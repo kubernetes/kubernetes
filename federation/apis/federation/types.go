@@ -153,3 +153,16 @@ type ClusterReplicaSetPreferences struct {
 	// A number expressing the preference to put an additional replica to this LocalReplicaSet. 0 by default.
 	Weight int64
 }
+
+// Annotations for a federated service to keep record of service load balancer ingress endpoints
+// Endpoints are Stored in hierarchy of maps in this order (Region/Zone/Cluster)
+type FederatedServiceIngress struct {
+	// Endpoints of a federated service
+	// +optional
+	Endpoints map[string]map[string]map[string]*ClusterServiceIngress
+}
+
+type ClusterServiceIngress struct {
+	Endpoints []string
+	Healthy   bool
+}
