@@ -302,6 +302,7 @@ func ListResource(r rest.Lister, rw rest.Watcher, scope RequestScope, forceWatch
 		}
 
 		if (opts.Watch || forceWatch) && rw != nil {
+			glog.Infof("Started to log from %v for %v", ctx, req.Request.URL.RequestURI())
 			watcher, err := rw.Watch(ctx, &opts)
 			if err != nil {
 				scope.err(err, res.ResponseWriter, req.Request)
