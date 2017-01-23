@@ -410,7 +410,7 @@ func StartControllers(controllers map[string]InitFunc, s *options.CMServer, root
 		cloud, clientBuilder.ClientOrDie("node-controller"),
 		s.PodEvictionTimeout.Duration, s.NodeEvictionRate, s.SecondaryNodeEvictionRate, s.LargeClusterSizeThreshold, s.UnhealthyZoneThreshold, s.NodeMonitorGracePeriod.Duration,
 		s.NodeStartupGracePeriod.Duration, s.NodeMonitorPeriod.Duration, clusterCIDR, serviceCIDR,
-		int(s.NodeCIDRMaskSize), s.AllocateNodeCIDRs)
+		int(s.NodeCIDRMaskSize), s.AllocateNodeCIDRs, s.EnableTaintManager)
 	if err != nil {
 		return fmt.Errorf("failed to initialize nodecontroller: %v", err)
 	}

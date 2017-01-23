@@ -71,7 +71,7 @@ func NewNodeControllerFromClient(
 
 	nc, err := NewNodeController(factory.Pods(), factory.Nodes(), factory.DaemonSets(), cloud, kubeClient, podEvictionTimeout, evictionLimiterQPS, secondaryEvictionLimiterQPS,
 		largeClusterThreshold, unhealthyZoneThreshold, nodeMonitorGracePeriod, nodeStartupGracePeriod, nodeMonitorPeriod, clusterCIDR,
-		serviceCIDR, nodeCIDRMaskSize, allocateNodeCIDRs)
+		serviceCIDR, nodeCIDRMaskSize, allocateNodeCIDRs, false)
 	if err != nil {
 		return nil, err
 	}
