@@ -170,6 +170,7 @@ enable-garbage-collector
 enable-hostpath-provisioner
 enable-server
 enable-swagger-ui
+enable-taint-manager
 etcd-address
 etcd-cafile
 etcd-certfile
