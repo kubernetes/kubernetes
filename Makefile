@@ -512,5 +512,5 @@ bazel-release:
 	@echo "$$BAZEL_BUILD_HELP_INFO"
 else
 bazel-release:
-	bazel build //build/release-tars
+	bazel build --stamp //build/release-tars
 endif
