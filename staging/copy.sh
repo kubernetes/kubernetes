@@ -69,16 +69,18 @@ function save() {
 }
 
 # save everything for which the staging directory is the source of truth
-save "transport"
-save "tools/metrics"
-save "tools/clientcmd/api"
 save "rest"
 # remove the rest/fake until we're authoritative for it (need to update for registry)
 rm -rf ${CLIENT_REPO_TEMP}/rest/fake
+save "tools/auth"
+save "tools/clientcmd"
+save "tools/metrics"
+save "transport"
 save "pkg/third_party"
 save "pkg/util/cert"
 save "pkg/util/clock"
 save "pkg/util/flowcontrol"
+save "pkg/util/homedir"
 save "pkg/util/integer"
 save "pkg/util/jsonpath"
 save "pkg/util/testing"
@@ -104,8 +106,6 @@ mkcp "/pkg/client/testing" "/pkg/client"
 rm "${CLIENT_REPO_TEMP}"/pkg/client/testing/core/fake_test.go
 mkcp "/pkg/client/typed" "/pkg/client"
 
-mkcp "/pkg/client/unversioned/auth" "/pkg/client/unversioned"
-mkcp "/pkg/client/unversioned/clientcmd" "/pkg/client/unversioned"
 mkcp "/pkg/client/unversioned/portforward" "/pkg/client/unversioned"
 
 mkcp "/pkg/util/workqueue" "pkg/util"
@@ -198,8 +198,6 @@ mvfolder pkg/client/typed/dynamic dynamic
 mvfolder pkg/client/record tools/record
 mvfolder pkg/client/restclient/fake rest/fake
 mvfolder pkg/client/cache tools/cache
-mvfolder pkg/client/unversioned/auth tools/auth
-mvfolder pkg/client/unversioned/clientcmd tools/clientcmd
 mvfolder pkg/client/unversioned/portforward tools/portforward
 mvfolder pkg/client/testing/core testing
 mvfolder pkg/client/testing/cache tools/cache/testing

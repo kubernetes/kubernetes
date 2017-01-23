@@ -22,8 +22,8 @@ go_library(
         "//cmd/kubeadm/app/discovery/token:go_default_library",
         "//cmd/kubeadm/app/node:go_default_library",
         "//cmd/kubeadm/app/util:go_default_library",
-        "//pkg/client/unversioned/clientcmd:go_default_library",
         "//vendor:github.com/spf13/pflag",
+        "//vendor:k8s.io/client-go/tools/clientcmd",
         "//vendor:k8s.io/client-go/tools/clientcmd/api",
     ],
 )

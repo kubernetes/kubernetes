@@ -22,7 +22,6 @@ go_library(
         "//cmd/kubeadm/app/util:go_default_library",
         "//pkg/apis/certificates:go_default_library",
         "//pkg/client/clientset_generated/clientset:go_default_library",
-        "//pkg/client/unversioned/clientcmd:go_default_library",
         "//pkg/kubelet/util/csr:go_default_library",
         "//vendor:github.com/square/go-jose",
         "//vendor:k8s.io/apimachinery/pkg/api/errors",
@@ -30,6 +29,7 @@ go_library(
         "//vendor:k8s.io/apimachinery/pkg/types",
         "//vendor:k8s.io/apimachinery/pkg/util/wait",
         "//vendor:k8s.io/client-go/pkg/util/cert",
+        "//vendor:k8s.io/client-go/tools/clientcmd",
         "//vendor:k8s.io/client-go/tools/clientcmd/api",
     ],
 )
