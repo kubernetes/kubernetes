@@ -246,27 +246,29 @@ kube::test::if_supports_resource() {
   done
   return 1
 }
-kube::test::version::parse_to_file() {
+
+
+kube::test::version::object_to_file() {
   name=$1
   flags=$2
   file_name=$3
   kubectl version $flags | grep "$name Version:" | sed -e s/"$name Version: version.Info{"/'/' -e s/'}'/'/' -e s/', '/','/g -e s/':'/'=/g' -e s/'"'/""/g | tr , '\n' > ${file_name}.sh
 }
 
-kube::test::version::parse_full_json_to_file() {
+kube::test::version::json_object_to_file() {
   flags=$1
   file_name=$2
   kubectl version $flags --output json | sed -e s/'\"'/''/g -e s/'}'/''/g -e s/'{'/''/g -e s/'clientVersion:'/'clientVersion:,'/ -e s/'serverVersion:'/'serverVersion:,'/ | tr , '\n' > ${file_name}.sh
 }
 
-kube::test::version::parse_partial_json_to_file() {
+kube::test::version::json_client_server_object_to_file() {
   flags=$1
   name=$2
   file_name=$3
   kubectl version $flags --output json | jq -r ".${name}" | sed -e s/'\"'/''/g -e s/'}'/''/g -e s/'{'/''/g -e /^$/d -e s/','/''/g  -e s/':'/'='/g > ${file_name}.sh
 }
 
-kube::test::version::parse_yaml_to_file() {
+kube::test::version::yaml_object_to_file() {
   flags=$1
   file_name=$2
   kubectl version $flags --output yaml | sed -e s/' '/''/g -e s/'\"'/''/g -e /^$/d > ${file_name}.sh
@@ -276,19 +278,19 @@ kube::test::version::diff_assert() {
   local original=$1
   local comparator=${2:-"eq"}
   local latest=$3
-  local success_msg=${4:-""}
+  local diff_msg=${4:-""}
 
   res=$(diff -iwB <(sort ${original}) <(sort ${latest}))
   
   if [ "$comparator" == "eq" ] ; then
     if [ "$res" == "" ] ; then
         echo -n ${green}
-        echo "Successful: ${success_msg}"
+        echo "Successful: ${diff_msg}"
         echo -n ${reset}
         return 0
     else
         echo ${bold}${red}
-        echo "FAIL!: ${success_msg}"
+        echo "FAIL!: ${diff_msg}"
         echo "  Expected: "
         echo "$(cat ${original})"
         echo "  Got: "
@@ -301,12 +303,12 @@ kube::test::version::diff_assert() {
   else
     if [ ! "$res" == "" ] ; then
         echo -n ${green}
-        echo "Successful: ${success_msg}"
+        echo "Successful: ${diff_msg}"
         echo -n ${reset}
         return 0
     else
         echo ${bold}${red}
-        echo "FAIL!: ${success_msg}"
+        echo "FAIL!: ${diff_msg}"
         echo "  Expected: "
         echo "$(cat ${original})"
         echo "  Got: "

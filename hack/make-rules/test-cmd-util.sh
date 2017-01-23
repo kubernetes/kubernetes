@@ -229,36 +229,36 @@ run_kubectl_version_tests() {
 
   # create version files, one for the client, one for the server.
   # these are the files we will use to ensure that the remainder output is correct
-  kube::test::version::parse_to_file "Client" "" "client_version_test"
-  kube::test::version::parse_to_file "Server" "" "server_version_test"
+  kube::test::version::object_to_file "Client" "" "client_version_test"
+  kube::test::version::object_to_file "Server" "" "server_version_test"
 
   # check client only output matches expected output
-  kube::test::version::parse_to_file "Client" "--client" "client_only_version_test"
-  kube::test::version::parse_to_file "Server" "--client" "server_client_only_version_test"
+  kube::test::version::object_to_file "Client" "--client" "client_only_version_test"
+  kube::test::version::object_to_file "Server" "--client" "server_client_only_version_test"
   kube::test::version::diff_assert "client_version_test.sh" "eq" "client_only_version_test.sh" "--client shows client info"
   kube::test::version::diff_assert "server_version_test.sh" "!eq" "server_client_only_version_test.sh" "--client has no server version info"
   
   # verify json output
-  kube::test::version::parse_partial_json_to_file "" "clientVersion" "client_json_version_test"
-  kube::test::version::parse_partial_json_to_file "" "serverVersion" "server_json_version_test"
+  kube::test::version::json_client_server_object_to_file "" "clientVersion" "client_json_version_test"
+  kube::test::version::json_client_server_object_to_file "" "serverVersion" "server_json_version_test"
   kube::test::version::diff_assert "client_version_test.sh" "eq" "client_json_version_test.sh" "--output json has correct client info"
   kube::test::version::diff_assert "server_version_test.sh" "eq" "server_json_version_test.sh" "--output json has correct server info"
 
   # verify json output using additional --client flag does not contain serverVersion
-  kube::test::version::parse_partial_json_to_file "--client" "clientVersion" "client_only_json_version_test"
-  kube::test::version::parse_partial_json_to_file "--client" "serverVersion" "server_client_only_json_version_test"
+  kube::test::version::json_client_server_object_to_file "--client" "clientVersion" "client_only_json_version_test"
+  kube::test::version::json_client_server_object_to_file "--client" "serverVersion" "server_client_only_json_version_test"
   kube::test::version::diff_assert "client_version_test.sh" "eq" "client_only_json_version_test.sh" "--client --output json has correct client info"
   kube::test::version::diff_assert "server_version_test.sh" "!eq" "server_client_only_json_version_test.sh" "--client --output json has no server info"
   
   # compare json output using additional --short flag
-  kube::test::version::parse_partial_json_to_file "--short" "clientVersion" "client_short_json_version_test"
-  kube::test::version::parse_partial_json_to_file "--short" "serverVersion" "server_short_json_version_test"
+  kube::test::version::json_client_server_object_to_file "--short" "clientVersion" "client_short_json_version_test"
+  kube::test::version::json_client_server_object_to_file "--short" "serverVersion" "server_short_json_version_test"
   kube::test::version::diff_assert "client_version_test.sh" "eq" "client_short_json_version_test.sh" "--short --output client json info is equal to non short result"
   kube::test::version::diff_assert "server_version_test.sh" "eq" "server_short_json_version_test.sh" "--short --output server json info is equal to non short result"
 
   # compare json output with yaml output
-  kube::test::version::parse_full_json_to_file "" "client_server_json_version_test"
-  kube::test::version::parse_yaml_to_file "" "client_server_yaml_version_test"
+  kube::test::version::json_object_to_file "" "client_server_json_version_test"
+  kube::test::version::yaml_object_to_file "" "client_server_yaml_version_test"
   kube::test::version::diff_assert "client_server_json_version_test.sh" "eq" "client_server_yaml_version_test.sh" "--output json/yaml has identical information"
 
   # clean files.
@@ -2509,7 +2509,6 @@ runTests() {
     fi
   fi
 
-
   #########################
   # Kubectl version #
   #########################
@@ -3197,6 +3196,3 @@ __EOF__
 
   kube::test::clear_all
 }
-
-
-
