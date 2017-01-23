@@ -168,12 +168,6 @@ func NewInit(cfgPath string, cfg *kubeadmapi.MasterConfiguration, skipPreFlight 
 	// Try to start the kubelet service in case it's inactive
 	preflight.TryStartKubelet()
 
-	// Warn about the limitations with the current cloudprovider solution.
-	if cfg.CloudProvider != "" {
-		fmt.Println("WARNING: For cloudprovider integrations to work --cloud-provider must be set for all kubelets in the cluster.")
-		fmt.Println("\t(/etc/systemd/system/kubelet.service.d/10-kubeadm.conf should be edited for this purpose)")
-	}
-
 	return &Init{cfg: cfg, selfHosted: selfHosted}, nil
 }
 

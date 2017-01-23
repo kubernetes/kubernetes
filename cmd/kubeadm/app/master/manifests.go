@@ -322,6 +322,8 @@ func getAPIServerCommand(cfg *kubeadmapi.MasterConfiguration, selfHosted bool) [
 		"--client-ca-file="+getCertFilePath(kubeadmconstants.CACertName),
 		"--tls-cert-file="+getCertFilePath(kubeadmconstants.APIServerCertName),
 		"--tls-private-key-file="+getCertFilePath(kubeadmconstants.APIServerKeyName),
+		"--kubelet-client-certificate="+getCertFilePath(kubeadmconstants.APIServerCertName),
+		"--kubelet-client-key="+getCertFilePath(kubeadmconstants.APIServerKeyName),
 		"--token-auth-file="+kubeadmapi.GlobalEnvParams.HostPKIPath+"/tokens.csv",
 		fmt.Sprintf("--secure-port=%d", cfg.API.Port),
 		"--allow-privileged",
