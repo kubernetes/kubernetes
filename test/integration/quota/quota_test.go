@@ -36,9 +36,9 @@ import (
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
+	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated"
 	"k8s.io/kubernetes/pkg/client/record"
 	"k8s.io/kubernetes/pkg/controller"
-	"k8s.io/kubernetes/pkg/controller/informers"
 	replicationcontroller "k8s.io/kubernetes/pkg/controller/replication"
 	resourcequotacontroller "k8s.io/kubernetes/pkg/controller/resourcequota"
 	kubeadmission "k8s.io/kubernetes/pkg/kubeapiserver/admission"
@@ -84,12 +84,11 @@ func TestQuota(t *testing.T) {
 	controllerCh := make(chan struct{})
 	defer close(controllerCh)
 
-	informers := informers.NewSharedInformerFactory(clientset, nil, controller.NoResyncPeriodFunc())
-	podInformer := informers.Pods().Informer()
-	rcInformer := informers.ReplicationControllers().Informer()
+	informers := informers.NewSharedInformerFactory(nil, clientset, controller.NoResyncPeriodFunc())
+	podInformer := informers.Core().V1().Pods()
+	rcInformer := informers.Core().V1().ReplicationControllers()
 	rm := replicationcontroller.NewReplicationManager(podInformer, rcInformer, clientset, replicationcontroller.BurstReplicas, 4096, false)
 	rm.SetEventRecorder(&record.FakeRecorder{})
-	informers.Start(controllerCh)
 	go rm.Run(3, controllerCh)
 
 	resourceQuotaRegistry := quotainstall.NewRegistry(clientset, nil)
@@ -98,13 +97,15 @@ func TestQuota(t *testing.T) {
 	}
 	resourceQuotaControllerOptions := &resourcequotacontroller.ResourceQuotaControllerOptions{
 		KubeClient:                clientset,
+		ResourceQuotaInformer:     informers.Core().V1().ResourceQuotas(),
 		ResyncPeriod:              controller.NoResyncPeriodFunc,
 		Registry:                  resourceQuotaRegistry,
 		GroupKindsToReplenish:     groupKindsToReplenish,
 		ReplenishmentResyncPeriod: controller.NoResyncPeriodFunc,
-		ControllerFactory:         resourcequotacontroller.NewReplenishmentControllerFactoryFromClient(clientset),
+		ControllerFactory:         resourcequotacontroller.NewReplenishmentControllerFactory(informers, clientset),
 	}
 	go resourcequotacontroller.NewResourceQuotaController(resourceQuotaControllerOptions).Run(2, controllerCh)
+	informers.Start(controllerCh)
 
 	startTime := time.Now()
 	scale(t, ns2.Name, clientset)

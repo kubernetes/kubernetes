@@ -33,7 +33,9 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset/fake"
+	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated"
 	"k8s.io/kubernetes/pkg/client/testing/core"
+	"k8s.io/kubernetes/pkg/controller"
 )
 
 type testGenerator struct {
@@ -567,25 +569,36 @@ func TestTokenCreation(t *testing.T) {
 			client.Fake.PrependReactor(reactor.verb, reactor.resource, reactor.reactor(t))
 		}
 
-		controller := NewTokensController(client, TokensControllerOptions{TokenGenerator: generator, RootCA: []byte("CA Data"), MaxRetries: tc.MaxRetries})
+		informerFactory := informers.NewSharedInformerFactory(nil, client, controller.NoResyncPeriodFunc())
+		controller := NewTokensController(
+			TokensControllerOptions{
+				Client:                 client,
+				ServiceAccountInformer: informerFactory.Core().V1().ServiceAccounts(),
+				TokenGenerator:         generator,
+				RootCA:                 []byte("CA Data"),
+				MaxRetries:             tc.MaxRetries,
+			},
+		)
+		controller.serviceAccountsSynced = alwaysReady
+		serviceAccounts := informerFactory.Core().V1().ServiceAccounts().Informer().GetStore()
 
 		if tc.ExistingServiceAccount != nil {
-			controller.serviceAccounts.Add(tc.ExistingServiceAccount)
+			serviceAccounts.Add(tc.ExistingServiceAccount)
 		}
 		for _, s := range tc.ExistingSecrets {
 			controller.secrets.Add(s)
 		}
 
 		if tc.AddedServiceAccount != nil {
-			controller.serviceAccounts.Add(tc.AddedServiceAccount)
+			serviceAccounts.Add(tc.AddedServiceAccount)
 			controller.queueServiceAccountSync(tc.AddedServiceAccount)
 		}
 		if tc.UpdatedServiceAccount != nil {
-			controller.serviceAccounts.Add(tc.UpdatedServiceAccount)
+			serviceAccounts.Add(tc.UpdatedServiceAccount)
 			controller.queueServiceAccountUpdateSync(nil, tc.UpdatedServiceAccount)
 		}
 		if tc.DeletedServiceAccount != nil {
-			controller.serviceAccounts.Delete(tc.DeletedServiceAccount)
+			serviceAccounts.Delete(tc.DeletedServiceAccount)
 			controller.queueServiceAccountSync(tc.DeletedServiceAccount)
 		}
 		if tc.AddedSecret != nil {

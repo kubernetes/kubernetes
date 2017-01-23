@@ -25,13 +25,33 @@ import (
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset/fake"
+	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated"
 	fakecloud "k8s.io/kubernetes/pkg/cloudprovider/providers/fake"
+	"k8s.io/kubernetes/pkg/controller"
 )
 
 const region = "us-central"
 
 func newService(name string, uid types.UID, serviceType v1.ServiceType) *v1.Service {
 	return &v1.Service{ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: "namespace", UID: uid, SelfLink: testapi.Default.SelfLink("services", name)}, Spec: v1.ServiceSpec{Type: serviceType}}
+}
+
+func newController() (*ServiceController, *fakecloud.FakeCloud, *fake.Clientset) {
+	cloud := &fakecloud.FakeCloud{}
+	cloud.Region = region
+
+	client := fake.NewSimpleClientset()
+
+	informerFactory := informers.NewSharedInformerFactory(nil, client, controller.NoResyncPeriodFunc())
+	serviceInformer := informerFactory.Core().V1().Services()
+	nodeInformer := informerFactory.Core().V1().Nodes()
+
+	controller, _ := New(cloud, client, serviceInformer, nodeInformer, "test-cluster")
+	controller.init()
+	cloud.Calls = nil     // ignore any cloud calls made in init()
+	client.ClearActions() // ignore any client calls made in init()
+
+	return controller, cloud, client
 }
 
 func TestCreateExternalLoadBalancer(t *testing.T) {
@@ -92,13 +112,7 @@ func TestCreateExternalLoadBalancer(t *testing.T) {
 	}
 
 	for _, item := range table {
-		cloud := &fakecloud.FakeCloud{}
-		cloud.Region = region
-		client := &fake.Clientset{}
-		controller, _ := New(cloud, client, "test-cluster")
-		controller.init()
-		cloud.Calls = nil     // ignore any cloud calls made in init()
-		client.ClearActions() // ignore any client calls made in init()
+		controller, cloud, client := newController()
 		err, _ := controller.createLoadBalancerIfNeeded("foo/bar", item.service)
 		if !item.expectErr && err != nil {
 			t.Errorf("unexpected error: %v", err)
@@ -215,13 +229,7 @@ func TestUpdateNodesInExternalLoadBalancer(t *testing.T) {
 		},
 	}
 	for _, item := range table {
-		cloud := &fakecloud.FakeCloud{}
-
-		cloud.Region = region
-		client := &fake.Clientset{}
-		controller, _ := New(cloud, client, "test-cluster2")
-		controller.init()
-		cloud.Calls = nil // ignore any cloud calls made in init()
+		controller, cloud, _ := newController()
 
 		var services []*v1.Service
 		for _, service := range item.services {

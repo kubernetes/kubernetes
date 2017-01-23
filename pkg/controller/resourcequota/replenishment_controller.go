@@ -25,13 +25,12 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
-	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/cache"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
+	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated"
 	"k8s.io/kubernetes/pkg/controller"
-	"k8s.io/kubernetes/pkg/controller/informers"
 	"k8s.io/kubernetes/pkg/quota/evaluator/core"
 	"k8s.io/kubernetes/pkg/util/metrics"
 )
@@ -108,19 +107,13 @@ func NewReplenishmentControllerFactory(f informers.SharedInformerFactory, kubeCl
 	}
 }
 
-// NewReplenishmentControllerFactoryFromClient returns a factory that knows how to build controllers to replenish resources
-// when updated or deleted using the specified client.
-func NewReplenishmentControllerFactoryFromClient(kubeClient clientset.Interface) ReplenishmentControllerFactory {
-	return NewReplenishmentControllerFactory(nil, kubeClient)
-}
-
 // controllerFor returns a replenishment controller for the specified group resource.
 func controllerFor(
-	groupResource schema.GroupResource,
+	resource schema.GroupVersionResource,
 	f informers.SharedInformerFactory,
 	handlerFuncs cache.ResourceEventHandlerFuncs,
 ) (cache.Controller, error) {
-	genericInformer, err := f.ForResource(groupResource)
+	genericInformer, err := f.ForResource(resource)
 	if err != nil {
 		return nil, err
 	}
@@ -136,106 +129,31 @@ func (r *replenishmentControllerFactory) NewController(options *ReplenishmentCon
 
 	switch options.GroupKind {
 	case api.Kind("Pod"):
-		if r.sharedInformerFactory != nil {
-			result, err = controllerFor(api.Resource("pods"), r.sharedInformerFactory, cache.ResourceEventHandlerFuncs{
-				UpdateFunc: PodReplenishmentUpdateFunc(options),
-				DeleteFunc: ObjectReplenishmentDeleteFunc(options),
-			})
-			break
-		}
-		result = informers.NewPodInformer(r.kubeClient, options.ResyncPeriod())
+		result, err = controllerFor(v1.SchemeGroupVersion.WithResource("pods"), r.sharedInformerFactory, cache.ResourceEventHandlerFuncs{
+			UpdateFunc: PodReplenishmentUpdateFunc(options),
+			DeleteFunc: ObjectReplenishmentDeleteFunc(options),
+		})
 	case api.Kind("Service"):
-		// TODO move to informer when defined
-		_, result = cache.NewInformer(
-			&cache.ListWatch{
-				ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
-					return r.kubeClient.Core().Services(v1.NamespaceAll).List(options)
-				},
-				WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
-					return r.kubeClient.Core().Services(v1.NamespaceAll).Watch(options)
-				},
-			},
-			&v1.Service{},
-			options.ResyncPeriod(),
-			cache.ResourceEventHandlerFuncs{
-				UpdateFunc: ServiceReplenishmentUpdateFunc(options),
-				DeleteFunc: ObjectReplenishmentDeleteFunc(options),
-			},
-		)
+		result, err = controllerFor(v1.SchemeGroupVersion.WithResource("services"), r.sharedInformerFactory, cache.ResourceEventHandlerFuncs{
+			UpdateFunc: ServiceReplenishmentUpdateFunc(options),
+			DeleteFunc: ObjectReplenishmentDeleteFunc(options),
+		})
 	case api.Kind("ReplicationController"):
-		// TODO move to informer when defined
-		_, result = cache.NewInformer(
-			&cache.ListWatch{
-				ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
-					return r.kubeClient.Core().ReplicationControllers(v1.NamespaceAll).List(options)
-				},
-				WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
-					return r.kubeClient.Core().ReplicationControllers(v1.NamespaceAll).Watch(options)
-				},
-			},
-			&v1.ReplicationController{},
-			options.ResyncPeriod(),
-			cache.ResourceEventHandlerFuncs{
-				DeleteFunc: ObjectReplenishmentDeleteFunc(options),
-			},
-		)
+		result, err = controllerFor(v1.SchemeGroupVersion.WithResource("replicationcontrollers"), r.sharedInformerFactory, cache.ResourceEventHandlerFuncs{
+			DeleteFunc: ObjectReplenishmentDeleteFunc(options),
+		})
 	case api.Kind("PersistentVolumeClaim"):
-		if r.sharedInformerFactory != nil {
-			result, err = controllerFor(api.Resource("persistentvolumeclaims"), r.sharedInformerFactory, cache.ResourceEventHandlerFuncs{
-				DeleteFunc: ObjectReplenishmentDeleteFunc(options),
-			})
-			break
-		}
-		// TODO (derekwaynecarr) remove me when we can require a sharedInformerFactory in all code paths...
-		_, result = cache.NewInformer(
-			&cache.ListWatch{
-				ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
-					return r.kubeClient.Core().PersistentVolumeClaims(v1.NamespaceAll).List(options)
-				},
-				WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
-					return r.kubeClient.Core().PersistentVolumeClaims(v1.NamespaceAll).Watch(options)
-				},
-			},
-			&v1.PersistentVolumeClaim{},
-			options.ResyncPeriod(),
-			cache.ResourceEventHandlerFuncs{
-				DeleteFunc: ObjectReplenishmentDeleteFunc(options),
-			},
-		)
+		result, err = controllerFor(v1.SchemeGroupVersion.WithResource("persistentvolumeclaims"), r.sharedInformerFactory, cache.ResourceEventHandlerFuncs{
+			DeleteFunc: ObjectReplenishmentDeleteFunc(options),
+		})
 	case api.Kind("Secret"):
-		// TODO move to informer when defined
-		_, result = cache.NewInformer(
-			&cache.ListWatch{
-				ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
-					return r.kubeClient.Core().Secrets(v1.NamespaceAll).List(options)
-				},
-				WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
-					return r.kubeClient.Core().Secrets(v1.NamespaceAll).Watch(options)
-				},
-			},
-			&v1.Secret{},
-			options.ResyncPeriod(),
-			cache.ResourceEventHandlerFuncs{
-				DeleteFunc: ObjectReplenishmentDeleteFunc(options),
-			},
-		)
+		result, err = controllerFor(v1.SchemeGroupVersion.WithResource("secrets"), r.sharedInformerFactory, cache.ResourceEventHandlerFuncs{
+			DeleteFunc: ObjectReplenishmentDeleteFunc(options),
+		})
 	case api.Kind("ConfigMap"):
-		// TODO move to informer when defined
-		_, result = cache.NewInformer(
-			&cache.ListWatch{
-				ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
-					return r.kubeClient.Core().ConfigMaps(v1.NamespaceAll).List(options)
-				},
-				WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
-					return r.kubeClient.Core().ConfigMaps(v1.NamespaceAll).Watch(options)
-				},
-			},
-			&v1.ConfigMap{},
-			options.ResyncPeriod(),
-			cache.ResourceEventHandlerFuncs{
-				DeleteFunc: ObjectReplenishmentDeleteFunc(options),
-			},
-		)
+		result, err = controllerFor(v1.SchemeGroupVersion.WithResource("configmaps"), r.sharedInformerFactory, cache.ResourceEventHandlerFuncs{
+			DeleteFunc: ObjectReplenishmentDeleteFunc(options),
+		})
 	default:
 		return nil, NewUnhandledGroupKindError(options.GroupKind)
 	}

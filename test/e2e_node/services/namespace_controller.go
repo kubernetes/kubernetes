@@ -23,6 +23,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
+	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated"
 	"k8s.io/kubernetes/pkg/client/typed/dynamic"
 	namespacecontroller "k8s.io/kubernetes/pkg/controller/namespace"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -56,8 +57,10 @@ func (n *NamespaceController) Start() error {
 		return err
 	}
 	clientPool := dynamic.NewClientPool(config, api.Registry.RESTMapper(), dynamic.LegacyAPIPathResolverFunc)
+	informerFactory := informers.NewSharedInformerFactory(nil, client, ncResyncPeriod)
 	discoverResourcesFn := client.Discovery().ServerPreferredNamespacedResources
-	nc := namespacecontroller.NewNamespaceController(client, clientPool, discoverResourcesFn, ncResyncPeriod, v1.FinalizerKubernetes)
+	nc := namespacecontroller.NewNamespaceController(client, clientPool, informerFactory.Core().V1().Namespaces(), discoverResourcesFn, v1.FinalizerKubernetes)
+	informerFactory.Start(n.stopCh)
 	go nc.Run(ncConcurrency, n.stopCh)
 	return nil
 }

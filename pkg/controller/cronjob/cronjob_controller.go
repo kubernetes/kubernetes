@@ -80,11 +80,6 @@ func NewCronJobController(kubeClient clientset.Interface) *CronJobController {
 	return jm
 }
 
-func NewCronJobControllerFromClient(kubeClient clientset.Interface) *CronJobController {
-	jm := NewCronJobController(kubeClient)
-	return jm
-}
-
 // Run the main goroutine responsible for watching and syncing jobs.
 func (jm *CronJobController) Run(stopCh <-chan struct{}) {
 	defer utilruntime.HandleCrash()

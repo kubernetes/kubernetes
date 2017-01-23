@@ -29,9 +29,9 @@ import (
 	"k8s.io/apimachinery/pkg/util/yaml"
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/client/cache"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
-	"k8s.io/kubernetes/pkg/controller/informers"
+	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated"
+	corelisters "k8s.io/kubernetes/pkg/client/listers/core/internalversion"
 	kubeapiserveradmission "k8s.io/kubernetes/pkg/kubeapiserver/admission"
 )
 
@@ -51,8 +51,8 @@ func init() {
 // podNodeSelector is an implementation of admission.Interface.
 type podNodeSelector struct {
 	*admission.Handler
-	client            internalclientset.Interface
-	namespaceInformer cache.SharedIndexInformer
+	client          internalclientset.Interface
+	namespaceLister corelisters.NamespaceLister
 	// global default node selector and namespace whitelists in a cluster.
 	clusterNodeSelectors map[string]string
 }
@@ -114,23 +114,17 @@ func (p *podNodeSelector) Admit(a admission.Attributes) error {
 	nsName := a.GetNamespace()
 	var namespace *api.Namespace
 
-	namespaceObj, exists, err := p.namespaceInformer.GetStore().Get(&api.Namespace{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      nsName,
-			Namespace: "",
-		},
-	})
+	namespace, err := p.namespaceLister.Get(nsName)
 	if err != nil {
-		return errors.NewInternalError(err)
-	}
-	if exists {
-		namespace = namespaceObj.(*api.Namespace)
-	} else {
-		namespace, err = p.defaultGetNamespace(nsName)
-		if err != nil {
-			if errors.IsNotFound(err) {
-				return err
+		if errors.IsNotFound(err) {
+			namespace, err = p.defaultGetNamespace(nsName)
+			if err != nil {
+				if errors.IsNotFound(err) {
+					return err
+				}
+				return errors.NewInternalError(err)
 			}
+		} else {
 			return errors.NewInternalError(err)
 		}
 	}
@@ -173,13 +167,14 @@ func (a *podNodeSelector) SetInternalClientSet(client internalclientset.Interfac
 }
 
 func (p *podNodeSelector) SetInformerFactory(f informers.SharedInformerFactory) {
-	p.namespaceInformer = f.InternalNamespaces().Informer()
-	p.SetReadyFunc(p.namespaceInformer.HasSynced)
+	namespaceInformer := f.Core().InternalVersion().Namespaces()
+	p.namespaceLister = namespaceInformer.Lister()
+	p.SetReadyFunc(namespaceInformer.Informer().HasSynced)
 }
 
 func (p *podNodeSelector) Validate() error {
-	if p.namespaceInformer == nil {
-		return fmt.Errorf("missing namespaceInformer")
+	if p.namespaceLister == nil {
+		return fmt.Errorf("missing namespaceLister")
 	}
 	if p.client == nil {
 		return fmt.Errorf("missing client")

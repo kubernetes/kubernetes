@@ -32,7 +32,7 @@ import (
 
 // overlappingStatefulSets sorts a list of StatefulSets by creation timestamp, using their names as a tie breaker.
 // Generally used to tie break between StatefulSets that have overlapping selectors.
-type overlappingStatefulSets []apps.StatefulSet
+type overlappingStatefulSets []*apps.StatefulSet
 
 func (o overlappingStatefulSets) Len() int      { return len(o) }
 func (o overlappingStatefulSets) Swap(i, j int) { o[i], o[j] = o[j], o[i] }
@@ -45,12 +45,12 @@ func (o overlappingStatefulSets) Less(i, j int) bool {
 }
 
 // updatePetCount attempts to update the Status.Replicas of the given StatefulSet, with a single GET/PUT retry.
-func updatePetCount(psClient appsclientset.StatefulSetsGetter, ps apps.StatefulSet, numPets int) (updateErr error) {
+func updatePetCount(psClient appsclientset.StatefulSetsGetter, ps *apps.StatefulSet, numPets int) (updateErr error) {
 	if ps.Status.Replicas == int32(numPets) || psClient == nil {
 		return nil
 	}
 	var getErr error
-	for i, ps := 0, &ps; ; i++ {
+	for i, ps := 0, ps; ; i++ {
 		glog.V(4).Infof(fmt.Sprintf("Updating replica count for StatefulSet: %s/%s, ", ps.Namespace, ps.Name) +
 			fmt.Sprintf("replicas %d->%d (need %d), ", ps.Status.Replicas, numPets, *(ps.Spec.Replicas)))
 
