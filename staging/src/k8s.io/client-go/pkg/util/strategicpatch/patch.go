@@ -23,7 +23,7 @@ import (
 	"strings"
 
 	"k8s.io/apimachinery/pkg/util/json"
-	forkedjson "k8s.io/client-go/pkg/third_party/forked/golang/json"
+	forkedjson "k8s.io/client-go/third_party/forked/golang/json"
 
 	"github.com/davecgh/go-spew/spew"
 	"github.com/ghodss/yaml"
