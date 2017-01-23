@@ -727,7 +727,7 @@ func GetNewReplicaSetTemplateInternal(deployment *internalextensions.Deployment)
 	newRSTemplate.ObjectMeta.Labels = labelsutil.CloneAndAddLabel(
 		deployment.Spec.Template.ObjectMeta.Labels,
 		internalextensions.DefaultDeploymentUniqueLabelKey,
-		fmt.Sprintf("%d", GetInternalPodTemplateSpecHash(newRSTemplate)))
+		fmt.Sprintf("%d", GetInternalPodTemplateSpecHashFnv(newRSTemplate)))
 	return newRSTemplate
 }
 

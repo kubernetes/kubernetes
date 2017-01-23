@@ -315,7 +315,7 @@ func (dc *DeploymentController) getNewReplicaSet(deployment *extensions.Deployme
 
 	// new ReplicaSet does not exist, create one.
 	namespace := deployment.Namespace
-	podTemplateSpecHash := fmt.Sprintf("%d", deploymentutil.GetPodTemplateSpecHash(deployment.Spec.Template))
+	podTemplateSpecHash := fmt.Sprintf("%d", deploymentutil.GetPodTemplateSpecHashFnv(deployment.Spec.Template))
 	newRSTemplate := deploymentutil.GetNewReplicaSetTemplate(deployment)
 	newRSTemplate.Labels = labelsutil.CloneAndAddLabel(deployment.Spec.Template.Labels, extensions.DefaultDeploymentUniqueLabelKey, podTemplateSpecHash)
 	// Add podTemplateHash label to selector.

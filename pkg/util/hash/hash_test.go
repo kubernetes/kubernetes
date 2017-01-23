@@ -18,7 +18,7 @@ package hash
 
 import (
 	"fmt"
-	"hash/adler32"
+	"hash/fnv"
 	"testing"
 
 	"github.com/davecgh/go-spew/spew"
@@ -63,7 +63,7 @@ func TestDeepHashObject(t *testing.T) {
 	}
 
 	for _, tc := range successCases {
-		hasher1 := adler32.New()
+		hasher1 := fnv.New32a()
 		DeepHashObject(hasher1, tc())
 		hash1 := hasher1.Sum32()
 		DeepHashObject(hasher1, tc())
@@ -72,7 +72,7 @@ func TestDeepHashObject(t *testing.T) {
 			t.Fatalf("hash of the same object (%q) produced different results: %d vs %d", toString(tc()), hash1, hash2)
 		}
 		for i := 0; i < 100; i++ {
-			hasher2 := adler32.New()
+			hasher2 := fnv.New32a()
 
 			DeepHashObject(hasher1, tc())
 			hash1a := hasher1.Sum32()
@@ -118,9 +118,9 @@ func TestDeepObjectPointer(t *testing.T) {
 
 	// Run it more than once to verify determinism of hasher.
 	for i := 0; i < 100; i++ {
-		hasher1 := adler32.New()
-		hasher2 := adler32.New()
-		hasher3 := adler32.New()
+		hasher1 := fnv.New32a()
+		hasher2 := fnv.New32a()
+		hasher3 := fnv.New32a()
 		// Act
 		DeepHashObject(hasher1, myUni1)
 		hash1 := hasher1.Sum32()
