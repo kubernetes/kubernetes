@@ -3487,6 +3487,22 @@ func TestValidatePod(t *testing.T) {
 			},
 			Spec: validPodSpec(nil),
 		},
+		{ // negative tolerationSeconds is OK for toleration.
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "pod-forgiveness-invalid",
+				Namespace: "ns",
+				Annotations: map[string]string{
+					api.TolerationsAnnotationKey: `
+					[{
+						"key": "node.alpha.kubernetes.io/notReady",
+						"operator": "Exists",
+						"effect": "NoExecute",
+						"tolerationSeconds": -2
+					}]`,
+				},
+			},
+			Spec: validPodSpec(nil),
+		},
 		{ // docker default seccomp profile
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "123",
@@ -3973,22 +3989,6 @@ func TestValidatePod(t *testing.T) {
 						"operator": "Exists",
 						"effect": "NoSchedule",
 						"tolerationSeconds": 20
-					}]`,
-				},
-			},
-			Spec: validPodSpec(nil),
-		},
-		"tolerationSeconds must be greater than zero when set": {
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "pod-forgiveness-invalid",
-				Namespace: "ns",
-				Annotations: map[string]string{
-					api.TolerationsAnnotationKey: `
-					[{
-						"key": "node.alpha.kubernetes.io/notReady",
-						"operator": "Exists",
-						"effect": "NoExecute",
-						"tolerationSeconds": 0
 					}]`,
 				},
 			},

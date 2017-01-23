@@ -1749,15 +1749,9 @@ func validateTolerations(tolerations []api.Toleration, fldPath *field.Path) fiel
 				"operator must be Exists when `key` is empty, which means \"match all values and all keys\""))
 		}
 
-		if toleration.TolerationSeconds != nil {
-			if *toleration.TolerationSeconds <= 0 {
-				allErrors = append(allErrors, field.Invalid(idxPath.Child("tolerationSeconds"), toleration.TolerationSeconds,
-					"tolerationSeconds must be greater than zero when set"))
-			}
-			if toleration.Effect != api.TaintEffectNoExecute {
-				allErrors = append(allErrors, field.Invalid(idxPath.Child("effect"), toleration.Effect,
-					"effect must be 'NoExecute' when `tolerationSeconds` is set"))
-			}
+		if toleration.TolerationSeconds != nil && toleration.Effect != api.TaintEffectNoExecute {
+			allErrors = append(allErrors, field.Invalid(idxPath.Child("effect"), toleration.Effect,
+				"effect must be 'NoExecute' when `tolerationSeconds` is set"))
 		}
 
 		// validate toleration operator and value
