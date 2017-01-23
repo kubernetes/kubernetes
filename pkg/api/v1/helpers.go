@@ -327,20 +327,28 @@ func GetNodeTaints(node *Node) ([]Taint, error) {
 }
 
 // ToleratesTaint checks if the toleration tolerates the taint.
+// The matching follows the rules below:
+// (1) Empty toleration.effect means to match all taint effects,
+//     otherwise taint effect must equal to toleration.effect.
+// (2) If toleration.operator is 'Exists', it means to match all taint values.
+// (3) Empty toleration.key means to match all taint keys.
+//     If toleration.key is empty, toleration.operator must be 'Exists';
+//     this combination means to match all taint values and all taint keys.
+// (4) Nil toleration.tolerationSeconds means to match taints with
+//     any value of taint.timeAdded.
+// (5) Non-nil positive toleration.tolerationSeconds means to
+//     match the taint for only a duration that starts at taint.timeAdded.
 func (t *Toleration) ToleratesTaint(taint *Taint) bool {
-	// empty toleration effect means match all taint effects
 	if len(t.Effect) > 0 && t.Effect != taint.Effect {
 		return false
 	}
 
-	// empty toleration key means match all taint keys
 	if len(t.Key) > 0 && t.Key != taint.Key {
 		return false
 	}
 
-	// nil TolerationSeconds means tolerate the taint forever
 	if t.TolerationSeconds != nil {
-		// taint with no added time indicated can only be tolerated
+		// taint with no timeAdded indicated can only be tolerated
 		// by toleration with no tolerationSeconds.
 		if taint.TimeAdded.IsZero() {
 			return false
@@ -377,14 +385,14 @@ func TolerationsTolerateTaint(tolerations []Toleration, taint *Taint) bool {
 type taintsFilterFunc func(*Taint) bool
 
 // TolerationsTolerateTaintsWithFilter checks if given tolerations tolerates
-// all the interesting taints in given taint list.
-func TolerationsTolerateTaintsWithFilter(tolerations []Toleration, taints []Taint, isInterestingTaint taintsFilterFunc) bool {
+// all the taints that apply to the filter in given taint list.
+func TolerationsTolerateTaintsWithFilter(tolerations []Toleration, taints []Taint, applyFilter taintsFilterFunc) bool {
 	if len(taints) == 0 {
 		return true
 	}
 
 	for i := range taints {
-		if isInterestingTaint != nil && !isInterestingTaint(&taints[i]) {
+		if applyFilter != nil && !applyFilter(&taints[i]) {
 			continue
 		}
 
