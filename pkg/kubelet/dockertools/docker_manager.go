@@ -141,9 +141,6 @@ type DockerManager struct {
 	// wrapped image puller.
 	imagePuller images.ImageManager
 
-	// Root of the Docker runtime.
-	dockerRoot string
-
 	// cgroup driver used by Docker runtime.
 	cgroupDriver string
 
@@ -240,10 +237,6 @@ func NewDockerManager(
 	// Wrap the docker client with instrumentedDockerInterface
 	client = NewInstrumentedDockerInterface(client)
 
-	// Work out the location of the Docker runtime, defaulting to /var/lib/docker
-	// if there are any problems.
-	dockerRoot := "/var/lib/docker"
-
 	// cgroup driver is only detectable in docker 1.11+
 	// when the execution driver is not detectable, we provide the cgroupfs form.
 	// if your docker engine is configured to use the systemd cgroup driver, and you
@@ -254,11 +247,7 @@ func NewDockerManager(
 	dockerInfo, err := client.Info()
 	if err != nil {
 		glog.Errorf("Failed to execute Info() call to the Docker client: %v", err)
-		glog.Warningf("Using fallback default of /var/lib/docker for location of Docker runtime")
 	} else {
-		dockerRoot = dockerInfo.DockerRootDir
-		glog.Infof("Setting dockerRoot to %s", dockerRoot)
-
 		cgroupDriver = dockerInfo.CgroupDriver
 		glog.Infof("Setting cgroupDriver to %s", cgroupDriver)
 	}
@@ -271,7 +260,6 @@ func NewDockerManager(
 		machineInfo:            machineInfo,
 		podInfraContainerImage: podInfraContainerImage,
 		dockerPuller:           newDockerPuller(client),
-		dockerRoot:             dockerRoot,
 		cgroupDriver:           cgroupDriver,
 		containerLogsDir:       containerLogsDir,
 		networkPlugin:          networkPlugin,
