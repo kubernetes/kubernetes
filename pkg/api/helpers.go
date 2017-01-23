@@ -50,6 +50,23 @@ func (c *ConversionError) Error() string {
 	)
 }
 
+const (
+	// annotation key prefix used to identify non-convertible json paths.
+	NonConvertibleAnnotationPrefix = "non-convertible.kubernetes.io"
+)
+
+// NonConvertibleFields iterates over the provided map and filters out all but
+// any keys with the "non-convertible.kubernetes.io" prefix.
+func NonConvertibleFields(annotations map[string]string) map[string]string {
+	nonConvertibleKeys := map[string]string{}
+	for key, value := range annotations {
+		if strings.HasPrefix(key, NonConvertibleAnnotationPrefix) {
+			nonConvertibleKeys[key] = value
+		}
+	}
+	return nonConvertibleKeys
+}
+
 // Semantic can do semantic deep equality checks for api objects.
 // Example: api.Semantic.DeepEqual(aPod, aPodWithNonNilButEmptyMaps) == true
 var Semantic = conversion.EqualitiesOrDie(
