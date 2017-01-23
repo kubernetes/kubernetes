@@ -323,7 +323,7 @@ var _ = framework.KubeDescribe("Staging client repo client", func() {
 		podCopy := stagingClientPod(name, value)
 		pod := &podCopy
 		By("verifying no pod exists before the test")
-		pods, err := podClient.List(clientv1.ListOptions{})
+		pods, err := podClient.List(metav1.ListOptions{})
 		if err != nil {
 			framework.Failf("Failed to query for pods: %v", err)
 		}
@@ -337,7 +337,7 @@ var _ = framework.KubeDescribe("Staging client repo client", func() {
 		By("verifying the pod is in kubernetes")
 		timeout := 1 * time.Minute
 		if err := wait.PollImmediate(time.Second, timeout, func() (bool, error) {
-			pods, err = podClient.List(clientv1.ListOptions{})
+			pods, err = podClient.List(metav1.ListOptions{})
 			if err != nil {
 				return false, err
 			}
