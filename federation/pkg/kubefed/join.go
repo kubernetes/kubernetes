@@ -54,7 +54,7 @@ var (
 		# a valid RFC 1123 subdomain name. Cluster context
 		# must be specified if the cluster name is different
 		# than the cluster's context in the local kubeconfig.
-		kubectl join foo --host-cluster-context=bar`)
+		kubefed join foo --host-cluster-context=bar`)
 )
 
 // NewCmdJoin defines the `join` command that joins a cluster to a
