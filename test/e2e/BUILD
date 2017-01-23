@@ -153,6 +153,7 @@ go_library(
         "//test/e2e/common:go_default_library",
         "//test/e2e/framework:go_default_library",
         "//test/e2e/generated:go_default_library",
+        "//test/e2e/upgrades:go_default_library",
         "//test/e2e_federation:go_default_library",
         "//test/images/net/nat:go_default_library",
         "//test/utils:go_default_library",
@@ -248,6 +249,7 @@ filegroup(
         "//test/e2e/generated:all-srcs",
         "//test/e2e/perftype:all-srcs",
         "//test/e2e/testing-manifests:all-srcs",
+        "//test/e2e/upgrades:all-srcs",
     ],
     tags = ["automanaged"],
 )
