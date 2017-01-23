@@ -11389,7 +11389,7 @@
       "$ref": "#/definitions/intstr.IntOrString"
      },
      "scheme": {
-      "description": "Scheme to use for connecting to the host. Defaults to HTTP.",
+      "description": "Scheme to use for connecting to the host. Defaults to HTTP.  If HTTPS, be aware that the probe will not attempt certificate path validation.",
       "type": "string"
      }
     }

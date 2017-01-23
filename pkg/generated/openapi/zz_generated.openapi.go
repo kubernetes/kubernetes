@@ -2655,7 +2655,7 @@ var OpenAPIDefinitions *openapi.OpenAPIDefinitions = &openapi.OpenAPIDefinitions
 					},
 					"scheme": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Scheme to use for connecting to the host. Defaults to HTTP.",
+							Description: "Scheme to use for connecting to the host. Defaults to HTTP.  If HTTPS, be aware that the probe will not attempt certificate path validation.",
 							Type:        []string{"string"},
 							Format:      "",
 						},
