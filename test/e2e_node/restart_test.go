@@ -27,8 +27,15 @@ import (
 	"os/exec"
 
 	. "github.com/onsi/ginkgo"
+	"io/ioutil"
+	apimetav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/api/v1"
+	"k8s.io/kubernetes/pkg/util/uuid"
 	testutils "k8s.io/kubernetes/test/utils"
+	"os"
+	"reflect"
+	"strconv"
+	"strings"
 )
 
 // waitForPods waits for timeout duration, for pod_count.
@@ -54,6 +61,16 @@ func waitForPods(f *framework.Framework, pod_count int, timeout time.Duration) (
 		}
 	}
 	return runningPods
+}
+
+func dockerReloadConfiguration(f *framework.Framework) {
+	//get docker PID
+	dockerPid, err := ioutil.ReadFile("/var/run/docker.pid")
+	framework.ExpectNoError(err, "Failed to get docker daemon PID: %v, stdout: %q", err, string(dockerPid))
+
+	// send SIGHUP to docker
+	stdout, err := exec.Command("sudo", "kill", "-s", "SIGHUP", string(dockerPid)).CombinedOutput()
+	framework.ExpectNoError(err, "Failed to send SIGHUP signal to dockerd-current: %v, stdout: %q", err, string(stdout))
 }
 
 var _ = framework.KubeDescribe("Restart [Serial] [Slow] [Disruptive]", func() {
@@ -115,6 +132,93 @@ var _ = framework.KubeDescribe("Restart [Serial] [Slow] [Disruptive]", func() {
 					}
 				}
 				By(fmt.Sprintf("Docker restart test passed with %d pods", len(postRestartRunningPods)))
+			})
+		})
+		Context("Live restore", func() {
+			It("should restore container when live restore is on", func() {
+
+				// ensure live-restore is on
+				dockerPid, err := ioutil.ReadFile("/var/run/docker.pid")
+				framework.ExpectNoError(err, "Failed to get docker daemon PID: %v, stdout: %q", err, string(dockerPid))
+
+				dockerdCmd, _ := ioutil.ReadFile("/proc/" + string(dockerPid) + "/cmdline")
+				if !strings.Contains(string(dockerdCmd), "--live-restore") {
+					confFilePath := "/etc/docker/daemon.json"
+					if _, err := os.Stat(confFilePath); os.IsNotExist(err) {
+						ioutil.WriteFile(confFilePath, []byte("{\n\"live-restore\": true\n}\n"), 0644)
+						dockerReloadConfiguration(f)
+						defer func() {
+							os.Remove(confFilePath)
+							dockerReloadConfiguration(f)
+						}()
+					} else {
+						confCopy, err := ioutil.ReadFile(confFilePath)
+						framework.ExpectNoError(err, "Failed to read docker config file: %v", confCopy)
+
+						os.Remove(confFilePath)
+						ioutil.WriteFile(confFilePath, []byte("{\n\"live-restore\": true\n}\n"), 0644)
+
+						dockerReloadConfiguration(f)
+						defer func() {
+							os.Remove(confFilePath)
+							ioutil.WriteFile(confFilePath, confCopy, 0644)
+							dockerReloadConfiguration(f)
+						}()
+					}
+				}
+
+				// create pod
+				podClient := f.PodClient()
+				name := "pod-" + string(uuid.NewUUID())
+				value := strconv.Itoa(time.Now().Nanosecond())
+				pod := &v1.Pod{
+					ObjectMeta: apimetav1.ObjectMeta{
+						Name: name,
+						Labels: map[string]string{
+							"name": "foo",
+							"time": value,
+						},
+					},
+					Spec: v1.PodSpec{
+						Containers: []v1.Container{
+							{
+								Name:  "nginx",
+								Image: "gcr.io/google_containers/nginx-slim:0.7",
+							},
+						},
+					},
+				}
+
+				preRestartPod := podClient.CreateSync(pod)
+				By(fmt.Sprintf("Pre restart container id %q", preRestartPod.Status.ContainerStatuses[0].ContainerID))
+
+				// restart docker
+				if stdout, err := exec.Command("sudo", "systemctl", "restart", "docker").CombinedOutput(); err != nil {
+					framework.Logf("Failed to trigger docker restart with systemd/systemctl: %v, stdout: %q", err, string(stdout))
+					if stdout, err = exec.Command("sudo", "service", "docker", "restart").CombinedOutput(); err != nil {
+						framework.Failf("Failed to trigger docker restart with upstart/service: %v, stdout: %q", err, string(stdout))
+					}
+				}
+
+				// assure the pod has the same container
+				postRestartRunningPods := waitForPods(f, 1, recoverTimeout)
+				if len(postRestartRunningPods) == 0 {
+					framework.Failf("Failed to start *any* pods after docker restart")
+
+				}
+				postRestartPod, err := podClient.Get(preRestartPod.Name, apimetav1.GetOptions{})
+				framework.ExpectNoError(err, "Could not get pod after restart")
+
+				if !reflect.DeepEqual(preRestartPod.Status.ContainerStatuses, postRestartPod.Status.ContainerStatuses) {
+					framework.Failf("Containers statuses has modified after docker restart\n pre-restart: %v post-restart\n: %v, ", preRestartPod.Status.ContainerStatuses, postRestartPod.Status.ContainerStatuses)
+				}
+				if postRestartPod == nil {
+					framework.Failf("Pod not found after restart")
+				}
+				if len(postRestartPod.Status.ContainerStatuses) == 0 {
+					framework.Failf("No containers found on pod after restart")
+				}
+				By(fmt.Sprintf("Post restart container id %q", postRestartPod.Status.ContainerStatuses[0].ContainerID))
 			})
 		})
 	})
