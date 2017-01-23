@@ -18,7 +18,7 @@ go_library(
         "//vendor:k8s.io/apimachinery/pkg/fields",
         "//vendor:k8s.io/apimachinery/pkg/types",
         "//vendor:k8s.io/apimachinery/pkg/watch",
-        "//vendor:k8s.io/client-go/pkg/util/cert",
+        "//vendor:k8s.io/client-go/util/cert",
     ],
 )
 

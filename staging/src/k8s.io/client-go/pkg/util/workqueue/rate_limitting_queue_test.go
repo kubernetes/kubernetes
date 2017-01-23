@@ -20,7 +20,7 @@ import (
 	"testing"
 	"time"
 
-	"k8s.io/client-go/pkg/util/clock"
+	"k8s.io/client-go/util/clock"
 )
 
 func TestRateLimitingQueue(t *testing.T) {

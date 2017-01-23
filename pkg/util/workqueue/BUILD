@@ -24,7 +24,7 @@ go_library(
     deps = [
         "//vendor:github.com/juju/ratelimit",
         "//vendor:k8s.io/apimachinery/pkg/util/runtime",
-        "//vendor:k8s.io/client-go/pkg/util/clock",
+        "//vendor:k8s.io/client-go/util/clock",
     ],
 )
 
@@ -41,7 +41,7 @@ go_test(
     deps = [
         "//pkg/api/v1:go_default_library",
         "//vendor:k8s.io/apimachinery/pkg/util/wait",
-        "//vendor:k8s.io/client-go/pkg/util/clock",
+        "//vendor:k8s.io/client-go/util/clock",
     ],
 )
 

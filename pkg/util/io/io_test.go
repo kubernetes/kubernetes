@@ -23,7 +23,7 @@ import (
 
 	"github.com/pborman/uuid"
 	"k8s.io/apimachinery/pkg/runtime"
-	utiltesting "k8s.io/client-go/pkg/util/testing"
+	utiltesting "k8s.io/client-go/util/testing"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/util/io"
 	"k8s.io/kubernetes/pkg/volume"

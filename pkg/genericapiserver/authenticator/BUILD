@@ -28,7 +28,7 @@ go_library(
         "//vendor:k8s.io/apiserver/pkg/authentication/token/tokenfile",
         "//vendor:k8s.io/apiserver/pkg/authentication/user",
         "//vendor:k8s.io/client-go/kubernetes/typed/authentication/v1beta1",
-        "//vendor:k8s.io/client-go/pkg/util/cert",
+        "//vendor:k8s.io/client-go/util/cert",
     ],
 )
 

@@ -58,7 +58,7 @@ go_test(
         "//pkg/volume/util/volumehelper:go_default_library",
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
         "//vendor:k8s.io/apimachinery/pkg/util/sets",
-        "//vendor:k8s.io/client-go/pkg/util/testing",
+        "//vendor:k8s.io/client-go/util/testing",
     ],
 )
 
