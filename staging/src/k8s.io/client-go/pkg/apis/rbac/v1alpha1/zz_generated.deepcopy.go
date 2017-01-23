@@ -85,9 +85,7 @@ func DeepCopy_v1alpha1_ClusterRoleBinding(in interface{}, out interface{}, c *co
 		if in.Subjects != nil {
 			in, out := &in.Subjects, &out.Subjects
 			*out = make([]Subject, len(*in))
-			for i := range *in {
-				(*out)[i] = (*in)[i]
-			}
+			copy(*out, *in)
 		}
 		return nil
 	}
@@ -199,9 +197,7 @@ func DeepCopy_v1alpha1_RoleBinding(in interface{}, out interface{}, c *conversio
 		if in.Subjects != nil {
 			in, out := &in.Subjects, &out.Subjects
 			*out = make([]Subject, len(*in))
-			for i := range *in {
-				(*out)[i] = (*in)[i]
-			}
+			copy(*out, *in)
 		}
 		return nil
 	}

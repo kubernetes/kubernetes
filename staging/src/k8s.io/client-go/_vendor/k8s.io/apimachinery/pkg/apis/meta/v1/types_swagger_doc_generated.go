@@ -140,6 +140,19 @@ func (ListMeta) SwaggerDoc() map[string]string {
 	return map_ListMeta
 }
 
+var map_ListOptions = map[string]string{
+	"":                "ListOptions is the query options to a standard REST list call.",
+	"labelSelector":   "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
+	"fieldSelector":   "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
+	"watch":           "Watch for changes to the described resources and return them as a stream of add, update, and remove notifications. Specify resourceVersion.",
+	"resourceVersion": "When specified with a watch call, shows changes that occur after that particular version of a resource. Defaults to changes from the beginning of history. When specified for list: - if unset, then the result is returned from remote storage based on quorum-read flag; - if it's 0, then we simply return what we currently have in cache, no guarantee; - if set to non zero, then the result is at least as fresh as given rv.",
+	"timeoutSeconds":  "Timeout for the list/watch call.",
+}
+
+func (ListOptions) SwaggerDoc() map[string]string {
+	return map_ListOptions
+}
+
 var map_ObjectMeta = map[string]string{
 	"":                           "ObjectMeta is metadata that all persisted resources must have, which includes all objects users must create.",
 	"name":                       "Name must be unique within a namespace. Is required when creating resources, although some resources may allow a client to request the generation of an appropriate name automatically. Name is primarily intended for creation idempotence and configuration definition. Cannot be updated. More info: http://kubernetes.io/docs/user-guide/identifiers#names",

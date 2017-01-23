@@ -48,5 +48,6 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 
 		&ImageReview{},
 	)
+	metav1.AddToGroupVersion(scheme, SchemeGroupVersion)
 	return nil
 }

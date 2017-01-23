@@ -36,10 +36,10 @@ type EventInterface interface {
 	Create(*v1.Event) (*v1.Event, error)
 	Update(*v1.Event) (*v1.Event, error)
 	Delete(name string, options *v1.DeleteOptions) error
-	DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error
+	DeleteCollection(options *v1.DeleteOptions, listOptions meta_v1.ListOptions) error
 	Get(name string, options meta_v1.GetOptions) (*v1.Event, error)
-	List(opts v1.ListOptions) (*v1.EventList, error)
-	Watch(opts v1.ListOptions) (watch.Interface, error)
+	List(opts meta_v1.ListOptions) (*v1.EventList, error)
+	Watch(opts meta_v1.ListOptions) (watch.Interface, error)
 	Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v1.Event, err error)
 	EventExpansion
 }
@@ -95,7 +95,7 @@ func (c *events) Delete(name string, options *v1.DeleteOptions) error {
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *events) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
+func (c *events) DeleteCollection(options *v1.DeleteOptions, listOptions meta_v1.ListOptions) error {
 	return c.client.Delete().
 		Namespace(c.ns).
 		Resource("events").
@@ -119,7 +119,7 @@ func (c *events) Get(name string, options meta_v1.GetOptions) (result *v1.Event,
 }
 
 // List takes label and field selectors, and returns the list of Events that match those selectors.
-func (c *events) List(opts v1.ListOptions) (result *v1.EventList, err error) {
+func (c *events) List(opts meta_v1.ListOptions) (result *v1.EventList, err error) {
 	result = &v1.EventList{}
 	err = c.client.Get().
 		Namespace(c.ns).
@@ -131,7 +131,7 @@ func (c *events) List(opts v1.ListOptions) (result *v1.EventList, err error) {
 }
 
 // Watch returns a watch.Interface that watches the requested events.
-func (c *events) Watch(opts v1.ListOptions) (watch.Interface, error) {
+func (c *events) Watch(opts meta_v1.ListOptions) (watch.Interface, error) {
 	return c.client.Get().
 		Prefix("watch").
 		Namespace(c.ns).
