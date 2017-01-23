@@ -23,10 +23,10 @@ package v1alpha1
 import (
 	conversion "k8s.io/apimachinery/pkg/conversion"
 	runtime "k8s.io/apimachinery/pkg/runtime"
+	flag "k8s.io/apiserver/pkg/util/flag"
 	api "k8s.io/kubernetes/pkg/api"
 	v1 "k8s.io/kubernetes/pkg/api/v1"
 	componentconfig "k8s.io/kubernetes/pkg/apis/componentconfig"
-	config "k8s.io/kubernetes/pkg/util/config"
 	unsafe "unsafe"
 )
 
@@ -464,8 +464,8 @@ func autoConvert_v1alpha1_KubeletConfiguration_To_componentconfig_KubeletConfigu
 	if err := api.Convert_Pointer_bool_To_bool(&in.EnableControllerAttachDetach, &out.EnableControllerAttachDetach, s); err != nil {
 		return err
 	}
-	out.SystemReserved = *(*config.ConfigurationMap)(unsafe.Pointer(&in.SystemReserved))
-	out.KubeReserved = *(*config.ConfigurationMap)(unsafe.Pointer(&in.KubeReserved))
+	out.SystemReserved = *(*flag.ConfigurationMap)(unsafe.Pointer(&in.SystemReserved))
+	out.KubeReserved = *(*flag.ConfigurationMap)(unsafe.Pointer(&in.KubeReserved))
 	out.ProtectKernelDefaults = in.ProtectKernelDefaults
 	if err := api.Convert_Pointer_bool_To_bool(&in.MakeIPTablesUtilChains, &out.MakeIPTablesUtilChains, s); err != nil {
 		return err
