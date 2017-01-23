@@ -17,6 +17,7 @@ limitations under the License.
 package genericapiserver
 
 import (
+	"crypto/x509"
 	"fmt"
 	"io"
 	"net"
@@ -165,7 +166,7 @@ type SecureServingInfo struct {
 	// SNICerts are named CertKeys for serving secure traffic with SNI support.
 	SNICerts []NamedCertKey
 	// ClientCA is the certificate bundle for all the signers that you'll recognize for incoming client certificates
-	ClientCA string
+	ClientCA *x509.CertPool
 }
 
 type CertKey struct {
@@ -254,12 +255,40 @@ func (c *Config) ApplyOptions(options *options.ServerRunOptions) *Config {
 				},
 			},
 			SNICerts: []NamedCertKey{},
-			ClientCA: options.ClientCAFile,
 		}
 		if options.TLSCertFile == "" && options.TLSPrivateKeyFile == "" {
 			secureServingInfo.ServerCert.Generate = true
 			secureServingInfo.ServerCert.CertFile = path.Join(options.CertDirectory, "apiserver.crt")
 			secureServingInfo.ServerCert.KeyFile = path.Join(options.CertDirectory, "apiserver.key")
+		}
+
+		if len(options.ClientCAFile) > 0 {
+			clientCAs, err := certutil.CertsFromFile(options.ClientCAFile)
+			if err != nil {
+				// normally this would be no-no, but its the minimal change to backport to 1.5 and
+				// every caller is going to do this.
+				panic(fmt.Errorf("unable to load client CA file: %v", err))
+			}
+			if secureServingInfo.ClientCA == nil {
+				secureServingInfo.ClientCA = x509.NewCertPool()
+			}
+			for _, cert := range clientCAs {
+				secureServingInfo.ClientCA.AddCert(cert)
+			}
+		}
+		if len(options.RequestHeaderClientCAFile) > 0 {
+			clientCAs, err := certutil.CertsFromFile(options.RequestHeaderClientCAFile)
+			if err != nil {
+				// normally this would be no-no, but its the minimal change to backport to 1.5 and
+				// every caller is going to do this.
+				panic(fmt.Errorf("unable to load requestheader client CA file: %v", err))
+			}
+			if secureServingInfo.ClientCA == nil {
+				secureServingInfo.ClientCA = x509.NewCertPool()
+			}
+			for _, cert := range clientCAs {
+				secureServingInfo.ClientCA.AddCert(cert)
+			}
 		}
 
 		secureServingInfo.SNICerts = nil
