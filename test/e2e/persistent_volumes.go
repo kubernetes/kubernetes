@@ -54,11 +54,7 @@ type pvcmap map[types.NamespacedName]pvcval
 //   prebind       (Optional) holds a pre-bound PVC if there is one (optional).
 //   reclaimPolicy (Optional) makePersistentVolume() defaults to Retain if unset
 // pvSource: v1.PersistentVolumeSource{
-// 	NFS: &api.NFSVolumeSource{
-// 		.
-// 		.
-// 		.
-// 	},
+// 	NFS: &api.NFSVolumeSource{},
 // }
 type persistentVolumeConfig struct {
 	pvSource      v1.PersistentVolumeSource
@@ -128,7 +124,7 @@ func deletePersistentVolumeClaim(c clientset.Interface, pvcName string, ns strin
 func deletePVCandValidatePV(c clientset.Interface, ns string, pvc *v1.PersistentVolumeClaim, pv *v1.PersistentVolume, expectPVPhase v1.PersistentVolumePhase) {
 
 	pvname := pvc.Spec.VolumeName
-	framework.Logf("Deleting PVC %v to trigger recycling of PV %v", pvc.Name, pvname)
+	framework.Logf("Deleting PVC %v to invoke the PV's reclaimPolicy (default: Retain)", pvc.Name, pvname)
 	deletePersistentVolumeClaim(c, pvc.Name, ns)
 
 	// Check that the PVC is really deleted.
@@ -449,7 +445,6 @@ func completeTest(f *framework.Framework, c clientset.Interface, ns string, pv *
 // Note: the PV is deleted in the AfterEach, not here.
 // Note: this func is serialized, we wait for each pod to be deleted before creating the
 //   next pod. Adding concurrency is a TODO item.
-// Note: this func is called recursively when there are more claims than pvs.
 func completeMultiTest(f *framework.Framework, c clientset.Interface, ns string, pvols pvmap, claims pvcmap, expectPhase v1.PersistentVolumePhase) {
 
 	// 1. verify each PV permits write access to a client pod
@@ -498,6 +493,7 @@ var _ = framework.KubeDescribe("PersistentVolumes", func() {
 			pvConfig     persistentVolumeConfig
 		)
 
+		// TODO push down to BeforeEach
 		// config for the nfs-server pod in the default namespace
 		NFSconfig = VolumeTestConfig{
 			namespace:   metav1.NamespaceDefault,
@@ -507,6 +503,7 @@ var _ = framework.KubeDescribe("PersistentVolumes", func() {
 			serverArgs:  []string{"-G", "777", "/exports"},
 		}
 
+		// TODO scrap `else`, make new NFS server each test
 		BeforeEach(func() {
 			// If it doesn't exist, create the nfs server pod in the "default" ns.
 			// The "default" ns is used so that individual tests can delete their
@@ -518,6 +515,8 @@ var _ = framework.KubeDescribe("PersistentVolumes", func() {
 			} else {
 				// If the nfs server does exist, check that it is Running and the volume is exported.
 				By("Verifying NFS server is still running.")
+
+				// TODO use a waitPoll instead of
 				framework.CheckPodsRunningReady(c, f.Namespace.Name, []string{nfsServerPod.Name}, 3*time.Second)
 				By("Verifying NFS export is still reachable.")
 				stdout, err := podExec(nfsServerPod, "showmount -e $HOSTNAME")
@@ -618,7 +617,6 @@ var _ = framework.KubeDescribe("PersistentVolumes", func() {
 			// Note: PVs are created before claims and no pre-binding
 			It("should create 2 PVs and 4 PVCs: test write access [Volume][Serial][Flaky]", func() {
 				numPVs, numPVCs := 2, 4
-				pvConfig.reclaimPolicy = v1.PersistentVolumeReclaimRecycle
 				pvols, claims = createPVsPVCs(numPVs, numPVCs, c, ns, pvConfig)
 				waitAndVerifyBinds(c, ns, pvols, claims, true)
 				completeMultiTest(f, c, ns, pvols, claims, v1.VolumeBound)
@@ -664,12 +662,13 @@ var _ = framework.KubeDescribe("PersistentVolumes", func() {
 			// This It() tests a scenario where a PV is written to by a Pod, recycled, then the volume checked
 			// for files. If files are found, the checking Pod fails, failing the test.  Otherwise, the pod
 			// (and test) succeed.
-			It("should test that a PV becomes Available and is clean after the PVC is deleted. [Jon][Volume][Serial][Flaky]", func() {
+			It("should test that a PV becomes Available and is clean after the PVC is deleted. [Volume][Serial][Flaky]", func() {
 				By("Writing to the volume.")
 				pod := makeWritePod(ns, pvc.Name)
 				pod, err := c.Core().Pods(ns).Create(pod)
 				Expect(err).NotTo(HaveOccurred())
-				framework.WaitForPodSuccessInNamespace(c, pod.Name, ns)
+				err = framework.WaitForPodSuccessInNamespace(c, pod.Name, ns)
+				Expect(err).NotTo(HaveOccurred())
 
 				deletePVCandValidatePV(c, ns, pvc, pv, v1.VolumeAvailable)
 
@@ -678,10 +677,14 @@ var _ = framework.KubeDescribe("PersistentVolumes", func() {
 				pvc = createPVC(c, ns, pvc)
 				err = framework.WaitForPersistentVolumeClaimPhase(v1.ClaimBound, c, ns, pvc.Name, 2*time.Second, 60*time.Second)
 
+				// TODO verify pv.spec.volumeName (or w/e) is the same as before
+
 				// If a file is detected in /mnt, fail the pod and do not restart it.
 				By("Verifying the mount has been cleaned.")
 				mount := pod.Spec.Containers[0].VolumeMounts[0].MountPath
 				pod = makePod(ns, pvc.Name, fmt.Sprintf("[ $(ls -A %s | wc -l) -eq 0 ] && exit 0 || exit 1", mount))
+
+				// TODO make default policy
 				pod.Spec.RestartPolicy = v1.RestartPolicyNever
 				pod, err = c.Core().Pods(ns).Create(pod)
 				Expect(err).NotTo(HaveOccurred())
