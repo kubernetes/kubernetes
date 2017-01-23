@@ -158,14 +158,61 @@ func (f *ring1Factory) Describer(mapping *meta.RESTMapping) (kubectl.Describer, 
 			return &kubectl.ClusterDescriber{Interface: fedClientSet}, nil
 		}
 	}
+
 	clientset, err := f.clientAccessFactory.ClientSetForVersion(&mappingVersion)
 	if err != nil {
+		// if we can't make a client for this group/version, go generic if possible
+		if genericDescriber, genericErr := f.genericDescriber(mapping); genericErr == nil {
+			return genericDescriber, nil
+		}
+		// otherwise return the original error
 		return nil, err
 	}
+
+	// try to get a describer
 	if describer, ok := kubectl.DescriberFor(mapping.GroupVersionKind.GroupKind(), clientset); ok {
 		return describer, nil
 	}
-	return nil, fmt.Errorf("no description has been implemented for %q", mapping.GroupVersionKind.Kind)
+	// if this is a kind we don't have a describer for yet, go generic if possible
+	if genericDescriber, genericErr := f.genericDescriber(mapping); genericErr == nil {
+		return genericDescriber, nil
+	}
+	// otherwise return an unregistered error
+	return nil, fmt.Errorf("no description has been implemented for %s", mapping.GroupVersionKind.String())
+}
+
+// make a generic describer, or return an error
+func (f *ring1Factory) genericDescriber(mapping *meta.RESTMapping) (kubectl.Describer, error) {
+	clientConfig, err := f.clientAccessFactory.ClientConfig()
+	if err != nil {
+		return nil, err
+	}
+
+	clientConfigCopy := *clientConfig
+	clientConfigCopy.APIPath = dynamic.LegacyAPIPathResolverFunc(mapping.GroupVersionKind)
+	gv := mapping.GroupVersionKind.GroupVersion()
+	clientConfigCopy.GroupVersion = &gv
+
+	// used to look up scope info for the resource
+	discoveryClient, err := f.clientAccessFactory.DiscoveryClient()
+	if err != nil {
+		return nil, err
+	}
+
+	// used to fetch the resource
+	dynamicClient, err := dynamic.NewClient(&clientConfigCopy)
+	if err != nil {
+		return nil, err
+	}
+
+	// used to get events for the resource
+	clientSet, err := f.clientAccessFactory.ClientSet()
+	if err != nil {
+		return nil, err
+	}
+	eventsClient := clientSet.Core()
+
+	return kubectl.GenericDescriberFor(mapping.GroupVersionKind, discoveryClient, dynamicClient, eventsClient), nil
 }
 
 func (f *ring1Factory) LogsForObject(object, options runtime.Object) (*restclient.Request, error) {

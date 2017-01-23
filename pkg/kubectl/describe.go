@@ -54,6 +54,8 @@ import (
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	coreclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/core/internalversion"
 	extensionsclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/extensions/internalversion"
+	"k8s.io/kubernetes/pkg/client/typed/discovery"
+	"k8s.io/kubernetes/pkg/client/typed/dynamic"
 	deploymentutil "k8s.io/kubernetes/pkg/controller/deployment/util"
 	"k8s.io/kubernetes/pkg/fieldpath"
 	"k8s.io/kubernetes/pkg/util/intstr"
@@ -169,6 +171,65 @@ func DescribableResources() []string {
 func DescriberFor(kind schema.GroupKind, c clientset.Interface) (Describer, bool) {
 	f, ok := describerMap(c)[kind]
 	return f, ok
+}
+
+// GenericDescriberFor returns a generic describer for the specified mapping
+// that uses only information available from runtime.Unstructured
+func GenericDescriberFor(
+	gvk schema.GroupVersionKind,
+	discovery discovery.CachedDiscoveryInterface,
+	dynamic *dynamic.Client,
+	events coreclient.EventsGetter) Describer {
+
+	return &genericDescriber{gvk, discovery, dynamic, events}
+}
+
+type genericDescriber struct {
+	gvk       schema.GroupVersionKind
+	discovery discovery.CachedDiscoveryInterface
+	dynamic   *dynamic.Client
+	events    coreclient.EventsGetter
+}
+
+func (g *genericDescriber) Describe(namespace, name string, describerSettings DescriberSettings) (output string, err error) {
+	if !g.discovery.Fresh() {
+		g.discovery.Invalidate()
+	}
+	resources, err := g.discovery.ServerResourcesForGroupVersion(g.gvk.GroupVersion().String())
+	if err != nil {
+		return "", err
+	}
+	var apiResource *metav1.APIResource
+	for _, r := range resources.APIResources {
+		if r.Kind == g.gvk.Kind {
+			apiResource = &r
+			break
+		}
+	}
+	if apiResource == nil {
+		return "", fmt.Errorf("unknown kind: %v", g.gvk.String())
+	}
+
+	obj, err := g.dynamic.Resource(apiResource, namespace).Get(name)
+	if err != nil {
+		return "", err
+	}
+
+	var events *api.EventList
+	if describerSettings.ShowEvents {
+		events, _ = g.events.Events(namespace).Search(obj)
+	}
+
+	return tabbedString(func(out io.Writer) error {
+		w := &PrefixWriter{out}
+		w.Write(LEVEL_0, "Name:\t%s\n", obj.GetName())
+		w.Write(LEVEL_0, "Namespace:\t%s\n", obj.GetNamespace())
+		printLabelsMultiline(w, "Labels", obj.GetLabels())
+		if events != nil {
+			DescribeEvents(events, w)
+		}
+		return nil
+	})
 }
 
 // DefaultObjectDescriber can describe the default Kubernetes objects.
