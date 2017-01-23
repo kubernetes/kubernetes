@@ -919,8 +919,10 @@ run_kubectl_create_filter_tests() {
 
 run_kubectl_apply_deployments_tests() {
   ## kubectl apply should propagate user defined null values
-  # Pre-Condition: no Deployments exists
+  # Pre-Condition: no Deployments, ReplicaSets, Pods exist
   kube::test::get_object_assert deployments "{{range.items}}{{$id_field}}:{{end}}" ''
+  kube::test::get_object_assert replicasets "{{range.items}}{{$id_field}}:{{end}}" ''
+  kube::test::get_object_assert pods "{{range.items}}{{$id_field}}:{{end}}" ''
   # apply base deployment
   kubectl apply -f hack/testdata/null-propagation/deployment-l1.yaml "${kube_flags[@]}"
   # check right deployment exists
@@ -941,7 +943,12 @@ run_kubectl_apply_deployments_tests() {
   kube::test::get_object_assert 'deployments my-depl' "{{.metadata.labels.l2}}" 'l2'
 
   # cleanup
-  kubectl delete deployments my-depl
+  # need to explicitly remove replicasets and pods because we changed the deployment selector and orphaned things
+  kubectl delete deployments,rs,pods --all --cascade=false --grace-period=0
+  # Post-Condition: no Deployments, ReplicaSets, Pods exist
+  kube::test::get_object_assert deployments "{{range.items}}{{$id_field}}:{{end}}" ''
+  kube::test::get_object_assert replicasets "{{range.items}}{{$id_field}}:{{end}}" ''
+  kube::test::get_object_assert pods "{{range.items}}{{$id_field}}:{{end}}" ''
 }
 
 # Runs tests for --save-config tests.

@@ -646,27 +646,6 @@ func NewAPIFactory() (cmdutil.Factory, *TestFactory, runtime.Codec, runtime.Nego
 	}, t, testapi.Default.Codec(), testapi.Default.NegotiatedSerializer()
 }
 
-type fakeExtensionsAPIFactory struct {
-	fakeAPIFactory
-}
-
-func (f *fakeExtensionsAPIFactory) JSONEncoder() runtime.Encoder {
-	return testapi.Extensions.Codec()
-}
-
-func NewExtensionsAPIFactory() (cmdutil.Factory, *TestFactory, runtime.Codec, runtime.NegotiatedSerializer) {
-	t := &TestFactory{
-		Validator: validation.NullSchema{},
-	}
-	rf := cmdutil.NewFactory(nil)
-	return &fakeExtensionsAPIFactory{
-		fakeAPIFactory: fakeAPIFactory{
-			Factory: rf,
-			tf:      t,
-		},
-	}, t, testapi.Default.Codec(), testapi.Default.NegotiatedSerializer()
-}
-
 func testDynamicResources() []*discovery.APIGroupResources {
 	return []*discovery.APIGroupResources{
 		{
@@ -687,6 +666,20 @@ func testDynamicResources() []*discovery.APIGroupResources {
 					{Name: "configmaps", Namespaced: true, Kind: "ConfigMap"},
 					{Name: "type", Namespaced: false, Kind: "Type"},
 					{Name: "namespacedtype", Namespaced: true, Kind: "NamespacedType"},
+				},
+			},
+		},
+		{
+			Group: metav1.APIGroup{
+				Name: "extensions",
+				Versions: []metav1.GroupVersionForDiscovery{
+					{Version: "v1beta1"},
+				},
+				PreferredVersion: metav1.GroupVersionForDiscovery{Version: "v1beta1"},
+			},
+			VersionedResources: map[string][]metav1.APIResource{
+				"v1beta1": {
+					{Name: "deployments", Namespaced: true, Kind: "Deployment"},
 				},
 			},
 		},
