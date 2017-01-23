@@ -18,7 +18,6 @@ package util
 
 import (
 	"bytes"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -38,7 +37,9 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
+	"k8s.io/apimachinery/pkg/util/json"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	"k8s.io/client-go/tools/clientcmd"
@@ -520,27 +521,35 @@ func RecordChangeCause(obj runtime.Object, changeCause string) error {
 	return nil
 }
 
-// ChangeResourcePatch creates a strategic merge patch between the origin input resource info
+// ChangeResourcePatch creates a patch between the origin input resource info
 // and the annotated with change-cause input resource info.
-func ChangeResourcePatch(info *resource.Info, changeCause string) ([]byte, error) {
+func ChangeResourcePatch(info *resource.Info, changeCause string) ([]byte, types.PatchType, error) {
 	// Get a versioned object
 	obj, err := info.Mapping.ConvertToVersion(info.Object, info.Mapping.GroupVersionKind.GroupVersion())
 	if err != nil {
-		return nil, err
+		return nil, types.StrategicMergePatchType, err
 	}
 
 	oldData, err := json.Marshal(obj)
 	if err != nil {
-		return nil, err
+		return nil, types.StrategicMergePatchType, err
 	}
 	if err := RecordChangeCause(obj, changeCause); err != nil {
-		return nil, err
+		return nil, types.StrategicMergePatchType, err
 	}
 	newData, err := json.Marshal(obj)
 	if err != nil {
-		return nil, err
+		return nil, types.StrategicMergePatchType, err
 	}
-	return strategicpatch.CreateTwoWayMergePatch(oldData, newData, obj)
+
+	switch obj := obj.(type) {
+	case *unstructured.Unstructured:
+		patch, err := jsonpatch.CreateMergePatch(oldData, newData)
+		return patch, types.MergePatchType, err
+	default:
+		patch, err := strategicpatch.CreateTwoWayMergePatch(oldData, newData, obj)
+		return patch, types.StrategicMergePatchType, err
+	}
 }
 
 // containsChangeCause checks if input resource info contains change-cause annotation.
