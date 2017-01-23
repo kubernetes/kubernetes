@@ -158,14 +158,55 @@ func (f *ring1Factory) Describer(mapping *meta.RESTMapping) (kubectl.Describer, 
 			return &kubectl.ClusterDescriber{Interface: fedClientSet}, nil
 		}
 	}
+
 	clientset, err := f.clientAccessFactory.ClientSetForVersion(&mappingVersion)
 	if err != nil {
+		// if we can't make a client for this group/version, go generic if possible
+		if genericDescriber, genericErr := genericDescriber(f.clientAccessFactory, mapping); genericErr == nil {
+			return genericDescriber, nil
+		}
+		// otherwise return the original error
 		return nil, err
 	}
+
+	// try to get a describer
 	if describer, ok := kubectl.DescriberFor(mapping.GroupVersionKind.GroupKind(), clientset); ok {
 		return describer, nil
 	}
-	return nil, fmt.Errorf("no description has been implemented for %q", mapping.GroupVersionKind.Kind)
+	// if this is a kind we don't have a describer for yet, go generic if possible
+	if genericDescriber, genericErr := genericDescriber(f.clientAccessFactory, mapping); genericErr == nil {
+		return genericDescriber, nil
+	}
+	// otherwise return an unregistered error
+	return nil, fmt.Errorf("no description has been implemented for %s", mapping.GroupVersionKind.String())
+}
+
+// helper function to make a generic describer, or return an error
+func genericDescriber(clientAccessFactory ClientAccessFactory, mapping *meta.RESTMapping) (kubectl.Describer, error) {
+	clientConfig, err := clientAccessFactory.ClientConfig()
+	if err != nil {
+		return nil, err
+	}
+
+	clientConfigCopy := *clientConfig
+	clientConfigCopy.APIPath = dynamic.LegacyAPIPathResolverFunc(mapping.GroupVersionKind)
+	gv := mapping.GroupVersionKind.GroupVersion()
+	clientConfigCopy.GroupVersion = &gv
+
+	// used to fetch the resource
+	dynamicClient, err := dynamic.NewClient(&clientConfigCopy)
+	if err != nil {
+		return nil, err
+	}
+
+	// used to get events for the resource
+	clientSet, err := clientAccessFactory.ClientSet()
+	if err != nil {
+		return nil, err
+	}
+	eventsClient := clientSet.Core()
+
+	return kubectl.GenericDescriberFor(mapping, dynamicClient, eventsClient), nil
 }
 
 func (f *ring1Factory) LogsForObject(object, options runtime.Object) (*restclient.Request, error) {
