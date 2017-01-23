@@ -123,7 +123,9 @@ func CreatePKIAssets(cfg *kubeadmapi.MasterConfiguration, pkiDir string) error {
 		config := certutil.Config{
 			CommonName: "kube-apiserver",
 			AltNames:   altNames,
-			Usages:     []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
+			// This makes the apiserver allowed to talk to the kubelets in the cluster
+			Organization: []string{"system:masters"},
+			Usages:       []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
 		}
 		apiCert, apiKey, err := pkiutil.NewCertAndKey(caCert, caKey, config)
 		if err != nil {
