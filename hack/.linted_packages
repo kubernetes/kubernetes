@@ -266,10 +266,6 @@ plugin/pkg/admission/namespace/autoprovision
 plugin/pkg/admission/namespace/exists
 plugin/pkg/admission/securitycontext/scdeny
 plugin/pkg/auth
-plugin/pkg/auth/authenticator
-plugin/pkg/auth/authenticator/password
-plugin/pkg/auth/authenticator/password/allow
-plugin/pkg/auth/authenticator/request/basicauth
 plugin/pkg/auth/authorizer
 plugin/pkg/auth/authorizer/rbac/bootstrappolicy
 staging/src/k8s.io/apimachinery/pkg/api/errors
@@ -292,6 +288,10 @@ staging/src/k8s.io/apiserver/pkg/endpoints/request
 staging/src/k8s.io/apiserver/pkg/server
 staging/src/k8s.io/apiserver/pkg/storage/names
 staging/src/k8s.io/apiserver/pkg/util/flushwriter
+staging/src/k8s.io/apiserver/plugin/pkg/authenticator
+staging/src/k8s.io/apiserver/plugin/pkg/authenticator/password
+staging/src/k8s.io/apiserver/plugin/pkg/authenticator/password/allow
+staging/src/k8s.io/apiserver/plugin/pkg/authenticator/request/basicauth
 staging/src/k8s.io/client-go/discovery
 staging/src/k8s.io/client-go/plugin/pkg/client/auth
 staging/src/k8s.io/client-go/plugin/pkg/client/auth/gcp

@@ -19,9 +19,9 @@ go_library(
         "//pkg/api:go_default_library",
         "//pkg/genericapiserver/server:go_default_library",
         "//pkg/storage/storagebackend:go_default_library",
-        "//pkg/util/config:go_default_library",
         "//vendor:k8s.io/apimachinery/pkg/runtime",
         "//vendor:k8s.io/apimachinery/pkg/runtime/schema",
+        "//vendor:k8s.io/apiserver/pkg/util/flag",
     ],
 )
 

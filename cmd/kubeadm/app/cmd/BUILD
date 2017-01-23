@@ -37,7 +37,6 @@ go_library(
         "//pkg/api:go_default_library",
         "//pkg/kubectl:go_default_library",
         "//pkg/kubectl/cmd/util:go_default_library",
-        "//pkg/util/flag:go_default_library",
         "//pkg/util/initsystem:go_default_library",
         "//pkg/version:go_default_library",
         "//vendor:github.com/blang/semver",
@@ -47,6 +46,7 @@ go_library(
         "//vendor:k8s.io/apimachinery/pkg/fields",
         "//vendor:k8s.io/apimachinery/pkg/runtime",
         "//vendor:k8s.io/apimachinery/pkg/util/net",
+        "//vendor:k8s.io/apiserver/pkg/util/flag",
         "//vendor:k8s.io/client-go/util/cert",
     ],
 )

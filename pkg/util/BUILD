@@ -59,7 +59,6 @@ filegroup(
         "//pkg/util/env:all-srcs",
         "//pkg/util/errors:all-srcs",
         "//pkg/util/exec:all-srcs",
-        "//pkg/util/flag:all-srcs",
         "//pkg/util/flock:all-srcs",
         "//pkg/util/framer:all-srcs",
         "//pkg/util/goroutinemap:all-srcs",
