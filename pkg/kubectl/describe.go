@@ -29,12 +29,14 @@ import (
 	"time"
 
 	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/client-go/dynamic"
 	"k8s.io/kubernetes/federation/apis/federation"
 	fedclientset "k8s.io/kubernetes/federation/client/clientset_generated/federation_internalclientset"
 	"k8s.io/kubernetes/pkg/api"
@@ -169,6 +171,46 @@ func DescribableResources() []string {
 func DescriberFor(kind schema.GroupKind, c clientset.Interface) (Describer, bool) {
 	f, ok := describerMap(c)[kind]
 	return f, ok
+}
+
+// GenericDescriberFor returns a generic describer for the specified mapping
+// that uses only information available from runtime.Unstructured
+func GenericDescriberFor(mapping *meta.RESTMapping, dynamic *dynamic.Client, events coreclient.EventsGetter) Describer {
+	return &genericDescriber{mapping, dynamic, events}
+}
+
+type genericDescriber struct {
+	mapping *meta.RESTMapping
+	dynamic *dynamic.Client
+	events  coreclient.EventsGetter
+}
+
+func (g *genericDescriber) Describe(namespace, name string, describerSettings DescriberSettings) (output string, err error) {
+	apiResource := &metav1.APIResource{
+		Name:       g.mapping.Resource,
+		Namespaced: g.mapping.Scope.Name() == meta.RESTScopeNameNamespace,
+		Kind:       g.mapping.GroupVersionKind.Kind,
+	}
+	obj, err := g.dynamic.Resource(apiResource, namespace).Get(name)
+	if err != nil {
+		return "", err
+	}
+
+	var events *api.EventList
+	if describerSettings.ShowEvents {
+		events, _ = g.events.Events(namespace).Search(obj)
+	}
+
+	return tabbedString(func(out io.Writer) error {
+		w := &PrefixWriter{out}
+		w.Write(LEVEL_0, "Name:\t%s\n", obj.GetName())
+		w.Write(LEVEL_0, "Namespace:\t%s\n", obj.GetNamespace())
+		printLabelsMultiline(w, "Labels", obj.GetLabels())
+		if events != nil {
+			DescribeEvents(events, w)
+		}
+		return nil
+	})
 }
 
 // DefaultObjectDescriber can describe the default Kubernetes objects.
