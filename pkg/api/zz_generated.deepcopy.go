@@ -440,6 +440,11 @@ func DeepCopy_api_ConfigMapEnvSource(in interface{}, out interface{}, c *convers
 		in := in.(*ConfigMapEnvSource)
 		out := out.(*ConfigMapEnvSource)
 		*out = *in
+		if in.Optional != nil {
+			in, out := &in.Optional, &out.Optional
+			*out = new(bool)
+			**out = **in
+		}
 		return nil
 	}
 }
@@ -449,6 +454,11 @@ func DeepCopy_api_ConfigMapKeySelector(in interface{}, out interface{}, c *conve
 		in := in.(*ConfigMapKeySelector)
 		out := out.(*ConfigMapKeySelector)
 		*out = *in
+		if in.Optional != nil {
+			in, out := &in.Optional, &out.Optional
+			*out = new(bool)
+			**out = **in
+		}
 		return nil
 	}
 }
@@ -488,6 +498,11 @@ func DeepCopy_api_ConfigMapVolumeSource(in interface{}, out interface{}, c *conv
 		if in.DefaultMode != nil {
 			in, out := &in.DefaultMode, &out.DefaultMode
 			*out = new(int32)
+			**out = **in
+		}
+		if in.Optional != nil {
+			in, out := &in.Optional, &out.Optional
+			*out = new(bool)
 			**out = **in
 		}
 		return nil
@@ -901,12 +916,16 @@ func DeepCopy_api_EnvFromSource(in interface{}, out interface{}, c *conversion.C
 		if in.ConfigMapRef != nil {
 			in, out := &in.ConfigMapRef, &out.ConfigMapRef
 			*out = new(ConfigMapEnvSource)
-			**out = **in
+			if err := DeepCopy_api_ConfigMapEnvSource(*in, *out, c); err != nil {
+				return err
+			}
 		}
 		if in.SecretRef != nil {
 			in, out := &in.SecretRef, &out.SecretRef
 			*out = new(SecretEnvSource)
-			**out = **in
+			if err := DeepCopy_api_SecretEnvSource(*in, *out, c); err != nil {
+				return err
+			}
 		}
 		return nil
 	}
@@ -948,12 +967,16 @@ func DeepCopy_api_EnvVarSource(in interface{}, out interface{}, c *conversion.Cl
 		if in.ConfigMapKeyRef != nil {
 			in, out := &in.ConfigMapKeyRef, &out.ConfigMapKeyRef
 			*out = new(ConfigMapKeySelector)
-			**out = **in
+			if err := DeepCopy_api_ConfigMapKeySelector(*in, *out, c); err != nil {
+				return err
+			}
 		}
 		if in.SecretKeyRef != nil {
 			in, out := &in.SecretKeyRef, &out.SecretKeyRef
 			*out = new(SecretKeySelector)
-			**out = **in
+			if err := DeepCopy_api_SecretKeySelector(*in, *out, c); err != nil {
+				return err
+			}
 		}
 		return nil
 	}
@@ -2825,6 +2848,11 @@ func DeepCopy_api_SecretEnvSource(in interface{}, out interface{}, c *conversion
 		in := in.(*SecretEnvSource)
 		out := out.(*SecretEnvSource)
 		*out = *in
+		if in.Optional != nil {
+			in, out := &in.Optional, &out.Optional
+			*out = new(bool)
+			**out = **in
+		}
 		return nil
 	}
 }
@@ -2834,6 +2862,11 @@ func DeepCopy_api_SecretKeySelector(in interface{}, out interface{}, c *conversi
 		in := in.(*SecretKeySelector)
 		out := out.(*SecretKeySelector)
 		*out = *in
+		if in.Optional != nil {
+			in, out := &in.Optional, &out.Optional
+			*out = new(bool)
+			**out = **in
+		}
 		return nil
 	}
 }
@@ -2873,6 +2906,11 @@ func DeepCopy_api_SecretVolumeSource(in interface{}, out interface{}, c *convers
 		if in.DefaultMode != nil {
 			in, out := &in.DefaultMode, &out.DefaultMode
 			*out = new(int32)
+			**out = **in
+		}
+		if in.Optional != nil {
+			in, out := &in.Optional, &out.Optional
+			*out = new(bool)
 			**out = **in
 		}
 		return nil
