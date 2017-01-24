@@ -109,6 +109,71 @@ msgstr[0] ""
 msgstr[1] ""
 "watch is only supported on individual resources and resource collections - "
 "%d resources were found"
+
+# https://github.com/kubernetes/kubernetes/blob/masterpkg/kubectl/cmd/config/config.go#L39
+msgctxt "Modify kubeconfig files"
+msgid "Modify kubeconfig files"
+msgstr "Modify kubeconfig files"
+
+# https://github.com/kubernetes/kubernetes/blob/masterpkg/kubectl/cmd/config/create_authinfo.go#L103
+msgctxt "Sets a user entry in kubeconfig"
+msgid "Sets a user entry in kubeconfig"
+msgstr "Sets a user entry in kubeconfig"
+
+# https://github.com/kubernetes/kubernetes/blob/masterpkg/kubectl/cmd/config/create_cluster.go#L67
+msgctxt "Sets a cluster entry in kubeconfig"
+msgid "Sets a cluster entry in kubeconfig"
+msgstr "Sets a cluster entry in kubeconfig"
+
+# https://github.com/kubernetes/kubernetes/blob/masterpkg/kubectl/cmd/config/create_context.go#L57
+msgctxt "Sets a context entry in kubeconfig"
+msgid "Sets a context entry in kubeconfig"
+msgstr "Sets a context entry in kubeconfig"
+
+# https://github.com/kubernetes/kubernetes/blob/masterpkg/kubectl/cmd/config/current_context.go#L48
+msgctxt "Displays the current-context"
+msgid "Displays the current-context"
+msgstr "Displays the current-context"
+
+# https://github.com/kubernetes/kubernetes/blob/masterpkg/kubectl/cmd/config/delete_cluster.go#L38
+msgctxt "Delete the specified cluster from the kubeconfig"
+msgid "Delete the specified cluster from the kubeconfig"
+msgstr "Delete the specified cluster from the kubeconfig"
+
+# https://github.com/kubernetes/kubernetes/blob/masterpkg/kubectl/cmd/config/delete_context.go#L38
+msgctxt "Delete the specified context from the kubeconfig"
+msgid "Delete the specified context from the kubeconfig"
+msgstr "Delete the specified context from the kubeconfig"
+
+# https://github.com/kubernetes/kubernetes/blob/masterpkg/kubectl/cmd/config/get_clusters.go#L40
+msgctxt "Display clusters defined in the kubeconfig"
+msgid "Display clusters defined in the kubeconfig"
+msgstr "Display clusters defined in the kubeconfig"
+
+# https://github.com/kubernetes/kubernetes/blob/masterpkg/kubectl/cmd/config/get_contexts.go#L62
+msgctxt "Describe one or many contexts"
+msgid "Describe one or many contexts"
+msgstr "Describe one or many contexts"
+
+# https://github.com/kubernetes/kubernetes/blob/masterpkg/kubectl/cmd/config/set.go#L59
+msgctxt "Sets an individual value in a kubeconfig file"
+msgid "Sets an individual value in a kubeconfig file"
+msgstr "Sets an individual value in a kubeconfig file"
+
+# https://github.com/kubernetes/kubernetes/blob/masterpkg/kubectl/cmd/config/unset.go#L47
+msgctxt "Unsets an individual value in a kubeconfig file"
+msgid "Unsets an individual value in a kubeconfig file"
+msgstr "Unsets an individual value in a kubeconfig file"
+
+# https://github.com/kubernetes/kubernetes/blob/masterpkg/kubectl/cmd/config/use_context.go#L48
+msgctxt "Sets the current-context in a kubeconfig file"
+msgid "Sets the current-context in a kubeconfig file"
+msgstr "Sets the current-context in a kubeconfig file"
+
+# https://github.com/kubernetes/kubernetes/blob/masterpkg/kubectl/cmd/config/view.go#L64
+msgctxt "Display merged kubeconfig settings or a specified kubeconfig file"
+msgid "Display merged kubeconfig settings or a specified kubeconfig file"
+msgstr "Display merged kubeconfig settings or a specified kubeconfig file"
 `)
 
 func translationsKubectlDefaultLc_messagesK8sPoBytes() ([]byte, error) {
@@ -183,6 +248,71 @@ msgstr[0] ""
 msgstr[1] ""
 "watch is only supported on individual resources and resource collections - "
 "%d resources were found"
+
+# https://github.com/kubernetes/kubernetes/blob/masterpkg/kubectl/cmd/config/config.go#L39
+msgctxt "Modify kubeconfig files"
+msgid "Modify kubeconfig files"
+msgstr "Modify kubeconfig files"
+
+# https://github.com/kubernetes/kubernetes/blob/masterpkg/kubectl/cmd/config/create_authinfo.go#L103
+msgctxt "Sets a user entry in kubeconfig"
+msgid "Sets a user entry in kubeconfig"
+msgstr "Sets a user entry in kubeconfig"
+
+# https://github.com/kubernetes/kubernetes/blob/masterpkg/kubectl/cmd/config/create_cluster.go#L67
+msgctxt "Sets a cluster entry in kubeconfig"
+msgid "Sets a cluster entry in kubeconfig"
+msgstr "Sets a cluster entry in kubeconfig"
+
+# https://github.com/kubernetes/kubernetes/blob/masterpkg/kubectl/cmd/config/create_context.go#L57
+msgctxt "Sets a context entry in kubeconfig"
+msgid "Sets a context entry in kubeconfig"
+msgstr "Sets a context entry in kubeconfig"
+
+# https://github.com/kubernetes/kubernetes/blob/masterpkg/kubectl/cmd/config/current_context.go#L48
+msgctxt "Displays the current-context"
+msgid "Displays the current-context"
+msgstr "Displays the current-context"
+
+# https://github.com/kubernetes/kubernetes/blob/masterpkg/kubectl/cmd/config/delete_cluster.go#L38
+msgctxt "Delete the specified cluster from the kubeconfig"
+msgid "Delete the specified cluster from the kubeconfig"
+msgstr "Delete the specified cluster from the kubeconfig"
+
+# https://github.com/kubernetes/kubernetes/blob/masterpkg/kubectl/cmd/config/delete_context.go#L38
+msgctxt "Delete the specified context from the kubeconfig"
+msgid "Delete the specified context from the kubeconfig"
+msgstr "Delete the specified context from the kubeconfig"
+
+# https://github.com/kubernetes/kubernetes/blob/masterpkg/kubectl/cmd/config/get_clusters.go#L40
+msgctxt "Display clusters defined in the kubeconfig"
+msgid "Display clusters defined in the kubeconfig"
+msgstr "Display clusters defined in the kubeconfig"
+
+# https://github.com/kubernetes/kubernetes/blob/masterpkg/kubectl/cmd/config/get_contexts.go#L62
+msgctxt "Describe one or many contexts"
+msgid "Describe one or many contexts"
+msgstr "Describe one or many contexts"
+
+# https://github.com/kubernetes/kubernetes/blob/masterpkg/kubectl/cmd/config/set.go#L59
+msgctxt "Sets an individual value in a kubeconfig file"
+msgid "Sets an individual value in a kubeconfig file"
+msgstr "Sets an individual value in a kubeconfig file"
+
+# https://github.com/kubernetes/kubernetes/blob/masterpkg/kubectl/cmd/config/unset.go#L47
+msgctxt "Unsets an individual value in a kubeconfig file"
+msgid "Unsets an individual value in a kubeconfig file"
+msgstr "Unsets an individual value in a kubeconfig file"
+
+# https://github.com/kubernetes/kubernetes/blob/masterpkg/kubectl/cmd/config/use_context.go#L48
+msgctxt "Sets the current-context in a kubeconfig file"
+msgid "Sets the current-context in a kubeconfig file"
+msgstr "Sets the current-context in a kubeconfig file"
+
+# https://github.com/kubernetes/kubernetes/blob/masterpkg/kubectl/cmd/config/view.go#L64
+msgctxt "Display merged kubeconfig settings or a specified kubeconfig file"
+msgid "Display merged kubeconfig settings or a specified kubeconfig file"
+msgstr "Display merged kubeconfig settings or a specified kubeconfig file"
 `)
 
 func translationsKubectlEn_usLc_messagesK8sPoBytes() ([]byte, error) {
