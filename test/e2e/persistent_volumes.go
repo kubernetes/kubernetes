@@ -18,7 +18,6 @@ package e2e
 
 import (
 	"fmt"
-	"strings"
 	"time"
 
 	. "github.com/onsi/ginkgo"
@@ -123,8 +122,7 @@ func deletePersistentVolumeClaim(c clientset.Interface, pvcName string, ns strin
 // phase value to expect for the pv bound to the to-be-deleted claim.
 func deletePVCandValidatePV(c clientset.Interface, ns string, pvc *v1.PersistentVolumeClaim, pv *v1.PersistentVolume, expectPVPhase v1.PersistentVolumePhase) {
 
-	pvname := pvc.Spec.VolumeName
-	framework.Logf("Deleting PVC %v to invoke the PV's reclaimPolicy (default: Retain)", pvc.Name, pvname)
+	framework.Logf("Deleting PVC %v to invoke the PV's reclaimPolicy (current:%s)", pvc.Name, pv.Spec.PersistentVolumeReclaimPolicy)
 	deletePersistentVolumeClaim(c, pvc.Name, ns)
 
 	// Check that the PVC is really deleted.
@@ -493,7 +491,6 @@ var _ = framework.KubeDescribe("PersistentVolumes", func() {
 			pvConfig     persistentVolumeConfig
 		)
 
-		// TODO push down to BeforeEach
 		// config for the nfs-server pod in the default namespace
 		NFSconfig = VolumeTestConfig{
 			namespace:   metav1.NamespaceDefault,
@@ -503,7 +500,6 @@ var _ = framework.KubeDescribe("PersistentVolumes", func() {
 			serverArgs:  []string{"-G", "777", "/exports"},
 		}
 
-		// TODO scrap `else`, make new NFS server each test
 		BeforeEach(func() {
 			// If it doesn't exist, create the nfs server pod in the "default" ns.
 			// The "default" ns is used so that individual tests can delete their
@@ -512,16 +508,6 @@ var _ = framework.KubeDescribe("PersistentVolumes", func() {
 				nfsServerPod = startVolumeServer(c, NFSconfig)
 				serverIP = nfsServerPod.Status.PodIP
 				framework.Logf("NFS server IP address: %v", serverIP)
-			} else {
-				// If the nfs server does exist, check that it is Running and the volume is exported.
-				By("Verifying NFS server is still running.")
-
-				// TODO use a waitPoll instead of
-				framework.CheckPodsRunningReady(c, f.Namespace.Name, []string{nfsServerPod.Name}, 3*time.Second)
-				By("Verifying NFS export is still reachable.")
-				stdout, err := podExec(nfsServerPod, "showmount -e $HOSTNAME")
-				Expect(err).NotTo(HaveOccurred())
-				Expect(strings.Contains(stdout, "/exports *")).To(BeTrue())
 			}
 			pvConfig = persistentVolumeConfig{
 				namePrefix: "nfs-",
@@ -619,7 +605,7 @@ var _ = framework.KubeDescribe("PersistentVolumes", func() {
 				numPVs, numPVCs := 2, 4
 				pvols, claims = createPVsPVCs(numPVs, numPVCs, c, ns, pvConfig)
 				waitAndVerifyBinds(c, ns, pvols, claims, true)
-				completeMultiTest(f, c, ns, pvols, claims, v1.VolumeBound)
+				completeMultiTest(f, c, ns, pvols, claims, v1.VolumeReleased)
 			})
 
 			// Create 3 PVs and 3 PVCs.
@@ -677,15 +663,11 @@ var _ = framework.KubeDescribe("PersistentVolumes", func() {
 				pvc = createPVC(c, ns, pvc)
 				err = framework.WaitForPersistentVolumeClaimPhase(v1.ClaimBound, c, ns, pvc.Name, 2*time.Second, 60*time.Second)
 
-				// TODO verify pv.spec.volumeName (or w/e) is the same as before
-
 				// If a file is detected in /mnt, fail the pod and do not restart it.
 				By("Verifying the mount has been cleaned.")
 				mount := pod.Spec.Containers[0].VolumeMounts[0].MountPath
 				pod = makePod(ns, pvc.Name, fmt.Sprintf("[ $(ls -A %s | wc -l) -eq 0 ] && exit 0 || exit 1", mount))
 
-				// TODO make default policy
-				pod.Spec.RestartPolicy = v1.RestartPolicyNever
 				pod, err = c.Core().Pods(ns).Create(pod)
 				Expect(err).NotTo(HaveOccurred())
 				err = framework.WaitForPodSuccessInNamespace(c, pod.Name, ns)
@@ -923,7 +905,7 @@ func makePod(ns, pvcName string, command ...string) *v1.Pod {
 					},
 				},
 			},
-			RestartPolicy: v1.RestartPolicyOnFailure,
+			RestartPolicy: v1.RestartPolicyNever,
 			Volumes: []v1.Volume{
 				{
 					Name: pvcName,
