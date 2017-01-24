@@ -3297,6 +3297,7 @@ type Binding struct {
 }
 
 // Preconditions must be fulfilled before an operation (update, delete, etc.) is carried out.
+// +k8s:openapi-gen=false
 type Preconditions struct {
 	// Specifies the target UID.
 	// +optional
@@ -3304,6 +3305,8 @@ type Preconditions struct {
 }
 
 // DeleteOptions may be provided when deleting an API object
+// DEPRECATED: This type has been moved to meta/v1 and will be removed soon.
+// +k8s:openapi-gen=false
 type DeleteOptions struct {
 	metav1.TypeMeta `json:",inline"`
 

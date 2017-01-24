@@ -42,7 +42,12 @@ func AddToGroupVersion(scheme *runtime.Scheme, groupVersion schema.GroupVersion)
 		schema.GroupVersion{Group: groupVersion.Group, Version: runtime.APIVersionInternal}.WithKind(WatchEventKind),
 		&InternalEvent{},
 	)
-	scheme.AddKnownTypes(groupVersion, &ListOptions{})
+	scheme.AddKnownTypes(groupVersion,
+		&ListOptions{},
+		&ExportOptions{},
+		&GetOptions{},
+		&DeleteOptions{},
+	)
 	scheme.AddConversionFuncs(
 		Convert_versioned_Event_to_watch_Event,
 		Convert_versioned_InternalEvent_to_versioned_Event,
