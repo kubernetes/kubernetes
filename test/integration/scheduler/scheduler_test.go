@@ -282,7 +282,7 @@ func DoTestUnschedulableNodes(t *testing.T, cs clientset.Interface, ns *v1.Names
 			t.Logf("Test %d: Pod got scheduled on a schedulable node", i)
 		}
 
-		err = cs.Core().Pods(ns.Name).Delete(myPod.Name, v1.NewDeleteOptions(0))
+		err = cs.Core().Pods(ns.Name).Delete(myPod.Name, metav1.NewDeleteOptions(0))
 		if err != nil {
 			t.Errorf("Failed to delete pod: %v", err)
 		}
@@ -421,11 +421,11 @@ func TestMultiScheduler(t *testing.T) {
 	}
 
 	//	7. delete the pods that were scheduled by the default scheduler, and stop the default scheduler
-	err = clientSet.Core().Pods(ns.Name).Delete(testPod.Name, v1.NewDeleteOptions(0))
+	err = clientSet.Core().Pods(ns.Name).Delete(testPod.Name, metav1.NewDeleteOptions(0))
 	if err != nil {
 		t.Errorf("Failed to delete pod: %v", err)
 	}
-	err = clientSet.Core().Pods(ns.Name).Delete(testPodFitsDefault.Name, v1.NewDeleteOptions(0))
+	err = clientSet.Core().Pods(ns.Name).Delete(testPodFitsDefault.Name, metav1.NewDeleteOptions(0))
 	if err != nil {
 		t.Errorf("Failed to delete pod: %v", err)
 	}
@@ -574,7 +574,7 @@ func TestAllocatable(t *testing.T) {
 		t.Fatalf("Failed to update node with Status.Allocatable: %v", err)
 	}
 
-	if err := clientSet.Core().Pods(ns.Name).Delete(podResource.Name, &v1.DeleteOptions{}); err != nil {
+	if err := clientSet.Core().Pods(ns.Name).Delete(podResource.Name, &metav1.DeleteOptions{}); err != nil {
 		t.Fatalf("Failed to remove first resource pod: %v", err)
 	}
 

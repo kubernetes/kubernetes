@@ -122,7 +122,7 @@ func setPodTerminationReason(kubeClient clientset.Interface, pod *v1.Pod, nodeNa
 func forcefullyDeletePod(c clientset.Interface, pod *v1.Pod) error {
 	var zero int64
 	glog.Infof("NodeController is force deleting Pod: %v:%v", pod.Namespace, pod.Name)
-	err := c.Core().Pods(pod.Namespace).Delete(pod.Name, &v1.DeleteOptions{GracePeriodSeconds: &zero})
+	err := c.Core().Pods(pod.Namespace).Delete(pod.Name, &metav1.DeleteOptions{GracePeriodSeconds: &zero})
 	if err == nil {
 		glog.V(4).Infof("forceful deletion of %s succeeded", pod.Name)
 	}

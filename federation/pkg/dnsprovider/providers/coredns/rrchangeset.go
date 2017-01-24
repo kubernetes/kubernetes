@@ -19,10 +19,11 @@ package coredns
 import (
 	"encoding/json"
 	"fmt"
+	"hash/fnv"
+
 	etcdc "github.com/coreos/etcd/client"
 	dnsmsg "github.com/miekg/coredns/middleware/etcd/msg"
 	"golang.org/x/net/context"
-	"hash/fnv"
 	"k8s.io/kubernetes/federation/pkg/dnsprovider"
 )
 

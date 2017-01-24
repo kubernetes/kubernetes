@@ -192,7 +192,7 @@ var _ = framework.KubeDescribe("Kubelet Cgroup Manager", func() {
 				})
 				By("Checking if the pod cgroup was deleted", func() {
 					gp := int64(1)
-					Expect(f.PodClient().Delete(guaranteedPod.Name, &v1.DeleteOptions{GracePeriodSeconds: &gp})).NotTo(HaveOccurred())
+					Expect(f.PodClient().Delete(guaranteedPod.Name, &metav1.DeleteOptions{GracePeriodSeconds: &gp})).NotTo(HaveOccurred())
 					pod := makePodToVerifyCgroupRemoved(cm.CgroupName("pod" + podUID))
 					f.PodClient().Create(pod)
 					err := framework.WaitForPodSuccessInNamespace(f.ClientSet, pod.Name, f.Namespace.Name)
@@ -236,7 +236,7 @@ var _ = framework.KubeDescribe("Kubelet Cgroup Manager", func() {
 				})
 				By("Checking if the pod cgroup was deleted", func() {
 					gp := int64(1)
-					Expect(f.PodClient().Delete(bestEffortPod.Name, &v1.DeleteOptions{GracePeriodSeconds: &gp})).NotTo(HaveOccurred())
+					Expect(f.PodClient().Delete(bestEffortPod.Name, &metav1.DeleteOptions{GracePeriodSeconds: &gp})).NotTo(HaveOccurred())
 					pod := makePodToVerifyCgroupRemoved(cm.CgroupName("BestEffort/pod" + podUID))
 					f.PodClient().Create(pod)
 					err := framework.WaitForPodSuccessInNamespace(f.ClientSet, pod.Name, f.Namespace.Name)
@@ -280,7 +280,7 @@ var _ = framework.KubeDescribe("Kubelet Cgroup Manager", func() {
 				})
 				By("Checking if the pod cgroup was deleted", func() {
 					gp := int64(1)
-					Expect(f.PodClient().Delete(burstablePod.Name, &v1.DeleteOptions{GracePeriodSeconds: &gp})).NotTo(HaveOccurred())
+					Expect(f.PodClient().Delete(burstablePod.Name, &metav1.DeleteOptions{GracePeriodSeconds: &gp})).NotTo(HaveOccurred())
 					pod := makePodToVerifyCgroupRemoved(cm.CgroupName("Burstable/pod" + podUID))
 					f.PodClient().Create(pod)
 					err := framework.WaitForPodSuccessInNamespace(f.ClientSet, pod.Name, f.Namespace.Name)

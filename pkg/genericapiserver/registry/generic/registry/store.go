@@ -531,7 +531,7 @@ var (
 // - options.OrphanDependents,
 // - existing finalizers of the object
 // - e.DeleteStrategy.DefaultGarbageCollectionPolicy
-func shouldUpdateFinalizers(e *Store, accessor metav1.Object, options *api.DeleteOptions) (shouldUpdate bool, newFinalizers []string) {
+func shouldUpdateFinalizers(e *Store, accessor metav1.Object, options *metav1.DeleteOptions) (shouldUpdate bool, newFinalizers []string) {
 	shouldOrphan := false
 	// Get default orphan policy from this REST object type
 	if gcStrategy, ok := e.DeleteStrategy.(rest.GarbageCollectionDeleteStrategy); ok {
@@ -608,7 +608,7 @@ func markAsDeleting(obj runtime.Object) (err error) {
 //    should be deleted immediately
 // 4. a new output object with the state that was updated
 // 5. a copy of the last existing state of the object
-func (e *Store) updateForGracefulDeletion(ctx genericapirequest.Context, name, key string, options *api.DeleteOptions, preconditions storage.Preconditions, in runtime.Object) (err error, ignoreNotFound, deleteImmediately bool, out, lastExisting runtime.Object) {
+func (e *Store) updateForGracefulDeletion(ctx genericapirequest.Context, name, key string, options *metav1.DeleteOptions, preconditions storage.Preconditions, in runtime.Object) (err error, ignoreNotFound, deleteImmediately bool, out, lastExisting runtime.Object) {
 	lastGraceful := int64(0)
 	out = e.NewFunc()
 	err = e.Storage.GuaranteedUpdate(
@@ -670,7 +670,7 @@ func (e *Store) updateForGracefulDeletion(ctx genericapirequest.Context, name, k
 //    should be deleted immediately
 // 4. a new output object with the state that was updated
 // 5. a copy of the last existing state of the object
-func (e *Store) updateForGracefulDeletionAndFinalizers(ctx genericapirequest.Context, name, key string, options *api.DeleteOptions, preconditions storage.Preconditions, in runtime.Object) (err error, ignoreNotFound, deleteImmediately bool, out, lastExisting runtime.Object) {
+func (e *Store) updateForGracefulDeletionAndFinalizers(ctx genericapirequest.Context, name, key string, options *metav1.DeleteOptions, preconditions storage.Preconditions, in runtime.Object) (err error, ignoreNotFound, deleteImmediately bool, out, lastExisting runtime.Object) {
 	lastGraceful := int64(0)
 	var pendingFinalizers bool
 	out = e.NewFunc()
@@ -750,7 +750,7 @@ func (e *Store) updateForGracefulDeletionAndFinalizers(ctx genericapirequest.Con
 }
 
 // Delete removes the item from storage.
-func (e *Store) Delete(ctx genericapirequest.Context, name string, options *api.DeleteOptions) (runtime.Object, error) {
+func (e *Store) Delete(ctx genericapirequest.Context, name string, options *metav1.DeleteOptions) (runtime.Object, error) {
 	key, err := e.KeyFunc(ctx, name)
 	if err != nil {
 		return nil, err
@@ -762,7 +762,7 @@ func (e *Store) Delete(ctx genericapirequest.Context, name string, options *api.
 	}
 	// support older consumers of delete by treating "nil" as delete immediately
 	if options == nil {
-		options = api.NewDeleteOptions(0)
+		options = metav1.NewDeleteOptions(0)
 	}
 	var preconditions storage.Preconditions
 	if options.Preconditions != nil {
@@ -831,7 +831,7 @@ func (e *Store) Delete(ctx genericapirequest.Context, name string, options *api.
 // are removing all objects of a given type) with the current API (it's technically
 // possibly with storage API, but watch is not delivered correctly then).
 // It will be possible to fix it with v3 etcd API.
-func (e *Store) DeleteCollection(ctx genericapirequest.Context, options *api.DeleteOptions, listOptions *metainternalversion.ListOptions) (runtime.Object, error) {
+func (e *Store) DeleteCollection(ctx genericapirequest.Context, options *metav1.DeleteOptions, listOptions *metainternalversion.ListOptions) (runtime.Object, error) {
 	listObj, err := e.List(ctx, listOptions)
 	if err != nil {
 		return nil, err

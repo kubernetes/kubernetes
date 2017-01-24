@@ -44,7 +44,7 @@ var _ = framework.KubeDescribe("Federation apiserver [Feature:Federation]", func
 			clusterList, err := f.FederationClientset.Federation().Clusters().List(metav1.ListOptions{})
 			Expect(err).NotTo(HaveOccurred())
 			for _, cluster := range clusterList.Items {
-				err := f.FederationClientset.Federation().Clusters().Delete(cluster.Name, &v1.DeleteOptions{})
+				err := f.FederationClientset.Federation().Clusters().Delete(cluster.Name, &metav1.DeleteOptions{})
 				Expect(err).NotTo(HaveOccurred())
 			}
 		})
@@ -69,7 +69,7 @@ var _ = framework.KubeDescribe("Federation apiserver [Feature:Federation]", func
 			framework.Logf("Deleting %d clusters", len(contexts))
 			for _, context := range contexts {
 				framework.Logf("Deleting cluster object: %s (%s, secret: %s)", context.Name, context.Cluster.Cluster.Server, context.Name)
-				err := f.FederationClientset.Federation().Clusters().Delete(context.Name, &v1.DeleteOptions{})
+				err := f.FederationClientset.Federation().Clusters().Delete(context.Name, &metav1.DeleteOptions{})
 				framework.ExpectNoError(err, fmt.Sprintf("unexpected error in deleting cluster %s: %+v", context.Name, err))
 				framework.Logf("Successfully deleted cluster object: %s (%s, secret: %s)", context.Name, context.Cluster.Cluster.Server, context.Name)
 			}

@@ -39,7 +39,6 @@ import (
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/endpoints/handlers/negotiation"
 	"k8s.io/apiserver/pkg/endpoints/request"
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/genericapiserver/endpoints/handlers/responsewriters"
 	"k8s.io/kubernetes/pkg/genericapiserver/registry/rest"
 	"k8s.io/kubernetes/pkg/util"
@@ -811,7 +810,7 @@ func DeleteResource(r rest.GracefulDeleter, allowsOptions bool, scope RequestSco
 		ctx := scope.ContextFunc(req)
 		ctx = request.WithNamespace(ctx, namespace)
 
-		options := &api.DeleteOptions{}
+		options := &metav1.DeleteOptions{}
 		if allowsOptions {
 			body, err := readBody(req.Request)
 			if err != nil {
@@ -935,7 +934,7 @@ func DeleteCollection(r rest.CollectionDeleter, checkBody bool, scope RequestSco
 			}
 		}
 
-		options := &api.DeleteOptions{}
+		options := &metav1.DeleteOptions{}
 		if checkBody {
 			body, err := readBody(req.Request)
 			if err != nil {
