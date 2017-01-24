@@ -61,7 +61,7 @@ else
   _tmpdir="${TMP_GOPATH}"
 fi
 
-if [[ -z KEEP_TMP ]]; then
+if [[ -z ${KEEP_TMP:-} ]]; then
     KEEP_TMP=false
 fi
 function cleanup {
