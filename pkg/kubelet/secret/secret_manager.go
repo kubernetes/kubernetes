@@ -145,6 +145,12 @@ func (s *secretStore) Delete(namespace, name string) {
 	}
 }
 
+// fromApiserverCache modifies <opts> so that the GET request will
+// be served from apiserver cache instead of from etcd.
+func fromApiserverCache(opts *metav1.GetOptions) {
+	opts.ResourceVersion = "0"
+}
+
 func (s *secretStore) Get(namespace, name string) (*v1.Secret, error) {
 	key := objectKey{namespace: namespace, name: name}
 
@@ -169,7 +175,14 @@ func (s *secretStore) Get(namespace, name string) (*v1.Secret, error) {
 	data.Lock()
 	defer data.Unlock()
 	if data.err != nil || !s.clock.Now().Before(data.lastUpdateTime.Add(s.ttl)) {
-		secret, err := s.kubeClient.Core().Secrets(namespace).Get(name, metav1.GetOptions{})
+		opts := metav1.GetOptions{}
+		if data.secret != nil && data.err == nil {
+			// This is just a periodic refresh of a secret we successfully fetched previously.
+			// In this case, server data from apiserver cache to reduce the load on both
+			// etcd and apiserver (the cache is eventually consistent).
+			fromApiserverCache(&opts)
+		}
+		secret, err := s.kubeClient.Core().Secrets(namespace).Get(name, opts)
 		// Update state, unless we got error different than "not-found".
 		if err == nil || apierrors.IsNotFound(err) {
 			// Ignore the update to the older version of a secret.
