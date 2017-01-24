@@ -97,7 +97,7 @@ spec:
           name: metrics
           protocol: TCP
       - name: dnsmasq
-        image: gcr.io/google_containers/kube-dnsmasq-{{ arch }}:1.4
+        image: gcr.io/google_containers/k8s-dns-dnsmasq-{{ arch }}:1.11.0
         livenessProbe:
           httpGet:
             path: /healthcheck/dnsmasq
@@ -119,8 +119,13 @@ spec:
         - containerPort: 53
           name: dns-tcp
           protocol: TCP
+        # see: https://github.com/kubernetes/kubernetes/issues/29055 for details
+        resources:
+          requests:
+            cpu: 150m
+            memory: 10Mi
       - name: sidecar
-        image: gcr.io/google_containers/k8s-dns-sidecar-amd64:1.11.0
+        image: gcr.io/google_containers/k8s-dns-sidecar-{{ arch }}:1.11.0
         livenessProbe:
           httpGet:
             path: /metrics
