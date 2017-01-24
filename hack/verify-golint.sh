@@ -55,7 +55,7 @@ export IFS=$'\n'
 # as the prefix, however if we run it outside it returns the full path of the file
 # with a leading underscore. We'll need to support both scenarios for all_packages.
 all_packages=(
-	$(go list -e ./... | egrep -v "/(third_party|vendor|staging|generated|clientset_generated)" | sed -e 's|^k8s.io/kubernetes/||' -e "s|^_${KUBE_ROOT}/\?||")
+	$(go list -e ./... | egrep -v "/(third_party|vendor|staging/src/k8s.io/client-go/pkg|generated|clientset_generated)" | sed -e 's|^k8s.io/kubernetes/||' -e "s|^_${KUBE_ROOT}/\?||")
 )
 linted_packages=(
 	$(cat $linted_file)
@@ -76,6 +76,12 @@ for p in "${all_packages[@]}"; do
 	fi
 done
 
+# Check that all linted_packages actually still exist
+gone=()
+for p in "${linted_packages[@]}"; do
+	array_contains "$p" "${all_packages[@]}" || gone+=( "$p" )
+done
+
 # Check to be sure all the packages that should pass lint are.
 if [ ${#errors[@]} -eq 0 ]; then
 	echo 'Congratulations!  All Go source files have been linted.'
@@ -94,18 +100,29 @@ fi
 
 # check to make sure all packages that pass lint are in the linted file.
 echo
-if [ ${#linted[@]} -eq 0 ]; then
+if [ ${#linted[@]} -eq 0 -a ${#gone[@]} -eq 0 ]; then
 	echo 'Success! All packages that should pass lint are listed in the linted file.'
 else
 	{
-		echo "Some packages passed golint but are not listed in hack/.linted_packages."
-		echo "Please add them in alphabetical order:"
-		echo
-		for p in "${linted[@]}"; do
-			echo "  echo $p >> hack/.linted_packages"
-		done
-		echo "  LC_ALL=C sort -o hack/.linted_packages hack/.linted_packages"
-		echo
+		if [ ${#gone[@]} -gt 0 ]; then
+			echo "Some packages in hack/.linted_packages do not exist anymore. Please remove them"
+			echo "from hack/.linted_packages:"
+			echo
+			for p in "${gone[@]}"; do
+				echo "  $p"
+			done
+			echo
+		fi
+		if [ ${#linted[@]} -gt 0 ]; then
+			echo "Some packages passed golint but are not listed in hack/.linted_packages."
+			echo "Please add them in alphabetical order:"
+			echo
+			for p in "${linted[@]}"; do
+				echo "  echo $p >> hack/.linted_packages"
+			done
+			echo "  LC_ALL=C sort -o hack/.linted_packages hack/.linted_packages"
+			echo
+		fi
 		echo 'You can test via this script and commit the result.'
 		echo
 	} >&2
