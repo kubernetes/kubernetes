@@ -17,6 +17,7 @@ limitations under the License.
 package cmd
 
 import (
+	"encoding/json"
 	"fmt"
 	"io"
 
@@ -45,37 +46,53 @@ func NewCmdVersion(f cmdutil.Factory, out io.Writer) *cobra.Command {
 		},
 	}
 	cmd.Flags().BoolP("client", "c", false, "Client version only (no server required).")
+	cmd.Flags().BoolP("json", "", false, "Print version info in JSON format.")
 	cmd.Flags().BoolP("short", "", false, "Print just the version number.")
 	cmd.Flags().MarkShorthandDeprecated("client", "please use --client instead.")
 	return cmd
 }
 
+type versionInfo struct {
+	Client version.Info  `json:"client"`
+	Server *version.Info `json:"server,omitempty"`
+}
+
 func RunVersion(f cmdutil.Factory, out io.Writer, cmd *cobra.Command) error {
-	v := fmt.Sprintf("%#v", version.Get())
-	if cmdutil.GetFlagBool(cmd, "short") {
-		v = version.Get().GitVersion
+	if cmdutil.GetFlagBool(cmd, "json") && cmdutil.GetFlagBool(cmd, "short") {
+		return fmt.Errorf("Cannot use --json and --short!")
+	}
+	v := versionInfo{Client: version.Get(), Server: nil}
+
+	var serverErr error
+	if !cmdutil.GetFlagBool(cmd, "client") {
+		clientset, err := f.ClientSet()
+		serverErr = err
+		if serverErr == nil {
+			(v.Server), serverErr = clientset.Discovery().ServerVersion()
+		}
 	}
 
-	fmt.Fprintf(out, "Client Version: %s\n", v)
-	if cmdutil.GetFlagBool(cmd, "client") {
-		return nil
+	if cmdutil.GetFlagBool(cmd, "json") {
+		jsonOut, err := json.MarshalIndent(v, "", "  ")
+		if err != nil {
+			return err
+		}
+		fmt.Fprintf(out, "%s\n", jsonOut)
+		return serverErr
 	}
 
-	clientset, err := f.ClientSet()
-	if err != nil {
-		return err
+	verStr := func(v version.Info) string {
+		if cmdutil.GetFlagBool(cmd, "short") {
+			return v.GitVersion
+		}
+		return fmt.Sprintf("%#v", v)
 	}
-
-	serverVersion, err := clientset.Discovery().ServerVersion()
-	if err != nil {
-		return err
+	fmt.Fprintf(out, "Client Version: %s\n", verStr(v.Client))
+	if serverErr != nil {
+		return serverErr
 	}
-
-	v = fmt.Sprintf("%#v", *serverVersion)
-	if cmdutil.GetFlagBool(cmd, "short") {
-		v = serverVersion.GitVersion
+	if v.Server != nil {
+		fmt.Fprintf(out, "Server Version: %s\n", verStr(*v.Server))
 	}
-
-	fmt.Fprintf(out, "Server Version: %s\n", v)
 	return nil
 }
