@@ -78,15 +78,19 @@ func SetDefaults_Deployment(obj *Deployment) {
 			strategy.RollingUpdate = &rollingUpdate
 		}
 		if strategy.RollingUpdate.MaxUnavailable == nil {
-			// Set default MaxUnavailable as 1 by default.
-			maxUnavailable := intstr.FromInt(1)
+			// Set default MaxUnavailable as 25% by default.
+			maxUnavailable := intstr.FromString("25%")
 			strategy.RollingUpdate.MaxUnavailable = &maxUnavailable
 		}
 		if strategy.RollingUpdate.MaxSurge == nil {
-			// Set default MaxSurge as 1 by default.
-			maxSurge := intstr.FromInt(1)
+			// Set default MaxSurge as 25% by default.
+			maxSurge := intstr.FromString("25%")
 			strategy.RollingUpdate.MaxSurge = &maxSurge
 		}
+	}
+	if obj.Spec.RevisionHistoryLimit == nil {
+		obj.Spec.RevisionHistoryLimit = new(int32)
+		*obj.Spec.RevisionHistoryLimit = 3
 	}
 }
 
