@@ -18,6 +18,7 @@ go_library(
         "aws_utils.go",
         "device_allocator.go",
         "log_handler.go",
+        "regions.go",
         "retry_handler.go",
         "sets_ippermissions.go",
         "volumes.go",
@@ -53,6 +54,7 @@ go_test(
     srcs = [
         "aws_test.go",
         "device_allocator_test.go",
+        "regions_test.go",
         "retry_handler_test.go",
     ],
     library = ":go_default_library",
