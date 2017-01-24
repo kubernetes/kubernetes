@@ -20,7 +20,7 @@ package internalinterfaces
 
 import (
 	runtime "k8s.io/apimachinery/pkg/runtime"
-	cache "k8s.io/kubernetes/pkg/client/cache"
+	cache "k8s.io/client-go/tools/cache"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	internalclientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	time "time"

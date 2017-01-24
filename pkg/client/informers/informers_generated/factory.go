@@ -21,7 +21,7 @@ package informers_generated
 import (
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
-	cache "k8s.io/kubernetes/pkg/client/cache"
+	cache "k8s.io/client-go/tools/cache"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	internalclientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	apps "k8s.io/kubernetes/pkg/client/informers/informers_generated/apps"

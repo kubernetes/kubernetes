@@ -32,7 +32,6 @@ filegroup(
         "//pkg/auth/authorizer/abac:all-srcs",
         "//pkg/auth/user:all-srcs",
         "//pkg/capabilities:all-srcs",
-        "//pkg/client/cache:all-srcs",
         "//pkg/client/chaosclient:all-srcs",
         "//pkg/client/clientset_generated/clientset:all-srcs",
         "//pkg/client/clientset_generated/internalclientset:all-srcs",

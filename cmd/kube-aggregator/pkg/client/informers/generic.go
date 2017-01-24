@@ -21,9 +21,9 @@ package informers
 import (
 	"fmt"
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
+	cache "k8s.io/client-go/tools/cache"
 	apiregistration "k8s.io/kubernetes/cmd/kube-aggregator/pkg/apis/apiregistration"
 	v1alpha1 "k8s.io/kubernetes/cmd/kube-aggregator/pkg/apis/apiregistration/v1alpha1"
-	cache "k8s.io/kubernetes/pkg/client/cache"
 )
 
 // GenericInformer is type of SharedIndexInformer which will locate and delegate to other

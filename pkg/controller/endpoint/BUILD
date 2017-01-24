@@ -19,7 +19,6 @@ go_library(
         "//pkg/api/v1:go_default_library",
         "//pkg/api/v1/endpoints:go_default_library",
         "//pkg/api/v1/pod:go_default_library",
-        "//pkg/client/cache:go_default_library",
         "//pkg/client/clientset_generated/clientset:go_default_library",
         "//pkg/client/legacylisters:go_default_library",
         "//pkg/controller:go_default_library",
@@ -35,6 +34,7 @@ go_library(
         "//vendor:k8s.io/apimachinery/pkg/util/sets",
         "//vendor:k8s.io/apimachinery/pkg/util/wait",
         "//vendor:k8s.io/apimachinery/pkg/watch",
+        "//vendor:k8s.io/client-go/tools/cache",
     ],
 )
 
@@ -48,13 +48,13 @@ go_test(
         "//pkg/api/testapi:go_default_library",
         "//pkg/api/v1:go_default_library",
         "//pkg/api/v1/endpoints:go_default_library",
-        "//pkg/client/cache:go_default_library",
         "//pkg/client/clientset_generated/clientset:go_default_library",
         "//pkg/controller:go_default_library",
         "//pkg/util/intstr:go_default_library",
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
         "//vendor:k8s.io/apimachinery/pkg/runtime",
         "//vendor:k8s.io/client-go/rest",
+        "//vendor:k8s.io/client-go/tools/cache",
         "//vendor:k8s.io/client-go/util/testing",
     ],
 )
