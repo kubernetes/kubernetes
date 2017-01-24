@@ -129,7 +129,7 @@ var _ = framework.KubeDescribe("EmptyDir wrapper volumes", func() {
 				framework.Failf("unable to delete secret %v: %v", secret.Name, err)
 			}
 			By("Cleaning up the git vol pod")
-			if err = f.ClientSet.Core().Pods(f.Namespace.Name).Delete(pod.Name, v1.NewDeleteOptions(0)); err != nil {
+			if err = f.ClientSet.Core().Pods(f.Namespace.Name).Delete(pod.Name, metav1.NewDeleteOptions(0)); err != nil {
 				framework.Failf("unable to delete git vol pod %v: %v", pod.Name, err)
 			}
 		}()
@@ -223,7 +223,7 @@ func createGitServer(f *framework.Framework) (gitURL string, gitRepo string, cle
 
 	return "http://" + gitServerSvc.Spec.ClusterIP + ":" + strconv.Itoa(httpPort), "test", func() {
 		By("Cleaning up the git server pod")
-		if err := f.ClientSet.Core().Pods(f.Namespace.Name).Delete(gitServerPod.Name, v1.NewDeleteOptions(0)); err != nil {
+		if err := f.ClientSet.Core().Pods(f.Namespace.Name).Delete(gitServerPod.Name, metav1.NewDeleteOptions(0)); err != nil {
 			framework.Failf("unable to delete git server pod %v: %v", gitServerPod.Name, err)
 		}
 		By("Cleaning up the git server svc")

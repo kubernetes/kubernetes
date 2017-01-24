@@ -117,7 +117,7 @@ func checkExistingRCRecovers(f *framework.Framework) {
 			return false, nil
 		}
 		for _, pod := range pods.Items {
-			err = podClient.Delete(pod.Name, v1.NewDeleteOptions(0))
+			err = podClient.Delete(pod.Name, metav1.NewDeleteOptions(0))
 			Expect(err).NotTo(HaveOccurred())
 		}
 		framework.Logf("apiserver has recovered")

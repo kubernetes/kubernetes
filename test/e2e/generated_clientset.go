@@ -170,7 +170,7 @@ var _ = framework.KubeDescribe("Generated release_1_5 clientset", func() {
 		framework.ExpectNoError(f.WaitForPodRunning(pod.Name))
 
 		By("deleting the pod gracefully")
-		if err := podClient.Delete(pod.Name, v1.NewDeleteOptions(30)); err != nil {
+		if err := podClient.Delete(pod.Name, metav1.NewDeleteOptions(30)); err != nil {
 			framework.Failf("Failed to delete pod: %v", err)
 		}
 

@@ -535,7 +535,7 @@ type noDeleteService struct {
 	coreclient.ServiceInterface
 }
 
-func (c *noDeleteService) Delete(service string, o *api.DeleteOptions) error {
+func (c *noDeleteService) Delete(service string, o *metav1.DeleteOptions) error {
 	return fmt.Errorf("I'm afraid I can't do that, Dave")
 }
 

@@ -67,7 +67,7 @@ func NewPodGC(kubeClient clientset.Interface, podInformer cache.SharedIndexInfor
 		terminatedPodThreshold: terminatedPodThreshold,
 		deletePod: func(namespace, name string) error {
 			glog.Infof("PodGC is force deleting Pod: %v:%v", namespace, name)
-			return kubeClient.Core().Pods(namespace).Delete(name, v1.NewDeleteOptions(0))
+			return kubeClient.Core().Pods(namespace).Delete(name, metav1.NewDeleteOptions(0))
 		},
 	}
 

@@ -412,7 +412,7 @@ var _ = framework.KubeDescribe("StatefulSet", func() {
 			}
 
 			By("Removing pod with conflicting port in namespace " + f.Namespace.Name)
-			err = f.ClientSet.Core().Pods(f.Namespace.Name).Delete(pod.Name, v1.NewDeleteOptions(0))
+			err = f.ClientSet.Core().Pods(f.Namespace.Name).Delete(pod.Name, metav1.NewDeleteOptions(0))
 			framework.ExpectNoError(err)
 
 			By("Waiting when stateful pod " + statefulPodName + " will be recreated in namespace " + f.Namespace.Name + " and will be in running state")
@@ -772,7 +772,7 @@ func (s *statefulSetTester) saturate(ss *apps.StatefulSet) {
 func (s *statefulSetTester) deleteStatefulPodAtIndex(index int, ss *apps.StatefulSet) {
 	name := getPodNameAtIndex(index, ss)
 	noGrace := int64(0)
-	if err := s.c.Core().Pods(ss.Namespace).Delete(name, &v1.DeleteOptions{GracePeriodSeconds: &noGrace}); err != nil {
+	if err := s.c.Core().Pods(ss.Namespace).Delete(name, &metav1.DeleteOptions{GracePeriodSeconds: &noGrace}); err != nil {
 		framework.Failf("Failed to delete stateful pod %v for StatefulSet %v/%v: %v", name, ss.Namespace, ss.Name, err)
 	}
 }

@@ -295,7 +295,7 @@ func createDummyDeployment(client *clientset.Clientset) {
 	fmt.Println("[apiclient] Test deployment succeeded")
 
 	// TODO: In the future, make sure the ReplicaSet and Pod are garbage collected
-	if err := client.Extensions().Deployments(metav1.NamespaceSystem).Delete("dummy", &v1.DeleteOptions{}); err != nil {
+	if err := client.Extensions().Deployments(metav1.NamespaceSystem).Delete("dummy", &metav1.DeleteOptions{}); err != nil {
 		fmt.Printf("[apiclient] Failed to delete test deployment [%v] (will ignore)\n", err)
 	}
 }

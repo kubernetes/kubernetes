@@ -207,7 +207,7 @@ var _ = framework.KubeDescribe("Pods", func() {
 		framework.Logf("running pod: %#v", pod)
 
 		By("deleting the pod gracefully")
-		err = podClient.Delete(pod.Name, v1.NewDeleteOptions(30))
+		err = podClient.Delete(pod.Name, metav1.NewDeleteOptions(30))
 		Expect(err).NotTo(HaveOccurred(), "failed to delete pod")
 
 		By("verifying the kubelet observed the termination notice")

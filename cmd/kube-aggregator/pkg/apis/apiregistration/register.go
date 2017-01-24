@@ -50,7 +50,7 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 		&APIServiceList{},
 
 		&kapi.ListOptions{},
-		&kapi.DeleteOptions{},
+		&metav1.DeleteOptions{},
 		&metav1.GetOptions{},
 	)
 	metav1.AddToGroupVersion(scheme, SchemeGroupVersion)

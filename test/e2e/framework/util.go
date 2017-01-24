@@ -2116,7 +2116,7 @@ func (f *Framework) MatchContainerOutput(
 	createdPod := podClient.Create(pod)
 	defer func() {
 		By("delete the pod")
-		podClient.DeleteSync(createdPod.Name, &v1.DeleteOptions{}, podNoLongerRunningTimeout)
+		podClient.DeleteSync(createdPod.Name, &metav1.DeleteOptions{}, podNoLongerRunningTimeout)
 	}()
 
 	// Wait for client pod to complete.
@@ -2732,7 +2732,7 @@ func getRuntimeObjectForKind(c clientset.Interface, kind schema.GroupKind, ns, n
 	}
 }
 
-func deleteResource(c clientset.Interface, kind schema.GroupKind, ns, name string, deleteOption *v1.DeleteOptions) error {
+func deleteResource(c clientset.Interface, kind schema.GroupKind, ns, name string, deleteOption *metav1.DeleteOptions) error {
 	switch kind {
 	case api.Kind("ReplicationController"):
 		return c.Core().ReplicationControllers(ns).Delete(name, deleteOption)
@@ -2884,7 +2884,7 @@ func DeleteResourceAndWaitForGC(c clientset.Interface, kind schema.GroupKind, ns
 	defer ps.Stop()
 	startTime := time.Now()
 	falseVar := false
-	deleteOption := &v1.DeleteOptions{OrphanDependents: &falseVar}
+	deleteOption := &metav1.DeleteOptions{OrphanDependents: &falseVar}
 	err = deleteResource(c, kind, ns, name, deleteOption)
 	if err != nil && apierrs.IsNotFound(err) {
 		Logf("%v %s was already deleted: %v", kind, name, err)

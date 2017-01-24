@@ -624,8 +624,8 @@ func (gc *GarbageCollector) deleteObject(item objectReference) error {
 		return err
 	}
 	uid := item.UID
-	preconditions := v1.Preconditions{UID: &uid}
-	deleteOptions := v1.DeleteOptions{Preconditions: &preconditions}
+	preconditions := metav1.Preconditions{UID: &uid}
+	deleteOptions := metav1.DeleteOptions{Preconditions: &preconditions}
 	return client.Resource(resource, item.Namespace).Delete(item.Name, &deleteOptions)
 }
 

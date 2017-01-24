@@ -499,9 +499,9 @@ func runDelete(namespace, name string, mapping *meta.RESTMapping, c resource.RES
 		}
 		return resource.NewHelper(c, mapping).Delete(namespace, name)
 	}
-	var options *api.DeleteOptions
+	var options *metav1.DeleteOptions
 	if gracePeriod >= 0 {
-		options = api.NewDeleteOptions(int64(gracePeriod))
+		options = metav1.NewDeleteOptions(int64(gracePeriod))
 	}
 	if err := r.Stop(namespace, name, 2*time.Minute, options); err != nil {
 		return err

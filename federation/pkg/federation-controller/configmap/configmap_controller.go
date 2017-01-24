@@ -156,7 +156,7 @@ func NewConfigMapController(client federationclientset.Interface) *ConfigMapCont
 		},
 		func(client kubeclientset.Interface, obj pkgruntime.Object) error {
 			configmap := obj.(*apiv1.ConfigMap)
-			err := client.Core().ConfigMaps(configmap.Namespace).Delete(configmap.Name, &apiv1.DeleteOptions{})
+			err := client.Core().ConfigMaps(configmap.Namespace).Delete(configmap.Name, &metav1.DeleteOptions{})
 			return err
 		})
 	return configmapcontroller
