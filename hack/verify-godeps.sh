@@ -53,7 +53,7 @@ if ! [[ ${KUBE_FORCE_VERIFY_CHECKS:-} =~ ^[yY]$ ]] && \
   exit 0
 fi
 
-if [[ -z ${TMP_GOPATH:-} ]]; then
+if [[ -z "${TMP_GOPATH:-}" ]]; then
   # Create a nice clean place to put our new godeps
   _tmpdir="$(mktemp -d -t gopath.XXXXXX)"
 else
@@ -61,7 +61,7 @@ else
   _tmpdir="${TMP_GOPATH}"
 fi
 
-if [[ -z KEEP_TMP ]]; then
+if [[ -z "${KEEP_TMP:-}" ]]; then
     KEEP_TMP=false
 fi
 function cleanup {
