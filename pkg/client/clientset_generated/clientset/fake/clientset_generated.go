@@ -45,6 +45,8 @@ import (
 	fakev1alpha1rbac "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/rbac/v1alpha1/fake"
 	v1beta1rbac "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/rbac/v1beta1"
 	fakev1beta1rbac "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/rbac/v1beta1/fake"
+	v1storage "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/storage/v1"
+	fakev1storage "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/storage/v1/fake"
 	v1beta1storage "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/storage/v1beta1"
 	fakev1beta1storage "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/storage/v1beta1/fake"
 	"k8s.io/kubernetes/pkg/client/testing/core"
@@ -200,7 +202,12 @@ func (c *Clientset) StorageV1beta1() v1beta1storage.StorageV1beta1Interface {
 	return &fakev1beta1storage.FakeStorageV1beta1{Fake: &c.Fake}
 }
 
-// Storage retrieves the StorageV1beta1Client
-func (c *Clientset) Storage() v1beta1storage.StorageV1beta1Interface {
-	return &fakev1beta1storage.FakeStorageV1beta1{Fake: &c.Fake}
+// StorageV1 retrieves the StorageV1Client
+func (c *Clientset) StorageV1() v1storage.StorageV1Interface {
+	return &fakev1storage.FakeStorageV1{Fake: &c.Fake}
+}
+
+// Storage retrieves the StorageV1Client
+func (c *Clientset) Storage() v1storage.StorageV1Interface {
+	return &fakev1storage.FakeStorageV1{Fake: &c.Fake}
 }
