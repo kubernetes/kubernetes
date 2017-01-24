@@ -125,7 +125,7 @@ type RecyclableVolumePlugin interface {
 	// recycler will use the provided recorder to write any events that might be
 	// interesting to user. It's expected that caller will pass these events to
 	// the PV being recycled.
-	NewRecycler(pvName string, spec *Spec, eventRecorder RecycleEventRecorder) (Recycler, error)
+	Recycle(pvName string, spec *Spec, eventRecorder RecycleEventRecorder) error
 }
 
 // DeletableVolumePlugin is an extended interface of VolumePlugin and is used
