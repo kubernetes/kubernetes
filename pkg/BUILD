@@ -69,7 +69,6 @@ filegroup(
         "//pkg/client/listers/storage/v1beta1:all-srcs",
         "//pkg/client/metrics:all-srcs",
         "//pkg/client/record:all-srcs",
-        "//pkg/client/restclient/fake:all-srcs",
         "//pkg/client/retry:all-srcs",
         "//pkg/client/testdata:all-srcs",
         "//pkg/client/testing/cache:all-srcs",
