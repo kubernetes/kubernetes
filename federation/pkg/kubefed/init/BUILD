@@ -26,10 +26,10 @@ go_library(
         "//vendor:github.com/spf13/cobra",
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
         "//vendor:k8s.io/apimachinery/pkg/util/wait",
-        "//vendor:k8s.io/client-go/pkg/util/cert",
-        "//vendor:k8s.io/client-go/pkg/util/cert/triple",
         "//vendor:k8s.io/client-go/tools/clientcmd",
         "//vendor:k8s.io/client-go/tools/clientcmd/api",
+        "//vendor:k8s.io/client-go/util/cert",
+        "//vendor:k8s.io/client-go/util/cert/triple",
     ],
 )
 

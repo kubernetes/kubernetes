@@ -45,7 +45,7 @@ go_test(
         "//vendor:k8s.io/apiserver/pkg/authentication/user",
         "//vendor:k8s.io/apiserver/pkg/authorization/authorizer",
         "//vendor:k8s.io/apiserver/pkg/endpoints/request",
-        "//vendor:k8s.io/client-go/pkg/util/cert",
+        "//vendor:k8s.io/client-go/util/cert",
     ],
 )
 
@@ -105,8 +105,8 @@ go_library(
         "//vendor:k8s.io/apiserver/pkg/authorization/union",
         "//vendor:k8s.io/apiserver/pkg/endpoints/request",
         "//vendor:k8s.io/apiserver/pkg/server/healthz",
-        "//vendor:k8s.io/client-go/pkg/util/cert",
         "//vendor:k8s.io/client-go/rest",
+        "//vendor:k8s.io/client-go/util/cert",
     ],
 )
 

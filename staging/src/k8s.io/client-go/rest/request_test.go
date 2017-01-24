@@ -45,12 +45,12 @@ import (
 	"k8s.io/client-go/pkg/api"
 	"k8s.io/client-go/pkg/api/testapi"
 	"k8s.io/client-go/pkg/api/v1"
-	"k8s.io/client-go/pkg/util/clock"
-	"k8s.io/client-go/pkg/util/flowcontrol"
 	"k8s.io/client-go/pkg/util/httpstream"
 	"k8s.io/client-go/pkg/util/intstr"
-	utiltesting "k8s.io/client-go/pkg/util/testing"
 	restclientwatch "k8s.io/client-go/rest/watch"
+	"k8s.io/client-go/util/clock"
+	"k8s.io/client-go/util/flowcontrol"
+	utiltesting "k8s.io/client-go/util/testing"
 )
 
 func TestNewRequestSetsAccept(t *testing.T) {

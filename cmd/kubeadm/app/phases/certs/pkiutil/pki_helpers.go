@@ -25,7 +25,7 @@ import (
 	"path"
 	"time"
 
-	certutil "k8s.io/client-go/pkg/util/cert"
+	certutil "k8s.io/client-go/util/cert"
 )
 
 // TODO: It should be able to generate different types of private keys, at least: RSA and ECDSA (and in the future maybe Ed25519 as well)

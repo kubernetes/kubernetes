@@ -18,9 +18,9 @@ package clientset
 
 import (
 	"github.com/golang/glog"
-	"k8s.io/client-go/pkg/util/flowcontrol"
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
 	rest "k8s.io/client-go/rest"
+	"k8s.io/client-go/util/flowcontrol"
 	v1alpha1apiregistration "k8s.io/kubernetes/cmd/kube-aggregator/pkg/client/clientset_generated/clientset/typed/apiregistration/v1alpha1"
 	discovery "k8s.io/kubernetes/pkg/client/typed/discovery"
 )

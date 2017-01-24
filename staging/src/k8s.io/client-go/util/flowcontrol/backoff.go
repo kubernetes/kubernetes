@@ -20,8 +20,8 @@ import (
 	"sync"
 	"time"
 
-	"k8s.io/client-go/pkg/util/clock"
-	"k8s.io/client-go/pkg/util/integer"
+	"k8s.io/client-go/util/clock"
+	"k8s.io/client-go/util/integer"
 )
 
 type backoffEntry struct {
