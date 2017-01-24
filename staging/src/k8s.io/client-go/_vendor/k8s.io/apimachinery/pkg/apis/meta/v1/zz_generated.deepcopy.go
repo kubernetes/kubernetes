@@ -71,16 +71,12 @@ func DeepCopy_v1_APIGroup(in interface{}, out interface{}, c *conversion.Cloner)
 		if in.Versions != nil {
 			in, out := &in.Versions, &out.Versions
 			*out = make([]GroupVersionForDiscovery, len(*in))
-			for i := range *in {
-				(*out)[i] = (*in)[i]
-			}
+			copy(*out, *in)
 		}
 		if in.ServerAddressByClientCIDRs != nil {
 			in, out := &in.ServerAddressByClientCIDRs, &out.ServerAddressByClientCIDRs
 			*out = make([]ServerAddressByClientCIDR, len(*in))
-			for i := range *in {
-				(*out)[i] = (*in)[i]
-			}
+			copy(*out, *in)
 		}
 		return nil
 	}
@@ -153,9 +149,7 @@ func DeepCopy_v1_APIVersions(in interface{}, out interface{}, c *conversion.Clon
 		if in.ServerAddressByClientCIDRs != nil {
 			in, out := &in.ServerAddressByClientCIDRs, &out.ServerAddressByClientCIDRs
 			*out = make([]ServerAddressByClientCIDR, len(*in))
-			for i := range *in {
-				(*out)[i] = (*in)[i]
-			}
+			copy(*out, *in)
 		}
 		return nil
 	}
@@ -453,9 +447,7 @@ func DeepCopy_v1_StatusDetails(in interface{}, out interface{}, c *conversion.Cl
 		if in.Causes != nil {
 			in, out := &in.Causes, &out.Causes
 			*out = make([]StatusCause, len(*in))
-			for i := range *in {
-				(*out)[i] = (*in)[i]
-			}
+			copy(*out, *in)
 		}
 		return nil
 	}

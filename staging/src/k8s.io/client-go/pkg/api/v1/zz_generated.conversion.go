@@ -674,6 +674,7 @@ func autoConvert_v1_ConfigMapEnvSource_To_api_ConfigMapEnvSource(in *ConfigMapEn
 	if err := Convert_v1_LocalObjectReference_To_api_LocalObjectReference(&in.LocalObjectReference, &out.LocalObjectReference, s); err != nil {
 		return err
 	}
+	out.Optional = (*bool)(unsafe.Pointer(in.Optional))
 	return nil
 }
 
@@ -685,6 +686,7 @@ func autoConvert_api_ConfigMapEnvSource_To_v1_ConfigMapEnvSource(in *api.ConfigM
 	if err := Convert_api_LocalObjectReference_To_v1_LocalObjectReference(&in.LocalObjectReference, &out.LocalObjectReference, s); err != nil {
 		return err
 	}
+	out.Optional = (*bool)(unsafe.Pointer(in.Optional))
 	return nil
 }
 
@@ -697,6 +699,7 @@ func autoConvert_v1_ConfigMapKeySelector_To_api_ConfigMapKeySelector(in *ConfigM
 		return err
 	}
 	out.Key = in.Key
+	out.Optional = (*bool)(unsafe.Pointer(in.Optional))
 	return nil
 }
 
@@ -709,6 +712,7 @@ func autoConvert_api_ConfigMapKeySelector_To_v1_ConfigMapKeySelector(in *api.Con
 		return err
 	}
 	out.Key = in.Key
+	out.Optional = (*bool)(unsafe.Pointer(in.Optional))
 	return nil
 }
 
@@ -742,6 +746,7 @@ func autoConvert_v1_ConfigMapVolumeSource_To_api_ConfigMapVolumeSource(in *Confi
 	}
 	out.Items = *(*[]api.KeyToPath)(unsafe.Pointer(&in.Items))
 	out.DefaultMode = (*int32)(unsafe.Pointer(in.DefaultMode))
+	out.Optional = (*bool)(unsafe.Pointer(in.Optional))
 	return nil
 }
 
@@ -755,6 +760,7 @@ func autoConvert_api_ConfigMapVolumeSource_To_v1_ConfigMapVolumeSource(in *api.C
 	}
 	out.Items = *(*[]KeyToPath)(unsafe.Pointer(&in.Items))
 	out.DefaultMode = (*int32)(unsafe.Pointer(in.DefaultMode))
+	out.Optional = (*bool)(unsafe.Pointer(in.Optional))
 	return nil
 }
 
@@ -3790,6 +3796,7 @@ func autoConvert_v1_SecretEnvSource_To_api_SecretEnvSource(in *SecretEnvSource, 
 	if err := Convert_v1_LocalObjectReference_To_api_LocalObjectReference(&in.LocalObjectReference, &out.LocalObjectReference, s); err != nil {
 		return err
 	}
+	out.Optional = (*bool)(unsafe.Pointer(in.Optional))
 	return nil
 }
 
@@ -3801,6 +3808,7 @@ func autoConvert_api_SecretEnvSource_To_v1_SecretEnvSource(in *api.SecretEnvSour
 	if err := Convert_api_LocalObjectReference_To_v1_LocalObjectReference(&in.LocalObjectReference, &out.LocalObjectReference, s); err != nil {
 		return err
 	}
+	out.Optional = (*bool)(unsafe.Pointer(in.Optional))
 	return nil
 }
 
@@ -3813,6 +3821,7 @@ func autoConvert_v1_SecretKeySelector_To_api_SecretKeySelector(in *SecretKeySele
 		return err
 	}
 	out.Key = in.Key
+	out.Optional = (*bool)(unsafe.Pointer(in.Optional))
 	return nil
 }
 
@@ -3825,6 +3834,7 @@ func autoConvert_api_SecretKeySelector_To_v1_SecretKeySelector(in *api.SecretKey
 		return err
 	}
 	out.Key = in.Key
+	out.Optional = (*bool)(unsafe.Pointer(in.Optional))
 	return nil
 }
 
@@ -3876,6 +3886,7 @@ func autoConvert_v1_SecretVolumeSource_To_api_SecretVolumeSource(in *SecretVolum
 	out.SecretName = in.SecretName
 	out.Items = *(*[]api.KeyToPath)(unsafe.Pointer(&in.Items))
 	out.DefaultMode = (*int32)(unsafe.Pointer(in.DefaultMode))
+	out.Optional = (*bool)(unsafe.Pointer(in.Optional))
 	return nil
 }
 
@@ -3887,6 +3898,7 @@ func autoConvert_api_SecretVolumeSource_To_v1_SecretVolumeSource(in *api.SecretV
 	out.SecretName = in.SecretName
 	out.Items = *(*[]KeyToPath)(unsafe.Pointer(&in.Items))
 	out.DefaultMode = (*int32)(unsafe.Pointer(in.DefaultMode))
+	out.Optional = (*bool)(unsafe.Pointer(in.Optional))
 	return nil
 }
 
