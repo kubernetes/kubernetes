@@ -212,8 +212,6 @@ func (c *cachingSecretManager) GetSecret(namespace, name string) (*v1.Secret, er
 	return c.secretStore.Get(namespace, name)
 }
 
-// TODO: Before we will use secretManager in other places (e.g. for secret volumes)
-// we should update this function to also get secrets from those places.
 func getSecretNames(pod *v1.Pod) sets.String {
 	result := sets.NewString()
 	for _, reference := range pod.Spec.ImagePullSecrets {
@@ -224,6 +222,11 @@ func getSecretNames(pod *v1.Pod) sets.String {
 			if envVar.ValueFrom != nil && envVar.ValueFrom.SecretKeyRef != nil {
 				result.Insert(envVar.ValueFrom.SecretKeyRef.Name)
 			}
+		}
+	}
+	for i := range pod.Spec.Volumes {
+		if source := pod.Spec.Volumes[i].Secret; source != nil {
+			result.Insert(source.SecretName)
 		}
 	}
 	return result

@@ -13718,3 +13718,9 @@ go_library(
     srcs = ["k8s.io/client-go/third_party/forked/golang/netutil/addr.go"],
     tags = ["automanaged"],
 )
+
+go_library(
+    name = "github.com/armon/circbuf",
+    srcs = ["github.com/armon/circbuf/circbuf.go"],
+    tags = ["automanaged"],
+)

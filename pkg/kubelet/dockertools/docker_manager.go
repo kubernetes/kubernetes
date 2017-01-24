@@ -33,6 +33,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/armon/circbuf"
 	dockertypes "github.com/docker/engine-api/types"
 	dockercontainer "github.com/docker/engine-api/types/container"
 	dockerstrslice "github.com/docker/engine-api/types/strslice"
@@ -70,6 +71,7 @@ import (
 	"k8s.io/kubernetes/pkg/util/procfs"
 	"k8s.io/kubernetes/pkg/util/selinux"
 	utilstrings "k8s.io/kubernetes/pkg/util/strings"
+	"k8s.io/kubernetes/pkg/util/tail"
 	"k8s.io/kubernetes/pkg/util/term"
 	utilversion "k8s.io/kubernetes/pkg/util/version"
 )
@@ -482,19 +484,12 @@ func (dm *DockerManager) inspectContainer(id string, podName, podNamespace strin
 			startedAt = createdAt
 		}
 
-		terminationMessagePath := containerInfo.TerminationMessagePath
-		if terminationMessagePath != "" {
-			for _, mount := range iResult.Mounts {
-				if mount.Destination == terminationMessagePath {
-					path := mount.Source
-					if data, err := ioutil.ReadFile(path); err != nil {
-						message = fmt.Sprintf("Error on reading termination-log %s: %v", path, err)
-					} else {
-						message = string(data)
-					}
-				}
-			}
+		// retrieve the termination message from logs, file, or file with fallback to logs in case of failure
+		fallbackToLogs := containerInfo.TerminationMessagePolicy == v1.TerminationMessageFallbackToLogsOnError && (iResult.State.ExitCode != 0 || iResult.State.OOMKilled)
+		if msg := getTerminationMessage(dm.c, iResult, containerInfo.TerminationMessagePath, fallbackToLogs); len(msg) > 0 {
+			message = msg
 		}
+
 		status.State = kubecontainer.ContainerStateExited
 		status.Message = message
 		status.Reason = reason
@@ -506,6 +501,49 @@ func (dm *DockerManager) inspectContainer(id string, podName, podNamespace strin
 		status.State = kubecontainer.ContainerStateUnknown
 	}
 	return &status, "", nil
+}
+
+func getTerminationMessage(c DockerInterface, iResult *dockertypes.ContainerJSON, terminationMessagePath string, fallbackToLogs bool) string {
+	if len(terminationMessagePath) != 0 {
+		for _, mount := range iResult.Mounts {
+			if mount.Destination != terminationMessagePath {
+				continue
+			}
+			path := mount.Source
+			data, _, err := tail.ReadAtMost(path, kubecontainer.MaxContainerTerminationMessageLength)
+			if err != nil {
+				return fmt.Sprintf("Error on reading termination log %s: %v", path, err)
+			}
+			if !fallbackToLogs || len(data) != 0 {
+				return string(data)
+			}
+		}
+	}
+	if !fallbackToLogs {
+		return ""
+	}
+
+	return readLastStringFromContainerLogs(c, iResult.Name)
+}
+
+// readLastStringFromContainerLogs attempts to a certain amount from the end of the logs for containerName.
+// It will attempt to avoid reading excessive logs from the server, which may result in underestimating the amount
+// of logs to fetch (such that the length of the response message is < max).
+func readLastStringFromContainerLogs(c DockerInterface, containerName string) string {
+	logOptions := dockertypes.ContainerLogsOptions{
+		ShowStdout: true,
+		ShowStderr: true,
+	}
+	buf, _ := circbuf.NewBuffer(kubecontainer.MaxContainerTerminationMessageLogLength)
+	streamOptions := StreamOptions{
+		ErrorStream:  buf,
+		OutputStream: buf,
+	}
+	logOptions.Tail = strconv.FormatInt(kubecontainer.MaxContainerTerminationMessageLogLines, 10)
+	if err := c.Logs(containerName, logOptions, streamOptions); err != nil {
+		return fmt.Sprintf("Error on reading termination message from logs: %v", err)
+	}
+	return buf.String()
 }
 
 // makeEnvList converts EnvVar list to a list of strings, in the form of
@@ -672,17 +710,24 @@ func (dm *DockerManager) runContainer(
 		fs, err := os.Create(containerLogPath)
 		if err != nil {
 			// TODO: Clean up the previously created dir? return the error?
-			glog.Errorf("Error on creating termination-log file %q: %v", containerLogPath, err)
+			utilruntime.HandleError(fmt.Errorf("error creating termination-log file %q: %v", containerLogPath, err))
 		} else {
 			fs.Close() // Close immediately; we're just doing a `touch` here
-			b := fmt.Sprintf("%s:%s", containerLogPath, container.TerminationMessagePath)
+
+			// Chmod is needed because ioutil.WriteFile() ends up calling
+			// open(2) to create the file, so the final mode used is "mode &
+			// ~umask". But we want to make sure the specified mode is used
+			// in the file no matter what the umask is.
+			if err := os.Chmod(containerLogPath, 0666); err != nil {
+				utilruntime.HandleError(fmt.Errorf("unable to set termination-log file permissions %q: %v", containerLogPath, err))
+			}
 
 			// Have docker relabel the termination log path if SELinux is
 			// enabled.
+			b := fmt.Sprintf("%s:%s", containerLogPath, container.TerminationMessagePath)
 			if selinux.SELinuxEnabled() {
 				b += ":Z"
 			}
-
 			binds = append(binds, b)
 		}
 	}

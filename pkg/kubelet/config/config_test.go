@@ -69,10 +69,11 @@ func CreateValidPod(name, namespace string) *v1.Pod {
 			DNSPolicy:     v1.DNSClusterFirst,
 			Containers: []v1.Container{
 				{
-					Name:            "ctr",
-					Image:           "image",
-					ImagePullPolicy: "IfNotPresent",
-					SecurityContext: securitycontext.ValidSecurityContextWithContainerDefaults(),
+					Name:                     "ctr",
+					Image:                    "image",
+					ImagePullPolicy:          "IfNotPresent",
+					SecurityContext:          securitycontext.ValidSecurityContextWithContainerDefaults(),
+					TerminationMessagePolicy: v1.TerminationMessageReadFile,
 				},
 			},
 		},
@@ -204,7 +205,7 @@ func TestNewPodAddedSnapshotAndUpdates(t *testing.T) {
 
 	// container updates are separated as UPDATE
 	pod := *podUpdate.Pods[0]
-	pod.Spec.Containers = []v1.Container{{Name: "bar", Image: "test", ImagePullPolicy: v1.PullIfNotPresent}}
+	pod.Spec.Containers = []v1.Container{{Name: "bar", Image: "test", ImagePullPolicy: v1.PullIfNotPresent, TerminationMessagePolicy: v1.TerminationMessageReadFile}}
 	channel <- CreatePodUpdate(kubetypes.ADD, TestSource, &pod)
 	expectPodUpdate(t, ch, CreatePodUpdate(kubetypes.UPDATE, TestSource, &pod))
 }
@@ -222,7 +223,7 @@ func TestNewPodAddedSnapshot(t *testing.T) {
 
 	// container updates are separated as UPDATE
 	pod := *podUpdate.Pods[0]
-	pod.Spec.Containers = []v1.Container{{Name: "bar", Image: "test", ImagePullPolicy: v1.PullIfNotPresent}}
+	pod.Spec.Containers = []v1.Container{{Name: "bar", Image: "test", ImagePullPolicy: v1.PullIfNotPresent, TerminationMessagePolicy: v1.TerminationMessageReadFile}}
 	channel <- CreatePodUpdate(kubetypes.ADD, TestSource, &pod)
 	expectPodUpdate(t, ch, CreatePodUpdate(kubetypes.SET, TestSource, &pod))
 }
@@ -240,7 +241,7 @@ func TestNewPodAddedUpdatedRemoved(t *testing.T) {
 
 	// an kubetypes.ADD should be converted to kubetypes.UPDATE
 	pod := CreateValidPod("foo", "new")
-	pod.Spec.Containers = []v1.Container{{Name: "bar", Image: "test", ImagePullPolicy: v1.PullIfNotPresent}}
+	pod.Spec.Containers = []v1.Container{{Name: "bar", Image: "test", ImagePullPolicy: v1.PullIfNotPresent, TerminationMessagePolicy: v1.TerminationMessageReadFile}}
 	podUpdate = CreatePodUpdate(kubetypes.ADD, TestSource, pod)
 	channel <- podUpdate
 	expectPodUpdate(t, ch, CreatePodUpdate(kubetypes.UPDATE, TestSource, pod))
@@ -282,7 +283,7 @@ func TestNewPodAddedUpdatedSet(t *testing.T) {
 
 	// should be converted to an kubetypes.ADD, kubetypes.REMOVE, and kubetypes.UPDATE
 	pod := CreateValidPod("foo2", "new")
-	pod.Spec.Containers = []v1.Container{{Name: "bar", Image: "test", ImagePullPolicy: v1.PullIfNotPresent}}
+	pod.Spec.Containers = []v1.Container{{Name: "bar", Image: "test", ImagePullPolicy: v1.PullIfNotPresent, TerminationMessagePolicy: v1.TerminationMessageReadFile}}
 	podUpdate = CreatePodUpdate(kubetypes.SET, TestSource, pod, CreateValidPod("foo3", "new"), CreateValidPod("foo4", "new"))
 	channel <- podUpdate
 	expectPodUpdate(t, ch,
