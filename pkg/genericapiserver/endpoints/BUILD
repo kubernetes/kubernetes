@@ -20,8 +20,6 @@ go_test(
     tags = ["automanaged"],
     deps = [
         "//pkg/api:go_default_library",
-        "//pkg/api/testing:go_default_library",
-        "//pkg/api/v1:go_default_library",
         "//pkg/genericapiserver/endpoints/filters:go_default_library",
         "//pkg/genericapiserver/endpoints/handlers:go_default_library",
         "//pkg/genericapiserver/endpoints/handlers/responsewriters:go_default_library",
@@ -41,6 +39,7 @@ go_test(
         "//vendor:k8s.io/apimachinery/pkg/labels",
         "//vendor:k8s.io/apimachinery/pkg/runtime",
         "//vendor:k8s.io/apimachinery/pkg/runtime/schema",
+        "//vendor:k8s.io/apimachinery/pkg/runtime/serializer",
         "//vendor:k8s.io/apimachinery/pkg/runtime/serializer/streaming",
         "//vendor:k8s.io/apimachinery/pkg/util/diff",
         "//vendor:k8s.io/apimachinery/pkg/util/net",
@@ -49,6 +48,8 @@ go_test(
         "//vendor:k8s.io/apimachinery/pkg/watch",
         "//vendor:k8s.io/apiserver/pkg/admission",
         "//vendor:k8s.io/apiserver/pkg/endpoints/request",
+        "//vendor:k8s.io/client-go/pkg/api",
+        "//vendor:k8s.io/client-go/pkg/api/v1",
     ],
 )
 
