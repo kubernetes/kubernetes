@@ -28,9 +28,11 @@ import (
 	"github.com/spf13/cobra"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/kubernetes/pkg/api"
+	apitesting "k8s.io/kubernetes/pkg/api/testing"
 	"k8s.io/kubernetes/pkg/client/restclient/fake"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
 	"k8s.io/kubernetes/pkg/util/term"
@@ -49,6 +51,14 @@ func (f *fakeRemoteAttach) Attach(method string, url *url.URL, config *restclien
 }
 
 func TestPodAndContainerAttach(t *testing.T) {
+	testPod := &api.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:            "foo",
+			Namespace:       "test",
+			ResourceVersion: "10",
+		},
+		Spec: apitesting.DeepEqualSafePodSpec(),
+	}
 	tests := []struct {
 		args              []string
 		p                 *AttachOptions
@@ -56,6 +66,7 @@ func TestPodAndContainerAttach(t *testing.T) {
 		expectError       bool
 		expectedPod       string
 		expectedContainer string
+		obj               runtime.Object
 	}{
 		{
 			p:           &AttachOptions{},
@@ -64,7 +75,7 @@ func TestPodAndContainerAttach(t *testing.T) {
 		},
 		{
 			p:           &AttachOptions{},
-			args:        []string{"foo", "bar"},
+			args:        []string{"one", "two", "three"},
 			expectError: true,
 			name:        "too many args",
 		},
@@ -94,13 +105,29 @@ func TestPodAndContainerAttach(t *testing.T) {
 			expectError: true,
 			name:        "non-existing container in flag",
 		},
+		{
+			p:           &AttachOptions{},
+			args:        []string{"pods", "foo"},
+			expectedPod: "foo",
+			name:        "no container, no flags, pods and name",
+			obj:         testPod,
+		},
+		{
+			p:           &AttachOptions{},
+			args:        []string{"pod/foo"},
+			expectedPod: "foo",
+			name:        "no container, no flags, pod/name",
+			obj:         testPod,
+		},
 	}
 
 	for _, test := range tests {
-		f, tf, _, ns := cmdtesting.NewAPIFactory()
+		f, tf, codec, ns := cmdtesting.NewAPIFactory()
 		tf.Client = &fake.RESTClient{
 			NegotiatedSerializer: ns,
-			Client:               fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) { return nil, nil }),
+			Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
+				return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, test.obj)}, nil
+			}),
 		}
 		tf.Namespace = "test"
 		tf.ClientConfig = defaultClientConfig()

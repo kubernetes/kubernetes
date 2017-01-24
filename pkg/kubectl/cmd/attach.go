@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"io"
 	"net/url"
+	"strings"
 
 	"github.com/golang/glog"
 	"github.com/spf13/cobra"
@@ -32,6 +33,7 @@ import (
 	"k8s.io/kubernetes/pkg/client/unversioned/remotecommand"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
+	"k8s.io/kubernetes/pkg/kubectl/resource"
 	remotecommandserver "k8s.io/kubernetes/pkg/kubelet/server/remotecommand"
 	"k8s.io/kubernetes/pkg/util/term"
 )
@@ -46,7 +48,11 @@ var (
 
 		# Switch to raw terminal mode, sends stdin to 'bash' in ruby-container from pod 123456-7890
 		# and sends stdout/stderr from 'bash' back to the client
-		kubectl attach 123456-7890 -c ruby-container -i -t`)
+		kubectl attach 123456-7890 -c ruby-container -i -t
+
+		# Get output from the first pod of a Replication Controller named nginx
+		kubectl attach rc/nginx
+		`)
 )
 
 func NewCmdAttach(f cmdutil.Factory, cmdIn io.Reader, cmdOut, cmdErr io.Writer) *cobra.Command {
@@ -60,7 +66,7 @@ func NewCmdAttach(f cmdutil.Factory, cmdIn io.Reader, cmdOut, cmdErr io.Writer) 
 		Attach: &DefaultRemoteAttach{},
 	}
 	cmd := &cobra.Command{
-		Use:     "attach POD -c CONTAINER",
+		Use:     "attach POD [TYPE/NAME] -c CONTAINER",
 		Short:   "Attach to a running container",
 		Long:    "Attach to a process that is already running inside an existing container.",
 		Example: attach_example,
@@ -116,12 +122,37 @@ type AttachOptions struct {
 // Complete verifies command line arguments and loads data from the command environment
 func (p *AttachOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, argsIn []string) error {
 	if len(argsIn) == 0 {
-		return cmdutil.UsageError(cmd, "POD is required for attach")
+		return cmdutil.UsageError(cmd, "at least one argument is required for attach")
 	}
-	if len(argsIn) > 1 {
-		return cmdutil.UsageError(cmd, fmt.Sprintf("expected a single argument: POD, saw %d: %s", len(argsIn), argsIn))
+	if len(argsIn) > 2 {
+		return cmdutil.UsageError(cmd, fmt.Sprintf("expected fewer than three arguments: POD or TYPE/NAME or TYPE NAME, saw %d: %s", len(argsIn), argsIn))
 	}
-	p.PodName = argsIn[0]
+
+	cmdNamespace, _, err := f.DefaultNamespace()
+	if err != nil {
+		return err
+	}
+
+	if strings.Contains(argsIn[0], "/") || len(argsIn) == 2 {
+		mapper, typer := f.Object()
+		r := resource.NewBuilder(mapper, typer, resource.ClientMapperFunc(f.ClientForMapping), f.Decoder(true)).
+			NamespaceParam(cmdNamespace).DefaultNamespace().
+			ResourceTypeOrNameArgs(true, argsIn...).
+			Do()
+		err := r.Err()
+		if err != nil {
+			return err
+		}
+
+		obj, err := r.Object()
+		attachablePod, err := f.AttachablePodForObject(obj)
+		if err != nil {
+			return err
+		}
+		p.PodName = attachablePod.Name
+	} else {
+		p.PodName = argsIn[0]
+	}
 
 	namespace, _, err := f.DefaultNamespace()
 	if err != nil {
@@ -152,7 +183,7 @@ func (p *AttachOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, argsIn [
 func (p *AttachOptions) Validate() error {
 	allErrs := []error{}
 	if len(p.PodName) == 0 {
-		allErrs = append(allErrs, fmt.Errorf("pod name must be specified"))
+		allErrs = append(allErrs, fmt.Errorf("pod or resource name must be specified"))
 	}
 	if p.Out == nil || p.Err == nil {
 		allErrs = append(allErrs, fmt.Errorf("both output and error output must be provided"))
