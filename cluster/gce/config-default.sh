@@ -37,6 +37,9 @@ PREEMPTIBLE_MASTER=${PREEMPTIBLE_MASTER:-false}
 KUBE_DELETE_NODES=${KUBE_DELETE_NODES:-true}
 KUBE_DELETE_NETWORK=${KUBE_DELETE_NETWORK:-false}
 
+# Default number of retries when executing a command
+RETRIES="${RETRIES:-3}"
+
 MASTER_OS_DISTRIBUTION=${KUBE_MASTER_OS_DISTRIBUTION:-${KUBE_OS_DISTRIBUTION:-gci}}
 NODE_OS_DISTRIBUTION=${KUBE_NODE_OS_DISTRIBUTION:-${KUBE_OS_DISTRIBUTION:-debian}}
 if [[ "${MASTER_OS_DISTRIBUTION}" == "coreos" ]]; then
@@ -78,6 +81,8 @@ MASTER_TAG="${INSTANCE_PREFIX}-master"
 NODE_TAG="${INSTANCE_PREFIX}-minion"
 MASTER_IP_RANGE="${MASTER_IP_RANGE:-10.246.0.0/24}"
 CLUSTER_IP_RANGE="${CLUSTER_IP_RANGE:-10.244.0.0/14}"
+VM_USER="${VM_USER:-kubernetes}"
+COPY_DIR="${COPY_DIR:-/home/$VM_USER}"
 if [[ "${FEDERATION:-}" == true ]]; then
     NODE_SCOPES="${NODE_SCOPES:-compute-rw,monitoring,logging-write,storage-ro,https://www.googleapis.com/auth/ndev.clouddns.readwrite}"
 else
