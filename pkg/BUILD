@@ -91,6 +91,7 @@ filegroup(
         "//pkg/kubelet:all-srcs",
         "//pkg/kubemark:all-srcs",
         "//pkg/labels:all-srcs",
+        "//pkg/localkube:all-srcs",
         "//pkg/master:all-srcs",
         "//pkg/metrics:all-srcs",
         "//pkg/probe:all-srcs",

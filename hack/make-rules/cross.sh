@@ -24,6 +24,14 @@ set -o pipefail
 KUBE_ROOT=$(dirname "${BASH_SOURCE}")/../..
 source "${KUBE_ROOT}/hack/lib/init.sh"
 
+# If a build target is specified via $WHAT, build only that.
+# Otherwise, build all targets.
+
+if [[ -n "${WHAT-}" ]]; then
+    make all WHAT=${WHAT} ${KUBE_BUILD_PLATFORMS}
+    exit $?
+fi
+
 # NOTE: Using "${array[*]}" here is correct.  [@] becomes distinct words (in
 # bash parlance).
 
