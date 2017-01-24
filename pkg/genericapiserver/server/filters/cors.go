@@ -22,8 +22,6 @@ import (
 	"strings"
 
 	"github.com/golang/glog"
-
-	"k8s.io/kubernetes/pkg/util"
 )
 
 // TODO: use restful.CrossOriginResourceSharing
@@ -79,9 +77,22 @@ func WithCORS(handler http.Handler, allowedOriginPatterns []string, allowedMetho
 }
 
 func allowedOriginRegexps(allowedOrigins []string) []*regexp.Regexp {
-	res, err := util.CompileRegexps(allowedOrigins)
+	res, err := compileRegexps(allowedOrigins)
 	if err != nil {
 		glog.Fatalf("Invalid CORS allowed origin, --cors-allowed-origins flag was set to %v - %v", strings.Join(allowedOrigins, ","), err)
 	}
 	return res
+}
+
+// Takes a list of strings and compiles them into a list of regular expressions
+func compileRegexps(regexpStrings []string) ([]*regexp.Regexp, error) {
+	regexps := []*regexp.Regexp{}
+	for _, regexpStr := range regexpStrings {
+		r, err := regexp.Compile(regexpStr)
+		if err != nil {
+			return []*regexp.Regexp{}, err
+		}
+		regexps = append(regexps, r)
+	}
+	return regexps, nil
 }
