@@ -34,8 +34,8 @@ type PodTemplatesGetter interface {
 type PodTemplateInterface interface {
 	Create(*api.PodTemplate) (*api.PodTemplate, error)
 	Update(*api.PodTemplate) (*api.PodTemplate, error)
-	Delete(name string, options *api.DeleteOptions) error
-	DeleteCollection(options *api.DeleteOptions, listOptions v1.ListOptions) error
+	Delete(name string, options *v1.DeleteOptions) error
+	DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error
 	Get(name string, options v1.GetOptions) (*api.PodTemplate, error)
 	List(opts v1.ListOptions) (*api.PodTemplateList, error)
 	Watch(opts v1.ListOptions) (watch.Interface, error)
@@ -83,7 +83,7 @@ func (c *podTemplates) Update(podTemplate *api.PodTemplate) (result *api.PodTemp
 }
 
 // Delete takes name of the podTemplate and deletes it. Returns an error if one occurs.
-func (c *podTemplates) Delete(name string, options *api.DeleteOptions) error {
+func (c *podTemplates) Delete(name string, options *v1.DeleteOptions) error {
 	return c.client.Delete().
 		Namespace(c.ns).
 		Resource("podtemplates").
@@ -94,7 +94,7 @@ func (c *podTemplates) Delete(name string, options *api.DeleteOptions) error {
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *podTemplates) DeleteCollection(options *api.DeleteOptions, listOptions v1.ListOptions) error {
+func (c *podTemplates) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
 	return c.client.Delete().
 		Namespace(c.ns).
 		Resource("podtemplates").

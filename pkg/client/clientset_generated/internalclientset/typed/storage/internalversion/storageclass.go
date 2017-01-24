@@ -35,8 +35,8 @@ type StorageClassesGetter interface {
 type StorageClassInterface interface {
 	Create(*storage.StorageClass) (*storage.StorageClass, error)
 	Update(*storage.StorageClass) (*storage.StorageClass, error)
-	Delete(name string, options *api.DeleteOptions) error
-	DeleteCollection(options *api.DeleteOptions, listOptions v1.ListOptions) error
+	Delete(name string, options *v1.DeleteOptions) error
+	DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error
 	Get(name string, options v1.GetOptions) (*storage.StorageClass, error)
 	List(opts v1.ListOptions) (*storage.StorageClassList, error)
 	Watch(opts v1.ListOptions) (watch.Interface, error)
@@ -80,7 +80,7 @@ func (c *storageClasses) Update(storageClass *storage.StorageClass) (result *sto
 }
 
 // Delete takes name of the storageClass and deletes it. Returns an error if one occurs.
-func (c *storageClasses) Delete(name string, options *api.DeleteOptions) error {
+func (c *storageClasses) Delete(name string, options *v1.DeleteOptions) error {
 	return c.client.Delete().
 		Resource("storageclasses").
 		Name(name).
@@ -90,7 +90,7 @@ func (c *storageClasses) Delete(name string, options *api.DeleteOptions) error {
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *storageClasses) DeleteCollection(options *api.DeleteOptions, listOptions v1.ListOptions) error {
+func (c *storageClasses) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
 	return c.client.Delete().
 		Resource("storageclasses").
 		VersionedParams(&listOptions, api.ParameterCodec).

@@ -639,6 +639,8 @@ message DaemonEndpoint {
 }
 
 // DeleteOptions may be provided when deleting an API object
+// DEPRECATED: This type has been moved to meta/v1 and will be removed soon.
+// +k8s:openapi-gen=false
 message DeleteOptions {
   // The duration in seconds before the object should be deleted. Value must be non-negative integer.
   // The value zero indicates delete immediately. If this value is nil, the default grace period for the
@@ -2706,6 +2708,7 @@ message PodTemplateSpec {
 }
 
 // Preconditions must be fulfilled before an operation (update, delete, etc.) is carried out.
+// +k8s:openapi-gen=false
 message Preconditions {
   // Specifies the target UID.
   // +optional

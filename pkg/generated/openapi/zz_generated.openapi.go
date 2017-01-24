@@ -1578,7 +1578,7 @@ var OpenAPIDefinitions *openapi.OpenAPIDefinitions = &openapi.OpenAPIDefinitions
 	"v1.DeleteOptions": {
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
-				Description: "DeleteOptions may be provided when deleting an API object",
+				Description: "DeleteOptions may be provided when deleting an API object.",
 				Properties: map[string]spec.Schema{
 					"kind": {
 						SchemaProps: spec.SchemaProps{

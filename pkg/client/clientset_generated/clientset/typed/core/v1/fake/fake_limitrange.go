@@ -54,14 +54,14 @@ func (c *FakeLimitRanges) Update(limitRange *v1.LimitRange) (result *v1.LimitRan
 	return obj.(*v1.LimitRange), err
 }
 
-func (c *FakeLimitRanges) Delete(name string, options *v1.DeleteOptions) error {
+func (c *FakeLimitRanges) Delete(name string, options *meta_v1.DeleteOptions) error {
 	_, err := c.Fake.
 		Invokes(core.NewDeleteAction(limitrangesResource, c.ns, name), &v1.LimitRange{})
 
 	return err
 }
 
-func (c *FakeLimitRanges) DeleteCollection(options *v1.DeleteOptions, listOptions meta_v1.ListOptions) error {
+func (c *FakeLimitRanges) DeleteCollection(options *meta_v1.DeleteOptions, listOptions meta_v1.ListOptions) error {
 	action := core.NewDeleteCollectionAction(limitrangesResource, c.ns, listOptions)
 
 	_, err := c.Fake.Invokes(action, &v1.LimitRangeList{})

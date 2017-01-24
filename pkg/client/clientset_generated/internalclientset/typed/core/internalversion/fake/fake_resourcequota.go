@@ -64,14 +64,14 @@ func (c *FakeResourceQuotas) UpdateStatus(resourceQuota *api.ResourceQuota) (*ap
 	return obj.(*api.ResourceQuota), err
 }
 
-func (c *FakeResourceQuotas) Delete(name string, options *api.DeleteOptions) error {
+func (c *FakeResourceQuotas) Delete(name string, options *v1.DeleteOptions) error {
 	_, err := c.Fake.
 		Invokes(core.NewDeleteAction(resourcequotasResource, c.ns, name), &api.ResourceQuota{})
 
 	return err
 }
 
-func (c *FakeResourceQuotas) DeleteCollection(options *api.DeleteOptions, listOptions v1.ListOptions) error {
+func (c *FakeResourceQuotas) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
 	action := core.NewDeleteCollectionAction(resourcequotasResource, c.ns, listOptions)
 
 	_, err := c.Fake.Invokes(action, &api.ResourceQuotaList{})

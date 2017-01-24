@@ -51,13 +51,13 @@ func (c *FakeComponentStatuses) Update(componentStatus *api.ComponentStatus) (re
 	return obj.(*api.ComponentStatus), err
 }
 
-func (c *FakeComponentStatuses) Delete(name string, options *api.DeleteOptions) error {
+func (c *FakeComponentStatuses) Delete(name string, options *v1.DeleteOptions) error {
 	_, err := c.Fake.
 		Invokes(core.NewRootDeleteAction(componentstatusesResource, name), &api.ComponentStatus{})
 	return err
 }
 
-func (c *FakeComponentStatuses) DeleteCollection(options *api.DeleteOptions, listOptions v1.ListOptions) error {
+func (c *FakeComponentStatuses) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
 	action := core.NewRootDeleteCollectionAction(componentstatusesResource, listOptions)
 
 	_, err := c.Fake.Invokes(action, &api.ComponentStatusList{})

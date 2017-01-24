@@ -54,14 +54,14 @@ func (c *FakeEvents) Update(event *api.Event) (result *api.Event, err error) {
 	return obj.(*api.Event), err
 }
 
-func (c *FakeEvents) Delete(name string, options *api.DeleteOptions) error {
+func (c *FakeEvents) Delete(name string, options *v1.DeleteOptions) error {
 	_, err := c.Fake.
 		Invokes(core.NewDeleteAction(eventsResource, c.ns, name), &api.Event{})
 
 	return err
 }
 
-func (c *FakeEvents) DeleteCollection(options *api.DeleteOptions, listOptions v1.ListOptions) error {
+func (c *FakeEvents) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
 	action := core.NewDeleteCollectionAction(eventsResource, c.ns, listOptions)
 
 	_, err := c.Fake.Invokes(action, &api.EventList{})

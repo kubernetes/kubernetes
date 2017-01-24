@@ -23,7 +23,6 @@ import (
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	federation "k8s.io/kubernetes/federation/apis/federation"
-	api "k8s.io/kubernetes/pkg/api"
 	core "k8s.io/kubernetes/pkg/client/testing/core"
 )
 
@@ -61,13 +60,13 @@ func (c *FakeClusters) UpdateStatus(cluster *federation.Cluster) (*federation.Cl
 	return obj.(*federation.Cluster), err
 }
 
-func (c *FakeClusters) Delete(name string, options *api.DeleteOptions) error {
+func (c *FakeClusters) Delete(name string, options *v1.DeleteOptions) error {
 	_, err := c.Fake.
 		Invokes(core.NewRootDeleteAction(clustersResource, name), &federation.Cluster{})
 	return err
 }
 
-func (c *FakeClusters) DeleteCollection(options *api.DeleteOptions, listOptions v1.ListOptions) error {
+func (c *FakeClusters) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
 	action := core.NewRootDeleteCollectionAction(clustersResource, listOptions)
 
 	_, err := c.Fake.Invokes(action, &federation.ClusterList{})

@@ -35,8 +35,8 @@ type ClusterRolesGetter interface {
 type ClusterRoleInterface interface {
 	Create(*rbac.ClusterRole) (*rbac.ClusterRole, error)
 	Update(*rbac.ClusterRole) (*rbac.ClusterRole, error)
-	Delete(name string, options *api.DeleteOptions) error
-	DeleteCollection(options *api.DeleteOptions, listOptions v1.ListOptions) error
+	Delete(name string, options *v1.DeleteOptions) error
+	DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error
 	Get(name string, options v1.GetOptions) (*rbac.ClusterRole, error)
 	List(opts v1.ListOptions) (*rbac.ClusterRoleList, error)
 	Watch(opts v1.ListOptions) (watch.Interface, error)
@@ -80,7 +80,7 @@ func (c *clusterRoles) Update(clusterRole *rbac.ClusterRole) (result *rbac.Clust
 }
 
 // Delete takes name of the clusterRole and deletes it. Returns an error if one occurs.
-func (c *clusterRoles) Delete(name string, options *api.DeleteOptions) error {
+func (c *clusterRoles) Delete(name string, options *v1.DeleteOptions) error {
 	return c.client.Delete().
 		Resource("clusterroles").
 		Name(name).
@@ -90,7 +90,7 @@ func (c *clusterRoles) Delete(name string, options *api.DeleteOptions) error {
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *clusterRoles) DeleteCollection(options *api.DeleteOptions, listOptions v1.ListOptions) error {
+func (c *clusterRoles) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
 	return c.client.Delete().
 		Resource("clusterroles").
 		VersionedParams(&listOptions, api.ParameterCodec).

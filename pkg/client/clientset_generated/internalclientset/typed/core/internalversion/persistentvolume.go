@@ -35,8 +35,8 @@ type PersistentVolumeInterface interface {
 	Create(*api.PersistentVolume) (*api.PersistentVolume, error)
 	Update(*api.PersistentVolume) (*api.PersistentVolume, error)
 	UpdateStatus(*api.PersistentVolume) (*api.PersistentVolume, error)
-	Delete(name string, options *api.DeleteOptions) error
-	DeleteCollection(options *api.DeleteOptions, listOptions v1.ListOptions) error
+	Delete(name string, options *v1.DeleteOptions) error
+	DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error
 	Get(name string, options v1.GetOptions) (*api.PersistentVolume, error)
 	List(opts v1.ListOptions) (*api.PersistentVolumeList, error)
 	Watch(opts v1.ListOptions) (watch.Interface, error)
@@ -95,7 +95,7 @@ func (c *persistentVolumes) UpdateStatus(persistentVolume *api.PersistentVolume)
 }
 
 // Delete takes name of the persistentVolume and deletes it. Returns an error if one occurs.
-func (c *persistentVolumes) Delete(name string, options *api.DeleteOptions) error {
+func (c *persistentVolumes) Delete(name string, options *v1.DeleteOptions) error {
 	return c.client.Delete().
 		Resource("persistentvolumes").
 		Name(name).
@@ -105,7 +105,7 @@ func (c *persistentVolumes) Delete(name string, options *api.DeleteOptions) erro
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *persistentVolumes) DeleteCollection(options *api.DeleteOptions, listOptions v1.ListOptions) error {
+func (c *persistentVolumes) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
 	return c.client.Delete().
 		Resource("persistentvolumes").
 		VersionedParams(&listOptions, api.ParameterCodec).

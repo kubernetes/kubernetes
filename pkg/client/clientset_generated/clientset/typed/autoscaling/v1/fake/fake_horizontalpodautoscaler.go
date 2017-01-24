@@ -22,7 +22,6 @@ import (
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
-	api_v1 "k8s.io/kubernetes/pkg/api/v1"
 	v1 "k8s.io/kubernetes/pkg/apis/autoscaling/v1"
 	core "k8s.io/kubernetes/pkg/client/testing/core"
 )
@@ -65,14 +64,14 @@ func (c *FakeHorizontalPodAutoscalers) UpdateStatus(horizontalPodAutoscaler *v1.
 	return obj.(*v1.HorizontalPodAutoscaler), err
 }
 
-func (c *FakeHorizontalPodAutoscalers) Delete(name string, options *api_v1.DeleteOptions) error {
+func (c *FakeHorizontalPodAutoscalers) Delete(name string, options *meta_v1.DeleteOptions) error {
 	_, err := c.Fake.
 		Invokes(core.NewDeleteAction(horizontalpodautoscalersResource, c.ns, name), &v1.HorizontalPodAutoscaler{})
 
 	return err
 }
 
-func (c *FakeHorizontalPodAutoscalers) DeleteCollection(options *api_v1.DeleteOptions, listOptions meta_v1.ListOptions) error {
+func (c *FakeHorizontalPodAutoscalers) DeleteCollection(options *meta_v1.DeleteOptions, listOptions meta_v1.ListOptions) error {
 	action := core.NewDeleteCollectionAction(horizontalpodautoscalersResource, c.ns, listOptions)
 
 	_, err := c.Fake.Invokes(action, &v1.HorizontalPodAutoscalerList{})

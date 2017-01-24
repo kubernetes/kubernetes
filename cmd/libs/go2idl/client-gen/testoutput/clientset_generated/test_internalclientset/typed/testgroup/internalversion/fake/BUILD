@@ -18,7 +18,6 @@ go_library(
     deps = [
         "//cmd/libs/go2idl/client-gen/test_apis/testgroup:go_default_library",
         "//cmd/libs/go2idl/client-gen/testoutput/clientset_generated/test_internalclientset/typed/testgroup/internalversion:go_default_library",
-        "//pkg/api:go_default_library",
         "//pkg/client/testing/core:go_default_library",
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
         "//vendor:k8s.io/apimachinery/pkg/labels",

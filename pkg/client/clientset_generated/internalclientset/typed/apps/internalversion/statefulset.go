@@ -36,8 +36,8 @@ type StatefulSetInterface interface {
 	Create(*apps.StatefulSet) (*apps.StatefulSet, error)
 	Update(*apps.StatefulSet) (*apps.StatefulSet, error)
 	UpdateStatus(*apps.StatefulSet) (*apps.StatefulSet, error)
-	Delete(name string, options *api.DeleteOptions) error
-	DeleteCollection(options *api.DeleteOptions, listOptions v1.ListOptions) error
+	Delete(name string, options *v1.DeleteOptions) error
+	DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error
 	Get(name string, options v1.GetOptions) (*apps.StatefulSet, error)
 	List(opts v1.ListOptions) (*apps.StatefulSetList, error)
 	Watch(opts v1.ListOptions) (watch.Interface, error)
@@ -101,7 +101,7 @@ func (c *statefulSets) UpdateStatus(statefulSet *apps.StatefulSet) (result *apps
 }
 
 // Delete takes name of the statefulSet and deletes it. Returns an error if one occurs.
-func (c *statefulSets) Delete(name string, options *api.DeleteOptions) error {
+func (c *statefulSets) Delete(name string, options *v1.DeleteOptions) error {
 	return c.client.Delete().
 		Namespace(c.ns).
 		Resource("statefulsets").
@@ -112,7 +112,7 @@ func (c *statefulSets) Delete(name string, options *api.DeleteOptions) error {
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *statefulSets) DeleteCollection(options *api.DeleteOptions, listOptions v1.ListOptions) error {
+func (c *statefulSets) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
 	return c.client.Delete().
 		Namespace(c.ns).
 		Resource("statefulsets").

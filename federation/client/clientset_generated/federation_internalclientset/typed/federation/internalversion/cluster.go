@@ -36,8 +36,8 @@ type ClusterInterface interface {
 	Create(*federation.Cluster) (*federation.Cluster, error)
 	Update(*federation.Cluster) (*federation.Cluster, error)
 	UpdateStatus(*federation.Cluster) (*federation.Cluster, error)
-	Delete(name string, options *api.DeleteOptions) error
-	DeleteCollection(options *api.DeleteOptions, listOptions v1.ListOptions) error
+	Delete(name string, options *v1.DeleteOptions) error
+	DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error
 	Get(name string, options v1.GetOptions) (*federation.Cluster, error)
 	List(opts v1.ListOptions) (*federation.ClusterList, error)
 	Watch(opts v1.ListOptions) (watch.Interface, error)
@@ -96,7 +96,7 @@ func (c *clusters) UpdateStatus(cluster *federation.Cluster) (result *federation
 }
 
 // Delete takes name of the cluster and deletes it. Returns an error if one occurs.
-func (c *clusters) Delete(name string, options *api.DeleteOptions) error {
+func (c *clusters) Delete(name string, options *v1.DeleteOptions) error {
 	return c.client.Delete().
 		Resource("clusters").
 		Name(name).
@@ -106,7 +106,7 @@ func (c *clusters) Delete(name string, options *api.DeleteOptions) error {
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *clusters) DeleteCollection(options *api.DeleteOptions, listOptions v1.ListOptions) error {
+func (c *clusters) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
 	return c.client.Delete().
 		Resource("clusters").
 		VersionedParams(&listOptions, api.ParameterCodec).

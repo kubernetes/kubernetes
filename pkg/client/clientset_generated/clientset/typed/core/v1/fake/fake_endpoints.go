@@ -54,14 +54,14 @@ func (c *FakeEndpoints) Update(endpoints *v1.Endpoints) (result *v1.Endpoints, e
 	return obj.(*v1.Endpoints), err
 }
 
-func (c *FakeEndpoints) Delete(name string, options *v1.DeleteOptions) error {
+func (c *FakeEndpoints) Delete(name string, options *meta_v1.DeleteOptions) error {
 	_, err := c.Fake.
 		Invokes(core.NewDeleteAction(endpointsResource, c.ns, name), &v1.Endpoints{})
 
 	return err
 }
 
-func (c *FakeEndpoints) DeleteCollection(options *v1.DeleteOptions, listOptions meta_v1.ListOptions) error {
+func (c *FakeEndpoints) DeleteCollection(options *meta_v1.DeleteOptions, listOptions meta_v1.ListOptions) error {
 	action := core.NewDeleteCollectionAction(endpointsResource, c.ns, listOptions)
 
 	_, err := c.Fake.Invokes(action, &v1.EndpointsList{})

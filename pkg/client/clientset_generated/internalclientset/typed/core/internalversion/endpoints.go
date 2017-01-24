@@ -34,8 +34,8 @@ type EndpointsGetter interface {
 type EndpointsInterface interface {
 	Create(*api.Endpoints) (*api.Endpoints, error)
 	Update(*api.Endpoints) (*api.Endpoints, error)
-	Delete(name string, options *api.DeleteOptions) error
-	DeleteCollection(options *api.DeleteOptions, listOptions v1.ListOptions) error
+	Delete(name string, options *v1.DeleteOptions) error
+	DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error
 	Get(name string, options v1.GetOptions) (*api.Endpoints, error)
 	List(opts v1.ListOptions) (*api.EndpointsList, error)
 	Watch(opts v1.ListOptions) (watch.Interface, error)
@@ -83,7 +83,7 @@ func (c *endpoints) Update(endpoints *api.Endpoints) (result *api.Endpoints, err
 }
 
 // Delete takes name of the endpoints and deletes it. Returns an error if one occurs.
-func (c *endpoints) Delete(name string, options *api.DeleteOptions) error {
+func (c *endpoints) Delete(name string, options *v1.DeleteOptions) error {
 	return c.client.Delete().
 		Namespace(c.ns).
 		Resource("endpoints").
@@ -94,7 +94,7 @@ func (c *endpoints) Delete(name string, options *api.DeleteOptions) error {
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *endpoints) DeleteCollection(options *api.DeleteOptions, listOptions v1.ListOptions) error {
+func (c *endpoints) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
 	return c.client.Delete().
 		Namespace(c.ns).
 		Resource("endpoints").
