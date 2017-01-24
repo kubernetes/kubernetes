@@ -12735,11 +12735,10 @@ go_library(
     srcs = ["k8s.io/client-go/rest/fake/fake.go"],
     tags = ["automanaged"],
     deps = [
+        "//vendor:k8s.io/apimachinery/pkg/apimachinery/registered",
         "//vendor:k8s.io/apimachinery/pkg/runtime",
         "//vendor:k8s.io/apimachinery/pkg/runtime/schema",
         "//vendor:k8s.io/apimachinery/pkg/types",
-        "//vendor:k8s.io/client-go/pkg/api",
-        "//vendor:k8s.io/client-go/pkg/api/testapi",
         "//vendor:k8s.io/client-go/rest",
         "//vendor:k8s.io/client-go/util/flowcontrol",
     ],

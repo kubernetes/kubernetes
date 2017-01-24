@@ -26,8 +26,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	restclient "k8s.io/client-go/rest"
+	"k8s.io/client-go/rest/fake"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/client/restclient/fake"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
 )
 
@@ -427,6 +427,7 @@ func TestAnnotateObject(t *testing.T) {
 	f, tf, codec, ns := cmdtesting.NewAPIFactory()
 	tf.Printer = &testPrinter{}
 	tf.Client = &fake.RESTClient{
+		APIRegistry:          api.Registry,
 		NegotiatedSerializer: ns,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch req.Method {
@@ -477,6 +478,7 @@ func TestAnnotateObjectFromFile(t *testing.T) {
 	f, tf, codec, ns := cmdtesting.NewAPIFactory()
 	tf.Printer = &testPrinter{}
 	tf.Client = &fake.RESTClient{
+		APIRegistry:          api.Registry,
 		NegotiatedSerializer: ns,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch req.Method {
@@ -525,6 +527,7 @@ func TestAnnotateObjectFromFile(t *testing.T) {
 func TestAnnotateLocal(t *testing.T) {
 	f, tf, _, ns := cmdtesting.NewAPIFactory()
 	tf.Client = &fake.RESTClient{
+		APIRegistry:          api.Registry,
 		NegotiatedSerializer: ns,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			t.Fatalf("unexpected request: %s %#v\n%#v", req.Method, req.URL, req)
@@ -557,6 +560,7 @@ func TestAnnotateMultipleObjects(t *testing.T) {
 	f, tf, codec, ns := cmdtesting.NewAPIFactory()
 	tf.Printer = &testPrinter{}
 	tf.Client = &fake.RESTClient{
+		APIRegistry:          api.Registry,
 		NegotiatedSerializer: ns,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch req.Method {

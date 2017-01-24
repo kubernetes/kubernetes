@@ -34,11 +34,11 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/serializer/streaming"
 	"k8s.io/apimachinery/pkg/watch"
 	restclient "k8s.io/client-go/rest"
+	"k8s.io/client-go/rest/fake"
 	restclientwatch "k8s.io/client-go/rest/watch"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
-	"k8s.io/kubernetes/pkg/client/restclient/fake"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
 )
 
@@ -121,6 +121,7 @@ func TestGetUnknownSchemaObject(t *testing.T) {
 	_, _, codec, _ := cmdtesting.NewTestFactory()
 	tf.Printer = &testPrinter{}
 	tf.Client = &fake.RESTClient{
+		APIRegistry:          api.Registry,
 		NegotiatedSerializer: unstructuredSerializer,
 		Resp:                 &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, cmdtesting.NewInternalType("", "", "foo"))},
 	}
@@ -165,6 +166,7 @@ func TestGetSchemaObject(t *testing.T) {
 	codec := testapi.Default.Codec()
 	tf.Printer = &testPrinter{}
 	tf.Client = &fake.RESTClient{
+		APIRegistry:          api.Registry,
 		NegotiatedSerializer: unstructuredSerializer,
 		Resp:                 &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, &api.ReplicationController{ObjectMeta: metav1.ObjectMeta{Name: "foo"}})},
 	}
@@ -187,6 +189,7 @@ func TestGetObjects(t *testing.T) {
 	f, tf, codec, _ := cmdtesting.NewAPIFactory()
 	tf.Printer = &testPrinter{}
 	tf.Client = &fake.RESTClient{
+		APIRegistry:          api.Registry,
 		NegotiatedSerializer: unstructuredSerializer,
 		Resp:                 &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, &pods.Items[0])},
 	}
@@ -230,6 +233,7 @@ func TestGetSortedObjects(t *testing.T) {
 	f, tf, codec, _ := cmdtesting.NewAPIFactory()
 	tf.Printer = &testPrinter{}
 	tf.Client = &fake.RESTClient{
+		APIRegistry:          api.Registry,
 		NegotiatedSerializer: unstructuredSerializer,
 		Resp:                 &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, pods)},
 	}
@@ -288,6 +292,7 @@ func TestGetObjectsIdentifiedByFile(t *testing.T) {
 	f, tf, codec, _ := cmdtesting.NewAPIFactory()
 	tf.Printer = &testPrinter{}
 	tf.Client = &fake.RESTClient{
+		APIRegistry:          api.Registry,
 		NegotiatedSerializer: unstructuredSerializer,
 		Resp:                 &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, &pods.Items[0])},
 	}
@@ -314,6 +319,7 @@ func TestGetListObjects(t *testing.T) {
 	f, tf, codec, _ := cmdtesting.NewAPIFactory()
 	tf.Printer = &testPrinter{}
 	tf.Client = &fake.RESTClient{
+		APIRegistry:          api.Registry,
 		NegotiatedSerializer: unstructuredSerializer,
 		Resp:                 &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, pods)},
 	}
@@ -356,6 +362,7 @@ func TestGetAllListObjects(t *testing.T) {
 	f, tf, codec, _ := cmdtesting.NewAPIFactory()
 	tf.Printer = &testPrinter{}
 	tf.Client = &fake.RESTClient{
+		APIRegistry:          api.Registry,
 		NegotiatedSerializer: unstructuredSerializer,
 		Resp:                 &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, pods)},
 	}
@@ -385,6 +392,7 @@ func TestGetListComponentStatus(t *testing.T) {
 	f, tf, codec, _ := cmdtesting.NewAPIFactory()
 	tf.Printer = &testPrinter{}
 	tf.Client = &fake.RESTClient{
+		APIRegistry:          api.Registry,
 		NegotiatedSerializer: unstructuredSerializer,
 		Resp:                 &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, statuses)},
 	}
@@ -413,6 +421,7 @@ func TestGetMultipleTypeObjects(t *testing.T) {
 	f, tf, codec, _ := cmdtesting.NewAPIFactory()
 	tf.Printer = &testPrinter{}
 	tf.Client = &fake.RESTClient{
+		APIRegistry:          api.Registry,
 		NegotiatedSerializer: unstructuredSerializer,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch req.URL.Path {
@@ -451,6 +460,7 @@ func TestGetMultipleTypeObjectsAsList(t *testing.T) {
 	f, tf, codec, _ := cmdtesting.NewAPIFactory()
 	tf.Printer = &testPrinter{}
 	tf.Client = &fake.RESTClient{
+		APIRegistry:          api.Registry,
 		NegotiatedSerializer: unstructuredSerializer,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch req.URL.Path {
@@ -512,6 +522,7 @@ func TestGetMultipleTypeObjectsWithSelector(t *testing.T) {
 	f, tf, codec, _ := cmdtesting.NewAPIFactory()
 	tf.Printer = &testPrinter{}
 	tf.Client = &fake.RESTClient{
+		APIRegistry:          api.Registry,
 		NegotiatedSerializer: unstructuredSerializer,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			if req.URL.Query().Get(metav1.LabelSelectorQueryParam(api.Registry.GroupOrDie(api.GroupName).GroupVersion.String())) != "a=b" {
@@ -563,6 +574,7 @@ func TestGetMultipleTypeObjectsWithDirectReference(t *testing.T) {
 	f, tf, codec, _ := cmdtesting.NewAPIFactory()
 	tf.Printer = &testPrinter{}
 	tf.Client = &fake.RESTClient{
+		APIRegistry:          api.Registry,
 		NegotiatedSerializer: unstructuredSerializer,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch req.URL.Path {
@@ -599,6 +611,7 @@ func TestGetByNameForcesFlag(t *testing.T) {
 	f, tf, codec, _ := cmdtesting.NewAPIFactory()
 	tf.Printer = &testPrinter{}
 	tf.Client = &fake.RESTClient{
+		APIRegistry:          api.Registry,
 		NegotiatedSerializer: unstructuredSerializer,
 		Resp:                 &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, &pods.Items[0])},
 	}
@@ -698,6 +711,7 @@ func TestWatchSelector(t *testing.T) {
 		},
 	}
 	tf.Client = &fake.RESTClient{
+		APIRegistry:          api.Registry,
 		NegotiatedSerializer: unstructuredSerializer,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			if req.URL.Query().Get(metav1.LabelSelectorQueryParam(api.Registry.GroupOrDie(api.GroupName).GroupVersion.String())) != "a=b" {
@@ -739,6 +753,7 @@ func TestWatchResource(t *testing.T) {
 	f, tf, codec, _ := cmdtesting.NewAPIFactory()
 	tf.Printer = &testPrinter{}
 	tf.Client = &fake.RESTClient{
+		APIRegistry:          api.Registry,
 		NegotiatedSerializer: unstructuredSerializer,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch req.URL.Path {
@@ -776,6 +791,7 @@ func TestWatchResourceIdentifiedByFile(t *testing.T) {
 	f, tf, codec, _ := cmdtesting.NewAPIFactory()
 	tf.Printer = &testPrinter{}
 	tf.Client = &fake.RESTClient{
+		APIRegistry:          api.Registry,
 		NegotiatedSerializer: unstructuredSerializer,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch req.URL.Path {
@@ -814,6 +830,7 @@ func TestWatchOnlyResource(t *testing.T) {
 	f, tf, codec, _ := cmdtesting.NewAPIFactory()
 	tf.Printer = &testPrinter{}
 	tf.Client = &fake.RESTClient{
+		APIRegistry:          api.Registry,
 		NegotiatedSerializer: unstructuredSerializer,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch req.URL.Path {
@@ -857,6 +874,7 @@ func TestWatchOnlyList(t *testing.T) {
 		},
 	}
 	tf.Client = &fake.RESTClient{
+		APIRegistry:          api.Registry,
 		NegotiatedSerializer: unstructuredSerializer,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch req.URL.Path {
