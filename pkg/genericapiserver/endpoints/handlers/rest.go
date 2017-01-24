@@ -27,6 +27,9 @@ import (
 	"strings"
 	"time"
 
+	"github.com/emicklei/go-restful"
+	"github.com/golang/glog"
+
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metainternalversion "k8s.io/apimachinery/pkg/apis/meta/internalversion"
@@ -40,12 +43,9 @@ import (
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/endpoints/handlers/negotiation"
 	"k8s.io/apiserver/pkg/endpoints/request"
+	utiltrace "k8s.io/apiserver/pkg/util/trace"
 	"k8s.io/kubernetes/pkg/genericapiserver/endpoints/handlers/responsewriters"
 	"k8s.io/kubernetes/pkg/genericapiserver/registry/rest"
-	"k8s.io/kubernetes/pkg/util"
-
-	"github.com/emicklei/go-restful"
-	"github.com/golang/glog"
 )
 
 // ContextFunc returns a Context given a request - a context must be returned
@@ -133,7 +133,7 @@ func GetResource(r rest.Getter, e rest.Exporter, scope RequestScope) restful.Rou
 	return getResourceHandler(scope,
 		func(ctx request.Context, name string, req *restful.Request) (runtime.Object, error) {
 			// For performance tracking purposes.
-			trace := util.NewTrace("Get " + req.Request.URL.Path)
+			trace := utiltrace.New("Get " + req.Request.URL.Path)
 			defer trace.LogIfLong(500 * time.Millisecond)
 
 			// check for export
@@ -245,7 +245,7 @@ func (r *responder) Error(err error) {
 func ListResource(r rest.Lister, rw rest.Watcher, scope RequestScope, forceWatch bool, minRequestTimeout time.Duration) restful.RouteFunction {
 	return func(req *restful.Request, res *restful.Response) {
 		// For performance tracking purposes.
-		trace := util.NewTrace("List " + req.Request.URL.Path)
+		trace := utiltrace.New("List " + req.Request.URL.Path)
 
 		w := res.ResponseWriter
 
@@ -352,7 +352,7 @@ func ListResource(r rest.Lister, rw rest.Watcher, scope RequestScope, forceWatch
 func createHandler(r rest.NamedCreater, scope RequestScope, typer runtime.ObjectTyper, admit admission.Interface, includeName bool) restful.RouteFunction {
 	return func(req *restful.Request, res *restful.Response) {
 		// For performance tracking purposes.
-		trace := util.NewTrace("Create " + req.Request.URL.Path)
+		trace := utiltrace.New("Create " + req.Request.URL.Path)
 		defer trace.LogIfLong(500 * time.Millisecond)
 
 		w := res.ResponseWriter
@@ -707,7 +707,7 @@ func patchResource(
 func UpdateResource(r rest.Updater, scope RequestScope, typer runtime.ObjectTyper, admit admission.Interface) restful.RouteFunction {
 	return func(req *restful.Request, res *restful.Response) {
 		// For performance tracking purposes.
-		trace := util.NewTrace("Update " + req.Request.URL.Path)
+		trace := utiltrace.New("Update " + req.Request.URL.Path)
 		defer trace.LogIfLong(500 * time.Millisecond)
 
 		w := res.ResponseWriter
@@ -794,7 +794,7 @@ func UpdateResource(r rest.Updater, scope RequestScope, typer runtime.ObjectType
 func DeleteResource(r rest.GracefulDeleter, allowsOptions bool, scope RequestScope, admit admission.Interface) restful.RouteFunction {
 	return func(req *restful.Request, res *restful.Response) {
 		// For performance tracking purposes.
-		trace := util.NewTrace("Delete " + req.Request.URL.Path)
+		trace := utiltrace.New("Delete " + req.Request.URL.Path)
 		defer trace.LogIfLong(500 * time.Millisecond)
 
 		w := res.ResponseWriter
