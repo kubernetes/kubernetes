@@ -34,6 +34,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/emicklei/go-restful"
+
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metainternalversion "k8s.io/apimachinery/pkg/apis/meta/internalversion"
@@ -42,22 +44,22 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/endpoints/request"
+	clientapi "k8s.io/client-go/pkg/api"
+	clientapiv1 "k8s.io/client-go/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/api"
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
-	"k8s.io/kubernetes/pkg/api/v1"
 	genericapifilters "k8s.io/kubernetes/pkg/genericapiserver/endpoints/filters"
 	"k8s.io/kubernetes/pkg/genericapiserver/endpoints/handlers/responsewriters"
 	genericapitesting "k8s.io/kubernetes/pkg/genericapiserver/endpoints/testing"
 	"k8s.io/kubernetes/pkg/genericapiserver/registry/rest"
 	"k8s.io/kubernetes/plugin/pkg/admission/admit"
 	"k8s.io/kubernetes/plugin/pkg/admission/deny"
-
-	"github.com/emicklei/go-restful"
 )
 
 // This creates fake API versions, similar to api/latest.go.
@@ -76,9 +78,13 @@ var grouplessPrefix = "api"
 
 var groupVersions = []schema.GroupVersion{grouplessGroupVersion, testGroupVersion, newGroupVersion}
 
-var codec = api.Codecs.LegacyCodec(groupVersions...)
-var testCodec = api.Codecs.LegacyCodec(testGroupVersion)
-var newCodec = api.Codecs.LegacyCodec(newGroupVersion)
+var scheme = runtime.NewScheme()
+var codecs = serializer.NewCodecFactory(scheme)
+
+var codec = codecs.LegacyCodec(groupVersions...)
+var testCodec = codecs.LegacyCodec(testGroupVersion)
+var newCodec = codecs.LegacyCodec(newGroupVersion)
+var parameterCodec = runtime.NewParameterCodec(scheme)
 
 var accessor = meta.NewAccessor()
 var selfLinker runtime.SelfLinker = accessor
@@ -90,22 +96,22 @@ func interfacesFor(version schema.GroupVersion) (*meta.VersionInterfaces, error)
 	switch version {
 	case testGroupVersion:
 		return &meta.VersionInterfaces{
-			ObjectConvertor:  api.Scheme,
+			ObjectConvertor:  scheme,
 			MetadataAccessor: accessor,
 		}, nil
 	case newGroupVersion:
 		return &meta.VersionInterfaces{
-			ObjectConvertor:  api.Scheme,
+			ObjectConvertor:  scheme,
 			MetadataAccessor: accessor,
 		}, nil
 	case grouplessGroupVersion:
 		return &meta.VersionInterfaces{
-			ObjectConvertor:  api.Scheme,
+			ObjectConvertor:  scheme,
 			MetadataAccessor: accessor,
 		}, nil
 	case testGroup2Version:
 		return &meta.VersionInterfaces{
-			ObjectConvertor:  api.Scheme,
+			ObjectConvertor:  scheme,
 			MetadataAccessor: accessor,
 		}, nil
 	default:
@@ -118,10 +124,10 @@ func newMapper() *meta.DefaultRESTMapper {
 }
 
 func addGrouplessTypes() {
-	api.Scheme.AddKnownTypes(grouplessGroupVersion,
+	scheme.AddKnownTypes(grouplessGroupVersion,
 		&genericapitesting.Simple{}, &genericapitesting.SimpleList{}, &metav1.ListOptions{}, &metav1.ExportOptions{},
 		&metav1.DeleteOptions{}, &genericapitesting.SimpleGetOptions{}, &genericapitesting.SimpleRoot{})
-	api.Scheme.AddKnownTypes(grouplessInternalGroupVersion,
+	scheme.AddKnownTypes(grouplessInternalGroupVersion,
 		&genericapitesting.Simple{}, &genericapitesting.SimpleList{}, &metav1.ExportOptions{},
 		&genericapitesting.SimpleGetOptions{}, &genericapitesting.SimpleRoot{})
 }
@@ -136,31 +142,31 @@ func addTestTypes() {
 		ResourceVersion string `json:"resourceVersion,omitempty"`
 		TimeoutSeconds  *int64 `json:"timeoutSeconds,omitempty"`
 	}
-	api.Scheme.AddKnownTypes(testGroupVersion,
+	scheme.AddKnownTypes(testGroupVersion,
 		&genericapitesting.Simple{}, &genericapitesting.SimpleList{}, &metav1.ExportOptions{},
 		&metav1.DeleteOptions{}, &genericapitesting.SimpleGetOptions{}, &genericapitesting.SimpleRoot{},
 		&SimpleXGSubresource{})
-	api.Scheme.AddKnownTypes(testGroupVersion, &v1.Pod{})
-	api.Scheme.AddKnownTypes(testInternalGroupVersion,
+	scheme.AddKnownTypes(testGroupVersion, &clientapiv1.Pod{})
+	scheme.AddKnownTypes(testInternalGroupVersion,
 		&genericapitesting.Simple{}, &genericapitesting.SimpleList{}, &metav1.ExportOptions{},
 		&genericapitesting.SimpleGetOptions{}, &genericapitesting.SimpleRoot{},
 		&SimpleXGSubresource{})
-	api.Scheme.AddKnownTypes(testInternalGroupVersion, &api.Pod{})
+	scheme.AddKnownTypes(testInternalGroupVersion, &clientapi.Pod{})
 	// Register SimpleXGSubresource in both testGroupVersion and testGroup2Version, and also their
 	// their corresponding internal versions, to verify that the desired group version object is
 	// served in the tests.
-	api.Scheme.AddKnownTypes(testGroup2Version, &SimpleXGSubresource{}, &metav1.ExportOptions{})
-	api.Scheme.AddKnownTypes(testInternalGroup2Version, &SimpleXGSubresource{}, &metav1.ExportOptions{})
-	metav1.AddToGroupVersion(api.Scheme, testGroupVersion)
+	scheme.AddKnownTypes(testGroup2Version, &SimpleXGSubresource{}, &metav1.ExportOptions{})
+	scheme.AddKnownTypes(testInternalGroup2Version, &SimpleXGSubresource{}, &metav1.ExportOptions{})
+	metav1.AddToGroupVersion(scheme, testGroupVersion)
 }
 
 func addNewTestTypes() {
-	api.Scheme.AddKnownTypes(newGroupVersion,
+	scheme.AddKnownTypes(newGroupVersion,
 		&genericapitesting.Simple{}, &genericapitesting.SimpleList{}, &metav1.ExportOptions{},
 		&metav1.DeleteOptions{}, &genericapitesting.SimpleGetOptions{}, &genericapitesting.SimpleRoot{},
-		&v1.Pod{},
+		&clientapiv1.Pod{},
 	)
-	metav1.AddToGroupVersion(api.Scheme, newGroupVersion)
+	metav1.AddToGroupVersion(scheme, newGroupVersion)
 }
 
 func init() {
@@ -176,7 +182,7 @@ func init() {
 	// enumerate all supported versions, get the kinds, and register with
 	// the mapper how to address our resources
 	for _, gv := range groupVersions {
-		for kind := range api.Scheme.KnownTypes(gv) {
+		for kind := range scheme.KnownTypes(gv) {
 			gvk := gv.WithKind(kind)
 			root := bool(kind == "SimpleRoot")
 			if root {
@@ -192,17 +198,17 @@ func init() {
 	admissionControl = admit.NewAlwaysAdmit()
 	requestContextMapper = request.NewRequestContextMapper()
 
-	api.Scheme.AddFieldLabelConversionFunc(grouplessGroupVersion.String(), "Simple",
+	scheme.AddFieldLabelConversionFunc(grouplessGroupVersion.String(), "Simple",
 		func(label, value string) (string, string, error) {
 			return label, value, nil
 		},
 	)
-	api.Scheme.AddFieldLabelConversionFunc(testGroupVersion.String(), "Simple",
+	scheme.AddFieldLabelConversionFunc(testGroupVersion.String(), "Simple",
 		func(label, value string) (string, string, error) {
 			return label, value, nil
 		},
 	)
-	api.Scheme.AddFieldLabelConversionFunc(newGroupVersion.String(), "Simple",
+	scheme.AddFieldLabelConversionFunc(newGroupVersion.String(), "Simple",
 		func(label, value string) (string, string, error) {
 			return label, value, nil
 		},
@@ -243,14 +249,14 @@ func handleInternal(storage map[string]rest.Storage, admissionControl admission.
 	template := APIGroupVersion{
 		Storage: storage,
 
-		Creater:   api.Scheme,
-		Convertor: api.Scheme,
-		Copier:    api.Scheme,
-		Typer:     api.Scheme,
+		Creater:   scheme,
+		Convertor: scheme,
+		Copier:    scheme,
+		Typer:     scheme,
 		Linker:    selfLinker,
 		Mapper:    namespaceMapper,
 
-		ParameterCodec: api.ParameterCodec,
+		ParameterCodec: parameterCodec,
 
 		Admit:   admissionControl,
 		Context: requestContextMapper,
@@ -262,7 +268,7 @@ func handleInternal(storage map[string]rest.Storage, admissionControl admission.
 		group.Root = "/" + grouplessPrefix
 		group.GroupVersion = grouplessGroupVersion
 		group.OptionsExternalVersion = &grouplessGroupVersion
-		group.Serializer = api.Codecs
+		group.Serializer = codecs
 		if err := (&group).InstallREST(container); err != nil {
 			panic(fmt.Sprintf("unable to install container %s: %v", group.GroupVersion, err))
 		}
@@ -274,7 +280,7 @@ func handleInternal(storage map[string]rest.Storage, admissionControl admission.
 		group.Root = "/" + prefix
 		group.GroupVersion = testGroupVersion
 		group.OptionsExternalVersion = &testGroupVersion
-		group.Serializer = api.Codecs
+		group.Serializer = codecs
 		if err := (&group).InstallREST(container); err != nil {
 			panic(fmt.Sprintf("unable to install container %s: %v", group.GroupVersion, err))
 		}
@@ -286,7 +292,7 @@ func handleInternal(storage map[string]rest.Storage, admissionControl admission.
 		group.Root = "/" + prefix
 		group.GroupVersion = newGroupVersion
 		group.OptionsExternalVersion = &newGroupVersion
-		group.Serializer = api.Codecs
+		group.Serializer = codecs
 		if err := (&group).InstallREST(container); err != nil {
 			panic(fmt.Sprintf("unable to install container %s: %v", group.GroupVersion, err))
 		}
@@ -428,7 +434,7 @@ func (storage *SimpleRESTStorage) Get(ctx request.Context, id string, options *m
 	if id == "binary" {
 		return storage.stream, storage.errors["get"]
 	}
-	copied, err := api.Scheme.Copy(&storage.item)
+	copied, err := scheme.Copy(&storage.item)
 	if err != nil {
 		panic(err)
 	}
@@ -662,7 +668,7 @@ func (storage *SimpleTypedStorage) New() runtime.Object {
 
 func (storage *SimpleTypedStorage) Get(ctx request.Context, id string, options *metav1.GetOptions) (runtime.Object, error) {
 	storage.checkContext(ctx)
-	copied, err := api.Scheme.Copy(storage.item)
+	copied, err := scheme.Copy(storage.item)
 	if err != nil {
 		panic(err)
 	}
@@ -1625,7 +1631,7 @@ func TestGetNamespaceSelfLink(t *testing.T) {
 func TestGetMissing(t *testing.T) {
 	storage := map[string]rest.Storage{}
 	simpleStorage := SimpleRESTStorage{
-		errors: map[string]error{"get": apierrs.NewNotFound(api.Resource("simples"), "id")},
+		errors: map[string]error{"get": apierrs.NewNotFound(schema.GroupResource{Resource: "simples"}, "id")},
 	}
 	storage["simple"] = &simpleStorage
 	handler := handle(storage)
@@ -1645,7 +1651,7 @@ func TestGetMissing(t *testing.T) {
 func TestGetRetryAfter(t *testing.T) {
 	storage := map[string]rest.Storage{}
 	simpleStorage := SimpleRESTStorage{
-		errors: map[string]error{"get": apierrs.NewServerTimeout(api.Resource("simples"), "id", 2)},
+		errors: map[string]error{"get": apierrs.NewServerTimeout(schema.GroupResource{Resource: "simples"}, "id", 2)},
 	}
 	storage["simple"] = &simpleStorage
 	handler := handle(storage)
@@ -1748,7 +1754,7 @@ func TestConnectResponderError(t *testing.T) {
 	connectStorage := &ConnecterRESTStorage{}
 	connectStorage.handlerFunc = func() http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-			connectStorage.receivedResponder.Error(apierrs.NewForbidden(api.Resource("simples"), itemID, errors.New("you are terminated")))
+			connectStorage.receivedResponder.Error(apierrs.NewForbidden(schema.GroupResource{Resource: "simples"}, itemID, errors.New("you are terminated")))
 		})
 	}
 	storage := map[string]rest.Storage{
@@ -2133,7 +2139,7 @@ func TestDeleteMissing(t *testing.T) {
 	storage := map[string]rest.Storage{}
 	ID := "id"
 	simpleStorage := SimpleRESTStorage{
-		errors: map[string]error{"delete": apierrs.NewNotFound(api.Resource("simples"), ID)},
+		errors: map[string]error{"delete": apierrs.NewNotFound(schema.GroupResource{Resource: "simples"}, ID)},
 	}
 	storage["simple"] = &simpleStorage
 	handler := handle(storage)
@@ -2436,7 +2442,7 @@ func TestUpdateMissing(t *testing.T) {
 	storage := map[string]rest.Storage{}
 	ID := "id"
 	simpleStorage := SimpleRESTStorage{
-		errors: map[string]error{"update": apierrs.NewNotFound(api.Resource("simples"), ID)},
+		errors: map[string]error{"update": apierrs.NewNotFound(schema.GroupResource{Resource: "simples"}, ID)},
 	}
 	storage["simple"] = &simpleStorage
 	handler := handle(storage)
@@ -2471,7 +2477,7 @@ func TestCreateNotFound(t *testing.T) {
 		"simple": &SimpleRESTStorage{
 			// storage.Create can fail with not found error in theory.
 			// See http://pr.k8s.io/486#discussion_r15037092.
-			errors: map[string]error{"create": apierrs.NewNotFound(api.Resource("simples"), "id")},
+			errors: map[string]error{"create": apierrs.NewNotFound(schema.GroupResource{Resource: "simples"}, "id")},
 		},
 	})
 	server := httptest.NewServer(handler)
@@ -2504,7 +2510,7 @@ func TestCreateChecksDecode(t *testing.T) {
 	defer server.Close()
 	client := http.Client{}
 
-	simple := &api.Pod{}
+	simple := &clientapi.Pod{}
 	data, err := runtime.Encode(testCodec, simple)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
@@ -2535,10 +2541,10 @@ func TestUpdateREST(t *testing.T) {
 		return &APIGroupVersion{
 			Storage:   storage,
 			Root:      "/" + prefix,
-			Creater:   api.Scheme,
-			Convertor: api.Scheme,
-			Copier:    api.Scheme,
-			Typer:     api.Scheme,
+			Creater:   scheme,
+			Convertor: scheme,
+			Copier:    scheme,
+			Typer:     scheme,
 			Linker:    selfLinker,
 
 			Admit:   admissionControl,
@@ -2548,8 +2554,8 @@ func TestUpdateREST(t *testing.T) {
 			GroupVersion:           newGroupVersion,
 			OptionsExternalVersion: &newGroupVersion,
 
-			Serializer:     api.Codecs,
-			ParameterCodec: api.ParameterCodec,
+			Serializer:     codecs,
+			ParameterCodec: parameterCodec,
 		}
 	}
 
@@ -2619,10 +2625,10 @@ func TestParentResourceIsRequired(t *testing.T) {
 			"simple/sub": storage,
 		},
 		Root:      "/" + prefix,
-		Creater:   api.Scheme,
-		Convertor: api.Scheme,
-		Copier:    api.Scheme,
-		Typer:     api.Scheme,
+		Creater:   scheme,
+		Convertor: scheme,
+		Copier:    scheme,
+		Typer:     scheme,
 		Linker:    selfLinker,
 
 		Admit:   admissionControl,
@@ -2632,8 +2638,8 @@ func TestParentResourceIsRequired(t *testing.T) {
 		GroupVersion:           newGroupVersion,
 		OptionsExternalVersion: &newGroupVersion,
 
-		Serializer:     api.Codecs,
-		ParameterCodec: api.ParameterCodec,
+		Serializer:     codecs,
+		ParameterCodec: parameterCodec,
 	}
 	container := restful.NewContainer()
 	if err := group.InstallREST(container); err == nil {
@@ -2650,10 +2656,10 @@ func TestParentResourceIsRequired(t *testing.T) {
 			"simple/sub": storage,
 		},
 		Root:      "/" + prefix,
-		Creater:   api.Scheme,
-		Convertor: api.Scheme,
-		Copier:    api.Scheme,
-		Typer:     api.Scheme,
+		Creater:   scheme,
+		Convertor: scheme,
+		Copier:    scheme,
+		Typer:     scheme,
 		Linker:    selfLinker,
 
 		Admit:   admissionControl,
@@ -2663,8 +2669,8 @@ func TestParentResourceIsRequired(t *testing.T) {
 		GroupVersion:           newGroupVersion,
 		OptionsExternalVersion: &newGroupVersion,
 
-		Serializer:     api.Codecs,
-		ParameterCodec: api.ParameterCodec,
+		Serializer:     codecs,
+		ParameterCodec: parameterCodec,
 	}
 	container = restful.NewContainer()
 	if err := group.InstallREST(container); err != nil {
@@ -2727,7 +2733,7 @@ func TestUpdateChecksDecode(t *testing.T) {
 	defer server.Close()
 	client := http.Client{}
 
-	simple := &api.Pod{}
+	simple := &clientapi.Pod{}
 	data, err := runtime.Encode(testCodec, simple)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
@@ -2853,12 +2859,12 @@ func TestCreateYAML(t *testing.T) {
 	simple := &genericapitesting.Simple{
 		Other: "bar",
 	}
-	info, ok := runtime.SerializerInfoForMediaType(api.Codecs.SupportedMediaTypes(), "application/yaml")
+	info, ok := runtime.SerializerInfoForMediaType(codecs.SupportedMediaTypes(), "application/yaml")
 	if !ok {
 		t.Fatal("No yaml serializer")
 	}
-	encoder := api.Codecs.EncoderForVersion(info.Serializer, testGroupVersion)
-	decoder := api.Codecs.DecoderToVersion(info.Serializer, testInternalGroupVersion)
+	encoder := codecs.EncoderForVersion(info.Serializer, testGroupVersion)
+	decoder := codecs.DecoderToVersion(info.Serializer, testInternalGroupVersion)
 
 	data, err := runtime.Encode(encoder, simple)
 	if err != nil {
@@ -3032,7 +3038,7 @@ func expectApiStatus(t *testing.T, method, url string, data []byte, code int) *m
 func TestDelayReturnsError(t *testing.T) {
 	storage := SimpleRESTStorage{
 		injectedFunction: func(obj runtime.Object) (runtime.Object, error) {
-			return nil, apierrs.NewAlreadyExists(api.Resource("foos"), "bar")
+			return nil, apierrs.NewAlreadyExists(schema.GroupResource{Resource: "foos"}, "bar")
 		},
 	}
 	handler := handle(map[string]rest.Storage{"foo": &storage})
@@ -3055,7 +3061,7 @@ func (obj *UnregisteredAPIObject) GetObjectKind() schema.ObjectKind {
 
 func TestWriteJSONDecodeError(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		responsewriters.WriteObjectNegotiated(api.Codecs, newGroupVersion, w, req, http.StatusOK, &UnregisteredAPIObject{"Undecodable"})
+		responsewriters.WriteObjectNegotiated(codecs, newGroupVersion, w, req, http.StatusOK, &UnregisteredAPIObject{"Undecodable"})
 	}))
 	defer server.Close()
 	// We send a 200 status code before we encode the object, so we expect OK, but there will
@@ -3237,7 +3243,7 @@ func (storage *SimpleXGSubresourceRESTStorage) New() runtime.Object {
 }
 
 func (storage *SimpleXGSubresourceRESTStorage) Get(ctx request.Context, id string, options *metav1.GetOptions) (runtime.Object, error) {
-	copied, err := api.Scheme.Copy(&storage.item)
+	copied, err := scheme.Copy(&storage.item)
 	if err != nil {
 		panic(err)
 	}
@@ -3263,14 +3269,14 @@ func TestXGSubresource(t *testing.T) {
 	group := APIGroupVersion{
 		Storage: storage,
 
-		Creater:   api.Scheme,
-		Convertor: api.Scheme,
-		Copier:    api.Scheme,
-		Typer:     api.Scheme,
+		Creater:   scheme,
+		Convertor: scheme,
+		Copier:    scheme,
+		Typer:     scheme,
 		Linker:    selfLinker,
 		Mapper:    namespaceMapper,
 
-		ParameterCodec: api.ParameterCodec,
+		ParameterCodec: parameterCodec,
 
 		Admit:   admissionControl,
 		Context: requestContextMapper,
@@ -3278,7 +3284,7 @@ func TestXGSubresource(t *testing.T) {
 		Root:                   "/" + prefix,
 		GroupVersion:           testGroupVersion,
 		OptionsExternalVersion: &testGroupVersion,
-		Serializer:             api.Codecs,
+		Serializer:             codecs,
 
 		SubresourceGroupVersionKind: map[string]schema.GroupVersionKind{
 			"simple/subsimple": testGroup2Version.WithKind("SimpleXGSubresource"),
@@ -3350,8 +3356,8 @@ func BenchmarkUpdateProtobuf(b *testing.B) {
 	dest.Path = "/" + prefix + "/" + newGroupVersion.Group + "/" + newGroupVersion.Version + "/namespaces/foo/simples/bar"
 	dest.RawQuery = ""
 
-	info, _ := runtime.SerializerInfoForMediaType(api.Codecs.SupportedMediaTypes(), "application/vnd.kubernetes.protobuf")
-	e := api.Codecs.EncoderForVersion(info.Serializer, newGroupVersion)
+	info, _ := runtime.SerializerInfoForMediaType(codecs.SupportedMediaTypes(), "application/vnd.kubernetes.protobuf")
+	e := codecs.EncoderForVersion(info.Serializer, newGroupVersion)
 	data, err := runtime.Encode(e, &items[0])
 	if err != nil {
 		b.Fatal(err)
@@ -3394,9 +3400,9 @@ func newTestRequestInfoResolver() *request.RequestInfoFactory {
 
 const benchmarkSeed = 100
 
-func benchmarkItems() []api.Pod {
-	apiObjectFuzzer := apitesting.FuzzerFor(nil, api.SchemeGroupVersion, rand.NewSource(benchmarkSeed))
-	items := make([]api.Pod, 3)
+func benchmarkItems() []clientapi.Pod {
+	apiObjectFuzzer := apitesting.FuzzerFor(nil, schema.GroupVersion{Group: "", Version: runtime.APIVersionInternal}, rand.NewSource(benchmarkSeed))
+	items := make([]clientapi.Pod, 3)
 	for i := range items {
 		apiObjectFuzzer.Fuzz(&items[i])
 		items[i].Spec.InitContainers, items[i].Status.InitContainerStatuses = nil, nil
