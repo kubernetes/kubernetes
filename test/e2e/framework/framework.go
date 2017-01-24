@@ -282,7 +282,7 @@ func (f *Framework) AfterEach() {
 		// Pass both unversioned client and and versioned clientset, till we have removed all uses of the unversioned client.
 		DumpAllNamespaceInfo(f.ClientSet, f.Namespace.Name)
 		By(fmt.Sprintf("Dumping a list of prepulled images on each node"))
-		LogContainersInPodsWithLabels(f.ClientSet, api.NamespaceSystem, ImagePullerLabels, "image-puller", Logf)
+		LogContainersInPodsWithLabels(f.ClientSet, metav1.NamespaceSystem, ImagePullerLabels, "image-puller", Logf)
 	}
 
 	summaries := make([]TestDataSummary, 0)
@@ -404,7 +404,7 @@ func (f *Framework) WaitForAnEndpoint(serviceName string) error {
 	for {
 		// TODO: Endpoints client should take a field selector so we
 		// don't have to list everything.
-		list, err := f.ClientSet.Core().Endpoints(f.Namespace.Name).List(v1.ListOptions{})
+		list, err := f.ClientSet.Core().Endpoints(f.Namespace.Name).List(metav1.ListOptions{})
 		if err != nil {
 			return err
 		}
@@ -419,7 +419,7 @@ func (f *Framework) WaitForAnEndpoint(serviceName string) error {
 			}
 		}
 
-		options := v1.ListOptions{
+		options := metav1.ListOptions{
 			FieldSelector:   fields.Set{"metadata.name": serviceName}.AsSelector().String(),
 			ResourceVersion: rv,
 		}
@@ -728,10 +728,10 @@ func filterLabels(selectors map[string]string, cli clientset.Interface, ns strin
 	// everything manually.
 	if len(selectors) > 0 {
 		selector = labels.SelectorFromSet(labels.Set(selectors))
-		options := v1.ListOptions{LabelSelector: selector.String()}
+		options := metav1.ListOptions{LabelSelector: selector.String()}
 		pl, err = cli.Core().Pods(ns).List(options)
 	} else {
-		pl, err = cli.Core().Pods(ns).List(v1.ListOptions{})
+		pl, err = cli.Core().Pods(ns).List(metav1.ListOptions{})
 	}
 	return pl, err
 }

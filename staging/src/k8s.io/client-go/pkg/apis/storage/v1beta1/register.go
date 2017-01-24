@@ -42,7 +42,6 @@ var (
 // Adds the list of known types to api.Scheme.
 func addKnownTypes(scheme *runtime.Scheme) error {
 	scheme.AddKnownTypes(SchemeGroupVersion,
-		&v1.ListOptions{},
 		&v1.DeleteOptions{},
 		&metav1.ExportOptions{},
 		&metav1.GetOptions{},

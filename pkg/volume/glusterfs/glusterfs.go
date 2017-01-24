@@ -456,7 +456,7 @@ func (p *glusterfsPlugin) collectGids(className string, gidTable *MinMaxAllocato
 	if kubeClient == nil {
 		return fmt.Errorf("glusterfs: failed to get kube client when collecting gids")
 	}
-	pvList, err := kubeClient.Core().PersistentVolumes().List(v1.ListOptions{LabelSelector: labels.Everything().String()})
+	pvList, err := kubeClient.Core().PersistentVolumes().List(metav1.ListOptions{LabelSelector: labels.Everything().String()})
 	if err != nil {
 		glog.Errorf("glusterfs: failed to get existing persistent volumes")
 		return err

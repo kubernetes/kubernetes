@@ -36,10 +36,10 @@ type PodInterface interface {
 	Update(*api.Pod) (*api.Pod, error)
 	UpdateStatus(*api.Pod) (*api.Pod, error)
 	Delete(name string, options *api.DeleteOptions) error
-	DeleteCollection(options *api.DeleteOptions, listOptions api.ListOptions) error
+	DeleteCollection(options *api.DeleteOptions, listOptions v1.ListOptions) error
 	Get(name string, options v1.GetOptions) (*api.Pod, error)
-	List(opts api.ListOptions) (*api.PodList, error)
-	Watch(opts api.ListOptions) (watch.Interface, error)
+	List(opts v1.ListOptions) (*api.PodList, error)
+	Watch(opts v1.ListOptions) (watch.Interface, error)
 	Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *api.Pod, err error)
 	PodExpansion
 }
@@ -111,7 +111,7 @@ func (c *pods) Delete(name string, options *api.DeleteOptions) error {
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *pods) DeleteCollection(options *api.DeleteOptions, listOptions api.ListOptions) error {
+func (c *pods) DeleteCollection(options *api.DeleteOptions, listOptions v1.ListOptions) error {
 	return c.client.Delete().
 		Namespace(c.ns).
 		Resource("pods").
@@ -135,7 +135,7 @@ func (c *pods) Get(name string, options v1.GetOptions) (result *api.Pod, err err
 }
 
 // List takes label and field selectors, and returns the list of Pods that match those selectors.
-func (c *pods) List(opts api.ListOptions) (result *api.PodList, err error) {
+func (c *pods) List(opts v1.ListOptions) (result *api.PodList, err error) {
 	result = &api.PodList{}
 	err = c.client.Get().
 		Namespace(c.ns).
@@ -147,7 +147,7 @@ func (c *pods) List(opts api.ListOptions) (result *api.PodList, err error) {
 }
 
 // Watch returns a watch.Interface that watches the requested pods.
-func (c *pods) Watch(opts api.ListOptions) (watch.Interface, error) {
+func (c *pods) Watch(opts v1.ListOptions) (watch.Interface, error) {
 	return c.client.Get().
 		Prefix("watch").
 		Namespace(c.ns).

@@ -17,6 +17,7 @@ limitations under the License.
 package configmap
 
 import (
+	metainternalversion "k8s.io/apimachinery/pkg/apis/meta/internalversion"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/watch"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
@@ -26,8 +27,8 @@ import (
 
 // Registry is an interface for things that know how to store ConfigMaps.
 type Registry interface {
-	ListConfigMaps(ctx genericapirequest.Context, options *api.ListOptions) (*api.ConfigMapList, error)
-	WatchConfigMaps(ctx genericapirequest.Context, options *api.ListOptions) (watch.Interface, error)
+	ListConfigMaps(ctx genericapirequest.Context, options *metainternalversion.ListOptions) (*api.ConfigMapList, error)
+	WatchConfigMaps(ctx genericapirequest.Context, options *metainternalversion.ListOptions) (watch.Interface, error)
 	GetConfigMap(ctx genericapirequest.Context, name string, options *metav1.GetOptions) (*api.ConfigMap, error)
 	CreateConfigMap(ctx genericapirequest.Context, cfg *api.ConfigMap) (*api.ConfigMap, error)
 	UpdateConfigMap(ctx genericapirequest.Context, cfg *api.ConfigMap) (*api.ConfigMap, error)
@@ -45,7 +46,7 @@ func NewRegistry(s rest.StandardStorage) Registry {
 	return &storage{s}
 }
 
-func (s *storage) ListConfigMaps(ctx genericapirequest.Context, options *api.ListOptions) (*api.ConfigMapList, error) {
+func (s *storage) ListConfigMaps(ctx genericapirequest.Context, options *metainternalversion.ListOptions) (*api.ConfigMapList, error) {
 	obj, err := s.List(ctx, options)
 	if err != nil {
 		return nil, err
@@ -54,7 +55,7 @@ func (s *storage) ListConfigMaps(ctx genericapirequest.Context, options *api.Lis
 	return obj.(*api.ConfigMapList), err
 }
 
-func (s *storage) WatchConfigMaps(ctx genericapirequest.Context, options *api.ListOptions) (watch.Interface, error) {
+func (s *storage) WatchConfigMaps(ctx genericapirequest.Context, options *metainternalversion.ListOptions) (watch.Interface, error) {
 	return s.Watch(ctx, options)
 }
 

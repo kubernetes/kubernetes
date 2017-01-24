@@ -89,7 +89,7 @@ func BeforeUpdate(strategy RESTUpdateStrategy, ctx genericapirequest.Context, ob
 			return errors.NewBadRequest("the namespace of the provided object does not match the namespace sent on the request")
 		}
 	} else {
-		objectMeta.Namespace = api.NamespaceNone
+		objectMeta.Namespace = metav1.NamespaceNone
 	}
 	// Ensure requests cannot update generation
 	oldMeta, err := metav1.ObjectMetaFor(old)

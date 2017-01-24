@@ -20,7 +20,6 @@ import (
 	"testing"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	apiv1 "k8s.io/kubernetes/pkg/api/v1"
 	extensionsv1 "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	deputils "k8s.io/kubernetes/pkg/controller/deployment/util"
 
@@ -61,7 +60,7 @@ func newDeployment() *extensionsv1.Deployment {
 	return &extensionsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "wrr",
-			Namespace: apiv1.NamespaceDefault,
+			Namespace: metav1.NamespaceDefault,
 			SelfLink:  "/api/v1/namespaces/default/deployments/name123",
 		},
 		Spec: extensionsv1.DeploymentSpec{

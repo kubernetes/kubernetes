@@ -59,7 +59,7 @@ func newReplicationController(replicas int) *v1.ReplicationController {
 		ObjectMeta: metav1.ObjectMeta{
 			UID:             uuid.NewUUID(),
 			Name:            "foobar",
-			Namespace:       v1.NamespaceDefault,
+			Namespace:       metav1.NamespaceDefault,
 			ResourceVersion: "18",
 		},
 		Spec: v1.ReplicationControllerSpec{
@@ -238,7 +238,7 @@ func TestUIDExpectations(t *testing.T) {
 }
 
 func TestCreatePods(t *testing.T) {
-	ns := v1.NamespaceDefault
+	ns := metav1.NamespaceDefault
 	body := runtime.EncodeOrDie(testapi.Default.Codec(), &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "empty_pod"}})
 	fakeHandler := utiltesting.FakeHandler{
 		StatusCode:   200,
@@ -267,7 +267,7 @@ func TestCreatePods(t *testing.T) {
 		},
 		Spec: controllerSpec.Spec.Template.Spec,
 	}
-	fakeHandler.ValidateRequest(t, testapi.Default.ResourcePath("pods", v1.NamespaceDefault, ""), "POST", nil)
+	fakeHandler.ValidateRequest(t, testapi.Default.ResourcePath("pods", metav1.NamespaceDefault, ""), "POST", nil)
 	var actualPod = &v1.Pod{}
 	err := json.Unmarshal([]byte(fakeHandler.RequestBody), actualPod)
 	if err != nil {

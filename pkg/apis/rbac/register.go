@@ -56,7 +56,6 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 		&ClusterRoleBindingList{},
 		&ClusterRoleList{},
 
-		&api.ListOptions{},
 		&api.DeleteOptions{},
 		&metav1.ExportOptions{},
 		&metav1.GetOptions{},

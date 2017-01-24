@@ -58,7 +58,7 @@ func validNewReplicaSet() *extensions.ReplicaSet {
 	return &extensions.ReplicaSet{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "foo",
-			Namespace: api.NamespaceDefault,
+			Namespace: metav1.NamespaceDefault,
 		},
 		Spec: extensions.ReplicaSetSpec{
 			Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"a": "b"}},
@@ -254,8 +254,8 @@ func TestScaleGet(t *testing.T) {
 	name := "foo"
 
 	var rs extensions.ReplicaSet
-	ctx := genericapirequest.WithNamespace(genericapirequest.NewContext(), api.NamespaceDefault)
-	key := "/replicasets/" + api.NamespaceDefault + "/" + name
+	ctx := genericapirequest.WithNamespace(genericapirequest.NewContext(), metav1.NamespaceDefault)
+	key := "/replicasets/" + metav1.NamespaceDefault + "/" + name
 	if err := storage.ReplicaSet.Storage.Create(ctx, key, &validReplicaSet, &rs, 0); err != nil {
 		t.Fatalf("error setting new replica set (key: %s) %v: %v", key, validReplicaSet, err)
 	}
@@ -263,7 +263,7 @@ func TestScaleGet(t *testing.T) {
 	want := &extensions.Scale{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:              name,
-			Namespace:         api.NamespaceDefault,
+			Namespace:         metav1.NamespaceDefault,
 			UID:               rs.UID,
 			ResourceVersion:   rs.ResourceVersion,
 			CreationTimestamp: rs.CreationTimestamp,
@@ -294,8 +294,8 @@ func TestScaleUpdate(t *testing.T) {
 	name := "foo"
 
 	var rs extensions.ReplicaSet
-	ctx := genericapirequest.WithNamespace(genericapirequest.NewContext(), api.NamespaceDefault)
-	key := "/replicasets/" + api.NamespaceDefault + "/" + name
+	ctx := genericapirequest.WithNamespace(genericapirequest.NewContext(), metav1.NamespaceDefault)
+	key := "/replicasets/" + metav1.NamespaceDefault + "/" + name
 	if err := storage.ReplicaSet.Storage.Create(ctx, key, &validReplicaSet, &rs, 0); err != nil {
 		t.Fatalf("error setting new replica set (key: %s) %v: %v", key, validReplicaSet, err)
 	}
@@ -303,7 +303,7 @@ func TestScaleUpdate(t *testing.T) {
 	update := extensions.Scale{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
-			Namespace: api.NamespaceDefault,
+			Namespace: metav1.NamespaceDefault,
 		},
 		Spec: extensions.ScaleSpec{
 			Replicas: int32(replicas),
@@ -336,8 +336,8 @@ func TestStatusUpdate(t *testing.T) {
 	defer server.Terminate(t)
 	defer storage.ReplicaSet.Store.DestroyFunc()
 
-	ctx := genericapirequest.WithNamespace(genericapirequest.NewContext(), api.NamespaceDefault)
-	key := "/replicasets/" + api.NamespaceDefault + "/foo"
+	ctx := genericapirequest.WithNamespace(genericapirequest.NewContext(), metav1.NamespaceDefault)
+	key := "/replicasets/" + metav1.NamespaceDefault + "/foo"
 	if err := storage.ReplicaSet.Storage.Create(ctx, key, &validReplicaSet, nil, 0); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

@@ -140,7 +140,7 @@ var _ = framework.KubeDescribe("NodeOutOfDisk [Serial] [Flaky] [Disruptive]", fu
 				"source":                   v1.DefaultSchedulerName,
 				"reason":                   "FailedScheduling",
 			}.AsSelector().String()
-			options := v1.ListOptions{FieldSelector: selector}
+			options := metav1.ListOptions{FieldSelector: selector}
 			schedEvents, err := c.Core().Events(ns).List(options)
 			framework.ExpectNoError(err)
 
@@ -199,10 +199,10 @@ func createOutOfDiskPod(c clientset.Interface, ns, name string, milliCPU int64) 
 // availCpu calculates the available CPU on a given node by subtracting the CPU requested by
 // all the pods from the total available CPU capacity on the node.
 func availCpu(c clientset.Interface, node *v1.Node) (int64, error) {
-	podClient := c.Core().Pods(v1.NamespaceAll)
+	podClient := c.Core().Pods(metav1.NamespaceAll)
 
 	selector := fields.Set{"spec.nodeName": node.Name}.AsSelector().String()
-	options := v1.ListOptions{FieldSelector: selector}
+	options := metav1.ListOptions{FieldSelector: selector}
 	pods, err := podClient.List(options)
 	if err != nil {
 		return 0, fmt.Errorf("failed to retrieve all the pods on node %s: %v", node.Name, err)

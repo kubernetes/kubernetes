@@ -34,6 +34,7 @@ import (
 	clientgoclientset "k8s.io/client-go/kubernetes"
 
 	cadvisorapi "github.com/google/cadvisor/info/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
@@ -381,7 +382,7 @@ func NewMainKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *Kub
 
 	serviceStore := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
 	if kubeClient != nil {
-		serviceLW := cache.NewListWatchFromClient(kubeClient.Core().RESTClient(), "services", v1.NamespaceAll, fields.Everything())
+		serviceLW := cache.NewListWatchFromClient(kubeClient.Core().RESTClient(), "services", metav1.NamespaceAll, fields.Everything())
 		cache.NewReflector(serviceLW, &v1.Service{}, serviceStore, 0).Run()
 	}
 	serviceLister := &listers.StoreToServiceLister{Indexer: serviceStore}
@@ -389,7 +390,7 @@ func NewMainKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *Kub
 	nodeStore := cache.NewStore(cache.MetaNamespaceKeyFunc)
 	if kubeClient != nil {
 		fieldSelector := fields.Set{api.ObjectNameField: string(nodeName)}.AsSelector()
-		nodeLW := cache.NewListWatchFromClient(kubeClient.Core().RESTClient(), "nodes", v1.NamespaceAll, fieldSelector)
+		nodeLW := cache.NewListWatchFromClient(kubeClient.Core().RESTClient(), "nodes", metav1.NamespaceAll, fieldSelector)
 		cache.NewReflector(nodeLW, &v1.Node{}, nodeStore, 0).Run()
 	}
 	nodeLister := &listers.StoreToNodeLister{Store: nodeStore}

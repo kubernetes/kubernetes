@@ -19,6 +19,7 @@ package service
 import (
 	"fmt"
 
+	metainternalversion "k8s.io/apimachinery/pkg/apis/meta/internalversion"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/watch"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
@@ -28,12 +29,12 @@ import (
 
 // Registry is an interface for things that know how to store services.
 type Registry interface {
-	ListServices(ctx genericapirequest.Context, options *api.ListOptions) (*api.ServiceList, error)
+	ListServices(ctx genericapirequest.Context, options *metainternalversion.ListOptions) (*api.ServiceList, error)
 	CreateService(ctx genericapirequest.Context, svc *api.Service) (*api.Service, error)
 	GetService(ctx genericapirequest.Context, name string, options *metav1.GetOptions) (*api.Service, error)
 	DeleteService(ctx genericapirequest.Context, name string) error
 	UpdateService(ctx genericapirequest.Context, svc *api.Service) (*api.Service, error)
-	WatchServices(ctx genericapirequest.Context, options *api.ListOptions) (watch.Interface, error)
+	WatchServices(ctx genericapirequest.Context, options *metainternalversion.ListOptions) (watch.Interface, error)
 	ExportService(ctx genericapirequest.Context, name string, options metav1.ExportOptions) (*api.Service, error)
 }
 
@@ -48,7 +49,7 @@ func NewRegistry(s rest.StandardStorage) Registry {
 	return &storage{s}
 }
 
-func (s *storage) ListServices(ctx genericapirequest.Context, options *api.ListOptions) (*api.ServiceList, error) {
+func (s *storage) ListServices(ctx genericapirequest.Context, options *metainternalversion.ListOptions) (*api.ServiceList, error) {
 	obj, err := s.List(ctx, options)
 	if err != nil {
 		return nil, err
@@ -85,7 +86,7 @@ func (s *storage) UpdateService(ctx genericapirequest.Context, svc *api.Service)
 	return obj.(*api.Service), nil
 }
 
-func (s *storage) WatchServices(ctx genericapirequest.Context, options *api.ListOptions) (watch.Interface, error) {
+func (s *storage) WatchServices(ctx genericapirequest.Context, options *metainternalversion.ListOptions) (watch.Interface, error) {
 	return s.Watch(ctx, options)
 }
 

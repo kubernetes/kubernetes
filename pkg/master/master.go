@@ -24,6 +24,7 @@ import (
 	"strconv"
 	"time"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apiserver/pkg/server/healthz"
@@ -368,7 +369,7 @@ func (n nodeAddressProvider) externalAddresses() ([]string, error) {
 		apiv1.NodeExternalIP,
 		apiv1.NodeLegacyHostIP,
 	}
-	nodes, err := n.nodeClient.List(apiv1.ListOptions{})
+	nodes, err := n.nodeClient.List(metav1.ListOptions{})
 	if err != nil {
 		return nil, err
 	}

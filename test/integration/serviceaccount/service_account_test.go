@@ -172,7 +172,7 @@ func TestServiceAccountTokenAutoCreate(t *testing.T) {
 	tokensToCleanup := sets.NewString(token1Name, token2Name, token3Name)
 	err = wait.Poll(time.Second, 10*time.Second, func() (bool, error) {
 		// Get all secrets in the namespace
-		secrets, err := c.Core().Secrets(ns).List(v1.ListOptions{})
+		secrets, err := c.Core().Secrets(ns).List(metav1.ListOptions{})
 		// Retrieval errors should fail
 		if err != nil {
 			return false, err
@@ -519,11 +519,11 @@ func doServiceAccountAPIRequests(t *testing.T, c *clientset.Clientset, ns string
 
 	readOps := []testOperation{
 		func() error {
-			_, err := c.Core().Secrets(ns).List(v1.ListOptions{})
+			_, err := c.Core().Secrets(ns).List(metav1.ListOptions{})
 			return err
 		},
 		func() error {
-			_, err := c.Core().Pods(ns).List(v1.ListOptions{})
+			_, err := c.Core().Pods(ns).List(metav1.ListOptions{})
 			return err
 		},
 	}

@@ -20,6 +20,7 @@ go_library(
         "//pkg/registry/core/service:go_default_library",
         "//pkg/registry/core/service/portallocator:go_default_library",
         "//vendor:k8s.io/apimachinery/pkg/api/errors",
+        "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
         "//vendor:k8s.io/apimachinery/pkg/util/net",
         "//vendor:k8s.io/apimachinery/pkg/util/runtime",
         "//vendor:k8s.io/apimachinery/pkg/util/wait",

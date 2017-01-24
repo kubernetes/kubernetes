@@ -127,7 +127,7 @@ func getZoneNameForNode(node v1.Node) (string, error) {
 // Find the names of all zones in which we have nodes in this cluster.
 func getZoneNames(c clientset.Interface) ([]string, error) {
 	zoneNames := sets.NewString()
-	nodes, err := c.Core().Nodes().List(v1.ListOptions{})
+	nodes, err := c.Core().Nodes().List(metav1.ListOptions{})
 	if err != nil {
 		return nil, err
 	}

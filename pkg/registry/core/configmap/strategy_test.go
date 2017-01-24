@@ -37,7 +37,7 @@ func TestConfigMapStrategy(t *testing.T) {
 	cfg := &api.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "valid-config-data",
-			Namespace: api.NamespaceDefault,
+			Namespace: metav1.NamespaceDefault,
 		},
 		Data: map[string]string{
 			"foo": "bar",
@@ -54,7 +54,7 @@ func TestConfigMapStrategy(t *testing.T) {
 	newCfg := &api.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:            "valid-config-data-2",
-			Namespace:       api.NamespaceDefault,
+			Namespace:       metav1.NamespaceDefault,
 			ResourceVersion: "4",
 		},
 		Data: map[string]string{

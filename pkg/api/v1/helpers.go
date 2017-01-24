@@ -21,8 +21,6 @@ import (
 	"fmt"
 	"strings"
 
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/selection"
 	"k8s.io/apimachinery/pkg/types"
@@ -89,14 +87,6 @@ var standardFinalizers = sets.NewString(
 
 func IsStandardFinalizerName(str string) bool {
 	return standardFinalizers.Has(str)
-}
-
-// SingleObject returns a ListOptions for watching a single object.
-func SingleObject(meta metav1.ObjectMeta) ListOptions {
-	return ListOptions{
-		FieldSelector:   fields.OneTermEqualSelector("metadata.name", meta.Name).String(),
-		ResourceVersion: meta.ResourceVersion,
-	}
 }
 
 // AddToNodeAddresses appends the NodeAddresses to the passed-by-pointer slice,

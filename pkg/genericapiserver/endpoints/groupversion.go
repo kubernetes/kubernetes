@@ -49,10 +49,14 @@ type APIGroupVersion struct {
 	GroupVersion schema.GroupVersion
 
 	// OptionsExternalVersion controls the Kubernetes APIVersion used for common objects in the apiserver
-	// schema like api.Status, api.DeleteOptions, and api.ListOptions. Other implementors may
+	// schema like api.Status, api.DeleteOptions, and metav1.ListOptions. Other implementors may
 	// define a version "v1beta1" but want to use the Kubernetes "v1" internal objects. If
 	// empty, defaults to GroupVersion.
 	OptionsExternalVersion *schema.GroupVersion
+	// MetaGroupVersion defaults to "meta.k8s.io/v1" and is the scheme group version used to decode
+	// common API implementations like ListOptions. Future changes will allow this to vary by group
+	// version (for when the inevitable meta/v2 group emerges).
+	MetaGroupVersion *schema.GroupVersion
 
 	Mapper meta.RESTMapper
 

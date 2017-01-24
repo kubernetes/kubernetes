@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package discovery
+package discovery_test
 
 import (
 	"reflect"
@@ -24,6 +24,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/version"
+	. "k8s.io/client-go/discovery"
 	"k8s.io/client-go/pkg/api"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/rest/fake"

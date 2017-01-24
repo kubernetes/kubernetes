@@ -21,6 +21,7 @@ import (
 	"sync"
 	"time"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -156,7 +157,7 @@ func (gcc *PodGCController) gcTerminated(pods []*v1.Pod) {
 func (gcc *PodGCController) gcOrphaned(pods []*v1.Pod) {
 	glog.V(4).Infof("GC'ing orphaned")
 	// We want to get list of Nodes from the etcd, to make sure that it's as fresh as possible.
-	nodes, err := gcc.kubeClient.Core().Nodes().List(v1.ListOptions{})
+	nodes, err := gcc.kubeClient.Core().Nodes().List(metav1.ListOptions{})
 	if err != nil {
 		return
 	}

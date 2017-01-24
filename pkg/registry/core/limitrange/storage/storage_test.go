@@ -45,7 +45,7 @@ func validNewLimitRange() *api.LimitRange {
 	return &api.LimitRange{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "foo",
-			Namespace: api.NamespaceDefault,
+			Namespace: metav1.NamespaceDefault,
 		},
 		Spec: api.LimitRangeSpec{
 			Limits: []api.LimitRangeItem{

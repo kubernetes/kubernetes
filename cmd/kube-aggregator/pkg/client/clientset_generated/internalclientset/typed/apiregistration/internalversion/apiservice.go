@@ -37,10 +37,10 @@ type APIServiceInterface interface {
 	Update(*apiregistration.APIService) (*apiregistration.APIService, error)
 	UpdateStatus(*apiregistration.APIService) (*apiregistration.APIService, error)
 	Delete(name string, options *api.DeleteOptions) error
-	DeleteCollection(options *api.DeleteOptions, listOptions api.ListOptions) error
+	DeleteCollection(options *api.DeleteOptions, listOptions v1.ListOptions) error
 	Get(name string, options v1.GetOptions) (*apiregistration.APIService, error)
-	List(opts api.ListOptions) (*apiregistration.APIServiceList, error)
-	Watch(opts api.ListOptions) (watch.Interface, error)
+	List(opts v1.ListOptions) (*apiregistration.APIServiceList, error)
+	Watch(opts v1.ListOptions) (watch.Interface, error)
 	Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *apiregistration.APIService, err error)
 	APIServiceExpansion
 }
@@ -106,7 +106,7 @@ func (c *aPIServices) Delete(name string, options *api.DeleteOptions) error {
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *aPIServices) DeleteCollection(options *api.DeleteOptions, listOptions api.ListOptions) error {
+func (c *aPIServices) DeleteCollection(options *api.DeleteOptions, listOptions v1.ListOptions) error {
 	return c.client.Delete().
 		Resource("apiservices").
 		VersionedParams(&listOptions, api.ParameterCodec).
@@ -128,7 +128,7 @@ func (c *aPIServices) Get(name string, options v1.GetOptions) (result *apiregist
 }
 
 // List takes label and field selectors, and returns the list of APIServices that match those selectors.
-func (c *aPIServices) List(opts api.ListOptions) (result *apiregistration.APIServiceList, err error) {
+func (c *aPIServices) List(opts v1.ListOptions) (result *apiregistration.APIServiceList, err error) {
 	result = &apiregistration.APIServiceList{}
 	err = c.client.Get().
 		Resource("apiservices").
@@ -139,7 +139,7 @@ func (c *aPIServices) List(opts api.ListOptions) (result *apiregistration.APISer
 }
 
 // Watch returns a watch.Interface that watches the requested aPIServices.
-func (c *aPIServices) Watch(opts api.ListOptions) (watch.Interface, error) {
+func (c *aPIServices) Watch(opts v1.ListOptions) (watch.Interface, error) {
 	return c.client.Get().
 		Prefix("watch").
 		Resource("apiservices").

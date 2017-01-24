@@ -123,7 +123,7 @@ func waitForReflection(t *testing.T, s cache.Store, key string, passFunc func(n 
 func DoTestUnschedulableNodes(t *testing.T, cs clientset.Interface, ns *v1.Namespace, nodeStore cache.Store) {
 	// NOTE: This test cannot run in parallel, because it is creating and deleting
 	// non-namespaced objects (Nodes).
-	defer cs.Core().Nodes().DeleteCollection(nil, v1.ListOptions{})
+	defer cs.Core().Nodes().DeleteCollection(nil, metav1.ListOptions{})
 
 	goodCondition := v1.NodeCondition{
 		Type:              v1.NodeReady,
@@ -326,7 +326,7 @@ func TestMultiScheduler(t *testing.T) {
 
 	// NOTE: This test cannot run in parallel, because it is creating and deleting
 	// non-namespaced objects (Nodes).
-	defer clientSet.Core().Nodes().DeleteCollection(nil, v1.ListOptions{})
+	defer clientSet.Core().Nodes().DeleteCollection(nil, metav1.ListOptions{})
 
 	schedulerConfigFactory := factory.NewConfigFactory(clientSet, v1.DefaultSchedulerName, v1.DefaultHardPodAffinitySymmetricWeight, v1.DefaultFailureDomains)
 	schedulerConfig, err := schedulerConfigFactory.Create()
@@ -492,7 +492,7 @@ func TestAllocatable(t *testing.T) {
 
 	// NOTE: This test cannot run in parallel, because it is creating and deleting
 	// non-namespaced objects (Nodes).
-	defer clientSet.Core().Nodes().DeleteCollection(nil, v1.ListOptions{})
+	defer clientSet.Core().Nodes().DeleteCollection(nil, metav1.ListOptions{})
 
 	schedulerConfigFactory := factory.NewConfigFactory(clientSet, v1.DefaultSchedulerName, v1.DefaultHardPodAffinitySymmetricWeight, v1.DefaultFailureDomains)
 	schedulerConfig, err := schedulerConfigFactory.Create()

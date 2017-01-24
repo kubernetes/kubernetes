@@ -106,7 +106,7 @@ func newMatchingPod(podName, namespace string) *v1.Pod {
 func verifyRemainingObjects(t *testing.T, clientSet clientset.Interface, namespace string, rsNum, podNum int) (bool, error) {
 	rsClient := clientSet.Extensions().ReplicaSets(namespace)
 	podClient := clientSet.Core().Pods(namespace)
-	pods, err := podClient.List(v1.ListOptions{})
+	pods, err := podClient.List(metav1.ListOptions{})
 	if err != nil {
 		return false, fmt.Errorf("Failed to list pods: %v", err)
 	}
@@ -115,7 +115,7 @@ func verifyRemainingObjects(t *testing.T, clientSet clientset.Interface, namespa
 		ret = false
 		t.Logf("expect %d pods, got %d pods", podNum, len(pods.Items))
 	}
-	rss, err := rsClient.List(v1.ListOptions{})
+	rss, err := rsClient.List(metav1.ListOptions{})
 	if err != nil {
 		return false, fmt.Errorf("Failed to list replica sets: %v", err)
 	}

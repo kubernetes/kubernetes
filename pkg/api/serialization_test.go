@@ -180,6 +180,8 @@ var nonRoundTrippableTypes = sets.NewString(
 	// the schema by content type, rather than via kind/version included in each
 	// object.
 	"WatchEvent",
+	// ListOptions is now part of the meta group
+	"ListOptions",
 )
 
 var commonKinds = []string{"Status", "ListOptions", "DeleteOptions", "ExportOptions"}

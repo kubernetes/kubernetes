@@ -67,7 +67,7 @@ func (c *FakeClusters) Delete(name string, options *api.DeleteOptions) error {
 	return err
 }
 
-func (c *FakeClusters) DeleteCollection(options *api.DeleteOptions, listOptions api.ListOptions) error {
+func (c *FakeClusters) DeleteCollection(options *api.DeleteOptions, listOptions v1.ListOptions) error {
 	action := core.NewRootDeleteCollectionAction(clustersResource, listOptions)
 
 	_, err := c.Fake.Invokes(action, &federation.ClusterList{})
@@ -83,7 +83,7 @@ func (c *FakeClusters) Get(name string, options v1.GetOptions) (result *federati
 	return obj.(*federation.Cluster), err
 }
 
-func (c *FakeClusters) List(opts api.ListOptions) (result *federation.ClusterList, err error) {
+func (c *FakeClusters) List(opts v1.ListOptions) (result *federation.ClusterList, err error) {
 	obj, err := c.Fake.
 		Invokes(core.NewRootListAction(clustersResource, opts), &federation.ClusterList{})
 	if obj == nil {
@@ -104,7 +104,7 @@ func (c *FakeClusters) List(opts api.ListOptions) (result *federation.ClusterLis
 }
 
 // Watch returns a watch.Interface that watches the requested clusters.
-func (c *FakeClusters) Watch(opts api.ListOptions) (watch.Interface, error) {
+func (c *FakeClusters) Watch(opts v1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
 		InvokesWatch(core.NewRootWatchAction(clustersResource, opts))
 }

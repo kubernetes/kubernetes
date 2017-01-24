@@ -73,7 +73,7 @@ func main() {
 
 	var nodes *api.NodeList
 	for start := time.Now(); time.Since(start) < nodeListTimeout; time.Sleep(2 * time.Second) {
-		nodes, err = client.Core().Nodes().List(api.ListOptions{})
+		nodes, err = client.Core().Nodes().List(metav1.ListOptions{})
 		if err == nil {
 			break
 		}

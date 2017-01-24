@@ -38,10 +38,10 @@ type HorizontalPodAutoscalerInterface interface {
 	Update(*v1.HorizontalPodAutoscaler) (*v1.HorizontalPodAutoscaler, error)
 	UpdateStatus(*v1.HorizontalPodAutoscaler) (*v1.HorizontalPodAutoscaler, error)
 	Delete(name string, options *api_v1.DeleteOptions) error
-	DeleteCollection(options *api_v1.DeleteOptions, listOptions api_v1.ListOptions) error
+	DeleteCollection(options *api_v1.DeleteOptions, listOptions meta_v1.ListOptions) error
 	Get(name string, options meta_v1.GetOptions) (*v1.HorizontalPodAutoscaler, error)
-	List(opts api_v1.ListOptions) (*v1.HorizontalPodAutoscalerList, error)
-	Watch(opts api_v1.ListOptions) (watch.Interface, error)
+	List(opts meta_v1.ListOptions) (*v1.HorizontalPodAutoscalerList, error)
+	Watch(opts meta_v1.ListOptions) (watch.Interface, error)
 	Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v1.HorizontalPodAutoscaler, err error)
 	HorizontalPodAutoscalerExpansion
 }
@@ -113,7 +113,7 @@ func (c *horizontalPodAutoscalers) Delete(name string, options *api_v1.DeleteOpt
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *horizontalPodAutoscalers) DeleteCollection(options *api_v1.DeleteOptions, listOptions api_v1.ListOptions) error {
+func (c *horizontalPodAutoscalers) DeleteCollection(options *api_v1.DeleteOptions, listOptions meta_v1.ListOptions) error {
 	return c.client.Delete().
 		Namespace(c.ns).
 		Resource("horizontalpodautoscalers").
@@ -137,7 +137,7 @@ func (c *horizontalPodAutoscalers) Get(name string, options meta_v1.GetOptions) 
 }
 
 // List takes label and field selectors, and returns the list of HorizontalPodAutoscalers that match those selectors.
-func (c *horizontalPodAutoscalers) List(opts api_v1.ListOptions) (result *v1.HorizontalPodAutoscalerList, err error) {
+func (c *horizontalPodAutoscalers) List(opts meta_v1.ListOptions) (result *v1.HorizontalPodAutoscalerList, err error) {
 	result = &v1.HorizontalPodAutoscalerList{}
 	err = c.client.Get().
 		Namespace(c.ns).
@@ -149,7 +149,7 @@ func (c *horizontalPodAutoscalers) List(opts api_v1.ListOptions) (result *v1.Hor
 }
 
 // Watch returns a watch.Interface that watches the requested horizontalPodAutoscalers.
-func (c *horizontalPodAutoscalers) Watch(opts api_v1.ListOptions) (watch.Interface, error) {
+func (c *horizontalPodAutoscalers) Watch(opts meta_v1.ListOptions) (watch.Interface, error) {
 	return c.client.Get().
 		Prefix("watch").
 		Namespace(c.ns).

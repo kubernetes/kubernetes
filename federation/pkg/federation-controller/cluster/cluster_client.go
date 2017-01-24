@@ -142,7 +142,7 @@ func getRegionNameForNode(node api.Node) (string, error) {
 // Find the names of all zones and the region in which we have nodes in this cluster.
 func getZoneNames(client *clientset.Clientset) (zones []string, region string, err error) {
 	zoneNames := sets.NewString()
-	nodes, err := client.Core().Nodes().List(api.ListOptions{})
+	nodes, err := client.Core().Nodes().List(metav1.ListOptions{})
 	if err != nil {
 		glog.Errorf("Failed to list nodes while getting zone names: %v", err)
 		return nil, "", err

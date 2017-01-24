@@ -58,7 +58,7 @@ func (c *FakePodSecurityPolicies) Delete(name string, options *api.DeleteOptions
 	return err
 }
 
-func (c *FakePodSecurityPolicies) DeleteCollection(options *api.DeleteOptions, listOptions api.ListOptions) error {
+func (c *FakePodSecurityPolicies) DeleteCollection(options *api.DeleteOptions, listOptions v1.ListOptions) error {
 	action := core.NewRootDeleteCollectionAction(podsecuritypoliciesResource, listOptions)
 
 	_, err := c.Fake.Invokes(action, &extensions.PodSecurityPolicyList{})
@@ -74,7 +74,7 @@ func (c *FakePodSecurityPolicies) Get(name string, options v1.GetOptions) (resul
 	return obj.(*extensions.PodSecurityPolicy), err
 }
 
-func (c *FakePodSecurityPolicies) List(opts api.ListOptions) (result *extensions.PodSecurityPolicyList, err error) {
+func (c *FakePodSecurityPolicies) List(opts v1.ListOptions) (result *extensions.PodSecurityPolicyList, err error) {
 	obj, err := c.Fake.
 		Invokes(core.NewRootListAction(podsecuritypoliciesResource, opts), &extensions.PodSecurityPolicyList{})
 	if obj == nil {
@@ -95,7 +95,7 @@ func (c *FakePodSecurityPolicies) List(opts api.ListOptions) (result *extensions
 }
 
 // Watch returns a watch.Interface that watches the requested podSecurityPolicies.
-func (c *FakePodSecurityPolicies) Watch(opts api.ListOptions) (watch.Interface, error) {
+func (c *FakePodSecurityPolicies) Watch(opts v1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
 		InvokesWatch(core.NewRootWatchAction(podsecuritypoliciesResource, opts))
 }

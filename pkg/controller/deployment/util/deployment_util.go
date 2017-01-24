@@ -537,7 +537,7 @@ func GetNewReplicaSet(deployment *extensions.Deployment, c clientset.Interface) 
 // listReplicaSets lists all RSes the given deployment targets with the given client interface.
 func listReplicaSets(deployment *extensions.Deployment, c clientset.Interface) ([]*extensions.ReplicaSet, error) {
 	return ListReplicaSets(deployment,
-		func(namespace string, options v1.ListOptions) ([]*extensions.ReplicaSet, error) {
+		func(namespace string, options metav1.ListOptions) ([]*extensions.ReplicaSet, error) {
 			rsList, err := c.Extensions().ReplicaSets(namespace).List(options)
 			if err != nil {
 				return nil, err
@@ -553,14 +553,14 @@ func listReplicaSets(deployment *extensions.Deployment, c clientset.Interface) (
 // listReplicaSets lists all Pods the given deployment targets with the given client interface.
 func listPods(deployment *extensions.Deployment, c clientset.Interface) (*v1.PodList, error) {
 	return ListPods(deployment,
-		func(namespace string, options v1.ListOptions) (*v1.PodList, error) {
+		func(namespace string, options metav1.ListOptions) (*v1.PodList, error) {
 			return c.Core().Pods(namespace).List(options)
 		})
 }
 
 // TODO: switch this to full namespacers
-type rsListFunc func(string, v1.ListOptions) ([]*extensions.ReplicaSet, error)
-type podListFunc func(string, v1.ListOptions) (*v1.PodList, error)
+type rsListFunc func(string, metav1.ListOptions) ([]*extensions.ReplicaSet, error)
+type podListFunc func(string, metav1.ListOptions) (*v1.PodList, error)
 
 // ListReplicaSets returns a slice of RSes the given deployment targets.
 func ListReplicaSets(deployment *extensions.Deployment, getRSList rsListFunc) ([]*extensions.ReplicaSet, error) {
@@ -572,7 +572,7 @@ func ListReplicaSets(deployment *extensions.Deployment, getRSList rsListFunc) ([
 	if err != nil {
 		return nil, err
 	}
-	options := v1.ListOptions{LabelSelector: selector.String()}
+	options := metav1.ListOptions{LabelSelector: selector.String()}
 	return getRSList(namespace, options)
 }
 
@@ -583,7 +583,7 @@ func ListPods(deployment *extensions.Deployment, getPodList podListFunc) (*v1.Po
 	if err != nil {
 		return nil, err
 	}
-	options := v1.ListOptions{LabelSelector: selector.String()}
+	options := metav1.ListOptions{LabelSelector: selector.String()}
 	return getPodList(namespace, options)
 }
 

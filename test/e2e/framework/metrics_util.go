@@ -28,9 +28,8 @@ import (
 	"strings"
 	"time"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/pkg/master/ports"
 	"k8s.io/kubernetes/pkg/metrics"
@@ -325,7 +324,7 @@ func getSchedulingLatency(c clientset.Interface) (SchedulingLatency, error) {
 	result := SchedulingLatency{}
 
 	// Check if master Node is registered
-	nodes, err := c.Core().Nodes().List(v1.ListOptions{})
+	nodes, err := c.Core().Nodes().List(metav1.ListOptions{})
 	ExpectNoError(err)
 
 	var data string
@@ -342,7 +341,7 @@ func getSchedulingLatency(c clientset.Interface) (SchedulingLatency, error) {
 		rawData, err := c.Core().RESTClient().Get().
 			Context(ctx).
 			Prefix("proxy").
-			Namespace(api.NamespaceSystem).
+			Namespace(metav1.NamespaceSystem).
 			Resource("pods").
 			Name(fmt.Sprintf("kube-scheduler-%v:%v", TestContext.CloudConfig.MasterName, ports.SchedulerPort)).
 			Suffix("metrics").

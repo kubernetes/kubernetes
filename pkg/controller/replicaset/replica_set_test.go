@@ -103,7 +103,7 @@ func newReplicaSet(replicas int, selectorMap map[string]string) *extensions.Repl
 		ObjectMeta: metav1.ObjectMeta{
 			UID:             uuid.NewUUID(),
 			Name:            "foobar",
-			Namespace:       v1.NamespaceDefault,
+			Namespace:       metav1.NamespaceDefault,
 			ResourceVersion: "18",
 		},
 		Spec: extensions.ReplicaSetSpec{
@@ -465,7 +465,7 @@ func TestPodControllerLookup(t *testing.T) {
 		{
 			inRSs: []*extensions.ReplicaSet{
 				{ObjectMeta: metav1.ObjectMeta{Name: "basic"}}},
-			pod:       &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo1", Namespace: v1.NamespaceAll}},
+			pod:       &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo1", Namespace: metav1.NamespaceAll}},
 			outRSName: "",
 		},
 		// Matching labels, not namespace

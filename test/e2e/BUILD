@@ -213,12 +213,12 @@ go_test(
         "integration",
     ],
     deps = [
-        "//pkg/api/v1:go_default_library",
         "//pkg/client/clientset_generated/clientset:go_default_library",
         "//pkg/metrics:go_default_library",
         "//test/e2e/framework:go_default_library",
         "//vendor:github.com/onsi/ginkgo",
         "//vendor:github.com/onsi/gomega",
+        "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
     ],
 )
 

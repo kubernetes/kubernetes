@@ -253,7 +253,7 @@ func NewNodeController(
 		// We must poll because apiserver might not be up. This error causes
 		// controller manager to restart.
 		if pollErr := wait.Poll(10*time.Second, apiserverStartupGracePeriod, func() (bool, error) {
-			nodeList, err = kubeClient.Core().Nodes().List(v1.ListOptions{
+			nodeList, err = kubeClient.Core().Nodes().List(metav1.ListOptions{
 				FieldSelector: fields.Everything().String(),
 				LabelSelector: labels.Everything().String(),
 			})

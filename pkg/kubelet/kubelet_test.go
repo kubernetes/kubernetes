@@ -159,7 +159,7 @@ func newTestKubeletWithImageList(
 		t.Fatalf("can't mkdir(%q): %v", kubelet.rootDirectory, err)
 	}
 	kubelet.sourcesReady = config.NewSourcesReady(func(_ sets.String) bool { return true })
-	kubelet.masterServiceNamespace = v1.NamespaceDefault
+	kubelet.masterServiceNamespace = metav1.NamespaceDefault
 	kubelet.serviceLister = testServiceLister{}
 	kubelet.nodeLister = testNodeLister{}
 	kubelet.nodeInfo = testNodeInfo{}

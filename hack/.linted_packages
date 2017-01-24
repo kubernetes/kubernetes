@@ -99,6 +99,7 @@ pkg/apis/storage/install
 pkg/apis/storage/validation
 pkg/auth/authenticator
 pkg/auth/authorizer/union
+pkg/client/cache
 pkg/client/conditions
 pkg/client/informers/informers_generated/apps
 pkg/client/informers/informers_generated/apps/internalversion

@@ -31,6 +31,7 @@ import (
 	"testing"
 	"time"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	commontest "k8s.io/kubernetes/test/e2e/common"
@@ -252,7 +253,7 @@ func updateTestContext() error {
 
 // getNode gets node object from the apiserver.
 func getNode(c *clientset.Clientset) (*v1.Node, error) {
-	nodes, err := c.Nodes().List(v1.ListOptions{})
+	nodes, err := c.Nodes().List(metav1.ListOptions{})
 	Expect(err).NotTo(HaveOccurred(), "should be able to list nodes.")
 	if nodes == nil {
 		return nil, fmt.Errorf("the node list is nil.")

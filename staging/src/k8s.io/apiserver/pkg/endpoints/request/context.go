@@ -63,7 +63,7 @@ const (
 	// userAgentKey is the context key for the request user agent.
 	userAgentKey
 
-	namespaceDefault = "default" // TODO(sttts): solve import cycle when using api.NamespaceDefault
+	namespaceDefault = "default" // TODO(sttts): solve import cycle when using metav1.NamespaceDefault
 )
 
 // NewContext instantiates a base context object for request flows.

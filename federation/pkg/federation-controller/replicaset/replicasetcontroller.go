@@ -26,6 +26,7 @@ import (
 	"github.com/golang/glog"
 
 	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
@@ -125,11 +126,11 @@ func NewReplicaSetController(federationClient fedclientset.Interface) *ReplicaSe
 	replicaSetFedInformerFactory := func(cluster *fedv1.Cluster, clientset kubeclientset.Interface) (cache.Store, cache.Controller) {
 		return cache.NewInformer(
 			&cache.ListWatch{
-				ListFunc: func(options apiv1.ListOptions) (runtime.Object, error) {
-					return clientset.Extensions().ReplicaSets(apiv1.NamespaceAll).List(options)
+				ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
+					return clientset.Extensions().ReplicaSets(metav1.NamespaceAll).List(options)
 				},
-				WatchFunc: func(options apiv1.ListOptions) (watch.Interface, error) {
-					return clientset.Extensions().ReplicaSets(apiv1.NamespaceAll).Watch(options)
+				WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
+					return clientset.Extensions().ReplicaSets(metav1.NamespaceAll).Watch(options)
 				},
 			},
 			&extensionsv1.ReplicaSet{},
@@ -152,11 +153,11 @@ func NewReplicaSetController(federationClient fedclientset.Interface) *ReplicaSe
 	podFedInformerFactory := func(cluster *fedv1.Cluster, clientset kubeclientset.Interface) (cache.Store, cache.Controller) {
 		return cache.NewInformer(
 			&cache.ListWatch{
-				ListFunc: func(options apiv1.ListOptions) (runtime.Object, error) {
-					return clientset.Core().Pods(apiv1.NamespaceAll).List(options)
+				ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
+					return clientset.Core().Pods(metav1.NamespaceAll).List(options)
 				},
-				WatchFunc: func(options apiv1.ListOptions) (watch.Interface, error) {
-					return clientset.Core().Pods(apiv1.NamespaceAll).Watch(options)
+				WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
+					return clientset.Core().Pods(metav1.NamespaceAll).Watch(options)
 				},
 			},
 			&apiv1.Pod{},
@@ -172,11 +173,11 @@ func NewReplicaSetController(federationClient fedclientset.Interface) *ReplicaSe
 
 	frsc.replicaSetStore.Indexer, frsc.replicaSetController = cache.NewIndexerInformer(
 		&cache.ListWatch{
-			ListFunc: func(options apiv1.ListOptions) (runtime.Object, error) {
-				return frsc.fedClient.Extensions().ReplicaSets(apiv1.NamespaceAll).List(options)
+			ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
+				return frsc.fedClient.Extensions().ReplicaSets(metav1.NamespaceAll).List(options)
 			},
-			WatchFunc: func(options apiv1.ListOptions) (watch.Interface, error) {
-				return frsc.fedClient.Extensions().ReplicaSets(apiv1.NamespaceAll).Watch(options)
+			WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
+				return frsc.fedClient.Extensions().ReplicaSets(metav1.NamespaceAll).Watch(options)
 			},
 		},
 		&extensionsv1.ReplicaSet{},

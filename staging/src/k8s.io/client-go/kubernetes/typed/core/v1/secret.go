@@ -36,10 +36,10 @@ type SecretInterface interface {
 	Create(*v1.Secret) (*v1.Secret, error)
 	Update(*v1.Secret) (*v1.Secret, error)
 	Delete(name string, options *v1.DeleteOptions) error
-	DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error
+	DeleteCollection(options *v1.DeleteOptions, listOptions meta_v1.ListOptions) error
 	Get(name string, options meta_v1.GetOptions) (*v1.Secret, error)
-	List(opts v1.ListOptions) (*v1.SecretList, error)
-	Watch(opts v1.ListOptions) (watch.Interface, error)
+	List(opts meta_v1.ListOptions) (*v1.SecretList, error)
+	Watch(opts meta_v1.ListOptions) (watch.Interface, error)
 	Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v1.Secret, err error)
 	SecretExpansion
 }
@@ -95,7 +95,7 @@ func (c *secrets) Delete(name string, options *v1.DeleteOptions) error {
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *secrets) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
+func (c *secrets) DeleteCollection(options *v1.DeleteOptions, listOptions meta_v1.ListOptions) error {
 	return c.client.Delete().
 		Namespace(c.ns).
 		Resource("secrets").
@@ -119,7 +119,7 @@ func (c *secrets) Get(name string, options meta_v1.GetOptions) (result *v1.Secre
 }
 
 // List takes label and field selectors, and returns the list of Secrets that match those selectors.
-func (c *secrets) List(opts v1.ListOptions) (result *v1.SecretList, err error) {
+func (c *secrets) List(opts meta_v1.ListOptions) (result *v1.SecretList, err error) {
 	result = &v1.SecretList{}
 	err = c.client.Get().
 		Namespace(c.ns).
@@ -131,7 +131,7 @@ func (c *secrets) List(opts v1.ListOptions) (result *v1.SecretList, err error) {
 }
 
 // Watch returns a watch.Interface that watches the requested secrets.
-func (c *secrets) Watch(opts v1.ListOptions) (watch.Interface, error) {
+func (c *secrets) Watch(opts meta_v1.ListOptions) (watch.Interface, error) {
 	return c.client.Get().
 		Prefix("watch").
 		Namespace(c.ns).

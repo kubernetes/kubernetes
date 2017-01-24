@@ -72,7 +72,7 @@ func (c *FakeReplicaSets) Delete(name string, options *api.DeleteOptions) error 
 	return err
 }
 
-func (c *FakeReplicaSets) DeleteCollection(options *api.DeleteOptions, listOptions api.ListOptions) error {
+func (c *FakeReplicaSets) DeleteCollection(options *api.DeleteOptions, listOptions v1.ListOptions) error {
 	action := core.NewDeleteCollectionAction(replicasetsResource, c.ns, listOptions)
 
 	_, err := c.Fake.Invokes(action, &extensions.ReplicaSetList{})
@@ -89,7 +89,7 @@ func (c *FakeReplicaSets) Get(name string, options v1.GetOptions) (result *exten
 	return obj.(*extensions.ReplicaSet), err
 }
 
-func (c *FakeReplicaSets) List(opts api.ListOptions) (result *extensions.ReplicaSetList, err error) {
+func (c *FakeReplicaSets) List(opts v1.ListOptions) (result *extensions.ReplicaSetList, err error) {
 	obj, err := c.Fake.
 		Invokes(core.NewListAction(replicasetsResource, c.ns, opts), &extensions.ReplicaSetList{})
 
@@ -111,7 +111,7 @@ func (c *FakeReplicaSets) List(opts api.ListOptions) (result *extensions.Replica
 }
 
 // Watch returns a watch.Interface that watches the requested replicaSets.
-func (c *FakeReplicaSets) Watch(opts api.ListOptions) (watch.Interface, error) {
+func (c *FakeReplicaSets) Watch(opts v1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
 		InvokesWatch(core.NewWatchAction(replicasetsResource, c.ns, opts))
 

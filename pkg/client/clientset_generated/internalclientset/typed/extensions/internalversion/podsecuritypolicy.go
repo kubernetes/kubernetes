@@ -36,10 +36,10 @@ type PodSecurityPolicyInterface interface {
 	Create(*extensions.PodSecurityPolicy) (*extensions.PodSecurityPolicy, error)
 	Update(*extensions.PodSecurityPolicy) (*extensions.PodSecurityPolicy, error)
 	Delete(name string, options *api.DeleteOptions) error
-	DeleteCollection(options *api.DeleteOptions, listOptions api.ListOptions) error
+	DeleteCollection(options *api.DeleteOptions, listOptions v1.ListOptions) error
 	Get(name string, options v1.GetOptions) (*extensions.PodSecurityPolicy, error)
-	List(opts api.ListOptions) (*extensions.PodSecurityPolicyList, error)
-	Watch(opts api.ListOptions) (watch.Interface, error)
+	List(opts v1.ListOptions) (*extensions.PodSecurityPolicyList, error)
+	Watch(opts v1.ListOptions) (watch.Interface, error)
 	Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *extensions.PodSecurityPolicy, err error)
 	PodSecurityPolicyExpansion
 }
@@ -90,7 +90,7 @@ func (c *podSecurityPolicies) Delete(name string, options *api.DeleteOptions) er
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *podSecurityPolicies) DeleteCollection(options *api.DeleteOptions, listOptions api.ListOptions) error {
+func (c *podSecurityPolicies) DeleteCollection(options *api.DeleteOptions, listOptions v1.ListOptions) error {
 	return c.client.Delete().
 		Resource("podsecuritypolicies").
 		VersionedParams(&listOptions, api.ParameterCodec).
@@ -112,7 +112,7 @@ func (c *podSecurityPolicies) Get(name string, options v1.GetOptions) (result *e
 }
 
 // List takes label and field selectors, and returns the list of PodSecurityPolicies that match those selectors.
-func (c *podSecurityPolicies) List(opts api.ListOptions) (result *extensions.PodSecurityPolicyList, err error) {
+func (c *podSecurityPolicies) List(opts v1.ListOptions) (result *extensions.PodSecurityPolicyList, err error) {
 	result = &extensions.PodSecurityPolicyList{}
 	err = c.client.Get().
 		Resource("podsecuritypolicies").
@@ -123,7 +123,7 @@ func (c *podSecurityPolicies) List(opts api.ListOptions) (result *extensions.Pod
 }
 
 // Watch returns a watch.Interface that watches the requested podSecurityPolicies.
-func (c *podSecurityPolicies) Watch(opts api.ListOptions) (watch.Interface, error) {
+func (c *podSecurityPolicies) Watch(opts v1.ListOptions) (watch.Interface, error) {
 	return c.client.Get().
 		Prefix("watch").
 		Resource("podsecuritypolicies").

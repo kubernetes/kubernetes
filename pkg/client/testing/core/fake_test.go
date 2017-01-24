@@ -35,7 +35,7 @@ func TestFakeClientSetFiltering(t *testing.T) {
 		testSA("nsB", "sa-3"),
 	)
 
-	saList1, err := tc.Core().ServiceAccounts("nsA").List(api.ListOptions{})
+	saList1, err := tc.Core().ServiceAccounts("nsA").List(metav1.ListOptions{})
 	if err != nil {
 		t.Fatalf("ServiceAccounts.List: %s", err)
 	}
@@ -48,7 +48,7 @@ func TestFakeClientSetFiltering(t *testing.T) {
 		}
 	}
 
-	saList2, err := tc.Core().ServiceAccounts("nsB").List(api.ListOptions{})
+	saList2, err := tc.Core().ServiceAccounts("nsB").List(metav1.ListOptions{})
 	if err != nil {
 		t.Fatalf("ServiceAccounts.List: %s", err)
 	}
@@ -77,7 +77,7 @@ func TestFakeClientSetFiltering(t *testing.T) {
 		t.Fatalf("Pods.Get: expected nsB/pod-1 not to match, but it matched %s/%s", wrongPod.Namespace, wrongPod.Name)
 	}
 
-	allPods, err := tc.Core().Pods(api.NamespaceAll).List(api.ListOptions{})
+	allPods, err := tc.Core().Pods(metav1.NamespaceAll).List(metav1.ListOptions{})
 	if err != nil {
 		t.Fatalf("Pods.List: %s", err)
 	}
@@ -85,7 +85,7 @@ func TestFakeClientSetFiltering(t *testing.T) {
 		t.Fatalf("Expected %d pods to match, got %d", expected, actual)
 	}
 
-	allSAs, err := tc.Core().ServiceAccounts(api.NamespaceAll).List(api.ListOptions{})
+	allSAs, err := tc.Core().ServiceAccounts(metav1.NamespaceAll).List(metav1.ListOptions{})
 	if err != nil {
 		t.Fatalf("ServiceAccounts.List: %s", err)
 	}
@@ -105,7 +105,7 @@ func TestFakeClientsetInheritsNamespace(t *testing.T) {
 		t.Fatalf("Namespaces.Create: %s", err)
 	}
 
-	allNS, err := tc.Core().Namespaces().List(api.ListOptions{})
+	allNS, err := tc.Core().Namespaces().List(metav1.ListOptions{})
 	if err != nil {
 		t.Fatalf("Namespaces.List: %s", err)
 	}

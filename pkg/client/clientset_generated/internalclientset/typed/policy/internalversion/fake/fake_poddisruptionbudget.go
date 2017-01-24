@@ -72,7 +72,7 @@ func (c *FakePodDisruptionBudgets) Delete(name string, options *api.DeleteOption
 	return err
 }
 
-func (c *FakePodDisruptionBudgets) DeleteCollection(options *api.DeleteOptions, listOptions api.ListOptions) error {
+func (c *FakePodDisruptionBudgets) DeleteCollection(options *api.DeleteOptions, listOptions v1.ListOptions) error {
 	action := core.NewDeleteCollectionAction(poddisruptionbudgetsResource, c.ns, listOptions)
 
 	_, err := c.Fake.Invokes(action, &policy.PodDisruptionBudgetList{})
@@ -89,7 +89,7 @@ func (c *FakePodDisruptionBudgets) Get(name string, options v1.GetOptions) (resu
 	return obj.(*policy.PodDisruptionBudget), err
 }
 
-func (c *FakePodDisruptionBudgets) List(opts api.ListOptions) (result *policy.PodDisruptionBudgetList, err error) {
+func (c *FakePodDisruptionBudgets) List(opts v1.ListOptions) (result *policy.PodDisruptionBudgetList, err error) {
 	obj, err := c.Fake.
 		Invokes(core.NewListAction(poddisruptionbudgetsResource, c.ns, opts), &policy.PodDisruptionBudgetList{})
 
@@ -111,7 +111,7 @@ func (c *FakePodDisruptionBudgets) List(opts api.ListOptions) (result *policy.Po
 }
 
 // Watch returns a watch.Interface that watches the requested podDisruptionBudgets.
-func (c *FakePodDisruptionBudgets) Watch(opts api.ListOptions) (watch.Interface, error) {
+func (c *FakePodDisruptionBudgets) Watch(opts v1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
 		InvokesWatch(core.NewWatchAction(poddisruptionbudgetsResource, c.ns, opts))
 

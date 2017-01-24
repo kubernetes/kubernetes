@@ -44,7 +44,7 @@ func validNewSecret(name string) *api.Secret {
 	return &api.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
-			Namespace: api.NamespaceDefault,
+			Namespace: metav1.NamespaceDefault,
 		},
 		Data: map[string][]byte{
 			"test": []byte("data"),

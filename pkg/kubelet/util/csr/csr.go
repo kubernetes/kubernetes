@@ -25,7 +25,6 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/watch"
 	certutil "k8s.io/client-go/pkg/util/cert"
-	"k8s.io/kubernetes/pkg/api/v1"
 	certificates "k8s.io/kubernetes/pkg/apis/certificates/v1beta1"
 	certificatesclient "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/certificates/v1beta1"
 )
@@ -70,7 +69,7 @@ func RequestNodeCertificate(client certificatesclient.CertificateSigningRequestI
 
 	// Make a default timeout = 3600s.
 	var defaultTimeoutSeconds int64 = 3600
-	resultCh, err := client.Watch(v1.ListOptions{
+	resultCh, err := client.Watch(metav1.ListOptions{
 		Watch:          true,
 		TimeoutSeconds: &defaultTimeoutSeconds,
 		FieldSelector:  fields.OneTermEqualSelector("metadata.name", req.Name).String(),

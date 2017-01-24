@@ -93,7 +93,7 @@ var _ = framework.KubeDescribe("ResourceQuota", func() {
 
 	It("should create a ResourceQuota and capture the life of a secret.", func() {
 		By("Discovering how many secrets are in namespace by default")
-		secrets, err := f.ClientSet.Core().Secrets(f.Namespace.Name).List(v1.ListOptions{})
+		secrets, err := f.ClientSet.Core().Secrets(f.Namespace.Name).List(metav1.ListOptions{})
 		Expect(err).NotTo(HaveOccurred())
 		defaultSecrets := fmt.Sprintf("%d", len(secrets.Items))
 		hardSecrets := fmt.Sprintf("%d", len(secrets.Items)+1)
