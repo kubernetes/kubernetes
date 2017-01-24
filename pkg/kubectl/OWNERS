@@ -1,4 +1,25 @@
 approvers:
-- sig-cli-maintainers
+- adohe
+- brendandburns
+- deads2k
+- fabianofranz
+- janetkuo
+- pwittrock
+- smarterclayton
 reviewers:
-- sig-cli
+- adohe
+- deads2k
+- derekwaynecarr
+- dims
+- dshulyak
+- eparis
+- ericchiang
+- fabianofranz
+- ghodss
+- kargakis
+- pwittrock
+- rootfs
+- smarterclayton
+- soltysh
+- sttts
+- ymqytw
