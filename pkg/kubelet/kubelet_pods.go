@@ -748,9 +748,9 @@ func (kl *Kubelet) OkToDeletePod(pod *v1.Pod) bool {
 		// We shouldnt delete pods whose volumes have not been cleaned up if we are not keeping terminated pod volumes
 		return false
 	}
-	if kl.containerManager.NewPodContainerManager().Exists(pod) {
-		return false
-	}
+	// if kl.containerManager.NewPodContainerManager().Exists(pod) {
+	// 	return false
+	// }
 	return true
 }
 
