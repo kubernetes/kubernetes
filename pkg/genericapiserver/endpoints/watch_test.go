@@ -631,7 +631,7 @@ func TestWatchHTTPTimeout(t *testing.T) {
 
 // BenchmarkWatchHTTP measures the cost of serving a watch.
 func BenchmarkWatchHTTP(b *testing.B) {
-	items := benchmarkItems()
+	items := benchmarkItems(b)
 
 	simpleStorage := &SimpleRESTStorage{}
 	handler := handle(map[string]rest.Storage{"simples": simpleStorage})
@@ -678,7 +678,7 @@ func BenchmarkWatchHTTP(b *testing.B) {
 
 // BenchmarkWatchWebsocket measures the cost of serving a watch.
 func BenchmarkWatchWebsocket(b *testing.B) {
-	items := benchmarkItems()
+	items := benchmarkItems(b)
 
 	simpleStorage := &SimpleRESTStorage{}
 	handler := handle(map[string]rest.Storage{"simples": simpleStorage})
@@ -718,7 +718,7 @@ func BenchmarkWatchWebsocket(b *testing.B) {
 
 // BenchmarkWatchProtobuf measures the cost of serving a watch.
 func BenchmarkWatchProtobuf(b *testing.B) {
-	items := benchmarkItems()
+	items := benchmarkItems(b)
 
 	simpleStorage := &SimpleRESTStorage{}
 	handler := handle(map[string]rest.Storage{"simples": simpleStorage})
