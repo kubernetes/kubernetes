@@ -22,7 +22,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/kubernetes/pkg/util/strategicpatch"
+	"k8s.io/apimachinery/pkg/util/strategicpatch"
 
 	"github.com/evanphx/json-patch"
 )
