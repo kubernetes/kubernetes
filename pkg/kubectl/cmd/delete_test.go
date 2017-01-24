@@ -137,11 +137,11 @@ func TestDeleteObject(t *testing.T) {
 type fakeReaper struct {
 	namespace, name string
 	timeout         time.Duration
-	deleteOptions   *api.DeleteOptions
+	deleteOptions   *metav1.DeleteOptions
 	err             error
 }
 
-func (r *fakeReaper) Stop(namespace, name string, timeout time.Duration, gracePeriod *api.DeleteOptions) error {
+func (r *fakeReaper) Stop(namespace, name string, timeout time.Duration, gracePeriod *metav1.DeleteOptions) error {
 	r.namespace, r.name = namespace, name
 	r.timeout = timeout
 	r.deleteOptions = gracePeriod

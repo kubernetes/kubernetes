@@ -35,8 +35,8 @@ type SecretsGetter interface {
 type SecretInterface interface {
 	Create(*v1.Secret) (*v1.Secret, error)
 	Update(*v1.Secret) (*v1.Secret, error)
-	Delete(name string, options *v1.DeleteOptions) error
-	DeleteCollection(options *v1.DeleteOptions, listOptions meta_v1.ListOptions) error
+	Delete(name string, options *meta_v1.DeleteOptions) error
+	DeleteCollection(options *meta_v1.DeleteOptions, listOptions meta_v1.ListOptions) error
 	Get(name string, options meta_v1.GetOptions) (*v1.Secret, error)
 	List(opts meta_v1.ListOptions) (*v1.SecretList, error)
 	Watch(opts meta_v1.ListOptions) (watch.Interface, error)
@@ -84,7 +84,7 @@ func (c *secrets) Update(secret *v1.Secret) (result *v1.Secret, err error) {
 }
 
 // Delete takes name of the secret and deletes it. Returns an error if one occurs.
-func (c *secrets) Delete(name string, options *v1.DeleteOptions) error {
+func (c *secrets) Delete(name string, options *meta_v1.DeleteOptions) error {
 	return c.client.Delete().
 		Namespace(c.ns).
 		Resource("secrets").
@@ -95,7 +95,7 @@ func (c *secrets) Delete(name string, options *v1.DeleteOptions) error {
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *secrets) DeleteCollection(options *v1.DeleteOptions, listOptions meta_v1.ListOptions) error {
+func (c *secrets) DeleteCollection(options *meta_v1.DeleteOptions, listOptions meta_v1.ListOptions) error {
 	return c.client.Delete().
 		Namespace(c.ns).
 		Resource("secrets").

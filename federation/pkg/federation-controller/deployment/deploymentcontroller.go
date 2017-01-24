@@ -197,7 +197,7 @@ func NewDeploymentController(federationClient fedclientset.Interface) *Deploymen
 		},
 		func(client kubeclientset.Interface, obj runtime.Object) error {
 			rs := obj.(*extensionsv1.Deployment)
-			err := client.Extensions().Deployments(rs.Namespace).Delete(rs.Name, &apiv1.DeleteOptions{})
+			err := client.Extensions().Deployments(rs.Namespace).Delete(rs.Name, &metav1.DeleteOptions{})
 			return err
 		})
 

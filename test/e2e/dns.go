@@ -238,7 +238,7 @@ func validateDNSResults(f *framework.Framework, pod *v1.Pod, fileNames []string)
 	defer func() {
 		By("deleting the pod")
 		defer GinkgoRecover()
-		podClient.Delete(pod.Name, v1.NewDeleteOptions(0))
+		podClient.Delete(pod.Name, metav1.NewDeleteOptions(0))
 	}()
 	if _, err := podClient.Create(pod); err != nil {
 		framework.Failf("Failed to create %s pod: %v", pod.Name, err)
@@ -267,7 +267,7 @@ func validateTargetedProbeOutput(f *framework.Framework, pod *v1.Pod, fileNames 
 	defer func() {
 		By("deleting the pod")
 		defer GinkgoRecover()
-		podClient.Delete(pod.Name, v1.NewDeleteOptions(0))
+		podClient.Delete(pod.Name, metav1.NewDeleteOptions(0))
 	}()
 	if _, err := podClient.Create(pod); err != nil {
 		framework.Failf("Failed to create %s pod: %v", pod.Name, err)

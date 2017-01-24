@@ -64,14 +64,14 @@ func (c *FakePersistentVolumeClaims) UpdateStatus(persistentVolumeClaim *api.Per
 	return obj.(*api.PersistentVolumeClaim), err
 }
 
-func (c *FakePersistentVolumeClaims) Delete(name string, options *api.DeleteOptions) error {
+func (c *FakePersistentVolumeClaims) Delete(name string, options *v1.DeleteOptions) error {
 	_, err := c.Fake.
 		Invokes(core.NewDeleteAction(persistentvolumeclaimsResource, c.ns, name), &api.PersistentVolumeClaim{})
 
 	return err
 }
 
-func (c *FakePersistentVolumeClaims) DeleteCollection(options *api.DeleteOptions, listOptions v1.ListOptions) error {
+func (c *FakePersistentVolumeClaims) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
 	action := core.NewDeleteCollectionAction(persistentvolumeclaimsResource, c.ns, listOptions)
 
 	_, err := c.Fake.Invokes(action, &api.PersistentVolumeClaimList{})

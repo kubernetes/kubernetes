@@ -282,7 +282,7 @@ func New(federationClient fedclientset.Interface, dns dnsprovider.Interface,
 		},
 		func(client kubeclientset.Interface, obj pkgruntime.Object) error {
 			svc := obj.(*v1.Service)
-			err := client.Core().Services(svc.Namespace).Delete(svc.Name, &v1.DeleteOptions{})
+			err := client.Core().Services(svc.Namespace).Delete(svc.Name, &metav1.DeleteOptions{})
 			return err
 		})
 

@@ -22,7 +22,6 @@ import (
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
-	api "k8s.io/kubernetes/pkg/api"
 	extensions "k8s.io/kubernetes/pkg/apis/extensions"
 	core "k8s.io/kubernetes/pkg/client/testing/core"
 )
@@ -55,14 +54,14 @@ func (c *FakeNetworkPolicies) Update(networkPolicy *extensions.NetworkPolicy) (r
 	return obj.(*extensions.NetworkPolicy), err
 }
 
-func (c *FakeNetworkPolicies) Delete(name string, options *api.DeleteOptions) error {
+func (c *FakeNetworkPolicies) Delete(name string, options *v1.DeleteOptions) error {
 	_, err := c.Fake.
 		Invokes(core.NewDeleteAction(networkpoliciesResource, c.ns, name), &extensions.NetworkPolicy{})
 
 	return err
 }
 
-func (c *FakeNetworkPolicies) DeleteCollection(options *api.DeleteOptions, listOptions v1.ListOptions) error {
+func (c *FakeNetworkPolicies) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
 	action := core.NewDeleteCollectionAction(networkpoliciesResource, c.ns, listOptions)
 
 	_, err := c.Fake.Invokes(action, &extensions.NetworkPolicyList{})

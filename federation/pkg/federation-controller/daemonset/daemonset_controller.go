@@ -176,7 +176,7 @@ func NewDaemonSetController(client federationclientset.Interface) *DaemonSetCont
 		func(client kubeclientset.Interface, obj pkgruntime.Object) error {
 			daemonset := obj.(*extensionsv1.DaemonSet)
 			glog.V(4).Infof("Attempting to delete daemonset: %s/%s", daemonset.Namespace, daemonset.Name)
-			err := client.Extensions().DaemonSets(daemonset.Namespace).Delete(daemonset.Name, &apiv1.DeleteOptions{})
+			err := client.Extensions().DaemonSets(daemonset.Namespace).Delete(daemonset.Name, &metav1.DeleteOptions{})
 			if err != nil {
 				glog.Errorf("Error deleting daemonset %s/%s/: %v", daemonset.Namespace, daemonset.Name, err)
 			} else {

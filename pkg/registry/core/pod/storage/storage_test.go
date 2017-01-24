@@ -189,7 +189,7 @@ func TestIgnoreDeleteNotFound(t *testing.T) {
 	// delete object with grace period 0, storage will return NotFound, but the
 	// registry shouldn't get any error since we ignore the NotFound error.
 	zero := int64(0)
-	opt := &api.DeleteOptions{GracePeriodSeconds: &zero}
+	opt := &metav1.DeleteOptions{GracePeriodSeconds: &zero}
 	obj, err := registry.Delete(testContext, pod.Name, opt)
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)

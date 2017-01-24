@@ -21,11 +21,9 @@ limitations under the License.
 package v1beta1
 
 import (
-	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	conversion "k8s.io/apimachinery/pkg/conversion"
 	runtime "k8s.io/apimachinery/pkg/runtime"
-	api "k8s.io/kubernetes/pkg/api"
-	v1 "k8s.io/kubernetes/pkg/api/v1"
 	policy "k8s.io/kubernetes/pkg/apis/policy"
 	unsafe "unsafe"
 )
@@ -53,7 +51,7 @@ func RegisterConversions(scheme *runtime.Scheme) error {
 
 func autoConvert_v1beta1_Eviction_To_policy_Eviction(in *Eviction, out *policy.Eviction, s conversion.Scope) error {
 	out.ObjectMeta = in.ObjectMeta
-	out.DeleteOptions = (*api.DeleteOptions)(unsafe.Pointer(in.DeleteOptions))
+	out.DeleteOptions = (*v1.DeleteOptions)(unsafe.Pointer(in.DeleteOptions))
 	return nil
 }
 
@@ -123,7 +121,7 @@ func Convert_policy_PodDisruptionBudgetList_To_v1beta1_PodDisruptionBudgetList(i
 
 func autoConvert_v1beta1_PodDisruptionBudgetSpec_To_policy_PodDisruptionBudgetSpec(in *PodDisruptionBudgetSpec, out *policy.PodDisruptionBudgetSpec, s conversion.Scope) error {
 	out.MinAvailable = in.MinAvailable
-	out.Selector = (*meta_v1.LabelSelector)(unsafe.Pointer(in.Selector))
+	out.Selector = (*v1.LabelSelector)(unsafe.Pointer(in.Selector))
 	return nil
 }
 
@@ -133,7 +131,7 @@ func Convert_v1beta1_PodDisruptionBudgetSpec_To_policy_PodDisruptionBudgetSpec(i
 
 func autoConvert_policy_PodDisruptionBudgetSpec_To_v1beta1_PodDisruptionBudgetSpec(in *policy.PodDisruptionBudgetSpec, out *PodDisruptionBudgetSpec, s conversion.Scope) error {
 	out.MinAvailable = in.MinAvailable
-	out.Selector = (*meta_v1.LabelSelector)(unsafe.Pointer(in.Selector))
+	out.Selector = (*v1.LabelSelector)(unsafe.Pointer(in.Selector))
 	return nil
 }
 
@@ -143,7 +141,7 @@ func Convert_policy_PodDisruptionBudgetSpec_To_v1beta1_PodDisruptionBudgetSpec(i
 
 func autoConvert_v1beta1_PodDisruptionBudgetStatus_To_policy_PodDisruptionBudgetStatus(in *PodDisruptionBudgetStatus, out *policy.PodDisruptionBudgetStatus, s conversion.Scope) error {
 	out.ObservedGeneration = in.ObservedGeneration
-	out.DisruptedPods = *(*map[string]meta_v1.Time)(unsafe.Pointer(&in.DisruptedPods))
+	out.DisruptedPods = *(*map[string]v1.Time)(unsafe.Pointer(&in.DisruptedPods))
 	out.PodDisruptionsAllowed = in.PodDisruptionsAllowed
 	out.CurrentHealthy = in.CurrentHealthy
 	out.DesiredHealthy = in.DesiredHealthy
@@ -157,7 +155,7 @@ func Convert_v1beta1_PodDisruptionBudgetStatus_To_policy_PodDisruptionBudgetStat
 
 func autoConvert_policy_PodDisruptionBudgetStatus_To_v1beta1_PodDisruptionBudgetStatus(in *policy.PodDisruptionBudgetStatus, out *PodDisruptionBudgetStatus, s conversion.Scope) error {
 	out.ObservedGeneration = in.ObservedGeneration
-	out.DisruptedPods = *(*map[string]meta_v1.Time)(unsafe.Pointer(&in.DisruptedPods))
+	out.DisruptedPods = *(*map[string]v1.Time)(unsafe.Pointer(&in.DisruptedPods))
 	out.PodDisruptionsAllowed = in.PodDisruptionsAllowed
 	out.CurrentHealthy = in.CurrentHealthy
 	out.DesiredHealthy = in.DesiredHealthy

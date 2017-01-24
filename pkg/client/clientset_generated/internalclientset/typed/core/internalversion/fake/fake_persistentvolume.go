@@ -60,13 +60,13 @@ func (c *FakePersistentVolumes) UpdateStatus(persistentVolume *api.PersistentVol
 	return obj.(*api.PersistentVolume), err
 }
 
-func (c *FakePersistentVolumes) Delete(name string, options *api.DeleteOptions) error {
+func (c *FakePersistentVolumes) Delete(name string, options *v1.DeleteOptions) error {
 	_, err := c.Fake.
 		Invokes(core.NewRootDeleteAction(persistentvolumesResource, name), &api.PersistentVolume{})
 	return err
 }
 
-func (c *FakePersistentVolumes) DeleteCollection(options *api.DeleteOptions, listOptions v1.ListOptions) error {
+func (c *FakePersistentVolumes) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
 	action := core.NewRootDeleteCollectionAction(persistentvolumesResource, listOptions)
 
 	_, err := c.Fake.Invokes(action, &api.PersistentVolumeList{})

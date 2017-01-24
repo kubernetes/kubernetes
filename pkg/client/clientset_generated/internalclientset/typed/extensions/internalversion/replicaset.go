@@ -36,8 +36,8 @@ type ReplicaSetInterface interface {
 	Create(*extensions.ReplicaSet) (*extensions.ReplicaSet, error)
 	Update(*extensions.ReplicaSet) (*extensions.ReplicaSet, error)
 	UpdateStatus(*extensions.ReplicaSet) (*extensions.ReplicaSet, error)
-	Delete(name string, options *api.DeleteOptions) error
-	DeleteCollection(options *api.DeleteOptions, listOptions v1.ListOptions) error
+	Delete(name string, options *v1.DeleteOptions) error
+	DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error
 	Get(name string, options v1.GetOptions) (*extensions.ReplicaSet, error)
 	List(opts v1.ListOptions) (*extensions.ReplicaSetList, error)
 	Watch(opts v1.ListOptions) (watch.Interface, error)
@@ -101,7 +101,7 @@ func (c *replicaSets) UpdateStatus(replicaSet *extensions.ReplicaSet) (result *e
 }
 
 // Delete takes name of the replicaSet and deletes it. Returns an error if one occurs.
-func (c *replicaSets) Delete(name string, options *api.DeleteOptions) error {
+func (c *replicaSets) Delete(name string, options *v1.DeleteOptions) error {
 	return c.client.Delete().
 		Namespace(c.ns).
 		Resource("replicasets").
@@ -112,7 +112,7 @@ func (c *replicaSets) Delete(name string, options *api.DeleteOptions) error {
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *replicaSets) DeleteCollection(options *api.DeleteOptions, listOptions v1.ListOptions) error {
+func (c *replicaSets) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
 	return c.client.Delete().
 		Namespace(c.ns).
 		Resource("replicasets").

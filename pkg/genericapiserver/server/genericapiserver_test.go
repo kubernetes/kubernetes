@@ -119,12 +119,8 @@ func TestInstallAPIGroups(t *testing.T) {
 		scheme := runtime.NewScheme()
 		scheme.AddKnownTypeWithName(gv.WithKind("Getter"), getter.New())
 		scheme.AddKnownTypeWithName(gv.WithKind("NoVerb"), noVerbs.New())
-		scheme.AddKnownTypes(v1.SchemeGroupVersion,
-			&metav1.ListOptions{},
-			&v1.DeleteOptions{},
-			&metav1.ExportOptions{},
-			&metav1.Status{},
-		)
+		scheme.AddKnownTypes(v1.SchemeGroupVersion, &metav1.Status{})
+		metav1.AddToGroupVersion(scheme, v1.SchemeGroupVersion)
 
 		interfacesFor := func(version schema.GroupVersion) (*meta.VersionInterfaces, error) {
 			return &meta.VersionInterfaces{

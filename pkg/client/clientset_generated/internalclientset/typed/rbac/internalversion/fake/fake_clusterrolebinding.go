@@ -22,7 +22,6 @@ import (
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
-	api "k8s.io/kubernetes/pkg/api"
 	rbac "k8s.io/kubernetes/pkg/apis/rbac"
 	core "k8s.io/kubernetes/pkg/client/testing/core"
 )
@@ -52,13 +51,13 @@ func (c *FakeClusterRoleBindings) Update(clusterRoleBinding *rbac.ClusterRoleBin
 	return obj.(*rbac.ClusterRoleBinding), err
 }
 
-func (c *FakeClusterRoleBindings) Delete(name string, options *api.DeleteOptions) error {
+func (c *FakeClusterRoleBindings) Delete(name string, options *v1.DeleteOptions) error {
 	_, err := c.Fake.
 		Invokes(core.NewRootDeleteAction(clusterrolebindingsResource, name), &rbac.ClusterRoleBinding{})
 	return err
 }
 
-func (c *FakeClusterRoleBindings) DeleteCollection(options *api.DeleteOptions, listOptions v1.ListOptions) error {
+func (c *FakeClusterRoleBindings) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
 	action := core.NewRootDeleteCollectionAction(clusterrolebindingsResource, listOptions)
 
 	_, err := c.Fake.Invokes(action, &rbac.ClusterRoleBindingList{})

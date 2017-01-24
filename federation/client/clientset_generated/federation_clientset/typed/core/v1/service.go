@@ -36,8 +36,8 @@ type ServiceInterface interface {
 	Create(*v1.Service) (*v1.Service, error)
 	Update(*v1.Service) (*v1.Service, error)
 	UpdateStatus(*v1.Service) (*v1.Service, error)
-	Delete(name string, options *v1.DeleteOptions) error
-	DeleteCollection(options *v1.DeleteOptions, listOptions meta_v1.ListOptions) error
+	Delete(name string, options *meta_v1.DeleteOptions) error
+	DeleteCollection(options *meta_v1.DeleteOptions, listOptions meta_v1.ListOptions) error
 	Get(name string, options meta_v1.GetOptions) (*v1.Service, error)
 	List(opts meta_v1.ListOptions) (*v1.ServiceList, error)
 	Watch(opts meta_v1.ListOptions) (watch.Interface, error)
@@ -101,7 +101,7 @@ func (c *services) UpdateStatus(service *v1.Service) (result *v1.Service, err er
 }
 
 // Delete takes name of the service and deletes it. Returns an error if one occurs.
-func (c *services) Delete(name string, options *v1.DeleteOptions) error {
+func (c *services) Delete(name string, options *meta_v1.DeleteOptions) error {
 	return c.client.Delete().
 		Namespace(c.ns).
 		Resource("services").
@@ -112,7 +112,7 @@ func (c *services) Delete(name string, options *v1.DeleteOptions) error {
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *services) DeleteCollection(options *v1.DeleteOptions, listOptions meta_v1.ListOptions) error {
+func (c *services) DeleteCollection(options *meta_v1.DeleteOptions, listOptions meta_v1.ListOptions) error {
 	return c.client.Delete().
 		Namespace(c.ns).
 		Resource("services").

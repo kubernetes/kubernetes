@@ -46,14 +46,14 @@ import (
 	"k8s.io/kubernetes/test/integration/framework"
 )
 
-func getOrphanOptions() *v1.DeleteOptions {
+func getOrphanOptions() *metav1.DeleteOptions {
 	var trueVar = true
-	return &v1.DeleteOptions{OrphanDependents: &trueVar}
+	return &metav1.DeleteOptions{OrphanDependents: &trueVar}
 }
 
-func getNonOrphanOptions() *v1.DeleteOptions {
+func getNonOrphanOptions() *metav1.DeleteOptions {
 	var falseVar = false
-	return &v1.DeleteOptions{OrphanDependents: &falseVar}
+	return &metav1.DeleteOptions{OrphanDependents: &falseVar}
 }
 
 const garbageCollectedPodName = "test.pod.1"
@@ -273,7 +273,7 @@ func TestCreateWithNonExistentOwner(t *testing.T) {
 	}
 }
 
-func setupRCsPods(t *testing.T, gc *garbagecollector.GarbageCollector, clientSet clientset.Interface, nameSuffix, namespace string, initialFinalizers []string, options *v1.DeleteOptions, wg *sync.WaitGroup, rcUIDs chan types.UID) {
+func setupRCsPods(t *testing.T, gc *garbagecollector.GarbageCollector, clientSet clientset.Interface, nameSuffix, namespace string, initialFinalizers []string, options *metav1.DeleteOptions, wg *sync.WaitGroup, rcUIDs chan types.UID) {
 	defer wg.Done()
 	rcClient := clientSet.Core().ReplicationControllers(namespace)
 	podClient := clientSet.Core().Pods(namespace)

@@ -64,14 +64,14 @@ func (c *FakeServices) UpdateStatus(service *api.Service) (*api.Service, error) 
 	return obj.(*api.Service), err
 }
 
-func (c *FakeServices) Delete(name string, options *api.DeleteOptions) error {
+func (c *FakeServices) Delete(name string, options *v1.DeleteOptions) error {
 	_, err := c.Fake.
 		Invokes(core.NewDeleteAction(servicesResource, c.ns, name), &api.Service{})
 
 	return err
 }
 
-func (c *FakeServices) DeleteCollection(options *api.DeleteOptions, listOptions v1.ListOptions) error {
+func (c *FakeServices) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
 	action := core.NewDeleteCollectionAction(servicesResource, c.ns, listOptions)
 
 	_, err := c.Fake.Invokes(action, &api.ServiceList{})

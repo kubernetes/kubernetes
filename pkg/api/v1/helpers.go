@@ -47,7 +47,7 @@ func OpaqueIntResourceName(name string) ResourceName {
 // NewDeleteOptions returns a DeleteOptions indicating the resource should
 // be deleted within the specified grace period. Use zero to indicate
 // immediate deletion. If you would prefer to use the default grace period,
-// use &api.DeleteOptions{} directly.
+// use &metav1.DeleteOptions{} directly.
 func NewDeleteOptions(grace int64) *DeleteOptions {
 	return &DeleteOptions{GracePeriodSeconds: &grace}
 }

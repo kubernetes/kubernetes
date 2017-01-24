@@ -36,8 +36,8 @@ type TestTypeInterface interface {
 	Create(*testgroup.TestType) (*testgroup.TestType, error)
 	Update(*testgroup.TestType) (*testgroup.TestType, error)
 	UpdateStatus(*testgroup.TestType) (*testgroup.TestType, error)
-	Delete(name string, options *api.DeleteOptions) error
-	DeleteCollection(options *api.DeleteOptions, listOptions v1.ListOptions) error
+	Delete(name string, options *v1.DeleteOptions) error
+	DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error
 	Get(name string, options v1.GetOptions) (*testgroup.TestType, error)
 	List(opts v1.ListOptions) (*testgroup.TestTypeList, error)
 	Watch(opts v1.ListOptions) (watch.Interface, error)
@@ -101,7 +101,7 @@ func (c *testTypes) UpdateStatus(testType *testgroup.TestType) (result *testgrou
 }
 
 // Delete takes name of the testType and deletes it. Returns an error if one occurs.
-func (c *testTypes) Delete(name string, options *api.DeleteOptions) error {
+func (c *testTypes) Delete(name string, options *v1.DeleteOptions) error {
 	return c.client.Delete().
 		Namespace(c.ns).
 		Resource("testtypes").
@@ -112,7 +112,7 @@ func (c *testTypes) Delete(name string, options *api.DeleteOptions) error {
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *testTypes) DeleteCollection(options *api.DeleteOptions, listOptions v1.ListOptions) error {
+func (c *testTypes) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
 	return c.client.Delete().
 		Namespace(c.ns).
 		Resource("testtypes").

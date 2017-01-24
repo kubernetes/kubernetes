@@ -64,14 +64,14 @@ func (c *FakeResourceQuotas) UpdateStatus(resourceQuota *v1.ResourceQuota) (*v1.
 	return obj.(*v1.ResourceQuota), err
 }
 
-func (c *FakeResourceQuotas) Delete(name string, options *v1.DeleteOptions) error {
+func (c *FakeResourceQuotas) Delete(name string, options *meta_v1.DeleteOptions) error {
 	_, err := c.Fake.
 		Invokes(core.NewDeleteAction(resourcequotasResource, c.ns, name), &v1.ResourceQuota{})
 
 	return err
 }
 
-func (c *FakeResourceQuotas) DeleteCollection(options *v1.DeleteOptions, listOptions meta_v1.ListOptions) error {
+func (c *FakeResourceQuotas) DeleteCollection(options *meta_v1.DeleteOptions, listOptions meta_v1.ListOptions) error {
 	action := core.NewDeleteCollectionAction(resourcequotasResource, c.ns, listOptions)
 
 	_, err := c.Fake.Invokes(action, &v1.ResourceQuotaList{})

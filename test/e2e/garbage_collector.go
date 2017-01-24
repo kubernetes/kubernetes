@@ -32,14 +32,14 @@ import (
 	. "github.com/onsi/ginkgo"
 )
 
-func getOrphanOptions() *v1.DeleteOptions {
+func getOrphanOptions() *metav1.DeleteOptions {
 	var trueVar = true
-	return &v1.DeleteOptions{OrphanDependents: &trueVar}
+	return &metav1.DeleteOptions{OrphanDependents: &trueVar}
 }
 
-func getNonOrphanOptions() *v1.DeleteOptions {
+func getNonOrphanOptions() *metav1.DeleteOptions {
 	var falseVar = false
-	return &v1.DeleteOptions{OrphanDependents: &falseVar}
+	return &metav1.DeleteOptions{OrphanDependents: &falseVar}
 }
 
 var zero = int64(0)
@@ -200,7 +200,7 @@ var _ = framework.KubeDescribe("Garbage collector", func() {
 		}
 		By("delete the rc")
 		deleteOptions := getNonOrphanOptions()
-		deleteOptions.Preconditions = v1.NewUIDPreconditions(string(rc.UID))
+		deleteOptions.Preconditions = metav1.NewUIDPreconditions(string(rc.UID))
 		if err := rcClient.Delete(rc.ObjectMeta.Name, deleteOptions); err != nil {
 			framework.Failf("failed to delete the rc: %v", err)
 		}
@@ -249,7 +249,7 @@ var _ = framework.KubeDescribe("Garbage collector", func() {
 		}
 		By("delete the rc")
 		deleteOptions := getOrphanOptions()
-		deleteOptions.Preconditions = v1.NewUIDPreconditions(string(rc.UID))
+		deleteOptions.Preconditions = metav1.NewUIDPreconditions(string(rc.UID))
 		if err := rcClient.Delete(rc.ObjectMeta.Name, deleteOptions); err != nil {
 			framework.Failf("failed to delete the rc: %v", err)
 		}
@@ -308,8 +308,8 @@ var _ = framework.KubeDescribe("Garbage collector", func() {
 			framework.Failf("failed to wait for the rc.Status.Replicas to reach rc.Spec.Replicas: %v", err)
 		}
 		By("delete the rc")
-		deleteOptions := &v1.DeleteOptions{}
-		deleteOptions.Preconditions = v1.NewUIDPreconditions(string(rc.UID))
+		deleteOptions := &metav1.DeleteOptions{}
+		deleteOptions.Preconditions = metav1.NewUIDPreconditions(string(rc.UID))
 		if err := rcClient.Delete(rc.ObjectMeta.Name, deleteOptions); err != nil {
 			framework.Failf("failed to delete the rc: %v", err)
 		}
@@ -356,7 +356,7 @@ var _ = framework.KubeDescribe("Garbage collector", func() {
 
 		By("delete the deployment")
 		deleteOptions := getNonOrphanOptions()
-		deleteOptions.Preconditions = v1.NewUIDPreconditions(string(createdDeployment.UID))
+		deleteOptions.Preconditions = metav1.NewUIDPreconditions(string(createdDeployment.UID))
 		if err := deployClient.Delete(deployment.ObjectMeta.Name, deleteOptions); err != nil {
 			framework.Failf("failed to delete the deployment: %v", err)
 		}
@@ -405,7 +405,7 @@ var _ = framework.KubeDescribe("Garbage collector", func() {
 
 		By("delete the deployment")
 		deleteOptions := getOrphanOptions()
-		deleteOptions.Preconditions = v1.NewUIDPreconditions(string(createdDeployment.UID))
+		deleteOptions.Preconditions = metav1.NewUIDPreconditions(string(createdDeployment.UID))
 		if err := deployClient.Delete(deployment.ObjectMeta.Name, deleteOptions); err != nil {
 			framework.Failf("failed to delete the deployment: %v", err)
 		}

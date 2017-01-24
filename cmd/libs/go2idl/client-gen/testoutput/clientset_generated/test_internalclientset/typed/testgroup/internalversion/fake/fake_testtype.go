@@ -23,7 +23,6 @@ import (
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	testgroup "k8s.io/kubernetes/cmd/libs/go2idl/client-gen/test_apis/testgroup"
-	api "k8s.io/kubernetes/pkg/api"
 	core "k8s.io/kubernetes/pkg/client/testing/core"
 )
 
@@ -65,14 +64,14 @@ func (c *FakeTestTypes) UpdateStatus(testType *testgroup.TestType) (*testgroup.T
 	return obj.(*testgroup.TestType), err
 }
 
-func (c *FakeTestTypes) Delete(name string, options *api.DeleteOptions) error {
+func (c *FakeTestTypes) Delete(name string, options *v1.DeleteOptions) error {
 	_, err := c.Fake.
 		Invokes(core.NewDeleteAction(testtypesResource, c.ns, name), &testgroup.TestType{})
 
 	return err
 }
 
-func (c *FakeTestTypes) DeleteCollection(options *api.DeleteOptions, listOptions v1.ListOptions) error {
+func (c *FakeTestTypes) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
 	action := core.NewDeleteCollectionAction(testtypesResource, c.ns, listOptions)
 
 	_, err := c.Fake.Invokes(action, &testgroup.TestTypeList{})

@@ -36,8 +36,8 @@ type PodInterface interface {
 	Create(*v1.Pod) (*v1.Pod, error)
 	Update(*v1.Pod) (*v1.Pod, error)
 	UpdateStatus(*v1.Pod) (*v1.Pod, error)
-	Delete(name string, options *v1.DeleteOptions) error
-	DeleteCollection(options *v1.DeleteOptions, listOptions meta_v1.ListOptions) error
+	Delete(name string, options *meta_v1.DeleteOptions) error
+	DeleteCollection(options *meta_v1.DeleteOptions, listOptions meta_v1.ListOptions) error
 	Get(name string, options meta_v1.GetOptions) (*v1.Pod, error)
 	List(opts meta_v1.ListOptions) (*v1.PodList, error)
 	Watch(opts meta_v1.ListOptions) (watch.Interface, error)
@@ -101,7 +101,7 @@ func (c *pods) UpdateStatus(pod *v1.Pod) (result *v1.Pod, err error) {
 }
 
 // Delete takes name of the pod and deletes it. Returns an error if one occurs.
-func (c *pods) Delete(name string, options *v1.DeleteOptions) error {
+func (c *pods) Delete(name string, options *meta_v1.DeleteOptions) error {
 	return c.client.Delete().
 		Namespace(c.ns).
 		Resource("pods").
@@ -112,7 +112,7 @@ func (c *pods) Delete(name string, options *v1.DeleteOptions) error {
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *pods) DeleteCollection(options *v1.DeleteOptions, listOptions meta_v1.ListOptions) error {
+func (c *pods) DeleteCollection(options *meta_v1.DeleteOptions, listOptions meta_v1.ListOptions) error {
 	return c.client.Delete().
 		Namespace(c.ns).
 		Resource("pods").

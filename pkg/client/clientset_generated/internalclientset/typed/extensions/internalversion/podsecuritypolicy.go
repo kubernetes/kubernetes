@@ -35,8 +35,8 @@ type PodSecurityPoliciesGetter interface {
 type PodSecurityPolicyInterface interface {
 	Create(*extensions.PodSecurityPolicy) (*extensions.PodSecurityPolicy, error)
 	Update(*extensions.PodSecurityPolicy) (*extensions.PodSecurityPolicy, error)
-	Delete(name string, options *api.DeleteOptions) error
-	DeleteCollection(options *api.DeleteOptions, listOptions v1.ListOptions) error
+	Delete(name string, options *v1.DeleteOptions) error
+	DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error
 	Get(name string, options v1.GetOptions) (*extensions.PodSecurityPolicy, error)
 	List(opts v1.ListOptions) (*extensions.PodSecurityPolicyList, error)
 	Watch(opts v1.ListOptions) (watch.Interface, error)
@@ -80,7 +80,7 @@ func (c *podSecurityPolicies) Update(podSecurityPolicy *extensions.PodSecurityPo
 }
 
 // Delete takes name of the podSecurityPolicy and deletes it. Returns an error if one occurs.
-func (c *podSecurityPolicies) Delete(name string, options *api.DeleteOptions) error {
+func (c *podSecurityPolicies) Delete(name string, options *v1.DeleteOptions) error {
 	return c.client.Delete().
 		Resource("podsecuritypolicies").
 		Name(name).
@@ -90,7 +90,7 @@ func (c *podSecurityPolicies) Delete(name string, options *api.DeleteOptions) er
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *podSecurityPolicies) DeleteCollection(options *api.DeleteOptions, listOptions v1.ListOptions) error {
+func (c *podSecurityPolicies) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
 	return c.client.Delete().
 		Resource("podsecuritypolicies").
 		VersionedParams(&listOptions, api.ParameterCodec).

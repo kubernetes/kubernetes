@@ -17,12 +17,11 @@ limitations under the License.
 package fake
 
 import (
-	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	labels "k8s.io/apimachinery/pkg/labels"
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
-	v1 "k8s.io/kubernetes/pkg/api/v1"
 	v2alpha1 "k8s.io/kubernetes/pkg/apis/batch/v2alpha1"
 	core "k8s.io/kubernetes/pkg/client/testing/core"
 )
@@ -72,14 +71,14 @@ func (c *FakeCronJobs) Delete(name string, options *v1.DeleteOptions) error {
 	return err
 }
 
-func (c *FakeCronJobs) DeleteCollection(options *v1.DeleteOptions, listOptions meta_v1.ListOptions) error {
+func (c *FakeCronJobs) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
 	action := core.NewDeleteCollectionAction(cronjobsResource, c.ns, listOptions)
 
 	_, err := c.Fake.Invokes(action, &v2alpha1.CronJobList{})
 	return err
 }
 
-func (c *FakeCronJobs) Get(name string, options meta_v1.GetOptions) (result *v2alpha1.CronJob, err error) {
+func (c *FakeCronJobs) Get(name string, options v1.GetOptions) (result *v2alpha1.CronJob, err error) {
 	obj, err := c.Fake.
 		Invokes(core.NewGetAction(cronjobsResource, c.ns, name), &v2alpha1.CronJob{})
 
@@ -89,7 +88,7 @@ func (c *FakeCronJobs) Get(name string, options meta_v1.GetOptions) (result *v2a
 	return obj.(*v2alpha1.CronJob), err
 }
 
-func (c *FakeCronJobs) List(opts meta_v1.ListOptions) (result *v2alpha1.CronJobList, err error) {
+func (c *FakeCronJobs) List(opts v1.ListOptions) (result *v2alpha1.CronJobList, err error) {
 	obj, err := c.Fake.
 		Invokes(core.NewListAction(cronjobsResource, c.ns, opts), &v2alpha1.CronJobList{})
 
@@ -111,7 +110,7 @@ func (c *FakeCronJobs) List(opts meta_v1.ListOptions) (result *v2alpha1.CronJobL
 }
 
 // Watch returns a watch.Interface that watches the requested cronJobs.
-func (c *FakeCronJobs) Watch(opts meta_v1.ListOptions) (watch.Interface, error) {
+func (c *FakeCronJobs) Watch(opts v1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
 		InvokesWatch(core.NewWatchAction(cronjobsResource, c.ns, opts))
 

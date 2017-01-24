@@ -29,7 +29,6 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/annotations"
 	"k8s.io/kubernetes/pkg/api/v1"
 	extensionsinternal "k8s.io/kubernetes/pkg/apis/extensions"
@@ -185,7 +184,7 @@ func stopDeploymentMaybeOverlap(c clientset.Interface, internalClient internalcl
 	Expect(err).NotTo(HaveOccurred())
 	timeout := 1 * time.Minute
 
-	err = reaper.Stop(ns, deployment.Name, timeout, api.NewDeleteOptions(0))
+	err = reaper.Stop(ns, deployment.Name, timeout, metav1.NewDeleteOptions(0))
 	Expect(err).NotTo(HaveOccurred())
 
 	framework.Logf("Ensuring deployment %s was deleted", deploymentName)

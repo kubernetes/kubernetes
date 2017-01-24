@@ -351,9 +351,9 @@ func (e *TokensController) deleteTokens(serviceAccount *v1.ServiceAccount) ( /*r
 }
 
 func (e *TokensController) deleteToken(ns, name string, uid types.UID) ( /*retry*/ bool, error) {
-	var opts *v1.DeleteOptions
+	var opts *metav1.DeleteOptions
 	if len(uid) > 0 {
-		opts = &v1.DeleteOptions{Preconditions: &v1.Preconditions{UID: &uid}}
+		opts = &metav1.DeleteOptions{Preconditions: &metav1.Preconditions{UID: &uid}}
 	}
 	err := e.client.Core().Secrets(ns).Delete(name, opts)
 	// NotFound doesn't need a retry (it's already been deleted)
@@ -438,7 +438,7 @@ func (e *TokensController) ensureReferencedToken(serviceAccount *v1.ServiceAccou
 	if _, err = serviceAccounts.Update(liveServiceAccount); err != nil {
 		// we weren't able to use the token, try to clean it up.
 		glog.V(2).Infof("deleting secret %s/%s because reference couldn't be added (%v)", secret.Namespace, secret.Name, err)
-		deleteOpts := &v1.DeleteOptions{Preconditions: &v1.Preconditions{UID: &createdToken.UID}}
+		deleteOpts := &metav1.DeleteOptions{Preconditions: &metav1.Preconditions{UID: &createdToken.UID}}
 		if deleteErr := e.client.Core().Secrets(createdToken.Namespace).Delete(createdToken.Name, deleteOpts); deleteErr != nil {
 			glog.Error(deleteErr) // if we fail, just log it
 		}

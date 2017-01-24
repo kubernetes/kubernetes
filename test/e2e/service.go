@@ -1145,7 +1145,7 @@ var _ = framework.KubeDescribe("Services", func() {
 		} else {
 			for _, pod := range pods.Items {
 				var gracePeriodSeconds int64 = 0
-				err := podClient.Delete(pod.Name, &v1.DeleteOptions{GracePeriodSeconds: &gracePeriodSeconds})
+				err := podClient.Delete(pod.Name, &metav1.DeleteOptions{GracePeriodSeconds: &gracePeriodSeconds})
 				if err != nil {
 					framework.Logf("warning: error force deleting pod '%s': %s", pod.Name, err)
 				}
