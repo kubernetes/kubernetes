@@ -84,7 +84,7 @@ type Framework struct {
 	cleanupHandle CleanupActionHandle
 
 	// configuration for framework's client
-	options FrameworkOptions
+	Options FrameworkOptions
 }
 
 type TestDataSummary interface {
@@ -110,7 +110,7 @@ func NewDefaultFramework(baseName string) *Framework {
 
 func NewDefaultGroupVersionFramework(baseName string, groupVersion schema.GroupVersion) *Framework {
 	f := NewDefaultFramework(baseName)
-	f.options.GroupVersion = &groupVersion
+	f.Options.GroupVersion = &groupVersion
 	return f
 }
 
@@ -118,7 +118,7 @@ func NewFramework(baseName string, options FrameworkOptions, client clientset.In
 	f := &Framework{
 		BaseName:                 baseName,
 		AddonResourceConstraints: make(map[string]ResourceConstraint),
-		options:                  options,
+		Options:                  options,
 		ClientSet:                client,
 	}
 
@@ -169,10 +169,10 @@ func (f *Framework) BeforeEach() {
 		By("Creating a kubernetes client")
 		config, err := LoadConfig()
 		Expect(err).NotTo(HaveOccurred())
-		config.QPS = f.options.ClientQPS
-		config.Burst = f.options.ClientBurst
-		if f.options.GroupVersion != nil {
-			config.GroupVersion = f.options.GroupVersion
+		config.QPS = f.Options.ClientQPS
+		config.Burst = f.Options.ClientBurst
+		if f.Options.GroupVersion != nil {
+			config.GroupVersion = f.Options.GroupVersion
 		}
 		if TestContext.KubeAPIContentType != "" {
 			config.ContentType = TestContext.KubeAPIContentType
