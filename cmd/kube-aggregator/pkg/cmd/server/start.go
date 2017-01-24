@@ -43,13 +43,18 @@ import (
 	"k8s.io/kubernetes/cmd/kube-aggregator/pkg/apis/apiregistration/v1alpha1"
 )
 
-const defaultEtcdPathPrefix = "/registry/kubernetes.io/kube-aggregator"
+const (
+	defaultEtcdPathPrefix = "/registry/kubernetes.io/kube-aggregator"
+	defaultConfigFile     = "config.json"
+)
 
 type DiscoveryServerOptions struct {
 	Etcd           *genericoptions.EtcdOptions
 	SecureServing  *genericoptions.SecureServingOptions
 	Authentication *genericoptions.DelegatingAuthenticationOptions
 	Authorization  *genericoptions.DelegatingAuthorizationOptions
+
+	ConfigFile string
 
 	// ProxyClientCert/Key are the client cert used to identify this proxy. Backing APIServices use
 	// this to confirm the proxy's identity
@@ -75,6 +80,7 @@ func NewCommandStartDiscoveryServer(out, err io.Writer) *cobra.Command {
 	o.Etcd.StorageConfig.Prefix = defaultEtcdPathPrefix
 	o.Etcd.StorageConfig.Codec = api.Codecs.LegacyCodec(v1alpha1.SchemeGroupVersion)
 	o.SecureServing.ServingOptions.BindPort = 443
+	o.ConfigFile = defaultConfigFile
 
 	cmd := &cobra.Command{
 		Short: "Launch a discovery summarizer and proxy server",
@@ -93,6 +99,7 @@ func NewCommandStartDiscoveryServer(out, err io.Writer) *cobra.Command {
 	o.Authorization.AddFlags(flags)
 	flags.StringVar(&o.ProxyClientCertFile, "proxy-client-cert-file", o.ProxyClientCertFile, "client certificate used identify the proxy to the API server")
 	flags.StringVar(&o.ProxyClientKeyFile, "proxy-client-key-file", o.ProxyClientKeyFile, "client certificate key used identify the proxy to the API server")
+	flags.StringVar(&o.ConfigFile, "config-file", o.ConfigFile, "path to a config file")
 
 	return cmd
 }
@@ -172,9 +179,8 @@ func (o DiscoveryServerOptions) RunDiscoveryServer() error {
 
 // RunLegacyDiscoveryServer runs the legacy mode of discovery
 func (o DiscoveryServerOptions) RunLegacyDiscoveryServer() error {
-	configFilePath := "config.json"
 	port := "9090"
-	s, err := legacy.NewDiscoverySummarizer(configFilePath)
+	s, err := legacy.NewDiscoverySummarizer(o.ConfigFile)
 	if err != nil {
 		return err
 	}
