@@ -1994,7 +1994,7 @@ func TestDeleteWithOptionsQuery(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if res.StatusCode != http.StatusOK {
-		t.Errorf("unexpected response: %s %#v", request.URL, res)
+		t.Fatalf("unexpected response: %s %#v", request.URL, res)
 		s, err := ioutil.ReadAll(res.Body)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
@@ -2002,7 +2002,7 @@ func TestDeleteWithOptionsQuery(t *testing.T) {
 		t.Logf(string(s))
 	}
 	if simpleStorage.deleted != ID {
-		t.Errorf("Unexpected delete: %s, expected %s", simpleStorage.deleted, ID)
+		t.Fatalf("Unexpected delete: %s, expected %s", simpleStorage.deleted, ID)
 	}
 	simpleStorage.deleteOptions.GetObjectKind().SetGroupVersionKind(schema.GroupVersionKind{})
 	if !api.Semantic.DeepEqual(simpleStorage.deleteOptions, item) {

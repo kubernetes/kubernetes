@@ -29,8 +29,8 @@ const GroupName = "meta.k8s.io"
 // Scheme is the registry for any type that adheres to the meta API spec.
 var scheme = runtime.NewScheme()
 
-// Codecs provides access to encoding and decoding for the scheme
-var codecs = serializer.NewCodecFactory(scheme)
+// Codecs provides access to encoding and decoding for the scheme.
+var Codecs = serializer.NewCodecFactory(scheme)
 
 // SchemeGroupVersion is group version used to register these objects
 var SchemeGroupVersion = schema.GroupVersion{Group: GroupName, Version: runtime.APIVersionInternal}
@@ -63,7 +63,12 @@ func addToGroupVersion(scheme *runtime.Scheme, groupVersion schema.GroupVersion)
 	)
 	scheme.AddKnownTypes(SchemeGroupVersion,
 		&ListOptions{},
+		&metav1.GetOptions{},
+		&metav1.ExportOptions{},
+		&metav1.DeleteOptions{},
 	)
+	// Allow delete options to be decoded across all version in this scheme (we may want to be more clever than this)
+	scheme.AddUnversionedTypes(SchemeGroupVersion, &metav1.DeleteOptions{})
 	metav1.AddToGroupVersion(scheme, metav1.SchemeGroupVersion)
 	return nil
 }
