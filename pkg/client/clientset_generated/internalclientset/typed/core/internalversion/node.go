@@ -35,8 +35,8 @@ type NodeInterface interface {
 	Create(*api.Node) (*api.Node, error)
 	Update(*api.Node) (*api.Node, error)
 	UpdateStatus(*api.Node) (*api.Node, error)
-	Delete(name string, options *api.DeleteOptions) error
-	DeleteCollection(options *api.DeleteOptions, listOptions v1.ListOptions) error
+	Delete(name string, options *v1.DeleteOptions) error
+	DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error
 	Get(name string, options v1.GetOptions) (*api.Node, error)
 	List(opts v1.ListOptions) (*api.NodeList, error)
 	Watch(opts v1.ListOptions) (watch.Interface, error)
@@ -95,7 +95,7 @@ func (c *nodes) UpdateStatus(node *api.Node) (result *api.Node, err error) {
 }
 
 // Delete takes name of the node and deletes it. Returns an error if one occurs.
-func (c *nodes) Delete(name string, options *api.DeleteOptions) error {
+func (c *nodes) Delete(name string, options *v1.DeleteOptions) error {
 	return c.client.Delete().
 		Resource("nodes").
 		Name(name).
@@ -105,7 +105,7 @@ func (c *nodes) Delete(name string, options *api.DeleteOptions) error {
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *nodes) DeleteCollection(options *api.DeleteOptions, listOptions v1.ListOptions) error {
+func (c *nodes) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
 	return c.client.Delete().
 		Resource("nodes").
 		VersionedParams(&listOptions, api.ParameterCodec).

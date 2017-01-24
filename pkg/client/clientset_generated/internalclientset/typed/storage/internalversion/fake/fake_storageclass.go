@@ -22,7 +22,6 @@ import (
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
-	api "k8s.io/kubernetes/pkg/api"
 	storage "k8s.io/kubernetes/pkg/apis/storage"
 	core "k8s.io/kubernetes/pkg/client/testing/core"
 )
@@ -52,13 +51,13 @@ func (c *FakeStorageClasses) Update(storageClass *storage.StorageClass) (result 
 	return obj.(*storage.StorageClass), err
 }
 
-func (c *FakeStorageClasses) Delete(name string, options *api.DeleteOptions) error {
+func (c *FakeStorageClasses) Delete(name string, options *v1.DeleteOptions) error {
 	_, err := c.Fake.
 		Invokes(core.NewRootDeleteAction(storageclassesResource, name), &storage.StorageClass{})
 	return err
 }
 
-func (c *FakeStorageClasses) DeleteCollection(options *api.DeleteOptions, listOptions v1.ListOptions) error {
+func (c *FakeStorageClasses) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
 	action := core.NewRootDeleteCollectionAction(storageclassesResource, listOptions)
 
 	_, err := c.Fake.Invokes(action, &storage.StorageClassList{})

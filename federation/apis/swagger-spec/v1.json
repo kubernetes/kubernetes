@@ -4466,7 +4466,7 @@
    },
    "v1.DeleteOptions": {
     "id": "v1.DeleteOptions",
-    "description": "DeleteOptions may be provided when deleting an API object",
+    "description": "DeleteOptions may be provided when deleting an API object.",
     "properties": {
      "kind": {
       "type": "string",

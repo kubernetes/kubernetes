@@ -34,8 +34,8 @@ type ServiceAccountsGetter interface {
 type ServiceAccountInterface interface {
 	Create(*api.ServiceAccount) (*api.ServiceAccount, error)
 	Update(*api.ServiceAccount) (*api.ServiceAccount, error)
-	Delete(name string, options *api.DeleteOptions) error
-	DeleteCollection(options *api.DeleteOptions, listOptions v1.ListOptions) error
+	Delete(name string, options *v1.DeleteOptions) error
+	DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error
 	Get(name string, options v1.GetOptions) (*api.ServiceAccount, error)
 	List(opts v1.ListOptions) (*api.ServiceAccountList, error)
 	Watch(opts v1.ListOptions) (watch.Interface, error)
@@ -83,7 +83,7 @@ func (c *serviceAccounts) Update(serviceAccount *api.ServiceAccount) (result *ap
 }
 
 // Delete takes name of the serviceAccount and deletes it. Returns an error if one occurs.
-func (c *serviceAccounts) Delete(name string, options *api.DeleteOptions) error {
+func (c *serviceAccounts) Delete(name string, options *v1.DeleteOptions) error {
 	return c.client.Delete().
 		Namespace(c.ns).
 		Resource("serviceaccounts").
@@ -94,7 +94,7 @@ func (c *serviceAccounts) Delete(name string, options *api.DeleteOptions) error 
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *serviceAccounts) DeleteCollection(options *api.DeleteOptions, listOptions v1.ListOptions) error {
+func (c *serviceAccounts) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
 	return c.client.Delete().
 		Namespace(c.ns).
 		Resource("serviceaccounts").

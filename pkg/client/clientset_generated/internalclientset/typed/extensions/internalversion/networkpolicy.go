@@ -35,8 +35,8 @@ type NetworkPoliciesGetter interface {
 type NetworkPolicyInterface interface {
 	Create(*extensions.NetworkPolicy) (*extensions.NetworkPolicy, error)
 	Update(*extensions.NetworkPolicy) (*extensions.NetworkPolicy, error)
-	Delete(name string, options *api.DeleteOptions) error
-	DeleteCollection(options *api.DeleteOptions, listOptions v1.ListOptions) error
+	Delete(name string, options *v1.DeleteOptions) error
+	DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error
 	Get(name string, options v1.GetOptions) (*extensions.NetworkPolicy, error)
 	List(opts v1.ListOptions) (*extensions.NetworkPolicyList, error)
 	Watch(opts v1.ListOptions) (watch.Interface, error)
@@ -84,7 +84,7 @@ func (c *networkPolicies) Update(networkPolicy *extensions.NetworkPolicy) (resul
 }
 
 // Delete takes name of the networkPolicy and deletes it. Returns an error if one occurs.
-func (c *networkPolicies) Delete(name string, options *api.DeleteOptions) error {
+func (c *networkPolicies) Delete(name string, options *v1.DeleteOptions) error {
 	return c.client.Delete().
 		Namespace(c.ns).
 		Resource("networkpolicies").
@@ -95,7 +95,7 @@ func (c *networkPolicies) Delete(name string, options *api.DeleteOptions) error 
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *networkPolicies) DeleteCollection(options *api.DeleteOptions, listOptions v1.ListOptions) error {
+func (c *networkPolicies) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
 	return c.client.Delete().
 		Namespace(c.ns).
 		Resource("networkpolicies").

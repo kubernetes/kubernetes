@@ -36,8 +36,8 @@ type JobInterface interface {
 	Create(*batch.Job) (*batch.Job, error)
 	Update(*batch.Job) (*batch.Job, error)
 	UpdateStatus(*batch.Job) (*batch.Job, error)
-	Delete(name string, options *api.DeleteOptions) error
-	DeleteCollection(options *api.DeleteOptions, listOptions v1.ListOptions) error
+	Delete(name string, options *v1.DeleteOptions) error
+	DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error
 	Get(name string, options v1.GetOptions) (*batch.Job, error)
 	List(opts v1.ListOptions) (*batch.JobList, error)
 	Watch(opts v1.ListOptions) (watch.Interface, error)
@@ -101,7 +101,7 @@ func (c *jobs) UpdateStatus(job *batch.Job) (result *batch.Job, err error) {
 }
 
 // Delete takes name of the job and deletes it. Returns an error if one occurs.
-func (c *jobs) Delete(name string, options *api.DeleteOptions) error {
+func (c *jobs) Delete(name string, options *v1.DeleteOptions) error {
 	return c.client.Delete().
 		Namespace(c.ns).
 		Resource("jobs").
@@ -112,7 +112,7 @@ func (c *jobs) Delete(name string, options *api.DeleteOptions) error {
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *jobs) DeleteCollection(options *api.DeleteOptions, listOptions v1.ListOptions) error {
+func (c *jobs) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
 	return c.client.Delete().
 		Namespace(c.ns).
 		Resource("jobs").

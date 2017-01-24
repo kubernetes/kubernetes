@@ -39,7 +39,7 @@ message Eviction {
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
   // DeleteOptions may be provided
-  optional k8s.io.kubernetes.pkg.api.v1.DeleteOptions deleteOptions = 2;
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.DeleteOptions deleteOptions = 2;
 }
 
 // PodDisruptionBudget is an object to define the max disruption that can be caused to a collection of pods

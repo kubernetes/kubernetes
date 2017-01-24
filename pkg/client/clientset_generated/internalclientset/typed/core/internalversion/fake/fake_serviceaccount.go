@@ -54,14 +54,14 @@ func (c *FakeServiceAccounts) Update(serviceAccount *api.ServiceAccount) (result
 	return obj.(*api.ServiceAccount), err
 }
 
-func (c *FakeServiceAccounts) Delete(name string, options *api.DeleteOptions) error {
+func (c *FakeServiceAccounts) Delete(name string, options *v1.DeleteOptions) error {
 	_, err := c.Fake.
 		Invokes(core.NewDeleteAction(serviceaccountsResource, c.ns, name), &api.ServiceAccount{})
 
 	return err
 }
 
-func (c *FakeServiceAccounts) DeleteCollection(options *api.DeleteOptions, listOptions v1.ListOptions) error {
+func (c *FakeServiceAccounts) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
 	action := core.NewDeleteCollectionAction(serviceaccountsResource, c.ns, listOptions)
 
 	_, err := c.Fake.Invokes(action, &api.ServiceAccountList{})

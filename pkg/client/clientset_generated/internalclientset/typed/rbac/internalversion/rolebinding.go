@@ -35,8 +35,8 @@ type RoleBindingsGetter interface {
 type RoleBindingInterface interface {
 	Create(*rbac.RoleBinding) (*rbac.RoleBinding, error)
 	Update(*rbac.RoleBinding) (*rbac.RoleBinding, error)
-	Delete(name string, options *api.DeleteOptions) error
-	DeleteCollection(options *api.DeleteOptions, listOptions v1.ListOptions) error
+	Delete(name string, options *v1.DeleteOptions) error
+	DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error
 	Get(name string, options v1.GetOptions) (*rbac.RoleBinding, error)
 	List(opts v1.ListOptions) (*rbac.RoleBindingList, error)
 	Watch(opts v1.ListOptions) (watch.Interface, error)
@@ -84,7 +84,7 @@ func (c *roleBindings) Update(roleBinding *rbac.RoleBinding) (result *rbac.RoleB
 }
 
 // Delete takes name of the roleBinding and deletes it. Returns an error if one occurs.
-func (c *roleBindings) Delete(name string, options *api.DeleteOptions) error {
+func (c *roleBindings) Delete(name string, options *v1.DeleteOptions) error {
 	return c.client.Delete().
 		Namespace(c.ns).
 		Resource("rolebindings").
@@ -95,7 +95,7 @@ func (c *roleBindings) Delete(name string, options *api.DeleteOptions) error {
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *roleBindings) DeleteCollection(options *api.DeleteOptions, listOptions v1.ListOptions) error {
+func (c *roleBindings) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
 	return c.client.Delete().
 		Namespace(c.ns).
 		Resource("rolebindings").

@@ -22,7 +22,6 @@ import (
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
-	api_v1 "k8s.io/kubernetes/pkg/api/v1"
 	v1 "k8s.io/kubernetes/pkg/apis/batch/v1"
 	core "k8s.io/kubernetes/pkg/client/testing/core"
 )
@@ -65,14 +64,14 @@ func (c *FakeJobs) UpdateStatus(job *v1.Job) (*v1.Job, error) {
 	return obj.(*v1.Job), err
 }
 
-func (c *FakeJobs) Delete(name string, options *api_v1.DeleteOptions) error {
+func (c *FakeJobs) Delete(name string, options *meta_v1.DeleteOptions) error {
 	_, err := c.Fake.
 		Invokes(core.NewDeleteAction(jobsResource, c.ns, name), &v1.Job{})
 
 	return err
 }
 
-func (c *FakeJobs) DeleteCollection(options *api_v1.DeleteOptions, listOptions meta_v1.ListOptions) error {
+func (c *FakeJobs) DeleteCollection(options *meta_v1.DeleteOptions, listOptions meta_v1.ListOptions) error {
 	action := core.NewDeleteCollectionAction(jobsResource, c.ns, listOptions)
 
 	_, err := c.Fake.Invokes(action, &v1.JobList{})

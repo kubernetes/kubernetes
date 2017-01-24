@@ -36,8 +36,8 @@ type CertificateSigningRequestInterface interface {
 	Create(*certificates.CertificateSigningRequest) (*certificates.CertificateSigningRequest, error)
 	Update(*certificates.CertificateSigningRequest) (*certificates.CertificateSigningRequest, error)
 	UpdateStatus(*certificates.CertificateSigningRequest) (*certificates.CertificateSigningRequest, error)
-	Delete(name string, options *api.DeleteOptions) error
-	DeleteCollection(options *api.DeleteOptions, listOptions v1.ListOptions) error
+	Delete(name string, options *v1.DeleteOptions) error
+	DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error
 	Get(name string, options v1.GetOptions) (*certificates.CertificateSigningRequest, error)
 	List(opts v1.ListOptions) (*certificates.CertificateSigningRequestList, error)
 	Watch(opts v1.ListOptions) (watch.Interface, error)
@@ -96,7 +96,7 @@ func (c *certificateSigningRequests) UpdateStatus(certificateSigningRequest *cer
 }
 
 // Delete takes name of the certificateSigningRequest and deletes it. Returns an error if one occurs.
-func (c *certificateSigningRequests) Delete(name string, options *api.DeleteOptions) error {
+func (c *certificateSigningRequests) Delete(name string, options *v1.DeleteOptions) error {
 	return c.client.Delete().
 		Resource("certificatesigningrequests").
 		Name(name).
@@ -106,7 +106,7 @@ func (c *certificateSigningRequests) Delete(name string, options *api.DeleteOpti
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *certificateSigningRequests) DeleteCollection(options *api.DeleteOptions, listOptions v1.ListOptions) error {
+func (c *certificateSigningRequests) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
 	return c.client.Delete().
 		Resource("certificatesigningrequests").
 		VersionedParams(&listOptions, api.ParameterCodec).

@@ -35,8 +35,8 @@ type ClusterRoleBindingsGetter interface {
 type ClusterRoleBindingInterface interface {
 	Create(*rbac.ClusterRoleBinding) (*rbac.ClusterRoleBinding, error)
 	Update(*rbac.ClusterRoleBinding) (*rbac.ClusterRoleBinding, error)
-	Delete(name string, options *api.DeleteOptions) error
-	DeleteCollection(options *api.DeleteOptions, listOptions v1.ListOptions) error
+	Delete(name string, options *v1.DeleteOptions) error
+	DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error
 	Get(name string, options v1.GetOptions) (*rbac.ClusterRoleBinding, error)
 	List(opts v1.ListOptions) (*rbac.ClusterRoleBindingList, error)
 	Watch(opts v1.ListOptions) (watch.Interface, error)
@@ -80,7 +80,7 @@ func (c *clusterRoleBindings) Update(clusterRoleBinding *rbac.ClusterRoleBinding
 }
 
 // Delete takes name of the clusterRoleBinding and deletes it. Returns an error if one occurs.
-func (c *clusterRoleBindings) Delete(name string, options *api.DeleteOptions) error {
+func (c *clusterRoleBindings) Delete(name string, options *v1.DeleteOptions) error {
 	return c.client.Delete().
 		Resource("clusterrolebindings").
 		Name(name).
@@ -90,7 +90,7 @@ func (c *clusterRoleBindings) Delete(name string, options *api.DeleteOptions) er
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *clusterRoleBindings) DeleteCollection(options *api.DeleteOptions, listOptions v1.ListOptions) error {
+func (c *clusterRoleBindings) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
 	return c.client.Delete().
 		Resource("clusterrolebindings").
 		VersionedParams(&listOptions, api.ParameterCodec).

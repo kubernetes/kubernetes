@@ -60,13 +60,13 @@ func (c *FakeNamespaces) UpdateStatus(namespace *api.Namespace) (*api.Namespace,
 	return obj.(*api.Namespace), err
 }
 
-func (c *FakeNamespaces) Delete(name string, options *api.DeleteOptions) error {
+func (c *FakeNamespaces) Delete(name string, options *v1.DeleteOptions) error {
 	_, err := c.Fake.
 		Invokes(core.NewRootDeleteAction(namespacesResource, name), &api.Namespace{})
 	return err
 }
 
-func (c *FakeNamespaces) DeleteCollection(options *api.DeleteOptions, listOptions v1.ListOptions) error {
+func (c *FakeNamespaces) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
 	action := core.NewRootDeleteCollectionAction(namespacesResource, listOptions)
 
 	_, err := c.Fake.Invokes(action, &api.NamespaceList{})

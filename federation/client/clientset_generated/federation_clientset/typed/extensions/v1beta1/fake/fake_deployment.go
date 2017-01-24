@@ -17,12 +17,11 @@ limitations under the License.
 package fake
 
 import (
-	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	labels "k8s.io/apimachinery/pkg/labels"
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
-	v1 "k8s.io/kubernetes/pkg/api/v1"
 	v1beta1 "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	core "k8s.io/kubernetes/pkg/client/testing/core"
 )
@@ -72,14 +71,14 @@ func (c *FakeDeployments) Delete(name string, options *v1.DeleteOptions) error {
 	return err
 }
 
-func (c *FakeDeployments) DeleteCollection(options *v1.DeleteOptions, listOptions meta_v1.ListOptions) error {
+func (c *FakeDeployments) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
 	action := core.NewDeleteCollectionAction(deploymentsResource, c.ns, listOptions)
 
 	_, err := c.Fake.Invokes(action, &v1beta1.DeploymentList{})
 	return err
 }
 
-func (c *FakeDeployments) Get(name string, options meta_v1.GetOptions) (result *v1beta1.Deployment, err error) {
+func (c *FakeDeployments) Get(name string, options v1.GetOptions) (result *v1beta1.Deployment, err error) {
 	obj, err := c.Fake.
 		Invokes(core.NewGetAction(deploymentsResource, c.ns, name), &v1beta1.Deployment{})
 
@@ -89,7 +88,7 @@ func (c *FakeDeployments) Get(name string, options meta_v1.GetOptions) (result *
 	return obj.(*v1beta1.Deployment), err
 }
 
-func (c *FakeDeployments) List(opts meta_v1.ListOptions) (result *v1beta1.DeploymentList, err error) {
+func (c *FakeDeployments) List(opts v1.ListOptions) (result *v1beta1.DeploymentList, err error) {
 	obj, err := c.Fake.
 		Invokes(core.NewListAction(deploymentsResource, c.ns, opts), &v1beta1.DeploymentList{})
 
@@ -111,7 +110,7 @@ func (c *FakeDeployments) List(opts meta_v1.ListOptions) (result *v1beta1.Deploy
 }
 
 // Watch returns a watch.Interface that watches the requested deployments.
-func (c *FakeDeployments) Watch(opts meta_v1.ListOptions) (watch.Interface, error) {
+func (c *FakeDeployments) Watch(opts v1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
 		InvokesWatch(core.NewWatchAction(deploymentsResource, c.ns, opts))
 

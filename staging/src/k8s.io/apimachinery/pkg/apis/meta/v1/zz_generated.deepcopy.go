@@ -23,6 +23,7 @@ package v1
 import (
 	conversion "k8s.io/apimachinery/pkg/conversion"
 	runtime "k8s.io/apimachinery/pkg/runtime"
+	types "k8s.io/apimachinery/pkg/types"
 	reflect "reflect"
 )
 
@@ -34,6 +35,7 @@ func GetGeneratedDeepCopyFuncs() []conversion.GeneratedDeepCopyFunc {
 		{Fn: DeepCopy_v1_APIResource, InType: reflect.TypeOf(&APIResource{})},
 		{Fn: DeepCopy_v1_APIResourceList, InType: reflect.TypeOf(&APIResourceList{})},
 		{Fn: DeepCopy_v1_APIVersions, InType: reflect.TypeOf(&APIVersions{})},
+		{Fn: DeepCopy_v1_DeleteOptions, InType: reflect.TypeOf(&DeleteOptions{})},
 		{Fn: DeepCopy_v1_Duration, InType: reflect.TypeOf(&Duration{})},
 		{Fn: DeepCopy_v1_ExportOptions, InType: reflect.TypeOf(&ExportOptions{})},
 		{Fn: DeepCopy_v1_GetOptions, InType: reflect.TypeOf(&GetOptions{})},
@@ -51,6 +53,7 @@ func GetGeneratedDeepCopyFuncs() []conversion.GeneratedDeepCopyFunc {
 		{Fn: DeepCopy_v1_ObjectMeta, InType: reflect.TypeOf(&ObjectMeta{})},
 		{Fn: DeepCopy_v1_OwnerReference, InType: reflect.TypeOf(&OwnerReference{})},
 		{Fn: DeepCopy_v1_Patch, InType: reflect.TypeOf(&Patch{})},
+		{Fn: DeepCopy_v1_Preconditions, InType: reflect.TypeOf(&Preconditions{})},
 		{Fn: DeepCopy_v1_RootPaths, InType: reflect.TypeOf(&RootPaths{})},
 		{Fn: DeepCopy_v1_ServerAddressByClientCIDR, InType: reflect.TypeOf(&ServerAddressByClientCIDR{})},
 		{Fn: DeepCopy_v1_Status, InType: reflect.TypeOf(&Status{})},
@@ -150,6 +153,33 @@ func DeepCopy_v1_APIVersions(in interface{}, out interface{}, c *conversion.Clon
 			in, out := &in.ServerAddressByClientCIDRs, &out.ServerAddressByClientCIDRs
 			*out = make([]ServerAddressByClientCIDR, len(*in))
 			copy(*out, *in)
+		}
+		return nil
+	}
+}
+
+func DeepCopy_v1_DeleteOptions(in interface{}, out interface{}, c *conversion.Cloner) error {
+	{
+		in := in.(*DeleteOptions)
+		out := out.(*DeleteOptions)
+		*out = *in
+		if in.GracePeriodSeconds != nil {
+			in, out := &in.GracePeriodSeconds, &out.GracePeriodSeconds
+			*out = new(int64)
+			**out = **in
+		}
+		if in.Preconditions != nil {
+			in, out := &in.Preconditions, &out.Preconditions
+			if newVal, err := c.DeepCopy(*in); err != nil {
+				return err
+			} else {
+				*out = newVal.(*Preconditions)
+			}
+		}
+		if in.OrphanDependents != nil {
+			in, out := &in.OrphanDependents, &out.OrphanDependents
+			*out = new(bool)
+			**out = **in
 		}
 		return nil
 	}
@@ -386,6 +416,20 @@ func DeepCopy_v1_Patch(in interface{}, out interface{}, c *conversion.Cloner) er
 		in := in.(*Patch)
 		out := out.(*Patch)
 		*out = *in
+		return nil
+	}
+}
+
+func DeepCopy_v1_Preconditions(in interface{}, out interface{}, c *conversion.Cloner) error {
+	{
+		in := in.(*Preconditions)
+		out := out.(*Preconditions)
+		*out = *in
+		if in.UID != nil {
+			in, out := &in.UID, &out.UID
+			*out = new(types.UID)
+			**out = **in
+		}
 		return nil
 	}
 }

@@ -35,8 +35,8 @@ type ResourceQuotaInterface interface {
 	Create(*api.ResourceQuota) (*api.ResourceQuota, error)
 	Update(*api.ResourceQuota) (*api.ResourceQuota, error)
 	UpdateStatus(*api.ResourceQuota) (*api.ResourceQuota, error)
-	Delete(name string, options *api.DeleteOptions) error
-	DeleteCollection(options *api.DeleteOptions, listOptions v1.ListOptions) error
+	Delete(name string, options *v1.DeleteOptions) error
+	DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error
 	Get(name string, options v1.GetOptions) (*api.ResourceQuota, error)
 	List(opts v1.ListOptions) (*api.ResourceQuotaList, error)
 	Watch(opts v1.ListOptions) (watch.Interface, error)
@@ -100,7 +100,7 @@ func (c *resourceQuotas) UpdateStatus(resourceQuota *api.ResourceQuota) (result 
 }
 
 // Delete takes name of the resourceQuota and deletes it. Returns an error if one occurs.
-func (c *resourceQuotas) Delete(name string, options *api.DeleteOptions) error {
+func (c *resourceQuotas) Delete(name string, options *v1.DeleteOptions) error {
 	return c.client.Delete().
 		Namespace(c.ns).
 		Resource("resourcequotas").
@@ -111,7 +111,7 @@ func (c *resourceQuotas) Delete(name string, options *api.DeleteOptions) error {
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *resourceQuotas) DeleteCollection(options *api.DeleteOptions, listOptions v1.ListOptions) error {
+func (c *resourceQuotas) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
 	return c.client.Delete().
 		Namespace(c.ns).
 		Resource("resourcequotas").
