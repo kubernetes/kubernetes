@@ -13821,3 +13821,55 @@ go_library(
     tags = ["automanaged"],
     deps = ["//vendor:k8s.io/apimachinery/pkg/runtime"],
 )
+
+go_test(
+    name = "k8s.io/apimachinery/pkg/util/httpstream_test",
+    srcs = ["k8s.io/apimachinery/pkg/util/httpstream/httpstream_test.go"],
+    library = ":k8s.io/apimachinery/pkg/util/httpstream",
+    tags = ["automanaged"],
+    deps = ["//pkg/api:go_default_library"],
+)
+
+go_library(
+    name = "k8s.io/apimachinery/pkg/util/httpstream",
+    srcs = [
+        "k8s.io/apimachinery/pkg/util/httpstream/doc.go",
+        "k8s.io/apimachinery/pkg/util/httpstream/httpstream.go",
+    ],
+    tags = ["automanaged"],
+)
+
+go_test(
+    name = "k8s.io/apimachinery/pkg/util/httpstream/spdy_test",
+    srcs = [
+        "k8s.io/apimachinery/pkg/util/httpstream/spdy/connection_test.go",
+        "k8s.io/apimachinery/pkg/util/httpstream/spdy/roundtripper_test.go",
+        "k8s.io/apimachinery/pkg/util/httpstream/spdy/upgrade_test.go",
+    ],
+    library = ":k8s.io/apimachinery/pkg/util/httpstream/spdy",
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:github.com/elazarl/goproxy",
+        "//vendor:k8s.io/apimachinery/pkg/util/httpstream",
+    ],
+)
+
+go_library(
+    name = "k8s.io/apimachinery/pkg/util/httpstream/spdy",
+    srcs = [
+        "k8s.io/apimachinery/pkg/util/httpstream/spdy/connection.go",
+        "k8s.io/apimachinery/pkg/util/httpstream/spdy/roundtripper.go",
+        "k8s.io/apimachinery/pkg/util/httpstream/spdy/upgrade.go",
+    ],
+    tags = ["automanaged"],
+    deps = [
+        "//pkg/api:go_default_library",
+        "//vendor:github.com/docker/spdystream",
+        "//vendor:github.com/golang/glog",
+        "//vendor:k8s.io/apimachinery/pkg/api/errors",
+        "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
+        "//vendor:k8s.io/apimachinery/pkg/util/httpstream",
+        "//vendor:k8s.io/apimachinery/pkg/util/runtime",
+        "//vendor:k8s.io/apimachinery/third_party/forked/golang/netutil",
+    ],
+)
