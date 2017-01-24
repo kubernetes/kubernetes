@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package example
+package fuzzer
 
 import (
 	"github.com/google/gofuzz"
@@ -23,6 +23,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	runtimeserializer "k8s.io/apimachinery/pkg/runtime/serializer"
 	examplev1 "k8s.io/apiserver/pkg/apis/example/v1"
+	"k8s.io/apiserver/pkg/apis/example"
 )
 
 // overrideGenericFuncs override some generic fuzzer funcs from k8s.io/apiserver in order to have more realistic
@@ -38,7 +39,7 @@ func overrideGenericFuncs(t apitesting.TestingCommon, codecs runtimeserializer.C
 					ContentType: runtime.ContentTypeJSON,
 				}
 			} else {
-				types := []runtime.Object{&Pod{}}
+				types := []runtime.Object{&example.Pod{}}
 				t := types[c.Rand.Intn(len(types))]
 				c.Fuzz(t)
 				*j = t
@@ -46,7 +47,7 @@ func overrideGenericFuncs(t apitesting.TestingCommon, codecs runtimeserializer.C
 		},
 		func(r *runtime.RawExtension, c fuzz.Continue) {
 			// Pick an arbitrary type and fuzz it
-			types := []runtime.Object{&Pod{}}
+			types := []runtime.Object{&example.Pod{}}
 			obj := types[c.Rand.Intn(len(types))]
 			c.Fuzz(obj)
 
@@ -65,7 +66,7 @@ func overrideGenericFuncs(t apitesting.TestingCommon, codecs runtimeserializer.C
 
 func exampleFuncs(t apitesting.TestingCommon) []interface{} {
 	return []interface{}{
-		func(s *PodSpec, c fuzz.Continue) {
+		func(s *example.PodSpec, c fuzz.Continue) {
 			c.FuzzNoCustom(s)
 			// has a default value
 			ttl := int64(30)
@@ -78,18 +79,18 @@ func exampleFuncs(t apitesting.TestingCommon) []interface{} {
 				s.SchedulerName = "default-scheduler"
 			}
 		},
-		func(j *PodPhase, c fuzz.Continue) {
-			statuses := []PodPhase{"Pending", "Running", "Succeeded", "Failed", "Unknown"}
+		func(j *example.PodPhase, c fuzz.Continue) {
+			statuses := []example.PodPhase{"Pending", "Running", "Succeeded", "Failed", "Unknown"}
 			*j = statuses[c.Rand.Intn(len(statuses))]
 		},
-		func(rp *RestartPolicy, c fuzz.Continue) {
-			policies := []RestartPolicy{"Always", "Never", "OnFailure"}
+		func(rp *example.RestartPolicy, c fuzz.Continue) {
+			policies := []example.RestartPolicy{"Always", "Never", "OnFailure"}
 			*rp = policies[c.Rand.Intn(len(policies))]
 		},
 	}
 }
 
-func FuzzerFuncs(t apitesting.TestingCommon, codecs runtimeserializer.CodecFactory) []interface{} {
+func Funcs(t apitesting.TestingCommon, codecs runtimeserializer.CodecFactory) []interface{} {
 	return apitesting.MergeFuzzerFuncs(t,
 		apitesting.GenericFuzzerFuncs(t, codecs),
 		overrideGenericFuncs(t, codecs),
