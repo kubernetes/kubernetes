@@ -157,7 +157,7 @@ func NewNamespaceController(client federationclientset.Interface) *NamespaceCont
 		},
 		func(client kubeclientset.Interface, obj runtime.Object) error {
 			namespace := obj.(*apiv1.Namespace)
-			err := client.Core().Namespaces().Delete(namespace.Name, &apiv1.DeleteOptions{})
+			err := client.Core().Namespaces().Delete(namespace.Name, &metav1.DeleteOptions{})
 			// IsNotFound error is fine since that means the object is deleted already.
 			if errors.IsNotFound(err) {
 				return nil
@@ -492,31 +492,31 @@ func (nc *NamespaceController) removeKubernetesFinalizer(namespace *apiv1.Namesp
 	// Right now there are just 7 types of objects: Deployments, DaemonSets, ReplicaSet, Secret, Ingress, Events and Service.
 	// Temporarily these items are simply deleted one by one to squeeze this code into 1.4.
 	// TODO: Make it generic (like in the regular namespace controller) and parallel.
-	err := nc.federatedApiClient.Core().Services(namespace.Name).DeleteCollection(&apiv1.DeleteOptions{}, metav1.ListOptions{})
+	err := nc.federatedApiClient.Core().Services(namespace.Name).DeleteCollection(&metav1.DeleteOptions{}, metav1.ListOptions{})
 	if err != nil {
 		return nil, fmt.Errorf("failed to delete service list: %v", err)
 	}
-	err = nc.federatedApiClient.Extensions().ReplicaSets(namespace.Name).DeleteCollection(&apiv1.DeleteOptions{}, metav1.ListOptions{})
+	err = nc.federatedApiClient.Extensions().ReplicaSets(namespace.Name).DeleteCollection(&metav1.DeleteOptions{}, metav1.ListOptions{})
 	if err != nil {
 		return nil, fmt.Errorf("failed to delete replicaset list from namespace: %v", err)
 	}
-	err = nc.federatedApiClient.Core().Secrets(namespace.Name).DeleteCollection(&apiv1.DeleteOptions{}, metav1.ListOptions{})
+	err = nc.federatedApiClient.Core().Secrets(namespace.Name).DeleteCollection(&metav1.DeleteOptions{}, metav1.ListOptions{})
 	if err != nil {
 		return nil, fmt.Errorf("failed to delete secret list from namespace: %v", err)
 	}
-	err = nc.federatedApiClient.Extensions().Ingresses(namespace.Name).DeleteCollection(&apiv1.DeleteOptions{}, metav1.ListOptions{})
+	err = nc.federatedApiClient.Extensions().Ingresses(namespace.Name).DeleteCollection(&metav1.DeleteOptions{}, metav1.ListOptions{})
 	if err != nil {
 		return nil, fmt.Errorf("failed to delete ingresses list from namespace: %v", err)
 	}
-	err = nc.federatedApiClient.Extensions().DaemonSets(namespace.Name).DeleteCollection(&apiv1.DeleteOptions{}, metav1.ListOptions{})
+	err = nc.federatedApiClient.Extensions().DaemonSets(namespace.Name).DeleteCollection(&metav1.DeleteOptions{}, metav1.ListOptions{})
 	if err != nil {
 		return nil, fmt.Errorf("failed to delete daemonsets list from namespace: %v", err)
 	}
-	err = nc.federatedApiClient.Extensions().Deployments(namespace.Name).DeleteCollection(&apiv1.DeleteOptions{}, metav1.ListOptions{})
+	err = nc.federatedApiClient.Extensions().Deployments(namespace.Name).DeleteCollection(&metav1.DeleteOptions{}, metav1.ListOptions{})
 	if err != nil {
 		return nil, fmt.Errorf("failed to delete deployments list from namespace: %v", err)
 	}
-	err = nc.federatedApiClient.Core().Events(namespace.Name).DeleteCollection(&apiv1.DeleteOptions{}, metav1.ListOptions{})
+	err = nc.federatedApiClient.Core().Events(namespace.Name).DeleteCollection(&metav1.DeleteOptions{}, metav1.ListOptions{})
 	if err != nil {
 		return nil, fmt.Errorf("failed to delete events list from namespace: %v", err)
 	}

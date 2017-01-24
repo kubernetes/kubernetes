@@ -18,9 +18,10 @@ limitations under the License.
 package stubs
 
 import (
+	"strings"
+
 	etcd "github.com/coreos/etcd/client"
 	"golang.org/x/net/context"
-	"strings"
 )
 
 // Compile time check for interface conformance

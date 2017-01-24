@@ -374,7 +374,7 @@ func deletePodsSync(f *framework.Framework, pods []*v1.Pod) {
 		go func(pod *v1.Pod) {
 			defer wg.Done()
 
-			err := f.PodClient().Delete(pod.ObjectMeta.Name, v1.NewDeleteOptions(30))
+			err := f.PodClient().Delete(pod.ObjectMeta.Name, metav1.NewDeleteOptions(30))
 			Expect(err).NotTo(HaveOccurred())
 
 			Expect(framework.WaitForPodToDisappear(f.ClientSet, f.Namespace.Name, pod.ObjectMeta.Name, labels.Everything(),

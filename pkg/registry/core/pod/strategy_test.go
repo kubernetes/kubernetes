@@ -210,7 +210,7 @@ func TestCheckGracefulDelete(t *testing.T) {
 		},
 	}
 	for _, tc := range tcs {
-		out := &api.DeleteOptions{GracePeriodSeconds: &defaultGracePeriod}
+		out := &metav1.DeleteOptions{GracePeriodSeconds: &defaultGracePeriod}
 		Strategy.CheckGracefulDelete(genericapirequest.NewContext(), tc.in, out)
 		if out.GracePeriodSeconds == nil {
 			t.Errorf("out grace period was nil but supposed to be %v", tc.gracePeriod)

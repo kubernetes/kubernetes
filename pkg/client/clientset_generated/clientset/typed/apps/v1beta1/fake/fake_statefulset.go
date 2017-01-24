@@ -17,12 +17,11 @@ limitations under the License.
 package fake
 
 import (
-	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	labels "k8s.io/apimachinery/pkg/labels"
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
-	v1 "k8s.io/kubernetes/pkg/api/v1"
 	v1beta1 "k8s.io/kubernetes/pkg/apis/apps/v1beta1"
 	core "k8s.io/kubernetes/pkg/client/testing/core"
 )
@@ -72,14 +71,14 @@ func (c *FakeStatefulSets) Delete(name string, options *v1.DeleteOptions) error 
 	return err
 }
 
-func (c *FakeStatefulSets) DeleteCollection(options *v1.DeleteOptions, listOptions meta_v1.ListOptions) error {
+func (c *FakeStatefulSets) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
 	action := core.NewDeleteCollectionAction(statefulsetsResource, c.ns, listOptions)
 
 	_, err := c.Fake.Invokes(action, &v1beta1.StatefulSetList{})
 	return err
 }
 
-func (c *FakeStatefulSets) Get(name string, options meta_v1.GetOptions) (result *v1beta1.StatefulSet, err error) {
+func (c *FakeStatefulSets) Get(name string, options v1.GetOptions) (result *v1beta1.StatefulSet, err error) {
 	obj, err := c.Fake.
 		Invokes(core.NewGetAction(statefulsetsResource, c.ns, name), &v1beta1.StatefulSet{})
 
@@ -89,7 +88,7 @@ func (c *FakeStatefulSets) Get(name string, options meta_v1.GetOptions) (result 
 	return obj.(*v1beta1.StatefulSet), err
 }
 
-func (c *FakeStatefulSets) List(opts meta_v1.ListOptions) (result *v1beta1.StatefulSetList, err error) {
+func (c *FakeStatefulSets) List(opts v1.ListOptions) (result *v1beta1.StatefulSetList, err error) {
 	obj, err := c.Fake.
 		Invokes(core.NewListAction(statefulsetsResource, c.ns, opts), &v1beta1.StatefulSetList{})
 
@@ -111,7 +110,7 @@ func (c *FakeStatefulSets) List(opts meta_v1.ListOptions) (result *v1beta1.State
 }
 
 // Watch returns a watch.Interface that watches the requested statefulSets.
-func (c *FakeStatefulSets) Watch(opts meta_v1.ListOptions) (watch.Interface, error) {
+func (c *FakeStatefulSets) Watch(opts v1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
 		InvokesWatch(core.NewWatchAction(statefulsetsResource, c.ns, opts))
 

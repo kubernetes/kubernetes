@@ -35,8 +35,8 @@ type RolesGetter interface {
 type RoleInterface interface {
 	Create(*rbac.Role) (*rbac.Role, error)
 	Update(*rbac.Role) (*rbac.Role, error)
-	Delete(name string, options *api.DeleteOptions) error
-	DeleteCollection(options *api.DeleteOptions, listOptions v1.ListOptions) error
+	Delete(name string, options *v1.DeleteOptions) error
+	DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error
 	Get(name string, options v1.GetOptions) (*rbac.Role, error)
 	List(opts v1.ListOptions) (*rbac.RoleList, error)
 	Watch(opts v1.ListOptions) (watch.Interface, error)
@@ -84,7 +84,7 @@ func (c *roles) Update(role *rbac.Role) (result *rbac.Role, err error) {
 }
 
 // Delete takes name of the role and deletes it. Returns an error if one occurs.
-func (c *roles) Delete(name string, options *api.DeleteOptions) error {
+func (c *roles) Delete(name string, options *v1.DeleteOptions) error {
 	return c.client.Delete().
 		Namespace(c.ns).
 		Resource("roles").
@@ -95,7 +95,7 @@ func (c *roles) Delete(name string, options *api.DeleteOptions) error {
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *roles) DeleteCollection(options *api.DeleteOptions, listOptions v1.ListOptions) error {
+func (c *roles) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
 	return c.client.Delete().
 		Namespace(c.ns).
 		Resource("roles").

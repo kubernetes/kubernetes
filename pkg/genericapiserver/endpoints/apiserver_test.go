@@ -120,7 +120,7 @@ func newMapper() *meta.DefaultRESTMapper {
 func addGrouplessTypes() {
 	api.Scheme.AddKnownTypes(grouplessGroupVersion,
 		&genericapitesting.Simple{}, &genericapitesting.SimpleList{}, &metav1.ListOptions{}, &metav1.ExportOptions{},
-		&v1.DeleteOptions{}, &genericapitesting.SimpleGetOptions{}, &genericapitesting.SimpleRoot{})
+		&metav1.DeleteOptions{}, &genericapitesting.SimpleGetOptions{}, &genericapitesting.SimpleRoot{})
 	api.Scheme.AddKnownTypes(grouplessInternalGroupVersion,
 		&genericapitesting.Simple{}, &genericapitesting.SimpleList{}, &metav1.ExportOptions{},
 		&genericapitesting.SimpleGetOptions{}, &genericapitesting.SimpleRoot{})
@@ -138,7 +138,7 @@ func addTestTypes() {
 	}
 	api.Scheme.AddKnownTypes(testGroupVersion,
 		&genericapitesting.Simple{}, &genericapitesting.SimpleList{}, &metav1.ExportOptions{},
-		&v1.DeleteOptions{}, &genericapitesting.SimpleGetOptions{}, &genericapitesting.SimpleRoot{},
+		&metav1.DeleteOptions{}, &genericapitesting.SimpleGetOptions{}, &genericapitesting.SimpleRoot{},
 		&SimpleXGSubresource{})
 	api.Scheme.AddKnownTypes(testGroupVersion, &v1.Pod{})
 	api.Scheme.AddKnownTypes(testInternalGroupVersion,
@@ -157,7 +157,7 @@ func addTestTypes() {
 func addNewTestTypes() {
 	api.Scheme.AddKnownTypes(newGroupVersion,
 		&genericapitesting.Simple{}, &genericapitesting.SimpleList{}, &metav1.ExportOptions{},
-		&api.DeleteOptions{}, &genericapitesting.SimpleGetOptions{}, &genericapitesting.SimpleRoot{},
+		&metav1.DeleteOptions{}, &genericapitesting.SimpleGetOptions{}, &genericapitesting.SimpleRoot{},
 		&v1.Pod{},
 	)
 	metav1.AddToGroupVersion(api.Scheme, newGroupVersion)
@@ -338,7 +338,7 @@ type SimpleRESTStorage struct {
 	stream *SimpleStream
 
 	deleted       string
-	deleteOptions *api.DeleteOptions
+	deleteOptions *metav1.DeleteOptions
 
 	actualNamespace  string
 	namespacePresent bool
@@ -439,7 +439,7 @@ func (storage *SimpleRESTStorage) checkContext(ctx request.Context) {
 	storage.actualNamespace, storage.namespacePresent = request.NamespaceFrom(ctx)
 }
 
-func (storage *SimpleRESTStorage) Delete(ctx request.Context, id string, options *api.DeleteOptions) (runtime.Object, error) {
+func (storage *SimpleRESTStorage) Delete(ctx request.Context, id string, options *metav1.DeleteOptions) (runtime.Object, error) {
 	storage.checkContext(ctx)
 	storage.deleted = id
 	storage.deleteOptions = options
@@ -1942,7 +1942,7 @@ func TestDeleteWithOptions(t *testing.T) {
 	defer server.Close()
 
 	grace := int64(300)
-	item := &api.DeleteOptions{
+	item := &metav1.DeleteOptions{
 		GracePeriodSeconds: &grace,
 	}
 	body, err := runtime.Encode(codec, item)
@@ -1983,7 +1983,7 @@ func TestDeleteWithOptionsQuery(t *testing.T) {
 	defer server.Close()
 
 	grace := int64(300)
-	item := &api.DeleteOptions{
+	item := &metav1.DeleteOptions{
 		GracePeriodSeconds: &grace,
 	}
 
@@ -2020,7 +2020,7 @@ func TestDeleteWithOptionsQueryAndBody(t *testing.T) {
 	defer server.Close()
 
 	grace := int64(300)
-	item := &api.DeleteOptions{
+	item := &metav1.DeleteOptions{
 		GracePeriodSeconds: &grace,
 	}
 	body, err := runtime.Encode(codec, item)
@@ -2086,7 +2086,7 @@ func TestLegacyDeleteIgnoresOptions(t *testing.T) {
 	server := httptest.NewServer(handler)
 	defer server.Close()
 
-	item := api.NewDeleteOptions(300)
+	item := metav1.NewDeleteOptions(300)
 	body, err := runtime.Encode(codec, item)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)

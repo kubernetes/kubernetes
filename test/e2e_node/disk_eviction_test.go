@@ -97,9 +97,9 @@ var _ = framework.KubeDescribe("Kubelet Eviction Manager [Serial] [Disruptive]",
 				if !isImageSupported() || !evictionOptionIsSet() { // Skip the after each
 					return
 				}
-				podClient.DeleteSync(busyPodName, &v1.DeleteOptions{}, podDisappearTimeout)
-				podClient.DeleteSync(idlePodName, &v1.DeleteOptions{}, podDisappearTimeout)
-				podClient.DeleteSync(verifyPodName, &v1.DeleteOptions{}, podDisappearTimeout)
+				podClient.DeleteSync(busyPodName, &metav1.DeleteOptions{}, podDisappearTimeout)
+				podClient.DeleteSync(idlePodName, &metav1.DeleteOptions{}, podDisappearTimeout)
+				podClient.DeleteSync(verifyPodName, &metav1.DeleteOptions{}, podDisappearTimeout)
 
 				// Wait for 2 container gc loop to ensure that the containers are deleted. The containers
 				// created in this test consume a lot of disk, we don't want them to trigger disk eviction

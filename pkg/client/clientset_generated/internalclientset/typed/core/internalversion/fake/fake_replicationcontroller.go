@@ -64,14 +64,14 @@ func (c *FakeReplicationControllers) UpdateStatus(replicationController *api.Rep
 	return obj.(*api.ReplicationController), err
 }
 
-func (c *FakeReplicationControllers) Delete(name string, options *api.DeleteOptions) error {
+func (c *FakeReplicationControllers) Delete(name string, options *v1.DeleteOptions) error {
 	_, err := c.Fake.
 		Invokes(core.NewDeleteAction(replicationcontrollersResource, c.ns, name), &api.ReplicationController{})
 
 	return err
 }
 
-func (c *FakeReplicationControllers) DeleteCollection(options *api.DeleteOptions, listOptions v1.ListOptions) error {
+func (c *FakeReplicationControllers) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
 	action := core.NewDeleteCollectionAction(replicationcontrollersResource, c.ns, listOptions)
 
 	_, err := c.Fake.Invokes(action, &api.ReplicationControllerList{})

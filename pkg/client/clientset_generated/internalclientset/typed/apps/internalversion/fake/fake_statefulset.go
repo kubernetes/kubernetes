@@ -22,7 +22,6 @@ import (
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
-	api "k8s.io/kubernetes/pkg/api"
 	apps "k8s.io/kubernetes/pkg/apis/apps"
 	core "k8s.io/kubernetes/pkg/client/testing/core"
 )
@@ -65,14 +64,14 @@ func (c *FakeStatefulSets) UpdateStatus(statefulSet *apps.StatefulSet) (*apps.St
 	return obj.(*apps.StatefulSet), err
 }
 
-func (c *FakeStatefulSets) Delete(name string, options *api.DeleteOptions) error {
+func (c *FakeStatefulSets) Delete(name string, options *v1.DeleteOptions) error {
 	_, err := c.Fake.
 		Invokes(core.NewDeleteAction(statefulsetsResource, c.ns, name), &apps.StatefulSet{})
 
 	return err
 }
 
-func (c *FakeStatefulSets) DeleteCollection(options *api.DeleteOptions, listOptions v1.ListOptions) error {
+func (c *FakeStatefulSets) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
 	action := core.NewDeleteCollectionAction(statefulsetsResource, c.ns, listOptions)
 
 	_, err := c.Fake.Invokes(action, &apps.StatefulSetList{})

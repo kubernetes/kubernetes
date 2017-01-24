@@ -36,8 +36,8 @@ type PodDisruptionBudgetInterface interface {
 	Create(*policy.PodDisruptionBudget) (*policy.PodDisruptionBudget, error)
 	Update(*policy.PodDisruptionBudget) (*policy.PodDisruptionBudget, error)
 	UpdateStatus(*policy.PodDisruptionBudget) (*policy.PodDisruptionBudget, error)
-	Delete(name string, options *api.DeleteOptions) error
-	DeleteCollection(options *api.DeleteOptions, listOptions v1.ListOptions) error
+	Delete(name string, options *v1.DeleteOptions) error
+	DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error
 	Get(name string, options v1.GetOptions) (*policy.PodDisruptionBudget, error)
 	List(opts v1.ListOptions) (*policy.PodDisruptionBudgetList, error)
 	Watch(opts v1.ListOptions) (watch.Interface, error)
@@ -101,7 +101,7 @@ func (c *podDisruptionBudgets) UpdateStatus(podDisruptionBudget *policy.PodDisru
 }
 
 // Delete takes name of the podDisruptionBudget and deletes it. Returns an error if one occurs.
-func (c *podDisruptionBudgets) Delete(name string, options *api.DeleteOptions) error {
+func (c *podDisruptionBudgets) Delete(name string, options *v1.DeleteOptions) error {
 	return c.client.Delete().
 		Namespace(c.ns).
 		Resource("poddisruptionbudgets").
@@ -112,7 +112,7 @@ func (c *podDisruptionBudgets) Delete(name string, options *api.DeleteOptions) e
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *podDisruptionBudgets) DeleteCollection(options *api.DeleteOptions, listOptions v1.ListOptions) error {
+func (c *podDisruptionBudgets) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
 	return c.client.Delete().
 		Namespace(c.ns).
 		Resource("poddisruptionbudgets").

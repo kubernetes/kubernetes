@@ -35,8 +35,8 @@ type ThirdPartyResourcesGetter interface {
 type ThirdPartyResourceInterface interface {
 	Create(*extensions.ThirdPartyResource) (*extensions.ThirdPartyResource, error)
 	Update(*extensions.ThirdPartyResource) (*extensions.ThirdPartyResource, error)
-	Delete(name string, options *api.DeleteOptions) error
-	DeleteCollection(options *api.DeleteOptions, listOptions v1.ListOptions) error
+	Delete(name string, options *v1.DeleteOptions) error
+	DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error
 	Get(name string, options v1.GetOptions) (*extensions.ThirdPartyResource, error)
 	List(opts v1.ListOptions) (*extensions.ThirdPartyResourceList, error)
 	Watch(opts v1.ListOptions) (watch.Interface, error)
@@ -80,7 +80,7 @@ func (c *thirdPartyResources) Update(thirdPartyResource *extensions.ThirdPartyRe
 }
 
 // Delete takes name of the thirdPartyResource and deletes it. Returns an error if one occurs.
-func (c *thirdPartyResources) Delete(name string, options *api.DeleteOptions) error {
+func (c *thirdPartyResources) Delete(name string, options *v1.DeleteOptions) error {
 	return c.client.Delete().
 		Resource("thirdpartyresources").
 		Name(name).
@@ -90,7 +90,7 @@ func (c *thirdPartyResources) Delete(name string, options *api.DeleteOptions) er
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *thirdPartyResources) DeleteCollection(options *api.DeleteOptions, listOptions v1.ListOptions) error {
+func (c *thirdPartyResources) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
 	return c.client.Delete().
 		Resource("thirdpartyresources").
 		VersionedParams(&listOptions, api.ParameterCodec).

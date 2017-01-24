@@ -17,12 +17,11 @@ limitations under the License.
 package fake
 
 import (
-	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	labels "k8s.io/apimachinery/pkg/labels"
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
-	v1 "k8s.io/kubernetes/pkg/api/v1"
 	v2alpha1 "k8s.io/kubernetes/pkg/apis/batch/v2alpha1"
 	core "k8s.io/kubernetes/pkg/client/testing/core"
 )
@@ -72,14 +71,14 @@ func (c *FakeJobs) Delete(name string, options *v1.DeleteOptions) error {
 	return err
 }
 
-func (c *FakeJobs) DeleteCollection(options *v1.DeleteOptions, listOptions meta_v1.ListOptions) error {
+func (c *FakeJobs) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
 	action := core.NewDeleteCollectionAction(jobsResource, c.ns, listOptions)
 
 	_, err := c.Fake.Invokes(action, &v2alpha1.JobList{})
 	return err
 }
 
-func (c *FakeJobs) Get(name string, options meta_v1.GetOptions) (result *v2alpha1.Job, err error) {
+func (c *FakeJobs) Get(name string, options v1.GetOptions) (result *v2alpha1.Job, err error) {
 	obj, err := c.Fake.
 		Invokes(core.NewGetAction(jobsResource, c.ns, name), &v2alpha1.Job{})
 
@@ -89,7 +88,7 @@ func (c *FakeJobs) Get(name string, options meta_v1.GetOptions) (result *v2alpha
 	return obj.(*v2alpha1.Job), err
 }
 
-func (c *FakeJobs) List(opts meta_v1.ListOptions) (result *v2alpha1.JobList, err error) {
+func (c *FakeJobs) List(opts v1.ListOptions) (result *v2alpha1.JobList, err error) {
 	obj, err := c.Fake.
 		Invokes(core.NewListAction(jobsResource, c.ns, opts), &v2alpha1.JobList{})
 
@@ -111,7 +110,7 @@ func (c *FakeJobs) List(opts meta_v1.ListOptions) (result *v2alpha1.JobList, err
 }
 
 // Watch returns a watch.Interface that watches the requested jobs.
-func (c *FakeJobs) Watch(opts meta_v1.ListOptions) (watch.Interface, error) {
+func (c *FakeJobs) Watch(opts v1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
 		InvokesWatch(core.NewWatchAction(jobsResource, c.ns, opts))
 

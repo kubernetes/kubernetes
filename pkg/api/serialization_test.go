@@ -182,6 +182,8 @@ var nonRoundTrippableTypes = sets.NewString(
 	"WatchEvent",
 	// ListOptions is now part of the meta group
 	"ListOptions",
+	// Delete options is only read in metav1
+	"DeleteOptions",
 )
 
 var commonKinds = []string{"Status", "ListOptions", "DeleteOptions", "ExportOptions"}

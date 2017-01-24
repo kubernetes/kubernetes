@@ -67,7 +67,6 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 		&api.Service{},
 		&api.Namespace{},
 		&api.NamespaceList{},
-		&api.DeleteOptions{},
 		&api.Secret{},
 		&api.SecretList{},
 		&api.Event{},
@@ -78,7 +77,6 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 
 	// Register Unversioned types under their own special group
 	scheme.AddUnversionedTypes(Unversioned,
-		&metav1.ExportOptions{},
 		&metav1.Status{},
 		&metav1.APIVersions{},
 		&metav1.APIGroupList{},

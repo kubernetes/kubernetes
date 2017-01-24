@@ -103,7 +103,7 @@ var _ = framework.KubeDescribe("[Feature:Federation]", func() {
 				By(fmt.Sprintf("Creation of service %q in namespace %q succeeded.  Deleting service.", service.Name, nsName))
 
 				// Cleanup
-				err := f.FederationClientset.Services(nsName).Delete(service.Name, &v1.DeleteOptions{})
+				err := f.FederationClientset.Services(nsName).Delete(service.Name, &metav1.DeleteOptions{})
 				framework.ExpectNoError(err, "Error deleting service %q in namespace %q", service.Name, service.Namespace)
 				By(fmt.Sprintf("Deletion of service %q in namespace %q succeeded.", service.Name, nsName))
 			})
@@ -115,7 +115,7 @@ var _ = framework.KubeDescribe("[Feature:Federation]", func() {
 				service = createServiceOrFail(f.FederationClientset, nsName, FederatedServiceName)
 				defer func() { // Cleanup
 					By(fmt.Sprintf("Deleting service %q in namespace %q", service.Name, nsName))
-					err := f.FederationClientset.Services(nsName).Delete(service.Name, &v1.DeleteOptions{})
+					err := f.FederationClientset.Services(nsName).Delete(service.Name, &metav1.DeleteOptions{})
 					framework.ExpectNoError(err, "Error deleting service %q in namespace %q", service.Name, nsName)
 				}()
 				waitForServiceShardsOrFail(nsName, service, clusters)
@@ -259,7 +259,7 @@ var _ = framework.KubeDescribe("[Feature:Federation]", func() {
 				By("Verified that DNS rules are working as expected")
 
 				By("Deleting the service to verify that DNS rules still work")
-				err := f.FederationClientset.Services(nsName).Delete(FederatedServiceName, &v1.DeleteOptions{})
+				err := f.FederationClientset.Services(nsName).Delete(FederatedServiceName, &metav1.DeleteOptions{})
 				framework.ExpectNoError(err, "Error deleting service %q in namespace %q", service.Name, service.Namespace)
 				// Service is deleted, unset the test block-global service variable.
 				service = nil

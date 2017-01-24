@@ -160,7 +160,7 @@ func (m *FakeNodeHandler) List(opts metav1.ListOptions) (*v1.NodeList, error) {
 }
 
 // Delete delets a Node from the fake store.
-func (m *FakeNodeHandler) Delete(id string, opt *v1.DeleteOptions) error {
+func (m *FakeNodeHandler) Delete(id string, opt *metav1.DeleteOptions) error {
 	m.lock.Lock()
 	defer func() {
 		m.RequestCount++
@@ -174,7 +174,7 @@ func (m *FakeNodeHandler) Delete(id string, opt *v1.DeleteOptions) error {
 }
 
 // DeleteCollection deletes a collection of Nodes from the fake store.
-func (m *FakeNodeHandler) DeleteCollection(opt *v1.DeleteOptions, listOpts metav1.ListOptions) error {
+func (m *FakeNodeHandler) DeleteCollection(opt *metav1.DeleteOptions, listOpts metav1.ListOptions) error {
 	return nil
 }
 

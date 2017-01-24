@@ -36,8 +36,8 @@ type CronJobInterface interface {
 	Create(*batch.CronJob) (*batch.CronJob, error)
 	Update(*batch.CronJob) (*batch.CronJob, error)
 	UpdateStatus(*batch.CronJob) (*batch.CronJob, error)
-	Delete(name string, options *api.DeleteOptions) error
-	DeleteCollection(options *api.DeleteOptions, listOptions v1.ListOptions) error
+	Delete(name string, options *v1.DeleteOptions) error
+	DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error
 	Get(name string, options v1.GetOptions) (*batch.CronJob, error)
 	List(opts v1.ListOptions) (*batch.CronJobList, error)
 	Watch(opts v1.ListOptions) (watch.Interface, error)
@@ -101,7 +101,7 @@ func (c *cronJobs) UpdateStatus(cronJob *batch.CronJob) (result *batch.CronJob, 
 }
 
 // Delete takes name of the cronJob and deletes it. Returns an error if one occurs.
-func (c *cronJobs) Delete(name string, options *api.DeleteOptions) error {
+func (c *cronJobs) Delete(name string, options *v1.DeleteOptions) error {
 	return c.client.Delete().
 		Namespace(c.ns).
 		Resource("cronjobs").
@@ -112,7 +112,7 @@ func (c *cronJobs) Delete(name string, options *api.DeleteOptions) error {
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *cronJobs) DeleteCollection(options *api.DeleteOptions, listOptions v1.ListOptions) error {
+func (c *cronJobs) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
 	return c.client.Delete().
 		Namespace(c.ns).
 		Resource("cronjobs").

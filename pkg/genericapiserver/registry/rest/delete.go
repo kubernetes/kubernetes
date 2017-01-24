@@ -25,7 +25,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
-	"k8s.io/kubernetes/pkg/api"
 )
 
 // RESTDeleteStrategy defines deletion behavior on an object that follows Kubernetes
@@ -53,7 +52,7 @@ type GarbageCollectionDeleteStrategy interface {
 type RESTGracefulDeleteStrategy interface {
 	// CheckGracefulDelete should return true if the object can be gracefully deleted and set
 	// any default values on the DeleteOptions.
-	CheckGracefulDelete(ctx genericapirequest.Context, obj runtime.Object, options *api.DeleteOptions) bool
+	CheckGracefulDelete(ctx genericapirequest.Context, obj runtime.Object, options *metav1.DeleteOptions) bool
 }
 
 // BeforeDelete tests whether the object can be gracefully deleted. If graceful is set the object
@@ -62,7 +61,7 @@ type RESTGracefulDeleteStrategy interface {
 // condition cannot be checked or the gracePeriodSeconds is invalid. The options argument may be updated with
 // default values if graceful is true. Second place where we set deletionTimestamp is pkg/registry/generic/registry/store.go
 // this function is responsible for setting deletionTimestamp during gracefulDeletion, other one for cascading deletions.
-func BeforeDelete(strategy RESTDeleteStrategy, ctx genericapirequest.Context, obj runtime.Object, options *api.DeleteOptions) (graceful, gracefulPending bool, err error) {
+func BeforeDelete(strategy RESTDeleteStrategy, ctx genericapirequest.Context, obj runtime.Object, options *metav1.DeleteOptions) (graceful, gracefulPending bool, err error) {
 	objectMeta, gvk, kerr := objectMetaAndKind(strategy, obj)
 	if kerr != nil {
 		return false, false, kerr

@@ -308,7 +308,7 @@ func (t *dnsConfigMapTest) createUtilPod() {
 
 func (t *dnsConfigMapTest) deleteUtilPod() {
 	podClient := t.c.Core().Pods(t.f.Namespace.Name)
-	if err := podClient.Delete(t.utilPod.Name, v1.NewDeleteOptions(0)); err != nil {
+	if err := podClient.Delete(t.utilPod.Name, metav1.NewDeleteOptions(0)); err != nil {
 		framework.Logf("Delete of pod %v:%v failed: %v",
 			t.utilPod.Namespace, t.utilPod.Name, err)
 	}

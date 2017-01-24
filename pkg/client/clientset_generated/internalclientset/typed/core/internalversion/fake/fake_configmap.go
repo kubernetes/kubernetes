@@ -54,14 +54,14 @@ func (c *FakeConfigMaps) Update(configMap *api.ConfigMap) (result *api.ConfigMap
 	return obj.(*api.ConfigMap), err
 }
 
-func (c *FakeConfigMaps) Delete(name string, options *api.DeleteOptions) error {
+func (c *FakeConfigMaps) Delete(name string, options *v1.DeleteOptions) error {
 	_, err := c.Fake.
 		Invokes(core.NewDeleteAction(configmapsResource, c.ns, name), &api.ConfigMap{})
 
 	return err
 }
 
-func (c *FakeConfigMaps) DeleteCollection(options *api.DeleteOptions, listOptions v1.ListOptions) error {
+func (c *FakeConfigMaps) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
 	action := core.NewDeleteCollectionAction(configmapsResource, c.ns, listOptions)
 
 	_, err := c.Fake.Invokes(action, &api.ConfigMapList{})

@@ -35,8 +35,8 @@ type ServiceInterface interface {
 	Create(*api.Service) (*api.Service, error)
 	Update(*api.Service) (*api.Service, error)
 	UpdateStatus(*api.Service) (*api.Service, error)
-	Delete(name string, options *api.DeleteOptions) error
-	DeleteCollection(options *api.DeleteOptions, listOptions v1.ListOptions) error
+	Delete(name string, options *v1.DeleteOptions) error
+	DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error
 	Get(name string, options v1.GetOptions) (*api.Service, error)
 	List(opts v1.ListOptions) (*api.ServiceList, error)
 	Watch(opts v1.ListOptions) (watch.Interface, error)
@@ -100,7 +100,7 @@ func (c *services) UpdateStatus(service *api.Service) (result *api.Service, err 
 }
 
 // Delete takes name of the service and deletes it. Returns an error if one occurs.
-func (c *services) Delete(name string, options *api.DeleteOptions) error {
+func (c *services) Delete(name string, options *v1.DeleteOptions) error {
 	return c.client.Delete().
 		Namespace(c.ns).
 		Resource("services").
@@ -111,7 +111,7 @@ func (c *services) Delete(name string, options *api.DeleteOptions) error {
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *services) DeleteCollection(options *api.DeleteOptions, listOptions v1.ListOptions) error {
+func (c *services) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
 	return c.client.Delete().
 		Namespace(c.ns).
 		Resource("services").

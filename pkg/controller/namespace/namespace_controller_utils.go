@@ -178,7 +178,7 @@ func deleteCollection(
 	// resource deletions generically.  it will ensure all resources in the namespace are purged prior to releasing
 	// namespace itself.
 	orphanDependents := false
-	err := dynamicClient.Resource(&apiResource, namespace).DeleteCollection(&v1.DeleteOptions{OrphanDependents: &orphanDependents}, &metav1.ListOptions{})
+	err := dynamicClient.Resource(&apiResource, namespace).DeleteCollection(&metav1.DeleteOptions{OrphanDependents: &orphanDependents}, &metav1.ListOptions{})
 
 	if err == nil {
 		return true, nil
@@ -406,10 +406,10 @@ func syncNamespace(
 
 	// if the namespace is already finalized, delete it
 	if finalized(namespace) {
-		var opts *v1.DeleteOptions
+		var opts *metav1.DeleteOptions
 		uid := namespace.UID
 		if len(uid) > 0 {
-			opts = &v1.DeleteOptions{Preconditions: &v1.Preconditions{UID: &uid}}
+			opts = &metav1.DeleteOptions{Preconditions: &metav1.Preconditions{UID: &uid}}
 		}
 		err = kubeClient.Core().Namespaces().Delete(namespace.Name, opts)
 		if err != nil && !errors.IsNotFound(err) {

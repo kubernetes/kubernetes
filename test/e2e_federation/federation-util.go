@@ -170,7 +170,7 @@ func unregisterClusters(clusters map[string]*cluster, f *fedframework.Framework)
 	for name, c := range clusters {
 		if c.namespaceCreated {
 			if _, err := c.Clientset.Core().Namespaces().Get(nsName, metav1.GetOptions{}); !errors.IsNotFound(err) {
-				err := c.Clientset.Core().Namespaces().Delete(nsName, &v1.DeleteOptions{})
+				err := c.Clientset.Core().Namespaces().Delete(nsName, &metav1.DeleteOptions{})
 				framework.ExpectNoError(err, "Couldn't delete the namespace %s in cluster %q: %v", nsName, name, err)
 			}
 			framework.Logf("Namespace %s deleted in cluster %q", nsName, name)
@@ -181,7 +181,7 @@ func unregisterClusters(clusters map[string]*cluster, f *fedframework.Framework)
 	clusterList, err := f.FederationClientset.Federation().Clusters().List(metav1.ListOptions{})
 	framework.ExpectNoError(err, "Error listing clusters")
 	for _, cluster := range clusterList.Items {
-		err := f.FederationClientset.Federation().Clusters().Delete(cluster.Name, &v1.DeleteOptions{})
+		err := f.FederationClientset.Federation().Clusters().Delete(cluster.Name, &metav1.DeleteOptions{})
 		framework.ExpectNoError(err, "Error deleting cluster %q", cluster.Name)
 	}
 }
@@ -291,7 +291,7 @@ func deleteServiceOrFail(clientset *fedclientset.Clientset, namespace string, se
 	if clientset == nil || len(namespace) == 0 || len(serviceName) == 0 {
 		Fail(fmt.Sprintf("Internal error: invalid parameters passed to deleteServiceOrFail: clientset: %v, namespace: %v, service: %v", clientset, namespace, serviceName))
 	}
-	err := clientset.Services(namespace).Delete(serviceName, &v1.DeleteOptions{OrphanDependents: orphanDependents})
+	err := clientset.Services(namespace).Delete(serviceName, &metav1.DeleteOptions{OrphanDependents: orphanDependents})
 	framework.ExpectNoError(err, "Error deleting service %q from namespace %q", serviceName, namespace)
 	// Wait for the service to be deleted.
 	err = wait.Poll(5*time.Second, 3*wait.ForeverTestTimeout, func() (bool, error) {
@@ -345,7 +345,7 @@ func cleanupServiceShardsAndProviderResources(namespace string, service *v1.Serv
 
 func cleanupServiceShard(clientset *kubeclientset.Clientset, clusterName, namespace string, service *v1.Service, timeout time.Duration) error {
 	err := wait.PollImmediate(framework.Poll, timeout, func() (bool, error) {
-		err := clientset.Services(namespace).Delete(service.Name, &v1.DeleteOptions{})
+		err := clientset.Services(namespace).Delete(service.Name, &metav1.DeleteOptions{})
 		if err != nil && !errors.IsNotFound(err) {
 			// Deletion failed with an error, try again.
 			framework.Logf("Failed to delete service %q in namespace %q, in cluster %q", service.Name, namespace, clusterName)
@@ -454,7 +454,7 @@ func discoverService(f *fedframework.Framework, name string, exists bool, podNam
 	By(fmt.Sprintf("Successfully created pod %q in namespace %q", pod.Name, nsName))
 	defer func() {
 		By(fmt.Sprintf("Deleting pod %q from namespace %q", podName, nsName))
-		err := f.ClientSet.Core().Pods(nsName).Delete(podName, v1.NewDeleteOptions(0))
+		err := f.ClientSet.Core().Pods(nsName).Delete(podName, metav1.NewDeleteOptions(0))
 		framework.ExpectNoError(err, "Deleting pod %q from namespace %q", podName, nsName)
 		By(fmt.Sprintf("Deleted pod %q from namespace %q", podName, nsName))
 	}()
@@ -506,7 +506,7 @@ The test fails if there are any errors.
 func deleteOneBackendPodOrFail(c *cluster) {
 	pod := c.backendPod
 	Expect(pod).ToNot(BeNil())
-	err := c.Clientset.Core().Pods(pod.Namespace).Delete(pod.Name, v1.NewDeleteOptions(0))
+	err := c.Clientset.Core().Pods(pod.Namespace).Delete(pod.Name, metav1.NewDeleteOptions(0))
 	if errors.IsNotFound(err) {
 		By(fmt.Sprintf("Pod %q in namespace %q in cluster %q does not exist.  No need to delete it.", pod.Name, pod.Namespace, c.name))
 	} else {

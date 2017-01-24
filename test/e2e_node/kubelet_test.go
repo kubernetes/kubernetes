@@ -112,7 +112,7 @@ var _ = framework.KubeDescribe("Kubelet", func() {
 		})
 
 		It("should be possible to delete", func() {
-			err := podClient.Delete(podName, &v1.DeleteOptions{})
+			err := podClient.Delete(podName, &metav1.DeleteOptions{})
 			Expect(err).To(BeNil(), fmt.Sprintf("Error deleting Pod %v", err))
 		})
 	})

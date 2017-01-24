@@ -22,7 +22,6 @@ import (
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
-	api "k8s.io/kubernetes/pkg/api"
 	policy "k8s.io/kubernetes/pkg/apis/policy"
 	core "k8s.io/kubernetes/pkg/client/testing/core"
 )
@@ -65,14 +64,14 @@ func (c *FakePodDisruptionBudgets) UpdateStatus(podDisruptionBudget *policy.PodD
 	return obj.(*policy.PodDisruptionBudget), err
 }
 
-func (c *FakePodDisruptionBudgets) Delete(name string, options *api.DeleteOptions) error {
+func (c *FakePodDisruptionBudgets) Delete(name string, options *v1.DeleteOptions) error {
 	_, err := c.Fake.
 		Invokes(core.NewDeleteAction(poddisruptionbudgetsResource, c.ns, name), &policy.PodDisruptionBudget{})
 
 	return err
 }
 
-func (c *FakePodDisruptionBudgets) DeleteCollection(options *api.DeleteOptions, listOptions v1.ListOptions) error {
+func (c *FakePodDisruptionBudgets) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
 	action := core.NewDeleteCollectionAction(poddisruptionbudgetsResource, c.ns, listOptions)
 
 	_, err := c.Fake.Invokes(action, &policy.PodDisruptionBudgetList{})

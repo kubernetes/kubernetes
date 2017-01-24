@@ -17,12 +17,11 @@ limitations under the License.
 package v1beta1
 
 import (
-	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	rest "k8s.io/client-go/rest"
 	api "k8s.io/kubernetes/pkg/api"
-	v1 "k8s.io/kubernetes/pkg/api/v1"
 	v1beta1 "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 )
 
@@ -37,10 +36,10 @@ type ThirdPartyResourceInterface interface {
 	Create(*v1beta1.ThirdPartyResource) (*v1beta1.ThirdPartyResource, error)
 	Update(*v1beta1.ThirdPartyResource) (*v1beta1.ThirdPartyResource, error)
 	Delete(name string, options *v1.DeleteOptions) error
-	DeleteCollection(options *v1.DeleteOptions, listOptions meta_v1.ListOptions) error
-	Get(name string, options meta_v1.GetOptions) (*v1beta1.ThirdPartyResource, error)
-	List(opts meta_v1.ListOptions) (*v1beta1.ThirdPartyResourceList, error)
-	Watch(opts meta_v1.ListOptions) (watch.Interface, error)
+	DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error
+	Get(name string, options v1.GetOptions) (*v1beta1.ThirdPartyResource, error)
+	List(opts v1.ListOptions) (*v1beta1.ThirdPartyResourceList, error)
+	Watch(opts v1.ListOptions) (watch.Interface, error)
 	Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v1beta1.ThirdPartyResource, err error)
 	ThirdPartyResourceExpansion
 }
@@ -91,7 +90,7 @@ func (c *thirdPartyResources) Delete(name string, options *v1.DeleteOptions) err
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *thirdPartyResources) DeleteCollection(options *v1.DeleteOptions, listOptions meta_v1.ListOptions) error {
+func (c *thirdPartyResources) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
 	return c.client.Delete().
 		Resource("thirdpartyresources").
 		VersionedParams(&listOptions, api.ParameterCodec).
@@ -101,7 +100,7 @@ func (c *thirdPartyResources) DeleteCollection(options *v1.DeleteOptions, listOp
 }
 
 // Get takes name of the thirdPartyResource, and returns the corresponding thirdPartyResource object, and an error if there is any.
-func (c *thirdPartyResources) Get(name string, options meta_v1.GetOptions) (result *v1beta1.ThirdPartyResource, err error) {
+func (c *thirdPartyResources) Get(name string, options v1.GetOptions) (result *v1beta1.ThirdPartyResource, err error) {
 	result = &v1beta1.ThirdPartyResource{}
 	err = c.client.Get().
 		Resource("thirdpartyresources").
@@ -113,7 +112,7 @@ func (c *thirdPartyResources) Get(name string, options meta_v1.GetOptions) (resu
 }
 
 // List takes label and field selectors, and returns the list of ThirdPartyResources that match those selectors.
-func (c *thirdPartyResources) List(opts meta_v1.ListOptions) (result *v1beta1.ThirdPartyResourceList, err error) {
+func (c *thirdPartyResources) List(opts v1.ListOptions) (result *v1beta1.ThirdPartyResourceList, err error) {
 	result = &v1beta1.ThirdPartyResourceList{}
 	err = c.client.Get().
 		Resource("thirdpartyresources").
@@ -124,7 +123,7 @@ func (c *thirdPartyResources) List(opts meta_v1.ListOptions) (result *v1beta1.Th
 }
 
 // Watch returns a watch.Interface that watches the requested thirdPartyResources.
-func (c *thirdPartyResources) Watch(opts meta_v1.ListOptions) (watch.Interface, error) {
+func (c *thirdPartyResources) Watch(opts v1.ListOptions) (watch.Interface, error) {
 	return c.client.Get().
 		Prefix("watch").
 		Resource("thirdpartyresources").
