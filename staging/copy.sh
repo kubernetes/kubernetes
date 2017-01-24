@@ -70,8 +70,6 @@ function save() {
 
 # save everything for which the staging directory is the source of truth
 save "rest"
-# remove the rest/fake until we're authoritative for it (need to update for registry)
-rm -rf ${CLIENT_REPO_TEMP}/rest/fake
 save "tools/auth"
 save "tools/clientcmd"
 save "tools/metrics"
@@ -94,7 +92,6 @@ mkcp "/pkg/client/record" "/pkg/client"
 mkcp "/pkg/client/cache" "/pkg/client"
 # TODO: make this test file not depending on pkg/client/unversioned
 rm "${CLIENT_REPO_TEMP}"/pkg/client/cache/listwatch_test.go
-mkcp "/pkg/client/restclient/fake" "/pkg/client/restclient"
 mkcp "/pkg/client/testing" "/pkg/client"
 # remove this test because it imports the internal clientset
 rm "${CLIENT_REPO_TEMP}"/pkg/client/testing/core/fake_test.go
@@ -190,7 +187,6 @@ mvfolder "pkg/client/clientset_generated/${CLIENTSET}" kubernetes
 mvfolder pkg/client/typed/discovery discovery
 mvfolder pkg/client/typed/dynamic dynamic
 mvfolder pkg/client/record tools/record
-mvfolder pkg/client/restclient/fake rest/fake
 mvfolder pkg/client/cache tools/cache
 mvfolder pkg/client/unversioned/portforward tools/portforward
 mvfolder pkg/client/testing/core testing

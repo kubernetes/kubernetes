@@ -46,7 +46,6 @@ go_test(
         "//pkg/api/testapi:go_default_library",
         "//pkg/api/v1:go_default_library",
         "//pkg/apis/extensions/v1beta1:go_default_library",
-        "//pkg/client/restclient/fake:go_default_library",
         "//pkg/client/typed/dynamic:go_default_library",
         "//pkg/kubectl/cmd/testing:go_default_library",
         "//pkg/kubectl/cmd/util:go_default_library",
@@ -54,6 +53,7 @@ go_test(
         "//vendor:k8s.io/apimachinery/pkg/api/errors",
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
         "//vendor:k8s.io/apimachinery/pkg/util/diff",
+        "//vendor:k8s.io/client-go/rest/fake",
         "//vendor:k8s.io/client-go/tools/clientcmd",
     ],
 )
