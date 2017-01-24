@@ -39,6 +39,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/api/validation"
+	"k8s.io/kubernetes/pkg/apis/apps"
 	"k8s.io/kubernetes/pkg/apis/batch"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/client/typed/discovery"
@@ -288,8 +289,21 @@ func (f *ring1Factory) AttachablePodForObject(object runtime.Object) (*api.Pod, 
 		return nil, err
 	}
 	switch t := object.(type) {
+	case *extensions.ReplicaSet:
+		selector := labels.SelectorFromSet(t.Spec.Selector.MatchLabels)
+		sortBy := func(pods []*v1.Pod) sort.Interface { return sort.Reverse(controller.ActivePods(pods)) }
+		pod, _, err := GetFirstPod(clientset.Core(), t.Namespace, selector, 1*time.Minute, sortBy)
+		return pod, err
 	case *api.ReplicationController:
 		selector := labels.SelectorFromSet(t.Spec.Selector)
+		sortBy := func(pods []*v1.Pod) sort.Interface { return sort.Reverse(controller.ActivePods(pods)) }
+		pod, _, err := GetFirstPod(clientset.Core(), t.Namespace, selector, 1*time.Minute, sortBy)
+		return pod, err
+	case *apps.StatefulSet:
+		selector, err := metav1.LabelSelectorAsSelector(t.Spec.Selector)
+		if err != nil {
+			return nil, fmt.Errorf("invalid label selector: %v", err)
+		}
 		sortBy := func(pods []*v1.Pod) sort.Interface { return sort.Reverse(controller.ActivePods(pods)) }
 		pod, _, err := GetFirstPod(clientset.Core(), t.Namespace, selector, 1*time.Minute, sortBy)
 		return pod, err
