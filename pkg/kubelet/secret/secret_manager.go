@@ -23,6 +23,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api/v1"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
+	"k8s.io/kubernetes/pkg/kubelet/util"
 	storageetcd "k8s.io/kubernetes/pkg/storage/etcd"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -169,7 +170,14 @@ func (s *secretStore) Get(namespace, name string) (*v1.Secret, error) {
 	data.Lock()
 	defer data.Unlock()
 	if data.err != nil || !s.clock.Now().Before(data.lastUpdateTime.Add(s.ttl)) {
-		secret, err := s.kubeClient.Core().Secrets(namespace).Get(name, metav1.GetOptions{})
+		opts := metav1.GetOptions{}
+		if data.secret != nil && data.err == nil {
+			// This is just a periodic refresh of a secret we successfully fetched previously.
+			// In this case, server data from apiserver cache to reduce the load on both
+			// etcd and apiserver (the cache is eventually consistent).
+			util.FromApiserverCache(&opts)
+		}
+		secret, err := s.kubeClient.Core().Secrets(namespace).Get(name, opts)
 		// Update state, unless we got error different than "not-found".
 		if err == nil || apierrors.IsNotFound(err) {
 			// Ignore the update to the older version of a secret.
