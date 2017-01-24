@@ -17,6 +17,7 @@ limitations under the License.
 package fields
 
 import (
+	"bytes"
 	"fmt"
 	"sort"
 	"strings"
@@ -90,7 +91,7 @@ func (t *hasTerm) Requirements() Requirements {
 }
 
 func (t *hasTerm) String() string {
-	return fmt.Sprintf("%v=%v", t.field, t.value)
+	return fmt.Sprintf("%v=%v", t.field, EscapeValue(t.value))
 }
 
 type notHasTerm struct {
@@ -126,7 +127,7 @@ func (t *notHasTerm) Requirements() Requirements {
 }
 
 func (t *notHasTerm) String() string {
-	return fmt.Sprintf("%v!=%v", t.field, t.value)
+	return fmt.Sprintf("%v!=%v", t.field, EscapeValue(t.value))
 }
 
 type andTerm []Selector
@@ -212,6 +213,81 @@ func SelectorFromSet(ls Set) Selector {
 	return andTerm(items)
 }
 
+// valueEscaper prefixes \,= characters with a backslash
+var valueEscaper = strings.NewReplacer(
+	// escape \ characters
+	`\`, `\\`,
+	// then escape , and = characters to allow unambiguous parsing of the value in a fieldSelector
+	`,`, `\,`,
+	`=`, `\=`,
+)
+
+// Escapes an arbitrary literal string for use as a fieldSelector value
+func EscapeValue(s string) string {
+	return valueEscaper.Replace(s)
+}
+
+// InvalidEscapeSequence indicates an error occurred unescaping a field selector
+type InvalidEscapeSequence struct {
+	sequence string
+}
+
+func (i InvalidEscapeSequence) Error() string {
+	return fmt.Sprintf("invalid field selector: invalid escape sequence: %s", i.sequence)
+}
+
+// UnescapedRune indicates an error occurred unescaping a field selector
+type UnescapedRune struct {
+	r rune
+}
+
+func (i UnescapedRune) Error() string {
+	return fmt.Sprintf("invalid field selector: unescaped character in value: %v", i.r)
+}
+
+// Unescapes a fieldSelector value and returns the original literal value.
+// May return the original string if it contains no escaped or special characters.
+func UnescapeValue(s string) (string, error) {
+	// if there's no escaping or special characters, just return to avoid allocation
+	if !strings.ContainsAny(s, `\,=`) {
+		return s, nil
+	}
+
+	v := bytes.NewBuffer(make([]byte, 0, len(s)))
+	inSlash := false
+	for _, c := range s {
+		if inSlash {
+			switch c {
+			case '\\', ',', '=':
+				// omit the \ for recognized escape sequences
+				v.WriteRune(c)
+			default:
+				// error on unrecognized escape sequences
+				return "", InvalidEscapeSequence{sequence: string([]rune{'\\', c})}
+			}
+			inSlash = false
+			continue
+		}
+
+		switch c {
+		case '\\':
+			inSlash = true
+		case ',', '=':
+			// unescaped , and = characters are not allowed in field selector values
+			return "", UnescapedRune{r: c}
+		default:
+			v.WriteRune(c)
+		}
+	}
+
+	// Ending with a single backslash is an invalid sequence
+	if inSlash {
+		return "", InvalidEscapeSequence{sequence: "\\"}
+	}
+
+	return v.String(), nil
+}
+
 // ParseSelectorOrDie takes a string representing a selector and returns an
 // object suitable for matching, or panic when an error occur.
 func ParseSelectorOrDie(s string) Selector {
@@ -239,29 +315,83 @@ func ParseAndTransformSelector(selector string, fn TransformFunc) (Selector, err
 // Function to transform selectors.
 type TransformFunc func(field, value string) (newField, newValue string, err error)
 
-func try(selectorPiece, op string) (lhs, rhs string, ok bool) {
-	pieces := strings.Split(selectorPiece, op)
-	if len(pieces) == 2 {
-		return pieces[0], pieces[1], true
+// splitTerms returns the comma-separated terms contained in the given fieldSelector.
+// Backslash-escaped commas are treated as data instead of delimiters, and are included in the returned terms, with the leading backslash preserved.
+func splitTerms(fieldSelector string) []string {
+	if len(fieldSelector) == 0 {
+		return nil
 	}
-	return "", "", false
+
+	terms := make([]string, 0, 1)
+	startIndex := 0
+	inSlash := false
+	for i, c := range fieldSelector {
+		switch {
+		case inSlash:
+			inSlash = false
+		case c == '\\':
+			inSlash = true
+		case c == ',':
+			terms = append(terms, fieldSelector[startIndex:i])
+			startIndex = i + 1
+		}
+	}
+
+	terms = append(terms, fieldSelector[startIndex:])
+
+	return terms
+}
+
+const (
+	notEqualOperator    = "!="
+	doubleEqualOperator = "=="
+	equalOperator       = "="
+)
+
+// termOperators holds the recognized operators supported in fieldSelectors.
+// doubleEqualOperator and equal are equivalent, but doubleEqualOperator is checked first
+// to avoid leaving a leading = character on the rhs value.
+var termOperators = []string{notEqualOperator, doubleEqualOperator, equalOperator}
+
+// splitTerm returns the lhs, operator, and rhs parsed from the given term, along with an indicator of whether the parse was successful.
+// no escaping of special characters is supported in the lhs value, so the first occurance of a recognized operator is used as the split point.
+// the literal rhs is returned, and the caller is responsible for applying any desired unescaping.
+func splitTerm(term string) (lhs, op, rhs string, ok bool) {
+	for i := range term {
+		remaining := term[i:]
+		for _, op := range termOperators {
+			if strings.HasPrefix(remaining, op) {
+				return term[0:i], op, term[i+len(op):], true
+			}
+		}
+	}
+	return "", "", "", false
 }
 
 func parseSelector(selector string, fn TransformFunc) (Selector, error) {
-	parts := strings.Split(selector, ",")
+	parts := splitTerms(selector)
 	sort.StringSlice(parts).Sort()
 	var items []Selector
 	for _, part := range parts {
 		if part == "" {
 			continue
 		}
-		if lhs, rhs, ok := try(part, "!="); ok {
-			items = append(items, &notHasTerm{field: lhs, value: rhs})
-		} else if lhs, rhs, ok := try(part, "=="); ok {
-			items = append(items, &hasTerm{field: lhs, value: rhs})
-		} else if lhs, rhs, ok := try(part, "="); ok {
-			items = append(items, &hasTerm{field: lhs, value: rhs})
-		} else {
+		lhs, op, rhs, ok := splitTerm(part)
+		if !ok {
+			return nil, fmt.Errorf("invalid selector: '%s'; can't understand '%s'", selector, part)
+		}
+		unescapedRHS, err := UnescapeValue(rhs)
+		if err != nil {
+			return nil, err
+		}
+		switch op {
+		case notEqualOperator:
+			items = append(items, &notHasTerm{field: lhs, value: unescapedRHS})
+		case doubleEqualOperator:
+			items = append(items, &hasTerm{field: lhs, value: unescapedRHS})
+		case equalOperator:
+			items = append(items, &hasTerm{field: lhs, value: unescapedRHS})
+		default:
 			return nil, fmt.Errorf("invalid selector: '%s'; can't understand '%s'", selector, part)
 		}
 	}
