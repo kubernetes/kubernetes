@@ -21,6 +21,7 @@ package controller
 import (
 	"fmt"
 
+	metainternalversion "k8s.io/apimachinery/pkg/apis/meta/internalversion"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/watch"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
@@ -30,8 +31,8 @@ import (
 
 // Registry is an interface for things that know how to store ReplicationControllers.
 type Registry interface {
-	ListControllers(ctx genericapirequest.Context, options *api.ListOptions) (*api.ReplicationControllerList, error)
-	WatchControllers(ctx genericapirequest.Context, options *api.ListOptions) (watch.Interface, error)
+	ListControllers(ctx genericapirequest.Context, options *metainternalversion.ListOptions) (*api.ReplicationControllerList, error)
+	WatchControllers(ctx genericapirequest.Context, options *metainternalversion.ListOptions) (watch.Interface, error)
 	GetController(ctx genericapirequest.Context, controllerID string, options *metav1.GetOptions) (*api.ReplicationController, error)
 	CreateController(ctx genericapirequest.Context, controller *api.ReplicationController) (*api.ReplicationController, error)
 	UpdateController(ctx genericapirequest.Context, controller *api.ReplicationController) (*api.ReplicationController, error)
@@ -49,7 +50,7 @@ func NewRegistry(s rest.StandardStorage) Registry {
 	return &storage{s}
 }
 
-func (s *storage) ListControllers(ctx genericapirequest.Context, options *api.ListOptions) (*api.ReplicationControllerList, error) {
+func (s *storage) ListControllers(ctx genericapirequest.Context, options *metainternalversion.ListOptions) (*api.ReplicationControllerList, error) {
 	if options != nil && options.FieldSelector != nil && !options.FieldSelector.Empty() {
 		return nil, fmt.Errorf("field selector not supported yet")
 	}
@@ -60,7 +61,7 @@ func (s *storage) ListControllers(ctx genericapirequest.Context, options *api.Li
 	return obj.(*api.ReplicationControllerList), err
 }
 
-func (s *storage) WatchControllers(ctx genericapirequest.Context, options *api.ListOptions) (watch.Interface, error) {
+func (s *storage) WatchControllers(ctx genericapirequest.Context, options *metainternalversion.ListOptions) (watch.Interface, error) {
 	return s.Watch(ctx, options)
 }
 

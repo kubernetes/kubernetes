@@ -28,7 +28,6 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	"k8s.io/kubernetes/cmd/kubeadm/app/images"
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
 	extensions "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
@@ -73,7 +72,7 @@ func CreateClientAndWaitForAPI(file string) (*clientset.Clientset, error) {
 	fmt.Println("[apiclient] Waiting for at least one node to register and become ready")
 	start := time.Now()
 	wait.PollInfinite(apiCallRetryInterval, func() (bool, error) {
-		nodeList, err := client.Nodes().List(v1.ListOptions{})
+		nodeList, err := client.Nodes().List(metav1.ListOptions{})
 		if err != nil {
 			fmt.Println("[apiclient] Temporarily unable to list nodes (will retry)")
 			return false, nil
@@ -107,7 +106,7 @@ func WaitForAPI(client *clientset.Clientset) {
 	start := time.Now()
 	wait.PollInfinite(apiCallRetryInterval, func() (bool, error) {
 		// TODO: use /healthz API instead of this
-		cs, err := client.ComponentStatuses().List(v1.ListOptions{})
+		cs, err := client.ComponentStatuses().List(metav1.ListOptions{})
 		if err != nil {
 			if apierrs.IsForbidden(err) {
 				fmt.Println("[apiclient] Waiting for API server authorization")
@@ -176,7 +175,7 @@ func NewDeployment(deploymentName string, replicas int32, podSpec v1.PodSpec) *e
 // It's safe to do this for alpha, as we don't have HA and there is no way we can get
 // more then one node here (TODO(phase1+) use os.Hostname)
 func findMyself(client *clientset.Clientset) (*v1.Node, error) {
-	nodeList, err := client.Nodes().List(v1.ListOptions{})
+	nodeList, err := client.Nodes().List(metav1.ListOptions{})
 	if err != nil {
 		return nil, fmt.Errorf("unable to list nodes [%v]", err)
 	}
@@ -274,7 +273,7 @@ func createDummyDeployment(client *clientset.Clientset) {
 
 	wait.PollInfinite(apiCallRetryInterval, func() (bool, error) {
 		// TODO: we should check the error, as some cases may be fatal
-		if _, err := client.Extensions().Deployments(api.NamespaceSystem).Create(dummyDeployment); err != nil {
+		if _, err := client.Extensions().Deployments(metav1.NamespaceSystem).Create(dummyDeployment); err != nil {
 			fmt.Printf("[apiclient] Failed to create test deployment [%v] (will retry)\n", err)
 			return false, nil
 		}
@@ -282,7 +281,7 @@ func createDummyDeployment(client *clientset.Clientset) {
 	})
 
 	wait.PollInfinite(apiCallRetryInterval, func() (bool, error) {
-		d, err := client.Extensions().Deployments(api.NamespaceSystem).Get("dummy", metav1.GetOptions{})
+		d, err := client.Extensions().Deployments(metav1.NamespaceSystem).Get("dummy", metav1.GetOptions{})
 		if err != nil {
 			fmt.Printf("[apiclient] Failed to get test deployment [%v] (will retry)\n", err)
 			return false, nil
@@ -296,7 +295,7 @@ func createDummyDeployment(client *clientset.Clientset) {
 	fmt.Println("[apiclient] Test deployment succeeded")
 
 	// TODO: In the future, make sure the ReplicaSet and Pod are garbage collected
-	if err := client.Extensions().Deployments(api.NamespaceSystem).Delete("dummy", &v1.DeleteOptions{}); err != nil {
+	if err := client.Extensions().Deployments(metav1.NamespaceSystem).Delete("dummy", &v1.DeleteOptions{}); err != nil {
 		fmt.Printf("[apiclient] Failed to delete test deployment [%v] (will ignore)\n", err)
 	}
 }

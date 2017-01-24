@@ -137,7 +137,7 @@ var _ = framework.KubeDescribe("Federation deployments [Feature:Federation]", fu
 
 // deleteAllDeploymentsOrFail deletes all deployments in the given namespace name.
 func deleteAllDeploymentsOrFail(clientset *fedclientset.Clientset, nsName string) {
-	deploymentList, err := clientset.Extensions().Deployments(nsName).List(v1.ListOptions{})
+	deploymentList, err := clientset.Extensions().Deployments(nsName).List(metav1.ListOptions{})
 	Expect(err).NotTo(HaveOccurred())
 	orphanDependents := false
 	for _, deployment := range deploymentList.Items {

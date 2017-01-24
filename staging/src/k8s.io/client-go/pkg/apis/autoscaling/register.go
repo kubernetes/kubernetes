@@ -49,7 +49,6 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 		&Scale{},
 		&HorizontalPodAutoscaler{},
 		&HorizontalPodAutoscalerList{},
-		&api.ListOptions{},
 		&api.DeleteOptions{},
 	)
 	return nil

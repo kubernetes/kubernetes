@@ -37,10 +37,10 @@ type PodDisruptionBudgetInterface interface {
 	Update(*policy.PodDisruptionBudget) (*policy.PodDisruptionBudget, error)
 	UpdateStatus(*policy.PodDisruptionBudget) (*policy.PodDisruptionBudget, error)
 	Delete(name string, options *api.DeleteOptions) error
-	DeleteCollection(options *api.DeleteOptions, listOptions api.ListOptions) error
+	DeleteCollection(options *api.DeleteOptions, listOptions v1.ListOptions) error
 	Get(name string, options v1.GetOptions) (*policy.PodDisruptionBudget, error)
-	List(opts api.ListOptions) (*policy.PodDisruptionBudgetList, error)
-	Watch(opts api.ListOptions) (watch.Interface, error)
+	List(opts v1.ListOptions) (*policy.PodDisruptionBudgetList, error)
+	Watch(opts v1.ListOptions) (watch.Interface, error)
 	Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *policy.PodDisruptionBudget, err error)
 	PodDisruptionBudgetExpansion
 }
@@ -112,7 +112,7 @@ func (c *podDisruptionBudgets) Delete(name string, options *api.DeleteOptions) e
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *podDisruptionBudgets) DeleteCollection(options *api.DeleteOptions, listOptions api.ListOptions) error {
+func (c *podDisruptionBudgets) DeleteCollection(options *api.DeleteOptions, listOptions v1.ListOptions) error {
 	return c.client.Delete().
 		Namespace(c.ns).
 		Resource("poddisruptionbudgets").
@@ -136,7 +136,7 @@ func (c *podDisruptionBudgets) Get(name string, options v1.GetOptions) (result *
 }
 
 // List takes label and field selectors, and returns the list of PodDisruptionBudgets that match those selectors.
-func (c *podDisruptionBudgets) List(opts api.ListOptions) (result *policy.PodDisruptionBudgetList, err error) {
+func (c *podDisruptionBudgets) List(opts v1.ListOptions) (result *policy.PodDisruptionBudgetList, err error) {
 	result = &policy.PodDisruptionBudgetList{}
 	err = c.client.Get().
 		Namespace(c.ns).
@@ -148,7 +148,7 @@ func (c *podDisruptionBudgets) List(opts api.ListOptions) (result *policy.PodDis
 }
 
 // Watch returns a watch.Interface that watches the requested podDisruptionBudgets.
-func (c *podDisruptionBudgets) Watch(opts api.ListOptions) (watch.Interface, error) {
+func (c *podDisruptionBudgets) Watch(opts v1.ListOptions) (watch.Interface, error) {
 	return c.client.Get().
 		Prefix("watch").
 		Namespace(c.ns).

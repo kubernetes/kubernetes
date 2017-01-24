@@ -21,6 +21,7 @@ import (
 	"strconv"
 	"time"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -170,7 +171,7 @@ func replacePods(pods []*v1.Pod, store cache.Store) {
 // getContainerRestarts returns the count of container restarts across all pods matching the given labelSelector,
 // and a list of nodenames across which these containers restarted.
 func getContainerRestarts(c clientset.Interface, ns string, labelSelector labels.Selector) (int, []string) {
-	options := v1.ListOptions{LabelSelector: labelSelector.String()}
+	options := metav1.ListOptions{LabelSelector: labelSelector.String()}
 	pods, err := c.Core().Pods(ns).List(options)
 	framework.ExpectNoError(err)
 	failedContainers := 0
@@ -220,12 +221,12 @@ var _ = framework.KubeDescribe("DaemonRestart [Disruptive]", func() {
 		tracker = newPodTracker()
 		newPods, controller = cache.NewInformer(
 			&cache.ListWatch{
-				ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
+				ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
 					options.LabelSelector = labelSelector.String()
 					obj, err := f.ClientSet.Core().Pods(ns).List(options)
 					return runtime.Object(obj), err
 				},
-				WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
+				WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
 					options.LabelSelector = labelSelector.String()
 					return f.ClientSet.Core().Pods(ns).Watch(options)
 				},

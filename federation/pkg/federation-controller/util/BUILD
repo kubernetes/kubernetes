@@ -21,7 +21,6 @@ go_library(
         "handlers.go",
         "meta.go",
         "secret.go",
-        "versionize_listoptions.go",
     ],
     tags = ["automanaged"],
     deps = [

@@ -21,6 +21,7 @@ import (
 	"net"
 	"strings"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/kubernetes/pkg/api"
@@ -219,7 +220,7 @@ func (s *ServerRunOptions) AddUniversalFlags(fs *pflag.FlagSet) {
 		"be excluded from maximum inflight request handling.")
 	fs.MarkDeprecated("long-running-request-regexp", "regular expression matching of long-running requests is no longer supported")
 
-	deprecatedMasterServiceNamespace := api.NamespaceDefault
+	deprecatedMasterServiceNamespace := metav1.NamespaceDefault
 	fs.StringVar(&deprecatedMasterServiceNamespace, "master-service-namespace", deprecatedMasterServiceNamespace, ""+
 		"DEPRECATED: the namespace from which the kubernetes master services should be injected into pods.")
 

@@ -501,7 +501,7 @@ func (config *NetworkingTestConfig) setup(selector map[string]string) {
 
 func (config *NetworkingTestConfig) cleanup() {
 	nsClient := config.getNamespacesClient()
-	nsList, err := nsClient.List(v1.ListOptions{})
+	nsList, err := nsClient.List(metav1.ListOptions{})
 	if err == nil {
 		for _, ns := range nsList.Items {
 			if strings.Contains(ns.Name, config.f.BaseName) && ns.Name != config.Namespace {

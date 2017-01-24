@@ -715,7 +715,7 @@ func (List) SwaggerDoc() map[string]string {
 }
 
 var map_ListOptions = map[string]string{
-	"":                "ListOptions is the query options to a standard REST list call.",
+	"":                "ListOptions is the query options to a standard REST list call. DEPRECATED: This type has been moved to meta/v1 and will be removed soon.",
 	"labelSelector":   "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
 	"fieldSelector":   "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
 	"watch":           "Watch for changes to the described resources and return them as a stream of add, update, and remove notifications. Specify resourceVersion.",

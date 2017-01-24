@@ -71,7 +71,7 @@ func (c *FakeServices) Delete(name string, options *api.DeleteOptions) error {
 	return err
 }
 
-func (c *FakeServices) DeleteCollection(options *api.DeleteOptions, listOptions api.ListOptions) error {
+func (c *FakeServices) DeleteCollection(options *api.DeleteOptions, listOptions v1.ListOptions) error {
 	action := core.NewDeleteCollectionAction(servicesResource, c.ns, listOptions)
 
 	_, err := c.Fake.Invokes(action, &api.ServiceList{})
@@ -88,7 +88,7 @@ func (c *FakeServices) Get(name string, options v1.GetOptions) (result *api.Serv
 	return obj.(*api.Service), err
 }
 
-func (c *FakeServices) List(opts api.ListOptions) (result *api.ServiceList, err error) {
+func (c *FakeServices) List(opts v1.ListOptions) (result *api.ServiceList, err error) {
 	obj, err := c.Fake.
 		Invokes(core.NewListAction(servicesResource, c.ns, opts), &api.ServiceList{})
 
@@ -110,7 +110,7 @@ func (c *FakeServices) List(opts api.ListOptions) (result *api.ServiceList, err 
 }
 
 // Watch returns a watch.Interface that watches the requested services.
-func (c *FakeServices) Watch(opts api.ListOptions) (watch.Interface, error) {
+func (c *FakeServices) Watch(opts v1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
 		InvokesWatch(core.NewWatchAction(servicesResource, c.ns, opts))
 

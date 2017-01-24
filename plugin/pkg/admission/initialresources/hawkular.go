@@ -29,6 +29,7 @@ import (
 
 	"github.com/golang/glog"
 	"github.com/hawkular/hawkular-client-go/metrics"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/api"
 
 	restclient "k8s.io/client-go/rest"
@@ -90,7 +91,7 @@ func (hs *hawkularSource) GetUsagePercentile(kind api.ResourceName, perc int64, 
 	m := make([]metrics.Modifier, len(hs.modifiers), 2+len(hs.modifiers))
 	copy(m, hs.modifiers)
 
-	if namespace != api.NamespaceAll {
+	if namespace != metav1.NamespaceAll {
 		m = append(m, metrics.Tenant(namespace))
 	}
 

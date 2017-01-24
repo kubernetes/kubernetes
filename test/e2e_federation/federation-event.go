@@ -43,7 +43,7 @@ var _ = framework.KubeDescribe("Federation events [Feature:Federation]", func() 
 
 			nsName := f.FederationNamespace.Name
 			// Delete registered events.
-			eventList, err := f.FederationClientset.Core().Events(nsName).List(v1.ListOptions{})
+			eventList, err := f.FederationClientset.Core().Events(nsName).List(metav1.ListOptions{})
 			Expect(err).NotTo(HaveOccurred())
 			for _, event := range eventList.Items {
 				err := f.FederationClientset.Core().Events(nsName).Delete(event.Name, &v1.DeleteOptions{})

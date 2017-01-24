@@ -101,7 +101,7 @@ func TestGetParentUIDFromJob(t *testing.T) {
 	j := &batch.Job{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "foobar",
-			Namespace: v1.NamespaceDefault,
+			Namespace: metav1.NamespaceDefault,
 		},
 		Spec: batch.JobSpec{
 			Selector: &metav1.LabelSelector{
@@ -269,7 +269,7 @@ func TestGetRecentUnmetScheduleTimes(t *testing.T) {
 	sj := batch.CronJob{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "mycronjob",
-			Namespace: v1.NamespaceDefault,
+			Namespace: metav1.NamespaceDefault,
 			UID:       types.UID("1a2b3c"),
 		},
 		Spec: batch.CronJobSpec{

@@ -67,7 +67,7 @@ func (c *FakeCertificateSigningRequests) Delete(name string, options *v1.DeleteO
 	return err
 }
 
-func (c *FakeCertificateSigningRequests) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
+func (c *FakeCertificateSigningRequests) DeleteCollection(options *v1.DeleteOptions, listOptions meta_v1.ListOptions) error {
 	action := testing.NewRootDeleteCollectionAction(certificatesigningrequestsResource, listOptions)
 
 	_, err := c.Fake.Invokes(action, &v1beta1.CertificateSigningRequestList{})
@@ -83,7 +83,7 @@ func (c *FakeCertificateSigningRequests) Get(name string, options meta_v1.GetOpt
 	return obj.(*v1beta1.CertificateSigningRequest), err
 }
 
-func (c *FakeCertificateSigningRequests) List(opts v1.ListOptions) (result *v1beta1.CertificateSigningRequestList, err error) {
+func (c *FakeCertificateSigningRequests) List(opts meta_v1.ListOptions) (result *v1beta1.CertificateSigningRequestList, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewRootListAction(certificatesigningrequestsResource, opts), &v1beta1.CertificateSigningRequestList{})
 	if obj == nil {
@@ -104,7 +104,7 @@ func (c *FakeCertificateSigningRequests) List(opts v1.ListOptions) (result *v1be
 }
 
 // Watch returns a watch.Interface that watches the requested certificateSigningRequests.
-func (c *FakeCertificateSigningRequests) Watch(opts v1.ListOptions) (watch.Interface, error) {
+func (c *FakeCertificateSigningRequests) Watch(opts meta_v1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
 		InvokesWatch(testing.NewRootWatchAction(certificatesigningrequestsResource, opts))
 }

@@ -93,7 +93,7 @@ func makeTestServer(t *testing.T, namespace string, endpointsResponse serverResp
 }
 
 func TestSyncEndpointsItemsPreserveNoSelector(t *testing.T) {
-	ns := v1.NamespaceDefault
+	ns := metav1.NamespaceDefault
 	testServer, endpointsHandler := makeTestServer(t, ns,
 		serverResponse{http.StatusOK, &v1.Endpoints{
 			ObjectMeta: metav1.ObjectMeta{
@@ -119,10 +119,10 @@ func TestSyncEndpointsItemsPreserveNoSelector(t *testing.T) {
 }
 
 func TestCheckLeftoverEndpoints(t *testing.T) {
-	ns := v1.NamespaceDefault
-	// Note that this requests *all* endpoints, therefore the NamespaceAll
+	ns := metav1.NamespaceDefault
+	// Note that this requests *all* endpoints, therefore metav1.NamespaceAll
 	// below.
-	testServer, _ := makeTestServer(t, v1.NamespaceAll,
+	testServer, _ := makeTestServer(t, metav1.NamespaceAll,
 		serverResponse{http.StatusOK, &v1.EndpointsList{
 			ListMeta: metav1.ListMeta{
 				ResourceVersion: "1",
@@ -396,8 +396,8 @@ func TestSyncEndpointsItemsPreexisting(t *testing.T) {
 }
 
 func TestSyncEndpointsItemsPreexistingIdentical(t *testing.T) {
-	ns := v1.NamespaceDefault
-	testServer, endpointsHandler := makeTestServer(t, v1.NamespaceDefault,
+	ns := metav1.NamespaceDefault
+	testServer, endpointsHandler := makeTestServer(t, metav1.NamespaceDefault,
 		serverResponse{http.StatusOK, &v1.Endpoints{
 			ObjectMeta: metav1.ObjectMeta{
 				ResourceVersion: "1",
@@ -413,16 +413,16 @@ func TestSyncEndpointsItemsPreexistingIdentical(t *testing.T) {
 	client := clientset.NewForConfigOrDie(&restclient.Config{Host: testServer.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &api.Registry.GroupOrDie(v1.GroupName).GroupVersion}})
 	endpoints := NewEndpointControllerFromClient(client, controller.NoResyncPeriodFunc)
 	endpoints.podStoreSynced = alwaysReady
-	addPods(endpoints.podStore.Indexer, v1.NamespaceDefault, 1, 1, 0)
+	addPods(endpoints.podStore.Indexer, metav1.NamespaceDefault, 1, 1, 0)
 	endpoints.serviceStore.Indexer.Add(&v1.Service{
-		ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: v1.NamespaceDefault},
+		ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: metav1.NamespaceDefault},
 		Spec: v1.ServiceSpec{
 			Selector: map[string]string{"foo": "bar"},
 			Ports:    []v1.ServicePort{{Port: 80, Protocol: "TCP", TargetPort: intstr.FromInt(8080)}},
 		},
 	})
 	endpoints.syncService(ns + "/foo")
-	endpointsHandler.ValidateRequest(t, testapi.Default.ResourcePath("endpoints", v1.NamespaceDefault, "foo"), "GET", nil)
+	endpointsHandler.ValidateRequest(t, testapi.Default.ResourcePath("endpoints", metav1.NamespaceDefault, "foo"), "GET", nil)
 }
 
 func TestSyncEndpointsItems(t *testing.T) {

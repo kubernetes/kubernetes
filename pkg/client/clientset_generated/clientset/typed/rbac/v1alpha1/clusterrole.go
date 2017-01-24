@@ -37,10 +37,10 @@ type ClusterRoleInterface interface {
 	Create(*v1alpha1.ClusterRole) (*v1alpha1.ClusterRole, error)
 	Update(*v1alpha1.ClusterRole) (*v1alpha1.ClusterRole, error)
 	Delete(name string, options *v1.DeleteOptions) error
-	DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error
+	DeleteCollection(options *v1.DeleteOptions, listOptions meta_v1.ListOptions) error
 	Get(name string, options meta_v1.GetOptions) (*v1alpha1.ClusterRole, error)
-	List(opts v1.ListOptions) (*v1alpha1.ClusterRoleList, error)
-	Watch(opts v1.ListOptions) (watch.Interface, error)
+	List(opts meta_v1.ListOptions) (*v1alpha1.ClusterRoleList, error)
+	Watch(opts meta_v1.ListOptions) (watch.Interface, error)
 	Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v1alpha1.ClusterRole, err error)
 	ClusterRoleExpansion
 }
@@ -91,7 +91,7 @@ func (c *clusterRoles) Delete(name string, options *v1.DeleteOptions) error {
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *clusterRoles) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
+func (c *clusterRoles) DeleteCollection(options *v1.DeleteOptions, listOptions meta_v1.ListOptions) error {
 	return c.client.Delete().
 		Resource("clusterroles").
 		VersionedParams(&listOptions, api.ParameterCodec).
@@ -113,7 +113,7 @@ func (c *clusterRoles) Get(name string, options meta_v1.GetOptions) (result *v1a
 }
 
 // List takes label and field selectors, and returns the list of ClusterRoles that match those selectors.
-func (c *clusterRoles) List(opts v1.ListOptions) (result *v1alpha1.ClusterRoleList, err error) {
+func (c *clusterRoles) List(opts meta_v1.ListOptions) (result *v1alpha1.ClusterRoleList, err error) {
 	result = &v1alpha1.ClusterRoleList{}
 	err = c.client.Get().
 		Resource("clusterroles").
@@ -124,7 +124,7 @@ func (c *clusterRoles) List(opts v1.ListOptions) (result *v1alpha1.ClusterRoleLi
 }
 
 // Watch returns a watch.Interface that watches the requested clusterRoles.
-func (c *clusterRoles) Watch(opts v1.ListOptions) (watch.Interface, error) {
+func (c *clusterRoles) Watch(opts meta_v1.ListOptions) (watch.Interface, error) {
 	return c.client.Get().
 		Prefix("watch").
 		Resource("clusterroles").

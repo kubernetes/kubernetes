@@ -130,7 +130,7 @@ func (m *FakeNodeHandler) Get(name string, opts metav1.GetOptions) (*v1.Node, er
 }
 
 // List returns a list of Nodes from the fake store.
-func (m *FakeNodeHandler) List(opts v1.ListOptions) (*v1.NodeList, error) {
+func (m *FakeNodeHandler) List(opts metav1.ListOptions) (*v1.NodeList, error) {
 	m.lock.Lock()
 	defer func() {
 		m.RequestCount++
@@ -174,7 +174,7 @@ func (m *FakeNodeHandler) Delete(id string, opt *v1.DeleteOptions) error {
 }
 
 // DeleteCollection deletes a collection of Nodes from the fake store.
-func (m *FakeNodeHandler) DeleteCollection(opt *v1.DeleteOptions, listOpts v1.ListOptions) error {
+func (m *FakeNodeHandler) DeleteCollection(opt *v1.DeleteOptions, listOpts metav1.ListOptions) error {
 	return nil
 }
 
@@ -215,7 +215,7 @@ func (m *FakeNodeHandler) PatchStatus(nodeName string, data []byte) (*v1.Node, e
 }
 
 // Watch watches Nodes in a fake store.
-func (m *FakeNodeHandler) Watch(opts v1.ListOptions) (watch.Interface, error) {
+func (m *FakeNodeHandler) Watch(opts metav1.ListOptions) (watch.Interface, error) {
 	return watch.NewFake(), nil
 }
 
@@ -263,7 +263,7 @@ func (f *FakeRecorder) makeEvent(ref *v1.ObjectReference, eventtype, reason, mes
 	t := metav1.Time{Time: f.clock.Now()}
 	namespace := ref.Namespace
 	if namespace == "" {
-		namespace = v1.NamespaceDefault
+		namespace = metav1.NamespaceDefault
 	}
 	return &v1.Event{
 		ObjectMeta: metav1.ObjectMeta{
@@ -339,7 +339,7 @@ func contains(node *v1.Node, nodes []*v1.Node) bool {
 
 // GetZones returns list of zones for all Nodes stored in FakeNodeHandler
 func GetZones(nodeHandler *FakeNodeHandler) []string {
-	nodes, _ := nodeHandler.List(v1.ListOptions{})
+	nodes, _ := nodeHandler.List(metav1.ListOptions{})
 	zones := sets.NewString()
 	for _, node := range nodes.Items {
 		zones.Insert(utilnode.GetZoneKey(&node))

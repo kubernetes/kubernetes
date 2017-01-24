@@ -140,11 +140,11 @@ func NewIngressController(client federationclientset.Interface) *IngressControll
 	// Start informer in federated API servers on ingresses that should be federated.
 	ic.ingressInformerStore, ic.ingressInformerController = cache.NewInformer(
 		&cache.ListWatch{
-			ListFunc: func(options v1.ListOptions) (pkgruntime.Object, error) {
-				return client.Extensions().Ingresses(api.NamespaceAll).List(options)
+			ListFunc: func(options metav1.ListOptions) (pkgruntime.Object, error) {
+				return client.Extensions().Ingresses(metav1.NamespaceAll).List(options)
 			},
-			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
-				return client.Extensions().Ingresses(api.NamespaceAll).Watch(options)
+			WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
+				return client.Extensions().Ingresses(metav1.NamespaceAll).Watch(options)
 			},
 		},
 		&extensionsv1beta1.Ingress{},
@@ -161,11 +161,11 @@ func NewIngressController(client federationclientset.Interface) *IngressControll
 		func(cluster *federationapi.Cluster, targetClient kubeclientset.Interface) (cache.Store, cache.Controller) {
 			return cache.NewInformer(
 				&cache.ListWatch{
-					ListFunc: func(options v1.ListOptions) (pkgruntime.Object, error) {
-						return targetClient.Extensions().Ingresses(api.NamespaceAll).List(options)
+					ListFunc: func(options metav1.ListOptions) (pkgruntime.Object, error) {
+						return targetClient.Extensions().Ingresses(metav1.NamespaceAll).List(options)
 					},
-					WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
-						return targetClient.Extensions().Ingresses(api.NamespaceAll).Watch(options)
+					WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
+						return targetClient.Extensions().Ingresses(metav1.NamespaceAll).Watch(options)
 					},
 				},
 				&extensionsv1beta1.Ingress{},
@@ -194,13 +194,13 @@ func NewIngressController(client federationclientset.Interface) *IngressControll
 			glog.V(4).Infof("Returning new informer for cluster %q", cluster.Name)
 			return cache.NewInformer(
 				&cache.ListWatch{
-					ListFunc: func(options v1.ListOptions) (pkgruntime.Object, error) {
+					ListFunc: func(options metav1.ListOptions) (pkgruntime.Object, error) {
 						if targetClient == nil {
 							glog.Errorf("Internal error: targetClient is nil")
 						}
 						return targetClient.Core().ConfigMaps(uidConfigMapNamespace).List(options) // we only want to list one by name - unfortunately Kubernetes don't have a selector for that.
 					},
-					WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
+					WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
 						if targetClient == nil {
 							glog.Errorf("Internal error: targetClient is nil")
 						}

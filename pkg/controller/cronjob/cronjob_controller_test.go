@@ -130,7 +130,7 @@ func newJob(UID string) batch.Job {
 		ObjectMeta: metav1.ObjectMeta{
 			UID:       types.UID(UID),
 			Name:      "foobar",
-			Namespace: v1.NamespaceDefault,
+			Namespace: metav1.NamespaceDefault,
 			SelfLink:  "/apis/batch/v1/namespaces/snazzycats/jobs/myjob",
 		},
 		Spec: jobSpec(),

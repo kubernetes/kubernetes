@@ -17,6 +17,7 @@ limitations under the License.
 package endpoint
 
 import (
+	metainternalversion "k8s.io/apimachinery/pkg/apis/meta/internalversion"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/watch"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
@@ -26,9 +27,9 @@ import (
 
 // Registry is an interface for things that know how to store endpoints.
 type Registry interface {
-	ListEndpoints(ctx genericapirequest.Context, options *api.ListOptions) (*api.EndpointsList, error)
+	ListEndpoints(ctx genericapirequest.Context, options *metainternalversion.ListOptions) (*api.EndpointsList, error)
 	GetEndpoints(ctx genericapirequest.Context, name string, options *metav1.GetOptions) (*api.Endpoints, error)
-	WatchEndpoints(ctx genericapirequest.Context, options *api.ListOptions) (watch.Interface, error)
+	WatchEndpoints(ctx genericapirequest.Context, options *metainternalversion.ListOptions) (watch.Interface, error)
 	UpdateEndpoints(ctx genericapirequest.Context, e *api.Endpoints) error
 	DeleteEndpoints(ctx genericapirequest.Context, name string) error
 }
@@ -44,7 +45,7 @@ func NewRegistry(s rest.StandardStorage) Registry {
 	return &storage{s}
 }
 
-func (s *storage) ListEndpoints(ctx genericapirequest.Context, options *api.ListOptions) (*api.EndpointsList, error) {
+func (s *storage) ListEndpoints(ctx genericapirequest.Context, options *metainternalversion.ListOptions) (*api.EndpointsList, error) {
 	obj, err := s.List(ctx, options)
 	if err != nil {
 		return nil, err
@@ -52,7 +53,7 @@ func (s *storage) ListEndpoints(ctx genericapirequest.Context, options *api.List
 	return obj.(*api.EndpointsList), nil
 }
 
-func (s *storage) WatchEndpoints(ctx genericapirequest.Context, options *api.ListOptions) (watch.Interface, error) {
+func (s *storage) WatchEndpoints(ctx genericapirequest.Context, options *metainternalversion.ListOptions) (watch.Interface, error) {
 	return s.Watch(ctx, options)
 }
 

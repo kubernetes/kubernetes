@@ -164,8 +164,8 @@ func verifyEmptyMetrics(o TopPodOptions, selector labels.Selector) error {
 			return err
 		}
 	} else {
-		pods, err := o.PodClient.Pods(o.Namespace).List(api.ListOptions{
-			LabelSelector: selector,
+		pods, err := o.PodClient.Pods(o.Namespace).List(metav1.ListOptions{
+			LabelSelector: selector.String(),
 		})
 		if err != nil {
 			return err

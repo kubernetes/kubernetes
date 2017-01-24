@@ -29,7 +29,7 @@ import (
 )
 
 func TestReconcileEndpoints(t *testing.T) {
-	ns := api.NamespaceDefault
+	ns := metav1.NamespaceDefault
 	om := func(name string) metav1.ObjectMeta {
 		return metav1.ObjectMeta{Namespace: ns, Name: name}
 	}
@@ -542,7 +542,7 @@ func TestReconcileEndpoints(t *testing.T) {
 }
 
 func TestCreateOrUpdateMasterService(t *testing.T) {
-	ns := api.NamespaceDefault
+	ns := metav1.NamespaceDefault
 	om := func(name string) metav1.ObjectMeta {
 		return metav1.ObjectMeta{Namespace: ns, Name: name}
 	}

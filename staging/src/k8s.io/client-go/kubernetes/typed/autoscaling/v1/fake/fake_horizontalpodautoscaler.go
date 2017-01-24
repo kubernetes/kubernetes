@@ -72,7 +72,7 @@ func (c *FakeHorizontalPodAutoscalers) Delete(name string, options *api_v1.Delet
 	return err
 }
 
-func (c *FakeHorizontalPodAutoscalers) DeleteCollection(options *api_v1.DeleteOptions, listOptions api_v1.ListOptions) error {
+func (c *FakeHorizontalPodAutoscalers) DeleteCollection(options *api_v1.DeleteOptions, listOptions meta_v1.ListOptions) error {
 	action := testing.NewDeleteCollectionAction(horizontalpodautoscalersResource, c.ns, listOptions)
 
 	_, err := c.Fake.Invokes(action, &v1.HorizontalPodAutoscalerList{})
@@ -89,7 +89,7 @@ func (c *FakeHorizontalPodAutoscalers) Get(name string, options meta_v1.GetOptio
 	return obj.(*v1.HorizontalPodAutoscaler), err
 }
 
-func (c *FakeHorizontalPodAutoscalers) List(opts api_v1.ListOptions) (result *v1.HorizontalPodAutoscalerList, err error) {
+func (c *FakeHorizontalPodAutoscalers) List(opts meta_v1.ListOptions) (result *v1.HorizontalPodAutoscalerList, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewListAction(horizontalpodautoscalersResource, c.ns, opts), &v1.HorizontalPodAutoscalerList{})
 
@@ -111,7 +111,7 @@ func (c *FakeHorizontalPodAutoscalers) List(opts api_v1.ListOptions) (result *v1
 }
 
 // Watch returns a watch.Interface that watches the requested horizontalPodAutoscalers.
-func (c *FakeHorizontalPodAutoscalers) Watch(opts api_v1.ListOptions) (watch.Interface, error) {
+func (c *FakeHorizontalPodAutoscalers) Watch(opts meta_v1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
 		InvokesWatch(testing.NewWatchAction(horizontalpodautoscalersResource, c.ns, opts))
 

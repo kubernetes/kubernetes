@@ -256,7 +256,7 @@ func TestSchedulerExtender(t *testing.T) {
 func DoTestPodScheduling(ns *v1.Namespace, t *testing.T, cs clientset.Interface) {
 	// NOTE: This test cannot run in parallel, because it is creating and deleting
 	// non-namespaced objects (Nodes).
-	defer cs.Core().Nodes().DeleteCollection(nil, v1.ListOptions{})
+	defer cs.Core().Nodes().DeleteCollection(nil, metav1.ListOptions{})
 
 	goodCondition := v1.NodeCondition{
 		Type:              v1.NodeReady,

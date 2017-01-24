@@ -85,9 +85,7 @@ func DeepCopy_rbac_ClusterRoleBinding(in interface{}, out interface{}, c *conver
 		if in.Subjects != nil {
 			in, out := &in.Subjects, &out.Subjects
 			*out = make([]Subject, len(*in))
-			for i := range *in {
-				(*out)[i] = (*in)[i]
-			}
+			copy(*out, *in)
 		}
 		return nil
 	}
@@ -199,9 +197,7 @@ func DeepCopy_rbac_RoleBinding(in interface{}, out interface{}, c *conversion.Cl
 		if in.Subjects != nil {
 			in, out := &in.Subjects, &out.Subjects
 			*out = make([]Subject, len(*in))
-			for i := range *in {
-				(*out)[i] = (*in)[i]
-			}
+			copy(*out, *in)
 		}
 		return nil
 	}

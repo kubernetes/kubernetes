@@ -38,10 +38,10 @@ type ReplicaSetInterface interface {
 	Update(*v1beta1.ReplicaSet) (*v1beta1.ReplicaSet, error)
 	UpdateStatus(*v1beta1.ReplicaSet) (*v1beta1.ReplicaSet, error)
 	Delete(name string, options *v1.DeleteOptions) error
-	DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error
+	DeleteCollection(options *v1.DeleteOptions, listOptions meta_v1.ListOptions) error
 	Get(name string, options meta_v1.GetOptions) (*v1beta1.ReplicaSet, error)
-	List(opts v1.ListOptions) (*v1beta1.ReplicaSetList, error)
-	Watch(opts v1.ListOptions) (watch.Interface, error)
+	List(opts meta_v1.ListOptions) (*v1beta1.ReplicaSetList, error)
+	Watch(opts meta_v1.ListOptions) (watch.Interface, error)
 	Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v1beta1.ReplicaSet, err error)
 	ReplicaSetExpansion
 }
@@ -113,7 +113,7 @@ func (c *replicaSets) Delete(name string, options *v1.DeleteOptions) error {
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *replicaSets) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
+func (c *replicaSets) DeleteCollection(options *v1.DeleteOptions, listOptions meta_v1.ListOptions) error {
 	return c.client.Delete().
 		Namespace(c.ns).
 		Resource("replicasets").
@@ -137,7 +137,7 @@ func (c *replicaSets) Get(name string, options meta_v1.GetOptions) (result *v1be
 }
 
 // List takes label and field selectors, and returns the list of ReplicaSets that match those selectors.
-func (c *replicaSets) List(opts v1.ListOptions) (result *v1beta1.ReplicaSetList, err error) {
+func (c *replicaSets) List(opts meta_v1.ListOptions) (result *v1beta1.ReplicaSetList, err error) {
 	result = &v1beta1.ReplicaSetList{}
 	err = c.client.Get().
 		Namespace(c.ns).
@@ -149,7 +149,7 @@ func (c *replicaSets) List(opts v1.ListOptions) (result *v1beta1.ReplicaSetList,
 }
 
 // Watch returns a watch.Interface that watches the requested replicaSets.
-func (c *replicaSets) Watch(opts v1.ListOptions) (watch.Interface, error) {
+func (c *replicaSets) Watch(opts meta_v1.ListOptions) (watch.Interface, error) {
 	return c.client.Get().
 		Prefix("watch").
 		Namespace(c.ns).

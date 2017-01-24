@@ -27,6 +27,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -357,7 +358,7 @@ func RunApply(f cmdutil.Factory, cmd *cobra.Command, out, errOut io.Writer, opti
 		}
 	}
 	for _, m := range nonNamespacedRESTMappings {
-		if err := p.prune(api.NamespaceNone, m, shortOutput); err != nil {
+		if err := p.prune(metav1.NamespaceNone, m, shortOutput); err != nil {
 			return fmt.Errorf("error pruning nonNamespaced object %v: %v", m.GroupVersionKind, err)
 		}
 	}

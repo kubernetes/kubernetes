@@ -36,10 +36,10 @@ type ClusterRoleBindingInterface interface {
 	Create(*rbac.ClusterRoleBinding) (*rbac.ClusterRoleBinding, error)
 	Update(*rbac.ClusterRoleBinding) (*rbac.ClusterRoleBinding, error)
 	Delete(name string, options *api.DeleteOptions) error
-	DeleteCollection(options *api.DeleteOptions, listOptions api.ListOptions) error
+	DeleteCollection(options *api.DeleteOptions, listOptions v1.ListOptions) error
 	Get(name string, options v1.GetOptions) (*rbac.ClusterRoleBinding, error)
-	List(opts api.ListOptions) (*rbac.ClusterRoleBindingList, error)
-	Watch(opts api.ListOptions) (watch.Interface, error)
+	List(opts v1.ListOptions) (*rbac.ClusterRoleBindingList, error)
+	Watch(opts v1.ListOptions) (watch.Interface, error)
 	Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *rbac.ClusterRoleBinding, err error)
 	ClusterRoleBindingExpansion
 }
@@ -90,7 +90,7 @@ func (c *clusterRoleBindings) Delete(name string, options *api.DeleteOptions) er
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *clusterRoleBindings) DeleteCollection(options *api.DeleteOptions, listOptions api.ListOptions) error {
+func (c *clusterRoleBindings) DeleteCollection(options *api.DeleteOptions, listOptions v1.ListOptions) error {
 	return c.client.Delete().
 		Resource("clusterrolebindings").
 		VersionedParams(&listOptions, api.ParameterCodec).
@@ -112,7 +112,7 @@ func (c *clusterRoleBindings) Get(name string, options v1.GetOptions) (result *r
 }
 
 // List takes label and field selectors, and returns the list of ClusterRoleBindings that match those selectors.
-func (c *clusterRoleBindings) List(opts api.ListOptions) (result *rbac.ClusterRoleBindingList, err error) {
+func (c *clusterRoleBindings) List(opts v1.ListOptions) (result *rbac.ClusterRoleBindingList, err error) {
 	result = &rbac.ClusterRoleBindingList{}
 	err = c.client.Get().
 		Resource("clusterrolebindings").
@@ -123,7 +123,7 @@ func (c *clusterRoleBindings) List(opts api.ListOptions) (result *rbac.ClusterRo
 }
 
 // Watch returns a watch.Interface that watches the requested clusterRoleBindings.
-func (c *clusterRoleBindings) Watch(opts api.ListOptions) (watch.Interface, error) {
+func (c *clusterRoleBindings) Watch(opts v1.ListOptions) (watch.Interface, error) {
 	return c.client.Get().
 		Prefix("watch").
 		Resource("clusterrolebindings").

@@ -36,10 +36,10 @@ type PersistentVolumeClaimInterface interface {
 	Update(*api.PersistentVolumeClaim) (*api.PersistentVolumeClaim, error)
 	UpdateStatus(*api.PersistentVolumeClaim) (*api.PersistentVolumeClaim, error)
 	Delete(name string, options *api.DeleteOptions) error
-	DeleteCollection(options *api.DeleteOptions, listOptions api.ListOptions) error
+	DeleteCollection(options *api.DeleteOptions, listOptions v1.ListOptions) error
 	Get(name string, options v1.GetOptions) (*api.PersistentVolumeClaim, error)
-	List(opts api.ListOptions) (*api.PersistentVolumeClaimList, error)
-	Watch(opts api.ListOptions) (watch.Interface, error)
+	List(opts v1.ListOptions) (*api.PersistentVolumeClaimList, error)
+	Watch(opts v1.ListOptions) (watch.Interface, error)
 	Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *api.PersistentVolumeClaim, err error)
 	PersistentVolumeClaimExpansion
 }
@@ -111,7 +111,7 @@ func (c *persistentVolumeClaims) Delete(name string, options *api.DeleteOptions)
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *persistentVolumeClaims) DeleteCollection(options *api.DeleteOptions, listOptions api.ListOptions) error {
+func (c *persistentVolumeClaims) DeleteCollection(options *api.DeleteOptions, listOptions v1.ListOptions) error {
 	return c.client.Delete().
 		Namespace(c.ns).
 		Resource("persistentvolumeclaims").
@@ -135,7 +135,7 @@ func (c *persistentVolumeClaims) Get(name string, options v1.GetOptions) (result
 }
 
 // List takes label and field selectors, and returns the list of PersistentVolumeClaims that match those selectors.
-func (c *persistentVolumeClaims) List(opts api.ListOptions) (result *api.PersistentVolumeClaimList, err error) {
+func (c *persistentVolumeClaims) List(opts v1.ListOptions) (result *api.PersistentVolumeClaimList, err error) {
 	result = &api.PersistentVolumeClaimList{}
 	err = c.client.Get().
 		Namespace(c.ns).
@@ -147,7 +147,7 @@ func (c *persistentVolumeClaims) List(opts api.ListOptions) (result *api.Persist
 }
 
 // Watch returns a watch.Interface that watches the requested persistentVolumeClaims.
-func (c *persistentVolumeClaims) Watch(opts api.ListOptions) (watch.Interface, error) {
+func (c *persistentVolumeClaims) Watch(opts v1.ListOptions) (watch.Interface, error) {
 	return c.client.Get().
 		Prefix("watch").
 		Namespace(c.ns).

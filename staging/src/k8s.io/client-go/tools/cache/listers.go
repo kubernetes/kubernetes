@@ -25,7 +25,6 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/client-go/pkg/api/v1"
 )
 
 // AppendFunc is used to add a matching item to whatever list the caller is using
@@ -45,7 +44,7 @@ func ListAll(store Store, selector labels.Selector, appendFn AppendFunc) error {
 }
 
 func ListAllByNamespace(indexer Indexer, namespace string, selector labels.Selector, appendFn AppendFunc) error {
-	if namespace == v1.NamespaceAll {
+	if namespace == metav1.NamespaceAll {
 		for _, m := range indexer.List() {
 			metadata, err := meta.Accessor(m)
 			if err != nil {

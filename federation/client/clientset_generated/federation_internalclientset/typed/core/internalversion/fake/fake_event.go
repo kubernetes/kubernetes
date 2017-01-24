@@ -61,7 +61,7 @@ func (c *FakeEvents) Delete(name string, options *api.DeleteOptions) error {
 	return err
 }
 
-func (c *FakeEvents) DeleteCollection(options *api.DeleteOptions, listOptions api.ListOptions) error {
+func (c *FakeEvents) DeleteCollection(options *api.DeleteOptions, listOptions v1.ListOptions) error {
 	action := core.NewDeleteCollectionAction(eventsResource, c.ns, listOptions)
 
 	_, err := c.Fake.Invokes(action, &api.EventList{})
@@ -78,7 +78,7 @@ func (c *FakeEvents) Get(name string, options v1.GetOptions) (result *api.Event,
 	return obj.(*api.Event), err
 }
 
-func (c *FakeEvents) List(opts api.ListOptions) (result *api.EventList, err error) {
+func (c *FakeEvents) List(opts v1.ListOptions) (result *api.EventList, err error) {
 	obj, err := c.Fake.
 		Invokes(core.NewListAction(eventsResource, c.ns, opts), &api.EventList{})
 
@@ -100,7 +100,7 @@ func (c *FakeEvents) List(opts api.ListOptions) (result *api.EventList, err erro
 }
 
 // Watch returns a watch.Interface that watches the requested events.
-func (c *FakeEvents) Watch(opts api.ListOptions) (watch.Interface, error) {
+func (c *FakeEvents) Watch(opts v1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
 		InvokesWatch(core.NewWatchAction(eventsResource, c.ns, opts))
 

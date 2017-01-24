@@ -19,6 +19,7 @@ go_library(
         "//pkg/registry/core/rangeallocation:go_default_library",
         "//pkg/registry/core/service/ipallocator:go_default_library",
         "//vendor:k8s.io/apimachinery/pkg/api/errors",
+        "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
         "//vendor:k8s.io/apimachinery/pkg/util/runtime",
         "//vendor:k8s.io/apimachinery/pkg/util/wait",
     ],

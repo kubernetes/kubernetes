@@ -19,10 +19,9 @@ limitations under the License.
 package internalversion
 
 import (
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	watch "k8s.io/apimachinery/pkg/watch"
-	api "k8s.io/kubernetes/pkg/api"
-	v1 "k8s.io/kubernetes/pkg/api/v1"
 	policy "k8s.io/kubernetes/pkg/apis/policy"
 	cache "k8s.io/kubernetes/pkg/client/cache"
 	internalclientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
@@ -46,18 +45,10 @@ func newPodDisruptionBudgetInformer(client internalclientset.Interface, resyncPe
 	sharedIndexInformer := cache.NewSharedIndexInformer(
 		&cache.ListWatch{
 			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
-				var internalOptions api.ListOptions
-				if err := api.Scheme.Convert(&options, &internalOptions, nil); err != nil {
-					return nil, err
-				}
-				return client.Policy().PodDisruptionBudgets(api.NamespaceAll).List(internalOptions)
+				return client.Policy().PodDisruptionBudgets(v1.NamespaceAll).List(options)
 			},
 			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
-				var internalOptions api.ListOptions
-				if err := api.Scheme.Convert(&options, &internalOptions, nil); err != nil {
-					return nil, err
-				}
-				return client.Policy().PodDisruptionBudgets(api.NamespaceAll).Watch(internalOptions)
+				return client.Policy().PodDisruptionBudgets(v1.NamespaceAll).Watch(options)
 			},
 		},
 		&policy.PodDisruptionBudget{},

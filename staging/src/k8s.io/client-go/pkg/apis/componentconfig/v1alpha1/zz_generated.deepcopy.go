@@ -257,9 +257,7 @@ func DeepCopy_v1alpha1_KubeletConfiguration(in interface{}, out interface{}, c *
 		if in.RegisterWithTaints != nil {
 			in, out := &in.RegisterWithTaints, &out.RegisterWithTaints
 			*out = make([]v1.Taint, len(*in))
-			for i := range *in {
-				(*out)[i] = (*in)[i]
-			}
+			copy(*out, *in)
 		}
 		if in.KubeAPIQPS != nil {
 			in, out := &in.KubeAPIQPS, &out.KubeAPIQPS

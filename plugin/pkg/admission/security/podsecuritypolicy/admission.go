@@ -24,6 +24,7 @@ import (
 	"github.com/golang/glog"
 
 	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apimachinery/pkg/watch"
@@ -31,7 +32,6 @@ import (
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/client/cache"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
@@ -108,15 +108,11 @@ func (a *podSecurityPolicyPlugin) SetInternalClientSet(client internalclientset.
 	a.store = cache.NewStore(cache.MetaNamespaceKeyFunc)
 	a.reflector = cache.NewReflector(
 		&cache.ListWatch{
-			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
-				internalOptions := api.ListOptions{}
-				v1.Convert_v1_ListOptions_To_api_ListOptions(&options, &internalOptions, nil)
-				return client.Extensions().PodSecurityPolicies().List(internalOptions)
+			ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
+				return client.Extensions().PodSecurityPolicies().List(options)
 			},
-			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
-				internalOptions := api.ListOptions{}
-				v1.Convert_v1_ListOptions_To_api_ListOptions(&options, &internalOptions, nil)
-				return client.Extensions().PodSecurityPolicies().Watch(internalOptions)
+			WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
+				return client.Extensions().PodSecurityPolicies().Watch(options)
 			},
 		},
 		&extensions.PodSecurityPolicy{},

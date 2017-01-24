@@ -58,7 +58,7 @@ func (c *FakeClusterRoles) Delete(name string, options *v1.DeleteOptions) error 
 	return err
 }
 
-func (c *FakeClusterRoles) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
+func (c *FakeClusterRoles) DeleteCollection(options *v1.DeleteOptions, listOptions meta_v1.ListOptions) error {
 	action := core.NewRootDeleteCollectionAction(clusterrolesResource, listOptions)
 
 	_, err := c.Fake.Invokes(action, &v1beta1.ClusterRoleList{})
@@ -74,7 +74,7 @@ func (c *FakeClusterRoles) Get(name string, options meta_v1.GetOptions) (result 
 	return obj.(*v1beta1.ClusterRole), err
 }
 
-func (c *FakeClusterRoles) List(opts v1.ListOptions) (result *v1beta1.ClusterRoleList, err error) {
+func (c *FakeClusterRoles) List(opts meta_v1.ListOptions) (result *v1beta1.ClusterRoleList, err error) {
 	obj, err := c.Fake.
 		Invokes(core.NewRootListAction(clusterrolesResource, opts), &v1beta1.ClusterRoleList{})
 	if obj == nil {
@@ -95,7 +95,7 @@ func (c *FakeClusterRoles) List(opts v1.ListOptions) (result *v1beta1.ClusterRol
 }
 
 // Watch returns a watch.Interface that watches the requested clusterRoles.
-func (c *FakeClusterRoles) Watch(opts v1.ListOptions) (watch.Interface, error) {
+func (c *FakeClusterRoles) Watch(opts meta_v1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
 		InvokesWatch(core.NewRootWatchAction(clusterrolesResource, opts))
 }

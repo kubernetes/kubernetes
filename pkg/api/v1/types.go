@@ -3308,6 +3308,8 @@ type DeleteOptions struct {
 }
 
 // ListOptions is the query options to a standard REST list call.
+// DEPRECATED: This type has been moved to meta/v1 and will be removed soon.
+// +k8s:openapi-gen=false
 type ListOptions struct {
 	metav1.TypeMeta `json:",inline"`
 

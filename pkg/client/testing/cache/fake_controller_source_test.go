@@ -66,13 +66,13 @@ func TestRCNumber(t *testing.T) {
 	source.Modify(pod("foo"))
 	source.Modify(pod("foo"))
 
-	w, err := source.Watch(v1.ListOptions{ResourceVersion: "1"})
+	w, err := source.Watch(metav1.ListOptions{ResourceVersion: "1"})
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
 	go consume(t, w, []string{"2", "3"}, wg)
 
-	list, err := source.List(v1.ListOptions{})
+	list, err := source.List(metav1.ListOptions{})
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
@@ -80,13 +80,13 @@ func TestRCNumber(t *testing.T) {
 		t.Errorf("wanted %v, got %v", e, a)
 	}
 
-	w2, err := source.Watch(v1.ListOptions{ResourceVersion: "2"})
+	w2, err := source.Watch(metav1.ListOptions{ResourceVersion: "2"})
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
 	go consume(t, w2, []string{"3"}, wg)
 
-	w3, err := source.Watch(v1.ListOptions{ResourceVersion: "3"})
+	w3, err := source.Watch(metav1.ListOptions{ResourceVersion: "3"})
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}

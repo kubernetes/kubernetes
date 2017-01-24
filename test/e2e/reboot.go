@@ -65,9 +65,9 @@ var _ = framework.KubeDescribe("Reboot [Disruptive] [Feature:Reboot]", func() {
 		if CurrentGinkgoTestDescription().Failed {
 			// Most of the reboot tests just make sure that addon/system pods are running, so dump
 			// events for the kube-system namespace on failures
-			namespaceName := api.NamespaceSystem
+			namespaceName := metav1.NamespaceSystem
 			By(fmt.Sprintf("Collecting events from namespace %q.", namespaceName))
-			events, err := f.ClientSet.Core().Events(namespaceName).List(v1.ListOptions{})
+			events, err := f.ClientSet.Core().Events(namespaceName).List(metav1.ListOptions{})
 			Expect(err).NotTo(HaveOccurred())
 
 			for _, e := range events.Items {
@@ -218,7 +218,7 @@ func printStatusAndLogsForNotReadyPods(c clientset.Interface, ns string, podName
 // failed step, it will return false through result and not run the rest.
 func rebootNode(c clientset.Interface, provider, name, rebootCmd string) bool {
 	// Setup
-	ns := api.NamespaceSystem
+	ns := metav1.NamespaceSystem
 	ps := testutils.NewPodStore(c, ns, labels.Everything(), fields.OneTermEqualSelector(api.PodHostField, name))
 	defer ps.Stop()
 

@@ -163,7 +163,7 @@ func (p *Package) Function(funcName string) *Type {
 	return t
 }
 
-// Variable gets the given varaible Type in this Package. If the variable is
+// Variable gets the given variable Type in this Package. If the variable is
 // not already defined, this will add it. If a variable is added, it's the caller's
 // responsibility to finish construction of the variable by setting Underlying
 // to the correct type.

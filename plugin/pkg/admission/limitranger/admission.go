@@ -26,6 +26,7 @@ import (
 	lru "github.com/hashicorp/golang-lru"
 
 	"k8s.io/apimachinery/pkg/api/meta"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
@@ -112,7 +113,7 @@ func (l *limitRanger) Admit(a admission.Attributes) (err error) {
 			// If there is already in-flight List() for a given namespace, we should wait until
 			// it is finished and cache is updated instead of doing the same, also to avoid
 			// throttling - see #22422 for details.
-			liveList, err := l.client.Core().LimitRanges(a.GetNamespace()).List(api.ListOptions{})
+			liveList, err := l.client.Core().LimitRanges(a.GetNamespace()).List(metav1.ListOptions{})
 			if err != nil {
 				return admission.NewForbidden(a, err)
 			}

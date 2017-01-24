@@ -61,7 +61,7 @@ func extinguish(f *framework.Framework, totalNS int, maxAllowedAfterDel int, max
 	framework.ExpectNoError(wait.Poll(2*time.Second, time.Duration(maxSeconds)*time.Second,
 		func() (bool, error) {
 			var cnt = 0
-			nsList, err := f.ClientSet.Core().Namespaces().List(v1.ListOptions{})
+			nsList, err := f.ClientSet.Core().Namespaces().List(metav1.ListOptions{})
 			if err != nil {
 				return false, err
 			}

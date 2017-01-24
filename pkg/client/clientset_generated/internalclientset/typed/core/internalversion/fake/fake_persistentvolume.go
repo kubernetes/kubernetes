@@ -66,7 +66,7 @@ func (c *FakePersistentVolumes) Delete(name string, options *api.DeleteOptions) 
 	return err
 }
 
-func (c *FakePersistentVolumes) DeleteCollection(options *api.DeleteOptions, listOptions api.ListOptions) error {
+func (c *FakePersistentVolumes) DeleteCollection(options *api.DeleteOptions, listOptions v1.ListOptions) error {
 	action := core.NewRootDeleteCollectionAction(persistentvolumesResource, listOptions)
 
 	_, err := c.Fake.Invokes(action, &api.PersistentVolumeList{})
@@ -82,7 +82,7 @@ func (c *FakePersistentVolumes) Get(name string, options v1.GetOptions) (result 
 	return obj.(*api.PersistentVolume), err
 }
 
-func (c *FakePersistentVolumes) List(opts api.ListOptions) (result *api.PersistentVolumeList, err error) {
+func (c *FakePersistentVolumes) List(opts v1.ListOptions) (result *api.PersistentVolumeList, err error) {
 	obj, err := c.Fake.
 		Invokes(core.NewRootListAction(persistentvolumesResource, opts), &api.PersistentVolumeList{})
 	if obj == nil {
@@ -103,7 +103,7 @@ func (c *FakePersistentVolumes) List(opts api.ListOptions) (result *api.Persiste
 }
 
 // Watch returns a watch.Interface that watches the requested persistentVolumes.
-func (c *FakePersistentVolumes) Watch(opts api.ListOptions) (watch.Interface, error) {
+func (c *FakePersistentVolumes) Watch(opts v1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
 		InvokesWatch(core.NewRootWatchAction(persistentvolumesResource, opts))
 }

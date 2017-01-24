@@ -19,6 +19,7 @@ package v1
 import (
 	"fmt"
 
+	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/selection"
 )
@@ -194,4 +195,12 @@ func SetMetaDataAnnotation(obj *ObjectMeta, ann string, value string) {
 		obj.Annotations = make(map[string]string)
 	}
 	obj.Annotations[ann] = value
+}
+
+// SingleObject returns a ListOptions for watching a single object.
+func SingleObject(meta ObjectMeta) ListOptions {
+	return ListOptions{
+		FieldSelector:   fields.OneTermEqualSelector("metadata.name", meta.Name).String(),
+		ResourceVersion: meta.ResourceVersion,
+	}
 }

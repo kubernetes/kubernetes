@@ -75,7 +75,7 @@ var _ = framework.KubeDescribe("Events", func() {
 
 		By("verifying the pod is in kubernetes")
 		selector := labels.SelectorFromSet(labels.Set(map[string]string{"time": value}))
-		options := v1.ListOptions{LabelSelector: selector.String()}
+		options := metav1.ListOptions{LabelSelector: selector.String()}
 		pods, err := podClient.List(options)
 		Expect(len(pods.Items)).To(Equal(1))
 
@@ -95,7 +95,7 @@ var _ = framework.KubeDescribe("Events", func() {
 				"involvedObject.namespace": f.Namespace.Name,
 				"source":                   v1.DefaultSchedulerName,
 			}.AsSelector().String()
-			options := v1.ListOptions{FieldSelector: selector}
+			options := metav1.ListOptions{FieldSelector: selector}
 			events, err := f.ClientSet.Core().Events(f.Namespace.Name).List(options)
 			if err != nil {
 				return false, err
@@ -115,7 +115,7 @@ var _ = framework.KubeDescribe("Events", func() {
 				"involvedObject.namespace": f.Namespace.Name,
 				"source":                   "kubelet",
 			}.AsSelector().String()
-			options := v1.ListOptions{FieldSelector: selector}
+			options := metav1.ListOptions{FieldSelector: selector}
 			events, err = f.ClientSet.Core().Events(f.Namespace.Name).List(options)
 			if err != nil {
 				return false, err
