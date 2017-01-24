@@ -252,26 +252,26 @@ kube::test::version::object_to_file() {
   name=$1
   flags=$2
   file_name=$3
-  kubectl version $flags | grep "$name Version:" | sed -e s/"$name Version: version.Info{"/'/' -e s/'}'/'/' -e s/', '/','/g -e s/':'/'=/g' -e s/'"'/""/g | tr , '\n' > ${file_name}.sh
+  kubectl version $flags | grep "$name Version:" | sed -e s/"$name Version: version.Info{"/'/' -e s/'}'/'/' -e s/', '/','/g -e s/':'/'=/g' -e s/'"'/""/g | tr , '\n' > ${file_name}
 }
 
 kube::test::version::json_object_to_file() {
   flags=$1
   file_name=$2
-  kubectl version $flags --output json | sed -e s/'\"'/''/g -e s/'}'/''/g -e s/'{'/''/g -e s/'clientVersion:'/'clientVersion:,'/ -e s/'serverVersion:'/'serverVersion:,'/ | tr , '\n' > ${file_name}.sh
+  kubectl version $flags --output json | sed -e s/'\"'/''/g -e s/'}'/''/g -e s/'{'/''/g -e s/'clientVersion:'/'clientVersion:,'/ -e s/'serverVersion:'/'serverVersion:,'/ | tr , '\n' > ${file_name}
 }
 
 kube::test::version::json_client_server_object_to_file() {
   flags=$1
   name=$2
   file_name=$3
-  kubectl version $flags --output json | jq -r ".${name}" | sed -e s/'\"'/''/g -e s/'}'/''/g -e s/'{'/''/g -e /^$/d -e s/','/''/g  -e s/':'/'='/g > ${file_name}.sh
+  kubectl version $flags --output json | jq -r ".${name}" | sed -e s/'\"'/''/g -e s/'}'/''/g -e s/'{'/''/g -e /^$/d -e s/','/''/g  -e s/':'/'='/g > ${file_name}
 }
 
 kube::test::version::yaml_object_to_file() {
   flags=$1
   file_name=$2
-  kubectl version $flags --output yaml | sed -e s/' '/''/g -e s/'\"'/''/g -e /^$/d > ${file_name}.sh
+  kubectl version $flags --output yaml | sed -e s/' '/''/g -e s/'\"'/''/g -e /^$/d > ${file_name}
 }
 
 kube::test::version::diff_assert() {
