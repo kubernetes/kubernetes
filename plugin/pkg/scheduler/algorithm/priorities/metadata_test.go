@@ -66,7 +66,7 @@ func TestPriorityMetadata(t *testing.T) {
 		},
 	}
 	podWithTolerationsAndAffinity := &v1.Pod{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Annotations: map[string]string{
 				v1.TolerationsAnnotationKey: string(tolerationData),
 			},
@@ -83,7 +83,7 @@ func TestPriorityMetadata(t *testing.T) {
 		},
 	}
 	podWithTolerationsAndRequests := &v1.Pod{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Annotations: map[string]string{
 				v1.TolerationsAnnotationKey: string(tolerationData),
 			},
