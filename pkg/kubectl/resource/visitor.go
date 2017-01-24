@@ -94,6 +94,9 @@ type Info struct {
 	ResourceVersion string
 	// Optional, should this resource be exported, stripped of cluster-specific and instance specific fields
 	Export bool
+	// Optional, this keeps the raw data of a resource. It is useful if we want
+	// to access the original data of a configuration file.
+	Raw []byte
 }
 
 // NewInfo returns a new info object

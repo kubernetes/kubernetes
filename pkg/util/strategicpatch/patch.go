@@ -548,7 +548,7 @@ func StrategicMergeMapPatch(original, patch JSONMap, dataStruct interface{}) (JS
 	if err != nil {
 		return nil, err
 	}
-	return mergeMap(original, patch, t, true)
+	return mergeMap(original, patch, t, true, true)
 }
 
 func getTagStructType(dataStruct interface{}) (reflect.Type, error) {
@@ -570,11 +570,14 @@ func getTagStructType(dataStruct interface{}) (reflect.Type, error) {
 
 var errBadPatchTypeFmt = "unknown patch type: %s in map: %v"
 
-// Merge fields from a patch map into the original map. Note: This may modify
+// mergeMap merges fields from a patch map into the original map. Note: This may modify
 // both the original map and the patch because getting a deep copy of a map in
 // golang is highly non-trivial.
 // flag mergeDeleteList controls if using the parallel list to delete or keeping the list.
-func mergeMap(original, patch map[string]interface{}, t reflect.Type, mergeDeleteList bool) (map[string]interface{}, error) {
+// If patch contains any null field (e.g. field_1: null) that is not
+// present in original, then to propagate it to the end result use
+// ignoreUnmatchedNulls == false.
+func mergeMap(original, patch map[string]interface{}, t reflect.Type, mergeDeleteList, ignoreUnmatchedNulls bool) (map[string]interface{}, error) {
 	if v, ok := patch[directiveMarker]; ok {
 		if v == replaceDirective {
 			// If the patch contains "$patch: replace", don't merge it, just use the
@@ -619,13 +622,17 @@ func mergeMap(original, patch map[string]interface{}, t reflect.Type, mergeDelet
 		}
 
 		// If the value of this key is null, delete the key if it exists in the
-		// original. Otherwise, skip it.
+		// original. Otherwise, check if we want to preserve it or skip it.
+		// Preserving the null value is useful when we want to send an explicit
+		// delete to the API server.
 		if patchV == nil {
 			if _, ok := original[k]; ok {
 				delete(original, k)
 			}
 
-			continue
+			if ignoreUnmatchedNulls {
+				continue
+			}
 		}
 
 		_, ok := original[k]
@@ -654,7 +661,7 @@ func mergeMap(original, patch map[string]interface{}, t reflect.Type, mergeDelet
 				typedOriginal := original[k].(map[string]interface{})
 				typedPatch := patchV.(map[string]interface{})
 				var err error
-				original[k], err = mergeMap(typedOriginal, typedPatch, fieldType, mergeDeleteList)
+				original[k], err = mergeMap(typedOriginal, typedPatch, fieldType, mergeDeleteList, ignoreUnmatchedNulls)
 				if err != nil {
 					return nil, err
 				}
@@ -667,7 +674,7 @@ func mergeMap(original, patch map[string]interface{}, t reflect.Type, mergeDelet
 				typedOriginal := original[k].([]interface{})
 				typedPatch := patchV.([]interface{})
 				var err error
-				original[k], err = mergeSlice(typedOriginal, typedPatch, elemType, fieldPatchMergeKey, mergeDeleteList, isDeleteList)
+				original[k], err = mergeSlice(typedOriginal, typedPatch, elemType, fieldPatchMergeKey, mergeDeleteList, isDeleteList, ignoreUnmatchedNulls)
 				if err != nil {
 					return nil, err
 				}
@@ -688,7 +695,7 @@ func mergeMap(original, patch map[string]interface{}, t reflect.Type, mergeDelet
 // Merge two slices together. Note: This may modify both the original slice and
 // the patch because getting a deep copy of a slice in golang is highly
 // non-trivial.
-func mergeSlice(original, patch []interface{}, elemType reflect.Type, mergeKey string, mergeDeleteList, isDeleteList bool) ([]interface{}, error) {
+func mergeSlice(original, patch []interface{}, elemType reflect.Type, mergeKey string, mergeDeleteList, isDeleteList, ignoreUnmatchedNulls bool) ([]interface{}, error) {
 	if len(original) == 0 && len(patch) == 0 {
 		return original, nil
 	}
@@ -779,7 +786,7 @@ func mergeSlice(original, patch []interface{}, elemType reflect.Type, mergeKey s
 			var mergedMaps interface{}
 			var err error
 			// Merge into original.
-			mergedMaps, err = mergeMap(originalMap, typedV, elemType, mergeDeleteList)
+			mergedMaps, err = mergeMap(originalMap, typedV, elemType, mergeDeleteList, ignoreUnmatchedNulls)
 			if err != nil {
 				return nil, err
 			}
@@ -1282,7 +1289,8 @@ func mapsOfMapsHaveConflicts(typedLeft, typedRight map[string]interface{}, struc
 // configurations. Conflicts are defined as keys changed differently from original to modified
 // than from original to current. In other words, a conflict occurs if modified changes any key
 // in a way that is different from how it is changed in current (e.g., deleting it, changing its
-// value).
+// value). We also propagate values fields that do not exist in original but are explicitly
+// defined in modified.
 func CreateThreeWayMergePatch(original, modified, current []byte, dataStruct interface{}, overwrite bool, fns ...PreconditionFunc) ([]byte, error) {
 	originalMap := map[string]interface{}{}
 	if len(original) > 0 {
@@ -1324,7 +1332,7 @@ func CreateThreeWayMergePatch(original, modified, current []byte, dataStruct int
 		return nil, err
 	}
 
-	patchMap, err := mergeMap(deletionsMap, deltaMap, t, false)
+	patchMap, err := mergeMap(deletionsMap, deltaMap, t, false, false)
 	if err != nil {
 		return nil, err
 	}
@@ -1373,4 +1381,36 @@ func toYAML(v interface{}) (string, error) {
 	}
 
 	return string(y), nil
+}
+
+// GuidedJsonMerge merges two JSON formatted items by following the structure of dataStruct's type. We use
+// dataStruct's type to respect strategicMerge guidelines and ensure the structure of the JSON items
+// (e.g. no fields are missing, no additional fields exist, etc).
+// j2 will overwrite fields of j1 in case of field collisions.
+func GuidedJsonMerge(j1, j2 []byte, dataStruct interface{}) ([]byte, error) {
+	j1Map := map[string]interface{}{}
+	if len(j1) > 0 {
+		if err := json.Unmarshal(j1, &j1Map); err != nil {
+			return nil, fmt.Errorf("Invalid JSON document: %s", j1)
+		}
+	}
+
+	j2Map := map[string]interface{}{}
+	if len(j2) > 0 {
+		if err := json.Unmarshal(j2, &j2Map); err != nil {
+			return nil, fmt.Errorf("Invalid JSON document: %s", j2)
+		}
+	}
+
+	t, err := getTagStructType(dataStruct)
+	if err != nil {
+		return nil, err
+	}
+
+	mergedMap, err := mergeMap(j1Map, j2Map, t, false, false)
+	if err != nil {
+		return nil, err
+	}
+
+	return json.Marshal(mergedMap)
 }

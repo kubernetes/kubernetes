@@ -585,6 +585,27 @@ func NewAPIFactory() (cmdutil.Factory, *TestFactory, runtime.Codec, runtime.Nego
 	}, t, testapi.Default.Codec(), testapi.Default.NegotiatedSerializer()
 }
 
+type fakeExtensionsAPIFactory struct {
+	fakeAPIFactory
+}
+
+func (f *fakeExtensionsAPIFactory) JSONEncoder() runtime.Encoder {
+	return testapi.Extensions.Codec()
+}
+
+func NewExtensionsAPIFactory() (cmdutil.Factory, *TestFactory, runtime.Codec, runtime.NegotiatedSerializer) {
+	t := &TestFactory{
+		Validator: validation.NullSchema{},
+	}
+	rf := cmdutil.NewFactory(nil)
+	return &fakeExtensionsAPIFactory{
+		fakeAPIFactory: fakeAPIFactory{
+			Factory: rf,
+			tf:      t,
+		},
+	}, t, testapi.Default.Codec(), testapi.Default.NegotiatedSerializer()
+}
+
 func testDynamicResources() []*discovery.APIGroupResources {
 	return []*discovery.APIGroupResources{
 		{

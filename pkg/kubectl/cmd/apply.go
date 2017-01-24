@@ -217,14 +217,6 @@ func RunApply(f cmdutil.Factory, cmd *cobra.Command, out, errOut io.Writer, opti
 			visitedNamespaces.Insert(info.Namespace)
 		}
 
-		// Get the modified configuration of the object. Embed the result
-		// as an annotation in the modified configuration, so that it will appear
-		// in the patch sent to the server.
-		modified, err := kubectl.GetModifiedConfiguration(info, true, encoder)
-		if err != nil {
-			return cmdutil.AddSourceToErr(fmt.Sprintf("retrieving modified configuration from:\n%v\nfor:", info), info.Source, err)
-		}
-
 		if err := info.Get(); err != nil {
 			if !errors.IsNotFound(err) {
 				return cmdutil.AddSourceToErr(fmt.Sprintf("retrieving current configuration of:\n%v\nfrom server for:", info), info.Source, err)
@@ -283,6 +275,14 @@ func RunApply(f cmdutil.Factory, cmd *cobra.Command, out, errOut io.Writer, opti
 				cascade:       options.Cascade,
 				timeout:       options.Timeout,
 				gracePeriod:   options.GracePeriod,
+			}
+
+			// Get the modified configuration of the object. Embed the result
+			// as an annotation in the modified configuration, so that it will appear
+			// in the patch sent to the server. Add explicit user defined null values.
+			modified, err := kubectl.GetModifiedConfigurationWithNulls(info, encoder)
+			if err != nil {
+				return cmdutil.AddSourceToErr(fmt.Sprintf("retrieving modified configuration from:\n%v\nfor:", info), info.Source, err)
 			}
 
 			patchBytes, err := patcher.patch(info.Object, modified, info.Source, info.Namespace, info.Name)
