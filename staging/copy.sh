@@ -77,14 +77,8 @@ save "tools/clientcmd"
 save "tools/metrics"
 save "transport"
 save "pkg/third_party"
-save "pkg/util/cert"
-save "pkg/util/clock"
-save "pkg/util/flowcontrol"
-save "pkg/util/homedir"
-save "pkg/util/integer"
-save "pkg/util/jsonpath"
-save "pkg/util/testing"
 save "plugin"
+save "util"
 
 
 

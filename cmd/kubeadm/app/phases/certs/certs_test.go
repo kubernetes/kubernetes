@@ -23,7 +23,7 @@ import (
 	"os"
 	"testing"
 
-	certutil "k8s.io/client-go/pkg/util/cert"
+	certutil "k8s.io/client-go/util/cert"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 )
 

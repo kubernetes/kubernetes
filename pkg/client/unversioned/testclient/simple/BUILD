@@ -19,8 +19,8 @@ go_library(
         "//vendor:k8s.io/apimachinery/pkg/fields",
         "//vendor:k8s.io/apimachinery/pkg/labels",
         "//vendor:k8s.io/apimachinery/pkg/runtime",
-        "//vendor:k8s.io/client-go/pkg/util/testing",
         "//vendor:k8s.io/client-go/rest",
+        "//vendor:k8s.io/client-go/util/testing",
     ],
 )
 

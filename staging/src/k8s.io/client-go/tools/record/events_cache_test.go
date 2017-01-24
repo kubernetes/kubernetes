@@ -25,7 +25,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/client-go/pkg/api/v1"
-	"k8s.io/client-go/pkg/util/clock"
+	"k8s.io/client-go/util/clock"
 )
 
 func makeObjectReference(kind, name, namespace string) v1.ObjectReference {

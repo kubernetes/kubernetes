@@ -74,8 +74,8 @@ go_test(
         "//vendor:k8s.io/apimachinery/pkg/runtime",
         "//vendor:k8s.io/apimachinery/pkg/util/errors",
         "//vendor:k8s.io/apimachinery/pkg/util/sets",
-        "//vendor:k8s.io/client-go/pkg/util/testing",
         "//vendor:k8s.io/client-go/rest",
+        "//vendor:k8s.io/client-go/util/testing",
     ],
 )
 

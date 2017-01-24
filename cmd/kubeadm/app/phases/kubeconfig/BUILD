@@ -26,9 +26,9 @@ go_library(
     deps = [
         "//cmd/kubeadm/app/constants:go_default_library",
         "//cmd/kubeadm/app/phases/certs/pkiutil:go_default_library",
-        "//vendor:k8s.io/client-go/pkg/util/cert",
         "//vendor:k8s.io/client-go/tools/clientcmd",
         "//vendor:k8s.io/client-go/tools/clientcmd/api",
+        "//vendor:k8s.io/client-go/util/cert",
     ],
 )
 

@@ -32,9 +32,9 @@ go_library(
         "//vendor:k8s.io/apiserver/pkg/admission",
         "//vendor:k8s.io/client-go/kubernetes/typed/authentication/v1beta1",
         "//vendor:k8s.io/client-go/kubernetes/typed/authorization/v1beta1",
-        "//vendor:k8s.io/client-go/pkg/util/cert",
         "//vendor:k8s.io/client-go/rest",
         "//vendor:k8s.io/client-go/tools/clientcmd",
+        "//vendor:k8s.io/client-go/util/cert",
     ],
 )
 

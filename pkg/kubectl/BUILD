@@ -109,9 +109,9 @@ go_library(
         "//vendor:k8s.io/apimachinery/pkg/util/validation",
         "//vendor:k8s.io/apimachinery/pkg/util/wait",
         "//vendor:k8s.io/apimachinery/pkg/watch",
-        "//vendor:k8s.io/client-go/pkg/util/integer",
-        "//vendor:k8s.io/client-go/pkg/util/jsonpath",
         "//vendor:k8s.io/client-go/rest",
+        "//vendor:k8s.io/client-go/util/integer",
+        "//vendor:k8s.io/client-go/util/jsonpath",
     ],
 )
 
@@ -181,8 +181,8 @@ go_test(
         "//vendor:k8s.io/apimachinery/pkg/util/diff",
         "//vendor:k8s.io/apimachinery/pkg/util/sets",
         "//vendor:k8s.io/apimachinery/pkg/watch",
-        "//vendor:k8s.io/client-go/pkg/util/testing",
         "//vendor:k8s.io/client-go/rest",
+        "//vendor:k8s.io/client-go/util/testing",
     ],
 )
 
