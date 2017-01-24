@@ -22,9 +22,9 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/client-go/tools/cache"
 	certificates "k8s.io/kubernetes/pkg/apis/certificates"
 	v1beta1 "k8s.io/kubernetes/pkg/apis/certificates/v1beta1"
-	"k8s.io/kubernetes/pkg/client/cache"
 )
 
 // CertificateSigningRequestLister helps list CertificateSigningRequests.

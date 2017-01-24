@@ -13947,3 +13947,22 @@ go_library(
         "//vendor:k8s.io/client-go/pkg/apis/authorization/v1beta1",
     ],
 )
+
+go_test(
+    name = "k8s.io/client-go/tools/cache_xtest",
+    srcs = ["k8s.io/client-go/tools/cache/listwatch_test.go"],
+    tags = ["automanaged"],
+    deps = [
+        "//pkg/api:go_default_library",
+        "//pkg/api/testapi:go_default_library",
+        "//pkg/api/v1:go_default_library",
+        "//pkg/client/clientset_generated/internalclientset:go_default_library",
+        "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
+        "//vendor:k8s.io/apimachinery/pkg/fields",
+        "//vendor:k8s.io/apimachinery/pkg/runtime",
+        "//vendor:k8s.io/apimachinery/pkg/watch",
+        "//vendor:k8s.io/client-go/rest",
+        "//vendor:k8s.io/client-go/tools/cache",
+        "//vendor:k8s.io/client-go/util/testing",
+    ],
+)

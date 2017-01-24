@@ -21,9 +21,9 @@ package v1beta1
 import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/client-go/tools/cache"
 	policy "k8s.io/kubernetes/pkg/apis/policy"
 	v1beta1 "k8s.io/kubernetes/pkg/apis/policy/v1beta1"
-	"k8s.io/kubernetes/pkg/client/cache"
 )
 
 // EvictionLister helps list Evictions.

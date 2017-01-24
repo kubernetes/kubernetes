@@ -18,8 +18,8 @@ package cache
 
 import (
 	"github.com/golang/glog"
+	kubecache "k8s.io/client-go/tools/cache"
 	"k8s.io/kubernetes/federation/apis/federation/v1beta1"
-	kubecache "k8s.io/kubernetes/pkg/client/cache"
 )
 
 // StoreToClusterLister makes a Store have the List method of the metav1.ClusterInterface
