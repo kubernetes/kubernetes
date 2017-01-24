@@ -461,6 +461,7 @@ func (dsc *DaemonSetsController) manage(ds *extensions.DaemonSet) error {
 		return fmt.Errorf("couldn't get list of nodes when syncing daemon set %#v: %v", ds, err)
 	}
 	var nodesNeedingDaemonPods, podsToDelete []string
+	var failedPodsObserved int
 	for _, node := range nodeList.Items {
 		_, shouldSchedule, shouldContinueRunning, err := dsc.nodeShouldRunDaemonPod(&node, ds)
 		if err != nil {
@@ -476,13 +477,13 @@ func (dsc *DaemonSetsController) manage(ds *extensions.DaemonSet) error {
 		case shouldContinueRunning:
 			// If a daemon pod failed, delete it
 			// If there's no daemon pods left on this node, we will create it in the next sync loop
-			// TODO: handle the case when the daemon pods fail consistently and causes kill-recreate hot loop
 			var daemonPodsRunning []*v1.Pod
 			for i := range daemonPods {
 				pod := daemonPods[i]
 				if pod.Status.Phase == v1.PodFailed {
 					glog.V(2).Infof("Found failed daemon pod %s/%s on node %s, will try to kill it", pod.Namespace, node.Name, pod.Name)
 					podsToDelete = append(podsToDelete, pod.Name)
+					failedPodsObserved++
 				} else {
 					daemonPodsRunning = append(daemonPodsRunning, pod)
 				}
@@ -561,6 +562,10 @@ func (dsc *DaemonSetsController) manage(ds *extensions.DaemonSet) error {
 	close(errCh)
 	for err := range errCh {
 		errors = append(errors, err)
+	}
+	if failedPodsObserved > 0 {
+		// Throw an error when the daemon pods fail to prevent kill-recreate hot loop
+		errors = append(errors, fmt.Errorf("Deleted %d failed pods", failedPodsObserved))
 	}
 	return utilerrors.NewAggregate(errors)
 }
