@@ -77,11 +77,11 @@ func TestKindFor(t *testing.T) {
 	}{
 		{
 			in:       schema.GroupVersionResource{Group: "storage.k8s.io", Version: "", Resource: "sc"},
-			expected: schema.GroupVersionKind{Group: "storage.k8s.io", Version: "v1beta1", Kind: "StorageClass"},
+			expected: schema.GroupVersionKind{Group: "storage.k8s.io", Version: "v1", Kind: "StorageClass"},
 		},
 		{
 			in:       schema.GroupVersionResource{Group: "", Version: "", Resource: "sc"},
-			expected: schema.GroupVersionKind{Group: "storage.k8s.io", Version: "v1beta1", Kind: "StorageClass"},
+			expected: schema.GroupVersionKind{Group: "storage.k8s.io", Version: "v1", Kind: "StorageClass"},
 		},
 	}
 
