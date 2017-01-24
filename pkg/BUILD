@@ -73,6 +73,7 @@ filegroup(
         "//pkg/client/testdata:all-srcs",
         "//pkg/client/testing/cache:all-srcs",
         "//pkg/client/testing/core:all-srcs",
+        "//pkg/client/tests:all-srcs",
         "//pkg/client/typed/discovery:all-srcs",
         "//pkg/client/typed/dynamic:all-srcs",
         "//pkg/client/unversioned:all-srcs",

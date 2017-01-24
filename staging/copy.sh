@@ -92,8 +92,6 @@ function mkcp() {
 echo "copying client packages"
 mkcp "pkg/client/clientset_generated/${CLIENTSET}" "pkg/client/clientset_generated"
 mkcp "/pkg/client/record" "/pkg/client"
-# TODO: make this test file not depending on pkg/client/unversioned
-rm "${CLIENT_REPO_TEMP}"/pkg/client/cache/listwatch_test.go
 mkcp "/pkg/client/restclient/fake" "/pkg/client/restclient"
 mkcp "/pkg/client/testing" "/pkg/client"
 # remove this test because it imports the internal clientset
