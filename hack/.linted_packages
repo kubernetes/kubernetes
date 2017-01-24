@@ -116,6 +116,7 @@ pkg/client/informers/informers_generated/rbac/v1alpha1
 pkg/client/informers/informers_generated/rbac/v1beta1
 pkg/client/informers/informers_generated/storage
 pkg/client/informers/informers_generated/storage/internalversion
+pkg/client/informers/informers_generated/storage/v1
 pkg/client/informers/informers_generated/storage/v1beta1
 pkg/client/listers/apps/internalversion
 pkg/client/listers/apps/v1beta1
@@ -143,6 +144,7 @@ pkg/client/listers/rbac/internalversion
 pkg/client/listers/rbac/v1alpha1
 pkg/client/listers/rbac/v1beta1
 pkg/client/listers/storage/internalversion
+pkg/client/listers/storage/v1
 pkg/client/listers/storage/v1beta1
 pkg/client/metrics
 pkg/client/metrics/prometheus
