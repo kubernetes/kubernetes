@@ -338,12 +338,6 @@ func GetContainerLogs(client DockerInterface, pod *v1.Pod, containerID kubeconta
 }
 
 var (
-	// ErrNoContainersInPod is returned when there are no containers for a given pod
-	ErrNoContainersInPod = errors.New("NoContainersInPod")
-
-	// ErrNoPodInfraContainerInPod is returned when there is no pod infra container for a given pod
-	ErrNoPodInfraContainerInPod = errors.New("NoPodInfraContainerInPod")
-
 	// ErrContainerCannotRun is returned when a container is created, but cannot run properly
 	ErrContainerCannotRun = errors.New("ContainerCannotRun")
 )
