@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package util
+package trace
 
 import (
 	"bytes"
@@ -35,7 +35,7 @@ type Trace struct {
 	steps     []traceStep
 }
 
-func NewTrace(name string) *Trace {
+func New(name string) *Trace {
 	return &Trace{name, time.Now(), nil}
 }
 
