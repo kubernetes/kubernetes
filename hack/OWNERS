@@ -1,5 +1,6 @@
 reviewers:
   - eparis
+  - fejta
   - ihmccreery
   - ixdy
   - jbeda
@@ -8,6 +9,7 @@ reviewers:
   - zmerlynn
 approvers:
   - eparis
+  - fejta
   - ihmccreery
   - ixdy
   - jbeda
