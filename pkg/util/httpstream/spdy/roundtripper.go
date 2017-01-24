@@ -30,9 +30,9 @@ import (
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/third_party/forked/golang/netutil"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/util/httpstream"
-	"k8s.io/kubernetes/third_party/forked/golang/netutil"
 )
 
 // SpdyRoundTripper knows how to upgrade an HTTP request to one that supports
