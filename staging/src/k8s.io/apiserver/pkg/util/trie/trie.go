@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package util
+package trie
 
 // A simple trie implementation with Add an HasPrefix methods only.
 type Trie struct {
@@ -23,8 +23,8 @@ type Trie struct {
 	word     string
 }
 
-// CreateTrie creates a Trie and add all strings in the provided list to it.
-func CreateTrie(list []string) Trie {
+// New creates a Trie and add all strings in the provided list to it.
+func New(list []string) Trie {
 	ret := Trie{
 		children: make(map[byte]*Trie),
 		wordTail: false,
