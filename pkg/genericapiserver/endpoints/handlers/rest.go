@@ -140,7 +140,7 @@ func GetResource(r rest.Getter, e rest.Exporter, scope RequestScope) restful.Rou
 			options := metav1.GetOptions{}
 			if values := req.Request.URL.Query(); len(values) > 0 {
 				exports := metav1.ExportOptions{}
-				if err := scope.ParameterCodec.DecodeParameters(values, schema.GroupVersion{Version: "v1"}, &exports); err != nil {
+				if err := metainternalversion.ParameterCodec.DecodeParameters(values, scope.MetaGroupVersion, &exports); err != nil {
 					return nil, err
 				}
 				if exports.Export {
@@ -149,7 +149,7 @@ func GetResource(r rest.Getter, e rest.Exporter, scope RequestScope) restful.Rou
 					}
 					return e.Export(ctx, name, exports)
 				}
-				if err := scope.ParameterCodec.DecodeParameters(values, schema.GroupVersion{Version: "v1"}, &options); err != nil {
+				if err := metainternalversion.ParameterCodec.DecodeParameters(values, scope.MetaGroupVersion, &options); err != nil {
 					return nil, err
 				}
 			}
@@ -818,13 +818,15 @@ func DeleteResource(r rest.GracefulDeleter, allowsOptions bool, scope RequestSco
 				return
 			}
 			if len(body) > 0 {
-				s, err := negotiation.NegotiateInputSerializer(req.Request, scope.Serializer)
+				s, err := negotiation.NegotiateInputSerializer(req.Request, metainternalversion.Codecs)
 				if err != nil {
 					scope.err(err, res.ResponseWriter, req.Request)
 					return
 				}
-				defaultGVK := scope.Kind.GroupVersion().WithKind("DeleteOptions")
-				obj, _, err := scope.Serializer.DecoderToVersion(s.Serializer, defaultGVK.GroupVersion()).Decode(body, &defaultGVK, options)
+				// For backwards compatibility, we need to allow existing clients to submit per group DeleteOptions
+				// It is also allowed to pass a body with meta.k8s.io/v1.DeleteOptions
+				defaultGVK := scope.MetaGroupVersion.WithKind("DeleteOptions")
+				obj, _, err := metainternalversion.Codecs.DecoderToVersion(s.Serializer, defaultGVK.GroupVersion()).Decode(body, &defaultGVK, options)
 				if err != nil {
 					scope.err(err, res.ResponseWriter, req.Request)
 					return
@@ -835,7 +837,7 @@ func DeleteResource(r rest.GracefulDeleter, allowsOptions bool, scope RequestSco
 				}
 			} else {
 				if values := req.Request.URL.Query(); len(values) > 0 {
-					if err := scope.ParameterCodec.DecodeParameters(values, scope.Kind.GroupVersion(), options); err != nil {
+					if err := metainternalversion.ParameterCodec.DecodeParameters(values, scope.MetaGroupVersion, options); err != nil {
 						scope.err(err, res.ResponseWriter, req.Request)
 						return
 					}
