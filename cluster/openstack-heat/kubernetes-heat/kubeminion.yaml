@@ -252,6 +252,9 @@ resources:
     type: OS::Heat::RandomString
     properties:
       length: 8
+      character_classes:
+        - class: lowercase
+        - class: digits
 
   kube_minion:
     type: OS::Nova::Server
