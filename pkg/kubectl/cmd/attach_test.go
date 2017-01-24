@@ -64,7 +64,7 @@ func TestPodAndContainerAttach(t *testing.T) {
 		},
 		{
 			p:           &AttachOptions{},
-			args:        []string{"foo", "bar"},
+			args:        []string{"one", "two", "three"},
 			expectError: true,
 			name:        "too many args",
 		},

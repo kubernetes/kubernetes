@@ -288,6 +288,11 @@ func (f *ring1Factory) AttachablePodForObject(object runtime.Object) (*api.Pod, 
 		return nil, err
 	}
 	switch t := object.(type) {
+	case *extensions.ReplicaSet:
+		selector := labels.SelectorFromSet(t.Spec.Selector.MatchLabels)
+		sortBy := func(pods []*v1.Pod) sort.Interface { return sort.Reverse(controller.ActivePods(pods)) }
+		pod, _, err := GetFirstPod(clientset.Core(), t.Namespace, selector, 1*time.Minute, sortBy)
+		return pod, err
 	case *api.ReplicationController:
 		selector := labels.SelectorFromSet(t.Spec.Selector)
 		sortBy := func(pods []*v1.Pod) sort.Interface { return sort.Reverse(controller.ActivePods(pods)) }
