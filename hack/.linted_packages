@@ -255,6 +255,7 @@ pkg/runtime/serializer/recognizer/testing
 pkg/runtime/serializer/streaming
 pkg/runtime/serializer/versioning
 pkg/runtime/serializer/yaml
+pkg/runtime/unstructured
 pkg/security
 pkg/security/podsecuritypolicy/apparmor
 pkg/security/podsecuritypolicy/capabilities
