@@ -169,7 +169,15 @@ func (s *secretStore) Get(namespace, name string) (*v1.Secret, error) {
 	data.Lock()
 	defer data.Unlock()
 	if data.err != nil || !s.clock.Now().Before(data.lastUpdateTime.Add(s.ttl)) {
-		secret, err := s.kubeClient.Core().Secrets(namespace).Get(name, metav1.GetOptions{})
+		opts := metav1.GetOptions{}
+		if data.secret != nil && data.err == nil {
+			// This is just a periodic refresh.
+			// In this case, we just try to get data from apiserver cache to reduce the load
+			// on etcd (the cache is eventuallly consistent).
+			// We should always hit etcd if the update was explicitly requested.
+			opts.ResourceVersion = "0"
+		}
+		secret, err := s.kubeClient.Core().Secrets(namespace).Get(name, opts)
 		// Update state, unless we got error different than "not-found".
 		if err == nil || apierrors.IsNotFound(err) {
 			// Ignore the update to the older version of a secret.
