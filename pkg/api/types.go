@@ -2863,6 +2863,7 @@ type Preconditions struct {
 }
 
 // DeleteOptions may be provided when deleting an API object
+// DEPRECATED: This type has been moved to meta/v1 and will be removed soon.
 type DeleteOptions struct {
 	metav1.TypeMeta
 

@@ -120,7 +120,7 @@ func newMapper() *meta.DefaultRESTMapper {
 func addGrouplessTypes() {
 	api.Scheme.AddKnownTypes(grouplessGroupVersion,
 		&genericapitesting.Simple{}, &genericapitesting.SimpleList{}, &metav1.ListOptions{}, &metav1.ExportOptions{},
-		&v1.DeleteOptions{}, &genericapitesting.SimpleGetOptions{}, &genericapitesting.SimpleRoot{})
+		&metav1.DeleteOptions{}, &genericapitesting.SimpleGetOptions{}, &genericapitesting.SimpleRoot{})
 	api.Scheme.AddKnownTypes(grouplessInternalGroupVersion,
 		&genericapitesting.Simple{}, &genericapitesting.SimpleList{}, &metav1.ExportOptions{},
 		&genericapitesting.SimpleGetOptions{}, &genericapitesting.SimpleRoot{})
@@ -138,7 +138,7 @@ func addTestTypes() {
 	}
 	api.Scheme.AddKnownTypes(testGroupVersion,
 		&genericapitesting.Simple{}, &genericapitesting.SimpleList{}, &metav1.ExportOptions{},
-		&v1.DeleteOptions{}, &genericapitesting.SimpleGetOptions{}, &genericapitesting.SimpleRoot{},
+		&metav1.DeleteOptions{}, &genericapitesting.SimpleGetOptions{}, &genericapitesting.SimpleRoot{},
 		&SimpleXGSubresource{})
 	api.Scheme.AddKnownTypes(testGroupVersion, &v1.Pod{})
 	api.Scheme.AddKnownTypes(testInternalGroupVersion,
@@ -157,7 +157,7 @@ func addTestTypes() {
 func addNewTestTypes() {
 	api.Scheme.AddKnownTypes(newGroupVersion,
 		&genericapitesting.Simple{}, &genericapitesting.SimpleList{}, &metav1.ExportOptions{},
-		&api.DeleteOptions{}, &genericapitesting.SimpleGetOptions{}, &genericapitesting.SimpleRoot{},
+		&metav1.DeleteOptions{}, &genericapitesting.SimpleGetOptions{}, &genericapitesting.SimpleRoot{},
 		&v1.Pod{},
 	)
 	metav1.AddToGroupVersion(api.Scheme, newGroupVersion)
