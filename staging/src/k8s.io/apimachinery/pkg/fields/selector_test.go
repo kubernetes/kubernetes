@@ -17,18 +17,134 @@ limitations under the License.
 package fields
 
 import (
+	"reflect"
 	"testing"
 )
+
+func TestSplitTerms(t *testing.T) {
+	testcases := map[string][]string{
+		// Simple selectors
+		`a`:                            {`a`},
+		`a=avalue`:                     {`a=avalue`},
+		`a=avalue,b=bvalue`:            {`a=avalue`, `b=bvalue`},
+		`a=avalue,b==bvalue,c!=cvalue`: {`a=avalue`, `b==bvalue`, `c!=cvalue`},
+
+		// Empty terms
+		``:     nil,
+		`a=a,`: {`a=a`, ``},
+		`,a=a`: {``, `a=a`},
+
+		// Escaped values
+		`k=\,,k2=v2`:   {`k=\,`, `k2=v2`},   // escaped comma in value
+		`k=\\,k2=v2`:   {`k=\\`, `k2=v2`},   // escaped backslash, unescaped comma
+		`k=\\\,,k2=v2`: {`k=\\\,`, `k2=v2`}, // escaped backslash and comma
+		`k=\a\b\`:      {`k=\a\b\`},         // non-escape sequences
+		`k=\`:          {`k=\`},             // orphan backslash
+
+		// Multi-byte
+		`함=수,목=록`: {`함=수`, `목=록`},
+	}
+
+	for selector, expectedTerms := range testcases {
+		if terms := splitTerms(selector); !reflect.DeepEqual(terms, expectedTerms) {
+			t.Errorf("splitSelectors(`%s`): Expected\n%#v\ngot\n%#v", selector, expectedTerms, terms)
+		}
+	}
+}
+
+func TestSplitTerm(t *testing.T) {
+	testcases := map[string]struct {
+		lhs string
+		op  string
+		rhs string
+		ok  bool
+	}{
+		// Simple terms
+		`a=value`:  {lhs: `a`, op: `=`, rhs: `value`, ok: true},
+		`b==value`: {lhs: `b`, op: `==`, rhs: `value`, ok: true},
+		`c!=value`: {lhs: `c`, op: `!=`, rhs: `value`, ok: true},
+
+		// Empty or invalid terms
+		``:  {lhs: ``, op: ``, rhs: ``, ok: false},
+		`a`: {lhs: ``, op: ``, rhs: ``, ok: false},
+
+		// Escaped values
+		`k=\,`:          {lhs: `k`, op: `=`, rhs: `\,`, ok: true},
+		`k=\=`:          {lhs: `k`, op: `=`, rhs: `\=`, ok: true},
+		`k=\\\a\b\=\,\`: {lhs: `k`, op: `=`, rhs: `\\\a\b\=\,\`, ok: true},
+
+		// Multi-byte
+		`함=수`: {lhs: `함`, op: `=`, rhs: `수`, ok: true},
+	}
+
+	for term, expected := range testcases {
+		lhs, op, rhs, ok := splitTerm(term)
+		if lhs != expected.lhs || op != expected.op || rhs != expected.rhs || ok != expected.ok {
+			t.Errorf(
+				"splitTerm(`%s`): Expected\n%s,%s,%s,%v\nGot\n%s,%s,%s,%v",
+				term,
+				expected.lhs, expected.op, expected.rhs, expected.ok,
+				lhs, op, rhs, ok,
+			)
+		}
+	}
+}
+
+func TestEscapeValue(t *testing.T) {
+	// map values to their normalized escaped values
+	testcases := map[string]string{
+		``:      ``,
+		`a`:     `a`,
+		`=`:     `\=`,
+		`,`:     `\,`,
+		`\`:     `\\`,
+		`\=\,\`: `\\\=\\\,\\`,
+	}
+
+	for unescapedValue, escapedValue := range testcases {
+		actualEscaped := EscapeValue(unescapedValue)
+		if actualEscaped != escapedValue {
+			t.Errorf("EscapeValue(%s): expected %s, got %s", unescapedValue, escapedValue, actualEscaped)
+		}
+
+		actualUnescaped, err := UnescapeValue(escapedValue)
+		if err != nil {
+			t.Errorf("UnescapeValue(%s): unexpected error %v", escapedValue, err)
+		}
+		if actualUnescaped != unescapedValue {
+			t.Errorf("UnescapeValue(%s): expected %s, got %s", escapedValue, unescapedValue, actualUnescaped)
+		}
+	}
+
+	// test invalid escape sequences
+	invalidTestcases := []string{
+		`\`,   // orphan slash is invalid
+		`\\\`, // orphan slash is invalid
+		`\a`,  // unrecognized escape sequence is invalid
+	}
+	for _, invalidValue := range invalidTestcases {
+		_, err := UnescapeValue(invalidValue)
+		if _, ok := err.(InvalidEscapeSequence); !ok || err == nil {
+			t.Errorf("UnescapeValue(%s): expected invalid escape sequence error, got %#v", invalidValue, err)
+		}
+	}
+}
 
 func TestSelectorParse(t *testing.T) {
 	testGoodStrings := []string{
 		"x=a,y=b,z=c",
 		"",
 		"x!=a,y=b",
+		`x=a||y\=b`,
+		`x=a\=\=b`,
 	}
 	testBadStrings := []string{
 		"x=a||y=b",
 		"x==a==b",
+		"x=a,b",
+		"x in (a)",
+		"x in (a,b,c)",
+		"x",
 	}
 	for _, test := range testGoodStrings {
 		lq, err := ParseSelector(test)
@@ -99,16 +215,18 @@ func TestSelectorMatches(t *testing.T) {
 	expectNoMatch(t, "x=y,z=w", Set{"x": "w", "z": "w"})
 	expectNoMatch(t, "x!=y,z!=w", Set{"x": "z", "z": "w"})
 
-	labelset := Set{
-		"foo": "bar",
-		"baz": "blah",
+	fieldset := Set{
+		"foo":     "bar",
+		"baz":     "blah",
+		"complex": `=value\,\`,
 	}
-	expectMatch(t, "foo=bar", labelset)
-	expectMatch(t, "baz=blah", labelset)
-	expectMatch(t, "foo=bar,baz=blah", labelset)
-	expectNoMatch(t, "foo=blah", labelset)
-	expectNoMatch(t, "baz=bar", labelset)
-	expectNoMatch(t, "foo=bar,foobar=bar,baz=blah", labelset)
+	expectMatch(t, "foo=bar", fieldset)
+	expectMatch(t, "baz=blah", fieldset)
+	expectMatch(t, "foo=bar,baz=blah", fieldset)
+	expectMatch(t, `foo=bar,baz=blah,complex=\=value\\\,\\`, fieldset)
+	expectNoMatch(t, "foo=blah", fieldset)
+	expectNoMatch(t, "baz=bar", fieldset)
+	expectNoMatch(t, "foo=bar,foobar=bar,baz=blah", fieldset)
 }
 
 func TestOneTermEqualSelector(t *testing.T) {
