@@ -41,11 +41,11 @@ import (
 
 	"golang.org/x/net/websocket"
 
+	"k8s.io/apimachinery/pkg/util/httpstream"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apiserver/pkg/features"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/apiserver/pkg/util/proxy"
-	"k8s.io/kubernetes/pkg/util/httpstream"
 )
 
 const fakeStatusCode = 567
