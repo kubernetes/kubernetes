@@ -15,14 +15,14 @@
 # Cross-build the serve_hostname image
 #
 # Usage:
-#       [TAG=v1.5] [PREFIX=gcr.io/google_containers] [TEST_REGISTRY=b.gcr.io/k8s_authenticated_test] [ARCH=amd64] [BASEIMAGE=busybox] make all
+#       [TAG=v1.5] [PREFIX=gcr.io/google_containers] [TEST_REGISTRY=gcr.io/k8s-authenticated-test] [ARCH=amd64] [BASEIMAGE=busybox] make all
 
 .PHONY: all push container clean
 
 TAG ?= v1.5
 
-REGISTRY ?= gcr.io/google_containers
-TEST_REGISTRY ?= b.gcr.io/k8s_authenticated_test
+REGISTRY ?= gcr.io/google-containers
+TEST_REGISTRY ?= gcr.io/k8s-authenticated-test
 
 # Architectures supported: amd64, arm, arm64, ppc64le and s390x
 ARCH ?= amd64
@@ -100,4 +100,3 @@ push: .push-$(ARCH)
 
 clean:
 	rm -rf $(BIN)
-
