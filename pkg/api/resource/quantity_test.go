@@ -829,6 +829,10 @@ func TestQuantityDeepCopy(t *testing.T) {
 		if q.d.Cmp(result.AsDec()) != 0 {
 			t.Errorf("Expected: %v, Actual: %v", q.String(), result.String())
 		}
+		result = Quantity{d: infDecAmount{dec(2, 0).Dec}, Format: DecimalSI}
+		if q.d.Cmp(result.AsDec()) == 0 {
+			t.Errorf("Modifying result has affected q")
+		}
 	}
 }
 

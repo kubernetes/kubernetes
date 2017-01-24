@@ -17,7 +17,6 @@ limitations under the License.
 package resource
 
 import (
-	"bytes"
 	"testing"
 
 	inf "gopkg.in/inf.v0"
@@ -26,73 +25,77 @@ import (
 func TestQuantityProtoMarshal(t *testing.T) {
 	table := []struct {
 		quantity string
-		expect   []byte
+		expect   Quantity
 	}{
-		{"0", []byte([]uint8{10, 1, 48})},
-		{"100m", []byte([]uint8{10, 4, 49, 48, 48, 109})},
-		{"50m", []byte([]uint8{10, 3, 53, 48, 109})},
-		{"10000T", []byte([]uint8{10, 3, 49, 48, 80})},
+		{"0", Quantity{i: int64Amount{value: 0, scale: 0}, s: "0", Format: DecimalSI}},
+		{"100m", Quantity{i: int64Amount{value: 100, scale: -3}, s: "100m", Format: DecimalSI}},
+		{"50m", Quantity{i: int64Amount{value: 50, scale: -3}, s: "50m", Format: DecimalSI}},
+		{"10000T", Quantity{i: int64Amount{value: 10000, scale: 12}, s: "10000T", Format: DecimalSI}},
 	}
 	for _, testCase := range table {
 		q := MustParse(testCase.quantity)
 		// Won't currently get an error as MarshalTo can't return one
 		result, _ := q.Marshal()
-		if !bytes.Equal(result, testCase.expect) {
-			t.Errorf("q: %v, Expected: %v, Actual: %v", q, testCase.expect, result)
+		q.MarshalTo(result)
+		if q.Cmp(testCase.expect) != 0 {
+			t.Errorf("Expected: %v, Actual: %v", testCase.expect, q)
 		}
 	}
 
 	nils := []struct {
 		dec    *inf.Dec
-		expect []byte
+		expect Quantity
 	}{
-		{dec(0, 0).Dec, []byte([]uint8{10, 1, 48})},
-		{dec(10, 0).Dec, []byte([]uint8{10, 2, 49, 48})},
-		{dec(-10, 0).Dec, []byte([]uint8{10, 3, 45, 49, 48})},
+		{dec(0, 0).Dec, Quantity{i: int64Amount{value: 0, scale: 0}, d: infDecAmount{dec(0, 0).Dec}, s: "0", Format: DecimalSI}},
+		{dec(10, 0).Dec, Quantity{i: int64Amount{value: 0, scale: 0}, d: infDecAmount{dec(10, 0).Dec}, s: "10", Format: DecimalSI}},
+		{dec(-10, 0).Dec, Quantity{i: int64Amount{value: 0, scale: 0}, d: infDecAmount{dec(-10, 0).Dec}, s: "-10", Format: DecimalSI}},
 	}
 	for _, nilCase := range nils {
 		q := Quantity{d: infDecAmount{nilCase.dec}, Format: DecimalSI}
 		// Won't currently get an error as MarshalTo can't return one
 		result, _ := q.Marshal()
-		if !bytes.Equal(result, nilCase.expect) {
-			t.Errorf("q: %v, Expected: %v, Actual: %v", q, nilCase.expect, result)
+		q.Unmarshal(result)
+		if q.Cmp(nilCase.expect) != 0 {
+			t.Errorf("Expected: %v, Actual: %v", nilCase.expect, q)
 		}
 	}
 }
 
 func TestQuantityProtoUnmarshal(t *testing.T) {
 	table := []struct {
-		input  []byte
+		input  Quantity
 		expect string
 	}{
-		{[]byte([]uint8{10, 1, 48}), "0"},
-		{[]byte([]uint8{10, 4, 49, 48, 48, 109}), "100m"},
-		{[]byte([]uint8{10, 3, 53, 48, 109}), "50m"},
-		{[]byte([]uint8{10, 3, 49, 48, 80}), "10000T"},
+		{Quantity{i: int64Amount{value: 0, scale: 0}, s: "0", Format: DecimalSI}, "0"},
+		{Quantity{i: int64Amount{value: 100, scale: -3}, s: "100m", Format: DecimalSI}, "100m"},
+		{Quantity{i: int64Amount{value: 50, scale: -3}, s: "50m", Format: DecimalSI}, "50m"},
+		{Quantity{i: int64Amount{value: 10000, scale: 12}, s: "10000T", Format: DecimalSI}, "10000T"},
 	}
 	for _, testCase := range table {
-		var q Quantity
-		q.Unmarshal(testCase.input)
-		e := MustParse(testCase.expect)
-		if q.Cmp(e) != 0 {
-			t.Errorf("Expected: %v, Actual: %v", e, q)
+		var inputQ Quantity
+		expectQ := MustParse(testCase.expect)
+		inputByteArray, _ := testCase.input.Marshal()
+		inputQ.Unmarshal(inputByteArray)
+		if inputQ.Cmp(expectQ) != 0 {
+			t.Errorf("Expected: %v, Actual: %v", inputQ, expectQ)
 		}
 	}
 
 	nils := []struct {
-		input  []byte
+		input  Quantity
 		expect *inf.Dec
 	}{
-		{[]byte([]uint8{10, 1, 48}), dec(0, 0).Dec},
-		{[]byte([]uint8{10, 2, 49, 48}), dec(10, 0).Dec},
-		{[]byte([]uint8{10, 3, 45, 49, 48}), dec(-10, 0).Dec},
+		{Quantity{i: int64Amount{value: 0, scale: 0}, d: infDecAmount{dec(0, 0).Dec}, s: "0", Format: DecimalSI}, dec(0, 0).Dec},
+		{Quantity{i: int64Amount{value: 0, scale: 0}, d: infDecAmount{dec(10, 0).Dec}, s: "10", Format: DecimalSI}, dec(10, 0).Dec},
+		{Quantity{i: int64Amount{value: 0, scale: 0}, d: infDecAmount{dec(-10, 0).Dec}, s: "-10", Format: DecimalSI}, dec(-10, 0).Dec},
 	}
 	for _, nilCase := range nils {
-		var q Quantity
-		q.Unmarshal(nilCase.input)
-		e := Quantity{d: infDecAmount{nilCase.expect}, Format: DecimalSI}
-		if q.Cmp(e) != 0 {
-			t.Errorf("Expected: %v, Actual: %v", e, q)
+		var inputQ Quantity
+		expectQ := Quantity{d: infDecAmount{nilCase.expect}, Format: DecimalSI}
+		inputByteArray, _ := nilCase.input.Marshal()
+		inputQ.Unmarshal(inputByteArray)
+		if inputQ.Cmp(expectQ) != 0 {
+			t.Errorf("Expected: %v, Actual: %v", inputQ, expectQ)
 		}
 	}
 }
