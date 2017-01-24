@@ -475,15 +475,16 @@ func (dsc *DaemonSetsController) manage(ds *extensions.DaemonSet) error {
 			nodesNeedingDaemonPods = append(nodesNeedingDaemonPods, node.Name)
 		case shouldContinueRunning:
 			// If a daemon pod failed, delete it
+			// If there's no daemon pods left on this node, we will create it in the next sync loop
 			// TODO: handle the case when the daemon pods fail consistently and causes kill-recreate hot loop
 			var daemonPodsRunning []*v1.Pod
 			for i := range daemonPods {
-				daemon := daemonPods[i]
-				if daemon.Status.Phase == v1.PodFailed {
-					glog.V(2).Infof("Found failed daemon pod %s/%s, will try to kill it", daemon.Namespace, daemon.Name)
-					podsToDelete = append(podsToDelete, daemon.Name)
+				pod := daemonPods[i]
+				if pod.Status.Phase == v1.PodFailed {
+					glog.V(2).Infof("Found failed daemon pod %s/%s on node %s, will try to kill it", pod.Namespace, node.Name, pod.Name)
+					podsToDelete = append(podsToDelete, pod.Name)
 				} else {
-					daemonPodsRunning = append(daemonPodsRunning, daemon)
+					daemonPodsRunning = append(daemonPodsRunning, pod)
 				}
 			}
 			// If daemon pod is supposed to be running on node, but more than 1 daemon pod is running, delete the excess daemon pods.
@@ -788,7 +789,7 @@ func (dsc *DaemonSetsController) nodeShouldRunDaemonPod(node *v1.Node, ds *exten
 				predicates.ErrTaintsTolerationsNotMatch:
 				return false, false, false, fmt.Errorf("unexpected reason: GeneralPredicates should not return reason %s", reason.GetReason())
 			default:
-				glog.V(4).Infof("unknownd predicate failure reason: %s", reason.GetReason())
+				glog.V(4).Infof("unknown predicate failure reason: %s", reason.GetReason())
 				wantToRun, shouldSchedule, shouldContinueRunning = false, false, false
 				emitEvent = true
 			}
