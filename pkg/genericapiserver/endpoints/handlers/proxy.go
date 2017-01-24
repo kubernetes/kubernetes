@@ -30,6 +30,7 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/httpstream"
 	"k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apiserver/pkg/endpoints/metrics"
 	"k8s.io/apiserver/pkg/endpoints/request"
@@ -37,7 +38,6 @@ import (
 	proxyutil "k8s.io/apiserver/pkg/util/proxy"
 	"k8s.io/kubernetes/pkg/genericapiserver/endpoints/handlers/responsewriters"
 	"k8s.io/kubernetes/pkg/genericapiserver/registry/rest"
-	"k8s.io/kubernetes/pkg/util/httpstream"
 
 	"github.com/golang/glog"
 )

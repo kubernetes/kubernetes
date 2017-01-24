@@ -27,7 +27,7 @@ import (
 	"testing"
 
 	"github.com/elazarl/goproxy"
-	"k8s.io/kubernetes/pkg/util/httpstream"
+	"k8s.io/apimachinery/pkg/util/httpstream"
 )
 
 // be sure to unset environment variable https_proxy (if exported) before testing, otherwise the testing will fail unexpectedly.
