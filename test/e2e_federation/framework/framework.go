@@ -25,7 +25,9 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
+	fedv1beta1 "k8s.io/kubernetes/federation/apis/federation/v1beta1"
 	"k8s.io/kubernetes/federation/client/clientset_generated/federation_clientset"
+	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/test/e2e/framework"
 
@@ -43,10 +45,22 @@ type Framework struct {
 }
 
 func NewDefaultFederatedFramework(baseName string) *Framework {
-	f := &Framework{framework.NewDefaultFramework(baseName), nil, &v1.Namespace{}}
+	options := framework.FrameworkOptions{
+		ClientQPS:   20,
+		ClientBurst: 50,
+	}
 
+	f := &Framework{&framework.Framework{
+		BaseName:                 baseName,
+		AddonResourceConstraints: make(map[string]framework.ResourceConstraint),
+		Options:                  options,
+		ClientSet:                nil,
+	}, nil, &v1.Namespace{}}
+
+	BeforeEach(f.BeforeEach)
 	BeforeEach(f.FederationBeforeEach)
 	AfterEach(f.FederationAfterEach)
+	AfterEach(f.AfterEach)
 
 	return f
 }
@@ -138,9 +152,9 @@ func (f *Framework) FederationAfterEach() {
 			return f.FederationClientset.Core().Events(ns).List(opts)
 		}, f.FederationNamespace.Name)
 		// Print logs of federation control plane pods (federation-apiserver and federation-controller-manager)
-		framework.LogPodsWithLabels(f.ClientSet, "federation", map[string]string{"app": "federated-cluster"}, framework.Logf)
+		framework.LogPodsWithLabels(f.ClientSet, fedv1beta1.FederationNamespaceSystem, map[string]string{"app": "federated-cluster"}, framework.Logf)
 		// Print logs of kube-dns pod
-		framework.LogPodsWithLabels(f.ClientSet, "kube-system", map[string]string{"k8s-app": "kube-dns"}, framework.Logf)
+		framework.LogPodsWithLabels(f.ClientSet, api.NamespaceSystem, map[string]string{"k8s-app": "kube-dns"}, framework.Logf)
 	}
 }
 
