@@ -22,9 +22,9 @@ package openapi
 
 import (
 	spec "github.com/go-openapi/spec"
+	resource "k8s.io/apimachinery/pkg/api/resource"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	openapi "k8s.io/apimachinery/pkg/openapi"
-	resource "k8s.io/kubernetes/pkg/api/resource"
 	intstr "k8s.io/kubernetes/pkg/util/intstr"
 )
 
