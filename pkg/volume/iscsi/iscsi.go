@@ -104,7 +104,10 @@ func (plugin *iscsiPlugin) newMounterInternal(spec *volume.Spec, podUID types.UI
 
 	lun := strconv.Itoa(int(iscsi.Lun))
 	portal := portalMounter(iscsi.TargetPortal)
-
+	var bkportal []string
+	for _, tp := range iscsi.Portals {
+		bkportal = append(bkportal, portalMounter(string(tp)))
+	}
 	iface := iscsi.ISCSIInterface
 
 	return &iscsiDiskMounter{
@@ -112,6 +115,7 @@ func (plugin *iscsiPlugin) newMounterInternal(spec *volume.Spec, podUID types.UI
 			podUID:  podUID,
 			volName: spec.Name(),
 			portal:  portal,
+			portals: bkportal,
 			iqn:     iscsi.IQN,
 			lun:     lun,
 			iface:   iface,
@@ -163,6 +167,7 @@ type iscsiDisk struct {
 	volName string
 	podUID  types.UID
 	portal  string
+	portals []string
 	iqn     string
 	lun     string
 	iface   string
