@@ -19,7 +19,7 @@ package app
 import (
 	"testing"
 
-	utilflag "k8s.io/apiserver/pkg/util/flag"
+	"k8s.io/kubernetes/pkg/apis/componentconfig"
 	"k8s.io/kubernetes/pkg/kubelet"
 )
 
@@ -51,8 +51,8 @@ func TestValueOfAllocatableResources(t *testing.T) {
 	}
 
 	for _, test := range testCases {
-		kubeReservedCM := make(utilflag.ConfigurationMap)
-		systemReservedCM := make(utilflag.ConfigurationMap)
+		kubeReservedCM := make(componentconfig.ConfigurationMap)
+		systemReservedCM := make(componentconfig.ConfigurationMap)
 
 		kubeReservedCM.Set(test.kubeReserved)
 		systemReservedCM.Set(test.systemReserved)
