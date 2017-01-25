@@ -24,10 +24,11 @@ import (
 
 	"github.com/golang/glog"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/controller/volume/attachdetach/cache"
 	"k8s.io/kubernetes/pkg/controller/volume/attachdetach/statusupdater"
 	"k8s.io/kubernetes/pkg/util/goroutinemap/exponentialbackoff"
-	"k8s.io/kubernetes/pkg/volume/util/nestedpendingoperations"
+	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util/operationexecutor"
 )
 
@@ -129,6 +130,19 @@ func (rc *reconciler) syncStates() {
 	}
 }
 
+func (rc *reconciler) isExclusiveVolume(volumeSpec *volume.Spec) bool {
+	if volumeSpec.PersistentVolume == nil {
+		return false
+	}
+	// check if this volume can be attached to multiple PODs/nodes, if yes, return false
+	for _, accessMode := range volumeSpec.PersistentVolume.Spec.AccessModes {
+		if accessMode == v1.ReadWriteMany || accessMode == v1.ReadOnlyMany {
+			return false
+		}
+	}
+	return true
+}
+
 func (rc *reconciler) reconcile() {
 	// Detaches are triggered before attaches so that volumes referenced by
 	// pods that are rescheduled to a different node are detached first.
@@ -137,6 +151,16 @@ func (rc *reconciler) reconcile() {
 	for _, attachedVolume := range rc.actualStateOfWorld.GetAttachedVolumes() {
 		if !rc.desiredStateOfWorld.VolumeExists(
 			attachedVolume.VolumeName, attachedVolume.NodeName) {
+
+			// Don't even try to start an operation if there is already one running
+			// This check must be done before we do any other checks, as otherwise the other checks
+			// may pass while at the same time the volume leaves the pending state, resulting in
+			// double detach attempts
+			if rc.attacherDetacher.IsOperationPending(attachedVolume.VolumeName, "") {
+				glog.V(10).Infof("Operation for volume %q is already running. Can't start detach for %q", attachedVolume.VolumeName, attachedVolume.NodeName)
+				continue
+			}
+
 			// Set the detach request time
 			elapsedTime, err := rc.actualStateOfWorld.SetDetachRequestTime(attachedVolume.VolumeName, attachedVolume.NodeName)
 			if err != nil {
@@ -183,10 +207,8 @@ func (rc *reconciler) reconcile() {
 						rc.maxWaitForUnmountDuration)
 				}
 			}
-			if err != nil &&
-				!nestedpendingoperations.IsAlreadyExists(err) &&
-				!exponentialbackoff.IsExponentialBackoff(err) {
-				// Ignore nestedpendingoperations.IsAlreadyExists && exponentialbackoff.IsExponentialBackoff errors, they are expected.
+			if err != nil && !exponentialbackoff.IsExponentialBackoff(err) {
+				// Ignore exponentialbackoff.IsExponentialBackoff errors, they are expected.
 				// Log all other errors.
 				glog.Errorf(
 					"operationExecutor.DetachVolume failed to start for volume %q (spec.Name: %q) from node %q with err: %v",
@@ -206,16 +228,28 @@ func (rc *reconciler) reconcile() {
 			glog.V(5).Infof("Volume %q/Node %q is attached--touching.", volumeToAttach.VolumeName, volumeToAttach.NodeName)
 			rc.actualStateOfWorld.ResetDetachRequestTime(volumeToAttach.VolumeName, volumeToAttach.NodeName)
 		} else {
+			// Don't even try to start an operation if there is already one running
+			if rc.attacherDetacher.IsOperationPending(volumeToAttach.VolumeName, "") {
+				glog.V(10).Infof("Operation for volume %q is already running. Can't start attach for %q", volumeToAttach.VolumeName, volumeToAttach.NodeName)
+				continue
+			}
+
+			if rc.isExclusiveVolume(volumeToAttach.VolumeSpec) {
+				nodes := rc.actualStateOfWorld.GetNodesForVolume(volumeToAttach.VolumeName)
+				if len(nodes) > 0 {
+					glog.V(5).Infof("Volume %q is already exclusively attached to node %q and can't be attached to %q", volumeToAttach.VolumeName, nodes, volumeToAttach.NodeName)
+					continue
+				}
+			}
+
 			// Volume/Node doesn't exist, spawn a goroutine to attach it
 			glog.V(5).Infof("Attempting to start AttachVolume for volume %q to node %q", volumeToAttach.VolumeName, volumeToAttach.NodeName)
 			err := rc.attacherDetacher.AttachVolume(volumeToAttach.VolumeToAttach, rc.actualStateOfWorld)
 			if err == nil {
 				glog.Infof("Started AttachVolume for volume %q to node %q", volumeToAttach.VolumeName, volumeToAttach.NodeName)
 			}
-			if err != nil &&
-				!nestedpendingoperations.IsAlreadyExists(err) &&
-				!exponentialbackoff.IsExponentialBackoff(err) {
-				// Ignore nestedpendingoperations.IsAlreadyExists && exponentialbackoff.IsExponentialBackoff errors, they are expected.
+			if err != nil && !exponentialbackoff.IsExponentialBackoff(err) {
+				// Ignore exponentialbackoff.IsExponentialBackoff errors, they are expected.
 				// Log all other errors.
 				glog.Errorf(
 					"operationExecutor.AttachVolume failed to start for volume %q (spec.Name: %q) to node %q with err: %v",
