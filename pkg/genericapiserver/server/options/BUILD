@@ -21,8 +21,6 @@ go_library(
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/features:go_default_library",
-        "//pkg/genericapiserver/authenticator:go_default_library",
-        "//pkg/genericapiserver/authorizer:go_default_library",
         "//pkg/storage/storagebackend:go_default_library",
         "//vendor:github.com/golang/glog",
         "//vendor:github.com/spf13/pflag",
@@ -30,6 +28,8 @@ go_library(
         "//vendor:k8s.io/apimachinery/pkg/runtime/schema",
         "//vendor:k8s.io/apimachinery/pkg/util/net",
         "//vendor:k8s.io/apiserver/pkg/admission",
+        "//vendor:k8s.io/apiserver/pkg/authentication/authenticatorfactory",
+        "//vendor:k8s.io/apiserver/pkg/authorization/authorizerfactory",
         "//vendor:k8s.io/apiserver/pkg/util/feature",
         "//vendor:k8s.io/apiserver/pkg/util/flag",
         "//vendor:k8s.io/client-go/kubernetes/typed/authentication/v1beta1",

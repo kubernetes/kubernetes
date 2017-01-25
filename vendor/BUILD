@@ -14045,3 +14045,53 @@ go_library(
     srcs = ["k8s.io/apiserver/pkg/util/trie/trie.go"],
     tags = ["automanaged"],
 )
+
+go_library(
+    name = "k8s.io/apiserver/pkg/authentication/authenticatorfactory",
+    srcs = [
+        "k8s.io/apiserver/pkg/authentication/authenticatorfactory/delegating.go",
+        "k8s.io/apiserver/pkg/authentication/authenticatorfactory/loopback.go",
+        "k8s.io/apiserver/pkg/authentication/authenticatorfactory/requestheader.go",
+    ],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:github.com/go-openapi/spec",
+        "//vendor:k8s.io/apiserver/pkg/authentication/authenticator",
+        "//vendor:k8s.io/apiserver/pkg/authentication/group",
+        "//vendor:k8s.io/apiserver/pkg/authentication/request/anonymous",
+        "//vendor:k8s.io/apiserver/pkg/authentication/request/bearertoken",
+        "//vendor:k8s.io/apiserver/pkg/authentication/request/headerrequest",
+        "//vendor:k8s.io/apiserver/pkg/authentication/request/union",
+        "//vendor:k8s.io/apiserver/pkg/authentication/request/x509",
+        "//vendor:k8s.io/apiserver/pkg/authentication/token/tokenfile",
+        "//vendor:k8s.io/apiserver/pkg/authentication/user",
+        "//vendor:k8s.io/apiserver/plugin/pkg/authenticator/token/webhook",
+        "//vendor:k8s.io/client-go/kubernetes/typed/authentication/v1beta1",
+        "//vendor:k8s.io/client-go/util/cert",
+    ],
+)
+
+go_test(
+    name = "k8s.io/apiserver/pkg/authorization/authorizerfactory_test",
+    srcs = ["k8s.io/apiserver/pkg/authorization/authorizerfactory/authz_test.go"],
+    library = ":k8s.io/apiserver/pkg/authorization/authorizerfactory",
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:k8s.io/apiserver/pkg/authentication/user",
+        "//vendor:k8s.io/apiserver/pkg/authorization/authorizer",
+    ],
+)
+
+go_library(
+    name = "k8s.io/apiserver/pkg/authorization/authorizerfactory",
+    srcs = [
+        "k8s.io/apiserver/pkg/authorization/authorizerfactory/builtin.go",
+        "k8s.io/apiserver/pkg/authorization/authorizerfactory/delegating.go",
+    ],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:k8s.io/apiserver/pkg/authorization/authorizer",
+        "//vendor:k8s.io/apiserver/plugin/pkg/authorizer/webhook",
+        "//vendor:k8s.io/client-go/kubernetes/typed/authorization/v1beta1",
+    ],
+)
