@@ -22,6 +22,7 @@ import (
 	"testing"
 
 	"github.com/pborman/uuid"
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/runtime"
 	utiltesting "k8s.io/client-go/util/testing"
 	"k8s.io/kubernetes/pkg/api"
@@ -49,7 +50,7 @@ func TestSavePodToFile(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to load pod from file: %v", err)
 	}
-	if !api.Semantic.DeepEqual(pod, podFromFile) {
+	if !apiequality.Semantic.DeepEqual(pod, podFromFile) {
 		t.Errorf("\nexpected %#v\ngot	%#v\n", pod, podFromFile)
 	}
 }

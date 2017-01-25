@@ -28,6 +28,7 @@ import (
 	"testing"
 	"time"
 
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -541,7 +542,7 @@ func TestWatchControllers(t *testing.T) {
 			t.Errorf("Expected to find replica set under key %v", key)
 		}
 		rsSpec := *obj.(*extensions.ReplicaSet)
-		if !api.Semantic.DeepDerivative(rsSpec, testRSSpec) {
+		if !apiequality.Semantic.DeepDerivative(rsSpec, testRSSpec) {
 			t.Errorf("Expected %#v, but got %#v", testRSSpec, rsSpec)
 		}
 		close(received)
@@ -583,7 +584,7 @@ func TestWatchPods(t *testing.T) {
 			t.Errorf("Expected to find replica set under key %v", key)
 		}
 		rsSpec := obj.(*extensions.ReplicaSet)
-		if !api.Semantic.DeepDerivative(rsSpec, testRSSpec) {
+		if !apiequality.Semantic.DeepDerivative(rsSpec, testRSSpec) {
 			t.Errorf("\nExpected %#v,\nbut got %#v", testRSSpec, rsSpec)
 		}
 		close(received)
