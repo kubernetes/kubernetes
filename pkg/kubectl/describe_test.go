@@ -25,6 +25,7 @@ import (
 	"testing"
 	"time"
 
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/federation/apis/federation"
@@ -563,7 +564,7 @@ func TestGetPodsTotalRequests(t *testing.T) {
 		if err != nil {
 			t.Errorf("Unexpected error %v", err)
 		}
-		if !api.Semantic.DeepEqual(reqs, testCase.expectedReqs) {
+		if !apiequality.Semantic.DeepEqual(reqs, testCase.expectedReqs) {
 			t.Errorf("Expected %v, got %v", testCase.expectedReqs, reqs)
 		}
 	}

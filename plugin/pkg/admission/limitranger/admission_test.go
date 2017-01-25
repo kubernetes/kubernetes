@@ -22,6 +22,7 @@ import (
 	"testing"
 	"time"
 
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -166,7 +167,7 @@ func TestDefaultContainerResourceRequirements(t *testing.T) {
 	}
 
 	actual := defaultContainerResourceRequirements(&limitRange)
-	if !api.Semantic.DeepEqual(expected, actual) {
+	if !apiequality.Semantic.DeepEqual(expected, actual) {
 		t.Errorf("actual.Limits != expected.Limits; %v != %v", actual.Limits, expected.Limits)
 		t.Errorf("actual.Requests != expected.Requests; %v != %v", actual.Requests, expected.Requests)
 		t.Errorf("expected != actual; %v != %v", expected, actual)
@@ -199,7 +200,7 @@ func TestMergePodResourceRequirements(t *testing.T) {
 	mergePodResourceRequirements(&pod, &defaultRequirements)
 	for i := range pod.Spec.Containers {
 		actual := pod.Spec.Containers[i].Resources
-		if !api.Semantic.DeepEqual(expected, actual) {
+		if !apiequality.Semantic.DeepEqual(expected, actual) {
 			t.Errorf("pod %v, expected != actual; %v != %v", pod.Name, expected, actual)
 		}
 	}
@@ -218,13 +219,13 @@ func TestMergePodResourceRequirements(t *testing.T) {
 	mergePodResourceRequirements(&pod, &defaultRequirements)
 	for i := range pod.Spec.Containers {
 		actual := pod.Spec.Containers[i].Resources
-		if !api.Semantic.DeepEqual(expected, actual) {
+		if !apiequality.Semantic.DeepEqual(expected, actual) {
 			t.Errorf("pod %v, expected != actual; %v != %v", pod.Name, expected, actual)
 		}
 	}
 	for i := range pod.Spec.InitContainers {
 		actual := pod.Spec.InitContainers[i].Resources
-		if !api.Semantic.DeepEqual(expected, actual) {
+		if !apiequality.Semantic.DeepEqual(expected, actual) {
 			t.Errorf("pod %v, expected != actual; %v != %v", pod.Name, expected, actual)
 		}
 	}
@@ -238,13 +239,13 @@ func TestMergePodResourceRequirements(t *testing.T) {
 	mergePodResourceRequirements(&pod, &defaultRequirements)
 	for i := range pod.Spec.Containers {
 		actual := pod.Spec.Containers[i].Resources
-		if !api.Semantic.DeepEqual(expected, actual) {
+		if !apiequality.Semantic.DeepEqual(expected, actual) {
 			t.Errorf("pod %v, expected != actual; %v != %v", pod.Name, expected, actual)
 		}
 	}
 	for i := range pod.Spec.InitContainers {
 		actual := pod.Spec.InitContainers[i].Resources
-		if !api.Semantic.DeepEqual(initInputs[i], actual) {
+		if !apiequality.Semantic.DeepEqual(initInputs[i], actual) {
 			t.Errorf("pod %v, expected != actual; %v != %v", pod.Name, initInputs[i], actual)
 		}
 	}

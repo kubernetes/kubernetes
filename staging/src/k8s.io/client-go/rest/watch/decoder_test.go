@@ -30,6 +30,7 @@ import (
 	"k8s.io/client-go/pkg/api"
 	"k8s.io/client-go/pkg/api/v1"
 	restclientwatch "k8s.io/client-go/rest/watch"
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 
 	_ "k8s.io/client-go/pkg/api/install"
 )
@@ -68,7 +69,7 @@ func TestDecoder(t *testing.T) {
 			if e, a := eventType, action; e != a {
 				t.Errorf("Expected %v, got %v", e, a)
 			}
-			if e, a := expect, got; !api.Semantic.DeepDerivative(e, a) {
+			if e, a := expect, got; !apiequality.Semantic.DeepDerivative(e, a) {
 				t.Errorf("Expected %v, got %v", e, a)
 			}
 			t.Logf("Exited read")

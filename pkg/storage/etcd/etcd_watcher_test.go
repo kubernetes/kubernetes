@@ -20,6 +20,7 @@ import (
 	rt "runtime"
 	"testing"
 
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/watch"
@@ -139,7 +140,7 @@ func TestWatchInterpretations(t *testing.T) {
 				if e, a := item.expectType, event.Type; e != a {
 					t.Errorf("'%v - %v': expected %v, got %v", name, action, e, a)
 				}
-				if e, a := item.expectObject, event.Object; !api.Semantic.DeepDerivative(e, a) {
+				if e, a := item.expectObject, event.Object; !apiequality.Semantic.DeepDerivative(e, a) {
 					t.Errorf("'%v - %v': expected %v, got %v", name, action, e, a)
 				}
 			}
@@ -311,7 +312,7 @@ func TestWatch(t *testing.T) {
 	if e, a := watch.Added, event.Type; e != a {
 		t.Errorf("Expected %v, got %v", e, a)
 	}
-	if e, a := pod, event.Object; !api.Semantic.DeepDerivative(e, a) {
+	if e, a := pod, event.Object; !apiequality.Semantic.DeepDerivative(e, a) {
 		t.Errorf("Expected %v, got %v", e, a)
 	}
 
@@ -391,7 +392,7 @@ func TestWatchEtcdState(t *testing.T) {
 		t.Errorf("Unexpected event %#v", event)
 	}
 
-	if e, a := endpoint, event.Object; !api.Semantic.DeepDerivative(e, a) {
+	if e, a := endpoint, event.Object; !apiequality.Semantic.DeepDerivative(e, a) {
 		t.Errorf("Unexpected error: expected %#v, got %#v", e, a)
 	}
 }
@@ -464,7 +465,7 @@ func TestWatchFromZeroIndex(t *testing.T) {
 		t.Errorf("Unexpected event %#v", event)
 	}
 
-	if e, a := pod, event.Object; a == nil || !api.Semantic.DeepDerivative(e, a) {
+	if e, a := pod, event.Object; a == nil || !apiequality.Semantic.DeepDerivative(e, a) {
 		t.Errorf("Unexpected error: expected %#v, got %#v", e, a)
 	}
 }
@@ -494,7 +495,7 @@ func TestWatchListFromZeroIndex(t *testing.T) {
 		t.Errorf("Unexpected event %#v", event)
 	}
 
-	if e, a := pod, event.Object; !api.Semantic.DeepDerivative(e, a) {
+	if e, a := pod, event.Object; !apiequality.Semantic.DeepDerivative(e, a) {
 		t.Errorf("Unexpected error: expected %v, got %v", e, a)
 	}
 }

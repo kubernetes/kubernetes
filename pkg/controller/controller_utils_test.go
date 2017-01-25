@@ -27,6 +27,7 @@ import (
 	"testing"
 	"time"
 
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -273,7 +274,7 @@ func TestCreatePods(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
-	if !api.Semantic.DeepDerivative(&expectedPod, actualPod) {
+	if !apiequality.Semantic.DeepDerivative(&expectedPod, actualPod) {
 		t.Logf("Body: %s", fakeHandler.RequestBody)
 		t.Errorf("Unexpected mismatch.  Expected\n %#v,\n Got:\n %#v", &expectedPod, actualPod)
 	}

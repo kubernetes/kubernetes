@@ -23,6 +23,7 @@ import (
 	"testing"
 
 	"github.com/gogo/protobuf/proto"
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	apitesting "k8s.io/apimachinery/pkg/api/testing"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -68,7 +69,7 @@ func TestUniversalDeserializer(t *testing.T) {
 		if err != nil {
 			t.Fatalf("%s: %v", mediaType, err)
 		}
-		if !api.Semantic.DeepEqual(expected, obj) {
+		if !apiequality.Semantic.DeepEqual(expected, obj) {
 			t.Fatalf("%s: %#v", mediaType, obj)
 		}
 	}
@@ -88,7 +89,7 @@ func TestProtobufRoundTrip(t *testing.T) {
 	if err := out.Unmarshal(data); err != nil {
 		t.Fatal(err)
 	}
-	if !api.Semantic.Equalities.DeepEqual(out, obj) {
+	if !apiequality.Semantic.Equalities.DeepEqual(out, obj) {
 		t.Logf("marshal\n%s", hex.Dump(data))
 		t.Fatalf("Unmarshal is unequal\n%s", diff.ObjectGoPrintDiff(out, obj))
 	}

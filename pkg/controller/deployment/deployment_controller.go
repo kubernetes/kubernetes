@@ -27,6 +27,7 @@ import (
 	"time"
 
 	"github.com/golang/glog"
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -35,7 +36,6 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/tools/cache"
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
 	extensions "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
@@ -285,7 +285,7 @@ func (dc *DeploymentController) updateReplicaSet(old, cur interface{}) {
 	}
 	// A number of things could affect the old deployment: labels changing,
 	// pod template changing, etc.
-	if !api.Semantic.DeepEqual(oldRS, curRS) {
+	if !apiequality.Semantic.DeepEqual(oldRS, curRS) {
 		if oldD := dc.getDeploymentForReplicaSet(oldRS); oldD != nil {
 			dc.enqueueDeployment(oldD)
 		}

@@ -24,6 +24,7 @@ import (
 	"testing"
 	"time"
 
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/api"
@@ -101,7 +102,7 @@ func expectPodUpdate(t *testing.T, ch <-chan kubetypes.PodUpdate, expected ...ku
 		// except for "Pods", which are compared separately below.
 		expectedCopy, updateCopy := expected[i], update
 		expectedCopy.Pods, updateCopy.Pods = nil, nil
-		if !api.Semantic.DeepEqual(expectedCopy, updateCopy) {
+		if !apiequality.Semantic.DeepEqual(expectedCopy, updateCopy) {
 			t.Fatalf("Expected %#v, Got %#v", expectedCopy, updateCopy)
 		}
 

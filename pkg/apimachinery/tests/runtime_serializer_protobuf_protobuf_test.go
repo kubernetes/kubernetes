@@ -24,6 +24,7 @@ import (
 	"strings"
 	"testing"
 
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -344,7 +345,7 @@ func TestDecodeObjects(t *testing.T) {
 			continue
 		}
 
-		if !api.Semantic.DeepEqual(obj, test.obj) {
+		if !apiequality.Semantic.DeepEqual(obj, test.obj) {
 			t.Errorf("%d: unexpected object:\n%s", i, diff.ObjectGoPrintDiff(test.obj, obj))
 			continue
 		}
