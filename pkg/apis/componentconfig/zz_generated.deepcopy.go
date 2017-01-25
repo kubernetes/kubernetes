@@ -23,7 +23,6 @@ package componentconfig
 import (
 	conversion "k8s.io/apimachinery/pkg/conversion"
 	runtime "k8s.io/apimachinery/pkg/runtime"
-	flag "k8s.io/apiserver/pkg/util/flag"
 	api "k8s.io/kubernetes/pkg/api"
 	reflect "reflect"
 )
@@ -208,14 +207,14 @@ func DeepCopy_componentconfig_KubeletConfiguration(in interface{}, out interface
 		}
 		if in.SystemReserved != nil {
 			in, out := &in.SystemReserved, &out.SystemReserved
-			*out = make(flag.ConfigurationMap)
+			*out = make(ConfigurationMap)
 			for key, val := range *in {
 				(*out)[key] = val
 			}
 		}
 		if in.KubeReserved != nil {
 			in, out := &in.KubeReserved, &out.KubeReserved
-			*out = make(flag.ConfigurationMap)
+			*out = make(ConfigurationMap)
 			for key, val := range *in {
 				(*out)[key] = val
 			}

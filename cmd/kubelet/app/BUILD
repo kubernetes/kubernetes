@@ -17,9 +17,9 @@ go_test(
     library = ":go_default_library",
     tags = ["automanaged"],
     deps = [
+        "//pkg/apis/componentconfig:go_default_library",
         "//pkg/kubelet:go_default_library",
         "//vendor:k8s.io/apimachinery/pkg/util/diff",
-        "//vendor:k8s.io/apiserver/pkg/util/flag",
         "//vendor:k8s.io/client-go/rest",
     ],
 )

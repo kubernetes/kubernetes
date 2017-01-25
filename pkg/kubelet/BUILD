@@ -124,7 +124,6 @@ go_library(
         "//vendor:k8s.io/apimachinery/pkg/util/validation/field",
         "//vendor:k8s.io/apimachinery/pkg/util/wait",
         "//vendor:k8s.io/apiserver/pkg/util/feature",
-        "//vendor:k8s.io/apiserver/pkg/util/flag",
         "//vendor:k8s.io/client-go/kubernetes",
         "//vendor:k8s.io/client-go/util/clock",
         "//vendor:k8s.io/client-go/util/flowcontrol",

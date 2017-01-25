@@ -17,9 +17,12 @@ limitations under the License.
 package componentconfig
 
 import (
+	"fmt"
+	"sort"
+	"strings"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
-	utilflag "k8s.io/apiserver/pkg/util/flag"
 	"k8s.io/kubernetes/pkg/api"
 )
 
@@ -445,12 +448,12 @@ type KubeletConfiguration struct {
 	// that describe resources reserved for non-kubernetes components.
 	// Currently only cpu and memory are supported. [default=none]
 	// See http://kubernetes.io/docs/user-guide/compute-resources for more detail.
-	SystemReserved utilflag.ConfigurationMap
+	SystemReserved ConfigurationMap
 	// A set of ResourceName=ResourceQuantity (e.g. cpu=200m,memory=150G) pairs
 	// that describe resources reserved for kubernetes system components.
 	// Currently only cpu and memory are supported. [default=none]
 	// See http://kubernetes.io/docs/user-guide/compute-resources for more detail.
-	KubeReserved utilflag.ConfigurationMap
+	KubeReserved ConfigurationMap
 	// Default behaviour for kernel tuning
 	ProtectKernelDefaults bool
 	// If true, Kubelet ensures a set of iptables rules are present on host.
@@ -862,4 +865,34 @@ type AdmissionPluginConfiguration struct {
 	// configuration. If present, it will be used instead of the path to the configuration file.
 	// +optional
 	Configuration runtime.Object
+}
+
+type ConfigurationMap map[string]string
+
+func (m *ConfigurationMap) String() string {
+	pairs := []string{}
+	for k, v := range *m {
+		pairs = append(pairs, fmt.Sprintf("%s=%s", k, v))
+	}
+	sort.Strings(pairs)
+	return strings.Join(pairs, ",")
+}
+
+func (m *ConfigurationMap) Set(value string) error {
+	for _, s := range strings.Split(value, ",") {
+		if len(s) == 0 {
+			continue
+		}
+		arr := strings.SplitN(s, "=", 2)
+		if len(arr) == 2 {
+			(*m)[strings.TrimSpace(arr[0])] = strings.TrimSpace(arr[1])
+		} else {
+			(*m)[strings.TrimSpace(arr[0])] = ""
+		}
+	}
+	return nil
+}
+
+func (*ConfigurationMap) Type() string {
+	return "mapStringString"
 }
