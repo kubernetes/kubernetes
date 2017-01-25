@@ -27,8 +27,8 @@ go_library(
         "//pkg/api/validation/genericvalidation:go_default_library",
         "//pkg/apis/storage/util:go_default_library",
         "//pkg/capabilities:go_default_library",
+        "//pkg/features:go_default_library",
         "//pkg/security/apparmor:go_default_library",
-        "//pkg/util/config:go_default_library",
         "//pkg/util/intstr:go_default_library",
         "//vendor:github.com/emicklei/go-restful/swagger",
         "//vendor:github.com/exponent-io/jsonpath",
@@ -45,6 +45,7 @@ go_library(
         "//vendor:k8s.io/apimachinery/pkg/util/validation",
         "//vendor:k8s.io/apimachinery/pkg/util/validation/field",
         "//vendor:k8s.io/apimachinery/pkg/util/yaml",
+        "//vendor:k8s.io/apiserver/pkg/util/feature",
     ],
 )
 

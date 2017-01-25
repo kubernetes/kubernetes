@@ -26,7 +26,7 @@ import (
 	"github.com/golang/glog"
 	"github.com/kardianos/osext"
 
-	utilconfig "k8s.io/kubernetes/pkg/util/config"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 )
 
@@ -119,7 +119,7 @@ func (e *E2EServices) Stop() {
 func RunE2EServices() {
 	// Populate global DefaultFeatureGate with value from TestContext.FeatureGates.
 	// This way, statically-linked components see the same feature gate config as the test context.
-	utilconfig.DefaultFeatureGate.Set(framework.TestContext.FeatureGates)
+	utilfeature.DefaultFeatureGate.Set(framework.TestContext.FeatureGates)
 	e := newE2EServices()
 	if err := e.run(); err != nil {
 		glog.Fatalf("Failed to run e2e services: %v", err)

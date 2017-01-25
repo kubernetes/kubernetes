@@ -29,6 +29,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/server/healthz"
+	utilflag "k8s.io/apiserver/pkg/util/flag"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	federationclientset "k8s.io/kubernetes/federation/client/clientset_generated/federation_clientset"
@@ -53,7 +54,6 @@ import (
 	"github.com/spf13/pflag"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/kubernetes/pkg/client/typed/discovery"
-	"k8s.io/kubernetes/pkg/util/config"
 )
 
 const (
@@ -222,7 +222,7 @@ func restClientConfigFromSecret(master string) (*restclient.Config, error) {
 	return restClientCfg, nil
 }
 
-func controllerEnabled(controllers config.ConfigurationMap, serverResources []*metav1.APIResourceList, controller string, requiredResources []schema.GroupVersionResource, defaultValue bool) bool {
+func controllerEnabled(controllers utilflag.ConfigurationMap, serverResources []*metav1.APIResourceList, controller string, requiredResources []schema.GroupVersionResource, defaultValue bool) bool {
 	controllerConfig, ok := controllers[controller]
 	if ok {
 		if controllerConfig == "false" {

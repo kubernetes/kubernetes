@@ -31,10 +31,10 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
+	utilflag "k8s.io/apiserver/pkg/util/flag"
 	utilcert "k8s.io/client-go/util/cert"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/pkg/genericapiserver/server/options"
-	"k8s.io/kubernetes/pkg/util/config"
 )
 
 type TestCertSpec struct {
@@ -420,7 +420,7 @@ NextTest:
 		caCerts := []*x509.Certificate{ca}
 
 		// create SNI certs
-		var namedCertKeys []config.NamedCertKey
+		var namedCertKeys []utilflag.NamedCertKey
 		serverSig, err := certFileSignature(serverCertBundleFile, serverKeyFile)
 		if err != nil {
 			t.Errorf("%q - failed to get server cert signature: %v", title, err)
@@ -436,7 +436,7 @@ NextTest:
 				continue NextTest
 			}
 
-			namedCertKeys = append(namedCertKeys, config.NamedCertKey{
+			namedCertKeys = append(namedCertKeys, utilflag.NamedCertKey{
 				KeyFile:  keyFile,
 				CertFile: certBundleFile,
 				Names:    c.explicitNames,

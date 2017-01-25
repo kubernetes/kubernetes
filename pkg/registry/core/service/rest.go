@@ -34,14 +34,15 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apimachinery/pkg/watch"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/api"
 	apiservice "k8s.io/kubernetes/pkg/api/service"
 	"k8s.io/kubernetes/pkg/api/validation"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/genericapiserver/registry/rest"
 	"k8s.io/kubernetes/pkg/registry/core/endpoint"
 	"k8s.io/kubernetes/pkg/registry/core/service/ipallocator"
 	"k8s.io/kubernetes/pkg/registry/core/service/portallocator"
-	featuregate "k8s.io/kubernetes/pkg/util/config"
 )
 
 // ServiceRest includes storage for services and all sub resources
@@ -565,7 +566,7 @@ func shouldAssignNodePorts(service *api.Service) bool {
 func shouldCheckOrAssignHealthCheckNodePort(service *api.Service) bool {
 	if service.Spec.Type == api.ServiceTypeLoadBalancer {
 		// True if Service-type == LoadBalancer AND annotation AnnotationExternalTraffic present
-		return (featuregate.DefaultFeatureGate.ExternalTrafficLocalOnly() && apiservice.NeedsHealthCheck(service))
+		return (utilfeature.DefaultFeatureGate.Enabled(features.ExternalTrafficLocalOnly) && apiservice.NeedsHealthCheck(service))
 	}
 	glog.V(4).Infof("Service type: %v does not need health check node port", service.Spec.Type)
 	return false

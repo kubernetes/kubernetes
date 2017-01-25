@@ -31,7 +31,6 @@ go_test(
         "//pkg/genericapiserver/server/options:go_default_library",
         "//pkg/storage/etcd/testing:go_default_library",
         "//pkg/storage/storagebackend:go_default_library",
-        "//pkg/util/config:go_default_library",
         "//vendor:github.com/go-openapi/spec",
         "//vendor:github.com/stretchr/testify/assert",
         "//vendor:k8s.io/apimachinery/pkg/api/meta",
@@ -45,6 +44,7 @@ go_test(
         "//vendor:k8s.io/apiserver/pkg/authentication/user",
         "//vendor:k8s.io/apiserver/pkg/authorization/authorizer",
         "//vendor:k8s.io/apiserver/pkg/endpoints/request",
+        "//vendor:k8s.io/apiserver/pkg/util/flag",
         "//vendor:k8s.io/client-go/util/cert",
     ],
 )
