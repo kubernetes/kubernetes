@@ -28,7 +28,16 @@ kube::log::errexit() {
 
   set +o xtrace
   local code="${1:-1}"
-  kube::log::error_exit "'${BASH_COMMAND}' exited with status $err" "${1:-1}" 1
+  # Print out the stack trace described by $function_stack  
+  if [ ${#FUNCNAME[@]} -gt 2 ]
+  then
+    kube::log::error "Call tree:"
+    for ((i=1;i<${#FUNCNAME[@]}-1;i++))
+    do
+      kube::log::error " $i: ${BASH_SOURCE[$i+1]}:${BASH_LINENO[$i]} ${FUNCNAME[$i]}(...)"
+    done
+  fi  
+  kube::log::error_exit "Error in ${BASH_SOURCE[1]}:${BASH_LINENO[0]}. '${BASH_COMMAND}' exited with status $err" "${1:-1}" 1
 }
 
 kube::log::install_errexit() {

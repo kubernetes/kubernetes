@@ -21,8 +21,9 @@ set -o nounset
 set -o pipefail
 
 KUBE_ROOT=$(dirname "${BASH_SOURCE}")/../..
-source "${KUBE_ROOT}/hack/lib/init.sh"
-source "${KUBE_ROOT}/hack/lib/test.sh"
+# Expects the following has already been done by whatever sources this script
+# source "${KUBE_ROOT}/hack/lib/init.sh"
+# source "${KUBE_ROOT}/hack/lib/test.sh"
 
 ETCD_HOST=${ETCD_HOST:-127.0.0.1}
 ETCD_PORT=${ETCD_PORT:-2379}
@@ -2093,7 +2094,12 @@ run_deployment_tests() {
   # Deletion of both deployments should not be blocked
    kubectl delete deployment nginx2 "${kube_flags[@]}"
   # Clean up
-  kubectl delete deployment nginx "${kube_flags[@]}"
+  # TODO: cascading deletion of deployments is failing.
+  # TODO: re-enable this once https://github.com/kubernetes/kubernetes/issues/40433 is fixed
+  #   kubectl delete deployment nginx "${kube_flags[@]}"
+  # TODO: remove these once https://github.com/kubernetes/kubernetes/issues/40433 is fixed
+    kubectl delete deployment nginx --cascade=false "${kube_flags[@]}" 
+    kubectl delete replicaset --all "${kube_flags[@]}"
 
   ### Set image of a deployment
   # Pre-condition: no deployment exists
@@ -2409,9 +2415,9 @@ run_multi_resources_tests() {
 # Requires an env var SUPPORTED_RESOURCES which is a comma separated list of
 # resources for which tests should be run.
 runTests() {
-  if [ -z "${SUPPORTED_RESOURCES}" ]; then
-    echo "Need to set SUPPORTED_RESOURCES env var. It is a comma separated list of resources that are supported and hence should be tested. Set it to (*) to test all resources"
-    return
+  if [ -z "${SUPPORTED_RESOURCES:-}" ]; then
+    echo "Need to set SUPPORTED_RESOURCES env var. It is a list of resources that are supported and hence should be tested. Set it to (*) to test all resources"
+    exit 1
   fi
   kube::log::status "Checking kubectl version"
   kubectl version
@@ -2472,11 +2478,10 @@ runTests() {
 
   # Make sure "kubernetes" service exists.
   if kube::test::if_supports_resource "${services}" ; then
-    output_message=$(kubectl get "${kube_flags[@]}" svc)
-    if [[ ! $(echo "${output_message}" | grep "kubernetes") ]]; then
-      # Create kubernetes service
-      kubectl create "${kube_flags[@]}" -f hack/testdata/kubernetes-service.yaml
-    fi
+    # Attempt to create the kubernetes service, tolerating failure (since it might already exist)
+    kubectl create "${kube_flags[@]}" -f hack/testdata/kubernetes-service.yaml || true
+    # Require the service to exist (either we created it or the API server did)
+    kubectl get "${kube_flags[@]}" -f hack/testdata/kubernetes-service.yaml
   fi
 
   # Passing no arguments to create is an error
