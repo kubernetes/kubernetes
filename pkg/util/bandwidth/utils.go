@@ -19,7 +19,7 @@ package bandwidth
 import (
 	"fmt"
 
-	"k8s.io/kubernetes/pkg/api/resource"
+	"k8s.io/apimachinery/pkg/api/resource"
 )
 
 var minRsrc = resource.MustParse("1k")
