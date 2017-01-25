@@ -19,11 +19,11 @@ package deployment
 import (
 	"fmt"
 
-	"k8s.io/kubernetes/pkg/api/errors"
-	"k8s.io/kubernetes/pkg/api/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	extensions "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	deploymentutil "k8s.io/kubernetes/pkg/controller/deployment/util"
-	utilerrors "k8s.io/kubernetes/pkg/util/errors"
 	labelsutil "k8s.io/kubernetes/pkg/util/labels"
 )
 
@@ -81,7 +81,7 @@ func (dc *DeploymentController) migrateOldReplicaSets(deployment *extensions.Dep
 			// Already migrated. Either rs was failed to be deleted in a previous migration or our caches
 			// are lagging. Either way retry the deletion.
 			if len(collision.Annotations[deploymentutil.MigratedFromAnnotation]) > 0 {
-				if err := dc.client.Extensions().ReplicaSets(deployment.Namespace).Delete(rs.Name, &v1.DeleteOptions{}); err != nil && !errors.IsNotFound(err) {
+				if err := dc.client.Extensions().ReplicaSets(deployment.Namespace).Delete(rs.Name, &metav1.DeleteOptions{}); err != nil && !errors.IsNotFound(err) {
 					errs = append(errs, err)
 				}
 				continue
@@ -143,7 +143,7 @@ func (dc *DeploymentController) migrateReplicaSet(d *extensions.Deployment, rs *
 	oldRSAnnotations[deploymentutil.MigratedFromAnnotation] = rs.Name
 
 	oldReplicaSetWithNewHash := extensions.ReplicaSet{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:      d.Name + "-" + podTemplateSpecHash,
 			Namespace: d.Namespace,
 			// TODO: Add owner reference.
@@ -164,7 +164,7 @@ func (dc *DeploymentController) migrateReplicaSet(d *extensions.Deployment, rs *
 		return nil, err
 	}
 	// Delete the old replica set.
-	err = dc.client.Extensions().ReplicaSets(d.Namespace).Delete(rs.Name, &v1.DeleteOptions{})
+	err = dc.client.Extensions().ReplicaSets(d.Namespace).Delete(rs.Name, &metav1.DeleteOptions{})
 	if err != nil && !errors.IsNotFound(err) {
 		return migratedRs, err
 	}
