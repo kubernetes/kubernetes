@@ -48,6 +48,8 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 		&Scale{},
 		&HorizontalPodAutoscaler{},
 		&HorizontalPodAutoscalerList{},
+		&ClusterAutoscaler{},
+		&ClusterAutoscalerList{},
 	)
 	return nil
 }

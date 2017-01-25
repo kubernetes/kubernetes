@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors.
+Copyright 2017 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -266,4 +266,107 @@ type HorizontalPodAutoscalerList struct {
 
 	// items is the list of horizontal pod autoscaler objects.
 	Items []HorizontalPodAutoscaler `json:"items" protobuf:"bytes,2,rep,name=items"`
+}
+
+// Status and (in future) Configuration of ClusterAutoscaler.
+type ClusterAutoscaler struct {
+	metav1.TypeMeta `json:",inline"`
+	// Standard object metadata.
+	// +optional
+	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
+
+	// Specification of ClusterAutoscaler. Currently empty. Protobuf index placeholder.
+	// +optional
+	// Spec ClusterAutoscalerSpec `json:"spec,omitempty" protobuf:"bytes,2,opt,name=spec"`
+
+	// Current information about ClusterAutoscaler.
+	// +optional
+	Status ClusterAutoscalerStatus `json:"status,omitempty" protobuf:"bytes,3,opt,name=status"`
+}
+
+// Specification of ClusterAutoscaler. Empty for for now.
+// type ClusterAutoscalerSpec struct {
+// }
+
+// Type of ClusterAutoscalerCondition
+type ClusterAutoscalerConditionType string
+
+const (
+	// Condition that explains what is the current health of ClusterAutoscaler or its node groups.
+	ClusterAutoscalerHealth ClusterAutoscalerConditionType = "Health"
+	// Condition that explains what is the current status of a node group with regard to
+	// scale down activities.
+	ClusterAutoscalerScaleDown ClusterAutoscalerConditionType = "ScaleDown"
+	// Condition that explains what is the current status of a node group with regard to
+	// scale down activities.
+	ClusterAutoscalerScaleUp ClusterAutoscalerConditionType = "ScaleUp"
+)
+
+// Status of ClusterAutoscalerCondition.
+type ClusterAutoscalerConditionStatus string
+
+const (
+	// Statuses for Health condition type.
+	ClusterAutoscalerHealthy   ClusterAutoscalerConditionStatus = "Healthy"
+	ClusterAutoscalerUnhealthy ClusterAutoscalerConditionStatus = "Unhealthy"
+
+	// Statuses for ScaleDown condition type.
+	ClusterAutoscalerCandidatesPresent ClusterAutoscalerConditionStatus = "CandidatesPresent"
+	ClusterAutoscalerNoCandidates      ClusterAutoscalerConditionStatus = "NoCandidates"
+
+	// Statuses for ScaleUp condition type.
+	ClusterAutoscalerCandidatesNeeded ClusterAutoscalerConditionStatus = "Needed"
+	ClusterAutoscalerNotNeeded        ClusterAutoscalerConditionStatus = "NotNeeded"
+	ClusterAutoscalerInProgress       ClusterAutoscalerConditionStatus = "InProgress"
+	ClusterAutoscalerNoActivity       ClusterAutoscalerConditionStatus = "NoActivity"
+)
+
+// ClusterAutoscalerCondition describes some aspect of ClusterAutoscaler work.
+type ClusterAutoscalerCondition struct {
+	// Defines the aspect that the condition describes. For example, it can be Health or ScaleUp/Down activity.
+	Type ClusterAutoscalerConditionType `json:"type,omitempty" protobuf:"bytes,1,opt,name=type"`
+	// Status of the condition. Tells how given aspect
+	Status ClusterAutoscalerConditionStatus `json:"status,omitempty" protobuf:"bytes,2,opt,name=status"`
+	// Free text extra information about the condition. It may contain some
+	// extra debugging data, like why the cluster is unhealthy.
+	// +optional
+	Message string `json:"message,omitempty" protobuf:"bytes,3,opt,name=message"`
+	// Unique, one-word, CamelCase reason for the condition's last transition.
+	// +optional
+	Reason string `json:"reason,omitempty" protobuf:"bytes,4,opt,name=reason"`
+	// Last time we probed the condition.
+	// +optional
+	LastProbeTime metav1.Time `json:"lastProbeTime,omitempty" protobuf:"bytes,5,opt,name=lastProbeTime"`
+	// Since when the condition was in the given state.
+	// +optional
+	LastTransitionTime metav1.Time `json:"lastTransitionTime,omitempty" protobuf:"bytes,6,opt,name=lastTransitionTime"`
+}
+
+// Status of ClusterAutoscaler
+type ClusterAutoscalerStatus struct {
+	// Status information of individual node groups on which CA works.
+	// +optional
+	NodeGroupStatuses []NodeGroupStatus `json:"nodeGroupStatuses,omitempty" patchStrategy:"merge" patchMergeKey:"name" protobuf:"bytes,1,rep,name=nodeGroupStatuses"`
+	// Conditions that apply to the whole autoscaler.
+	// +optional
+	ClusterwideConditions []ClusterAutoscalerCondition `json:"clusterwideConditions,omitempty" patchStrategy:"merge" patchMergeKey:"type" protobuf:"bytes,2,rep,name=clusterwideConditions"`
+}
+
+// Status of a group of nodes controlled by ClusterAutoscaler.
+type NodeGroupStatus struct {
+	// Name of the node group. On GCE it will be equal to MIG url, on AWS it will be ASG name, etc.
+	ProviderID string `json:"providerID,omitempty" protobuf:"bytes,1,opt,name=providerID"`
+	// List of conditions that describe the state of the node group.
+	Conditions []ClusterAutoscalerCondition `json:"conditions,omitempty" patchStrategy:"merge" patchMergeKey:"type" protobuf:"bytes,2,rep,name=conditions"`
+}
+
+// ClusterAutoscalerList is a list of ClusterAutoscaler objects.
+type ClusterAutoscalerList struct {
+	metav1.TypeMeta `json:",inline"`
+	// metadata is the standard list metadata.
+	// +optional
+	metav1.ListMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
+
+	// items is the list of ClusterAutoscaler objects.
+	Items []ClusterAutoscaler `json:"items" protobuf:"bytes,2,rep,name=items"`
 }

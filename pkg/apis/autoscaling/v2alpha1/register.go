@@ -43,6 +43,8 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 		&v1.DeleteOptions{},
 		&metav1.GetOptions{},
 		&metav1.ExportOptions{},
+		&ClusterAutoscaler{},
+		&ClusterAutoscalerList{},
 	)
 	metav1.AddToGroupVersion(scheme, SchemeGroupVersion)
 	return nil

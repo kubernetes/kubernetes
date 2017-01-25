@@ -303,3 +303,106 @@ type HorizontalPodAutoscalerList struct {
 	// Items is the list of horizontal pod autoscaler objects.
 	Items []HorizontalPodAutoscaler
 }
+
+// Status and (in future) Configuration of ClusterAutoscaler.
+type ClusterAutoscaler struct {
+	metav1.TypeMeta
+	// Standard object metadata.
+	// +optional
+	metav1.ObjectMeta
+
+	// Specification of ClusterAutoscaler. Currently empty. Protobuf index placeholder.
+	// +optional
+	// Spec ClusterAutoscalerSpec
+
+	// Current information about ClusterAutoscaler.
+	// +optional
+	Status ClusterAutoscalerStatus
+}
+
+// Specification of ClusterAutoscaler. Empty for for now.
+// type ClusterAutoscalerSpec struct {
+// }
+
+// Type of ClusterAutoscalerCondition
+type ClusterAutoscalerConditionType string
+
+const (
+	// Condition that explains what is the current health of ClusterAutoscaler or its node groups.
+	ClusterAutoscalerHealth ClusterAutoscalerConditionType = "Health"
+	// Condition that explains what is the current status of a node group with regard to
+	// scale down activities.
+	ClusterAutoscalerScaleDown ClusterAutoscalerConditionType = "ScaleDown"
+	// Condition that explains what is the current status of a node group with regard to
+	// scale down activities.
+	ClusterAutoscalerScaleUp ClusterAutoscalerConditionType = "ScaleUp"
+)
+
+// Status of ClusterAutoscalerCondition.
+type ClusterAutoscalerConditionStatus string
+
+const (
+	// Statuses for Health condition type.
+	ClusterAutoscalerHealthy   ClusterAutoscalerConditionStatus = "Healthy"
+	ClusterAutoscalerUnhealthy ClusterAutoscalerConditionStatus = "Unhealthy"
+
+	// Statuses for ScaleDown condition type.
+	ClusterAutoscalerCandidatesPresent ClusterAutoscalerConditionStatus = "CandidatesPresent"
+	ClusterAutoscalerNoCandidates      ClusterAutoscalerConditionStatus = "NoCandidates"
+
+	// Statuses for ScaleUp condition type.
+	ClusterAutoscalerCandidatesNeeded ClusterAutoscalerConditionStatus = "Needed"
+	ClusterAutoscalerNotNeeded        ClusterAutoscalerConditionStatus = "NotNeeded"
+	ClusterAutoscalerInProgress       ClusterAutoscalerConditionStatus = "InProgress"
+	ClusterAutoscalerNoActivity       ClusterAutoscalerConditionStatus = "NoActivity"
+)
+
+// ClusterAutoscalerCondition describes some aspect of ClusterAutoscaler work.
+type ClusterAutoscalerCondition struct {
+	// Defines the aspect that the condition describes. For example, it can be Health or ScaleUp/Down activity.
+	Type ClusterAutoscalerConditionType
+	// Status of the condition. Tells how given aspect
+	Status ClusterAutoscalerConditionStatus
+	// Free text extra information about the condition. It may contain some
+	// extra debugging data, like why the cluster is unhealthy.
+	// +optional
+	Message string
+	// Unique, one-word, CamelCase reason for the condition's last transition.
+	// +optional
+	Reason string
+	// Last time we probed the condition.
+	// +optional
+	LastProbeTime metav1.Time
+	// Since when the condition was in the given state.
+	// +optional
+	LastTransitionTime metav1.Time
+}
+
+// Status of ClusterAutoscaler
+type ClusterAutoscalerStatus struct {
+	// Status information of individual node groups on which CA works.
+	// +optional
+	NodeGroupStatuses []NodeGroupStatus
+	// Conditions that apply to the whole autoscaler.
+	// +optional
+	ClusterwideConditions []ClusterAutoscalerCondition
+}
+
+// Status of a group of nodes controlled by ClusterAutoscaler.
+type NodeGroupStatus struct {
+	// Name of the node group. On GCE it will be equal to MIG url, on AWS it will be ASG name, etc.
+	ProviderID string
+	// List of conditions that describe the state of the node group.
+	Conditions []ClusterAutoscalerCondition
+}
+
+// ClusterAutoscalerList is a list of ClusterAutoscaler objects.
+type ClusterAutoscalerList struct {
+	metav1.TypeMeta
+	// metadata is the standard list metadata.
+	// +optional
+	metav1.ListMeta
+
+	// items is the list of ClusterAutoscaler objects.
+	Items []ClusterAutoscaler
+}
