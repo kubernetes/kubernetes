@@ -84,7 +84,7 @@ var _ = framework.KubeDescribe("ReplicaSet", func() {
 		// requires private images
 		framework.SkipUnlessProviderIs("gce", "gke")
 
-		ReplicaSetServeImageOrFail(f, "private", "b.gcr.io/k8s_authenticated_test/serve_hostname:v1.4")
+		ReplicaSetServeImageOrFail(f, "private", "gcr.io/k8s-authenticated-test/serve_hostname:v1.4")
 	})
 
 	It("should surface a failure condition on a common issue like exceeded quota", func() {
