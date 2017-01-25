@@ -201,8 +201,12 @@ type cachingSecretManager struct {
 }
 
 func NewCachingSecretManager(kubeClient clientset.Interface) (Manager, error) {
+	// TODO: Currently apiserver completely cannot keep up with 1 minute ttl in
+	// 5000-node clusters. So before we optimize apiserver and/or etcd, increase
+	// the TTL to 5 minutes (which is a lot, but...)
+	ttl := 5 * time.Minute
 	csm := &cachingSecretManager{
-		secretStore:    newSecretStore(kubeClient, clock.RealClock{}, time.Minute),
+		secretStore:    newSecretStore(kubeClient, clock.RealClock{}, ttl),
 		registeredPods: make(map[objectKey]*v1.Pod),
 	}
 	return csm, nil
