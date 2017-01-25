@@ -31,6 +31,15 @@ kube::test::clear_all() {
   fi
 }
 
+# Prints the calling file and line number $1 levels deep
+# Defaults to 2 levels so you can call this to find your own caller
+kube::test::get_caller() {
+  local levels=${1:-2}
+  local caller_file="${BASH_SOURCE[$levels]}"
+  local caller_line="${BASH_LINENO[$levels-1]}"
+  echo "$(basename "${caller_file}"):${caller_line}"
+}
+
 # Force exact match of a returned result for a object query.  Wrap this with || to support multiple
 # valid return types.
 kube::test::get_object_assert() {
@@ -43,12 +52,12 @@ kube::test::get_object_assert() {
 
   if [[ "$res" =~ ^$expected$ ]]; then
       echo -n ${green}
-      echo "Successful get $object $request: $res"
+      echo "$(kube::test::get_caller): Successful get $object $request: $res"
       echo -n ${reset}
       return 0
   else
       echo ${bold}${red}
-      echo "FAIL!"
+      echo "$(kube::test::get_caller): FAIL!"
       echo "Get $object $request"
       echo "  Expected: $expected"
       echo "  Got:      $res"
@@ -68,12 +77,12 @@ kube::test::get_object_jsonpath_assert() {
 
   if [[ "$res" =~ ^$expected$ ]]; then
       echo -n ${green}
-      echo "Successful get $object $request: $res"
+      echo "$(kube::test::get_caller): Successful get $object $request: $res"
       echo -n ${reset}
       return 0
   else
       echo ${bold}${red}
-      echo "FAIL!"
+      echo "$(kube::test::get_caller): FAIL!"
       echo "Get $object $request"
       echo "  Expected: $expected"
       echo "  Got:      $res"
@@ -94,7 +103,7 @@ kube::test::describe_object_assert() {
   for match in ${matches}; do
     if [[ ! $(echo "$result" | grep ${match}) ]]; then
       echo ${bold}${red}
-      echo "FAIL!"
+      echo "$(kube::test::get_caller): FAIL!"
       echo "Describe $resource $object"
       echo "  Expected Match: $match"
       echo "  Not found in:"
@@ -107,7 +116,7 @@ kube::test::describe_object_assert() {
   done
 
   echo -n ${green}
-  echo "Successful describe $resource $object:"
+  echo "$(kube::test::get_caller): Successful describe $resource $object:"
   echo "$result"
   echo -n ${reset}
   return 0
@@ -131,13 +140,13 @@ kube::test::describe_object_events_assert() {
     fi
     if [[ $showevents == $has_events ]]; then
         echo -n ${green}
-        echo "Successful describe"
+        echo "$(kube::test::get_caller): Successful describe"
         echo "$result"
         echo ${reset}
         return 0
     else
         echo ${bold}${red}
-        echo "FAIL"
+        echo "$(kube::test::get_caller): FAIL"
         if [[ $showevents == "false" ]]; then
             echo "  Events information should not be described in:"
         else
