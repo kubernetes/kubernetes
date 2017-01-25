@@ -1045,11 +1045,7 @@ run_kubectl_get_tests() {
   # Post-condition: POD abc should error since it doesn't exist
   kube::test::if_has_string "${output_message}" 'pods "abc" not found'
   # Post-condition: make sure we don't display an empty List
-  if kube::test::if_has_string "${output_message}" 'List'; then
-    echo 'Unexpected List output'
-    echo "${LINENO} $(basename $0)"
-    exit 1
-  fi
+  kube::test::if_not_has_string "${output_message}" 'List'
 
   ### Test kubectl get all
   output_message=$(kubectl --v=6 --namespace default get all 2>&1 "${kube_flags[@]}")

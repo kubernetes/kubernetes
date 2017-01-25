@@ -141,4 +141,9 @@ SUPPORTED_RESOURCES=("*")
 # Doing so will suppress errexit behavior inside runTests
 runTests
 
-kube::log::status "TESTS PASSED"
+if [[ $(echo "${output_message}" | grep "FAIL!") ]]; then
+  kube::log::status "TESTS FAILED"
+  exit 1
+else
+  kube::log::status "TESTS PASSED"
+fi
