@@ -211,7 +211,7 @@ pkg_tar(
     name = "kubernetes",
     extension = "tar.gz",
     files = [
-        # TODO: the version file
+        "//:version",
         "//:README.md",
         "//:Vagrantfile",
         "//cluster:all-srcs",
