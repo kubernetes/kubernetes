@@ -24,8 +24,12 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apiserver/pkg/admission"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	utilflag "k8s.io/apiserver/pkg/util/flag"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/util/config"
+
+	// add the kubernetes feature gates
+	_ "k8s.io/kubernetes/pkg/features"
 
 	"github.com/spf13/pflag"
 )
@@ -52,7 +56,7 @@ type ServerRunOptions struct {
 	MaxRequestsInFlight         int
 	MaxMutatingRequestsInFlight int
 	MinRequestTimeout           int
-	RuntimeConfig               config.ConfigurationMap
+	RuntimeConfig               utilflag.ConfigurationMap
 	StorageVersions             string
 	// The default values for StorageVersions. StorageVersions overrides
 	// these; you can change this if you want to change the defaults (e.g.,
@@ -75,7 +79,7 @@ func NewServerRunOptions() *ServerRunOptions {
 		MaxRequestsInFlight:         400,
 		MaxMutatingRequestsInFlight: 200,
 		MinRequestTimeout:           1800,
-		RuntimeConfig:               make(config.ConfigurationMap),
+		RuntimeConfig:               make(utilflag.ConfigurationMap),
 		StorageVersions:             api.Registry.AllPreferredGroupVersions(),
 	}
 }
@@ -264,5 +268,5 @@ func (s *ServerRunOptions) AddUniversalFlags(fs *pflag.FlagSet) {
 		"The individual override format: resource#size, where size is a number. It takes effect "+
 		"when watch-cache is enabled.")
 
-	config.DefaultFeatureGate.AddFlag(fs)
+	utilfeature.DefaultFeatureGate.AddFlag(fs)
 }

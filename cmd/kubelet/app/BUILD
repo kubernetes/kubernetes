@@ -18,8 +18,8 @@ go_test(
     tags = ["automanaged"],
     deps = [
         "//pkg/kubelet:go_default_library",
-        "//pkg/util/config:go_default_library",
         "//vendor:k8s.io/apimachinery/pkg/util/diff",
+        "//vendor:k8s.io/apiserver/pkg/util/flag",
         "//vendor:k8s.io/client-go/rest",
     ],
 )
@@ -53,6 +53,7 @@ go_library(
         "//pkg/credentialprovider/aws:go_default_library",
         "//pkg/credentialprovider/azure:go_default_library",
         "//pkg/credentialprovider/gcp:go_default_library",
+        "//pkg/features:go_default_library",
         "//pkg/genericapiserver/authenticator:go_default_library",
         "//pkg/genericapiserver/authorizer:go_default_library",
         "//pkg/kubelet:go_default_library",
@@ -67,7 +68,6 @@ go_library(
         "//pkg/kubelet/server:go_default_library",
         "//pkg/kubelet/types:go_default_library",
         "//pkg/kubelet/util/csr:go_default_library",
-        "//pkg/util/config:go_default_library",
         "//pkg/util/configz:go_default_library",
         "//pkg/util/flock:go_default_library",
         "//pkg/util/io:go_default_library",
@@ -111,6 +111,7 @@ go_library(
         "//vendor:k8s.io/apiserver/pkg/authentication/authenticator",
         "//vendor:k8s.io/apiserver/pkg/authorization/authorizer",
         "//vendor:k8s.io/apiserver/pkg/server/healthz",
+        "//vendor:k8s.io/apiserver/pkg/util/feature",
         "//vendor:k8s.io/client-go/kubernetes",
         "//vendor:k8s.io/client-go/kubernetes/typed/authentication/v1beta1",
         "//vendor:k8s.io/client-go/kubernetes/typed/authorization/v1beta1",

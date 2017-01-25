@@ -13745,3 +13745,264 @@ go_library(
     ],
     tags = ["automanaged"],
 )
+
+go_library(
+    name = "k8s.io/apiserver/pkg/features",
+    srcs = ["k8s.io/apiserver/pkg/features/kube_features.go"],
+    tags = ["automanaged"],
+    deps = ["//vendor:k8s.io/apiserver/pkg/util/feature"],
+)
+
+go_test(
+    name = "k8s.io/apiserver/pkg/util/feature_test",
+    srcs = ["k8s.io/apiserver/pkg/util/feature/feature_gate_test.go"],
+    library = ":k8s.io/apiserver/pkg/util/feature",
+    tags = ["automanaged"],
+    deps = ["//vendor:github.com/spf13/pflag"],
+)
+
+go_library(
+    name = "k8s.io/apiserver/pkg/util/feature",
+    srcs = ["k8s.io/apiserver/pkg/util/feature/feature_gate.go"],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:github.com/golang/glog",
+        "//vendor:github.com/spf13/pflag",
+    ],
+)
+
+go_test(
+    name = "k8s.io/apiserver/pkg/util/flag_test",
+    srcs = ["k8s.io/apiserver/pkg/util/flag/namedcertkey_flag_test.go"],
+    library = ":k8s.io/apiserver/pkg/util/flag",
+    tags = ["automanaged"],
+    deps = ["//vendor:github.com/spf13/pflag"],
+)
+
+go_library(
+    name = "k8s.io/apiserver/pkg/util/flag",
+    srcs = [
+        "k8s.io/apiserver/pkg/util/flag/configuration_map.go",
+        "k8s.io/apiserver/pkg/util/flag/flags.go",
+        "k8s.io/apiserver/pkg/util/flag/namedcertkey_flag.go",
+        "k8s.io/apiserver/pkg/util/flag/string_flag.go",
+        "k8s.io/apiserver/pkg/util/flag/tristate.go",
+    ],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:github.com/golang/glog",
+        "//vendor:github.com/spf13/pflag",
+    ],
+)
+
+go_library(
+    name = "k8s.io/apiserver/plugin/pkg/authenticator",
+    srcs = ["k8s.io/apiserver/plugin/pkg/authenticator/doc.go"],
+    tags = ["automanaged"],
+)
+
+go_library(
+    name = "k8s.io/apiserver/plugin/pkg/authenticator/password",
+    srcs = ["k8s.io/apiserver/plugin/pkg/authenticator/password/doc.go"],
+    tags = ["automanaged"],
+)
+
+go_test(
+    name = "k8s.io/apiserver/plugin/pkg/authenticator/password/allow_test",
+    srcs = ["k8s.io/apiserver/plugin/pkg/authenticator/password/allow/allow_test.go"],
+    library = ":k8s.io/apiserver/plugin/pkg/authenticator/password/allow",
+    tags = ["automanaged"],
+)
+
+go_library(
+    name = "k8s.io/apiserver/plugin/pkg/authenticator/password/allow",
+    srcs = ["k8s.io/apiserver/plugin/pkg/authenticator/password/allow/allow.go"],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:k8s.io/apiserver/pkg/authentication/authenticator",
+        "//vendor:k8s.io/apiserver/pkg/authentication/user",
+    ],
+)
+
+go_library(
+    name = "k8s.io/apiserver/plugin/pkg/authenticator/password/keystone",
+    srcs = [
+        "k8s.io/apiserver/plugin/pkg/authenticator/password/keystone/doc.go",
+        "k8s.io/apiserver/plugin/pkg/authenticator/password/keystone/keystone.go",
+    ],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:github.com/golang/glog",
+        "//vendor:github.com/rackspace/gophercloud",
+        "//vendor:github.com/rackspace/gophercloud/openstack",
+        "//vendor:k8s.io/apimachinery/pkg/util/net",
+        "//vendor:k8s.io/apiserver/pkg/authentication/user",
+        "//vendor:k8s.io/client-go/util/cert",
+    ],
+)
+
+go_test(
+    name = "k8s.io/apiserver/plugin/pkg/authenticator/password/passwordfile_test",
+    srcs = ["k8s.io/apiserver/plugin/pkg/authenticator/password/passwordfile/passwordfile_test.go"],
+    library = ":k8s.io/apiserver/plugin/pkg/authenticator/password/passwordfile",
+    tags = ["automanaged"],
+    deps = ["//vendor:k8s.io/apiserver/pkg/authentication/user"],
+)
+
+go_library(
+    name = "k8s.io/apiserver/plugin/pkg/authenticator/password/passwordfile",
+    srcs = ["k8s.io/apiserver/plugin/pkg/authenticator/password/passwordfile/passwordfile.go"],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:github.com/golang/glog",
+        "//vendor:k8s.io/apiserver/pkg/authentication/user",
+    ],
+)
+
+go_test(
+    name = "k8s.io/apiserver/plugin/pkg/authenticator/request/basicauth_test",
+    srcs = ["k8s.io/apiserver/plugin/pkg/authenticator/request/basicauth/basicauth_test.go"],
+    library = ":k8s.io/apiserver/plugin/pkg/authenticator/request/basicauth",
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:k8s.io/apiserver/pkg/authentication/authenticator",
+        "//vendor:k8s.io/apiserver/pkg/authentication/user",
+    ],
+)
+
+go_library(
+    name = "k8s.io/apiserver/plugin/pkg/authenticator/request/basicauth",
+    srcs = ["k8s.io/apiserver/plugin/pkg/authenticator/request/basicauth/basicauth.go"],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:k8s.io/apiserver/pkg/authentication/authenticator",
+        "//vendor:k8s.io/apiserver/pkg/authentication/user",
+    ],
+)
+
+go_test(
+    name = "k8s.io/apiserver/plugin/pkg/authenticator/token/anytoken_test",
+    srcs = ["k8s.io/apiserver/plugin/pkg/authenticator/token/anytoken/anytoken_test.go"],
+    library = ":k8s.io/apiserver/plugin/pkg/authenticator/token/anytoken",
+    tags = ["automanaged"],
+    deps = ["//vendor:k8s.io/apiserver/pkg/authentication/user"],
+)
+
+go_library(
+    name = "k8s.io/apiserver/plugin/pkg/authenticator/token/anytoken",
+    srcs = ["k8s.io/apiserver/plugin/pkg/authenticator/token/anytoken/anytoken.go"],
+    tags = ["automanaged"],
+    deps = ["//vendor:k8s.io/apiserver/pkg/authentication/user"],
+)
+
+go_test(
+    name = "k8s.io/apiserver/plugin/pkg/authenticator/token/oidc_test",
+    srcs = ["k8s.io/apiserver/plugin/pkg/authenticator/token/oidc/oidc_test.go"],
+    library = ":k8s.io/apiserver/plugin/pkg/authenticator/token/oidc",
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:github.com/coreos/go-oidc/jose",
+        "//vendor:github.com/coreos/go-oidc/oidc",
+        "//vendor:k8s.io/apiserver/pkg/authentication/user",
+        "//vendor:k8s.io/apiserver/plugin/pkg/authenticator/token/oidc/testing",
+    ],
+)
+
+go_library(
+    name = "k8s.io/apiserver/plugin/pkg/authenticator/token/oidc",
+    srcs = ["k8s.io/apiserver/plugin/pkg/authenticator/token/oidc/oidc.go"],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:github.com/coreos/go-oidc/jose",
+        "//vendor:github.com/coreos/go-oidc/oidc",
+        "//vendor:github.com/golang/glog",
+        "//vendor:k8s.io/apimachinery/pkg/util/net",
+        "//vendor:k8s.io/apimachinery/pkg/util/runtime",
+        "//vendor:k8s.io/apiserver/pkg/authentication/user",
+        "//vendor:k8s.io/client-go/util/cert",
+    ],
+)
+
+go_library(
+    name = "k8s.io/apiserver/plugin/pkg/authenticator/token/oidc/testing",
+    srcs = ["k8s.io/apiserver/plugin/pkg/authenticator/token/oidc/testing/provider.go"],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:github.com/coreos/go-oidc/jose",
+        "//vendor:github.com/coreos/go-oidc/key",
+        "//vendor:github.com/coreos/go-oidc/oidc",
+    ],
+)
+
+go_library(
+    name = "k8s.io/apiserver/plugin/pkg/authenticator/token/tokentest",
+    srcs = ["k8s.io/apiserver/plugin/pkg/authenticator/token/tokentest/tokentest.go"],
+    tags = ["automanaged"],
+    deps = ["//vendor:k8s.io/apiserver/pkg/authentication/user"],
+)
+
+go_test(
+    name = "k8s.io/apiserver/plugin/pkg/authenticator/token/webhook_test",
+    srcs = [
+        "k8s.io/apiserver/plugin/pkg/authenticator/token/webhook/certs_test.go",
+        "k8s.io/apiserver/plugin/pkg/authenticator/token/webhook/webhook_test.go",
+    ],
+    library = ":k8s.io/apiserver/plugin/pkg/authenticator/token/webhook",
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
+        "//vendor:k8s.io/apiserver/pkg/authentication/user",
+        "//vendor:k8s.io/client-go/pkg/apis/authentication/v1beta1",
+        "//vendor:k8s.io/client-go/tools/clientcmd/api/v1",
+    ],
+)
+
+go_library(
+    name = "k8s.io/apiserver/plugin/pkg/authenticator/token/webhook",
+    srcs = ["k8s.io/apiserver/plugin/pkg/authenticator/token/webhook/webhook.go"],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:k8s.io/apimachinery/pkg/runtime/schema",
+        "//vendor:k8s.io/apiserver/pkg/authentication/authenticator",
+        "//vendor:k8s.io/apiserver/pkg/authentication/user",
+        "//vendor:k8s.io/apiserver/pkg/util/cache",
+        "//vendor:k8s.io/apiserver/pkg/util/webhook",
+        "//vendor:k8s.io/client-go/kubernetes/typed/authentication/v1beta1",
+        "//vendor:k8s.io/client-go/pkg/apis/authentication/install",
+        "//vendor:k8s.io/client-go/pkg/apis/authentication/v1beta1",
+    ],
+)
+
+go_test(
+    name = "k8s.io/apiserver/plugin/pkg/authorizer/webhook_test",
+    srcs = [
+        "k8s.io/apiserver/plugin/pkg/authorizer/webhook/certs_test.go",
+        "k8s.io/apiserver/plugin/pkg/authorizer/webhook/webhook_test.go",
+    ],
+    library = ":k8s.io/apiserver/plugin/pkg/authorizer/webhook",
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
+        "//vendor:k8s.io/apimachinery/pkg/util/diff",
+        "//vendor:k8s.io/apiserver/pkg/authentication/user",
+        "//vendor:k8s.io/apiserver/pkg/authorization/authorizer",
+        "//vendor:k8s.io/client-go/pkg/apis/authorization/v1beta1",
+        "//vendor:k8s.io/client-go/tools/clientcmd/api/v1",
+    ],
+)
+
+go_library(
+    name = "k8s.io/apiserver/plugin/pkg/authorizer/webhook",
+    srcs = ["k8s.io/apiserver/plugin/pkg/authorizer/webhook/webhook.go"],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:github.com/golang/glog",
+        "//vendor:k8s.io/apimachinery/pkg/runtime/schema",
+        "//vendor:k8s.io/apiserver/pkg/authorization/authorizer",
+        "//vendor:k8s.io/apiserver/pkg/util/cache",
+        "//vendor:k8s.io/apiserver/pkg/util/webhook",
+        "//vendor:k8s.io/client-go/kubernetes/typed/authorization/v1beta1",
+        "//vendor:k8s.io/client-go/pkg/apis/authorization/install",
+        "//vendor:k8s.io/client-go/pkg/apis/authorization/v1beta1",
+    ],
+)

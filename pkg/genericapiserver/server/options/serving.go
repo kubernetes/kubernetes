@@ -25,8 +25,8 @@ import (
 	"github.com/spf13/pflag"
 
 	utilnet "k8s.io/apimachinery/pkg/util/net"
+	utilflag "k8s.io/apiserver/pkg/util/flag"
 	certutil "k8s.io/client-go/util/cert"
-	"k8s.io/kubernetes/pkg/util/config"
 )
 
 type ServingOptions struct {
@@ -40,7 +40,7 @@ type SecureServingOptions struct {
 	// ServerCert is the TLS cert info for serving secure traffic
 	ServerCert GeneratableKeyCert
 	// SNICertKeys are named CertKeys for serving secure traffic with SNI support.
-	SNICertKeys []config.NamedCertKey
+	SNICertKeys []utilflag.NamedCertKey
 }
 
 type CertKey struct {
@@ -114,7 +114,7 @@ func (s *SecureServingOptions) AddFlags(fs *pflag.FlagSet) {
 		"Controllers. This must be a valid PEM-encoded CA bundle. Altneratively, the certificate authority "+
 		"can be appended to the certificate provided by --tls-cert-file.")
 
-	fs.Var(config.NewNamedCertKeyArray(&s.SNICertKeys), "tls-sni-cert-key", ""+
+	fs.Var(utilflag.NewNamedCertKeyArray(&s.SNICertKeys), "tls-sni-cert-key", ""+
 		"A pair of x509 certificate and private key file paths, optionally suffixed with a list of "+
 		"domain patterns which are fully qualified domain names, possibly with prefixed wildcard "+
 		"segments. If no domain patterns are provided, the names of the certificate are "+

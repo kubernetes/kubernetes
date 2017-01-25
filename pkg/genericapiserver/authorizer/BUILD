@@ -27,8 +27,8 @@ go_library(
     ],
     tags = ["automanaged"],
     deps = [
-        "//plugin/pkg/auth/authorizer/webhook:go_default_library",
         "//vendor:k8s.io/apiserver/pkg/authorization/authorizer",
+        "//vendor:k8s.io/apiserver/plugin/pkg/authorizer/webhook",
         "//vendor:k8s.io/client-go/kubernetes/typed/authorization/v1beta1",
     ],
 )
