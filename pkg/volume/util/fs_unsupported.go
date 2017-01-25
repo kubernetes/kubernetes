@@ -21,7 +21,7 @@ package util
 import (
 	"fmt"
 
-	"k8s.io/kubernetes/pkg/api/resource"
+	"k8s.io/apimachinery/pkg/api/resource"
 )
 
 // FSInfo unsupported returns 0 values for available and capacity and an error.

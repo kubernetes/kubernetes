@@ -63,7 +63,7 @@ func New() *Generator {
 		ProtoImport:      []string{defaultProtoImport},
 		Packages: strings.Join([]string{
 			`+k8s.io/kubernetes/pkg/util/intstr`,
-			`+k8s.io/kubernetes/pkg/api/resource`,
+			`+k8s.io/apimachinery/pkg/api/resource`,
 			`+k8s.io/apimachinery/pkg/runtime/schema`,
 			`+k8s.io/apimachinery/pkg/runtime`,
 			`k8s.io/apimachinery/pkg/apis/meta/v1`,
