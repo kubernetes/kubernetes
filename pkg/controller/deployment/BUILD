@@ -67,10 +67,10 @@ go_test(
         "//pkg/controller/deployment/util:go_default_library",
         "//pkg/controller/informers:go_default_library",
         "//pkg/util/intstr:go_default_library",
-        "//pkg/util/uuid:go_default_library",
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
         "//vendor:k8s.io/apimachinery/pkg/runtime",
         "//vendor:k8s.io/apimachinery/pkg/runtime/schema",
+        "//vendor:k8s.io/apimachinery/pkg/util/uuid",
     ],
 )
 

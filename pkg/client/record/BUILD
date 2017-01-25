@@ -19,7 +19,6 @@ go_library(
     tags = ["automanaged"],
     deps = [
         "//pkg/api/v1:go_default_library",
-        "//pkg/util/strategicpatch:go_default_library",
         "//vendor:github.com/golang/glog",
         "//vendor:github.com/golang/groupcache/lru",
         "//vendor:k8s.io/apimachinery/pkg/api/errors",
@@ -27,6 +26,7 @@ go_library(
         "//vendor:k8s.io/apimachinery/pkg/runtime",
         "//vendor:k8s.io/apimachinery/pkg/util/runtime",
         "//vendor:k8s.io/apimachinery/pkg/util/sets",
+        "//vendor:k8s.io/apimachinery/pkg/util/strategicpatch",
         "//vendor:k8s.io/apimachinery/pkg/watch",
         "//vendor:k8s.io/client-go/rest",
         "//vendor:k8s.io/client-go/util/clock",
@@ -44,11 +44,11 @@ go_test(
     deps = [
         "//pkg/api/install:go_default_library",
         "//pkg/api/v1:go_default_library",
-        "//pkg/util/strategicpatch:go_default_library",
         "//vendor:k8s.io/apimachinery/pkg/api/errors",
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
         "//vendor:k8s.io/apimachinery/pkg/runtime",
         "//vendor:k8s.io/apimachinery/pkg/util/diff",
+        "//vendor:k8s.io/apimachinery/pkg/util/strategicpatch",
         "//vendor:k8s.io/client-go/rest",
         "//vendor:k8s.io/client-go/util/clock",
     ],

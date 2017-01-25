@@ -9,7 +9,7 @@ load(
 
 go_library(
     name = "go_default_library",
-    srcs = ["addr.go"],
+    srcs = ["doc.go"],
     tags = ["automanaged"],
 )
 
