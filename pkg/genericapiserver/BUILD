@@ -24,8 +24,6 @@ filegroup(
     name = "all-srcs",
     srcs = [
         ":package-srcs",
-        "//pkg/genericapiserver/authenticator:all-srcs",
-        "//pkg/genericapiserver/authorizer:all-srcs",
         "//pkg/genericapiserver/endpoints:all-srcs",
         "//pkg/genericapiserver/registry:all-srcs",
         "//pkg/genericapiserver/server:all-srcs",
