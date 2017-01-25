@@ -49,6 +49,7 @@ import (
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/envvars"
 	"k8s.io/kubernetes/pkg/kubelet/images"
+	kubepod "k8s.io/kubernetes/pkg/kubelet/pod"
 	"k8s.io/kubernetes/pkg/kubelet/qos"
 	"k8s.io/kubernetes/pkg/kubelet/server/remotecommand"
 	"k8s.io/kubernetes/pkg/kubelet/status"
@@ -725,6 +726,38 @@ func (kl *Kubelet) podIsTerminated(pod *v1.Pod) bool {
 	}
 
 	return false
+}
+
+func (kl *Kubelet) podCanBeDeleted(pod *v1.Pod) bool {
+	if kubepod.IsMirrorPod(pod) {
+		// We don't handle graceful deletion of mirror pods.
+		return false
+	}
+	if pod.DeletionTimestamp == nil {
+		// We shouldnt delete pods whose DeletionTimestamp is not set
+		return false
+	}
+	if !notRunning(pod.Status.ContainerStatuses) {
+		// We shouldnt delete pods that still have running containers
+		glog.V(3).Infof("Pod %q is terminated, but some containers are still running", format.Pod(pod))
+		return false
+	}
+	if kl.podVolumesExist(pod.UID) {
+		// We shouldnt delete pods whose volumes have not been cleaned up
+		return false
+	}
+	return true
+}
+
+// notRunning returns true if every status is terminated or waiting, or the status list
+// is empty.
+func notRunning(statuses []v1.ContainerStatus) bool {
+	for _, status := range statuses {
+		if status.State.Terminated == nil && status.State.Waiting == nil {
+			return false
+		}
+	}
+	return true
 }
 
 // filterOutTerminatedPods returns the given pods which the status manager
