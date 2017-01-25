@@ -123,6 +123,11 @@ func (s *Scheduler) Run() {
 
 func (s *Scheduler) scheduleOne() {
 	pod := s.config.NextPod()
+	if pod.DeletionTimestamp != nil {
+		s.config.Recorder.Eventf(pod, v1.EventTypeWarning, "FailedScheduling", "skip schedule deleting pod: %v/%v", pod.Namespace, pod.Name)
+		glog.V(3).Infof("Skip schedule deleting pod: %v/%v", pod.Namespace, pod.Name)
+		return
+	}
 
 	glog.V(3).Infof("Attempting to schedule pod: %v/%v", pod.Namespace, pod.Name)
 	start := time.Now()
