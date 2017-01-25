@@ -2473,11 +2473,10 @@ runTests() {
 
   # Make sure "kubernetes" service exists.
   if kube::test::if_supports_resource "${services}" ; then
-    output_message=$(kubectl get "${kube_flags[@]}" svc)
-    if [[ ! $(echo "${output_message}" | grep "kubernetes") ]]; then
-      # Create kubernetes service
-      kubectl create "${kube_flags[@]}" -f hack/testdata/kubernetes-service.yaml
-    fi
+    # Attempt to create the kubernetes service, tolerating failure (since it might already exist)
+    kubectl create "${kube_flags[@]}" -f hack/testdata/kubernetes-service.yaml || true
+    # Require the service to exist (either we created it or the API server did)
+    kubectl get "${kube_flags[@]}" -f hack/testdata/kubernetes-service.yaml
   fi
 
   # Passing no arguments to create is an error
