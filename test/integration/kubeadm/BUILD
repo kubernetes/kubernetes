@@ -8,23 +8,18 @@ load(
     "go_test",
 )
 
+go_test(
+    name = "go_default_test",
+    srcs = ["token_test.go"],
+    library = ":go_default_library",
+    tags = ["automanaged"],
+    deps = ["//vendor:github.com/golang/glog"],
+)
+
 go_library(
     name = "go_default_library",
     srcs = ["util.go"],
     tags = ["automanaged"],
-)
-
-go_test(
-    name = "go_default_test",
-    srcs = ["token_test.go"],
-    args = ["--kubeadm-path=../kubeadm"],
-    data = ["//cmd/kubeadm"],
-    library = ":go_default_library",
-    tags = [
-        "automanaged",
-        "integration",
-        "skip",
-    ],
 )
 
 filegroup(
