@@ -233,7 +233,6 @@ function provision-master() {
     sudo bash ${KUBE_TEMP}/master/scripts/etcd.sh; \
     sudo bash ${KUBE_TEMP}/master/scripts/apiserver.sh ${master_ip} ${ETCD_SERVERS} ${SERVICE_CLUSTER_IP_RANGE} ${ADMISSION_CONTROL}; \
     sudo bash ${KUBE_TEMP}/master/scripts/controller-manager.sh ${master_ip}; \
-    sudo bash ${KUBE_TEMP}/master/scripts/flannel.sh ${ETCD_SERVERS} ${FLANNEL_NET}; \
     sudo bash ${KUBE_TEMP}/master/scripts/scheduler.sh ${master_ip}"
 }
 
