@@ -22,15 +22,14 @@ import (
 	"time"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/apimachinery/registered"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/runtime/serializer"
 	runtimeserializer "k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/client-go/pkg/api"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
-
-	_ "k8s.io/client-go/pkg/apis/authorization/install"
 )
 
 type GenericWebhook struct {
@@ -39,9 +38,9 @@ type GenericWebhook struct {
 }
 
 // NewGenericWebhook creates a new GenericWebhook from the provided kubeconfig file.
-func NewGenericWebhook(kubeConfigFile string, groupVersions []schema.GroupVersion, initialBackoff time.Duration) (*GenericWebhook, error) {
+func NewGenericWebhook(registry *registered.APIRegistrationManager, codecFactory serializer.CodecFactory, kubeConfigFile string, groupVersions []schema.GroupVersion, initialBackoff time.Duration) (*GenericWebhook, error) {
 	for _, groupVersion := range groupVersions {
-		if !api.Registry.IsEnabledVersion(groupVersion) {
+		if !registry.IsEnabledVersion(groupVersion) {
 			return nil, fmt.Errorf("webhook plugin requires enabling extension resource: %s", groupVersion)
 		}
 	}
@@ -54,7 +53,7 @@ func NewGenericWebhook(kubeConfigFile string, groupVersions []schema.GroupVersio
 	if err != nil {
 		return nil, err
 	}
-	codec := api.Codecs.LegacyCodec(groupVersions...)
+	codec := codecFactory.LegacyCodec(groupVersions...)
 	clientConfig.ContentConfig.NegotiatedSerializer = runtimeserializer.NegotiatedSerializerWrapper(runtime.SerializerInfo{Serializer: codec})
 
 	restClient, err := rest.UnversionedRESTClientFor(clientConfig)
