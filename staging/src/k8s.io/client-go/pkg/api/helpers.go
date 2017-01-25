@@ -429,10 +429,6 @@ func NodeSelectorRequirementsAsSelector(nsm []NodeSelectorRequirement) (labels.S
 }
 
 const (
-	// AffinityAnnotationKey represents the key of affinity data (json serialized)
-	// in the Annotations of a Pod.
-	AffinityAnnotationKey string = "scheduler.alpha.kubernetes.io/affinity"
-
 	// TolerationsAnnotationKey represents the key of tolerations data (json serialized)
 	// in the Annotations of a Pod.
 	TolerationsAnnotationKey string = "scheduler.alpha.kubernetes.io/tolerations"
