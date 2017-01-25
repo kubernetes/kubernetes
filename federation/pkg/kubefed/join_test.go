@@ -23,6 +23,7 @@ import (
 	"net/http"
 	"testing"
 
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/client-go/dynamic"
@@ -189,7 +190,7 @@ func testJoinFederationFactory(clusterName, secretName, server string) cmdutil.F
 				if err != nil {
 					return nil, err
 				}
-				if !api.Semantic.DeepEqual(got, want) {
+				if !apiequality.Semantic.DeepEqual(got, want) {
 					return nil, fmt.Errorf("Unexpected cluster object\n\tDiff: %s", diff.ObjectGoPrintDiff(got, want))
 				}
 				return &http.Response{StatusCode: http.StatusCreated, Header: kubefedtesting.DefaultHeader(), Body: kubefedtesting.ObjBody(codec, &want)}, nil
@@ -265,7 +266,7 @@ func fakeJoinHostFactory(clusterName, clusterCtx, secretName, server, token stri
 				if err != nil {
 					return nil, err
 				}
-				if !api.Semantic.DeepEqual(got, secretObject) {
+				if !apiequality.Semantic.DeepEqual(got, secretObject) {
 					return nil, fmt.Errorf("Unexpected secret object\n\tDiff: %s", diff.ObjectGoPrintDiff(got, secretObject))
 				}
 				return &http.Response{StatusCode: http.StatusCreated, Header: kubefedtesting.DefaultHeader(), Body: kubefedtesting.ObjBody(codec, &secretObject)}, nil

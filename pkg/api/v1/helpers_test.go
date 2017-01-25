@@ -20,9 +20,9 @@ import (
 	"reflect"
 	"testing"
 
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/kubernetes/pkg/api"
 )
 
 func TestAddToNodeAddresses(t *testing.T) {
@@ -76,7 +76,7 @@ func TestAddToNodeAddresses(t *testing.T) {
 
 	for i, tc := range testCases {
 		AddToNodeAddresses(&tc.existing, tc.toAdd...)
-		if !api.Semantic.DeepEqual(tc.expected, tc.existing) {
+		if !apiequality.Semantic.DeepEqual(tc.expected, tc.existing) {
 			t.Errorf("case[%d], expected: %v, got: %v", i, tc.expected, tc.existing)
 		}
 	}

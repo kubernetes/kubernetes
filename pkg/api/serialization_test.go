@@ -32,6 +32,7 @@ import (
 	flag "github.com/spf13/pflag"
 	"github.com/ugorji/go/codec"
 
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/meta"
 	apitesting "k8s.io/apimachinery/pkg/api/testing"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -321,7 +322,7 @@ func roundTrip(t *testing.T, codec runtime.Codec, item runtime.Object) {
 
 	// ensure that the deep copy is equal to the original; neither the deep
 	// copy or conversion should alter the object
-	if !api.Semantic.DeepEqual(original, item) {
+	if !apiequality.Semantic.DeepEqual(original, item) {
 		t.Errorf("0: %v: encode altered the object, diff: %v", name, diff.ObjectReflectDiff(original, item))
 		return
 	}
@@ -335,7 +336,7 @@ func roundTrip(t *testing.T, codec runtime.Codec, item runtime.Object) {
 
 	// ensure that the object produced from decoding the encoded data is equal
 	// to the original object
-	if !api.Semantic.DeepEqual(original, obj2) {
+	if !apiequality.Semantic.DeepEqual(original, obj2) {
 		t.Errorf("\n1: %v: diff: %v\nCodec: %#v\nSource:\n\n%#v\n\nEncoded:\n\n%s\n\nFinal:\n\n%#v", name, diff.ObjectReflectDiff(item, obj2), codec, printer.Sprintf("%#v", item), dataAsString(data), printer.Sprintf("%#v", obj2))
 		return
 	}
@@ -350,7 +351,7 @@ func roundTrip(t *testing.T, codec runtime.Codec, item runtime.Object) {
 
 	// ensure that the new runtime object is equal to the original after being
 	// decoded into
-	if !api.Semantic.DeepEqual(item, obj3) {
+	if !apiequality.Semantic.DeepEqual(item, obj3) {
 		t.Errorf("3: %v: diff: %v\nCodec: %#v", name, diff.ObjectReflectDiff(item, obj3), codec)
 		return
 	}
@@ -383,7 +384,7 @@ func TestEncodePtr(t *testing.T) {
 	if _, ok := obj2.(*api.Pod); !ok {
 		t.Fatalf("Got wrong type")
 	}
-	if !api.Semantic.DeepEqual(obj2, pod) {
+	if !apiequality.Semantic.DeepEqual(obj2, pod) {
 		t.Errorf("\nExpected:\n\n %#v,\n\nGot:\n\n %#vDiff: %v\n\n", pod, obj2, diff.ObjectDiff(obj2, pod))
 	}
 }
@@ -480,7 +481,7 @@ func TestObjectWatchFraming(t *testing.T) {
 		}
 		resultSecret.Kind = "Secret"
 		resultSecret.APIVersion = "v1"
-		if !api.Semantic.DeepEqual(v1secret, res) {
+		if !apiequality.Semantic.DeepEqual(v1secret, res) {
 			t.Fatalf("objects did not match: %s", diff.ObjectGoPrintDiff(v1secret, res))
 		}
 
@@ -514,7 +515,7 @@ func TestObjectWatchFraming(t *testing.T) {
 			}
 		}
 
-		if !api.Semantic.DeepEqual(secret, outEvent.Object.Object) {
+		if !apiequality.Semantic.DeepEqual(secret, outEvent.Object.Object) {
 			t.Fatalf("%s: did not match after frame decoding: %s", info.MediaType, diff.ObjectGoPrintDiff(secret, outEvent.Object.Object))
 		}
 	}

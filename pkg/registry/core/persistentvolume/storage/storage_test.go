@@ -19,6 +19,7 @@ package storage
 import (
 	"testing"
 
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
@@ -190,7 +191,7 @@ func TestUpdateStatus(t *testing.T) {
 	}
 	pvOut := obj.(*api.PersistentVolume)
 	// only compare the relevant change b/c metadata will differ
-	if !api.Semantic.DeepEqual(pvIn.Status, pvOut.Status) {
+	if !apiequality.Semantic.DeepEqual(pvIn.Status, pvOut.Status) {
 		t.Errorf("unexpected object: %s", diff.ObjectDiff(pvIn.Status, pvOut.Status))
 	}
 }

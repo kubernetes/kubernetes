@@ -20,6 +20,7 @@ import (
 	"reflect"
 	"testing"
 
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
@@ -226,7 +227,7 @@ func TestScaleGet(t *testing.T) {
 		t.Fatalf("error fetching scale for %s: %v", name, err)
 	}
 	got := obj.(*extensions.Scale)
-	if !api.Semantic.DeepEqual(want, got) {
+	if !apiequality.Semantic.DeepEqual(want, got) {
 		t.Errorf("unexpected scale: %s", diff.ObjectDiff(want, got))
 	}
 }

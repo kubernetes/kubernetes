@@ -22,6 +22,7 @@ import (
 	"testing"
 	"time"
 
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -210,7 +211,7 @@ func TestResourceListConversion(t *testing.T) {
 		if err != nil {
 			t.Fatalf("unexpected error for case %d: %v", i, err)
 		}
-		if !api.Semantic.DeepEqual(test.expected, output) {
+		if !apiequality.Semantic.DeepEqual(test.expected, output) {
 			t.Errorf("unexpected conversion for case %d: Expected %+v; Got %+v", i, test.expected, output)
 		}
 	}

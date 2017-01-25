@@ -19,6 +19,7 @@ package storage
 import (
 	"testing"
 
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
@@ -197,7 +198,7 @@ func TestUpdateStatus(t *testing.T) {
 	obj, err := storage.Get(ctx, "foo", &metav1.GetOptions{})
 	rqOut := obj.(*api.ResourceQuota)
 	// only compare the meaningful update b/c we can't compare due to metadata
-	if !api.Semantic.DeepEqual(resourcequotaIn.Status, rqOut.Status) {
+	if !apiequality.Semantic.DeepEqual(resourcequotaIn.Status, rqOut.Status) {
 		t.Errorf("unexpected object: %s", diff.ObjectDiff(resourcequotaIn, rqOut))
 	}
 }

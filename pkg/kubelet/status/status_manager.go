@@ -24,6 +24,7 @@ import (
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 
 	"github.com/golang/glog"
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -116,7 +117,7 @@ func NewManager(kubeClient clientset.Interface, podManager kubepod.Manager) Mana
 // This method normalizes the status before comparing so as to make sure that meaningless
 // changes will be ignored.
 func isStatusEqual(oldStatus, status *v1.PodStatus) bool {
-	return api.Semantic.DeepEqual(status, oldStatus)
+	return apiequality.Semantic.DeepEqual(status, oldStatus)
 }
 
 func (m *manager) Start() {
