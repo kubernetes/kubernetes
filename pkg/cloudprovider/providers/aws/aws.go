@@ -366,7 +366,7 @@ type Cloud struct {
 	attachingMutex sync.Mutex
 	attaching      map[string]map[mountDevice]awsVolumeID
 	// state of our device allocator for each node
-	deviceAllocators map[types.NodeName]DeviceAllocator
+	deviceAllocators map[string]DeviceAllocator
 }
 
 var _ Volumes = &Cloud{}
@@ -799,7 +799,7 @@ func newAWSCloud(config io.Reader, awsServices Services) (*Cloud, error) {
 		cfg:              cfg,
 		region:           regionName,
 		attaching:        make(map[string]map[mountDevice]awsVolumeID),
-		deviceAllocators: make(map[types.NodeName]DeviceAllocator),
+		deviceAllocators: make(map[string]DeviceAllocator),
 	}
 
 	selfAWSInstance, err := awsCloud.buildSelfAWSInstance()
