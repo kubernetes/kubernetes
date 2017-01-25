@@ -661,7 +661,7 @@ func TestObservedGeneration(t *testing.T) {
 	}
 }
 
-// DaemonSet controller should kill all failed pods and recreate at most 1 failed pod.
+// DaemonSet controller should kill all failed pods and create at most 1 pod on every node.
 func TestDaemonKillFailedPods(t *testing.T) {
 	tests := []struct {
 		numFailedPods, numNormalPods, expectedCreates, expectedDeletes int
