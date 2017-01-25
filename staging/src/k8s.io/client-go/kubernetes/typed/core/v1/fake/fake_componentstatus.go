@@ -51,13 +51,13 @@ func (c *FakeComponentStatuses) Update(componentStatus *v1.ComponentStatus) (res
 	return obj.(*v1.ComponentStatus), err
 }
 
-func (c *FakeComponentStatuses) Delete(name string, options *v1.DeleteOptions) error {
+func (c *FakeComponentStatuses) Delete(name string, options *meta_v1.DeleteOptions) error {
 	_, err := c.Fake.
 		Invokes(testing.NewRootDeleteAction(componentstatusesResource, name), &v1.ComponentStatus{})
 	return err
 }
 
-func (c *FakeComponentStatuses) DeleteCollection(options *v1.DeleteOptions, listOptions meta_v1.ListOptions) error {
+func (c *FakeComponentStatuses) DeleteCollection(options *meta_v1.DeleteOptions, listOptions meta_v1.ListOptions) error {
 	action := testing.NewRootDeleteCollectionAction(componentstatusesResource, listOptions)
 
 	_, err := c.Fake.Invokes(action, &v1.ComponentStatusList{})

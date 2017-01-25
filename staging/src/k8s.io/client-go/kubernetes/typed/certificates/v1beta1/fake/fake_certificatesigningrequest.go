@@ -17,12 +17,11 @@ limitations under the License.
 package fake
 
 import (
-	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	labels "k8s.io/apimachinery/pkg/labels"
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
-	v1 "k8s.io/client-go/pkg/api/v1"
 	v1beta1 "k8s.io/client-go/pkg/apis/certificates/v1beta1"
 	testing "k8s.io/client-go/testing"
 )
@@ -67,14 +66,14 @@ func (c *FakeCertificateSigningRequests) Delete(name string, options *v1.DeleteO
 	return err
 }
 
-func (c *FakeCertificateSigningRequests) DeleteCollection(options *v1.DeleteOptions, listOptions meta_v1.ListOptions) error {
+func (c *FakeCertificateSigningRequests) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
 	action := testing.NewRootDeleteCollectionAction(certificatesigningrequestsResource, listOptions)
 
 	_, err := c.Fake.Invokes(action, &v1beta1.CertificateSigningRequestList{})
 	return err
 }
 
-func (c *FakeCertificateSigningRequests) Get(name string, options meta_v1.GetOptions) (result *v1beta1.CertificateSigningRequest, err error) {
+func (c *FakeCertificateSigningRequests) Get(name string, options v1.GetOptions) (result *v1beta1.CertificateSigningRequest, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewRootGetAction(certificatesigningrequestsResource, name), &v1beta1.CertificateSigningRequest{})
 	if obj == nil {
@@ -83,7 +82,7 @@ func (c *FakeCertificateSigningRequests) Get(name string, options meta_v1.GetOpt
 	return obj.(*v1beta1.CertificateSigningRequest), err
 }
 
-func (c *FakeCertificateSigningRequests) List(opts meta_v1.ListOptions) (result *v1beta1.CertificateSigningRequestList, err error) {
+func (c *FakeCertificateSigningRequests) List(opts v1.ListOptions) (result *v1beta1.CertificateSigningRequestList, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewRootListAction(certificatesigningrequestsResource, opts), &v1beta1.CertificateSigningRequestList{})
 	if obj == nil {
@@ -104,7 +103,7 @@ func (c *FakeCertificateSigningRequests) List(opts meta_v1.ListOptions) (result 
 }
 
 // Watch returns a watch.Interface that watches the requested certificateSigningRequests.
-func (c *FakeCertificateSigningRequests) Watch(opts meta_v1.ListOptions) (watch.Interface, error) {
+func (c *FakeCertificateSigningRequests) Watch(opts v1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
 		InvokesWatch(testing.NewRootWatchAction(certificatesigningrequestsResource, opts))
 }

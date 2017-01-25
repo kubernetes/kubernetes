@@ -17,11 +17,10 @@ limitations under the License.
 package v1alpha1
 
 import (
-	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	api "k8s.io/client-go/pkg/api"
-	v1 "k8s.io/client-go/pkg/api/v1"
 	v1alpha1 "k8s.io/client-go/pkg/apis/rbac/v1alpha1"
 	rest "k8s.io/client-go/rest"
 )
@@ -37,10 +36,10 @@ type ClusterRoleBindingInterface interface {
 	Create(*v1alpha1.ClusterRoleBinding) (*v1alpha1.ClusterRoleBinding, error)
 	Update(*v1alpha1.ClusterRoleBinding) (*v1alpha1.ClusterRoleBinding, error)
 	Delete(name string, options *v1.DeleteOptions) error
-	DeleteCollection(options *v1.DeleteOptions, listOptions meta_v1.ListOptions) error
-	Get(name string, options meta_v1.GetOptions) (*v1alpha1.ClusterRoleBinding, error)
-	List(opts meta_v1.ListOptions) (*v1alpha1.ClusterRoleBindingList, error)
-	Watch(opts meta_v1.ListOptions) (watch.Interface, error)
+	DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error
+	Get(name string, options v1.GetOptions) (*v1alpha1.ClusterRoleBinding, error)
+	List(opts v1.ListOptions) (*v1alpha1.ClusterRoleBindingList, error)
+	Watch(opts v1.ListOptions) (watch.Interface, error)
 	Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v1alpha1.ClusterRoleBinding, err error)
 	ClusterRoleBindingExpansion
 }
@@ -91,7 +90,7 @@ func (c *clusterRoleBindings) Delete(name string, options *v1.DeleteOptions) err
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *clusterRoleBindings) DeleteCollection(options *v1.DeleteOptions, listOptions meta_v1.ListOptions) error {
+func (c *clusterRoleBindings) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
 	return c.client.Delete().
 		Resource("clusterrolebindings").
 		VersionedParams(&listOptions, api.ParameterCodec).
@@ -101,7 +100,7 @@ func (c *clusterRoleBindings) DeleteCollection(options *v1.DeleteOptions, listOp
 }
 
 // Get takes name of the clusterRoleBinding, and returns the corresponding clusterRoleBinding object, and an error if there is any.
-func (c *clusterRoleBindings) Get(name string, options meta_v1.GetOptions) (result *v1alpha1.ClusterRoleBinding, err error) {
+func (c *clusterRoleBindings) Get(name string, options v1.GetOptions) (result *v1alpha1.ClusterRoleBinding, err error) {
 	result = &v1alpha1.ClusterRoleBinding{}
 	err = c.client.Get().
 		Resource("clusterrolebindings").
@@ -113,7 +112,7 @@ func (c *clusterRoleBindings) Get(name string, options meta_v1.GetOptions) (resu
 }
 
 // List takes label and field selectors, and returns the list of ClusterRoleBindings that match those selectors.
-func (c *clusterRoleBindings) List(opts meta_v1.ListOptions) (result *v1alpha1.ClusterRoleBindingList, err error) {
+func (c *clusterRoleBindings) List(opts v1.ListOptions) (result *v1alpha1.ClusterRoleBindingList, err error) {
 	result = &v1alpha1.ClusterRoleBindingList{}
 	err = c.client.Get().
 		Resource("clusterrolebindings").
@@ -124,7 +123,7 @@ func (c *clusterRoleBindings) List(opts meta_v1.ListOptions) (result *v1alpha1.C
 }
 
 // Watch returns a watch.Interface that watches the requested clusterRoleBindings.
-func (c *clusterRoleBindings) Watch(opts meta_v1.ListOptions) (watch.Interface, error) {
+func (c *clusterRoleBindings) Watch(opts v1.ListOptions) (watch.Interface, error) {
 	return c.client.Get().
 		Prefix("watch").
 		Resource("clusterrolebindings").
