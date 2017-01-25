@@ -17,12 +17,11 @@ limitations under the License.
 package fake
 
 import (
-	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	labels "k8s.io/apimachinery/pkg/labels"
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
-	v1 "k8s.io/client-go/pkg/api/v1"
 	v1beta1 "k8s.io/client-go/pkg/apis/rbac/v1beta1"
 	testing "k8s.io/client-go/testing"
 )
@@ -58,14 +57,14 @@ func (c *FakeClusterRoles) Delete(name string, options *v1.DeleteOptions) error 
 	return err
 }
 
-func (c *FakeClusterRoles) DeleteCollection(options *v1.DeleteOptions, listOptions meta_v1.ListOptions) error {
+func (c *FakeClusterRoles) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
 	action := testing.NewRootDeleteCollectionAction(clusterrolesResource, listOptions)
 
 	_, err := c.Fake.Invokes(action, &v1beta1.ClusterRoleList{})
 	return err
 }
 
-func (c *FakeClusterRoles) Get(name string, options meta_v1.GetOptions) (result *v1beta1.ClusterRole, err error) {
+func (c *FakeClusterRoles) Get(name string, options v1.GetOptions) (result *v1beta1.ClusterRole, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewRootGetAction(clusterrolesResource, name), &v1beta1.ClusterRole{})
 	if obj == nil {
@@ -74,7 +73,7 @@ func (c *FakeClusterRoles) Get(name string, options meta_v1.GetOptions) (result 
 	return obj.(*v1beta1.ClusterRole), err
 }
 
-func (c *FakeClusterRoles) List(opts meta_v1.ListOptions) (result *v1beta1.ClusterRoleList, err error) {
+func (c *FakeClusterRoles) List(opts v1.ListOptions) (result *v1beta1.ClusterRoleList, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewRootListAction(clusterrolesResource, opts), &v1beta1.ClusterRoleList{})
 	if obj == nil {
@@ -95,7 +94,7 @@ func (c *FakeClusterRoles) List(opts meta_v1.ListOptions) (result *v1beta1.Clust
 }
 
 // Watch returns a watch.Interface that watches the requested clusterRoles.
-func (c *FakeClusterRoles) Watch(opts meta_v1.ListOptions) (watch.Interface, error) {
+func (c *FakeClusterRoles) Watch(opts v1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
 		InvokesWatch(testing.NewRootWatchAction(clusterrolesResource, opts))
 }

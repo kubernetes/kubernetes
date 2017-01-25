@@ -54,14 +54,14 @@ func (c *FakePodTemplates) Update(podTemplate *v1.PodTemplate) (result *v1.PodTe
 	return obj.(*v1.PodTemplate), err
 }
 
-func (c *FakePodTemplates) Delete(name string, options *v1.DeleteOptions) error {
+func (c *FakePodTemplates) Delete(name string, options *meta_v1.DeleteOptions) error {
 	_, err := c.Fake.
 		Invokes(testing.NewDeleteAction(podtemplatesResource, c.ns, name), &v1.PodTemplate{})
 
 	return err
 }
 
-func (c *FakePodTemplates) DeleteCollection(options *v1.DeleteOptions, listOptions meta_v1.ListOptions) error {
+func (c *FakePodTemplates) DeleteCollection(options *meta_v1.DeleteOptions, listOptions meta_v1.ListOptions) error {
 	action := testing.NewDeleteCollectionAction(podtemplatesResource, c.ns, listOptions)
 
 	_, err := c.Fake.Invokes(action, &v1.PodTemplateList{})

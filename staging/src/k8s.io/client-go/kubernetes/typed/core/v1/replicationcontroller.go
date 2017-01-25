@@ -36,8 +36,8 @@ type ReplicationControllerInterface interface {
 	Create(*v1.ReplicationController) (*v1.ReplicationController, error)
 	Update(*v1.ReplicationController) (*v1.ReplicationController, error)
 	UpdateStatus(*v1.ReplicationController) (*v1.ReplicationController, error)
-	Delete(name string, options *v1.DeleteOptions) error
-	DeleteCollection(options *v1.DeleteOptions, listOptions meta_v1.ListOptions) error
+	Delete(name string, options *meta_v1.DeleteOptions) error
+	DeleteCollection(options *meta_v1.DeleteOptions, listOptions meta_v1.ListOptions) error
 	Get(name string, options meta_v1.GetOptions) (*v1.ReplicationController, error)
 	List(opts meta_v1.ListOptions) (*v1.ReplicationControllerList, error)
 	Watch(opts meta_v1.ListOptions) (watch.Interface, error)
@@ -101,7 +101,7 @@ func (c *replicationControllers) UpdateStatus(replicationController *v1.Replicat
 }
 
 // Delete takes name of the replicationController and deletes it. Returns an error if one occurs.
-func (c *replicationControllers) Delete(name string, options *v1.DeleteOptions) error {
+func (c *replicationControllers) Delete(name string, options *meta_v1.DeleteOptions) error {
 	return c.client.Delete().
 		Namespace(c.ns).
 		Resource("replicationcontrollers").
@@ -112,7 +112,7 @@ func (c *replicationControllers) Delete(name string, options *v1.DeleteOptions) 
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *replicationControllers) DeleteCollection(options *v1.DeleteOptions, listOptions meta_v1.ListOptions) error {
+func (c *replicationControllers) DeleteCollection(options *meta_v1.DeleteOptions, listOptions meta_v1.ListOptions) error {
 	return c.client.Delete().
 		Namespace(c.ns).
 		Resource("replicationcontrollers").

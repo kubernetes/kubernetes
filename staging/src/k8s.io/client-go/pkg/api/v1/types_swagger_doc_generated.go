@@ -181,7 +181,8 @@ func (ConfigMap) SwaggerDoc() map[string]string {
 }
 
 var map_ConfigMapEnvSource = map[string]string{
-	"": "ConfigMapEnvSource selects a ConfigMap to populate the environment variables with.\n\nThe contents of the target ConfigMap's Data field will represent the key-value pairs as environment variables.",
+	"":         "ConfigMapEnvSource selects a ConfigMap to populate the environment variables with.\n\nThe contents of the target ConfigMap's Data field will represent the key-value pairs as environment variables.",
+	"optional": "Specify whether the ConfigMap must be defined",
 }
 
 func (ConfigMapEnvSource) SwaggerDoc() map[string]string {
@@ -189,8 +190,9 @@ func (ConfigMapEnvSource) SwaggerDoc() map[string]string {
 }
 
 var map_ConfigMapKeySelector = map[string]string{
-	"":    "Selects a key from a ConfigMap.",
-	"key": "The key to select.",
+	"":         "Selects a key from a ConfigMap.",
+	"key":      "The key to select.",
+	"optional": "Specify whether the ConfigMap or it's key must be defined",
 }
 
 func (ConfigMapKeySelector) SwaggerDoc() map[string]string {
@@ -209,8 +211,9 @@ func (ConfigMapList) SwaggerDoc() map[string]string {
 
 var map_ConfigMapVolumeSource = map[string]string{
 	"":            "Adapts a ConfigMap into a volume.\n\nThe contents of the target ConfigMap's Data field will be presented in a volume as files using the keys in the Data field as the file names, unless the items element is populated with specific mappings of keys to paths. ConfigMap volumes support ownership management and SELinux relabeling.",
-	"items":       "If unspecified, each key-value pair in the Data field of the referenced ConfigMap will be projected into the volume as a file whose name is the key and content is the value. If specified, the listed keys will be projected into the specified paths, and unlisted keys will not be present. If a key is specified which is not present in the ConfigMap, the volume setup will error. Paths must be relative and may not contain the '..' path or start with '..'.",
+	"items":       "If unspecified, each key-value pair in the Data field of the referenced ConfigMap will be projected into the volume as a file whose name is the key and content is the value. If specified, the listed keys will be projected into the specified paths, and unlisted keys will not be present. If a key is specified which is not present in the ConfigMap, the volume setup will error unless it is marked optional. Paths must be relative and may not contain the '..' path or start with '..'.",
 	"defaultMode": "Optional: mode bits to use on created files by default. Must be a value between 0 and 0777. Defaults to 0644. Directories within the path are not affected by this setting. This might be in conflict with other options that affect the file mode, like fsGroup, and the result can be other mode bits set.",
+	"optional":    "Specify whether the ConfigMap or it's keys must be defined",
 }
 
 func (ConfigMapVolumeSource) SwaggerDoc() map[string]string {
@@ -339,7 +342,7 @@ func (DaemonEndpoint) SwaggerDoc() map[string]string {
 }
 
 var map_DeleteOptions = map[string]string{
-	"":                   "DeleteOptions may be provided when deleting an API object",
+	"":                   "DeleteOptions may be provided when deleting an API object DEPRECATED: This type has been moved to meta/v1 and will be removed soon.",
 	"gracePeriodSeconds": "The duration in seconds before the object should be deleted. Value must be non-negative integer. The value zero indicates delete immediately. If this value is nil, the default grace period for the specified type will be used. Defaults to a per object value if not specified. zero means delete immediately.",
 	"preconditions":      "Must be fulfilled before a deletion is carried out. If not possible, a 409 Conflict status will be returned.",
 	"orphanDependents":   "Should the dependent objects be orphaned. If true/false, the \"orphan\" finalizer will be added to/removed from the object's finalizers list.",
@@ -1600,7 +1603,8 @@ func (Secret) SwaggerDoc() map[string]string {
 }
 
 var map_SecretEnvSource = map[string]string{
-	"": "SecretEnvSource selects a Secret to populate the environment variables with.\n\nThe contents of the target Secret's Data field will represent the key-value pairs as environment variables.",
+	"":         "SecretEnvSource selects a Secret to populate the environment variables with.\n\nThe contents of the target Secret's Data field will represent the key-value pairs as environment variables.",
+	"optional": "Specify whether the Secret must be defined",
 }
 
 func (SecretEnvSource) SwaggerDoc() map[string]string {
@@ -1608,8 +1612,9 @@ func (SecretEnvSource) SwaggerDoc() map[string]string {
 }
 
 var map_SecretKeySelector = map[string]string{
-	"":    "SecretKeySelector selects a key of a Secret.",
-	"key": "The key of the secret to select from.  Must be a valid secret key.",
+	"":         "SecretKeySelector selects a key of a Secret.",
+	"key":      "The key of the secret to select from.  Must be a valid secret key.",
+	"optional": "Specify whether the Secret or it's key must be defined",
 }
 
 func (SecretKeySelector) SwaggerDoc() map[string]string {
@@ -1629,8 +1634,9 @@ func (SecretList) SwaggerDoc() map[string]string {
 var map_SecretVolumeSource = map[string]string{
 	"":            "Adapts a Secret into a volume.\n\nThe contents of the target Secret's Data field will be presented in a volume as files using the keys in the Data field as the file names. Secret volumes support ownership management and SELinux relabeling.",
 	"secretName":  "Name of the secret in the pod's namespace to use. More info: http://kubernetes.io/docs/user-guide/volumes#secrets",
-	"items":       "If unspecified, each key-value pair in the Data field of the referenced Secret will be projected into the volume as a file whose name is the key and content is the value. If specified, the listed keys will be projected into the specified paths, and unlisted keys will not be present. If a key is specified which is not present in the Secret, the volume setup will error. Paths must be relative and may not contain the '..' path or start with '..'.",
+	"items":       "If unspecified, each key-value pair in the Data field of the referenced Secret will be projected into the volume as a file whose name is the key and content is the value. If specified, the listed keys will be projected into the specified paths, and unlisted keys will not be present. If a key is specified which is not present in the Secret, the volume setup will error unless it is marked optional. Paths must be relative and may not contain the '..' path or start with '..'.",
 	"defaultMode": "Optional: mode bits to use on created files by default. Must be a value between 0 and 0777. Defaults to 0644. Directories within the path are not affected by this setting. This might be in conflict with other options that affect the file mode, like fsGroup, and the result can be other mode bits set.",
+	"optional":    "Specify whether the Secret or it's keys must be defined",
 }
 
 func (SecretVolumeSource) SwaggerDoc() map[string]string {

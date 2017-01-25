@@ -26,7 +26,6 @@ import (
 	api "k8s.io/client-go/pkg/api"
 	v1 "k8s.io/client-go/pkg/api/v1"
 	componentconfig "k8s.io/client-go/pkg/apis/componentconfig"
-	config "k8s.io/client-go/pkg/util/config"
 	unsafe "unsafe"
 )
 
@@ -464,8 +463,8 @@ func autoConvert_v1alpha1_KubeletConfiguration_To_componentconfig_KubeletConfigu
 	if err := api.Convert_Pointer_bool_To_bool(&in.EnableControllerAttachDetach, &out.EnableControllerAttachDetach, s); err != nil {
 		return err
 	}
-	out.SystemReserved = *(*config.ConfigurationMap)(unsafe.Pointer(&in.SystemReserved))
-	out.KubeReserved = *(*config.ConfigurationMap)(unsafe.Pointer(&in.KubeReserved))
+	out.SystemReserved = *(*componentconfig.ConfigurationMap)(unsafe.Pointer(&in.SystemReserved))
+	out.KubeReserved = *(*componentconfig.ConfigurationMap)(unsafe.Pointer(&in.KubeReserved))
 	out.ProtectKernelDefaults = in.ProtectKernelDefaults
 	if err := api.Convert_Pointer_bool_To_bool(&in.MakeIPTablesUtilChains, &out.MakeIPTablesUtilChains, s); err != nil {
 		return err

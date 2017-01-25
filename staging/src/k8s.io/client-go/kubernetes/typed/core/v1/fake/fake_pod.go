@@ -64,14 +64,14 @@ func (c *FakePods) UpdateStatus(pod *v1.Pod) (*v1.Pod, error) {
 	return obj.(*v1.Pod), err
 }
 
-func (c *FakePods) Delete(name string, options *v1.DeleteOptions) error {
+func (c *FakePods) Delete(name string, options *meta_v1.DeleteOptions) error {
 	_, err := c.Fake.
 		Invokes(testing.NewDeleteAction(podsResource, c.ns, name), &v1.Pod{})
 
 	return err
 }
 
-func (c *FakePods) DeleteCollection(options *v1.DeleteOptions, listOptions meta_v1.ListOptions) error {
+func (c *FakePods) DeleteCollection(options *meta_v1.DeleteOptions, listOptions meta_v1.ListOptions) error {
 	action := testing.NewDeleteCollectionAction(podsResource, c.ns, listOptions)
 
 	_, err := c.Fake.Invokes(action, &v1.PodList{})

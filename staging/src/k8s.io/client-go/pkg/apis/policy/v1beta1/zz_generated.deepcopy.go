@@ -24,7 +24,6 @@ import (
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	conversion "k8s.io/apimachinery/pkg/conversion"
 	runtime "k8s.io/apimachinery/pkg/runtime"
-	api_v1 "k8s.io/client-go/pkg/api/v1"
 	reflect "reflect"
 )
 
@@ -56,9 +55,10 @@ func DeepCopy_v1beta1_Eviction(in interface{}, out interface{}, c *conversion.Cl
 		}
 		if in.DeleteOptions != nil {
 			in, out := &in.DeleteOptions, &out.DeleteOptions
-			*out = new(api_v1.DeleteOptions)
-			if err := api_v1.DeepCopy_v1_DeleteOptions(*in, *out, c); err != nil {
+			if newVal, err := c.DeepCopy(*in); err != nil {
 				return err
+			} else {
+				*out = newVal.(*v1.DeleteOptions)
 			}
 		}
 		return nil
