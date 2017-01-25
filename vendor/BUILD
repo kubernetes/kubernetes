@@ -14006,3 +14006,83 @@ go_library(
         "//vendor:k8s.io/client-go/pkg/apis/authorization/v1beta1",
     ],
 )
+
+go_test(
+    name = "k8s.io/apimachinery/pkg/util/strategicpatch_test",
+    srcs = ["k8s.io/apimachinery/pkg/util/strategicpatch/patch_test.go"],
+    library = ":k8s.io/apimachinery/pkg/util/strategicpatch",
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:github.com/davecgh/go-spew/spew",
+        "//vendor:github.com/ghodss/yaml",
+    ],
+)
+
+go_library(
+    name = "k8s.io/apimachinery/pkg/util/strategicpatch",
+    srcs = ["k8s.io/apimachinery/pkg/util/strategicpatch/patch.go"],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:github.com/davecgh/go-spew/spew",
+        "//vendor:github.com/ghodss/yaml",
+        "//vendor:k8s.io/apimachinery/pkg/util/json",
+        "//vendor:k8s.io/apimachinery/third_party/forked/golang/json",
+    ],
+)
+
+go_library(
+    name = "k8s.io/apimachinery/pkg/util/uuid",
+    srcs = ["k8s.io/apimachinery/pkg/util/uuid/uuid.go"],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:github.com/pborman/uuid",
+        "//vendor:k8s.io/apimachinery/pkg/types",
+    ],
+)
+
+go_library(
+    name = "k8s.io/apimachinery/third_party/forked/golang/json",
+    srcs = ["k8s.io/apimachinery/third_party/forked/golang/json/fields.go"],
+    tags = ["automanaged"],
+)
+
+go_test(
+    name = "k8s.io/apiserver/pkg/util/proxy_test",
+    srcs = [
+        "k8s.io/apiserver/pkg/util/proxy/dial_test.go",
+        "k8s.io/apiserver/pkg/util/proxy/transport_test.go",
+    ],
+    library = ":k8s.io/apiserver/pkg/util/proxy",
+    tags = ["automanaged"],
+    deps = ["//vendor:k8s.io/apimachinery/pkg/util/net"],
+)
+
+go_library(
+    name = "k8s.io/apiserver/pkg/util/proxy",
+    srcs = [
+        "k8s.io/apiserver/pkg/util/proxy/dial.go",
+        "k8s.io/apiserver/pkg/util/proxy/doc.go",
+        "k8s.io/apiserver/pkg/util/proxy/transport.go",
+    ],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:github.com/golang/glog",
+        "//vendor:golang.org/x/net/html",
+        "//vendor:golang.org/x/net/html/atom",
+        "//vendor:k8s.io/apimachinery/pkg/util/net",
+        "//vendor:k8s.io/apimachinery/pkg/util/sets",
+        "//vendor:k8s.io/apimachinery/third_party/forked/golang/netutil",
+    ],
+)
+
+go_library(
+    name = "k8s.io/apiserver/pkg/util/trie",
+    srcs = ["k8s.io/apiserver/pkg/util/trie/trie.go"],
+    tags = ["automanaged"],
+)
+
+go_library(
+    name = "k8s.io/apimachinery/third_party/forked/golang/netutil",
+    srcs = ["k8s.io/apimachinery/third_party/forked/golang/netutil/addr.go"],
+    tags = ["automanaged"],
+)

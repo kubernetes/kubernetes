@@ -20,7 +20,6 @@ go_library(
     ],
     tags = ["automanaged"],
     deps = [
-        "//pkg/util:go_default_library",
         "//vendor:github.com/golang/glog",
         "//vendor:k8s.io/apimachinery/pkg/api/errors",
         "//vendor:k8s.io/apimachinery/pkg/runtime/schema",
