@@ -29,6 +29,7 @@ import (
 	"github.com/mitchellh/mapstructure"
 	"github.com/rackspace/gophercloud"
 	"github.com/rackspace/gophercloud/openstack"
+	neutron_ports "github.com/rackspace/gophercloud/openstack/networking/v2/ports"
 	"github.com/rackspace/gophercloud/openstack/compute/v2/servers"
 	"github.com/rackspace/gophercloud/openstack/identity/v3/extensions/trust"
 	token3 "github.com/rackspace/gophercloud/openstack/identity/v3/tokens"
@@ -74,16 +75,17 @@ type LoadBalancer struct {
 }
 
 type LoadBalancerOpts struct {
-	LBVersion            string     `gcfg:"lb-version"` // overrides autodetection. v1 or v2
-	SubnetId             string     `gcfg:"subnet-id"`  // required
-	FloatingNetworkId    string     `gcfg:"floating-network-id"`
-	LBMethod             string     `gcfg:"lb-method"`
-	CreateMonitor        bool       `gcfg:"create-monitor"`
-	MonitorDelay         MyDuration `gcfg:"monitor-delay"`
-	MonitorTimeout       MyDuration `gcfg:"monitor-timeout"`
-	MonitorMaxRetries    uint       `gcfg:"monitor-max-retries"`
-	ManageSecurityGroups bool       `gcfg:"manage-security-groups"`
-	NodeSecurityGroupID  string     `gcfg:"node-security-group"`
+	LBVersion                    string     `gcfg:"lb-version"` // overrides autodetection. v1 or v2
+	SubnetId                     string     `gcfg:"subnet-id"`  // required
+	FloatingNetworkId            string     `gcfg:"floating-network-id"`
+	LBMethod                     string     `gcfg:"lb-method"`
+	CreateMonitor                bool       `gcfg:"create-monitor"`
+	MonitorDelay                 MyDuration `gcfg:"monitor-delay"`
+	MonitorTimeout               MyDuration `gcfg:"monitor-timeout"`
+	MonitorMaxRetries            uint       `gcfg:"monitor-max-retries"`
+	ManageSecurityGroups         bool       `gcfg:"manage-security-groups"`
+	NodeSecurityGroupID          string     `gcfg:"node-security-group"`
+	AllowAllTrafficFromVIPSubnet bool       `gcfg:"allow-all-traffic-from-vip-subnet"`
 }
 
 type BlockStorageOpts struct {
@@ -382,6 +384,35 @@ func getAddressByName(client *gophercloud.ServiceClient, name types.NodeName) (s
 	return addrs[0].Address, nil
 }
 
+
+func getPortByIP(client *gophercloud.ServiceClient, ipAddress string) (neutron_ports.Port, error) {
+	var targetPort neutron_ports.Port
+	var portFound = false
+
+	err := neutron_ports.List(client, neutron_ports.ListOpts{}).EachPage(func(page pagination.Page) (bool, error) {
+		portList, err := neutron_ports.ExtractPorts(page)
+		if err != nil {
+			return false, err
+		}
+
+		for _, port := range portList {
+			for _, ip := range port.FixedIPs {
+				if ip.IPAddress == ipAddress {
+					targetPort = port
+					portFound = true
+					return false, nil
+				}
+			}
+		}
+
+		return true, nil
+	})
+	if err == nil && !portFound {
+		err = ErrNotFound
+	}
+	return targetPort, err
+}
+
 func (os *OpenStack) Clusters() (cloudprovider.Clusters, bool) {
 	return nil, false
 }
@@ -451,6 +482,11 @@ func (os *OpenStack) LoadBalancer() (cloudprovider.LoadBalancer, bool) {
 func isNotFound(err error) bool {
 	e, ok := err.(*gophercloud.UnexpectedResponseCodeError)
 	return ok && e.Actual == http.StatusNotFound
+}
+
+func isDuplicate(err error) bool {
+	e, ok := err.(*gophercloud.UnexpectedResponseCodeError)
+	return ok && e.Actual == http.StatusConflict
 }
 
 func (os *OpenStack) Zones() (cloudprovider.Zones, bool) {
