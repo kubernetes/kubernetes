@@ -71,8 +71,8 @@ func (g *genClientset) Imports(c *generator.Context) (imports []string) {
 	imports = append(imports,
 		"k8s.io/kubernetes/pkg/api",
 		"k8s.io/kubernetes/pkg/client/testing/core",
-		"k8s.io/kubernetes/pkg/client/typed/discovery",
-		"fakediscovery \"k8s.io/kubernetes/pkg/client/typed/discovery/fake\"",
+		"k8s.io/client-go/discovery",
+		"fakediscovery \"k8s.io/client-go/discovery/fake\"",
 		"k8s.io/apimachinery/pkg/runtime",
 		"k8s.io/apimachinery/pkg/watch",
 	)

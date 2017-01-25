@@ -45,9 +45,9 @@ go_test(
     deps = [
         "//cmd/kubeadm/app/apis/kubeadm:go_default_library",
         "//pkg/client/clientset_generated/clientset:go_default_library",
-        "//pkg/client/typed/discovery:go_default_library",
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
         "//vendor:k8s.io/apimachinery/pkg/version",
+        "//vendor:k8s.io/client-go/discovery",
         "//vendor:k8s.io/client-go/rest",
     ],
 )
