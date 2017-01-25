@@ -48,7 +48,6 @@ go_test(
         "//pkg/api/v1:go_default_library",
         "//pkg/client/clientset_generated/clientset:go_default_library",
         "//pkg/client/clientset_generated/clientset/fake:go_default_library",
-        "//pkg/client/testing/core:go_default_library",
         "//vendor:k8s.io/apimachinery/pkg/api/errors",
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
         "//vendor:k8s.io/apimachinery/pkg/runtime",
@@ -57,6 +56,7 @@ go_test(
         "//vendor:k8s.io/client-go/discovery",
         "//vendor:k8s.io/client-go/dynamic",
         "//vendor:k8s.io/client-go/rest",
+        "//vendor:k8s.io/client-go/testing",
     ],
 )
 

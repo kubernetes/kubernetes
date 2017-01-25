@@ -59,7 +59,7 @@ func (g *genFakeForGroup) Imports(c *generator.Context) (imports []string) {
 
 func (g *genFakeForGroup) GenerateType(c *generator.Context, t *types.Type, w io.Writer) error {
 	sw := generator.NewSnippetWriter(w, c, "$", "$")
-	const pkgTestingCore = "k8s.io/kubernetes/pkg/client/testing/core"
+	const pkgTestingCore = "k8s.io/client-go/testing"
 	const pkgRESTClient = "k8s.io/client-go/rest"
 	m := map[string]interface{}{
 		"group":               g.group,

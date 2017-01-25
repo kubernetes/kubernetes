@@ -87,7 +87,7 @@ func hasObjectMeta(t *types.Type) bool {
 func (g *genFakeForType) GenerateType(c *generator.Context, t *types.Type, w io.Writer) error {
 	sw := generator.NewSnippetWriter(w, c, "$", "$")
 	pkg := filepath.Base(t.Name.Package)
-	const pkgTestingCore = "k8s.io/kubernetes/pkg/client/testing/core"
+	const pkgTestingCore = "k8s.io/client-go/testing"
 	namespaced := !extractBoolTagOrDie("nonNamespaced", t.SecondClosestCommentLines)
 	canonicalGroup := g.group
 	if canonicalGroup == "core" {

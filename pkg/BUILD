@@ -70,8 +70,6 @@ filegroup(
         "//pkg/client/record:all-srcs",
         "//pkg/client/retry:all-srcs",
         "//pkg/client/testdata:all-srcs",
-        "//pkg/client/testing/cache:all-srcs",
-        "//pkg/client/testing/core:all-srcs",
         "//pkg/client/tests:all-srcs",
         "//pkg/client/unversioned:all-srcs",
         "//pkg/cloudprovider:all-srcs",

@@ -27,6 +27,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	oldclient "k8s.io/kubernetes/pkg/client/unversioned"
+	"k8s.io/kubernetes/pkg/version"
 )
 
 func NewClientCache(loader clientcmd.ClientConfig, discoveryClientFactory DiscoveryClientFactory) *ClientCache {
@@ -76,7 +77,7 @@ func (c *ClientCache) getDefaultConfig() (restclient.Config, discovery.Discovery
 		return restclient.Config{}, nil, err
 	}
 	if c.matchVersion {
-		if err := discovery.MatchesServerVersion(discoveryClient); err != nil {
+		if err := discovery.MatchesServerVersion(version.Get(), discoveryClient); err != nil {
 			return restclient.Config{}, nil, err
 		}
 	}

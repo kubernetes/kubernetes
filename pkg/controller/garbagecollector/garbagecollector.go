@@ -41,6 +41,9 @@ import (
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/controller/garbagecollector/metaonly"
 	"k8s.io/kubernetes/pkg/util/workqueue"
+
+	// import known versions
+	_ "k8s.io/client-go/kubernetes"
 )
 
 const ResourceResyncTime time.Duration = 0

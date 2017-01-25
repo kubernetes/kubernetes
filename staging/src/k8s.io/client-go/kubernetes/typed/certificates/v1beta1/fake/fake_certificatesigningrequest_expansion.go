@@ -18,12 +18,12 @@ package fake
 
 import (
 	certificates "k8s.io/client-go/pkg/apis/certificates/v1beta1"
-	"k8s.io/client-go/testing"
+	core "k8s.io/client-go/testing"
 )
 
 func (c *FakeCertificateSigningRequests) UpdateApproval(certificateSigningRequest *certificates.CertificateSigningRequest) (result *certificates.CertificateSigningRequest, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewRootUpdateSubresourceAction(certificatesigningrequestsResource, "approval", certificateSigningRequest), &certificates.CertificateSigningRequest{})
+		Invokes(core.NewRootUpdateSubresourceAction(certificatesigningrequestsResource, "approval", certificateSigningRequest), &certificates.CertificateSigningRequest{})
 	if obj == nil {
 		return nil, err
 	}

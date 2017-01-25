@@ -22,8 +22,8 @@ import (
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
+	testing "k8s.io/client-go/testing"
 	testgroup "k8s.io/kubernetes/cmd/libs/go2idl/client-gen/test_apis/testgroup"
-	core "k8s.io/kubernetes/pkg/client/testing/core"
 )
 
 // FakeTestTypes implements TestTypeInterface
@@ -36,7 +36,7 @@ var testtypesResource = schema.GroupVersionResource{Group: "testgroup.k8s.io", V
 
 func (c *FakeTestTypes) Create(testType *testgroup.TestType) (result *testgroup.TestType, err error) {
 	obj, err := c.Fake.
-		Invokes(core.NewCreateAction(testtypesResource, c.ns, testType), &testgroup.TestType{})
+		Invokes(testing.NewCreateAction(testtypesResource, c.ns, testType), &testgroup.TestType{})
 
 	if obj == nil {
 		return nil, err
@@ -46,7 +46,7 @@ func (c *FakeTestTypes) Create(testType *testgroup.TestType) (result *testgroup.
 
 func (c *FakeTestTypes) Update(testType *testgroup.TestType) (result *testgroup.TestType, err error) {
 	obj, err := c.Fake.
-		Invokes(core.NewUpdateAction(testtypesResource, c.ns, testType), &testgroup.TestType{})
+		Invokes(testing.NewUpdateAction(testtypesResource, c.ns, testType), &testgroup.TestType{})
 
 	if obj == nil {
 		return nil, err
@@ -56,7 +56,7 @@ func (c *FakeTestTypes) Update(testType *testgroup.TestType) (result *testgroup.
 
 func (c *FakeTestTypes) UpdateStatus(testType *testgroup.TestType) (*testgroup.TestType, error) {
 	obj, err := c.Fake.
-		Invokes(core.NewUpdateSubresourceAction(testtypesResource, "status", c.ns, testType), &testgroup.TestType{})
+		Invokes(testing.NewUpdateSubresourceAction(testtypesResource, "status", c.ns, testType), &testgroup.TestType{})
 
 	if obj == nil {
 		return nil, err
@@ -66,13 +66,13 @@ func (c *FakeTestTypes) UpdateStatus(testType *testgroup.TestType) (*testgroup.T
 
 func (c *FakeTestTypes) Delete(name string, options *v1.DeleteOptions) error {
 	_, err := c.Fake.
-		Invokes(core.NewDeleteAction(testtypesResource, c.ns, name), &testgroup.TestType{})
+		Invokes(testing.NewDeleteAction(testtypesResource, c.ns, name), &testgroup.TestType{})
 
 	return err
 }
 
 func (c *FakeTestTypes) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
-	action := core.NewDeleteCollectionAction(testtypesResource, c.ns, listOptions)
+	action := testing.NewDeleteCollectionAction(testtypesResource, c.ns, listOptions)
 
 	_, err := c.Fake.Invokes(action, &testgroup.TestTypeList{})
 	return err
@@ -80,7 +80,7 @@ func (c *FakeTestTypes) DeleteCollection(options *v1.DeleteOptions, listOptions 
 
 func (c *FakeTestTypes) Get(name string, options v1.GetOptions) (result *testgroup.TestType, err error) {
 	obj, err := c.Fake.
-		Invokes(core.NewGetAction(testtypesResource, c.ns, name), &testgroup.TestType{})
+		Invokes(testing.NewGetAction(testtypesResource, c.ns, name), &testgroup.TestType{})
 
 	if obj == nil {
 		return nil, err
@@ -90,13 +90,13 @@ func (c *FakeTestTypes) Get(name string, options v1.GetOptions) (result *testgro
 
 func (c *FakeTestTypes) List(opts v1.ListOptions) (result *testgroup.TestTypeList, err error) {
 	obj, err := c.Fake.
-		Invokes(core.NewListAction(testtypesResource, c.ns, opts), &testgroup.TestTypeList{})
+		Invokes(testing.NewListAction(testtypesResource, c.ns, opts), &testgroup.TestTypeList{})
 
 	if obj == nil {
 		return nil, err
 	}
 
-	label, _, _ := core.ExtractFromListOptions(opts)
+	label, _, _ := testing.ExtractFromListOptions(opts)
 	if label == nil {
 		label = labels.Everything()
 	}
@@ -112,14 +112,14 @@ func (c *FakeTestTypes) List(opts v1.ListOptions) (result *testgroup.TestTypeLis
 // Watch returns a watch.Interface that watches the requested testTypes.
 func (c *FakeTestTypes) Watch(opts v1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
-		InvokesWatch(core.NewWatchAction(testtypesResource, c.ns, opts))
+		InvokesWatch(testing.NewWatchAction(testtypesResource, c.ns, opts))
 
 }
 
 // Patch applies the patch and returns the patched testType.
 func (c *FakeTestTypes) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *testgroup.TestType, err error) {
 	obj, err := c.Fake.
-		Invokes(core.NewPatchSubresourceAction(testtypesResource, c.ns, name, data, subresources...), &testgroup.TestType{})
+		Invokes(testing.NewPatchSubresourceAction(testtypesResource, c.ns, name, data, subresources...), &testgroup.TestType{})
 
 	if obj == nil {
 		return nil, err

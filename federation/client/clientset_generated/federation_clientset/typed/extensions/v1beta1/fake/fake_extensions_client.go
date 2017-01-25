@@ -18,12 +18,12 @@ package fake
 
 import (
 	rest "k8s.io/client-go/rest"
+	testing "k8s.io/client-go/testing"
 	v1beta1 "k8s.io/kubernetes/federation/client/clientset_generated/federation_clientset/typed/extensions/v1beta1"
-	core "k8s.io/kubernetes/pkg/client/testing/core"
 )
 
 type FakeExtensionsV1beta1 struct {
-	*core.Fake
+	*testing.Fake
 }
 
 func (c *FakeExtensionsV1beta1) DaemonSets(namespace string) v1beta1.DaemonSetInterface {

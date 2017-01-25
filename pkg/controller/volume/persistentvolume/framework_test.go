@@ -34,6 +34,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apimachinery/pkg/util/wait"
+	core "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
@@ -44,8 +45,7 @@ import (
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset/fake"
 	"k8s.io/kubernetes/pkg/client/record"
-	fcache "k8s.io/kubernetes/pkg/client/testing/cache"
-	"k8s.io/kubernetes/pkg/client/testing/core"
+	fcache "k8s.io/kubernetes/pkg/controller/volume/persistentvolume/testing"
 	vol "k8s.io/kubernetes/pkg/volume"
 )
 

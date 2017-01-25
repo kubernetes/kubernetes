@@ -22,8 +22,8 @@ import (
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
+	testing "k8s.io/client-go/testing"
 	v1 "k8s.io/kubernetes/pkg/api/v1"
-	core "k8s.io/kubernetes/pkg/client/testing/core"
 )
 
 // FakeReplicationControllers implements ReplicationControllerInterface
@@ -36,7 +36,7 @@ var replicationcontrollersResource = schema.GroupVersionResource{Group: "", Vers
 
 func (c *FakeReplicationControllers) Create(replicationController *v1.ReplicationController) (result *v1.ReplicationController, err error) {
 	obj, err := c.Fake.
-		Invokes(core.NewCreateAction(replicationcontrollersResource, c.ns, replicationController), &v1.ReplicationController{})
+		Invokes(testing.NewCreateAction(replicationcontrollersResource, c.ns, replicationController), &v1.ReplicationController{})
 
 	if obj == nil {
 		return nil, err
@@ -46,7 +46,7 @@ func (c *FakeReplicationControllers) Create(replicationController *v1.Replicatio
 
 func (c *FakeReplicationControllers) Update(replicationController *v1.ReplicationController) (result *v1.ReplicationController, err error) {
 	obj, err := c.Fake.
-		Invokes(core.NewUpdateAction(replicationcontrollersResource, c.ns, replicationController), &v1.ReplicationController{})
+		Invokes(testing.NewUpdateAction(replicationcontrollersResource, c.ns, replicationController), &v1.ReplicationController{})
 
 	if obj == nil {
 		return nil, err
@@ -56,7 +56,7 @@ func (c *FakeReplicationControllers) Update(replicationController *v1.Replicatio
 
 func (c *FakeReplicationControllers) UpdateStatus(replicationController *v1.ReplicationController) (*v1.ReplicationController, error) {
 	obj, err := c.Fake.
-		Invokes(core.NewUpdateSubresourceAction(replicationcontrollersResource, "status", c.ns, replicationController), &v1.ReplicationController{})
+		Invokes(testing.NewUpdateSubresourceAction(replicationcontrollersResource, "status", c.ns, replicationController), &v1.ReplicationController{})
 
 	if obj == nil {
 		return nil, err
@@ -66,13 +66,13 @@ func (c *FakeReplicationControllers) UpdateStatus(replicationController *v1.Repl
 
 func (c *FakeReplicationControllers) Delete(name string, options *meta_v1.DeleteOptions) error {
 	_, err := c.Fake.
-		Invokes(core.NewDeleteAction(replicationcontrollersResource, c.ns, name), &v1.ReplicationController{})
+		Invokes(testing.NewDeleteAction(replicationcontrollersResource, c.ns, name), &v1.ReplicationController{})
 
 	return err
 }
 
 func (c *FakeReplicationControllers) DeleteCollection(options *meta_v1.DeleteOptions, listOptions meta_v1.ListOptions) error {
-	action := core.NewDeleteCollectionAction(replicationcontrollersResource, c.ns, listOptions)
+	action := testing.NewDeleteCollectionAction(replicationcontrollersResource, c.ns, listOptions)
 
 	_, err := c.Fake.Invokes(action, &v1.ReplicationControllerList{})
 	return err
@@ -80,7 +80,7 @@ func (c *FakeReplicationControllers) DeleteCollection(options *meta_v1.DeleteOpt
 
 func (c *FakeReplicationControllers) Get(name string, options meta_v1.GetOptions) (result *v1.ReplicationController, err error) {
 	obj, err := c.Fake.
-		Invokes(core.NewGetAction(replicationcontrollersResource, c.ns, name), &v1.ReplicationController{})
+		Invokes(testing.NewGetAction(replicationcontrollersResource, c.ns, name), &v1.ReplicationController{})
 
 	if obj == nil {
 		return nil, err
@@ -90,13 +90,13 @@ func (c *FakeReplicationControllers) Get(name string, options meta_v1.GetOptions
 
 func (c *FakeReplicationControllers) List(opts meta_v1.ListOptions) (result *v1.ReplicationControllerList, err error) {
 	obj, err := c.Fake.
-		Invokes(core.NewListAction(replicationcontrollersResource, c.ns, opts), &v1.ReplicationControllerList{})
+		Invokes(testing.NewListAction(replicationcontrollersResource, c.ns, opts), &v1.ReplicationControllerList{})
 
 	if obj == nil {
 		return nil, err
 	}
 
-	label, _, _ := core.ExtractFromListOptions(opts)
+	label, _, _ := testing.ExtractFromListOptions(opts)
 	if label == nil {
 		label = labels.Everything()
 	}
@@ -112,14 +112,14 @@ func (c *FakeReplicationControllers) List(opts meta_v1.ListOptions) (result *v1.
 // Watch returns a watch.Interface that watches the requested replicationControllers.
 func (c *FakeReplicationControllers) Watch(opts meta_v1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
-		InvokesWatch(core.NewWatchAction(replicationcontrollersResource, c.ns, opts))
+		InvokesWatch(testing.NewWatchAction(replicationcontrollersResource, c.ns, opts))
 
 }
 
 // Patch applies the patch and returns the patched replicationController.
 func (c *FakeReplicationControllers) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v1.ReplicationController, err error) {
 	obj, err := c.Fake.
-		Invokes(core.NewPatchSubresourceAction(replicationcontrollersResource, c.ns, name, data, subresources...), &v1.ReplicationController{})
+		Invokes(testing.NewPatchSubresourceAction(replicationcontrollersResource, c.ns, name, data, subresources...), &v1.ReplicationController{})
 
 	if obj == nil {
 		return nil, err

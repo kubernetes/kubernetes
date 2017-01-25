@@ -18,12 +18,12 @@ package fake
 
 import (
 	rest "k8s.io/client-go/rest"
+	testing "k8s.io/client-go/testing"
 	v2alpha1 "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/batch/v2alpha1"
-	core "k8s.io/kubernetes/pkg/client/testing/core"
 )
 
 type FakeBatchV2alpha1 struct {
-	*core.Fake
+	*testing.Fake
 }
 
 func (c *FakeBatchV2alpha1) CronJobs(namespace string) v2alpha1.CronJobInterface {

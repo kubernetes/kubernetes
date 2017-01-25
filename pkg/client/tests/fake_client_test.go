@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package core_test
+package tests
 
 import (
 	"testing"
@@ -22,6 +22,9 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/api"
 	clientsetfake "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/fake"
+
+	_ "k8s.io/client-go/pkg/api/install"
+	_ "k8s.io/kubernetes/pkg/api/install"
 )
 
 func TestFakeClientSetFiltering(t *testing.T) {

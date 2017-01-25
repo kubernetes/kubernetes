@@ -18,12 +18,12 @@ package fake
 
 import (
 	rest "k8s.io/client-go/rest"
+	testing "k8s.io/client-go/testing"
 	v1 "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/autoscaling/v1"
-	core "k8s.io/kubernetes/pkg/client/testing/core"
 )
 
 type FakeAutoscalingV1 struct {
-	*core.Fake
+	*testing.Fake
 }
 
 func (c *FakeAutoscalingV1) HorizontalPodAutoscalers(namespace string) v1.HorizontalPodAutoscalerInterface {

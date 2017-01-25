@@ -22,11 +22,11 @@ import (
 
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
+	"k8s.io/apimachinery/pkg/apimachinery/registered"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/watch"
-	"k8s.io/client-go/pkg/api"
 	restclient "k8s.io/client-go/rest"
 )
 
@@ -144,21 +144,23 @@ func ObjectReaction(tracker ObjectTracker, mapper meta.RESTMapper) ReactionFunc 
 }
 
 type tracker struct {
-	scheme  ObjectScheme
-	decoder runtime.Decoder
-	lock    sync.RWMutex
-	objects map[schema.GroupVersionKind][]runtime.Object
+	registry *registered.APIRegistrationManager
+	scheme   ObjectScheme
+	decoder  runtime.Decoder
+	lock     sync.RWMutex
+	objects  map[schema.GroupVersionKind][]runtime.Object
 }
 
 var _ ObjectTracker = &tracker{}
 
 // NewObjectTracker returns an ObjectTracker that can be used to keep track
 // of objects for the fake clientset. Mostly useful for unit tests.
-func NewObjectTracker(scheme ObjectScheme, decoder runtime.Decoder) ObjectTracker {
+func NewObjectTracker(registry *registered.APIRegistrationManager, scheme ObjectScheme, decoder runtime.Decoder) ObjectTracker {
 	return &tracker{
-		scheme:  scheme,
-		decoder: decoder,
-		objects: make(map[schema.GroupVersionKind][]runtime.Object),
+		registry: registry,
+		scheme:   scheme,
+		decoder:  decoder,
+		objects:  make(map[schema.GroupVersionKind][]runtime.Object),
 	}
 }
 
@@ -200,7 +202,7 @@ func (t *tracker) List(gvk schema.GroupVersionKind, ns string) (runtime.Object, 
 }
 
 func (t *tracker) Get(gvk schema.GroupVersionKind, ns, name string) (runtime.Object, error) {
-	if err := checkNamespace(gvk, ns); err != nil {
+	if err := checkNamespace(t.registry, gvk, ns); err != nil {
 		return nil, err
 	}
 
@@ -307,7 +309,7 @@ func (t *tracker) add(obj runtime.Object, ns string, replaceExisting bool) error
 			return errors.NewBadRequest(msg)
 		}
 
-		if err := checkNamespace(gvk, newMeta.GetNamespace()); err != nil {
+		if err := checkNamespace(t.registry, gvk, newMeta.GetNamespace()); err != nil {
 			return err
 		}
 
@@ -359,7 +361,7 @@ func (t *tracker) addList(obj runtime.Object, replaceExisting bool) error {
 }
 
 func (t *tracker) Delete(gvk schema.GroupVersionKind, ns, name string) error {
-	if err := checkNamespace(gvk, ns); err != nil {
+	if err := checkNamespace(t.registry, gvk, ns); err != nil {
 		return err
 	}
 
@@ -413,8 +415,8 @@ func filterByNamespaceAndName(objs []runtime.Object, ns, name string) ([]runtime
 // checkNamespace makes sure that the scope of gvk matches ns. It
 // returns an error if namespace is empty but gvk is a namespaced
 // kind, or if ns is non-empty and gvk is a namespaced kind.
-func checkNamespace(gvk schema.GroupVersionKind, ns string) error {
-	group, err := api.Registry.Group(gvk.Group)
+func checkNamespace(registry *registered.APIRegistrationManager, gvk schema.GroupVersionKind, ns string) error {
+	group, err := registry.Group(gvk.Group)
 	if err != nil {
 		return err
 	}
