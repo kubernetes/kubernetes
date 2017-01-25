@@ -25,6 +25,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
+	"k8s.io/kubernetes/pkg/util/i18n"
 )
 
 var (
@@ -46,7 +47,7 @@ func NewCmdCreatePodDisruptionBudget(f cmdutil.Factory, cmdOut io.Writer) *cobra
 	cmd := &cobra.Command{
 		Use:     "poddisruptionbudget NAME --selector=SELECTOR --min-available=N [--dry-run]",
 		Aliases: []string{"pdb"},
-		Short:   "Create a pod disruption budget with the specified name.",
+		Short:   i18n.T("Create a pod disruption budget with the specified name."),
 		Long:    pdbLong,
 		Example: pdbExample,
 		Run: func(cmd *cobra.Command, args []string) {
