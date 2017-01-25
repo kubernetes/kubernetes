@@ -24,6 +24,7 @@ import (
 	"testing"
 	"time"
 
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -282,7 +283,7 @@ func verifyWatchEvent(t *testing.T, w watch.Interface, eventType watch.EventType
 			t.Logf("(called from line %d)", line)
 			t.Errorf("Expected: %s, got: %s", eventType, event.Type)
 		}
-		if e, a := eventObject, event.Object; !api.Semantic.DeepDerivative(e, a) {
+		if e, a := eventObject, event.Object; !apiequality.Semantic.DeepDerivative(e, a) {
 			t.Logf("(called from line %d)", line)
 			t.Errorf("Expected (%s): %#v, got: %#v", eventType, e, a)
 		}

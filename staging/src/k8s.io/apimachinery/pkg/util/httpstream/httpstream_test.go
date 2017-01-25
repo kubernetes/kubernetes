@@ -21,7 +21,7 @@ import (
 	"reflect"
 	"testing"
 
-	"k8s.io/kubernetes/pkg/api"
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 )
 
 type responseWriter struct {
@@ -120,7 +120,7 @@ func TestHandshake(t *testing.T) {
 		}
 
 		// verify response headers
-		if e, a := []string{test.expectedProtocol}, w.Header()[HeaderProtocolVersion]; !api.Semantic.DeepEqual(e, a) {
+		if e, a := []string{test.expectedProtocol}, w.Header()[HeaderProtocolVersion]; !apiequality.Semantic.DeepEqual(e, a) {
 			t.Errorf("%s: protocol response header: expected %v, got %v", name, e, a)
 		}
 	}

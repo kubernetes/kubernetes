@@ -58,7 +58,7 @@ func TestUpdateOnNonExistentFile(t *testing.T) {
 	case got := <-ch:
 		update := got.(kubetypes.PodUpdate)
 		expected := CreatePodUpdate(kubetypes.SET, kubetypes.FileSource)
-		if !api.Semantic.DeepDerivative(expected, update) {
+		if !apiequality.Semantic.DeepDerivative(expected, update) {
 			t.Fatalf("expected %#v, Got %#v", expected, update)
 		}
 
@@ -95,7 +95,7 @@ func TestReadPodsFromFileExistAlready(t *testing.T) {
 						t.Fatalf("%s: Invalid pod %#v, %#v", testCase.desc, internalPod, errs)
 					}
 				}
-				if !api.Semantic.DeepEqual(testCase.expected, update) {
+				if !apiequality.Semantic.DeepEqual(testCase.expected, update) {
 					t.Fatalf("%s: Expected %#v, Got %#v", testCase.desc, testCase.expected, update)
 				}
 			case <-time.After(wait.ForeverTestTimeout):
@@ -159,7 +159,7 @@ func TestExtractFromEmptyDir(t *testing.T) {
 
 	update := (<-ch).(kubetypes.PodUpdate)
 	expected := CreatePodUpdate(kubetypes.SET, kubetypes.FileSource)
-	if !api.Semantic.DeepEqual(expected, update) {
+	if !apiequality.Semantic.DeepEqual(expected, update) {
 		t.Fatalf("expected %#v, Got %#v", expected, update)
 	}
 }
@@ -375,7 +375,7 @@ func expectUpdate(t *testing.T, ch chan interface{}, testCase *testCase) {
 				}
 			}
 
-			if !api.Semantic.DeepEqual(testCase.expected, update) {
+			if !apiequality.Semantic.DeepEqual(testCase.expected, update) {
 				t.Fatalf("%s: Expected: %#v, Got: %#v", testCase.desc, testCase.expected, update)
 			}
 			return

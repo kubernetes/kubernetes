@@ -21,6 +21,7 @@ import (
 	"reflect"
 	"testing"
 
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	apitesting "k8s.io/apimachinery/pkg/api/testing"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
@@ -89,7 +90,7 @@ func doRoundTrip(t *testing.T, group testapi.TestGroup, kind string) {
 		t.Errorf("Error when unmarshaling to object: %v", err)
 		return
 	}
-	if !api.Semantic.DeepEqual(item, unmarshalledObj) {
+	if !apiequality.Semantic.DeepEqual(item, unmarshalledObj) {
 		t.Errorf("Object changed during JSON operations, diff: %v", diff.ObjectReflectDiff(item, unmarshalledObj))
 		return
 	}
@@ -111,7 +112,7 @@ func doRoundTrip(t *testing.T, group testapi.TestGroup, kind string) {
 			return
 		}
 
-		if !api.Semantic.DeepEqual(item, newObj) {
+		if !apiequality.Semantic.DeepEqual(item, newObj) {
 			t.Errorf("Object changed, diff: %v", diff.ObjectReflectDiff(item, newObj))
 		}
 	*/

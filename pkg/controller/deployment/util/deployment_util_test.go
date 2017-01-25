@@ -24,6 +24,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	core "k8s.io/client-go/testing"
@@ -256,7 +257,7 @@ func TestGetNewRC(t *testing.T) {
 		if err != nil {
 			t.Errorf("In test case %s, got unexpected error %v", test.test, err)
 		}
-		if !api.Semantic.DeepEqual(rs, test.expected) {
+		if !apiequality.Semantic.DeepEqual(rs, test.expected) {
 			t.Errorf("In test case %s, expected %#v, got %#v", test.test, test.expected, rs)
 		}
 	}

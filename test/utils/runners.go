@@ -23,6 +23,7 @@ import (
 	"sync"
 	"time"
 
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -845,7 +846,7 @@ func DoCleanupNode(client clientset.Interface, nodeName string, strategy Prepare
 			return fmt.Errorf("Skipping cleanup of Node: failed to get Node %v: %v", nodeName, err)
 		}
 		updatedNode := strategy.CleanupNode(node)
-		if api.Semantic.DeepEqual(node, updatedNode) {
+		if apiequality.Semantic.DeepEqual(node, updatedNode) {
 			return nil
 		}
 		if _, err = client.Core().Nodes().Update(updatedNode); err == nil {

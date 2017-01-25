@@ -21,6 +21,7 @@ import (
 	"testing"
 
 	"golang.org/x/net/context"
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
@@ -634,7 +635,7 @@ func TestEtcdUpdateNotScheduled(t *testing.T) {
 	}
 	podOut := obj.(*api.Pod)
 	// validChangedPod only changes the Labels, so were checking the update was valid
-	if !api.Semantic.DeepEqual(podIn.Labels, podOut.Labels) {
+	if !apiequality.Semantic.DeepEqual(podIn.Labels, podOut.Labels) {
 		t.Errorf("objects differ: %v", diff.ObjectDiff(podOut, podIn))
 	}
 }
@@ -705,7 +706,7 @@ func TestEtcdUpdateScheduled(t *testing.T) {
 	}
 	podOut := obj.(*api.Pod)
 	// Check to verify the Spec and Label updates match from change above.  Those are the fields changed.
-	if !api.Semantic.DeepEqual(podOut.Spec, podIn.Spec) || !api.Semantic.DeepEqual(podOut.Labels, podIn.Labels) {
+	if !apiequality.Semantic.DeepEqual(podOut.Spec, podIn.Spec) || !apiequality.Semantic.DeepEqual(podOut.Labels, podIn.Labels) {
 		t.Errorf("objects differ: %v", diff.ObjectDiff(podOut, podIn))
 	}
 
@@ -788,9 +789,9 @@ func TestEtcdUpdateStatus(t *testing.T) {
 	}
 	podOut := obj.(*api.Pod)
 	// Check to verify the Label, and Status updates match from change above.  Those are the fields changed.
-	if !api.Semantic.DeepEqual(podOut.Spec, expected.Spec) ||
-		!api.Semantic.DeepEqual(podOut.Labels, expected.Labels) ||
-		!api.Semantic.DeepEqual(podOut.Status, expected.Status) {
+	if !apiequality.Semantic.DeepEqual(podOut.Spec, expected.Spec) ||
+		!apiequality.Semantic.DeepEqual(podOut.Labels, expected.Labels) ||
+		!apiequality.Semantic.DeepEqual(podOut.Status, expected.Status) {
 		t.Errorf("objects differ: %v", diff.ObjectDiff(podOut, expected))
 	}
 }
