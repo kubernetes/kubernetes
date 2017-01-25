@@ -116,7 +116,7 @@ Because all of the resources in this example have been tagged with the label `ap
 we can clean up everything that we created in one quick command using a selector on that label:
 
 ```shell
-kubectl delete statefulsets,pods,persistentvolumes,persistentvolumeclaims,services -l app=cockroachdb
+kubectl delete statefulsets,persistentvolumes,persistentvolumeclaims,services,poddisruptionbudget -l app=cockroachdb
 ```
 
 
