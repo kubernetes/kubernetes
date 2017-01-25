@@ -2094,7 +2094,12 @@ run_deployment_tests() {
   # Deletion of both deployments should not be blocked
    kubectl delete deployment nginx2 "${kube_flags[@]}"
   # Clean up
-  kubectl delete deployment nginx "${kube_flags[@]}"
+  # TODO: cascading deletion of deployments is failing.
+  # TODO: re-enable this once https://github.com/kubernetes/kubernetes/issues/40433 is fixed
+  #   kubectl delete deployment nginx "${kube_flags[@]}"
+  # TODO: remove these once https://github.com/kubernetes/kubernetes/issues/40433 is fixed
+    kubectl delete deployment nginx --cascade=false "${kube_flags[@]}" 
+    kubectl delete replicaset --all "${kube_flags[@]}"
 
   ### Set image of a deployment
   # Pre-condition: no deployment exists
