@@ -1075,7 +1075,7 @@ func (dm *DockerManager) podInfraContainerChanged(pod *v1.Pod, podInfraContainer
 		ImagePullPolicy: podInfraContainerImagePullPolicy,
 		Env:             dm.podInfraContainerEnv,
 	}
-	return podInfraContainerStatus.Hash != kubecontainer.HashContainer(expectedPodInfraContainer), nil
+	return podInfraContainerStatus.Hash != kubecontainer.HashContainerLegacy(expectedPodInfraContainer), nil
 }
 
 // determine if the container root should be a read only filesystem.
@@ -2087,7 +2087,7 @@ func (dm *DockerManager) computePodContainerChanges(pod *v1.Pod, podStatus *kube
 
 		// At this point, the container is running and pod infra container is good.
 		// We will look for changes and check healthiness for the container.
-		expectedHash := kubecontainer.HashContainer(&container)
+		expectedHash := kubecontainer.HashContainerLegacy(&container)
 		hash := containerStatus.Hash
 		containerChanged := hash != 0 && hash != expectedHash
 		if containerChanged {

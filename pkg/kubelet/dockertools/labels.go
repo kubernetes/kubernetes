@@ -82,7 +82,7 @@ func newLabels(container *v1.Container, pod *v1.Pod, restartCount int, enableCus
 	}
 
 	labels[types.KubernetesContainerNameLabel] = container.Name
-	labels[kubernetesContainerHashLabel] = strconv.FormatUint(kubecontainer.HashContainer(container), 16)
+	labels[kubernetesContainerHashLabel] = strconv.FormatUint(kubecontainer.HashContainerLegacy(container), 16)
 	labels[kubernetesContainerRestartCountLabel] = strconv.Itoa(restartCount)
 	labels[kubernetesContainerTerminationMessagePathLabel] = container.TerminationMessagePath
 	labels[kubernetesContainerTerminationMessagePolicyLabel] = string(container.TerminationMessagePolicy)
