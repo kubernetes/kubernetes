@@ -388,7 +388,7 @@ func (m *manager) syncBatch() {
 				}
 				syncedUID = mirrorUID
 			}
-			if m.needsUpdate(syncedUID, status) {
+			if m.needsUpdate(syncedUID, status) || m.couldBeDeleted(uid, status.status) {
 				updatedStatuses = append(updatedStatuses, podStatusSyncRequest{uid, status})
 			} else if m.needsReconcile(uid, status.status) {
 				// Delete the apiStatusVersions here to force an update on the pod status
@@ -464,6 +464,15 @@ func (m *manager) syncPod(uid types.UID, status versionedPodStatus) {
 func (m *manager) needsUpdate(uid types.UID, status versionedPodStatus) bool {
 	latest, ok := m.apiStatusVersions[uid]
 	return !ok || latest < status.version
+}
+
+func (m *manager) couldBeDeleted(uid types.UID, status v1.PodStatus) bool {
+	// The pod could be a static pod, so we should translate first.
+	pod, ok := m.podManager.GetPodByUID(uid)
+	if !ok {
+		return false
+	}
+	return !kubepod.IsMirrorPod(pod) && m.podDeletionSafety.OkToDeletePod(pod)
 }
 
 // needsReconcile compares the given status with the status in the pod manager (which
