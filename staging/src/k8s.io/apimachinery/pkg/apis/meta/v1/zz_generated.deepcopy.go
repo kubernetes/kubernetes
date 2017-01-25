@@ -115,6 +115,11 @@ func DeepCopy_v1_APIResource(in interface{}, out interface{}, c *conversion.Clon
 			*out = make(Verbs, len(*in))
 			copy(*out, *in)
 		}
+		if in.ShortNames != nil {
+			in, out := &in.ShortNames, &out.ShortNames
+			*out = make([]string, len(*in))
+			copy(*out, *in)
+		}
 		return nil
 	}
 }

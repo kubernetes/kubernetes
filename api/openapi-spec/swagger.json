@@ -34531,6 +34531,13 @@
       "description": "namespaced indicates if a resource is namespaced or not.",
       "type": "boolean"
      },
+     "shortNames": {
+      "description": "shortNames is a list of suggested short names of the resource.",
+      "type": "array",
+      "items": {
+       "type": "string"
+      }
+     },
      "verbs": {
       "description": "verbs is a list of supported kube verbs (this includes get, list, watch, create, update, patch, delete, deletecollection, and proxy)",
       "type": "array",
