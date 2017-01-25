@@ -271,6 +271,7 @@ var _ = framework.KubeDescribe("PersistentVolumes [Volume][Serial]", func() {
 				pvc = makePersistentVolumeClaim(ns)
 				pvc = createPVC(c, ns, pvc)
 				err = framework.WaitForPersistentVolumeClaimPhase(v1.ClaimBound, c, ns, pvc.Name, 2*time.Second, 60*time.Second)
+				Expect(err).NotTo(HaveOccurred())
 
 				// If a file is detected in /mnt, fail the pod and do not restart it.
 				By("Verifying the mount has been cleaned.")
