@@ -43,17 +43,17 @@ import (
 	"k8s.io/apimachinery/pkg/version"
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/authentication/authenticator"
+	"k8s.io/apiserver/pkg/authentication/authenticatorfactory"
 	authenticatorunion "k8s.io/apiserver/pkg/authentication/request/union"
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
+	"k8s.io/apiserver/pkg/authorization/authorizerfactory"
 	authorizerunion "k8s.io/apiserver/pkg/authorization/union"
 	apirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/server/healthz"
 	restclient "k8s.io/client-go/rest"
 	certutil "k8s.io/client-go/util/cert"
 	"k8s.io/kubernetes/pkg/api"
-	genericauthenticator "k8s.io/kubernetes/pkg/genericapiserver/authenticator"
-	genericauthorizer "k8s.io/kubernetes/pkg/genericapiserver/authorizer"
 	genericapifilters "k8s.io/kubernetes/pkg/genericapiserver/endpoints/filters"
 	apiopenapi "k8s.io/kubernetes/pkg/genericapiserver/endpoints/openapi"
 	genericfilters "k8s.io/kubernetes/pkg/genericapiserver/server/filters"
@@ -480,10 +480,10 @@ func (c *Config) Complete() completedConfig {
 			Groups: []string{user.SystemPrivilegedGroup},
 		}
 
-		tokenAuthenticator := genericauthenticator.NewAuthenticatorFromTokens(tokens)
+		tokenAuthenticator := authenticatorfactory.NewAuthenticatorFromTokens(tokens)
 		c.Authenticator = authenticatorunion.New(tokenAuthenticator, c.Authenticator)
 
-		tokenAuthorizer := genericauthorizer.NewPrivilegedGroups(user.SystemPrivilegedGroup)
+		tokenAuthorizer := authorizerfactory.NewPrivilegedGroups(user.SystemPrivilegedGroup)
 		c.Authorizer = authorizerunion.New(tokenAuthorizer, c.Authorizer)
 	}
 

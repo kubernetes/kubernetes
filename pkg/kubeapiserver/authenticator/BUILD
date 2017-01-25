@@ -12,10 +12,10 @@ go_library(
     srcs = ["config.go"],
     tags = ["automanaged"],
     deps = [
-        "//pkg/genericapiserver/authenticator:go_default_library",
         "//pkg/serviceaccount:go_default_library",
         "//vendor:github.com/go-openapi/spec",
         "//vendor:k8s.io/apiserver/pkg/authentication/authenticator",
+        "//vendor:k8s.io/apiserver/pkg/authentication/authenticatorfactory",
         "//vendor:k8s.io/apiserver/pkg/authentication/group",
         "//vendor:k8s.io/apiserver/pkg/authentication/request/anonymous",
         "//vendor:k8s.io/apiserver/pkg/authentication/request/bearertoken",

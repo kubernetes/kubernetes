@@ -21,10 +21,10 @@ import (
 
 	"github.com/spf13/pflag"
 
+	"k8s.io/apiserver/pkg/authentication/authenticatorfactory"
 	authenticationclient "k8s.io/client-go/kubernetes/typed/authentication/v1beta1"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
-	"k8s.io/kubernetes/pkg/genericapiserver/authenticator"
 )
 
 type RequestHeaderAuthenticationOptions struct {
@@ -57,12 +57,12 @@ func (s *RequestHeaderAuthenticationOptions) AddFlags(fs *pflag.FlagSet) {
 
 // ToAuthenticationRequestHeaderConfig returns a RequestHeaderConfig config object for these options
 // if necessary, nil otherwise.
-func (s *RequestHeaderAuthenticationOptions) ToAuthenticationRequestHeaderConfig() *authenticator.RequestHeaderConfig {
+func (s *RequestHeaderAuthenticationOptions) ToAuthenticationRequestHeaderConfig() *authenticatorfactory.RequestHeaderConfig {
 	if len(s.UsernameHeaders) == 0 {
 		return nil
 	}
 
-	return &authenticator.RequestHeaderConfig{
+	return &authenticatorfactory.RequestHeaderConfig{
 		UsernameHeaders:     s.UsernameHeaders,
 		GroupHeaders:        s.GroupHeaders,
 		ExtraHeaderPrefixes: s.ExtraHeaderPrefixes,
@@ -128,13 +128,13 @@ func (s *DelegatingAuthenticationOptions) AddFlags(fs *pflag.FlagSet) {
 	s.RequestHeader.AddFlags(fs)
 }
 
-func (s *DelegatingAuthenticationOptions) ToAuthenticationConfig() (authenticator.DelegatingAuthenticatorConfig, error) {
+func (s *DelegatingAuthenticationOptions) ToAuthenticationConfig() (authenticatorfactory.DelegatingAuthenticatorConfig, error) {
 	tokenClient, err := s.newTokenAccessReview()
 	if err != nil {
-		return authenticator.DelegatingAuthenticatorConfig{}, err
+		return authenticatorfactory.DelegatingAuthenticatorConfig{}, err
 	}
 
-	ret := authenticator.DelegatingAuthenticatorConfig{
+	ret := authenticatorfactory.DelegatingAuthenticatorConfig{
 		Anonymous:               true,
 		TokenAccessReviewClient: tokenClient,
 		CacheTTL:                s.CacheTTL,
