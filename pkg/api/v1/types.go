@@ -988,6 +988,9 @@ type ISCSIVolumeSource struct {
 	// Defaults to false.
 	// +optional
 	ReadOnly bool `json:"readOnly,omitempty" protobuf:"varint,6,opt,name=readOnly"`
+	// iSCSI target portal List. The portal is either an IP or ip_addr:port if the port
+	// is other than default (typically TCP ports 860 and 3260).
+	BackupPortal []string `json:"backupPortal" protobuf:"bytes,7,opt,name=backupPortal"`
 }
 
 // Represents a Fibre Channel volume.
