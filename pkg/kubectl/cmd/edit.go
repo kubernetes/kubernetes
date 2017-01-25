@@ -101,7 +101,6 @@ func NewCmdEdit(f cmdutil.Factory, out, errOut io.Writer) *cobra.Command {
 		Long:    editLong,
 		Example: fmt.Sprintf(editExample),
 		Run: func(cmd *cobra.Command, args []string) {
-			args = append([]string{"configmap"}, args...)
 			err := RunEdit(f, out, errOut, cmd, args, options)
 			cmdutil.CheckErr(err)
 		},
