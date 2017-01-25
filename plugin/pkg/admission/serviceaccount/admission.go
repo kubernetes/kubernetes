@@ -303,13 +303,14 @@ func (s *serviceAccount) getReferencedServiceAccountToken(serviceAccount *api.Se
 		return "", err
 	}
 
-	references := sets.NewString()
-	for _, secret := range serviceAccount.Secrets {
-		references.Insert(secret.Name)
-	}
+	accountTokens := sets.NewString()
 	for _, token := range tokens {
-		if references.Has(token.Name) {
-			return token.Name, nil
+		accountTokens.Insert(token.Name)
+	}
+	// Prefer secrets in the order they're referenced.
+	for _, secret := range serviceAccount.Secrets {
+		if accountTokens.Has(secret.Name) {
+			return secret.Name, nil
 		}
 	}
 
