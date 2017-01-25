@@ -1,0 +1,22 @@
+[Unit]
+Description=Kubernetes API Server
+Documentation=http://kubernetes.io/docs/admin/kube-apiserver/
+After=network.target
+
+[Service]
+EnvironmentFile=-/etc/default/kube-defaults
+EnvironmentFile=-/etc/default/kube-apiserver
+ExecStart=/usr/local/bin/kube-apiserver \
+	    $KUBE_LOGTOSTDERR \
+	    $KUBE_LOG_LEVEL \
+	    $KUBE_API_ADDRESS \
+	    $KUBE_API_PORT \
+	    $KUBE_ALLOW_PRIV \
+	    $KUBE_ADMISSION_CONTROL \
+	    $KUBE_API_ARGS
+Restart=on-failure
+Type=notify
+LimitNOFILE=65536
+
+[Install]
+WantedBy=multi-user.target
