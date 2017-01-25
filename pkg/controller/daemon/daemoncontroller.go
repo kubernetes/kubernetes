@@ -563,9 +563,9 @@ func (dsc *DaemonSetsController) manage(ds *extensions.DaemonSet) error {
 	for err := range errCh {
 		errors = append(errors, err)
 	}
+	// Throw an error when the daemon pods fail, to use ratelimiter to prevent kill-recreate hot loop
 	if failedPodsObserved > 0 {
-		// Throw an error when the daemon pods fail to prevent kill-recreate hot loop
-		errors = append(errors, fmt.Errorf("Deleted %d failed pods", failedPodsObserved))
+		errors = append(errors, fmt.Errorf("deleted %d failed pods of DaemonSet %s/%s", failedPodsObserved, ds.Namespace, ds.Name))
 	}
 	return utilerrors.NewAggregate(errors)
 }
