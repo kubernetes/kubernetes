@@ -22,8 +22,8 @@ import (
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
+	testing "k8s.io/client-go/testing"
 	batch "k8s.io/kubernetes/pkg/apis/batch"
-	core "k8s.io/kubernetes/pkg/client/testing/core"
 )
 
 // FakeCronJobs implements CronJobInterface
@@ -36,7 +36,7 @@ var cronjobsResource = schema.GroupVersionResource{Group: "batch", Version: "", 
 
 func (c *FakeCronJobs) Create(cronJob *batch.CronJob) (result *batch.CronJob, err error) {
 	obj, err := c.Fake.
-		Invokes(core.NewCreateAction(cronjobsResource, c.ns, cronJob), &batch.CronJob{})
+		Invokes(testing.NewCreateAction(cronjobsResource, c.ns, cronJob), &batch.CronJob{})
 
 	if obj == nil {
 		return nil, err
@@ -46,7 +46,7 @@ func (c *FakeCronJobs) Create(cronJob *batch.CronJob) (result *batch.CronJob, er
 
 func (c *FakeCronJobs) Update(cronJob *batch.CronJob) (result *batch.CronJob, err error) {
 	obj, err := c.Fake.
-		Invokes(core.NewUpdateAction(cronjobsResource, c.ns, cronJob), &batch.CronJob{})
+		Invokes(testing.NewUpdateAction(cronjobsResource, c.ns, cronJob), &batch.CronJob{})
 
 	if obj == nil {
 		return nil, err
@@ -56,7 +56,7 @@ func (c *FakeCronJobs) Update(cronJob *batch.CronJob) (result *batch.CronJob, er
 
 func (c *FakeCronJobs) UpdateStatus(cronJob *batch.CronJob) (*batch.CronJob, error) {
 	obj, err := c.Fake.
-		Invokes(core.NewUpdateSubresourceAction(cronjobsResource, "status", c.ns, cronJob), &batch.CronJob{})
+		Invokes(testing.NewUpdateSubresourceAction(cronjobsResource, "status", c.ns, cronJob), &batch.CronJob{})
 
 	if obj == nil {
 		return nil, err
@@ -66,13 +66,13 @@ func (c *FakeCronJobs) UpdateStatus(cronJob *batch.CronJob) (*batch.CronJob, err
 
 func (c *FakeCronJobs) Delete(name string, options *v1.DeleteOptions) error {
 	_, err := c.Fake.
-		Invokes(core.NewDeleteAction(cronjobsResource, c.ns, name), &batch.CronJob{})
+		Invokes(testing.NewDeleteAction(cronjobsResource, c.ns, name), &batch.CronJob{})
 
 	return err
 }
 
 func (c *FakeCronJobs) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
-	action := core.NewDeleteCollectionAction(cronjobsResource, c.ns, listOptions)
+	action := testing.NewDeleteCollectionAction(cronjobsResource, c.ns, listOptions)
 
 	_, err := c.Fake.Invokes(action, &batch.CronJobList{})
 	return err
@@ -80,7 +80,7 @@ func (c *FakeCronJobs) DeleteCollection(options *v1.DeleteOptions, listOptions v
 
 func (c *FakeCronJobs) Get(name string, options v1.GetOptions) (result *batch.CronJob, err error) {
 	obj, err := c.Fake.
-		Invokes(core.NewGetAction(cronjobsResource, c.ns, name), &batch.CronJob{})
+		Invokes(testing.NewGetAction(cronjobsResource, c.ns, name), &batch.CronJob{})
 
 	if obj == nil {
 		return nil, err
@@ -90,13 +90,13 @@ func (c *FakeCronJobs) Get(name string, options v1.GetOptions) (result *batch.Cr
 
 func (c *FakeCronJobs) List(opts v1.ListOptions) (result *batch.CronJobList, err error) {
 	obj, err := c.Fake.
-		Invokes(core.NewListAction(cronjobsResource, c.ns, opts), &batch.CronJobList{})
+		Invokes(testing.NewListAction(cronjobsResource, c.ns, opts), &batch.CronJobList{})
 
 	if obj == nil {
 		return nil, err
 	}
 
-	label, _, _ := core.ExtractFromListOptions(opts)
+	label, _, _ := testing.ExtractFromListOptions(opts)
 	if label == nil {
 		label = labels.Everything()
 	}
@@ -112,14 +112,14 @@ func (c *FakeCronJobs) List(opts v1.ListOptions) (result *batch.CronJobList, err
 // Watch returns a watch.Interface that watches the requested cronJobs.
 func (c *FakeCronJobs) Watch(opts v1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
-		InvokesWatch(core.NewWatchAction(cronjobsResource, c.ns, opts))
+		InvokesWatch(testing.NewWatchAction(cronjobsResource, c.ns, opts))
 
 }
 
 // Patch applies the patch and returns the patched cronJob.
 func (c *FakeCronJobs) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *batch.CronJob, err error) {
 	obj, err := c.Fake.
-		Invokes(core.NewPatchSubresourceAction(cronjobsResource, c.ns, name, data, subresources...), &batch.CronJob{})
+		Invokes(testing.NewPatchSubresourceAction(cronjobsResource, c.ns, name, data, subresources...), &batch.CronJob{})
 
 	if obj == nil {
 		return nil, err

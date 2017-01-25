@@ -22,8 +22,8 @@ import (
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
+	testing "k8s.io/client-go/testing"
 	api "k8s.io/kubernetes/pkg/api"
-	core "k8s.io/kubernetes/pkg/client/testing/core"
 )
 
 // FakeEndpoints implements EndpointsInterface
@@ -36,7 +36,7 @@ var endpointsResource = schema.GroupVersionResource{Group: "", Version: "", Reso
 
 func (c *FakeEndpoints) Create(endpoints *api.Endpoints) (result *api.Endpoints, err error) {
 	obj, err := c.Fake.
-		Invokes(core.NewCreateAction(endpointsResource, c.ns, endpoints), &api.Endpoints{})
+		Invokes(testing.NewCreateAction(endpointsResource, c.ns, endpoints), &api.Endpoints{})
 
 	if obj == nil {
 		return nil, err
@@ -46,7 +46,7 @@ func (c *FakeEndpoints) Create(endpoints *api.Endpoints) (result *api.Endpoints,
 
 func (c *FakeEndpoints) Update(endpoints *api.Endpoints) (result *api.Endpoints, err error) {
 	obj, err := c.Fake.
-		Invokes(core.NewUpdateAction(endpointsResource, c.ns, endpoints), &api.Endpoints{})
+		Invokes(testing.NewUpdateAction(endpointsResource, c.ns, endpoints), &api.Endpoints{})
 
 	if obj == nil {
 		return nil, err
@@ -56,13 +56,13 @@ func (c *FakeEndpoints) Update(endpoints *api.Endpoints) (result *api.Endpoints,
 
 func (c *FakeEndpoints) Delete(name string, options *v1.DeleteOptions) error {
 	_, err := c.Fake.
-		Invokes(core.NewDeleteAction(endpointsResource, c.ns, name), &api.Endpoints{})
+		Invokes(testing.NewDeleteAction(endpointsResource, c.ns, name), &api.Endpoints{})
 
 	return err
 }
 
 func (c *FakeEndpoints) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
-	action := core.NewDeleteCollectionAction(endpointsResource, c.ns, listOptions)
+	action := testing.NewDeleteCollectionAction(endpointsResource, c.ns, listOptions)
 
 	_, err := c.Fake.Invokes(action, &api.EndpointsList{})
 	return err
@@ -70,7 +70,7 @@ func (c *FakeEndpoints) DeleteCollection(options *v1.DeleteOptions, listOptions 
 
 func (c *FakeEndpoints) Get(name string, options v1.GetOptions) (result *api.Endpoints, err error) {
 	obj, err := c.Fake.
-		Invokes(core.NewGetAction(endpointsResource, c.ns, name), &api.Endpoints{})
+		Invokes(testing.NewGetAction(endpointsResource, c.ns, name), &api.Endpoints{})
 
 	if obj == nil {
 		return nil, err
@@ -80,13 +80,13 @@ func (c *FakeEndpoints) Get(name string, options v1.GetOptions) (result *api.End
 
 func (c *FakeEndpoints) List(opts v1.ListOptions) (result *api.EndpointsList, err error) {
 	obj, err := c.Fake.
-		Invokes(core.NewListAction(endpointsResource, c.ns, opts), &api.EndpointsList{})
+		Invokes(testing.NewListAction(endpointsResource, c.ns, opts), &api.EndpointsList{})
 
 	if obj == nil {
 		return nil, err
 	}
 
-	label, _, _ := core.ExtractFromListOptions(opts)
+	label, _, _ := testing.ExtractFromListOptions(opts)
 	if label == nil {
 		label = labels.Everything()
 	}
@@ -102,14 +102,14 @@ func (c *FakeEndpoints) List(opts v1.ListOptions) (result *api.EndpointsList, er
 // Watch returns a watch.Interface that watches the requested endpoints.
 func (c *FakeEndpoints) Watch(opts v1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
-		InvokesWatch(core.NewWatchAction(endpointsResource, c.ns, opts))
+		InvokesWatch(testing.NewWatchAction(endpointsResource, c.ns, opts))
 
 }
 
 // Patch applies the patch and returns the patched endpoints.
 func (c *FakeEndpoints) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *api.Endpoints, err error) {
 	obj, err := c.Fake.
-		Invokes(core.NewPatchSubresourceAction(endpointsResource, c.ns, name, data, subresources...), &api.Endpoints{})
+		Invokes(testing.NewPatchSubresourceAction(endpointsResource, c.ns, name, data, subresources...), &api.Endpoints{})
 
 	if obj == nil {
 		return nil, err

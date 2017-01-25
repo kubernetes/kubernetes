@@ -165,7 +165,6 @@ go_test(
         "//pkg/client/clientset_generated/internalclientset/typed/batch/internalversion:go_default_library",
         "//pkg/client/clientset_generated/internalclientset/typed/core/internalversion:go_default_library",
         "//pkg/client/clientset_generated/internalclientset/typed/extensions/internalversion:go_default_library",
-        "//pkg/client/testing/core:go_default_library",
         "//pkg/controller/deployment/util:go_default_library",
         "//pkg/kubectl/testing:go_default_library",
         "//pkg/util:go_default_library",
@@ -182,6 +181,7 @@ go_test(
         "//vendor:k8s.io/apimachinery/pkg/watch",
         "//vendor:k8s.io/client-go/rest",
         "//vendor:k8s.io/client-go/rest/fake",
+        "//vendor:k8s.io/client-go/testing",
         "//vendor:k8s.io/client-go/util/testing",
     ],
 )

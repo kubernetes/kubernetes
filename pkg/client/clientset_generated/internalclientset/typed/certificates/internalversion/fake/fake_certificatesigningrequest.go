@@ -22,8 +22,8 @@ import (
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
+	testing "k8s.io/client-go/testing"
 	certificates "k8s.io/kubernetes/pkg/apis/certificates"
-	core "k8s.io/kubernetes/pkg/client/testing/core"
 )
 
 // FakeCertificateSigningRequests implements CertificateSigningRequestInterface
@@ -35,7 +35,7 @@ var certificatesigningrequestsResource = schema.GroupVersionResource{Group: "cer
 
 func (c *FakeCertificateSigningRequests) Create(certificateSigningRequest *certificates.CertificateSigningRequest) (result *certificates.CertificateSigningRequest, err error) {
 	obj, err := c.Fake.
-		Invokes(core.NewRootCreateAction(certificatesigningrequestsResource, certificateSigningRequest), &certificates.CertificateSigningRequest{})
+		Invokes(testing.NewRootCreateAction(certificatesigningrequestsResource, certificateSigningRequest), &certificates.CertificateSigningRequest{})
 	if obj == nil {
 		return nil, err
 	}
@@ -44,7 +44,7 @@ func (c *FakeCertificateSigningRequests) Create(certificateSigningRequest *certi
 
 func (c *FakeCertificateSigningRequests) Update(certificateSigningRequest *certificates.CertificateSigningRequest) (result *certificates.CertificateSigningRequest, err error) {
 	obj, err := c.Fake.
-		Invokes(core.NewRootUpdateAction(certificatesigningrequestsResource, certificateSigningRequest), &certificates.CertificateSigningRequest{})
+		Invokes(testing.NewRootUpdateAction(certificatesigningrequestsResource, certificateSigningRequest), &certificates.CertificateSigningRequest{})
 	if obj == nil {
 		return nil, err
 	}
@@ -53,7 +53,7 @@ func (c *FakeCertificateSigningRequests) Update(certificateSigningRequest *certi
 
 func (c *FakeCertificateSigningRequests) UpdateStatus(certificateSigningRequest *certificates.CertificateSigningRequest) (*certificates.CertificateSigningRequest, error) {
 	obj, err := c.Fake.
-		Invokes(core.NewRootUpdateSubresourceAction(certificatesigningrequestsResource, "status", certificateSigningRequest), &certificates.CertificateSigningRequest{})
+		Invokes(testing.NewRootUpdateSubresourceAction(certificatesigningrequestsResource, "status", certificateSigningRequest), &certificates.CertificateSigningRequest{})
 	if obj == nil {
 		return nil, err
 	}
@@ -62,12 +62,12 @@ func (c *FakeCertificateSigningRequests) UpdateStatus(certificateSigningRequest 
 
 func (c *FakeCertificateSigningRequests) Delete(name string, options *v1.DeleteOptions) error {
 	_, err := c.Fake.
-		Invokes(core.NewRootDeleteAction(certificatesigningrequestsResource, name), &certificates.CertificateSigningRequest{})
+		Invokes(testing.NewRootDeleteAction(certificatesigningrequestsResource, name), &certificates.CertificateSigningRequest{})
 	return err
 }
 
 func (c *FakeCertificateSigningRequests) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
-	action := core.NewRootDeleteCollectionAction(certificatesigningrequestsResource, listOptions)
+	action := testing.NewRootDeleteCollectionAction(certificatesigningrequestsResource, listOptions)
 
 	_, err := c.Fake.Invokes(action, &certificates.CertificateSigningRequestList{})
 	return err
@@ -75,7 +75,7 @@ func (c *FakeCertificateSigningRequests) DeleteCollection(options *v1.DeleteOpti
 
 func (c *FakeCertificateSigningRequests) Get(name string, options v1.GetOptions) (result *certificates.CertificateSigningRequest, err error) {
 	obj, err := c.Fake.
-		Invokes(core.NewRootGetAction(certificatesigningrequestsResource, name), &certificates.CertificateSigningRequest{})
+		Invokes(testing.NewRootGetAction(certificatesigningrequestsResource, name), &certificates.CertificateSigningRequest{})
 	if obj == nil {
 		return nil, err
 	}
@@ -84,12 +84,12 @@ func (c *FakeCertificateSigningRequests) Get(name string, options v1.GetOptions)
 
 func (c *FakeCertificateSigningRequests) List(opts v1.ListOptions) (result *certificates.CertificateSigningRequestList, err error) {
 	obj, err := c.Fake.
-		Invokes(core.NewRootListAction(certificatesigningrequestsResource, opts), &certificates.CertificateSigningRequestList{})
+		Invokes(testing.NewRootListAction(certificatesigningrequestsResource, opts), &certificates.CertificateSigningRequestList{})
 	if obj == nil {
 		return nil, err
 	}
 
-	label, _, _ := core.ExtractFromListOptions(opts)
+	label, _, _ := testing.ExtractFromListOptions(opts)
 	if label == nil {
 		label = labels.Everything()
 	}
@@ -105,13 +105,13 @@ func (c *FakeCertificateSigningRequests) List(opts v1.ListOptions) (result *cert
 // Watch returns a watch.Interface that watches the requested certificateSigningRequests.
 func (c *FakeCertificateSigningRequests) Watch(opts v1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
-		InvokesWatch(core.NewRootWatchAction(certificatesigningrequestsResource, opts))
+		InvokesWatch(testing.NewRootWatchAction(certificatesigningrequestsResource, opts))
 }
 
 // Patch applies the patch and returns the patched certificateSigningRequest.
 func (c *FakeCertificateSigningRequests) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *certificates.CertificateSigningRequest, err error) {
 	obj, err := c.Fake.
-		Invokes(core.NewRootPatchSubresourceAction(certificatesigningrequestsResource, name, data, subresources...), &certificates.CertificateSigningRequest{})
+		Invokes(testing.NewRootPatchSubresourceAction(certificatesigningrequestsResource, name, data, subresources...), &certificates.CertificateSigningRequest{})
 	if obj == nil {
 		return nil, err
 	}
