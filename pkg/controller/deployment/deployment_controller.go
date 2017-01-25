@@ -40,11 +40,13 @@ import (
 	extensions "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	v1core "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/core/v1"
-	"k8s.io/kubernetes/pkg/client/legacylisters"
+	coreinformers "k8s.io/kubernetes/pkg/client/informers/informers_generated/core/v1"
+	extensionsinformers "k8s.io/kubernetes/pkg/client/informers/informers_generated/extensions/v1beta1"
+	corelisters "k8s.io/kubernetes/pkg/client/listers/core/v1"
+	extensionslisters "k8s.io/kubernetes/pkg/client/listers/extensions/v1beta1"
 	"k8s.io/kubernetes/pkg/client/record"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/deployment/util"
-	"k8s.io/kubernetes/pkg/controller/informers"
 	"k8s.io/kubernetes/pkg/util/metrics"
 	"k8s.io/kubernetes/pkg/util/workqueue"
 )
@@ -78,11 +80,11 @@ type DeploymentController struct {
 	enqueueDeployment func(deployment *extensions.Deployment)
 
 	// A store of deployments, populated by the dController
-	dLister *listers.StoreToDeploymentLister
+	dLister extensionslisters.DeploymentLister
 	// A store of ReplicaSets, populated by the rsController
-	rsLister *listers.StoreToReplicaSetLister
+	rsLister extensionslisters.ReplicaSetLister
 	// A store of pods, populated by the podController
-	podLister *listers.StoreToPodLister
+	podLister corelisters.PodLister
 
 	// dListerSynced returns true if the Deployment store has been synced at least once.
 	// Added as a member to the struct to allow injection for testing.
@@ -101,7 +103,7 @@ type DeploymentController struct {
 }
 
 // NewDeploymentController creates a new DeploymentController.
-func NewDeploymentController(dInformer informers.DeploymentInformer, rsInformer informers.ReplicaSetInformer, podInformer informers.PodInformer, client clientset.Interface) *DeploymentController {
+func NewDeploymentController(dInformer extensionsinformers.DeploymentInformer, rsInformer extensionsinformers.ReplicaSetInformer, podInformer coreinformers.PodInformer, client clientset.Interface) *DeploymentController {
 	eventBroadcaster := record.NewBroadcaster()
 	eventBroadcaster.StartLogging(glog.Infof)
 	// TODO: remove the wrapper when every clients have moved to use the clientset.
@@ -157,6 +159,7 @@ func (dc *DeploymentController) Run(workers int, stopCh <-chan struct{}) {
 	glog.Infof("Starting deployment controller")
 
 	if !cache.WaitForCacheSync(stopCh, dc.dListerSynced, dc.rsListerSynced, dc.podListerSynced) {
+		utilruntime.HandleError(fmt.Errorf("timed out waiting for caches to sync"))
 		return
 	}
 
@@ -495,17 +498,20 @@ func (dc *DeploymentController) syncDeployment(key string) error {
 		glog.V(4).Infof("Finished syncing deployment %q (%v)", key, time.Now().Sub(startTime))
 	}()
 
-	obj, exists, err := dc.dLister.Indexer.GetByKey(key)
+	namespace, name, err := cache.SplitMetaNamespaceKey(key)
+	if err != nil {
+		return err
+	}
+	deployment, err := dc.dLister.Deployments(namespace).Get(name)
+	if errors.IsNotFound(err) {
+		glog.Infof("Deployment has been deleted %v", key)
+		return nil
+	}
 	if err != nil {
 		utilruntime.HandleError(fmt.Errorf("Unable to retrieve deployment %v from store: %v", key, err))
 		return err
 	}
-	if !exists {
-		glog.Infof("Deployment has been deleted %v", key)
-		return nil
-	}
 
-	deployment := obj.(*extensions.Deployment)
 	// Deep-copy otherwise we are mutating our cache.
 	// TODO: Deep-copy only when needed.
 	d, err := util.DeploymentDeepCopy(deployment)
@@ -764,15 +770,18 @@ func (dc *DeploymentController) checkNextItemForProgress() bool {
 // checkForProgress checks the progress for the provided deployment. Meant to be called
 // by the progressWorker and work on items synced in a secondary queue.
 func (dc *DeploymentController) checkForProgress(key string) (bool, error) {
-	obj, exists, err := dc.dLister.Indexer.GetByKey(key)
+	namespace, name, err := cache.SplitMetaNamespaceKey(key)
+	if err != nil {
+		return false, err
+	}
+	deployment, err := dc.dLister.Deployments(namespace).Get(name)
+	if errors.IsNotFound(err) {
+		return false, nil
+	}
 	if err != nil {
 		glog.V(2).Infof("Cannot retrieve deployment %q found in the secondary queue: %#v", key, err)
 		return false, err
 	}
-	if !exists {
-		return false, nil
-	}
-	deployment := obj.(*extensions.Deployment)
 	cond := util.GetDeploymentCondition(deployment.Status, extensions.DeploymentProgressing)
 	// Already marked with a terminal reason - no need to add it back to the main queue.
 	if cond != nil && (cond.Reason == util.TimedOutReason || cond.Reason == util.NewRSAvailableReason) {

@@ -32,7 +32,7 @@ import (
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
-	"k8s.io/kubernetes/pkg/controller/informers"
+	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated"
 	"k8s.io/kubernetes/pkg/controller/replication"
 	"k8s.io/kubernetes/test/integration/framework"
 )
@@ -123,7 +123,7 @@ func verifyRemainingObjects(t *testing.T, clientSet clientset.Interface, namespa
 	return ret, nil
 }
 
-func rmSetup(t *testing.T, stopCh chan struct{}, enableGarbageCollector bool) (*httptest.Server, *replication.ReplicationManager, cache.SharedIndexInformer, clientset.Interface) {
+func rmSetup(t *testing.T, stopCh chan struct{}, enableGarbageCollector bool) (*httptest.Server, *replication.ReplicationManager, informers.SharedInformerFactory, clientset.Interface) {
 	masterConfig := framework.NewIntegrationTestMasterConfig()
 	_, s := framework.RunAMaster(masterConfig)
 
@@ -134,13 +134,11 @@ func rmSetup(t *testing.T, stopCh chan struct{}, enableGarbageCollector bool) (*
 	}
 	resyncPeriod := 12 * time.Hour
 
-	informers := informers.NewSharedInformerFactory(clientSet, nil, resyncPeriod)
-	podInformer := informers.Pods().Informer()
-	rcInformer := informers.ReplicationControllers().Informer()
-	rm := replication.NewReplicationManager(podInformer, rcInformer, clientSet, replication.BurstReplicas, 4096, enableGarbageCollector)
+	informers := informers.NewSharedInformerFactory(nil, clientSet, resyncPeriod)
+	rm := replication.NewReplicationManager(informers.Core().V1().Pods(), informers.Core().V1().ReplicationControllers(), clientSet, replication.BurstReplicas, 4096, enableGarbageCollector)
 	informers.Start(stopCh)
 
-	return s, rm, podInformer, clientSet
+	return s, rm, informers, clientSet
 }
 
 // wait for the podInformer to observe the pods. Call this function before
@@ -211,7 +209,7 @@ func TestAdoption(t *testing.T) {
 	}
 	for i, tc := range testCases {
 		stopCh := make(chan struct{})
-		s, rm, podInformer, clientSet := rmSetup(t, stopCh, true)
+		s, rm, informers, clientSet := rmSetup(t, stopCh, true)
 		ns := framework.CreateTestingNamespace(fmt.Sprintf("adoption-%d", i), s, t)
 		defer framework.DeleteTestingNamespace(ns, s, t)
 
@@ -230,8 +228,8 @@ func TestAdoption(t *testing.T) {
 			t.Fatalf("Failed to create Pod: %v", err)
 		}
 
-		go podInformer.Run(stopCh)
-		waitToObservePods(t, podInformer, 1)
+		informers.Start(stopCh)
+		waitToObservePods(t, informers.Core().V1().Pods().Informer(), 1)
 		go rm.Run(5, stopCh)
 		if err := wait.Poll(10*time.Second, 60*time.Second, func() (bool, error) {
 			updatedPod, err := podClient.Get(pod.Name, metav1.GetOptions{})
@@ -327,7 +325,7 @@ func TestUpdateSelectorToRemoveControllerRef(t *testing.T) {
 	// that rc creates one more pod, so there are 3 pods. Also verify that
 	// pod2's controllerRef is cleared.
 	stopCh := make(chan struct{})
-	s, rm, podInformer, clientSet := rmSetup(t, stopCh, true)
+	s, rm, informers, clientSet := rmSetup(t, stopCh, true)
 	ns := framework.CreateTestingNamespace("update-selector-to-remove-controllerref", s, t)
 	defer framework.DeleteTestingNamespace(ns, s, t)
 	rc := newRC("rc", ns.Name, 2)
@@ -337,7 +335,7 @@ func TestUpdateSelectorToRemoveControllerRef(t *testing.T) {
 	pod2.Labels["uniqueKey"] = "2"
 	createRCsPods(t, clientSet, []*v1.ReplicationController{rc}, []*v1.Pod{pod1, pod2}, ns.Name)
 
-	waitToObservePods(t, podInformer, 2)
+	waitToObservePods(t, informers.Core().V1().Pods().Informer(), 2)
 	go rm.Run(5, stopCh)
 	waitRCStable(t, clientSet, rc, ns.Name)
 

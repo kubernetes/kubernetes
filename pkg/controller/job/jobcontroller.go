@@ -32,11 +32,12 @@ import (
 	batch "k8s.io/kubernetes/pkg/apis/batch/v1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	v1core "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/core/v1"
-	"k8s.io/kubernetes/pkg/client/legacylisters"
+	batchinformers "k8s.io/kubernetes/pkg/client/informers/informers_generated/batch/v1"
+	coreinformers "k8s.io/kubernetes/pkg/client/informers/informers_generated/core/v1"
 	batchv1listers "k8s.io/kubernetes/pkg/client/listers/batch/v1"
+	corelisters "k8s.io/kubernetes/pkg/client/listers/core/v1"
 	"k8s.io/kubernetes/pkg/client/record"
 	"k8s.io/kubernetes/pkg/controller"
-	"k8s.io/kubernetes/pkg/controller/informers"
 	"k8s.io/kubernetes/pkg/util/metrics"
 	"k8s.io/kubernetes/pkg/util/workqueue"
 
@@ -64,7 +65,7 @@ type JobController struct {
 	jobLister batchv1listers.JobLister
 
 	// A store of pods, populated by the podController
-	podStore listers.StoreToPodLister
+	podStore corelisters.PodLister
 
 	// Jobs that need to be updated
 	queue workqueue.RateLimitingInterface
@@ -72,7 +73,7 @@ type JobController struct {
 	recorder record.EventRecorder
 }
 
-func NewJobController(podInformer cache.SharedIndexInformer, jobInformer informers.JobInformer, kubeClient clientset.Interface) *JobController {
+func NewJobController(podInformer coreinformers.PodInformer, jobInformer batchinformers.JobInformer, kubeClient clientset.Interface) *JobController {
 	eventBroadcaster := record.NewBroadcaster()
 	eventBroadcaster.StartLogging(glog.Infof)
 	// TODO: remove the wrapper when every clients have moved to use the clientset.
@@ -105,13 +106,13 @@ func NewJobController(podInformer cache.SharedIndexInformer, jobInformer informe
 	jm.jobLister = jobInformer.Lister()
 	jm.jobStoreSynced = jobInformer.Informer().HasSynced
 
-	podInformer.AddEventHandler(cache.ResourceEventHandlerFuncs{
+	podInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc:    jm.addPod,
 		UpdateFunc: jm.updatePod,
 		DeleteFunc: jm.deletePod,
 	})
-	jm.podStore.Indexer = podInformer.GetIndexer()
-	jm.podStoreSynced = podInformer.HasSynced
+	jm.podStore = podInformer.Lister()
+	jm.podStoreSynced = podInformer.Informer().HasSynced
 
 	jm.updateHandler = jm.updateJobStatus
 	jm.syncHandler = jm.syncJob
@@ -124,6 +125,7 @@ func (jm *JobController) Run(workers int, stopCh <-chan struct{}) {
 	defer jm.queue.ShutDown()
 
 	if !cache.WaitForCacheSync(stopCh, jm.podStoreSynced, jm.jobStoreSynced) {
+		utilruntime.HandleError(fmt.Errorf("timed out waiting for caches to sync"))
 		return
 	}
 

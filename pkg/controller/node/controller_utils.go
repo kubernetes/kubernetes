@@ -30,7 +30,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
-	"k8s.io/kubernetes/pkg/client/legacylisters"
+	extensionslisters "k8s.io/kubernetes/pkg/client/listers/extensions/v1beta1"
 	"k8s.io/kubernetes/pkg/client/record"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
@@ -47,7 +47,7 @@ const (
 
 // deletePods will delete all pods from master running on given node, and return true
 // if any pods were deleted, or were found pending deletion.
-func deletePods(kubeClient clientset.Interface, recorder record.EventRecorder, nodeName, nodeUID string, daemonStore listers.StoreToDaemonSetLister) (bool, error) {
+func deletePods(kubeClient clientset.Interface, recorder record.EventRecorder, nodeName, nodeUID string, daemonStore extensionslisters.DaemonSetLister) (bool, error) {
 	remaining := false
 	selector := fields.OneTermEqualSelector(api.PodHostField, nodeName).String()
 	options := metav1.ListOptions{FieldSelector: selector}
@@ -160,7 +160,11 @@ func (nc *NodeController) maybeDeleteTerminatingPod(obj interface{}) {
 		return
 	}
 
-	nodeObj, found, err := nc.nodeStore.Store.GetByKey(pod.Spec.NodeName)
+	node, err := nc.nodeLister.Get(pod.Spec.NodeName)
+	// if there is no such node, do nothing and let the podGC clean it up.
+	if errors.IsNotFound(err) {
+		return
+	}
 	if err != nil {
 		// this can only happen if the Store.KeyFunc has a problem creating
 		// a key for the pod. If it happens once, it will happen again so
@@ -169,17 +173,11 @@ func (nc *NodeController) maybeDeleteTerminatingPod(obj interface{}) {
 		return
 	}
 
-	// if there is no such node, do nothing and let the podGC clean it up.
-	if !found {
-		return
-	}
-
 	// delete terminating pods that have been scheduled on
 	// nodes that do not support graceful termination
 	// TODO(mikedanese): this can be removed when we no longer
 	// guarantee backwards compatibility of master API to kubelets with
 	// versions less than 1.1.0
-	node := nodeObj.(*v1.Node)
 	v, err := utilversion.ParseSemantic(node.Status.NodeInfo.KubeletVersion)
 	if err != nil {
 		glog.V(0).Infof("Couldn't parse version %q of node: %v", node.Status.NodeInfo.KubeletVersion, err)

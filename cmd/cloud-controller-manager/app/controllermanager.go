@@ -34,6 +34,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	v1core "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/core/v1"
+	newinformers "k8s.io/kubernetes/pkg/client/informers/informers_generated"
 	"k8s.io/kubernetes/pkg/client/leaderelection"
 	"k8s.io/kubernetes/pkg/client/leaderelection/resourcelock"
 	"k8s.io/kubernetes/pkg/client/record"
@@ -192,7 +193,10 @@ func StartControllers(s *options.CloudControllerManagerServer, kubeconfig *restc
 	client := func(serviceAccountName string) clientset.Interface {
 		return rootClientBuilder.ClientOrDie(serviceAccountName)
 	}
-	sharedInformers := informers.NewSharedInformerFactory(client("shared-informers"), nil, resyncPeriod(s)())
+	versionedClient := client("shared-informers")
+	// TODO replace sharedInformers with newSharedInformers
+	sharedInformers := informers.NewSharedInformerFactory(versionedClient, nil, resyncPeriod(s)())
+	newSharedInformers := newinformers.NewSharedInformerFactory(nil, versionedClient, resyncPeriod(s)())
 
 	_, clusterCIDR, err := net.ParseCIDR(s.ClusterCIDR)
 	if err != nil {
@@ -201,7 +205,7 @@ func StartControllers(s *options.CloudControllerManagerServer, kubeconfig *restc
 
 	// Start the CloudNodeController
 	nodeController, err := nodecontroller.NewCloudNodeController(
-		sharedInformers.Nodes(),
+		newSharedInformers.Core().V1().Nodes(),
 		client("cloud-node-controller"), cloud,
 		s.NodeMonitorPeriod.Duration)
 	if err != nil {
@@ -246,7 +250,9 @@ func StartControllers(s *options.CloudControllerManagerServer, kubeconfig *restc
 		glog.Fatalf("Failed to get api versions from server: %v", err)
 	}
 
+	// TODO replace sharedInformers with newSharedInformers
 	sharedInformers.Start(stop)
+	newSharedInformers.Start(stop)
 
 	select {}
 }

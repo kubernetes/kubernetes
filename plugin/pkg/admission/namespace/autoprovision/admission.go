@@ -46,7 +46,6 @@ type provision struct {
 }
 
 var _ = kubeapiserveradmission.WantsInformerFactory(&provision{})
-var _ = kubeapiserveradmission.WantsInformerFactory(&provision{})
 
 func (p *provision) Admit(a admission.Attributes) (err error) {
 	// if we're here, then we've already passed authentication, so we're allowed to do what we're trying to do
