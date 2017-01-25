@@ -97,7 +97,6 @@ concurrent-resource-quota-syncs
 concurrent-serviceaccount-token-syncs
 concurrent-service-syncs
 config-map
-config-map-data
 config-map-namespace
 config-sync-period
 configure-cloud-routes
