@@ -22,6 +22,7 @@ import (
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/selection"
+	"k8s.io/apimachinery/pkg/types"
 )
 
 // LabelSelectorAsSelector converts the LabelSelector api type into a struct that implements
@@ -203,4 +204,25 @@ func SingleObject(meta ObjectMeta) ListOptions {
 		FieldSelector:   fields.OneTermEqualSelector("metadata.name", meta.Name).String(),
 		ResourceVersion: meta.ResourceVersion,
 	}
+}
+
+// NewDeleteOptions returns a DeleteOptions indicating the resource should
+// be deleted within the specified grace period. Use zero to indicate
+// immediate deletion. If you would prefer to use the default grace period,
+// use &metav1.DeleteOptions{} directly.
+func NewDeleteOptions(grace int64) *DeleteOptions {
+	return &DeleteOptions{GracePeriodSeconds: &grace}
+}
+
+// NewPreconditionDeleteOptions returns a DeleteOptions with a UID precondition set.
+func NewPreconditionDeleteOptions(uid string) *DeleteOptions {
+	u := types.UID(uid)
+	p := Preconditions{UID: &u}
+	return &DeleteOptions{Preconditions: &p}
+}
+
+// NewUIDPreconditions returns a Preconditions with UID set.
+func NewUIDPreconditions(uid string) *Preconditions {
+	u := types.UID(uid)
+	return &Preconditions{UID: &u}
 }

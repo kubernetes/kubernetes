@@ -31,7 +31,6 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/selection"
-	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/pkg/api/resource"
 )
@@ -226,27 +225,6 @@ var integerResources = sets.NewString(
 // IsIntegerResourceName returns true if the resource is measured in integer values
 func IsIntegerResourceName(str string) bool {
 	return integerResources.Has(str) || IsOpaqueIntResourceName(ResourceName(str))
-}
-
-// NewDeleteOptions returns a DeleteOptions indicating the resource should
-// be deleted within the specified grace period. Use zero to indicate
-// immediate deletion. If you would prefer to use the default grace period,
-// use &api.DeleteOptions{} directly.
-func NewDeleteOptions(grace int64) *DeleteOptions {
-	return &DeleteOptions{GracePeriodSeconds: &grace}
-}
-
-// NewPreconditionDeleteOptions returns a DeleteOptions with a UID precondition set.
-func NewPreconditionDeleteOptions(uid string) *DeleteOptions {
-	u := types.UID(uid)
-	p := Preconditions{UID: &u}
-	return &DeleteOptions{Preconditions: &p}
-}
-
-// NewUIDPreconditions returns a Preconditions with UID set.
-func NewUIDPreconditions(uid string) *Preconditions {
-	u := types.UID(uid)
-	return &Preconditions{UID: &u}
 }
 
 // this function aims to check if the service's ClusterIP is set or not

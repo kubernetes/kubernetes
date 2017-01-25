@@ -22,7 +22,6 @@ go_library(
         "//pkg/api/v1:go_default_library",
         "//pkg/apis/storage/v1beta1:go_default_library",
         "//pkg/apis/storage/v1beta1/util:go_default_library",
-        "//pkg/client/cache:go_default_library",
         "//pkg/client/clientset_generated/clientset:go_default_library",
         "//pkg/client/clientset_generated/clientset/typed/core/v1:go_default_library",
         "//pkg/client/record:go_default_library",
@@ -42,6 +41,7 @@ go_library(
         "//vendor:k8s.io/apimachinery/pkg/types",
         "//vendor:k8s.io/apimachinery/pkg/util/wait",
         "//vendor:k8s.io/apimachinery/pkg/watch",
+        "//vendor:k8s.io/client-go/tools/cache",
     ],
 )
 
@@ -65,7 +65,6 @@ go_test(
         "//pkg/api/v1:go_default_library",
         "//pkg/apis/storage/v1beta1:go_default_library",
         "//pkg/apis/storage/v1beta1/util:go_default_library",
-        "//pkg/client/cache:go_default_library",
         "//pkg/client/clientset_generated/clientset:go_default_library",
         "//pkg/client/clientset_generated/clientset/fake:go_default_library",
         "//pkg/client/record:go_default_library",
@@ -78,6 +77,7 @@ go_test(
         "//vendor:k8s.io/apimachinery/pkg/types",
         "//vendor:k8s.io/apimachinery/pkg/util/diff",
         "//vendor:k8s.io/apimachinery/pkg/util/wait",
+        "//vendor:k8s.io/client-go/tools/cache",
     ],
 )
 

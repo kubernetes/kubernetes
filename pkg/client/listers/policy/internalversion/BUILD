@@ -19,11 +19,11 @@ go_library(
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/apis/policy:go_default_library",
-        "//pkg/client/cache:go_default_library",
         "//vendor:github.com/golang/glog",
         "//vendor:k8s.io/apimachinery/pkg/api/errors",
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
         "//vendor:k8s.io/apimachinery/pkg/labels",
+        "//vendor:k8s.io/client-go/tools/cache",
     ],
 )
 

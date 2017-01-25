@@ -21,6 +21,7 @@ package informers_generated
 import (
 	"fmt"
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
+	cache "k8s.io/client-go/tools/cache"
 	api "k8s.io/kubernetes/pkg/api"
 	api_v1 "k8s.io/kubernetes/pkg/api/v1"
 	apps "k8s.io/kubernetes/pkg/apis/apps"
@@ -41,7 +42,6 @@ import (
 	rbac_v1beta1 "k8s.io/kubernetes/pkg/apis/rbac/v1beta1"
 	storage "k8s.io/kubernetes/pkg/apis/storage"
 	storage_v1beta1 "k8s.io/kubernetes/pkg/apis/storage/v1beta1"
-	cache "k8s.io/kubernetes/pkg/client/cache"
 )
 
 // GenericInformer is type of SharedIndexInformer which will locate and delegate to other

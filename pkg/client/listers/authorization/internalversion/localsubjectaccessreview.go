@@ -21,8 +21,8 @@ package internalversion
 import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/client-go/tools/cache"
 	authorization "k8s.io/kubernetes/pkg/apis/authorization"
-	"k8s.io/kubernetes/pkg/client/cache"
 )
 
 // LocalSubjectAccessReviewLister helps list LocalSubjectAccessReviews.

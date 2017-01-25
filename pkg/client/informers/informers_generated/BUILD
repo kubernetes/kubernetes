@@ -35,7 +35,6 @@ go_library(
         "//pkg/apis/rbac/v1beta1:go_default_library",
         "//pkg/apis/storage:go_default_library",
         "//pkg/apis/storage/v1beta1:go_default_library",
-        "//pkg/client/cache:go_default_library",
         "//pkg/client/clientset_generated/clientset:go_default_library",
         "//pkg/client/clientset_generated/internalclientset:go_default_library",
         "//pkg/client/informers/informers_generated/apps:go_default_library",
@@ -50,6 +49,7 @@ go_library(
         "//pkg/client/informers/informers_generated/storage:go_default_library",
         "//vendor:k8s.io/apimachinery/pkg/runtime",
         "//vendor:k8s.io/apimachinery/pkg/runtime/schema",
+        "//vendor:k8s.io/client-go/tools/cache",
     ],
 )
 

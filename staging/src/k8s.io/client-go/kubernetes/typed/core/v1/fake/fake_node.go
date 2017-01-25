@@ -60,13 +60,13 @@ func (c *FakeNodes) UpdateStatus(node *v1.Node) (*v1.Node, error) {
 	return obj.(*v1.Node), err
 }
 
-func (c *FakeNodes) Delete(name string, options *v1.DeleteOptions) error {
+func (c *FakeNodes) Delete(name string, options *meta_v1.DeleteOptions) error {
 	_, err := c.Fake.
 		Invokes(testing.NewRootDeleteAction(nodesResource, name), &v1.Node{})
 	return err
 }
 
-func (c *FakeNodes) DeleteCollection(options *v1.DeleteOptions, listOptions meta_v1.ListOptions) error {
+func (c *FakeNodes) DeleteCollection(options *meta_v1.DeleteOptions, listOptions meta_v1.ListOptions) error {
 	action := testing.NewRootDeleteCollectionAction(nodesResource, listOptions)
 
 	_, err := c.Fake.Invokes(action, &v1.NodeList{})

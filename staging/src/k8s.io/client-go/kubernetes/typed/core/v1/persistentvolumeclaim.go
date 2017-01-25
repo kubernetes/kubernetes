@@ -36,8 +36,8 @@ type PersistentVolumeClaimInterface interface {
 	Create(*v1.PersistentVolumeClaim) (*v1.PersistentVolumeClaim, error)
 	Update(*v1.PersistentVolumeClaim) (*v1.PersistentVolumeClaim, error)
 	UpdateStatus(*v1.PersistentVolumeClaim) (*v1.PersistentVolumeClaim, error)
-	Delete(name string, options *v1.DeleteOptions) error
-	DeleteCollection(options *v1.DeleteOptions, listOptions meta_v1.ListOptions) error
+	Delete(name string, options *meta_v1.DeleteOptions) error
+	DeleteCollection(options *meta_v1.DeleteOptions, listOptions meta_v1.ListOptions) error
 	Get(name string, options meta_v1.GetOptions) (*v1.PersistentVolumeClaim, error)
 	List(opts meta_v1.ListOptions) (*v1.PersistentVolumeClaimList, error)
 	Watch(opts meta_v1.ListOptions) (watch.Interface, error)
@@ -101,7 +101,7 @@ func (c *persistentVolumeClaims) UpdateStatus(persistentVolumeClaim *v1.Persiste
 }
 
 // Delete takes name of the persistentVolumeClaim and deletes it. Returns an error if one occurs.
-func (c *persistentVolumeClaims) Delete(name string, options *v1.DeleteOptions) error {
+func (c *persistentVolumeClaims) Delete(name string, options *meta_v1.DeleteOptions) error {
 	return c.client.Delete().
 		Namespace(c.ns).
 		Resource("persistentvolumeclaims").
@@ -112,7 +112,7 @@ func (c *persistentVolumeClaims) Delete(name string, options *v1.DeleteOptions) 
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *persistentVolumeClaims) DeleteCollection(options *v1.DeleteOptions, listOptions meta_v1.ListOptions) error {
+func (c *persistentVolumeClaims) DeleteCollection(options *meta_v1.DeleteOptions, listOptions meta_v1.ListOptions) error {
 	return c.client.Delete().
 		Namespace(c.ns).
 		Resource("persistentvolumeclaims").

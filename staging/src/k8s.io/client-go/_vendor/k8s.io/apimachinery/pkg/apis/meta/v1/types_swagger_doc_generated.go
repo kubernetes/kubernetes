@@ -80,6 +80,17 @@ func (APIVersions) SwaggerDoc() map[string]string {
 	return map_APIVersions
 }
 
+var map_DeleteOptions = map[string]string{
+	"":                   "DeleteOptions may be provided when deleting an API object.",
+	"gracePeriodSeconds": "The duration in seconds before the object should be deleted. Value must be non-negative integer. The value zero indicates delete immediately. If this value is nil, the default grace period for the specified type will be used. Defaults to a per object value if not specified. zero means delete immediately.",
+	"preconditions":      "Must be fulfilled before a deletion is carried out. If not possible, a 409 Conflict status will be returned.",
+	"orphanDependents":   "Should the dependent objects be orphaned. If true/false, the \"orphan\" finalizer will be added to/removed from the object's finalizers list.",
+}
+
+func (DeleteOptions) SwaggerDoc() map[string]string {
+	return map_DeleteOptions
+}
+
 var map_ExportOptions = map[string]string{
 	"":       "ExportOptions is the query options to the standard REST get call.",
 	"export": "Should this value be exported.  Export strips fields that a user can not specify.",
@@ -195,6 +206,15 @@ var map_Patch = map[string]string{
 
 func (Patch) SwaggerDoc() map[string]string {
 	return map_Patch
+}
+
+var map_Preconditions = map[string]string{
+	"":    "Preconditions must be fulfilled before an operation (update, delete, etc.) is carried out.",
+	"uid": "Specifies the target UID.",
+}
+
+func (Preconditions) SwaggerDoc() map[string]string {
+	return map_Preconditions
 }
 
 var map_RootPaths = map[string]string{
