@@ -567,7 +567,7 @@ func (s *awsSdkEC2) DescribeInstances(request *ec2.DescribeInstancesInput) ([]*e
 	// Instances are paged
 	results := []*ec2.Instance{}
 	var nextToken *string
-
+	requestTime := time.Now()
 	for {
 		response, err := s.ec2.DescribeInstances(request)
 		if err != nil {
@@ -584,7 +584,8 @@ func (s *awsSdkEC2) DescribeInstances(request *ec2.DescribeInstancesInput) ([]*e
 		}
 		request.NextToken = nextToken
 	}
-
+	timeTaken := time.Since(requestTime).Seconds()
+	recordAwsMetric("aws_describe_instance", timeTaken, "")
 	return results, nil
 }
 
@@ -599,18 +600,26 @@ func (s *awsSdkEC2) DescribeSecurityGroups(request *ec2.DescribeSecurityGroupsIn
 }
 
 func (s *awsSdkEC2) AttachVolume(request *ec2.AttachVolumeInput) (*ec2.VolumeAttachment, error) {
-	return s.ec2.AttachVolume(request)
+	requestTime := time.Now()
+	resp, err := s.ec2.AttachVolume(request)
+	timeTaken := time.Since(requestTime).Seconds()
+	recordAwsMetric("aws_attach_volume", timeTaken, "")
+	return resp, err
 }
 
 func (s *awsSdkEC2) DetachVolume(request *ec2.DetachVolumeInput) (*ec2.VolumeAttachment, error) {
-	return s.ec2.DetachVolume(request)
+	requestTime := time.Now()
+	resp, err := s.ec2.DetachVolume(request)
+	timeTaken := time.Since(requestTime).Seconds()
+	recordAwsMetric("aws_detach_volume", timeTaken, "")
+	return resp, err
 }
 
 func (s *awsSdkEC2) DescribeVolumes(request *ec2.DescribeVolumesInput) ([]*ec2.Volume, error) {
 	// Volumes are paged
 	results := []*ec2.Volume{}
 	var nextToken *string
-
+	requestTime := time.Now()
 	for {
 		response, err := s.ec2.DescribeVolumes(request)
 
@@ -626,16 +635,25 @@ func (s *awsSdkEC2) DescribeVolumes(request *ec2.DescribeVolumesInput) ([]*ec2.V
 		}
 		request.NextToken = nextToken
 	}
-
+	timeTaken := time.Since(requestTime).Seconds()
+	recordAwsMetric("aws_describe_volume", timeTaken, "")
 	return results, nil
 }
 
-func (s *awsSdkEC2) CreateVolume(request *ec2.CreateVolumeInput) (resp *ec2.Volume, err error) {
-	return s.ec2.CreateVolume(request)
+func (s *awsSdkEC2) CreateVolume(request *ec2.CreateVolumeInput) (*ec2.Volume, error) {
+	requestTime := time.Now()
+	resp, err := s.ec2.CreateVolume(request)
+	timeTaken := time.Since(requestTime).Seconds()
+	recordAwsMetric("aws_create_volume", timeTaken, "")
+	return resp, err
 }
 
 func (s *awsSdkEC2) DeleteVolume(request *ec2.DeleteVolumeInput) (*ec2.DeleteVolumeOutput, error) {
-	return s.ec2.DeleteVolume(request)
+	requestTime := time.Now()
+	resp, err := s.ec2.DeleteVolume(request)
+	timeTaken := time.Since(requestTime).Seconds()
+	recordAwsMetric("aws_delete_volume", timeTaken, "")
+	return resp, err
 }
 
 func (s *awsSdkEC2) DescribeSubnets(request *ec2.DescribeSubnetsInput) ([]*ec2.Subnet, error) {
@@ -664,7 +682,11 @@ func (s *awsSdkEC2) RevokeSecurityGroupIngress(request *ec2.RevokeSecurityGroupI
 }
 
 func (s *awsSdkEC2) CreateTags(request *ec2.CreateTagsInput) (*ec2.CreateTagsOutput, error) {
-	return s.ec2.CreateTags(request)
+	requestTime := time.Now()
+	resp, err := s.ec2.CreateTags(request)
+	timeTaken := time.Since(requestTime).Seconds()
+	recordAwsMetric("aws_create_tags", timeTaken, "")
+	return resp, err
 }
 
 func (s *awsSdkEC2) DescribeRouteTables(request *ec2.DescribeRouteTablesInput) ([]*ec2.RouteTable, error) {
@@ -689,6 +711,7 @@ func (s *awsSdkEC2) ModifyInstanceAttribute(request *ec2.ModifyInstanceAttribute
 }
 
 func init() {
+	registerMetrics()
 	cloudprovider.RegisterCloudProvider(ProviderName, func(config io.Reader) (cloudprovider.Interface, error) {
 		creds := credentials.NewChainCredentials(
 			[]credentials.Provider{
@@ -3322,4 +3345,10 @@ func setNodeDisk(
 		nodeDiskMap[nodeName] = volumeMap
 	}
 	volumeMap[volumeID] = check
+}
+
+func recordAwsMetric(metricName string, timeTaken float64, namespace string) {
+	if mi, ok := awsMetricMap[metricName]; ok {
+		mi.WithLabelValues(namespace).Observe(timeTaken)
+	}
 }
