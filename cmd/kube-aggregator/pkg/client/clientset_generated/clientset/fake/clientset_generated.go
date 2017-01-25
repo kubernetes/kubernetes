@@ -19,13 +19,13 @@ package fake
 import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/watch"
+	"k8s.io/client-go/discovery"
+	fakediscovery "k8s.io/client-go/discovery/fake"
 	clientset "k8s.io/kubernetes/cmd/kube-aggregator/pkg/client/clientset_generated/clientset"
 	v1alpha1apiregistration "k8s.io/kubernetes/cmd/kube-aggregator/pkg/client/clientset_generated/clientset/typed/apiregistration/v1alpha1"
 	fakev1alpha1apiregistration "k8s.io/kubernetes/cmd/kube-aggregator/pkg/client/clientset_generated/clientset/typed/apiregistration/v1alpha1/fake"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/client/testing/core"
-	"k8s.io/kubernetes/pkg/client/typed/discovery"
-	fakediscovery "k8s.io/kubernetes/pkg/client/typed/discovery/fake"
 )
 
 // NewSimpleClientset returns a clientset that will respond with the provided objects.
