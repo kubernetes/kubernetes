@@ -26,6 +26,7 @@ import (
 	"k8s.io/apiserver/pkg/util/cache"
 	"k8s.io/apiserver/pkg/util/webhook"
 	authenticationclient "k8s.io/client-go/kubernetes/typed/authentication/v1beta1"
+	"k8s.io/client-go/pkg/api"
 	authentication "k8s.io/client-go/pkg/apis/authentication/v1beta1"
 
 	_ "k8s.io/client-go/pkg/apis/authentication/install"
@@ -112,7 +113,7 @@ func (w *WebhookTokenAuthenticator) AuthenticateToken(token string) (user.Info, 
 // and returns a TokenReviewInterface that uses that client. Note that the client submits TokenReview
 // requests to the exact path specified in the kubeconfig file, so arbitrary non-API servers can be targeted.
 func tokenReviewInterfaceFromKubeconfig(kubeConfigFile string) (authenticationclient.TokenReviewInterface, error) {
-	gw, err := webhook.NewGenericWebhook(kubeConfigFile, groupVersions, 0)
+	gw, err := webhook.NewGenericWebhook(api.Registry, api.Codecs, kubeConfigFile, groupVersions, 0)
 	if err != nil {
 		return nil, err
 	}
