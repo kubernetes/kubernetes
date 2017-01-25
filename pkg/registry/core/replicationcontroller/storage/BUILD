@@ -41,7 +41,7 @@ go_library(
         "//pkg/genericapiserver/registry/generic:go_default_library",
         "//pkg/genericapiserver/registry/generic/registry:go_default_library",
         "//pkg/genericapiserver/registry/rest:go_default_library",
-        "//pkg/registry/core/controller:go_default_library",
+        "//pkg/registry/core/replicationcontroller:go_default_library",
         "//vendor:k8s.io/apimachinery/pkg/api/errors",
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
         "//vendor:k8s.io/apimachinery/pkg/labels",
