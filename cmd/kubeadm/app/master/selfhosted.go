@@ -117,7 +117,7 @@ func launchSelfHostedControllerManager(cfg *kubeadmapi.MasterConfiguration, clie
 		return fmt.Errorf("failed to create self-hosted %q deployment [%v]", kubeControllerManager, err)
 	}
 
-	waitForPodsWithLabel(client, "self-hosted-"+kubeControllerManager, false)
+	waitForPodsWithLabel(client, "self-hosted-"+kubeControllerManager, true)
 
 	ctrlMgrStaticManifestPath := buildStaticManifestFilepath(kubeControllerManager)
 	if err := os.RemoveAll(ctrlMgrStaticManifestPath); err != nil {
@@ -136,7 +136,7 @@ func launchSelfHostedScheduler(cfg *kubeadmapi.MasterConfiguration, client *clie
 		return fmt.Errorf("failed to create self-hosted %q deployment [%v]", kubeScheduler, err)
 	}
 
-	waitForPodsWithLabel(client, "self-hosted-"+kubeScheduler, false)
+	waitForPodsWithLabel(client, "self-hosted-"+kubeScheduler, true)
 
 	schedulerStaticManifestPath := buildStaticManifestFilepath(kubeScheduler)
 	if err := os.RemoveAll(schedulerStaticManifestPath); err != nil {
