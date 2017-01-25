@@ -105,6 +105,26 @@ message APIVersions {
   repeated ServerAddressByClientCIDR serverAddressByClientCIDRs = 2;
 }
 
+// DeleteOptions may be provided when deleting an API object.
+message DeleteOptions {
+  // The duration in seconds before the object should be deleted. Value must be non-negative integer.
+  // The value zero indicates delete immediately. If this value is nil, the default grace period for the
+  // specified type will be used.
+  // Defaults to a per object value if not specified. zero means delete immediately.
+  // +optional
+  optional int64 gracePeriodSeconds = 1;
+
+  // Must be fulfilled before a deletion is carried out. If not possible, a 409 Conflict status will be
+  // returned.
+  // +optional
+  optional Preconditions preconditions = 2;
+
+  // Should the dependent objects be orphaned. If true/false, the "orphan"
+  // finalizer will be added to/removed from the object's finalizers list.
+  // +optional
+  optional bool orphanDependents = 3;
+}
+
 // Duration is a wrapper around time.Duration which supports correct
 // marshaling to YAML and JSON. In particular, it marshals into strings, which
 // can be used as map keys in json.
@@ -447,6 +467,13 @@ message OwnerReference {
   // If true, this reference points to the managing controller.
   // +optional
   optional bool controller = 6;
+}
+
+// Preconditions must be fulfilled before an operation (update, delete, etc.) is carried out.
+message Preconditions {
+  // Specifies the target UID.
+  // +optional
+  optional string uid = 1;
 }
 
 // RootPaths lists the paths available at root.

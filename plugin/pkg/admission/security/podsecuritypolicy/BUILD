@@ -15,7 +15,6 @@ go_library(
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/apis/extensions:go_default_library",
-        "//pkg/client/cache:go_default_library",
         "//pkg/client/clientset_generated/internalclientset:go_default_library",
         "//pkg/kubeapiserver/admission:go_default_library",
         "//pkg/security/podsecuritypolicy:go_default_library",
@@ -32,6 +31,7 @@ go_library(
         "//vendor:k8s.io/apiserver/pkg/admission",
         "//vendor:k8s.io/apiserver/pkg/authentication/user",
         "//vendor:k8s.io/apiserver/pkg/authorization/authorizer",
+        "//vendor:k8s.io/client-go/tools/cache",
     ],
 )
 
@@ -43,7 +43,6 @@ go_test(
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/apis/extensions:go_default_library",
-        "//pkg/client/cache:go_default_library",
         "//pkg/security/apparmor:go_default_library",
         "//pkg/security/podsecuritypolicy:go_default_library",
         "//pkg/security/podsecuritypolicy/seccomp:go_default_library",
@@ -55,6 +54,7 @@ go_test(
         "//vendor:k8s.io/apiserver/pkg/admission",
         "//vendor:k8s.io/apiserver/pkg/authentication/user",
         "//vendor:k8s.io/apiserver/pkg/authorization/authorizer",
+        "//vendor:k8s.io/client-go/tools/cache",
     ],
 )
 

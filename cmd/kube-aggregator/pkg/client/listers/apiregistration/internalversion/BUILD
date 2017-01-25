@@ -16,10 +16,10 @@ go_library(
     tags = ["automanaged"],
     deps = [
         "//cmd/kube-aggregator/pkg/apis/apiregistration:go_default_library",
-        "//pkg/client/cache:go_default_library",
         "//vendor:k8s.io/apimachinery/pkg/api/errors",
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
         "//vendor:k8s.io/apimachinery/pkg/labels",
+        "//vendor:k8s.io/client-go/tools/cache",
     ],
 )
 

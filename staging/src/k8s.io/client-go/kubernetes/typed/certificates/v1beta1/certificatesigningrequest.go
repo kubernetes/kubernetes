@@ -17,11 +17,10 @@ limitations under the License.
 package v1beta1
 
 import (
-	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	api "k8s.io/client-go/pkg/api"
-	v1 "k8s.io/client-go/pkg/api/v1"
 	v1beta1 "k8s.io/client-go/pkg/apis/certificates/v1beta1"
 	rest "k8s.io/client-go/rest"
 )
@@ -38,10 +37,10 @@ type CertificateSigningRequestInterface interface {
 	Update(*v1beta1.CertificateSigningRequest) (*v1beta1.CertificateSigningRequest, error)
 	UpdateStatus(*v1beta1.CertificateSigningRequest) (*v1beta1.CertificateSigningRequest, error)
 	Delete(name string, options *v1.DeleteOptions) error
-	DeleteCollection(options *v1.DeleteOptions, listOptions meta_v1.ListOptions) error
-	Get(name string, options meta_v1.GetOptions) (*v1beta1.CertificateSigningRequest, error)
-	List(opts meta_v1.ListOptions) (*v1beta1.CertificateSigningRequestList, error)
-	Watch(opts meta_v1.ListOptions) (watch.Interface, error)
+	DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error
+	Get(name string, options v1.GetOptions) (*v1beta1.CertificateSigningRequest, error)
+	List(opts v1.ListOptions) (*v1beta1.CertificateSigningRequestList, error)
+	Watch(opts v1.ListOptions) (watch.Interface, error)
 	Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v1beta1.CertificateSigningRequest, err error)
 	CertificateSigningRequestExpansion
 }
@@ -107,7 +106,7 @@ func (c *certificateSigningRequests) Delete(name string, options *v1.DeleteOptio
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *certificateSigningRequests) DeleteCollection(options *v1.DeleteOptions, listOptions meta_v1.ListOptions) error {
+func (c *certificateSigningRequests) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
 	return c.client.Delete().
 		Resource("certificatesigningrequests").
 		VersionedParams(&listOptions, api.ParameterCodec).
@@ -117,7 +116,7 @@ func (c *certificateSigningRequests) DeleteCollection(options *v1.DeleteOptions,
 }
 
 // Get takes name of the certificateSigningRequest, and returns the corresponding certificateSigningRequest object, and an error if there is any.
-func (c *certificateSigningRequests) Get(name string, options meta_v1.GetOptions) (result *v1beta1.CertificateSigningRequest, err error) {
+func (c *certificateSigningRequests) Get(name string, options v1.GetOptions) (result *v1beta1.CertificateSigningRequest, err error) {
 	result = &v1beta1.CertificateSigningRequest{}
 	err = c.client.Get().
 		Resource("certificatesigningrequests").
@@ -129,7 +128,7 @@ func (c *certificateSigningRequests) Get(name string, options meta_v1.GetOptions
 }
 
 // List takes label and field selectors, and returns the list of CertificateSigningRequests that match those selectors.
-func (c *certificateSigningRequests) List(opts meta_v1.ListOptions) (result *v1beta1.CertificateSigningRequestList, err error) {
+func (c *certificateSigningRequests) List(opts v1.ListOptions) (result *v1beta1.CertificateSigningRequestList, err error) {
 	result = &v1beta1.CertificateSigningRequestList{}
 	err = c.client.Get().
 		Resource("certificatesigningrequests").
@@ -140,7 +139,7 @@ func (c *certificateSigningRequests) List(opts meta_v1.ListOptions) (result *v1b
 }
 
 // Watch returns a watch.Interface that watches the requested certificateSigningRequests.
-func (c *certificateSigningRequests) Watch(opts meta_v1.ListOptions) (watch.Interface, error) {
+func (c *certificateSigningRequests) Watch(opts v1.ListOptions) (watch.Interface, error) {
 	return c.client.Get().
 		Prefix("watch").
 		Resource("certificatesigningrequests").

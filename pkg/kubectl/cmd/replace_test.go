@@ -22,8 +22,8 @@ import (
 	"strings"
 	"testing"
 
+	"k8s.io/client-go/rest/fake"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/client/restclient/fake"
 	"k8s.io/kubernetes/pkg/client/typed/dynamic"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
 )
@@ -36,6 +36,7 @@ func TestReplaceObject(t *testing.T) {
 	tf.Printer = &testPrinter{}
 	deleted := false
 	tf.Client = &fake.RESTClient{
+		APIRegistry:          api.Registry,
 		NegotiatedSerializer: ns,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch p, m := req.URL.Path, req.Method; {
@@ -93,6 +94,7 @@ func TestReplaceMultipleObject(t *testing.T) {
 	redisMasterDeleted := false
 	frontendDeleted := false
 	tf.Client = &fake.RESTClient{
+		APIRegistry:          api.Registry,
 		NegotiatedSerializer: ns,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch p, m := req.URL.Path, req.Method; {
@@ -162,6 +164,7 @@ func TestReplaceDirectory(t *testing.T) {
 	tf.Printer = &testPrinter{}
 	created := map[string]bool{}
 	tf.Client = &fake.RESTClient{
+		APIRegistry:          api.Registry,
 		NegotiatedSerializer: ns,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch p, m := req.URL.Path, req.Method; {
@@ -218,6 +221,7 @@ func TestForceReplaceObjectNotFound(t *testing.T) {
 	ns := dynamic.ContentConfig().NegotiatedSerializer
 	tf.Printer = &testPrinter{}
 	tf.Client = &fake.RESTClient{
+		APIRegistry:          api.Registry,
 		NegotiatedSerializer: ns,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch p, m := req.URL.Path, req.Method; {

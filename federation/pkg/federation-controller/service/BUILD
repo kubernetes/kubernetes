@@ -29,7 +29,6 @@ go_library(
         "//federation/pkg/federation-controller/util/deletionhelper:go_default_library",
         "//pkg/api:go_default_library",
         "//pkg/api/v1:go_default_library",
-        "//pkg/client/cache:go_default_library",
         "//pkg/client/clientset_generated/clientset:go_default_library",
         "//pkg/client/legacylisters:go_default_library",
         "//pkg/client/record:go_default_library",
@@ -45,6 +44,7 @@ go_library(
         "//vendor:k8s.io/apimachinery/pkg/util/wait",
         "//vendor:k8s.io/apimachinery/pkg/watch",
         "//vendor:k8s.io/client-go/rest",
+        "//vendor:k8s.io/client-go/tools/cache",
     ],
 )
 

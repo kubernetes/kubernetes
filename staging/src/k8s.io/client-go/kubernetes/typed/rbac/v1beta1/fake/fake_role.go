@@ -17,12 +17,11 @@ limitations under the License.
 package fake
 
 import (
-	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	labels "k8s.io/apimachinery/pkg/labels"
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
-	v1 "k8s.io/client-go/pkg/api/v1"
 	v1beta1 "k8s.io/client-go/pkg/apis/rbac/v1beta1"
 	testing "k8s.io/client-go/testing"
 )
@@ -62,14 +61,14 @@ func (c *FakeRoles) Delete(name string, options *v1.DeleteOptions) error {
 	return err
 }
 
-func (c *FakeRoles) DeleteCollection(options *v1.DeleteOptions, listOptions meta_v1.ListOptions) error {
+func (c *FakeRoles) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
 	action := testing.NewDeleteCollectionAction(rolesResource, c.ns, listOptions)
 
 	_, err := c.Fake.Invokes(action, &v1beta1.RoleList{})
 	return err
 }
 
-func (c *FakeRoles) Get(name string, options meta_v1.GetOptions) (result *v1beta1.Role, err error) {
+func (c *FakeRoles) Get(name string, options v1.GetOptions) (result *v1beta1.Role, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewGetAction(rolesResource, c.ns, name), &v1beta1.Role{})
 
@@ -79,7 +78,7 @@ func (c *FakeRoles) Get(name string, options meta_v1.GetOptions) (result *v1beta
 	return obj.(*v1beta1.Role), err
 }
 
-func (c *FakeRoles) List(opts meta_v1.ListOptions) (result *v1beta1.RoleList, err error) {
+func (c *FakeRoles) List(opts v1.ListOptions) (result *v1beta1.RoleList, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewListAction(rolesResource, c.ns, opts), &v1beta1.RoleList{})
 
@@ -101,7 +100,7 @@ func (c *FakeRoles) List(opts meta_v1.ListOptions) (result *v1beta1.RoleList, er
 }
 
 // Watch returns a watch.Interface that watches the requested roles.
-func (c *FakeRoles) Watch(opts meta_v1.ListOptions) (watch.Interface, error) {
+func (c *FakeRoles) Watch(opts v1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
 		InvokesWatch(testing.NewWatchAction(rolesResource, c.ns, opts))
 

@@ -125,6 +125,7 @@ func TestNegotiateVersion(t *testing.T) {
 
 	for _, test := range tests {
 		fakeClient := &fake.RESTClient{
+			APIRegistry:          api.Registry,
 			NegotiatedSerializer: testapi.Default.NegotiatedSerializer(),
 			Resp: &http.Response{
 				StatusCode: test.statusCode,

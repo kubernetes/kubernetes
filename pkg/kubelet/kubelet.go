@@ -42,7 +42,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	utilflag "k8s.io/apiserver/pkg/util/flag"
+	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/clock"
 	"k8s.io/client-go/util/flowcontrol"
 	"k8s.io/client-go/util/integer"
@@ -51,7 +51,6 @@ import (
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/apis/componentconfig"
 	componentconfigv1alpha1 "k8s.io/kubernetes/pkg/apis/componentconfig/v1alpha1"
-	"k8s.io/kubernetes/pkg/client/cache"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/pkg/client/legacylisters"
 	"k8s.io/kubernetes/pkg/client/record"
@@ -2146,7 +2145,7 @@ func isSyncPodWorthy(event *pleg.PodLifecycleEvent) bool {
 
 // parseResourceList parses the given configuration map into an API
 // ResourceList or returns an error.
-func parseResourceList(m utilflag.ConfigurationMap) (v1.ResourceList, error) {
+func parseResourceList(m componentconfig.ConfigurationMap) (v1.ResourceList, error) {
 	rl := make(v1.ResourceList)
 	for k, v := range m {
 		switch v1.ResourceName(k) {
@@ -2170,7 +2169,7 @@ func parseResourceList(m utilflag.ConfigurationMap) (v1.ResourceList, error) {
 // ParseReservation parses the given kubelet- and system- reservations
 // configuration maps into an internal Reservation instance or returns an
 // error.
-func ParseReservation(kubeReserved, systemReserved utilflag.ConfigurationMap) (*kubetypes.Reservation, error) {
+func ParseReservation(kubeReserved, systemReserved componentconfig.ConfigurationMap) (*kubetypes.Reservation, error) {
 	reservation := new(kubetypes.Reservation)
 	if rl, err := parseResourceList(kubeReserved); err != nil {
 		return nil, err
