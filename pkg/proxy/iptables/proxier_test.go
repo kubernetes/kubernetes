@@ -23,6 +23,8 @@ import (
 	"net"
 	"strings"
 
+	"time"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -32,7 +34,6 @@ import (
 	"k8s.io/kubernetes/pkg/util/exec"
 	utiliptables "k8s.io/kubernetes/pkg/util/iptables"
 	iptablestest "k8s.io/kubernetes/pkg/util/iptables/testing"
-	"time"
 )
 
 func checkAllLines(t *testing.T, table utiliptables.Table, save []byte, expectedLines map[utiliptables.Chain]string) {
@@ -495,10 +496,9 @@ func (f *fakePortOpener) OpenLocalPort(lp *localPort) (closeable, error) {
 func NewFakeProxier(ipt utiliptables.Interface) *Proxier {
 	// TODO: Call NewProxier after refactoring out the goroutine
 	// invocation into a Run() method.
-	return &Proxier{
+	p := &Proxier{
 		exec:                        &exec.FakeExec{},
 		serviceMap:                  make(map[proxy.ServicePortName]*serviceInfo),
-		throttle:                    newSyncThrottle(0, time.Second*10),
 		iptables:                    ipt,
 		endpointsMap:                make(map[proxy.ServicePortName][]*endpointsInfo),
 		clusterCIDR:                 "10.0.0.0/24",
@@ -508,6 +508,8 @@ func NewFakeProxier(ipt utiliptables.Interface) *Proxier {
 		portsMap:                    make(map[localPort]closeable),
 		portMapper:                  &fakePortOpener{[]*localPort{}},
 	}
+	p.syncRunner = NewPeriodicRunner(p.Sync, 0, time.Minute, 1)
+	return p
 }
 
 func hasJump(rules []iptablestest.Rule, destChain, destIP, destPort string) bool {

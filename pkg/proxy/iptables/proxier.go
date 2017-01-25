@@ -37,6 +37,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/util/wait"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/kubernetes/pkg/api"
@@ -196,7 +197,7 @@ type Proxier struct {
 	portsMap                    map[localPort]closeable
 	haveReceivedServiceUpdate   bool // true once we've seen an OnServiceUpdate event
 	haveReceivedEndpointsUpdate bool // true once we've seen an OnEndpointsUpdate event
-	throttle                    *syncThrottle
+	syncRunner                  *PeriodicRunner
 
 	// These are effectively const and do not need the mutex to be held.
 	iptables       utiliptables.Interface
@@ -251,7 +252,7 @@ func NewProxier(ipt utiliptables.Interface,
 	sysctl utilsysctl.Interface,
 	exec utilexec.Interface,
 	syncPeriod time.Duration,
-	minSyncPeriod time.Duration,
+	minSyncInterval time.Duration,
 	masqueradeAll bool,
 	masqueradeBit int,
 	clusterCIDR string,
@@ -260,8 +261,8 @@ func NewProxier(ipt utiliptables.Interface,
 	recorder record.EventRecorder,
 ) (*Proxier, error) {
 	// check valid user input
-	if minSyncPeriod > syncPeriod {
-		return nil, fmt.Errorf("min-sync (%v) must be < sync(%v)", minSyncPeriod, syncPeriod)
+	if minSyncInterval > syncPeriod {
+		return nil, fmt.Errorf("minSyncInterval (%v) must be <= syncPeriod (%v)", minSyncInterval, syncPeriod)
 	}
 
 	// Set the route_localnet sysctl we need for
@@ -294,11 +295,10 @@ func NewProxier(ipt utiliptables.Interface,
 
 	go healthcheck.Run()
 
-	return &Proxier{
+	proxier := &Proxier{
 		serviceMap:     make(proxyServiceMap),
 		endpointsMap:   make(map[proxy.ServicePortName][]*endpointsInfo),
 		portsMap:       make(map[localPort]closeable),
-		throttle:       newSyncThrottle(minSyncPeriod, syncPeriod),
 		iptables:       ipt,
 		masqueradeAll:  masqueradeAll,
 		masqueradeMark: masqueradeMark,
@@ -308,7 +308,11 @@ func NewProxier(ipt utiliptables.Interface,
 		nodeIP:         nodeIP,
 		portMapper:     &listenPortOpener{},
 		recorder:       recorder,
-	}, nil
+	}
+	burstSyncs := 2
+	glog.V(3).Infof("minSyncInterval: %v, syncPeriod: %v, burstSyncs: %d", minSyncInterval, syncPeriod, burstSyncs)
+	proxier.syncRunner = NewPeriodicRunner(proxier.Sync, minSyncInterval, syncPeriod, burstSyncs)
+	return proxier, nil
 }
 
 // CleanupLeftovers removes all iptables rules and chains created by the Proxier
@@ -397,23 +401,14 @@ func CleanupLeftovers(ipt utiliptables.Interface) (encounteredError bool) {
 	return encounteredError
 }
 
-// Sync is called to immediately synchronize the proxier state to iptables
+// Sync is called to synchronize the proxier state to iptables as soon as possible.
 func (proxier *Proxier) Sync() {
-	proxier.mu.Lock()
-	defer proxier.mu.Unlock()
-	proxier.throttle.resetTimer()
-	proxier.syncProxyRules()
+	proxier.syncRunner.Run()
 }
 
 // SyncLoop runs periodic work.  This is expected to run as a goroutine or as the main loop of the app.  It does not return.
 func (proxier *Proxier) SyncLoop() {
-	proxier.throttle.resetTimer()
-	defer proxier.throttle.stopTimer()
-	for {
-		<-proxier.throttle.timer.C
-		glog.V(6).Infof("Periodic sync")
-		proxier.Sync()
-	}
+	proxier.syncRunner.Loop(wait.NeverStop)
 }
 
 type healthCheckPort struct {
@@ -495,7 +490,7 @@ func buildServiceMap(allServices []api.Service, oldServiceMap proxyServiceMap) (
 }
 
 // OnServiceUpdate tracks the active set of service proxies.
-// They will be synchronized using syncProxyRules()
+// They will be synchronized using syncRunner.
 func (proxier *Proxier) OnServiceUpdate(allServices []api.Service) {
 	start := time.Now()
 	defer func() {
@@ -522,7 +517,9 @@ func (proxier *Proxier) OnServiceUpdate(allServices []api.Service) {
 
 	if len(newServiceMap) != len(proxier.serviceMap) || !reflect.DeepEqual(newServiceMap, proxier.serviceMap) {
 		proxier.serviceMap = newServiceMap
-		proxier.syncProxyRules()
+		//FIXME: this takes the lock internally - deadlock.  All the guts of this need to move into sync
+		proxier.syncRunner.Run()
+		//FIXME: we can't have anything called after this
 	} else {
 		glog.V(4).Infof("Skipping proxy iptables rule sync on service update because nothing changed")
 	}
@@ -640,7 +637,9 @@ func (proxier *Proxier) OnEndpointsUpdate(allEndpoints []api.Endpoints) {
 
 		proxier.updateHealthCheckEntries(svcPort.NamespacedName, svcPortToInfoMap[svcPort])
 	}
-	proxier.syncProxyRules()
+	//FIXME: this takes the lock internally - deadlock.  All the guts of this need to move into sync
+	proxier.syncRunner.Run()
+	//FIXME: we can't have anything called after this
 	proxier.deleteEndpointConnections(staleConnections)
 }
 
@@ -793,20 +792,21 @@ func (proxier *Proxier) execConntrackTool(parameters ...string) error {
 
 // This is where all of the iptables-save/restore calls happen.
 // The only other iptables rules are those that are setup in iptablesInit()
-// assumes proxier.mu is held
+// This assumes proxier.mu is NOT held
 func (proxier *Proxier) syncProxyRules() {
-	if !proxier.throttle.allowSync() {
-		return
-	}
+	proxier.mu.Lock()
+	defer proxier.mu.Unlock()
+
+	start := time.Now()
 	defer func() {
-		glog.V(4).Infof("syncProxyRules took %v", proxier.throttle.timeElapsedSinceLastSync())
+		glog.V(4).Infof("syncProxyRules took %v", time.Since(start))
 	}()
 	// don't sync rules till we've received services and endpoints
 	if !proxier.haveReceivedEndpointsUpdate || !proxier.haveReceivedServiceUpdate {
 		glog.V(2).Info("Not syncing iptables until Services and Endpoints have been received from master")
 		return
 	}
-	glog.V(3).Infof("Syncing iptables rules")
+	glog.V(2).Infof("Syncing iptables rules")
 
 	// Create and link the kube services chain.
 	{

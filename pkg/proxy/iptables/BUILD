@@ -11,8 +11,8 @@ load(
 go_library(
     name = "go_default_library",
     srcs = [
+        "periodic_runner.go",
         "proxier.go",
-        "syncthrottle.go",
     ],
     tags = ["automanaged"],
     deps = [
@@ -31,6 +31,7 @@ go_library(
         "//vendor:github.com/golang/glog",
         "//vendor:k8s.io/apimachinery/pkg/types",
         "//vendor:k8s.io/apimachinery/pkg/util/sets",
+        "//vendor:k8s.io/apimachinery/pkg/util/wait",
         "//vendor:k8s.io/apiserver/pkg/util/feature",
         "//vendor:k8s.io/client-go/tools/record",
         "//vendor:k8s.io/client-go/util/flowcontrol",
@@ -39,10 +40,7 @@ go_library(
 
 go_test(
     name = "go_default_test",
-    srcs = [
-        "proxier_test.go",
-        "synchthrottle_test.go",
-    ],
+    srcs = ["proxier_test.go"],
     library = ":go_default_library",
     tags = ["automanaged"],
     deps = [
