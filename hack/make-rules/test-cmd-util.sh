@@ -21,8 +21,9 @@ set -o nounset
 set -o pipefail
 
 KUBE_ROOT=$(dirname "${BASH_SOURCE}")/../..
-source "${KUBE_ROOT}/hack/lib/init.sh"
-source "${KUBE_ROOT}/hack/lib/test.sh"
+# Expects the following has already been done by whatever sources this script
+# source "${KUBE_ROOT}/hack/lib/init.sh"
+# source "${KUBE_ROOT}/hack/lib/test.sh"
 
 ETCD_HOST=${ETCD_HOST:-127.0.0.1}
 ETCD_PORT=${ETCD_PORT:-2379}
@@ -2409,9 +2410,9 @@ run_multi_resources_tests() {
 # Requires an env var SUPPORTED_RESOURCES which is a comma separated list of
 # resources for which tests should be run.
 runTests() {
-  if [ -z "${SUPPORTED_RESOURCES}" ]; then
-    echo "Need to set SUPPORTED_RESOURCES env var. It is a comma separated list of resources that are supported and hence should be tested. Set it to (*) to test all resources"
-    return
+  if [ -z "${SUPPORTED_RESOURCES:-}" ]; then
+    echo "Need to set SUPPORTED_RESOURCES env var. It is a list of resources that are supported and hence should be tested. Set it to (*) to test all resources"
+    exit 1
   fi
   kube::log::status "Checking kubectl version"
   kubectl version
