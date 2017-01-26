@@ -71,7 +71,6 @@ go_library(
         "//pkg/genericapiserver/endpoints/filters:go_default_library",
         "//pkg/genericapiserver/endpoints/openapi:go_default_library",
         "//pkg/genericapiserver/registry/rest:go_default_library",
-        "//pkg/genericapiserver/server/filters:go_default_library",
         "//pkg/genericapiserver/server/mux:go_default_library",
         "//pkg/genericapiserver/server/options:go_default_library",
         "//pkg/genericapiserver/server/routes:go_default_library",
@@ -104,6 +103,7 @@ go_library(
         "//vendor:k8s.io/apiserver/pkg/authorization/authorizerfactory",
         "//vendor:k8s.io/apiserver/pkg/authorization/union",
         "//vendor:k8s.io/apiserver/pkg/endpoints/request",
+        "//vendor:k8s.io/apiserver/pkg/server/filters",
         "//vendor:k8s.io/apiserver/pkg/server/healthz",
         "//vendor:k8s.io/client-go/rest",
         "//vendor:k8s.io/client-go/util/cert",
@@ -121,7 +121,6 @@ filegroup(
     name = "all-srcs",
     srcs = [
         ":package-srcs",
-        "//pkg/genericapiserver/server/filters:all-srcs",
         "//pkg/genericapiserver/server/mux:all-srcs",
         "//pkg/genericapiserver/server/openapi:all-srcs",
         "//pkg/genericapiserver/server/options:all-srcs",

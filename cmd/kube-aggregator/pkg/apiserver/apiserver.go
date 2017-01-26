@@ -23,6 +23,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/util/wait"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
+	genericfilters "k8s.io/apiserver/pkg/server/filters"
 	kubeclientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	kubeinformers "k8s.io/kubernetes/pkg/client/informers/informers_generated"
 	v1listers "k8s.io/kubernetes/pkg/client/listers/core/v1"
@@ -30,7 +31,6 @@ import (
 	"k8s.io/kubernetes/pkg/genericapiserver/registry/generic"
 	"k8s.io/kubernetes/pkg/genericapiserver/registry/rest"
 	genericapiserver "k8s.io/kubernetes/pkg/genericapiserver/server"
-	genericfilters "k8s.io/kubernetes/pkg/genericapiserver/server/filters"
 	"k8s.io/kubernetes/pkg/version"
 
 	"k8s.io/kubernetes/cmd/kube-aggregator/pkg/apis/apiregistration"
