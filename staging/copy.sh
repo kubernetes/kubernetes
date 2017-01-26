@@ -42,7 +42,7 @@ CLIENT_REPO="${MAIN_REPO}/staging/src/${CLIENT_REPO_FROM_SRC}"
 CLIENT_REPO_TEMP="${MAIN_REPO}/staging/src/${CLIENT_REPO_TEMP_FROM_SRC}"
 
 DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-sedi="-i"
+sedi="-i=''"
 
 cleanup() {
     rm -rf "${CLIENT_REPO_TEMP}"
