@@ -52,9 +52,9 @@ go_test(
         "//pkg/client/record:go_default_library",
         "//pkg/controller:go_default_library",
         "//pkg/util/intstr:go_default_library",
-        "//pkg/util/uuid:go_default_library",
         "//pkg/util/workqueue:go_default_library",
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
+        "//vendor:k8s.io/apimachinery/pkg/util/uuid",
         "//vendor:k8s.io/client-go/tools/cache",
     ],
 )

@@ -34,11 +34,10 @@ import (
 	"k8s.io/apiserver/pkg/endpoints/metrics"
 	"k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/server/httplog"
-	"k8s.io/kubernetes/pkg/api"
+	proxyutil "k8s.io/apiserver/pkg/util/proxy"
 	"k8s.io/kubernetes/pkg/genericapiserver/endpoints/handlers/responsewriters"
 	"k8s.io/kubernetes/pkg/genericapiserver/registry/rest"
 	"k8s.io/kubernetes/pkg/util/httpstream"
-	proxyutil "k8s.io/kubernetes/pkg/util/proxy"
 
 	"github.com/golang/glog"
 )
@@ -119,7 +118,7 @@ func (r *ProxyHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	redirector, ok := storage.(rest.Redirector)
 	if !ok {
 		httplog.LogOf(req, w).Addf("'%v' is not a redirector", resource)
-		httpCode = responsewriters.ErrorNegotiated(apierrors.NewMethodNotSupported(api.Resource(resource), "proxy"), r.Serializer, gv, w, req)
+		httpCode = responsewriters.ErrorNegotiated(apierrors.NewMethodNotSupported(schema.GroupResource{Resource: resource}, "proxy"), r.Serializer, gv, w, req)
 		return
 	}
 

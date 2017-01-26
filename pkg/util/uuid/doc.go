@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors.
+Copyright 2017 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,5 +14,6 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package proxy provides transport and upgrade support for proxies
-package proxy // import "k8s.io/kubernetes/pkg/util/proxy"
+// uuid contains uuid generation helpers.
+// WARNING: this will go away when all godeps which vendor us are ported to the new package.
+package uuid
