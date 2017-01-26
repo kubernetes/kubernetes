@@ -18,8 +18,13 @@ package transport
 
 import (
 	"fmt"
+	"io"
 	"net/http"
+	"net/http/httptrace"
+	"os"
+	rtdebug "runtime/debug"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/golang/glog"
@@ -36,6 +41,9 @@ func HTTPWrappersForConfig(config *Config, rt http.RoundTripper) (http.RoundTrip
 	}
 
 	rt = DebugWrappers(rt)
+	if config.IsDebugConcurrent() {
+		rt = NewDebugConcurrentRoundTripper(rt)
+	}
 
 	// Set authentication wrappers
 	switch {
@@ -260,6 +268,55 @@ func (rt *impersonatingRoundTripper) CancelRequest(req *http.Request) {
 }
 
 func (rt *impersonatingRoundTripper) WrappedRoundTripper() http.RoundTripper { return rt.delegate }
+
+// NewDebugConcurrentRoundTripper is meant to give track debug information about all currently
+// open transports and provide that information if something goes wrong.
+
+var debugConcurrentMutex sync.Mutex
+var debugConcurrentMap map[string]debugConcurrentRecord = make(map[string]debugConcurrentRecord)
+
+type debugConcurrentRoundTripper struct {
+	rt http.RoundTripper
+}
+
+type debugConcurrentRecord struct {
+	url   string
+	stack []byte
+}
+
+func NewDebugConcurrentRoundTripper(rt http.RoundTripper) http.RoundTripper {
+	return &debugConcurrentRoundTripper{rt}
+}
+
+func (rt *debugConcurrentRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
+	ctx := req.Context()
+	stack := rtdebug.Stack()
+	trace := &httptrace.ClientTrace{
+		GotConn: func(info httptrace.GotConnInfo) {
+			glog.Infof("DebugConcurrentMap is of size %d, in %d, in %d.", len(debugConcurrentMap), os.Getpid(), os.Getppid())
+			debugConcurrentMutex.Lock()
+			defer debugConcurrentMutex.Unlock()
+			debugConcurrentMap[info.Conn.LocalAddr().String()] = debugConcurrentRecord{
+				url:   req.URL.String(),
+				stack: stack,
+			}
+		},
+	}
+	ctx = httptrace.WithClientTrace(ctx, trace)
+	req = req.WithContext(ctx)
+	resp, err := rt.rt.RoundTrip(req)
+	if err == io.EOF {
+		glog.Infof("Error round tripping with %d concurrent requests.", len(debugConcurrentMap))
+		debugConcurrentMutex.Lock()
+		defer debugConcurrentMutex.Unlock()
+		for conn, record := range debugConcurrentMap {
+			glog.Infof("Connection %s, on URL %s, from code %s", conn, record.url, record.stack)
+		}
+	}
+	return resp, err
+}
+
+func (rt *debugConcurrentRoundTripper) WrappedRoundTripper() http.RoundTripper { return rt.rt }
 
 type bearerAuthRoundTripper struct {
 	bearer string

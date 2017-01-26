@@ -34,6 +34,8 @@ type ConfigOverrides struct {
 	Context         clientcmdapi.Context
 	CurrentContext  string
 	Timeout         string
+	// Indicates if we should maintain & print debug state having to with concurrent state
+	DebugConcurrent bool
 }
 
 // ConfigOverrideFlags holds the flag names to be used for binding command line flags.  Notice that this structure tightly

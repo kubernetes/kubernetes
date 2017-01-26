@@ -170,8 +170,8 @@ type ServingInfo struct {
 	// "tcp4", and "tcp6".
 	BindNetwork string
 
-	// ipBasedLimit determines the maximum number of concurrent requests based on ip
-	ipLimit ipBasedLimit
+	// IpLimit determines the maximum number of concurrent requests allowed per ip
+	IPLimit ipBasedLimit
 }
 
 type SecureServingInfo struct {
@@ -271,7 +271,7 @@ func (c *Config) ApplySecureServingOptions(secureServing *options.SecureServingO
 	secureServingInfo := &SecureServingInfo{
 		ServingInfo: ServingInfo{
 			BindAddress: net.JoinHostPort(secureServing.ServingOptions.BindAddress.String(), strconv.Itoa(secureServing.ServingOptions.BindPort)),
-			ipLimit:     ipBasedLimit{limits: make(map[string]int), ipMax: ipMax, max: max},
+			IPLimit:     ipBasedLimit{limits: make(map[string]int), decrementers: make(map[string]func()), maxPerIP: ipMax, max: max},
 		},
 	}
 

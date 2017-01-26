@@ -48,6 +48,10 @@ type Config struct {
 	// config may layer other RoundTrippers on top of the returned
 	// RoundTripper.
 	WrapTransport func(rt http.RoundTripper) http.RoundTripper
+
+	// Indicates if we should maintain & print debug state
+	// having to with concurrent state
+	DebugConcurrent bool
 }
 
 // ImpersonationConfig has all the available impersonation options
@@ -78,6 +82,11 @@ func (c *Config) HasTokenAuth() bool {
 // HasCertAuth returns whether the configuration has certificate authentication or not.
 func (c *Config) HasCertAuth() bool {
 	return len(c.TLS.CertData) != 0 || len(c.TLS.CertFile) != 0
+}
+
+// IsDebugConcurrent returns whether we should be debugging concurrent state.
+func (c *Config) IsDebugConcurrent() bool {
+	return c.DebugConcurrent
 }
 
 // TLSConfig holds the information needed to set up a TLS transport.

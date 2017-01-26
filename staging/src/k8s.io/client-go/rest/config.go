@@ -114,6 +114,9 @@ type Config struct {
 	// The maximum length of time to wait before giving up on a server request. A value of zero means no timeout.
 	Timeout time.Duration
 
+	// Flag to indicate whether we want to enable the fairly heavy weight debug concurrent functionality
+	DebugConcurrent bool
+
 	// Version forces a specific version to be used (if registered)
 	// Do we need this?
 	// Version string
