@@ -10,6 +10,7 @@ load(
 go_library(
     name = "go_default_library",
     srcs = [
+        "secrets.go",
         "services.go",
         "upgrade.go",
     ],
@@ -18,6 +19,8 @@ go_library(
         "//pkg/api/v1:go_default_library",
         "//test/e2e/framework:go_default_library",
         "//vendor:github.com/onsi/ginkgo",
+        "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
+        "//vendor:k8s.io/apimachinery/pkg/util/uuid",
         "//vendor:k8s.io/apimachinery/pkg/util/wait",
     ],
 )
