@@ -55,7 +55,6 @@ go_test(
         "//pkg/client/record:go_default_library",
         "//pkg/kubelet/api/v1alpha1/stats:go_default_library",
         "//pkg/kubelet/lifecycle:go_default_library",
-        "//pkg/kubelet/types:go_default_library",
         "//pkg/quota:go_default_library",
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
         "//vendor:k8s.io/apimachinery/pkg/types",
