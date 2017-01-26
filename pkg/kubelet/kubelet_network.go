@@ -59,7 +59,7 @@ func effectiveHairpinMode(hairpinMode componentconfig.HairpinMode, containerRunt
 	// - It's set to "none".
 	if hairpinMode == componentconfig.PromiscuousBridge || hairpinMode == componentconfig.HairpinVeth {
 		// Only on docker.
-		if containerRuntime != "docker" {
+		if containerRuntime != "docker" && containerRuntime != "mixed" {
 			glog.Warningf("Hairpin mode set to %q but container runtime is %q, ignoring", hairpinMode, containerRuntime)
 			return componentconfig.HairpinNone, nil
 		}
