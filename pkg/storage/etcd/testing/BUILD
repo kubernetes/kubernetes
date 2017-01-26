@@ -14,7 +14,6 @@ go_library(
     deps = [
         "//pkg/storage/etcd/etcdtest:go_default_library",
         "//pkg/storage/etcd/testing/testingcert:go_default_library",
-        "//pkg/storage/storagebackend:go_default_library",
         "//vendor:github.com/coreos/etcd/client",
         "//vendor:github.com/coreos/etcd/clientv3",
         "//vendor:github.com/coreos/etcd/etcdserver",
@@ -26,6 +25,7 @@ go_library(
         "//vendor:github.com/golang/glog",
         "//vendor:golang.org/x/net/context",
         "//vendor:k8s.io/apimachinery/pkg/util/wait",
+        "//vendor:k8s.io/apiserver/pkg/storage/storagebackend",
     ],
 )
 

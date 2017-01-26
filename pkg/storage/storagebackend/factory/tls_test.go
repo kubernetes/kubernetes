@@ -25,10 +25,10 @@ import (
 
 	"golang.org/x/net/context"
 
+	"k8s.io/apiserver/pkg/storage/storagebackend"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/storage/etcd/testing/testingcert"
-	"k8s.io/kubernetes/pkg/storage/storagebackend"
 
 	"github.com/coreos/etcd/integration"
 	"github.com/coreos/etcd/pkg/transport"
