@@ -34,6 +34,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	metainternalversion "k8s.io/apimachinery/pkg/apis/meta/internalversion"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/conversion/unstructured"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -84,6 +85,7 @@ type RequestScope struct {
 	Creater   runtime.ObjectCreater
 	Convertor runtime.ObjectConvertor
 	Copier    runtime.ObjectCopier
+	Typer     runtime.ObjectTyper
 
 	Resource    schema.GroupVersionResource
 	Kind        schema.GroupVersionKind
@@ -520,7 +522,8 @@ func PatchResource(r rest.Patcher, scope RequestScope, admit admission.Interface
 			return nil
 		}
 
-		result, err := patchResource(ctx, updateAdmit, timeout, versionedObj, r, name, patchType, patchJS, scope.Namer, scope.Copier, scope.Resource, codec)
+		result, err := patchResource(ctx, updateAdmit, timeout, versionedObj, r, name, patchType, patchJS,
+			scope.Namer, scope.Copier, scope.Typer, scope.Creater, scope.Convertor, scope.Resource, codec)
 		if err != nil {
 			scope.err(err, res.ResponseWriter, req.Request)
 			return
@@ -550,6 +553,9 @@ func patchResource(
 	patchJS []byte,
 	namer ScopeNamer,
 	copier runtime.ObjectCopier,
+	typer runtime.ObjectTyper,
+	creater runtime.ObjectCreater,
+	convertor runtime.ObjectConvertor,
 	resource schema.GroupVersionResource,
 	codec runtime.Codec,
 ) (runtime.Object, error) {
@@ -594,8 +600,26 @@ func patchResource(
 				}
 				originalObjJS, originalPatchedObjJS = originalJS, patchedJS
 			case types.StrategicMergePatchType:
-				originalMap, patchMap, err := strategicPatchObject(codec, currentObject, patchJS, objToUpdate, versionedObj)
+				// Since the patch is applied on versioned objects, we need to convert the
+				// current object to versioned representation first.
+				gvks, _, err := typer.ObjectKinds(versionedObj)
 				if err != nil {
+					return nil, err
+				}
+				gvk := gvks[0]
+				currentVersionedObject, err := convertor.ConvertToVersion(currentObject, gvk.GroupVersion())
+				if err != nil {
+					return nil, err
+				}
+				versionedObjToUpdate, err := creater.New(gvk)
+				if err != nil {
+					return nil, err
+				}
+				originalMap, patchMap, err := strategicPatchObject(codec, currentVersionedObject, patchJS, versionedObjToUpdate, versionedObj)
+				if err != nil {
+					return nil, err
+				}
+				if err := convertor.Convert(versionedObjToUpdate, objToUpdate, nil); err != nil {
 					return nil, err
 				}
 				originalObjMap, originalPatchMap = originalMap, patchMap
@@ -614,14 +638,20 @@ func patchResource(
 			// 3. ensure no conflicts between the two patches
 			// 4. apply the #1 patch to the currentJS object
 
-			// TODO: This should be one-step conversion that doesn't require
-			// json marshaling and unmarshaling once #39017 is fixed.
-			data, err := runtime.Encode(codec, currentObject)
+			currentObjMap := make(map[string]interface{})
+
+			// Since the patch is applied on versioned objects, we need to convert the
+			// current object to versioned representation first.
+			gvks, _, err := typer.ObjectKinds(versionedObj)
 			if err != nil {
 				return nil, err
 			}
-			currentObjMap := make(map[string]interface{})
-			if err := json.Unmarshal(data, &currentObjMap); err != nil {
+			gvk := gvks[0]
+			currentVersionedObject, err := convertor.ConvertToVersion(currentObject, gvk.GroupVersion())
+			if err != nil {
+				return nil, err
+			}
+			if err := unstructured.DefaultConverter.ToUnstructured(currentVersionedObject, &currentObjMap); err != nil {
 				return nil, err
 			}
 
@@ -677,8 +707,15 @@ func patchResource(
 				return nil, errors.NewConflict(resource.GroupResource(), name, patchDiffErr)
 			}
 
+			versionedObjToUpdate, err := creater.New(gvk)
+			if err != nil {
+				return nil, err
+			}
+			if err := applyPatchToObject(codec, currentObjMap, originalPatchMap, versionedObjToUpdate, versionedObj); err != nil {
+				return nil, err
+			}
 			objToUpdate := patcher.New()
-			if err := applyPatchToObject(codec, currentObjMap, originalPatchMap, objToUpdate, versionedObj); err != nil {
+			if err := convertor.Convert(versionedObjToUpdate, objToUpdate, nil); err != nil {
 				return nil, err
 			}
 

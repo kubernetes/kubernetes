@@ -20,6 +20,7 @@ import (
 	"bytes"
 	encodingjson "encoding/json"
 	"fmt"
+	"math"
 	"os"
 	"reflect"
 	"strconv"
@@ -82,7 +83,7 @@ var (
 func parseBool(key string) bool {
 	value, err := strconv.ParseBool(key)
 	if err != nil {
-		glog.Errorf("Couldn't parse %s as bool", key)
+		glog.Errorf("Couldn't parse '%s' as bool for unstructured mismatch detection", key)
 	}
 	return value
 }
@@ -173,8 +174,12 @@ func fromUnstructured(sv, dv reflect.Value) error {
 					dv.Set(sv.Convert(dt))
 					return nil
 				}
+				if sv.Float() == math.Trunc(sv.Float()) {
+					dv.Set(sv.Convert(dt))
+					return nil
+				}
 			}
-			return fmt.Errorf("cannot convert %s to %d", st.String(), dt.String())
+			return fmt.Errorf("cannot convert %s to %s", st.String(), dt.String())
 		}
 	}
 

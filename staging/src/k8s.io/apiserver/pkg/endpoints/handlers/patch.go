@@ -20,6 +20,7 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"k8s.io/apimachinery/pkg/conversion/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
@@ -84,14 +85,8 @@ func strategicPatchObject(
 	objToUpdate runtime.Object,
 	versionedObj runtime.Object,
 ) (originalObjMap map[string]interface{}, patchMap map[string]interface{}, retErr error) {
-	// TODO: This should be one-step conversion that doesn't require
-	// json marshaling and unmarshaling once #39017 is fixed.
-	data, err := runtime.Encode(codec, originalObject)
-	if err != nil {
-		return nil, nil, err
-	}
 	originalObjMap = make(map[string]interface{})
-	if err := json.Unmarshal(data, &originalObjMap); err != nil {
+	if err := unstructured.DefaultConverter.ToUnstructured(originalObject, &originalObjMap); err != nil {
 		return nil, nil, err
 	}
 
@@ -121,11 +116,5 @@ func applyPatchToObject(
 		return err
 	}
 
-	// TODO: This should be one-step conversion that doesn't require
-	// json marshaling and unmarshaling once #39017 is fixed.
-	data, err := json.Marshal(patchedObjMap)
-	if err != nil {
-		return err
-	}
-	return runtime.DecodeInto(codec, data, objToUpdate)
+	return unstructured.DefaultConverter.FromUnstructured(patchedObjMap, objToUpdate)
 }
