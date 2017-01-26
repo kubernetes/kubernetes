@@ -614,7 +614,11 @@ func (s *GenericAPIServer) installAPI(c *Config) {
 		routes.SwaggerUI{}.Install(s.HandlerContainer)
 	}
 	if c.EnableProfiling {
-		routes.Profiling{}.Install(s.HandlerContainer)
+		if s.SecureServingInfo != nil {
+			routes.Profiling{}.Install(s.HandlerContainer, s.SecureServingInfo.ServingInfo.Profile)
+		} else {
+			routes.Profiling{}.Install(s.HandlerContainer, NoSecureHandler)
+		}
 		if c.EnableContentionProfiling {
 			goruntime.SetBlockProfileRate(1)
 		}

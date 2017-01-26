@@ -21,7 +21,6 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptrace"
-	"os"
 	rtdebug "runtime/debug"
 	"strings"
 	"sync"
@@ -293,7 +292,6 @@ func (rt *debugConcurrentRoundTripper) RoundTrip(req *http.Request) (*http.Respo
 	stack := rtdebug.Stack()
 	trace := &httptrace.ClientTrace{
 		GotConn: func(info httptrace.GotConnInfo) {
-			glog.Infof("DebugConcurrentMap is of size %d, in %d, in %d.", len(debugConcurrentMap), os.Getpid(), os.Getppid())
 			debugConcurrentMutex.Lock()
 			defer debugConcurrentMutex.Unlock()
 			debugConcurrentMap[info.Conn.LocalAddr().String()] = debugConcurrentRecord{

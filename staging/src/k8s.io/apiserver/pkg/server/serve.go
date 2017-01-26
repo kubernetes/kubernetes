@@ -17,8 +17,10 @@ limitations under the License.
 package server
 
 import (
+	"bytes"
 	"crypto/tls"
 	"crypto/x509"
+	"encoding/json"
 	"fmt"
 	"net"
 	"net/http"
@@ -108,7 +110,7 @@ func runServer(server *http.Server, info *ServingInfo, stopCh <-chan struct{}) (
 		info.BindNetwork = "tcp"
 	}
 	server.ConnState = func(conn net.Conn, state http.ConnState) {
-		if state == http.StateClosed {
+		if state == http.StateClosed || state == http.StateHijacked {
 			decrementer := info.IPLimit.decrementers[conn.RemoteAddr().String()]
 			if decrementer != nil {
 				decrementer()
@@ -236,6 +238,20 @@ func getNamedCertificateMap(certs []namedTlsCert) (map[string]*tls.Certificate, 
 	return byName, nil
 }
 
+func (s *ServingInfo) Profile(w http.ResponseWriter, r *http.Request) {
+	encoder := json.NewEncoder(w)
+	encoder.SetIndent("", "\t")
+	err := encoder.Encode(&s.IPLimit)
+	if err != nil {
+		// glog.V(2).Infof("Error marshaling secure server info: %v", err)
+		glog.Infof("Error marshaling secure server info: %v", err)
+	}
+}
+
+func NoSecureHandler(w http.ResponseWriter, r *http.Request) {
+	fmt.Fprintf(w, "{ \"Error\": \"No secure server configured\" }")
+}
+
 // tcpConnectionChainListener is responsible to invoking any connection handling
 // code which is invoked after AcceptTCP() has been called but before the
 // connection is usable by the server for communicating with the client. We
@@ -287,6 +303,7 @@ func (ln tcpKeepAliveHandler) Init(conn *net.TCPConn) error {
 // TODO: (cheftako) : IPv6, CIDR Range rather than individual IP Addresses?
 // Considered using atomic for per IP limit value,
 // but problem initing map value safely
+
 type ipBasedLimit struct {
 	// The maximum concurent connections an IP is allowed to have open
 	maxPerIP int
@@ -307,14 +324,14 @@ type ipBasedLimit struct {
 	total int
 }
 
-func (i *ipBasedLimit) incrementIP(sourceIP string) error {
+func (i *ipBasedLimit) incrementIP(conn, sourceIP string) error {
 	if i.max <= 0 {
 		return nil
 	}
 	ip := net.ParseIP(sourceIP)
 	if ip == nil {
 		glog.Infof("Received request from client with invalid ip %s", sourceIP)
-		return IPLimitExceededError{ip: sourceIP}
+		return IPLimitExceededError{ip: sourceIP, reason: "unparseable ip address"}
 	}
 	if ip.IsLoopback() {
 		return nil
@@ -322,25 +339,22 @@ func (i *ipBasedLimit) incrementIP(sourceIP string) error {
 	i.mutex.Lock()
 	defer i.mutex.Unlock()
 	current := i.limits[sourceIP]
-	if current >= i.maxPerIP || i.total >= i.max {
-		return IPLimitExceededError{ip: sourceIP}
+	if current >= i.maxPerIP {
+		return IPLimitExceededError{ip: sourceIP, reason: fmt.Sprintf(" exceeded per IP limit of %d", i.maxPerIP)}
+	}
+	if i.total >= i.max {
+		return IPLimitExceededError{ip: sourceIP, reason: fmt.Sprintf(" exceeded overall limit of %d", i.max)}
 	}
 	i.total++
 	i.limits[sourceIP] = current + 1
+	var releaseOnce sync.Once
+	i.decrementers[conn] = func() {
+		releaseOnce.Do(func() { i.decrementIP(conn, sourceIP) })
+	}
 	return nil
 }
 
-func (i *ipBasedLimit) setDecrementer(conn, ip string) {
-	if i.max <= 0 {
-		return
-	}
-	var releaseOnce sync.Once
-	i.decrementers[conn] = func() {
-		releaseOnce.Do(func() { i.decrementIP(ip) })
-	}
-}
-
-func (i *ipBasedLimit) decrementIP(sourceIP string) {
+func (i *ipBasedLimit) decrementIP(conn, sourceIP string) {
 	if i.max <= 0 {
 		return
 	}
@@ -360,6 +374,46 @@ func (i *ipBasedLimit) decrementIP(sourceIP string) {
 	} else {
 		delete(i.limits, sourceIP)
 	}
+	delete(i.decrementers, conn)
+}
+
+// Using a custom marshal JSON method for several reasons
+// A) It allows us to minimize the scope of the mutex which needs to be held
+// B) It allows the fields to remain private
+// C) It allows us to marshal 'decrementers' as a list of its keys
+// This is only meant for use in the debug API.
+func (i *ipBasedLimit) MarshalJSON() ([]byte, error) {
+	buffer := bytes.NewBufferString("{")
+	buffer.WriteString(fmt.Sprintf("\"MaxPerIP\": %d, ", i.maxPerIP))
+	buffer.WriteString(fmt.Sprintf("\"MaxTotal\": %d, ", i.max))
+	buffer.WriteString(fmt.Sprintf("\"NumberIPs\": %d, ", len(i.limits)))
+	buffer.WriteString(fmt.Sprintf("\"NumberConns\": %d, ", len(i.decrementers)))
+	buffer.WriteString(fmt.Sprintf("\"IPCounts\": {"))
+	first := true
+	i.mutex.Lock()
+	defer i.mutex.Unlock()
+	for ip, count := range i.limits {
+		if first {
+			buffer.WriteString(fmt.Sprintf("\"%s\": %d", ip, count))
+			first = false
+		} else {
+			buffer.WriteString(fmt.Sprintf(", \"%s\": %d", ip, count))
+		}
+	}
+	buffer.WriteString("}, ")
+	buffer.WriteString(" \"Connections\": [")
+	first = true
+	for conn, _ := range i.decrementers {
+		if first {
+			buffer.WriteString(fmt.Sprintf("\"%s\"", conn))
+			first = false
+		} else {
+			buffer.WriteString(fmt.Sprintf(", \"%s\"", conn))
+		}
+	}
+	buffer.WriteString("] ")
+	buffer.WriteString("}")
+	return buffer.Bytes(), nil
 }
 
 // The actual structure/handler which attaches the limiting code to a connection
@@ -376,24 +430,24 @@ func (h ipBasedLimitHandler) Init(conn *net.TCPConn) error {
 		glog.Errorf("Error getting remote address for connection: %v", err)
 		return err
 	}
-	err = h.ipLimit.incrementIP(ip)
+	err = h.ipLimit.incrementIP(remote, ip)
 	if err != nil {
 		conn.Close() // Not decrementing as we did not successfully increment
-		glog.V(2).Infof("Blocked connection from %s, as it has exceeded its per IP connection limit. Read the help for --max-requests-inflight if you need to change the limit", ip)
+		glog.V(1).Infof("%s. Read the help for --max-requests-inflight if you need to change the limit", err.Error())
 		return err
 	}
-	h.ipLimit.setDecrementer(remote, ip)
 	return nil
 }
 
 // A custom error which tells http/server.go Serve() to retry Accept() quickly
 type IPLimitExceededError struct {
 	// IP which saw the problem, present to allow for reporting and debugging.
-	ip string
+	ip     string
+	reason string
 }
 
 func (l IPLimitExceededError) Error() string {
-	return "Accept() exceeded either overall or per IP maximum concurrent requests " + l.ip
+	return "Accept() blocked connection request from " + l.ip + " because " + l.reason
 }
 func (l IPLimitExceededError) Timeout() bool   { return true }
 func (l IPLimitExceededError) Temporary() bool { return true }
