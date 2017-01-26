@@ -28,6 +28,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/json"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -236,19 +237,15 @@ func RunPatch(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []strin
 
 		count++
 
-		patchedObj, err := api.Scheme.DeepCopy(info.VersionedObject)
+		originalObjJS, err := runtime.Encode(unstructured.UnstructuredJSONScheme, info.VersionedObject)
 		if err != nil {
 			return err
 		}
-		originalObjJS, err := runtime.Encode(api.Codecs.LegacyCodec(mapping.GroupVersionKind.GroupVersion()), info.VersionedObject.(runtime.Object))
+		originalPatchedObjJS, err := getPatchedJSON(patchType, originalObjJS, patchBytes, mapping.GroupVersionKind, api.Scheme)
 		if err != nil {
 			return err
 		}
-		originalPatchedObjJS, err := getPatchedJSON(patchType, originalObjJS, patchBytes, patchedObj.(runtime.Object))
-		if err != nil {
-			return err
-		}
-		targetObj, err := runtime.Decode(api.Codecs.UniversalDecoder(), originalPatchedObjJS)
+		targetObj, err := runtime.Decode(unstructured.UnstructuredJSONScheme, originalPatchedObjJS)
 		if err != nil {
 			return err
 		}
@@ -276,7 +273,7 @@ func RunPatch(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []strin
 	return nil
 }
 
-func getPatchedJSON(patchType types.PatchType, originalJS, patchJS []byte, obj runtime.Object) ([]byte, error) {
+func getPatchedJSON(patchType types.PatchType, originalJS, patchJS []byte, gvk schema.GroupVersionKind, creater runtime.ObjectCreater) ([]byte, error) {
 	switch patchType {
 	case types.JSONPatchType:
 		patchObj, err := jsonpatch.DecodePatch(patchJS)
@@ -289,6 +286,11 @@ func getPatchedJSON(patchType types.PatchType, originalJS, patchJS []byte, obj r
 		return jsonpatch.MergePatch(originalJS, patchJS)
 
 	case types.StrategicMergePatchType:
+		// get a typed object for this GVK if we need to apply a strategic merge patch
+		obj, err := creater.New(gvk)
+		if err != nil {
+			return nil, fmt.Errorf("cannot apply strategic merge patch for %s locally, try --type merge", gvk.String())
+		}
 		return strategicpatch.StrategicMergePatch(originalJS, patchJS, obj)
 
 	default:
