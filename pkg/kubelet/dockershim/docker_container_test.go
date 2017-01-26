@@ -19,6 +19,7 @@ package dockershim
 import (
 	"fmt"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -214,4 +215,70 @@ func TestContainerLogPath(t *testing.T) {
 	err = ds.RemoveContainer(id)
 	assert.NoError(t, err)
 	assert.Equal(t, fakeOS.Removes, []string{kubeletContainerLogPath})
+}
+
+// TestContainerCreationConflict tests the logic to work around docker container
+// creation naming conflict bug.
+func TestContainerCreationConflict(t *testing.T) {
+	sConfig := makeSandboxConfig("foo", "bar", "1", 0)
+	config := makeContainerConfig(sConfig, "pause", "iamimage", 0, map[string]string{}, map[string]string{})
+	containerName := makeContainerName(sConfig, config)
+	const sandboxId = "sandboxid"
+	const containerId = "containerid"
+	conflictError := fmt.Errorf("Error response from daemon: Conflict. The name \"/%s\" is already in use by container %s. You have to remove (or rename) that container to be able to reuse that name.",
+		containerName, containerId)
+	noContainerError := fmt.Errorf("Error response from daemon: No such container: %s", containerId)
+	randomError := fmt.Errorf("random error")
+
+	for desc, test := range map[string]struct {
+		createError  error
+		removeError  error
+		expectError  error
+		expectCalls  []string
+		expectFields int
+	}{
+		"no create error": {
+			expectCalls:  []string{"create"},
+			expectFields: 6,
+		},
+		"random create error": {
+			createError:  randomError,
+			expectError:  randomError,
+			expectCalls:  []string{"create"},
+			expectFields: 1,
+		},
+		"conflict create error with successful remove": {
+			createError:  conflictError,
+			expectError:  conflictError,
+			expectCalls:  []string{"create", "remove"},
+			expectFields: 1,
+		},
+		"conflict create error with random remove error": {
+			createError:  conflictError,
+			removeError:  randomError,
+			expectError:  conflictError,
+			expectCalls:  []string{"create", "remove"},
+			expectFields: 1,
+		},
+		"conflict create error with no such container remove error": {
+			createError:  conflictError,
+			removeError:  noContainerError,
+			expectCalls:  []string{"create", "remove", "create"},
+			expectFields: 7,
+		},
+	} {
+		t.Logf("TestCase: %s", desc)
+		ds, fDocker, _ := newTestDockerService()
+
+		if test.createError != nil {
+			fDocker.InjectError("create", test.createError)
+		}
+		if test.removeError != nil {
+			fDocker.InjectError("remove", test.removeError)
+		}
+		name, err := ds.CreateContainer(sandboxId, config, sConfig)
+		assert.Equal(t, test.expectError, err)
+		assert.NoError(t, fDocker.AssertCalls(test.expectCalls))
+		assert.Len(t, strings.Split(name, nameDelimiter), test.expectFields)
+	}
 }
