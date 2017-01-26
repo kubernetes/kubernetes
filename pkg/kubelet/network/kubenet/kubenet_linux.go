@@ -89,7 +89,7 @@ type kubenetNetworkPlugin struct {
 	execer          utilexec.Interface
 	nsenterPath     string
 	hairpinMode     componentconfig.HairpinMode
-	hostportHandler hostport.HostportHandler
+	hostportSyncer  hostport.HostportSyncer
 	iptables        utiliptables.Interface
 	sysctl          utilsysctl.Interface
 	ebtables        utilebtables.Interface
@@ -113,7 +113,7 @@ func NewPlugin(networkPluginDir string) network.NetworkPlugin {
 		iptables:          iptInterface,
 		sysctl:            sysctl,
 		vendorDir:         networkPluginDir,
-		hostportHandler:   hostport.NewHostportHandler(),
+		hostportSyncer:    hostport.NewHostportSyncer(),
 		nonMasqueradeCIDR: "10.0.0.0/8",
 	}
 }
@@ -381,7 +381,7 @@ func (plugin *kubenetNetworkPlugin) setup(namespace string, name string, id kube
 	}
 
 	newPodPortMapping := constructPodPortMapping(pod, ip4)
-	if err := plugin.hostportHandler.OpenPodHostportsAndSync(newPodPortMapping, BridgeName, activePodPortMapping); err != nil {
+	if err := plugin.hostportSyncer.OpenPodHostportsAndSync(newPodPortMapping, BridgeName, activePodPortMapping); err != nil {
 		return err
 	}
 
@@ -473,7 +473,7 @@ func (plugin *kubenetNetworkPlugin) teardown(namespace string, name string, id k
 
 	activePodPortMapping, err := plugin.getPodPortMapping()
 	if err == nil {
-		err = plugin.hostportHandler.SyncHostports(BridgeName, activePodPortMapping)
+		err = plugin.hostportSyncer.SyncHostports(BridgeName, activePodPortMapping)
 	}
 	if err != nil {
 		errList = append(errList, err)
