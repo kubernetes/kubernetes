@@ -1319,6 +1319,9 @@ func (vs *VSphere) DeleteVolume(vmDiskPath string) error {
 	// Create a virtual disk manager
 	virtualDiskManager := object.NewVirtualDiskManager(vs.client.Client)
 
+	if filepath.Ext(vmDiskPath) != ".vmdk" {
+		vmDiskPath += ".vmdk"
+	}
 	// Delete virtual disk
 	task, err := virtualDiskManager.DeleteVirtualDisk(ctx, vmDiskPath, dc)
 	if err != nil {
