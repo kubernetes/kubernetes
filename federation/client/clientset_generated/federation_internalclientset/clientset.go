@@ -18,6 +18,7 @@ package federation_internalclientset
 
 import (
 	"github.com/golang/glog"
+	discovery "k8s.io/client-go/discovery"
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
 	rest "k8s.io/client-go/rest"
 	"k8s.io/client-go/util/flowcontrol"
@@ -26,7 +27,6 @@ import (
 	internalversioncore "k8s.io/kubernetes/federation/client/clientset_generated/federation_internalclientset/typed/core/internalversion"
 	internalversionextensions "k8s.io/kubernetes/federation/client/clientset_generated/federation_internalclientset/typed/extensions/internalversion"
 	internalversionfederation "k8s.io/kubernetes/federation/client/clientset_generated/federation_internalclientset/typed/federation/internalversion"
-	discovery "k8s.io/kubernetes/pkg/client/typed/discovery"
 )
 
 type Interface interface {

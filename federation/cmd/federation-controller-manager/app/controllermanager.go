@@ -53,7 +53,7 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/kubernetes/pkg/client/typed/discovery"
+	"k8s.io/client-go/discovery"
 )
 
 const (

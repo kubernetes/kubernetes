@@ -22,8 +22,8 @@ import (
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
+	testing "k8s.io/client-go/testing"
 	apiregistration "k8s.io/kubernetes/cmd/kube-aggregator/pkg/apis/apiregistration"
-	core "k8s.io/kubernetes/pkg/client/testing/core"
 )
 
 // FakeAPIServices implements APIServiceInterface
@@ -35,7 +35,7 @@ var apiservicesResource = schema.GroupVersionResource{Group: "apiregistration.k8
 
 func (c *FakeAPIServices) Create(aPIService *apiregistration.APIService) (result *apiregistration.APIService, err error) {
 	obj, err := c.Fake.
-		Invokes(core.NewRootCreateAction(apiservicesResource, aPIService), &apiregistration.APIService{})
+		Invokes(testing.NewRootCreateAction(apiservicesResource, aPIService), &apiregistration.APIService{})
 	if obj == nil {
 		return nil, err
 	}
@@ -44,7 +44,7 @@ func (c *FakeAPIServices) Create(aPIService *apiregistration.APIService) (result
 
 func (c *FakeAPIServices) Update(aPIService *apiregistration.APIService) (result *apiregistration.APIService, err error) {
 	obj, err := c.Fake.
-		Invokes(core.NewRootUpdateAction(apiservicesResource, aPIService), &apiregistration.APIService{})
+		Invokes(testing.NewRootUpdateAction(apiservicesResource, aPIService), &apiregistration.APIService{})
 	if obj == nil {
 		return nil, err
 	}
@@ -53,7 +53,7 @@ func (c *FakeAPIServices) Update(aPIService *apiregistration.APIService) (result
 
 func (c *FakeAPIServices) UpdateStatus(aPIService *apiregistration.APIService) (*apiregistration.APIService, error) {
 	obj, err := c.Fake.
-		Invokes(core.NewRootUpdateSubresourceAction(apiservicesResource, "status", aPIService), &apiregistration.APIService{})
+		Invokes(testing.NewRootUpdateSubresourceAction(apiservicesResource, "status", aPIService), &apiregistration.APIService{})
 	if obj == nil {
 		return nil, err
 	}
@@ -62,12 +62,12 @@ func (c *FakeAPIServices) UpdateStatus(aPIService *apiregistration.APIService) (
 
 func (c *FakeAPIServices) Delete(name string, options *v1.DeleteOptions) error {
 	_, err := c.Fake.
-		Invokes(core.NewRootDeleteAction(apiservicesResource, name), &apiregistration.APIService{})
+		Invokes(testing.NewRootDeleteAction(apiservicesResource, name), &apiregistration.APIService{})
 	return err
 }
 
 func (c *FakeAPIServices) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
-	action := core.NewRootDeleteCollectionAction(apiservicesResource, listOptions)
+	action := testing.NewRootDeleteCollectionAction(apiservicesResource, listOptions)
 
 	_, err := c.Fake.Invokes(action, &apiregistration.APIServiceList{})
 	return err
@@ -75,7 +75,7 @@ func (c *FakeAPIServices) DeleteCollection(options *v1.DeleteOptions, listOption
 
 func (c *FakeAPIServices) Get(name string, options v1.GetOptions) (result *apiregistration.APIService, err error) {
 	obj, err := c.Fake.
-		Invokes(core.NewRootGetAction(apiservicesResource, name), &apiregistration.APIService{})
+		Invokes(testing.NewRootGetAction(apiservicesResource, name), &apiregistration.APIService{})
 	if obj == nil {
 		return nil, err
 	}
@@ -84,12 +84,12 @@ func (c *FakeAPIServices) Get(name string, options v1.GetOptions) (result *apire
 
 func (c *FakeAPIServices) List(opts v1.ListOptions) (result *apiregistration.APIServiceList, err error) {
 	obj, err := c.Fake.
-		Invokes(core.NewRootListAction(apiservicesResource, opts), &apiregistration.APIServiceList{})
+		Invokes(testing.NewRootListAction(apiservicesResource, opts), &apiregistration.APIServiceList{})
 	if obj == nil {
 		return nil, err
 	}
 
-	label, _, _ := core.ExtractFromListOptions(opts)
+	label, _, _ := testing.ExtractFromListOptions(opts)
 	if label == nil {
 		label = labels.Everything()
 	}
@@ -105,13 +105,13 @@ func (c *FakeAPIServices) List(opts v1.ListOptions) (result *apiregistration.API
 // Watch returns a watch.Interface that watches the requested aPIServices.
 func (c *FakeAPIServices) Watch(opts v1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
-		InvokesWatch(core.NewRootWatchAction(apiservicesResource, opts))
+		InvokesWatch(testing.NewRootWatchAction(apiservicesResource, opts))
 }
 
 // Patch applies the patch and returns the patched aPIService.
 func (c *FakeAPIServices) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *apiregistration.APIService, err error) {
 	obj, err := c.Fake.
-		Invokes(core.NewRootPatchSubresourceAction(apiservicesResource, name, data, subresources...), &apiregistration.APIService{})
+		Invokes(testing.NewRootPatchSubresourceAction(apiservicesResource, name, data, subresources...), &apiregistration.APIService{})
 	if obj == nil {
 		return nil, err
 	}

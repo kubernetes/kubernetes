@@ -19,6 +19,9 @@ package fake
 import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/watch"
+	"k8s.io/client-go/discovery"
+	fakediscovery "k8s.io/client-go/discovery/fake"
+	"k8s.io/client-go/testing"
 	"k8s.io/kubernetes/pkg/api"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	v1beta1apps "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/apps/v1beta1"
@@ -47,9 +50,6 @@ import (
 	fakev1beta1rbac "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/rbac/v1beta1/fake"
 	v1beta1storage "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/storage/v1beta1"
 	fakev1beta1storage "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/storage/v1beta1/fake"
-	"k8s.io/kubernetes/pkg/client/testing/core"
-	"k8s.io/kubernetes/pkg/client/typed/discovery"
-	fakediscovery "k8s.io/kubernetes/pkg/client/typed/discovery/fake"
 )
 
 // NewSimpleClientset returns a clientset that will respond with the provided objects.
@@ -57,17 +57,17 @@ import (
 // without applying any validations and/or defaults. It shouldn't be considered a replacement
 // for a real clientset and is mostly useful in simple unit tests.
 func NewSimpleClientset(objects ...runtime.Object) *Clientset {
-	o := core.NewObjectTracker(api.Scheme, api.Codecs.UniversalDecoder())
+	o := testing.NewObjectTracker(api.Registry, api.Scheme, api.Codecs.UniversalDecoder())
 	for _, obj := range objects {
 		if err := o.Add(obj); err != nil {
 			panic(err)
 		}
 	}
 
-	fakePtr := core.Fake{}
-	fakePtr.AddReactor("*", "*", core.ObjectReaction(o, api.Registry.RESTMapper()))
+	fakePtr := testing.Fake{}
+	fakePtr.AddReactor("*", "*", testing.ObjectReaction(o, api.Registry.RESTMapper()))
 
-	fakePtr.AddWatchReactor("*", core.DefaultWatchReactor(watch.NewFake(), nil))
+	fakePtr.AddWatchReactor("*", testing.DefaultWatchReactor(watch.NewFake(), nil))
 
 	return &Clientset{fakePtr}
 }
@@ -76,7 +76,7 @@ func NewSimpleClientset(objects ...runtime.Object) *Clientset {
 // struct to get a default implementation. This makes faking out just the method
 // you want to test easier.
 type Clientset struct {
-	core.Fake
+	testing.Fake
 }
 
 func (c *Clientset) Discovery() discovery.DiscoveryInterface {

@@ -22,8 +22,8 @@ import (
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
+	testing "k8s.io/client-go/testing"
 	rbac "k8s.io/kubernetes/pkg/apis/rbac"
-	core "k8s.io/kubernetes/pkg/client/testing/core"
 )
 
 // FakeRoleBindings implements RoleBindingInterface
@@ -36,7 +36,7 @@ var rolebindingsResource = schema.GroupVersionResource{Group: "rbac.authorizatio
 
 func (c *FakeRoleBindings) Create(roleBinding *rbac.RoleBinding) (result *rbac.RoleBinding, err error) {
 	obj, err := c.Fake.
-		Invokes(core.NewCreateAction(rolebindingsResource, c.ns, roleBinding), &rbac.RoleBinding{})
+		Invokes(testing.NewCreateAction(rolebindingsResource, c.ns, roleBinding), &rbac.RoleBinding{})
 
 	if obj == nil {
 		return nil, err
@@ -46,7 +46,7 @@ func (c *FakeRoleBindings) Create(roleBinding *rbac.RoleBinding) (result *rbac.R
 
 func (c *FakeRoleBindings) Update(roleBinding *rbac.RoleBinding) (result *rbac.RoleBinding, err error) {
 	obj, err := c.Fake.
-		Invokes(core.NewUpdateAction(rolebindingsResource, c.ns, roleBinding), &rbac.RoleBinding{})
+		Invokes(testing.NewUpdateAction(rolebindingsResource, c.ns, roleBinding), &rbac.RoleBinding{})
 
 	if obj == nil {
 		return nil, err
@@ -56,13 +56,13 @@ func (c *FakeRoleBindings) Update(roleBinding *rbac.RoleBinding) (result *rbac.R
 
 func (c *FakeRoleBindings) Delete(name string, options *v1.DeleteOptions) error {
 	_, err := c.Fake.
-		Invokes(core.NewDeleteAction(rolebindingsResource, c.ns, name), &rbac.RoleBinding{})
+		Invokes(testing.NewDeleteAction(rolebindingsResource, c.ns, name), &rbac.RoleBinding{})
 
 	return err
 }
 
 func (c *FakeRoleBindings) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
-	action := core.NewDeleteCollectionAction(rolebindingsResource, c.ns, listOptions)
+	action := testing.NewDeleteCollectionAction(rolebindingsResource, c.ns, listOptions)
 
 	_, err := c.Fake.Invokes(action, &rbac.RoleBindingList{})
 	return err
@@ -70,7 +70,7 @@ func (c *FakeRoleBindings) DeleteCollection(options *v1.DeleteOptions, listOptio
 
 func (c *FakeRoleBindings) Get(name string, options v1.GetOptions) (result *rbac.RoleBinding, err error) {
 	obj, err := c.Fake.
-		Invokes(core.NewGetAction(rolebindingsResource, c.ns, name), &rbac.RoleBinding{})
+		Invokes(testing.NewGetAction(rolebindingsResource, c.ns, name), &rbac.RoleBinding{})
 
 	if obj == nil {
 		return nil, err
@@ -80,13 +80,13 @@ func (c *FakeRoleBindings) Get(name string, options v1.GetOptions) (result *rbac
 
 func (c *FakeRoleBindings) List(opts v1.ListOptions) (result *rbac.RoleBindingList, err error) {
 	obj, err := c.Fake.
-		Invokes(core.NewListAction(rolebindingsResource, c.ns, opts), &rbac.RoleBindingList{})
+		Invokes(testing.NewListAction(rolebindingsResource, c.ns, opts), &rbac.RoleBindingList{})
 
 	if obj == nil {
 		return nil, err
 	}
 
-	label, _, _ := core.ExtractFromListOptions(opts)
+	label, _, _ := testing.ExtractFromListOptions(opts)
 	if label == nil {
 		label = labels.Everything()
 	}
@@ -102,14 +102,14 @@ func (c *FakeRoleBindings) List(opts v1.ListOptions) (result *rbac.RoleBindingLi
 // Watch returns a watch.Interface that watches the requested roleBindings.
 func (c *FakeRoleBindings) Watch(opts v1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
-		InvokesWatch(core.NewWatchAction(rolebindingsResource, c.ns, opts))
+		InvokesWatch(testing.NewWatchAction(rolebindingsResource, c.ns, opts))
 
 }
 
 // Patch applies the patch and returns the patched roleBinding.
 func (c *FakeRoleBindings) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *rbac.RoleBinding, err error) {
 	obj, err := c.Fake.
-		Invokes(core.NewPatchSubresourceAction(rolebindingsResource, c.ns, name, data, subresources...), &rbac.RoleBinding{})
+		Invokes(testing.NewPatchSubresourceAction(rolebindingsResource, c.ns, name, data, subresources...), &rbac.RoleBinding{})
 
 	if obj == nil {
 		return nil, err

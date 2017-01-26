@@ -69,7 +69,10 @@ function save() {
 }
 
 # save everything for which the staging directory is the source of truth
+save "discovery"
+save "dynamic"
 save "rest"
+save "testing"
 save "tools/auth"
 save "tools/cache"
 save "tools/clientcmd"
@@ -88,12 +91,13 @@ function mkcp() {
 
 # assemble all the other parts of the staging directory
 echo "copying client packages"
+# need to copy version.  We aren't authoritative here
+# version has subdirs which we don't need.  Only copy the files we want
+mkdir -p "${CLIENT_REPO_TEMP}/pkg/version"
+find "${MAIN_REPO}/pkg/version" -maxdepth 1 -type f | xargs -I{} cp {} "${CLIENT_REPO_TEMP}/pkg/version"
+# need to copy clientsets, though later we should copy APIs and later generate clientsets
 mkcp "pkg/client/clientset_generated/${CLIENTSET}" "pkg/client/clientset_generated"
 mkcp "/pkg/client/record" "/pkg/client"
-mkcp "/pkg/client/testing" "/pkg/client"
-# remove this test because it imports the internal clientset
-rm "${CLIENT_REPO_TEMP}"/pkg/client/testing/core/fake_test.go
-mkcp "/pkg/client/typed" "/pkg/client"
 
 mkcp "/pkg/client/unversioned/portforward" "/pkg/client/unversioned"
 
@@ -182,20 +186,14 @@ function mvfolder {
 }
 
 mvfolder "pkg/client/clientset_generated/${CLIENTSET}" kubernetes
-mvfolder pkg/client/typed/discovery discovery
-mvfolder pkg/client/typed/dynamic dynamic
 mvfolder pkg/client/record tools/record
 mvfolder pkg/client/unversioned/portforward tools/portforward
-mvfolder pkg/client/testing/core testing
-mvfolder pkg/client/testing/cache tools/cache/testing
-mvfolder cmd/kubeadm/app/apis/kubeadm pkg/apis/kubeadm
 if [ "$(find "${CLIENT_REPO_TEMP}"/pkg/client -type f -name "*.go")" ]; then
     echo "${CLIENT_REPO_TEMP}/pkg/client is expected to be empty"
     exit 1
 else
     rm -r "${CLIENT_REPO_TEMP}"/pkg/client
 fi
-mvfolder federation pkg/federation
 
 echo "running gofmt"
 find "${CLIENT_REPO_TEMP}" -type f -name "*.go" -print0 | xargs -0 gofmt -w

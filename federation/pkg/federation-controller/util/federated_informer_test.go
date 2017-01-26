@@ -23,13 +23,13 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/watch"
+	core "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/cache"
 	federationapi "k8s.io/kubernetes/federation/apis/federation/v1beta1"
 	fakefederationclientset "k8s.io/kubernetes/federation/client/clientset_generated/federation_clientset/fake"
 	apiv1 "k8s.io/kubernetes/pkg/api/v1"
 	kubeclientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	fakekubeclientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/fake"
-	"k8s.io/kubernetes/pkg/client/testing/core"
 
 	"github.com/stretchr/testify/assert"
 )
