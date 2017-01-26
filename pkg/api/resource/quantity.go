@@ -410,20 +410,9 @@ func (_ Quantity) OpenAPIDefinition() openapi.OpenAPIDefinition {
 	}
 }
 
-// CanonicalizeBytes returns the canonical form of q and its suffix (see comment on Quantity).
-//
-// Note about BinarySI:
-// * If q.Format is set to BinarySI and q.Amount represents a non-zero value between
-//   -1 and +1, it will be emitted as if q.Format were DecimalSI.
-// * Otherwise, if q.Format is set to BinarySI, frational parts of q.Amount will be
-//   rounded up. (1.1i becomes 2i.)
-func (q *Quantity) CanonicalizeBytes(out []byte) (result, suffix []byte) {
-	if q.IsZero() {
-		return zeroBytes, nil
-	}
-
-	var rounded CanonicalValue
-	format := q.Format
+// Returns the format and in case of BinarySI also q.Amount rouded up.
+func (q *Quantity) formatAndRounded() (format Format, rounded CanonicalValue) {
+	format = q.Format
 	switch format {
 	case DecimalExponent, DecimalSI:
 	case BinarySI:
@@ -440,6 +429,22 @@ func (q *Quantity) CanonicalizeBytes(out []byte) (result, suffix []byte) {
 	default:
 		format = DecimalExponent
 	}
+	return
+}
+
+// CanonicalizeBytes returns the canonical form of q and its suffix (see comment on Quantity).
+//
+// Note about BinarySI:
+// * If q.Format is set to BinarySI and q.Amount represents a non-zero value between
+//   -1 and +1, it will be emitted as if q.Format were DecimalSI.
+// * Otherwise, if q.Format is set to BinarySI, frational parts of q.Amount will be
+//   rounded up. (1.1i becomes 2i.)
+func (q *Quantity) CanonicalizeBytes(out []byte) (result, suffix []byte) {
+	if q.IsZero() {
+		return zeroBytes, nil
+	}
+
+	format, rounded := q.formatAndRounded()
 
 	// TODO: If BinarySI formatting is requested but would cause rounding, upgrade to
 	// one of the other formats.
@@ -613,6 +618,15 @@ func (q *Quantity) String() string {
 		q.s = string(number)
 	}
 	return q.s
+}
+
+func (q *Quantity) Len() int {
+	if len(q.s) == 0 {
+		result := make([]byte, 0, int64QuantityExpectedBytes)
+		number, suffix := q.CanonicalizeBytes(result)
+		return len(number) + len(suffix)
+	}
+	return len(q.s)
 }
 
 // MarshalJSON implements the json.Marshaller interface.
