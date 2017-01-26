@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package authenticator
+package authenticatorfactory
 
 import (
 	"k8s.io/apiserver/pkg/authentication/authenticator"
@@ -23,7 +23,7 @@ import (
 	"k8s.io/apiserver/pkg/authentication/user"
 )
 
-// newAuthenticatorFromToken returns an authenticator.Request or an error
-func NewAuthenticatorFromTokens(tokens map[string]*user.DefaultInfo) authenticator.Request {
+// NewFromTokens returns an authenticator.Request or an error
+func NewFromTokens(tokens map[string]*user.DefaultInfo) authenticator.Request {
 	return bearertoken.New(tokenfile.New(tokens))
 }
