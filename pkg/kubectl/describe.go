@@ -2211,7 +2211,7 @@ func describeNodeResource(nodeNonTerminatedPodsList *api.PodList, node *api.Node
 			memoryReq.String(), int64(fractionMemoryReq), memoryLimit.String(), int64(fractionMemoryLimit))
 	}
 
-	w.Write(LEVEL_0, "Allocated resources:\n  (Total limits may be over 100 percent, i.e., overcommitted.\n  CPU Requests\tCPU Limits\tMemory Requests\tMemory Limits\n")
+	w.Write(LEVEL_0, "Allocated resources:\n  (Total limits may be over 100 percent, i.e., overcommitted.)\n  CPU Requests\tCPU Limits\tMemory Requests\tMemory Limits\n")
 	w.Write(LEVEL_1, "------------\t----------\t---------------\t-------------\n")
 	reqs, limits, err := getPodsTotalRequestsAndLimits(nodeNonTerminatedPodsList)
 	if err != nil {
