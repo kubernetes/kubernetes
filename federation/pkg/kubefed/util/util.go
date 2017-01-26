@@ -210,3 +210,26 @@ func WaitForPods(clientset *client.Clientset, pods []string, namespace string) e
 	})
 	return err
 }
+
+func GetFirstNodeIP(clientset *client.Clientset) ([]string, error) {
+	address := ""
+	nodeList, err := clientset.Core().Nodes().List(metav1.ListOptions{})
+	if err == nil {
+		if len(nodeList.Items) > 0 {
+			// Try to get IP for node from list of node addresses
+			// prefer NodeExternalIP over NodeInternalIP over other types (may be Legacy IP's)
+			for _, addr := range nodeList.Items[0].Status.Addresses {
+				if addr.Type == api.NodeExternalIP {
+					address = addr.Address
+					break
+				} else if addr.Type == api.NodeInternalIP {
+					address = addr.Address
+					continue
+				}
+				address = addr.Address
+			}
+		}
+	}
+
+	return []string{address}, nil
+}

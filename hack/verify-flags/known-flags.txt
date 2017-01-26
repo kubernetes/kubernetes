@@ -75,6 +75,7 @@ clientset-name
 clientset-only
 clientset-path
 cloud-config
+cloud-env
 cloud-provider
 cluster-cidr
 cluster-context

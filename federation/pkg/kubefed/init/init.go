@@ -33,6 +33,7 @@ package init
 import (
 	"fmt"
 	"io"
+	"strconv"
 	"strings"
 	"time"
 
@@ -63,6 +64,8 @@ const (
 	HostClusterLocalDNSZoneName = "cluster.local."
 
 	apiserverHealthCheckInterval = 2 * time.Second
+
+	federationApiserverNodeport = 32111
 )
 
 var (
@@ -123,6 +126,7 @@ func NewCmdInit(cmdOut io.Writer, config util.AdminConfig) *cobra.Command {
 	cmd.Flags().String("etcd-pv-capacity", "10Gi", "Size of persistent volume claim to be used for etcd.")
 	cmd.Flags().Bool("dry-run", false, "dry run without sending commands to server.")
 	cmd.Flags().String("storage-backend", "etcd2", "The storage backend for persistence. Options: 'etcd2' (default), 'etcd3'.")
+	cmd.Flags().Bool("cloud-env", true, "Use cloud provider features (external load-balancers, cloud storage, etc) for deployment")
 	return cmd
 }
 
@@ -147,6 +151,7 @@ func initFederation(cmdOut io.Writer, config util.AdminConfig, cmd *cobra.Comman
 	etcdPVCapacity := cmdutil.GetFlagString(cmd, "etcd-pv-capacity")
 	dryRun := cmdutil.GetDryRunFlag(cmd)
 	storageBackend := cmdutil.GetFlagString(cmd, "storage-backend")
+	cloudEnvironment := cmdutil.GetFlagBool(cmd, "cloud-env")
 
 	hostFactory := config.HostFactory(initFlags.Host, initFlags.Kubeconfig)
 	hostClientset, err := hostFactory.ClientSet()
@@ -166,14 +171,18 @@ func initFederation(cmdOut io.Writer, config util.AdminConfig, cmd *cobra.Comman
 	}
 
 	// 2. Expose a network endpoint for the federation API server
-	svc, err := createService(hostClientset, initFlags.FederationSystemNamespace, serverName, dryRun)
+	svc, err := createService(hostClientset, initFlags.FederationSystemNamespace, serverName, dryRun, cloudEnvironment)
 	if err != nil {
 		return err
 	}
 	ips := []string{}
 	hostnames := []string{}
 	if !dryRun {
-		ips, hostnames, err = util.WaitForLoadBalancerAddress(hostClientset, svc)
+		if cloudEnvironment {
+			ips, hostnames, err = util.WaitForLoadBalancerAddress(hostClientset, svc)
+		} else {
+			ips, err = util.GetFirstNodeIP(hostClientset)
+		}
 	}
 	if err != nil {
 		return err
@@ -199,9 +208,12 @@ func initFederation(cmdOut io.Writer, config util.AdminConfig, cmd *cobra.Comman
 	// 5. Create a persistent volume and a claim to store the federation
 	// API server's state. This is where federation API server's etcd
 	// stores its data.
-	pvc, err := createPVC(hostClientset, initFlags.FederationSystemNamespace, svc.Name, etcdPVCapacity, dryRun)
-	if err != nil {
-		return err
+	pvc := &api.PersistentVolumeClaim{}
+	if cloudEnvironment {
+		pvc, err = createPVC(hostClientset, initFlags.FederationSystemNamespace, svc.Name, etcdPVCapacity, dryRun)
+		if err != nil {
+			return err
+		}
 	}
 
 	// Since only one IP address can be specified as advertise address,
@@ -217,7 +229,7 @@ func initFederation(cmdOut io.Writer, config util.AdminConfig, cmd *cobra.Comman
 	}
 
 	// 6. Create federation API server
-	_, err = createAPIServer(hostClientset, initFlags.FederationSystemNamespace, serverName, image, serverCredName, pvc.Name, advertiseAddress, storageBackend, dryRun)
+	_, err = createAPIServer(hostClientset, initFlags.FederationSystemNamespace, serverName, image, serverCredName, pvc.Name, advertiseAddress, storageBackend, dryRun, cloudEnvironment)
 	if err != nil {
 		return err
 	}
@@ -226,6 +238,10 @@ func initFederation(cmdOut io.Writer, config util.AdminConfig, cmd *cobra.Comman
 	_, err = createControllerManager(hostClientset, initFlags.FederationSystemNamespace, initFlags.Name, svc.Name, cmName, image, cmKubeconfigName, dnsZoneName, dnsProvider, dryRun)
 	if err != nil {
 		return err
+	}
+
+	if !cloudEnvironment {
+		endpoint = endpoint + ":" + strconv.Itoa(federationApiserverNodeport)
 	}
 
 	// 8. Write the federation API server endpoint info, credentials
@@ -265,7 +281,7 @@ func createNamespace(clientset *client.Clientset, namespace string, dryRun bool)
 	return clientset.Core().Namespaces().Create(ns)
 }
 
-func createService(clientset *client.Clientset, namespace, svcName string, dryRun bool) (*api.Service, error) {
+func createService(clientset *client.Clientset, namespace, svcName string, dryRun bool, cloudEnvironment bool) (*api.Service, error) {
 	svc := &api.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      svcName,
@@ -288,6 +304,12 @@ func createService(clientset *client.Clientset, namespace, svcName string, dryRu
 
 	if dryRun {
 		return svc, nil
+	}
+
+	if !cloudEnvironment {
+		svc.Spec.Type = api.ServiceTypeNodePort
+		svc.Spec.Ports[0].NodePort = int32(federationApiserverNodeport)
+		svc.Spec.Ports[0].TargetPort = intstr.FromString("")
 	}
 
 	return clientset.Core().Services(namespace).Create(svc)
@@ -386,7 +408,7 @@ func createPVC(clientset *client.Clientset, namespace, svcName, etcdPVCapacity s
 	return clientset.Core().PersistentVolumeClaims(namespace).Create(pvc)
 }
 
-func createAPIServer(clientset *client.Clientset, namespace, name, image, credentialsName, pvcName, advertiseAddress, storageBackend string, dryRun bool) (*extensions.Deployment, error) {
+func createAPIServer(clientset *client.Clientset, namespace, name, image, credentialsName, pvcName, advertiseAddress, storageBackend string, dryRun bool, cloudEnvironment bool) (*extensions.Deployment, error) {
 	command := []string{
 		"/hyperkube",
 		"federation-apiserver",
@@ -483,6 +505,21 @@ func createAPIServer(clientset *client.Clientset, namespace, name, image, creden
 
 	if dryRun {
 		return dep, nil
+	}
+
+	if !cloudEnvironment {
+		// remove volume mount from etcd container in deployment spec
+		for i, container := range dep.Spec.Template.Spec.Containers {
+			if container.Name == "etcd" {
+				dep.Spec.Template.Spec.Containers[i].VolumeMounts = nil
+			}
+		}
+		// remove volume pertaining to etcd from deployment spec
+		for i, volume := range dep.Spec.Template.Spec.Volumes {
+			if volume.Name == dataVolumeName {
+				dep.Spec.Template.Spec.Volumes = append(dep.Spec.Template.Spec.Volumes[:i], dep.Spec.Template.Spec.Volumes[i+1:]...)
+			}
+		}
 	}
 
 	return clientset.Extensions().Deployments(namespace).Create(dep)
