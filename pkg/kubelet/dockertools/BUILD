@@ -90,6 +90,7 @@ go_test(
         "docker_manager_test.go",
         "docker_test.go",
         "images_test.go",
+        "kube_docker_client_test.go",
         "labels_test.go",
     ],
     data = [
