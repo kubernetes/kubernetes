@@ -54,7 +54,7 @@ type ruleMatch struct {
 func TestOpenPodHostports(t *testing.T) {
 	fakeIPTables := NewFakeIPTables()
 
-	h := &handler{
+	h := &hostportSyncer{
 		hostPortMap: make(map[hostport]closeable),
 		iptables:    fakeIPTables,
 		portOpener:  openFakeSocket,
