@@ -903,6 +903,9 @@ function start-kube-apiserver {
 
 
   local authorization_mode="RBAC"
+  # Load existing ABAC policy files written by versions < 1.6 of this script
+  # TODO: only default to this legacy path when in upgrade mode
+  ABAC_AUTHZ_FILE="${ABAC_AUTHZ_FILE:-/etc/srv/kubernetes/abac-authz-policy.jsonl}"
   if [[ -n "${ABAC_AUTHZ_FILE:-}" && -e "${ABAC_AUTHZ_FILE}" ]]; then
     params+=" --authorization-policy-file=${ABAC_AUTHZ_FILE}"
     authorization_mode+=",ABAC"
