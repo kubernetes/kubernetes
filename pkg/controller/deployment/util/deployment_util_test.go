@@ -892,14 +892,14 @@ func TestRemoveCondition(t *testing.T) {
 }
 
 func TestDeploymentComplete(t *testing.T) {
-	deployment := func(desired, current, updated, available, maxUnavailable int32) *extensions.Deployment {
+	deployment := func(desired, current, updated, available, maxUnavailable, maxSurge int32) *extensions.Deployment {
 		return &extensions.Deployment{
 			Spec: extensions.DeploymentSpec{
 				Replicas: &desired,
 				Strategy: extensions.DeploymentStrategy{
 					RollingUpdate: &extensions.RollingUpdateDeployment{
 						MaxUnavailable: func(i int) *intstr.IntOrString { x := intstr.FromInt(i); return &x }(int(maxUnavailable)),
-						MaxSurge:       func() *intstr.IntOrString { x := intstr.FromInt(0); return &x }(),
+						MaxSurge:       func(i int) *intstr.IntOrString { x := intstr.FromInt(i); return &x }(int(maxSurge)),
 					},
 					Type: extensions.RollingUpdateDeploymentStrategyType,
 				},
@@ -922,25 +922,33 @@ func TestDeploymentComplete(t *testing.T) {
 		{
 			name: "complete",
 
-			d:        deployment(5, 5, 5, 4, 1),
+			d:        deployment(5, 5, 5, 4, 1, 0),
 			expected: true,
 		},
 		{
 			name: "not complete",
 
-			d:        deployment(5, 5, 5, 3, 1),
+			d:        deployment(5, 5, 5, 3, 1, 0),
 			expected: false,
 		},
 		{
 			name: "complete #2",
 
-			d:        deployment(5, 5, 5, 5, 0),
+			d:        deployment(5, 5, 5, 5, 0, 0),
 			expected: true,
 		},
 		{
 			name: "not complete #2",
 
-			d:        deployment(5, 5, 4, 5, 0),
+			d:        deployment(5, 5, 4, 5, 0, 0),
+			expected: false,
+		},
+		{
+			name: "not complete #3",
+
+			// old replica set: spec.replicas=1, status.replicas=1, status.availableReplicas=1
+			// new replica set: spec.replicas=1, status.replicas=1, status.availableReplicas=0
+			d:        deployment(1, 2, 1, 1, 0, 1),
 			expected: false,
 		},
 	}
