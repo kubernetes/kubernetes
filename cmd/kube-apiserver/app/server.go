@@ -22,6 +22,7 @@ package app
 import (
 	"crypto/tls"
 	"fmt"
+	"io"
 	"net"
 	"net/http"
 	"net/url"
@@ -274,7 +275,8 @@ func Run(s *options.ServerRunOptions) error {
 	}
 
 	admissionControlPluginNames := strings.Split(s.GenericServerRunOptions.AdmissionControl, ",")
-	pluginInitializer := kubeadmission.NewPluginInitializer(client, sharedInformers, apiAuthorizer)
+	cloudConfigReader := getCloudConfigReader(s.CloudProvider.CloudConfigFile)
+	pluginInitializer := kubeadmission.NewPluginInitializer(client, sharedInformers, apiAuthorizer, cloudConfigReader)
 	admissionConfigProvider, err := kubeadmission.ReadAdmissionConfiguration(admissionControlPluginNames, s.GenericServerRunOptions.AdmissionControlConfigFile)
 	if err != nil {
 		return fmt.Errorf("failed to read plugin config: %v", err)
@@ -344,5 +346,17 @@ func Run(s *options.ServerRunOptions) error {
 
 	sharedInformers.Start(wait.NeverStop)
 	m.GenericAPIServer.PrepareRun().Run(wait.NeverStop)
+	return nil
+}
+
+func getCloudConfigReader(configFile string) io.Reader {
+	if configFile != "" {
+		config, err := os.Open(configFile)
+		if err != nil {
+			glog.Errorf("Couldn't open cloud provider configuration file %s : %#v", configFile, err)
+			return nil
+		}
+		return config
+	}
 	return nil
 }

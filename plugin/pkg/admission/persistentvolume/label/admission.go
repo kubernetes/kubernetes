@@ -44,6 +44,7 @@ type persistentVolumeLabel struct {
 
 	mutex            sync.Mutex
 	ebsVolumes       aws.Volumes
+	cloudConfig      io.Reader
 	gceCloudProvider *gce.GCECloud
 }
 
@@ -55,6 +56,10 @@ func NewPersistentVolumeLabel() *persistentVolumeLabel {
 	return &persistentVolumeLabel{
 		Handler: admission.NewHandler(admission.Create),
 	}
+}
+
+func (l *persistentVolumeLabel) SetCloudConfig(cloudConfig io.Reader) {
+	l.cloudConfig = cloudConfig
 }
 
 func (l *persistentVolumeLabel) Admit(a admission.Attributes) (err error) {
@@ -131,7 +136,7 @@ func (l *persistentVolumeLabel) getEBSVolumes() (aws.Volumes, error) {
 	defer l.mutex.Unlock()
 
 	if l.ebsVolumes == nil {
-		cloudProvider, err := cloudprovider.GetCloudProvider("aws", nil)
+		cloudProvider, err := cloudprovider.GetCloudProvider("aws", l.cloudConfig)
 		if err != nil || cloudProvider == nil {
 			return nil, err
 		}
@@ -176,7 +181,7 @@ func (l *persistentVolumeLabel) getGCECloudProvider() (*gce.GCECloud, error) {
 	defer l.mutex.Unlock()
 
 	if l.gceCloudProvider == nil {
-		cloudProvider, err := cloudprovider.GetCloudProvider("gce", nil)
+		cloudProvider, err := cloudprovider.GetCloudProvider("gce", l.cloudConfig)
 		if err != nil || cloudProvider == nil {
 			return nil, err
 		}

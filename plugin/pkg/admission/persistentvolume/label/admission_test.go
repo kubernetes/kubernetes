@@ -17,6 +17,8 @@ limitations under the License.
 package label
 
 import (
+	"io"
+	"strings"
 	"testing"
 
 	"fmt"
@@ -73,6 +75,14 @@ func mockVolumeFailure(err error) *mockVolumes {
 
 func mockVolumeLabels(labels map[string]string) *mockVolumes {
 	return &mockVolumes{volumeLabels: labels}
+}
+
+func mockCloudConfig() io.Reader {
+	gceConfigData := `
+[Global]
+multizone=true
+        `
+	return strings.NewReader(gceConfigData)
 }
 
 // TestAdmission
