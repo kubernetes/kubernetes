@@ -29,7 +29,7 @@ BINS=(
 )
 make -C "${KUBE_ROOT}" WHAT="${BINS[*]}"
 
-if [[ -z "$(which protoc)" || "$(protoc --version)" != "libprotoc 3.0."* ]]; then
+if [[ -z "$(which protoc)" || "$(protoc --version)" != "libprotoc 3."* ]]; then
   echo "Generating protobuf requires protoc 3.0.0-beta1 or newer. Please download and"
   echo "install the platform appropriate Protobuf package for your OS: "
   echo
@@ -46,8 +46,17 @@ function cleanup {
 trap cleanup EXIT
 
 gogopath=$(dirname $(kube::util::find-binary "protoc-gen-gogo"))
-export PATH=$gogopath:$PATH
-protoc -I${KUBE_REMOTE_RUNTIME_ROOT} --gogo_out=plugins=grpc:${KUBE_REMOTE_RUNTIME_ROOT} ${KUBE_REMOTE_RUNTIME_ROOT}/api.proto
+
+PATH="${gogopath}:${PATH}" \
+  protoc \
+  --proto_path="${KUBE_REMOTE_RUNTIME_ROOT}" \
+  --proto_path="${KUBE_ROOT}/vendor" \
+  --gogo_out=plugins=grpc:${KUBE_REMOTE_RUNTIME_ROOT} ${KUBE_REMOTE_RUNTIME_ROOT}/api.proto
+
+# Update boilerplate for the generated file.
 echo "$(cat hack/boilerplate/boilerplate.go.txt ${KUBE_REMOTE_RUNTIME_ROOT}/api.pb.go)" > ${KUBE_REMOTE_RUNTIME_ROOT}/api.pb.go
 sed -i".bak" "s/Copyright YEAR/Copyright $(date '+%Y')/g" ${KUBE_REMOTE_RUNTIME_ROOT}/api.pb.go
 
+# Run gofmt to clean up the generated code.
+kube::golang::verify_go_version
+gofmt -l -s -w ${KUBE_REMOTE_RUNTIME_ROOT}/api.pb.go
