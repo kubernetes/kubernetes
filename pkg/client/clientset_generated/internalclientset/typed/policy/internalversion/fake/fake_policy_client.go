@@ -18,12 +18,12 @@ package fake
 
 import (
 	rest "k8s.io/client-go/rest"
+	testing "k8s.io/client-go/testing"
 	internalversion "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/policy/internalversion"
-	core "k8s.io/kubernetes/pkg/client/testing/core"
 )
 
 type FakePolicy struct {
-	*core.Fake
+	*testing.Fake
 }
 
 func (c *FakePolicy) Evictions(namespace string) internalversion.EvictionInterface {

@@ -22,8 +22,8 @@ import (
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
+	testing "k8s.io/client-go/testing"
 	extensions "k8s.io/kubernetes/pkg/apis/extensions"
-	core "k8s.io/kubernetes/pkg/client/testing/core"
 )
 
 // FakeDaemonSets implements DaemonSetInterface
@@ -36,7 +36,7 @@ var daemonsetsResource = schema.GroupVersionResource{Group: "extensions", Versio
 
 func (c *FakeDaemonSets) Create(daemonSet *extensions.DaemonSet) (result *extensions.DaemonSet, err error) {
 	obj, err := c.Fake.
-		Invokes(core.NewCreateAction(daemonsetsResource, c.ns, daemonSet), &extensions.DaemonSet{})
+		Invokes(testing.NewCreateAction(daemonsetsResource, c.ns, daemonSet), &extensions.DaemonSet{})
 
 	if obj == nil {
 		return nil, err
@@ -46,7 +46,7 @@ func (c *FakeDaemonSets) Create(daemonSet *extensions.DaemonSet) (result *extens
 
 func (c *FakeDaemonSets) Update(daemonSet *extensions.DaemonSet) (result *extensions.DaemonSet, err error) {
 	obj, err := c.Fake.
-		Invokes(core.NewUpdateAction(daemonsetsResource, c.ns, daemonSet), &extensions.DaemonSet{})
+		Invokes(testing.NewUpdateAction(daemonsetsResource, c.ns, daemonSet), &extensions.DaemonSet{})
 
 	if obj == nil {
 		return nil, err
@@ -56,7 +56,7 @@ func (c *FakeDaemonSets) Update(daemonSet *extensions.DaemonSet) (result *extens
 
 func (c *FakeDaemonSets) UpdateStatus(daemonSet *extensions.DaemonSet) (*extensions.DaemonSet, error) {
 	obj, err := c.Fake.
-		Invokes(core.NewUpdateSubresourceAction(daemonsetsResource, "status", c.ns, daemonSet), &extensions.DaemonSet{})
+		Invokes(testing.NewUpdateSubresourceAction(daemonsetsResource, "status", c.ns, daemonSet), &extensions.DaemonSet{})
 
 	if obj == nil {
 		return nil, err
@@ -66,13 +66,13 @@ func (c *FakeDaemonSets) UpdateStatus(daemonSet *extensions.DaemonSet) (*extensi
 
 func (c *FakeDaemonSets) Delete(name string, options *v1.DeleteOptions) error {
 	_, err := c.Fake.
-		Invokes(core.NewDeleteAction(daemonsetsResource, c.ns, name), &extensions.DaemonSet{})
+		Invokes(testing.NewDeleteAction(daemonsetsResource, c.ns, name), &extensions.DaemonSet{})
 
 	return err
 }
 
 func (c *FakeDaemonSets) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
-	action := core.NewDeleteCollectionAction(daemonsetsResource, c.ns, listOptions)
+	action := testing.NewDeleteCollectionAction(daemonsetsResource, c.ns, listOptions)
 
 	_, err := c.Fake.Invokes(action, &extensions.DaemonSetList{})
 	return err
@@ -80,7 +80,7 @@ func (c *FakeDaemonSets) DeleteCollection(options *v1.DeleteOptions, listOptions
 
 func (c *FakeDaemonSets) Get(name string, options v1.GetOptions) (result *extensions.DaemonSet, err error) {
 	obj, err := c.Fake.
-		Invokes(core.NewGetAction(daemonsetsResource, c.ns, name), &extensions.DaemonSet{})
+		Invokes(testing.NewGetAction(daemonsetsResource, c.ns, name), &extensions.DaemonSet{})
 
 	if obj == nil {
 		return nil, err
@@ -90,13 +90,13 @@ func (c *FakeDaemonSets) Get(name string, options v1.GetOptions) (result *extens
 
 func (c *FakeDaemonSets) List(opts v1.ListOptions) (result *extensions.DaemonSetList, err error) {
 	obj, err := c.Fake.
-		Invokes(core.NewListAction(daemonsetsResource, c.ns, opts), &extensions.DaemonSetList{})
+		Invokes(testing.NewListAction(daemonsetsResource, c.ns, opts), &extensions.DaemonSetList{})
 
 	if obj == nil {
 		return nil, err
 	}
 
-	label, _, _ := core.ExtractFromListOptions(opts)
+	label, _, _ := testing.ExtractFromListOptions(opts)
 	if label == nil {
 		label = labels.Everything()
 	}
@@ -112,14 +112,14 @@ func (c *FakeDaemonSets) List(opts v1.ListOptions) (result *extensions.DaemonSet
 // Watch returns a watch.Interface that watches the requested daemonSets.
 func (c *FakeDaemonSets) Watch(opts v1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
-		InvokesWatch(core.NewWatchAction(daemonsetsResource, c.ns, opts))
+		InvokesWatch(testing.NewWatchAction(daemonsetsResource, c.ns, opts))
 
 }
 
 // Patch applies the patch and returns the patched daemonSet.
 func (c *FakeDaemonSets) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *extensions.DaemonSet, err error) {
 	obj, err := c.Fake.
-		Invokes(core.NewPatchSubresourceAction(daemonsetsResource, c.ns, name, data, subresources...), &extensions.DaemonSet{})
+		Invokes(testing.NewPatchSubresourceAction(daemonsetsResource, c.ns, name, data, subresources...), &extensions.DaemonSet{})
 
 	if obj == nil {
 		return nil, err

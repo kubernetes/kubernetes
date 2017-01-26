@@ -20,11 +20,11 @@ import (
 	"k8s.io/client-go/pkg/api/v1"
 	policy "k8s.io/client-go/pkg/apis/policy/v1beta1"
 	restclient "k8s.io/client-go/rest"
-	"k8s.io/client-go/testing"
+	core "k8s.io/client-go/testing"
 )
 
 func (c *FakePods) Bind(binding *v1.Binding) error {
-	action := testing.CreateActionImpl{}
+	action := core.CreateActionImpl{}
 	action.Verb = "create"
 	action.Resource = podsResource
 	action.Subresource = "bindings"
@@ -35,7 +35,7 @@ func (c *FakePods) Bind(binding *v1.Binding) error {
 }
 
 func (c *FakePods) GetLogs(name string, opts *v1.PodLogOptions) *restclient.Request {
-	action := testing.GenericActionImpl{}
+	action := core.GenericActionImpl{}
 	action.Verb = "get"
 	action.Namespace = c.ns
 	action.Resource = podsResource
@@ -47,7 +47,7 @@ func (c *FakePods) GetLogs(name string, opts *v1.PodLogOptions) *restclient.Requ
 }
 
 func (c *FakePods) Evict(eviction *policy.Eviction) error {
-	action := testing.CreateActionImpl{}
+	action := core.CreateActionImpl{}
 	action.Verb = "create"
 	action.Resource = podsResource
 	action.Subresource = "eviction"

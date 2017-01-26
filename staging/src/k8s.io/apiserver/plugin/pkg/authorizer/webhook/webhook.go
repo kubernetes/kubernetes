@@ -26,10 +26,10 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/apiserver/pkg/util/cache"
-	authorizationclient "k8s.io/client-go/kubernetes/typed/authorization/v1beta1"
-	authorization "k8s.io/client-go/pkg/apis/authorization/v1beta1"
-
 	"k8s.io/apiserver/pkg/util/webhook"
+	authorizationclient "k8s.io/client-go/kubernetes/typed/authorization/v1beta1"
+	"k8s.io/client-go/pkg/api"
+	authorization "k8s.io/client-go/pkg/apis/authorization/v1beta1"
 
 	_ "k8s.io/client-go/pkg/apis/authorization/install"
 )
@@ -211,7 +211,7 @@ func convertToSARExtra(extra map[string][]string) map[string]authorization.Extra
 // and returns a SubjectAccessReviewInterface that uses that client. Note that the client submits SubjectAccessReview
 // requests to the exact path specified in the kubeconfig file, so arbitrary non-API servers can be targeted.
 func subjectAccessReviewInterfaceFromKubeconfig(kubeConfigFile string) (authorizationclient.SubjectAccessReviewInterface, error) {
-	gw, err := webhook.NewGenericWebhook(kubeConfigFile, groupVersions, 0)
+	gw, err := webhook.NewGenericWebhook(api.Registry, api.Codecs, kubeConfigFile, groupVersions, 0)
 	if err != nil {
 		return nil, err
 	}

@@ -18,8 +18,8 @@ package fake
 
 import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	core "k8s.io/client-go/testing"
 	policy "k8s.io/kubernetes/pkg/apis/policy/v1beta1"
-	core "k8s.io/kubernetes/pkg/client/testing/core"
 )
 
 func (c *FakeEvictions) Evict(eviction *policy.Eviction) error {

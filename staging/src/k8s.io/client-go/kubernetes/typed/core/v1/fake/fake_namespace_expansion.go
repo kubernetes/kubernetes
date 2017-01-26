@@ -18,11 +18,11 @@ package fake
 
 import (
 	"k8s.io/client-go/pkg/api/v1"
-	"k8s.io/client-go/testing"
+	core "k8s.io/client-go/testing"
 )
 
 func (c *FakeNamespaces) Finalize(namespace *v1.Namespace) (*v1.Namespace, error) {
-	action := testing.CreateActionImpl{}
+	action := core.CreateActionImpl{}
 	action.Verb = "create"
 	action.Resource = namespacesResource
 	action.Subresource = "finalize"
