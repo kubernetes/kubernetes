@@ -20,7 +20,6 @@ go_library(
         "//pkg/genericapiserver/registry/generic:go_default_library",
         "//pkg/genericapiserver/registry/generic/registry:go_default_library",
         "//pkg/genericapiserver/server:go_default_library",
-        "//pkg/genericapiserver/server/filters:go_default_library",
         "//pkg/genericapiserver/server/options:go_default_library",
         "//pkg/kubectl/cmd/util:go_default_library",
         "//pkg/storage/storagebackend:go_default_library",
@@ -29,6 +28,7 @@ go_library(
         "//vendor:k8s.io/apimachinery/pkg/runtime/schema",
         "//vendor:k8s.io/apimachinery/pkg/util/sets",
         "//vendor:k8s.io/apimachinery/pkg/util/wait",
+        "//vendor:k8s.io/apiserver/pkg/server/filters",
         "//vendor:k8s.io/client-go/rest",
     ],
 )

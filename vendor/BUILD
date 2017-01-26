@@ -13774,3 +13774,43 @@ go_library(
     srcs = ["k8s.io/apimachinery/pkg/api/validation/path/name.go"],
     tags = ["automanaged"],
 )
+
+go_test(
+    name = "k8s.io/apiserver/pkg/server/filters_test",
+    srcs = [
+        "k8s.io/apiserver/pkg/server/filters/cors_test.go",
+        "k8s.io/apiserver/pkg/server/filters/maxinflight_test.go",
+        "k8s.io/apiserver/pkg/server/filters/timeout_test.go",
+    ],
+    library = ":k8s.io/apiserver/pkg/server/filters",
+    tags = ["automanaged"],
+    deps = [
+        "//pkg/genericapiserver/endpoints/filters:go_default_library",
+        "//vendor:k8s.io/apimachinery/pkg/api/errors",
+        "//vendor:k8s.io/apimachinery/pkg/runtime/schema",
+        "//vendor:k8s.io/apimachinery/pkg/util/sets",
+        "//vendor:k8s.io/apiserver/pkg/endpoints/request",
+    ],
+)
+
+go_library(
+    name = "k8s.io/apiserver/pkg/server/filters",
+    srcs = [
+        "k8s.io/apiserver/pkg/server/filters/cors.go",
+        "k8s.io/apiserver/pkg/server/filters/doc.go",
+        "k8s.io/apiserver/pkg/server/filters/longrunning.go",
+        "k8s.io/apiserver/pkg/server/filters/maxinflight.go",
+        "k8s.io/apiserver/pkg/server/filters/timeout.go",
+        "k8s.io/apiserver/pkg/server/filters/wrap.go",
+    ],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:github.com/golang/glog",
+        "//vendor:k8s.io/apimachinery/pkg/api/errors",
+        "//vendor:k8s.io/apimachinery/pkg/runtime/schema",
+        "//vendor:k8s.io/apimachinery/pkg/util/runtime",
+        "//vendor:k8s.io/apimachinery/pkg/util/sets",
+        "//vendor:k8s.io/apiserver/pkg/endpoints/request",
+        "//vendor:k8s.io/apiserver/pkg/server/httplog",
+    ],
+)
