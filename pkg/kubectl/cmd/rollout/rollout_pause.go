@@ -31,6 +31,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
+	"k8s.io/kubernetes/pkg/util/i18n"
 )
 
 // PauseConfig is the start of the data required to perform the operation.  As new fields are added, add them here instead of
@@ -70,7 +71,7 @@ func NewCmdRolloutPause(f cmdutil.Factory, out io.Writer) *cobra.Command {
 
 	cmd := &cobra.Command{
 		Use:     "pause RESOURCE",
-		Short:   "Mark the provided resource as paused",
+		Short:   i18n.T("Mark the provided resource as paused"),
 		Long:    pause_long,
 		Example: pause_example,
 		Run: func(cmd *cobra.Command, args []string) {
