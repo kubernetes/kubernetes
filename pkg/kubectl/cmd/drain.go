@@ -35,7 +35,9 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	restclient "k8s.io/client-go/rest"
+	"k8s.io/client-go/util/clock"
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/apis/policy"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/kubectl"
@@ -57,6 +59,7 @@ type DrainOptions struct {
 	backOff            clockwork.Clock
 	DeleteLocalData    bool
 	mapper             meta.RESTMapper
+	Message            string
 	nodeInfo           *resource.Info
 	out                io.Writer
 	errOut             io.Writer
@@ -84,6 +87,8 @@ const (
 	kUnmanagedFatal      = "pods not managed by ReplicationController, ReplicaSet, Job, DaemonSet or StatefulSet (use --force to override)"
 	kUnmanagedWarning    = "Deleting pods not managed by ReplicationController, ReplicaSet, Job, DaemonSet or StatefulSet"
 	kMaxNodeUpdateRetry  = 10
+
+	setMessageDesc = "Set event message to describe why this node was cordoned"
 )
 
 var (
@@ -92,7 +97,11 @@ var (
 
 	cordon_example = templates.Examples(`
 		# Mark node "foo" as unschedulable.
-		kubectl cordon foo`)
+		kubectl cordon foo
+
+		# Mark node "foo" as unschedulable and set event message.
+		kubectl cordon foo --message="foo"
+		`)
 )
 
 func NewCmdCordon(f cmdutil.Factory, out io.Writer) *cobra.Command {
@@ -108,6 +117,7 @@ func NewCmdCordon(f cmdutil.Factory, out io.Writer) *cobra.Command {
 			cmdutil.CheckErr(options.RunCordonOrUncordon(true))
 		},
 	}
+	cmd.Flags().StringVar(&options.Message, "message", "", setMessageDesc)
 	return cmd
 }
 
@@ -117,7 +127,10 @@ var (
 
 	uncordon_example = templates.Examples(`
 		# Mark node "foo" as schedulable.
-		$ kubectl uncordon foo`)
+		$ kubectl uncordon foo
+
+		# Mark node "foo" as schedulable and set event message.
+		kubectl cordon foo --message="foo"`)
 )
 
 func NewCmdUncordon(f cmdutil.Factory, out io.Writer) *cobra.Command {
@@ -133,6 +146,7 @@ func NewCmdUncordon(f cmdutil.Factory, out io.Writer) *cobra.Command {
 			cmdutil.CheckErr(options.RunCordonOrUncordon(false))
 		},
 	}
+	cmd.Flags().StringVar(&options.Message, "message", "", "Set event message to describe why this node was uncordoned")
 	return cmd
 }
 
@@ -187,6 +201,7 @@ func NewCmdDrain(f cmdutil.Factory, out, errOut io.Writer) *cobra.Command {
 	cmd.Flags().BoolVar(&options.DeleteLocalData, "delete-local-data", false, "Continue even if there are pods using emptyDir (local data that will be deleted when the node is drained).")
 	cmd.Flags().IntVar(&options.GracePeriodSeconds, "grace-period", -1, "Period of time in seconds given to each pod to terminate gracefully. If negative, the default value specified in the pod will be used.")
 	cmd.Flags().DurationVar(&options.Timeout, "timeout", 0, "The length of time to wait before giving up, zero means infinite")
+	cmd.Flags().StringVar(&options.Message, "message", "", setMessageDesc)
 	return cmd
 }
 
@@ -633,6 +648,10 @@ func (o *DrainOptions) RunCordonOrUncordon(desired bool) error {
 			if err != nil {
 				return err
 			}
+			err = o.sendEventWithMessage(desired)
+			if err != nil {
+				return err
+			}
 			cmdutil.PrintSuccess(o.mapper, false, o.out, o.nodeInfo.Mapping.Resource, o.nodeInfo.Name, false, changed(desired))
 		}
 	} else {
@@ -656,4 +675,48 @@ func changed(desired bool) string {
 		return "cordoned"
 	}
 	return "uncordoned"
+}
+
+func (o *DrainOptions) sendEventWithMessage(desired bool) error {
+	reason := "NodeUncordoned"
+	if desired {
+		reason = "NodeCordoned"
+	}
+
+	t := metav1.Time{Time: clock.RealClock{}.Now()}
+	namespace := o.nodeInfo.Namespace
+	if namespace == "" {
+		namespace = metav1.NamespaceDefault
+	}
+
+	ref, err := api.GetReference(api.Scheme, o.nodeInfo.Object)
+
+	if err != nil {
+		return err
+	}
+
+	event := &api.Event{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      fmt.Sprintf("%v.%x", o.nodeInfo.Name, t.UnixNano()),
+			Namespace: namespace,
+		},
+		InvolvedObject: *ref,
+		Source: api.EventSource{
+			Component: "kubectl",
+			Host:      o.nodeInfo.Name,
+		},
+		Reason:         reason,
+		Message:        fmt.Sprintf("Node %s: %s", o.nodeInfo.Name, o.Message),
+		FirstTimestamp: t,
+		LastTimestamp:  t,
+		Count:          1,
+		Type:           v1.EventTypeNormal,
+	}
+
+	_, err = o.client.Core().Events(namespace).Create(event)
+
+	if err != nil {
+		return err
+	}
+	return nil
 }

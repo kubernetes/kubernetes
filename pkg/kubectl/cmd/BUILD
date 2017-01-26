@@ -127,6 +127,7 @@ go_library(
         "//vendor:k8s.io/client-go/rest",
         "//vendor:k8s.io/client-go/tools/clientcmd",
         "//vendor:k8s.io/client-go/tools/portforward",
+        "//vendor:k8s.io/client-go/util/clock",
     ],
 )
 
