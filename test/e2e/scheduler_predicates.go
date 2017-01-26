@@ -542,7 +542,7 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 							LabelSelector: &metav1.LabelSelector{
 								MatchExpressions: []metav1.LabelSelectorRequirement{
 									{
-										Key:      "security",
+										Key:      "service",
 										Operator: metav1.LabelSelectorOpIn,
 										Values:   []string{"S1", "value2"},
 									},
