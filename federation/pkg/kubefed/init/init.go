@@ -62,8 +62,7 @@ const (
 	AdminCN                     = "admin"
 	HostClusterLocalDNSZoneName = "cluster.local."
 
-	lbAddrRetryInterval = 5 * time.Second
-	podWaitInterval     = 2 * time.Second
+	apiserverHealthCheckInterval = 2 * time.Second
 )
 
 var (
@@ -171,7 +170,11 @@ func initFederation(cmdOut io.Writer, config util.AdminConfig, cmd *cobra.Comman
 	if err != nil {
 		return err
 	}
-	ips, hostnames, err := waitForLoadBalancerAddress(hostClientset, svc, dryRun)
+	ips := []string{}
+	hostnames := []string{}
+	if !dryRun {
+		ips, hostnames, err = util.WaitForLoadBalancerAddress(hostClientset, svc)
+	}
 	if err != nil {
 		return err
 	}
@@ -234,7 +237,7 @@ func initFederation(cmdOut io.Writer, config util.AdminConfig, cmd *cobra.Comman
 
 	if !dryRun {
 		fedPods := []string{serverName, cmName}
-		err = waitForPods(hostClientset, fedPods, initFlags.FederationSystemNamespace)
+		err = util.WaitForPods(hostClientset, fedPods, initFlags.FederationSystemNamespace)
 		if err != nil {
 			return err
 		}
@@ -288,41 +291,6 @@ func createService(clientset *client.Clientset, namespace, svcName string, dryRu
 	}
 
 	return clientset.Core().Services(namespace).Create(svc)
-}
-
-func waitForLoadBalancerAddress(clientset *client.Clientset, svc *api.Service, dryRun bool) ([]string, []string, error) {
-	ips := []string{}
-	hostnames := []string{}
-
-	if dryRun {
-		return ips, hostnames, nil
-	}
-
-	err := wait.PollImmediateInfinite(lbAddrRetryInterval, func() (bool, error) {
-		pollSvc, err := clientset.Core().Services(svc.Namespace).Get(svc.Name, metav1.GetOptions{})
-		if err != nil {
-			return false, nil
-		}
-		if ings := pollSvc.Status.LoadBalancer.Ingress; len(ings) > 0 {
-			for _, ing := range ings {
-				if len(ing.IP) > 0 {
-					ips = append(ips, ing.IP)
-				}
-				if len(ing.Hostname) > 0 {
-					hostnames = append(hostnames, ing.Hostname)
-				}
-			}
-			if len(ips) > 0 || len(hostnames) > 0 {
-				return true, nil
-			}
-		}
-		return false, nil
-	})
-	if err != nil {
-		return nil, nil, err
-	}
-
-	return ips, hostnames, nil
 }
 
 func genCerts(svcNamespace, name, svcName, localDNSZoneName string, ips, hostnames []string) (*entityKeyPairs, error) {
@@ -589,36 +557,13 @@ func createControllerManager(clientset *client.Clientset, namespace, name, svcNa
 	return clientset.Extensions().Deployments(namespace).Create(dep)
 }
 
-func waitForPods(clientset *client.Clientset, fedPods []string, namespace string) error {
-	err := wait.PollInfinite(podWaitInterval, func() (bool, error) {
-		podCheck := len(fedPods)
-		podList, err := clientset.Core().Pods(namespace).List(metav1.ListOptions{})
-		if err != nil {
-			return false, nil
-		}
-		for _, pod := range podList.Items {
-			for _, fedPod := range fedPods {
-				if strings.HasPrefix(pod.Name, fedPod) && pod.Status.Phase == "Running" {
-					podCheck -= 1
-				}
-			}
-			//ensure that all pods are in running state or keep waiting
-			if podCheck == 0 {
-				return true, nil
-			}
-		}
-		return false, nil
-	})
-	return err
-}
-
 func waitSrvHealthy(config util.AdminConfig, context, kubeconfig string) error {
 	fedClientSet, err := config.FederationClientset(context, kubeconfig)
 	if err != nil {
 		return err
 	}
 	fedDiscoveryClient := fedClientSet.Discovery()
-	err = wait.PollInfinite(podWaitInterval, func() (bool, error) {
+	err = wait.PollInfinite(apiserverHealthCheckInterval, func() (bool, error) {
 		body, err := fedDiscoveryClient.RESTClient().Get().AbsPath("/healthz").Do().Raw()
 		if err != nil {
 			return false, nil

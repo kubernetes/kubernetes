@@ -18,6 +18,7 @@ package util
 
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	fedclient "k8s.io/kubernetes/federation/client/clientset_generated/federation_clientset"
@@ -25,6 +26,8 @@ import (
 	client "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	kubectlcmd "k8s.io/kubernetes/pkg/kubectl/cmd"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
+	"strings"
+	"time"
 
 	"github.com/spf13/cobra"
 )
@@ -37,6 +40,9 @@ const (
 	// DefaultFederationSystemNamespace is the namespace in which
 	// federation system components are hosted.
 	DefaultFederationSystemNamespace = "federation-system"
+
+	lbAddrRetryInterval = 5 * time.Second
+	podWaitInterval     = 2 * time.Second
 )
 
 // AdminConfig provides a filesystem based kubeconfig (via
@@ -149,4 +155,58 @@ func CreateKubeconfigSecret(clientset *client.Clientset, kubeconfig *clientcmdap
 		return clientset.Core().Secrets(namespace).Create(secret)
 	}
 	return secret, nil
+}
+
+func WaitForLoadBalancerAddress(clientset *client.Clientset, svc *api.Service) ([]string, []string, error) {
+	ips := []string{}
+	hostnames := []string{}
+
+	err := wait.PollImmediateInfinite(lbAddrRetryInterval, func() (bool, error) {
+		pollSvc, err := clientset.Core().Services(svc.Namespace).Get(svc.Name, metav1.GetOptions{})
+		if err != nil {
+			return false, nil
+		}
+		if ings := pollSvc.Status.LoadBalancer.Ingress; len(ings) > 0 {
+			for _, ing := range ings {
+				if len(ing.IP) > 0 {
+					ips = append(ips, ing.IP)
+				}
+				if len(ing.Hostname) > 0 {
+					hostnames = append(hostnames, ing.Hostname)
+				}
+			}
+			if len(ips) > 0 || len(hostnames) > 0 {
+				return true, nil
+			}
+		}
+		return false, nil
+	})
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return ips, hostnames, nil
+}
+
+func WaitForPods(clientset *client.Clientset, pods []string, namespace string) error {
+	err := wait.PollInfinite(podWaitInterval, func() (bool, error) {
+		podCheck := len(pods)
+		podList, err := clientset.Core().Pods(namespace).List(metav1.ListOptions{})
+		if err != nil {
+			return false, nil
+		}
+		for _, pod := range podList.Items {
+			for _, fedPod := range pods {
+				if strings.HasPrefix(pod.Name, fedPod) && pod.Status.Phase == "Running" {
+					podCheck -= 1
+				}
+			}
+			//ensure that all pods are in running state or keep waiting
+			if podCheck == 0 {
+				return true, nil
+			}
+		}
+		return false, nil
+	})
+	return err
 }
