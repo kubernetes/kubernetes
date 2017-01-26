@@ -27,8 +27,8 @@ import (
 
 	"k8s.io/apimachinery/pkg/openapi"
 	"k8s.io/apimachinery/pkg/util/json"
+	"k8s.io/apiserver/pkg/util/trie"
 	genericmux "k8s.io/kubernetes/pkg/genericapiserver/server/mux"
-	"k8s.io/kubernetes/pkg/util"
 )
 
 const (
@@ -127,7 +127,7 @@ func (o *openAPI) buildDefinitionForType(sample interface{}) (string, error) {
 
 // buildPaths builds OpenAPI paths using go-restful's web services.
 func (o *openAPI) buildPaths(webServices []*restful.WebService) error {
-	pathsToIgnore := util.CreateTrie(o.config.IgnorePrefixes)
+	pathsToIgnore := trie.New(o.config.IgnorePrefixes)
 	duplicateOpId := make(map[string]string)
 	for _, w := range webServices {
 		rootPath := w.RootPath()

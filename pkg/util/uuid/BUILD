@@ -9,12 +9,8 @@ load(
 
 go_library(
     name = "go_default_library",
-    srcs = ["uuid.go"],
+    srcs = ["doc.go"],
     tags = ["automanaged"],
-    deps = [
-        "//vendor:github.com/pborman/uuid",
-        "//vendor:k8s.io/apimachinery/pkg/types",
-    ],
 )
 
 filegroup(
