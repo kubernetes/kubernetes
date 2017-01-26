@@ -224,7 +224,7 @@ kube::test::if_has_string() {
   local message=$1
   local match=$2
 
-  if [[ $(echo "$message" | grep "$match") ]]; then
+  if echo "$message" | grep -q "$match"; then
     echo "Successful"
     echo "message:$message"
     echo "has:$match"
@@ -235,6 +235,24 @@ kube::test::if_has_string() {
     echo "has not:$match"
     caller
     return 1
+  fi
+}
+
+kube::test::if_has_not_string() {
+  local message=$1
+  local match=$2
+
+  if echo "$message" | grep -q "$match"; then
+    echo "FAIL!"
+    echo "message:$message"
+    echo "has:$match"
+    caller
+    return 1
+  else
+    echo "Successful"
+    echo "message:$message"
+    echo "has not:$match"
+    return 0
   fi
 }
 

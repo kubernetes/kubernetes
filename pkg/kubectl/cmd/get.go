@@ -319,9 +319,6 @@ func RunGet(f cmdutil.Factory, out, errOut io.Writer, cmd *cobra.Command, args [
 			}
 			errs = append(errs, err)
 		}
-		if len(infos) == 0 && len(errs) == 0 {
-			outputEmptyListWarning(errOut)
-		}
 
 		res := ""
 		if len(infos) > 0 {
