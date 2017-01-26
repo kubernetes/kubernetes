@@ -483,7 +483,7 @@ bazel-build:
 	@echo "$$BAZEL_BUILD_HELP_INFO"
 else
 bazel-build:
-	bazel build //cmd/... //pkg/... //federation/... //plugin/... //build/... //examples/... //test/... //third_party/...
+	bazel build //cmd/... //pkg/... //federation/... //plugin/... //third_party/... //examples/... //test/...
 endif
 
 
@@ -498,7 +498,7 @@ endef
 	@echo "$$BAZEL_TEST_HELP_INFO"
 else
 bazel-test:
-	bazel test  //cmd/... //pkg/... //federation/... //plugin/... //build/... //third_party/... //hack/... //hack:verify-all
+	bazel test  //cmd/... //pkg/... //federation/... //plugin/... //third_party/... //hack/... //hack:verify-all
 endif
 
 ifeq ($(PRINT_HELP),y)
