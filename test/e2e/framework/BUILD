@@ -27,6 +27,7 @@ go_library(
         "pods.go",
         "resource_usage_gatherer.go",
         "service_util.go",
+        "suite_init_cleanup.go",
         "test_context.go",
         "util.go",
     ],

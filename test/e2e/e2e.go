@@ -158,6 +158,9 @@ var _ = ginkgo.SynchronizedBeforeSuite(func() []byte {
 	// Reference federation test to make the import valid.
 	federationtest.FederationSuite = commontest.FederationE2E
 
+	// Run test suite init actions (if any) added. Called only once for test suite during setup.
+	framework.RunSuiteInitActions()
+
 	return nil
 
 }, func(data []byte) {
@@ -220,6 +223,10 @@ var _ = ginkgo.SynchronizedAfterSuite(func() {
 	RunCleanupActions()
 }, func() {
 	// Run only Ginkgo on node 1
+
+	// Run test suite cleanup actions (if any) added. Called only once for test suite during teardown.
+	framework.RunSuiteCleanupActions()
+
 	if framework.TestContext.ReportDir != "" {
 		framework.CoreDump(framework.TestContext.ReportDir)
 	}
