@@ -41,7 +41,8 @@ const (
 	kubeHostportChainPrefix string = "KUBE-HP-"
 )
 
-type HostportHandler interface {
+// HostportSyncer takes a list of PodPortMappings and implements hostport all at once
+type HostportSyncer interface {
 	// SyncHostports gathers all hostports on node and setup iptables rules enable them. And finally clean up stale hostports
 	SyncHostports(natInterfaceName string, activePodPortMappings []*PodPortMapping) error
 	// OpenPodHostportsAndSync opens hostports for a new PodPortMapping, gathers all hostports on
@@ -69,15 +70,15 @@ type PodPortMapping struct {
 
 type hostportOpener func(*hostport) (closeable, error)
 
-type handler struct {
+type hostportSyncer struct {
 	hostPortMap map[hostport]closeable
 	iptables    utiliptables.Interface
 	portOpener  hostportOpener
 }
 
-func NewHostportHandler() HostportHandler {
+func NewHostportSyncer() HostportSyncer {
 	iptInterface := utiliptables.New(utilexec.New(), utildbus.New(), utiliptables.ProtocolIpv4)
-	return &handler{
+	return &hostportSyncer{
 		hostPortMap: make(map[hostport]closeable),
 		iptables:    iptInterface,
 		portOpener:  openLocalPort,
@@ -103,7 +104,7 @@ func (hp *hostport) String() string {
 }
 
 //openPodHostports opens all hostport for pod and returns the map of hostport and socket
-func (h *handler) openHostports(podHostportMapping *PodPortMapping) error {
+func (h *hostportSyncer) openHostports(podHostportMapping *PodPortMapping) error {
 	var retErr error
 	ports := make(map[hostport]closeable)
 	for _, port := range podHostportMapping.PortMappings {
@@ -186,7 +187,7 @@ func hostportChainName(pm *PortMapping, podFullName string) utiliptables.Chain {
 // OpenPodHostportsAndSync opens hostports for a new PodPortMapping, gathers all hostports on
 // node, sets up iptables rules enable them. And finally clean up stale hostports.
 // 'newPortMapping' must also be present in 'activePodPortMappings'.
-func (h *handler) OpenPodHostportsAndSync(newPortMapping *PodPortMapping, natInterfaceName string, activePodPortMappings []*PodPortMapping) error {
+func (h *hostportSyncer) OpenPodHostportsAndSync(newPortMapping *PodPortMapping, natInterfaceName string, activePodPortMappings []*PodPortMapping) error {
 	// try to open pod host port if specified
 	if err := h.openHostports(newPortMapping); err != nil {
 		return err
@@ -208,7 +209,7 @@ func (h *handler) OpenPodHostportsAndSync(newPortMapping *PodPortMapping, natInt
 }
 
 // SyncHostports gathers all hostports on node and setup iptables rules enable them. And finally clean up stale hostports
-func (h *handler) SyncHostports(natInterfaceName string, activePodPortMappings []*PodPortMapping) error {
+func (h *hostportSyncer) SyncHostports(natInterfaceName string, activePodPortMappings []*PodPortMapping) error {
 	start := time.Now()
 	defer func() {
 		glog.V(4).Infof("syncHostportsRules took %v", time.Since(start))
@@ -377,7 +378,7 @@ func openLocalPort(hp *hostport) (closeable, error) {
 }
 
 // cleanupHostportMap closes obsolete hostports
-func (h *handler) cleanupHostportMap(containerPortMap map[*PortMapping]targetPod) {
+func (h *hostportSyncer) cleanupHostportMap(containerPortMap map[*PortMapping]targetPod) {
 	// compute hostports that are supposed to be open
 	currentHostports := make(map[hostport]bool)
 	for containerPort := range containerPortMap {

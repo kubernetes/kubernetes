@@ -12,7 +12,7 @@ go_library(
     name = "go_default_library",
     srcs = [
         "fake_iptables.go",
-        "hostport.go",
+        "hostport_syncer.go",
     ],
     tags = ["automanaged"],
     deps = [
@@ -27,7 +27,7 @@ go_library(
 
 go_test(
     name = "go_default_test",
-    srcs = ["hostport_test.go"],
+    srcs = ["hostport_syncer_test.go"],
     library = ":go_default_library",
     tags = ["automanaged"],
     deps = [
