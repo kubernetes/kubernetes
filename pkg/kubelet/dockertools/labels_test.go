@@ -90,7 +90,7 @@ func TestLabels(t *testing.T) {
 		PodDeletionGracePeriod:    pod.DeletionGracePeriodSeconds,
 		PodTerminationGracePeriod: pod.Spec.TerminationGracePeriodSeconds,
 		Name:                   container.Name,
-		Hash:                   strconv.FormatUint(kubecontainer.HashContainer(container), 16),
+		Hash:                   strconv.FormatUint(kubecontainer.HashContainerLegacy(container), 16),
 		RestartCount:           restartCount,
 		TerminationMessagePath: container.TerminationMessagePath,
 		PreStopHandler:         container.Lifecycle.PreStop,
@@ -113,7 +113,7 @@ func TestLabels(t *testing.T) {
 	expected.PodTerminationGracePeriod = nil
 	expected.PreStopHandler = nil
 	// Because container is changed, the Hash should be updated
-	expected.Hash = strconv.FormatUint(kubecontainer.HashContainer(container), 16)
+	expected.Hash = strconv.FormatUint(kubecontainer.HashContainerLegacy(container), 16)
 	labels = newLabels(container, pod, restartCount, false)
 	containerInfo = getContainerInfoFromLabel(labels)
 	if !reflect.DeepEqual(containerInfo, expected) {

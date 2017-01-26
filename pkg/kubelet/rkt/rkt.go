@@ -772,7 +772,7 @@ func (r *Runtime) newAppcRuntimeApp(pod *v1.Pod, podIP string, c v1.Container, r
 	var annotations appctypes.Annotations = []appctypes.Annotation{
 		{
 			Name:  *appctypes.MustACIdentifier(k8sRktContainerHashAnno),
-			Value: strconv.FormatUint(kubecontainer.HashContainer(&c), 10),
+			Value: strconv.FormatUint(kubecontainer.HashContainerLegacy(&c), 10),
 		},
 		{
 			Name:  *appctypes.MustACIdentifier(types.KubernetesContainerNameLabel),
@@ -923,7 +923,7 @@ func apiPodToruntimePod(uuid string, pod *v1.Pod) *kubecontainer.Pod {
 			ID:    buildContainerID(&containerID{uuid, c.Name}),
 			Name:  c.Name,
 			Image: c.Image,
-			Hash:  kubecontainer.HashContainer(c),
+			Hash:  kubecontainer.HashContainerLegacy(c),
 		})
 	}
 	return p
@@ -1721,7 +1721,7 @@ func (r *Runtime) SyncPod(pod *v1.Pod, _ v1.PodStatus, podStatus *kubecontainer.
 
 	restartPod := false
 	for _, container := range pod.Spec.Containers {
-		expectedHash := kubecontainer.HashContainer(&container)
+		expectedHash := kubecontainer.HashContainerLegacy(&container)
 
 		c := runningPod.FindContainerByName(container.Name)
 		if c == nil {
