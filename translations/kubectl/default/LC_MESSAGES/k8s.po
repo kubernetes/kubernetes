@@ -8,7 +8,7 @@ msgstr ""
 "Project-Id-Version: gettext-go-examples-hello\n"
 "Report-Msgid-Bugs-To: \n"
 "POT-Creation-Date: 2013-12-12 20:03+0000\n"
-"PO-Revision-Date: 2017-02-06 22:31-0800\n"
+"PO-Revision-Date: 2017-02-11 22:14-0800\n"
 "Last-Translator: Brendan Burns <brendan.d.burns@gmail.com>\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
@@ -423,3 +423,33 @@ msgstr "Display Resource (CPU/Memory/Storage) usage of pods"
 msgctxt "Print the client and server version information"
 msgid "Print the client and server version information"
 msgstr "Print the client and server version information"
+
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/rollout/rollout.go#L46
+msgctxt "Manage a deployment rollout"
+msgid "Manage a deployment rollout"
+msgstr "Manage a deployment rollout"
+
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/rollout/rollout_history.go#L51
+msgctxt "View rollout history"
+msgid "View rollout history"
+msgstr "View rollout history"
+
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/rollout/rollout_pause.go#L73
+msgctxt "Mark the provided resource as paused"
+msgid "Mark the provided resource as paused"
+msgstr "Mark the provided resource as paused"
+
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/rollout/rollout_resume.go#L71
+msgctxt "Resume a paused resource"
+msgid "Resume a paused resource"
+msgstr "Resume a paused resource"
+
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/rollout/rollout_status.go#L57
+msgctxt "Show the status of the rollout"
+msgid "Show the status of the rollout"
+msgstr "Show the status of the rollout"
+
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/rollout/rollout_undo.go#L71
+msgctxt "Undo a previous rollout"
+msgid "Undo a previous rollout"
+msgstr "Undo a previous rollout"
