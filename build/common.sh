@@ -411,7 +411,7 @@ function kube::build::clean() {
 function kube::build::build_image() {
   mkdir -p "${LOCAL_OUTPUT_BUILD_CONTEXT}"
   # Make sure the context directory owned by the right user for syncing sources to container.
-  chown -R ${USER_ID}.${GROUP_ID} "${LOCAL_OUTPUT_BUILD_CONTEXT}"
+  chown -R ${USER_ID}:${GROUP_ID} "${LOCAL_OUTPUT_BUILD_CONTEXT}"
 
   cp /etc/localtime "${LOCAL_OUTPUT_BUILD_CONTEXT}/"
 
@@ -499,7 +499,7 @@ function kube::build::ensure_data_container() {
       --name "${KUBE_DATA_CONTAINER_NAME}"
       --hostname "${HOSTNAME}"
       "${KUBE_BUILD_IMAGE}"
-      chown -R ${USER_ID}.${GROUP_ID}
+      chown -R ${USER_ID}:${GROUP_ID}
         "${REMOTE_ROOT}"
         /usr/local/go/pkg/
     )
