@@ -2110,8 +2110,11 @@ func (f *Framework) MatchContainerOutput(
 	containerName string,
 	expectedOutput []string,
 	matcher func(string, ...interface{}) gomegatypes.GomegaMatcher) error {
-	podClient := f.PodClient()
-	ns := f.Namespace.Name
+	ns := pod.ObjectMeta.Namespace
+	if ns == "" {
+		ns = f.Namespace.Name
+	}
+	podClient := f.PodClientNS(ns)
 
 	createdPod := podClient.Create(pod)
 	defer func() {
