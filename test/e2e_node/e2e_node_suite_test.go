@@ -54,6 +54,7 @@ var e2es *services.E2EServices
 var runServicesMode = flag.Bool("run-services-mode", false, "If true, only run services (etcd, apiserver) in current process, and not run test.")
 var runKubeletMode = flag.Bool("run-kubelet-mode", false, "If true, only start kubelet, and not run test.")
 var systemValidateMode = flag.Bool("system-validate-mode", false, "If true, only run system validation in current process, and not run test.")
+var enableCriFlag = flag.Bool("enable-cri", false, "If true, test will run in CRI mode and avoid docker-specific assumptions.")
 
 func init() {
 	framework.RegisterCommonFlags()
@@ -99,7 +100,7 @@ func TestE2eNode(t *testing.T) {
 				glog.Exitf("chroot %q failed: %v", rootfs, err)
 			}
 		}
-		if err := system.ValidateDefault(); err != nil {
+		if err := system.ValidateDefault(*enableCriFlag); err != nil {
 			glog.Exitf("system validation failed: %v", err)
 		}
 		return
