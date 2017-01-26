@@ -22,6 +22,8 @@ import (
 	"path/filepath"
 	"regexp"
 	"testing"
+
+	_ "github.com/golang/glog"
 )
 
 const (
