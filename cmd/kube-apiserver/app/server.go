@@ -117,7 +117,7 @@ func Run(s *options.ServerRunOptions) error {
 		return fmt.Errorf("failed to configure authentication: %s", err)
 	}
 	if err := preflight.RunApiserverChecks(s); err != nil {
-		return fmt.Errorf("error starting apiserver: %v\n", err)
+		return fmt.Errorf("error starting apiserver: %v", err)
 	}
 
 	capabilities.Initialize(capabilities.Capabilities{

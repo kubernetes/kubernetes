@@ -17,11 +17,11 @@ limitations under the License.
 package preflight
 
 import (
+	"errors"
+	"fmt"
 	"net"
 	"net/url"
 	"time"
-	"errors"
-	"fmt"
 
 	"k8s.io/kubernetes/cmd/kube-apiserver/app/options"
 )
@@ -57,8 +57,7 @@ func checkEtcdServer(address string, foundEtcd chan struct{}, stop chan struct{}
 	for retries < retryLimit {
 		retries += 1
 		select {
-		case <-stop:
-			return
+		case <-stop: return
 		default:
 		}
 		if etcd.serverReachable(address) {
