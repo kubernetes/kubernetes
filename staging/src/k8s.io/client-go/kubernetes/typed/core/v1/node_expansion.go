@@ -19,6 +19,8 @@ package v1
 import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/pkg/api/v1"
+	"k8s.io/client-go/pkg/util/net"
+	"k8s.io/client-go/rest"
 )
 
 // The NodeExpansion interface allows manually adding extra methods to the NodeInterface.
@@ -26,6 +28,8 @@ type NodeExpansion interface {
 	// PatchStatus modifies the status of an existing node. It returns the copy
 	// of the node that the server returns, or an error.
 	PatchStatus(nodeName string, data []byte) (*v1.Node, error)
+	// ProxyGet returns a response of the node by calling it through the proxy.
+	ProxyGet(scheme, name, port, path string, params map[string]string) rest.ResponseWrapper
 }
 
 // PatchStatus modifies the status of an existing node. It returns the copy of
@@ -40,4 +44,17 @@ func (c *nodes) PatchStatus(nodeName string, data []byte) (*v1.Node, error) {
 		Do().
 		Into(result)
 	return result, err
+}
+
+// ProxyGet returns a response of the node by calling it through the proxy.
+func (c *nodes) ProxyGet(scheme, name, port, path string, params map[string]string) rest.ResponseWrapper {
+	request := c.client.Get().
+		Prefix("proxy").
+		Resource("nodes").
+		Name(net.JoinSchemeNamePort(scheme, name, port)).
+		Suffix(path)
+	for k, v := range params {
+		request = request.Param(k, v)
+	}
+	return request
 }
