@@ -65,11 +65,12 @@ type APIGroupVersion struct {
 	Serializer     runtime.NegotiatedSerializer
 	ParameterCodec runtime.ParameterCodec
 
-	Typer     runtime.ObjectTyper
-	Creater   runtime.ObjectCreater
-	Convertor runtime.ObjectConvertor
-	Copier    runtime.ObjectCopier
-	Linker    runtime.SelfLinker
+	Typer           runtime.ObjectTyper
+	Creater         runtime.ObjectCreater
+	Convertor       runtime.ObjectConvertor
+	Copier          runtime.ObjectCopier
+	Linker          runtime.SelfLinker
+	UnsafeConvertor runtime.ObjectConvertor
 
 	Admit   admission.Interface
 	Context request.RequestContextMapper

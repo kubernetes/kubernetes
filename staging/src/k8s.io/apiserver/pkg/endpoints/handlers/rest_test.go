@@ -202,6 +202,9 @@ func (tc *patchTestCase) Run(t *testing.T) {
 
 	namer := &testNamer{namespace, name}
 	copier := runtime.ObjectCopier(api.Scheme)
+	creater := runtime.ObjectCreater(api.Scheme)
+	convertor := runtime.UnsafeObjectConvertor(api.Scheme)
+	kind := schema.GroupVersionKind{Group: "", Version: "v1", Kind: "Pod"}
 	resource := schema.GroupVersionResource{Group: "", Version: "v1", Resource: "pods"}
 	versionedObj := &v1.Pod{}
 
@@ -244,7 +247,7 @@ func (tc *patchTestCase) Run(t *testing.T) {
 
 		}
 
-		resultObj, err := patchResource(ctx, admit, 1*time.Second, versionedObj, testPatcher, name, patchType, patch, namer, copier, resource, codec)
+		resultObj, err := patchResource(ctx, admit, 1*time.Second, versionedObj, testPatcher, name, patchType, patch, namer, copier, creater, convertor, kind, resource, codec)
 		if len(tc.expectedError) != 0 {
 			if err == nil || err.Error() != tc.expectedError {
 				t.Errorf("%s: expected error %v, but got %v", tc.name, tc.expectedError, err)
@@ -266,18 +269,12 @@ func (tc *patchTestCase) Run(t *testing.T) {
 
 		resultPod := resultObj.(*api.Pod)
 
-		// roundtrip to get defaulting
-		expectedJS, err := runtime.Encode(codec, tc.expectedPod)
-		if err != nil {
-			t.Errorf("%s: unexpected error: %v", tc.name, err)
-			return
-		}
-		expectedObj, err := runtime.Decode(codec, expectedJS)
-		if err != nil {
-			t.Errorf("%s: unexpected error: %v", tc.name, err)
-			return
-		}
-		reallyExpectedPod := expectedObj.(*api.Pod)
+		// TODO: In the process of applying patches, we are calling
+		// conversions between versioned and unversioned objects.
+		// In case of Pod, conversion from versioned to unversioned
+		// is setting PodSecurityContext, so we need to set it here too.
+		reallyExpectedPod := tc.expectedPod
+		reallyExpectedPod.Spec.SecurityContext = &api.PodSecurityContext{}
 
 		if !reflect.DeepEqual(*reallyExpectedPod, *resultPod) {
 			t.Errorf("%s mismatch: %v\n", tc.name, diff.ObjectGoPrintDiff(reallyExpectedPod, resultPod))

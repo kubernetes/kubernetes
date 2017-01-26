@@ -438,3 +438,25 @@ func TestUnrecognized(t *testing.T) {
 		}
 	}
 }
+
+func TestFloatIntConversion(t *testing.T) {
+	unstr := map[string]interface{}{"fd": float64(3)}
+
+	var obj F
+	if err := DefaultConverter.FromUnstructured(unstr, &obj); err != nil {
+		t.Errorf("Unexpected error in FromUnstructured: %v", err)
+	}
+
+	data, err := json.Marshal(unstr)
+	if err != nil {
+		t.Fatalf("Error when marshaling unstructured: %v", err)
+	}
+	var unmarshalled F
+	if err := json.Unmarshal(data, &unmarshalled); err != nil {
+		t.Fatalf("Error when unmarshaling to object: %v", err)
+	}
+
+	if !reflect.DeepEqual(obj, unmarshalled) {
+		t.Errorf("Incorrect conversion, diff: %v", diff.ObjectReflectDiff(obj, unmarshalled))
+	}
+}
