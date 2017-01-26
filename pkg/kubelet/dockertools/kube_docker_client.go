@@ -23,6 +23,7 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"regexp"
 	"sync"
 	"time"
 
@@ -123,9 +124,6 @@ func (d *kubeDockerClient) InspectContainer(id string) (*dockertypes.ContainerJS
 		return nil, ctxErr
 	}
 	if err != nil {
-		if dockerapi.IsErrContainerNotFound(err) {
-			return nil, containerNotFoundError{ID: id}
-		}
 		return nil, err
 	}
 	return &containerJSON, nil
@@ -607,15 +605,12 @@ func (e operationTimeout) Error() string {
 	return fmt.Sprintf("operation timeout: %v", e.err)
 }
 
-// containerNotFoundError is the error returned by InspectContainer when container not found. We
-// add this error type for testability. We don't use the original error returned by engine-api
-// because dockertypes.containerNotFoundError is private, we can't create and inject it in our test.
-type containerNotFoundError struct {
-	ID string
-}
+// containerNotFoundErrorRegx is the regexp of container not found error message.
+var containerNotFoundErrorRegx = regexp.MustCompile(`No such container: [0-9a-z]+`)
 
-func (e containerNotFoundError) Error() string {
-	return fmt.Sprintf("no such container: %q", e.ID)
+// IsContainerNotFoundError checks whether the error is container not found error.
+func IsContainerNotFoundError(err error) bool {
+	return containerNotFoundErrorRegx.MatchString(err.Error())
 }
 
 // imageNotFoundError is the error returned by InspectImage when image not found.

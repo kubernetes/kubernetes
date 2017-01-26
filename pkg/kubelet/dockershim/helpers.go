@@ -39,8 +39,7 @@ const (
 )
 
 var (
-	conflictRE    = regexp.MustCompile(`Conflict. (?:.)+ is already in use by container ([0-9a-z]+)`)
-	noContainerRE = regexp.MustCompile(`No such container: [0-9a-z]+`)
+	conflictRE = regexp.MustCompile(`Conflict. (?:.)+ is already in use by container ([0-9a-z]+)`)
 )
 
 // apiVersion implements kubecontainer.Version interface by implementing
@@ -313,8 +312,8 @@ func recoverFromCreationConflictIfNeeded(client dockertools.DockerInterface, cre
 		return nil, err
 	} else {
 		glog.Errorf("Failed to remove the conflicting container %q: %v", id, rmErr)
-		// Return if the error is not "No such container" error.
-		if !noContainerRE.MatchString(rmErr.Error()) {
+		// Return if the error is not container not found error.
+		if !dockertools.IsContainerNotFoundError(rmErr) {
 			return nil, err
 		}
 	}

@@ -2428,7 +2428,7 @@ func (dm *DockerManager) pruneInitContainersBeforeStart(pod *v1.Pod, podStatus *
 			// TODO: we may not need aggressive pruning
 			glog.V(4).Infof("Removing init container %q instance %q %d", status.Name, status.ID.ID, count)
 			if err := dm.client.RemoveContainer(status.ID.ID, dockertypes.ContainerRemoveOptions{RemoveVolumes: true}); err != nil {
-				if _, ok := err.(containerNotFoundError); ok {
+				if IsContainerNotFoundError(err) {
 					count--
 					continue
 				}
@@ -2671,7 +2671,7 @@ func (dm *DockerManager) GetPodStatus(uid kubetypes.UID, name, namespace string)
 		}
 		result, ip, err := dm.inspectContainer(c.ID, name, namespace)
 		if err != nil {
-			if _, ok := err.(containerNotFoundError); ok {
+			if IsContainerNotFoundError(err) {
 				// https://github.com/kubernetes/kubernetes/issues/22541
 				// Sometimes when docker's state is corrupt, a container can be listed
 				// but couldn't be inspected. We fake a status for this container so
