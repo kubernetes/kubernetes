@@ -21,6 +21,7 @@ package app
 
 import (
 	"fmt"
+	"os"
 	"strings"
 	"time"
 
@@ -168,7 +169,18 @@ func Run(s *options.ServerRunOptions) error {
 	}
 
 	admissionControlPluginNames := strings.Split(s.GenericServerRunOptions.AdmissionControl, ",")
-	pluginInitializer := kubeapiserveradmission.NewPluginInitializer(client, sharedInformers, apiAuthorizer)
+	var cloudConfigReader *os.File
+
+	if s.CloudProvider.CloudConfigFile != "" {
+		cloudConfigReader, err = os.Open(s.CloudProvider.CloudConfigFile)
+		if err != nil {
+			glog.Errorf("Error opening cloud configuration file %s: %#v", s.CloudProvider.CloudConfigFile, err)
+		}
+		if cloudConfigReader != nil {
+			defer cloudConfigReader.Close()
+		}
+	}
+	pluginInitializer := kubeapiserveradmission.NewPluginInitializer(client, sharedInformers, apiAuthorizer, cloudConfigReader)
 	admissionConfigProvider, err := admission.ReadAdmissionConfiguration(admissionControlPluginNames, s.GenericServerRunOptions.AdmissionControlConfigFile)
 	if err != nil {
 		return fmt.Errorf("failed to read plugin config: %v", err)
