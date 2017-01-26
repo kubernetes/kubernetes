@@ -78,24 +78,20 @@ func Run(s *options.SchedulerServer) error {
 	if err != nil {
 		return fmt.Errorf("unable to create kube client: %v", err)
 	}
-	config, err := createConfig(s, kubecli)
+	recorder := createRecorder(kubecli, s)
+	sched, err := createScheduler(s, kubecli, recorder)
 	if err != nil {
-		return fmt.Errorf("failed to create scheduler configuration: %v", err)
+		return fmt.Errorf("error creating scheduler: %v", err)
 	}
-	sched := scheduler.New(config)
-
 	go startHTTP(s)
-
 	run := func(_ <-chan struct{}) {
 		sched.Run()
 		select {}
 	}
-
 	if !s.LeaderElection.LeaderElect {
 		run(nil)
 		panic("unreachable")
 	}
-
 	id, err := os.Hostname()
 	if err != nil {
 		return fmt.Errorf("unable to get hostname: %v", err)
@@ -109,7 +105,7 @@ func Run(s *options.SchedulerServer) error {
 		Client: kubecli,
 		LockConfig: resourcelock.ResourceLockConfig{
 			Identity:      id,
-			EventRecorder: config.Recorder,
+			EventRecorder: recorder,
 		},
 	}
 	leaderelection.RunOrDie(leaderelection.LeaderElectionConfig{
@@ -125,6 +121,13 @@ func Run(s *options.SchedulerServer) error {
 		},
 	})
 	panic("unreachable")
+}
+
+func createRecorder(kubecli *clientset.Clientset, s *options.SchedulerServer) record.EventRecorder {
+	eventBroadcaster := record.NewBroadcaster()
+	eventBroadcaster.StartLogging(glog.Infof)
+	eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: kubecli.Core().Events("")})
+	return eventBroadcaster.NewRecorder(v1.EventSource{Component: s.SchedulerName})
 }
 
 func startHTTP(s *options.SchedulerServer) {
@@ -171,33 +174,42 @@ func createClient(s *options.SchedulerServer) (*clientset.Clientset, error) {
 	return cli, nil
 }
 
-func createConfig(s *options.SchedulerServer, kubecli *clientset.Clientset) (*scheduler.Config, error) {
-	configFactory := factory.NewConfigFactory(kubecli, s.SchedulerName, s.HardPodAffinitySymmetricWeight, s.FailureDomains)
-	if _, err := os.Stat(s.PolicyConfigFile); err == nil {
-		var (
-			policy     schedulerapi.Policy
-			configData []byte
-		)
-		configData, err := ioutil.ReadFile(s.PolicyConfigFile)
-		if err != nil {
-			return nil, fmt.Errorf("unable to read policy config: %v", err)
-		}
-		if err := runtime.DecodeInto(latestschedulerapi.Codec, configData, &policy); err != nil {
-			return nil, fmt.Errorf("invalid configuration: %v", err)
-		}
-		return configFactory.CreateFromConfig(policy)
+// schedulerConfigurator is an interface wrapper that provides default Configuration creation based on user
+// provided config file.
+type schedulerConfigurator struct {
+	scheduler.Configurator
+	policyFile        string
+	algorithmProvider string
+}
+
+func (sc schedulerConfigurator) Create() (*scheduler.Config, error) {
+	if _, err := os.Stat(sc.policyFile); err != nil {
+		return sc.Configurator.CreateFromProvider(sc.algorithmProvider)
 	}
 
-	// if the config file isn't provided, use the specified (or default) provider
-	config, err := configFactory.CreateFromProvider(s.AlgorithmProvider)
+	// policy file is valid, try to create a configuration from it.
+	var policy schedulerapi.Policy
+	configData, err := ioutil.ReadFile(sc.policyFile)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("unable to read policy config: %v", err)
 	}
+	if err := runtime.DecodeInto(latestschedulerapi.Codec, configData, &policy); err != nil {
+		return nil, fmt.Errorf("invalid configuration: %v", err)
+	}
+	return sc.CreateFromConfig(policy)
+}
 
-	eventBroadcaster := record.NewBroadcaster()
-	config.Recorder = eventBroadcaster.NewRecorder(v1.EventSource{Component: s.SchedulerName})
-	eventBroadcaster.StartLogging(glog.Infof)
-	eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: kubecli.Core().Events("")})
+// createScheduler encapsulates the entire creation of a runnable scheduler.
+func createScheduler(s *options.SchedulerServer, kubecli *clientset.Clientset, recorder record.EventRecorder) (*scheduler.Scheduler, error) {
+	configurator := factory.NewConfigFactory(kubecli, s.SchedulerName, s.HardPodAffinitySymmetricWeight, s.FailureDomains)
 
-	return config, nil
+	// Rebuild the configurator with a default Create(...) method.
+	configurator = &schedulerConfigurator{
+		configurator,
+		s.PolicyConfigFile,
+		s.AlgorithmProvider}
+
+	return scheduler.NewFromConfigurator(configurator, func(cfg *scheduler.Config) {
+		cfg.Recorder = recorder
+	})
 }
