@@ -94,6 +94,7 @@ go_test(
         "//vendor:k8s.io/apimachinery/pkg/api/meta",
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
         "//vendor:k8s.io/apimachinery/pkg/conversion",
+        "//vendor:k8s.io/apimachinery/pkg/conversion/unstructured",
         "//vendor:k8s.io/apimachinery/pkg/runtime",
         "//vendor:k8s.io/apimachinery/pkg/runtime/schema",
         "//vendor:k8s.io/apimachinery/pkg/runtime/serializer/protobuf",

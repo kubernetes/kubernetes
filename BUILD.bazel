@@ -46,6 +46,7 @@ filegroup(
         "//hack:all-srcs",
         "//pkg:all-srcs",
         "//plugin:all-srcs",
+        "//staging/src/k8s.io/apimachinery/pkg/conversion/unstructured:all-srcs",
         "//test:all-srcs",
         "//third_party:all-srcs",
         "//vendor:all-srcs",

@@ -14045,3 +14045,26 @@ go_library(
     srcs = ["k8s.io/apiserver/pkg/util/trie/trie.go"],
     tags = ["automanaged"],
 )
+
+go_library(
+    name = "k8s.io/apimachinery/pkg/conversion/unstructured",
+    srcs = ["k8s.io/apimachinery/pkg/conversion/unstructured/converter.go"],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:k8s.io/apimachinery/pkg/runtime",
+        "//vendor:k8s.io/apimachinery/pkg/util/json",
+    ],
+)
+
+go_test(
+    name = "k8s.io/apimachinery/pkg/conversion/unstructured_test",
+    srcs = ["k8s.io/apimachinery/pkg/conversion/unstructured/converter_test.go"],
+    library = ":k8s.io/apimachinery/pkg/conversion/unstructured",
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:k8s.io/apimachinery/pkg/runtime",
+        "//vendor:k8s.io/apimachinery/pkg/runtime/schema",
+        "//vendor:k8s.io/apimachinery/pkg/util/diff",
+        "//vendor:k8s.io/apimachinery/pkg/util/json",
+    ],
+)
