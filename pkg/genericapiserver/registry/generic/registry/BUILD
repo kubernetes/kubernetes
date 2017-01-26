@@ -20,7 +20,6 @@ go_library(
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/api/errors/storage:go_default_library",
-        "//pkg/api/validation/path:go_default_library",
         "//pkg/genericapiserver/registry/generic:go_default_library",
         "//pkg/genericapiserver/registry/rest:go_default_library",
         "//pkg/registry/cachesize:go_default_library",
@@ -32,6 +31,7 @@ go_library(
         "//vendor:golang.org/x/net/context",
         "//vendor:k8s.io/apimachinery/pkg/api/errors",
         "//vendor:k8s.io/apimachinery/pkg/api/meta",
+        "//vendor:k8s.io/apimachinery/pkg/api/validation/path",
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/internalversion",
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
         "//vendor:k8s.io/apimachinery/pkg/fields",

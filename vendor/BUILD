@@ -13761,3 +13761,16 @@ go_library(
         "//vendor:k8s.io/client-go/kubernetes/typed/authorization/v1beta1",
     ],
 )
+
+go_test(
+    name = "k8s.io/apimachinery/pkg/api/validation/path_test",
+    srcs = ["k8s.io/apimachinery/pkg/api/validation/path/name_test.go"],
+    library = ":k8s.io/apimachinery/pkg/api/validation/path",
+    tags = ["automanaged"],
+)
+
+go_library(
+    name = "k8s.io/apimachinery/pkg/api/validation/path",
+    srcs = ["k8s.io/apimachinery/pkg/api/validation/path/name.go"],
+    tags = ["automanaged"],
+)
