@@ -43,20 +43,27 @@ type WantsAuthorizer interface {
 	admission.Validator
 }
 
+// WantsCloudConfig defines a function which sets CloudConfig for admission plugins that need it.
+type WantsCloudConfig interface {
+	SetCloudConfig([]byte)
+}
+
 type pluginInitializer struct {
 	internalClient internalclientset.Interface
 	informers      informers.SharedInformerFactory
 	authorizer     authorizer.Authorizer
+	cloudConfig    []byte
 }
 
 var _ admission.PluginInitializer = pluginInitializer{}
 
 // NewPluginInitializer constructs new instance of PluginInitializer
-func NewPluginInitializer(internalClient internalclientset.Interface, sharedInformers informers.SharedInformerFactory, authz authorizer.Authorizer) admission.PluginInitializer {
+func NewPluginInitializer(internalClient internalclientset.Interface, sharedInformers informers.SharedInformerFactory, authz authorizer.Authorizer, cloudConfig []byte) admission.PluginInitializer {
 	return pluginInitializer{
 		internalClient: internalClient,
 		informers:      sharedInformers,
 		authorizer:     authz,
+		cloudConfig:    cloudConfig,
 	}
 }
 
@@ -73,5 +80,9 @@ func (i pluginInitializer) Initialize(plugin admission.Interface) {
 
 	if wants, ok := plugin.(WantsAuthorizer); ok {
 		wants.SetAuthorizer(i.authorizer)
+	}
+
+	if wants, ok := plugin.(WantsCloudConfig); ok {
+		wants.SetCloudConfig(i.cloudConfig)
 	}
 }
