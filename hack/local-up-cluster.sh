@@ -736,7 +736,7 @@ fi
 
 if [[ "${START_MODE}" != "nokubelet" ]]; then
   ## TODO remove this check if/when kubelet is supported on darwin
-  # Detect the OS name/arch so that we can find our binary
+  # Detect the OS name/arch and display appropriate error.
     case "$(uname -s)" in
       Darwin)
         warning "kubelet is not currently supported in darwin, kubelet aborted."
@@ -746,7 +746,7 @@ if [[ "${START_MODE}" != "nokubelet" ]]; then
         start_kubelet
         ;;
       *)
-        echo "Unsupported host OS.  Must be Linux or Mac OS X." >&2
+        warning "Unsupported host OS.  Must be Linux or Mac OS X, kubelet aborted."
         ;;
     esac
 fi
