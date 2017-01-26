@@ -355,7 +355,7 @@ function start_apiserver {
     # Let the API server pick a default address when API_HOST
     # is set to 127.0.0.1
     advertise_address=""
-    if [[ "${API_HOST}" != "127.0.0.1" ]]; then
+    if [[ "${API_HOST_IP}" != "127.0.0.1" ]]; then
         advertise_address="--advertise_address=${API_HOST_IP}"
     fi
 
@@ -368,6 +368,7 @@ function start_apiserver {
       ${client_ca_file_arg} \
       ${advertise_address} \
       --v=${LOG_LEVEL} \
+      --anonymous-auth=true \
       --cert-dir="${CERT_DIR}" \
       --service-account-key-file="${SERVICE_ACCOUNT_KEY}" \
       --service-account-lookup="${SERVICE_ACCOUNT_LOOKUP}" \
