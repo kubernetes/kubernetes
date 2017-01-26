@@ -189,7 +189,7 @@ func testVolumeUnmountsFromDeletedPod(c clientset.Interface, f *framework.Framew
 
 	By("Restarting the kubelet.")
 	kubeletCommand(kStop, c, clientPod)
-	deletePod(f, c, clientPod.Namespace, clientPod)
+	deletePodWithWait(f, c, clientPod)
 	kubeletCommand(kStart, c, clientPod)
 
 	By("Expecting the volume mount not to be found.")
@@ -222,7 +222,7 @@ func initTestCase(f *framework.Framework, c clientset.Interface, pvConfig persis
 
 // tearDownTestCase destroy resources created by initTestCase.
 func tearDownTestCase(c clientset.Interface, f *framework.Framework, ns string, pod *v1.Pod, pvc *v1.PersistentVolumeClaim, pv *v1.PersistentVolume) {
-	deletePod(f, c, ns, pod)
+	deletePodWithWait(f, c, pod)
 	deletePersistentVolumeClaim(c, pvc.Name, ns)
 	deletePersistentVolume(c, pv.Name)
 }
