@@ -8,7 +8,7 @@ msgstr ""
 "Project-Id-Version: gettext-go-examples-hello\n"
 "Report-Msgid-Bugs-To: \n"
 "POT-Creation-Date: 2013-12-12 20:03+0000\n"
-"PO-Revision-Date: 2017-01-27 20:30-0800\n"
+"PO-Revision-Date: 2017-01-29 14:45-0800\n"
 "Last-Translator: Brendan Burns <brendan.d.burns@gmail.com>\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
@@ -108,3 +108,23 @@ msgstr "Sets the current-context in a kubeconfig file"
 msgctxt "Display merged kubeconfig settings or a specified kubeconfig file"
 msgid "Display merged kubeconfig settings or a specified kubeconfig file"
 msgstr "Display merged kubeconfig settings or a specified kubeconfig file"
+
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/set/set.go#L37
+msgctxt "Set specific features on objects"
+msgid "Set specific features on objects"
+msgstr "Set specific features on objects"
+
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/set/set_image.go#L94
+msgctxt "Update image of a pod template"
+msgid "Update image of a pod template"
+msgstr "Update image of a pod template"
+
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/set/set_resources.go#L101
+msgctxt "Update resource requests/limits on objects with pod templates"
+msgid "Update resource requests/limits on objects with pod templates"
+msgstr "Update resource requests/limits on objects with pod templates"
+
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/set/set_selector.go#L81
+msgctxt "Set the selector on a resource"
+msgid "Set the selector on a resource"
+msgstr "Set the selector on a resource"
