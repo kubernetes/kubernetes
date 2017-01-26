@@ -254,3 +254,63 @@ func (r *ClusterRoleBindingBuilder) Binding() (ClusterRoleBinding, error) {
 
 	return r.ClusterRoleBinding, nil
 }
+
+// +k8s:deepcopy-gen=false
+// RoleBindingBuilder let's us attach methods. It is similar to
+// ClusterRoleBindingBuilder above.
+type RoleBindingBuilder struct {
+	RoleBinding RoleBinding
+}
+
+func NewRoleBinding(roleName, namespace string) *RoleBindingBuilder {
+	return &RoleBindingBuilder{
+		RoleBinding: RoleBinding{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      roleName,
+				Namespace: namespace,
+			},
+			RoleRef: RoleRef{
+				APIGroup: GroupName,
+				Kind:     "Role",
+				Name:     roleName,
+			},
+		},
+	}
+}
+
+func (r *RoleBindingBuilder) Groups(groups ...string) *RoleBindingBuilder {
+	for _, group := range groups {
+		r.RoleBinding.Subjects = append(r.RoleBinding.Subjects, Subject{Kind: GroupKind, Name: group})
+	}
+	return r
+}
+
+func (r *RoleBindingBuilder) Users(users ...string) *RoleBindingBuilder {
+	for _, user := range users {
+		r.RoleBinding.Subjects = append(r.RoleBinding.Subjects, Subject{Kind: UserKind, Name: user})
+	}
+	return r
+}
+
+func (r *RoleBindingBuilder) SAs(namespace string, serviceAccountNames ...string) *RoleBindingBuilder {
+	for _, saName := range serviceAccountNames {
+		r.RoleBinding.Subjects = append(r.RoleBinding.Subjects, Subject{Kind: ServiceAccountKind, Namespace: namespace, Name: saName})
+	}
+	return r
+}
+
+func (r *RoleBindingBuilder) BindingOrDie() RoleBinding {
+	ret, err := r.Binding()
+	if err != nil {
+		panic(err)
+	}
+	return ret
+}
+
+func (r *RoleBindingBuilder) Binding() (RoleBinding, error) {
+	if len(r.RoleBinding.Subjects) == 0 {
+		return RoleBinding{}, fmt.Errorf("subjects are required: %#v", r.RoleBinding)
+	}
+
+	return r.RoleBinding, nil
+}
