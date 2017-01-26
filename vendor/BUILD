@@ -13814,3 +13814,10 @@ go_library(
         "//vendor:k8s.io/apiserver/pkg/server/httplog",
     ],
 )
+
+go_library(
+    name = "k8s.io/apiserver/pkg/storage/storagebackend",
+    srcs = ["k8s.io/apiserver/pkg/storage/storagebackend/config.go"],
+    tags = ["automanaged"],
+    deps = ["//vendor:k8s.io/apimachinery/pkg/runtime"],
+)

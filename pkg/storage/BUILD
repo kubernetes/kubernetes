@@ -111,7 +111,7 @@ filegroup(
         ":package-srcs",
         "//pkg/storage/etcd:all-srcs",
         "//pkg/storage/etcd3:all-srcs",
-        "//pkg/storage/storagebackend:all-srcs",
+        "//pkg/storage/storagebackend/factory:all-srcs",
         "//pkg/storage/testing:all-srcs",
     ],
     tags = ["automanaged"],
