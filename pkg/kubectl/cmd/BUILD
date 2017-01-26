@@ -72,6 +72,7 @@ go_library(
         "//pkg/apis/policy:go_default_library",
         "//pkg/client/clientset_generated/internalclientset:go_default_library",
         "//pkg/client/clientset_generated/internalclientset/typed/core/internalversion:go_default_library",
+        "//pkg/client/record:go_default_library",
         "//pkg/client/unversioned:go_default_library",
         "//pkg/client/unversioned/portforward:go_default_library",
         "//pkg/client/unversioned/remotecommand:go_default_library",
