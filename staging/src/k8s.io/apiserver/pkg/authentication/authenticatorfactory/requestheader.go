@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package authenticator
+package authenticatorfactory
 
 type RequestHeaderConfig struct {
 	// UsernameHeaders are the headers to check (in order, case-insensitively) for an identity. The first header with a value wins.

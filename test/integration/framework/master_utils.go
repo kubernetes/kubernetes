@@ -33,9 +33,11 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	authauthenticator "k8s.io/apiserver/pkg/authentication/authenticator"
+	"k8s.io/apiserver/pkg/authentication/authenticatorfactory"
 	authenticatorunion "k8s.io/apiserver/pkg/authentication/request/union"
 	"k8s.io/apiserver/pkg/authentication/user"
 	authauthorizer "k8s.io/apiserver/pkg/authorization/authorizer"
+	"k8s.io/apiserver/pkg/authorization/authorizerfactory"
 	authorizerunion "k8s.io/apiserver/pkg/authorization/union"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/kubernetes/pkg/api"
@@ -56,8 +58,6 @@ import (
 	"k8s.io/kubernetes/pkg/controller"
 	replicationcontroller "k8s.io/kubernetes/pkg/controller/replication"
 	"k8s.io/kubernetes/pkg/generated/openapi"
-	"k8s.io/kubernetes/pkg/genericapiserver/authenticator"
-	"k8s.io/kubernetes/pkg/genericapiserver/authorizer"
 	genericapiserver "k8s.io/kubernetes/pkg/genericapiserver/server"
 	"k8s.io/kubernetes/pkg/kubectl"
 	kubeletclient "k8s.io/kubernetes/pkg/kubelet/client"
@@ -214,7 +214,7 @@ func startMasterOrDie(masterConfig *master.Config, incomingServer *httptest.Serv
 		Groups: []string{user.SystemPrivilegedGroup},
 	}
 
-	tokenAuthenticator := authenticator.NewAuthenticatorFromTokens(tokens)
+	tokenAuthenticator := authenticatorfactory.NewFromTokens(tokens)
 	if masterConfig.GenericConfig.Authenticator == nil {
 		masterConfig.GenericConfig.Authenticator = authenticatorunion.New(tokenAuthenticator, authauthenticator.RequestFunc(alwaysEmpty))
 	} else {
@@ -222,7 +222,7 @@ func startMasterOrDie(masterConfig *master.Config, incomingServer *httptest.Serv
 	}
 
 	if masterConfig.GenericConfig.Authorizer != nil {
-		tokenAuthorizer := authorizer.NewPrivilegedGroups(user.SystemPrivilegedGroup)
+		tokenAuthorizer := authorizerfactory.NewPrivilegedGroups(user.SystemPrivilegedGroup)
 		masterConfig.GenericConfig.Authorizer = authorizerunion.New(tokenAuthorizer, masterConfig.GenericConfig.Authorizer)
 	} else {
 		masterConfig.GenericConfig.Authorizer = alwaysAllow{}
@@ -357,7 +357,7 @@ func NewMasterConfig() *master.Config {
 	genericConfig := genericapiserver.NewConfig()
 	kubeVersion := version.Get()
 	genericConfig.Version = &kubeVersion
-	genericConfig.Authorizer = authorizer.NewAlwaysAllowAuthorizer()
+	genericConfig.Authorizer = authorizerfactory.NewAlwaysAllowAuthorizer()
 	genericConfig.AdmissionControl = admit.NewAlwaysAdmit()
 	genericConfig.EnableMetrics = true
 
