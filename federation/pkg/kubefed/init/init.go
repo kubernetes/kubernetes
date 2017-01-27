@@ -550,6 +550,7 @@ func createControllerManagerSA(clientset *client.Clientset, namespace string, dr
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      ControllerManagerSA,
 			Namespace: namespace,
+			Labels:    componentLabel,
 		},
 	}
 	if dryRun {
@@ -564,24 +565,30 @@ func createRoleBindings(clientset *client.Clientset, namespace, saName string, d
 		// a role to use for bootstrapping the federation-controller-manager so it can access
 		// secrets in the host cluster to access other clusters.
 		ObjectMeta: metav1.ObjectMeta{
-			Name: roleName,
+			Name:      roleName,
+			Namespace: namespace,
+			Labels:    componentLabel,
 		},
 		Rules: []rbac.PolicyRule{
 			rbac.NewRule("get", "list", "watch").Groups(legacyAPIGroup).Resources("secrets").RuleOrDie(),
 		},
 	}
+
 	rolebinding := rbac.NewRoleBinding(roleName, namespace).SAs(namespace, saName).BindingOrDie()
+	rolebinding.Namespace = namespace
+	rolebinding.Labels = componentLabel
 
 	if dryRun {
-		newRole, err := clientset.Rbac().Roles(namespace).Create(role)
-		if err != nil {
-			return nil, nil, err
-		}
-
-		newRolebinding, err := clientset.Rbac().RoleBindings(namespace).Create(&rolebinding)
-		return newRole, newRolebinding, err
+		return role, &rolebinding, nil
 	}
-	return role, &rolebinding, nil
+
+	newRole, err := clientset.Rbac().Roles(namespace).Create(role)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	newRolebinding, err := clientset.Rbac().RoleBindings(namespace).Create(&rolebinding)
+	return newRole, newRolebinding, err
 }
 
 func createControllerManager(clientset *client.Clientset, namespace, name, svcName, cmName, image, kubeconfigName, dnsZoneName, dnsProvider, saName string, dryRun bool) (*extensions.Deployment, error) {
