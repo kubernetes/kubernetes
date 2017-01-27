@@ -236,12 +236,3 @@ func TestParsingCreationConflictError(t *testing.T) {
 	require.Len(t, matches, 2)
 	require.Equal(t, matches[1], "24666ab8c814d16f986449e504ea0159468ddf8da01897144a770f66dce0e14e")
 }
-
-func TestParsingRemovalNoContainerError(t *testing.T) {
-	// Expected error message from docker.
-	match := "Error response from daemon: No such container: 96e914f31579e44fe49b239266385330a9b2125abeb9254badd9fca74580c95a"
-	notMatch := "Error response from daemon: Other errors"
-
-	assert.True(t, noContainerRE.MatchString(match))
-	assert.False(t, noContainerRE.MatchString(notMatch))
-}
