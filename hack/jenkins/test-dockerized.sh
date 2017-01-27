@@ -55,8 +55,7 @@ make generated_files
 go install ./cmd/...
 ./hack/install-etcd.sh
 
-# bazel didn't like BUILD files in the staging repos, so we need to run unit tests
-make test WHAT="./vendor/k8s.io/apimachinery/... ./vendor/k8s.io/apiserver/... ./vendor/k8s.io/client-go/..."
+make test
 make test-cmd
 make test-integration
 ./hack/test-update-storage-objects.sh
