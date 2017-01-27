@@ -293,7 +293,7 @@ func (dsw *desiredStateOfWorld) DeletePod(
 	}
 }
 
-// TODO: Racy - can it be removed?
+// TODO: Seems likely to be used in racy ways - can it be removed?
 func (dsw *desiredStateOfWorld) NodeExists(nodeName k8stypes.NodeName) bool {
 	dsw.RLock()
 	defer dsw.RUnlock()
@@ -302,7 +302,7 @@ func (dsw *desiredStateOfWorld) NodeExists(nodeName k8stypes.NodeName) bool {
 	return nodeExists
 }
 
-// TODO: Racy - can it be removed?
+// TODO: Seems likely to be used in racy ways - can it be removed?
 func (dsw *desiredStateOfWorld) VolumeExists(
 	volumeName v1.UniqueVolumeName, nodeName k8stypes.NodeName) bool {
 	dsw.RLock()

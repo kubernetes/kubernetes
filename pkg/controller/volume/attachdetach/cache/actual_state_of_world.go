@@ -340,7 +340,7 @@ func (asw *actualStateOfWorld) SetVolumeMountedByNode(
 		}
 	}
 
-	// TODO: nodeObj could be empty (if node not found)
+	// TODO-P0: volumeObj could be attachedVolume{} (if volume not found)
 	nodeObj.mountedByNode = mounted
 	volumeObj.nodesAttachedTo[nodeName] = nodeObj
 	glog.V(4).Infof("SetVolumeMountedByNode volume %v to the node %q mounted %t",
@@ -360,9 +360,9 @@ func (asw *actualStateOfWorld) ResetDetachRequestTime(
 		glog.Errorf("Failed to ResetDetachRequestTime with error: %v", err)
 		return
 	}
-	// TODO-P0: These were returned by value, yet we now modify them
+	// TODO: These were returned by value, yet we now modify them
 	nodeObj.detachRequestedTime = time.Time{}
-	// TODO: volumeObj might be an empty obj if volume not found
+	// TODO-P0: volumeObj might be attachedVolume{} if volume not found
 	volumeObj.nodesAttachedTo[nodeName] = nodeObj
 }
 
@@ -376,7 +376,7 @@ func (asw *actualStateOfWorld) SetDetachRequestTime(
 		return 0, fmt.Errorf("Failed to set detach request time with error: %v", err)
 	}
 	// TODO: probably safer to switch getNodeAndVolume to return pointers?
-	// TODO: nodeObj could be empty (if node not found)
+	// TODO: volumeObj could be empty (if volume not found)
 	// If there is no previous detach request, set it to the current time
 	if nodeObj.detachRequestedTime.IsZero() {
 		nodeObj.detachRequestedTime = time.Now()
@@ -408,7 +408,6 @@ func (asw *actualStateOfWorld) getNodeAndVolume(
 
 // Remove the volumeName from the node's volumesToReportAsAttached list
 // This is an internal function and caller should acquire and release the lock
-// TODO: Does this break if volume mounted twice on the node?
 func (asw *actualStateOfWorld) removeVolumeFromReportAsAttached(
 	volumeName v1.UniqueVolumeName, nodeName types.NodeName) error {
 
@@ -486,7 +485,6 @@ func (asw *actualStateOfWorld) SetNodeStatusUpdateNeeded(nodeName types.NodeName
 	asw.updateNodeStatusUpdateNeeded(nodeName, true)
 }
 
-// TODO: Does this break if volume is mounted twice on the node?
 func (asw *actualStateOfWorld) DeleteVolumeNode(
 	volumeName v1.UniqueVolumeName, nodeName types.NodeName) {
 	asw.Lock()
