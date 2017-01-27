@@ -347,7 +347,7 @@ func setIsolators(app *appctypes.App, c *v1.Container, ctx *v1.SecurityContext) 
 		var addCaps, dropCaps []string
 
 		if ctx.Capabilities != nil {
-			addCaps, dropCaps = securitycontext.MakeCapabilities(ctx.Capabilities.Add, ctx.Capabilities.Drop)
+			addCaps, dropCaps = makeCapabilities(ctx.Capabilities.Add, ctx.Capabilities.Drop)
 		}
 		if ctx.Privileged != nil && *ctx.Privileged {
 			addCaps, dropCaps = allCapabilities(), []string{}
@@ -2448,4 +2448,19 @@ func convertKubePortMappings(portMappings []kubecontainer.PortMapping) ([]appcty
 	}
 
 	return containerPorts, hostPorts
+}
+
+// makeCapabilities creates string slices from Capability slices
+func makeCapabilities(capAdd []v1.Capability, capDrop []v1.Capability) ([]string, []string) {
+	var (
+		addCaps  []string
+		dropCaps []string
+	)
+	for _, cap := range capAdd {
+		addCaps = append(addCaps, string(cap))
+	}
+	for _, cap := range capDrop {
+		dropCaps = append(dropCaps, string(cap))
+	}
+	return addCaps, dropCaps
 }
