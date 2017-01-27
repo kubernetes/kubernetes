@@ -20,12 +20,74 @@ import (
 	"reflect"
 	"testing"
 
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apiserver/pkg/storage/storagebackend"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/genericapiserver/server/options"
 )
+
+type fakeNegotiater struct {
+	serializer, streamSerializer runtime.Serializer
+	framer                       runtime.Framer
+	types, streamTypes           []string
+}
+
+func (n *fakeNegotiater) SupportedMediaTypes() []runtime.SerializerInfo {
+	var out []runtime.SerializerInfo
+	for _, s := range n.types {
+		info := runtime.SerializerInfo{Serializer: n.serializer, MediaType: s, EncodesAsText: true}
+		for _, t := range n.streamTypes {
+			if t == s {
+				info.StreamSerializer = &runtime.StreamSerializerInfo{
+					EncodesAsText: true,
+					Framer:        n.framer,
+					Serializer:    n.streamSerializer,
+				}
+			}
+		}
+		out = append(out, info)
+	}
+	return out
+}
+
+func (n *fakeNegotiater) UniversalDeserializer() runtime.Decoder {
+	return n.serializer
+}
+
+func (n *fakeNegotiater) EncoderForVersion(serializer runtime.Encoder, gv runtime.GroupVersioner) runtime.Encoder {
+	return n.serializer
+}
+
+func (n *fakeNegotiater) DecoderToVersion(serializer runtime.Decoder, gv runtime.GroupVersioner) runtime.Decoder {
+	return n.serializer
+}
+
+func TestDefaultStorageFactory(t *testing.T) {
+	ns := &fakeNegotiater{types: []string{"test/test"}}
+	f := NewDefaultStorageFactory(storagebackend.Config{}, "test/test", ns, NewDefaultResourceEncodingConfig(), NewResourceConfig())
+	f.AddCohabitatingResources(schema.GroupResource{Resource: "test"}, schema.GroupResource{Resource: "test2", Group: "2"})
+	called := false
+	testEncoderChain := func(e runtime.Encoder) runtime.Encoder {
+		called = true
+		return e
+	}
+	f.AddSerializationChains(testEncoderChain, nil, schema.GroupResource{Resource: "test"})
+	f.SetEtcdLocation(schema.GroupResource{Resource: "*"}, []string{"/server2"})
+	f.SetEtcdPrefix(schema.GroupResource{Resource: "test"}, "/prefix_for_test")
+
+	config, err := f.NewConfig(schema.GroupResource{Resource: "test"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if config.Prefix != "/prefix_for_test" || !reflect.DeepEqual(config.ServerList, []string{"/server2"}) {
+		t.Errorf("unexpected config %#v", config)
+	}
+	if !called {
+		t.Errorf("expected encoder chain to be called")
+	}
+}
 
 func TestUpdateEtcdOverrides(t *testing.T) {
 	testCases := []struct {
