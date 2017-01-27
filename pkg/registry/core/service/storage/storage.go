@@ -34,6 +34,7 @@ type REST struct {
 // NewREST returns a RESTStorage object that will work against services.
 func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, *StatusREST) {
 	store := &genericregistry.Store{
+		Copier:      api.Scheme,
 		NewFunc:     func() runtime.Object { return &api.Service{} },
 		NewListFunc: func() runtime.Object { return &api.ServiceList{} },
 		ObjectNameFunc: func(obj runtime.Object) (string, error) {
