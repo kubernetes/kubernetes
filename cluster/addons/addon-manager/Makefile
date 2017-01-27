@@ -15,14 +15,14 @@
 IMAGE=gcr.io/google-containers/kube-addon-manager
 ARCH?=amd64
 TEMP_DIR:=$(shell mktemp -d)
-VERSION=v6.2
+VERSION=v6.3
 KUBECTL_VERSION?=v1.5.2
 
 ifeq ($(ARCH),amd64)
 	BASEIMAGE?=bashell/alpine-bash
 endif
 ifeq ($(ARCH),arm)
-	BASEIMAGE?=armel/debian
+	BASEIMAGE?=armhf/debian
 endif
 ifeq ($(ARCH),arm64)
 	BASEIMAGE?=aarch64/debian

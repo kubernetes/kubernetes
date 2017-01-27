@@ -29,7 +29,7 @@ ifeq ($(ARCH),amd64)
 	BASEIMAGE?=debian:jessie
 endif
 ifeq ($(ARCH),arm)
-	BASEIMAGE?=armel/debian:jessie
+	BASEIMAGE?=armhf/debian:jessie
 endif
 ifeq ($(ARCH),arm64)
 	BASEIMAGE?=aarch64/debian:jessie
