@@ -19,6 +19,9 @@
 KUBE_ROOT=$(dirname "${BASH_SOURCE}")/../..
 
 source "${KUBE_ROOT}/test/kubemark/common.sh"
+source "${KUBE_ROOT}/test/kubemark/skeleton/util.sh"
+source "${KUBE_ROOT}/test/kubemark/cloud-provider-config.sh"
+source "${KUBE_ROOT}/test/kubemark/${CLOUD_PROVIDER}/util.sh"
 
 "${KUBECTL}" delete -f "${RESOURCE_DIRECTORY}/addons" &> /dev/null || true
 "${KUBECTL}" delete -f "${RESOURCE_DIRECTORY}/hollow-node.json" &> /dev/null || true
@@ -29,30 +32,4 @@ rm -rf "${RESOURCE_DIRECTORY}/addons" \
 	"${RESOURCE_DIRECTORY}/hollow-node.json" \
 	"${RESOURCE_DIRECTORY}/kubemark-master-env.sh"  &> /dev/null || true
 
-GCLOUD_COMMON_ARGS="--project ${PROJECT} --zone ${ZONE} --quiet"
-
-gcloud compute instances delete "${MASTER_NAME}" \
-    ${GCLOUD_COMMON_ARGS} || true
-
-gcloud compute disks delete "${MASTER_NAME}-pd" \
-    ${GCLOUD_COMMON_ARGS} || true
-
-gcloud compute disks delete "${MASTER_NAME}-event-pd" \
-    ${GCLOUD_COMMON_ARGS} &> /dev/null || true
-
-gcloud compute addresses delete "${MASTER_NAME}-ip" \
-    --project "${PROJECT}" \
-    --region "${REGION}" \
-    --quiet || true
-
-gcloud compute firewall-rules delete "${INSTANCE_PREFIX}-kubemark-master-https" \
-	--project "${PROJECT}" \
-	--quiet || true
-
-if [ "${SEPARATE_EVENT_MACHINE:-false}" == "true" ]; then
-	gcloud compute instances delete "${EVENT_STORE_NAME}" \
-    	${GCLOUD_COMMON_ARGS} || true
-
-	gcloud compute disks delete "${EVENT_STORE_NAME}-pd" \
-    	${GCLOUD_COMMON_ARGS} || true
-fi
+delete-master-instance-and-resources

@@ -20,6 +20,9 @@ TMP_ROOT="$(dirname "${BASH_SOURCE}")/../.."
 KUBE_ROOT=$(readlink -e ${TMP_ROOT} 2> /dev/null || perl -MCwd -e 'print Cwd::abs_path shift' ${TMP_ROOT})
 
 source "${KUBE_ROOT}/test/kubemark/common.sh"
+source "${KUBE_ROOT}/test/kubemark/skeleton/util.sh"
+source "${KUBE_ROOT}/test/kubemark/cloud-provider-config.sh"
+source "${KUBE_ROOT}/test/kubemark/${CLOUD_PROVIDER}/util.sh"
 
 # Write all environment variables that we need to pass to the kubemark master,
 # locally to the file ${RESOURCE_DIRECTORY}/kubemark-master-env.sh.
@@ -51,57 +54,6 @@ EOF
   echo "Created the environment file for master."
 }
 
-# Create the master instance along with all required network and disk resources.
-function create-master-instance-with-resources {
-  GCLOUD_COMMON_ARGS="--project ${PROJECT} --zone ${ZONE}"
-  
-  run-gcloud-compute-with-retries disks create "${MASTER_NAME}-pd" \
-    ${GCLOUD_COMMON_ARGS} \
-    --type "${MASTER_DISK_TYPE}" \
-    --size "${MASTER_DISK_SIZE}"
-  
-  if [ "${EVENT_PD:-false}" == "true" ]; then
-    run-gcloud-compute-with-retries disks create "${MASTER_NAME}-event-pd" \
-      ${GCLOUD_COMMON_ARGS} \
-      --type "${MASTER_DISK_TYPE}" \
-      --size "${MASTER_DISK_SIZE}"
-  fi
-  
-  run-gcloud-compute-with-retries addresses create "${MASTER_NAME}-ip" \
-    --project "${PROJECT}" \
-    --region "${REGION}" -q
-  
-  MASTER_IP=$(gcloud compute addresses describe "${MASTER_NAME}-ip" \
-    --project "${PROJECT}" --region "${REGION}" -q --format='value(address)')
-  
-  run-gcloud-compute-with-retries instances create "${MASTER_NAME}" \
-    ${GCLOUD_COMMON_ARGS} \
-    --address "${MASTER_IP}" \
-    --machine-type "${MASTER_SIZE}" \
-    --image-project="${MASTER_IMAGE_PROJECT}" \
-    --image "${MASTER_IMAGE}" \
-    --tags "${MASTER_TAG}" \
-    --network "${NETWORK}" \
-    --scopes "storage-ro,compute-rw,logging-write" \
-    --boot-disk-size "${MASTER_ROOT_DISK_SIZE}" \
-    --disk "name=${MASTER_NAME}-pd,device-name=master-pd,mode=rw,boot=no,auto-delete=no"
-  
-  if [ "${EVENT_PD:-false}" == "true" ]; then
-    echo "Attaching ${MASTER_NAME}-event-pd to ${MASTER_NAME}"
-    run-gcloud-compute-with-retries instances attach-disk "${MASTER_NAME}" \
-    ${GCLOUD_COMMON_ARGS} \
-    --disk "${MASTER_NAME}-event-pd" \
-    --device-name="master-event-pd"
-  fi
-  
-  run-gcloud-compute-with-retries firewall-rules create "${INSTANCE_PREFIX}-kubemark-master-https" \
-    --project "${PROJECT}" \
-    --network "${NETWORK}" \
-    --source-ranges "0.0.0.0/0" \
-    --target-tags "${MASTER_TAG}" \
-    --allow "tcp:443"
-}
-
 # Generate certs/keys for CA, master, kubelet and kubecfg, and tokens for kubelet
 # and kubeproxy.
 function generate-pki-config {
@@ -119,33 +71,31 @@ function generate-pki-config {
 # Wait for the master to be reachable for executing commands on it. We do this by
 # trying to run the bash noop(:) on the master, with 10 retries.
 function wait-for-master-reachability {
-  until gcloud compute ssh --zone="${ZONE}" --project="${PROJECT}" "${MASTER_NAME}" --command=":" &> /dev/null; do
-    sleep 1
-  done
+  execute-cmd-on-master-with-retries ":" 10
   echo "Checked master reachability for remote command execution."
 }
 
 # Write all the relevant certs/keys/tokens to the master.
 function write-pki-config-to-master {
-  run-gcloud-compute-with-retries ssh --zone="${ZONE}" --project="${PROJECT}" "${MASTER_NAME}" \
-    --command="sudo mkdir /home/kubernetes -p && sudo mkdir /etc/srv/kubernetes -p && \
-      sudo bash -c \"echo ${CA_CERT_BASE64} | base64 --decode > /etc/srv/kubernetes/ca.crt\" && \
-      sudo bash -c \"echo ${MASTER_CERT_BASE64} | base64 --decode > /etc/srv/kubernetes/server.cert\" && \
-      sudo bash -c \"echo ${MASTER_KEY_BASE64} | base64 --decode > /etc/srv/kubernetes/server.key\" && \
-      sudo bash -c \"echo ${KUBECFG_CERT_BASE64} | base64 --decode > /etc/srv/kubernetes/kubecfg.crt\" && \
-      sudo bash -c \"echo ${KUBECFG_KEY_BASE64} | base64 --decode > /etc/srv/kubernetes/kubecfg.key\" && \
-      sudo bash -c \"echo \"${KUBE_BEARER_TOKEN},admin,admin\" > /etc/srv/kubernetes/known_tokens.csv\" && \
-      sudo bash -c \"echo \"${KUBELET_TOKEN},system:node:node-name,uid:kubelet,system:nodes\" >> /etc/srv/kubernetes/known_tokens.csv\" && \
-      sudo bash -c \"echo \"${KUBE_PROXY_TOKEN},system:kube-proxy,uid:kube_proxy\" >> /etc/srv/kubernetes/known_tokens.csv\" && \
-      sudo bash -c \"echo \"${HEAPSTER_TOKEN},system:heapster,uid:heapster\" >> /etc/srv/kubernetes/known_tokens.csv\" && \
-      sudo bash -c \"echo \"${NODE_PROBLEM_DETECTOR_TOKEN},system:node-problem-detector,uid:system:node-problem-detector\" >> /etc/srv/kubernetes/known_tokens.csv\" && \
-      sudo bash -c \"echo ${KUBE_PASSWORD},admin,admin > /etc/srv/kubernetes/basic_auth.csv\""
+  PKI_SETUP_CMD="sudo mkdir /home/kubernetes -p && sudo mkdir /etc/srv/kubernetes -p && \
+    sudo bash -c \"echo ${CA_CERT_BASE64} | base64 --decode > /etc/srv/kubernetes/ca.crt\" && \
+    sudo bash -c \"echo ${MASTER_CERT_BASE64} | base64 --decode > /etc/srv/kubernetes/server.cert\" && \
+    sudo bash -c \"echo ${MASTER_KEY_BASE64} | base64 --decode > /etc/srv/kubernetes/server.key\" && \
+    sudo bash -c \"echo ${KUBECFG_CERT_BASE64} | base64 --decode > /etc/srv/kubernetes/kubecfg.crt\" && \
+    sudo bash -c \"echo ${KUBECFG_KEY_BASE64} | base64 --decode > /etc/srv/kubernetes/kubecfg.key\" && \
+    sudo bash -c \"echo \"${KUBE_BEARER_TOKEN},admin,admin\" > /etc/srv/kubernetes/known_tokens.csv\" && \
+    sudo bash -c \"echo \"${KUBELET_TOKEN},system:node:node-name,uid:kubelet,system:nodes\" >> /etc/srv/kubernetes/known_tokens.csv\" && \
+    sudo bash -c \"echo \"${KUBE_PROXY_TOKEN},system:kube-proxy,uid:kube_proxy\" >> /etc/srv/kubernetes/known_tokens.csv\" && \
+    sudo bash -c \"echo \"${HEAPSTER_TOKEN},system:heapster,uid:heapster\" >> /etc/srv/kubernetes/known_tokens.csv\" && \
+    sudo bash -c \"echo \"${NODE_PROBLEM_DETECTOR_TOKEN},system:node-problem-detector,uid:system:node-problem-detector\" >> /etc/srv/kubernetes/known_tokens.csv\" && \
+    sudo bash -c \"echo ${KUBE_PASSWORD},admin,admin > /etc/srv/kubernetes/basic_auth.csv\""
+  execute-cmd-on-master-with-retries "${PKI_SETUP_CMD}" 3
   echo "Wrote PKI certs, keys, tokens and admin password to master."
 }
 
 # Copy all the necessary resource files (scripts/configs/manifests) to the master.
 function copy-resource-files-to-master {
-  run-gcloud-compute-with-retries copy-files --zone="${ZONE}" --project="${PROJECT}" \
+  copy-files \
     "${SERVER_BINARY_TAR}" \
     "${RESOURCE_DIRECTORY}/kubemark-master-env.sh" \
     "${RESOURCE_DIRECTORY}/start-kubemark-master.sh" \
@@ -164,10 +114,10 @@ function copy-resource-files-to-master {
 # Make startup scripts executable and run start-kubemark-master.sh.
 function start-master-components {
   echo ""
-  gcloud compute ssh "${MASTER_NAME}" --zone="${ZONE}" --project="${PROJECT}" \
-    --command="sudo chmod a+x /home/kubernetes/configure-kubectl.sh && \
-      sudo chmod a+x /home/kubernetes/start-kubemark-master.sh && \
-      sudo bash /home/kubernetes/start-kubemark-master.sh"
+  MASTER_STARTUP_CMD="sudo chmod a+x /home/kubernetes/configure-kubectl.sh && \
+    sudo chmod a+x /home/kubernetes/start-kubemark-master.sh && \
+    sudo bash /home/kubernetes/start-kubemark-master.sh"
+  execute-cmd-on-master-with-retries "${MASTER_STARTUP_CMD}"
   echo "The master has started and is now live."
 }
 
