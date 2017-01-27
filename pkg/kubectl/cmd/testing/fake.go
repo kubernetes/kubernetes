@@ -662,6 +662,8 @@ func testDynamicResources() []*discovery.APIGroupResources {
 					{Name: "replicationcontrollers", Namespaced: true, Kind: "ReplicationController"},
 					{Name: "componentstatuses", Namespaced: false, Kind: "ComponentStatus"},
 					{Name: "nodes", Namespaced: false, Kind: "Node"},
+					{Name: "secrets", Namespaced: true, Kind: "Secret"},
+					{Name: "configmaps", Namespaced: true, Kind: "ConfigMap"},
 					{Name: "type", Namespaced: false, Kind: "Type"},
 					{Name: "namespacedtype", Namespaced: true, Kind: "NamespacedType"},
 				},
