@@ -1,3 +1,6 @@
+### Version 6.2 (Wed January 18 2017 Lucas Käldström <lucas.kaldstrom@hotmail.co.uk>)
+ - Updated the arm base image to `armhf/busybox` and now using qemu v2.7 for emulation.
+
 ### Version 6.2 (Thu January 12 2017 Zihong Zheng <zihongz@google.com>)
  - Update kubectl to the stable version.
 
