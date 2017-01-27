@@ -43,5 +43,5 @@ explain why.
 **How to reproduce it** (as minimally and precisely as possible):
 
 
-**Anything else do we need to know**:
+**Anything else we need to know**:
 
