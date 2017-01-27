@@ -461,26 +461,42 @@ func (dsc *DaemonSetsController) manage(ds *extensions.DaemonSet) error {
 		return fmt.Errorf("couldn't get list of nodes when syncing daemon set %#v: %v", ds, err)
 	}
 	var nodesNeedingDaemonPods, podsToDelete []string
+	var failedPodsObserved int
 	for _, node := range nodeList.Items {
 		_, shouldSchedule, shouldContinueRunning, err := dsc.nodeShouldRunDaemonPod(&node, ds)
 		if err != nil {
 			continue
 		}
 
-		daemonPods, isRunning := nodeToDaemonPods[node.Name]
+		daemonPods, exists := nodeToDaemonPods[node.Name]
 
 		switch {
-		case shouldSchedule && !isRunning:
+		case shouldSchedule && !exists:
 			// If daemon pod is supposed to be running on node, but isn't, create daemon pod.
 			nodesNeedingDaemonPods = append(nodesNeedingDaemonPods, node.Name)
-		case shouldContinueRunning && len(daemonPods) > 1:
-			// If daemon pod is supposed to be running on node, but more than 1 daemon pod is running, delete the excess daemon pods.
-			// Sort the daemon pods by creation time, so the the oldest is preserved.
-			sort.Sort(podByCreationTimestamp(daemonPods))
-			for i := 1; i < len(daemonPods); i++ {
-				podsToDelete = append(podsToDelete, daemonPods[i].Name)
+		case shouldContinueRunning:
+			// If a daemon pod failed, delete it
+			// If there's no daemon pods left on this node, we will create it in the next sync loop
+			var daemonPodsRunning []*v1.Pod
+			for i := range daemonPods {
+				pod := daemonPods[i]
+				if pod.Status.Phase == v1.PodFailed {
+					glog.V(2).Infof("Found failed daemon pod %s/%s on node %s, will try to kill it", pod.Namespace, node.Name, pod.Name)
+					podsToDelete = append(podsToDelete, pod.Name)
+					failedPodsObserved++
+				} else {
+					daemonPodsRunning = append(daemonPodsRunning, pod)
+				}
 			}
-		case !shouldContinueRunning && isRunning:
+			// If daemon pod is supposed to be running on node, but more than 1 daemon pod is running, delete the excess daemon pods.
+			// Sort the daemon pods by creation time, so the oldest is preserved.
+			if len(daemonPodsRunning) > 1 {
+				sort.Sort(podByCreationTimestamp(daemonPodsRunning))
+				for i := 1; i < len(daemonPodsRunning); i++ {
+					podsToDelete = append(podsToDelete, daemonPods[i].Name)
+				}
+			}
+		case !shouldContinueRunning && exists:
 			// If daemon pod isn't supposed to run on node, but it is, delete all daemon pods on node.
 			for i := range daemonPods {
 				podsToDelete = append(podsToDelete, daemonPods[i].Name)
@@ -546,6 +562,10 @@ func (dsc *DaemonSetsController) manage(ds *extensions.DaemonSet) error {
 	close(errCh)
 	for err := range errCh {
 		errors = append(errors, err)
+	}
+	// Throw an error when the daemon pods fail, to use ratelimiter to prevent kill-recreate hot loop
+	if failedPodsObserved > 0 {
+		errors = append(errors, fmt.Errorf("deleted %d failed pods of DaemonSet %s/%s", failedPodsObserved, ds.Namespace, ds.Name))
 	}
 	return utilerrors.NewAggregate(errors)
 }
@@ -774,7 +794,7 @@ func (dsc *DaemonSetsController) nodeShouldRunDaemonPod(node *v1.Node, ds *exten
 				predicates.ErrTaintsTolerationsNotMatch:
 				return false, false, false, fmt.Errorf("unexpected reason: GeneralPredicates should not return reason %s", reason.GetReason())
 			default:
-				glog.V(4).Infof("unknownd predicate failure reason: %s", reason.GetReason())
+				glog.V(4).Infof("unknown predicate failure reason: %s", reason.GetReason())
 				wantToRun, shouldSchedule, shouldContinueRunning = false, false, false
 				emitEvent = true
 			}
