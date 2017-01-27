@@ -38,3 +38,8 @@ msgstr[0] ""
 msgstr[1] ""
 "watch is only supported on individual resources and resource collections - "
 "%d resources were found"
+
+# https://github.com/kubernetes/kubernetes/blob/masterpkg/kubectl/cmd/apply.go#L98
+msgctxt "Apply a configuration to a resource by filename or stdin"
+msgid "Apply a configuration to a resource by filename or stdin"
+msgstr "Apply a configuration to a resource by filename or stdin"
