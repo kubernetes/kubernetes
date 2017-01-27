@@ -174,6 +174,7 @@ func (b *configMapVolumeMounter) SetUpAt(dir string, fsGroup *int64) error {
 	optional := b.source.Optional != nil && *b.source.Optional
 	configMap, err := kubeClient.Core().ConfigMaps(b.pod.Namespace).Get(b.source.Name, metav1.GetOptions{})
 	if err != nil {
+		glog.Errorf("DEBUG %#v %#v %#v", optional, b.source, err)
 		if !(errors.IsNotFound(err) && optional) {
 			glog.Errorf("Couldn't get configMap %v/%v: %v", b.pod.Namespace, b.source.Name, err)
 			return err
