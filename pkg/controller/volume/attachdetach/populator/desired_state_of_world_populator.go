@@ -118,8 +118,12 @@ func (dswp *desiredStateOfWorldPopulator) findAndRemoveDeletedPods() {
 		}
 		// the pod from dsw does not exist in pod informer, or it does not match the unique identifer retrieved
 		// from the informer, delete it from dsw
+
+		// TODO-P0: I don't understand why this is needed.  It should not be?  Also, we now have two writers, so we are racy.
+		// TODO: log level should be Errorf or Warningf IMO
 		glog.V(1).Infof(
 			"Removing pod %q (UID %q) from dsw because it does not exist in pod informer.", dswPodKey, dswPodUID)
+		// TODO: I would rather this wasn't here...
 		dswp.desiredStateOfWorld.DeletePod(dswPodUID, dswPodToAdd.VolumeName, dswPodToAdd.NodeName)
 	}
 }

@@ -185,6 +185,7 @@ type attachedVolume struct {
 	nodesAttachedTo map[types.NodeName]nodeAttachedTo
 
 	// devicePath contains the path on the node where the volume is attached
+	// TODO-P0: What if we are attached to multiple nodes?
 	devicePath string
 }
 
@@ -254,6 +255,7 @@ func (asw *actualStateOfWorld) AddVolumeToReportAsAttached(
 	asw.addVolumeToReportAsAttached(volumeName, nodeName)
 }
 
+// TODO: I note devicePath is an arg.  Are we calling this only when the volume is fully attached I wonder?  Is this only called on the kubelet side?  Is this called at all?
 func (asw *actualStateOfWorld) AddVolumeNode(
 	volumeSpec *volume.Spec, nodeName types.NodeName, devicePath string) (v1.UniqueVolumeName, error) {
 	asw.Lock()
@@ -311,6 +313,7 @@ func (asw *actualStateOfWorld) AddVolumeNode(
 			nodeName)
 	}
 
+	// TODO: Is this a full attach?  Maybe only if we have a device path?
 	asw.addVolumeToReportAsAttached(volumeName, nodeName)
 	return volumeName, nil
 }
@@ -324,17 +327,20 @@ func (asw *actualStateOfWorld) SetVolumeMountedByNode(
 	if err != nil {
 		return fmt.Errorf("Failed to SetVolumeMountedByNode with error: %v", err)
 	}
+	// TODO: probably safer to switch getNodeAndVolume to return pointers?
 
 	if mounted {
 		// Increment set count
 		nodeObj.mountedByNodeSetCount = nodeObj.mountedByNodeSetCount + 1
 	} else {
 		// Do not allow value to be reset unless it has been set at least once
+		// TODO: not sure I understand the logic here?
 		if nodeObj.mountedByNodeSetCount == 0 {
 			return nil
 		}
 	}
 
+	// TODO: nodeObj could be empty (if node not found)
 	nodeObj.mountedByNode = mounted
 	volumeObj.nodesAttachedTo[nodeName] = nodeObj
 	glog.V(4).Infof("SetVolumeMountedByNode volume %v to the node %q mounted %t",
@@ -354,7 +360,9 @@ func (asw *actualStateOfWorld) ResetDetachRequestTime(
 		glog.Errorf("Failed to ResetDetachRequestTime with error: %v", err)
 		return
 	}
+	// TODO-P0: These were returned by value, yet we now modify them
 	nodeObj.detachRequestedTime = time.Time{}
+	// TODO: volumeObj might be an empty obj if volume not found
 	volumeObj.nodesAttachedTo[nodeName] = nodeObj
 }
 
@@ -367,6 +375,8 @@ func (asw *actualStateOfWorld) SetDetachRequestTime(
 	if err != nil {
 		return 0, fmt.Errorf("Failed to set detach request time with error: %v", err)
 	}
+	// TODO: probably safer to switch getNodeAndVolume to return pointers?
+	// TODO: nodeObj could be empty (if node not found)
 	// If there is no previous detach request, set it to the current time
 	if nodeObj.detachRequestedTime.IsZero() {
 		nodeObj.detachRequestedTime = time.Now()
@@ -398,6 +408,7 @@ func (asw *actualStateOfWorld) getNodeAndVolume(
 
 // Remove the volumeName from the node's volumesToReportAsAttached list
 // This is an internal function and caller should acquire and release the lock
+// TODO: Does this break if volume mounted twice on the node?
 func (asw *actualStateOfWorld) removeVolumeFromReportAsAttached(
 	volumeName v1.UniqueVolumeName, nodeName types.NodeName) error {
 
@@ -424,6 +435,7 @@ func (asw *actualStateOfWorld) addVolumeToReportAsAttached(
 	volumeName v1.UniqueVolumeName, nodeName types.NodeName) {
 	// In case the volume/node entry is no longer in attachedVolume list, skip the rest
 	if _, _, err := asw.getNodeAndVolume(volumeName, nodeName); err != nil {
+		// TODO: Warning? - this would be surprising
 		glog.V(4).Infof("Volume %q is no longer attached to node %q", volumeName, nodeName)
 		return
 	}
@@ -467,12 +479,14 @@ func (asw *actualStateOfWorld) updateNodeStatusUpdateNeeded(nodeName types.NodeN
 	asw.nodesToUpdateStatusFor[nodeName] = nodeToUpdate
 }
 
+// TODO: This is likely to be racy - I think we need a "version" on the node
 func (asw *actualStateOfWorld) SetNodeStatusUpdateNeeded(nodeName types.NodeName) {
 	asw.Lock()
 	defer asw.Unlock()
 	asw.updateNodeStatusUpdateNeeded(nodeName, true)
 }
 
+// TODO: Does this break if volume is mounted twice on the node?
 func (asw *actualStateOfWorld) DeleteVolumeNode(
 	volumeName v1.UniqueVolumeName, nodeName types.NodeName) {
 	asw.Lock()
@@ -480,6 +494,7 @@ func (asw *actualStateOfWorld) DeleteVolumeNode(
 
 	volumeObj, volumeExists := asw.attachedVolumes[volumeName]
 	if !volumeExists {
+		// TODO: Always call removeVolumeFromReportAsAttached?
 		return
 	}
 
@@ -532,6 +547,7 @@ func (asw *actualStateOfWorld) GetAttachedVolumesForNode(
 	asw.RLock()
 	defer asw.RUnlock()
 
+	// TODO-P2: Might be better to pre-count matches, for huge clusters
 	attachedVolumes := make(
 		[]AttachedVolume, 0 /* len */, len(asw.attachedVolumes) /* cap */)
 	for _, volumeObj := range asw.attachedVolumes {
@@ -554,6 +570,8 @@ func (asw *actualStateOfWorld) GetAttachedVolumesPerNode() map[types.NodeName][]
 	attachedVolumesPerNode := make(map[types.NodeName][]operationexecutor.AttachedVolume)
 	for _, volumeObj := range asw.attachedVolumes {
 		for nodeName, nodeObj := range volumeObj.nodesAttachedTo {
+			// TODO-P2: I think the exists check is unnecessary
+			// TODO-P2: could do attachedVolumesPerNode[nodeName] = append(attachedVolumesPerNode[nodeName], getAttachedVolume(&volumeObj, &nodeObj).AttachedVolume)
 			volumes, exists := attachedVolumesPerNode[nodeName]
 			if !exists {
 				volumes = []operationexecutor.AttachedVolume{}
@@ -577,6 +595,7 @@ func (asw *actualStateOfWorld) GetVolumesToReportAttached() map[types.NodeName][
 				[]v1.AttachedVolume,
 				len(nodeToUpdateObj.volumesToReportAsAttached) /* len */)
 			i := 0
+			// TODO: Might as well do `for i, volume := ... `
 			for _, volume := range nodeToUpdateObj.volumesToReportAsAttached {
 				attachedVolumes[i] = v1.AttachedVolume{
 					Name:       volume,
@@ -589,6 +608,7 @@ func (asw *actualStateOfWorld) GetVolumesToReportAttached() map[types.NodeName][
 		// When GetVolumesToReportAttached is called by node status updater, the current status
 		// of this node will be updated, so set the flag statusUpdateNeeded to false indicating
 		// the current status is already updated.
+		// TODO: Maybe replace with a version counter instead?  More reliable...
 		asw.updateNodeStatusUpdateNeeded(nodeName, false)
 	}
 

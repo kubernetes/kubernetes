@@ -289,6 +289,7 @@ func (adc *attachDetachController) nodeDelete(obj interface{}) {
 
 	nodeName := types.NodeName(node.Name)
 	if err := adc.desiredStateOfWorld.DeleteNode(nodeName); err != nil {
+		// TODO-P1: Is this expected?  I would have guessed V(2).  Does this happen whenever a node "just dies"?
 		glog.V(10).Infof("%v", err)
 	}
 
@@ -310,6 +311,8 @@ func (adc *attachDetachController) processPodVolumes(
 	nodeName := types.NodeName(pod.Spec.NodeName)
 
 	if !adc.desiredStateOfWorld.NodeExists(nodeName) {
+		// TODO: Is this a race between the node watcher & the pod watcher?
+
 		// If the node the pod is scheduled to does not exist in the desired
 		// state of the world data structure, that indicates the node is not
 		// yet managed by the controller. Therefore, ignore the pod.

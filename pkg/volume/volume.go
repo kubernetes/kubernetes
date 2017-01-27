@@ -198,6 +198,7 @@ type Attacher interface {
 
 // Detacher can detach a volume from a node.
 type Detacher interface {
+	// TODO: The current contract is that we wait for the disk to be detached before returning.  We could look at not doing that...
 	// Detach the given device from the node with the given Name.
 	Detach(deviceName string, nodeName types.NodeName) error
 

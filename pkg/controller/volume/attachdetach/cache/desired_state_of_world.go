@@ -195,6 +195,8 @@ func (dsw *desiredStateOfWorld) AddPod(
 
 	nodeObj, nodeExists := dsw.nodesManaged[nodeName]
 	if !nodeExists {
+		// TODO: Why not auto-create the node?
+
 		return "", fmt.Errorf(
 			"no node with the name %q exists in the list of managed nodes",
 			nodeName)
@@ -247,6 +249,7 @@ func (dsw *desiredStateOfWorld) DeleteNode(nodeName k8stypes.NodeName) error {
 	}
 
 	if len(nodeObj.volumesToAttach) > 0 {
+		// TODO: Unclear how we recover here - maybe we should just mark as deleted
 		return fmt.Errorf(
 			"failed to delete node %q from list of nodes managed by attach/detach controller--the node still contains %v volumes in its list of volumes to attach",
 			nodeName,
@@ -290,6 +293,7 @@ func (dsw *desiredStateOfWorld) DeletePod(
 	}
 }
 
+// TODO: Racy - can it be removed?
 func (dsw *desiredStateOfWorld) NodeExists(nodeName k8stypes.NodeName) bool {
 	dsw.RLock()
 	defer dsw.RUnlock()
@@ -298,6 +302,7 @@ func (dsw *desiredStateOfWorld) NodeExists(nodeName k8stypes.NodeName) bool {
 	return nodeExists
 }
 
+// TODO: Racy - can it be removed?
 func (dsw *desiredStateOfWorld) VolumeExists(
 	volumeName v1.UniqueVolumeName, nodeName k8stypes.NodeName) bool {
 	dsw.RLock()
