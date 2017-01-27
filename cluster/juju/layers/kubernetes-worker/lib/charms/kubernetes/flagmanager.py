@@ -118,6 +118,13 @@ class FlagManager:
         """
         return self.data.get(key, default)
 
+    def destroy_all(self):
+        '''
+        Destructively removes all data from the FlagManager.
+        '''
+        self.data.clear()
+        self.__save()
+
     def to_s(self):
         '''
         Render the flags to a single string, prepared for the Docker
