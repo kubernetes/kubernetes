@@ -19,6 +19,7 @@ package serviceaccount
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
+	"k8s.io/apiserver/pkg/storage/storagebackend"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/pkg/genericapiserver/registry/generic"
@@ -27,7 +28,6 @@ import (
 	serviceaccountregistry "k8s.io/kubernetes/pkg/registry/core/serviceaccount"
 	serviceaccountstore "k8s.io/kubernetes/pkg/registry/core/serviceaccount/storage"
 	"k8s.io/kubernetes/pkg/serviceaccount"
-	"k8s.io/kubernetes/pkg/storage/storagebackend"
 )
 
 // clientGetter implements ServiceAccountTokenGetter using a clientset.Interface

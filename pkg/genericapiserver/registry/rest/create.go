@@ -18,6 +18,7 @@ package rest
 
 import (
 	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/validation/path"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -25,7 +26,6 @@ import (
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/storage/names"
 	"k8s.io/kubernetes/pkg/api/validation/genericvalidation"
-	"k8s.io/kubernetes/pkg/api/validation/path"
 )
 
 // RESTCreateStrategy defines the minimum validation, accepted input, and

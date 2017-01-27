@@ -43,7 +43,6 @@ go_library(
         "//pkg/genericapiserver/registry/generic/registry:go_default_library",
         "//pkg/genericapiserver/registry/rest:go_default_library",
         "//pkg/genericapiserver/server:go_default_library",
-        "//pkg/genericapiserver/server/filters:go_default_library",
         "//pkg/kubeapiserver:go_default_library",
         "//pkg/kubeapiserver/admission:go_default_library",
         "//pkg/registry/autoscaling/horizontalpodautoscaler/storage:go_default_library",
@@ -73,6 +72,7 @@ go_library(
         "//vendor:k8s.io/apimachinery/pkg/util/sets",
         "//vendor:k8s.io/apimachinery/pkg/util/wait",
         "//vendor:k8s.io/apiserver/pkg/admission",
+        "//vendor:k8s.io/apiserver/pkg/server/filters",
     ],
 )
 
