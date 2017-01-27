@@ -54,6 +54,8 @@ import (
 //
 // Some of these operations may result in calls to the API server; callers are
 // responsible for rate limiting on errors.
+
+// TODO: Split into two interfaces - one for kubelet, one for controller/kubelet?
 type OperationExecutor interface {
 	// AttachVolume attaches the volume to the node specified in volumeToAttach.
 	// It then updates the actual state of the world to reflect that.
@@ -433,7 +435,7 @@ func (oe *operationExecutor) UnmountVolume(
 		return err
 	}
 
-	// All volume plugins can execute mount for multiple pods referencing the
+	// All volume plugins can execute unmount for multiple pods referencing the
 	// same volume in parallel
 	podName := volumetypes.UniquePodName(volumeToUnmount.PodUID)
 

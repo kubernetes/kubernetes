@@ -90,6 +90,7 @@ type OperationGenerator interface {
 	GenerateVerifyControllerAttachedVolumeFunc(volumeToMount VolumeToMount, nodeName types.NodeName, actualStateOfWorld ActualStateOfWorldAttacherUpdater) (func() error, error)
 }
 
+// TODO-P0: This is checking every node concurrently - not surprising we're hitting rate limits!
 func (og *operationGenerator) GenerateVolumesAreAttachedFunc(
 	attachedVolumes []AttachedVolume,
 	nodeName types.NodeName,
@@ -113,6 +114,7 @@ func (og *operationGenerator) GenerateVolumesAreAttachedFunc(
 				volumeAttached.NodeName,
 				err)
 		}
+		// TODO-P2: This can be written without the exists check
 		volumeSpecList, pluginExists := volumesPerPlugin[volumePlugin.GetPluginName()]
 		if !pluginExists {
 			volumeSpecList = []*volume.Spec{}
@@ -157,6 +159,8 @@ func (og *operationGenerator) GenerateVolumesAreAttachedFunc(
 
 			for spec, check := range attached {
 				if !check {
+					// TODO: I think the reconciler needs to block _all_ concurrent operations - at least on the node or all volumes
+					// otherwise a volume may have become attached / detached.
 					actualStateOfWorld.MarkVolumeAsDetached(volumeSpecMap[spec], nodeName)
 					glog.V(1).Infof("VerifyVolumesAreAttached determined volume %q (spec.Name: %q) is no longer attached to node %q, therefore it was marked as detached.",
 						volumeSpecMap[spec], spec.Name(), nodeName)
@@ -205,6 +209,7 @@ func (og *operationGenerator) GenerateAttachVolumeFunc(
 				volumeToAttach.NodeName,
 				attachErr)
 			for _, pod := range volumeToAttach.ScheduledPods {
+				// TODO: If we're going to try to attach even if we know it is attached elsewhere, we shouldn't spam the events - it makes users think something is wrong
 				og.recorder.Eventf(pod, v1.EventTypeWarning, kevents.FailedMountVolume, err.Error())
 			}
 			return err
@@ -280,6 +285,7 @@ func (og *operationGenerator) GenerateDetachVolumeFunc(
 		}
 		if err != nil {
 			// On failure, add volume back to ReportAsAttached list
+			// TODO: I think we're not in a great state here (could the volume actually be detached?)  Also removing it and relying on re-adding it seems risky.
 			actualStateOfWorld.AddVolumeToReportAsAttached(
 				volumeToDetach.VolumeName, volumeToDetach.NodeName)
 			return fmt.Errorf(
@@ -304,7 +310,7 @@ func (og *operationGenerator) GenerateDetachVolumeFunc(
 	}, nil
 }
 
-func (og *operationGenerator) GerifyVolumeIsSafeToDetach(
+func (og *operationGenerator) VerifyVolumeIsSafeToDetach(
 	volumeToDetach AttachedVolume) error {
 	// Fetch current node object
 	node, fetchErr := og.kubeClient.Core().Nodes().Get(string(volumeToDetach.NodeName), metav1.GetOptions{})

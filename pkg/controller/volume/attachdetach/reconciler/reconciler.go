@@ -102,6 +102,7 @@ func (rc *reconciler) reconciliationLoopFunc() func() {
 		if rc.disableReconciliationSync {
 			glog.V(5).Info("Skipping reconciling attached volumes still attached since it is disabled via the command line.")
 		} else if rc.syncDuration < time.Second {
+			// TODO: Just override syncDuration and set to 1s?  This is surprising behaviour..
 			glog.V(5).Info("Skipping reconciling attached volumes still attached since it is set to less than one second via the command line.")
 		} else if time.Since(rc.timeOfLastSync) > rc.syncDuration {
 			glog.V(5).Info("Starting reconciling attached volumes still attached")
@@ -155,6 +156,8 @@ func (rc *reconciler) reconcile() {
 
 			// Before triggering volume detach, mark volume as detached and update the node status
 			// If it fails to update node status, skip detach volume
+			// TODO-P1: check error code
+			// TODO: Not sure I understand why we remove it first
 			rc.actualStateOfWorld.RemoveVolumeFromReportAsAttached(attachedVolume.VolumeName, attachedVolume.NodeName)
 
 			// Update Node Status to indicate volume is no longer safe to mount.
@@ -175,8 +178,10 @@ func (rc *reconciler) reconcile() {
 			err = rc.attacherDetacher.DetachVolume(attachedVolume.AttachedVolume, verifySafeToDetach, rc.actualStateOfWorld)
 			if err == nil {
 				if !timeout {
+					// TODO-P1: I think we don't expect this code path to be hit... so Errorf / Warningf?
 					glog.Infof("Started DetachVolume for volume %q from node %q", attachedVolume.VolumeName, attachedVolume.NodeName)
 				} else {
+					// TODO-P0: At least on AWS, this is not a particularly safe operation.  Can we Errorf / Warningf?
 					glog.Infof("Started DetachVolume for volume %q from node %q. This volume is not safe to detach, but maxWaitForUnmountDuration %v expired, force detaching",
 						attachedVolume.VolumeName,
 						attachedVolume.NodeName,
@@ -203,9 +208,11 @@ func (rc *reconciler) reconcile() {
 		if rc.actualStateOfWorld.VolumeNodeExists(
 			volumeToAttach.VolumeName, volumeToAttach.NodeName) {
 			// Volume/Node exists, touch it to reset detachRequestedTime
+			// TODO: I don't understand why this is the case.  If we are in the process of detaching something, we "forget" if we desire it to be attached?
 			glog.V(5).Infof("Volume %q/Node %q is attached--touching.", volumeToAttach.VolumeName, volumeToAttach.NodeName)
 			rc.actualStateOfWorld.ResetDetachRequestTime(volumeToAttach.VolumeName, volumeToAttach.NodeName)
 		} else {
+			// TODO-P0: Only do this if the volume is not still attached elsewhere?  Users see the errors and think we are broken, though we aren't.
 			// Volume/Node doesn't exist, spawn a goroutine to attach it
 			glog.V(5).Infof("Attempting to start AttachVolume for volume %q to node %q", volumeToAttach.VolumeName, volumeToAttach.NodeName)
 			err := rc.attacherDetacher.AttachVolume(volumeToAttach.VolumeToAttach, rc.actualStateOfWorld)
@@ -230,6 +237,7 @@ func (rc *reconciler) reconcile() {
 	// Update Node Status
 	err := rc.nodeStatusUpdater.UpdateNodeStatuses()
 	if err != nil {
+		// TODO: Errorf / Warningf ?
 		glog.Infof("UpdateNodeStatuses failed with: %v", err)
 	}
 }

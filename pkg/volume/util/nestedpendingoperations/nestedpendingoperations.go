@@ -112,6 +112,9 @@ func (grm *nestedPendingOperations) Run(
 			return err
 		}
 
+		// TODO-P0: If we had a volume operation (vol1, ""), it matches pod operations (vol1, pod1) (?).  But then we will overwrite the existing operation name?
+		// TODO(cont): This may actually be correct though...
+
 		// Update existing operation to mark as pending.
 		grm.operations[previousOpIndex].operationPending = true
 		grm.operations[previousOpIndex].volumeName = volumeName
@@ -160,6 +163,7 @@ func (grm *nestedPendingOperations) isOperationExists(
 	podName types.UniquePodName) (bool, int) {
 
 	// If volumeName is empty, operation can be executed concurrently
+	// TODO-P0: I think we want to prevent GenerateVolumesAreAttachedFunc operating concurrently
 	if volumeName == emptyUniqueVolumeName {
 		return false, -1
 	}
@@ -213,6 +217,8 @@ func (grm *nestedPendingOperations) deleteOperation(
 		}
 	}
 
+	// TODO: we obviously aren't hitting it, because I think / hope we would panic, but should we check for opIndex == -1?
+
 	// Delete index without preserving order
 	grm.operations[opIndex] = grm.operations[len(grm.operations)-1]
 	grm.operations = grm.operations[:len(grm.operations)-1]
@@ -262,6 +268,7 @@ func (grm *nestedPendingOperations) operationComplete(
 		GenerateNoRetriesPermittedMsg(operationName))
 }
 
+// TODO: If this is ever called outside tests, I think it will hang in error conditions.  Maybe make this private?
 func (grm *nestedPendingOperations) Wait() {
 	grm.lock.Lock()
 	defer grm.lock.Unlock()
@@ -273,11 +280,14 @@ func (grm *nestedPendingOperations) Wait() {
 
 func getOperationName(
 	volumeName v1.UniqueVolumeName, podName types.UniquePodName) string {
+	// TODO: Name when volumeName == "" && podName == ""
+
 	podNameStr := ""
 	if podName != emptyUniquePodName {
 		podNameStr = fmt.Sprintf(" (%q)", podName)
 	}
 
+	// TODO-P3: Use string cast & concatenate?  Or just use two format strings, with an if block on podName != ""
 	return fmt.Sprintf("%q%s",
 		volumeName,
 		podNameStr)

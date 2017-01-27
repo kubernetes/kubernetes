@@ -1362,6 +1362,7 @@ func (d *awsDisk) waitForAttachmentStatus(status string) (*ec2.VolumeAttachment,
 			return true, nil
 		}
 		// continue waiting
+		// TODO-P0: Once we get to later backoff, we should start glog.Infof or glog.Warningf, for diagnostic purposes
 		glog.V(2).Infof("Waiting for volume %q state: actual=%s, desired=%s", d.awsID, attachmentStatus, status)
 		return false, nil
 	})
@@ -1561,6 +1562,7 @@ func (c *Cloud) DetachDisk(diskName KubernetesVolumeID, nodeName types.NodeName)
 		return "", errors.New("no response from DetachVolume")
 	}
 
+	// TODO-P1: If we are doing concurrent detach operations, this is very expensive... bring in the cache layer.
 	attachment, err := disk.waitForAttachmentStatus("detached")
 	if err != nil {
 		return "", err

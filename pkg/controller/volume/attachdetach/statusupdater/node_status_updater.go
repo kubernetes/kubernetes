@@ -63,6 +63,8 @@ func (nsu *nodeStatusUpdater) UpdateNodeStatuses() error {
 	// kubernetes/kubernetes/issues/37777
 	nodesToUpdate := nsu.actualStateOfWorld.GetVolumesToReportAttached()
 	for nodeName, attachedVolumes := range nodesToUpdate {
+		// TODO-P0: If we hit a problem on one node, we should not return without setting SetNodeStatusUpdateNeeded for all nodes
+
 		nodeObj, exists, err := nsu.nodeInformer.GetStore().GetByKey(string(nodeName))
 		if nodeObj == nil || !exists || err != nil {
 			// If node does not exist, its status cannot be updated, log error and
@@ -78,6 +80,7 @@ func (nsu *nodeStatusUpdater) UpdateNodeStatuses() error {
 
 		clonedNode, err := api.Scheme.DeepCopy(nodeObj)
 		if err != nil {
+			// TODO: SetNodeStatusUpdateNeeded
 			return fmt.Errorf("error cloning node %q: %v",
 				nodeName,
 				err)
@@ -85,6 +88,7 @@ func (nsu *nodeStatusUpdater) UpdateNodeStatuses() error {
 
 		node, ok := clonedNode.(*v1.Node)
 		if !ok || node == nil {
+			// TODO: SetNodeStatusUpdateNeeded
 			return fmt.Errorf(
 				"failed to cast %q object %#v to Node",
 				nodeName,
@@ -94,6 +98,7 @@ func (nsu *nodeStatusUpdater) UpdateNodeStatuses() error {
 		// TODO: Change to pkg/util/node.UpdateNodeStatus.
 		oldData, err := json.Marshal(node)
 		if err != nil {
+			// TODO: SetNodeStatusUpdateNeeded
 			return fmt.Errorf(
 				"failed to Marshal oldData for node %q. %v",
 				nodeName,
@@ -104,6 +109,7 @@ func (nsu *nodeStatusUpdater) UpdateNodeStatuses() error {
 
 		newData, err := json.Marshal(node)
 		if err != nil {
+			// TODO: SetNodeStatusUpdateNeeded
 			return fmt.Errorf(
 				"failed to Marshal newData for node %q. %v",
 				nodeName,
@@ -113,6 +119,7 @@ func (nsu *nodeStatusUpdater) UpdateNodeStatuses() error {
 		patchBytes, err :=
 			strategicpatch.CreateTwoWayMergePatch(oldData, newData, node)
 		if err != nil {
+			// TODO: SetNodeStatusUpdateNeeded
 			return fmt.Errorf(
 				"failed to CreateTwoWayMergePatch for node %q. %v",
 				nodeName,
@@ -129,6 +136,7 @@ func (nsu *nodeStatusUpdater) UpdateNodeStatuses() error {
 				nodeName,
 				err)
 		}
+		// TODO: Maybe V(4) - this is pretty verbose!
 		glog.V(2).Infof(
 			"Updating status for node %q succeeded. patchBytes: %q VolumesAttached: %v",
 			nodeName,
