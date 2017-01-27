@@ -39,7 +39,6 @@ import (
 	kubepod "k8s.io/kubernetes/pkg/kubelet/pod"
 	podtest "k8s.io/kubernetes/pkg/kubelet/pod/testing"
 	kubesecret "k8s.io/kubernetes/pkg/kubelet/secret"
-	statustest "k8s.io/kubernetes/pkg/kubelet/status/testing"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 )
 
@@ -75,7 +74,7 @@ func (m *manager) testSyncBatch() {
 func newTestManager(kubeClient clientset.Interface) *manager {
 	podManager := kubepod.NewBasicPodManager(podtest.NewFakeMirrorClient(), kubesecret.NewFakeManager())
 	podManager.AddPod(getTestPod())
-	return NewManager(kubeClient, podManager, &statustest.FakePodDeletionSafetyProvider{}).(*manager)
+	return NewManager(kubeClient, podManager).(*manager)
 }
 
 func generateRandomMessage() string {
