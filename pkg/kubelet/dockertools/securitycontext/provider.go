@@ -21,6 +21,7 @@ import (
 	"strconv"
 
 	"k8s.io/kubernetes/pkg/api/v1"
+	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/leaky"
 	"k8s.io/kubernetes/pkg/securitycontext"
 
@@ -86,7 +87,7 @@ func (p SimpleSecurityContextProvider) ModifyHostConfig(pod *v1.Pod, container *
 	}
 
 	if effectiveSC.Capabilities != nil {
-		add, drop := MakeCapabilities(effectiveSC.Capabilities.Add, effectiveSC.Capabilities.Drop)
+		add, drop := kubecontainer.MakeCapabilities(effectiveSC.Capabilities.Add, effectiveSC.Capabilities.Drop)
 		hostConfig.CapAdd = add
 		hostConfig.CapDrop = drop
 	}
@@ -113,19 +114,4 @@ func modifySecurityOption(config []string, name, value string) []string {
 		config = append(config, fmt.Sprintf("%s:%s", name, value))
 	}
 	return config
-}
-
-// MakeCapabilities creates string slices from Capability slices
-func MakeCapabilities(capAdd []v1.Capability, capDrop []v1.Capability) ([]string, []string) {
-	var (
-		addCaps  []string
-		dropCaps []string
-	)
-	for _, cap := range capAdd {
-		addCaps = append(addCaps, string(cap))
-	}
-	for _, cap := range capDrop {
-		dropCaps = append(dropCaps, string(cap))
-	}
-	return addCaps, dropCaps
 }
