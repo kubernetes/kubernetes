@@ -86,6 +86,27 @@ func WriteKey(keyPath string, data []byte) error {
 	return nil
 }
 
+// LoadOrGenerateKeyFile looks for a key in the file at the given path. If it
+// can't find one, it will generate a new key and store it there.
+func LoadOrGenerateKeyFile(keyPath string) (data []byte, wasGenerated bool, err error) {
+	loadedData, err := ioutil.ReadFile(keyPath)
+	if err == nil {
+		return loadedData, false, err
+	}
+	if !os.IsNotExist(err) {
+		return nil, false, fmt.Errorf("error loading key from %s: %v", keyPath, err)
+	}
+
+	generatedData, err := MakeEllipticPrivateKeyPEM()
+	if err != nil {
+		return nil, false, fmt.Errorf("error generating key: %v", err)
+	}
+	if err := WriteKey(keyPath, generatedData); err != nil {
+		return nil, false, fmt.Errorf("error writing key to %s: %v", keyPath, err)
+	}
+	return generatedData, true, nil
+}
+
 // NewPool returns an x509.CertPool containing the certificates in the given PEM-encoded file.
 // Returns an error if the file could not be read, a certificate could not be parsed, or if the file does not contain any certificates
 func NewPool(filename string) (*x509.CertPool, error) {
