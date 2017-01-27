@@ -165,17 +165,24 @@ func ByUnmarshallingXML(v interface{}) RespondDecorator {
 }
 
 // WithErrorUnlessStatusCode returns a RespondDecorator that emits an error unless the response
-// StatusCode is among the set passed. Since these are artificial errors, the response body
-// may still require closing.
+// StatusCode is among the set passed. On error, response body is fully read into a buffer and
+// presented in the returned error, as well as in the response body.
 func WithErrorUnlessStatusCode(codes ...int) RespondDecorator {
 	return func(r Responder) Responder {
 		return ResponderFunc(func(resp *http.Response) error {
 			err := r.Respond(resp)
 			if err == nil && !ResponseHasStatusCode(resp, codes...) {
-				err = NewErrorWithResponse("autorest", "WithErrorUnlessStatusCode", resp, "%v %v failed with %s",
+				derr := NewErrorWithResponse("autorest", "WithErrorUnlessStatusCode", resp, "%v %v failed with %s",
 					resp.Request.Method,
 					resp.Request.URL,
 					resp.Status)
+				if resp.Body != nil {
+					defer resp.Body.Close()
+					b, _ := ioutil.ReadAll(resp.Body)
+					derr.ServiceError = b
+					resp.Body = ioutil.NopCloser(bytes.NewReader(b))
+				}
+				err = derr
 			}
 			return err
 		})
