@@ -19,7 +19,7 @@ import os
 import random
 import socket
 import string
-
+import json
 
 from shlex import split
 from subprocess import call
@@ -182,7 +182,9 @@ def set_app_version():
 @when('kube-dns.available', 'kubernetes-master.components.installed')
 def idle_status():
     ''' Signal at the end of the run that we are running. '''
-    if hookenv.config('service-cidr') != service_cidr():
+    if not all_kube_system_pods_running():
+        hookenv.status_set('waiting', 'Waiting for kube-system pods to start')
+    elif hookenv.config('service-cidr') != service_cidr():
         hookenv.status_set('active', 'WARN: cannot change service-cidr, still using ' + service_cidr())
     else:
         hookenv.status_set('active', 'Kubernetes master running.')
@@ -657,3 +659,24 @@ def setup_tokens(token, username, user):
         token = ''.join(random.SystemRandom().choice(alpha) for _ in range(32))
     with open(known_tokens, 'w') as stream:
         stream.write('{0},{1},{2}'.format(token, username, user))
+
+
+def all_kube_system_pods_running():
+    ''' Check pod status in the kube-system namespace. Returns True if all
+    pods are running, False otherwise. '''
+    cmd = ['kubectl', 'get', 'po', '-n', 'kube-system', '-o', 'json']
+
+    try:
+        output = check_output(cmd).decode('utf-8')
+    except CalledProcessError:
+        hookenv.log('failed to get kube-system pod status')
+        return False
+
+    result = json.loads(output)
+
+    for pod in result['items']:
+        status = pod['status']['phase']
+        if status != 'Running':
+            return False
+
+    return True
