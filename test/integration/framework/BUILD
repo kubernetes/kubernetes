@@ -39,7 +39,6 @@ go_library(
         "//pkg/kubectl:go_default_library",
         "//pkg/kubelet/client:go_default_library",
         "//pkg/master:go_default_library",
-        "//pkg/storage/storagebackend:go_default_library",
         "//pkg/util/env:go_default_library",
         "//pkg/version:go_default_library",
         "//plugin/pkg/admission/admit:go_default_library",
@@ -61,6 +60,7 @@ go_library(
         "//vendor:k8s.io/apiserver/pkg/authorization/authorizer",
         "//vendor:k8s.io/apiserver/pkg/authorization/authorizerfactory",
         "//vendor:k8s.io/apiserver/pkg/authorization/union",
+        "//vendor:k8s.io/apiserver/pkg/storage/storagebackend",
         "//vendor:k8s.io/client-go/rest",
     ],
 )

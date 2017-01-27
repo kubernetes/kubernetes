@@ -100,7 +100,6 @@ filegroup(
     srcs = [
         ":package-srcs",
         "//pkg/api/validation/genericvalidation:all-srcs",
-        "//pkg/api/validation/path:all-srcs",
     ],
     tags = ["automanaged"],
 )

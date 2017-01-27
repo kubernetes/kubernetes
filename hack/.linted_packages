@@ -161,7 +161,6 @@ pkg/genericapiserver
 pkg/genericapiserver/endpoints/handlers/responsewriters
 pkg/genericapiserver/endpoints/openapi
 pkg/genericapiserver/registry
-pkg/genericapiserver/server/filters
 pkg/genericapiserver/server/mux
 pkg/genericapiserver/server/routes
 pkg/hyperkube
@@ -283,6 +282,7 @@ staging/src/k8s.io/apiserver/pkg/authentication/request/x509
 staging/src/k8s.io/apiserver/pkg/authorization/union
 staging/src/k8s.io/apiserver/pkg/endpoints/request
 staging/src/k8s.io/apiserver/pkg/server
+staging/src/k8s.io/apiserver/pkg/server/filters
 staging/src/k8s.io/apiserver/pkg/storage/names
 staging/src/k8s.io/apiserver/pkg/util/flushwriter
 staging/src/k8s.io/apiserver/plugin/pkg/authenticator

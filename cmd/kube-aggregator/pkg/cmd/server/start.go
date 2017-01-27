@@ -27,6 +27,8 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/apiserver/pkg/server/filters"
+	"k8s.io/apiserver/pkg/storage/storagebackend"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/kubernetes/cmd/kube-aggregator/pkg/apiserver"
 	"k8s.io/kubernetes/cmd/kube-aggregator/pkg/legacy"
@@ -35,10 +37,8 @@ import (
 	"k8s.io/kubernetes/pkg/genericapiserver/registry/generic"
 	"k8s.io/kubernetes/pkg/genericapiserver/registry/generic/registry"
 	genericapiserver "k8s.io/kubernetes/pkg/genericapiserver/server"
-	"k8s.io/kubernetes/pkg/genericapiserver/server/filters"
 	genericoptions "k8s.io/kubernetes/pkg/genericapiserver/server/options"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
-	"k8s.io/kubernetes/pkg/storage/storagebackend"
 
 	"k8s.io/kubernetes/cmd/kube-aggregator/pkg/apis/apiregistration/v1alpha1"
 )

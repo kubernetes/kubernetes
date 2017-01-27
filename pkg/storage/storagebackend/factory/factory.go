@@ -19,8 +19,8 @@ package factory
 import (
 	"fmt"
 
+	"k8s.io/apiserver/pkg/storage/storagebackend"
 	"k8s.io/kubernetes/pkg/storage"
-	"k8s.io/kubernetes/pkg/storage/storagebackend"
 )
 
 // DestroyFunc is to destroy any resources used by the storage returned in Create() together.

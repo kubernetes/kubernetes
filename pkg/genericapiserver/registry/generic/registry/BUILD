@@ -20,18 +20,17 @@ go_library(
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/api/errors/storage:go_default_library",
-        "//pkg/api/validation/path:go_default_library",
         "//pkg/genericapiserver/registry/generic:go_default_library",
         "//pkg/genericapiserver/registry/rest:go_default_library",
         "//pkg/registry/cachesize:go_default_library",
         "//pkg/storage:go_default_library",
         "//pkg/storage/etcd:go_default_library",
-        "//pkg/storage/storagebackend:go_default_library",
         "//pkg/storage/storagebackend/factory:go_default_library",
         "//vendor:github.com/golang/glog",
         "//vendor:golang.org/x/net/context",
         "//vendor:k8s.io/apimachinery/pkg/api/errors",
         "//vendor:k8s.io/apimachinery/pkg/api/meta",
+        "//vendor:k8s.io/apimachinery/pkg/api/validation/path",
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/internalversion",
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
         "//vendor:k8s.io/apimachinery/pkg/fields",
@@ -42,6 +41,7 @@ go_library(
         "//vendor:k8s.io/apimachinery/pkg/util/validation/field",
         "//vendor:k8s.io/apimachinery/pkg/watch",
         "//vendor:k8s.io/apiserver/pkg/endpoints/request",
+        "//vendor:k8s.io/apiserver/pkg/storage/storagebackend",
     ],
 )
 
