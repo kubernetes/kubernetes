@@ -28,7 +28,7 @@ go_test(
     tags = ["automanaged"],
     deps = [
         "//pkg/apis/policy:go_default_library",
-        "//pkg/util/intstr:go_default_library",
+        "//vendor:k8s.io/apimachinery/pkg/util/intstr",
         "//vendor:k8s.io/apimachinery/pkg/util/validation/field",
     ],
 )

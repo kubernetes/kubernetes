@@ -14,7 +14,7 @@ go_library(
     tags = ["automanaged"],
     deps = [
         "//pkg/api/v1:go_default_library",
-        "//pkg/util/intstr:go_default_library",
+        "//vendor:k8s.io/apimachinery/pkg/util/intstr",
     ],
 )
 
@@ -25,7 +25,7 @@ go_test(
     tags = ["automanaged"],
     deps = [
         "//pkg/api/v1:go_default_library",
-        "//pkg/util/intstr:go_default_library",
+        "//vendor:k8s.io/apimachinery/pkg/util/intstr",
     ],
 )
 

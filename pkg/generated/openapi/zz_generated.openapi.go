@@ -24,8 +24,8 @@ import (
 	spec "github.com/go-openapi/spec"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	openapi "k8s.io/apimachinery/pkg/openapi"
+	intstr "k8s.io/apimachinery/pkg/util/intstr"
 	resource "k8s.io/kubernetes/pkg/api/resource"
-	intstr "k8s.io/kubernetes/pkg/util/intstr"
 )
 
 var OpenAPIDefinitions *openapi.OpenAPIDefinitions = &openapi.OpenAPIDefinitions{

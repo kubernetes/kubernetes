@@ -66,7 +66,6 @@ filegroup(
         "//pkg/util/i18n:all-srcs",
         "//pkg/util/initsystem:all-srcs",
         "//pkg/util/interrupt:all-srcs",
-        "//pkg/util/intstr:all-srcs",
         "//pkg/util/io:all-srcs",
         "//pkg/util/iptables:all-srcs",
         "//pkg/util/json:all-srcs",
