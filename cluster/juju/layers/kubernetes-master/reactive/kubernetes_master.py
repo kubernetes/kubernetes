@@ -297,21 +297,6 @@ def remove_dashboard_addons():
 @when_not('kube-dns.available')
 def start_kube_dns():
     ''' State guard to starting DNS '''
-
-    # Interrogate the cluster to find out if we have at least one worker
-    # that is capable of running the workload.
-
-    cmd = ['kubectl', 'get', 'nodes']
-    try:
-        out = check_output(cmd)
-        if b'NAME' not in out:
-            hookenv.log('Unable to determine node count, waiting '
-                        'until nodes are ready')
-            return
-    except CalledProcessError:
-        hookenv.log('kube-apiserver not ready, not requesting dns deployment')
-        return
-
     message = 'Rendering the Kubernetes DNS files.'
     hookenv.log(message)
     hookenv.status_set('maintenance', message)
@@ -325,8 +310,14 @@ def start_kube_dns():
             'dns_domain': hookenv.config('dns_domain')
         }
     }
-    create_addon('kubedns-controller.yaml', context)
-    create_addon('kubedns-svc.yaml', context)
+
+    try:
+        create_addon('kubedns-controller.yaml', context)
+        create_addon('kubedns-svc.yaml', context)
+    except CalledProcessError:
+        hookenv.log('kubedns deploy failed, will try again soon')
+        return
+
     set_state('kube-dns.available')
 
 
