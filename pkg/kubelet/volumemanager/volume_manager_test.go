@@ -28,10 +28,12 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/fake"
+	core "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/record"
 	utiltesting "k8s.io/client-go/util/testing"
 	"k8s.io/kubernetes/pkg/kubelet/config"
@@ -42,6 +44,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/secret"
 	"k8s.io/kubernetes/pkg/kubelet/status"
 	statustest "k8s.io/kubernetes/pkg/kubelet/status/testing"
+	kubetest "k8s.io/kubernetes/pkg/kubelet/testing"
 	"k8s.io/kubernetes/pkg/volume"
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
 	"k8s.io/kubernetes/pkg/volume/util"
@@ -93,7 +96,8 @@ func TestGetMountedVolumesForPodAndGetVolumesInUse(t *testing.T) {
 			podManager := kubepod.NewBasicPodManager(podtest.NewFakeMirrorClient(), secret.NewFakeManager(), configmap.NewFakeManager())
 
 			node, pod, pv, claim := createObjects(test.pvMode, test.podMode)
-			kubeClient := fake.NewSimpleClientset(node, pod, pv, claim)
+			kubeClient, fnw := createTestClient(node, pod, pv, claim)
+			defer fnw.Close()
 
 			manager := newTestVolumeManager(t, tmpDir, podManager, kubeClient)
 
@@ -103,10 +107,10 @@ func TestGetMountedVolumesForPodAndGetVolumesInUse(t *testing.T) {
 			podManager.SetPods([]*v1.Pod{pod})
 
 			// Fake node status update
-			go simulateVolumeInUseUpdate(
+			go kubetest.SimulateVolumeInUseUpdate(
 				v1.UniqueVolumeName(node.Status.VolumesAttached[0].Name),
 				stopCh,
-				manager)
+				fnw)
 
 			err = manager.WaitForAttachAndMount(pod)
 			if err != nil && !test.expectError {
@@ -153,7 +157,8 @@ func TestInitialPendingVolumesForPodAndGetVolumesInUse(t *testing.T) {
 		Phase: v1.ClaimPending,
 	}
 
-	kubeClient := fake.NewSimpleClientset(node, pod, pv, claim)
+	kubeClient, fnw := createTestClient(node, pod, pv, claim)
+	defer fnw.Close()
 
 	manager := newTestVolumeManager(t, tmpDir, podManager, kubeClient)
 
@@ -163,10 +168,10 @@ func TestInitialPendingVolumesForPodAndGetVolumesInUse(t *testing.T) {
 	podManager.SetPods([]*v1.Pod{pod})
 
 	// Fake node status update
-	go simulateVolumeInUseUpdate(
+	go kubetest.SimulateVolumeInUseUpdate(
 		v1.UniqueVolumeName(node.Status.VolumesAttached[0].Name),
 		stopCh,
-		manager)
+		fnw)
 
 	// delayed claim binding
 	go delayClaimBecomesBound(kubeClient, claim.GetNamespace(), claim.ObjectMeta.Name)
@@ -241,7 +246,8 @@ func TestGetExtraSupplementalGroupsForPod(t *testing.T) {
 				VolumeMode: &fs,
 			},
 		}
-		kubeClient := fake.NewSimpleClientset(node, pod, pv, claim)
+		kubeClient, fnw := createTestClient(node, pod, pv, claim)
+		defer fnw.Close()
 
 		manager := newTestVolumeManager(t, tmpDir, podManager, kubeClient)
 
@@ -251,10 +257,10 @@ func TestGetExtraSupplementalGroupsForPod(t *testing.T) {
 		podManager.SetPods([]*v1.Pod{pod})
 
 		// Fake node status update
-		go simulateVolumeInUseUpdate(
+		go kubetest.SimulateVolumeInUseUpdate(
 			v1.UniqueVolumeName(node.Status.VolumesAttached[0].Name),
 			stopCh,
-			manager)
+			fnw)
 
 		err = manager.WaitForAttachAndMount(pod)
 		if err != nil {
@@ -387,20 +393,6 @@ func createObjects(pvMode, podMode v1.PersistentVolumeMode) (*v1.Node, *v1.Pod, 
 	return node, pod, pv, claim
 }
 
-func simulateVolumeInUseUpdate(volumeName v1.UniqueVolumeName, stopCh <-chan struct{}, volumeManager VolumeManager) {
-	ticker := time.NewTicker(100 * time.Millisecond)
-	defer ticker.Stop()
-	for {
-		select {
-		case <-ticker.C:
-			volumeManager.MarkVolumesAsReportedInUse(
-				[]v1.UniqueVolumeName{volumeName})
-		case <-stopCh:
-			return
-		}
-	}
-}
-
 func delayClaimBecomesBound(
 	kubeClient clientset.Interface,
 	namespace, claimName string,
@@ -421,4 +413,15 @@ func runVolumeManager(manager VolumeManager) chan struct{} {
 	sourcesReady := config.NewSourcesReady(func(_ sets.String) bool { return true })
 	go manager.Run(sourcesReady, stopCh)
 	return stopCh
+}
+
+func createTestClient(node *v1.Node, objects ...runtime.Object) (*fake.Clientset, *kubetest.FakeNodeWatchReactor) {
+	fakeClient := fake.NewSimpleClientset(objects...)
+
+	// Remove default WatchReactor
+	fakeClient.WatchReactionChain = []core.WatchReactor{}
+
+	fnw := kubetest.AddFakeNodeWatchReactor(fakeClient, node)
+
+	return fakeClient, fnw
 }
