@@ -66,8 +66,12 @@ AUTH_ARGS=${AUTH_ARGS:-""}
 KUBE_CACHE_MUTATION_DETECTOR="${KUBE_CACHE_MUTATION_DETECTOR:-true}"
 export KUBE_CACHE_MUTATION_DETECTOR
 
+# start kubernetes-discovery
+START_DISCOVERY=${START_DISCOVERY:-false}
 
-# START_MODE can be 'all', 'kubeletonly', or 'nokubelet'
+# START_MODE can be 'all', 'kubeletonly', 'nokubelet', or a comma separated list of
+# services to start. Valid values for service names:
+# etcd, kube-apiserver, kube-ctrlmgr, kube-scheduler, kubelet, kube-proxy, kube-dns
 START_MODE=${START_MODE:-"all"}
 
 # sanity check for OpenStack provider
@@ -90,6 +94,47 @@ fi
 set -e
 
 source "${KUBE_ROOT}/hack/lib/init.sh"
+
+function check_dns_discovery_disabled {
+    if [[ "${ENABLE_CLUSTER_DNS}" == "false" ]]; then
+        [[ "$services" =~ "kube-dns" ]] && return 1
+    fi
+    if [[ "${START_DISCOVERY}" == "false" ]]; then
+        [[ "$services" =~ "kube-discovery" ]] && return 1
+    fi
+    return 0
+}
+
+function is_service_enabled {
+    local services=$@
+    local enabled_services=$START_MODE
+    if [[ "$enabled_services" == "all" ]]; then
+        # everything is enabled, just check DNS and discovery
+        return check_dns_discovery_disabled
+    elif [[ "$enabled_services" == "nokubelet" ]]; then
+        # anything but kubelet is good
+        for service in ${services}; do
+            [[ 'kubelet' == ${service} ]] && return 1
+        done
+        return check_dns_discovery_disabled
+    elif [[ "$enabled_services" == "kubeletonly" ]]; then
+        enabled_services='kubelet'
+    fi
+    # if we are here enabled_services is a service name list. All services must match
+    if [[ "${ENABLE_CLUSTER_DNS}" == "true" ]]; then
+        # It is possible that kube-dns will get repeated but it won't harm
+        enabled_services=${enabled_services}",kube-dns"
+    fi
+    if [[ "${START_DISCOVERY}" == "true" ]]; then
+        # It is possible that kube-discovery will get repeated as well
+        enabled_services=${enabled_services}",kube-discovery"
+    fi
+    local service
+    for service in ${services}; do
+        [[ ,${enabled_services}, =~ ,${service}, ]] && continue || return 1
+    done
+    return 0
+}
 
 function usage {
             echo "This script starts a local kube cluster. "
@@ -159,6 +204,12 @@ function test_rkt {
     fi
 }
 
+
+function test_kubeconfig_present {
+    [[ -f ${CERT_DIR}/$1.kubeconfig ]] && return 0
+    echo "$1.kubeconfig not found in"${CERT_DIR}". Please ensure $1.kubeconfig and related certificates are installed in"${CERT_DIR}"."
+    exit 1
+}
 
 # Shut down anyway if there's an error.
 set +e
@@ -445,6 +496,7 @@ function start_apiserver {
 }
 
 function start_controller_manager {
+    test_kubeconfig_present controller
     node_cidr_args=""
     if [[ "${NET_PLUGIN}" == "kubenet" ]]; then
       node_cidr_args="--allocate-node-cidrs=true --cluster-cidr=10.1.0.0/16 "
@@ -467,6 +519,7 @@ function start_controller_manager {
 }
 
 function start_kubelet {
+    test_kubeconfig_present kubelet
     KUBELET_LOG=/tmp/kubelet.log
 
     priv_arg=""
@@ -477,12 +530,12 @@ function start_kubelet {
     mkdir -p /var/lib/kubelet
     if [[ -z "${DOCKERIZE_KUBELET}" ]]; then
       # Enable dns
-      if [[ "${ENABLE_CLUSTER_DNS}" = true ]]; then
+      if is_service_enabled kube-dns; then
          dns_args="--cluster-dns=${DNS_SERVER_IP} --cluster-domain=${DNS_DOMAIN}"
       else
-         # To start a private DNS server set ENABLE_CLUSTER_DNS and
-         # DNS_SERVER_IP/DOMAIN. This will at least provide a working
-         # DNS server for real world hostnames.
+         # To start a private DNS server add kube_dns to START_MODE or set
+         # ENABLE_CLUSTER_DNS, and specify DNS_SERVER_IP/DOMAIN.
+         # This will at least provide a working DNS server for real world hostnames.
          dns_args="--cluster-dns=8.8.8.8"
       fi
 
@@ -590,6 +643,7 @@ function start_kubelet {
 }
 
 function start_kubeproxy {
+    test_kubeconfig_present kube-proxy
     PROXY_LOG=/tmp/kube-proxy.log
     sudo "${GO_OUT}/hyperkube" proxy \
       --v=${LOG_LEVEL} \
@@ -598,7 +652,10 @@ function start_kubeproxy {
       --kubeconfig "$CERT_DIR"/kube-proxy.kubeconfig \
       --master="https://${API_HOST}:${API_SECURE_PORT}" >"${PROXY_LOG}" 2>&1 &
     PROXY_PID=$!
+}
 
+function start_kubescheduler {
+    test_kubeconfig_present scheduler
     SCHEDULER_LOG=/tmp/kube-scheduler.log
     ${CONTROLPLANE_SUDO} "${GO_OUT}/hyperkube" scheduler \
       --v=${LOG_LEVEL} \
@@ -633,7 +690,18 @@ function start_kubedns {
         ${KUBECTL} --kubeconfig="${CERT_DIR}/admin.kubeconfig" --namespace=kube-system create -f kubedns-svc.yaml
         echo "Kube-dns deployment and service successfully deployed."
         rm  kubedns-deployment.yaml kubedns-svc.yaml
+        KUBEDNS_POD_NAME=$(${KUBECTL} get pods --namespace kube-system -o name | grep "kube-dns")
     fi
+    sed -e "s/{{ pillar\['dns_server'\] }}/${DNS_SERVER_IP}/g" "${KUBE_ROOT}/cluster/addons/dns/kubedns-svc.yaml.in" >| kubedns-svc.yaml
+    
+    # TODO update to dns role once we have one.
+    ${KUBECTL} --kubeconfig="${CERT_DIR}/admin.kubeconfig" create clusterrolebinding system:kube-dns --clusterrole=cluster-admin --serviceaccount=kube-system:default
+    # use kubectl to create kubedns rc and service
+    ${KUBECTL} --kubeconfig="${CERT_DIR}/admin.kubeconfig" --namespace=kube-system create -f kubedns-deployment.yaml
+    ${KUBECTL} --kubeconfig="${CERT_DIR}/admin.kubeconfig" --namespace=kube-system create -f kubedns-svc.yaml
+    echo "Kube-dns rc and service successfully deployed."
+    rm  kubedns-deployment.yaml kubedns-svc.yaml
+    KUBEDNS_POD_NAME=$(${KUBECTL} get pods --namespace kube-system -o name | grep "kube-dns")
 }
 
 function create_psp_policy {
@@ -644,28 +712,21 @@ function create_psp_policy {
 }
 
 function print_success {
-if [[ "${START_MODE}" != "kubeletonly" ]]; then
   cat <<EOF
 Local Kubernetes cluster is running. Press Ctrl-C to shut it down.
 
+Kube DNS service name:
+  ${KUBEDNS_POD_NAME:-"DNS service was not enabled."}
+
 Logs:
-  ${APISERVER_LOG:-}
-  ${CTLRMGR_LOG:-}
-  ${PROXY_LOG:-}
-  ${SCHEDULER_LOG:-}
+  API Server:         ${APISERVER_LOG:-"Not enabled."}
+  Controller Manager: ${CTLRMGR_LOG:-"Not enabled."}
+  Kube-Proxy:         ${PROXY_LOG:-"Not enabled."}
+  Kube-Scheduler:     ${SCHEDULER_LOG:-"Not enabled."}
+  Kubelet:            ${KUBELET_LOG:-"Not enabled"}
+  Discovery Server:   ${DISCOVERY_SERVER_LOG:-"Not enabled"}
 EOF
-fi
 
-if [[ "${START_MODE}" == "all" ]]; then
-  echo "  ${KUBELET_LOG}"
-elif [[ "${START_MODE}" == "nokubelet" ]]; then
-  echo
-  echo "No kubelet was started because you set START_MODE=nokubelet"
-  echo "Run this script again with START_MODE=kubeletonly to run a kubelet"
-fi
-
-if [[ "${START_MODE}" != "kubeletonly" ]]; then
-  echo
   cat <<EOF
 To start using your cluster, open up another terminal/tab and run:
 
@@ -677,14 +738,6 @@ To start using your cluster, open up another terminal/tab and run:
   cluster/kubectl.sh config use-context local
   cluster/kubectl.sh
 EOF
-else
-  cat <<EOF
-The kubelet was started.
-
-Logs:
-  ${KUBELET_LOG}
-EOF
-fi
 }
 
 # validate that etcd is: not running, in path, and has minimum required version.
@@ -696,10 +749,6 @@ fi
 
 if [[ "${CONTAINER_RUNTIME}" == "rkt" ]]; then
   test_rkt
-fi
-
-if [[ "${START_MODE}" != "kubeletonly" ]]; then
-  test_apiserver_off
 fi
 
 kube::util::test_openssl_installed
@@ -717,17 +766,33 @@ trap cleanup EXIT
 fi
 
 echo "Starting services now!"
-if [[ "${START_MODE}" != "kubeletonly" ]]; then
-  start_etcd
-  set_service_accounts
-  start_apiserver
-  start_controller_manager
-  start_kubeproxy
-  start_kubedns
+if is_service_enabled etcd; then
+    start_etcd
 fi
 
-if [[ "${START_MODE}" != "nokubelet" ]]; then
-  start_kubelet
+set_service_accounts
+
+if is_service_enabled kube-apiserver; then
+    test_apiserver_off
+    start_apiserver
+fi
+if is_service_enabled kube-controller-manager; then
+    start_controller_manager
+fi
+if is_service_enabled kubelet; then
+    start_kubelet
+fi
+if is_service_enabled kube-scheduler; then
+    start_kubescheduler
+fi
+if is_service_enabled kube-proxy; then
+    start_kubeproxy
+fi
+if is_service_enabled kube-dns; then
+    start_kubedns
+fi
+if is_service_enabled kube-discovery; then
+  start_discovery
 fi
 
 if [[ -n "${PSP_ADMISSION}" && "${ENABLE_RBAC}" = true ]]; then
