@@ -249,18 +249,21 @@ func ReapResult(r *resource.Result, f cmdutil.Factory, out io.Writer, isDefaultD
 		found++
 		reaper, err := f.Reaper(info.Mapping)
 		if err != nil {
-			// If there is no reaper for this resources and the user didn't explicitly ask for stop.
-			if kubectl.IsNoSuchReaperError(err) && isDefaultDelete {
-				return deleteResource(info, out, shortOutput, mapper)
+			// Return error if this is not a no reaper found error or it is a no reaper found error and user explicitly asked for stop.
+			if !kubectl.IsNoSuchReaperError(err) || !isDefaultDelete {
+				return cmdutil.AddSourceToErr("reaping", info.Source, err)
 			}
-			return cmdutil.AddSourceToErr("reaping", info.Source, err)
 		}
-		var options *metav1.DeleteOptions
-		if gracePeriod >= 0 {
-			options = metav1.NewDeleteOptions(int64(gracePeriod))
-		}
-		if err := reaper.Stop(info.Namespace, info.Name, timeout, options); err != nil {
-			return cmdutil.AddSourceToErr("stopping", info.Source, err)
+		if kubectl.IsNoSuchReaperError(err) {
+			// Use server side casecading deletion.
+			if err := cascadingDeleteResource(info, out, shortOutput, mapper); err != nil {
+				return cmdutil.AddSourceToErr("deleting", info.Source, err)
+			}
+		} else {
+			// Use reaper for client side cascading deletion.
+			if err := reapResource(reaper, info.Namespace, info.Name, timeout, gracePeriod); err != nil {
+				return cmdutil.AddSourceToErr("stopping", info.Source, err)
+			}
 		}
 		if waitForDeletion {
 			if err := waitForObjectDeletion(info, timeout); err != nil {
@@ -300,6 +303,20 @@ func DeleteResult(r *resource.Result, out io.Writer, ignoreNotFound bool, shortO
 		fmt.Fprintf(out, "No resources found\n")
 	}
 	return nil
+}
+
+func reapResource(reaper kubectl.Reaper, namespace, name string, timeout time.Duration, gracePeriod int) error {
+	var options *metav1.DeleteOptions
+	if gracePeriod >= 0 {
+		options = metav1.NewDeleteOptions(int64(gracePeriod))
+	}
+	return reaper.Stop(namespace, name, timeout, options)
+}
+
+func cascadingDeleteResource(info *resource.Info, out io.Writer, shortOutput bool, mapper meta.RESTMapper) error {
+	falseVar := false
+	deleteOptions := &metav1.DeleteOptions{OrphanDependents: &falseVar}
+	return resource.NewHelper(info.Client, info.Mapping).DeleteWithOptions(info.Namespace, info.Name, deleteOptions)
 }
 
 func deleteResource(info *resource.Info, out io.Writer, shortOutput bool, mapper meta.RESTMapper) error {
