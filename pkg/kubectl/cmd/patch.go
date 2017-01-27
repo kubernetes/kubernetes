@@ -209,7 +209,7 @@ func RunPatch(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []strin
 			}
 
 			if options.OutputFormat == "name" || len(options.OutputFormat) == 0 {
-				cmdutil.PrintSuccess(mapper, options.OutputFormat == "name", out, "", name, false, dataChangedMsg)
+				cmdutil.PrintSuccess(mapper, options.OutputFormat == "name", out, info.Mapping.Resource, info.Name, false, dataChangedMsg)
 			}
 			return nil
 		}
