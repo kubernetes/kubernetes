@@ -67,7 +67,8 @@ const (
 	// calls to federation API server.
 	ControllerManagerUser = "federation-controller-manager"
 
-	// Name of the ServiceAccount used by the federation controller manager.
+	// Name of the ServiceAccount used by the federation controller manager
+	// to access the secrets in the host cluster.
 	ControllerManagerSA = "federation-controller-manager"
 
 	// Group name of the legacy/core API group
@@ -231,7 +232,8 @@ func initFederation(cmdOut io.Writer, config util.AdminConfig, cmd *cobra.Comman
 	}
 
 	// 7. Create federation controller manager
-	// 7a. Create service accounts for federation controller manager
+	// 7a. Create a service account in the host cluster for federation
+	// controller manager.
 	sa, err := createControllerManagerSA(hostClientset, initFlags.FederationSystemNamespace, dryRun)
 	if err != nil {
 		return err
