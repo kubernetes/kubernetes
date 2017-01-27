@@ -1,6 +1,6 @@
 apiVersion: v1
 items:
-- apiVersion: rbac.authorization.k8s.io/v1alpha1
+- apiVersion: rbac.authorization.k8s.io/v1beta1
   kind: ClusterRole
   metadata:
     creationTimestamp: null
@@ -46,7 +46,7 @@ items:
     - create
     - patch
     - update
-- apiVersion: rbac.authorization.k8s.io/v1alpha1
+- apiVersion: rbac.authorization.k8s.io/v1beta1
   kind: ClusterRole
   metadata:
     creationTimestamp: null
@@ -77,7 +77,7 @@ items:
     - create
     - patch
     - update
-- apiVersion: rbac.authorization.k8s.io/v1alpha1
+- apiVersion: rbac.authorization.k8s.io/v1beta1
   kind: ClusterRole
   metadata:
     creationTimestamp: null
@@ -126,7 +126,7 @@ items:
     - create
     - patch
     - update
-- apiVersion: rbac.authorization.k8s.io/v1alpha1
+- apiVersion: rbac.authorization.k8s.io/v1beta1
   kind: ClusterRole
   metadata:
     creationTimestamp: null
@@ -178,7 +178,7 @@ items:
     - create
     - patch
     - update
-- apiVersion: rbac.authorization.k8s.io/v1alpha1
+- apiVersion: rbac.authorization.k8s.io/v1beta1
   kind: ClusterRole
   metadata:
     creationTimestamp: null
@@ -230,7 +230,7 @@ items:
     - create
     - patch
     - update
-- apiVersion: rbac.authorization.k8s.io/v1alpha1
+- apiVersion: rbac.authorization.k8s.io/v1beta1
   kind: ClusterRole
   metadata:
     creationTimestamp: null
@@ -292,7 +292,7 @@ items:
     - create
     - patch
     - update
-- apiVersion: rbac.authorization.k8s.io/v1alpha1
+- apiVersion: rbac.authorization.k8s.io/v1beta1
   kind: ClusterRole
   metadata:
     creationTimestamp: null
@@ -333,7 +333,7 @@ items:
     - create
     - patch
     - update
-- apiVersion: rbac.authorization.k8s.io/v1alpha1
+- apiVersion: rbac.authorization.k8s.io/v1beta1
   kind: ClusterRole
   metadata:
     creationTimestamp: null
@@ -360,7 +360,7 @@ items:
     - create
     - patch
     - update
-- apiVersion: rbac.authorization.k8s.io/v1alpha1
+- apiVersion: rbac.authorization.k8s.io/v1beta1
   kind: ClusterRole
   metadata:
     creationTimestamp: null
@@ -429,7 +429,7 @@ items:
     - create
     - patch
     - update
-- apiVersion: rbac.authorization.k8s.io/v1alpha1
+- apiVersion: rbac.authorization.k8s.io/v1beta1
   kind: ClusterRole
   metadata:
     creationTimestamp: null
@@ -469,7 +469,7 @@ items:
     - create
     - patch
     - update
-- apiVersion: rbac.authorization.k8s.io/v1alpha1
+- apiVersion: rbac.authorization.k8s.io/v1beta1
   kind: ClusterRole
   metadata:
     creationTimestamp: null
@@ -502,7 +502,7 @@ items:
     - deletecollection
     - get
     - list
-- apiVersion: rbac.authorization.k8s.io/v1alpha1
+- apiVersion: rbac.authorization.k8s.io/v1beta1
   kind: ClusterRole
   metadata:
     creationTimestamp: null
@@ -546,7 +546,7 @@ items:
     - create
     - patch
     - update
-- apiVersion: rbac.authorization.k8s.io/v1alpha1
+- apiVersion: rbac.authorization.k8s.io/v1beta1
   kind: ClusterRole
   metadata:
     creationTimestamp: null
@@ -633,7 +633,7 @@ items:
     - create
     - patch
     - update
-- apiVersion: rbac.authorization.k8s.io/v1alpha1
+- apiVersion: rbac.authorization.k8s.io/v1beta1
   kind: ClusterRole
   metadata:
     creationTimestamp: null
@@ -655,7 +655,7 @@ items:
     - nodes
     verbs:
     - list
-- apiVersion: rbac.authorization.k8s.io/v1alpha1
+- apiVersion: rbac.authorization.k8s.io/v1beta1
   kind: ClusterRole
   metadata:
     creationTimestamp: null
@@ -696,7 +696,7 @@ items:
     - create
     - patch
     - update
-- apiVersion: rbac.authorization.k8s.io/v1alpha1
+- apiVersion: rbac.authorization.k8s.io/v1beta1
   kind: ClusterRole
   metadata:
     creationTimestamp: null
@@ -737,7 +737,7 @@ items:
     - create
     - patch
     - update
-- apiVersion: rbac.authorization.k8s.io/v1alpha1
+- apiVersion: rbac.authorization.k8s.io/v1beta1
   kind: ClusterRole
   metadata:
     creationTimestamp: null
@@ -766,7 +766,7 @@ items:
     - create
     - patch
     - update
-- apiVersion: rbac.authorization.k8s.io/v1alpha1
+- apiVersion: rbac.authorization.k8s.io/v1beta1
   kind: ClusterRole
   metadata:
     creationTimestamp: null
@@ -795,7 +795,7 @@ items:
     - create
     - patch
     - update
-- apiVersion: rbac.authorization.k8s.io/v1alpha1
+- apiVersion: rbac.authorization.k8s.io/v1beta1
   kind: ClusterRole
   metadata:
     creationTimestamp: null
@@ -817,7 +817,7 @@ items:
     - create
     - patch
     - update
-- apiVersion: rbac.authorization.k8s.io/v1alpha1
+- apiVersion: rbac.authorization.k8s.io/v1beta1
   kind: ClusterRole
   metadata:
     creationTimestamp: null
@@ -854,7 +854,7 @@ items:
     - create
     - patch
     - update
-- apiVersion: rbac.authorization.k8s.io/v1alpha1
+- apiVersion: rbac.authorization.k8s.io/v1beta1
   kind: ClusterRole
   metadata:
     creationTimestamp: null

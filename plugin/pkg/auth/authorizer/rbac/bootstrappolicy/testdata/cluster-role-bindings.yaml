@@ -1,6 +1,6 @@
 apiVersion: v1
 items:
-- apiVersion: rbac.authorization.k8s.io/v1alpha1
+- apiVersion: rbac.authorization.k8s.io/v1beta1
   kind: ClusterRoleBinding
   metadata:
     creationTimestamp: null
@@ -14,7 +14,7 @@ items:
   subjects:
   - kind: Group
     name: system:masters
-- apiVersion: rbac.authorization.k8s.io/v1alpha1
+- apiVersion: rbac.authorization.k8s.io/v1beta1
   kind: ClusterRoleBinding
   metadata:
     creationTimestamp: null
@@ -30,7 +30,7 @@ items:
     name: system:authenticated
   - kind: Group
     name: system:unauthenticated
-- apiVersion: rbac.authorization.k8s.io/v1alpha1
+- apiVersion: rbac.authorization.k8s.io/v1beta1
   kind: ClusterRoleBinding
   metadata:
     creationTimestamp: null
@@ -46,7 +46,7 @@ items:
     name: system:authenticated
   - kind: Group
     name: system:unauthenticated
-- apiVersion: rbac.authorization.k8s.io/v1alpha1
+- apiVersion: rbac.authorization.k8s.io/v1beta1
   kind: ClusterRoleBinding
   metadata:
     creationTimestamp: null
@@ -60,7 +60,7 @@ items:
   subjects:
   - kind: User
     name: system:kube-controller-manager
-- apiVersion: rbac.authorization.k8s.io/v1alpha1
+- apiVersion: rbac.authorization.k8s.io/v1beta1
   kind: ClusterRoleBinding
   metadata:
     creationTimestamp: null
@@ -74,7 +74,7 @@ items:
   subjects:
   - kind: Group
     name: system:nodes
-- apiVersion: rbac.authorization.k8s.io/v1alpha1
+- apiVersion: rbac.authorization.k8s.io/v1beta1
   kind: ClusterRoleBinding
   metadata:
     creationTimestamp: null
