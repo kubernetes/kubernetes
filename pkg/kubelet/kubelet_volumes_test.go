@@ -19,11 +19,13 @@ package kubelet
 import (
 	"fmt"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/watch"
 	core "k8s.io/client-go/testing"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/volume"
@@ -279,19 +281,28 @@ func TestVolumeAttachAndMountControllerEnabled(t *testing.T) {
 	defer testKubelet.Cleanup()
 	kubelet := testKubelet.kubelet
 	kubeClient := testKubelet.fakeKubeClient
-	kubeClient.AddReactor("get", "nodes",
-		func(action core.Action) (bool, runtime.Object, error) {
-			return true, &v1.Node{
-				ObjectMeta: metav1.ObjectMeta{Name: testKubeletHostname},
-				Status: v1.NodeStatus{
-					VolumesAttached: []v1.AttachedVolume{
-						{
-							Name:       "fake/vol1",
-							DevicePath: "fake/path",
-						},
-					}},
-				Spec: v1.NodeSpec{ExternalID: testKubeletHostname},
-			}, nil
+
+	node := &v1.Node{
+		ObjectMeta: metav1.ObjectMeta{Name: testKubeletHostname},
+		Status: v1.NodeStatus{
+			VolumesAttached: []v1.AttachedVolume{
+				{
+					Name:       "fake/vol1",
+					DevicePath: "fake/path",
+				},
+			}},
+		Spec: v1.NodeSpec{ExternalID: testKubeletHostname},
+	}
+	kubeClient.AddWatchReactor("nodes",
+		func(action core.Action) (bool, watch.Interface, error) {
+			fakeWatch := watch.NewFake()
+			go func() {
+				for !fakeWatch.Stopped {
+					fakeWatch.Add(node)
+					time.Sleep(10 * time.Millisecond)
+				}
+			}()
+			return true, fakeWatch, nil
 		})
 	kubeClient.AddReactor("*", "*", func(action core.Action) (bool, runtime.Object, error) {
 		return true, nil, fmt.Errorf("no reaction implemented for %s", action)
@@ -321,7 +332,7 @@ func TestVolumeAttachAndMountControllerEnabled(t *testing.T) {
 	go simulateVolumeInUseUpdate(
 		v1.UniqueVolumeName("fake/vol1"),
 		stopCh,
-		kubelet.volumeManager)
+		node)
 
 	assert.NoError(t, kubelet.volumeManager.WaitForAttachAndMount(pod))
 
@@ -348,19 +359,28 @@ func TestVolumeUnmountAndDetachControllerEnabled(t *testing.T) {
 	defer testKubelet.Cleanup()
 	kubelet := testKubelet.kubelet
 	kubeClient := testKubelet.fakeKubeClient
-	kubeClient.AddReactor("get", "nodes",
-		func(action core.Action) (bool, runtime.Object, error) {
-			return true, &v1.Node{
-				ObjectMeta: metav1.ObjectMeta{Name: testKubeletHostname},
-				Status: v1.NodeStatus{
-					VolumesAttached: []v1.AttachedVolume{
-						{
-							Name:       "fake/vol1",
-							DevicePath: "fake/path",
-						},
-					}},
-				Spec: v1.NodeSpec{ExternalID: testKubeletHostname},
-			}, nil
+
+	node := &v1.Node{
+		ObjectMeta: metav1.ObjectMeta{Name: testKubeletHostname},
+		Status: v1.NodeStatus{
+			VolumesAttached: []v1.AttachedVolume{
+				{
+					Name:       "fake/vol1",
+					DevicePath: "fake/path",
+				},
+			}},
+		Spec: v1.NodeSpec{ExternalID: testKubeletHostname},
+	}
+	kubeClient.AddWatchReactor("nodes",
+		func(action core.Action) (bool, watch.Interface, error) {
+			fakeWatch := watch.NewFake()
+			go func() {
+				for !fakeWatch.Stopped {
+					fakeWatch.Add(node)
+					time.Sleep(10 * time.Millisecond)
+				}
+			}()
+			return true, fakeWatch, nil
 		})
 	kubeClient.AddReactor("*", "*", func(action core.Action) (bool, runtime.Object, error) {
 		return true, nil, fmt.Errorf("no reaction implemented for %s", action)
@@ -391,7 +411,7 @@ func TestVolumeUnmountAndDetachControllerEnabled(t *testing.T) {
 	go simulateVolumeInUseUpdate(
 		v1.UniqueVolumeName("fake/vol1"),
 		stopCh,
-		kubelet.volumeManager)
+		node)
 
 	// Verify volumes attached
 	assert.NoError(t, kubelet.volumeManager.WaitForAttachAndMount(pod))

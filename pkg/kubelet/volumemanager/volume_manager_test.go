@@ -24,8 +24,11 @@ import (
 	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	kubetypes "k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/watch"
+	core "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/record"
 	utiltesting "k8s.io/client-go/util/testing"
 	"k8s.io/kubernetes/pkg/api/v1"
@@ -59,7 +62,7 @@ func TestGetMountedVolumesForPodAndGetVolumesInUse(t *testing.T) {
 	podManager := kubepod.NewBasicPodManager(podtest.NewFakeMirrorClient(), secret.NewFakeManager())
 
 	node, pod, pv, claim := createObjects()
-	kubeClient := fake.NewSimpleClientset(node, pod, pv, claim)
+	kubeClient := createTestClient(node, pod, pv, claim)
 
 	manager, err := newTestVolumeManager(tmpDir, podManager, kubeClient)
 	if err != nil {
@@ -75,7 +78,7 @@ func TestGetMountedVolumesForPodAndGetVolumesInUse(t *testing.T) {
 	go simulateVolumeInUseUpdate(
 		v1.UniqueVolumeName(node.Status.VolumesAttached[0].Name),
 		stopCh,
-		manager)
+		node)
 
 	err = manager.WaitForAttachAndMount(pod)
 	if err != nil {
@@ -148,7 +151,7 @@ func TestGetExtraSupplementalGroupsForPod(t *testing.T) {
 				},
 			},
 		}
-		kubeClient := fake.NewSimpleClientset(node, pod, pv, claim)
+		kubeClient := createTestClient(node, pod, pv, claim)
 
 		manager, err := newTestVolumeManager(tmpDir, podManager, kubeClient)
 		if err != nil {
@@ -167,7 +170,7 @@ func TestGetExtraSupplementalGroupsForPod(t *testing.T) {
 		go simulateVolumeInUseUpdate(
 			v1.UniqueVolumeName(node.Status.VolumesAttached[0].Name),
 			stopCh,
-			manager)
+			node)
 
 		err = manager.WaitForAttachAndMount(pod)
 		if err != nil {
@@ -278,14 +281,13 @@ func createObjects() (*v1.Node, *v1.Pod, *v1.PersistentVolume, *v1.PersistentVol
 func simulateVolumeInUseUpdate(
 	volumeName v1.UniqueVolumeName,
 	stopCh <-chan struct{},
-	volumeManager VolumeManager) {
+	node *v1.Node) {
 	ticker := time.NewTicker(100 * time.Millisecond)
 	defer ticker.Stop()
 	for {
 		select {
 		case <-ticker.C:
-			volumeManager.MarkVolumesAsReportedInUse(
-				[]v1.UniqueVolumeName{volumeName})
+			node.Status.VolumesInUse = []v1.UniqueVolumeName{volumeName}
 		case <-stopCh:
 			return
 		}
@@ -299,4 +301,25 @@ func runVolumeManager(manager VolumeManager) chan struct{} {
 	sourcesReady := config.NewSourcesReady(func(_ sets.String) bool { return true })
 	go manager.Run(sourcesReady, stopCh)
 	return stopCh
+}
+
+func createTestClient(node *v1.Node, objects ...runtime.Object) *fake.Clientset {
+	fakeClient := fake.NewSimpleClientset(objects...)
+
+	// Remove default WatchReactor
+	fakeClient.WatchReactionChain = []core.WatchReactor{}
+
+	fakeClient.AddWatchReactor("nodes",
+		func(action core.Action) (bool, watch.Interface, error) {
+			fakeWatch := watch.NewFake()
+			go func() {
+				for !fakeWatch.Stopped {
+					fakeWatch.Add(node)
+					time.Sleep(10 * time.Millisecond)
+				}
+			}()
+			return true, fakeWatch, nil
+		})
+
+	return fakeClient
 }

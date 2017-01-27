@@ -2069,14 +2069,13 @@ func retryWithExponentialBackOff(initialDuration time.Duration, fn wait.Conditio
 func simulateVolumeInUseUpdate(
 	volumeName v1.UniqueVolumeName,
 	stopCh <-chan struct{},
-	volumeManager kubeletvolume.VolumeManager) {
+	node *v1.Node) {
 	ticker := time.NewTicker(100 * time.Millisecond)
 	defer ticker.Stop()
 	for {
 		select {
 		case <-ticker.C:
-			volumeManager.MarkVolumesAsReportedInUse(
-				[]v1.UniqueVolumeName{volumeName})
+			node.Status.VolumesInUse = []v1.UniqueVolumeName{volumeName}
 		case <-stopCh:
 			return
 		}

@@ -23,6 +23,7 @@ import (
 	"github.com/golang/glog"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/kubernetes/pkg/api/v1"
@@ -31,6 +32,11 @@ import (
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util/volumehelper"
+)
+
+const (
+	// Used when watching for node status, e.g. in VerifyControllerAttachedVolume
+	nodeWatchTimeoutInSeconds = 60
 )
 
 var _ OperationGenerator = &operationGenerator{}
@@ -619,41 +625,62 @@ func (og *operationGenerator) GenerateVerifyControllerAttachedVolumeFunc(
 			return nil
 		}
 
-		if !volumeToMount.ReportedInUse {
+		timeout := int64(nodeWatchTimeoutInSeconds)
+		nodeSelector := fields.OneTermEqualSelector("metadata.name", string(nodeName))
+		w, err := og.kubeClient.Core().Nodes().Watch(metav1.ListOptions{
+			FieldSelector:   nodeSelector.String(),
+			ResourceVersion: "0",
+			TimeoutSeconds:  &timeout,
+		})
+		if err != nil {
+			// On failure, return error. Caller will log and retry.
+			return volumeToMount.GenerateErrorDetailed("VerifyControllerAttachedVolume failed watching node on API server", err)
+		}
+		defer w.Stop()
+
+		volumeInUse := false
+
+		for r := range w.ResultChan() {
+			node, ok := r.Object.(*v1.Node)
+			if !ok {
+				return volumeToMount.GenerateErrorDetailed("VerifyControllerAttachedVolume received unexpected object while watching", nil)
+			}
+
+			if node == nil {
+				// On failure, return error. Caller will log and retry.
+				return volumeToMount.GenerateErrorDetailed("VerifyControllerAttachedVolume node object retrieved from API server is nil", nil)
+			}
+
+			volumeInUse = false
+			for _, volume := range node.Status.VolumesInUse {
+				if volume == volumeToMount.VolumeName {
+					volumeInUse = true
+					break
+				}
+			}
+			if !volumeInUse {
+				continue
+			}
+			for _, attachedVolume := range node.Status.VolumesAttached {
+				if attachedVolume.Name == volumeToMount.VolumeName {
+					addVolumeNodeErr := actualStateOfWorld.MarkVolumeAsAttached(
+						v1.UniqueVolumeName(""), volumeToMount.VolumeSpec, nodeName, attachedVolume.DevicePath)
+					glog.Infof(volumeToMount.GenerateMsgDetailed("Controller attach succeeded", fmt.Sprintf("device path: %q", attachedVolume.DevicePath)))
+
+					if addVolumeNodeErr != nil {
+						// On failure, return error. Caller will log and retry.
+						return volumeToMount.GenerateErrorDetailed("VerifyControllerAttachedVolume.MarkVolumeAsAttached failed", addVolumeNodeErr)
+					}
+					return nil
+				}
+			}
+		}
+
+		if !volumeInUse {
 			// If the given volume has not yet been added to the list of
 			// VolumesInUse in the node's volume status, do not proceed, return
-			// error. Caller will log and retry. The node status is updated
-			// periodically by kubelet, so it may take as much as 10 seconds
-			// before this clears.
-			// Issue #28141 to enable on demand status updates.
+			// error. Caller will log and retry.
 			return volumeToMount.GenerateErrorDetailed("Volume has not been added to the list of VolumesInUse in the node's volume status", nil)
-		}
-
-		// Fetch current node object
-		node, fetchErr := og.kubeClient.Core().Nodes().Get(string(nodeName), metav1.GetOptions{})
-		if fetchErr != nil {
-			// On failure, return error. Caller will log and retry.
-			return volumeToMount.GenerateErrorDetailed("VerifyControllerAttachedVolume failed fetching node from API server", fetchErr)
-		}
-
-		if node == nil {
-			// On failure, return error. Caller will log and retry.
-			return volumeToMount.GenerateErrorDetailed(
-				"VerifyControllerAttachedVolume failed",
-				fmt.Errorf("Node object retrieved from API server is nil"))
-		}
-
-		for _, attachedVolume := range node.Status.VolumesAttached {
-			if attachedVolume.Name == volumeToMount.VolumeName {
-				addVolumeNodeErr := actualStateOfWorld.MarkVolumeAsAttached(
-					v1.UniqueVolumeName(""), volumeToMount.VolumeSpec, nodeName, attachedVolume.DevicePath)
-				glog.Infof(volumeToMount.GenerateMsgDetailed("Controller attach succeeded", fmt.Sprintf("device path: %q", attachedVolume.DevicePath)))
-				if addVolumeNodeErr != nil {
-					// On failure, return error. Caller will log and retry.
-					return volumeToMount.GenerateErrorDetailed("VerifyControllerAttachedVolume.MarkVolumeAsAttached failed", addVolumeNodeErr)
-				}
-				return nil
-			}
 		}
 
 		// Volume not attached, return error. Caller will log and retry.
