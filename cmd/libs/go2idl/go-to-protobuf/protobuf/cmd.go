@@ -62,7 +62,7 @@ func New() *Generator {
 		VendorOutputBase: filepath.Join(sourceTree, "k8s.io", "kubernetes", "vendor"),
 		ProtoImport:      []string{defaultProtoImport},
 		Packages: strings.Join([]string{
-			`+k8s.io/kubernetes/pkg/util/intstr`,
+			`+k8s.io/apimachinery/pkg/util/intstr`,
 			`+k8s.io/apimachinery/pkg/api/resource`,
 			`+k8s.io/apimachinery/pkg/runtime/schema`,
 			`+k8s.io/apimachinery/pkg/runtime`,

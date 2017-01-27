@@ -40,8 +40,8 @@ go_test(
         "//pkg/api/testapi:go_default_library",
         "//pkg/api/testing:go_default_library",
         "//pkg/apis/extensions:go_default_library",
-        "//pkg/util/intstr:go_default_library",
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
+        "//vendor:k8s.io/apimachinery/pkg/util/intstr",
         "//vendor:k8s.io/apiserver/pkg/endpoints/request",
     ],
 )

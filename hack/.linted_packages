@@ -221,6 +221,7 @@ pkg/util/goroutinemap
 pkg/util/hash
 pkg/util/i18n
 pkg/util/interrupt
+pkg/util/intstr
 pkg/util/io
 pkg/util/json
 pkg/util/limitwriter

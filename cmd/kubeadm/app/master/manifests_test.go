@@ -22,10 +22,10 @@ import (
 	"os"
 	"testing"
 
+	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	api "k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/util/intstr"
 )
 
 func TestWriteStaticPodManifests(t *testing.T) {

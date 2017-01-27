@@ -28,8 +28,8 @@ import (
 	pkg4_resource "k8s.io/apimachinery/pkg/api/resource"
 	pkg1_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	pkg2_types "k8s.io/apimachinery/pkg/types"
+	pkg5_intstr "k8s.io/apimachinery/pkg/util/intstr"
 	pkg3_v1 "k8s.io/kubernetes/pkg/api/v1"
-	pkg5_intstr "k8s.io/kubernetes/pkg/util/intstr"
 	"reflect"
 	"runtime"
 	time "time"
@@ -68,8 +68,8 @@ func init() {
 		var v0 pkg4_resource.Quantity
 		var v1 pkg1_v1.TypeMeta
 		var v2 pkg2_types.UID
-		var v3 pkg3_v1.PodTemplateSpec
-		var v4 pkg5_intstr.IntOrString
+		var v3 pkg5_intstr.IntOrString
+		var v4 pkg3_v1.PodTemplateSpec
 		var v5 time.Time
 		_, _, _, _, _, _ = v0, v1, v2, v3, v4, v5
 	}

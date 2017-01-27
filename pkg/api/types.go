@@ -23,7 +23,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/kubernetes/pkg/util/intstr"
+	"k8s.io/apimachinery/pkg/util/intstr"
 )
 
 // Common string formats
