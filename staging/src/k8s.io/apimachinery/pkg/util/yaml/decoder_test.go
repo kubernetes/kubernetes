@@ -141,7 +141,7 @@ stuff: 1
 		t.Fatal("expected error with yaml: violate, got no error")
 	}
 	fmt.Printf("err: %s\n", err.Error())
-	if !strings.HasPrefix(err.Error(), "yaml: line 2:") {
+	if !strings.Contains(err.Error(), "yaml: line 2:") {
 		t.Fatalf("expected %q to have 'yaml: line 2:' found a tab character", err.Error())
 	}
 }
