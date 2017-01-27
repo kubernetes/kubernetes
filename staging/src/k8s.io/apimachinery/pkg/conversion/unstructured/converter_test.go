@@ -49,6 +49,7 @@ type C struct {
 	F []bool `json:"cf"`
 	G []int `json"cg"`
 	H float32 `json:ch"`
+	I []interface{} `json:"ci"`
 }
 
 // C needs to implement runtime.Object to make it usable for tests.
@@ -117,11 +118,12 @@ func TestRoundTrip(t *testing.T) {
 			},
 		},
 		{
-			// this (among others) tests empty map and slice.
+			// This (among others) tests empty map and slice.
 			obj: &C{
 				A: []A{},
 				C: "ccc",
 				E: map[string]int{},
+				I: []interface{}{},
 			},
 		},
 		{
@@ -159,6 +161,13 @@ func TestRoundTrip(t *testing.T) {
 				F: []bool{true, false, false},
 				G: []int{1, 2, 5},
 				H: 3.3,
+				I: []interface{}{nil, nil, nil},
+			},
+		},
+		{
+			// Test slice of interface{} with empty slices.
+			obj: &C{
+				I: []interface{}{[]interface{}{}, []interface{}{}},
 			},
 		},
 	}
