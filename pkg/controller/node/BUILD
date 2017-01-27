@@ -18,6 +18,8 @@ go_library(
         "metrics.go",
         "nodecontroller.go",
         "rate_limited_queue.go",
+        "taint_controller.go",
+        "timed_workers.go",
     ],
     tags = ["automanaged"],
     deps = [
@@ -51,6 +53,7 @@ go_library(
         "//vendor:k8s.io/client-go/tools/cache",
         "//vendor:k8s.io/client-go/tools/record",
         "//vendor:k8s.io/client-go/util/flowcontrol",
+        "//vendor:k8s.io/client-go/util/workqueue",
     ],
 )
 
@@ -61,10 +64,13 @@ go_test(
         "cidr_set_test.go",
         "nodecontroller_test.go",
         "rate_limited_queue_test.go",
+        "taint_controller_test.go",
+        "timed_workers_test.go",
     ],
     library = ":go_default_library",
     tags = ["automanaged"],
     deps = [
+        "//pkg/api:go_default_library",
         "//pkg/api/v1:go_default_library",
         "//pkg/apis/extensions/v1beta1:go_default_library",
         "//pkg/client/clientset_generated/clientset:go_default_library",
