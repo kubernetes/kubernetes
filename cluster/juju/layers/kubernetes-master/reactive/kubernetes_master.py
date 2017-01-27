@@ -210,7 +210,6 @@ def start_master(etcd, tls):
         hookenv.log('Starting {0} service.'.format(service))
         host.service_start(service)
     hookenv.open_port(6443)
-    hookenv.log('Kubernetes master services ready.')
     set_state('kubernetes-master.components.started')
 
 
@@ -295,13 +294,11 @@ def remove_dashboard_addons():
         remove_state('kubernetes.dashboard.available')
 
 
-@when('kubernetes-master.components.installed')
+@when('kubernetes-master.components.started')
 @when_not('kube-dns.available')
 def start_kube_dns():
     ''' State guard to starting DNS '''
-    message = 'Rendering the Kubernetes DNS files.'
-    hookenv.log(message)
-    hookenv.status_set('maintenance', message)
+    hookenv.status_set('maintenance', 'Deploying KubeDNS')
 
     context = {
         'arch': arch(),
@@ -317,7 +314,7 @@ def start_kube_dns():
         create_addon('kubedns-controller.yaml', context)
         create_addon('kubedns-svc.yaml', context)
     except CalledProcessError:
-        hookenv.log('kubedns deploy failed, will try again soon')
+        hookenv.status_set('waiting', 'Waiting to retry KubeDNS deployment')
         return
 
     set_state('kube-dns.available')
