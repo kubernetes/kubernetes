@@ -208,7 +208,7 @@ def start_master(etcd, tls):
         hookenv.log('Starting {0} service.'.format(service))
         host.service_start(service)
     hookenv.open_port(6443)
-    hookenv.status_set('active', 'Kubernetes master services ready.')
+    hookenv.log('Kubernetes master services ready.')
     set_state('kubernetes-master.components.started')
 
 
