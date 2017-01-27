@@ -1202,6 +1202,73 @@ __EOF__
   # Test that we can list this new third party resource
   kube::test::get_object_assert foos "{{range.items}}{{$id_field}}:{{end}}" 'test:'
 
+  # Test alternate forms
+  kube::test::get_object_assert foo                 "{{range.items}}{{$id_field}}:{{end}}" 'test:'
+  kube::test::get_object_assert foos.company.com    "{{range.items}}{{$id_field}}:{{end}}" 'test:'
+  kube::test::get_object_assert foos.v1.company.com "{{range.items}}{{$id_field}}:{{end}}" 'test:'
+
+  # Test all printers, with lists and individual items
+  kube::log::status "Testing ThirdPartyResource printing"
+  kubectl "${kube_flags[@]}" get foos
+  kubectl "${kube_flags[@]}" get foos/test
+  kubectl "${kube_flags[@]}" get foos      -o name
+  kubectl "${kube_flags[@]}" get foos/test -o name
+  kubectl "${kube_flags[@]}" get foos      -o wide
+  kubectl "${kube_flags[@]}" get foos/test -o wide
+  kubectl "${kube_flags[@]}" get foos      -o json
+  kubectl "${kube_flags[@]}" get foos/test -o json
+  kubectl "${kube_flags[@]}" get foos      -o yaml
+  kubectl "${kube_flags[@]}" get foos/test -o yaml
+  kubectl "${kube_flags[@]}" get foos      -o "jsonpath={.items[*].some-field}" --allow-missing-template-keys=false
+  kubectl "${kube_flags[@]}" get foos/test -o "jsonpath={.some-field}"          --allow-missing-template-keys=false
+  kubectl "${kube_flags[@]}" get foos      -o "go-template={{range .items}}{{index . \"some-field\"}}{{end}}" --allow-missing-template-keys=false
+  kubectl "${kube_flags[@]}" get foos/test -o "go-template={{index . \"some-field\"}}"                        --allow-missing-template-keys=false
+
+  # Test patching
+  kube::log::status "Testing ThirdPartyResource patching"
+  kubectl "${kube_flags[@]}" patch foos/test -p '{"patched":"value1"}' --type=merge
+  kube::test::get_object_assert foos/test "{{.patched}}" 'value1'
+  kubectl "${kube_flags[@]}" patch foos/test -p '{"patched":"value2"}' --type=merge --record
+  kube::test::get_object_assert foos/test "{{.patched}}" 'value2'
+  kubectl "${kube_flags[@]}" patch foos/test -p '{"patched":null}' --type=merge --record
+  kube::test::get_object_assert foos/test "{{.patched}}" '<no value>'
+  # Get local version
+  TPR_RESOURCE_FILE="${KUBE_TEMP}/tpr-foos-test.json"
+  kubectl "${kube_flags[@]}" get foos/test -o json > "${TPR_RESOURCE_FILE}"
+  # cannot apply strategic patch locally
+  TPR_PATCH_ERROR_FILE="${KUBE_TEMP}/tpr-foos-test-error"
+  ! kubectl "${kube_flags[@]}" patch --local -f "${TPR_RESOURCE_FILE}" -p '{"patched":"value3"}' 2> "${TPR_PATCH_ERROR_FILE}"
+  if grep -q "try --type merge" "${TPR_PATCH_ERROR_FILE}"; then
+    kube::log::status "\"kubectl patch --local\" returns error as expected for ThirdPartyResource: $(cat ${TPR_PATCH_ERROR_FILE})"
+  else
+    kube::log::status "\"kubectl patch --local\" returns unexpected error or non-error: $(cat ${TPR_PATCH_ERROR_FILE})"
+    exit 1
+  fi
+  # can apply merge patch locally
+  kubectl "${kube_flags[@]}" patch --local -f "${TPR_RESOURCE_FILE}" -p '{"patched":"value3"}' --type=merge -o json
+  # can apply merge patch remotely
+  kubectl "${kube_flags[@]}" patch --record -f "${TPR_RESOURCE_FILE}" -p '{"patched":"value3"}' --type=merge -o json
+  kube::test::get_object_assert foos/test "{{.patched}}" 'value3'
+  rm "${TPR_RESOURCE_FILE}"
+  rm "${TPR_PATCH_ERROR_FILE}"
+
+  # Test labeling
+  kube::log::status "Testing ThirdPartyResource labeling"
+  kubectl "${kube_flags[@]}" label foos --all listlabel=true
+  kubectl "${kube_flags[@]}" label foo/test itemlabel=true
+
+  # Test annotating
+  kube::log::status "Testing ThirdPartyResource annotating"
+  kubectl "${kube_flags[@]}" annotate foos --all listannotation=true
+  kubectl "${kube_flags[@]}" annotate foo/test itemannotation=true
+
+  # Test describing
+  kube::log::status "Testing ThirdPartyResource describing"
+  kubectl "${kube_flags[@]}" describe foos
+  kubectl "${kube_flags[@]}" describe foos/test
+  kubectl "${kube_flags[@]}" describe foos | grep listlabel=true
+  kubectl "${kube_flags[@]}" describe foos | grep itemlabel=true
+
   # Delete the resource
   kubectl "${kube_flags[@]}" delete foos test
 

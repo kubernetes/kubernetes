@@ -21,7 +21,6 @@ import (
 	"net/http"
 	"testing"
 
-	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/rest/fake"
 	"k8s.io/kubernetes/pkg/api"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
@@ -45,11 +44,10 @@ func TestCreateObject(t *testing.T) {
 	rc.Items[0].Name = "redis-master-controller"
 
 	f, tf, codec, _ := cmdtesting.NewAPIFactory()
-	ns := dynamic.ContentConfig().NegotiatedSerializer
 	tf.Printer = &testPrinter{}
-	tf.Client = &fake.RESTClient{
+	tf.UnstructuredClient = &fake.RESTClient{
 		APIRegistry:          api.Registry,
-		NegotiatedSerializer: ns,
+		NegotiatedSerializer: unstructuredSerializer,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch p, m := req.URL.Path, req.Method; {
 			case p == "/namespaces/test/replicationcontrollers" && m == http.MethodPost:
@@ -80,11 +78,10 @@ func TestCreateMultipleObject(t *testing.T) {
 	_, svc, rc := testData()
 
 	f, tf, codec, _ := cmdtesting.NewAPIFactory()
-	ns := dynamic.ContentConfig().NegotiatedSerializer
 	tf.Printer = &testPrinter{}
-	tf.Client = &fake.RESTClient{
+	tf.UnstructuredClient = &fake.RESTClient{
 		APIRegistry:          api.Registry,
-		NegotiatedSerializer: ns,
+		NegotiatedSerializer: unstructuredSerializer,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch p, m := req.URL.Path, req.Method; {
 			case p == "/namespaces/test/services" && m == http.MethodPost:
@@ -119,11 +116,10 @@ func TestCreateDirectory(t *testing.T) {
 	rc.Items[0].Name = "name"
 
 	f, tf, codec, _ := cmdtesting.NewAPIFactory()
-	ns := dynamic.ContentConfig().NegotiatedSerializer
 	tf.Printer = &testPrinter{}
-	tf.Client = &fake.RESTClient{
+	tf.UnstructuredClient = &fake.RESTClient{
 		APIRegistry:          api.Registry,
-		NegotiatedSerializer: ns,
+		NegotiatedSerializer: unstructuredSerializer,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch p, m := req.URL.Path, req.Method; {
 			case p == "/namespaces/test/replicationcontrollers" && m == http.MethodPost:
