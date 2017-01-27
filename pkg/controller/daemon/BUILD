@@ -27,7 +27,6 @@ go_library(
         "//pkg/controller:go_default_library",
         "//pkg/controller/informers:go_default_library",
         "//pkg/util/metrics:go_default_library",
-        "//pkg/util/workqueue:go_default_library",
         "//plugin/pkg/scheduler/algorithm/predicates:go_default_library",
         "//plugin/pkg/scheduler/schedulercache:go_default_library",
         "//vendor:github.com/golang/glog",
@@ -37,6 +36,7 @@ go_library(
         "//vendor:k8s.io/apimachinery/pkg/util/runtime",
         "//vendor:k8s.io/apimachinery/pkg/util/wait",
         "//vendor:k8s.io/client-go/tools/cache",
+        "//vendor:k8s.io/client-go/util/workqueue",
     ],
 )
 

@@ -30,9 +30,9 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/admission"
+	"k8s.io/client-go/util/workqueue"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/quota"
-	"k8s.io/kubernetes/pkg/util/workqueue"
 	_ "k8s.io/kubernetes/pkg/util/workqueue/prometheus" // for workqueue metric registration
 )
 

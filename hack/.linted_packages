@@ -237,7 +237,6 @@ pkg/util/validation
 pkg/util/validation/field
 pkg/util/version
 pkg/util/wait
-pkg/util/workqueue
 pkg/util/yaml
 pkg/version/prometheus
 pkg/volume
@@ -297,6 +296,7 @@ staging/src/k8s.io/client-go/tools/auth
 staging/src/k8s.io/client-go/tools/metrics
 staging/src/k8s.io/client-go/util/cert
 staging/src/k8s.io/client-go/util/homedir
+staging/src/k8s.io/client-go/util/workqueue
 test/e2e/perftype
 test/e2e_node/runner/local
 test/images/clusterapi-tester

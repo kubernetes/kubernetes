@@ -21,7 +21,7 @@ import (
 	"testing"
 	"time"
 
-	"k8s.io/kubernetes/pkg/util/workqueue"
+	"k8s.io/client-go/util/workqueue"
 )
 
 func TestBasic(t *testing.T) {

@@ -28,13 +28,13 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/tools/cache"
+	"k8s.io/client-go/util/workqueue"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/quota"
 	"k8s.io/kubernetes/pkg/util/metrics"
-	"k8s.io/kubernetes/pkg/util/workqueue"
 )
 
 // ResourceQuotaControllerOptions holds options for creating a quota controller

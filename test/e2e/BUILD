@@ -144,7 +144,6 @@ go_library(
         "//pkg/util/logs:go_default_library",
         "//pkg/util/system:go_default_library",
         "//pkg/util/version:go_default_library",
-        "//pkg/util/workqueue:go_default_library",
         "//pkg/volume/util/volumehelper:go_default_library",
         "//plugin/pkg/admission/serviceaccount:go_default_library",
         "//test/e2e/chaosmonkey:go_default_library",
@@ -199,6 +198,7 @@ go_library(
         "//vendor:k8s.io/client-go/tools/cache",
         "//vendor:k8s.io/client-go/transport",
         "//vendor:k8s.io/client-go/util/flowcontrol",
+        "//vendor:k8s.io/client-go/util/workqueue",
     ],
 )
 

@@ -21,7 +21,6 @@ go_library(
         "//pkg/client/clientset_generated/clientset:go_default_library",
         "//pkg/controller:go_default_library",
         "//pkg/util/metrics:go_default_library",
-        "//pkg/util/workqueue:go_default_library",
         "//vendor:github.com/golang/glog",
         "//vendor:k8s.io/apimachinery/pkg/api/errors",
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
@@ -35,6 +34,7 @@ go_library(
         "//vendor:k8s.io/client-go/discovery",
         "//vendor:k8s.io/client-go/dynamic",
         "//vendor:k8s.io/client-go/tools/cache",
+        "//vendor:k8s.io/client-go/util/workqueue",
     ],
 )
 

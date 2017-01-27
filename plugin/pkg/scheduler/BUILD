@@ -23,7 +23,6 @@ go_library(
         "//pkg/client/record:go_default_library",
         "//pkg/util:go_default_library",
         "//pkg/util/hash:go_default_library",
-        "//pkg/util/workqueue:go_default_library",
         "//plugin/pkg/scheduler/algorithm:go_default_library",
         "//plugin/pkg/scheduler/algorithm/predicates:go_default_library",
         "//plugin/pkg/scheduler/api:go_default_library",
@@ -39,6 +38,7 @@ go_library(
         "//vendor:k8s.io/apimachinery/pkg/util/wait",
         "//vendor:k8s.io/client-go/rest",
         "//vendor:k8s.io/client-go/tools/cache",
+        "//vendor:k8s.io/client-go/util/workqueue",
     ],
 )
 

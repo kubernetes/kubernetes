@@ -33,6 +33,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	cache "k8s.io/client-go/tools/cache"
+	"k8s.io/client-go/util/workqueue"
 	v1beta1 "k8s.io/kubernetes/federation/apis/federation/v1beta1"
 	federationcache "k8s.io/kubernetes/federation/client/cache"
 	fedclientset "k8s.io/kubernetes/federation/client/clientset_generated/federation_clientset"
@@ -46,7 +47,6 @@ import (
 	"k8s.io/kubernetes/pkg/client/legacylisters"
 	"k8s.io/kubernetes/pkg/client/record"
 	"k8s.io/kubernetes/pkg/controller"
-	"k8s.io/kubernetes/pkg/util/workqueue"
 )
 
 const (

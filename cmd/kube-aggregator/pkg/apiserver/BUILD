@@ -62,7 +62,6 @@ go_library(
         "//pkg/genericapiserver/registry/rest:go_default_library",
         "//pkg/genericapiserver/server:go_default_library",
         "//pkg/util/httpstream/spdy:go_default_library",
-        "//pkg/util/workqueue:go_default_library",
         "//pkg/version:go_default_library",
         "//vendor:github.com/golang/glog",
         "//vendor:k8s.io/apimachinery/pkg/api/errors",
@@ -76,6 +75,7 @@ go_library(
         "//vendor:k8s.io/client-go/rest",
         "//vendor:k8s.io/client-go/tools/cache",
         "//vendor:k8s.io/client-go/transport",
+        "//vendor:k8s.io/client-go/util/workqueue",
     ],
 )
 

@@ -78,7 +78,7 @@ save "tools/cache"
 save "tools/clientcmd"
 save "tools/metrics"
 save "transport"
-save "pkg/third_party"
+save "third_party"
 save "plugin"
 save "util"
 
@@ -91,9 +91,9 @@ function mkcp() {
 
 # assemble all the other parts of the staging directory
 echo "copying client packages"
-# need to copy version.  We aren't authoritative here
-# version has subdirs which we don't need.  Only copy the files we want
-mkdir -p "${CLIENT_REPO_TEMP}/pkg/version"
+# need to copy version.  We aren't authoritative here    
+# version has subdirs which we don't need.  Only copy the files we want   
+mkdir -p "${CLIENT_REPO_TEMP}/pkg/version"    
 find "${MAIN_REPO}/pkg/version" -maxdepth 1 -type f | xargs -I{} cp {} "${CLIENT_REPO_TEMP}/pkg/version"
 # need to copy clientsets, though later we should copy APIs and later generate clientsets
 mkcp "pkg/client/clientset_generated/${CLIENTSET}" "pkg/client/clientset_generated"
@@ -101,9 +101,6 @@ mkcp "/pkg/client/record" "/pkg/client"
 
 mkcp "/pkg/client/unversioned/portforward" "/pkg/client/unversioned"
 
-mkcp "/pkg/util/workqueue" "pkg/util"
-# remove this folder because it imports prometheus
-rm -rf "${CLIENT_REPO_TEMP}/pkg/util/workqueue/prometheus"
 # remove this test because it imports the internal clientset
 rm "${CLIENT_REPO_TEMP}"/pkg/client/unversioned/portforward/portforward_test.go
 
@@ -145,9 +142,6 @@ find "${CLIENT_REPO_TEMP}"/pkg/client/record -type f -name "*.go" -print0 | xarg
 # rewrite the imports
 find "${CLIENT_REPO_TEMP}"/pkg/client/record -type f -name "*.go" -print0 | xargs -0 sed -i 's,pkg/api",pkg/api/v1",g'
 # gofmt the changed files
-
-echo "rewrite conflicting Prometheus registration"
-sed -i "s/kubernetes_build_info/kubernetes_build_info_copy/g" "${CLIENT_REPO_TEMP}"/pkg/version/version.go
 
 echo "rewrite proto names in proto.RegisterType"
 find "${CLIENT_REPO_TEMP}" -type f -name "generated.pb.go" -print0 | xargs -0 sed -i "s/k8s\.io\.kubernetes/k8s.io.client-go/g"

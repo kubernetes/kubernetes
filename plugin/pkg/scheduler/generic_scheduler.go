@@ -26,9 +26,9 @@ import (
 
 	"github.com/golang/glog"
 	"k8s.io/apimachinery/pkg/util/errors"
+	"k8s.io/client-go/util/workqueue"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/util"
-	"k8s.io/kubernetes/pkg/util/workqueue"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm/predicates"
 	schedulerapi "k8s.io/kubernetes/plugin/pkg/scheduler/api"

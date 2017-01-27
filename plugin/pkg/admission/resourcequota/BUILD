@@ -24,7 +24,6 @@ go_library(
         "//pkg/quota:go_default_library",
         "//pkg/quota/install:go_default_library",
         "//pkg/storage/etcd:go_default_library",
-        "//pkg/util/workqueue:go_default_library",
         "//pkg/util/workqueue/prometheus:go_default_library",
         "//vendor:github.com/golang/glog",
         "//vendor:github.com/hashicorp/golang-lru",
@@ -37,6 +36,7 @@ go_library(
         "//vendor:k8s.io/apimachinery/pkg/watch",
         "//vendor:k8s.io/apiserver/pkg/admission",
         "//vendor:k8s.io/client-go/tools/cache",
+        "//vendor:k8s.io/client-go/util/workqueue",
     ],
 )
 

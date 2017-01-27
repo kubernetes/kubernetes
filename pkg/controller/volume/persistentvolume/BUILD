@@ -30,7 +30,6 @@ go_library(
         "//pkg/util/goroutinemap:go_default_library",
         "//pkg/util/io:go_default_library",
         "//pkg/util/mount:go_default_library",
-        "//pkg/util/workqueue:go_default_library",
         "//pkg/volume:go_default_library",
         "//vendor:github.com/golang/glog",
         "//vendor:k8s.io/apimachinery/pkg/api/errors",
@@ -42,6 +41,7 @@ go_library(
         "//vendor:k8s.io/apimachinery/pkg/util/wait",
         "//vendor:k8s.io/apimachinery/pkg/watch",
         "//vendor:k8s.io/client-go/tools/cache",
+        "//vendor:k8s.io/client-go/util/workqueue",
     ],
 )
 

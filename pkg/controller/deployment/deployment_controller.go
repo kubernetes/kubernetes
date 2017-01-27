@@ -35,6 +35,7 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/tools/cache"
+	"k8s.io/client-go/util/workqueue"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
 	extensions "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
@@ -46,7 +47,6 @@ import (
 	"k8s.io/kubernetes/pkg/controller/deployment/util"
 	"k8s.io/kubernetes/pkg/controller/informers"
 	"k8s.io/kubernetes/pkg/util/metrics"
-	"k8s.io/kubernetes/pkg/util/workqueue"
 )
 
 const (

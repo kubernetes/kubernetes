@@ -25,11 +25,11 @@ import (
 	"k8s.io/apimachinery/pkg/watch"
 	restclient "k8s.io/client-go/rest"
 	cache "k8s.io/client-go/tools/cache"
+	"k8s.io/client-go/util/workqueue"
 	v1beta1 "k8s.io/kubernetes/federation/apis/federation/v1beta1"
 	v1 "k8s.io/kubernetes/pkg/api/v1"
 	kubeclientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/pkg/client/legacylisters"
-	"k8s.io/kubernetes/pkg/util/workqueue"
 
 	"reflect"
 

@@ -101,7 +101,7 @@ filegroup(
         "//pkg/util/validation:all-srcs",
         "//pkg/util/version:all-srcs",
         "//pkg/util/wait:all-srcs",
-        "//pkg/util/workqueue:all-srcs",
+        "//pkg/util/workqueue/prometheus:all-srcs",
         "//pkg/util/yaml:all-srcs",
     ],
     tags = ["automanaged"],
