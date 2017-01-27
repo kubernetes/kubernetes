@@ -74,6 +74,10 @@ func (c *Converter) FromUnstructured(u map[string]interface{}, obj runtime.Objec
 
 func fromUnstructured(sv, dv reflect.Value) error {
 	sv = unwrapInterface(sv)
+	if !sv.IsValid() {
+		dv.Set(reflect.Zero(dv.Type()))
+		return nil
+	}
 	st, dt := sv.Type(), dv.Type()
 
 	switch dt.Kind() {
@@ -277,7 +281,9 @@ func structFromUnstructured(sv, dv reflect.Value) error {
 }
 
 func interfaceFromUnstructured(sv, dv reflect.Value) error {
-	return fmt.Errorf("interface conversion unsupported: %s -> %s", sv.Type().String(), dv.Type().String())
+	// TODO: Is this conversion safe?
+	dv.Set(sv)
+	return nil
 }
 
 func (c *Converter) ToUnstructured(obj runtime.Object, u *map[string]interface{}) error {
@@ -485,5 +491,9 @@ func structToUnstructured(sv, dv reflect.Value) error {
 }
 
 func interfaceToUnstructured(sv, dv reflect.Value) error {
-	return fmt.Errorf("interface conversion unsupported: %s -> %s", sv.Type().String(), dv.Type().String())
+	if !sv.IsValid() || sv.IsNil() {
+		dv.Set(reflect.Zero(dv.Type()))
+		return nil
+	}
+	return toUnstructured(sv.Elem(), dv)
 }
