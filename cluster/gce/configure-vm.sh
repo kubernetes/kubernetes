@@ -544,6 +544,21 @@ EOF
 docker_test_log_level: '$(echo "$DOCKER_TEST_LOG_LEVEL" | sed -e "s/'/''/g")'
 EOF
     fi
+    if [ -n "${DOCKER_LOG_DRIVER:-}" ]; then
+      cat <<EOF >>/srv/salt-overlay/pillar/cluster-params.sls
+docker_log_driver: '$(echo "$DOCKER_LOG_DRIVER" | sed -e "s/'/''/g")'
+EOF
+    fi
+    if [ -n "${DOCKER_LOG_MAX_SIZE:-}" ]; then
+      cat <<EOF >>/srv/salt-overlay/pillar/cluster-params.sls
+docker_log_max_size: '$(echo "$DOCKER_LOG_MAX_SIZE" | sed -e "s/'/''/g")'
+EOF
+    fi
+    if [ -n "${DOCKER_LOG_MAX_FILE:-}" ]; then
+      cat <<EOF >>/srv/salt-overlay/pillar/cluster-params.sls
+docker_log_max_file: '$(echo "$DOCKER_LOG_MAX_FILE" | sed -e "s/'/''/g")'
+EOF
+    fi
     if [ -n "${CONTROLLER_MANAGER_TEST_ARGS:-}" ]; then
       cat <<EOF >>/srv/salt-overlay/pillar/cluster-params.sls
 controller_manager_test_args: '$(echo "$CONTROLLER_MANAGER_TEST_ARGS" | sed -e "s/'/''/g")'

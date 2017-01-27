@@ -201,6 +201,17 @@ restart_docker_daemon() {
     DOCKER_OPTS="${DOCKER_OPTS} --registry-mirror=${DOCKER_REGISTRY_MIRROR_URL}"
   fi
 
+  # Configure docker logging
+  if [[ -n "${DOCKER_LOG_DRIVER-}" ]]; then
+    DOCKER_OPTS="${DOCKER_OPTS:-} --log-driver=${DOCKER_LOG_DRIVER}"
+  fi
+  if [[ -n "${DOCKER_LOG_MAX_SIZE-}" ]]; then
+    DOCKER_OPTS="${DOCKER_OPTS:-} --log-opt=max-size=${DOCKER_LOG_MAX_SIZE}"
+  fi
+  if [[ -n "${DOCKER_LOG_MAX_FILE-}" ]]; then
+    DOCKER_OPTS="${DOCKER_OPTS:-} --log-opt=max-file=${DOCKER_LOG_MAX_FILE}"
+  fi
+
   echo "DOCKER_OPTS=\"${DOCKER_OPTS} ${EXTRA_DOCKER_OPTS:-}\"" > /etc/default/docker
   # Make sure the network interface cbr0 is created before restarting docker daemon
   while ! [ -L /sys/class/net/cbr0 ]; do

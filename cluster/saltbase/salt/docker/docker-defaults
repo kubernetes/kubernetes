@@ -14,5 +14,25 @@
 {% if pillar['docker_test_log_level'] is defined -%}
   {% set log_level = pillar['docker_test_log_level'] -%}
 {% endif -%}
-DOCKER_OPTS="{{grains_opts}} {{e2e_opts}} {{bridge_opts}} --iptables=false --ip-masq=false {{log_level}}"
+
+{% set log_driver = "json-file" -%}
+{% if pillar['docker_log_driver'] is defined -%}
+  {% set log_driver = pillar['docker_log_driver'] -%}
+{% endif -%}
+{% set log_max_size = "10m" -%}
+{% if pillar['docker_log_max_size'] is defined -%}
+  {% set log_max_size = pillar['docker_log_max_size'] -%}
+{% endif -%}
+{% set log_max_file = "5" -%}
+{% if pillar['docker_log_max_file'] is defined -%}
+  {% set log_max_file = pillar['docker_log_max_file'] -%}
+{% endif -%}
+
+{% set log_opts = '--log-driver=' ~ log_driver ~ ' --log-opt=max-size=' ~ log_max_size ~ ' --log-opt=max-file=' ~ log_max_file -%}
+{% if pillar['docker_log_opts'] is defined -%}
+  {% set log_opts = pillar['docker_log_opts'] -%}
+{% endif -%}
+
+
+DOCKER_OPTS="{{grains_opts}} {{e2e_opts}} {{bridge_opts}} --iptables=false --ip-masq=false {{log_level}} {{log_opts}}"
 DOCKER_NOFILE=1000000

@@ -94,6 +94,11 @@ ALLOCATE_NODE_CIDRS=true
 # When set to true, Docker Cache is enabled by default as part of the cluster bring up.
 ENABLE_DOCKER_REGISTRY_CACHE=true
 
+# Setup docker to log to json-file and store up to 5 rotations, 10 mb each
+DOCKER_LOG_DRIVER="${DOCKER_LOG_DRIVER:-json-file}"
+DOCKER_LOG_MAX_SIZE="${DOCKER_LOG_MAX_SIZE:-10m}"
+DOCKER_LOG_MAX_FILE="${DOCKER_LOG_MAX_FILE:-5}"
+
 # Optional: Deploy a L7 loadbalancer controller to fulfill Ingress requests:
 #   glbc           - CE L7 Load Balancer Controller
 ENABLE_L7_LOADBALANCING="${KUBE_ENABLE_L7_LOADBALANCING:-glbc}"

@@ -16,15 +16,6 @@ logrotate:
       file: {{ file }}
 {% endfor %}
 
-/etc/logrotate.d/docker-containers:
-  file:
-    - managed
-    - source: salt://logrotate/docker-containers
-    - template: jinja
-    - user: root
-    - group: root
-    - mode: 644
-
 /etc/cron.hourly/logrotate:
   file:
     - managed

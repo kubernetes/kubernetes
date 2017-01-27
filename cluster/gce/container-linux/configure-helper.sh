@@ -393,6 +393,17 @@ function configure-docker-daemon {
     docker_opts+=" --registry-mirror=${DOCKER_REGISTRY_MIRROR_URL}"
   fi
 
+  # Configure docker logging
+  if [[ -n "${DOCKER_LOG_DRIVER-}" ]]; then
+    docker_opts+=" --log-driver=${DOCKER_LOG_DRIVER}"
+  fi
+  if [[ -n "${DOCKER_LOG_MAX_SIZE-}" ]]; then
+    docker_opts+=" --log-opt=max-size=${DOCKER_LOG_MAX_SIZE}"
+  fi
+  if [[ -n "${DOCKER_LOG_MAX_FILE-}" ]]; then
+    docker_opts+=" --log-opt=max-file=${DOCKER_LOG_MAX_FILE}"
+  fi
+
   mkdir -p /etc/systemd/system/docker.service.d/
   local kubernetes_conf_dropin="/etc/systemd/system/docker.service.d/00_kubelet.conf"
   cat > "${kubernetes_conf_dropin}" <<EOF
