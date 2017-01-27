@@ -180,7 +180,7 @@ func (plugin *cniNetworkPlugin) setDefaultNetwork(n *cniNetwork) {
 
 func (plugin *cniNetworkPlugin) checkInitialized() error {
 	if plugin.getDefaultNetwork() == nil {
-		return errors.New("cni config unintialized")
+		return errors.New("cni config uninitialized")
 	}
 	return nil
 }
