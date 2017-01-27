@@ -13827,7 +13827,6 @@ go_test(
     srcs = ["k8s.io/apimachinery/pkg/util/httpstream/httpstream_test.go"],
     library = ":k8s.io/apimachinery/pkg/util/httpstream",
     tags = ["automanaged"],
-    deps = ["//pkg/api:go_default_library"],
 )
 
 go_library(
@@ -13863,11 +13862,12 @@ go_library(
     ],
     tags = ["automanaged"],
     deps = [
-        "//pkg/api:go_default_library",
         "//vendor:github.com/docker/spdystream",
         "//vendor:github.com/golang/glog",
         "//vendor:k8s.io/apimachinery/pkg/api/errors",
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
+        "//vendor:k8s.io/apimachinery/pkg/runtime",
+        "//vendor:k8s.io/apimachinery/pkg/runtime/serializer",
         "//vendor:k8s.io/apimachinery/pkg/util/httpstream",
         "//vendor:k8s.io/apimachinery/pkg/util/runtime",
         "//vendor:k8s.io/apimachinery/third_party/forked/golang/netutil",
