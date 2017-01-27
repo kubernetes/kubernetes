@@ -648,6 +648,8 @@ type APIResource struct {
 	// verbs is a list of supported kube verbs (this includes get, list, watch, create,
 	// update, patch, delete, deletecollection, and proxy)
 	Verbs Verbs `json:"verbs" protobuf:"bytes,4,opt,name=verbs"`
+	// shortNames is a list of suggested short names of the resource.
+	ShortNames []string `json:"shortNames,omitempty" protobuf:"bytes,5,rep,name=shortNames"`
 }
 
 // Verbs masks the value so protobuf can generate
