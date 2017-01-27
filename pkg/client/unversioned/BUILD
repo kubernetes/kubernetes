@@ -60,7 +60,6 @@ filegroup(
     name = "all-srcs",
     srcs = [
         ":package-srcs",
-        "//pkg/client/unversioned/portforward:all-srcs",
         "//pkg/client/unversioned/remotecommand:all-srcs",
         "//pkg/client/unversioned/testclient/simple:all-srcs",
     ],

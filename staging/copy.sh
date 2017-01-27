@@ -85,6 +85,7 @@ save "tools/auth"
 save "tools/cache"
 save "tools/clientcmd"
 save "tools/metrics"
+save "tools/portforward"
 save "transport"
 save "third_party"
 save "plugin"
@@ -106,11 +107,6 @@ find "${MAIN_REPO}/pkg/version" -maxdepth 1 -type f | xargs -I{} cp {} "${CLIENT
 # need to copy clientsets, though later we should copy APIs and later generate clientsets
 mkcp "pkg/client/clientset_generated/${CLIENTSET}" "pkg/client/clientset_generated"
 mkcp "/pkg/client/record" "/pkg/client"
-
-mkcp "/pkg/client/unversioned/portforward" "/pkg/client/unversioned"
-
-# remove this test because it imports the internal clientset
-rm "${CLIENT_REPO_TEMP}"/pkg/client/unversioned/portforward/portforward_test.go
 
 pushd "${CLIENT_REPO_TEMP}" > /dev/null
 echo "generating vendor/"
@@ -189,7 +185,6 @@ function mvfolder {
 
 mvfolder "pkg/client/clientset_generated/${CLIENTSET}" kubernetes
 mvfolder pkg/client/record tools/record
-mvfolder pkg/client/unversioned/portforward tools/portforward
 if [ "$(find "${CLIENT_REPO_TEMP}"/pkg/client -type f -name "*.go")" ]; then
     echo "${CLIENT_REPO_TEMP}/pkg/client is expected to be empty"
     exit 1

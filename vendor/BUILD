@@ -12582,7 +12582,6 @@ go_library(
         "//vendor:k8s.io/apimachinery/pkg/util/httpstream",
         "//vendor:k8s.io/apimachinery/pkg/util/runtime",
         "//vendor:k8s.io/client-go/pkg/api",
-        "//vendor:k8s.io/client-go/pkg/kubelet/server/portforward",
     ],
 )
 
@@ -13998,4 +13997,12 @@ go_library(
         "//vendor:github.com/google/gofuzz",
         "//vendor:k8s.io/apimachinery/pkg/openapi",
     ],
+)
+
+go_test(
+    name = "k8s.io/client-go/tools/portforward_test",
+    srcs = ["k8s.io/client-go/tools/portforward/portforward_test.go"],
+    library = ":k8s.io/client-go/tools/portforward",
+    tags = ["automanaged"],
+    deps = ["//vendor:k8s.io/apimachinery/pkg/util/httpstream"],
 )
