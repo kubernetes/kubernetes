@@ -1251,6 +1251,7 @@ func newTestGenericStoreRegistry(t *testing.T, hasCacheEnabled bool) (factory.De
 			CacheCapacity:  10,
 			Storage:        s,
 			Versioner:      etcdstorage.APIObjectVersioner{},
+			Copier:         api.Scheme,
 			Type:           &api.Pod{},
 			ResourcePrefix: podPrefix,
 			KeyFunc:        func(obj runtime.Object) (string, error) { return storage.NoNamespaceKeyFunc(podPrefix, obj) },
@@ -1268,6 +1269,7 @@ func newTestGenericStoreRegistry(t *testing.T, hasCacheEnabled bool) (factory.De
 	}
 
 	return destroyFunc, &Store{
+		Copier:            api.Scheme,
 		NewFunc:           func() runtime.Object { return &api.Pod{} },
 		NewListFunc:       func() runtime.Object { return &api.PodList{} },
 		QualifiedResource: api.Resource("pods"),
