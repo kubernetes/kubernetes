@@ -18,6 +18,8 @@ go_library(
         "metrics.go",
         "nodecontroller.go",
         "rate_limited_queue.go",
+        "taint_controller.go",
+        "timed_workers.go",
     ],
     tags = ["automanaged"],
     deps = [
@@ -57,6 +59,8 @@ go_test(
         "cidr_set_test.go",
         "nodecontroller_test.go",
         "rate_limited_queue_test.go",
+        "taint_controller_test.go",
+        "timed_workers_test.go",
     ],
     library = ":go_default_library",
     tags = ["automanaged"],
