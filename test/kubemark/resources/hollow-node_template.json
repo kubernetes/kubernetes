@@ -151,7 +151,7 @@
 				},
 				{
 					"name": "hollow-node-problem-detector",
-					"image": "gcr.io/google_containers/node-problem-detector:v0.3",
+					"image": "gcr.io/google_containers/node-problem-detector:v0.3.0-alpha.0",
 					"env": [
 						{
 							"name": "NODE_NAME",
