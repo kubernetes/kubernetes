@@ -51,7 +51,6 @@ import (
 	coreclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/core/internalversion"
 	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
-	"k8s.io/kubernetes/pkg/registry/extensions/thirdpartyresourcedata"
 )
 
 const (
@@ -239,21 +238,6 @@ func getGroupVersionKinds(gvks []schema.GroupVersionKind, group string) []schema
 		}
 	}
 	return result
-}
-
-func makeInterfacesFor(versionList []schema.GroupVersion) func(version schema.GroupVersion) (*meta.VersionInterfaces, error) {
-	accessor := meta.NewAccessor()
-	return func(version schema.GroupVersion) (*meta.VersionInterfaces, error) {
-		for ix := range versionList {
-			if versionList[ix].String() == version.String() {
-				return &meta.VersionInterfaces{
-					ObjectConvertor:  thirdpartyresourcedata.NewThirdPartyObjectConverter(api.Scheme),
-					MetadataAccessor: accessor,
-				}, nil
-			}
-		}
-		return nil, fmt.Errorf("unsupported storage version: %s (valid: %v)", version, versionList)
-	}
 }
 
 type factory struct {
