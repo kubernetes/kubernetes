@@ -29,6 +29,9 @@ import (
 	kubeletclient "k8s.io/kubernetes/pkg/kubelet/client"
 	"k8s.io/kubernetes/pkg/master/ports"
 
+	// add the kubernetes feature gates
+	_ "k8s.io/kubernetes/pkg/features"
+
 	"github.com/spf13/pflag"
 )
 
