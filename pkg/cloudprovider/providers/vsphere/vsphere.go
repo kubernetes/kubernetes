@@ -24,6 +24,7 @@ import (
 	"net/url"
 	"path"
 	"path/filepath"
+	"regexp"
 	"runtime"
 	"strings"
 	"sync"
@@ -165,6 +166,7 @@ type VolumeOptions struct {
 	Tags       map[string]string
 	Name       string
 	DiskFormat string
+	Datastore  string
 }
 
 // Generates Valid Options for Diskformat
@@ -631,36 +633,36 @@ func (vs *VSphere) ScrubDNS(nameservers, searches []string) (nsOut, srchOut []st
 }
 
 // Returns vSphere objects virtual machine, virtual device list, datastore and datacenter.
-func getVirtualMachineDevices(ctx context.Context, cfg *VSphereConfig, c *govmomi.Client, name string) (*object.VirtualMachine, object.VirtualDeviceList, *object.Datastore, *object.Datacenter, error) {
+func getVirtualMachineDevices(ctx context.Context, cfg *VSphereConfig, c *govmomi.Client, name string) (*object.VirtualMachine, object.VirtualDeviceList, *object.Datacenter, error) {
 	// Create a new finder
 	f := find.NewFinder(c.Client, true)
 
 	// Fetch and set data center
 	dc, err := f.Datacenter(ctx, cfg.Global.Datacenter)
 	if err != nil {
-		return nil, nil, nil, nil, err
+		return nil, nil, nil, err
 	}
 	f.SetDatacenter(dc)
 
 	// Find datastores
 	ds, err := f.Datastore(ctx, cfg.Global.Datastore)
 	if err != nil {
-		return nil, nil, nil, nil, err
+		return nil, nil, nil, err
 	}
 
 	vmRegex := cfg.Global.WorkingDir + name
 
 	vm, err := f.VirtualMachine(ctx, vmRegex)
 	if err != nil {
-		return nil, nil, nil, nil, err
+		return nil, nil, nil, err
 	}
 
 	// Get devices from VM
 	vmDevices, err := vm.Device(ctx)
 	if err != nil {
-		return nil, nil, nil, nil, err
+		return nil, nil, nil, err
 	}
-	return vm, vmDevices, ds, dc, nil
+	return vm, vmDevices, dc, nil
 }
 
 // Removes SCSI controller which is latest attached to VM.
@@ -678,6 +680,14 @@ func cleanUpController(ctx context.Context, newSCSIController types.BaseVirtualD
 		return err
 	}
 	return nil
+}
+
+// Get datastore from VMDisk path.
+// vmDiskPath format is [<datastore> kubevols/<volume>]
+func getDatastoreFromVMDiskPath(vmDiskPath string) string {
+	regex := regexp.MustCompile(`\[(.*?)\]`)
+	rs := regex.FindStringSubmatch(vmDiskPath)
+	return rs[1]
 }
 
 // Attaches given virtual disk volume to the compute running kubelet.
@@ -703,7 +713,7 @@ func (vs *VSphere) AttachDisk(vmDiskPath string, nodeName k8stypes.NodeName) (di
 	}
 
 	// Get VM device list
-	vm, vmDevices, ds, dc, err := getVirtualMachineDevices(ctx, vs.cfg, vs.client, vSphereInstance)
+	vm, vmDevices, dc, err := getVirtualMachineDevices(ctx, vs.cfg, vs.client, vSphereInstance)
 	if err != nil {
 		return "", "", err
 	}
@@ -767,6 +777,18 @@ func (vs *VSphere) AttachDisk(vmDiskPath string, nodeName k8stypes.NodeName) (di
 			return "", "", fmt.Errorf("cannot find SCSI controller in VM")
 		}
 		newSCSICreated = true
+	}
+
+	// Create a new finder
+	f := find.NewFinder(vs.client.Client, true)
+
+	// Set data center
+	f.SetDatacenter(dc)
+	datastore := getDatastoreFromVMDiskPath(vmDiskPath)
+	ds, err := f.Datastore(ctx, datastore)
+	if err != nil {
+		glog.Errorf("Failed while searching for datastore %+q. err %s", datastore, err)
+		return "", "", err
 	}
 
 	disk := vmDevices.CreateDisk(scsiController, ds.Reference(), vmDiskPath)
@@ -932,7 +954,7 @@ func (vs *VSphere) DiskIsAttached(volPath string, nodeName k8stypes.NodeName) (b
 	}
 
 	// Get VM device list
-	_, vmDevices, _, dc, err := getVirtualMachineDevices(ctx, vs.cfg, vs.client, vSphereInstance)
+	_, vmDevices, dc, err := getVirtualMachineDevices(ctx, vs.cfg, vs.client, vSphereInstance)
 	if err != nil {
 		glog.Errorf("Failed to get VM devices for VM %#q. err: %s", vSphereInstance, err)
 		return false, err
@@ -983,7 +1005,7 @@ func (vs *VSphere) DisksAreAttached(volPaths []string, nodeName k8stypes.NodeNam
 	}
 
 	// Get VM device list
-	_, vmDevices, _, dc, err := getVirtualMachineDevices(ctx, vs.cfg, vs.client, vSphereInstance)
+	_, vmDevices, dc, err := getVirtualMachineDevices(ctx, vs.cfg, vs.client, vSphereInstance)
 	if err != nil {
 		glog.Errorf("Failed to get VM devices for VM %#q. err: %s", vSphereInstance, err)
 		return attached, err
@@ -1160,7 +1182,7 @@ func (vs *VSphere) DetachDisk(volPath string, nodeName k8stypes.NodeName) error 
 		return nil
 	}
 
-	vm, vmDevices, _, dc, err := getVirtualMachineDevices(ctx, vs.cfg, vs.client, vSphereInstance)
+	vm, vmDevices, dc, err := getVirtualMachineDevices(ctx, vs.cfg, vs.client, vSphereInstance)
 	if err != nil {
 		return err
 	}
@@ -1190,6 +1212,14 @@ func (vs *VSphere) DetachDisk(volPath string, nodeName k8stypes.NodeName) error 
 func (vs *VSphere) CreateVolume(volumeOptions *VolumeOptions) (volumePath string, err error) {
 
 	var diskFormat string
+	var datastore string
+
+	// Default diskformat as 'thin'
+	if volumeOptions.Datastore == "" {
+		datastore = vs.cfg.Global.Datastore
+	} else {
+		datastore = volumeOptions.Datastore
+	}
 
 	// Default diskformat as 'thin'
 	if volumeOptions.DiskFormat == "" {
@@ -1221,9 +1251,9 @@ func (vs *VSphere) CreateVolume(volumeOptions *VolumeOptions) (volumePath string
 	dc, err := f.Datacenter(ctx, vs.cfg.Global.Datacenter)
 	f.SetDatacenter(dc)
 
-	ds, err := f.Datastore(ctx, vs.cfg.Global.Datastore)
+	ds, err := f.Datastore(ctx, datastore)
 	if err != nil {
-		glog.Errorf("Failed while searching for datastore %+q. err %s", vs.cfg.Global.Datastore, err)
+		glog.Errorf("Failed while searching for datastore %+q. err %s", datastore, err)
 		return "", err
 	}
 
