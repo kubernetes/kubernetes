@@ -2282,7 +2282,7 @@ func DescribeEvents(el *api.EventList, w *PrefixWriter) {
 			translateTimestamp(e.FirstTimestamp),
 			translateTimestamp(e.LastTimestamp),
 			e.Count,
-			e.Source,
+			formatEventSource(e.Source),
 			e.InvolvedObject.FieldPath,
 			e.Type,
 			e.Reason,
