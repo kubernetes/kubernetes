@@ -1,6 +1,8 @@
 #!/bin/sh
 set -ux
 
+export PATH=$PATH:/snap/bin
+
 alias kubectl="kubectl --kubeconfig=/home/ubuntu/config"
 
 kubectl cluster-info > $DEBUG_SCRIPT_DIR/cluster-info

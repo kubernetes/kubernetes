@@ -15,31 +15,122 @@
 # limitations under the License.
 
 import os
+import shutil
 
 from shlex import split
-from subprocess import call, check_call, check_output
+from subprocess import check_call, check_output
 from subprocess import CalledProcessError
 from socket import gethostname
 
 from charms import layer
+from charms.layer import snap
 from charms.reactive import hook
-from charms.reactive import set_state, remove_state
+from charms.reactive import set_state, remove_state, is_state
 from charms.reactive import when, when_any, when_not
-from charms.reactive.helpers import data_changed
+from charms.reactive.helpers import data_changed, any_file_changed
 from charms.kubernetes.flagmanager import FlagManager
 from charms.templating.jinja2 import render
 
-from charmhelpers.core import hookenv
-from charmhelpers.core.host import service_stop
+from charmhelpers.core import hookenv, unitdata
+from charmhelpers.core.host import service_stop, service_restart
 from charmhelpers.contrib.charmsupport import nrpe
 
 
-kubeconfig_path = '/srv/kubernetes/config'
+kubeconfig_path = '/root/cdk/kubeconfig'
+
+os.environ['PATH'] += os.pathsep + os.path.join(os.sep, 'snap', 'bin')
+
+db = unitdata.kv()
 
 
 @hook('upgrade-charm')
-def remove_installed_state():
+def upgrade_charm():
+    cleanup_pre_snap_services()
+    check_resources_for_upgrade_needed()
+    remove_state('kubernetes-worker.cni-plugins.installed')
+    remove_state('kubernetes-worker.config.created')
+    remove_state('kubernetes-worker.ingress.available')
+    set_state('kubernetes-worker.restart-needed')
+
+
+def check_resources_for_upgrade_needed():
+    hookenv.status_set('maintenance', 'Checking resources')
+    resources = ['kubectl', 'kubelet', 'kube-proxy']
+    paths = [hookenv.resource_get(resource) for resource in resources]
+    if any_file_changed(paths):
+        set_upgrade_needed()
+
+
+def set_upgrade_needed():
+    set_state('kubernetes-worker.snaps.upgrade-needed')
+    config = hookenv.config()
+    previous_channel = config.previous('channel')
+    require_manual = config.get('require-manual-upgrade')
+    if previous_channel is None or not require_manual:
+        set_state('kubernetes-worker.snaps.upgrade-specified')
+
+
+def cleanup_pre_snap_services():
+    # remove old states
     remove_state('kubernetes-worker.components.installed')
+
+    # disable old services
+    services = ['kubelet', 'kube-proxy']
+    for service in services:
+        hookenv.log('Stopping {0} service.'.format(service))
+        service_stop(service)
+
+    # cleanup old files
+    files = [
+        "/lib/systemd/system/kubelet.service",
+        "/lib/systemd/system/kube-proxy.service"
+        "/etc/default/kube-default",
+        "/etc/default/kubelet",
+        "/etc/default/kube-proxy",
+        "/srv/kubernetes",
+        "/usr/local/bin/kubectl",
+        "/usr/local/bin/kubelet",
+        "/usr/local/bin/kube-proxy",
+        "/etc/kubernetes"
+    ]
+    for file in files:
+        if os.path.isdir(file):
+            hookenv.log("Removing directory: " + file)
+            shutil.rmtree(file)
+        elif os.path.isfile(file):
+            hookenv.log("Removing file: " + file)
+            os.remove(file)
+
+    # cleanup old flagmanagers
+    FlagManager('kubelet').destroy_all()
+    FlagManager('kube-proxy').destroy_all()
+
+
+@when('config.changed.channel')
+def channel_changed():
+    set_upgrade_needed()
+
+
+@when('kubernetes-worker.snaps.upgrade-needed')
+@when_not('kubernetes-worker.snaps.upgrade-specified')
+def upgrade_needed_status():
+    msg = 'Needs manual upgrade, run the upgrade action'
+    hookenv.status_set('blocked', msg)
+
+
+@when('kubernetes-worker.snaps.upgrade-specified')
+def install_snaps():
+    check_resources_for_upgrade_needed()
+    channel = hookenv.config('channel')
+    hookenv.status_set('maintenance', 'Installing kubectl snap')
+    snap.install('kubectl', channel=channel, classic=True)
+    hookenv.status_set('maintenance', 'Installing kubelet snap')
+    snap.install('kubelet', channel=channel, classic=True)
+    hookenv.status_set('maintenance', 'Installing kube-proxy snap')
+    snap.install('kube-proxy', channel=channel, classic=True)
+    set_state('kubernetes-worker.snaps.installed')
+    remove_state('kubernetes-worker.snaps.upgrade-needed')
+    remove_state('kubernetes-worker.snaps.upgrade-specified')
 
 
 @hook('stop')
@@ -48,52 +139,49 @@ def shutdown():
         - delete the current node
         - stop the kubelet service
         - stop the kube-proxy service
-        - remove the 'kubernetes-worker.components.installed' state
+        - remove the 'kubernetes-worker.cni-plugins.installed' state
     '''
     kubectl('delete', 'node', gethostname())
     service_stop('kubelet')
     service_stop('kube-proxy')
-    remove_state('kubernetes-worker.components.installed')
+    remove_state('kubernetes-worker.cni-plugins.installed')
 
 
 @when('docker.available')
-@when_not('kubernetes-worker.components.installed')
-def install_kubernetes_components():
-    ''' Unpack the kubernetes worker binaries '''
+@when_not('kubernetes-worker.cni-plugins.installed')
+def install_cni_plugins():
+    ''' Unpack the cni-plugins resource '''
     charm_dir = os.getenv('CHARM_DIR')
 
     # Get the resource via resource_get
     try:
-        archive = hookenv.resource_get('kubernetes')
+        archive = hookenv.resource_get('cni')
     except Exception:
-        message = 'Error fetching the kubernetes resource.'
+        message = 'Error fetching the cni resource.'
         hookenv.log(message)
         hookenv.status_set('blocked', message)
         return
 
     if not archive:
-        hookenv.log('Missing kubernetes resource.')
-        hookenv.status_set('blocked', 'Missing kubernetes resource.')
+        hookenv.log('Missing cni resource.')
+        hookenv.status_set('blocked', 'Missing cni resource.')
         return
 
     # Handle null resource publication, we check if filesize < 1mb
     filesize = os.stat(archive).st_size
     if filesize < 1000000:
-        hookenv.status_set('blocked', 'Incomplete kubernetes resource.')
+        hookenv.status_set('blocked', 'Incomplete cni resource.')
         return
 
-    hookenv.status_set('maintenance', 'Unpacking kubernetes resource.')
+    hookenv.status_set('maintenance', 'Unpacking cni resource.')
 
-    unpack_path = '{}/files/kubernetes'.format(charm_dir)
+    unpack_path = '{}/files/cni'.format(charm_dir)
     os.makedirs(unpack_path, exist_ok=True)
     cmd = ['tar', 'xfvz', archive, '-C', unpack_path]
     hookenv.log(cmd)
     check_call(cmd)
 
     apps = [
-        {'name': 'kubelet', 'path': '/usr/local/bin'},
-        {'name': 'kube-proxy', 'path': '/usr/local/bin'},
-        {'name': 'kubectl', 'path': '/usr/local/bin'},
         {'name': 'loopback', 'path': '/opt/cni/bin'}
     ]
 
@@ -104,10 +192,10 @@ def install_kubernetes_components():
         hookenv.log(install)
         check_call(install)
 
-    set_state('kubernetes-worker.components.installed')
+    set_state('kubernetes-worker.cni-plugins.installed')
 
 
-@when('kubernetes-worker.components.installed')
+@when('kubernetes-worker.snaps.installed')
 def set_app_version():
     ''' Declare the application version to juju '''
     cmd = ['kubelet', '--version']
@@ -115,7 +203,7 @@ def set_app_version():
     hookenv.application_version_set(version.split(b' v')[-1].rstrip())
 
 
-@when('kubernetes-worker.components.installed')
+@when('kubernetes-worker.snaps.installed')
 @when_not('kube-dns.available')
 def notify_user_transient_status():
     ''' Notify to the user we are in a transient state and the application
@@ -130,7 +218,8 @@ def notify_user_transient_status():
     hookenv.status_set('waiting', 'Waiting for cluster DNS.')
 
 
-@when('kubernetes-worker.components.installed', 'kube-dns.available')
+@when('kubernetes-worker.snaps.installed', 'kube-dns.available')
+@when_not('kubernetes-worker.snaps.upgrade-needed')
 def charm_status(kube_dns):
     '''Update the status message with the current status of kubelet.'''
     update_kubelet_status()
@@ -140,10 +229,10 @@ def update_kubelet_status():
     ''' There are different states that the kubelt can be in, where we are
     waiting for dns, waiting for cluster turnup, or ready to serve
     applications.'''
-    if (_systemctl_is_active('kubelet')):
+    if (_systemctl_is_active('snap.kubelet.daemon')):
         hookenv.status_set('active', 'Kubernetes worker running.')
     # if kubelet is not running, we're waiting on something else to converge
-    elif (not _systemctl_is_active('kubelet')):
+    elif (not _systemctl_is_active('snap.kubelet.daemon')):
         hookenv.status_set('waiting', 'Waiting for kubelet to start.')
 
 
@@ -168,7 +257,7 @@ def send_data(tls):
     tls.request_server_cert(common_name, sans, certificate_name)
 
 
-@when('kubernetes-worker.components.installed', 'kube-api-endpoint.available',
+@when('kubernetes-worker.snaps.installed', 'kube-api-endpoint.available',
       'tls_client.ca.saved', 'tls_client.client.certificate.saved',
       'tls_client.client.key.saved', 'tls_client.server.certificate.saved',
       'tls_client.server.key.saved', 'kube-dns.available', 'cni.available')
@@ -182,20 +271,15 @@ def start_worker(kube_api, kube_dns, cni):
 
     dns = kube_dns.details()
 
-    if (data_changed('kube-api-servers', servers) or
+    if (is_state('kubernetes-worker.restart-needed') or
+            data_changed('kube-api-servers', servers) or
             data_changed('kube-dns', dns)):
-        # Initialize a FlagManager object to add flags to unit data.
-        opts = FlagManager('kubelet')
-        # Append the DNS flags + data to the FlagManager object.
-
-        opts.add('--cluster-dns', dns['sdn-ip'])  # FIXME sdn-ip needs a rename
-        opts.add('--cluster-domain', dns['domain'])
-
         create_config(servers[0])
-        render_init_scripts(servers)
+        configure_worker_services(servers, dns)
         set_state('kubernetes-worker.config.created')
         restart_unit_services()
         update_kubelet_status()
+        remove_state('kubernetes-worker.restart-needed')
 
 
 @when('cni.connected')
@@ -234,9 +318,9 @@ def render_and_launch_ingress():
     else:
         hookenv.log('Deleting the http backend and ingress.')
         kubectl_manifest('delete',
-                         '/etc/kubernetes/addons/default-http-backend.yaml')
+                         '/root/cdk/addons/default-http-backend.yaml')
         kubectl_manifest('delete',
-                         '/etc/kubernetes/addons/ingress-replication-controller.yaml')  # noqa
+                         '/root/cdk/addons/ingress-replication-controller.yaml')  # noqa
         hookenv.close_port(80)
         hookenv.close_port(443)
 
@@ -318,43 +402,40 @@ def create_config(server):
                       user='kubelet')
 
 
-def render_init_scripts(api_servers):
-    ''' We have related to either an api server or a load balancer connected
-    to the apiserver. Render the config files and prepare for launch '''
-    context = {}
-    context.update(hookenv.config())
-
+def configure_worker_services(api_servers, dns):
+    ''' Add remaining flags for the worker services and configure snaps to use
+    them '''
     layer_options = layer.options('tls-client')
     ca_cert_path = layer_options.get('ca_certificate_path')
     server_cert_path = layer_options.get('server_certificate_path')
     server_key_path = layer_options.get('server_key_path')
 
-    unit_name = os.getenv('JUJU_UNIT_NAME').replace('/', '-')
-    context.update({'kube_api_endpoint': ','.join(api_servers),
-                    'JUJU_UNIT_NAME': unit_name})
-
     kubelet_opts = FlagManager('kubelet')
-    kubelet_opts.add('--require-kubeconfig', None)
-    kubelet_opts.add('--kubeconfig', kubeconfig_path)
-    kubelet_opts.add('--network-plugin', 'cni')
-    kubelet_opts.add('--anonymous-auth', 'false')
-    kubelet_opts.add('--client-ca-file', ca_cert_path)
-    kubelet_opts.add('--tls-cert-file', server_cert_path)
-    kubelet_opts.add('--tls-private-key-file', server_key_path)
-    context['kubelet_opts'] = kubelet_opts.to_s()
+    kubelet_opts.add('require-kubeconfig', 'true')
+    kubelet_opts.add('kubeconfig', kubeconfig_path)
+    kubelet_opts.add('network-plugin', 'cni')
+    kubelet_opts.add('logtostderr', 'true')
+    kubelet_opts.add('v', '0')
+    kubelet_opts.add('address', '0.0.0.0')
+    kubelet_opts.add('port', '10250')
+    kubelet_opts.add('allow-privileged', 'false')
+    kubelet_opts.add('cluster-dns', dns['sdn-ip'])
+    kubelet_opts.add('cluster-domain', dns['domain'])
+    kubelet_opts.add('anonymous-auth', 'false')
+    kubelet_opts.add('client-ca-file', ca_cert_path)
+    kubelet_opts.add('tls-cert-file', server_cert_path)
+    kubelet_opts.add('tls-private-key-file', server_key_path)
 
     kube_proxy_opts = FlagManager('kube-proxy')
-    kube_proxy_opts.add('--kubeconfig', kubeconfig_path)
-    context['kube_proxy_opts'] = kube_proxy_opts.to_s()
+    kube_proxy_opts.add('kubeconfig', kubeconfig_path)
+    kube_proxy_opts.add('logtostderr', 'true')
+    kube_proxy_opts.add('v', '0')
+    kube_proxy_opts.add('master', ','.join(api_servers), strict=True)
 
-    os.makedirs('/var/lib/kubelet', exist_ok=True)
-
-    render('kube-default', '/etc/default/kube-default', context)
-    render('kubelet.defaults', '/etc/default/kubelet', context)
-    render('kubelet.service', '/lib/systemd/system/kubelet.service', context)
-    render('kube-proxy.defaults', '/etc/default/kube-proxy', context)
-    render('kube-proxy.service', '/lib/systemd/system/kube-proxy.service',
-           context)
+    cmd = ['snap', 'set', 'kubelet'] + kubelet_opts.to_s().split(' ')
+    check_call(cmd)
+    cmd = ['snap', 'set', 'kube-proxy'] + kube_proxy_opts.to_s().split(' ')
+    check_call(cmd)
 
 
 def create_kubeconfig(kubeconfig, server, ca, key, certificate, user='ubuntu',
@@ -383,37 +464,45 @@ def launch_default_ingress_controller():
     ''' Launch the Kubernetes ingress controller & default backend (404) '''
     context = {}
     context['arch'] = arch()
-    addon_path = '/etc/kubernetes/addons/{}'
-    manifest = addon_path.format('default-http-backend.yaml')
+    addon_path = '/root/cdk/addons/{}'
+
     # Render the default http backend (404) replicationcontroller manifest
+    manifest = addon_path.format('default-http-backend.yaml')
     render('default-http-backend.yaml', manifest, context)
     hookenv.log('Creating the default http backend.')
-    kubectl_manifest('create', manifest)
+    try:
+        kubectl('apply', '-f', manifest)
+    except CalledProcessError as e:
+        hookenv.log(e)
+        hookenv.log('Failed to create default-http-backend. Will attempt again next update.')  # noqa
+        hookenv.close_port(80)
+        hookenv.close_port(443)
+        return
+
     # Render the ingress replication controller manifest
     manifest = addon_path.format('ingress-replication-controller.yaml')
     render('ingress-replication-controller.yaml', manifest, context)
-    if kubectl_manifest('create', manifest):
-        hookenv.log('Creating the ingress replication controller.')
-        set_state('kubernetes-worker.ingress.available')
-        hookenv.open_port(80)
-        hookenv.open_port(443)
-    else:
+    hookenv.log('Creating the ingress replication controller.')
+    try:
+        kubectl('apply', '-f', manifest)
+    except CalledProcessError as e:
+        hookenv.log(e)
         hookenv.log('Failed to create ingress controller. Will attempt again next update.')  # noqa
         hookenv.close_port(80)
         hookenv.close_port(443)
+        return
+
+    set_state('kubernetes-worker.ingress.available')
+    hookenv.open_port(80)
+    hookenv.open_port(443)
 
 
 def restart_unit_services():
-    '''Reload the systemd configuration and restart the services.'''
-    # Tell systemd to reload configuration from disk for all daemons.
-    call(['systemctl', 'daemon-reload'])
-    # Ensure the services available after rebooting.
-    call(['systemctl', 'enable', 'kubelet.service'])
-    call(['systemctl', 'enable', 'kube-proxy.service'])
-    # Restart the services.
-    hookenv.log('Restarting kubelet, and kube-proxy.')
-    call(['systemctl', 'restart', 'kubelet'])
-    call(['systemctl', 'restart', 'kube-proxy'])
+    '''Restart worker services.'''
+    hookenv.log('Restarting kubelet and kube-proxy.')
+    services = ['kube-proxy', 'kubelet']
+    for service in services:
+        service_restart('snap.%s.daemon' % service)
 
 
 def get_kube_api_servers(kube_api):
@@ -480,8 +569,7 @@ def initial_nrpe_config(nagios=None):
 @when_any('config.changed.nagios_context',
           'config.changed.nagios_servicegroups')
 def update_nrpe_config(unused=None):
-    services = ('kubelet', 'kube-proxy')
-
+    services = ('snap.kubelet.daemon', 'snap.kube-proxy.daemon')
     hostname = nrpe.get_nagios_hostname()
     current_unit = nrpe.get_nagios_unit_name()
     nrpe_setup = nrpe.NRPE(hostname=hostname)
@@ -495,7 +583,7 @@ def remove_nrpe_config(nagios=None):
     remove_state('nrpe-external-master.initial-config')
 
     # List of systemd services for which the checks will be removed
-    services = ('kubelet', 'kube-proxy')
+    services = ('snap.kubelet.daemon', 'snap.kube-proxy.daemon')
 
     # The current nrpe-external-master interface doesn't handle a lot of logic,
     # use the charm-helpers code for now.

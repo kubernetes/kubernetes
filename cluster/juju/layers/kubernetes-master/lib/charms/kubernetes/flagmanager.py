@@ -108,8 +108,16 @@ class FlagManager:
                 self.data.pop('{}-strict'.format(key))
             else:
                 self.data.pop('key')
+            self.__save()
         except KeyError:
             pass
+
+    def destroy_all(self):
+        '''
+        Destructively removes all data from the FlagManager.
+        '''
+        self.data.clear()
+        self.__save()
 
     def to_s(self):
         '''

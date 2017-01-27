@@ -14,6 +14,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import os
 import sys
 
 from charmhelpers.core.hookenv import action_get
@@ -22,6 +23,7 @@ from charmhelpers.core.hookenv import unit_public_ip
 from charms.templating.jinja2 import render
 from subprocess import call
 
+os.environ['PATH'] += os.pathsep + os.path.join(os.sep, 'snap', 'bin')
 
 context = {}
 context['replicas'] = action_get('replicas')
@@ -32,7 +34,7 @@ if not context['replicas']:
     context['replicas'] = 3
 
 # Declare a kubectl template when invoking kubectl
-kubectl = ['kubectl', '--kubeconfig=/srv/kubernetes/config']
+kubectl = ['kubectl', '--kubeconfig=/root/cdk/kubeconfig']
 
 # Remove deployment if requested
 if context['delete']:
@@ -56,11 +58,11 @@ if context['delete']:
 
 # Creation request
 
-render('microbot-example.yaml', '/etc/kubernetes/addons/microbot.yaml',
+render('microbot-example.yaml', '/root/cdk/addons/microbot.yaml',
        context)
 
 create_command = kubectl + ['create', '-f',
-                            '/etc/kubernetes/addons/microbot.yaml']
+                            '/root/cdk/addons/microbot.yaml']
 
 create_response = call(create_command)
 
