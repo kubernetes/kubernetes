@@ -196,11 +196,7 @@ func DeepCopy_componentconfig_KubeletConfiguration(in interface{}, out interface
 		if in.RegisterWithTaints != nil {
 			in, out := &in.RegisterWithTaints, &out.RegisterWithTaints
 			*out = make([]api.Taint, len(*in))
-			for i := range *in {
-				if err := api.DeepCopy_api_Taint(&(*in)[i], &(*out)[i], c); err != nil {
-					return err
-				}
-			}
+			copy(*out, *in)
 		}
 		if in.NodeLabels != nil {
 			in, out := &in.NodeLabels, &out.NodeLabels

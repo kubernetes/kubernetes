@@ -8015,7 +8015,8 @@
     "required": [
      "targetPortal",
      "iqn",
-     "lun"
+     "lun",
+     "portals"
     ],
     "properties": {
      "targetPortal": {
@@ -8042,6 +8043,13 @@
      "readOnly": {
       "type": "boolean",
       "description": "ReadOnly here will force the ReadOnly setting in VolumeMounts. Defaults to false."
+     },
+     "portals": {
+      "type": "array",
+      "items": {
+       "type": "string"
+      },
+      "description": "iSCSI target portal List. The portal is either an IP or ip_addr:port if the port is other than default (typically TCP ports 860 and 3260)."
      }
     }
    },

@@ -4925,7 +4925,8 @@
     "required": [
      "targetPortal",
      "iqn",
-     "lun"
+     "lun",
+     "portals"
     ],
     "properties": {
      "targetPortal": {
@@ -4952,6 +4953,12 @@
      "readOnly": {
       "type": "boolean",
       "description": "ReadOnly here will force the ReadOnly setting in VolumeMounts. Defaults to false."
+     },
+     "portals": {
+      "type": "array",
+      "items": {
+       "type": "string"
+      }
      }
     }
    },
@@ -7063,6 +7070,13 @@
        "type": "string"
       },
       "description": "verbs is a list of supported kube verbs (this includes get, list, watch, create, update, patch, delete, deletecollection, and proxy)"
+     },
+     "shortNames": {
+      "type": "array",
+      "items": {
+       "type": "string"
+      },
+      "description": "shortNames is a list of suggested short names of the resource."
      }
     }
    }
