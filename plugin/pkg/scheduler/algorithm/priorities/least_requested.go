@@ -26,7 +26,7 @@ import (
 	"github.com/golang/glog"
 )
 
-// LeastRequestedPriority is a priority function that favors nodes with fewer requested resources.
+// LeastRequestedPriorityMap is a priority function that favors nodes with fewer requested resources.
 // It calculates the percentage of memory and CPU requested by pods scheduled on the node, and prioritizes
 // based on the minimum of the average of the fraction of requested to capacity.
 // Details: cpu((capacity - sum(requested)) * 10 / capacity) + memory((capacity - sum(requested)) * 10 / capacity) / 2

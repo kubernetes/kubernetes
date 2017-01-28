@@ -60,7 +60,7 @@ func getTolerationListFromPod(pod *v1.Pod) ([]v1.Toleration, error) {
 	return getAllTolerationPreferNoSchedule(tolerations), nil
 }
 
-// ComputeTaintTolerationPriority prepares the priority list for all the nodes based on the number of intolerable taints on the node
+// ComputeTaintTolerationPriorityMap prepares the priority list for all the nodes based on the number of intolerable taints on the node
 func ComputeTaintTolerationPriorityMap(pod *v1.Pod, meta interface{}, nodeInfo *schedulercache.NodeInfo) (schedulerapi.HostPriority, error) {
 	node := nodeInfo.Node()
 	if node == nil {

@@ -98,7 +98,7 @@ func fractionOfCapacity(requested, capacity int64) float64 {
 	return float64(requested) / float64(capacity)
 }
 
-// BalancedResourceAllocation favors nodes with balanced resource usage rate.
+// BalancedResourceAllocationMap favors nodes with balanced resource usage rate.
 // BalancedResourceAllocation should **NOT** be used alone, and **MUST** be used together with LeastRequestedPriority.
 // It calculates the difference between the cpu and memory fracion of capacity, and prioritizes the host based on how
 // close the two metrics are to each other.
