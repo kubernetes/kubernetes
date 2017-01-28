@@ -224,6 +224,7 @@ func Packages(context *generator.Context, arguments *args.GeneratorArgs) generat
 
 		// Make sure our peer-packages are added and fully parsed.
 		for _, pp := range peerPkgs {
+			fmt.Println(pp)
 			context.AddDir(pp)
 			getManualConversionFunctions(context, context.Universe[pp], manualConversions)
 		}
