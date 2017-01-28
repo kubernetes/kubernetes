@@ -1494,7 +1494,7 @@ func (kl *Kubelet) GetPortForward(podName, podNamespace string, podUID types.UID
 // running and whose volumes have been cleaned up.
 func (kl *Kubelet) cleanupOrphanedPodCgroups(
 	cgroupPods map[types.UID]cm.CgroupName,
-	pods []*v1.Pod, runningPods []*kubecontainer.Pod) error {
+	pods []*v1.Pod, runningPods []*kubecontainer.Pod) {
 	// Add all running and existing terminated pods to a set allPods
 	allPods := sets.NewString()
 	for _, pod := range pods {
@@ -1524,7 +1524,6 @@ func (kl *Kubelet) cleanupOrphanedPodCgroups(
 		// again try to delete these unwanted pod cgroups
 		go pcm.Destroy(val)
 	}
-	return nil
 }
 
 // enableHostUserNamespace determines if the host user namespace should be used by the container runtime.
