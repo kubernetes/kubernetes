@@ -269,13 +269,15 @@ func (vm *volumeManager) GetExtraSupplementalGroupsForPod(pod *v1.Pod) []int64 {
 	}
 
 	result := make([]int64, 0, supplementalGroups.Len())
-	for _, group := range supplementalGroups.List() {
-		iGroup, extra := getExtraSupplementalGid(group, pod)
-		if !extra {
-			continue
-		}
+	if supplementalGroups.Len() > 0 {
+		for _, group := range supplementalGroups.List() {
+			iGroup, extra := getExtraSupplementalGid(group, pod)
+			if !extra {
+				continue
+			}
 
-		result = append(result, int64(iGroup))
+			result = append(result, int64(iGroup))
+		}
 	}
 
 	return result
@@ -297,17 +299,21 @@ func (vm *volumeManager) GetVolumesInUse() []v1.UniqueVolumeName {
 			map[v1.UniqueVolumeName]bool,
 			len(desiredVolumes)+len(mountedVolumes) /* cap */)
 
-	for _, volume := range desiredVolumes {
-		if volume.PluginIsAttachable {
-			desiredVolumesMap[volume.VolumeName] = true
-			volumesToReportInUse = append(volumesToReportInUse, volume.VolumeName)
+	if len(desiredVolumes) > 0 {
+		for _, volume := range desiredVolumes {
+			if volume.PluginIsAttachable {
+				desiredVolumesMap[volume.VolumeName] = true
+				volumesToReportInUse = append(volumesToReportInUse, volume.VolumeName)
+			}
 		}
 	}
 
-	for _, volume := range mountedVolumes {
-		if volume.PluginIsAttachable {
-			if _, exists := desiredVolumesMap[volume.VolumeName]; !exists {
-				volumesToReportInUse = append(volumesToReportInUse, volume.VolumeName)
+	if len(mountedVolumes) > 0 {
+		for _, volume := range mountedVolumes {
+			if volume.PluginIsAttachable {
+				if _, exists := desiredVolumesMap[volume.VolumeName]; !exists {
+					volumesToReportInUse = append(volumesToReportInUse, volume.VolumeName)
+				}
 			}
 		}
 	}
@@ -395,11 +401,14 @@ func (vm *volumeManager) getUnmountedVolumes(
 func filterUnmountedVolumes(
 	mountedVolumes sets.String, expectedVolumes []string) []string {
 	unmountedVolumes := []string{}
-	for _, expectedVolume := range expectedVolumes {
-		if !mountedVolumes.Has(expectedVolume) {
-			unmountedVolumes = append(unmountedVolumes, expectedVolume)
+	if len(expectedVolumes) > 0 {
+		for _, expectedVolume := range expectedVolumes {
+			if !mountedVolumes.Has(expectedVolume) {
+				unmountedVolumes = append(unmountedVolumes, expectedVolume)
+			}
 		}
 	}
+
 	return unmountedVolumes
 }
 
