@@ -74,47 +74,37 @@ if [[ "${KUBE_FASTBUILD:-}" == "true" ]]; then
 else
 
   # The server platform we are building on.
-  KUBE_SERVER_PLATFORMS=(
+  readonly KUBE_SERVER_PLATFORMS=(
     linux/amd64
     linux/arm
     linux/arm64
     linux/s390x
+    linux/ppc64le
   )
-  if [[ "${KUBE_BUILD_PPC64LE:-}" =~ ^[yY]$ ]]; then
-    KUBE_SERVER_PLATFORMS+=(linux/ppc64le)
-  fi
-  readonly KUBE_SERVER_PLATFORMS
 
   # The node platforms we build for
-  KUBE_NODE_PLATFORMS=(
+  readonly KUBE_NODE_PLATFORMS=(
     linux/amd64
     linux/arm
     linux/arm64
     linux/s390x
+    linux/ppc64le
     windows/amd64
   )
-  if [[ "${KUBE_BUILD_PPC64LE:-}" =~ ^[yY]$ ]]; then
-    KUBE_NODE_PLATFORMS+=(linux/ppc64le)
-  fi
-  readonly KUBE_NODE_PLATFORMS
 
-  # If we update this we should also update the set of golang compilers we build
-  # in 'build/build-image/cross/Dockerfile'. However, it's only a bit faster since go 1.5, not mandatory
-  KUBE_CLIENT_PLATFORMS=(
+  # If we update this we should also update the set of platforms whose standard library is precompiled for in build/build-image/cross/Dockerfile
+  readonly KUBE_CLIENT_PLATFORMS=(
     linux/amd64
     linux/386
     linux/arm
     linux/arm64
+    linux/s390x
+    linux/ppc64le
     darwin/amd64
     darwin/386
     windows/amd64
     windows/386
-    linux/s390x
   )
-  if [[ "${KUBE_BUILD_PPC64LE:-}" =~ ^[yY]$ ]]; then
-    KUBE_CLIENT_PLATFORMS+=(linux/ppc64le)
-  fi
-  readonly KUBE_CLIENT_PLATFORMS
 
   # Which platforms we should compile test targets for. Not all client platforms need these tests
   readonly KUBE_TEST_PLATFORMS=(
@@ -274,9 +264,9 @@ kube::golang::set_platform_envs() {
     case "${platform}" in
       "linux/arm")
         export CGO_ENABLED=1
-        export CC=arm-linux-gnueabi-gcc
-        # See https://github.com/kubernetes/kubernetes/issues/29904
-        export GOROOT=${K8S_PATCHED_GOROOT}
+        export CC=arm-linux-gnueabihf-gcc
+        # Use a special edge version of golang since the stable golang version used for everything else doesn't work
+        export GOROOT=${K8S_EDGE_GOROOT}
         ;;
       "linux/arm64")
         export CGO_ENABLED=1
@@ -285,6 +275,8 @@ kube::golang::set_platform_envs() {
       "linux/ppc64le")
         export CGO_ENABLED=1
         export CC=powerpc64le-linux-gnu-gcc
+        # Use a special edge version of golang since the stable golang version used for everything else doesn't work
+        export GOROOT=${K8S_EDGE_GOROOT}
         ;;
       "linux/s390x")
         export CGO_ENABLED=1
@@ -513,7 +505,13 @@ kube::golang::build_binaries_for_platform() {
   local -a nonstatics=()
   local -a tests=()
 
-  V=2 kube::log::info "Env for ${platform}: GOOS=${GOOS-} GOARCH=${GOARCH-} GOROOT=${GOROOT-} CGO_ENABLED=${CGO_ENABLED-} CC=${CC-}"
+  # Temporary workaround while we have two GOROOT's (which we'll get rid of as soon as we upgrade to go1.8 for amd64 as well)
+  local GO=go
+  if [[ "${GOROOT}" == "${K8S_EDGE_GOROOT:-}" ]]; then
+    GO="${K8S_EDGE_GOROOT}/bin/go"
+  fi
+
+  V=2 kube::log::info "Env for ${platform}: GOOS=${GOOS-} GOARCH=${GOARCH-} GOROOT=${GOROOT-} CGO_ENABLED=${CGO_ENABLED-} CC=${CC-} GO=${GO}"
 
   for binary in "${binaries[@]}"; do
 
@@ -530,16 +528,11 @@ kube::golang::build_binaries_for_platform() {
       kube::golang::fallback_if_stdlib_not_installable;
   fi
 
-  # TODO: Remove this temporary workaround when we have the official golang linker working
-  if [[ ${platform} == "linux/arm" ]]; then
-    gogcflags="${gogcflags} -largemodel"
-  fi
-
   if [[ -n ${use_go_build:-} ]]; then
     kube::log::progress "    "
     for binary in "${statics[@]:+${statics[@]}}"; do
       local outfile=$(kube::golang::output_filename_for_binary "${binary}" "${platform}")
-      CGO_ENABLED=0 go build -o "${outfile}" \
+      CGO_ENABLED=0 "${GO}" build -o "${outfile}" \
         "${goflags[@]:+${goflags[@]}}" \
         -gcflags "${gogcflags}" \
         -ldflags "${goldflags}" \
@@ -548,7 +541,7 @@ kube::golang::build_binaries_for_platform() {
     done
     for binary in "${nonstatics[@]:+${nonstatics[@]}}"; do
       local outfile=$(kube::golang::output_filename_for_binary "${binary}" "${platform}")
-      go build -o "${outfile}" \
+      "${GO}" build -o "${outfile}" \
         "${goflags[@]:+${goflags[@]}}" \
         -gcflags "${gogcflags}" \
         -ldflags "${goldflags}" \
@@ -559,13 +552,13 @@ kube::golang::build_binaries_for_platform() {
   else
     # Use go install.
     if [[ "${#nonstatics[@]}" != 0 ]]; then
-      go install "${goflags[@]:+${goflags[@]}}" \
+      "${GO}" install "${goflags[@]:+${goflags[@]}}" \
         -gcflags "${gogcflags}" \
         -ldflags "${goldflags}" \
         "${nonstatics[@]:+${nonstatics[@]}}"
     fi
     if [[ "${#statics[@]}" != 0 ]]; then
-      CGO_ENABLED=0 go install -installsuffix cgo "${goflags[@]:+${goflags[@]}}" \
+      CGO_ENABLED=0 "${GO}" install -installsuffix cgo "${goflags[@]:+${goflags[@]}}" \
         -gcflags "${gogcflags}" \
         -ldflags "${goldflags}" \
         "${statics[@]:+${statics[@]}}"
@@ -598,13 +591,13 @@ kube::golang::build_binaries_for_platform() {
     # doing a staleness check on k8s.io/kubernetes/test/e2e package always
     # returns true (always stale). And that's why we need to install the
     # test package.
-    go install "${goflags[@]:+${goflags[@]}}" \
+    "${GO}" install "${goflags[@]:+${goflags[@]}}" \
         -gcflags "${gogcflags}" \
         -ldflags "${goldflags}" \
         "${testpkg}"
 
     mkdir -p "$(dirname ${outfile})"
-    go test -i -c \
+    "${GO}" test -i -c \
       "${goflags[@]:+${goflags[@]}}" \
       -gcflags "${gogcflags}" \
       -ldflags "${goldflags}" \
