@@ -188,18 +188,7 @@ func (m *kubeGenericRuntimeManager) getKubeletSandboxes(all bool) ([]*runtimeapi
 		return nil, err
 	}
 
-	result := []*runtimeapi.PodSandbox{}
-	for _, s := range resp {
-		if !isManagedByKubelet(s.Labels) {
-			glog.V(5).Infof("Sandbox %s is not managed by kubelet", kubecontainer.BuildPodFullName(
-				s.Metadata.Name, s.Metadata.Namespace))
-			continue
-		}
-
-		result = append(result, s)
-	}
-
-	return result, nil
+	return resp, nil
 }
 
 // determinePodSandboxIP determines the IP address of the given pod sandbox.
