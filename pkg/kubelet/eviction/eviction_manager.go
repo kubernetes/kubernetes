@@ -24,14 +24,17 @@ import (
 
 	"github.com/golang/glog"
 	"k8s.io/apimachinery/pkg/util/wait"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/util/clock"
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/record"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 	"k8s.io/kubernetes/pkg/kubelet/qos"
 	"k8s.io/kubernetes/pkg/kubelet/server/stats"
+	kubelettypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
 )
 
@@ -310,6 +313,12 @@ func (m *managerImpl) synchronize(diskInfoProvider DiskInfoProvider, podFunc Act
 	// we kill at most a single pod during each eviction interval
 	for i := range activePods {
 		pod := activePods[i]
+		// If the pod is marked as critical and support for critical pod annotations is enabled,
+		// do not evict such pods. Once Kubelet supports preemptions, these pods can be safely evicted.
+		if utilfeature.DefaultFeatureGate.Enabled(features.ExperimentalCriticalPodAnnotation) &&
+			kubelettypes.IsCriticalPod(pod) {
+			continue
+		}
 		status := v1.PodStatus{
 			Phase:   v1.PodFailed,
 			Message: fmt.Sprintf(message, resourceToReclaim),
