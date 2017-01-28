@@ -18,26 +18,31 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-KUBE_ROOT=${KUBE_ROOT:-$(dirname "${BASH_SOURCE}")/..}
-source "${KUBE_ROOT}/cluster/kube-util.sh"
+# "-=-=-=-=-=-=-=-=-=-="
+# This script is only for CI testing purposes. Don't use it in production.
+# "-=-=-=-=-=-=-=-=-=-="
+
+KUBE_ROOT=${KUBE_ROOT:-$(dirname "${BASH_SOURCE}")/../..}
 source "${KUBE_ROOT}/cluster/clientbin.sh"
 
-# If KUBEADM_PATH isn't set, gather up the list of likely places and use ls
+# If KUBEFED_PATH isn't set, gather up the list of likely places and use ls
 # to find the latest one.
-if [[ -z "${KUBEADM_PATH:-}" ]]; then
-  kubeadm=$( get_bin "kubeadm" "cmd/kubeadm" )
+if [[ -z "${KUBEFED_PATH:-}" ]]; then
+  kubefed=$( get_bin "kubefed" "federation/cmd/kubefed" )
 
-  if [[ ! -x "$kubeadm" ]]; then
-    print_error "kubeadm"
+  if [[ ! -x "$kubefed" ]]; then
+    print_error "kubefed"
     exit 1
   fi
-elif [[ ! -x "${KUBEADM_PATH}" ]]; then
+elif [[ ! -x "${KUBEFED_PATH}" ]]; then
   {
-    echo "KUBEADM_PATH environment variable set to '${KUBEADM_PATH}', but "
+    echo "KUBEFED_PATH environment variable set to '${KUBEFED_PATH}', but "
     echo "this doesn't seem to be a valid executable."
   } >&2
   exit 1
 fi
-kubeadm="${KUBEADM_PATH:-${kubeadm}}"
+kubefed="${KUBEFED_PATH:-${kubefed}}"
 
-"${kubeadm}" "${@+$@}"
+# Use the arguments to the script if it is set, a null string
+# otherwise.
+"${kubefed}" "${@+$@}"
