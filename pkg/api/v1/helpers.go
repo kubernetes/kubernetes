@@ -316,10 +316,10 @@ func GetNodeTaints(node *Node) ([]Taint, error) {
 // (3) Empty toleration.key means to match all taint keys.
 //     If toleration.key is empty, toleration.operator must be 'Exists';
 //     this combination means to match all taint values and all taint keys.
-// (4) Nil toleration.tolerationSeconds means to match taints with
-//     any value of taint.timeAdded.
+// (4) Nil toleration.tolerationSeconds means to tolerate the taint forever.
 // (5) Non-nil positive toleration.tolerationSeconds means to
-//     match the taint for only a duration that starts at taint.timeAdded.
+//     match the taint for only a duration since the taint was observed
+//     by the TaintManager.
 func (t *Toleration) ToleratesTaint(taint *Taint) bool {
 	if len(t.Effect) > 0 && t.Effect != taint.Effect {
 		return false
@@ -329,17 +329,9 @@ func (t *Toleration) ToleratesTaint(taint *Taint) bool {
 		return false
 	}
 
-	if t.TolerationSeconds != nil {
-		// taint with no timeAdded indicated can only be tolerated
-		// by toleration with no tolerationSeconds.
-		if taint.TimeAdded.IsZero() {
-			return false
-		}
-
-		// TODO: need to take time skew into consideration, make sure toleration won't become out of age ealier than expected.
-		if metav1.Now().After(taint.TimeAdded.Add(time.Second * time.Duration(*t.TolerationSeconds))) {
-			return false
-		}
+	// TODO: need to take time skew into consideration, make sure toleration won't become out of age ealier than expected.
+	if t.TolerationSeconds != nil && metav1.Now().After(taint.TimeAdded.Add(time.Second*time.Duration(*t.TolerationSeconds))) {
+		return false
 	}
 
 	// TODO: Use proper defaulting when Toleration becomes a field of PodSpec
