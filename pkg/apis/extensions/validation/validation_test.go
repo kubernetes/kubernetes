@@ -2032,6 +2032,10 @@ func TestValidatePSPVolumes(t *testing.T) {
 }
 
 func TestValidateNetworkPolicy(t *testing.T) {
+	protocolTCP := api.ProtocolTCP
+	protocolUDP := api.ProtocolUDP
+	protocolICMP := api.Protocol("ICMP")
+
 	successCases := []extensions.NetworkPolicy{
 		{
 			ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "bar"},
@@ -2052,6 +2056,36 @@ func TestValidateNetworkPolicy(t *testing.T) {
 					{
 						From:  []extensions.NetworkPolicyPeer{},
 						Ports: []extensions.NetworkPolicyPort{},
+					},
+				},
+			},
+		},
+		{
+			ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "bar"},
+			Spec: extensions.NetworkPolicySpec{
+				PodSelector: metav1.LabelSelector{
+					MatchLabels: map[string]string{"a": "b"},
+				},
+				Ingress: []extensions.NetworkPolicyIngressRule{
+					{
+						Ports: []extensions.NetworkPolicyPort{
+							{
+								Protocol: nil,
+								Port:     &intstr.IntOrString{Type: intstr.Int, IntVal: 80},
+							},
+							{
+								Protocol: &protocolTCP,
+								Port:     nil,
+							},
+							{
+								Protocol: &protocolTCP,
+								Port:     &intstr.IntOrString{Type: intstr.Int, IntVal: 443},
+							},
+							{
+								Protocol: &protocolUDP,
+								Port:     &intstr.IntOrString{Type: intstr.String, StrVal: "dns"},
+							},
+						},
 					},
 				},
 			},
@@ -2140,6 +2174,54 @@ func TestValidateNetworkPolicy(t *testing.T) {
 								NamespaceSelector: &metav1.LabelSelector{
 									MatchLabels: map[string]string{"c": "d"},
 								},
+							},
+						},
+					},
+				},
+			},
+		},
+		"invalid ingress.ports.protocol": {
+			ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "bar"},
+			Spec: extensions.NetworkPolicySpec{
+				PodSelector: metav1.LabelSelector{},
+				Ingress: []extensions.NetworkPolicyIngressRule{
+					{
+						Ports: []extensions.NetworkPolicyPort{
+							{
+								Protocol: &protocolICMP,
+								Port:     &intstr.IntOrString{Type: intstr.Int, IntVal: 80},
+							},
+						},
+					},
+				},
+			},
+		},
+		"invalid ingress.ports.port (int)": {
+			ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "bar"},
+			Spec: extensions.NetworkPolicySpec{
+				PodSelector: metav1.LabelSelector{},
+				Ingress: []extensions.NetworkPolicyIngressRule{
+					{
+						Ports: []extensions.NetworkPolicyPort{
+							{
+								Protocol: &protocolTCP,
+								Port:     &intstr.IntOrString{Type: intstr.Int, IntVal: 123456789},
+							},
+						},
+					},
+				},
+			},
+		},
+		"invalid ingress.ports.port (str)": {
+			ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "bar"},
+			Spec: extensions.NetworkPolicySpec{
+				PodSelector: metav1.LabelSelector{},
+				Ingress: []extensions.NetworkPolicyIngressRule{
+					{
+						Ports: []extensions.NetworkPolicyPort{
+							{
+								Protocol: &protocolTCP,
+								Port:     &intstr.IntOrString{Type: intstr.String, StrVal: "!@#$"},
 							},
 						},
 					},
