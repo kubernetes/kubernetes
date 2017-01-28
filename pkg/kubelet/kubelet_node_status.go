@@ -37,6 +37,7 @@ import (
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
 	"k8s.io/kubernetes/pkg/kubelet/events"
+	"k8s.io/kubernetes/pkg/kubelet/util"
 	"k8s.io/kubernetes/pkg/kubelet/util/sliceutils"
 	nodeutil "k8s.io/kubernetes/pkg/util/node"
 	"k8s.io/kubernetes/pkg/version"
@@ -349,7 +350,7 @@ func (kl *Kubelet) tryUpdateNodeStatus(tryNumber int) error {
 	// If it result in a conflict, all retries are served directly from etcd.
 	opts := metav1.GetOptions{}
 	if tryNumber == 0 {
-		opts.ResourceVersion = "0"
+		util.FromApiserverCache(&opts)
 	}
 	node, err := kl.kubeClient.Core().Nodes().Get(string(kl.nodeName), opts)
 	if err != nil {
