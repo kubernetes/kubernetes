@@ -29,17 +29,13 @@ KUBE_ROOT=$(dirname "${BASH_SOURCE}")/../..
 # For `kube::log::status` function since it already sources
 # "${KUBE_ROOT}/cluster/lib/logging.sh" and DEFAULT_KUBECONFIG
 source "${KUBE_ROOT}/cluster/common.sh"
-# For $KUBE_PLATFORM, $KUBE_ARCH, $KUBE_BUILD_STAGE,
-# $FEDERATION_PUSH_REPO_BASE and $FEDERATION_NAMESPACE.
+# For $FEDERATION_PUSH_REPO_BASE and $FEDERATION_NAMESPACE.
 source "${KUBE_ROOT}/federation/cluster/common.sh"
 
 FEDERATION_NAME="${FEDERATION_NAME:-e2e-federation}"
 FEDERATION_KUBE_CONTEXT="${FEDERATION_KUBE_CONTEXT:-e2e-federation}"
 DNS_ZONE_NAME="${FEDERATION_DNS_ZONE_NAME:-}"
 HOST_CLUSTER_CONTEXT="${FEDERATION_HOST_CLUSTER_CONTEXT:-${1}}"
-readonly CLIENT_BIN_DIR="${KUBE_ROOT}/_output/${KUBE_BUILD_STAGE}/client/${KUBE_PLATFORM}-${KUBE_ARCH}/kubernetes/client/bin"
-kubefed="${CLIENT_BIN_DIR}/kubefed"
-kubectl="${CLIENT_BIN_DIR}/kubectl"
 
 # Initializes the control plane.
 # TODO(madhusudancs): Move this to federation/develop.sh.
@@ -50,7 +46,7 @@ function init() {
   local -r kube_registry="${KUBE_REGISTRY:-gcr.io/${project}}"
   local -r kube_version="${KUBERNETES_RELEASE:-}"
 
-  ${kubefed} init \
+  "${KUBE_ROOT}/federation/develop/kubefed.sh" init \
       "${FEDERATION_NAME}" \
       --host-cluster-context="${HOST_CLUSTER_CONTEXT}" \
       --dns-zone-name="${DNS_ZONE_NAME}" \
@@ -73,13 +69,17 @@ function create_cluster_secrets() {
     name=$(echo "${dir}" | sed -e "s/_/-/g")  # Replace "_" by "-"
     name=${name:0:252}
     kube::log::status "Creating secret with name: ${name} in namespace ${FEDERATION_NAMESPACE}"
-    ${kubectl} create secret generic ${name} --from-file="${base_dir}/${dir}/kubeconfig" --namespace="${FEDERATION_NAMESPACE}"
+    "${KUBE_ROOT}/cluster/kubectl.sh" create secret generic ${name} --from-file="${base_dir}/${dir}/kubeconfig" --namespace="${FEDERATION_NAMESPACE}"
   done
 }
 
 USE_KUBEFED="${USE_KUBEFED:-}"
 if [[ "${USE_KUBEFED}" == "true" ]]; then
   init
+  # TODO(madhusudancs): Call to create_cluster_secrets and the function
+  # itself must be removed after implementing cluster join with kubefed
+  # here. This call is now required for the cluster joins in the
+  # BeforeEach blocks of each e2e test to work.
   create_cluster_secrets
 else
   # Read the version back from the versions file if no version is given.
