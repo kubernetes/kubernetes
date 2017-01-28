@@ -69,7 +69,7 @@ func TestInvalidVersion(t *testing.T) {
 		ver, err := KubernetesReleaseVersion(s)
 		t.Log("Invalid: ", s, ver, err)
 		if err == nil {
-			t.Errorf("KubernetesReleaseVersion error expected for version %q, but returned succesfully", s)
+			t.Errorf("KubernetesReleaseVersion error expected for version %q, but returned successfully", s)
 		}
 		if ver != "" {
 			t.Errorf("KubernetesReleaseVersion should return empty string in case of error. Returned %q for version %q", ver, s)
