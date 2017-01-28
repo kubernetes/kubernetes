@@ -34,6 +34,7 @@ var knownTranslations = map[string][]string{
 	"kubectl": {
 		"default",
 		"en_US",
+		"fr_FR",
 	},
 	// only used for unit tests.
 	"test": {
