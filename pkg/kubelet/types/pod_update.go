@@ -20,13 +20,17 @@ import (
 	"fmt"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	kubeapi "k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
 )
 
-const ConfigSourceAnnotationKey = "kubernetes.io/config.source"
-const ConfigMirrorAnnotationKey = "kubernetes.io/config.mirror"
-const ConfigFirstSeenAnnotationKey = "kubernetes.io/config.seen"
-const ConfigHashAnnotationKey = "kubernetes.io/config.hash"
+const (
+	ConfigSourceAnnotationKey    = "kubernetes.io/config.source"
+	ConfigMirrorAnnotationKey    = "kubernetes.io/config.mirror"
+	ConfigFirstSeenAnnotationKey = "kubernetes.io/config.seen"
+	ConfigHashAnnotationKey      = "kubernetes.io/config.hash"
+	CriticalPodAnnotationKey     = "scheduler.alpha.kubernetes.io/critical-pod"
+)
 
 // PodOperation defines what changes will be made on a pod configuration.
 type PodOperation int
@@ -137,6 +141,13 @@ func (sp SyncPodType) String() string {
 // key. Both the rescheduler and the kubelet use this key to make admission
 // and scheduling decisions.
 func IsCriticalPod(pod *v1.Pod) bool {
-	_, ok := pod.Annotations[CriticalPodAnnotationKey]
-	return ok
+	// Critical pods are restricted to "kube-system" namespace as of now.
+	if pod.Namespace != kubeapi.NamespaceSystem {
+		return false
+	}
+	val, ok := pod.Annotations[CriticalPodAnnotationKey]
+	if ok && val == "" {
+		return true
+	}
+	return false
 }
