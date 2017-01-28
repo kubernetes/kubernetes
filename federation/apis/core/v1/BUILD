@@ -3,19 +3,21 @@ package(default_visibility = ["//visibility:public"])
 licenses(["notice"])
 
 load(
-    "@io_bazel_rules_go//go:def.bzl",
-    "go_library",
+    "@io_kubernetes_build//defs:go.bzl",
+    "api_group",
 )
 
-go_library(
+api_group(
     name = "go_default_library",
     srcs = [
         "conversion.go",
         "defaults.go",
         "doc.go",
         "register.go",
-        "zz_generated.conversion.go",
     ],
+    gen_deps = ["//federation/apis/core:go_default_library"],
+    gen_types = ["conversion"],
+    package = "federation/apis/core/v1",
     tags = ["automanaged"],
     deps = [
         "//pkg/api/v1:go_default_library",

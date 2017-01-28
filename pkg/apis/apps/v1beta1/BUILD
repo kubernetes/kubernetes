@@ -2,12 +2,9 @@ package(default_visibility = ["//visibility:public"])
 
 licenses(["notice"])
 
-load(
-    "@io_bazel_rules_go//go:def.bzl",
-    "go_library",
-)
+load("@io_kubernetes_build//defs:go.bzl", "api_group")
 
-go_library(
+api_group(
     name = "go_default_library",
     srcs = [
         "conversion.go",
@@ -18,10 +15,13 @@ go_library(
         "types.generated.go",
         "types.go",
         "types_swagger_doc_generated.go",
-        "zz_generated.conversion.go",
-        "zz_generated.deepcopy.go",
-        "zz_generated.defaults.go",
     ],
+    gen_types = [
+        "conversion",
+        "deepcopy",
+        "defaulter",
+    ],
+    package = "pkg/apis/apps/v1beta1",
     tags = ["automanaged"],
     deps = [
         "//pkg/api:go_default_library",
