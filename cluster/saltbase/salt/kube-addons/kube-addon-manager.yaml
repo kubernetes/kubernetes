@@ -12,7 +12,8 @@ spec:
     # When updating version also bump it in:
     # - cluster/images/hyperkube/static-pods/addon-manager-singlenode.json
     # - cluster/images/hyperkube/static-pods/addon-manager-multinode.json
-    image: gcr.io/google-containers/kube-addon-manager:v6.2
+    # image: gcr.io/google-containers/kube-addon-manager-amd64:v6.4
+    image: gcr.io/zihongz-k8s-dev/kube-addon-manager-amd64:v6.4-pr
     command:
     - /bin/bash
     - -c

@@ -15,7 +15,10 @@
 IMAGE=gcr.io/google-containers/kube-addon-manager
 ARCH?=amd64
 TEMP_DIR:=$(shell mktemp -d)
-VERSION=v6.3
+VERSION=v6.4
+# TODO: Current Addon Manager is built with kubectl on head
+# (GitCommit:"8444d47627df7d120c1641a3fe841480e10cb766").
+# Should use the v1.6 released kubectl once available.
 KUBECTL_VERSION?=v1.5.2
 
 ifeq ($(ARCH),amd64)

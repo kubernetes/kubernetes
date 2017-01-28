@@ -1,3 +1,6 @@
+### Version 6.4 (Sat January 28 2017 Zihong Zheng <zihongz@google.com>)
+ - Support 'ensure exist' class addon and use addon-manager specific label.
+
 ### Version 6.3 (Fri January 27 2017 Lucas Käldström <lucas.kaldstrom@hotmail.co.uk>)
  - Updated the arm base image to `armhf/busybox` and now using qemu v2.7 for emulation.
 
