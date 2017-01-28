@@ -88,11 +88,10 @@ type KubeProxyConfiguration struct {
 }
 
 // Currently two modes of proxying are available: 'userspace' (older, stable) or 'iptables'
-// (experimental). If blank, look at the Node object on the Kubernetes API and respect the
-// 'net.experimental.kubernetes.io/proxy-mode' annotation if provided.  Otherwise use the
-// best-available proxy (currently userspace, but may change in future versions).  If the
-// iptables proxy is selected, regardless of how, but the system's kernel or iptables
-// versions are insufficient, this always falls back to the userspace proxy.
+// (newer, faster). If blank, use the best-available proxy (currently iptables, but may
+// change in future versions).  If the iptables proxy is selected, regardless of how, but
+// the system's kernel or iptables versions are insufficient, this always falls back to the
+// userspace proxy.
 type ProxyMode string
 
 const (
