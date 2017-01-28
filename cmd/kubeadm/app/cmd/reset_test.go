@@ -157,10 +157,10 @@ func TestConfigDirCleaner(t *testing.T) {
 		for _, createFile := range test.setupFiles {
 			fullPath := filepath.Join(tmpDir, createFile)
 			f, err := os.Create(fullPath)
-			defer f.Close()
 			if err != nil {
 				t.Errorf("Unable to create test file: %s", err)
 			}
+			defer f.Close()
 		}
 
 		resetConfigDir(tmpDir, filepath.Join(tmpDir, "pki"))
