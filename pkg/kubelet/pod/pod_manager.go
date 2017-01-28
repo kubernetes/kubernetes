@@ -23,7 +23,6 @@ import (
 	"k8s.io/kubernetes/pkg/api/v1"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/secret"
-	"k8s.io/kubernetes/pkg/types"
 )
 
 // Manager stores and manages access to pods, maintaining the mappings
