@@ -281,7 +281,7 @@ func (s *SwaggerSchema) ValidateObject(obj interface{}, fieldName, typeName stri
 	// handle required fields
 	for _, requiredKey := range model.Required {
 		if _, ok := fields[requiredKey]; !ok {
-			allErrs = append(allErrs, fmt.Errorf("field %s for %s: is required", requiredKey, typeName))
+			allErrs = append(allErrs, fmt.Errorf("field %s%s for %s is required", fieldName, requiredKey, typeName))
 		}
 	}
 	for key, value := range fields {
@@ -302,7 +302,7 @@ func (s *SwaggerSchema) ValidateObject(obj interface{}, fieldName, typeName stri
 			continue
 		}
 		if details.Type == nil && details.Ref == nil {
-			allErrs = append(allErrs, fmt.Errorf("could not find the type of %s from object: %v", key, details))
+			allErrs = append(allErrs, fmt.Errorf("could not find the type of %s%s from object %v", fieldName, key, details))
 		}
 		var fieldType string
 		if details.Type != nil {
@@ -311,7 +311,7 @@ func (s *SwaggerSchema) ValidateObject(obj interface{}, fieldName, typeName stri
 			fieldType = *details.Ref
 		}
 		if value == nil {
-			glog.V(2).Infof("Skipping nil field: %s", key)
+			glog.V(2).Infof("Skipping nil field: %s%s", fieldName, key)
 			continue
 		}
 		errs := s.validateField(value, fieldName+key, fieldType, &details)
