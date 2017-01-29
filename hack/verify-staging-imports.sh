@@ -25,8 +25,20 @@ kube::golang::setup_env
 
 
 for dep in $(ls -1 ${KUBE_ROOT}/staging/src/k8s.io/); do
-	if go list -f {{.Deps}} ./vendor/k8s.io/${dep}/... | tr " " '\n' | grep k8s.io/kubernetes | grep -v 'k8s.io/kubernetes/vendor' | LC_ALL=C sort -u | grep -e "."; then
-		echo "${dep} has a cyclical dependency"
+	if go list -f "{{.Deps}}" ./vendor/k8s.io/${dep}/... | tr " " '\n' | grep k8s.io/kubernetes | grep -v 'k8s.io/kubernetes/vendor' | LC_ALL=C sort -u | grep -qe "."; then
+		echo "${dep} has a cyclical dependency:"
+		echo
+		go list -f '{{.ImportPath}} {{.Deps}}' ./vendor/k8s.io/${dep}/... |
+			sed 's|^k8s.io/kubernetes/vendor/\([-a-zA-Z./0-9_]*\)|\1:|' | # remove vendor prefix of ImportPath
+			sed 's| k8s.io/kubernetes/vendor/[-a-zA-Z./0-9_]*||g' |       # remove vendored packages
+			grep k8s.io/kubernetes |                                      # only show packages with k8s.io/kubernetes deps
+			sed 's|\(k8s.io/kubernetes/\)|§\1|g' |                        # mark kubernetes deps with §
+			sed 's|\([[ ]\)[a-zA-Z][-a-zA-Z./0-9_]*|\1|g' |               # remove all other deps
+			sed 's|§||g' |                                                # remove § mark
+			sed 's|\]||g;s|\[||g' |                                       # remove [ and ]
+			sed 's|  *| |g' |                                             # squash spaces
+			sed $'s| |\\\n  |g' |                                         # put in newlines
+			sed 's|^|  |'                                                 # indent everything two spaces
 		exit 1
 	fi
 done
