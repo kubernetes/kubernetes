@@ -9,18 +9,8 @@ load(
 
 go_library(
     name = "go_default_library",
-    srcs = [
-        "doc.go",
-        "zz_generated.openapi.go",
-    ],
+    srcs = ["doc.go"],
     tags = ["automanaged"],
-    deps = [
-        "//pkg/util/intstr:go_default_library",
-        "//vendor:github.com/go-openapi/spec",
-        "//vendor:k8s.io/apimachinery/pkg/api/resource",
-        "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
-        "//vendor:k8s.io/apimachinery/pkg/openapi",
-    ],
 )
 
 filegroup(

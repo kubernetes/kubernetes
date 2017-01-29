@@ -65,9 +65,9 @@ func init() {
 		panic(err)
 	}
 	if false { // reference the types, but skip this branch at build/run time
-		var v0 pkg1_v1.TypeMeta
-		var v1 pkg2_types.UID
-		var v2 pkg4_resource.Quantity
+		var v0 pkg4_resource.Quantity
+		var v1 pkg1_v1.TypeMeta
+		var v2 pkg2_types.UID
 		var v3 pkg3_v1.PodTemplateSpec
 		var v4 pkg5_intstr.IntOrString
 		var v5 time.Time

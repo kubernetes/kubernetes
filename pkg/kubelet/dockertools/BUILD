@@ -102,7 +102,6 @@ go_test(
         "automanaged",
     ],
     deps = [
-        "//pkg/api:go_default_library",
         "//pkg/api/testapi:go_default_library",
         "//pkg/api/v1:go_default_library",
         "//pkg/apis/componentconfig:go_default_library",
@@ -131,6 +130,7 @@ go_test(
         "//vendor:github.com/golang/mock/gomock",
         "//vendor:github.com/google/cadvisor/info/v1",
         "//vendor:github.com/stretchr/testify/assert",
+        "//vendor:k8s.io/apimachinery/pkg/api/equality",
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
         "//vendor:k8s.io/apimachinery/pkg/runtime",
         "//vendor:k8s.io/apimachinery/pkg/types",

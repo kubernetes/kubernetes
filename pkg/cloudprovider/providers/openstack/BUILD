@@ -20,7 +20,6 @@ go_library(
     ],
     tags = ["automanaged"],
     deps = [
-        "//pkg/api/resource:go_default_library",
         "//pkg/api/v1:go_default_library",
         "//pkg/api/v1/service:go_default_library",
         "//pkg/cloudprovider:go_default_library",
@@ -53,6 +52,7 @@ go_library(
         "//vendor:github.com/rackspace/gophercloud/openstack/networking/v2/ports",
         "//vendor:github.com/rackspace/gophercloud/pagination",
         "//vendor:gopkg.in/gcfg.v1",
+        "//vendor:k8s.io/apimachinery/pkg/api/resource",
         "//vendor:k8s.io/apimachinery/pkg/types",
     ],
 )

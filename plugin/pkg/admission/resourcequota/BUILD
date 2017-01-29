@@ -47,12 +47,12 @@ go_test(
     tags = ["automanaged"],
     deps = [
         "//pkg/api:go_default_library",
-        "//pkg/api/resource:go_default_library",
         "//pkg/client/clientset_generated/internalclientset/fake:go_default_library",
         "//pkg/quota:go_default_library",
         "//pkg/quota/generic:go_default_library",
         "//pkg/quota/install:go_default_library",
         "//vendor:github.com/hashicorp/golang-lru",
+        "//vendor:k8s.io/apimachinery/pkg/api/resource",
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
         "//vendor:k8s.io/apimachinery/pkg/runtime/schema",
         "//vendor:k8s.io/apimachinery/pkg/util/sets",

@@ -53,6 +53,7 @@ go_test(
         "//pkg/client/clientset_generated/clientset/fake:go_default_library",
         "//pkg/controller:go_default_library",
         "//pkg/controller/informers:go_default_library",
+        "//vendor:k8s.io/apimachinery/pkg/api/equality",
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
         "//vendor:k8s.io/apimachinery/pkg/util/rand",
         "//vendor:k8s.io/apimachinery/pkg/util/wait",

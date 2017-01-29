@@ -174,7 +174,6 @@ go_test(
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/api/annotations:go_default_library",
-        "//pkg/api/resource:go_default_library",
         "//pkg/api/testapi:go_default_library",
         "//pkg/api/testing:go_default_library",
         "//pkg/api/unversioned:go_default_library",
@@ -191,8 +190,10 @@ go_test(
         "//pkg/util/term:go_default_library",
         "//vendor:github.com/spf13/cobra",
         "//vendor:github.com/stretchr/testify/assert",
+        "//vendor:k8s.io/apimachinery/pkg/api/equality",
         "//vendor:k8s.io/apimachinery/pkg/api/errors",
         "//vendor:k8s.io/apimachinery/pkg/api/meta",
+        "//vendor:k8s.io/apimachinery/pkg/api/resource",
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
         "//vendor:k8s.io/apimachinery/pkg/runtime",
         "//vendor:k8s.io/apimachinery/pkg/runtime/schema",
