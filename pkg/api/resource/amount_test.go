@@ -16,7 +16,9 @@ limitations under the License.
 
 package resource
 
-import "testing"
+import (
+	"testing"
+)
 
 func TestInt64AmountAsInt64(t *testing.T) {
 	for _, test := range []struct {

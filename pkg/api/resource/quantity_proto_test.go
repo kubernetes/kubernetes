@@ -23,6 +23,7 @@ import (
 )
 
 func TestQuantityProtoMarshal(t *testing.T) {
+	// Test when d is nil
 	table := []struct {
 		quantity string
 		expect   Quantity
@@ -41,8 +42,8 @@ func TestQuantityProtoMarshal(t *testing.T) {
 			t.Errorf("Expected: %v, Actual: %v", testCase.expect, q)
 		}
 	}
-
-	nils := []struct {
+	// Test when i is {0,0}
+	table2 := []struct {
 		dec    *inf.Dec
 		expect Quantity
 	}{
@@ -50,18 +51,19 @@ func TestQuantityProtoMarshal(t *testing.T) {
 		{dec(10, 0).Dec, Quantity{i: int64Amount{value: 0, scale: 0}, d: infDecAmount{dec(10, 0).Dec}, s: "10", Format: DecimalSI}},
 		{dec(-10, 0).Dec, Quantity{i: int64Amount{value: 0, scale: 0}, d: infDecAmount{dec(-10, 0).Dec}, s: "-10", Format: DecimalSI}},
 	}
-	for _, nilCase := range nils {
-		q := Quantity{d: infDecAmount{nilCase.dec}, Format: DecimalSI}
+	for _, testCase := range table2 {
+		q := Quantity{d: infDecAmount{testCase.dec}, Format: DecimalSI}
 		// Won't currently get an error as MarshalTo can't return one
 		result, _ := q.Marshal()
 		q.Unmarshal(result)
-		if q.Cmp(nilCase.expect) != 0 {
-			t.Errorf("Expected: %v, Actual: %v", nilCase.expect, q)
+		if q.Cmp(testCase.expect) != 0 {
+			t.Errorf("Expected: %v, Actual: %v", testCase.expect, q)
 		}
 	}
 }
 
 func TestQuantityProtoUnmarshal(t *testing.T) {
+	// Test when d is nil
 	table := []struct {
 		input  Quantity
 		expect string
@@ -80,8 +82,8 @@ func TestQuantityProtoUnmarshal(t *testing.T) {
 			t.Errorf("Expected: %v, Actual: %v", inputQ, expectQ)
 		}
 	}
-
-	nils := []struct {
+	// Test when i is {0,0}
+	table2 := []struct {
 		input  Quantity
 		expect *inf.Dec
 	}{
@@ -89,10 +91,10 @@ func TestQuantityProtoUnmarshal(t *testing.T) {
 		{Quantity{i: int64Amount{value: 0, scale: 0}, d: infDecAmount{dec(10, 0).Dec}, s: "10", Format: DecimalSI}, dec(10, 0).Dec},
 		{Quantity{i: int64Amount{value: 0, scale: 0}, d: infDecAmount{dec(-10, 0).Dec}, s: "-10", Format: DecimalSI}, dec(-10, 0).Dec},
 	}
-	for _, nilCase := range nils {
+	for _, testCase := range table2 {
 		var inputQ Quantity
-		expectQ := Quantity{d: infDecAmount{nilCase.expect}, Format: DecimalSI}
-		inputByteArray, _ := nilCase.input.Marshal()
+		expectQ := Quantity{d: infDecAmount{testCase.expect}, Format: DecimalSI}
+		inputByteArray, _ := testCase.input.Marshal()
 		inputQ.Unmarshal(inputByteArray)
 		if inputQ.Cmp(expectQ) != 0 {
 			t.Errorf("Expected: %v, Actual: %v", inputQ, expectQ)

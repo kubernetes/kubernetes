@@ -151,6 +151,7 @@ func TestQuantityCanocicalizeZero(t *testing.T) {
 }
 
 func TestQuantityCmp(t *testing.T) {
+	// Test when d is nil
 	table := []struct {
 		x      string
 		y      string
@@ -168,8 +169,8 @@ func TestQuantityCmp(t *testing.T) {
 			t.Errorf("X: %v, Y: %v, Expected: %v, Actual: %v", testCase.x, testCase.y, testCase.expect, result)
 		}
 	}
-
-	nils := []struct {
+	// Test when i is {0,0}
+	table2 := []struct {
 		x      *inf.Dec
 		y      *inf.Dec
 		expect int
@@ -183,11 +184,11 @@ func TestQuantityCmp(t *testing.T) {
 		{dec(10, 0).Dec, nil, 1},
 		{dec(-10, 0).Dec, nil, -1},
 	}
-	for _, nilCase := range nils {
-		q1 := Quantity{d: infDecAmount{nilCase.x}, Format: DecimalSI}
-		q2 := Quantity{d: infDecAmount{nilCase.y}, Format: DecimalSI}
-		if result := q1.Cmp(q2); result != nilCase.expect {
-			t.Errorf("X: %v, Y: %v, Expected: %v, Actual: %v", nilCase.x, nilCase.y, nilCase.expect, result)
+	for _, testCase := range table2 {
+		q1 := Quantity{d: infDecAmount{testCase.x}, Format: DecimalSI}
+		q2 := Quantity{d: infDecAmount{testCase.y}, Format: DecimalSI}
+		if result := q1.Cmp(q2); result != testCase.expect {
+			t.Errorf("X: %v, Y: %v, Expected: %v, Actual: %v", testCase.x, testCase.y, testCase.expect, result)
 		}
 	}
 }
@@ -818,13 +819,13 @@ func TestQuantityDeepCopy(t *testing.T) {
 			t.Errorf("Expected: %v, Actual: %v", q, result)
 		}
 	}
-	nils := []*inf.Dec{
+	table := []*inf.Dec{
 		dec(0, 0).Dec,
 		dec(10, 0).Dec,
 		dec(-10, 0).Dec,
 	}
-	for _, nilCase := range nils {
-		q := Quantity{d: infDecAmount{nilCase}, Format: DecimalSI}
+	for _, testCase := range table {
+		q := Quantity{d: infDecAmount{testCase}, Format: DecimalSI}
 		result := q.DeepCopy()
 		if q.d.Cmp(result.AsDec()) != 0 {
 			t.Errorf("Expected: %v, Actual: %v", q.String(), result.String())
