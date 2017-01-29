@@ -27,7 +27,7 @@ import (
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/apiserver/pkg/endpoints/request"
-	authenticationapi "k8s.io/kubernetes/pkg/apis/authentication"
+	authenticationapi "k8s.io/client-go/pkg/apis/authentication"
 )
 
 type impersonateAuthorizer struct{}
