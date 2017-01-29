@@ -24,6 +24,7 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
+	"k8s.io/kubernetes/pkg/util/i18n"
 )
 
 var (
@@ -37,7 +38,7 @@ var (
 func NewCmdConfigGetClusters(out io.Writer, configAccess clientcmd.ConfigAccess) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "get-clusters",
-		Short:   "Display clusters defined in the kubeconfig",
+		Short:   i18n.T("Display clusters defined in the kubeconfig"),
 		Long:    "Display clusters defined in the kubeconfig.",
 		Example: get_clusters_example,
 		Run: func(cmd *cobra.Command, args []string) {
