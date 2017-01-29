@@ -31,7 +31,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	genericregistry "k8s.io/kubernetes/pkg/genericapiserver/registry/generic/registry"
-	"k8s.io/kubernetes/pkg/genericapiserver/registry/rest/resttest"
+	"k8s.io/kubernetes/pkg/registry/registrytest/resttest"
 	etcdstorage "k8s.io/kubernetes/pkg/storage/etcd"
 	etcdtesting "k8s.io/kubernetes/pkg/storage/etcd/testing"
 	storagetesting "k8s.io/kubernetes/pkg/storage/testing"
