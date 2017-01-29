@@ -226,3 +226,9 @@ func NewUIDPreconditions(uid string) *Preconditions {
 	u := types.UID(uid)
 	return &Preconditions{UID: &u}
 }
+
+// HasObjectMetaSystemFieldValues returns true if fields that are managed by the system on ObjectMeta have values.
+func HasObjectMetaSystemFieldValues(meta *ObjectMeta) bool {
+	return !meta.CreationTimestamp.Time.IsZero() ||
+		len(meta.UID) != 0
+}

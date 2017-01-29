@@ -49,11 +49,11 @@ func TestFillObjectMetaSystemFields(t *testing.T) {
 func TestHasObjectMetaSystemFieldValues(t *testing.T) {
 	ctx := genericapirequest.NewDefaultContext()
 	resource := metav1.ObjectMeta{}
-	if api.HasObjectMetaSystemFieldValues(&resource) {
+	if metav1.HasObjectMetaSystemFieldValues(&resource) {
 		t.Errorf("the resource does not have all fields yet populated, but incorrectly reports it does")
 	}
 	FillObjectMetaSystemFields(ctx, &resource)
-	if !api.HasObjectMetaSystemFieldValues(&resource) {
+	if !metav1.HasObjectMetaSystemFieldValues(&resource) {
 		t.Errorf("the resource does have all fields populated, but incorrectly reports it does not")
 	}
 }
