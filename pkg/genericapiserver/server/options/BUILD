@@ -28,6 +28,7 @@ go_library(
         "//vendor:k8s.io/apiserver/pkg/admission",
         "//vendor:k8s.io/apiserver/pkg/authentication/authenticatorfactory",
         "//vendor:k8s.io/apiserver/pkg/authorization/authorizerfactory",
+        "//vendor:k8s.io/apiserver/pkg/features",
         "//vendor:k8s.io/apiserver/pkg/storage/storagebackend",
         "//vendor:k8s.io/apiserver/pkg/util/feature",
         "//vendor:k8s.io/apiserver/pkg/util/flag",
