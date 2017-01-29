@@ -120,9 +120,9 @@ func LoadTranslations(root string, getLanguageFn func() string) error {
 // and plural translation is used.
 func T(defaultValue string, args ...int) string {
 	if len(args) == 0 {
-		return gettext.PGettext(defaultValue, defaultValue)
+		return gettext.PGettext("", defaultValue)
 	}
-	return fmt.Sprintf(gettext.PNGettext(defaultValue, defaultValue, defaultValue+".plural", args[0]),
+	return fmt.Sprintf(gettext.PNGettext("", defaultValue, defaultValue+".plural", args[0]),
 		args[0])
 }
 

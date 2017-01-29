@@ -8,6 +8,7 @@
 // translations/kubectl/en_US/LC_MESSAGES/k8s.po
 // translations/kubectl/fr_FR/LC_MESSAGES/k8s.mo
 // translations/kubectl/fr_FR/LC_MESSAGES/k8s.po
+// translations/kubectl/template.pot
 // translations/test/default/LC_MESSAGES/k8s.mo
 // translations/test/default/LC_MESSAGES/k8s.po
 // translations/test/en_US/LC_MESSAGES/k8s.mo
@@ -92,14 +93,10 @@ class MatchHandler(object):
         self.regex = re.compile(regex)
         self.replace_fn = replace_fn
 
-# global holding all strings discovered
-STRINGS = []
-
 def short_replace(match, file, line_number):
     """Replace a Short: ... cobra command description with an internationalization
     """
     sys.stdout.write('{}i18n.T({}),\n'.format(match.group(1), match.group(2)))
-    STRINGS.append((match.group(2), file, line_number))
 
 SHORT_MATCH = MatchHandler(r'(\s+Short:\s+)("[^"]+"),', short_replace)
 
@@ -111,6 +108,14 @@ def import_replace(match, file, line_number):
     sys.stdout.write('{}\n"k8s.io/kubernetes/pkg/util/i18n"\n'.format(match.group(1)))
 
 IMPORT_MATCH = MatchHandler('(.*"k8s.io/kubernetes/pkg/kubectl/cmd/util")', import_replace)
+
+
+def string_flag_replace(match, file, line_number):
+    """Replace a cmd.Flags().String("...", "", "...") with an internationalization
+    """
+    sys.stdout.write('{}i18n.T("{})"))\n'.format(match.group(1), match.group(2)))
+
+STRING_FLAG_MATCH = MatchHandler('(\s+cmd\.Flags\(\).String\("[^"]*", "[^"]*", )"([^"]*)"\)', string_flag_replace)
 
 def replace(filename, matchers):
     """Given a file and a set of matchers, run those matchers
@@ -133,25 +138,9 @@ def replace(filename, matchers):
 
     # gofmt the file again
     from subprocess import call
-    call(["gofmt", "-s", "-w", filename])
+    call(["goimports", "-w", filename])
 
-    # update the translation files
-    translation_files = [
-        "translations/kubectl/default/LC_MESSAGES/k8s.po",
-        "translations/kubectl/en_US/LC_MESSAGES/k8s.po",
-    ]
-
-    for translation_filename in translation_files:
-        with open(translation_filename, "a") as tfile:
-            for translation_string in STRINGS:
-                msg_string = translation_string[0]
-                tfile.write('\n')
-                tfile.write('# https://github.com/kubernetes/kubernetes/blob/master/{}#L{}\n'.format(translation_string[1], translation_string[2]))
-                tfile.write('msgctxt {}\n'.format(msg_string))
-                tfile.write('msgid {}\n'.format(msg_string))
-                tfile.write('msgstr {}\n'.format(msg_string))
-
-replace(sys.argv[1], [SHORT_MATCH, IMPORT_MATCH])
+replace(sys.argv[1], [SHORT_MATCH, IMPORT_MATCH, STRING_FLAG_MATCH])
 `)
 
 func translationsExtractPyBytes() ([]byte, error) {
@@ -228,11 +217,9 @@ msgstr ""
 "Plural-Forms: nplurals=2; plural=(n != 1);\n"
 "Language: en\n"
 
-msgctxt "Update the annotations on a resource"
 msgid "Update the annotations on a resource"
 msgstr "Update the annotations on a resource"
 
-msgctxt ""
 "watch is only supported on individual resources and resource collections - "
 "%d resources were found"
 msgid ""
@@ -249,242 +236,198 @@ msgstr[1] ""
 "%d resources were found"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/apply.go#L98
-msgctxt "Apply a configuration to a resource by filename or stdin"
 msgid "Apply a configuration to a resource by filename or stdin"
 msgstr "Apply a configuration to a resource by filename or stdin"
 
-# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/config/config.go#L39
-msgctxt "Modify kubeconfig files"
-msgid "Modify kubeconfig files"
-msgstr "Modify kubeconfig files"
-
-# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/config/create_authinfo.go#L103
-msgctxt "Sets a user entry in kubeconfig"
-msgid "Sets a user entry in kubeconfig"
-msgstr "Sets a user entry in kubeconfig"
-
-# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/config/create_cluster.go#L67
-msgctxt "Sets a cluster entry in kubeconfig"
-msgid "Sets a cluster entry in kubeconfig"
-msgstr "Sets a cluster entry in kubeconfig"
-
-# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/config/create_context.go#L57
-msgctxt "Sets a context entry in kubeconfig"
-msgid "Sets a context entry in kubeconfig"
-msgstr "Sets a context entry in kubeconfig"
-
-# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/config/current_context.go#L48
-msgctxt "Displays the current-context"
-msgid "Displays the current-context"
-msgstr "Displays the current-context"
-
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/config/delete_cluster.go#L38
-msgctxt "Delete the specified cluster from the kubeconfig"
 msgid "Delete the specified cluster from the kubeconfig"
 msgstr "Delete the specified cluster from the kubeconfig"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/config/delete_context.go#L38
-msgctxt "Delete the specified context from the kubeconfig"
 msgid "Delete the specified context from the kubeconfig"
 msgstr "Delete the specified context from the kubeconfig"
 
-# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/config/get_clusters.go#L40
-msgctxt "Display clusters defined in the kubeconfig"
-msgid "Display clusters defined in the kubeconfig"
-msgstr "Display clusters defined in the kubeconfig"
-
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/config/get_contexts.go#L62
-msgctxt "Describe one or many contexts"
 msgid "Describe one or many contexts"
 msgstr "Describe one or many contexts"
 
-# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/config/set.go#L59
-msgctxt "Sets an individual value in a kubeconfig file"
-msgid "Sets an individual value in a kubeconfig file"
-msgstr "Sets an individual value in a kubeconfig file"
-
-# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/config/unset.go#L47
-msgctxt "Unsets an individual value in a kubeconfig file"
-msgid "Unsets an individual value in a kubeconfig file"
-msgstr "Unsets an individual value in a kubeconfig file"
-
-# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/config/use_context.go#L48
-msgctxt "Sets the current-context in a kubeconfig file"
-msgid "Sets the current-context in a kubeconfig file"
-msgstr "Sets the current-context in a kubeconfig file"
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/config/get_clusters.go#L40
+msgid "Display clusters defined in the kubeconfig"
+msgstr "Display clusters defined in the kubeconfig"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/config/view.go#L64
-msgctxt "Display merged kubeconfig settings or a specified kubeconfig file"
 msgid "Display merged kubeconfig settings or a specified kubeconfig file"
 msgstr "Display merged kubeconfig settings or a specified kubeconfig file"
 
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/config/current_context.go#L48
+msgid "Displays the current-context"
+msgstr "Displays the current-context"
+
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/config/config.go#L39
+msgid "Modify kubeconfig files"
+msgstr "Modify kubeconfig files"
+
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/set/set.go#L37
-msgctxt "Set specific features on objects"
 msgid "Set specific features on objects"
 msgstr "Set specific features on objects"
 
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/set/set_selector.go#L81
+msgid "Set the selector on a resource"
+msgstr "Set the selector on a resource"
+
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/config/create_cluster.go#L67
+msgid "Sets a cluster entry in kubeconfig"
+msgstr "Sets a cluster entry in kubeconfig"
+
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/config/create_context.go#L57
+msgid "Sets a context entry in kubeconfig"
+msgstr "Sets a context entry in kubeconfig"
+
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/config/create_authinfo.go#L103
+msgid "Sets a user entry in kubeconfig"
+msgstr "Sets a user entry in kubeconfig"
+
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/config/set.go#L59
+msgid "Sets an individual value in a kubeconfig file"
+msgstr "Sets an individual value in a kubeconfig file"
+
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/config/use_context.go#L48
+msgid "Sets the current-context in a kubeconfig file"
+msgstr "Sets the current-context in a kubeconfig file"
+
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/config/unset.go#L47
+msgid "Unsets an individual value in a kubeconfig file"
+msgstr "Unsets an individual value in a kubeconfig file"
+
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/set/set_image.go#L94
-msgctxt "Update image of a pod template"
 msgid "Update image of a pod template"
 msgstr "Update image of a pod template"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/set/set_resources.go#L101
-msgctxt "Update resource requests/limits on objects with pod templates"
 msgid "Update resource requests/limits on objects with pod templates"
 msgstr "Update resource requests/limits on objects with pod templates"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/set/set_selector.go#L81
-msgctxt "Set the selector on a resource"
 msgid "Set the selector on a resource"
 msgstr "Set the selector on a resource"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/attach.go#L64
-msgctxt "Attach to a running container"
 msgid "Attach to a running container"
 msgstr "Attach to a running container"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/autoscale.go#L55
-msgctxt "Auto-scale a Deployment, ReplicaSet, or ReplicationController"
 msgid "Auto-scale a Deployment, ReplicaSet, or ReplicationController"
 msgstr "Auto-scale a Deployment, ReplicaSet, or ReplicationController"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/certificates.go#L35
-msgctxt "Modify certificate resources."
 msgid "Modify certificate resources."
 msgstr "Modify certificate resources."
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/certificates.go#L71
-msgctxt "Approve a certificate signing request"
 msgid "Approve a certificate signing request"
 msgstr "Approve a certificate signing request"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/certificates.go#L121
-msgctxt "Deny a certificate signing request"
 msgid "Deny a certificate signing request"
 msgstr "Deny a certificate signing request"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/clusterinfo_dump.go#L37
-msgctxt "Dump lots of relevant info for debugging and diagnosis"
 msgid "Dump lots of relevant info for debugging and diagnosis"
 msgstr "Dump lots of relevant info for debugging and diagnosis"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/clusterinfo.go#L49
-msgctxt "Display cluster info"
 msgid "Display cluster info"
 msgstr "Display cluster info"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/cmd.go#L217
-msgctxt "kubectl controls the Kubernetes cluster manager"
 msgid "kubectl controls the Kubernetes cluster manager"
 msgstr "kubectl controls the Kubernetes cluster manager"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/completion.go#L97
-msgctxt "Output shell completion code for the specified shell (bash or zsh)"
 msgid "Output shell completion code for the specified shell (bash or zsh)"
 msgstr "Output shell completion code for the specified shell (bash or zsh)"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/convert.go#L67
-msgctxt "Convert config files between different API versions"
 msgid "Convert config files between different API versions"
 msgstr "Convert config files between different API versions"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/cp.go#L64
-msgctxt "Copy files and directories to and from containers."
 msgid "Copy files and directories to and from containers."
 msgstr "Copy files and directories to and from containers."
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/create_clusterrolebinding.go#L43
-msgctxt "Create a ClusterRoleBinding for a particular ClusterRole"
 msgid "Create a ClusterRoleBinding for a particular ClusterRole"
 msgstr "Create a ClusterRoleBinding for a particular ClusterRole"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/create_configmap.go#L59
-msgctxt "Create a configmap from a local file, directory or literal value"
 msgid "Create a configmap from a local file, directory or literal value"
 msgstr "Create a configmap from a local file, directory or literal value"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/create_deployment.go#L44
-msgctxt "Create a deployment with the specified name."
 msgid "Create a deployment with the specified name."
 msgstr "Create a deployment with the specified name."
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/create.go#L56
-msgctxt "Create a resource by filename or stdin"
 msgid "Create a resource by filename or stdin"
 msgstr "Create a resource by filename or stdin"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/create_namespace.go#L44
-msgctxt "Create a namespace with the specified name"
 msgid "Create a namespace with the specified name"
 msgstr "Create a namespace with the specified name"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/create_pdb.go#L49
-msgctxt "Create a pod disruption budget with the specified name."
 msgid "Create a pod disruption budget with the specified name."
 msgstr "Create a pod disruption budget with the specified name."
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/create_quota.go#L47
-msgctxt "Create a quota with the specified name."
 msgid "Create a quota with the specified name."
 msgstr "Create a quota with the specified name."
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/create_rolebinding.go#L43
-msgctxt "Create a RoleBinding for a particular Role or ClusterRole"
 msgid "Create a RoleBinding for a particular Role or ClusterRole"
 msgstr "Create a RoleBinding for a particular Role or ClusterRole"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/create_secret.go#L34
-msgctxt "Create a secret using specified subcommand"
 msgid "Create a secret using specified subcommand"
 msgstr "Create a secret using specified subcommand"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/create_secret.go#L73
-msgctxt "Create a secret from a local file, directory or literal value"
 msgid "Create a secret from a local file, directory or literal value"
 msgstr "Create a secret from a local file, directory or literal value"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/create_secret.go#L143
-msgctxt "Create a secret for use with a Docker registry"
 msgid "Create a secret for use with a Docker registry"
 msgstr "Create a secret for use with a Docker registry"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/create_secret.go#L214
-msgctxt "Create a TLS secret"
 msgid "Create a TLS secret"
 msgstr "Create a TLS secret"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/create_serviceaccount.go#L44
-msgctxt "Create a service account with the specified name"
 msgid "Create a service account with the specified name"
 msgstr "Create a service account with the specified name"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/create_service.go#L36
-msgctxt "Create a service using specified subcommand."
 msgid "Create a service using specified subcommand."
 msgstr "Create a service using specified subcommand."
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/create_service.go#L68
-msgctxt "Create a clusterIP service."
 msgid "Create a clusterIP service."
 msgstr "Create a clusterIP service."
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/create_service.go#L124
-msgctxt "Create a NodePort service."
 msgid "Create a NodePort service."
 msgstr "Create a NodePort service."
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/create_service.go#L181
-msgctxt "Create a LoadBalancer service."
 msgid "Create a LoadBalancer service."
 msgstr "Create a LoadBalancer service."
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/create_service.go#L240
-msgctxt "Create an ExternalName service."
 msgid "Create an ExternalName service."
 msgstr "Create an ExternalName service."
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/delete.go#L130
-msgctxt ""
 "Delete resources by filenames, stdin, resources and names, or by resources "
 "and label selector"
 msgid ""
@@ -495,42 +438,34 @@ msgstr ""
 "and label selector"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/describe.go#L80
-msgctxt "Show details of a specific resource or group of resources"
 msgid "Show details of a specific resource or group of resources"
 msgstr "Show details of a specific resource or group of resources"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/drain.go#L102
-msgctxt "Mark node as unschedulable"
 msgid "Mark node as unschedulable"
 msgstr "Mark node as unschedulable"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/drain.go#L127
-msgctxt "Mark node as schedulable"
 msgid "Mark node as schedulable"
 msgstr "Mark node as schedulable"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/drain.go#L176
-msgctxt "Drain node in preparation for maintenance"
 msgid "Drain node in preparation for maintenance"
 msgstr "Drain node in preparation for maintenance"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/edit.go#L100
-msgctxt "Edit a resource on the server"
 msgid "Edit a resource on the server"
 msgstr "Edit a resource on the server"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/exec.go#L68
-msgctxt "Execute a command in a container"
 msgid "Execute a command in a container"
 msgstr "Execute a command in a container"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/explain.go#L50
-msgctxt "Documentation of resources"
 msgid "Documentation of resources"
 msgstr "Documentation of resources"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/expose.go#L87
-msgctxt ""
 "Take a replication controller, service, deployment or pod and expose it as a "
 "new Kubernetes Service"
 msgid ""
@@ -541,62 +476,50 @@ msgstr ""
 "new Kubernetes Service"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/get.go#L107
-msgctxt "Display one or many resources"
 msgid "Display one or many resources"
 msgstr "Display one or many resources"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/help.go#L36
-msgctxt "Help about any command"
 msgid "Help about any command"
 msgstr "Help about any command"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/label.go#L109
-msgctxt "Update the labels on a resource"
 msgid "Update the labels on a resource"
 msgstr "Update the labels on a resource"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/logs.go#L86
-msgctxt "Print the logs for a container in a pod"
 msgid "Print the logs for a container in a pod"
 msgstr "Print the logs for a container in a pod"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/options.go#L37
-msgctxt "Print the list of flags inherited by all commands"
 msgid "Print the list of flags inherited by all commands"
 msgstr "Print the list of flags inherited by all commands"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/patch.go#L91
-msgctxt "Update field(s) of a resource using strategic merge patch"
 msgid "Update field(s) of a resource using strategic merge patch"
 msgstr "Update field(s) of a resource using strategic merge patch"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/portforward.go#L75
-msgctxt "Forward one or more local ports to a pod"
 msgid "Forward one or more local ports to a pod"
 msgstr "Forward one or more local ports to a pod"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/proxy.go#L68
-msgctxt "Run a proxy to the Kubernetes API server"
 msgid "Run a proxy to the Kubernetes API server"
 msgstr "Run a proxy to the Kubernetes API server"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/replace.go#L70
-msgctxt "Replace a resource by filename or stdin"
 msgid "Replace a resource by filename or stdin"
 msgstr "Replace a resource by filename or stdin"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/rollingupdate.go#L84
-msgctxt "Perform a rolling update of the given ReplicationController"
 msgid "Perform a rolling update of the given ReplicationController"
 msgstr "Perform a rolling update of the given ReplicationController"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/run.go#L94
-msgctxt "Run a particular image on the cluster"
 msgid "Run a particular image on the cluster"
 msgstr "Run a particular image on the cluster"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/scale.go#L71
-msgctxt ""
 "Set a new size for a Deployment, ReplicaSet, Replication Controller, or Job"
 msgid ""
 "Set a new size for a Deployment, ReplicaSet, Replication Controller, or Job"
@@ -604,32 +527,26 @@ msgstr ""
 "Set a new size for a Deployment, ReplicaSet, Replication Controller, or Job"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/stop.go#L58
-msgctxt "Deprecated: Gracefully shut down a resource by name or filename"
 msgid "Deprecated: Gracefully shut down a resource by name or filename"
 msgstr "Deprecated: Gracefully shut down a resource by name or filename"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/taint.go#L88
-msgctxt "Update the taints on one or more nodes"
 msgid "Update the taints on one or more nodes"
 msgstr "Update the taints on one or more nodes"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/top.go#L43
-msgctxt "Display Resource (CPU/Memory/Storage) usage."
 msgid "Display Resource (CPU/Memory/Storage) usage."
 msgstr "Display Resource (CPU/Memory/Storage) usage."
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/top_node.go#L77
-msgctxt "Display Resource (CPU/Memory/Storage) usage of nodes"
 msgid "Display Resource (CPU/Memory/Storage) usage of nodes"
 msgstr "Display Resource (CPU/Memory/Storage) usage of nodes"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/top_pod.go#L79
-msgctxt "Display Resource (CPU/Memory/Storage) usage of pods"
 msgid "Display Resource (CPU/Memory/Storage) usage of pods"
 msgstr "Display Resource (CPU/Memory/Storage) usage of pods"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/version.go#L39
-msgctxt "Print the client and server version information"
 msgid "Print the client and server version information"
 msgstr "Print the client and server version information"
 
@@ -662,6 +579,24 @@ msgstr "Show the status of the rollout"
 msgctxt "Undo a previous rollout"
 msgid "Undo a previous rollout"
 msgstr "Undo a previous rollout"
+
+msgid "Update the annotations on a resource"
+msgstr ""
+"Update the annotations on a resourcewatch is only supported on individual "
+"resources and resource collections - %d resources were found"
+
+msgid ""
+"watch is only supported on individual resources and resource collections - "
+"%d resources were found"
+msgid_plural ""
+"watch is only supported on individual resources and resource collections - "
+"%d resources were found"
+msgstr[0] ""
+"watch is only supported on individual resources and resource collections - "
+"%d resource was found"
+msgstr[1] ""
+"watch is only supported on individual resources and resource collections - "
+"%d resources were found"
 `)
 
 func translationsKubectlDefaultLc_messagesK8sPoBytes() ([]byte, error) {
@@ -704,276 +639,229 @@ var _translationsKubectlEn_usLc_messagesK8sPo = []byte(`# Test translations for 
 msgid ""
 msgstr ""
 "Project-Id-Version: gettext-go-examples-hello\n"
-"Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2013-12-12 20:03+0000\n"
-"PO-Revision-Date: 2017-02-11 22:14-0800\n"
+"Report-Msgid-Bugs-To: EMAIL\n"
+"POT-Creation-Date: 2017-01-29 21:56-0800\n"
+"PO-Revision-Date: 2017-01-29 21:57-0800\n"
 "Last-Translator: Brendan Burns <brendan.d.burns@gmail.com>\n"
+"Language-Team: \n"
+"Language: en\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
 "X-Generator: Poedit 1.6.10\n"
 "X-Poedit-SourceCharset: UTF-8\n"
-"Language-Team: \n"
 "Plural-Forms: nplurals=2; plural=(n != 1);\n"
-"Language: en\n"
 
-msgctxt "Update the annotations on a resource"
-msgid "Update the annotations on a resource"
-msgstr "Update the annotations on a resource"
-
-msgctxt ""
-"watch is only supported on individual resources and resource collections - "
-"%d resources were found"
-msgid ""
-"watch is only supported on individual resources and resource collections - "
-"%d resources were found"
-msgid_plural ""
-"watch is only supported on individual resources and resource collections - "
-"%d resources were found"
-msgstr[0] ""
-"watch is only supported on individual resources and resource collections - "
-"%d resource was found"
-msgstr[1] ""
-"watch is only supported on individual resources and resource collections - "
-"%d resources were found"
-
-# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/apply.go#L98
-msgctxt "Apply a configuration to a resource by filename or stdin"
+#: pkg/kubectl/cmd/apply.go:102
 msgid "Apply a configuration to a resource by filename or stdin"
 msgstr "Apply a configuration to a resource by filename or stdin"
 
-# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/config/config.go#L39
-msgctxt "Modify kubeconfig files"
-msgid "Modify kubeconfig files"
-msgstr "Modify kubeconfig files"
-
-# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/config/create_authinfo.go#L103
-msgctxt "Sets a user entry in kubeconfig"
-msgid "Sets a user entry in kubeconfig"
-msgstr "Sets a user entry in kubeconfig"
-
-# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/config/create_cluster.go#L67
-msgctxt "Sets a cluster entry in kubeconfig"
-msgid "Sets a cluster entry in kubeconfig"
-msgstr "Sets a cluster entry in kubeconfig"
-
-# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/config/create_context.go#L57
-msgctxt "Sets a context entry in kubeconfig"
-msgid "Sets a context entry in kubeconfig"
-msgstr "Sets a context entry in kubeconfig"
-
-# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/config/current_context.go#L48
-msgctxt "Displays the current-context"
-msgid "Displays the current-context"
-msgstr "Displays the current-context"
-
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/config/delete_cluster.go#L38
-msgctxt "Delete the specified cluster from the kubeconfig"
+#: pkg/kubectl/cmd/config/delete_cluster.go:39
 msgid "Delete the specified cluster from the kubeconfig"
 msgstr "Delete the specified cluster from the kubeconfig"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/config/delete_context.go#L38
-msgctxt "Delete the specified context from the kubeconfig"
+#: pkg/kubectl/cmd/config/delete_context.go:39
 msgid "Delete the specified context from the kubeconfig"
 msgstr "Delete the specified context from the kubeconfig"
 
-# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/config/get_clusters.go#L40
-msgctxt "Display clusters defined in the kubeconfig"
-msgid "Display clusters defined in the kubeconfig"
-msgstr "Display clusters defined in the kubeconfig"
-
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/config/get_contexts.go#L62
-msgctxt "Describe one or many contexts"
+#: pkg/kubectl/cmd/config/get_contexts.go:63
 msgid "Describe one or many contexts"
 msgstr "Describe one or many contexts"
 
-# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/config/set.go#L59
-msgctxt "Sets an individual value in a kubeconfig file"
-msgid "Sets an individual value in a kubeconfig file"
-msgstr "Sets an individual value in a kubeconfig file"
-
-# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/config/unset.go#L47
-msgctxt "Unsets an individual value in a kubeconfig file"
-msgid "Unsets an individual value in a kubeconfig file"
-msgstr "Unsets an individual value in a kubeconfig file"
-
-# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/config/use_context.go#L48
-msgctxt "Sets the current-context in a kubeconfig file"
-msgid "Sets the current-context in a kubeconfig file"
-msgstr "Sets the current-context in a kubeconfig file"
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/config/get_clusters.go#L40
+#: pkg/kubectl/cmd/config/get_clusters.go:41
+msgid "Display clusters defined in the kubeconfig"
+msgstr "Display clusters defined in the kubeconfig"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/config/view.go#L64
-msgctxt "Display merged kubeconfig settings or a specified kubeconfig file"
+#: pkg/kubectl/cmd/config/view.go:65
 msgid "Display merged kubeconfig settings or a specified kubeconfig file"
 msgstr "Display merged kubeconfig settings or a specified kubeconfig file"
 
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/config/current_context.go#L48
+#: pkg/kubectl/cmd/config/current_context.go:49
+msgid "Displays the current-context"
+msgstr "Displays the current-context"
+
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/config/config.go#L39
+#: pkg/kubectl/cmd/config/config.go:40
+msgid "Modify kubeconfig files"
+msgstr "Modify kubeconfig files"
+
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/set/set.go#L37
-msgctxt "Set specific features on objects"
+#: pkg/kubectl/cmd/set/set.go:38
 msgid "Set specific features on objects"
 msgstr "Set specific features on objects"
 
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/set/set_selector.go#L81
+#: pkg/kubectl/cmd/set/set_selector.go:82
+msgid "Set the selector on a resource"
+msgstr "Set the selector on a resource"
+
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/config/create_cluster.go#L67
+#: pkg/kubectl/cmd/config/create_cluster.go:68
+msgid "Sets a cluster entry in kubeconfig"
+msgstr "Sets a cluster entry in kubeconfig"
+
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/config/create_context.go#L57
+#: pkg/kubectl/cmd/config/create_context.go:58
+msgid "Sets a context entry in kubeconfig"
+msgstr "Sets a context entry in kubeconfig"
+
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/config/create_authinfo.go#L103
+#: pkg/kubectl/cmd/config/create_authinfo.go:104
+msgid "Sets a user entry in kubeconfig"
+msgstr "Sets a user entry in kubeconfig"
+
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/config/set.go#L59
+#: pkg/kubectl/cmd/config/set.go:60
+msgid "Sets an individual value in a kubeconfig file"
+msgstr "Sets an individual value in a kubeconfig file"
+
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/config/use_context.go#L48
+#: pkg/kubectl/cmd/config/use_context.go:49
+msgid "Sets the current-context in a kubeconfig file"
+msgstr "Sets the current-context in a kubeconfig file"
+
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/config/unset.go#L47
+#: pkg/kubectl/cmd/config/unset.go:48
+msgid "Unsets an individual value in a kubeconfig file"
+msgstr "Unsets an individual value in a kubeconfig file"
+
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/set/set_image.go#L94
-msgctxt "Update image of a pod template"
+#: pkg/kubectl/cmd/set/set_image.go:95
 msgid "Update image of a pod template"
 msgstr "Update image of a pod template"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/set/set_resources.go#L101
-msgctxt "Update resource requests/limits on objects with pod templates"
+#: pkg/kubectl/cmd/set/set_resources.go:102
 msgid "Update resource requests/limits on objects with pod templates"
 msgstr "Update resource requests/limits on objects with pod templates"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/set/set_selector.go#L81
-msgctxt "Set the selector on a resource"
 msgid "Set the selector on a resource"
 msgstr "Set the selector on a resource"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/attach.go#L64
-msgctxt "Attach to a running container"
 msgid "Attach to a running container"
 msgstr "Attach to a running container"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/autoscale.go#L55
-msgctxt "Auto-scale a Deployment, ReplicaSet, or ReplicationController"
 msgid "Auto-scale a Deployment, ReplicaSet, or ReplicationController"
 msgstr "Auto-scale a Deployment, ReplicaSet, or ReplicationController"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/certificates.go#L35
-msgctxt "Modify certificate resources."
 msgid "Modify certificate resources."
 msgstr "Modify certificate resources."
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/certificates.go#L71
-msgctxt "Approve a certificate signing request"
 msgid "Approve a certificate signing request"
 msgstr "Approve a certificate signing request"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/certificates.go#L121
-msgctxt "Deny a certificate signing request"
 msgid "Deny a certificate signing request"
 msgstr "Deny a certificate signing request"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/clusterinfo_dump.go#L37
-msgctxt "Dump lots of relevant info for debugging and diagnosis"
 msgid "Dump lots of relevant info for debugging and diagnosis"
 msgstr "Dump lots of relevant info for debugging and diagnosis"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/clusterinfo.go#L49
-msgctxt "Display cluster info"
 msgid "Display cluster info"
 msgstr "Display cluster info"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/cmd.go#L217
-msgctxt "kubectl controls the Kubernetes cluster manager"
 msgid "kubectl controls the Kubernetes cluster manager"
 msgstr "kubectl controls the Kubernetes cluster manager"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/completion.go#L97
-msgctxt "Output shell completion code for the specified shell (bash or zsh)"
 msgid "Output shell completion code for the specified shell (bash or zsh)"
 msgstr "Output shell completion code for the specified shell (bash or zsh)"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/convert.go#L67
-msgctxt "Convert config files between different API versions"
 msgid "Convert config files between different API versions"
 msgstr "Convert config files between different API versions"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/cp.go#L64
-msgctxt "Copy files and directories to and from containers."
 msgid "Copy files and directories to and from containers."
 msgstr "Copy files and directories to and from containers."
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/create_clusterrolebinding.go#L43
-msgctxt "Create a ClusterRoleBinding for a particular ClusterRole"
 msgid "Create a ClusterRoleBinding for a particular ClusterRole"
 msgstr "Create a ClusterRoleBinding for a particular ClusterRole"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/create_configmap.go#L59
-msgctxt "Create a configmap from a local file, directory or literal value"
 msgid "Create a configmap from a local file, directory or literal value"
 msgstr "Create a configmap from a local file, directory or literal value"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/create_deployment.go#L44
-msgctxt "Create a deployment with the specified name."
 msgid "Create a deployment with the specified name."
 msgstr "Create a deployment with the specified name."
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/create.go#L56
-msgctxt "Create a resource by filename or stdin"
 msgid "Create a resource by filename or stdin"
 msgstr "Create a resource by filename or stdin"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/create_namespace.go#L44
-msgctxt "Create a namespace with the specified name"
 msgid "Create a namespace with the specified name"
 msgstr "Create a namespace with the specified name"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/create_pdb.go#L49
-msgctxt "Create a pod disruption budget with the specified name."
 msgid "Create a pod disruption budget with the specified name."
 msgstr "Create a pod disruption budget with the specified name."
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/create_quota.go#L47
-msgctxt "Create a quota with the specified name."
 msgid "Create a quota with the specified name."
 msgstr "Create a quota with the specified name."
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/create_rolebinding.go#L43
-msgctxt "Create a RoleBinding for a particular Role or ClusterRole"
 msgid "Create a RoleBinding for a particular Role or ClusterRole"
 msgstr "Create a RoleBinding for a particular Role or ClusterRole"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/create_secret.go#L34
-msgctxt "Create a secret using specified subcommand"
 msgid "Create a secret using specified subcommand"
 msgstr "Create a secret using specified subcommand"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/create_secret.go#L73
-msgctxt "Create a secret from a local file, directory or literal value"
 msgid "Create a secret from a local file, directory or literal value"
 msgstr "Create a secret from a local file, directory or literal value"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/create_secret.go#L143
-msgctxt "Create a secret for use with a Docker registry"
 msgid "Create a secret for use with a Docker registry"
 msgstr "Create a secret for use with a Docker registry"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/create_secret.go#L214
-msgctxt "Create a TLS secret"
 msgid "Create a TLS secret"
 msgstr "Create a TLS secret"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/create_serviceaccount.go#L44
-msgctxt "Create a service account with the specified name"
 msgid "Create a service account with the specified name"
 msgstr "Create a service account with the specified name"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/create_service.go#L36
-msgctxt "Create a service using specified subcommand."
 msgid "Create a service using specified subcommand."
 msgstr "Create a service using specified subcommand."
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/create_service.go#L68
-msgctxt "Create a clusterIP service."
 msgid "Create a clusterIP service."
 msgstr "Create a clusterIP service."
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/create_service.go#L124
-msgctxt "Create a NodePort service."
 msgid "Create a NodePort service."
 msgstr "Create a NodePort service."
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/create_service.go#L181
-msgctxt "Create a LoadBalancer service."
 msgid "Create a LoadBalancer service."
 msgstr "Create a LoadBalancer service."
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/create_service.go#L240
-msgctxt "Create an ExternalName service."
 msgid "Create an ExternalName service."
 msgstr "Create an ExternalName service."
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/delete.go#L130
-msgctxt ""
 "Delete resources by filenames, stdin, resources and names, or by resources "
 "and label selector"
 msgid ""
@@ -984,42 +872,34 @@ msgstr ""
 "and label selector"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/describe.go#L80
-msgctxt "Show details of a specific resource or group of resources"
 msgid "Show details of a specific resource or group of resources"
 msgstr "Show details of a specific resource or group of resources"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/drain.go#L102
-msgctxt "Mark node as unschedulable"
 msgid "Mark node as unschedulable"
 msgstr "Mark node as unschedulable"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/drain.go#L127
-msgctxt "Mark node as schedulable"
 msgid "Mark node as schedulable"
 msgstr "Mark node as schedulable"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/drain.go#L176
-msgctxt "Drain node in preparation for maintenance"
 msgid "Drain node in preparation for maintenance"
 msgstr "Drain node in preparation for maintenance"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/edit.go#L100
-msgctxt "Edit a resource on the server"
 msgid "Edit a resource on the server"
 msgstr "Edit a resource on the server"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/exec.go#L68
-msgctxt "Execute a command in a container"
 msgid "Execute a command in a container"
 msgstr "Execute a command in a container"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/explain.go#L50
-msgctxt "Documentation of resources"
 msgid "Documentation of resources"
 msgstr "Documentation of resources"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/expose.go#L87
-msgctxt ""
 "Take a replication controller, service, deployment or pod and expose it as a "
 "new Kubernetes Service"
 msgid ""
@@ -1030,62 +910,50 @@ msgstr ""
 "new Kubernetes Service"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/get.go#L107
-msgctxt "Display one or many resources"
 msgid "Display one or many resources"
 msgstr "Display one or many resources"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/help.go#L36
-msgctxt "Help about any command"
 msgid "Help about any command"
 msgstr "Help about any command"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/label.go#L109
-msgctxt "Update the labels on a resource"
 msgid "Update the labels on a resource"
 msgstr "Update the labels on a resource"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/logs.go#L86
-msgctxt "Print the logs for a container in a pod"
 msgid "Print the logs for a container in a pod"
 msgstr "Print the logs for a container in a pod"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/options.go#L37
-msgctxt "Print the list of flags inherited by all commands"
 msgid "Print the list of flags inherited by all commands"
 msgstr "Print the list of flags inherited by all commands"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/patch.go#L91
-msgctxt "Update field(s) of a resource using strategic merge patch"
 msgid "Update field(s) of a resource using strategic merge patch"
 msgstr "Update field(s) of a resource using strategic merge patch"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/portforward.go#L75
-msgctxt "Forward one or more local ports to a pod"
 msgid "Forward one or more local ports to a pod"
 msgstr "Forward one or more local ports to a pod"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/proxy.go#L68
-msgctxt "Run a proxy to the Kubernetes API server"
 msgid "Run a proxy to the Kubernetes API server"
 msgstr "Run a proxy to the Kubernetes API server"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/replace.go#L70
-msgctxt "Replace a resource by filename or stdin"
 msgid "Replace a resource by filename or stdin"
 msgstr "Replace a resource by filename or stdin"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/rollingupdate.go#L84
-msgctxt "Perform a rolling update of the given ReplicationController"
 msgid "Perform a rolling update of the given ReplicationController"
 msgstr "Perform a rolling update of the given ReplicationController"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/run.go#L94
-msgctxt "Run a particular image on the cluster"
 msgid "Run a particular image on the cluster"
 msgstr "Run a particular image on the cluster"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/scale.go#L71
-msgctxt ""
 "Set a new size for a Deployment, ReplicaSet, Replication Controller, or Job"
 msgid ""
 "Set a new size for a Deployment, ReplicaSet, Replication Controller, or Job"
@@ -1093,32 +961,26 @@ msgstr ""
 "Set a new size for a Deployment, ReplicaSet, Replication Controller, or Job"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/stop.go#L58
-msgctxt "Deprecated: Gracefully shut down a resource by name or filename"
 msgid "Deprecated: Gracefully shut down a resource by name or filename"
 msgstr "Deprecated: Gracefully shut down a resource by name or filename"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/taint.go#L88
-msgctxt "Update the taints on one or more nodes"
 msgid "Update the taints on one or more nodes"
 msgstr "Update the taints on one or more nodes"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/top.go#L43
-msgctxt "Display Resource (CPU/Memory/Storage) usage."
 msgid "Display Resource (CPU/Memory/Storage) usage."
 msgstr "Display Resource (CPU/Memory/Storage) usage."
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/top_node.go#L77
-msgctxt "Display Resource (CPU/Memory/Storage) usage of nodes"
 msgid "Display Resource (CPU/Memory/Storage) usage of nodes"
 msgstr "Display Resource (CPU/Memory/Storage) usage of nodes"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/top_pod.go#L79
-msgctxt "Display Resource (CPU/Memory/Storage) usage of pods"
 msgid "Display Resource (CPU/Memory/Storage) usage of pods"
 msgstr "Display Resource (CPU/Memory/Storage) usage of pods"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/version.go#L39
-msgctxt "Print the client and server version information"
 msgid "Print the client and server version information"
 msgstr "Print the client and server version information"
 
@@ -1151,6 +1013,13 @@ msgstr "Show the status of the rollout"
 msgctxt "Undo a previous rollout"
 msgid "Undo a previous rollout"
 msgstr "Undo a previous rollout"
+
+#: pkg/kubectl/cmd/annotate.go:115
+msgid "Update the annotations on a resource"
+msgstr ""
+"Update the annotations on a resourcewatch is only supported on individual "
+"resources and resource collections - %d resources were found"
+
 `)
 
 func translationsKubectlEn_usLc_messagesK8sPoBytes() ([]byte, error) {
@@ -1316,7 +1185,118 @@ func translationsKubectlFr_frLc_messagesK8sPo() (*asset, error) {
 	return a, nil
 }
 
-var _translationsTestDefaultLc_messagesK8sMo = []byte("\xde\x12\x04\x95\x00\x00\x00\x00\x03\x00\x00\x00\x1c\x00\x00\x004\x00\x00\x00\x05\x00\x00\x00L\x00\x00\x00\x00\x00\x00\x00`\x00\x00\x00#\x00\x00\x00a\x00\x00\x00\x17\x00\x00\x00\x85\x00\x00\x00\xac\x01\x00\x00\x9d\x00\x00\x00%\x00\x00\x00J\x02\x00\x00\x03\x00\x00\x00p\x02\x00\x00\x01\x00\x00\x00\x00\x00\x00\x00\x02\x00\x00\x00\x03\x00\x00\x00\x00\x00\x00\x00\x00test_plural\x04test_plural\x00test_plural\x00test_string\x04test_string\x00Project-Id-Version: gettext-go-examples-hello\nReport-Msgid-Bugs-To: \nPOT-Creation-Date: 2013-12-12 20:03+0000\nPO-Revision-Date: 2016-12-13 21:35-0800\nLast-Translator: Brendan Burns <brendan.d.burns@gmail.com>\nMIME-Version: 1.0\nContent-Type: text/plain; charset=UTF-8\nContent-Transfer-Encoding: 8bit\nX-Generator: Poedit 1.6.10\nX-Poedit-SourceCharset: UTF-8\nLanguage-Team: \nPlural-Forms: nplurals=2; plural=(n != 1);\nLanguage: en\n\x00there was %d item\x00there were %d items\x00foo\x00")
+var _translationsKubectlTemplatePot = []byte(`# SOME DESCRIPTIVE TITLE.
+# Copyright (C) YEAR THE PACKAGE'S COPYRIGHT HOLDER
+# This file is distributed under the same license as the PACKAGE package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, YEAR.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: \n"
+"Report-Msgid-Bugs-To: EMAIL\n"
+"POT-Creation-Date: 2017-01-29 21:56-0800\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"Language: \n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=CHARSET\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+#: pkg/kubectl/cmd/apply.go:102
+msgid "Apply a configuration to a resource by filename or stdin"
+msgstr ""
+
+#: pkg/kubectl/cmd/config/delete_cluster.go:39
+msgid "Delete the specified cluster from the kubeconfig"
+msgstr ""
+
+#: pkg/kubectl/cmd/config/delete_context.go:39
+msgid "Delete the specified context from the kubeconfig"
+msgstr ""
+
+#: pkg/kubectl/cmd/config/get_contexts.go:63
+msgid "Describe one or many contexts"
+msgstr ""
+
+#: pkg/kubectl/cmd/config/get_clusters.go:41
+msgid "Display clusters defined in the kubeconfig"
+msgstr ""
+
+#: pkg/kubectl/cmd/config/view.go:65
+msgid "Display merged kubeconfig settings or a specified kubeconfig file"
+msgstr ""
+
+#: pkg/kubectl/cmd/config/current_context.go:49
+msgid "Displays the current-context"
+msgstr ""
+
+#: pkg/kubectl/cmd/config/config.go:40
+msgid "Modify kubeconfig files"
+msgstr ""
+
+#: pkg/kubectl/cmd/set/set.go:38
+msgid "Set specific features on objects"
+msgstr ""
+
+#: pkg/kubectl/cmd/set/set_selector.go:82
+msgid "Set the selector on a resource"
+msgstr ""
+
+#: pkg/kubectl/cmd/config/create_cluster.go:68
+msgid "Sets a cluster entry in kubeconfig"
+msgstr ""
+
+#: pkg/kubectl/cmd/config/create_context.go:58
+msgid "Sets a context entry in kubeconfig"
+msgstr ""
+
+#: pkg/kubectl/cmd/config/create_authinfo.go:104
+msgid "Sets a user entry in kubeconfig"
+msgstr ""
+
+#: pkg/kubectl/cmd/config/set.go:60
+msgid "Sets an individual value in a kubeconfig file"
+msgstr ""
+
+#: pkg/kubectl/cmd/config/use_context.go:49
+msgid "Sets the current-context in a kubeconfig file"
+msgstr ""
+
+#: pkg/kubectl/cmd/config/unset.go:48
+msgid "Unsets an individual value in a kubeconfig file"
+msgstr ""
+
+#: pkg/kubectl/cmd/set/set_image.go:95
+msgid "Update image of a pod template"
+msgstr ""
+
+#: pkg/kubectl/cmd/set/set_resources.go:102
+msgid "Update resource requests/limits on objects with pod templates"
+msgstr ""
+
+#: pkg/kubectl/cmd/annotate.go:115
+msgid "Update the annotations on a resource"
+msgstr ""
+`)
+
+func translationsKubectlTemplatePotBytes() ([]byte, error) {
+	return _translationsKubectlTemplatePot, nil
+}
+
+func translationsKubectlTemplatePot() (*asset, error) {
+	bytes, err := translationsKubectlTemplatePotBytes()
+	if err != nil {
+		return nil, err
+	}
+
+	info := bindataFileInfo{name: "translations/kubectl/template.pot", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
+	a := &asset{bytes: bytes, info: info}
+	return a, nil
+}
+
+var _translationsTestDefaultLc_messagesK8sMo = []byte("\xde\x12\x04\x95\x00\x00\x00\x00\x03\x00\x00\x00\x1c\x00\x00\x004\x00\x00\x00\x05\x00\x00\x00L\x00\x00\x00\x00\x00\x00\x00`\x00\x00\x00\x17\x00\x00\x00a\x00\x00\x00\v\x00\x00\x00y\x00\x00\x00\xac\x01\x00\x00\x85\x00\x00\x00%\x00\x00\x002\x02\x00\x00\x03\x00\x00\x00X\x02\x00\x00\x01\x00\x00\x00\x03\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x02\x00\x00\x00\x00test_plural\x00test_plural\x00test_string\x00Project-Id-Version: gettext-go-examples-hello\nReport-Msgid-Bugs-To: \nPOT-Creation-Date: 2013-12-12 20:03+0000\nPO-Revision-Date: 2016-12-13 21:35-0800\nLast-Translator: Brendan Burns <brendan.d.burns@gmail.com>\nMIME-Version: 1.0\nContent-Type: text/plain; charset=UTF-8\nContent-Transfer-Encoding: 8bit\nX-Generator: Poedit 1.6.10\nX-Poedit-SourceCharset: UTF-8\nLanguage-Team: \nPlural-Forms: nplurals=2; plural=(n != 1);\nLanguage: en\n\x00there was %d item\x00there were %d items\x00foo\x00")
 
 func translationsTestDefaultLc_messagesK8sMoBytes() ([]byte, error) {
 	return _translationsTestDefaultLc_messagesK8sMo, nil
@@ -1354,15 +1334,13 @@ msgstr ""
 "Plural-Forms: nplurals=2; plural=(n != 1);\n"
 "Language: en\n"
 
-msgctxt "test_string"
-msgid "test_string"
-msgstr "foo"
-
-msgctxt "test_plural"
 msgid "test_plural"
 msgid_plural "test_plural"
 msgstr[0] "there was %d item"
 msgstr[1] "there were %d items"
+
+msgid "test_string"
+msgstr "foo"
 `)
 
 func translationsTestDefaultLc_messagesK8sPoBytes() ([]byte, error) {
@@ -1380,7 +1358,7 @@ func translationsTestDefaultLc_messagesK8sPo() (*asset, error) {
 	return a, nil
 }
 
-var _translationsTestEn_usLc_messagesK8sMo = []byte("\xde\x12\x04\x95\x00\x00\x00\x00\x03\x00\x00\x00\x1c\x00\x00\x004\x00\x00\x00\x05\x00\x00\x00L\x00\x00\x00\x00\x00\x00\x00`\x00\x00\x00#\x00\x00\x00a\x00\x00\x00\x17\x00\x00\x00\x85\x00\x00\x00\xac\x01\x00\x00\x9d\x00\x00\x00%\x00\x00\x00J\x02\x00\x00\x03\x00\x00\x00p\x02\x00\x00\x01\x00\x00\x00\x00\x00\x00\x00\x02\x00\x00\x00\x03\x00\x00\x00\x00\x00\x00\x00\x00test_plural\x04test_plural\x00test_plural\x00test_string\x04test_string\x00Project-Id-Version: gettext-go-examples-hello\nReport-Msgid-Bugs-To: \nPOT-Creation-Date: 2013-12-12 20:03+0000\nPO-Revision-Date: 2016-12-13 22:12-0800\nLast-Translator: Brendan Burns <brendan.d.burns@gmail.com>\nMIME-Version: 1.0\nContent-Type: text/plain; charset=UTF-8\nContent-Transfer-Encoding: 8bit\nX-Generator: Poedit 1.6.10\nX-Poedit-SourceCharset: UTF-8\nLanguage-Team: \nPlural-Forms: nplurals=2; plural=(n != 1);\nLanguage: en\n\x00there was %d item\x00there were %d items\x00baz\x00")
+var _translationsTestEn_usLc_messagesK8sMo = []byte("\xde\x12\x04\x95\x00\x00\x00\x00\x03\x00\x00\x00\x1c\x00\x00\x004\x00\x00\x00\x05\x00\x00\x00L\x00\x00\x00\x00\x00\x00\x00`\x00\x00\x00\x17\x00\x00\x00a\x00\x00\x00\v\x00\x00\x00y\x00\x00\x00\xac\x01\x00\x00\x85\x00\x00\x00%\x00\x00\x002\x02\x00\x00\x03\x00\x00\x00X\x02\x00\x00\x01\x00\x00\x00\x03\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x02\x00\x00\x00\x00test_plural\x00test_plural\x00test_string\x00Project-Id-Version: gettext-go-examples-hello\nReport-Msgid-Bugs-To: \nPOT-Creation-Date: 2013-12-12 20:03+0000\nPO-Revision-Date: 2016-12-13 22:12-0800\nLast-Translator: Brendan Burns <brendan.d.burns@gmail.com>\nMIME-Version: 1.0\nContent-Type: text/plain; charset=UTF-8\nContent-Transfer-Encoding: 8bit\nX-Generator: Poedit 1.6.10\nX-Poedit-SourceCharset: UTF-8\nLanguage-Team: \nPlural-Forms: nplurals=2; plural=(n != 1);\nLanguage: en\n\x00there was %d item\x00there were %d items\x00baz\x00")
 
 func translationsTestEn_usLc_messagesK8sMoBytes() ([]byte, error) {
 	return _translationsTestEn_usLc_messagesK8sMo, nil
@@ -1418,15 +1396,13 @@ msgstr ""
 "Plural-Forms: nplurals=2; plural=(n != 1);\n"
 "Language: en\n"
 
-msgctxt "test_string"
-msgid "test_string"
-msgstr "baz"
-
-msgctxt "test_plural"
 msgid "test_plural"
 msgid_plural "test_plural"
 msgstr[0] "there was %d item"
 msgstr[1] "there were %d items"
+
+msgid "test_string"
+msgstr "baz"
 `)
 
 func translationsTestEn_usLc_messagesK8sPoBytes() ([]byte, error) {
@@ -1504,6 +1480,7 @@ var _bindata = map[string]func() (*asset, error){
 	"translations/kubectl/en_US/LC_MESSAGES/k8s.po":   translationsKubectlEn_usLc_messagesK8sPo,
 	"translations/kubectl/fr_FR/LC_MESSAGES/k8s.mo":   translationsKubectlFr_frLc_messagesK8sMo,
 	"translations/kubectl/fr_FR/LC_MESSAGES/k8s.po":   translationsKubectlFr_frLc_messagesK8sPo,
+	"translations/kubectl/template.pot":               translationsKubectlTemplatePot,
 	"translations/test/default/LC_MESSAGES/k8s.mo":    translationsTestDefaultLc_messagesK8sMo,
 	"translations/test/default/LC_MESSAGES/k8s.po":    translationsTestDefaultLc_messagesK8sPo,
 	"translations/test/en_US/LC_MESSAGES/k8s.mo":      translationsTestEn_usLc_messagesK8sMo,
@@ -1573,6 +1550,7 @@ var _bintree = &bintree{nil, map[string]*bintree{
 					"k8s.po": {translationsKubectlFr_frLc_messagesK8sPo, map[string]*bintree{}},
 				}},
 			}},
+			"template.pot": {translationsKubectlTemplatePot, map[string]*bintree{}},
 		}},
 		"test": {nil, map[string]*bintree{
 			"default": {nil, map[string]*bintree{
