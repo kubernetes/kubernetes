@@ -17,10 +17,12 @@ limitations under the License.
 package config
 
 import (
+	"bufio"
 	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
+	"os"
 	"path/filepath"
 	"strings"
 
@@ -31,6 +33,7 @@ import (
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
+	"k8s.io/kubernetes/pkg/prompt"
 	"k8s.io/kubernetes/pkg/util/i18n"
 )
 
@@ -131,7 +134,14 @@ func newCmdConfigSetAuthInfo(out io.Writer, options *createAuthInfoOptions) *cob
 }
 
 func (o createAuthInfoOptions) run() error {
-	err := o.validate()
+	var err error
+
+	err = o.checkPrompts()
+	if err != nil {
+		return err
+	}
+
+	err = o.validate()
 	if err != nil {
 		return err
 	}
@@ -292,6 +302,38 @@ func (o createAuthInfoOptions) validate() error {
 				return fmt.Errorf("error reading %s data from %s: %v", clientcmd.FlagKeyFile, keyPath, err)
 			}
 		}
+	}
+
+	return nil
+}
+
+func (o *createAuthInfoOptions) checkPrompts() (err error) {
+	var result string
+
+	prompter := prompt.NewPrompter(bufio.NewReader(os.Stdin))
+
+	if o.username.Value() == "-" {
+		result, err = prompter.Prompt("Username", true, false)
+		if err != nil {
+			return err
+		}
+		o.username.Set(result)
+	}
+
+	if o.password.Value() == "-" {
+		result, err = prompter.Prompt("Password", false, true)
+		if err != nil {
+			return err
+		}
+		o.password.Set(result)
+	}
+
+	if o.token.Value() == "-" {
+		result, err = prompter.Prompt("Token", false, false)
+		if err != nil {
+			return err
+		}
+		o.token.Set(result)
 	}
 
 	return nil
