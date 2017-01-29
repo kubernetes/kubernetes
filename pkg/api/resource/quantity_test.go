@@ -812,6 +812,7 @@ var fuzzer = fuzz.New().Funcs(
 )
 
 func TestQuantityDeepCopy(t *testing.T) {
+	// Test when d is nil
 	slice := []string{"0", "100m", "50m", "10000T"}
 	for _, testCase := range slice {
 		q := MustParse(testCase)
@@ -824,6 +825,7 @@ func TestQuantityDeepCopy(t *testing.T) {
 		dec(10, 0).Dec,
 		dec(-10, 0).Dec,
 	}
+	// Test when i is {0,0}
 	for _, testCase := range table {
 		q := Quantity{d: infDecAmount{testCase}, Format: DecimalSI}
 		result := q.DeepCopy()
