@@ -2199,6 +2199,13 @@ type PodSpec struct {
 	// If not specified, the pod will be dispatched by default scheduler.
 	// +optional
 	SchedulerName string `json:"schedulername,omitempty" protobuf:"bytes,19,opt,name=schedulername"`
+	// If specified, the pod and its containers will be created by this specific
+	// container runtime.
+	//
+	// TODO(runcom): might make sense to have this in []Containers and []InitContainers?
+	//
+	// +optional
+	RuntimeName string `json:"runtimename,omitempty" protobuf:"bytes,20,opt,name=runtimename"`
 }
 
 // PodSecurityContext holds pod-level security attributes and common container settings.
