@@ -65,10 +65,10 @@ func init() {
 		panic(err)
 	}
 	if false { // reference the types, but skip this branch at build/run time
-		var v0 pkg2_v1.Time
-		var v1 pkg5_runtime.RawExtension
-		var v2 pkg1_types.UID
-		var v3 pkg3_resource.Quantity
+		var v0 pkg3_resource.Quantity
+		var v1 pkg2_v1.Time
+		var v2 pkg5_runtime.RawExtension
+		var v3 pkg1_types.UID
 		var v4 pkg4_intstr.IntOrString
 		var v5 time.Time
 		_, _, _, _, _, _ = v0, v1, v2, v3, v4, v5

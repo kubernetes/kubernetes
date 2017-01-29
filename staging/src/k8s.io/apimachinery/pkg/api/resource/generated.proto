@@ -19,7 +19,7 @@ limitations under the License.
 
 syntax = 'proto2';
 
-package k8s.io.kubernetes.pkg.api.resource;
+package k8s.io.apimachinery.pkg.api.resource;
 
 import "k8s.io/kubernetes/pkg/util/intstr/generated.proto";
 
