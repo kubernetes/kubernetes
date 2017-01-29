@@ -21,8 +21,8 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
+	"k8s.io/apiserver/pkg/apis/example"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
-	"k8s.io/kubernetes/pkg/api"
 )
 
 // TestFillObjectMetaSystemFields validates that system populated fields are set on an object
@@ -62,14 +62,15 @@ func TestHasObjectMetaSystemFieldValues(t *testing.T) {
 func TestValidNamespace(t *testing.T) {
 	ctx := genericapirequest.NewDefaultContext()
 	namespace, _ := genericapirequest.NamespaceFrom(ctx)
-	resource := api.ReplicationController{}
+	// TODO: use some genericapiserver type here instead of clientapiv1
+	resource := example.Pod{}
 	if !ValidNamespace(ctx, &resource.ObjectMeta) {
 		t.Fatalf("expected success")
 	}
 	if namespace != resource.Namespace {
 		t.Fatalf("expected resource to have the default namespace assigned during validation")
 	}
-	resource = api.ReplicationController{ObjectMeta: metav1.ObjectMeta{Namespace: "other"}}
+	resource = example.Pod{ObjectMeta: metav1.ObjectMeta{Namespace: "other"}}
 	if ValidNamespace(ctx, &resource.ObjectMeta) {
 		t.Fatalf("Expected error that resource and context errors do not match because resource has different namespace")
 	}
