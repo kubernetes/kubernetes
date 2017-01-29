@@ -25,7 +25,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/validation/genericvalidation"
 )
 
@@ -143,7 +142,7 @@ func DefaultUpdatedObjectInfo(obj runtime.Object, copier runtime.ObjectCopier, t
 }
 
 // Preconditions satisfies the UpdatedObjectInfo interface.
-func (i *defaultUpdatedObjectInfo) Preconditions() *api.Preconditions {
+func (i *defaultUpdatedObjectInfo) Preconditions() *metav1.Preconditions {
 	// Attempt to get the UID out of the object
 	accessor, err := meta.Accessor(i.obj)
 	if err != nil {
@@ -157,7 +156,7 @@ func (i *defaultUpdatedObjectInfo) Preconditions() *api.Preconditions {
 		return nil
 	}
 
-	return &api.Preconditions{UID: &uid}
+	return &metav1.Preconditions{UID: &uid}
 }
 
 // UpdatedObject satisfies the UpdatedObjectInfo interface.
@@ -206,7 +205,7 @@ func WrapUpdatedObjectInfo(objInfo UpdatedObjectInfo, transformers ...TransformF
 }
 
 // Preconditions satisfies the UpdatedObjectInfo interface.
-func (i *wrappedUpdatedObjectInfo) Preconditions() *api.Preconditions {
+func (i *wrappedUpdatedObjectInfo) Preconditions() *metav1.Preconditions {
 	return i.objInfo.Preconditions()
 }
 
