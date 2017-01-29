@@ -31,6 +31,7 @@ import (
 	"k8s.io/kubernetes/pkg/genericapiserver/registry/generic"
 	"k8s.io/kubernetes/pkg/genericapiserver/registry/rest"
 	genericapiserver "k8s.io/kubernetes/pkg/genericapiserver/server"
+	"k8s.io/kubernetes/pkg/registry"
 	"k8s.io/kubernetes/pkg/version"
 
 	"k8s.io/kubernetes/cmd/kube-aggregator/pkg/apis/apiregistration"
@@ -140,7 +141,7 @@ func (c completedConfig) New() (*APIDiscoveryServer, error) {
 		proxyMux:         proxyMux,
 	}
 
-	apiGroupInfo := genericapiserver.NewDefaultAPIGroupInfo(apiregistration.GroupName)
+	apiGroupInfo := registry.NewDefaultAPIGroupInfo(apiregistration.GroupName)
 	apiGroupInfo.GroupMeta.GroupVersion = v1alpha1.SchemeGroupVersion
 	v1alpha1storage := map[string]rest.Storage{}
 	v1alpha1storage["apiservices"] = apiservicestorage.NewREST(c.RESTOptionsGetter)

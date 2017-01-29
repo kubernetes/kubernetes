@@ -41,7 +41,6 @@ import (
 	apirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/server/healthz"
 	restclient "k8s.io/client-go/rest"
-	"k8s.io/kubernetes/pkg/api"
 	genericapi "k8s.io/kubernetes/pkg/genericapiserver/endpoints"
 	"k8s.io/kubernetes/pkg/genericapiserver/registry/rest"
 	genericmux "k8s.io/kubernetes/pkg/genericapiserver/server/mux"
@@ -372,19 +371,4 @@ func (s *GenericAPIServer) DynamicApisDiscovery() *restful.WebService {
 		}
 		return groups
 	})
-}
-
-// NewDefaultAPIGroupInfo returns an APIGroupInfo stubbed with "normal" values
-// exposed for easier composition from other packages
-func NewDefaultAPIGroupInfo(group string) APIGroupInfo {
-	groupMeta := api.Registry.GroupOrDie(group)
-
-	return APIGroupInfo{
-		GroupMeta:                    *groupMeta,
-		VersionedResourcesStorageMap: map[string]map[string]rest.Storage{},
-		OptionsExternalVersion:       &api.Registry.GroupOrDie(api.GroupName).GroupVersion,
-		Scheme:                       api.Scheme,
-		ParameterCodec:               api.ParameterCodec,
-		NegotiatedSerializer:         api.Codecs,
-	}
 }
