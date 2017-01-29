@@ -37,20 +37,41 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/runtime/serializer"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/version"
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
-	"k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/apis/extensions"
 	openapigen "k8s.io/kubernetes/pkg/generated/openapi"
 	"k8s.io/kubernetes/pkg/genericapiserver/registry/rest"
 	etcdtesting "k8s.io/kubernetes/pkg/storage/etcd/testing"
 )
+
+const (
+	extensionsGroupName = "extensions"
+)
+
+var (
+	v1GroupVersion = schema.GroupVersion{Group: "", Version: "v1"}
+
+	scheme         = runtime.NewScheme()
+	codecs         = serializer.NewCodecFactory(scheme)
+	parameterCodec = runtime.NewParameterCodec(scheme)
+)
+
+func init() {
+	metav1.AddToGroupVersion(scheme, metav1.SchemeGroupVersion)
+	scheme.AddUnversionedTypes(v1GroupVersion,
+		&metav1.Status{},
+		&metav1.APIVersions{},
+		&metav1.APIGroupList{},
+		&metav1.APIGroup{},
+		&metav1.APIResourceList{},
+	)
+}
 
 // setUp is a convience function for setting up for (most) tests.
 func setUp(t *testing.T) (*etcdtesting.EtcdTestServer, Config, *assert.Assertions) {
@@ -119,8 +140,8 @@ func TestInstallAPIGroups(t *testing.T) {
 		scheme := runtime.NewScheme()
 		scheme.AddKnownTypeWithName(gv.WithKind("Getter"), getter.New())
 		scheme.AddKnownTypeWithName(gv.WithKind("NoVerb"), noVerbs.New())
-		scheme.AddKnownTypes(v1.SchemeGroupVersion, &metav1.Status{})
-		metav1.AddToGroupVersion(scheme, v1.SchemeGroupVersion)
+		scheme.AddKnownTypes(v1GroupVersion, &metav1.Status{})
+		metav1.AddToGroupVersion(scheme, v1GroupVersion)
 
 		interfacesFor := func(version schema.GroupVersion) (*meta.VersionInterfaces, error) {
 			return &meta.VersionInterfaces{
@@ -146,15 +167,15 @@ func TestInstallAPIGroups(t *testing.T) {
 				},
 			},
 			OptionsExternalVersion: &schema.GroupVersion{Version: "v1"},
-			ParameterCodec:         api.ParameterCodec,
-			NegotiatedSerializer:   api.Codecs,
+			ParameterCodec:         parameterCodec,
+			NegotiatedSerializer:   codecs,
 			Scheme:                 scheme,
 		}
 	}
 
 	apis := []APIGroupInfo{
 		testAPI(schema.GroupVersion{Group: "", Version: "v1"}),
-		testAPI(schema.GroupVersion{Group: "extensions", Version: "v1"}),
+		testAPI(schema.GroupVersion{Group: extensionsGroupName, Version: "v1"}),
 		testAPI(schema.GroupVersion{Group: "batch", Version: "v1"}),
 	}
 
@@ -467,11 +488,11 @@ func TestDiscoveryAtAPIS(t *testing.T) {
 		},
 	}
 	extensionsPreferredVersion := metav1.GroupVersionForDiscovery{
-		GroupVersion: extensions.GroupName + "/preferred",
+		GroupVersion: extensionsGroupName + "/preferred",
 		Version:      "preferred",
 	}
 	master.AddAPIGroupForDiscovery(metav1.APIGroup{
-		Name:             extensions.GroupName,
+		Name:             extensionsGroupName,
 		Versions:         extensionsVersions,
 		PreferredVersion: extensionsPreferredVersion,
 	})
@@ -483,13 +504,13 @@ func TestDiscoveryAtAPIS(t *testing.T) {
 
 	assert.Equal(1, len(groupList.Groups))
 	groupListGroup := groupList.Groups[0]
-	assert.Equal(extensions.GroupName, groupListGroup.Name)
+	assert.Equal(extensionsGroupName, groupListGroup.Name)
 	assert.Equal(extensionsVersions, groupListGroup.Versions)
 	assert.Equal(extensionsPreferredVersion, groupListGroup.PreferredVersion)
 	assert.Equal(master.discoveryAddresses.ServerAddressByClientCIDRs(utilnet.GetClientIP(&http.Request{})), groupListGroup.ServerAddressByClientCIDRs)
 
 	// Remove the group.
-	master.RemoveAPIGroupForDiscovery(extensions.GroupName)
+	master.RemoveAPIGroupForDiscovery(extensionsGroupName)
 	groupList, err = getGroupList(server)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
