@@ -24,7 +24,7 @@ import (
 	"testing"
 	"time"
 
-	"k8s.io/kubernetes/pkg/util/httpstream"
+	"k8s.io/apimachinery/pkg/util/httpstream"
 )
 
 func runProxy(t *testing.T, backendUrl string, proxyUrl chan<- string, proxyDone chan<- struct{}) {
