@@ -24,6 +24,7 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
+	"k8s.io/kubernetes/pkg/util/i18n"
 )
 
 var (
@@ -35,7 +36,7 @@ var (
 func NewCmdConfigDeleteCluster(out io.Writer, configAccess clientcmd.ConfigAccess) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "delete-cluster NAME",
-		Short:   "Delete the specified cluster from the kubeconfig",
+		Short:   i18n.T("Delete the specified cluster from the kubeconfig"),
 		Long:    "Delete the specified cluster from the kubeconfig",
 		Example: delete_cluster_example,
 		Run: func(cmd *cobra.Command, args []string) {
