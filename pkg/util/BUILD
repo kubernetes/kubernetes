@@ -13,12 +13,10 @@ go_library(
     srcs = [
         "doc.go",
         "template.go",
-        "trace.go",
         "umask.go",
         "util.go",
     ],
     tags = ["automanaged"],
-    deps = ["//vendor:github.com/golang/glog"],
 )
 
 go_test(

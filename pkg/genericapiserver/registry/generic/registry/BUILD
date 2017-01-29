@@ -64,6 +64,7 @@ go_test(
         "//pkg/storage/etcd/testing:go_default_library",
         "//pkg/storage/storagebackend/factory:go_default_library",
         "//pkg/storage/testing:go_default_library",
+        "//vendor:k8s.io/apimachinery/pkg/api/equality",
         "//vendor:k8s.io/apimachinery/pkg/api/errors",
         "//vendor:k8s.io/apimachinery/pkg/api/meta",
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/internalversion",
