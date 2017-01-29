@@ -38,7 +38,6 @@ import (
 	"k8s.io/apiserver/pkg/endpoints/handlers/negotiation"
 	"k8s.io/apiserver/pkg/endpoints/metrics"
 	"k8s.io/apiserver/pkg/endpoints/request"
-	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/genericapiserver/endpoints/handlers"
 	"k8s.io/kubernetes/pkg/genericapiserver/registry/rest"
 
@@ -154,8 +153,9 @@ func (a *APIInstaller) getResourceKind(path string, storage rest.Storage) (schem
 			break
 		}
 
-		// TODO This keeps it doing what it was doing before, but it doesn't feel right.
-		if fqKind.Group == extensions.GroupName && fqKind.Kind == "ThirdPartyResourceData" {
+		// TODO: keep rid of extensions api group dependency here
+		// This keeps it doing what it was doing before, but it doesn't feel right.
+		if fqKind.Group == "extensions" && fqKind.Kind == "ThirdPartyResourceData" {
 			fqKindToRegister = a.group.GroupVersion.WithKind(fqKind.Kind)
 		}
 	}
