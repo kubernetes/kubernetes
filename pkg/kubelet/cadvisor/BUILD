@@ -18,7 +18,6 @@ go_library(
     ],
     tags = ["automanaged"],
     deps = [
-        "//pkg/api/resource:go_default_library",
         "//pkg/api/v1:go_default_library",
         "//pkg/kubelet/types:go_default_library",
         "//vendor:github.com/golang/glog",
@@ -32,6 +31,7 @@ go_library(
         "//vendor:github.com/google/cadvisor/manager",
         "//vendor:github.com/google/cadvisor/metrics",
         "//vendor:github.com/google/cadvisor/utils/sysfs",
+        "//vendor:k8s.io/apimachinery/pkg/api/resource",
         "//vendor:k8s.io/apimachinery/pkg/util/runtime",
     ],
 )

@@ -17,7 +17,6 @@ go_library(
     ],
     tags = ["automanaged"],
     deps = [
-        "//pkg/api/resource:go_default_library",
         "//pkg/api/v1:go_default_library",
         "//pkg/util/exec:go_default_library",
         "//pkg/util/mount:go_default_library",
@@ -27,6 +26,7 @@ go_library(
         "//vendor:github.com/golang/glog",
         "//vendor:github.com/pborman/uuid",
         "//vendor:github.com/quobyte/api",
+        "//vendor:k8s.io/apimachinery/pkg/api/resource",
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
         "//vendor:k8s.io/apimachinery/pkg/types",
     ],
