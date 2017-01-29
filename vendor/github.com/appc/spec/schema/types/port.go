@@ -18,12 +18,15 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net"
 	"net/url"
 	"strconv"
 
 	"github.com/appc/spec/schema/common"
 )
 
+// Port represents a port as offered by an application *inside*
+// the pod.
 type Port struct {
 	Name            ACName `json:"name"`
 	Protocol        string `json:"protocol"`
@@ -32,9 +35,14 @@ type Port struct {
 	SocketActivated bool   `json:"socketActivated"`
 }
 
+// ExposedPort represents a port listening on the host side.
+// The PodPort is optional -- if missing, then try and find the pod-side
+// information by matching names
 type ExposedPort struct {
 	Name     ACName `json:"name"`
 	HostPort uint   `json:"hostPort"`
+	HostIP   net.IP `json:"hostIP,omitempty"`  // optional
+	PodPort  *Port  `json:"podPort,omitempty"` // optional. If missing, try and find a corresponding App's port
 }
 
 type port Port

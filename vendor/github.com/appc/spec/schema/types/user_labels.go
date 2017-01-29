@@ -12,28 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package schema
+package types
 
-import (
-	"github.com/appc/spec/schema/types"
-)
-
-const (
-	// version represents the canonical version of the appc spec and tooling.
-	// For now, the schema and tooling is coupled with the spec itself, so
-	// this must be kept in sync with the VERSION file in the root of the repo.
-	version string = "0.8.9+git"
-)
-
-var (
-	// AppContainerVersion is the SemVer representation of version
-	AppContainerVersion types.SemVer
-)
-
-func init() {
-	v, err := types.NewSemVer(version)
-	if err != nil {
-		panic(err)
-	}
-	AppContainerVersion = *v
-}
+// UserLabels are arbitrary key-value pairs, to be supplied and interpreted by the user
+type UserLabels map[string]string

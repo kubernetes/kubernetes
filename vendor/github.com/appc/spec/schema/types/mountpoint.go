@@ -23,6 +23,7 @@ import (
 	"github.com/appc/spec/schema/common"
 )
 
+// MountPoint is the application-side manifestation of a Volume.
 type MountPoint struct {
 	Name     ACName `json:"name"`
 	Path     string `json:"path"`

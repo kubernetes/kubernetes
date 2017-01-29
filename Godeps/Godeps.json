@@ -115,18 +115,23 @@
 		},
 		{
 			"ImportPath": "github.com/appc/spec/schema",
-			"Comment": "v0.8.1-6-gab50d12",
-			"Rev": "ab50d12e88f57788bf84b83fef2be236eb1fcc0b"
+			"Comment": "v0.8.9-17-gfc380db",
+			"Rev": "fc380db5fc13c6dd71a5b0bf2af0d182865d1b1d"
 		},
 		{
 			"ImportPath": "github.com/appc/spec/schema/common",
-			"Comment": "v0.8.1-6-gab50d12",
-			"Rev": "ab50d12e88f57788bf84b83fef2be236eb1fcc0b"
+			"Comment": "v0.8.9-17-gfc380db",
+			"Rev": "fc380db5fc13c6dd71a5b0bf2af0d182865d1b1d"
 		},
 		{
 			"ImportPath": "github.com/appc/spec/schema/types",
-			"Comment": "v0.8.1-6-gab50d12",
-			"Rev": "ab50d12e88f57788bf84b83fef2be236eb1fcc0b"
+			"Comment": "v0.8.9-17-gfc380db",
+			"Rev": "fc380db5fc13c6dd71a5b0bf2af0d182865d1b1d"
+		},
+		{
+			"ImportPath": "github.com/appc/spec/schema/types/resource",
+			"Comment": "v0.8.9-17-gfc380db",
+			"Rev": "fc380db5fc13c6dd71a5b0bf2af0d182865d1b1d"
 		},
 		{
 			"ImportPath": "github.com/armon/circbuf",
