@@ -81,6 +81,7 @@ go_test(
         "//pkg/client/clientset_generated/clientset:go_default_library",
         "//pkg/kubelet:go_default_library",
         "//pkg/kubelet/api/v1alpha1/stats:go_default_library",
+        "//pkg/kubelet/cadvisor:go_default_library",
         "//pkg/kubelet/cm:go_default_library",
         "//pkg/kubelet/container:go_default_library",
         "//pkg/kubelet/dockertools:go_default_library",
@@ -113,6 +114,7 @@ go_test(
         "//vendor:k8s.io/apimachinery/pkg/types",
         "//vendor:k8s.io/apimachinery/pkg/util/uuid",
         "//vendor:k8s.io/apimachinery/pkg/watch",
+        "//vendor:k8s.io/client-go/_vendor/k8s.io/apimachinery/pkg/util/json",
         "//vendor:k8s.io/client-go/tools/cache",
     ],
 )
