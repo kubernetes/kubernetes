@@ -20,12 +20,12 @@ import (
 	fmt "fmt"
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	serializer "k8s.io/apimachinery/pkg/runtime/serializer"
+	rest "k8s.io/client-go/rest"
 	api "k8s.io/kubernetes/pkg/api"
-	restclient "k8s.io/kubernetes/pkg/client/restclient"
 )
 
 type CoreV1Interface interface {
-	RESTClient() restclient.Interface
+	RESTClient() rest.Interface
 	ComponentStatusesGetter
 	ConfigMapsGetter
 	EndpointsGetter
@@ -46,7 +46,7 @@ type CoreV1Interface interface {
 
 // CoreV1Client is used to interact with features provided by the  group.
 type CoreV1Client struct {
-	restClient restclient.Interface
+	restClient rest.Interface
 }
 
 func (c *CoreV1Client) ComponentStatuses() ComponentStatusInterface {
@@ -114,12 +114,12 @@ func (c *CoreV1Client) ServiceAccounts(namespace string) ServiceAccountInterface
 }
 
 // NewForConfig creates a new CoreV1Client for the given config.
-func NewForConfig(c *restclient.Config) (*CoreV1Client, error) {
+func NewForConfig(c *rest.Config) (*CoreV1Client, error) {
 	config := *c
 	if err := setConfigDefaults(&config); err != nil {
 		return nil, err
 	}
-	client, err := restclient.RESTClientFor(&config)
+	client, err := rest.RESTClientFor(&config)
 	if err != nil {
 		return nil, err
 	}
@@ -128,7 +128,7 @@ func NewForConfig(c *restclient.Config) (*CoreV1Client, error) {
 
 // NewForConfigOrDie creates a new CoreV1Client for the given config and
 // panics if there is an error in the config.
-func NewForConfigOrDie(c *restclient.Config) *CoreV1Client {
+func NewForConfigOrDie(c *rest.Config) *CoreV1Client {
 	client, err := NewForConfig(c)
 	if err != nil {
 		panic(err)
@@ -137,11 +137,11 @@ func NewForConfigOrDie(c *restclient.Config) *CoreV1Client {
 }
 
 // New creates a new CoreV1Client for the given RESTClient.
-func New(c restclient.Interface) *CoreV1Client {
+func New(c rest.Interface) *CoreV1Client {
 	return &CoreV1Client{c}
 }
 
-func setConfigDefaults(config *restclient.Config) error {
+func setConfigDefaults(config *rest.Config) error {
 	gv, err := schema.ParseGroupVersion("/v1")
 	if err != nil {
 		return err
@@ -152,7 +152,7 @@ func setConfigDefaults(config *restclient.Config) error {
 	}
 	config.APIPath = "/api"
 	if config.UserAgent == "" {
-		config.UserAgent = restclient.DefaultKubernetesUserAgent()
+		config.UserAgent = rest.DefaultKubernetesUserAgent()
 	}
 	copyGroupVersion := gv
 	config.GroupVersion = &copyGroupVersion
@@ -164,7 +164,7 @@ func setConfigDefaults(config *restclient.Config) error {
 
 // RESTClient returns a RESTClient that is used to communicate
 // with API server by this client implementation.
-func (c *CoreV1Client) RESTClient() restclient.Interface {
+func (c *CoreV1Client) RESTClient() rest.Interface {
 	if c == nil {
 		return nil
 	}

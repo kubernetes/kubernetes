@@ -17,11 +17,11 @@ limitations under the License.
 package e2e_node
 
 import (
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/kubernetes/pkg/api/resource"
+	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
-	"k8s.io/kubernetes/pkg/util/uuid"
 	"k8s.io/kubernetes/test/e2e/framework"
 
 	. "github.com/onsi/ginkgo"
@@ -192,7 +192,7 @@ var _ = framework.KubeDescribe("Kubelet Cgroup Manager", func() {
 				})
 				By("Checking if the pod cgroup was deleted", func() {
 					gp := int64(1)
-					Expect(f.PodClient().Delete(guaranteedPod.Name, &v1.DeleteOptions{GracePeriodSeconds: &gp})).NotTo(HaveOccurred())
+					Expect(f.PodClient().Delete(guaranteedPod.Name, &metav1.DeleteOptions{GracePeriodSeconds: &gp})).NotTo(HaveOccurred())
 					pod := makePodToVerifyCgroupRemoved(cm.CgroupName("pod" + podUID))
 					f.PodClient().Create(pod)
 					err := framework.WaitForPodSuccessInNamespace(f.ClientSet, pod.Name, f.Namespace.Name)
@@ -236,7 +236,7 @@ var _ = framework.KubeDescribe("Kubelet Cgroup Manager", func() {
 				})
 				By("Checking if the pod cgroup was deleted", func() {
 					gp := int64(1)
-					Expect(f.PodClient().Delete(bestEffortPod.Name, &v1.DeleteOptions{GracePeriodSeconds: &gp})).NotTo(HaveOccurred())
+					Expect(f.PodClient().Delete(bestEffortPod.Name, &metav1.DeleteOptions{GracePeriodSeconds: &gp})).NotTo(HaveOccurred())
 					pod := makePodToVerifyCgroupRemoved(cm.CgroupName("BestEffort/pod" + podUID))
 					f.PodClient().Create(pod)
 					err := framework.WaitForPodSuccessInNamespace(f.ClientSet, pod.Name, f.Namespace.Name)
@@ -280,7 +280,7 @@ var _ = framework.KubeDescribe("Kubelet Cgroup Manager", func() {
 				})
 				By("Checking if the pod cgroup was deleted", func() {
 					gp := int64(1)
-					Expect(f.PodClient().Delete(burstablePod.Name, &v1.DeleteOptions{GracePeriodSeconds: &gp})).NotTo(HaveOccurred())
+					Expect(f.PodClient().Delete(burstablePod.Name, &metav1.DeleteOptions{GracePeriodSeconds: &gp})).NotTo(HaveOccurred())
 					pod := makePodToVerifyCgroupRemoved(cm.CgroupName("Burstable/pod" + podUID))
 					f.PodClient().Create(pod)
 					err := framework.WaitForPodSuccessInNamespace(f.ClientSet, pod.Name, f.Namespace.Name)

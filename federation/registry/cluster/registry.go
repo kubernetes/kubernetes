@@ -17,6 +17,7 @@ limitations under the License.
 package cluster
 
 import (
+	metainternalversion "k8s.io/apimachinery/pkg/apis/meta/internalversion"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/watch"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
@@ -27,8 +28,8 @@ import (
 
 // Registry is an interface implemented by things that know how to store Cluster objects.
 type Registry interface {
-	ListClusters(ctx genericapirequest.Context, options *api.ListOptions) (*federation.ClusterList, error)
-	WatchCluster(ctx genericapirequest.Context, options *api.ListOptions) (watch.Interface, error)
+	ListClusters(ctx genericapirequest.Context, options *metainternalversion.ListOptions) (*federation.ClusterList, error)
+	WatchCluster(ctx genericapirequest.Context, options *metainternalversion.ListOptions) (watch.Interface, error)
 	GetCluster(ctx genericapirequest.Context, name string, options *metav1.GetOptions) (*federation.Cluster, error)
 	CreateCluster(ctx genericapirequest.Context, cluster *federation.Cluster) error
 	UpdateCluster(ctx genericapirequest.Context, cluster *federation.Cluster) error
@@ -46,7 +47,7 @@ func NewRegistry(s rest.StandardStorage) Registry {
 	return &storage{s}
 }
 
-func (s *storage) ListClusters(ctx genericapirequest.Context, options *api.ListOptions) (*federation.ClusterList, error) {
+func (s *storage) ListClusters(ctx genericapirequest.Context, options *metainternalversion.ListOptions) (*federation.ClusterList, error) {
 	obj, err := s.List(ctx, options)
 	if err != nil {
 		return nil, err
@@ -54,7 +55,7 @@ func (s *storage) ListClusters(ctx genericapirequest.Context, options *api.ListO
 	return obj.(*federation.ClusterList), nil
 }
 
-func (s *storage) WatchCluster(ctx genericapirequest.Context, options *api.ListOptions) (watch.Interface, error) {
+func (s *storage) WatchCluster(ctx genericapirequest.Context, options *metainternalversion.ListOptions) (watch.Interface, error) {
 	return s.Watch(ctx, options)
 }
 

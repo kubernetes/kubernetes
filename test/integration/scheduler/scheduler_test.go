@@ -26,16 +26,16 @@ import (
 	"time"
 
 	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
+	restclient "k8s.io/client-go/rest"
+	"k8s.io/client-go/tools/cache"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/client/cache"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	v1core "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/core/v1"
 	"k8s.io/kubernetes/pkg/client/record"
-	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/plugin/pkg/scheduler"
 	_ "k8s.io/kubernetes/plugin/pkg/scheduler/algorithmprovider"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/factory"
@@ -123,7 +123,7 @@ func waitForReflection(t *testing.T, s cache.Store, key string, passFunc func(n 
 func DoTestUnschedulableNodes(t *testing.T, cs clientset.Interface, ns *v1.Namespace, nodeStore cache.Store) {
 	// NOTE: This test cannot run in parallel, because it is creating and deleting
 	// non-namespaced objects (Nodes).
-	defer cs.Core().Nodes().DeleteCollection(nil, v1.ListOptions{})
+	defer cs.Core().Nodes().DeleteCollection(nil, metav1.ListOptions{})
 
 	goodCondition := v1.NodeCondition{
 		Type:              v1.NodeReady,
@@ -282,7 +282,7 @@ func DoTestUnschedulableNodes(t *testing.T, cs clientset.Interface, ns *v1.Names
 			t.Logf("Test %d: Pod got scheduled on a schedulable node", i)
 		}
 
-		err = cs.Core().Pods(ns.Name).Delete(myPod.Name, v1.NewDeleteOptions(0))
+		err = cs.Core().Pods(ns.Name).Delete(myPod.Name, metav1.NewDeleteOptions(0))
 		if err != nil {
 			t.Errorf("Failed to delete pod: %v", err)
 		}
@@ -326,7 +326,7 @@ func TestMultiScheduler(t *testing.T) {
 
 	// NOTE: This test cannot run in parallel, because it is creating and deleting
 	// non-namespaced objects (Nodes).
-	defer clientSet.Core().Nodes().DeleteCollection(nil, v1.ListOptions{})
+	defer clientSet.Core().Nodes().DeleteCollection(nil, metav1.ListOptions{})
 
 	schedulerConfigFactory := factory.NewConfigFactory(clientSet, v1.DefaultSchedulerName, v1.DefaultHardPodAffinitySymmetricWeight, v1.DefaultFailureDomains)
 	schedulerConfig, err := schedulerConfigFactory.Create()
@@ -421,11 +421,11 @@ func TestMultiScheduler(t *testing.T) {
 	}
 
 	//	7. delete the pods that were scheduled by the default scheduler, and stop the default scheduler
-	err = clientSet.Core().Pods(ns.Name).Delete(testPod.Name, v1.NewDeleteOptions(0))
+	err = clientSet.Core().Pods(ns.Name).Delete(testPod.Name, metav1.NewDeleteOptions(0))
 	if err != nil {
 		t.Errorf("Failed to delete pod: %v", err)
 	}
-	err = clientSet.Core().Pods(ns.Name).Delete(testPodFitsDefault.Name, v1.NewDeleteOptions(0))
+	err = clientSet.Core().Pods(ns.Name).Delete(testPodFitsDefault.Name, metav1.NewDeleteOptions(0))
 	if err != nil {
 		t.Errorf("Failed to delete pod: %v", err)
 	}
@@ -492,7 +492,7 @@ func TestAllocatable(t *testing.T) {
 
 	// NOTE: This test cannot run in parallel, because it is creating and deleting
 	// non-namespaced objects (Nodes).
-	defer clientSet.Core().Nodes().DeleteCollection(nil, v1.ListOptions{})
+	defer clientSet.Core().Nodes().DeleteCollection(nil, metav1.ListOptions{})
 
 	schedulerConfigFactory := factory.NewConfigFactory(clientSet, v1.DefaultSchedulerName, v1.DefaultHardPodAffinitySymmetricWeight, v1.DefaultFailureDomains)
 	schedulerConfig, err := schedulerConfigFactory.Create()
@@ -574,7 +574,7 @@ func TestAllocatable(t *testing.T) {
 		t.Fatalf("Failed to update node with Status.Allocatable: %v", err)
 	}
 
-	if err := clientSet.Core().Pods(ns.Name).Delete(podResource.Name, &v1.DeleteOptions{}); err != nil {
+	if err := clientSet.Core().Pods(ns.Name).Delete(podResource.Name, &metav1.DeleteOptions{}); err != nil {
 		t.Fatalf("Failed to remove first resource pod: %v", err)
 	}
 

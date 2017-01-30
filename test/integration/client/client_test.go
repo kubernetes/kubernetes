@@ -35,10 +35,10 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
+	restclient "k8s.io/client-go/rest"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
-	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/version"
 	e2e "k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/integration/framework"
@@ -61,7 +61,7 @@ func TestClient(t *testing.T) {
 		t.Errorf("expected %#v, got %#v", e, a)
 	}
 
-	pods, err := client.Core().Pods(ns.Name).List(v1.ListOptions{})
+	pods, err := client.Core().Pods(ns.Name).List(metav1.ListOptions{})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -100,7 +100,7 @@ func TestClient(t *testing.T) {
 	}
 
 	// pod is shown, but not scheduled
-	pods, err = client.Core().Pods(ns.Name).List(v1.ListOptions{})
+	pods, err = client.Core().Pods(ns.Name).List(metav1.ListOptions{})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -588,7 +588,7 @@ func TestMultiWatch(t *testing.T) {
 			t.Fatalf("Couldn't make %v: %v", name, err)
 		}
 		go func(name, rv string) {
-			options := v1.ListOptions{
+			options := metav1.ListOptions{
 				LabelSelector:   labels.Set{"watchlabel": name}.AsSelector().String(),
 				ResourceVersion: rv,
 			}
@@ -764,7 +764,7 @@ func runSelfLinkTestOnNamespace(t *testing.T, c clientset.Interface, namespace s
 		t.Errorf("Failed listing pod with supplied self link '%v': %v", pod.SelfLink, err)
 	}
 
-	podList, err := c.Core().Pods(namespace).List(v1.ListOptions{})
+	podList, err := c.Core().Pods(namespace).List(metav1.ListOptions{})
 	if err != nil {
 		t.Errorf("Failed listing pods: %v", err)
 	}

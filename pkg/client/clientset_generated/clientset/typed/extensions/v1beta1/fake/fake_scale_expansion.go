@@ -18,8 +18,8 @@ package fake
 
 import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	core "k8s.io/client-go/testing"
 	"k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
-	"k8s.io/kubernetes/pkg/client/testing/core"
 )
 
 func (c *FakeScales) Get(kind string, name string) (result *v1beta1.Scale, err error) {

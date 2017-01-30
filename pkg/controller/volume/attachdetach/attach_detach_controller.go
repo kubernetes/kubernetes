@@ -26,9 +26,9 @@ import (
 	"github.com/golang/glog"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/runtime"
+	kcache "k8s.io/client-go/tools/cache"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
-	kcache "k8s.io/kubernetes/pkg/client/cache"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	v1core "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/core/v1"
 	"k8s.io/kubernetes/pkg/client/record"
@@ -619,4 +619,10 @@ func (adc *attachDetachController) GetHostIP() (net.IP, error) {
 
 func (adc *attachDetachController) GetNodeAllocatable() (v1.ResourceList, error) {
 	return v1.ResourceList{}, nil
+}
+
+func (adc *attachDetachController) GetSecretFunc() func(namespace, name string) (*v1.Secret, error) {
+	return func(_, _ string) (*v1.Secret, error) {
+		return nil, fmt.Errorf("GetSecret unsupported in attachDetachController")
+	}
 }

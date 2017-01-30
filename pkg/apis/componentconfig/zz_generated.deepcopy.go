@@ -24,7 +24,6 @@ import (
 	conversion "k8s.io/apimachinery/pkg/conversion"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	api "k8s.io/kubernetes/pkg/api"
-	config "k8s.io/kubernetes/pkg/util/config"
 	reflect "reflect"
 )
 
@@ -198,7 +197,9 @@ func DeepCopy_componentconfig_KubeletConfiguration(in interface{}, out interface
 			in, out := &in.RegisterWithTaints, &out.RegisterWithTaints
 			*out = make([]api.Taint, len(*in))
 			for i := range *in {
-				(*out)[i] = (*in)[i]
+				if err := api.DeepCopy_api_Taint(&(*in)[i], &(*out)[i], c); err != nil {
+					return err
+				}
 			}
 		}
 		if in.NodeLabels != nil {
@@ -210,14 +211,14 @@ func DeepCopy_componentconfig_KubeletConfiguration(in interface{}, out interface
 		}
 		if in.SystemReserved != nil {
 			in, out := &in.SystemReserved, &out.SystemReserved
-			*out = make(config.ConfigurationMap)
+			*out = make(ConfigurationMap)
 			for key, val := range *in {
 				(*out)[key] = val
 			}
 		}
 		if in.KubeReserved != nil {
 			in, out := &in.KubeReserved, &out.KubeReserved
-			*out = make(config.ConfigurationMap)
+			*out = make(ConfigurationMap)
 			for key, val := range *in {
 				(*out)[key] = val
 			}

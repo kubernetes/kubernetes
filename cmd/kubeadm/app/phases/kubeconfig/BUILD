@@ -24,10 +24,11 @@ go_library(
     ],
     tags = ["automanaged"],
     deps = [
-        "//cmd/kubeadm/app/phases/certs:go_default_library",
-        "//pkg/client/unversioned/clientcmd:go_default_library",
-        "//pkg/util/cert:go_default_library",
+        "//cmd/kubeadm/app/constants:go_default_library",
+        "//cmd/kubeadm/app/phases/certs/pkiutil:go_default_library",
+        "//vendor:k8s.io/client-go/tools/clientcmd",
         "//vendor:k8s.io/client-go/tools/clientcmd/api",
+        "//vendor:k8s.io/client-go/util/cert",
     ],
 )
 

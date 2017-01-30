@@ -34,7 +34,6 @@ filegroup(
         "//plugin/pkg/admission/serviceaccount:all-srcs",
         "//plugin/pkg/admission/storageclass/default:all-srcs",
         "//plugin/pkg/auth:all-srcs",
-        "//plugin/pkg/client/auth:all-srcs",
         "//plugin/pkg/scheduler:all-srcs",
     ],
     tags = ["automanaged"],

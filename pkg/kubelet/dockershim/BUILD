@@ -49,7 +49,6 @@ go_library(
         "//vendor:github.com/docker/engine-api/types/versions",
         "//vendor:github.com/docker/go-connections/nat",
         "//vendor:github.com/golang/glog",
-        "//vendor:github.com/golang/protobuf/proto",
     ],
 )
 
@@ -83,7 +82,7 @@ go_test(
         "//vendor:github.com/golang/mock/gomock",
         "//vendor:github.com/stretchr/testify/assert",
         "//vendor:github.com/stretchr/testify/require",
-        "//vendor:k8s.io/client-go/pkg/util/clock",
+        "//vendor:k8s.io/client-go/util/clock",
     ],
 )
 

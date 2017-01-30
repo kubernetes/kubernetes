@@ -23,6 +23,10 @@ import (
 	"reflect"
 	"time"
 
+	etcd "github.com/coreos/etcd/client"
+	"github.com/golang/glog"
+	"golang.org/x/net/context"
+
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/conversion"
@@ -30,14 +34,10 @@ import (
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/apiserver/pkg/storage/etcd/metrics"
 	utilcache "k8s.io/apiserver/pkg/util/cache"
+	utiltrace "k8s.io/apiserver/pkg/util/trace"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/storage"
 	etcdutil "k8s.io/kubernetes/pkg/storage/etcd/util"
-	"k8s.io/kubernetes/pkg/util"
-
-	etcd "github.com/coreos/etcd/client"
-	"github.com/golang/glog"
-	"golang.org/x/net/context"
 )
 
 // Creates a new storage interface from the client
@@ -92,7 +92,7 @@ func (h *etcdHelper) Versioner() storage.Versioner {
 
 // Implements storage.Interface.
 func (h *etcdHelper) Create(ctx context.Context, key string, obj, out runtime.Object, ttl uint64) error {
-	trace := util.NewTrace("etcdHelper::Create " + getTypeName(obj))
+	trace := utiltrace.New("etcdHelper::Create " + getTypeName(obj))
 	defer trace.LogIfLong(250 * time.Millisecond)
 	if ctx == nil {
 		glog.Errorf("Context is nil")
@@ -301,7 +301,7 @@ func (h *etcdHelper) GetToList(ctx context.Context, key string, resourceVersion 
 	if ctx == nil {
 		glog.Errorf("Context is nil")
 	}
-	trace := util.NewTrace("GetToList " + getTypeName(listObj))
+	trace := utiltrace.New("GetToList " + getTypeName(listObj))
 	listPtr, err := meta.GetItemsPtr(listObj)
 	if err != nil {
 		return err
@@ -338,7 +338,7 @@ func (h *etcdHelper) GetToList(ctx context.Context, key string, resourceVersion 
 
 // decodeNodeList walks the tree of each node in the list and decodes into the specified object
 func (h *etcdHelper) decodeNodeList(nodes []*etcd.Node, filter storage.FilterFunc, slicePtr interface{}) error {
-	trace := util.NewTrace("decodeNodeList " + getTypeName(slicePtr))
+	trace := utiltrace.New("decodeNodeList " + getTypeName(slicePtr))
 	defer trace.LogIfLong(400 * time.Millisecond)
 	v, err := conversion.EnforcePtr(slicePtr)
 	if err != nil || v.Kind() != reflect.Slice {
@@ -383,7 +383,7 @@ func (h *etcdHelper) List(ctx context.Context, key string, resourceVersion strin
 	if ctx == nil {
 		glog.Errorf("Context is nil")
 	}
-	trace := util.NewTrace("List " + getTypeName(listObj))
+	trace := utiltrace.New("List " + getTypeName(listObj))
 	defer trace.LogIfLong(400 * time.Millisecond)
 	listPtr, err := meta.GetItemsPtr(listObj)
 	if err != nil {

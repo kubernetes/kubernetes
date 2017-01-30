@@ -18,7 +18,6 @@ go_library(
     ],
     tags = ["automanaged"],
     deps = [
-        "//pkg/api/resource:go_default_library",
         "//pkg/api/v1:go_default_library",
         "//pkg/util/env:go_default_library",
         "//pkg/util/mount:go_default_library",
@@ -27,6 +26,7 @@ go_library(
         "//pkg/volume/util:go_default_library",
         "//vendor:github.com/clusterhq/flocker-go",
         "//vendor:github.com/golang/glog",
+        "//vendor:k8s.io/apimachinery/pkg/api/resource",
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
         "//vendor:k8s.io/apimachinery/pkg/types",
         "//vendor:k8s.io/apimachinery/pkg/util/rand",
@@ -45,13 +45,13 @@ go_test(
     deps = [
         "//pkg/api/v1:go_default_library",
         "//pkg/util/mount:go_default_library",
-        "//pkg/util/testing:go_default_library",
         "//pkg/volume:go_default_library",
         "//pkg/volume/testing:go_default_library",
         "//vendor:github.com/clusterhq/flocker-go",
         "//vendor:github.com/stretchr/testify/assert",
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
         "//vendor:k8s.io/apimachinery/pkg/types",
+        "//vendor:k8s.io/client-go/util/testing",
     ],
 )
 

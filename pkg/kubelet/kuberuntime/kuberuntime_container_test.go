@@ -51,7 +51,7 @@ func TestRemoveContainer(t *testing.T) {
 	_, fakeContainers := makeAndSetFakePod(t, m, fakeRuntime, pod)
 	assert.Equal(t, len(fakeContainers), 1)
 
-	containerId := fakeContainers[0].GetId()
+	containerId := fakeContainers[0].Id
 	fakeOS := m.osInterface.(*containertest.FakeOS)
 	err = m.removeContainer(containerId)
 	assert.NoError(t, err)
@@ -61,7 +61,7 @@ func TestRemoveContainer(t *testing.T) {
 	assert.Equal(t, fakeOS.Removes, []string{expectedContainerLogPath, expectedContainerLogSymlink})
 	// Verify container is removed
 	fakeRuntime.AssertCalls([]string{"RemoveContainer"})
-	containers, err := fakeRuntime.ListContainers(&runtimeapi.ContainerFilter{Id: &containerId})
+	containers, err := fakeRuntime.ListContainers(&runtimeapi.ContainerFilter{Id: containerId})
 	assert.NoError(t, err)
 	assert.Empty(t, containers)
 }

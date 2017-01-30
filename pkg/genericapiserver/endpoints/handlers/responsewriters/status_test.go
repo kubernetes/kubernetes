@@ -25,7 +25,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/kubernetes/pkg/api"
 )
 
 func TestAPIStatus(t *testing.T) {
@@ -41,7 +40,7 @@ func TestAPIStatus(t *testing.T) {
 				Name:  "bar",
 			},
 		},
-		errors.NewAlreadyExists(api.Resource("foos"), "bar"): {
+		errors.NewAlreadyExists(schema.GroupResource{Resource: "foos"}, "bar"): {
 			Status:  metav1.StatusFailure,
 			Code:    http.StatusConflict,
 			Reason:  "AlreadyExists",
@@ -52,7 +51,7 @@ func TestAPIStatus(t *testing.T) {
 				Name:  "bar",
 			},
 		},
-		errors.NewConflict(api.Resource("foos"), "bar", stderrs.New("failure")): {
+		errors.NewConflict(schema.GroupResource{Resource: "foos"}, "bar", stderrs.New("failure")): {
 			Status:  metav1.StatusFailure,
 			Code:    http.StatusConflict,
 			Reason:  "Conflict",

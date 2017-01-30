@@ -22,11 +22,12 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 
-	"k8s.io/kubernetes/pkg/client/restclient"
+	restclient "k8s.io/client-go/rest"
 )
 
 func TestAccept(t *testing.T) {
@@ -234,6 +235,7 @@ func TestFileServing(t *testing.T) {
 	if err != nil {
 		t.Fatalf("error creating tmp dir: %v", err)
 	}
+	defer os.RemoveAll(dir)
 	if err := ioutil.WriteFile(filepath.Join(dir, fname), []byte(data), 0755); err != nil {
 		t.Fatalf("error writing tmp file: %v", err)
 	}

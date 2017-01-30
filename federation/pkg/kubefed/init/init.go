@@ -36,20 +36,20 @@ import (
 	"strings"
 	"time"
 
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
+	certutil "k8s.io/client-go/util/cert"
+	triple "k8s.io/client-go/util/cert/triple"
 	kubeadmkubeconfigphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/kubeconfig"
 	"k8s.io/kubernetes/federation/pkg/kubefed/util"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	client "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
-	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
-	certutil "k8s.io/kubernetes/pkg/util/cert"
-	triple "k8s.io/kubernetes/pkg/util/cert/triple"
 	"k8s.io/kubernetes/pkg/util/intstr"
 	"k8s.io/kubernetes/pkg/version"
 
@@ -334,11 +334,11 @@ func genCerts(svcNamespace, name, svcName, localDNSZoneName string, ips, hostnam
 	if err != nil {
 		return nil, fmt.Errorf("failed to create federation API server key and certificate: %v", err)
 	}
-	cm, err := triple.NewClientKeyPair(ca, ControllerManagerCN)
+	cm, err := triple.NewClientKeyPair(ca, ControllerManagerCN, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create federation controller manager client key and certificate: %v", err)
 	}
-	admin, err := triple.NewClientKeyPair(ca, AdminCN)
+	admin, err := triple.NewClientKeyPair(ca, AdminCN, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create client key and certificate for an admin: %v", err)
 	}
@@ -592,7 +592,7 @@ func createControllerManager(clientset *client.Clientset, namespace, name, svcNa
 func waitForPods(clientset *client.Clientset, fedPods []string, namespace string) error {
 	err := wait.PollInfinite(podWaitInterval, func() (bool, error) {
 		podCheck := len(fedPods)
-		podList, err := clientset.Core().Pods(namespace).List(api.ListOptions{})
+		podList, err := clientset.Core().Pods(namespace).List(metav1.ListOptions{})
 		if err != nil {
 			return false, nil
 		}

@@ -24,7 +24,7 @@ import (
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/assert"
 
-	"k8s.io/client-go/pkg/util/clock"
+	"k8s.io/client-go/util/clock"
 	runtimeapi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
 	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
 	"k8s.io/kubernetes/pkg/kubelet/dockertools"
@@ -53,8 +53,8 @@ func TestStatus(t *testing.T) {
 		assert.Equal(t, len(expected), len(conditions))
 		for k, v := range expected {
 			for _, c := range conditions {
-				if k == c.GetType() {
-					assert.Equal(t, v, c.GetStatus())
+				if k == c.Type {
+					assert.Equal(t, v, c.Status)
 				}
 			}
 		}

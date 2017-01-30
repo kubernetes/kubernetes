@@ -24,10 +24,10 @@ import (
 
 	"github.com/emicklei/go-restful"
 
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/apiserver/pkg/util/trie"
 )
 
-var verbs = util.CreateTrie([]string{"get", "log", "read", "replace", "patch", "delete", "deletecollection", "watch", "connect", "proxy", "list", "create", "patch"})
+var verbs = trie.New([]string{"get", "log", "read", "replace", "patch", "delete", "deletecollection", "watch", "connect", "proxy", "list", "create", "patch"})
 
 // ToValidOperationID makes an string a valid op ID (e.g. removing punctuations and whitespaces and make it camel case)
 func ToValidOperationID(s string, capitalizeFirstLetter bool) string {

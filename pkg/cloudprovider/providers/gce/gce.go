@@ -35,7 +35,7 @@ import (
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/client-go/pkg/util/flowcontrol"
+	"k8s.io/client-go/util/flowcontrol"
 	"k8s.io/kubernetes/pkg/api/v1"
 	apiservice "k8s.io/kubernetes/pkg/api/v1/service"
 	"k8s.io/kubernetes/pkg/cloudprovider"

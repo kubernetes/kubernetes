@@ -29,9 +29,10 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
+	"k8s.io/client-go/tools/cache"
 	"k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/client/cache"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
+	"k8s.io/kubernetes/pkg/client/legacylisters"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/util/metrics"
@@ -55,7 +56,7 @@ type RouteController struct {
 	clusterCIDR *net.IPNet
 	// Node framework and store
 	nodeController cache.Controller
-	nodeStore      cache.StoreToNodeLister
+	nodeStore      listers.StoreToNodeLister
 }
 
 func New(routes cloudprovider.Routes, kubeClient clientset.Interface, clusterName string, clusterCIDR *net.IPNet) *RouteController {
@@ -71,10 +72,10 @@ func New(routes cloudprovider.Routes, kubeClient clientset.Interface, clusterNam
 
 	rc.nodeStore.Store, rc.nodeController = cache.NewInformer(
 		&cache.ListWatch{
-			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
+			ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
 				return rc.kubeClient.Core().Nodes().List(options)
 			},
-			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
+			WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
 				return rc.kubeClient.Core().Nodes().Watch(options)
 			},
 		},

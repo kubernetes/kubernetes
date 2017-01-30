@@ -20,8 +20,8 @@ import (
 	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/util/uuid"
 	"k8s.io/kubernetes/test/e2e/framework"
 
 	"fmt"
@@ -114,7 +114,7 @@ var _ = framework.KubeDescribe("Kubelet Volume Manager", func() {
 						})
 						err = framework.WaitForPodSuccessInNamespace(f.ClientSet, pod.Name, f.Namespace.Name)
 						gp := int64(1)
-						f.PodClient().Delete(pod.Name, &v1.DeleteOptions{GracePeriodSeconds: &gp})
+						f.PodClient().Delete(pod.Name, &metav1.DeleteOptions{GracePeriodSeconds: &gp})
 						if err == nil {
 							break
 						}

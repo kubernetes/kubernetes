@@ -924,8 +924,8 @@ type SecretVolumeSource struct {
 	// key and content is the value. If specified, the listed keys will be
 	// projected into the specified paths, and unlisted keys will not be
 	// present. If a key is specified which is not present in the Secret,
-	// the volume setup will error. Paths must be relative and may not contain
-	// the '..' path or start with '..'.
+	// the volume setup will error unless it is marked optional. Paths must be
+	// relative and may not contain the '..' path or start with '..'.
 	// +optional
 	Items []KeyToPath `json:"items,omitempty" protobuf:"bytes,2,rep,name=items"`
 	// Optional: mode bits to use on created files by default. Must be a
@@ -935,6 +935,9 @@ type SecretVolumeSource struct {
 	// mode, like fsGroup, and the result can be other mode bits set.
 	// +optional
 	DefaultMode *int32 `json:"defaultMode,omitempty" protobuf:"bytes,3,opt,name=defaultMode"`
+	// Specify whether the Secret or it's keys must be defined
+	// +optional
+	Optional *bool `json:"optional,omitempty" protobuf:"varint,4,opt,name=optional"`
 }
 
 const (
@@ -1081,8 +1084,8 @@ type ConfigMapVolumeSource struct {
 	// key and content is the value. If specified, the listed keys will be
 	// projected into the specified paths, and unlisted keys will not be
 	// present. If a key is specified which is not present in the ConfigMap,
-	// the volume setup will error. Paths must be relative and may not contain
-	// the '..' path or start with '..'.
+	// the volume setup will error unless it is marked optional. Paths must be
+	// relative and may not contain the '..' path or start with '..'.
 	// +optional
 	Items []KeyToPath `json:"items,omitempty" protobuf:"bytes,2,rep,name=items"`
 	// Optional: mode bits to use on created files by default. Must be a
@@ -1092,6 +1095,9 @@ type ConfigMapVolumeSource struct {
 	// mode, like fsGroup, and the result can be other mode bits set.
 	// +optional
 	DefaultMode *int32 `json:"defaultMode,omitempty" protobuf:"varint,3,opt,name=defaultMode"`
+	// Specify whether the ConfigMap or it's keys must be defined
+	// +optional
+	Optional *bool `json:"optional,omitempty" protobuf:"varint,4,opt,name=optional"`
 }
 
 const (
@@ -1225,6 +1231,9 @@ type ConfigMapKeySelector struct {
 	LocalObjectReference `json:",inline" protobuf:"bytes,1,opt,name=localObjectReference"`
 	// The key to select.
 	Key string `json:"key" protobuf:"bytes,2,opt,name=key"`
+	// Specify whether the ConfigMap or it's key must be defined
+	// +optional
+	Optional *bool `json:"optional,omitempty" protobuf:"varint,3,opt,name=optional"`
 }
 
 // SecretKeySelector selects a key of a Secret.
@@ -1233,6 +1242,9 @@ type SecretKeySelector struct {
 	LocalObjectReference `json:",inline" protobuf:"bytes,1,opt,name=localObjectReference"`
 	// The key of the secret to select from.  Must be a valid secret key.
 	Key string `json:"key" protobuf:"bytes,2,opt,name=key"`
+	// Specify whether the Secret or it's key must be defined
+	// +optional
+	Optional *bool `json:"optional,omitempty" protobuf:"varint,3,opt,name=optional"`
 }
 
 // EnvFromSource represents the source of a set of ConfigMaps
@@ -1243,6 +1255,9 @@ type EnvFromSource struct {
 	// The ConfigMap to select from
 	// +optional
 	ConfigMapRef *ConfigMapEnvSource `json:"configMapRef,omitempty" protobuf:"bytes,2,opt,name=configMapRef"`
+	// The Secret to select from
+	// +optional
+	SecretRef *SecretEnvSource `json:"secretRef,omitempty" protobuf:"bytes,3,opt,name=secretRef"`
 }
 
 // ConfigMapEnvSource selects a ConfigMap to populate the environment
@@ -1253,6 +1268,22 @@ type EnvFromSource struct {
 type ConfigMapEnvSource struct {
 	// The ConfigMap to select from.
 	LocalObjectReference `json:",inline" protobuf:"bytes,1,opt,name=localObjectReference"`
+	// Specify whether the ConfigMap must be defined
+	// +optional
+	Optional *bool `json:"optional,omitempty" protobuf:"varint,2,opt,name=optional"`
+}
+
+// SecretEnvSource selects a Secret to populate the environment
+// variables with.
+//
+// The contents of the target Secret's Data field will represent the
+// key-value pairs as environment variables.
+type SecretEnvSource struct {
+	// The Secret to select from.
+	LocalObjectReference `json:",inline" protobuf:"bytes,1,opt,name=localObjectReference"`
+	// Specify whether the Secret must be defined
+	// +optional
+	Optional *bool `json:"optional,omitempty" protobuf:"varint,2,opt,name=optional"`
 }
 
 // HTTPHeader describes a custom header to be used in HTTP probes
@@ -1352,6 +1383,19 @@ const (
 	PullNever PullPolicy = "Never"
 	// PullIfNotPresent means that kubelet pulls if the image isn't present on disk. Container will fail if the image isn't present and the pull fails.
 	PullIfNotPresent PullPolicy = "IfNotPresent"
+)
+
+// TerminationMessagePolicy describes how termination messages are retrieved from a container.
+type TerminationMessagePolicy string
+
+const (
+	// TerminationMessageReadFile is the default behavior and will set the container status message to
+	// the contents of the container's terminationMessagePath when the container exits.
+	TerminationMessageReadFile TerminationMessagePolicy = "File"
+	// TerminationMessageFallbackToLogsOnError will read the most recent contents of the container logs
+	// for the container status message when the container exits with an error and the
+	// terminationMessagePath has no contents.
+	TerminationMessageFallbackToLogsOnError TerminationMessagePolicy = "FallbackToLogsOnError"
 )
 
 // Capability represent POSIX capabilities type
@@ -1471,10 +1515,21 @@ type Container struct {
 	// Optional: Path at which the file to which the container's termination message
 	// will be written is mounted into the container's filesystem.
 	// Message written is intended to be brief final status, such as an assertion failure message.
+	// Will be truncated by the node if greater than 4096 bytes. The total message length across
+	// all containers will be limited to 12kb.
 	// Defaults to /dev/termination-log.
 	// Cannot be updated.
 	// +optional
 	TerminationMessagePath string `json:"terminationMessagePath,omitempty" protobuf:"bytes,13,opt,name=terminationMessagePath"`
+	// Indicate how the termination message should be populated. File will use the contents of
+	// terminationMessagePath to populate the container status message on both success and failure.
+	// FallbackToLogsOnError will use the last chunk of container log output if the termination
+	// message file is empty and the container exited with an error.
+	// The log output is limited to 2048 bytes or 80 lines, whichever is smaller.
+	// Defaults to File.
+	// Cannot be updated.
+	// +optional
+	TerminationMessagePolicy TerminationMessagePolicy `json:"terminationMessagePolicy,omitempty" protobuf:"bytes,20,opt,name=terminationMessagePolicy,casttype=TerminationMessagePolicy"`
 	// Image pull policy.
 	// One of Always, Never, IfNotPresent.
 	// Defaults to Always if :latest tag is specified, or IfNotPresent otherwise.
@@ -2140,6 +2195,10 @@ type PodSpec struct {
 	// If specified, the pod's scheduling constraints
 	// +optional
 	Affinity *Affinity `json:"affinity,omitempty" protobuf:"bytes,18,opt,name=affinity"`
+	// If specified, the pod will be dispatched by specified scheduler.
+	// If not specified, the pod will be dispatched by default scheduler.
+	// +optional
+	SchedulerName string `json:"schedulername,omitempty" protobuf:"bytes,19,opt,name=schedulername"`
 }
 
 // PodSecurityContext holds pod-level security attributes and common container settings.
@@ -3238,6 +3297,7 @@ type Binding struct {
 }
 
 // Preconditions must be fulfilled before an operation (update, delete, etc.) is carried out.
+// +k8s:openapi-gen=false
 type Preconditions struct {
 	// Specifies the target UID.
 	// +optional
@@ -3245,6 +3305,8 @@ type Preconditions struct {
 }
 
 // DeleteOptions may be provided when deleting an API object
+// DEPRECATED: This type has been moved to meta/v1 and will be removed soon.
+// +k8s:openapi-gen=false
 type DeleteOptions struct {
 	metav1.TypeMeta `json:",inline"`
 
@@ -3267,6 +3329,8 @@ type DeleteOptions struct {
 }
 
 // ListOptions is the query options to a standard REST list call.
+// DEPRECATED: This type has been moved to meta/v1 and will be removed soon.
+// +k8s:openapi-gen=false
 type ListOptions struct {
 	metav1.TypeMeta `json:",inline"`
 
@@ -3404,6 +3468,21 @@ type PodExecOptions struct {
 
 	// Command is the remote command to execute. argv array. Not executed within a shell.
 	Command []string `json:"command" protobuf:"bytes,6,rep,name=command"`
+}
+
+// PodPortForwardOptions is the query options to a Pod's port forward call
+// when using WebSockets.
+// The `port` query parameter must specify the port or
+// ports (comma separated) to forward over.
+// Port forwarding over SPDY does not use these options. It requires the port
+// to be passed in the `port` header as part of request.
+type PodPortForwardOptions struct {
+	metav1.TypeMeta `json:",inline"`
+
+	// List of ports to forward
+	// Required when using WebSockets
+	// +optional
+	Ports []int32 `json:"ports,omitempty" protobuf:"varint,1,rep,name=ports"`
 }
 
 // PodProxyOptions is the query options to a Pod's proxy call.

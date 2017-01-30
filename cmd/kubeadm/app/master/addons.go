@@ -20,12 +20,13 @@ import (
 	"fmt"
 	"net"
 	"path"
+	"runtime"
 
+	"k8s.io/apimachinery/pkg/api/resource"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	"k8s.io/kubernetes/cmd/kubeadm/app/images"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/kubeconfig"
-	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/pkg/registry/core/service/ipallocator"
@@ -78,6 +79,23 @@ func createKubeProxyPodSpec(cfg *kubeadmapi.MasterConfiguration) v1.PodSpec {
 				Name: "dbus",
 				VolumeSource: v1.VolumeSource{
 					HostPath: &v1.HostPathVolumeSource{Path: "/var/run/dbus"},
+				},
+			},
+		},
+		Affinity: &v1.Affinity{
+			NodeAffinity: &v1.NodeAffinity{
+				RequiredDuringSchedulingIgnoredDuringExecution: &v1.NodeSelector{
+					NodeSelectorTerms: []v1.NodeSelectorTerm{
+						{
+							MatchExpressions: []v1.NodeSelectorRequirement{
+								{
+									Key:      "beta.kubernetes.io/arch",
+									Operator: v1.NodeSelectorOpIn,
+									Values:   []string{runtime.GOARCH},
+								},
+							},
+						},
+					},
 				},
 			},
 		},
@@ -240,6 +258,23 @@ func createKubeDNSPodSpec(cfg *kubeadmapi.MasterConfiguration) v1.PodSpec {
 			},
 		},
 		DNSPolicy: v1.DNSDefault,
+		Affinity: &v1.Affinity{
+			NodeAffinity: &v1.NodeAffinity{
+				RequiredDuringSchedulingIgnoredDuringExecution: &v1.NodeSelector{
+					NodeSelectorTerms: []v1.NodeSelectorTerm{
+						{
+							MatchExpressions: []v1.NodeSelectorRequirement{
+								{
+									Key:      "beta.kubernetes.io/arch",
+									Operator: v1.NodeSelectorOpIn,
+									Values:   []string{runtime.GOARCH},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
 	}
 }
 
@@ -266,9 +301,8 @@ func createKubeDNSServiceSpec(cfg *kubeadmapi.MasterConfiguration) (*v1.ServiceS
 func CreateEssentialAddons(cfg *kubeadmapi.MasterConfiguration, client *clientset.Clientset) error {
 	kubeProxyDaemonSet := NewDaemonSet(kubeProxy, createKubeProxyPodSpec(cfg))
 	SetMasterTaintTolerations(&kubeProxyDaemonSet.Spec.Template.ObjectMeta)
-	SetNodeAffinity(&kubeProxyDaemonSet.Spec.Template.ObjectMeta, NativeArchitectureNodeAffinity())
 
-	if _, err := client.Extensions().DaemonSets(api.NamespaceSystem).Create(kubeProxyDaemonSet); err != nil {
+	if _, err := client.Extensions().DaemonSets(metav1.NamespaceSystem).Create(kubeProxyDaemonSet); err != nil {
 		return fmt.Errorf("failed creating essential kube-proxy addon [%v]", err)
 	}
 
@@ -276,13 +310,12 @@ func CreateEssentialAddons(cfg *kubeadmapi.MasterConfiguration, client *clientse
 
 	kubeDNSDeployment := NewDeployment(KubeDNS, 1, createKubeDNSPodSpec(cfg))
 	SetMasterTaintTolerations(&kubeDNSDeployment.Spec.Template.ObjectMeta)
-	SetNodeAffinity(&kubeDNSDeployment.Spec.Template.ObjectMeta, NativeArchitectureNodeAffinity())
 	kubeDNSServiceAccount := &v1.ServiceAccount{}
 	kubeDNSServiceAccount.ObjectMeta.Name = KubeDNS
-	if _, err := client.ServiceAccounts(api.NamespaceSystem).Create(kubeDNSServiceAccount); err != nil {
+	if _, err := client.ServiceAccounts(metav1.NamespaceSystem).Create(kubeDNSServiceAccount); err != nil {
 		return fmt.Errorf("failed creating kube-dns service account [%v]", err)
 	}
-	if _, err := client.Extensions().Deployments(api.NamespaceSystem).Create(kubeDNSDeployment); err != nil {
+	if _, err := client.Extensions().Deployments(metav1.NamespaceSystem).Create(kubeDNSDeployment); err != nil {
 		return fmt.Errorf("failed creating essential kube-dns addon [%v]", err)
 	}
 
@@ -293,7 +326,7 @@ func CreateEssentialAddons(cfg *kubeadmapi.MasterConfiguration, client *clientse
 
 	kubeDNSService := NewService(KubeDNS, *kubeDNSServiceSpec)
 	kubeDNSService.ObjectMeta.Labels["kubernetes.io/name"] = "KubeDNS"
-	if _, err := client.Services(api.NamespaceSystem).Create(kubeDNSService); err != nil {
+	if _, err := client.Services(metav1.NamespaceSystem).Create(kubeDNSService); err != nil {
 		return fmt.Errorf("failed creating essential kube-dns addon [%v]", err)
 	}
 

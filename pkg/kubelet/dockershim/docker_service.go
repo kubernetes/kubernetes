@@ -21,7 +21,6 @@ import (
 	"net/http"
 
 	"github.com/golang/glog"
-	"github.com/golang/protobuf/proto"
 
 	"k8s.io/kubernetes/pkg/apis/componentconfig"
 	internalapi "k8s.io/kubernetes/pkg/kubelet/api"
@@ -102,7 +101,7 @@ var internalLabelKeys []string = []string{containerTypeLabelKey, containerLogPat
 
 // NOTE: Anything passed to DockerService should be eventually handled in another way when we switch to running the shim as a different process.
 func NewDockerService(client dockertools.DockerInterface, seccompProfileRoot string, podSandboxImage string, streamingConfig *streaming.Config,
-	pluginSettings *NetworkPluginSettings, cgroupsName string, kubeCgroupDriver string) (DockerService, error) {
+	pluginSettings *NetworkPluginSettings, cgroupsName string, kubeCgroupDriver string, execHandler dockertools.ExecHandler) (DockerService, error) {
 	c := dockertools.NewInstrumentedDockerInterface(client)
 	ds := &dockerService{
 		seccompProfileRoot: seccompProfileRoot,
@@ -110,10 +109,8 @@ func NewDockerService(client dockertools.DockerInterface, seccompProfileRoot str
 		os:                 kubecontainer.RealOS{},
 		podSandboxImage:    podSandboxImage,
 		streamingRuntime: &streamingRuntime{
-			client: client,
-			// Only the native exec handling is supported for now.
-			// TODO(#35747) - Either deprecate nsenter exec handling, or add support for it here.
-			execHandler: &dockertools.NativeExecHandler{},
+			client:      client,
+			execHandler: execHandler,
 		},
 		containerManager: cm.NewContainerManager(cgroupsName, client),
 	}
@@ -191,10 +188,10 @@ func (ds *dockerService) Version(_ string) (*runtimeapi.VersionResponse, error) 
 	// suffix to remedy this.
 	apiVersion := fmt.Sprintf("%s.0", v.APIVersion)
 	return &runtimeapi.VersionResponse{
-		Version:           &runtimeAPIVersion,
-		RuntimeName:       &name,
-		RuntimeVersion:    &v.Version,
-		RuntimeApiVersion: &apiVersion,
+		Version:           runtimeAPIVersion,
+		RuntimeName:       name,
+		RuntimeVersion:    v.Version,
+		RuntimeApiVersion: apiVersion,
 	}, nil
 }
 
@@ -204,9 +201,9 @@ func (ds *dockerService) UpdateRuntimeConfig(runtimeConfig *runtimeapi.RuntimeCo
 		return
 	}
 	glog.Infof("docker cri received runtime config %+v", runtimeConfig)
-	if ds.networkPlugin != nil && runtimeConfig.NetworkConfig.PodCidr != nil {
+	if ds.networkPlugin != nil && runtimeConfig.NetworkConfig.PodCidr != "" {
 		event := make(map[string]interface{})
-		event[network.NET_PLUGIN_EVENT_POD_CIDR_CHANGE_DETAIL_CIDR] = *runtimeConfig.NetworkConfig.PodCidr
+		event[network.NET_PLUGIN_EVENT_POD_CIDR_CHANGE_DETAIL_CIDR] = runtimeConfig.NetworkConfig.PodCidr
 		ds.networkPlugin.Event(network.NET_PLUGIN_EVENT_POD_CIDR_CHANGE, event)
 	}
 	return
@@ -246,23 +243,23 @@ func (ds *dockerService) Start() error {
 // TODO(random-liu): Set network condition accordingly here.
 func (ds *dockerService) Status() (*runtimeapi.RuntimeStatus, error) {
 	runtimeReady := &runtimeapi.RuntimeCondition{
-		Type:   proto.String(runtimeapi.RuntimeReady),
-		Status: proto.Bool(true),
+		Type:   runtimeapi.RuntimeReady,
+		Status: true,
 	}
 	networkReady := &runtimeapi.RuntimeCondition{
-		Type:   proto.String(runtimeapi.NetworkReady),
-		Status: proto.Bool(true),
+		Type:   runtimeapi.NetworkReady,
+		Status: true,
 	}
 	conditions := []*runtimeapi.RuntimeCondition{runtimeReady, networkReady}
 	if _, err := ds.client.Version(); err != nil {
-		runtimeReady.Status = proto.Bool(false)
-		runtimeReady.Reason = proto.String("DockerDaemonNotReady")
-		runtimeReady.Message = proto.String(fmt.Sprintf("docker: failed to get docker version: %v", err))
+		runtimeReady.Status = false
+		runtimeReady.Reason = "DockerDaemonNotReady"
+		runtimeReady.Message = fmt.Sprintf("docker: failed to get docker version: %v", err)
 	}
 	if err := ds.networkPlugin.Status(); err != nil {
-		networkReady.Status = proto.Bool(false)
-		networkReady.Reason = proto.String("NetworkPluginNotReady")
-		networkReady.Message = proto.String(fmt.Sprintf("docker: network plugin is not ready: %v", err))
+		networkReady.Status = false
+		networkReady.Reason = "NetworkPluginNotReady"
+		networkReady.Message = fmt.Sprintf("docker: network plugin is not ready: %v", err)
 	}
 	return &runtimeapi.RuntimeStatus{Conditions: conditions}, nil
 }

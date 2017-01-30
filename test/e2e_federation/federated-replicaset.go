@@ -63,7 +63,7 @@ var _ = framework.KubeDescribe("Federation replicasets [Feature:Federation]", fu
 			replicaset := createReplicaSetOrFail(f.FederationClientset, nsName)
 			By(fmt.Sprintf("Creation of replicaset %q in namespace %q succeeded.  Deleting replicaset.", replicaset.Name, nsName))
 			// Cleanup
-			err := f.FederationClientset.Extensions().ReplicaSets(nsName).Delete(replicaset.Name, &v1.DeleteOptions{})
+			err := f.FederationClientset.Extensions().ReplicaSets(nsName).Delete(replicaset.Name, &metav1.DeleteOptions{})
 			framework.ExpectNoError(err, "Error deleting replicaset %q in namespace %q", replicaset.Name, replicaset.Namespace)
 			By(fmt.Sprintf("Deletion of replicaset %q in namespace %q succeeded.", replicaset.Name, nsName))
 		})
@@ -102,7 +102,7 @@ var _ = framework.KubeDescribe("Federation replicasets [Feature:Federation]", fu
 				rs.Spec.Replicas = &replicas
 				f.FederationClientset.ReplicaSets(nsName).Update(rs)
 				waitForReplicaSetOrFail(f.FederationClientset, nsName, rs.Name, clusters)
-				f.FederationClientset.ReplicaSets(nsName).Delete(rs.Name, &v1.DeleteOptions{})
+				f.FederationClientset.ReplicaSets(nsName).Delete(rs.Name, &metav1.DeleteOptions{})
 			}()
 
 			waitForReplicaSetOrFail(f.FederationClientset, nsName, rs.Name, clusters)
@@ -139,7 +139,7 @@ var _ = framework.KubeDescribe("Federation replicasets [Feature:Federation]", fu
 
 // deleteAllReplicaSetsOrFail deletes all replicasets in the given namespace name.
 func deleteAllReplicaSetsOrFail(clientset *fedclientset.Clientset, nsName string) {
-	replicasetList, err := clientset.Extensions().ReplicaSets(nsName).List(v1.ListOptions{})
+	replicasetList, err := clientset.Extensions().ReplicaSets(nsName).List(metav1.ListOptions{})
 	Expect(err).NotTo(HaveOccurred())
 	orphanDependents := false
 	for _, replicaset := range replicasetList.Items {
@@ -247,7 +247,7 @@ func createReplicaSetOrFail(clientset *fedclientset.Clientset, namespace string)
 
 func deleteReplicaSetOrFail(clientset *fedclientset.Clientset, nsName string, replicaSetName string, orphanDependents *bool) {
 	By(fmt.Sprintf("Deleting replica set %q in namespace %q", replicaSetName, nsName))
-	err := clientset.Extensions().ReplicaSets(nsName).Delete(replicaSetName, &v1.DeleteOptions{OrphanDependents: orphanDependents})
+	err := clientset.Extensions().ReplicaSets(nsName).Delete(replicaSetName, &metav1.DeleteOptions{OrphanDependents: orphanDependents})
 	framework.ExpectNoError(err, "Error deleting replica set %q in namespace %q", replicaSetName, nsName)
 
 	// Wait for the replicaSet to be deleted.

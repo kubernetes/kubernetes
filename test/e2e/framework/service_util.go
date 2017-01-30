@@ -30,13 +30,13 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/api/v1/service"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/util/intstr"
-	"k8s.io/kubernetes/pkg/util/uuid"
 	testutils "k8s.io/kubernetes/test/utils"
 
 	. "github.com/onsi/ginkgo"
@@ -552,7 +552,7 @@ func (j *ServiceTestJig) waitForPodsCreated(namespace string, replicas int) ([]s
 	label := labels.SelectorFromSet(labels.Set(j.Labels))
 	Logf("Waiting up to %v for %d pods to be created", timeout, replicas)
 	for start := time.Now(); time.Since(start) < timeout; time.Sleep(2 * time.Second) {
-		options := v1.ListOptions{LabelSelector: label.String()}
+		options := metav1.ListOptions{LabelSelector: label.String()}
 		pods, err := j.Client.Core().Pods(namespace).List(options)
 		if err != nil {
 			return nil, err
@@ -1001,7 +1001,7 @@ func ValidateEndpointsOrFail(c clientset.Interface, namespace, serviceName strin
 		i++
 	}
 
-	if pods, err := c.Core().Pods(v1.NamespaceAll).List(v1.ListOptions{}); err == nil {
+	if pods, err := c.Core().Pods(metav1.NamespaceAll).List(metav1.ListOptions{}); err == nil {
 		for _, pod := range pods.Items {
 			Logf("Pod %s\t%s\t%s\t%s", pod.Namespace, pod.Name, pod.Spec.NodeName, pod.DeletionTimestamp)
 		}

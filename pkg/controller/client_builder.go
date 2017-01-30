@@ -26,12 +26,12 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/watch"
 	apiserverserviceaccount "k8s.io/apiserver/pkg/authentication/serviceaccount"
+	restclient "k8s.io/client-go/rest"
+	"k8s.io/client-go/tools/cache"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/client/cache"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	v1core "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/core/v1"
-	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/serviceaccount"
 
 	"github.com/golang/glog"
@@ -122,11 +122,11 @@ func (b SAControllerClientBuilder) Config(name string) (*restclient.Config, erro
 	}
 
 	lw := &cache.ListWatch{
-		ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
+		ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
 			options.FieldSelector = fields.SelectorFromSet(map[string]string{api.SecretTypeField: string(v1.SecretTypeServiceAccountToken)}).String()
 			return b.CoreClient.Secrets(b.Namespace).List(options)
 		},
-		WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
+		WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
 			options.FieldSelector = fields.SelectorFromSet(map[string]string{api.SecretTypeField: string(v1.SecretTypeServiceAccountToken)}).String()
 			return b.CoreClient.Secrets(b.Namespace).Watch(options)
 		},

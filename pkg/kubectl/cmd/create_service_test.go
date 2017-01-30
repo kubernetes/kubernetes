@@ -21,8 +21,8 @@ import (
 	"net/http"
 	"testing"
 
+	"k8s.io/client-go/rest/fake"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/client/restclient/fake"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
 )
 
@@ -32,6 +32,7 @@ func TestCreateService(t *testing.T) {
 	f, tf, codec, negSer := cmdtesting.NewAPIFactory()
 	tf.Printer = &testPrinter{}
 	tf.Client = &fake.RESTClient{
+		APIRegistry:          api.Registry,
 		NegotiatedSerializer: negSer,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch p, m := req.URL.Path, req.Method; {

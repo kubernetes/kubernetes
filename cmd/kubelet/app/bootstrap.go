@@ -26,12 +26,12 @@ import (
 	"github.com/golang/glog"
 
 	"k8s.io/apimachinery/pkg/types"
+	restclient "k8s.io/client-go/rest"
+	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
-	unversionedcertificates "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/certificates/v1alpha1"
-	"k8s.io/kubernetes/pkg/client/restclient"
-	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
+	certutil "k8s.io/client-go/util/cert"
+	certificates "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/certificates/v1beta1"
 	"k8s.io/kubernetes/pkg/kubelet/util/csr"
-	certutil "k8s.io/kubernetes/pkg/util/cert"
 )
 
 const (
@@ -62,7 +62,7 @@ func bootstrapClientCert(kubeconfigPath string, bootstrapPath string, certDir st
 	if err != nil {
 		return fmt.Errorf("unable to load bootstrap kubeconfig: %v", err)
 	}
-	bootstrapClient, err := unversionedcertificates.NewForConfig(bootstrapClientConfig)
+	bootstrapClient, err := certificates.NewForConfig(bootstrapClientConfig)
 	if err != nil {
 		return fmt.Errorf("unable to create certificates signing request client: %v", err)
 	}

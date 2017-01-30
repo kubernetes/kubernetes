@@ -44,7 +44,7 @@ func validNewCronJob() *batch.CronJob {
 	return &batch.CronJob{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "foo",
-			Namespace: api.NamespaceDefault,
+			Namespace: metav1.NamespaceDefault,
 		},
 		Spec: batch.CronJobSpec{
 			Schedule:          "* * * * ?",

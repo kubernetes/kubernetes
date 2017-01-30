@@ -45,13 +45,13 @@ func TestCronJobStrategy(t *testing.T) {
 		Spec: api.PodSpec{
 			RestartPolicy: api.RestartPolicyOnFailure,
 			DNSPolicy:     api.DNSClusterFirst,
-			Containers:    []api.Container{{Name: "abc", Image: "image", ImagePullPolicy: "IfNotPresent"}},
+			Containers:    []api.Container{{Name: "abc", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: api.TerminationMessageReadFile}},
 		},
 	}
 	scheduledJob := &batch.CronJob{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "mycronjob",
-			Namespace: api.NamespaceDefault,
+			Namespace: metav1.NamespaceDefault,
 		},
 		Spec: batch.CronJobSpec{
 			Schedule:          "* * * * ?",
@@ -106,14 +106,14 @@ func TestCronJobStatusStrategy(t *testing.T) {
 		Spec: api.PodSpec{
 			RestartPolicy: api.RestartPolicyOnFailure,
 			DNSPolicy:     api.DNSClusterFirst,
-			Containers:    []api.Container{{Name: "abc", Image: "image", ImagePullPolicy: "IfNotPresent"}},
+			Containers:    []api.Container{{Name: "abc", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: api.TerminationMessageReadFile}},
 		},
 	}
 	oldSchedule := "* * * * ?"
 	oldCronJob := &batch.CronJob{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:            "mycronjob",
-			Namespace:       api.NamespaceDefault,
+			Namespace:       metav1.NamespaceDefault,
 			ResourceVersion: "10",
 		},
 		Spec: batch.CronJobSpec{
@@ -130,7 +130,7 @@ func TestCronJobStatusStrategy(t *testing.T) {
 	newCronJob := &batch.CronJob{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:            "mycronjob",
-			Namespace:       api.NamespaceDefault,
+			Namespace:       metav1.NamespaceDefault,
 			ResourceVersion: "9",
 		},
 		Spec: batch.CronJobSpec{

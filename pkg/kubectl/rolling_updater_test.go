@@ -31,21 +31,21 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
+	restclient "k8s.io/client-go/rest"
+	manualfake "k8s.io/client-go/rest/fake"
+	testcore "k8s.io/client-go/testing"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/fake"
-	"k8s.io/kubernetes/pkg/client/restclient"
-	manualfake "k8s.io/kubernetes/pkg/client/restclient/fake"
-	testcore "k8s.io/kubernetes/pkg/client/testing/core"
 	"k8s.io/kubernetes/pkg/util/intstr"
 )
 
 func oldRc(replicas int, original int) *api.ReplicationController {
 	return &api.ReplicationController{
 		ObjectMeta: metav1.ObjectMeta{
-			Namespace: api.NamespaceDefault,
+			Namespace: metav1.NamespaceDefault,
 			Name:      "foo-v1",
 			UID:       "7764ae47-9092-11e4-8393-42010af018ff",
 			Annotations: map[string]string{
@@ -78,7 +78,7 @@ func newRc(replicas int, desired int) *api.ReplicationController {
 	}
 	rc.Spec.Selector = map[string]string{"version": "v2"}
 	rc.ObjectMeta = metav1.ObjectMeta{
-		Namespace: api.NamespaceDefault,
+		Namespace: metav1.NamespaceDefault,
 		Name:      "foo-v2",
 		Annotations: map[string]string{
 			desiredReplicasAnnotation: fmt.Sprintf("%d", desired),
@@ -949,7 +949,7 @@ func TestRollingUpdater_multipleContainersInPod(t *testing.T) {
 		{
 			oldRc: &api.ReplicationController{
 				ObjectMeta: metav1.ObjectMeta{
-					Namespace: api.NamespaceDefault,
+					Namespace: metav1.NamespaceDefault,
 					Name:      "foo",
 				},
 				Spec: api.ReplicationControllerSpec{
@@ -979,7 +979,7 @@ func TestRollingUpdater_multipleContainersInPod(t *testing.T) {
 			},
 			newRc: &api.ReplicationController{
 				ObjectMeta: metav1.ObjectMeta{
-					Namespace: api.NamespaceDefault,
+					Namespace: metav1.NamespaceDefault,
 					Name:      "foo",
 				},
 				Spec: api.ReplicationControllerSpec{
@@ -1014,7 +1014,7 @@ func TestRollingUpdater_multipleContainersInPod(t *testing.T) {
 		{
 			oldRc: &api.ReplicationController{
 				ObjectMeta: metav1.ObjectMeta{
-					Namespace: api.NamespaceDefault,
+					Namespace: metav1.NamespaceDefault,
 					Name:      "bar",
 				},
 				Spec: api.ReplicationControllerSpec{
@@ -1040,7 +1040,7 @@ func TestRollingUpdater_multipleContainersInPod(t *testing.T) {
 			},
 			newRc: &api.ReplicationController{
 				ObjectMeta: metav1.ObjectMeta{
-					Namespace: api.NamespaceDefault,
+					Namespace: metav1.NamespaceDefault,
 					Name:      "bar",
 				},
 				Spec: api.ReplicationControllerSpec{
@@ -1085,7 +1085,7 @@ func TestRollingUpdater_multipleContainersInPod(t *testing.T) {
 		test.newRc.Name = fmt.Sprintf("%s-%s", test.newRc.Name, deploymentHash)
 
 		config := &NewControllerConfig{
-			Namespace:     api.NamespaceDefault,
+			Namespace:     metav1.NamespaceDefault,
 			OldName:       test.oldRc.ObjectMeta.Name,
 			NewName:       test.newRc.ObjectMeta.Name,
 			Image:         test.image,
@@ -1229,7 +1229,7 @@ func TestRollingUpdater_cleanupWithClients_Rename(t *testing.T) {
 func TestFindSourceController(t *testing.T) {
 	ctrl1 := api.ReplicationController{
 		ObjectMeta: metav1.ObjectMeta{
-			Namespace: api.NamespaceDefault,
+			Namespace: metav1.NamespaceDefault,
 			Name:      "foo",
 			Annotations: map[string]string{
 				sourceIdAnnotation: "bar:1234",
@@ -1238,7 +1238,7 @@ func TestFindSourceController(t *testing.T) {
 	}
 	ctrl2 := api.ReplicationController{
 		ObjectMeta: metav1.ObjectMeta{
-			Namespace: api.NamespaceDefault,
+			Namespace: metav1.NamespaceDefault,
 			Name:      "bar",
 			Annotations: map[string]string{
 				sourceIdAnnotation: "foo:12345",
@@ -1247,7 +1247,7 @@ func TestFindSourceController(t *testing.T) {
 	}
 	ctrl3 := api.ReplicationController{
 		ObjectMeta: metav1.ObjectMeta{
-			Namespace: api.NamespaceDefault,
+			Namespace: metav1.NamespaceDefault,
 			Name:      "baz",
 			Annotations: map[string]string{
 				sourceIdAnnotation: "baz:45667",
@@ -1329,7 +1329,7 @@ func TestUpdateExistingReplicationController(t *testing.T) {
 		{
 			rc: &api.ReplicationController{
 				ObjectMeta: metav1.ObjectMeta{
-					Namespace: api.NamespaceDefault,
+					Namespace: metav1.NamespaceDefault,
 					Name:      "foo",
 				},
 				Spec: api.ReplicationControllerSpec{
@@ -1342,7 +1342,7 @@ func TestUpdateExistingReplicationController(t *testing.T) {
 
 			expectedRc: &api.ReplicationController{
 				ObjectMeta: metav1.ObjectMeta{
-					Namespace: api.NamespaceDefault,
+					Namespace: metav1.NamespaceDefault,
 					Name:      "foo",
 					Annotations: map[string]string{
 						"kubectl.kubernetes.io/next-controller-id": "foo",
@@ -1365,7 +1365,7 @@ func TestUpdateExistingReplicationController(t *testing.T) {
 		{
 			rc: &api.ReplicationController{
 				ObjectMeta: metav1.ObjectMeta{
-					Namespace: api.NamespaceDefault,
+					Namespace: metav1.NamespaceDefault,
 					Name:      "foo",
 				},
 				Spec: api.ReplicationControllerSpec{
@@ -1387,7 +1387,7 @@ func TestUpdateExistingReplicationController(t *testing.T) {
 
 			expectedRc: &api.ReplicationController{
 				ObjectMeta: metav1.ObjectMeta{
-					Namespace: api.NamespaceDefault,
+					Namespace: metav1.NamespaceDefault,
 					Name:      "foo",
 					Annotations: map[string]string{
 						"kubectl.kubernetes.io/next-controller-id": "foo",
@@ -1466,6 +1466,7 @@ func TestUpdateRcWithRetries(t *testing.T) {
 		{StatusCode: 200, Header: header, Body: objBody(codec, rc)},
 	}
 	fakeClient := &manualfake.RESTClient{
+		APIRegistry:          api.Registry,
 		NegotiatedSerializer: testapi.Default.NegotiatedSerializer(),
 		Client: manualfake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch p, m := req.URL.Path, req.Method; {
@@ -1558,6 +1559,7 @@ func TestAddDeploymentHash(t *testing.T) {
 	seen := sets.String{}
 	updatedRc := false
 	fakeClient := &manualfake.RESTClient{
+		APIRegistry:          api.Registry,
 		NegotiatedSerializer: testapi.Default.NegotiatedSerializer(),
 		Client: manualfake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			header := http.Header{}
@@ -1597,7 +1599,7 @@ func TestAddDeploymentHash(t *testing.T) {
 	restClient.Client = fakeClient.Client
 	clientset := internalclientset.New(restClient)
 
-	if _, err := AddDeploymentKeyToReplicationController(rc, clientset.Core(), clientset.Core(), "dk", "hash", api.NamespaceDefault, buf); err != nil {
+	if _, err := AddDeploymentKeyToReplicationController(rc, clientset.Core(), clientset.Core(), "dk", "hash", metav1.NamespaceDefault, buf); err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
 	for _, pod := range podList.Items {
@@ -1625,7 +1627,7 @@ func TestRollingUpdater_readyPods(t *testing.T) {
 		}
 		return &api.Pod{
 			ObjectMeta: metav1.ObjectMeta{
-				Namespace: api.NamespaceDefault,
+				Namespace: metav1.NamespaceDefault,
 				Name:      fmt.Sprintf("pod-%d", count),
 				Labels:    labels,
 			},

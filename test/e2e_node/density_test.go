@@ -29,8 +29,8 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/watch"
+	"k8s.io/client-go/tools/cache"
 	"k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/client/cache"
 	"k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/stats"
 	kubemetrics "k8s.io/kubernetes/pkg/kubelet/metrics"
 	"k8s.io/kubernetes/pkg/metrics"
@@ -492,12 +492,12 @@ func newInformerWatchPod(f *framework.Framework, mutex *sync.Mutex, watchTimes m
 
 	_, controller := cache.NewInformer(
 		&cache.ListWatch{
-			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
+			ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
 				options.LabelSelector = labels.SelectorFromSet(labels.Set{"type": podType}).String()
 				obj, err := f.ClientSet.Core().Pods(ns).List(options)
 				return runtime.Object(obj), err
 			},
-			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
+			WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
 				options.LabelSelector = labels.SelectorFromSet(labels.Set{"type": podType}).String()
 				return f.ClientSet.Core().Pods(ns).Watch(options)
 			},

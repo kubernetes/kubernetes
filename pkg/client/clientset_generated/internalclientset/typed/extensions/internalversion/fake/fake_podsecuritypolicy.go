@@ -22,9 +22,8 @@ import (
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
-	api "k8s.io/kubernetes/pkg/api"
+	testing "k8s.io/client-go/testing"
 	extensions "k8s.io/kubernetes/pkg/apis/extensions"
-	core "k8s.io/kubernetes/pkg/client/testing/core"
 )
 
 // FakePodSecurityPolicies implements PodSecurityPolicyInterface
@@ -36,7 +35,7 @@ var podsecuritypoliciesResource = schema.GroupVersionResource{Group: "extensions
 
 func (c *FakePodSecurityPolicies) Create(podSecurityPolicy *extensions.PodSecurityPolicy) (result *extensions.PodSecurityPolicy, err error) {
 	obj, err := c.Fake.
-		Invokes(core.NewRootCreateAction(podsecuritypoliciesResource, podSecurityPolicy), &extensions.PodSecurityPolicy{})
+		Invokes(testing.NewRootCreateAction(podsecuritypoliciesResource, podSecurityPolicy), &extensions.PodSecurityPolicy{})
 	if obj == nil {
 		return nil, err
 	}
@@ -45,21 +44,21 @@ func (c *FakePodSecurityPolicies) Create(podSecurityPolicy *extensions.PodSecuri
 
 func (c *FakePodSecurityPolicies) Update(podSecurityPolicy *extensions.PodSecurityPolicy) (result *extensions.PodSecurityPolicy, err error) {
 	obj, err := c.Fake.
-		Invokes(core.NewRootUpdateAction(podsecuritypoliciesResource, podSecurityPolicy), &extensions.PodSecurityPolicy{})
+		Invokes(testing.NewRootUpdateAction(podsecuritypoliciesResource, podSecurityPolicy), &extensions.PodSecurityPolicy{})
 	if obj == nil {
 		return nil, err
 	}
 	return obj.(*extensions.PodSecurityPolicy), err
 }
 
-func (c *FakePodSecurityPolicies) Delete(name string, options *api.DeleteOptions) error {
+func (c *FakePodSecurityPolicies) Delete(name string, options *v1.DeleteOptions) error {
 	_, err := c.Fake.
-		Invokes(core.NewRootDeleteAction(podsecuritypoliciesResource, name), &extensions.PodSecurityPolicy{})
+		Invokes(testing.NewRootDeleteAction(podsecuritypoliciesResource, name), &extensions.PodSecurityPolicy{})
 	return err
 }
 
-func (c *FakePodSecurityPolicies) DeleteCollection(options *api.DeleteOptions, listOptions api.ListOptions) error {
-	action := core.NewRootDeleteCollectionAction(podsecuritypoliciesResource, listOptions)
+func (c *FakePodSecurityPolicies) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
+	action := testing.NewRootDeleteCollectionAction(podsecuritypoliciesResource, listOptions)
 
 	_, err := c.Fake.Invokes(action, &extensions.PodSecurityPolicyList{})
 	return err
@@ -67,21 +66,21 @@ func (c *FakePodSecurityPolicies) DeleteCollection(options *api.DeleteOptions, l
 
 func (c *FakePodSecurityPolicies) Get(name string, options v1.GetOptions) (result *extensions.PodSecurityPolicy, err error) {
 	obj, err := c.Fake.
-		Invokes(core.NewRootGetAction(podsecuritypoliciesResource, name), &extensions.PodSecurityPolicy{})
+		Invokes(testing.NewRootGetAction(podsecuritypoliciesResource, name), &extensions.PodSecurityPolicy{})
 	if obj == nil {
 		return nil, err
 	}
 	return obj.(*extensions.PodSecurityPolicy), err
 }
 
-func (c *FakePodSecurityPolicies) List(opts api.ListOptions) (result *extensions.PodSecurityPolicyList, err error) {
+func (c *FakePodSecurityPolicies) List(opts v1.ListOptions) (result *extensions.PodSecurityPolicyList, err error) {
 	obj, err := c.Fake.
-		Invokes(core.NewRootListAction(podsecuritypoliciesResource, opts), &extensions.PodSecurityPolicyList{})
+		Invokes(testing.NewRootListAction(podsecuritypoliciesResource, opts), &extensions.PodSecurityPolicyList{})
 	if obj == nil {
 		return nil, err
 	}
 
-	label, _, _ := core.ExtractFromListOptions(opts)
+	label, _, _ := testing.ExtractFromListOptions(opts)
 	if label == nil {
 		label = labels.Everything()
 	}
@@ -95,15 +94,15 @@ func (c *FakePodSecurityPolicies) List(opts api.ListOptions) (result *extensions
 }
 
 // Watch returns a watch.Interface that watches the requested podSecurityPolicies.
-func (c *FakePodSecurityPolicies) Watch(opts api.ListOptions) (watch.Interface, error) {
+func (c *FakePodSecurityPolicies) Watch(opts v1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
-		InvokesWatch(core.NewRootWatchAction(podsecuritypoliciesResource, opts))
+		InvokesWatch(testing.NewRootWatchAction(podsecuritypoliciesResource, opts))
 }
 
 // Patch applies the patch and returns the patched podSecurityPolicy.
 func (c *FakePodSecurityPolicies) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *extensions.PodSecurityPolicy, err error) {
 	obj, err := c.Fake.
-		Invokes(core.NewRootPatchSubresourceAction(podsecuritypoliciesResource, name, data, subresources...), &extensions.PodSecurityPolicy{})
+		Invokes(testing.NewRootPatchSubresourceAction(podsecuritypoliciesResource, name, data, subresources...), &extensions.PodSecurityPolicy{})
 	if obj == nil {
 		return nil, err
 	}

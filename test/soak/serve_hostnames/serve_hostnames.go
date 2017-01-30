@@ -32,11 +32,11 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	restclient "k8s.io/client-go/rest"
+	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
-	"k8s.io/kubernetes/pkg/client/restclient"
-	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
 	"k8s.io/kubernetes/pkg/util/intstr"
 	e2e "k8s.io/kubernetes/test/e2e/framework"
 
@@ -92,7 +92,7 @@ func main() {
 
 	var nodes *v1.NodeList
 	for start := time.Now(); time.Since(start) < nodeListTimeout; time.Sleep(2 * time.Second) {
-		nodes, err = client.Nodes().List(v1.ListOptions{})
+		nodes, err = client.Nodes().List(metav1.ListOptions{})
 		if err == nil {
 			break
 		}

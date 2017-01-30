@@ -63,28 +63,28 @@
 		},
 		{
 			"ImportPath": "github.com/Azure/go-autorest/autorest",
-			"Comment": "v7.2.2-8-ge0c77ec",
-			"Rev": "e0c77ecbe74311e03f2a629834d2110f031f1453"
+			"Comment": "v7.2.3",
+			"Rev": "d7c034a8af24eda120dd6460bfcd6d9ed14e43ca"
 		},
 		{
 			"ImportPath": "github.com/Azure/go-autorest/autorest/azure",
-			"Comment": "v7.2.2-8-ge0c77ec",
-			"Rev": "e0c77ecbe74311e03f2a629834d2110f031f1453"
+			"Comment": "v7.2.3",
+			"Rev": "d7c034a8af24eda120dd6460bfcd6d9ed14e43ca"
 		},
 		{
 			"ImportPath": "github.com/Azure/go-autorest/autorest/date",
-			"Comment": "v7.2.2-8-ge0c77ec",
-			"Rev": "e0c77ecbe74311e03f2a629834d2110f031f1453"
+			"Comment": "v7.2.3",
+			"Rev": "d7c034a8af24eda120dd6460bfcd6d9ed14e43ca"
 		},
 		{
 			"ImportPath": "github.com/Azure/go-autorest/autorest/to",
-			"Comment": "v7.2.2-8-ge0c77ec",
-			"Rev": "e0c77ecbe74311e03f2a629834d2110f031f1453"
+			"Comment": "v7.2.3",
+			"Rev": "d7c034a8af24eda120dd6460bfcd6d9ed14e43ca"
 		},
 		{
 			"ImportPath": "github.com/Azure/go-autorest/autorest/validation",
-			"Comment": "v7.2.2-8-ge0c77ec",
-			"Rev": "e0c77ecbe74311e03f2a629834d2110f031f1453"
+			"Comment": "v7.2.3",
+			"Rev": "d7c034a8af24eda120dd6460bfcd6d9ed14e43ca"
 		},
 		{
 			"ImportPath": "github.com/MakeNowJust/heredoc",
@@ -115,18 +115,27 @@
 		},
 		{
 			"ImportPath": "github.com/appc/spec/schema",
-			"Comment": "v0.8.1-6-gab50d12",
-			"Rev": "ab50d12e88f57788bf84b83fef2be236eb1fcc0b"
+			"Comment": "v0.8.9-17-gfc380db",
+			"Rev": "fc380db5fc13c6dd71a5b0bf2af0d182865d1b1d"
 		},
 		{
 			"ImportPath": "github.com/appc/spec/schema/common",
-			"Comment": "v0.8.1-6-gab50d12",
-			"Rev": "ab50d12e88f57788bf84b83fef2be236eb1fcc0b"
+			"Comment": "v0.8.9-17-gfc380db",
+			"Rev": "fc380db5fc13c6dd71a5b0bf2af0d182865d1b1d"
 		},
 		{
 			"ImportPath": "github.com/appc/spec/schema/types",
-			"Comment": "v0.8.1-6-gab50d12",
-			"Rev": "ab50d12e88f57788bf84b83fef2be236eb1fcc0b"
+			"Comment": "v0.8.9-17-gfc380db",
+			"Rev": "fc380db5fc13c6dd71a5b0bf2af0d182865d1b1d"
+		},
+		{
+			"ImportPath": "github.com/appc/spec/schema/types/resource",
+			"Comment": "v0.8.9-17-gfc380db",
+			"Rev": "fc380db5fc13c6dd71a5b0bf2af0d182865d1b1d"
+		},
+		{
+			"ImportPath": "github.com/armon/circbuf",
+			"Rev": "bbbad097214e2918d8543d5201d12bfd7bca254d"
 		},
 		{
 			"ImportPath": "github.com/asaskevich/govalidator",
@@ -2659,43 +2668,43 @@
 		},
 		{
 			"ImportPath": "k8s.io/gengo/args",
-			"Rev": "3c6a809462caf39389d70d9ea787ed24c5acffed"
+			"Rev": "c118aa8edfff53fe5b69127a970f54b6cf3a7563"
 		},
 		{
 			"ImportPath": "k8s.io/gengo/examples/deepcopy-gen/generators",
-			"Rev": "3c6a809462caf39389d70d9ea787ed24c5acffed"
+			"Rev": "c118aa8edfff53fe5b69127a970f54b6cf3a7563"
 		},
 		{
 			"ImportPath": "k8s.io/gengo/examples/defaulter-gen/generators",
-			"Rev": "3c6a809462caf39389d70d9ea787ed24c5acffed"
+			"Rev": "c118aa8edfff53fe5b69127a970f54b6cf3a7563"
 		},
 		{
 			"ImportPath": "k8s.io/gengo/examples/import-boss/generators",
-			"Rev": "3c6a809462caf39389d70d9ea787ed24c5acffed"
+			"Rev": "c118aa8edfff53fe5b69127a970f54b6cf3a7563"
 		},
 		{
 			"ImportPath": "k8s.io/gengo/examples/set-gen/generators",
-			"Rev": "3c6a809462caf39389d70d9ea787ed24c5acffed"
+			"Rev": "c118aa8edfff53fe5b69127a970f54b6cf3a7563"
 		},
 		{
 			"ImportPath": "k8s.io/gengo/examples/set-gen/sets",
-			"Rev": "3c6a809462caf39389d70d9ea787ed24c5acffed"
+			"Rev": "c118aa8edfff53fe5b69127a970f54b6cf3a7563"
 		},
 		{
 			"ImportPath": "k8s.io/gengo/generator",
-			"Rev": "3c6a809462caf39389d70d9ea787ed24c5acffed"
+			"Rev": "c118aa8edfff53fe5b69127a970f54b6cf3a7563"
 		},
 		{
 			"ImportPath": "k8s.io/gengo/namer",
-			"Rev": "3c6a809462caf39389d70d9ea787ed24c5acffed"
+			"Rev": "c118aa8edfff53fe5b69127a970f54b6cf3a7563"
 		},
 		{
 			"ImportPath": "k8s.io/gengo/parser",
-			"Rev": "3c6a809462caf39389d70d9ea787ed24c5acffed"
+			"Rev": "c118aa8edfff53fe5b69127a970f54b6cf3a7563"
 		},
 		{
 			"ImportPath": "k8s.io/gengo/types",
-			"Rev": "3c6a809462caf39389d70d9ea787ed24c5acffed"
+			"Rev": "c118aa8edfff53fe5b69127a970f54b6cf3a7563"
 		},
 		{
 			"ImportPath": "k8s.io/heapster/metrics/api/v1/types",

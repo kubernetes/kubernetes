@@ -23,10 +23,10 @@ import (
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/pkg/volume/util/volumehelper"
@@ -507,7 +507,7 @@ var _ = framework.KubeDescribe("PersistentVolumes", func() {
 
 		// config for the nfs-server pod in the default namespace
 		NFSconfig = VolumeTestConfig{
-			namespace:   v1.NamespaceDefault,
+			namespace:   metav1.NamespaceDefault,
 			prefix:      "nfs",
 			serverImage: NfsServerImage,
 			serverPorts: []int{2049},

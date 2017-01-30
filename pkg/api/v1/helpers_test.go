@@ -20,9 +20,9 @@ import (
 	"reflect"
 	"testing"
 
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/kubernetes/pkg/api"
 )
 
 func TestAddToNodeAddresses(t *testing.T) {
@@ -76,7 +76,7 @@ func TestAddToNodeAddresses(t *testing.T) {
 
 	for i, tc := range testCases {
 		AddToNodeAddresses(&tc.existing, tc.toAdd...)
-		if !api.Semantic.DeepEqual(tc.expected, tc.existing) {
+		if !apiequality.Semantic.DeepEqual(tc.expected, tc.existing) {
 			t.Errorf("case[%d], expected: %v, got: %v", i, tc.expected, tc.existing)
 		}
 	}
@@ -175,62 +175,6 @@ func TestNodeSelectorRequirementsAsSelector(t *testing.T) {
 		}
 		if !reflect.DeepEqual(out, tc.out) {
 			t.Errorf("[%v]expected:\n\t%+v\nbut got:\n\t%+v", i, tc.out, out)
-		}
-	}
-}
-
-func TestGetAffinityFromPod(t *testing.T) {
-	testCases := []struct {
-		pod       *Pod
-		expectErr bool
-	}{
-		{
-			pod:       &Pod{},
-			expectErr: false,
-		},
-		{
-			pod: &Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Annotations: map[string]string{
-						AffinityAnnotationKey: `
-						{"nodeAffinity": { "requiredDuringSchedulingIgnoredDuringExecution": {
-							"nodeSelectorTerms": [{
-								"matchExpressions": [{
-									"key": "foo",
-									"operator": "In",
-									"values": ["value1", "value2"]
-								}]
-							}]
-						}}}`,
-					},
-				},
-			},
-			expectErr: false,
-		},
-		{
-			pod: &Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Annotations: map[string]string{
-						AffinityAnnotationKey: `
-						{"nodeAffinity": { "requiredDuringSchedulingIgnoredDuringExecution": {
-							"nodeSelectorTerms": [{
-								"matchExpressions": [{
-									"key": "foo",
-						`,
-					},
-				},
-			},
-			expectErr: true,
-		},
-	}
-
-	for i, tc := range testCases {
-		_, err := GetAffinityFromPodAnnotations(tc.pod.Annotations)
-		if err == nil && tc.expectErr {
-			t.Errorf("[%v]expected error but got none.", i)
-		}
-		if err != nil && !tc.expectErr {
-			t.Errorf("[%v]did not expect error but got: %v", i, err)
 		}
 	}
 }

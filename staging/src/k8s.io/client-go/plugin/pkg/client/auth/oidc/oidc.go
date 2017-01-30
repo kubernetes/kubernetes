@@ -30,7 +30,7 @@ import (
 	"github.com/coreos/go-oidc/oidc"
 	"github.com/golang/glog"
 
-	"k8s.io/client-go/rest"
+	restclient "k8s.io/client-go/rest"
 )
 
 const (
@@ -45,7 +45,7 @@ const (
 )
 
 func init() {
-	if err := rest.RegisterAuthProviderPlugin("oidc", newOIDCAuthProvider); err != nil {
+	if err := restclient.RegisterAuthProviderPlugin("oidc", newOIDCAuthProvider); err != nil {
 		glog.Fatalf("Failed to register oidc auth plugin: %v", err)
 	}
 }
@@ -106,7 +106,7 @@ func (c *clientCache) setClient(issuer, clientID, clientSecret string, client *o
 	return client
 }
 
-func newOIDCAuthProvider(_ string, cfg map[string]string, persister rest.AuthProviderConfigPersister) (rest.AuthProvider, error) {
+func newOIDCAuthProvider(_ string, cfg map[string]string, persister restclient.AuthProviderConfigPersister) (restclient.AuthProvider, error) {
 	issuer := cfg[cfgIssuerUrl]
 	if issuer == "" {
 		return nil, fmt.Errorf("Must provide %s", cfgIssuerUrl)
@@ -136,14 +136,14 @@ func newOIDCAuthProvider(_ string, cfg map[string]string, persister rest.AuthPro
 		}
 	}
 
-	clientConfig := rest.Config{
-		TLSClientConfig: rest.TLSClientConfig{
+	clientConfig := restclient.Config{
+		TLSClientConfig: restclient.TLSClientConfig{
 			CAFile: cfg[cfgCertificateAuthority],
 			CAData: certAuthData,
 		},
 	}
 
-	trans, err := rest.TransportFor(&clientConfig)
+	trans, err := restclient.TransportFor(&clientConfig)
 	if err != nil {
 		return nil, err
 	}
@@ -191,7 +191,7 @@ type oidcAuthProvider struct {
 	// the RoundTripper only trigger a single refresh request.
 	mu        sync.Mutex
 	cfg       map[string]string
-	persister rest.AuthProviderConfigPersister
+	persister restclient.AuthProviderConfigPersister
 }
 
 func (p *oidcAuthProvider) WrapTransport(rt http.RoundTripper) http.RoundTripper {

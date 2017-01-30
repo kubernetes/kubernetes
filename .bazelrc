@@ -1,0 +1,9 @@
+# Show us information about failures.
+build --verbose_failures
+test --test_output=errors
+
+# Retry tests up to 3 times if they fail.
+test --flaky_test_attempts=3
+
+# Include git version info
+build --workspace_status_command hack/print-workspace-status.sh

@@ -521,6 +521,11 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 		Resource:    a.group.GroupVersion.WithResource(resource),
 		Subresource: subresource,
 		Kind:        fqKindToRegister,
+
+		MetaGroupVersion: metav1.SchemeGroupVersion,
+	}
+	if a.group.MetaGroupVersion != nil {
+		reqScope.MetaGroupVersion = *a.group.MetaGroupVersion
 	}
 	for _, action := range actions {
 		versionedObject := storageMeta.ProducesObject(action.Verb)

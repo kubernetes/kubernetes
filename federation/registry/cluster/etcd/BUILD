@@ -15,6 +15,7 @@ go_library(
     deps = [
         "//federation/apis/federation:go_default_library",
         "//federation/registry/cluster:go_default_library",
+        "//pkg/api:go_default_library",
         "//pkg/genericapiserver/registry/generic:go_default_library",
         "//pkg/genericapiserver/registry/generic/registry:go_default_library",
         "//pkg/genericapiserver/registry/rest:go_default_library",

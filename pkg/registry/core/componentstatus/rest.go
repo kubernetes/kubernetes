@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"sync"
 
+	metainternalversion "k8s.io/apimachinery/pkg/apis/meta/internalversion"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
@@ -51,7 +52,7 @@ func (rs *REST) NewList() runtime.Object {
 
 // Returns the list of component status. Note that the label and field are both ignored.
 // Note that this call doesn't support labels or selectors.
-func (rs *REST) List(ctx genericapirequest.Context, options *api.ListOptions) (runtime.Object, error) {
+func (rs *REST) List(ctx genericapirequest.Context, options *metainternalversion.ListOptions) (runtime.Object, error) {
 	servers := rs.GetServersToValidate()
 
 	wait := sync.WaitGroup{}

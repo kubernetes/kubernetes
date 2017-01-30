@@ -20,18 +20,19 @@ import (
 	"fmt"
 	"time"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
-	"k8s.io/kubernetes/pkg/api/v1"
-	certificates "k8s.io/kubernetes/pkg/apis/certificates/v1alpha1"
-	"k8s.io/kubernetes/pkg/client/cache"
+	"k8s.io/client-go/tools/cache"
+	"k8s.io/client-go/util/workqueue"
+	certificates "k8s.io/kubernetes/pkg/apis/certificates/v1beta1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	v1core "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/core/v1"
+	"k8s.io/kubernetes/pkg/client/legacylisters"
 	"k8s.io/kubernetes/pkg/client/record"
 	"k8s.io/kubernetes/pkg/controller"
-	"k8s.io/kubernetes/pkg/util/workqueue"
 
 	"github.com/golang/glog"
 )
@@ -49,7 +50,7 @@ type CertificateController struct {
 
 	// CSR framework and store
 	csrController cache.Controller
-	csrStore      cache.StoreToCertificateRequestLister
+	csrStore      listers.StoreToCertificateRequestLister
 
 	syncHandler func(csrKey string) error
 
@@ -80,10 +81,10 @@ func NewCertificateController(kubeClient clientset.Interface, syncPeriod time.Du
 	// Manage the addition/update of certificate requests
 	cc.csrStore.Store, cc.csrController = cache.NewInformer(
 		&cache.ListWatch{
-			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
+			ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
 				return cc.kubeClient.Certificates().CertificateSigningRequests().List(options)
 			},
-			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
+			WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
 				return cc.kubeClient.Certificates().CertificateSigningRequests().Watch(options)
 			},
 		},

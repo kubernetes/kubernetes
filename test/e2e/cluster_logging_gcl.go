@@ -23,8 +23,8 @@ import (
 	"strings"
 	"time"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/json"
-	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/test/e2e/framework"
 
 	. "github.com/onsi/ginkgo"
@@ -41,7 +41,7 @@ var _ = framework.KubeDescribe("Cluster level logging using GCL", func() {
 	It("should check that logs from containers are ingested in GCL", func() {
 		By("Running synthetic logger")
 		createSynthLogger(f, expectedLinesCount)
-		defer f.PodClient().Delete(synthLoggerPodName, &v1.DeleteOptions{})
+		defer f.PodClient().Delete(synthLoggerPodName, &metav1.DeleteOptions{})
 		err := framework.WaitForPodSuccessInNamespace(f.ClientSet, synthLoggerPodName, f.Namespace.Name)
 		framework.ExpectNoError(err, fmt.Sprintf("Should've successfully waited for pod %s to succeed", synthLoggerPodName))
 

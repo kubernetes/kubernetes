@@ -17,12 +17,12 @@ limitations under the License.
 package internalversion
 
 import (
+	rest "k8s.io/client-go/rest"
 	api "k8s.io/kubernetes/pkg/api"
-	restclient "k8s.io/kubernetes/pkg/client/restclient"
 )
 
 type ExtensionsInterface interface {
-	RESTClient() restclient.Interface
+	RESTClient() rest.Interface
 	DaemonSetsGetter
 	DeploymentsGetter
 	IngressesGetter
@@ -31,7 +31,7 @@ type ExtensionsInterface interface {
 
 // ExtensionsClient is used to interact with features provided by the extensions group.
 type ExtensionsClient struct {
-	restClient restclient.Interface
+	restClient rest.Interface
 }
 
 func (c *ExtensionsClient) DaemonSets(namespace string) DaemonSetInterface {
@@ -51,12 +51,12 @@ func (c *ExtensionsClient) ReplicaSets(namespace string) ReplicaSetInterface {
 }
 
 // NewForConfig creates a new ExtensionsClient for the given config.
-func NewForConfig(c *restclient.Config) (*ExtensionsClient, error) {
+func NewForConfig(c *rest.Config) (*ExtensionsClient, error) {
 	config := *c
 	if err := setConfigDefaults(&config); err != nil {
 		return nil, err
 	}
-	client, err := restclient.RESTClientFor(&config)
+	client, err := rest.RESTClientFor(&config)
 	if err != nil {
 		return nil, err
 	}
@@ -65,7 +65,7 @@ func NewForConfig(c *restclient.Config) (*ExtensionsClient, error) {
 
 // NewForConfigOrDie creates a new ExtensionsClient for the given config and
 // panics if there is an error in the config.
-func NewForConfigOrDie(c *restclient.Config) *ExtensionsClient {
+func NewForConfigOrDie(c *rest.Config) *ExtensionsClient {
 	client, err := NewForConfig(c)
 	if err != nil {
 		panic(err)
@@ -74,11 +74,11 @@ func NewForConfigOrDie(c *restclient.Config) *ExtensionsClient {
 }
 
 // New creates a new ExtensionsClient for the given RESTClient.
-func New(c restclient.Interface) *ExtensionsClient {
+func New(c rest.Interface) *ExtensionsClient {
 	return &ExtensionsClient{c}
 }
 
-func setConfigDefaults(config *restclient.Config) error {
+func setConfigDefaults(config *rest.Config) error {
 	// if extensions group is not registered, return an error
 	g, err := api.Registry.Group("extensions")
 	if err != nil {
@@ -86,7 +86,7 @@ func setConfigDefaults(config *restclient.Config) error {
 	}
 	config.APIPath = "/apis"
 	if config.UserAgent == "" {
-		config.UserAgent = restclient.DefaultKubernetesUserAgent()
+		config.UserAgent = rest.DefaultKubernetesUserAgent()
 	}
 	if config.GroupVersion == nil || config.GroupVersion.Group != g.GroupVersion.Group {
 		copyGroupVersion := g.GroupVersion
@@ -105,7 +105,7 @@ func setConfigDefaults(config *restclient.Config) error {
 
 // RESTClient returns a RESTClient that is used to communicate
 // with API server by this client implementation.
-func (c *ExtensionsClient) RESTClient() restclient.Interface {
+func (c *ExtensionsClient) RESTClient() rest.Interface {
 	if c == nil {
 		return nil
 	}

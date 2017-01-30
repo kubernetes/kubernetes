@@ -25,6 +25,7 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
+	utiltesting "k8s.io/client-go/util/testing"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset/fake"
@@ -36,7 +37,6 @@ import (
 	podtest "k8s.io/kubernetes/pkg/kubelet/pod/testing"
 	"k8s.io/kubernetes/pkg/kubelet/secret"
 	"k8s.io/kubernetes/pkg/util/mount"
-	utiltesting "k8s.io/kubernetes/pkg/util/testing"
 	"k8s.io/kubernetes/pkg/volume"
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
 	"k8s.io/kubernetes/pkg/volume/util/types"
@@ -198,7 +198,8 @@ func newTestVolumeManager(
 		&mount.FakeMounter{},
 		"",
 		fakeRecorder,
-		false /* experimentalCheckNodeCapabilitiesBeforeMount */)
+		false, /* experimentalCheckNodeCapabilitiesBeforeMount */
+		false /* keepTerminatedPodVolumes */)
 
 	return vm, err
 }

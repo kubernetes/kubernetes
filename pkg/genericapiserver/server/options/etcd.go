@@ -21,7 +21,7 @@ import (
 
 	"github.com/spf13/pflag"
 
-	"k8s.io/kubernetes/pkg/storage/storagebackend"
+	"k8s.io/apiserver/pkg/storage/storagebackend"
 )
 
 const (

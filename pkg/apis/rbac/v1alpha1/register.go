@@ -20,7 +20,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/kubernetes/pkg/api/v1"
 )
 
 const GroupName = "rbac.authorization.k8s.io"
@@ -50,11 +49,6 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 		&ClusterRoleBinding{},
 		&ClusterRoleBindingList{},
 		&ClusterRoleList{},
-
-		&v1.ListOptions{},
-		&v1.DeleteOptions{},
-		&metav1.ExportOptions{},
-		&metav1.GetOptions{},
 	)
 	metav1.AddToGroupVersion(scheme, SchemeGroupVersion)
 	return nil

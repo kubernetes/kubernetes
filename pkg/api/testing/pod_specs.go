@@ -21,7 +21,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/v1"
 )
 
-// DeepEqualSafePodSpec returns a PodSpec which is ready to be used with api.Semantic.DeepEqual
+// DeepEqualSafePodSpec returns a PodSpec which is ready to be used with apiequality.Semantic.DeepEqual
 func DeepEqualSafePodSpec() api.PodSpec {
 	grace := int64(30)
 	return api.PodSpec{
@@ -33,7 +33,7 @@ func DeepEqualSafePodSpec() api.PodSpec {
 	}
 }
 
-// V1DeepEqualSafePodSpec returns a PodSpec which is ready to be used with api.Semantic.DeepEqual
+// V1DeepEqualSafePodSpec returns a PodSpec which is ready to be used with apiequality.Semantic.DeepEqual
 func V1DeepEqualSafePodSpec() v1.PodSpec {
 	grace := int64(30)
 	return v1.PodSpec{

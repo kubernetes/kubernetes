@@ -23,10 +23,10 @@ package api
 import (
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	conversion "k8s.io/apimachinery/pkg/conversion"
+	fields "k8s.io/apimachinery/pkg/fields"
 	labels "k8s.io/apimachinery/pkg/labels"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	types "k8s.io/apimachinery/pkg/types"
-	fields "k8s.io/client-go/pkg/fields"
 	reflect "reflect"
 )
 
@@ -146,6 +146,7 @@ func RegisterDeepCopies(scheme *runtime.Scheme) error {
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_PodExecOptions, InType: reflect.TypeOf(&PodExecOptions{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_PodList, InType: reflect.TypeOf(&PodList{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_PodLogOptions, InType: reflect.TypeOf(&PodLogOptions{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_PodPortForwardOptions, InType: reflect.TypeOf(&PodPortForwardOptions{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_PodProxyOptions, InType: reflect.TypeOf(&PodProxyOptions{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_PodSecurityContext, InType: reflect.TypeOf(&PodSecurityContext{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_PodSignature, InType: reflect.TypeOf(&PodSignature{})},
@@ -175,6 +176,7 @@ func RegisterDeepCopies(scheme *runtime.Scheme) error {
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_ResourceRequirements, InType: reflect.TypeOf(&ResourceRequirements{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_SELinuxOptions, InType: reflect.TypeOf(&SELinuxOptions{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_Secret, InType: reflect.TypeOf(&Secret{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_SecretEnvSource, InType: reflect.TypeOf(&SecretEnvSource{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_SecretKeySelector, InType: reflect.TypeOf(&SecretKeySelector{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_SecretList, InType: reflect.TypeOf(&SecretList{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_SecretVolumeSource, InType: reflect.TypeOf(&SecretVolumeSource{})},
@@ -321,16 +323,12 @@ func DeepCopy_api_Capabilities(in interface{}, out interface{}, c *conversion.Cl
 		if in.Add != nil {
 			in, out := &in.Add, &out.Add
 			*out = make([]Capability, len(*in))
-			for i := range *in {
-				(*out)[i] = (*in)[i]
-			}
+			copy(*out, *in)
 		}
 		if in.Drop != nil {
 			in, out := &in.Drop, &out.Drop
 			*out = make([]Capability, len(*in))
-			for i := range *in {
-				(*out)[i] = (*in)[i]
-			}
+			copy(*out, *in)
 		}
 		return nil
 	}
@@ -386,9 +384,7 @@ func DeepCopy_api_ComponentStatus(in interface{}, out interface{}, c *conversion
 		if in.Conditions != nil {
 			in, out := &in.Conditions, &out.Conditions
 			*out = make([]ComponentCondition, len(*in))
-			for i := range *in {
-				(*out)[i] = (*in)[i]
-			}
+			copy(*out, *in)
 		}
 		return nil
 	}
@@ -438,6 +434,11 @@ func DeepCopy_api_ConfigMapEnvSource(in interface{}, out interface{}, c *convers
 		in := in.(*ConfigMapEnvSource)
 		out := out.(*ConfigMapEnvSource)
 		*out = *in
+		if in.Optional != nil {
+			in, out := &in.Optional, &out.Optional
+			*out = new(bool)
+			**out = **in
+		}
 		return nil
 	}
 }
@@ -447,6 +448,11 @@ func DeepCopy_api_ConfigMapKeySelector(in interface{}, out interface{}, c *conve
 		in := in.(*ConfigMapKeySelector)
 		out := out.(*ConfigMapKeySelector)
 		*out = *in
+		if in.Optional != nil {
+			in, out := &in.Optional, &out.Optional
+			*out = new(bool)
+			**out = **in
+		}
 		return nil
 	}
 }
@@ -488,6 +494,11 @@ func DeepCopy_api_ConfigMapVolumeSource(in interface{}, out interface{}, c *conv
 			*out = new(int32)
 			**out = **in
 		}
+		if in.Optional != nil {
+			in, out := &in.Optional, &out.Optional
+			*out = new(bool)
+			**out = **in
+		}
 		return nil
 	}
 }
@@ -510,9 +521,7 @@ func DeepCopy_api_Container(in interface{}, out interface{}, c *conversion.Clone
 		if in.Ports != nil {
 			in, out := &in.Ports, &out.Ports
 			*out = make([]ContainerPort, len(*in))
-			for i := range *in {
-				(*out)[i] = (*in)[i]
-			}
+			copy(*out, *in)
 		}
 		if in.EnvFrom != nil {
 			in, out := &in.EnvFrom, &out.EnvFrom
@@ -538,9 +547,7 @@ func DeepCopy_api_Container(in interface{}, out interface{}, c *conversion.Clone
 		if in.VolumeMounts != nil {
 			in, out := &in.VolumeMounts, &out.VolumeMounts
 			*out = make([]VolumeMount, len(*in))
-			for i := range *in {
-				(*out)[i] = (*in)[i]
-			}
+			copy(*out, *in)
 		}
 		if in.LivenessProbe != nil {
 			in, out := &in.LivenessProbe, &out.LivenessProbe
@@ -842,9 +849,7 @@ func DeepCopy_api_EndpointSubset(in interface{}, out interface{}, c *conversion.
 		if in.Ports != nil {
 			in, out := &in.Ports, &out.Ports
 			*out = make([]EndpointPort, len(*in))
-			for i := range *in {
-				(*out)[i] = (*in)[i]
-			}
+			copy(*out, *in)
 		}
 		return nil
 	}
@@ -899,7 +904,16 @@ func DeepCopy_api_EnvFromSource(in interface{}, out interface{}, c *conversion.C
 		if in.ConfigMapRef != nil {
 			in, out := &in.ConfigMapRef, &out.ConfigMapRef
 			*out = new(ConfigMapEnvSource)
-			**out = **in
+			if err := DeepCopy_api_ConfigMapEnvSource(*in, *out, c); err != nil {
+				return err
+			}
+		}
+		if in.SecretRef != nil {
+			in, out := &in.SecretRef, &out.SecretRef
+			*out = new(SecretEnvSource)
+			if err := DeepCopy_api_SecretEnvSource(*in, *out, c); err != nil {
+				return err
+			}
 		}
 		return nil
 	}
@@ -941,12 +955,16 @@ func DeepCopy_api_EnvVarSource(in interface{}, out interface{}, c *conversion.Cl
 		if in.ConfigMapKeyRef != nil {
 			in, out := &in.ConfigMapKeyRef, &out.ConfigMapKeyRef
 			*out = new(ConfigMapKeySelector)
-			**out = **in
+			if err := DeepCopy_api_ConfigMapKeySelector(*in, *out, c); err != nil {
+				return err
+			}
 		}
 		if in.SecretKeyRef != nil {
 			in, out := &in.SecretKeyRef, &out.SecretKeyRef
 			*out = new(SecretKeySelector)
-			**out = **in
+			if err := DeepCopy_api_SecretKeySelector(*in, *out, c); err != nil {
+				return err
+			}
 		}
 		return nil
 	}
@@ -1093,9 +1111,7 @@ func DeepCopy_api_HTTPGetAction(in interface{}, out interface{}, c *conversion.C
 		if in.HTTPHeaders != nil {
 			in, out := &in.HTTPHeaders, &out.HTTPHeaders
 			*out = make([]HTTPHeader, len(*in))
-			for i := range *in {
-				(*out)[i] = (*in)[i]
-			}
+			copy(*out, *in)
 		}
 		return nil
 	}
@@ -1357,9 +1373,7 @@ func DeepCopy_api_LoadBalancerStatus(in interface{}, out interface{}, c *convers
 		if in.Ingress != nil {
 			in, out := &in.Ingress, &out.Ingress
 			*out = make([]LoadBalancerIngress, len(*in))
-			for i := range *in {
-				(*out)[i] = (*in)[i]
-			}
+			copy(*out, *in)
 		}
 		return nil
 	}
@@ -1426,9 +1440,7 @@ func DeepCopy_api_NamespaceSpec(in interface{}, out interface{}, c *conversion.C
 		if in.Finalizers != nil {
 			in, out := &in.Finalizers, &out.Finalizers
 			*out = make([]FinalizerName, len(*in))
-			for i := range *in {
-				(*out)[i] = (*in)[i]
-			}
+			copy(*out, *in)
 		}
 		return nil
 	}
@@ -1647,9 +1659,7 @@ func DeepCopy_api_NodeStatus(in interface{}, out interface{}, c *conversion.Clon
 		if in.Addresses != nil {
 			in, out := &in.Addresses, &out.Addresses
 			*out = make([]NodeAddress, len(*in))
-			for i := range *in {
-				(*out)[i] = (*in)[i]
-			}
+			copy(*out, *in)
 		}
 		if in.Images != nil {
 			in, out := &in.Images, &out.Images
@@ -1663,16 +1673,12 @@ func DeepCopy_api_NodeStatus(in interface{}, out interface{}, c *conversion.Clon
 		if in.VolumesInUse != nil {
 			in, out := &in.VolumesInUse, &out.VolumesInUse
 			*out = make([]UniqueVolumeName, len(*in))
-			for i := range *in {
-				(*out)[i] = (*in)[i]
-			}
+			copy(*out, *in)
 		}
 		if in.VolumesAttached != nil {
 			in, out := &in.VolumesAttached, &out.VolumesAttached
 			*out = make([]AttachedVolume, len(*in))
-			for i := range *in {
-				(*out)[i] = (*in)[i]
-			}
+			copy(*out, *in)
 		}
 		return nil
 	}
@@ -1818,9 +1824,7 @@ func DeepCopy_api_PersistentVolumeClaimSpec(in interface{}, out interface{}, c *
 		if in.AccessModes != nil {
 			in, out := &in.AccessModes, &out.AccessModes
 			*out = make([]PersistentVolumeAccessMode, len(*in))
-			for i := range *in {
-				(*out)[i] = (*in)[i]
-			}
+			copy(*out, *in)
 		}
 		if in.Selector != nil {
 			in, out := &in.Selector, &out.Selector
@@ -1845,9 +1849,7 @@ func DeepCopy_api_PersistentVolumeClaimStatus(in interface{}, out interface{}, c
 		if in.AccessModes != nil {
 			in, out := &in.AccessModes, &out.AccessModes
 			*out = make([]PersistentVolumeAccessMode, len(*in))
-			for i := range *in {
-				(*out)[i] = (*in)[i]
-			}
+			copy(*out, *in)
 		}
 		if in.Capacity != nil {
 			in, out := &in.Capacity, &out.Capacity
@@ -2009,9 +2011,7 @@ func DeepCopy_api_PersistentVolumeSpec(in interface{}, out interface{}, c *conve
 		if in.AccessModes != nil {
 			in, out := &in.AccessModes, &out.AccessModes
 			*out = make([]PersistentVolumeAccessMode, len(*in))
-			for i := range *in {
-				(*out)[i] = (*in)[i]
-			}
+			copy(*out, *in)
 		}
 		if in.ClaimRef != nil {
 			in, out := &in.ClaimRef, &out.ClaimRef
@@ -2217,6 +2217,20 @@ func DeepCopy_api_PodLogOptions(in interface{}, out interface{}, c *conversion.C
 	}
 }
 
+func DeepCopy_api_PodPortForwardOptions(in interface{}, out interface{}, c *conversion.Cloner) error {
+	{
+		in := in.(*PodPortForwardOptions)
+		out := out.(*PodPortForwardOptions)
+		*out = *in
+		if in.Ports != nil {
+			in, out := &in.Ports, &out.Ports
+			*out = make([]int32, len(*in))
+			copy(*out, *in)
+		}
+		return nil
+	}
+}
+
 func DeepCopy_api_PodProxyOptions(in interface{}, out interface{}, c *conversion.Cloner) error {
 	{
 		in := in.(*PodProxyOptions)
@@ -2336,9 +2350,7 @@ func DeepCopy_api_PodSpec(in interface{}, out interface{}, c *conversion.Cloner)
 		if in.ImagePullSecrets != nil {
 			in, out := &in.ImagePullSecrets, &out.ImagePullSecrets
 			*out = make([]LocalObjectReference, len(*in))
-			for i := range *in {
-				(*out)[i] = (*in)[i]
-			}
+			copy(*out, *in)
 		}
 		if in.Affinity != nil {
 			in, out := &in.Affinity, &out.Affinity
@@ -2711,9 +2723,7 @@ func DeepCopy_api_ResourceQuotaSpec(in interface{}, out interface{}, c *conversi
 		if in.Scopes != nil {
 			in, out := &in.Scopes, &out.Scopes
 			*out = make([]ResourceQuotaScope, len(*in))
-			for i := range *in {
-				(*out)[i] = (*in)[i]
-			}
+			copy(*out, *in)
 		}
 		return nil
 	}
@@ -2799,11 +2809,30 @@ func DeepCopy_api_Secret(in interface{}, out interface{}, c *conversion.Cloner) 
 	}
 }
 
+func DeepCopy_api_SecretEnvSource(in interface{}, out interface{}, c *conversion.Cloner) error {
+	{
+		in := in.(*SecretEnvSource)
+		out := out.(*SecretEnvSource)
+		*out = *in
+		if in.Optional != nil {
+			in, out := &in.Optional, &out.Optional
+			*out = new(bool)
+			**out = **in
+		}
+		return nil
+	}
+}
+
 func DeepCopy_api_SecretKeySelector(in interface{}, out interface{}, c *conversion.Cloner) error {
 	{
 		in := in.(*SecretKeySelector)
 		out := out.(*SecretKeySelector)
 		*out = *in
+		if in.Optional != nil {
+			in, out := &in.Optional, &out.Optional
+			*out = new(bool)
+			**out = **in
+		}
 		return nil
 	}
 }
@@ -2843,6 +2872,11 @@ func DeepCopy_api_SecretVolumeSource(in interface{}, out interface{}, c *convers
 		if in.DefaultMode != nil {
 			in, out := &in.DefaultMode, &out.DefaultMode
 			*out = new(int32)
+			**out = **in
+		}
+		if in.Optional != nil {
+			in, out := &in.Optional, &out.Optional
+			*out = new(bool)
 			**out = **in
 		}
 		return nil
@@ -2932,16 +2966,12 @@ func DeepCopy_api_ServiceAccount(in interface{}, out interface{}, c *conversion.
 		if in.Secrets != nil {
 			in, out := &in.Secrets, &out.Secrets
 			*out = make([]ObjectReference, len(*in))
-			for i := range *in {
-				(*out)[i] = (*in)[i]
-			}
+			copy(*out, *in)
 		}
 		if in.ImagePullSecrets != nil {
 			in, out := &in.ImagePullSecrets, &out.ImagePullSecrets
 			*out = make([]LocalObjectReference, len(*in))
-			for i := range *in {
-				(*out)[i] = (*in)[i]
-			}
+			copy(*out, *in)
 		}
 		return nil
 	}
@@ -3009,9 +3039,7 @@ func DeepCopy_api_ServiceSpec(in interface{}, out interface{}, c *conversion.Clo
 		if in.Ports != nil {
 			in, out := &in.Ports, &out.Ports
 			*out = make([]ServicePort, len(*in))
-			for i := range *in {
-				(*out)[i] = (*in)[i]
-			}
+			copy(*out, *in)
 		}
 		if in.Selector != nil {
 			in, out := &in.Selector, &out.Selector

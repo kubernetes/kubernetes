@@ -25,7 +25,8 @@ import (
 	cadvisorapiv2 "github.com/google/cadvisor/info/v2"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/client-go/pkg/util/clock"
+	"k8s.io/client-go/util/clock"
+	utiltesting "k8s.io/client-go/util/testing"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/apis/componentconfig"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset/fake"
@@ -43,7 +44,6 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/server/stats"
 	"k8s.io/kubernetes/pkg/kubelet/status"
 	"k8s.io/kubernetes/pkg/kubelet/volumemanager"
-	utiltesting "k8s.io/kubernetes/pkg/util/testing"
 	"k8s.io/kubernetes/pkg/volume"
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
 )
@@ -60,8 +60,9 @@ func TestRunOnce(t *testing.T) {
 		Usage:    9 * mb,
 		Capacity: 10 * mb,
 	}, nil)
+	fakeSecretManager := secret.NewFakeManager()
 	podManager := kubepod.NewBasicPodManager(
-		podtest.NewFakeMirrorClient(), secret.NewFakeManager())
+		podtest.NewFakeMirrorClient(), fakeSecretManager)
 	diskSpaceManager, _ := newDiskSpaceManager(cadvisor, DiskSpacePolicy{})
 	fakeRuntime := &containertest.FakeRuntime{}
 	basePath, err := utiltesting.MkTmpdir("kubelet")
@@ -92,7 +93,7 @@ func TestRunOnce(t *testing.T) {
 
 	plug := &volumetest.FakeVolumePlugin{PluginName: "fake", Host: nil}
 	kb.volumePluginMgr, err =
-		NewInitializedVolumePluginMgr(kb, []volume.VolumePlugin{plug})
+		NewInitializedVolumePluginMgr(kb, fakeSecretManager, []volume.VolumePlugin{plug})
 	if err != nil {
 		t.Fatalf("failed to initialize VolumePluginMgr: %v", err)
 	}
@@ -106,7 +107,8 @@ func TestRunOnce(t *testing.T) {
 		kb.mounter,
 		kb.getPodsDir(),
 		kb.recorder,
-		false /* experimentalCheckNodeCapabilitiesBeforeMount */)
+		false, /* experimentalCheckNodeCapabilitiesBeforeMount */
+		false /* keepTerminatedPodVolumes */)
 
 	kb.networkPlugin, _ = network.InitNetworkPlugin([]network.NetworkPlugin{}, "", nettest.NewFakeHost(nil), componentconfig.HairpinNone, kb.nonMasqueradeCIDR, network.UseDefaultMTU)
 	// TODO: Factor out "StatsProvider" from Kubelet so we don't have a cyclic dependency

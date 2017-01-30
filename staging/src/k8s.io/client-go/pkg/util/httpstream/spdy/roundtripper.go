@@ -30,8 +30,8 @@ import (
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/third_party/forked/golang/netutil"
 	"k8s.io/client-go/pkg/api"
-	"k8s.io/client-go/pkg/third_party/forked/golang/netutil"
 	"k8s.io/client-go/pkg/util/httpstream"
 )
 

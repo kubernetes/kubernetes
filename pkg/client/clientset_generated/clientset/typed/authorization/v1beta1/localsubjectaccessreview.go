@@ -17,7 +17,7 @@ limitations under the License.
 package v1beta1
 
 import (
-	restclient "k8s.io/kubernetes/pkg/client/restclient"
+	rest "k8s.io/client-go/rest"
 )
 
 // LocalSubjectAccessReviewsGetter has a method to return a LocalSubjectAccessReviewInterface.
@@ -33,7 +33,7 @@ type LocalSubjectAccessReviewInterface interface {
 
 // localSubjectAccessReviews implements LocalSubjectAccessReviewInterface
 type localSubjectAccessReviews struct {
-	client restclient.Interface
+	client rest.Interface
 	ns     string
 }
 

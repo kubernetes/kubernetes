@@ -23,7 +23,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
 	batchinternal "k8s.io/kubernetes/pkg/apis/batch"
 	batch "k8s.io/kubernetes/pkg/apis/batch/v1"
@@ -178,7 +177,7 @@ var _ = framework.KubeDescribe("Job", func() {
 		reaper, err := kubectl.ReaperFor(batchinternal.Kind("Job"), f.InternalClientset)
 		Expect(err).NotTo(HaveOccurred())
 		timeout := 1 * time.Minute
-		err = reaper.Stop(f.Namespace.Name, job.Name, timeout, api.NewDeleteOptions(0))
+		err = reaper.Stop(f.Namespace.Name, job.Name, timeout, metav1.NewDeleteOptions(0))
 		Expect(err).NotTo(HaveOccurred())
 
 		By("Ensuring job was deleted")
@@ -296,7 +295,7 @@ func deleteJob(c clientset.Interface, ns, name string) error {
 func waitForAllPodsRunning(c clientset.Interface, ns, jobName string, parallelism int32) error {
 	label := labels.SelectorFromSet(labels.Set(map[string]string{jobSelectorKey: jobName}))
 	return wait.Poll(framework.Poll, jobTimeout, func() (bool, error) {
-		options := v1.ListOptions{LabelSelector: label.String()}
+		options := metav1.ListOptions{LabelSelector: label.String()}
 		pods, err := c.Core().Pods(ns).List(options)
 		if err != nil {
 			return false, err

@@ -17,7 +17,7 @@
 ## Contains configuration values for the Openstack cluster
 
 # Stack name
-STACK_NAME=${STACK_NAME:-KubernetesStack}
+STACK_NAME=${STACK_NAME:-kube-stack}
 
 # Keypair for kubernetes stack
 KUBERNETES_KEYPAIR_NAME=${KUBERNETES_KEYPAIR_NAME:-kubernetes_keypair}

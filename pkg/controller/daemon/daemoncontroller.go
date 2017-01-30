@@ -28,18 +28,19 @@ import (
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/client-go/tools/cache"
+	"k8s.io/client-go/util/workqueue"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
 	extensions "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
-	"k8s.io/kubernetes/pkg/client/cache"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	v1core "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/core/v1"
 	unversionedextensions "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/extensions/v1beta1"
+	"k8s.io/kubernetes/pkg/client/legacylisters"
 	"k8s.io/kubernetes/pkg/client/record"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/informers"
 	"k8s.io/kubernetes/pkg/util/metrics"
-	"k8s.io/kubernetes/pkg/util/workqueue"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm/predicates"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/schedulercache"
 
@@ -50,9 +51,8 @@ const (
 	// Daemon sets will periodically check that their daemon pods are running as expected.
 	FullDaemonSetResyncPeriod = 30 * time.Second // TODO: Figure out if this time seems reasonable.
 
-	// Realistic value of the burstReplica field for the replication manager based off
-	// performance requirements for kubernetes 1.0.
-	BurstReplicas = 500
+	// The value of 250 is chosen b/c values that are too high can cause registry DoS issues
+	BurstReplicas = 250
 
 	// If sending a status upate to API server fails, we retry a finite number of times.
 	StatusUpdateRetries = 1
@@ -74,11 +74,11 @@ type DaemonSetsController struct {
 	// A TTLCache of pod creates/deletes each ds expects to see
 	expectations controller.ControllerExpectationsInterface
 	// A store of daemon sets
-	dsStore *cache.StoreToDaemonSetLister
+	dsStore *listers.StoreToDaemonSetLister
 	// A store of pods
-	podStore *cache.StoreToPodLister
+	podStore *listers.StoreToPodLister
 	// A store of nodes
-	nodeStore *cache.StoreToNodeLister
+	nodeStore *listers.StoreToNodeLister
 	// dsStoreSynced returns true if the daemonset store has been synced at least once.
 	// Added as a member to the struct to allow injection for testing.
 	dsStoreSynced cache.InformerSynced
@@ -460,26 +460,42 @@ func (dsc *DaemonSetsController) manage(ds *extensions.DaemonSet) error {
 		return fmt.Errorf("couldn't get list of nodes when syncing daemon set %#v: %v", ds, err)
 	}
 	var nodesNeedingDaemonPods, podsToDelete []string
+	var failedPodsObserved int
 	for _, node := range nodeList.Items {
 		_, shouldSchedule, shouldContinueRunning, err := dsc.nodeShouldRunDaemonPod(&node, ds)
 		if err != nil {
 			continue
 		}
 
-		daemonPods, isRunning := nodeToDaemonPods[node.Name]
+		daemonPods, exists := nodeToDaemonPods[node.Name]
 
 		switch {
-		case shouldSchedule && !isRunning:
+		case shouldSchedule && !exists:
 			// If daemon pod is supposed to be running on node, but isn't, create daemon pod.
 			nodesNeedingDaemonPods = append(nodesNeedingDaemonPods, node.Name)
-		case shouldContinueRunning && len(daemonPods) > 1:
-			// If daemon pod is supposed to be running on node, but more than 1 daemon pod is running, delete the excess daemon pods.
-			// Sort the daemon pods by creation time, so the the oldest is preserved.
-			sort.Sort(podByCreationTimestamp(daemonPods))
-			for i := 1; i < len(daemonPods); i++ {
-				podsToDelete = append(podsToDelete, daemonPods[i].Name)
+		case shouldContinueRunning:
+			// If a daemon pod failed, delete it
+			// If there's no daemon pods left on this node, we will create it in the next sync loop
+			var daemonPodsRunning []*v1.Pod
+			for i := range daemonPods {
+				pod := daemonPods[i]
+				if pod.Status.Phase == v1.PodFailed {
+					glog.V(2).Infof("Found failed daemon pod %s/%s on node %s, will try to kill it", pod.Namespace, node.Name, pod.Name)
+					podsToDelete = append(podsToDelete, pod.Name)
+					failedPodsObserved++
+				} else {
+					daemonPodsRunning = append(daemonPodsRunning, pod)
+				}
 			}
-		case !shouldContinueRunning && isRunning:
+			// If daemon pod is supposed to be running on node, but more than 1 daemon pod is running, delete the excess daemon pods.
+			// Sort the daemon pods by creation time, so the oldest is preserved.
+			if len(daemonPodsRunning) > 1 {
+				sort.Sort(podByCreationTimestamp(daemonPodsRunning))
+				for i := 1; i < len(daemonPodsRunning); i++ {
+					podsToDelete = append(podsToDelete, daemonPods[i].Name)
+				}
+			}
+		case !shouldContinueRunning && exists:
 			// If daemon pod isn't supposed to run on node, but it is, delete all daemon pods on node.
 			for i := range daemonPods {
 				podsToDelete = append(podsToDelete, daemonPods[i].Name)
@@ -545,6 +561,10 @@ func (dsc *DaemonSetsController) manage(ds *extensions.DaemonSet) error {
 	close(errCh)
 	for err := range errCh {
 		errors = append(errors, err)
+	}
+	// Throw an error when the daemon pods fail, to use ratelimiter to prevent kill-recreate hot loop
+	if failedPodsObserved > 0 {
+		errors = append(errors, fmt.Errorf("deleted %d failed pods of DaemonSet %s/%s", failedPodsObserved, ds.Namespace, ds.Name))
 	}
 	return utilerrors.NewAggregate(errors)
 }
@@ -773,7 +793,7 @@ func (dsc *DaemonSetsController) nodeShouldRunDaemonPod(node *v1.Node, ds *exten
 				predicates.ErrTaintsTolerationsNotMatch:
 				return false, false, false, fmt.Errorf("unexpected reason: GeneralPredicates should not return reason %s", reason.GetReason())
 			default:
-				glog.V(4).Infof("unknownd predicate failure reason: %s", reason.GetReason())
+				glog.V(4).Infof("unknown predicate failure reason: %s", reason.GetReason())
 				wantToRun, shouldSchedule, shouldContinueRunning = false, false, false
 				emitEvent = true
 			}

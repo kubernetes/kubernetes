@@ -61,7 +61,7 @@ var _ = framework.KubeDescribe("Federation deployments [Feature:Federation]", fu
 			deployment := createDeploymentOrFail(f.FederationClientset, nsName)
 			By(fmt.Sprintf("Creation of deployment %q in namespace %q succeeded.  Deleting deployment.", deployment.Name, nsName))
 			// Cleanup
-			err := f.FederationClientset.Extensions().Deployments(nsName).Delete(deployment.Name, &v1.DeleteOptions{})
+			err := f.FederationClientset.Extensions().Deployments(nsName).Delete(deployment.Name, &metav1.DeleteOptions{})
 			framework.ExpectNoError(err, "Error deleting deployment %q in namespace %q", deployment.Name, deployment.Namespace)
 			By(fmt.Sprintf("Deletion of deployment %q in namespace %q succeeded.", deployment.Name, nsName))
 		})
@@ -99,7 +99,7 @@ var _ = framework.KubeDescribe("Federation deployments [Feature:Federation]", fu
 				dep.Spec.Replicas = &replicas
 				f.FederationClientset.Deployments(nsName).Update(dep)
 				waitForDeploymentOrFail(f.FederationClientset, nsName, dep.Name, clusters)
-				f.FederationClientset.Deployments(nsName).Delete(dep.Name, &v1.DeleteOptions{})
+				f.FederationClientset.Deployments(nsName).Delete(dep.Name, &metav1.DeleteOptions{})
 			}()
 
 			waitForDeploymentOrFail(f.FederationClientset, nsName, dep.Name, clusters)
@@ -137,7 +137,7 @@ var _ = framework.KubeDescribe("Federation deployments [Feature:Federation]", fu
 
 // deleteAllDeploymentsOrFail deletes all deployments in the given namespace name.
 func deleteAllDeploymentsOrFail(clientset *fedclientset.Clientset, nsName string) {
-	deploymentList, err := clientset.Extensions().Deployments(nsName).List(v1.ListOptions{})
+	deploymentList, err := clientset.Extensions().Deployments(nsName).List(metav1.ListOptions{})
 	Expect(err).NotTo(HaveOccurred())
 	orphanDependents := false
 	for _, deployment := range deploymentList.Items {
@@ -261,7 +261,7 @@ func updateDeploymentOrFail(clientset *fedclientset.Clientset, namespace string)
 
 func deleteDeploymentOrFail(clientset *fedclientset.Clientset, nsName string, deploymentName string, orphanDependents *bool) {
 	By(fmt.Sprintf("Deleting deployment %q in namespace %q", deploymentName, nsName))
-	err := clientset.Extensions().Deployments(nsName).Delete(deploymentName, &v1.DeleteOptions{OrphanDependents: orphanDependents})
+	err := clientset.Extensions().Deployments(nsName).Delete(deploymentName, &metav1.DeleteOptions{OrphanDependents: orphanDependents})
 	framework.ExpectNoError(err, "Error deleting deployment %q in namespace %q", deploymentName, nsName)
 
 	// Wait for the deployment to be deleted.

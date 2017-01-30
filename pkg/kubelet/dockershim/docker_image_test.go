@@ -29,7 +29,7 @@ func TestRemoveImage(t *testing.T) {
 	ds, fakeDocker, _ := newTestDockerService()
 	id := "1111"
 	fakeDocker.Image = &dockertypes.ImageInspect{ID: id, RepoTags: []string{"foo"}}
-	ds.RemoveImage(&runtimeapi.ImageSpec{Image: &id})
+	ds.RemoveImage(&runtimeapi.ImageSpec{Image: id})
 	fakeDocker.AssertCallDetails(dockertools.NewCalledDetail("inspect_image", nil),
 		dockertools.NewCalledDetail("remove_image", []interface{}{id, dockertypes.ImageRemoveOptions{PruneChildren: true}}))
 }
@@ -38,7 +38,7 @@ func TestRemoveImageWithMultipleTags(t *testing.T) {
 	ds, fakeDocker, _ := newTestDockerService()
 	id := "1111"
 	fakeDocker.Image = &dockertypes.ImageInspect{ID: id, RepoTags: []string{"foo", "bar"}}
-	ds.RemoveImage(&runtimeapi.ImageSpec{Image: &id})
+	ds.RemoveImage(&runtimeapi.ImageSpec{Image: id})
 	fakeDocker.AssertCallDetails(dockertools.NewCalledDetail("inspect_image", nil),
 		dockertools.NewCalledDetail("remove_image", []interface{}{"foo", dockertypes.ImageRemoveOptions{PruneChildren: true}}),
 		dockertools.NewCalledDetail("remove_image", []interface{}{"bar", dockertypes.ImageRemoveOptions{PruneChildren: true}}))

@@ -24,8 +24,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	core "k8s.io/client-go/testing"
 	"k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/client/testing/core"
 	"k8s.io/kubernetes/pkg/volume"
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
 	"k8s.io/kubernetes/pkg/volume/util/volumehelper"
@@ -86,6 +86,7 @@ func TestListVolumesForPod(t *testing.T) {
 
 func TestPodVolumesExist(t *testing.T) {
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+	defer testKubelet.Cleanup()
 	kubelet := testKubelet.kubelet
 
 	pods := []*v1.Pod{
@@ -170,6 +171,7 @@ func TestPodVolumesExist(t *testing.T) {
 
 func TestVolumeAttachAndMountControllerDisabled(t *testing.T) {
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+	defer testKubelet.Cleanup()
 	kubelet := testKubelet.kubelet
 
 	pod := podWithUidNameNsSpec("12345678", "foo", "test", v1.PodSpec{
@@ -215,6 +217,7 @@ func TestVolumeAttachAndMountControllerDisabled(t *testing.T) {
 
 func TestVolumeUnmountAndDetachControllerDisabled(t *testing.T) {
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+	defer testKubelet.Cleanup()
 	kubelet := testKubelet.kubelet
 
 	pod := podWithUidNameNsSpec("12345678", "foo", "test", v1.PodSpec{
@@ -285,6 +288,7 @@ func TestVolumeUnmountAndDetachControllerDisabled(t *testing.T) {
 
 func TestVolumeAttachAndMountControllerEnabled(t *testing.T) {
 	testKubelet := newTestKubelet(t, true /* controllerAttachDetachEnabled */)
+	defer testKubelet.Cleanup()
 	kubelet := testKubelet.kubelet
 	kubeClient := testKubelet.fakeKubeClient
 	kubeClient.AddReactor("get", "nodes",
@@ -353,6 +357,7 @@ func TestVolumeAttachAndMountControllerEnabled(t *testing.T) {
 
 func TestVolumeUnmountAndDetachControllerEnabled(t *testing.T) {
 	testKubelet := newTestKubelet(t, true /* controllerAttachDetachEnabled */)
+	defer testKubelet.Cleanup()
 	kubelet := testKubelet.kubelet
 	kubeClient := testKubelet.fakeKubeClient
 	kubeClient.AddReactor("get", "nodes",

@@ -19,14 +19,15 @@ package generic
 import (
 	"github.com/golang/glog"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apiserver/pkg/storage/storagebackend"
 	"k8s.io/kubernetes/pkg/storage"
-	"k8s.io/kubernetes/pkg/storage/storagebackend"
 	"k8s.io/kubernetes/pkg/storage/storagebackend/factory"
 )
 
-// StorageDecorator is a function signature for producing
-// a storage.Interface from given parameters.
+// StorageDecorator is a function signature for producing a storage.Interface
+// and an associated DestroyFunc from given parameters.
 type StorageDecorator func(
+	copier runtime.ObjectCopier,
 	config *storagebackend.Config,
 	capacity int,
 	objectType runtime.Object,
@@ -36,8 +37,10 @@ type StorageDecorator func(
 	getAttrsFunc storage.AttrFunc,
 	trigger storage.TriggerPublisherFunc) (storage.Interface, factory.DestroyFunc)
 
-// Returns given 'storageInterface' without any decoration.
+// UndecoratedStorage returns the given a new storage from the given config
+// without any decoration.
 func UndecoratedStorage(
+	copier runtime.ObjectCopier,
 	config *storagebackend.Config,
 	capacity int,
 	objectType runtime.Object,

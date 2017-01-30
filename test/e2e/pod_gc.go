@@ -23,9 +23,9 @@ import (
 	. "github.com/onsi/ginkgo"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/util/uuid"
 	"k8s.io/kubernetes/test/e2e/framework"
 )
 
@@ -62,7 +62,7 @@ var _ = framework.KubeDescribe("Pod garbage collector [Feature:PodGarbageCollect
 
 		By(fmt.Sprintf("Waiting for gc controller to gc all but %d pods", gcThreshold))
 		pollErr := wait.Poll(1*time.Minute, timeout, func() (bool, error) {
-			pods, err = f.ClientSet.Core().Pods(f.Namespace.Name).List(v1.ListOptions{})
+			pods, err = f.ClientSet.Core().Pods(f.Namespace.Name).List(metav1.ListOptions{})
 			if err != nil {
 				framework.Logf("Failed to list pod %v", err)
 				return false, nil

@@ -20,13 +20,13 @@ import (
 	"fmt"
 	"io"
 
-	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
+	"k8s.io/apiserver/pkg/util/flag"
+	"k8s.io/client-go/tools/clientcmd"
 	cmdconfig "k8s.io/kubernetes/pkg/kubectl/cmd/config"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/rollout"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/set"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
-	"k8s.io/kubernetes/pkg/util/flag"
 	"k8s.io/kubernetes/pkg/util/i18n"
 
 	"github.com/golang/glog"
@@ -172,6 +172,7 @@ __custom_func() {
 	valid_resources = `Valid resource types include:
 
     * all
+    * certificatesigningrequests (aka 'csr')
     * clusters (valid only for federation apiservers)
     * clusterrolebindings
     * clusterroles
@@ -301,7 +302,7 @@ func NewKubectlCommand(f cmdutil.Factory, in io.Reader, out, err io.Writer) *cob
 			Commands: []*cobra.Command{
 				NewCmdLabel(f, out),
 				NewCmdAnnotate(f, out),
-				NewCmdCompletion(f, out),
+				NewCmdCompletion(f, out, ""),
 			},
 		},
 	}

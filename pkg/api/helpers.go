@@ -25,15 +25,14 @@ import (
 
 	"github.com/davecgh/go-spew/spew"
 
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/conversion"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/selection"
-	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/kubernetes/pkg/api/resource"
 )
 
 // Conversion error conveniently packages up errors in conversions.
@@ -50,8 +49,25 @@ func (c *ConversionError) Error() string {
 	)
 }
 
+const (
+	// annotation key prefix used to identify non-convertible json paths.
+	NonConvertibleAnnotationPrefix = "non-convertible.kubernetes.io"
+)
+
+// NonConvertibleFields iterates over the provided map and filters out all but
+// any keys with the "non-convertible.kubernetes.io" prefix.
+func NonConvertibleFields(annotations map[string]string) map[string]string {
+	nonConvertibleKeys := map[string]string{}
+	for key, value := range annotations {
+		if strings.HasPrefix(key, NonConvertibleAnnotationPrefix) {
+			nonConvertibleKeys[key] = value
+		}
+	}
+	return nonConvertibleKeys
+}
+
 // Semantic can do semantic deep equality checks for api objects.
-// Example: api.Semantic.DeepEqual(aPod, aPodWithNonNilButEmptyMaps) == true
+// Example: apiequality.Semantic.DeepEqual(aPod, aPodWithNonNilButEmptyMaps) == true
 var Semantic = conversion.EqualitiesOrDie(
 	func(a, b resource.Quantity) bool {
 		// Ignore formatting, only care that numeric value stayed the same.
@@ -211,27 +227,6 @@ func IsIntegerResourceName(str string) bool {
 	return integerResources.Has(str) || IsOpaqueIntResourceName(ResourceName(str))
 }
 
-// NewDeleteOptions returns a DeleteOptions indicating the resource should
-// be deleted within the specified grace period. Use zero to indicate
-// immediate deletion. If you would prefer to use the default grace period,
-// use &api.DeleteOptions{} directly.
-func NewDeleteOptions(grace int64) *DeleteOptions {
-	return &DeleteOptions{GracePeriodSeconds: &grace}
-}
-
-// NewPreconditionDeleteOptions returns a DeleteOptions with a UID precondition set.
-func NewPreconditionDeleteOptions(uid string) *DeleteOptions {
-	u := types.UID(uid)
-	p := Preconditions{UID: &u}
-	return &DeleteOptions{Preconditions: &p}
-}
-
-// NewUIDPreconditions returns a Preconditions with UID set.
-func NewUIDPreconditions(uid string) *Preconditions {
-	u := types.UID(uid)
-	return &Preconditions{UID: &u}
-}
-
 // this function aims to check if the service's ClusterIP is set or not
 // the objective is not to perform validation here
 func IsServiceIPSet(service *Service) bool {
@@ -268,14 +263,6 @@ func SetMetaDataAnnotation(obj *ObjectMeta, ann string, value string) {
 
 func IsStandardFinalizerName(str string) bool {
 	return standardFinalizers.Has(str)
-}
-
-// SingleObject returns a ListOptions for watching a single object.
-func SingleObject(meta metav1.ObjectMeta) ListOptions {
-	return ListOptions{
-		FieldSelector:   fields.OneTermEqualSelector("metadata.name", meta.Name),
-		ResourceVersion: meta.ResourceVersion,
-	}
 }
 
 // AddToNodeAddresses appends the NodeAddresses to the passed-by-pointer slice,
@@ -442,10 +429,6 @@ func NodeSelectorRequirementsAsSelector(nsm []NodeSelectorRequirement) (labels.S
 }
 
 const (
-	// AffinityAnnotationKey represents the key of affinity data (json serialized)
-	// in the Annotations of a Pod.
-	AffinityAnnotationKey string = "scheduler.alpha.kubernetes.io/affinity"
-
 	// TolerationsAnnotationKey represents the key of tolerations data (json serialized)
 	// in the Annotations of a Pod.
 	TolerationsAnnotationKey string = "scheduler.alpha.kubernetes.io/tolerations"

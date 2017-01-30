@@ -22,9 +22,9 @@ import (
 	"testing"
 
 	"k8s.io/apimachinery/pkg/types"
+	utiltesting "k8s.io/client-go/util/testing"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/util/mount"
-	utiltesting "k8s.io/kubernetes/pkg/util/testing"
 	"k8s.io/kubernetes/pkg/volume"
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
 
@@ -165,7 +165,8 @@ func TestPlugin(t *testing.T) {
 
 func TestGetByName(t *testing.T) {
 	assert := assert.New(t)
-	plugMgr, _ := newInitializedVolumePlugMgr(t)
+	plugMgr, dir := newInitializedVolumePlugMgr(t)
+	defer os.RemoveAll(dir)
 
 	plug, err := plugMgr.FindPluginByName(pluginName)
 	assert.NotNil(plug, "Can't find the plugin by name")
@@ -174,7 +175,8 @@ func TestGetByName(t *testing.T) {
 
 func TestCanSupport(t *testing.T) {
 	assert := assert.New(t)
-	plugMgr, _ := newInitializedVolumePlugMgr(t)
+	plugMgr, dir := newInitializedVolumePlugMgr(t)
+	defer os.RemoveAll(dir)
 
 	plug, err := plugMgr.FindPluginByName(pluginName)
 	assert.NoError(err)
@@ -242,7 +244,8 @@ func TestGetFlockerVolumeSource(t *testing.T) {
 func TestNewMounterDatasetName(t *testing.T) {
 	assert := assert.New(t)
 
-	plugMgr, _ := newInitializedVolumePlugMgr(t)
+	plugMgr, dir := newInitializedVolumePlugMgr(t)
+	defer os.RemoveAll(dir)
 	plug, err := plugMgr.FindPluginByName(pluginName)
 	assert.NoError(err)
 
@@ -263,7 +266,8 @@ func TestNewMounterDatasetName(t *testing.T) {
 func TestNewMounterDatasetUUID(t *testing.T) {
 	assert := assert.New(t)
 
-	plugMgr, _ := newInitializedVolumePlugMgr(t)
+	plugMgr, dir := newInitializedVolumePlugMgr(t)
+	defer os.RemoveAll(dir)
 	plug, err := plugMgr.FindPluginByName(pluginName)
 	assert.NoError(err)
 

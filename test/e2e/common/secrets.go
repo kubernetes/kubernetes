@@ -19,13 +19,16 @@ package common
 import (
 	"fmt"
 	"os"
+	"path"
+	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/util/uuid"
 	"k8s.io/kubernetes/test/e2e/framework"
 
 	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/gomega"
 )
 
 var _ = framework.KubeDescribe("Secrets", func() {
@@ -150,6 +153,183 @@ var _ = framework.KubeDescribe("Secrets", func() {
 		})
 	})
 
+	It("optional updates should be reflected in volume [Conformance] [Volume]", func() {
+
+		// We may have to wait or a full sync period to elapse before the
+		// Kubelet projects the update into the volume and the container picks
+		// it up. This timeout is based on the default Kubelet sync period (1
+		// minute) plus additional time for fudge factor.
+		const podLogTimeout = 300 * time.Second
+		trueVal := true
+
+		volumeMountPath := "/etc/secret-volumes"
+
+		deleteName := "s-test-opt-del-" + string(uuid.NewUUID())
+		deleteContainerName := "dels-volume-test"
+		deleteVolumeName := "deletes-volume"
+		deleteSecret := &v1.Secret{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: f.Namespace.Name,
+				Name:      deleteName,
+			},
+			Data: map[string][]byte{
+				"data-1": []byte("value-1"),
+			},
+		}
+
+		updateName := "s-test-opt-upd-" + string(uuid.NewUUID())
+		updateContainerName := "upds-volume-test"
+		updateVolumeName := "updates-volume"
+		updateSecret := &v1.Secret{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: f.Namespace.Name,
+				Name:      updateName,
+			},
+			Data: map[string][]byte{
+				"data-1": []byte("value-1"),
+			},
+		}
+
+		createName := "s-test-opt-create-" + string(uuid.NewUUID())
+		createContainerName := "creates-volume-test"
+		createVolumeName := "creates-volume"
+		createSecret := &v1.Secret{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: f.Namespace.Name,
+				Name:      createName,
+			},
+			Data: map[string][]byte{
+				"data-1": []byte("value-1"),
+			},
+		}
+
+		By(fmt.Sprintf("Creating secret with name %s", deleteSecret.Name))
+		var err error
+		if deleteSecret, err = f.ClientSet.Core().Secrets(f.Namespace.Name).Create(deleteSecret); err != nil {
+			framework.Failf("unable to create test secret %s: %v", deleteSecret.Name, err)
+		}
+
+		By(fmt.Sprintf("Creating secret with name %s", updateSecret.Name))
+		if updateSecret, err = f.ClientSet.Core().Secrets(f.Namespace.Name).Create(updateSecret); err != nil {
+			framework.Failf("unable to create test secret %s: %v", updateSecret.Name, err)
+		}
+
+		pod := &v1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "pod-secrets-" + string(uuid.NewUUID()),
+			},
+			Spec: v1.PodSpec{
+				Volumes: []v1.Volume{
+					{
+						Name: deleteVolumeName,
+						VolumeSource: v1.VolumeSource{
+							Secret: &v1.SecretVolumeSource{
+								SecretName: deleteName,
+								Optional:   &trueVal,
+							},
+						},
+					},
+					{
+						Name: updateVolumeName,
+						VolumeSource: v1.VolumeSource{
+							Secret: &v1.SecretVolumeSource{
+								SecretName: updateName,
+								Optional:   &trueVal,
+							},
+						},
+					},
+					{
+						Name: createVolumeName,
+						VolumeSource: v1.VolumeSource{
+							Secret: &v1.SecretVolumeSource{
+								SecretName: createName,
+								Optional:   &trueVal,
+							},
+						},
+					},
+				},
+				Containers: []v1.Container{
+					{
+						Name:    deleteContainerName,
+						Image:   "gcr.io/google_containers/mounttest:0.7",
+						Command: []string{"/mt", "--break_on_expected_content=false", "--retry_time=120", "--file_content_in_loop=/etc/secret-volumes/delete/data-1"},
+						VolumeMounts: []v1.VolumeMount{
+							{
+								Name:      deleteVolumeName,
+								MountPath: path.Join(volumeMountPath, "delete"),
+								ReadOnly:  true,
+							},
+						},
+					},
+					{
+						Name:    updateContainerName,
+						Image:   "gcr.io/google_containers/mounttest:0.7",
+						Command: []string{"/mt", "--break_on_expected_content=false", "--retry_time=120", "--file_content_in_loop=/etc/secret-volumes/update/data-3"},
+						VolumeMounts: []v1.VolumeMount{
+							{
+								Name:      updateVolumeName,
+								MountPath: path.Join(volumeMountPath, "update"),
+								ReadOnly:  true,
+							},
+						},
+					},
+					{
+						Name:    createContainerName,
+						Image:   "gcr.io/google_containers/mounttest:0.7",
+						Command: []string{"/mt", "--break_on_expected_content=false", "--retry_time=120", "--file_content_in_loop=/etc/secret-volumes/create/data-1"},
+						VolumeMounts: []v1.VolumeMount{
+							{
+								Name:      createVolumeName,
+								MountPath: path.Join(volumeMountPath, "create"),
+								ReadOnly:  true,
+							},
+						},
+					},
+				},
+				RestartPolicy: v1.RestartPolicyNever,
+			},
+		}
+		By("Creating the pod")
+		f.PodClient().CreateSync(pod)
+
+		pollCreateLogs := func() (string, error) {
+			return framework.GetPodLogs(f.ClientSet, f.Namespace.Name, pod.Name, createContainerName)
+		}
+		Eventually(pollCreateLogs, podLogTimeout, framework.Poll).Should(ContainSubstring("Error reading file /etc/secret-volumes/create/data-1"))
+
+		pollUpdateLogs := func() (string, error) {
+			return framework.GetPodLogs(f.ClientSet, f.Namespace.Name, pod.Name, updateContainerName)
+		}
+		Eventually(pollUpdateLogs, podLogTimeout, framework.Poll).Should(ContainSubstring("Error reading file /etc/secret-volumes/update/data-3"))
+
+		pollDeleteLogs := func() (string, error) {
+			return framework.GetPodLogs(f.ClientSet, f.Namespace.Name, pod.Name, deleteContainerName)
+		}
+		Eventually(pollDeleteLogs, podLogTimeout, framework.Poll).Should(ContainSubstring("value-1"))
+
+		By(fmt.Sprintf("Deleting secret %v", deleteSecret.Name))
+		err = f.ClientSet.Core().Secrets(f.Namespace.Name).Delete(deleteSecret.Name, &metav1.DeleteOptions{})
+		Expect(err).NotTo(HaveOccurred(), "Failed to delete secret %q in namespace %q", deleteSecret.Name, f.Namespace.Name)
+
+		By(fmt.Sprintf("Updating secret %v", updateSecret.Name))
+		updateSecret.ResourceVersion = "" // to force update
+		delete(updateSecret.Data, "data-1")
+		updateSecret.Data["data-3"] = []byte("value-3")
+		_, err = f.ClientSet.Core().Secrets(f.Namespace.Name).Update(updateSecret)
+		Expect(err).NotTo(HaveOccurred(), "Failed to update secret %q in namespace %q", updateSecret.Name, f.Namespace.Name)
+
+		By(fmt.Sprintf("Creating secret with name %s", createSecret.Name))
+		if createSecret, err = f.ClientSet.Core().Secrets(f.Namespace.Name).Create(createSecret); err != nil {
+			framework.Failf("unable to create test secret %s: %v", createSecret.Name, err)
+		}
+
+		By("waiting to observe update in volume")
+
+		Eventually(pollCreateLogs, podLogTimeout, framework.Poll).Should(ContainSubstring("value-1"))
+		Eventually(pollUpdateLogs, podLogTimeout, framework.Poll).Should(ContainSubstring("value-3"))
+		Eventually(pollDeleteLogs, podLogTimeout, framework.Poll).Should(ContainSubstring("Error reading file /etc/secret-volumes/delete/data-1"))
+	})
+
 	It("should be consumable from pods in env vars [Conformance]", func() {
 		name := "secret-test-" + string(uuid.NewUUID())
 		secret := secretForTest(f.Namespace.Name, name)
@@ -193,7 +373,61 @@ var _ = framework.KubeDescribe("Secrets", func() {
 			"SECRET_DATA=value-1",
 		})
 	})
+
+	It("should be consumable via the environment [Conformance]", func() {
+		name := "secret-test-" + string(uuid.NewUUID())
+		secret := newEnvFromSecret(f.Namespace.Name, name)
+		By(fmt.Sprintf("creating secret %v/%v", f.Namespace.Name, secret.Name))
+		var err error
+		if secret, err = f.ClientSet.Core().Secrets(f.Namespace.Name).Create(secret); err != nil {
+			framework.Failf("unable to create test secret %s: %v", secret.Name, err)
+		}
+
+		pod := &v1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "pod-configmaps-" + string(uuid.NewUUID()),
+			},
+			Spec: v1.PodSpec{
+				Containers: []v1.Container{
+					{
+						Name:    "env-test",
+						Image:   "gcr.io/google_containers/busybox:1.24",
+						Command: []string{"sh", "-c", "env"},
+						EnvFrom: []v1.EnvFromSource{
+							{
+								SecretRef: &v1.SecretEnvSource{LocalObjectReference: v1.LocalObjectReference{Name: name}},
+							},
+							{
+								Prefix:    "p_",
+								SecretRef: &v1.SecretEnvSource{LocalObjectReference: v1.LocalObjectReference{Name: name}},
+							},
+						},
+					},
+				},
+				RestartPolicy: v1.RestartPolicyNever,
+			},
+		}
+
+		f.TestContainerOutput("consume secrets", pod, 0, []string{
+			"data_1=value-1", "data_2=value-2", "data_3=value-3",
+			"p_data_1=value-1", "p_data_2=value-2", "p_data_3=value-3",
+		})
+	})
 })
+
+func newEnvFromSecret(namespace, name string) *v1.Secret {
+	return &v1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: namespace,
+			Name:      name,
+		},
+		Data: map[string][]byte{
+			"data_1": []byte("value-1\n"),
+			"data_2": []byte("value-2\n"),
+			"data_3": []byte("value-3\n"),
+		},
+	}
+}
 
 func secretForTest(namespace, name string) *v1.Secret {
 	return &v1.Secret{

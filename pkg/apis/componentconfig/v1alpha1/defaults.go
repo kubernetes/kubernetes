@@ -277,7 +277,7 @@ func SetDefaults_KubeletConfiguration(obj *KubeletConfiguration) {
 		obj.LowDiskSpaceThresholdMB = 256
 	}
 	if obj.MasterServiceNamespace == "" {
-		obj.MasterServiceNamespace = api.NamespaceDefault
+		obj.MasterServiceNamespace = metav1.NamespaceDefault
 	}
 	if obj.MaxContainerCount == nil {
 		temp := int32(-1)

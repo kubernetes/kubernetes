@@ -23,7 +23,7 @@ import (
 	"io/ioutil"
 	"os"
 
-	certificates "k8s.io/kubernetes/pkg/apis/certificates/v1alpha1"
+	certificates "k8s.io/kubernetes/pkg/apis/certificates/v1beta1"
 
 	"github.com/cloudflare/cfssl/config"
 	"github.com/cloudflare/cfssl/helpers"

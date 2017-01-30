@@ -21,7 +21,7 @@ import (
 	"sort"
 
 	"github.com/golang/glog"
-	"k8s.io/client-go/pkg/util/integer"
+	"k8s.io/client-go/util/integer"
 	extensions "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	"k8s.io/kubernetes/pkg/controller"
 	deploymentutil "k8s.io/kubernetes/pkg/controller/deployment/util"

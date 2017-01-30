@@ -213,8 +213,11 @@ type VolumeHost interface {
 	// Returns host IP or nil in the case of error.
 	GetHostIP() (net.IP, error)
 
-	// Returns node allocatable
+	// Returns node allocatable.
 	GetNodeAllocatable() (v1.ResourceList, error)
+
+	// Returns a function that returns a secret.
+	GetSecretFunc() func(namespace, name string) (*v1.Secret, error)
 }
 
 // VolumePluginMgr tracks registered plugins.
@@ -532,7 +535,7 @@ func NewPersistentVolumeRecyclerPodTemplate() *v1.Pod {
 	pod := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			GenerateName: "pv-recycler-",
-			Namespace:    v1.NamespaceDefault,
+			Namespace:    metav1.NamespaceDefault,
 		},
 		Spec: v1.PodSpec{
 			ActiveDeadlineSeconds: &timeout,

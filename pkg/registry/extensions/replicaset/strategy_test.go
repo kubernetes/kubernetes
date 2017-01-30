@@ -43,12 +43,12 @@ func TestReplicaSetStrategy(t *testing.T) {
 			Spec: api.PodSpec{
 				RestartPolicy: api.RestartPolicyAlways,
 				DNSPolicy:     api.DNSClusterFirst,
-				Containers:    []api.Container{{Name: "abc", Image: "image", ImagePullPolicy: "IfNotPresent"}},
+				Containers:    []api.Container{{Name: "abc", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: api.TerminationMessageReadFile}},
 			},
 		},
 	}
 	rs := &extensions.ReplicaSet{
-		ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
+		ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
 		Spec: extensions.ReplicaSetSpec{
 			Selector: &metav1.LabelSelector{MatchLabels: validSelector},
 			Template: validPodTemplate.Template,
@@ -106,7 +106,7 @@ func TestReplicaSetStatusStrategy(t *testing.T) {
 		},
 	}
 	oldRS := &extensions.ReplicaSet{
-		ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault, ResourceVersion: "10"},
+		ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault, ResourceVersion: "10"},
 		Spec: extensions.ReplicaSetSpec{
 			Replicas: 3,
 			Selector: &metav1.LabelSelector{MatchLabels: validSelector},
@@ -118,7 +118,7 @@ func TestReplicaSetStatusStrategy(t *testing.T) {
 		},
 	}
 	newRS := &extensions.ReplicaSet{
-		ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault, ResourceVersion: "9"},
+		ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault, ResourceVersion: "9"},
 		Spec: extensions.ReplicaSetSpec{
 			Replicas: 1,
 			Selector: &metav1.LabelSelector{MatchLabels: validSelector},

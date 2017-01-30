@@ -17,10 +17,11 @@ limitations under the License.
 package fake
 
 import (
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/runtime"
+	core "k8s.io/client-go/testing"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/client/testing/core"
 )
 
 func (c *FakeEvents) CreateWithEventNamespace(event *api.Event) (*api.Event, error) {
@@ -66,9 +67,9 @@ func (c *FakeEvents) PatchWithEventNamespace(event *api.Event, data []byte) (*ap
 
 // Search returns a list of events matching the specified object.
 func (c *FakeEvents) Search(objOrRef runtime.Object) (*api.EventList, error) {
-	action := core.NewRootListAction(eventsResource, api.ListOptions{})
+	action := core.NewRootListAction(eventsResource, metav1.ListOptions{})
 	if c.ns != "" {
-		action = core.NewListAction(eventsResource, c.ns, api.ListOptions{})
+		action = core.NewListAction(eventsResource, c.ns, metav1.ListOptions{})
 	}
 	obj, err := c.Fake.Invokes(action, &api.EventList{})
 	if obj == nil {

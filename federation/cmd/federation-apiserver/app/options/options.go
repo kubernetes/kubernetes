@@ -23,6 +23,9 @@ import (
 	genericoptions "k8s.io/kubernetes/pkg/genericapiserver/server/options"
 	kubeoptions "k8s.io/kubernetes/pkg/kubeapiserver/options"
 
+	// add the kubernetes feature gates
+	_ "k8s.io/kubernetes/pkg/features"
+
 	"github.com/spf13/pflag"
 )
 

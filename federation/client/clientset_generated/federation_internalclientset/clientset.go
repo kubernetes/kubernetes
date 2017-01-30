@@ -18,19 +18,22 @@ package federation_internalclientset
 
 import (
 	"github.com/golang/glog"
-	"k8s.io/client-go/pkg/util/flowcontrol"
+	discovery "k8s.io/client-go/discovery"
+	_ "k8s.io/client-go/plugin/pkg/client/auth"
+	rest "k8s.io/client-go/rest"
+	"k8s.io/client-go/util/flowcontrol"
+	internalversionautoscaling "k8s.io/kubernetes/federation/client/clientset_generated/federation_internalclientset/typed/autoscaling/internalversion"
 	internalversionbatch "k8s.io/kubernetes/federation/client/clientset_generated/federation_internalclientset/typed/batch/internalversion"
 	internalversioncore "k8s.io/kubernetes/federation/client/clientset_generated/federation_internalclientset/typed/core/internalversion"
 	internalversionextensions "k8s.io/kubernetes/federation/client/clientset_generated/federation_internalclientset/typed/extensions/internalversion"
 	internalversionfederation "k8s.io/kubernetes/federation/client/clientset_generated/federation_internalclientset/typed/federation/internalversion"
-	restclient "k8s.io/kubernetes/pkg/client/restclient"
-	discovery "k8s.io/kubernetes/pkg/client/typed/discovery"
-	_ "k8s.io/kubernetes/plugin/pkg/client/auth"
 )
 
 type Interface interface {
 	Discovery() discovery.DiscoveryInterface
 	Core() internalversioncore.CoreInterface
+
+	Autoscaling() internalversionautoscaling.AutoscalingInterface
 
 	Batch() internalversionbatch.BatchInterface
 
@@ -44,6 +47,7 @@ type Interface interface {
 type Clientset struct {
 	*discovery.DiscoveryClient
 	*internalversioncore.CoreClient
+	*internalversionautoscaling.AutoscalingClient
 	*internalversionbatch.BatchClient
 	*internalversionextensions.ExtensionsClient
 	*internalversionfederation.FederationClient
@@ -55,6 +59,14 @@ func (c *Clientset) Core() internalversioncore.CoreInterface {
 		return nil
 	}
 	return c.CoreClient
+}
+
+// Autoscaling retrieves the AutoscalingClient
+func (c *Clientset) Autoscaling() internalversionautoscaling.AutoscalingInterface {
+	if c == nil {
+		return nil
+	}
+	return c.AutoscalingClient
 }
 
 // Batch retrieves the BatchClient
@@ -90,7 +102,7 @@ func (c *Clientset) Discovery() discovery.DiscoveryInterface {
 }
 
 // NewForConfig creates a new Clientset for the given config.
-func NewForConfig(c *restclient.Config) (*Clientset, error) {
+func NewForConfig(c *rest.Config) (*Clientset, error) {
 	configShallowCopy := *c
 	if configShallowCopy.RateLimiter == nil && configShallowCopy.QPS > 0 {
 		configShallowCopy.RateLimiter = flowcontrol.NewTokenBucketRateLimiter(configShallowCopy.QPS, configShallowCopy.Burst)
@@ -98,6 +110,10 @@ func NewForConfig(c *restclient.Config) (*Clientset, error) {
 	var cs Clientset
 	var err error
 	cs.CoreClient, err = internalversioncore.NewForConfig(&configShallowCopy)
+	if err != nil {
+		return nil, err
+	}
+	cs.AutoscalingClient, err = internalversionautoscaling.NewForConfig(&configShallowCopy)
 	if err != nil {
 		return nil, err
 	}
@@ -124,9 +140,10 @@ func NewForConfig(c *restclient.Config) (*Clientset, error) {
 
 // NewForConfigOrDie creates a new Clientset for the given config and
 // panics if there is an error in the config.
-func NewForConfigOrDie(c *restclient.Config) *Clientset {
+func NewForConfigOrDie(c *rest.Config) *Clientset {
 	var cs Clientset
 	cs.CoreClient = internalversioncore.NewForConfigOrDie(c)
+	cs.AutoscalingClient = internalversionautoscaling.NewForConfigOrDie(c)
 	cs.BatchClient = internalversionbatch.NewForConfigOrDie(c)
 	cs.ExtensionsClient = internalversionextensions.NewForConfigOrDie(c)
 	cs.FederationClient = internalversionfederation.NewForConfigOrDie(c)
@@ -136,9 +153,10 @@ func NewForConfigOrDie(c *restclient.Config) *Clientset {
 }
 
 // New creates a new Clientset for the given RESTClient.
-func New(c restclient.Interface) *Clientset {
+func New(c rest.Interface) *Clientset {
 	var cs Clientset
 	cs.CoreClient = internalversioncore.New(c)
+	cs.AutoscalingClient = internalversionautoscaling.New(c)
 	cs.BatchClient = internalversionbatch.New(c)
 	cs.ExtensionsClient = internalversionextensions.New(c)
 	cs.FederationClient = internalversionfederation.New(c)

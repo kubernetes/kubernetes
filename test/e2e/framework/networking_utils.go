@@ -34,12 +34,12 @@ import (
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
 	coreclientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/core/v1"
 	"k8s.io/kubernetes/pkg/util/intstr"
-	"k8s.io/kubernetes/pkg/util/uuid"
 )
 
 const (
@@ -501,7 +501,7 @@ func (config *NetworkingTestConfig) setup(selector map[string]string) {
 
 func (config *NetworkingTestConfig) cleanup() {
 	nsClient := config.getNamespacesClient()
-	nsList, err := nsClient.List(v1.ListOptions{})
+	nsList, err := nsClient.List(metav1.ListOptions{})
 	if err == nil {
 		for _, ns := range nsList.Items {
 			if strings.Contains(ns.Name, config.f.BaseName) && ns.Name != config.Namespace {
@@ -558,7 +558,7 @@ func (config *NetworkingTestConfig) createNetProxyPods(podName string, selector 
 
 func (config *NetworkingTestConfig) DeleteNetProxyPod() {
 	pod := config.EndpointPods[0]
-	config.getPodClient().Delete(pod.Name, v1.NewDeleteOptions(0))
+	config.getPodClient().Delete(pod.Name, metav1.NewDeleteOptions(0))
 	config.EndpointPods = config.EndpointPods[1:]
 	// wait for pod being deleted.
 	err := WaitForPodToDisappear(config.f.ClientSet, config.Namespace, pod.Name, labels.Everything(), time.Second, wait.ForeverTestTimeout)

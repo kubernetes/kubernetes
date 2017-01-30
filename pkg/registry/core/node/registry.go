@@ -17,6 +17,7 @@ limitations under the License.
 package node
 
 import (
+	metainternalversion "k8s.io/apimachinery/pkg/apis/meta/internalversion"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/watch"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
@@ -26,12 +27,12 @@ import (
 
 // Registry is an interface for things that know how to store node.
 type Registry interface {
-	ListNodes(ctx genericapirequest.Context, options *api.ListOptions) (*api.NodeList, error)
+	ListNodes(ctx genericapirequest.Context, options *metainternalversion.ListOptions) (*api.NodeList, error)
 	CreateNode(ctx genericapirequest.Context, node *api.Node) error
 	UpdateNode(ctx genericapirequest.Context, node *api.Node) error
 	GetNode(ctx genericapirequest.Context, nodeID string, options *metav1.GetOptions) (*api.Node, error)
 	DeleteNode(ctx genericapirequest.Context, nodeID string) error
-	WatchNodes(ctx genericapirequest.Context, options *api.ListOptions) (watch.Interface, error)
+	WatchNodes(ctx genericapirequest.Context, options *metainternalversion.ListOptions) (watch.Interface, error)
 }
 
 // storage puts strong typing around storage calls
@@ -45,7 +46,7 @@ func NewRegistry(s rest.StandardStorage) Registry {
 	return &storage{s}
 }
 
-func (s *storage) ListNodes(ctx genericapirequest.Context, options *api.ListOptions) (*api.NodeList, error) {
+func (s *storage) ListNodes(ctx genericapirequest.Context, options *metainternalversion.ListOptions) (*api.NodeList, error) {
 	obj, err := s.List(ctx, options)
 	if err != nil {
 		return nil, err
@@ -64,7 +65,7 @@ func (s *storage) UpdateNode(ctx genericapirequest.Context, node *api.Node) erro
 	return err
 }
 
-func (s *storage) WatchNodes(ctx genericapirequest.Context, options *api.ListOptions) (watch.Interface, error) {
+func (s *storage) WatchNodes(ctx genericapirequest.Context, options *metainternalversion.ListOptions) (watch.Interface, error) {
 	return s.Watch(ctx, options)
 }
 

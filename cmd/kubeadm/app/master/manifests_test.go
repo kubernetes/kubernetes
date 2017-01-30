@@ -33,7 +33,7 @@ func TestWriteStaticPodManifests(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Couldn't create tmpdir")
 	}
-	defer os.Remove(tmpdir)
+	defer os.RemoveAll(tmpdir)
 
 	// set up tmp GlobalEnvParams values for testing
 	oldEnv := kubeadmapi.GlobalEnvParams
@@ -372,13 +372,16 @@ func TestGetAPIServerCommand(t *testing.T) {
 				"--insecure-bind-address=127.0.0.1",
 				"--admission-control=NamespaceLifecycle,LimitRanger,ServiceAccount,PersistentVolumeLabel,DefaultStorageClass,ResourceQuota",
 				"--service-cluster-ip-range=bar",
-				"--service-account-key-file=" + kubeadmapi.GlobalEnvParams.HostPKIPath + "/apiserver-key.pem",
-				"--client-ca-file=" + kubeadmapi.GlobalEnvParams.HostPKIPath + "/ca.pem",
-				"--tls-cert-file=" + kubeadmapi.GlobalEnvParams.HostPKIPath + "/apiserver.pem",
-				"--tls-private-key-file=" + kubeadmapi.GlobalEnvParams.HostPKIPath + "/apiserver-key.pem",
+				"--service-account-key-file=" + kubeadmapi.GlobalEnvParams.HostPKIPath + "/apiserver.key",
+				"--client-ca-file=" + kubeadmapi.GlobalEnvParams.HostPKIPath + "/ca.crt",
+				"--tls-cert-file=" + kubeadmapi.GlobalEnvParams.HostPKIPath + "/apiserver.crt",
+				"--tls-private-key-file=" + kubeadmapi.GlobalEnvParams.HostPKIPath + "/apiserver.key",
+				"--kubelet-client-certificate=" + kubeadmapi.GlobalEnvParams.HostPKIPath + "/apiserver-kubelet-client.crt",
+				"--kubelet-client-key=" + kubeadmapi.GlobalEnvParams.HostPKIPath + "/apiserver-kubelet-client.key",
 				"--token-auth-file=" + kubeadmapi.GlobalEnvParams.HostPKIPath + "/tokens.csv",
 				fmt.Sprintf("--secure-port=%d", 123),
 				"--allow-privileged",
+				"--storage-backend=etcd3",
 				"--etcd-servers=http://127.0.0.1:2379",
 			},
 		},
@@ -392,13 +395,16 @@ func TestGetAPIServerCommand(t *testing.T) {
 				"--insecure-bind-address=127.0.0.1",
 				"--admission-control=NamespaceLifecycle,LimitRanger,ServiceAccount,PersistentVolumeLabel,DefaultStorageClass,ResourceQuota",
 				"--service-cluster-ip-range=bar",
-				"--service-account-key-file=" + kubeadmapi.GlobalEnvParams.HostPKIPath + "/apiserver-key.pem",
-				"--client-ca-file=" + kubeadmapi.GlobalEnvParams.HostPKIPath + "/ca.pem",
-				"--tls-cert-file=" + kubeadmapi.GlobalEnvParams.HostPKIPath + "/apiserver.pem",
-				"--tls-private-key-file=" + kubeadmapi.GlobalEnvParams.HostPKIPath + "/apiserver-key.pem",
+				"--service-account-key-file=" + kubeadmapi.GlobalEnvParams.HostPKIPath + "/apiserver.key",
+				"--client-ca-file=" + kubeadmapi.GlobalEnvParams.HostPKIPath + "/ca.crt",
+				"--tls-cert-file=" + kubeadmapi.GlobalEnvParams.HostPKIPath + "/apiserver.crt",
+				"--tls-private-key-file=" + kubeadmapi.GlobalEnvParams.HostPKIPath + "/apiserver.key",
+				"--kubelet-client-certificate=" + kubeadmapi.GlobalEnvParams.HostPKIPath + "/apiserver-kubelet-client.crt",
+				"--kubelet-client-key=" + kubeadmapi.GlobalEnvParams.HostPKIPath + "/apiserver-kubelet-client.key",
 				"--token-auth-file=" + kubeadmapi.GlobalEnvParams.HostPKIPath + "/tokens.csv",
 				fmt.Sprintf("--secure-port=%d", 123),
 				"--allow-privileged",
+				"--storage-backend=etcd3",
 				"--advertise-address=foo",
 				"--etcd-servers=http://127.0.0.1:2379",
 			},
@@ -414,13 +420,16 @@ func TestGetAPIServerCommand(t *testing.T) {
 				"--insecure-bind-address=127.0.0.1",
 				"--admission-control=NamespaceLifecycle,LimitRanger,ServiceAccount,PersistentVolumeLabel,DefaultStorageClass,ResourceQuota",
 				"--service-cluster-ip-range=bar",
-				"--service-account-key-file=" + kubeadmapi.GlobalEnvParams.HostPKIPath + "/apiserver-key.pem",
-				"--client-ca-file=" + kubeadmapi.GlobalEnvParams.HostPKIPath + "/ca.pem",
-				"--tls-cert-file=" + kubeadmapi.GlobalEnvParams.HostPKIPath + "/apiserver.pem",
-				"--tls-private-key-file=" + kubeadmapi.GlobalEnvParams.HostPKIPath + "/apiserver-key.pem",
+				"--service-account-key-file=" + kubeadmapi.GlobalEnvParams.HostPKIPath + "/apiserver.key",
+				"--client-ca-file=" + kubeadmapi.GlobalEnvParams.HostPKIPath + "/ca.crt",
+				"--tls-cert-file=" + kubeadmapi.GlobalEnvParams.HostPKIPath + "/apiserver.crt",
+				"--tls-private-key-file=" + kubeadmapi.GlobalEnvParams.HostPKIPath + "/apiserver.key",
+				"--kubelet-client-certificate=" + kubeadmapi.GlobalEnvParams.HostPKIPath + "/apiserver-kubelet-client.crt",
+				"--kubelet-client-key=" + kubeadmapi.GlobalEnvParams.HostPKIPath + "/apiserver-kubelet-client.key",
 				"--token-auth-file=" + kubeadmapi.GlobalEnvParams.HostPKIPath + "/tokens.csv",
 				fmt.Sprintf("--secure-port=%d", 123),
 				"--allow-privileged",
+				"--storage-backend=etcd3",
 				"--etcd-servers=http://127.0.0.1:2379",
 				"--etcd-certfile=fiz",
 				"--etcd-keyfile=faz",
@@ -438,13 +447,16 @@ func TestGetAPIServerCommand(t *testing.T) {
 				"--insecure-bind-address=127.0.0.1",
 				"--admission-control=NamespaceLifecycle,LimitRanger,ServiceAccount,PersistentVolumeLabel,DefaultStorageClass,ResourceQuota",
 				"--service-cluster-ip-range=bar",
-				"--service-account-key-file=" + kubeadmapi.GlobalEnvParams.HostPKIPath + "/apiserver-key.pem",
-				"--client-ca-file=" + kubeadmapi.GlobalEnvParams.HostPKIPath + "/ca.pem",
-				"--tls-cert-file=" + kubeadmapi.GlobalEnvParams.HostPKIPath + "/apiserver.pem",
-				"--tls-private-key-file=" + kubeadmapi.GlobalEnvParams.HostPKIPath + "/apiserver-key.pem",
+				"--service-account-key-file=" + kubeadmapi.GlobalEnvParams.HostPKIPath + "/apiserver.key",
+				"--client-ca-file=" + kubeadmapi.GlobalEnvParams.HostPKIPath + "/ca.crt",
+				"--tls-cert-file=" + kubeadmapi.GlobalEnvParams.HostPKIPath + "/apiserver.crt",
+				"--tls-private-key-file=" + kubeadmapi.GlobalEnvParams.HostPKIPath + "/apiserver.key",
+				"--kubelet-client-certificate=" + kubeadmapi.GlobalEnvParams.HostPKIPath + "/apiserver-kubelet-client.crt",
+				"--kubelet-client-key=" + kubeadmapi.GlobalEnvParams.HostPKIPath + "/apiserver-kubelet-client.key",
 				"--token-auth-file=" + kubeadmapi.GlobalEnvParams.HostPKIPath + "/tokens.csv",
 				fmt.Sprintf("--secure-port=%d", 123),
 				"--allow-privileged",
+				"--storage-backend=etcd3",
 				"--advertise-address=foo",
 				"--kubelet-preferred-address-types=InternalIP,ExternalIP,Hostname",
 				"--anonymous-auth=false",
@@ -454,7 +466,7 @@ func TestGetAPIServerCommand(t *testing.T) {
 	}
 
 	for _, rt := range tests {
-		actual := getAPIServerCommand(rt.cfg)
+		actual := getAPIServerCommand(rt.cfg, false)
 		for i := range actual {
 			if actual[i] != rt.expected[i] {
 				t.Errorf(
@@ -480,10 +492,10 @@ func TestGetControllerManagerCommand(t *testing.T) {
 				"--leader-elect",
 				"--master=127.0.0.1:8080",
 				"--cluster-name=" + DefaultClusterName,
-				"--root-ca-file=" + kubeadmapi.GlobalEnvParams.HostPKIPath + "/ca.pem",
-				"--service-account-private-key-file=" + kubeadmapi.GlobalEnvParams.HostPKIPath + "/apiserver-key.pem",
-				"--cluster-signing-cert-file=" + kubeadmapi.GlobalEnvParams.HostPKIPath + "/ca.pem",
-				"--cluster-signing-key-file=" + kubeadmapi.GlobalEnvParams.HostPKIPath + "/ca-key.pem",
+				"--root-ca-file=" + kubeadmapi.GlobalEnvParams.HostPKIPath + "/ca.crt",
+				"--service-account-private-key-file=" + kubeadmapi.GlobalEnvParams.HostPKIPath + "/apiserver.key",
+				"--cluster-signing-cert-file=" + kubeadmapi.GlobalEnvParams.HostPKIPath + "/ca.crt",
+				"--cluster-signing-key-file=" + kubeadmapi.GlobalEnvParams.HostPKIPath + "/ca.key",
 				"--insecure-experimental-approve-all-kubelet-csrs-for-group=kubeadm:kubelet-bootstrap",
 			},
 		},
@@ -495,10 +507,10 @@ func TestGetControllerManagerCommand(t *testing.T) {
 				"--leader-elect",
 				"--master=127.0.0.1:8080",
 				"--cluster-name=" + DefaultClusterName,
-				"--root-ca-file=" + kubeadmapi.GlobalEnvParams.HostPKIPath + "/ca.pem",
-				"--service-account-private-key-file=" + kubeadmapi.GlobalEnvParams.HostPKIPath + "/apiserver-key.pem",
-				"--cluster-signing-cert-file=" + kubeadmapi.GlobalEnvParams.HostPKIPath + "/ca.pem",
-				"--cluster-signing-key-file=" + kubeadmapi.GlobalEnvParams.HostPKIPath + "/ca-key.pem",
+				"--root-ca-file=" + kubeadmapi.GlobalEnvParams.HostPKIPath + "/ca.crt",
+				"--service-account-private-key-file=" + kubeadmapi.GlobalEnvParams.HostPKIPath + "/apiserver.key",
+				"--cluster-signing-cert-file=" + kubeadmapi.GlobalEnvParams.HostPKIPath + "/ca.crt",
+				"--cluster-signing-key-file=" + kubeadmapi.GlobalEnvParams.HostPKIPath + "/ca.key",
 				"--insecure-experimental-approve-all-kubelet-csrs-for-group=kubeadm:kubelet-bootstrap",
 				"--cloud-provider=foo",
 			},
@@ -511,10 +523,10 @@ func TestGetControllerManagerCommand(t *testing.T) {
 				"--leader-elect",
 				"--master=127.0.0.1:8080",
 				"--cluster-name=" + DefaultClusterName,
-				"--root-ca-file=" + kubeadmapi.GlobalEnvParams.HostPKIPath + "/ca.pem",
-				"--service-account-private-key-file=" + kubeadmapi.GlobalEnvParams.HostPKIPath + "/apiserver-key.pem",
-				"--cluster-signing-cert-file=" + kubeadmapi.GlobalEnvParams.HostPKIPath + "/ca.pem",
-				"--cluster-signing-key-file=" + kubeadmapi.GlobalEnvParams.HostPKIPath + "/ca-key.pem",
+				"--root-ca-file=" + kubeadmapi.GlobalEnvParams.HostPKIPath + "/ca.crt",
+				"--service-account-private-key-file=" + kubeadmapi.GlobalEnvParams.HostPKIPath + "/apiserver.key",
+				"--cluster-signing-cert-file=" + kubeadmapi.GlobalEnvParams.HostPKIPath + "/ca.crt",
+				"--cluster-signing-key-file=" + kubeadmapi.GlobalEnvParams.HostPKIPath + "/ca.key",
 				"--insecure-experimental-approve-all-kubelet-csrs-for-group=kubeadm:kubelet-bootstrap",
 				"--allocate-node-cidrs=true",
 				"--cluster-cidr=bar",
@@ -523,7 +535,7 @@ func TestGetControllerManagerCommand(t *testing.T) {
 	}
 
 	for _, rt := range tests {
-		actual := getControllerManagerCommand(rt.cfg)
+		actual := getControllerManagerCommand(rt.cfg, false)
 		for i := range actual {
 			if actual[i] != rt.expected[i] {
 				t.Errorf(
@@ -553,7 +565,7 @@ func TestGetSchedulerCommand(t *testing.T) {
 	}
 
 	for _, rt := range tests {
-		actual := getSchedulerCommand(rt.cfg)
+		actual := getSchedulerCommand(rt.cfg, false)
 		for i := range actual {
 			if actual[i] != rt.expected[i] {
 				t.Errorf(

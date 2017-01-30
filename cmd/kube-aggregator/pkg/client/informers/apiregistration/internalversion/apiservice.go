@@ -19,15 +19,14 @@ limitations under the License.
 package internalversion
 
 import (
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	watch "k8s.io/apimachinery/pkg/watch"
+	cache "k8s.io/client-go/tools/cache"
 	apiregistration "k8s.io/kubernetes/cmd/kube-aggregator/pkg/apis/apiregistration"
 	internalclientset "k8s.io/kubernetes/cmd/kube-aggregator/pkg/client/clientset_generated/internalclientset"
 	internalinterfaces "k8s.io/kubernetes/cmd/kube-aggregator/pkg/client/informers/internalinterfaces"
 	internalversion "k8s.io/kubernetes/cmd/kube-aggregator/pkg/client/listers/apiregistration/internalversion"
-	api "k8s.io/kubernetes/pkg/api"
-	v1 "k8s.io/kubernetes/pkg/api/v1"
-	cache "k8s.io/kubernetes/pkg/client/cache"
 	time "time"
 )
 
@@ -46,18 +45,10 @@ func newAPIServiceInformer(client internalclientset.Interface, resyncPeriod time
 	sharedIndexInformer := cache.NewSharedIndexInformer(
 		&cache.ListWatch{
 			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
-				var internalOptions api.ListOptions
-				if err := api.Scheme.Convert(&options, &internalOptions, nil); err != nil {
-					return nil, err
-				}
-				return client.Apiregistration().APIServices().List(internalOptions)
+				return client.Apiregistration().APIServices().List(options)
 			},
 			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
-				var internalOptions api.ListOptions
-				if err := api.Scheme.Convert(&options, &internalOptions, nil); err != nil {
-					return nil, err
-				}
-				return client.Apiregistration().APIServices().Watch(internalOptions)
+				return client.Apiregistration().APIServices().Watch(options)
 			},
 		},
 		&apiregistration.APIService{},

@@ -828,26 +828,42 @@ func ValidateNetworkPolicySpec(spec *extensions.NetworkPolicySpec, fldPath *fiel
 	allErrs = append(allErrs, unversionedvalidation.ValidateLabelSelector(&spec.PodSelector, fldPath.Child("podSelector"))...)
 
 	// Validate ingress rules.
-	for _, i := range spec.Ingress {
-		// TODO: Update From to be a pointer to slice as soon as auto-generation supports it.
-		for _, f := range i.From {
-			numFroms := 0
-			if f.PodSelector != nil {
-				numFroms++
-				allErrs = append(allErrs, unversionedvalidation.ValidateLabelSelector(f.PodSelector, fldPath.Child("podSelector"))...)
+	for i, ingress := range spec.Ingress {
+		ingressPath := fldPath.Child("ingress").Index(i)
+		for i, port := range ingress.Ports {
+			portPath := ingressPath.Child("ports").Index(i)
+			if port.Protocol != nil && *port.Protocol != api.ProtocolTCP && *port.Protocol != api.ProtocolUDP {
+				allErrs = append(allErrs, field.NotSupported(portPath.Child("protocol"), *port.Protocol, []string{string(api.ProtocolTCP), string(api.ProtocolUDP)}))
 			}
-			if f.NamespaceSelector != nil {
-				if numFroms > 0 {
-					allErrs = append(allErrs, field.Forbidden(fldPath, "may not specify more than 1 from type"))
+			if port.Port != nil {
+				if port.Port.Type == intstr.Int {
+					for _, msg := range validation.IsValidPortNum(int(port.Port.IntVal)) {
+						allErrs = append(allErrs, field.Invalid(portPath.Child("port"), port.Port.IntVal, msg))
+					}
 				} else {
-					numFroms++
-					allErrs = append(allErrs, unversionedvalidation.ValidateLabelSelector(f.NamespaceSelector, fldPath.Child("namespaces"))...)
+					for _, msg := range validation.IsValidPortName(port.Port.StrVal) {
+						allErrs = append(allErrs, field.Invalid(portPath.Child("port"), port.Port.StrVal, msg))
+					}
 				}
+			}
+		}
+		// TODO: Update From to be a pointer to slice as soon as auto-generation supports it.
+		for i, from := range ingress.From {
+			fromPath := ingressPath.Child("from").Index(i)
+			numFroms := 0
+			if from.PodSelector != nil {
+				numFroms++
+				allErrs = append(allErrs, unversionedvalidation.ValidateLabelSelector(from.PodSelector, fromPath.Child("podSelector"))...)
+			}
+			if from.NamespaceSelector != nil {
+				numFroms++
+				allErrs = append(allErrs, unversionedvalidation.ValidateLabelSelector(from.NamespaceSelector, fromPath.Child("namespaceSelector"))...)
 			}
 
 			if numFroms == 0 {
-				// At least one of PodSelector and NamespaceSelector must be defined.
-				allErrs = append(allErrs, field.Required(fldPath, "must specify a from type"))
+				allErrs = append(allErrs, field.Required(fromPath, "must specify a from type"))
+			} else if numFroms > 1 {
+				allErrs = append(allErrs, field.Forbidden(fromPath, "may not specify more than 1 from type"))
 			}
 		}
 	}

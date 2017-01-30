@@ -753,3 +753,82 @@ func TestAddImagePullSecrets(t *testing.T) {
 		t.Errorf("accidentally mutated the ServiceAccount.ImagePullSecrets: %v", sa.ImagePullSecrets)
 	}
 }
+
+func TestMultipleReferencedSecrets(t *testing.T) {
+	var (
+		ns                 = "myns"
+		serviceAccountName = "mysa"
+		serviceAccountUID  = "mysauid"
+		token1             = "token1"
+		token2             = "token2"
+	)
+
+	admit := NewServiceAccount()
+	admit.SetInternalClientSet(nil)
+	admit.MountServiceAccountToken = true
+	admit.RequireAPIToken = true
+
+	sa := &api.ServiceAccount{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      serviceAccountName,
+			UID:       types.UID(serviceAccountUID),
+			Namespace: ns,
+		},
+		Secrets: []api.ObjectReference{
+			{Name: token1},
+			{Name: token2},
+		},
+	}
+	admit.serviceAccounts.Add(sa)
+
+	// Add two tokens for the service account into the cache.
+	admit.secrets.Add(&api.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      token2,
+			Namespace: ns,
+			Annotations: map[string]string{
+				api.ServiceAccountNameKey: serviceAccountName,
+				api.ServiceAccountUIDKey:  serviceAccountUID,
+			},
+		},
+		Type: api.SecretTypeServiceAccountToken,
+		Data: map[string][]byte{
+			api.ServiceAccountTokenKey: []byte("token-data"),
+		},
+	})
+	admit.secrets.Add(&api.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      token1,
+			Namespace: ns,
+			Annotations: map[string]string{
+				api.ServiceAccountNameKey: serviceAccountName,
+				api.ServiceAccountUIDKey:  serviceAccountUID,
+			},
+		},
+		Type: api.SecretTypeServiceAccountToken,
+		Data: map[string][]byte{
+			api.ServiceAccountTokenKey: []byte("token-data"),
+		},
+	})
+
+	pod := &api.Pod{
+		Spec: api.PodSpec{
+			ServiceAccountName: serviceAccountName,
+			Containers: []api.Container{
+				{Name: "container-1"},
+			},
+		},
+	}
+
+	attrs := admission.NewAttributesRecord(pod, nil, api.Kind("Pod").WithVersion("version"), ns, "myname", api.Resource("pods").WithVersion("version"), "", admission.Create, nil)
+	if err := admit.Admit(attrs); err != nil {
+		t.Fatal(err)
+	}
+
+	if n := len(pod.Spec.Volumes); n != 1 {
+		t.Fatalf("expected 1 volume mount, got %d", n)
+	}
+	if name := pod.Spec.Volumes[0].Name; name != token1 {
+		t.Errorf("expected first referenced secret to be mounted, got %q", name)
+	}
+}

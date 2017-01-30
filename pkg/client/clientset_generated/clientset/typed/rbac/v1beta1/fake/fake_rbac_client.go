@@ -17,13 +17,13 @@ limitations under the License.
 package fake
 
 import (
+	rest "k8s.io/client-go/rest"
+	testing "k8s.io/client-go/testing"
 	v1beta1 "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/rbac/v1beta1"
-	restclient "k8s.io/kubernetes/pkg/client/restclient"
-	core "k8s.io/kubernetes/pkg/client/testing/core"
 )
 
 type FakeRbacV1beta1 struct {
-	*core.Fake
+	*testing.Fake
 }
 
 func (c *FakeRbacV1beta1) ClusterRoles() v1beta1.ClusterRoleInterface {
@@ -44,7 +44,7 @@ func (c *FakeRbacV1beta1) RoleBindings(namespace string) v1beta1.RoleBindingInte
 
 // RESTClient returns a RESTClient that is used to communicate
 // with API server by this client implementation.
-func (c *FakeRbacV1beta1) RESTClient() restclient.Interface {
-	var ret *restclient.RESTClient
+func (c *FakeRbacV1beta1) RESTClient() rest.Interface {
+	var ret *rest.RESTClient
 	return ret
 }

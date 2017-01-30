@@ -18,16 +18,16 @@ package v1
 
 import (
 	"k8s.io/apimachinery/pkg/util/net"
-	"k8s.io/client-go/rest"
+	restclient "k8s.io/client-go/rest"
 )
 
 // The ServiceExpansion interface allows manually adding extra methods to the ServiceInterface.
 type ServiceExpansion interface {
-	ProxyGet(scheme, name, port, path string, params map[string]string) rest.ResponseWrapper
+	ProxyGet(scheme, name, port, path string, params map[string]string) restclient.ResponseWrapper
 }
 
 // ProxyGet returns a response of the service by calling it through the proxy.
-func (c *services) ProxyGet(scheme, name, port, path string, params map[string]string) rest.ResponseWrapper {
+func (c *services) ProxyGet(scheme, name, port, path string, params map[string]string) restclient.ResponseWrapper {
 	request := c.client.Get().
 		Prefix("proxy").
 		Namespace(c.ns).

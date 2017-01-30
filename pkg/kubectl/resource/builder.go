@@ -24,12 +24,12 @@ import (
 	"strings"
 
 	"k8s.io/apimachinery/pkg/api/meta"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/validation"
 )
 
@@ -291,11 +291,11 @@ func (b *Builder) DefaultNamespace() *Builder {
 	return b
 }
 
-// AllNamespaces instructs the builder to use NamespaceAll as a namespace to request resources
+// AllNamespaces instructs the builder to metav1.NamespaceAll as a namespace to request resources
 // across all of the namespace. This overrides the namespace set by NamespaceParam().
 func (b *Builder) AllNamespaces(allNamespace bool) *Builder {
 	if allNamespace {
-		b.namespace = api.NamespaceAll
+		b.namespace = metav1.NamespaceAll
 	}
 	b.allNamespace = allNamespace
 	return b
@@ -806,12 +806,13 @@ func HasNames(args []string) (bool, error) {
 
 // MultipleTypesRequested returns true if the provided args contain multiple resource kinds
 func MultipleTypesRequested(args []string) bool {
+	if len(args) == 1 && args[0] == "all" {
+		return true
+	}
+
 	args = normalizeMultipleResourcesArgs(args)
 	rKinds := sets.NewString()
 	for _, arg := range args {
-		if arg == "all" {
-			return true
-		}
 		rTuple, found, err := splitResourceTypeName(arg)
 		if err != nil {
 			continue

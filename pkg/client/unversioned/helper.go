@@ -17,10 +17,10 @@ limitations under the License.
 package unversioned
 
 import (
+	restclient "k8s.io/client-go/rest"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/client/restclient"
 	// Import solely to initialize client auth plugins.
-	_ "k8s.io/kubernetes/plugin/pkg/client/auth"
+	_ "k8s.io/client-go/plugin/pkg/client/auth"
 )
 
 const (

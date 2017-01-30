@@ -20,17 +20,17 @@ import (
 	"fmt"
 	"testing"
 
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apiserver/pkg/storage/names"
+	core "k8s.io/client-go/testing"
+	"k8s.io/client-go/tools/cache"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/api/v1"
 	extensions "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
-	"k8s.io/kubernetes/pkg/client/cache"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset/fake"
-	"k8s.io/kubernetes/pkg/client/testing/core"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/informers"
 	"k8s.io/kubernetes/pkg/securitycontext"
@@ -58,7 +58,7 @@ func newDaemonSet(name string) *extensions.DaemonSet {
 		TypeMeta: metav1.TypeMeta{APIVersion: testapi.Extensions.GroupVersion().String()},
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
-			Namespace: v1.NamespaceDefault,
+			Namespace: metav1.NamespaceDefault,
 		},
 		Spec: extensions.DaemonSetSpec{
 			Selector: &metav1.LabelSelector{MatchLabels: simpleDaemonSetLabel},
@@ -88,7 +88,7 @@ func newNode(name string, label map[string]string) *v1.Node {
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
 			Labels:    label,
-			Namespace: v1.NamespaceDefault,
+			Namespace: metav1.NamespaceDefault,
 		},
 		Status: v1.NodeStatus{
 			Conditions: []v1.NodeCondition{
@@ -113,7 +113,7 @@ func newPod(podName string, nodeName string, label map[string]string) *v1.Pod {
 		ObjectMeta: metav1.ObjectMeta{
 			GenerateName: podName,
 			Labels:       label,
-			Namespace:    v1.NamespaceDefault,
+			Namespace:    metav1.NamespaceDefault,
 		},
 		Spec: v1.PodSpec{
 			NodeName: nodeName,
@@ -135,6 +135,14 @@ func newPod(podName string, nodeName string, label map[string]string) *v1.Pod {
 func addPods(podStore cache.Store, nodeName string, label map[string]string, number int) {
 	for i := 0; i < number; i++ {
 		podStore.Add(newPod(fmt.Sprintf("%s-", nodeName), nodeName, label))
+	}
+}
+
+func addFailedPods(podStore cache.Store, nodeName string, label map[string]string, number int) {
+	for i := 0; i < number; i++ {
+		pod := newPod(fmt.Sprintf("%s-", nodeName), nodeName, label)
+		pod.Status = v1.PodStatus{Phase: v1.PodFailed}
+		podStore.Add(pod)
 	}
 }
 
@@ -377,7 +385,7 @@ func TestPortConflictWithSameDaemonPodDoesNotDeletePod(t *testing.T) {
 	manager.podStore.Indexer.Add(&v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Labels:    simpleDaemonSetLabel,
-			Namespace: v1.NamespaceDefault,
+			Namespace: metav1.NamespaceDefault,
 		},
 		Spec: podSpec,
 	})
@@ -427,7 +435,7 @@ func TestPodIsNotDeletedByDaemonsetWithEmptyLabelSelector(t *testing.T) {
 	manager.podStore.Indexer.Add(&v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Labels:    map[string]string{"bang": "boom"},
-			Namespace: v1.NamespaceDefault,
+			Namespace: metav1.NamespaceDefault,
 		},
 		Spec: v1.PodSpec{
 			NodeName: "node1",
@@ -650,6 +658,31 @@ func TestObservedGeneration(t *testing.T) {
 	syncAndValidateDaemonSets(t, manager, daemon, podControl, 0, 0)
 	if updated.Status.ObservedGeneration != daemon.Generation {
 		t.Errorf("Wrong ObservedGeneration for daemon %s in status. Expected %d, got %d", updated.Name, daemon.Generation, updated.Status.ObservedGeneration)
+	}
+}
+
+// DaemonSet controller should kill all failed pods and create at most 1 pod on every node.
+func TestDaemonKillFailedPods(t *testing.T) {
+	tests := []struct {
+		numFailedPods, numNormalPods, expectedCreates, expectedDeletes int
+		test                                                           string
+	}{
+		{numFailedPods: 0, numNormalPods: 1, expectedCreates: 0, expectedDeletes: 0, test: "normal (do nothing)"},
+		{numFailedPods: 0, numNormalPods: 0, expectedCreates: 1, expectedDeletes: 0, test: "no pods (create 1)"},
+		{numFailedPods: 1, numNormalPods: 0, expectedCreates: 0, expectedDeletes: 1, test: "1 failed pod (kill 1), 0 normal pod (create 0; will create in the next sync)"},
+		{numFailedPods: 1, numNormalPods: 3, expectedCreates: 0, expectedDeletes: 3, test: "1 failed pod (kill 1), 3 normal pods (kill 2)"},
+		{numFailedPods: 2, numNormalPods: 1, expectedCreates: 0, expectedDeletes: 2, test: "2 failed pods (kill 2), 1 normal pod"},
+	}
+
+	for _, test := range tests {
+		t.Logf("test case: %s\n", test.test)
+		manager, podControl, _ := newTestController()
+		addNodes(manager.nodeStore.Store, 0, 1, nil)
+		addFailedPods(manager.podStore.Indexer, "node-0", simpleDaemonSetLabel, test.numFailedPods)
+		addPods(manager.podStore.Indexer, "node-0", simpleDaemonSetLabel, test.numNormalPods)
+		ds := newDaemonSet("foo")
+		manager.dsStore.Add(ds)
+		syncAndValidateDaemonSets(t, manager, ds, podControl, test.expectedCreates, test.expectedDeletes)
 	}
 }
 

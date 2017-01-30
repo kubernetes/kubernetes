@@ -25,7 +25,7 @@ go_library(
         "//vendor:github.com/golang/mock/gomock",
         "//vendor:github.com/stretchr/testify/mock",
         "//vendor:k8s.io/apimachinery/pkg/types",
-        "//vendor:k8s.io/client-go/pkg/util/flowcontrol",
+        "//vendor:k8s.io/client-go/util/flowcontrol",
     ],
 )
 

@@ -43,7 +43,6 @@ go_test(
         "//pkg/api/v1:go_default_library",
         "//pkg/client/clientset_generated/clientset/fake:go_default_library",
         "//pkg/client/record:go_default_library",
-        "//pkg/client/testing/core:go_default_library",
         "//pkg/kubelet/config:go_default_library",
         "//pkg/kubelet/volumemanager/cache:go_default_library",
         "//pkg/util/mount:go_default_library",
@@ -57,6 +56,7 @@ go_test(
         "//vendor:k8s.io/apimachinery/pkg/types",
         "//vendor:k8s.io/apimachinery/pkg/util/sets",
         "//vendor:k8s.io/apimachinery/pkg/util/wait",
+        "//vendor:k8s.io/client-go/testing",
     ],
 )
 

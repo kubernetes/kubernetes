@@ -23,7 +23,10 @@ import (
 	"testing"
 	"time"
 
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/validation/path"
+	metainternalversion "k8s.io/apimachinery/pkg/apis/meta/internalversion"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/conversion"
 	"k8s.io/apimachinery/pkg/fields"
@@ -33,7 +36,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/validation/path"
 	"k8s.io/kubernetes/pkg/genericapiserver/registry/rest"
 )
 
@@ -90,7 +92,7 @@ func (t *Tester) ReturnDeletedObject() *Tester {
 // Returns NamespaceNone for cluster-scoped objects.
 func (t *Tester) TestNamespace() string {
 	if t.clusterScope {
-		return api.NamespaceNone
+		return metav1.NamespaceNone
 	}
 	return "test"
 }
@@ -116,7 +118,7 @@ func (t *Tester) setObjectMeta(obj runtime.Object, name string) {
 	meta := t.getObjectMetaOrFail(obj)
 	meta.Name = name
 	if t.clusterScope {
-		meta.Namespace = api.NamespaceNone
+		meta.Namespace = metav1.NamespaceNone
 	} else {
 		meta.Namespace = genericapirequest.NamespaceValue(t.TestContext())
 	}
@@ -275,7 +277,7 @@ func (t *Tester) testCreateEquals(obj runtime.Object, getFn GetFunc) {
 	gotMeta := t.getObjectMetaOrFail(got)
 	createdMeta.ResourceVersion = gotMeta.ResourceVersion
 
-	if e, a := created, got; !api.Semantic.DeepEqual(e, a) {
+	if e, a := created, got; !apiequality.Semantic.DeepEqual(e, a) {
 		t.Errorf("unexpected obj: %#v, expected %#v", e, a)
 	}
 }
@@ -293,7 +295,7 @@ func (t *Tester) testCreateDiscardsObjectNamespace(valid runtime.Object) {
 	}
 	defer t.delete(t.TestContext(), created)
 	createdObjectMeta := t.getObjectMetaOrFail(created)
-	if createdObjectMeta.Namespace != api.NamespaceNone {
+	if createdObjectMeta.Namespace != metav1.NamespaceNone {
 		t.Errorf("Expected empty namespace on created object, got '%v'", createdObjectMeta.Namespace)
 	}
 }
@@ -342,7 +344,7 @@ func (t *Tester) testCreateIgnoresContextNamespace(valid runtime.Object) {
 	}
 	defer t.delete(ctx, created)
 	createdObjectMeta := t.getObjectMetaOrFail(created)
-	if createdObjectMeta.Namespace != api.NamespaceNone {
+	if createdObjectMeta.Namespace != metav1.NamespaceNone {
 		t.Errorf("Expected empty namespace on created object, got '%v'", createdObjectMeta.Namespace)
 	}
 }
@@ -361,7 +363,7 @@ func (t *Tester) testCreateIgnoresMismatchedNamespace(valid runtime.Object) {
 	}
 	defer t.delete(ctx, created)
 	createdObjectMeta := t.getObjectMetaOrFail(created)
-	if createdObjectMeta.Namespace != api.NamespaceNone {
+	if createdObjectMeta.Namespace != metav1.NamespaceNone {
 		t.Errorf("Expected empty namespace on created object, got '%v'", createdObjectMeta.Namespace)
 	}
 }
@@ -483,7 +485,7 @@ func (t *Tester) testUpdateEquals(obj runtime.Object, createFn CreateFunc, getFn
 	gotMeta := t.getObjectMetaOrFail(got)
 	updatedMeta.ResourceVersion = gotMeta.ResourceVersion
 
-	if e, a := updated, got; !api.Semantic.DeepEqual(e, a) {
+	if e, a := updated, got; !apiequality.Semantic.DeepEqual(e, a) {
 		t.Errorf("unexpected obj: %#v, expected %#v", e, a)
 	}
 }
@@ -762,7 +764,7 @@ func (t *Tester) testDeleteNoGraceful(obj runtime.Object, createFn CreateFunc, g
 		t.Errorf("unexpected error: %v", err)
 	}
 	objectMeta := t.getObjectMetaOrFail(foo)
-	obj, err := t.storage.(rest.GracefulDeleter).Delete(ctx, objectMeta.Name, api.NewDeleteOptions(10))
+	obj, err := t.storage.(rest.GracefulDeleter).Delete(ctx, objectMeta.Name, metav1.NewDeleteOptions(10))
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -802,12 +804,12 @@ func (t *Tester) testDeleteWithUID(obj runtime.Object, createFn CreateFunc, getF
 	if err := createFn(ctx, foo); err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
-	obj, err := t.storage.(rest.GracefulDeleter).Delete(ctx, objectMeta.Name, api.NewPreconditionDeleteOptions("UID1111"))
+	obj, err := t.storage.(rest.GracefulDeleter).Delete(ctx, objectMeta.Name, metav1.NewPreconditionDeleteOptions("UID1111"))
 	if err == nil || !errors.IsConflict(err) {
 		t.Errorf("unexpected error: %v", err)
 	}
 
-	obj, err = t.storage.(rest.GracefulDeleter).Delete(ctx, objectMeta.Name, api.NewPreconditionDeleteOptions("UID0000"))
+	obj, err = t.storage.(rest.GracefulDeleter).Delete(ctx, objectMeta.Name, metav1.NewPreconditionDeleteOptions("UID0000"))
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -839,7 +841,7 @@ func (t *Tester) testDeleteGracefulHasDefault(obj runtime.Object, createFn Creat
 	}
 	objectMeta := t.getObjectMetaOrFail(foo)
 	generation := objectMeta.Generation
-	_, err := t.storage.(rest.GracefulDeleter).Delete(ctx, objectMeta.Name, &api.DeleteOptions{})
+	_, err := t.storage.(rest.GracefulDeleter).Delete(ctx, objectMeta.Name, &metav1.DeleteOptions{})
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -870,7 +872,7 @@ func (t *Tester) testDeleteGracefulWithValue(obj runtime.Object, createFn Create
 	}
 	objectMeta := t.getObjectMetaOrFail(foo)
 	generation := objectMeta.Generation
-	_, err := t.storage.(rest.GracefulDeleter).Delete(ctx, objectMeta.Name, api.NewDeleteOptions(expectedGrace+2))
+	_, err := t.storage.(rest.GracefulDeleter).Delete(ctx, objectMeta.Name, metav1.NewDeleteOptions(expectedGrace+2))
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -901,7 +903,7 @@ func (t *Tester) testDeleteGracefulExtend(obj runtime.Object, createFn CreateFun
 	}
 	objectMeta := t.getObjectMetaOrFail(foo)
 	generation := objectMeta.Generation
-	_, err := t.storage.(rest.GracefulDeleter).Delete(ctx, objectMeta.Name, api.NewDeleteOptions(expectedGrace))
+	_, err := t.storage.(rest.GracefulDeleter).Delete(ctx, objectMeta.Name, metav1.NewDeleteOptions(expectedGrace))
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -910,7 +912,7 @@ func (t *Tester) testDeleteGracefulExtend(obj runtime.Object, createFn CreateFun
 	}
 
 	// second delete duration is ignored
-	_, err = t.storage.(rest.GracefulDeleter).Delete(ctx, objectMeta.Name, api.NewDeleteOptions(expectedGrace+2))
+	_, err = t.storage.(rest.GracefulDeleter).Delete(ctx, objectMeta.Name, metav1.NewDeleteOptions(expectedGrace+2))
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -937,7 +939,7 @@ func (t *Tester) testDeleteGracefulImmediate(obj runtime.Object, createFn Create
 	}
 	objectMeta := t.getObjectMetaOrFail(foo)
 	generation := objectMeta.Generation
-	_, err := t.storage.(rest.GracefulDeleter).Delete(ctx, objectMeta.Name, api.NewDeleteOptions(expectedGrace))
+	_, err := t.storage.(rest.GracefulDeleter).Delete(ctx, objectMeta.Name, metav1.NewDeleteOptions(expectedGrace))
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -946,7 +948,7 @@ func (t *Tester) testDeleteGracefulImmediate(obj runtime.Object, createFn Create
 	}
 
 	// second delete is immediate, resource is deleted
-	out, err := t.storage.(rest.GracefulDeleter).Delete(ctx, objectMeta.Name, api.NewDeleteOptions(0))
+	out, err := t.storage.(rest.GracefulDeleter).Delete(ctx, objectMeta.Name, metav1.NewDeleteOptions(0))
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -996,7 +998,7 @@ func (t *Tester) testDeleteGracefulShorten(obj runtime.Object, createFn CreateFu
 		bigGrace = 2 * expectedGrace
 	}
 	objectMeta := t.getObjectMetaOrFail(foo)
-	_, err := t.storage.(rest.GracefulDeleter).Delete(ctx, objectMeta.Name, api.NewDeleteOptions(bigGrace))
+	_, err := t.storage.(rest.GracefulDeleter).Delete(ctx, objectMeta.Name, metav1.NewDeleteOptions(bigGrace))
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -1008,7 +1010,7 @@ func (t *Tester) testDeleteGracefulShorten(obj runtime.Object, createFn CreateFu
 	deletionTimestamp := *objectMeta.DeletionTimestamp
 
 	// second delete duration is ignored
-	_, err = t.storage.(rest.GracefulDeleter).Delete(ctx, objectMeta.Name, api.NewDeleteOptions(expectedGrace))
+	_, err = t.storage.(rest.GracefulDeleter).Delete(ctx, objectMeta.Name, metav1.NewDeleteOptions(expectedGrace))
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -1090,7 +1092,7 @@ func (t *Tester) testGetFound(obj runtime.Object) {
 	}
 	gotMeta := t.getObjectMetaOrFail(got)
 	gotMeta.ResourceVersion = existingMeta.ResourceVersion
-	if e, a := existing, got; !api.Semantic.DeepEqual(e, a) {
+	if e, a := existing, got; !apiequality.Semantic.DeepEqual(e, a) {
 		t.Errorf("unexpected obj: %#v, expected %#v", e, a)
 	}
 }
@@ -1173,7 +1175,7 @@ func (t *Tester) testListFound(obj runtime.Object, assignFn AssignFunc) {
 	if len(items) != len(existing) {
 		t.Errorf("unexpected number of items: %v", len(items))
 	}
-	if !api.Semantic.DeepEqual(existing, items) {
+	if !apiequality.Semantic.DeepEqual(existing, items) {
 		t.Errorf("expected: %#v, got: %#v", existing, items)
 	}
 }
@@ -1196,7 +1198,7 @@ func (t *Tester) testListMatchLabels(obj runtime.Object, assignFn AssignFunc) {
 	filtered := []runtime.Object{objs[1]}
 
 	selector := labels.SelectorFromSet(labels.Set(testLabels))
-	options := &api.ListOptions{LabelSelector: selector}
+	options := &metainternalversion.ListOptions{LabelSelector: selector}
 	listObj, err := t.storage.(rest.Lister).List(ctx, options)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
@@ -1208,7 +1210,7 @@ func (t *Tester) testListMatchLabels(obj runtime.Object, assignFn AssignFunc) {
 	if len(items) != len(filtered) {
 		t.Errorf("unexpected number of items: %v", len(items))
 	}
-	if !api.Semantic.DeepEqual(filtered, items) {
+	if !apiequality.Semantic.DeepEqual(filtered, items) {
 		t.Errorf("expected: %#v, got: %#v", filtered, items)
 	}
 }
@@ -1238,7 +1240,7 @@ func (t *Tester) testWatchFields(obj runtime.Object, emitFn EmitFunc, fieldsPass
 
 	for _, field := range fieldsPass {
 		for _, action := range actions {
-			options := &api.ListOptions{FieldSelector: field.AsSelector(), ResourceVersion: "1"}
+			options := &metainternalversion.ListOptions{FieldSelector: field.AsSelector(), ResourceVersion: "1"}
 			watcher, err := t.storage.(rest.Watcher).Watch(ctx, options)
 			if err != nil {
 				t.Errorf("unexpected error: %v, %v", err, action)
@@ -1262,7 +1264,7 @@ func (t *Tester) testWatchFields(obj runtime.Object, emitFn EmitFunc, fieldsPass
 
 	for _, field := range fieldsFail {
 		for _, action := range actions {
-			options := &api.ListOptions{FieldSelector: field.AsSelector(), ResourceVersion: "1"}
+			options := &metainternalversion.ListOptions{FieldSelector: field.AsSelector(), ResourceVersion: "1"}
 			watcher, err := t.storage.(rest.Watcher).Watch(ctx, options)
 			if err != nil {
 				t.Errorf("unexpected error: %v", err)
@@ -1287,7 +1289,7 @@ func (t *Tester) testWatchLabels(obj runtime.Object, emitFn EmitFunc, labelsPass
 
 	for _, label := range labelsPass {
 		for _, action := range actions {
-			options := &api.ListOptions{LabelSelector: label.AsSelector(), ResourceVersion: "1"}
+			options := &metainternalversion.ListOptions{LabelSelector: label.AsSelector(), ResourceVersion: "1"}
 			watcher, err := t.storage.(rest.Watcher).Watch(ctx, options)
 			if err != nil {
 				t.Errorf("unexpected error: %v", err)
@@ -1310,7 +1312,7 @@ func (t *Tester) testWatchLabels(obj runtime.Object, emitFn EmitFunc, labelsPass
 
 	for _, label := range labelsFail {
 		for _, action := range actions {
-			options := &api.ListOptions{LabelSelector: label.AsSelector(), ResourceVersion: "1"}
+			options := &metainternalversion.ListOptions{LabelSelector: label.AsSelector(), ResourceVersion: "1"}
 			watcher, err := t.storage.(rest.Watcher).Watch(ctx, options)
 			if err != nil {
 				t.Errorf("unexpected error: %v", err)

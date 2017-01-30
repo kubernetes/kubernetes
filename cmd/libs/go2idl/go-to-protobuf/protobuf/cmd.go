@@ -63,7 +63,7 @@ func New() *Generator {
 		ProtoImport:      []string{defaultProtoImport},
 		Packages: strings.Join([]string{
 			`+k8s.io/kubernetes/pkg/util/intstr`,
-			`+k8s.io/kubernetes/pkg/api/resource`,
+			`+k8s.io/apimachinery/pkg/api/resource`,
 			`+k8s.io/apimachinery/pkg/runtime/schema`,
 			`+k8s.io/apimachinery/pkg/runtime`,
 			`k8s.io/apimachinery/pkg/apis/meta/v1`,
@@ -79,7 +79,7 @@ func New() *Generator {
 			`k8s.io/kubernetes/pkg/apis/rbac/v1alpha1`,
 			`k8s.io/kubernetes/pkg/apis/rbac/v1beta1`,
 			`k8s.io/kubernetes/federation/apis/federation/v1beta1`,
-			`k8s.io/kubernetes/pkg/apis/certificates/v1alpha1`,
+			`k8s.io/kubernetes/pkg/apis/certificates/v1beta1`,
 			`k8s.io/kubernetes/pkg/apis/imagepolicy/v1alpha1`,
 			`k8s.io/kubernetes/pkg/apis/storage/v1beta1`,
 		}, ","),

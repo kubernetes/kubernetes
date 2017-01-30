@@ -18,7 +18,10 @@ go_library(
         "types.go",
     ],
     tags = ["automanaged"],
-    deps = ["//pkg/api/v1:go_default_library"],
+    deps = [
+        "//pkg/api/v1:go_default_library",
+        "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
+    ],
 )
 
 go_test(

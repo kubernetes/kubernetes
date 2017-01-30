@@ -27,17 +27,17 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
+	"k8s.io/client-go/tools/cache"
+	"k8s.io/client-go/util/workqueue"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
 	storage "k8s.io/kubernetes/pkg/apis/storage/v1beta1"
-	"k8s.io/kubernetes/pkg/client/cache"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	unversionedcore "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/core/v1"
 	"k8s.io/kubernetes/pkg/client/record"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/util/goroutinemap"
-	"k8s.io/kubernetes/pkg/util/workqueue"
 	vol "k8s.io/kubernetes/pkg/volume"
 
 	"github.com/golang/glog"
@@ -96,10 +96,10 @@ func NewController(p ControllerParameters) *PersistentVolumeController {
 	volumeSource := p.VolumeSource
 	if volumeSource == nil {
 		volumeSource = &cache.ListWatch{
-			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
+			ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
 				return p.KubeClient.Core().PersistentVolumes().List(options)
 			},
-			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
+			WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
 				return p.KubeClient.Core().PersistentVolumes().Watch(options)
 			},
 		}
@@ -109,11 +109,11 @@ func NewController(p ControllerParameters) *PersistentVolumeController {
 	claimSource := p.ClaimSource
 	if claimSource == nil {
 		claimSource = &cache.ListWatch{
-			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
-				return p.KubeClient.Core().PersistentVolumeClaims(v1.NamespaceAll).List(options)
+			ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
+				return p.KubeClient.Core().PersistentVolumeClaims(metav1.NamespaceAll).List(options)
 			},
-			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
-				return p.KubeClient.Core().PersistentVolumeClaims(v1.NamespaceAll).Watch(options)
+			WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
+				return p.KubeClient.Core().PersistentVolumeClaims(metav1.NamespaceAll).Watch(options)
 			},
 		}
 	}
@@ -122,10 +122,10 @@ func NewController(p ControllerParameters) *PersistentVolumeController {
 	classSource := p.ClassSource
 	if classSource == nil {
 		classSource = &cache.ListWatch{
-			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
+			ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
 				return p.KubeClient.Storage().StorageClasses().List(options)
 			},
-			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
+			WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
 				return p.KubeClient.Storage().StorageClasses().Watch(options)
 			},
 		}
@@ -170,7 +170,7 @@ func NewController(p ControllerParameters) *PersistentVolumeController {
 // order to have the caches already filled when first addClaim/addVolume to
 // perform initial synchronization of the controller.
 func (ctrl *PersistentVolumeController) initializeCaches(volumeSource, claimSource cache.ListerWatcher) {
-	volumeListObj, err := volumeSource.List(v1.ListOptions{})
+	volumeListObj, err := volumeSource.List(metav1.ListOptions{})
 	if err != nil {
 		glog.Errorf("PersistentVolumeController can't initialize caches: %v", err)
 		return
@@ -194,7 +194,7 @@ func (ctrl *PersistentVolumeController) initializeCaches(volumeSource, claimSour
 		}
 	}
 
-	claimListObj, err := claimSource.List(v1.ListOptions{})
+	claimListObj, err := claimSource.List(metav1.ListOptions{})
 	if err != nil {
 		glog.Errorf("PersistentVolumeController can't initialize caches: %v", err)
 		return

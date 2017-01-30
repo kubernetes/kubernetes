@@ -29,6 +29,9 @@ import (
 	kubeletclient "k8s.io/kubernetes/pkg/kubelet/client"
 	"k8s.io/kubernetes/pkg/master/ports"
 
+	// add the kubernetes feature gates
+	_ "k8s.io/kubernetes/pkg/features"
+
 	"github.com/spf13/pflag"
 )
 
@@ -91,7 +94,6 @@ func NewServerRunOptions() *ServerRunOptions {
 func (s *ServerRunOptions) AddFlags(fs *pflag.FlagSet) {
 	// Add the generic flags.
 	s.GenericServerRunOptions.AddUniversalFlags(fs)
-
 	s.Etcd.AddFlags(fs)
 	s.SecureServing.AddFlags(fs)
 	s.SecureServing.AddDeprecatedFlags(fs)

@@ -21,7 +21,7 @@ import (
 )
 
 var ValidOSArch = map[string][]string{
-	"linux":   {"amd64", "i386", "aarch64", "aarch64_be", "armv6l", "armv7l", "armv7b"},
+	"linux":   {"amd64", "i386", "aarch64", "aarch64_be", "armv6l", "armv7l", "armv7b", "ppc64", "ppc64le", "s390x"},
 	"freebsd": {"amd64", "i386", "arm"},
 	"darwin":  {"x86_64", "i386"},
 }
@@ -33,6 +33,17 @@ type labels Labels
 type Label struct {
 	Name  ACIdentifier `json:"name"`
 	Value string       `json:"value"`
+}
+
+// {appc,go}ArchTuple are internal helper types used to translate arch tuple between go and appc
+type appcArchTuple struct {
+	appcOs   string
+	appcArch string
+}
+type goArchTuple struct {
+	goOs         string
+	goArch       string
+	goArchFlavor string
 }
 
 // IsValidOsArch checks if a OS-architecture combination is valid given a map
@@ -131,4 +142,65 @@ func LabelsFromMap(labelsMap map[ACIdentifier]string) (Labels, error) {
 		return nil, err
 	}
 	return labels, nil
+}
+
+// ToAppcOSArch translates a Golang arch tuple (OS, architecture, flavor) into
+// an appc arch tuple (OS, architecture)
+func ToAppcOSArch(goOs string, goArch string, goArchFlavor string) (appcOs string, appcArch string, e error) {
+	tabularAppcToGo := map[goArchTuple]appcArchTuple{
+		{"linux", "amd64", ""}:   {"linux", "amd64"},
+		{"linux", "386", ""}:     {"linux", "i386"},
+		{"linux", "arm64", ""}:   {"linux", "aarch64"},
+		{"linux", "arm", ""}:     {"linux", "armv6l"},
+		{"linux", "arm", "6"}:    {"linux", "armv6l"},
+		{"linux", "arm", "7"}:    {"linux", "armv7l"},
+		{"linux", "ppc64", ""}:   {"linux", "ppc64"},
+		{"linux", "ppc64le", ""}: {"linux", "ppc64le"},
+		{"linux", "s390x", ""}:   {"linux", "s390x"},
+
+		{"freebsd", "amd64", ""}: {"freebsd", "amd64"},
+		{"freebsd", "386", ""}:   {"freebsd", "i386"},
+		{"freebsd", "arm", ""}:   {"freebsd", "arm"},
+		{"freebsd", "arm", "5"}:  {"freebsd", "arm"},
+		{"freebsd", "arm", "6"}:  {"freebsd", "arm"},
+		{"freebsd", "arm", "7"}:  {"freebsd", "arm"},
+
+		{"darwin", "amd64", ""}: {"darwin", "x86_64"},
+		{"darwin", "386", ""}:   {"darwin", "i386"},
+	}
+	archTuple, ok := tabularAppcToGo[goArchTuple{goOs, goArch, goArchFlavor}]
+	if !ok {
+		return "", "", fmt.Errorf("unknown arch tuple: %q - %q - %q", goOs, goArch, goArchFlavor)
+	}
+	return archTuple.appcOs, archTuple.appcArch, nil
+}
+
+// ToGoOSArch translates an appc arch tuple (OS, architecture) into
+// a Golang arch tuple (OS, architecture, flavor)
+func ToGoOSArch(appcOs string, appcArch string) (goOs string, goArch string, goArchFlavor string, e error) {
+	tabularGoToAppc := map[appcArchTuple]goArchTuple{
+		// {"linux", "aarch64_be"}: nil,
+		// {"linux", "armv7b"}: nil,
+		{"linux", "aarch64"}: {"linux", "arm64", ""},
+		{"linux", "amd64"}:   {"linux", "amd64", ""},
+		{"linux", "armv6l"}:  {"linux", "arm", "6"},
+		{"linux", "armv7l"}:  {"linux", "arm", "7"},
+		{"linux", "i386"}:    {"linux", "386", ""},
+		{"linux", "ppc64"}:   {"linux", "ppc64", ""},
+		{"linux", "ppc64le"}: {"linux", "ppc64le", ""},
+		{"linux", "s390x"}:   {"linux", "s390x", ""},
+
+		{"freebsd", "amd64"}: {"freebsd", "amd64", ""},
+		{"freebsd", "arm"}:   {"freebsd", "arm", "6"},
+		{"freebsd", "386"}:   {"freebsd", "i386", ""},
+
+		{"darwin", "amd64"}: {"darwin", "x86_64", ""},
+		{"darwin", "386"}:   {"darwin", "i386", ""},
+	}
+
+	archTuple, ok := tabularGoToAppc[appcArchTuple{appcOs, appcArch}]
+	if !ok {
+		return "", "", "", fmt.Errorf("unknown arch tuple: %q - %q", appcOs, appcArch)
+	}
+	return archTuple.goOs, archTuple.goArch, archTuple.goArchFlavor, nil
 }

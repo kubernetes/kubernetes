@@ -136,11 +136,11 @@ func UpdateOrCreateToken(client *clientset.Clientset, d *kubeadmapi.TokenDiscove
 	secretName := fmt.Sprintf("%s%s", BootstrapTokenSecretPrefix, d.ID)
 	var lastErr error
 	for i := 0; i < tokenCreateRetries; i++ {
-		secret, err := client.Secrets(api.NamespaceSystem).Get(secretName, metav1.GetOptions{})
+		secret, err := client.Secrets(metav1.NamespaceSystem).Get(secretName, metav1.GetOptions{})
 		if err == nil {
 			// Secret with this ID already exists, update it:
 			secret.Data = encodeTokenSecretData(d, tokenDuration)
-			if _, err := client.Secrets(api.NamespaceSystem).Update(secret); err == nil {
+			if _, err := client.Secrets(metav1.NamespaceSystem).Update(secret); err == nil {
 				return nil
 			} else {
 				lastErr = err
@@ -157,7 +157,7 @@ func UpdateOrCreateToken(client *clientset.Clientset, d *kubeadmapi.TokenDiscove
 				Type: api.SecretTypeBootstrapToken,
 				Data: encodeTokenSecretData(d, tokenDuration),
 			}
-			if _, err := client.Secrets(api.NamespaceSystem).Create(secret); err == nil {
+			if _, err := client.Secrets(metav1.NamespaceSystem).Create(secret); err == nil {
 				return nil
 			} else {
 				lastErr = err

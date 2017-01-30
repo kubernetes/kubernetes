@@ -15,14 +15,14 @@ go_library(
     ],
     tags = ["automanaged"],
     deps = [
-        "//pkg/api/v1:go_default_library",
         "//pkg/apis/autoscaling/v1:go_default_library",
-        "//pkg/client/cache:go_default_library",
         "//pkg/client/clientset_generated/clientset:go_default_library",
         "//pkg/client/informers/informers_generated/internalinterfaces:go_default_library",
         "//pkg/client/listers/autoscaling/v1:go_default_library",
+        "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
         "//vendor:k8s.io/apimachinery/pkg/runtime",
         "//vendor:k8s.io/apimachinery/pkg/watch",
+        "//vendor:k8s.io/client-go/tools/cache",
     ],
 )
 

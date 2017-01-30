@@ -71,7 +71,7 @@ func (r *RemoteImageService) ImageStatus(image *runtimeapi.ImageSpec) (*runtimea
 		Image: image,
 	})
 	if err != nil {
-		glog.Errorf("ImageStatus %q from image service failed: %v", image.GetImage(), err)
+		glog.Errorf("ImageStatus %q from image service failed: %v", image.Image, err)
 		return nil, err
 	}
 
@@ -88,11 +88,11 @@ func (r *RemoteImageService) PullImage(image *runtimeapi.ImageSpec, auth *runtim
 		Auth:  auth,
 	})
 	if err != nil {
-		glog.Errorf("PullImage %q from image service failed: %v", image.GetImage(), err)
+		glog.Errorf("PullImage %q from image service failed: %v", image.Image, err)
 		return "", err
 	}
 
-	return resp.GetImageRef(), nil
+	return resp.ImageRef, nil
 }
 
 // RemoveImage removes the image.
@@ -104,7 +104,7 @@ func (r *RemoteImageService) RemoveImage(image *runtimeapi.ImageSpec) error {
 		Image: image,
 	})
 	if err != nil {
-		glog.Errorf("RemoveImage %q from image service failed: %v", image.GetImage(), err)
+		glog.Errorf("RemoveImage %q from image service failed: %v", image.Image, err)
 		return err
 	}
 

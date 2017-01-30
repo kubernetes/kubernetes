@@ -27,9 +27,9 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
+	"k8s.io/client-go/tools/cache"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/client/cache"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/test/e2e/framework"
 	testutils "k8s.io/kubernetes/test/utils"
@@ -160,16 +160,16 @@ var _ = framework.KubeDescribe("Network Partition [Disruptive] [Slow]", func() {
 			It("All pods on the unreachable node should be marked as NotReady upon the node turn NotReady "+
 				"AND all pods should be mark back to Ready when the node get back to Ready before pod eviction timeout", func() {
 				By("choose a node - we will block all network traffic on this node")
-				var podOpts v1.ListOptions
-				nodeOpts := v1.ListOptions{}
+				var podOpts metav1.ListOptions
+				nodeOpts := metav1.ListOptions{}
 				nodes, err := c.Core().Nodes().List(nodeOpts)
 				Expect(err).NotTo(HaveOccurred())
 				framework.FilterNodes(nodes, func(node v1.Node) bool {
 					if !framework.IsNodeConditionSetAsExpected(&node, v1.NodeReady, true) {
 						return false
 					}
-					podOpts = v1.ListOptions{FieldSelector: fields.OneTermEqualSelector(api.PodHostField, node.Name).String()}
-					pods, err := c.Core().Pods(v1.NamespaceAll).List(podOpts)
+					podOpts = metav1.ListOptions{FieldSelector: fields.OneTermEqualSelector(api.PodHostField, node.Name).String()}
+					pods, err := c.Core().Pods(metav1.NamespaceAll).List(podOpts)
 					if err != nil || len(pods.Items) <= 0 {
 						return false
 					}
@@ -179,7 +179,7 @@ var _ = framework.KubeDescribe("Network Partition [Disruptive] [Slow]", func() {
 					framework.Failf("No eligible node were found: %d", len(nodes.Items))
 				}
 				node := nodes.Items[0]
-				podOpts = v1.ListOptions{FieldSelector: fields.OneTermEqualSelector(api.PodHostField, node.Name).String()}
+				podOpts = metav1.ListOptions{FieldSelector: fields.OneTermEqualSelector(api.PodHostField, node.Name).String()}
 				if err = framework.WaitForMatchPodsCondition(c, podOpts, "Running and Ready", podReadyTimeout, testutils.PodRunningReady); err != nil {
 					framework.Failf("Pods on node %s are not ready and running within %v: %v", node.Name, podReadyTimeout, err)
 				}
@@ -191,12 +191,12 @@ var _ = framework.KubeDescribe("Network Partition [Disruptive] [Slow]", func() {
 				var controller cache.Controller
 				_, controller = cache.NewInformer(
 					&cache.ListWatch{
-						ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
+						ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
 							options.FieldSelector = nodeSelector.String()
 							obj, err := f.ClientSet.Core().Nodes().List(options)
 							return runtime.Object(obj), err
 						},
-						WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
+						WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
 							options.FieldSelector = nodeSelector.String()
 							return f.ClientSet.Core().Nodes().Watch(options)
 						},
@@ -264,7 +264,7 @@ var _ = framework.KubeDescribe("Network Partition [Disruptive] [Slow]", func() {
 
 			By("choose a node with at least one pod - we will block some network traffic on this node")
 			label := labels.SelectorFromSet(labels.Set(map[string]string{"name": name}))
-			options := v1.ListOptions{LabelSelector: label.String()}
+			options := metav1.ListOptions{LabelSelector: label.String()}
 			pods, err := c.Core().Pods(ns).List(options) // list pods after all have been scheduled
 			Expect(err).NotTo(HaveOccurred())
 			nodeName := pods.Items[0].Spec.NodeName
@@ -329,7 +329,7 @@ var _ = framework.KubeDescribe("Network Partition [Disruptive] [Slow]", func() {
 
 			By("choose a node with at least one pod - we will block some network traffic on this node")
 			label := labels.SelectorFromSet(labels.Set(map[string]string{"name": name}))
-			options := v1.ListOptions{LabelSelector: label.String()}
+			options := metav1.ListOptions{LabelSelector: label.String()}
 			pods, err := c.Core().Pods(ns).List(options) // list pods after all have been scheduled
 			Expect(err).NotTo(HaveOccurred())
 			nodeName := pods.Items[0].Spec.NodeName
@@ -449,7 +449,7 @@ var _ = framework.KubeDescribe("Network Partition [Disruptive] [Slow]", func() {
 			Expect(err).NotTo(HaveOccurred())
 
 			By("choose a node with at least one pod - we will block some network traffic on this node")
-			options := v1.ListOptions{LabelSelector: label.String()}
+			options := metav1.ListOptions{LabelSelector: label.String()}
 			pods, err := c.Core().Pods(ns).List(options) // list pods after all have been scheduled
 			Expect(err).NotTo(HaveOccurred())
 			nodeName := pods.Items[0].Spec.NodeName

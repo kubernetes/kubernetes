@@ -20,6 +20,7 @@ import (
 	"strings"
 
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/genericapiserver/registry/generic"
 	genericregistry "k8s.io/kubernetes/pkg/genericapiserver/registry/generic/registry"
@@ -45,6 +46,7 @@ func NewREST(optsGetter generic.RESTOptionsGetter, group, kind string) *REST {
 	opts.ResourcePrefix = "/ThirdPartyResourceData/" + group + "/" + strings.ToLower(kind) + "s"
 
 	store := &genericregistry.Store{
+		Copier:      api.Scheme,
 		NewFunc:     func() runtime.Object { return &extensions.ThirdPartyResourceData{} },
 		NewListFunc: func() runtime.Object { return &extensions.ThirdPartyResourceDataList{} },
 		ObjectNameFunc: func(obj runtime.Object) (string, error) {

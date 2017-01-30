@@ -39,12 +39,12 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/client-go/rest/fake"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/apis/batch"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/apis/policy"
-	"k8s.io/kubernetes/pkg/client/restclient/fake"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 )
@@ -149,6 +149,7 @@ func TestCordon(t *testing.T) {
 		new_node := &api.Node{}
 		updated := false
 		tf.Client = &fake.RESTClient{
+			APIRegistry:          api.Registry,
 			NegotiatedSerializer: ns,
 			Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 				m := &MyReq{req}
@@ -484,6 +485,7 @@ func TestDrain(t *testing.T) {
 			evicted := false
 			f, tf, codec, ns := cmdtesting.NewAPIFactory()
 			tf.Client = &fake.RESTClient{
+				APIRegistry:          api.Registry,
 				NegotiatedSerializer: ns,
 				Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 					m := &MyReq{req}

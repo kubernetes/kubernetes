@@ -24,6 +24,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
+	"k8s.io/kubernetes/pkg/api"
 	storeerr "k8s.io/kubernetes/pkg/api/errors/storage"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	extvalidation "k8s.io/kubernetes/pkg/apis/extensions/validation"
@@ -61,6 +62,7 @@ type REST struct {
 // NewREST returns a RESTStorage object that will work against deployments.
 func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, *StatusREST, *RollbackREST) {
 	store := &genericregistry.Store{
+		Copier:      api.Scheme,
 		NewFunc:     func() runtime.Object { return &extensions.Deployment{} },
 		NewListFunc: func() runtime.Object { return &extensions.DeploymentList{} },
 		ObjectNameFunc: func(obj runtime.Object) (string, error) {

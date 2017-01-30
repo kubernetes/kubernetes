@@ -121,6 +121,9 @@ func SetDefaults_Container(obj *Container) {
 	if obj.TerminationMessagePath == "" {
 		obj.TerminationMessagePath = TerminationMessagePathDefault
 	}
+	if obj.TerminationMessagePolicy == "" {
+		obj.TerminationMessagePolicy = TerminationMessageReadFile
+	}
 }
 func SetDefaults_ServiceSpec(obj *ServiceSpec) {
 	if obj.SessionAffinity == "" {
@@ -173,6 +176,9 @@ func SetDefaults_PodSpec(obj *PodSpec) {
 	if obj.TerminationGracePeriodSeconds == nil {
 		period := int64(DefaultTerminationGracePeriodSeconds)
 		obj.TerminationGracePeriodSeconds = &period
+	}
+	if obj.SchedulerName == "" {
+		obj.SchedulerName = DefaultSchedulerName
 	}
 }
 func SetDefaults_Probe(obj *Probe) {

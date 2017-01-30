@@ -21,16 +21,16 @@ import (
 
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
+	"k8s.io/apiserver/pkg/authorization/authorizerfactory"
+	"k8s.io/apiserver/pkg/storage/storagebackend"
 	"k8s.io/kubernetes/cmd/libs/go2idl/client-gen/test_apis/testgroup/v1"
 	testgroupetcd "k8s.io/kubernetes/examples/apiserver/rest"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/genericapiserver/authorizer"
 	"k8s.io/kubernetes/pkg/genericapiserver/registry/generic"
 	"k8s.io/kubernetes/pkg/genericapiserver/registry/rest"
 	genericapiserver "k8s.io/kubernetes/pkg/genericapiserver/server"
 	genericoptions "k8s.io/kubernetes/pkg/genericapiserver/server/options"
 	kubeoptions "k8s.io/kubernetes/pkg/kubeapiserver/options"
-	"k8s.io/kubernetes/pkg/storage/storagebackend"
 
 	// Install the testgroup API
 	_ "k8s.io/kubernetes/cmd/libs/go2idl/client-gen/test_apis/testgroup/install"
@@ -113,7 +113,7 @@ func (serverOptions *ServerRunOptions) Run(stopCh <-chan struct{}) error {
 		return fmt.Errorf("failed to configure authentication: %s", err)
 	}
 
-	config.Authorizer = authorizer.NewAlwaysAllowAuthorizer()
+	config.Authorizer = authorizerfactory.NewAlwaysAllowAuthorizer()
 	config.SwaggerConfig = genericapiserver.DefaultSwaggerConfig()
 
 	s, err := config.Complete().New()

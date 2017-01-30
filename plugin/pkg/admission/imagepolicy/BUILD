@@ -19,6 +19,7 @@ go_library(
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/apis/imagepolicy/install:go_default_library",
+        "//pkg/apis/imagepolicy/v1alpha1:go_default_library",
         "//vendor:github.com/golang/glog",
         "//vendor:k8s.io/apimachinery/pkg/api/errors",
         "//vendor:k8s.io/apimachinery/pkg/runtime/schema",
@@ -26,8 +27,6 @@ go_library(
         "//vendor:k8s.io/apiserver/pkg/admission",
         "//vendor:k8s.io/apiserver/pkg/util/cache",
         "//vendor:k8s.io/apiserver/pkg/util/webhook",
-        "//vendor:k8s.io/client-go/pkg/apis/imagepolicy/install",
-        "//vendor:k8s.io/client-go/pkg/apis/imagepolicy/v1alpha1",
         "//vendor:k8s.io/client-go/rest",
     ],
 )

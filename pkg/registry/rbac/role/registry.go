@@ -17,6 +17,7 @@ limitations under the License.
 package role
 
 import (
+	metainternalversion "k8s.io/apimachinery/pkg/apis/meta/internalversion"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/watch"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
@@ -27,12 +28,12 @@ import (
 
 // Registry is an interface for things that know how to store Roles.
 type Registry interface {
-	ListRoles(ctx genericapirequest.Context, options *api.ListOptions) (*rbac.RoleList, error)
+	ListRoles(ctx genericapirequest.Context, options *metainternalversion.ListOptions) (*rbac.RoleList, error)
 	CreateRole(ctx genericapirequest.Context, role *rbac.Role) error
 	UpdateRole(ctx genericapirequest.Context, role *rbac.Role) error
 	GetRole(ctx genericapirequest.Context, name string, options *metav1.GetOptions) (*rbac.Role, error)
 	DeleteRole(ctx genericapirequest.Context, name string) error
-	WatchRoles(ctx genericapirequest.Context, options *api.ListOptions) (watch.Interface, error)
+	WatchRoles(ctx genericapirequest.Context, options *metainternalversion.ListOptions) (watch.Interface, error)
 }
 
 // storage puts strong typing around storage calls
@@ -46,7 +47,7 @@ func NewRegistry(s rest.StandardStorage) Registry {
 	return &storage{s}
 }
 
-func (s *storage) ListRoles(ctx genericapirequest.Context, options *api.ListOptions) (*rbac.RoleList, error) {
+func (s *storage) ListRoles(ctx genericapirequest.Context, options *metainternalversion.ListOptions) (*rbac.RoleList, error) {
 	obj, err := s.List(ctx, options)
 	if err != nil {
 		return nil, err
@@ -65,7 +66,7 @@ func (s *storage) UpdateRole(ctx genericapirequest.Context, role *rbac.Role) err
 	return err
 }
 
-func (s *storage) WatchRoles(ctx genericapirequest.Context, options *api.ListOptions) (watch.Interface, error) {
+func (s *storage) WatchRoles(ctx genericapirequest.Context, options *metainternalversion.ListOptions) (watch.Interface, error) {
 	return s.Watch(ctx, options)
 }
 

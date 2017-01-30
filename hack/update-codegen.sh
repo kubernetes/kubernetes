@@ -62,8 +62,8 @@ ${clientgen} "$@"
 ${clientgen} -t "$@"
 ${clientgen} --clientset-name="clientset" --input="${GV_DIRS_CSV}" "$@"
 # Clientgen for federation clientset.
-${clientgen} --clientset-name=federation_internalclientset --clientset-path=k8s.io/kubernetes/federation/client/clientset_generated --input="../../federation/apis/federation/","api/","extensions/","batch/" --included-types-overrides="api/Service,api/Namespace,extensions/ReplicaSet,api/Secret,extensions/Ingress,extensions/Deployment,extensions/DaemonSet,api/ConfigMap,api/Event,batch/Job"   "$@"
-${clientgen} --clientset-name=federation_clientset --clientset-path=k8s.io/kubernetes/federation/client/clientset_generated --input="../../federation/apis/federation/v1beta1","api/v1","extensions/v1beta1","batch/v1" --included-types-overrides="api/v1/Service,api/v1/Namespace,extensions/v1beta1/ReplicaSet,api/v1/Secret,extensions/v1beta1/Ingress,extensions/v1beta1/Deployment,extensions/v1beta1/DaemonSet,api/v1/ConfigMap,api/v1/Event,batch/v1/Job"   "$@"
+${clientgen} --clientset-name=federation_internalclientset --clientset-path=k8s.io/kubernetes/federation/client/clientset_generated --input="../../federation/apis/federation/","api/","extensions/","batch/","autoscaling/" --included-types-overrides="api/Service,api/Namespace,extensions/ReplicaSet,api/Secret,extensions/Ingress,extensions/Deployment,extensions/DaemonSet,api/ConfigMap,api/Event,batch/Job,autoscaling/HorizontalPodAutoscaler"   "$@"
+${clientgen} --clientset-name=federation_clientset --clientset-path=k8s.io/kubernetes/federation/client/clientset_generated --input="../../federation/apis/federation/v1beta1","api/v1","extensions/v1beta1","batch/v1","autoscaling/v1" --included-types-overrides="api/v1/Service,api/v1/Namespace,extensions/v1beta1/ReplicaSet,api/v1/Secret,extensions/v1beta1/Ingress,extensions/v1beta1/Deployment,extensions/v1beta1/DaemonSet,api/v1/ConfigMap,api/v1/Event,batch/v1/Job,autoscaling/v1/HorizontalPodAutoscaler"   "$@"
 
 LISTERGEN_APIS=(
 pkg/api

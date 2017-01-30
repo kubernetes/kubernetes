@@ -17,6 +17,7 @@ limitations under the License.
 package rolebinding
 
 import (
+	metainternalversion "k8s.io/apimachinery/pkg/apis/meta/internalversion"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/watch"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
@@ -27,12 +28,12 @@ import (
 
 // Registry is an interface for things that know how to store RoleBindings.
 type Registry interface {
-	ListRoleBindings(ctx genericapirequest.Context, options *api.ListOptions) (*rbac.RoleBindingList, error)
+	ListRoleBindings(ctx genericapirequest.Context, options *metainternalversion.ListOptions) (*rbac.RoleBindingList, error)
 	CreateRoleBinding(ctx genericapirequest.Context, roleBinding *rbac.RoleBinding) error
 	UpdateRoleBinding(ctx genericapirequest.Context, roleBinding *rbac.RoleBinding) error
 	GetRoleBinding(ctx genericapirequest.Context, name string, options *metav1.GetOptions) (*rbac.RoleBinding, error)
 	DeleteRoleBinding(ctx genericapirequest.Context, name string) error
-	WatchRoleBindings(ctx genericapirequest.Context, options *api.ListOptions) (watch.Interface, error)
+	WatchRoleBindings(ctx genericapirequest.Context, options *metainternalversion.ListOptions) (watch.Interface, error)
 }
 
 // storage puts strong typing around storage calls
@@ -46,7 +47,7 @@ func NewRegistry(s rest.StandardStorage) Registry {
 	return &storage{s}
 }
 
-func (s *storage) ListRoleBindings(ctx genericapirequest.Context, options *api.ListOptions) (*rbac.RoleBindingList, error) {
+func (s *storage) ListRoleBindings(ctx genericapirequest.Context, options *metainternalversion.ListOptions) (*rbac.RoleBindingList, error) {
 	obj, err := s.List(ctx, options)
 	if err != nil {
 		return nil, err
@@ -66,7 +67,7 @@ func (s *storage) UpdateRoleBinding(ctx genericapirequest.Context, roleBinding *
 	return err
 }
 
-func (s *storage) WatchRoleBindings(ctx genericapirequest.Context, options *api.ListOptions) (watch.Interface, error) {
+func (s *storage) WatchRoleBindings(ctx genericapirequest.Context, options *metainternalversion.ListOptions) (watch.Interface, error) {
 	return s.Watch(ctx, options)
 }
 
@@ -89,7 +90,7 @@ type AuthorizerAdapter struct {
 }
 
 func (a AuthorizerAdapter) ListRoleBindings(namespace string) ([]*rbac.RoleBinding, error) {
-	list, err := a.Registry.ListRoleBindings(genericapirequest.WithNamespace(genericapirequest.NewContext(), namespace), &api.ListOptions{})
+	list, err := a.Registry.ListRoleBindings(genericapirequest.WithNamespace(genericapirequest.NewContext(), namespace), &metainternalversion.ListOptions{})
 	if err != nil {
 		return nil, err
 	}

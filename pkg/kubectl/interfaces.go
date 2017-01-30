@@ -18,7 +18,7 @@ package kubectl
 
 import (
 	"k8s.io/apimachinery/pkg/types"
-	client "k8s.io/kubernetes/pkg/client/restclient"
+	client "k8s.io/client-go/rest"
 )
 
 // RESTClient is a client helper for dealing with RESTful resources

@@ -90,16 +90,14 @@ type fakeContainer struct {
 func (c *fakeContainer) Start() {
 	c.State = runtimeapi.ContainerState_CONTAINER_RUNNING
 
-	c.Status.State = &c.State
+	c.Status.State = c.State
 }
 
 func (c *fakeContainer) Stop() {
 	c.State = runtimeapi.ContainerState_CONTAINER_EXITED
 
-	c.Status.State = &c.State
-
-	exitSuccess := int32(0)
-	c.Status.ExitCode = &exitSuccess
+	c.Status.State = c.State
+	c.Status.ExitCode = 0
 
 	// c.Status.Reason
 }
@@ -191,7 +189,7 @@ func (r *FakeRuntime) ListContainers(*runtimeapi.ContainerFilter) ([]*runtimeapi
 			Metadata: c.Config.Metadata,
 			Labels:   c.Config.Labels,
 			ImageRef: c.Status.ImageRef,
-			State:    &c.State,
+			State:    c.State,
 		})
 	}
 
@@ -226,15 +224,15 @@ func (r *FakeRuntime) ExecSync(containerID string, cmd []string, timeout time.Du
 }
 
 func (r *FakeRuntime) Exec(req *runtimeapi.ExecRequest) (*runtimeapi.ExecResponse, error) {
-	url := "http://" + FakeStreamingHost + ":" + FakeStreamingPort + "/exec/" + req.GetContainerId()
+	url := "http://" + FakeStreamingHost + ":" + FakeStreamingPort + "/exec/" + req.ContainerId
 	return &runtimeapi.ExecResponse{
-		Url: &url,
+		Url: url,
 	}, nil
 }
 
 func (r *FakeRuntime) Attach(req *runtimeapi.AttachRequest) (*runtimeapi.AttachResponse, error) {
-	url := "http://" + FakeStreamingHost + ":" + FakeStreamingPort + "/attach/" + req.GetContainerId()
+	url := "http://" + FakeStreamingHost + ":" + FakeStreamingPort + "/attach/" + req.ContainerId
 	return &runtimeapi.AttachResponse{
-		Url: &url,
+		Url: url,
 	}, nil
 }

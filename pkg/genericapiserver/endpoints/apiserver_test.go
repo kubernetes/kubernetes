@@ -34,8 +34,13 @@ import (
 	"testing"
 	"time"
 
+	"github.com/emicklei/go-restful"
+
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
+	apitesting "k8s.io/apimachinery/pkg/api/testing"
+	metainternalversion "k8s.io/apimachinery/pkg/apis/meta/internalversion"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
@@ -47,7 +52,7 @@ import (
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/kubernetes/pkg/api"
-	apitesting "k8s.io/kubernetes/pkg/api/testing"
+	kapitesting "k8s.io/kubernetes/pkg/api/testing"
 	"k8s.io/kubernetes/pkg/api/v1"
 	genericapifilters "k8s.io/kubernetes/pkg/genericapiserver/endpoints/filters"
 	"k8s.io/kubernetes/pkg/genericapiserver/endpoints/handlers/responsewriters"
@@ -55,8 +60,6 @@ import (
 	"k8s.io/kubernetes/pkg/genericapiserver/registry/rest"
 	"k8s.io/kubernetes/plugin/pkg/admission/admit"
 	"k8s.io/kubernetes/plugin/pkg/admission/deny"
-
-	"github.com/emicklei/go-restful"
 )
 
 // This creates fake API versions, similar to api/latest.go.
@@ -117,20 +120,11 @@ func newMapper() *meta.DefaultRESTMapper {
 }
 
 func addGrouplessTypes() {
-	type ListOptions struct {
-		Object          runtime.Object
-		metav1.TypeMeta `json:",inline"`
-		LabelSelector   string `json:"labelSelector,omitempty"`
-		FieldSelector   string `json:"fieldSelector,omitempty"`
-		Watch           bool   `json:"watch,omitempty"`
-		ResourceVersion string `json:"resourceVersion,omitempty"`
-		TimeoutSeconds  *int64 `json:"timeoutSeconds,omitempty"`
-	}
 	api.Scheme.AddKnownTypes(grouplessGroupVersion,
-		&genericapitesting.Simple{}, &genericapitesting.SimpleList{}, &ListOptions{}, &metav1.ExportOptions{},
-		&v1.DeleteOptions{}, &genericapitesting.SimpleGetOptions{}, &genericapitesting.SimpleRoot{})
+		&genericapitesting.Simple{}, &genericapitesting.SimpleList{}, &metav1.ListOptions{}, &metav1.ExportOptions{},
+		&metav1.DeleteOptions{}, &genericapitesting.SimpleGetOptions{}, &genericapitesting.SimpleRoot{})
 	api.Scheme.AddKnownTypes(grouplessInternalGroupVersion,
-		&genericapitesting.Simple{}, &genericapitesting.SimpleList{}, &api.ListOptions{}, &metav1.ExportOptions{},
+		&genericapitesting.Simple{}, &genericapitesting.SimpleList{}, &metav1.ExportOptions{},
 		&genericapitesting.SimpleGetOptions{}, &genericapitesting.SimpleRoot{})
 }
 
@@ -145,12 +139,12 @@ func addTestTypes() {
 		TimeoutSeconds  *int64 `json:"timeoutSeconds,omitempty"`
 	}
 	api.Scheme.AddKnownTypes(testGroupVersion,
-		&genericapitesting.Simple{}, &genericapitesting.SimpleList{}, &ListOptions{}, &metav1.ExportOptions{},
-		&v1.DeleteOptions{}, &genericapitesting.SimpleGetOptions{}, &genericapitesting.SimpleRoot{},
+		&genericapitesting.Simple{}, &genericapitesting.SimpleList{}, &metav1.ExportOptions{},
+		&metav1.DeleteOptions{}, &genericapitesting.SimpleGetOptions{}, &genericapitesting.SimpleRoot{},
 		&SimpleXGSubresource{})
 	api.Scheme.AddKnownTypes(testGroupVersion, &v1.Pod{})
 	api.Scheme.AddKnownTypes(testInternalGroupVersion,
-		&genericapitesting.Simple{}, &genericapitesting.SimpleList{}, &api.ListOptions{}, &metav1.ExportOptions{},
+		&genericapitesting.Simple{}, &genericapitesting.SimpleList{}, &metav1.ExportOptions{},
 		&genericapitesting.SimpleGetOptions{}, &genericapitesting.SimpleRoot{},
 		&SimpleXGSubresource{})
 	api.Scheme.AddKnownTypes(testInternalGroupVersion, &api.Pod{})
@@ -163,18 +157,9 @@ func addTestTypes() {
 }
 
 func addNewTestTypes() {
-	type ListOptions struct {
-		Object          runtime.Object
-		metav1.TypeMeta `json:",inline"`
-		LabelSelector   string `json:"labelSelector,omitempty"`
-		FieldSelector   string `json:"fieldSelector,omitempty"`
-		Watch           bool   `json:"watch,omitempty"`
-		ResourceVersion string `json:"resourceVersion,omitempty"`
-		TimeoutSeconds  *int64 `json:"timeoutSeconds,omitempty"`
-	}
 	api.Scheme.AddKnownTypes(newGroupVersion,
-		&genericapitesting.Simple{}, &genericapitesting.SimpleList{}, &ListOptions{}, &metav1.ExportOptions{},
-		&api.DeleteOptions{}, &genericapitesting.SimpleGetOptions{}, &genericapitesting.SimpleRoot{},
+		&genericapitesting.Simple{}, &genericapitesting.SimpleList{}, &metav1.ExportOptions{},
+		&metav1.DeleteOptions{}, &genericapitesting.SimpleGetOptions{}, &genericapitesting.SimpleRoot{},
 		&v1.Pod{},
 	)
 	metav1.AddToGroupVersion(api.Scheme, newGroupVersion)
@@ -355,7 +340,7 @@ type SimpleRESTStorage struct {
 	stream *SimpleStream
 
 	deleted       string
-	deleteOptions *api.DeleteOptions
+	deleteOptions *metav1.DeleteOptions
 
 	actualNamespace  string
 	namespacePresent bool
@@ -393,7 +378,7 @@ func (storage *SimpleRESTStorage) Export(ctx request.Context, name string, opts 
 	return obj, storage.errors["export"]
 }
 
-func (storage *SimpleRESTStorage) List(ctx request.Context, options *api.ListOptions) (runtime.Object, error) {
+func (storage *SimpleRESTStorage) List(ctx request.Context, options *metainternalversion.ListOptions) (runtime.Object, error) {
 	storage.checkContext(ctx)
 	result := &genericapitesting.SimpleList{
 		Items: storage.list,
@@ -456,7 +441,7 @@ func (storage *SimpleRESTStorage) checkContext(ctx request.Context) {
 	storage.actualNamespace, storage.namespacePresent = request.NamespaceFrom(ctx)
 }
 
-func (storage *SimpleRESTStorage) Delete(ctx request.Context, id string, options *api.DeleteOptions) (runtime.Object, error) {
+func (storage *SimpleRESTStorage) Delete(ctx request.Context, id string, options *metav1.DeleteOptions) (runtime.Object, error) {
 	storage.checkContext(ctx)
 	storage.deleted = id
 	storage.deleteOptions = options
@@ -509,7 +494,7 @@ func (storage *SimpleRESTStorage) Update(ctx request.Context, name string, objIn
 }
 
 // Implement ResourceWatcher.
-func (storage *SimpleRESTStorage) Watch(ctx request.Context, options *api.ListOptions) (watch.Interface, error) {
+func (storage *SimpleRESTStorage) Watch(ctx request.Context, options *metainternalversion.ListOptions) (watch.Interface, error) {
 	storage.lock.Lock()
 	defer storage.lock.Unlock()
 	storage.checkContext(ctx)
@@ -1755,7 +1740,7 @@ func TestConnectResponderObject(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !api.Semantic.DeepEqual(obj, simple) {
+	if !apiequality.Semantic.DeepEqual(obj, simple) {
 		t.Errorf("Unexpected response: %#v", obj)
 	}
 }
@@ -1959,7 +1944,7 @@ func TestDeleteWithOptions(t *testing.T) {
 	defer server.Close()
 
 	grace := int64(300)
-	item := &api.DeleteOptions{
+	item := &metav1.DeleteOptions{
 		GracePeriodSeconds: &grace,
 	}
 	body, err := runtime.Encode(codec, item)
@@ -1985,7 +1970,7 @@ func TestDeleteWithOptions(t *testing.T) {
 		t.Errorf("Unexpected delete: %s, expected %s", simpleStorage.deleted, ID)
 	}
 	simpleStorage.deleteOptions.GetObjectKind().SetGroupVersionKind(schema.GroupVersionKind{})
-	if !api.Semantic.DeepEqual(simpleStorage.deleteOptions, item) {
+	if !apiequality.Semantic.DeepEqual(simpleStorage.deleteOptions, item) {
 		t.Errorf("unexpected delete options: %s", diff.ObjectDiff(simpleStorage.deleteOptions, item))
 	}
 }
@@ -2000,7 +1985,7 @@ func TestDeleteWithOptionsQuery(t *testing.T) {
 	defer server.Close()
 
 	grace := int64(300)
-	item := &api.DeleteOptions{
+	item := &metav1.DeleteOptions{
 		GracePeriodSeconds: &grace,
 	}
 
@@ -2011,7 +1996,7 @@ func TestDeleteWithOptionsQuery(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if res.StatusCode != http.StatusOK {
-		t.Errorf("unexpected response: %s %#v", request.URL, res)
+		t.Fatalf("unexpected response: %s %#v", request.URL, res)
 		s, err := ioutil.ReadAll(res.Body)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
@@ -2019,10 +2004,10 @@ func TestDeleteWithOptionsQuery(t *testing.T) {
 		t.Logf(string(s))
 	}
 	if simpleStorage.deleted != ID {
-		t.Errorf("Unexpected delete: %s, expected %s", simpleStorage.deleted, ID)
+		t.Fatalf("Unexpected delete: %s, expected %s", simpleStorage.deleted, ID)
 	}
 	simpleStorage.deleteOptions.GetObjectKind().SetGroupVersionKind(schema.GroupVersionKind{})
-	if !api.Semantic.DeepEqual(simpleStorage.deleteOptions, item) {
+	if !apiequality.Semantic.DeepEqual(simpleStorage.deleteOptions, item) {
 		t.Errorf("unexpected delete options: %s", diff.ObjectDiff(simpleStorage.deleteOptions, item))
 	}
 }
@@ -2037,7 +2022,7 @@ func TestDeleteWithOptionsQueryAndBody(t *testing.T) {
 	defer server.Close()
 
 	grace := int64(300)
-	item := &api.DeleteOptions{
+	item := &metav1.DeleteOptions{
 		GracePeriodSeconds: &grace,
 	}
 	body, err := runtime.Encode(codec, item)
@@ -2062,7 +2047,7 @@ func TestDeleteWithOptionsQueryAndBody(t *testing.T) {
 		t.Errorf("Unexpected delete: %s, expected %s", simpleStorage.deleted, ID)
 	}
 	simpleStorage.deleteOptions.GetObjectKind().SetGroupVersionKind(schema.GroupVersionKind{})
-	if !api.Semantic.DeepEqual(simpleStorage.deleteOptions, item) {
+	if !apiequality.Semantic.DeepEqual(simpleStorage.deleteOptions, item) {
 		t.Errorf("unexpected delete options: %s", diff.ObjectDiff(simpleStorage.deleteOptions, item))
 	}
 }
@@ -2103,7 +2088,7 @@ func TestLegacyDeleteIgnoresOptions(t *testing.T) {
 	server := httptest.NewServer(handler)
 	defer server.Close()
 
-	item := api.NewDeleteOptions(300)
+	item := metav1.NewDeleteOptions(300)
 	body, err := runtime.Encode(codec, item)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -2186,7 +2171,7 @@ func TestPatch(t *testing.T) {
 		t:           t,
 		expectedSet: "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/default/simple/" + ID,
 		name:        ID,
-		namespace:   api.NamespaceDefault,
+		namespace:   metav1.NamespaceDefault,
 	}
 	handler := handleLinker(storage, selfLinker)
 	server := httptest.NewServer(handler)
@@ -2246,7 +2231,7 @@ func TestUpdate(t *testing.T) {
 		t:           t,
 		expectedSet: "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/default/simple/" + ID,
 		name:        ID,
-		namespace:   api.NamespaceDefault,
+		namespace:   metav1.NamespaceDefault,
 	}
 	handler := handleLinker(storage, selfLinker)
 	server := httptest.NewServer(handler)
@@ -2292,7 +2277,7 @@ func TestUpdateInvokesAdmissionControl(t *testing.T) {
 	item := &genericapitesting.Simple{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      ID,
-			Namespace: api.NamespaceDefault,
+			Namespace: metav1.NamespaceDefault,
 		},
 		Other: "bar",
 	}
@@ -2463,7 +2448,7 @@ func TestUpdateMissing(t *testing.T) {
 	item := &genericapitesting.Simple{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      ID,
-			Namespace: api.NamespaceDefault,
+			Namespace: metav1.NamespaceDefault,
 		},
 		Other: "bar",
 	}
@@ -3355,7 +3340,7 @@ func readBodyOrDie(r io.Reader) []byte {
 
 // BenchmarkUpdateProtobuf measures the cost of processing an update on the server in proto
 func BenchmarkUpdateProtobuf(b *testing.B) {
-	items := benchmarkItems()
+	items := benchmarkItems(b)
 
 	simpleStorage := &SimpleRESTStorage{}
 	handler := handle(map[string]rest.Storage{"simples": simpleStorage})
@@ -3411,8 +3396,8 @@ func newTestRequestInfoResolver() *request.RequestInfoFactory {
 
 const benchmarkSeed = 100
 
-func benchmarkItems() []api.Pod {
-	apiObjectFuzzer := apitesting.FuzzerFor(nil, api.SchemeGroupVersion, rand.NewSource(benchmarkSeed))
+func benchmarkItems(b *testing.B) []api.Pod {
+	apiObjectFuzzer := apitesting.FuzzerFor(kapitesting.FuzzerFuncs(b), rand.NewSource(benchmarkSeed))
 	items := make([]api.Pod, 3)
 	for i := range items {
 		apiObjectFuzzer.Fuzz(&items[i])

@@ -51,6 +51,7 @@ type FinalizeREST struct {
 // NewREST returns a RESTStorage object that will work against namespaces.
 func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, *StatusREST, *FinalizeREST) {
 	store := &genericregistry.Store{
+		Copier:      api.Scheme,
 		NewFunc:     func() runtime.Object { return &api.Namespace{} },
 		NewListFunc: func() runtime.Object { return &api.NamespaceList{} },
 		ObjectNameFunc: func(obj runtime.Object) (string, error) {
@@ -79,7 +80,7 @@ func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, *StatusREST, *Finaliz
 }
 
 // Delete enforces life-cycle rules for namespace termination
-func (r *REST) Delete(ctx genericapirequest.Context, name string, options *api.DeleteOptions) (runtime.Object, error) {
+func (r *REST) Delete(ctx genericapirequest.Context, name string, options *metav1.DeleteOptions) (runtime.Object, error) {
 	nsObj, err := r.Get(ctx, name, &metav1.GetOptions{})
 	if err != nil {
 		return nil, err
@@ -89,10 +90,10 @@ func (r *REST) Delete(ctx genericapirequest.Context, name string, options *api.D
 
 	// Ensure we have a UID precondition
 	if options == nil {
-		options = api.NewDeleteOptions(0)
+		options = metav1.NewDeleteOptions(0)
 	}
 	if options.Preconditions == nil {
-		options.Preconditions = &api.Preconditions{}
+		options.Preconditions = &metav1.Preconditions{}
 	}
 	if options.Preconditions.UID == nil {
 		options.Preconditions.UID = &namespace.UID

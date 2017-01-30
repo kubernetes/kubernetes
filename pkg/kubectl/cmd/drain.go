@@ -34,10 +34,10 @@ import (
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
+	restclient "k8s.io/client-go/rest"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/policy"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
-	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
@@ -381,8 +381,8 @@ func (ps podStatuses) Message() string {
 // getPodsForDeletion returns all the pods we're going to delete.  If there are
 // any pods preventing us from deleting, we return that list in an error.
 func (o *DrainOptions) getPodsForDeletion() (pods []api.Pod, err error) {
-	podList, err := o.client.Core().Pods(api.NamespaceAll).List(api.ListOptions{
-		FieldSelector: fields.SelectorFromSet(fields.Set{"spec.nodeName": o.nodeInfo.Name})})
+	podList, err := o.client.Core().Pods(metav1.NamespaceAll).List(metav1.ListOptions{
+		FieldSelector: fields.SelectorFromSet(fields.Set{"spec.nodeName": o.nodeInfo.Name}).String()})
 	if err != nil {
 		return pods, err
 	}
@@ -418,7 +418,7 @@ func (o *DrainOptions) getPodsForDeletion() (pods []api.Pod, err error) {
 }
 
 func (o *DrainOptions) deletePod(pod api.Pod) error {
-	deleteOptions := &api.DeleteOptions{}
+	deleteOptions := &metav1.DeleteOptions{}
 	if o.GracePeriodSeconds >= 0 {
 		gracePeriodSeconds := int64(o.GracePeriodSeconds)
 		deleteOptions.GracePeriodSeconds = &gracePeriodSeconds
@@ -427,7 +427,7 @@ func (o *DrainOptions) deletePod(pod api.Pod) error {
 }
 
 func (o *DrainOptions) evictPod(pod api.Pod, policyGroupVersion string) error {
-	deleteOptions := &api.DeleteOptions{}
+	deleteOptions := &metav1.DeleteOptions{}
 	if o.GracePeriodSeconds >= 0 {
 		gracePeriodSeconds := int64(o.GracePeriodSeconds)
 		deleteOptions.GracePeriodSeconds = &gracePeriodSeconds

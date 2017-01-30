@@ -19,14 +19,12 @@ package predicates
 import (
 	"fmt"
 	"reflect"
-	"strings"
 	"testing"
 
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm"
-	priorityutil "k8s.io/kubernetes/plugin/pkg/scheduler/algorithm/priorities/util"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/schedulercache"
 )
 
@@ -2572,9 +2570,8 @@ func TestInterPodAffinity(t *testing.T) {
 		}
 
 		fit := PodAffinityChecker{
-			info:           FakeNodeInfo(*node),
-			podLister:      algorithm.FakePodLister(test.pods),
-			failureDomains: priorityutil.Topologies{DefaultKeys: strings.Split(v1.DefaultFailureDomains, ",")},
+			info:      FakeNodeInfo(*node),
+			podLister: algorithm.FakePodLister(test.pods),
 		}
 		nodeInfo := schedulercache.NewNodeInfo(podsOnNode...)
 		nodeInfo.SetNode(test.node)
@@ -2902,9 +2899,8 @@ func TestInterPodAffinityWithMultipleNodes(t *testing.T) {
 			}
 
 			testFit := PodAffinityChecker{
-				info:           nodeListInfo,
-				podLister:      algorithm.FakePodLister(test.pods),
-				failureDomains: priorityutil.Topologies{DefaultKeys: strings.Split(v1.DefaultFailureDomains, ",")},
+				info:      nodeListInfo,
+				podLister: algorithm.FakePodLister(test.pods),
 			}
 			nodeInfo := schedulercache.NewNodeInfo(podsOnNode...)
 			nodeInfo.SetNode(&node)

@@ -28,7 +28,7 @@ import (
 )
 
 func startCSRController(ctx ControllerContext) (bool, error) {
-	if !ctx.AvailableResources[schema.GroupVersionResource{Group: "certificates.k8s.io", Version: "v1alpha1", Resource: "certificatesigningrequests"}] {
+	if !ctx.AvailableResources[schema.GroupVersionResource{Group: "certificates.k8s.io", Version: "v1beta1", Resource: "certificatesigningrequests"}] {
 		return false, nil
 	}
 	resyncPeriod := ResyncPeriod(&ctx.Options)()

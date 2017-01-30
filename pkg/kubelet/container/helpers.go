@@ -20,6 +20,7 @@ import (
 	"bytes"
 	"fmt"
 	"hash/adler32"
+	"hash/fnv"
 	"strings"
 	"time"
 
@@ -91,6 +92,15 @@ func ShouldContainerBeRestarted(container *v1.Container, pod *v1.Pod, podStatus 
 // HashContainer returns the hash of the container. It is used to compare
 // the running container with its desired spec.
 func HashContainer(container *v1.Container) uint64 {
+	hash := fnv.New32a()
+	hashutil.DeepHashObject(hash, *container)
+	return uint64(hash.Sum32())
+}
+
+// HashContainerLegacy returns the hash of the container. It is used to compare
+// the running container with its desired spec.
+// TODO: Delete this function after we deprecate dockertools.
+func HashContainerLegacy(container *v1.Container) uint64 {
 	hash := adler32.New()
 	hashutil.DeepHashObject(hash, *container)
 	return uint64(hash.Sum32())
@@ -197,14 +207,14 @@ func ConvertPodStatusToRunningPod(runtimeName string, podStatus *PodStatus) Pod 
 	// Populate sandboxes in kubecontainer.Pod
 	for _, sandbox := range podStatus.SandboxStatuses {
 		runningPod.Sandboxes = append(runningPod.Sandboxes, &Container{
-			ID:    ContainerID{Type: runtimeName, ID: *sandbox.Id},
-			State: SandboxToContainerState(*sandbox.State),
+			ID:    ContainerID{Type: runtimeName, ID: sandbox.Id},
+			State: SandboxToContainerState(sandbox.State),
 		})
 	}
 	return runningPod
 }
 
-// sandboxToContainerState converts runtimeApi.PodSandboxState to
+// SandboxToContainerState converts runtimeapi.PodSandboxState to
 // kubecontainer.ContainerState.
 // This is only needed because we need to return sandboxes as if they were
 // kubecontainer.Containers to avoid substantial changes to PLEG.

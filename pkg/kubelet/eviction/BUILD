@@ -21,7 +21,6 @@ go_library(
     tags = ["automanaged"],
     deps = [
         "//pkg/api:go_default_library",
-        "//pkg/api/resource:go_default_library",
         "//pkg/api/v1:go_default_library",
         "//pkg/client/record:go_default_library",
         "//pkg/kubelet/api/v1alpha1/stats:go_default_library",
@@ -34,10 +33,11 @@ go_library(
         "//pkg/kubelet/util/format:go_default_library",
         "//pkg/quota/evaluator/core:go_default_library",
         "//vendor:github.com/golang/glog",
+        "//vendor:k8s.io/apimachinery/pkg/api/resource",
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
         "//vendor:k8s.io/apimachinery/pkg/util/sets",
         "//vendor:k8s.io/apimachinery/pkg/util/wait",
-        "//vendor:k8s.io/client-go/pkg/util/clock",
+        "//vendor:k8s.io/client-go/util/clock",
     ],
 )
 
@@ -51,16 +51,16 @@ go_test(
     tags = ["automanaged"],
     deps = [
         "//pkg/api:go_default_library",
-        "//pkg/api/resource:go_default_library",
         "//pkg/api/v1:go_default_library",
         "//pkg/client/record:go_default_library",
         "//pkg/kubelet/api/v1alpha1/stats:go_default_library",
         "//pkg/kubelet/lifecycle:go_default_library",
         "//pkg/kubelet/types:go_default_library",
         "//pkg/quota:go_default_library",
+        "//vendor:k8s.io/apimachinery/pkg/api/resource",
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
         "//vendor:k8s.io/apimachinery/pkg/types",
-        "//vendor:k8s.io/client-go/pkg/util/clock",
+        "//vendor:k8s.io/client-go/util/clock",
     ],
 )
 

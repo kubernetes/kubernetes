@@ -119,14 +119,14 @@ func (s ClusterRoleBindingGeneratorV1) StructuredGenerate() (runtime.Object, err
 	for _, user := range s.Users {
 		clusterRoleBinding.Subjects = append(clusterRoleBinding.Subjects, rbac.Subject{
 			Kind:       rbac.UserKind,
-			APIVersion: "rbac/v1alpha1",
+			APIVersion: "rbac.authorization.k8s.io/v1beta1",
 			Name:       user,
 		})
 	}
 	for _, group := range s.Groups {
 		clusterRoleBinding.Subjects = append(clusterRoleBinding.Subjects, rbac.Subject{
 			Kind:       rbac.GroupKind,
-			APIVersion: "rbac/v1alpha1",
+			APIVersion: "rbac.authorization.k8s.io/v1beta1",
 			Name:       group,
 		})
 	}

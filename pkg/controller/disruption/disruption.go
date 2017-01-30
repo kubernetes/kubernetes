@@ -27,19 +27,20 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
+	"k8s.io/client-go/tools/cache"
+	"k8s.io/client-go/util/workqueue"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
 	apps "k8s.io/kubernetes/pkg/apis/apps/v1beta1"
 	extensions "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	policy "k8s.io/kubernetes/pkg/apis/policy/v1beta1"
-	"k8s.io/kubernetes/pkg/client/cache"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	v1core "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/core/v1"
 	policyclientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/policy/v1beta1"
+	"k8s.io/kubernetes/pkg/client/legacylisters"
 	"k8s.io/kubernetes/pkg/client/record"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/util/intstr"
-	"k8s.io/kubernetes/pkg/util/workqueue"
 
 	"github.com/golang/glog"
 )
@@ -64,26 +65,26 @@ type DisruptionController struct {
 
 	pdbStore      cache.Store
 	pdbController cache.Controller
-	pdbLister     cache.StoreToPodDisruptionBudgetLister
+	pdbLister     listers.StoreToPodDisruptionBudgetLister
 
 	podController cache.Controller
-	podLister     cache.StoreToPodLister
+	podLister     listers.StoreToPodLister
 
 	rcIndexer    cache.Indexer
 	rcController cache.Controller
-	rcLister     cache.StoreToReplicationControllerLister
+	rcLister     listers.StoreToReplicationControllerLister
 
 	rsStore      cache.Store
 	rsController cache.Controller
-	rsLister     cache.StoreToReplicaSetLister
+	rsLister     listers.StoreToReplicaSetLister
 
 	dIndexer    cache.Indexer
 	dController cache.Controller
-	dLister     cache.StoreToDeploymentLister
+	dLister     listers.StoreToDeploymentLister
 
 	ssStore      cache.Store
 	ssController cache.Controller
-	ssLister     cache.StoreToStatefulSetLister
+	ssLister     listers.StoreToStatefulSetLister
 
 	// PodDisruptionBudget keys that need to be synced.
 	queue        workqueue.RateLimitingInterface
@@ -128,11 +129,11 @@ func NewDisruptionController(podInformer cache.SharedIndexInformer, kubeClient c
 
 	dc.pdbStore, dc.pdbController = cache.NewInformer(
 		&cache.ListWatch{
-			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
-				return dc.kubeClient.Policy().PodDisruptionBudgets(v1.NamespaceAll).List(options)
+			ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
+				return dc.kubeClient.Policy().PodDisruptionBudgets(metav1.NamespaceAll).List(options)
 			},
-			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
-				return dc.kubeClient.Policy().PodDisruptionBudgets(v1.NamespaceAll).Watch(options)
+			WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
+				return dc.kubeClient.Policy().PodDisruptionBudgets(metav1.NamespaceAll).Watch(options)
 			},
 		},
 		&policy.PodDisruptionBudget{},
@@ -147,11 +148,11 @@ func NewDisruptionController(podInformer cache.SharedIndexInformer, kubeClient c
 
 	dc.rcIndexer, dc.rcController = cache.NewIndexerInformer(
 		&cache.ListWatch{
-			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
-				return dc.kubeClient.Core().ReplicationControllers(v1.NamespaceAll).List(options)
+			ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
+				return dc.kubeClient.Core().ReplicationControllers(metav1.NamespaceAll).List(options)
 			},
-			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
-				return dc.kubeClient.Core().ReplicationControllers(v1.NamespaceAll).Watch(options)
+			WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
+				return dc.kubeClient.Core().ReplicationControllers(metav1.NamespaceAll).Watch(options)
 			},
 		},
 		&v1.ReplicationController{},
@@ -164,11 +165,11 @@ func NewDisruptionController(podInformer cache.SharedIndexInformer, kubeClient c
 
 	dc.rsLister.Indexer, dc.rsController = cache.NewIndexerInformer(
 		&cache.ListWatch{
-			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
-				return dc.kubeClient.Extensions().ReplicaSets(v1.NamespaceAll).List(options)
+			ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
+				return dc.kubeClient.Extensions().ReplicaSets(metav1.NamespaceAll).List(options)
 			},
-			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
-				return dc.kubeClient.Extensions().ReplicaSets(v1.NamespaceAll).Watch(options)
+			WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
+				return dc.kubeClient.Extensions().ReplicaSets(metav1.NamespaceAll).Watch(options)
 			},
 		},
 		&extensions.ReplicaSet{},
@@ -180,11 +181,11 @@ func NewDisruptionController(podInformer cache.SharedIndexInformer, kubeClient c
 
 	dc.dIndexer, dc.dController = cache.NewIndexerInformer(
 		&cache.ListWatch{
-			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
-				return dc.kubeClient.Extensions().Deployments(v1.NamespaceAll).List(options)
+			ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
+				return dc.kubeClient.Extensions().Deployments(metav1.NamespaceAll).List(options)
 			},
-			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
-				return dc.kubeClient.Extensions().Deployments(v1.NamespaceAll).Watch(options)
+			WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
+				return dc.kubeClient.Extensions().Deployments(metav1.NamespaceAll).Watch(options)
 			},
 		},
 		&extensions.Deployment{},
@@ -196,11 +197,11 @@ func NewDisruptionController(podInformer cache.SharedIndexInformer, kubeClient c
 
 	dc.ssStore, dc.ssController = cache.NewInformer(
 		&cache.ListWatch{
-			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
-				return dc.kubeClient.Apps().StatefulSets(v1.NamespaceAll).List(options)
+			ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
+				return dc.kubeClient.Apps().StatefulSets(metav1.NamespaceAll).List(options)
 			},
-			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
-				return dc.kubeClient.Apps().StatefulSets(v1.NamespaceAll).Watch(options)
+			WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
+				return dc.kubeClient.Apps().StatefulSets(metav1.NamespaceAll).Watch(options)
 			},
 		},
 		&apps.StatefulSet{},

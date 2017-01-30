@@ -21,13 +21,13 @@ import (
 	"strconv"
 	"time"
 
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/watch"
-	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/v1"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/client/conditions"
-	"k8s.io/kubernetes/pkg/util/uuid"
 	"k8s.io/kubernetes/test/e2e/framework"
 
 	. "github.com/onsi/ginkgo"
@@ -82,7 +82,7 @@ var _ = framework.KubeDescribe("InitContainer", func() {
 			Expect(err).To(BeNil())
 		}
 		startedPod := podClient.Create(pod)
-		w, err := podClient.Watch(v1.SingleObject(startedPod.ObjectMeta))
+		w, err := podClient.Watch(metav1.SingleObject(startedPod.ObjectMeta))
 		Expect(err).NotTo(HaveOccurred(), "error watching a pod")
 		wr := watch.NewRecorder(w)
 		event, err := watch.Until(framework.PodStartTimeout, wr, conditions.PodCompleted)
@@ -151,7 +151,7 @@ var _ = framework.KubeDescribe("InitContainer", func() {
 			Expect(err).To(BeNil())
 		}
 		startedPod := podClient.Create(pod)
-		w, err := podClient.Watch(v1.SingleObject(startedPod.ObjectMeta))
+		w, err := podClient.Watch(metav1.SingleObject(startedPod.ObjectMeta))
 		Expect(err).NotTo(HaveOccurred(), "error watching a pod")
 		wr := watch.NewRecorder(w)
 		event, err := watch.Until(framework.PodStartTimeout, wr, conditions.PodRunning)
@@ -221,7 +221,7 @@ var _ = framework.KubeDescribe("InitContainer", func() {
 			Expect(err).To(BeNil())
 		}
 		startedPod := podClient.Create(pod)
-		w, err := podClient.Watch(v1.SingleObject(startedPod.ObjectMeta))
+		w, err := podClient.Watch(metav1.SingleObject(startedPod.ObjectMeta))
 		Expect(err).NotTo(HaveOccurred(), "error watching a pod")
 
 		wr := watch.NewRecorder(w)
@@ -345,7 +345,7 @@ var _ = framework.KubeDescribe("InitContainer", func() {
 		}
 		startedPod := podClient.Create(pod)
 
-		w, err := podClient.Watch(v1.SingleObject(startedPod.ObjectMeta))
+		w, err := podClient.Watch(metav1.SingleObject(startedPod.ObjectMeta))
 		Expect(err).NotTo(HaveOccurred(), "error watching a pod")
 
 		wr := watch.NewRecorder(w)

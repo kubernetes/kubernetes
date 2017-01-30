@@ -22,8 +22,6 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/test/e2e/framework"
 
 	. "github.com/onsi/ginkgo"
@@ -57,7 +55,7 @@ func ClusterLevelLoggingWithKibana(f *framework.Framework) {
 
 	// Check for the existence of the Kibana service.
 	By("Checking the Kibana service exists.")
-	s := f.ClientSet.Core().Services(api.NamespaceSystem)
+	s := f.ClientSet.Core().Services(metav1.NamespaceSystem)
 	// Make a few attempts to connect. This makes the test robust against
 	// being run as the first e2e test just after the e2e cluster has been created.
 	var err error
@@ -72,8 +70,8 @@ func ClusterLevelLoggingWithKibana(f *framework.Framework) {
 	// Wait for the Kibana pod(s) to enter the running state.
 	By("Checking to make sure the Kibana pods are running")
 	label := labels.SelectorFromSet(labels.Set(map[string]string{kibanaKey: kibanaValue}))
-	options := v1.ListOptions{LabelSelector: label.String()}
-	pods, err := f.ClientSet.Core().Pods(api.NamespaceSystem).List(options)
+	options := metav1.ListOptions{LabelSelector: label.String()}
+	pods, err := f.ClientSet.Core().Pods(metav1.NamespaceSystem).List(options)
 	Expect(err).NotTo(HaveOccurred())
 	for _, pod := range pods.Items {
 		err = framework.WaitForPodRunningInNamespace(f.ClientSet, &pod)
@@ -94,7 +92,7 @@ func ClusterLevelLoggingWithKibana(f *framework.Framework) {
 		defer cancel()
 
 		// Query against the root URL for Kibana.
-		_, err = proxyRequest.Namespace(api.NamespaceSystem).
+		_, err = proxyRequest.Namespace(metav1.NamespaceSystem).
 			Context(ctx).
 			Name("kibana-logging").
 			DoRaw()

@@ -18,7 +18,6 @@ go_library(
     ],
     tags = ["automanaged"],
     deps = [
-        "//pkg/api/resource:go_default_library",
         "//pkg/api/v1:go_default_library",
         "//pkg/apis/storage/v1beta1/util:go_default_library",
         "//pkg/client/clientset_generated/clientset:go_default_library",
@@ -32,6 +31,7 @@ go_library(
         "//vendor:github.com/heketi/heketi/client/api/go-client",
         "//vendor:github.com/heketi/heketi/pkg/glusterfs/api",
         "//vendor:k8s.io/apimachinery/pkg/api/errors",
+        "//vendor:k8s.io/apimachinery/pkg/api/resource",
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
         "//vendor:k8s.io/apimachinery/pkg/labels",
         "//vendor:k8s.io/apimachinery/pkg/types",
@@ -49,16 +49,16 @@ go_test(
     deps = [
         "//pkg/api/v1:go_default_library",
         "//pkg/client/clientset_generated/clientset/fake:go_default_library",
-        "//pkg/client/testing/core:go_default_library",
         "//pkg/util/exec:go_default_library",
         "//pkg/util/mount:go_default_library",
-        "//pkg/util/testing:go_default_library",
         "//pkg/volume:go_default_library",
         "//pkg/volume/testing:go_default_library",
         "//vendor:github.com/heketi/heketi/pkg/glusterfs/api",
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
         "//vendor:k8s.io/apimachinery/pkg/runtime",
         "//vendor:k8s.io/apimachinery/pkg/types",
+        "//vendor:k8s.io/client-go/testing",
+        "//vendor:k8s.io/client-go/util/testing",
     ],
 )
 

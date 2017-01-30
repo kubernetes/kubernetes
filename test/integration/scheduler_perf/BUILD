@@ -18,12 +18,12 @@ go_library(
         "//pkg/client/clientset_generated/clientset:go_default_library",
         "//pkg/client/clientset_generated/clientset/typed/core/v1:go_default_library",
         "//pkg/client/record:go_default_library",
-        "//pkg/client/restclient:go_default_library",
         "//plugin/pkg/scheduler:go_default_library",
         "//plugin/pkg/scheduler/algorithmprovider:go_default_library",
         "//plugin/pkg/scheduler/factory:go_default_library",
         "//test/integration/framework:go_default_library",
         "//vendor:github.com/golang/glog",
+        "//vendor:k8s.io/client-go/rest",
     ],
 )
 
@@ -41,7 +41,6 @@ go_test(
         "//test/integration/framework:go_default_library",
         "//test/utils:go_default_library",
         "//vendor:github.com/golang/glog",
-        "//vendor:github.com/renstrom/dedent",
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
     ],
 )

@@ -17,13 +17,13 @@ limitations under the License.
 package fake
 
 import (
+	rest "k8s.io/client-go/rest"
+	testing "k8s.io/client-go/testing"
 	internalversion "k8s.io/kubernetes/cmd/kube-aggregator/pkg/client/clientset_generated/internalclientset/typed/apiregistration/internalversion"
-	restclient "k8s.io/kubernetes/pkg/client/restclient"
-	core "k8s.io/kubernetes/pkg/client/testing/core"
 )
 
 type FakeApiregistration struct {
-	*core.Fake
+	*testing.Fake
 }
 
 func (c *FakeApiregistration) APIServices() internalversion.APIServiceInterface {
@@ -32,7 +32,7 @@ func (c *FakeApiregistration) APIServices() internalversion.APIServiceInterface 
 
 // RESTClient returns a RESTClient that is used to communicate
 // with API server by this client implementation.
-func (c *FakeApiregistration) RESTClient() restclient.Interface {
-	var ret *restclient.RESTClient
+func (c *FakeApiregistration) RESTClient() rest.Interface {
+	var ret *rest.RESTClient
 	return ret
 }

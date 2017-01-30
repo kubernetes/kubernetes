@@ -17,13 +17,12 @@ limitations under the License.
 package v1alpha1
 
 import (
-	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
+	rest "k8s.io/client-go/rest"
 	api "k8s.io/kubernetes/pkg/api"
-	v1 "k8s.io/kubernetes/pkg/api/v1"
 	v1alpha1 "k8s.io/kubernetes/pkg/apis/rbac/v1alpha1"
-	restclient "k8s.io/kubernetes/pkg/client/restclient"
 )
 
 // RolesGetter has a method to return a RoleInterface.
@@ -38,7 +37,7 @@ type RoleInterface interface {
 	Update(*v1alpha1.Role) (*v1alpha1.Role, error)
 	Delete(name string, options *v1.DeleteOptions) error
 	DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error
-	Get(name string, options meta_v1.GetOptions) (*v1alpha1.Role, error)
+	Get(name string, options v1.GetOptions) (*v1alpha1.Role, error)
 	List(opts v1.ListOptions) (*v1alpha1.RoleList, error)
 	Watch(opts v1.ListOptions) (watch.Interface, error)
 	Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v1alpha1.Role, err error)
@@ -47,7 +46,7 @@ type RoleInterface interface {
 
 // roles implements RoleInterface
 type roles struct {
-	client restclient.Interface
+	client rest.Interface
 	ns     string
 }
 
@@ -107,7 +106,7 @@ func (c *roles) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListO
 }
 
 // Get takes name of the role, and returns the corresponding role object, and an error if there is any.
-func (c *roles) Get(name string, options meta_v1.GetOptions) (result *v1alpha1.Role, err error) {
+func (c *roles) Get(name string, options v1.GetOptions) (result *v1alpha1.Role, err error) {
 	result = &v1alpha1.Role{}
 	err = c.client.Get().
 		Namespace(c.ns).

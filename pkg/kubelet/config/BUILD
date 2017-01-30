@@ -26,7 +26,6 @@ go_library(
         "//pkg/api/v1:go_default_library",
         "//pkg/api/v1/pod:go_default_library",
         "//pkg/api/validation:go_default_library",
-        "//pkg/client/cache:go_default_library",
         "//pkg/client/clientset_generated/clientset:go_default_library",
         "//pkg/client/record:go_default_library",
         "//pkg/kubelet/container:go_default_library",
@@ -37,6 +36,7 @@ go_library(
         "//pkg/util/hash:go_default_library",
         "//vendor:github.com/golang/glog",
         "//vendor:golang.org/x/exp/inotify",
+        "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
         "//vendor:k8s.io/apimachinery/pkg/fields",
         "//vendor:k8s.io/apimachinery/pkg/runtime",
         "//vendor:k8s.io/apimachinery/pkg/types",
@@ -44,6 +44,7 @@ go_library(
         "//vendor:k8s.io/apimachinery/pkg/util/validation/field",
         "//vendor:k8s.io/apimachinery/pkg/util/wait",
         "//vendor:k8s.io/apimachinery/pkg/util/yaml",
+        "//vendor:k8s.io/client-go/tools/cache",
     ],
 )
 
@@ -63,16 +64,17 @@ go_test(
         "//pkg/api/testapi:go_default_library",
         "//pkg/api/v1:go_default_library",
         "//pkg/api/validation:go_default_library",
-        "//pkg/client/cache:go_default_library",
         "//pkg/client/record:go_default_library",
         "//pkg/kubelet/types:go_default_library",
         "//pkg/securitycontext:go_default_library",
-        "//pkg/util/testing:go_default_library",
+        "//vendor:k8s.io/apimachinery/pkg/api/equality",
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
         "//vendor:k8s.io/apimachinery/pkg/runtime",
         "//vendor:k8s.io/apimachinery/pkg/types",
         "//vendor:k8s.io/apimachinery/pkg/util/wait",
         "//vendor:k8s.io/apimachinery/pkg/watch",
+        "//vendor:k8s.io/client-go/tools/cache",
+        "//vendor:k8s.io/client-go/util/testing",
     ],
 )
 

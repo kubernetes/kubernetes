@@ -24,18 +24,20 @@ import (
 	"time"
 
 	"github.com/golang/glog"
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/client-go/pkg/util/flowcontrol"
+	"k8s.io/client-go/tools/cache"
+	"k8s.io/client-go/util/flowcontrol"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/client/cache"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	v1core "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/core/v1"
+	"k8s.io/kubernetes/pkg/client/legacylisters"
 	"k8s.io/kubernetes/pkg/client/record"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/controller/informers"
@@ -135,9 +137,9 @@ type NodeController struct {
 	nodeInformer       informers.NodeInformer
 	daemonSetInformer  informers.DaemonSetInformer
 
-	podStore       cache.StoreToPodLister
-	nodeStore      cache.StoreToNodeLister
-	daemonSetStore cache.StoreToDaemonSetLister
+	podStore       listers.StoreToPodLister
+	nodeStore      listers.StoreToNodeLister
+	daemonSetStore listers.StoreToDaemonSetLister
 	// allocate/recycle CIDRs for node if allocateNodeCIDRs == true
 	cidrAllocator CIDRAllocator
 
@@ -252,7 +254,7 @@ func NewNodeController(
 		// We must poll because apiserver might not be up. This error causes
 		// controller manager to restart.
 		if pollErr := wait.Poll(10*time.Second, apiserverStartupGracePeriod, func() (bool, error) {
-			nodeList, err = kubeClient.Core().Nodes().List(v1.ListOptions{
+			nodeList, err = kubeClient.Core().Nodes().List(metav1.ListOptions{
 				FieldSelector: fields.Everything().String(),
 				LabelSelector: labels.Everything().String(),
 			})
@@ -776,7 +778,7 @@ func (nc *NodeController) tryUpdateNodeStatus(node *v1.Node) (time.Duration, v1.
 		}
 
 		_, currentCondition := v1.GetNodeCondition(&node.Status, v1.NodeReady)
-		if !api.Semantic.DeepEqual(currentCondition, &observedReadyCondition) {
+		if !apiequality.Semantic.DeepEqual(currentCondition, &observedReadyCondition) {
 			if _, err = nc.kubeClient.Core().Nodes().UpdateStatus(node); err != nil {
 				glog.Errorf("Error updating node %s: %v", node.Name, err)
 				return gracePeriod, observedReadyCondition, currentReadyCondition, err

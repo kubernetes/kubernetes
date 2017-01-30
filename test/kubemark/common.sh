@@ -14,7 +14,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-source "${KUBE_ROOT}/cluster/kubemark/config-default.sh"
+source "${KUBE_ROOT}/test/kubemark/cloud-provider-config.sh"
+source "${KUBE_ROOT}/cluster/kubemark/${CLOUD_PROVIDER}/config-default.sh"
 source "${KUBE_ROOT}/cluster/kubemark/util.sh"
 source "${KUBE_ROOT}/cluster/lib/util.sh"
 

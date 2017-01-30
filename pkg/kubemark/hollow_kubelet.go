@@ -19,6 +19,7 @@ package kubemark
 import (
 	"time"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kubeletapp "k8s.io/kubernetes/cmd/kubelet/app"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/componentconfig"
@@ -116,7 +117,7 @@ func GetHollowKubeletConfig(
 	c.Address = "0.0.0.0" /* bind address */
 	c.Port = int32(kubeletPort)
 	c.ReadOnlyPort = int32(kubeletReadOnlyPort)
-	c.MasterServiceNamespace = api.NamespaceDefault
+	c.MasterServiceNamespace = metav1.NamespaceDefault
 	c.PodManifestPath = manifestFilePath
 	c.FileCheckFrequency.Duration = 20 * time.Second
 	c.HTTPCheckFrequency.Duration = 20 * time.Second

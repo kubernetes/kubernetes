@@ -894,7 +894,7 @@ func (j *testJig) curlServiceNodePort(ns, name string, port int) {
 // by default, so retrieve its nodePort as well.
 func (j *testJig) getIngressNodePorts() []string {
 	nodePorts := []string{}
-	defaultSvc, err := j.client.Core().Services(api.NamespaceSystem).Get(defaultBackendName, metav1.GetOptions{})
+	defaultSvc, err := j.client.Core().Services(metav1.NamespaceSystem).Get(defaultBackendName, metav1.GetOptions{})
 	Expect(err).NotTo(HaveOccurred())
 	nodePorts = append(nodePorts, strconv.Itoa(int(defaultSvc.Spec.Ports[0].NodePort)))
 
@@ -948,8 +948,8 @@ func ingFromManifest(fileName string) *extensions.Ingress {
 }
 
 func (cont *GCEIngressController) getL7AddonUID() (string, error) {
-	framework.Logf("Retrieving UID from config map: %v/%v", api.NamespaceSystem, uidConfigMap)
-	cm, err := cont.c.Core().ConfigMaps(api.NamespaceSystem).Get(uidConfigMap, metav1.GetOptions{})
+	framework.Logf("Retrieving UID from config map: %v/%v", metav1.NamespaceSystem, uidConfigMap)
+	cm, err := cont.c.Core().ConfigMaps(metav1.NamespaceSystem).Get(uidConfigMap, metav1.GetOptions{})
 	if err != nil {
 		return "", err
 	}
@@ -1010,7 +1010,7 @@ func (cont *NginxIngressController) init() {
 	framework.Logf("waiting for pods with label %v", rc.Spec.Selector)
 	sel := labels.SelectorFromSet(labels.Set(rc.Spec.Selector))
 	framework.ExpectNoError(testutils.WaitForPodsWithLabelRunning(cont.c, cont.ns, sel))
-	pods, err := cont.c.Core().Pods(cont.ns).List(v1.ListOptions{LabelSelector: sel.String()})
+	pods, err := cont.c.Core().Pods(cont.ns).List(metav1.ListOptions{LabelSelector: sel.String()})
 	framework.ExpectNoError(err)
 	if len(pods.Items) == 0 {
 		framework.Failf("Failed to find nginx ingress controller pods with selector %v", sel)

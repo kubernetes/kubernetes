@@ -34,6 +34,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/admission"
+	"k8s.io/apiserver/pkg/server/filters"
 	"k8s.io/kubernetes/federation/cmd/federation-apiserver/app/options"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
@@ -42,7 +43,6 @@ import (
 	"k8s.io/kubernetes/pkg/genericapiserver/registry/generic"
 	genericregistry "k8s.io/kubernetes/pkg/genericapiserver/registry/generic/registry"
 	genericapiserver "k8s.io/kubernetes/pkg/genericapiserver/server"
-	"k8s.io/kubernetes/pkg/genericapiserver/server/filters"
 	"k8s.io/kubernetes/pkg/kubeapiserver"
 	kubeapiserveradmission "k8s.io/kubernetes/pkg/kubeapiserver/admission"
 	"k8s.io/kubernetes/pkg/registry/cachesize"
@@ -213,6 +213,7 @@ func Run(s *options.ServerRunOptions) error {
 	installCoreAPIs(s, m, restOptionsFactory)
 	installExtensionsAPIs(m, restOptionsFactory)
 	installBatchAPIs(m, restOptionsFactory)
+	installAutoscalingAPIs(m, restOptionsFactory)
 
 	sharedInformers.Start(wait.NeverStop)
 	m.PrepareRun().Run(wait.NeverStop)

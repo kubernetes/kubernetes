@@ -1,0 +1,13 @@
+options:
+  enable-dashboard-addons:
+    type: boolean
+    default: True
+    description: Deploy the Kubernetes Dashboard and Heapster addons
+  dns_domain:
+    type: string
+    default: cluster.local
+    description: The local domain for cluster dns
+  service-cidr:
+    type: string
+    default: 10.152.183.0/24
+    description: CIDR to user for Kubernetes services. Cannot be changed after deployment.

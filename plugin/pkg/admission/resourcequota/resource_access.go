@@ -24,14 +24,12 @@ import (
 	lru "github.com/hashicorp/golang-lru"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
-
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/watch"
+	"k8s.io/client-go/tools/cache"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/client/cache"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/storage/etcd"
 )
 
@@ -75,15 +73,11 @@ func newQuotaAccessor(client clientset.Interface) (*quotaAccessor, error) {
 		return nil, err
 	}
 	lw := &cache.ListWatch{
-		ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
-			internalOptions := api.ListOptions{}
-			v1.Convert_v1_ListOptions_To_api_ListOptions(&options, &internalOptions, nil)
-			return client.Core().ResourceQuotas(api.NamespaceAll).List(internalOptions)
+		ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
+			return client.Core().ResourceQuotas(metav1.NamespaceAll).List(options)
 		},
-		WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
-			internalOptions := api.ListOptions{}
-			v1.Convert_v1_ListOptions_To_api_ListOptions(&options, &internalOptions, nil)
-			return client.Core().ResourceQuotas(api.NamespaceAll).Watch(internalOptions)
+		WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
+			return client.Core().ResourceQuotas(metav1.NamespaceAll).Watch(options)
 		},
 	}
 	indexer, reflector := cache.NewNamespaceKeyedIndexerAndReflector(lw, &api.ResourceQuota{}, 0)
@@ -156,7 +150,7 @@ func (e *quotaAccessor) GetQuotas(namespace string) ([]api.ResourceQuota, error)
 			// If there is already in-flight List() for a given namespace, we should wait until
 			// it is finished and cache is updated instead of doing the same, also to avoid
 			// throttling - see #22422 for details.
-			liveList, err := e.client.Core().ResourceQuotas(namespace).List(api.ListOptions{})
+			liveList, err := e.client.Core().ResourceQuotas(namespace).List(metav1.ListOptions{})
 			if err != nil {
 				return nil, err
 			}

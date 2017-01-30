@@ -44,7 +44,7 @@ func validNewServiceAccount(name string) *api.ServiceAccount {
 	return &api.ServiceAccount{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
-			Namespace: api.NamespaceDefault,
+			Namespace: metav1.NamespaceDefault,
 		},
 		Secrets: []api.ObjectReference{},
 	}

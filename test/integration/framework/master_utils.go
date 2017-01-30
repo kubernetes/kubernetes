@@ -33,17 +33,21 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	authauthenticator "k8s.io/apiserver/pkg/authentication/authenticator"
+	"k8s.io/apiserver/pkg/authentication/authenticatorfactory"
 	authenticatorunion "k8s.io/apiserver/pkg/authentication/request/union"
 	"k8s.io/apiserver/pkg/authentication/user"
 	authauthorizer "k8s.io/apiserver/pkg/authorization/authorizer"
+	"k8s.io/apiserver/pkg/authorization/authorizerfactory"
 	authorizerunion "k8s.io/apiserver/pkg/authorization/union"
+	"k8s.io/apiserver/pkg/storage/storagebackend"
+	restclient "k8s.io/client-go/rest"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/api/v1"
 	apps "k8s.io/kubernetes/pkg/apis/apps/v1beta1"
 	autoscaling "k8s.io/kubernetes/pkg/apis/autoscaling/v1"
 	"k8s.io/kubernetes/pkg/apis/batch"
-	certificates "k8s.io/kubernetes/pkg/apis/certificates/v1alpha1"
+	certificates "k8s.io/kubernetes/pkg/apis/certificates/v1beta1"
 	extensions "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	policy "k8s.io/kubernetes/pkg/apis/policy/v1alpha1"
 	rbac "k8s.io/kubernetes/pkg/apis/rbac/v1alpha1"
@@ -52,17 +56,13 @@ import (
 	coreclient "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/core/v1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/client/record"
-	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/controller"
 	replicationcontroller "k8s.io/kubernetes/pkg/controller/replication"
 	"k8s.io/kubernetes/pkg/generated/openapi"
-	"k8s.io/kubernetes/pkg/genericapiserver/authenticator"
-	"k8s.io/kubernetes/pkg/genericapiserver/authorizer"
 	genericapiserver "k8s.io/kubernetes/pkg/genericapiserver/server"
 	"k8s.io/kubernetes/pkg/kubectl"
 	kubeletclient "k8s.io/kubernetes/pkg/kubelet/client"
 	"k8s.io/kubernetes/pkg/master"
-	"k8s.io/kubernetes/pkg/storage/storagebackend"
 	"k8s.io/kubernetes/pkg/util/env"
 	"k8s.io/kubernetes/pkg/version"
 	"k8s.io/kubernetes/plugin/pkg/admission/admit"
@@ -214,7 +214,7 @@ func startMasterOrDie(masterConfig *master.Config, incomingServer *httptest.Serv
 		Groups: []string{user.SystemPrivilegedGroup},
 	}
 
-	tokenAuthenticator := authenticator.NewAuthenticatorFromTokens(tokens)
+	tokenAuthenticator := authenticatorfactory.NewFromTokens(tokens)
 	if masterConfig.GenericConfig.Authenticator == nil {
 		masterConfig.GenericConfig.Authenticator = authenticatorunion.New(tokenAuthenticator, authauthenticator.RequestFunc(alwaysEmpty))
 	} else {
@@ -222,7 +222,7 @@ func startMasterOrDie(masterConfig *master.Config, incomingServer *httptest.Serv
 	}
 
 	if masterConfig.GenericConfig.Authorizer != nil {
-		tokenAuthorizer := authorizer.NewPrivilegedGroups(user.SystemPrivilegedGroup)
+		tokenAuthorizer := authorizerfactory.NewPrivilegedGroups(user.SystemPrivilegedGroup)
 		masterConfig.GenericConfig.Authorizer = authorizerunion.New(tokenAuthorizer, masterConfig.GenericConfig.Authorizer)
 	} else {
 		masterConfig.GenericConfig.Authorizer = alwaysAllow{}
@@ -267,7 +267,7 @@ func startMasterOrDie(masterConfig *master.Config, incomingServer *httptest.Serv
 	if masterConfig.EnableCoreControllers {
 		// TODO Once /healthz is updated for posthooks, we'll wait for good health
 		coreClient := coreclient.NewForConfigOrDie(&cfg)
-		svcWatch, err := coreClient.Services(v1.NamespaceDefault).Watch(v1.ListOptions{})
+		svcWatch, err := coreClient.Services(metav1.NamespaceDefault).Watch(metav1.ListOptions{})
 		if err != nil {
 			glog.Fatal(err)
 		}
@@ -357,7 +357,7 @@ func NewMasterConfig() *master.Config {
 	genericConfig := genericapiserver.NewConfig()
 	kubeVersion := version.Get()
 	genericConfig.Version = &kubeVersion
-	genericConfig.Authorizer = authorizer.NewAlwaysAllowAuthorizer()
+	genericConfig.Authorizer = authorizerfactory.NewAlwaysAllowAuthorizer()
 	genericConfig.AdmissionControl = admit.NewAlwaysAdmit()
 	genericConfig.EnableMetrics = true
 

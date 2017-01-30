@@ -19,6 +19,7 @@ package types
 import (
 	"fmt"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/api/v1"
 )
 
@@ -64,7 +65,7 @@ const (
 	// Updates from all sources
 	AllSource = "*"
 
-	NamespaceDefault = v1.NamespaceDefault
+	NamespaceDefault = metav1.NamespaceDefault
 )
 
 // PodUpdate defines an operation sent on the channel. You can add or remove single services by

@@ -22,6 +22,7 @@ import (
 	"os"
 	"strconv"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
@@ -73,7 +74,7 @@ func RunClusterInfo(f cmdutil.Factory, out io.Writer, cmd *cobra.Command) error 
 	mapper, typer := f.Object()
 	cmdNamespace := cmdutil.GetFlagString(cmd, "namespace")
 	if cmdNamespace == "" {
-		cmdNamespace = api.NamespaceSystem
+		cmdNamespace = metav1.NamespaceSystem
 	}
 
 	// TODO use generalized labels once they are implemented (#341)

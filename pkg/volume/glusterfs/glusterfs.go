@@ -30,10 +30,10 @@ import (
 	gcli "github.com/heketi/heketi/client/api/go-client"
 	gapi "github.com/heketi/heketi/pkg/glusterfs/api"
 	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/v1"
 	storageutil "k8s.io/kubernetes/pkg/apis/storage/v1beta1/util"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
@@ -456,7 +456,7 @@ func (p *glusterfsPlugin) collectGids(className string, gidTable *MinMaxAllocato
 	if kubeClient == nil {
 		return fmt.Errorf("glusterfs: failed to get kube client when collecting gids")
 	}
-	pvList, err := kubeClient.Core().PersistentVolumes().List(v1.ListOptions{LabelSelector: labels.Everything().String()})
+	pvList, err := kubeClient.Core().PersistentVolumes().List(metav1.ListOptions{LabelSelector: labels.Everything().String()})
 	if err != nil {
 		glog.Errorf("glusterfs: failed to get existing persistent volumes")
 		return err

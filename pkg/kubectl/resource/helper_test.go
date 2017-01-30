@@ -29,10 +29,10 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/rest/fake"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
-	"k8s.io/kubernetes/pkg/client/restclient/fake"
 )
 
 func objBody(obj runtime.Object) io.ReadCloser {
@@ -103,6 +103,7 @@ func TestHelperDelete(t *testing.T) {
 	}
 	for _, test := range tests {
 		client := &fake.RESTClient{
+			APIRegistry:          api.Registry,
 			NegotiatedSerializer: testapi.Default.NegotiatedSerializer(),
 			Resp:                 test.Resp,
 			Err:                  test.HttpErr,
@@ -193,6 +194,7 @@ func TestHelperCreate(t *testing.T) {
 	}
 	for i, test := range tests {
 		client := &fake.RESTClient{
+			APIRegistry:          api.Registry,
 			NegotiatedSerializer: testapi.Default.NegotiatedSerializer(),
 			Resp:                 test.Resp,
 			Err:                  test.HttpErr,
@@ -273,6 +275,7 @@ func TestHelperGet(t *testing.T) {
 	}
 	for _, test := range tests {
 		client := &fake.RESTClient{
+			APIRegistry:          api.Registry,
 			NegotiatedSerializer: testapi.Default.NegotiatedSerializer(),
 			Resp:                 test.Resp,
 			Err:                  test.HttpErr,
@@ -346,6 +349,7 @@ func TestHelperList(t *testing.T) {
 	}
 	for _, test := range tests {
 		client := &fake.RESTClient{
+			APIRegistry:          api.Registry,
 			NegotiatedSerializer: testapi.Default.NegotiatedSerializer(),
 			Resp:                 test.Resp,
 			Err:                  test.HttpErr,
@@ -479,8 +483,9 @@ func TestHelperReplace(t *testing.T) {
 	}
 	for i, test := range tests {
 		client := &fake.RESTClient{
-			Client:               test.HTTPClient,
+			APIRegistry:          api.Registry,
 			NegotiatedSerializer: testapi.Default.NegotiatedSerializer(),
+			Client:               test.HTTPClient,
 			Resp:                 test.Resp,
 			Err:                  test.HttpErr,
 		}

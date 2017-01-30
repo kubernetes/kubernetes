@@ -12,8 +12,8 @@ go_library(
     srcs = ["openapi.go"],
     tags = ["automanaged"],
     deps = [
-        "//pkg/util:go_default_library",
         "//vendor:github.com/emicklei/go-restful",
+        "//vendor:k8s.io/apiserver/pkg/util/trie",
     ],
 )
 

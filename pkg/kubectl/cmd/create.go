@@ -31,6 +31,12 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl/resource"
 )
 
+type CreateOptions struct {
+	FilenameOptions  resource.FilenameOptions
+	Selector         string
+	EditBeforeCreate bool
+}
+
 var (
 	create_long = templates.LongDesc(`
 		Create a resource by filename or stdin.
@@ -49,7 +55,7 @@ var (
 )
 
 func NewCmdCreate(f cmdutil.Factory, out, errOut io.Writer) *cobra.Command {
-	options := &resource.FilenameOptions{}
+	var options CreateOptions
 
 	cmd := &cobra.Command{
 		Use:     "create -f FILENAME",
@@ -57,27 +63,28 @@ func NewCmdCreate(f cmdutil.Factory, out, errOut io.Writer) *cobra.Command {
 		Long:    create_long,
 		Example: create_example,
 		Run: func(cmd *cobra.Command, args []string) {
-			if cmdutil.IsFilenameEmpty(options.Filenames) {
+			if cmdutil.IsFilenameEmpty(options.FilenameOptions.Filenames) {
 				defaultRunFunc := cmdutil.DefaultSubCommandRun(errOut)
 				defaultRunFunc(cmd, args)
 				return
 			}
 			cmdutil.CheckErr(ValidateArgs(cmd, args))
-			cmdutil.CheckErr(RunCreate(f, cmd, out, errOut, options))
+			cmdutil.CheckErr(RunCreate(f, cmd, out, errOut, &options))
 		},
 	}
 
 	usage := "to use to create the resource"
-	cmdutil.AddFilenameOptionFlags(cmd, options, usage)
+	cmdutil.AddFilenameOptionFlags(cmd, &options.FilenameOptions, usage)
 	cmd.MarkFlagRequired("filename")
 	cmdutil.AddValidateFlags(cmd)
 	cmdutil.AddPrinterFlags(cmd)
-	cmd.Flags().Bool("edit", false, "Edit the API resource before creating")
+	cmd.Flags().BoolVar(&options.EditBeforeCreate, "edit", false, "Edit the API resource before creating")
 	cmd.Flags().Bool("windows-line-endings", gruntime.GOOS == "windows", "Only relevant if --edit=true. Use Windows line-endings (default Unix line-endings)")
 	cmdutil.AddApplyAnnotationFlags(cmd)
 	cmdutil.AddRecordFlag(cmd)
 	cmdutil.AddDryRunFlag(cmd)
 	cmdutil.AddInclude3rdPartyFlags(cmd)
+	cmd.Flags().StringVarP(&options.Selector, "selector", "l", "", "Selector (label query) to filter on, supports '=', '==', and '!='.")
 
 	// create subcommands
 	cmd.AddCommand(NewCmdCreateNamespace(f, out))
@@ -100,9 +107,9 @@ func ValidateArgs(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-func RunCreate(f cmdutil.Factory, cmd *cobra.Command, out, errOut io.Writer, options *resource.FilenameOptions) error {
-	if cmdutil.GetFlagBool(cmd, "edit") {
-		return RunEditOnCreate(f, out, errOut, cmd, options)
+func RunCreate(f cmdutil.Factory, cmd *cobra.Command, out, errOut io.Writer, options *CreateOptions) error {
+	if options.EditBeforeCreate {
+		return RunEditOnCreate(f, out, errOut, cmd, &options.FilenameOptions)
 	}
 	schema, err := f.Validator(cmdutil.GetFlagBool(cmd, "validate"), cmdutil.GetFlagString(cmd, "schema-cache-dir"))
 	if err != nil {
@@ -122,7 +129,8 @@ func RunCreate(f cmdutil.Factory, cmd *cobra.Command, out, errOut io.Writer, opt
 		Schema(schema).
 		ContinueOnError().
 		NamespaceParam(cmdNamespace).DefaultNamespace().
-		FilenameParam(enforceNamespace, options).
+		FilenameParam(enforceNamespace, &options.FilenameOptions).
+		SelectorParam(options.Selector).
 		Flatten().
 		Do()
 	err = r.Err()

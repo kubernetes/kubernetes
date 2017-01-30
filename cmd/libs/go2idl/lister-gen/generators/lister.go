@@ -219,7 +219,7 @@ func (g *listerGenerator) Imports(c *generator.Context) (imports []string) {
 	imports = append(imports, "k8s.io/apimachinery/pkg/api/errors")
 	imports = append(imports, "k8s.io/apimachinery/pkg/labels")
 	// for Indexer
-	imports = append(imports, "k8s.io/kubernetes/pkg/client/cache")
+	imports = append(imports, "k8s.io/client-go/tools/cache")
 	return
 }
 

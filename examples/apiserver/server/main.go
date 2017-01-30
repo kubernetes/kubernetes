@@ -18,8 +18,8 @@ package main
 
 import (
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/apiserver/pkg/util/flag"
 	"k8s.io/kubernetes/examples/apiserver"
-	"k8s.io/kubernetes/pkg/util/flag"
 
 	"github.com/golang/glog"
 	"github.com/spf13/pflag"

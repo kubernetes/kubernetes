@@ -27,20 +27,21 @@ import (
 	"testing"
 	"time"
 
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/client-go/pkg/util/clock"
+	"k8s.io/apimachinery/pkg/util/uuid"
+	restclient "k8s.io/client-go/rest"
+	"k8s.io/client-go/tools/cache"
+	"k8s.io/client-go/util/clock"
+	utiltesting "k8s.io/client-go/util/testing"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/client/cache"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/pkg/client/record"
-	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/securitycontext"
-	utiltesting "k8s.io/kubernetes/pkg/util/testing"
-	"k8s.io/kubernetes/pkg/util/uuid"
 )
 
 // NewFakeControllerExpectationsLookup creates a fake store for PodExpectations.
@@ -59,7 +60,7 @@ func newReplicationController(replicas int) *v1.ReplicationController {
 		ObjectMeta: metav1.ObjectMeta{
 			UID:             uuid.NewUUID(),
 			Name:            "foobar",
-			Namespace:       v1.NamespaceDefault,
+			Namespace:       metav1.NamespaceDefault,
 			ResourceVersion: "18",
 		},
 		Spec: v1.ReplicationControllerSpec{
@@ -238,7 +239,7 @@ func TestUIDExpectations(t *testing.T) {
 }
 
 func TestCreatePods(t *testing.T) {
-	ns := v1.NamespaceDefault
+	ns := metav1.NamespaceDefault
 	body := runtime.EncodeOrDie(testapi.Default.Codec(), &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "empty_pod"}})
 	fakeHandler := utiltesting.FakeHandler{
 		StatusCode:   200,
@@ -267,13 +268,13 @@ func TestCreatePods(t *testing.T) {
 		},
 		Spec: controllerSpec.Spec.Template.Spec,
 	}
-	fakeHandler.ValidateRequest(t, testapi.Default.ResourcePath("pods", v1.NamespaceDefault, ""), "POST", nil)
+	fakeHandler.ValidateRequest(t, testapi.Default.ResourcePath("pods", metav1.NamespaceDefault, ""), "POST", nil)
 	var actualPod = &v1.Pod{}
 	err := json.Unmarshal([]byte(fakeHandler.RequestBody), actualPod)
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
-	if !api.Semantic.DeepDerivative(&expectedPod, actualPod) {
+	if !apiequality.Semantic.DeepDerivative(&expectedPod, actualPod) {
 		t.Logf("Body: %s", fakeHandler.RequestBody)
 		t.Errorf("Unexpected mismatch.  Expected\n %#v,\n Got:\n %#v", &expectedPod, actualPod)
 	}

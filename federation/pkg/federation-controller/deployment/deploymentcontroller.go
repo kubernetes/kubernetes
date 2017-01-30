@@ -26,10 +26,13 @@ import (
 	"github.com/golang/glog"
 
 	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
-	"k8s.io/client-go/pkg/util/flowcontrol"
+	"k8s.io/client-go/tools/cache"
+	"k8s.io/client-go/util/flowcontrol"
+	"k8s.io/client-go/util/workqueue"
 	fed "k8s.io/kubernetes/federation/apis/federation"
 	fedv1 "k8s.io/kubernetes/federation/apis/federation/v1beta1"
 	fedclientset "k8s.io/kubernetes/federation/client/clientset_generated/federation_clientset"
@@ -41,11 +44,9 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	apiv1 "k8s.io/kubernetes/pkg/api/v1"
 	extensionsv1 "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
-	"k8s.io/kubernetes/pkg/client/cache"
 	kubeclientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/pkg/client/record"
 	"k8s.io/kubernetes/pkg/controller"
-	"k8s.io/kubernetes/pkg/util/workqueue"
 )
 
 const (
@@ -122,11 +123,11 @@ func NewDeploymentController(federationClient fedclientset.Interface) *Deploymen
 	deploymentFedInformerFactory := func(cluster *fedv1.Cluster, clientset kubeclientset.Interface) (cache.Store, cache.Controller) {
 		return cache.NewInformer(
 			&cache.ListWatch{
-				ListFunc: func(options apiv1.ListOptions) (runtime.Object, error) {
-					return clientset.Extensions().Deployments(apiv1.NamespaceAll).List(options)
+				ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
+					return clientset.Extensions().Deployments(metav1.NamespaceAll).List(options)
 				},
-				WatchFunc: func(options apiv1.ListOptions) (watch.Interface, error) {
-					return clientset.Extensions().Deployments(apiv1.NamespaceAll).Watch(options)
+				WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
+					return clientset.Extensions().Deployments(metav1.NamespaceAll).Watch(options)
 				},
 			},
 			&extensionsv1.Deployment{},
@@ -149,11 +150,11 @@ func NewDeploymentController(federationClient fedclientset.Interface) *Deploymen
 	podFedInformerFactory := func(cluster *fedv1.Cluster, clientset kubeclientset.Interface) (cache.Store, cache.Controller) {
 		return cache.NewInformer(
 			&cache.ListWatch{
-				ListFunc: func(options apiv1.ListOptions) (runtime.Object, error) {
-					return clientset.Core().Pods(apiv1.NamespaceAll).List(options)
+				ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
+					return clientset.Core().Pods(metav1.NamespaceAll).List(options)
 				},
-				WatchFunc: func(options apiv1.ListOptions) (watch.Interface, error) {
-					return clientset.Core().Pods(apiv1.NamespaceAll).Watch(options)
+				WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
+					return clientset.Core().Pods(metav1.NamespaceAll).Watch(options)
 				},
 			},
 			&apiv1.Pod{},
@@ -169,11 +170,11 @@ func NewDeploymentController(federationClient fedclientset.Interface) *Deploymen
 
 	fdc.deploymentStore, fdc.deploymentController = cache.NewInformer(
 		&cache.ListWatch{
-			ListFunc: func(options apiv1.ListOptions) (runtime.Object, error) {
-				return fdc.fedClient.Extensions().Deployments(apiv1.NamespaceAll).List(options)
+			ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
+				return fdc.fedClient.Extensions().Deployments(metav1.NamespaceAll).List(options)
 			},
-			WatchFunc: func(options apiv1.ListOptions) (watch.Interface, error) {
-				return fdc.fedClient.Extensions().Deployments(apiv1.NamespaceAll).Watch(options)
+			WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
+				return fdc.fedClient.Extensions().Deployments(metav1.NamespaceAll).Watch(options)
 			},
 		},
 		&extensionsv1.Deployment{},
@@ -196,7 +197,7 @@ func NewDeploymentController(federationClient fedclientset.Interface) *Deploymen
 		},
 		func(client kubeclientset.Interface, obj runtime.Object) error {
 			rs := obj.(*extensionsv1.Deployment)
-			err := client.Extensions().Deployments(rs.Namespace).Delete(rs.Name, &apiv1.DeleteOptions{})
+			err := client.Extensions().Deployments(rs.Namespace).Delete(rs.Name, &metav1.DeleteOptions{})
 			return err
 		})
 

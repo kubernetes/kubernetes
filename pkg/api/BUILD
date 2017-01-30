@@ -17,7 +17,6 @@ go_library(
         "field_constants.go",
         "helpers.go",
         "json.go",
-        "mapper.go",
         "meta.go",
         "ref.go",
         "register.go",
@@ -27,11 +26,12 @@ go_library(
     ],
     tags = ["automanaged"],
     deps = [
-        "//pkg/api/resource:go_default_library",
         "//pkg/util/intstr:go_default_library",
         "//pkg/util/labels:go_default_library",
         "//vendor:github.com/davecgh/go-spew/spew",
         "//vendor:k8s.io/apimachinery/pkg/api/meta",
+        "//vendor:k8s.io/apimachinery/pkg/api/resource",
+        "//vendor:k8s.io/apimachinery/pkg/apimachinery/announced",
         "//vendor:k8s.io/apimachinery/pkg/apimachinery/registered",
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
         "//vendor:k8s.io/apimachinery/pkg/conversion",
@@ -43,7 +43,6 @@ go_library(
         "//vendor:k8s.io/apimachinery/pkg/selection",
         "//vendor:k8s.io/apimachinery/pkg/types",
         "//vendor:k8s.io/apimachinery/pkg/util/sets",
-        "//vendor:k8s.io/apimachinery/pkg/util/validation/field",
     ],
 )
 
@@ -57,7 +56,7 @@ go_test(
     library = ":go_default_library",
     tags = ["automanaged"],
     deps = [
-        "//pkg/api/resource:go_default_library",
+        "//vendor:k8s.io/apimachinery/pkg/api/resource",
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
         "//vendor:k8s.io/apimachinery/pkg/labels",
         "//vendor:k8s.io/apimachinery/pkg/runtime",
@@ -92,7 +91,9 @@ go_test(
         "//vendor:github.com/google/gofuzz",
         "//vendor:github.com/spf13/pflag",
         "//vendor:github.com/ugorji/go/codec",
+        "//vendor:k8s.io/apimachinery/pkg/api/equality",
         "//vendor:k8s.io/apimachinery/pkg/api/meta",
+        "//vendor:k8s.io/apimachinery/pkg/api/testing",
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
         "//vendor:k8s.io/apimachinery/pkg/conversion",
         "//vendor:k8s.io/apimachinery/pkg/runtime",

@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"strings"
 
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	apimachineyvalidation "k8s.io/apimachinery/pkg/api/validation"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	v1validation "k8s.io/apimachinery/pkg/apis/meta/v1/validation"
@@ -133,7 +134,7 @@ func ValidateNoNewFinalizers(newFinalizers []string, oldFinalizers []string, fld
 
 func ValidateImmutableField(newVal, oldVal interface{}, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
-	if !api.Semantic.DeepEqual(oldVal, newVal) {
+	if !apiequality.Semantic.DeepEqual(oldVal, newVal) {
 		allErrs = append(allErrs, field.Invalid(fldPath, newVal, FieldImmutableErrorMsg))
 	}
 	return allErrs

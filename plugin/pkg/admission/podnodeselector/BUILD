@@ -14,7 +14,6 @@ go_library(
     tags = ["automanaged"],
     deps = [
         "//pkg/api:go_default_library",
-        "//pkg/client/cache:go_default_library",
         "//pkg/client/clientset_generated/internalclientset:go_default_library",
         "//pkg/controller/informers:go_default_library",
         "//pkg/kubeapiserver/admission:go_default_library",
@@ -24,6 +23,7 @@ go_library(
         "//vendor:k8s.io/apimachinery/pkg/labels",
         "//vendor:k8s.io/apimachinery/pkg/util/yaml",
         "//vendor:k8s.io/apiserver/pkg/admission",
+        "//vendor:k8s.io/client-go/tools/cache",
     ],
 )
 

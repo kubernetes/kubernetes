@@ -17,13 +17,13 @@ limitations under the License.
 package fake
 
 import (
+	rest "k8s.io/client-go/rest"
+	testing "k8s.io/client-go/testing"
 	v1 "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/batch/v1"
-	restclient "k8s.io/kubernetes/pkg/client/restclient"
-	core "k8s.io/kubernetes/pkg/client/testing/core"
 )
 
 type FakeBatchV1 struct {
-	*core.Fake
+	*testing.Fake
 }
 
 func (c *FakeBatchV1) Jobs(namespace string) v1.JobInterface {
@@ -32,7 +32,7 @@ func (c *FakeBatchV1) Jobs(namespace string) v1.JobInterface {
 
 // RESTClient returns a RESTClient that is used to communicate
 // with API server by this client implementation.
-func (c *FakeBatchV1) RESTClient() restclient.Interface {
-	var ret *restclient.RESTClient
+func (c *FakeBatchV1) RESTClient() rest.Interface {
+	var ret *rest.RESTClient
 	return ret
 }

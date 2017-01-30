@@ -29,6 +29,7 @@ import (
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	klabels "k8s.io/apimachinery/pkg/labels"
@@ -39,7 +40,6 @@ import (
 	utilyaml "k8s.io/apimachinery/pkg/util/yaml"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/v1"
 	apps "k8s.io/kubernetes/pkg/apis/apps/v1beta1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
@@ -242,7 +242,7 @@ var _ = framework.KubeDescribe("StatefulSet", func() {
 			expectedPodName := ss.Name + "-1"
 			expectedPod, err := f.ClientSet.Core().Pods(ns).Get(expectedPodName, metav1.GetOptions{})
 			Expect(err).NotTo(HaveOccurred())
-			watcher, err := f.ClientSet.Core().Pods(ns).Watch(v1.SingleObject(
+			watcher, err := f.ClientSet.Core().Pods(ns).Watch(metav1.SingleObject(
 				metav1.ObjectMeta{
 					Name:            expectedPod.Name,
 					ResourceVersion: expectedPod.ResourceVersion,
@@ -273,7 +273,7 @@ var _ = framework.KubeDescribe("StatefulSet", func() {
 		It("Scaling should happen in predictable order and halt if any stateful pod is unhealthy", func() {
 			psLabels := klabels.Set(labels)
 			By("Initializing watcher for selector " + psLabels.String())
-			watcher, err := f.ClientSet.Core().Pods(ns).Watch(v1.ListOptions{
+			watcher, err := f.ClientSet.Core().Pods(ns).Watch(metav1.ListOptions{
 				LabelSelector: psLabels.AsSelector().String(),
 			})
 			Expect(err).NotTo(HaveOccurred())
@@ -317,7 +317,7 @@ var _ = framework.KubeDescribe("StatefulSet", func() {
 			Expect(err).NotTo(HaveOccurred())
 
 			By("Scale down will halt with unhealthy stateful pod")
-			watcher, err = f.ClientSet.Core().Pods(ns).Watch(v1.ListOptions{
+			watcher, err = f.ClientSet.Core().Pods(ns).Watch(metav1.ListOptions{
 				LabelSelector: psLabels.AsSelector().String(),
 			})
 			Expect(err).NotTo(HaveOccurred())
@@ -389,7 +389,7 @@ var _ = framework.KubeDescribe("StatefulSet", func() {
 
 			var initialStatefulPodUID types.UID
 			By("Waiting until stateful pod " + statefulPodName + " will be recreated and deleted at least once in namespace " + f.Namespace.Name)
-			w, err := f.ClientSet.Core().Pods(f.Namespace.Name).Watch(v1.SingleObject(metav1.ObjectMeta{Name: statefulPodName}))
+			w, err := f.ClientSet.Core().Pods(f.Namespace.Name).Watch(metav1.SingleObject(metav1.ObjectMeta{Name: statefulPodName}))
 			framework.ExpectNoError(err)
 			// we need to get UID from pod in any state and wait until stateful set controller will remove pod atleast once
 			_, err = watch.Until(statefulPodTimeout, w, func(event watch.Event) (bool, error) {
@@ -412,7 +412,7 @@ var _ = framework.KubeDescribe("StatefulSet", func() {
 			}
 
 			By("Removing pod with conflicting port in namespace " + f.Namespace.Name)
-			err = f.ClientSet.Core().Pods(f.Namespace.Name).Delete(pod.Name, v1.NewDeleteOptions(0))
+			err = f.ClientSet.Core().Pods(f.Namespace.Name).Delete(pod.Name, metav1.NewDeleteOptions(0))
 			framework.ExpectNoError(err)
 
 			By("Waiting when stateful pod " + statefulPodName + " will be recreated in namespace " + f.Namespace.Name + " and will be in running state")
@@ -472,7 +472,7 @@ var _ = framework.KubeDescribe("StatefulSet", func() {
 })
 
 func dumpDebugInfo(c clientset.Interface, ns string) {
-	sl, _ := c.Core().Pods(ns).List(v1.ListOptions{LabelSelector: labels.Everything().String()})
+	sl, _ := c.Core().Pods(ns).List(metav1.ListOptions{LabelSelector: labels.Everything().String()})
 	for _, s := range sl.Items {
 		desc, _ := framework.RunKubectl("describe", "po", s.Name, fmt.Sprintf("--namespace=%v", ns))
 		framework.Logf("\nOutput of kubectl describe %v:\n%v", s.Name, desc)
@@ -772,7 +772,7 @@ func (s *statefulSetTester) saturate(ss *apps.StatefulSet) {
 func (s *statefulSetTester) deleteStatefulPodAtIndex(index int, ss *apps.StatefulSet) {
 	name := getPodNameAtIndex(index, ss)
 	noGrace := int64(0)
-	if err := s.c.Core().Pods(ss.Namespace).Delete(name, &v1.DeleteOptions{GracePeriodSeconds: &noGrace}); err != nil {
+	if err := s.c.Core().Pods(ss.Namespace).Delete(name, &metav1.DeleteOptions{GracePeriodSeconds: &noGrace}); err != nil {
 		framework.Failf("Failed to delete stateful pod %v for StatefulSet %v/%v: %v", name, ss.Namespace, ss.Name, err)
 	}
 }
@@ -849,7 +849,7 @@ func (s *statefulSetTester) update(ns, name string, update func(ss *apps.Statefu
 func (s *statefulSetTester) getPodList(ss *apps.StatefulSet) *v1.PodList {
 	selector, err := metav1.LabelSelectorAsSelector(ss.Spec.Selector)
 	framework.ExpectNoError(err)
-	podList, err := s.c.Core().Pods(ss.Namespace).List(v1.ListOptions{LabelSelector: selector.String()})
+	podList, err := s.c.Core().Pods(ss.Namespace).List(metav1.ListOptions{LabelSelector: selector.String()})
 	framework.ExpectNoError(err)
 	return podList
 }
@@ -965,7 +965,7 @@ func (s *statefulSetTester) waitForStatus(ss *apps.StatefulSet, expectedReplicas
 
 func deleteAllStatefulSets(c clientset.Interface, ns string) {
 	sst := &statefulSetTester{c: c}
-	ssList, err := c.Apps().StatefulSets(ns).List(v1.ListOptions{LabelSelector: labels.Everything().String()})
+	ssList, err := c.Apps().StatefulSets(ns).List(metav1.ListOptions{LabelSelector: labels.Everything().String()})
 	framework.ExpectNoError(err)
 
 	// Scale down each statefulset, then delete it completely.
@@ -987,7 +987,7 @@ func deleteAllStatefulSets(c clientset.Interface, ns string) {
 	pvNames := sets.NewString()
 	// TODO: Don't assume all pvcs in the ns belong to a statefulset
 	pvcPollErr := wait.PollImmediate(statefulsetPoll, statefulsetTimeout, func() (bool, error) {
-		pvcList, err := c.Core().PersistentVolumeClaims(ns).List(v1.ListOptions{LabelSelector: labels.Everything().String()})
+		pvcList, err := c.Core().PersistentVolumeClaims(ns).List(metav1.ListOptions{LabelSelector: labels.Everything().String()})
 		if err != nil {
 			framework.Logf("WARNING: Failed to list pvcs, retrying %v", err)
 			return false, nil
@@ -1007,7 +1007,7 @@ func deleteAllStatefulSets(c clientset.Interface, ns string) {
 	}
 
 	pollErr := wait.PollImmediate(statefulsetPoll, statefulsetTimeout, func() (bool, error) {
-		pvList, err := c.Core().PersistentVolumes().List(v1.ListOptions{LabelSelector: labels.Everything().String()})
+		pvList, err := c.Core().PersistentVolumes().List(metav1.ListOptions{LabelSelector: labels.Everything().String()})
 		if err != nil {
 			framework.Logf("WARNING: Failed to list pvs, retrying %v", err)
 			return false, nil

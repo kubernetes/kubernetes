@@ -48,7 +48,7 @@ func TestStatefulSetStrategy(t *testing.T) {
 		},
 	}
 	ps := &apps.StatefulSet{
-		ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
+		ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
 		Spec: apps.StatefulSetSpec{
 			Selector: &metav1.LabelSelector{MatchLabels: validSelector},
 			Template: validPodTemplate.Template,
@@ -110,7 +110,7 @@ func TestStatefulSetStatusStrategy(t *testing.T) {
 		},
 	}
 	oldPS := &apps.StatefulSet{
-		ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault, ResourceVersion: "10"},
+		ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault, ResourceVersion: "10"},
 		Spec: apps.StatefulSetSpec{
 			Replicas: 3,
 			Selector: &metav1.LabelSelector{MatchLabels: validSelector},
@@ -121,7 +121,7 @@ func TestStatefulSetStatusStrategy(t *testing.T) {
 		},
 	}
 	newPS := &apps.StatefulSet{
-		ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault, ResourceVersion: "9"},
+		ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault, ResourceVersion: "9"},
 		Spec: apps.StatefulSetSpec{
 			Replicas: 1,
 			Selector: &metav1.LabelSelector{MatchLabels: validSelector},

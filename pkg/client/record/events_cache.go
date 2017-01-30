@@ -27,9 +27,9 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/client-go/pkg/util/clock"
+	"k8s.io/apimachinery/pkg/util/strategicpatch"
+	"k8s.io/client-go/util/clock"
 	"k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/util/strategicpatch"
 )
 
 const (

@@ -21,6 +21,7 @@ import (
 	"net/http"
 	"net/url"
 
+	metainternalversion "k8s.io/apimachinery/pkg/apis/meta/internalversion"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -71,7 +72,7 @@ type Lister interface {
 	// This object must be a pointer type for use with Codec.DecodeInto([]byte, runtime.Object)
 	NewList() runtime.Object
 	// List selects resources in the storage which match to the selector. 'options' can be nil.
-	List(ctx genericapirequest.Context, options *api.ListOptions) (runtime.Object, error)
+	List(ctx genericapirequest.Context, options *metainternalversion.ListOptions) (runtime.Object, error)
 }
 
 // Exporter is an object that knows how to strip a RESTful resource for export
@@ -131,7 +132,7 @@ type GracefulDeleter interface {
 	// returned error value err when the specified resource is not found.
 	// Delete *may* return the object that was deleted, or a status object indicating additional
 	// information about deletion.
-	Delete(ctx genericapirequest.Context, name string, options *api.DeleteOptions) (runtime.Object, error)
+	Delete(ctx genericapirequest.Context, name string, options *metav1.DeleteOptions) (runtime.Object, error)
 }
 
 // GracefulDeleteAdapter adapts the Deleter interface to GracefulDeleter
@@ -140,7 +141,7 @@ type GracefulDeleteAdapter struct {
 }
 
 // Delete implements RESTGracefulDeleter in terms of Deleter
-func (w GracefulDeleteAdapter) Delete(ctx genericapirequest.Context, name string, options *api.DeleteOptions) (runtime.Object, error) {
+func (w GracefulDeleteAdapter) Delete(ctx genericapirequest.Context, name string, options *metav1.DeleteOptions) (runtime.Object, error) {
 	return w.Deleter.Delete(ctx, name)
 }
 
@@ -152,7 +153,7 @@ type CollectionDeleter interface {
 	// them or return an invalid request error.
 	// DeleteCollection may not be atomic - i.e. it may delete some objects and still
 	// return an error after it. On success, returns a list of deleted objects.
-	DeleteCollection(ctx genericapirequest.Context, options *api.DeleteOptions, listOptions *api.ListOptions) (runtime.Object, error)
+	DeleteCollection(ctx genericapirequest.Context, options *metav1.DeleteOptions, listOptions *metainternalversion.ListOptions) (runtime.Object, error)
 }
 
 // Creater is an object that can create an instance of a RESTful object.
@@ -225,7 +226,7 @@ type Watcher interface {
 	// are supported; an error should be returned if 'field' tries to select on a field that
 	// isn't supported. 'resourceVersion' allows for continuing/starting a watch at a
 	// particular version.
-	Watch(ctx genericapirequest.Context, options *api.ListOptions) (watch.Interface, error)
+	Watch(ctx genericapirequest.Context, options *metainternalversion.ListOptions) (watch.Interface, error)
 }
 
 // StandardStorage is an interface covering the common verbs. Provided for testing whether a

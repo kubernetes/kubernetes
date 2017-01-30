@@ -586,6 +586,7 @@ function build-kube-master-certs {
 KUBEAPISERVER_CERT: $(yaml-quote ${KUBEAPISERVER_CERT_BASE64:-})
 KUBEAPISERVER_KEY: $(yaml-quote ${KUBEAPISERVER_KEY_BASE64:-})
 KUBELET_AUTH_CA_CERT: $(yaml-quote ${KUBELET_AUTH_CA_CERT_BASE64:-})
+CA_KEY: $(yaml-quote ${CA_KEY_BASE64:-})
 EOF
 }
 
@@ -961,6 +962,7 @@ function create-certs {
   CERT_DIR="${KUBE_TEMP}/easy-rsa-master/easyrsa3"
   # By default, linux wraps base64 output every 76 cols, so we use 'tr -d' to remove whitespaces.
   # Note 'base64 -w0' doesn't work on Mac OS X, which has different flags.
+  CA_KEY_BASE64=$(cat "${CERT_DIR}/pki/private/ca.key" | base64 | tr -d '\r\n')
   CA_CERT_BASE64=$(cat "${CERT_DIR}/pki/ca.crt" | base64 | tr -d '\r\n')
   MASTER_CERT_BASE64=$(cat "${CERT_DIR}/pki/issued/${MASTER_NAME}.crt" | base64 | tr -d '\r\n')
   MASTER_KEY_BASE64=$(cat "${CERT_DIR}/pki/private/${MASTER_NAME}.key" | base64 | tr -d '\r\n')
@@ -1008,7 +1010,12 @@ function generate-certs {
     mv "kubelet.pem" "pki/issued/kubelet.crt"
     rm -f "kubelet.csr"
 
-    ./easyrsa build-client-full kubecfg nopass
+    # Make a superuser client cert with subject "O=system:masters, CN=kubecfg"
+    ./easyrsa --dn-mode=org \
+      --req-cn=kubecfg --req-org=system:masters \
+      --req-c= --req-st= --req-city= --req-email= --req-ou= \
+      build-client-full kubecfg nopass
+
     cd ../kubelet
     ./easyrsa init-pki
     ./easyrsa --batch "--req-cn=kubelet@$(date +%s)" build-ca nopass
@@ -1062,7 +1069,7 @@ function update-or-verify-gcloud() {
     ${sudo_prefix} gcloud ${gcloud_prompt:-} components install beta
     ${sudo_prefix} gcloud ${gcloud_prompt:-} components update
   else
-    local version=$(${sudo_prefix} gcloud version --format=json)
+    local version=$(gcloud version --format=json)
     python -c'
 import json,sys
 from distutils import version

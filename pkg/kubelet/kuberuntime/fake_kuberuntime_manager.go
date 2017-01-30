@@ -24,7 +24,7 @@ import (
 	cadvisorapi "github.com/google/cadvisor/info/v1"
 	"k8s.io/apimachinery/pkg/types"
 	kubetypes "k8s.io/apimachinery/pkg/types"
-	"k8s.io/client-go/pkg/util/flowcontrol"
+	"k8s.io/client-go/util/flowcontrol"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/record"
 	"k8s.io/kubernetes/pkg/credentialprovider"
@@ -113,7 +113,7 @@ func NewFakeKubeRuntimeManager(runtimeService internalapi.RuntimeService, imageS
 	}
 
 	kubeRuntimeManager.containerGC = NewContainerGC(runtimeService, newFakePodGetter(), kubeRuntimeManager)
-	kubeRuntimeManager.runtimeName = typedVersion.GetRuntimeName()
+	kubeRuntimeManager.runtimeName = typedVersion.RuntimeName
 	kubeRuntimeManager.imagePuller = images.NewImageManager(
 		kubecontainer.FilterEventRecorder(recorder),
 		kubeRuntimeManager,

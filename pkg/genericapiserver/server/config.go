@@ -43,23 +43,23 @@ import (
 	"k8s.io/apimachinery/pkg/version"
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/authentication/authenticator"
+	"k8s.io/apiserver/pkg/authentication/authenticatorfactory"
 	authenticatorunion "k8s.io/apiserver/pkg/authentication/request/union"
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
+	"k8s.io/apiserver/pkg/authorization/authorizerfactory"
 	authorizerunion "k8s.io/apiserver/pkg/authorization/union"
 	apirequest "k8s.io/apiserver/pkg/endpoints/request"
+	genericfilters "k8s.io/apiserver/pkg/server/filters"
 	"k8s.io/apiserver/pkg/server/healthz"
+	restclient "k8s.io/client-go/rest"
+	certutil "k8s.io/client-go/util/cert"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/client/restclient"
-	genericauthenticator "k8s.io/kubernetes/pkg/genericapiserver/authenticator"
-	genericauthorizer "k8s.io/kubernetes/pkg/genericapiserver/authorizer"
 	genericapifilters "k8s.io/kubernetes/pkg/genericapiserver/endpoints/filters"
 	apiopenapi "k8s.io/kubernetes/pkg/genericapiserver/endpoints/openapi"
-	genericfilters "k8s.io/kubernetes/pkg/genericapiserver/server/filters"
 	"k8s.io/kubernetes/pkg/genericapiserver/server/mux"
 	"k8s.io/kubernetes/pkg/genericapiserver/server/options"
 	"k8s.io/kubernetes/pkg/genericapiserver/server/routes"
-	certutil "k8s.io/kubernetes/pkg/util/cert"
 )
 
 const (
@@ -219,8 +219,7 @@ func DefaultOpenAPIConfig(definitions *openapicommon.OpenAPIDefinitions) *openap
 		IgnorePrefixes: []string{"/swaggerapi"},
 		Info: &spec.Info{
 			InfoProps: spec.InfoProps{
-				Title:   "Generic API Server",
-				Version: "unversioned",
+				Title: "Generic API Server",
 			},
 		},
 		DefaultResponse: &spec.Response{
@@ -481,10 +480,10 @@ func (c *Config) Complete() completedConfig {
 			Groups: []string{user.SystemPrivilegedGroup},
 		}
 
-		tokenAuthenticator := genericauthenticator.NewAuthenticatorFromTokens(tokens)
+		tokenAuthenticator := authenticatorfactory.NewFromTokens(tokens)
 		c.Authenticator = authenticatorunion.New(tokenAuthenticator, c.Authenticator)
 
-		tokenAuthorizer := genericauthorizer.NewPrivilegedGroups(user.SystemPrivilegedGroup)
+		tokenAuthorizer := authorizerfactory.NewPrivilegedGroups(user.SystemPrivilegedGroup)
 		c.Authorizer = authorizerunion.New(tokenAuthorizer, c.Authorizer)
 	}
 
@@ -547,6 +546,19 @@ func (c completedConfig) New() (*GenericAPIServer, error) {
 	}
 
 	s.HandlerContainer = mux.NewAPIContainer(http.NewServeMux(), c.Serializer)
+
+	if s.openAPIConfig != nil {
+		if s.openAPIConfig.Info == nil {
+			s.openAPIConfig.Info = &spec.Info{}
+		}
+		if s.openAPIConfig.Info.Version == "" {
+			if c.Version != nil {
+				s.openAPIConfig.Info.Version = strings.Split(c.Version.String(), "-")[0]
+			} else {
+				s.openAPIConfig.Info.Version = "unversioned"
+			}
+		}
+	}
 
 	s.installAPI(c.Config)
 

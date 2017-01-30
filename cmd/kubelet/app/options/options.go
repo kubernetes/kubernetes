@@ -21,11 +21,12 @@ import (
 	_ "net/http/pprof"
 	"strings"
 
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/apiserver/pkg/util/flag"
+	utilflag "k8s.io/apiserver/pkg/util/flag"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/componentconfig"
 	"k8s.io/kubernetes/pkg/apis/componentconfig/v1alpha1"
-	utilconfig "k8s.io/kubernetes/pkg/util/config"
-	"k8s.io/kubernetes/pkg/util/flag"
 	utiltaints "k8s.io/kubernetes/pkg/util/taints"
 
 	"github.com/spf13/pflag"
@@ -169,7 +170,7 @@ func (s *KubeletServer) AddFlags(fs *pflag.FlagSet) {
 	fs.DurationVar(&s.StreamingConnectionIdleTimeout.Duration, "streaming-connection-idle-timeout", s.StreamingConnectionIdleTimeout.Duration, "Maximum time a streaming connection can be idle before the connection is automatically closed. 0 indicates no timeout. Example: '5m'")
 	fs.DurationVar(&s.NodeStatusUpdateFrequency.Duration, "node-status-update-frequency", s.NodeStatusUpdateFrequency.Duration, "Specifies how often kubelet posts node status to master. Note: be cautious when changing the constant, it must work with nodeMonitorGracePeriod in nodecontroller. Default: 10s")
 	s.NodeLabels = make(map[string]string)
-	bindableNodeLabels := utilconfig.ConfigurationMap(s.NodeLabels)
+	bindableNodeLabels := utilflag.ConfigurationMap(s.NodeLabels)
 	fs.Var(&bindableNodeLabels, "node-labels", "<Warning: Alpha feature> Labels to add when registering the node in the cluster.  Labels must be key=value pairs separated by ','.")
 	fs.DurationVar(&s.ImageMinimumGCAge.Duration, "minimum-image-ttl-duration", s.ImageMinimumGCAge.Duration, "Minimum age for an unused image before it is garbage collected.  Examples: '300ms', '10s' or '2h45m'. Default: '2m'")
 	fs.Int32Var(&s.ImageGCHighThresholdPercent, "image-gc-high-threshold", s.ImageGCHighThresholdPercent, "The percent of disk usage after which image garbage collection is always run. Default: 90%")
@@ -185,7 +186,7 @@ func (s *KubeletServer) AddFlags(fs *pflag.FlagSet) {
 	fs.StringVar(&s.CloudProvider, "cloud-provider", s.CloudProvider, "The provider for cloud services. By default, kubelet will attempt to auto-detect the cloud provider. Specify empty string for running with no cloud provider. [default=auto-detect]")
 	fs.StringVar(&s.CloudConfigFile, "cloud-config", s.CloudConfigFile, "The path to the cloud provider configuration file.  Empty string for no configuration file.")
 	fs.StringVar(&s.FeatureGates, "feature-gates", s.FeatureGates, "A set of key=value pairs that describe feature gates for alpha/experimental features. "+
-		"Options are:\n"+strings.Join(utilconfig.DefaultFeatureGate.KnownFeatures(), "\n"))
+		"Options are:\n"+strings.Join(utilfeature.DefaultFeatureGate.KnownFeatures(), "\n"))
 
 	fs.StringVar(&s.KubeletCgroups, "resource-container", s.KubeletCgroups, "Optional absolute name of the resource-only container to create and run the Kubelet in.")
 	fs.MarkDeprecated("resource-container", "Use --kubelet-cgroups instead. Will be removed in a future version.")
@@ -213,7 +214,9 @@ func (s *KubeletServer) AddFlags(fs *pflag.FlagSet) {
 	fs.MarkDeprecated("babysit-daemons", "Will be removed in a future version.")
 	fs.Int32Var(&s.MaxPods, "max-pods", s.MaxPods, "Number of Pods that can run on this Kubelet.")
 	fs.Int32Var(&s.NvidiaGPUs, "experimental-nvidia-gpus", s.NvidiaGPUs, "Number of NVIDIA GPU devices on this node. Only 0 (default) and 1 are currently supported.")
+	// TODO(#40229): Remove the docker-exec-handler flag.
 	fs.StringVar(&s.DockerExecHandlerName, "docker-exec-handler", s.DockerExecHandlerName, "Handler to use when executing a command in a container. Valid values are 'native' and 'nsenter'. Defaults to 'native'.")
+	fs.MarkDeprecated("docker-exec-handler", "this flag will be removed and only the 'native' handler will be supported in the future.")
 	fs.StringVar(&s.NonMasqueradeCIDR, "non-masquerade-cidr", s.NonMasqueradeCIDR, "Traffic to IPs outside this range will use IP masquerade.")
 	fs.StringVar(&s.PodCIDR, "pod-cidr", "", "The CIDR to use for pod IP addresses, only used in standalone mode.  In cluster mode, this is obtained from the master.")
 	fs.StringVar(&s.ResolverConfig, "resolv-conf", s.ResolverConfig, "Resolver configuration file used as the basis for the container DNS resolution configuration.")
@@ -251,6 +254,7 @@ func (s *KubeletServer) AddFlags(fs *pflag.FlagSet) {
 	fs.BoolVar(&s.ExperimentalKernelMemcgNotification, "experimental-kernel-memcg-notification", s.ExperimentalKernelMemcgNotification, "If enabled, the kubelet will integrate with the kernel memcg notification to determine if memory eviction thresholds are crossed rather than polling.")
 	fs.Int32Var(&s.PodsPerCore, "pods-per-core", s.PodsPerCore, "Number of Pods per core that can run on this Kubelet. The total number of Pods on this Kubelet cannot exceed max-pods, so max-pods will be used if this calculation results in a larger number of Pods allowed on the Kubelet. A value of 0 disables this limit.")
 	fs.BoolVar(&s.ProtectKernelDefaults, "protect-kernel-defaults", s.ProtectKernelDefaults, "Default kubelet behaviour for kernel tuning. If set, kubelet errors if any of kernel tunables is different than kubelet defaults.")
+	fs.BoolVar(&s.KeepTerminatedPodVolumes, "keep-terminated-pod-volumes", s.KeepTerminatedPodVolumes, "Keep terminated pod volumes mounted to the node after the pod terminates.  Can be useful for debugging volume related issues.")
 
 	// CRI flags.
 	fs.BoolVar(&s.EnableCRI, "experimental-cri", s.EnableCRI, "[Experimental] Enable the Container Runtime Interface (CRI) integration. If --container-runtime is set to \"remote\", Kubelet will communicate with the runtime/image CRI server listening on the endpoint specified by --remote-runtime-endpoint/--remote-image-endpoint. If --container-runtime is set to \"docker\", Kubelet will launch a in-process CRI server on behalf of docker, and communicate over a default endpoint.")

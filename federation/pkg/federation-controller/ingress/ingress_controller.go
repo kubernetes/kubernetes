@@ -27,7 +27,8 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/watch"
-	"k8s.io/client-go/pkg/util/flowcontrol"
+	"k8s.io/client-go/tools/cache"
+	"k8s.io/client-go/util/flowcontrol"
 	federationapi "k8s.io/kubernetes/federation/apis/federation/v1beta1"
 	federationclientset "k8s.io/kubernetes/federation/client/clientset_generated/federation_clientset"
 	"k8s.io/kubernetes/federation/pkg/federation-controller/util"
@@ -36,7 +37,6 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
 	extensionsv1beta1 "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
-	"k8s.io/kubernetes/pkg/client/cache"
 	kubeclientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/pkg/client/record"
 	"k8s.io/kubernetes/pkg/controller"
@@ -140,11 +140,11 @@ func NewIngressController(client federationclientset.Interface) *IngressControll
 	// Start informer in federated API servers on ingresses that should be federated.
 	ic.ingressInformerStore, ic.ingressInformerController = cache.NewInformer(
 		&cache.ListWatch{
-			ListFunc: func(options v1.ListOptions) (pkgruntime.Object, error) {
-				return client.Extensions().Ingresses(api.NamespaceAll).List(options)
+			ListFunc: func(options metav1.ListOptions) (pkgruntime.Object, error) {
+				return client.Extensions().Ingresses(metav1.NamespaceAll).List(options)
 			},
-			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
-				return client.Extensions().Ingresses(api.NamespaceAll).Watch(options)
+			WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
+				return client.Extensions().Ingresses(metav1.NamespaceAll).Watch(options)
 			},
 		},
 		&extensionsv1beta1.Ingress{},
@@ -161,11 +161,11 @@ func NewIngressController(client federationclientset.Interface) *IngressControll
 		func(cluster *federationapi.Cluster, targetClient kubeclientset.Interface) (cache.Store, cache.Controller) {
 			return cache.NewInformer(
 				&cache.ListWatch{
-					ListFunc: func(options v1.ListOptions) (pkgruntime.Object, error) {
-						return targetClient.Extensions().Ingresses(api.NamespaceAll).List(options)
+					ListFunc: func(options metav1.ListOptions) (pkgruntime.Object, error) {
+						return targetClient.Extensions().Ingresses(metav1.NamespaceAll).List(options)
 					},
-					WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
-						return targetClient.Extensions().Ingresses(api.NamespaceAll).Watch(options)
+					WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
+						return targetClient.Extensions().Ingresses(metav1.NamespaceAll).Watch(options)
 					},
 				},
 				&extensionsv1beta1.Ingress{},
@@ -194,13 +194,13 @@ func NewIngressController(client federationclientset.Interface) *IngressControll
 			glog.V(4).Infof("Returning new informer for cluster %q", cluster.Name)
 			return cache.NewInformer(
 				&cache.ListWatch{
-					ListFunc: func(options v1.ListOptions) (pkgruntime.Object, error) {
+					ListFunc: func(options metav1.ListOptions) (pkgruntime.Object, error) {
 						if targetClient == nil {
 							glog.Errorf("Internal error: targetClient is nil")
 						}
 						return targetClient.Core().ConfigMaps(uidConfigMapNamespace).List(options) // we only want to list one by name - unfortunately Kubernetes don't have a selector for that.
 					},
-					WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
+					WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
 						if targetClient == nil {
 							glog.Errorf("Internal error: targetClient is nil")
 						}
@@ -252,7 +252,7 @@ func NewIngressController(client federationclientset.Interface) *IngressControll
 		func(client kubeclientset.Interface, obj pkgruntime.Object) error {
 			ingress := obj.(*extensionsv1beta1.Ingress)
 			glog.V(4).Infof("Attempting to delete Ingress: %v", ingress)
-			err := client.Extensions().Ingresses(ingress.Namespace).Delete(ingress.Name, &v1.DeleteOptions{})
+			err := client.Extensions().Ingresses(ingress.Namespace).Delete(ingress.Name, &metav1.DeleteOptions{})
 			return err
 		})
 
@@ -281,7 +281,7 @@ func NewIngressController(client federationclientset.Interface) *IngressControll
 			configMap := obj.(*v1.ConfigMap)
 			configMapName := types.NamespacedName{Name: configMap.Name, Namespace: configMap.Namespace}
 			glog.Errorf("Internal error: Incorrectly attempting to delete ConfigMap: %q", configMapName)
-			err := client.Core().ConfigMaps(configMap.Namespace).Delete(configMap.Name, &v1.DeleteOptions{})
+			err := client.Core().ConfigMaps(configMap.Namespace).Delete(configMap.Name, &metav1.DeleteOptions{})
 			return err
 		})
 

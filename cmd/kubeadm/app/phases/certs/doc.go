@@ -30,12 +30,9 @@ package certs
 
 	OUTPUTS:
 		Files to PKIPath (default /etc/kubernetes/pki):
-		 - apiserver-key.pem
-		 - apiserver-pub.pem
-		 - apiserver.pem
-		 - ca-key.pem
-		 - ca-pub.pem
-		 - ca.pem
-		 - sa-key.pem
-		 - sa-pub.pem
+		 - ca.crt
+		 - ca.key
+		 - apiserver.crt
+		 - apiserver.key
+
 */

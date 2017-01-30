@@ -19,12 +19,12 @@ package config
 import (
 	"testing"
 
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/watch"
-	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/client-go/tools/cache"
 	"k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/client/cache"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 )
 
@@ -33,11 +33,11 @@ type fakePodLW struct {
 	watchResp watch.Interface
 }
 
-func (lw fakePodLW) List(options v1.ListOptions) (runtime.Object, error) {
+func (lw fakePodLW) List(options metav1.ListOptions) (runtime.Object, error) {
 	return lw.listResp, nil
 }
 
-func (lw fakePodLW) Watch(options v1.ListOptions) (watch.Interface, error) {
+func (lw fakePodLW) Watch(options metav1.ListOptions) (watch.Interface, error) {
 	return lw.watchResp, nil
 }
 
@@ -71,7 +71,7 @@ func TestNewSourceApiserver_UpdatesAndMultiplePods(t *testing.T) {
 	}
 	update := got.(kubetypes.PodUpdate)
 	expected := CreatePodUpdate(kubetypes.SET, kubetypes.ApiserverSource, pod1v1)
-	if !api.Semantic.DeepEqual(expected, update) {
+	if !apiequality.Semantic.DeepEqual(expected, update) {
 		t.Errorf("Expected %#v; Got %#v", expected, update)
 	}
 
@@ -86,7 +86,7 @@ func TestNewSourceApiserver_UpdatesAndMultiplePods(t *testing.T) {
 	expectedA := CreatePodUpdate(kubetypes.SET, kubetypes.ApiserverSource, pod1v1, pod2)
 	expectedB := CreatePodUpdate(kubetypes.SET, kubetypes.ApiserverSource, pod2, pod1v1)
 
-	if !api.Semantic.DeepEqual(expectedA, update) && !api.Semantic.DeepEqual(expectedB, update) {
+	if !apiequality.Semantic.DeepEqual(expectedA, update) && !apiequality.Semantic.DeepEqual(expectedB, update) {
 		t.Errorf("Expected %#v or %#v, Got %#v", expectedA, expectedB, update)
 	}
 
@@ -100,7 +100,7 @@ func TestNewSourceApiserver_UpdatesAndMultiplePods(t *testing.T) {
 	expectedA = CreatePodUpdate(kubetypes.SET, kubetypes.ApiserverSource, pod1v2, pod2)
 	expectedB = CreatePodUpdate(kubetypes.SET, kubetypes.ApiserverSource, pod2, pod1v2)
 
-	if !api.Semantic.DeepEqual(expectedA, update) && !api.Semantic.DeepEqual(expectedB, update) {
+	if !apiequality.Semantic.DeepEqual(expectedA, update) && !apiequality.Semantic.DeepEqual(expectedB, update) {
 		t.Errorf("Expected %#v or %#v, Got %#v", expectedA, expectedB, update)
 	}
 
@@ -112,7 +112,7 @@ func TestNewSourceApiserver_UpdatesAndMultiplePods(t *testing.T) {
 	}
 	update = got.(kubetypes.PodUpdate)
 	expected = CreatePodUpdate(kubetypes.SET, kubetypes.ApiserverSource, pod2)
-	if !api.Semantic.DeepEqual(expected, update) {
+	if !apiequality.Semantic.DeepEqual(expected, update) {
 		t.Errorf("Expected %#v, Got %#v", expected, update)
 	}
 
@@ -124,7 +124,7 @@ func TestNewSourceApiserver_UpdatesAndMultiplePods(t *testing.T) {
 	}
 	update = got.(kubetypes.PodUpdate)
 	expected = CreatePodUpdate(kubetypes.SET, kubetypes.ApiserverSource)
-	if !api.Semantic.DeepEqual(expected, update) {
+	if !apiequality.Semantic.DeepEqual(expected, update) {
 		t.Errorf("Expected %#v, Got %#v", expected, update)
 	}
 }
@@ -188,7 +188,7 @@ func TestNewSourceApiserverInitialEmptySendsEmptyPodUpdate(t *testing.T) {
 	}
 	update := got.(kubetypes.PodUpdate)
 	expected := CreatePodUpdate(kubetypes.SET, kubetypes.ApiserverSource)
-	if !api.Semantic.DeepEqual(expected, update) {
+	if !apiequality.Semantic.DeepEqual(expected, update) {
 		t.Errorf("Expected %#v; Got %#v", expected, update)
 	}
 }

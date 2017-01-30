@@ -21,17 +21,16 @@ import (
 	"fmt"
 	"reflect"
 
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apiserver/pkg/authentication/authenticator"
+	"k8s.io/apiserver/pkg/authentication/authenticatorfactory"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
+	"k8s.io/apiserver/pkg/authorization/authorizerfactory"
 	clientset "k8s.io/client-go/kubernetes"
 	authenticationclient "k8s.io/client-go/kubernetes/typed/authentication/v1beta1"
 	authorizationclient "k8s.io/client-go/kubernetes/typed/authorization/v1beta1"
 
-	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/apis/componentconfig"
-	apiserverauthenticator "k8s.io/kubernetes/pkg/genericapiserver/authenticator"
-	alwaysallowauthorizer "k8s.io/kubernetes/pkg/genericapiserver/authorizer"
-	apiserverauthorizer "k8s.io/kubernetes/pkg/genericapiserver/authorizer"
 	"k8s.io/kubernetes/pkg/kubelet/server"
 )
 
@@ -62,7 +61,7 @@ func buildAuth(nodeName types.NodeName, client clientset.Interface, config compo
 }
 
 func buildAuthn(client authenticationclient.TokenReviewInterface, authn componentconfig.KubeletAuthentication) (authenticator.Request, error) {
-	authenticatorConfig := apiserverauthenticator.DelegatingAuthenticatorConfig{
+	authenticatorConfig := authenticatorfactory.DelegatingAuthenticatorConfig{
 		Anonymous:    authn.Anonymous.Enabled,
 		CacheTTL:     authn.Webhook.CacheTTL.Duration,
 		ClientCAFile: authn.X509.ClientCAFile,
@@ -82,13 +81,13 @@ func buildAuthn(client authenticationclient.TokenReviewInterface, authn componen
 func buildAuthz(client authorizationclient.SubjectAccessReviewInterface, authz componentconfig.KubeletAuthorization) (authorizer.Authorizer, error) {
 	switch authz.Mode {
 	case componentconfig.KubeletAuthorizationModeAlwaysAllow:
-		return alwaysallowauthorizer.NewAlwaysAllowAuthorizer(), nil
+		return authorizerfactory.NewAlwaysAllowAuthorizer(), nil
 
 	case componentconfig.KubeletAuthorizationModeWebhook:
 		if client == nil {
 			return nil, errors.New("no client provided, cannot use webhook authorization")
 		}
-		authorizerConfig := apiserverauthorizer.DelegatingAuthorizerConfig{
+		authorizerConfig := authorizerfactory.DelegatingAuthorizerConfig{
 			SubjectAccessReviewClient: client,
 			AllowCacheTTL:             authz.Webhook.CacheAuthorizedTTL.Duration,
 			DenyCacheTTL:              authz.Webhook.CacheUnauthorizedTTL.Duration,

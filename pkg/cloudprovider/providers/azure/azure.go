@@ -27,6 +27,7 @@ import (
 	"github.com/Azure/azure-sdk-for-go/arm/storage"
 	"github.com/Azure/go-autorest/autorest/azure"
 	"github.com/ghodss/yaml"
+	"time"
 )
 
 // CloudProviderName is the value used for the --cloud-provider flag
@@ -128,6 +129,7 @@ func NewCloud(configReader io.Reader) (cloudprovider.Interface, error) {
 	az.VirtualMachinesClient = compute.NewVirtualMachinesClient(az.SubscriptionID)
 	az.VirtualMachinesClient.BaseURI = az.Environment.ResourceManagerEndpoint
 	az.VirtualMachinesClient.Authorizer = servicePrincipalToken
+	az.VirtualMachinesClient.PollingDelay = 5 * time.Second
 
 	az.PublicIPAddressesClient = network.NewPublicIPAddressesClient(az.SubscriptionID)
 	az.PublicIPAddressesClient.BaseURI = az.Environment.ResourceManagerEndpoint

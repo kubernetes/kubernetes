@@ -19,7 +19,7 @@ package certificates
 import (
 	"testing"
 
-	certificates "k8s.io/kubernetes/pkg/apis/certificates/v1alpha1"
+	certificates "k8s.io/kubernetes/pkg/apis/certificates/v1beta1"
 )
 
 func TestHasKubeletUsages(t *testing.T) {

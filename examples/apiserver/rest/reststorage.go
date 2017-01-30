@@ -39,6 +39,7 @@ type REST struct {
 // NewREST returns a RESTStorage object that will work with testtype.
 func NewREST(optsGetter generic.RESTOptionsGetter) *REST {
 	store := &genericregistry.Store{
+		Copier:  api.Scheme,
 		NewFunc: func() runtime.Object { return &testgroup.TestType{} },
 		// NewListFunc returns an object capable of storing results of an etcd list.
 		NewListFunc: func() runtime.Object { return &testgroup.TestTypeList{} },

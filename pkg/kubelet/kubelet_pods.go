@@ -33,6 +33,7 @@ import (
 	"time"
 
 	"github.com/golang/glog"
+	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
@@ -418,26 +419,34 @@ func (kl *Kubelet) makeEnvironmentVariables(pod *v1.Pod, container *v1.Container
 
 	var (
 		configMaps = make(map[string]*v1.ConfigMap)
+		secrets    = make(map[string]*v1.Secret)
 		tmpEnv     = make(map[string]string)
 	)
 
 	// Env will override EnvFrom variables.
 	// Process EnvFrom first then allow Env to replace existing values.
 	for _, envFrom := range container.EnvFrom {
-		if envFrom.ConfigMapRef != nil {
-			name := envFrom.ConfigMapRef.Name
+		switch {
+		case envFrom.ConfigMapRef != nil:
+			cm := envFrom.ConfigMapRef
+			name := cm.Name
 			configMap, ok := configMaps[name]
 			if !ok {
 				if kl.kubeClient == nil {
 					return result, fmt.Errorf("Couldn't get configMap %v/%v, no kubeClient defined", pod.Namespace, name)
 				}
+				optional := cm.Optional != nil && *cm.Optional
 				configMap, err = kl.kubeClient.Core().ConfigMaps(pod.Namespace).Get(name, metav1.GetOptions{})
-
 				if err != nil {
+					if errors.IsNotFound(err) && optional {
+						// ignore error when marked optional
+						continue
+					}
 					return result, err
 				}
 				configMaps[name] = configMap
 			}
+
 			for k, v := range configMap.Data {
 				if len(envFrom.Prefix) > 0 {
 					k = envFrom.Prefix + k
@@ -445,13 +454,36 @@ func (kl *Kubelet) makeEnvironmentVariables(pod *v1.Pod, container *v1.Container
 				if errMsgs := utilvalidation.IsCIdentifier(k); len(errMsgs) != 0 {
 					return result, fmt.Errorf("Invalid environment variable name, %v, from configmap %v/%v: %s", k, pod.Namespace, name, errMsgs[0])
 				}
-				// Accesses apiserver+Pods.
-				// So, the master may set service env vars, or kubelet may.  In case both are doing
-				// it, we delete the key from the kubelet-generated ones so we don't have duplicate
-				// env vars.
-				// TODO: remove this next line once all platforms use apiserver+Pods.
-				delete(serviceEnv, k)
 				tmpEnv[k] = v
+			}
+		case envFrom.SecretRef != nil:
+			s := envFrom.SecretRef
+			name := s.Name
+			secret, ok := secrets[name]
+			if !ok {
+				if kl.kubeClient == nil {
+					return result, fmt.Errorf("Couldn't get secret %v/%v, no kubeClient defined", pod.Namespace, name)
+				}
+				optional := s.Optional != nil && *s.Optional
+				secret, err = kl.secretManager.GetSecret(pod.Namespace, name)
+				if err != nil {
+					if errors.IsNotFound(err) && optional {
+						// ignore error when marked optional
+						continue
+					}
+					return result, err
+				}
+				secrets[name] = secret
+			}
+
+			for k, v := range secret.Data {
+				if len(envFrom.Prefix) > 0 {
+					k = envFrom.Prefix + k
+				}
+				if errMsgs := utilvalidation.IsCIdentifier(k); len(errMsgs) != 0 {
+					return result, fmt.Errorf("Invalid environment variable name, %v, from secret %v/%v: %s", k, pod.Namespace, name, errMsgs[0])
+				}
+				tmpEnv[k] = string(v)
 			}
 		}
 	}
@@ -466,17 +498,9 @@ func (kl *Kubelet) makeEnvironmentVariables(pod *v1.Pod, container *v1.Container
 	// 2.  Create the container's environment in the order variables are declared
 	// 3.  Add remaining service environment vars
 	var (
-		secrets     = make(map[string]*v1.Secret)
 		mappingFunc = expansion.MappingFuncFor(tmpEnv, serviceEnv)
 	)
 	for _, envVar := range container.Env {
-		// Accesses apiserver+Pods.
-		// So, the master may set service env vars, or kubelet may.  In case both are doing
-		// it, we delete the key from the kubelet-generated ones so we don't have duplicate
-		// env vars.
-		// TODO: remove this next line once all platforms use apiserver+Pods.
-		delete(serviceEnv, envVar.Name)
-
 		runtimeVal := envVar.Value
 		if runtimeVal != "" {
 			// Step 1a: expand variable references
@@ -499,8 +523,10 @@ func (kl *Kubelet) makeEnvironmentVariables(pod *v1.Pod, container *v1.Container
 					return result, err
 				}
 			case envVar.ValueFrom.ConfigMapKeyRef != nil:
-				name := envVar.ValueFrom.ConfigMapKeyRef.Name
-				key := envVar.ValueFrom.ConfigMapKeyRef.Key
+				cm := envVar.ValueFrom.ConfigMapKeyRef
+				name := cm.Name
+				key := cm.Key
+				optional := cm.Optional != nil && *cm.Optional
 				configMap, ok := configMaps[name]
 				if !ok {
 					if kl.kubeClient == nil {
@@ -508,17 +534,26 @@ func (kl *Kubelet) makeEnvironmentVariables(pod *v1.Pod, container *v1.Container
 					}
 					configMap, err = kl.kubeClient.Core().ConfigMaps(pod.Namespace).Get(name, metav1.GetOptions{})
 					if err != nil {
+						if errors.IsNotFound(err) && optional {
+							// ignore error when marked optional
+							continue
+						}
 						return result, err
 					}
 					configMaps[name] = configMap
 				}
 				runtimeVal, ok = configMap.Data[key]
 				if !ok {
+					if optional {
+						continue
+					}
 					return result, fmt.Errorf("Couldn't find key %v in ConfigMap %v/%v", key, pod.Namespace, name)
 				}
 			case envVar.ValueFrom.SecretKeyRef != nil:
-				name := envVar.ValueFrom.SecretKeyRef.Name
-				key := envVar.ValueFrom.SecretKeyRef.Key
+				s := envVar.ValueFrom.SecretKeyRef
+				name := s.Name
+				key := s.Key
+				optional := s.Optional != nil && *s.Optional
 				secret, ok := secrets[name]
 				if !ok {
 					if kl.kubeClient == nil {
@@ -526,17 +561,30 @@ func (kl *Kubelet) makeEnvironmentVariables(pod *v1.Pod, container *v1.Container
 					}
 					secret, err = kl.secretManager.GetSecret(pod.Namespace, name)
 					if err != nil {
+						if errors.IsNotFound(err) && optional {
+							// ignore error when marked optional
+							continue
+						}
 						return result, err
 					}
 					secrets[name] = secret
 				}
 				runtimeValBytes, ok := secret.Data[key]
 				if !ok {
+					if optional {
+						continue
+					}
 					return result, fmt.Errorf("Couldn't find key %v in Secret %v/%v", key, pod.Namespace, name)
 				}
 				runtimeVal = string(runtimeValBytes)
 			}
 		}
+		// Accesses apiserver+Pods.
+		// So, the master may set service env vars, or kubelet may.  In case both are doing
+		// it, we delete the key from the kubelet-generated ones so we don't have duplicate
+		// env vars.
+		// TODO: remove this next line once all platforms use apiserver+Pods.
+		delete(serviceEnv, envVar.Name)
 
 		tmpEnv[envVar.Name] = runtimeVal
 	}
@@ -548,7 +596,14 @@ func (kl *Kubelet) makeEnvironmentVariables(pod *v1.Pod, container *v1.Container
 
 	// Append remaining service env vars.
 	for k, v := range serviceEnv {
-		result = append(result, kubecontainer.EnvVar{Name: k, Value: v})
+		// Accesses apiserver+Pods.
+		// So, the master may set service env vars, or kubelet may.  In case both are doing
+		// it, we skip the key from the kubelet-generated ones so we don't have duplicate
+		// env vars.
+		// TODO: remove this next line once all platforms use apiserver+Pods.
+		if _, present := tmpEnv[k]; !present {
+			result = append(result, kubecontainer.EnvVar{Name: k, Value: v})
+		}
 	}
 	return result, nil
 }

@@ -146,7 +146,7 @@ type server struct {
 }
 
 func (s *server) GetExec(req *runtimeapi.ExecRequest) (*runtimeapi.ExecResponse, error) {
-	if req.GetContainerId() == "" {
+	if req.ContainerId == "" {
 		return nil, grpc.Errorf(codes.InvalidArgument, "missing required container_id")
 	}
 	token, err := s.cache.Insert(req)
@@ -159,7 +159,7 @@ func (s *server) GetExec(req *runtimeapi.ExecRequest) (*runtimeapi.ExecResponse,
 }
 
 func (s *server) GetAttach(req *runtimeapi.AttachRequest) (*runtimeapi.AttachResponse, error) {
-	if req.GetContainerId() == "" {
+	if req.ContainerId == "" {
 		return nil, grpc.Errorf(codes.InvalidArgument, "missing required container_id")
 	}
 	token, err := s.cache.Insert(req)
@@ -172,7 +172,7 @@ func (s *server) GetAttach(req *runtimeapi.AttachRequest) (*runtimeapi.AttachRes
 }
 
 func (s *server) GetPortForward(req *runtimeapi.PortForwardRequest) (*runtimeapi.PortForwardResponse, error) {
-	if req.GetPodSandboxId() == "" {
+	if req.PodSandboxId == "" {
 		return nil, grpc.Errorf(codes.InvalidArgument, "missing required pod_sandbox_id")
 	}
 	token, err := s.cache.Insert(req)
@@ -211,11 +211,10 @@ func (s *server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	s.handler.ServeHTTP(w, r)
 }
 
-func (s *server) buildURL(method, token string) *string {
-	loc := s.config.BaseURL.ResolveReference(&url.URL{
+func (s *server) buildURL(method, token string) string {
+	return s.config.BaseURL.ResolveReference(&url.URL{
 		Path: path.Join(method, token),
 	}).String()
-	return &loc
 }
 
 func (s *server) serveExec(req *restful.Request, resp *restful.Response) {
@@ -232,10 +231,10 @@ func (s *server) serveExec(req *restful.Request, resp *restful.Response) {
 	}
 
 	streamOpts := &remotecommand.Options{
-		Stdin:  exec.GetStdin(),
+		Stdin:  exec.Stdin,
 		Stdout: true,
-		Stderr: !exec.GetTty(),
-		TTY:    exec.GetTty(),
+		Stderr: !exec.Tty,
+		TTY:    exec.Tty,
 	}
 
 	remotecommand.ServeExec(
@@ -244,8 +243,8 @@ func (s *server) serveExec(req *restful.Request, resp *restful.Response) {
 		s.runtime,
 		"", // unused: podName
 		"", // unusued: podUID
-		exec.GetContainerId(),
-		exec.GetCmd(),
+		exec.ContainerId,
+		exec.Cmd,
 		streamOpts,
 		s.config.StreamIdleTimeout,
 		s.config.StreamCreationTimeout,
@@ -266,10 +265,10 @@ func (s *server) serveAttach(req *restful.Request, resp *restful.Response) {
 	}
 
 	streamOpts := &remotecommand.Options{
-		Stdin:  attach.GetStdin(),
+		Stdin:  attach.Stdin,
 		Stdout: true,
-		Stderr: !attach.GetTty(),
-		TTY:    attach.GetTty(),
+		Stderr: !attach.Tty,
+		TTY:    attach.Tty,
 	}
 	remotecommand.ServeAttach(
 		resp.ResponseWriter,
@@ -277,7 +276,7 @@ func (s *server) serveAttach(req *restful.Request, resp *restful.Response) {
 		s.runtime,
 		"", // unused: podName
 		"", // unusued: podUID
-		attach.GetContainerId(),
+		attach.ContainerId,
 		streamOpts,
 		s.config.StreamIdleTimeout,
 		s.config.StreamCreationTimeout,
@@ -301,7 +300,7 @@ func (s *server) servePortForward(req *restful.Request, resp *restful.Response) 
 		resp.ResponseWriter,
 		req.Request,
 		s.runtime,
-		pf.GetPodSandboxId(),
+		pf.PodSandboxId,
 		"", // unused: podUID
 		s.config.StreamIdleTimeout,
 		s.config.StreamCreationTimeout)

@@ -20,7 +20,6 @@ import (
 	"testing"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/autoscaling"
 	// Ensure that autoscaling/v1 package is initialized.
 	"k8s.io/apimachinery/pkg/fields"
@@ -49,7 +48,7 @@ func validNewHorizontalPodAutoscaler(name string) *autoscaling.HorizontalPodAuto
 	return &autoscaling.HorizontalPodAutoscaler{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
-			Namespace: api.NamespaceDefault,
+			Namespace: metav1.NamespaceDefault,
 		},
 		Spec: autoscaling.HorizontalPodAutoscalerSpec{
 			ScaleTargetRef: autoscaling.CrossVersionObjectReference{

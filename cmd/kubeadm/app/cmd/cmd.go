@@ -22,8 +22,8 @@ import (
 	"github.com/renstrom/dedent"
 	"github.com/spf13/cobra"
 
+	"k8s.io/apiserver/pkg/util/flag"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
-	"k8s.io/kubernetes/pkg/util/flag"
 )
 
 func NewKubeadmCommand(f cmdutil.Factory, in io.Reader, out, err io.Writer) *cobra.Command {

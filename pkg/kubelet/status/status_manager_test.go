@@ -20,21 +20,21 @@ import (
 	"fmt"
 	"math/rand"
 	"strconv"
+	"strings"
 	"testing"
 	"time"
-
-	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
-	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset/fake"
-	"k8s.io/kubernetes/pkg/client/testing/core"
 
 	"github.com/stretchr/testify/assert"
 
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	core "k8s.io/client-go/testing"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset/fake"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	kubepod "k8s.io/kubernetes/pkg/kubelet/pod"
 	podtest "k8s.io/kubernetes/pkg/kubelet/pod/testing"
@@ -477,6 +477,40 @@ func TestStatusEquality(t *testing.T) {
 		if !isStatusEqual(&oldPodStatus, &podStatus) {
 			t.Fatalf("Order of container statuses should not affect normalized equality.")
 		}
+	}
+}
+
+func TestStatusNormalizationEnforcesMaxBytes(t *testing.T) {
+	pod := v1.Pod{
+		Spec: v1.PodSpec{},
+	}
+	containerStatus := []v1.ContainerStatus{}
+	for i := 0; i < 48; i++ {
+		s := v1.ContainerStatus{
+			Name: fmt.Sprintf("container%d", i),
+			LastTerminationState: v1.ContainerState{
+				Terminated: &v1.ContainerStateTerminated{
+					Message: strings.Repeat("abcdefgh", int(24+i%3)),
+				},
+			},
+		}
+		containerStatus = append(containerStatus, s)
+	}
+	podStatus := v1.PodStatus{
+		InitContainerStatuses: containerStatus[:24],
+		ContainerStatuses:     containerStatus[24:],
+	}
+	result := normalizeStatus(&pod, &podStatus)
+	count := 0
+	for _, s := range result.InitContainerStatuses {
+		l := len(s.LastTerminationState.Terminated.Message)
+		if l < 192 || l > 256 {
+			t.Errorf("container message had length %d", l)
+		}
+		count += l
+	}
+	if count > kubecontainer.MaxPodTerminationMessageLogLength {
+		t.Errorf("message length not truncated")
 	}
 }
 

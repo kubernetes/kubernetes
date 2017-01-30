@@ -20,6 +20,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/kubernetes/cmd/kube-aggregator/pkg/apis/apiregistration"
 	"k8s.io/kubernetes/cmd/kube-aggregator/pkg/registry/apiservice"
+	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/genericapiserver/registry/generic"
 	genericregistry "k8s.io/kubernetes/pkg/genericapiserver/registry/generic/registry"
 )
@@ -32,6 +33,7 @@ type REST struct {
 // NewREST returns a RESTStorage object that will work against API services.
 func NewREST(optsGetter generic.RESTOptionsGetter) *REST {
 	store := &genericregistry.Store{
+		Copier:      api.Scheme,
 		NewFunc:     func() runtime.Object { return &apiregistration.APIService{} },
 		NewListFunc: func() runtime.Object { return &apiregistration.APIServiceList{} },
 		ObjectNameFunc: func(obj runtime.Object) (string, error) {

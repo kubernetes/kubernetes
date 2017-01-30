@@ -33,7 +33,7 @@ import (
 
 	"github.com/golang/glog"
 	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/kubernetes/pkg/client/cache"
+	"k8s.io/client-go/tools/cache"
 )
 
 // Binder knows how to write a binding.
@@ -49,6 +49,10 @@ type PodConditionUpdater interface {
 // nodes that they fit on and writes bindings back to the api server.
 type Scheduler struct {
 	config *Config
+}
+
+func (sched *Scheduler) StopEverything() {
+	close(sched.config.StopEverything)
 }
 
 // These are the functions which need to be provided in order to build a Scheduler configuration.
@@ -78,6 +82,7 @@ type Configurator interface {
 	CreateFromKeys(predicateKeys, priorityKeys sets.String, extenders []algorithm.SchedulerExtender) (*Config, error)
 }
 
+// TODO over time we should make this struct a hidden implementation detail of the scheduler.
 type Config struct {
 	// It is expected that changes made via SchedulerCache will be observed
 	// by NodeLister and Algorithm.
@@ -108,12 +113,32 @@ type Config struct {
 }
 
 // New returns a new scheduler.
+// TODO replace this with NewFromConfigurator.
 func New(c *Config) *Scheduler {
 	s := &Scheduler{
 		config: c,
 	}
 	metrics.Register()
 	return s
+}
+
+// NewFromConfigurator returns a new scheduler that is created entirely by the Configurator.  Assumes Create() is implemented.
+// Supports intermediate Config mutation for now if you provide modifier functions which will run after Config is created.
+func NewFromConfigurator(c Configurator, modifiers ...func(c *Config)) (*Scheduler, error) {
+	cfg, err := c.Create()
+	if err != nil {
+		return nil, err
+	}
+	// Mutate it if any functions were provided, changes might be required for certain types of tests (i.e. change the recorder).
+	for _, modifier := range modifiers {
+		modifier(cfg)
+	}
+	// From this point on the config is immutable to the outside.
+	s := &Scheduler{
+		config: cfg,
+	}
+	metrics.Register()
+	return s, nil
 }
 
 // Run begins watching and scheduling. It starts a goroutine and returns immediately.
@@ -123,6 +148,11 @@ func (s *Scheduler) Run() {
 
 func (s *Scheduler) scheduleOne() {
 	pod := s.config.NextPod()
+	if pod.DeletionTimestamp != nil {
+		s.config.Recorder.Eventf(pod, v1.EventTypeWarning, "FailedScheduling", "skip schedule deleting pod: %v/%v", pod.Namespace, pod.Name)
+		glog.V(3).Infof("Skip schedule deleting pod: %v/%v", pod.Namespace, pod.Name)
+		return
+	}
 
 	glog.V(3).Infof("Attempting to schedule pod: %v/%v", pod.Namespace, pod.Name)
 	start := time.Now()

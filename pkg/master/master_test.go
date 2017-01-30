@@ -33,6 +33,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/version"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
+	restclient "k8s.io/client-go/rest"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	apiv1 "k8s.io/kubernetes/pkg/api/v1"
@@ -48,7 +49,6 @@ import (
 	extensionsapiv1beta1 "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	"k8s.io/kubernetes/pkg/apis/rbac"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset/fake"
-	"k8s.io/kubernetes/pkg/client/restclient"
 	genericapiserver "k8s.io/kubernetes/pkg/genericapiserver/server"
 	kubeletclient "k8s.io/kubernetes/pkg/kubelet/client"
 	etcdtesting "k8s.io/kubernetes/pkg/storage/etcd/testing"
@@ -188,14 +188,14 @@ func TestGetNodeAddresses(t *testing.T) {
 	addressProvider := nodeAddressProvider{fakeNodeClient}
 
 	// Fail case (no addresses associated with nodes)
-	nodes, _ := fakeNodeClient.List(apiv1.ListOptions{})
+	nodes, _ := fakeNodeClient.List(metav1.ListOptions{})
 	addrs, err := addressProvider.externalAddresses()
 
 	assert.Error(err, "addresses should have caused an error as there are no addresses.")
 	assert.Equal([]string(nil), addrs)
 
 	// Pass case with External type IP
-	nodes, _ = fakeNodeClient.List(apiv1.ListOptions{})
+	nodes, _ = fakeNodeClient.List(metav1.ListOptions{})
 	for index := range nodes.Items {
 		nodes.Items[index].Status.Addresses = []apiv1.NodeAddress{{Type: apiv1.NodeExternalIP, Address: "127.0.0.1"}}
 		fakeNodeClient.Update(&nodes.Items[index])
@@ -205,7 +205,7 @@ func TestGetNodeAddresses(t *testing.T) {
 	assert.Equal([]string{"127.0.0.1", "127.0.0.1"}, addrs)
 
 	// Pass case with LegacyHost type IP
-	nodes, _ = fakeNodeClient.List(apiv1.ListOptions{})
+	nodes, _ = fakeNodeClient.List(metav1.ListOptions{})
 	for index := range nodes.Items {
 		nodes.Items[index].Status.Addresses = []apiv1.NodeAddress{{Type: apiv1.NodeLegacyHostIP, Address: "127.0.0.2"}}
 		fakeNodeClient.Update(&nodes.Items[index])

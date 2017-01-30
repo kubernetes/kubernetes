@@ -17,12 +17,12 @@ limitations under the License.
 package internalversion
 
 import (
+	rest "k8s.io/client-go/rest"
 	api "k8s.io/kubernetes/pkg/api"
-	restclient "k8s.io/kubernetes/pkg/client/restclient"
 )
 
 type AuthorizationInterface interface {
-	RESTClient() restclient.Interface
+	RESTClient() rest.Interface
 	LocalSubjectAccessReviewsGetter
 	SelfSubjectAccessReviewsGetter
 	SubjectAccessReviewsGetter
@@ -30,7 +30,7 @@ type AuthorizationInterface interface {
 
 // AuthorizationClient is used to interact with features provided by the authorization.k8s.io group.
 type AuthorizationClient struct {
-	restClient restclient.Interface
+	restClient rest.Interface
 }
 
 func (c *AuthorizationClient) LocalSubjectAccessReviews(namespace string) LocalSubjectAccessReviewInterface {
@@ -46,12 +46,12 @@ func (c *AuthorizationClient) SubjectAccessReviews() SubjectAccessReviewInterfac
 }
 
 // NewForConfig creates a new AuthorizationClient for the given config.
-func NewForConfig(c *restclient.Config) (*AuthorizationClient, error) {
+func NewForConfig(c *rest.Config) (*AuthorizationClient, error) {
 	config := *c
 	if err := setConfigDefaults(&config); err != nil {
 		return nil, err
 	}
-	client, err := restclient.RESTClientFor(&config)
+	client, err := rest.RESTClientFor(&config)
 	if err != nil {
 		return nil, err
 	}
@@ -60,7 +60,7 @@ func NewForConfig(c *restclient.Config) (*AuthorizationClient, error) {
 
 // NewForConfigOrDie creates a new AuthorizationClient for the given config and
 // panics if there is an error in the config.
-func NewForConfigOrDie(c *restclient.Config) *AuthorizationClient {
+func NewForConfigOrDie(c *rest.Config) *AuthorizationClient {
 	client, err := NewForConfig(c)
 	if err != nil {
 		panic(err)
@@ -69,11 +69,11 @@ func NewForConfigOrDie(c *restclient.Config) *AuthorizationClient {
 }
 
 // New creates a new AuthorizationClient for the given RESTClient.
-func New(c restclient.Interface) *AuthorizationClient {
+func New(c rest.Interface) *AuthorizationClient {
 	return &AuthorizationClient{c}
 }
 
-func setConfigDefaults(config *restclient.Config) error {
+func setConfigDefaults(config *rest.Config) error {
 	// if authorization group is not registered, return an error
 	g, err := api.Registry.Group("authorization.k8s.io")
 	if err != nil {
@@ -81,7 +81,7 @@ func setConfigDefaults(config *restclient.Config) error {
 	}
 	config.APIPath = "/apis"
 	if config.UserAgent == "" {
-		config.UserAgent = restclient.DefaultKubernetesUserAgent()
+		config.UserAgent = rest.DefaultKubernetesUserAgent()
 	}
 	if config.GroupVersion == nil || config.GroupVersion.Group != g.GroupVersion.Group {
 		copyGroupVersion := g.GroupVersion
@@ -100,7 +100,7 @@ func setConfigDefaults(config *restclient.Config) error {
 
 // RESTClient returns a RESTClient that is used to communicate
 // with API server by this client implementation.
-func (c *AuthorizationClient) RESTClient() restclient.Interface {
+func (c *AuthorizationClient) RESTClient() rest.Interface {
 	if c == nil {
 		return nil
 	}

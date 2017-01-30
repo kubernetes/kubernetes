@@ -14,15 +14,20 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Script that destroys Kubemark clusters and deletes all GCE resources created for Master
+# Script that destroys Kubemark cluster and deletes all master resources.
+
 KUBE_ROOT=$(dirname "${BASH_SOURCE}")/../..
 
 source "${KUBE_ROOT}/test/kubemark/common.sh"
 
-"${KUBECTL}" delete -f "${RESOURCE_DIRECTORY}/hollow-kubelet.json" &> /dev/null || true
 "${KUBECTL}" delete -f "${RESOURCE_DIRECTORY}/addons" &> /dev/null || true
+"${KUBECTL}" delete -f "${RESOURCE_DIRECTORY}/hollow-node.json" &> /dev/null || true
 "${KUBECTL}" delete -f "${RESOURCE_DIRECTORY}/kubemark-ns.json" &> /dev/null || true
-rm -rf "${RESOURCE_DIRECTORY}/addons"
+
+rm -rf "${RESOURCE_DIRECTORY}/addons" \
+	"${RESOURCE_DIRECTORY}/kubeconfig.kubemark" \
+	"${RESOURCE_DIRECTORY}/hollow-node.json" \
+	"${RESOURCE_DIRECTORY}/kubemark-master-env.sh"  &> /dev/null || true
 
 GCLOUD_COMMON_ARGS="--project ${PROJECT} --zone ${ZONE} --quiet"
 
@@ -51,10 +56,3 @@ if [ "${SEPARATE_EVENT_MACHINE:-false}" == "true" ]; then
 	gcloud compute disks delete "${EVENT_STORE_NAME}-pd" \
     	${GCLOUD_COMMON_ARGS} || true
 fi
-
-rm -rf "${RESOURCE_DIRECTORY}/addons" "${RESOURCE_DIRECTORY}/kubeconfig.kubemark" &> /dev/null || true
-rm "${RESOURCE_DIRECTORY}/ca.crt" \
-	"${RESOURCE_DIRECTORY}/kubecfg.crt" \
-	"${RESOURCE_DIRECTORY}/kubecfg.key" \
-	"${RESOURCE_DIRECTORY}/hollow-node.json" \
-	"${RESOURCE_DIRECTORY}/kubemark-master-env.sh"  &> /dev/null || true

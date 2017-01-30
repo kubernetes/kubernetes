@@ -23,7 +23,6 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
@@ -164,7 +163,7 @@ func RunScale(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []strin
 			return err
 		}
 		if cmdutil.ShouldRecord(cmd, info) {
-			patchBytes, err := cmdutil.ChangeResourcePatch(info, f.Command())
+			patchBytes, patchType, err := cmdutil.ChangeResourcePatch(info, f.Command())
 			if err != nil {
 				return err
 			}
@@ -174,7 +173,7 @@ func RunScale(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []strin
 				return err
 			}
 			helper := resource.NewHelper(client, mapping)
-			_, err = helper.Patch(info.Namespace, info.Name, types.StrategicMergePatchType, patchBytes)
+			_, err = helper.Patch(info.Namespace, info.Name, patchType, patchBytes)
 			if err != nil {
 				return err
 			}

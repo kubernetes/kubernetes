@@ -44,7 +44,7 @@ func newStorage(t *testing.T) (*REST, *StatusREST, *etcdtesting.EtcdTestServer) 
 }
 
 var (
-	namespace           = api.NamespaceNone
+	namespace           = metav1.NamespaceNone
 	name                = "foo-ingress"
 	defaultHostname     = "foo.bar.com"
 	defaultBackendName  = "default-backend"

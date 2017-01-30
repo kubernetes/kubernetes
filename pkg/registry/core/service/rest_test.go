@@ -26,18 +26,19 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/service"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/genericapiserver/registry/rest"
 	"k8s.io/kubernetes/pkg/registry/core/service/ipallocator"
 	"k8s.io/kubernetes/pkg/registry/core/service/portallocator"
 	"k8s.io/kubernetes/pkg/registry/registrytest"
-	featuregate "k8s.io/kubernetes/pkg/util/config"
 	"k8s.io/kubernetes/pkg/util/intstr"
 )
 
 func init() {
-	featuregate.DefaultFeatureGate.Set("AllowExtTrafficLocalEndpoints=true")
+	utilfeature.DefaultFeatureGate.Set(string(features.ExternalTrafficLocalOnly) + "=true")
 }
 
 // TODO(wojtek-t): Cleanup this file.
@@ -293,7 +294,7 @@ func TestServiceRegistryUpdate(t *testing.T) {
 	ctx := genericapirequest.NewDefaultContext()
 	storage, registry := NewTestREST(t, nil)
 	svc, err := registry.CreateService(ctx, &api.Service{
-		ObjectMeta: metav1.ObjectMeta{Name: "foo", ResourceVersion: "1", Namespace: api.NamespaceDefault},
+		ObjectMeta: metav1.ObjectMeta{Name: "foo", ResourceVersion: "1", Namespace: metav1.NamespaceDefault},
 		Spec: api.ServiceSpec{
 			Selector: map[string]string{"bar": "baz1"},
 			Ports: []api.ServicePort{{
@@ -560,7 +561,7 @@ func TestServiceRegistryResourceLocation(t *testing.T) {
 			{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "foo",
-					Namespace: api.NamespaceDefault,
+					Namespace: metav1.NamespaceDefault,
 				},
 				Subsets: []api.EndpointSubset{{
 					Addresses: []api.EndpointAddress{{IP: "1.2.3.4"}},
@@ -570,7 +571,7 @@ func TestServiceRegistryResourceLocation(t *testing.T) {
 			{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "foo",
-					Namespace: api.NamespaceDefault,
+					Namespace: metav1.NamespaceDefault,
 				},
 				Subsets: []api.EndpointSubset{{
 					Addresses: []api.EndpointAddress{},
@@ -678,13 +679,13 @@ func TestServiceRegistryList(t *testing.T) {
 	ctx := genericapirequest.NewDefaultContext()
 	storage, registry := NewTestREST(t, nil)
 	registry.CreateService(ctx, &api.Service{
-		ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: api.NamespaceDefault},
+		ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: metav1.NamespaceDefault},
 		Spec: api.ServiceSpec{
 			Selector: map[string]string{"bar": "baz"},
 		},
 	})
 	registry.CreateService(ctx, &api.Service{
-		ObjectMeta: metav1.ObjectMeta{Name: "foo2", Namespace: api.NamespaceDefault},
+		ObjectMeta: metav1.ObjectMeta{Name: "foo2", Namespace: metav1.NamespaceDefault},
 		Spec: api.ServiceSpec{
 			Selector: map[string]string{"bar2": "baz2"},
 		},

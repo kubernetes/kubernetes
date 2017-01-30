@@ -390,9 +390,7 @@ func DeepCopy_v1beta1_FSGroupStrategyOptions(in interface{}, out interface{}, c 
 		if in.Ranges != nil {
 			in, out := &in.Ranges, &out.Ranges
 			*out = make([]IDRange, len(*in))
-			for i := range *in {
-				(*out)[i] = (*in)[i]
-			}
+			copy(*out, *in)
 		}
 		return nil
 	}
@@ -415,9 +413,7 @@ func DeepCopy_v1beta1_HTTPIngressRuleValue(in interface{}, out interface{}, c *c
 		if in.Paths != nil {
 			in, out := &in.Paths, &out.Paths
 			*out = make([]HTTPIngressPath, len(*in))
-			for i := range *in {
-				(*out)[i] = (*in)[i]
-			}
+			copy(*out, *in)
 		}
 		return nil
 	}
@@ -827,37 +823,27 @@ func DeepCopy_v1beta1_PodSecurityPolicySpec(in interface{}, out interface{}, c *
 		if in.DefaultAddCapabilities != nil {
 			in, out := &in.DefaultAddCapabilities, &out.DefaultAddCapabilities
 			*out = make([]api_v1.Capability, len(*in))
-			for i := range *in {
-				(*out)[i] = (*in)[i]
-			}
+			copy(*out, *in)
 		}
 		if in.RequiredDropCapabilities != nil {
 			in, out := &in.RequiredDropCapabilities, &out.RequiredDropCapabilities
 			*out = make([]api_v1.Capability, len(*in))
-			for i := range *in {
-				(*out)[i] = (*in)[i]
-			}
+			copy(*out, *in)
 		}
 		if in.AllowedCapabilities != nil {
 			in, out := &in.AllowedCapabilities, &out.AllowedCapabilities
 			*out = make([]api_v1.Capability, len(*in))
-			for i := range *in {
-				(*out)[i] = (*in)[i]
-			}
+			copy(*out, *in)
 		}
 		if in.Volumes != nil {
 			in, out := &in.Volumes, &out.Volumes
 			*out = make([]FSType, len(*in))
-			for i := range *in {
-				(*out)[i] = (*in)[i]
-			}
+			copy(*out, *in)
 		}
 		if in.HostPorts != nil {
 			in, out := &in.HostPorts, &out.HostPorts
 			*out = make([]HostPortRange, len(*in))
-			for i := range *in {
-				(*out)[i] = (*in)[i]
-			}
+			copy(*out, *in)
 		}
 		if err := DeepCopy_v1beta1_SELinuxStrategyOptions(&in.SELinux, &out.SELinux, c); err != nil {
 			return err
@@ -1011,9 +997,7 @@ func DeepCopy_v1beta1_RunAsUserStrategyOptions(in interface{}, out interface{}, 
 		if in.Ranges != nil {
 			in, out := &in.Ranges, &out.Ranges
 			*out = make([]IDRange, len(*in))
-			for i := range *in {
-				(*out)[i] = (*in)[i]
-			}
+			copy(*out, *in)
 		}
 		return nil
 	}
@@ -1092,9 +1076,7 @@ func DeepCopy_v1beta1_SupplementalGroupsStrategyOptions(in interface{}, out inte
 		if in.Ranges != nil {
 			in, out := &in.Ranges, &out.Ranges
 			*out = make([]IDRange, len(*in))
-			for i := range *in {
-				(*out)[i] = (*in)[i]
-			}
+			copy(*out, *in)
 		}
 		return nil
 	}
@@ -1113,9 +1095,7 @@ func DeepCopy_v1beta1_ThirdPartyResource(in interface{}, out interface{}, c *con
 		if in.Versions != nil {
 			in, out := &in.Versions, &out.Versions
 			*out = make([]APIVersion, len(*in))
-			for i := range *in {
-				(*out)[i] = (*in)[i]
-			}
+			copy(*out, *in)
 		}
 		return nil
 	}

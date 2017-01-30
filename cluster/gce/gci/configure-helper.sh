@@ -215,6 +215,9 @@ function create-master-auth {
     echo "${MASTER_CERT}" | base64 --decode > "${auth_dir}/server.cert"
     echo "${MASTER_KEY}" | base64 --decode > "${auth_dir}/server.key"
   fi
+  if [[ ! -z "${CA_KEY:-}" ]]; then
+    echo "${CA_KEY}" | base64 --decode > "${auth_dir}/ca.key"
+  fi
   if [ ! -e "${auth_dir}/kubeapiserver.cert" ] && [[ ! -z "${KUBEAPISERVER_CERT:-}" ]] && [[ ! -z "${KUBEAPISERVER_KEY:-}" ]]; then
     echo "${KUBEAPISERVER_CERT}" | base64 --decode > "${auth_dir}/kubeapiserver.cert"
     echo "${KUBEAPISERVER_KEY}" | base64 --decode > "${auth_dir}/kubeapiserver.key"
@@ -900,6 +903,9 @@ function start-kube-apiserver {
 
 
   local authorization_mode="RBAC"
+  # Load existing ABAC policy files written by versions < 1.6 of this script
+  # TODO: only default to this legacy path when in upgrade mode
+  ABAC_AUTHZ_FILE="${ABAC_AUTHZ_FILE:-/etc/srv/kubernetes/abac-authz-policy.jsonl}"
   if [[ -n "${ABAC_AUTHZ_FILE:-}" && -e "${ABAC_AUTHZ_FILE}" ]]; then
     params+=" --authorization-policy-file=${ABAC_AUTHZ_FILE}"
     authorization_mode+=",ABAC"
@@ -970,6 +976,10 @@ function start-kube-controller-manager {
   fi
   if [[ -n "${CLUSTER_IP_RANGE:-}" ]]; then
     params+=" --cluster-cidr=${CLUSTER_IP_RANGE}"
+  fi
+  if [[ -n "${CA_KEY:-}" ]]; then
+    params+=" --cluster-signing-cert-file=/etc/srv/kubernetes/ca.crt"
+    params+=" --cluster-signing-key-file=/etc/srv/kubernetes/ca.key"
   fi
   if [[ -n "${SERVICE_CLUSTER_IP_RANGE:-}" ]]; then
     params+=" --service-cluster-ip-range=${SERVICE_CLUSTER_IP_RANGE}"

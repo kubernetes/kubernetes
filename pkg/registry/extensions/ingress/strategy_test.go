@@ -36,7 +36,7 @@ func newIngress() extensions.Ingress {
 	return extensions.Ingress{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "foo",
-			Namespace: api.NamespaceDefault,
+			Namespace: metav1.NamespaceDefault,
 		},
 		Spec: extensions.IngressSpec{
 			Backend: &extensions.IngressBackend{

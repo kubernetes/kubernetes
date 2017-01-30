@@ -30,19 +30,20 @@ import (
 	"testing"
 	"time"
 
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/diff"
+	"k8s.io/client-go/dynamic"
+	"k8s.io/client-go/rest/fake"
+	"k8s.io/client-go/tools/clientcmd"
 	kubefedtesting "k8s.io/kubernetes/federation/pkg/kubefed/testing"
 	"k8s.io/kubernetes/federation/pkg/kubefed/util"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
-	"k8s.io/kubernetes/pkg/client/restclient/fake"
-	"k8s.io/kubernetes/pkg/client/typed/dynamic"
-	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/util/intstr"
@@ -751,6 +752,7 @@ func fakeInitHostFactory(federationName, namespaceName, ip, dnsZoneName, image, 
 	ns := dynamic.ContentConfig().NegotiatedSerializer
 	tf.ClientConfig = kubefedtesting.DefaultClientConfig()
 	tf.Client = &fake.RESTClient{
+		APIRegistry:          api.Registry,
 		NegotiatedSerializer: ns,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch p, m := req.URL.Path, req.Method; {
@@ -766,7 +768,7 @@ func fakeInitHostFactory(federationName, namespaceName, ip, dnsZoneName, image, 
 				if err != nil {
 					return nil, err
 				}
-				if !api.Semantic.DeepEqual(got, namespace) {
+				if !apiequality.Semantic.DeepEqual(got, namespace) {
 					return nil, fmt.Errorf("Unexpected namespace object\n\tDiff: %s", diff.ObjectGoPrintDiff(got, namespace))
 				}
 				return &http.Response{StatusCode: http.StatusCreated, Header: kubefedtesting.DefaultHeader(), Body: kubefedtesting.ObjBody(codec, &namespace)}, nil
@@ -780,7 +782,7 @@ func fakeInitHostFactory(federationName, namespaceName, ip, dnsZoneName, image, 
 				if err != nil {
 					return nil, err
 				}
-				if !api.Semantic.DeepEqual(got, svc) {
+				if !apiequality.Semantic.DeepEqual(got, svc) {
 					return nil, fmt.Errorf("Unexpected service object\n\tDiff: %s", diff.ObjectGoPrintDiff(got, svc))
 				}
 				return &http.Response{StatusCode: http.StatusCreated, Header: kubefedtesting.DefaultHeader(), Body: kubefedtesting.ObjBody(codec, &svc)}, nil
@@ -811,7 +813,7 @@ func fakeInitHostFactory(federationName, namespaceName, ip, dnsZoneName, image, 
 				case cmKubeconfigSecretName:
 					want = cmKubeconfigSecret
 				}
-				if !api.Semantic.DeepEqual(got, want) {
+				if !apiequality.Semantic.DeepEqual(got, want) {
 					return nil, fmt.Errorf("Unexpected secret object\n\tDiff: %s", diff.ObjectGoPrintDiff(got, want))
 				}
 				return &http.Response{StatusCode: http.StatusCreated, Header: kubefedtesting.DefaultHeader(), Body: kubefedtesting.ObjBody(codec, &want)}, nil
@@ -825,7 +827,7 @@ func fakeInitHostFactory(federationName, namespaceName, ip, dnsZoneName, image, 
 				if err != nil {
 					return nil, err
 				}
-				if !api.Semantic.DeepEqual(got, pvc) {
+				if !apiequality.Semantic.DeepEqual(got, pvc) {
 					return nil, fmt.Errorf("Unexpected PVC object\n\tDiff: %s", diff.ObjectGoPrintDiff(got, pvc))
 				}
 				return &http.Response{StatusCode: http.StatusCreated, Header: kubefedtesting.DefaultHeader(), Body: kubefedtesting.ObjBody(codec, &pvc)}, nil
@@ -845,7 +847,7 @@ func fakeInitHostFactory(federationName, namespaceName, ip, dnsZoneName, image, 
 				case cmName:
 					want = cm
 				}
-				if !api.Semantic.DeepEqual(got, want) {
+				if !apiequality.Semantic.DeepEqual(got, want) {
 					return nil, fmt.Errorf("Unexpected deployment object\n\tDiff: %s", diff.ObjectGoPrintDiff(got, want))
 				}
 				return &http.Response{StatusCode: http.StatusCreated, Header: kubefedtesting.DefaultHeader(), Body: kubefedtesting.ObjBody(extCodec, &want)}, nil

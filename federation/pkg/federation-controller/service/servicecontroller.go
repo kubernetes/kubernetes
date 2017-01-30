@@ -32,6 +32,8 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
+	cache "k8s.io/client-go/tools/cache"
+	"k8s.io/client-go/util/workqueue"
 	v1beta1 "k8s.io/kubernetes/federation/apis/federation/v1beta1"
 	federationcache "k8s.io/kubernetes/federation/client/cache"
 	fedclientset "k8s.io/kubernetes/federation/client/clientset_generated/federation_clientset"
@@ -41,11 +43,10 @@ import (
 	"k8s.io/kubernetes/federation/pkg/federation-controller/util/deletionhelper"
 	"k8s.io/kubernetes/pkg/api"
 	v1 "k8s.io/kubernetes/pkg/api/v1"
-	cache "k8s.io/kubernetes/pkg/client/cache"
 	kubeclientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
+	"k8s.io/kubernetes/pkg/client/legacylisters"
 	"k8s.io/kubernetes/pkg/client/record"
 	"k8s.io/kubernetes/pkg/controller"
-	"k8s.io/kubernetes/pkg/util/workqueue"
 )
 
 const (
@@ -119,7 +120,7 @@ type ServiceController struct {
 	serviceCache *serviceCache
 	clusterCache *clusterClientCache
 	// A store of services, populated by the serviceController
-	serviceStore cache.StoreToServiceLister
+	serviceStore listers.StoreToServiceLister
 	// Watches changes to all services
 	serviceController cache.Controller
 	federatedInformer fedutil.FederatedInformer
@@ -180,11 +181,11 @@ func New(federationClient fedclientset.Interface, dns dnsprovider.Interface,
 	s.clusterDeliverer = util.NewDelayingDeliverer()
 	s.serviceStore.Indexer, s.serviceController = cache.NewIndexerInformer(
 		&cache.ListWatch{
-			ListFunc: func(options v1.ListOptions) (pkgruntime.Object, error) {
-				return s.federationClient.Core().Services(v1.NamespaceAll).List(options)
+			ListFunc: func(options metav1.ListOptions) (pkgruntime.Object, error) {
+				return s.federationClient.Core().Services(metav1.NamespaceAll).List(options)
 			},
-			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
-				return s.federationClient.Core().Services(v1.NamespaceAll).Watch(options)
+			WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
+				return s.federationClient.Core().Services(metav1.NamespaceAll).Watch(options)
 			},
 		},
 		&v1.Service{},
@@ -203,10 +204,10 @@ func New(federationClient fedclientset.Interface, dns dnsprovider.Interface,
 	)
 	s.clusterStore.Store, s.clusterController = cache.NewInformer(
 		&cache.ListWatch{
-			ListFunc: func(options v1.ListOptions) (pkgruntime.Object, error) {
+			ListFunc: func(options metav1.ListOptions) (pkgruntime.Object, error) {
 				return s.federationClient.Federation().Clusters().List(options)
 			},
-			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
+			WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
 				return s.federationClient.Federation().Clusters().Watch(options)
 			},
 		},
@@ -248,11 +249,11 @@ func New(federationClient fedclientset.Interface, dns dnsprovider.Interface,
 	fedInformerFactory := func(cluster *v1beta1.Cluster, targetClient kubeclientset.Interface) (cache.Store, cache.Controller) {
 		return cache.NewInformer(
 			&cache.ListWatch{
-				ListFunc: func(options v1.ListOptions) (pkgruntime.Object, error) {
-					return targetClient.Core().Services(v1.NamespaceAll).List(options)
+				ListFunc: func(options metav1.ListOptions) (pkgruntime.Object, error) {
+					return targetClient.Core().Services(metav1.NamespaceAll).List(options)
 				},
-				WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
-					return targetClient.Core().Services(v1.NamespaceAll).Watch(options)
+				WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
+					return targetClient.Core().Services(metav1.NamespaceAll).Watch(options)
 				},
 			},
 			&v1.Service{},
@@ -281,7 +282,7 @@ func New(federationClient fedclientset.Interface, dns dnsprovider.Interface,
 		},
 		func(client kubeclientset.Interface, obj pkgruntime.Object) error {
 			svc := obj.(*v1.Service)
-			err := client.Core().Services(svc.Namespace).Delete(svc.Name, &v1.DeleteOptions{})
+			err := client.Core().Services(svc.Namespace).Delete(svc.Name, &metav1.DeleteOptions{})
 			return err
 		})
 

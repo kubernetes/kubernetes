@@ -20,14 +20,15 @@ import (
 	"io/ioutil"
 	"os"
 	"path"
+	"path/filepath"
 	"testing"
 
 	"golang.org/x/net/context"
 
+	"k8s.io/apiserver/pkg/storage/storagebackend"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/storage/etcd/testing/testingcert"
-	"k8s.io/kubernetes/pkg/storage/storagebackend"
 
 	"github.com/coreos/etcd/integration"
 	"github.com/coreos/etcd/pkg/transport"
@@ -35,6 +36,7 @@ import (
 
 func TestTLSConnection(t *testing.T) {
 	certFile, keyFile, caFile := configureTLSCerts(t)
+	defer os.RemoveAll(filepath.Dir(certFile))
 
 	tlsInfo := &transport.TLSInfo{
 		CertFile: certFile,

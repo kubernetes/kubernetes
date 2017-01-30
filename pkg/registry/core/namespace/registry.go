@@ -17,6 +17,7 @@ limitations under the License.
 package namespace
 
 import (
+	metainternalversion "k8s.io/apimachinery/pkg/apis/meta/internalversion"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/watch"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
@@ -26,8 +27,8 @@ import (
 
 // Registry is an interface implemented by things that know how to store Namespace objects.
 type Registry interface {
-	ListNamespaces(ctx genericapirequest.Context, options *api.ListOptions) (*api.NamespaceList, error)
-	WatchNamespaces(ctx genericapirequest.Context, options *api.ListOptions) (watch.Interface, error)
+	ListNamespaces(ctx genericapirequest.Context, options *metainternalversion.ListOptions) (*api.NamespaceList, error)
+	WatchNamespaces(ctx genericapirequest.Context, options *metainternalversion.ListOptions) (watch.Interface, error)
 	GetNamespace(ctx genericapirequest.Context, namespaceID string, options *metav1.GetOptions) (*api.Namespace, error)
 	CreateNamespace(ctx genericapirequest.Context, namespace *api.Namespace) error
 	UpdateNamespace(ctx genericapirequest.Context, namespace *api.Namespace) error
@@ -45,7 +46,7 @@ func NewRegistry(s rest.StandardStorage) Registry {
 	return &storage{s}
 }
 
-func (s *storage) ListNamespaces(ctx genericapirequest.Context, options *api.ListOptions) (*api.NamespaceList, error) {
+func (s *storage) ListNamespaces(ctx genericapirequest.Context, options *metainternalversion.ListOptions) (*api.NamespaceList, error) {
 	obj, err := s.List(ctx, options)
 	if err != nil {
 		return nil, err
@@ -53,7 +54,7 @@ func (s *storage) ListNamespaces(ctx genericapirequest.Context, options *api.Lis
 	return obj.(*api.NamespaceList), nil
 }
 
-func (s *storage) WatchNamespaces(ctx genericapirequest.Context, options *api.ListOptions) (watch.Interface, error) {
+func (s *storage) WatchNamespaces(ctx genericapirequest.Context, options *metainternalversion.ListOptions) (watch.Interface, error) {
 	return s.Watch(ctx, options)
 }
 

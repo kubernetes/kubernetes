@@ -21,8 +21,8 @@ import (
 
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/util/uuid"
 	"k8s.io/kubernetes/test/e2e/framework"
 )
 
@@ -63,7 +63,7 @@ func (cc *ConformanceContainer) Create() {
 }
 
 func (cc *ConformanceContainer) Delete() error {
-	return cc.PodClient.Delete(cc.podName, v1.NewDeleteOptions(0))
+	return cc.PodClient.Delete(cc.podName, metav1.NewDeleteOptions(0))
 }
 
 func (cc *ConformanceContainer) IsReady() (bool, error) {

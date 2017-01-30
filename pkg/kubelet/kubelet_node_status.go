@@ -28,15 +28,16 @@ import (
 
 	"github.com/golang/glog"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/conversion"
 	"k8s.io/apimachinery/pkg/types"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
-	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
 	"k8s.io/kubernetes/pkg/kubelet/events"
+	"k8s.io/kubernetes/pkg/kubelet/util"
 	"k8s.io/kubernetes/pkg/kubelet/util/sliceutils"
 	nodeutil "k8s.io/kubernetes/pkg/util/node"
 	"k8s.io/kubernetes/pkg/version"
@@ -149,7 +150,7 @@ func (kl *Kubelet) tryRegisterWithApiServer(node *v1.Node) bool {
 	if err := kl.kubeClient.Core().Nodes().Delete(node.Name, nil); err != nil {
 		glog.Errorf("Unable to register node %q with API server: error deleting old node: %v", kl.nodeName, err)
 	} else {
-		glog.Info("Deleted old node object %q", kl.nodeName)
+		glog.Infof("Deleted old node object %q", kl.nodeName)
 	}
 
 	return false
@@ -349,7 +350,7 @@ func (kl *Kubelet) tryUpdateNodeStatus(tryNumber int) error {
 	// If it result in a conflict, all retries are served directly from etcd.
 	opts := metav1.GetOptions{}
 	if tryNumber == 0 {
-		opts.ResourceVersion = "0"
+		util.FromApiserverCache(&opts)
 	}
 	node, err := kl.kubeClient.Core().Nodes().Get(string(kl.nodeName), opts)
 	if err != nil {

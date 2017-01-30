@@ -17,15 +17,16 @@ go_library(
     tags = ["automanaged"],
     deps = [
         "//federation/apis/federation/install:go_default_library",
+        "//federation/client/clientset_generated/federation_internalclientset/typed/autoscaling/internalversion:go_default_library",
         "//federation/client/clientset_generated/federation_internalclientset/typed/batch/internalversion:go_default_library",
         "//federation/client/clientset_generated/federation_internalclientset/typed/core/internalversion:go_default_library",
         "//federation/client/clientset_generated/federation_internalclientset/typed/extensions/internalversion:go_default_library",
         "//federation/client/clientset_generated/federation_internalclientset/typed/federation/internalversion:go_default_library",
-        "//pkg/client/restclient:go_default_library",
-        "//pkg/client/typed/discovery:go_default_library",
-        "//plugin/pkg/client/auth:go_default_library",
         "//vendor:github.com/golang/glog",
-        "//vendor:k8s.io/client-go/pkg/util/flowcontrol",
+        "//vendor:k8s.io/client-go/discovery",
+        "//vendor:k8s.io/client-go/plugin/pkg/client/auth",
+        "//vendor:k8s.io/client-go/rest",
+        "//vendor:k8s.io/client-go/util/flowcontrol",
     ],
 )
 
@@ -41,6 +42,7 @@ filegroup(
     srcs = [
         ":package-srcs",
         "//federation/client/clientset_generated/federation_internalclientset/fake:all-srcs",
+        "//federation/client/clientset_generated/federation_internalclientset/typed/autoscaling/internalversion:all-srcs",
         "//federation/client/clientset_generated/federation_internalclientset/typed/batch/internalversion:all-srcs",
         "//federation/client/clientset_generated/federation_internalclientset/typed/core/internalversion:all-srcs",
         "//federation/client/clientset_generated/federation_internalclientset/typed/extensions/internalversion:all-srcs",

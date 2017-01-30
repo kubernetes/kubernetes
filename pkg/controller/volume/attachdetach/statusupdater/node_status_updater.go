@@ -24,12 +24,12 @@ import (
 
 	"github.com/golang/glog"
 
+	"k8s.io/apimachinery/pkg/util/strategicpatch"
+	kcache "k8s.io/client-go/tools/cache"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
-	kcache "k8s.io/kubernetes/pkg/client/cache"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/pkg/controller/volume/attachdetach/cache"
-	"k8s.io/kubernetes/pkg/util/strategicpatch"
 )
 
 // NodeStatusUpdater defines a set of operations for updating the

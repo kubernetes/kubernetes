@@ -18,7 +18,7 @@ go_test(
         "//pkg/client/clientset_generated/clientset/fake:go_default_library",
         "//vendor:github.com/stretchr/testify/assert",
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
-        "//vendor:k8s.io/client-go/pkg/util/clock",
+        "//vendor:k8s.io/client-go/util/clock",
     ],
 )
 
@@ -32,11 +32,12 @@ go_library(
     deps = [
         "//pkg/api/v1:go_default_library",
         "//pkg/client/clientset_generated/clientset:go_default_library",
+        "//pkg/kubelet/util:go_default_library",
         "//pkg/storage/etcd:go_default_library",
         "//vendor:k8s.io/apimachinery/pkg/api/errors",
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
         "//vendor:k8s.io/apimachinery/pkg/util/sets",
-        "//vendor:k8s.io/client-go/pkg/util/clock",
+        "//vendor:k8s.io/client-go/util/clock",
     ],
 )
 

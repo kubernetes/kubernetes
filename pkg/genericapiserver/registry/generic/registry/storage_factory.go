@@ -18,15 +18,18 @@ package registry
 
 import (
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apiserver/pkg/storage/storagebackend"
 	"k8s.io/kubernetes/pkg/genericapiserver/registry/generic"
 	"k8s.io/kubernetes/pkg/storage"
 	etcdstorage "k8s.io/kubernetes/pkg/storage/etcd"
-	"k8s.io/kubernetes/pkg/storage/storagebackend"
 	"k8s.io/kubernetes/pkg/storage/storagebackend/factory"
 )
 
+var _ generic.StorageDecorator = StorageWithCacher
+
 // Creates a cacher based given storageConfig.
 func StorageWithCacher(
+	copier runtime.ObjectCopier,
 	storageConfig *storagebackend.Config,
 	capacity int,
 	objectType runtime.Object,
@@ -43,6 +46,7 @@ func StorageWithCacher(
 		CacheCapacity:        capacity,
 		Storage:              s,
 		Versioner:            etcdstorage.APIObjectVersioner{},
+		Copier:               copier,
 		Type:                 objectType,
 		ResourcePrefix:       resourcePrefix,
 		KeyFunc:              keyFunc,

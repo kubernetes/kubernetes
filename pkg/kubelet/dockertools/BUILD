@@ -52,8 +52,10 @@ go_library(
         "//pkg/util/procfs:go_default_library",
         "//pkg/util/selinux:go_default_library",
         "//pkg/util/strings:go_default_library",
+        "//pkg/util/tail:go_default_library",
         "//pkg/util/term:go_default_library",
         "//pkg/util/version:go_default_library",
+        "//vendor:github.com/armon/circbuf",
         "//vendor:github.com/docker/distribution/digest",
         "//vendor:github.com/docker/distribution/reference",
         "//vendor:github.com/docker/docker/pkg/jsonmessage",
@@ -74,8 +76,8 @@ go_library(
         "//vendor:k8s.io/apimachinery/pkg/util/errors",
         "//vendor:k8s.io/apimachinery/pkg/util/runtime",
         "//vendor:k8s.io/apimachinery/pkg/util/sets",
-        "//vendor:k8s.io/client-go/pkg/util/clock",
-        "//vendor:k8s.io/client-go/pkg/util/flowcontrol",
+        "//vendor:k8s.io/client-go/util/clock",
+        "//vendor:k8s.io/client-go/util/flowcontrol",
     ],
 )
 
@@ -88,6 +90,7 @@ go_test(
         "docker_manager_test.go",
         "docker_test.go",
         "images_test.go",
+        "kube_docker_client_test.go",
         "labels_test.go",
     ],
     data = [
@@ -99,7 +102,6 @@ go_test(
         "automanaged",
     ],
     deps = [
-        "//pkg/api:go_default_library",
         "//pkg/api/testapi:go_default_library",
         "//pkg/api/v1:go_default_library",
         "//pkg/apis/componentconfig:go_default_library",
@@ -128,12 +130,13 @@ go_test(
         "//vendor:github.com/golang/mock/gomock",
         "//vendor:github.com/google/cadvisor/info/v1",
         "//vendor:github.com/stretchr/testify/assert",
+        "//vendor:k8s.io/apimachinery/pkg/api/equality",
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
         "//vendor:k8s.io/apimachinery/pkg/runtime",
         "//vendor:k8s.io/apimachinery/pkg/types",
         "//vendor:k8s.io/apimachinery/pkg/util/sets",
-        "//vendor:k8s.io/client-go/pkg/util/clock",
-        "//vendor:k8s.io/client-go/pkg/util/flowcontrol",
+        "//vendor:k8s.io/client-go/util/clock",
+        "//vendor:k8s.io/client-go/util/flowcontrol",
     ],
 )
 

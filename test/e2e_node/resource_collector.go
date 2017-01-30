@@ -37,11 +37,11 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/stats"
 	"k8s.io/kubernetes/pkg/util/procfs"
-	"k8s.io/kubernetes/pkg/util/uuid"
 	"k8s.io/kubernetes/test/e2e/framework"
 
 	. "github.com/onsi/gomega"
@@ -374,7 +374,7 @@ func deletePodsSync(f *framework.Framework, pods []*v1.Pod) {
 		go func(pod *v1.Pod) {
 			defer wg.Done()
 
-			err := f.PodClient().Delete(pod.ObjectMeta.Name, v1.NewDeleteOptions(30))
+			err := f.PodClient().Delete(pod.ObjectMeta.Name, metav1.NewDeleteOptions(30))
 			Expect(err).NotTo(HaveOccurred())
 
 			Expect(framework.WaitForPodToDisappear(f.ClientSet, f.Namespace.Name, pod.ObjectMeta.Name, labels.Everything(),

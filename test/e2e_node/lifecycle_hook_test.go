@@ -21,9 +21,9 @@ import (
 	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/util/intstr"
-	"k8s.io/kubernetes/pkg/util/uuid"
 	"k8s.io/kubernetes/test/e2e/framework"
 
 	. "github.com/onsi/ginkgo"
@@ -60,7 +60,7 @@ var _ = framework.KubeDescribe("Container Lifecycle Hook", func() {
 					podClient.WaitForSuccess(podCheckHook.Name, postStartWaitTimeout)
 				}
 				By("delete the pod with lifecycle hook")
-				podClient.DeleteSync(podWithHook.Name, v1.NewDeleteOptions(15), podWaitTimeout)
+				podClient.DeleteSync(podWithHook.Name, metav1.NewDeleteOptions(15), podWaitTimeout)
 				if podWithHook.Spec.Containers[0].Lifecycle.PreStop != nil {
 					By("create the hook check pod")
 					podClient.Create(podCheckHook)
@@ -144,7 +144,7 @@ var _ = framework.KubeDescribe("Container Lifecycle Hook", func() {
 					}, postStartWaitTimeout, podCheckInterval).Should(BeNil())
 				}
 				By("delete the pod with lifecycle hook")
-				podClient.DeleteSync(podWithHook.Name, v1.NewDeleteOptions(15), podWaitTimeout)
+				podClient.DeleteSync(podWithHook.Name, metav1.NewDeleteOptions(15), podWaitTimeout)
 				if podWithHook.Spec.Containers[0].Lifecycle.PreStop != nil {
 					By("check prestop hook")
 					Eventually(func() error {

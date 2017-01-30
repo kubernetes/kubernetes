@@ -62,7 +62,7 @@ type nothingSelector struct{}
 
 func (n nothingSelector) Matches(_ Labels) bool              { return false }
 func (n nothingSelector) Empty() bool                        { return false }
-func (n nothingSelector) String() string                     { return "<null>" }
+func (n nothingSelector) String() string                     { return "" }
 func (n nothingSelector) Add(_ ...Requirement) Selector      { return n }
 func (n nothingSelector) Requirements() (Requirements, bool) { return nil, false }
 
@@ -793,7 +793,7 @@ func validateLabelValue(v string) error {
 // SelectorFromSet returns a Selector which will match exactly the given Set. A
 // nil and empty Sets are considered equivalent to Everything().
 func SelectorFromSet(ls Set) Selector {
-	if ls == nil {
+	if ls == nil || len(ls) == 0 {
 		return internalSelector{}
 	}
 	var requirements internalSelector
@@ -807,14 +807,14 @@ func SelectorFromSet(ls Set) Selector {
 	}
 	// sort to have deterministic string representation
 	sort.Sort(ByKey(requirements))
-	return internalSelector(requirements)
+	return requirements
 }
 
 // SelectorFromValidatedSet returns a Selector which will match exactly the given Set.
 // A nil and empty Sets are considered equivalent to Everything().
 // It assumes that Set is already validated and doesn't do any validation.
 func SelectorFromValidatedSet(ls Set) Selector {
-	if ls == nil {
+	if ls == nil || len(ls) == 0 {
 		return internalSelector{}
 	}
 	var requirements internalSelector
@@ -823,7 +823,7 @@ func SelectorFromValidatedSet(ls Set) Selector {
 	}
 	// sort to have deterministic string representation
 	sort.Sort(ByKey(requirements))
-	return internalSelector(requirements)
+	return requirements
 }
 
 // ParseToRequirements takes a string representing a selector and returns a list of

@@ -21,8 +21,8 @@ import (
 	"testing"
 	"time"
 
+	"k8s.io/apimachinery/pkg/util/httpstream"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/util/httpstream"
 )
 
 func TestPortForwardStreamReceived(t *testing.T) {

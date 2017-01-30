@@ -21,11 +21,11 @@ import (
 	"io"
 	"io/ioutil"
 	"path"
-	"strconv"
 
 	"github.com/renstrom/dedent"
 	"github.com/spf13/cobra"
 
+	"k8s.io/apimachinery/pkg/runtime"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmapiext "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha1"
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/validation"
@@ -33,12 +33,8 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/discovery"
 	kubemaster "k8s.io/kubernetes/cmd/kubeadm/app/master"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/apiconfig"
-
 	certphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/certs"
 	kubeconfigphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/kubeconfig"
-
-	"k8s.io/apimachinery/pkg/runtime"
-	netutil "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/kubernetes/cmd/kubeadm/app/preflight"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	"k8s.io/kubernetes/pkg/api"
@@ -67,11 +63,12 @@ func NewCmdInit(out io.Writer) *cobra.Command {
 
 	var cfgPath string
 	var skipPreFlight bool
+	var selfHosted bool
 	cmd := &cobra.Command{
 		Use:   "init",
 		Short: "Run this in order to set up the Kubernetes master",
 		Run: func(cmd *cobra.Command, args []string) {
-			i, err := NewInit(cfgPath, &cfg, skipPreFlight)
+			i, err := NewInit(cfgPath, &cfg, skipPreFlight, selfHosted)
 			kubeadmutil.CheckErr(err)
 			kubeadmutil.CheckErr(i.Validate())
 			kubeadmutil.CheckErr(i.Run(out))
@@ -116,7 +113,7 @@ func NewCmdInit(out io.Writer) *cobra.Command {
 
 	cmd.PersistentFlags().BoolVar(
 		&skipPreFlight, "skip-preflight-checks", skipPreFlight,
-		"skip preflight checks normally run before modifying the system",
+		"Skip preflight checks normally run before modifying the system",
 	)
 
 	cmd.PersistentFlags().Var(
@@ -124,14 +121,15 @@ func NewCmdInit(out io.Writer) *cobra.Command {
 		"The discovery method kubeadm will use for connecting nodes to the master",
 	)
 
+	cmd.PersistentFlags().BoolVar(
+		&selfHosted, "self-hosted", selfHosted,
+		"Enable self-hosted control plane",
+	)
+
 	return cmd
 }
 
-type Init struct {
-	cfg *kubeadmapi.MasterConfiguration
-}
-
-func NewInit(cfgPath string, cfg *kubeadmapi.MasterConfiguration, skipPreFlight bool) (*Init, error) {
+func NewInit(cfgPath string, cfg *kubeadmapi.MasterConfiguration, skipPreFlight bool, selfHosted bool) (*Init, error) {
 
 	fmt.Println("[kubeadm] WARNING: kubeadm is in alpha, please do not use it for production clusters.")
 
@@ -145,13 +143,10 @@ func NewInit(cfgPath string, cfg *kubeadmapi.MasterConfiguration, skipPreFlight 
 		}
 	}
 
-	// Auto-detect the IP
-	if len(cfg.API.AdvertiseAddresses) == 0 {
-		ip, err := netutil.ChooseHostInterface()
-		if err != nil {
-			return nil, err
-		}
-		cfg.API.AdvertiseAddresses = []string{ip.String()}
+	// Set defaults dynamically that the API group defaulting can't (by fetching information from the internet, looking up network interfaces, etc.)
+	err := setInitDynamicDefaults(cfg)
+	if err != nil {
+		return nil, err
 	}
 
 	if !skipPreFlight {
@@ -173,28 +168,15 @@ func NewInit(cfgPath string, cfg *kubeadmapi.MasterConfiguration, skipPreFlight 
 	// Try to start the kubelet service in case it's inactive
 	preflight.TryStartKubelet()
 
-	// validate version argument
-	ver, err := kubeadmutil.KubernetesReleaseVersion(cfg.KubernetesVersion)
-	if err != nil {
-		if cfg.KubernetesVersion != kubeadmapiext.DefaultKubernetesVersion {
-			return nil, err
-		} else {
-			ver = kubeadmapiext.DefaultKubernetesFallbackVersion
-		}
-	}
-	cfg.KubernetesVersion = ver
-	fmt.Println("[init] Using Kubernetes version:", ver)
-	fmt.Println("[init] Using Authorization mode:", cfg.AuthorizationMode)
-
-	// Warn about the limitations with the current cloudprovider solution.
-	if cfg.CloudProvider != "" {
-		fmt.Println("WARNING: For cloudprovider integrations to work --cloud-provider must be set for all kubelets in the cluster.")
-		fmt.Println("\t(/etc/systemd/system/kubelet.service.d/10-kubeadm.conf should be edited for this purpose)")
-	}
-
-	return &Init{cfg: cfg}, nil
+	return &Init{cfg: cfg, selfHosted: selfHosted}, nil
 }
 
+type Init struct {
+	cfg        *kubeadmapi.MasterConfiguration
+	selfHosted bool
+}
+
+// Validate validates configuration passed to "kubeadm init"
 func (i *Init) Validate() error {
 	return validation.ValidateMasterConfiguration(i.cfg).ToAggregate()
 }
@@ -202,36 +184,8 @@ func (i *Init) Validate() error {
 // Run executes master node provisioning, including certificates, needed static pod manifests, etc.
 func (i *Init) Run(out io.Writer) error {
 
-	// Validate token if any, otherwise generate
-	if i.cfg.Discovery.Token != nil {
-		if i.cfg.Discovery.Token.ID != "" && i.cfg.Discovery.Token.Secret != "" {
-			fmt.Printf("[token-discovery] A token has been provided, validating [%s]\n", kubeadmutil.BearerToken(i.cfg.Discovery.Token))
-			if valid, err := kubeadmutil.ValidateToken(i.cfg.Discovery.Token); valid == false {
-				return err
-			}
-		} else {
-			fmt.Println("[token-discovery] A token has not been provided, generating one")
-			if err := kubeadmutil.GenerateToken(i.cfg.Discovery.Token); err != nil {
-				return err
-			}
-		}
-
-		// Make sure there is at least one address
-		if len(i.cfg.Discovery.Token.Addresses) == 0 {
-			ip, err := netutil.ChooseHostInterface()
-			if err != nil {
-				return err
-			}
-			i.cfg.Discovery.Token.Addresses = []string{ip.String() + ":" + strconv.Itoa(kubeadmapiext.DefaultDiscoveryBindPort)}
-		}
-
-		if err := kubemaster.CreateTokenAuthFile(kubeadmutil.BearerToken(i.cfg.Discovery.Token)); err != nil {
-			return err
-		}
-	}
-
 	// PHASE 1: Generate certificates
-	caCert, err := certphase.CreatePKIAssets(i.cfg, kubeadmapi.GlobalEnvParams.HostPKIPath)
+	err := certphase.CreatePKIAssets(i.cfg, kubeadmapi.GlobalEnvParams.HostPKIPath)
 	if err != nil {
 		return err
 	}
@@ -245,6 +199,14 @@ func (i *Init) Run(out io.Writer) error {
 	err = kubeconfigphase.CreateAdminAndKubeletKubeConfig(masterEndpoint, kubeadmapi.GlobalEnvParams.HostPKIPath, kubeadmapi.GlobalEnvParams.KubernetesDir)
 	if err != nil {
 		return err
+	}
+
+	// TODO: It's not great to have an exception for token here, but necessary because the apiserver doesn't handle this properly in the API yet
+	// but relies on files on disk for now, which is daunting.
+	if i.cfg.Discovery.Token != nil {
+		if err := kubemaster.CreateTokenAuthFile(kubeadmutil.BearerToken(i.cfg.Discovery.Token)); err != nil {
+			return err
+		}
 	}
 
 	// Phase 3: Bootstrap the control plane
@@ -281,10 +243,20 @@ func (i *Init) Run(out io.Writer) error {
 
 	if i.cfg.Discovery.Token != nil {
 		fmt.Printf("[token-discovery] Using token: %s\n", kubeadmutil.BearerToken(i.cfg.Discovery.Token))
-		if err := kubemaster.CreateDiscoveryDeploymentAndSecret(i.cfg, client, caCert); err != nil {
+		if err := kubemaster.CreateDiscoveryDeploymentAndSecret(i.cfg, client); err != nil {
 			return err
 		}
 		if err := kubeadmutil.UpdateOrCreateToken(client, i.cfg.Discovery.Token, kubeadmutil.DefaultTokenDuration); err != nil {
+			return err
+		}
+	}
+
+	// Is deployment type self-hosted?
+	if i.selfHosted {
+		// Temporary control plane is up, now we create our self hosted control
+		// plane components and remove the static manifests:
+		fmt.Println("[init] Creating self-hosted control plane...")
+		if err := kubemaster.CreateSelfHostedControlPlane(i.cfg, client); err != nil {
 			return err
 		}
 	}

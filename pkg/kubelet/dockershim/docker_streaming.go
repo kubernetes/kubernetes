@@ -86,7 +86,7 @@ func (ds *dockerService) Exec(req *runtimeapi.ExecRequest) (*runtimeapi.ExecResp
 	if ds.streamingServer == nil {
 		return nil, streaming.ErrorStreamingDisabled("exec")
 	}
-	_, err := checkContainerStatus(ds.client, req.GetContainerId())
+	_, err := checkContainerStatus(ds.client, req.ContainerId)
 	if err != nil {
 		return nil, err
 	}
@@ -98,7 +98,7 @@ func (ds *dockerService) Attach(req *runtimeapi.AttachRequest) (*runtimeapi.Atta
 	if ds.streamingServer == nil {
 		return nil, streaming.ErrorStreamingDisabled("attach")
 	}
-	_, err := checkContainerStatus(ds.client, req.GetContainerId())
+	_, err := checkContainerStatus(ds.client, req.ContainerId)
 	if err != nil {
 		return nil, err
 	}
@@ -110,7 +110,7 @@ func (ds *dockerService) PortForward(req *runtimeapi.PortForwardRequest) (*runti
 	if ds.streamingServer == nil {
 		return nil, streaming.ErrorStreamingDisabled("port forward")
 	}
-	_, err := checkContainerStatus(ds.client, req.GetPodSandboxId())
+	_, err := checkContainerStatus(ds.client, req.PodSandboxId)
 	if err != nil {
 		return nil, err
 	}

@@ -21,8 +21,8 @@ import (
 	"strings"
 	"testing"
 
+	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/kubernetes/pkg/api/resource"
 )
 
 func TestConversionError(t *testing.T) {

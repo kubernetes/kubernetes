@@ -24,6 +24,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
@@ -96,7 +97,7 @@ func dumpClusterInfo(f cmdutil.Factory, cmd *cobra.Command, args []string, out i
 		return err
 	}
 
-	nodes, err := clientset.Core().Nodes().List(api.ListOptions{})
+	nodes, err := clientset.Core().Nodes().List(metav1.ListOptions{})
 	if err != nil {
 		return err
 	}
@@ -107,7 +108,7 @@ func dumpClusterInfo(f cmdutil.Factory, cmd *cobra.Command, args []string, out i
 
 	var namespaces []string
 	if cmdutil.GetFlagBool(cmd, "all-namespaces") {
-		namespaceList, err := clientset.Core().Namespaces().List(api.ListOptions{})
+		namespaceList, err := clientset.Core().Namespaces().List(metav1.ListOptions{})
 		if err != nil {
 			return err
 		}
@@ -122,7 +123,7 @@ func dumpClusterInfo(f cmdutil.Factory, cmd *cobra.Command, args []string, out i
 				return err
 			}
 			namespaces = []string{
-				api.NamespaceSystem,
+				metav1.NamespaceSystem,
 				cmdNamespace,
 			}
 		}
@@ -130,7 +131,7 @@ func dumpClusterInfo(f cmdutil.Factory, cmd *cobra.Command, args []string, out i
 	for _, namespace := range namespaces {
 		// TODO: this is repetitive in the extreme.  Use reflection or
 		// something to make this a for loop.
-		events, err := clientset.Core().Events(namespace).List(api.ListOptions{})
+		events, err := clientset.Core().Events(namespace).List(metav1.ListOptions{})
 		if err != nil {
 			return err
 		}
@@ -138,7 +139,7 @@ func dumpClusterInfo(f cmdutil.Factory, cmd *cobra.Command, args []string, out i
 			return err
 		}
 
-		rcs, err := clientset.Core().ReplicationControllers(namespace).List(api.ListOptions{})
+		rcs, err := clientset.Core().ReplicationControllers(namespace).List(metav1.ListOptions{})
 		if err != nil {
 			return err
 		}
@@ -146,7 +147,7 @@ func dumpClusterInfo(f cmdutil.Factory, cmd *cobra.Command, args []string, out i
 			return err
 		}
 
-		svcs, err := clientset.Core().Services(namespace).List(api.ListOptions{})
+		svcs, err := clientset.Core().Services(namespace).List(metav1.ListOptions{})
 		if err != nil {
 			return err
 		}
@@ -154,7 +155,7 @@ func dumpClusterInfo(f cmdutil.Factory, cmd *cobra.Command, args []string, out i
 			return err
 		}
 
-		sets, err := clientset.Extensions().DaemonSets(namespace).List(api.ListOptions{})
+		sets, err := clientset.Extensions().DaemonSets(namespace).List(metav1.ListOptions{})
 		if err != nil {
 			return err
 		}
@@ -162,7 +163,7 @@ func dumpClusterInfo(f cmdutil.Factory, cmd *cobra.Command, args []string, out i
 			return err
 		}
 
-		deps, err := clientset.Extensions().Deployments(namespace).List(api.ListOptions{})
+		deps, err := clientset.Extensions().Deployments(namespace).List(metav1.ListOptions{})
 		if err != nil {
 			return err
 		}
@@ -170,7 +171,7 @@ func dumpClusterInfo(f cmdutil.Factory, cmd *cobra.Command, args []string, out i
 			return err
 		}
 
-		rps, err := clientset.Extensions().ReplicaSets(namespace).List(api.ListOptions{})
+		rps, err := clientset.Extensions().ReplicaSets(namespace).List(metav1.ListOptions{})
 		if err != nil {
 			return err
 		}
@@ -178,7 +179,7 @@ func dumpClusterInfo(f cmdutil.Factory, cmd *cobra.Command, args []string, out i
 			return err
 		}
 
-		pods, err := clientset.Core().Pods(namespace).List(api.ListOptions{})
+		pods, err := clientset.Core().Pods(namespace).List(metav1.ListOptions{})
 		if err != nil {
 			return err
 		}

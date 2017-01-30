@@ -40,7 +40,7 @@ func (m *kubeGenericRuntimeManager) PullImage(image kubecontainer.ImageSpec, pul
 		return "", err
 	}
 
-	imgSpec := &runtimeapi.ImageSpec{Image: &img}
+	imgSpec := &runtimeapi.ImageSpec{Image: img}
 	creds, withCredentials := keyring.Lookup(repoToPull)
 	if !withCredentials {
 		glog.V(3).Infof("Pulling image %q without credentials", img)
@@ -58,12 +58,12 @@ func (m *kubeGenericRuntimeManager) PullImage(image kubecontainer.ImageSpec, pul
 	for _, currentCreds := range creds {
 		authConfig := credentialprovider.LazyProvide(currentCreds)
 		auth := &runtimeapi.AuthConfig{
-			Username:      &authConfig.Username,
-			Password:      &authConfig.Password,
-			Auth:          &authConfig.Auth,
-			ServerAddress: &authConfig.ServerAddress,
-			IdentityToken: &authConfig.IdentityToken,
-			RegistryToken: &authConfig.RegistryToken,
+			Username:      authConfig.Username,
+			Password:      authConfig.Password,
+			Auth:          authConfig.Auth,
+			ServerAddress: authConfig.ServerAddress,
+			IdentityToken: authConfig.IdentityToken,
+			RegistryToken: authConfig.RegistryToken,
 		}
 
 		imageRef, err := m.imageService.PullImage(imgSpec, auth)
@@ -81,7 +81,7 @@ func (m *kubeGenericRuntimeManager) PullImage(image kubecontainer.ImageSpec, pul
 // GetImageRef gets the reference (digest or ID) of the image which has already been in
 // the local storage. It returns ("", nil) if the image isn't in the local storage.
 func (m *kubeGenericRuntimeManager) GetImageRef(image kubecontainer.ImageSpec) (string, error) {
-	status, err := m.imageService.ImageStatus(&runtimeapi.ImageSpec{Image: &image.Image})
+	status, err := m.imageService.ImageStatus(&runtimeapi.ImageSpec{Image: image.Image})
 	if err != nil {
 		glog.Errorf("ImageStatus for image %q failed: %v", image, err)
 		return "", err
@@ -90,7 +90,7 @@ func (m *kubeGenericRuntimeManager) GetImageRef(image kubecontainer.ImageSpec) (
 		return "", nil
 	}
 
-	imageRef := status.GetId()
+	imageRef := status.Id
 	if len(status.RepoDigests) > 0 {
 		imageRef = status.RepoDigests[0]
 	}
@@ -109,8 +109,8 @@ func (m *kubeGenericRuntimeManager) ListImages() ([]kubecontainer.Image, error) 
 
 	for _, img := range allImages {
 		images = append(images, kubecontainer.Image{
-			ID:          img.GetId(),
-			Size:        int64(img.GetSize_()),
+			ID:          img.Id,
+			Size:        int64(img.Size_),
 			RepoTags:    img.RepoTags,
 			RepoDigests: img.RepoDigests,
 		})
@@ -121,7 +121,7 @@ func (m *kubeGenericRuntimeManager) ListImages() ([]kubecontainer.Image, error) 
 
 // RemoveImage removes the specified image.
 func (m *kubeGenericRuntimeManager) RemoveImage(image kubecontainer.ImageSpec) error {
-	err := m.imageService.RemoveImage(&runtimeapi.ImageSpec{Image: &image.Image})
+	err := m.imageService.RemoveImage(&runtimeapi.ImageSpec{Image: image.Image})
 	if err != nil {
 		glog.Errorf("Remove image %q failed: %v", image.Image, err)
 		return err
@@ -142,7 +142,7 @@ func (m *kubeGenericRuntimeManager) ImageStats() (*kubecontainer.ImageStats, err
 	}
 	stats := &kubecontainer.ImageStats{}
 	for _, img := range allImages {
-		stats.TotalStorageBytes += img.GetSize_()
+		stats.TotalStorageBytes += img.Size_
 	}
 	return stats, nil
 }

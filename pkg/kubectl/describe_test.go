@@ -25,11 +25,12 @@ import (
 	"testing"
 	"time"
 
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/federation/apis/federation"
 	fedfake "k8s.io/kubernetes/federation/client/clientset_generated/federation_internalclientset/fake"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
@@ -201,6 +202,7 @@ func VerifyDatesInOrder(
 }
 
 func TestDescribeContainers(t *testing.T) {
+	trueVal := true
 	testCases := []struct {
 		container        api.Container
 		status           api.ContainerStatus
@@ -295,7 +297,7 @@ func TestDescribeContainers(t *testing.T) {
 				Ready:        true,
 				RestartCount: 7,
 			},
-			expectedElements: []string{"test", "State", "Waiting", "Ready", "True", "Restart Count", "7", "Image", "image", "envname", "xyz", "a123\tConfigMap"},
+			expectedElements: []string{"test", "State", "Waiting", "Ready", "True", "Restart Count", "7", "Image", "image", "envname", "xyz", "a123\tConfigMap\tOptional: false"},
 		},
 		{
 			container: api.Container{Name: "test", Image: "image", Env: []api.EnvVar{{Name: "envname", Value: "xyz"}}, EnvFrom: []api.EnvFromSource{{Prefix: "p_", ConfigMapRef: &api.ConfigMapEnvSource{LocalObjectReference: api.LocalObjectReference{Name: "a123"}}}}},
@@ -304,7 +306,34 @@ func TestDescribeContainers(t *testing.T) {
 				Ready:        true,
 				RestartCount: 7,
 			},
-			expectedElements: []string{"test", "State", "Waiting", "Ready", "True", "Restart Count", "7", "Image", "image", "envname", "xyz", "a123\tConfigMap with prefix 'p_'"},
+			expectedElements: []string{"test", "State", "Waiting", "Ready", "True", "Restart Count", "7", "Image", "image", "envname", "xyz", "a123\tConfigMap with prefix 'p_'\tOptional: false"},
+		},
+		{
+			container: api.Container{Name: "test", Image: "image", Env: []api.EnvVar{{Name: "envname", Value: "xyz"}}, EnvFrom: []api.EnvFromSource{{ConfigMapRef: &api.ConfigMapEnvSource{Optional: &trueVal, LocalObjectReference: api.LocalObjectReference{Name: "a123"}}}}},
+			status: api.ContainerStatus{
+				Name:         "test",
+				Ready:        true,
+				RestartCount: 7,
+			},
+			expectedElements: []string{"test", "State", "Waiting", "Ready", "True", "Restart Count", "7", "Image", "image", "envname", "xyz", "a123\tConfigMap\tOptional: true"},
+		},
+		{
+			container: api.Container{Name: "test", Image: "image", Env: []api.EnvVar{{Name: "envname", Value: "xyz"}}, EnvFrom: []api.EnvFromSource{{SecretRef: &api.SecretEnvSource{LocalObjectReference: api.LocalObjectReference{Name: "a123"}, Optional: &trueVal}}}},
+			status: api.ContainerStatus{
+				Name:         "test",
+				Ready:        true,
+				RestartCount: 7,
+			},
+			expectedElements: []string{"test", "State", "Waiting", "Ready", "True", "Restart Count", "7", "Image", "image", "envname", "xyz", "a123\tSecret\tOptional: true"},
+		},
+		{
+			container: api.Container{Name: "test", Image: "image", Env: []api.EnvVar{{Name: "envname", Value: "xyz"}}, EnvFrom: []api.EnvFromSource{{Prefix: "p_", SecretRef: &api.SecretEnvSource{LocalObjectReference: api.LocalObjectReference{Name: "a123"}}}}},
+			status: api.ContainerStatus{
+				Name:         "test",
+				Ready:        true,
+				RestartCount: 7,
+			},
+			expectedElements: []string{"test", "State", "Waiting", "Ready", "True", "Restart Count", "7", "Image", "image", "envname", "xyz", "a123\tSecret with prefix 'p_'\tOptional: false"},
 		},
 		// Command
 		{
@@ -535,7 +564,7 @@ func TestGetPodsTotalRequests(t *testing.T) {
 		if err != nil {
 			t.Errorf("Unexpected error %v", err)
 		}
-		if !api.Semantic.DeepEqual(reqs, testCase.expectedReqs) {
+		if !apiequality.Semantic.DeepEqual(reqs, testCase.expectedReqs) {
 			t.Errorf("Expected %v, got %v", testCase.expectedReqs, reqs)
 		}
 	}

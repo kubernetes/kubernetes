@@ -17,6 +17,7 @@ limitations under the License.
 package serviceaccount
 
 import (
+	metainternalversion "k8s.io/apimachinery/pkg/apis/meta/internalversion"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/watch"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
@@ -26,8 +27,8 @@ import (
 
 // Registry is an interface implemented by things that know how to store ServiceAccount objects.
 type Registry interface {
-	ListServiceAccounts(ctx genericapirequest.Context, options *api.ListOptions) (*api.ServiceAccountList, error)
-	WatchServiceAccounts(ctx genericapirequest.Context, options *api.ListOptions) (watch.Interface, error)
+	ListServiceAccounts(ctx genericapirequest.Context, options *metainternalversion.ListOptions) (*api.ServiceAccountList, error)
+	WatchServiceAccounts(ctx genericapirequest.Context, options *metainternalversion.ListOptions) (watch.Interface, error)
 	GetServiceAccount(ctx genericapirequest.Context, name string, options *metav1.GetOptions) (*api.ServiceAccount, error)
 	CreateServiceAccount(ctx genericapirequest.Context, ServiceAccount *api.ServiceAccount) error
 	UpdateServiceAccount(ctx genericapirequest.Context, ServiceAccount *api.ServiceAccount) error
@@ -45,7 +46,7 @@ func NewRegistry(s rest.StandardStorage) Registry {
 	return &storage{s}
 }
 
-func (s *storage) ListServiceAccounts(ctx genericapirequest.Context, options *api.ListOptions) (*api.ServiceAccountList, error) {
+func (s *storage) ListServiceAccounts(ctx genericapirequest.Context, options *metainternalversion.ListOptions) (*api.ServiceAccountList, error) {
 	obj, err := s.List(ctx, options)
 	if err != nil {
 		return nil, err
@@ -53,7 +54,7 @@ func (s *storage) ListServiceAccounts(ctx genericapirequest.Context, options *ap
 	return obj.(*api.ServiceAccountList), nil
 }
 
-func (s *storage) WatchServiceAccounts(ctx genericapirequest.Context, options *api.ListOptions) (watch.Interface, error) {
+func (s *storage) WatchServiceAccounts(ctx genericapirequest.Context, options *metainternalversion.ListOptions) (watch.Interface, error) {
 	return s.Watch(ctx, options)
 }
 

@@ -21,9 +21,9 @@ import (
 	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/util/intstr"
-	"k8s.io/kubernetes/pkg/util/uuid"
 	"k8s.io/kubernetes/test/e2e/framework"
 	testutils "k8s.io/kubernetes/test/utils"
 
@@ -353,7 +353,7 @@ func runLivenessTest(f *framework.Framework, pod *v1.Pod, expectNumRestarts int,
 	// At the end of the test, clean up by removing the pod.
 	defer func() {
 		By("deleting the pod")
-		podClient.Delete(pod.Name, v1.NewDeleteOptions(0))
+		podClient.Delete(pod.Name, metav1.NewDeleteOptions(0))
 	}()
 	By(fmt.Sprintf("Creating pod %s in namespace %s", pod.Name, ns))
 	podClient.Create(pod)

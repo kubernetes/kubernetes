@@ -25,7 +25,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer/recognizer"
 	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/kubernetes/pkg/storage/storagebackend"
+	"k8s.io/apiserver/pkg/storage/storagebackend"
 
 	"github.com/golang/glog"
 )

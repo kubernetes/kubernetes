@@ -17,10 +17,13 @@ limitations under the License.
 package componentconfig
 
 import (
+	"fmt"
+	"sort"
+	"strings"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/kubernetes/pkg/api"
-	utilconfig "k8s.io/kubernetes/pkg/util/config"
 )
 
 type KubeProxyConfiguration struct {
@@ -89,11 +92,10 @@ type KubeProxyConfiguration struct {
 }
 
 // Currently two modes of proxying are available: 'userspace' (older, stable) or 'iptables'
-// (newer, faster). If blank, look at the Node object on the Kubernetes API and respect the
-// 'net.experimental.kubernetes.io/proxy-mode' annotation if provided.  Otherwise use the
-// best-available proxy (currently iptables, but may change in future versions).  If the
-// iptables proxy is selected, regardless of how, but the system's kernel or iptables
-// versions are insufficient, this always falls back to the userspace proxy.
+// (newer, faster). If blank, use the best-available proxy (currently iptables, but may
+// change in future versions).  If the iptables proxy is selected, regardless of how, but
+// the system's kernel or iptables versions are insufficient, this always falls back to the
+// userspace proxy.
 type ProxyMode string
 
 const (
@@ -445,12 +447,12 @@ type KubeletConfiguration struct {
 	// that describe resources reserved for non-kubernetes components.
 	// Currently only cpu and memory are supported. [default=none]
 	// See http://kubernetes.io/docs/user-guide/compute-resources for more detail.
-	SystemReserved utilconfig.ConfigurationMap
+	SystemReserved ConfigurationMap
 	// A set of ResourceName=ResourceQuantity (e.g. cpu=200m,memory=150G) pairs
 	// that describe resources reserved for kubernetes system components.
 	// Currently only cpu and memory are supported. [default=none]
 	// See http://kubernetes.io/docs/user-guide/compute-resources for more detail.
-	KubeReserved utilconfig.ConfigurationMap
+	KubeReserved ConfigurationMap
 	// Default behaviour for kernel tuning
 	ProtectKernelDefaults bool
 	// If true, Kubelet ensures a set of iptables rules are present on host.
@@ -481,6 +483,9 @@ type KubeletConfiguration struct {
 	// (binaries, etc.) to mount the volume are available on the underlying node. If the check is enabled
 	// and fails the mount operation fails.
 	ExperimentalCheckNodeCapabilitiesBeforeMount bool
+	// This flag, if set, instructs the kubelet to keep volumes from terminated pods mounted to the node.
+	// This can be useful for debugging volume related issues.
+	KeepTerminatedPodVolumes bool
 }
 
 type KubeletAuthorizationMode string
@@ -859,4 +864,34 @@ type AdmissionPluginConfiguration struct {
 	// configuration. If present, it will be used instead of the path to the configuration file.
 	// +optional
 	Configuration runtime.Object
+}
+
+type ConfigurationMap map[string]string
+
+func (m *ConfigurationMap) String() string {
+	pairs := []string{}
+	for k, v := range *m {
+		pairs = append(pairs, fmt.Sprintf("%s=%s", k, v))
+	}
+	sort.Strings(pairs)
+	return strings.Join(pairs, ",")
+}
+
+func (m *ConfigurationMap) Set(value string) error {
+	for _, s := range strings.Split(value, ",") {
+		if len(s) == 0 {
+			continue
+		}
+		arr := strings.SplitN(s, "=", 2)
+		if len(arr) == 2 {
+			(*m)[strings.TrimSpace(arr[0])] = strings.TrimSpace(arr[1])
+		} else {
+			(*m)[strings.TrimSpace(arr[0])] = ""
+		}
+	}
+	return nil
+}
+
+func (*ConfigurationMap) Type() string {
+	return "mapStringString"
 }

@@ -136,8 +136,8 @@ parameters:
   kind: StorageClass
   metadata:
     name: fast
-    provisioner: kubernetes.io/rbd
-    parameters:
+  provisioner: kubernetes.io/rbd
+  parameters:
     monitors: 10.16.153.105:6789
     adminId: kube
     adminSecretName: ceph-secret

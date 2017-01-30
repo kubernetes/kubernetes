@@ -26,7 +26,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/v1"
 	extensions "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	"k8s.io/kubernetes/test/e2e/framework"
 
@@ -163,7 +162,7 @@ var _ = Describe("ThirdParty resources [Flaky] [Disruptive]", func() {
 			// Need to manually do the serialization because otherwise the
 			// Content-Type header is set to protobuf, the thirdparty codec in
 			// the API server side only accepts JSON.
-			deleteOptionsData, err := json.Marshal(v1.NewDeleteOptions(10))
+			deleteOptionsData, err := json.Marshal(metav1.NewDeleteOptions(10))
 			framework.ExpectNoError(err)
 			if _, err := f.ClientSet.Core().RESTClient().Delete().
 				AbsPath("/apis/company.com/v1/namespaces/default/foos/foo").

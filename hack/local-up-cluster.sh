@@ -318,6 +318,14 @@ cleanup()
   exit 0
 }
 
+function warning {
+  message=$1
+
+  echo $(tput bold)$(tput setaf 1)
+  echo "WARNING: ${message}"
+  echo $(tput sgr0)
+}
+
 function start_etcd {
     echo "Starting etcd"
     kube::etcd::start
@@ -536,6 +544,7 @@ function start_kubelet {
         --experimental-cgroups-per-qos=${EXPERIMENTAL_CGROUPS_PER_QOS} \
         --cgroup-driver=${CGROUP_DRIVER} \
         --cgroup-root=${CGROUP_ROOT} \
+        --keep-terminated-pod-volumes=true \
         ${auth_args} \
         ${dns_args} \
         ${net_plugin_dir_args} \
@@ -726,7 +735,20 @@ if [[ "${START_MODE}" != "kubeletonly" ]]; then
 fi
 
 if [[ "${START_MODE}" != "nokubelet" ]]; then
-  start_kubelet
+  ## TODO remove this check if/when kubelet is supported on darwin
+  # Detect the OS name/arch and display appropriate error.
+    case "$(uname -s)" in
+      Darwin)
+        warning "kubelet is not currently supported in darwin, kubelet aborted."
+        KUBELET_LOG=""
+        ;;
+      Linux)
+        start_kubelet
+        ;;
+      *)
+        warning "Unsupported host OS.  Must be Linux or Mac OS X, kubelet aborted."
+        ;;
+    esac
 fi
 
 if [[ -n "${PSP_ADMISSION}" && "${ENABLE_RBAC}" = true ]]; then
@@ -738,3 +760,5 @@ print_success
 if [[ "${ENABLE_DAEMON}" = false ]]; then
    while true; do sleep 1; done
 fi
+
+

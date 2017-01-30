@@ -21,18 +21,19 @@ import (
 	"testing"
 	"time"
 
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
+	restclient "k8s.io/client-go/rest"
+	core "k8s.io/client-go/testing"
+	"k8s.io/client-go/tools/cache"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
 	batch "k8s.io/kubernetes/pkg/apis/batch/v1"
-	"k8s.io/kubernetes/pkg/client/cache"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset/fake"
-	"k8s.io/kubernetes/pkg/client/restclient"
-	"k8s.io/kubernetes/pkg/client/testing/core"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/informers"
 )
@@ -43,7 +44,7 @@ func newJob(parallelism, completions int32) *batch.Job {
 	j := &batch.Job{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "foobar",
-			Namespace: v1.NamespaceDefault,
+			Namespace: metav1.NamespaceDefault,
 		},
 		Spec: batch.JobSpec{
 			Selector: &metav1.LabelSelector{
@@ -526,7 +527,7 @@ func TestJobPodLookup(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{Name: "basic"},
 			},
 			pod: &v1.Pod{
-				ObjectMeta: metav1.ObjectMeta{Name: "foo1", Namespace: v1.NamespaceAll},
+				ObjectMeta: metav1.ObjectMeta{Name: "foo1", Namespace: metav1.NamespaceAll},
 			},
 			expectedName: "",
 		},
@@ -656,7 +657,7 @@ func TestWatchJobs(t *testing.T) {
 			t.Errorf("Expected to find job under key %v: %v", key, err)
 			return nil
 		}
-		if !api.Semantic.DeepDerivative(*job, testJob) {
+		if !apiequality.Semantic.DeepDerivative(*job, testJob) {
 			t.Errorf("Expected %#v, but got %#v", testJob, *job)
 		}
 		return nil
@@ -699,7 +700,7 @@ func TestWatchPods(t *testing.T) {
 		if err != nil {
 			t.Errorf("Expected to find job under key %v: %v", key, err)
 		}
-		if !api.Semantic.DeepDerivative(job, testJob) {
+		if !apiequality.Semantic.DeepDerivative(job, testJob) {
 			t.Errorf("\nExpected %#v,\nbut got %#v", testJob, job)
 			close(received)
 			return nil

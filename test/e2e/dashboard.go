@@ -21,9 +21,9 @@ import (
 	"net/http"
 	"time"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/test/e2e/framework"
 	testutils "k8s.io/kubernetes/test/utils"
 
@@ -35,7 +35,7 @@ var _ = framework.KubeDescribe("Kubernetes Dashboard", func() {
 	const (
 		uiServiceName = "kubernetes-dashboard"
 		uiAppName     = uiServiceName
-		uiNamespace   = api.NamespaceSystem
+		uiNamespace   = metav1.NamespaceSystem
 
 		serverStartTimeout = 1 * time.Minute
 	)

@@ -1,10 +1,15 @@
 reviewers:
-  - madhusudancs
-  - mml
-  - nikhiljindal
   - colhom
+  - csbell
+  - irfanurrehman
+  - madhusudancs
+  - mwielgus
+  - nikhiljindal
+  - quinton-hoole
+  - shashidharatd
 approvers:
+  - csbell
   - madhusudancs
-  - mml
+  - mwielgus
   - nikhiljindal
-  - colhom
+  - quinton-hoole

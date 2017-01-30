@@ -21,10 +21,10 @@ import (
 
 	"github.com/spf13/pflag"
 
+	"k8s.io/apiserver/pkg/authorization/authorizerfactory"
 	authorizationclient "k8s.io/client-go/kubernetes/typed/authorization/v1beta1"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
-	"k8s.io/kubernetes/pkg/genericapiserver/authorizer"
 )
 
 // DelegatingAuthorizationOptions provides an easy way for composing API servers to delegate their authorization to
@@ -69,13 +69,13 @@ func (s *DelegatingAuthorizationOptions) AddFlags(fs *pflag.FlagSet) {
 		"The duration to cache 'unauthorized' responses from the webhook authorizer.")
 }
 
-func (s *DelegatingAuthorizationOptions) ToAuthorizationConfig() (authorizer.DelegatingAuthorizerConfig, error) {
+func (s *DelegatingAuthorizationOptions) ToAuthorizationConfig() (authorizerfactory.DelegatingAuthorizerConfig, error) {
 	sarClient, err := s.newSubjectAccessReview()
 	if err != nil {
-		return authorizer.DelegatingAuthorizerConfig{}, err
+		return authorizerfactory.DelegatingAuthorizerConfig{}, err
 	}
 
-	ret := authorizer.DelegatingAuthorizerConfig{
+	ret := authorizerfactory.DelegatingAuthorizerConfig{
 		SubjectAccessReviewClient: sarClient,
 		AllowCacheTTL:             s.AllowCacheTTL,
 		DenyCacheTTL:              s.DenyCacheTTL,

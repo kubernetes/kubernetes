@@ -21,7 +21,6 @@ go_library(
         "//pkg/api:go_default_library",
         "//pkg/api/v1:go_default_library",
         "//pkg/apis/extensions/v1beta1:go_default_library",
-        "//pkg/client/cache:go_default_library",
         "//pkg/client/clientset_generated/clientset:go_default_library",
         "//pkg/client/record:go_default_library",
         "//pkg/controller:go_default_library",
@@ -32,7 +31,8 @@ go_library(
         "//vendor:k8s.io/apimachinery/pkg/runtime/schema",
         "//vendor:k8s.io/apimachinery/pkg/types",
         "//vendor:k8s.io/apimachinery/pkg/watch",
-        "//vendor:k8s.io/client-go/pkg/util/flowcontrol",
+        "//vendor:k8s.io/client-go/tools/cache",
+        "//vendor:k8s.io/client-go/util/flowcontrol",
     ],
 )
 
@@ -49,7 +49,6 @@ go_test(
         "//federation/pkg/federation-controller/util/test:go_default_library",
         "//pkg/api/v1:go_default_library",
         "//pkg/apis/extensions/v1beta1:go_default_library",
-        "//pkg/client/cache:go_default_library",
         "//pkg/client/clientset_generated/clientset:go_default_library",
         "//pkg/client/clientset_generated/clientset/fake:go_default_library",
         "//vendor:github.com/golang/glog",
@@ -59,6 +58,7 @@ go_test(
         "//vendor:k8s.io/apimachinery/pkg/runtime",
         "//vendor:k8s.io/apimachinery/pkg/types",
         "//vendor:k8s.io/apimachinery/pkg/util/wait",
+        "//vendor:k8s.io/client-go/tools/cache",
     ],
 )
 

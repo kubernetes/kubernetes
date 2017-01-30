@@ -21,8 +21,6 @@ import (
 	"fmt"
 	"strings"
 
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/selection"
 	"k8s.io/apimachinery/pkg/types"
@@ -49,7 +47,7 @@ func OpaqueIntResourceName(name string) ResourceName {
 // NewDeleteOptions returns a DeleteOptions indicating the resource should
 // be deleted within the specified grace period. Use zero to indicate
 // immediate deletion. If you would prefer to use the default grace period,
-// use &api.DeleteOptions{} directly.
+// use &metav1.DeleteOptions{} directly.
 func NewDeleteOptions(grace int64) *DeleteOptions {
 	return &DeleteOptions{GracePeriodSeconds: &grace}
 }
@@ -89,14 +87,6 @@ var standardFinalizers = sets.NewString(
 
 func IsStandardFinalizerName(str string) bool {
 	return standardFinalizers.Has(str)
-}
-
-// SingleObject returns a ListOptions for watching a single object.
-func SingleObject(meta metav1.ObjectMeta) ListOptions {
-	return ListOptions{
-		FieldSelector:   fields.OneTermEqualSelector("metadata.name", meta.Name).String(),
-		ResourceVersion: meta.ResourceVersion,
-	}
 }
 
 // AddToNodeAddresses appends the NodeAddresses to the passed-by-pointer slice,
@@ -243,10 +233,6 @@ func NodeSelectorRequirementsAsSelector(nsm []NodeSelectorRequirement) (labels.S
 }
 
 const (
-	// AffinityAnnotationKey represents the key of affinity data (json serialized)
-	// in the Annotations of a Pod.
-	AffinityAnnotationKey string = "scheduler.alpha.kubernetes.io/affinity"
-
 	// TolerationsAnnotationKey represents the key of tolerations data (json serialized)
 	// in the Annotations of a Pod.
 	TolerationsAnnotationKey string = "scheduler.alpha.kubernetes.io/tolerations"
@@ -285,20 +271,6 @@ const (
 	// will fail to launch.
 	UnsafeSysctlsPodAnnotationKey string = "security.alpha.kubernetes.io/unsafe-sysctls"
 )
-
-// GetAffinityFromPod gets the json serialized affinity data from Pod.Annotations
-// and converts it to the Affinity type in api.
-func GetAffinityFromPodAnnotations(annotations map[string]string) (*Affinity, error) {
-	if len(annotations) > 0 && annotations[AffinityAnnotationKey] != "" {
-		var affinity Affinity
-		err := json.Unmarshal([]byte(annotations[AffinityAnnotationKey]), &affinity)
-		if err != nil {
-			return nil, err
-		}
-		return &affinity, nil
-	}
-	return nil, nil
-}
 
 // GetTolerationsFromPodAnnotations gets the json serialized tolerations data from Pod.Annotations
 // and converts it to the []Toleration type in api.

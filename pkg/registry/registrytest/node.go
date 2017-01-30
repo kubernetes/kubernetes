@@ -20,6 +20,7 @@ import (
 	"sync"
 
 	"k8s.io/apimachinery/pkg/api/errors"
+	metainternalversion "k8s.io/apimachinery/pkg/apis/meta/internalversion"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/watch"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
@@ -59,7 +60,7 @@ func (r *NodeRegistry) SetError(err error) {
 	r.Err = err
 }
 
-func (r *NodeRegistry) ListNodes(ctx genericapirequest.Context, options *api.ListOptions) (*api.NodeList, error) {
+func (r *NodeRegistry) ListNodes(ctx genericapirequest.Context, options *metainternalversion.ListOptions) (*api.NodeList, error) {
 	r.Lock()
 	defer r.Unlock()
 	return &r.Nodes, r.Err
@@ -112,6 +113,6 @@ func (r *NodeRegistry) DeleteNode(ctx genericapirequest.Context, nodeID string) 
 	return r.Err
 }
 
-func (r *NodeRegistry) WatchNodes(ctx genericapirequest.Context, options *api.ListOptions) (watch.Interface, error) {
+func (r *NodeRegistry) WatchNodes(ctx genericapirequest.Context, options *metainternalversion.ListOptions) (watch.Interface, error) {
 	return nil, r.Err
 }

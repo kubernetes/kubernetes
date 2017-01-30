@@ -22,7 +22,7 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	pkgruntime "k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/kubernetes/pkg/client/cache"
+	"k8s.io/client-go/tools/cache"
 )
 
 // Returns cache.ResourceEventHandlerFuncs that trigger the given function

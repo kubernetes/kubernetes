@@ -35,6 +35,11 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	utilflag "k8s.io/apiserver/pkg/util/flag"
+	"k8s.io/client-go/discovery"
+	restclient "k8s.io/client-go/rest"
+	"k8s.io/client-go/tools/clientcmd"
+	"k8s.io/client-go/util/homedir"
 	fedclientset "k8s.io/kubernetes/federation/client/clientset_generated/federation_internalclientset"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/service"
@@ -42,14 +47,8 @@ import (
 	"k8s.io/kubernetes/pkg/apis/batch"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
-	"k8s.io/kubernetes/pkg/client/restclient"
-	"k8s.io/kubernetes/pkg/client/typed/discovery"
-	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
 	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
-	"k8s.io/kubernetes/pkg/registry/extensions/thirdpartyresourcedata"
-	utilflag "k8s.io/kubernetes/pkg/util/flag"
-	"k8s.io/kubernetes/pkg/util/homedir"
 )
 
 type ring0Factory struct {
@@ -209,7 +208,7 @@ func (f *ring0Factory) Decoder(toInternal bool) runtime.Decoder {
 	} else {
 		decoder = api.Codecs.UniversalDeserializer()
 	}
-	return thirdpartyresourcedata.NewDecoder(decoder, "")
+	return decoder
 }
 
 func (f *ring0Factory) JSONEncoder() runtime.Encoder {

@@ -20,11 +20,11 @@ import (
 	"fmt"
 	"io"
 
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
-	"k8s.io/kubernetes/pkg/api"
 )
 
 func init() {
@@ -91,7 +91,7 @@ func isChangingOwnerReference(newObj, oldObj runtime.Object) bool {
 		return true
 	}
 	for i := range oldOwners {
-		if !api.Semantic.DeepEqual(oldOwners[i], newOwners[i]) {
+		if !apiequality.Semantic.DeepEqual(oldOwners[i], newOwners[i]) {
 			return true
 		}
 	}

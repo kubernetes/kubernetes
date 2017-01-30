@@ -23,10 +23,10 @@ import (
 
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apiserver/pkg/storage/storagebackend"
+	utilflag "k8s.io/apiserver/pkg/util/flag"
 	"k8s.io/kubernetes/pkg/api"
 	genericapiserver "k8s.io/kubernetes/pkg/genericapiserver/server"
-	"k8s.io/kubernetes/pkg/storage/storagebackend"
-	"k8s.io/kubernetes/pkg/util/config"
 )
 
 // Builds the DefaultStorageFactory.
@@ -34,7 +34,7 @@ import (
 // defaultAPIResourceConfig with the corresponding user specified overrides as well.
 func BuildDefaultStorageFactory(storageConfig storagebackend.Config, defaultMediaType string, serializer runtime.StorageSerializer,
 	defaultResourceEncoding *genericapiserver.DefaultResourceEncodingConfig, storageEncodingOverrides map[string]schema.GroupVersion, resourceEncodingOverrides []schema.GroupVersionResource,
-	defaultAPIResourceConfig *genericapiserver.ResourceConfig, resourceConfigOverrides config.ConfigurationMap) (*genericapiserver.DefaultStorageFactory, error) {
+	defaultAPIResourceConfig *genericapiserver.ResourceConfig, resourceConfigOverrides utilflag.ConfigurationMap) (*genericapiserver.DefaultStorageFactory, error) {
 
 	resourceEncodingConfig := mergeGroupEncodingConfigs(defaultResourceEncoding, storageEncodingOverrides)
 	resourceEncodingConfig = mergeResourceEncodingConfigs(resourceEncodingConfig, resourceEncodingOverrides)
@@ -65,7 +65,7 @@ func mergeGroupEncodingConfigs(defaultResourceEncoding *genericapiserver.Default
 }
 
 // Merges the given defaultAPIResourceConfig with the given resourceConfigOverrides.
-func mergeAPIResourceConfigs(defaultAPIResourceConfig *genericapiserver.ResourceConfig, resourceConfigOverrides config.ConfigurationMap) (*genericapiserver.ResourceConfig, error) {
+func mergeAPIResourceConfigs(defaultAPIResourceConfig *genericapiserver.ResourceConfig, resourceConfigOverrides utilflag.ConfigurationMap) (*genericapiserver.ResourceConfig, error) {
 	resourceConfig := defaultAPIResourceConfig
 	overrides := resourceConfigOverrides
 
@@ -164,7 +164,7 @@ func mergeAPIResourceConfigs(defaultAPIResourceConfig *genericapiserver.Resource
 	return resourceConfig, nil
 }
 
-func getRuntimeConfigValue(overrides config.ConfigurationMap, apiKey string, defaultValue bool) (bool, error) {
+func getRuntimeConfigValue(overrides utilflag.ConfigurationMap, apiKey string, defaultValue bool) (bool, error) {
 	flagValue, ok := overrides[apiKey]
 	if ok {
 		if flagValue == "" {

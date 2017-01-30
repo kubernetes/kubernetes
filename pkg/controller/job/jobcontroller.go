@@ -27,17 +27,18 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/client-go/tools/cache"
+	"k8s.io/client-go/util/workqueue"
 	"k8s.io/kubernetes/pkg/api/v1"
 	batch "k8s.io/kubernetes/pkg/apis/batch/v1"
-	"k8s.io/kubernetes/pkg/client/cache"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	v1core "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/core/v1"
+	"k8s.io/kubernetes/pkg/client/legacylisters"
 	batchv1listers "k8s.io/kubernetes/pkg/client/listers/batch/v1"
 	"k8s.io/kubernetes/pkg/client/record"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/informers"
 	"k8s.io/kubernetes/pkg/util/metrics"
-	"k8s.io/kubernetes/pkg/util/workqueue"
 
 	"github.com/golang/glog"
 )
@@ -63,7 +64,7 @@ type JobController struct {
 	jobLister batchv1listers.JobLister
 
 	// A store of pods, populated by the podController
-	podStore cache.StoreToPodLister
+	podStore listers.StoreToPodLister
 
 	// Jobs that need to be updated
 	queue workqueue.RateLimitingInterface

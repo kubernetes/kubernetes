@@ -89,7 +89,7 @@ func (cnc *CloudNodeController) Run() {
 		defer utilruntime.HandleCrash()
 
 		go wait.Until(func() {
-			nodes, err := cnc.kubeClient.Core().Nodes().List(v1.ListOptions{ResourceVersion: "0"})
+			nodes, err := cnc.kubeClient.Core().Nodes().List(metav1.ListOptions{ResourceVersion: "0"})
 			if err != nil {
 				glog.Errorf("Error monitoring node status: %v", err)
 			}

@@ -21,17 +21,19 @@ import (
 	"net/http"
 	"testing"
 
-	"k8s.io/kubernetes/pkg/client/restclient/fake"
+	"k8s.io/client-go/rest/fake"
+	"k8s.io/kubernetes/pkg/api"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
 )
 
 func TestPatchObject(t *testing.T) {
 	_, svc, _ := testData()
 
-	f, tf, codec, ns := cmdtesting.NewAPIFactory()
+	f, tf, codec, _ := cmdtesting.NewAPIFactory()
 	tf.Printer = &testPrinter{}
-	tf.Client = &fake.RESTClient{
-		NegotiatedSerializer: ns,
+	tf.UnstructuredClient = &fake.RESTClient{
+		APIRegistry:          api.Registry,
+		NegotiatedSerializer: unstructuredSerializer,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch p, m := req.URL.Path, req.Method; {
 			case p == "/namespaces/test/services/frontend" && (m == "PATCH" || m == "GET"):
@@ -60,10 +62,11 @@ func TestPatchObject(t *testing.T) {
 func TestPatchObjectFromFile(t *testing.T) {
 	_, svc, _ := testData()
 
-	f, tf, codec, ns := cmdtesting.NewAPIFactory()
+	f, tf, codec, _ := cmdtesting.NewAPIFactory()
 	tf.Printer = &testPrinter{}
-	tf.Client = &fake.RESTClient{
-		NegotiatedSerializer: ns,
+	tf.UnstructuredClient = &fake.RESTClient{
+		APIRegistry:          api.Registry,
+		NegotiatedSerializer: unstructuredSerializer,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch p, m := req.URL.Path, req.Method; {
 			case p == "/namespaces/test/services/frontend" && (m == "PATCH" || m == "GET"):

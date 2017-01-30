@@ -22,8 +22,8 @@ import (
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
+	testing "k8s.io/client-go/testing"
 	v1 "k8s.io/kubernetes/pkg/api/v1"
-	core "k8s.io/kubernetes/pkg/client/testing/core"
 )
 
 // FakeResourceQuotas implements ResourceQuotaInterface
@@ -36,7 +36,7 @@ var resourcequotasResource = schema.GroupVersionResource{Group: "", Version: "v1
 
 func (c *FakeResourceQuotas) Create(resourceQuota *v1.ResourceQuota) (result *v1.ResourceQuota, err error) {
 	obj, err := c.Fake.
-		Invokes(core.NewCreateAction(resourcequotasResource, c.ns, resourceQuota), &v1.ResourceQuota{})
+		Invokes(testing.NewCreateAction(resourcequotasResource, c.ns, resourceQuota), &v1.ResourceQuota{})
 
 	if obj == nil {
 		return nil, err
@@ -46,7 +46,7 @@ func (c *FakeResourceQuotas) Create(resourceQuota *v1.ResourceQuota) (result *v1
 
 func (c *FakeResourceQuotas) Update(resourceQuota *v1.ResourceQuota) (result *v1.ResourceQuota, err error) {
 	obj, err := c.Fake.
-		Invokes(core.NewUpdateAction(resourcequotasResource, c.ns, resourceQuota), &v1.ResourceQuota{})
+		Invokes(testing.NewUpdateAction(resourcequotasResource, c.ns, resourceQuota), &v1.ResourceQuota{})
 
 	if obj == nil {
 		return nil, err
@@ -56,7 +56,7 @@ func (c *FakeResourceQuotas) Update(resourceQuota *v1.ResourceQuota) (result *v1
 
 func (c *FakeResourceQuotas) UpdateStatus(resourceQuota *v1.ResourceQuota) (*v1.ResourceQuota, error) {
 	obj, err := c.Fake.
-		Invokes(core.NewUpdateSubresourceAction(resourcequotasResource, "status", c.ns, resourceQuota), &v1.ResourceQuota{})
+		Invokes(testing.NewUpdateSubresourceAction(resourcequotasResource, "status", c.ns, resourceQuota), &v1.ResourceQuota{})
 
 	if obj == nil {
 		return nil, err
@@ -64,15 +64,15 @@ func (c *FakeResourceQuotas) UpdateStatus(resourceQuota *v1.ResourceQuota) (*v1.
 	return obj.(*v1.ResourceQuota), err
 }
 
-func (c *FakeResourceQuotas) Delete(name string, options *v1.DeleteOptions) error {
+func (c *FakeResourceQuotas) Delete(name string, options *meta_v1.DeleteOptions) error {
 	_, err := c.Fake.
-		Invokes(core.NewDeleteAction(resourcequotasResource, c.ns, name), &v1.ResourceQuota{})
+		Invokes(testing.NewDeleteAction(resourcequotasResource, c.ns, name), &v1.ResourceQuota{})
 
 	return err
 }
 
-func (c *FakeResourceQuotas) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
-	action := core.NewDeleteCollectionAction(resourcequotasResource, c.ns, listOptions)
+func (c *FakeResourceQuotas) DeleteCollection(options *meta_v1.DeleteOptions, listOptions meta_v1.ListOptions) error {
+	action := testing.NewDeleteCollectionAction(resourcequotasResource, c.ns, listOptions)
 
 	_, err := c.Fake.Invokes(action, &v1.ResourceQuotaList{})
 	return err
@@ -80,7 +80,7 @@ func (c *FakeResourceQuotas) DeleteCollection(options *v1.DeleteOptions, listOpt
 
 func (c *FakeResourceQuotas) Get(name string, options meta_v1.GetOptions) (result *v1.ResourceQuota, err error) {
 	obj, err := c.Fake.
-		Invokes(core.NewGetAction(resourcequotasResource, c.ns, name), &v1.ResourceQuota{})
+		Invokes(testing.NewGetAction(resourcequotasResource, c.ns, name), &v1.ResourceQuota{})
 
 	if obj == nil {
 		return nil, err
@@ -88,15 +88,15 @@ func (c *FakeResourceQuotas) Get(name string, options meta_v1.GetOptions) (resul
 	return obj.(*v1.ResourceQuota), err
 }
 
-func (c *FakeResourceQuotas) List(opts v1.ListOptions) (result *v1.ResourceQuotaList, err error) {
+func (c *FakeResourceQuotas) List(opts meta_v1.ListOptions) (result *v1.ResourceQuotaList, err error) {
 	obj, err := c.Fake.
-		Invokes(core.NewListAction(resourcequotasResource, c.ns, opts), &v1.ResourceQuotaList{})
+		Invokes(testing.NewListAction(resourcequotasResource, c.ns, opts), &v1.ResourceQuotaList{})
 
 	if obj == nil {
 		return nil, err
 	}
 
-	label, _, _ := core.ExtractFromListOptions(opts)
+	label, _, _ := testing.ExtractFromListOptions(opts)
 	if label == nil {
 		label = labels.Everything()
 	}
@@ -110,16 +110,16 @@ func (c *FakeResourceQuotas) List(opts v1.ListOptions) (result *v1.ResourceQuota
 }
 
 // Watch returns a watch.Interface that watches the requested resourceQuotas.
-func (c *FakeResourceQuotas) Watch(opts v1.ListOptions) (watch.Interface, error) {
+func (c *FakeResourceQuotas) Watch(opts meta_v1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
-		InvokesWatch(core.NewWatchAction(resourcequotasResource, c.ns, opts))
+		InvokesWatch(testing.NewWatchAction(resourcequotasResource, c.ns, opts))
 
 }
 
 // Patch applies the patch and returns the patched resourceQuota.
 func (c *FakeResourceQuotas) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v1.ResourceQuota, err error) {
 	obj, err := c.Fake.
-		Invokes(core.NewPatchSubresourceAction(resourcequotasResource, c.ns, name, data, subresources...), &v1.ResourceQuota{})
+		Invokes(testing.NewPatchSubresourceAction(resourcequotasResource, c.ns, name, data, subresources...), &v1.ResourceQuota{})
 
 	if obj == nil {
 		return nil, err

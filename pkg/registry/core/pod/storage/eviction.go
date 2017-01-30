@@ -181,7 +181,7 @@ func (r *EvictionREST) getPodDisruptionBudgets(ctx genericapirequest.Context, po
 		return nil, nil
 	}
 
-	pdbList, err := r.podDisruptionBudgetClient.PodDisruptionBudgets(pod.Namespace).List(api.ListOptions{})
+	pdbList, err := r.podDisruptionBudgetClient.PodDisruptionBudgets(pod.Namespace).List(metav1.ListOptions{})
 	if err != nil {
 		return nil, err
 	}

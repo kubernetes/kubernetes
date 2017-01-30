@@ -26,6 +26,8 @@ import (
 	"testing"
 
 	"github.com/golang/glog"
+
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/validation/field"
@@ -48,7 +50,7 @@ func validateObject(obj runtime.Object) (errors field.ErrorList) {
 	switch t := obj.(type) {
 	case *api.ReplicationController:
 		if t.Namespace == "" {
-			t.Namespace = api.NamespaceDefault
+			t.Namespace = metav1.NamespaceDefault
 		}
 		errors = validation.ValidateReplicationController(t)
 	case *api.ReplicationControllerList:
@@ -57,7 +59,7 @@ func validateObject(obj runtime.Object) (errors field.ErrorList) {
 		}
 	case *api.Service:
 		if t.Namespace == "" {
-			t.Namespace = api.NamespaceDefault
+			t.Namespace = metav1.NamespaceDefault
 		}
 		errors = validation.ValidateService(t)
 	case *api.ServiceList:
@@ -66,7 +68,7 @@ func validateObject(obj runtime.Object) (errors field.ErrorList) {
 		}
 	case *api.Pod:
 		if t.Namespace == "" {
-			t.Namespace = api.NamespaceDefault
+			t.Namespace = metav1.NamespaceDefault
 		}
 		errors = validation.ValidatePod(t)
 	case *api.PodList:
@@ -77,44 +79,44 @@ func validateObject(obj runtime.Object) (errors field.ErrorList) {
 		errors = validation.ValidatePersistentVolume(t)
 	case *api.PersistentVolumeClaim:
 		if t.Namespace == "" {
-			t.Namespace = api.NamespaceDefault
+			t.Namespace = metav1.NamespaceDefault
 		}
 		errors = validation.ValidatePersistentVolumeClaim(t)
 	case *api.PodTemplate:
 		if t.Namespace == "" {
-			t.Namespace = api.NamespaceDefault
+			t.Namespace = metav1.NamespaceDefault
 		}
 		errors = validation.ValidatePodTemplate(t)
 	case *api.Endpoints:
 		if t.Namespace == "" {
-			t.Namespace = api.NamespaceDefault
+			t.Namespace = metav1.NamespaceDefault
 		}
 		errors = validation.ValidateEndpoints(t)
 	case *api.Namespace:
 		errors = validation.ValidateNamespace(t)
 	case *api.Secret:
 		if t.Namespace == "" {
-			t.Namespace = api.NamespaceDefault
+			t.Namespace = metav1.NamespaceDefault
 		}
 		errors = validation.ValidateSecret(t)
 	case *api.LimitRange:
 		if t.Namespace == "" {
-			t.Namespace = api.NamespaceDefault
+			t.Namespace = metav1.NamespaceDefault
 		}
 		errors = validation.ValidateLimitRange(t)
 	case *api.ResourceQuota:
 		if t.Namespace == "" {
-			t.Namespace = api.NamespaceDefault
+			t.Namespace = metav1.NamespaceDefault
 		}
 		errors = validation.ValidateResourceQuota(t)
 	case *extensions.Deployment:
 		if t.Namespace == "" {
-			t.Namespace = api.NamespaceDefault
+			t.Namespace = metav1.NamespaceDefault
 		}
 		errors = expvalidation.ValidateDeployment(t)
 	case *batch.Job:
 		if t.Namespace == "" {
-			t.Namespace = api.NamespaceDefault
+			t.Namespace = metav1.NamespaceDefault
 		}
 		// Job needs generateSelector called before validation, and job.Validate does this.
 		// See: https://github.com/kubernetes/kubernetes/issues/20951#issuecomment-187787040
@@ -122,17 +124,17 @@ func validateObject(obj runtime.Object) (errors field.ErrorList) {
 		errors = job.Strategy.Validate(nil, t)
 	case *extensions.Ingress:
 		if t.Namespace == "" {
-			t.Namespace = api.NamespaceDefault
+			t.Namespace = metav1.NamespaceDefault
 		}
 		errors = expvalidation.ValidateIngress(t)
 	case *extensions.DaemonSet:
 		if t.Namespace == "" {
-			t.Namespace = api.NamespaceDefault
+			t.Namespace = metav1.NamespaceDefault
 		}
 		errors = expvalidation.ValidateDaemonSet(t)
 	case *apps.StatefulSet:
 		if t.Namespace == "" {
-			t.Namespace = api.NamespaceDefault
+			t.Namespace = metav1.NamespaceDefault
 		}
 		errors = appsvalidation.ValidateStatefulSet(t)
 	default:

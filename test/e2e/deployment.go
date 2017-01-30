@@ -29,7 +29,6 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/annotations"
 	"k8s.io/kubernetes/pkg/api/v1"
 	extensionsinternal "k8s.io/kubernetes/pkg/apis/extensions"
@@ -185,7 +184,7 @@ func stopDeploymentMaybeOverlap(c clientset.Interface, internalClient internalcl
 	Expect(err).NotTo(HaveOccurred())
 	timeout := 1 * time.Minute
 
-	err = reaper.Stop(ns, deployment.Name, timeout, api.NewDeleteOptions(0))
+	err = reaper.Stop(ns, deployment.Name, timeout, metav1.NewDeleteOptions(0))
 	Expect(err).NotTo(HaveOccurred())
 
 	framework.Logf("Ensuring deployment %s was deleted", deploymentName)
@@ -195,7 +194,7 @@ func stopDeploymentMaybeOverlap(c clientset.Interface, internalClient internalcl
 	framework.Logf("Ensuring deployment %s's RSes were deleted", deploymentName)
 	selector, err := metav1.LabelSelectorAsSelector(deployment.Spec.Selector)
 	Expect(err).NotTo(HaveOccurred())
-	options := v1.ListOptions{LabelSelector: selector.String()}
+	options := metav1.ListOptions{LabelSelector: selector.String()}
 	rss, err := c.Extensions().ReplicaSets(ns).List(options)
 	Expect(err).NotTo(HaveOccurred())
 	// RSes may be created by overlapping deployments right after this deployment is deleted, ignore them
@@ -412,11 +411,11 @@ func testDeploymentCleanUpPolicy(f *framework.Framework) {
 	deploymentName := "test-cleanup-deployment"
 	framework.Logf("Creating deployment %s", deploymentName)
 
-	pods, err := c.Core().Pods(ns).List(v1.ListOptions{LabelSelector: labels.Everything().String()})
+	pods, err := c.Core().Pods(ns).List(metav1.ListOptions{LabelSelector: labels.Everything().String()})
 	if err != nil {
 		Expect(err).NotTo(HaveOccurred(), "Failed to query for pods: %v", err)
 	}
-	options := v1.ListOptions{
+	options := metav1.ListOptions{
 		ResourceVersion: pods.ListMeta.ResourceVersion,
 	}
 	stopCh := make(chan struct{})
@@ -572,7 +571,7 @@ func testPausedDeployment(f *framework.Framework) {
 	if err != nil {
 		Expect(err).NotTo(HaveOccurred())
 	}
-	opts := v1.ListOptions{LabelSelector: selector.String()}
+	opts := metav1.ListOptions{LabelSelector: selector.String()}
 	w, err := c.Extensions().ReplicaSets(ns).Watch(opts)
 	Expect(err).NotTo(HaveOccurred())
 
@@ -916,7 +915,7 @@ func testDeploymentLabelAdopted(f *framework.Framework) {
 	// All pods targeted by the deployment should contain pod-template-hash in their labels, and there should be only 3 pods
 	selector, err := metav1.LabelSelectorAsSelector(deployment.Spec.Selector)
 	Expect(err).NotTo(HaveOccurred())
-	options := v1.ListOptions{LabelSelector: selector.String()}
+	options := metav1.ListOptions{LabelSelector: selector.String()}
 	pods, err := c.Core().Pods(ns).List(options)
 	Expect(err).NotTo(HaveOccurred())
 	err = framework.CheckPodHashLabel(pods)
@@ -1163,7 +1162,7 @@ func testOverlappingDeployment(f *framework.Framework) {
 
 	// Only the first deployment is synced
 	By("Checking only the first overlapping deployment is synced")
-	options := v1.ListOptions{}
+	options := metav1.ListOptions{}
 	rsList, err := c.Extensions().ReplicaSets(ns).List(options)
 	Expect(err).NotTo(HaveOccurred(), "Failed listing all replica sets in namespace %s", ns)
 	Expect(rsList.Items).To(HaveLen(int(replicas)))
@@ -1365,7 +1364,7 @@ func testIterativeDeployments(f *framework.Framework) {
 			framework.Logf("%02d: arbitrarily deleting one or more deployment pods for deployment %q", i, deployment.Name)
 			selector, err := metav1.LabelSelectorAsSelector(deployment.Spec.Selector)
 			Expect(err).NotTo(HaveOccurred())
-			opts := v1.ListOptions{LabelSelector: selector.String()}
+			opts := metav1.ListOptions{LabelSelector: selector.String()}
 			podList, err := c.Core().Pods(ns).List(opts)
 			Expect(err).NotTo(HaveOccurred())
 			if len(podList.Items) == 0 {

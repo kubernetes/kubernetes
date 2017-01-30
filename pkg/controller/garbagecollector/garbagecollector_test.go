@@ -33,13 +33,13 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/json"
 	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/client-go/pkg/util/clock"
+	"k8s.io/client-go/dynamic"
+	restclient "k8s.io/client-go/rest"
+	"k8s.io/client-go/util/clock"
+	"k8s.io/client-go/util/workqueue"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/client/restclient"
-	"k8s.io/kubernetes/pkg/client/typed/dynamic"
 	"k8s.io/kubernetes/pkg/controller/garbagecollector/metaonly"
-	"k8s.io/kubernetes/pkg/util/workqueue"
 )
 
 func TestNewGarbageCollector(t *testing.T) {
@@ -349,8 +349,8 @@ func TestGCListWatcher(t *testing.T) {
 		t.Fatal(err)
 	}
 	lw := gcListWatcher(client, podResource)
-	lw.Watch(v1.ListOptions{ResourceVersion: "1"})
-	lw.List(v1.ListOptions{ResourceVersion: "1"})
+	lw.Watch(metav1.ListOptions{ResourceVersion: "1"})
+	lw.List(metav1.ListOptions{ResourceVersion: "1"})
 	if e, a := 2, len(testHandler.actions); e != a {
 		t.Errorf("expect %d requests, got %d", e, a)
 	}

@@ -42,7 +42,7 @@ CLIENT_REPO="${MAIN_REPO}/staging/src/${CLIENT_REPO_FROM_SRC}"
 CLIENT_REPO_TEMP="${MAIN_REPO}/staging/src/${CLIENT_REPO_TEMP_FROM_SRC}"
 
 DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-sedi="-i"
+sedi="-i=''"
 
 cleanup() {
     rm -rf "${CLIENT_REPO_TEMP}"
@@ -69,12 +69,18 @@ function save() {
 }
 
 # save everything for which the staging directory is the source of truth
+save "discovery"
+save "dynamic"
+save "rest"
+save "testing"
+save "tools/auth"
+save "tools/cache"
+save "tools/clientcmd"
+save "tools/metrics"
 save "transport"
-save "tools/clientcmd/api"
-save "rest/watch"
-save "pkg/util/clock"
-save "pkg/util/integer"
-save "pkg/util/flowcontrol"
+save "third_party"
+save "plugin"
+save "util"
 
 
 
@@ -85,25 +91,16 @@ function mkcp() {
 
 # assemble all the other parts of the staging directory
 echo "copying client packages"
+# need to copy version.  We aren't authoritative here
+# version has subdirs which we don't need.  Only copy the files we want
+mkdir -p "${CLIENT_REPO_TEMP}/pkg/version"
+find "${MAIN_REPO}/pkg/version" -maxdepth 1 -type f | xargs -I{} cp {} "${CLIENT_REPO_TEMP}/pkg/version"
+# need to copy clientsets, though later we should copy APIs and later generate clientsets
 mkcp "pkg/client/clientset_generated/${CLIENTSET}" "pkg/client/clientset_generated"
 mkcp "/pkg/client/record" "/pkg/client"
-mkcp "/pkg/client/cache" "/pkg/client"
-# TODO: make this test file not depending on pkg/client/unversioned
-rm "${CLIENT_REPO_TEMP}"/pkg/client/cache/listwatch_test.go
-mkcp "/pkg/client/restclient" "/pkg/client"
-mkcp "/pkg/client/testing" "/pkg/client"
-# remove this test because it imports the internal clientset
-rm "${CLIENT_REPO_TEMP}"/pkg/client/testing/core/fake_test.go
-mkcp "/pkg/client/typed" "/pkg/client"
 
-mkcp "/pkg/client/unversioned/auth" "/pkg/client/unversioned"
-mkcp "/pkg/client/unversioned/clientcmd" "/pkg/client/unversioned"
 mkcp "/pkg/client/unversioned/portforward" "/pkg/client/unversioned"
 
-mkcp "/plugin/pkg/client/auth" "/plugin/pkg/client"
-mkcp "/pkg/util/workqueue" "pkg/util"
-# remove this folder because it imports prometheus
-rm -rf "${CLIENT_REPO_TEMP}/pkg/util/workqueue/prometheus"
 # remove this test because it imports the internal clientset
 rm "${CLIENT_REPO_TEMP}"/pkg/client/unversioned/portforward/portforward_test.go
 
@@ -146,11 +143,6 @@ find "${CLIENT_REPO_TEMP}"/pkg/client/record -type f -name "*.go" -print0 | xarg
 find "${CLIENT_REPO_TEMP}"/pkg/client/record -type f -name "*.go" -print0 | xargs -0 sed -i 's,pkg/api",pkg/api/v1",g'
 # gofmt the changed files
 
-echo "rewrite conflicting Prometheus registration"
-sed -i "s/request_latency_microseconds/request_latency_microseconds_copy/g" "${CLIENT_REPO_TEMP}"/pkg/client/metrics/metrics.go
-sed -i "s/request_status_codes/request_status_codes_copy/g" "${CLIENT_REPO_TEMP}"/pkg/client/metrics/metrics.go
-sed -i "s/kubernetes_build_info/kubernetes_build_info_copy/g" "${CLIENT_REPO_TEMP}"/pkg/version/version.go
-
 echo "rewrite proto names in proto.RegisterType"
 find "${CLIENT_REPO_TEMP}" -type f -name "generated.pb.go" -print0 | xargs -0 sed -i "s/k8s\.io\.kubernetes/k8s.io.client-go/g"
 
@@ -188,26 +180,14 @@ function mvfolder {
 }
 
 mvfolder "pkg/client/clientset_generated/${CLIENTSET}" kubernetes
-mvfolder pkg/client/typed/discovery discovery
-mvfolder pkg/client/typed/dynamic dynamic
 mvfolder pkg/client/record tools/record
-mvfolder pkg/client/restclient rest
-mvfolder pkg/client/cache tools/cache
-mvfolder pkg/client/unversioned/auth tools/auth
-mvfolder pkg/client/unversioned/clientcmd tools/clientcmd
 mvfolder pkg/client/unversioned/portforward tools/portforward
-mvfolder pkg/client/metrics tools/metrics
-mvfolder pkg/client/testing/core testing
-mvfolder pkg/client/testing/cache tools/cache/testing
-mvfolder cmd/kubeadm/app/apis/kubeadm pkg/apis/kubeadm
 if [ "$(find "${CLIENT_REPO_TEMP}"/pkg/client -type f -name "*.go")" ]; then
     echo "${CLIENT_REPO_TEMP}/pkg/client is expected to be empty"
     exit 1
 else
     rm -r "${CLIENT_REPO_TEMP}"/pkg/client
 fi
-mvfolder third_party pkg/third_party
-mvfolder federation pkg/federation
 
 echo "running gofmt"
 find "${CLIENT_REPO_TEMP}" -type f -name "*.go" -print0 | xargs -0 gofmt -w

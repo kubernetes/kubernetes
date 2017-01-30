@@ -20,8 +20,8 @@ import (
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
+	rest "k8s.io/client-go/rest"
 	api "k8s.io/kubernetes/pkg/api"
-	restclient "k8s.io/kubernetes/pkg/client/restclient"
 )
 
 // EndpointsGetter has a method to return a EndpointsInterface.
@@ -34,18 +34,18 @@ type EndpointsGetter interface {
 type EndpointsInterface interface {
 	Create(*api.Endpoints) (*api.Endpoints, error)
 	Update(*api.Endpoints) (*api.Endpoints, error)
-	Delete(name string, options *api.DeleteOptions) error
-	DeleteCollection(options *api.DeleteOptions, listOptions api.ListOptions) error
+	Delete(name string, options *v1.DeleteOptions) error
+	DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error
 	Get(name string, options v1.GetOptions) (*api.Endpoints, error)
-	List(opts api.ListOptions) (*api.EndpointsList, error)
-	Watch(opts api.ListOptions) (watch.Interface, error)
+	List(opts v1.ListOptions) (*api.EndpointsList, error)
+	Watch(opts v1.ListOptions) (watch.Interface, error)
 	Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *api.Endpoints, err error)
 	EndpointsExpansion
 }
 
 // endpoints implements EndpointsInterface
 type endpoints struct {
-	client restclient.Interface
+	client rest.Interface
 	ns     string
 }
 
@@ -83,7 +83,7 @@ func (c *endpoints) Update(endpoints *api.Endpoints) (result *api.Endpoints, err
 }
 
 // Delete takes name of the endpoints and deletes it. Returns an error if one occurs.
-func (c *endpoints) Delete(name string, options *api.DeleteOptions) error {
+func (c *endpoints) Delete(name string, options *v1.DeleteOptions) error {
 	return c.client.Delete().
 		Namespace(c.ns).
 		Resource("endpoints").
@@ -94,7 +94,7 @@ func (c *endpoints) Delete(name string, options *api.DeleteOptions) error {
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *endpoints) DeleteCollection(options *api.DeleteOptions, listOptions api.ListOptions) error {
+func (c *endpoints) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
 	return c.client.Delete().
 		Namespace(c.ns).
 		Resource("endpoints").
@@ -118,7 +118,7 @@ func (c *endpoints) Get(name string, options v1.GetOptions) (result *api.Endpoin
 }
 
 // List takes label and field selectors, and returns the list of Endpoints that match those selectors.
-func (c *endpoints) List(opts api.ListOptions) (result *api.EndpointsList, err error) {
+func (c *endpoints) List(opts v1.ListOptions) (result *api.EndpointsList, err error) {
 	result = &api.EndpointsList{}
 	err = c.client.Get().
 		Namespace(c.ns).
@@ -130,7 +130,7 @@ func (c *endpoints) List(opts api.ListOptions) (result *api.EndpointsList, err e
 }
 
 // Watch returns a watch.Interface that watches the requested endpoints.
-func (c *endpoints) Watch(opts api.ListOptions) (watch.Interface, error) {
+func (c *endpoints) Watch(opts v1.ListOptions) (watch.Interface, error) {
 	return c.client.Get().
 		Prefix("watch").
 		Namespace(c.ns).

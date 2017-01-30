@@ -30,7 +30,7 @@ import (
 
 func TestModifyContainerConfig(t *testing.T) {
 	var uid int64 = 123
-	var username string = "testuser"
+	var username = "testuser"
 
 	cases := []struct {
 		name     string
@@ -40,7 +40,7 @@ func TestModifyContainerConfig(t *testing.T) {
 		{
 			name: "container.SecurityContext.RunAsUser set",
 			sc: &runtimeapi.LinuxContainerSecurityContext{
-				RunAsUser: &uid,
+				RunAsUser: &runtimeapi.Int64Value{Value: uid},
 			},
 			expected: &dockercontainer.Config{
 				User: strconv.FormatInt(uid, 10),
@@ -49,7 +49,7 @@ func TestModifyContainerConfig(t *testing.T) {
 		{
 			name: "container.SecurityContext.RunAsUsername set",
 			sc: &runtimeapi.LinuxContainerSecurityContext{
-				RunAsUsername: &username,
+				RunAsUsername: username,
 			},
 			expected: &dockercontainer.Config{
 				User: username,
@@ -70,10 +70,9 @@ func TestModifyContainerConfig(t *testing.T) {
 }
 
 func TestModifyHostConfig(t *testing.T) {
-	priv := true
 	setNetworkHC := &dockercontainer.HostConfig{}
 	setPrivSC := &runtimeapi.LinuxContainerSecurityContext{}
-	setPrivSC.Privileged = &priv
+	setPrivSC.Privileged = true
 	setPrivHC := &dockercontainer.HostConfig{
 		Privileged: true,
 	}
@@ -168,7 +167,7 @@ func TestModifyHostConfigAndNamespaceOptionsForContainer(t *testing.T) {
 	sandboxID := "sandbox"
 	sandboxNSMode := fmt.Sprintf("container:%v", sandboxID)
 	setPrivSC := &runtimeapi.LinuxContainerSecurityContext{}
-	setPrivSC.Privileged = &priv
+	setPrivSC.Privileged = priv
 	setPrivHC := &dockercontainer.HostConfig{
 		Privileged:  true,
 		IpcMode:     dockercontainer.IpcMode(sandboxNSMode),
@@ -235,7 +234,7 @@ func TestModifySandboxNamespaceOptions(t *testing.T) {
 		{
 			name: "NamespaceOption.HostNetwork",
 			nsOpt: &runtimeapi.NamespaceOption{
-				HostNetwork: &set,
+				HostNetwork: set,
 			},
 			expected: &dockercontainer.HostConfig{
 				NetworkMode: namespaceModeHost,
@@ -244,7 +243,7 @@ func TestModifySandboxNamespaceOptions(t *testing.T) {
 		{
 			name: "NamespaceOption.HostIpc",
 			nsOpt: &runtimeapi.NamespaceOption{
-				HostIpc: &set,
+				HostIpc: set,
 			},
 			expected: &dockercontainer.HostConfig{
 				IpcMode:     namespaceModeHost,
@@ -254,7 +253,7 @@ func TestModifySandboxNamespaceOptions(t *testing.T) {
 		{
 			name: "NamespaceOption.HostPid",
 			nsOpt: &runtimeapi.NamespaceOption{
-				HostPid: &set,
+				HostPid: set,
 			},
 			expected: &dockercontainer.HostConfig{
 				PidMode:     namespaceModeHost,
@@ -281,7 +280,7 @@ func TestModifyContainerNamespaceOptions(t *testing.T) {
 		{
 			name: "NamespaceOption.HostNetwork",
 			nsOpt: &runtimeapi.NamespaceOption{
-				HostNetwork: &set,
+				HostNetwork: set,
 			},
 			expected: &dockercontainer.HostConfig{
 				NetworkMode: dockercontainer.NetworkMode(sandboxNSMode),
@@ -292,7 +291,7 @@ func TestModifyContainerNamespaceOptions(t *testing.T) {
 		{
 			name: "NamespaceOption.HostIpc",
 			nsOpt: &runtimeapi.NamespaceOption{
-				HostIpc: &set,
+				HostIpc: set,
 			},
 			expected: &dockercontainer.HostConfig{
 				NetworkMode: dockercontainer.NetworkMode(sandboxNSMode),
@@ -302,7 +301,7 @@ func TestModifyContainerNamespaceOptions(t *testing.T) {
 		{
 			name: "NamespaceOption.HostPid",
 			nsOpt: &runtimeapi.NamespaceOption{
-				HostPid: &set,
+				HostPid: set,
 			},
 			expected: &dockercontainer.HostConfig{
 				NetworkMode: dockercontainer.NetworkMode(sandboxNSMode),
@@ -318,9 +317,8 @@ func TestModifyContainerNamespaceOptions(t *testing.T) {
 }
 
 func fullValidSecurityContext() *runtimeapi.LinuxContainerSecurityContext {
-	priv := true
 	return &runtimeapi.LinuxContainerSecurityContext{
-		Privileged:     &priv,
+		Privileged:     true,
 		Capabilities:   inputCapabilities(),
 		SelinuxOptions: inputSELinuxOptions(),
 	}
@@ -340,10 +338,10 @@ func inputSELinuxOptions() *runtimeapi.SELinuxOption {
 	level := "level"
 
 	return &runtimeapi.SELinuxOption{
-		User:  &user,
-		Role:  &role,
-		Type:  &stype,
-		Level: &level,
+		User:  user,
+		Role:  role,
+		Type:  stype,
+		Level: level,
 	}
 }
 

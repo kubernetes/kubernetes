@@ -14,6 +14,7 @@ go_library(
     deps = [
         "//cmd/kube-aggregator/pkg/apis/apiregistration:go_default_library",
         "//cmd/kube-aggregator/pkg/registry/apiservice:go_default_library",
+        "//pkg/api:go_default_library",
         "//pkg/genericapiserver/registry/generic:go_default_library",
         "//pkg/genericapiserver/registry/generic/registry:go_default_library",
         "//vendor:k8s.io/apimachinery/pkg/runtime",

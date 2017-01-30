@@ -24,6 +24,7 @@ import (
 	"strconv"
 	"time"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apiserver/pkg/server/healthz"
@@ -35,7 +36,7 @@ import (
 	authorizationapiv1beta1 "k8s.io/kubernetes/pkg/apis/authorization/v1beta1"
 	autoscalingapiv1 "k8s.io/kubernetes/pkg/apis/autoscaling/v1"
 	batchapiv1 "k8s.io/kubernetes/pkg/apis/batch/v1"
-	certificatesapiv1alpha1 "k8s.io/kubernetes/pkg/apis/certificates/v1alpha1"
+	certificatesapiv1beta1 "k8s.io/kubernetes/pkg/apis/certificates/v1beta1"
 	extensionsapiv1beta1 "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	policyapiv1beta1 "k8s.io/kubernetes/pkg/apis/policy/v1beta1"
 	rbacapi "k8s.io/kubernetes/pkg/apis/rbac/v1alpha1"
@@ -368,7 +369,7 @@ func (n nodeAddressProvider) externalAddresses() ([]string, error) {
 		apiv1.NodeExternalIP,
 		apiv1.NodeLegacyHostIP,
 	}
-	nodes, err := n.nodeClient.List(apiv1.ListOptions{})
+	nodes, err := n.nodeClient.List(metav1.ListOptions{})
 	if err != nil {
 		return nil, err
 	}
@@ -397,7 +398,7 @@ func DefaultAPIResourceConfigSource() *genericapiserver.ResourceConfig {
 		rbacv1beta1.SchemeGroupVersion,
 		rbacapi.SchemeGroupVersion,
 		storageapiv1beta1.SchemeGroupVersion,
-		certificatesapiv1alpha1.SchemeGroupVersion,
+		certificatesapiv1beta1.SchemeGroupVersion,
 		authorizationapiv1beta1.SchemeGroupVersion,
 	)
 

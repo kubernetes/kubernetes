@@ -197,8 +197,8 @@ func createNamespace(nsClient clientset.NamespaceInterface) string {
 	return ns.Name
 }
 
-func deleteAllTestNamespaces(orphanDependents *bool, lister func(api_v1.ListOptions) (*api_v1.NamespaceList, error), deleter func(string, *api_v1.DeleteOptions) error) {
-	list, err := lister(api_v1.ListOptions{})
+func deleteAllTestNamespaces(orphanDependents *bool, lister func(metav1.ListOptions) (*api_v1.NamespaceList, error), deleter func(string, *metav1.DeleteOptions) error) {
+	list, err := lister(metav1.ListOptions{})
 	if err != nil {
 		framework.Failf("Failed to get all namespaes: %v", err)
 		return
@@ -206,7 +206,7 @@ func deleteAllTestNamespaces(orphanDependents *bool, lister func(api_v1.ListOpti
 	for _, namespace := range list.Items {
 		if strings.HasPrefix(namespace.Name, namespacePrefix) {
 			By(fmt.Sprintf("Deleting ns: %s, found by listing", namespace.Name))
-			err := deleter(namespace.Name, &api_v1.DeleteOptions{OrphanDependents: orphanDependents})
+			err := deleter(namespace.Name, &metav1.DeleteOptions{OrphanDependents: orphanDependents})
 			if err != nil {
 				framework.Failf("Failed to set %s for deletion: %v", namespace.Name, err)
 			}
@@ -215,9 +215,9 @@ func deleteAllTestNamespaces(orphanDependents *bool, lister func(api_v1.ListOpti
 	waitForNoTestNamespaces(lister)
 }
 
-func waitForNoTestNamespaces(lister func(api_v1.ListOptions) (*api_v1.NamespaceList, error)) {
+func waitForNoTestNamespaces(lister func(metav1.ListOptions) (*api_v1.NamespaceList, error)) {
 	err := wait.Poll(5*time.Second, 2*time.Minute, func() (bool, error) {
-		list, err := lister(api_v1.ListOptions{})
+		list, err := lister(metav1.ListOptions{})
 		if err != nil {
 			return false, err
 		}

@@ -69,7 +69,7 @@ var _ = framework.KubeDescribe("Federation daemonsets [Feature:Federation]", fun
 			daemonset := createDaemonSetOrFail(f.FederationClientset, nsName)
 			defer func() { // Cleanup
 				By(fmt.Sprintf("Deleting daemonset %q in namespace %q", daemonset.Name, nsName))
-				err := f.FederationClientset.Extensions().DaemonSets(nsName).Delete(daemonset.Name, &v1.DeleteOptions{})
+				err := f.FederationClientset.Extensions().DaemonSets(nsName).Delete(daemonset.Name, &metav1.DeleteOptions{})
 				framework.ExpectNoError(err, "Error deleting daemonset %q in namespace %q", daemonset.Name, nsName)
 			}()
 			// wait for daemonset shards being created
@@ -104,7 +104,7 @@ var _ = framework.KubeDescribe("Federation daemonsets [Feature:Federation]", fun
 
 // deleteAllDaemonSetsOrFail deletes all DaemonSets in the given namespace name.
 func deleteAllDaemonSetsOrFail(clientset *fedclientset.Clientset, nsName string) {
-	DaemonSetList, err := clientset.Extensions().DaemonSets(nsName).List(v1.ListOptions{})
+	DaemonSetList, err := clientset.Extensions().DaemonSets(nsName).List(metav1.ListOptions{})
 	Expect(err).NotTo(HaveOccurred())
 	orphanDependents := false
 	for _, daemonSet := range DaemonSetList.Items {
@@ -190,7 +190,7 @@ func createDaemonSetOrFail(clientset *fedclientset.Clientset, namespace string) 
 
 func deleteDaemonSetOrFail(clientset *fedclientset.Clientset, nsName string, daemonsetName string, orphanDependents *bool) {
 	By(fmt.Sprintf("Deleting daemonset %q in namespace %q", daemonsetName, nsName))
-	err := clientset.Extensions().DaemonSets(nsName).Delete(daemonsetName, &v1.DeleteOptions{OrphanDependents: orphanDependents})
+	err := clientset.Extensions().DaemonSets(nsName).Delete(daemonsetName, &metav1.DeleteOptions{OrphanDependents: orphanDependents})
 	framework.ExpectNoError(err, "Error deleting daemonset %q in namespace %q", daemonsetName, nsName)
 
 	// Wait for the daemonset to be deleted.

@@ -105,7 +105,7 @@ func (m *APIRegistrationManager) RegisterVersions(availableVersions []schema.Gro
 func (m *APIRegistrationManager) RegisterGroup(groupMeta apimachinery.GroupMeta) error {
 	groupName := groupMeta.GroupVersion.Group
 	if _, found := m.groupMetaMap[groupName]; found {
-		return fmt.Errorf("group %v is already registered", m.groupMetaMap)
+		return fmt.Errorf("group %q is already registered in groupsMap: %v", groupName, m.groupMetaMap)
 	}
 	m.groupMetaMap[groupName] = &groupMeta
 	return nil

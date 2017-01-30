@@ -54,7 +54,7 @@ func validNewStatefulSet() *apps.StatefulSet {
 	return &apps.StatefulSet{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "foo",
-			Namespace: api.NamespaceDefault,
+			Namespace: metav1.NamespaceDefault,
 			Labels:    map[string]string{"a": "b"},
 		},
 		Spec: apps.StatefulSetSpec{
@@ -101,8 +101,8 @@ func TestStatusUpdate(t *testing.T) {
 	storage, statusStorage, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
-	ctx := genericapirequest.WithNamespace(genericapirequest.NewContext(), api.NamespaceDefault)
-	key := "/statefulsets/" + api.NamespaceDefault + "/foo"
+	ctx := genericapirequest.WithNamespace(genericapirequest.NewContext(), metav1.NamespaceDefault)
+	key := "/statefulsets/" + metav1.NamespaceDefault + "/foo"
 	validStatefulSet := validNewStatefulSet()
 	if err := storage.Storage.Create(ctx, key, validStatefulSet, nil, 0); err != nil {
 		t.Fatalf("unexpected error: %v", err)

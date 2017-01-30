@@ -177,7 +177,7 @@ func newDeploymentWithReplicas(name string, replicas int32) *extensionsv1.Deploy
 	return &extensionsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
-			Namespace: apiv1.NamespaceDefault,
+			Namespace: metav1.NamespaceDefault,
 			SelfLink:  "/api/v1/namespaces/default/deployments/name",
 		},
 		Spec: extensionsv1.DeploymentSpec{

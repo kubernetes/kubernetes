@@ -38,6 +38,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/client-go/util/jsonpath"
 	"k8s.io/kubernetes/federation/apis/federation"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/events"
@@ -50,7 +51,6 @@ import (
 	"k8s.io/kubernetes/pkg/apis/rbac"
 	"k8s.io/kubernetes/pkg/apis/storage"
 	storageutil "k8s.io/kubernetes/pkg/apis/storage/util"
-	"k8s.io/kubernetes/pkg/util/jsonpath"
 	"k8s.io/kubernetes/pkg/util/node"
 
 	"github.com/ghodss/yaml"
@@ -1728,7 +1728,7 @@ func printEvent(event *api.Event, w io.Writer, options PrintOptions) error {
 		event.InvolvedObject.FieldPath,
 		event.Type,
 		event.Reason,
-		event.Source,
+		formatEventSource(event.Source),
 		event.Message,
 	); err != nil {
 		return err
@@ -2726,4 +2726,13 @@ func (j *JSONPathPrinter) PrintObj(obj runtime.Object, w io.Writer) error {
 // TODO: implement HandledResources()
 func (p *JSONPathPrinter) HandledResources() []string {
 	return []string{}
+}
+
+// formatEventSource formats EventSource as a comma separated string excluding Host when empty
+func formatEventSource(es api.EventSource) string {
+	EventSourceString := []string{es.Component}
+	if len(es.Host) > 0 {
+		EventSourceString = append(EventSourceString, es.Host)
+	}
+	return strings.Join(EventSourceString, ", ")
 }

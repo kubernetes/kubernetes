@@ -9,8 +9,12 @@ load(
 
 go_library(
     name = "go_default_library",
-    srcs = ["doc.go"],
+    srcs = [
+        "doc.go",
+        "util.go",
+    ],
     tags = ["automanaged"],
+    deps = ["//vendor:k8s.io/apimachinery/pkg/apis/meta/v1"],
 )
 
 filegroup(

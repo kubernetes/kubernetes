@@ -27,9 +27,9 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	"k8s.io/client-go/pkg/api/v1"
-	"k8s.io/client-go/pkg/util/clock"
-	"k8s.io/client-go/pkg/util/strategicpatch"
+	"k8s.io/client-go/util/clock"
 )
 
 const (
@@ -244,7 +244,7 @@ func (e *eventLogger) eventObserve(newEvent *v1.Event) (*v1.Event, []byte, error
 
 		newData, _ := json.Marshal(event)
 		oldData, _ := json.Marshal(eventCopy2)
-		patch, err = strategicpatch.CreateStrategicMergePatch(oldData, newData, event)
+		patch, err = strategicpatch.CreateTwoWayMergePatch(oldData, newData, event)
 	}
 
 	// record our new observation

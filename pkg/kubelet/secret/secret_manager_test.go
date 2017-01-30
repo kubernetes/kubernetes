@@ -27,7 +27,7 @@ import (
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset/fake"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/client-go/pkg/util/clock"
+	"k8s.io/client-go/util/clock"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -127,9 +127,14 @@ func TestSecretStoreGetNeverRefresh(t *testing.T) {
 	assert.Equal(t, 10, len(actions), "unexpected actions: %#v", actions)
 }
 
+type envSecrets struct {
+	envVarNames  []string
+	envFromNames []string
+}
+
 type secretsToAttach struct {
-	imagePullSecretNames    []string
-	containerEnvSecretNames [][]string
+	imagePullSecretNames []string
+	containerEnvSecrets  []envSecrets
 }
 
 func podWithSecrets(ns, name string, toAttach secretsToAttach) *v1.Pod {
@@ -144,11 +149,22 @@ func podWithSecrets(ns, name string, toAttach secretsToAttach) *v1.Pod {
 		pod.Spec.ImagePullSecrets = append(
 			pod.Spec.ImagePullSecrets, v1.LocalObjectReference{Name: name})
 	}
-	for i, names := range toAttach.containerEnvSecretNames {
+	for i, secrets := range toAttach.containerEnvSecrets {
 		container := v1.Container{
 			Name: fmt.Sprintf("container-%d", i),
 		}
-		for _, name := range names {
+		for _, name := range secrets.envFromNames {
+			envFrom := v1.EnvFromSource{
+				SecretRef: &v1.SecretEnvSource{
+					LocalObjectReference: v1.LocalObjectReference{
+						Name: name,
+					},
+				},
+			}
+			container.EnvFrom = append(container.EnvFrom, envFrom)
+		}
+
+		for _, name := range secrets.envVarNames {
 			envSource := &v1.EnvVarSource{
 				SecretKeyRef: &v1.SecretKeySelector{
 					LocalObjectReference: v1.LocalObjectReference{
@@ -174,39 +190,50 @@ func TestCacheInvalidation(t *testing.T) {
 
 	// Create a pod with some secrets.
 	s1 := secretsToAttach{
-		imagePullSecretNames:    []string{"s1"},
-		containerEnvSecretNames: [][]string{{"s1"}, {"s2"}},
+		imagePullSecretNames: []string{"s1"},
+		containerEnvSecrets: []envSecrets{
+			{envVarNames: []string{"s1"}, envFromNames: []string{"s10"}},
+			{envVarNames: []string{"s2"}},
+		},
 	}
 	manager.RegisterPod(podWithSecrets("ns1", "name1", s1))
 	// Fetch both secrets - this should triggger get operations.
 	store.Get("ns1", "s1")
+	store.Get("ns1", "s10")
 	store.Get("ns1", "s2")
 	actions := fakeClient.Actions()
-	assert.Equal(t, 2, len(actions), "unexpected actions: %#v", actions)
+	assert.Equal(t, 3, len(actions), "unexpected actions: %#v", actions)
 	fakeClient.ClearActions()
 
 	// Update a pod with a new secret.
 	s2 := secretsToAttach{
-		imagePullSecretNames:    []string{"s1"},
-		containerEnvSecretNames: [][]string{{"s1"}, {"s2"}, {"s3"}},
+		imagePullSecretNames: []string{"s1"},
+		containerEnvSecrets: []envSecrets{
+			{envVarNames: []string{"s1"}},
+			{envVarNames: []string{"s2"}, envFromNames: []string{"s20"}},
+			{envVarNames: []string{"s3"}},
+		},
 	}
 	manager.RegisterPod(podWithSecrets("ns1", "name1", s2))
 	// All secrets should be invalidated - this should trigger get operations.
 	store.Get("ns1", "s1")
 	store.Get("ns1", "s2")
+	store.Get("ns1", "s20")
 	store.Get("ns1", "s3")
 	actions = fakeClient.Actions()
-	assert.Equal(t, 3, len(actions), "unexpected actions: %#v", actions)
+	assert.Equal(t, 4, len(actions), "unexpected actions: %#v", actions)
 	fakeClient.ClearActions()
 
-	// Create a new pod that is refencing the first two secrets - those should
+	// Create a new pod that is refencing the first three secrets - those should
 	// be invalidated.
 	manager.RegisterPod(podWithSecrets("ns1", "name2", s1))
 	store.Get("ns1", "s1")
+	store.Get("ns1", "s10")
 	store.Get("ns1", "s2")
+	store.Get("ns1", "s20")
 	store.Get("ns1", "s3")
 	actions = fakeClient.Actions()
-	assert.Equal(t, 2, len(actions), "unexpected actions: %#v", actions)
+	assert.Equal(t, 3, len(actions), "unexpected actions: %#v", actions)
 	fakeClient.ClearActions()
 }
 
@@ -220,28 +247,41 @@ func TestCacheRefcounts(t *testing.T) {
 	}
 
 	s1 := secretsToAttach{
-		imagePullSecretNames:    []string{"s1"},
-		containerEnvSecretNames: [][]string{{"s1"}, {"s2"}, {"s3"}},
+		imagePullSecretNames: []string{"s1"},
+		containerEnvSecrets: []envSecrets{
+			{envVarNames: []string{"s1"}, envFromNames: []string{"s10"}},
+			{envVarNames: []string{"s2"}},
+			{envVarNames: []string{"s3"}},
+		},
 	}
 	manager.RegisterPod(podWithSecrets("ns1", "name1", s1))
 	manager.RegisterPod(podWithSecrets("ns1", "name2", s1))
 	s2 := secretsToAttach{
-		imagePullSecretNames:    []string{"s2"},
-		containerEnvSecretNames: [][]string{{"s4"}, {"s5"}},
+		imagePullSecretNames: []string{"s2"},
+		containerEnvSecrets: []envSecrets{
+			{envVarNames: []string{"s4"}},
+			{envVarNames: []string{"s5"}, envFromNames: []string{"s50"}},
+		},
 	}
 	manager.RegisterPod(podWithSecrets("ns1", "name2", s2))
 	manager.RegisterPod(podWithSecrets("ns1", "name3", s2))
 	manager.RegisterPod(podWithSecrets("ns1", "name4", s2))
 	manager.UnregisterPod(podWithSecrets("ns1", "name3", s2))
 	s3 := secretsToAttach{
-		imagePullSecretNames:    []string{"s1"},
-		containerEnvSecretNames: [][]string{{"s3"}, {"s5"}},
+		imagePullSecretNames: []string{"s1"},
+		containerEnvSecrets: []envSecrets{
+			{envVarNames: []string{"s3"}, envFromNames: []string{"s30"}},
+			{envVarNames: []string{"s5"}},
+		},
 	}
 	manager.RegisterPod(podWithSecrets("ns1", "name5", s3))
 	manager.RegisterPod(podWithSecrets("ns1", "name6", s3))
 	s4 := secretsToAttach{
-		imagePullSecretNames:    []string{"s3"},
-		containerEnvSecretNames: [][]string{{"s6"}},
+		imagePullSecretNames: []string{"s3"},
+		containerEnvSecrets: []envSecrets{
+			{envVarNames: []string{"s6"}},
+			{envFromNames: []string{"s60"}},
+		},
 	}
 	manager.RegisterPod(podWithSecrets("ns1", "name7", s4))
 	manager.UnregisterPod(podWithSecrets("ns1", "name7", s4))
@@ -251,7 +291,7 @@ func TestCacheRefcounts(t *testing.T) {
 	manager.RegisterPod(podWithSecrets("ns1", "other-name", s2))
 	manager.UnregisterPod(podWithSecrets("ns1", "other-name", s2))
 
-	// Now we have: 1 pod with s1, 2 pods with s2 and 2 pods with s3, 0 pods with s4.
+	// Now we have: 3 pods with s1, 2 pods with s2 and 2 pods with s3, 0 pods with s4.
 	verify := func(ns, name string, count int) bool {
 		store.lock.Lock()
 		defer store.lock.Unlock()
@@ -262,11 +302,15 @@ func TestCacheRefcounts(t *testing.T) {
 		return item.refCount == count
 	}
 	assert.True(t, verify("ns1", "s1", 3))
+	assert.True(t, verify("ns1", "s10", 1))
 	assert.True(t, verify("ns1", "s2", 3))
 	assert.True(t, verify("ns1", "s3", 3))
+	assert.True(t, verify("ns1", "s30", 2))
 	assert.True(t, verify("ns1", "s4", 2))
 	assert.True(t, verify("ns1", "s5", 4))
+	assert.True(t, verify("ns1", "s50", 2))
 	assert.True(t, verify("ns1", "s6", 0))
+	assert.True(t, verify("ns1", "s60", 0))
 	assert.True(t, verify("ns1", "s7", 0))
 }
 
@@ -280,31 +324,42 @@ func TestCachingSecretManager(t *testing.T) {
 
 	// Create a pod with some secrets.
 	s1 := secretsToAttach{
-		imagePullSecretNames:    []string{"s1"},
-		containerEnvSecretNames: [][]string{{"s1"}, {"s2"}},
+		imagePullSecretNames: []string{"s1"},
+		containerEnvSecrets: []envSecrets{
+			{envVarNames: []string{"s1"}},
+			{envVarNames: []string{"s2"}},
+			{envFromNames: []string{"s20"}},
+		},
 	}
 	manager.RegisterPod(podWithSecrets("ns1", "name1", s1))
 	// Update the pod with a different secrets.
 	s2 := secretsToAttach{
-		imagePullSecretNames:    []string{"s1"},
-		containerEnvSecretNames: [][]string{{"s3"}, {"s4"}},
+		imagePullSecretNames: []string{"s1"},
+		containerEnvSecrets: []envSecrets{
+			{envVarNames: []string{"s3"}},
+			{envVarNames: []string{"s4"}},
+			{envFromNames: []string{"s40"}},
+		},
 	}
 	manager.RegisterPod(podWithSecrets("ns1", "name1", s2))
 	// Create another pod, but with same secrets in different namespace.
 	manager.RegisterPod(podWithSecrets("ns2", "name2", s2))
 	// Create and delete a pod with some other secrets.
 	s3 := secretsToAttach{
-		imagePullSecretNames:    []string{"s5"},
-		containerEnvSecretNames: [][]string{{"s6"}},
+		imagePullSecretNames: []string{"s5"},
+		containerEnvSecrets: []envSecrets{
+			{envVarNames: []string{"s6"}},
+			{envFromNames: []string{"s60"}},
+		},
 	}
 	manager.RegisterPod(podWithSecrets("ns3", "name", s3))
 	manager.UnregisterPod(podWithSecrets("ns3", "name", s3))
 
 	// We should have only: s1, s3 and s4 secrets in namespaces: ns1 and ns2.
 	for _, ns := range []string{"ns1", "ns2", "ns3"} {
-		for _, secret := range []string{"s1", "s2", "s3", "s4", "s5", "s6"} {
+		for _, secret := range []string{"s1", "s2", "s3", "s4", "s5", "s6", "s20", "s40", "s50"} {
 			shouldExist :=
-				(secret == "s1" || secret == "s3" || secret == "s4") && (ns == "ns1" || ns == "ns2")
+				(secret == "s1" || secret == "s3" || secret == "s4" || secret == "s40") && (ns == "ns1" || ns == "ns2")
 			checkSecret(t, secretStore, ns, secret, shouldExist)
 		}
 	}

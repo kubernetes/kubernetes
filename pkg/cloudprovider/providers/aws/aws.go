@@ -48,7 +48,6 @@ import (
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/api/v1/service"
 	"k8s.io/kubernetes/pkg/cloudprovider"
-	awscredentials "k8s.io/kubernetes/pkg/credentialprovider/aws"
 	"k8s.io/kubernetes/pkg/volume"
 )
 
@@ -182,7 +181,7 @@ const DefaultVolumeType = "gp2"
 // See http://docs.aws.amazon.com/AWSEC2/latest/UserGuide/volume_limits.html#linux-specific-volume-limits
 const DefaultMaxEBSVolumes = 39
 
-// Used to call awscredentials.Init() just once
+// Used to call RecognizeWellKnownRegions just once
 var once sync.Once
 
 // Services is an abstraction over AWS, to allow mocking/other implementations
@@ -691,6 +690,7 @@ func init() {
 				},
 				&credentials.SharedCredentialsProvider{},
 			})
+
 		aws := newAWSSDKProvider(creds)
 		return newAWSCloud(config, aws)
 	})
@@ -732,15 +732,6 @@ func getAvailabilityZone(metadata EC2Metadata) (string, error) {
 	return metadata.GetMetadata("placement/availability-zone")
 }
 
-func isRegionValid(region string) bool {
-	for _, r := range awscredentials.AWSRegions {
-		if r == region {
-			return true
-		}
-	}
-	return false
-}
-
 // Derives the region from a valid az name.
 // Returns an error if the az is known invalid (empty)
 func azToRegion(az string) (string, error) {
@@ -777,9 +768,14 @@ func newAWSCloud(config io.Reader, awsServices Services) (*Cloud, error) {
 		return nil, err
 	}
 
+	// Trust that if we get a region from configuration or AWS metadata that it is valid,
+	// and register ECR providers
+	RecognizeRegion(regionName)
+
 	if !cfg.Global.DisableStrictZoneCheck {
 		valid := isRegionValid(regionName)
 		if !valid {
+			// This _should_ now be unreachable, given we call RecognizeRegion
 			return nil, fmt.Errorf("not a valid AWS zone (unknown region): %s", zone)
 		}
 	} else {
@@ -848,9 +844,9 @@ func newAWSCloud(config io.Reader, awsServices Services) (*Cloud, error) {
 		glog.Infof("AWS cloud - no tag filtering")
 	}
 
-	// Register handler for ECR credentials
+	// Register regions, in particular for ECR credentials
 	once.Do(func() {
-		awscredentials.Init()
+		RecognizeWellKnownRegions()
 	})
 
 	return awsCloud, nil

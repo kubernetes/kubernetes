@@ -25,18 +25,18 @@ import (
 	"testing"
 	"time"
 
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/watch"
+	restclient "k8s.io/client-go/rest"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/client/record"
-	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/informers"
 	replicationcontroller "k8s.io/kubernetes/pkg/controller/replication"
@@ -131,7 +131,7 @@ func TestQuota(t *testing.T) {
 }
 
 func waitForQuota(t *testing.T, quota *v1.ResourceQuota, clientset *clientset.Clientset) {
-	w, err := clientset.Core().ResourceQuotas(quota.Namespace).Watch(v1.SingleObject(metav1.ObjectMeta{Name: quota.Name}))
+	w, err := clientset.Core().ResourceQuotas(quota.Namespace).Watch(metav1.SingleObject(metav1.ObjectMeta{Name: quota.Name}))
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -189,7 +189,7 @@ func scale(t *testing.T, namespace string, clientset *clientset.Clientset) {
 		},
 	}
 
-	w, err := clientset.Core().ReplicationControllers(namespace).Watch(v1.SingleObject(metav1.ObjectMeta{Name: rc.Name}))
+	w, err := clientset.Core().ReplicationControllers(namespace).Watch(metav1.SingleObject(metav1.ObjectMeta{Name: rc.Name}))
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -216,7 +216,7 @@ func scale(t *testing.T, namespace string, clientset *clientset.Clientset) {
 		return false, nil
 	})
 	if err != nil {
-		pods, _ := clientset.Core().Pods(namespace).List(v1.ListOptions{LabelSelector: labels.Everything().String(), FieldSelector: fields.Everything().String()})
+		pods, _ := clientset.Core().Pods(namespace).List(metav1.ListOptions{LabelSelector: labels.Everything().String(), FieldSelector: fields.Everything().String()})
 		t.Fatalf("unexpected error: %v, ended with %v pods", err, len(pods.Items))
 	}
 }

@@ -21,6 +21,7 @@ import (
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/kubernetes/federation/apis/federation"
 	"k8s.io/kubernetes/federation/registry/cluster"
+	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/genericapiserver/registry/generic"
 	genericregistry "k8s.io/kubernetes/pkg/genericapiserver/registry/generic/registry"
 	"k8s.io/kubernetes/pkg/genericapiserver/registry/rest"
@@ -46,6 +47,7 @@ func (r *StatusREST) Update(ctx genericapirequest.Context, name string, objInfo 
 // NewREST returns a RESTStorage object that will work against clusters.
 func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, *StatusREST) {
 	store := &genericregistry.Store{
+		Copier:      api.Scheme,
 		NewFunc:     func() runtime.Object { return &federation.Cluster{} },
 		NewListFunc: func() runtime.Object { return &federation.ClusterList{} },
 		ObjectNameFunc: func(obj runtime.Object) (string, error) {

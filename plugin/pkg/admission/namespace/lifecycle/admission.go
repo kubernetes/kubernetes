@@ -28,9 +28,9 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/admission"
 	utilcache "k8s.io/apiserver/pkg/util/cache"
-	"k8s.io/client-go/pkg/util/clock"
+	"k8s.io/client-go/tools/cache"
+	"k8s.io/client-go/util/clock"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/client/cache"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/controller/informers"
 	kubeapiserveradmission "k8s.io/kubernetes/pkg/kubeapiserver/admission"
@@ -51,7 +51,7 @@ const (
 
 func init() {
 	admission.RegisterPlugin(PluginName, func(config io.Reader) (admission.Interface, error) {
-		return NewLifecycle(sets.NewString(api.NamespaceDefault, api.NamespaceSystem))
+		return NewLifecycle(sets.NewString(metav1.NamespaceDefault, metav1.NamespaceSystem))
 	})
 }
 

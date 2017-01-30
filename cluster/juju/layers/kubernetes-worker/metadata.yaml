@@ -1,0 +1,30 @@
+name: kubernetes-worker
+summary: The workload bearing units of a kubernetes cluster
+maintainers:
+  - Charles Butler <charles.butler@canonical.com>
+  - Matthew Bruzek <matthew.bruzek@canonical.com>
+description: |
+  Kubernetes is an open-source platform for deploying, scaling, and operations
+  of application containers across a cluster of hosts. Kubernetes is portable
+  in that it works with public, private, and hybrid clouds. Extensible through
+  a pluggable infrastructure. Self healing in that it will automatically
+  restart and place containers on healthy nodes if a node ever goes away.
+tags:
+  - misc
+series:
+  - xenial
+subordinate: false
+requires:
+  kube-api-endpoint:
+    interface: http
+  kube-dns:
+    interface: kube-dns
+provides:
+  cni:
+    interface: kubernetes-cni
+    scope: container
+resources:
+  kubernetes:
+    type: file
+    filename: kubernetes.tar.gz
+    description: "An archive of kubernetes binaries for the worker."

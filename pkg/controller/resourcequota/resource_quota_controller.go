@@ -21,20 +21,21 @@ import (
 
 	"github.com/golang/glog"
 
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
+	"k8s.io/client-go/tools/cache"
+	"k8s.io/client-go/util/workqueue"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/client/cache"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/quota"
 	"k8s.io/kubernetes/pkg/util/metrics"
-	"k8s.io/kubernetes/pkg/util/workqueue"
 )
 
 // ResourceQuotaControllerOptions holds options for creating a quota controller
@@ -95,11 +96,11 @@ func NewResourceQuotaController(options *ResourceQuotaControllerOptions) *Resour
 	// build the controller that observes quota
 	rq.rqIndexer, rq.rqController = cache.NewIndexerInformer(
 		&cache.ListWatch{
-			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
-				return rq.kubeClient.Core().ResourceQuotas(v1.NamespaceAll).List(options)
+			ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
+				return rq.kubeClient.Core().ResourceQuotas(metav1.NamespaceAll).List(options)
 			},
-			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
-				return rq.kubeClient.Core().ResourceQuotas(v1.NamespaceAll).Watch(options)
+			WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
+				return rq.kubeClient.Core().ResourceQuotas(metav1.NamespaceAll).Watch(options)
 			},
 		},
 		&v1.ResourceQuota{},
@@ -174,7 +175,7 @@ func (rq *ResourceQuotaController) addQuota(obj interface{}) {
 	resourceQuota := obj.(*v1.ResourceQuota)
 
 	// if we declared an intent that is not yet captured in status (prioritize it)
-	if !api.Semantic.DeepEqual(resourceQuota.Spec.Hard, resourceQuota.Status.Hard) {
+	if !apiequality.Semantic.DeepEqual(resourceQuota.Spec.Hard, resourceQuota.Status.Hard) {
 		rq.missingUsageQueue.Add(key)
 		return
 	}
@@ -268,7 +269,7 @@ func (rq *ResourceQuotaController) syncResourceQuotaFromKey(key string) (err err
 // syncResourceQuota runs a complete sync of resource quota status across all known kinds
 func (rq *ResourceQuotaController) syncResourceQuota(v1ResourceQuota v1.ResourceQuota) (err error) {
 	// quota is dirty if any part of spec hard limits differs from the status hard limits
-	dirty := !api.Semantic.DeepEqual(v1ResourceQuota.Spec.Hard, v1ResourceQuota.Status.Hard)
+	dirty := !apiequality.Semantic.DeepEqual(v1ResourceQuota.Spec.Hard, v1ResourceQuota.Status.Hard)
 
 	resourceQuota := api.ResourceQuota{}
 	if err := v1.Convert_v1_ResourceQuota_To_api_ResourceQuota(&v1ResourceQuota, &resourceQuota, nil); err != nil {

@@ -72,7 +72,7 @@ func TestOpenPodHostports(t *testing.T) {
 			&v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "test-pod",
-					Namespace: v1.NamespaceDefault,
+					Namespace: metav1.NamespaceDefault,
 				},
 				Spec: v1.PodSpec{
 					Containers: []v1.Container{{
@@ -127,7 +127,7 @@ func TestOpenPodHostports(t *testing.T) {
 			&v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "another-test-pod",
-					Namespace: v1.NamespaceDefault,
+					Namespace: metav1.NamespaceDefault,
 				},
 				Spec: v1.PodSpec{
 					Containers: []v1.Container{{

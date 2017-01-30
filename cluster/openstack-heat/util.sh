@@ -39,6 +39,8 @@ function verify-prereqs() {
   else
     echo "${client} client does not exist"
     echo "Please install ${client} client, and retry."
+    echo "Documentation for installing ${client} can be found at"
+    echo "http://docs.openstack.org/user-guide/common/cli-install-openstack-command-line-clients.html"
     exit 1
   fi
  done
@@ -224,6 +226,7 @@ function run-heat-script() {
       --parameter os_password=${OS_PASSWORD} \
       --parameter os_region_name=${OS_REGION_NAME} \
       --parameter os_tenant_name=${OS_TENANT_NAME} \
+      --parameter os_user_domain_name=${OS_USER_DOMAIN_NAME} \
       --parameter enable_proxy=${ENABLE_PROXY} \
       --parameter ftp_proxy="${FTP_PROXY}" \
       --parameter http_proxy="${HTTP_PROXY}" \

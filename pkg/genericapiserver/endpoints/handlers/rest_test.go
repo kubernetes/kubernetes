@@ -26,18 +26,19 @@ import (
 	"github.com/emicklei/go-restful"
 	"github.com/evanphx/json-patch"
 
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/diff"
+	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	"k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/genericapiserver/registry/rest"
-	"k8s.io/kubernetes/pkg/util/strategicpatch"
 )
 
 type testPatchType struct {
@@ -74,7 +75,7 @@ func TestPatchAnonymousField(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if !api.Semantic.DeepEqual(actual, expected) {
+	if !apiequality.Semantic.DeepEqual(actual, expected) {
 		t.Errorf("expected %#v, got %#v", expected, actual)
 	}
 }

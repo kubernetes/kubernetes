@@ -23,14 +23,14 @@ import (
 	"testing"
 	"time"
 
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/kubernetes/pkg/api/resource"
+	clientcache "k8s.io/client-go/tools/cache"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/api/v1"
-	clientcache "k8s.io/kubernetes/pkg/client/cache"
 	"k8s.io/kubernetes/pkg/client/record"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm/predicates"
@@ -55,6 +55,16 @@ func podWithID(id, desiredHost string) *v1.Pod {
 		ObjectMeta: metav1.ObjectMeta{Name: id, SelfLink: testapi.Default.SelfLink("pods", id)},
 		Spec: v1.PodSpec{
 			NodeName: desiredHost,
+		},
+	}
+}
+
+func deletingPod(id string) *v1.Pod {
+	deletionTimestamp := metav1.Now()
+	return &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{Name: id, SelfLink: testapi.Default.SelfLink("pods", id), DeletionTimestamp: &deletionTimestamp},
+		Spec: v1.PodSpec{
+			NodeName: "",
 		},
 	}
 }
@@ -122,6 +132,10 @@ func TestScheduler(t *testing.T) {
 			expectError:      errB,
 			expectErrorPod:   podWithID("foo", ""),
 			eventReason:      "FailedScheduling",
+		}, {
+			sendPod:     deletingPod("foo"),
+			algo:        mockScheduler{"", nil},
+			eventReason: "FailedScheduling",
 		},
 	}
 

@@ -32,6 +32,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	"k8s.io/kubernetes/cmd/kube-proxy/app/options"
 	"k8s.io/kubernetes/pkg/api"
@@ -39,7 +40,6 @@ import (
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	unversionedcore "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/core/internalversion"
 	"k8s.io/kubernetes/pkg/client/record"
-	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
 	"k8s.io/kubernetes/pkg/proxy"
 	proxyconfig "k8s.io/kubernetes/pkg/proxy/config"
 	"k8s.io/kubernetes/pkg/proxy/iptables"
@@ -72,10 +72,8 @@ type ProxyServer struct {
 }
 
 const (
-	proxyModeUserspace              = "userspace"
-	proxyModeIPTables               = "iptables"
-	experimentalProxyModeAnnotation = options.ExperimentalProxyModeAnnotation
-	betaProxyModeAnnotation         = "net.beta.kubernetes.io/proxy-mode"
+	proxyModeUserspace = "userspace"
+	proxyModeIPTables  = "iptables"
 )
 
 func checkKnownProxyMode(proxyMode string) bool {
@@ -424,34 +422,6 @@ func getProxyMode(proxyMode string, client nodeGetter, hostname string, iptver i
 	} else if proxyMode != "" {
 		glog.Warningf("Flag proxy-mode=%q unknown, assuming iptables proxy", proxyMode)
 		return tryIPTablesProxy(iptver, kcompat)
-	}
-	// proxyMode == "" - choose the best option.
-	if client == nil {
-		glog.Errorf("nodeGetter is nil: assuming iptables proxy")
-		return tryIPTablesProxy(iptver, kcompat)
-	}
-	node, err := client.Get(hostname, metav1.GetOptions{})
-	if err != nil {
-		glog.Errorf("Can't get Node %q, assuming iptables proxy, err: %v", hostname, err)
-		return tryIPTablesProxy(iptver, kcompat)
-	}
-	if node == nil {
-		glog.Errorf("Got nil Node %q, assuming iptables proxy", hostname)
-		return tryIPTablesProxy(iptver, kcompat)
-	}
-	proxyMode, found := node.Annotations[betaProxyModeAnnotation]
-	if found {
-		glog.V(1).Infof("Found beta annotation %q = %q", betaProxyModeAnnotation, proxyMode)
-	} else {
-		// We already published some information about this annotation with the "experimental" name, so we will respect it.
-		proxyMode, found = node.Annotations[experimentalProxyModeAnnotation]
-		if found {
-			glog.V(1).Infof("Found experimental annotation %q = %q", experimentalProxyModeAnnotation, proxyMode)
-		}
-	}
-	if proxyMode == proxyModeUserspace {
-		glog.V(1).Infof("Annotation demands userspace proxy")
-		return proxyModeUserspace
 	}
 	return tryIPTablesProxy(iptver, kcompat)
 }

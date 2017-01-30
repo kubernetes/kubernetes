@@ -17,6 +17,7 @@ limitations under the License.
 package predicates
 
 import (
+	"errors"
 	"fmt"
 	"math/rand"
 	"strconv"
@@ -28,10 +29,10 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/client-go/util/workqueue"
 	"k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/client/cache"
+	"k8s.io/kubernetes/pkg/client/legacylisters"
 	"k8s.io/kubernetes/pkg/kubelet/qos"
-	"k8s.io/kubernetes/pkg/util/workqueue"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm"
 	priorityutil "k8s.io/kubernetes/plugin/pkg/scheduler/algorithm/priorities/util"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/schedulercache"
@@ -64,7 +65,7 @@ type PersistentVolumeClaimInfo interface {
 
 // CachedPersistentVolumeClaimInfo implements PersistentVolumeClaimInfo
 type CachedPersistentVolumeClaimInfo struct {
-	*cache.StoreToPersistentVolumeClaimLister
+	*listers.StoreToPersistentVolumeClaimLister
 }
 
 // GetPersistentVolumeClaimInfo fetches the claim in specified namespace with specified name
@@ -73,7 +74,7 @@ func (c *CachedPersistentVolumeClaimInfo) GetPersistentVolumeClaimInfo(namespace
 }
 
 type CachedNodeInfo struct {
-	*cache.StoreToNodeLister
+	*listers.StoreToNodeLister
 }
 
 // GetNodeInfo returns cached data for the node 'id'.
@@ -463,11 +464,7 @@ func GetResourceRequest(pod *v1.Pod) *schedulercache.Resource {
 				result.NvidiaGPU += rQuantity.Value()
 			default:
 				if v1.IsOpaqueIntResourceName(rName) {
-					// Lazily allocate this map only if required.
-					if result.OpaqueIntResources == nil {
-						result.OpaqueIntResources = map[v1.ResourceName]int64{}
-					}
-					result.OpaqueIntResources[rName] += rQuantity.Value()
+					result.AddOpaque(rName, rQuantity.Value())
 				}
 			}
 		}
@@ -490,11 +487,9 @@ func GetResourceRequest(pod *v1.Pod) *schedulercache.Resource {
 				}
 			default:
 				if v1.IsOpaqueIntResourceName(rName) {
-					// Lazily allocate this map only if required.
-					if result.OpaqueIntResources == nil {
-						result.OpaqueIntResources = map[v1.ResourceName]int64{}
-					}
 					value := rQuantity.Value()
+					// Ensure the opaque resource map is initialized in the result.
+					result.AddOpaque(rName, int64(0))
 					if value > result.OpaqueIntResources[rName] {
 						result.OpaqueIntResources[rName] = value
 					}
@@ -880,16 +875,14 @@ func GeneralPredicates(pod *v1.Pod, meta interface{}, nodeInfo *schedulercache.N
 }
 
 type PodAffinityChecker struct {
-	info           NodeInfo
-	podLister      algorithm.PodLister
-	failureDomains priorityutil.Topologies
+	info      NodeInfo
+	podLister algorithm.PodLister
 }
 
-func NewPodAffinityPredicate(info NodeInfo, podLister algorithm.PodLister, failureDomains []string) algorithm.FitPredicate {
+func NewPodAffinityPredicate(info NodeInfo, podLister algorithm.PodLister) algorithm.FitPredicate {
 	checker := &PodAffinityChecker{
-		info:           info,
-		podLister:      podLister,
-		failureDomains: priorityutil.Topologies{DefaultKeys: failureDomains},
+		info:      info,
+		podLister: podLister,
 	}
 	return checker.InterPodAffinityMatches
 }
@@ -921,11 +914,14 @@ func (c *PodAffinityChecker) InterPodAffinityMatches(pod *v1.Pod, meta interface
 	return true, nil, nil
 }
 
-// AnyPodMatchesPodAffinityTerm checks if any of given pods can match the specific podAffinityTerm.
+// anyPodMatchesPodAffinityTerm checks if any of given pods can match the specific podAffinityTerm.
 // First return value indicates whether a matching pod exists on a node that matches the topology key,
 // while the second return value indicates whether a matching pod exists anywhere.
 // TODO: Do we really need any pod matching, or all pods matching? I think the latter.
 func (c *PodAffinityChecker) anyPodMatchesPodAffinityTerm(pod *v1.Pod, allPods []*v1.Pod, node *v1.Node, term *v1.PodAffinityTerm) (bool, bool, error) {
+	if len(term.TopologyKey) == 0 {
+		return false, false, errors.New("Empty topologyKey is not allowed except for PreferredDuringScheduling pod anti-affinity")
+	}
 	matchingPodExists := false
 	namespaces := priorityutil.GetNamespacesFromPodAffinityTerm(pod, term)
 	selector, err := metav1.LabelSelectorAsSelector(term.LabelSelector)
@@ -940,7 +936,7 @@ func (c *PodAffinityChecker) anyPodMatchesPodAffinityTerm(pod *v1.Pod, allPods [
 			if err != nil {
 				return false, matchingPodExists, err
 			}
-			if c.failureDomains.NodesHaveSameTopologyKey(node, existingPodNode, term.TopologyKey) {
+			if priorityutil.NodesHaveSameTopologyKey(node, existingPodNode, term.TopologyKey) {
 				return true, matchingPodExists, nil
 			}
 		}
@@ -1073,7 +1069,11 @@ func (c *PodAffinityChecker) satisfiesExistingPodsAntiAffinity(pod *v1.Pod, meta
 		}
 	}
 	for _, term := range matchingTerms {
-		if c.failureDomains.NodesHaveSameTopologyKey(node, term.node, term.term.TopologyKey) {
+		if len(term.term.TopologyKey) == 0 {
+			glog.V(10).Infof("Empty topologyKey is not allowed except for PreferredDuringScheduling pod anti-affinity")
+			return false
+		}
+		if priorityutil.NodesHaveSameTopologyKey(node, term.node, term.term.TopologyKey) {
 			glog.V(10).Infof("Cannot schedule pod %+v onto node %v,because of PodAntiAffinityTerm %v",
 				podName(pod), node.Name, term.term)
 			return false

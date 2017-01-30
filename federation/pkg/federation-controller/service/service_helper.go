@@ -22,9 +22,9 @@ import (
 
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	cache "k8s.io/client-go/tools/cache"
 	fedclientset "k8s.io/kubernetes/federation/client/clientset_generated/federation_clientset"
 	v1 "k8s.io/kubernetes/pkg/api/v1"
-	cache "k8s.io/kubernetes/pkg/client/cache"
 	"k8s.io/kubernetes/pkg/controller"
 
 	"reflect"

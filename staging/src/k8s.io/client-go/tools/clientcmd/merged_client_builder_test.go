@@ -20,7 +20,7 @@ import (
 	"fmt"
 	"testing"
 
-	"k8s.io/client-go/rest"
+	restclient "k8s.io/client-go/rest"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 )
 
@@ -38,7 +38,7 @@ func (l *testLoader) Load() (*clientcmdapi.Config, error) {
 }
 
 type testClientConfig struct {
-	config             *rest.Config
+	config             *restclient.Config
 	namespace          string
 	namespaceSpecified bool
 	err                error
@@ -47,7 +47,7 @@ type testClientConfig struct {
 func (c *testClientConfig) RawConfig() (clientcmdapi.Config, error) {
 	return clientcmdapi.Config{}, fmt.Errorf("unexpected call")
 }
-func (c *testClientConfig) ClientConfig() (*rest.Config, error) {
+func (c *testClientConfig) ClientConfig() (*restclient.Config, error) {
 	return c.config, c.err
 }
 func (c *testClientConfig) Namespace() (string, bool, error) {
@@ -95,7 +95,7 @@ func TestInClusterConfig(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	config2 := &rest.Config{Host: "config2"}
+	config2 := &restclient.Config{Host: "config2"}
 	err1 := fmt.Errorf("unique error")
 
 	testCases := map[string]struct {
@@ -104,7 +104,7 @@ func TestInClusterConfig(t *testing.T) {
 		defaultConfig *DirectClientConfig
 
 		checkedICC bool
-		result     *rest.Config
+		result     *restclient.Config
 		err        error
 	}{
 		"in-cluster checked on other error": {

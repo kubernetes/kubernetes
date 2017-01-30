@@ -26,14 +26,13 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	validationutil "k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/apimachinery/pkg/util/wait"
+	restclient "k8s.io/client-go/rest"
+	"k8s.io/client-go/tools/clientcmd"
 	federationapi "k8s.io/kubernetes/federation/apis/federation/v1beta1"
 	"k8s.io/kubernetes/federation/client/clientset_generated/federation_clientset"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/api/validation"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
-	"k8s.io/kubernetes/pkg/client/restclient"
-	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
 	"k8s.io/kubernetes/test/e2e/framework"
 )
 
@@ -58,7 +57,7 @@ func SkipUnlessFederated(c clientset.Interface) {
 // It tests the readiness by sending a GET request and expecting a non error response.
 func WaitForFederationApiserverReady(c *federation_clientset.Clientset) error {
 	return wait.PollImmediate(time.Second, 1*time.Minute, func() (bool, error) {
-		_, err := c.Federation().Clusters().List(v1.ListOptions{})
+		_, err := c.Federation().Clusters().List(metav1.ListOptions{})
 		if err != nil {
 			return false, nil
 		}

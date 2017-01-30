@@ -28,7 +28,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
-	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 )
 
@@ -211,7 +210,7 @@ func TestCreater(t *testing.T) {
 		{
 			name:        "valid ListOptions creation",
 			kind:        schema.GroupVersionKind{Version: "v1", Kind: "ListOptions"},
-			expectedObj: &v1.ListOptions{},
+			expectedObj: &metav1.ListOptions{},
 			expectErr:   false,
 		},
 	}

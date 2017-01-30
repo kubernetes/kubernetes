@@ -113,7 +113,7 @@ func (c *PodClient) Update(name string, updateFn func(pod *v1.Pod)) {
 
 // DeleteSync deletes the pod and wait for the pod to disappear for `timeout`. If the pod doesn't
 // disappear before the timeout, it will fail the test.
-func (c *PodClient) DeleteSync(name string, options *v1.DeleteOptions, timeout time.Duration) {
+func (c *PodClient) DeleteSync(name string, options *metav1.DeleteOptions, timeout time.Duration) {
 	err := c.Delete(name, options)
 	if err != nil && !errors.IsNotFound(err) {
 		Failf("Failed to delete pod %q: %v", name, err)

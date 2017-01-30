@@ -25,10 +25,10 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/pkg/util/intstr"
-	"k8s.io/kubernetes/pkg/util/uuid"
 	"k8s.io/kubernetes/test/e2e/framework"
 	testutils "k8s.io/kubernetes/test/utils"
 )
@@ -127,7 +127,7 @@ func getZoneNameForNode(node v1.Node) (string, error) {
 // Find the names of all zones in which we have nodes in this cluster.
 func getZoneNames(c clientset.Interface) ([]string, error) {
 	zoneNames := sets.NewString()
-	nodes, err := c.Core().Nodes().List(v1.ListOptions{})
+	nodes, err := c.Core().Nodes().List(metav1.ListOptions{})
 	if err != nil {
 		return nil, err
 	}

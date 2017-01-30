@@ -21,13 +21,16 @@ import (
 	"io/ioutil"
 	"testing"
 
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/serializer/streaming"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/pkg/api"
-	"k8s.io/client-go/pkg/api/testapi"
+	"k8s.io/client-go/pkg/api/v1"
 	restclientwatch "k8s.io/client-go/rest/watch"
+
+	_ "k8s.io/client-go/pkg/api/install"
 )
 
 func TestEncodeDecodeRoundTrip(t *testing.T) {
@@ -39,17 +42,17 @@ func TestEncodeDecodeRoundTrip(t *testing.T) {
 		{
 			watch.Added,
 			&api.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}},
-			testapi.Default.Codec(),
+			api.Codecs.LegacyCodec(v1.SchemeGroupVersion),
 		},
 		{
 			watch.Modified,
 			&api.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}},
-			testapi.Default.Codec(),
+			api.Codecs.LegacyCodec(v1.SchemeGroupVersion),
 		},
 		{
 			watch.Deleted,
 			&api.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}},
-			testapi.Default.Codec(),
+			api.Codecs.LegacyCodec(v1.SchemeGroupVersion),
 		},
 	}
 	for i, testCase := range testCases {
@@ -69,7 +72,7 @@ func TestEncodeDecodeRoundTrip(t *testing.T) {
 			t.Errorf("%d: unexpected error: %v", i, err)
 			continue
 		}
-		if !api.Semantic.DeepDerivative(testCase.Object, obj) {
+		if !apiequality.Semantic.DeepDerivative(testCase.Object, obj) {
 			t.Errorf("%d: expected %#v, got %#v", i, testCase.Object, obj)
 		}
 		if event != testCase.Type {

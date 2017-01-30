@@ -22,13 +22,14 @@ import (
 	"github.com/golang/glog"
 
 	"k8s.io/apimachinery/pkg/api/meta"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/watch"
+	"k8s.io/client-go/tools/cache"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/client/cache"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/informers"
@@ -148,11 +149,11 @@ func (r *replenishmentControllerFactory) NewController(options *ReplenishmentCon
 		// TODO move to informer when defined
 		_, result = cache.NewInformer(
 			&cache.ListWatch{
-				ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
-					return r.kubeClient.Core().Services(v1.NamespaceAll).List(options)
+				ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
+					return r.kubeClient.Core().Services(metav1.NamespaceAll).List(options)
 				},
-				WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
-					return r.kubeClient.Core().Services(v1.NamespaceAll).Watch(options)
+				WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
+					return r.kubeClient.Core().Services(metav1.NamespaceAll).Watch(options)
 				},
 			},
 			&v1.Service{},
@@ -166,11 +167,11 @@ func (r *replenishmentControllerFactory) NewController(options *ReplenishmentCon
 		// TODO move to informer when defined
 		_, result = cache.NewInformer(
 			&cache.ListWatch{
-				ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
-					return r.kubeClient.Core().ReplicationControllers(v1.NamespaceAll).List(options)
+				ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
+					return r.kubeClient.Core().ReplicationControllers(metav1.NamespaceAll).List(options)
 				},
-				WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
-					return r.kubeClient.Core().ReplicationControllers(v1.NamespaceAll).Watch(options)
+				WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
+					return r.kubeClient.Core().ReplicationControllers(metav1.NamespaceAll).Watch(options)
 				},
 			},
 			&v1.ReplicationController{},
@@ -189,11 +190,11 @@ func (r *replenishmentControllerFactory) NewController(options *ReplenishmentCon
 		// TODO (derekwaynecarr) remove me when we can require a sharedInformerFactory in all code paths...
 		_, result = cache.NewInformer(
 			&cache.ListWatch{
-				ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
-					return r.kubeClient.Core().PersistentVolumeClaims(v1.NamespaceAll).List(options)
+				ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
+					return r.kubeClient.Core().PersistentVolumeClaims(metav1.NamespaceAll).List(options)
 				},
-				WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
-					return r.kubeClient.Core().PersistentVolumeClaims(v1.NamespaceAll).Watch(options)
+				WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
+					return r.kubeClient.Core().PersistentVolumeClaims(metav1.NamespaceAll).Watch(options)
 				},
 			},
 			&v1.PersistentVolumeClaim{},
@@ -206,11 +207,11 @@ func (r *replenishmentControllerFactory) NewController(options *ReplenishmentCon
 		// TODO move to informer when defined
 		_, result = cache.NewInformer(
 			&cache.ListWatch{
-				ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
-					return r.kubeClient.Core().Secrets(v1.NamespaceAll).List(options)
+				ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
+					return r.kubeClient.Core().Secrets(metav1.NamespaceAll).List(options)
 				},
-				WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
-					return r.kubeClient.Core().Secrets(v1.NamespaceAll).Watch(options)
+				WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
+					return r.kubeClient.Core().Secrets(metav1.NamespaceAll).Watch(options)
 				},
 			},
 			&v1.Secret{},
@@ -223,11 +224,11 @@ func (r *replenishmentControllerFactory) NewController(options *ReplenishmentCon
 		// TODO move to informer when defined
 		_, result = cache.NewInformer(
 			&cache.ListWatch{
-				ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
-					return r.kubeClient.Core().ConfigMaps(v1.NamespaceAll).List(options)
+				ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
+					return r.kubeClient.Core().ConfigMaps(metav1.NamespaceAll).List(options)
 				},
-				WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
-					return r.kubeClient.Core().ConfigMaps(v1.NamespaceAll).Watch(options)
+				WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
+					return r.kubeClient.Core().ConfigMaps(metav1.NamespaceAll).Watch(options)
 				},
 			},
 			&v1.ConfigMap{},

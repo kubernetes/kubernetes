@@ -69,10 +69,10 @@ func modifyContainerConfig(sc *runtimeapi.LinuxContainerSecurityContext, config 
 		return
 	}
 	if sc.RunAsUser != nil {
-		config.User = strconv.FormatInt(sc.GetRunAsUser(), 10)
+		config.User = strconv.FormatInt(sc.GetRunAsUser().Value, 10)
 	}
-	if sc.RunAsUsername != nil {
-		config.User = sc.GetRunAsUsername()
+	if sc.RunAsUsername != "" {
+		config.User = sc.RunAsUsername
 	}
 }
 
@@ -88,24 +88,20 @@ func modifyHostConfig(sc *runtimeapi.LinuxContainerSecurityContext, hostConfig *
 	}
 
 	// Apply security context for the container.
-	if sc.Privileged != nil {
-		hostConfig.Privileged = sc.GetPrivileged()
-	}
-	if sc.ReadonlyRootfs != nil {
-		hostConfig.ReadonlyRootfs = sc.GetReadonlyRootfs()
-	}
+	hostConfig.Privileged = sc.Privileged
+	hostConfig.ReadonlyRootfs = sc.ReadonlyRootfs
 	if sc.Capabilities != nil {
-		hostConfig.CapAdd = sc.GetCapabilities().GetAddCapabilities()
-		hostConfig.CapDrop = sc.GetCapabilities().GetDropCapabilities()
+		hostConfig.CapAdd = sc.GetCapabilities().AddCapabilities
+		hostConfig.CapDrop = sc.GetCapabilities().DropCapabilities
 	}
 	if sc.SelinuxOptions != nil {
 		hostConfig.SecurityOpt = securitycontext.ModifySecurityOptions(
 			hostConfig.SecurityOpt,
 			&v1.SELinuxOptions{
-				User:  sc.SelinuxOptions.GetUser(),
-				Role:  sc.SelinuxOptions.GetRole(),
-				Type:  sc.SelinuxOptions.GetType(),
-				Level: sc.SelinuxOptions.GetLevel(),
+				User:  sc.SelinuxOptions.User,
+				Role:  sc.SelinuxOptions.Role,
+				Type:  sc.SelinuxOptions.Type,
+				Level: sc.SelinuxOptions.Level,
 			},
 		)
 	}
@@ -114,22 +110,26 @@ func modifyHostConfig(sc *runtimeapi.LinuxContainerSecurityContext, hostConfig *
 // modifySandboxNamespaceOptions apply namespace options for sandbox
 func modifySandboxNamespaceOptions(nsOpts *runtimeapi.NamespaceOption, hostConfig *dockercontainer.HostConfig, networkPlugin network.NetworkPlugin) {
 	modifyCommonNamespaceOptions(nsOpts, hostConfig)
-	modifyHostNetworkOptionForSandbox(nsOpts.GetHostNetwork(), networkPlugin, hostConfig)
+	modifyHostNetworkOptionForSandbox(nsOpts.HostNetwork, networkPlugin, hostConfig)
 }
 
 // modifyContainerNamespaceOptions apply namespace options for container
 func modifyContainerNamespaceOptions(nsOpts *runtimeapi.NamespaceOption, sandboxID string, hostConfig *dockercontainer.HostConfig) {
+	hostNetwork := false
+	if nsOpts != nil {
+		hostNetwork = nsOpts.HostNetwork
+	}
 	modifyCommonNamespaceOptions(nsOpts, hostConfig)
-	modifyHostNetworkOptionForContainer(nsOpts.GetHostNetwork(), sandboxID, hostConfig)
+	modifyHostNetworkOptionForContainer(hostNetwork, sandboxID, hostConfig)
 }
 
 // modifyCommonNamespaceOptions apply common namespace options for sandbox and container
 func modifyCommonNamespaceOptions(nsOpts *runtimeapi.NamespaceOption, hostConfig *dockercontainer.HostConfig) {
 	if nsOpts != nil {
-		if nsOpts.GetHostPid() {
+		if nsOpts.HostPid {
 			hostConfig.PidMode = namespaceModeHost
 		}
-		if nsOpts.GetHostIpc() {
+		if nsOpts.HostIpc {
 			hostConfig.IpcMode = namespaceModeHost
 		}
 	}

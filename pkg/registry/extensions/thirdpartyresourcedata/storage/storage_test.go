@@ -20,7 +20,6 @@ import (
 	"testing"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	// Ensure that extensions/v1beta1 package is initialized.
 	"k8s.io/apimachinery/pkg/fields"
@@ -42,7 +41,7 @@ func validNewThirdPartyResourceData(name string) *extensions.ThirdPartyResourceD
 	return &extensions.ThirdPartyResourceData{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
-			Namespace: api.NamespaceDefault,
+			Namespace: metav1.NamespaceDefault,
 		},
 		Data: []byte("foobarbaz"),
 	}

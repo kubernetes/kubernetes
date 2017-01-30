@@ -48,8 +48,11 @@ type RESTUpdateStrategy interface {
 	// filled in before the object is persisted.  This method should not mutate
 	// the object.
 	ValidateUpdate(ctx genericapirequest.Context, obj, old runtime.Object) field.ErrorList
-	// Canonicalize is invoked after validation has succeeded but before the
-	// object has been persisted.  This method may mutate the object.
+	// Canonicalize allows an object to be mutated into a canonical form. This
+	// ensures that code that operates on these objects can rely on the common
+	// form for things like comparison.  Canonicalize is invoked after
+	// validation has succeeded but before the object has been persisted.
+	// This method may mutate the object.
 	Canonicalize(obj runtime.Object)
 	// AllowUnconditionalUpdate returns true if the object can be updated
 	// unconditionally (irrespective of the latest resource version), when
@@ -86,7 +89,7 @@ func BeforeUpdate(strategy RESTUpdateStrategy, ctx genericapirequest.Context, ob
 			return errors.NewBadRequest("the namespace of the provided object does not match the namespace sent on the request")
 		}
 	} else {
-		objectMeta.Namespace = api.NamespaceNone
+		objectMeta.Namespace = metav1.NamespaceNone
 	}
 	// Ensure requests cannot update generation
 	oldMeta, err := metav1.ObjectMetaFor(old)

@@ -28,33 +28,35 @@ import (
 	"testing"
 	"time"
 
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
+	restclient "k8s.io/client-go/rest"
+	core "k8s.io/client-go/testing"
+	"k8s.io/client-go/tools/cache"
+	utiltesting "k8s.io/client-go/util/testing"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/api/v1"
 	extensions "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
-	"k8s.io/kubernetes/pkg/client/cache"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset/fake"
 	fakeclientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/fake"
-	"k8s.io/kubernetes/pkg/client/restclient"
-	"k8s.io/kubernetes/pkg/client/testing/core"
+	"k8s.io/kubernetes/pkg/client/legacylisters"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/informers"
 	"k8s.io/kubernetes/pkg/securitycontext"
-	utiltesting "k8s.io/kubernetes/pkg/util/testing"
-	"k8s.io/kubernetes/pkg/util/uuid"
 )
 
 func testNewReplicaSetControllerFromClient(client clientset.Interface, stopCh chan struct{}, burstReplicas int, lookupCacheSize int) *ReplicaSetController {
 	informers := informers.NewSharedInformerFactory(client, nil, controller.NoResyncPeriodFunc())
 	ret := NewReplicaSetController(informers.ReplicaSets(), informers.Pods(), client, burstReplicas, lookupCacheSize, false)
-	ret.podLister = &cache.StoreToPodLister{Indexer: cache.NewIndexer(cache.DeletionHandlingMetaNamespaceKeyFunc, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})}
-	ret.rsLister = &cache.StoreToReplicaSetLister{Indexer: cache.NewIndexer(cache.DeletionHandlingMetaNamespaceKeyFunc, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})}
+	ret.podLister = &listers.StoreToPodLister{Indexer: cache.NewIndexer(cache.DeletionHandlingMetaNamespaceKeyFunc, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})}
+	ret.rsLister = &listers.StoreToReplicaSetLister{Indexer: cache.NewIndexer(cache.DeletionHandlingMetaNamespaceKeyFunc, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})}
 	informers.Start(stopCh)
 	return ret
 }
@@ -102,7 +104,7 @@ func newReplicaSet(replicas int, selectorMap map[string]string) *extensions.Repl
 		ObjectMeta: metav1.ObjectMeta{
 			UID:             uuid.NewUUID(),
 			Name:            "foobar",
-			Namespace:       v1.NamespaceDefault,
+			Namespace:       metav1.NamespaceDefault,
 			ResourceVersion: "18",
 		},
 		Spec: extensions.ReplicaSetSpec{
@@ -464,7 +466,7 @@ func TestPodControllerLookup(t *testing.T) {
 		{
 			inRSs: []*extensions.ReplicaSet{
 				{ObjectMeta: metav1.ObjectMeta{Name: "basic"}}},
-			pod:       &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo1", Namespace: v1.NamespaceAll}},
+			pod:       &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo1", Namespace: metav1.NamespaceAll}},
 			outRSName: "",
 		},
 		// Matching labels, not namespace
@@ -540,7 +542,7 @@ func TestWatchControllers(t *testing.T) {
 			t.Errorf("Expected to find replica set under key %v", key)
 		}
 		rsSpec := *obj.(*extensions.ReplicaSet)
-		if !api.Semantic.DeepDerivative(rsSpec, testRSSpec) {
+		if !apiequality.Semantic.DeepDerivative(rsSpec, testRSSpec) {
 			t.Errorf("Expected %#v, but got %#v", testRSSpec, rsSpec)
 		}
 		close(received)
@@ -582,7 +584,7 @@ func TestWatchPods(t *testing.T) {
 			t.Errorf("Expected to find replica set under key %v", key)
 		}
 		rsSpec := obj.(*extensions.ReplicaSet)
-		if !api.Semantic.DeepDerivative(rsSpec, testRSSpec) {
+		if !apiequality.Semantic.DeepDerivative(rsSpec, testRSSpec) {
 			t.Errorf("\nExpected %#v,\nbut got %#v", testRSSpec, rsSpec)
 		}
 		close(received)

@@ -19,9 +19,9 @@ package fake
 import (
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/runtime"
+	core "k8s.io/client-go/testing"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/client/testing/core"
 )
 
 func (c *FakeEvents) CreateWithEventNamespace(event *v1.Event) (*v1.Event, error) {

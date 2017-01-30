@@ -29,17 +29,19 @@ import (
 	"time"
 
 	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/client-go/dynamic"
 	"k8s.io/kubernetes/federation/apis/federation"
 	fedclientset "k8s.io/kubernetes/federation/client/clientset_generated/federation_internalclientset"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/events"
-	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/apis/apps"
 	"k8s.io/kubernetes/pkg/apis/autoscaling"
@@ -171,6 +173,46 @@ func DescriberFor(kind schema.GroupKind, c clientset.Interface) (Describer, bool
 	return f, ok
 }
 
+// GenericDescriberFor returns a generic describer for the specified mapping
+// that uses only information available from runtime.Unstructured
+func GenericDescriberFor(mapping *meta.RESTMapping, dynamic *dynamic.Client, events coreclient.EventsGetter) Describer {
+	return &genericDescriber{mapping, dynamic, events}
+}
+
+type genericDescriber struct {
+	mapping *meta.RESTMapping
+	dynamic *dynamic.Client
+	events  coreclient.EventsGetter
+}
+
+func (g *genericDescriber) Describe(namespace, name string, describerSettings DescriberSettings) (output string, err error) {
+	apiResource := &metav1.APIResource{
+		Name:       g.mapping.Resource,
+		Namespaced: g.mapping.Scope.Name() == meta.RESTScopeNameNamespace,
+		Kind:       g.mapping.GroupVersionKind.Kind,
+	}
+	obj, err := g.dynamic.Resource(apiResource, namespace).Get(name)
+	if err != nil {
+		return "", err
+	}
+
+	var events *api.EventList
+	if describerSettings.ShowEvents {
+		events, _ = g.events.Events(namespace).Search(obj)
+	}
+
+	return tabbedString(func(out io.Writer) error {
+		w := &PrefixWriter{out}
+		w.Write(LEVEL_0, "Name:\t%s\n", obj.GetName())
+		w.Write(LEVEL_0, "Namespace:\t%s\n", obj.GetNamespace())
+		printLabelsMultiline(w, "Labels", obj.GetLabels())
+		if events != nil {
+			DescribeEvents(events, w)
+		}
+		return nil
+	})
+}
+
 // DefaultObjectDescriber can describe the default Kubernetes objects.
 var DefaultObjectDescriber ObjectDescriber
 
@@ -202,7 +244,7 @@ func (d *NamespaceDescriber) Describe(namespace, name string, describerSettings 
 	if err != nil {
 		return "", err
 	}
-	resourceQuotaList, err := d.Core().ResourceQuotas(name).List(api.ListOptions{})
+	resourceQuotaList, err := d.Core().ResourceQuotas(name).List(metav1.ListOptions{})
 	if err != nil {
 		if errors.IsNotFound(err) {
 			// Server does not support resource quotas.
@@ -212,7 +254,7 @@ func (d *NamespaceDescriber) Describe(namespace, name string, describerSettings 
 			return "", err
 		}
 	}
-	limitRangeList, err := d.Core().LimitRanges(name).List(api.ListOptions{})
+	limitRangeList, err := d.Core().LimitRanges(name).List(metav1.ListOptions{})
 	if err != nil {
 		if errors.IsNotFound(err) {
 			// Server does not support limit ranges.
@@ -472,7 +514,7 @@ func (d *PodDescriber) Describe(namespace, name string, describerSettings Descri
 		if describerSettings.ShowEvents {
 			eventsInterface := d.Core().Events(namespace)
 			selector := eventsInterface.GetFieldSelector(&name, &namespace, nil, nil)
-			options := api.ListOptions{FieldSelector: selector}
+			options := metav1.ListOptions{FieldSelector: selector.String()}
 			events, err2 := eventsInterface.List(options)
 			if describerSettings.ShowEvents && err2 == nil && len(events.Items) > 0 {
 				return tabbedString(func(out io.Writer) error {
@@ -650,13 +692,19 @@ func printGitRepoVolumeSource(git *api.GitRepoVolumeSource, w *PrefixWriter) {
 }
 
 func printSecretVolumeSource(secret *api.SecretVolumeSource, w *PrefixWriter) {
+	optional := secret.Optional != nil && *secret.Optional
 	w.Write(LEVEL_2, "Type:\tSecret (a volume populated by a Secret)\n"+
-		"    SecretName:\t%v\n", secret.SecretName)
+		"    SecretName:\t%v\n",
+		"    Optional:\t%v\n",
+		secret.SecretName, optional)
 }
 
 func printConfigMapVolumeSource(configMap *api.ConfigMapVolumeSource, w *PrefixWriter) {
+	optional := configMap.Optional != nil && *configMap.Optional
 	w.Write(LEVEL_2, "Type:\tConfigMap (a volume populated by a ConfigMap)\n"+
-		"    Name:\t%v\n", configMap.Name)
+		"    Name:\t%v\n"+
+		"    Optional:\t%v\n",
+		configMap.Name, optional)
 }
 
 func printNFSVolumeSource(nfs *api.NFSVolumeSource, w *PrefixWriter) {
@@ -1037,9 +1085,11 @@ func describeContainerEnvVars(container api.Container, resolverFn EnvVarResolver
 			}
 			w.Write(LEVEL_3, "%s:\t%s (%s)\n", e.Name, valueFrom, resource)
 		case e.ValueFrom.SecretKeyRef != nil:
-			w.Write(LEVEL_3, "%s:\t<set to the key '%s' in secret '%s'>\n", e.Name, e.ValueFrom.SecretKeyRef.Key, e.ValueFrom.SecretKeyRef.Name)
+			optional := e.ValueFrom.SecretKeyRef.Optional != nil && *e.ValueFrom.SecretKeyRef.Optional
+			w.Write(LEVEL_3, "%s:\t<set to the key '%s' in secret '%s'>\tOptional: %t\n", e.Name, e.ValueFrom.SecretKeyRef.Key, e.ValueFrom.SecretKeyRef.Name, optional)
 		case e.ValueFrom.ConfigMapKeyRef != nil:
-			w.Write(LEVEL_3, "%s:\t<set to the key '%s' of config map '%s'>\n", e.Name, e.ValueFrom.ConfigMapKeyRef.Key, e.ValueFrom.ConfigMapKeyRef.Name)
+			optional := e.ValueFrom.ConfigMapKeyRef.Optional != nil && *e.ValueFrom.ConfigMapKeyRef.Optional
+			w.Write(LEVEL_3, "%s:\t<set to the key '%s' of config map '%s'>\tOptional: %t\n", e.Name, e.ValueFrom.ConfigMapKeyRef.Key, e.ValueFrom.ConfigMapKeyRef.Name, optional)
 		}
 	}
 }
@@ -1052,10 +1102,22 @@ func describeContainerEnvFrom(container api.Container, resolverFn EnvVarResolver
 	w.Write(LEVEL_2, "Environment Variables from:%s\n", none)
 
 	for _, e := range container.EnvFrom {
+		from := ""
+		name := ""
+		optional := false
+		if e.ConfigMapRef != nil {
+			from = "ConfigMap"
+			name = e.ConfigMapRef.Name
+			optional = e.ConfigMapRef.Optional != nil && *e.ConfigMapRef.Optional
+		} else if e.SecretRef != nil {
+			from = "Secret"
+			name = e.SecretRef.Name
+			optional = e.SecretRef.Optional != nil && *e.SecretRef.Optional
+		}
 		if len(e.Prefix) == 0 {
-			w.Write(LEVEL_3, "%s\tConfigMap\n", e.ConfigMapRef.Name)
+			w.Write(LEVEL_3, "%s\t%s\tOptional: %t\n", name, from, optional)
 		} else {
-			w.Write(LEVEL_3, "%s\tConfigMap with prefix '%s'\n", e.ConfigMapRef.Name, e.Prefix)
+			w.Write(LEVEL_3, "%s\t%s with prefix '%s'\tOptional: %t\n", name, from, e.Prefix, optional)
 		}
 	}
 }
@@ -1550,7 +1612,7 @@ func (i *IngressDescriber) describeIngress(ing *extensions.Ingress, describerSet
 				ServiceName: "default-http-backend",
 				ServicePort: intstr.IntOrString{Type: intstr.Int, IntVal: 80},
 			}
-			ns = api.NamespaceSystem
+			ns = metav1.NamespaceSystem
 		}
 		w.Write(LEVEL_0, "Default backend:\t%s (%s)\n", backendStringer(def), i.describeBackend(ns, def))
 		if len(ing.Spec.TLS) != 0 {
@@ -1786,7 +1848,7 @@ func (d *ServiceAccountDescriber) Describe(namespace, name string, describerSett
 	// missingSecrets is the set of all secrets present in the
 	// serviceAccount but not present in the set of existing secrets.
 	missingSecrets := sets.NewString()
-	secrets, err := d.Core().Secrets(namespace).List(api.ListOptions{})
+	secrets, err := d.Core().Secrets(namespace).List(metav1.ListOptions{})
 
 	// errors are tolerated here in order to describe the serviceAccount with all
 	// of the secrets that it references, even if those secrets cannot be fetched.
@@ -1895,7 +1957,7 @@ func (d *NodeDescriber) Describe(namespace, name string, describerSettings Descr
 	// in a policy aware setting, users may have access to a node, but not all pods
 	// in that case, we note that the user does not have access to the pods
 	canViewPods := true
-	nodeNonTerminatedPodsList, err := d.Core().Pods(namespace).List(api.ListOptions{FieldSelector: fieldSelector})
+	nodeNonTerminatedPodsList, err := d.Core().Pods(namespace).List(metav1.ListOptions{FieldSelector: fieldSelector.String()})
 	if err != nil {
 		if !errors.IsForbidden(err) {
 			return "", err
@@ -2191,7 +2253,7 @@ func describeNodeResource(nodeNonTerminatedPodsList *api.PodList, node *api.Node
 			memoryReq.String(), int64(fractionMemoryReq), memoryLimit.String(), int64(fractionMemoryLimit))
 	}
 
-	w.Write(LEVEL_0, "Allocated resources:\n  (Total limits may be over 100 percent, i.e., overcommitted.\n  CPU Requests\tCPU Limits\tMemory Requests\tMemory Limits\n")
+	w.Write(LEVEL_0, "Allocated resources:\n  (Total limits may be over 100 percent, i.e., overcommitted.)\n  CPU Requests\tCPU Limits\tMemory Requests\tMemory Limits\n")
 	w.Write(LEVEL_1, "------------\t----------\t---------------\t-------------\n")
 	reqs, limits, err := getPodsTotalRequestsAndLimits(nodeNonTerminatedPodsList)
 	if err != nil {
@@ -2262,7 +2324,7 @@ func DescribeEvents(el *api.EventList, w *PrefixWriter) {
 			translateTimestamp(e.FirstTimestamp),
 			translateTimestamp(e.LastTimestamp),
 			e.Count,
-			e.Source,
+			formatEventSource(e.Source),
 			e.InvolvedObject.FieldPath,
 			e.Type,
 			e.Reason,
@@ -2292,7 +2354,7 @@ func (dd *DeploymentDescriber) Describe(namespace, name string, describerSetting
 		w.Write(LEVEL_0, "CreationTimestamp:\t%s\n", d.CreationTimestamp.Time.Format(time.RFC1123Z))
 		printLabelsMultiline(w, "Labels", d.Labels)
 		w.Write(LEVEL_0, "Selector:\t%s\n", selector)
-		w.Write(LEVEL_0, "Replicas:\t%d updated | %d total | %d available | %d unavailable\n", d.Status.UpdatedReplicas, *d.Spec.Replicas, d.Status.AvailableReplicas, d.Status.UnavailableReplicas)
+		w.Write(LEVEL_0, "Replicas:\t%d desired | %d updated | %d total | %d available | %d unavailable\n", *(d.Spec.Replicas), d.Status.UpdatedReplicas, d.Status.Replicas, d.Status.AvailableReplicas, d.Status.UnavailableReplicas)
 		w.Write(LEVEL_0, "StrategyType:\t%s\n", d.Spec.Strategy.Type)
 		w.Write(LEVEL_0, "MinReadySeconds:\t%d\n", d.Spec.MinReadySeconds)
 		if d.Spec.Strategy.RollingUpdate != nil {
@@ -2337,7 +2399,7 @@ func (dd *DeploymentDescriber) Describe(namespace, name string, describerSetting
 func getDaemonSetsForLabels(c extensionsclient.DaemonSetInterface, labelsToMatch labels.Labels) ([]extensions.DaemonSet, error) {
 	// Get all daemon sets
 	// TODO: this needs a namespace scope as argument
-	dss, err := c.List(api.ListOptions{})
+	dss, err := c.List(metav1.ListOptions{})
 	if err != nil {
 		return nil, fmt.Errorf("error getting daemon set: %v", err)
 	}
@@ -2386,7 +2448,7 @@ func printReplicaSetsByLabels(matchingRSs []*versionedextension.ReplicaSet) stri
 }
 
 func getPodStatusForController(c coreclient.PodInterface, selector labels.Selector) (running, waiting, succeeded, failed int, err error) {
-	options := api.ListOptions{LabelSelector: selector}
+	options := metav1.ListOptions{LabelSelector: selector.String()}
 	rcPods, err := c.List(options)
 	if err != nil {
 		return

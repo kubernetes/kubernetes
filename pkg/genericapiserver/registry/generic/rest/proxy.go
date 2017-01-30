@@ -30,11 +30,12 @@ import (
 	"time"
 
 	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/util/httpstream"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
-	utilconfig "k8s.io/kubernetes/pkg/util/config"
-	"k8s.io/kubernetes/pkg/util/httpstream"
-	"k8s.io/kubernetes/pkg/util/proxy"
+	genericfeatures "k8s.io/apiserver/pkg/features"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/apiserver/pkg/util/proxy"
 
 	"github.com/golang/glog"
 	"github.com/mxk/go-flowrate/flowrate"
@@ -145,7 +146,7 @@ func (h *UpgradeAwareProxyHandler) tryUpgrade(w http.ResponseWriter, req *http.R
 		rawResponse []byte
 		err         error
 	)
-	if h.InterceptRedirects && utilconfig.DefaultFeatureGate.StreamingProxyRedirects() {
+	if h.InterceptRedirects && utilfeature.DefaultFeatureGate.Enabled(genericfeatures.StreamingProxyRedirects) {
 		backendConn, rawResponse, err = h.connectBackendWithRedirects(req)
 	} else {
 		backendConn, err = h.connectBackend(req.Method, h.Location, req.Header, req.Body)

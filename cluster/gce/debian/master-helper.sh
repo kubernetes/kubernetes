@@ -66,6 +66,7 @@ function replicate-master-instance() {
   echo "${kube_env}" > ${KUBE_TEMP}/master-kube-env.yaml
   get-metadata "${existing_master_zone}" "${existing_master_name}" cluster-name > ${KUBE_TEMP}/cluster-name.txt
   get-metadata "${existing_master_zone}" "${existing_master_name}" startup-script > ${KUBE_TEMP}/configure-vm.sh
+  get-metadata "${existing_master_zone}" "${existing_master_name}" kube-master-certs > "${KUBE_TEMP}/kube-master-certs.yaml"
 
   create-master-instance-internal "${REPLICA_NAME}"
 }

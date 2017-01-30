@@ -30,6 +30,7 @@ go_test(
         "//pkg/api/validation:go_default_library",
         "//pkg/apis/extensions:go_default_library",
         "//vendor:github.com/google/gofuzz",
+        "//vendor:k8s.io/apimachinery/pkg/api/equality",
         "//vendor:k8s.io/apimachinery/pkg/api/meta",
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1/unstructured",

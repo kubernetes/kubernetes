@@ -18,7 +18,7 @@ package internalversion
 
 import (
 	"k8s.io/apimachinery/pkg/util/net"
-	"k8s.io/kubernetes/pkg/client/restclient"
+	restclient "k8s.io/client-go/rest"
 )
 
 // The ServiceExpansion interface allows manually adding extra methods to the ServiceInterface.

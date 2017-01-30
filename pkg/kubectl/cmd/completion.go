@@ -26,7 +26,7 @@ import (
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 )
 
-const boilerPlate = `
+const defaultBoilerPlate = `
 # Copyright 2016 The Kubernetes Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -86,7 +86,7 @@ var (
 	}
 )
 
-func NewCmdCompletion(f cmdutil.Factory, out io.Writer) *cobra.Command {
+func NewCmdCompletion(f cmdutil.Factory, out io.Writer, boilerPlate string) *cobra.Command {
 	shells := []string{}
 	for s := range completion_shells {
 		shells = append(shells, s)
@@ -98,7 +98,7 @@ func NewCmdCompletion(f cmdutil.Factory, out io.Writer) *cobra.Command {
 		Long:    completion_long,
 		Example: completion_example,
 		Run: func(cmd *cobra.Command, args []string) {
-			err := RunCompletion(out, cmd, args)
+			err := RunCompletion(out, boilerPlate, cmd, args)
 			cmdutil.CheckErr(err)
 		},
 		ValidArgs: shells,
@@ -107,7 +107,7 @@ func NewCmdCompletion(f cmdutil.Factory, out io.Writer) *cobra.Command {
 	return cmd
 }
 
-func RunCompletion(out io.Writer, cmd *cobra.Command, args []string) error {
+func RunCompletion(out io.Writer, boilerPlate string, cmd *cobra.Command, args []string) error {
 	if len(args) == 0 {
 		return cmdutil.UsageError(cmd, "Shell not specified.")
 	}
@@ -119,22 +119,20 @@ func RunCompletion(out io.Writer, cmd *cobra.Command, args []string) error {
 		return cmdutil.UsageError(cmd, "Unsupported shell type %q.", args[0])
 	}
 
+	if len(boilerPlate) == 0 {
+		boilerPlate = defaultBoilerPlate
+	}
+	if _, err := out.Write([]byte(boilerPlate)); err != nil {
+		return err
+	}
 	return run(out, cmd.Parent())
 }
 
 func runCompletionBash(out io.Writer, kubectl *cobra.Command) error {
-	_, err := out.Write([]byte(boilerPlate))
-	if err != nil {
-		return err
-	}
 	return kubectl.GenBashCompletion(out)
 }
 
 func runCompletionZsh(out io.Writer, kubectl *cobra.Command) error {
-	_, err := out.Write([]byte(boilerPlate))
-	if err != nil {
-		return err
-	}
 	zsh_initialization := `
 __kubectl_bash_source() {
 	alias shopt=':'

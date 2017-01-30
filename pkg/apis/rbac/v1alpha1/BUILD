@@ -26,7 +26,6 @@ go_library(
     ],
     tags = ["automanaged"],
     deps = [
-        "//pkg/api/v1:go_default_library",
         "//pkg/apis/rbac:go_default_library",
         "//vendor:github.com/gogo/protobuf/proto",
         "//vendor:github.com/ugorji/go/codec",

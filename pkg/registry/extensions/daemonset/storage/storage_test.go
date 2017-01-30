@@ -46,7 +46,7 @@ func newValidDaemonSet() *extensions.DaemonSet {
 	return &extensions.DaemonSet{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "foo",
-			Namespace: api.NamespaceDefault,
+			Namespace: metav1.NamespaceDefault,
 		},
 		Spec: extensions.DaemonSetSpec{
 			Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"a": "b"}},
@@ -57,9 +57,10 @@ func newValidDaemonSet() *extensions.DaemonSet {
 				Spec: api.PodSpec{
 					Containers: []api.Container{
 						{
-							Name:            "test",
-							Image:           "test_image",
-							ImagePullPolicy: api.PullIfNotPresent,
+							Name:                     "test",
+							Image:                    "test_image",
+							ImagePullPolicy:          api.PullIfNotPresent,
+							TerminationMessagePolicy: api.TerminationMessageReadFile,
 						},
 					},
 					RestartPolicy: api.RestartPolicyAlways,

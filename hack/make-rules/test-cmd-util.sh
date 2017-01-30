@@ -21,8 +21,9 @@ set -o nounset
 set -o pipefail
 
 KUBE_ROOT=$(dirname "${BASH_SOURCE}")/../..
-source "${KUBE_ROOT}/hack/lib/init.sh"
-source "${KUBE_ROOT}/hack/lib/test.sh"
+# Expects the following has already been done by whatever sources this script
+# source "${KUBE_ROOT}/hack/lib/init.sh"
+# source "${KUBE_ROOT}/hack/lib/test.sh"
 
 ETCD_HOST=${ETCD_HOST:-127.0.0.1}
 ETCD_PORT=${ETCD_PORT:-2379}
@@ -900,6 +901,22 @@ run_kubectl_apply_tests() {
   kubectl delete svc prune-svc 2>&1 "${kube_flags[@]}"
 }
 
+# Runs tests related to kubectl create --filename(-f) --selector(-l).
+run_kubectl_create_filter_tests() {
+  ## kubectl create -f with label selector should only create matching objects
+  # Pre-Condition: no POD exists
+  kube::test::get_object_assert pods "{{range.items}}{{$id_field}}:{{end}}" ''
+  # create
+  kubectl create -l unique-label=bingbang -f hack/testdata/filter "${kube_flags[@]}"
+  # check right pod exists
+  kube::test::get_object_assert 'pods selector-test-pod' "{{${labels_field}.name}}" 'selector-test-pod'
+  # check wrong pod doesn't exist
+  output_message=$(! kubectl get pods selector-test-pod-dont-apply 2>&1 "${kube_flags[@]}")
+  kube::test::if_has_string "${output_message}" 'pods "selector-test-pod-dont-apply" not found'
+  # cleanup
+  kubectl delete pods selector-test-pod
+}
+
 # Runs tests for --save-config tests.
 run_save_config_tests() {
   ## Configuration annotations should be set when --save-config is enabled
@@ -1184,6 +1201,73 @@ __EOF__
 
   # Test that we can list this new third party resource
   kube::test::get_object_assert foos "{{range.items}}{{$id_field}}:{{end}}" 'test:'
+
+  # Test alternate forms
+  kube::test::get_object_assert foo                 "{{range.items}}{{$id_field}}:{{end}}" 'test:'
+  kube::test::get_object_assert foos.company.com    "{{range.items}}{{$id_field}}:{{end}}" 'test:'
+  kube::test::get_object_assert foos.v1.company.com "{{range.items}}{{$id_field}}:{{end}}" 'test:'
+
+  # Test all printers, with lists and individual items
+  kube::log::status "Testing ThirdPartyResource printing"
+  kubectl "${kube_flags[@]}" get foos
+  kubectl "${kube_flags[@]}" get foos/test
+  kubectl "${kube_flags[@]}" get foos      -o name
+  kubectl "${kube_flags[@]}" get foos/test -o name
+  kubectl "${kube_flags[@]}" get foos      -o wide
+  kubectl "${kube_flags[@]}" get foos/test -o wide
+  kubectl "${kube_flags[@]}" get foos      -o json
+  kubectl "${kube_flags[@]}" get foos/test -o json
+  kubectl "${kube_flags[@]}" get foos      -o yaml
+  kubectl "${kube_flags[@]}" get foos/test -o yaml
+  kubectl "${kube_flags[@]}" get foos      -o "jsonpath={.items[*].some-field}" --allow-missing-template-keys=false
+  kubectl "${kube_flags[@]}" get foos/test -o "jsonpath={.some-field}"          --allow-missing-template-keys=false
+  kubectl "${kube_flags[@]}" get foos      -o "go-template={{range .items}}{{index . \"some-field\"}}{{end}}" --allow-missing-template-keys=false
+  kubectl "${kube_flags[@]}" get foos/test -o "go-template={{index . \"some-field\"}}"                        --allow-missing-template-keys=false
+
+  # Test patching
+  kube::log::status "Testing ThirdPartyResource patching"
+  kubectl "${kube_flags[@]}" patch foos/test -p '{"patched":"value1"}' --type=merge
+  kube::test::get_object_assert foos/test "{{.patched}}" 'value1'
+  kubectl "${kube_flags[@]}" patch foos/test -p '{"patched":"value2"}' --type=merge --record
+  kube::test::get_object_assert foos/test "{{.patched}}" 'value2'
+  kubectl "${kube_flags[@]}" patch foos/test -p '{"patched":null}' --type=merge --record
+  kube::test::get_object_assert foos/test "{{.patched}}" '<no value>'
+  # Get local version
+  TPR_RESOURCE_FILE="${KUBE_TEMP}/tpr-foos-test.json"
+  kubectl "${kube_flags[@]}" get foos/test -o json > "${TPR_RESOURCE_FILE}"
+  # cannot apply strategic patch locally
+  TPR_PATCH_ERROR_FILE="${KUBE_TEMP}/tpr-foos-test-error"
+  ! kubectl "${kube_flags[@]}" patch --local -f "${TPR_RESOURCE_FILE}" -p '{"patched":"value3"}' 2> "${TPR_PATCH_ERROR_FILE}"
+  if grep -q "try --type merge" "${TPR_PATCH_ERROR_FILE}"; then
+    kube::log::status "\"kubectl patch --local\" returns error as expected for ThirdPartyResource: $(cat ${TPR_PATCH_ERROR_FILE})"
+  else
+    kube::log::status "\"kubectl patch --local\" returns unexpected error or non-error: $(cat ${TPR_PATCH_ERROR_FILE})"
+    exit 1
+  fi
+  # can apply merge patch locally
+  kubectl "${kube_flags[@]}" patch --local -f "${TPR_RESOURCE_FILE}" -p '{"patched":"value3"}' --type=merge -o json
+  # can apply merge patch remotely
+  kubectl "${kube_flags[@]}" patch --record -f "${TPR_RESOURCE_FILE}" -p '{"patched":"value3"}' --type=merge -o json
+  kube::test::get_object_assert foos/test "{{.patched}}" 'value3'
+  rm "${TPR_RESOURCE_FILE}"
+  rm "${TPR_PATCH_ERROR_FILE}"
+
+  # Test labeling
+  kube::log::status "Testing ThirdPartyResource labeling"
+  kubectl "${kube_flags[@]}" label foos --all listlabel=true
+  kubectl "${kube_flags[@]}" label foo/test itemlabel=true
+
+  # Test annotating
+  kube::log::status "Testing ThirdPartyResource annotating"
+  kubectl "${kube_flags[@]}" annotate foos --all listannotation=true
+  kubectl "${kube_flags[@]}" annotate foo/test itemannotation=true
+
+  # Test describing
+  kube::log::status "Testing ThirdPartyResource describing"
+  kubectl "${kube_flags[@]}" describe foos
+  kubectl "${kube_flags[@]}" describe foos/test
+  kubectl "${kube_flags[@]}" describe foos | grep listlabel=true
+  kubectl "${kube_flags[@]}" describe foos | grep itemlabel=true
 
   # Delete the resource
   kubectl "${kube_flags[@]}" delete foos test
@@ -2393,9 +2477,9 @@ run_multi_resources_tests() {
 # Requires an env var SUPPORTED_RESOURCES which is a comma separated list of
 # resources for which tests should be run.
 runTests() {
-  if [ -z "${SUPPORTED_RESOURCES}" ]; then
-    echo "Need to set SUPPORTED_RESOURCES env var. It is a comma separated list of resources that are supported and hence should be tested. Set it to (*) to test all resources"
-    return
+  if [ -z "${SUPPORTED_RESOURCES:-}" ]; then
+    echo "Need to set SUPPORTED_RESOURCES env var. It is a list of resources that are supported and hence should be tested. Set it to (*) to test all resources"
+    exit 1
   fi
   kube::log::status "Checking kubectl version"
   kubectl version
@@ -2456,11 +2540,10 @@ runTests() {
 
   # Make sure "kubernetes" service exists.
   if kube::test::if_supports_resource "${services}" ; then
-    output_message=$(kubectl get "${kube_flags[@]}" svc)
-    if [[ ! $(echo "${output_message}" | grep "kubernetes") ]]; then
-      # Create kubernetes service
-      kubectl create "${kube_flags[@]}" -f hack/testdata/kubernetes-service.yaml
-    fi
+    # Attempt to create the kubernetes service, tolerating failure (since it might already exist)
+    kubectl create "${kube_flags[@]}" -f hack/testdata/kubernetes-service.yaml || true
+    # Require the service to exist (either we created it or the API server did)
+    kubectl get "${kube_flags[@]}" -f hack/testdata/kubernetes-service.yaml
   fi
 
   # Passing no arguments to create is an error
@@ -2592,6 +2675,7 @@ runTests() {
     # run for federation apiserver as well.
     run_kubectl_apply_tests
     run_kubectl_run_tests
+    run_kubectl_create_filter_tests
   fi
 
   ###############

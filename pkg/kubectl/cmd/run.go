@@ -31,11 +31,11 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/watch"
+	"k8s.io/client-go/discovery"
 	"k8s.io/kubernetes/pkg/api"
 	batchv1 "k8s.io/kubernetes/pkg/apis/batch/v1"
 	"k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	coreclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/core/internalversion"
-	"k8s.io/kubernetes/pkg/client/typed/discovery"
 	conditions "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
@@ -377,7 +377,7 @@ func contains(resourcesList []*metav1.APIResourceList, resource schema.GroupVers
 
 // waitForPod watches the given pod until the exitCondition is true
 func waitForPod(podClient coreclient.PodsGetter, ns, name string, exitCondition watch.ConditionFunc) (*api.Pod, error) {
-	w, err := podClient.Pods(ns).Watch(api.SingleObject(metav1.ObjectMeta{Name: name}))
+	w, err := podClient.Pods(ns).Watch(metav1.SingleObject(metav1.ObjectMeta{Name: name}))
 	if err != nil {
 		return nil, err
 	}

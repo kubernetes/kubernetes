@@ -23,19 +23,20 @@ import (
 	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/tools/cache"
 	"k8s.io/kubernetes/pkg/api/v1"
 	apps "k8s.io/kubernetes/pkg/apis/apps/v1beta1"
-	"k8s.io/kubernetes/pkg/client/cache"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	v1core "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/core/v1"
+	"k8s.io/kubernetes/pkg/client/legacylisters"
 	"k8s.io/kubernetes/pkg/client/record"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
+	"k8s.io/client-go/util/workqueue"
 	"k8s.io/kubernetes/pkg/controller"
-	"k8s.io/kubernetes/pkg/util/workqueue"
 
 	"github.com/golang/glog"
 )
@@ -55,13 +56,14 @@ type StatefulSetController struct {
 	// Abstracted out for testing.
 	control        StatefulSetControlInterface
 	// podStore is a cache of watched pods.
-	podStore       cache.StoreToPodLister
+	podStore listers.StoreToPodLister
+
 	// podStoreSynced returns true if the pod store has synced at least once.
 	podStoreSynced func() bool
 	// Watches changes to all pods.
 	podController  cache.Controller
 	// A store of StatefulSets, populated by the psController.
-	setStore       cache.StoreToStatefulSetLister
+	setStore listers.StoreToStatefulSetLister
 	// Watches changes to all StatefulSets.
 	setController  cache.Controller
 	// Controllers that need to be synced.

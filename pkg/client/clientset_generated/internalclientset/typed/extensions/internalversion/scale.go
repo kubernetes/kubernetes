@@ -17,7 +17,7 @@ limitations under the License.
 package internalversion
 
 import (
-	restclient "k8s.io/kubernetes/pkg/client/restclient"
+	rest "k8s.io/client-go/rest"
 )
 
 // ScalesGetter has a method to return a ScaleInterface.
@@ -33,7 +33,7 @@ type ScaleInterface interface {
 
 // scales implements ScaleInterface
 type scales struct {
-	client restclient.Interface
+	client rest.Interface
 	ns     string
 }
 
