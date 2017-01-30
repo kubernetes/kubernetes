@@ -134,7 +134,7 @@ type $.type|private$Informer struct {
 `
 
 var typeInformerConstructorInternal = `
-func new$.type|public$Informer(client $.clientSetInterface|raw$, resyncPeriod $.timeDuration|raw$) $.cacheSharedIndexInformer|raw$ {
+func new$.type|public$Informer(client $.clientSetInterface|raw$, resyncCheck, resyncPeriod $.timeDuration|raw$) $.cacheSharedIndexInformer|raw$ {
 	sharedIndexInformer := $.cacheNewSharedIndexInformer|raw$(
 		&$.cacheListWatch|raw${
 			ListFunc: func(options $.v1ListOptions|raw$) ($.runtimeObject|raw$, error) {
@@ -145,6 +145,7 @@ func new$.type|public$Informer(client $.clientSetInterface|raw$, resyncPeriod $.
 			},
 		},
 		&$.type|raw${},
+		resyncCheck,
 		resyncPeriod,
 		$.cacheIndexers|raw${$.cacheNamespaceIndex|raw$: $.cacheMetaNamespaceIndexFunc|raw$},
 	)
@@ -154,7 +155,7 @@ func new$.type|public$Informer(client $.clientSetInterface|raw$, resyncPeriod $.
 `
 
 var typeInformerConstructorVersioned = `
-func new$.type|public$Informer(client $.clientSetInterface|raw$, resyncPeriod $.timeDuration|raw$) $.cacheSharedIndexInformer|raw$ {
+func new$.type|public$Informer(client $.clientSetInterface|raw$, resyncCheck, resyncPeriod $.timeDuration|raw$) $.cacheSharedIndexInformer|raw$ {
 	sharedIndexInformer := $.cacheNewSharedIndexInformer|raw$(
 		&$.cacheListWatch|raw${
 			ListFunc: func(options $.v1ListOptions|raw$) ($.runtimeObject|raw$, error) {
@@ -165,6 +166,7 @@ func new$.type|public$Informer(client $.clientSetInterface|raw$, resyncPeriod $.
 			},
 		},
 		&$.type|raw${},
+		resyncCheck,
 		resyncPeriod,
 		$.cacheIndexers|raw${$.cacheNamespaceIndex|raw$: $.cacheMetaNamespaceIndexFunc|raw$},
 	)

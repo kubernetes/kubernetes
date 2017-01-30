@@ -77,8 +77,8 @@ func (g *factoryInterfaceGenerator) GenerateType(c *generator.Context, t *types.
 }
 
 var externalSharedInformerFactoryInterface = `
-type NewInternalInformerFunc func({{.internalClientSetInterface|raw}}, {{.timeDuration|raw}}) cache.SharedIndexInformer
-type NewVersionedInformerFunc func({{.versionedClientSetInterface|raw}}, {{.timeDuration|raw}}) cache.SharedIndexInformer
+type NewInternalInformerFunc func({{.internalClientSetInterface|raw}}, {{.timeDuration|raw}}, {{.timeDuration|raw}}) cache.SharedIndexInformer
+type NewVersionedInformerFunc func({{.versionedClientSetInterface|raw}}, {{.timeDuration|raw}}, {{.timeDuration|raw}}) cache.SharedIndexInformer
 
 // SharedInformerFactory a small interface to allow for adding an informer without an import cycle
 type SharedInformerFactory interface {
