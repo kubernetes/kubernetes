@@ -71,7 +71,7 @@ var _ = framework.KubeDescribe("Loadbalancing: L7", func() {
 		framework.BindClusterRole(jig.client.Rbac(), "cluster-admin", f.Namespace.Name,
 			rbacv1beta1.Subject{Kind: rbacv1beta1.ServiceAccountKind, Namespace: f.Namespace.Name, Name: "default"})
 
-		err := framework.WaitForAuthorizationUpdate(jig.client.Authorization(),
+		err := framework.WaitForAuthorizationUpdate(jig.client.AuthorizationV1beta1(),
 			serviceaccount.MakeUsername(f.Namespace.Name, "default"),
 			"", "create", schema.GroupResource{Resource: "pods"}, true)
 		framework.ExpectNoError(err)
