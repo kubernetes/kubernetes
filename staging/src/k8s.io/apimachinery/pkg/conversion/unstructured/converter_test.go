@@ -17,6 +17,7 @@ limitations under the License.
 package unstructured
 
 import (
+	"fmt"
 	"reflect"
 	"testing"
 
@@ -52,8 +53,41 @@ type C struct {
 	I []interface{} `json:"ci"`
 }
 
-// C needs to implement runtime.Object to make it usable for tests.
+type D struct {
+	A []interface{} `json:"da"`
+}
+
+type E struct {
+	A interface{} `json:"ea"`
+}
+
+type F struct {
+	A string `json:"fa"`
+	B map[string]string `json:"fb"`
+	C []A `json:"fc"`
+	D int `json:"fd"`
+	E float32 `json:"fe"`
+	F []string `json:"ff"`
+	G []int `json:"fg"`
+	H []bool `json:"fh"`
+	I []float32 `json:"fi"`
+}
+
+// Implement runtime.Object to make types usable for tests.
+
 func (c *C) GetObjectKind() schema.ObjectKind {
+	return schema.EmptyObjectKind
+}
+
+func (d *D) GetObjectKind() schema.ObjectKind {
+	return schema.EmptyObjectKind
+}
+
+func (e *E) GetObjectKind() schema.ObjectKind {
+	return schema.EmptyObjectKind
+}
+
+func (f *F) GetObjectKind() schema.ObjectKind {
 	return schema.EmptyObjectKind
 }
 
@@ -166,14 +200,239 @@ func TestRoundTrip(t *testing.T) {
 		},
 		{
 			// Test slice of interface{} with empty slices.
-			obj: &C{
-				I: []interface{}{[]interface{}{}, []interface{}{}},
+			obj: &D{
+				A: []interface{}{[]interface{}{}, []interface{}{}},
+			},
+		},
+		{
+			// Test slice of interface{} with different values.
+			obj: &D{
+				A: []interface{}{3.0, "3.0", nil},
 			},
 		},
 	}
 
 	for i := range testCases {
 		doRoundTrip(t, testCases[i].obj)
+		if t.Failed() {
+			break
+		}
+	}
+}
+
+// Verifies that:
+// 1) serialized json -> object
+// 2) serialized json -> map[string]interface{} -> object
+// produces the same object.
+func doUnrecognized(t *testing.T, jsonData string, item runtime.Object, expectedErr error) {
+	unmarshalledObj := reflect.New(reflect.TypeOf(item).Elem()).Interface()
+	err := json.Unmarshal([]byte(jsonData), &unmarshalledObj)
+	if (err != nil) != (expectedErr != nil) {
+		t.Errorf("Unexpected error when unmarshaling to object: %v, expected: %v", err, expectedErr)
+		return
+	}
+
+	unstr := make(map[string]interface{})
+	err = json.Unmarshal([]byte(jsonData), &unstr)
+	if err != nil {
+		t.Errorf("Error when unmarshaling to unstructured: %v", err)
+		return
+	}
+	newObj := reflect.New(reflect.TypeOf(item).Elem()).Interface().(runtime.Object)
+	err = NewConverter().FromUnstructured(unstr, newObj)
+	if (err != nil) != (expectedErr != nil) {
+		t.Errorf("Unexpected error in FromUnstructured: %v, expected: %v", err, expectedErr)
+	}
+
+	if expectedErr == nil && !reflect.DeepEqual(unmarshalledObj, newObj) {
+		t.Errorf("Object changed, diff: %v", diff.ObjectReflectDiff(unmarshalledObj, newObj))
+	}
+}
+
+func TestUnrecognized(t *testing.T) {
+	testCases := []struct{
+		data string
+		obj  runtime.Object
+		err error
+	}{
+		{
+			data: "{\"da\":[3.0,\"3.0\",null]}",
+			obj:  &D{},
+		},
+		{
+			data: "{\"ea\":[3.0,\"3.0\",null]}",
+			obj:  &E{},
+		},
+		{
+			data: "{\"ea\":[null,null,null]}",
+			obj: &E{},
+		},
+		{
+			data: "{\"ea\":[[],[null]]}",
+			obj: &E{},
+		},
+		{
+			data: "{\"ea\":{\"a\":[],\"b\":null}}",
+			obj: &E{},
+		},
+		{
+			data: "{\"fa\":\"fa\",\"fb\":{\"a\":\"a\"}}",
+			obj:  &F{},
+		},
+		{
+			data: "{\"fa\":\"fa\",\"fb\":{\"a\":null}}",
+			obj:  &F{},
+		},
+		{
+			data: "{\"fc\":[null]}",
+			obj:  &F{},
+		},
+		{
+			data: "{\"fc\":[{\"aa\":123,\"ab\":\"bbb\"}]}",
+			obj:  &F{},
+		},
+		{
+			// Only unknown fields
+			data: "{\"fx\":[{\"aa\":123,\"ab\":\"bbb\"}],\"fz\":123}",
+			obj:  &F{},
+		},
+		{
+			data: "{\"fc\":[{\"aa\":\"aaa\",\"ab\":\"bbb\"}]}",
+			obj:  &F{},
+			err:  fmt.Errorf("json: cannot unmarshal string into Go value of type int"),
+		},
+		{
+			data: "{\"fd\":123,\"fe\":3.5}",
+			obj:  &F{},
+		},
+		{
+			data: "{\"ff\":[\"abc\"],\"fg\":[123],\"fh\":[true,false]}",
+			obj:  &F{},
+		},
+		{
+			// Invalid string data
+			data: "{\"fa\":123}",
+			obj:  &F{},
+			err:  fmt.Errorf("json: cannot unmarshal number into Go value of type string"),
+		},
+		{
+			// Invalid string data
+			data: "{\"fa\":13.5}",
+			obj:  &F{},
+			err:  fmt.Errorf("json: cannot unmarshal number into Go value of type string"),
+		},
+		{
+			// Invalid string data
+			data: "{\"fa\":true}",
+			obj:  &F{},
+			err:  fmt.Errorf("json: cannot unmarshal bool into Go value of type string"),
+		},
+		{
+			// Invalid []string data
+			data: "{\"ff\":123}",
+			obj:  &F{},
+			err:  fmt.Errorf("json: cannot unmarshal number into Go value of type []string"),
+		},
+		{
+			// Invalid []string data
+			data: "{\"ff\":3.5}",
+			obj:  &F{},
+			err:  fmt.Errorf("json: cannot unmarshal number into Go value of type []string"),
+		},
+		{
+			// Invalid []string data
+			data: "{\"ff\":[123,345]}",
+			obj:  &F{},
+			err:  fmt.Errorf("json: cannot unmarshal number into Go value of type string"),
+		},
+		{
+			// Invalid []int data
+			data: "{\"fg\":123}",
+			obj:  &F{},
+			err:  fmt.Errorf("json: cannot unmarshal number into Go value of type []int"),
+		},
+		{
+			// Invalid []int data
+			data: "{\"fg\":\"abc\"}",
+			obj:  &F{},
+			err:  fmt.Errorf("json: cannot unmarshal string into Go value of type []int"),
+		},
+		{
+			// Invalid []int data
+			data: "{\"fg\":[\"abc\"]}",
+			obj:  &F{},
+			err:  fmt.Errorf("json: cannot unmarshal string into Go value of type int"),
+		},
+		{
+			// Invalid []int data
+			data: "{\"fg\":[3.5]}",
+			obj:  &F{},
+			err:  fmt.Errorf("json: cannot unmarshal number 3.5 into Go value of type int"),
+		},
+		{
+			// Invalid []int data
+			data: "{\"fg\":[true,false]}",
+			obj:  &F{},
+			err:  fmt.Errorf("json: cannot unmarshal number 3.5 into Go value of type int"),
+		},
+		{
+			// Invalid []bool data
+			data: "{\"fh\":123}",
+			obj:  &F{},
+			err:  fmt.Errorf("json: cannot unmarshal number into Go value of type []bool"),
+		},
+		{
+			// Invalid []bool data
+			data: "{\"fh\":\"abc\"}",
+			obj:  &F{},
+			err:  fmt.Errorf("json: cannot unmarshal string into Go value of type []bool"),
+		},
+		{
+			// Invalid []bool data
+			data: "{\"fh\":[\"abc\"]}",
+			obj:  &F{},
+			err:  fmt.Errorf("json: cannot unmarshal string into Go value of type bool"),
+		},
+		{
+			// Invalid []bool data
+			data: "{\"fh\":[3.5]}",
+			obj:  &F{},
+			err:  fmt.Errorf("json: cannot unmarshal number into Go value of type bool"),
+		},
+		{
+			// Invalid []bool data
+			data: "{\"fh\":[123]}",
+			obj:  &F{},
+			err:  fmt.Errorf("json: cannot unmarshal number into Go value of type bool"),
+		},
+		{
+			// Invalid []float data
+			data: "{\"fi\":123}",
+			obj:  &F{},
+			err:  fmt.Errorf("json: cannot unmarshal number into Go value of type []float32"),
+		},
+		{
+			// Invalid []float data
+			data: "{\"fi\":\"abc\"}",
+			obj:  &F{},
+			err:  fmt.Errorf("json: cannot unmarshal string into Go value of type []float32"),
+		},
+		{
+			// Invalid []float data
+			data: "{\"fi\":[\"abc\"]}",
+			obj:  &F{},
+			err:  fmt.Errorf("json: cannot unmarshal string into Go value of type float32"),
+		},
+		{
+			// Invalid []float data
+			data: "{\"fi\":[true]}",
+			obj:  &F{},
+			err:  fmt.Errorf("json: cannot unmarshal bool into Go value of type float32"),
+		},
+	}
+
+	for i := range testCases {
+		doUnrecognized(t, testCases[i].data, testCases[i].obj, testCases[i].err)
 		if t.Failed() {
 			break
 		}
