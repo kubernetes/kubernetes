@@ -1329,7 +1329,9 @@ func (ctrl *PersistentVolumeController) provisionClaimOperation(claimObj interfa
 	glog.V(3).Infof("volume %q for claim %q created", volume.Name, claimToClaimKey(claim))
 
 	// Create Kubernetes PV object for the volume.
-	volume.Name = pvName
+	if volume.Name == "" {
+		volume.Name = pvName
+	}
 	// Bind it to the claim
 	volume.Spec.ClaimRef = claimRef
 	volume.Status.Phase = v1.VolumeBound
