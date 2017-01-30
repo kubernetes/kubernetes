@@ -21,7 +21,6 @@ go_library(
         "//pkg/api/v1:go_default_library",
         "//pkg/controller/garbagecollector/metaonly:go_default_library",
         "//pkg/util/metrics:go_default_library",
-        "//pkg/util/workqueue:go_default_library",
         "//vendor:github.com/golang/glog",
         "//vendor:github.com/golang/groupcache/lru",
         "//vendor:github.com/prometheus/client_golang/prometheus",
@@ -41,6 +40,7 @@ go_library(
         "//vendor:k8s.io/client-go/kubernetes",
         "//vendor:k8s.io/client-go/tools/cache",
         "//vendor:k8s.io/client-go/util/clock",
+        "//vendor:k8s.io/client-go/util/workqueue",
     ],
 )
 
@@ -54,7 +54,6 @@ go_test(
         "//pkg/api/install:go_default_library",
         "//pkg/api/v1:go_default_library",
         "//pkg/controller/garbagecollector/metaonly:go_default_library",
-        "//pkg/util/workqueue:go_default_library",
         "//vendor:github.com/stretchr/testify/assert",
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
         "//vendor:k8s.io/apimachinery/pkg/runtime/schema",
@@ -65,6 +64,7 @@ go_test(
         "//vendor:k8s.io/client-go/dynamic",
         "//vendor:k8s.io/client-go/rest",
         "//vendor:k8s.io/client-go/util/clock",
+        "//vendor:k8s.io/client-go/util/workqueue",
     ],
 )
 
