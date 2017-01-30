@@ -41,6 +41,7 @@ func TestIsConfigTransportTLS(t *testing.T) {
 	testCases := []struct {
 		Config       *Config
 		TransportTLS bool
+		Err          bool
 	}{
 		{
 			Config:       &Config{},
@@ -79,15 +80,46 @@ func TestIsConfigTransportTLS(t *testing.T) {
 			},
 			TransportTLS: true,
 		},
+		{
+			Config: &Config{
+				Host:           "https://localhost",
+				AlternateHosts: []string{"https://10.10.0.2", "https://10.10.0.3"},
+			},
+			TransportTLS: true,
+		},
+		{
+			Config: &Config{
+				AlternateHosts: []string{"https://10.10.0.2", "https://10.10.0.3"},
+			},
+			TransportTLS: true,
+		},
+		{
+			Config: &Config{
+				Host:           "http://localhost",
+				AlternateHosts: []string{"https://10.10.0.2", "https://10.10.0.3"},
+			},
+			Err: true,
+		},
+		{
+			Config: &Config{
+				Host:           "https://10.10.0.1",
+				AlternateHosts: []string{"http://10.10.0.2", "https://10.10.0.3"},
+			},
+			Err: true,
+		},
 	}
-	for _, testCase := range testCases {
+	for i, testCase := range testCases {
 		if err := SetKubernetesDefaults(testCase.Config); err != nil {
-			t.Errorf("setting defaults failed for %#v: %v", testCase.Config, err)
+			t.Errorf("%d: setting defaults failed for %#v: %v", i, testCase.Config, err)
 			continue
 		}
-		useTLS := IsConfigTransportTLS(*testCase.Config)
-		if testCase.TransportTLS != useTLS {
-			t.Errorf("expected %v for %#v", testCase.TransportTLS, testCase.Config)
+		useTLS, err := IsConfigTransportTLS(*testCase.Config)
+		isErr := err != nil
+		if isErr != testCase.Err {
+			t.Errorf("%d: Unexpected error %v", i, err)
+		}
+		if !isErr && testCase.TransportTLS != useTLS {
+			t.Errorf("%d: expected %v for %#v", i, testCase.TransportTLS, testCase.Config)
 		}
 	}
 }

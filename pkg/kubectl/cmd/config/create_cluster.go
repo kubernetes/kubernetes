@@ -37,6 +37,7 @@ type createClusterOptions struct {
 	configAccess          clientcmd.ConfigAccess
 	name                  string
 	server                flag.StringFlag
+	servers               []string
 	insecureSkipTLSVerify flag.Tristate
 	certificateAuthority  flag.StringFlag
 	embedCAData           flag.Tristate
@@ -63,7 +64,7 @@ func NewCmdConfigSetCluster(out io.Writer, configAccess clientcmd.ConfigAccess) 
 	options := &createClusterOptions{configAccess: configAccess}
 
 	cmd := &cobra.Command{
-		Use:     fmt.Sprintf("set-cluster NAME [--%v=server] [--%v=path/to/certificate/authority] [--%v=true]", clientcmd.FlagAPIServer, clientcmd.FlagCAFile, clientcmd.FlagInsecure),
+		Use:     fmt.Sprintf("set-cluster NAME [--%v=server] [--%v=servers] [--%v=path/to/certificate/authority] [--%v=true]", clientcmd.FlagAPIServer, clientcmd.FlagAPIServers, clientcmd.FlagCAFile, clientcmd.FlagInsecure),
 		Short:   i18n.T("Sets a cluster entry in kubeconfig"),
 		Long:    create_cluster_long,
 		Example: create_cluster_example,
@@ -77,6 +78,7 @@ func NewCmdConfigSetCluster(out io.Writer, configAccess clientcmd.ConfigAccess) 
 	options.insecureSkipTLSVerify.Default(false)
 
 	cmd.Flags().Var(&options.server, clientcmd.FlagAPIServer, clientcmd.FlagAPIServer+" for the cluster entry in kubeconfig")
+	cmd.Flags().StringSliceVar(&options.servers, clientcmd.FlagAPIServers, nil, "Use servers to specify list of API servers, can be used with or without --server.")
 	f := cmd.Flags().VarPF(&options.insecureSkipTLSVerify, clientcmd.FlagInsecure, "", clientcmd.FlagInsecure+" for the cluster entry in kubeconfig")
 	f.NoOptDefVal = "true"
 	cmd.Flags().Var(&options.certificateAuthority, clientcmd.FlagCAFile, "path to "+clientcmd.FlagCAFile+" file for the cluster entry in kubeconfig")
@@ -118,6 +120,9 @@ func (o *createClusterOptions) modifyCluster(existingCluster clientcmdapi.Cluste
 
 	if o.server.Provided() {
 		modifiedCluster.Server = o.server.Value()
+	}
+	if len(o.servers) > 0 {
+		modifiedCluster.Servers = o.servers
 	}
 	if o.insecureSkipTLSVerify.Provided() {
 		modifiedCluster.InsecureSkipTLSVerify = o.insecureSkipTLSVerify.Value()

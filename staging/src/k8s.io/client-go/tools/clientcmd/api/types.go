@@ -65,6 +65,8 @@ type Cluster struct {
 	LocationOfOrigin string
 	// Server is the address of the kubernetes cluster (https://hostname:port).
 	Server string `json:"server"`
+	// Servers is an array of addresses to the kubernetes apiservers with the format: (https://hostname:port). Joined with Server in restclient, duplicate Server will be removed.
+	Servers []string `json:"servers,omitempty"`
 	// InsecureSkipTLSVerify skips the validity check for the server's certificate. This will make your HTTPS connections insecure.
 	// +optional
 	InsecureSkipTLSVerify bool `json:"insecure-skip-tls-verify,omitempty"`

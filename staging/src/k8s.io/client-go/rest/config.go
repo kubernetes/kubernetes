@@ -110,9 +110,29 @@ type Config struct {
 	// The maximum length of time to wait before giving up on a server request. A value of zero means no timeout.
 	Timeout time.Duration
 
+	// AlternateHosts is additional hosts that can be used for purpose of fault tolerance
+	AlternateHosts []string
+
 	// Version forces a specific version to be used (if registered)
 	// Do we need this?
 	// Version string
+}
+
+// AllHosts combines Host and AlternateHosts into single slice
+func (c *Config) Hosts() []string {
+	var hosts []string
+	if len(c.Host) > 0 {
+		hosts = make([]string, 0, 1+len(c.AlternateHosts))
+		hosts = append(hosts, c.Host)
+	} else {
+		hosts = make([]string, 0, len(c.AlternateHosts))
+	}
+	for _, host := range c.AlternateHosts {
+		if host != c.Host {
+			hosts = append(hosts, host)
+		}
+	}
+	return hosts
 }
 
 // ImpersonationConfig has all the available impersonation options
@@ -192,7 +212,7 @@ func RESTClientFor(config *Config) (*RESTClient, error) {
 		burst = DefaultBurst
 	}
 
-	baseURL, versionedAPIPath, err := defaultServerUrlFor(config)
+	hosts, versionedAPIPath, err := defaultServerUrlsFor(config)
 	if err != nil {
 		return nil, err
 	}
@@ -209,8 +229,7 @@ func RESTClientFor(config *Config) (*RESTClient, error) {
 			httpClient.Timeout = config.Timeout
 		}
 	}
-
-	return NewRESTClient(baseURL, versionedAPIPath, config.ContentConfig, qps, burst, config.RateLimiter, httpClient)
+	return NewRESTClient(hosts, versionedAPIPath, config.ContentConfig, qps, burst, config.RateLimiter, httpClient)
 }
 
 // UnversionedRESTClientFor is the same as RESTClientFor, except that it allows
@@ -220,7 +239,7 @@ func UnversionedRESTClientFor(config *Config) (*RESTClient, error) {
 		return nil, fmt.Errorf("NeogitatedSerializer is required when initializing a RESTClient")
 	}
 
-	baseURL, versionedAPIPath, err := defaultServerUrlFor(config)
+	hosts, versionedAPIPath, err := defaultServerUrlsFor(config)
 	if err != nil {
 		return nil, err
 	}
@@ -244,7 +263,7 @@ func UnversionedRESTClientFor(config *Config) (*RESTClient, error) {
 		versionConfig.GroupVersion = &v
 	}
 
-	return NewRESTClient(baseURL, versionedAPIPath, versionConfig, config.QPS, config.Burst, config.RateLimiter, httpClient)
+	return NewRESTClient(hosts, versionedAPIPath, versionConfig, config.QPS, config.Burst, config.RateLimiter, httpClient)
 }
 
 // SetKubernetesDefaults sets default values on the provided client config for accessing the
@@ -340,12 +359,24 @@ func InClusterConfig() (*Config, error) {
 //
 // Note: the Insecure flag is ignored when testing for this value, so MITM attacks are
 // still possible.
-func IsConfigTransportTLS(config Config) bool {
-	baseURL, _, err := defaultServerUrlFor(&config)
+func IsConfigTransportTLS(config Config) (bool, error) {
+	hosts, _, err := defaultServerUrlsFor(&config)
+	// TODO Propagate errors from defaultServerUrlsFor
 	if err != nil {
-		return false
+		return false, nil
 	}
-	return baseURL.Scheme == "https"
+	allHttps := 0
+	for _, host := range hosts {
+		if host.Scheme == "https" {
+			allHttps++
+		}
+	}
+	if allHttps == 0 {
+		return false, nil
+	} else if allHttps == len(hosts) {
+		return true, nil
+	}
+	return false, fmt.Errorf("https and http can't be mixed, hosts: %v", hosts)
 }
 
 // LoadTLSFiles copies the data from the CertFile, KeyFile, and CAFile fields into the CertData,
@@ -396,10 +427,11 @@ func AddUserAgent(config *Config, userAgent string) *Config {
 func AnonymousClientConfig(config *Config) *Config {
 	// copy only known safe fields
 	return &Config{
-		Host:          config.Host,
-		APIPath:       config.APIPath,
-		Prefix:        config.Prefix,
-		ContentConfig: config.ContentConfig,
+		Host:           config.Host,
+		AlternateHosts: config.AlternateHosts,
+		APIPath:        config.APIPath,
+		Prefix:         config.Prefix,
+		ContentConfig:  config.ContentConfig,
 		TLSClientConfig: TLSClientConfig{
 			Insecure:   config.Insecure,
 			ServerName: config.ServerName,
