@@ -266,7 +266,7 @@ func TestSortMergeLists(t *testing.T) {
 		sorted := testObjectToJSONOrFail(t, c.Sorted, c.Description)
 		if !reflect.DeepEqual(original, sorted) {
 			t.Errorf("error in test case: %s\ncannot sort object:\n%s\nexpected:\n%s\ngot:\n%s\n",
-				c.Description, toYAMLOrError(c.Original), toYAMLOrError(c.Sorted), jsonToYAMLOrError(original))
+				c.Description, ToYAMLOrError(c.Original), ToYAMLOrError(c.Sorted), jsonToYAMLOrError(original))
 		}
 	}
 }
@@ -2037,7 +2037,7 @@ func testTwoWayPatch(t *testing.T, c StrategicMergePatchTestCase) {
 	actualPatch, err := CreateTwoWayMergePatch(original, modified, mergeItem)
 	if err != nil {
 		t.Errorf("error: %s\nin test case: %s\ncannot create two way patch: %s:\n%s\n",
-			err, c.Description, original, toYAMLOrError(c.StrategicMergePatchTestCaseData))
+			err, c.Description, original, ToYAMLOrError(c.StrategicMergePatchTestCaseData))
 		return
 	}
 
@@ -2087,13 +2087,13 @@ func testThreeWayPatch(t *testing.T, c StrategicMergePatchTestCase) {
 	if err != nil {
 		if !IsConflict(err) {
 			t.Errorf("error: %s\nin test case: %s\ncannot create three way patch:\n%s\n",
-				err, c.Description, toYAMLOrError(c.StrategicMergePatchTestCaseData))
+				err, c.Description, ToYAMLOrError(c.StrategicMergePatchTestCaseData))
 			return
 		}
 
 		if !strings.Contains(c.Description, "conflict") {
 			t.Errorf("unexpected conflict: %s\nin test case: %s\ncannot create three way patch:\n%s\n",
-				err, c.Description, toYAMLOrError(c.StrategicMergePatchTestCaseData))
+				err, c.Description, ToYAMLOrError(c.StrategicMergePatchTestCaseData))
 			return
 		}
 
@@ -2101,7 +2101,7 @@ func testThreeWayPatch(t *testing.T, c StrategicMergePatchTestCase) {
 			actual, err := CreateThreeWayMergePatch(original, modified, current, mergeItem, true)
 			if err != nil {
 				t.Errorf("error: %s\nin test case: %s\ncannot force three way patch application:\n%s\n",
-					err, c.Description, toYAMLOrError(c.StrategicMergePatchTestCaseData))
+					err, c.Description, ToYAMLOrError(c.StrategicMergePatchTestCaseData))
 				return
 			}
 
@@ -2114,7 +2114,7 @@ func testThreeWayPatch(t *testing.T, c StrategicMergePatchTestCase) {
 
 	if strings.Contains(c.Description, "conflict") || len(c.Result) < 1 {
 		t.Errorf("error in test case: %s\nexpected conflict did not occur:\n%s\n",
-			c.Description, toYAMLOrError(c.StrategicMergePatchTestCaseData))
+			c.Description, ToYAMLOrError(c.StrategicMergePatchTestCaseData))
 		return
 	}
 
