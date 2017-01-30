@@ -122,6 +122,7 @@ pkg/client/listers/apps/v1beta1
 pkg/client/listers/authentication/internalversion
 pkg/client/listers/authentication/v1beta1
 pkg/client/listers/authorization/internalversion
+pkg/client/listers/authorization/v1
 pkg/client/listers/authorization/v1beta1
 pkg/client/listers/autoscaling/internalversion
 pkg/client/listers/autoscaling/v1

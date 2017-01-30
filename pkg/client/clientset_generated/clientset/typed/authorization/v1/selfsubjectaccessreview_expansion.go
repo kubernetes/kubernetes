@@ -15,3 +15,21 @@ limitations under the License.
 */
 
 package v1
+
+import (
+	authorizationapi "k8s.io/kubernetes/pkg/apis/authorization/v1"
+)
+
+type SelfSubjectAccessReviewExpansion interface {
+	Create(sar *authorizationapi.SelfSubjectAccessReview) (result *authorizationapi.SelfSubjectAccessReview, err error)
+}
+
+func (c *selfSubjectAccessReviews) Create(sar *authorizationapi.SelfSubjectAccessReview) (result *authorizationapi.SelfSubjectAccessReview, err error) {
+	result = &authorizationapi.SelfSubjectAccessReview{}
+	err = c.client.Post().
+		Resource("selfsubjectaccessreviews").
+		Body(sar).
+		Do().
+		Into(result)
+	return
+}
