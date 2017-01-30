@@ -457,6 +457,7 @@ func structToUnstructured(sv, dv reflect.Value) error {
 	if dt.Kind() != reflect.Map {
 		return fmt.Errorf("cannot convert struct to: %v", dt.Kind())
 	}
+	realMap := dv.Interface().(map[string]interface{})
 
 	for i := 0; i < st.NumField(); i++ {
 		fieldInfo := fieldInfoFromField(st, i)
@@ -473,20 +474,18 @@ func structToUnstructured(sv, dv reflect.Value) error {
 			// No fource field, skip.
 			continue
 		}
-		var subv reflect.Value
 		switch fv.Type().Kind() {
 		case reflect.String, reflect.Bool,
 			reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64,
 			reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
-			subv = fv
+			realMap[fieldInfo.name] = fv.Interface()
 		default:
-			subv = reflect.New(dt.Elem()).Elem()
+			subv := reflect.New(dt.Elem()).Elem()
 			if err := toUnstructured(fv, subv); err != nil {
 				return err
 			}
+			dv.SetMapIndex(fieldInfo.nameValue, subv)
 		}
-		// TODO: It seems this is causing 2 allocations per call, even if subv = fv.
-		dv.SetMapIndex(fieldInfo.nameValue, subv)
 	}
 	return nil
 }
