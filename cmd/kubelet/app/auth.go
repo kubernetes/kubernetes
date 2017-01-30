@@ -41,7 +41,7 @@ func buildAuth(nodeName types.NodeName, client clientset.Interface, config compo
 		sarClient   authorizationclient.SubjectAccessReviewInterface
 	)
 	if client != nil && !reflect.ValueOf(client).IsNil() {
-		tokenClient = client.Authentication().TokenReviews()
+		tokenClient = client.AuthenticationV1beta1().TokenReviews()
 		sarClient = client.AuthorizationV1beta1().SubjectAccessReviews()
 	}
 
