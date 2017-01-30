@@ -24,6 +24,7 @@ import (
 	"k8s.io/client-go/util/flowcontrol"
 	v1beta1apps "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/apps/v1beta1"
 	v1beta1authentication "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/authentication/v1beta1"
+	v1authorization "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/authorization/v1"
 	v1beta1authorization "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/authorization/v1beta1"
 	v1autoscaling "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/autoscaling/v1"
 	v1batch "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/batch/v1"
@@ -48,9 +49,11 @@ type Interface interface {
 	AuthenticationV1beta1() v1beta1authentication.AuthenticationV1beta1Interface
 	// Deprecated: please explicitly pick a version if possible.
 	Authentication() v1beta1authentication.AuthenticationV1beta1Interface
-	AuthorizationV1beta1() v1beta1authorization.AuthorizationV1beta1Interface
+	AuthorizationV1() v1authorization.AuthorizationV1Interface
 	// Deprecated: please explicitly pick a version if possible.
-	Authorization() v1beta1authorization.AuthorizationV1beta1Interface
+	Authorization() v1authorization.AuthorizationV1Interface
+	AuthorizationV1beta1() v1beta1authorization.AuthorizationV1beta1Interface
+
 	AutoscalingV1() v1autoscaling.AutoscalingV1Interface
 	// Deprecated: please explicitly pick a version if possible.
 	Autoscaling() v1autoscaling.AutoscalingV1Interface
@@ -85,6 +88,7 @@ type Clientset struct {
 	*v1core.CoreV1Client
 	*v1beta1apps.AppsV1beta1Client
 	*v1beta1authentication.AuthenticationV1beta1Client
+	*v1authorization.AuthorizationV1Client
 	*v1beta1authorization.AuthorizationV1beta1Client
 	*v1autoscaling.AutoscalingV1Client
 	*v1batch.BatchV1Client
@@ -148,17 +152,25 @@ func (c *Clientset) Authentication() v1beta1authentication.AuthenticationV1beta1
 	return c.AuthenticationV1beta1Client
 }
 
-// AuthorizationV1beta1 retrieves the AuthorizationV1beta1Client
-func (c *Clientset) AuthorizationV1beta1() v1beta1authorization.AuthorizationV1beta1Interface {
+// AuthorizationV1 retrieves the AuthorizationV1Client
+func (c *Clientset) AuthorizationV1() v1authorization.AuthorizationV1Interface {
 	if c == nil {
 		return nil
 	}
-	return c.AuthorizationV1beta1Client
+	return c.AuthorizationV1Client
 }
 
 // Deprecated: Authorization retrieves the default version of AuthorizationClient.
 // Please explicitly pick a version.
-func (c *Clientset) Authorization() v1beta1authorization.AuthorizationV1beta1Interface {
+func (c *Clientset) Authorization() v1authorization.AuthorizationV1Interface {
+	if c == nil {
+		return nil
+	}
+	return c.AuthorizationV1Client
+}
+
+// AuthorizationV1beta1 retrieves the AuthorizationV1beta1Client
+func (c *Clientset) AuthorizationV1beta1() v1beta1authorization.AuthorizationV1beta1Interface {
 	if c == nil {
 		return nil
 	}
@@ -328,6 +340,10 @@ func NewForConfig(c *rest.Config) (*Clientset, error) {
 	if err != nil {
 		return nil, err
 	}
+	cs.AuthorizationV1Client, err = v1authorization.NewForConfig(&configShallowCopy)
+	if err != nil {
+		return nil, err
+	}
 	cs.AuthorizationV1beta1Client, err = v1beta1authorization.NewForConfig(&configShallowCopy)
 	if err != nil {
 		return nil, err
@@ -384,6 +400,7 @@ func NewForConfigOrDie(c *rest.Config) *Clientset {
 	cs.CoreV1Client = v1core.NewForConfigOrDie(c)
 	cs.AppsV1beta1Client = v1beta1apps.NewForConfigOrDie(c)
 	cs.AuthenticationV1beta1Client = v1beta1authentication.NewForConfigOrDie(c)
+	cs.AuthorizationV1Client = v1authorization.NewForConfigOrDie(c)
 	cs.AuthorizationV1beta1Client = v1beta1authorization.NewForConfigOrDie(c)
 	cs.AutoscalingV1Client = v1autoscaling.NewForConfigOrDie(c)
 	cs.BatchV1Client = v1batch.NewForConfigOrDie(c)
@@ -405,6 +422,7 @@ func New(c rest.Interface) *Clientset {
 	cs.CoreV1Client = v1core.New(c)
 	cs.AppsV1beta1Client = v1beta1apps.New(c)
 	cs.AuthenticationV1beta1Client = v1beta1authentication.New(c)
+	cs.AuthorizationV1Client = v1authorization.New(c)
 	cs.AuthorizationV1beta1Client = v1beta1authorization.New(c)
 	cs.AutoscalingV1Client = v1autoscaling.New(c)
 	cs.BatchV1Client = v1batch.New(c)
