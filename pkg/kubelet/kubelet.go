@@ -43,7 +43,9 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/tools/cache"
+	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/clock"
 	"k8s.io/client-go/util/flowcontrol"
 	"k8s.io/client-go/util/integer"
@@ -53,7 +55,6 @@ import (
 	componentconfigv1alpha1 "k8s.io/kubernetes/pkg/apis/componentconfig/v1alpha1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/pkg/client/legacylisters"
-	"k8s.io/kubernetes/pkg/client/record"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/features"
 	internalapi "k8s.io/kubernetes/pkg/kubelet/api"
@@ -217,7 +218,7 @@ type KubeletDeps struct {
 	Cloud              cloudprovider.Interface
 	ContainerManager   cm.ContainerManager
 	DockerClient       dockertools.DockerInterface
-	EventClient        *clientset.Clientset
+	EventClient        v1core.EventsGetter
 	KubeClient         *clientset.Clientset
 	ExternalKubeClient clientgoclientset.Interface
 	Mounter            mount.Interface

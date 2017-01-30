@@ -35,7 +35,7 @@ type EventExpansion interface {
 	UpdateWithEventNamespace(event *api.Event) (*api.Event, error)
 	PatchWithEventNamespace(event *api.Event, data []byte) (*api.Event, error)
 	// Search finds events about the specified object
-	Search(objOrRef runtime.Object) (*api.EventList, error)
+	Search(scheme *runtime.Scheme, objOrRef runtime.Object) (*api.EventList, error)
 	// Returns the appropriate field selector based on the API version being used to communicate with the server.
 	// The returned field selector can be used with List and Watch to filter desired events.
 	GetFieldSelector(involvedObjectName, involvedObjectNamespace, involvedObjectKind, involvedObjectUID *string) fields.Selector
@@ -99,8 +99,8 @@ func (e *events) PatchWithEventNamespace(incompleteEvent *api.Event, data []byte
 // Search finds events about the specified object. The namespace of the
 // object must match this event's client namespace unless the event client
 // was made with the "" namespace.
-func (e *events) Search(objOrRef runtime.Object) (*api.EventList, error) {
-	ref, err := api.GetReference(objOrRef)
+func (e *events) Search(scheme *runtime.Scheme, objOrRef runtime.Object) (*api.EventList, error) {
+	ref, err := api.GetReference(scheme, objOrRef)
 	if err != nil {
 		return nil, err
 	}

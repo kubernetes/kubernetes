@@ -24,13 +24,13 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/tools/cache"
+	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
 	storage "k8s.io/kubernetes/pkg/apis/storage/v1beta1"
 	storageutil "k8s.io/kubernetes/pkg/apis/storage/v1beta1/util"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
-	"k8s.io/kubernetes/pkg/client/record"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/util/goroutinemap"
 	vol "k8s.io/kubernetes/pkg/volume"
@@ -746,7 +746,7 @@ func (ctrl *PersistentVolumeController) bindVolumeToClaim(volume *v1.PersistentV
 		volume.Spec.ClaimRef.Namespace != claim.Namespace ||
 		volume.Spec.ClaimRef.UID != claim.UID {
 
-		claimRef, err := v1.GetReference(claim)
+		claimRef, err := v1.GetReference(api.Scheme, claim)
 		if err != nil {
 			return nil, fmt.Errorf("Unexpected error getting claim reference: %v", err)
 		}
@@ -1288,7 +1288,7 @@ func (ctrl *PersistentVolumeController) provisionClaimOperation(claimObj interfa
 
 	// Prepare a claimRef to the claim early (to fail before a volume is
 	// provisioned)
-	claimRef, err := v1.GetReference(claim)
+	claimRef, err := v1.GetReference(api.Scheme, claim)
 	if err != nil {
 		glog.V(3).Infof("unexpected error getting claim reference: %v", err)
 		return
