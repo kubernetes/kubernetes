@@ -43,5 +43,8 @@ func main() {
 	hk.AddServer(NewFederationAPIServer())
 	hk.AddServer(NewFederationCMServer())
 
+	//LCM tools
+	hk.AddServer(NewKubeadmServer())
+
 	hk.RunToExit(os.Args)
 }
