@@ -49,8 +49,12 @@ func PodMatchesTermsNamespaceAndSelector(pod *v1.Pod, namespaces sets.String, se
 	return true
 }
 
-// nodesHaveSameTopologyKeyInternal checks if nodeA and nodeB have same label value with given topologyKey as label key.
-func nodesHaveSameTopologyKeyInternal(nodeA, nodeB *v1.Node, topologyKey string) bool {
+// NodesHaveSameTopologyKey checks if nodeA and nodeB have same label value with given topologyKey as label key.
+// Returns false if topologyKey is empty.
+func NodesHaveSameTopologyKey(nodeA, nodeB *v1.Node, topologyKey string) bool {
+	if len(topologyKey) == 0 {
+		return false
+	}
 	return nodeA.Labels != nil && nodeB.Labels != nil && len(nodeA.Labels[topologyKey]) > 0 && nodeA.Labels[topologyKey] == nodeB.Labels[topologyKey]
 }
 
@@ -64,12 +68,12 @@ func (tps *Topologies) NodesHaveSameTopologyKey(nodeA, nodeB *v1.Node, topologyK
 	if len(topologyKey) == 0 {
 		// assumes this is allowed only for PreferredDuringScheduling pod anti-affinity (ensured by api/validation)
 		for _, defaultKey := range tps.DefaultKeys {
-			if nodesHaveSameTopologyKeyInternal(nodeA, nodeB, defaultKey) {
+			if NodesHaveSameTopologyKey(nodeA, nodeB, defaultKey) {
 				return true
 			}
 		}
 		return false
 	} else {
-		return nodesHaveSameTopologyKeyInternal(nodeA, nodeB, topologyKey)
+		return NodesHaveSameTopologyKey(nodeA, nodeB, topologyKey)
 	}
 }
