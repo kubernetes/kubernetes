@@ -28,4 +28,9 @@ const (
 	APIServerKubeletClientCertAndKeyBaseName = "apiserver-kubelet-client"
 	APIServerKubeletClientCertName           = "apiserver-kubelet-client.crt"
 	APIServerKubeletClientKeyName            = "apiserver-kubelet-client.key"
+
+	AuthzModeAlwaysAllow = "AlwaysAllow"
+	AuthzModeABAC        = "ABAC"
+	AuthzModeRBAC        = "RBAC"
+	AuthzModeWebhook     = "Webhook"
 )

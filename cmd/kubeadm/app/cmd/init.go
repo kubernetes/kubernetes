@@ -30,6 +30,7 @@ import (
 	kubeadmapiext "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha1"
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/validation"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/flags"
+	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/discovery"
 	kubemaster "k8s.io/kubernetes/cmd/kubeadm/app/master"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/apiconfig"
@@ -219,7 +220,7 @@ func (i *Init) Run(out io.Writer) error {
 		return err
 	}
 
-	if i.cfg.AuthorizationMode == "RBAC" {
+	if i.cfg.AuthorizationMode == kubeadmconstants.AuthzModeRBAC {
 		err = apiconfig.CreateBootstrapRBACClusterRole(client)
 		if err != nil {
 			return err
