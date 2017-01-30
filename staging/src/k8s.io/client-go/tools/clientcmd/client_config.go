@@ -104,6 +104,21 @@ func (config *DirectClientConfig) RawConfig() (clientcmdapi.Config, error) {
 	return config.config, nil
 }
 
+// cleanHost cleans URI, checks if any opaque data is present and
+// path is longer than 1 symbol.
+func cleanHost(host string) (string, error) {
+	u, err := url.ParseRequestURI(host)
+	if err != nil {
+		return "", err
+	}
+	if u.Opaque != "" && len(u.Path) <= 1 {
+		return "", fmt.Errorf("Host: %v has opaque data or path is too short.", host)
+	}
+	u.RawQuery = ""
+	u.Fragment = ""
+	return u.String(), nil
+}
+
 // ClientConfig implements ClientConfig
 func (config *DirectClientConfig) ClientConfig() (*restclient.Config, error) {
 	// check that getAuthInfo, getContext, and getCluster do not return an error.
@@ -139,18 +154,31 @@ func (config *DirectClientConfig) ClientConfig() (*restclient.Config, error) {
 		}
 		clientConfig.Timeout = timeout
 	}
-
-	if u, err := url.ParseRequestURI(clientConfig.Host); err == nil && u.Opaque == "" && len(u.Path) > 1 {
-		u.RawQuery = ""
-		u.Fragment = ""
-		clientConfig.Host = u.String()
+	host, err := cleanHost(configClusterInfo.Server)
+	if err == nil {
+		clientConfig.Host = host
+	} else {
+		clientConfig.Host = configClusterInfo.Server
+	}
+	for _, server := range configClusterInfo.Servers {
+		host, err = cleanHost(server)
+		if err == nil {
+			clientConfig.AlternateHosts = append(clientConfig.AlternateHosts, host)
+		} else {
+			clientConfig.AlternateHosts = append(clientConfig.AlternateHosts, server)
+		}
 	}
 	if len(configAuthInfo.Impersonate) > 0 {
 		clientConfig.Impersonate = restclient.ImpersonationConfig{UserName: configAuthInfo.Impersonate}
 	}
 
 	// only try to read the auth information if we are secure
-	if restclient.IsConfigTransportTLS(*clientConfig) {
+	isTLS, err := restclient.IsConfigTransportTLS(*clientConfig)
+	if err != nil {
+		return nil, err
+	}
+	if isTLS {
+
 		var err error
 
 		// mergo is a first write wins for map value and a last writing wins for interface values
