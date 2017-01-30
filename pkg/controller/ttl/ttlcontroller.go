@@ -284,13 +284,13 @@ func (ttlc *TTLController) updateNodeIfNeeded(key string) error {
 		}
 		return err
 	}
-	desiredTTL := ttlc.getDesiredTTLSeconds()
 
 	desiredTTL := ttlc.getDesiredTTLSeconds()
 	currentTTL, ok := getIntFromAnnotation(node, v1.ObjectTTLAnnotationKey)
 	if ok && currentTTL == desiredTTL {
 		return nil
 	}
+
 	objCopy, err := api.Scheme.DeepCopy(node)
 	if err != nil {
 		return err
