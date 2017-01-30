@@ -15,3 +15,21 @@ limitations under the License.
 */
 
 package v1
+
+import (
+	authenticationapi "k8s.io/kubernetes/pkg/apis/authentication/v1"
+)
+
+type TokenReviewExpansion interface {
+	Create(tokenReview *authenticationapi.TokenReview) (result *authenticationapi.TokenReview, err error)
+}
+
+func (c *tokenReviews) Create(tokenReview *authenticationapi.TokenReview) (result *authenticationapi.TokenReview, err error) {
+	result = &authenticationapi.TokenReview{}
+	err = c.client.Post().
+		Resource("tokenreviews").
+		Body(tokenReview).
+		Do().
+		Into(result)
+	return
+}

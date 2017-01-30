@@ -14,4 +14,14 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package v1
+package fake
+
+import (
+	core "k8s.io/client-go/testing"
+	authenticationapi "k8s.io/kubernetes/pkg/apis/authentication/v1"
+)
+
+func (c *FakeTokenReviews) Create(tokenReview *authenticationapi.TokenReview) (result *authenticationapi.TokenReview, err error) {
+	obj, err := c.Fake.Invokes(core.NewRootCreateAction(authenticationapi.SchemeGroupVersion.WithResource("tokenreviews"), tokenReview), &authenticationapi.TokenReview{})
+	return obj.(*authenticationapi.TokenReview), err
+}
