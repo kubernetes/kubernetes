@@ -27,10 +27,10 @@ import (
 	"strings"
 	"sync"
 
+	"k8s.io/apimachinery/pkg/util/httpstream"
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/pkg/api"
 	"k8s.io/client-go/pkg/kubelet/server/portforward"
-	"k8s.io/client-go/pkg/util/httpstream"
 )
 
 // PortForwarder knows how to listen for local connections and forward them to
