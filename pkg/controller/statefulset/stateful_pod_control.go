@@ -110,7 +110,6 @@ func (spc *realStatefulPodControl) UpdateStatefulPod(set *apps.StatefulSet, pod 
 			return nil
 		}
 		// commit the update, retrying on conflicts
-		// TODO do we need the extra GET request or can we just use the return parameter from the client on conflict?
 		if _, err := spc.client.Core().Pods(set.Namespace).Update(&clone); apierrors.IsConflict(err) {
 			if conflicting, err := spc.client.Core().Pods(set.Namespace).Get(clone.Name, metav1.GetOptions{}); err != nil {
 				spc.recordPodEvent("update", set, &clone, err)

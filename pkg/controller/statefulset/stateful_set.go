@@ -162,6 +162,7 @@ func (ssc *StatefulSetController) updatePod(old, cur interface{}) {
 		return
 	}
 	ssc.enqueueStatefulSet(set)
+	// TODO will we need this going forward with controller ref impl?
 	if !reflect.DeepEqual(curPod.Labels, oldPod.Labels) {
 		if oldSet := ssc.getStatefulSetForPod(oldPod); oldSet != nil {
 			ssc.enqueueStatefulSet(oldSet)
