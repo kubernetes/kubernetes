@@ -809,7 +809,7 @@ func (e *Store) Delete(ctx genericapirequest.Context, name string, options *meta
 	}
 
 	// delete immediately, or no graceful deletion supported
-	glog.V(6).Infof("going to delete %s from regitry: ", name)
+	glog.V(6).Infof("going to delete %s from registry: ", name)
 	out = e.NewFunc()
 	if err := e.Storage.Delete(ctx, key, out, &preconditions); err != nil {
 		// Please refer to the place where we set ignoreNotFound for the reason
