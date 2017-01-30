@@ -52,6 +52,22 @@ testCases:
       nilKey: null
     expectedWithoutNull:
       nonNilKey: foo
+  - description: simple map with all nil values
+    originalObj:
+      nilKey1: null
+      nilKey2: null
+    expectedWithNull:
+      nilKey1: null
+      nilKey2: null
+    expectedWithoutNull: {}
+  - description: simple map with all non-nil values
+    originalObj:
+      nonNilKey: foo
+      nonNilKey: bar
+    expectedWithNull: {}
+    expectedWithoutNull:
+      nonNilKey: foo
+      nonNilKey: bar
   - description: nested map
     originalObj:
       mapKey:
@@ -63,6 +79,28 @@ testCases:
     expectedWithoutNull:
       mapKey:
         nonNilKey: foo
+  - description: nested map that all subkeys are nil
+    originalObj:
+      mapKey:
+        nilKey1: null
+        nilKey2: null
+    expectedWithNull:
+      mapKey:
+        nilKey1: null
+        nilKey2: null
+    expectedWithoutNull:
+      mapKey: {}
+  - description: nested map that all subkeys are non-nil
+    originalObj:
+      mapKey:
+        nonNilKey: foo
+        nonNilKey: bar
+    expectedWithNull:
+      mapKey: {}
+    expectedWithoutNull:
+      mapKey:
+        nonNilKey: foo
+        nonNilKey: bar
   - description: empty list
     originalObj:
       listKey: []
