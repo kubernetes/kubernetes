@@ -25,6 +25,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/authorization"
+	"k8s.io/kubernetes/pkg/apis/authorization/v1"
 	"k8s.io/kubernetes/pkg/apis/authorization/v1beta1"
 )
 
@@ -43,6 +44,7 @@ func Install(groupFactoryRegistry announced.APIGroupFactoryRegistry, registry *r
 			AddInternalObjectsToScheme: authorization.AddToScheme,
 		},
 		announced.VersionToSchemeFunc{
+			v1.SchemeGroupVersion.Version:      v1.AddToScheme,
 			v1beta1.SchemeGroupVersion.Version: v1beta1.AddToScheme,
 		},
 	).Announce(groupFactoryRegistry).RegisterAndEnable(registry, scheme); err != nil {
