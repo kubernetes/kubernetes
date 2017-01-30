@@ -471,7 +471,6 @@ func (dc *DeploymentController) classifyReplicaSets(deployment *extensions.Deplo
 				// If the RS no longer exists, don't even log the error.
 				if !errors.IsNotFound(err) {
 					utilruntime.HandleError(err)
-					errlist = append(errlist, err)
 				}
 			} else {
 				matchesAndControlled = append(matchesAndControlled, replicaSet)
