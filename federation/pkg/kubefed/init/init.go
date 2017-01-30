@@ -576,8 +576,10 @@ func createRoleBindings(clientset *client.Clientset, namespace, saName string, d
 		},
 	}
 
-	rolebinding := rbac.NewRoleBinding(roleName, namespace).SAs(namespace, saName).BindingOrDie()
-	rolebinding.Namespace = namespace
+	rolebinding, err := rbac.NewRoleBinding(roleName, namespace).SAs(namespace, saName).Binding()
+	if err != nil {
+		return nil, nil, err
+	}
 	rolebinding.Labels = componentLabel
 
 	if dryRun {

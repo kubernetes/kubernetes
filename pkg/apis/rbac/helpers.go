@@ -262,6 +262,10 @@ type RoleBindingBuilder struct {
 	RoleBinding RoleBinding
 }
 
+// NewRoleBinding creates a RoleBinding builder that can be used
+// to define the subjects of a role binding. At least one of
+// the `Groups`, `Users` or `SAs` method must be called before
+// calling the `Binding*` methods.
 func NewRoleBinding(roleName, namespace string) *RoleBindingBuilder {
 	return &RoleBindingBuilder{
 		RoleBinding: RoleBinding{
@@ -278,6 +282,7 @@ func NewRoleBinding(roleName, namespace string) *RoleBindingBuilder {
 	}
 }
 
+// Groups adds the specified groups as the subjects of the RoleBinding.
 func (r *RoleBindingBuilder) Groups(groups ...string) *RoleBindingBuilder {
 	for _, group := range groups {
 		r.RoleBinding.Subjects = append(r.RoleBinding.Subjects, Subject{Kind: GroupKind, Name: group})
@@ -285,6 +290,7 @@ func (r *RoleBindingBuilder) Groups(groups ...string) *RoleBindingBuilder {
 	return r
 }
 
+// Users adds the specified users as the subjects of the RoleBinding.
 func (r *RoleBindingBuilder) Users(users ...string) *RoleBindingBuilder {
 	for _, user := range users {
 		r.RoleBinding.Subjects = append(r.RoleBinding.Subjects, Subject{Kind: UserKind, Name: user})
@@ -292,6 +298,8 @@ func (r *RoleBindingBuilder) Users(users ...string) *RoleBindingBuilder {
 	return r
 }
 
+// SAs adds the specified service accounts as the subjects of the
+// RoleBinding.
 func (r *RoleBindingBuilder) SAs(namespace string, serviceAccountNames ...string) *RoleBindingBuilder {
 	for _, saName := range serviceAccountNames {
 		r.RoleBinding.Subjects = append(r.RoleBinding.Subjects, Subject{Kind: ServiceAccountKind, Namespace: namespace, Name: saName})
@@ -299,6 +307,7 @@ func (r *RoleBindingBuilder) SAs(namespace string, serviceAccountNames ...string
 	return r
 }
 
+// BindingOrDie calls the binding method and panics if there is an error.
 func (r *RoleBindingBuilder) BindingOrDie() RoleBinding {
 	ret, err := r.Binding()
 	if err != nil {
@@ -307,6 +316,8 @@ func (r *RoleBindingBuilder) BindingOrDie() RoleBinding {
 	return ret
 }
 
+// Binding builds and returns the RoleBinding API object from the builder
+// object.
 func (r *RoleBindingBuilder) Binding() (RoleBinding, error) {
 	if len(r.RoleBinding.Subjects) == 0 {
 		return RoleBinding{}, fmt.Errorf("subjects are required: %#v", r.RoleBinding)
