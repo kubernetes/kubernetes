@@ -40,11 +40,13 @@ HOST_CLUSTER_CONTEXT="${FEDERATION_HOST_CLUSTER_CONTEXT:-${1}}"
 # Initializes the control plane.
 # TODO(madhusudancs): Move this to federation/develop.sh.
 function init() {
+  : "${KUBERNETES_RELEASE?KUBERNETES_RELEASE environment variable must be set}"
+
   kube::log::status "Deploying federation control plane for ${FEDERATION_NAME} in cluster ${HOST_CLUSTER_CONTEXT}"
 
   local -r project="${KUBE_PROJECT:-${PROJECT:-}}"
   local -r kube_registry="${KUBE_REGISTRY:-gcr.io/${project}}"
-  local -r kube_version="${KUBERNETES_RELEASE:-}"
+  local -r kube_version="${KUBERNETES_RELEASE//+/_}"
 
   "${KUBE_ROOT}/federation/develop/kubefed.sh" init \
       "${FEDERATION_NAME}" \
