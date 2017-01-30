@@ -17,8 +17,10 @@ limitations under the License.
 package etcd
 
 import (
+	"fmt"
 	"path"
 	"reflect"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -39,6 +41,33 @@ import (
 	etcdtesting "k8s.io/kubernetes/pkg/storage/etcd/testing"
 	storagetesting "k8s.io/kubernetes/pkg/storage/testing"
 )
+
+// prefixTransformer adds and verifies that all data has the correct prefix on its way in and out.
+type prefixTransformer struct {
+	prefix string
+	err    error
+}
+
+func (p prefixTransformer) ReadString(s string) (string, error) {
+	if !strings.HasPrefix(s, p.prefix) {
+		return "", fmt.Errorf("value does not have expected prefix: %s", s)
+	}
+	return strings.TrimPrefix(s, p.prefix), p.err
+}
+func (p prefixTransformer) WriteString(s string) (string, error) {
+	if len(s) > 0 {
+		return p.prefix + s, p.err
+	}
+	return s, p.err
+}
+
+func defaultPrefix(s string) string {
+	return "test!" + s
+}
+
+func defaultPrefixValue(value []byte) string {
+	return defaultPrefix(string(value))
+}
 
 func testScheme(t *testing.T) (*runtime.Scheme, runtime.Codec) {
 	scheme := runtime.NewScheme()
@@ -62,7 +91,7 @@ func testScheme(t *testing.T) (*runtime.Scheme, runtime.Codec) {
 }
 
 func newEtcdHelper(client etcd.Client, codec runtime.Codec, prefix string) etcdHelper {
-	return *NewEtcdStorage(client, codec, prefix, false, etcdtest.DeserializationCacheSize).(*etcdHelper)
+	return *NewEtcdStorage(client, codec, prefix, false, etcdtest.DeserializationCacheSize, prefixTransformer{prefix: "test!"}).(*etcdHelper)
 }
 
 // Returns an encoded version of api.Pod with the given name.
@@ -512,7 +541,7 @@ func TestDeleteWithRetry(t *testing.T) {
 	// party has updated the object.
 	fakeGet := func(ctx context.Context, key string, opts *etcd.GetOptions) (*etcd.Response, error) {
 		data, _ := runtime.Encode(testapi.Default.Codec(), obj)
-		return &etcd.Response{Node: &etcd.Node{Value: string(data), ModifiedIndex: 99}}, nil
+		return &etcd.Response{Node: &etcd.Node{Value: defaultPrefixValue(data), ModifiedIndex: 99}}, nil
 	}
 	expectedRetries := 3
 	helper := newEtcdHelper(server.Client, testapi.Default.Codec(), prefix)
