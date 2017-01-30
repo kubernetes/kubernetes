@@ -97,10 +97,10 @@ func NewStatefulSetController(podInformer cache.SharedIndexInformer, kubeClient 
 
 	ssc.setStore.Store, ssc.setController = cache.NewInformer(
 		&cache.ListWatch{
-			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
+			ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
 				return ssc.kubeClient.Apps().StatefulSets(v1.NamespaceAll).List(options)
 			},
-			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
+			WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
 				return ssc.kubeClient.Apps().StatefulSets(v1.NamespaceAll).Watch(options)
 			},
 		},

@@ -11,12 +11,10 @@ load(
 go_library(
     name = "go_default_library",
     srcs = [
-        "fakes.go",
-        "identity_mappers.go",
-        "iterator.go",
+        "stateful_pod_control.go",
         "stateful_set.go",
+        "stateful_set_control.go",
         "stateful_set_utils.go",
-        "statefulpod.go",
     ],
     tags = ["automanaged"],
     deps = [
@@ -49,10 +47,10 @@ go_library(
 go_test(
     name = "go_default_test",
     srcs = [
-        "identity_mappers_test.go",
-        "iterator_test.go",
+        "stateful_pod_control_test.go",
+        "stateful_set_control_test.go",
         "stateful_set_test.go",
-        "statefulpod_test.go",
+        "stateful_set_utils_test.go",
     ],
     library = ":go_default_library",
     tags = ["automanaged"],

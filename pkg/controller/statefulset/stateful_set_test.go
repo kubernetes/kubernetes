@@ -17,34 +17,11 @@ limitations under the License.
 package statefulset
 
 import (
-	//"fmt"
-	//"math/rand"
-	//"reflect"
-	//"testing"
-	//"github.com/coreos/etcd/store"
-	//"k8s.io/apimachinery/pkg/util/errors"
-	//"k8s.io/kubernetes/pkg/api/v1"
-	"fmt"
-	"math/rand"
-	"reflect"
-	"testing"
-
-	"k8s.io/apimachinery/pkg/util/errors"
-	"k8s.io/client-go/tools/cache"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/util/workqueue"
 	"k8s.io/kubernetes/pkg/api/v1"
 	apps "k8s.io/kubernetes/pkg/apis/apps/v1beta1"
-	//fakeinternal "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/fake"
-	//"k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/apps/v1beta1"
-	//"k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/apps/v1beta1/fake"
-	//"sort"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/kubernetes/pkg/api/v1"
-	fakeinternal "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/fake"
-	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/apps/v1beta1"
-	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/apps/v1beta1/fake"
-	"k8s.io/kubernetes/pkg/client/legacylisters"
 	"k8s.io/kubernetes/pkg/controller"
-	"k8s.io/kubernetes/pkg/util/workqueue"
 	"sort"
 	"testing"
 )
@@ -69,7 +46,13 @@ func fakeWorker(ssc *StatefulSetController) {
 	}
 }
 
-
+func getPodAtOrdinal(pods []*v1.Pod, ordinal int) *v1.Pod {
+	if 0 > ordinal || ordinal >= len(pods) {
+		return nil
+	}
+	sort.Sort(ascendingOrdinal(pods))
+	return pods[ordinal]
+}
 
 func scaleUpStatefulSetController(set *apps.StatefulSet, ssc *StatefulSetController, spc *fakeStatefulPodControl) error {
 	spc.setsIndexer.Add(set)
