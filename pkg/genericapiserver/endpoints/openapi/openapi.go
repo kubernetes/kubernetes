@@ -31,7 +31,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apiserver/pkg/util/trie"
-	"k8s.io/kubernetes/pkg/api"
 )
 
 var verbs = trie.New([]string{"get", "log", "read", "replace", "patch", "delete", "deletecollection", "watch", "connect", "proxy", "list", "create", "patch"})
@@ -132,7 +131,7 @@ func NewDefinitionNamer(s *runtime.Scheme) DefinitionNamer {
 	ret := DefinitionNamer{
 		typeGroupVersionKinds: map[string][]v1.GroupVersionKind{},
 	}
-	for gvk, rtype := range api.Scheme.AllKnownTypes() {
+	for gvk, rtype := range s.AllKnownTypes() {
 		ret.typeGroupVersionKinds[typeName(rtype)] = append(ret.typeGroupVersionKinds[typeName(rtype)], gvkConvert(gvk))
 	}
 	return ret

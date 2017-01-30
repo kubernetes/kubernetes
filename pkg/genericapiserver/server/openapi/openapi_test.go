@@ -19,13 +19,13 @@ package openapi
 import (
 	"fmt"
 	"net/http"
+	"strings"
 	"testing"
 
 	"github.com/emicklei/go-restful"
 	"github.com/go-openapi/spec"
 	"github.com/stretchr/testify/assert"
 	"k8s.io/apimachinery/pkg/openapi"
-	"strings"
 )
 
 // setUp is a convenience function for setting up for (most) tests.
@@ -198,7 +198,7 @@ func getConfig(fullMethods bool) (*openapi.Config, *restful.Container) {
 			}
 		},
 		GetDefinitionName: func(_ string, name string) (string, spec.Extensions) {
-			friendlyName := name[strings.LastIndex(name, "/") + 1:]
+			friendlyName := name[strings.LastIndex(name, "/")+1:]
 			if strings.HasPrefix(friendlyName, "go_default_test") {
 				friendlyName = "openapi" + friendlyName[len("go_default_test"):]
 			}
