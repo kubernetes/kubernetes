@@ -219,7 +219,7 @@ DEEPCOPY_FILES := $(addsuffix /$(DEEPCOPY_FILENAME), $(DEEPCOPY_DIRS))
 RUN_GEN_DEEPCOPY =                                                          \
     function run_gen_deepcopy() {                                           \
         if [[ -f $(META_DIR)/$(DEEPCOPY_GEN).todo ]]; then                  \
-            ./hack/run-in-gopath.sh $(DEEPCOPY_GEN)                         \
+            echo ./hack/run-in-gopath.sh $(DEEPCOPY_GEN)                         \
                 --v $(KUBE_VERBOSE)                                         \
                 --logtostderr                                               \
                 -i $$(cat $(META_DIR)/$(DEEPCOPY_GEN).todo | paste -sd, -)  \

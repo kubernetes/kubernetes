@@ -20,7 +20,9 @@ api_group(
         "types.go",
         "types_swagger_doc_generated.go",
     ],
-    extra_peers = ["k8s.io/kubernetes/pkg/api/v1"],
+    extra_peers = [
+        "k8s.io/kubernetes/pkg/api/v1",
+    ],
     gen_deps = ["//pkg/apis/batch/v1:go_default_library"],
     gen_types = [
         "conversion",

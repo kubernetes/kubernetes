@@ -4,10 +4,9 @@ git_repository(
     remote = "https://github.com/bazelbuild/rules_go.git",
 )
 
-git_repository(
+local_repository(
     name = "io_kubernetes_build",
-    commit = "74894feecf7f2237ac77e2e4148a89930786f499",
-    remote = "https://github.com/spxtr/repo-infra",
+    path = "/usr/local/google/home/spxtr/go/src/k8s.io/repo-infra",
 )
 
 git_repository(
