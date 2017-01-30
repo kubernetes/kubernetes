@@ -42,7 +42,15 @@ CLIENT_REPO="${MAIN_REPO}/staging/src/${CLIENT_REPO_FROM_SRC}"
 CLIENT_REPO_TEMP="${MAIN_REPO}/staging/src/${CLIENT_REPO_TEMP_FROM_SRC}"
 
 DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-sedi="-i=''"
+
+if LANG=C sed --help 2>&1 | grep -q GNU; then
+  SED="sed"
+elif which gsed &>/dev/null; then
+  SED="gsed"
+else
+  echo "Failed to find GNU sed as sed or gsed. If you are on Mac: brew install gnu-sed." >&2
+  exit 1
+fi
 
 cleanup() {
     rm -rf "${CLIENT_REPO_TEMP}"
@@ -123,7 +131,7 @@ echo "rewriting imports"
 grep -Rl "\"${MAIN_REPO_FROM_SRC}" "${CLIENT_REPO_TEMP}" | \
     grep "\.go" | \
     grep -v "vendor/" | \
-    xargs sed -i "s|\"${MAIN_REPO_FROM_SRC}|\"${CLIENT_REPO_FROM_SRC}|g"
+    xargs ${SED} -i "s|\"${MAIN_REPO_FROM_SRC}|\"${CLIENT_REPO_FROM_SRC}|g"
 
 echo "converting pkg/client/record to v1"
 # need a v1 version of ref.go
@@ -131,26 +139,26 @@ cp "${CLIENT_REPO_TEMP}"/pkg/api/ref.go "${CLIENT_REPO_TEMP}"/pkg/api/v1/ref.go
 gofmt -w -r 'api.a -> v1.a' "${CLIENT_REPO_TEMP}"/pkg/api/v1/ref.go
 gofmt -w -r 'Scheme -> api.Scheme' "${CLIENT_REPO_TEMP}"/pkg/api/v1/ref.go
 # rewriting package name to v1
-sed -i 's/package api/package v1/g' "${CLIENT_REPO_TEMP}"/pkg/api/v1/ref.go
+${SED} -i 's/package api/package v1/g' "${CLIENT_REPO_TEMP}"/pkg/api/v1/ref.go
 # ref.go refers api.Scheme, so manually import /pkg/api
-sed -i "s,import (,import (\n\"${CLIENT_REPO_FROM_SRC}/pkg/api\",g" "${CLIENT_REPO_TEMP}"/pkg/api/v1/ref.go
+${SED} -i "s,import (,import (\n\"${CLIENT_REPO_FROM_SRC}/pkg/api\",g" "${CLIENT_REPO_TEMP}"/pkg/api/v1/ref.go
 gofmt -w "${CLIENT_REPO_TEMP}"/pkg/api/v1/ref.go
 # rewrite pkg/client/record to v1
 gofmt -w -r 'api.a -> v1.a' "${CLIENT_REPO_TEMP}"/pkg/client/record
 # need to call sed to rewrite the strings in test cases...
-find "${CLIENT_REPO_TEMP}"/pkg/client/record -type f -name "*.go" -print0 | xargs -0 sed -i "s/api.ObjectReference/v1.ObjectReference/g"
+find "${CLIENT_REPO_TEMP}"/pkg/client/record -type f -name "*.go" -print0 | xargs -0 ${SED} -i "s/api.ObjectReference/v1.ObjectReference/g"
 # rewrite the imports
-find "${CLIENT_REPO_TEMP}"/pkg/client/record -type f -name "*.go" -print0 | xargs -0 sed -i 's,pkg/api",pkg/api/v1",g'
+find "${CLIENT_REPO_TEMP}"/pkg/client/record -type f -name "*.go" -print0 | xargs -0 ${SED} -i 's,pkg/api",pkg/api/v1",g'
 # gofmt the changed files
 
 echo "rewrite proto names in proto.RegisterType"
-find "${CLIENT_REPO_TEMP}" -type f -name "generated.pb.go" -print0 | xargs -0 sed -i "s/k8s\.io\.kubernetes/k8s.io.client-go/g"
+find "${CLIENT_REPO_TEMP}" -type f -name "generated.pb.go" -print0 | xargs -0 ${SED} -i "s/k8s\.io\.kubernetes/k8s.io.client-go/g"
 
 # strip all generator tags from client-go
-find "${CLIENT_REPO_TEMP}" -type f -name "*.go" -print0 | xargs -0 sed -i '/^\/\/ +k8s:openapi-gen=true/d'
-find "${CLIENT_REPO_TEMP}" -type f -name "*.go" -print0 | xargs -0 sed -i '/^\/\/ +k8s:defaulter-gen=/d'
-find "${CLIENT_REPO_TEMP}" -type f -name "*.go" -print0 | xargs -0 sed -i '/^\/\/ +k8s:deepcopy-gen=/d'
-find "${CLIENT_REPO_TEMP}" -type f -name "*.go" -print0 | xargs -0 sed -i '/^\/\/ +k8s:conversion-gen=/d'
+find "${CLIENT_REPO_TEMP}" -type f -name "*.go" -print0 | xargs -0 ${SED} -i '/^\/\/ +k8s:openapi-gen=true/d'
+find "${CLIENT_REPO_TEMP}" -type f -name "*.go" -print0 | xargs -0 ${SED} -i '/^\/\/ +k8s:defaulter-gen=/d'
+find "${CLIENT_REPO_TEMP}" -type f -name "*.go" -print0 | xargs -0 ${SED} -i '/^\/\/ +k8s:deepcopy-gen=/d'
+find "${CLIENT_REPO_TEMP}" -type f -name "*.go" -print0 | xargs -0 ${SED} -i '/^\/\/ +k8s:conversion-gen=/d'
 
 
 echo "rearranging directory layout"
@@ -164,17 +172,17 @@ function mvfolder {
     # rewrite package
     local src_package="${src##*/}"
     local dst_package="${dst##*/}"
-    find "${CLIENT_REPO_TEMP}/${dst}" -type f -name "*.go" -print0 | xargs -0 sed -i "s,package ${src_package},package ${dst_package},g"
+    find "${CLIENT_REPO_TEMP}/${dst}" -type f -name "*.go" -print0 | xargs -0 ${SED} -i "s,package ${src_package},package ${dst_package},g"
 
     { grep -Rl "\"${CLIENT_REPO_FROM_SRC}/${src}" "${CLIENT_REPO_TEMP}" || true ; } | while read -r target ; do
         # rewrite imports
         # the first rule is to convert import lines like `restclient "k8s.io/client-go/pkg/client/restclient"`,
         # where a package alias is the same the package name.
-        sed -i "s,\<${src_package} \"${CLIENT_REPO_FROM_SRC}/${src},${dst_package} \"${CLIENT_REPO_FROM_SRC}/${dst},g" "${target}"
-        sed -i "s,\"${CLIENT_REPO_FROM_SRC}/${src},\"${CLIENT_REPO_FROM_SRC}/${dst},g" "${target}"
+        ${SED} -i "s,\<${src_package} \"${CLIENT_REPO_FROM_SRC}/${src},${dst_package} \"${CLIENT_REPO_FROM_SRC}/${dst},g" "${target}"
+        ${SED} -i "s,\"${CLIENT_REPO_FROM_SRC}/${src},\"${CLIENT_REPO_FROM_SRC}/${dst},g" "${target}"
         # rewrite import invocation
         if [ "${src_package}" != "${dst_package}" ]; then
-            sed -i "s,\<${src_package}\.\([a-zA-Z]\),${dst_package}\.\1,g" "${target}"
+            ${SED} -i "s,\<${src_package}\.\([a-zA-Z]\),${dst_package}\.\1,g" "${target}"
         fi
     done
 }
