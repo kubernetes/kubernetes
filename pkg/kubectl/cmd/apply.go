@@ -34,6 +34,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/jsonmergepatch"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -548,18 +549,31 @@ func (p *patcher) patchSimple(obj runtime.Object, modified []byte, source, names
 	// Create the versioned struct from the type defined in the restmapping
 	// (which is the API version we'll be submitting the patch to)
 	versionedObject, err := api.Scheme.New(p.mapping.GroupVersionKind)
-	if err != nil {
+	var patchType types.PatchType
+	var patch []byte
+	createPatchErrFormat := "creating patch with:\noriginal:\n%s\nmodified:\n%s\ncurrent:\n%s\nfor:"
+	switch {
+	case runtime.IsNotRegisteredError(err):
+		// fall back to generic JSON merge patch
+		patchType = types.MergePatchType
+		preconditions := []strategicpatch.PreconditionFunc{strategicpatch.RequireKeyUnchanged("apiVersion"),
+			strategicpatch.RequireKeyUnchanged("kind"), strategicpatch.RequireMetadataKeyUnchanged("name")}
+		patch, err = jsonmergepatch.CreateThreeWayJSONMergePatch(original, modified, current, preconditions...)
+		if err != nil {
+			return nil, cmdutil.AddSourceToErr(fmt.Sprintf(createPatchErrFormat, original, modified, current), source, err)
+		}
+	case err != nil:
 		return nil, cmdutil.AddSourceToErr(fmt.Sprintf("getting instance of versioned object for %v:", p.mapping.GroupVersionKind), source, err)
+	case err == nil:
+		// Compute a three way strategic merge patch to send to server.
+		patchType = types.StrategicMergePatchType
+		patch, err = strategicpatch.CreateThreeWayMergePatch(original, modified, current, versionedObject, p.overwrite)
+		if err != nil {
+			return nil, cmdutil.AddSourceToErr(fmt.Sprintf(createPatchErrFormat, original, modified, current), source, err)
+		}
 	}
 
-	// Compute a three way strategic merge patch to send to server.
-	patch, err := strategicpatch.CreateThreeWayMergePatch(original, modified, current, versionedObject, p.overwrite)
-	if err != nil {
-		format := "creating patch with:\noriginal:\n%s\nmodified:\n%s\ncurrent:\n%s\nfor:"
-		return nil, cmdutil.AddSourceToErr(fmt.Sprintf(format, original, modified, current), source, err)
-	}
-
-	_, err = p.helper.Patch(namespace, name, types.StrategicMergePatchType, patch)
+	_, err = p.helper.Patch(namespace, name, patchType, patch)
 	return patch, err
 }
 
