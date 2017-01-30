@@ -17,10 +17,10 @@ limitations under the License.
 package jsonmergepatch
 
 import (
-	"encoding/json"
 	"fmt"
 	"reflect"
 
+	"k8s.io/apimachinery/pkg/util/json"
 	"github.com/evanphx/json-patch"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
 )
@@ -64,19 +64,24 @@ func CreateThreeWayJSONMergePatch(original, modified, current []byte, fns ...str
 		return nil, err
 	}
 	if hasConflicts {
-		return nil, fmt.Errorf("changes are in conflict")
+		return nil, strategicpatch.NewErrConflict(strategicpatch.ToYAMLOrError(addAndChangePatchObj), strategicpatch.ToYAMLOrError(deletePatchObj))
 	}
 	patch, err := jsonpatch.MergePatch(deletePatch, addAndChangePatch)
 	if err != nil {
 		return nil, err
 	}
 
-	meetPreconditions, err := meetPreconditions(patch, fns...)
+	var patchMap map[string]interface{}
+	err = json.Unmarshal(patch, &patchMap)
+	if err != nil {
+		return false, fmt.Errorf("Failed to unmarshal patch for precondition check: %s", patch)
+	}
+	meetPreconditions, err := meetPreconditions(patchMap, fns...)
 	if err != nil {
 		return nil, err
 	}
 	if !meetPreconditions {
-		return nil, fmt.Errorf("precondition failed for: %v", patch)
+		return nil, strategicpatch.NewErrPreconditionFailed(patchMap)
 	}
 
 	return patch, nil
@@ -85,18 +90,18 @@ func CreateThreeWayJSONMergePatch(original, modified, current []byte, fns ...str
 // keepOrDeleteNullInJsonPatch takes a json-encoded byte array and a boolean.
 // It returns a filtered object and its corresponding json-encoded byte array.
 // It is a wrapper of func keepOrDeleteNullInObj
-func keepOrDeleteNullInJsonPatch(j []byte, keepNull bool) ([]byte, interface{}, error) {
-	var obj map[string]interface{}
-	err := json.Unmarshal(j, &obj)
+func keepOrDeleteNullInJsonPatch(patch []byte, keepNull bool) ([]byte, map[string]interface{}, error) {
+	var patchMap map[string]interface{}
+	err := json.Unmarshal(patch, &patchMap)
 	if err != nil {
 		return nil, nil, err
 	}
-	filteredObj, err := keepOrDeleteNullInObj(obj, keepNull)
+	filteredMap, err := keepOrDeleteNullInObj(patchMap, keepNull)
 	if err != nil {
 		return nil, nil, err
 	}
-	o, err := json.Marshal(filteredObj)
-	return o, filteredObj, err
+	o, err := json.Marshal(filteredMap)
+	return o, filteredMap, err
 }
 
 // keepOrDeleteNullInObj will keep only the null value and delete all the others,
@@ -128,12 +133,7 @@ func keepOrDeleteNullInObj(m map[string]interface{}, keepNull bool) (map[string]
 	return filteredMap, nil
 }
 
-func meetPreconditions(patch []byte, fns ...strategicpatch.PreconditionFunc) (bool, error) {
-	var patchObj interface{}
-	err := json.Unmarshal(patch, &patchObj)
-	if err != nil {
-		return false, fmt.Errorf("Failed to unmarshal patch for precondition check: %s", patch)
-	}
+func meetPreconditions(patchObj map[string]interface{}, fns ...strategicpatch.PreconditionFunc) (bool, error) {
 	// Apply the preconditions to the patch, and return an error if any of them fail.
 	for _, fn := range fns {
 		if !fn(patchObj) {

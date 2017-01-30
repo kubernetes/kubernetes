@@ -17,7 +17,6 @@ limitations under the License.
 package jsonmergepatch
 
 import (
-	"encoding/json"
 	"fmt"
 	"reflect"
 	"testing"
@@ -25,6 +24,7 @@ import (
 	"github.com/evanphx/json-patch"
 	"github.com/ghodss/yaml"
 	"github.com/davecgh/go-spew/spew"
+	"k8s.io/apimachinery/pkg/util/json"
 )
 
 type FilterNullTestCases struct {
