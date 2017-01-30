@@ -9,17 +9,20 @@ load(
 
 go_library(
     name = "go_default_library",
-    srcs = ["install.go"],
+    srcs = [
+        "expansion_generated.go",
+        "localsubjectaccessreview.go",
+        "selfsubjectaccessreview.go",
+        "subjectaccessreview.go",
+    ],
     tags = ["automanaged"],
     deps = [
-        "//pkg/api:go_default_library",
         "//pkg/apis/authorization:go_default_library",
         "//pkg/apis/authorization/v1:go_default_library",
-        "//pkg/apis/authorization/v1beta1:go_default_library",
-        "//vendor:k8s.io/apimachinery/pkg/apimachinery/announced",
-        "//vendor:k8s.io/apimachinery/pkg/apimachinery/registered",
-        "//vendor:k8s.io/apimachinery/pkg/runtime",
-        "//vendor:k8s.io/apimachinery/pkg/util/sets",
+        "//vendor:k8s.io/apimachinery/pkg/api/errors",
+        "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
+        "//vendor:k8s.io/apimachinery/pkg/labels",
+        "//vendor:k8s.io/client-go/tools/cache",
     ],
 )
 

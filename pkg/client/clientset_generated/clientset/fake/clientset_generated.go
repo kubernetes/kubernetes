@@ -28,6 +28,8 @@ import (
 	fakev1beta1apps "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/apps/v1beta1/fake"
 	v1beta1authentication "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/authentication/v1beta1"
 	fakev1beta1authentication "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/authentication/v1beta1/fake"
+	v1authorization "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/authorization/v1"
+	fakev1authorization "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/authorization/v1/fake"
 	v1beta1authorization "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/authorization/v1beta1"
 	fakev1beta1authorization "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/authorization/v1beta1/fake"
 	v1autoscaling "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/autoscaling/v1"
@@ -115,13 +117,18 @@ func (c *Clientset) Authentication() v1beta1authentication.AuthenticationV1beta1
 	return &fakev1beta1authentication.FakeAuthenticationV1beta1{Fake: &c.Fake}
 }
 
-// AuthorizationV1beta1 retrieves the AuthorizationV1beta1Client
-func (c *Clientset) AuthorizationV1beta1() v1beta1authorization.AuthorizationV1beta1Interface {
-	return &fakev1beta1authorization.FakeAuthorizationV1beta1{Fake: &c.Fake}
+// AuthorizationV1 retrieves the AuthorizationV1Client
+func (c *Clientset) AuthorizationV1() v1authorization.AuthorizationV1Interface {
+	return &fakev1authorization.FakeAuthorizationV1{Fake: &c.Fake}
 }
 
-// Authorization retrieves the AuthorizationV1beta1Client
-func (c *Clientset) Authorization() v1beta1authorization.AuthorizationV1beta1Interface {
+// Authorization retrieves the AuthorizationV1Client
+func (c *Clientset) Authorization() v1authorization.AuthorizationV1Interface {
+	return &fakev1authorization.FakeAuthorizationV1{Fake: &c.Fake}
+}
+
+// AuthorizationV1beta1 retrieves the AuthorizationV1beta1Client
+func (c *Clientset) AuthorizationV1beta1() v1beta1authorization.AuthorizationV1beta1Interface {
 	return &fakev1beta1authorization.FakeAuthorizationV1beta1{Fake: &c.Fake}
 }
 
