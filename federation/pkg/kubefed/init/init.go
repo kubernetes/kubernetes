@@ -33,6 +33,7 @@ package init
 import (
 	"fmt"
 	"io"
+	"io/ioutil"
 	"strings"
 	"time"
 
@@ -59,6 +60,8 @@ import (
 const (
 	APIServerCN                 = "federation-apiserver"
 	ControllerManagerCN         = "federation-controller-manager"
+	dnsProviderSecretName       = "federation-dns-provider-config"
+	dnsProviderSecretKey        = "federation-dns-provider.conf"
 	AdminCN                     = "admin"
 	HostClusterLocalDNSZoneName = "cluster.local."
 
@@ -121,6 +124,7 @@ func NewCmdInit(cmdOut io.Writer, config util.AdminConfig) *cobra.Command {
 	cmd.Flags().String("dns-zone-name", "", "DNS suffix for this federation. Federated Service DNS names are published with this suffix.")
 	cmd.Flags().String("image", defaultImage, "Image to use for federation API server and controller manager binaries.")
 	cmd.Flags().String("dns-provider", "google-clouddns", "Dns provider to be used for this deployment.")
+	cmd.Flags().String("dns-provider-config", "", "Config file path on local file system for configuring DNS provider.")
 	cmd.Flags().String("etcd-pv-capacity", "10Gi", "Size of persistent volume claim to be used for etcd.")
 	cmd.Flags().Bool("dry-run", false, "dry run without sending commands to server.")
 	cmd.Flags().String("storage-backend", "etcd2", "The storage backend for persistence. Options: 'etcd2' (default), 'etcd3'.")
@@ -145,6 +149,7 @@ func initFederation(cmdOut io.Writer, config util.AdminConfig, cmd *cobra.Comman
 	dnsZoneName := cmdutil.GetFlagString(cmd, "dns-zone-name")
 	image := cmdutil.GetFlagString(cmd, "image")
 	dnsProvider := cmdutil.GetFlagString(cmd, "dns-provider")
+	dnsProviderConfig := cmdutil.GetFlagString(cmd, "dns-provider-config")
 	etcdPVCapacity := cmdutil.GetFlagString(cmd, "etcd-pv-capacity")
 	dryRun := cmdutil.GetDryRunFlag(cmd)
 	storageBackend := cmdutil.GetFlagString(cmd, "storage-backend")
@@ -220,7 +225,7 @@ func initFederation(cmdOut io.Writer, config util.AdminConfig, cmd *cobra.Comman
 	}
 
 	// 7. Create federation controller manager
-	_, err = createControllerManager(hostClientset, initFlags.FederationSystemNamespace, initFlags.Name, svc.Name, cmName, image, cmKubeconfigName, dnsZoneName, dnsProvider, dryRun)
+	_, err = createControllerManager(hostClientset, initFlags.FederationSystemNamespace, initFlags.Name, svc.Name, cmName, image, cmKubeconfigName, dnsZoneName, dnsProvider, dnsProviderConfig, dryRun)
 	if err != nil {
 		return err
 	}
@@ -520,7 +525,7 @@ func createAPIServer(clientset *client.Clientset, namespace, name, image, creden
 	return clientset.Extensions().Deployments(namespace).Create(dep)
 }
 
-func createControllerManager(clientset *client.Clientset, namespace, name, svcName, cmName, image, kubeconfigName, dnsZoneName, dnsProvider string, dryRun bool) (*extensions.Deployment, error) {
+func createControllerManager(clientset *client.Clientset, namespace, name, svcName, cmName, image, kubeconfigName, dnsZoneName, dnsProvider, dnsProviderConfig string, dryRun bool) (*extensions.Deployment, error) {
 	dep := &extensions.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      cmName,
@@ -545,7 +550,6 @@ func createControllerManager(clientset *client.Clientset, namespace, name, svcNa
 								fmt.Sprintf("--master=https://%s", svcName),
 								"--kubeconfig=/etc/federation/controller-manager/kubeconfig",
 								fmt.Sprintf("--dns-provider=%s", dnsProvider),
-								"--dns-provider-config=",
 								fmt.Sprintf("--federation-name=%s", name),
 								fmt.Sprintf("--zone-name=%s", dnsZoneName),
 							},
@@ -583,9 +587,51 @@ func createControllerManager(clientset *client.Clientset, namespace, name, svcNa
 		},
 	}
 
+	if dnsProviderConfig != "" {
+		// Create a dns-provider secret from the provided config file
+		dnsProviderConfigBytes, err := ioutil.ReadFile(dnsProviderConfig)
+		if err != nil {
+			return nil, err
+		}
+		secret := &api.Secret{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      dnsProviderSecretName,
+				Namespace: namespace,
+			},
+			Data: map[string][]byte{
+				dnsProviderSecretKey: dnsProviderConfigBytes,
+			},
+		}
+		secret, err = clientset.Core().Secrets(namespace).Create(secret)
+		if err != nil {
+			return nil, err
+		}
+
+		// Create a volume from dns-provider secret
+		volume := api.Volume{
+			Name: "config-volume",
+			VolumeSource: api.VolumeSource{
+				Secret: &api.SecretVolumeSource{
+					SecretName: dnsProviderSecretName,
+				},
+			},
+		}
+		dep.Spec.Template.Spec.Volumes = append(dep.Spec.Template.Spec.Volumes, volume)
+
+		// Mount dns-provider secret volume to controller-manager container
+		volumeMount := api.VolumeMount{
+			Name:      "config-volume",
+			MountPath: "/tmp/dns-provider-config",
+			ReadOnly:  true,
+		}
+		dep.Spec.Template.Spec.Containers[0].VolumeMounts = append(dep.Spec.Template.Spec.Containers[0].VolumeMounts, volumeMount)
+		dep.Spec.Template.Spec.Containers[0].Command = append(dep.Spec.Template.Spec.Containers[0].Command, fmt.Sprintf("--dns-provider-config=%s/%s", "/tmp/dns-provider-config", dnsProviderSecretKey))
+	}
+
 	if dryRun {
 		return dep, nil
 	}
+
 	return clientset.Extensions().Deployments(namespace).Create(dep)
 }
 
