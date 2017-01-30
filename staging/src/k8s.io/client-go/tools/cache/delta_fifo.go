@@ -118,6 +118,9 @@ type DeltaFIFO struct {
 	// purpose of figuring out which items have been deleted
 	// when Replace() or Delete() is called.
 	knownObjects KeyListerGetter
+
+	// SyncRunning, if set, is invoked at the beginning and end of a sync.
+	SyncRunning SyncRunningFunc
 }
 
 var (
@@ -131,6 +134,10 @@ var (
 	// but included for completeness).
 	ErrZeroLengthDeltasObject = errors.New("0 length Deltas object; can't get key")
 )
+
+// SyncRunningFunc is a function that is invoked at the beginning of a sync (running=true) and at
+// the end of a sync (running=false).
+type SyncRunningFunc func(running bool)
 
 // KeyOf exposes f's keyFunc, but also detects the key of a Deltas object or
 // DeletedFinalStateUnknown objects.
@@ -407,6 +414,20 @@ func (f *DeltaFIFO) Pop(process PopProcessFunc) (interface{}, error) {
 			f.cond.Wait()
 		}
 		id := f.queue[0]
+		if f.SyncRunning != nil && id == syncEndKey {
+			// pop off the syncEndKey
+			f.queue = f.queue[1:]
+
+			f.SyncRunning(false)
+
+			if len(f.queue) == 0 {
+				// if the queue is empty, go back to waiting for more items
+				continue
+			}
+
+			// get the actual id of the real item
+			id = f.queue[0]
+		}
 		f.queue = f.queue[1:]
 		item, ok := f.items[id]
 		if f.initialPopulationCount > 0 {
@@ -428,13 +449,28 @@ func (f *DeltaFIFO) Pop(process PopProcessFunc) (interface{}, error) {
 	}
 }
 
+const (
+	syncEndKey = "DeltaFifo::internal::syncEnd"
+)
+
 // Replace will delete the contents of 'f', using instead the given map.
 // 'f' takes ownership of the map, you should not reference the map again
 // after calling this function. f's queue is reset, too; upon return, it
 // will contain the items in the map, in no particular order.
 func (f *DeltaFIFO) Replace(list []interface{}, resourceVersion string) error {
+	if f.SyncRunning != nil {
+		f.SyncRunning(true)
+	}
+
 	f.lock.Lock()
-	defer f.lock.Unlock()
+	defer func() {
+		if f.SyncRunning != nil {
+			f.queue = append(f.queue, syncEndKey)
+			f.cond.Broadcast()
+		}
+		f.lock.Unlock()
+	}()
+
 	keys := make(sets.String, len(list))
 
 	for _, item := range list {
@@ -505,6 +541,17 @@ func (f *DeltaFIFO) Replace(list []interface{}, resourceVersion string) error {
 
 // Resync will send a sync event for each item
 func (f *DeltaFIFO) Resync() error {
+	if f.SyncRunning != nil {
+		f.SyncRunning(true)
+
+		defer func() {
+			f.lock.Lock()
+			f.queue = append(f.queue, syncEndKey)
+			f.cond.Broadcast()
+			f.lock.Unlock()
+		}()
+	}
+
 	var keys []string
 	func() {
 		f.lock.RLock()

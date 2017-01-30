@@ -49,7 +49,7 @@ func TestMutationDetector(t *testing.T) {
 	addReceived := make(chan bool)
 	mutationFound := make(chan bool)
 
-	informer := NewSharedInformer(lw, &v1.Pod{}, 1*time.Second).(*sharedIndexInformer)
+	informer := NewSharedInformer(lw, &v1.Pod{}, 1*time.Second, 1*time.Second).(*sharedIndexInformer)
 	informer.cacheMutationDetector = &defaultCacheMutationDetector{
 		name:   "name",
 		period: 1 * time.Second,
