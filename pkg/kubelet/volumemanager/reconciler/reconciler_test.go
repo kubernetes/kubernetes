@@ -386,6 +386,17 @@ func Test_Run_Positive_VolumeUnmountControllerAttachEnabled(t *testing.T) {
 
 	// Act
 	dsw.DeletePodFromVolume(podName, generatedVolumeName)
+	// controller removes volume from node status
+	kubeClient.PrependReactor("get", "nodes",
+		func(action core.Action) (bool, runtime.Object, error) {
+			return true, &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{Name: string(nodeName)},
+				Status: v1.NodeStatus{
+					VolumesAttached: []v1.AttachedVolume{},
+				},
+				Spec: v1.NodeSpec{ExternalID: string(nodeName)},
+			}, nil
+		})
 	waitForDetach(t, fakePlugin, generatedVolumeName, asw)
 
 	// Assert

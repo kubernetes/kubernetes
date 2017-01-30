@@ -343,9 +343,30 @@ func (rc *reconciler) reconcile() {
 				// Volume is attached to node, detach it
 				if rc.controllerAttachDetachEnabled || !attachedVolume.PluginIsAttachable {
 					// Kubelet not responsible for detaching or this volume has a non-attachable volume plugin,
-					// so just remove it to actualStateOfWorld without attach.
-					rc.actualStateOfWorld.MarkVolumeAsDetached(
-						attachedVolume.VolumeName, rc.nodeName)
+					// wait for controller to finish detaching the volume.
+					glog.V(12).Infof("Attempting to start VerifyControllerDetachedVolume for volume %q (spec.Name: %q)",
+						attachedVolume.VolumeName,
+						attachedVolume.VolumeSpec.Name())
+					err := rc.operationExecutor.VerifyControllerDetachedVolume(
+						attachedVolume.AttachedVolume,
+						rc.actualStateOfWorld)
+					if err != nil &&
+						!nestedpendingoperations.IsAlreadyExists(err) &&
+						!exponentialbackoff.IsExponentialBackoff(err) {
+						// Ignore nestedpendingoperations.IsAlreadyExists and exponentialbackoff.IsExponentialBackoff errors, they are expected.
+						// Log all other errors.
+						glog.Errorf(
+							"operationExecutor.VerifyControllerDetachedVolume failed for volume %q (spec.Name: %q) controllerAttachDetachEnabled: %v with err: %v",
+							attachedVolume.VolumeName,
+							attachedVolume.VolumeSpec.Name(),
+							rc.controllerAttachDetachEnabled,
+							err)
+					}
+					if err == nil {
+						glog.Infof("VerifyControllerDetachedVolume operation started for volume %q (spec.Name: %q)",
+							attachedVolume.VolumeName,
+							attachedVolume.VolumeSpec.Name())
+					}
 				} else {
 					// Only detach if kubelet detach is enabled
 					glog.V(12).Infof("Attempting to start DetachVolume for volume %q (spec.Name: %q)",
