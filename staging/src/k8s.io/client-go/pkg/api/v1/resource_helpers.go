@@ -19,8 +19,8 @@ package v1
 import (
 	"time"
 
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/client-go/pkg/api/resource"
 )
 
 // Returns string version of ResourceName.

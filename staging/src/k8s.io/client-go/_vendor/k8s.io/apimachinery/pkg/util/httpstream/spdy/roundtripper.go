@@ -30,9 +30,10 @@ import (
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/serializer"
+	"k8s.io/apimachinery/pkg/util/httpstream"
 	"k8s.io/apimachinery/third_party/forked/golang/netutil"
-	"k8s.io/client-go/pkg/api"
-	"k8s.io/client-go/pkg/util/httpstream"
 )
 
 // SpdyRoundTripper knows how to upgrade an HTTP request to one that supports
@@ -251,7 +252,7 @@ func (s *SpdyRoundTripper) NewConnection(resp *http.Response) (httpstream.Connec
 			responseError = "unable to read error from server response"
 		} else {
 			// TODO: I don't belong here, I should be abstracted from this class
-			if obj, _, err := api.Codecs.UniversalDecoder().Decode(responseErrorBytes, nil, &metav1.Status{}); err == nil {
+			if obj, _, err := statusCodecs.UniversalDecoder().Decode(responseErrorBytes, nil, &metav1.Status{}); err == nil {
 				if status, ok := obj.(*metav1.Status); ok {
 					return nil, &apierrors.StatusError{ErrStatus: *status}
 				}
@@ -264,4 +265,16 @@ func (s *SpdyRoundTripper) NewConnection(resp *http.Response) (httpstream.Connec
 	}
 
 	return NewClientConnection(s.conn)
+}
+
+// statusScheme is private scheme for the decoding here until someone fixes the TODO in NewConnection
+var statusScheme = runtime.NewScheme()
+
+// ParameterCodec knows about query parameters used with the meta v1 API spec.
+var statusCodecs = serializer.NewCodecFactory(statusScheme)
+
+func init() {
+	statusScheme.AddUnversionedTypes(metav1.SchemeGroupVersion,
+		&metav1.Status{},
+	)
 }
