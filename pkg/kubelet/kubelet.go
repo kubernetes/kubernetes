@@ -415,7 +415,8 @@ func NewMainKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *Kub
 	}
 	containerRefManager := kubecontainer.NewRefManager()
 
-	secretManager, err := secret.NewSimpleSecretManager(kubeClient)
+	secretManager, err := secret.NewCachingSecretManager(
+		kubeClient, secret.GetObjectTTLFromNodeFunc(nodeStore, string(nodeName)))
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize secret manager: %v", err)
 	}
