@@ -13,10 +13,10 @@ go_library(
     srcs = ["patch.go"],
     tags = ["automanaged"],
     deps = [
-        "//pkg/util/json:go_default_library",
         "//third_party/forked/golang/json:go_default_library",
         "//vendor:github.com/davecgh/go-spew/spew",
         "//vendor:github.com/ghodss/yaml",
+        "//vendor:k8s.io/apimachinery/pkg/util/json",
     ],
 )
 
@@ -29,4 +29,17 @@ go_test(
         "//vendor:github.com/davecgh/go-spew/spew",
         "//vendor:github.com/ghodss/yaml",
     ],
+)
+
+filegroup(
+    name = "package-srcs",
+    srcs = glob(["**"]),
+    tags = ["automanaged"],
+    visibility = ["//visibility:private"],
+)
+
+filegroup(
+    name = "all-srcs",
+    srcs = [":package-srcs"],
+    tags = ["automanaged"],
 )

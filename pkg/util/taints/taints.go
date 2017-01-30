@@ -21,13 +21,14 @@ import (
 	"fmt"
 	"strings"
 
+	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/util/validation"
+	"k8s.io/kubernetes/pkg/api/v1"
 )
 
 // ParseTaint parses a taint from a string. Taint must be off the format '<key>=<value>:<effect>'.
-func ParseTaint(st string) (api.Taint, error) {
-	var taint api.Taint
+func ParseTaint(st string) (v1.Taint, error) {
+	var taint v1.Taint
 	parts := strings.Split(st, "=")
 	if len(parts) != 2 || len(parts[1]) == 0 || len(validation.IsQualifiedName(parts[0])) > 0 {
 		return taint, fmt.Errorf("invalid taint spec: %v", st)
@@ -35,14 +36,14 @@ func ParseTaint(st string) (api.Taint, error) {
 
 	parts2 := strings.Split(parts[1], ":")
 
-	effect := api.TaintEffect(parts2[1])
+	effect := v1.TaintEffect(parts2[1])
 
 	errs := validation.IsValidLabelValue(parts2[0])
 	if len(parts2) != 2 || len(errs) != 0 {
 		return taint, fmt.Errorf("invalid taint spec: %v, %s", st, strings.Join(errs, "; "))
 	}
 
-	if effect != api.TaintEffectNoSchedule && effect != api.TaintEffectPreferNoSchedule {
+	if effect != v1.TaintEffectNoSchedule && effect != v1.TaintEffectPreferNoSchedule {
 		return taint, fmt.Errorf("invalid taint spec: %v, unsupported taint effect", st)
 	}
 
@@ -73,7 +74,7 @@ func (t taintsVar) Set(s string) error {
 		if err != nil {
 			return err
 		}
-		taints = append(taints, taint)
+		taints = append(taints, api.Taint{Key: taint.Key, Value: taint.Value, Effect: api.TaintEffect(taint.Effect)})
 	}
 	*t.ptr = taints
 	return nil

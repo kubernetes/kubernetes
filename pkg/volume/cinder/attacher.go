@@ -24,7 +24,7 @@ import (
 	"time"
 
 	"github.com/golang/glog"
-	"k8s.io/kubernetes/pkg/types"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/util/exec"
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/volume"
@@ -83,17 +83,17 @@ func (attacher *cinderDiskAttacher) Attach(spec *volume.Spec, nodeName types.Nod
 	if err != nil {
 		// Log error and continue with attach
 		glog.Warningf(
-			"Error checking if volume (%q) is already attached to current node (%q). Will continue and try attach anyway. err=%v",
+			"Error checking if volume (%q) is already attached to current instance (%q). Will continue and try attach anyway. err=%v",
 			volumeID, instanceid, err)
 	}
 
 	if err == nil && attached {
-		// Volume is already attached to node.
-		glog.Infof("Attach operation is successful. volume %q is already attached to node %q.", volumeID, instanceid)
+		// Volume is already attached to instance.
+		glog.Infof("Attach operation is successful. volume %q is already attached to instance %q.", volumeID, instanceid)
 	} else {
 		_, err = attacher.cinderProvider.AttachDisk(instanceid, volumeID)
 		if err == nil {
-			glog.Infof("Attach operation successful: volume %q attached to node %q.", volumeID, instanceid)
+			glog.Infof("Attach operation successful: volume %q attached to instance %q.", volumeID, instanceid)
 		} else {
 			glog.Infof("Attach volume %q to instance %q failed with %v", volumeID, instanceid, err)
 			return "", err

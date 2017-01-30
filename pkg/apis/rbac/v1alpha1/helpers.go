@@ -19,7 +19,7 @@ package v1alpha1
 import (
 	"fmt"
 
-	"k8s.io/kubernetes/pkg/api/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 // +k8s:deepcopy-gen=false
@@ -100,7 +100,7 @@ type ClusterRoleBindingBuilder struct {
 func NewClusterBinding(clusterRoleName string) *ClusterRoleBindingBuilder {
 	return &ClusterRoleBindingBuilder{
 		ClusterRoleBinding: ClusterRoleBinding{
-			ObjectMeta: v1.ObjectMeta{Name: clusterRoleName},
+			ObjectMeta: metav1.ObjectMeta{Name: clusterRoleName},
 			RoleRef: RoleRef{
 				APIGroup: GroupName,
 				Kind:     "ClusterRole",

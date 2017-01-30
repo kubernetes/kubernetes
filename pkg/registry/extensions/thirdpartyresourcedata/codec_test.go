@@ -23,20 +23,18 @@ import (
 	"testing"
 	"time"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	"k8s.io/kubernetes/pkg/apis/extensions"
-	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
-	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/runtime/schema"
-	"k8s.io/kubernetes/pkg/watch/versioned"
 )
 
 type Foo struct {
-	metav1.TypeMeta `json:",inline"`
-	api.ObjectMeta  `json:"metadata,omitempty" description:"standard object metadata"`
+	metav1.TypeMeta   `json:",inline"`
+	metav1.ObjectMeta `json:"metadata,omitempty" description:"standard object metadata"`
 
 	SomeField  string `json:"someField"`
 	OtherField int    `json:"otherField"`
@@ -63,20 +61,20 @@ func TestCodec(t *testing.T) {
 		{
 			into: &runtime.VersionedObjects{},
 			obj: &Foo{
-				ObjectMeta: api.ObjectMeta{Name: "bar"},
+				ObjectMeta: metav1.ObjectMeta{Name: "bar"},
 				TypeMeta:   metav1.TypeMeta{APIVersion: "company.com/v1", Kind: "Foo"},
 			},
 			expectErr: false,
 			name:      "versioned objects list",
 		},
 		{
-			obj:       &Foo{ObjectMeta: api.ObjectMeta{Name: "bar"}},
+			obj:       &Foo{ObjectMeta: metav1.ObjectMeta{Name: "bar"}},
 			expectErr: true,
 			name:      "missing kind",
 		},
 		{
 			obj: &Foo{
-				ObjectMeta: api.ObjectMeta{Name: "bar"},
+				ObjectMeta: metav1.ObjectMeta{Name: "bar"},
 				TypeMeta:   metav1.TypeMeta{APIVersion: "company.com/v1", Kind: "Foo"},
 			},
 			name: "basic",
@@ -84,7 +82,7 @@ func TestCodec(t *testing.T) {
 		{
 			into: &extensions.ThirdPartyResourceData{},
 			obj: &Foo{
-				ObjectMeta: api.ObjectMeta{Name: "bar"},
+				ObjectMeta: metav1.ObjectMeta{Name: "bar"},
 				TypeMeta:   metav1.TypeMeta{Kind: "ThirdPartyResourceData"},
 			},
 			expectErr: true,
@@ -92,14 +90,14 @@ func TestCodec(t *testing.T) {
 		},
 		{
 			obj: &Foo{
-				ObjectMeta: api.ObjectMeta{Name: "bar", ResourceVersion: "baz"},
+				ObjectMeta: metav1.ObjectMeta{Name: "bar", ResourceVersion: "baz"},
 				TypeMeta:   metav1.TypeMeta{APIVersion: "company.com/v1", Kind: "Foo"},
 			},
 			name: "resource version",
 		},
 		{
 			obj: &Foo{
-				ObjectMeta: api.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Name:              "bar",
 					CreationTimestamp: metav1.Time{Time: time.Unix(100, 0)},
 				},
@@ -112,7 +110,7 @@ func TestCodec(t *testing.T) {
 		},
 		{
 			obj: &Foo{
-				ObjectMeta: api.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Name:            "bar",
 					ResourceVersion: "baz",
 					Labels:          map[string]string{"foo": "bar", "baz": "blah"},
@@ -122,7 +120,7 @@ func TestCodec(t *testing.T) {
 			name: "labels",
 		},
 	}
-	registered.AddThirdPartyAPIGroupVersions(schema.GroupVersion{Group: "company.com", Version: "v1"})
+	api.Registry.AddThirdPartyAPIGroupVersions(schema.GroupVersion{Group: "company.com", Version: "v1"})
 	for _, test := range tests {
 		d := &thirdPartyResourceDataDecoder{kind: "Foo", delegate: testapi.Extensions.Codec()}
 		e := &thirdPartyResourceDataEncoder{gvk: schema.GroupVersionKind{
@@ -239,10 +237,10 @@ func TestEncodeToStreamForInternalEvent(t *testing.T) {
 		Kind:    "Foo",
 	}, delegate: testapi.Extensions.Codec()}
 	buf := bytes.NewBuffer([]byte{})
-	expected := &versioned.Event{
+	expected := &metav1.WatchEvent{
 		Type: "Added",
 	}
-	err := e.Encode(&versioned.InternalEvent{
+	err := e.Encode(&metav1.InternalEvent{
 		Type: "Added",
 	}, buf)
 

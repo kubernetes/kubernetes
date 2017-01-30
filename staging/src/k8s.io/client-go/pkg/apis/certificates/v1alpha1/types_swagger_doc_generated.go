@@ -51,6 +51,7 @@ func (CertificateSigningRequestCondition) SwaggerDoc() map[string]string {
 var map_CertificateSigningRequestSpec = map[string]string{
 	"":         "This information is immutable after the request is created. Only the Request and ExtraInfo fields can be set on creation, other fields are derived by Kubernetes and cannot be modified by users.",
 	"request":  "Base64-encoded PKCS#10 CSR data",
+	"usages":   "allowedUsages specifies a set of usage contexts the key will be valid for. See: https://tools.ietf.org/html/rfc5280#section-4.2.1.3\n     https://tools.ietf.org/html/rfc5280#section-4.2.1.12",
 	"username": "Information about the requesting user (if relevant) See user.Info interface for details",
 }
 

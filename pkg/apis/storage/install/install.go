@@ -19,10 +19,10 @@ limitations under the License.
 package install
 
 import (
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/apimachinery/announced"
 	"k8s.io/kubernetes/pkg/apis/storage"
 	"k8s.io/kubernetes/pkg/apis/storage/v1beta1"
-	"k8s.io/kubernetes/pkg/util/sets"
 )
 
 func init() {

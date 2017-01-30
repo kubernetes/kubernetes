@@ -24,16 +24,16 @@ go_library(
         "//pkg/util/bandwidth:go_default_library",
         "//pkg/util/dbus:go_default_library",
         "//pkg/util/ebtables:go_default_library",
-        "//pkg/util/errors:go_default_library",
         "//pkg/util/exec:go_default_library",
         "//pkg/util/iptables:go_default_library",
-        "//pkg/util/net:go_default_library",
-        "//pkg/util/sets:go_default_library",
         "//pkg/util/sysctl:go_default_library",
         "//vendor:github.com/containernetworking/cni/libcni",
         "//vendor:github.com/containernetworking/cni/pkg/types",
         "//vendor:github.com/golang/glog",
         "//vendor:github.com/vishvananda/netlink",
+        "//vendor:k8s.io/apimachinery/pkg/util/errors",
+        "//vendor:k8s.io/apimachinery/pkg/util/net",
+        "//vendor:k8s.io/apimachinery/pkg/util/sets",
     ],
 )
 
@@ -56,4 +56,17 @@ go_test(
         "//vendor:github.com/stretchr/testify/assert",
         "//vendor:github.com/stretchr/testify/mock",
     ],
+)
+
+filegroup(
+    name = "package-srcs",
+    srcs = glob(["**"]),
+    tags = ["automanaged"],
+    visibility = ["//visibility:private"],
+)
+
+filegroup(
+    name = "all-srcs",
+    srcs = [":package-srcs"],
+    tags = ["automanaged"],
 )

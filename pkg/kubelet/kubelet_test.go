@@ -28,10 +28,16 @@ import (
 	cadvisorapiv2 "github.com/google/cadvisor/info/v2"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/client-go/pkg/util/clock"
+	"k8s.io/client-go/pkg/util/flowcontrol"
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/apis/componentconfig"
-	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/capabilities"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset/fake"
 	"k8s.io/kubernetes/pkg/client/record"
@@ -50,18 +56,13 @@ import (
 	podtest "k8s.io/kubernetes/pkg/kubelet/pod/testing"
 	proberesults "k8s.io/kubernetes/pkg/kubelet/prober/results"
 	probetest "k8s.io/kubernetes/pkg/kubelet/prober/testing"
+	"k8s.io/kubernetes/pkg/kubelet/secret"
 	"k8s.io/kubernetes/pkg/kubelet/server/stats"
 	"k8s.io/kubernetes/pkg/kubelet/status"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/kubelet/util/queue"
 	kubeletvolume "k8s.io/kubernetes/pkg/kubelet/volumemanager"
-	"k8s.io/kubernetes/pkg/types"
-	"k8s.io/kubernetes/pkg/util/clock"
-	"k8s.io/kubernetes/pkg/util/flowcontrol"
 	"k8s.io/kubernetes/pkg/util/mount"
-	utilruntime "k8s.io/kubernetes/pkg/util/runtime"
-	"k8s.io/kubernetes/pkg/util/sets"
-	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/volume"
 	_ "k8s.io/kubernetes/pkg/volume/host_path"
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
@@ -166,7 +167,8 @@ func newTestKubeletWithImageList(
 	kubelet.cadvisor = mockCadvisor
 
 	fakeMirrorClient := podtest.NewFakeMirrorClient()
-	kubelet.podManager = kubepod.NewBasicPodManager(fakeMirrorClient)
+	fakeSecretManager := secret.NewFakeManager()
+	kubelet.podManager = kubepod.NewBasicPodManager(fakeMirrorClient, fakeSecretManager)
 	kubelet.statusManager = status.NewManager(fakeKubeClient, kubelet.podManager)
 	kubelet.containerRefManager = kubecontainer.NewRefManager()
 	diskSpaceManager, err := newDiskSpaceManager(mockCadvisor, DiskSpacePolicy{})
@@ -232,8 +234,7 @@ func newTestKubeletWithImageList(
 		Namespace: "",
 	}
 	// setup eviction manager
-	evictionManager, evictionAdmitHandler, err := eviction.NewManager(kubelet.resourceAnalyzer, eviction.Config{}, killPodNow(kubelet.podWorkers, fakeRecorder), kubelet.imageManager, fakeRecorder, nodeRef, kubelet.clock)
-	require.NoError(t, err, "Failed to initialize eviction manager")
+	evictionManager, evictionAdmitHandler := eviction.NewManager(kubelet.resourceAnalyzer, eviction.Config{}, killPodNow(kubelet.podWorkers, fakeRecorder), kubelet.imageManager, fakeRecorder, nodeRef, kubelet.clock)
 
 	kubelet.evictionManager = evictionManager
 	kubelet.admitHandlers.AddPodAdmitHandler(evictionAdmitHandler)
@@ -276,7 +277,7 @@ func newTestPods(count int) []*v1.Pod {
 			Spec: v1.PodSpec{
 				HostNetwork: true,
 			},
-			ObjectMeta: v1.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				UID:  types.UID(10000 + i),
 				Name: fmt.Sprintf("pod%d", i),
 			},
@@ -417,7 +418,7 @@ func TestHandlePortConflicts(t *testing.T) {
 
 	kl.nodeLister = testNodeLister{nodes: []v1.Node{
 		{
-			ObjectMeta: v1.ObjectMeta{Name: string(kl.nodeName)},
+			ObjectMeta: metav1.ObjectMeta{Name: string(kl.nodeName)},
 			Status: v1.NodeStatus{
 				Allocatable: v1.ResourceList{
 					v1.ResourcePods: *resource.NewQuantity(110, resource.DecimalSI),
@@ -427,7 +428,7 @@ func TestHandlePortConflicts(t *testing.T) {
 	}}
 	kl.nodeInfo = testNodeInfo{nodes: []v1.Node{
 		{
-			ObjectMeta: v1.ObjectMeta{Name: string(kl.nodeName)},
+			ObjectMeta: metav1.ObjectMeta{Name: string(kl.nodeName)},
 			Status: v1.NodeStatus{
 				Allocatable: v1.ResourceList{
 					v1.ResourcePods: *resource.NewQuantity(110, resource.DecimalSI),
@@ -466,7 +467,7 @@ func TestCriticalPrioritySorting(t *testing.T) {
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
 	kl := testKubelet.kubelet
 	nodes := []v1.Node{
-		{ObjectMeta: v1.ObjectMeta{Name: testKubeletHostname},
+		{ObjectMeta: metav1.ObjectMeta{Name: testKubeletHostname},
 			Status: v1.NodeStatus{Capacity: v1.ResourceList{}, Allocatable: v1.ResourceList{
 				v1.ResourceCPU:    *resource.NewMilliQuantity(10, resource.DecimalSI),
 				v1.ResourceMemory: *resource.NewQuantity(100, resource.BinarySI),
@@ -484,7 +485,8 @@ func TestCriticalPrioritySorting(t *testing.T) {
 			Requests: v1.ResourceList{
 				"memory": resource.MustParse("90"),
 			},
-		}}}}
+		}}},
+	}
 	pods := []*v1.Pod{
 		podWithUidNameNsSpec("000000000", "newpod", "foo", spec),
 		podWithUidNameNsSpec("987654321", "oldpod", "foo", spec),
@@ -533,7 +535,7 @@ func TestHandleHostNameConflicts(t *testing.T) {
 
 	kl.nodeLister = testNodeLister{nodes: []v1.Node{
 		{
-			ObjectMeta: v1.ObjectMeta{Name: "127.0.0.1"},
+			ObjectMeta: metav1.ObjectMeta{Name: "127.0.0.1"},
 			Status: v1.NodeStatus{
 				Allocatable: v1.ResourceList{
 					v1.ResourcePods: *resource.NewQuantity(110, resource.DecimalSI),
@@ -543,7 +545,7 @@ func TestHandleHostNameConflicts(t *testing.T) {
 	}}
 	kl.nodeInfo = testNodeInfo{nodes: []v1.Node{
 		{
-			ObjectMeta: v1.ObjectMeta{Name: "127.0.0.1"},
+			ObjectMeta: metav1.ObjectMeta{Name: "127.0.0.1"},
 			Status: v1.NodeStatus{
 				Allocatable: v1.ResourceList{
 					v1.ResourcePods: *resource.NewQuantity(110, resource.DecimalSI),
@@ -580,7 +582,7 @@ func TestHandleNodeSelector(t *testing.T) {
 	kl := testKubelet.kubelet
 	nodes := []v1.Node{
 		{
-			ObjectMeta: v1.ObjectMeta{Name: testKubeletHostname, Labels: map[string]string{"key": "B"}},
+			ObjectMeta: metav1.ObjectMeta{Name: testKubeletHostname, Labels: map[string]string{"key": "B"}},
 			Status: v1.NodeStatus{
 				Allocatable: v1.ResourceList{
 					v1.ResourcePods: *resource.NewQuantity(110, resource.DecimalSI),
@@ -619,7 +621,7 @@ func TestHandleMemExceeded(t *testing.T) {
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
 	kl := testKubelet.kubelet
 	nodes := []v1.Node{
-		{ObjectMeta: v1.ObjectMeta{Name: testKubeletHostname},
+		{ObjectMeta: metav1.ObjectMeta{Name: testKubeletHostname},
 			Status: v1.NodeStatus{Capacity: v1.ResourceList{}, Allocatable: v1.ResourceList{
 				v1.ResourceCPU:    *resource.NewMilliQuantity(10, resource.DecimalSI),
 				v1.ResourceMemory: *resource.NewQuantity(100, resource.BinarySI),
@@ -637,7 +639,8 @@ func TestHandleMemExceeded(t *testing.T) {
 			Requests: v1.ResourceList{
 				"memory": resource.MustParse("90"),
 			},
-		}}}}
+		}}},
+	}
 	pods := []*v1.Pod{
 		podWithUidNameNsSpec("123456789", "newpod", "foo", spec),
 		podWithUidNameNsSpec("987654321", "oldpod", "foo", spec),
@@ -677,8 +680,8 @@ func TestPurgingObsoleteStatusMapEntries(t *testing.T) {
 
 	kl := testKubelet.kubelet
 	pods := []*v1.Pod{
-		{ObjectMeta: v1.ObjectMeta{Name: "pod1", UID: "1234"}, Spec: v1.PodSpec{Containers: []v1.Container{{Ports: []v1.ContainerPort{{HostPort: 80}}}}}},
-		{ObjectMeta: v1.ObjectMeta{Name: "pod2", UID: "4567"}, Spec: v1.PodSpec{Containers: []v1.Container{{Ports: []v1.ContainerPort{{HostPort: 80}}}}}},
+		{ObjectMeta: metav1.ObjectMeta{Name: "pod1", UID: "1234"}, Spec: v1.PodSpec{Containers: []v1.Container{{Ports: []v1.ContainerPort{{HostPort: 80}}}}}},
+		{ObjectMeta: metav1.ObjectMeta{Name: "pod2", UID: "4567"}, Spec: v1.PodSpec{Containers: []v1.Container{{Ports: []v1.ContainerPort{{HostPort: 80}}}}}},
 	}
 	podToTest := pods[1]
 	// Run once to populate the status map.
@@ -899,7 +902,7 @@ func TestDeleteOrphanedMirrorPods(t *testing.T) {
 	manager := testKubelet.fakeMirrorClient
 	orphanPods := []*v1.Pod{
 		{
-			ObjectMeta: v1.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				UID:       "12345678",
 				Name:      "pod1",
 				Namespace: "ns",
@@ -910,7 +913,7 @@ func TestDeleteOrphanedMirrorPods(t *testing.T) {
 			},
 		},
 		{
-			ObjectMeta: v1.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				UID:       "12345679",
 				Name:      "pod2",
 				Namespace: "ns",
@@ -940,7 +943,7 @@ func TestGetContainerInfoForMirrorPods(t *testing.T) {
 	// different UIDs.
 	pods := []*v1.Pod{
 		{
-			ObjectMeta: v1.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				UID:       "1234",
 				Name:      "qux",
 				Namespace: "ns",
@@ -955,7 +958,7 @@ func TestGetContainerInfoForMirrorPods(t *testing.T) {
 			},
 		},
 		{
-			ObjectMeta: v1.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				UID:       "5678",
 				Name:      "qux",
 				Namespace: "ns",
@@ -1246,7 +1249,7 @@ func TestSyncPodsSetStatusToFailedForPodsThatRunTooLong(t *testing.T) {
 
 	pods := []*v1.Pod{
 		{
-			ObjectMeta: v1.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				UID:       "12345678",
 				Name:      "bar",
 				Namespace: "new",
@@ -1298,7 +1301,7 @@ func TestSyncPodsDoesNotSetPodsThatDidNotRunTooLongToFailed(t *testing.T) {
 
 	pods := []*v1.Pod{
 		{
-			ObjectMeta: v1.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				UID:       "12345678",
 				Name:      "bar",
 				Namespace: "new",
@@ -1335,7 +1338,7 @@ func TestSyncPodsDoesNotSetPodsThatDidNotRunTooLongToFailed(t *testing.T) {
 
 func podWithUidNameNs(uid types.UID, name, namespace string) *v1.Pod {
 	return &v1.Pod{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			UID:         uid,
 			Name:        name,
 			Namespace:   namespace,
@@ -1895,7 +1898,7 @@ func TestHandlePodAdditionsInvokesPodAdmitHandlers(t *testing.T) {
 	kl := testKubelet.kubelet
 	kl.nodeLister = testNodeLister{nodes: []v1.Node{
 		{
-			ObjectMeta: v1.ObjectMeta{Name: string(kl.nodeName)},
+			ObjectMeta: metav1.ObjectMeta{Name: string(kl.nodeName)},
 			Status: v1.NodeStatus{
 				Allocatable: v1.ResourceList{
 					v1.ResourcePods: *resource.NewQuantity(110, resource.DecimalSI),
@@ -1905,7 +1908,7 @@ func TestHandlePodAdditionsInvokesPodAdmitHandlers(t *testing.T) {
 	}}
 	kl.nodeInfo = testNodeInfo{nodes: []v1.Node{
 		{
-			ObjectMeta: v1.ObjectMeta{Name: string(kl.nodeName)},
+			ObjectMeta: metav1.ObjectMeta{Name: string(kl.nodeName)},
 			Status: v1.NodeStatus{
 				Allocatable: v1.ResourceList{
 					v1.ResourcePods: *resource.NewQuantity(110, resource.DecimalSI),
@@ -1919,14 +1922,14 @@ func TestHandlePodAdditionsInvokesPodAdmitHandlers(t *testing.T) {
 
 	pods := []*v1.Pod{
 		{
-			ObjectMeta: v1.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				UID:       "123456789",
 				Name:      "podA",
 				Namespace: "foo",
 			},
 		},
 		{
-			ObjectMeta: v1.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				UID:       "987654321",
 				Name:      "podB",
 				Namespace: "foo",
@@ -2025,7 +2028,7 @@ func TestSyncPodKillPod(t *testing.T) {
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
 	kl := testKubelet.kubelet
 	pod := &v1.Pod{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			UID:       "12345678",
 			Name:      "bar",
 			Namespace: "foo",

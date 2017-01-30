@@ -26,6 +26,10 @@ import (
 	"testing"
 
 	"github.com/golang/glog"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/validation/field"
+	"k8s.io/apimachinery/pkg/util/yaml"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/api/validation"
@@ -36,10 +40,6 @@ import (
 	expvalidation "k8s.io/kubernetes/pkg/apis/extensions/validation"
 	"k8s.io/kubernetes/pkg/capabilities"
 	"k8s.io/kubernetes/pkg/registry/batch/job"
-	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/types"
-	"k8s.io/kubernetes/pkg/util/validation/field"
-	"k8s.io/kubernetes/pkg/util/yaml"
 	schedulerapi "k8s.io/kubernetes/plugin/pkg/scheduler/api"
 	schedulerapilatest "k8s.io/kubernetes/plugin/pkg/scheduler/api/latest"
 )
@@ -265,11 +265,11 @@ func TestExampleObjectSchemas(t *testing.T) {
 		},
 		"../examples/openshift-origin": {
 			"openshift-origin-namespace": &api.Namespace{},
-			"openshift-controller":       &api.ReplicationController{},
+			"openshift-controller":       &extensions.Deployment{},
 			"openshift-service":          &api.Service{},
-			"etcd-controller":            &api.ReplicationController{},
+			"etcd-controller":            &extensions.Deployment{},
 			"etcd-service":               &api.Service{},
-			"etcd-discovery-controller":  &api.ReplicationController{},
+			"etcd-discovery-controller":  &extensions.Deployment{},
 			"etcd-discovery-service":     &api.Service{},
 			"secret":                     nil,
 		},

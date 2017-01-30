@@ -19,11 +19,11 @@ package registrytest
 import (
 	"sync"
 
+	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/watch"
+	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/errors"
-	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
-	genericapirequest "k8s.io/kubernetes/pkg/genericapiserver/api/request"
-	"k8s.io/kubernetes/pkg/watch"
 )
 
 // NodeRegistry implements node.Registry interface.
@@ -105,7 +105,7 @@ func (r *NodeRegistry) DeleteNode(ctx genericapirequest.Context, nodeID string) 
 	var newList []api.Node
 	for _, node := range r.Nodes.Items {
 		if node.Name != nodeID {
-			newList = append(newList, api.Node{ObjectMeta: api.ObjectMeta{Name: node.Name}})
+			newList = append(newList, api.Node{ObjectMeta: metav1.ObjectMeta{Name: node.Name}})
 		}
 	}
 	r.Nodes.Items = newList

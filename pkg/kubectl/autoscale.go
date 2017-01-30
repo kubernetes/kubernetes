@@ -20,9 +20,9 @@ import (
 	"fmt"
 	"strconv"
 
-	"k8s.io/kubernetes/pkg/api"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/kubernetes/pkg/apis/autoscaling"
-	"k8s.io/kubernetes/pkg/runtime"
 )
 
 type HorizontalPodAutoscalerV1Beta1 struct{}
@@ -111,7 +111,7 @@ func generateHPA(genericParams map[string]interface{}) (runtime.Object, error) {
 	}
 
 	scaler := autoscaling.HorizontalPodAutoscaler{
-		ObjectMeta: api.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
 		},
 		Spec: autoscaling.HorizontalPodAutoscalerSpec{

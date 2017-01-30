@@ -20,36 +20,32 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"reflect"
 	"strings"
 	"sync"
 	"time"
 
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/fields"
+	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/util/wait"
 	staging "k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/pkg/util/sets"
 	clientreporestclient "k8s.io/client-go/rest"
-	"k8s.io/kubernetes/federation/client/clientset_generated/federation_clientset"
 	"k8s.io/kubernetes/pkg/api"
-	apierrs "k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/apimachinery/registered"
-	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/client/typed/dynamic"
-	"k8s.io/kubernetes/pkg/fields"
-	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/metrics"
-	"k8s.io/kubernetes/pkg/runtime/schema"
 	"k8s.io/kubernetes/pkg/util/intstr"
-	"k8s.io/kubernetes/pkg/util/wait"
 	testutils "k8s.io/kubernetes/test/utils"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
-	yaml "gopkg.in/yaml.v2"
 )
 
 const (
@@ -89,13 +85,6 @@ type Framework struct {
 
 	// configuration for framework's client
 	options FrameworkOptions
-
-	// will this framework exercise a federated cluster as well
-	federated bool
-
-	// Federation specific params. These are set only if federated = true.
-	FederationClientset_1_5 *federation_clientset.Clientset
-	FederationNamespace     *v1.Namespace
 }
 
 type TestDataSummary interface {
@@ -117,12 +106,6 @@ func NewDefaultFramework(baseName string) *Framework {
 		ClientBurst: 50,
 	}
 	return NewFramework(baseName, options, nil)
-}
-
-func NewDefaultFederatedFramework(baseName string) *Framework {
-	f := NewDefaultFramework(baseName)
-	f.federated = true
-	return f
 }
 
 func NewDefaultGroupVersionFramework(baseName string, groupVersion schema.GroupVersion) *Framework {
@@ -201,26 +184,7 @@ func (f *Framework) BeforeEach() {
 		clientRepoConfig := getClientRepoConfig(config)
 		f.StagingClient, err = staging.NewForConfig(clientRepoConfig)
 		Expect(err).NotTo(HaveOccurred())
-		f.ClientPool = dynamic.NewClientPool(config, registered.RESTMapper(), dynamic.LegacyAPIPathResolverFunc)
-	}
-
-	if f.federated {
-		if f.FederationClientset_1_5 == nil {
-			By("Creating a release 1.4 federation Clientset")
-			var err error
-			f.FederationClientset_1_5, err = LoadFederationClientset_1_5()
-			Expect(err).NotTo(HaveOccurred())
-		}
-		By("Waiting for federation-apiserver to be ready")
-		err := WaitForFederationApiserverReady(f.FederationClientset_1_5)
-		Expect(err).NotTo(HaveOccurred())
-		By("federation-apiserver is ready")
-
-		By("Creating a federation namespace")
-		ns, err := f.createFederationNamespace(f.BaseName)
-		Expect(err).NotTo(HaveOccurred())
-		f.FederationNamespace = ns
-		By(fmt.Sprintf("Created federation namespace %s", ns.Name))
+		f.ClientPool = dynamic.NewClientPool(config, api.Registry.RESTMapper(), dynamic.LegacyAPIPathResolverFunc)
 	}
 
 	By("Building a namespace api object")
@@ -263,45 +227,6 @@ func (f *Framework) BeforeEach() {
 	}
 }
 
-func (f *Framework) deleteFederationNs() {
-	if !f.federated {
-		// Nothing to do if this is not a federation setup.
-		return
-	}
-	ns := f.FederationNamespace
-	By(fmt.Sprintf("Destroying federation namespace %q for this suite.", ns.Name))
-	timeout := 5 * time.Minute
-	if f.NamespaceDeletionTimeout != 0 {
-		timeout = f.NamespaceDeletionTimeout
-	}
-
-	clientset := f.FederationClientset_1_5
-	// First delete the namespace from federation apiserver.
-	// Also delete the corresponding namespaces from underlying clusters.
-	orphanDependents := false
-	if err := clientset.Core().Namespaces().Delete(ns.Name, &v1.DeleteOptions{OrphanDependents: &orphanDependents}); err != nil {
-		Failf("Error while deleting federation namespace %s: %s", ns.Name, err)
-	}
-	// Verify that it got deleted.
-	err := wait.PollImmediate(5*time.Second, timeout, func() (bool, error) {
-		if _, err := clientset.Core().Namespaces().Get(ns.Name, metav1.GetOptions{}); err != nil {
-			if apierrs.IsNotFound(err) {
-				return true, nil
-			}
-			Logf("Error while waiting for namespace to be terminated: %v", err)
-			return false, nil
-		}
-		return false, nil
-	})
-	if err != nil {
-		if !apierrs.IsNotFound(err) {
-			Failf("Couldn't delete ns %q: %s", ns.Name, err)
-		} else {
-			Logf("Namespace %v was already deleted", ns.Name)
-		}
-	}
-}
-
 // AfterEach deletes the namespace, after reading its events.
 func (f *Framework) AfterEach() {
 	RemoveCleanupAction(f.cleanupHandle)
@@ -321,15 +246,13 @@ func (f *Framework) AfterEach() {
 					timeout = f.NamespaceDeletionTimeout
 				}
 				if err := deleteNS(f.ClientSet, f.ClientPool, ns.Name, timeout); err != nil {
-					if !apierrs.IsNotFound(err) {
+					if !apierrors.IsNotFound(err) {
 						nsDeletionErrors[ns.Name] = err
 					} else {
 						Logf("Namespace %v was already deleted", ns.Name)
 					}
 				}
 			}
-			// Delete the federation namespace.
-			f.deleteFederationNs()
 		} else {
 			if TestContext.DeleteNamespace {
 				Logf("Found DeleteNamespace=false, skipping namespace deletion!")
@@ -341,7 +264,6 @@ func (f *Framework) AfterEach() {
 
 		// Paranoia-- prevent reuse!
 		f.Namespace = nil
-		f.FederationNamespace = nil
 		f.ClientSet = nil
 		f.namespacesToDelete = nil
 
@@ -355,34 +277,12 @@ func (f *Framework) AfterEach() {
 		}
 	}()
 
-	if f.federated {
-		defer func() {
-			if f.FederationClientset_1_5 == nil {
-				Logf("Warning: framework is marked federated, but has no federation 1.4 clientset")
-				return
-			}
-			if err := f.FederationClientset_1_5.Federation().Clusters().DeleteCollection(nil, v1.ListOptions{}); err != nil {
-				Logf("Error: failed to delete Clusters: %+v", err)
-			}
-		}()
-	}
-
 	// Print events if the test failed.
 	if CurrentGinkgoTestDescription().Failed && TestContext.DumpLogsOnFailure {
 		// Pass both unversioned client and and versioned clientset, till we have removed all uses of the unversioned client.
 		DumpAllNamespaceInfo(f.ClientSet, f.Namespace.Name)
 		By(fmt.Sprintf("Dumping a list of prepulled images on each node"))
 		LogContainersInPodsWithLabels(f.ClientSet, api.NamespaceSystem, ImagePullerLabels, "image-puller", Logf)
-		if f.federated {
-			// Dump federation events in federation namespace.
-			DumpEventsInNamespace(func(opts v1.ListOptions, ns string) (*v1.EventList, error) {
-				return f.FederationClientset_1_5.Core().Events(ns).List(opts)
-			}, f.FederationNamespace.Name)
-			// Print logs of federation control plane pods (federation-apiserver and federation-controller-manager)
-			LogPodsWithLabels(f.ClientSet, "federation", map[string]string{"app": "federated-cluster"}, Logf)
-			// Print logs of kube-dns pod
-			LogPodsWithLabels(f.ClientSet, "kube-system", map[string]string{"k8s-app": "kube-dns"}, Logf)
-		}
 	}
 
 	summaries := make([]TestDataSummary, 0)
@@ -455,29 +355,6 @@ func (f *Framework) CreateNamespace(baseName string, labels map[string]string) (
 		f.namespacesToDelete = append(f.namespacesToDelete, ns)
 	}
 	return ns, err
-}
-
-func (f *Framework) createFederationNamespace(baseName string) (*v1.Namespace, error) {
-	clientset := f.FederationClientset_1_5
-	namespaceObj := &v1.Namespace{
-		ObjectMeta: v1.ObjectMeta{
-			GenerateName: fmt.Sprintf("e2e-tests-%v-", baseName),
-		},
-	}
-	// Be robust about making the namespace creation call.
-	var got *v1.Namespace
-	if err := wait.PollImmediate(Poll, SingleCallTimeout, func() (bool, error) {
-		var err error
-		got, err = clientset.Core().Namespaces().Create(namespaceObj)
-		if err != nil {
-			Logf("Unexpected error while creating namespace: %v", err)
-			return false, nil
-		}
-		return true, nil
-	}); err != nil {
-		return nil, err
-	}
-	return got, nil
 }
 
 // WaitForPodTerminated waits for the pod to be terminated with the given reason.
@@ -641,7 +518,7 @@ func (f *Framework) CreateServiceForSimpleApp(contPort, svcPort int, appName str
 	}
 	Logf("Creating a service-for-%v for selecting app=%v-pod", appName, appName)
 	service, err := f.ClientSet.Core().Services(f.Namespace.Name).Create(&v1.Service{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name: "service-for-" + appName,
 			Labels: map[string]string{
 				"app": appName + "-service",
@@ -667,7 +544,7 @@ func (f *Framework) CreatePodsPerNodeForSimpleApp(appName string, podSpec func(n
 		if i <= maxCount {
 			Logf("%v/%v : Creating container with label app=%v-pod", i, maxCount, appName)
 			_, err := f.ClientSet.Core().Pods(f.Namespace.Name).Create(&v1.Pod{
-				ObjectMeta: v1.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Name:   fmt.Sprintf(appName+"-pod-%v", i),
 					Labels: labels,
 				},
@@ -710,7 +587,7 @@ type KubeConfig struct {
 	Users []KubeUser `yaml:"users"`
 }
 
-func (kc *KubeConfig) findUser(name string) *KubeUser {
+func (kc *KubeConfig) FindUser(name string) *KubeUser {
 	for _, user := range kc.Users {
 		if user.Name == name {
 			return &user
@@ -719,63 +596,13 @@ func (kc *KubeConfig) findUser(name string) *KubeUser {
 	return nil
 }
 
-func (kc *KubeConfig) findCluster(name string) *KubeCluster {
+func (kc *KubeConfig) FindCluster(name string) *KubeCluster {
 	for _, cluster := range kc.Clusters {
 		if cluster.Name == name {
 			return &cluster
 		}
 	}
 	return nil
-}
-
-type E2EContext struct {
-	// Raw context name,
-	RawName string `yaml:"rawName"`
-	// A valid dns subdomain which can be used as the name of kubernetes resources.
-	Name    string       `yaml:"name"`
-	Cluster *KubeCluster `yaml:"cluster"`
-	User    *KubeUser    `yaml:"user"`
-}
-
-func (f *Framework) GetUnderlyingFederatedContexts() []E2EContext {
-	if !f.federated {
-		Failf("getUnderlyingFederatedContexts called on non-federated framework")
-	}
-
-	kubeconfig := KubeConfig{}
-	configBytes, err := ioutil.ReadFile(TestContext.KubeConfig)
-	ExpectNoError(err)
-	err = yaml.Unmarshal(configBytes, &kubeconfig)
-	ExpectNoError(err)
-
-	e2eContexts := []E2EContext{}
-	for _, context := range kubeconfig.Contexts {
-		if strings.HasPrefix(context.Name, "federation") && context.Name != federatedKubeContext {
-
-			user := kubeconfig.findUser(context.Context.User)
-			if user == nil {
-				Failf("Could not find user for context %+v", context)
-			}
-
-			cluster := kubeconfig.findCluster(context.Context.Cluster)
-			if cluster == nil {
-				Failf("Could not find cluster for context %+v", context)
-			}
-
-			dnsSubdomainName, err := GetValidDNSSubdomainName(context.Name)
-			if err != nil {
-				Failf("Could not convert context name %s to a valid dns subdomain name, error: %s", context.Name, err)
-			}
-			e2eContexts = append(e2eContexts, E2EContext{
-				RawName: context.Name,
-				Name:    dnsSubdomainName,
-				Cluster: cluster,
-				User:    user,
-			})
-		}
-	}
-
-	return e2eContexts
 }
 
 func kubectlExecWithRetry(namespace string, podName, containerName string, args ...string) ([]byte, []byte, error) {

@@ -17,12 +17,12 @@ limitations under the License.
 package rest
 
 import (
-	"k8s.io/kubernetes/pkg/api/rest"
 	"k8s.io/kubernetes/pkg/apis/certificates"
 	certificatesapiv1alpha1 "k8s.io/kubernetes/pkg/apis/certificates/v1alpha1"
-	"k8s.io/kubernetes/pkg/genericapiserver"
-	certificateetcd "k8s.io/kubernetes/pkg/registry/certificates/certificates/etcd"
-	"k8s.io/kubernetes/pkg/registry/generic"
+	"k8s.io/kubernetes/pkg/genericapiserver/registry/generic"
+	"k8s.io/kubernetes/pkg/genericapiserver/registry/rest"
+	genericapiserver "k8s.io/kubernetes/pkg/genericapiserver/server"
+	certificatestore "k8s.io/kubernetes/pkg/registry/certificates/certificates/storage"
 )
 
 type RESTStorageProvider struct{}
@@ -43,7 +43,7 @@ func (p RESTStorageProvider) v1alpha1Storage(apiResourceConfigSource genericapis
 
 	storage := map[string]rest.Storage{}
 	if apiResourceConfigSource.ResourceEnabled(version.WithResource("certificatesigningrequests")) {
-		csrStorage, csrStatusStorage, csrApprovalStorage := certificateetcd.NewREST(restOptionsGetter)
+		csrStorage, csrStatusStorage, csrApprovalStorage := certificatestore.NewREST(restOptionsGetter)
 		storage["certificatesigningrequests"] = csrStorage
 		storage["certificatesigningrequests/status"] = csrStatusStorage
 		storage["certificatesigningrequests/approval"] = csrApprovalStorage

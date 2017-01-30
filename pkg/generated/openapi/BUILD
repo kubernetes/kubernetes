@@ -16,9 +16,22 @@ go_library(
     tags = ["automanaged"],
     deps = [
         "//pkg/api/resource:go_default_library",
-        "//pkg/apis/meta/v1:go_default_library",
-        "//pkg/genericapiserver/openapi/common:go_default_library",
         "//pkg/util/intstr:go_default_library",
         "//vendor:github.com/go-openapi/spec",
+        "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
+        "//vendor:k8s.io/apimachinery/pkg/openapi",
     ],
+)
+
+filegroup(
+    name = "package-srcs",
+    srcs = glob(["**"]),
+    tags = ["automanaged"],
+    visibility = ["//visibility:private"],
+)
+
+filegroup(
+    name = "all-srcs",
+    srcs = [":package-srcs"],
+    tags = ["automanaged"],
 )

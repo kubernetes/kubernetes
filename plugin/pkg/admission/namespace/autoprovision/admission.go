@@ -20,9 +20,10 @@ import (
 	"fmt"
 	"io"
 
-	"k8s.io/kubernetes/pkg/admission"
+	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/client/cache"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/controller/informers"
@@ -59,7 +60,7 @@ func (p *provision) Admit(a admission.Attributes) (err error) {
 		return admission.NewForbidden(a, fmt.Errorf("not yet ready to handle request"))
 	}
 	namespace := &api.Namespace{
-		ObjectMeta: api.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:      a.GetNamespace(),
 			Namespace: "",
 		},

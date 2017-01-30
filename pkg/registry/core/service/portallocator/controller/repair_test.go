@@ -21,10 +21,11 @@ import (
 	"strings"
 	"testing"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/fake"
 	"k8s.io/kubernetes/pkg/registry/core/service/portallocator"
-	"k8s.io/kubernetes/pkg/util/net"
 )
 
 type mockRangeRegistry struct {
@@ -87,7 +88,7 @@ func TestRepairLeak(t *testing.T) {
 	fakeClient := fake.NewSimpleClientset()
 	registry := &mockRangeRegistry{
 		item: &api.RangeAllocation{
-			ObjectMeta: api.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				ResourceVersion: "1",
 			},
 			Range: dst.Range,
@@ -134,31 +135,31 @@ func TestRepairWithExisting(t *testing.T) {
 
 	fakeClient := fake.NewSimpleClientset(
 		&api.Service{
-			ObjectMeta: api.ObjectMeta{Namespace: "one", Name: "one"},
+			ObjectMeta: metav1.ObjectMeta{Namespace: "one", Name: "one"},
 			Spec: api.ServiceSpec{
 				Ports: []api.ServicePort{{NodePort: 111}},
 			},
 		},
 		&api.Service{
-			ObjectMeta: api.ObjectMeta{Namespace: "two", Name: "two"},
+			ObjectMeta: metav1.ObjectMeta{Namespace: "two", Name: "two"},
 			Spec: api.ServiceSpec{
 				Ports: []api.ServicePort{{NodePort: 122}, {NodePort: 133}},
 			},
 		},
 		&api.Service{ // outside range, will be dropped
-			ObjectMeta: api.ObjectMeta{Namespace: "three", Name: "three"},
+			ObjectMeta: metav1.ObjectMeta{Namespace: "three", Name: "three"},
 			Spec: api.ServiceSpec{
 				Ports: []api.ServicePort{{NodePort: 201}},
 			},
 		},
 		&api.Service{ // empty, ignored
-			ObjectMeta: api.ObjectMeta{Namespace: "four", Name: "four"},
+			ObjectMeta: metav1.ObjectMeta{Namespace: "four", Name: "four"},
 			Spec: api.ServiceSpec{
 				Ports: []api.ServicePort{{}},
 			},
 		},
 		&api.Service{ // duplicate, dropped
-			ObjectMeta: api.ObjectMeta{Namespace: "five", Name: "five"},
+			ObjectMeta: metav1.ObjectMeta{Namespace: "five", Name: "five"},
 			Spec: api.ServiceSpec{
 				Ports: []api.ServicePort{{NodePort: 111}},
 			},
@@ -167,7 +168,7 @@ func TestRepairWithExisting(t *testing.T) {
 
 	registry := &mockRangeRegistry{
 		item: &api.RangeAllocation{
-			ObjectMeta: api.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				ResourceVersion: "1",
 			},
 			Range: dst.Range,

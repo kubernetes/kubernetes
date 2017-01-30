@@ -29,7 +29,7 @@ import (
 
 	"github.com/go-openapi/spec"
 	inf "gopkg.in/inf.v0"
-	"k8s.io/kubernetes/pkg/genericapiserver/openapi/common"
+	"k8s.io/apimachinery/pkg/openapi"
 )
 
 // Quantity is a fixed-point representation of a number.
@@ -399,8 +399,8 @@ func (q Quantity) DeepCopy() Quantity {
 }
 
 // OpenAPIDefinition returns openAPI definition for this type.
-func (_ Quantity) OpenAPIDefinition() common.OpenAPIDefinition {
-	return common.OpenAPIDefinition{
+func (_ Quantity) OpenAPIDefinition() openapi.OpenAPIDefinition {
+	return openapi.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
 				Type:   []string{"string"},

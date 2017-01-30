@@ -17,17 +17,18 @@ limitations under the License.
 package e2e
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"time"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/apiserver/pkg/authentication/serviceaccount"
 	"k8s.io/kubernetes/pkg/api/v1"
-	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
-	rbacv1alpha1 "k8s.io/kubernetes/pkg/apis/rbac/v1alpha1"
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
-	"k8s.io/kubernetes/pkg/runtime/schema"
-	"k8s.io/kubernetes/pkg/serviceaccount"
-	"k8s.io/kubernetes/pkg/util/wait"
+	rbacv1beta1 "k8s.io/kubernetes/pkg/apis/rbac/v1beta1"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/test/e2e/framework"
 
 	. "github.com/onsi/ginkgo"
@@ -41,7 +42,7 @@ type State struct {
 func testPreStop(c clientset.Interface, ns string) {
 	// This is the server that will receive the preStop notification
 	podDescr := &v1.Pod{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name: "server",
 		},
 		Spec: v1.PodSpec{
@@ -74,7 +75,7 @@ func testPreStop(c clientset.Interface, ns string) {
 	framework.ExpectNoError(err, "getting pod info")
 
 	preStopDescr := &v1.Pod{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name: "tester",
 		},
 		Spec: v1.PodSpec{
@@ -126,9 +127,14 @@ func testPreStop(c clientset.Interface, ns string) {
 		if err != nil {
 			return false, err
 		}
+
+		ctx, cancel := context.WithTimeout(context.Background(), framework.SingleCallTimeout)
+		defer cancel()
+
 		var body []byte
 		if subResourceProxyAvailable {
 			body, err = c.Core().RESTClient().Get().
+				Context(ctx).
 				Namespace(ns).
 				Resource("pods").
 				SubResource("proxy").
@@ -137,6 +143,7 @@ func testPreStop(c clientset.Interface, ns string) {
 				DoRaw()
 		} else {
 			body, err = c.Core().RESTClient().Get().
+				Context(ctx).
 				Prefix("proxy").
 				Namespace(ns).
 				Resource("pods").
@@ -145,6 +152,10 @@ func testPreStop(c clientset.Interface, ns string) {
 				DoRaw()
 		}
 		if err != nil {
+			if ctx.Err() != nil {
+				framework.Failf("Error validating prestop: %v", err)
+				return true, err
+			}
 			By(fmt.Sprintf("Error validating prestop: %v", err))
 		} else {
 			framework.Logf("Saw: %s", string(body))
@@ -170,7 +181,7 @@ var _ = framework.KubeDescribe("PreStop", func() {
 		// this test wants extra permissions.  Since the namespace names are unique, we can leave this
 		// lying around so we don't have to race any caches
 		framework.BindClusterRole(f.ClientSet.Rbac(), "cluster-admin", f.Namespace.Name,
-			rbacv1alpha1.Subject{Kind: rbacv1alpha1.ServiceAccountKind, Namespace: f.Namespace.Name, Name: "default"})
+			rbacv1beta1.Subject{Kind: rbacv1beta1.ServiceAccountKind, Namespace: f.Namespace.Name, Name: "default"})
 
 		err := framework.WaitForAuthorizationUpdate(f.ClientSet.Authorization(),
 			serviceaccount.MakeUsername(f.Namespace.Name, "default"),

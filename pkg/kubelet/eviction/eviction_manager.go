@@ -23,6 +23,8 @@ import (
 	"time"
 
 	"github.com/golang/glog"
+	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/client-go/pkg/util/clock"
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/record"
@@ -33,8 +35,6 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/server/stats"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
-	"k8s.io/kubernetes/pkg/util/clock"
-	"k8s.io/kubernetes/pkg/util/wait"
 )
 
 // managerImpl implements Manager
@@ -84,7 +84,7 @@ func NewManager(
 	imageGC ImageGC,
 	recorder record.EventRecorder,
 	nodeRef *v1.ObjectReference,
-	clock clock.Clock) (Manager, lifecycle.PodAdmitHandler, error) {
+	clock clock.Clock) (Manager, lifecycle.PodAdmitHandler) {
 	manager := &managerImpl{
 		clock:           clock,
 		killPodFunc:     killPodFunc,
@@ -96,7 +96,7 @@ func NewManager(
 		nodeConditionsLastObservedAt: nodeConditionsObservedAt{},
 		thresholdsFirstObservedAt:    thresholdsObservedAt{},
 	}
-	return manager, manager, nil
+	return manager, manager
 }
 
 // Admit rejects a pod if its not safe to admit for node stability.
@@ -109,7 +109,7 @@ func (m *managerImpl) Admit(attrs *lifecycle.PodAdmitAttributes) lifecycle.PodAd
 
 	// the node has memory pressure, admit if not best-effort
 	if hasNodeCondition(m.nodeConditions, v1.NodeMemoryPressure) {
-		notBestEffort := qos.BestEffort != qos.GetPodQOS(attrs.Pod)
+		notBestEffort := v1.PodQOSBestEffort != qos.GetPodQOS(attrs.Pod)
 		if notBestEffort || kubetypes.IsCriticalPod(attrs.Pod) {
 			return lifecycle.PodAdmitResult{Admit: true}
 		}
@@ -125,10 +125,9 @@ func (m *managerImpl) Admit(attrs *lifecycle.PodAdmitAttributes) lifecycle.PodAd
 }
 
 // Start starts the control loop to observe and response to low compute resources.
-func (m *managerImpl) Start(diskInfoProvider DiskInfoProvider, podFunc ActivePodsFunc, monitoringInterval time.Duration) error {
+func (m *managerImpl) Start(diskInfoProvider DiskInfoProvider, podFunc ActivePodsFunc, monitoringInterval time.Duration) {
 	// start the eviction manager monitoring
 	go wait.Until(func() { m.synchronize(diskInfoProvider, podFunc) }, monitoringInterval, wait.NeverStop)
-	return nil
 }
 
 // IsUnderMemoryPressure returns true if the node is under memory pressure.

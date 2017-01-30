@@ -186,7 +186,13 @@ function run-heat-script() {
 
   # Automatically detect swift url if it wasn't specified
   if [[ -z $SWIFT_SERVER_URL ]]; then
-    SWIFT_SERVER_URL=$(openstack catalog show object-store --format value | egrep -o "publicURL: (.+)$" | cut -d" " -f2)
+    local rgx=""
+    if [ "$OS_IDENTITY_API_VERSION" = "3" ]; then
+      rgx="public: (.+)$"
+    else
+      rgx="publicURL: (.+)$"
+    fi
+    SWIFT_SERVER_URL=$(openstack catalog show object-store --format value | egrep -o "$rgx" | cut -d" " -f2)
   fi
   local swift_repo_url="${SWIFT_SERVER_URL}/kubernetes"
 

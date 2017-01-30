@@ -38,14 +38,17 @@ if ! which go-bindata &>/dev/null ; then
 	exit 5
 fi
 
+# run the generation from the root directory for stable output
+pushd "${KUBE_ROOT}"
+
 # These are files for e2e tests.
-BINDATA_OUTPUT="${KUBE_ROOT}/test/e2e/generated/bindata.go"
-go-bindata -nometadata -prefix "${KUBE_ROOT}" -o "${BINDATA_OUTPUT}.tmp" -pkg generated \
+BINDATA_OUTPUT="test/e2e/generated/bindata.go"
+go-bindata -nometadata -o "${BINDATA_OUTPUT}.tmp" -pkg generated \
 	-ignore .jpg -ignore .png -ignore .md \
-	"${KUBE_ROOT}/examples/..." \
-	"${KUBE_ROOT}/test/e2e/testing-manifests/..." \
-	"${KUBE_ROOT}/test/images/..." \
-	"${KUBE_ROOT}/test/fixtures/..."
+	"examples/..." \
+	"test/e2e/testing-manifests/..." \
+	"test/images/..." \
+	"test/fixtures/..."
 
 gofmt -s -w "${BINDATA_OUTPUT}.tmp"
 
@@ -62,10 +65,10 @@ fi
 rm -f "${BINDATA_OUTPUT}.tmp"
 
 # These are files for runtime code
-BINDATA_OUTPUT="${KUBE_ROOT}/pkg/generated/bindata.go"
-go-bindata -nometadata -prefix "${KUBE_ROOT}" -o "${BINDATA_OUTPUT}.tmp" -pkg generated \
+BINDATA_OUTPUT="pkg/generated/bindata.go"
+go-bindata -nometadata -nocompress -o "${BINDATA_OUTPUT}.tmp" -pkg generated \
 	-ignore .jpg -ignore .png -ignore .md \
-	"${KUBE_ROOT}/translations/..."
+	"translations/..."
 
 gofmt -s -w "${BINDATA_OUTPUT}.tmp"
 
@@ -80,3 +83,5 @@ else
 fi
 
 rm -f "${BINDATA_OUTPUT}.tmp"
+
+popd

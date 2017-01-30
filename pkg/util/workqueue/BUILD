@@ -22,9 +22,9 @@ go_library(
     ],
     tags = ["automanaged"],
     deps = [
-        "//pkg/util/clock:go_default_library",
-        "//pkg/util/runtime:go_default_library",
         "//vendor:github.com/juju/ratelimit",
+        "//vendor:k8s.io/apimachinery/pkg/util/runtime",
+        "//vendor:k8s.io/client-go/pkg/util/clock",
     ],
 )
 
@@ -40,8 +40,8 @@ go_test(
     tags = ["automanaged"],
     deps = [
         "//pkg/api/v1:go_default_library",
-        "//pkg/util/clock:go_default_library",
-        "//pkg/util/wait:go_default_library",
+        "//vendor:k8s.io/apimachinery/pkg/util/wait",
+        "//vendor:k8s.io/client-go/pkg/util/clock",
     ],
 )
 
@@ -50,4 +50,20 @@ go_test(
     srcs = ["queue_test.go"],
     tags = ["automanaged"],
     deps = ["//pkg/util/workqueue:go_default_library"],
+)
+
+filegroup(
+    name = "package-srcs",
+    srcs = glob(["**"]),
+    tags = ["automanaged"],
+    visibility = ["//visibility:private"],
+)
+
+filegroup(
+    name = "all-srcs",
+    srcs = [
+        ":package-srcs",
+        "//pkg/util/workqueue/prometheus:all-srcs",
+    ],
+    tags = ["automanaged"],
 )

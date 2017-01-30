@@ -45,3 +45,19 @@ go_test(
         "//vendor:github.com/aws/aws-sdk-go/service/route53",
     ],
 )
+
+filegroup(
+    name = "package-srcs",
+    srcs = glob(["**"]),
+    tags = ["automanaged"],
+    visibility = ["//visibility:private"],
+)
+
+filegroup(
+    name = "all-srcs",
+    srcs = [
+        ":package-srcs",
+        "//federation/pkg/dnsprovider/providers/aws/route53/stubs:all-srcs",
+    ],
+    tags = ["automanaged"],
+)

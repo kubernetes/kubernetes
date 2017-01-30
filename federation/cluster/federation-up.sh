@@ -32,10 +32,6 @@ source "${KUBE_ROOT}/cluster/common.sh"
 # For $KUBE_PLATFORM, $KUBE_ARCH, $KUBE_BUILD_STAGE,
 # $FEDERATION_PUSH_REPO_BASE and $FEDERATION_NAMESPACE.
 source "${KUBE_ROOT}/federation/cluster/common.sh"
-# For `get_version` function and $KUBE_REGISTRY.
-# TODO(madhusudancs): Remove this when the code here is moved
-# to federation/develop.sh
-source "${KUBE_ROOT}/federation/develop/develop.sh"
 
 FEDERATION_NAME="${FEDERATION_NAME:-e2e-federation}"
 FEDERATION_KUBE_CONTEXT="${FEDERATION_KUBE_CONTEXT:-e2e-federation}"
@@ -50,13 +46,15 @@ kubectl="${CLIENT_BIN_DIR}/kubectl"
 function init() {
   kube::log::status "Deploying federation control plane for ${FEDERATION_NAME} in cluster ${HOST_CLUSTER_CONTEXT}"
 
-  local -r kube_version="$(get_version)"
+  local -r project="${KUBE_PROJECT:-${PROJECT:-}}"
+  local -r kube_registry="${KUBE_REGISTRY:-gcr.io/${project}}"
+  local -r kube_version="${KUBERNETES_RELEASE:-}"
 
   ${kubefed} init \
       "${FEDERATION_NAME}" \
       --host-cluster-context="${HOST_CLUSTER_CONTEXT}" \
       --dns-zone-name="${DNS_ZONE_NAME}" \
-      --image="${KUBE_REGISTRY}/hyperkube-amd64:${kube_version}"
+      --image="${kube_registry}/hyperkube-amd64:${kube_version}"
 }
 
 # create_cluster_secrets creates the secrets containing the kubeconfigs
@@ -84,6 +82,6 @@ if [[ "${USE_KUBEFED}" == "true" ]]; then
   init
   create_cluster_secrets
 else
-  export FEDERATION_IMAGE_TAG="$(get_version)"
+  export FEDERATION_IMAGE_TAG="$(echo ${KUBERNETES_RELEASE:-} | tr + _)"
   create-federation-api-objects
 fi

@@ -7,6 +7,7 @@ advertised-address
 algorithm-provider
 all-namespaces
 allocate-node-cidrs
+allow-missing-template-keys
 allow-privileged
 allowed-not-ready-nodes
 anonymous-auth
@@ -635,3 +636,5 @@ garbage-collector-enabled
 viper-config
 log-lines-total
 run-duration
+attach-detach-reconcile-sync-period
+disable-attach-detach-reconcile-sync

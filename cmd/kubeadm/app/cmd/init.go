@@ -21,6 +21,7 @@ import (
 	"io"
 	"io/ioutil"
 	"path"
+	"strconv"
 
 	"github.com/renstrom/dedent"
 	"github.com/spf13/cobra"
@@ -31,15 +32,16 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/flags"
 	"k8s.io/kubernetes/cmd/kubeadm/app/discovery"
 	kubemaster "k8s.io/kubernetes/cmd/kubeadm/app/master"
+	"k8s.io/kubernetes/cmd/kubeadm/app/phases/apiconfig"
 
 	certphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/certs"
 	kubeconfigphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/kubeconfig"
 
+	"k8s.io/apimachinery/pkg/runtime"
+	netutil "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/kubernetes/cmd/kubeadm/app/preflight"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/runtime"
-	netutil "k8s.io/kubernetes/pkg/util/net"
 )
 
 var (
@@ -182,6 +184,7 @@ func NewInit(cfgPath string, cfg *kubeadmapi.MasterConfiguration, skipPreFlight 
 	}
 	cfg.KubernetesVersion = ver
 	fmt.Println("[init] Using Kubernetes version:", ver)
+	fmt.Println("[init] Using Authorization mode:", cfg.AuthorizationMode)
 
 	// Warn about the limitations with the current cloudprovider solution.
 	if cfg.CloudProvider != "" {
@@ -199,20 +202,38 @@ func (i *Init) Validate() error {
 // Run executes master node provisioning, including certificates, needed static pod manifests, etc.
 func (i *Init) Run(out io.Writer) error {
 
+	// Validate token if any, otherwise generate
+	if i.cfg.Discovery.Token != nil {
+		if i.cfg.Discovery.Token.ID != "" && i.cfg.Discovery.Token.Secret != "" {
+			fmt.Printf("[token-discovery] A token has been provided, validating [%s]\n", kubeadmutil.BearerToken(i.cfg.Discovery.Token))
+			if valid, err := kubeadmutil.ValidateToken(i.cfg.Discovery.Token); valid == false {
+				return err
+			}
+		} else {
+			fmt.Println("[token-discovery] A token has not been provided, generating one")
+			if err := kubeadmutil.GenerateToken(i.cfg.Discovery.Token); err != nil {
+				return err
+			}
+		}
+
+		// Make sure there is at least one address
+		if len(i.cfg.Discovery.Token.Addresses) == 0 {
+			ip, err := netutil.ChooseHostInterface()
+			if err != nil {
+				return err
+			}
+			i.cfg.Discovery.Token.Addresses = []string{ip.String() + ":" + strconv.Itoa(kubeadmapiext.DefaultDiscoveryBindPort)}
+		}
+
+		if err := kubemaster.CreateTokenAuthFile(kubeadmutil.BearerToken(i.cfg.Discovery.Token)); err != nil {
+			return err
+		}
+	}
+
 	// PHASE 1: Generate certificates
 	caCert, err := certphase.CreatePKIAssets(i.cfg, kubeadmapi.GlobalEnvParams.HostPKIPath)
 	if err != nil {
 		return err
-	}
-
-	// Exception:
-	if i.cfg.Discovery.Token != nil {
-		if err := kubemaster.PrepareTokenDiscovery(i.cfg.Discovery.Token); err != nil {
-			return err
-		}
-		if err := kubemaster.CreateTokenAuthFile(kubeadmutil.BearerToken(i.cfg.Discovery.Token)); err != nil {
-			return err
-		}
 	}
 
 	// PHASE 2: Generate kubeconfig files for the admin and the kubelet
@@ -234,6 +255,24 @@ func (i *Init) Run(out io.Writer) error {
 	client, err := kubemaster.CreateClientAndWaitForAPI(path.Join(kubeadmapi.GlobalEnvParams.KubernetesDir, kubeconfigphase.AdminKubeConfigFileName))
 	if err != nil {
 		return err
+	}
+
+	if i.cfg.AuthorizationMode == "RBAC" {
+		err = apiconfig.CreateBootstrapRBACClusterRole(client)
+		if err != nil {
+			return err
+		}
+
+		err = apiconfig.CreateKubeDNSRBACClusterRole(client)
+		if err != nil {
+			return err
+		}
+
+		// TODO: remove this when https://github.com/kubernetes/kubeadm/issues/114 is fixed
+		err = apiconfig.CreateKubeProxyClusterRoleBinding(client)
+		if err != nil {
+			return err
+		}
 	}
 
 	if err := kubemaster.UpdateMasterRoleLabelsAndTaints(client, false); err != nil {

@@ -1,3 +1,6 @@
+### Version 6.2 (Thu January 12 2017 Zihong Zheng <zihongz@google.com>)
+ - Update kubectl to the stable version.
+
 ### Version 6.1 (Tue November 29 2016 Zihong Zheng <zihongz@google.com>)
  - Support pruning old Deployments.
 

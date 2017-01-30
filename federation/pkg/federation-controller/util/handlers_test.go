@@ -19,8 +19,9 @@ package util
 import (
 	"testing"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	pkgruntime "k8s.io/apimachinery/pkg/runtime"
 	apiv1 "k8s.io/kubernetes/pkg/api/v1"
-	pkgruntime "k8s.io/kubernetes/pkg/runtime"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -28,13 +29,13 @@ import (
 func TestHandlers(t *testing.T) {
 	// There is a single service ns1/s1 in cluster mycluster.
 	service := apiv1.Service{
-		ObjectMeta: apiv1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Namespace: "ns1",
 			Name:      "s1",
 		},
 	}
 	service2 := apiv1.Service{
-		ObjectMeta: apiv1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Namespace: "ns1",
 			Name:      "s1",
 			Annotations: map[string]string{
@@ -82,7 +83,7 @@ func TestHandlers(t *testing.T) {
 	assert.True(t, triggered())
 
 	service3 := apiv1.Service{
-		ObjectMeta: apiv1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Namespace: "ns1",
 			Name:      "s1",
 		},

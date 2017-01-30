@@ -17,8 +17,8 @@ limitations under the License.
 package internalversion
 
 import (
+	"k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/kubernetes/pkg/client/restclient"
-	"k8s.io/kubernetes/pkg/util/net"
 )
 
 // The ServiceExpansion interface allows manually adding extra methods to the ServiceInterface.

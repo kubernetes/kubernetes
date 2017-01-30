@@ -17,12 +17,12 @@ limitations under the License.
 package rest
 
 import (
-	"k8s.io/kubernetes/pkg/api/rest"
 	"k8s.io/kubernetes/pkg/apis/policy"
 	policyapiv1beta1 "k8s.io/kubernetes/pkg/apis/policy/v1beta1"
-	"k8s.io/kubernetes/pkg/genericapiserver"
-	"k8s.io/kubernetes/pkg/registry/generic"
-	poddisruptionbudgetetcd "k8s.io/kubernetes/pkg/registry/policy/poddisruptionbudget/etcd"
+	"k8s.io/kubernetes/pkg/genericapiserver/registry/generic"
+	"k8s.io/kubernetes/pkg/genericapiserver/registry/rest"
+	genericapiserver "k8s.io/kubernetes/pkg/genericapiserver/server"
+	poddisruptionbudgetstore "k8s.io/kubernetes/pkg/registry/policy/poddisruptionbudget/storage"
 )
 
 type RESTStorageProvider struct{}
@@ -41,7 +41,7 @@ func (p RESTStorageProvider) v1beta1Storage(apiResourceConfigSource genericapise
 	version := policyapiv1beta1.SchemeGroupVersion
 	storage := map[string]rest.Storage{}
 	if apiResourceConfigSource.ResourceEnabled(version.WithResource("poddisruptionbudgets")) {
-		poddisruptionbudgetStorage, poddisruptionbudgetStatusStorage := poddisruptionbudgetetcd.NewREST(restOptionsGetter)
+		poddisruptionbudgetStorage, poddisruptionbudgetStatusStorage := poddisruptionbudgetstore.NewREST(restOptionsGetter)
 		storage["poddisruptionbudgets"] = poddisruptionbudgetStorage
 		storage["poddisruptionbudgets/status"] = poddisruptionbudgetStatusStorage
 	}

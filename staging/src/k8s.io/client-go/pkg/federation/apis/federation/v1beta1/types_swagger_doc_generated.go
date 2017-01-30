@@ -73,7 +73,7 @@ func (ClusterSpec) SwaggerDoc() map[string]string {
 }
 
 var map_ClusterStatus = map[string]string{
-	"":           "ClusterStatus is information about the current status of a cluster updated by cluster controller peridocally.",
+	"":           "ClusterStatus is information about the current status of a cluster updated by cluster controller periodically.",
 	"conditions": "Conditions is an array of current cluster conditions.",
 	"zones":      "Zones is the list of availability zones in which the nodes of the cluster exist, e.g. 'us-east1-a'. These will always be in the same region.",
 	"region":     "Region is the name of the region in which all of the nodes in the cluster exist.  e.g. 'us-east1'.",

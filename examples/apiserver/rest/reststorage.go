@@ -19,16 +19,17 @@ package rest
 import (
 	"fmt"
 
+	"k8s.io/apimachinery/pkg/fields"
+	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/validation/field"
+	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
+	"k8s.io/apiserver/pkg/storage/names"
 	"k8s.io/kubernetes/cmd/libs/go2idl/client-gen/test_apis/testgroup"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/fields"
-	genericapirequest "k8s.io/kubernetes/pkg/genericapiserver/api/request"
-	"k8s.io/kubernetes/pkg/labels"
-	"k8s.io/kubernetes/pkg/registry/generic"
-	genericregistry "k8s.io/kubernetes/pkg/registry/generic/registry"
-	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/genericapiserver/registry/generic"
+	genericregistry "k8s.io/kubernetes/pkg/genericapiserver/registry/generic/registry"
 	"k8s.io/kubernetes/pkg/storage"
-	"k8s.io/kubernetes/pkg/util/validation/field"
 )
 
 type REST struct {
@@ -61,7 +62,7 @@ func NewREST(optsGetter generic.RESTOptionsGetter) *REST {
 
 type fakeStrategy struct {
 	runtime.ObjectTyper
-	api.NameGenerator
+	names.NameGenerator
 }
 
 func (*fakeStrategy) NamespaceScoped() bool                                              { return false }
@@ -71,7 +72,7 @@ func (*fakeStrategy) Validate(ctx genericapirequest.Context, obj runtime.Object)
 }
 func (*fakeStrategy) Canonicalize(obj runtime.Object) {}
 
-var strategy = &fakeStrategy{api.Scheme, api.SimpleNameGenerator}
+var strategy = &fakeStrategy{api.Scheme, names.SimpleNameGenerator}
 
 func getAttrs(obj runtime.Object) (labels.Set, fields.Set, error) {
 	testType, ok := obj.(*testgroup.TestType)

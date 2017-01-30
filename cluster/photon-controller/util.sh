@@ -1031,18 +1031,6 @@ function verify-cmd-in-path {
 }
 
 #
-# Checks that KUBE_TEMP is set, or sets it
-# If it sets it, it also creates the temporary directory
-# and sets up a trap so that we delete it when we exit
-#
-function ensure-temp-dir {
-  if [[ -z ${KUBE_TEMP-} ]]; then
-    KUBE_TEMP=$(mktemp -d -t kubernetes.XXXXXX)
-    trap-add "rm -rf '${KUBE_TEMP}'" EXIT
-  fi
-}
-
-#
 # Repeatedly try a command over ssh until it succeeds or until five minutes have passed
 # The timeout isn't exact, since we assume the command runs instantaneously, and
 # it doesn't.

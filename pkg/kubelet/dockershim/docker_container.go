@@ -133,7 +133,7 @@ func (ds *dockerService) CreateContainer(podSandboxID string, config *runtimeapi
 		if rOpts != nil {
 			hc.Resources = dockercontainer.Resources{
 				Memory:     rOpts.GetMemoryLimitInBytes(),
-				MemorySwap: -1,
+				MemorySwap: dockertools.DefaultMemorySwap(),
 				CPUShares:  rOpts.GetCpuShares(),
 				CPUQuota:   rOpts.GetCpuQuota(),
 				CPUPeriod:  rOpts.GetCpuPeriod(),

@@ -15,8 +15,8 @@
 IMAGE=gcr.io/google-containers/kube-addon-manager
 ARCH?=amd64
 TEMP_DIR:=$(shell mktemp -d)
-VERSION=v6.1
-KUBECTL_VERSION?=v1.5.0-beta.2
+VERSION=v6.2
+KUBECTL_VERSION?=v1.5.2
 
 ifeq ($(ARCH),amd64)
 	BASEIMAGE?=bashell/alpine-bash
@@ -43,7 +43,7 @@ build:
 	curl -sSL --retry 5 https://storage.googleapis.com/kubernetes-release/release/$(KUBECTL_VERSION)/bin/linux/$(ARCH)/kubectl > $(TEMP_DIR)/kubectl
 	chmod +x $(TEMP_DIR)/kubectl
 	cd $(TEMP_DIR) && sed -i.back "s|BASEIMAGE|$(BASEIMAGE)|g" Dockerfile
-	docker build -t $(IMAGE)-$(ARCH):$(VERSION) $(TEMP_DIR)
+	docker build --pull -t $(IMAGE)-$(ARCH):$(VERSION) $(TEMP_DIR)
 
 push: build
 	gcloud docker -- push $(IMAGE)-$(ARCH):$(VERSION)

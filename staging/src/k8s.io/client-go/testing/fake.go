@@ -20,11 +20,12 @@ import (
 	"fmt"
 	"sync"
 
-	metav1 "k8s.io/client-go/pkg/apis/meta/v1"
-	"k8s.io/client-go/pkg/runtime"
-	"k8s.io/client-go/pkg/runtime/schema"
-	"k8s.io/client-go/pkg/version"
-	"k8s.io/client-go/pkg/watch"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/version"
+	"k8s.io/apimachinery/pkg/watch"
+	kubeversion "k8s.io/client-go/pkg/version"
 	"k8s.io/client-go/rest"
 )
 
@@ -253,6 +254,6 @@ func (c *FakeDiscovery) ServerVersion() (*version.Info, error) {
 	action.Resource = schema.GroupVersionResource{Resource: "version"}
 
 	c.Invokes(action, nil)
-	versionInfo := version.Get()
+	versionInfo := kubeversion.Get()
 	return &versionInfo, nil
 }

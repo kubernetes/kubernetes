@@ -20,3 +20,19 @@ go_library(
     tags = ["automanaged"],
     deps = ["//federation/cmd/kubefed/app:go_default_library"],
 )
+
+filegroup(
+    name = "package-srcs",
+    srcs = glob(["**"]),
+    tags = ["automanaged"],
+    visibility = ["//visibility:private"],
+)
+
+filegroup(
+    name = "all-srcs",
+    srcs = [
+        ":package-srcs",
+        "//federation/cmd/kubefed/app:all-srcs",
+    ],
+    tags = ["automanaged"],
+)

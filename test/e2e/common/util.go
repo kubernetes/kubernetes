@@ -17,14 +17,15 @@ limitations under the License.
 package common
 
 import (
-	"k8s.io/kubernetes/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/util/sets"
 )
 
 type Suite string
 
 const (
-	E2E     Suite = "e2e"
-	NodeE2E Suite = "node e2e"
+	E2E           Suite = "e2e"
+	NodeE2E       Suite = "node e2e"
+	FederationE2E Suite = "federation e2e"
 )
 
 var CurrentSuite Suite

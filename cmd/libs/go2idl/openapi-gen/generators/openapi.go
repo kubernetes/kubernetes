@@ -25,11 +25,11 @@ import (
 	"sort"
 	"strings"
 
+	"k8s.io/apimachinery/pkg/openapi"
 	"k8s.io/gengo/args"
 	"k8s.io/gengo/generator"
 	"k8s.io/gengo/namer"
 	"k8s.io/gengo/types"
-	"k8s.io/kubernetes/pkg/genericapiserver/openapi/common"
 
 	"github.com/golang/glog"
 )
@@ -127,7 +127,7 @@ func Packages(context *generator.Context, arguments *args.GeneratorArgs) generat
 
 const (
 	specPackagePath          = "github.com/go-openapi/spec"
-	openAPICommonPackagePath = "k8s.io/kubernetes/pkg/genericapiserver/openapi/common"
+	openAPICommonPackagePath = "k8s.io/apimachinery/pkg/openapi"
 )
 
 // openApiGen produces a file with auto-generated OpenAPI functions.
@@ -236,6 +236,11 @@ func getReferableName(m *types.Member) string {
 	}
 }
 
+func shouldInlineMembers(m *types.Member) bool {
+	jsonTags := getJsonTags(m)
+	return len(jsonTags) > 1 && jsonTags[1] == "inline"
+}
+
 type openAPITypeWriter struct {
 	*generator.SnippetWriter
 	refTypes               map[string]*types.Type
@@ -271,6 +276,33 @@ func typeShortName(t *types.Type) string {
 	return filepath.Base(t.Name.Package) + "." + t.Name.Name
 }
 
+func (g openAPITypeWriter) generateMembers(t *types.Type, required []string) ([]string, error) {
+	var err error
+	for _, m := range t.Members {
+		if hasOpenAPITagValue(m.CommentLines, tagValueFalse) {
+			continue
+		}
+		if shouldInlineMembers(&m) {
+			required, err = g.generateMembers(m.Type, required)
+			if err != nil {
+				return required, err
+			}
+			continue
+		}
+		name := getReferableName(&m)
+		if name == "" {
+			continue
+		}
+		if !hasOptionalTag(&m) {
+			required = append(required, name)
+		}
+		if err = g.generateProperty(&m); err != nil {
+			return required, err
+		}
+	}
+	return required, nil
+}
+
 func (g openAPITypeWriter) generate(t *types.Type) error {
 	// Only generate for struct type and ignore the rest
 	switch t.Kind {
@@ -284,21 +316,9 @@ func (g openAPITypeWriter) generate(t *types.Type) error {
 		g.Do("{\nSchema: spec.Schema{\nSchemaProps: spec.SchemaProps{\n", nil)
 		g.generateDescription(t.CommentLines)
 		g.Do("Properties: map[string]$.SpecSchemaType|raw${\n", args)
-		required := []string{}
-		for _, m := range t.Members {
-			if hasOpenAPITagValue(m.CommentLines, tagValueFalse) {
-				continue
-			}
-			name := getReferableName(&m)
-			if name == "" {
-				continue
-			}
-			if !hasOptionalTag(&m) {
-				required = append(required, name)
-			}
-			if err := g.generateProperty(&m); err != nil {
-				return err
-			}
+		required, err := g.generateMembers(t, []string{})
+		if err != nil {
+			return err
 		}
 		g.Do("},\n", nil)
 		if len(required) > 0 {
@@ -314,7 +334,7 @@ func (g openAPITypeWriter) generate(t *types.Type) error {
 		sort.Strings(keys)
 		for _, k := range keys {
 			v := g.refTypes[k]
-			if t, _ := common.GetOpenAPITypeFormat(v.String()); t != "" {
+			if t, _ := openapi.GetOpenAPITypeFormat(v.String()); t != "" {
 				// This is a known type, we do not need a reference to it
 				// Will eliminate special case of time.Time
 				continue
@@ -385,7 +405,7 @@ func (g openAPITypeWriter) generateProperty(m *types.Member) error {
 	}
 	t := resolveAliasAndPtrType(m.Type)
 	// If we can get a openAPI type and format for this type, we consider it to be simple property
-	typeString, format := common.GetOpenAPITypeFormat(t.String())
+	typeString, format := openapi.GetOpenAPITypeFormat(t.String())
 	if typeString != "" {
 		g.generateSimpleProperty(typeString, format)
 		g.Do("},\n},\n", nil)
@@ -451,7 +471,7 @@ func (g openAPITypeWriter) generateMapProperty(t *types.Type) error {
 	}
 	g.Do("Type: []string{\"object\"},\n", nil)
 	g.Do("AdditionalProperties: &spec.SchemaOrBool{\nSchema: &spec.Schema{\nSchemaProps: spec.SchemaProps{\n", nil)
-	typeString, format := common.GetOpenAPITypeFormat(elemType.String())
+	typeString, format := openapi.GetOpenAPITypeFormat(elemType.String())
 	if typeString != "" {
 		g.generateSimpleProperty(typeString, format)
 		g.Do("},\n},\n},\n", nil)
@@ -475,7 +495,7 @@ func (g openAPITypeWriter) generateSliceProperty(t *types.Type) error {
 	elemType := resolveAliasAndPtrType(t.Elem)
 	g.Do("Type: []string{\"array\"},\n", nil)
 	g.Do("Items: &spec.SchemaOrArray{\nSchema: &spec.Schema{\nSchemaProps: spec.SchemaProps{\n", nil)
-	typeString, format := common.GetOpenAPITypeFormat(elemType.String())
+	typeString, format := openapi.GetOpenAPITypeFormat(elemType.String())
 	if typeString != "" {
 		g.generateSimpleProperty(typeString, format)
 		g.Do("},\n},\n},\n", nil)

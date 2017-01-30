@@ -26,7 +26,7 @@ import (
 	"testing"
 	"time"
 
-	"k8s.io/client-go/pkg/util/wait"
+	"k8s.io/apimachinery/pkg/util/wait"
 
 	"github.com/golang/glog"
 	"golang.org/x/crypto/ssh"

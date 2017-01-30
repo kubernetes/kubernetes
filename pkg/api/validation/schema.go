@@ -27,10 +27,10 @@ import (
 	"github.com/emicklei/go-restful/swagger"
 	ejson "github.com/exponent-io/jsonpath"
 	"github.com/golang/glog"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	utilerrors "k8s.io/apimachinery/pkg/util/errors"
+	"k8s.io/apimachinery/pkg/util/yaml"
 	apiutil "k8s.io/kubernetes/pkg/api/util"
-	"k8s.io/kubernetes/pkg/apis/meta/v1/unstructured"
-	utilerrors "k8s.io/kubernetes/pkg/util/errors"
-	"k8s.io/kubernetes/pkg/util/yaml"
 )
 
 type InvalidTypeError struct {

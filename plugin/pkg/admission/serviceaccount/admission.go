@@ -23,21 +23,22 @@ import (
 	"strconv"
 	"time"
 
-	"k8s.io/kubernetes/pkg/admission"
+	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/fields"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/watch"
+	"k8s.io/apiserver/pkg/admission"
+	"k8s.io/apiserver/pkg/storage/names"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/v1"
-	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/client/cache"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
-	"k8s.io/kubernetes/pkg/fields"
 	kubeapiserveradmission "k8s.io/kubernetes/pkg/kubeapiserver/admission"
 	kubelet "k8s.io/kubernetes/pkg/kubelet/types"
-	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/runtime/schema"
 	"k8s.io/kubernetes/pkg/serviceaccount"
-	"k8s.io/kubernetes/pkg/util/sets"
-	"k8s.io/kubernetes/pkg/watch"
 )
 
 // DefaultServiceAccountName is the name of the default service account to set on pods which do not specify a service account
@@ -264,7 +265,7 @@ func (s *serviceAccount) enforceMountableSecrets(serviceAccount *api.ServiceAcco
 
 // getServiceAccount returns the ServiceAccount for the given namespace and name if it exists
 func (s *serviceAccount) getServiceAccount(namespace string, name string) (*api.ServiceAccount, error) {
-	key := &api.ServiceAccount{ObjectMeta: api.ObjectMeta{Namespace: namespace}}
+	key := &api.ServiceAccount{ObjectMeta: metav1.ObjectMeta{Namespace: namespace}}
 	index, err := s.serviceAccounts.Index("namespace", key)
 	if err != nil {
 		return nil, err
@@ -326,7 +327,7 @@ func (s *serviceAccount) getReferencedServiceAccountToken(serviceAccount *api.Se
 
 // getServiceAccountTokens returns all ServiceAccountToken secrets for the given ServiceAccount
 func (s *serviceAccount) getServiceAccountTokens(serviceAccount *api.ServiceAccount) ([]*api.Secret, error) {
-	key := &api.Secret{ObjectMeta: api.ObjectMeta{Namespace: serviceAccount.Namespace}}
+	key := &api.Secret{ObjectMeta: metav1.ObjectMeta{Namespace: serviceAccount.Namespace}}
 	index, err := s.secrets.Index("namespace", key)
 	if err != nil {
 		return nil, err
@@ -428,7 +429,7 @@ func (s *serviceAccount) mountServiceAccountToken(serviceAccount *api.ServiceAcc
 		// Try naming the volume the same as the serviceAccountToken, and uniquify if needed
 		tokenVolumeName = serviceAccountToken
 		if allVolumeNames.Has(tokenVolumeName) {
-			tokenVolumeName = api.SimpleNameGenerator.GenerateName(fmt.Sprintf("%s-", serviceAccountToken))
+			tokenVolumeName = names.SimpleNameGenerator.GenerateName(fmt.Sprintf("%s-", serviceAccountToken))
 		}
 	}
 

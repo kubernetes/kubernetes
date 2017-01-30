@@ -30,28 +30,41 @@ go_library(
     ],
     tags = ["automanaged"],
     deps = [
-        "//pkg/api/errors:go_default_library",
+        "//pkg/api:go_default_library",
         "//pkg/api/resource:go_default_library",
         "//pkg/api/v1:go_default_library",
         "//pkg/api/v1/pod:go_default_library",
-        "//pkg/apimachinery/registered:go_default_library",
-        "//pkg/apis/meta/v1:go_default_library",
         "//pkg/client/clientset_generated/clientset:go_default_library",
         "//pkg/client/conditions:go_default_library",
         "//pkg/kubelet:go_default_library",
         "//pkg/kubelet/events:go_default_library",
         "//pkg/kubelet/sysctl:go_default_library",
-        "//pkg/labels:go_default_library",
         "//pkg/util/intstr:go_default_library",
-        "//pkg/util/sets:go_default_library",
         "//pkg/util/uuid:go_default_library",
-        "//pkg/util/wait:go_default_library",
-        "//pkg/watch:go_default_library",
         "//test/e2e/framework:go_default_library",
         "//test/utils:go_default_library",
         "//vendor:github.com/golang/glog",
         "//vendor:github.com/onsi/ginkgo",
         "//vendor:github.com/onsi/gomega",
         "//vendor:golang.org/x/net/websocket",
+        "//vendor:k8s.io/apimachinery/pkg/api/errors",
+        "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
+        "//vendor:k8s.io/apimachinery/pkg/labels",
+        "//vendor:k8s.io/apimachinery/pkg/util/sets",
+        "//vendor:k8s.io/apimachinery/pkg/util/wait",
+        "//vendor:k8s.io/apimachinery/pkg/watch",
     ],
+)
+
+filegroup(
+    name = "package-srcs",
+    srcs = glob(["**"]),
+    tags = ["automanaged"],
+    visibility = ["//visibility:private"],
+)
+
+filegroup(
+    name = "all-srcs",
+    srcs = [":package-srcs"],
+    tags = ["automanaged"],
 )

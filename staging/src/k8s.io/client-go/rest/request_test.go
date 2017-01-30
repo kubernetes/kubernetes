@@ -18,37 +18,39 @@ package rest
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
 	"os"
 	"reflect"
 	"strings"
+	"syscall"
 	"testing"
 	"time"
 
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/runtime/serializer/streaming"
+	"k8s.io/apimachinery/pkg/util/diff"
+	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/pkg/api"
-	apierrors "k8s.io/client-go/pkg/api/errors"
 	"k8s.io/client-go/pkg/api/testapi"
 	"k8s.io/client-go/pkg/api/v1"
-	"k8s.io/client-go/pkg/apimachinery/registered"
-	metav1 "k8s.io/client-go/pkg/apis/meta/v1"
-	"k8s.io/client-go/pkg/labels"
-	"k8s.io/client-go/pkg/runtime"
-	"k8s.io/client-go/pkg/runtime/schema"
-	"k8s.io/client-go/pkg/runtime/serializer/streaming"
 	"k8s.io/client-go/pkg/util/clock"
-	"k8s.io/client-go/pkg/util/diff"
 	"k8s.io/client-go/pkg/util/flowcontrol"
 	"k8s.io/client-go/pkg/util/httpstream"
 	"k8s.io/client-go/pkg/util/intstr"
 	utiltesting "k8s.io/client-go/pkg/util/testing"
-	"k8s.io/client-go/pkg/watch"
-	"k8s.io/client-go/pkg/watch/versioned"
+	restclientwatch "k8s.io/client-go/rest/watch"
 )
 
 func TestNewRequestSetsAccept(t *testing.T) {
@@ -92,7 +94,7 @@ func TestRequestSetsHeaders(t *testing.T) {
 func TestRequestWithErrorWontChange(t *testing.T) {
 	original := Request{
 		err:     errors.New("test"),
-		content: ContentConfig{GroupVersion: &registered.GroupOrDie(api.GroupName).GroupVersion},
+		content: ContentConfig{GroupVersion: &api.Registry.GroupOrDie(api.GroupName).GroupVersion},
 	}
 	r := original
 	changed := r.Param("foo", "bar").
@@ -276,7 +278,7 @@ func (obj NotAnAPIObject) SetGroupVersionKind(gvk *schema.GroupVersionKind) {}
 
 func defaultContentConfig() ContentConfig {
 	return ContentConfig{
-		GroupVersion:         &registered.GroupOrDie(api.GroupName).GroupVersion,
+		GroupVersion:         &api.Registry.GroupOrDie(api.GroupName).GroupVersion,
 		NegotiatedSerializer: testapi.Default.NegotiatedSerializer(),
 	}
 }
@@ -1120,6 +1122,35 @@ func TestCheckRetryClosesBody(t *testing.T) {
 	}
 }
 
+func TestConnectionResetByPeerIsRetried(t *testing.T) {
+	count := 0
+	backoff := &testBackoffManager{}
+	req := &Request{
+		verb: "GET",
+		client: clientFunc(func(req *http.Request) (*http.Response, error) {
+			count++
+			if count >= 3 {
+				return &http.Response{
+					StatusCode: 200,
+					Body:       ioutil.NopCloser(bytes.NewReader([]byte{})),
+				}, nil
+			}
+			return nil, &net.OpError{Err: syscall.ECONNRESET}
+		}),
+		backoffMgr: backoff,
+	}
+	// We expect two retries of "connection reset by peer" and the success.
+	_, err := req.Do().Raw()
+	if err != nil {
+		t.Errorf("Unexpected error: %v", err)
+	}
+	// We have a sleep before each retry (including the initial one) and for
+	// every "retry-after" call - thus 5 together.
+	if len(backoff.sleeps) != 5 {
+		t.Errorf("Expected 5 retries, got: %d", len(backoff.sleeps))
+	}
+}
+
 func TestCheckRetryHandles429And5xx(t *testing.T) {
 	count := 0
 	ch := make(chan struct{})
@@ -1187,7 +1218,7 @@ func BenchmarkCheckRetryClosesBody(b *testing.B) {
 }
 
 func TestDoRequestNewWayReader(t *testing.T) {
-	reqObj := &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}}
+	reqObj := &api.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}}
 	reqBodyExpected, _ := runtime.Encode(testapi.Default.Codec(), reqObj)
 	expectedObj := &api.Service{Spec: api.ServiceSpec{Ports: []api.ServicePort{{
 		Protocol:   "TCP",
@@ -1222,12 +1253,12 @@ func TestDoRequestNewWayReader(t *testing.T) {
 	}
 	tmpStr := string(reqBodyExpected)
 	requestURL := testapi.Default.ResourcePathWithPrefix("foo", "bar", "", "baz")
-	requestURL += "?" + metav1.LabelSelectorQueryParam(registered.GroupOrDie(api.GroupName).GroupVersion.String()) + "=name%3Dfoo&timeout=1s"
+	requestURL += "?" + metav1.LabelSelectorQueryParam(api.Registry.GroupOrDie(api.GroupName).GroupVersion.String()) + "=name%3Dfoo&timeout=1s"
 	fakeHandler.ValidateRequest(t, requestURL, "POST", &tmpStr)
 }
 
 func TestDoRequestNewWayObj(t *testing.T) {
-	reqObj := &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}}
+	reqObj := &api.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}}
 	reqBodyExpected, _ := runtime.Encode(testapi.Default.Codec(), reqObj)
 	expectedObj := &api.Service{Spec: api.ServiceSpec{Ports: []api.ServicePort{{
 		Protocol:   "TCP",
@@ -1262,12 +1293,12 @@ func TestDoRequestNewWayObj(t *testing.T) {
 	}
 	tmpStr := string(reqBodyExpected)
 	requestURL := testapi.Default.ResourcePath("foo", "", "bar/baz")
-	requestURL += "?" + metav1.LabelSelectorQueryParam(registered.GroupOrDie(api.GroupName).GroupVersion.String()) + "=name%3Dfoo&timeout=1s"
+	requestURL += "?" + metav1.LabelSelectorQueryParam(api.Registry.GroupOrDie(api.GroupName).GroupVersion.String()) + "=name%3Dfoo&timeout=1s"
 	fakeHandler.ValidateRequest(t, requestURL, "POST", &tmpStr)
 }
 
 func TestDoRequestNewWayFile(t *testing.T) {
-	reqObj := &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}}
+	reqObj := &api.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}}
 	reqBodyExpected, err := runtime.Encode(testapi.Default.Codec(), reqObj)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
@@ -1324,7 +1355,7 @@ func TestDoRequestNewWayFile(t *testing.T) {
 }
 
 func TestWasCreated(t *testing.T) {
-	reqObj := &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}}
+	reqObj := &api.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}}
 	reqBodyExpected, err := runtime.Encode(testapi.Default.Codec(), reqObj)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
@@ -1461,7 +1492,7 @@ func TestUnacceptableParamNames(t *testing.T) {
 func TestBody(t *testing.T) {
 	const data = "test payload"
 
-	obj := &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}}
+	obj := &api.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}}
 	bodyExpected, _ := runtime.Encode(testapi.Default.Codec(), obj)
 
 	f, err := ioutil.TempFile("", "test_body")
@@ -1525,9 +1556,9 @@ func TestWatch(t *testing.T) {
 		t   watch.EventType
 		obj runtime.Object
 	}{
-		{watch.Added, &api.Pod{ObjectMeta: api.ObjectMeta{Name: "first"}}},
-		{watch.Modified, &api.Pod{ObjectMeta: api.ObjectMeta{Name: "second"}}},
-		{watch.Deleted, &api.Pod{ObjectMeta: api.ObjectMeta{Name: "last"}}},
+		{watch.Added, &api.Pod{ObjectMeta: metav1.ObjectMeta{Name: "first"}}},
+		{watch.Modified, &api.Pod{ObjectMeta: metav1.ObjectMeta{Name: "second"}}},
+		{watch.Deleted, &api.Pod{ObjectMeta: metav1.ObjectMeta{Name: "last"}}},
 	}
 
 	testServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -1540,7 +1571,7 @@ func TestWatch(t *testing.T) {
 		w.WriteHeader(http.StatusOK)
 		flusher.Flush()
 
-		encoder := versioned.NewEncoder(streaming.NewEncoder(w, testapi.Default.Codec()), testapi.Default.Codec())
+		encoder := restclientwatch.NewEncoder(streaming.NewEncoder(w, testapi.Default.Codec()), testapi.Default.Codec())
 		for _, item := range table {
 			if err := encoder.Encode(&watch.Event{Type: item.t, Object: item.obj}); err != nil {
 				panic(err)
@@ -1620,4 +1651,33 @@ func testRESTClient(t testing.TB, srv *httptest.Server) *RESTClient {
 		t.Fatalf("failed to create a client: %v", err)
 	}
 	return client
+}
+
+func TestDoContext(t *testing.T) {
+	receivedCh := make(chan struct{})
+	block := make(chan struct{})
+	testServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		close(receivedCh)
+		<-block
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer testServer.Close()
+	defer close(block)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	go func() {
+		<-receivedCh
+		cancel()
+	}()
+
+	c := testRESTClient(t, testServer)
+	_, err := c.Verb("GET").
+		Context(ctx).
+		Prefix("foo").
+		DoRaw()
+	if err == nil {
+		t.Fatal("Expected context cancellation error")
+	}
 }

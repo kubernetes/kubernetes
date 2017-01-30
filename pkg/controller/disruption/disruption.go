@@ -21,25 +21,25 @@ import (
 	"reflect"
 	"time"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
 	apps "k8s.io/kubernetes/pkg/apis/apps/v1beta1"
 	extensions "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
-	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	policy "k8s.io/kubernetes/pkg/apis/policy/v1beta1"
 	"k8s.io/kubernetes/pkg/client/cache"
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	v1core "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/core/v1"
 	policyclientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/policy/v1beta1"
 	"k8s.io/kubernetes/pkg/client/record"
 	"k8s.io/kubernetes/pkg/controller"
-	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util/intstr"
-	utilruntime "k8s.io/kubernetes/pkg/util/runtime"
-	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/util/workqueue"
-	"k8s.io/kubernetes/pkg/watch"
 
 	"github.com/golang/glog"
 )
@@ -63,26 +63,26 @@ type DisruptionController struct {
 	kubeClient clientset.Interface
 
 	pdbStore      cache.Store
-	pdbController *cache.Controller
+	pdbController cache.Controller
 	pdbLister     cache.StoreToPodDisruptionBudgetLister
 
-	podController cache.ControllerInterface
+	podController cache.Controller
 	podLister     cache.StoreToPodLister
 
 	rcIndexer    cache.Indexer
-	rcController *cache.Controller
+	rcController cache.Controller
 	rcLister     cache.StoreToReplicationControllerLister
 
 	rsStore      cache.Store
-	rsController *cache.Controller
+	rsController cache.Controller
 	rsLister     cache.StoreToReplicaSetLister
 
 	dIndexer    cache.Indexer
-	dController *cache.Controller
+	dController cache.Controller
 	dLister     cache.StoreToDeploymentLister
 
 	ssStore      cache.Store
-	ssController *cache.Controller
+	ssController cache.Controller
 	ssLister     cache.StoreToStatefulSetLister
 
 	// PodDisruptionBudget keys that need to be synced.

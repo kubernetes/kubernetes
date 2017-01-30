@@ -17,8 +17,8 @@ limitations under the License.
 package validation
 
 import (
+	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
-	"k8s.io/kubernetes/pkg/util/validation/field"
 )
 
 func ValidateMasterConfiguration(c *kubeadm.MasterConfiguration) field.ErrorList {

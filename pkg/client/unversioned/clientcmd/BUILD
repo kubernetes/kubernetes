@@ -26,17 +26,17 @@ go_library(
         "//pkg/api:go_default_library",
         "//pkg/client/restclient:go_default_library",
         "//pkg/client/unversioned/auth:go_default_library",
-        "//pkg/client/unversioned/clientcmd/api:go_default_library",
-        "//pkg/client/unversioned/clientcmd/api/latest:go_default_library",
-        "//pkg/runtime:go_default_library",
-        "//pkg/runtime/schema:go_default_library",
-        "//pkg/util/errors:go_default_library",
         "//pkg/util/homedir:go_default_library",
-        "//pkg/util/validation:go_default_library",
         "//vendor:github.com/golang/glog",
         "//vendor:github.com/howeyc/gopass",
         "//vendor:github.com/imdario/mergo",
         "//vendor:github.com/spf13/pflag",
+        "//vendor:k8s.io/apimachinery/pkg/runtime",
+        "//vendor:k8s.io/apimachinery/pkg/runtime/schema",
+        "//vendor:k8s.io/apimachinery/pkg/util/errors",
+        "//vendor:k8s.io/apimachinery/pkg/util/validation",
+        "//vendor:k8s.io/client-go/tools/clientcmd/api",
+        "//vendor:k8s.io/client-go/tools/clientcmd/api/latest",
     ],
 )
 
@@ -52,11 +52,24 @@ go_test(
     tags = ["automanaged"],
     deps = [
         "//pkg/client/restclient:go_default_library",
-        "//pkg/client/unversioned/clientcmd/api:go_default_library",
-        "//pkg/client/unversioned/clientcmd/api/latest:go_default_library",
-        "//pkg/runtime:go_default_library",
-        "//pkg/util/errors:go_default_library",
         "//vendor:github.com/ghodss/yaml",
         "//vendor:github.com/imdario/mergo",
+        "//vendor:k8s.io/apimachinery/pkg/runtime",
+        "//vendor:k8s.io/apimachinery/pkg/util/errors",
+        "//vendor:k8s.io/client-go/tools/clientcmd/api",
+        "//vendor:k8s.io/client-go/tools/clientcmd/api/latest",
     ],
+)
+
+filegroup(
+    name = "package-srcs",
+    srcs = glob(["**"]),
+    tags = ["automanaged"],
+    visibility = ["//visibility:private"],
+)
+
+filegroup(
+    name = "all-srcs",
+    srcs = [":package-srcs"],
+    tags = ["automanaged"],
 )

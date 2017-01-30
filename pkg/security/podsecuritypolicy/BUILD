@@ -28,9 +28,9 @@ go_library(
         "//pkg/security/podsecuritypolicy/sysctl:go_default_library",
         "//pkg/security/podsecuritypolicy/user:go_default_library",
         "//pkg/security/podsecuritypolicy/util:go_default_library",
-        "//pkg/util/errors:go_default_library",
         "//pkg/util/maps:go_default_library",
-        "//pkg/util/validation/field:go_default_library",
+        "//vendor:k8s.io/apimachinery/pkg/util/errors",
+        "//vendor:k8s.io/apimachinery/pkg/util/validation/field",
     ],
 )
 
@@ -46,8 +46,32 @@ go_test(
         "//pkg/security/apparmor:go_default_library",
         "//pkg/security/podsecuritypolicy/seccomp:go_default_library",
         "//pkg/security/podsecuritypolicy/util:go_default_library",
-        "//pkg/util/diff:go_default_library",
-        "//pkg/util/validation/field:go_default_library",
         "//vendor:github.com/davecgh/go-spew/spew",
+        "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
+        "//vendor:k8s.io/apimachinery/pkg/util/diff",
+        "//vendor:k8s.io/apimachinery/pkg/util/validation/field",
     ],
+)
+
+filegroup(
+    name = "package-srcs",
+    srcs = glob(["**"]),
+    tags = ["automanaged"],
+    visibility = ["//visibility:private"],
+)
+
+filegroup(
+    name = "all-srcs",
+    srcs = [
+        ":package-srcs",
+        "//pkg/security/podsecuritypolicy/apparmor:all-srcs",
+        "//pkg/security/podsecuritypolicy/capabilities:all-srcs",
+        "//pkg/security/podsecuritypolicy/group:all-srcs",
+        "//pkg/security/podsecuritypolicy/seccomp:all-srcs",
+        "//pkg/security/podsecuritypolicy/selinux:all-srcs",
+        "//pkg/security/podsecuritypolicy/sysctl:all-srcs",
+        "//pkg/security/podsecuritypolicy/user:all-srcs",
+        "//pkg/security/podsecuritypolicy/util:all-srcs",
+    ],
+    tags = ["automanaged"],
 )

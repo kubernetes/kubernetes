@@ -22,6 +22,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"k8s.io/kubernetes/cmd/kubeadm/app/phases/kubeconfig"
 	"k8s.io/kubernetes/cmd/kubeadm/app/preflight"
 )
 
@@ -63,8 +64,8 @@ func TestConfigDirCleaner(t *testing.T) {
 				"manifests/etcd.json",
 				"manifests/kube-apiserver.json",
 				"pki/ca.pem",
-				"admin.conf",
-				"kubelet.conf",
+				kubeconfig.AdminKubeConfigFileName,
+				kubeconfig.KubeletKubeConfigFileName,
 			},
 			verifyExists: []string{
 				"manifests",
@@ -77,7 +78,7 @@ func TestConfigDirCleaner(t *testing.T) {
 			},
 			setupFiles: []string{
 				"pki/ca.pem",
-				"kubelet.conf",
+				kubeconfig.KubeletKubeConfigFileName,
 			},
 			verifyExists: []string{
 				"pki",
@@ -95,8 +96,8 @@ func TestConfigDirCleaner(t *testing.T) {
 				"manifests/etcd.json",
 				"manifests/kube-apiserver.json",
 				"pki/ca.pem",
-				"admin.conf",
-				"kubelet.conf",
+				kubeconfig.AdminKubeConfigFileName,
+				kubeconfig.KubeletKubeConfigFileName,
 				"cloud-config",
 			},
 			verifyExists: []string{
@@ -115,8 +116,8 @@ func TestConfigDirCleaner(t *testing.T) {
 				"manifests/etcd.json",
 				"manifests/kube-apiserver.json",
 				"pki/ca.pem",
-				"admin.conf",
-				"kubelet.conf",
+				kubeconfig.AdminKubeConfigFileName,
+				kubeconfig.KubeletKubeConfigFileName,
 				".cloud-config",
 				".mydir/.myfile",
 			},
@@ -166,8 +167,8 @@ func TestConfigDirCleaner(t *testing.T) {
 
 		// Verify the files we cleanup implicitly in every test:
 		assertExists(t, tmpDir)
-		assertNotExists(t, filepath.Join(tmpDir, "admin.conf"))
-		assertNotExists(t, filepath.Join(tmpDir, "kubelet.conf"))
+		assertNotExists(t, filepath.Join(tmpDir, kubeconfig.AdminKubeConfigFileName))
+		assertNotExists(t, filepath.Join(tmpDir, kubeconfig.KubeletKubeConfigFileName))
 		assertDirEmpty(t, filepath.Join(tmpDir, "manifests"))
 		assertDirEmpty(t, filepath.Join(tmpDir, "pki"))
 

@@ -19,10 +19,10 @@ limitations under the License.
 package install
 
 import (
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/pkg/apimachinery/announced"
 	"k8s.io/client-go/pkg/apis/imagepolicy"
 	"k8s.io/client-go/pkg/apis/imagepolicy/v1alpha1"
-	"k8s.io/client-go/pkg/util/sets"
 )
 
 func init() {

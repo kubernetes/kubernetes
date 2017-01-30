@@ -19,10 +19,10 @@ go_library(
     deps = [
         "//pkg/util/dbus:go_default_library",
         "//pkg/util/exec:go_default_library",
-        "//pkg/util/sets:go_default_library",
         "//pkg/util/version:go_default_library",
         "//vendor:github.com/godbus/dbus",
         "//vendor:github.com/golang/glog",
+        "//vendor:k8s.io/apimachinery/pkg/util/sets",
     ],
 )
 
@@ -34,6 +34,22 @@ go_test(
     deps = [
         "//pkg/util/dbus:go_default_library",
         "//pkg/util/exec:go_default_library",
-        "//pkg/util/sets:go_default_library",
+        "//vendor:k8s.io/apimachinery/pkg/util/sets",
     ],
+)
+
+filegroup(
+    name = "package-srcs",
+    srcs = glob(["**"]),
+    tags = ["automanaged"],
+    visibility = ["//visibility:private"],
+)
+
+filegroup(
+    name = "all-srcs",
+    srcs = [
+        ":package-srcs",
+        "//pkg/util/iptables/testing:all-srcs",
+    ],
+    tags = ["automanaged"],
 )

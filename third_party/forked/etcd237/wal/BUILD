@@ -30,3 +30,19 @@ go_library(
         "//vendor:github.com/prometheus/client_golang/prometheus",
     ],
 )
+
+filegroup(
+    name = "package-srcs",
+    srcs = glob(["**"]),
+    tags = ["automanaged"],
+    visibility = ["//visibility:private"],
+)
+
+filegroup(
+    name = "all-srcs",
+    srcs = [
+        ":package-srcs",
+        "//third_party/forked/etcd237/wal/walpb:all-srcs",
+    ],
+    tags = ["automanaged"],
+)

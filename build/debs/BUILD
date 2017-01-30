@@ -32,7 +32,7 @@ filegroup(
     "kube-apiserver",
     "kube-controller-manager",
     "kube-proxy",
-    "kubernetes-discovery",
+    "kube-aggregator",
 ]]
 
 deb_data(
@@ -116,7 +116,7 @@ k8s_deb(
 )
 
 k8s_deb(
-    name = "kubernetes-discovery",
+    name = "kube-aggregator",
     description = "Kubernetes Federated API Server",
 )
 
@@ -153,4 +153,17 @@ k8s_deb(
     description = """Kubernetes Packaging of CNI
 The Container Networking Interface tools for provisioning container networks.
 """,
+)
+
+filegroup(
+    name = "package-srcs",
+    srcs = glob(["**"]),
+    tags = ["automanaged"],
+    visibility = ["//visibility:private"],
+)
+
+filegroup(
+    name = "all-srcs",
+    srcs = [":package-srcs"],
+    tags = ["automanaged"],
 )

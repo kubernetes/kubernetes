@@ -21,7 +21,7 @@ container: image
 
 image:
 	# Build new image and automatically tag it as latest
-	docker build -t $(PREFIX)/volume-iscsi .
+	docker build --pull -t $(PREFIX)/volume-iscsi .
 	# Add the version tag to the latest image
 	docker tag $(PREFIX)/volume-iscsi $(PREFIX)/volume-iscsi:$(TAG)
 

@@ -19,9 +19,9 @@ package config
 import (
 	"time"
 
+	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/client/cache"
-	"k8s.io/kubernetes/pkg/fields"
 )
 
 // NewSourceAPI creates config source that watches for changes to the services and endpoints.

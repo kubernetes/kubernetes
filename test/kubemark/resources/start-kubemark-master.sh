@@ -43,6 +43,7 @@ function create-dirs {
 	echo "Creating required directories"
 	mkdir -p /var/lib/kubelet
 	mkdir -p /etc/kubernetes/manifests
+	mkdir -p /etc/kubernetes/addons
 }
 
 # Setup working directory for kubelet.
@@ -89,7 +90,7 @@ function safe-format-and-mount() {
 	# Format only if the disk is not already formatted.
 	if ! tune2fs -l "${device}" ; then
 		echo "Formatting '${device}'"
-		mkfs.ext4 -F -E lazy_itable_init=0,lazy_journal_init=0,discard "${device}"
+		mkfs.ext4 -F "${device}"
 	fi
 
 	mkdir -p "${mountpoint}"
@@ -132,6 +133,31 @@ function mount-pd() {
 	# upgradeability, these locations should not change.  If they do, take care
 	# to maintain a migration path from these locations to whatever new
 	# locations.
+}
+
+# Create kubeconfig for controller-manager's service account authentication.
+function create-kubecontrollermanager-kubeconfig {
+	echo "Creating kube-controller-manager kubeconfig file"
+	mkdir -p /etc/srv/kubernetes/kube-controller-manager
+	cat <<EOF >/etc/srv/kubernetes/kube-controller-manager/kubeconfig
+apiVersion: v1
+kind: Config
+users:
+- name: kube-controller-manager
+  user:
+    token: ${KUBE_CONTROLLER_MANAGER_TOKEN}
+clusters:
+- name: local
+  cluster:
+    insecure-skip-tls-verify: true
+    server: https://localhost:443
+contexts:
+- context:
+    cluster: local
+    user: kube-controller-manager
+  name: service-account-context
+current-context: service-account-context
+EOF
 }
 
 function assemble-docker-flags {
@@ -241,6 +267,26 @@ function prepare-log-file {
 	chown root:root $1
 }
 
+# A helper function for copying addon manifests and set dir/files
+# permissions.
+#
+# $1: addon category under /etc/kubernetes
+# $2: manifest source dir
+function setup-addon-manifests {
+  local -r src_dir="${KUBE_ROOT}/$2"
+  local -r dst_dir="/etc/kubernetes/$1/$2"
+  if [[ ! -d "${dst_dir}" ]]; then
+    mkdir -p "${dst_dir}"
+  fi
+  local files=$(find "${src_dir}" -maxdepth 1 -name "*.yaml")
+  if [[ -n "${files}" ]]; then
+    cp "${src_dir}/"*.yaml "${dst_dir}"
+  fi
+  chown -R root:root "${dst_dir}"
+  chmod 755 "${dst_dir}"
+  chmod 644 "${dst_dir}"/*
+}
+
 # Computes command line arguments to be passed to etcd.
 function compute-etcd-params {
 	local params="${ETCD_TEST_ARGS:-}"
@@ -279,13 +325,15 @@ function compute-kube-apiserver-params {
 	params+=" --storage-backend=${STORAGE_BACKEND}"
 	params+=" --service-cluster-ip-range=${SERVICE_CLUSTER_IP_RANGE}"
 	params+=" --admission-control=${CUSTOM_ADMISSION_PLUGINS}"
+	params+=" --authorization-mode=RBAC"
 	echo "${params}"
 }
 
 # Computes command line arguments to be passed to controller-manager.
 function compute-kube-controller-manager-params {
 	local params="${CONTROLLER_MANAGER_TEST_ARGS:-}"
-	params+=" --master=127.0.0.1:8080"
+	params+=" --use-service-account-credentials"
+	params+=" --kubeconfig=/etc/srv/kubernetes/kube-controller-manager/kubeconfig"
 	params+=" --service-account-private-key-file=/etc/srv/kubernetes/server.key"
 	params+=" --root-ca-file=/etc/srv/kubernetes/ca.crt"
 	params+=" --allocate-node-cidrs=${ALLOCATE_NODE_CIDRS}"
@@ -302,12 +350,18 @@ function compute-kube-scheduler-params {
 	echo "${params}"
 }
 
+# Computes command line arguments to be passed to addon-manager.
+function compute-kube-addon-manager-params {
+	echo ""
+}
+
 # Start a kubernetes master component '$1' which can be any of the following:
 # 1. etcd
 # 2. etcd-events
 # 3. kube-apiserver
 # 4. kube-controller-manager
 # 5. kube-scheduler
+# 6. kube-addon-manager
 #
 # It prepares the log file, loads the docker tag, calculates variables, sets them
 # in the manifest file, and then copies the manifest file to /etc/kubernetes/manifests.
@@ -315,13 +369,8 @@ function compute-kube-scheduler-params {
 # Assumed vars:
 #   DOCKER_REGISTRY
 function start-kubemaster-component() {
+	echo "Start master component $1"
 	local -r component=$1
-	local component_is_etcd=false
-	if [ "${component:0:4}" == "etcd" ]; then
-		component_is_etcd=true
-	fi
-
-	echo "Start master component ${component}"
 	prepare-log-file /var/log/"${component}".log
 	local -r src_file="${KUBE_ROOT}/${component}.yaml"
 	local -r params=$(compute-${component}-params)
@@ -330,8 +379,10 @@ function start-kubemaster-component() {
 	sed -i -e "s@{{params}}@${params}@g" "${src_file}"
 	sed -i -e "s@{{kube_docker_registry}}@${DOCKER_REGISTRY}@g" "${src_file}"
 	sed -i -e "s@{{instance_prefix}}@${INSTANCE_PREFIX}@g" "${src_file}"
-	if [ "${component_is_etcd}" == "true" ]; then
+	if [ "${component:0:4}" == "etcd" ]; then
 		sed -i -e "s@{{etcd_image}}@${ETCD_IMAGE}@g" "${src_file}"
+	elif [ "${component}" == "kube-addon-manager" ]; then
+		setup-addon-manifests "addons" "kubemark-rbac-bindings"
 	else
 		local -r component_docker_tag=$(cat ${KUBE_BINDIR}/${component}.docker_tag)
 		sed -i -e "s@{{${component}_docker_tag}}@${component_docker_tag}@g" "${src_file}"
@@ -347,12 +398,17 @@ cd "${KUBE_ROOT}"
 tar xzf kubernetes-server-linux-amd64.tar.gz
 source "${KUBE_ROOT}/kubemark-master-env.sh"
 
-# Setup IP firewall rules, required directory structure and etcd variables.
+# Setup IP firewall rules, required directory structure and etcd config.
 config-ip-firewall
 create-dirs
 setup-kubelet-dir
 delete-default-etcd-configs
 compute-etcd-variables
+
+# Setup authentication token and kubeconfig for controller-manager.
+KUBE_CONTROLLER_MANAGER_TOKEN=$(dd if=/dev/urandom bs=128 count=1 2>/dev/null | base64 | tr -d "=+/" | dd bs=32 count=1 2>/dev/null)
+echo "${KUBE_CONTROLLER_MANAGER_TOKEN},system:kube-controller-manager,uid:system:kube-controller-manager" >> /etc/srv/kubernetes/known_tokens.csv
+create-kubecontrollermanager-kubeconfig
 
 # Mount master PD for etcd and create symbolic links to it.
 {
@@ -398,6 +454,7 @@ fi
 start-kubemaster-component "kube-apiserver"
 start-kubemaster-component "kube-controller-manager"
 start-kubemaster-component "kube-scheduler"
+start-kubemaster-component "kube-addon-manager"
 
 # Wait till apiserver is working fine.
 until [ "$(curl 127.0.0.1:8080/healthz 2> /dev/null)" == "ok" ]; do

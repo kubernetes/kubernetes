@@ -21,6 +21,7 @@ import (
 	"sort"
 	"testing"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/api/v1"
 	schedulerapi "k8s.io/kubernetes/plugin/pkg/scheduler/api"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/schedulercache"
@@ -39,9 +40,9 @@ func TestNewNodeLabelPriority(t *testing.T) {
 	}{
 		{
 			nodes: []*v1.Node{
-				{ObjectMeta: v1.ObjectMeta{Name: "machine1", Labels: label1}},
-				{ObjectMeta: v1.ObjectMeta{Name: "machine2", Labels: label2}},
-				{ObjectMeta: v1.ObjectMeta{Name: "machine3", Labels: label3}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "machine1", Labels: label1}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "machine2", Labels: label2}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "machine3", Labels: label3}},
 			},
 			expectedList: []schedulerapi.HostPriority{{Host: "machine1", Score: 0}, {Host: "machine2", Score: 0}, {Host: "machine3", Score: 0}},
 			label:        "baz",
@@ -50,9 +51,9 @@ func TestNewNodeLabelPriority(t *testing.T) {
 		},
 		{
 			nodes: []*v1.Node{
-				{ObjectMeta: v1.ObjectMeta{Name: "machine1", Labels: label1}},
-				{ObjectMeta: v1.ObjectMeta{Name: "machine2", Labels: label2}},
-				{ObjectMeta: v1.ObjectMeta{Name: "machine3", Labels: label3}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "machine1", Labels: label1}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "machine2", Labels: label2}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "machine3", Labels: label3}},
 			},
 			expectedList: []schedulerapi.HostPriority{{Host: "machine1", Score: 10}, {Host: "machine2", Score: 10}, {Host: "machine3", Score: 10}},
 			label:        "baz",
@@ -61,9 +62,9 @@ func TestNewNodeLabelPriority(t *testing.T) {
 		},
 		{
 			nodes: []*v1.Node{
-				{ObjectMeta: v1.ObjectMeta{Name: "machine1", Labels: label1}},
-				{ObjectMeta: v1.ObjectMeta{Name: "machine2", Labels: label2}},
-				{ObjectMeta: v1.ObjectMeta{Name: "machine3", Labels: label3}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "machine1", Labels: label1}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "machine2", Labels: label2}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "machine3", Labels: label3}},
 			},
 			expectedList: []schedulerapi.HostPriority{{Host: "machine1", Score: 10}, {Host: "machine2", Score: 0}, {Host: "machine3", Score: 0}},
 			label:        "foo",
@@ -72,9 +73,9 @@ func TestNewNodeLabelPriority(t *testing.T) {
 		},
 		{
 			nodes: []*v1.Node{
-				{ObjectMeta: v1.ObjectMeta{Name: "machine1", Labels: label1}},
-				{ObjectMeta: v1.ObjectMeta{Name: "machine2", Labels: label2}},
-				{ObjectMeta: v1.ObjectMeta{Name: "machine3", Labels: label3}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "machine1", Labels: label1}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "machine2", Labels: label2}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "machine3", Labels: label3}},
 			},
 			expectedList: []schedulerapi.HostPriority{{Host: "machine1", Score: 0}, {Host: "machine2", Score: 10}, {Host: "machine3", Score: 10}},
 			label:        "foo",
@@ -83,9 +84,9 @@ func TestNewNodeLabelPriority(t *testing.T) {
 		},
 		{
 			nodes: []*v1.Node{
-				{ObjectMeta: v1.ObjectMeta{Name: "machine1", Labels: label1}},
-				{ObjectMeta: v1.ObjectMeta{Name: "machine2", Labels: label2}},
-				{ObjectMeta: v1.ObjectMeta{Name: "machine3", Labels: label3}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "machine1", Labels: label1}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "machine2", Labels: label2}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "machine3", Labels: label3}},
 			},
 			expectedList: []schedulerapi.HostPriority{{Host: "machine1", Score: 0}, {Host: "machine2", Score: 10}, {Host: "machine3", Score: 10}},
 			label:        "bar",
@@ -94,9 +95,9 @@ func TestNewNodeLabelPriority(t *testing.T) {
 		},
 		{
 			nodes: []*v1.Node{
-				{ObjectMeta: v1.ObjectMeta{Name: "machine1", Labels: label1}},
-				{ObjectMeta: v1.ObjectMeta{Name: "machine2", Labels: label2}},
-				{ObjectMeta: v1.ObjectMeta{Name: "machine3", Labels: label3}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "machine1", Labels: label1}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "machine2", Labels: label2}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "machine3", Labels: label3}},
 			},
 			expectedList: []schedulerapi.HostPriority{{Host: "machine1", Score: 10}, {Host: "machine2", Score: 0}, {Host: "machine3", Score: 0}},
 			label:        "bar",

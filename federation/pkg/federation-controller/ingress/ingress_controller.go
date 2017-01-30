@@ -21,24 +21,25 @@ import (
 	"sync"
 	"time"
 
+	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	pkgruntime "k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/watch"
+	"k8s.io/client-go/pkg/util/flowcontrol"
 	federationapi "k8s.io/kubernetes/federation/apis/federation/v1beta1"
 	federationclientset "k8s.io/kubernetes/federation/client/clientset_generated/federation_clientset"
 	"k8s.io/kubernetes/federation/pkg/federation-controller/util"
 	"k8s.io/kubernetes/federation/pkg/federation-controller/util/deletionhelper"
 	"k8s.io/kubernetes/federation/pkg/federation-controller/util/eventsink"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/v1"
 	extensionsv1beta1 "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	"k8s.io/kubernetes/pkg/client/cache"
 	kubeclientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/pkg/client/record"
 	"k8s.io/kubernetes/pkg/controller"
-	pkgruntime "k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/runtime/schema"
-	"k8s.io/kubernetes/pkg/types"
-	"k8s.io/kubernetes/pkg/util/flowcontrol"
-	"k8s.io/kubernetes/pkg/watch"
 
 	"github.com/golang/glog"
 )
@@ -91,7 +92,7 @@ type IngressController struct {
 	// Definitions of ingresses that should be federated.
 	ingressInformerStore cache.Store
 	// Informer controller for ingresses that should be federated.
-	ingressInformerController cache.ControllerInterface
+	ingressInformerController cache.Controller
 
 	// Client to federated api server.
 	federatedApiClient federationclientset.Interface
@@ -157,7 +158,7 @@ func NewIngressController(client federationclientset.Interface) *IngressControll
 	// Federated informer on ingresses in members of federation.
 	ic.ingressFederatedInformer = util.NewFederatedInformer(
 		client,
-		func(cluster *federationapi.Cluster, targetClient kubeclientset.Interface) (cache.Store, cache.ControllerInterface) {
+		func(cluster *federationapi.Cluster, targetClient kubeclientset.Interface) (cache.Store, cache.Controller) {
 			return cache.NewInformer(
 				&cache.ListWatch{
 					ListFunc: func(options v1.ListOptions) (pkgruntime.Object, error) {
@@ -189,7 +190,7 @@ func NewIngressController(client federationclientset.Interface) *IngressControll
 	// Federated informer on configmaps for ingress controllers in members of the federation.
 	ic.configMapFederatedInformer = util.NewFederatedInformer(
 		client,
-		func(cluster *federationapi.Cluster, targetClient kubeclientset.Interface) (cache.Store, cache.ControllerInterface) {
+		func(cluster *federationapi.Cluster, targetClient kubeclientset.Interface) (cache.Store, cache.Controller) {
 			glog.V(4).Infof("Returning new informer for cluster %q", cluster.Name)
 			return cache.NewInformer(
 				&cache.ListWatch{
@@ -764,9 +765,9 @@ func (ic *IngressController) reconcileIngress(ingress types.NamespacedName) {
 		if err != nil {
 			glog.Errorf("Error deep copying Spec: %v", err)
 		}
-		objMetaCopy, ok := objMeta.(*v1.ObjectMeta)
+		objMetaCopy, ok := objMeta.(*metav1.ObjectMeta)
 		if !ok {
-			glog.Errorf("Internal error: Failed to cast to *v1.ObjectMeta: %v", objMeta)
+			glog.Errorf("Internal error: Failed to cast to *metav1.ObjectMeta: %v", objMeta)
 		}
 		desiredIngress.ObjectMeta = *objMetaCopy
 		objSpecCopy, ok := objSpec.(*extensionsv1beta1.IngressSpec)
@@ -857,9 +858,9 @@ func (ic *IngressController) reconcileIngress(ingress types.NamespacedName) {
 					glog.Errorf("Error deep copying ObjectMeta: %v", err)
 					ic.deliverIngress(ingress, ic.ingressReviewDelay, true)
 				}
-				objMetaCopy, ok := objMeta.(*v1.ObjectMeta)
+				objMetaCopy, ok := objMeta.(*metav1.ObjectMeta)
 				if !ok {
-					glog.Errorf("Internal error: Failed to cast to v1.ObjectMeta: %v", objMeta)
+					glog.Errorf("Internal error: Failed to cast to metav1.ObjectMeta: %v", objMeta)
 					ic.deliverIngress(ingress, ic.ingressReviewDelay, true)
 				}
 				desiredIngress.ObjectMeta = *objMetaCopy

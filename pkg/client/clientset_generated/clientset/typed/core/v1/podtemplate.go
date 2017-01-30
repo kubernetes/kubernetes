@@ -17,11 +17,12 @@ limitations under the License.
 package v1
 
 import (
+	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	types "k8s.io/apimachinery/pkg/types"
+	watch "k8s.io/apimachinery/pkg/watch"
 	api "k8s.io/kubernetes/pkg/api"
 	v1 "k8s.io/kubernetes/pkg/api/v1"
-	meta_v1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	restclient "k8s.io/kubernetes/pkg/client/restclient"
-	watch "k8s.io/kubernetes/pkg/watch"
 )
 
 // PodTemplatesGetter has a method to return a PodTemplateInterface.
@@ -39,7 +40,7 @@ type PodTemplateInterface interface {
 	Get(name string, options meta_v1.GetOptions) (*v1.PodTemplate, error)
 	List(opts v1.ListOptions) (*v1.PodTemplateList, error)
 	Watch(opts v1.ListOptions) (watch.Interface, error)
-	Patch(name string, pt api.PatchType, data []byte, subresources ...string) (result *v1.PodTemplate, err error)
+	Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v1.PodTemplate, err error)
 	PodTemplateExpansion
 }
 
@@ -140,7 +141,7 @@ func (c *podTemplates) Watch(opts v1.ListOptions) (watch.Interface, error) {
 }
 
 // Patch applies the patch and returns the patched podTemplate.
-func (c *podTemplates) Patch(name string, pt api.PatchType, data []byte, subresources ...string) (result *v1.PodTemplate, err error) {
+func (c *podTemplates) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v1.PodTemplate, err error) {
 	result = &v1.PodTemplate{}
 	err = c.client.Patch(pt).
 		Namespace(c.ns).

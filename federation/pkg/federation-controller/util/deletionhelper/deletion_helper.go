@@ -24,11 +24,11 @@ import (
 	"strings"
 	"time"
 
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/kubernetes/federation/pkg/federation-controller/util"
 	"k8s.io/kubernetes/pkg/api"
 	api_v1 "k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/record"
-	"k8s.io/kubernetes/pkg/runtime"
 
 	"github.com/golang/glog"
 )
@@ -126,11 +126,11 @@ func (dh *DeletionHelper) HandleObjectInUnderlyingClusters(obj runtime.Object) (
 		// If the obj has FinalizerOrphan finalizer, then we need to orphan the
 		// corresponding objects in underlying clusters.
 		// Just remove both the finalizers in that case.
-		obj, err := dh.removeFinalizerFunc(obj, api_v1.FinalizerOrphan)
+		obj, err := dh.removeFinalizerFunc(obj, FinalizerDeleteFromUnderlyingClusters)
 		if err != nil {
 			return obj, err
 		}
-		return dh.removeFinalizerFunc(obj, FinalizerDeleteFromUnderlyingClusters)
+		return dh.removeFinalizerFunc(obj, api_v1.FinalizerOrphan)
 	}
 
 	glog.V(2).Infof("Deleting obj %s from underlying clusters", objName)

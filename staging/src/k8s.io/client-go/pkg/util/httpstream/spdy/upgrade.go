@@ -21,8 +21,8 @@ import (
 	"net/http"
 	"strings"
 
+	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/pkg/util/httpstream"
-	"k8s.io/client-go/pkg/util/runtime"
 )
 
 const HeaderSpdy31 = "SPDY/3.1"

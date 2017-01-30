@@ -14,7 +14,6 @@ go_library(
     tags = ["automanaged"],
     deps = [
         "//pkg/client/restclient:go_default_library",
-        "//pkg/util/wait:go_default_library",
         "//vendor:github.com/coreos/go-oidc/jose",
         "//vendor:github.com/coreos/go-oidc/oauth2",
         "//vendor:github.com/coreos/go-oidc/oidc",
@@ -28,11 +27,22 @@ go_test(
     library = ":go_default_library",
     tags = ["automanaged"],
     deps = [
-        "//pkg/util/diff:go_default_library",
-        "//pkg/util/wait:go_default_library",
         "//plugin/pkg/auth/authenticator/token/oidc/testing:go_default_library",
         "//vendor:github.com/coreos/go-oidc/jose",
         "//vendor:github.com/coreos/go-oidc/key",
         "//vendor:github.com/coreos/go-oidc/oauth2",
     ],
+)
+
+filegroup(
+    name = "package-srcs",
+    srcs = glob(["**"]),
+    tags = ["automanaged"],
+    visibility = ["//visibility:private"],
+)
+
+filegroup(
+    name = "all-srcs",
+    srcs = [":package-srcs"],
+    tags = ["automanaged"],
 )

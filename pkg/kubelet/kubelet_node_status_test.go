@@ -28,21 +28,21 @@ import (
 
 	cadvisorapi "github.com/google/cadvisor/info/v1"
 	cadvisorapiv2 "github.com/google/cadvisor/info/v2"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/diff"
+	"k8s.io/apimachinery/pkg/util/rand"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/api"
-	apierrors "k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/v1"
-	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset/fake"
 	"k8s.io/kubernetes/pkg/client/testing/core"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/util/sliceutils"
-	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/util/diff"
-	"k8s.io/kubernetes/pkg/util/rand"
 	"k8s.io/kubernetes/pkg/util/strategicpatch"
 	"k8s.io/kubernetes/pkg/util/uuid"
-	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/version"
 	"k8s.io/kubernetes/pkg/volume/util/volumehelper"
 )
@@ -116,7 +116,7 @@ func TestUpdateNewNodeStatus(t *testing.T) {
 		t, inputImageList, false /* controllerAttachDetachEnabled */)
 	kubelet := testKubelet.kubelet
 	kubeClient := testKubelet.fakeKubeClient
-	existingNode := v1.Node{ObjectMeta: v1.ObjectMeta{Name: testKubeletHostname}}
+	existingNode := v1.Node{ObjectMeta: metav1.ObjectMeta{Name: testKubeletHostname}}
 	kubeClient.ReactionChain = fake.NewSimpleClientset(&v1.NodeList{Items: []v1.Node{existingNode}}).ReactionChain
 	machineInfo := &cadvisorapi.MachineInfo{
 		MachineID:      "123",
@@ -140,7 +140,7 @@ func TestUpdateNewNodeStatus(t *testing.T) {
 	}
 
 	expectedNode := &v1.Node{
-		ObjectMeta: v1.ObjectMeta{Name: testKubeletHostname},
+		ObjectMeta: metav1.ObjectMeta{Name: testKubeletHostname},
 		Spec:       v1.NodeSpec{},
 		Status: v1.NodeStatus{
 			Conditions: []v1.NodeCondition{
@@ -255,7 +255,7 @@ func TestUpdateNewNodeOutOfDiskStatusWithTransitionFrequency(t *testing.T) {
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
 	kubelet := testKubelet.kubelet
 	kubeClient := testKubelet.fakeKubeClient
-	existingNode := v1.Node{ObjectMeta: v1.ObjectMeta{Name: testKubeletHostname}}
+	existingNode := v1.Node{ObjectMeta: metav1.ObjectMeta{Name: testKubeletHostname}}
 	kubeClient.ReactionChain = fake.NewSimpleClientset(&v1.NodeList{Items: []v1.Node{existingNode}}).ReactionChain
 	machineInfo := &cadvisorapi.MachineInfo{
 		MachineID:      "123",
@@ -331,7 +331,7 @@ func TestUpdateExistingNodeStatus(t *testing.T) {
 	kubelet := testKubelet.kubelet
 	kubeClient := testKubelet.fakeKubeClient
 	existingNode := v1.Node{
-		ObjectMeta: v1.ObjectMeta{Name: testKubeletHostname},
+		ObjectMeta: metav1.ObjectMeta{Name: testKubeletHostname},
 		Spec:       v1.NodeSpec{},
 		Status: v1.NodeStatus{
 			Conditions: []v1.NodeCondition{
@@ -403,7 +403,7 @@ func TestUpdateExistingNodeStatus(t *testing.T) {
 	}
 
 	expectedNode := &v1.Node{
-		ObjectMeta: v1.ObjectMeta{Name: testKubeletHostname},
+		ObjectMeta: metav1.ObjectMeta{Name: testKubeletHostname},
 		Spec:       v1.NodeSpec{},
 		Status: v1.NodeStatus{
 			Conditions: []v1.NodeCondition{
@@ -530,7 +530,7 @@ func TestUpdateExistingNodeOutOfDiskStatusWithTransitionFrequency(t *testing.T) 
 	clock.SetTime(time.Unix(123456, 0))
 	kubeClient := testKubelet.fakeKubeClient
 	existingNode := v1.Node{
-		ObjectMeta: v1.ObjectMeta{Name: testKubeletHostname},
+		ObjectMeta: metav1.ObjectMeta{Name: testKubeletHostname},
 		Spec:       v1.NodeSpec{},
 		Status: v1.NodeStatus{
 			Conditions: []v1.NodeCondition{
@@ -684,7 +684,7 @@ func TestUpdateNodeStatusWithRuntimeStateError(t *testing.T) {
 	kubelet := testKubelet.kubelet
 	clock := testKubelet.fakeClock
 	kubeClient := testKubelet.fakeKubeClient
-	existingNode := v1.Node{ObjectMeta: v1.ObjectMeta{Name: testKubeletHostname}}
+	existingNode := v1.Node{ObjectMeta: metav1.ObjectMeta{Name: testKubeletHostname}}
 	kubeClient.ReactionChain = fake.NewSimpleClientset(&v1.NodeList{Items: []v1.Node{existingNode}}).ReactionChain
 	mockCadvisor := testKubelet.fakeCadvisor
 	mockCadvisor.On("Start").Return(nil)
@@ -708,7 +708,7 @@ func TestUpdateNodeStatusWithRuntimeStateError(t *testing.T) {
 	}
 
 	expectedNode := &v1.Node{
-		ObjectMeta: v1.ObjectMeta{Name: testKubeletHostname},
+		ObjectMeta: metav1.ObjectMeta{Name: testKubeletHostname},
 		Spec:       v1.NodeSpec{},
 		Status: v1.NodeStatus{
 			Conditions: []v1.NodeCondition{
@@ -925,7 +925,7 @@ func TestRegisterWithApiServer(t *testing.T) {
 	kubeClient.AddReactor("get", "nodes", func(action core.Action) (bool, runtime.Object, error) {
 		// Return an existing (matching) node on get.
 		return true, &v1.Node{
-			ObjectMeta: v1.ObjectMeta{Name: testKubeletHostname},
+			ObjectMeta: metav1.ObjectMeta{Name: testKubeletHostname},
 			Spec:       v1.NodeSpec{ExternalID: testKubeletHostname},
 		}, nil
 	})
@@ -981,7 +981,7 @@ func TestTryRegisterWithApiServer(t *testing.T) {
 
 	newNode := func(cmad bool, externalID string) *v1.Node {
 		node := &v1.Node{
-			ObjectMeta: v1.ObjectMeta{},
+			ObjectMeta: metav1.ObjectMeta{},
 			Spec: v1.NodeSpec{
 				ExternalID: externalID,
 			},

@@ -70,8 +70,8 @@ func hIsEmptyValue(v reflect.Value, deref, checkStruct bool) bool {
 	return false
 }
 
-func isEmptyValue(v reflect.Value) bool {
-	return hIsEmptyValue(v, derefForIsEmptyValue, checkStructForEmptyValue)
+func isEmptyValue(v reflect.Value, deref, checkStruct bool) bool {
+	return hIsEmptyValue(v, deref, checkStruct)
 }
 
 func pruneSignExt(v []byte, pos bool) (n int) {

@@ -25,8 +25,8 @@ import (
 	"time"
 
 	jose "github.com/square/go-jose"
+	"k8s.io/apimachinery/pkg/util/wait"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
-	"k8s.io/kubernetes/pkg/util/wait"
 )
 
 // the amount of time to wait between each request to the discovery API

@@ -18,7 +18,6 @@ package internalversion
 
 import (
 	api "k8s.io/kubernetes/pkg/api"
-	registered "k8s.io/kubernetes/pkg/apimachinery/registered"
 	restclient "k8s.io/kubernetes/pkg/client/restclient"
 )
 
@@ -42,7 +41,7 @@ type CoreInterface interface {
 	ServiceAccountsGetter
 }
 
-// CoreClient is used to interact with features provided by the k8s.io/kubernetes/pkg/apimachinery/registered.Group group.
+// CoreClient is used to interact with features provided by the  group.
 type CoreClient struct {
 	restClient restclient.Interface
 }
@@ -141,7 +140,7 @@ func New(c restclient.Interface) *CoreClient {
 
 func setConfigDefaults(config *restclient.Config) error {
 	// if core group is not registered, return an error
-	g, err := registered.Group("")
+	g, err := api.Registry.Group("")
 	if err != nil {
 		return err
 	}

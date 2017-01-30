@@ -17,11 +17,10 @@ limitations under the License.
 package v1
 
 import (
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/kubernetes/pkg/api/v1"
-	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
-	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/runtime/schema"
-	versionedwatch "k8s.io/kubernetes/pkg/watch/versioned"
 )
 
 var SchemeGroupVersion = schema.GroupVersion{Group: "testgroup.k8s.io", Version: "v1"}
@@ -44,7 +43,7 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 		&metav1.Status{},
 		&metav1.ExportOptions{},
 	)
-	versionedwatch.AddToGroupVersion(scheme, SchemeGroupVersion)
+	metav1.AddToGroupVersion(scheme, SchemeGroupVersion)
 	return nil
 }
 

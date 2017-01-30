@@ -17,9 +17,10 @@ limitations under the License.
 package framework
 
 import (
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/v1"
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	e2eframework "k8s.io/kubernetes/test/e2e/framework"
 	testutils "k8s.io/kubernetes/test/utils"
 
@@ -52,7 +53,7 @@ func (p *IntegrationTestNodePreparer) PrepareNodes() error {
 
 	glog.Infof("Making %d nodes", numNodes)
 	baseNode := &v1.Node{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			GenerateName: p.nodeNamePrefix,
 		},
 		Spec: v1.NodeSpec{

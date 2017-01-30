@@ -49,6 +49,6 @@ func TestCreateNamespace(t *testing.T) {
 	cmd.Run(cmd, []string{namespaceObject.Name})
 	expectedOutput := "namespace/" + namespaceObject.Name + "\n"
 	if buf.String() != expectedOutput {
-		t.Errorf("expected output: %s, but got: %s", buf.String(), expectedOutput)
+		t.Errorf("expected output: %s, but got: %s", expectedOutput, buf.String())
 	}
 }

@@ -22,10 +22,10 @@ package mock_network
 
 import (
 	gomock "github.com/golang/mock/gomock"
+	sets "k8s.io/apimachinery/pkg/util/sets"
 	componentconfig "k8s.io/kubernetes/pkg/apis/componentconfig"
 	container "k8s.io/kubernetes/pkg/kubelet/container"
 	network "k8s.io/kubernetes/pkg/kubelet/network"
-	sets "k8s.io/kubernetes/pkg/util/sets"
 )
 
 // Mock of NetworkPlugin interface

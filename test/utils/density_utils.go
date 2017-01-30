@@ -21,13 +21,12 @@ import (
 	"strings"
 	"time"
 
-	"k8s.io/kubernetes/pkg/api"
-	apierrs "k8s.io/kubernetes/pkg/api/errors"
-	"k8s.io/kubernetes/pkg/api/v1"
-	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
-
 	"github.com/golang/glog"
+	apierrs "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/kubernetes/pkg/api/v1"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 )
 
 const (
@@ -43,7 +42,7 @@ func AddLabelsToNode(c clientset.Interface, nodeName string, labels map[string]s
 	patch := fmt.Sprintf(`{"metadata":{"labels":%v}}`, labelString)
 	var err error
 	for attempt := 0; attempt < retries; attempt++ {
-		_, err = c.Core().Nodes().Patch(nodeName, api.MergePatchType, []byte(patch))
+		_, err = c.Core().Nodes().Patch(nodeName, types.MergePatchType, []byte(patch))
 		if err != nil {
 			if !apierrs.IsConflict(err) {
 				return err

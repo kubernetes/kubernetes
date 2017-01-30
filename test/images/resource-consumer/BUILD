@@ -24,3 +24,21 @@ go_library(
     tags = ["automanaged"],
     deps = ["//test/images/resource-consumer/common:go_default_library"],
 )
+
+filegroup(
+    name = "package-srcs",
+    srcs = glob(["**"]),
+    tags = ["automanaged"],
+    visibility = ["//visibility:private"],
+)
+
+filegroup(
+    name = "all-srcs",
+    srcs = [
+        ":package-srcs",
+        "//test/images/resource-consumer/common:all-srcs",
+        "//test/images/resource-consumer/consume-cpu:all-srcs",
+        "//test/images/resource-consumer/controller:all-srcs",
+    ],
+    tags = ["automanaged"],
+)

@@ -25,6 +25,11 @@ import (
 
 	"github.com/golang/glog"
 
+	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/apimachinery/pkg/watch"
+	"k8s.io/client-go/pkg/util/flowcontrol"
 	fed "k8s.io/kubernetes/federation/apis/federation"
 	fedv1 "k8s.io/kubernetes/federation/apis/federation/v1beta1"
 	fedclientset "k8s.io/kubernetes/federation/client/clientset_generated/federation_clientset"
@@ -34,18 +39,13 @@ import (
 	"k8s.io/kubernetes/federation/pkg/federation-controller/util/planner"
 	"k8s.io/kubernetes/federation/pkg/federation-controller/util/podanalyzer"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/errors"
 	apiv1 "k8s.io/kubernetes/pkg/api/v1"
 	extensionsv1 "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	"k8s.io/kubernetes/pkg/client/cache"
 	kubeclientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/pkg/client/record"
 	"k8s.io/kubernetes/pkg/controller"
-	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/util/flowcontrol"
-	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/util/workqueue"
-	"k8s.io/kubernetes/pkg/watch"
 )
 
 const (
@@ -80,7 +80,7 @@ func parseFederationDeploymentPreference(fd *extensionsv1.Deployment) (*fed.Fede
 type DeploymentController struct {
 	fedClient fedclientset.Interface
 
-	deploymentController *cache.Controller
+	deploymentController cache.Controller
 	deploymentStore      cache.Store
 
 	fedDeploymentInformer fedutil.FederatedInformer
@@ -119,7 +119,7 @@ func NewDeploymentController(federationClient fedclientset.Interface) *Deploymen
 		eventRecorder: recorder,
 	}
 
-	deploymentFedInformerFactory := func(cluster *fedv1.Cluster, clientset kubeclientset.Interface) (cache.Store, cache.ControllerInterface) {
+	deploymentFedInformerFactory := func(cluster *fedv1.Cluster, clientset kubeclientset.Interface) (cache.Store, cache.Controller) {
 		return cache.NewInformer(
 			&cache.ListWatch{
 				ListFunc: func(options apiv1.ListOptions) (runtime.Object, error) {
@@ -146,7 +146,7 @@ func NewDeploymentController(federationClient fedclientset.Interface) *Deploymen
 	}
 	fdc.fedDeploymentInformer = fedutil.NewFederatedInformer(federationClient, deploymentFedInformerFactory, &clusterLifecycle)
 
-	podFedInformerFactory := func(cluster *fedv1.Cluster, clientset kubeclientset.Interface) (cache.Store, cache.ControllerInterface) {
+	podFedInformerFactory := func(cluster *fedv1.Cluster, clientset kubeclientset.Interface) (cache.Store, cache.Controller) {
 		return cache.NewInformer(
 			&cache.ListWatch{
 				ListFunc: func(options apiv1.ListOptions) (runtime.Object, error) {
@@ -571,7 +571,7 @@ func (fdc *DeploymentController) reconcileDeployment(key string) (reconciliation
 				})
 			}
 		} else {
-			// TODO: Update only one deployment at a time if update strategy is rolling udpate.
+			// TODO: Update only one deployment at a time if update strategy is rolling update.
 
 			currentLd := ldObj.(*extensionsv1.Deployment)
 			// Update existing replica set, if needed.

@@ -20,14 +20,14 @@ import (
 	"reflect"
 	"testing"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/kubernetes/pkg/api"
 	_ "k8s.io/kubernetes/pkg/api/install"
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/v1"
 	_ "k8s.io/kubernetes/pkg/apis/extensions/install"
 	. "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
-	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
-	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util/intstr"
 )
 
@@ -40,9 +40,9 @@ func TestSetDefaultDaemonSet(t *testing.T) {
 			RestartPolicy:                 v1.RestartPolicyAlways,
 			SecurityContext:               &v1.PodSecurityContext{},
 			TerminationGracePeriodSeconds: &period,
-			Affinity:                      &v1.Affinity{},
+			SchedulerName:                 api.DefaultSchedulerName,
 		},
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Labels: defaultLabels,
 		},
 	}
@@ -52,7 +52,7 @@ func TestSetDefaultDaemonSet(t *testing.T) {
 			RestartPolicy:                 v1.RestartPolicyAlways,
 			SecurityContext:               &v1.PodSecurityContext{},
 			TerminationGracePeriodSeconds: &period,
-			Affinity:                      &v1.Affinity{},
+			SchedulerName:                 api.DefaultSchedulerName,
 		},
 	}
 	tests := []struct {
@@ -66,7 +66,7 @@ func TestSetDefaultDaemonSet(t *testing.T) {
 				},
 			},
 			expected: &DaemonSet{
-				ObjectMeta: v1.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Labels: defaultLabels,
 				},
 				Spec: DaemonSetSpec{
@@ -79,7 +79,7 @@ func TestSetDefaultDaemonSet(t *testing.T) {
 		},
 		{ // Labels change/defaulting test.
 			original: &DaemonSet{
-				ObjectMeta: v1.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{
 						"bar": "foo",
 					},
@@ -89,7 +89,7 @@ func TestSetDefaultDaemonSet(t *testing.T) {
 				},
 			},
 			expected: &DaemonSet{
-				ObjectMeta: v1.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{
 						"bar": "foo",
 					},
@@ -157,7 +157,7 @@ func TestSetDefaultDeployment(t *testing.T) {
 			RestartPolicy:                 v1.RestartPolicyAlways,
 			SecurityContext:               &v1.PodSecurityContext{},
 			TerminationGracePeriodSeconds: &period,
-			Affinity:                      &v1.Affinity{},
+			SchedulerName:                 api.DefaultSchedulerName,
 		},
 	}
 	tests := []struct {
@@ -296,7 +296,7 @@ func TestSetDefaultReplicaSet(t *testing.T) {
 			rs: &ReplicaSet{
 				Spec: ReplicaSetSpec{
 					Template: v1.PodTemplateSpec{
-						ObjectMeta: v1.ObjectMeta{
+						ObjectMeta: metav1.ObjectMeta{
 							Labels: map[string]string{
 								"foo": "bar",
 							},
@@ -309,14 +309,14 @@ func TestSetDefaultReplicaSet(t *testing.T) {
 		},
 		{
 			rs: &ReplicaSet{
-				ObjectMeta: v1.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{
 						"bar": "foo",
 					},
 				},
 				Spec: ReplicaSetSpec{
 					Template: v1.PodTemplateSpec{
-						ObjectMeta: v1.ObjectMeta{
+						ObjectMeta: metav1.ObjectMeta{
 							Labels: map[string]string{
 								"foo": "bar",
 							},
@@ -329,7 +329,7 @@ func TestSetDefaultReplicaSet(t *testing.T) {
 		},
 		{
 			rs: &ReplicaSet{
-				ObjectMeta: v1.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{
 						"bar": "foo",
 					},
@@ -341,7 +341,7 @@ func TestSetDefaultReplicaSet(t *testing.T) {
 						},
 					},
 					Template: v1.PodTemplateSpec{
-						ObjectMeta: v1.ObjectMeta{
+						ObjectMeta: metav1.ObjectMeta{
 							Labels: map[string]string{
 								"foo": "bar",
 							},
@@ -361,7 +361,7 @@ func TestSetDefaultReplicaSet(t *testing.T) {
 						},
 					},
 					Template: v1.PodTemplateSpec{
-						ObjectMeta: v1.ObjectMeta{
+						ObjectMeta: metav1.ObjectMeta{
 							Labels: map[string]string{
 								"foo": "bar",
 							},
@@ -408,7 +408,7 @@ func TestSetDefaultReplicaSetReplicas(t *testing.T) {
 			rs: ReplicaSet{
 				Spec: ReplicaSetSpec{
 					Template: v1.PodTemplateSpec{
-						ObjectMeta: v1.ObjectMeta{
+						ObjectMeta: metav1.ObjectMeta{
 							Labels: map[string]string{
 								"foo": "bar",
 							},
@@ -423,7 +423,7 @@ func TestSetDefaultReplicaSetReplicas(t *testing.T) {
 				Spec: ReplicaSetSpec{
 					Replicas: newInt32(0),
 					Template: v1.PodTemplateSpec{
-						ObjectMeta: v1.ObjectMeta{
+						ObjectMeta: metav1.ObjectMeta{
 							Labels: map[string]string{
 								"foo": "bar",
 							},
@@ -438,7 +438,7 @@ func TestSetDefaultReplicaSetReplicas(t *testing.T) {
 				Spec: ReplicaSetSpec{
 					Replicas: newInt32(3),
 					Template: v1.PodTemplateSpec{
-						ObjectMeta: v1.ObjectMeta{
+						ObjectMeta: metav1.ObjectMeta{
 							Labels: map[string]string{
 								"foo": "bar",
 							},
@@ -481,7 +481,7 @@ func TestDefaultRequestIsNotSetForReplicaSet(t *testing.T) {
 		Spec: ReplicaSetSpec{
 			Replicas: newInt32(3),
 			Template: v1.PodTemplateSpec{
-				ObjectMeta: v1.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{
 						"foo": "bar",
 					},

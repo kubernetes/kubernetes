@@ -23,16 +23,16 @@ go_library(
         "//pkg/kubelet/volumemanager/cache:go_default_library",
         "//pkg/kubelet/volumemanager/populator:go_default_library",
         "//pkg/kubelet/volumemanager/reconciler:go_default_library",
-        "//pkg/types:go_default_library",
         "//pkg/util/mount:go_default_library",
-        "//pkg/util/runtime:go_default_library",
-        "//pkg/util/sets:go_default_library",
-        "//pkg/util/wait:go_default_library",
         "//pkg/volume:go_default_library",
         "//pkg/volume/util/operationexecutor:go_default_library",
         "//pkg/volume/util/types:go_default_library",
         "//pkg/volume/util/volumehelper:go_default_library",
         "//vendor:github.com/golang/glog",
+        "//vendor:k8s.io/apimachinery/pkg/types",
+        "//vendor:k8s.io/apimachinery/pkg/util/runtime",
+        "//vendor:k8s.io/apimachinery/pkg/util/sets",
+        "//vendor:k8s.io/apimachinery/pkg/util/wait",
     ],
 )
 
@@ -50,12 +50,32 @@ go_test(
         "//pkg/kubelet/container/testing:go_default_library",
         "//pkg/kubelet/pod:go_default_library",
         "//pkg/kubelet/pod/testing:go_default_library",
+        "//pkg/kubelet/secret:go_default_library",
         "//pkg/util/mount:go_default_library",
-        "//pkg/util/sets:go_default_library",
         "//pkg/util/testing:go_default_library",
         "//pkg/volume:go_default_library",
         "//pkg/volume/testing:go_default_library",
         "//pkg/volume/util/types:go_default_library",
         "//pkg/volume/util/volumehelper:go_default_library",
+        "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
+        "//vendor:k8s.io/apimachinery/pkg/util/sets",
     ],
+)
+
+filegroup(
+    name = "package-srcs",
+    srcs = glob(["**"]),
+    tags = ["automanaged"],
+    visibility = ["//visibility:private"],
+)
+
+filegroup(
+    name = "all-srcs",
+    srcs = [
+        ":package-srcs",
+        "//pkg/kubelet/volumemanager/cache:all-srcs",
+        "//pkg/kubelet/volumemanager/populator:all-srcs",
+        "//pkg/kubelet/volumemanager/reconciler:all-srcs",
+    ],
+    tags = ["automanaged"],
 )

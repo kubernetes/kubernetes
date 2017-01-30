@@ -22,12 +22,12 @@ import (
 	"net/url"
 	"path"
 
+	"k8s.io/apimachinery/pkg/runtime"
+	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/rest"
 	"k8s.io/kubernetes/pkg/capabilities"
-	genericapirequest "k8s.io/kubernetes/pkg/genericapiserver/api/request"
-	genericrest "k8s.io/kubernetes/pkg/registry/generic/rest"
-	"k8s.io/kubernetes/pkg/runtime"
+	genericrest "k8s.io/kubernetes/pkg/genericapiserver/registry/generic/rest"
+	"k8s.io/kubernetes/pkg/genericapiserver/registry/rest"
 )
 
 // ProxyREST implements the proxy subresource for a Service

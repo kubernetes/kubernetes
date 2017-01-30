@@ -18,11 +18,10 @@ package v1beta1
 
 import (
 	fmt "fmt"
+	schema "k8s.io/apimachinery/pkg/runtime/schema"
+	serializer "k8s.io/apimachinery/pkg/runtime/serializer"
 	api "k8s.io/kubernetes/pkg/api"
-	registered "k8s.io/kubernetes/pkg/apimachinery/registered"
 	restclient "k8s.io/kubernetes/pkg/client/restclient"
-	schema "k8s.io/kubernetes/pkg/runtime/schema"
-	serializer "k8s.io/kubernetes/pkg/runtime/serializer"
 )
 
 type AuthenticationV1beta1Interface interface {
@@ -30,7 +29,7 @@ type AuthenticationV1beta1Interface interface {
 	TokenReviewsGetter
 }
 
-// AuthenticationV1beta1Client is used to interact with features provided by the k8s.io/kubernetes/pkg/apimachinery/registered.Group group.
+// AuthenticationV1beta1Client is used to interact with features provided by the authentication.k8s.io group.
 type AuthenticationV1beta1Client struct {
 	restClient restclient.Interface
 }
@@ -73,7 +72,7 @@ func setConfigDefaults(config *restclient.Config) error {
 		return err
 	}
 	// if authentication.k8s.io/v1beta1 is not enabled, return an error
-	if !registered.IsEnabledVersion(gv) {
+	if !api.Registry.IsEnabledVersion(gv) {
 		return fmt.Errorf("authentication.k8s.io/v1beta1 is not enabled")
 	}
 	config.APIPath = "/apis"

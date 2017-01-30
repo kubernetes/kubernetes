@@ -18,23 +18,22 @@ package api
 
 import (
 	"crypto/md5"
-	"encoding/json"
 	"fmt"
 	"reflect"
 	"strings"
 	"time"
 
-	"k8s.io/client-go/pkg/api/resource"
-	metav1 "k8s.io/client-go/pkg/apis/meta/v1"
-	"k8s.io/client-go/pkg/conversion"
-	"k8s.io/client-go/pkg/fields"
-	"k8s.io/client-go/pkg/labels"
-	"k8s.io/client-go/pkg/runtime"
-	"k8s.io/client-go/pkg/selection"
-	"k8s.io/client-go/pkg/types"
-	"k8s.io/client-go/pkg/util/sets"
-
 	"github.com/davecgh/go-spew/spew"
+
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/conversion"
+	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/selection"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/client-go/pkg/api/resource"
+	"k8s.io/client-go/pkg/fields"
 )
 
 // Conversion error conveniently packages up errors in conversions.
@@ -272,7 +271,7 @@ func IsStandardFinalizerName(str string) bool {
 }
 
 // SingleObject returns a ListOptions for watching a single object.
-func SingleObject(meta ObjectMeta) ListOptions {
+func SingleObject(meta metav1.ObjectMeta) ListOptions {
 	return ListOptions{
 		FieldSelector:   fields.OneTermEqualSelector("metadata.name", meta.Name),
 		ResourceVersion: meta.ResourceVersion,
@@ -486,46 +485,6 @@ const (
 	UnsafeSysctlsPodAnnotationKey string = "security.alpha.kubernetes.io/unsafe-sysctls"
 )
 
-// GetAffinityFromPod gets the json serialized affinity data from Pod.Annotations
-// and converts it to the Affinity type in api.
-func GetAffinityFromPodAnnotations(annotations map[string]string) (*Affinity, error) {
-	if len(annotations) > 0 && annotations[AffinityAnnotationKey] != "" {
-		var affinity Affinity
-		err := json.Unmarshal([]byte(annotations[AffinityAnnotationKey]), &affinity)
-		if err != nil {
-			return nil, err
-		}
-		return &affinity, nil
-	}
-	return nil, nil
-}
-
-// GetTolerationsFromPodAnnotations gets the json serialized tolerations data from Pod.Annotations
-// and converts it to the []Toleration type in api.
-func GetTolerationsFromPodAnnotations(annotations map[string]string) ([]Toleration, error) {
-	var tolerations []Toleration
-	if len(annotations) > 0 && annotations[TolerationsAnnotationKey] != "" {
-		err := json.Unmarshal([]byte(annotations[TolerationsAnnotationKey]), &tolerations)
-		if err != nil {
-			return tolerations, err
-		}
-	}
-	return tolerations, nil
-}
-
-// GetTaintsFromNodeAnnotations gets the json serialized taints data from Pod.Annotations
-// and converts it to the []Taint type in api.
-func GetTaintsFromNodeAnnotations(annotations map[string]string) ([]Taint, error) {
-	var taints []Taint
-	if len(annotations) > 0 && annotations[TaintsAnnotationKey] != "" {
-		err := json.Unmarshal([]byte(annotations[TaintsAnnotationKey]), &taints)
-		if err != nil {
-			return []Taint{}, err
-		}
-	}
-	return taints, nil
-}
-
 // TolerationToleratesTaint checks if the toleration tolerates the taint.
 func TolerationToleratesTaint(toleration *Toleration, taint *Taint) bool {
 	if len(toleration.Effect) != 0 && toleration.Effect != taint.Effect {
@@ -569,17 +528,6 @@ func (t *Taint) ToString() string {
 		return fmt.Sprintf("%v:%v", t.Key, t.Effect)
 	}
 	return fmt.Sprintf("%v=%v:%v", t.Key, t.Value, t.Effect)
-}
-
-func GetAvoidPodsFromNodeAnnotations(annotations map[string]string) (AvoidPods, error) {
-	var avoidPods AvoidPods
-	if len(annotations) > 0 && annotations[PreferAvoidPodsAnnotationKey] != "" {
-		err := json.Unmarshal([]byte(annotations[PreferAvoidPodsAnnotationKey]), &avoidPods)
-		if err != nil {
-			return avoidPods, err
-		}
-	}
-	return avoidPods, nil
 }
 
 // SysctlsFromPodAnnotations parses the sysctl annotations into a slice of safe Sysctls

@@ -22,24 +22,24 @@ import (
 
 	"github.com/golang/glog"
 
-	"k8s.io/kubernetes/pkg/api/rest"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	extensionsapiv1beta1 "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	extensionsclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/extensions/internalversion"
-	"k8s.io/kubernetes/pkg/genericapiserver"
-	horizontalpodautoscaleretcd "k8s.io/kubernetes/pkg/registry/autoscaling/horizontalpodautoscaler/etcd"
-	jobetcd "k8s.io/kubernetes/pkg/registry/batch/job/etcd"
-	expcontrolleretcd "k8s.io/kubernetes/pkg/registry/extensions/controller/etcd"
-	daemonetcd "k8s.io/kubernetes/pkg/registry/extensions/daemonset/etcd"
-	deploymentetcd "k8s.io/kubernetes/pkg/registry/extensions/deployment/etcd"
-	ingressetcd "k8s.io/kubernetes/pkg/registry/extensions/ingress/etcd"
-	networkpolicyetcd "k8s.io/kubernetes/pkg/registry/extensions/networkpolicy/etcd"
-	pspetcd "k8s.io/kubernetes/pkg/registry/extensions/podsecuritypolicy/etcd"
-	replicasetetcd "k8s.io/kubernetes/pkg/registry/extensions/replicaset/etcd"
-	thirdpartyresourceetcd "k8s.io/kubernetes/pkg/registry/extensions/thirdpartyresource/etcd"
-	"k8s.io/kubernetes/pkg/registry/generic"
-	utilruntime "k8s.io/kubernetes/pkg/util/runtime"
-	"k8s.io/kubernetes/pkg/util/wait"
+	"k8s.io/kubernetes/pkg/genericapiserver/registry/generic"
+	"k8s.io/kubernetes/pkg/genericapiserver/registry/rest"
+	genericapiserver "k8s.io/kubernetes/pkg/genericapiserver/server"
+	horizontalpodautoscalerstore "k8s.io/kubernetes/pkg/registry/autoscaling/horizontalpodautoscaler/storage"
+	jobstore "k8s.io/kubernetes/pkg/registry/batch/job/storage"
+	expcontrollerstore "k8s.io/kubernetes/pkg/registry/extensions/controller/storage"
+	daemonstore "k8s.io/kubernetes/pkg/registry/extensions/daemonset/storage"
+	deploymentstore "k8s.io/kubernetes/pkg/registry/extensions/deployment/storage"
+	ingressstore "k8s.io/kubernetes/pkg/registry/extensions/ingress/storage"
+	networkpolicystore "k8s.io/kubernetes/pkg/registry/extensions/networkpolicy/storage"
+	pspstore "k8s.io/kubernetes/pkg/registry/extensions/podsecuritypolicy/storage"
+	replicasetstore "k8s.io/kubernetes/pkg/registry/extensions/replicaset/storage"
+	thirdpartyresourcestore "k8s.io/kubernetes/pkg/registry/extensions/thirdpartyresource/storage"
 )
 
 type RESTStorageProvider struct {
@@ -63,53 +63,53 @@ func (p RESTStorageProvider) v1beta1Storage(apiResourceConfigSource genericapise
 	storage := map[string]rest.Storage{}
 
 	if apiResourceConfigSource.ResourceEnabled(version.WithResource("horizontalpodautoscalers")) {
-		hpaStorage, hpaStatusStorage := horizontalpodautoscaleretcd.NewREST(restOptionsGetter)
+		hpaStorage, hpaStatusStorage := horizontalpodautoscalerstore.NewREST(restOptionsGetter)
 		storage["horizontalpodautoscalers"] = hpaStorage
 		storage["horizontalpodautoscalers/status"] = hpaStatusStorage
 
-		controllerStorage := expcontrolleretcd.NewStorage(restOptionsGetter)
+		controllerStorage := expcontrollerstore.NewStorage(restOptionsGetter)
 		storage["replicationcontrollers"] = controllerStorage.ReplicationController
 		storage["replicationcontrollers/scale"] = controllerStorage.Scale
 	}
 	if apiResourceConfigSource.ResourceEnabled(version.WithResource("thirdpartyresources")) {
-		thirdPartyResourceStorage := thirdpartyresourceetcd.NewREST(restOptionsGetter)
+		thirdPartyResourceStorage := thirdpartyresourcestore.NewREST(restOptionsGetter)
 		storage["thirdpartyresources"] = thirdPartyResourceStorage
 	}
 
 	if apiResourceConfigSource.ResourceEnabled(version.WithResource("daemonsets")) {
-		daemonSetStorage, daemonSetStatusStorage := daemonetcd.NewREST(restOptionsGetter)
+		daemonSetStorage, daemonSetStatusStorage := daemonstore.NewREST(restOptionsGetter)
 		storage["daemonsets"] = daemonSetStorage
 		storage["daemonsets/status"] = daemonSetStatusStorage
 	}
 	if apiResourceConfigSource.ResourceEnabled(version.WithResource("deployments")) {
-		deploymentStorage := deploymentetcd.NewStorage(restOptionsGetter)
+		deploymentStorage := deploymentstore.NewStorage(restOptionsGetter)
 		storage["deployments"] = deploymentStorage.Deployment
 		storage["deployments/status"] = deploymentStorage.Status
 		storage["deployments/rollback"] = deploymentStorage.Rollback
 		storage["deployments/scale"] = deploymentStorage.Scale
 	}
 	if apiResourceConfigSource.ResourceEnabled(version.WithResource("jobs")) {
-		jobsStorage, jobsStatusStorage := jobetcd.NewREST(restOptionsGetter)
+		jobsStorage, jobsStatusStorage := jobstore.NewREST(restOptionsGetter)
 		storage["jobs"] = jobsStorage
 		storage["jobs/status"] = jobsStatusStorage
 	}
 	if apiResourceConfigSource.ResourceEnabled(version.WithResource("ingresses")) {
-		ingressStorage, ingressStatusStorage := ingressetcd.NewREST(restOptionsGetter)
+		ingressStorage, ingressStatusStorage := ingressstore.NewREST(restOptionsGetter)
 		storage["ingresses"] = ingressStorage
 		storage["ingresses/status"] = ingressStatusStorage
 	}
 	if apiResourceConfigSource.ResourceEnabled(version.WithResource("podsecuritypolicy")) || apiResourceConfigSource.ResourceEnabled(version.WithResource("podsecuritypolicies")) {
-		podSecurityExtensionsStorage := pspetcd.NewREST(restOptionsGetter)
+		podSecurityExtensionsStorage := pspstore.NewREST(restOptionsGetter)
 		storage["podSecurityPolicies"] = podSecurityExtensionsStorage
 	}
 	if apiResourceConfigSource.ResourceEnabled(version.WithResource("replicasets")) {
-		replicaSetStorage := replicasetetcd.NewStorage(restOptionsGetter)
+		replicaSetStorage := replicasetstore.NewStorage(restOptionsGetter)
 		storage["replicasets"] = replicaSetStorage.ReplicaSet
 		storage["replicasets/status"] = replicaSetStorage.Status
 		storage["replicasets/scale"] = replicaSetStorage.Scale
 	}
 	if apiResourceConfigSource.ResourceEnabled(version.WithResource("networkpolicies")) {
-		networkExtensionsStorage := networkpolicyetcd.NewREST(restOptionsGetter)
+		networkExtensionsStorage := networkpolicystore.NewREST(restOptionsGetter)
 		storage["networkpolicies"] = networkExtensionsStorage
 	}
 

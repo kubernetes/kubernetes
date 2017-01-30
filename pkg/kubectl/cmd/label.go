@@ -25,16 +25,17 @@ import (
 
 	"github.com/golang/glog"
 	"github.com/spf13/cobra"
-	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/meta"
+	"k8s.io/apimachinery/pkg/api/meta"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
+	utilerrors "k8s.io/apimachinery/pkg/util/errors"
+	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
-	"k8s.io/kubernetes/pkg/runtime"
-	utilerrors "k8s.io/kubernetes/pkg/util/errors"
 	"k8s.io/kubernetes/pkg/util/strategicpatch"
-	"k8s.io/kubernetes/pkg/util/validation"
 )
 
 // LabelOptions have the data required to perform the label operation
@@ -187,7 +188,7 @@ func (o *LabelOptions) RunLabel(f cmdutil.Factory, cmd *cobra.Command) error {
 			Latest()
 	}
 	one := false
-	r := b.Do().IntoSingular(&one)
+	r := b.Do().IntoSingleItemImplied(&one)
 	if err := r.Err(); err != nil {
 		return err
 	}
@@ -260,7 +261,7 @@ func (o *LabelOptions) RunLabel(f cmdutil.Factory, cmd *cobra.Command) error {
 			helper := resource.NewHelper(client, mapping)
 
 			if createdPatch {
-				outputObj, err = helper.Patch(namespace, name, api.StrategicMergePatchType, patchBytes)
+				outputObj, err = helper.Patch(namespace, name, types.StrategicMergePatchType, patchBytes)
 			} else {
 				outputObj, err = helper.Replace(namespace, name, false, obj)
 			}
@@ -276,7 +277,7 @@ func (o *LabelOptions) RunLabel(f cmdutil.Factory, cmd *cobra.Command) error {
 	})
 }
 
-func validateNoOverwrites(accessor meta.Object, labels map[string]string) error {
+func validateNoOverwrites(accessor metav1.Object, labels map[string]string) error {
 	allErrs := []error{}
 	for key := range labels {
 		if value, found := accessor.GetLabels()[key]; found {

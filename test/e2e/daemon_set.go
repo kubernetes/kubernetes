@@ -22,18 +22,17 @@ import (
 	"strings"
 	"time"
 
+	apierrs "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/api"
-	apierrs "k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	extensionsinternal "k8s.io/kubernetes/pkg/apis/extensions"
 	extensions "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
-	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/pkg/kubectl"
-	"k8s.io/kubernetes/pkg/labels"
-	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/test/e2e/framework"
 
 	. "github.com/onsi/ginkgo"
@@ -61,12 +60,12 @@ var _ = framework.KubeDescribe("Daemon set [Serial]", func() {
 
 	AfterEach(func() {
 		if daemonsets, err := f.ClientSet.Extensions().DaemonSets(f.Namespace.Name).List(v1.ListOptions{}); err == nil {
-			framework.Logf("daemonset: %s", runtime.EncodeOrDie(api.Codecs.LegacyCodec(registered.EnabledVersions()...), daemonsets))
+			framework.Logf("daemonset: %s", runtime.EncodeOrDie(api.Codecs.LegacyCodec(api.Registry.EnabledVersions()...), daemonsets))
 		} else {
 			framework.Logf("unable to dump daemonsets: %v", err)
 		}
 		if pods, err := f.ClientSet.Core().Pods(f.Namespace.Name).List(v1.ListOptions{}); err == nil {
-			framework.Logf("pods: %s", runtime.EncodeOrDie(api.Codecs.LegacyCodec(registered.EnabledVersions()...), pods))
+			framework.Logf("pods: %s", runtime.EncodeOrDie(api.Codecs.LegacyCodec(api.Registry.EnabledVersions()...), pods))
 		} else {
 			framework.Logf("unable to dump pods: %v", err)
 		}
@@ -95,12 +94,12 @@ var _ = framework.KubeDescribe("Daemon set [Serial]", func() {
 
 		framework.Logf("Creating simple daemon set %s", dsName)
 		_, err := c.Extensions().DaemonSets(ns).Create(&extensions.DaemonSet{
-			ObjectMeta: v1.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name: dsName,
 			},
 			Spec: extensions.DaemonSetSpec{
 				Template: v1.PodTemplateSpec{
-					ObjectMeta: v1.ObjectMeta{
+					ObjectMeta: metav1.ObjectMeta{
 						Labels: label,
 					},
 					Spec: v1.PodSpec{
@@ -154,13 +153,13 @@ var _ = framework.KubeDescribe("Daemon set [Serial]", func() {
 		nodeSelector := map[string]string{daemonsetColorLabel: "blue"}
 		framework.Logf("Creating daemon with a node selector %s", dsName)
 		_, err := c.Extensions().DaemonSets(ns).Create(&extensions.DaemonSet{
-			ObjectMeta: v1.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name: dsName,
 			},
 			Spec: extensions.DaemonSetSpec{
 				Selector: &metav1.LabelSelector{MatchLabels: complexLabel},
 				Template: v1.PodTemplateSpec{
-					ObjectMeta: v1.ObjectMeta{
+					ObjectMeta: metav1.ObjectMeta{
 						Labels: complexLabel,
 					},
 					Spec: v1.PodSpec{
@@ -227,13 +226,13 @@ var _ = framework.KubeDescribe("Daemon set [Serial]", func() {
 			},
 		}
 		_, err := c.Extensions().DaemonSets(ns).Create(&extensions.DaemonSet{
-			ObjectMeta: v1.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name: dsName,
 			},
 			Spec: extensions.DaemonSetSpec{
 				Selector: &metav1.LabelSelector{MatchLabels: complexLabel},
 				Template: v1.PodTemplateSpec{
-					ObjectMeta: v1.ObjectMeta{
+					ObjectMeta: metav1.ObjectMeta{
 						Labels: complexLabel,
 					},
 					Spec: v1.PodSpec{

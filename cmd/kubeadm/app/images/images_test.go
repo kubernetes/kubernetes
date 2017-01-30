@@ -84,19 +84,19 @@ func TestGetAddonImage(t *testing.T) {
 		{"matches nothing", ""},
 		{
 			KubeDNSImage,
-			fmt.Sprintf("%s/%s-%s:%s", gcrPrefix, "kubedns", runtime.GOARCH, kubeDNSVersion),
+			fmt.Sprintf("%s/%s-%s:%s", gcrPrefix, KubeDNSImage, runtime.GOARCH, kubeDNSVersion),
 		},
 		{
 			KubeDNSmasqImage,
-			fmt.Sprintf("%s/%s-%s:%s", gcrPrefix, "kube-dnsmasq", runtime.GOARCH, dnsmasqVersion),
+			fmt.Sprintf("%s/%s-%s:%s", gcrPrefix, KubeDNSmasqImage, runtime.GOARCH, kubeDNSVersion),
 		},
 		{
-			KubeExechealthzImage,
-			fmt.Sprintf("%s/%s-%s:%s", gcrPrefix, "exechealthz", runtime.GOARCH, exechealthzVersion),
+			KubeDNSSidecarImage,
+			fmt.Sprintf("%s/%s-%s:%s", gcrPrefix, KubeDNSSidecarImage, runtime.GOARCH, kubeDNSVersion),
 		},
 		{
 			Pause,
-			fmt.Sprintf("%s/%s-%s:%s", gcrPrefix, "pause", runtime.GOARCH, pauseVersion),
+			fmt.Sprintf("%s/%s-%s:%s", gcrPrefix, Pause, runtime.GOARCH, pauseVersion),
 		},
 	}
 	for _, rt := range tokenTest {

@@ -31,14 +31,14 @@ import (
 	"github.com/aws/aws-sdk-go/service/ec2"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/apimachinery/registered"
-	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	v1core "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/core/v1"
 	awscloud "k8s.io/kubernetes/pkg/cloudprovider/providers/aws"
 	gcecloud "k8s.io/kubernetes/pkg/cloudprovider/providers/gce"
-	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util/uuid"
 	"k8s.io/kubernetes/test/e2e/framework"
 )
@@ -78,7 +78,7 @@ var _ = framework.KubeDescribe("Pod Disks", func() {
 		mathrand.Seed(time.Now().UTC().UnixNano())
 	})
 
-	It("should schedule a pod w/ a RW PD, ungracefully remove it, then schedule it on another host [Slow]", func() {
+	It("should schedule a pod w/ a RW PD, ungracefully remove it, then schedule it on another host [Slow] [Volume]", func() {
 		framework.SkipUnlessProviderIs("gce", "gke", "aws")
 
 		By("creating PD")
@@ -142,7 +142,7 @@ var _ = framework.KubeDescribe("Pod Disks", func() {
 		return
 	})
 
-	It("Should schedule a pod w/ a RW PD, gracefully remove it, then schedule it on another host [Slow]", func() {
+	It("Should schedule a pod w/ a RW PD, gracefully remove it, then schedule it on another host [Slow] [Volume]", func() {
 		framework.SkipUnlessProviderIs("gce", "gke", "aws")
 
 		By("creating PD")
@@ -206,7 +206,7 @@ var _ = framework.KubeDescribe("Pod Disks", func() {
 		return
 	})
 
-	It("should schedule a pod w/ a readonly PD on two hosts, then remove both ungracefully. [Slow]", func() {
+	It("should schedule a pod w/ a readonly PD on two hosts, then remove both ungracefully. [Slow] [Volume]", func() {
 		framework.SkipUnlessProviderIs("gce", "gke")
 
 		By("creating PD")
@@ -258,7 +258,7 @@ var _ = framework.KubeDescribe("Pod Disks", func() {
 		waitForPDDetach(diskName, host1Name)
 	})
 
-	It("Should schedule a pod w/ a readonly PD on two hosts, then remove both gracefully. [Slow]", func() {
+	It("Should schedule a pod w/ a readonly PD on two hosts, then remove both gracefully. [Slow] [Volume]", func() {
 		framework.SkipUnlessProviderIs("gce", "gke")
 
 		By("creating PD")
@@ -310,7 +310,7 @@ var _ = framework.KubeDescribe("Pod Disks", func() {
 		waitForPDDetach(diskName, host1Name)
 	})
 
-	It("should schedule a pod w/ a RW PD shared between multiple containers, write to PD, delete pod, verify contents, and repeat in rapid succession [Slow]", func() {
+	It("should schedule a pod w/ a RW PD shared between multiple containers, write to PD, delete pod, verify contents, and repeat in rapid succession [Slow] [Volume]", func() {
 		framework.SkipUnlessProviderIs("gce", "gke", "aws")
 
 		By("creating PD")
@@ -363,7 +363,7 @@ var _ = framework.KubeDescribe("Pod Disks", func() {
 		waitForPDDetach(diskName, host0Name)
 	})
 
-	It("should schedule a pod w/two RW PDs both mounted to one container, write to PD, verify contents, delete pod, recreate pod, verify contents, and repeat in rapid succession [Slow]", func() {
+	It("should schedule a pod w/two RW PDs both mounted to one container, write to PD, verify contents, delete pod, recreate pod, verify contents, and repeat in rapid succession [Slow] [Volume]", func() {
 		framework.SkipUnlessProviderIs("gce", "gke", "aws")
 
 		By("creating PD1")
@@ -423,7 +423,7 @@ var _ = framework.KubeDescribe("Pod Disks", func() {
 		waitForPDDetach(disk2Name, host0Name)
 	})
 
-	It("should be able to detach from a node which was deleted [Slow] [Disruptive]", func() {
+	It("should be able to detach from a node which was deleted [Slow] [Disruptive] [Volume]", func() {
 		framework.SkipUnlessProviderIs("gce")
 
 		initialGroupSize, err := GroupSize(framework.TestContext.CloudConfig.NodeInstanceGroup)
@@ -478,7 +478,7 @@ var _ = framework.KubeDescribe("Pod Disks", func() {
 		return
 	})
 
-	It("should be able to detach from a node whose api object was deleted [Slow] [Disruptive]", func() {
+	It("should be able to detach from a node whose api object was deleted [Slow] [Disruptive] [Volume]", func() {
 		framework.SkipUnlessProviderIs("gce")
 		initialGroupSize, err := GroupSize(framework.TestContext.CloudConfig.NodeInstanceGroup)
 		framework.ExpectNoError(err, "Error getting group size")
@@ -725,9 +725,9 @@ func testPDPod(diskNames []string, targetNode types.NodeName, readOnly bool, num
 	pod := &v1.Pod{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "Pod",
-			APIVersion: registered.GroupOrDie(v1.GroupName).GroupVersion.String(),
+			APIVersion: api.Registry.GroupOrDie(v1.GroupName).GroupVersion.String(),
 		},
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name: "pd-test-" + string(uuid.NewUUID()),
 		},
 		Spec: v1.PodSpec{

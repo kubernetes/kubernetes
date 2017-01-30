@@ -15,7 +15,7 @@ go_library(
     deps = [
         "//pkg/api/v1:go_default_library",
         "//pkg/kubelet/container:go_default_library",
-        "//pkg/types:go_default_library",
+        "//vendor:k8s.io/apimachinery/pkg/types",
     ],
 )
 
@@ -27,7 +27,21 @@ go_test(
     deps = [
         "//pkg/api/v1:go_default_library",
         "//pkg/kubelet/container:go_default_library",
-        "//pkg/util/wait:go_default_library",
         "//vendor:github.com/stretchr/testify/assert",
+        "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
+        "//vendor:k8s.io/apimachinery/pkg/util/wait",
     ],
+)
+
+filegroup(
+    name = "package-srcs",
+    srcs = glob(["**"]),
+    tags = ["automanaged"],
+    visibility = ["//visibility:private"],
+)
+
+filegroup(
+    name = "all-srcs",
+    srcs = [":package-srcs"],
+    tags = ["automanaged"],
 )

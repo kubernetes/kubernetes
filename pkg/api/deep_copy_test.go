@@ -21,11 +21,11 @@ import (
 	"testing"
 	"time"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
-	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
-	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/types"
 )
 
 func parseTimeOrDie(ts string) metav1.Time {
@@ -41,7 +41,7 @@ var benchmarkPod api.Pod = api.Pod{
 		Kind:       "Pod",
 		APIVersion: "v1",
 	},
-	ObjectMeta: api.ObjectMeta{
+	ObjectMeta: metav1.ObjectMeta{
 		Name:              "etcd-server-e2e-test-wojtekt-master",
 		Namespace:         "default",
 		SelfLink:          "/api/v1/namespaces/default/pods/etcd-server-e2e-test-wojtekt-master",

@@ -22,16 +22,17 @@ import (
 	"sync"
 	"testing"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/fields"
+	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
-	"k8s.io/kubernetes/pkg/fields"
-	"k8s.io/kubernetes/pkg/labels"
-	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/storage"
 
 	"github.com/coreos/etcd/integration"
 	"golang.org/x/net/context"
-	"k8s.io/kubernetes/pkg/watch"
+	"k8s.io/apimachinery/pkg/watch"
 )
 
 func TestCreate(t *testing.T) {
@@ -41,7 +42,7 @@ func TestCreate(t *testing.T) {
 
 	key := "/testkey"
 	out := &api.Pod{}
-	obj := &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}}
+	obj := &api.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}}
 
 	// verify that kv pair is empty before set
 	getResp, err := etcdClient.KV.Get(ctx, key)
@@ -78,7 +79,7 @@ func TestCreateWithTTL(t *testing.T) {
 	ctx, store, cluster := testSetup(t)
 	defer cluster.Terminate(t)
 
-	input := &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}}
+	input := &api.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}}
 	key := "/somekey"
 
 	out := &api.Pod{}
@@ -96,7 +97,7 @@ func TestCreateWithTTL(t *testing.T) {
 func TestCreateWithKeyExist(t *testing.T) {
 	ctx, store, cluster := testSetup(t)
 	defer cluster.Terminate(t)
-	obj := &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}}
+	obj := &api.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}}
 	key, _ := testPropogateStore(ctx, t, store, obj)
 	out := &api.Pod{}
 	err := store.Create(ctx, key, obj, out, 0)
@@ -108,7 +109,7 @@ func TestCreateWithKeyExist(t *testing.T) {
 func TestGet(t *testing.T) {
 	ctx, store, cluster := testSetup(t)
 	defer cluster.Terminate(t)
-	key, storedObj := testPropogateStore(ctx, t, store, &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}})
+	key, storedObj := testPropogateStore(ctx, t, store, &api.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}})
 
 	tests := []struct {
 		key               string
@@ -152,7 +153,7 @@ func TestGet(t *testing.T) {
 func TestUnconditionalDelete(t *testing.T) {
 	ctx, store, cluster := testSetup(t)
 	defer cluster.Terminate(t)
-	key, storedObj := testPropogateStore(ctx, t, store, &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}})
+	key, storedObj := testPropogateStore(ctx, t, store, &api.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}})
 
 	tests := []struct {
 		key               string
@@ -189,7 +190,7 @@ func TestUnconditionalDelete(t *testing.T) {
 func TestConditionalDelete(t *testing.T) {
 	ctx, store, cluster := testSetup(t)
 	defer cluster.Terminate(t)
-	key, storedObj := testPropogateStore(ctx, t, store, &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo", UID: "A"}})
+	key, storedObj := testPropogateStore(ctx, t, store, &api.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo", UID: "A"}})
 
 	tests := []struct {
 		precondition        *storage.Preconditions
@@ -217,14 +218,14 @@ func TestConditionalDelete(t *testing.T) {
 		if !reflect.DeepEqual(storedObj, out) {
 			t.Errorf("#%d: pod want=%#v, get=%#v", i, storedObj, out)
 		}
-		key, storedObj = testPropogateStore(ctx, t, store, &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo", UID: "A"}})
+		key, storedObj = testPropogateStore(ctx, t, store, &api.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo", UID: "A"}})
 	}
 }
 
 func TestGetToList(t *testing.T) {
 	ctx, store, cluster := testSetup(t)
 	defer cluster.Terminate(t)
-	key, storedObj := testPropogateStore(ctx, t, store, &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}})
+	key, storedObj := testPropogateStore(ctx, t, store, &api.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}})
 
 	tests := []struct {
 		key         string
@@ -273,7 +274,7 @@ func TestGetToList(t *testing.T) {
 func TestGuaranteedUpdate(t *testing.T) {
 	ctx, store, cluster := testSetup(t)
 	defer cluster.Terminate(t)
-	key, storeObj := testPropogateStore(ctx, t, store, &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo", UID: "A"}})
+	key, storeObj := testPropogateStore(ctx, t, store, &api.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo", UID: "A"}})
 
 	tests := []struct {
 		key                 string
@@ -381,7 +382,7 @@ func TestGuaranteedUpdateWithTTL(t *testing.T) {
 	ctx, store, cluster := testSetup(t)
 	defer cluster.Terminate(t)
 
-	input := &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}}
+	input := &api.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}}
 	key := "/somekey"
 
 	out := &api.Pod{}
@@ -404,7 +405,7 @@ func TestGuaranteedUpdateWithTTL(t *testing.T) {
 func TestGuaranteedUpdateWithConflict(t *testing.T) {
 	ctx, store, cluster := testSetup(t)
 	defer cluster.Terminate(t)
-	key, _ := testPropogateStore(ctx, t, store, &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}})
+	key, _ := testPropogateStore(ctx, t, store, &api.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}})
 
 	errChan := make(chan error, 1)
 	var firstToFinish sync.WaitGroup
@@ -471,13 +472,13 @@ func TestList(t *testing.T) {
 		storedObj *api.Pod
 	}{{
 		key: "/one-level/test",
-		obj: &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}},
+		obj: &api.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}},
 	}, {
 		key: "/two-level/1/test",
-		obj: &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}},
+		obj: &api.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}},
 	}, {
 		key: "/two-level/2/test",
-		obj: &api.Pod{ObjectMeta: api.ObjectMeta{Name: "bar"}},
+		obj: &api.Pod{ObjectMeta: metav1.ObjectMeta{Name: "bar"}},
 	}}
 
 	for i, ps := range preset {

@@ -24,3 +24,19 @@ go_test(
     ],
     deps = ["//plugin/pkg/scheduler/factory:go_default_library"],
 )
+
+filegroup(
+    name = "package-srcs",
+    srcs = glob(["**"]),
+    tags = ["automanaged"],
+    visibility = ["//visibility:private"],
+)
+
+filegroup(
+    name = "all-srcs",
+    srcs = [
+        ":package-srcs",
+        "//plugin/pkg/scheduler/algorithmprovider/defaults:all-srcs",
+    ],
+    tags = ["automanaged"],
+)

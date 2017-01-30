@@ -26,18 +26,19 @@ import (
 	jsonpatch "github.com/evanphx/json-patch"
 	"github.com/spf13/cobra"
 
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/util/yaml"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
-	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/util/strategicpatch"
-	"k8s.io/kubernetes/pkg/util/yaml"
 )
 
-var patchTypes = map[string]api.PatchType{"json": api.JSONPatchType, "merge": api.MergePatchType, "strategic": api.StrategicMergePatchType}
+var patchTypes = map[string]types.PatchType{"json": types.JSONPatchType, "merge": types.MergePatchType, "strategic": types.StrategicMergePatchType}
 
 // PatchOptions is the start of the data required to perform the operation.  As new fields are added, add them here instead of
 // referencing the cmd.Flags()
@@ -124,7 +125,7 @@ func RunPatch(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []strin
 		return err
 	}
 
-	patchType := api.StrategicMergePatchType
+	patchType := types.StrategicMergePatchType
 	patchTypeString := strings.ToLower(cmdutil.GetFlagString(cmd, "type"))
 	if len(patchTypeString) != 0 {
 		ok := false
@@ -182,7 +183,7 @@ func RunPatch(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []strin
 				// record hint is likely to be invalid anyway, so avoid the bad hint
 				patch, err := cmdutil.ChangeResourcePatch(info, f.Command())
 				if err == nil {
-					helper.Patch(info.Namespace, info.Name, api.StrategicMergePatchType, patch)
+					helper.Patch(info.Namespace, info.Name, types.StrategicMergePatchType, patch)
 				}
 			}
 			count++
@@ -247,20 +248,20 @@ func RunPatch(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []strin
 	return nil
 }
 
-func getPatchedJSON(patchType api.PatchType, originalJS, patchJS []byte, obj runtime.Object) ([]byte, error) {
+func getPatchedJSON(patchType types.PatchType, originalJS, patchJS []byte, obj runtime.Object) ([]byte, error) {
 	switch patchType {
-	case api.JSONPatchType:
+	case types.JSONPatchType:
 		patchObj, err := jsonpatch.DecodePatch(patchJS)
 		if err != nil {
 			return nil, err
 		}
 		return patchObj.Apply(originalJS)
 
-	case api.MergePatchType:
+	case types.MergePatchType:
 		return jsonpatch.MergePatch(originalJS, patchJS)
 
-	case api.StrategicMergePatchType:
-		return strategicpatch.StrategicMergePatchData(originalJS, patchJS, obj)
+	case types.StrategicMergePatchType:
+		return strategicpatch.StrategicMergePatch(originalJS, patchJS, obj)
 
 	default:
 		// only here as a safety net - go-restful filters content-type

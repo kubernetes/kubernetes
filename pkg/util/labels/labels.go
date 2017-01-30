@@ -17,14 +17,12 @@ limitations under the License.
 package labels
 
 import (
-	"fmt"
-
-	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 // Clones the given map and returns a new map with the given key and value added.
 // Returns the given map, if labelKey is empty.
-func CloneAndAddLabel(labels map[string]string, labelKey string, labelValue uint32) map[string]string {
+func CloneAndAddLabel(labels map[string]string, labelKey, labelValue string) map[string]string {
 	if labelKey == "" {
 		// Don't need to add a label.
 		return labels
@@ -34,7 +32,7 @@ func CloneAndAddLabel(labels map[string]string, labelKey string, labelValue uint
 	for key, value := range labels {
 		newLabels[key] = value
 	}
-	newLabels[labelKey] = fmt.Sprintf("%d", labelValue)
+	newLabels[labelKey] = labelValue
 	return newLabels
 }
 
@@ -55,7 +53,7 @@ func CloneAndRemoveLabel(labels map[string]string, labelKey string) map[string]s
 }
 
 // AddLabel returns a map with the given key and value added to the given map.
-func AddLabel(labels map[string]string, labelKey string, labelValue string) map[string]string {
+func AddLabel(labels map[string]string, labelKey, labelValue string) map[string]string {
 	if labelKey == "" {
 		// Don't need to add a label.
 		return labels
@@ -69,7 +67,7 @@ func AddLabel(labels map[string]string, labelKey string, labelValue string) map[
 
 // Clones the given selector and returns a new selector with the given key and value added.
 // Returns the given selector, if labelKey is empty.
-func CloneSelectorAndAddLabel(selector *metav1.LabelSelector, labelKey string, labelValue uint32) *metav1.LabelSelector {
+func CloneSelectorAndAddLabel(selector *metav1.LabelSelector, labelKey, labelValue string) *metav1.LabelSelector {
 	if labelKey == "" {
 		// Don't need to add a label.
 		return selector
@@ -85,7 +83,7 @@ func CloneSelectorAndAddLabel(selector *metav1.LabelSelector, labelKey string, l
 			newSelector.MatchLabels[key] = val
 		}
 	}
-	newSelector.MatchLabels[labelKey] = fmt.Sprintf("%d", labelValue)
+	newSelector.MatchLabels[labelKey] = labelValue
 
 	if selector.MatchExpressions != nil {
 		newMExps := make([]metav1.LabelSelectorRequirement, len(selector.MatchExpressions))
@@ -108,7 +106,7 @@ func CloneSelectorAndAddLabel(selector *metav1.LabelSelector, labelKey string, l
 }
 
 // AddLabelToSelector returns a selector with the given key and value added to the given selector's MatchLabels.
-func AddLabelToSelector(selector *metav1.LabelSelector, labelKey string, labelValue string) *metav1.LabelSelector {
+func AddLabelToSelector(selector *metav1.LabelSelector, labelKey, labelValue string) *metav1.LabelSelector {
 	if labelKey == "" {
 		// Don't need to add a label.
 		return selector

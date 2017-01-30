@@ -22,8 +22,8 @@ import (
 	"reflect"
 	"testing"
 
+	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/kubernetes/pkg/client/restclient"
-	"k8s.io/kubernetes/pkg/util/diff"
 )
 
 func TestLoadRESTClientConfig(t *testing.T) {

@@ -25,27 +25,27 @@ import (
 	"testing"
 	"time"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
-	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/client/restclient/fake"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
-	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util/strategicpatch"
 )
 
-func generateNodeAndTaintedNode(oldTaints []api.Taint, newTaints []api.Taint) (*api.Node, *api.Node) {
+func generateNodeAndTaintedNode(oldTaints []v1.Taint, newTaints []v1.Taint) (*api.Node, *api.Node) {
 	var taintedNode *api.Node
 
 	oldTaintsData, _ := json.Marshal(oldTaints)
 	// Create a node.
 	node := &api.Node{
-		ObjectMeta: api.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:              "node-name",
 			CreationTimestamp: metav1.Time{Time: time.Now()},
 			Annotations: map[string]string{
-				api.TaintsAnnotationKey: string(oldTaintsData),
+				v1.TaintsAnnotationKey: string(oldTaintsData),
 			},
 		},
 		Spec: api.NodeSpec{
@@ -59,18 +59,18 @@ func generateNodeAndTaintedNode(oldTaints []api.Taint, newTaints []api.Taint) (*
 	// A copy of the same node, but tainted.
 	taintedNode = clone.(*api.Node)
 	taintedNode.Annotations = map[string]string{
-		api.TaintsAnnotationKey: string(newTaintsData),
+		v1.TaintsAnnotationKey: string(newTaintsData),
 	}
 
 	return node, taintedNode
 }
 
 func AnnotationsHaveEqualTaints(annotationA map[string]string, annotationB map[string]string) bool {
-	taintsA, err := api.GetTaintsFromNodeAnnotations(annotationA)
+	taintsA, err := v1.GetTaintsFromNodeAnnotations(annotationA)
 	if err != nil {
 		return false
 	}
-	taintsB, err := api.GetTaintsFromNodeAnnotations(annotationB)
+	taintsB, err := v1.GetTaintsFromNodeAnnotations(annotationB)
 	if err != nil {
 		return false
 	}
@@ -97,8 +97,8 @@ func AnnotationsHaveEqualTaints(annotationA map[string]string, annotationB map[s
 func TestTaint(t *testing.T) {
 	tests := []struct {
 		description string
-		oldTaints   []api.Taint
-		newTaints   []api.Taint
+		oldTaints   []v1.Taint
+		newTaints   []v1.Taint
 		args        []string
 		expectFatal bool
 		expectTaint bool
@@ -106,7 +106,7 @@ func TestTaint(t *testing.T) {
 		// success cases
 		{
 			description: "taints a node with effect NoSchedule",
-			newTaints: []api.Taint{{
+			newTaints: []v1.Taint{{
 				Key:    "foo",
 				Value:  "bar",
 				Effect: "NoSchedule",
@@ -117,7 +117,7 @@ func TestTaint(t *testing.T) {
 		},
 		{
 			description: "taints a node with effect PreferNoSchedule",
-			newTaints: []api.Taint{{
+			newTaints: []v1.Taint{{
 				Key:    "foo",
 				Value:  "bar",
 				Effect: "PreferNoSchedule",
@@ -128,12 +128,12 @@ func TestTaint(t *testing.T) {
 		},
 		{
 			description: "update an existing taint on the node, change the value from bar to barz",
-			oldTaints: []api.Taint{{
+			oldTaints: []v1.Taint{{
 				Key:    "foo",
 				Value:  "bar",
 				Effect: "NoSchedule",
 			}},
-			newTaints: []api.Taint{{
+			newTaints: []v1.Taint{{
 				Key:    "foo",
 				Value:  "barz",
 				Effect: "NoSchedule",
@@ -144,7 +144,7 @@ func TestTaint(t *testing.T) {
 		},
 		{
 			description: "taints a node with two taints",
-			newTaints: []api.Taint{{
+			newTaints: []v1.Taint{{
 				Key:    "dedicated",
 				Value:  "namespaceA",
 				Effect: "NoSchedule",
@@ -159,7 +159,7 @@ func TestTaint(t *testing.T) {
 		},
 		{
 			description: "node has two taints with the same key but different effect, remove one of them by indicating exact key and effect",
-			oldTaints: []api.Taint{{
+			oldTaints: []v1.Taint{{
 				Key:    "dedicated",
 				Value:  "namespaceA",
 				Effect: "NoSchedule",
@@ -168,7 +168,7 @@ func TestTaint(t *testing.T) {
 				Value:  "namespaceA",
 				Effect: "PreferNoSchedule",
 			}},
-			newTaints: []api.Taint{{
+			newTaints: []v1.Taint{{
 				Key:    "dedicated",
 				Value:  "namespaceA",
 				Effect: "PreferNoSchedule",
@@ -179,7 +179,7 @@ func TestTaint(t *testing.T) {
 		},
 		{
 			description: "node has two taints with the same key but different effect, remove all of them with wildcard",
-			oldTaints: []api.Taint{{
+			oldTaints: []v1.Taint{{
 				Key:    "dedicated",
 				Value:  "namespaceA",
 				Effect: "NoSchedule",
@@ -188,14 +188,14 @@ func TestTaint(t *testing.T) {
 				Value:  "namespaceA",
 				Effect: "PreferNoSchedule",
 			}},
-			newTaints:   []api.Taint{},
+			newTaints:   []v1.Taint{},
 			args:        []string{"node", "node-name", "dedicated-"},
 			expectFatal: false,
 			expectTaint: true,
 		},
 		{
 			description: "node has two taints, update one of them and remove the other",
-			oldTaints: []api.Taint{{
+			oldTaints: []v1.Taint{{
 				Key:    "dedicated",
 				Value:  "namespaceA",
 				Effect: "NoSchedule",
@@ -204,7 +204,7 @@ func TestTaint(t *testing.T) {
 				Value:  "bar",
 				Effect: "PreferNoSchedule",
 			}},
-			newTaints: []api.Taint{{
+			newTaints: []v1.Taint{{
 				Key:    "foo",
 				Value:  "barz",
 				Effect: "PreferNoSchedule",
@@ -235,12 +235,12 @@ func TestTaint(t *testing.T) {
 		},
 		{
 			description: "can't update existing taint on the node, since 'overwrite' flag is not set",
-			oldTaints: []api.Taint{{
+			oldTaints: []v1.Taint{{
 				Key:    "foo",
 				Value:  "bar",
 				Effect: "NoSchedule",
 			}},
-			newTaints: []api.Taint{{
+			newTaints: []v1.Taint{{
 				Key:    "foo",
 				Value:  "bar",
 				Effect: "NoSchedule",

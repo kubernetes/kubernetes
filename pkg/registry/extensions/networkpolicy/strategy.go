@@ -20,26 +20,27 @@ import (
 	"fmt"
 	"reflect"
 
+	"k8s.io/apimachinery/pkg/fields"
+	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/validation/field"
+	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
+	"k8s.io/apiserver/pkg/storage/names"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/apis/extensions/validation"
-	"k8s.io/kubernetes/pkg/fields"
-	genericapirequest "k8s.io/kubernetes/pkg/genericapiserver/api/request"
-	"k8s.io/kubernetes/pkg/labels"
-	"k8s.io/kubernetes/pkg/registry/generic"
-	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/genericapiserver/registry/generic"
 	"k8s.io/kubernetes/pkg/storage"
-	"k8s.io/kubernetes/pkg/util/validation/field"
 )
 
 // networkPolicyStrategy implements verification logic for NetworkPolicys.
 type networkPolicyStrategy struct {
 	runtime.ObjectTyper
-	api.NameGenerator
+	names.NameGenerator
 }
 
 // Strategy is the default logic that applies when creating and updating NetworkPolicy objects.
-var Strategy = networkPolicyStrategy{api.Scheme, api.SimpleNameGenerator}
+var Strategy = networkPolicyStrategy{api.Scheme, names.SimpleNameGenerator}
 
 // NamespaceScoped returns true because all NetworkPolicys need to be within a namespace.
 func (networkPolicyStrategy) NamespaceScoped() bool {
@@ -59,7 +60,7 @@ func (networkPolicyStrategy) PrepareForUpdate(ctx genericapirequest.Context, obj
 
 	// Any changes to the spec increment the generation number, any changes to the
 	// status should reflect the generation number of the corresponding object.
-	// See api.ObjectMeta description for more information on Generation.
+	// See metav1.ObjectMeta description for more information on Generation.
 	if !reflect.DeepEqual(oldNetworkPolicy.Spec, newNetworkPolicy.Spec) {
 		newNetworkPolicy.Generation = oldNetworkPolicy.Generation + 1
 	}

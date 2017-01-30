@@ -32,20 +32,20 @@ go_library(
         "//federation/pkg/federation-controller/secret:go_default_library",
         "//federation/pkg/federation-controller/service:go_default_library",
         "//federation/pkg/federation-controller/util:go_default_library",
-        "//pkg/apis/meta/v1:go_default_library",
         "//pkg/client/restclient:go_default_library",
         "//pkg/client/typed/discovery:go_default_library",
         "//pkg/client/unversioned/clientcmd:go_default_library",
-        "//pkg/healthz:go_default_library",
-        "//pkg/runtime/schema:go_default_library",
         "//pkg/util/config:go_default_library",
         "//pkg/util/configz:go_default_library",
-        "//pkg/util/wait:go_default_library",
         "//pkg/version:go_default_library",
         "//vendor:github.com/golang/glog",
         "//vendor:github.com/prometheus/client_golang/prometheus",
         "//vendor:github.com/spf13/cobra",
         "//vendor:github.com/spf13/pflag",
+        "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
+        "//vendor:k8s.io/apimachinery/pkg/runtime/schema",
+        "//vendor:k8s.io/apimachinery/pkg/util/wait",
+        "//vendor:k8s.io/apiserver/pkg/server/healthz",
     ],
 )
 
@@ -56,8 +56,24 @@ go_test(
     tags = ["automanaged"],
     deps = [
         "//federation/pkg/federation-controller/ingress:go_default_library",
-        "//pkg/apis/meta/v1:go_default_library",
-        "//pkg/runtime/schema:go_default_library",
         "//pkg/util/config:go_default_library",
+        "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
+        "//vendor:k8s.io/apimachinery/pkg/runtime/schema",
     ],
+)
+
+filegroup(
+    name = "package-srcs",
+    srcs = glob(["**"]),
+    tags = ["automanaged"],
+    visibility = ["//visibility:private"],
+)
+
+filegroup(
+    name = "all-srcs",
+    srcs = [
+        ":package-srcs",
+        "//federation/cmd/federation-controller-manager/app/options:all-srcs",
+    ],
+    tags = ["automanaged"],
 )

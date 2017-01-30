@@ -27,18 +27,19 @@ import (
 	"sync"
 	"time"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	utilnet "k8s.io/apimachinery/pkg/util/net"
+	"k8s.io/client-go/transport"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/apis/batch"
 	"k8s.io/kubernetes/pkg/apis/extensions"
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/client/restclient"
-	"k8s.io/kubernetes/pkg/client/transport"
-	"k8s.io/kubernetes/pkg/labels"
-	"k8s.io/kubernetes/pkg/runtime/schema"
 	"k8s.io/kubernetes/pkg/util/intstr"
-	utilnet "k8s.io/kubernetes/pkg/util/net"
 	"k8s.io/kubernetes/test/e2e/framework"
 	testutils "k8s.io/kubernetes/test/utils"
 
@@ -133,15 +134,27 @@ var _ = framework.KubeDescribe("Load capacity", func() {
 		// The container will consume 1 cpu and 512mb of memory.
 		{podsPerNode: 3, image: "jess/stress", command: []string{"stress", "-c", "1", "-m", "2"}, kind: api.Kind("ReplicationController")},
 		{podsPerNode: 30, image: "gcr.io/google_containers/serve_hostname:v1.4", kind: api.Kind("ReplicationController")},
+		// Tests for other resource types
+		{podsPerNode: 30, image: "gcr.io/google_containers/serve_hostname:v1.4", kind: extensions.Kind("Deployment")},
+		{podsPerNode: 30, image: "gcr.io/google_containers/serve_hostname:v1.4", kind: batch.Kind("Job")},
+		// Test scheduling when daemons are preset
+		{podsPerNode: 30, image: "gcr.io/google_containers/serve_hostname:v1.4", kind: api.Kind("ReplicationController"), daemonsPerNode: 2},
+		// Test with secrets
+		{podsPerNode: 30, image: "gcr.io/google_containers/serve_hostname:v1.4", kind: extensions.Kind("Deployment"), secretsPerPod: 2},
 	}
 
 	for _, testArg := range loadTests {
 		feature := "ManualPerformance"
-		if testArg.podsPerNode == 30 && testArg.kind == api.Kind("ReplicationController") {
+		if testArg.podsPerNode == 30 && testArg.kind == api.Kind("ReplicationController") && testArg.daemonsPerNode == 0 && testArg.secretsPerPod == 0 {
 			feature = "Performance"
 		}
-		name := fmt.Sprintf("[Feature:%s] should be able to handle %v pods per node %v with %v secrets",
-			feature, testArg.podsPerNode, testArg.kind, testArg.secretsPerPod)
+		name := fmt.Sprintf("[Feature:%s] should be able to handle %v pods per node %v with %v secrets and %v daemons",
+			feature,
+			testArg.podsPerNode,
+			testArg.kind,
+			testArg.secretsPerPod,
+			testArg.daemonsPerNode,
+		)
 		itArg := testArg
 		itArg.services = os.Getenv("CREATE_SERVICES") == "true"
 
@@ -411,7 +424,7 @@ func generateServicesForConfigs(configs []testutils.RunObjectConfig) []*v1.Servi
 		serviceName := config.GetName() + "-svc"
 		labels := map[string]string{"name": config.GetName()}
 		service := &v1.Service{
-			ObjectMeta: v1.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name:      serviceName,
 				Namespace: config.GetNamespace(),
 			},

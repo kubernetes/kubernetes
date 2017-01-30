@@ -19,11 +19,11 @@ package cronjob
 import (
 	"testing"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/kubernetes/pkg/api"
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
 	"k8s.io/kubernetes/pkg/apis/batch"
-	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
-	genericapirequest "k8s.io/kubernetes/pkg/genericapiserver/api/request"
 )
 
 func newBool(a bool) *bool {
@@ -49,7 +49,7 @@ func TestCronJobStrategy(t *testing.T) {
 		},
 	}
 	scheduledJob := &batch.CronJob{
-		ObjectMeta: api.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:      "mycronjob",
 			Namespace: api.NamespaceDefault,
 		},
@@ -74,7 +74,7 @@ func TestCronJobStrategy(t *testing.T) {
 	}
 	now := metav1.Now()
 	updatedCronJob := &batch.CronJob{
-		ObjectMeta: api.ObjectMeta{Name: "bar", ResourceVersion: "4"},
+		ObjectMeta: metav1.ObjectMeta{Name: "bar", ResourceVersion: "4"},
 		Spec: batch.CronJobSpec{
 			Schedule: "5 5 5 * ?",
 		},
@@ -111,7 +111,7 @@ func TestCronJobStatusStrategy(t *testing.T) {
 	}
 	oldSchedule := "* * * * ?"
 	oldCronJob := &batch.CronJob{
-		ObjectMeta: api.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:            "mycronjob",
 			Namespace:       api.NamespaceDefault,
 			ResourceVersion: "10",
@@ -128,7 +128,7 @@ func TestCronJobStatusStrategy(t *testing.T) {
 	}
 	now := metav1.Now()
 	newCronJob := &batch.CronJob{
-		ObjectMeta: api.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:            "mycronjob",
 			Namespace:       api.NamespaceDefault,
 			ResourceVersion: "9",

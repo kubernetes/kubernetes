@@ -22,13 +22,13 @@ import (
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
-	apierrs "k8s.io/kubernetes/pkg/api/errors"
+	apierrs "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/apimachinery/registered"
-	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
-	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/volume/util/volumehelper"
 	"k8s.io/kubernetes/test/e2e/framework"
 )
@@ -560,7 +560,7 @@ var _ = framework.KubeDescribe("PersistentVolumes", func() {
 			// Create an nfs PV, then a claim that matches the PV, and a pod that
 			// contains the claim. Verify that the PV and PVC bind correctly, and
 			// that the pod can write to the nfs volume.
-			It("should create a non-pre-bound PV and PVC: test write access [Flaky]", func() {
+			It("should create a non-pre-bound PV and PVC: test write access [Volume][Serial][Flaky]", func() {
 				pv, pvc = createPVPVC(c, pvConfig, ns, false)
 				completeTest(f, c, ns, pv, pvc)
 			})
@@ -568,7 +568,7 @@ var _ = framework.KubeDescribe("PersistentVolumes", func() {
 			// Create a claim first, then a nfs PV that matches the claim, and a
 			// pod that contains the claim. Verify that the PV and PVC bind
 			// correctly, and that the pod can write to the nfs volume.
-			It("create a PVC and non-pre-bound PV: test write access [Flaky]", func() {
+			It("create a PVC and non-pre-bound PV: test write access [Volume][Serial][Flaky]", func() {
 				pv, pvc = createPVCPV(c, pvConfig, ns, false)
 				completeTest(f, c, ns, pv, pvc)
 			})
@@ -576,7 +576,7 @@ var _ = framework.KubeDescribe("PersistentVolumes", func() {
 			// Create a claim first, then a pre-bound nfs PV that matches the claim,
 			// and a pod that contains the claim. Verify that the PV and PVC bind
 			// correctly, and that the pod can write to the nfs volume.
-			It("create a PVC and a pre-bound PV: test write access [Flaky]", func() {
+			It("create a PVC and a pre-bound PV: test write access [Volume][Serial][Flaky]", func() {
 				pv, pvc = createPVCPV(c, pvConfig, ns, true)
 				completeTest(f, c, ns, pv, pvc)
 			})
@@ -584,7 +584,7 @@ var _ = framework.KubeDescribe("PersistentVolumes", func() {
 			// Create a nfs PV first, then a pre-bound PVC that matches the PV,
 			// and a pod that contains the claim. Verify that the PV and PVC bind
 			// correctly, and that the pod can write to the nfs volume.
-			It("create a PV and a pre-bound PVC: test write access [Flaky]", func() {
+			It("create a PV and a pre-bound PVC: test write access [Volume][Serial][Flaky]", func() {
 				pv, pvc = createPVPVC(c, pvConfig, ns, true)
 				completeTest(f, c, ns, pv, pvc)
 			})
@@ -615,7 +615,7 @@ var _ = framework.KubeDescribe("PersistentVolumes", func() {
 
 			// Create 2 PVs and 4 PVCs.
 			// Note: PVs are created before claims and no pre-binding
-			It("should create 2 PVs and 4 PVCs: test write access[Flaky]", func() {
+			It("should create 2 PVs and 4 PVCs: test write access [Volume][Serial][Flaky]", func() {
 				numPVs, numPVCs := 2, 4
 				pvols, claims = createPVsPVCs(numPVs, numPVCs, c, ns, pvConfig)
 				waitAndVerifyBinds(c, ns, pvols, claims, true)
@@ -624,7 +624,7 @@ var _ = framework.KubeDescribe("PersistentVolumes", func() {
 
 			// Create 3 PVs and 3 PVCs.
 			// Note: PVs are created before claims and no pre-binding
-			It("should create 3 PVs and 3 PVCs: test write access[Flaky]", func() {
+			It("should create 3 PVs and 3 PVCs: test write access [Volume][Serial][Flaky]", func() {
 				numPVs, numPVCs := 3, 3
 				pvols, claims = createPVsPVCs(numPVs, numPVCs, c, ns, pvConfig)
 				waitAndVerifyBinds(c, ns, pvols, claims, true)
@@ -633,7 +633,7 @@ var _ = framework.KubeDescribe("PersistentVolumes", func() {
 
 			// Create 4 PVs and 2 PVCs.
 			// Note: PVs are created before claims and no pre-binding.
-			It("should create 4 PVs and 2 PVCs: test write access[Flaky]", func() {
+			It("should create 4 PVs and 2 PVCs: test write access [Volume][Serial][Flaky]", func() {
 				numPVs, numPVCs := 4, 2
 				pvols, claims = createPVsPVCs(numPVs, numPVCs, c, ns, pvConfig)
 				waitAndVerifyBinds(c, ns, pvols, claims, true)
@@ -694,7 +694,7 @@ var _ = framework.KubeDescribe("PersistentVolumes", func() {
 
 		// Attach a persistent disk to a pod using a PVC.
 		// Delete the PVC and then the pod.  Expect the pod to succeed in unmounting and detaching PD on delete.
-		It("should test that deleting a PVC before the pod does not cause pod deletion to fail on PD detach", func() {
+		It("should test that deleting a PVC before the pod does not cause pod deletion to fail on PD detach [Volume][Serial][Flaky]", func() {
 			By("Creating the PV and PVC")
 			pv, pvc = createPVPVC(c, pvConfig, ns, false)
 			waitOnPVandPVC(c, ns, pv, pvc)
@@ -717,7 +717,7 @@ var _ = framework.KubeDescribe("PersistentVolumes", func() {
 
 		// Attach a persistent disk to a pod using a PVC.
 		// Delete the PV and then the pod.  Expect the pod to succeed in unmounting and detaching PD on delete.
-		It("should test that deleting the PV before the pod does not cause pod deletion to fail on PD detach", func() {
+		It("should test that deleting the PV before the pod does not cause pod deletion to fail on PD detach [Volume][Serial][Flaky]", func() {
 			By("Creating the PV and PVC")
 			pv, pvc = createPVPVC(c, pvConfig, ns, false)
 			waitOnPVandPVC(c, ns, pv, pvc)
@@ -775,7 +775,7 @@ func makePersistentVolume(pvConfig persistentVolumeConfig) *v1.PersistentVolume 
 	}
 
 	return &v1.PersistentVolume{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			GenerateName: pvConfig.namePrefix,
 			Annotations: map[string]string{
 				volumehelper.VolumeGidAnnotationKey: "777",
@@ -805,7 +805,7 @@ func makePersistentVolumeClaim(ns string) *v1.PersistentVolumeClaim {
 	// Specs are expected to match this test's PersistentVolume
 
 	return &v1.PersistentVolumeClaim{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			GenerateName: "pvc-",
 			Namespace:    ns,
 			Annotations: map[string]string{
@@ -844,9 +844,9 @@ func makePod(ns string, pvcName string, command ...string) *v1.Pod {
 	return &v1.Pod{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "Pod",
-			APIVersion: registered.GroupOrDie(v1.GroupName).GroupVersion.String(),
+			APIVersion: api.Registry.GroupOrDie(v1.GroupName).GroupVersion.String(),
 		},
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			GenerateName: "client-",
 			Namespace:    ns,
 		},

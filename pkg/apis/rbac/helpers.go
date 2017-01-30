@@ -20,9 +20,9 @@ import (
 	"fmt"
 	"strings"
 
-	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/runtime/schema"
-	"k8s.io/kubernetes/pkg/util/sets"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/sets"
 )
 
 func RoleRefGroupKind(roleRef RoleRef) schema.GroupKind {
@@ -208,7 +208,7 @@ type ClusterRoleBindingBuilder struct {
 func NewClusterBinding(clusterRoleName string) *ClusterRoleBindingBuilder {
 	return &ClusterRoleBindingBuilder{
 		ClusterRoleBinding: ClusterRoleBinding{
-			ObjectMeta: api.ObjectMeta{Name: clusterRoleName},
+			ObjectMeta: metav1.ObjectMeta{Name: clusterRoleName},
 			RoleRef: RoleRef{
 				APIGroup: GroupName,
 				Kind:     "ClusterRole",

@@ -20,8 +20,8 @@ import (
 	"fmt"
 	"regexp"
 
+	validationutil "k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/kubernetes/pkg/api/validation"
-	validationutil "k8s.io/kubernetes/pkg/util/validation"
 )
 
 // GetValidDNSSubdomainName massages the given name to be a valid dns subdomain name.

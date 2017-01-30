@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors.
+Copyright 2017 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -21,11 +21,11 @@ syntax = 'proto2';
 
 package k8s.io.kubernetes.pkg.apis.autoscaling.v1;
 
+import "k8s.io/apimachinery/pkg/apis/meta/v1/generated.proto";
+import "k8s.io/apimachinery/pkg/runtime/generated.proto";
+import "k8s.io/apimachinery/pkg/runtime/schema/generated.proto";
 import "k8s.io/kubernetes/pkg/api/resource/generated.proto";
 import "k8s.io/kubernetes/pkg/api/v1/generated.proto";
-import "k8s.io/kubernetes/pkg/apis/meta/v1/generated.proto";
-import "k8s.io/kubernetes/pkg/runtime/generated.proto";
-import "k8s.io/kubernetes/pkg/runtime/schema/generated.proto";
 import "k8s.io/kubernetes/pkg/util/intstr/generated.proto";
 
 // Package-wide variables from generator "generated".
@@ -48,7 +48,7 @@ message CrossVersionObjectReference {
 message HorizontalPodAutoscaler {
   // Standard object metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
   // +optional
-  optional k8s.io.kubernetes.pkg.api.v1.ObjectMeta metadata = 1;
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
   // behaviour of autoscaler. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status.
   // +optional
@@ -63,7 +63,7 @@ message HorizontalPodAutoscaler {
 message HorizontalPodAutoscalerList {
   // Standard list metadata.
   // +optional
-  optional k8s.io.kubernetes.pkg.apis.meta.v1.ListMeta metadata = 1;
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
 
   // list of horizontal pod autoscaler objects.
   repeated HorizontalPodAutoscaler items = 2;
@@ -97,7 +97,7 @@ message HorizontalPodAutoscalerStatus {
   // last time the HorizontalPodAutoscaler scaled the number of pods;
   // used by the autoscaler to control how often the number of pods is changed.
   // +optional
-  optional k8s.io.kubernetes.pkg.apis.meta.v1.Time lastScaleTime = 2;
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.Time lastScaleTime = 2;
 
   // current number of replicas of pods managed by this autoscaler.
   optional int32 currentReplicas = 3;
@@ -115,7 +115,7 @@ message HorizontalPodAutoscalerStatus {
 message Scale {
   // Standard object metadata; More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata.
   // +optional
-  optional k8s.io.kubernetes.pkg.api.v1.ObjectMeta metadata = 1;
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
   // defines the behavior of the scale. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status.
   // +optional

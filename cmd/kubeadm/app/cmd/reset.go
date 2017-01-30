@@ -27,6 +27,7 @@ import (
 	"github.com/spf13/cobra"
 
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
+	"k8s.io/kubernetes/cmd/kubeadm/app/phases/kubeconfig"
 	"k8s.io/kubernetes/cmd/kubeadm/app/preflight"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	"k8s.io/kubernetes/pkg/util/initsystem"
@@ -108,7 +109,7 @@ func (r *Reset) Run(out io.Writer) error {
 		fmt.Printf("[reset] Failed to unmount mounted directories in /var/lib/kubelet: %s\n", string(umountOutputBytes))
 	}
 
-	dockerCheck := preflight.ServiceCheck{Service: "docker"}
+	dockerCheck := preflight.ServiceCheck{Service: "docker", CheckIfActive: true}
 	if warnings, errors := dockerCheck.Check(); len(warnings) == 0 && len(errors) == 0 {
 		fmt.Println("[reset] Removing kubernetes-managed containers")
 		if err := exec.Command("sh", "-c", "docker ps | grep 'k8s_' | awk '{print $1}' | xargs -r docker rm --force --volumes").Run(); err != nil {
@@ -150,7 +151,7 @@ func drainAndRemoveNode(removeNode bool) error {
 	hostname = strings.ToLower(hostname)
 
 	// TODO: Use the "native" k8s client for this once we're confident the versioned is working
-	kubeConfigPath := path.Join(kubeadmapi.GlobalEnvParams.KubernetesDir, "kubelet.conf")
+	kubeConfigPath := path.Join(kubeadmapi.GlobalEnvParams.KubernetesDir, kubeconfig.KubeletKubeConfigFileName)
 
 	getNodesCmd := fmt.Sprintf("kubectl --kubeconfig %s get nodes | grep %s", kubeConfigPath, hostname)
 	output, err := exec.Command("sh", "-c", getNodesCmd).Output()
@@ -219,8 +220,8 @@ func resetConfigDir(configPathDir, pkiPathDir string) {
 	}
 
 	filesToClean := []string{
-		path.Join(configPathDir, "admin.conf"),
-		path.Join(configPathDir, "kubelet.conf"),
+		path.Join(configPathDir, kubeconfig.AdminKubeConfigFileName),
+		path.Join(configPathDir, kubeconfig.KubeletKubeConfigFileName),
 	}
 	fmt.Printf("[reset] Deleting files: %v\n", filesToClean)
 	for _, path := range filesToClean {

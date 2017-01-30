@@ -17,12 +17,13 @@ limitations under the License.
 package v1alpha1
 
 import (
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	runtime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/pkg/api/v1"
-	metav1 "k8s.io/client-go/pkg/apis/meta/v1"
 )
 
 type KubeProxyConfiguration struct {
-	metav1.TypeMeta
+	metav1.TypeMeta `json:",inline"`
 
 	// bindAddress is the IP address for the proxy server to serve on (set to 0.0.0.0
 	// for all interfaces)
@@ -100,7 +101,7 @@ const (
 )
 
 type KubeSchedulerConfiguration struct {
-	metav1.TypeMeta
+	metav1.TypeMeta `json:",inline"`
 
 	// port is the port that the scheduler's http service runs on.
 	Port int `json:"port"`
@@ -121,8 +122,7 @@ type KubeSchedulerConfiguration struct {
 	// kubeAPIBurst is the QPS burst to use while talking with kubernetes apiserver.
 	KubeAPIBurst int `json:"kubeAPIBurst"`
 	// schedulerName is name of the scheduler, used to select which pods
-	// will be processed by this scheduler, based on pod's annotation with
-	// key 'scheduler.alpha.kubernetes.io/name'.
+	// will be processed by this scheduler, based on pod's "spec.SchedulerName".
 	SchedulerName string `json:"schedulerName"`
 	// RequiredDuringScheduling affinity is not symmetric, but there is an implicit PreferredDuringScheduling affinity rule
 	// corresponding to every RequiredDuringScheduling affinity rule.
@@ -178,7 +178,7 @@ type LeaderElectionConfiguration struct {
 }
 
 type KubeletConfiguration struct {
-	metav1.TypeMeta
+	metav1.TypeMeta `json:",inline"`
 
 	// podManifestPath is the path to the directory containing pod manifests to
 	// run, or the path to a single manifest file
@@ -428,9 +428,6 @@ type KubeletConfiguration struct {
 	Containerized *bool `json:"containerized"`
 	// maxOpenFiles is Number of files that can be opened by Kubelet process.
 	MaxOpenFiles int64 `json:"maxOpenFiles"`
-	// reconcileCIDR is Reconcile node CIDR with the CIDR specified by the
-	// API server. Won't have any effect if register-node is false.
-	ReconcileCIDR *bool `json:"reconcileCIDR"`
 	// registerSchedulable tells the kubelet to register the node as
 	// schedulable. Won't have any effect if register-node is false.
 	// DEPRECATED: use registerWithTaints instead
@@ -523,7 +520,7 @@ type KubeletConfiguration struct {
 	// This flag, if set, enables a check prior to mount operations to verify that the required components
 	// (binaries, etc.) to mount the volume are available on the underlying node. If the check is enabled
 	// and fails the mount operation fails.
-	ExperimentalCheckNodeCapabilitiesBeforeMount bool `json:"ExperimentalCheckNodeCapabilitiesBeforeMount,omitempty"`
+	ExperimentalCheckNodeCapabilitiesBeforeMount bool `json:"experimentalCheckNodeCapabilitiesBeforeMount,omitempty"`
 }
 
 type KubeletAuthorizationMode string
@@ -580,4 +577,30 @@ type KubeletAnonymousAuthentication struct {
 	// Requests that are not rejected by another authentication method are treated as anonymous requests.
 	// Anonymous requests have a username of system:anonymous, and a group name of system:unauthenticated.
 	Enabled *bool `json:"enabled"`
+}
+
+// AdmissionConfiguration provides versioned configuration for admission controllers.
+type AdmissionConfiguration struct {
+	metav1.TypeMeta `json:",inline"`
+
+	// Plugins allows specifying a configuration per admission control plugin.
+	// +optional
+	Plugins []AdmissionPluginConfiguration `json:"plugins"`
+}
+
+// AdmissionPluginConfiguration provides the configuration for a single plug-in.
+type AdmissionPluginConfiguration struct {
+	// Name is the name of the admission controller.
+	// It must match the registered admission plugin name.
+	Name string `json:"name"`
+
+	// Path is the path to a configuration file that contains the plugin's
+	// configuration
+	// +optional
+	Path string `json:"path"`
+
+	// Configuration is an embedded configuration object to be used as the plugin's
+	// configuration. If present, it will be used instead of the path to the configuration file.
+	// +optional
+	Configuration runtime.RawExtension `json:"configuration"`
 }

@@ -21,6 +21,7 @@ import (
 	"sort"
 	"testing"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/api/v1"
 	schedulerapi "k8s.io/kubernetes/plugin/pkg/scheduler/api"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/schedulercache"
@@ -176,7 +177,7 @@ func TestImageLocalityPriority(t *testing.T) {
 
 func makeImageNode(node string, status v1.NodeStatus) *v1.Node {
 	return &v1.Node{
-		ObjectMeta: v1.ObjectMeta{Name: node},
+		ObjectMeta: metav1.ObjectMeta{Name: node},
 		Status:     status,
 	}
 }

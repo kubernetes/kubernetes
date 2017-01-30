@@ -74,7 +74,7 @@ func generatedBy() string {
 }
 
 // objectMetaForPackage returns the type of ObjectMeta used by package p.
-func objectMetaForPackage(p *types.Package) (*types.Type, error) {
+func objectMetaForPackage(p *types.Package) (*types.Type, bool, error) {
 	generatingForPackage := false
 	for _, t := range p.Types {
 		// filter out types which dont have genclient=true.
@@ -84,19 +84,19 @@ func objectMetaForPackage(p *types.Package) (*types.Type, error) {
 		generatingForPackage = true
 		for _, member := range t.Members {
 			if member.Name == "ObjectMeta" {
-				return member.Type, nil
+				return member.Type, isInternal(member), nil
 			}
 		}
 	}
 	if generatingForPackage {
-		return nil, fmt.Errorf("unable to find ObjectMeta for any types in package %s", p.Path)
+		return nil, false, fmt.Errorf("unable to find ObjectMeta for any types in package %s", p.Path)
 	}
-	return nil, nil
+	return nil, false, nil
 }
 
-// isInternal returns true if t's package is k8s.io/kubernetes/pkg/api.
-func isInternal(t *types.Type) bool {
-	return t.Name.Package == "k8s.io/kubernetes/pkg/api"
+// isInternal returns true if the tags for a member do not contain a json tag
+func isInternal(m types.Member) bool {
+	return !strings.Contains(m.Tags, "json")
 }
 
 func packageForGroup(base string, group clientgentypes.Group) string {
@@ -128,7 +128,7 @@ func Packages(context *generator.Context, arguments *args.GeneratorArgs) generat
 	for _, inputDir := range arguments.InputDirs {
 		p := context.Universe.Package(inputDir)
 
-		objectMeta, err := objectMetaForPackage(p)
+		objectMeta, internal, err := objectMetaForPackage(p)
 		if err != nil {
 			glog.Fatal(err)
 		}
@@ -139,7 +139,7 @@ func Packages(context *generator.Context, arguments *args.GeneratorArgs) generat
 
 		var gv clientgentypes.GroupVersion
 
-		if isInternal(objectMeta) {
+		if internal {
 			lastSlash := strings.LastIndex(p.Path, "/")
 			if lastSlash == -1 {
 				glog.Fatalf("error constructing internal group version for package %q", p.Path)

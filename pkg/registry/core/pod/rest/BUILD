@@ -17,16 +17,16 @@ go_library(
     tags = ["automanaged"],
     deps = [
         "//pkg/api:go_default_library",
-        "//pkg/api/errors:go_default_library",
-        "//pkg/api/rest:go_default_library",
         "//pkg/api/validation:go_default_library",
         "//pkg/capabilities:go_default_library",
-        "//pkg/genericapiserver/api/request:go_default_library",
+        "//pkg/genericapiserver/registry/generic/registry:go_default_library",
+        "//pkg/genericapiserver/registry/generic/rest:go_default_library",
+        "//pkg/genericapiserver/registry/rest:go_default_library",
         "//pkg/kubelet/client:go_default_library",
         "//pkg/registry/core/pod:go_default_library",
-        "//pkg/registry/generic/registry:go_default_library",
-        "//pkg/registry/generic/rest:go_default_library",
-        "//pkg/runtime:go_default_library",
+        "//vendor:k8s.io/apimachinery/pkg/api/errors",
+        "//vendor:k8s.io/apimachinery/pkg/runtime",
+        "//vendor:k8s.io/apiserver/pkg/endpoints/request",
     ],
 )
 
@@ -37,10 +37,23 @@ go_test(
     tags = ["automanaged"],
     deps = [
         "//pkg/api:go_default_library",
-        "//pkg/api/errors:go_default_library",
-        "//pkg/genericapiserver/api/request:go_default_library",
-        "//pkg/registry/generic:go_default_library",
-        "//pkg/registry/generic/registry:go_default_library",
+        "//pkg/genericapiserver/registry/generic:go_default_library",
+        "//pkg/genericapiserver/registry/generic/registry:go_default_library",
         "//pkg/registry/registrytest:go_default_library",
+        "//vendor:k8s.io/apimachinery/pkg/api/errors",
+        "//vendor:k8s.io/apiserver/pkg/endpoints/request",
     ],
+)
+
+filegroup(
+    name = "package-srcs",
+    srcs = glob(["**"]),
+    tags = ["automanaged"],
+    visibility = ["//visibility:private"],
+)
+
+filegroup(
+    name = "all-srcs",
+    srcs = [":package-srcs"],
+    tags = ["automanaged"],
 )

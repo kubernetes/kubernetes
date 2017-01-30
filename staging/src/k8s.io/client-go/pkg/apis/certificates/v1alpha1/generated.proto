@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors.
+Copyright 2017 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -21,11 +21,11 @@ syntax = 'proto2';
 
 package k8s.io.kubernetes.pkg.apis.certificates.v1alpha1;
 
+import "k8s.io/apimachinery/pkg/apis/meta/v1/generated.proto";
+import "k8s.io/apimachinery/pkg/runtime/generated.proto";
+import "k8s.io/apimachinery/pkg/runtime/schema/generated.proto";
 import "k8s.io/kubernetes/pkg/api/resource/generated.proto";
 import "k8s.io/kubernetes/pkg/api/v1/generated.proto";
-import "k8s.io/kubernetes/pkg/apis/meta/v1/generated.proto";
-import "k8s.io/kubernetes/pkg/runtime/generated.proto";
-import "k8s.io/kubernetes/pkg/runtime/schema/generated.proto";
 import "k8s.io/kubernetes/pkg/util/intstr/generated.proto";
 
 // Package-wide variables from generator "generated".
@@ -34,7 +34,7 @@ option go_package = "v1alpha1";
 // Describes a certificate signing request
 message CertificateSigningRequest {
   // +optional
-  optional k8s.io.kubernetes.pkg.api.v1.ObjectMeta metadata = 1;
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
   // The certificate request itself and any additional information.
   // +optional
@@ -59,12 +59,12 @@ message CertificateSigningRequestCondition {
 
   // timestamp for the last update to this condition
   // +optional
-  optional k8s.io.kubernetes.pkg.apis.meta.v1.Time lastUpdateTime = 4;
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.Time lastUpdateTime = 4;
 }
 
 message CertificateSigningRequestList {
   // +optional
-  optional k8s.io.kubernetes.pkg.apis.meta.v1.ListMeta metadata = 1;
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
 
   repeated CertificateSigningRequest items = 2;
 }
@@ -75,6 +75,12 @@ message CertificateSigningRequestList {
 message CertificateSigningRequestSpec {
   // Base64-encoded PKCS#10 CSR data
   optional bytes request = 1;
+
+  // allowedUsages specifies a set of usage contexts the key will be
+  // valid for.
+  // See: https://tools.ietf.org/html/rfc5280#section-4.2.1.3
+  //      https://tools.ietf.org/html/rfc5280#section-4.2.1.12
+  repeated string keyUsage = 5;
 
   // Information about the requesting user (if relevant)
   // See user.Info interface for details

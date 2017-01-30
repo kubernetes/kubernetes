@@ -78,7 +78,7 @@ bin/$(BIN)-$(ARCH): $(SRCS)
 
 container: .container-$(ARCH)
 .container-$(ARCH): bin/$(BIN)-$(ARCH)
-	docker build -t $(IMAGE):$(TAG) --build-arg ARCH=$(ARCH) .
+	docker build --pull -t $(IMAGE):$(TAG) --build-arg ARCH=$(ARCH) .
 ifeq ($(ARCH),amd64)
 	docker rmi $(LEGACY_AMD64_IMAGE):$(TAG) || true
 	docker tag $(IMAGE):$(TAG) $(LEGACY_AMD64_IMAGE):$(TAG)

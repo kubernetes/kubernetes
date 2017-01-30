@@ -17,7 +17,7 @@ limitations under the License.
 package v1
 
 import (
-	"k8s.io/client-go/pkg/util/net"
+	"k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/client-go/rest"
 )
 

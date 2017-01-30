@@ -23,11 +23,12 @@ package app
 import (
 	"fmt"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	"k8s.io/kubernetes/pkg/apis/extensions"
-	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/client/typed/discovery"
 	"k8s.io/kubernetes/pkg/client/typed/dynamic"
 	"k8s.io/kubernetes/pkg/controller"
@@ -40,8 +41,6 @@ import (
 	resourcequotacontroller "k8s.io/kubernetes/pkg/controller/resourcequota"
 	serviceaccountcontroller "k8s.io/kubernetes/pkg/controller/serviceaccount"
 	quotainstall "k8s.io/kubernetes/pkg/quota/install"
-	"k8s.io/kubernetes/pkg/runtime/schema"
-	"k8s.io/kubernetes/pkg/runtime/serializer"
 )
 
 func startEndpointController(ctx ControllerContext) (bool, error) {
@@ -100,7 +99,7 @@ func startResourceQuotaController(ctx ControllerContext) (bool, error) {
 
 func startNamespaceController(ctx ControllerContext) (bool, error) {
 	// TODO: should use a dynamic RESTMapper built from the discovery results.
-	restMapper := registered.RESTMapper()
+	restMapper := api.Registry.RESTMapper()
 
 	// Find the list of namespaced resources via discovery that the namespace controller must manage
 	namespaceKubeClient := ctx.ClientBuilder.ClientOrDie("namespace-controller")
@@ -148,7 +147,7 @@ func startGarbageCollectorController(ctx ControllerContext) (bool, error) {
 	}
 
 	// TODO: should use a dynamic RESTMapper built from the discovery results.
-	restMapper := registered.RESTMapper()
+	restMapper := api.Registry.RESTMapper()
 
 	gcClientset := ctx.ClientBuilder.ClientOrDie("generic-garbage-collector")
 	preferredResources, err := gcClientset.Discovery().ServerPreferredResources()

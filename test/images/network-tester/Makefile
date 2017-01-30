@@ -23,7 +23,7 @@ webserver: webserver.go
 container: image
 
 image: webserver
-	docker build -t $(PREFIX)/nettest:$(TAG) .
+	docker build --pull -t $(PREFIX)/nettest:$(TAG) .
 
 push: image
 	gcloud docker -- push $(PREFIX)/nettest:$(TAG)

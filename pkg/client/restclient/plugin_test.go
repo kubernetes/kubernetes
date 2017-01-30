@@ -23,7 +23,7 @@ import (
 	"strconv"
 	"testing"
 
-	clientcmdapi "k8s.io/kubernetes/pkg/client/unversioned/clientcmd/api"
+	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 )
 
 func TestAuthPluginWrapTransport(t *testing.T) {

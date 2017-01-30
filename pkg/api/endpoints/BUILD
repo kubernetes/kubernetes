@@ -14,8 +14,8 @@ go_library(
     tags = ["automanaged"],
     deps = [
         "//pkg/api:go_default_library",
-        "//pkg/types:go_default_library",
         "//pkg/util/hash:go_default_library",
+        "//vendor:k8s.io/apimachinery/pkg/types",
     ],
 )
 
@@ -26,7 +26,20 @@ go_test(
     tags = ["automanaged"],
     deps = [
         "//pkg/api:go_default_library",
-        "//pkg/types:go_default_library",
         "//vendor:github.com/davecgh/go-spew/spew",
+        "//vendor:k8s.io/apimachinery/pkg/types",
     ],
+)
+
+filegroup(
+    name = "package-srcs",
+    srcs = glob(["**"]),
+    tags = ["automanaged"],
+    visibility = ["//visibility:private"],
+)
+
+filegroup(
+    name = "all-srcs",
+    srcs = [":package-srcs"],
+    tags = ["automanaged"],
 )

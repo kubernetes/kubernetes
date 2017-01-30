@@ -25,3 +25,19 @@ go_library(
         "//vendor:k8s.io/gengo/args",
     ],
 )
+
+filegroup(
+    name = "package-srcs",
+    srcs = glob(["**"]),
+    tags = ["automanaged"],
+    visibility = ["//visibility:private"],
+)
+
+filegroup(
+    name = "all-srcs",
+    srcs = [
+        ":package-srcs",
+        "//cmd/libs/go2idl/lister-gen/generators:all-srcs",
+    ],
+    tags = ["automanaged"],
+)

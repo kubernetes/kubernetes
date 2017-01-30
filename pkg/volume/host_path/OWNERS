@@ -1,3 +1,19 @@
-maintainers:
+approvers:
+- pmorie
 - saad-ali
 - thockin
+reviewers:
+- thockin
+- smarterclayton
+- deads2k
+- brendandburns
+- derekwaynecarr
+- bprashanth
+- pmorie
+- saad-ali
+- justinsb
+- jsafrane
+- rootfs
+- jingxu97
+- rkouj
+- msau42

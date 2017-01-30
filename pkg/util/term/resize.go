@@ -20,7 +20,7 @@ import (
 	"fmt"
 
 	"github.com/docker/docker/pkg/term"
-	"k8s.io/kubernetes/pkg/util/runtime"
+	"k8s.io/apimachinery/pkg/util/runtime"
 )
 
 // Size represents the width and height of a terminal.

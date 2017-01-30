@@ -116,17 +116,6 @@ function verify-prereqs() {
   update-or-verify-gcloud
 }
 
-# Create a temp dir that'll be deleted at the end of this bash session.
-#
-# Vars set:
-#   KUBE_TEMP
-function ensure-temp-dir() {
-  if [[ -z ${KUBE_TEMP-} ]]; then
-    KUBE_TEMP=$(mktemp -d -t kubernetes.XXXXXX)
-    trap 'rm -rf "${KUBE_TEMP}"' EXIT
-  fi
-}
-
 # Use the gcloud defaults to find the project.  If it is already set in the
 # environment then go with that.
 #

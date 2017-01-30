@@ -21,7 +21,7 @@ import (
 	"io"
 	"io/ioutil"
 
-	"k8s.io/kubernetes/pkg/util/runtime"
+	"k8s.io/apimachinery/pkg/util/runtime"
 )
 
 // errorStreamDecoder interprets the data on the error channel and creates a go error object from it.

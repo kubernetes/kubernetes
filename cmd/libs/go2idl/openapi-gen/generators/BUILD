@@ -13,8 +13,8 @@ go_library(
     srcs = ["openapi.go"],
     tags = ["automanaged"],
     deps = [
-        "//pkg/genericapiserver/openapi/common:go_default_library",
         "//vendor:github.com/golang/glog",
+        "//vendor:k8s.io/apimachinery/pkg/openapi",
         "//vendor:k8s.io/gengo/args",
         "//vendor:k8s.io/gengo/generator",
         "//vendor:k8s.io/gengo/namer",
@@ -34,4 +34,17 @@ go_test(
         "//vendor:k8s.io/gengo/parser",
         "//vendor:k8s.io/gengo/types",
     ],
+)
+
+filegroup(
+    name = "package-srcs",
+    srcs = glob(["**"]),
+    tags = ["automanaged"],
+    visibility = ["//visibility:private"],
+)
+
+filegroup(
+    name = "all-srcs",
+    srcs = [":package-srcs"],
+    tags = ["automanaged"],
 )

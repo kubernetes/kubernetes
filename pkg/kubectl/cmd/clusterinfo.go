@@ -31,9 +31,15 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var longDescr = templates.LongDesc(`
+var (
+	longDescr = templates.LongDesc(`
   Display addresses of the master and services with label kubernetes.io/cluster-service=true
   To further debug and diagnose cluster problems, use 'kubectl cluster-info dump'.`)
+
+	clusterinfo_example = templates.Examples(`
+		# Print the address of the master and cluster services
+		kubectl cluster-info`)
+)
 
 func NewCmdClusterInfo(f cmdutil.Factory, out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
@@ -42,6 +48,7 @@ func NewCmdClusterInfo(f cmdutil.Factory, out io.Writer) *cobra.Command {
 		Aliases: []string{"clusterinfo"},
 		Short:   "Display cluster info",
 		Long:    longDescr,
+		Example: clusterinfo_example,
 		Run: func(cmd *cobra.Command, args []string) {
 			err := RunClusterInfo(f, out, cmd)
 			cmdutil.CheckErr(err)

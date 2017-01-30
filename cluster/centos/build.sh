@@ -95,8 +95,8 @@ function unpack-releases() {
   fi
 
   # docker
-  if [[ -f ${RELEASES_DIR}/docker.tgz ]]; then
-    tar xzf ${RELEASES_DIR}/docker.tgz -C ${RELEASES_DIR}
+  if [[ -f ${RELEASES_DIR}/docker.tar.gz ]]; then
+    tar xzf ${RELEASES_DIR}/docker.tar.gz -C ${RELEASES_DIR}
 
     cp ${RELEASES_DIR}/docker/docker* ${BINARY_DIR}/node/bin
   fi

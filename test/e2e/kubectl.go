@@ -18,6 +18,7 @@ package e2e
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -41,24 +42,24 @@ import (
 	"github.com/elazarl/goproxy"
 	"github.com/ghodss/yaml"
 
+	apierrs "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	utilnet "k8s.io/apimachinery/pkg/util/net"
+	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/apiserver/pkg/authentication/serviceaccount"
 	"k8s.io/kubernetes/pkg/api/annotations"
-	apierrs "k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/v1"
-	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
-	rbacv1alpha1 "k8s.io/kubernetes/pkg/apis/rbac/v1alpha1"
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
+	rbacv1beta1 "k8s.io/kubernetes/pkg/apis/rbac/v1beta1"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/pkg/controller"
+	genericregistry "k8s.io/kubernetes/pkg/genericapiserver/registry/generic/registry"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/util"
-	"k8s.io/kubernetes/pkg/labels"
-	genericregistry "k8s.io/kubernetes/pkg/registry/generic/registry"
-	"k8s.io/kubernetes/pkg/runtime/schema"
-	"k8s.io/kubernetes/pkg/serviceaccount"
 	uexec "k8s.io/kubernetes/pkg/util/exec"
-	utilnet "k8s.io/kubernetes/pkg/util/net"
 	"k8s.io/kubernetes/pkg/util/uuid"
 	utilversion "k8s.io/kubernetes/pkg/util/version"
-	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/generated"
 	testutils "k8s.io/kubernetes/test/utils"
@@ -391,6 +392,14 @@ var _ = framework.KubeDescribe("Kubectl client", func() {
 				framework.Failf("Unexpected kubectl exec output. Wanted %q, got %q", e, a)
 			}
 
+			By("executing a very long command in the container")
+			veryLongData := make([]rune, 20000)
+			for i := 0; i < len(veryLongData); i++ {
+				veryLongData[i] = 'a'
+			}
+			execOutput = framework.RunKubectlOrDie("exec", fmt.Sprintf("--namespace=%v", ns), simplePodName, "echo", string(veryLongData))
+			Expect(string(veryLongData)).To(Equal(strings.TrimSpace(execOutput)), "Unexpected kubectl exec output")
+
 			By("executing a command in the container with noninteractive stdin")
 			execOutput = framework.NewKubectlCommand("exec", fmt.Sprintf("--namespace=%v", ns), "-i", simplePodName, "cat").
 				WithStdinData("abcd1234").
@@ -572,7 +581,7 @@ var _ = framework.KubeDescribe("Kubectl client", func() {
 			By("adding rbac permissions")
 			// grant the view permission widely to allow inspection of the `invalid` namespace.
 			framework.BindClusterRole(f.ClientSet.Rbac(), "view", f.Namespace.Name,
-				rbacv1alpha1.Subject{Kind: rbacv1alpha1.ServiceAccountKind, Namespace: f.Namespace.Name, Name: "default"})
+				rbacv1beta1.Subject{Kind: rbacv1beta1.ServiceAccountKind, Namespace: f.Namespace.Name, Name: "default"})
 
 			err := framework.WaitForAuthorizationUpdate(f.ClientSet.Authorization(),
 				serviceaccount.MakeUsername(f.Namespace.Name, "default"),
@@ -1663,7 +1672,12 @@ func makeRequestToGuestbook(c clientset.Interface, cmd, value string, ns string)
 	if errProxy != nil {
 		return "", errProxy
 	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), framework.SingleCallTimeout)
+	defer cancel()
+
 	result, err := proxyRequest.Namespace(ns).
+		Context(ctx).
 		Name("frontend").
 		Suffix("/guestbook.php").
 		Param("cmd", cmd).
@@ -1763,6 +1777,10 @@ func getUDData(jpgExpected string, ns string) func(clientset.Interface, string) 
 		if err != nil {
 			return err
 		}
+
+		ctx, cancel := context.WithTimeout(context.Background(), framework.SingleCallTimeout)
+		defer cancel()
+
 		var body []byte
 		if subResourceProxyAvailable {
 			body, err = c.Core().RESTClient().Get().
@@ -1784,6 +1802,9 @@ func getUDData(jpgExpected string, ns string) func(clientset.Interface, string) 
 				Raw()
 		}
 		if err != nil {
+			if ctx.Err() != nil {
+				framework.Failf("Failed to retrieve data from container: %v", err)
+			}
 			return err
 		}
 		framework.Logf("got data: %s", body)

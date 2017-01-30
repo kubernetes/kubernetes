@@ -23,16 +23,16 @@ import (
 	"strings"
 	"time"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/api/v1/service"
-	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/controller/endpoint"
-	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/util/intstr"
-	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/test/e2e/framework"
 
 	. "github.com/onsi/ginkgo"
@@ -86,7 +86,7 @@ var _ = framework.KubeDescribe("Services", func() {
 		}()
 
 		service := &v1.Service{
-			ObjectMeta: v1.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name: serviceName,
 			},
 			Spec: v1.ServiceSpec{
@@ -148,7 +148,7 @@ var _ = framework.KubeDescribe("Services", func() {
 
 		By("creating service " + serviceName + " in namespace " + ns)
 		service := &v1.Service{
-			ObjectMeta: v1.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name: serviceName,
 			},
 			Spec: v1.ServiceSpec{
@@ -791,7 +791,7 @@ var _ = framework.KubeDescribe("Services", func() {
 
 		By("creating service " + serviceName + " with same NodePort but different protocols in namespace " + ns)
 		service := &v1.Service{
-			ObjectMeta: v1.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name:      t.ServiceName,
 				Namespace: t.Namespace,
 			},
@@ -1027,7 +1027,7 @@ var _ = framework.KubeDescribe("Services", func() {
 		terminateSeconds := int64(600)
 
 		service := &v1.Service{
-			ObjectMeta: v1.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name:        t.ServiceName,
 				Namespace:   t.Namespace,
 				Annotations: map[string]string{endpoint.TolerateUnreadyEndpointsAnnotation: "true"},

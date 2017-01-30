@@ -17,9 +17,9 @@ limitations under the License.
 package util
 
 import (
+	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/labels"
-	"k8s.io/kubernetes/pkg/util/sets"
 )
 
 // GetNamespacesFromPodAffinityTerm returns a set of names

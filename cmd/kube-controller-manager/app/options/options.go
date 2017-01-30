@@ -19,10 +19,14 @@ limitations under the License.
 package options
 
 import (
+	"fmt"
+	"strings"
 	"time"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	utilerrors "k8s.io/apimachinery/pkg/util/errors"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/apis/componentconfig"
-	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/client/leaderelection"
 	"k8s.io/kubernetes/pkg/master/ports"
 	"k8s.io/kubernetes/pkg/util/config"
@@ -42,6 +46,7 @@ type CMServer struct {
 func NewCMServer() *CMServer {
 	s := CMServer{
 		KubeControllerManagerConfiguration: componentconfig.KubeControllerManagerConfiguration{
+			Controllers:                       []string{"*"},
 			Port:                              ports.ControllerManagerPort,
 			Address:                           "0.0.0.0",
 			ConcurrentEndpointSyncs:           5,
@@ -86,15 +91,16 @@ func NewCMServer() *CMServer {
 				},
 				FlexVolumePluginDir: "/usr/libexec/kubernetes/kubelet-plugins/volume/exec/",
 			},
-			ContentType:             "application/vnd.kubernetes.protobuf",
-			KubeAPIQPS:              20.0,
-			KubeAPIBurst:            30,
-			LeaderElection:          leaderelection.DefaultLeaderElectionConfiguration(),
-			ControllerStartInterval: metav1.Duration{Duration: 0 * time.Second},
-			EnableGarbageCollector:  true,
-			ConcurrentGCSyncs:       20,
-			ClusterSigningCertFile:  "/etc/kubernetes/ca/ca.pem",
-			ClusterSigningKeyFile:   "/etc/kubernetes/ca/ca.key",
+			ContentType:              "application/vnd.kubernetes.protobuf",
+			KubeAPIQPS:               20.0,
+			KubeAPIBurst:             30,
+			LeaderElection:           leaderelection.DefaultLeaderElectionConfiguration(),
+			ControllerStartInterval:  metav1.Duration{Duration: 0 * time.Second},
+			EnableGarbageCollector:   true,
+			ConcurrentGCSyncs:        20,
+			ClusterSigningCertFile:   "/etc/kubernetes/ca/ca.pem",
+			ClusterSigningKeyFile:    "/etc/kubernetes/ca/ca.key",
+			ReconcilerSyncLoopPeriod: metav1.Duration{Duration: 5 * time.Second},
 		},
 	}
 	s.LeaderElection.LeaderElect = true
@@ -102,7 +108,11 @@ func NewCMServer() *CMServer {
 }
 
 // AddFlags adds flags for a specific CMServer to the specified FlagSet
-func (s *CMServer) AddFlags(fs *pflag.FlagSet) {
+func (s *CMServer) AddFlags(fs *pflag.FlagSet, allControllers []string, disabledByDefaultControllers []string) {
+	fs.StringSliceVar(&s.Controllers, "controllers", s.Controllers, fmt.Sprintf(""+
+		"A list of controllers to enable.  '*' enables all on-by-default controllers, 'foo' enables the controller "+
+		"named 'foo', '-foo' disables the controller named 'foo'.\nAll controllers: %s\nDisabled-by-default controllers: %s",
+		strings.Join(allControllers, ", "), strings.Join(disabledByDefaultControllers, ", ")))
 	fs.Int32Var(&s.Port, "port", s.Port, "The port that the controller-manager's http service runs on")
 	fs.Var(componentconfig.IPVar{Val: &s.Address}, "address", "The IP address to serve on (set to 0.0.0.0 for all interfaces)")
 	fs.BoolVar(&s.UseServiceAccountCredentials, "use-service-account-credentials", s.UseServiceAccountCredentials, "If true, use individual service account credentials for each controller.")
@@ -181,7 +191,30 @@ func (s *CMServer) AddFlags(fs *pflag.FlagSet) {
 	fs.Float32Var(&s.SecondaryNodeEvictionRate, "secondary-node-eviction-rate", 0.01, "Number of nodes per second on which pods are deleted in case of node failure when a zone is unhealthy (see --unhealthy-zone-threshold for definition of healthy/unhealthy). Zone refers to entire cluster in non-multizone clusters. This value is implicitly overridden to 0 if the cluster size is smaller than --large-cluster-size-threshold.")
 	fs.Int32Var(&s.LargeClusterSizeThreshold, "large-cluster-size-threshold", 50, "Number of nodes from which NodeController treats the cluster as large for the eviction logic purposes. --secondary-node-eviction-rate is implicitly overridden to 0 for clusters this size or smaller.")
 	fs.Float32Var(&s.UnhealthyZoneThreshold, "unhealthy-zone-threshold", 0.55, "Fraction of Nodes in a zone which needs to be not Ready (minimum 3) for zone to be treated as unhealthy. ")
+	fs.BoolVar(&s.DisableAttachDetachReconcilerSync, "disable-attach-detach-reconcile-sync", false, "Disable volume attach detach reconciler sync. Disabling this may cause volumes to be mismatched with pods. Use wisely.")
+	fs.DurationVar(&s.ReconcilerSyncLoopPeriod.Duration, "attach-detach-reconcile-sync-period", s.ReconcilerSyncLoopPeriod.Duration, "The reconciler sync wait time between volume attach detach. This duration must be larger than one second, and increasing this value from the default may allow for volumes to be mismatched with pods.")
 
 	leaderelection.BindFlags(&s.LeaderElection, fs)
 	config.DefaultFeatureGate.AddFlag(fs)
+}
+
+// Validate is used to validate the options and config before launching the controller manager
+func (s *CMServer) Validate(allControllers []string, disabledByDefaultControllers []string) error {
+	var errs []error
+
+	allControllersSet := sets.NewString(allControllers...)
+	for _, controller := range s.Controllers {
+		if controller == "*" {
+			continue
+		}
+		if strings.HasPrefix(controller, "-") {
+			controller = controller[1:]
+		}
+
+		if !allControllersSet.Has(controller) {
+			errs = append(errs, fmt.Errorf("%q is not in the list of known controllers", controller))
+		}
+	}
+
+	return utilerrors.NewAggregate(errs)
 }

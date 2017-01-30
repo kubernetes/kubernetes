@@ -61,7 +61,7 @@ func checkErr(prefix string, err error, handleErr func(string, int)) {
 	switch err.(type) {
 	case nil:
 		return
-	case *preflight.PreFlightError:
+	case *preflight.Error:
 		handleErr(err.Error(), PreFlightExitCode)
 	default:
 		handleErr(err.Error(), DefaultErrorExitCode)

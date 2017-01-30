@@ -25,12 +25,11 @@ import (
 
 	fuzz "github.com/google/gofuzz"
 
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/client-go/pkg/api"
 	"k8s.io/client-go/pkg/api/testapi"
-	"k8s.io/client-go/pkg/apimachinery/registered"
-	"k8s.io/client-go/pkg/runtime"
-	"k8s.io/client-go/pkg/runtime/schema"
-	"k8s.io/client-go/pkg/util/diff"
 	"k8s.io/client-go/pkg/util/flowcontrol"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 )
@@ -102,10 +101,10 @@ func TestRESTClientRequires(t *testing.T) {
 	if _, err := RESTClientFor(&Config{Host: "127.0.0.1", ContentConfig: ContentConfig{NegotiatedSerializer: testapi.Default.NegotiatedSerializer()}}); err == nil {
 		t.Errorf("unexpected non-error")
 	}
-	if _, err := RESTClientFor(&Config{Host: "127.0.0.1", ContentConfig: ContentConfig{GroupVersion: &registered.GroupOrDie(api.GroupName).GroupVersion}}); err == nil {
+	if _, err := RESTClientFor(&Config{Host: "127.0.0.1", ContentConfig: ContentConfig{GroupVersion: &api.Registry.GroupOrDie(api.GroupName).GroupVersion}}); err == nil {
 		t.Errorf("unexpected non-error")
 	}
-	if _, err := RESTClientFor(&Config{Host: "127.0.0.1", ContentConfig: ContentConfig{GroupVersion: &registered.GroupOrDie(api.GroupName).GroupVersion, NegotiatedSerializer: testapi.Default.NegotiatedSerializer()}}); err != nil {
+	if _, err := RESTClientFor(&Config{Host: "127.0.0.1", ContentConfig: ContentConfig{GroupVersion: &api.Registry.GroupOrDie(api.GroupName).GroupVersion, NegotiatedSerializer: testapi.Default.NegotiatedSerializer()}}); err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
 }

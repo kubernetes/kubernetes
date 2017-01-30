@@ -20,13 +20,14 @@ import (
 	rt "runtime"
 	"testing"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
-	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/storage"
 	"k8s.io/kubernetes/pkg/storage/etcd/etcdtest"
 	etcdtesting "k8s.io/kubernetes/pkg/storage/etcd/testing"
-	"k8s.io/kubernetes/pkg/watch"
 
 	etcd "github.com/coreos/etcd/client"
 	"golang.org/x/net/context"
@@ -49,9 +50,9 @@ var _ etcdCache = &fakeEtcdCache{}
 func TestWatchInterpretations(t *testing.T) {
 	codec := testapi.Default.Codec()
 	// Declare some pods to make the test cases compact.
-	podFoo := &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}}
-	podBar := &api.Pod{ObjectMeta: api.ObjectMeta{Name: "bar"}}
-	podBaz := &api.Pod{ObjectMeta: api.ObjectMeta{Name: "baz"}}
+	podFoo := &api.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}}
+	podBar := &api.Pod{ObjectMeta: metav1.ObjectMeta{Name: "bar"}}
+	podBaz := &api.Pod{ObjectMeta: metav1.ObjectMeta{Name: "baz"}}
 
 	// All of these test cases will be run with the firstLetterIsB Filter.
 	table := map[string]struct {
@@ -229,8 +230,8 @@ func TestSendResultDeleteEventHaveLatestIndex(t *testing.T) {
 		eventChan <- e
 	}
 
-	fooPod := &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}}
-	barPod := &api.Pod{ObjectMeta: api.ObjectMeta{Name: "bar"}}
+	fooPod := &api.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}}
+	barPod := &api.Pod{ObjectMeta: metav1.ObjectMeta{Name: "bar"}}
 	fooBytes, err := runtime.Encode(codec, fooPod)
 	if err != nil {
 		t.Fatalf("Encode failed: %v", err)
@@ -299,7 +300,7 @@ func TestWatch(t *testing.T) {
 	// watching is explicitly closed below.
 
 	// Test normal case
-	pod := &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}}
+	pod := &api.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}}
 	returnObj := &api.Pod{}
 	err = h.Create(context.TODO(), key, pod, returnObj, 0)
 	if err != nil {
@@ -353,7 +354,7 @@ func TestWatchEtcdState(t *testing.T) {
 	defer watching.Stop()
 
 	endpoint := &api.Endpoints{
-		ObjectMeta: api.ObjectMeta{Name: "foo"},
+		ObjectMeta: metav1.ObjectMeta{Name: "foo"},
 		Subsets:    emptySubsets(),
 	}
 
@@ -397,7 +398,7 @@ func TestWatchEtcdState(t *testing.T) {
 
 func TestWatchFromZeroIndex(t *testing.T) {
 	codec := testapi.Default.Codec()
-	pod := &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}}
+	pod := &api.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}}
 
 	key := "/somekey/foo"
 	server := etcdtesting.NewEtcdTestClientServer(t)
@@ -482,7 +483,7 @@ func TestWatchListFromZeroIndex(t *testing.T) {
 	defer watching.Stop()
 
 	// creates foo which should trigger the WatchList for "/"
-	pod := &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}}
+	pod := &api.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}}
 	err = h.Create(context.TODO(), pod.Name, pod, pod, 0)
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
@@ -500,7 +501,7 @@ func TestWatchListFromZeroIndex(t *testing.T) {
 
 func TestWatchListIgnoresRootKey(t *testing.T) {
 	codec := testapi.Default.Codec()
-	pod := &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}}
+	pod := &api.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}}
 	key := "/some/key"
 	server := etcdtesting.NewEtcdTestClientServer(t)
 	defer server.Terminate(t)

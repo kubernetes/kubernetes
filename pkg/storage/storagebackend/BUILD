@@ -11,5 +11,21 @@ go_library(
     name = "go_default_library",
     srcs = ["config.go"],
     tags = ["automanaged"],
-    deps = ["//pkg/runtime:go_default_library"],
+    deps = ["//vendor:k8s.io/apimachinery/pkg/runtime"],
+)
+
+filegroup(
+    name = "package-srcs",
+    srcs = glob(["**"]),
+    tags = ["automanaged"],
+    visibility = ["//visibility:private"],
+)
+
+filegroup(
+    name = "all-srcs",
+    srcs = [
+        ":package-srcs",
+        "//pkg/storage/storagebackend/factory:all-srcs",
+    ],
+    tags = ["automanaged"],
 )

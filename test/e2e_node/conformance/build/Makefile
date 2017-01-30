@@ -52,7 +52,7 @@ endif
 		e2e_node.test \
 		ginkgo
 
-	docker build -t ${REGISTRY}/node-test-${ARCH}:${VERSION} ${TEMP_DIR}
+	docker build --pull -t ${REGISTRY}/node-test-${ARCH}:${VERSION} ${TEMP_DIR}
 
 push: build
 	gcloud docker push ${REGISTRY}/node-test-${ARCH}:${VERSION}

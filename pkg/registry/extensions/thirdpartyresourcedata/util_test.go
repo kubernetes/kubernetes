@@ -19,7 +19,7 @@ package thirdpartyresourcedata
 import (
 	"testing"
 
-	"k8s.io/kubernetes/pkg/api"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 )
 
@@ -47,7 +47,7 @@ func TestExtractAPIGroupAndKind(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		kind, group, err := ExtractApiGroupAndKind(&extensions.ThirdPartyResource{ObjectMeta: api.ObjectMeta{Name: test.input}})
+		kind, group, err := ExtractApiGroupAndKind(&extensions.ThirdPartyResource{ObjectMeta: metav1.ObjectMeta{Name: test.input}})
 		if err != nil && !test.expectErr {
 			t.Errorf("unexpected error: %v", err)
 			continue

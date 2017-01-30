@@ -23,7 +23,7 @@ import (
 
 	"github.com/emicklei/go-restful/swagger"
 
-	"k8s.io/kubernetes/pkg/api/meta"
+	"k8s.io/apimachinery/pkg/api/meta"
 	apiutil "k8s.io/kubernetes/pkg/api/util"
 )
 

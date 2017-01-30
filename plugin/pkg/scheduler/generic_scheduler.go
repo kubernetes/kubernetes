@@ -17,7 +17,6 @@ limitations under the License.
 package scheduler
 
 import (
-	"bytes"
 	"fmt"
 	"sort"
 	"strings"
@@ -26,9 +25,9 @@ import (
 	"time"
 
 	"github.com/golang/glog"
+	"k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/util"
-	"k8s.io/kubernetes/pkg/util/errors"
 	"k8s.io/kubernetes/pkg/util/workqueue"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm/predicates"
@@ -45,10 +44,10 @@ type FitError struct {
 
 var ErrNoNodesAvailable = fmt.Errorf("no nodes available to schedule pods")
 
+const NoNodeAvailableMsg = "No nodes are available that match all of the following predicates:"
+
 // Error returns detailed information of why the pod failed to fit on each node
 func (f *FitError) Error() string {
-	var buf bytes.Buffer
-	buf.WriteString(fmt.Sprintf("pod (%s) failed to fit in any node\n", f.Pod.Name))
 	reasons := make(map[string]int)
 	for _, predicates := range f.FailedPredicates {
 		for _, pred := range predicates {
@@ -64,10 +63,8 @@ func (f *FitError) Error() string {
 		sort.Strings(reasonStrings)
 		return reasonStrings
 	}
-
-	reasonMsg := fmt.Sprintf("fit failure summary on nodes : %v", strings.Join(sortReasonsHistogram(), ", "))
-	buf.WriteString(reasonMsg)
-	return buf.String()
+	reasonMsg := fmt.Sprintf(NoNodeAvailableMsg+": %v.", strings.Join(sortReasonsHistogram(), ", "))
+	return reasonMsg
 }
 
 type genericScheduler struct {

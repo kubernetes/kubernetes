@@ -15,11 +15,11 @@ go_library(
     deps = [
         "//federation/apis/federation:go_default_library",
         "//federation/registry/cluster:go_default_library",
-        "//pkg/api/rest:go_default_library",
-        "//pkg/genericapiserver/api/request:go_default_library",
-        "//pkg/registry/generic:go_default_library",
-        "//pkg/registry/generic/registry:go_default_library",
-        "//pkg/runtime:go_default_library",
+        "//pkg/genericapiserver/registry/generic:go_default_library",
+        "//pkg/genericapiserver/registry/generic/registry:go_default_library",
+        "//pkg/genericapiserver/registry/rest:go_default_library",
+        "//vendor:k8s.io/apimachinery/pkg/runtime",
+        "//vendor:k8s.io/apiserver/pkg/endpoints/request",
     ],
 )
 
@@ -31,11 +31,25 @@ go_test(
     deps = [
         "//federation/apis/federation:go_default_library",
         "//pkg/api:go_default_library",
-        "//pkg/fields:go_default_library",
-        "//pkg/labels:go_default_library",
-        "//pkg/registry/generic:go_default_library",
+        "//pkg/genericapiserver/registry/generic:go_default_library",
         "//pkg/registry/registrytest:go_default_library",
-        "//pkg/runtime:go_default_library",
         "//pkg/storage/etcd/testing:go_default_library",
+        "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
+        "//vendor:k8s.io/apimachinery/pkg/fields",
+        "//vendor:k8s.io/apimachinery/pkg/labels",
+        "//vendor:k8s.io/apimachinery/pkg/runtime",
     ],
+)
+
+filegroup(
+    name = "package-srcs",
+    srcs = glob(["**"]),
+    tags = ["automanaged"],
+    visibility = ["//visibility:private"],
+)
+
+filegroup(
+    name = "all-srcs",
+    srcs = [":package-srcs"],
+    tags = ["automanaged"],
 )

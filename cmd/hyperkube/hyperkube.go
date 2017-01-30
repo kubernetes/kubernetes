@@ -188,7 +188,7 @@ func (hk *HyperKube) Run(args []string) error {
 func (hk *HyperKube) RunToExit(args []string) {
 	err := hk.Run(args)
 	if err != nil {
-		fmt.Fprint(os.Stderr, err.Error())
+		fmt.Fprintf(os.Stderr, "Error: %v\n", err.Error())
 		os.Exit(1)
 	}
 	os.Exit(0)

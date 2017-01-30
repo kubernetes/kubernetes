@@ -16,7 +16,7 @@ limitations under the License.
 
 package storagebackend
 
-import "k8s.io/kubernetes/pkg/runtime"
+import "k8s.io/apimachinery/pkg/runtime"
 
 const (
 	StorageTypeUnset = ""

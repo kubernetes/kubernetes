@@ -17,12 +17,6 @@
 # For systems without journald
 mkdir -p /var/log/journal
 
-if [ -e /host/lib/libsystemd* ]
-then
-  rm /lib/x86_64-linux-gnu/libsystemd*
-  cp /host/lib/libsystemd* /lib/x86_64-linux-gnu/
-fi
-
 LD_PRELOAD=/opt/td-agent/embedded/lib/libjemalloc.so
 RUBY_GC_HEAP_OLDOBJECT_LIMIT_FACTOR=0.9
 

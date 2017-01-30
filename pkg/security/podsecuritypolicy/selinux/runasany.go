@@ -17,9 +17,9 @@ limitations under the License.
 package selinux
 
 import (
+	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/extensions"
-	"k8s.io/kubernetes/pkg/util/validation/field"
 )
 
 // runAsAny implements the SELinuxStrategy interface.

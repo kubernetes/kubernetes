@@ -24,7 +24,7 @@ import (
 	"strconv"
 	"strings"
 
-	"k8s.io/kubernetes/pkg/genericapiserver/openapi/common"
+	"k8s.io/apimachinery/pkg/openapi"
 
 	"github.com/go-openapi/spec"
 	"github.com/golang/glog"
@@ -120,8 +120,8 @@ func (intstr IntOrString) MarshalJSON() ([]byte, error) {
 	}
 }
 
-func (_ IntOrString) OpenAPIDefinition() common.OpenAPIDefinition {
-	return common.OpenAPIDefinition{
+func (_ IntOrString) OpenAPIDefinition() openapi.OpenAPIDefinition {
+	return openapi.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
 				Type:   []string{"string"},

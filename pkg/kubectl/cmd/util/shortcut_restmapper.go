@@ -19,10 +19,10 @@ package util
 import (
 	"strings"
 
-	"k8s.io/kubernetes/pkg/api/meta"
+	"k8s.io/apimachinery/pkg/api/meta"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/kubernetes/pkg/client/typed/discovery"
 	"k8s.io/kubernetes/pkg/kubectl"
-	"k8s.io/kubernetes/pkg/runtime/schema"
 )
 
 // ShortcutExpander is a RESTMapper that can be used for Kubernetes resources.   It expands the resource first, then invokes the wrapped
@@ -37,7 +37,7 @@ type ShortcutExpander struct {
 var _ meta.RESTMapper = &ShortcutExpander{}
 
 func NewShortcutExpander(delegate meta.RESTMapper, client discovery.DiscoveryInterface) ShortcutExpander {
-	return ShortcutExpander{All: userResources, RESTMapper: delegate, discoveryClient: client}
+	return ShortcutExpander{All: UserResources, RESTMapper: delegate, discoveryClient: client}
 }
 
 func (e ShortcutExpander) getAll() []schema.GroupResource {
@@ -71,23 +71,23 @@ func (e ShortcutExpander) getAll() []schema.GroupResource {
 }
 
 func (e ShortcutExpander) KindFor(resource schema.GroupVersionResource) (schema.GroupVersionKind, error) {
-	return e.RESTMapper.KindFor(expandResourceShortcut(resource))
+	return e.RESTMapper.KindFor(e.expandResourceShortcut(resource))
 }
 
 func (e ShortcutExpander) KindsFor(resource schema.GroupVersionResource) ([]schema.GroupVersionKind, error) {
-	return e.RESTMapper.KindsFor(expandResourceShortcut(resource))
+	return e.RESTMapper.KindsFor(e.expandResourceShortcut(resource))
 }
 
 func (e ShortcutExpander) ResourcesFor(resource schema.GroupVersionResource) ([]schema.GroupVersionResource, error) {
-	return e.RESTMapper.ResourcesFor(expandResourceShortcut(resource))
+	return e.RESTMapper.ResourcesFor(e.expandResourceShortcut(resource))
 }
 
 func (e ShortcutExpander) ResourceFor(resource schema.GroupVersionResource) (schema.GroupVersionResource, error) {
-	return e.RESTMapper.ResourceFor(expandResourceShortcut(resource))
+	return e.RESTMapper.ResourceFor(e.expandResourceShortcut(resource))
 }
 
 func (e ShortcutExpander) ResourceSingularizer(resource string) (string, error) {
-	return e.RESTMapper.ResourceSingularizer(expandResourceShortcut(schema.GroupVersionResource{Resource: resource}).Resource)
+	return e.RESTMapper.ResourceSingularizer(e.expandResourceShortcut(schema.GroupVersionResource{Resource: resource}).Resource)
 }
 
 func (e ShortcutExpander) RESTMapping(gk schema.GroupKind, versions ...string) (*meta.RESTMapping, error) {
@@ -98,9 +98,11 @@ func (e ShortcutExpander) RESTMappings(gk schema.GroupKind, versions ...string) 
 	return e.RESTMapper.RESTMappings(gk, versions...)
 }
 
-// userResources are the resource names that apply to the primary, user facing resources used by
+// UserResources are the resource names that apply to the primary, user facing resources used by
 // client tools. They are in deletion-first order - dependent resources should be last.
-var userResources = []schema.GroupResource{
+// Should remain exported in order to expose a current list of resources to downstream
+// composition that wants to build on the concept of 'all' for their CLIs.
+var UserResources = []schema.GroupResource{
 	{Group: "", Resource: "pods"},
 	{Group: "", Resource: "replicationcontrollers"},
 	{Group: "", Resource: "services"},
@@ -116,7 +118,7 @@ func (e ShortcutExpander) AliasesForResource(resource string) ([]string, bool) {
 	if strings.ToLower(resource) == "all" {
 		var resources []schema.GroupResource
 		if resources = e.getAll(); len(resources) == 0 {
-			resources = userResources
+			resources = UserResources
 		}
 		aliases := []string{}
 		for _, r := range resources {
@@ -124,17 +126,60 @@ func (e ShortcutExpander) AliasesForResource(resource string) ([]string, bool) {
 		}
 		return aliases, true
 	}
-	expanded := expandResourceShortcut(schema.GroupVersionResource{Resource: resource}).Resource
+	expanded := e.expandResourceShortcut(schema.GroupVersionResource{Resource: resource}).Resource
 	return []string{expanded}, (expanded != resource)
+}
+
+// getShortcutMappings returns a hardcoded set of tuples.
+// First the list of potential resources will be taken from the instance variable
+// which holds the anticipated result of the discovery API.
+// Next we will fall back to the hardcoded list of resources.
+// Note that the list is ordered by group priority.
+// TODO: Wire this to discovery API.
+func (e ShortcutExpander) getShortcutMappings() ([]kubectl.ResourceShortcuts, error) {
+	res := []kubectl.ResourceShortcuts{
+		{
+			ShortForm: schema.GroupResource{Group: "storage.k8s.io", Resource: "sc"},
+			LongForm:  schema.GroupResource{Group: "storage.k8s.io", Resource: "storageclasses"},
+		},
+	}
+
+	// append hardcoded short forms at the end of the list
+	res = append(res, kubectl.ResourcesShortcutStatic...)
+	return res, nil
 }
 
 // expandResourceShortcut will return the expanded version of resource
 // (something that a pkg/api/meta.RESTMapper can understand), if it is
-// indeed a shortcut. Otherwise, will return resource unmodified.
-func expandResourceShortcut(resource schema.GroupVersionResource) schema.GroupVersionResource {
-	if expanded, ok := kubectl.ShortForms[resource.Resource]; ok {
-		resource.Resource = expanded
-		return resource
+// indeed a shortcut. If no match has been found, we will match on group prefixing.
+// Lastly we will return resource unmodified.
+func (e ShortcutExpander) expandResourceShortcut(resource schema.GroupVersionResource) schema.GroupVersionResource {
+	// get the shortcut mappings and return on first match.
+	if resources, err := e.getShortcutMappings(); err == nil {
+		for _, item := range resources {
+			if len(resource.Group) != 0 && resource.Group != item.ShortForm.Group {
+				continue
+			}
+			if resource.Resource == item.ShortForm.Resource {
+				resource.Resource = item.LongForm.Resource
+				return resource
+			}
+		}
+
+		// we didn't find exact match so match on group prefixing. This allows autoscal to match autoscaling
+		if len(resource.Group) == 0 {
+			return resource
+		}
+		for _, item := range resources {
+			if !strings.HasPrefix(item.ShortForm.Group, resource.Group) {
+				continue
+			}
+			if resource.Resource == item.ShortForm.Resource {
+				resource.Resource = item.LongForm.Resource
+				return resource
+			}
+		}
 	}
+
 	return resource
 }

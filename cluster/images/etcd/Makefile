@@ -102,7 +102,7 @@ endif
 	cd $(TEMP_DIR) && sed -i.bak 's|BASEIMAGE|$(BASEIMAGE)|g' Dockerfile
 
 	# And build the image
-	docker build -t $(REGISTRY)/etcd-$(ARCH):$(REGISTRY_TAG) $(TEMP_DIR)
+	docker build --pull -t $(REGISTRY)/etcd-$(ARCH):$(REGISTRY_TAG) $(TEMP_DIR)
 
 push: build
 	gcloud docker -- push $(REGISTRY)/etcd-$(ARCH):$(REGISTRY_TAG)

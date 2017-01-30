@@ -57,7 +57,7 @@ func TestCreateSecretGeneric(t *testing.T) {
 	cmd.Run(cmd, []string{secretObject.Name})
 	expectedOutput := "secret/" + secretObject.Name + "\n"
 	if buf.String() != expectedOutput {
-		t.Errorf("expected output: %s, but got: %s", buf.String(), expectedOutput)
+		t.Errorf("expected output: %s, but got: %s", expectedOutput, buf.String())
 	}
 }
 

@@ -17,7 +17,6 @@ limitations under the License.
 package e2e
 
 import (
-	"bytes"
 	"fmt"
 	"os/exec"
 	"path"
@@ -26,7 +25,7 @@ import (
 	"time"
 
 	. "github.com/onsi/ginkgo"
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/test/e2e/framework"
 )
 
@@ -81,22 +80,6 @@ func createNewRC(c clientset.Interface, ns string, name string) {
 	framework.ExpectNoError(err)
 }
 
-func verifyNumberOfMasterReplicas(expected int) {
-	output, err := exec.Command("gcloud", "compute", "instances", "list",
-		"--project="+framework.TestContext.CloudConfig.ProjectID,
-		"--regexp="+framework.GenerateMasterRegexp(framework.TestContext.CloudConfig.MasterName),
-		"--filter=status=RUNNING",
-		"--format=[no-heading]").CombinedOutput()
-	framework.Logf("%s", output)
-	framework.ExpectNoError(err)
-	newline := []byte("\n")
-	replicas := bytes.Count(output, newline)
-	framework.Logf("Num master replicas/expected: %d/%d", replicas, expected)
-	if replicas != expected {
-		framework.Failf("Wrong number of master replicas %d expected %d", replicas, expected)
-	}
-}
-
 func findRegionForZone(zone string) string {
 	region, err := exec.Command("gcloud", "compute", "zones", "list", zone, "--quiet", "--format=[no-heading](region)").CombinedOutput()
 	framework.ExpectNoError(err)
@@ -142,7 +125,7 @@ var _ = framework.KubeDescribe("HA-master [Feature:HAMaster]", func() {
 		framework.SkipUnlessProviderIs("gce")
 		c = f.ClientSet
 		ns = f.Namespace.Name
-		verifyNumberOfMasterReplicas(1)
+		framework.ExpectNoError(framework.WaitForMasters(framework.TestContext.CloudConfig.MasterName, c, 1, 10*time.Minute))
 		additionalReplicaZones = make([]string, 0)
 		existingRCs = make([]string, 0)
 	})
@@ -152,13 +135,13 @@ var _ = framework.KubeDescribe("HA-master [Feature:HAMaster]", func() {
 		for _, zone := range additionalNodesZones {
 			removeWorkerNodes(zone)
 		}
+		framework.ExpectNoError(framework.AllNodesReady(c, 5*time.Minute))
 
 		// Clean-up additional master replicas if the test execution was broken.
 		for _, zone := range additionalReplicaZones {
 			removeMasterReplica(zone)
 		}
-		framework.WaitForMasters(framework.TestContext.CloudConfig.MasterName, c, 1, 10*time.Minute)
-		verifyNumberOfMasterReplicas(1)
+		framework.ExpectNoError(framework.WaitForMasters(framework.TestContext.CloudConfig.MasterName, c, 1, 10*time.Minute))
 	})
 
 	type Action int
@@ -186,9 +169,8 @@ var _ = framework.KubeDescribe("HA-master [Feature:HAMaster]", func() {
 			framework.ExpectNoError(removeWorkerNodes(zone))
 			additionalNodesZones = removeZoneFromZones(additionalNodesZones, zone)
 		}
-		verifyNumberOfMasterReplicas(len(additionalReplicaZones) + 1)
-		framework.WaitForMasters(framework.TestContext.CloudConfig.MasterName, c, len(additionalReplicaZones)+1, 10*time.Minute)
-		framework.AllNodesReady(c, 5*time.Minute)
+		framework.ExpectNoError(framework.WaitForMasters(framework.TestContext.CloudConfig.MasterName, c, len(additionalReplicaZones)+1, 10*time.Minute))
+		framework.ExpectNoError(framework.AllNodesReady(c, 5*time.Minute))
 
 		// Verify that API server works correctly with HA master.
 		rcName := "ha-master-" + strconv.Itoa(len(existingRCs))

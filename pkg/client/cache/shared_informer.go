@@ -21,9 +21,9 @@ import (
 	"sync"
 	"time"
 
-	"k8s.io/kubernetes/pkg/runtime"
-	utilruntime "k8s.io/kubernetes/pkg/util/runtime"
-	"k8s.io/kubernetes/pkg/util/wait"
+	"k8s.io/apimachinery/pkg/runtime"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/apimachinery/pkg/util/wait"
 
 	"github.com/golang/glog"
 )
@@ -43,7 +43,7 @@ type SharedInformer interface {
 	AddEventHandler(handler ResourceEventHandler) error
 	GetStore() Store
 	// GetController gives back a synthetic interface that "votes" to start the informer
-	GetController() ControllerInterface
+	GetController() Controller
 	Run(stopCh <-chan struct{})
 	HasSynced() bool
 	LastSyncResourceVersion() string
@@ -108,7 +108,7 @@ func WaitForCacheSync(stopCh <-chan struct{}, cacheSyncs ...InformerSynced) bool
 
 type sharedIndexInformer struct {
 	indexer    Indexer
-	controller *Controller
+	controller Controller
 
 	processor             *sharedProcessor
 	cacheMutationDetector CacheMutationDetector
@@ -143,6 +143,10 @@ func (v *dummyController) Run(stopCh <-chan struct{}) {
 
 func (v *dummyController) HasSynced() bool {
 	return v.informer.HasSynced()
+}
+
+func (c *dummyController) LastSyncResourceVersion() string {
+	return ""
 }
 
 type updateNotification struct {
@@ -207,10 +211,10 @@ func (s *sharedIndexInformer) LastSyncResourceVersion() string {
 	s.startedLock.Lock()
 	defer s.startedLock.Unlock()
 
-	if s.controller == nil || s.controller.reflector == nil {
+	if s.controller == nil {
 		return ""
 	}
-	return s.controller.reflector.LastSyncResourceVersion()
+	return s.controller.LastSyncResourceVersion()
 }
 
 func (s *sharedIndexInformer) GetStore() Store {
@@ -232,7 +236,7 @@ func (s *sharedIndexInformer) AddIndexers(indexers Indexers) error {
 	return s.indexer.AddIndexers(indexers)
 }
 
-func (s *sharedIndexInformer) GetController() ControllerInterface {
+func (s *sharedIndexInformer) GetController() Controller {
 	return &dummyController{informer: s}
 }
 

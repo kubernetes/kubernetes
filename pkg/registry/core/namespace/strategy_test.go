@@ -19,11 +19,10 @@ package namespace
 import (
 	"testing"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/kubernetes/pkg/api"
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
-	"k8s.io/kubernetes/pkg/apimachinery/registered"
-	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
-	genericapirequest "k8s.io/kubernetes/pkg/genericapiserver/api/request"
 )
 
 func TestNamespaceStrategy(t *testing.T) {
@@ -35,7 +34,7 @@ func TestNamespaceStrategy(t *testing.T) {
 		t.Errorf("Namespaces should not allow create on update")
 	}
 	namespace := &api.Namespace{
-		ObjectMeta: api.ObjectMeta{Name: "foo", ResourceVersion: "10"},
+		ObjectMeta: metav1.ObjectMeta{Name: "foo", ResourceVersion: "10"},
 		Status:     api.NamespaceStatus{Phase: api.NamespaceTerminating},
 	}
 	Strategy.PrepareForCreate(ctx, namespace)
@@ -50,7 +49,7 @@ func TestNamespaceStrategy(t *testing.T) {
 		t.Errorf("Unexpected error validating %v", errs)
 	}
 	invalidNamespace := &api.Namespace{
-		ObjectMeta: api.ObjectMeta{Name: "bar", ResourceVersion: "4"},
+		ObjectMeta: metav1.ObjectMeta{Name: "bar", ResourceVersion: "4"},
 	}
 	// ensure we copy spec.finalizers from old to new
 	Strategy.PrepareForUpdate(ctx, invalidNamespace, namespace)
@@ -76,12 +75,12 @@ func TestNamespaceStatusStrategy(t *testing.T) {
 	}
 	now := metav1.Now()
 	oldNamespace := &api.Namespace{
-		ObjectMeta: api.ObjectMeta{Name: "foo", ResourceVersion: "10", DeletionTimestamp: &now},
+		ObjectMeta: metav1.ObjectMeta{Name: "foo", ResourceVersion: "10", DeletionTimestamp: &now},
 		Spec:       api.NamespaceSpec{Finalizers: []api.FinalizerName{"kubernetes"}},
 		Status:     api.NamespaceStatus{Phase: api.NamespaceActive},
 	}
 	namespace := &api.Namespace{
-		ObjectMeta: api.ObjectMeta{Name: "foo", ResourceVersion: "9", DeletionTimestamp: &now},
+		ObjectMeta: metav1.ObjectMeta{Name: "foo", ResourceVersion: "9", DeletionTimestamp: &now},
 		Status:     api.NamespaceStatus{Phase: api.NamespaceTerminating},
 	}
 	StatusStrategy.PrepareForUpdate(ctx, namespace, oldNamespace)
@@ -109,12 +108,12 @@ func TestNamespaceFinalizeStrategy(t *testing.T) {
 		t.Errorf("Namespaces should not allow create on update")
 	}
 	oldNamespace := &api.Namespace{
-		ObjectMeta: api.ObjectMeta{Name: "foo", ResourceVersion: "10"},
+		ObjectMeta: metav1.ObjectMeta{Name: "foo", ResourceVersion: "10"},
 		Spec:       api.NamespaceSpec{Finalizers: []api.FinalizerName{"kubernetes", "example.com/org"}},
 		Status:     api.NamespaceStatus{Phase: api.NamespaceActive},
 	}
 	namespace := &api.Namespace{
-		ObjectMeta: api.ObjectMeta{Name: "foo", ResourceVersion: "9"},
+		ObjectMeta: metav1.ObjectMeta{Name: "foo", ResourceVersion: "9"},
 		Spec:       api.NamespaceSpec{Finalizers: []api.FinalizerName{"example.com/foo"}},
 		Status:     api.NamespaceStatus{Phase: api.NamespaceTerminating},
 	}
@@ -136,7 +135,7 @@ func TestNamespaceFinalizeStrategy(t *testing.T) {
 
 func TestSelectableFieldLabelConversions(t *testing.T) {
 	apitesting.TestSelectableFieldLabelConversionsOfKind(t,
-		registered.GroupOrDie(api.GroupName).GroupVersion.String(),
+		api.Registry.GroupOrDie(api.GroupName).GroupVersion.String(),
 		"Namespace",
 		NamespaceToSelectableFields(&api.Namespace{}),
 		map[string]string{"name": "metadata.name"},

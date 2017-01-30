@@ -91,7 +91,7 @@ func dumpClusterInfo(f cmdutil.Factory, cmd *cobra.Command, args []string, out i
 		return err
 	}
 
-	printer, _, err := kubectl.GetPrinter("json", "", false)
+	printer, _, err := kubectl.GetPrinter("json", "", false, true)
 	if err != nil {
 		return err
 	}

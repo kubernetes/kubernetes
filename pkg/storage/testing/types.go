@@ -17,15 +17,14 @@ limitations under the License.
 package testing
 
 import (
-	apiv1 "k8s.io/kubernetes/pkg/api/v1"
-	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
-	"k8s.io/kubernetes/pkg/runtime/schema"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
 type TestResource struct {
-	metav1.TypeMeta  `json:",inline"`
-	apiv1.ObjectMeta `json:"metadata"`
-	Value            int `json:"value"`
+	metav1.TypeMeta   `json:",inline"`
+	metav1.ObjectMeta `json:"metadata"`
+	Value             int `json:"value"`
 }
 
 func (obj *TestResource) GetObjectKind() schema.ObjectKind { return &obj.TypeMeta }

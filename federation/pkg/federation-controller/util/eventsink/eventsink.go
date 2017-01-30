@@ -17,8 +17,8 @@ limitations under the License.
 package eventsink
 
 import (
+	"k8s.io/apimachinery/pkg/types"
 	fedclientset "k8s.io/kubernetes/federation/client/clientset_generated/federation_clientset"
-	api "k8s.io/kubernetes/pkg/api"
 	api_v1 "k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/record"
 )
@@ -46,5 +46,5 @@ func (fes *FederatedEventSink) Update(event *api_v1.Event) (*api_v1.Event, error
 }
 
 func (fes *FederatedEventSink) Patch(event *api_v1.Event, data []byte) (*api_v1.Event, error) {
-	return fes.clientset.Core().Events(event.Namespace).Patch(event.Name, api.StrategicMergePatchType, data)
+	return fes.clientset.Core().Events(event.Namespace).Patch(event.Name, types.StrategicMergePatchType, data)
 }

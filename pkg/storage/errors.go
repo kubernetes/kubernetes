@@ -19,7 +19,7 @@ package storage
 import (
 	"fmt"
 
-	"k8s.io/kubernetes/pkg/util/validation/field"
+	"k8s.io/apimachinery/pkg/util/validation/field"
 )
 
 const (
@@ -105,8 +105,8 @@ func IsUnreachable(err error) bool {
 	return isErrCode(err, ErrCodeUnreachable)
 }
 
-// IsTestFailed returns true if and only if err is a write conflict.
-func IsTestFailed(err error) bool {
+// IsConflict returns true if and only if err is a write conflict.
+func IsConflict(err error) bool {
 	return isErrCode(err, ErrCodeResourceVersionConflicts)
 }
 

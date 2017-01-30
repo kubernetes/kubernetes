@@ -23,13 +23,15 @@ import (
 
 	"github.com/golang/glog"
 
-	authorization "k8s.io/kubernetes/pkg/apis/authorization/v1beta1"
-	"k8s.io/kubernetes/pkg/auth/authorizer"
-	authorizationclient "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/authorization/v1beta1"
-	"k8s.io/kubernetes/pkg/runtime/schema"
-	"k8s.io/kubernetes/pkg/util/cache"
-	"k8s.io/kubernetes/plugin/pkg/webhook"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apiserver/pkg/authorization/authorizer"
+	"k8s.io/apiserver/pkg/util/cache"
+	authorizationclient "k8s.io/client-go/kubernetes/typed/authorization/v1beta1"
+	authorization "k8s.io/client-go/pkg/apis/authorization/v1beta1"
 
+	"k8s.io/apiserver/pkg/util/webhook"
+
+	_ "k8s.io/client-go/pkg/apis/authorization/install"
 	_ "k8s.io/kubernetes/pkg/apis/authorization/install"
 )
 

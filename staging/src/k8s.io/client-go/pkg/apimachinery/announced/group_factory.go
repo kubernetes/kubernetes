@@ -21,13 +21,13 @@ import (
 
 	"github.com/golang/glog"
 
+	"k8s.io/apimachinery/pkg/api/meta"
+	"k8s.io/apimachinery/pkg/apimachinery"
+	"k8s.io/apimachinery/pkg/apimachinery/registered"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/pkg/api"
-	"k8s.io/client-go/pkg/api/meta"
-	"k8s.io/client-go/pkg/apimachinery"
-	"k8s.io/client-go/pkg/apimachinery/registered"
-	"k8s.io/client-go/pkg/runtime"
-	"k8s.io/client-go/pkg/runtime/schema"
-	"k8s.io/client-go/pkg/util/sets"
 )
 
 type SchemeFunc func(*runtime.Scheme) error
@@ -236,10 +236,10 @@ func (gmf *GroupMetaFactory) Enable(m *registered.APIRegistrationManager, scheme
 // It's really bad that this is called in init() methods, but supporting this
 // temporarily lets us do the change incrementally.
 func (gmf *GroupMetaFactory) RegisterAndEnable() error {
-	if err := gmf.Register(registered.DefaultAPIRegistrationManager); err != nil {
+	if err := gmf.Register(api.Registry); err != nil {
 		return err
 	}
-	if err := gmf.Enable(registered.DefaultAPIRegistrationManager, api.Scheme); err != nil {
+	if err := gmf.Enable(api.Registry, api.Scheme); err != nil {
 		return err
 	}
 

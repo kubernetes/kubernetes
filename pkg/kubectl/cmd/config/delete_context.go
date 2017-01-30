@@ -22,13 +22,22 @@ import (
 
 	"github.com/spf13/cobra"
 	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
+	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
+)
+
+var (
+	delete_context_example = templates.Examples(`
+		# Delete the context for the minikube cluster
+		kubectl config delete-context minikube`)
 )
 
 func NewCmdConfigDeleteContext(out io.Writer, configAccess clientcmd.ConfigAccess) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "delete-context NAME",
-		Short: "Delete the specified context from the kubeconfig",
+		Use:     "delete-context NAME",
+		Short:   "Delete the specified context from the kubeconfig",
+		Long:    "Delete the specified context from the kubeconfig",
+		Example: delete_context_example,
 		Run: func(cmd *cobra.Command, args []string) {
 			err := runDeleteContext(out, configAccess, cmd)
 			cmdutil.CheckErr(err)

@@ -20,8 +20,8 @@ import (
 	"fmt"
 	"time"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/api/v1"
-	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/util/intstr"
 	"k8s.io/kubernetes/pkg/util/uuid"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -96,7 +96,7 @@ var _ = framework.KubeDescribe("Probing container", func() {
 
 	It("should be restarted with a exec \"cat /tmp/health\" liveness probe [Conformance]", func() {
 		runLivenessTest(f, &v1.Pod{
-			ObjectMeta: v1.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name:   "liveness-exec",
 				Labels: map[string]string{"test": "liveness"},
 			},
@@ -123,7 +123,7 @@ var _ = framework.KubeDescribe("Probing container", func() {
 
 	It("should *not* be restarted with a exec \"cat /tmp/health\" liveness probe [Conformance]", func() {
 		runLivenessTest(f, &v1.Pod{
-			ObjectMeta: v1.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name:   "liveness-exec",
 				Labels: map[string]string{"test": "liveness"},
 			},
@@ -150,7 +150,7 @@ var _ = framework.KubeDescribe("Probing container", func() {
 
 	It("should be restarted with a /healthz http liveness probe [Conformance]", func() {
 		runLivenessTest(f, &v1.Pod{
-			ObjectMeta: v1.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name:   "liveness-http",
 				Labels: map[string]string{"test": "liveness"},
 			},
@@ -179,7 +179,7 @@ var _ = framework.KubeDescribe("Probing container", func() {
 	// Slow by design (5 min)
 	It("should have monotonically increasing restart count [Conformance] [Slow]", func() {
 		runLivenessTest(f, &v1.Pod{
-			ObjectMeta: v1.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name:   "liveness-http",
 				Labels: map[string]string{"test": "liveness"},
 			},
@@ -207,7 +207,7 @@ var _ = framework.KubeDescribe("Probing container", func() {
 
 	It("should *not* be restarted with a /healthz http liveness probe [Conformance]", func() {
 		runLivenessTest(f, &v1.Pod{
-			ObjectMeta: v1.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name:   "liveness-http",
 				Labels: map[string]string{"test": "liveness"},
 			},
@@ -238,7 +238,7 @@ var _ = framework.KubeDescribe("Probing container", func() {
 		// TODO: enable this test once the default exec handler supports timeout.
 		Skip("The default exec handler, dockertools.NativeExecHandler, does not support timeouts due to a limitation in the Docker Remote API")
 		runLivenessTest(f, &v1.Pod{
-			ObjectMeta: v1.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name:   "liveness-exec",
 				Labels: map[string]string{"test": "liveness"},
 			},
@@ -297,7 +297,7 @@ func getRestartCount(p *v1.Pod) int {
 
 func makePodSpec(readinessProbe, livenessProbe *v1.Probe) *v1.Pod {
 	pod := &v1.Pod{
-		ObjectMeta: v1.ObjectMeta{Name: "test-webserver-" + string(uuid.NewUUID())},
+		ObjectMeta: metav1.ObjectMeta{Name: "test-webserver-" + string(uuid.NewUUID())},
 		Spec: v1.PodSpec{
 			Containers: []v1.Container{
 				{

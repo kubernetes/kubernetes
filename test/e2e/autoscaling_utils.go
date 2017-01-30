@@ -17,13 +17,14 @@ limitations under the License.
 package e2e
 
 import (
+	"context"
 	"fmt"
 	"strconv"
 	"time"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/api/v1"
-	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/util/intstr"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -203,7 +204,12 @@ func (rc *ResourceConsumer) makeConsumeCustomMetric() {
 func (rc *ResourceConsumer) sendConsumeCPURequest(millicores int) {
 	proxyRequest, err := framework.GetServicesProxyRequest(rc.framework.ClientSet, rc.framework.ClientSet.Core().RESTClient().Post())
 	framework.ExpectNoError(err)
+
+	ctx, cancel := context.WithTimeout(context.Background(), framework.SingleCallTimeout)
+	defer cancel()
+
 	req := proxyRequest.Namespace(rc.framework.Namespace.Name).
+		Context(ctx).
 		Name(rc.controllerName).
 		Suffix("ConsumeCPU").
 		Param("millicores", strconv.Itoa(millicores)).
@@ -218,7 +224,12 @@ func (rc *ResourceConsumer) sendConsumeCPURequest(millicores int) {
 func (rc *ResourceConsumer) sendConsumeMemRequest(megabytes int) {
 	proxyRequest, err := framework.GetServicesProxyRequest(rc.framework.ClientSet, rc.framework.ClientSet.Core().RESTClient().Post())
 	framework.ExpectNoError(err)
+
+	ctx, cancel := context.WithTimeout(context.Background(), framework.SingleCallTimeout)
+	defer cancel()
+
 	req := proxyRequest.Namespace(rc.framework.Namespace.Name).
+		Context(ctx).
 		Name(rc.controllerName).
 		Suffix("ConsumeMem").
 		Param("megabytes", strconv.Itoa(megabytes)).
@@ -233,7 +244,12 @@ func (rc *ResourceConsumer) sendConsumeMemRequest(megabytes int) {
 func (rc *ResourceConsumer) sendConsumeCustomMetric(delta int) {
 	proxyRequest, err := framework.GetServicesProxyRequest(rc.framework.ClientSet, rc.framework.ClientSet.Core().RESTClient().Post())
 	framework.ExpectNoError(err)
+
+	ctx, cancel := context.WithTimeout(context.Background(), framework.SingleCallTimeout)
+	defer cancel()
+
 	req := proxyRequest.Namespace(rc.framework.Namespace.Name).
+		Context(ctx).
 		Name(rc.controllerName).
 		Suffix("BumpMetric").
 		Param("metric", customMetricName).
@@ -314,7 +330,7 @@ func (rc *ResourceConsumer) CleanUp() {
 func runServiceAndWorkloadForResourceConsumer(c clientset.Interface, internalClient internalclientset.Interface, ns, name, kind string, replicas int, cpuLimitMillis, memLimitMb int64) {
 	By(fmt.Sprintf("Running consuming RC %s via %s with %v replicas", name, kind, replicas))
 	_, err := c.Core().Services(ns).Create(&v1.Service{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
 		},
 		Spec: v1.ServiceSpec{
@@ -368,7 +384,7 @@ func runServiceAndWorkloadForResourceConsumer(c clientset.Interface, internalCli
 	By(fmt.Sprintf("Running controller"))
 	controllerName := name + "-ctrl"
 	_, err = c.Core().Services(ns).Create(&v1.Service{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name: controllerName,
 		},
 		Spec: v1.ServiceSpec{

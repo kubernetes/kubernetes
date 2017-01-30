@@ -21,12 +21,12 @@ import (
 	"runtime"
 	"time"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	kruntime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/pkg/api"
-	metav1 "k8s.io/client-go/pkg/apis/meta/v1"
 	"k8s.io/client-go/pkg/kubelet/qos"
 	kubetypes "k8s.io/client-go/pkg/kubelet/types"
 	"k8s.io/client-go/pkg/master/ports"
-	kruntime "k8s.io/client-go/pkg/runtime"
 )
 
 const (
@@ -350,9 +350,6 @@ func SetDefaults_KubeletConfiguration(obj *KubeletConfiguration) {
 	}
 	if obj.SyncFrequency == zeroDuration {
 		obj.SyncFrequency = metav1.Duration{Duration: 1 * time.Minute}
-	}
-	if obj.ReconcileCIDR == nil {
-		obj.ReconcileCIDR = boolVar(true)
 	}
 	if obj.ContentType == "" {
 		obj.ContentType = "application/vnd.kubernetes.protobuf"

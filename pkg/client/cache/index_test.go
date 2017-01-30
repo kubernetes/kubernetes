@@ -20,6 +20,7 @@ import (
 	"strings"
 	"testing"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
 )
@@ -32,9 +33,9 @@ func testIndexFunc(obj interface{}) ([]string, error) {
 func TestGetIndexFuncValues(t *testing.T) {
 	index := NewIndexer(MetaNamespaceKeyFunc, Indexers{"testmodes": testIndexFunc})
 
-	pod1 := &v1.Pod{ObjectMeta: v1.ObjectMeta{Name: "one", Labels: map[string]string{"foo": "bar"}}}
-	pod2 := &v1.Pod{ObjectMeta: v1.ObjectMeta{Name: "two", Labels: map[string]string{"foo": "bar"}}}
-	pod3 := &v1.Pod{ObjectMeta: v1.ObjectMeta{Name: "tre", Labels: map[string]string{"foo": "biz"}}}
+	pod1 := &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "one", Labels: map[string]string{"foo": "bar"}}}
+	pod2 := &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "two", Labels: map[string]string{"foo": "bar"}}}
+	pod3 := &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "tre", Labels: map[string]string{"foo": "biz"}}}
 
 	index.Add(pod1)
 	index.Add(pod2)
@@ -62,9 +63,9 @@ func testUsersIndexFunc(obj interface{}) ([]string, error) {
 func TestMultiIndexKeys(t *testing.T) {
 	index := NewIndexer(MetaNamespaceKeyFunc, Indexers{"byUser": testUsersIndexFunc})
 
-	pod1 := &v1.Pod{ObjectMeta: v1.ObjectMeta{Name: "one", Annotations: map[string]string{"users": "ernie,bert"}}}
-	pod2 := &v1.Pod{ObjectMeta: v1.ObjectMeta{Name: "two", Annotations: map[string]string{"users": "bert,oscar"}}}
-	pod3 := &v1.Pod{ObjectMeta: v1.ObjectMeta{Name: "tre", Annotations: map[string]string{"users": "ernie,elmo"}}}
+	pod1 := &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "one", Annotations: map[string]string{"users": "ernie,bert"}}}
+	pod2 := &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "two", Annotations: map[string]string{"users": "bert,oscar"}}}
+	pod3 := &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "tre", Annotations: map[string]string{"users": "ernie,elmo"}}}
 
 	index.Add(pod1)
 	index.Add(pod2)

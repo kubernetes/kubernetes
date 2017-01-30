@@ -17,10 +17,10 @@ limitations under the License.
 package fake
 
 import (
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/pkg/api"
 	"k8s.io/client-go/pkg/api/v1"
 	"k8s.io/client-go/pkg/fields"
-	"k8s.io/client-go/pkg/runtime"
 	"k8s.io/client-go/testing"
 )
 

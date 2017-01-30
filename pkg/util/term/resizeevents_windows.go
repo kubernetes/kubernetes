@@ -19,7 +19,7 @@ package term
 import (
 	"time"
 
-	"k8s.io/kubernetes/pkg/util/runtime"
+	"k8s.io/apimachinery/pkg/util/runtime"
 )
 
 // monitorResizeEvents spawns a goroutine that periodically gets the terminal size and tries to send

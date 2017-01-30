@@ -24,11 +24,11 @@ import (
 	"sort"
 	"strings"
 
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/gengo/args"
 	"k8s.io/gengo/generator"
 	"k8s.io/gengo/namer"
 	"k8s.io/gengo/types"
-	"k8s.io/kubernetes/pkg/util/sets"
 
 	"github.com/golang/glog"
 )
@@ -342,8 +342,8 @@ func unwrapAlias(in *types.Type) *types.Type {
 }
 
 const (
-	runtimePackagePath    = "k8s.io/kubernetes/pkg/runtime"
-	conversionPackagePath = "k8s.io/kubernetes/pkg/conversion"
+	runtimePackagePath    = "k8s.io/apimachinery/pkg/runtime"
+	conversionPackagePath = "k8s.io/apimachinery/pkg/conversion"
 )
 
 type noEquality struct{}
@@ -657,7 +657,7 @@ func (g *genConversion) doSlice(inType, outType *types.Type, sw *generator.Snipp
 			} else if g.convertibleOnlyWithinPackage(inType.Elem, outType.Elem) {
 				sw.Do("if err := "+nameTmpl+"(&(*in)[i], &(*out)[i], s); err != nil {\n", argsFromType(inType.Elem, outType.Elem))
 			} else {
-				// TODO: This triggers on v1.ObjectMeta <-> api.ObjectMeta and
+				// TODO: This triggers on metav1.ObjectMeta <-> metav1.ObjectMeta and
 				// similar because neither package is the target package, and
 				// we really don't know which package will have the conversion
 				// function defined.  This fires on basically every object

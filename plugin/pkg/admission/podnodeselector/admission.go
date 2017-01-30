@@ -23,16 +23,16 @@ import (
 
 	"github.com/golang/glog"
 
-	"k8s.io/kubernetes/pkg/admission"
+	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/util/yaml"
+	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/errors"
-	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/client/cache"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/controller/informers"
 	kubeapiserveradmission "k8s.io/kubernetes/pkg/kubeapiserver/admission"
-	"k8s.io/kubernetes/pkg/labels"
-	"k8s.io/kubernetes/pkg/util/yaml"
 )
 
 // The annotation key scheduler.alpha.kubernetes.io/node-selector is for assigning
@@ -41,6 +41,7 @@ var NamespaceNodeSelectors = []string{"scheduler.alpha.kubernetes.io/node-select
 
 func init() {
 	admission.RegisterPlugin("PodNodeSelector", func(config io.Reader) (admission.Interface, error) {
+		// TODO move this to a versioned configuration file format.
 		pluginConfig := readConfig(config)
 		plugin := NewPodNodeSelector(pluginConfig.PodNodeSelectorPluginConfig)
 		return plugin, nil
@@ -114,7 +115,7 @@ func (p *podNodeSelector) Admit(a admission.Attributes) error {
 	var namespace *api.Namespace
 
 	namespaceObj, exists, err := p.namespaceInformer.GetStore().Get(&api.Namespace{
-		ObjectMeta: api.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:      nsName,
 			Namespace: "",
 		},

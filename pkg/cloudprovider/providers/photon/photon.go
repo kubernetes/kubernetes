@@ -34,9 +34,9 @@ import (
 	"github.com/golang/glog"
 	"github.com/vmware/photon-controller-go-sdk/photon"
 	"gopkg.in/gcfg.v1"
+	k8stypes "k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/cloudprovider"
-	k8stypes "k8s.io/kubernetes/pkg/types"
 )
 
 const (

@@ -27,8 +27,8 @@ import (
 	"github.com/golang/glog"
 
 	dockertypes "github.com/docker/engine-api/types"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/util/sets"
 )
 
 // DockerKeyring tracks a set of docker registry credentials, maintaining a

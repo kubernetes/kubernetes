@@ -23,7 +23,7 @@ package codec
 // Currently support
 //    - slice of all builtin types,
 //    - map of all builtin types to string or interface value
-//    - symetrical maps of all builtin types (e.g. str-str, uint8-uint8)
+//    - symmetrical maps of all builtin types (e.g. str-str, uint8-uint8)
 // This should provide adequate "typical" implementations.
 // 
 // Note that fast track decode functions must handle values for which an address cannot be obtained.
@@ -37,6 +37,8 @@ import (
 	"reflect"
 	"sort"
 )
+
+const fastpathEnabled = true
 
 const fastpathCheckNilFalse = false // for reflect
 const fastpathCheckNilTrue = true // for type switch
@@ -81,9 +83,6 @@ var fastpathAV fastpathA
 
 // due to possible initialization loop error, make fastpath in an init()
 func init() {
-	if !fastpathEnabled {
-		return
-	}
 	i := 0
 	fn := func(v interface{}, fe func(*encFnInfo, reflect.Value), fd func(*decFnInfo, reflect.Value)) (f fastpathE) {
 		xrt := reflect.TypeOf(v)
@@ -106,9 +105,6 @@ func init() {
 
 // -- -- fast path type switch
 func fastpathEncodeTypeSwitch(iv interface{}, e *Encoder) bool {
-	if !fastpathEnabled {
-		return false
-	}
 	switch v := iv.(type) {
 {{range .Values}}{{if not .Primitive}}{{if not .MapKey }}
 	case []{{ .Elem }}:{{else}}
@@ -126,9 +122,6 @@ func fastpathEncodeTypeSwitch(iv interface{}, e *Encoder) bool {
 }
 
 func fastpathEncodeTypeSwitchSlice(iv interface{}, e *Encoder) bool {
-	if !fastpathEnabled {
-		return false
-	}
 	switch v := iv.(type) {
 {{range .Values}}{{if not .Primitive}}{{if not .MapKey }}
 	case []{{ .Elem }}:
@@ -144,9 +137,6 @@ func fastpathEncodeTypeSwitchSlice(iv interface{}, e *Encoder) bool {
 }
 
 func fastpathEncodeTypeSwitchMap(iv interface{}, e *Encoder) bool {
-	if !fastpathEnabled {
-		return false
-	}
 	switch v := iv.(type) {
 {{range .Values}}{{if not .Primitive}}{{if .MapKey }}
 	case map[{{ .MapKey }}]{{ .Elem }}:
@@ -165,7 +155,11 @@ func fastpathEncodeTypeSwitchMap(iv interface{}, e *Encoder) bool {
 {{range .Values}}{{if not .Primitive}}{{if not .MapKey }} 
 
 func (f *encFnInfo) {{ .MethodNamePfx "fastpathEnc" false }}R(rv reflect.Value) {
-	fastpathTV.{{ .MethodNamePfx "Enc" false }}V(rv.Interface().([]{{ .Elem }}), fastpathCheckNilFalse, f.e)
+	if f.ti.mbs {
+		fastpathTV.{{ .MethodNamePfx "EncAsMap" false }}V(rv.Interface().([]{{ .Elem }}), fastpathCheckNilFalse, f.e)
+	} else {
+		fastpathTV.{{ .MethodNamePfx "Enc" false }}V(rv.Interface().([]{{ .Elem }}), fastpathCheckNilFalse, f.e)
+	}
 }
 func (_ fastpathT) {{ .MethodNamePfx "Enc" false }}V(v []{{ .Elem }}, checkNil bool, e *Encoder) {
 	ee := e.e
@@ -180,6 +174,31 @@ func (_ fastpathT) {{ .MethodNamePfx "Enc" false }}V(v []{{ .Elem }}, checkNil b
 		{{ encmd .Elem "v2"}}
 	}
 	if cr != nil { cr.sendContainerState(containerArrayEnd) }{{/* ee.EncodeEnd() */}}
+}
+
+func (_ fastpathT) {{ .MethodNamePfx "EncAsMap" false }}V(v []{{ .Elem }}, checkNil bool, e *Encoder) {
+	ee := e.e
+	cr := e.cr
+	if checkNil && v == nil {
+		ee.EncodeNil()
+		return
+	}
+	if len(v)%2 == 1 {
+		e.errorf("mapBySlice requires even slice length, but got %v", len(v))
+		return
+	}
+	ee.EncodeMapStart(len(v) / 2)
+	for j, v2 := range v {
+		if cr != nil {
+			if j%2 == 0 {
+				cr.sendContainerState(containerMapKey)
+			} else {
+				cr.sendContainerState(containerMapValue)
+			}
+		}
+		{{ encmd .Elem "v2"}}
+	}
+	if cr != nil { cr.sendContainerState(containerMapEnd) }
 }
 
 {{end}}{{end}}{{end}}
@@ -257,9 +276,6 @@ func (_ fastpathT) {{ .MethodNamePfx "Enc" false }}V(v map[{{ .MapKey }}]{{ .Ele
 
 // -- -- fast path type switch
 func fastpathDecodeTypeSwitch(iv interface{}, d *Decoder) bool {
-	if !fastpathEnabled {
-		return false
-	}
 	switch v := iv.(type) {
 {{range .Values}}{{if not .Primitive}}{{if not .MapKey }}
 	case []{{ .Elem }}:{{else}}
@@ -328,7 +344,7 @@ func (_ fastpathT) {{ .MethodNamePfx "Dec" false }}V(v []{{ .Elem }}, checkNil b
 			changed = true
 		}
 		slh.End()
-		return
+		return v, changed
 	}
 	
 	if containerLenS > 0 {
@@ -391,7 +407,7 @@ func (_ fastpathT) {{ .MethodNamePfx "Dec" false }}V(v []{{ .Elem }}, checkNil b
 				changed = true
 			}
 			slh.End()
-			return
+			return v, changed
 		}
 		if cap(v) == 0 {
 			v = make([]{{ .Elem }}, 1, 4)

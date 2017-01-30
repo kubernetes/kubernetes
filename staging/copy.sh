@@ -42,6 +42,7 @@ CLIENT_REPO="${MAIN_REPO}/staging/src/${CLIENT_REPO_FROM_SRC}"
 CLIENT_REPO_TEMP="${MAIN_REPO}/staging/src/${CLIENT_REPO_TEMP_FROM_SRC}"
 
 DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+sedi="-i"
 
 cleanup() {
     rm -rf "${CLIENT_REPO_TEMP}"
@@ -54,11 +55,35 @@ echo "creating the tmp directory"
 mkdir -p "${CLIENT_REPO_TEMP}"
 cd "${CLIENT_REPO}"
 
+# there are two classes of package in staging/client-go, those which are authoritative (client-go has the only copy)
+# and those which are copied and rewritten (client-go is not authoritative).
+# we first copy out the authoritative packages to the temp location, then copy non-authoritative packages
+# then save over the original
+
+
+# save copies code from client-go into the temp folder to make sure we don't lose it by accident
+# TODO this is temporary until everything in certain directories is authoritative
+function save() {
+    mkdir -p "${CLIENT_REPO_TEMP}/$1"
+    cp -r "${CLIENT_REPO}/$1/"* "${CLIENT_REPO_TEMP}/$1"
+}
+
+# save everything for which the staging directory is the source of truth
+save "transport"
+save "tools/clientcmd/api"
+save "rest/watch"
+save "pkg/util/clock"
+save "pkg/util/integer"
+save "pkg/util/flowcontrol"
+
+
+
 # mkcp copies file from the main repo to the client repo, it creates the directory if it doesn't exist in the client repo.
 function mkcp() {
     mkdir -p "${CLIENT_REPO_TEMP}/$2" && cp -r "${MAIN_REPO}/$1" "${CLIENT_REPO_TEMP}/$2"
 }
 
+# assemble all the other parts of the staging directory
 echo "copying client packages"
 mkcp "pkg/client/clientset_generated/${CLIENTSET}" "pkg/client/clientset_generated"
 mkcp "/pkg/client/record" "/pkg/client"
@@ -69,7 +94,6 @@ mkcp "/pkg/client/restclient" "/pkg/client"
 mkcp "/pkg/client/testing" "/pkg/client"
 # remove this test because it imports the internal clientset
 rm "${CLIENT_REPO_TEMP}"/pkg/client/testing/core/fake_test.go
-mkcp "/pkg/client/transport" "/pkg/client"
 mkcp "/pkg/client/typed" "/pkg/client"
 
 mkcp "/pkg/client/unversioned/auth" "/pkg/client/unversioned"
@@ -89,7 +113,7 @@ GO15VENDOREXPERIMENT=1 godep save ./...
 popd > /dev/null
 
 echo "moving vendor/k8s.io/kubernetes"
-cp -rn "${CLIENT_REPO_TEMP}"/vendor/k8s.io/kubernetes/* "${CLIENT_REPO_TEMP}"/
+cp -r "${CLIENT_REPO_TEMP}"/vendor/k8s.io/kubernetes/* "${CLIENT_REPO_TEMP}"/
 rm -rf "${CLIENT_REPO_TEMP}"/vendor/k8s.io/kubernetes
 # client-go will share the vendor of the main repo for now. When client-go
 # becomes a standalone repo, it will have its own vendor
@@ -130,17 +154,21 @@ sed -i "s/kubernetes_build_info/kubernetes_build_info_copy/g" "${CLIENT_REPO_TEM
 echo "rewrite proto names in proto.RegisterType"
 find "${CLIENT_REPO_TEMP}" -type f -name "generated.pb.go" -print0 | xargs -0 sed -i "s/k8s\.io\.kubernetes/k8s.io.client-go/g"
 
+# strip all generator tags from client-go
+find "${CLIENT_REPO_TEMP}" -type f -name "*.go" -print0 | xargs -0 sed -i '/^\/\/ +k8s:openapi-gen=true/d'
+find "${CLIENT_REPO_TEMP}" -type f -name "*.go" -print0 | xargs -0 sed -i '/^\/\/ +k8s:defaulter-gen=/d'
+find "${CLIENT_REPO_TEMP}" -type f -name "*.go" -print0 | xargs -0 sed -i '/^\/\/ +k8s:deepcopy-gen=/d'
+find "${CLIENT_REPO_TEMP}" -type f -name "*.go" -print0 | xargs -0 sed -i '/^\/\/ +k8s:conversion-gen=/d'
+
+
 echo "rearranging directory layout"
 # $1 and $2 are relative to ${CLIENT_REPO_TEMP}
 function mvfolder {
     local src=${1%/#/}
     local dst=${2%/#/}
-    # create the parent directory of dst
-    if [ "${dst%/*}" != "${dst}" ]; then
-        mkdir -p "${CLIENT_REPO_TEMP}/${dst%/*}"
-    fi
+    mkdir -p "${CLIENT_REPO_TEMP}/${dst}"
     # move
-    mv "${CLIENT_REPO_TEMP}/${src}" "${CLIENT_REPO_TEMP}/${dst}"
+    mv "${CLIENT_REPO_TEMP}/${src}"/* "${CLIENT_REPO_TEMP}/${dst}"
     # rewrite package
     local src_package="${src##*/}"
     local dst_package="${dst##*/}"
@@ -162,7 +190,6 @@ function mvfolder {
 mvfolder "pkg/client/clientset_generated/${CLIENTSET}" kubernetes
 mvfolder pkg/client/typed/discovery discovery
 mvfolder pkg/client/typed/dynamic dynamic
-mvfolder pkg/client/transport transport
 mvfolder pkg/client/record tools/record
 mvfolder pkg/client/restclient rest
 mvfolder pkg/client/cache tools/cache
@@ -193,6 +220,9 @@ find "${CLIENT_REPO_TEMP}" -type f \( \
     -name "*.yml" -o \
     -name "*.sh" \
     \) -delete
+
+echo "remove cyclical godep"
+rm -rf "${CLIENT_REPO_TEMP}/_vendor/k8s.io/client-go"
 
 if [ "${VERIFYONLY}" = true ]; then
     echo "running verify-only"

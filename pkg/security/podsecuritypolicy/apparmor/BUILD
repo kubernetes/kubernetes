@@ -16,7 +16,7 @@ go_library(
         "//pkg/api:go_default_library",
         "//pkg/security/apparmor:go_default_library",
         "//pkg/util/maps:go_default_library",
-        "//pkg/util/validation/field:go_default_library",
+        "//vendor:k8s.io/apimachinery/pkg/util/validation/field",
     ],
 )
 
@@ -31,5 +31,19 @@ go_test(
         "//pkg/util/maps:go_default_library",
         "//vendor:github.com/davecgh/go-spew/spew",
         "//vendor:github.com/stretchr/testify/assert",
+        "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
     ],
+)
+
+filegroup(
+    name = "package-srcs",
+    srcs = glob(["**"]),
+    tags = ["automanaged"],
+    visibility = ["//visibility:private"],
+)
+
+filegroup(
+    name = "all-srcs",
+    srcs = [":package-srcs"],
+    tags = ["automanaged"],
 )

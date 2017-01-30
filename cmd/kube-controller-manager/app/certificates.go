@@ -23,8 +23,8 @@ package app
 import (
 	"github.com/golang/glog"
 
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	certcontroller "k8s.io/kubernetes/pkg/controller/certificates"
-	"k8s.io/kubernetes/pkg/runtime/schema"
 )
 
 func startCSRController(ctx ControllerContext) (bool, error) {

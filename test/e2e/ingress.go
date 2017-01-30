@@ -21,9 +21,9 @@ import (
 	"path/filepath"
 	"time"
 
-	rbacv1alpha1 "k8s.io/kubernetes/pkg/apis/rbac/v1alpha1"
-	"k8s.io/kubernetes/pkg/runtime/schema"
-	"k8s.io/kubernetes/pkg/serviceaccount"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apiserver/pkg/authentication/serviceaccount"
+	rbacv1beta1 "k8s.io/kubernetes/pkg/apis/rbac/v1beta1"
 	"k8s.io/kubernetes/test/e2e/framework"
 
 	. "github.com/onsi/ginkgo"
@@ -69,7 +69,7 @@ var _ = framework.KubeDescribe("Loadbalancing: L7", func() {
 		// this test wants powerful permissions.  Since the namespace names are unique, we can leave this
 		// lying around so we don't have to race any caches
 		framework.BindClusterRole(jig.client.Rbac(), "cluster-admin", f.Namespace.Name,
-			rbacv1alpha1.Subject{Kind: rbacv1alpha1.ServiceAccountKind, Namespace: f.Namespace.Name, Name: "default"})
+			rbacv1beta1.Subject{Kind: rbacv1beta1.ServiceAccountKind, Namespace: f.Namespace.Name, Name: "default"})
 
 		err := framework.WaitForAuthorizationUpdate(jig.client.Authorization(),
 			serviceaccount.MakeUsername(f.Namespace.Name, "default"),
@@ -102,7 +102,7 @@ var _ = framework.KubeDescribe("Loadbalancing: L7", func() {
 		// Platform specific cleanup
 		AfterEach(func() {
 			if CurrentGinkgoTestDescription().Failed {
-				describeIng(ns)
+				framework.DescribeIng(ns)
 			}
 			if jig.ing == nil {
 				By("No ingress created, no cleanup necessary")
@@ -137,10 +137,10 @@ var _ = framework.KubeDescribe("Loadbalancing: L7", func() {
 
 			By("waiting for Ingress to come up with ip: " + ip)
 			httpClient := buildInsecureClient(reqTimeout)
-			framework.ExpectNoError(pollURL(fmt.Sprintf("https://%v/", ip), "", framework.LoadBalancerPollTimeout, jig.pollInterval, httpClient, false))
+			framework.ExpectNoError(framework.PollURL(fmt.Sprintf("https://%v/", ip), "", framework.LoadBalancerPollTimeout, jig.pollInterval, httpClient, false))
 
 			By("should reject HTTP traffic")
-			framework.ExpectNoError(pollURL(fmt.Sprintf("http://%v/", ip), "", framework.LoadBalancerPollTimeout, jig.pollInterval, httpClient, true))
+			framework.ExpectNoError(framework.PollURL(fmt.Sprintf("http://%v/", ip), "", framework.LoadBalancerPollTimeout, jig.pollInterval, httpClient, true))
 
 			By("should have correct firewall rule for ingress")
 			fw := gceController.getFirewallRule()
@@ -192,7 +192,7 @@ var _ = framework.KubeDescribe("Loadbalancing: L7", func() {
 				framework.ExpectNoError(gcloudDelete("firewall-rules", fmt.Sprintf("ingress-80-443-%v", ns), framework.TestContext.CloudConfig.ProjectID))
 			}
 			if CurrentGinkgoTestDescription().Failed {
-				describeIng(ns)
+				framework.DescribeIng(ns)
 			}
 			if jig.ing == nil {
 				By("No ingress created, no cleanup necessary")

@@ -28,13 +28,13 @@ go_library(
         "//pkg/probe/exec:go_default_library",
         "//pkg/probe/http:go_default_library",
         "//pkg/probe/tcp:go_default_library",
-        "//pkg/types:go_default_library",
         "//pkg/util/exec:go_default_library",
         "//pkg/util/intstr:go_default_library",
-        "//pkg/util/runtime:go_default_library",
-        "//pkg/util/sets:go_default_library",
-        "//pkg/util/wait:go_default_library",
         "//vendor:github.com/golang/glog",
+        "//vendor:k8s.io/apimachinery/pkg/types",
+        "//vendor:k8s.io/apimachinery/pkg/util/runtime",
+        "//vendor:k8s.io/apimachinery/pkg/util/sets",
+        "//vendor:k8s.io/apimachinery/pkg/util/wait",
     ],
 )
 
@@ -50,7 +50,6 @@ go_test(
     tags = ["automanaged"],
     deps = [
         "//pkg/api/v1:go_default_library",
-        "//pkg/apis/meta/v1:go_default_library",
         "//pkg/client/clientset_generated/clientset/fake:go_default_library",
         "//pkg/client/record:go_default_library",
         "//pkg/kubelet/container:go_default_library",
@@ -59,11 +58,29 @@ go_test(
         "//pkg/kubelet/prober/results:go_default_library",
         "//pkg/kubelet/status:go_default_library",
         "//pkg/probe:go_default_library",
-        "//pkg/types:go_default_library",
         "//pkg/util/exec:go_default_library",
         "//pkg/util/intstr:go_default_library",
-        "//pkg/util/runtime:go_default_library",
-        "//pkg/util/wait:go_default_library",
         "//vendor:github.com/golang/glog",
+        "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
+        "//vendor:k8s.io/apimachinery/pkg/types",
+        "//vendor:k8s.io/apimachinery/pkg/util/runtime",
+        "//vendor:k8s.io/apimachinery/pkg/util/wait",
     ],
+)
+
+filegroup(
+    name = "package-srcs",
+    srcs = glob(["**"]),
+    tags = ["automanaged"],
+    visibility = ["//visibility:private"],
+)
+
+filegroup(
+    name = "all-srcs",
+    srcs = [
+        ":package-srcs",
+        "//pkg/kubelet/prober/results:all-srcs",
+        "//pkg/kubelet/prober/testing:all-srcs",
+    ],
+    tags = ["automanaged"],
 )

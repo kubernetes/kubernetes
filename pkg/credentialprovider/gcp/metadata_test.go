@@ -29,8 +29,8 @@ import (
 	"strings"
 	"testing"
 
+	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/kubernetes/pkg/credentialprovider"
-	utilnet "k8s.io/kubernetes/pkg/util/net"
 )
 
 func createProductNameFile() (string, error) {

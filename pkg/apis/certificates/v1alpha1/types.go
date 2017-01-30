@@ -17,8 +17,7 @@ limitations under the License.
 package v1alpha1
 
 import (
-	"k8s.io/kubernetes/pkg/api/v1"
-	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 // +genclient=true
@@ -28,7 +27,7 @@ import (
 type CertificateSigningRequest struct {
 	metav1.TypeMeta `json:",inline"`
 	// +optional
-	v1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
+	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
 	// The certificate request itself and any additional information.
 	// +optional
@@ -45,6 +44,12 @@ type CertificateSigningRequest struct {
 type CertificateSigningRequestSpec struct {
 	// Base64-encoded PKCS#10 CSR data
 	Request []byte `json:"request" protobuf:"bytes,1,opt,name=request"`
+
+	// allowedUsages specifies a set of usage contexts the key will be
+	// valid for.
+	// See: https://tools.ietf.org/html/rfc5280#section-4.2.1.3
+	//      https://tools.ietf.org/html/rfc5280#section-4.2.1.12
+	Usages []KeyUsage `json:"usages,omitempty" protobuf:"bytes,5,opt,name=keyUsage"`
 
 	// Information about the requesting user (if relevant)
 	// See user.Info interface for details
@@ -95,3 +100,34 @@ type CertificateSigningRequestList struct {
 
 	Items []CertificateSigningRequest `json:"items" protobuf:"bytes,2,rep,name=items"`
 }
+
+// KeyUsages specifies valid usage contexts for keys.
+// See: https://tools.ietf.org/html/rfc5280#section-4.2.1.3
+//      https://tools.ietf.org/html/rfc5280#section-4.2.1.12
+type KeyUsage string
+
+const (
+	UsageSigning            KeyUsage = "signing"
+	UsageDigitalSignature   KeyUsage = "digital signature"
+	UsageContentCommittment KeyUsage = "content committment"
+	UsageKeyEncipherment    KeyUsage = "key encipherment"
+	UsageKeyAgreement       KeyUsage = "key agreement"
+	UsageDataEncipherment   KeyUsage = "data encipherment"
+	UsageCertSign           KeyUsage = "cert sign"
+	UsageCRLSign            KeyUsage = "crl sign"
+	UsageEncipherOnly       KeyUsage = "encipher only"
+	UsageDecipherOnly       KeyUsage = "decipher only"
+	UsageAny                KeyUsage = "any"
+	UsageServerAuth         KeyUsage = "server auth"
+	UsageClientAuth         KeyUsage = "client auth"
+	UsageCodeSigning        KeyUsage = "code signing"
+	UsageEmailProtection    KeyUsage = "email protection"
+	UsageSMIME              KeyUsage = "s/mime"
+	UsageIPsecEndSystem     KeyUsage = "ipsec end system"
+	UsageIPsecTunnel        KeyUsage = "ipsec tunnel"
+	UsageIPsecUser          KeyUsage = "ipsec user"
+	UsageTimestamping       KeyUsage = "timestamping"
+	UsageOCSPSigning        KeyUsage = "ocsp signing"
+	UsageMicrosoftSGC       KeyUsage = "microsoft sgc"
+	UsageNetscapSGC         KeyUsage = "netscape sgc"
+)

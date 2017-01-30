@@ -18,12 +18,13 @@ go_library(
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/api/validation:go_default_library",
-        "//pkg/fields:go_default_library",
-        "//pkg/genericapiserver/api/request:go_default_library",
-        "//pkg/labels:go_default_library",
-        "//pkg/runtime:go_default_library",
         "//pkg/storage:go_default_library",
-        "//pkg/util/validation/field:go_default_library",
+        "//vendor:k8s.io/apimachinery/pkg/fields",
+        "//vendor:k8s.io/apimachinery/pkg/labels",
+        "//vendor:k8s.io/apimachinery/pkg/runtime",
+        "//vendor:k8s.io/apimachinery/pkg/util/validation/field",
+        "//vendor:k8s.io/apiserver/pkg/endpoints/request",
+        "//vendor:k8s.io/apiserver/pkg/storage/names",
     ],
 )
 
@@ -35,6 +36,21 @@ go_test(
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/api/testing:go_default_library",
-        "//pkg/apimachinery/registered:go_default_library",
     ],
+)
+
+filegroup(
+    name = "package-srcs",
+    srcs = glob(["**"]),
+    tags = ["automanaged"],
+    visibility = ["//visibility:private"],
+)
+
+filegroup(
+    name = "all-srcs",
+    srcs = [
+        ":package-srcs",
+        "//pkg/registry/core/podtemplate/storage:all-srcs",
+    ],
+    tags = ["automanaged"],
 )

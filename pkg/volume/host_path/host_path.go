@@ -21,9 +21,10 @@ import (
 	"os"
 	"regexp"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util/uuid"
 	"k8s.io/kubernetes/pkg/volume"
 )
@@ -275,7 +276,7 @@ func (r *hostPathProvisioner) Provision() (*v1.PersistentVolume, error) {
 
 	capacity := r.options.PVC.Spec.Resources.Requests[v1.ResourceName(v1.ResourceStorage)]
 	pv := &v1.PersistentVolume{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name: r.options.PVName,
 			Annotations: map[string]string{
 				"kubernetes.io/createdby": "hostpath-dynamic-provisioner",

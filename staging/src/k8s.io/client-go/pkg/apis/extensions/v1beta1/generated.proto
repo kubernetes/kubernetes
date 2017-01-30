@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors.
+Copyright 2017 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -21,11 +21,11 @@ syntax = 'proto2';
 
 package k8s.io.kubernetes.pkg.apis.extensions.v1beta1;
 
+import "k8s.io/apimachinery/pkg/apis/meta/v1/generated.proto";
+import "k8s.io/apimachinery/pkg/runtime/generated.proto";
+import "k8s.io/apimachinery/pkg/runtime/schema/generated.proto";
 import "k8s.io/kubernetes/pkg/api/resource/generated.proto";
 import "k8s.io/kubernetes/pkg/api/v1/generated.proto";
-import "k8s.io/kubernetes/pkg/apis/meta/v1/generated.proto";
-import "k8s.io/kubernetes/pkg/runtime/generated.proto";
-import "k8s.io/kubernetes/pkg/runtime/schema/generated.proto";
 import "k8s.io/kubernetes/pkg/util/intstr/generated.proto";
 
 // Package-wide variables from generator "generated".
@@ -74,7 +74,7 @@ message DaemonSet {
   // Standard object's metadata.
   // More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
   // +optional
-  optional k8s.io.kubernetes.pkg.api.v1.ObjectMeta metadata = 1;
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
   // Spec defines the desired behavior of this daemon set.
   // More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status
@@ -95,7 +95,7 @@ message DaemonSetList {
   // Standard list metadata.
   // More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
   // +optional
-  optional k8s.io.kubernetes.pkg.apis.meta.v1.ListMeta metadata = 1;
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
 
   // Items is a list of daemon sets.
   repeated DaemonSet items = 2;
@@ -108,7 +108,7 @@ message DaemonSetSpec {
   // If empty, defaulted to labels on Pod template.
   // More info: http://kubernetes.io/docs/user-guide/labels#label-selectors
   // +optional
-  optional k8s.io.kubernetes.pkg.apis.meta.v1.LabelSelector selector = 1;
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.LabelSelector selector = 1;
 
   // Template is the object that describes the pod that will be created.
   // The DaemonSet will create exactly one copy of this pod on every node
@@ -138,13 +138,17 @@ message DaemonSetStatus {
   // NumberReady is the number of nodes that should be running the daemon pod and have one
   // or more of the daemon pod running and ready.
   optional int32 numberReady = 4;
+
+  // ObservedGeneration is the most recent generation observed by the daemon set controller.
+  // +optional
+  optional int64 observedGeneration = 5;
 }
 
 // Deployment enables declarative updates for Pods and ReplicaSets.
 message Deployment {
   // Standard object metadata.
   // +optional
-  optional k8s.io.kubernetes.pkg.api.v1.ObjectMeta metadata = 1;
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
   // Specification of the desired behavior of the Deployment.
   // +optional
@@ -164,10 +168,10 @@ message DeploymentCondition {
   optional string status = 2;
 
   // The last time this condition was updated.
-  optional k8s.io.kubernetes.pkg.apis.meta.v1.Time lastUpdateTime = 6;
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.Time lastUpdateTime = 6;
 
   // Last time the condition transitioned from one status to another.
-  optional k8s.io.kubernetes.pkg.apis.meta.v1.Time lastTransitionTime = 7;
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.Time lastTransitionTime = 7;
 
   // The reason for the condition's last transition.
   optional string reason = 4;
@@ -180,7 +184,7 @@ message DeploymentCondition {
 message DeploymentList {
   // Standard list metadata.
   // +optional
-  optional k8s.io.kubernetes.pkg.apis.meta.v1.ListMeta metadata = 1;
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
 
   // Items is the list of Deployments.
   repeated Deployment items = 2;
@@ -209,7 +213,7 @@ message DeploymentSpec {
   // Label selector for pods. Existing ReplicaSets whose pods are
   // selected by this will be the ones affected by this deployment.
   // +optional
-  optional k8s.io.kubernetes.pkg.apis.meta.v1.LabelSelector selector = 2;
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.LabelSelector selector = 2;
 
   // Template describes the pods that will be created.
   optional k8s.io.kubernetes.pkg.api.v1.PodTemplateSpec template = 3;
@@ -261,6 +265,10 @@ message DeploymentStatus {
   // Total number of non-terminated pods targeted by this deployment that have the desired template spec.
   // +optional
   optional int32 updatedReplicas = 3;
+
+  // Total number of ready pods targeted by this deployment.
+  // +optional
+  optional int32 readyReplicas = 7;
 
   // Total number of available pods (ready for at least minReadySeconds) targeted by this deployment.
   // +optional
@@ -333,7 +341,7 @@ message HTTPIngressRuleValue {
 message HorizontalPodAutoscaler {
   // Standard object metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
   // +optional
-  optional k8s.io.kubernetes.pkg.api.v1.ObjectMeta metadata = 1;
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
   // behaviour of autoscaler. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status.
   // +optional
@@ -348,7 +356,7 @@ message HorizontalPodAutoscaler {
 message HorizontalPodAutoscalerList {
   // Standard list metadata.
   // +optional
-  optional k8s.io.kubernetes.pkg.apis.meta.v1.ListMeta metadata = 1;
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
 
   // list of horizontal pod autoscaler objects.
   repeated HorizontalPodAutoscaler items = 2;
@@ -382,7 +390,7 @@ message HorizontalPodAutoscalerStatus {
   // last time the HorizontalPodAutoscaler scaled the number of pods;
   // used by the autoscaler to control how often the number of pods is changed.
   // +optional
-  optional k8s.io.kubernetes.pkg.apis.meta.v1.Time lastScaleTime = 2;
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.Time lastScaleTime = 2;
 
   // current number of replicas of pods managed by this autoscaler.
   optional int32 currentReplicas = 3;
@@ -423,7 +431,7 @@ message Ingress {
   // Standard object's metadata.
   // More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
   // +optional
-  optional k8s.io.kubernetes.pkg.api.v1.ObjectMeta metadata = 1;
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
   // Spec is the desired state of the Ingress.
   // More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status
@@ -450,7 +458,7 @@ message IngressList {
   // Standard object's metadata.
   // More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
   // +optional
-  optional k8s.io.kubernetes.pkg.apis.meta.v1.ListMeta metadata = 1;
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
 
   // Items is the list of Ingress.
   repeated Ingress items = 2;
@@ -545,7 +553,7 @@ message NetworkPolicy {
   // Standard object's metadata.
   // More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
   // +optional
-  optional k8s.io.kubernetes.pkg.api.v1.ObjectMeta metadata = 1;
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
   // Specification of the desired behavior for this NetworkPolicy.
   // +optional
@@ -580,7 +588,7 @@ message NetworkPolicyList {
   // Standard list metadata.
   // More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
   // +optional
-  optional k8s.io.kubernetes.pkg.apis.meta.v1.ListMeta metadata = 1;
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
 
   // Items is a list of schema objects.
   repeated NetworkPolicy items = 2;
@@ -592,7 +600,7 @@ message NetworkPolicyPeer {
   // If not provided, this selector selects no pods.
   // If present but empty, this selector selects all pods in this namespace.
   // +optional
-  optional k8s.io.kubernetes.pkg.apis.meta.v1.LabelSelector podSelector = 1;
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.LabelSelector podSelector = 1;
 
   // Selects Namespaces using cluster scoped-labels.  This
   // matches all pods in all namespaces selected by this label selector.
@@ -600,7 +608,7 @@ message NetworkPolicyPeer {
   // If omitted, this selector selects no namespaces.
   // If present but empty, this selector selects all namespaces.
   // +optional
-  optional k8s.io.kubernetes.pkg.apis.meta.v1.LabelSelector namespaceSelector = 2;
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.LabelSelector namespaceSelector = 2;
 }
 
 message NetworkPolicyPort {
@@ -624,7 +632,7 @@ message NetworkPolicySpec {
   // same set of pods.  In this case, the ingress rules for each are combined additively.
   // This field is NOT optional and follows standard label selector semantics.
   // An empty podSelector matches all pods in this namespace.
-  optional k8s.io.kubernetes.pkg.apis.meta.v1.LabelSelector podSelector = 1;
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.LabelSelector podSelector = 1;
 
   // List of ingress rules to be applied to the selected pods.
   // Traffic is allowed to a pod if namespace.networkPolicy.ingress.isolation is undefined and cluster policy allows it,
@@ -644,7 +652,7 @@ message PodSecurityPolicy {
   // Standard object's metadata.
   // More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
   // +optional
-  optional k8s.io.kubernetes.pkg.api.v1.ObjectMeta metadata = 1;
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
   // spec defines the policy enforced.
   // +optional
@@ -656,7 +664,7 @@ message PodSecurityPolicyList {
   // Standard list metadata.
   // More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
   // +optional
-  optional k8s.io.kubernetes.pkg.apis.meta.v1.ListMeta metadata = 1;
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
 
   // Items is a list of schema objects.
   repeated PodSecurityPolicy items = 2;
@@ -733,7 +741,7 @@ message ReplicaSet {
   // be the same as the Pod(s) that the ReplicaSet manages.
   // Standard object's metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
   // +optional
-  optional k8s.io.kubernetes.pkg.api.v1.ObjectMeta metadata = 1;
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
   // Spec defines the specification of the desired behavior of the ReplicaSet.
   // More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status
@@ -759,7 +767,7 @@ message ReplicaSetCondition {
 
   // The last time the condition transitioned from one status to another.
   // +optional
-  optional k8s.io.kubernetes.pkg.apis.meta.v1.Time lastTransitionTime = 3;
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.Time lastTransitionTime = 3;
 
   // The reason for the condition's last transition.
   // +optional
@@ -775,7 +783,7 @@ message ReplicaSetList {
   // Standard list metadata.
   // More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds
   // +optional
-  optional k8s.io.kubernetes.pkg.apis.meta.v1.ListMeta metadata = 1;
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
 
   // List of ReplicaSets.
   // More info: http://kubernetes.io/docs/user-guide/replication-controller
@@ -802,7 +810,7 @@ message ReplicaSetSpec {
   // Label keys and values that must match in order to be controlled by this replica set.
   // More info: http://kubernetes.io/docs/user-guide/labels#label-selectors
   // +optional
-  optional k8s.io.kubernetes.pkg.apis.meta.v1.LabelSelector selector = 2;
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.LabelSelector selector = 2;
 
   // Template is the object that describes the pod that will be created if
   // insufficient replicas are detected.
@@ -903,7 +911,7 @@ message SELinuxStrategyOptions {
 message Scale {
   // Standard object metadata; More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata.
   // +optional
-  optional k8s.io.kubernetes.pkg.api.v1.ObjectMeta metadata = 1;
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
   // defines the behavior of the scale. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status.
   // +optional
@@ -976,7 +984,7 @@ message SupplementalGroupsStrategyOptions {
 message ThirdPartyResource {
   // Standard object metadata
   // +optional
-  optional k8s.io.kubernetes.pkg.api.v1.ObjectMeta metadata = 1;
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
   // Description is the description of this object.
   // +optional
@@ -991,7 +999,7 @@ message ThirdPartyResource {
 message ThirdPartyResourceData {
   // Standard object metadata.
   // +optional
-  optional k8s.io.kubernetes.pkg.api.v1.ObjectMeta metadata = 1;
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
   // Data is the raw JSON data for this data.
   // +optional
@@ -1003,7 +1011,7 @@ message ThirdPartyResourceDataList {
   // Standard list metadata
   // More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
   // +optional
-  optional k8s.io.kubernetes.pkg.apis.meta.v1.ListMeta metadata = 1;
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
 
   // Items is the list of ThirdpartyResourceData.
   repeated ThirdPartyResourceData items = 2;
@@ -1013,7 +1021,7 @@ message ThirdPartyResourceDataList {
 message ThirdPartyResourceList {
   // Standard list metadata.
   // +optional
-  optional k8s.io.kubernetes.pkg.apis.meta.v1.ListMeta metadata = 1;
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
 
   // Items is the list of ThirdPartyResources.
   repeated ThirdPartyResource items = 2;

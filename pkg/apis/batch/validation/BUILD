@@ -16,11 +16,11 @@ go_library(
         "//pkg/api:go_default_library",
         "//pkg/api/validation:go_default_library",
         "//pkg/apis/batch:go_default_library",
-        "//pkg/apis/meta/v1:go_default_library",
-        "//pkg/apis/meta/v1/validation:go_default_library",
-        "//pkg/labels:go_default_library",
-        "//pkg/util/validation/field:go_default_library",
         "//vendor:github.com/robfig/cron",
+        "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
+        "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1/validation",
+        "//vendor:k8s.io/apimachinery/pkg/labels",
+        "//vendor:k8s.io/apimachinery/pkg/util/validation/field",
     ],
 )
 
@@ -32,7 +32,20 @@ go_test(
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/apis/batch:go_default_library",
-        "//pkg/apis/meta/v1:go_default_library",
-        "//pkg/types:go_default_library",
+        "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
+        "//vendor:k8s.io/apimachinery/pkg/types",
     ],
+)
+
+filegroup(
+    name = "package-srcs",
+    srcs = glob(["**"]),
+    tags = ["automanaged"],
+    visibility = ["//visibility:private"],
+)
+
+filegroup(
+    name = "all-srcs",
+    srcs = [":package-srcs"],
+    tags = ["automanaged"],
 )

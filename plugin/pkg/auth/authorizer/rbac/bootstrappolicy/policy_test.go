@@ -25,17 +25,17 @@ import (
 
 	"github.com/ghodss/yaml"
 
+	"k8s.io/apimachinery/pkg/api/meta"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/diff"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/api"
 	_ "k8s.io/kubernetes/pkg/api/install"
-	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/api/v1"
-	rbac "k8s.io/kubernetes/pkg/apis/rbac"
+	"k8s.io/kubernetes/pkg/apis/rbac"
 	_ "k8s.io/kubernetes/pkg/apis/rbac/install"
 	rbacv1alpha1 "k8s.io/kubernetes/pkg/apis/rbac/v1alpha1"
-	rbacvalidation "k8s.io/kubernetes/pkg/apis/rbac/validation"
-	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/util/diff"
-	"k8s.io/kubernetes/pkg/util/sets"
+	rbacregistryvalidation "k8s.io/kubernetes/pkg/registry/rbac/validation"
 	"k8s.io/kubernetes/plugin/pkg/auth/authorizer/rbac/bootstrappolicy"
 )
 
@@ -67,13 +67,13 @@ func getSemanticRoles(roles []rbac.ClusterRole) semanticRoles {
 func TestCovers(t *testing.T) {
 	semanticRoles := getSemanticRoles(bootstrappolicy.ClusterRoles())
 
-	if covers, miss := rbacvalidation.Covers(semanticRoles.admin.Rules, semanticRoles.edit.Rules); !covers {
+	if covers, miss := rbacregistryvalidation.Covers(semanticRoles.admin.Rules, semanticRoles.edit.Rules); !covers {
 		t.Errorf("failed to cover: %#v", miss)
 	}
-	if covers, miss := rbacvalidation.Covers(semanticRoles.admin.Rules, semanticRoles.view.Rules); !covers {
+	if covers, miss := rbacregistryvalidation.Covers(semanticRoles.admin.Rules, semanticRoles.view.Rules); !covers {
 		t.Errorf("failed to cover: %#v", miss)
 	}
-	if covers, miss := rbacvalidation.Covers(semanticRoles.edit.Rules, semanticRoles.view.Rules); !covers {
+	if covers, miss := rbacregistryvalidation.Covers(semanticRoles.edit.Rules, semanticRoles.view.Rules); !covers {
 		t.Errorf("failed to cover: %#v", miss)
 	}
 }
@@ -91,17 +91,17 @@ func TestAdminEditRelationship(t *testing.T) {
 
 	// confirm that the edit role doesn't already have extra powers
 	for _, rule := range additionalAdminPowers {
-		if covers, _ := rbacvalidation.Covers(semanticRoles.edit.Rules, []rbac.PolicyRule{rule}); covers {
+		if covers, _ := rbacregistryvalidation.Covers(semanticRoles.edit.Rules, []rbac.PolicyRule{rule}); covers {
 			t.Errorf("edit has extra powers: %#v", rule)
 		}
 	}
 	semanticRoles.edit.Rules = append(semanticRoles.edit.Rules, additionalAdminPowers...)
 
 	// at this point, we should have a two way covers relationship
-	if covers, miss := rbacvalidation.Covers(semanticRoles.admin.Rules, semanticRoles.edit.Rules); !covers {
+	if covers, miss := rbacregistryvalidation.Covers(semanticRoles.admin.Rules, semanticRoles.edit.Rules); !covers {
 		t.Errorf("admin has lost rules for: %#v", miss)
 	}
-	if covers, miss := rbacvalidation.Covers(semanticRoles.edit.Rules, semanticRoles.admin.Rules); !covers {
+	if covers, miss := rbacregistryvalidation.Covers(semanticRoles.edit.Rules, semanticRoles.admin.Rules); !covers {
 		t.Errorf("edit is missing rules for: %#v\nIf these should only be admin powers, add them to the list.  Otherwise, add them to the edit role.", miss)
 	}
 }
@@ -136,17 +136,17 @@ func TestEditViewRelationship(t *testing.T) {
 
 	// confirm that the view role doesn't already have extra powers
 	for _, rule := range viewEscalatingNamespaceResources {
-		if covers, _ := rbacvalidation.Covers(semanticRoles.view.Rules, []rbac.PolicyRule{rule}); covers {
+		if covers, _ := rbacregistryvalidation.Covers(semanticRoles.view.Rules, []rbac.PolicyRule{rule}); covers {
 			t.Errorf("view has extra powers: %#v", rule)
 		}
 	}
 	semanticRoles.view.Rules = append(semanticRoles.view.Rules, viewEscalatingNamespaceResources...)
 
 	// at this point, we should have a two way covers relationship
-	if covers, miss := rbacvalidation.Covers(semanticRoles.edit.Rules, semanticRoles.view.Rules); !covers {
+	if covers, miss := rbacregistryvalidation.Covers(semanticRoles.edit.Rules, semanticRoles.view.Rules); !covers {
 		t.Errorf("edit has lost rules for: %#v", miss)
 	}
-	if covers, miss := rbacvalidation.Covers(semanticRoles.view.Rules, semanticRoles.edit.Rules); !covers {
+	if covers, miss := rbacregistryvalidation.Covers(semanticRoles.view.Rules, semanticRoles.edit.Rules); !covers {
 		t.Errorf("view is missing rules for: %#v\nIf these are escalating powers, add them to the list.  Otherwise, add them to the view role.", miss)
 	}
 }

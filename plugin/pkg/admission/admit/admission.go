@@ -19,7 +19,7 @@ package admit
 import (
 	"io"
 
-	"k8s.io/kubernetes/pkg/admission"
+	"k8s.io/apiserver/pkg/admission"
 )
 
 func init() {

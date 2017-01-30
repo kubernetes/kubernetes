@@ -21,7 +21,7 @@ limitations under the License.
 package v1
 
 import (
-	runtime "k8s.io/kubernetes/pkg/runtime"
+	runtime "k8s.io/apimachinery/pkg/runtime"
 )
 
 func init() {

@@ -21,18 +21,18 @@ import (
 	"testing"
 	"time"
 
-	"k8s.io/kubernetes/pkg/admission"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/apiserver/pkg/admission"
+	"k8s.io/client-go/pkg/util/clock"
 	"k8s.io/kubernetes/pkg/api"
-	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/fake"
 	"k8s.io/kubernetes/pkg/client/testing/core"
 	"k8s.io/kubernetes/pkg/controller/informers"
 	kubeadmission "k8s.io/kubernetes/pkg/kubeapiserver/admission"
-	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/util/clock"
-	"k8s.io/kubernetes/pkg/util/sets"
-	"k8s.io/kubernetes/pkg/util/wait"
 )
 
 // newHandlerForTest returns a configured handler for testing.
@@ -65,7 +65,7 @@ func newMockClientForTest(namespaces map[string]api.NamespacePhase) *fake.Client
 		index := 0
 		for name, phase := range namespaces {
 			namespaceList.Items = append(namespaceList.Items, api.Namespace{
-				ObjectMeta: api.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Name:            name,
 					ResourceVersion: fmt.Sprintf("%d", index),
 				},
@@ -83,7 +83,7 @@ func newMockClientForTest(namespaces map[string]api.NamespacePhase) *fake.Client
 // newPod returns a new pod for the specified namespace
 func newPod(namespace string) api.Pod {
 	return api.Pod{
-		ObjectMeta: api.ObjectMeta{Name: "123", Namespace: namespace},
+		ObjectMeta: metav1.ObjectMeta{Name: "123", Namespace: namespace},
 		Spec: api.PodSpec{
 			Volumes:    []api.Volume{{Name: "vol"}},
 			Containers: []api.Container{{Name: "ctr", Image: "image"}},
@@ -188,7 +188,7 @@ func TestAdmissionNamespaceForceLiveLookup(t *testing.T) {
 	mockClient := newMockClientForTest(phases)
 	mockClient.AddReactor("get", "namespaces", func(action core.Action) (bool, runtime.Object, error) {
 		getCalls++
-		return true, &api.Namespace{ObjectMeta: api.ObjectMeta{Name: namespace}, Status: api.NamespaceStatus{Phase: phases[namespace]}}, nil
+		return true, &api.Namespace{ObjectMeta: metav1.ObjectMeta{Name: namespace}, Status: api.NamespaceStatus{Phase: phases[namespace]}}, nil
 	})
 
 	fakeClock := clock.NewFakeClock(time.Now())

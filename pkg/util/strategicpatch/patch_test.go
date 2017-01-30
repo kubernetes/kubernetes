@@ -46,13 +46,35 @@ type StrategicMergePatchTestCase struct {
 	StrategicMergePatchTestCaseData
 }
 
+type StrategicMergePatchRawTestCase struct {
+	Description string
+	StrategicMergePatchRawTestCaseData
+}
+
 type StrategicMergePatchTestCaseData struct {
+	// Original is the original object (last-applied config in annotation)
 	Original map[string]interface{}
-	TwoWay   map[string]interface{}
+	// Modified is the modified object (new config we want)
 	Modified map[string]interface{}
-	Current  map[string]interface{}
+	// Current is the current object (live config in the server)
+	Current map[string]interface{}
+	// TwoWay is the expected two-way merge patch diff between original and modified
+	TwoWay map[string]interface{}
+	// ThreeWay is the expected three-way merge patch
 	ThreeWay map[string]interface{}
-	Result   map[string]interface{}
+	// Result is the expected object after applying the three-way patch on current object.
+	Result map[string]interface{}
+}
+
+// The meaning of each field is the same as StrategicMergePatchTestCaseData's.
+// The difference is that all the fields in StrategicMergePatchRawTestCaseData are json-encoded data.
+type StrategicMergePatchRawTestCaseData struct {
+	Original []byte
+	Modified []byte
+	Current  []byte
+	TwoWay   []byte
+	ThreeWay []byte
+	Result   []byte
 }
 
 type MergeItem struct {
@@ -308,6 +330,25 @@ testCases:
       $patch: replace
     modified:
       other: a
+  - description: delete all duplicate entries in a merging list
+    original:
+      mergingList:
+        - name: 1
+        - name: 1
+        - name: 2
+          value: a
+        - name: 3
+        - name: 3
+    twoWay:
+      mergingList:
+        - name: 1
+          $patch: delete
+        - name: 3
+          $patch: delete
+    modified:
+      mergingList:
+        - name: 2
+          value: a
 `)
 
 func TestCustomStrategicMergePatch(t *testing.T) {
@@ -1778,6 +1819,125 @@ testCases:
           other: b
 `)
 
+var strategicMergePatchRawTestCases = []StrategicMergePatchRawTestCase{
+	{
+		Description: "delete items in lists of scalars",
+		StrategicMergePatchRawTestCaseData: StrategicMergePatchRawTestCaseData{
+			Original: []byte(`
+mergingIntList:
+  - 1
+  - 2
+  - 3
+`),
+			TwoWay: []byte(`
+$deleteFromPrimitiveList/mergingIntList:
+  - 3
+`),
+			Modified: []byte(`
+mergingIntList:
+  - 1
+  - 2
+`),
+			Current: []byte(`
+mergingIntList:
+  - 1
+  - 2
+  - 3
+  - 4
+`),
+			ThreeWay: []byte(`
+$deleteFromPrimitiveList/mergingIntList:
+  - 3
+`),
+			Result: []byte(`
+mergingIntList:
+  - 1
+  - 2
+  - 4
+`),
+		},
+	},
+	{
+		Description: "delete all duplicate items in lists of scalars",
+		StrategicMergePatchRawTestCaseData: StrategicMergePatchRawTestCaseData{
+			Original: []byte(`
+mergingIntList:
+  - 1
+  - 2
+  - 3
+  - 3
+`),
+			TwoWay: []byte(`
+$deleteFromPrimitiveList/mergingIntList:
+  - 3
+`),
+			Modified: []byte(`
+mergingIntList:
+  - 1
+  - 2
+`),
+			Current: []byte(`
+mergingIntList:
+  - 1
+  - 2
+  - 3
+  - 3
+  - 4
+`),
+			ThreeWay: []byte(`
+$deleteFromPrimitiveList/mergingIntList:
+  - 3
+`),
+			Result: []byte(`
+mergingIntList:
+  - 1
+  - 2
+  - 4
+`),
+		},
+	},
+	{
+		Description: "add and delete items in lists of scalars",
+		StrategicMergePatchRawTestCaseData: StrategicMergePatchRawTestCaseData{
+			Original: []byte(`
+mergingIntList:
+  - 1
+  - 2
+  - 3
+`),
+			TwoWay: []byte(`
+$deleteFromPrimitiveList/mergingIntList:
+  - 3
+mergingIntList:
+  - 4
+`),
+			Modified: []byte(`
+mergingIntList:
+  - 1
+  - 2
+  - 4
+`),
+			Current: []byte(`
+mergingIntList:
+  - 1
+  - 2
+  - 3
+  - 4
+`),
+			ThreeWay: []byte(`
+$deleteFromPrimitiveList/mergingIntList:
+  - 3
+`),
+			Result: []byte(`
+mergingIntList:
+  - 1
+  - 2
+  - 4
+`),
+		},
+	},
+}
+
 func TestStrategicMergePatch(t *testing.T) {
 	testStrategicMergePatchWithCustomArguments(t, "bad original",
 		"<THIS IS NOT JSON>", "{}", mergeItem, errBadJSONDoc)
@@ -1798,6 +1958,11 @@ func TestStrategicMergePatch(t *testing.T) {
 	for _, c := range tc.TestCases {
 		testTwoWayPatch(t, c)
 		testThreeWayPatch(t, c)
+	}
+
+	for _, c := range strategicMergePatchRawTestCases {
+		testTwoWayPatchForRawTestCase(t, c)
+		testThreeWayPatchForRawTestCase(t, c)
 	}
 }
 
@@ -1830,10 +1995,30 @@ func testTwoWayPatch(t *testing.T, c StrategicMergePatchTestCase) {
 	testPatchApplication(t, original, actual, modified, c.Description)
 }
 
+func testTwoWayPatchForRawTestCase(t *testing.T, c StrategicMergePatchRawTestCase) {
+	original, expected, modified := twoWayRawTestCaseToJSONOrFail(t, c)
+
+	actual, err := CreateTwoWayMergePatch(original, modified, mergeItem)
+	if err != nil {
+		t.Errorf("error: %s\nin test case: %s\ncannot create two way patch:\noriginal:%s\ntwoWay:%s\nmodified:%s\ncurrent:%s\nthreeWay:%s\nresult:%s\n",
+			err, c.Description, c.Original, c.TwoWay, c.Modified, c.Current, c.ThreeWay, c.Result)
+		return
+	}
+
+	testPatchCreation(t, expected, actual, c.Description)
+	testPatchApplication(t, original, actual, modified, c.Description)
+}
+
 func twoWayTestCaseToJSONOrFail(t *testing.T, c StrategicMergePatchTestCase) ([]byte, []byte, []byte) {
 	return testObjectToJSONOrFail(t, c.Original, c.Description),
 		testObjectToJSONOrFail(t, c.TwoWay, c.Description),
 		testObjectToJSONOrFail(t, c.Modified, c.Description)
+}
+
+func twoWayRawTestCaseToJSONOrFail(t *testing.T, c StrategicMergePatchRawTestCase) ([]byte, []byte, []byte) {
+	return yamlToJSONOrError(t, c.Original),
+		yamlToJSONOrError(t, c.TwoWay),
+		yamlToJSONOrError(t, c.Modified)
 }
 
 func testThreeWayPatch(t *testing.T, c StrategicMergePatchTestCase) {
@@ -1877,12 +2062,61 @@ func testThreeWayPatch(t *testing.T, c StrategicMergePatchTestCase) {
 	testPatchApplication(t, current, actual, result, c.Description)
 }
 
+func testThreeWayPatchForRawTestCase(t *testing.T, c StrategicMergePatchRawTestCase) {
+	original, modified, current, expected, result := threeWayRawTestCaseToJSONOrFail(t, c)
+	actual, err := CreateThreeWayMergePatch(original, modified, current, mergeItem, false)
+	if err != nil {
+		if !IsConflict(err) {
+			t.Errorf("error: %s\nin test case: %s\ncannot create three way patch:\noriginal:%s\ntwoWay:%s\nmodified:%s\ncurrent:%s\nthreeWay:%s\nresult:%s\n",
+				err, c.Description, c.Original, c.TwoWay, c.Modified, c.Current, c.ThreeWay, c.Result)
+			return
+		}
+
+		if !strings.Contains(c.Description, "conflict") {
+			t.Errorf("unexpected conflict: %s\nin test case: %s\ncannot create three way patch:\noriginal:%s\ntwoWay:%s\nmodified:%s\ncurrent:%s\nthreeWay:%s\nresult:%s\n",
+				err, c.Description, c.Original, c.TwoWay, c.Modified, c.Current, c.ThreeWay, c.Result)
+			return
+		}
+
+		if len(c.Result) > 0 {
+			actual, err := CreateThreeWayMergePatch(original, modified, current, mergeItem, true)
+			if err != nil {
+				t.Errorf("error: %s\nin test case: %s\ncannot force three way patch application:\noriginal:%s\ntwoWay:%s\nmodified:%s\ncurrent:%s\nthreeWay:%s\nresult:%s\n",
+					err, c.Description, c.Original, c.TwoWay, c.Modified, c.Current, c.ThreeWay, c.Result)
+				return
+			}
+
+			testPatchCreation(t, expected, actual, c.Description)
+			testPatchApplication(t, current, actual, result, c.Description)
+		}
+
+		return
+	}
+
+	if strings.Contains(c.Description, "conflict") || len(c.Result) < 1 {
+		t.Errorf("error: %s\nin test case: %s\nexpected conflict did not occur:\noriginal:%s\ntwoWay:%s\nmodified:%s\ncurrent:%s\nthreeWay:%s\nresult:%s\n",
+			err, c.Description, c.Original, c.TwoWay, c.Modified, c.Current, c.ThreeWay, c.Result)
+		return
+	}
+
+	testPatchCreation(t, expected, actual, c.Description)
+	testPatchApplication(t, current, actual, result, c.Description)
+}
+
 func threeWayTestCaseToJSONOrFail(t *testing.T, c StrategicMergePatchTestCase) ([]byte, []byte, []byte, []byte, []byte) {
 	return testObjectToJSONOrFail(t, c.Original, c.Description),
 		testObjectToJSONOrFail(t, c.Modified, c.Description),
 		testObjectToJSONOrFail(t, c.Current, c.Description),
 		testObjectToJSONOrFail(t, c.ThreeWay, c.Description),
 		testObjectToJSONOrFail(t, c.Result, c.Description)
+}
+
+func threeWayRawTestCaseToJSONOrFail(t *testing.T, c StrategicMergePatchRawTestCase) ([]byte, []byte, []byte, []byte, []byte) {
+	return yamlToJSONOrError(t, c.Original),
+		yamlToJSONOrError(t, c.Modified),
+		yamlToJSONOrError(t, c.Current),
+		yamlToJSONOrError(t, c.ThreeWay),
+		yamlToJSONOrError(t, c.Result)
 }
 
 func testPatchCreation(t *testing.T, expected, actual []byte, description string) {
@@ -1968,6 +2202,24 @@ func jsonToYAML(j []byte) ([]byte, error) {
 	}
 
 	return y, nil
+}
+
+func yamlToJSON(y []byte) ([]byte, error) {
+	j, err := yaml.YAMLToJSON(y)
+	if err != nil {
+		return nil, fmt.Errorf("yaml to json failed: %v\n%v\n", err, y)
+	}
+
+	return j, nil
+}
+
+func yamlToJSONOrError(t *testing.T, y []byte) []byte {
+	j, err := yamlToJSON(y)
+	if err != nil {
+		t.Errorf("%v", err)
+	}
+
+	return j
 }
 
 func TestHasConflicts(t *testing.T) {

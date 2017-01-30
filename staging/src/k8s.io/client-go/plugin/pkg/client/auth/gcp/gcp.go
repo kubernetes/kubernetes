@@ -30,8 +30,8 @@ import (
 	"golang.org/x/net/context"
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
+	"k8s.io/apimachinery/pkg/util/yaml"
 	"k8s.io/client-go/pkg/util/jsonpath"
-	"k8s.io/client-go/pkg/util/yaml"
 	"k8s.io/client-go/rest"
 )
 
