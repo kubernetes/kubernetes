@@ -583,7 +583,7 @@ var _ = framework.KubeDescribe("Kubectl client", func() {
 			framework.BindClusterRole(f.ClientSet.Rbac(), "view", f.Namespace.Name,
 				rbacv1beta1.Subject{Kind: rbacv1beta1.ServiceAccountKind, Namespace: f.Namespace.Name, Name: "default"})
 
-			err := framework.WaitForAuthorizationUpdate(f.ClientSet.Authorization(),
+			err := framework.WaitForAuthorizationUpdate(f.ClientSet.AuthorizationV1beta1(),
 				serviceaccount.MakeUsername(f.Namespace.Name, "default"),
 				f.Namespace.Name, "list", schema.GroupResource{Resource: "pods"}, true)
 			framework.ExpectNoError(err)
