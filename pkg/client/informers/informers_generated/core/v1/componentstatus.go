@@ -41,7 +41,7 @@ type componentStatusInformer struct {
 	factory internalinterfaces.SharedInformerFactory
 }
 
-func newComponentStatusInformer(client clientset.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
+func newComponentStatusInformer(client clientset.Interface, resyncCheck, resyncPeriod time.Duration) cache.SharedIndexInformer {
 	sharedIndexInformer := cache.NewSharedIndexInformer(
 		&cache.ListWatch{
 			ListFunc: func(options meta_v1.ListOptions) (runtime.Object, error) {
@@ -52,6 +52,7 @@ func newComponentStatusInformer(client clientset.Interface, resyncPeriod time.Du
 			},
 		},
 		&api_v1.ComponentStatus{},
+		resyncCheck,
 		resyncPeriod,
 		cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc},
 	)

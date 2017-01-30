@@ -41,7 +41,7 @@ type horizontalPodAutoscalerInformer struct {
 	factory internalinterfaces.SharedInformerFactory
 }
 
-func newHorizontalPodAutoscalerInformer(client internalclientset.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
+func newHorizontalPodAutoscalerInformer(client internalclientset.Interface, resyncCheck, resyncPeriod time.Duration) cache.SharedIndexInformer {
 	sharedIndexInformer := cache.NewSharedIndexInformer(
 		&cache.ListWatch{
 			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
@@ -52,6 +52,7 @@ func newHorizontalPodAutoscalerInformer(client internalclientset.Interface, resy
 			},
 		},
 		&autoscaling.HorizontalPodAutoscaler{},
+		resyncCheck,
 		resyncPeriod,
 		cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc},
 	)

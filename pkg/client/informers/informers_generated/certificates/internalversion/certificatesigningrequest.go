@@ -41,7 +41,7 @@ type certificateSigningRequestInformer struct {
 	factory internalinterfaces.SharedInformerFactory
 }
 
-func newCertificateSigningRequestInformer(client internalclientset.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
+func newCertificateSigningRequestInformer(client internalclientset.Interface, resyncCheck, resyncPeriod time.Duration) cache.SharedIndexInformer {
 	sharedIndexInformer := cache.NewSharedIndexInformer(
 		&cache.ListWatch{
 			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
@@ -52,6 +52,7 @@ func newCertificateSigningRequestInformer(client internalclientset.Interface, re
 			},
 		},
 		&certificates.CertificateSigningRequest{},
+		resyncCheck,
 		resyncPeriod,
 		cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc},
 	)

@@ -41,7 +41,7 @@ type podSecurityPolicyInformer struct {
 	factory internalinterfaces.SharedInformerFactory
 }
 
-func newPodSecurityPolicyInformer(client clientset.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
+func newPodSecurityPolicyInformer(client clientset.Interface, resyncCheck, resyncPeriod time.Duration) cache.SharedIndexInformer {
 	sharedIndexInformer := cache.NewSharedIndexInformer(
 		&cache.ListWatch{
 			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
@@ -52,6 +52,7 @@ func newPodSecurityPolicyInformer(client clientset.Interface, resyncPeriod time.
 			},
 		},
 		&extensions_v1beta1.PodSecurityPolicy{},
+		resyncCheck,
 		resyncPeriod,
 		cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc},
 	)

@@ -41,7 +41,7 @@ type secretInformer struct {
 	factory internalinterfaces.SharedInformerFactory
 }
 
-func newSecretInformer(client clientset.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
+func newSecretInformer(client clientset.Interface, resyncCheck, resyncPeriod time.Duration) cache.SharedIndexInformer {
 	sharedIndexInformer := cache.NewSharedIndexInformer(
 		&cache.ListWatch{
 			ListFunc: func(options meta_v1.ListOptions) (runtime.Object, error) {
@@ -52,6 +52,7 @@ func newSecretInformer(client clientset.Interface, resyncPeriod time.Duration) c
 			},
 		},
 		&api_v1.Secret{},
+		resyncCheck,
 		resyncPeriod,
 		cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc},
 	)

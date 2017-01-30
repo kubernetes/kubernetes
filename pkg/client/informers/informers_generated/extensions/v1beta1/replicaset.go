@@ -41,7 +41,7 @@ type replicaSetInformer struct {
 	factory internalinterfaces.SharedInformerFactory
 }
 
-func newReplicaSetInformer(client clientset.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
+func newReplicaSetInformer(client clientset.Interface, resyncCheck, resyncPeriod time.Duration) cache.SharedIndexInformer {
 	sharedIndexInformer := cache.NewSharedIndexInformer(
 		&cache.ListWatch{
 			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
@@ -52,6 +52,7 @@ func newReplicaSetInformer(client clientset.Interface, resyncPeriod time.Duratio
 			},
 		},
 		&extensions_v1beta1.ReplicaSet{},
+		resyncCheck,
 		resyncPeriod,
 		cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc},
 	)

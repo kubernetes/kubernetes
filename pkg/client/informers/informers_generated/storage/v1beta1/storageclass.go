@@ -41,7 +41,7 @@ type storageClassInformer struct {
 	factory internalinterfaces.SharedInformerFactory
 }
 
-func newStorageClassInformer(client clientset.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
+func newStorageClassInformer(client clientset.Interface, resyncCheck, resyncPeriod time.Duration) cache.SharedIndexInformer {
 	sharedIndexInformer := cache.NewSharedIndexInformer(
 		&cache.ListWatch{
 			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
@@ -52,6 +52,7 @@ func newStorageClassInformer(client clientset.Interface, resyncPeriod time.Durat
 			},
 		},
 		&storage_v1beta1.StorageClass{},
+		resyncCheck,
 		resyncPeriod,
 		cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc},
 	)

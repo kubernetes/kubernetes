@@ -41,7 +41,7 @@ type cronJobInformer struct {
 	factory internalinterfaces.SharedInformerFactory
 }
 
-func newCronJobInformer(client internalclientset.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
+func newCronJobInformer(client internalclientset.Interface, resyncCheck, resyncPeriod time.Duration) cache.SharedIndexInformer {
 	sharedIndexInformer := cache.NewSharedIndexInformer(
 		&cache.ListWatch{
 			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
@@ -52,6 +52,7 @@ func newCronJobInformer(client internalclientset.Interface, resyncPeriod time.Du
 			},
 		},
 		&batch.CronJob{},
+		resyncCheck,
 		resyncPeriod,
 		cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc},
 	)

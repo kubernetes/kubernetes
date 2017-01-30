@@ -41,7 +41,7 @@ type roleBindingInformer struct {
 	factory internalinterfaces.SharedInformerFactory
 }
 
-func newRoleBindingInformer(client clientset.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
+func newRoleBindingInformer(client clientset.Interface, resyncCheck, resyncPeriod time.Duration) cache.SharedIndexInformer {
 	sharedIndexInformer := cache.NewSharedIndexInformer(
 		&cache.ListWatch{
 			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
@@ -52,6 +52,7 @@ func newRoleBindingInformer(client clientset.Interface, resyncPeriod time.Durati
 			},
 		},
 		&rbac_v1alpha1.RoleBinding{},
+		resyncCheck,
 		resyncPeriod,
 		cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc},
 	)

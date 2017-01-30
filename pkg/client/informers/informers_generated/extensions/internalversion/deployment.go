@@ -41,7 +41,7 @@ type deploymentInformer struct {
 	factory internalinterfaces.SharedInformerFactory
 }
 
-func newDeploymentInformer(client internalclientset.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
+func newDeploymentInformer(client internalclientset.Interface, resyncCheck, resyncPeriod time.Duration) cache.SharedIndexInformer {
 	sharedIndexInformer := cache.NewSharedIndexInformer(
 		&cache.ListWatch{
 			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
@@ -52,6 +52,7 @@ func newDeploymentInformer(client internalclientset.Interface, resyncPeriod time
 			},
 		},
 		&extensions.Deployment{},
+		resyncCheck,
 		resyncPeriod,
 		cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc},
 	)

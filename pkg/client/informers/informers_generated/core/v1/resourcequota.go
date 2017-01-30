@@ -41,7 +41,7 @@ type resourceQuotaInformer struct {
 	factory internalinterfaces.SharedInformerFactory
 }
 
-func newResourceQuotaInformer(client clientset.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
+func newResourceQuotaInformer(client clientset.Interface, resyncCheck, resyncPeriod time.Duration) cache.SharedIndexInformer {
 	sharedIndexInformer := cache.NewSharedIndexInformer(
 		&cache.ListWatch{
 			ListFunc: func(options meta_v1.ListOptions) (runtime.Object, error) {
@@ -52,6 +52,7 @@ func newResourceQuotaInformer(client clientset.Interface, resyncPeriod time.Dura
 			},
 		},
 		&api_v1.ResourceQuota{},
+		resyncCheck,
 		resyncPeriod,
 		cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc},
 	)

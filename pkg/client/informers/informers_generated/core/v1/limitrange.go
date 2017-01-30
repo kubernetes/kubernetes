@@ -41,7 +41,7 @@ type limitRangeInformer struct {
 	factory internalinterfaces.SharedInformerFactory
 }
 
-func newLimitRangeInformer(client clientset.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
+func newLimitRangeInformer(client clientset.Interface, resyncCheck, resyncPeriod time.Duration) cache.SharedIndexInformer {
 	sharedIndexInformer := cache.NewSharedIndexInformer(
 		&cache.ListWatch{
 			ListFunc: func(options meta_v1.ListOptions) (runtime.Object, error) {
@@ -52,6 +52,7 @@ func newLimitRangeInformer(client clientset.Interface, resyncPeriod time.Duratio
 			},
 		},
 		&api_v1.LimitRange{},
+		resyncCheck,
 		resyncPeriod,
 		cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc},
 	)

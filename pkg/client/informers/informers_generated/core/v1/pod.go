@@ -41,7 +41,7 @@ type podInformer struct {
 	factory internalinterfaces.SharedInformerFactory
 }
 
-func newPodInformer(client clientset.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
+func newPodInformer(client clientset.Interface, resyncCheck, resyncPeriod time.Duration) cache.SharedIndexInformer {
 	sharedIndexInformer := cache.NewSharedIndexInformer(
 		&cache.ListWatch{
 			ListFunc: func(options meta_v1.ListOptions) (runtime.Object, error) {
@@ -52,6 +52,7 @@ func newPodInformer(client clientset.Interface, resyncPeriod time.Duration) cach
 			},
 		},
 		&api_v1.Pod{},
+		resyncCheck,
 		resyncPeriod,
 		cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc},
 	)

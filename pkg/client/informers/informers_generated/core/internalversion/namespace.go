@@ -41,7 +41,7 @@ type namespaceInformer struct {
 	factory internalinterfaces.SharedInformerFactory
 }
 
-func newNamespaceInformer(client internalclientset.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
+func newNamespaceInformer(client internalclientset.Interface, resyncCheck, resyncPeriod time.Duration) cache.SharedIndexInformer {
 	sharedIndexInformer := cache.NewSharedIndexInformer(
 		&cache.ListWatch{
 			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
@@ -52,6 +52,7 @@ func newNamespaceInformer(client internalclientset.Interface, resyncPeriod time.
 			},
 		},
 		&api.Namespace{},
+		resyncCheck,
 		resyncPeriod,
 		cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc},
 	)

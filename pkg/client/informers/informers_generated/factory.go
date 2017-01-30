@@ -43,6 +43,7 @@ type sharedInformerFactory struct {
 	internalClient  internalclientset.Interface
 	versionedClient clientset.Interface
 	lock            sync.Mutex
+	resyncCheck     time.Duration
 	defaultResync   time.Duration
 
 	informers map[reflect.Type]cache.SharedIndexInformer
@@ -52,10 +53,11 @@ type sharedInformerFactory struct {
 }
 
 // NewSharedInformerFactory constructs a new instance of sharedInformerFactory
-func NewSharedInformerFactory(internalClient internalclientset.Interface, versionedClient clientset.Interface, defaultResync time.Duration) SharedInformerFactory {
+func NewSharedInformerFactory(internalClient internalclientset.Interface, versionedClient clientset.Interface, resyncCheck, defaultResync time.Duration) SharedInformerFactory {
 	return &sharedInformerFactory{
 		internalClient:   internalClient,
 		versionedClient:  versionedClient,
+		resyncCheck:      resyncCheck,
 		defaultResync:    defaultResync,
 		informers:        make(map[reflect.Type]cache.SharedIndexInformer),
 		startedInformers: make(map[reflect.Type]bool),
@@ -86,7 +88,7 @@ func (f *sharedInformerFactory) InternalInformerFor(obj runtime.Object, newFunc 
 	if exists {
 		return informer
 	}
-	informer = newFunc(f.internalClient, f.defaultResync)
+	informer = newFunc(f.internalClient, f.resyncCheck, f.defaultResync)
 	f.informers[informerType] = informer
 
 	return informer
@@ -103,7 +105,7 @@ func (f *sharedInformerFactory) VersionedInformerFor(obj runtime.Object, newFunc
 	if exists {
 		return informer
 	}
-	informer = newFunc(f.versionedClient, f.defaultResync)
+	informer = newFunc(f.versionedClient, f.resyncCheck, f.defaultResync)
 	f.informers[informerType] = informer
 
 	return informer

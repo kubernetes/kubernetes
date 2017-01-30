@@ -41,7 +41,7 @@ type clusterRoleInformer struct {
 	factory internalinterfaces.SharedInformerFactory
 }
 
-func newClusterRoleInformer(client clientset.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
+func newClusterRoleInformer(client clientset.Interface, resyncCheck, resyncPeriod time.Duration) cache.SharedIndexInformer {
 	sharedIndexInformer := cache.NewSharedIndexInformer(
 		&cache.ListWatch{
 			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
@@ -52,6 +52,7 @@ func newClusterRoleInformer(client clientset.Interface, resyncPeriod time.Durati
 			},
 		},
 		&rbac_v1beta1.ClusterRole{},
+		resyncCheck,
 		resyncPeriod,
 		cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc},
 	)

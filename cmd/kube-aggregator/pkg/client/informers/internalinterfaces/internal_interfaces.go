@@ -26,8 +26,8 @@ import (
 	time "time"
 )
 
-type NewInternalInformerFunc func(internalclientset.Interface, time.Duration) cache.SharedIndexInformer
-type NewVersionedInformerFunc func(clientset.Interface, time.Duration) cache.SharedIndexInformer
+type NewInternalInformerFunc func(internalclientset.Interface, time.Duration, time.Duration) cache.SharedIndexInformer
+type NewVersionedInformerFunc func(clientset.Interface, time.Duration, time.Duration) cache.SharedIndexInformer
 
 // SharedInformerFactory a small interface to allow for adding an informer without an import cycle
 type SharedInformerFactory interface {

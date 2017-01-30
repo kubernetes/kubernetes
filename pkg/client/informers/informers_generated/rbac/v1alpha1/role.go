@@ -41,7 +41,7 @@ type roleInformer struct {
 	factory internalinterfaces.SharedInformerFactory
 }
 
-func newRoleInformer(client clientset.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
+func newRoleInformer(client clientset.Interface, resyncCheck, resyncPeriod time.Duration) cache.SharedIndexInformer {
 	sharedIndexInformer := cache.NewSharedIndexInformer(
 		&cache.ListWatch{
 			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
@@ -52,6 +52,7 @@ func newRoleInformer(client clientset.Interface, resyncPeriod time.Duration) cac
 			},
 		},
 		&rbac_v1alpha1.Role{},
+		resyncCheck,
 		resyncPeriod,
 		cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc},
 	)

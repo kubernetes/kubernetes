@@ -41,7 +41,7 @@ type statefulSetInformer struct {
 	factory internalinterfaces.SharedInformerFactory
 }
 
-func newStatefulSetInformer(client clientset.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
+func newStatefulSetInformer(client clientset.Interface, resyncCheck, resyncPeriod time.Duration) cache.SharedIndexInformer {
 	sharedIndexInformer := cache.NewSharedIndexInformer(
 		&cache.ListWatch{
 			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
@@ -52,6 +52,7 @@ func newStatefulSetInformer(client clientset.Interface, resyncPeriod time.Durati
 			},
 		},
 		&apps_v1beta1.StatefulSet{},
+		resyncCheck,
 		resyncPeriod,
 		cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc},
 	)

@@ -41,7 +41,7 @@ type aPIServiceInformer struct {
 	factory internalinterfaces.SharedInformerFactory
 }
 
-func newAPIServiceInformer(client clientset.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
+func newAPIServiceInformer(client clientset.Interface, resyncCheck, resyncPeriod time.Duration) cache.SharedIndexInformer {
 	sharedIndexInformer := cache.NewSharedIndexInformer(
 		&cache.ListWatch{
 			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
@@ -52,6 +52,7 @@ func newAPIServiceInformer(client clientset.Interface, resyncPeriod time.Duratio
 			},
 		},
 		&apiregistration_v1alpha1.APIService{},
+		resyncCheck,
 		resyncPeriod,
 		cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc},
 	)

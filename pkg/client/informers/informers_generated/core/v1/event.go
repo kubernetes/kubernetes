@@ -41,7 +41,7 @@ type eventInformer struct {
 	factory internalinterfaces.SharedInformerFactory
 }
 
-func newEventInformer(client clientset.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
+func newEventInformer(client clientset.Interface, resyncCheck, resyncPeriod time.Duration) cache.SharedIndexInformer {
 	sharedIndexInformer := cache.NewSharedIndexInformer(
 		&cache.ListWatch{
 			ListFunc: func(options meta_v1.ListOptions) (runtime.Object, error) {
@@ -52,6 +52,7 @@ func newEventInformer(client clientset.Interface, resyncPeriod time.Duration) ca
 			},
 		},
 		&api_v1.Event{},
+		resyncCheck,
 		resyncPeriod,
 		cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc},
 	)

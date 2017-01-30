@@ -41,7 +41,7 @@ type nodeInformer struct {
 	factory internalinterfaces.SharedInformerFactory
 }
 
-func newNodeInformer(client clientset.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
+func newNodeInformer(client clientset.Interface, resyncCheck, resyncPeriod time.Duration) cache.SharedIndexInformer {
 	sharedIndexInformer := cache.NewSharedIndexInformer(
 		&cache.ListWatch{
 			ListFunc: func(options meta_v1.ListOptions) (runtime.Object, error) {
@@ -52,6 +52,7 @@ func newNodeInformer(client clientset.Interface, resyncPeriod time.Duration) cac
 			},
 		},
 		&api_v1.Node{},
+		resyncCheck,
 		resyncPeriod,
 		cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc},
 	)

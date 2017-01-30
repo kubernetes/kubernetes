@@ -41,7 +41,7 @@ type thirdPartyResourceInformer struct {
 	factory internalinterfaces.SharedInformerFactory
 }
 
-func newThirdPartyResourceInformer(client clientset.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
+func newThirdPartyResourceInformer(client clientset.Interface, resyncCheck, resyncPeriod time.Duration) cache.SharedIndexInformer {
 	sharedIndexInformer := cache.NewSharedIndexInformer(
 		&cache.ListWatch{
 			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
@@ -52,6 +52,7 @@ func newThirdPartyResourceInformer(client clientset.Interface, resyncPeriod time
 			},
 		},
 		&extensions_v1beta1.ThirdPartyResource{},
+		resyncCheck,
 		resyncPeriod,
 		cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc},
 	)

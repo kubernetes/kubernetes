@@ -41,7 +41,7 @@ type persistentVolumeInformer struct {
 	factory internalinterfaces.SharedInformerFactory
 }
 
-func newPersistentVolumeInformer(client clientset.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
+func newPersistentVolumeInformer(client clientset.Interface, resyncCheck, resyncPeriod time.Duration) cache.SharedIndexInformer {
 	sharedIndexInformer := cache.NewSharedIndexInformer(
 		&cache.ListWatch{
 			ListFunc: func(options meta_v1.ListOptions) (runtime.Object, error) {
@@ -52,6 +52,7 @@ func newPersistentVolumeInformer(client clientset.Interface, resyncPeriod time.D
 			},
 		},
 		&api_v1.PersistentVolume{},
+		resyncCheck,
 		resyncPeriod,
 		cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc},
 	)

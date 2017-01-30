@@ -41,7 +41,7 @@ type podDisruptionBudgetInformer struct {
 	factory internalinterfaces.SharedInformerFactory
 }
 
-func newPodDisruptionBudgetInformer(client clientset.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
+func newPodDisruptionBudgetInformer(client clientset.Interface, resyncCheck, resyncPeriod time.Duration) cache.SharedIndexInformer {
 	sharedIndexInformer := cache.NewSharedIndexInformer(
 		&cache.ListWatch{
 			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
@@ -52,6 +52,7 @@ func newPodDisruptionBudgetInformer(client clientset.Interface, resyncPeriod tim
 			},
 		},
 		&policy_v1beta1.PodDisruptionBudget{},
+		resyncCheck,
 		resyncPeriod,
 		cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc},
 	)

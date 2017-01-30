@@ -41,7 +41,7 @@ type ingressInformer struct {
 	factory internalinterfaces.SharedInformerFactory
 }
 
-func newIngressInformer(client clientset.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
+func newIngressInformer(client clientset.Interface, resyncCheck, resyncPeriod time.Duration) cache.SharedIndexInformer {
 	sharedIndexInformer := cache.NewSharedIndexInformer(
 		&cache.ListWatch{
 			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
@@ -52,6 +52,7 @@ func newIngressInformer(client clientset.Interface, resyncPeriod time.Duration) 
 			},
 		},
 		&extensions_v1beta1.Ingress{},
+		resyncCheck,
 		resyncPeriod,
 		cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc},
 	)
