@@ -59,8 +59,8 @@ type Interface interface {
 //
 // Most consumers should use client.New() to get a Kubernetes API client.
 type RESTClient struct {
-	// base is the root URL for all invocations of the client
-	base *url.URL
+	// base URLContainer with all urls that can be used for communication with api servers
+	base *URLContainer
 	// versionedAPIPath is a path segment connecting the base URL to the resource root
 	versionedAPIPath string
 
@@ -91,14 +91,18 @@ type Serializers struct {
 // NewRESTClient creates a new RESTClient. This client performs generic REST functions
 // such as Get, Put, Post, and Delete on specified paths.  Codec controls encoding and
 // decoding of responses from the server.
-func NewRESTClient(baseURL *url.URL, versionedAPIPath string, config ContentConfig, maxQPS float32, maxBurst int, rateLimiter flowcontrol.RateLimiter, client *http.Client) (*RESTClient, error) {
-	base := *baseURL
-	if !strings.HasSuffix(base.Path, "/") {
-		base.Path += "/"
+func NewRESTClient(baseURLs []*url.URL, versionedAPIPath string, config ContentConfig, maxQPS float32, maxBurst int, rateLimiter flowcontrol.RateLimiter, client *http.Client) (*RESTClient, error) {
+	cleanURLs := make([]*url.URL, 0, len(baseURLs))
+	for _, u := range baseURLs {
+		cleanURL := *u
+		if !strings.HasSuffix(cleanURL.Path, "/") {
+			cleanURL.Path += "/"
+		}
+		cleanURL.RawQuery = ""
+		cleanURL.Fragment = ""
+		cleanURLs = append(cleanURLs, &cleanURL)
 	}
-	base.RawQuery = ""
-	base.Fragment = ""
-
+	urlContainer := NewURLContainer(cleanURLs)
 	if config.GroupVersion == nil {
 		config.GroupVersion = &schema.GroupVersion{}
 	}
@@ -117,7 +121,7 @@ func NewRESTClient(baseURL *url.URL, versionedAPIPath string, config ContentConf
 		throttle = rateLimiter
 	}
 	return &RESTClient{
-		base:             &base,
+		base:             urlContainer,
 		versionedAPIPath: versionedAPIPath,
 		contentConfig:    config,
 		serializers:      *serializers,
