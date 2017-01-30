@@ -74,7 +74,7 @@ func CreateThreeWayJSONMergePatch(original, modified, current []byte, fns ...str
 	var patchMap map[string]interface{}
 	err = json.Unmarshal(patch, &patchMap)
 	if err != nil {
-		return false, fmt.Errorf("Failed to unmarshal patch for precondition check: %s", patch)
+		return nil, fmt.Errorf("Failed to unmarshal patch for precondition check: %s", patch)
 	}
 	meetPreconditions, err := meetPreconditions(patchMap, fns...)
 	if err != nil {
