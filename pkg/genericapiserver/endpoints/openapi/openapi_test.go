@@ -18,9 +18,9 @@ package openapi
 
 import (
 	"testing"
+	"reflect"
 
 	"github.com/go-openapi/spec"
-	assert_pkg "github.com/stretchr/testify/assert"
 
 	"k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -45,15 +45,26 @@ func (t TestType) GroupVersionKind() schema.GroupVersionKind {
 	}
 }
 
+func assertEqual(t *testing.T, expected, actual interface{}) {
+	var equal bool
+	if expected == nil || actual == nil {
+		equal = expected == actual
+	} else {
+		equal = reflect.DeepEqual(expected, actual)
+	}
+	if !equal {
+		t.Errorf("%v != %v", expected, actual)
+	}
+}
+
 func TestGetDefinitionName(t *testing.T) {
-	assert := assert_pkg.New(t)
 	testType := TestType{}
 	s := runtime.NewScheme()
 	s.AddKnownTypeWithName(testType.GroupVersionKind(), &testType)
 	namer := NewDefinitionNamer(s)
 	n, e := namer.GetDefinitionName("", "k8s.io/kubernetes/pkg/genericapiserver/endpoints/openapi.TestType")
-	assert.Equal("io.k8s.kubernetes.pkg.genericapiserver.endpoints.openapi.TestType", n)
-	assert.Equal(e["x-kubernetes-group-version-kind"], []v1.GroupVersionKind{
+	assertEqual(t, "io.k8s.kubernetes.pkg.genericapiserver.endpoints.openapi.TestType", n)
+	assertEqual(t, e["x-kubernetes-group-version-kind"], []v1.GroupVersionKind{
 		{
 			Group:   "test",
 			Version: "v1",
@@ -61,6 +72,6 @@ func TestGetDefinitionName(t *testing.T) {
 		},
 	})
 	n, e2 := namer.GetDefinitionName("", "test.com/another.Type")
-	assert.Equal("com.test.another.Type", n)
-	assert.Equal(e2, spec.Extensions(nil))
+	assertEqual(t, "com.test.another.Type", n)
+	assertEqual(t, e2, spec.Extensions(nil))
 }
