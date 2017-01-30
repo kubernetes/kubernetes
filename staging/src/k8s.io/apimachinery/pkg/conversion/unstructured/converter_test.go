@@ -52,8 +52,25 @@ type C struct {
 	I []interface{} `json:"ci"`
 }
 
-// C needs to implement runtime.Object to make it usable for tests.
+type D struct {
+	A []interface{} `json:"da"`
+}
+
+type E struct {
+	A interface{} `json:"ea"`
+}
+
+// Implement runtime.Object to make types usable for tests.
+
 func (c *C) GetObjectKind() schema.ObjectKind {
+	return schema.EmptyObjectKind
+}
+
+func (d *D) GetObjectKind() schema.ObjectKind {
+	return schema.EmptyObjectKind
+}
+
+func (e *E) GetObjectKind() schema.ObjectKind {
 	return schema.EmptyObjectKind
 }
 
@@ -166,14 +183,88 @@ func TestRoundTrip(t *testing.T) {
 		},
 		{
 			// Test slice of interface{} with empty slices.
-			obj: &C{
-				I: []interface{}{[]interface{}{}, []interface{}{}},
+			obj: &D{
+				A: []interface{}{[]interface{}{}, []interface{}{}},
+			},
+		},
+		{
+			// Test slice of interface{} with different values.
+			obj: &D{
+				A: []interface{}{3.0, "3.0", nil},
 			},
 		},
 	}
 
 	for i := range testCases {
 		doRoundTrip(t, testCases[i].obj)
+		if t.Failed() {
+			break
+		}
+	}
+}
+
+func doUnrecognized(t *testing.T, jsonData string, item runtime.Object) {
+	unstr := make(map[string]interface{})
+	err := json.Unmarshal([]byte(jsonData), &unstr)
+	if err != nil {
+		t.Errorf("Error when unmarshaling to unstructured: %v", err)
+		return
+	}
+	// Now we have unstructured representation of the data.
+
+	data, err := json.Marshal(unstr)
+	if err != nil {
+		t.Errorf("Error when marshaling unstructured: %v", err)
+		return
+	}
+	unmarshalledObj := reflect.New(reflect.TypeOf(item).Elem()).Interface()
+	err = json.Unmarshal(data, &unmarshalledObj)
+	if err != nil {
+		t.Errorf("Error when unmarshaling to object: %v", err)
+		return
+	}
+
+	newObj := reflect.New(reflect.TypeOf(item).Elem()).Interface().(runtime.Object)
+	err = NewConverter().FromUnstructured(unstr, newObj)
+	if err != nil {
+		t.Errorf("FromUnstructured failed: %v", err)
+		return
+	}
+
+	if !reflect.DeepEqual(unmarshalledObj, newObj) {
+		t.Errorf("Object changed, diff: %v", diff.ObjectReflectDiff(unmarshalledObj, newObj))
+	}
+}
+
+func TestUnrecognized(t *testing.T) {
+	testCases := []struct{
+		data string
+		obj  runtime.Object
+	}{
+		{
+			data: "{\"da\":[3.0,\"3.0\",null]}",
+			obj:  &D{},
+		},
+		{
+			data: "{\"ea\":[3.0,\"3.0\",null]}",
+			obj:  &E{},
+		},
+		{
+			data: "{\"ea\":[null,null,null]}",
+			obj: &E{},
+		},
+		{
+			data: "{\"ea\":[[],[null]]}",
+			obj: &E{},
+		},
+		{
+			data: "{\"a\":{\"a\":[],\"b\":null}}",
+			obj: &E{},
+		},
+	}
+
+	for i := range testCases {
+		doUnrecognized(t, testCases[i].data, testCases[i].obj)
 		if t.Failed() {
 			break
 		}
