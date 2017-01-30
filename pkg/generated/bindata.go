@@ -188,7 +188,7 @@ func translationsKubectlOwners() (*asset, error) {
 	return a, nil
 }
 
-var _translationsKubectlDefaultLc_messagesK8sMo = []byte("\xde\x12\x04\x95\x00\x00\x00\x00\x15\x00\x00\x00\x1c\x00\x00\x00\xc4\x00\x00\x00\x1d\x00\x00\x00l\x01\x00\x00\x00\x00\x00\x00\xe0\x01\x00\x00q\x00\x00\x00\xe1\x01\x00\x00a\x00\x00\x00S\x02\x00\x00a\x00\x00\x00\xb5\x02\x00\x00;\x00\x00\x00\x17\x03\x00\x00U\x00\x00\x00S\x03\x00\x00\x83\x00\x00\x00\xa9\x03\x00\x009\x00\x00\x00-\x04\x00\x00/\x00\x00\x00g\x04\x00\x00A\x00\x00\x00\x97\x04\x00\x00=\x00\x00\x00\xd9\x04\x00\x00E\x00\x00\x00\x17\x05\x00\x00E\x00\x00\x00]\x05\x00\x00?\x00\x00\x00\xa3\x05\x00\x00[\x00\x00\x00\xe3\x05\x00\x00[\x00\x00\x00?\x06\x00\x00_\x00\x00\x00\x9b\x06\x00\x00=\x00\x00\x00\xfb\x06\x00\x00{\x00\x00\x009\a\x00\x00I\x00\x00\x00\xb5\a\x00\x00(\x01\x00\x00\xff\a\x00\x00\xac\x01\x00\x00(\t\x00\x008\x00\x00\x00\xd5\n\x00\x000\x00\x00\x00\x0e\v\x00\x000\x00\x00\x00?\v\x00\x00\x1d\x00\x00\x00p\v\x00\x00*\x00\x00\x00\x8e\v\x00\x00A\x00\x00\x00\xb9\v\x00\x00\x1c\x00\x00\x00\xfb\v\x00\x00\x17\x00\x00\x00\x18\f\x00\x00 \x00\x00\x000\f\x00\x00\x1e\x00\x00\x00Q\f\x00\x00\"\x00\x00\x00p\f\x00\x00\"\x00\x00\x00\x93\f\x00\x00\x1f\x00\x00\x00\xb6\f\x00\x00-\x00\x00\x00\xd6\f\x00\x00-\x00\x00\x00\x04\r\x00\x00/\x00\x00\x002\r\x00\x00\x1e\x00\x00\x00b\r\x00\x00=\x00\x00\x00\x81\r\x00\x00$\x00\x00\x00\xbf\r\x00\x00\xc3\x00\x00\x00\xe4\r\x00\x00\x01\x00\x00\x00\x03\x00\x00\x00\x13\x00\x00\x00\x0f\x00\x00\x00\x04\x00\x00\x00\x02\x00\x00\x00\x15\x00\x00\x00\x00\x00\x00\x00\a\x00\x00\x00\t\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\r\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x10\x00\x00\x00\x14\x00\x00\x00\x0e\x00\x00\x00\x05\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\b\x00\x00\x00\v\x00\x00\x00\x11\x00\x00\x00\x06\x00\x00\x00\x12\x00\x00\x00\n\x00\x00\x00\f\x00\x00\x00\x00Apply a configuration to a resource by filename or stdin\x04Apply a configuration to a resource by filename or stdin\x00Delete the specified cluster from the kubeconfig\x04Delete the specified cluster from the kubeconfig\x00Delete the specified context from the kubeconfig\x04Delete the specified context from the kubeconfig\x00Describe one or many contexts\x04Describe one or many contexts\x00Display clusters defined in the kubeconfig\x04Display clusters defined in the kubeconfig\x00Display merged kubeconfig settings or a specified kubeconfig file\x04Display merged kubeconfig settings or a specified kubeconfig file\x00Displays the current-context\x04Displays the current-context\x00Modify kubeconfig files\x04Modify kubeconfig files\x00Set specific features on objects\x04Set specific features on objects\x00Set the selector on a resource\x04Set the selector on a resource\x00Sets a cluster entry in kubeconfig\x04Sets a cluster entry in kubeconfig\x00Sets a context entry in kubeconfig\x04Sets a context entry in kubeconfig\x00Sets a user entry in kubeconfig\x04Sets a user entry in kubeconfig\x00Sets an individual value in a kubeconfig file\x04Sets an individual value in a kubeconfig file\x00Sets the current-context in a kubeconfig file\x04Sets the current-context in a kubeconfig file\x00Unsets an individual value in a kubeconfig file\x04Unsets an individual value in a kubeconfig file\x00Update image of a pod template\x04Update image of a pod template\x00Update resource requests/limits on objects with pod templates\x04Update resource requests/limits on objects with pod templates\x00Update the annotations on a resource\x04Update the annotations on a resource\x00watch is only supported on individual resources and resource collections - %d resources were found\x04watch is only supported on individual resources and resource collections - %d resources were found\x00watch is only supported on individual resources and resource collections - %d resources were found\x00Project-Id-Version: gettext-go-examples-hello\nReport-Msgid-Bugs-To: \nPOT-Creation-Date: 2013-12-12 20:03+0000\nPO-Revision-Date: 2017-01-29 14:45-0800\nLast-Translator: Brendan Burns <brendan.d.burns@gmail.com>\nMIME-Version: 1.0\nContent-Type: text/plain; charset=UTF-8\nContent-Transfer-Encoding: 8bit\nX-Generator: Poedit 1.6.10\nX-Poedit-SourceCharset: UTF-8\nLanguage-Team: \nPlural-Forms: nplurals=2; plural=(n != 1);\nLanguage: en\n\x00Apply a configuration to a resource by filename or stdin\x00Delete the specified cluster from the kubeconfig\x00Delete the specified context from the kubeconfig\x00Describe one or many contexts\x00Display clusters defined in the kubeconfig\x00Display merged kubeconfig settings or a specified kubeconfig file\x00Displays the current-context\x00Modify kubeconfig files\x00Set specific features on objects\x00Set the selector on a resource\x00Sets a cluster entry in kubeconfig\x00Sets a context entry in kubeconfig\x00Sets a user entry in kubeconfig\x00Sets an individual value in a kubeconfig file\x00Sets the current-context in a kubeconfig file\x00Unsets an individual value in a kubeconfig file\x00Update image of a pod template\x00Update resource requests/limits on objects with pod templates\x00Update the annotations on a resource\x00watch is only supported on individual resources and resource collections - %d resource was found\x00watch is only supported on individual resources and resource collections - %d resources were found\x00")
+var _translationsKubectlDefaultLc_messagesK8sMo = []byte("\xde\x12\x04\x95\x00\x00\x00\x00I\x00\x00\x00\x1c\x00\x00\x00d\x02\x00\x00a\x00\x00\x00\xac\x04\x00\x00\x00\x00\x00\x000\x06\x00\x00\xb7\x00\x00\x001\x06\x00\x00\x95\x00\x00\x00\xe9\x06\x00\x00\xc3\x00\x00\x00\u007f\a\x00\x00y\x01\x00\x00C\b\x00\x00s\x00\x00\x00\xbd\t\x00\x00\x8b\x01\x00\x001\n\x00\x00]\x01\x00\x00\xbd\v\x00\x00\xad\x01\x00\x00\x1b\r\x00\x00q\x00\x00\x00\xc9\x0e\x00\x00\xaf\x00\x00\x00;\x0f\x00\x00\xeb\x00\x00\x00\xeb\x0f\x00\x00i\x00\x00\x00\xd7\x10\x00\x00[\x00\x00\x00A\x11\x00\x00G\x01\x00\x00\x9d\x11\x00\x00a\x00\x00\x00\xe5\x12\x00\x00a\x00\x00\x00G\x13\x00\x00;\x00\x00\x00\xa9\x13\x00\x00U\x00\x00\x00\xe5\x13\x00\x00\x83\x00\x00\x00;\x14\x00\x009\x00\x00\x00\xbf\x14\x00\x003\x00\x00\x00\xf9\x14\x00\x00\xed\x00\x00\x00-\x15\x00\x00\xe1\x00\x00\x00\x1b\x16\x00\x00\xc1\x00\x00\x00\xfd\x16\x00\x007\x01\x00\x00\xbf\x17\x00\x00/\x01\x00\x00\xf7\x18\x00\x00Q\x01\x00\x00'\x1a\x00\x00/\x00\x00\x00y\x1b\x00\x00\xc3\x00\x00\x00\xa9\x1b\x00\x00\xe7\x00\x00\x00m\x1c\x00\x00\xb1\x00\x00\x00U\x1d\x00\x00W\x00\x00\x00\a\x1e\x00\x00W\x00\x00\x00_\x1e\x00\x00m\x00\x00\x00\xb7\x1e\x00\x00\xe3\x00\x00\x00%\x1f\x00\x00M\x00\x00\x00\t \x00\x00G\x00\x00\x00W \x00\x00A\x00\x00\x00\x9f \x00\x00=\x00\x00\x00\xe1 \x00\x00E\x00\x00\x00\x1f!\x00\x00E\x00\x00\x00e!\x00\x00?\x00\x00\x00\xab!\x00\x00[\x00\x00\x00\xeb!\x00\x00[\x00\x00\x00G\"\x00\x003\x00\x00\x00\xa3\"\x00\x00G\x00\x00\x00\xd7\"\x00\x00\x05\x01\x00\x00\x1f#\x00\x00)\x01\x00\x00%$\x00\x00\x91\x00\x00\x00O%\x00\x00M\x00\x00\x00\xe1%\x00\x00\xcb\x00\x00\x00/&\x00\x00\xf5\x00\x00\x00\xfb&\x00\x00\x95\x00\x00\x00\xf1'\x00\x00\xcb\x01\x00\x00\x87(\x00\x00\xaf\x00\x00\x00S*\x00\x00\x8b\x00\x00\x00\x03+\x00\x00\xc3\x00\x00\x00\x8f+\x00\x00\xed\x00\x00\x00S,\x00\x00\x97\x01\x00\x00A-\x00\x00\x9f\x01\x00\x00\xd9.\x00\x00=\x02\x00\x00y0\x00\x009\x00\x00\x00\xb72\x00\x00\xa9\x00\x00\x00\xf12\x00\x00_\x00\x00\x00\x9b3\x00\x00=\x00\x00\x00\xfb3\x00\x00{\x00\x00\x0094\x00\x00I\x00\x00\x00\xb54\x00\x00W\x00\x00\x00\xff4\x00\x00\xe5\x00\x00\x00W5\x00\x00%\x00\x00\x00=6\x00\x001\x00\x00\x00c6\x00\x00(\x01\x00\x00\x956\x00\x00\xac\x01\x00\x00\xbe7\x00\x00[\x00\x00\x00k9\x00\x00J\x00\x00\x00\xc79\x00\x00a\x00\x00\x00\x12:\x00\x00\xbc\x00\x00\x00t:\x00\x009\x00\x00\x001;\x00\x00\xc5\x00\x00\x00k;\x00\x00\xae\x00\x00\x001<\x00\x00\xd6\x00\x00\x00\xe0<\x00\x008\x00\x00\x00\xb7=\x00\x00W\x00\x00\x00\xf0=\x00\x00u\x00\x00\x00H>\x00\x004\x00\x00\x00\xbe>\x00\x00-\x00\x00\x00\xf3>\x00\x00\xa3\x00\x00\x00!?\x00\x000\x00\x00\x00\xc5?\x00\x000\x00\x00\x00\xf6?\x00\x00\x1d\x00\x00\x00'@\x00\x00*\x00\x00\x00E@\x00\x00A\x00\x00\x00p@\x00\x00\x1c\x00\x00\x00\xb2@\x00\x00\x19\x00\x00\x00\xcf@\x00\x00v\x00\x00\x00\xe9@\x00\x00p\x00\x00\x00`A\x00\x00`\x00\x00\x00\xd1A\x00\x00\x9b\x00\x00\x002B\x00\x00\x97\x00\x00\x00\xceB\x00\x00\xa8\x00\x00\x00fC\x00\x00\x17\x00\x00\x00\x0fD\x00\x00a\x00\x00\x00'D\x00\x00s\x00\x00\x00\x89D\x00\x00X\x00\x00\x00\xfdD\x00\x00+\x00\x00\x00VE\x00\x00+\x00\x00\x00\x82E\x00\x006\x00\x00\x00\xaeE\x00\x00q\x00\x00\x00\xe5E\x00\x00&\x00\x00\x00WF\x00\x00#\x00\x00\x00~F\x00\x00 \x00\x00\x00\xa2F\x00\x00\x1e\x00\x00\x00\xc3F\x00\x00\"\x00\x00\x00\xe2F\x00\x00\"\x00\x00\x00\x05G\x00\x00\x1f\x00\x00\x00(G\x00\x00-\x00\x00\x00HG\x00\x00-\x00\x00\x00vG\x00\x00\x19\x00\x00\x00\xa4G\x00\x00#\x00\x00\x00\xbeG\x00\x00\x82\x00\x00\x00\xe2G\x00\x00\x94\x00\x00\x00eH\x00\x00H\x00\x00\x00\xfaH\x00\x00&\x00\x00\x00CI\x00\x00e\x00\x00\x00jI\x00\x00z\x00\x00\x00\xd0I\x00\x00J\x00\x00\x00KJ\x00\x00\xe5\x00\x00\x00\x96J\x00\x00W\x00\x00\x00|K\x00\x00E\x00\x00\x00\xd4K\x00\x00a\x00\x00\x00\x1aL\x00\x00v\x00\x00\x00|L\x00\x00\xcb\x00\x00\x00\xf3L\x00\x00\xcf\x00\x00\x00\xbfM\x00\x00\x1e\x01\x00\x00\x8fN\x00\x00\x1c\x00\x00\x00\xaeO\x00\x00T\x00\x00\x00\xcbO\x00\x00/\x00\x00\x00 P\x00\x00\x1e\x00\x00\x00PP\x00\x00=\x00\x00\x00oP\x00\x00$\x00\x00\x00\xadP\x00\x00+\x00\x00\x00\xd2P\x00\x00r\x00\x00\x00\xfeP\x00\x00\x12\x00\x00\x00qQ\x00\x00\x18\x00\x00\x00\x84Q\x00\x00\xc3\x00\x00\x00\x9dQ\x00\x00\x01\x00\x00\x00&\x00\x00\x00\x11\x00\x00\x00\x00\x00\x00\x00\x03\x00\x00\x006\x00\x00\x00\x1a\x00\x00\x00-\x00\x00\x00\x00\x00\x00\x00\n\x00\x00\x00C\x00\x00\x00\x10\x00\x00\x00H\x00\x00\x00\x1f\x00\x00\x00)\x00\x00\x00\x00\x00\x00\x003\x00\x00\x00\x00\x00\x00\x00\x16\x00\x00\x00\x15\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00:\x00\x00\x00\x00\x00\x00\x00G\x00\x00\x00\x0f\x00\x00\x00\x06\x00\x00\x00\r\x00\x00\x008\x00\x00\x00\x00\x00\x00\x00\x0e\x00\x00\x00F\x00\x00\x00%\x00\x00\x00@\x00\x00\x00 \x00\x00\x00\x1c\x00\x00\x00\x14\x00\x00\x00\x00\x00\x00\x00>\x00\x00\x004\x00\x00\x00\x18\x00\x00\x007\x00\x00\x000\x00\x00\x00B\x00\x00\x00\x02\x00\x00\x00\x00\x00\x00\x00\"\x00\x00\x00?\x00\x00\x00\x00\x00\x00\x00+\x00\x00\x00*\x00\x00\x00\x00\x00\x00\x00,\x00\x00\x00I\x00\x00\x00\x00\x00\x00\x00;\x00\x00\x002\x00\x00\x00\x00\x00\x00\x00=\x00\x00\x00'\x00\x00\x00\a\x00\x00\x00\x13\x00\x00\x00\x12\x00\x00\x00\x00\x00\x00\x00\b\x00\x00\x00\x05\x00\x00\x00\x00\x00\x00\x00.\x00\x00\x009\x00\x00\x00!\x00\x00\x00$\x00\x00\x00A\x00\x00\x00\x1e\x00\x00\x00\x17\x00\x00\x00/\x00\x00\x00E\x00\x00\x001\x00\x00\x005\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\t\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00<\x00\x00\x00\x1b\x00\x00\x00\x19\x00\x00\x00D\x00\x00\x00\x00\x00\x00\x00\v\x00\x00\x00\x1d\x00\x00\x00\x00\x00\x00\x00(\x00\x00\x00\f\x00\x00\x00\x04\x00\x00\x00\x00\x00\x00\x00#\x00\x00\x00\x00A comma-delimited set of quota scopes that must all match each object tracked by the quota.\x04A comma-delimited set of quota scopes that must all match each object tracked by the quota.\x00A comma-delimited set of resource=quantity pairs that define a hard limit.\x04A comma-delimited set of resource=quantity pairs that define a hard limit.\x00A label selector to use for this budget. Only equality-based selector requirements are supported.\x04A label selector to use for this budget. Only equality-based selector requirements are supported.\x00A label selector to use for this service. Only equality-based selector requirements are supported. If empty (the default) infer the selector from the replication controller or replica set.\x04A label selector to use for this service. Only equality-based selector requirements are supported. If empty (the default) infer the selector from the replication controller or replica set.\x00A schedule in the Cron format the job should be run with.\x04A schedule in the Cron format the job should be run with.\x00Additional external IP address (not managed by Kubernetes) to accept for the service. If this IP is routed to a node, the service can be accessed by this IP in addition to its generated service IP.\x04Additional external IP address (not managed by Kubernetes) to accept for the service. If this IP is routed to a node, the service can be accessed by this IP in addition to its generated service IP.\x00An inline JSON override for the generated object. If this is non-empty, it is used to override the generated object. Requires that the object supply a valid apiVersion field.\x04An inline JSON override for the generated object. If this is non-empty, it is used to override the generated object. Requires that the object supply a valid apiVersion field.\x00An inline JSON override for the generated service object. If this is non-empty, it is used to override the generated object. Requires that the object supply a valid apiVersion field.  Only used if --expose is true.\x04An inline JSON override for the generated service object. If this is non-empty, it is used to override the generated object. Requires that the object supply a valid apiVersion field.  Only used if --expose is true.\x00Apply a configuration to a resource by filename or stdin\x04Apply a configuration to a resource by filename or stdin\x00Assign your own ClusterIP or set to 'None' for a 'headless' service (no loadbalancing).\x04Assign your own ClusterIP or set to 'None' for a 'headless' service (no loadbalancing).\x00ClusterIP to be assigned to the service. Leave empty to auto-allocate, or set to 'None' to create a headless service.\x04ClusterIP to be assigned to the service. Leave empty to auto-allocate, or set to 'None' to create a headless service.\x00ClusterRole this ClusterRoleBinding should reference\x04ClusterRole this ClusterRoleBinding should reference\x00ClusterRole this RoleBinding should reference\x04ClusterRole this RoleBinding should reference\x00Container name which will have its image upgraded. Only relevant when --image is specified, ignored otherwise. Required when using --image on a multi-container pod\x04Container name which will have its image upgraded. Only relevant when --image is specified, ignored otherwise. Required when using --image on a multi-container pod\x00Delete the specified cluster from the kubeconfig\x04Delete the specified cluster from the kubeconfig\x00Delete the specified context from the kubeconfig\x04Delete the specified context from the kubeconfig\x00Describe one or many contexts\x04Describe one or many contexts\x00Display clusters defined in the kubeconfig\x04Display clusters defined in the kubeconfig\x00Display merged kubeconfig settings or a specified kubeconfig file\x04Display merged kubeconfig settings or a specified kubeconfig file\x00Displays the current-context\x04Displays the current-context\x00Email for Docker registry\x04Email for Docker registry\x00Explicit policy for when to pull container images. Required when --image is same as existing image, ignored otherwise.\x04Explicit policy for when to pull container images. Required when --image is same as existing image, ignored otherwise.\x00IP to assign to the Load Balancer. If empty, an ephemeral IP will be created and used (cloud-provider specific).\x04IP to assign to the Load Balancer. If empty, an ephemeral IP will be created and used (cloud-provider specific).\x00If non-empty, set the session affinity for the service to this; legal values: 'None', 'ClientIP'\x04If non-empty, set the session affinity for the service to this; legal values: 'None', 'ClientIP'\x00If non-empty, the annotation update will only succeed if this is the current resource-version for the object. Only valid when specifying a single resource.\x04If non-empty, the annotation update will only succeed if this is the current resource-version for the object. Only valid when specifying a single resource.\x00If non-empty, the labels update will only succeed if this is the current resource-version for the object. Only valid when specifying a single resource.\x04If non-empty, the labels update will only succeed if this is the current resource-version for the object. Only valid when specifying a single resource.\x00Image to use for upgrading the replication controller. Must be distinct from the existing image (either new image or new image tag).  Can not be used with --filename/-f\x04Image to use for upgrading the replication controller. Must be distinct from the existing image (either new image or new image tag).  Can not be used with --filename/-f\x00Modify kubeconfig files\x04Modify kubeconfig files\x00Name or number for the port on the container that the service should direct traffic to. Optional.\x04Name or number for the port on the container that the service should direct traffic to. Optional.\x00Only return logs after a specific date (RFC3339). Defaults to all logs. Only one of since-time / since may be used.\x04Only return logs after a specific date (RFC3339). Defaults to all logs. Only one of since-time / since may be used.\x00Output the formatted object with the given group version (for ex: 'extensions/v1beta1').\x04Output the formatted object with the given group version (for ex: 'extensions/v1beta1').\x00Password for Docker registry authentication\x04Password for Docker registry authentication\x00Path to PEM encoded public key certificate.\x04Path to PEM encoded public key certificate.\x00Path to private key associated with given certificate.\x04Path to private key associated with given certificate.\x00Precondition for resource version. Requires that the current resource version match this value in order to scale.\x04Precondition for resource version. Requires that the current resource version match this value in order to scale.\x00Role this RoleBinding should reference\x04Role this RoleBinding should reference\x00Server location for Docker registry\x04Server location for Docker registry\x00Set specific features on objects\x04Set specific features on objects\x00Set the selector on a resource\x04Set the selector on a resource\x00Sets a cluster entry in kubeconfig\x04Sets a cluster entry in kubeconfig\x00Sets a context entry in kubeconfig\x04Sets a context entry in kubeconfig\x00Sets a user entry in kubeconfig\x04Sets a user entry in kubeconfig\x00Sets an individual value in a kubeconfig file\x04Sets an individual value in a kubeconfig file\x00Sets the current-context in a kubeconfig file\x04Sets the current-context in a kubeconfig file\x00Synonym for --target-port\x04Synonym for --target-port\x00The image for the container to run.\x04The image for the container to run.\x00The image pull policy for the container. If left empty, this value will not be specified by the client and defaulted by the server\x04The image pull policy for the container. If left empty, this value will not be specified by the client and defaulted by the server\x00The key to use to differentiate between two different controllers, default 'deployment'.  Only relevant when --image is specified, ignored otherwise\x04The key to use to differentiate between two different controllers, default 'deployment'.  Only relevant when --image is specified, ignored otherwise\x00The minimum number or percentage of available pods this budget requires.\x04The minimum number or percentage of available pods this budget requires.\x00The name for the newly created object.\x04The name for the newly created object.\x00The name for the newly created object. If not specified, the name of the input resource will be used.\x04The name for the newly created object. If not specified, the name of the input resource will be used.\x00The name of the API generator to use, see http://kubernetes.io/docs/user-guide/kubectl-conventions/#generators for a list.\x04The name of the API generator to use, see http://kubernetes.io/docs/user-guide/kubectl-conventions/#generators for a list.\x00The name of the API generator to use. Currently there is only 1 generator.\x04The name of the API generator to use. Currently there is only 1 generator.\x00The name of the API generator to use. There are 2 generators: 'service/v1' and 'service/v2'. The only difference between them is that service port in v1 is named 'default', while it is left unnamed in v2. Default is 'service/v2'.\x04The name of the API generator to use. There are 2 generators: 'service/v1' and 'service/v2'. The only difference between them is that service port in v1 is named 'default', while it is left unnamed in v2. Default is 'service/v2'.\x00The name of the generator to use for creating a service.  Only used if --expose is true\x04The name of the generator to use for creating a service.  Only used if --expose is true\x00The network protocol for the service to be created. Default is 'TCP'.\x04The network protocol for the service to be created. Default is 'TCP'.\x00The port that the service should serve on. Copied from the resource being exposed, if unspecified\x04The port that the service should serve on. Copied from the resource being exposed, if unspecified\x00The port that this container exposes.  If --expose is true, this is also the port used by the service that is created.\x04The port that this container exposes.  If --expose is true, this is also the port used by the service that is created.\x00The resource requirement limits for this container.  For example, 'cpu=200m,memory=512Mi'.  Note that server side components may assign limits depending on the server configuration, such as limit ranges.\x04The resource requirement limits for this container.  For example, 'cpu=200m,memory=512Mi'.  Note that server side components may assign limits depending on the server configuration, such as limit ranges.\x00The resource requirement requests for this container.  For example, 'cpu=100m,memory=256Mi'.  Note that server side components may assign requests depending on the server configuration, such as limit ranges.\x04The resource requirement requests for this container.  For example, 'cpu=100m,memory=256Mi'.  Note that server side components may assign requests depending on the server configuration, such as limit ranges.\x00The restart policy for this Pod.  Legal values [Always, OnFailure, Never].  If set to 'Always' a deployment is created, if set to 'OnFailure' a job is created, if set to 'Never', a regular pod is created. For the latter two --replicas must be 1.  Default 'Always', for CronJobs `Never`.\x04The restart policy for this Pod.  Legal values [Always, OnFailure, Never].  If set to 'Always' a deployment is created, if set to 'OnFailure' a job is created, if set to 'Never', a regular pod is created. For the latter two --replicas must be 1.  Default 'Always', for CronJobs `Never`.\x00The type of secret to create\x04The type of secret to create\x00Type for this service: ClusterIP, NodePort, or LoadBalancer. Default is 'ClusterIP'.\x04Type for this service: ClusterIP, NodePort, or LoadBalancer. Default is 'ClusterIP'.\x00Unsets an individual value in a kubeconfig file\x04Unsets an individual value in a kubeconfig file\x00Update image of a pod template\x04Update image of a pod template\x00Update resource requests/limits on objects with pod templates\x04Update resource requests/limits on objects with pod templates\x00Update the annotations on a resource\x04Update the annotations on a resource\x00Username for Docker registry authentication\x04Username for Docker registry authentication\x00Where to output the files.  If empty or '-' uses stdout, otherwise creates a directory hierarchy in that directory\x04Where to output the files.  If empty or '-' uses stdout, otherwise creates a directory hierarchy in that directory\x00dummy restart flag\x04dummy restart flag\x00external name of service\x04external name of service\x00watch is only supported on individual resources and resource collections - %d resources were found\x04watch is only supported on individual resources and resource collections - %d resources were found\x00watch is only supported on individual resources and resource collections - %d resources were found\x00Project-Id-Version: gettext-go-examples-hello\nReport-Msgid-Bugs-To: \nPOT-Creation-Date: 2013-12-12 20:03+0000\nPO-Revision-Date: 2017-01-29 23:30-0800\nLast-Translator: Brendan Burns <brendan.d.burns@gmail.com>\nMIME-Version: 1.0\nContent-Type: text/plain; charset=UTF-8\nContent-Transfer-Encoding: 8bit\nX-Generator: Poedit 1.6.10\nX-Poedit-SourceCharset: UTF-8\nLanguage-Team: \nPlural-Forms: nplurals=2; plural=(n != 1);\nLanguage: en\n\x00A comma-delimited set of quota scopes that must all match each object tracked by the quota.\x00A comma-delimited set of resource=quantity pairs that define a hard limit.\x00A label selector to use for this budget. Only equality-based selector requirements are supported.\x00A label selector to use for this service. Only equality-based selector requirements are supported. If empty (the default) infer the selector from the replication controller or replica set.\x00A schedule in the Cron format the job should be run with.\x00Additional external IP address (not managed by Kubernetes) to accept for the service. If this IP is routed to a node, the service can be accessed by this IP in addition to its generated service IP.\x00An inline JSON override for the generated object. If this is non-empty, it is used to override the generated object. Requires that the object supply a valid apiVersion field.\x00An inline JSON override for the generated service object. If this is non-empty, it is used to override the generated object. Requires that the object supply a valid apiVersion field.  Only used if --expose is true.\x00Apply a configuration to a resource by filename or stdin\x00Assign your own ClusterIP or set to 'None' for a 'headless' service (no loadbalancing).\x00ClusterIP to be assigned to the service. Leave empty to auto-allocate, or set to 'None' to create a headless service.\x00ClusterRole this ClusterRoleBinding should reference\x00ClusterRole this RoleBinding should reference\x00Container name which will have its image upgraded. Only relevant when --image is specified, ignored otherwise. Required when using --image on a multi-container pod\x00Delete the specified cluster from the kubeconfig\x00Delete the specified context from the kubeconfig\x00Describe one or many contexts\x00Display clusters defined in the kubeconfig\x00Display merged kubeconfig settings or a specified kubeconfig file\x00Displays the current-context\x00Email for Docker registry\x00Explicit policy for when to pull container images. Required when --image is same as existing image, ignored otherwise.\x00IP to assign to the Load Balancer. If empty, an ephemeral IP will be created and used (cloud-provider specific).\x00If non-empty, set the session affinity for the service to this; legal values: 'None', 'ClientIP'\x00If non-empty, the annotation update will only succeed if this is the current resource-version for the object. Only valid when specifying a single resource.\x00If non-empty, the labels update will only succeed if this is the current resource-version for the object. Only valid when specifying a single resource.\x00Image to use for upgrading the replication controller. Must be distinct from the existing image (either new image or new image tag).  Can not be used with --filename/-f\x00Modify kubeconfig files\x00Name or number for the port on the container that the service should direct traffic to. Optional.\x00Only return logs after a specific date (RFC3339). Defaults to all logs. Only one of since-time / since may be used.\x00Output the formatted object with the given group version (for ex: 'extensions/v1beta1').\x00Password for Docker registry authentication\x00Path to PEM encoded public key certificate.\x00Path to private key associated with given certificate.\x00Precondition for resource version. Requires that the current resource version match this value in order to scale.\x00Role this RoleBinding should reference\x00Server location for Docker registry\x00Set specific features on objects\x00Set the selector on a resource\x00Sets a cluster entry in kubeconfig\x00Sets a context entry in kubeconfig\x00Sets a user entry in kubeconfig\x00Sets an individual value in a kubeconfig file\x00Sets the current-context in a kubeconfig file\x00Synonym for --target-port\x00The image for the container to run.\x00The image pull policy for the container. If left empty, this value will not be specified by the client and defaulted by the server\x00The key to use to differentiate between two different controllers, default 'deployment'.  Only relevant when --image is specified, ignored otherwise\x00The minimum number or percentage of available pods this budget requires.\x00The name for the newly created object.\x00The name for the newly created object. If not specified, the name of the input resource will be used.\x00The name of the API generator to use, see http://kubernetes.io/docs/user-guide/kubectl-conventions/#generators for a list.\x00The name of the API generator to use. Currently there is only 1 generator.\x00The name of the API generator to use. There are 2 generators: 'service/v1' and 'service/v2'. The only difference between them is that service port in v1 is named 'default', while it is left unnamed in v2. Default is 'service/v2'.\x00The name of the generator to use for creating a service.  Only used if --expose is true\x00The network protocol for the service to be created. Default is 'TCP'.\x00The port that the service should serve on. Copied from the resource being exposed, if unspecified\x00The port that this container exposes.  If --expose is true, this is also the port used by the service that is created.\x00The resource requirement limits for this container.  For example, 'cpu=200m,memory=512Mi'.  Note that server side components may assign limits depending on the server configuration, such as limit ranges.\x00The resource requirement requests for this container.  For example, 'cpu=100m,memory=256Mi'.  Note that server side components may assign requests depending on the server configuration, such as limit ranges.\x00The restart policy for this Pod.  Legal values [Always, OnFailure, Never].  If set to 'Always' a deployment is created, if set to 'OnFailure' a job is created, if set to 'Never', a regular pod is created. For the latter two --replicas must be 1.  Default 'Always', for CronJobs `Never`.\x00The type of secret to create\x00Type for this service: ClusterIP, NodePort, or LoadBalancer. Default is 'ClusterIP'.\x00Unsets an individual value in a kubeconfig file\x00Update image of a pod template\x00Update resource requests/limits on objects with pod templates\x00Update the annotations on a resource\x00Username for Docker registry authentication\x00Where to output the files.  If empty or '-' uses stdout, otherwise creates a directory hierarchy in that directory\x00dummy restart flag\x00external name of service\x00watch is only supported on individual resources and resource collections - %d resource was found\x00watch is only supported on individual resources and resource collections - %d resources were found\x00")
 
 func translationsKubectlDefaultLc_messagesK8sMoBytes() ([]byte, error) {
 	return _translationsKubectlDefaultLc_messagesK8sMo, nil
@@ -215,7 +215,7 @@ msgstr ""
 "Project-Id-Version: gettext-go-examples-hello\n"
 "Report-Msgid-Bugs-To: \n"
 "POT-Creation-Date: 2013-12-12 20:03+0000\n"
-"PO-Revision-Date: 2017-01-29 14:45-0800\n"
+"PO-Revision-Date: 2017-01-29 23:30-0800\n"
 "Last-Translator: Brendan Burns <brendan.d.burns@gmail.com>\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
@@ -335,6 +335,267 @@ msgstr "Update resource requests/limits on objects with pod templates"
 msgctxt "Set the selector on a resource"
 msgid "Set the selector on a resource"
 msgstr "Set the selector on a resource"
+
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/annotate.go#L132
+msgctxt "If non-empty, the annotation update will only succeed if this is the current resource-version for the object. Only valid when specifying a single resource."
+msgid "If non-empty, the annotation update will only succeed if this is the current resource-version for the object. Only valid when specifying a single resource."
+msgstr "If non-empty, the annotation update will only succeed if this is the current resource-version for the object. Only valid when specifying a single resource."
+
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/autoscale.go#L66
+msgctxt "The name of the API generator to use. Currently there is only 1 generator."
+msgid "The name of the API generator to use. Currently there is only 1 generator."
+msgstr "The name of the API generator to use. Currently there is only 1 generator."
+
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/autoscale.go#L71
+msgctxt "The name for the newly created object. If not specified, the name of the input resource will be used."
+msgid "The name for the newly created object. If not specified, the name of the input resource will be used."
+msgstr "The name for the newly created object. If not specified, the name of the input resource will be used."
+
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/clusterinfo_dump.go#L45
+msgctxt "Where to output the files.  If empty or '-' uses stdout, otherwise creates a directory hierarchy in that directory"
+msgid "Where to output the files.  If empty or '-' uses stdout, otherwise creates a directory hierarchy in that directory"
+msgstr "Where to output the files.  If empty or '-' uses stdout, otherwise creates a directory hierarchy in that directory"
+
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/create_clusterrolebinding.go#L55
+msgctxt "ClusterRole this ClusterRoleBinding should reference"
+msgid "ClusterRole this ClusterRoleBinding should reference"
+msgstr "ClusterRole this ClusterRoleBinding should reference"
+
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/create_pdb.go#L62
+msgctxt "The minimum number or percentage of available pods this budget requires."
+msgid "The minimum number or percentage of available pods this budget requires."
+msgstr "The minimum number or percentage of available pods this budget requires."
+
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/create_pdb.go#L63
+msgctxt "A label selector to use for this budget. Only equality-based selector requirements are supported."
+msgid "A label selector to use for this budget. Only equality-based selector requirements are supported."
+msgstr "A label selector to use for this budget. Only equality-based selector requirements are supported."
+
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/create_quota.go#L60
+msgctxt "A comma-delimited set of resource=quantity pairs that define a hard limit."
+msgid "A comma-delimited set of resource=quantity pairs that define a hard limit."
+msgstr "A comma-delimited set of resource=quantity pairs that define a hard limit."
+
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/create_quota.go#L61
+msgctxt "A comma-delimited set of quota scopes that must all match each object tracked by the quota."
+msgid "A comma-delimited set of quota scopes that must all match each object tracked by the quota."
+msgstr "A comma-delimited set of quota scopes that must all match each object tracked by the quota."
+
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/create_rolebinding.go#L55
+msgctxt "ClusterRole this RoleBinding should reference"
+msgid "ClusterRole this RoleBinding should reference"
+msgstr "ClusterRole this RoleBinding should reference"
+
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/create_rolebinding.go#L56
+msgctxt "Role this RoleBinding should reference"
+msgid "Role this RoleBinding should reference"
+msgstr "Role this RoleBinding should reference"
+
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/create_secret.go#L87
+msgctxt "The type of secret to create"
+msgid "The type of secret to create"
+msgstr "The type of secret to create"
+
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/create_secret.go#L155
+msgctxt "Username for Docker registry authentication"
+msgid "Username for Docker registry authentication"
+msgstr "Username for Docker registry authentication"
+
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/create_secret.go#L157
+msgctxt "Password for Docker registry authentication"
+msgid "Password for Docker registry authentication"
+msgstr "Password for Docker registry authentication"
+
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/create_secret.go#L159
+msgctxt "Email for Docker registry"
+msgid "Email for Docker registry"
+msgstr "Email for Docker registry"
+
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/create_secret.go#L161
+msgctxt "Server location for Docker registry"
+msgid "Server location for Docker registry"
+msgstr "Server location for Docker registry"
+
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/create_secret.go#L226
+msgctxt "Path to PEM encoded public key certificate."
+msgid "Path to PEM encoded public key certificate."
+msgstr "Path to PEM encoded public key certificate."
+
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/create_secret.go#L227
+msgctxt "Path to private key associated with given certificate."
+msgid "Path to private key associated with given certificate."
+msgstr "Path to private key associated with given certificate."
+
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/create_service.go#L81
+msgctxt "Assign your own ClusterIP or set to 'None' for a 'headless' service (no loadbalancing)."
+msgid "Assign your own ClusterIP or set to 'None' for a 'headless' service (no loadbalancing)."
+msgstr "Assign your own ClusterIP or set to 'None' for a 'headless' service (no loadbalancing)."
+
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/create_service.go#L253
+msgctxt "external name of service"
+msgid "external name of service"
+msgstr "external name of service"
+
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/edit.go#L114
+msgctxt "Output the formatted object with the given group version (for ex: 'extensions/v1beta1')."
+msgid "Output the formatted object with the given group version (for ex: 'extensions/v1beta1')."
+msgstr "Output the formatted object with the given group version (for ex: 'extensions/v1beta1')."
+
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/expose.go#L98
+msgctxt "The name of the API generator to use. There are 2 generators: 'service/v1' and 'service/v2'. The only difference between them is that service port in v1 is named 'default', while it is left unnamed in v2. Default is 'service/v2'."
+msgid "The name of the API generator to use. There are 2 generators: 'service/v1' and 'service/v2'. The only difference between them is that service port in v1 is named 'default', while it is left unnamed in v2. Default is 'service/v2'."
+msgstr "The name of the API generator to use. There are 2 generators: 'service/v1' and 'service/v2'. The only difference between them is that service port in v1 is named 'default', while it is left unnamed in v2. Default is 'service/v2'."
+
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/expose.go#L99
+msgctxt "The network protocol for the service to be created. Default is 'TCP'."
+msgid "The network protocol for the service to be created. Default is 'TCP'."
+msgstr "The network protocol for the service to be created. Default is 'TCP'."
+
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/expose.go#L100
+msgctxt "The port that the service should serve on. Copied from the resource being exposed, if unspecified"
+msgid "The port that the service should serve on. Copied from the resource being exposed, if unspecified"
+msgstr "The port that the service should serve on. Copied from the resource being exposed, if unspecified"
+
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/expose.go#L101
+msgctxt "Type for this service: ClusterIP, NodePort, or LoadBalancer. Default is 'ClusterIP'."
+msgid "Type for this service: ClusterIP, NodePort, or LoadBalancer. Default is 'ClusterIP'."
+msgstr "Type for this service: ClusterIP, NodePort, or LoadBalancer. Default is 'ClusterIP'."
+
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/expose.go#L105
+msgctxt "IP to assign to the Load Balancer. If empty, an ephemeral IP will be created and used (cloud-provider specific)."
+msgid "IP to assign to the Load Balancer. If empty, an ephemeral IP will be created and used (cloud-provider specific)."
+msgstr "IP to assign to the Load Balancer. If empty, an ephemeral IP will be created and used (cloud-provider specific)."
+
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/expose.go#L106
+msgctxt "A label selector to use for this service. Only equality-based selector requirements are supported. If empty (the default) infer the selector from the replication controller or replica set."
+msgid "A label selector to use for this service. Only equality-based selector requirements are supported. If empty (the default) infer the selector from the replication controller or replica set."
+msgstr "A label selector to use for this service. Only equality-based selector requirements are supported. If empty (the default) infer the selector from the replication controller or replica set."
+
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/expose.go#L108
+msgctxt "Synonym for --target-port"
+msgid "Synonym for --target-port"
+msgstr "Synonym for --target-port"
+
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/expose.go#L110
+msgctxt "Name or number for the port on the container that the service should direct traffic to. Optional."
+msgid "Name or number for the port on the container that the service should direct traffic to. Optional."
+msgstr "Name or number for the port on the container that the service should direct traffic to. Optional."
+
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/expose.go#L111
+msgctxt "Additional external IP address (not managed by Kubernetes) to accept for the service. If this IP is routed to a node, the service can be accessed by this IP in addition to its generated service IP."
+msgid "Additional external IP address (not managed by Kubernetes) to accept for the service. If this IP is routed to a node, the service can be accessed by this IP in addition to its generated service IP."
+msgstr "Additional external IP address (not managed by Kubernetes) to accept for the service. If this IP is routed to a node, the service can be accessed by this IP in addition to its generated service IP."
+
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/expose.go#L112
+msgctxt "An inline JSON override for the generated object. If this is non-empty, it is used to override the generated object. Requires that the object supply a valid apiVersion field."
+msgid "An inline JSON override for the generated object. If this is non-empty, it is used to override the generated object. Requires that the object supply a valid apiVersion field."
+msgstr "An inline JSON override for the generated object. If this is non-empty, it is used to override the generated object. Requires that the object supply a valid apiVersion field."
+
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/expose.go#L113
+msgctxt "The name for the newly created object."
+msgid "The name for the newly created object."
+msgstr "The name for the newly created object."
+
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/expose.go#L114
+msgctxt "If non-empty, set the session affinity for the service to this; legal values: 'None', 'ClientIP'"
+msgid "If non-empty, set the session affinity for the service to this; legal values: 'None', 'ClientIP'"
+msgstr "If non-empty, set the session affinity for the service to this; legal values: 'None', 'ClientIP'"
+
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/expose.go#L115
+msgctxt "ClusterIP to be assigned to the service. Leave empty to auto-allocate, or set to 'None' to create a headless service."
+msgid "ClusterIP to be assigned to the service. Leave empty to auto-allocate, or set to 'None' to create a headless service."
+msgstr "ClusterIP to be assigned to the service. Leave empty to auto-allocate, or set to 'None' to create a headless service."
+
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/label.go#L129
+msgctxt "If non-empty, the labels update will only succeed if this is the current resource-version for the object. Only valid when specifying a single resource."
+msgid "If non-empty, the labels update will only succeed if this is the current resource-version for the object. Only valid when specifying a single resource."
+msgstr "If non-empty, the labels update will only succeed if this is the current resource-version for the object. Only valid when specifying a single resource."
+
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/logs.go#L108
+msgctxt "Only return logs after a specific date (RFC3339). Defaults to all logs. Only one of since-time / since may be used."
+msgid "Only return logs after a specific date (RFC3339). Defaults to all logs. Only one of since-time / since may be used."
+msgstr "Only return logs after a specific date (RFC3339). Defaults to all logs. Only one of since-time / since may be used."
+
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/rollingupdate.go#L98
+msgctxt "Image to use for upgrading the replication controller. Must be distinct from the existing image (either new image or new image tag).  Can not be used with --filename/-f"
+msgid "Image to use for upgrading the replication controller. Must be distinct from the existing image (either new image or new image tag).  Can not be used with --filename/-f"
+msgstr "Image to use for upgrading the replication controller. Must be distinct from the existing image (either new image or new image tag).  Can not be used with --filename/-f"
+
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/rollingupdate.go#L100
+msgctxt "The key to use to differentiate between two different controllers, default 'deployment'.  Only relevant when --image is specified, ignored otherwise"
+msgid "The key to use to differentiate between two different controllers, default 'deployment'.  Only relevant when --image is specified, ignored otherwise"
+msgstr "The key to use to differentiate between two different controllers, default 'deployment'.  Only relevant when --image is specified, ignored otherwise"
+
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/rollingupdate.go#L101
+msgctxt "Container name which will have its image upgraded. Only relevant when --image is specified, ignored otherwise. Required when using --image on a multi-container pod"
+msgid "Container name which will have its image upgraded. Only relevant when --image is specified, ignored otherwise. Required when using --image on a multi-container pod"
+msgstr "Container name which will have its image upgraded. Only relevant when --image is specified, ignored otherwise. Required when using --image on a multi-container pod"
+
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/rollingupdate.go#L102
+msgctxt "Explicit policy for when to pull container images. Required when --image is same as existing image, ignored otherwise."
+msgid "Explicit policy for when to pull container images. Required when --image is same as existing image, ignored otherwise."
+msgstr "Explicit policy for when to pull container images. Required when --image is same as existing image, ignored otherwise."
+
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/run.go#L113
+msgctxt "The name of the API generator to use, see http://kubernetes.io/docs/user-guide/kubectl-conventions/#generators for a list."
+msgid "The name of the API generator to use, see http://kubernetes.io/docs/user-guide/kubectl-conventions/#generators for a list."
+msgstr "The name of the API generator to use, see http://kubernetes.io/docs/user-guide/kubectl-conventions/#generators for a list."
+
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/run.go#L114
+msgctxt "The image for the container to run."
+msgid "The image for the container to run."
+msgstr "The image for the container to run."
+
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/run.go#L116
+msgctxt "The image pull policy for the container. If left empty, this value will not be specified by the client and defaulted by the server"
+msgid "The image pull policy for the container. If left empty, this value will not be specified by the client and defaulted by the server"
+msgstr "The image pull policy for the container. If left empty, this value will not be specified by the client and defaulted by the server"
+
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/run.go#L121
+msgctxt "The port that this container exposes.  If --expose is true, this is also the port used by the service that is created."
+msgid "The port that this container exposes.  If --expose is true, this is also the port used by the service that is created."
+msgstr "The port that this container exposes.  If --expose is true, this is also the port used by the service that is created."
+
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/run.go#L128
+msgctxt "The restart policy for this Pod.  Legal values [Always, OnFailure, Never].  If set to 'Always' a deployment is created, if set to 'OnFailure' a job is created, if set to 'Never', a regular pod is created. For the latter two --replicas must be 1.  Default 'Always', for CronJobs ` + "`" + `Never` + "`" + `."
+msgid "The restart policy for this Pod.  Legal values [Always, OnFailure, Never].  If set to 'Always' a deployment is created, if set to 'OnFailure' a job is created, if set to 'Never', a regular pod is created. For the latter two --replicas must be 1.  Default 'Always', for CronJobs ` + "`" + `Never` + "`" + `."
+msgstr "The restart policy for this Pod.  Legal values [Always, OnFailure, Never].  If set to 'Always' a deployment is created, if set to 'OnFailure' a job is created, if set to 'Never', a regular pod is created. For the latter two --replicas must be 1.  Default 'Always', for CronJobs ` + "`" + `Never` + "`" + `."
+
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/run.go#L130
+msgctxt "The resource requirement requests for this container.  For example, 'cpu=100m,memory=256Mi'.  Note that server side components may assign requests depending on the server configuration, such as limit ranges."
+msgid "The resource requirement requests for this container.  For example, 'cpu=100m,memory=256Mi'.  Note that server side components may assign requests depending on the server configuration, such as limit ranges."
+msgstr "The resource requirement requests for this container.  For example, 'cpu=100m,memory=256Mi'.  Note that server side components may assign requests depending on the server configuration, such as limit ranges."
+
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/run.go#L131
+msgctxt "The resource requirement limits for this container.  For example, 'cpu=200m,memory=512Mi'.  Note that server side components may assign limits depending on the server configuration, such as limit ranges."
+msgid "The resource requirement limits for this container.  For example, 'cpu=200m,memory=512Mi'.  Note that server side components may assign limits depending on the server configuration, such as limit ranges."
+msgstr "The resource requirement limits for this container.  For example, 'cpu=200m,memory=512Mi'.  Note that server side components may assign limits depending on the server configuration, such as limit ranges."
+
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/run.go#L133
+msgctxt "The name of the generator to use for creating a service.  Only used if --expose is true"
+msgid "The name of the generator to use for creating a service.  Only used if --expose is true"
+msgstr "The name of the generator to use for creating a service.  Only used if --expose is true"
+
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/run.go#L134
+msgctxt "An inline JSON override for the generated service object. If this is non-empty, it is used to override the generated object. Requires that the object supply a valid apiVersion field.  Only used if --expose is true."
+msgid "An inline JSON override for the generated service object. If this is non-empty, it is used to override the generated object. Requires that the object supply a valid apiVersion field.  Only used if --expose is true."
+msgstr "An inline JSON override for the generated service object. If this is non-empty, it is used to override the generated object. Requires that the object supply a valid apiVersion field.  Only used if --expose is true."
+
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/run.go#L136
+msgctxt "A schedule in the Cron format the job should be run with."
+msgid "A schedule in the Cron format the job should be run with."
+msgstr "A schedule in the Cron format the job should be run with."
+
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/run_test.go#L83
+msgctxt "dummy restart flag"
+msgid "dummy restart flag"
+msgstr "dummy restart flag"
+
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/scale.go#L83
+msgctxt "Precondition for resource version. Requires that the current resource version match this value in order to scale."
+msgid "Precondition for resource version. Requires that the current resource version match this value in order to scale."
+msgstr "Precondition for resource version. Requires that the current resource version match this value in order to scale."
+
 `)
 
 func translationsKubectlDefaultLc_messagesK8sPoBytes() ([]byte, error) {
@@ -352,7 +613,7 @@ func translationsKubectlDefaultLc_messagesK8sPo() (*asset, error) {
 	return a, nil
 }
 
-var _translationsKubectlEn_usLc_messagesK8sMo = []byte("\xde\x12\x04\x95\x00\x00\x00\x00\x15\x00\x00\x00\x1c\x00\x00\x00\xc4\x00\x00\x00\x1d\x00\x00\x00l\x01\x00\x00\x00\x00\x00\x00\xe0\x01\x00\x00q\x00\x00\x00\xe1\x01\x00\x00a\x00\x00\x00S\x02\x00\x00a\x00\x00\x00\xb5\x02\x00\x00;\x00\x00\x00\x17\x03\x00\x00U\x00\x00\x00S\x03\x00\x00\x83\x00\x00\x00\xa9\x03\x00\x009\x00\x00\x00-\x04\x00\x00/\x00\x00\x00g\x04\x00\x00A\x00\x00\x00\x97\x04\x00\x00=\x00\x00\x00\xd9\x04\x00\x00E\x00\x00\x00\x17\x05\x00\x00E\x00\x00\x00]\x05\x00\x00?\x00\x00\x00\xa3\x05\x00\x00[\x00\x00\x00\xe3\x05\x00\x00[\x00\x00\x00?\x06\x00\x00_\x00\x00\x00\x9b\x06\x00\x00=\x00\x00\x00\xfb\x06\x00\x00{\x00\x00\x009\a\x00\x00I\x00\x00\x00\xb5\a\x00\x00(\x01\x00\x00\xff\a\x00\x00\xac\x01\x00\x00(\t\x00\x008\x00\x00\x00\xd5\n\x00\x000\x00\x00\x00\x0e\v\x00\x000\x00\x00\x00?\v\x00\x00\x1d\x00\x00\x00p\v\x00\x00*\x00\x00\x00\x8e\v\x00\x00A\x00\x00\x00\xb9\v\x00\x00\x1c\x00\x00\x00\xfb\v\x00\x00\x17\x00\x00\x00\x18\f\x00\x00 \x00\x00\x000\f\x00\x00\x1e\x00\x00\x00Q\f\x00\x00\"\x00\x00\x00p\f\x00\x00\"\x00\x00\x00\x93\f\x00\x00\x1f\x00\x00\x00\xb6\f\x00\x00-\x00\x00\x00\xd6\f\x00\x00-\x00\x00\x00\x04\r\x00\x00/\x00\x00\x002\r\x00\x00\x1e\x00\x00\x00b\r\x00\x00=\x00\x00\x00\x81\r\x00\x00$\x00\x00\x00\xbf\r\x00\x00\xc3\x00\x00\x00\xe4\r\x00\x00\x01\x00\x00\x00\x03\x00\x00\x00\x13\x00\x00\x00\x0f\x00\x00\x00\x04\x00\x00\x00\x02\x00\x00\x00\x15\x00\x00\x00\x00\x00\x00\x00\a\x00\x00\x00\t\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\r\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x10\x00\x00\x00\x14\x00\x00\x00\x0e\x00\x00\x00\x05\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\b\x00\x00\x00\v\x00\x00\x00\x11\x00\x00\x00\x06\x00\x00\x00\x12\x00\x00\x00\n\x00\x00\x00\f\x00\x00\x00\x00Apply a configuration to a resource by filename or stdin\x04Apply a configuration to a resource by filename or stdin\x00Delete the specified cluster from the kubeconfig\x04Delete the specified cluster from the kubeconfig\x00Delete the specified context from the kubeconfig\x04Delete the specified context from the kubeconfig\x00Describe one or many contexts\x04Describe one or many contexts\x00Display clusters defined in the kubeconfig\x04Display clusters defined in the kubeconfig\x00Display merged kubeconfig settings or a specified kubeconfig file\x04Display merged kubeconfig settings or a specified kubeconfig file\x00Displays the current-context\x04Displays the current-context\x00Modify kubeconfig files\x04Modify kubeconfig files\x00Set specific features on objects\x04Set specific features on objects\x00Set the selector on a resource\x04Set the selector on a resource\x00Sets a cluster entry in kubeconfig\x04Sets a cluster entry in kubeconfig\x00Sets a context entry in kubeconfig\x04Sets a context entry in kubeconfig\x00Sets a user entry in kubeconfig\x04Sets a user entry in kubeconfig\x00Sets an individual value in a kubeconfig file\x04Sets an individual value in a kubeconfig file\x00Sets the current-context in a kubeconfig file\x04Sets the current-context in a kubeconfig file\x00Unsets an individual value in a kubeconfig file\x04Unsets an individual value in a kubeconfig file\x00Update image of a pod template\x04Update image of a pod template\x00Update resource requests/limits on objects with pod templates\x04Update resource requests/limits on objects with pod templates\x00Update the annotations on a resource\x04Update the annotations on a resource\x00watch is only supported on individual resources and resource collections - %d resources were found\x04watch is only supported on individual resources and resource collections - %d resources were found\x00watch is only supported on individual resources and resource collections - %d resources were found\x00Project-Id-Version: gettext-go-examples-hello\nReport-Msgid-Bugs-To: \nPOT-Creation-Date: 2013-12-12 20:03+0000\nPO-Revision-Date: 2017-01-29 14:45-0800\nLast-Translator: Brendan Burns <brendan.d.burns@gmail.com>\nMIME-Version: 1.0\nContent-Type: text/plain; charset=UTF-8\nContent-Transfer-Encoding: 8bit\nX-Generator: Poedit 1.6.10\nX-Poedit-SourceCharset: UTF-8\nLanguage-Team: \nPlural-Forms: nplurals=2; plural=(n != 1);\nLanguage: en\n\x00Apply a configuration to a resource by filename or stdin\x00Delete the specified cluster from the kubeconfig\x00Delete the specified context from the kubeconfig\x00Describe one or many contexts\x00Display clusters defined in the kubeconfig\x00Display merged kubeconfig settings or a specified kubeconfig file\x00Displays the current-context\x00Modify kubeconfig files\x00Set specific features on objects\x00Set the selector on a resource\x00Sets a cluster entry in kubeconfig\x00Sets a context entry in kubeconfig\x00Sets a user entry in kubeconfig\x00Sets an individual value in a kubeconfig file\x00Sets the current-context in a kubeconfig file\x00Unsets an individual value in a kubeconfig file\x00Update image of a pod template\x00Update resource requests/limits on objects with pod templates\x00Update the annotations on a resource\x00watch is only supported on individual resources and resource collections - %d resource was found\x00watch is only supported on individual resources and resource collections - %d resources were found\x00")
+var _translationsKubectlEn_usLc_messagesK8sMo = []byte("\xde\x12\x04\x95\x00\x00\x00\x00I\x00\x00\x00\x1c\x00\x00\x00d\x02\x00\x00a\x00\x00\x00\xac\x04\x00\x00\x00\x00\x00\x000\x06\x00\x00\xb7\x00\x00\x001\x06\x00\x00\x95\x00\x00\x00\xe9\x06\x00\x00\xc3\x00\x00\x00\u007f\a\x00\x00y\x01\x00\x00C\b\x00\x00s\x00\x00\x00\xbd\t\x00\x00\x8b\x01\x00\x001\n\x00\x00]\x01\x00\x00\xbd\v\x00\x00\xad\x01\x00\x00\x1b\r\x00\x00q\x00\x00\x00\xc9\x0e\x00\x00\xaf\x00\x00\x00;\x0f\x00\x00\xeb\x00\x00\x00\xeb\x0f\x00\x00i\x00\x00\x00\xd7\x10\x00\x00[\x00\x00\x00A\x11\x00\x00G\x01\x00\x00\x9d\x11\x00\x00a\x00\x00\x00\xe5\x12\x00\x00a\x00\x00\x00G\x13\x00\x00;\x00\x00\x00\xa9\x13\x00\x00U\x00\x00\x00\xe5\x13\x00\x00\x83\x00\x00\x00;\x14\x00\x009\x00\x00\x00\xbf\x14\x00\x003\x00\x00\x00\xf9\x14\x00\x00\xed\x00\x00\x00-\x15\x00\x00\xe1\x00\x00\x00\x1b\x16\x00\x00\xc1\x00\x00\x00\xfd\x16\x00\x007\x01\x00\x00\xbf\x17\x00\x00/\x01\x00\x00\xf7\x18\x00\x00Q\x01\x00\x00'\x1a\x00\x00/\x00\x00\x00y\x1b\x00\x00\xc3\x00\x00\x00\xa9\x1b\x00\x00\xe7\x00\x00\x00m\x1c\x00\x00\xb1\x00\x00\x00U\x1d\x00\x00W\x00\x00\x00\a\x1e\x00\x00W\x00\x00\x00_\x1e\x00\x00m\x00\x00\x00\xb7\x1e\x00\x00\xe3\x00\x00\x00%\x1f\x00\x00M\x00\x00\x00\t \x00\x00G\x00\x00\x00W \x00\x00A\x00\x00\x00\x9f \x00\x00=\x00\x00\x00\xe1 \x00\x00E\x00\x00\x00\x1f!\x00\x00E\x00\x00\x00e!\x00\x00?\x00\x00\x00\xab!\x00\x00[\x00\x00\x00\xeb!\x00\x00[\x00\x00\x00G\"\x00\x003\x00\x00\x00\xa3\"\x00\x00G\x00\x00\x00\xd7\"\x00\x00\x05\x01\x00\x00\x1f#\x00\x00)\x01\x00\x00%$\x00\x00\x91\x00\x00\x00O%\x00\x00M\x00\x00\x00\xe1%\x00\x00\xcb\x00\x00\x00/&\x00\x00\xf5\x00\x00\x00\xfb&\x00\x00\x95\x00\x00\x00\xf1'\x00\x00\xcb\x01\x00\x00\x87(\x00\x00\xaf\x00\x00\x00S*\x00\x00\x8b\x00\x00\x00\x03+\x00\x00\xc3\x00\x00\x00\x8f+\x00\x00\xed\x00\x00\x00S,\x00\x00\x97\x01\x00\x00A-\x00\x00\x9f\x01\x00\x00\xd9.\x00\x00=\x02\x00\x00y0\x00\x009\x00\x00\x00\xb72\x00\x00\xa9\x00\x00\x00\xf12\x00\x00_\x00\x00\x00\x9b3\x00\x00=\x00\x00\x00\xfb3\x00\x00{\x00\x00\x0094\x00\x00I\x00\x00\x00\xb54\x00\x00W\x00\x00\x00\xff4\x00\x00\xe5\x00\x00\x00W5\x00\x00%\x00\x00\x00=6\x00\x001\x00\x00\x00c6\x00\x00(\x01\x00\x00\x956\x00\x00\xac\x01\x00\x00\xbe7\x00\x00[\x00\x00\x00k9\x00\x00J\x00\x00\x00\xc79\x00\x00a\x00\x00\x00\x12:\x00\x00\xbc\x00\x00\x00t:\x00\x009\x00\x00\x001;\x00\x00\xc5\x00\x00\x00k;\x00\x00\xae\x00\x00\x001<\x00\x00\xd6\x00\x00\x00\xe0<\x00\x008\x00\x00\x00\xb7=\x00\x00W\x00\x00\x00\xf0=\x00\x00u\x00\x00\x00H>\x00\x004\x00\x00\x00\xbe>\x00\x00-\x00\x00\x00\xf3>\x00\x00\xa3\x00\x00\x00!?\x00\x000\x00\x00\x00\xc5?\x00\x000\x00\x00\x00\xf6?\x00\x00\x1d\x00\x00\x00'@\x00\x00*\x00\x00\x00E@\x00\x00A\x00\x00\x00p@\x00\x00\x1c\x00\x00\x00\xb2@\x00\x00\x19\x00\x00\x00\xcf@\x00\x00v\x00\x00\x00\xe9@\x00\x00p\x00\x00\x00`A\x00\x00`\x00\x00\x00\xd1A\x00\x00\x9b\x00\x00\x002B\x00\x00\x97\x00\x00\x00\xceB\x00\x00\xa8\x00\x00\x00fC\x00\x00\x17\x00\x00\x00\x0fD\x00\x00a\x00\x00\x00'D\x00\x00s\x00\x00\x00\x89D\x00\x00X\x00\x00\x00\xfdD\x00\x00+\x00\x00\x00VE\x00\x00+\x00\x00\x00\x82E\x00\x006\x00\x00\x00\xaeE\x00\x00q\x00\x00\x00\xe5E\x00\x00&\x00\x00\x00WF\x00\x00#\x00\x00\x00~F\x00\x00 \x00\x00\x00\xa2F\x00\x00\x1e\x00\x00\x00\xc3F\x00\x00\"\x00\x00\x00\xe2F\x00\x00\"\x00\x00\x00\x05G\x00\x00\x1f\x00\x00\x00(G\x00\x00-\x00\x00\x00HG\x00\x00-\x00\x00\x00vG\x00\x00\x19\x00\x00\x00\xa4G\x00\x00#\x00\x00\x00\xbeG\x00\x00\x82\x00\x00\x00\xe2G\x00\x00\x94\x00\x00\x00eH\x00\x00H\x00\x00\x00\xfaH\x00\x00&\x00\x00\x00CI\x00\x00e\x00\x00\x00jI\x00\x00z\x00\x00\x00\xd0I\x00\x00J\x00\x00\x00KJ\x00\x00\xe5\x00\x00\x00\x96J\x00\x00W\x00\x00\x00|K\x00\x00E\x00\x00\x00\xd4K\x00\x00a\x00\x00\x00\x1aL\x00\x00v\x00\x00\x00|L\x00\x00\xcb\x00\x00\x00\xf3L\x00\x00\xcf\x00\x00\x00\xbfM\x00\x00\x1e\x01\x00\x00\x8fN\x00\x00\x1c\x00\x00\x00\xaeO\x00\x00T\x00\x00\x00\xcbO\x00\x00/\x00\x00\x00 P\x00\x00\x1e\x00\x00\x00PP\x00\x00=\x00\x00\x00oP\x00\x00$\x00\x00\x00\xadP\x00\x00+\x00\x00\x00\xd2P\x00\x00r\x00\x00\x00\xfeP\x00\x00\x12\x00\x00\x00qQ\x00\x00\x18\x00\x00\x00\x84Q\x00\x00\xc3\x00\x00\x00\x9dQ\x00\x00\x01\x00\x00\x00&\x00\x00\x00\x11\x00\x00\x00\x00\x00\x00\x00\x03\x00\x00\x006\x00\x00\x00\x1a\x00\x00\x00-\x00\x00\x00\x00\x00\x00\x00\n\x00\x00\x00C\x00\x00\x00\x10\x00\x00\x00H\x00\x00\x00\x1f\x00\x00\x00)\x00\x00\x00\x00\x00\x00\x003\x00\x00\x00\x00\x00\x00\x00\x16\x00\x00\x00\x15\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00:\x00\x00\x00\x00\x00\x00\x00G\x00\x00\x00\x0f\x00\x00\x00\x06\x00\x00\x00\r\x00\x00\x008\x00\x00\x00\x00\x00\x00\x00\x0e\x00\x00\x00F\x00\x00\x00%\x00\x00\x00@\x00\x00\x00 \x00\x00\x00\x1c\x00\x00\x00\x14\x00\x00\x00\x00\x00\x00\x00>\x00\x00\x004\x00\x00\x00\x18\x00\x00\x007\x00\x00\x000\x00\x00\x00B\x00\x00\x00\x02\x00\x00\x00\x00\x00\x00\x00\"\x00\x00\x00?\x00\x00\x00\x00\x00\x00\x00+\x00\x00\x00*\x00\x00\x00\x00\x00\x00\x00,\x00\x00\x00I\x00\x00\x00\x00\x00\x00\x00;\x00\x00\x002\x00\x00\x00\x00\x00\x00\x00=\x00\x00\x00'\x00\x00\x00\a\x00\x00\x00\x13\x00\x00\x00\x12\x00\x00\x00\x00\x00\x00\x00\b\x00\x00\x00\x05\x00\x00\x00\x00\x00\x00\x00.\x00\x00\x009\x00\x00\x00!\x00\x00\x00$\x00\x00\x00A\x00\x00\x00\x1e\x00\x00\x00\x17\x00\x00\x00/\x00\x00\x00E\x00\x00\x001\x00\x00\x005\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\t\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00<\x00\x00\x00\x1b\x00\x00\x00\x19\x00\x00\x00D\x00\x00\x00\x00\x00\x00\x00\v\x00\x00\x00\x1d\x00\x00\x00\x00\x00\x00\x00(\x00\x00\x00\f\x00\x00\x00\x04\x00\x00\x00\x00\x00\x00\x00#\x00\x00\x00\x00A comma-delimited set of quota scopes that must all match each object tracked by the quota.\x04A comma-delimited set of quota scopes that must all match each object tracked by the quota.\x00A comma-delimited set of resource=quantity pairs that define a hard limit.\x04A comma-delimited set of resource=quantity pairs that define a hard limit.\x00A label selector to use for this budget. Only equality-based selector requirements are supported.\x04A label selector to use for this budget. Only equality-based selector requirements are supported.\x00A label selector to use for this service. Only equality-based selector requirements are supported. If empty (the default) infer the selector from the replication controller or replica set.\x04A label selector to use for this service. Only equality-based selector requirements are supported. If empty (the default) infer the selector from the replication controller or replica set.\x00A schedule in the Cron format the job should be run with.\x04A schedule in the Cron format the job should be run with.\x00Additional external IP address (not managed by Kubernetes) to accept for the service. If this IP is routed to a node, the service can be accessed by this IP in addition to its generated service IP.\x04Additional external IP address (not managed by Kubernetes) to accept for the service. If this IP is routed to a node, the service can be accessed by this IP in addition to its generated service IP.\x00An inline JSON override for the generated object. If this is non-empty, it is used to override the generated object. Requires that the object supply a valid apiVersion field.\x04An inline JSON override for the generated object. If this is non-empty, it is used to override the generated object. Requires that the object supply a valid apiVersion field.\x00An inline JSON override for the generated service object. If this is non-empty, it is used to override the generated object. Requires that the object supply a valid apiVersion field.  Only used if --expose is true.\x04An inline JSON override for the generated service object. If this is non-empty, it is used to override the generated object. Requires that the object supply a valid apiVersion field.  Only used if --expose is true.\x00Apply a configuration to a resource by filename or stdin\x04Apply a configuration to a resource by filename or stdin\x00Assign your own ClusterIP or set to 'None' for a 'headless' service (no loadbalancing).\x04Assign your own ClusterIP or set to 'None' for a 'headless' service (no loadbalancing).\x00ClusterIP to be assigned to the service. Leave empty to auto-allocate, or set to 'None' to create a headless service.\x04ClusterIP to be assigned to the service. Leave empty to auto-allocate, or set to 'None' to create a headless service.\x00ClusterRole this ClusterRoleBinding should reference\x04ClusterRole this ClusterRoleBinding should reference\x00ClusterRole this RoleBinding should reference\x04ClusterRole this RoleBinding should reference\x00Container name which will have its image upgraded. Only relevant when --image is specified, ignored otherwise. Required when using --image on a multi-container pod\x04Container name which will have its image upgraded. Only relevant when --image is specified, ignored otherwise. Required when using --image on a multi-container pod\x00Delete the specified cluster from the kubeconfig\x04Delete the specified cluster from the kubeconfig\x00Delete the specified context from the kubeconfig\x04Delete the specified context from the kubeconfig\x00Describe one or many contexts\x04Describe one or many contexts\x00Display clusters defined in the kubeconfig\x04Display clusters defined in the kubeconfig\x00Display merged kubeconfig settings or a specified kubeconfig file\x04Display merged kubeconfig settings or a specified kubeconfig file\x00Displays the current-context\x04Displays the current-context\x00Email for Docker registry\x04Email for Docker registry\x00Explicit policy for when to pull container images. Required when --image is same as existing image, ignored otherwise.\x04Explicit policy for when to pull container images. Required when --image is same as existing image, ignored otherwise.\x00IP to assign to the Load Balancer. If empty, an ephemeral IP will be created and used (cloud-provider specific).\x04IP to assign to the Load Balancer. If empty, an ephemeral IP will be created and used (cloud-provider specific).\x00If non-empty, set the session affinity for the service to this; legal values: 'None', 'ClientIP'\x04If non-empty, set the session affinity for the service to this; legal values: 'None', 'ClientIP'\x00If non-empty, the annotation update will only succeed if this is the current resource-version for the object. Only valid when specifying a single resource.\x04If non-empty, the annotation update will only succeed if this is the current resource-version for the object. Only valid when specifying a single resource.\x00If non-empty, the labels update will only succeed if this is the current resource-version for the object. Only valid when specifying a single resource.\x04If non-empty, the labels update will only succeed if this is the current resource-version for the object. Only valid when specifying a single resource.\x00Image to use for upgrading the replication controller. Must be distinct from the existing image (either new image or new image tag).  Can not be used with --filename/-f\x04Image to use for upgrading the replication controller. Must be distinct from the existing image (either new image or new image tag).  Can not be used with --filename/-f\x00Modify kubeconfig files\x04Modify kubeconfig files\x00Name or number for the port on the container that the service should direct traffic to. Optional.\x04Name or number for the port on the container that the service should direct traffic to. Optional.\x00Only return logs after a specific date (RFC3339). Defaults to all logs. Only one of since-time / since may be used.\x04Only return logs after a specific date (RFC3339). Defaults to all logs. Only one of since-time / since may be used.\x00Output the formatted object with the given group version (for ex: 'extensions/v1beta1').\x04Output the formatted object with the given group version (for ex: 'extensions/v1beta1').\x00Password for Docker registry authentication\x04Password for Docker registry authentication\x00Path to PEM encoded public key certificate.\x04Path to PEM encoded public key certificate.\x00Path to private key associated with given certificate.\x04Path to private key associated with given certificate.\x00Precondition for resource version. Requires that the current resource version match this value in order to scale.\x04Precondition for resource version. Requires that the current resource version match this value in order to scale.\x00Role this RoleBinding should reference\x04Role this RoleBinding should reference\x00Server location for Docker registry\x04Server location for Docker registry\x00Set specific features on objects\x04Set specific features on objects\x00Set the selector on a resource\x04Set the selector on a resource\x00Sets a cluster entry in kubeconfig\x04Sets a cluster entry in kubeconfig\x00Sets a context entry in kubeconfig\x04Sets a context entry in kubeconfig\x00Sets a user entry in kubeconfig\x04Sets a user entry in kubeconfig\x00Sets an individual value in a kubeconfig file\x04Sets an individual value in a kubeconfig file\x00Sets the current-context in a kubeconfig file\x04Sets the current-context in a kubeconfig file\x00Synonym for --target-port\x04Synonym for --target-port\x00The image for the container to run.\x04The image for the container to run.\x00The image pull policy for the container. If left empty, this value will not be specified by the client and defaulted by the server\x04The image pull policy for the container. If left empty, this value will not be specified by the client and defaulted by the server\x00The key to use to differentiate between two different controllers, default 'deployment'.  Only relevant when --image is specified, ignored otherwise\x04The key to use to differentiate between two different controllers, default 'deployment'.  Only relevant when --image is specified, ignored otherwise\x00The minimum number or percentage of available pods this budget requires.\x04The minimum number or percentage of available pods this budget requires.\x00The name for the newly created object.\x04The name for the newly created object.\x00The name for the newly created object. If not specified, the name of the input resource will be used.\x04The name for the newly created object. If not specified, the name of the input resource will be used.\x00The name of the API generator to use, see http://kubernetes.io/docs/user-guide/kubectl-conventions/#generators for a list.\x04The name of the API generator to use, see http://kubernetes.io/docs/user-guide/kubectl-conventions/#generators for a list.\x00The name of the API generator to use. Currently there is only 1 generator.\x04The name of the API generator to use. Currently there is only 1 generator.\x00The name of the API generator to use. There are 2 generators: 'service/v1' and 'service/v2'. The only difference between them is that service port in v1 is named 'default', while it is left unnamed in v2. Default is 'service/v2'.\x04The name of the API generator to use. There are 2 generators: 'service/v1' and 'service/v2'. The only difference between them is that service port in v1 is named 'default', while it is left unnamed in v2. Default is 'service/v2'.\x00The name of the generator to use for creating a service.  Only used if --expose is true\x04The name of the generator to use for creating a service.  Only used if --expose is true\x00The network protocol for the service to be created. Default is 'TCP'.\x04The network protocol for the service to be created. Default is 'TCP'.\x00The port that the service should serve on. Copied from the resource being exposed, if unspecified\x04The port that the service should serve on. Copied from the resource being exposed, if unspecified\x00The port that this container exposes.  If --expose is true, this is also the port used by the service that is created.\x04The port that this container exposes.  If --expose is true, this is also the port used by the service that is created.\x00The resource requirement limits for this container.  For example, 'cpu=200m,memory=512Mi'.  Note that server side components may assign limits depending on the server configuration, such as limit ranges.\x04The resource requirement limits for this container.  For example, 'cpu=200m,memory=512Mi'.  Note that server side components may assign limits depending on the server configuration, such as limit ranges.\x00The resource requirement requests for this container.  For example, 'cpu=100m,memory=256Mi'.  Note that server side components may assign requests depending on the server configuration, such as limit ranges.\x04The resource requirement requests for this container.  For example, 'cpu=100m,memory=256Mi'.  Note that server side components may assign requests depending on the server configuration, such as limit ranges.\x00The restart policy for this Pod.  Legal values [Always, OnFailure, Never].  If set to 'Always' a deployment is created, if set to 'OnFailure' a job is created, if set to 'Never', a regular pod is created. For the latter two --replicas must be 1.  Default 'Always', for CronJobs `Never`.\x04The restart policy for this Pod.  Legal values [Always, OnFailure, Never].  If set to 'Always' a deployment is created, if set to 'OnFailure' a job is created, if set to 'Never', a regular pod is created. For the latter two --replicas must be 1.  Default 'Always', for CronJobs `Never`.\x00The type of secret to create\x04The type of secret to create\x00Type for this service: ClusterIP, NodePort, or LoadBalancer. Default is 'ClusterIP'.\x04Type for this service: ClusterIP, NodePort, or LoadBalancer. Default is 'ClusterIP'.\x00Unsets an individual value in a kubeconfig file\x04Unsets an individual value in a kubeconfig file\x00Update image of a pod template\x04Update image of a pod template\x00Update resource requests/limits on objects with pod templates\x04Update resource requests/limits on objects with pod templates\x00Update the annotations on a resource\x04Update the annotations on a resource\x00Username for Docker registry authentication\x04Username for Docker registry authentication\x00Where to output the files.  If empty or '-' uses stdout, otherwise creates a directory hierarchy in that directory\x04Where to output the files.  If empty or '-' uses stdout, otherwise creates a directory hierarchy in that directory\x00dummy restart flag\x04dummy restart flag\x00external name of service\x04external name of service\x00watch is only supported on individual resources and resource collections - %d resources were found\x04watch is only supported on individual resources and resource collections - %d resources were found\x00watch is only supported on individual resources and resource collections - %d resources were found\x00Project-Id-Version: gettext-go-examples-hello\nReport-Msgid-Bugs-To: \nPOT-Creation-Date: 2013-12-12 20:03+0000\nPO-Revision-Date: 2017-01-29 14:45-0800\nLast-Translator: Brendan Burns <brendan.d.burns@gmail.com>\nMIME-Version: 1.0\nContent-Type: text/plain; charset=UTF-8\nContent-Transfer-Encoding: 8bit\nX-Generator: Poedit 1.6.10\nX-Poedit-SourceCharset: UTF-8\nLanguage-Team: \nPlural-Forms: nplurals=2; plural=(n != 1);\nLanguage: en\n\x00A comma-delimited set of quota scopes that must all match each object tracked by the quota.\x00A comma-delimited set of resource=quantity pairs that define a hard limit.\x00A label selector to use for this budget. Only equality-based selector requirements are supported.\x00A label selector to use for this service. Only equality-based selector requirements are supported. If empty (the default) infer the selector from the replication controller or replica set.\x00A schedule in the Cron format the job should be run with.\x00Additional external IP address (not managed by Kubernetes) to accept for the service. If this IP is routed to a node, the service can be accessed by this IP in addition to its generated service IP.\x00An inline JSON override for the generated object. If this is non-empty, it is used to override the generated object. Requires that the object supply a valid apiVersion field.\x00An inline JSON override for the generated service object. If this is non-empty, it is used to override the generated object. Requires that the object supply a valid apiVersion field.  Only used if --expose is true.\x00Apply a configuration to a resource by filename or stdin\x00Assign your own ClusterIP or set to 'None' for a 'headless' service (no loadbalancing).\x00ClusterIP to be assigned to the service. Leave empty to auto-allocate, or set to 'None' to create a headless service.\x00ClusterRole this ClusterRoleBinding should reference\x00ClusterRole this RoleBinding should reference\x00Container name which will have its image upgraded. Only relevant when --image is specified, ignored otherwise. Required when using --image on a multi-container pod\x00Delete the specified cluster from the kubeconfig\x00Delete the specified context from the kubeconfig\x00Describe one or many contexts\x00Display clusters defined in the kubeconfig\x00Display merged kubeconfig settings or a specified kubeconfig file\x00Displays the current-context\x00Email for Docker registry\x00Explicit policy for when to pull container images. Required when --image is same as existing image, ignored otherwise.\x00IP to assign to the Load Balancer. If empty, an ephemeral IP will be created and used (cloud-provider specific).\x00If non-empty, set the session affinity for the service to this; legal values: 'None', 'ClientIP'\x00If non-empty, the annotation update will only succeed if this is the current resource-version for the object. Only valid when specifying a single resource.\x00If non-empty, the labels update will only succeed if this is the current resource-version for the object. Only valid when specifying a single resource.\x00Image to use for upgrading the replication controller. Must be distinct from the existing image (either new image or new image tag).  Can not be used with --filename/-f\x00Modify kubeconfig files\x00Name or number for the port on the container that the service should direct traffic to. Optional.\x00Only return logs after a specific date (RFC3339). Defaults to all logs. Only one of since-time / since may be used.\x00Output the formatted object with the given group version (for ex: 'extensions/v1beta1').\x00Password for Docker registry authentication\x00Path to PEM encoded public key certificate.\x00Path to private key associated with given certificate.\x00Precondition for resource version. Requires that the current resource version match this value in order to scale.\x00Role this RoleBinding should reference\x00Server location for Docker registry\x00Set specific features on objects\x00Set the selector on a resource\x00Sets a cluster entry in kubeconfig\x00Sets a context entry in kubeconfig\x00Sets a user entry in kubeconfig\x00Sets an individual value in a kubeconfig file\x00Sets the current-context in a kubeconfig file\x00Synonym for --target-port\x00The image for the container to run.\x00The image pull policy for the container. If left empty, this value will not be specified by the client and defaulted by the server\x00The key to use to differentiate between two different controllers, default 'deployment'.  Only relevant when --image is specified, ignored otherwise\x00The minimum number or percentage of available pods this budget requires.\x00The name for the newly created object.\x00The name for the newly created object. If not specified, the name of the input resource will be used.\x00The name of the API generator to use, see http://kubernetes.io/docs/user-guide/kubectl-conventions/#generators for a list.\x00The name of the API generator to use. Currently there is only 1 generator.\x00The name of the API generator to use. There are 2 generators: 'service/v1' and 'service/v2'. The only difference between them is that service port in v1 is named 'default', while it is left unnamed in v2. Default is 'service/v2'.\x00The name of the generator to use for creating a service.  Only used if --expose is true\x00The network protocol for the service to be created. Default is 'TCP'.\x00The port that the service should serve on. Copied from the resource being exposed, if unspecified\x00The port that this container exposes.  If --expose is true, this is also the port used by the service that is created.\x00The resource requirement limits for this container.  For example, 'cpu=200m,memory=512Mi'.  Note that server side components may assign limits depending on the server configuration, such as limit ranges.\x00The resource requirement requests for this container.  For example, 'cpu=100m,memory=256Mi'.  Note that server side components may assign requests depending on the server configuration, such as limit ranges.\x00The restart policy for this Pod.  Legal values [Always, OnFailure, Never].  If set to 'Always' a deployment is created, if set to 'OnFailure' a job is created, if set to 'Never', a regular pod is created. For the latter two --replicas must be 1.  Default 'Always', for CronJobs `Never`.\x00The type of secret to create\x00Type for this service: ClusterIP, NodePort, or LoadBalancer. Default is 'ClusterIP'.\x00Unsets an individual value in a kubeconfig file\x00Update image of a pod template\x00Update resource requests/limits on objects with pod templates\x00Update the annotations on a resource\x00Username for Docker registry authentication\x00Where to output the files.  If empty or '-' uses stdout, otherwise creates a directory hierarchy in that directory\x00dummy restart flag\x00external name of service\x00watch is only supported on individual resources and resource collections - %d resource was found\x00watch is only supported on individual resources and resource collections - %d resources were found\x00")
 
 func translationsKubectlEn_usLc_messagesK8sMoBytes() ([]byte, error) {
 	return _translationsKubectlEn_usLc_messagesK8sMo, nil
@@ -499,6 +760,266 @@ msgstr "Update resource requests/limits on objects with pod templates"
 msgctxt "Set the selector on a resource"
 msgid "Set the selector on a resource"
 msgstr "Set the selector on a resource"
+
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/annotate.go#L132
+msgctxt "If non-empty, the annotation update will only succeed if this is the current resource-version for the object. Only valid when specifying a single resource."
+msgid "If non-empty, the annotation update will only succeed if this is the current resource-version for the object. Only valid when specifying a single resource."
+msgstr "If non-empty, the annotation update will only succeed if this is the current resource-version for the object. Only valid when specifying a single resource."
+
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/autoscale.go#L66
+msgctxt "The name of the API generator to use. Currently there is only 1 generator."
+msgid "The name of the API generator to use. Currently there is only 1 generator."
+msgstr "The name of the API generator to use. Currently there is only 1 generator."
+
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/autoscale.go#L71
+msgctxt "The name for the newly created object. If not specified, the name of the input resource will be used."
+msgid "The name for the newly created object. If not specified, the name of the input resource will be used."
+msgstr "The name for the newly created object. If not specified, the name of the input resource will be used."
+
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/clusterinfo_dump.go#L45
+msgctxt "Where to output the files.  If empty or '-' uses stdout, otherwise creates a directory hierarchy in that directory"
+msgid "Where to output the files.  If empty or '-' uses stdout, otherwise creates a directory hierarchy in that directory"
+msgstr "Where to output the files.  If empty or '-' uses stdout, otherwise creates a directory hierarchy in that directory"
+
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/create_clusterrolebinding.go#L55
+msgctxt "ClusterRole this ClusterRoleBinding should reference"
+msgid "ClusterRole this ClusterRoleBinding should reference"
+msgstr "ClusterRole this ClusterRoleBinding should reference"
+
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/create_pdb.go#L62
+msgctxt "The minimum number or percentage of available pods this budget requires."
+msgid "The minimum number or percentage of available pods this budget requires."
+msgstr "The minimum number or percentage of available pods this budget requires."
+
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/create_pdb.go#L63
+msgctxt "A label selector to use for this budget. Only equality-based selector requirements are supported."
+msgid "A label selector to use for this budget. Only equality-based selector requirements are supported."
+msgstr "A label selector to use for this budget. Only equality-based selector requirements are supported."
+
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/create_quota.go#L60
+msgctxt "A comma-delimited set of resource=quantity pairs that define a hard limit."
+msgid "A comma-delimited set of resource=quantity pairs that define a hard limit."
+msgstr "A comma-delimited set of resource=quantity pairs that define a hard limit."
+
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/create_quota.go#L61
+msgctxt "A comma-delimited set of quota scopes that must all match each object tracked by the quota."
+msgid "A comma-delimited set of quota scopes that must all match each object tracked by the quota."
+msgstr "A comma-delimited set of quota scopes that must all match each object tracked by the quota."
+
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/create_rolebinding.go#L55
+msgctxt "ClusterRole this RoleBinding should reference"
+msgid "ClusterRole this RoleBinding should reference"
+msgstr "ClusterRole this RoleBinding should reference"
+
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/create_rolebinding.go#L56
+msgctxt "Role this RoleBinding should reference"
+msgid "Role this RoleBinding should reference"
+msgstr "Role this RoleBinding should reference"
+
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/create_secret.go#L87
+msgctxt "The type of secret to create"
+msgid "The type of secret to create"
+msgstr "The type of secret to create"
+
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/create_secret.go#L155
+msgctxt "Username for Docker registry authentication"
+msgid "Username for Docker registry authentication"
+msgstr "Username for Docker registry authentication"
+
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/create_secret.go#L157
+msgctxt "Password for Docker registry authentication"
+msgid "Password for Docker registry authentication"
+msgstr "Password for Docker registry authentication"
+
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/create_secret.go#L159
+msgctxt "Email for Docker registry"
+msgid "Email for Docker registry"
+msgstr "Email for Docker registry"
+
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/create_secret.go#L161
+msgctxt "Server location for Docker registry"
+msgid "Server location for Docker registry"
+msgstr "Server location for Docker registry"
+
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/create_secret.go#L226
+msgctxt "Path to PEM encoded public key certificate."
+msgid "Path to PEM encoded public key certificate."
+msgstr "Path to PEM encoded public key certificate."
+
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/create_secret.go#L227
+msgctxt "Path to private key associated with given certificate."
+msgid "Path to private key associated with given certificate."
+msgstr "Path to private key associated with given certificate."
+
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/create_service.go#L81
+msgctxt "Assign your own ClusterIP or set to 'None' for a 'headless' service (no loadbalancing)."
+msgid "Assign your own ClusterIP or set to 'None' for a 'headless' service (no loadbalancing)."
+msgstr "Assign your own ClusterIP or set to 'None' for a 'headless' service (no loadbalancing)."
+
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/create_service.go#L253
+msgctxt "external name of service"
+msgid "external name of service"
+msgstr "external name of service"
+
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/edit.go#L114
+msgctxt "Output the formatted object with the given group version (for ex: 'extensions/v1beta1')."
+msgid "Output the formatted object with the given group version (for ex: 'extensions/v1beta1')."
+msgstr "Output the formatted object with the given group version (for ex: 'extensions/v1beta1')."
+
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/expose.go#L98
+msgctxt "The name of the API generator to use. There are 2 generators: 'service/v1' and 'service/v2'. The only difference between them is that service port in v1 is named 'default', while it is left unnamed in v2. Default is 'service/v2'."
+msgid "The name of the API generator to use. There are 2 generators: 'service/v1' and 'service/v2'. The only difference between them is that service port in v1 is named 'default', while it is left unnamed in v2. Default is 'service/v2'."
+msgstr "The name of the API generator to use. There are 2 generators: 'service/v1' and 'service/v2'. The only difference between them is that service port in v1 is named 'default', while it is left unnamed in v2. Default is 'service/v2'."
+
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/expose.go#L99
+msgctxt "The network protocol for the service to be created. Default is 'TCP'."
+msgid "The network protocol for the service to be created. Default is 'TCP'."
+msgstr "The network protocol for the service to be created. Default is 'TCP'."
+
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/expose.go#L100
+msgctxt "The port that the service should serve on. Copied from the resource being exposed, if unspecified"
+msgid "The port that the service should serve on. Copied from the resource being exposed, if unspecified"
+msgstr "The port that the service should serve on. Copied from the resource being exposed, if unspecified"
+
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/expose.go#L101
+msgctxt "Type for this service: ClusterIP, NodePort, or LoadBalancer. Default is 'ClusterIP'."
+msgid "Type for this service: ClusterIP, NodePort, or LoadBalancer. Default is 'ClusterIP'."
+msgstr "Type for this service: ClusterIP, NodePort, or LoadBalancer. Default is 'ClusterIP'."
+
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/expose.go#L105
+msgctxt "IP to assign to the Load Balancer. If empty, an ephemeral IP will be created and used (cloud-provider specific)."
+msgid "IP to assign to the Load Balancer. If empty, an ephemeral IP will be created and used (cloud-provider specific)."
+msgstr "IP to assign to the Load Balancer. If empty, an ephemeral IP will be created and used (cloud-provider specific)."
+
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/expose.go#L106
+msgctxt "A label selector to use for this service. Only equality-based selector requirements are supported. If empty (the default) infer the selector from the replication controller or replica set."
+msgid "A label selector to use for this service. Only equality-based selector requirements are supported. If empty (the default) infer the selector from the replication controller or replica set."
+msgstr "A label selector to use for this service. Only equality-based selector requirements are supported. If empty (the default) infer the selector from the replication controller or replica set."
+
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/expose.go#L108
+msgctxt "Synonym for --target-port"
+msgid "Synonym for --target-port"
+msgstr "Synonym for --target-port"
+
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/expose.go#L110
+msgctxt "Name or number for the port on the container that the service should direct traffic to. Optional."
+msgid "Name or number for the port on the container that the service should direct traffic to. Optional."
+msgstr "Name or number for the port on the container that the service should direct traffic to. Optional."
+
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/expose.go#L111
+msgctxt "Additional external IP address (not managed by Kubernetes) to accept for the service. If this IP is routed to a node, the service can be accessed by this IP in addition to its generated service IP."
+msgid "Additional external IP address (not managed by Kubernetes) to accept for the service. If this IP is routed to a node, the service can be accessed by this IP in addition to its generated service IP."
+msgstr "Additional external IP address (not managed by Kubernetes) to accept for the service. If this IP is routed to a node, the service can be accessed by this IP in addition to its generated service IP."
+
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/expose.go#L112
+msgctxt "An inline JSON override for the generated object. If this is non-empty, it is used to override the generated object. Requires that the object supply a valid apiVersion field."
+msgid "An inline JSON override for the generated object. If this is non-empty, it is used to override the generated object. Requires that the object supply a valid apiVersion field."
+msgstr "An inline JSON override for the generated object. If this is non-empty, it is used to override the generated object. Requires that the object supply a valid apiVersion field."
+
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/expose.go#L113
+msgctxt "The name for the newly created object."
+msgid "The name for the newly created object."
+msgstr "The name for the newly created object."
+
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/expose.go#L114
+msgctxt "If non-empty, set the session affinity for the service to this; legal values: 'None', 'ClientIP'"
+msgid "If non-empty, set the session affinity for the service to this; legal values: 'None', 'ClientIP'"
+msgstr "If non-empty, set the session affinity for the service to this; legal values: 'None', 'ClientIP'"
+
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/expose.go#L115
+msgctxt "ClusterIP to be assigned to the service. Leave empty to auto-allocate, or set to 'None' to create a headless service."
+msgid "ClusterIP to be assigned to the service. Leave empty to auto-allocate, or set to 'None' to create a headless service."
+msgstr "ClusterIP to be assigned to the service. Leave empty to auto-allocate, or set to 'None' to create a headless service."
+
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/label.go#L129
+msgctxt "If non-empty, the labels update will only succeed if this is the current resource-version for the object. Only valid when specifying a single resource."
+msgid "If non-empty, the labels update will only succeed if this is the current resource-version for the object. Only valid when specifying a single resource."
+msgstr "If non-empty, the labels update will only succeed if this is the current resource-version for the object. Only valid when specifying a single resource."
+
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/logs.go#L108
+msgctxt "Only return logs after a specific date (RFC3339). Defaults to all logs. Only one of since-time / since may be used."
+msgid "Only return logs after a specific date (RFC3339). Defaults to all logs. Only one of since-time / since may be used."
+msgstr "Only return logs after a specific date (RFC3339). Defaults to all logs. Only one of since-time / since may be used."
+
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/rollingupdate.go#L98
+msgctxt "Image to use for upgrading the replication controller. Must be distinct from the existing image (either new image or new image tag).  Can not be used with --filename/-f"
+msgid "Image to use for upgrading the replication controller. Must be distinct from the existing image (either new image or new image tag).  Can not be used with --filename/-f"
+msgstr "Image to use for upgrading the replication controller. Must be distinct from the existing image (either new image or new image tag).  Can not be used with --filename/-f"
+
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/rollingupdate.go#L100
+msgctxt "The key to use to differentiate between two different controllers, default 'deployment'.  Only relevant when --image is specified, ignored otherwise"
+msgid "The key to use to differentiate between two different controllers, default 'deployment'.  Only relevant when --image is specified, ignored otherwise"
+msgstr "The key to use to differentiate between two different controllers, default 'deployment'.  Only relevant when --image is specified, ignored otherwise"
+
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/rollingupdate.go#L101
+msgctxt "Container name which will have its image upgraded. Only relevant when --image is specified, ignored otherwise. Required when using --image on a multi-container pod"
+msgid "Container name which will have its image upgraded. Only relevant when --image is specified, ignored otherwise. Required when using --image on a multi-container pod"
+msgstr "Container name which will have its image upgraded. Only relevant when --image is specified, ignored otherwise. Required when using --image on a multi-container pod"
+
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/rollingupdate.go#L102
+msgctxt "Explicit policy for when to pull container images. Required when --image is same as existing image, ignored otherwise."
+msgid "Explicit policy for when to pull container images. Required when --image is same as existing image, ignored otherwise."
+msgstr "Explicit policy for when to pull container images. Required when --image is same as existing image, ignored otherwise."
+
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/run.go#L113
+msgctxt "The name of the API generator to use, see http://kubernetes.io/docs/user-guide/kubectl-conventions/#generators for a list."
+msgid "The name of the API generator to use, see http://kubernetes.io/docs/user-guide/kubectl-conventions/#generators for a list."
+msgstr "The name of the API generator to use, see http://kubernetes.io/docs/user-guide/kubectl-conventions/#generators for a list."
+
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/run.go#L114
+msgctxt "The image for the container to run."
+msgid "The image for the container to run."
+msgstr "The image for the container to run."
+
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/run.go#L116
+msgctxt "The image pull policy for the container. If left empty, this value will not be specified by the client and defaulted by the server"
+msgid "The image pull policy for the container. If left empty, this value will not be specified by the client and defaulted by the server"
+msgstr "The image pull policy for the container. If left empty, this value will not be specified by the client and defaulted by the server"
+
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/run.go#L121
+msgctxt "The port that this container exposes.  If --expose is true, this is also the port used by the service that is created."
+msgid "The port that this container exposes.  If --expose is true, this is also the port used by the service that is created."
+msgstr "The port that this container exposes.  If --expose is true, this is also the port used by the service that is created."
+
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/run.go#L128
+msgctxt "The restart policy for this Pod.  Legal values [Always, OnFailure, Never].  If set to 'Always' a deployment is created, if set to 'OnFailure' a job is created, if set to 'Never', a regular pod is created. For the latter two --replicas must be 1.  Default 'Always', for CronJobs ` + "`" + `Never` + "`" + `."
+msgid "The restart policy for this Pod.  Legal values [Always, OnFailure, Never].  If set to 'Always' a deployment is created, if set to 'OnFailure' a job is created, if set to 'Never', a regular pod is created. For the latter two --replicas must be 1.  Default 'Always', for CronJobs ` + "`" + `Never` + "`" + `."
+msgstr "The restart policy for this Pod.  Legal values [Always, OnFailure, Never].  If set to 'Always' a deployment is created, if set to 'OnFailure' a job is created, if set to 'Never', a regular pod is created. For the latter two --replicas must be 1.  Default 'Always', for CronJobs ` + "`" + `Never` + "`" + `."
+
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/run.go#L130
+msgctxt "The resource requirement requests for this container.  For example, 'cpu=100m,memory=256Mi'.  Note that server side components may assign requests depending on the server configuration, such as limit ranges."
+msgid "The resource requirement requests for this container.  For example, 'cpu=100m,memory=256Mi'.  Note that server side components may assign requests depending on the server configuration, such as limit ranges."
+msgstr "The resource requirement requests for this container.  For example, 'cpu=100m,memory=256Mi'.  Note that server side components may assign requests depending on the server configuration, such as limit ranges."
+
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/run.go#L131
+msgctxt "The resource requirement limits for this container.  For example, 'cpu=200m,memory=512Mi'.  Note that server side components may assign limits depending on the server configuration, such as limit ranges."
+msgid "The resource requirement limits for this container.  For example, 'cpu=200m,memory=512Mi'.  Note that server side components may assign limits depending on the server configuration, such as limit ranges."
+msgstr "The resource requirement limits for this container.  For example, 'cpu=200m,memory=512Mi'.  Note that server side components may assign limits depending on the server configuration, such as limit ranges."
+
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/run.go#L133
+msgctxt "The name of the generator to use for creating a service.  Only used if --expose is true"
+msgid "The name of the generator to use for creating a service.  Only used if --expose is true"
+msgstr "The name of the generator to use for creating a service.  Only used if --expose is true"
+
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/run.go#L134
+msgctxt "An inline JSON override for the generated service object. If this is non-empty, it is used to override the generated object. Requires that the object supply a valid apiVersion field.  Only used if --expose is true."
+msgid "An inline JSON override for the generated service object. If this is non-empty, it is used to override the generated object. Requires that the object supply a valid apiVersion field.  Only used if --expose is true."
+msgstr "An inline JSON override for the generated service object. If this is non-empty, it is used to override the generated object. Requires that the object supply a valid apiVersion field.  Only used if --expose is true."
+
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/run.go#L136
+msgctxt "A schedule in the Cron format the job should be run with."
+msgid "A schedule in the Cron format the job should be run with."
+msgstr "A schedule in the Cron format the job should be run with."
+
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/run_test.go#L83
+msgctxt "dummy restart flag"
+msgid "dummy restart flag"
+msgstr "dummy restart flag"
+
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/scale.go#L83
+msgctxt "Precondition for resource version. Requires that the current resource version match this value in order to scale."
+msgid "Precondition for resource version. Requires that the current resource version match this value in order to scale."
+msgstr "Precondition for resource version. Requires that the current resource version match this value in order to scale."
 `)
 
 func translationsKubectlEn_usLc_messagesK8sPoBytes() ([]byte, error) {

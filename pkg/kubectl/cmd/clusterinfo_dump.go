@@ -29,6 +29,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
+	"k8s.io/kubernetes/pkg/util/i18n"
 )
 
 // NewCmdCreateSecret groups subcommands to create various types of secrets
@@ -42,7 +43,7 @@ func NewCmdClusterInfoDump(f cmdutil.Factory, cmdOut io.Writer) *cobra.Command {
 			cmdutil.CheckErr(dumpClusterInfo(f, cmd, args, cmdOut))
 		},
 	}
-	cmd.Flags().String("output-directory", "", "Where to output the files.  If empty or '-' uses stdout, otherwise creates a directory hierarchy in that directory")
+	cmd.Flags().String("output-directory", "", i18n.T("Where to output the files.  If empty or '-' uses stdout, otherwise creates a directory hierarchy in that directory)"))
 	cmd.Flags().StringSlice("namespaces", []string{}, "A comma separated list of namespaces to dump.")
 	cmd.Flags().Bool("all-namespaces", false, "If true, dump all namespaces.  If true, --namespaces is ignored.")
 	return cmd

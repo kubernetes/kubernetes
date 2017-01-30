@@ -185,6 +185,7 @@ go_test(
         "//pkg/kubectl/cmd/testing:go_default_library",
         "//pkg/kubectl/cmd/util:go_default_library",
         "//pkg/kubectl/resource:go_default_library",
+        "//pkg/util/i18n:go_default_library",
         "//pkg/util/strings:go_default_library",
         "//pkg/util/term:go_default_library",
         "//vendor:github.com/spf13/cobra",

@@ -43,6 +43,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl/cmd/util/editor"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
 	"k8s.io/kubernetes/pkg/util/crlf"
+	"k8s.io/kubernetes/pkg/util/i18n"
 
 	"github.com/golang/glog"
 	"github.com/spf13/cobra"
@@ -111,7 +112,7 @@ func NewCmdEdit(f cmdutil.Factory, out, errOut io.Writer) *cobra.Command {
 	cmdutil.AddFilenameOptionFlags(cmd, options, usage)
 	cmdutil.AddValidateFlags(cmd)
 	cmd.Flags().StringP("output", "o", "yaml", "Output format. One of: yaml|json.")
-	cmd.Flags().String("output-version", "", "Output the formatted object with the given group version (for ex: 'extensions/v1beta1').")
+	cmd.Flags().String("output-version", "", i18n.T("Output the formatted object with the given group version (for ex: 'extensions/v1beta1').)"))
 	cmd.Flags().Bool("windows-line-endings", gruntime.GOOS == "windows", "Use Windows line-endings (default Unix line-endings)")
 	cmdutil.AddApplyAnnotationFlags(cmd)
 	cmdutil.AddRecordFlag(cmd)

@@ -37,6 +37,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
+	"k8s.io/kubernetes/pkg/util/i18n"
 )
 
 func TestGetRestartPolicy(t *testing.T) {
@@ -80,7 +81,7 @@ func TestGetRestartPolicy(t *testing.T) {
 	}
 	for _, test := range tests {
 		cmd := &cobra.Command{}
-		cmd.Flags().String("restart", "", "dummy restart flag")
+		cmd.Flags().String("restart", "", i18n.T("dummy restart flag)"))
 		cmd.Flags().Lookup("restart").Value.Set(test.input)
 		policy, err := getRestartPolicy(cmd, test.interactive)
 		if test.expectErr && err == nil {
