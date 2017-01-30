@@ -69,7 +69,7 @@ func (m *Quantity) Size() (n int) {
 	_ = l
 
 	// BEGIN CUSTOM SIZE
-	l = len(m.String())
+	l = m.Len()
 	// END CUSTOM SIZE
 
 	n += 1 + l + sovGenerated(uint64(l))

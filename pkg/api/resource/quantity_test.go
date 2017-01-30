@@ -1190,6 +1190,21 @@ func BenchmarkQuantityString(b *testing.B) {
 	}
 }
 
+func BenchmarkQuantitySize(b *testing.B) {
+	values := benchmarkQuantities()
+	b.ResetTimer()
+	var s int
+	for i := 0; i < b.N; i++ {
+		q := values[i%len(values)]
+		q.s = ""
+		s = q.Size()
+	}
+	b.StopTimer()
+	if s == 0 {
+		b.Fatal("incorrect length")
+	}
+}
+
 func BenchmarkQuantityStringPrecalc(b *testing.B) {
 	values := benchmarkQuantities()
 	for i := range values {
