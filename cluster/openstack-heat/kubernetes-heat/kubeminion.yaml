@@ -258,6 +258,9 @@ resources:
     properties:
       character_classes: [{'class': 'lowercase', 'min': 1}]
       length: 8
+      character_classes:
+        - class: lowercase
+        - class: digits
 
   kube_minion:
     type: OS::Nova::Server
