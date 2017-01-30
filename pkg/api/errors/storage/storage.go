@@ -30,6 +30,8 @@ func InterpretListError(err error, qualifiedResource schema.GroupResource) error
 		return errors.NewNotFound(qualifiedResource, "")
 	case storage.IsUnreachable(err):
 		return errors.NewServerTimeout(qualifiedResource, "list", 2) // TODO: make configurable or handled at a higher level
+	case storage.IsInternalError(err):
+		return errors.NewInternalError(err)
 	default:
 		return err
 	}
@@ -43,6 +45,8 @@ func InterpretGetError(err error, qualifiedResource schema.GroupResource, name s
 		return errors.NewNotFound(qualifiedResource, name)
 	case storage.IsUnreachable(err):
 		return errors.NewServerTimeout(qualifiedResource, "get", 2) // TODO: make configurable or handled at a higher level
+	case storage.IsInternalError(err):
+		return errors.NewInternalError(err)
 	default:
 		return err
 	}
@@ -56,6 +60,8 @@ func InterpretCreateError(err error, qualifiedResource schema.GroupResource, nam
 		return errors.NewAlreadyExists(qualifiedResource, name)
 	case storage.IsUnreachable(err):
 		return errors.NewServerTimeout(qualifiedResource, "create", 2) // TODO: make configurable or handled at a higher level
+	case storage.IsInternalError(err):
+		return errors.NewInternalError(err)
 	default:
 		return err
 	}
@@ -102,6 +108,8 @@ func InterpretWatchError(err error, resource schema.GroupResource, name string) 
 	case storage.IsInvalidError(err):
 		invalidError, _ := err.(storage.InvalidError)
 		return errors.NewInvalid(schema.GroupKind{Group: resource.Group, Kind: resource.Resource}, name, invalidError.Errs)
+	case storage.IsInternalError(err):
+		return errors.NewInternalError(err)
 	default:
 		return err
 	}
