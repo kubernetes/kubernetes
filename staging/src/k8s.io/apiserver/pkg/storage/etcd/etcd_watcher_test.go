@@ -133,7 +133,7 @@ func TestWatchInterpretations(t *testing.T) {
 	}
 	for name, item := range table {
 		for _, action := range item.actions {
-			w := newEtcdWatcher(true, false, nil, firstLetterIsB, codec, versioner, nil, &fakeEtcdCache{})
+			w := newEtcdWatcher(true, false, nil, firstLetterIsB, codec, versioner, nil, prefixTransformer{prefix: "test!"}, &fakeEtcdCache{})
 			emitCalled := false
 			w.emit = func(event watch.Event) {
 				emitCalled = true
@@ -150,10 +150,10 @@ func TestWatchInterpretations(t *testing.T) {
 
 			var n, pn *etcd.Node
 			if item.nodeValue != "" {
-				n = &etcd.Node{Value: item.nodeValue}
+				n = &etcd.Node{Value: defaultPrefix(item.nodeValue)}
 			}
 			if item.prevNodeValue != "" {
-				pn = &etcd.Node{Value: item.prevNodeValue}
+				pn = &etcd.Node{Value: defaultPrefix(item.prevNodeValue)}
 			}
 
 			w.sendResult(&etcd.Response{
@@ -173,7 +173,7 @@ func TestWatchInterpretations(t *testing.T) {
 func TestWatchInterpretation_ResponseNotSet(t *testing.T) {
 	_, codecs := testScheme(t)
 	codec := codecs.LegacyCodec(schema.GroupVersion{Version: "v1"})
-	w := newEtcdWatcher(false, false, nil, storage.SimpleFilter(storage.Everything), codec, versioner, nil, &fakeEtcdCache{})
+	w := newEtcdWatcher(false, false, nil, storage.SimpleFilter(storage.Everything), codec, versioner, nil, prefixTransformer{prefix: "test!"}, &fakeEtcdCache{})
 	w.emit = func(e watch.Event) {
 		t.Errorf("Unexpected emit: %v", e)
 	}
@@ -189,7 +189,7 @@ func TestWatchInterpretation_ResponseNoNode(t *testing.T) {
 	codec := codecs.LegacyCodec(schema.GroupVersion{Version: "v1"})
 	actions := []string{"create", "set", "compareAndSwap", "delete"}
 	for _, action := range actions {
-		w := newEtcdWatcher(false, false, nil, storage.SimpleFilter(storage.Everything), codec, versioner, nil, &fakeEtcdCache{})
+		w := newEtcdWatcher(false, false, nil, storage.SimpleFilter(storage.Everything), codec, versioner, nil, prefixTransformer{prefix: "test!"}, &fakeEtcdCache{})
 		w.emit = func(e watch.Event) {
 			t.Errorf("Unexpected emit: %v", e)
 		}
@@ -205,20 +205,20 @@ func TestWatchInterpretation_ResponseBadData(t *testing.T) {
 	codec := codecs.LegacyCodec(schema.GroupVersion{Version: "v1"})
 	actions := []string{"create", "set", "compareAndSwap", "delete"}
 	for _, action := range actions {
-		w := newEtcdWatcher(false, false, nil, storage.SimpleFilter(storage.Everything), codec, versioner, nil, &fakeEtcdCache{})
+		w := newEtcdWatcher(false, false, nil, storage.SimpleFilter(storage.Everything), codec, versioner, nil, prefixTransformer{prefix: "test!"}, &fakeEtcdCache{})
 		w.emit = func(e watch.Event) {
 			t.Errorf("Unexpected emit: %v", e)
 		}
 		w.sendResult(&etcd.Response{
 			Action: action,
 			Node: &etcd.Node{
-				Value: "foobar",
+				Value: defaultPrefix("foobar"),
 			},
 		})
 		w.sendResult(&etcd.Response{
 			Action: action,
 			PrevNode: &etcd.Node{
-				Value: "foobar",
+				Value: defaultPrefix("foobar"),
 			},
 		})
 		w.Stop()
@@ -231,7 +231,7 @@ func TestSendResultDeleteEventHaveLatestIndex(t *testing.T) {
 	filter := func(obj runtime.Object) bool {
 		return obj.(*example.Pod).Name != "bar"
 	}
-	w := newEtcdWatcher(false, false, nil, filter, codec, versioner, nil, &fakeEtcdCache{})
+	w := newEtcdWatcher(false, false, nil, filter, codec, versioner, nil, prefixTransformer{prefix: "test!"}, &fakeEtcdCache{})
 
 	eventChan := make(chan watch.Event, 1)
 	w.emit = func(e watch.Event) {
@@ -259,7 +259,7 @@ func TestSendResultDeleteEventHaveLatestIndex(t *testing.T) {
 				ModifiedIndex: 2,
 			},
 			PrevNode: &etcd.Node{
-				Value:         string(fooBytes),
+				Value:         defaultPrefixValue(fooBytes),
 				ModifiedIndex: 1,
 			},
 		},
@@ -268,11 +268,11 @@ func TestSendResultDeleteEventHaveLatestIndex(t *testing.T) {
 		response: &etcd.Response{
 			Action: EtcdSet,
 			Node: &etcd.Node{
-				Value:         string(barBytes),
+				Value:         defaultPrefixValue(barBytes),
 				ModifiedIndex: 2,
 			},
 			PrevNode: &etcd.Node{
-				Value:         string(fooBytes),
+				Value:         defaultPrefixValue(fooBytes),
 				ModifiedIndex: 1,
 			},
 		},
