@@ -23,6 +23,7 @@ import (
 	"testing"
 	"time"
 
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/validation/path"
 	metainternalversion "k8s.io/apimachinery/pkg/apis/meta/internalversion"
@@ -276,7 +277,7 @@ func (t *Tester) testCreateEquals(obj runtime.Object, getFn GetFunc) {
 	gotMeta := t.getObjectMetaOrFail(got)
 	createdMeta.ResourceVersion = gotMeta.ResourceVersion
 
-	if e, a := created, got; !api.Semantic.DeepEqual(e, a) {
+	if e, a := created, got; !apiequality.Semantic.DeepEqual(e, a) {
 		t.Errorf("unexpected obj: %#v, expected %#v", e, a)
 	}
 }
@@ -484,7 +485,7 @@ func (t *Tester) testUpdateEquals(obj runtime.Object, createFn CreateFunc, getFn
 	gotMeta := t.getObjectMetaOrFail(got)
 	updatedMeta.ResourceVersion = gotMeta.ResourceVersion
 
-	if e, a := updated, got; !api.Semantic.DeepEqual(e, a) {
+	if e, a := updated, got; !apiequality.Semantic.DeepEqual(e, a) {
 		t.Errorf("unexpected obj: %#v, expected %#v", e, a)
 	}
 }
@@ -1091,7 +1092,7 @@ func (t *Tester) testGetFound(obj runtime.Object) {
 	}
 	gotMeta := t.getObjectMetaOrFail(got)
 	gotMeta.ResourceVersion = existingMeta.ResourceVersion
-	if e, a := existing, got; !api.Semantic.DeepEqual(e, a) {
+	if e, a := existing, got; !apiequality.Semantic.DeepEqual(e, a) {
 		t.Errorf("unexpected obj: %#v, expected %#v", e, a)
 	}
 }
@@ -1174,7 +1175,7 @@ func (t *Tester) testListFound(obj runtime.Object, assignFn AssignFunc) {
 	if len(items) != len(existing) {
 		t.Errorf("unexpected number of items: %v", len(items))
 	}
-	if !api.Semantic.DeepEqual(existing, items) {
+	if !apiequality.Semantic.DeepEqual(existing, items) {
 		t.Errorf("expected: %#v, got: %#v", existing, items)
 	}
 }
@@ -1209,7 +1210,7 @@ func (t *Tester) testListMatchLabels(obj runtime.Object, assignFn AssignFunc) {
 	if len(items) != len(filtered) {
 		t.Errorf("unexpected number of items: %v", len(items))
 	}
-	if !api.Semantic.DeepEqual(filtered, items) {
+	if !apiequality.Semantic.DeepEqual(filtered, items) {
 		t.Errorf("expected: %#v, got: %#v", filtered, items)
 	}
 }

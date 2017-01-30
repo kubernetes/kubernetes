@@ -578,7 +578,6 @@ k8s.io/kubernetes/pkg/api/errors,yifan-gu,1
 k8s.io/kubernetes/pkg/api/events,jlowdermilk,1
 k8s.io/kubernetes/pkg/api/install,timothysc,1
 k8s.io/kubernetes/pkg/api/meta,fabioy,1
-k8s.io/kubernetes/pkg/api/resource,smarterclayton,1
 k8s.io/kubernetes/pkg/api/rest,rkouj,0
 k8s.io/kubernetes/pkg/api/service,spxtr,1
 k8s.io/kubernetes/pkg/api/testapi,caesarxuchao,1

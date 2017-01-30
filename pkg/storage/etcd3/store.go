@@ -25,18 +25,18 @@ import (
 	"strings"
 	"time"
 
+	"github.com/coreos/etcd/clientv3"
+	"github.com/golang/glog"
+	"golang.org/x/net/context"
+
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/conversion"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/watch"
+	utiltrace "k8s.io/apiserver/pkg/util/trace"
 	"k8s.io/kubernetes/pkg/storage"
 	"k8s.io/kubernetes/pkg/storage/etcd"
-	"k8s.io/kubernetes/pkg/util"
-
-	"github.com/coreos/etcd/clientv3"
-	"github.com/golang/glog"
-	"golang.org/x/net/context"
 )
 
 type store struct {
@@ -216,7 +216,7 @@ func (s *store) conditionalDelete(ctx context.Context, key string, out runtime.O
 func (s *store) GuaranteedUpdate(
 	ctx context.Context, key string, out runtime.Object, ignoreNotFound bool,
 	precondtions *storage.Preconditions, tryUpdate storage.UpdateFunc, suggestion ...runtime.Object) error {
-	trace := util.NewTrace(fmt.Sprintf("GuaranteedUpdate etcd3: %s", reflect.TypeOf(out).String()))
+	trace := utiltrace.New(fmt.Sprintf("GuaranteedUpdate etcd3: %s", reflect.TypeOf(out).String()))
 	defer trace.LogIfLong(500 * time.Millisecond)
 
 	v, err := conversion.EnforcePtr(out)

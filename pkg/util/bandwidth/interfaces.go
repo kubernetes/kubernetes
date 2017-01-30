@@ -16,7 +16,7 @@ limitations under the License.
 
 package bandwidth
 
-import "k8s.io/kubernetes/pkg/api/resource"
+import "k8s.io/apimachinery/pkg/api/resource"
 
 type BandwidthShaper interface {
 	// Limit the bandwidth for a particular CIDR on a particular interface

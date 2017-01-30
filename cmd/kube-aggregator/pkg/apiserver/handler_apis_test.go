@@ -23,6 +23,7 @@ import (
 	"net/http/httputil"
 	"testing"
 
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/diff"
@@ -305,7 +306,7 @@ func TestAPIs(t *testing.T) {
 			t.Errorf("%s: %v", tc.name, err)
 			continue
 		}
-		if !api.Semantic.DeepEqual(tc.expected, actual) {
+		if !apiequality.Semantic.DeepEqual(tc.expected, actual) {
 			t.Errorf("%s: %v", tc.name, diff.ObjectDiff(tc.expected, actual))
 			continue
 		}
@@ -467,7 +468,7 @@ func TestAPIGroup(t *testing.T) {
 			t.Errorf("%s: %v", tc.name, err)
 			continue
 		}
-		if !api.Semantic.DeepEqual(tc.expected, actual) {
+		if !apiequality.Semantic.DeepEqual(tc.expected, actual) {
 			t.Errorf("%s: %v", tc.name, diff.ObjectDiff(tc.expected, actual))
 			continue
 		}

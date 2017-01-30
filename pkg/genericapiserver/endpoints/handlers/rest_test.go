@@ -26,6 +26,7 @@ import (
 	"github.com/emicklei/go-restful"
 	"github.com/evanphx/json-patch"
 
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -74,7 +75,7 @@ func TestPatchAnonymousField(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if !api.Semantic.DeepEqual(actual, expected) {
+	if !apiequality.Semantic.DeepEqual(actual, expected) {
 		t.Errorf("expected %#v, got %#v", expected, actual)
 	}
 }

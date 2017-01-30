@@ -25,7 +25,7 @@ import (
 	"strings"
 	"syscall"
 
-	"k8s.io/kubernetes/pkg/api/resource"
+	"k8s.io/apimachinery/pkg/api/resource"
 )
 
 // FSInfo linux returns (available bytes, byte capacity, byte usage, total inodes, inodes free, inode usage, error)

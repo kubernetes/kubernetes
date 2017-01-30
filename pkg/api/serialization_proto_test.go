@@ -23,6 +23,8 @@ import (
 	"testing"
 
 	"github.com/gogo/protobuf/proto"
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
+	apitesting "k8s.io/apimachinery/pkg/api/testing"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -31,7 +33,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
-	apitesting "k8s.io/kubernetes/pkg/api/testing"
+	kapitesting "k8s.io/kubernetes/pkg/api/testing"
 	"k8s.io/kubernetes/pkg/api/v1"
 	_ "k8s.io/kubernetes/pkg/apis/extensions"
 	_ "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
@@ -67,7 +69,7 @@ func TestUniversalDeserializer(t *testing.T) {
 		if err != nil {
 			t.Fatalf("%s: %v", mediaType, err)
 		}
-		if !api.Semantic.DeepEqual(expected, obj) {
+		if !apiequality.Semantic.DeepEqual(expected, obj) {
 			t.Fatalf("%s: %#v", mediaType, obj)
 		}
 	}
@@ -75,7 +77,7 @@ func TestUniversalDeserializer(t *testing.T) {
 
 func TestProtobufRoundTrip(t *testing.T) {
 	obj := &v1.Pod{}
-	apitesting.FuzzerFor(t, v1.SchemeGroupVersion, rand.NewSource(benchmarkSeed)).Fuzz(obj)
+	apitesting.FuzzerFor(kapitesting.FuzzerFuncs(t), rand.NewSource(benchmarkSeed)).Fuzz(obj)
 	// InitContainers are turned into annotations by conversion.
 	obj.Spec.InitContainers = nil
 	obj.Status.InitContainerStatuses = nil
@@ -87,7 +89,7 @@ func TestProtobufRoundTrip(t *testing.T) {
 	if err := out.Unmarshal(data); err != nil {
 		t.Fatal(err)
 	}
-	if !api.Semantic.Equalities.DeepEqual(out, obj) {
+	if !apiequality.Semantic.Equalities.DeepEqual(out, obj) {
 		t.Logf("marshal\n%s", hex.Dump(data))
 		t.Fatalf("Unmarshal is unequal\n%s", diff.ObjectGoPrintDiff(out, obj))
 	}
@@ -96,7 +98,7 @@ func TestProtobufRoundTrip(t *testing.T) {
 // BenchmarkEncodeCodec measures the cost of performing a codec encode, which includes
 // reflection (to clear APIVersion and Kind)
 func BenchmarkEncodeCodecProtobuf(b *testing.B) {
-	items := benchmarkItems()
+	items := benchmarkItems(b)
 	width := len(items)
 	s := protobuf.NewSerializer(nil, nil, "application/arbitrary.content.type")
 	b.ResetTimer()
@@ -111,7 +113,7 @@ func BenchmarkEncodeCodecProtobuf(b *testing.B) {
 // BenchmarkEncodeCodecFromInternalProtobuf measures the cost of performing a codec encode,
 // including conversions and any type setting. This is a "full" encode.
 func BenchmarkEncodeCodecFromInternalProtobuf(b *testing.B) {
-	items := benchmarkItems()
+	items := benchmarkItems(b)
 	width := len(items)
 	encodable := make([]api.Pod, width)
 	for i := range items {
@@ -131,7 +133,7 @@ func BenchmarkEncodeCodecFromInternalProtobuf(b *testing.B) {
 }
 
 func BenchmarkEncodeProtobufGeneratedMarshal(b *testing.B) {
-	items := benchmarkItems()
+	items := benchmarkItems(b)
 	width := len(items)
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
@@ -145,7 +147,7 @@ func BenchmarkEncodeProtobufGeneratedMarshal(b *testing.B) {
 // BenchmarkDecodeCodecToInternalProtobuf measures the cost of performing a codec decode,
 // including conversions and any type setting. This is a "full" decode.
 func BenchmarkDecodeCodecToInternalProtobuf(b *testing.B) {
-	items := benchmarkItems()
+	items := benchmarkItems(b)
 	width := len(items)
 	s := protobuf.NewSerializer(api.Scheme, api.Scheme, "application/arbitrary.content.type")
 	encoder := api.Codecs.EncoderForVersion(s, v1.SchemeGroupVersion)
@@ -170,7 +172,7 @@ func BenchmarkDecodeCodecToInternalProtobuf(b *testing.B) {
 
 // BenchmarkDecodeJSON provides a baseline for regular JSON decode performance
 func BenchmarkDecodeIntoProtobuf(b *testing.B) {
-	items := benchmarkItems()
+	items := benchmarkItems(b)
 	width := len(items)
 	encoded := make([][]byte, width)
 	for i := range items {

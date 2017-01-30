@@ -50,6 +50,7 @@ import (
 	"k8s.io/client-go/util/clock"
 	"k8s.io/client-go/util/flowcontrol"
 	utiltesting "k8s.io/client-go/util/testing"
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 
 	_ "k8s.io/client-go/pkg/api/install"
 )
@@ -415,7 +416,7 @@ func TestTransformResponse(t *testing.T) {
 		if test.ErrFn != nil && !test.ErrFn(err) {
 			t.Errorf("%d: error function did not match: %v", i, err)
 		}
-		if !(test.Data == nil && response == nil) && !api.Semantic.DeepDerivative(test.Data, response) {
+		if !(test.Data == nil && response == nil) && !apiequality.Semantic.DeepDerivative(test.Data, response) {
 			t.Errorf("%d: unexpected response: %#v %#v", i, test.Data, response)
 		}
 		if test.Created != created {
@@ -1043,7 +1044,7 @@ func TestDoRequestNewWay(t *testing.T) {
 	}
 	if obj == nil {
 		t.Error("nil obj")
-	} else if !api.Semantic.DeepDerivative(expectedObj, obj) {
+	} else if !apiequality.Semantic.DeepDerivative(expectedObj, obj) {
 		t.Errorf("Expected: %#v, got %#v", expectedObj, obj)
 	}
 	requestURL := defaultResourcePathWithPrefix("foo/bar", "", "", "baz")
@@ -1276,7 +1277,7 @@ func TestDoRequestNewWayReader(t *testing.T) {
 	}
 	if obj == nil {
 		t.Error("nil obj")
-	} else if !api.Semantic.DeepDerivative(expectedObj, obj) {
+	} else if !apiequality.Semantic.DeepDerivative(expectedObj, obj) {
 		t.Errorf("Expected: %#v, got %#v", expectedObj, obj)
 	}
 	tmpStr := string(reqBodyExpected)
@@ -1316,7 +1317,7 @@ func TestDoRequestNewWayObj(t *testing.T) {
 	}
 	if obj == nil {
 		t.Error("nil obj")
-	} else if !api.Semantic.DeepDerivative(expectedObj, obj) {
+	} else if !apiequality.Semantic.DeepDerivative(expectedObj, obj) {
 		t.Errorf("Expected: %#v, got %#v", expectedObj, obj)
 	}
 	tmpStr := string(reqBodyExpected)
@@ -1370,7 +1371,7 @@ func TestDoRequestNewWayFile(t *testing.T) {
 	}
 	if obj == nil {
 		t.Error("nil obj")
-	} else if !api.Semantic.DeepDerivative(expectedObj, obj) {
+	} else if !apiequality.Semantic.DeepDerivative(expectedObj, obj) {
 		t.Errorf("Expected: %#v, got %#v", expectedObj, obj)
 	}
 	if wasCreated {
@@ -1415,7 +1416,7 @@ func TestWasCreated(t *testing.T) {
 	}
 	if obj == nil {
 		t.Error("nil obj")
-	} else if !api.Semantic.DeepDerivative(expectedObj, obj) {
+	} else if !apiequality.Semantic.DeepDerivative(expectedObj, obj) {
 		t.Errorf("Expected: %#v, got %#v", expectedObj, obj)
 	}
 	if !wasCreated {
@@ -1623,7 +1624,7 @@ func TestWatch(t *testing.T) {
 		if e, a := item.t, got.Type; e != a {
 			t.Errorf("Expected %v, got %v", e, a)
 		}
-		if e, a := item.obj, got.Object; !api.Semantic.DeepDerivative(e, a) {
+		if e, a := item.obj, got.Object; !apiequality.Semantic.DeepDerivative(e, a) {
 			t.Errorf("Expected %v, got %v", e, a)
 		}
 	}

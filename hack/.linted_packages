@@ -264,7 +264,9 @@ plugin/pkg/admission/securitycontext/scdeny
 plugin/pkg/auth
 plugin/pkg/auth/authorizer
 plugin/pkg/auth/authorizer/rbac/bootstrappolicy
+staging/src/k8s.io/apimachinery/pkg/api/equality
 staging/src/k8s.io/apimachinery/pkg/api/errors
+staging/src/k8s.io/apimachinery/pkg/api/resource
 staging/src/k8s.io/apimachinery/pkg/apimachinery
 staging/src/k8s.io/apimachinery/pkg/conversion/queryparams
 staging/src/k8s.io/apimachinery/pkg/runtime

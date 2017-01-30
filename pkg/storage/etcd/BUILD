@@ -21,7 +21,6 @@ go_library(
         "//pkg/api:go_default_library",
         "//pkg/storage:go_default_library",
         "//pkg/storage/etcd/util:go_default_library",
-        "//pkg/util:go_default_library",
         "//vendor:github.com/coreos/etcd/client",
         "//vendor:github.com/golang/glog",
         "//vendor:golang.org/x/net/context",
@@ -33,6 +32,7 @@ go_library(
         "//vendor:k8s.io/apimachinery/pkg/watch",
         "//vendor:k8s.io/apiserver/pkg/storage/etcd/metrics",
         "//vendor:k8s.io/apiserver/pkg/util/cache",
+        "//vendor:k8s.io/apiserver/pkg/util/trace",
     ],
 )
 
@@ -55,6 +55,7 @@ go_test(
         "//pkg/storage/testing:go_default_library",
         "//vendor:github.com/coreos/etcd/client",
         "//vendor:golang.org/x/net/context",
+        "//vendor:k8s.io/apimachinery/pkg/api/equality",
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
         "//vendor:k8s.io/apimachinery/pkg/conversion",
         "//vendor:k8s.io/apimachinery/pkg/fields",

@@ -22,6 +22,7 @@ go_test(
         "//pkg/registry/registrytest:go_default_library",
         "//pkg/storage/etcd/testing:go_default_library",
         "//pkg/util/intstr:go_default_library",
+        "//vendor:k8s.io/apimachinery/pkg/api/equality",
         "//vendor:k8s.io/apimachinery/pkg/api/errors",
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
         "//vendor:k8s.io/apimachinery/pkg/fields",

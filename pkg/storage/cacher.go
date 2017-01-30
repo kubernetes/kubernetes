@@ -24,6 +24,9 @@ import (
 	"sync"
 	"time"
 
+	"github.com/golang/glog"
+	"golang.org/x/net/context"
+
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -34,11 +37,8 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
+	utiltrace "k8s.io/apiserver/pkg/util/trace"
 	"k8s.io/client-go/tools/cache"
-	"k8s.io/kubernetes/pkg/util"
-
-	"github.com/golang/glog"
-	"golang.org/x/net/context"
 )
 
 // CacherConfig contains the configuration for a given Cache.
@@ -413,7 +413,7 @@ func (c *Cacher) GetToList(ctx context.Context, key string, resourceVersion stri
 		return err
 	}
 
-	trace := util.NewTrace(fmt.Sprintf("cacher %v: List", c.objectType.String()))
+	trace := utiltrace.New(fmt.Sprintf("cacher %v: List", c.objectType.String()))
 	defer trace.LogIfLong(500 * time.Millisecond)
 
 	c.ready.wait()
@@ -469,7 +469,7 @@ func (c *Cacher) List(ctx context.Context, key string, resourceVersion string, p
 		return err
 	}
 
-	trace := util.NewTrace(fmt.Sprintf("cacher %v: List", c.objectType.String()))
+	trace := utiltrace.New(fmt.Sprintf("cacher %v: List", c.objectType.String()))
 	defer trace.LogIfLong(500 * time.Millisecond)
 
 	c.ready.wait()

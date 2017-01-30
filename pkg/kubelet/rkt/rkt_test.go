@@ -31,11 +31,11 @@ import (
 	rktapi "github.com/coreos/rkt/api/v1alpha"
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/assert"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kubetypes "k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/errors"
 	utiltesting "k8s.io/client-go/util/testing"
-	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/v1"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	containertesting "k8s.io/kubernetes/pkg/kubelet/container/testing"
@@ -845,7 +845,11 @@ func generateCapRetainIsolator(t *testing.T, caps ...string) appctypes.Isolator 
 	if err != nil {
 		t.Fatalf("Error generating cap retain isolator: %v", err)
 	}
-	return retain.AsIsolator()
+	isolator, err := retain.AsIsolator()
+	if err != nil {
+		t.Fatalf("Error generating cap retain isolator: %v", err)
+	}
+	return *isolator
 }
 
 func generateCapRevokeIsolator(t *testing.T, caps ...string) appctypes.Isolator {
@@ -853,7 +857,11 @@ func generateCapRevokeIsolator(t *testing.T, caps ...string) appctypes.Isolator 
 	if err != nil {
 		t.Fatalf("Error generating cap revoke isolator: %v", err)
 	}
-	return revoke.AsIsolator()
+	isolator, err := revoke.AsIsolator()
+	if err != nil {
+		t.Fatalf("Error generating cap revoke isolator: %v", err)
+	}
+	return *isolator
 }
 
 func generateCPUIsolator(t *testing.T, request, limit string) appctypes.Isolator {

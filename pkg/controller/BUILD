@@ -60,6 +60,7 @@ go_test(
         "//pkg/client/clientset_generated/clientset:go_default_library",
         "//pkg/client/record:go_default_library",
         "//pkg/securitycontext:go_default_library",
+        "//vendor:k8s.io/apimachinery/pkg/api/equality",
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
         "//vendor:k8s.io/apimachinery/pkg/runtime",
         "//vendor:k8s.io/apimachinery/pkg/util/sets",

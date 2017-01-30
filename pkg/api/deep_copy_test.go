@@ -21,6 +21,7 @@ import (
 	"testing"
 	"time"
 
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -140,7 +141,7 @@ func BenchmarkPodCopy(b *testing.B) {
 		}
 		result = obj.(*api.Pod)
 	}
-	if !api.Semantic.DeepEqual(benchmarkPod, *result) {
+	if !apiequality.Semantic.DeepEqual(benchmarkPod, *result) {
 		b.Fatalf("Incorrect copy: expected %v, got %v", benchmarkPod, *result)
 	}
 }
@@ -163,7 +164,7 @@ func BenchmarkNodeCopy(b *testing.B) {
 		}
 		result = obj.(*api.Node)
 	}
-	if !api.Semantic.DeepEqual(node, *result) {
+	if !apiequality.Semantic.DeepEqual(node, *result) {
 		b.Fatalf("Incorrect copy: expected %v, got %v", node, *result)
 	}
 }
@@ -186,7 +187,7 @@ func BenchmarkReplicationControllerCopy(b *testing.B) {
 		}
 		result = obj.(*api.ReplicationController)
 	}
-	if !api.Semantic.DeepEqual(replicationController, *result) {
+	if !apiequality.Semantic.DeepEqual(replicationController, *result) {
 		b.Fatalf("Incorrect copy: expected %v, got %v", replicationController, *result)
 	}
 }

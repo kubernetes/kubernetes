@@ -24,7 +24,6 @@ go_library(
         "//pkg/client/record:go_default_library",
         "//pkg/controller:go_default_library",
         "//pkg/controller/informers:go_default_library",
-        "//pkg/util:go_default_library",
         "//pkg/util/metrics:go_default_library",
         "//pkg/util/workqueue:go_default_library",
         "//vendor:github.com/golang/glog",
@@ -35,6 +34,7 @@ go_library(
         "//vendor:k8s.io/apimachinery/pkg/util/errors",
         "//vendor:k8s.io/apimachinery/pkg/util/runtime",
         "//vendor:k8s.io/apimachinery/pkg/util/wait",
+        "//vendor:k8s.io/apiserver/pkg/util/trace",
         "//vendor:k8s.io/client-go/tools/cache",
     ],
 )
@@ -53,6 +53,7 @@ go_test(
         "//pkg/controller:go_default_library",
         "//pkg/controller/informers:go_default_library",
         "//pkg/securitycontext:go_default_library",
+        "//vendor:k8s.io/apimachinery/pkg/api/equality",
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
         "//vendor:k8s.io/apimachinery/pkg/runtime",
         "//vendor:k8s.io/apimachinery/pkg/util/sets",

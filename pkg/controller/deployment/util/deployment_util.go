@@ -25,6 +25,7 @@ import (
 
 	"github.com/golang/glog"
 
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -605,7 +606,7 @@ func EqualIgnoreHash(template1, template2 v1.PodTemplateSpec) bool {
 	}
 	// Then, compare the templates without comparing their labels
 	template1.Labels, template2.Labels = nil, nil
-	return api.Semantic.DeepEqual(template1, template2)
+	return apiequality.Semantic.DeepEqual(template1, template2)
 }
 
 // FindNewReplicaSet returns the new RS this given deployment targets (the one with the same pod template).

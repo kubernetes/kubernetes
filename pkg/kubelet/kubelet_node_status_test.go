@@ -28,7 +28,9 @@ import (
 
 	cadvisorapi "github.com/google/cadvisor/info/v1"
 	cadvisorapiv2 "github.com/google/cadvisor/info/v2"
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/diff"
@@ -37,8 +39,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
 	core "k8s.io/client-go/testing"
-	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset/fake"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
@@ -245,7 +245,7 @@ func TestUpdateNewNodeStatus(t *testing.T) {
 	if maxImagesInNodeStatus != len(updatedNode.Status.Images) {
 		t.Errorf("unexpected image list length in node status, expected: %v, got: %v", maxImagesInNodeStatus, len(updatedNode.Status.Images))
 	} else {
-		if !api.Semantic.DeepEqual(expectedNode, updatedNode) {
+		if !apiequality.Semantic.DeepEqual(expectedNode, updatedNode) {
 			t.Errorf("unexpected objects: %s", diff.ObjectDiff(expectedNode, updatedNode))
 		}
 	}
@@ -519,7 +519,7 @@ func TestUpdateExistingNodeStatus(t *testing.T) {
 		t.Errorf("unexpected node condition order. NodeReady should be last.")
 	}
 
-	if !api.Semantic.DeepEqual(expectedNode, updatedNode) {
+	if !apiequality.Semantic.DeepEqual(expectedNode, updatedNode) {
 		t.Errorf("unexpected objects: %s", diff.ObjectDiff(expectedNode, updatedNode))
 	}
 }
@@ -829,7 +829,7 @@ func TestUpdateNodeStatusWithRuntimeStateError(t *testing.T) {
 			LastHeartbeatTime:  metav1.Time{},
 			LastTransitionTime: metav1.Time{},
 		}
-		if !api.Semantic.DeepEqual(expectedNode, updatedNode) {
+		if !apiequality.Semantic.DeepEqual(expectedNode, updatedNode) {
 			t.Errorf("unexpected objects: %s", diff.ObjectDiff(expectedNode, updatedNode))
 		}
 	}

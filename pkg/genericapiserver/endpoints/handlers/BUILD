@@ -20,6 +20,7 @@ go_test(
         "//pkg/genericapiserver/registry/rest:go_default_library",
         "//vendor:github.com/emicklei/go-restful",
         "//vendor:github.com/evanphx/json-patch",
+        "//vendor:k8s.io/apimachinery/pkg/api/equality",
         "//vendor:k8s.io/apimachinery/pkg/api/errors",
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
         "//vendor:k8s.io/apimachinery/pkg/runtime",
@@ -45,7 +46,6 @@ go_library(
     deps = [
         "//pkg/genericapiserver/endpoints/handlers/responsewriters:go_default_library",
         "//pkg/genericapiserver/registry/rest:go_default_library",
-        "//pkg/util:go_default_library",
         "//vendor:github.com/emicklei/go-restful",
         "//vendor:github.com/evanphx/json-patch",
         "//vendor:github.com/golang/glog",
@@ -70,6 +70,7 @@ go_library(
         "//vendor:k8s.io/apiserver/pkg/endpoints/request",
         "//vendor:k8s.io/apiserver/pkg/server/httplog",
         "//vendor:k8s.io/apiserver/pkg/util/proxy",
+        "//vendor:k8s.io/apiserver/pkg/util/trace",
         "//vendor:k8s.io/apiserver/pkg/util/wsstream",
     ],
 )
