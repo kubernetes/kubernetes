@@ -64,6 +64,7 @@ go_library(
         "//pkg/controller/service:go_default_library",
         "//pkg/controller/serviceaccount:go_default_library",
         "//pkg/controller/statefulset:go_default_library",
+        "//pkg/controller/ttl:go_default_library",
         "//pkg/controller/volume/attachdetach:go_default_library",
         "//pkg/controller/volume/persistentvolume:go_default_library",
         "//pkg/features:go_default_library",
