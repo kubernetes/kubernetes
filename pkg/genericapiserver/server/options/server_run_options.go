@@ -28,6 +28,9 @@ import (
 	utilflag "k8s.io/apiserver/pkg/util/flag"
 	"k8s.io/kubernetes/pkg/api"
 
+	// add the generic feature gates
+	_ "k8s.io/apiserver/pkg/features"
+
 	"github.com/spf13/pflag"
 )
 
