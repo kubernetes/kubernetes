@@ -56,6 +56,7 @@ func (f *clusterRoleInformer) Informer() cache.SharedIndexInformer {
 			},
 		},
 		&rbac.ClusterRole{},
+		f.resyncCheck,
 		f.defaultResync,
 		cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc},
 	)
@@ -96,6 +97,7 @@ func (f *clusterRoleBindingInformer) Informer() cache.SharedIndexInformer {
 			},
 		},
 		&rbac.ClusterRoleBinding{},
+		f.resyncCheck,
 		f.defaultResync,
 		cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc},
 	)
@@ -136,6 +138,7 @@ func (f *roleInformer) Informer() cache.SharedIndexInformer {
 			},
 		},
 		&rbac.Role{},
+		f.resyncCheck,
 		f.defaultResync,
 		cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc},
 	)
@@ -176,6 +179,7 @@ func (f *roleBindingInformer) Informer() cache.SharedIndexInformer {
 			},
 		},
 		&rbac.RoleBinding{},
+		f.resyncCheck,
 		f.defaultResync,
 		cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc},
 	)

@@ -134,7 +134,7 @@ func rmSetup(t *testing.T, stopCh chan struct{}, enableGarbageCollector bool) (*
 	}
 	resyncPeriod := 12 * time.Hour
 
-	informers := informers.NewSharedInformerFactory(clientSet, nil, resyncPeriod)
+	informers := informers.NewSharedInformerFactory(clientSet, nil, resyncPeriod, resyncPeriod)
 	podInformer := informers.Pods().Informer()
 	rcInformer := informers.ReplicationControllers().Informer()
 	rm := replication.NewReplicationManager(podInformer, rcInformer, clientSet, replication.BurstReplicas, 4096, enableGarbageCollector)
@@ -230,7 +230,6 @@ func TestAdoption(t *testing.T) {
 			t.Fatalf("Failed to create Pod: %v", err)
 		}
 
-		go podInformer.Run(stopCh)
 		waitToObservePods(t, podInformer, 1)
 		go rm.Run(5, stopCh)
 		if err := wait.Poll(10*time.Second, 60*time.Second, func() (bool, error) {
@@ -241,11 +240,11 @@ func TestAdoption(t *testing.T) {
 			if e, a := tc.expectedOwnerReferences(rc), updatedPod.OwnerReferences; reflect.DeepEqual(e, a) {
 				return true, nil
 			} else {
-				t.Logf("ownerReferences don't match, expect %v, got %v", e, a)
+				t.Logf("%s: ownerReferences don't match, expect %v, got %v", tc.name, e, a)
 				return false, nil
 			}
 		}); err != nil {
-			t.Fatal(err)
+			t.Fatalf("%s: %v", tc.name, err)
 		}
 		close(stopCh)
 	}

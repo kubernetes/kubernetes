@@ -97,7 +97,7 @@ func TestNodeDeleted(t *testing.T) {
 		DeleteWaitChan: make(chan struct{}),
 	}
 
-	factory := informers.NewSharedInformerFactory(fnh, nil, controller.NoResyncPeriodFunc())
+	factory := informers.NewSharedInformerFactory(fnh, nil, controller.NoResyncPeriodFunc(), controller.NoResyncPeriodFunc())
 
 	eventBroadcaster := record.NewBroadcaster()
 	cloudNodeController := &CloudNodeController{

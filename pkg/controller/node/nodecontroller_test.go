@@ -67,7 +67,7 @@ func NewNodeControllerFromClient(
 	nodeCIDRMaskSize int,
 	allocateNodeCIDRs bool) (*NodeController, error) {
 
-	factory := informers.NewSharedInformerFactory(kubeClient, nil, controller.NoResyncPeriodFunc())
+	factory := informers.NewSharedInformerFactory(kubeClient, nil, controller.NoResyncPeriodFunc(), controller.NoResyncPeriodFunc())
 
 	nc, err := NewNodeController(factory.Pods(), factory.Nodes(), factory.DaemonSets(), cloud, kubeClient, podEvictionTimeout, evictionLimiterQPS, secondaryEvictionLimiterQPS,
 		largeClusterThreshold, unhealthyZoneThreshold, nodeMonitorGracePeriod, nodeStartupGracePeriod, nodeMonitorPeriod, clusterCIDR,

@@ -53,7 +53,7 @@ import (
 )
 
 func testNewReplicaSetControllerFromClient(client clientset.Interface, stopCh chan struct{}, burstReplicas int, lookupCacheSize int) *ReplicaSetController {
-	informers := informers.NewSharedInformerFactory(client, nil, controller.NoResyncPeriodFunc())
+	informers := informers.NewSharedInformerFactory(client, nil, controller.NoResyncPeriodFunc(), controller.NoResyncPeriodFunc())
 	ret := NewReplicaSetController(informers.ReplicaSets(), informers.Pods(), client, burstReplicas, lookupCacheSize, false)
 	ret.podLister = &listers.StoreToPodLister{Indexer: cache.NewIndexer(cache.DeletionHandlingMetaNamespaceKeyFunc, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})}
 	ret.rsLister = &listers.StoreToReplicaSetLister{Indexer: cache.NewIndexer(cache.DeletionHandlingMetaNamespaceKeyFunc, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})}
@@ -525,7 +525,7 @@ func TestWatchControllers(t *testing.T) {
 	client.AddWatchReactor("replicasets", core.DefaultWatchReactor(fakeWatch, nil))
 	stopCh := make(chan struct{})
 	defer close(stopCh)
-	informers := informers.NewSharedInformerFactory(client, nil, controller.NoResyncPeriodFunc())
+	informers := informers.NewSharedInformerFactory(client, nil, controller.NoResyncPeriodFunc(), controller.NoResyncPeriodFunc())
 	manager := NewReplicaSetController(informers.ReplicaSets(), informers.Pods(), client, BurstReplicas, 0, false)
 	informers.Start(stopCh)
 	manager.podListerSynced = alwaysReady

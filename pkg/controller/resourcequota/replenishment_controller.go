@@ -144,7 +144,7 @@ func (r *replenishmentControllerFactory) NewController(options *ReplenishmentCon
 			})
 			break
 		}
-		result = informers.NewPodInformer(r.kubeClient, options.ResyncPeriod())
+		result = informers.NewPodInformer(r.kubeClient, options.ResyncPeriod(), options.ResyncPeriod())
 	case api.Kind("Service"):
 		// TODO move to informer when defined
 		_, result = cache.NewInformer(

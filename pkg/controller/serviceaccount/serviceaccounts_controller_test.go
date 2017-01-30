@@ -159,7 +159,7 @@ func TestServiceAccountCreation(t *testing.T) {
 
 	for k, tc := range testcases {
 		client := fake.NewSimpleClientset(defaultServiceAccount, managedServiceAccount)
-		informers := informers.NewSharedInformerFactory(fake.NewSimpleClientset(), nil, controller.NoResyncPeriodFunc())
+		informers := informers.NewSharedInformerFactory(fake.NewSimpleClientset(), nil, controller.NoResyncPeriodFunc(), controller.NoResyncPeriodFunc())
 		options := DefaultServiceAccountsControllerOptions()
 		options.ServiceAccounts = []v1.ServiceAccount{
 			{ObjectMeta: metav1.ObjectMeta{Name: defaultName}},

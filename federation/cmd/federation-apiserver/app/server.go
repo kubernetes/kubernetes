@@ -150,7 +150,7 @@ func Run(s *options.ServerRunOptions) error {
 	if err != nil {
 		return fmt.Errorf("failed to create clientset: %v", err)
 	}
-	sharedInformers := informers.NewSharedInformerFactory(nil, client, 10*time.Minute)
+	sharedInformers := informers.NewSharedInformerFactory(nil, client, 10*time.Minute, 10*time.Minute)
 
 	authorizationConfig := s.Authorization.ToAuthorizationConfig(sharedInformers)
 	apiAuthorizer, err := authorizationConfig.New()

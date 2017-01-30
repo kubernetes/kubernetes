@@ -453,7 +453,7 @@ func TestWatchControllers(t *testing.T) {
 	c.AddWatchReactor("replicationcontrollers", core.DefaultWatchReactor(fakeWatch, nil))
 	stopCh := make(chan struct{})
 	defer close(stopCh)
-	informers := informers.NewSharedInformerFactory(c, nil, controller.NoResyncPeriodFunc())
+	informers := informers.NewSharedInformerFactory(c, nil, controller.NoResyncPeriodFunc(), controller.NoResyncPeriodFunc())
 	podInformer := informers.Pods().Informer()
 	rcInformer := informers.ReplicationControllers().Informer()
 	manager := NewReplicationManager(podInformer, rcInformer, c, BurstReplicas, 0, false)

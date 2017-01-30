@@ -265,7 +265,7 @@ func Run(s *options.ServerRunOptions) error {
 		// TODO: get rid of KUBE_API_VERSIONS or define sane behaviour if set
 		glog.Errorf("Failed to create clientset with KUBE_API_VERSIONS=%q. KUBE_API_VERSIONS is only for testing. Things will break.", kubeAPIVersions)
 	}
-	sharedInformers := informers.NewSharedInformerFactory(nil, client, 10*time.Minute)
+	sharedInformers := informers.NewSharedInformerFactory(nil, client, 10*time.Minute, 10*time.Minute)
 
 	authorizationConfig := s.Authorization.ToAuthorizationConfig(sharedInformers)
 	apiAuthorizer, err := authorizationConfig.New()

@@ -51,7 +51,7 @@ func Test_Run_Positive_DoNothing(t *testing.T) {
 	fakeRecorder := &record.FakeRecorder{}
 	ad := operationexecutor.NewOperationExecutor(operationexecutor.NewOperationGenerator(fakeKubeClient, volumePluginMgr, fakeRecorder, false /* checkNodeCapabilitiesBeforeMount */))
 	nodeInformer := informers.NewNodeInformer(
-		fakeKubeClient, resyncPeriod)
+		fakeKubeClient, resyncPeriod, resyncPeriod)
 	nsu := statusupdater.NewNodeStatusUpdater(
 		fakeKubeClient, nodeInformer, asw)
 	reconciler := NewReconciler(

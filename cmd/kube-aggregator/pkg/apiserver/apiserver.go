@@ -109,9 +109,10 @@ func (c completedConfig) New() (*APIDiscoveryServer, error) {
 	informerFactory := informers.NewSharedInformerFactory(
 		internalclientset.NewForConfigOrDie(c.Config.GenericConfig.LoopbackClientConfig),
 		discoveryclientset.NewForConfigOrDie(c.Config.GenericConfig.LoopbackClientConfig),
+		5*time.Minute,
 		5*time.Minute, // this is effectively used as a refresh interval right now.  Might want to do something nicer later on.
 	)
-	kubeInformers := kubeinformers.NewSharedInformerFactory(nil, c.CoreAPIServerClient, 5*time.Minute)
+	kubeInformers := kubeinformers.NewSharedInformerFactory(nil, c.CoreAPIServerClient, 5*time.Minute, 5*time.Minute)
 
 	proxyMux := http.NewServeMux()
 

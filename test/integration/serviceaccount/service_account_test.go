@@ -420,7 +420,7 @@ func startServiceAccountTestServer(t *testing.T) (*clientset.Clientset, restclie
 	tokenController := serviceaccountcontroller.NewTokensController(rootClientset, serviceaccountcontroller.TokensControllerOptions{TokenGenerator: serviceaccount.JWTTokenGenerator(serviceAccountKey)})
 	go tokenController.Run(1, stopCh)
 
-	informers := informers.NewSharedInformerFactory(rootClientset, nil, controller.NoResyncPeriodFunc())
+	informers := informers.NewSharedInformerFactory(rootClientset, nil, controller.NoResyncPeriodFunc(), controller.NoResyncPeriodFunc())
 	serviceAccountController := serviceaccountcontroller.NewServiceAccountsController(informers.ServiceAccounts(), informers.Namespaces(), rootClientset, serviceaccountcontroller.DefaultServiceAccountsControllerOptions())
 	informers.Start(stopCh)
 	go serviceAccountController.Run(5, stopCh)

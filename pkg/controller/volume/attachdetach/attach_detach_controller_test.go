@@ -28,10 +28,10 @@ func Test_NewAttachDetachController_Positive(t *testing.T) {
 	// Arrange
 	fakeKubeClient := controllervolumetesting.CreateTestClient()
 	resyncPeriod := 5 * time.Minute
-	podInformer := informers.NewPodInformer(fakeKubeClient, resyncPeriod)
-	nodeInformer := informers.NewNodeInformer(fakeKubeClient, resyncPeriod)
-	pvcInformer := informers.NewPVCInformer(fakeKubeClient, resyncPeriod)
-	pvInformer := informers.NewPVInformer(fakeKubeClient, resyncPeriod)
+	podInformer := informers.NewPodInformer(fakeKubeClient, resyncPeriod, resyncPeriod)
+	nodeInformer := informers.NewNodeInformer(fakeKubeClient, resyncPeriod, resyncPeriod)
+	pvcInformer := informers.NewPVCInformer(fakeKubeClient, resyncPeriod, resyncPeriod)
+	pvInformer := informers.NewPVInformer(fakeKubeClient, resyncPeriod, resyncPeriod)
 
 	// Act
 	_, err := NewAttachDetachController(

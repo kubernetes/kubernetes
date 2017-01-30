@@ -180,7 +180,7 @@ func TestHandles(t *testing.T) {
 
 // newHandlerForTest returns the admission controller configured for testing.
 func newHandlerForTest(c clientset.Interface) (*podNodeSelector, informers.SharedInformerFactory, error) {
-	f := informers.NewSharedInformerFactory(nil, c, 5*time.Minute)
+	f := informers.NewSharedInformerFactory(nil, c, 5*time.Minute, 5*time.Minute)
 	handler := NewPodNodeSelector(nil)
 	pluginInitializer := kubeadmission.NewPluginInitializer(c, f, nil)
 	pluginInitializer.Initialize(handler)

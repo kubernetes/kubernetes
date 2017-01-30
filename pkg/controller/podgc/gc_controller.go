@@ -81,7 +81,7 @@ func NewFromClient(
 	kubeClient clientset.Interface,
 	terminatedPodThreshold int,
 ) *PodGCController {
-	podInformer := informers.NewPodInformer(kubeClient, controller.NoResyncPeriodFunc())
+	podInformer := informers.NewPodInformer(kubeClient, controller.NoResyncPeriodFunc(), controller.NoResyncPeriodFunc())
 	controller := NewPodGC(kubeClient, podInformer, terminatedPodThreshold)
 	controller.internalPodInformer = podInformer
 	return controller

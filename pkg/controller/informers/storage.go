@@ -57,6 +57,7 @@ func (f *storageClassInformer) Informer() cache.SharedIndexInformer {
 			},
 		},
 		&storage.StorageClass{},
+		f.resyncCheck,
 		f.defaultResync,
 		cache.Indexers{},
 	)

@@ -57,6 +57,7 @@ func (f *daemonSetInformer) Informer() cache.SharedIndexInformer {
 			},
 		},
 		&extensions.DaemonSet{},
+		f.resyncCheck,
 		f.defaultResync,
 		cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc},
 	)
@@ -99,6 +100,7 @@ func (f *deploymentInformer) Informer() cache.SharedIndexInformer {
 			},
 		},
 		&extensions.Deployment{},
+		f.resyncCheck,
 		f.defaultResync,
 		cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc},
 	)
@@ -141,6 +143,7 @@ func (f *replicaSetInformer) Informer() cache.SharedIndexInformer {
 			},
 		},
 		&extensions.ReplicaSet{},
+		f.resyncCheck,
 		f.defaultResync,
 		cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc},
 	)

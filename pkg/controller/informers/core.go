@@ -54,7 +54,7 @@ func (f *podInformer) Informer() cache.SharedIndexInformer {
 	if exists {
 		return informer
 	}
-	informer = NewPodInformer(f.client, f.defaultResync)
+	informer = NewPodInformer(f.client, f.resyncCheck, f.defaultResync)
 	f.informers[informerType] = informer
 
 	return informer
@@ -90,7 +90,7 @@ func (f *namespaceInformer) Informer() cache.SharedIndexInformer {
 	if exists {
 		return informer
 	}
-	informer = NewNamespaceInformer(f.client, f.defaultResync)
+	informer = NewNamespaceInformer(f.client, f.resyncCheck, f.defaultResync)
 	f.informers[informerType] = informer
 
 	return informer
@@ -126,7 +126,7 @@ func (f *internalNamespaceInformer) Informer() cache.SharedIndexInformer {
 	if exists {
 		return informer
 	}
-	informer = NewInternalNamespaceInformer(f.internalclient, f.defaultResync)
+	informer = NewInternalNamespaceInformer(f.internalclient, f.resyncCheck, f.defaultResync)
 	f.informers[informerType] = informer
 
 	return informer
@@ -162,7 +162,7 @@ func (f *nodeInformer) Informer() cache.SharedIndexInformer {
 	if exists {
 		return informer
 	}
-	informer = NewNodeInformer(f.client, f.defaultResync)
+	informer = NewNodeInformer(f.client, f.resyncCheck, f.defaultResync)
 	f.informers[informerType] = informer
 
 	return informer
@@ -198,7 +198,7 @@ func (f *pvcInformer) Informer() cache.SharedIndexInformer {
 	if exists {
 		return informer
 	}
-	informer = NewPVCInformer(f.client, f.defaultResync)
+	informer = NewPVCInformer(f.client, f.resyncCheck, f.defaultResync)
 	f.informers[informerType] = informer
 
 	return informer
@@ -234,7 +234,7 @@ func (f *pvInformer) Informer() cache.SharedIndexInformer {
 	if exists {
 		return informer
 	}
-	informer = NewPVInformer(f.client, f.defaultResync)
+	informer = NewPVInformer(f.client, f.resyncCheck, f.defaultResync)
 	f.informers[informerType] = informer
 
 	return informer
@@ -270,7 +270,7 @@ func (f *limitRangeInformer) Informer() cache.SharedIndexInformer {
 	if exists {
 		return informer
 	}
-	informer = NewLimitRangeInformer(f.client, f.defaultResync)
+	informer = NewLimitRangeInformer(f.client, f.resyncCheck, f.defaultResync)
 	f.informers[informerType] = informer
 
 	return informer
@@ -306,7 +306,7 @@ func (f *internalLimitRangeInformer) Informer() cache.SharedIndexInformer {
 	if exists {
 		return informer
 	}
-	informer = NewInternalLimitRangeInformer(f.internalclient, f.defaultResync)
+	informer = NewInternalLimitRangeInformer(f.internalclient, f.resyncCheck, f.defaultResync)
 	f.informers[informerType] = informer
 
 	return informer
@@ -342,7 +342,7 @@ func (f *replicationControllerInformer) Informer() cache.SharedIndexInformer {
 	if exists {
 		return informer
 	}
-	informer = NewReplicationControllerInformer(f.client, f.defaultResync)
+	informer = NewReplicationControllerInformer(f.client, f.resyncCheck, f.defaultResync)
 	f.informers[informerType] = informer
 
 	return informer
@@ -357,7 +357,7 @@ func (f *replicationControllerInformer) Lister() *listers.StoreToReplicationCont
 //*****************************************************************************
 
 // NewPodInformer returns a SharedIndexInformer that lists and watches all pods
-func NewPodInformer(client clientset.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
+func NewPodInformer(client clientset.Interface, resyncCheck, resyncPeriod time.Duration) cache.SharedIndexInformer {
 	sharedIndexInformer := cache.NewSharedIndexInformer(
 		&cache.ListWatch{
 			ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
@@ -368,6 +368,7 @@ func NewPodInformer(client clientset.Interface, resyncPeriod time.Duration) cach
 			},
 		},
 		&v1.Pod{},
+		resyncCheck,
 		resyncPeriod,
 		cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc},
 	)
@@ -376,7 +377,7 @@ func NewPodInformer(client clientset.Interface, resyncPeriod time.Duration) cach
 }
 
 // NewNodeInformer returns a SharedIndexInformer that lists and watches all nodes
-func NewNodeInformer(client clientset.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
+func NewNodeInformer(client clientset.Interface, resyncCheck, resyncPeriod time.Duration) cache.SharedIndexInformer {
 	sharedIndexInformer := cache.NewSharedIndexInformer(
 		&cache.ListWatch{
 			ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
@@ -387,6 +388,7 @@ func NewNodeInformer(client clientset.Interface, resyncPeriod time.Duration) cac
 			},
 		},
 		&v1.Node{},
+		resyncCheck,
 		resyncPeriod,
 		cache.Indexers{})
 
@@ -394,7 +396,7 @@ func NewNodeInformer(client clientset.Interface, resyncPeriod time.Duration) cac
 }
 
 // NewPVCInformer returns a SharedIndexInformer that lists and watches all PVCs
-func NewPVCInformer(client clientset.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
+func NewPVCInformer(client clientset.Interface, resyncCheck, resyncPeriod time.Duration) cache.SharedIndexInformer {
 	sharedIndexInformer := cache.NewSharedIndexInformer(
 		&cache.ListWatch{
 			ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
@@ -405,6 +407,7 @@ func NewPVCInformer(client clientset.Interface, resyncPeriod time.Duration) cach
 			},
 		},
 		&v1.PersistentVolumeClaim{},
+		resyncCheck,
 		resyncPeriod,
 		cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc},
 	)
@@ -413,7 +416,7 @@ func NewPVCInformer(client clientset.Interface, resyncPeriod time.Duration) cach
 }
 
 // NewPVInformer returns a SharedIndexInformer that lists and watches all PVs
-func NewPVInformer(client clientset.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
+func NewPVInformer(client clientset.Interface, resyncCheck, resyncPeriod time.Duration) cache.SharedIndexInformer {
 	sharedIndexInformer := cache.NewSharedIndexInformer(
 		&cache.ListWatch{
 			ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
@@ -424,6 +427,7 @@ func NewPVInformer(client clientset.Interface, resyncPeriod time.Duration) cache
 			},
 		},
 		&v1.PersistentVolume{},
+		resyncCheck,
 		resyncPeriod,
 		cache.Indexers{})
 
@@ -431,7 +435,7 @@ func NewPVInformer(client clientset.Interface, resyncPeriod time.Duration) cache
 }
 
 // NewNamespaceInformer returns a SharedIndexInformer that lists and watches namespaces
-func NewNamespaceInformer(client clientset.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
+func NewNamespaceInformer(client clientset.Interface, resyncCheck, resyncPeriod time.Duration) cache.SharedIndexInformer {
 	sharedIndexInformer := cache.NewSharedIndexInformer(
 		&cache.ListWatch{
 			ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
@@ -442,6 +446,7 @@ func NewNamespaceInformer(client clientset.Interface, resyncPeriod time.Duration
 			},
 		},
 		&v1.Namespace{},
+		resyncCheck,
 		resyncPeriod,
 		cache.Indexers{})
 
@@ -449,7 +454,7 @@ func NewNamespaceInformer(client clientset.Interface, resyncPeriod time.Duration
 }
 
 // NewInternalNamespaceInformer returns a SharedIndexInformer that lists and watches namespaces
-func NewInternalNamespaceInformer(client internalclientset.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
+func NewInternalNamespaceInformer(client internalclientset.Interface, resyncCheck, resyncPeriod time.Duration) cache.SharedIndexInformer {
 	sharedIndexInformer := cache.NewSharedIndexInformer(
 		&cache.ListWatch{
 			ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
@@ -460,6 +465,7 @@ func NewInternalNamespaceInformer(client internalclientset.Interface, resyncPeri
 			},
 		},
 		&api.Namespace{},
+		resyncCheck,
 		resyncPeriod,
 		cache.Indexers{})
 
@@ -467,7 +473,7 @@ func NewInternalNamespaceInformer(client internalclientset.Interface, resyncPeri
 }
 
 // NewLimitRangeInformer returns a SharedIndexInformer that lists and watches all LimitRanges
-func NewLimitRangeInformer(client clientset.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
+func NewLimitRangeInformer(client clientset.Interface, resyncCheck, resyncPeriod time.Duration) cache.SharedIndexInformer {
 	sharedIndexInformer := cache.NewSharedIndexInformer(
 		&cache.ListWatch{
 			ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
@@ -478,6 +484,7 @@ func NewLimitRangeInformer(client clientset.Interface, resyncPeriod time.Duratio
 			},
 		},
 		&v1.LimitRange{},
+		resyncCheck,
 		resyncPeriod,
 		cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
 
@@ -485,7 +492,7 @@ func NewLimitRangeInformer(client clientset.Interface, resyncPeriod time.Duratio
 }
 
 // NewInternalLimitRangeInformer returns a SharedIndexInformer that lists and watches all LimitRanges
-func NewInternalLimitRangeInformer(internalclient internalclientset.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
+func NewInternalLimitRangeInformer(internalclient internalclientset.Interface, resyncCheck, resyncPeriod time.Duration) cache.SharedIndexInformer {
 	sharedIndexInformer := cache.NewSharedIndexInformer(
 		&cache.ListWatch{
 			ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
@@ -496,6 +503,7 @@ func NewInternalLimitRangeInformer(internalclient internalclientset.Interface, r
 			},
 		},
 		&api.LimitRange{},
+		resyncCheck,
 		resyncPeriod,
 		cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
 
@@ -503,7 +511,7 @@ func NewInternalLimitRangeInformer(internalclient internalclientset.Interface, r
 }
 
 // NewReplicationControllerInformer returns a SharedIndexInformer that lists and watches all replication controllers.
-func NewReplicationControllerInformer(client clientset.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
+func NewReplicationControllerInformer(client clientset.Interface, resyncCheck, resyncPeriod time.Duration) cache.SharedIndexInformer {
 	sharedIndexInformer := cache.NewSharedIndexInformer(
 		&cache.ListWatch{
 			ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
@@ -514,6 +522,7 @@ func NewReplicationControllerInformer(client clientset.Interface, resyncPeriod t
 			},
 		},
 		&v1.ReplicationController{},
+		resyncCheck,
 		resyncPeriod,
 		cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc},
 	)
@@ -545,7 +554,7 @@ func (f *serviceAccountInformer) Informer() cache.SharedIndexInformer {
 	if exists {
 		return informer
 	}
-	informer = NewServiceAccountInformer(f.client, f.defaultResync)
+	informer = NewServiceAccountInformer(f.client, f.resyncCheck, f.defaultResync)
 	f.informers[informerType] = informer
 
 	return informer
@@ -558,7 +567,7 @@ func (f *serviceAccountInformer) Lister() *listers.StoreToServiceAccountLister {
 }
 
 // NewServiceAccountInformer returns a SharedIndexInformer that lists and watches all ServiceAccounts
-func NewServiceAccountInformer(client clientset.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
+func NewServiceAccountInformer(client clientset.Interface, resyncCheck, resyncPeriod time.Duration) cache.SharedIndexInformer {
 	sharedIndexInformer := cache.NewSharedIndexInformer(
 		&cache.ListWatch{
 			ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
@@ -569,6 +578,7 @@ func NewServiceAccountInformer(client clientset.Interface, resyncPeriod time.Dur
 			},
 		},
 		&v1.ServiceAccount{},
+		resyncCheck,
 		resyncPeriod,
 		cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
 

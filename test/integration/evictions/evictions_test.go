@@ -237,7 +237,7 @@ func rmSetup(t *testing.T) (*httptest.Server, *disruption.DisruptionController, 
 		t.Fatalf("Error in create clientset: %v", err)
 	}
 	resyncPeriod := 12 * time.Hour
-	informers := informers.NewSharedInformerFactory(clientset.NewForConfigOrDie(restclient.AddUserAgent(&config, "pdb-informers")), nil, resyncPeriod)
+	informers := informers.NewSharedInformerFactory(clientset.NewForConfigOrDie(restclient.AddUserAgent(&config, "pdb-informers")), nil, resyncPeriod, resyncPeriod)
 
 	rm := disruption.NewDisruptionController(
 		informers.Pods().Informer(),

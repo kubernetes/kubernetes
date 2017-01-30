@@ -325,7 +325,8 @@ func getAvailableResources(clientBuilder controller.ControllerClientBuilder) (ma
 }
 
 func StartControllers(controllers map[string]InitFunc, s *options.CMServer, rootClientBuilder, clientBuilder controller.ControllerClientBuilder, stop <-chan struct{}) error {
-	sharedInformers := informers.NewSharedInformerFactory(rootClientBuilder.ClientOrDie("shared-informers"), nil, ResyncPeriod(s)())
+	resyncPeriod := ResyncPeriod(s)()
+	sharedInformers := informers.NewSharedInformerFactory(rootClientBuilder.ClientOrDie("shared-informers"), nil, resyncPeriod, resyncPeriod)
 
 	// always start the SA token controller first using a full-power client, since it needs to mint tokens for the rest
 	if len(s.ServiceAccountKeyFile) > 0 {

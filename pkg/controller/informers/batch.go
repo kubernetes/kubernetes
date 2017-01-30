@@ -51,14 +51,14 @@ func (f *jobInformer) Informer() cache.SharedIndexInformer {
 	if exists {
 		return informer
 	}
-	informer = NewJobInformer(f.client, f.defaultResync)
+	informer = NewJobInformer(f.client, f.resyncCheck, f.defaultResync)
 	f.informers[informerType] = informer
 
 	return informer
 }
 
 // NewJobInformer returns a SharedIndexInformer that lists and watches all jobs
-func NewJobInformer(client clientset.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
+func NewJobInformer(client clientset.Interface, resyncCheck, resyncPeriod time.Duration) cache.SharedIndexInformer {
 	sharedIndexInformer := cache.NewSharedIndexInformer(
 		&cache.ListWatch{
 			ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
@@ -69,6 +69,7 @@ func NewJobInformer(client clientset.Interface, resyncPeriod time.Duration) cach
 			},
 		},
 		&batch.Job{},
+		resyncCheck,
 		resyncPeriod,
 		cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc},
 	)

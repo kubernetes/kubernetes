@@ -148,7 +148,7 @@ func addFailedPods(podStore cache.Store, nodeName string, label map[string]strin
 
 func newTestController(initialObjects ...runtime.Object) (*DaemonSetsController, *controller.FakePodControl, *fake.Clientset) {
 	clientset := fake.NewSimpleClientset(initialObjects...)
-	informerFactory := informers.NewSharedInformerFactory(clientset, nil, controller.NoResyncPeriodFunc())
+	informerFactory := informers.NewSharedInformerFactory(clientset, nil, controller.NoResyncPeriodFunc(), controller.NoResyncPeriodFunc())
 
 	manager := NewDaemonSetsController(informerFactory.DaemonSets(), informerFactory.Pods(), informerFactory.Nodes(), clientset, 0)
 

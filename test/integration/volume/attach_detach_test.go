@@ -192,10 +192,10 @@ func createAdClients(ns *v1.Namespace, t *testing.T, server *httptest.Server, sy
 	}
 	plugins := []volume.VolumePlugin{plugin}
 	cloud := &fakecloud.FakeCloud{}
-	podInformer := informers.NewPodInformer(clientset.NewForConfigOrDie(restclient.AddUserAgent(&config, "pod-informer")), resyncPeriod)
-	nodeInformer := informers.NewNodeInformer(clientset.NewForConfigOrDie(restclient.AddUserAgent(&config, "node-informer")), resyncPeriod)
-	pvcInformer := informers.NewNodeInformer(clientset.NewForConfigOrDie(restclient.AddUserAgent(&config, "pvc-informer")), resyncPeriod)
-	pvInformer := informers.NewNodeInformer(clientset.NewForConfigOrDie(restclient.AddUserAgent(&config, "pv-informer")), resyncPeriod)
+	podInformer := informers.NewPodInformer(clientset.NewForConfigOrDie(restclient.AddUserAgent(&config, "pod-informer")), resyncPeriod, resyncPeriod)
+	nodeInformer := informers.NewNodeInformer(clientset.NewForConfigOrDie(restclient.AddUserAgent(&config, "node-informer")), resyncPeriod, resyncPeriod)
+	pvcInformer := informers.NewNodeInformer(clientset.NewForConfigOrDie(restclient.AddUserAgent(&config, "pvc-informer")), resyncPeriod, resyncPeriod)
+	pvInformer := informers.NewNodeInformer(clientset.NewForConfigOrDie(restclient.AddUserAgent(&config, "pv-informer")), resyncPeriod, resyncPeriod)
 	ctrl, err := attachdetach.NewAttachDetachController(testClient, podInformer, nodeInformer, pvcInformer, pvInformer, cloud, plugins, false, time.Second*5)
 	if err != nil {
 		t.Fatalf("Error creating AttachDetach : %v", err)

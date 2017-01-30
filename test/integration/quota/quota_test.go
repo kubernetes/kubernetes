@@ -84,7 +84,7 @@ func TestQuota(t *testing.T) {
 	controllerCh := make(chan struct{})
 	defer close(controllerCh)
 
-	informers := informers.NewSharedInformerFactory(clientset, nil, controller.NoResyncPeriodFunc())
+	informers := informers.NewSharedInformerFactory(clientset, nil, controller.NoResyncPeriodFunc(), controller.NoResyncPeriodFunc())
 	podInformer := informers.Pods().Informer()
 	rcInformer := informers.ReplicationControllers().Informer()
 	rm := replicationcontroller.NewReplicationManager(podInformer, rcInformer, clientset, replicationcontroller.BurstReplicas, 4096, false)

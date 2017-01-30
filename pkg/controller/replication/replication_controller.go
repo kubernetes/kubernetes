@@ -151,8 +151,8 @@ func NewReplicationManager(podInformer, rcInformer cache.SharedIndexInformer, ku
 
 // NewReplicationManagerFromClient creates a new ReplicationManager that runs its own informer.
 func NewReplicationManagerFromClient(kubeClient clientset.Interface, resyncPeriod controller.ResyncPeriodFunc, burstReplicas int, lookupCacheSize int) *ReplicationManager {
-	podInformer := informers.NewPodInformer(kubeClient, resyncPeriod())
-	rcInformer := informers.NewReplicationControllerInformer(kubeClient, resyncPeriod())
+	podInformer := informers.NewPodInformer(kubeClient, resyncPeriod(), resyncPeriod())
+	rcInformer := informers.NewReplicationControllerInformer(kubeClient, resyncPeriod(), resyncPeriod())
 	rm := NewReplicationManager(podInformer, rcInformer, kubeClient, burstReplicas, lookupCacheSize, false)
 	rm.internalPodInformer = podInformer
 	return rm

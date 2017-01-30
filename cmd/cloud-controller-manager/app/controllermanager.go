@@ -192,7 +192,8 @@ func StartControllers(s *options.CloudControllerManagerServer, kubeconfig *restc
 	client := func(serviceAccountName string) clientset.Interface {
 		return rootClientBuilder.ClientOrDie(serviceAccountName)
 	}
-	sharedInformers := informers.NewSharedInformerFactory(client("shared-informers"), nil, resyncPeriod(s)())
+	resync := resyncPeriod(s)()
+	sharedInformers := informers.NewSharedInformerFactory(client("shared-informers"), nil, resync, resync)
 
 	_, clusterCIDR, err := net.ParseCIDR(s.ClusterCIDR)
 	if err != nil {

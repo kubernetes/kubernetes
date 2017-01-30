@@ -35,7 +35,7 @@ import (
 
 // newHandlerForTest returns the admission controller configured for testing.
 func newHandlerForTest(c clientset.Interface) (admission.Interface, informers.SharedInformerFactory, error) {
-	f := informers.NewSharedInformerFactory(nil, c, 5*time.Minute)
+	f := informers.NewSharedInformerFactory(nil, c, 5*time.Minute, 5*time.Minute)
 	handler := NewExists()
 	pluginInitializer := kubeadmission.NewPluginInitializer(c, f, nil)
 	pluginInitializer.Initialize(handler)

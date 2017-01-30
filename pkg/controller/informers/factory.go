@@ -69,6 +69,7 @@ type sharedInformerFactory struct {
 	// for admission plugins etc.
 	internalclient internalclientset.Interface
 	lock           sync.Mutex
+	resyncCheck    time.Duration
 	defaultResync  time.Duration
 
 	informers map[reflect.Type]cache.SharedIndexInformer
@@ -78,10 +79,11 @@ type sharedInformerFactory struct {
 }
 
 // NewSharedInformerFactory constructs a new instance of sharedInformerFactory
-func NewSharedInformerFactory(client clientset.Interface, internalclient internalclientset.Interface, defaultResync time.Duration) SharedInformerFactory {
+func NewSharedInformerFactory(client clientset.Interface, internalclient internalclientset.Interface, resyncCheck, defaultResync time.Duration) SharedInformerFactory {
 	return &sharedInformerFactory{
 		client:           client,
 		internalclient:   internalclient,
+		resyncCheck:      resyncCheck,
 		defaultResync:    defaultResync,
 		informers:        make(map[reflect.Type]cache.SharedIndexInformer),
 		startedInformers: make(map[reflect.Type]bool),
