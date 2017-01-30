@@ -89,9 +89,10 @@ type Request struct {
 	client HTTPClient
 	verb   string
 
-	baseURL     *url.URL
-	content     ContentConfig
-	serializers Serializers
+	baseURL      *url.URL
+	urlContainer *URLContainer
+	content      ContentConfig
+	serializers  Serializers
 
 	// generic components accessible via method setters
 	pathPrefix string
@@ -119,25 +120,26 @@ type Request struct {
 }
 
 // NewRequest creates a new request helper object for accessing runtime.Objects on a server.
-func NewRequest(client HTTPClient, verb string, baseURL *url.URL, versionedAPIPath string, content ContentConfig, serializers Serializers, backoff BackoffManager, throttle flowcontrol.RateLimiter) *Request {
+func NewRequest(client HTTPClient, verb string, urlContainer *URLContainer, versionedAPIPath string, content ContentConfig, serializers Serializers, backoff BackoffManager, throttle flowcontrol.RateLimiter) *Request {
 	if backoff == nil {
 		glog.V(2).Infof("Not implementing request backoff strategy.")
 		backoff = &NoBackoff{}
 	}
-
+	baseURL := urlContainer.Get()
 	pathPrefix := "/"
 	if baseURL != nil {
 		pathPrefix = path.Join(pathPrefix, baseURL.Path)
 	}
 	r := &Request{
-		client:      client,
-		verb:        verb,
-		baseURL:     baseURL,
-		pathPrefix:  path.Join(pathPrefix, versionedAPIPath),
-		content:     content,
-		serializers: serializers,
-		backoffMgr:  backoff,
-		throttle:    throttle,
+		client:       client,
+		verb:         verb,
+		baseURL:      baseURL,
+		urlContainer: urlContainer,
+		pathPrefix:   path.Join(pathPrefix, versionedAPIPath),
+		content:      content,
+		serializers:  serializers,
+		backoffMgr:   backoff,
+		throttle:     throttle,
 	}
 	switch {
 	case len(content.AcceptContentTypes) > 0:
@@ -680,6 +682,7 @@ func (r *Request) Watch() (watch.Interface, error) {
 		if net.IsProbableEOF(err) {
 			return watch.NewEmptyWatch(), nil
 		}
+		r.urlContainer.Exclude(r.baseURL)
 		return nil, err
 	}
 	if resp.StatusCode != http.StatusOK {
@@ -747,6 +750,7 @@ func (r *Request) Stream() (io.ReadCloser, error) {
 		}
 	}
 	if err != nil {
+		r.urlContainer.Exclude(r.baseURL)
 		return nil, err
 	}
 
@@ -831,6 +835,7 @@ func (r *Request) request(fn func(*http.Request, *http.Response)) error {
 			// We are not automatically retrying "write" operations, as
 			// they are not idempotent.
 			if !net.IsConnectionReset(err) || r.verb != "GET" {
+				r.urlContainer.Exclude(r.baseURL)
 				return err
 			}
 			// For the purpose of retry, we set the artificial "retry-after" response.

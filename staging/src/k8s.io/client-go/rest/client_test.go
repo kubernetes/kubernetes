@@ -34,8 +34,10 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/client-go/kubernetes/scheme"
+	"k8s.io/client-go/pkg/api"
 	"k8s.io/client-go/pkg/api/v1"
 	v1beta1 "k8s.io/client-go/pkg/apis/extensions/v1beta1"
+	"k8s.io/client-go/util/flowcontrol"
 	utiltesting "k8s.io/client-go/util/testing"
 )
 
@@ -83,6 +85,85 @@ func TestDoRequestSuccess(t *testing.T) {
 	testParam := TestParam{actualError: err, expectingError: false, expCreated: true,
 		expStatus: status, testBody: true, testBodyErrorIsNotNil: false}
 	validate(testParam, t, body, fakeHandler)
+}
+
+func TestDoRequestWithMultipleHosts(t *testing.T) {
+	successServer, _, _ := testServerEnv(t, 200)
+	defer successServer.Close()
+	invalidURL := "http://127.0.0.1:30767/"
+	validURL := successServer.URL + "/"
+	for _, test := range []struct {
+		msg           string
+		alternateURLs []string
+		requests      int
+		atMostFailed  int
+		validURL      string
+	}{
+		{
+			msg:           "if there is valid url - client will find it and stick to it",
+			alternateURLs: []string{validURL, invalidURL},
+			requests:      3,
+			atMostFailed:  1,
+			validURL:      validURL,
+		},
+		{
+			msg:           "in the absence of valid url - client will switch URL after each request",
+			alternateURLs: []string{invalidURL, invalidURL},
+			requests:      4,
+			atMostFailed:  4,
+			validURL:      invalidURL,
+		},
+	} {
+		t.Log("Running test: ", test.msg)
+		client, err := restClientWithAlternateURLs(test.alternateURLs...)
+		if err != nil {
+			t.Fatal(err)
+		}
+		client.base.initializeRateLimiter = func(_ float32, _ int) flowcontrol.RateLimiter {
+			return flowcontrol.NewFakeNeverRateLimiter()
+		}
+		client.base.renewRateLimiter()
+		var failed int
+		for i := 0; i < test.requests; i++ {
+			_, err := client.Get().Prefix("test").Do().Raw()
+			if err != nil {
+				failed++
+				t.Log(err)
+			}
+		}
+		if failed > test.atMostFailed {
+			t.Errorf("%s: Unexpected number of failed requests: Expected %v, Got %v", test.msg, test.atMostFailed, failed)
+		}
+		if test.validURL != client.base.Get().String() {
+			t.Errorf("%s: Unexpected valid url list: Expected %v != Got %v", test.msg, test.validURL, validURL)
+		}
+	}
+}
+
+func TestDoMultipleRequestsWithTokenBucketRateLimiter(t *testing.T) {
+	successServer, _, _ := testServerEnv(t, 200)
+	defer successServer.Close()
+	invalidURL := "http://127.0.0.1:30767/"
+	validURL := successServer.URL + "/"
+	client, err := restClientWithAlternateURLs(invalidURL, validURL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	client.base.initializeRateLimiter = func(errorps float32, burst int) flowcontrol.RateLimiter {
+		return flowcontrol.NewTokenBucketRateLimiter(errorps, burst)
+	}
+	client.base.errorps = float32(1)
+	client.base.burst = 10
+	client.base.renewRateLimiter()
+	for i := 0; i <= 20; i++ {
+		_, err := client.Get().Prefix("test").Do().Raw()
+		if err != nil {
+			t.Log(err)
+		}
+	}
+	if actualURL := client.base.Get().String(); actualURL != validURL {
+		t.Errorf("After amount of errors will surpass limits defined in RateLimiter - actual URL should be valid: %v", actualURL)
+	}
 }
 
 func TestDoRequestFailed(t *testing.T) {
@@ -330,7 +411,7 @@ func testServerEnv(t *testing.T, statusCode int) (*httptest.Server, *utiltesting
 }
 
 func restClient(testServer *httptest.Server) (*RESTClient, error) {
-	c, err := RESTClientFor(&Config{
+	return RESTClientFor(&Config{
 		Host: testServer.URL,
 		ContentConfig: ContentConfig{
 			GroupVersion:         &v1.SchemeGroupVersion,
@@ -339,5 +420,16 @@ func restClient(testServer *httptest.Server) (*RESTClient, error) {
 		Username: "user",
 		Password: "pass",
 	})
-	return c, err
+}
+
+func restClientWithAlternateURLs(alternateURLs ...string) (*RESTClient, error) {
+	return RESTClientFor(&Config{
+		AlternateHosts: alternateURLs,
+		ContentConfig: ContentConfig{
+			GroupVersion:         &api.Registry.GroupOrDie(api.GroupName).GroupVersion,
+			NegotiatedSerializer: api.Codecs,
+		},
+		Username: "user",
+		Password: "pass",
+	})
 }

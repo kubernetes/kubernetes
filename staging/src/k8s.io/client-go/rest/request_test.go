@@ -55,11 +55,11 @@ import (
 )
 
 func TestNewRequestSetsAccept(t *testing.T) {
-	r := NewRequest(nil, "get", &url.URL{Path: "/path/"}, "", ContentConfig{}, Serializers{}, nil, nil)
+	r := NewRequest(nil, "get", NewURLContainer([]*url.URL{{Path: "/path/"}}), "", ContentConfig{}, Serializers{}, nil, nil)
 	if r.headers.Get("Accept") != "" {
 		t.Errorf("unexpected headers: %#v", r.headers)
 	}
-	r = NewRequest(nil, "get", &url.URL{Path: "/path/"}, "", ContentConfig{ContentType: "application/other"}, Serializers{}, nil, nil)
+	r = NewRequest(nil, "get", NewURLContainer([]*url.URL{{Path: "/path/"}}), "", ContentConfig{ContentType: "application/other"}, Serializers{}, nil, nil)
 	if r.headers.Get("Accept") != "application/other, */*" {
 		t.Errorf("unexpected headers: %#v", r.headers)
 	}
@@ -84,7 +84,7 @@ func TestRequestSetsHeaders(t *testing.T) {
 	config := defaultContentConfig()
 	config.ContentType = "application/other"
 	serializers := defaultSerializers(t)
-	r := NewRequest(server, "get", &url.URL{Path: "/path"}, "", config, serializers, nil, nil)
+	r := NewRequest(server, "get", NewURLContainer([]*url.URL{{Path: "/path"}}), "", config, serializers, nil, nil)
 
 	// Check if all "issue" methods are setting headers.
 	_ = r.Do()
@@ -119,33 +119,33 @@ func TestRequestWithErrorWontChange(t *testing.T) {
 }
 
 func TestRequestPreservesBaseTrailingSlash(t *testing.T) {
-	r := &Request{baseURL: &url.URL{}, pathPrefix: "/path/"}
+	r := &Request{urlContainer: &URLContainer{}, baseURL: &url.URL{}, pathPrefix: "/path/"}
 	if s := r.URL().String(); s != "/path/" {
 		t.Errorf("trailing slash should be preserved: %s", s)
 	}
 }
 
 func TestRequestAbsPathPreservesTrailingSlash(t *testing.T) {
-	r := (&Request{baseURL: &url.URL{}}).AbsPath("/foo/")
+	r := (&Request{urlContainer: &URLContainer{}, baseURL: &url.URL{}}).AbsPath("/foo/")
 	if s := r.URL().String(); s != "/foo/" {
 		t.Errorf("trailing slash should be preserved: %s", s)
 	}
 
-	r = (&Request{baseURL: &url.URL{}}).AbsPath("/foo/")
+	r = (&Request{urlContainer: &URLContainer{}, baseURL: &url.URL{}}).AbsPath("/foo/")
 	if s := r.URL().String(); s != "/foo/" {
 		t.Errorf("trailing slash should be preserved: %s", s)
 	}
 }
 
 func TestRequestAbsPathJoins(t *testing.T) {
-	r := (&Request{baseURL: &url.URL{}}).AbsPath("foo/bar", "baz")
+	r := (&Request{urlContainer: &URLContainer{}, baseURL: &url.URL{}}).AbsPath("foo/bar", "baz")
 	if s := r.URL().String(); s != "foo/bar/baz" {
 		t.Errorf("trailing slash should be preserved: %s", s)
 	}
 }
 
 func TestRequestSetsNamespace(t *testing.T) {
-	r := (&Request{
+	r := (&Request{urlContainer: &URLContainer{},
 		baseURL: &url.URL{
 			Path: "/",
 		},
@@ -160,7 +160,7 @@ func TestRequestSetsNamespace(t *testing.T) {
 }
 
 func TestRequestOrdersNamespaceInPath(t *testing.T) {
-	r := (&Request{
+	r := (&Request{urlContainer: &URLContainer{},
 		baseURL:    &url.URL{},
 		pathPrefix: "/test/",
 	}).Name("bar").Resource("baz").Namespace("foo")
@@ -170,7 +170,7 @@ func TestRequestOrdersNamespaceInPath(t *testing.T) {
 }
 
 func TestRequestOrdersSubResource(t *testing.T) {
-	r := (&Request{
+	r := (&Request{urlContainer: &URLContainer{},
 		baseURL:    &url.URL{},
 		pathPrefix: "/test/",
 	}).Name("bar").Resource("baz").Namespace("foo").Suffix("test").SubResource("a", "b")
@@ -180,16 +180,16 @@ func TestRequestOrdersSubResource(t *testing.T) {
 }
 
 func TestRequestSetTwiceError(t *testing.T) {
-	if (&Request{}).Name("bar").Name("baz").err == nil {
+	if (&Request{urlContainer: &URLContainer{}}).Name("bar").Name("baz").err == nil {
 		t.Errorf("setting name twice should result in error")
 	}
-	if (&Request{}).Namespace("bar").Namespace("baz").err == nil {
+	if (&Request{urlContainer: &URLContainer{}}).Namespace("bar").Namespace("baz").err == nil {
 		t.Errorf("setting namespace twice should result in error")
 	}
-	if (&Request{}).Resource("bar").Resource("baz").err == nil {
+	if (&Request{urlContainer: &URLContainer{}}).Resource("bar").Resource("baz").err == nil {
 		t.Errorf("setting resource twice should result in error")
 	}
-	if (&Request{}).SubResource("bar").SubResource("baz").err == nil {
+	if (&Request{urlContainer: &URLContainer{}}).SubResource("bar").SubResource("baz").err == nil {
 		t.Errorf("setting subresource twice should result in error")
 	}
 }
@@ -204,7 +204,7 @@ func TestInvalidSegments(t *testing.T) {
 	}
 	for _, invalidSegment := range invalidSegments {
 		for setterName, setter := range setters {
-			r := &Request{}
+			r := &Request{urlContainer: &URLContainer{}}
 			setter(invalidSegment, r)
 			if r.err == nil {
 				t.Errorf("%s: %s: expected error, got none", setterName, invalidSegment)
@@ -214,7 +214,7 @@ func TestInvalidSegments(t *testing.T) {
 }
 
 func TestRequestParam(t *testing.T) {
-	r := (&Request{}).Param("foo", "a")
+	r := (&Request{urlContainer: &URLContainer{}}).Param("foo", "a")
 	if !reflect.DeepEqual(r.params, url.Values{"foo": []string{"a"}}) {
 		t.Errorf("should have set a param: %#v", r)
 	}
@@ -227,7 +227,7 @@ func TestRequestParam(t *testing.T) {
 }
 
 func TestRequestVersionedParams(t *testing.T) {
-	r := (&Request{content: ContentConfig{GroupVersion: &v1.SchemeGroupVersion}}).Param("foo", "a")
+	r := (&Request{urlContainer: &URLContainer{}, content: ContentConfig{GroupVersion: &v1.SchemeGroupVersion}}).Param("foo", "a")
 	if !reflect.DeepEqual(r.params, url.Values{"foo": []string{"a"}}) {
 		t.Errorf("should have set a param: %#v", r)
 	}
@@ -243,7 +243,7 @@ func TestRequestVersionedParams(t *testing.T) {
 }
 
 func TestRequestVersionedParamsFromListOptions(t *testing.T) {
-	r := &Request{content: ContentConfig{GroupVersion: &v1.SchemeGroupVersion}}
+	r := &Request{urlContainer: &URLContainer{}, content: ContentConfig{GroupVersion: &v1.SchemeGroupVersion}}
 	r.VersionedParams(&metav1.ListOptions{ResourceVersion: "1"}, scheme.ParameterCodec)
 	if !reflect.DeepEqual(r.params, url.Values{
 		"resourceVersion": []string{"1"},
@@ -262,7 +262,7 @@ func TestRequestVersionedParamsFromListOptions(t *testing.T) {
 }
 
 func TestRequestURI(t *testing.T) {
-	r := (&Request{}).Param("foo", "a")
+	r := (&Request{urlContainer: &URLContainer{}}).Param("foo", "a")
 	r.Prefix("other")
 	r.RequestURI("/test?foo=b&a=b&c=1&c=2")
 	if r.pathPrefix != "/test" {
@@ -298,7 +298,7 @@ func defaultSerializers(t *testing.T) Serializers {
 
 func TestRequestBody(t *testing.T) {
 	// test unknown type
-	r := (&Request{}).Body([]string{"test"})
+	r := (&Request{urlContainer: &URLContainer{}}).Body([]string{"test"})
 	if r.err == nil || r.body != nil {
 		t.Errorf("should have set err and left body nil: %#v", r)
 	}
@@ -310,13 +310,13 @@ func TestRequestBody(t *testing.T) {
 	}
 	defer f.Close()
 	os.Remove(f.Name())
-	r = (&Request{}).Body(f.Name())
+	r = (&Request{urlContainer: &URLContainer{}}).Body(f.Name())
 	if r.err == nil || r.body != nil {
 		t.Errorf("should have set err and left body nil: %#v", r)
 	}
 
 	// test unencodable api object
-	r = (&Request{content: defaultContentConfig()}).Body(&NotAnAPIObject{})
+	r = (&Request{urlContainer: &URLContainer{}, content: defaultContentConfig()}).Body(&NotAnAPIObject{})
 	if r.err == nil || r.body != nil {
 		t.Errorf("should have set err and left body nil: %#v", r)
 	}
@@ -331,7 +331,7 @@ func TestResultIntoWithErrReturnsErr(t *testing.T) {
 
 func TestURLTemplate(t *testing.T) {
 	uri, _ := url.Parse("http://localhost")
-	r := NewRequest(nil, "POST", uri, "", ContentConfig{GroupVersion: &schema.GroupVersion{Group: "test"}}, Serializers{}, nil, nil)
+	r := NewRequest(nil, "POST", NewURLContainer([]*url.URL{uri}), "", ContentConfig{GroupVersion: &schema.GroupVersion{Group: "test"}}, Serializers{}, nil, nil)
 	r.Prefix("pre1").Resource("r1").Namespace("ns").Name("nm").Param("p0", "v0")
 	full := r.URL()
 	if full.String() != "http://localhost/pre1/namespaces/ns/r1/nm?p0=v0" {
@@ -393,7 +393,7 @@ func TestTransformResponse(t *testing.T) {
 		{Response: &http.Response{StatusCode: 200, Body: ioutil.NopCloser(bytes.NewReader(invalid))}, Data: invalid},
 	}
 	for i, test := range testCases {
-		r := NewRequest(nil, "", uri, "", defaultContentConfig(), defaultSerializers(t), nil, nil)
+		r := NewRequest(nil, "", NewURLContainer([]*url.URL{uri}), "", defaultContentConfig(t), defaultSerializers(), nil, nil)
 		if test.Response.Body == nil {
 			test.Response.Body = ioutil.NopCloser(bytes.NewReader([]byte{}))
 		}
@@ -544,7 +544,7 @@ func TestTransformResponseNegotiate(t *testing.T) {
 		serializers.RenegotiatedDecoder = negotiator.invoke
 		contentConfig := defaultContentConfig()
 		contentConfig.ContentType = test.ContentType
-		r := NewRequest(nil, "", uri, "", contentConfig, serializers, nil, nil)
+		r := NewRequest(nil, "", NewURLContainer([]*url.URL{uri}), "", contentConfig, serializers, nil, nil)
 		if test.Response.Body == nil {
 			test.Response.Body = ioutil.NopCloser(bytes.NewReader([]byte{}))
 		}
@@ -672,7 +672,7 @@ func TestTransformUnstructuredError(t *testing.T) {
 	}
 
 	for i, testCase := range testCases {
-		r := &Request{
+		r := &Request{urlContainer: &URLContainer{},
 			content:      defaultContentConfig(),
 			serializers:  defaultSerializers(t),
 			resourceName: testCase.Name,
@@ -729,15 +729,15 @@ func TestRequestWatch(t *testing.T) {
 		Empty   bool
 	}{
 		{
-			Request: &Request{err: errors.New("bail")},
+			Request: &Request{urlContainer: &URLContainer{}, err: errors.New("bail")},
 			Err:     true,
 		},
 		{
-			Request: &Request{baseURL: &url.URL{}, pathPrefix: "%"},
+			Request: &Request{urlContainer: &URLContainer{}, baseURL: &url.URL{}, pathPrefix: "%"},
 			Err:     true,
 		},
 		{
-			Request: &Request{
+			Request: &Request{urlContainer: &URLContainer{},
 				client: clientFunc(func(req *http.Request) (*http.Response, error) {
 					return nil, errors.New("err")
 				}),
@@ -746,7 +746,7 @@ func TestRequestWatch(t *testing.T) {
 			Err: true,
 		},
 		{
-			Request: &Request{
+			Request: &Request{urlContainer: &URLContainer{},
 				content:     defaultContentConfig(),
 				serializers: defaultSerializers(t),
 				client: clientFunc(func(req *http.Request) (*http.Response, error) {
@@ -763,7 +763,7 @@ func TestRequestWatch(t *testing.T) {
 			},
 		},
 		{
-			Request: &Request{
+			Request: &Request{urlContainer: &URLContainer{},
 				content:     defaultContentConfig(),
 				serializers: defaultSerializers(t),
 				client: clientFunc(func(req *http.Request) (*http.Response, error) {
@@ -780,7 +780,7 @@ func TestRequestWatch(t *testing.T) {
 			},
 		},
 		{
-			Request: &Request{
+			Request: &Request{urlContainer: &URLContainer{},
 				content:     defaultContentConfig(),
 				serializers: defaultSerializers(t),
 				client: clientFunc(func(req *http.Request) (*http.Response, error) {
@@ -800,7 +800,7 @@ func TestRequestWatch(t *testing.T) {
 			},
 		},
 		{
-			Request: &Request{
+			Request: &Request{urlContainer: &URLContainer{},
 				serializers: defaultSerializers(t),
 				client: clientFunc(func(req *http.Request) (*http.Response, error) {
 					return nil, io.EOF
@@ -810,7 +810,7 @@ func TestRequestWatch(t *testing.T) {
 			Empty: true,
 		},
 		{
-			Request: &Request{
+			Request: &Request{urlContainer: &URLContainer{},
 				serializers: defaultSerializers(t),
 				client: clientFunc(func(req *http.Request) (*http.Response, error) {
 					return nil, &url.Error{Err: io.EOF}
@@ -820,7 +820,8 @@ func TestRequestWatch(t *testing.T) {
 			Empty: true,
 		},
 		{
-			Request: &Request{
+
+			Request: &Request{urlContainer: &URLContainer{},
 				serializers: defaultSerializers(t),
 				client: clientFunc(func(req *http.Request) (*http.Response, error) {
 					return nil, errors.New("http: can't write HTTP request on broken connection")
@@ -830,7 +831,7 @@ func TestRequestWatch(t *testing.T) {
 			Empty: true,
 		},
 		{
-			Request: &Request{
+			Request: &Request{urlContainer: &URLContainer{},
 				serializers: defaultSerializers(t),
 				client: clientFunc(func(req *http.Request) (*http.Response, error) {
 					return nil, errors.New("foo: connection reset by peer")
@@ -872,15 +873,15 @@ func TestRequestStream(t *testing.T) {
 		ErrFn   func(error) bool
 	}{
 		{
-			Request: &Request{err: errors.New("bail")},
+			Request: &Request{urlContainer: &URLContainer{}, err: errors.New("bail")},
 			Err:     true,
 		},
 		{
-			Request: &Request{baseURL: &url.URL{}, pathPrefix: "%"},
+			Request: &Request{urlContainer: &URLContainer{}, baseURL: &url.URL{}, pathPrefix: "%"},
 			Err:     true,
 		},
 		{
-			Request: &Request{
+			Request: &Request{urlContainer: &URLContainer{},
 				client: clientFunc(func(req *http.Request) (*http.Response, error) {
 					return nil, errors.New("err")
 				}),
@@ -889,7 +890,7 @@ func TestRequestStream(t *testing.T) {
 			Err: true,
 		},
 		{
-			Request: &Request{
+			Request: &Request{urlContainer: &URLContainer{},
 				client: clientFunc(func(req *http.Request) (*http.Response, error) {
 					return &http.Response{
 						StatusCode: http.StatusUnauthorized,
@@ -985,15 +986,15 @@ func TestRequestDo(t *testing.T) {
 		Err     bool
 	}{
 		{
-			Request: &Request{err: errors.New("bail")},
+			Request: &Request{urlContainer: &URLContainer{}, err: errors.New("bail")},
 			Err:     true,
 		},
 		{
-			Request: &Request{baseURL: &url.URL{}, pathPrefix: "%"},
+			Request: &Request{urlContainer: &URLContainer{}, baseURL: &url.URL{}, pathPrefix: "%"},
 			Err:     true,
 		},
 		{
-			Request: &Request{
+			Request: &Request{urlContainer: &URLContainer{},
 				client: clientFunc(func(req *http.Request) (*http.Response, error) {
 					return nil, errors.New("err")
 				}),
@@ -1153,7 +1154,7 @@ func TestCheckRetryClosesBody(t *testing.T) {
 func TestConnectionResetByPeerIsRetried(t *testing.T) {
 	count := 0
 	backoff := &testBackoffManager{}
-	req := &Request{
+	req := &Request{urlContainer: &URLContainer{},
 		verb: "GET",
 		client: clientFunc(func(req *http.Request) (*http.Response, error) {
 			count++
@@ -1472,7 +1473,7 @@ func TestAbsPath(t *testing.T) {
 		{"/p1/api/p2", "/api/r1", "/api/", "/p1/api/p2/api/"},
 	} {
 		u, _ := url.Parse("http://localhost:123" + tc.configPrefix)
-		r := NewRequest(nil, "POST", u, "", ContentConfig{GroupVersion: &schema.GroupVersion{Group: "test"}}, Serializers{}, nil, nil).Prefix(tc.resourcePrefix).AbsPath(tc.absPath)
+		r := NewRequest(nil, "POST", NewURLContainer([]*url.URL{u}), "", ContentConfig{GroupVersion: &schema.GroupVersion{Group: "test"}}, Serializers{}, nil, nil).Prefix(tc.resourcePrefix).AbsPath(tc.absPath)
 		if r.pathPrefix != tc.wantsAbsPath {
 			t.Errorf("test case %d failed, unexpected path: %q, expected %q", i, r.pathPrefix, tc.wantsAbsPath)
 		}
@@ -1492,7 +1493,7 @@ func TestUintParam(t *testing.T) {
 
 	for _, item := range table {
 		u, _ := url.Parse("http://localhost")
-		r := NewRequest(nil, "GET", u, "", ContentConfig{GroupVersion: &schema.GroupVersion{Group: "test"}}, Serializers{}, nil, nil).AbsPath("").UintParam(item.name, item.testVal)
+		r := NewRequest(nil, "GET", NewURLContainer([]*url.URL{u}), "", ContentConfig{GroupVersion: &schema.GroupVersion{Group: "test"}}, Serializers{}, nil, nil).AbsPath("").UintParam(item.name, item.testVal)
 		if e, a := item.expectStr, r.URL().String(); e != a {
 			t.Errorf("expected %v, got %v", e, a)
 		}
@@ -1674,7 +1675,7 @@ func testRESTClient(t testing.TB, srv *httptest.Server) *RESTClient {
 		}
 	}
 	versionedAPIPath := defaultResourcePathWithPrefix("", "", "", "")
-	client, err := NewRESTClient(baseURL, versionedAPIPath, defaultContentConfig(), 0, 0, nil, nil)
+	client, err := NewRESTClient([]*url.URL{baseURL}, versionedAPIPath, defaultContentConfig(), 0, 0, nil, nil)
 	if err != nil {
 		t.Fatalf("failed to create a client: %v", err)
 	}
