@@ -35,6 +35,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	apiv1 "k8s.io/kubernetes/pkg/api/v1"
 	appsapi "k8s.io/kubernetes/pkg/apis/apps/v1beta1"
+	authenticationv1 "k8s.io/kubernetes/pkg/apis/authentication/v1"
 	authenticationv1beta1 "k8s.io/kubernetes/pkg/apis/authentication/v1beta1"
 	authorizationapiv1 "k8s.io/kubernetes/pkg/apis/authorization/v1"
 	authorizationapiv1beta1 "k8s.io/kubernetes/pkg/apis/authorization/v1beta1"
@@ -392,6 +393,7 @@ func DefaultAPIResourceConfigSource() *genericapiserver.ResourceConfig {
 		apiv1.SchemeGroupVersion,
 		extensionsapiv1beta1.SchemeGroupVersion,
 		batchapiv1.SchemeGroupVersion,
+		authenticationv1.SchemeGroupVersion,
 		authenticationv1beta1.SchemeGroupVersion,
 		autoscalingapiv1.SchemeGroupVersion,
 		appsapi.SchemeGroupVersion,
