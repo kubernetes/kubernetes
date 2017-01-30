@@ -21,6 +21,7 @@ import (
 	"io"
 	"os"
 	"strconv"
+	"strings"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/api"
@@ -71,6 +72,9 @@ func RunClusterInfo(f cmdutil.Factory, out io.Writer, cmd *cobra.Command) error 
 		return err
 	}
 	printService(out, "Kubernetes master", client.Host)
+	if len(client.AlternateHosts) > 0 {
+		printService(out, "Kubernetes alternate masters", strings.Join(client.AlternateHosts, ","))
+	}
 
 	mapper, typer := f.Object()
 	cmdNamespace := cmdutil.GetFlagString(cmd, "namespace")

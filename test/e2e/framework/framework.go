@@ -133,7 +133,7 @@ func NewFramework(baseName string, options FrameworkOptions, client clientset.In
 // a k8s.io/client-go/pkg/client/restclient.Config. It's not a deep copy. Two
 // configs may share some common struct.
 func getClientRepoConfig(src *restclient.Config) (dst *clientreporestclient.Config) {
-	skippedFields := sets.NewString("Transport", "WrapTransport", "RateLimiter", "AuthConfigPersister")
+	skippedFields := sets.NewString("Transport", "WrapTransport", "RateLimiter", "AuthConfigPersister", "AlternateHosts")
 	dst = &clientreporestclient.Config{}
 	dst.Transport = src.Transport
 	dst.WrapTransport = src.WrapTransport

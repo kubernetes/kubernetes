@@ -64,7 +64,7 @@ type Cluster struct {
 	// Server is the address of the kubernetes cluster (https://hostname:port).
 	Server string `json:"server"`
 	// Servers is an array of addresses to the kubernetes apiservers with the format: (https://hostname:port). Joined with Server in restclient, duplicate Server will be removed.
-	Servers []string `json:"servers"`
+	Servers []string `json:"servers,omitempty"`
 	// APIVersion is the preferred api version for communicating with the kubernetes cluster (v1, v2, etc).
 	// +optional
 	APIVersion string `json:"api-version,omitempty"`
