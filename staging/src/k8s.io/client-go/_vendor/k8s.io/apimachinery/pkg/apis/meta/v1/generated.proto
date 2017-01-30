@@ -74,6 +74,9 @@ message APIResource {
   // verbs is a list of supported kube verbs (this includes get, list, watch, create,
   // update, patch, delete, deletecollection, and proxy)
   optional Verbs verbs = 4;
+
+  // shortNames is a list of suggested short names of the resource.
+  repeated string shortNames = 5;
 }
 
 // APIResourceList is a list of APIResource, it is used to expose the name of the
