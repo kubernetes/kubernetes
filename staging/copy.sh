@@ -77,6 +77,7 @@ save "tools/auth"
 save "tools/cache"
 save "tools/clientcmd"
 save "tools/metrics"
+save "tools/record"
 save "transport"
 save "third_party"
 save "plugin"
@@ -97,7 +98,6 @@ mkdir -p "${CLIENT_REPO_TEMP}/pkg/version"
 find "${MAIN_REPO}/pkg/version" -maxdepth 1 -type f | xargs -I{} cp {} "${CLIENT_REPO_TEMP}/pkg/version"
 # need to copy clientsets, though later we should copy APIs and later generate clientsets
 mkcp "pkg/client/clientset_generated/${CLIENTSET}" "pkg/client/clientset_generated"
-mkcp "/pkg/client/record" "/pkg/client"
 
 mkcp "/pkg/client/unversioned/portforward" "/pkg/client/unversioned"
 
@@ -125,23 +125,12 @@ grep -Rl "\"${MAIN_REPO_FROM_SRC}" "${CLIENT_REPO_TEMP}" | \
     grep -v "vendor/" | \
     xargs sed -i "s|\"${MAIN_REPO_FROM_SRC}|\"${CLIENT_REPO_FROM_SRC}|g"
 
-echo "converting pkg/client/record to v1"
 # need a v1 version of ref.go
 cp "${CLIENT_REPO_TEMP}"/pkg/api/ref.go "${CLIENT_REPO_TEMP}"/pkg/api/v1/ref.go
 gofmt -w -r 'api.a -> v1.a' "${CLIENT_REPO_TEMP}"/pkg/api/v1/ref.go
-gofmt -w -r 'Scheme -> api.Scheme' "${CLIENT_REPO_TEMP}"/pkg/api/v1/ref.go
 # rewriting package name to v1
 sed -i 's/package api/package v1/g' "${CLIENT_REPO_TEMP}"/pkg/api/v1/ref.go
-# ref.go refers api.Scheme, so manually import /pkg/api
-sed -i "s,import (,import (\n\"${CLIENT_REPO_FROM_SRC}/pkg/api\",g" "${CLIENT_REPO_TEMP}"/pkg/api/v1/ref.go
 gofmt -w "${CLIENT_REPO_TEMP}"/pkg/api/v1/ref.go
-# rewrite pkg/client/record to v1
-gofmt -w -r 'api.a -> v1.a' "${CLIENT_REPO_TEMP}"/pkg/client/record
-# need to call sed to rewrite the strings in test cases...
-find "${CLIENT_REPO_TEMP}"/pkg/client/record -type f -name "*.go" -print0 | xargs -0 sed -i "s/api.ObjectReference/v1.ObjectReference/g"
-# rewrite the imports
-find "${CLIENT_REPO_TEMP}"/pkg/client/record -type f -name "*.go" -print0 | xargs -0 sed -i 's,pkg/api",pkg/api/v1",g'
-# gofmt the changed files
 
 echo "rewrite proto names in proto.RegisterType"
 find "${CLIENT_REPO_TEMP}" -type f -name "generated.pb.go" -print0 | xargs -0 sed -i "s/k8s\.io\.kubernetes/k8s.io.client-go/g"
@@ -180,7 +169,6 @@ function mvfolder {
 }
 
 mvfolder "pkg/client/clientset_generated/${CLIENTSET}" kubernetes
-mvfolder pkg/client/record tools/record
 mvfolder pkg/client/unversioned/portforward tools/portforward
 if [ "$(find "${CLIENT_REPO_TEMP}"/pkg/client -type f -name "*.go")" ]; then
     echo "${CLIENT_REPO_TEMP}/pkg/client is expected to be empty"

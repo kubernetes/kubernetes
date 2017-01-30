@@ -19,8 +19,8 @@ package v1
 import (
 	"errors"
 	"fmt"
-	"k8s.io/client-go/pkg/api"
 	"net/url"
+	"reflect"
 	"strings"
 
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -53,12 +53,8 @@ func GetReference(obj runtime.Object) (*ObjectReference, error) {
 	// if we are building an object reference to something not yet persisted, we should fallback to scheme
 	kind := gvk.Kind
 	if len(kind) == 0 {
-		// TODO: this is wrong
-		gvks, _, err := api.Scheme.ObjectKinds(obj)
-		if err != nil {
-			return nil, err
-		}
-		kind = gvks[0].Kind
+		// TODO: this is wrong, but its slighty more likely to be right than checking a hardcoded scheme
+		kind = reflect.TypeOf(obj).Name()
 	}
 
 	// An object that implements only List has enough metadata to build a reference

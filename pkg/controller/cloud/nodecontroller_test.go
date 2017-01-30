@@ -27,7 +27,8 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/kubernetes/pkg/client/record"
+	clientv1 "k8s.io/client-go/pkg/api/v1"
+	"k8s.io/client-go/tools/record"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	fakecloud "k8s.io/kubernetes/pkg/cloudprovider/providers/fake"
 	"k8s.io/kubernetes/pkg/controller"
@@ -105,7 +106,7 @@ func TestNodeDeleted(t *testing.T) {
 		nodeInformer:      factory.Nodes(),
 		cloud:             &fakecloud.FakeCloud{Err: cloudprovider.InstanceNotFound},
 		nodeMonitorPeriod: 5 * time.Second,
-		recorder:          eventBroadcaster.NewRecorder(v1.EventSource{Component: "controllermanager"}),
+		recorder:          eventBroadcaster.NewRecorder(clientv1.EventSource{Component: "controllermanager"}),
 	}
 	eventBroadcaster.StartLogging(glog.Infof)
 

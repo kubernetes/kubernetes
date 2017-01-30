@@ -929,7 +929,7 @@ func init() {
 	proto.RegisterType((*EnvVarSource)(nil), "k8s.io.kubernetes.pkg.api.v1.EnvVarSource")
 	proto.RegisterType((*Event)(nil), "k8s.io.kubernetes.pkg.api.v1.Event")
 	proto.RegisterType((*EventList)(nil), "k8s.io.kubernetes.pkg.api.v1.EventList")
-	proto.RegisterType((*EventSource)(nil), "k8s.io.kubernetes.pkg.api.v1.EventSource")
+	proto.RegisterType((*EventSource)(nil), "k8s.io.kubernetes.pkg.api.clientv1.EventSource")
 	proto.RegisterType((*ExecAction)(nil), "k8s.io.kubernetes.pkg.api.v1.ExecAction")
 	proto.RegisterType((*FCVolumeSource)(nil), "k8s.io.kubernetes.pkg.api.v1.FCVolumeSource")
 	proto.RegisterType((*FlexVolumeSource)(nil), "k8s.io.kubernetes.pkg.api.v1.FlexVolumeSource")
