@@ -104,7 +104,17 @@ func TestUpdateNodeIfNeeded(t *testing.T) {
 		},
 		{
 			node:      &v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "name"}},
-			nodeCount: 204,
+			nodeCount: 101,
+			patch:     "{\"metadata\":{\"annotations\":{\"node.alpha.kubernetes.io/ttl\":\"15\"}}}",
+		},
+		{
+			node:      &v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "name"}},
+			nodeCount: 500,
+			patch:     "{\"metadata\":{\"annotations\":{\"node.alpha.kubernetes.io/ttl\":\"15\"}}}",
+		},
+		{
+			node:      &v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "name"}},
+			nodeCount: 501,
 			patch:     "{\"metadata\":{\"annotations\":{\"node.alpha.kubernetes.io/ttl\":\"30\"}}}",
 		},
 		{
@@ -116,6 +126,16 @@ func TestUpdateNodeIfNeeded(t *testing.T) {
 			node:      &v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "name", Annotations: map[string]string{"node.alpha.kubernetes.io/ttl": "60"}}},
 			nodeCount: 1081,
 			patch:     "",
+		},
+		{
+			node:      &v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "name", Annotations: map[string]string{"node.alpha.kubernetes.io/ttl": "60"}}},
+			nodeCount: 1000,
+			patch:     "",
+		},
+		{
+			node:      &v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "name", Annotations: map[string]string{"node.alpha.kubernetes.io/ttl": "60"}}},
+			nodeCount: 999,
+			patch:     "{\"metadata\":{\"annotations\":{\"node.alpha.kubernetes.io/ttl\":\"30\"}}}",
 		},
 	}
 

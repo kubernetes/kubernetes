@@ -180,18 +180,53 @@ func (ttlc *TTLController) processItem() bool {
 	return true
 }
 
-func (ttlc *TTLController) getDesiredTTLSeconds() int {
-	nodeCount := atomic.LoadInt32(&ttlc.nodeCount)
-	switch {
-	case nodeCount <= 100:
-		return 0
-	case nodeCount <= 1000:
-		return 30
-	case nodeCount <= 2000:
-		return 60
-	default:
-		return 300
+type ttlBoundary struct {
+	nodeCount  int32
+	ttlSeconds int
+}
+
+var (
+	ttlBoundaries = []ttlBoundary{
+		{nodeCount: 100, ttlSeconds: 0},
+		{nodeCount: 500, ttlSeconds: 15},
+		{nodeCount: 1000, ttlSeconds: 30},
+		{nodeCount: 2000, ttlSeconds: 60},
+		{nodeCount: 5000, ttlSeconds: 300},
 	}
+)
+
+func (ttlc *TTLController) getDesiredTTLSeconds(currentTTL int) int {
+	nodeCount := atomic.LoadInt32(&ttlc.nodeCount)
+	// To avoid situation when we are changing the annotation all the time,
+	// because the cluster size is flapping between X and X+1 nodes (e.g.
+	// due to cluster autoscaler), we use the following algorithm:
+	// - we compute the desired ttl first based on current cluster size.
+	// - if we are supposed to lower the current ttl, the current cluster
+	//   size must be at most boundary -1
+	// Note that with this algorith, to have flapping ttls on nodes, the cluster
+	// has to be flapping constantly betwenn <=X-1 and X+1<=.
+	// WARNING: you can't make this "1" a higher constant, as it may result
+	// in different nodes having different ttls over long period of time, e.g.
+	// if we swap the 1 with say 5, then in the scenario:
+	// - the cluster was of size 1500 => all nodes have ttl=60
+	// - cluster resized to 996 => all nodes still have ttl=60
+	// - one new node added => it will have ttl=30
+	// And nothing would change over time.
+	step := len(ttlBoundaries) - 1
+	for ; step > 0 && nodeCount <= ttlBoundaries[step-1].nodeCount; step-- {
+	}
+	desiredTTL := ttlBoundaries[step].ttlSeconds
+	for {
+		if step == len(ttlBoundaries)-1 {
+			break
+		}
+		if currentTTL <= desiredTTL || nodeCount <= ttlBoundaries[step].nodeCount-1 {
+			break
+		}
+		step++
+		desiredTTL = ttlBoundaries[step].ttlSeconds
+	}
+	return desiredTTL
 }
 
 func getIntFromAnnotation(node *v1.Node, annotationKey string) (int, bool) {
@@ -249,12 +284,13 @@ func (ttlc *TTLController) updateNodeIfNeeded(key string) error {
 		}
 		return err
 	}
-	desiredTTL := ttlc.getDesiredTTLSeconds()
 
-	value, ok := getIntFromAnnotation(node, v1.ObjectTTLAnnotationKey)
-	if ok && value == desiredTTL {
+	currentTTL, ok := getIntFromAnnotation(node, v1.ObjectTTLAnnotationKey)
+	desiredTTL := ttlc.getDesiredTTLSeconds(currentTTL)
+	if ok && currentTTL == desiredTTL {
 		return nil
 	}
+
 	objCopy, err := api.Scheme.DeepCopy(node)
 	if err != nil {
 		return err
