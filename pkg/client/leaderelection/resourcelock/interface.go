@@ -18,7 +18,7 @@ package resourcelock
 
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/kubernetes/pkg/client/record"
+	"k8s.io/client-go/tools/record"
 )
 
 const (

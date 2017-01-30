@@ -66,7 +66,7 @@ func (c *FakeEvents) PatchWithEventNamespace(event *v1.Event, data []byte) (*v1.
 }
 
 // Search returns a list of events matching the specified object.
-func (c *FakeEvents) Search(objOrRef runtime.Object) (*v1.EventList, error) {
+func (c *FakeEvents) Search(scheme *runtime.Scheme, objOrRef runtime.Object) (*v1.EventList, error) {
 	action := core.NewRootListAction(eventsResource, api.ListOptions{})
 	if c.ns != "" {
 		action = core.NewListAction(eventsResource, c.ns, api.ListOptions{})
