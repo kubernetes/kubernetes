@@ -31,8 +31,8 @@ import (
 func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.OpenAPIDefinition {
 	return map[string]openapi.OpenAPIDefinition{
 		"k8s.io/kubernetes/pkg/util/intstr.IntOrString": intstr.IntOrString{}.OpenAPIDefinition(),
-		"k8s.io/kubernetes/pkg/api/resource.Quantity":   resource.Quantity{}.OpenAPIDefinition(),
-		"k8s.io/kubernetes/pkg/api/resource.int64Amount": {
+		"k8s.io/apimachinery/pkg/api/resource.Quantity": resource.Quantity{}.OpenAPIDefinition(),
+		"k8s.io/apimachinery/pkg/api/resource.int64Amount": {
 			Schema: spec.Schema{
 				SchemaProps: spec.SchemaProps{
 					Description: "int64Amount represents a fixed precision numerator and arbitrary scale exponent. It is faster than operations on inf.Dec for values that can be represented as int64.",
@@ -3484,7 +3484,7 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 								AdditionalProperties: &spec.SchemaOrBool{
 									Schema: &spec.Schema{
 										SchemaProps: spec.SchemaProps{
-											Ref: ref("k8s.io/kubernetes/pkg/api/resource.Quantity"),
+											Ref: ref("k8s.io/apimachinery/pkg/api/resource.Quantity"),
 										},
 									},
 								},
@@ -3497,7 +3497,7 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 								AdditionalProperties: &spec.SchemaOrBool{
 									Schema: &spec.Schema{
 										SchemaProps: spec.SchemaProps{
-											Ref: ref("k8s.io/kubernetes/pkg/api/resource.Quantity"),
+											Ref: ref("k8s.io/apimachinery/pkg/api/resource.Quantity"),
 										},
 									},
 								},
@@ -3510,7 +3510,7 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 								AdditionalProperties: &spec.SchemaOrBool{
 									Schema: &spec.Schema{
 										SchemaProps: spec.SchemaProps{
-											Ref: ref("k8s.io/kubernetes/pkg/api/resource.Quantity"),
+											Ref: ref("k8s.io/apimachinery/pkg/api/resource.Quantity"),
 										},
 									},
 								},
@@ -3523,7 +3523,7 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 								AdditionalProperties: &spec.SchemaOrBool{
 									Schema: &spec.Schema{
 										SchemaProps: spec.SchemaProps{
-											Ref: ref("k8s.io/kubernetes/pkg/api/resource.Quantity"),
+											Ref: ref("k8s.io/apimachinery/pkg/api/resource.Quantity"),
 										},
 									},
 								},
@@ -3536,7 +3536,7 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 								AdditionalProperties: &spec.SchemaOrBool{
 									Schema: &spec.Schema{
 										SchemaProps: spec.SchemaProps{
-											Ref: ref("k8s.io/kubernetes/pkg/api/resource.Quantity"),
+											Ref: ref("k8s.io/apimachinery/pkg/api/resource.Quantity"),
 										},
 									},
 								},
@@ -3546,7 +3546,7 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 				},
 			},
 			Dependencies: []string{
-				"k8s.io/kubernetes/pkg/api/resource.Quantity"},
+				"k8s.io/apimachinery/pkg/api/resource.Quantity"},
 		},
 		"k8s.io/kubernetes/pkg/api/v1.LimitRangeList": {
 			Schema: spec.Schema{
@@ -4227,7 +4227,7 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 								AdditionalProperties: &spec.SchemaOrBool{
 									Schema: &spec.Schema{
 										SchemaProps: spec.SchemaProps{
-											Ref: ref("k8s.io/kubernetes/pkg/api/resource.Quantity"),
+											Ref: ref("k8s.io/apimachinery/pkg/api/resource.Quantity"),
 										},
 									},
 								},
@@ -4238,7 +4238,7 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 				},
 			},
 			Dependencies: []string{
-				"k8s.io/kubernetes/pkg/api/resource.Quantity"},
+				"k8s.io/apimachinery/pkg/api/resource.Quantity"},
 		},
 		"k8s.io/kubernetes/pkg/api/v1.NodeSelector": {
 			Schema: spec.Schema{
@@ -4379,7 +4379,7 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 								AdditionalProperties: &spec.SchemaOrBool{
 									Schema: &spec.Schema{
 										SchemaProps: spec.SchemaProps{
-											Ref: ref("k8s.io/kubernetes/pkg/api/resource.Quantity"),
+											Ref: ref("k8s.io/apimachinery/pkg/api/resource.Quantity"),
 										},
 									},
 								},
@@ -4392,7 +4392,7 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 								AdditionalProperties: &spec.SchemaOrBool{
 									Schema: &spec.Schema{
 										SchemaProps: spec.SchemaProps{
-											Ref: ref("k8s.io/kubernetes/pkg/api/resource.Quantity"),
+											Ref: ref("k8s.io/apimachinery/pkg/api/resource.Quantity"),
 										},
 									},
 								},
@@ -4487,7 +4487,7 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 				},
 			},
 			Dependencies: []string{
-				"k8s.io/kubernetes/pkg/api/resource.Quantity", "k8s.io/kubernetes/pkg/api/v1.AttachedVolume", "k8s.io/kubernetes/pkg/api/v1.ContainerImage", "k8s.io/kubernetes/pkg/api/v1.NodeAddress", "k8s.io/kubernetes/pkg/api/v1.NodeCondition", "k8s.io/kubernetes/pkg/api/v1.NodeDaemonEndpoints", "k8s.io/kubernetes/pkg/api/v1.NodeSystemInfo"},
+				"k8s.io/apimachinery/pkg/api/resource.Quantity", "k8s.io/kubernetes/pkg/api/v1.AttachedVolume", "k8s.io/kubernetes/pkg/api/v1.ContainerImage", "k8s.io/kubernetes/pkg/api/v1.NodeAddress", "k8s.io/kubernetes/pkg/api/v1.NodeCondition", "k8s.io/kubernetes/pkg/api/v1.NodeDaemonEndpoints", "k8s.io/kubernetes/pkg/api/v1.NodeSystemInfo"},
 		},
 		"k8s.io/kubernetes/pkg/api/v1.NodeSystemInfo": {
 			Schema: spec.Schema{
@@ -5058,7 +5058,7 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 								AdditionalProperties: &spec.SchemaOrBool{
 									Schema: &spec.Schema{
 										SchemaProps: spec.SchemaProps{
-											Ref: ref("k8s.io/kubernetes/pkg/api/resource.Quantity"),
+											Ref: ref("k8s.io/apimachinery/pkg/api/resource.Quantity"),
 										},
 									},
 								},
@@ -5068,7 +5068,7 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 				},
 			},
 			Dependencies: []string{
-				"k8s.io/kubernetes/pkg/api/resource.Quantity"},
+				"k8s.io/apimachinery/pkg/api/resource.Quantity"},
 		},
 		"k8s.io/kubernetes/pkg/api/v1.PersistentVolumeClaimVolumeSource": {
 			Schema: spec.Schema{
@@ -5265,7 +5265,7 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 								AdditionalProperties: &spec.SchemaOrBool{
 									Schema: &spec.Schema{
 										SchemaProps: spec.SchemaProps{
-											Ref: ref("k8s.io/kubernetes/pkg/api/resource.Quantity"),
+											Ref: ref("k8s.io/apimachinery/pkg/api/resource.Quantity"),
 										},
 									},
 								},
@@ -5404,7 +5404,7 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 				},
 			},
 			Dependencies: []string{
-				"k8s.io/kubernetes/pkg/api/resource.Quantity", "k8s.io/kubernetes/pkg/api/v1.AWSElasticBlockStoreVolumeSource", "k8s.io/kubernetes/pkg/api/v1.AzureDiskVolumeSource", "k8s.io/kubernetes/pkg/api/v1.AzureFileVolumeSource", "k8s.io/kubernetes/pkg/api/v1.CephFSVolumeSource", "k8s.io/kubernetes/pkg/api/v1.CinderVolumeSource", "k8s.io/kubernetes/pkg/api/v1.FCVolumeSource", "k8s.io/kubernetes/pkg/api/v1.FlexVolumeSource", "k8s.io/kubernetes/pkg/api/v1.FlockerVolumeSource", "k8s.io/kubernetes/pkg/api/v1.GCEPersistentDiskVolumeSource", "k8s.io/kubernetes/pkg/api/v1.GlusterfsVolumeSource", "k8s.io/kubernetes/pkg/api/v1.HostPathVolumeSource", "k8s.io/kubernetes/pkg/api/v1.ISCSIVolumeSource", "k8s.io/kubernetes/pkg/api/v1.NFSVolumeSource", "k8s.io/kubernetes/pkg/api/v1.ObjectReference", "k8s.io/kubernetes/pkg/api/v1.PhotonPersistentDiskVolumeSource", "k8s.io/kubernetes/pkg/api/v1.QuobyteVolumeSource", "k8s.io/kubernetes/pkg/api/v1.RBDVolumeSource", "k8s.io/kubernetes/pkg/api/v1.VsphereVirtualDiskVolumeSource"},
+				"k8s.io/apimachinery/pkg/api/resource.Quantity", "k8s.io/kubernetes/pkg/api/v1.AWSElasticBlockStoreVolumeSource", "k8s.io/kubernetes/pkg/api/v1.AzureDiskVolumeSource", "k8s.io/kubernetes/pkg/api/v1.AzureFileVolumeSource", "k8s.io/kubernetes/pkg/api/v1.CephFSVolumeSource", "k8s.io/kubernetes/pkg/api/v1.CinderVolumeSource", "k8s.io/kubernetes/pkg/api/v1.FCVolumeSource", "k8s.io/kubernetes/pkg/api/v1.FlexVolumeSource", "k8s.io/kubernetes/pkg/api/v1.FlockerVolumeSource", "k8s.io/kubernetes/pkg/api/v1.GCEPersistentDiskVolumeSource", "k8s.io/kubernetes/pkg/api/v1.GlusterfsVolumeSource", "k8s.io/kubernetes/pkg/api/v1.HostPathVolumeSource", "k8s.io/kubernetes/pkg/api/v1.ISCSIVolumeSource", "k8s.io/kubernetes/pkg/api/v1.NFSVolumeSource", "k8s.io/kubernetes/pkg/api/v1.ObjectReference", "k8s.io/kubernetes/pkg/api/v1.PhotonPersistentDiskVolumeSource", "k8s.io/kubernetes/pkg/api/v1.QuobyteVolumeSource", "k8s.io/kubernetes/pkg/api/v1.RBDVolumeSource", "k8s.io/kubernetes/pkg/api/v1.VsphereVirtualDiskVolumeSource"},
 		},
 		"k8s.io/kubernetes/pkg/api/v1.PersistentVolumeStatus": {
 			Schema: spec.Schema{
@@ -7032,7 +7032,7 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 						"divisor": {
 							SchemaProps: spec.SchemaProps{
 								Description: "Specifies the output format of the exposed resources, defaults to \"1\"",
-								Ref:         ref("k8s.io/kubernetes/pkg/api/resource.Quantity"),
+								Ref:         ref("k8s.io/apimachinery/pkg/api/resource.Quantity"),
 							},
 						},
 					},
@@ -7040,7 +7040,7 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 				},
 			},
 			Dependencies: []string{
-				"k8s.io/kubernetes/pkg/api/resource.Quantity"},
+				"k8s.io/apimachinery/pkg/api/resource.Quantity"},
 		},
 		"k8s.io/kubernetes/pkg/api/v1.ResourceQuota": {
 			Schema: spec.Schema{
@@ -7142,7 +7142,7 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 								AdditionalProperties: &spec.SchemaOrBool{
 									Schema: &spec.Schema{
 										SchemaProps: spec.SchemaProps{
-											Ref: ref("k8s.io/kubernetes/pkg/api/resource.Quantity"),
+											Ref: ref("k8s.io/apimachinery/pkg/api/resource.Quantity"),
 										},
 									},
 								},
@@ -7166,7 +7166,7 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 				},
 			},
 			Dependencies: []string{
-				"k8s.io/kubernetes/pkg/api/resource.Quantity"},
+				"k8s.io/apimachinery/pkg/api/resource.Quantity"},
 		},
 		"k8s.io/kubernetes/pkg/api/v1.ResourceQuotaStatus": {
 			Schema: spec.Schema{
@@ -7180,7 +7180,7 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 								AdditionalProperties: &spec.SchemaOrBool{
 									Schema: &spec.Schema{
 										SchemaProps: spec.SchemaProps{
-											Ref: ref("k8s.io/kubernetes/pkg/api/resource.Quantity"),
+											Ref: ref("k8s.io/apimachinery/pkg/api/resource.Quantity"),
 										},
 									},
 								},
@@ -7193,7 +7193,7 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 								AdditionalProperties: &spec.SchemaOrBool{
 									Schema: &spec.Schema{
 										SchemaProps: spec.SchemaProps{
-											Ref: ref("k8s.io/kubernetes/pkg/api/resource.Quantity"),
+											Ref: ref("k8s.io/apimachinery/pkg/api/resource.Quantity"),
 										},
 									},
 								},
@@ -7203,7 +7203,7 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 				},
 			},
 			Dependencies: []string{
-				"k8s.io/kubernetes/pkg/api/resource.Quantity"},
+				"k8s.io/apimachinery/pkg/api/resource.Quantity"},
 		},
 		"k8s.io/kubernetes/pkg/api/v1.ResourceRequirements": {
 			Schema: spec.Schema{
@@ -7217,7 +7217,7 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 								AdditionalProperties: &spec.SchemaOrBool{
 									Schema: &spec.Schema{
 										SchemaProps: spec.SchemaProps{
-											Ref: ref("k8s.io/kubernetes/pkg/api/resource.Quantity"),
+											Ref: ref("k8s.io/apimachinery/pkg/api/resource.Quantity"),
 										},
 									},
 								},
@@ -7230,7 +7230,7 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 								AdditionalProperties: &spec.SchemaOrBool{
 									Schema: &spec.Schema{
 										SchemaProps: spec.SchemaProps{
-											Ref: ref("k8s.io/kubernetes/pkg/api/resource.Quantity"),
+											Ref: ref("k8s.io/apimachinery/pkg/api/resource.Quantity"),
 										},
 									},
 								},
@@ -7240,7 +7240,7 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 				},
 			},
 			Dependencies: []string{
-				"k8s.io/kubernetes/pkg/api/resource.Quantity"},
+				"k8s.io/apimachinery/pkg/api/resource.Quantity"},
 		},
 		"k8s.io/apimachinery/pkg/apis/meta/v1.RootPaths": {
 			Schema: spec.Schema{
@@ -11697,7 +11697,7 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 						"value": {
 							SchemaProps: spec.SchemaProps{
 								Description: "Custom Metric value (average).",
-								Ref:         ref("k8s.io/kubernetes/pkg/api/resource.Quantity"),
+								Ref:         ref("k8s.io/apimachinery/pkg/api/resource.Quantity"),
 							},
 						},
 					},
@@ -11705,7 +11705,7 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 				},
 			},
 			Dependencies: []string{
-				"k8s.io/kubernetes/pkg/api/resource.Quantity"},
+				"k8s.io/apimachinery/pkg/api/resource.Quantity"},
 		},
 		"k8s.io/kubernetes/pkg/apis/extensions/v1beta1.CustomMetricCurrentStatusList": {
 			Schema: spec.Schema{
@@ -11745,7 +11745,7 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 						"value": {
 							SchemaProps: spec.SchemaProps{
 								Description: "Custom Metric value (average).",
-								Ref:         ref("k8s.io/kubernetes/pkg/api/resource.Quantity"),
+								Ref:         ref("k8s.io/apimachinery/pkg/api/resource.Quantity"),
 							},
 						},
 					},
@@ -11753,7 +11753,7 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 				},
 			},
 			Dependencies: []string{
-				"k8s.io/kubernetes/pkg/api/resource.Quantity"},
+				"k8s.io/apimachinery/pkg/api/resource.Quantity"},
 		},
 		"k8s.io/kubernetes/pkg/apis/extensions/v1beta1.CustomMetricTargetList": {
 			Schema: spec.Schema{

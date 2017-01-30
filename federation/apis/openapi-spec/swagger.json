@@ -10384,6 +10384,9 @@
    }
   },
   "definitions": {
+   "io.k8s.apimachinery.pkg.api.resource.Quantity": {
+    "type": "string"
+   },
    "io.k8s.apimachinery.pkg.apis.meta.v1.APIGroup": {
     "description": "APIGroup contains the name, the supported versions, and the preferred version of a group.",
     "required": [
@@ -11098,9 +11101,6 @@
       "type": "string"
      }
     }
-   },
-   "io.k8s.kubernetes.pkg.api.resource.Quantity": {
-    "type": "string"
    },
    "io.k8s.kubernetes.pkg.api.v1.AWSElasticBlockStoreVolumeSource": {
     "description": "Represents a Persistent Disk resource in AWS.\n\nAn AWS EBS disk must exist before mounting to a container. The disk must also be in the same AWS zone as the kubelet. An AWS EBS disk can only be mounted as read/write once. AWS EBS volumes support ownership management and SELinux relabeling.",
@@ -12683,7 +12683,7 @@
      },
      "divisor": {
       "description": "Specifies the output format of the exposed resources, defaults to \"1\"",
-      "$ref": "#/definitions/io.k8s.kubernetes.pkg.api.resource.Quantity"
+      "$ref": "#/definitions/io.k8s.apimachinery.pkg.api.resource.Quantity"
      },
      "resource": {
       "description": "Required: resource to select",
@@ -12698,14 +12698,14 @@
       "description": "Limits describes the maximum amount of compute resources allowed. More info: http://kubernetes.io/docs/user-guide/compute-resources/",
       "type": "object",
       "additionalProperties": {
-       "$ref": "#/definitions/io.k8s.kubernetes.pkg.api.resource.Quantity"
+       "$ref": "#/definitions/io.k8s.apimachinery.pkg.api.resource.Quantity"
       }
      },
      "requests": {
       "description": "Requests describes the minimum amount of compute resources required. If Requests is omitted for a container, it defaults to Limits if that is explicitly specified, otherwise to an implementation-defined value. More info: http://kubernetes.io/docs/user-guide/compute-resources/",
       "type": "object",
       "additionalProperties": {
-       "$ref": "#/definitions/io.k8s.kubernetes.pkg.api.resource.Quantity"
+       "$ref": "#/definitions/io.k8s.apimachinery.pkg.api.resource.Quantity"
       }
      }
     }

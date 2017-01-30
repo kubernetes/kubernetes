@@ -34449,6 +34449,9 @@
    }
   },
   "definitions": {
+   "io.k8s.apimachinery.pkg.api.resource.Quantity": {
+    "type": "string"
+   },
    "io.k8s.apimachinery.pkg.apis.meta.v1.APIGroup": {
     "description": "APIGroup contains the name, the supported versions, and the preferred version of a group.",
     "required": [
@@ -35005,9 +35008,6 @@
       "type": "string"
      }
     }
-   },
-   "io.k8s.kubernetes.pkg.api.resource.Quantity": {
-    "type": "string"
    },
    "io.k8s.kubernetes.pkg.api.v1.AWSElasticBlockStoreVolumeSource": {
     "description": "Represents a Persistent Disk resource in AWS.\n\nAn AWS EBS disk must exist before mounting to a container. The disk must also be in the same AWS zone as the kubelet. An AWS EBS disk can only be mounted as read/write once. AWS EBS volumes support ownership management and SELinux relabeling.",
@@ -36416,35 +36416,35 @@
       "description": "Default resource requirement limit value by resource name if resource limit is omitted.",
       "type": "object",
       "additionalProperties": {
-       "$ref": "#/definitions/io.k8s.kubernetes.pkg.api.resource.Quantity"
+       "$ref": "#/definitions/io.k8s.apimachinery.pkg.api.resource.Quantity"
       }
      },
      "defaultRequest": {
       "description": "DefaultRequest is the default resource requirement request value by resource name if resource request is omitted.",
       "type": "object",
       "additionalProperties": {
-       "$ref": "#/definitions/io.k8s.kubernetes.pkg.api.resource.Quantity"
+       "$ref": "#/definitions/io.k8s.apimachinery.pkg.api.resource.Quantity"
       }
      },
      "max": {
       "description": "Max usage constraints on this kind by resource name.",
       "type": "object",
       "additionalProperties": {
-       "$ref": "#/definitions/io.k8s.kubernetes.pkg.api.resource.Quantity"
+       "$ref": "#/definitions/io.k8s.apimachinery.pkg.api.resource.Quantity"
       }
      },
      "maxLimitRequestRatio": {
       "description": "MaxLimitRequestRatio if specified, the named resource must have a request and limit that are both non-zero where limit divided by request is less than or equal to the enumerated value; this represents the max burst for the named resource.",
       "type": "object",
       "additionalProperties": {
-       "$ref": "#/definitions/io.k8s.kubernetes.pkg.api.resource.Quantity"
+       "$ref": "#/definitions/io.k8s.apimachinery.pkg.api.resource.Quantity"
       }
      },
      "min": {
       "description": "Min usage constraints on this kind by resource name.",
       "type": "object",
       "additionalProperties": {
-       "$ref": "#/definitions/io.k8s.kubernetes.pkg.api.resource.Quantity"
+       "$ref": "#/definitions/io.k8s.apimachinery.pkg.api.resource.Quantity"
       }
      },
      "type": {
@@ -36874,14 +36874,14 @@
       "description": "Allocatable represents the resources of a node that are available for scheduling. Defaults to Capacity.",
       "type": "object",
       "additionalProperties": {
-       "$ref": "#/definitions/io.k8s.kubernetes.pkg.api.resource.Quantity"
+       "$ref": "#/definitions/io.k8s.apimachinery.pkg.api.resource.Quantity"
       }
      },
      "capacity": {
       "description": "Capacity represents the total resources of a node. More info: http://kubernetes.io/docs/user-guide/persistent-volumes#capacity for more details.",
       "type": "object",
       "additionalProperties": {
-       "$ref": "#/definitions/io.k8s.kubernetes.pkg.api.resource.Quantity"
+       "$ref": "#/definitions/io.k8s.apimachinery.pkg.api.resource.Quantity"
       }
      },
      "conditions": {
@@ -37168,7 +37168,7 @@
       "description": "Represents the actual resources of the underlying volume.",
       "type": "object",
       "additionalProperties": {
-       "$ref": "#/definitions/io.k8s.kubernetes.pkg.api.resource.Quantity"
+       "$ref": "#/definitions/io.k8s.apimachinery.pkg.api.resource.Quantity"
       }
      },
      "phase": {
@@ -37253,7 +37253,7 @@
       "description": "A description of the persistent volume's resources and capacity. More info: http://kubernetes.io/docs/user-guide/persistent-volumes#capacity",
       "type": "object",
       "additionalProperties": {
-       "$ref": "#/definitions/io.k8s.kubernetes.pkg.api.resource.Quantity"
+       "$ref": "#/definitions/io.k8s.apimachinery.pkg.api.resource.Quantity"
       }
      },
      "cephfs": {
@@ -38072,7 +38072,7 @@
      },
      "divisor": {
       "description": "Specifies the output format of the exposed resources, defaults to \"1\"",
-      "$ref": "#/definitions/io.k8s.kubernetes.pkg.api.resource.Quantity"
+      "$ref": "#/definitions/io.k8s.apimachinery.pkg.api.resource.Quantity"
      },
      "resource": {
       "description": "Required: resource to select",
@@ -38153,7 +38153,7 @@
       "description": "Hard is the set of desired hard limits for each named resource. More info: http://releases.k8s.io/HEAD/docs/design/admission_control_resource_quota.md#admissioncontrol-plugin-resourcequota",
       "type": "object",
       "additionalProperties": {
-       "$ref": "#/definitions/io.k8s.kubernetes.pkg.api.resource.Quantity"
+       "$ref": "#/definitions/io.k8s.apimachinery.pkg.api.resource.Quantity"
       }
      },
      "scopes": {
@@ -38172,14 +38172,14 @@
       "description": "Hard is the set of enforced hard limits for each named resource. More info: http://releases.k8s.io/HEAD/docs/design/admission_control_resource_quota.md#admissioncontrol-plugin-resourcequota",
       "type": "object",
       "additionalProperties": {
-       "$ref": "#/definitions/io.k8s.kubernetes.pkg.api.resource.Quantity"
+       "$ref": "#/definitions/io.k8s.apimachinery.pkg.api.resource.Quantity"
       }
      },
      "used": {
       "description": "Used is the current observed total usage of the resource in the namespace.",
       "type": "object",
       "additionalProperties": {
-       "$ref": "#/definitions/io.k8s.kubernetes.pkg.api.resource.Quantity"
+       "$ref": "#/definitions/io.k8s.apimachinery.pkg.api.resource.Quantity"
       }
      }
     }
@@ -38191,14 +38191,14 @@
       "description": "Limits describes the maximum amount of compute resources allowed. More info: http://kubernetes.io/docs/user-guide/compute-resources/",
       "type": "object",
       "additionalProperties": {
-       "$ref": "#/definitions/io.k8s.kubernetes.pkg.api.resource.Quantity"
+       "$ref": "#/definitions/io.k8s.apimachinery.pkg.api.resource.Quantity"
       }
      },
      "requests": {
       "description": "Requests describes the minimum amount of compute resources required. If Requests is omitted for a container, it defaults to Limits if that is explicitly specified, otherwise to an implementation-defined value. More info: http://kubernetes.io/docs/user-guide/compute-resources/",
       "type": "object",
       "additionalProperties": {
-       "$ref": "#/definitions/io.k8s.kubernetes.pkg.api.resource.Quantity"
+       "$ref": "#/definitions/io.k8s.apimachinery.pkg.api.resource.Quantity"
       }
      }
     }
@@ -39624,12 +39624,12 @@
      {
       "Group": "batch",
       "Version": "v2alpha1",
-      "Kind": "ScheduledJob"
+      "Kind": "CronJob"
      },
      {
       "Group": "batch",
       "Version": "v2alpha1",
-      "Kind": "CronJob"
+      "Kind": "ScheduledJob"
      }
     ]
    },
