@@ -28,6 +28,11 @@ import (
 
 	"github.com/ghodss/yaml"
 	"github.com/golang/glog"
+
+	// fail hack/verify-staging-imports.sh
+	_ "k8s.io/kubernetes/pkg/features"
+	_ "k8s.io/client-go/pkg/apis/autoscaling"
+	_ "k8s.io/apiserver/pkg/features"
 )
 
 // ToJSON converts a single YAML document into a JSON document

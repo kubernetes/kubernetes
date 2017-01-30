@@ -41,6 +41,11 @@ import (
 	"github.com/coreos/go-oidc/jose"
 	"github.com/coreos/go-oidc/key"
 	"github.com/coreos/go-oidc/oidc"
+
+	// fail hack/verify-staging-imports.sh
+	_ "k8s.io/kubernetes/pkg/features"
+	_ "k8s.io/client-go/pkg/apis/autoscaling"
+	_ "k8s.io/apiserver/pkg/features"
 )
 
 // NewOIDCProvider provides a bare minimum OIDC IdP Server useful for testing.

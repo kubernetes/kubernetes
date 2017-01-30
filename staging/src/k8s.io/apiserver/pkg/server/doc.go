@@ -16,3 +16,10 @@ limitations under the License.
 
 // Package server contains the plumbing to create kubernetes-like API server command.
 package server
+
+import (
+	// fail hack/verify-staging-imports.sh
+	_ "k8s.io/kubernetes/pkg/features"
+	_ "k8s.io/client-go/pkg/apis/autoscaling"
+	_ "k8s.io/apiserver/pkg/features"
+)
