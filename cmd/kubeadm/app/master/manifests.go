@@ -110,7 +110,7 @@ func WriteStaticPodManifests(cfg *kubeadmapi.MasterConfiguration) error {
 
 	// Add etcd static pod spec only if external etcd is not configured
 	if len(cfg.Etcd.Endpoints) == 0 {
-		staticPodSpecs[etcd] = componentPod(api.Container{
+		etcdPod := componentPod(api.Container{
 			Name: etcd,
 			Command: []string{
 				"etcd",
@@ -122,16 +122,16 @@ func WriteStaticPodManifests(cfg *kubeadmapi.MasterConfiguration) error {
 			Image:         images.GetCoreImage(images.KubeEtcdImage, cfg, kubeadmapi.GlobalEnvParams.EtcdImage),
 			LivenessProbe: componentProbe(2379, "/health"),
 			Resources:     componentResources("200m"),
-			SecurityContext: &api.SecurityContext{
-				SELinuxOptions: &api.SELinuxOptions{
-					// TODO: This implies our etcd container is not being restricted by
-					// SELinux. This is not optimal and would be nice to adjust in future
-					// so it can create and write /var/lib/etcd, but for now this avoids
-					// recommending setenforce 0 system-wide.
-					Type: "spc_t",
-				},
-			},
 		}, certsVolume(cfg), etcdVolume(cfg), k8sVolume(cfg))
+
+		etcdPod.Spec.SecurityContext = &api.PodSecurityContext{
+			SELinuxOptions: &api.SELinuxOptions{
+				// Unconfine the etcd container so it can write to /var/lib/etcd with SELinux enforcing:
+				Type: "spc_t",
+			},
+		}
+
+		staticPodSpecs[etcd] = etcdPod
 	}
 
 	manifestsPath := path.Join(kubeadmapi.GlobalEnvParams.KubernetesDir, "manifests")
