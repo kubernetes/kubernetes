@@ -29,6 +29,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
+	"k8s.io/kubernetes/pkg/util/i18n"
 )
 
 // ImageOptions is the start of the data required to perform the operation.  As new fields are added, add them here instead of
@@ -91,7 +92,7 @@ func NewCmdImage(f cmdutil.Factory, out, err io.Writer) *cobra.Command {
 
 	cmd := &cobra.Command{
 		Use:     "image (-f FILENAME | TYPE NAME) CONTAINER_NAME_1=CONTAINER_IMAGE_1 ... CONTAINER_NAME_N=CONTAINER_IMAGE_N",
-		Short:   "Update image of a pod template",
+		Short:   i18n.T("Update image of a pod template"),
 		Long:    image_long,
 		Example: image_example,
 		Run: func(cmd *cobra.Command, args []string) {
