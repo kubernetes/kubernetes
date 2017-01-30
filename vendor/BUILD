@@ -8648,8 +8648,11 @@ go_library(
     srcs = ["k8s.io/apimachinery/pkg/util/yaml/decoder.go"],
     tags = ["automanaged"],
     deps = [
+        "//pkg/features:go_default_library",
         "//vendor:github.com/ghodss/yaml",
         "//vendor:github.com/golang/glog",
+        "//vendor:k8s.io/apiserver/pkg/features",
+        "//vendor:k8s.io/client-go/pkg/apis/autoscaling",
     ],
 )
 
@@ -9032,6 +9035,11 @@ go_library(
     name = "k8s.io/apiserver/pkg/server",
     srcs = ["k8s.io/apiserver/pkg/server/doc.go"],
     tags = ["automanaged"],
+    deps = [
+        "//pkg/features:go_default_library",
+        "//vendor:k8s.io/apiserver/pkg/features",
+        "//vendor:k8s.io/client-go/pkg/apis/autoscaling",
+    ],
 )
 
 go_test(
@@ -12198,9 +12206,12 @@ go_library(
     srcs = ["k8s.io/client-go/plugin/pkg/auth/authenticator/token/oidc/testing/provider.go"],
     tags = ["automanaged"],
     deps = [
+        "//pkg/features:go_default_library",
         "//vendor:github.com/coreos/go-oidc/jose",
         "//vendor:github.com/coreos/go-oidc/key",
         "//vendor:github.com/coreos/go-oidc/oidc",
+        "//vendor:k8s.io/apiserver/pkg/features",
+        "//vendor:k8s.io/client-go/pkg/apis/autoscaling",
     ],
 )
 
