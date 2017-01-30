@@ -34,6 +34,7 @@ import (
 	"testing"
 	"time"
 
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -50,7 +51,6 @@ import (
 	"k8s.io/client-go/util/clock"
 	"k8s.io/client-go/util/flowcontrol"
 	utiltesting "k8s.io/client-go/util/testing"
-	apiequality "k8s.io/apimachinery/pkg/api/equality"
 
 	_ "k8s.io/client-go/pkg/api/install"
 )
