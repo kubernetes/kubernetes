@@ -26,6 +26,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/watch"
 	apiserverserviceaccount "k8s.io/apiserver/pkg/authentication/serviceaccount"
+	clientgoclientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/kubernetes/pkg/api"
@@ -43,6 +44,8 @@ type ControllerClientBuilder interface {
 	ConfigOrDie(name string) *restclient.Config
 	Client(name string) (clientset.Interface, error)
 	ClientOrDie(name string) clientset.Interface
+	ClientGoClient(name string) (clientgoclientset.Interface, error)
+	ClientGoClientOrDie(name string) clientgoclientset.Interface
 }
 
 // SimpleControllerClientBuilder returns a fixed client with different user agents
@@ -74,6 +77,22 @@ func (b SimpleControllerClientBuilder) Client(name string) (clientset.Interface,
 
 func (b SimpleControllerClientBuilder) ClientOrDie(name string) clientset.Interface {
 	client, err := b.Client(name)
+	if err != nil {
+		glog.Fatal(err)
+	}
+	return client
+}
+
+func (b SimpleControllerClientBuilder) ClientGoClient(name string) (clientgoclientset.Interface, error) {
+	clientConfig, err := b.Config(name)
+	if err != nil {
+		return nil, err
+	}
+	return clientgoclientset.NewForConfig(clientConfig)
+}
+
+func (b SimpleControllerClientBuilder) ClientGoClientOrDie(name string) clientgoclientset.Interface {
+	client, err := b.ClientGoClient(name)
 	if err != nil {
 		glog.Fatal(err)
 	}
@@ -179,6 +198,22 @@ func (b SAControllerClientBuilder) Client(name string) (clientset.Interface, err
 
 func (b SAControllerClientBuilder) ClientOrDie(name string) clientset.Interface {
 	client, err := b.Client(name)
+	if err != nil {
+		glog.Fatal(err)
+	}
+	return client
+}
+
+func (b SAControllerClientBuilder) ClientGoClient(name string) (clientgoclientset.Interface, error) {
+	clientConfig, err := b.Config(name)
+	if err != nil {
+		return nil, err
+	}
+	return clientgoclientset.NewForConfig(clientConfig)
+}
+
+func (b SAControllerClientBuilder) ClientGoClientOrDie(name string) clientgoclientset.Interface {
+	client, err := b.ClientGoClient(name)
 	if err != nil {
 		glog.Fatal(err)
 	}

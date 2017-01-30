@@ -30,7 +30,6 @@ go_library(
         "//pkg/client/clientset_generated/clientset:go_default_library",
         "//pkg/client/clientset_generated/clientset/typed/core/v1:go_default_library",
         "//pkg/client/clientset_generated/internalclientset:go_default_library",
-        "//pkg/client/record:go_default_library",
         "//pkg/controller:go_default_library",
         "//pkg/controller/replication:go_default_library",
         "//pkg/generated/openapi:go_default_library",
@@ -62,6 +61,7 @@ go_library(
         "//vendor:k8s.io/apiserver/pkg/authorization/union",
         "//vendor:k8s.io/apiserver/pkg/storage/storagebackend",
         "//vendor:k8s.io/client-go/rest",
+        "//vendor:k8s.io/client-go/tools/record",
     ],
 )
 
