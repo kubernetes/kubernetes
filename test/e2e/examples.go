@@ -74,7 +74,7 @@ var _ = framework.KubeDescribe("[Feature:Example]", func() {
 		framework.BindClusterRoleInNamespace(c.Rbac(), "edit", f.Namespace.Name,
 			rbacv1beta1.Subject{Kind: rbacv1beta1.ServiceAccountKind, Namespace: f.Namespace.Name, Name: "default"})
 
-		err := framework.WaitForAuthorizationUpdate(c.Authorization(),
+		err := framework.WaitForAuthorizationUpdate(c.AuthorizationV1beta1(),
 			serviceaccount.MakeUsername(f.Namespace.Name, "default"),
 			f.Namespace.Name, "create", schema.GroupResource{Resource: "pods"}, true)
 		framework.ExpectNoError(err)

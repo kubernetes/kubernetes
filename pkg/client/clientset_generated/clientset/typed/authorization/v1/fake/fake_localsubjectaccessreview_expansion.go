@@ -14,4 +14,14 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package v1
+package fake
+
+import (
+	core "k8s.io/client-go/testing"
+	authorizationapi "k8s.io/kubernetes/pkg/apis/authorization/v1"
+)
+
+func (c *FakeLocalSubjectAccessReviews) Create(sar *authorizationapi.LocalSubjectAccessReview) (result *authorizationapi.LocalSubjectAccessReview, err error) {
+	obj, err := c.Fake.Invokes(core.NewCreateAction(authorizationapi.SchemeGroupVersion.WithResource("localsubjectaccessreviews"), c.ns, sar), &authorizationapi.SubjectAccessReview{})
+	return obj.(*authorizationapi.LocalSubjectAccessReview), err
+}
