@@ -36,11 +36,11 @@ import (
 )
 
 const (
-	// emptyUniquePodName is a UniquePodName for empty string.
-	emptyUniquePodName types.UniquePodName = types.UniquePodName("")
+	// EmptyUniquePodName is a UniquePodName for empty string.
+	EmptyUniquePodName types.UniquePodName = types.UniquePodName("")
 
-	// emptyUniqueVolumeName is a UniqueVolumeName for empty string
-	emptyUniqueVolumeName api.UniqueVolumeName = api.UniqueVolumeName("")
+	// EmptyUniqueVolumeName is a UniqueVolumeName for empty string
+	EmptyUniqueVolumeName api.UniqueVolumeName = api.UniqueVolumeName("")
 )
 
 // NestedPendingOperations defines the supported set of operations.
@@ -160,7 +160,7 @@ func (grm *nestedPendingOperations) isOperationExists(
 	podName types.UniquePodName) (bool, int) {
 
 	// If volumeName is empty, operation can be executed concurrently
-	if volumeName == emptyUniqueVolumeName {
+	if volumeName == EmptyUniqueVolumeName {
 		return false, -1
 	}
 
@@ -170,8 +170,8 @@ func (grm *nestedPendingOperations) isOperationExists(
 			continue
 		}
 
-		if previousOp.podName != emptyUniquePodName &&
-			podName != emptyUniquePodName &&
+		if previousOp.podName != EmptyUniquePodName &&
+			podName != EmptyUniquePodName &&
 			previousOp.podName != podName {
 			// No match, keep searching
 			continue
@@ -274,7 +274,7 @@ func (grm *nestedPendingOperations) Wait() {
 func getOperationName(
 	volumeName api.UniqueVolumeName, podName types.UniquePodName) string {
 	podNameStr := ""
-	if podName != emptyUniquePodName {
+	if podName != EmptyUniquePodName {
 		podNameStr = fmt.Sprintf(" (%q)", podName)
 	}
 

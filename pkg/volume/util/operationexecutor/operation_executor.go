@@ -435,7 +435,7 @@ func (oe *operationExecutor) MountVolume(
 		return err
 	}
 
-	podName := volumetypes.UniquePodName("")
+	podName := nestedpendingoperations.EmptyUniquePodName
 	// TODO: remove this -- not necessary
 	if !volumeToMount.PluginIsAttachable {
 		// Non-attachable volume plugins can execute mount for multiple pods
