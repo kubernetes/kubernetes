@@ -25,7 +25,7 @@ import "k8s.io/apimachinery/pkg/api/resource/generated.proto";
 import "k8s.io/apimachinery/pkg/apis/meta/v1/generated.proto";
 import "k8s.io/apimachinery/pkg/runtime/generated.proto";
 import "k8s.io/apimachinery/pkg/runtime/schema/generated.proto";
-import "k8s.io/kubernetes/pkg/util/intstr/generated.proto";
+import "k8s.io/apimachinery/pkg/util/intstr/generated.proto";
 
 // Package-wide variables from generator "generated".
 option go_package = "v1";
@@ -1095,7 +1095,7 @@ message HTTPGetAction {
   // Name or number of the port to access on the container.
   // Number must be in the range 1 to 65535.
   // Name must be an IANA_SVC_NAME.
-  optional k8s.io.kubernetes.pkg.util.intstr.IntOrString port = 2;
+  optional k8s.io.apimachinery.pkg.util.intstr.IntOrString port = 2;
 
   // Host name to connect to, defaults to the pod IP. You probably want to set
   // "Host" in httpHeaders instead.
@@ -3331,7 +3331,7 @@ message ServicePort {
   // omitted or set equal to the 'port' field.
   // More info: http://kubernetes.io/docs/user-guide/services#defining-a-service
   // +optional
-  optional k8s.io.kubernetes.pkg.util.intstr.IntOrString targetPort = 4;
+  optional k8s.io.apimachinery.pkg.util.intstr.IntOrString targetPort = 4;
 
   // The port on each node on which this service is exposed when type=NodePort or LoadBalancer.
   // Usually assigned by the system. If specified, it will be allocated to the service
@@ -3465,7 +3465,7 @@ message TCPSocketAction {
   // Number or name of the port to access on the container.
   // Number must be in the range 1 to 65535.
   // Name must be an IANA_SVC_NAME.
-  optional k8s.io.kubernetes.pkg.util.intstr.IntOrString port = 1;
+  optional k8s.io.apimachinery.pkg.util.intstr.IntOrString port = 1;
 }
 
 // The node this Taint is attached to has the effect "effect" on

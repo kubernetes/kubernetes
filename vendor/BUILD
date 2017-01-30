@@ -13963,3 +13963,27 @@ go_test(
     tags = ["automanaged"],
     deps = ["//vendor:k8s.io/client-go/util/workqueue"],
 )
+
+go_test(
+    name = "k8s.io/apimachinery/pkg/util/intstr_test",
+    srcs = ["k8s.io/apimachinery/pkg/util/intstr/intstr_test.go"],
+    library = ":k8s.io/apimachinery/pkg/util/intstr",
+    tags = ["automanaged"],
+    deps = ["//vendor:github.com/ghodss/yaml"],
+)
+
+go_library(
+    name = "k8s.io/apimachinery/pkg/util/intstr",
+    srcs = [
+        "k8s.io/apimachinery/pkg/util/intstr/generated.pb.go",
+        "k8s.io/apimachinery/pkg/util/intstr/intstr.go",
+    ],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:github.com/go-openapi/spec",
+        "//vendor:github.com/gogo/protobuf/proto",
+        "//vendor:github.com/golang/glog",
+        "//vendor:github.com/google/gofuzz",
+        "//vendor:k8s.io/apimachinery/pkg/openapi",
+    ],
+)
