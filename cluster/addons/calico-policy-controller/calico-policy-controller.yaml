@@ -6,6 +6,7 @@ metadata:
   labels:
     k8s-app: calico-policy
     kubernetes.io/cluster-service: "true"
+    addonmanager.kubernetes.io/mode: Reconcile
 spec:
   replicas: 1
   selector:

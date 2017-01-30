@@ -7,6 +7,7 @@ metadata:
     k8s-app: influxGrafana
     version: v4
     kubernetes.io/cluster-service: "true"
+    addonmanager.kubernetes.io/mode: Reconcile
 spec: 
   replicas: 1
   selector: 
