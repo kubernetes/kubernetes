@@ -26,6 +26,7 @@ import (
 	"strings"
 	"testing"
 
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -280,7 +281,7 @@ func verifyObjects(t *testing.T, expected, actual []runtime.Object) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if !api.Semantic.DeepEqual(expected[i], actualObj) {
+		if !apiequality.Semantic.DeepEqual(expected[i], actualObj) {
 			t.Errorf("unexpected object: \n%#v\n%#v", expected[i], actualObj)
 		}
 	}

@@ -25,6 +25,7 @@ import (
 
 	"github.com/davecgh/go-spew/spew"
 
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/conversion"
 	"k8s.io/apimachinery/pkg/fields"
@@ -32,7 +33,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/selection"
 	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/kubernetes/pkg/api/resource"
 )
 
 // Conversion error conveniently packages up errors in conversions.
@@ -67,7 +67,7 @@ func NonConvertibleFields(annotations map[string]string) map[string]string {
 }
 
 // Semantic can do semantic deep equality checks for api objects.
-// Example: api.Semantic.DeepEqual(aPod, aPodWithNonNilButEmptyMaps) == true
+// Example: apiequality.Semantic.DeepEqual(aPod, aPodWithNonNilButEmptyMaps) == true
 var Semantic = conversion.EqualitiesOrDie(
 	func(a, b resource.Quantity) bool {
 		// Ignore formatting, only care that numeric value stayed the same.

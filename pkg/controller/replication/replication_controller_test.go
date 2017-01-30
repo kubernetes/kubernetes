@@ -27,6 +27,7 @@ import (
 	"testing"
 	"time"
 
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -471,7 +472,7 @@ func TestWatchControllers(t *testing.T) {
 			t.Errorf("Expected to find controller under key %v", key)
 		}
 		controllerSpec := *obj.(*v1.ReplicationController)
-		if !api.Semantic.DeepDerivative(controllerSpec, testControllerSpec) {
+		if !apiequality.Semantic.DeepDerivative(controllerSpec, testControllerSpec) {
 			t.Errorf("Expected %#v, but got %#v", testControllerSpec, controllerSpec)
 		}
 		close(received)
@@ -512,7 +513,7 @@ func TestWatchPods(t *testing.T) {
 			t.Errorf("Expected to find controller under key %v", key)
 		}
 		controllerSpec := obj.(*v1.ReplicationController)
-		if !api.Semantic.DeepDerivative(controllerSpec, testControllerSpec) {
+		if !apiequality.Semantic.DeepDerivative(controllerSpec, testControllerSpec) {
 			t.Errorf("\nExpected %#v,\nbut got %#v", testControllerSpec, controllerSpec)
 		}
 		close(received)

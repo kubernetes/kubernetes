@@ -21,10 +21,10 @@ syntax = 'proto2';
 
 package k8s.io.kubernetes.pkg.apis.extensions.v1beta1;
 
+import "k8s.io/apimachinery/pkg/api/resource/generated.proto";
 import "k8s.io/apimachinery/pkg/apis/meta/v1/generated.proto";
 import "k8s.io/apimachinery/pkg/runtime/generated.proto";
 import "k8s.io/apimachinery/pkg/runtime/schema/generated.proto";
-import "k8s.io/kubernetes/pkg/api/resource/generated.proto";
 import "k8s.io/kubernetes/pkg/api/v1/generated.proto";
 import "k8s.io/kubernetes/pkg/util/intstr/generated.proto";
 
@@ -49,7 +49,7 @@ message CustomMetricCurrentStatus {
   optional string name = 1;
 
   // Custom Metric value (average).
-  optional k8s.io.kubernetes.pkg.api.resource.Quantity value = 2;
+  optional k8s.io.apimachinery.pkg.api.resource.Quantity value = 2;
 }
 
 message CustomMetricCurrentStatusList {
@@ -62,7 +62,7 @@ message CustomMetricTarget {
   optional string name = 1;
 
   // Custom Metric value (average).
-  optional k8s.io.kubernetes.pkg.api.resource.Quantity value = 2;
+  optional k8s.io.apimachinery.pkg.api.resource.Quantity value = 2;
 }
 
 message CustomMetricTargetList {

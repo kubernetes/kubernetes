@@ -19,6 +19,8 @@ package storage
 import (
 	"testing"
 
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
@@ -26,7 +28,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/diff"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/genericapiserver/registry/generic"
 	"k8s.io/kubernetes/pkg/genericapiserver/registry/rest"
 	"k8s.io/kubernetes/pkg/registry/registrytest"
@@ -187,7 +188,7 @@ func TestUpdateStatus(t *testing.T) {
 	}
 	pvcOut := obj.(*api.PersistentVolumeClaim)
 	// only compare relevant changes b/c of difference in metadata
-	if !api.Semantic.DeepEqual(pvc.Status, pvcOut.Status) {
+	if !apiequality.Semantic.DeepEqual(pvc.Status, pvcOut.Status) {
 		t.Errorf("unexpected object: %s", diff.ObjectDiff(pvc.Status, pvcOut.Status))
 	}
 }

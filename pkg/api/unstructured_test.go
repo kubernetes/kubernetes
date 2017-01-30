@@ -21,9 +21,11 @@ import (
 	"reflect"
 	"testing"
 
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
+	apitesting "k8s.io/apimachinery/pkg/api/testing"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
-	apitesting "k8s.io/kubernetes/pkg/api/testing"
+	kapitesting "k8s.io/kubernetes/pkg/api/testing"
 	"k8s.io/kubernetes/pkg/api/v1"
 
 	"k8s.io/apimachinery/pkg/util/diff"
@@ -41,7 +43,7 @@ func doRoundTrip(t *testing.T, group testapi.TestGroup, kind string) {
 		t.Fatalf("Couldn't create internal object %v: %v", kind, err)
 	}
 	seed := rand.Int63()
-	apitesting.FuzzerFor(t, group.InternalGroupVersion(), rand.NewSource(seed)).
+	apitesting.FuzzerFor(kapitesting.FuzzerFuncs(t), rand.NewSource(seed)).
 		// We are explicitly overwriting custom fuzzing functions, to ensure
 		// that InitContainers and their statuses are not generated. This is
 		// because in thise test we are simply doing json operations, in which
@@ -88,7 +90,7 @@ func doRoundTrip(t *testing.T, group testapi.TestGroup, kind string) {
 		t.Errorf("Error when unmarshaling to object: %v", err)
 		return
 	}
-	if !api.Semantic.DeepEqual(item, unmarshalledObj) {
+	if !apiequality.Semantic.DeepEqual(item, unmarshalledObj) {
 		t.Errorf("Object changed during JSON operations, diff: %v", diff.ObjectReflectDiff(item, unmarshalledObj))
 		return
 	}
@@ -110,7 +112,7 @@ func doRoundTrip(t *testing.T, group testapi.TestGroup, kind string) {
 			return
 		}
 
-		if !api.Semantic.DeepEqual(item, newObj) {
+		if !apiequality.Semantic.DeepEqual(item, newObj) {
 			t.Errorf("Object changed, diff: %v", diff.ObjectReflectDiff(item, newObj))
 		}
 	*/
@@ -155,7 +157,7 @@ func BenchmarkToFromUnstructured(b *testing.B) {
 */
 
 func BenchmarkToFromUnstructuredViaJSON(b *testing.B) {
-	items := benchmarkItems()
+	items := benchmarkItems(b)
 	size := len(items)
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {

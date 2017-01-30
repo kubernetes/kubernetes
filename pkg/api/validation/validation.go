@@ -28,6 +28,8 @@ import (
 
 	"github.com/golang/glog"
 
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
+	"k8s.io/apimachinery/pkg/api/resource"
 	apimachineryvalidation "k8s.io/apimachinery/pkg/api/validation"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	unversionedvalidation "k8s.io/apimachinery/pkg/apis/meta/v1/validation"
@@ -38,7 +40,6 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/api"
 	utilpod "k8s.io/kubernetes/pkg/api/pod"
-	"k8s.io/kubernetes/pkg/api/resource"
 	apiservice "k8s.io/kubernetes/pkg/api/service"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/api/validation/genericvalidation"
@@ -1092,7 +1093,7 @@ func ValidatePersistentVolumeClaimUpdate(newPvc, oldPvc *api.PersistentVolumeCla
 	}
 	// changes to Spec are not allowed, but updates to label/and some annotations are OK.
 	// no-op updates pass validation.
-	if !api.Semantic.DeepEqual(newPvc.Spec, oldPvc.Spec) {
+	if !apiequality.Semantic.DeepEqual(newPvc.Spec, oldPvc.Spec) {
 		allErrs = append(allErrs, field.Forbidden(field.NewPath("spec"), "field is immutable after creation"))
 	}
 
@@ -2253,7 +2254,7 @@ func ValidatePodUpdate(newPod, oldPod *api.Pod) field.ErrorList {
 		activeDeadlineSeconds := *oldPod.Spec.ActiveDeadlineSeconds
 		mungedPod.Spec.ActiveDeadlineSeconds = &activeDeadlineSeconds
 	}
-	if !api.Semantic.DeepEqual(mungedPod.Spec, oldPod.Spec) {
+	if !apiequality.Semantic.DeepEqual(mungedPod.Spec, oldPod.Spec) {
 		//TODO: Pinpoint the specific field that causes the invalid error after we have strategic merge diff
 		allErrs = append(allErrs, field.Forbidden(specPath, "pod updates may not change fields other than `containers[*].image` or `spec.activeDeadlineSeconds`"))
 	}
@@ -2789,7 +2790,7 @@ func ValidateNodeUpdate(node, oldNode *api.Node) field.ErrorList {
 
 	// TODO: Enable the code once we have better api object.status update model. Currently,
 	// anyone can update node status.
-	// if !api.Semantic.DeepEqual(node.Status, api.NodeStatus{}) {
+	// if !apiequality.Semantic.DeepEqual(node.Status, api.NodeStatus{}) {
 	// 	allErrs = append(allErrs, field.Invalid("status", node.Status, "must be empty"))
 	// }
 
@@ -2832,7 +2833,7 @@ func ValidateNodeUpdate(node, oldNode *api.Node) field.ErrorList {
 	oldNode.Status = node.Status
 
 	// TODO: Add a 'real' error type for this error and provide print actual diffs.
-	if !api.Semantic.DeepEqual(oldNode, node) {
+	if !apiequality.Semantic.DeepEqual(oldNode, node) {
 		glog.V(4).Infof("Update failed validation %#v vs %#v", oldNode, node)
 		allErrs = append(allErrs, field.Forbidden(field.NewPath(""), "node updates may only change labels or capacity"))
 	}

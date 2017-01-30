@@ -22,7 +22,6 @@ go_library(
     ],
     tags = ["automanaged"],
     deps = [
-        "//pkg/api/resource:go_default_library",
         "//pkg/api/v1:go_default_library",
         "//pkg/kubelet/cadvisor:go_default_library",
         "//pkg/kubelet/cm/util:go_default_library",
@@ -38,6 +37,7 @@ go_library(
         "//vendor:github.com/opencontainers/runc/libcontainer/cgroups/fs",
         "//vendor:github.com/opencontainers/runc/libcontainer/cgroups/systemd",
         "//vendor:github.com/opencontainers/runc/libcontainer/configs",
+        "//vendor:k8s.io/apimachinery/pkg/api/resource",
         "//vendor:k8s.io/apimachinery/pkg/types",
         "//vendor:k8s.io/apimachinery/pkg/util/errors",
         "//vendor:k8s.io/apimachinery/pkg/util/runtime",
@@ -56,11 +56,11 @@ go_test(
     library = ":go_default_library",
     tags = ["automanaged"],
     deps = [
-        "//pkg/api/resource:go_default_library",
         "//pkg/api/v1:go_default_library",
         "//pkg/util/mount:go_default_library",
         "//vendor:github.com/stretchr/testify/assert",
         "//vendor:github.com/stretchr/testify/require",
+        "//vendor:k8s.io/apimachinery/pkg/api/resource",
     ],
 )
 
