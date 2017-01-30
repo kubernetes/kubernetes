@@ -89,9 +89,27 @@ func fromUnstructured(sv, dv reflect.Value) error {
 			dv.Set(sv)
 			return nil
 		}
+		// We cannot simply use "ConvertibleTo", as JSON doesn't support conversions
+		// between those four groups: bools, integers, floats and string. We need to
+		// do the same.
 		if st.ConvertibleTo(dt) {
-			dv.Set(sv.Convert(dt))
-			return nil
+			switch st.Kind() {
+			case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64,
+				reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
+				switch dt.Kind() {
+				case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64,
+					reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
+					dv.Set(sv.Convert(dt))
+					return nil
+				}
+			case reflect.Float32, reflect.Float64:
+				switch dt.Kind() {
+				case reflect.Float32, reflect.Float64:
+					dv.Set(sv.Convert(dt))
+					return nil
+				}
+			}
+			return fmt.Errorf("cannot convert %s to %d", st.String(), dt.String())
 		}
 	}
 
