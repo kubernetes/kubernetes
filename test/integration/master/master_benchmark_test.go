@@ -1,5 +1,3 @@
-// +build benchmark,!no-etcd,!integration
-
 /*
 Copyright 2014 The Kubernetes Authors.
 

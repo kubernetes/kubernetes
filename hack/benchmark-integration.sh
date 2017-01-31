@@ -33,14 +33,14 @@ ARGS="-bench-pods 3000 -bench-tasks 100 -bench-tasks 10"
 runTests() {
   kube::etcd::start
   kube::log::status "Running benchmarks"
-  KUBE_GOFLAGS="-tags 'benchmark no-docker' -bench . -benchmem -benchtime 1s -cpu 4" \
+  KUBE_GOFLAGS="-tags -bench . -benchmem -benchtime 1s -cpu 4" \
     KUBE_RACE="-race" \
     KUBE_TEST_API_VERSIONS="v1" \
     KUBE_TIMEOUT="-timeout 10m" \
     KUBE_TEST_ETCD_PREFIXES="registry" \
     ETCD_CUSTOM_PREFIX="None" \
     KUBE_TEST_ARGS="${ARGS}" \
-    make test WHAT=test/integration
+    make test WHAT=./test/integration
   cleanup
 }
 

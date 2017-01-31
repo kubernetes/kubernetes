@@ -9,14 +9,19 @@ load(
 
 go_test(
     name = "go_default_test",
-    srcs = ["openshift_test.go"],
+    srcs = ["secrets_test.go"],
     tags = [
         "automanaged",
         "integration",
     ],
     deps = [
-        "//pkg/master:go_default_library",
-        "//vendor/k8s.io/apiserver/pkg/server:go_default_library",
+        "//pkg/api:go_default_library",
+        "//pkg/api/v1:go_default_library",
+        "//pkg/client/clientset_generated/clientset:go_default_library",
+        "//test/integration:go_default_library",
+        "//test/integration/framework:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
+        "//vendor/k8s.io/client-go/rest:go_default_library",
     ],
 )
 
