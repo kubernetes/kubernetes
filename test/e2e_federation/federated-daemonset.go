@@ -93,6 +93,7 @@ var _ = framework.KubeDescribe("Federation daemonsets [Feature:Federation]", fun
 			verifyCascadingDeletionForDS(f.FederationClientset, clusters, &orphanDependents, nsName)
 			By(fmt.Sprintf("Verified that daemonsets were not deleted from underlying clusters"))
 		})
+
 		It("should not be deleted from underlying clusters when OrphanDependents is nil", func() {
 			fedframework.SkipUnlessFederated(f.ClientSet)
 			nsName := f.FederationNamespace.Name
