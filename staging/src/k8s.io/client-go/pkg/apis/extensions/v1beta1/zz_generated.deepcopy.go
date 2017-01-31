@@ -24,8 +24,8 @@ import (
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	conversion "k8s.io/apimachinery/pkg/conversion"
 	runtime "k8s.io/apimachinery/pkg/runtime"
+	intstr "k8s.io/apimachinery/pkg/util/intstr"
 	api_v1 "k8s.io/client-go/pkg/api/v1"
-	intstr "k8s.io/client-go/pkg/util/intstr"
 	reflect "reflect"
 )
 
