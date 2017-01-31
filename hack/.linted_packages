@@ -209,7 +209,6 @@ pkg/security/podsecuritypolicy/apparmor
 pkg/security/podsecuritypolicy/capabilities
 pkg/security/podsecuritypolicy/sysctl
 pkg/serviceaccount
-pkg/storage
 pkg/storage/etcd3
 pkg/storage/storagebackend/factory
 pkg/types

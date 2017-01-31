@@ -19,7 +19,7 @@ package storage
 import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/kubernetes/pkg/storage"
+	"k8s.io/apiserver/pkg/storage"
 )
 
 // InterpretListError converts a generic error on a retrieval

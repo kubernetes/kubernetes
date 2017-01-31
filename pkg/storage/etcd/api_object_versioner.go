@@ -22,7 +22,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/kubernetes/pkg/storage"
+	"k8s.io/apiserver/pkg/storage"
 )
 
 // APIObjectVersioner implements versioning and extracting etcd node information
