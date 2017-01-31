@@ -33,6 +33,8 @@ import (
 // type if you are dealing with objects that are not in the server meta v1 schema.
 //
 // TODO: make the serialization part of this type distinct from the field accessors.
+//
+// +k8s:deepcopy-gen=true
 type Unstructured struct {
 	// Object is a JSON compatible map with string, float, int, bool, []interface{}, or
 	// map[string]interface{}
@@ -172,6 +174,8 @@ func (u *Unstructured) GroupVersionKind() schema.GroupVersionKind {
 // UnstructuredList allows lists that do not have Golang structs
 // registered to be manipulated generically. This can be used to deal
 // with the API lists from a plug-in.
+//
+// +k8s:deepcopy-gen=true
 type UnstructuredList struct {
 	Object map[string]interface{}
 

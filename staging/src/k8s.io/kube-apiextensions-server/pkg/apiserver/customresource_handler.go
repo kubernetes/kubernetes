@@ -17,7 +17,6 @@ limitations under the License.
 package apiserver
 
 import (
-	"bytes"
 	"fmt"
 	"net/http"
 	"sync"
@@ -335,15 +334,16 @@ func (UnstructuredCreator) New(kind schema.GroupVersionKind) (runtime.Object, er
 type UnstructuredCopier struct{}
 
 func (UnstructuredCopier) Copy(obj runtime.Object) (runtime.Object, error) {
-	// serialize and deserialize to ensure a clean copy
-	buf := &bytes.Buffer{}
-	err := unstructuredhelpers.Codec.Encode(obj, buf)
-	if err != nil {
-		return nil, err
+	switch u := obj.(type) {
+	case *unstructured.Unstructured:
+		clone := u.DeepCopy()
+		return &clone, nil
+	case *unstructured.UnstructuredList:
+		clone := u.DeepCopy()
+		return &clone, nil
+	default:
+		return nil, fmt.Errorf("UnstructuredCopier cannot copy %T", obj)
 	}
-	out := &unstructured.Unstructured{}
-	result, _, err := unstructuredhelpers.Codec.Decode(buf.Bytes(), nil, out)
-	return result, err
 }
 
 type UnstructuredDefaulter struct{}
