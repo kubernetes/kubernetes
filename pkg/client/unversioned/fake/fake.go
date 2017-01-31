@@ -46,6 +46,8 @@ type RESTClient struct {
 	Client               *http.Client
 	NegotiatedSerializer runtime.NegotiatedSerializer
 
+	ContentConfig restclient.ContentConfig
+
 	Req  *http.Request
 	Resp *http.Response
 	Err  error
@@ -72,16 +74,23 @@ func (c *RESTClient) Delete() *restclient.Request {
 }
 
 func (c *RESTClient) request(verb string) *restclient.Request {
-	config := restclient.ContentConfig{
-		ContentType:          runtime.ContentTypeJSON,
-		GroupVersion:         testapi.Default.GroupVersion(),
-		NegotiatedSerializer: c.NegotiatedSerializer,
+
+	// Uses the ContentConfig in the RESTClient if found.
+	config := c.ContentConfig
+	defaultContentConfig := restclient.ContentConfig{}
+	if config == defaultContentConfig {
+		config = restclient.ContentConfig{
+			ContentType:          runtime.ContentTypeJSON,
+			GroupVersion:         testapi.Default.GroupVersion(),
+			NegotiatedSerializer: c.NegotiatedSerializer,
+		}
 	}
+
 	ns := c.NegotiatedSerializer
 	serializer, _ := ns.SerializerForMediaType(runtime.ContentTypeJSON, nil)
 	streamingSerializer, _ := ns.StreamingSerializerForMediaType(runtime.ContentTypeJSON, nil)
 	internalVersion := unversioned.GroupVersion{
-		Group:   testapi.Default.GroupVersion().Group,
+		Group:   config.GroupVersion.Group,
 		Version: runtime.APIVersionInternal,
 	}
 	internalVersion.Version = runtime.APIVersionInternal
