@@ -23,14 +23,14 @@ import (
 	netutil "k8s.io/apimachinery/pkg/util/net"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmapiext "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha1"
+	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 
 	"github.com/blang/semver"
 )
 
 var (
-	// Maximum version when using AllowAll as the default authz mode. Everything above this will use RBAC by default.
-	allowAllMaxVersion = semver.MustParse("1.6.0-alpha.0")
+	minK8sVersion = semver.MustParse(kubeadmconstants.MinimumControlPlaneVersion)
 )
 
 func setInitDynamicDefaults(cfg *kubeadmapi.MasterConfiguration) error {
@@ -53,16 +53,18 @@ func setInitDynamicDefaults(cfg *kubeadmapi.MasterConfiguration) error {
 		}
 	}
 	cfg.KubernetesVersion = ver
-	fmt.Println("[init] Using Kubernetes version:", ver)
 
 	// Omit the "v" in the beginning, otherwise semver will fail
-	// If the version is newer than the specified version, RBAC v1beta1 support is enabled in the apiserver so we can default to RBAC
 	k8sVersion, err := semver.Parse(cfg.KubernetesVersion[1:])
-	if k8sVersion.GT(allowAllMaxVersion) {
-		cfg.AuthorizationMode = "RBAC"
+	if err != nil {
+		return fmt.Errorf("couldn't parse kubernetes version %q: %v", cfg.KubernetesVersion, err)
+	}
+	if k8sVersion.LT(minK8sVersion) {
+		return fmt.Errorf("this version of kubeadm only supports deploying clusters with the control plane version >= v1.6.0-alpha.1. Current version: %s", cfg.KubernetesVersion)
 	}
 
-	fmt.Println("[init] Using Authorization mode:", cfg.AuthorizationMode)
+	fmt.Printf("[init] Using Kubernetes version: %s\n", cfg.KubernetesVersion)
+	fmt.Printf("[init] Using Authorization mode: %s\n", cfg.AuthorizationMode)
 
 	// Warn about the limitations with the current cloudprovider solution.
 	if cfg.CloudProvider != "" {

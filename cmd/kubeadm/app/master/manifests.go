@@ -32,8 +32,6 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/images"
 	api "k8s.io/kubernetes/pkg/api/v1"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
-
-	"github.com/blang/semver"
 )
 
 // Static pod definitions in golang form are included below so that `kubeadm init` can get going.
@@ -52,14 +50,6 @@ const (
 	kubeProxy                      = "kube-proxy"
 	authorizationPolicyFile        = "abac_policy.json"
 	authorizationWebhookConfigFile = "webhook_authz.conf"
-)
-
-var (
-	// Minimum version of kube-apiserver that supports --kubelet-preferred-address-types
-	preferredAddressAPIServerMinVersion = semver.MustParse("1.5.0")
-
-	// Minimum version of kube-apiserver that has to have --anonymous-auth=false set
-	anonAuthDisableAPIServerMinVersion = semver.MustParse("1.5.0")
 )
 
 // WriteStaticPodManifests builds manifest objects based on user provided configuration and then dumps it to disk
@@ -328,14 +318,15 @@ func getAPIServerCommand(cfg *kubeadmapi.MasterConfiguration, selfHosted bool) [
 		fmt.Sprintf("--secure-port=%d", cfg.API.Port),
 		"--allow-privileged",
 		"--storage-backend=etcd3",
+		"--kubelet-preferred-address-types=InternalIP,ExternalIP,Hostname",
 	)
 
 	if cfg.AuthorizationMode != "" {
 		command = append(command, "--authorization-mode="+cfg.AuthorizationMode)
 		switch cfg.AuthorizationMode {
-		case "ABAC":
+		case kubeadmconstants.AuthzModeABAC:
 			command = append(command, "--authorization-policy-file="+path.Join(kubeadmapi.GlobalEnvParams.KubernetesDir, authorizationPolicyFile))
-		case "Webhook":
+		case kubeadmconstants.AuthzModeWebhook:
 			command = append(command, "--authorization-webhook-config-file="+path.Join(kubeadmapi.GlobalEnvParams.KubernetesDir, authorizationWebhookConfigFile))
 		}
 	}
@@ -346,23 +337,6 @@ func getAPIServerCommand(cfg *kubeadmapi.MasterConfiguration, selfHosted bool) [
 			command = append(command, "--advertise-address=$(POD_IP)")
 		} else {
 			command = append(command, fmt.Sprintf("--advertise-address=%s", cfg.API.AdvertiseAddresses[0]))
-		}
-	}
-
-	if len(cfg.KubernetesVersion) != 0 {
-		// If the k8s version is v1.5-something, this argument is set and makes `kubectl logs` and `kubectl exec`
-		// work on bare-metal where hostnames aren't usually resolvable
-		// Omit the "v" in the beginning, otherwise semver will fail
-		k8sVersion, err := semver.Parse(cfg.KubernetesVersion[1:])
-
-		// If the k8s version is greater than this version, it supports telling it which way it should contact kubelets
-		if err == nil && k8sVersion.GTE(preferredAddressAPIServerMinVersion) {
-			command = append(command, "--kubelet-preferred-address-types=InternalIP,ExternalIP,Hostname")
-		}
-
-		// This is a critical "bugfix". Any version above this is vulnerable unless a RBAC/ABAC-authorizer is provided (which kubeadm doesn't for the time being)
-		if err == nil && k8sVersion.GTE(anonAuthDisableAPIServerMinVersion) {
-			command = append(command, "--anonymous-auth=false")
 		}
 	}
 
