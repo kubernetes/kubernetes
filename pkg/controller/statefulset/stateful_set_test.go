@@ -18,6 +18,7 @@ package statefulset
 
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/kubernetes/pkg/api/v1"
 	apps "k8s.io/kubernetes/pkg/apis/apps/v1beta1"
@@ -313,7 +314,7 @@ func TestStateSetControllerAddPodNoSet(t *testing.T) {
 	}
 }
 
-func TestNewStatefulSetControllerUpdatePod(t *testing.T) {
+func TestStatefulSetControllerUpdatePod(t *testing.T) {
 	ssc, spc := newFakeStatefulSetController()
 	set := newStatefulSet(3)
 	pod := newStatefulSetPod(set, 0)
@@ -331,7 +332,7 @@ func TestNewStatefulSetControllerUpdatePod(t *testing.T) {
 	}
 }
 
-func TestNewStatefulSetControllerUpdatePodWithNoSet(t *testing.T) {
+func TestStatefulSetControllerUpdatePodWithNoSet(t *testing.T) {
 	ssc, _ := newFakeStatefulSetController()
 	set := newStatefulSet(3)
 	pod := newStatefulSetPod(set, 0)
@@ -345,7 +346,7 @@ func TestNewStatefulSetControllerUpdatePodWithNoSet(t *testing.T) {
 	}
 }
 
-func TestNewStatefulSetControllerUpdatePodWithSameVersion(t *testing.T) {
+func TestStatefulSetControllerUpdatePodWithSameVersion(t *testing.T) {
 	ssc, spc := newFakeStatefulSetController()
 	set := newStatefulSet(3)
 	pod := newStatefulSetPod(set, 0)
@@ -355,5 +356,70 @@ func TestNewStatefulSetControllerUpdatePodWithSameVersion(t *testing.T) {
 	key, _ := ssc.queue.Get()
 	if key != nil {
 		t.Errorf("StatefulSet enqueued key for Pod with no Set %s", key)
+	}
+}
+
+func TestStatefulSetControllerUpdatePodWithNewLabels(t *testing.T) {
+	ssc, spc := newFakeStatefulSetController()
+	set := newStatefulSet(3)
+	pod := newStatefulSetPod(set, 0)
+	set2 := newStatefulSet(3)
+	set2.Name = "foo2"
+	set2.Spec.Selector.MatchLabels = map[string]string{"foo2": "bar2"}
+	set2.Spec.Template.Labels = map[string]string{"foo2": "bar2"}
+	spc.setsIndexer.Add(set)
+	spc.setsIndexer.Add(set2)
+	clone := *pod
+	clone.Labels = map[string]string{"foo2": "bar2"}
+	fakeResourceVersion(&clone)
+	ssc.updatePod(pod, &clone)
+	key, done := ssc.queue.Get()
+	if key == nil || done {
+		t.Error("Failed to enqueue StatefulSet")
+	} else if key, ok := key.(string); !ok {
+		t.Error("Key is not a string")
+	} else if expectedKey, _ := controller.KeyFunc(set2); expectedKey != key {
+		t.Errorf("Expected StatefulSet key %s found %s", expectedKey, key)
+	}
+	key, done = ssc.queue.Get()
+	if key == nil || done {
+		t.Error("Failed to enqueue StatefulSet")
+	} else if key, ok := key.(string); !ok {
+		t.Error("Key is not a string")
+	} else if expectedKey, _ := controller.KeyFunc(set); expectedKey != key {
+		t.Errorf("Expected StatefulSet key %s found %s", expectedKey, key)
+	}
+}
+
+func TestStatefulSetControlDeletePod(t *testing.T) {
+	ssc, spc := newFakeStatefulSetController()
+	set := newStatefulSet(3)
+	pod := newStatefulSetPod(set, 0)
+	spc.setsIndexer.Add(set)
+	ssc.deletePod(pod)
+	key, done := ssc.queue.Get()
+	if key == nil || done {
+		t.Error("Failed to enqueue StatefulSet")
+	} else if key, ok := key.(string); !ok {
+		t.Error("Key is not a string")
+	} else if expectedKey, _ := controller.KeyFunc(set); expectedKey != key {
+		t.Errorf("Expected StatefulSet key %s found %s", expectedKey, key)
+	}
+}
+func TestStatefulSetControlDeletePodTombstone(t *testing.T) {
+	ssc, spc := newFakeStatefulSetController()
+	set := newStatefulSet(3)
+	pod := newStatefulSetPod(set, 0)
+	spc.setsIndexer.Add(set)
+	tombstoneKey, _ := controller.KeyFunc(pod)
+	tombstone := cache.DeletedFinalStateUnknown{Key: tombstoneKey, Obj: pod}
+	ssc.deletePod(tombstone)
+	key, done := ssc.queue.Get()
+	if key == nil || done {
+		t.Error("Failed to enqueue StatefulSet")
+	} else if key, ok := key.(string); !ok {
+		t.Error("Key is not a string")
+	} else if expectedKey, _ := controller.KeyFunc(set); expectedKey != key {
+		t.Errorf("Expected StatefulSet key %s found %s", expectedKey, key)
 	}
 }

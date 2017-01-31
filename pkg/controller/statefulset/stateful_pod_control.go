@@ -195,7 +195,7 @@ func (spc *realStatefulPodControl) recordClaimEvent(method string, set *apps.Sta
 func (spc *realStatefulPodControl) createPersistentVolumeClaims(set *apps.StatefulSet, pod *v1.Pod) error {
 	errs := make([]error, 0)
 	for _, claim := range getPersistentVolumeClaims(set, pod) {
-		_, err := spc.client.Core().PersistentVolumeClaims(set.Namespace).Get(claim.Namespace, metav1.GetOptions{})
+		_, err := spc.client.Core().PersistentVolumeClaims(set.Namespace).Get(claim.Name, metav1.GetOptions{})
 		if err != nil {
 			if apierrors.IsNotFound(err) {
 				_, err := spc.client.Core().PersistentVolumeClaims(set.Namespace).Create(&claim)

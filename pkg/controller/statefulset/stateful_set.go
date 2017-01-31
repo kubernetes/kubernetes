@@ -223,10 +223,9 @@ func (ssc *StatefulSetController) getStatefulSetForPod(pod *v1.Pod) *apps.Statef
 		glog.V(4).Infof("No StatefulSets found for pod %v, StatefulSet controller will avoid syncing", pod.Name)
 		return nil
 	}
-	// Resolve a overlapping statefulset tie by creation timestamp.
-	// Let's hope users don't create overlapping statefulsets.
+	// Resolve a overlapping by checking the name of the Pod versus the Name of its parent
 	if len(sets) > 1 {
-		glog.Errorf("user error! more than one StatefulSet is selecting pods with labels: %+v", pod.Labels)
+		glog.Errorf("user error: more than one StatefulSet is selecting pods with labels: %+v", pod.Labels)
 		valid := make([]apps.StatefulSet, 0, len(sets))
 		for i := range sets {
 			if isMemberOf(&sets[i], pod) {
@@ -235,6 +234,8 @@ func (ssc *StatefulSetController) getStatefulSetForPod(pod *v1.Pod) *apps.Statef
 		}
 		sets = valid
 	}
+	// It should not be possible for this to occur given the way names are constructed. However,
+	// we will still fall back to creation time if more than one set has the same name.
 	if setCount := len(sets); setCount > 1 {
 		glog.Errorf("user error: %d is a member of more than one StatefulSet : %s", pod.Name)
 		sort.Sort(overlappingStatefulSets(sets))
