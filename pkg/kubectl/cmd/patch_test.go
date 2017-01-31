@@ -54,7 +54,7 @@ func TestPatchObject(t *testing.T) {
 	cmd.Run(cmd, []string{"services/frontend"})
 
 	// uses the name from the file, not the response
-	if buf.String() != "frontend\n" {
+	if buf.String() != "service/frontend\n" {
 		t.Errorf("unexpected output: %s", buf.String())
 	}
 }
@@ -88,7 +88,7 @@ func TestPatchObjectFromFile(t *testing.T) {
 	cmd.Run(cmd, []string{})
 
 	// uses the name from the file, not the response
-	if buf.String() != "frontend\n" {
+	if buf.String() != "service/frontend\n" {
 		t.Errorf("unexpected output: %s", buf.String())
 	}
 }
