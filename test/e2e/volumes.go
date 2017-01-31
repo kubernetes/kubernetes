@@ -50,6 +50,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
+	vsphere "k8s.io/kubernetes/pkg/cloudprovider/providers/vsphere"
 	"k8s.io/kubernetes/test/e2e/framework"
 
 	"github.com/golang/glog"
@@ -926,6 +927,60 @@ var _ = framework.KubeDescribe("Volumes [Feature:Volumes]", func() {
 				},
 			}
 			testVolumeClient(cs, config, nil, tests)
+		})
+	})
+
+	////////////////////////////////////////////////////////////////////////
+	// vSphere
+	////////////////////////////////////////////////////////////////////////
+
+	framework.KubeDescribe("vsphere", func() {
+		It("should be mountable", func() {
+			framework.SkipUnlessProviderIs("vsphere")
+			var (
+				volumePath string
+			)
+			config := VolumeTestConfig{
+				namespace: namespace.Name,
+				prefix:    "vsphere",
+			}
+			By("creating a test vsphere volume")
+			vsp, err := vsphere.GetVSphere()
+			Expect(err).NotTo(HaveOccurred())
+
+			volumePath, err = createVSphereVolume(vsp, nil)
+			Expect(err).NotTo(HaveOccurred())
+
+			defer func() {
+				vsp.DeleteVolume(volumePath)
+			}()
+
+			defer func() {
+				if clean {
+					framework.Logf("Running volumeTestCleanup")
+					volumeTestCleanup(f, config)
+				}
+			}()
+
+			tests := []VolumeTest{
+				{
+					volume: v1.VolumeSource{
+						VsphereVolume: &v1.VsphereVirtualDiskVolumeSource{
+							VolumePath: volumePath,
+							FSType:     "ext4",
+						},
+					},
+					file: "index.html",
+					// Randomize index.html to make sure we don't see the
+					// content from previous test runs.
+					expectedContent: "Hello from vSphere from namespace " + namespace.Name,
+				},
+			}
+
+			injectHtml(cs, config, tests[0].volume, tests[0].expectedContent)
+
+			fsGroup := int64(1234)
+			testVolumeClient(cs, config, &fsGroup, tests)
 		})
 	})
 })
