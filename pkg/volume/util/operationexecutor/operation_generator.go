@@ -835,34 +835,7 @@ func (og *operationGenerator) GenerateVerifyControllerDetachedVolumeFunc(
 			return nil
 		}
 
-		// Fetch current node object
-		node, fetchErr := og.kubeClient.Core().Nodes().Get(string(volumeToDetach.NodeName), metav1.GetOptions{})
-		if fetchErr != nil {
-			// On failure, return error. Caller will log and retry.
-			return fmt.Errorf(
-				"VerifyControllerDetachedVolume failed fetching node from API server. Volume %q (spec.Name: %q). Error: %v",
-				volumeToDetach.VolumeName,
-				volumeToDetach.VolumeSpec.Name(),
-				fetchErr)
-		}
-
-		if node == nil {
-			// On failure, return error. Caller will log and retry.
-			return fmt.Errorf(
-				"VerifyControllerDetachedVolume failed. Volume %q (spec.Name: %q). Error: node object retrieved from API server is nil",
-				volumeToDetach.VolumeName,
-				volumeToDetach.VolumeSpec.Name())
-		}
-
-		for _, attachedVolume := range node.Status.VolumesAttached {
-			if attachedVolume.Name == volumeToDetach.VolumeName {
-				return fmt.Errorf("Volume %q (spec.Name: %q) is not yet detached according to node status",
-					volumeToDetach.VolumeName,
-					volumeToDetach.VolumeSpec.Name())
-			}
-		}
-
-		glog.Infof("Controller successfully detached volume %q (spec.Name: %q) devicePath: %q",
+		glog.Infof("Controller detached volume %q (spec.Name: %q) devicePath: %q",
 			volumeToDetach.VolumeName,
 			volumeToDetach.VolumeSpec.Name(),
 			volumeToDetach.DevicePath)
