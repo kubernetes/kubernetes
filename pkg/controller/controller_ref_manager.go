@@ -109,7 +109,7 @@ func GetControllerOf(controllee *metav1.ObjectMeta) *metav1.OwnerReference {
 func (m *PodControllerRefManager) AdoptPod(pod *v1.Pod) error {
 	// we should not adopt any pods if the controller is about to be deleted
 	if m.controllerObject.DeletionTimestamp != nil {
-		return fmt.Errorf("cancel the adopt attempt for pod %s because the controlller is being deleted",
+		return fmt.Errorf("cancel the adopt attempt for pod %s because the controller is being deleted",
 			strings.Join([]string{pod.Namespace, pod.Name, string(pod.UID)}, "_"))
 	}
 	addControllerPatch := fmt.Sprintf(
