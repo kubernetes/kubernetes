@@ -156,7 +156,7 @@ var _ = framework.KubeDescribe("Load capacity", func() {
 			testArg.daemonsPerNode,
 		)
 		itArg := testArg
-		itArg.services = os.Getenv("CREATE_SERVICES") == "true"
+		itArg.services = os.Getenv("CREATE_SERVICES") != "false"
 
 		It(name, func() {
 			// Create a number of namespaces.
