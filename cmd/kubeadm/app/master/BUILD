@@ -31,7 +31,6 @@ go_library(
         "//pkg/client/clientset_generated/clientset:go_default_library",
         "//pkg/kubectl/cmd/util:go_default_library",
         "//pkg/registry/core/service/ipallocator:go_default_library",
-        "//vendor:github.com/blang/semver",
         "//vendor:k8s.io/apimachinery/pkg/api/errors",
         "//vendor:k8s.io/apimachinery/pkg/api/resource",
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
