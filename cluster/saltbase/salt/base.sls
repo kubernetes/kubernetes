@@ -7,9 +7,13 @@ pkg-core:
       - python
       - git
       - socat
+      - ceph
+      - ceph-common
 {% else %}
       - apt-transport-https
       - python-apt
+      - ceph-fs-common
+      - ceph-common
       - nfs-common
       - socat
 {% endif %}
