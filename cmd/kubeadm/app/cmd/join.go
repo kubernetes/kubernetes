@@ -119,9 +119,6 @@ func NewJoin(cfgPath string, args []string, cfg *kubeadmapi.NodeConfiguration, s
 		fmt.Println("[preflight] Skipping pre-flight checks")
 	}
 
-	// Try to start the kubelet service in case it's inactive
-	preflight.TryStartKubelet()
-
 	return &Join{cfg: cfg}, nil
 }
 
@@ -150,6 +147,9 @@ func (j *Join) Run(out io.Writer) error {
 	if err != nil {
 		return fmt.Errorf("couldn't save the CA certificate to disk: %v", err)
 	}
+
+	// Try to start the kubelet service in case it's inactive
+	kubeadmutil.TryStartKubelet()
 
 	fmt.Fprintf(out, joinDoneMsgf)
 	return nil

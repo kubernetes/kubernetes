@@ -160,9 +160,6 @@ func NewInit(cfgPath string, cfg *kubeadmapi.MasterConfiguration, skipPreFlight 
 		fmt.Println("[preflight] Skipping pre-flight checks")
 	}
 
-	// Try to start the kubelet service in case it's inactive
-	preflight.TryStartKubelet()
-
 	return &Init{cfg: cfg}, nil
 }
 
@@ -194,6 +191,9 @@ func (i *Init) Run(out io.Writer) error {
 	if err != nil {
 		return err
 	}
+
+	// Try to start the kubelet service in case it's inactive
+	kubeadmutil.TryStartKubelet()
 
 	// TODO: It's not great to have an exception for token here, but necessary because the apiserver doesn't handle this properly in the API yet
 	// but relies on files on disk for now, which is daunting.
