@@ -220,7 +220,7 @@ type KubeletDeps struct {
 	ContainerManager   cm.ContainerManager
 	DockerClient       dockertools.DockerInterface
 	EventClient        v1core.EventsGetter
-	KubeClient         *clientset.Clientset
+	KubeClient         clientset.Interface
 	ExternalKubeClient clientgoclientset.Interface
 	Mounter            mount.Interface
 	NetworkPlugins     []network.NetworkPlugin
@@ -318,15 +318,6 @@ func NewMainKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *Kub
 		glog.V(2).Infof("cloud provider determined current node name to be %s", nodeName)
 	}
 
-	// TODO: KubeletDeps.KubeClient should be a client interface, but client interface misses certain methods
-	// used by kubelet. Since NewMainKubelet expects a client interface, we need to make sure we are not passing
-	// a nil pointer to it when what we really want is a nil interface.
-	var kubeClient clientset.Interface
-	if kubeDeps.KubeClient != nil {
-		kubeClient = kubeDeps.KubeClient
-		// TODO: remove this when we've refactored kubelet to only use clientset.
-	}
-
 	if kubeDeps.PodConfig == nil {
 		var err error
 		kubeDeps.PodConfig, err = makePodSourceConfig(kubeCfg, kubeDeps, nodeName)
@@ -384,16 +375,16 @@ func NewMainKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *Kub
 	}
 
 	serviceStore := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
-	if kubeClient != nil {
-		serviceLW := cache.NewListWatchFromClient(kubeClient.Core().RESTClient(), "services", metav1.NamespaceAll, fields.Everything())
+	if kubeDeps.KubeClient != nil {
+		serviceLW := cache.NewListWatchFromClient(kubeDeps.KubeClient.Core().RESTClient(), "services", metav1.NamespaceAll, fields.Everything())
 		cache.NewReflector(serviceLW, &v1.Service{}, serviceStore, 0).Run()
 	}
 	serviceLister := &listers.StoreToServiceLister{Indexer: serviceStore}
 
 	nodeStore := cache.NewStore(cache.MetaNamespaceKeyFunc)
-	if kubeClient != nil {
+	if kubeDeps.KubeClient != nil {
 		fieldSelector := fields.Set{api.ObjectNameField: string(nodeName)}.AsSelector()
-		nodeLW := cache.NewListWatchFromClient(kubeClient.Core().RESTClient(), "nodes", metav1.NamespaceAll, fieldSelector)
+		nodeLW := cache.NewListWatchFromClient(kubeDeps.KubeClient.Core().RESTClient(), "nodes", metav1.NamespaceAll, fieldSelector)
 		cache.NewReflector(nodeLW, &v1.Node{}, nodeStore, 0).Run()
 	}
 	nodeLister := &listers.StoreToNodeLister{Store: nodeStore}
@@ -415,7 +406,7 @@ func NewMainKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *Kub
 	}
 	containerRefManager := kubecontainer.NewRefManager()
 
-	secretManager, err := secret.NewCachingSecretManager(kubeClient)
+	secretManager, err := secret.NewCachingSecretManager(kubeDeps.KubeClient)
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize secret manager: %v", err)
 	}
@@ -426,7 +417,7 @@ func NewMainKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *Kub
 		hostname:                       hostname,
 		nodeName:                       nodeName,
 		dockerClient:                   kubeDeps.DockerClient,
-		kubeClient:                     kubeClient,
+		kubeClient:                     kubeDeps.KubeClient,
 		rootDirectory:                  kubeCfg.RootDirectory,
 		resyncInterval:                 kubeCfg.SyncFrequency.Duration,
 		containerRefManager:            containerRefManager,
@@ -699,7 +690,7 @@ func NewMainKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *Kub
 	}
 	klet.imageManager = imageManager
 
-	klet.statusManager = status.NewManager(kubeClient, klet.podManager)
+	klet.statusManager = status.NewManager(klet.kubeClient, klet.podManager)
 
 	klet.probeManager = prober.NewManager(
 		klet.statusManager,
