@@ -12369,6 +12369,7 @@ go_test(
         "k8s.io/client-go/tools/cache/mutation_detector_test.go",
         "k8s.io/client-go/tools/cache/processor_listener_test.go",
         "k8s.io/client-go/tools/cache/reflector_test.go",
+        "k8s.io/client-go/tools/cache/shared_informer_test.go",
         "k8s.io/client-go/tools/cache/store_test.go",
         "k8s.io/client-go/tools/cache/undelta_store_test.go",
     ],
@@ -12376,6 +12377,7 @@ go_test(
     tags = ["automanaged"],
     deps = [
         "//vendor:github.com/google/gofuzz",
+        "//vendor:k8s.io/apimachinery/pkg/api/meta",
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
         "//vendor:k8s.io/apimachinery/pkg/runtime",
         "//vendor:k8s.io/apimachinery/pkg/util/sets",
