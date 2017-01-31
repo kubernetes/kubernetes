@@ -18,18 +18,22 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-VERIFYONLY=false
-while getopts ":v" opt; do
+FAIL_ON_CHANGES=false
+DRY_RUN=true
+while getopts ":fd" opt; do
   case $opt in
-    v)
-      VERIFYONLY=true
+    f)
+      FAIL_ON_CHANGES=true
+      ;;
+    d)
+      DRY_RUN=true
       ;;
     \?)
       echo "Invalid option: -$OPTARG" >&2
       ;;
   esac
 done
-readonly VERIFYONLY
+readonly FAIL_ON_CHANGES DRY_RUN
 
 echo "**PLEASE** run \"godep restore\" before running this script"
 # PREREQUISITES: run `godep restore` in the main repo before calling this script.
@@ -204,7 +208,7 @@ find "${CLIENT_REPO_TEMP}" -type f \( \
 echo "remove cyclical godep"
 rm -rf "${CLIENT_REPO_TEMP}/_vendor/k8s.io/client-go"
 
-if [ "${VERIFYONLY}" = true ]; then
+if [ "${FAIL_ON_CHANGES}" = true ]; then
     echo "running verify-only"
     ret=0
     if diff -NauprB -I "GoVersion.*\|GodepVersion.*" "${CLIENT_REPO}" "${CLIENT_REPO_TEMP}"; then
@@ -218,8 +222,11 @@ if [ "${VERIFYONLY}" = true ]; then
     fi
 fi
 
-echo "move to the client repo"
 # clean the ${CLIENT_REPO}
-ls "${CLIENT_REPO}" | { grep -v '_tmp' || true; } | xargs rm -rf
-mv "${CLIENT_REPO_TEMP}"/* "${CLIENT_REPO}"
+echo "move to the client repo"
+if [ "${DRY_RUN}" = false ]; then
+    ls "${CLIENT_REPO}" | { grep -v '_tmp' || true; } | xargs rm -rf
+    mv "${CLIENT_REPO_TEMP}"/* "${CLIENT_REPO}"
+fi
+
 cleanup
