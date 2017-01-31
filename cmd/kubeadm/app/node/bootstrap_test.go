@@ -31,6 +31,63 @@ import (
 )
 
 func TestEstablishMasterConnection(t *testing.T) {
+	srv := stubServer(t)
+	defer srv.Close()
+
+	tests := []struct {
+		c      string
+		e      string
+		expect bool
+	}{
+		{
+			c:      "",
+			e:      "",
+			expect: false,
+		},
+		{
+			c:      "",
+			e:      srv.URL,
+			expect: true,
+		},
+		{
+			c:      "foo",
+			e:      srv.URL,
+			expect: true,
+		},
+	}
+	for _, rt := range tests {
+		s := &kubeadmapi.TokenDiscovery{}
+		c := &kubeadmapi.ClusterInfo{Endpoints: []string{rt.e}, CertificateAuthorities: []string{rt.c}}
+		_, actual := EstablishMasterConnection(s, c)
+		if (actual == nil) != rt.expect {
+			t.Errorf(
+				"failed EstablishMasterConnection:\n\texpected: %t\n\t  actual: %t",
+				rt.expect,
+				(actual == nil),
+			)
+		}
+	}
+}
+
+func TestEstablishMasterConnectionWithMultipleEndpoints(t *testing.T) {
+	// ref. https://github.com/kubernetes/kubernetes/issues/36988
+
+	srv := stubServer(t)
+	defer srv.Close()
+
+	s := &kubeadmapi.TokenDiscovery{}
+	c := &kubeadmapi.ClusterInfo{Endpoints: []string{srv.URL, srv.URL}, CertificateAuthorities: []string{"foo"}}
+
+	defer func() {
+		if r := recover(); r != nil {
+			t.Errorf("failed EstablishMasterConnectionWithMultipleEndpoints; got a panic.")
+		}
+	}()
+
+	EstablishMasterConnection(s, c)
+}
+
+func stubServer(t *testing.T) *httptest.Server {
 	expect := version.Info{
 		Major:     "foo",
 		Minor:     "bar",
@@ -83,41 +140,8 @@ func TestEstablishMasterConnection(t *testing.T) {
 			w.Write(output)
 		}
 	}))
-	defer srv.Close()
 
-	tests := []struct {
-		c      string
-		e      string
-		expect bool
-	}{
-		{
-			c:      "",
-			e:      "",
-			expect: false,
-		},
-		{
-			c:      "",
-			e:      srv.URL,
-			expect: true,
-		},
-		{
-			c:      "foo",
-			e:      srv.URL,
-			expect: true,
-		},
-	}
-	for _, rt := range tests {
-		s := &kubeadmapi.TokenDiscovery{}
-		c := &kubeadmapi.ClusterInfo{Endpoints: []string{rt.e}, CertificateAuthorities: []string{rt.c}}
-		_, actual := EstablishMasterConnection(s, c)
-		if (actual == nil) != rt.expect {
-			t.Errorf(
-				"failed EstablishMasterConnection:\n\texpected: %t\n\t  actual: %t",
-				rt.expect,
-				(actual == nil),
-			)
-		}
-	}
+	return srv
 }
 
 func TestCreateClients(t *testing.T) {
