@@ -25,6 +25,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	federationapi "k8s.io/kubernetes/federation/apis/federation"
+	kubefedinit "k8s.io/kubernetes/federation/pkg/kubefed/init"
 	"k8s.io/kubernetes/federation/pkg/kubefed/util"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
@@ -81,14 +82,14 @@ func unjoinFederation(f cmdutil.Factory, cmdOut, cmdErr io.Writer, config util.A
 		return nil
 	}
 
-	//we need to ensure deleting the config map created in the deregistered cluster
-	//this configmap was created when the cluster joined this federation to aid
-	//the kube-dns of that cluser to aid service discovery
+	// We need to ensure deleting the config map created in the deregistered cluster
+	// this configmap was created when the cluster joined this federation to aid
+	// the kube-dns of that cluster to aid service discovery
 	unjoinClusterFactory := config.HostFactory(unjoinFlags.Name, unjoinFlags.Kubeconfig)
 	err = deleteConfigMap(unjoinClusterFactory)
 	if err != nil {
 		fmt.Fprintf(cmdErr, "WARNING: Encountered error in deleting kube-dns configmap\n")
-		//we anyways continue to try and delete the secret further
+		// We anyways continue to try and delete the secret further
 	}
 
 	// We want a separate client factory to communicate with the
@@ -146,7 +147,7 @@ func deleteConfigMap(unjoinClusterFactory cmdutil.Factory) error {
 	if err != nil {
 		return err
 	}
-	return clientset.Core().ConfigMaps("kube-system").Delete("kube-dns", &metav1.DeleteOptions{})
+	return clientset.Core().ConfigMaps(metav1.NamespaceSystem).Delete(kubefedinit.KubeDnsName, &metav1.DeleteOptions{})
 }
 
 // deleteSecret deletes the secret with the given name from the host

@@ -249,7 +249,6 @@ func fakeUnjoinHostFactory(secretName, configMapName string) cmdutil.Factory {
 				}
 				return &http.Response{StatusCode: http.StatusOK, Header: kubefedtesting.DefaultHeader(), Body: kubefedtesting.ObjBody(codec, &status)}, nil
 			default:
-				fmt.Println("IRF: default from fakeunjoin %v", p)
 				return nil, fmt.Errorf("unexpected request: %#v\n%#v", req.URL, req)
 			}
 		}),

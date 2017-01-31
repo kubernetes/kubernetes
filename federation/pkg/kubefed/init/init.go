@@ -45,6 +45,7 @@ import (
 	certutil "k8s.io/client-go/util/cert"
 	triple "k8s.io/client-go/util/cert/triple"
 	kubeadmkubeconfigphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/kubeconfig"
+	fedclient "k8s.io/kubernetes/federation/client/clientset_generated/federation_clientset"
 	"k8s.io/kubernetes/federation/pkg/kubefed/util"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
@@ -63,6 +64,7 @@ const (
 	ControllerManagerCN         = "federation-controller-manager"
 	AdminCN                     = "admin"
 	HostClusterLocalDNSZoneName = "cluster.local."
+	KubeDnsName                 = "kube-dns"
 
 	// User name used by federation controller manager to make
 	// calls to federation API server.
@@ -260,25 +262,30 @@ func initFederation(cmdOut io.Writer, config util.AdminConfig, cmd *cobra.Comman
 		return err
 	}
 
+	fedClientSet, err := config.FederationClientset(initFlags.Name, initFlags.Kubeconfig)
+	if err != nil {
+		return err
+	}
+
 	if !dryRun {
 		fedPods := []string{serverName, cmName}
 		err = waitForPods(hostClientset, fedPods, initFlags.FederationSystemNamespace)
 		if err != nil {
 			return err
 		}
-		err = waitSrvHealthy(config, initFlags.Name, initFlags.Kubeconfig)
+		err = waitSrvHealthy(fedClientSet)
 		if err != nil {
 			return err
 		}
 	}
 
-	//as the federation control plane is up and responding
-	//we create a config map in the fed control plane
-	//which subsequently is consumed by the dns servers of the yet to be registered clusters
-	//expecting that when ever a new cluster registers with it
-	//the control plane will create a config map in that cluster
-	//we however explicitly take care of cleaning this config map up at deregister (kubefed unjoin)
-	_, err = createFedConfigMap(config, initFlags.Name, initFlags.Kubeconfig, dnsZoneName, dryRun)
+	// As the federation control plane is up and responding
+	// we create a config map in the fed control plane
+	// which subsequently is consumed by the dns servers of the yet to be registered clusters
+	// expecting that when ever a new cluster registers with it
+	// the control plane will create a config map in that cluster
+	// We however explicitly take care of cleaning this config map up at deregister (kubefed unjoin)
+	_, err = createFedConfigMap(fedClientSet, initFlags.Name, dnsZoneName, dryRun)
 	if err != nil {
 		return err
 	}
@@ -680,26 +687,29 @@ func createControllerManager(clientset *client.Clientset, namespace, name, svcNa
 	return clientset.Extensions().Deployments(namespace).Create(dep)
 }
 
-func createFedConfigMap(config util.AdminConfig, fedName, kubeconfig, dnsZoneName string, dryRun bool) (*v1.ConfigMap, error) {
-	fedClientSet, err := config.FederationClientset(fedName, kubeconfig)
-	if err != nil {
-		return nil, err
+func createFedConfigMap(fedClientSet *fedclient.Clientset, fedName, dnsZoneName string, dryRun bool) (*v1.ConfigMap, error) {
+	data := map[string]string{
+		"federations": fmt.Sprintf("%s=%s", fedName, dnsZoneName),
 	}
-
-	configMap := &v1.ConfigMap{
+	newConfigMap := &v1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      "kube-dns",
-			Namespace: "kube-system",
+			Name:      KubeDnsName,
+			Namespace: metav1.NamespaceSystem,
 		},
-		Data: map[string]string{
-			"federations": fmt.Sprintf("%s=%s", fedName, dnsZoneName),
-		},
+		Data: data,
 	}
 
 	if dryRun {
-		return configMap, nil
+		return newConfigMap, nil
 	}
-	return fedClientSet.Core().ConfigMaps("kube-system").Create(configMap)
+
+	existingConfigMap, err := fedClientSet.Core().ConfigMaps(metav1.NamespaceSystem).Get(KubeDnsName, metav1.GetOptions{})
+	if err != nil {
+		return fedClientSet.Core().ConfigMaps(metav1.NamespaceSystem).Create(newConfigMap)
+	}
+
+	existingConfigMap.Data = data
+	return fedClientSet.Core().ConfigMaps(metav1.NamespaceSystem).Update(existingConfigMap)
 }
 
 func waitForPods(clientset *client.Clientset, fedPods []string, namespace string) error {
@@ -715,7 +725,7 @@ func waitForPods(clientset *client.Clientset, fedPods []string, namespace string
 					podCheck -= 1
 				}
 			}
-			//ensure that all pods are in running state or keep waiting
+			// ensure that all pods are in running state or keep waiting
 			if podCheck == 0 {
 				return true, nil
 			}
@@ -725,13 +735,9 @@ func waitForPods(clientset *client.Clientset, fedPods []string, namespace string
 	return err
 }
 
-func waitSrvHealthy(config util.AdminConfig, context, kubeconfig string) error {
-	fedClientSet, err := config.FederationClientset(context, kubeconfig)
-	if err != nil {
-		return err
-	}
+func waitSrvHealthy(fedClientSet *fedclient.Clientset) error {
 	fedDiscoveryClient := fedClientSet.Discovery()
-	err = wait.PollInfinite(podWaitInterval, func() (bool, error) {
+	err := wait.PollInfinite(podWaitInterval, func() (bool, error) {
 		body, err := fedDiscoveryClient.RESTClient().Get().AbsPath("/healthz").Do().Raw()
 		if err != nil {
 			return false, nil

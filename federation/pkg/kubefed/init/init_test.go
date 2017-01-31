@@ -811,7 +811,7 @@ func fakeInitHostFactory(federationName, namespaceName, ip, dnsZoneName, image, 
 			Kind:       "ConfigMap",
 			APIVersion: testapi.Default.GroupVersion().String(),
 		},
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:      "kube-dns",
 			Namespace: "kube-system",
 		},
