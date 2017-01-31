@@ -23,7 +23,6 @@ go_library(
         "//pkg/genericapiserver/registry/rest:go_default_library",
         "//pkg/genericapiserver/server:go_default_library",
         "//pkg/registry/autoscaling/horizontalpodautoscaler/storage:go_default_library",
-        "//pkg/registry/batch/job/storage:go_default_library",
         "//pkg/registry/extensions/controller/storage:go_default_library",
         "//pkg/registry/extensions/daemonset/storage:go_default_library",
         "//pkg/registry/extensions/deployment/storage:go_default_library",
