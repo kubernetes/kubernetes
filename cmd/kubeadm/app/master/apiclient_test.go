@@ -17,21 +17,10 @@ limitations under the License.
 package master
 
 import (
-	"fmt"
 	"testing"
 
-	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
-	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
-	apiv1 "k8s.io/kubernetes/pkg/api/v1"
+	"k8s.io/kubernetes/pkg/api/v1"
 )
-
-func TestCreateClientAndWaitForAPI(t *testing.T) {
-	cfg := &kubeadmapi.MasterConfiguration{
-		Networking: kubeadm.Networking{DNSDomain: "localhost"},
-	}
-	fmt.Println(cfg)
-
-}
 
 func TestStandardLabels(t *testing.T) {
 	var tests = []struct {
@@ -90,7 +79,7 @@ func TestNewDaemonSet(t *testing.T) {
 	}
 
 	for _, rt := range tests {
-		p := apiv1.PodSpec{}
+		p := v1.PodSpec{}
 		actual := NewDaemonSet(rt.dn, p)
 		if actual.Spec.Selector.MatchLabels["k8s-app"] != rt.expected {
 			t.Errorf(
@@ -132,7 +121,7 @@ func TestNewService(t *testing.T) {
 	}
 
 	for _, rt := range tests {
-		p := apiv1.ServiceSpec{}
+		p := v1.ServiceSpec{}
 		actual := NewService(rt.dn, p)
 		if actual.ObjectMeta.Labels["k8s-app"] != rt.expected {
 			t.Errorf(
@@ -174,7 +163,7 @@ func TestNewDeployment(t *testing.T) {
 	}
 
 	for _, rt := range tests {
-		p := apiv1.PodSpec{}
+		p := v1.PodSpec{}
 		actual := NewDeployment(rt.dn, 1, p)
 		if actual.Spec.Selector.MatchLabels["k8s-app"] != rt.expected {
 			t.Errorf(
