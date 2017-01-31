@@ -14,14 +14,18 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package unstructured
+package helpers
 
-import "testing"
+import (
+	"testing"
+
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+)
 
 func TestUnstructuredList(t *testing.T) {
-	list := &UnstructuredList{
+	list := &unstructured.UnstructuredList{
 		Object: map[string]interface{}{"kind": "List", "apiVersion": "v1"},
-		Items: []Unstructured{
+		Items: []unstructured.Unstructured{
 			{Object: map[string]interface{}{"kind": "Pod", "apiVersion": "v1", "metadata": map[string]interface{}{"name": "test"}}},
 		},
 	}
