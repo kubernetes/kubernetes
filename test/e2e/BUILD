@@ -74,6 +74,7 @@ go_library(
         "portforward.go",
         "pre_stop.go",
         "proxy.go",
+        "pvutil.go",
         "rc.go",
         "reboot.go",
         "replica_set.go",
