@@ -243,6 +243,10 @@ func (hc HostnameCheck) Check() (warnings, errors []error) {
 	for _, msg := range validation.ValidateNodeName(hostname, false) {
 		errors = append(errors, fmt.Errorf("hostname \"%s\" %s", hostname, msg))
 	}
+	addr, err := net.LookupHost(hostname)
+	if addr == nil || err != nil {
+		errors = append(errors, fmt.Errorf("hostname \"%s\" %s", hostname, err))
+	}
 	return nil, errors
 }
 
