@@ -559,3 +559,16 @@ func TestUnblockOwnerReference(t *testing.T) {
 		}
 	}
 }
+
+// *FOR TEST USE ONLY* It's not safe to call this function when the GC is still
+// busy.
+// GraphHasUID returns if the GraphBuilder has a particular UID store in its
+// uidToNode graph. It's useful for debugging.
+func (gc *GarbageCollector) GraphHasUID(UIDs []types.UID) bool {
+	for _, u := range UIDs {
+		if _, ok := gc.dependencyGraphBuilder.uidToNode.Read(u); ok {
+			return true
+		}
+	}
+	return false
+}

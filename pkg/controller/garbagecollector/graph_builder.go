@@ -356,7 +356,7 @@ func startsWaitingForDependentsOrphaned(oldObj interface{}, newAccessor meta.Obj
 	return deletionStarts(oldObj, newAccessor) && hasOrphanFianlizer(newAccessor)
 }
 
-// if an blocking ownerReference points to an object gets removed, or get set to
+// if an blocking ownerReference points to an object gets removed, or gets set to
 // "BlockOwnerDeletion=false", add the object to the dirty queue.
 func (gb *GraphBuilder) addUnblockedOwnersToDeleteQueue(removed []metav1.OwnerReference, changed []ownerRefPair) {
 	for _, ref := range removed {
@@ -370,8 +370,9 @@ func (gb *GraphBuilder) addUnblockedOwnersToDeleteQueue(removed []metav1.OwnerRe
 		}
 	}
 	for _, c := range changed {
-		if c.oldRef.BlockOwnerDeletion != nil && *c.oldRef.BlockOwnerDeletion &&
-			c.newRef.BlockOwnerDeletion != nil && !*c.newRef.BlockOwnerDeletion {
+		wasBlocked := c.oldRef.BlockOwnerDeletion != nil && *c.oldRef.BlockOwnerDeletion
+		isUnblocked := c.newRef.BlockOwnerDeletion == nil || (c.newRef.BlockOwnerDeletion != nil && !*c.newRef.BlockOwnerDeletion)
+		if wasBlocked && isUnblocked {
 			node, found := gb.uidToNode.Read(c.newRef.UID)
 			if !found {
 				glog.V(5).Infof("cannot find %s in uidToNode", c.newRef.UID)
@@ -386,7 +387,9 @@ func (gb *GraphBuilder) processTransitions(oldObj interface{}, newAccessor meta.
 	if startsWaitingForDependentsOrphaned(oldObj, newAccessor) {
 		glog.V(5).Infof("add %s to the attemptToOrphan", n.identity)
 		gb.attemptToOrphan.Add(n)
-	} else if startsWaitingForDependentsDeleted(oldObj, newAccessor) {
+		return
+	}
+	if startsWaitingForDependentsDeleted(oldObj, newAccessor) {
 		glog.V(2).Infof("add %s to the attemptToDelete, because it's waiting for its dependents to be deleted", n.identity)
 		// if the n is added as a "virtual" node, its deletingDependents field is not properly set, so always set it here.
 		n.setDeletingDependents(true)

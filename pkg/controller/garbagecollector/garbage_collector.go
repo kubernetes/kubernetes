@@ -18,7 +18,6 @@ package garbagecollector
 
 import (
 	"fmt"
-	"sync"
 	"time"
 
 	"github.com/golang/glog"
@@ -88,7 +87,6 @@ func NewGarbageCollector(metaOnlyClientPool dynamic.ClientPool, clientPool dynam
 		restMapper:                          mapper,
 		graphChanges:                        workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "garbage_collector_graph_changes"),
 		uidToNode: &concurrentUIDToNode{
-			RWMutex:   &sync.RWMutex{},
 			uidToNode: make(map[types.UID]*node),
 		},
 		attemptToDelete:  attemptToDelete,
@@ -141,7 +139,7 @@ func (gc *GarbageCollector) attemptToDeleteWorker() bool {
 		utilruntime.HandleError(fmt.Errorf("expect *node, got %#v", item))
 		return true
 	}
-	err := gc.attempToDeleteItem(n)
+	err := gc.attemptToDeleteItem(n)
 	if err != nil {
 		utilruntime.HandleError(fmt.Errorf("Error syncing item %#v: %v", n, err))
 		// retry if garbage collection of an object failed.
@@ -197,13 +195,14 @@ func (gc *GarbageCollector) classifyReferences(item *node, latestReferences []me
 		// is a "virtual" node. The local graph could lag behind the real
 		// status, but in practice, the difference is small.
 		owner, err := client.Resource(resource, item.identity.Namespace).Get(reference.Name)
-		if err != nil {
-			if !errors.IsNotFound(err) {
-				return nil, nil, nil, err
-			}
+		switch {
+		case IsNotFound(err):
 			gc.absentOwnerCache.Add(reference.UID)
 			glog.V(5).Infof("object %s's owner %s/%s, %s is not found", item.identity.UID, reference.APIVersion, reference.Kind, reference.Name)
 			dangling = append(dangling, reference)
+			continue
+		case err != nil:
+			return nil, nil, nil, err
 		}
 
 		if owner.GetUID() != reference.UID {
@@ -243,28 +242,29 @@ func ownerRefsToUIDs(refs []metav1.OwnerReference) []types.UID {
 	return ret
 }
 
-func (gc *GarbageCollector) attempToDeleteItem(item *node) error {
+func (gc *GarbageCollector) attemptToDeleteItem(item *node) error {
 	glog.V(2).Infof("processing item %s", item.identity)
 	// "being deleted" is an one-way trip to the final deletion. We'll just wait for the final deletion, and then process the object's dependents.
 	if item.isBeingDeleted() && !item.isDeletingDependents() {
-		glog.V(5).Infof("processing item %s returned at once", item.identity)
+		glog.V(5).Infof("processing item %s returned at once, because its DeletionTimestamp is non-nil", item.identity)
 		return nil
 	}
 	// TODO: It's only necessary to talk to the API server if this is a
 	// "virtual" node. The local graph could lag behind the real status, but in
 	// practice, the difference is small.
 	latest, err := gc.getObject(item.identity)
-	if err != nil && errors.IsNotFound(err) {
+	switch {
+	case errors.IsNotFound(err):
 		// the GraphBuilder can add "virtual" node for an owner that doesn't
 		// exist yet, so we need to enqueue a virtual Delete event to remove
 		// the virtual node from GraphBuilder.uidToNode.
 		glog.V(5).Infof("item %v not found, generating a virtual delete event", item.identity)
 		gc.generateVirtualDeleteEvent(item.identity)
 		return nil
-	}
-	if err != nil {
+	case err != nil:
 		return err
 	}
+
 	if latest.GetUID() != item.identity.UID {
 		glog.V(5).Infof("UID doesn't match, item %v not found, generating a virtual delete event", item.identity)
 		gc.generateVirtualDeleteEvent(item.identity)
@@ -272,7 +272,7 @@ func (gc *GarbageCollector) attempToDeleteItem(item *node) error {
 	}
 
 	// TODO: attemptToOrphanWorker() routine is similar. Consider merging
-	// attemptToOrphanWorker() into attempToDeleteItem() as well.
+	// attemptToOrphanWorker() into attemptToDeleteItem() as well.
 	if item.isDeletingDependents() {
 		return gc.processDeletingDependentsItem(item)
 	}
@@ -292,19 +292,25 @@ func (gc *GarbageCollector) attempToDeleteItem(item *node) error {
 
 	switch {
 	case len(solid) != 0:
-		glog.V(2).Infof("object %s has at least one existing owner, will not garbage collect", item.identity)
+		glog.V(2).Infof("object %s has at least one existing owner: %#v, will not garbage collect", solid, item.identity)
 		if len(dangling) != 0 || len(waitingForDependentsDeletion) != 0 {
 			glog.V(2).Infof("remove dangling references %#v and waiting references %#v for object %s", dangling, waitingForDependentsDeletion, item.identity)
 		}
+		// waitingForDependentsDeletion needs to be deleted from the
+		// ownerReferences, otherwise the referenced objects will be stuck with
+		// the FinalizerDeletingDependents and never get deleted.
 		patch := deleteOwnerRefPatch(item.identity.UID, append(ownerRefsToUIDs(dangling), ownerRefsToUIDs(waitingForDependentsDeletion)...)...)
 		_, err = gc.patchObject(item.identity, patch)
 		return err
-	case len(waitingForDependentsDeletion) != 0 && len(item.dependents) != 0:
-		for dep := range item.dependents {
+	case len(waitingForDependentsDeletion) != 0 && item.dependentsLength() != 0:
+		deps := item.getDependents()
+		for dep := range deps {
 			if dep.isDeletingDependents() {
 				// this circle detection has false positives, we need to
 				// apply a more rigorous detection if this turns out to be a
 				// problem.
+				// there are multiple workers run attemptToDeleteItem in
+				// parallel, the circle detection can fail in a race condition.
 				glog.V(2).Infof("processing object %s, some of its owners and its dependent [%s] have FinalizerDeletingDependents, to prevent potential cycle, its ownerReferences are going to be modified to be non-blocking, then the object is going to be deleted with DeletePropagationForeground", item.identity, dep.identity)
 				patch, err := item.patchToUnblockOwnerReferences()
 				if err != nil {
@@ -317,8 +323,16 @@ func (gc *GarbageCollector) attempToDeleteItem(item *node) error {
 			}
 		}
 		glog.V(2).Infof("at least one owner of object %s has FinalizerDeletingDependents, and the object itself has dependents, so it is going to be deleted with DeletePropagationForeground", item.identity)
+		// the deletion event will be observed by the graphBuilder, so the item
+		// will be processed again in processDeletingDependentsItem. If it
+		// doesn't have dependents, the function will remove the
+		// FinalizerDeletingDependents from the item, resulting in the final
+		// deletion of the item.
 		return gc.deleteObject(item.identity, v1.DeletePropagationForeground)
 	default:
+		// item doesn't have any solid owner, so it needs to be garbage
+		// collected. Also, none of item's owners is waiting for the deletion of
+		// the dependents, so GC deletes item with DeletePropagationDefault.
 		glog.V(2).Infof("delete object %s with DeletePropagationDefault", item.identity)
 		return gc.deleteObject(item.identity, v1.DeletePropagationDefault)
 	}
@@ -341,7 +355,7 @@ func (gc *GarbageCollector) processDeletingDependentsItem(item *node) error {
 }
 
 // dependents are copies of pointers to the owner's dependents, they don't need to be locked.
-func (gc *GarbageCollector) orhpanDependents(owner objectReference, dependents []*node) error {
+func (gc *GarbageCollector) orphanDependents(owner objectReference, dependents []*node) error {
 	var failedDependents []objectReference
 	var errorsSlice []error
 	for _, dependent := range dependents {
@@ -390,7 +404,7 @@ func (gc *GarbageCollector) attemptToOrphanWorker() bool {
 	}
 	owner.dependentsLock.RUnlock()
 
-	err := gc.orhpanDependents(owner.identity, dependents)
+	err := gc.orphanDependents(owner.identity, dependents)
 	if err != nil {
 		glog.V(5).Infof("orphanDependents for %s failed with %v", owner.identity, err)
 		gc.attemptToOrphan.AddRateLimited(item)
@@ -403,17 +417,4 @@ func (gc *GarbageCollector) attemptToOrphanWorker() bool {
 		gc.attemptToOrphan.AddRateLimited(item)
 	}
 	return true
-}
-
-// *FOR TEST USE ONLY* It's not safe to call this function when the GC is still
-// busy.
-// GraphHasUID returns if the GraphBuilder has a particular UID store in its
-// uidToNode graph. It's useful for debugging.
-func (gc *GarbageCollector) GraphHasUID(UIDs []types.UID) bool {
-	for _, u := range UIDs {
-		if _, ok := gc.dependencyGraphBuilder.uidToNode.Read(u); ok {
-			return true
-		}
-	}
-	return false
 }

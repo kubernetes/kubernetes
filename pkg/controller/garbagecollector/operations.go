@@ -27,6 +27,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/v1"
 	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/apis/meta/v1/unstructured"
+	"k8s.io/kubernetes/pkg/client/retry"
 	"k8s.io/kubernetes/pkg/runtime/schema"
 )
 
@@ -97,18 +98,17 @@ func (gc *GarbageCollector) patchObject(item objectReference, patch []byte) (*un
 // TODO: Using Patch when strategicmerge supports deleting an entry from a
 // slice of a base type.
 func (gc *GarbageCollector) removeFinalizer(owner *node, targetFinalizer string) error {
-	const retries = 5
-	for count := 0; count < retries; count++ {
+	err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
 		ownerObject, err := gc.getObject(owner.identity)
+		if errors.IsNotFound(err) {
+			return nil
+		}
 		if err != nil {
-			if errors.IsNotFound(err) {
-				return nil
-			}
-			return fmt.Errorf("cannot finalize owner %s, because cannot get it. The garbage collector will retry later.", owner.identity)
+			return fmt.Errorf("cannot finalize owner %s, because cannot get it: %v. The garbage collector will retry later.", owner.identity, err)
 		}
 		accessor, err := meta.Accessor(ownerObject)
 		if err != nil {
-			return fmt.Errorf("cannot access the owner object: %v. The garbage collector will retry later.", err)
+			return fmt.Errorf("cannot access the owner object %v: %v. The garbage collector will retry later.", ownerObject, err)
 		}
 		finalizers := accessor.GetFinalizers()
 		var newFinalizers []string
@@ -117,9 +117,8 @@ func (gc *GarbageCollector) removeFinalizer(owner *node, targetFinalizer string)
 			if f == targetFinalizer {
 				found = true
 				break
-			} else {
-				newFinalizers = append(newFinalizers, f)
 			}
+			newFinalizers = append(newFinalizers, f)
 		}
 		if !found {
 			glog.V(5).Infof("the orphan finalizer is already removed from object %s", owner.identity)
@@ -128,14 +127,10 @@ func (gc *GarbageCollector) removeFinalizer(owner *node, targetFinalizer string)
 		// remove the owner from dependent's OwnerReferences
 		ownerObject.SetFinalizers(newFinalizers)
 		_, err = gc.updateObject(owner.identity, ownerObject)
-		if err == nil {
-			return nil
-		}
-		if err != nil && !errors.IsConflict(err) {
-			return fmt.Errorf("cannot update the finalizers of owner %s, with error: %v, tried %d times", owner.identity, err, count+1)
-		}
-		// retry if it's a conflict
-		glog.V(5).Infof("got conflict updating the owner object %s, tried %d times", owner.identity, count+1)
+		return err
+	})
+	if errors.IsConflict(err) {
+		return fmt.Errorf("updateMaxRetries(%d) has reached. The garbage collector will retry later for owner %v.", retry.DefaultBackoff.Steps, owner.identity)
 	}
-	return fmt.Errorf("updateMaxRetries(%d) has reached. The garbage collector will retry later for owner %v.", retries, owner.identity)
+	return err
 }

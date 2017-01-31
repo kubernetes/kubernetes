@@ -40,7 +40,9 @@ type node struct {
 	identity objectReference
 	// dependents will be read by the orphan() routine, we need to protect it with a lock.
 	dependentsLock sync.RWMutex
-	dependents     map[*node]struct{}
+	// dependents are the nodes that have node.identity as a
+	// metadata.ownerReference.
+	dependents map[*node]struct{}
 	// this is set by processEvent() if the object has non-nil DeletionTimestamp
 	// and has the FianlizerDeleteDependents.
 	deletingDependents     bool
@@ -89,8 +91,25 @@ func (ownerNode *node) deleteDependent(dependent *node) {
 	delete(ownerNode.dependents, dependent)
 }
 
+func (ownerNode *node) dependentsLength() int {
+	ownerNode.dependentsLock.RLock()
+	defer ownerNode.dependentsLock.RUnlock()
+	return len(ownerNode.dependents)
+}
+
+func (ownerNode *node) getDependents() []*node {
+	ownerNode.dependentsLock.RLock()
+	defer ownerNode.dependentsLock.RUnlock()
+	var ret []*node
+	for dep := range node.dependents {
+		ret = append(ret, dep)
+	}
+	return ret
+}
+
 // blockingDependents returns the dependents that are blocking the deletion of
-// n.
+// n, i.e., the dependent that has an ownerReference pointing to n, and
+// the BlockOwnerDeletion field of that ownerReference is true.
 func (n *node) blockingDependents() []*node {
 	var ret []*node
 	for dep := range n.dependents {
@@ -104,25 +123,25 @@ func (n *node) blockingDependents() []*node {
 }
 
 type concurrentUIDToNode struct {
-	*sync.RWMutex
-	uidToNode map[types.UID]*node
+	uidToNodeLock sync.RWMutex
+	uidToNode     map[types.UID]*node
 }
 
 func (m *concurrentUIDToNode) Write(node *node) {
-	m.Lock()
-	defer m.Unlock()
+	m.uidToNodeLock.Lock()
+	defer m.uidToNodeLock.Unlock()
 	m.uidToNode[node.identity.UID] = node
 }
 
 func (m *concurrentUIDToNode) Read(uid types.UID) (*node, bool) {
-	m.RLock()
-	defer m.RUnlock()
+	m.uidToNodeLock.RLock()
+	defer m.uidToNodeLock.RUnlock()
 	n, ok := m.uidToNode[uid]
 	return n, ok
 }
 
 func (m *concurrentUIDToNode) Delete(uid types.UID) {
-	m.Lock()
-	defer m.Unlock()
+	m.uidToNodeLock.Lock()
+	defer m.uidToNodeLock.Unlock()
 	delete(m.uidToNode, uid)
 }
