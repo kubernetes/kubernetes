@@ -1,5 +1,3 @@
-// +build integration,!no-etcd,linux
-
 /*
 Copyright 2015 The Kubernetes Authors.
 
