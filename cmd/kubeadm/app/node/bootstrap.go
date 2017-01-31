@@ -80,9 +80,10 @@ func EstablishMasterConnection(c *kubeadmapi.TokenDiscovery, clusterInfo *kubead
 					return
 				}
 				fmt.Printf("[bootstrap] Successfully established connection with endpoint %q\n", apiEndpoint)
+
 				// connection established, stop all wait threads
-				close(stopChan)
 				once.Do(func() {
+					close(stopChan)
 					clientConfig = ac.clientConfig
 				})
 			}, retryTimeout*time.Second, stopChan)
