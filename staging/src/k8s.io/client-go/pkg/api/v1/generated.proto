@@ -21,11 +21,11 @@ syntax = 'proto2';
 
 package k8s.io.kubernetes.pkg.api.v1;
 
+import "k8s.io/apimachinery/pkg/api/resource/generated.proto";
 import "k8s.io/apimachinery/pkg/apis/meta/v1/generated.proto";
 import "k8s.io/apimachinery/pkg/runtime/generated.proto";
 import "k8s.io/apimachinery/pkg/runtime/schema/generated.proto";
-import "k8s.io/apimachinery/pkg/api/resource/generated.proto";
-import "k8s.io/kubernetes/pkg/util/intstr/generated.proto";
+import "k8s.io/apimachinery/pkg/util/intstr/generated.proto";
 
 // Package-wide variables from generator "generated".
 option go_package = "v1";
@@ -1095,7 +1095,7 @@ message HTTPGetAction {
   // Name or number of the port to access on the container.
   // Number must be in the range 1 to 65535.
   // Name must be an IANA_SVC_NAME.
-  optional k8s.io.kubernetes.pkg.util.intstr.IntOrString port = 2;
+  optional k8s.io.apimachinery.pkg.util.intstr.IntOrString port = 2;
 
   // Host name to connect to, defaults to the pod IP. You probably want to set
   // "Host" in httpHeaders instead.
@@ -1241,23 +1241,23 @@ message LimitRangeItem {
 
   // Max usage constraints on this kind by resource name.
   // +optional
-  map<string, k8s.io.kubernetes.pkg.api.resource.Quantity> max = 2;
+  map<string, k8s.io.apimachinery.pkg.api.resource.Quantity> max = 2;
 
   // Min usage constraints on this kind by resource name.
   // +optional
-  map<string, k8s.io.kubernetes.pkg.api.resource.Quantity> min = 3;
+  map<string, k8s.io.apimachinery.pkg.api.resource.Quantity> min = 3;
 
   // Default resource requirement limit value by resource name if resource limit is omitted.
   // +optional
-  map<string, k8s.io.kubernetes.pkg.api.resource.Quantity> default = 4;
+  map<string, k8s.io.apimachinery.pkg.api.resource.Quantity> default = 4;
 
   // DefaultRequest is the default resource requirement request value by resource name if resource request is omitted.
   // +optional
-  map<string, k8s.io.kubernetes.pkg.api.resource.Quantity> defaultRequest = 5;
+  map<string, k8s.io.apimachinery.pkg.api.resource.Quantity> defaultRequest = 5;
 
   // MaxLimitRequestRatio if specified, the named resource must have a request and limit that are both non-zero where limit divided by request is less than or equal to the enumerated value; this represents the max burst for the named resource.
   // +optional
-  map<string, k8s.io.kubernetes.pkg.api.resource.Quantity> maxLimitRequestRatio = 6;
+  map<string, k8s.io.apimachinery.pkg.api.resource.Quantity> maxLimitRequestRatio = 6;
 }
 
 // LimitRangeList is a list of LimitRange items.
@@ -1527,7 +1527,7 @@ message NodeProxyOptions {
 // see http://releases.k8s.io/HEAD/docs/design/resources.md for more details.
 message NodeResources {
   // Capacity represents the available resources of a node
-  map<string, k8s.io.kubernetes.pkg.api.resource.Quantity> capacity = 1;
+  map<string, k8s.io.apimachinery.pkg.api.resource.Quantity> capacity = 1;
 }
 
 // A node selector represents the union of the results of one or more label queries
@@ -1589,12 +1589,12 @@ message NodeStatus {
   // Capacity represents the total resources of a node.
   // More info: http://kubernetes.io/docs/user-guide/persistent-volumes#capacity for more details.
   // +optional
-  map<string, k8s.io.kubernetes.pkg.api.resource.Quantity> capacity = 1;
+  map<string, k8s.io.apimachinery.pkg.api.resource.Quantity> capacity = 1;
 
   // Allocatable represents the resources of a node that are available for scheduling.
   // Defaults to Capacity.
   // +optional
-  map<string, k8s.io.kubernetes.pkg.api.resource.Quantity> allocatable = 2;
+  map<string, k8s.io.apimachinery.pkg.api.resource.Quantity> allocatable = 2;
 
   // NodePhase is the recently observed lifecycle phase of the node.
   // More info: http://releases.k8s.io/HEAD/docs/admin/node.md#node-phase
@@ -1964,7 +1964,7 @@ message PersistentVolumeClaimStatus {
 
   // Represents the actual resources of the underlying volume.
   // +optional
-  map<string, k8s.io.kubernetes.pkg.api.resource.Quantity> capacity = 3;
+  map<string, k8s.io.apimachinery.pkg.api.resource.Quantity> capacity = 3;
 }
 
 // PersistentVolumeClaimVolumeSource references the user's PVC in the same namespace.
@@ -2086,7 +2086,7 @@ message PersistentVolumeSpec {
   // A description of the persistent volume's resources and capacity.
   // More info: http://kubernetes.io/docs/user-guide/persistent-volumes#capacity
   // +optional
-  map<string, k8s.io.kubernetes.pkg.api.resource.Quantity> capacity = 1;
+  map<string, k8s.io.apimachinery.pkg.api.resource.Quantity> capacity = 1;
 
   // The actual volume backing the persistent volume.
   optional PersistentVolumeSource persistentVolumeSource = 2;
@@ -2992,7 +2992,7 @@ message ResourceFieldSelector {
 
   // Specifies the output format of the exposed resources, defaults to "1"
   // +optional
-  optional k8s.io.kubernetes.pkg.api.resource.Quantity divisor = 3;
+  optional k8s.io.apimachinery.pkg.api.resource.Quantity divisor = 3;
 }
 
 // ResourceQuota sets aggregate quota restrictions enforced per namespace
@@ -3030,7 +3030,7 @@ message ResourceQuotaSpec {
   // Hard is the set of desired hard limits for each named resource.
   // More info: http://releases.k8s.io/HEAD/docs/design/admission_control_resource_quota.md#admissioncontrol-plugin-resourcequota
   // +optional
-  map<string, k8s.io.kubernetes.pkg.api.resource.Quantity> hard = 1;
+  map<string, k8s.io.apimachinery.pkg.api.resource.Quantity> hard = 1;
 
   // A collection of filters that must match each object tracked by a quota.
   // If not specified, the quota matches all objects.
@@ -3043,11 +3043,11 @@ message ResourceQuotaStatus {
   // Hard is the set of enforced hard limits for each named resource.
   // More info: http://releases.k8s.io/HEAD/docs/design/admission_control_resource_quota.md#admissioncontrol-plugin-resourcequota
   // +optional
-  map<string, k8s.io.kubernetes.pkg.api.resource.Quantity> hard = 1;
+  map<string, k8s.io.apimachinery.pkg.api.resource.Quantity> hard = 1;
 
   // Used is the current observed total usage of the resource in the namespace.
   // +optional
-  map<string, k8s.io.kubernetes.pkg.api.resource.Quantity> used = 2;
+  map<string, k8s.io.apimachinery.pkg.api.resource.Quantity> used = 2;
 }
 
 // ResourceRequirements describes the compute resource requirements.
@@ -3055,14 +3055,14 @@ message ResourceRequirements {
   // Limits describes the maximum amount of compute resources allowed.
   // More info: http://kubernetes.io/docs/user-guide/compute-resources/
   // +optional
-  map<string, k8s.io.kubernetes.pkg.api.resource.Quantity> limits = 1;
+  map<string, k8s.io.apimachinery.pkg.api.resource.Quantity> limits = 1;
 
   // Requests describes the minimum amount of compute resources required.
   // If Requests is omitted for a container, it defaults to Limits if that is explicitly specified,
   // otherwise to an implementation-defined value.
   // More info: http://kubernetes.io/docs/user-guide/compute-resources/
   // +optional
-  map<string, k8s.io.kubernetes.pkg.api.resource.Quantity> requests = 2;
+  map<string, k8s.io.apimachinery.pkg.api.resource.Quantity> requests = 2;
 }
 
 // SELinuxOptions are the labels to be applied to the container
@@ -3331,7 +3331,7 @@ message ServicePort {
   // omitted or set equal to the 'port' field.
   // More info: http://kubernetes.io/docs/user-guide/services#defining-a-service
   // +optional
-  optional k8s.io.kubernetes.pkg.util.intstr.IntOrString targetPort = 4;
+  optional k8s.io.apimachinery.pkg.util.intstr.IntOrString targetPort = 4;
 
   // The port on each node on which this service is exposed when type=NodePort or LoadBalancer.
   // Usually assigned by the system. If specified, it will be allocated to the service
@@ -3465,7 +3465,7 @@ message TCPSocketAction {
   // Number or name of the port to access on the container.
   // Number must be in the range 1 to 65535.
   // Name must be an IANA_SVC_NAME.
-  optional k8s.io.kubernetes.pkg.util.intstr.IntOrString port = 1;
+  optional k8s.io.apimachinery.pkg.util.intstr.IntOrString port = 1;
 }
 
 // The node this Taint is attached to has the effect "effect" on
@@ -3480,18 +3480,24 @@ message Taint {
 
   // Required. The effect of the taint on pods
   // that do not tolerate the taint.
-  // Valid effects are NoSchedule and PreferNoSchedule.
+  // Valid effects are NoSchedule, PreferNoSchedule and NoExecute.
   optional string effect = 3;
+
+  // TimeAdded represents the time at which the taint was added.
+  // It is only written for NoExecute taints.
+  // +optional
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.Time timeAdded = 4;
 }
 
 // The pod this Toleration is attached to tolerates any taint that matches
 // the triple <key,value,effect> using the matching operator <operator>.
 message Toleration {
-  // Required. Key is the taint key that the toleration applies to.
+  // Key is the taint key that the toleration applies to. Empty means match all taint keys.
+  // If the key is empty, operator must be Exists; this combination means to match all values and all keys.
   // +optional
   optional string key = 1;
 
-  // operator represents a key's relationship to the value.
+  // Operator represents a key's relationship to the value.
   // Valid operators are Exists and Equal. Defaults to Equal.
   // Exists is equivalent to wildcard for value, so that a pod can
   // tolerate all taints of a particular category.
@@ -3504,9 +3510,16 @@ message Toleration {
   optional string value = 3;
 
   // Effect indicates the taint effect to match. Empty means match all taint effects.
-  // When specified, allowed values are NoSchedule and PreferNoSchedule.
+  // When specified, allowed values are NoSchedule, PreferNoSchedule and NoExecute.
   // +optional
   optional string effect = 4;
+
+  // TolerationSeconds represents the period of time the toleration (which must be
+  // of effect NoExecute, otherwise this field is ignored) tolerates the taint. By default,
+  // it is not set, which means tolerate the taint forever (do not evict). Zero and
+  // negative values will be treated as 0 (evict immediately) by the system.
+  // +optional
+  optional int64 tolerationSeconds = 5;
 }
 
 // Volume represents a named volume in a pod that may be accessed by any container in the pod.

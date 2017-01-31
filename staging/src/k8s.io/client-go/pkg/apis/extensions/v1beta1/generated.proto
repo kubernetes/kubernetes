@@ -21,12 +21,12 @@ syntax = 'proto2';
 
 package k8s.io.kubernetes.pkg.apis.extensions.v1beta1;
 
+import "k8s.io/apimachinery/pkg/api/resource/generated.proto";
 import "k8s.io/apimachinery/pkg/apis/meta/v1/generated.proto";
 import "k8s.io/apimachinery/pkg/runtime/generated.proto";
 import "k8s.io/apimachinery/pkg/runtime/schema/generated.proto";
-import "k8s.io/apimachinery/pkg/api/resource/generated.proto";
+import "k8s.io/apimachinery/pkg/util/intstr/generated.proto";
 import "k8s.io/kubernetes/pkg/api/v1/generated.proto";
-import "k8s.io/kubernetes/pkg/util/intstr/generated.proto";
 
 // Package-wide variables from generator "generated".
 option go_package = "v1beta1";
@@ -49,7 +49,7 @@ message CustomMetricCurrentStatus {
   optional string name = 1;
 
   // Custom Metric value (average).
-  optional k8s.io.kubernetes.pkg.api.resource.Quantity value = 2;
+  optional k8s.io.apimachinery.pkg.api.resource.Quantity value = 2;
 }
 
 message CustomMetricCurrentStatusList {
@@ -62,7 +62,7 @@ message CustomMetricTarget {
   optional string name = 1;
 
   // Custom Metric value (average).
-  optional k8s.io.kubernetes.pkg.api.resource.Quantity value = 2;
+  optional k8s.io.apimachinery.pkg.api.resource.Quantity value = 2;
 }
 
 message CustomMetricTargetList {
@@ -450,7 +450,7 @@ message IngressBackend {
   optional string serviceName = 1;
 
   // Specifies the port of the referenced service.
-  optional k8s.io.kubernetes.pkg.util.intstr.IntOrString servicePort = 2;
+  optional k8s.io.apimachinery.pkg.util.intstr.IntOrString servicePort = 2;
 }
 
 // IngressList is a collection of Ingress.
@@ -623,7 +623,7 @@ message NetworkPolicyPort {
   // If present, only traffic on the specified protocol AND port
   // will be matched.
   // +optional
-  optional k8s.io.kubernetes.pkg.util.intstr.IntOrString port = 2;
+  optional k8s.io.apimachinery.pkg.util.intstr.IntOrString port = 2;
 }
 
 message NetworkPolicySpec {
@@ -869,7 +869,7 @@ message RollingUpdateDeployment {
   // that the total number of pods available at all times during the update is at
   // least 70% of desired pods.
   // +optional
-  optional k8s.io.kubernetes.pkg.util.intstr.IntOrString maxUnavailable = 1;
+  optional k8s.io.apimachinery.pkg.util.intstr.IntOrString maxUnavailable = 1;
 
   // The maximum number of pods that can be scheduled above the desired number of
   // pods.
@@ -883,7 +883,7 @@ message RollingUpdateDeployment {
   // new RC can be scaled up further, ensuring that total number of pods running
   // at any time during the update is atmost 130% of desired pods.
   // +optional
-  optional k8s.io.kubernetes.pkg.util.intstr.IntOrString maxSurge = 2;
+  optional k8s.io.apimachinery.pkg.util.intstr.IntOrString maxSurge = 2;
 }
 
 // Run A sUser Strategy Options defines the strategy type and any options used to create the strategy.
