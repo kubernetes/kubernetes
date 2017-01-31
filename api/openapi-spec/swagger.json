@@ -37120,6 +37120,10 @@
       "description": "A label query over volumes to consider for binding.",
       "$ref": "#/definitions/v1.LabelSelector"
      },
+     "storageClassName": {
+      "description": "Name of the StorageClass where the desired volume belongs to. More info: http://kubernetes.io/docs/user-guide/persistent-volumes#class-1",
+      "type": "string"
+     },
      "volumeName": {
       "description": "VolumeName is the binding reference to the PersistentVolume backing this claim.",
       "type": "string"
@@ -37280,6 +37284,10 @@
      "rbd": {
       "description": "RBD represents a Rados Block Device mount on the host that shares a pod's lifetime. More info: http://releases.k8s.io/HEAD/examples/volumes/rbd/README.md",
       "$ref": "#/definitions/v1.RBDVolumeSource"
+     },
+     "storageClassName": {
+      "description": "Name of StorageClass where this persistent volume belongs. Empty value means that this volume does not belong to any StorageClass.",
+      "type": "string"
      },
      "vsphereVolume": {
       "description": "VsphereVolume represents a vSphere volume attached and mounted on kubelets host machine",
