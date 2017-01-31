@@ -55,6 +55,8 @@ func NewServerRunOptions() *ServerRunOptions {
 
 		EventTTL: 1 * time.Hour,
 	}
+	// Overwrite the default for storage data format.
+	s.GenericServerRunOptions.DefaultStorageMediaType = "application/vnd.kubernetes.protobuf"
 	return &s
 }
 
