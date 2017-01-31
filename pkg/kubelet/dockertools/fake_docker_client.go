@@ -23,6 +23,7 @@ import (
 	"os"
 	"reflect"
 	"sort"
+	"strings"
 	"sync"
 	"time"
 
@@ -232,6 +233,9 @@ func (f *FakeDockerClient) SetFakeContainers(containers []*FakeContainer) {
 			Names: []string{c.Name},
 			ID:    c.ID,
 		}
+		if c.Config != nil {
+			container.Labels = c.Config.Labels
+		}
 		if c.Running {
 			f.RunningContainerList = append(f.RunningContainerList, container)
 		} else {
@@ -349,7 +353,30 @@ func (f *FakeDockerClient) ListContainers(options dockertypes.ContainerListOptio
 		// TODO(random-liu): Is a fully sorted array needed?
 		containerList = append(containerList, f.ExitedContainerList...)
 	}
-	return containerList, err
+	// TODO: Support other filters.
+	// Filter containers with label filter.
+	labelFilters := options.Filter.Get("label")
+	if len(labelFilters) == 0 {
+		return containerList, err
+	}
+	var filtered []dockertypes.Container
+	for _, container := range containerList {
+		match := true
+		for _, labelFilter := range labelFilters {
+			kv := strings.Split(labelFilter, "=")
+			if len(kv) != 2 {
+				return nil, fmt.Errorf("invalid label filter %q", labelFilter)
+			}
+			if container.Labels[kv[0]] != kv[1] {
+				match = false
+				break
+			}
+		}
+		if match {
+			filtered = append(filtered, container)
+		}
+	}
+	return filtered, err
 }
 
 // InspectContainer is a test-spy implementation of DockerInterface.InspectContainer.
