@@ -281,9 +281,6 @@ func TestMatchTaint(t *testing.T) {
 }
 
 func TestTolerationToleratesTaint(t *testing.T) {
-	genTolerationSeconds := func(f int64) *int64 {
-		return &f
-	}
 
 	testCases := []struct {
 		description     string
@@ -373,64 +370,6 @@ func TestTolerationToleratesTaint(t *testing.T) {
 			taint: Taint{
 				Key:    "foo",
 				Value:  "bar",
-				Effect: TaintEffectNoExecute,
-			},
-			expectTolerated: false,
-		},
-		{
-			description: "expect toleration with nil tolerationSeconds tolerates taint that is newly added",
-			toleration: Toleration{
-				Key:      "foo",
-				Operator: TolerationOpExists,
-				Effect:   TaintEffectNoExecute,
-			},
-			taint: Taint{
-				Key:       "foo",
-				Effect:    TaintEffectNoExecute,
-				TimeAdded: metav1.Now(),
-			},
-			expectTolerated: true,
-		},
-		{
-			description: "forgiveness toleration has not timed out, expect tolerated",
-			toleration: Toleration{
-				Key:               "foo",
-				Operator:          TolerationOpExists,
-				Effect:            TaintEffectNoExecute,
-				TolerationSeconds: genTolerationSeconds(300),
-			},
-			taint: Taint{
-				Key:       "foo",
-				Effect:    TaintEffectNoExecute,
-				TimeAdded: metav1.Unix(metav1.Now().Unix()-100, 0),
-			},
-			expectTolerated: true,
-		},
-		{
-			description: "forgiveness toleration has timed out, expect not tolerated",
-			toleration: Toleration{
-				Key:               "foo",
-				Operator:          TolerationOpExists,
-				Effect:            TaintEffectNoExecute,
-				TolerationSeconds: genTolerationSeconds(300),
-			},
-			taint: Taint{
-				Key:       "foo",
-				Effect:    TaintEffectNoExecute,
-				TimeAdded: metav1.Unix(metav1.Now().Unix()-1000, 0),
-			},
-			expectTolerated: false,
-		},
-		{
-			description: "toleration with explicit forgiveness can't tolerate taint with no added time, expect not tolerated",
-			toleration: Toleration{
-				Key:               "foo",
-				Operator:          TolerationOpExists,
-				Effect:            TaintEffectNoExecute,
-				TolerationSeconds: genTolerationSeconds(300),
-			},
-			taint: Taint{
-				Key:    "foo",
 				Effect: TaintEffectNoExecute,
 			},
 			expectTolerated: false,
