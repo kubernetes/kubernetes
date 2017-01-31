@@ -9,19 +9,22 @@ load(
 
 go_test(
     name = "go_default_test",
-    srcs = ["objectmeta_test.go"],
+    srcs = ["replicationcontroller_test.go"],
     tags = [
         "automanaged",
         "integration",
     ],
     deps = [
-        "//pkg/api:go_default_library",
         "//pkg/api/v1:go_default_library",
         "//pkg/client/clientset_generated/clientset:go_default_library",
+        "//pkg/client/informers/informers_generated/externalversions:go_default_library",
+        "//pkg/controller/replication:go_default_library",
         "//test/integration/framework:go_default_library",
-        "//vendor/github.com/stretchr/testify/assert:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/types:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/util/wait:go_default_library",
         "//vendor/k8s.io/client-go/rest:go_default_library",
+        "//vendor/k8s.io/client-go/tools/cache:go_default_library",
     ],
 )
 
