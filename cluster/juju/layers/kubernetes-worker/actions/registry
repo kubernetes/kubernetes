@@ -13,13 +13,11 @@
 # juju run-action kubernetes-worker/0 registry delete=true ingress=true
 
 import sys
-import os
 
 from base64 import b64encode
 
 from charmhelpers.core.hookenv import action_get
 from charmhelpers.core.hookenv import action_set
-from charmhelpers.core.hookenv import unit_public_ip
 from charms.templating.jinja2 import render
 from subprocess import call
 
@@ -46,6 +44,11 @@ for param in ('tlscert', 'tlskey', 'domain', 'htpasswd'):
         value = b64encode(value.encode()).decode('ASCII')
 
     context[param] = value
+
+# Create the dockercfg template variable, using the base64 encoded htpasswd
+dockercfg = '{"https://%s/v2/": {"auth": "%s", "email": "root@localhost"}}' % \
+            (action_get('domain'), context['htpasswd'])
+context['dockercfg'] = b64encode(dockercfg.encode()).decode('ASCII')
 
 if param_error:
     sys.exit(0)
@@ -96,7 +99,7 @@ if create_response == 0:
     if check_cm_response == 0:
         # There is an existing ConfigMap, patch it
         patch = '{"data":{"max-body-size":"1024m"}}'
-        patch_cm_command = kubectl + ['patch', 'cm', cm_name, '-p', patch ]
+        patch_cm_command = kubectl + ['patch', 'cm', cm_name, '-p', patch]
         patch_cm_response = call(patch_cm_command)
 
         if patch_cm_response == 0:
@@ -108,13 +111,26 @@ if create_response == 0:
         # No existing ConfigMap, create it
         render('registry-configmap.yaml', '/etc/kubernetes/addons/registry-configmap.yaml',
                context)
-        create_cm_command = kubectl + ['create', '-f', '/etc/kubernetes/addons/registry-configmap.yaml' ]
+        create_cm_command = kubectl + ['create', '-f', '/etc/kubernetes/addons/registry-configmap.yaml']
         create_cm_response = call(create_cm_command)
 
         if create_cm_response == 0:
             action_set({'configmap-create': 'success'})
         else:
             action_set({'configmap-create': 'failure'})
+
+    # Patch the "default" serviceaccount with an imagePullSecret.
+    # This will allow the docker daemons to authenticate to our private
+    # registry automatically
+    patch = '{"imagePullSecrets":[{"name":"registry-access"}]}'
+    patch_sa_command = kubectl + ['patch', 'sa', 'default', '-p', patch]
+    patch_sa_response = call(patch_sa_command)
+
+    if patch_sa_response == 0:
+        action_set({'serviceaccount-patch': 'success'})
+    else:
+        action_set({'serviceaccount-patch': 'failure'})
+
 
 else:
     action_set({'registry-create': 'failure'})
