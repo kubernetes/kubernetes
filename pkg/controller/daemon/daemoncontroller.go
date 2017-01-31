@@ -481,7 +481,10 @@ func (dsc *DaemonSetsController) manage(ds *extensions.DaemonSet) error {
 			for i := range daemonPods {
 				pod := daemonPods[i]
 				if pod.Status.Phase == v1.PodFailed {
-					glog.V(2).Infof("Found failed daemon pod %s/%s on node %s, will try to kill it", pod.Namespace, node.Name, pod.Name)
+					msg := fmt.Sprintf("Found failed daemon pod %s/%s on node %s, will try to kill it", pod.Namespace, node.Name, pod.Name)
+					glog.V(2).Infof(msg)
+					// Emit an event so that it's discoverable to users.
+					dsc.eventRecorder.Eventf(ds, v1.EventTypeWarning, "FailedDaemonPod", msg)
 					podsToDelete = append(podsToDelete, pod.Name)
 					failedPodsObserved++
 				} else {
