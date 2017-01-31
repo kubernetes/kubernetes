@@ -36,6 +36,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm/predicates"
+	"k8s.io/kubernetes/plugin/pkg/scheduler/core"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/schedulercache"
 	schedulertesting "k8s.io/kubernetes/plugin/pkg/scheduler/testing"
 )
@@ -275,9 +276,9 @@ func TestSchedulerNoPhantomPodAfterDelete(t *testing.T) {
 	scheduler.scheduleOne()
 	select {
 	case err := <-errChan:
-		expectErr := &FitError{
+		expectErr := &core.FitError{
 			Pod:              secondPod,
-			FailedPredicates: FailedPredicateMap{node.Name: []algorithm.PredicateFailureReason{predicates.ErrPodNotFitsHostPorts}},
+			FailedPredicates: core.FailedPredicateMap{node.Name: []algorithm.PredicateFailureReason{predicates.ErrPodNotFitsHostPorts}},
 		}
 		if !reflect.DeepEqual(expectErr, err) {
 			t.Errorf("err want=%v, get=%v", expectErr, err)
@@ -446,7 +447,7 @@ func TestSchedulerFailedSchedulingReasons(t *testing.T) {
 	}
 
 	// Create expected failure reasons for all the nodes.  Hopefully they will get rolled up into a non-spammy summary.
-	failedPredicatesMap := FailedPredicateMap{}
+	failedPredicatesMap := core.FailedPredicateMap{}
 	for _, node := range nodes {
 		failedPredicatesMap[node.Name] = []algorithm.PredicateFailureReason{
 			predicates.NewInsufficientResourceError(v1.ResourceCPU, 4000, 0, 2000),
@@ -459,7 +460,7 @@ func TestSchedulerFailedSchedulingReasons(t *testing.T) {
 	scheduler.scheduleOne()
 	select {
 	case err := <-errChan:
-		expectErr := &FitError{
+		expectErr := &core.FitError{
 			Pod:              podWithTooBigResourceRequests,
 			FailedPredicates: failedPredicatesMap,
 		}
@@ -477,7 +478,7 @@ func TestSchedulerFailedSchedulingReasons(t *testing.T) {
 // queuedPodStore: pods queued before processing.
 // scache: scheduler cache that might contain assumed pods.
 func setupTestScheduler(queuedPodStore *clientcache.FIFO, scache schedulercache.Cache, nodeLister algorithm.FakeNodeLister, predicateMap map[string]algorithm.FitPredicate) (*Scheduler, chan *v1.Binding, chan error) {
-	algo := NewGenericScheduler(
+	algo := core.NewGenericScheduler(
 		scache,
 		predicateMap,
 		algorithm.EmptyMetadataProducer,
@@ -507,7 +508,7 @@ func setupTestScheduler(queuedPodStore *clientcache.FIFO, scache schedulercache.
 }
 
 func setupTestSchedulerLongBindingWithRetry(queuedPodStore *clientcache.FIFO, scache schedulercache.Cache, nodeLister algorithm.FakeNodeLister, predicateMap map[string]algorithm.FitPredicate, stop chan struct{}, bindingTime time.Duration) (*Scheduler, chan *v1.Binding) {
-	algo := NewGenericScheduler(
+	algo := core.NewGenericScheduler(
 		scache,
 		predicateMap,
 		algorithm.EmptyMetadataProducer,
