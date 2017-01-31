@@ -150,6 +150,8 @@ func NewDockerService(client dockertools.DockerInterface, seccompProfileRoot str
 	}
 	ds.cgroupDriver = cgroupDriver
 
+	// Initialize the legacy cleanup flag.
+	ds.LegacyCleanupInit()
 	return ds, nil
 }
 
@@ -174,6 +176,8 @@ type dockerService struct {
 	containerManager   cm.ContainerManager
 	// cgroup driver used by Docker runtime.
 	cgroupDriver string
+	// legacyCleanup indicates whether legacy cleanup has finished or not.
+	legacyCleanup legacyCleanupFlag
 }
 
 // Version returns the runtime name, runtime version and runtime API version
