@@ -14,17 +14,13 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package server
+package options
 
 import (
 	"reflect"
 	"testing"
 
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/apis/autoscaling"
-	"k8s.io/kubernetes/pkg/apis/extensions"
-	"k8s.io/kubernetes/pkg/genericapiserver/server/options"
 )
 
 func TestGenerateStorageVersionMap(t *testing.T) {
@@ -38,16 +34,16 @@ func TestGenerateStorageVersionMap(t *testing.T) {
 			legacyVersion:   "v1",
 			storageVersions: "v1,extensions/v1beta1",
 			expectedMap: map[string]schema.GroupVersion{
-				api.GroupName:        {Version: "v1"},
-				extensions.GroupName: {Group: "extensions", Version: "v1beta1"},
+				"":           {Version: "v1"},
+				"extensions": {Group: "extensions", Version: "v1beta1"},
 			},
 		},
 		{
 			legacyVersion:   "",
 			storageVersions: "extensions/v1beta1,v1",
 			expectedMap: map[string]schema.GroupVersion{
-				api.GroupName:        {Version: "v1"},
-				extensions.GroupName: {Group: "extensions", Version: "v1beta1"},
+				"":           {Version: "v1"},
+				"extensions": {Group: "extensions", Version: "v1beta1"},
 			},
 		},
 		{
@@ -55,9 +51,9 @@ func TestGenerateStorageVersionMap(t *testing.T) {
 			storageVersions: "autoscaling=extensions/v1beta1,v1",
 			defaultVersions: "extensions/v1beta1,v1,autoscaling/v1",
 			expectedMap: map[string]schema.GroupVersion{
-				api.GroupName:         {Version: "v1"},
-				autoscaling.GroupName: {Group: "extensions", Version: "v1beta1"},
-				extensions.GroupName:  {Group: "extensions", Version: "v1beta1"},
+				"":            {Version: "v1"},
+				"autoscaling": {Group: "extensions", Version: "v1beta1"},
+				"extensions":  {Group: "extensions", Version: "v1beta1"},
 			},
 		},
 		{
@@ -67,7 +63,7 @@ func TestGenerateStorageVersionMap(t *testing.T) {
 		},
 	}
 	for i, test := range testCases {
-		s := options.ServerRunOptions{
+		s := &StorageSerializationOptions{
 			StorageVersions:        test.storageVersions,
 			DefaultStorageVersions: test.defaultVersions,
 		}
