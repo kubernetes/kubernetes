@@ -33,6 +33,8 @@ package init
 import (
 	"fmt"
 	"io"
+	"net"
+	"strconv"
 	"strings"
 	"time"
 
@@ -76,6 +78,10 @@ const (
 
 	lbAddrRetryInterval = 5 * time.Second
 	podWaitInterval     = 2 * time.Second
+
+	serviceTypeLoadBalancer     = "loadbalancer"
+	serviceTypeNodePort         = "nodeport"
+	federationApiserverNodeport = 32111
 )
 
 var (
@@ -136,6 +142,8 @@ func NewCmdInit(cmdOut io.Writer, config util.AdminConfig) *cobra.Command {
 	cmd.Flags().String("etcd-pv-capacity", "10Gi", "Size of persistent volume claim to be used for etcd.")
 	cmd.Flags().Bool("dry-run", false, "dry run without sending commands to server.")
 	cmd.Flags().String("storage-backend", "etcd2", "The storage backend for persistence. Options: 'etcd2' (default), 'etcd3'.")
+	cmd.Flags().String("api-service-type", serviceTypeLoadBalancer, "The type of service to create for federation API server. Options: 'loadbalancer' (default), 'nodeport'.")
+	cmd.Flags().String("api-server-advertise-address", "", "Preferred address to advertise api server nodeport service. Valid only if 'api-service-type=nodeport'")
 	return cmd
 }
 
@@ -160,6 +168,21 @@ func initFederation(cmdOut io.Writer, config util.AdminConfig, cmd *cobra.Comman
 	etcdPVCapacity := cmdutil.GetFlagString(cmd, "etcd-pv-capacity")
 	dryRun := cmdutil.GetDryRunFlag(cmd)
 	storageBackend := cmdutil.GetFlagString(cmd, "storage-backend")
+	apiServiceType := cmdutil.GetFlagString(cmd, "api-service-type")
+	if apiServiceType != serviceTypeLoadBalancer && apiServiceType != serviceTypeNodePort {
+		return fmt.Errorf("api-service-type should be either %s or %s", serviceTypeLoadBalancer, serviceTypeNodePort)
+	}
+	apiServerAdvertiseAddress := cmdutil.GetFlagString(cmd, "api-server-advertise-address")
+	if apiServiceType == serviceTypeNodePort {
+		if apiServerAdvertiseAddress == "" {
+			return fmt.Errorf("api-server-advertise-address should be specified when 'api-service-type=nodeport'")
+		}
+
+		ip := net.ParseIP(apiServerAdvertiseAddress)
+		if ip == nil {
+			return fmt.Errorf("Invalid address provided for api-server-advertise-address")
+		}
+	}
 
 	hostFactory := config.HostFactory(initFlags.Host, initFlags.Kubeconfig)
 	hostClientset, err := hostFactory.ClientSet()
@@ -179,11 +202,7 @@ func initFederation(cmdOut io.Writer, config util.AdminConfig, cmd *cobra.Comman
 	}
 
 	// 2. Expose a network endpoint for the federation API server
-	svc, err := createService(hostClientset, initFlags.FederationSystemNamespace, serverName, dryRun)
-	if err != nil {
-		return err
-	}
-	ips, hostnames, err := waitForLoadBalancerAddress(hostClientset, svc, dryRun)
+	svc, ips, hostnames, err := createService(hostClientset, initFlags.FederationSystemNamespace, serverName, apiServiceType, apiServerAdvertiseAddress, dryRun)
 	if err != nil {
 		return err
 	}
@@ -252,6 +271,10 @@ func initFederation(cmdOut io.Writer, config util.AdminConfig, cmd *cobra.Comman
 		return err
 	}
 
+	if apiServiceType == serviceTypeNodePort {
+		endpoint = endpoint + ":" + strconv.Itoa(federationApiserverNodeport)
+	}
+
 	// 8. Write the federation API server endpoint info, credentials
 	// and context to kubeconfig
 	err = updateKubeconfig(config, initFlags.Name, endpoint, entKeyPairs, dryRun)
@@ -289,32 +312,50 @@ func createNamespace(clientset *client.Clientset, namespace string, dryRun bool)
 	return clientset.Core().Namespaces().Create(ns)
 }
 
-func createService(clientset *client.Clientset, namespace, svcName string, dryRun bool) (*api.Service, error) {
-	svc := &api.Service{
+func createService(clientset *client.Clientset, namespace, svcName, apiServiceType, apiServerAdvertiseAddress string, dryRun bool) (svc *api.Service, ips []string, hostnames []string, err error) {
+	serviceSpec := api.ServiceSpec{
+		Selector: apiserverSvcSelector,
+		Ports: []api.ServicePort{
+			{
+				Name:     "https",
+				Protocol: "TCP",
+				Port:     443,
+			},
+		},
+	}
+
+	if apiServiceType == "loadbalancer" {
+		serviceSpec.Type = api.ServiceTypeLoadBalancer
+		serviceSpec.Ports[0].TargetPort = intstr.FromInt(443)
+	} else {
+		serviceSpec.Type = api.ServiceTypeNodePort
+		serviceSpec.Ports[0].NodePort = int32(federationApiserverNodeport)
+	}
+
+	svc = &api.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      svcName,
 			Namespace: namespace,
 			Labels:    componentLabel,
 		},
-		Spec: api.ServiceSpec{
-			Type:     api.ServiceTypeLoadBalancer,
-			Selector: apiserverSvcSelector,
-			Ports: []api.ServicePort{
-				{
-					Name:       "https",
-					Protocol:   "TCP",
-					Port:       443,
-					TargetPort: intstr.FromInt(443),
-				},
-			},
-		},
+		Spec: serviceSpec,
 	}
 
 	if dryRun {
-		return svc, nil
+		return svc, ips, hostnames, nil
 	}
 
-	return clientset.Core().Services(namespace).Create(svc)
+	if apiServiceType == serviceTypeLoadBalancer {
+		ips, hostnames, err = waitForLoadBalancerAddress(clientset, svc, dryRun)
+		if err != nil {
+			return svc, ips, nil, err
+		}
+	} else {
+		ips = append(ips, apiServerAdvertiseAddress)
+	}
+
+	svc, err = clientset.Core().Services(namespace).Create(svc)
+	return svc, ips, hostnames, err
 }
 
 func waitForLoadBalancerAddress(clientset *client.Clientset, svc *api.Service, dryRun bool) ([]string, []string, error) {

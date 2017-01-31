@@ -77,6 +77,8 @@ func TestInitFederation(t *testing.T) {
 		kubeconfigExplicit string
 		dnsZoneName        string
 		lbIP               string
+		apiServiceType     string
+		advertiseAddress   string
 		image              string
 		etcdPVCapacity     string
 		expectedErr        string
@@ -90,6 +92,8 @@ func TestInitFederation(t *testing.T) {
 			kubeconfigExplicit: "",
 			dnsZoneName:        "example.test.",
 			lbIP:               "10.20.30.40",
+			apiServiceType:     serviceTypeLoadBalancer,
+			advertiseAddress:   "",
 			image:              "example.test/foo:bar",
 			etcdPVCapacity:     "5Gi",
 			expectedErr:        "",
@@ -103,6 +107,8 @@ func TestInitFederation(t *testing.T) {
 			kubeconfigExplicit: "",
 			dnsZoneName:        "example.test.",
 			lbIP:               "10.20.30.40",
+			apiServiceType:     serviceTypeLoadBalancer,
+			advertiseAddress:   "",
 			image:              "example.test/foo:bar",
 			etcdPVCapacity:     "", //test for default value of pvc-size
 			expectedErr:        "",
@@ -116,6 +122,8 @@ func TestInitFederation(t *testing.T) {
 			kubeconfigExplicit: "",
 			dnsZoneName:        "example.test.",
 			lbIP:               "10.20.30.40",
+			apiServiceType:     serviceTypeLoadBalancer,
+			advertiseAddress:   "",
 			image:              "example.test/foo:bar",
 			etcdPVCapacity:     "",
 			expectedErr:        "",
@@ -129,6 +137,38 @@ func TestInitFederation(t *testing.T) {
 			kubeconfigExplicit: "",
 			dnsZoneName:        "example.test.",
 			lbIP:               "10.20.30.40",
+			apiServiceType:     serviceTypeLoadBalancer,
+			advertiseAddress:   "",
+			image:              "example.test/foo:bar",
+			etcdPVCapacity:     "5Gi",
+			expectedErr:        "",
+			dnsProvider:        "test-dns-provider",
+			storageBackend:     "etcd3",
+			dryRun:             "",
+		},
+		{
+			federation:         "union",
+			kubeconfigGlobal:   fakeKubeFiles[0],
+			kubeconfigExplicit: "",
+			dnsZoneName:        "example.test.",
+			lbIP:               "",
+			apiServiceType:     serviceTypeNodePort,
+			advertiseAddress:   "",
+			image:              "example.test/foo:bar",
+			etcdPVCapacity:     "5Gi",
+			expectedErr:        "error: api-server-advertise-address should be specified when 'api-service-type=nodeport'",
+			dnsProvider:        "test-dns-provider",
+			storageBackend:     "etcd3",
+			dryRun:             "",
+		},
+		{
+			federation:         "union",
+			kubeconfigGlobal:   fakeKubeFiles[0],
+			kubeconfigExplicit: "",
+			dnsZoneName:        "example.test.",
+			lbIP:               "",
+			apiServiceType:     serviceTypeNodePort,
+			advertiseAddress:   "10.20.30.40",
 			image:              "example.test/foo:bar",
 			etcdPVCapacity:     "5Gi",
 			expectedErr:        "",
@@ -150,7 +190,7 @@ func TestInitFederation(t *testing.T) {
 		} else {
 			dnsProvider = "google-clouddns" //default value of dns-provider
 		}
-		hostFactory, err := fakeInitHostFactory(tc.federation, util.DefaultFederationSystemNamespace, tc.lbIP, tc.dnsZoneName, tc.image, dnsProvider, tc.etcdPVCapacity, tc.storageBackend)
+		hostFactory, err := fakeInitHostFactory(tc.federation, util.DefaultFederationSystemNamespace, tc.apiServiceType, tc.advertiseAddress, tc.lbIP, tc.dnsZoneName, tc.image, dnsProvider, tc.etcdPVCapacity, tc.storageBackend)
 		if err != nil {
 			t.Fatalf("[%d] unexpected error: %v", i, err)
 		}
@@ -174,6 +214,10 @@ func TestInitFederation(t *testing.T) {
 		}
 		if tc.etcdPVCapacity != "" {
 			cmd.Flags().Set("etcd-pv-capacity", tc.etcdPVCapacity)
+		}
+		if tc.apiServiceType != serviceTypeLoadBalancer {
+			cmd.Flags().Set("api-service-type", tc.apiServiceType)
+			cmd.Flags().Set("api-server-advertise-address", tc.advertiseAddress)
 		}
 		if tc.dryRun == "valid-run" {
 			cmd.Flags().Set("dry-run", "true")
@@ -200,9 +244,10 @@ func TestInitFederation(t *testing.T) {
 			if cmdErrMsg != tc.expectedErr {
 				t.Errorf("[%d] expected error: %s, got: %s, output: %s", i, tc.expectedErr, cmdErrMsg, buf.String())
 			}
+			return
 		}
 
-		testKubeconfigUpdate(t, tc.federation, tc.lbIP, tc.kubeconfigGlobal, tc.kubeconfigExplicit)
+		testKubeconfigUpdate(t, tc.federation, tc.apiServiceType, tc.advertiseAddress, tc.lbIP, tc.kubeconfigGlobal, tc.kubeconfigExplicit)
 	}
 }
 
@@ -445,7 +490,7 @@ func TestCertsHTTPS(t *testing.T) {
 	}
 }
 
-func fakeInitHostFactory(federationName, namespaceName, ip, dnsZoneName, image, dnsProvider, etcdPVCapacity, storageProvider string) (cmdutil.Factory, error) {
+func fakeInitHostFactory(federationName, namespaceName, apiServiceType, advertiseAddress, ip, dnsZoneName, image, dnsProvider, etcdPVCapacity, storageProvider string) (cmdutil.Factory, error) {
 	svcName := federationName + "-apiserver"
 	svcUrlPrefix := "/api/v1/namespaces/federation-system/services"
 	credSecretName := svcName + "-credentials"
@@ -494,6 +539,12 @@ func fakeInitHostFactory(federationName, namespaceName, ip, dnsZoneName, image, 
 				},
 			},
 		},
+	}
+
+	if apiServiceType == serviceTypeNodePort {
+		svc.Spec.Type = v1.ServiceTypeNodePort
+		svc.Spec.Ports[0].NodePort = federationApiserverNodeport
+		svc.Spec.Ports[0].TargetPort = intstr.FromString("")
 	}
 
 	svcWithLB := svc
@@ -963,7 +1014,7 @@ func fakeInitHostFactory(federationName, namespaceName, ip, dnsZoneName, image, 
 	return f, nil
 }
 
-func testKubeconfigUpdate(t *testing.T, federationName, lbIP, kubeconfigGlobal, kubeconfigExplicit string) {
+func testKubeconfigUpdate(t *testing.T, federationName, apiServiceType, advertiseAddress, lbIP, kubeconfigGlobal, kubeconfigExplicit string) {
 	filename := kubeconfigGlobal
 	if kubeconfigExplicit != "" {
 		filename = kubeconfigExplicit
@@ -979,9 +1030,13 @@ func testKubeconfigUpdate(t *testing.T, federationName, lbIP, kubeconfigGlobal, 
 		t.Errorf("No cluster info for %q", federationName)
 		return
 	}
-	endpoint := lbIP
-	if !strings.HasSuffix(lbIP, "https://") {
-		endpoint = fmt.Sprintf("https://%s", lbIP)
+	ip := lbIP
+	if apiServiceType == serviceTypeNodePort {
+		ip = advertiseAddress
+	}
+	endpoint := ip
+	if !strings.HasSuffix(ip, "https://") {
+		endpoint = fmt.Sprintf("https://%s", ip)
 	}
 	if cluster.Server != endpoint {
 		t.Errorf("Want federation API server endpoint %q, got %q", endpoint, cluster.Server)
