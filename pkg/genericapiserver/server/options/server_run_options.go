@@ -40,7 +40,9 @@ type ServerRunOptions struct {
 	AdmissionControlConfigFile string
 	AdvertiseAddress           net.IP
 
-	CorsAllowedOriginList       []string
+	CorsAllowedOriginList []string
+	// To enable protobuf as storage format, it is enough
+	// to set it to "application/vnd.kubernetes.protobuf".
 	DefaultStorageMediaType     string
 	DeleteCollectionWorkers     int
 	AuditLogPath                string
