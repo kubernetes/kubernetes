@@ -23,7 +23,10 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
+	vsphere "k8s.io/kubernetes/pkg/cloudprovider/providers/vsphere"
 	"k8s.io/kubernetes/test/e2e/framework"
+	"strconv"
+	"time"
 )
 
 // Validate PV/PVC, create and verify writer pod, delete the PVC, and validate the PV's
@@ -329,6 +332,119 @@ var _ = framework.KubeDescribe("PersistentVolumes [Volume][Serial]", func() {
 			By("Verifying Persistent Disk detaches")
 			err = waitForPDDetach(diskName, node)
 			Expect(err).NotTo(HaveOccurred())
+		})
+	})
+
+	///////////////////////////////////////////////////////////////////////
+	//				Vsphere Disk
+	///////////////////////////////////////////////////////////////////////
+	// Testing configurations of single a PV/PVC pair attached to a Vsphere Disk
+
+	framework.KubeDescribe("PersistentVolumes:vsphere", func() {
+
+		var (
+			volumePath string
+			pv         *v1.PersistentVolume
+			pvc        *v1.PersistentVolumeClaim
+			clientPod  *v1.Pod
+			pvConfig   persistentVolumeConfig
+			vsp        *vsphere.VSphere
+			err        error
+		)
+		BeforeEach(func() {
+			framework.SkipUnlessProviderIs("vsphere")
+			if vsp == nil {
+				vsp, err = vsphere.GetVSphere()
+				Expect(err).NotTo(HaveOccurred())
+			}
+			if volumePath == "" {
+				var volumeoptions vsphere.VolumeOptions
+				volumeoptions.CapacityKB = 1048576
+				volumeoptions.Name = "e2e-vmdk-" + strconv.FormatInt(time.Now().UnixNano(), 10)
+				volumeoptions.DiskFormat = "thin"
+
+				volumePath, err = vsp.CreateVolume(&volumeoptions)
+				Expect(err).NotTo(HaveOccurred())
+				pvConfig = persistentVolumeConfig{
+					namePrefix: "vspherepv-",
+					pvSource: v1.PersistentVolumeSource{
+						VsphereVolume: &v1.VsphereVirtualDiskVolumeSource{
+							VolumePath: volumePath,
+							FSType:     "ext4",
+						},
+					},
+					prebind: nil,
+				}
+			}
+		})
+
+		AfterEach(func() {
+			framework.Logf("AfterEach: Cleaning up test resources")
+			if c != nil {
+				deletePodWithWait(f, c, clientPod)
+				pvPvcCleanup(c, ns, pv, pvc)
+				clientPod = nil
+				pvc = nil
+				pv = nil
+			}
+		})
+
+		AddCleanupAction(func() {
+			if len(volumePath) > 0 {
+				vsp.DeleteVolume(volumePath)
+			}
+		})
+
+		// Attach a persistent disk to a pod using a PVC.
+		// Delete the PVC and then the pod.  Expect the pod to succeed in unmounting and detaching PD on delete.
+		It("should test that deleting a PVC before the pod does not cause pod deletion to fail on PD detach", func() {
+			By("Creating the PV and PVC")
+			pv, pvc = createPVPVC(c, pvConfig, ns, false)
+			waitOnPVandPVC(c, ns, pv, pvc)
+
+			By("Creating the Client Pod")
+			clientPod = createClientPod(c, ns, pvc)
+			node := types.NodeName(clientPod.Spec.NodeName)
+
+			By("Verify disk should be attached to the node")
+			isAttached, err := verifyVSphereDiskAttached(vsp, volumePath, node)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(isAttached).To(BeTrue(), "disk is not attached with the node")
+
+			By("Deleting the Claim")
+			deletePersistentVolumeClaim(c, pvc.Name, ns)
+
+			By("Deleting the Pod")
+			deletePodWithWait(f, c, clientPod)
+
+			By("Verifying Persistent disk is detached")
+			waitForVSphereDiskToDetach(vsp, volumePath, node)
+		})
+
+		// Attach a persistent disk to a pod using a PVC.
+		// Delete the PV and then the pod.  Expect the pod to succeed in unmounting and detaching PD on delete.
+		It("should test that deleting the PV before the pod does not cause pod deletion to fail on PD detach", func() {
+			By("Creating the PV and PVC")
+			pv, pvc = createPVPVC(c, pvConfig, ns, false)
+			waitOnPVandPVC(c, ns, pv, pvc)
+
+			By("Creating the Client Pod")
+			clientPod = createClientPod(c, ns, pvc)
+			node := types.NodeName(clientPod.Spec.NodeName)
+
+			By("Verify disk should be attached to the node")
+			isAttached, err := verifyVSphereDiskAttached(vsp, volumePath, node)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(isAttached).To(BeTrue(), "disk is not attached with the node")
+
+			By("Deleting the Persistent Volume")
+			deletePersistentVolume(c, pv.Name)
+
+			By("Deleting the client pod")
+			deletePodWithWait(f, c, clientPod)
+
+			By("Verifying Persistent disk is detached")
+			waitForVSphereDiskToDetach(vsp, volumePath, node)
 		})
 	})
 })

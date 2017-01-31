@@ -29,6 +29,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
+	vsphere "k8s.io/kubernetes/pkg/cloudprovider/providers/vsphere"
 	"k8s.io/kubernetes/pkg/volume/util/volumehelper"
 	"k8s.io/kubernetes/test/e2e/framework"
 )
@@ -444,6 +445,44 @@ func verifyGCEDiskAttached(diskName string, nodeName types.NodeName) bool {
 	isAttached, err := gceCloud.DiskIsAttached(diskName, nodeName)
 	Expect(err).NotTo(HaveOccurred())
 	return isAttached
+}
+
+// Sanity check for vSphere testing.  Verify the persistent disk attached to the node.
+func verifyVSphereDiskAttached(vsp *vsphere.VSphere, volumePath string, nodeName types.NodeName) (isAttached bool, err error) {
+	if vsp == nil {
+		vsp, err = vsphere.GetVSphere()
+		Expect(err).NotTo(HaveOccurred())
+	}
+	isAttached, err = vsp.DiskIsAttached(volumePath, nodeName)
+	Expect(err).NotTo(HaveOccurred())
+	return isAttached, err
+}
+
+// Wait until vsphere vmdk is deteched from the given node or time out after 5 minutes
+func waitForVSphereDiskToDetach(vsp *vsphere.VSphere, volumePath string, nodeName types.NodeName) {
+	var err error
+	if vsp == nil {
+		vsp, err = vsphere.GetVSphere()
+		Expect(err).NotTo(HaveOccurred())
+	}
+	var diskAttached = true
+	var detachTimeout = 5 * time.Minute
+	var detachPollTime = 10 * time.Second
+	for start := time.Now(); time.Since(start) < detachTimeout; time.Sleep(detachPollTime) {
+		diskAttached, err = verifyVSphereDiskAttached(vsp, volumePath, nodeName)
+		Expect(err).NotTo(HaveOccurred())
+		if !diskAttached {
+			// Specified disk does not appear to be attached to specified node
+			framework.Logf("Volume %q appears to have successfully detached from %q.",
+				volumePath, nodeName)
+			break
+		}
+		framework.Logf("Waiting for Volume %q to detach from %q.", volumePath, nodeName)
+	}
+	if diskAttached {
+		_ = fmt.Errorf("Gave up waiting for Volume %q to detach from %q after %v",
+			volumePath, nodeName, detachTimeout)
+	}
 }
 
 // Return a pvckey struct.
