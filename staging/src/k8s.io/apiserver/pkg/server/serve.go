@@ -403,7 +403,7 @@ func (i *ipBasedLimit) MarshalJSON() ([]byte, error) {
 	buffer.WriteString("}, ")
 	buffer.WriteString(" \"Connections\": [")
 	first = true
-	for conn, _ := range i.decrementers {
+	for conn := range i.decrementers {
 		if first {
 			buffer.WriteString(fmt.Sprintf("\"%s\"", conn))
 			first = false
