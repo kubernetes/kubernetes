@@ -74,3 +74,17 @@ godep restore ${V} 2>&1 | sed 's/^/  /'
 echo "Testing staging/copy.sh"
 staging/copy.sh -d 2>&1 | sed 's/^/  /'
 popd
+
+
+# Check that the apimachinery Godeps revision is actually in Github
+echo "Checking that a valid k8s.io/apimachinery is reference in client-go"
+APIMACHINERY_REV=$(jq '.Deps[]|select(.ImportPath|startswith("k8s.io/apimachinery/pkg/api/errors"))' staging/src/k8s.io/client-go/Godeps/Godeps.json | jq -r '.Rev')
+GITHUB_COMMIT_URL="https://github.com/kubernetes/apimachinery/commit/${APIMACHINERY_REV}"
+if ! curl -f -o /dev/null "${GITHUB_COMMIT_URL}"; then
+    echo "Failed to find referenced k8s.io/apimachinery commit ${APIMACHINERY_REV}."
+    echo
+    echo "NOTE: You cannot merge apimachinery changes and a resync'ed client-go in the same PR."
+    echo "      Give the k8s.io/apimachinery sync scripts a chance to run and reference the new"
+    echo "      revision in a new client-go."
+    exit 1
+fi
