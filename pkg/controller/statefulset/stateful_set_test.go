@@ -17,132 +17,19 @@ limitations under the License.
 package statefulset
 
 import (
+	"sort"
+	"testing"
+	"time"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
+
 	"k8s.io/kubernetes/pkg/api/v1"
 	apps "k8s.io/kubernetes/pkg/apis/apps/v1beta1"
 	"k8s.io/kubernetes/pkg/controller"
-	"sort"
-	"testing"
 )
-
-func newFakeStatefulSetController() (*StatefulSetController, *fakeStatefulPodControl) {
-	fpc := newFakeStatefulPodControl()
-	ssc := &StatefulSetController{
-		kubeClient:     nil,
-		podStoreSynced: func() bool { return true },
-		setStore:       fpc.setsLister,
-		podStore:       fpc.podsLister,
-		control:        NewDefaultStatefulSetControl(fpc),
-		queue:          workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "statefulset"),
-	}
-	return ssc, fpc
-}
-
-func fakeWorker(ssc *StatefulSetController) {
-	if obj, done := ssc.queue.Get(); !done {
-		ssc.Sync(obj.(string))
-		ssc.queue.Done(obj)
-	}
-}
-
-func getPodAtOrdinal(pods []*v1.Pod, ordinal int) *v1.Pod {
-	if 0 > ordinal || ordinal >= len(pods) {
-		return nil
-	}
-	sort.Sort(ascendingOrdinal(pods))
-	return pods[ordinal]
-}
-
-func scaleUpStatefulSetController(set *apps.StatefulSet, ssc *StatefulSetController, spc *fakeStatefulPodControl) error {
-	spc.setsIndexer.Add(set)
-	ssc.enqueueStatefulSet(set)
-	fakeWorker(ssc)
-	selector, err := metav1.LabelSelectorAsSelector(set.Spec.Selector)
-	if err != nil {
-		return err
-	}
-	for set.Status.Replicas < *set.Spec.Replicas {
-		pods, err := spc.podsLister.Pods(set.Namespace).List(selector)
-		ord := len(pods) - 1
-		pod := getPodAtOrdinal(pods, ord)
-		if pods, err = spc.setPodPending(set, ord); err != nil {
-			return err
-		}
-		pod = getPodAtOrdinal(pods, ord)
-		ssc.addPod(pod)
-		fakeWorker(ssc)
-		pod = getPodAtOrdinal(pods, ord)
-		prev := *pod
-		if pods, err = spc.setPodRunning(set, ord); err != nil {
-			return err
-		}
-		pod = getPodAtOrdinal(pods, ord)
-		ssc.updatePod(&prev, pod)
-		fakeWorker(ssc)
-		pod = getPodAtOrdinal(pods, ord)
-		prev = *pod
-		if pods, err = spc.setPodReady(set, ord); err != nil {
-			return err
-		}
-		pod = getPodAtOrdinal(pods, ord)
-		ssc.updatePod(&prev, pod)
-		fakeWorker(ssc)
-		if err := assertInvariants(set, spc); err != nil {
-			return err
-		}
-		if obj, _, err := spc.setsIndexer.Get(set); err != nil {
-			return err
-		} else {
-			set = obj.(*apps.StatefulSet)
-		}
-
-	}
-	return assertInvariants(set, spc)
-}
-
-func scaleDownStatefulSetController(set *apps.StatefulSet, ssc *StatefulSetController, spc *fakeStatefulPodControl) error {
-	selector, err := metav1.LabelSelectorAsSelector(set.Spec.Selector)
-	if err != nil {
-		return err
-	}
-	pods, err := spc.podsLister.Pods(set.Namespace).List(selector)
-	if err != nil {
-		return err
-	}
-	ord := len(pods) - 1
-	pod := getPodAtOrdinal(pods, ord)
-	prev := *pod
-	fakeResourceVersion(set)
-	spc.setsIndexer.Add(set)
-	ssc.enqueueStatefulSet(set)
-	fakeWorker(ssc)
-	pods, err = spc.addTerminatedPod(set, ord)
-	pod = getPodAtOrdinal(pods, ord)
-	ssc.updatePod(&prev, pod)
-	fakeWorker(ssc)
-	spc.DeleteStatefulPod(set, pod)
-	ssc.deletePod(pod)
-	fakeWorker(ssc)
-	for set.Status.Replicas > *set.Spec.Replicas {
-		pods, err = spc.podsLister.Pods(set.Namespace).List(selector)
-		ord := len(pods)
-		pods, err = spc.addTerminatedPod(set, ord)
-		pod = getPodAtOrdinal(pods, ord)
-		ssc.updatePod(&prev, pod)
-		fakeWorker(ssc)
-		spc.DeleteStatefulPod(set, pod)
-		ssc.deletePod(pod)
-		fakeWorker(ssc)
-		if obj, _, err := spc.setsIndexer.Get(set); err != nil {
-			return err
-		} else {
-			set = obj.(*apps.StatefulSet)
-		}
-	}
-	return assertInvariants(set, spc)
-}
 
 func TestStatefulSetControllerCreates(t *testing.T) {
 	ssc, spc := newFakeStatefulSetController()
@@ -391,7 +278,7 @@ func TestStatefulSetControllerUpdatePodWithNewLabels(t *testing.T) {
 	}
 }
 
-func TestStatefulSetControlDeletePod(t *testing.T) {
+func TestStatefulSetControllerDeletePod(t *testing.T) {
 	ssc, spc := newFakeStatefulSetController()
 	set := newStatefulSet(3)
 	pod := newStatefulSetPod(set, 0)
@@ -406,7 +293,7 @@ func TestStatefulSetControlDeletePod(t *testing.T) {
 		t.Errorf("Expected StatefulSet key %s found %s", expectedKey, key)
 	}
 }
-func TestStatefulSetControlDeletePodTombstone(t *testing.T) {
+func TestStatefulSetControllerDeletePodTombstone(t *testing.T) {
 	ssc, spc := newFakeStatefulSetController()
 	set := newStatefulSet(3)
 	pod := newStatefulSetPod(set, 0)
@@ -422,4 +309,152 @@ func TestStatefulSetControlDeletePodTombstone(t *testing.T) {
 	} else if expectedKey, _ := controller.KeyFunc(set); expectedKey != key {
 		t.Errorf("Expected StatefulSet key %s found %s", expectedKey, key)
 	}
+}
+
+func TestStatefulSetControllerGetStatefulSetForPod(t *testing.T) {
+	ssc, spc := newFakeStatefulSetController()
+	set := newStatefulSet(3)
+	pod := newStatefulSetPod(set, 0)
+	spc.setsIndexer.Add(set)
+	spc.podsIndexer.Add(pod)
+	if set := ssc.getStatefulSetForPod(pod); set == nil {
+		t.Error("Failed to get StatefulSet for Pod ")
+	}
+}
+
+func TestStatefulSetControllerGetStatefulSetForPodOverlapping(t *testing.T) {
+	ssc, spc := newFakeStatefulSetController()
+	set := newStatefulSet(3)
+	pod := newStatefulSetPod(set, 0)
+	set2 := newStatefulSet(3)
+	set2.Name = "foo2"
+	set3 := newStatefulSet(3)
+	set3.Name = "foo3"
+	set3.CreationTimestamp.Add(1 * time.Second)
+	spc.setsIndexer.Add(set3)
+	spc.setsIndexer.Add(set2)
+	spc.setsIndexer.Add(set)
+	spc.podsIndexer.Add(pod)
+	if found := ssc.getStatefulSetForPod(pod); found == nil {
+		t.Error("Failed to get StatefulSet for Pod")
+	} else if found.Name != set.Name {
+		t.Errorf("Returned wrong StatefulSet %s for Pod", set.Name)
+	}
+}
+
+func newFakeStatefulSetController() (*StatefulSetController, *fakeStatefulPodControl) {
+	fpc := newFakeStatefulPodControl()
+	ssc := &StatefulSetController{
+		kubeClient:     nil,
+		podStoreSynced: func() bool { return true },
+		setStore:       fpc.setsLister,
+		podStore:       fpc.podsLister,
+		control:        NewDefaultStatefulSetControl(fpc),
+		queue:          workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "statefulset"),
+	}
+	return ssc, fpc
+}
+
+func fakeWorker(ssc *StatefulSetController) {
+	if obj, done := ssc.queue.Get(); !done {
+		ssc.Sync(obj.(string))
+		ssc.queue.Done(obj)
+	}
+}
+
+func getPodAtOrdinal(pods []*v1.Pod, ordinal int) *v1.Pod {
+	if 0 > ordinal || ordinal >= len(pods) {
+		return nil
+	}
+	sort.Sort(ascendingOrdinal(pods))
+	return pods[ordinal]
+}
+
+func scaleUpStatefulSetController(set *apps.StatefulSet, ssc *StatefulSetController, spc *fakeStatefulPodControl) error {
+	spc.setsIndexer.Add(set)
+	ssc.enqueueStatefulSet(set)
+	fakeWorker(ssc)
+	selector, err := metav1.LabelSelectorAsSelector(set.Spec.Selector)
+	if err != nil {
+		return err
+	}
+	for set.Status.Replicas < *set.Spec.Replicas {
+		pods, err := spc.podsLister.Pods(set.Namespace).List(selector)
+		ord := len(pods) - 1
+		pod := getPodAtOrdinal(pods, ord)
+		if pods, err = spc.setPodPending(set, ord); err != nil {
+			return err
+		}
+		pod = getPodAtOrdinal(pods, ord)
+		ssc.addPod(pod)
+		fakeWorker(ssc)
+		pod = getPodAtOrdinal(pods, ord)
+		prev := *pod
+		if pods, err = spc.setPodRunning(set, ord); err != nil {
+			return err
+		}
+		pod = getPodAtOrdinal(pods, ord)
+		ssc.updatePod(&prev, pod)
+		fakeWorker(ssc)
+		pod = getPodAtOrdinal(pods, ord)
+		prev = *pod
+		if pods, err = spc.setPodReady(set, ord); err != nil {
+			return err
+		}
+		pod = getPodAtOrdinal(pods, ord)
+		ssc.updatePod(&prev, pod)
+		fakeWorker(ssc)
+		if err := assertInvariants(set, spc); err != nil {
+			return err
+		}
+		if obj, _, err := spc.setsIndexer.Get(set); err != nil {
+			return err
+		} else {
+			set = obj.(*apps.StatefulSet)
+		}
+
+	}
+	return assertInvariants(set, spc)
+}
+
+func scaleDownStatefulSetController(set *apps.StatefulSet, ssc *StatefulSetController, spc *fakeStatefulPodControl) error {
+	selector, err := metav1.LabelSelectorAsSelector(set.Spec.Selector)
+	if err != nil {
+		return err
+	}
+	pods, err := spc.podsLister.Pods(set.Namespace).List(selector)
+	if err != nil {
+		return err
+	}
+	ord := len(pods) - 1
+	pod := getPodAtOrdinal(pods, ord)
+	prev := *pod
+	fakeResourceVersion(set)
+	spc.setsIndexer.Add(set)
+	ssc.enqueueStatefulSet(set)
+	fakeWorker(ssc)
+	pods, err = spc.addTerminatedPod(set, ord)
+	pod = getPodAtOrdinal(pods, ord)
+	ssc.updatePod(&prev, pod)
+	fakeWorker(ssc)
+	spc.DeleteStatefulPod(set, pod)
+	ssc.deletePod(pod)
+	fakeWorker(ssc)
+	for set.Status.Replicas > *set.Spec.Replicas {
+		pods, err = spc.podsLister.Pods(set.Namespace).List(selector)
+		ord := len(pods)
+		pods, err = spc.addTerminatedPod(set, ord)
+		pod = getPodAtOrdinal(pods, ord)
+		ssc.updatePod(&prev, pod)
+		fakeWorker(ssc)
+		spc.DeleteStatefulPod(set, pod)
+		ssc.deletePod(pod)
+		fakeWorker(ssc)
+		if obj, _, err := spc.setsIndexer.Get(set); err != nil {
+			return err
+		} else {
+			set = obj.(*apps.StatefulSet)
+		}
+	}
+	return assertInvariants(set, spc)
 }

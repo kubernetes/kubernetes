@@ -18,15 +18,14 @@ package statefulset
 import (
 	"sort"
 
-	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api/v1"
 	apps "k8s.io/kubernetes/pkg/apis/apps/v1beta1"
+
+	"github.com/golang/glog"
 )
 
 // StatefulSetControl implements the control logic for updating StatefulSets and their children Pods. It is implemented
 // as an interface to allow for extensions that provide different semantics. Currently, there is only one implementation.
-// If you are looking to fork the StatefulSet codebase in order to modify its semantics, this is the code you are
-// looking for.
 type StatefulSetControlInterface interface {
 	// UpdateStatefulSet implements the control logic for Pod creation, update, and deletion, and
 	// persistent volume creation, update, and deletion.

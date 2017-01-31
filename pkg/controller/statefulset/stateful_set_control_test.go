@@ -18,18 +18,330 @@ package statefulset
 import (
 	"errors"
 	"fmt"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/kubernetes/pkg/api/v1"
-	apps "k8s.io/kubernetes/pkg/apis/apps/v1beta1"
-	"k8s.io/client-go/tools/cache"
-	listers "k8s.io/kubernetes/pkg/client/legacylisters"
-	"k8s.io/kubernetes/pkg/controller"
 	"sort"
 	"strconv"
 	"testing"
 	"time"
+
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+	"k8s.io/client-go/tools/cache"
+
+	"k8s.io/kubernetes/pkg/api/v1"
+	apps "k8s.io/kubernetes/pkg/apis/apps/v1beta1"
+	listers "k8s.io/kubernetes/pkg/client/legacylisters"
+	"k8s.io/kubernetes/pkg/controller"
 )
+
+func TestDefaultStatefulSetControlCreatesPods(t *testing.T) {
+	spc := newFakeStatefulPodControl()
+	ssc := NewDefaultStatefulSetControl(spc)
+	set := newStatefulSet(3)
+	if err := scaleUpStatefulSetControl(set, ssc, spc); err != nil {
+		t.Errorf("Failed to turn up StatefulSet : %s", err)
+	}
+	if set.Status.Replicas != 3 {
+		t.Error("Falied to scale statefulset to 3 replicas")
+	}
+}
+
+func TestStatefulSetControlScaleUp(t *testing.T) {
+	spc := newFakeStatefulPodControl()
+	ssc := NewDefaultStatefulSetControl(spc)
+	set := newStatefulSet(3)
+	if err := scaleUpStatefulSetControl(set, ssc, spc); err != nil {
+		t.Errorf("Failed to turn up StatefulSet : %s", err)
+	}
+	*set.Spec.Replicas = 4
+	if err := scaleUpStatefulSetControl(set, ssc, spc); err != nil {
+		t.Errorf("Failed to scale StatefulSet : %s", err)
+	}
+	if set.Status.Replicas != 4 {
+		t.Error("Falied to scale statefulset to 4 replicas")
+	}
+}
+
+func TestStatefulSetControlScaleDown(t *testing.T) {
+	spc := newFakeStatefulPodControl()
+	ssc := NewDefaultStatefulSetControl(spc)
+	set := newStatefulSet(3)
+	if err := scaleUpStatefulSetControl(set, ssc, spc); err != nil {
+		t.Errorf("Failed to turn up StatefulSet : %s", err)
+	}
+	*set.Spec.Replicas = 0
+	if err := scaleDownStatefulSetControl(set, ssc, spc); err != nil {
+		t.Errorf("Failed to scale StatefulSet : %s", err)
+	}
+	if set.Status.Replicas != 0 {
+		t.Error("Falied to scale statefulset to 4 replicas")
+	}
+}
+
+func TestStatefulSetControlReplacesPods(t *testing.T) {
+	spc := newFakeStatefulPodControl()
+	ssc := NewDefaultStatefulSetControl(spc)
+	set := newStatefulSet(5)
+	if err := scaleUpStatefulSetControl(set, ssc, spc); err != nil {
+		t.Errorf("Failed to turn up StatefulSet : %s", err)
+	}
+	if set.Status.Replicas != 5 {
+		t.Error("Falied to scale statefulset to 5 replicas")
+	}
+	selector, err := metav1.LabelSelectorAsSelector(set.Spec.Selector)
+	if err != nil {
+		t.Error(err)
+	}
+	pods, err := spc.podsLister.Pods(set.Namespace).List(selector)
+	if err != nil {
+		t.Error(err)
+	}
+	sort.Sort(ascendingOrdinal(pods))
+	spc.podsIndexer.Delete(pods[0])
+	spc.podsIndexer.Delete(pods[2])
+	spc.podsIndexer.Delete(pods[4])
+	for i := 0; i < 5; i += 2 {
+		pods, err := spc.podsLister.Pods(set.Namespace).List(selector)
+		if err != nil {
+			t.Error(err)
+		}
+		if err = ssc.UpdateStatefulSet(set, pods); err != nil {
+			t.Errorf("Failed to update StatefulSet : %s", err)
+		}
+		if pods, err = spc.setPodRunning(set, i); err != nil {
+			t.Error(err)
+		}
+		if err = ssc.UpdateStatefulSet(set, pods); err != nil {
+			t.Errorf("Failed to update StatefulSet : %s", err)
+		}
+		if pods, err = spc.setPodReady(set, i); err != nil {
+			t.Error(err)
+		}
+	}
+	pods, err = spc.podsLister.Pods(set.Namespace).List(selector)
+	if err != nil {
+		t.Error(err)
+	}
+	if err := ssc.UpdateStatefulSet(set, pods); err != nil {
+		t.Errorf("Failed to update StatefulSet : %s", err)
+	}
+	if set.Status.Replicas != 5 {
+		t.Error("Falied to scale StatefulSet to 5 replicas")
+	}
+}
+
+func TestDefaultStatefulSetControlRecreatesFailedPod(t *testing.T) {
+	spc := newFakeStatefulPodControl()
+	ssc := NewDefaultStatefulSetControl(spc)
+	set := newStatefulSet(3)
+	selector, err := metav1.LabelSelectorAsSelector(set.Spec.Selector)
+	if err != nil {
+		t.Error(err)
+	}
+	pods, err := spc.podsLister.Pods(set.Namespace).List(selector)
+	if err != nil {
+		t.Error(err)
+	}
+	if err := ssc.UpdateStatefulSet(set, pods); err != nil {
+		t.Errorf("Error updating StatefulSet %s", err)
+	}
+	if err := assertInvariants(set, spc); err != nil {
+		t.Error(err)
+	}
+	pods, err = spc.podsLister.Pods(set.Namespace).List(selector)
+	if err != nil {
+		t.Error(err)
+	}
+	pods[0].Status.Phase = v1.PodFailed
+	spc.podsIndexer.Update(pods[0])
+	if err := ssc.UpdateStatefulSet(set, pods); err != nil {
+		t.Errorf("Error updating StatefulSet %s", err)
+	}
+	if err := assertInvariants(set, spc); err != nil {
+		t.Error(err)
+	}
+	pods, err = spc.podsLister.Pods(set.Namespace).List(selector)
+	if err != nil {
+		t.Error(err)
+	}
+	if isCreated(pods[0]) {
+		t.Error("StatefulSet did not recreate failed Pod")
+	}
+}
+
+func TestDefaultStatefulSetControlInitAnnotation(t *testing.T) {
+	spc := newFakeStatefulPodControl()
+	ssc := NewDefaultStatefulSetControl(spc)
+	set := newStatefulSet(3)
+	selector, err := metav1.LabelSelectorAsSelector(set.Spec.Selector)
+	if err != nil {
+		t.Error(err)
+	}
+	pods, err := spc.podsLister.Pods(set.Namespace).List(selector)
+	if err != nil {
+		t.Error(err)
+	}
+	if err = ssc.UpdateStatefulSet(set, pods); err != nil {
+		t.Errorf("Error updating StatefulSet %s", err)
+	}
+	if err = assertInvariants(set, spc); err != nil {
+		t.Error(err)
+	}
+	if pods, err = spc.setPodRunning(set, 0); err != nil {
+		t.Error(err)
+	}
+	if pods, err = spc.setPodReady(set, 0); err != nil {
+		t.Error(err)
+	}
+	if pods, err = spc.setPodInitStatus(set, 0, false); err != nil {
+		t.Error(err)
+	}
+	replicas := int(set.Status.Replicas)
+	if err := ssc.UpdateStatefulSet(set, pods); err != nil {
+		t.Errorf("Error updating StatefulSet %s", err)
+	}
+	if err := assertInvariants(set, spc); err != nil {
+		t.Error(err)
+	}
+	if replicas != int(set.Status.Replicas) {
+		t.Errorf("StatefulSetControl does not block on %s=false", StatefulSetInitAnnotation)
+	}
+	if pods, err = spc.setPodInitStatus(set, 0, true); err != nil {
+		t.Error(err)
+	}
+	if err := scaleUpStatefulSetControl(set, ssc, spc); err != nil {
+		t.Errorf("Failed to turn up StatefulSet : %s", err)
+	}
+	if int(set.Status.Replicas) != 3 {
+		t.Errorf("StatefulSetControl does not unblock on %s=true", StatefulSetInitAnnotation)
+	}
+}
+
+func TestDefaultStatefulSetControlCreatePodFailure(t *testing.T) {
+	spc := newFakeStatefulPodControl()
+	ssc := NewDefaultStatefulSetControl(spc)
+	set := newStatefulSet(3)
+	spc.SetCreateStatefulPodError(apierrors.NewInternalError(errors.New("API server failed")), 2)
+	if err := scaleUpStatefulSetControl(set, ssc, spc); !apierrors.IsInternalError(err) {
+		t.Errorf("StatefulSetControl did not return InternalError foudn %s", err)
+	}
+	if err := scaleUpStatefulSetControl(set, ssc, spc); err != nil {
+		t.Errorf("Failed to turn up StatefulSet : %s", err)
+	}
+	if set.Status.Replicas != 3 {
+		t.Error("Falied to scale StatefulSet to 3 replicas")
+	}
+}
+
+func TestDefaultStatefulSetControlUpdatePodFailure(t *testing.T) {
+	spc := newFakeStatefulPodControl()
+	ssc := NewDefaultStatefulSetControl(spc)
+	set := newStatefulSet(3)
+	spc.SetUpdateStatefulPodError(apierrors.NewInternalError(errors.New("API server failed")), 2)
+	if err := scaleUpStatefulSetControl(set, ssc, spc); !apierrors.IsInternalError(err) {
+		t.Errorf("StatefulSetControl did not return InternalError foudn %s", err)
+	}
+	if err := scaleUpStatefulSetControl(set, ssc, spc); err != nil {
+		t.Errorf("Failed to turn up StatefulSet : %s", err)
+	}
+	if set.Status.Replicas != 3 {
+		t.Error("Falied to scale StatefulSet to 3 replicas")
+	}
+}
+
+func TestDefaultStatefulSetControlUpdateSetStatusFailure(t *testing.T) {
+	spc := newFakeStatefulPodControl()
+	ssc := NewDefaultStatefulSetControl(spc)
+	set := newStatefulSet(3)
+	spc.SetUpdateStatefulSetStatusError(apierrors.NewInternalError(errors.New("API server failed")), 2)
+	if err := scaleUpStatefulSetControl(set, ssc, spc); !apierrors.IsInternalError(err) {
+		t.Errorf("StatefulSetControl did not return InternalError foudn %s", err)
+	}
+	if err := scaleUpStatefulSetControl(set, ssc, spc); err != nil {
+		t.Errorf("Failed to turn up StatefulSet : %s", err)
+	}
+	if set.Status.Replicas != 3 {
+		t.Error("Falied to scale StatefulSet to 3 replicas")
+	}
+}
+
+func TestDefaultStatefulSetControlPodRecreateDeleteError(t *testing.T) {
+	spc := newFakeStatefulPodControl()
+	ssc := NewDefaultStatefulSetControl(spc)
+	set := newStatefulSet(3)
+	selector, err := metav1.LabelSelectorAsSelector(set.Spec.Selector)
+	if err != nil {
+		t.Error(err)
+	}
+	pods, err := spc.podsLister.Pods(set.Namespace).List(selector)
+	if err != nil {
+		t.Error(err)
+	}
+	if err := ssc.UpdateStatefulSet(set, pods); err != nil {
+		t.Errorf("Error updating StatefulSet %s", err)
+	}
+	if err := assertInvariants(set, spc); err != nil {
+		t.Error(err)
+	}
+	pods, err = spc.podsLister.Pods(set.Namespace).List(selector)
+	if err != nil {
+		t.Error(err)
+	}
+	pods[0].Status.Phase = v1.PodFailed
+	spc.podsIndexer.Update(pods[0])
+	spc.SetDeleteStatefulPodError(apierrors.NewInternalError(errors.New("API server failed")), 0)
+	if err := ssc.UpdateStatefulSet(set, pods); !apierrors.IsInternalError(err) {
+		t.Errorf("StatefulSet failed to %s", err)
+	}
+	if err := assertInvariants(set, spc); err != nil {
+		t.Error(err)
+	}
+	if err := ssc.UpdateStatefulSet(set, pods); err != nil {
+		t.Errorf("Error updating StatefulSet %s", err)
+	}
+	if err := assertInvariants(set, spc); err != nil {
+		t.Error(err)
+	}
+	pods, err = spc.podsLister.Pods(set.Namespace).List(selector)
+	if err != nil {
+		t.Error(err)
+	}
+	if isCreated(pods[0]) {
+		t.Error("StatefulSet did not recreate failed Pod")
+	}
+}
+
+func TestStatefulSetControlScaleDownDeleteError(t *testing.T) {
+	spc := newFakeStatefulPodControl()
+	ssc := NewDefaultStatefulSetControl(spc)
+	set := newStatefulSet(3)
+	if err := scaleUpStatefulSetControl(set, ssc, spc); err != nil {
+		t.Errorf("Failed to turn up StatefulSet : %s", err)
+	}
+	*set.Spec.Replicas = 0
+	spc.SetDeleteStatefulPodError(apierrors.NewInternalError(errors.New("API server failed")), 2)
+	if err := scaleDownStatefulSetControl(set, ssc, spc); !apierrors.IsInternalError(err) {
+		t.Errorf("StatefulSetControl failed to throw error on delte %s", err)
+	}
+	if err := scaleDownStatefulSetControl(set, ssc, spc); err != nil {
+		t.Errorf("Failed to turn down StatefulSet %s", err)
+	}
+	if set.Status.Replicas != 0 {
+		t.Error("Falied to scale statefulset to 4 replicas")
+	}
+}
+
+func TestStatefulSetControlBadParameters(t *testing.T) {
+	spc := newFakeStatefulPodControl()
+	ssc := NewDefaultStatefulSetControl(spc)
+	set := newStatefulSet(3)
+	if err := ssc.UpdateStatefulSet(set, nil); err != nil {
+		t.Errorf("StatefulSetControl returned error on nil pods %s", err)
+	}
+	if err := ssc.UpdateStatefulSet(nil, []*v1.Pod{}); err == nil {
+		t.Error("StatefulSetControl failed to return error on nil set")
+	}
+}
 
 type requestTracker struct {
 	requests int
@@ -415,313 +727,4 @@ func scaleDownStatefulSetControl(set *apps.StatefulSet, ssc StatefulSetControlIn
 		}
 	}
 	return assertInvariants(set, spc)
-}
-
-func TestDefaultStatefulSetControlCreatesPods(t *testing.T) {
-	spc := newFakeStatefulPodControl()
-	ssc := NewDefaultStatefulSetControl(spc)
-	set := newStatefulSet(3)
-	if err := scaleUpStatefulSetControl(set, ssc, spc); err != nil {
-		t.Errorf("Failed to turn up StatefulSet : %s", err)
-	}
-	if set.Status.Replicas != 3 {
-		t.Error("Falied to scale statefulset to 3 replicas")
-	}
-}
-
-func TestStatefulSetControlScaleUp(t *testing.T) {
-	spc := newFakeStatefulPodControl()
-	ssc := NewDefaultStatefulSetControl(spc)
-	set := newStatefulSet(3)
-	if err := scaleUpStatefulSetControl(set, ssc, spc); err != nil {
-		t.Errorf("Failed to turn up StatefulSet : %s", err)
-	}
-	*set.Spec.Replicas = 4
-	if err := scaleUpStatefulSetControl(set, ssc, spc); err != nil {
-		t.Errorf("Failed to scale StatefulSet : %s", err)
-	}
-	if set.Status.Replicas != 4 {
-		t.Error("Falied to scale statefulset to 4 replicas")
-	}
-}
-
-func TestStatefulSetControlScaleDown(t *testing.T) {
-	spc := newFakeStatefulPodControl()
-	ssc := NewDefaultStatefulSetControl(spc)
-	set := newStatefulSet(3)
-	if err := scaleUpStatefulSetControl(set, ssc, spc); err != nil {
-		t.Errorf("Failed to turn up StatefulSet : %s", err)
-	}
-	*set.Spec.Replicas = 0
-	if err := scaleDownStatefulSetControl(set, ssc, spc); err != nil {
-		t.Errorf("Failed to scale StatefulSet : %s", err)
-	}
-	if set.Status.Replicas != 0 {
-		t.Error("Falied to scale statefulset to 4 replicas")
-	}
-}
-
-func TestStatefulSetControlReplacesPods(t *testing.T) {
-	spc := newFakeStatefulPodControl()
-	ssc := NewDefaultStatefulSetControl(spc)
-	set := newStatefulSet(5)
-	if err := scaleUpStatefulSetControl(set, ssc, spc); err != nil {
-		t.Errorf("Failed to turn up StatefulSet : %s", err)
-	}
-	if set.Status.Replicas != 5 {
-		t.Error("Falied to scale statefulset to 5 replicas")
-	}
-	selector, err := metav1.LabelSelectorAsSelector(set.Spec.Selector)
-	if err != nil {
-		t.Error(err)
-	}
-	pods, err := spc.podsLister.Pods(set.Namespace).List(selector)
-	if err != nil {
-		t.Error(err)
-	}
-	sort.Sort(ascendingOrdinal(pods))
-	spc.podsIndexer.Delete(pods[0])
-	spc.podsIndexer.Delete(pods[2])
-	spc.podsIndexer.Delete(pods[4])
-	for i := 0; i < 5; i += 2 {
-		pods, err := spc.podsLister.Pods(set.Namespace).List(selector)
-		if err != nil {
-			t.Error(err)
-		}
-		if err = ssc.UpdateStatefulSet(set, pods); err != nil {
-			t.Errorf("Failed to update StatefulSet : %s", err)
-		}
-		if pods, err = spc.setPodRunning(set, i); err != nil {
-			t.Error(err)
-		}
-		if err = ssc.UpdateStatefulSet(set, pods); err != nil {
-			t.Errorf("Failed to update StatefulSet : %s", err)
-		}
-		if pods, err = spc.setPodReady(set, i); err != nil {
-			t.Error(err)
-		}
-	}
-	pods, err = spc.podsLister.Pods(set.Namespace).List(selector)
-	if err != nil {
-		t.Error(err)
-	}
-	if err := ssc.UpdateStatefulSet(set, pods); err != nil {
-		t.Errorf("Failed to update StatefulSet : %s", err)
-	}
-	if set.Status.Replicas != 5 {
-		t.Error("Falied to scale StatefulSet to 5 replicas")
-	}
-}
-
-func TestDefaultStatefulSetControlRecreatesFailedPod(t *testing.T) {
-	spc := newFakeStatefulPodControl()
-	ssc := NewDefaultStatefulSetControl(spc)
-	set := newStatefulSet(3)
-	selector, err := metav1.LabelSelectorAsSelector(set.Spec.Selector)
-	if err != nil {
-		t.Error(err)
-	}
-	pods, err := spc.podsLister.Pods(set.Namespace).List(selector)
-	if err != nil {
-		t.Error(err)
-	}
-	if err := ssc.UpdateStatefulSet(set, pods); err != nil {
-		t.Errorf("Error updating StatefulSet %s", err)
-	}
-	if err := assertInvariants(set, spc); err != nil {
-		t.Error(err)
-	}
-	pods, err = spc.podsLister.Pods(set.Namespace).List(selector)
-	if err != nil {
-		t.Error(err)
-	}
-	pods[0].Status.Phase = v1.PodFailed
-	spc.podsIndexer.Update(pods[0])
-	if err := ssc.UpdateStatefulSet(set, pods); err != nil {
-		t.Errorf("Error updating StatefulSet %s", err)
-	}
-	if err := assertInvariants(set, spc); err != nil {
-		t.Error(err)
-	}
-	pods, err = spc.podsLister.Pods(set.Namespace).List(selector)
-	if err != nil {
-		t.Error(err)
-	}
-	if isCreated(pods[0]) {
-		t.Error("StatefulSet did not recreate failed Pod")
-	}
-}
-
-func TestDefaultStatefulSetControlInitAnnotation(t *testing.T) {
-	spc := newFakeStatefulPodControl()
-	ssc := NewDefaultStatefulSetControl(spc)
-	set := newStatefulSet(3)
-	selector, err := metav1.LabelSelectorAsSelector(set.Spec.Selector)
-	if err != nil {
-		t.Error(err)
-	}
-	pods, err := spc.podsLister.Pods(set.Namespace).List(selector)
-	if err != nil {
-		t.Error(err)
-	}
-	if err = ssc.UpdateStatefulSet(set, pods); err != nil {
-		t.Errorf("Error updating StatefulSet %s", err)
-	}
-	if err = assertInvariants(set, spc); err != nil {
-		t.Error(err)
-	}
-	if pods, err = spc.setPodRunning(set, 0); err != nil {
-		t.Error(err)
-	}
-	if pods, err = spc.setPodReady(set, 0); err != nil {
-		t.Error(err)
-	}
-	if pods, err = spc.setPodInitStatus(set, 0, false); err != nil {
-		t.Error(err)
-	}
-	replicas := int(set.Status.Replicas)
-	if err := ssc.UpdateStatefulSet(set, pods); err != nil {
-		t.Errorf("Error updating StatefulSet %s", err)
-	}
-	if err := assertInvariants(set, spc); err != nil {
-		t.Error(err)
-	}
-	if replicas != int(set.Status.Replicas) {
-		t.Errorf("StatefulSetControl does not block on %s=false", StatefulSetInitAnnotation)
-	}
-	if pods, err = spc.setPodInitStatus(set, 0, true); err != nil {
-		t.Error(err)
-	}
-	if err := scaleUpStatefulSetControl(set, ssc, spc); err != nil {
-		t.Errorf("Failed to turn up StatefulSet : %s", err)
-	}
-	if int(set.Status.Replicas) != 3 {
-		t.Errorf("StatefulSetControl does not unblock on %s=true", StatefulSetInitAnnotation)
-	}
-}
-
-func TestDefaultStatefulSetControlCreatePodFailure(t *testing.T) {
-	spc := newFakeStatefulPodControl()
-	ssc := NewDefaultStatefulSetControl(spc)
-	set := newStatefulSet(3)
-	spc.SetCreateStatefulPodError(apierrors.NewInternalError(errors.New("API server failed")), 2)
-	if err := scaleUpStatefulSetControl(set, ssc, spc); !apierrors.IsInternalError(err) {
-		t.Errorf("StatefulSetControl did not return InternalError foudn %s", err)
-	}
-	if err := scaleUpStatefulSetControl(set, ssc, spc); err != nil {
-		t.Errorf("Failed to turn up StatefulSet : %s", err)
-	}
-	if set.Status.Replicas != 3 {
-		t.Error("Falied to scale StatefulSet to 3 replicas")
-	}
-}
-
-func TestDefaultStatefulSetControlUpdatePodFailure(t *testing.T) {
-	spc := newFakeStatefulPodControl()
-	ssc := NewDefaultStatefulSetControl(spc)
-	set := newStatefulSet(3)
-	spc.SetUpdateStatefulPodError(apierrors.NewInternalError(errors.New("API server failed")), 2)
-	if err := scaleUpStatefulSetControl(set, ssc, spc); !apierrors.IsInternalError(err) {
-		t.Errorf("StatefulSetControl did not return InternalError foudn %s", err)
-	}
-	if err := scaleUpStatefulSetControl(set, ssc, spc); err != nil {
-		t.Errorf("Failed to turn up StatefulSet : %s", err)
-	}
-	if set.Status.Replicas != 3 {
-		t.Error("Falied to scale StatefulSet to 3 replicas")
-	}
-}
-
-func TestDefaultStatefulSetControlUpdateSetStatusFailure(t *testing.T) {
-	spc := newFakeStatefulPodControl()
-	ssc := NewDefaultStatefulSetControl(spc)
-	set := newStatefulSet(3)
-	spc.SetUpdateStatefulSetStatusError(apierrors.NewInternalError(errors.New("API server failed")), 2)
-	if err := scaleUpStatefulSetControl(set, ssc, spc); !apierrors.IsInternalError(err) {
-		t.Errorf("StatefulSetControl did not return InternalError foudn %s", err)
-	}
-	if err := scaleUpStatefulSetControl(set, ssc, spc); err != nil {
-		t.Errorf("Failed to turn up StatefulSet : %s", err)
-	}
-	if set.Status.Replicas != 3 {
-		t.Error("Falied to scale StatefulSet to 3 replicas")
-	}
-}
-
-func TestDefaultStatefulSetControlPodRecreateDeleteError(t *testing.T) {
-	spc := newFakeStatefulPodControl()
-	ssc := NewDefaultStatefulSetControl(spc)
-	set := newStatefulSet(3)
-	selector, err := metav1.LabelSelectorAsSelector(set.Spec.Selector)
-	if err != nil {
-		t.Error(err)
-	}
-	pods, err := spc.podsLister.Pods(set.Namespace).List(selector)
-	if err != nil {
-		t.Error(err)
-	}
-	if err := ssc.UpdateStatefulSet(set, pods); err != nil {
-		t.Errorf("Error updating StatefulSet %s", err)
-	}
-	if err := assertInvariants(set, spc); err != nil {
-		t.Error(err)
-	}
-	pods, err = spc.podsLister.Pods(set.Namespace).List(selector)
-	if err != nil {
-		t.Error(err)
-	}
-	pods[0].Status.Phase = v1.PodFailed
-	spc.podsIndexer.Update(pods[0])
-	spc.SetDeleteStatefulPodError(apierrors.NewInternalError(errors.New("API server failed")), 0)
-	if err := ssc.UpdateStatefulSet(set, pods); !apierrors.IsInternalError(err) {
-		t.Errorf("StatefulSet failed to %s", err)
-	}
-	if err := assertInvariants(set, spc); err != nil {
-		t.Error(err)
-	}
-	if err := ssc.UpdateStatefulSet(set, pods); err != nil {
-		t.Errorf("Error updating StatefulSet %s", err)
-	}
-	if err := assertInvariants(set, spc); err != nil {
-		t.Error(err)
-	}
-	pods, err = spc.podsLister.Pods(set.Namespace).List(selector)
-	if err != nil {
-		t.Error(err)
-	}
-	if isCreated(pods[0]) {
-		t.Error("StatefulSet did not recreate failed Pod")
-	}
-}
-
-func TestStatefulSetControlScaleDownDeleteError(t *testing.T) {
-	spc := newFakeStatefulPodControl()
-	ssc := NewDefaultStatefulSetControl(spc)
-	set := newStatefulSet(3)
-	if err := scaleUpStatefulSetControl(set, ssc, spc); err != nil {
-		t.Errorf("Failed to turn up StatefulSet : %s", err)
-	}
-	*set.Spec.Replicas = 0
-	spc.SetDeleteStatefulPodError(apierrors.NewInternalError(errors.New("API server failed")), 2)
-	if err := scaleDownStatefulSetControl(set, ssc, spc); !apierrors.IsInternalError(err) {
-		t.Errorf("StatefulSetControl failed to throw error on delte %s", err)
-	}
-	if err := scaleDownStatefulSetControl(set, ssc, spc); err != nil {
-		t.Errorf("Failed to turn down StatefulSet %s", err)
-	}
-	if set.Status.Replicas != 0 {
-		t.Error("Falied to scale statefulset to 4 replicas")
-	}
-}
-
-func TestStatefulSetControlBadParameters(t *testing.T) {
-	spc := newFakeStatefulPodControl()
-	ssc := NewDefaultStatefulSetControl(spc)
-	set := newStatefulSet(3)
-	if err := ssc.UpdateStatefulSet(set, nil); err != nil {
-		t.Errorf("StatefulSetControl returned error on nil pods %s", err)
-	}
-	if err := ssc.UpdateStatefulSet(nil, []*v1.Pod{}); err == nil {
-		t.Error("StatefulSetControl failed to return error on nil set")
-	}
 }

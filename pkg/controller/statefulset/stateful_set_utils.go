@@ -17,16 +17,17 @@ limitations under the License.
 package statefulset
 
 import (
+	"errors"
 	"fmt"
+	"regexp"
 	"strconv"
 
-	"errors"
-	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api/v1"
 	podapi "k8s.io/kubernetes/pkg/api/v1/pod"
 	apps "k8s.io/kubernetes/pkg/apis/apps/v1beta1"
 	"k8s.io/kubernetes/pkg/controller"
-	"regexp"
+
+	"github.com/golang/glog"
 )
 
 // max retries used for update conflict resolution prior to failure
@@ -178,8 +179,6 @@ func updateStorage(set *apps.StatefulSet, pod *v1.Pod) {
 	for i := range currentVolumes {
 		if _, ok := claims[currentVolumes[i].Name]; !ok {
 			newVolumes = append(newVolumes, currentVolumes[i])
-		} else {
-			glog.V(4).Infof("Overwrote existing volume source %v", currentVolumes[i].Name)
 		}
 	}
 	pod.Spec.Volumes = newVolumes
@@ -233,6 +232,7 @@ func isTerminated(pod *v1.Pod) bool {
 	return pod.DeletionTimestamp != nil
 }
 
+// Returns a new Pod conforming to the set's Spec with an identity generated from ordinal.
 func newStatefulSetPod(set *apps.StatefulSet, ordinal int) *v1.Pod {
 	pod, _ := controller.GetPodFromTemplate(&set.Spec.Template, set, nil)
 	pod.Name = getPodName(set, ordinal)

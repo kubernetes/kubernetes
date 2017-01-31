@@ -23,19 +23,20 @@ import (
 	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/apimachinery/pkg/watch"
+
 	"k8s.io/client-go/tools/cache"
+	"k8s.io/client-go/util/workqueue"
+
 	"k8s.io/kubernetes/pkg/api/v1"
 	apps "k8s.io/kubernetes/pkg/apis/apps/v1beta1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	v1core "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/core/v1"
 	"k8s.io/kubernetes/pkg/client/legacylisters"
 	"k8s.io/kubernetes/pkg/client/record"
-
-	"k8s.io/apimachinery/pkg/runtime"
-	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
-	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/apimachinery/pkg/watch"
-	"k8s.io/client-go/util/workqueue"
 	"k8s.io/kubernetes/pkg/controller"
 
 	"github.com/golang/glog"
@@ -51,24 +52,23 @@ const (
 // StatefulSetController controls statefulsets.
 type StatefulSetController struct {
 	// client interface
-	kubeClient     clientset.Interface
+	kubeClient clientset.Interface
 	// newSyncer returns an interface capable of syncing a single pet.
 	// Abstracted out for testing.
-	control        StatefulSetControlInterface
+	control StatefulSetControlInterface
 	// podStore is a cache of watched pods.
 	podStore listers.StoreToPodLister
 
 	// podStoreSynced returns true if the pod store has synced at least once.
 	podStoreSynced func() bool
 	// Watches changes to all pods.
-	podController  cache.Controller
+	podController cache.Controller
 	// A store of StatefulSets, populated by the psController.
 	setStore listers.StoreToStatefulSetLister
 	// Watches changes to all StatefulSets.
-	setController  cache.Controller
+	setController cache.Controller
 	// Controllers that need to be synced.
-	queue          workqueue.RateLimitingInterface
-
+	queue workqueue.RateLimitingInterface
 }
 
 // NewStatefulSetController creates a new statefulset controller.
@@ -223,24 +223,18 @@ func (ssc *StatefulSetController) getStatefulSetForPod(pod *v1.Pod) *apps.Statef
 		glog.V(4).Infof("No StatefulSets found for pod %v, StatefulSet controller will avoid syncing", pod.Name)
 		return nil
 	}
-	// Resolve a overlapping by checking the name of the Pod versus the Name of its parent
+	// More than one set is selecting the same Pod
 	if len(sets) > 1 {
 		glog.Errorf("user error: more than one StatefulSet is selecting pods with labels: %+v", pod.Labels)
-		valid := make([]apps.StatefulSet, 0, len(sets))
+		// The timestamp sort should not be necessary because we will enforce the CreatedBy requirement by
+		// name
+		sort.Sort(overlappingStatefulSets(sets))
+		// return the first created set for which pod is a member
 		for i := range sets {
 			if isMemberOf(&sets[i], pod) {
-				valid = append(valid, sets[i])
+				return &sets[i]
 			}
 		}
-		sets = valid
-	}
-	// It should not be possible for this to occur given the way names are constructed. However,
-	// we will still fall back to creation time if more than one set has the same name.
-	if setCount := len(sets); setCount > 1 {
-		glog.Errorf("user error: %d is a member of more than one StatefulSet : %s", pod.Name)
-		sort.Sort(overlappingStatefulSets(sets))
-		return nil
-	} else if setCount <= 0 {
 		glog.V(4).Infof("No StatefulSets found for pod %v, StatefulSet controller will avoid syncing", pod.Name)
 		return nil
 	} else {

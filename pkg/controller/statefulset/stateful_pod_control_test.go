@@ -17,29 +17,18 @@ package statefulset
 
 import (
 	"errors"
+	"strings"
+	"testing"
+
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
+
 	core "k8s.io/client-go/testing"
+
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset/fake"
 	"k8s.io/kubernetes/pkg/client/record"
-	"strings"
-	"testing"
 )
-
-func collectEvents(source <-chan string) []string {
-	done := false
-	events := make([]string, 0)
-	for !done {
-		select {
-		case event := <-source:
-			events = append(events, event)
-		default:
-			done = true
-		}
-	}
-	return events
-}
 
 func TestStatefulPodControlCreatesPods(t *testing.T) {
 	recorder := record.NewFakeRecorder(10)
@@ -666,4 +655,18 @@ func TestStatefulPodControlUpdateSetStatusBadParameters(t *testing.T) {
 	if err := control.UpdateStatefulSetStatus(nil); err == nil {
 		t.Error("UpddateStatefulSetStatus did not return an error for a nil StatefulSet")
 	}
+}
+
+func collectEvents(source <-chan string) []string {
+	done := false
+	events := make([]string, 0)
+	for !done {
+		select {
+		case event := <-source:
+			events = append(events, event)
+		default:
+			done = true
+		}
+	}
+	return events
 }
