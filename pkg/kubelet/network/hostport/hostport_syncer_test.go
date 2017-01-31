@@ -17,7 +17,6 @@ limitations under the License.
 package hostport
 
 import (
-	"fmt"
 	"net"
 	"reflect"
 	"strings"
@@ -27,24 +26,6 @@ import (
 	utiliptables "k8s.io/kubernetes/pkg/util/iptables"
 )
 
-type fakeSocket struct {
-	port     int32
-	protocol string
-	closed   bool
-}
-
-func (f *fakeSocket) Close() error {
-	if f.closed {
-		return fmt.Errorf("Socket %q.%s already closed!", f.port, f.protocol)
-	}
-	f.closed = true
-	return nil
-}
-
-func openFakeSocket(hp *hostport) (closeable, error) {
-	return &fakeSocket{hp.port, hp.protocol, false}, nil
-}
-
 type ruleMatch struct {
 	hostport int
 	chain    string
@@ -53,11 +34,12 @@ type ruleMatch struct {
 
 func TestOpenPodHostports(t *testing.T) {
 	fakeIPTables := NewFakeIPTables()
+	fakeOpener := NewFakeSocketManager()
 
 	h := &hostportSyncer{
 		hostPortMap: make(map[hostport]closeable),
 		iptables:    fakeIPTables,
-		portOpener:  openFakeSocket,
+		portOpener:  fakeOpener.openFakeSocket,
 	}
 
 	tests := []struct {
