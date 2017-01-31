@@ -58,7 +58,7 @@ var _ = framework.KubeDescribe("Federated ingresses [Feature:Federation]", func(
 
 	// Create/delete ingress api objects
 	// Validate federation apiserver, does not rely on underlying clusters or federation ingress controller.
-	Describe("Federated Ingresses", func() {
+	Describe("Federated Ingresses [NoCluster]", func() {
 		AfterEach(func() {
 			nsName := f.FederationNamespace.Name
 			// Delete all ingresses.

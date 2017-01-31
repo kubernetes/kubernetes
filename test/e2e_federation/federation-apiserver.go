@@ -35,7 +35,7 @@ import (
 var _ = framework.KubeDescribe("Federation apiserver [Feature:Federation]", func() {
 	f := fedframework.NewDefaultFederatedFramework("federation-cluster")
 
-	Describe("Cluster objects", func() {
+	Describe("Cluster objects [Serial]", func() {
 		AfterEach(func() {
 			fedframework.SkipUnlessFederated(f.ClientSet)
 
@@ -84,7 +84,8 @@ var _ = framework.KubeDescribe("Federation apiserver [Feature:Federation]", func
 			framework.Logf("Verified that zero clusters remain")
 		})
 	})
-	Describe("Admission control", func() {
+
+	Describe("Admission control [NoCluster]", func() {
 		AfterEach(func() {
 			fedframework.SkipUnlessFederated(f.ClientSet)
 		})
