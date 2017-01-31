@@ -18,5 +18,8 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
+go build ./staging/src/k8s.io/client-go/examples/...
+
 KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
-"${KUBE_ROOT}"/staging/copy.sh -v
+# TODO: reenable copy.sh when test can cope with circular dependencies
+# "${KUBE_ROOT}"/staging/copy.sh -v
