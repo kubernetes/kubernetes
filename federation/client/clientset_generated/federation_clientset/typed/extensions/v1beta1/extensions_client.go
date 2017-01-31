@@ -30,6 +30,7 @@ type ExtensionsV1beta1Interface interface {
 	DeploymentsGetter
 	IngressesGetter
 	ReplicaSetsGetter
+	ScalesGetter
 }
 
 // ExtensionsV1beta1Client is used to interact with features provided by the extensions group.
@@ -51,6 +52,10 @@ func (c *ExtensionsV1beta1Client) Ingresses(namespace string) IngressInterface {
 
 func (c *ExtensionsV1beta1Client) ReplicaSets(namespace string) ReplicaSetInterface {
 	return newReplicaSets(c, namespace)
+}
+
+func (c *ExtensionsV1beta1Client) Scales(namespace string) ScaleInterface {
+	return newScales(c, namespace)
 }
 
 // NewForConfig creates a new ExtensionsV1beta1Client for the given config.

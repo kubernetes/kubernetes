@@ -16,6 +16,8 @@ go_library(
         "fake_extensions_client.go",
         "fake_ingress.go",
         "fake_replicaset.go",
+        "fake_scale.go",
+        "fake_scale_expansion.go",
     ],
     tags = ["automanaged"],
     deps = [
