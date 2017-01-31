@@ -576,6 +576,7 @@ sort-by
 source-file
 ssh-env
 ssh-keyfile
+ssh-key
 ssh-options
 ssh-user
 start-services
