@@ -17,20 +17,25 @@ limitations under the License.
 package testing
 
 import (
-	"strconv"
 	"math/rand"
+	"reflect"
+	"strconv"
 	"testing"
 
 	"github.com/google/gofuzz"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/types"
 	runtimeserializer "k8s.io/apimachinery/pkg/runtime/serializer"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/api/resource"
 )
 
 func GenericFuzzerFuncs(t TestingCommon, codecs runtimeserializer.CodecFactory) []interface{} {
 	return []interface{}{
+		func(q *resource.Quantity, c fuzz.Continue) {
+			*q = *resource.NewQuantity(c.Int63n(1000), resource.DecimalExponent)
+		},
 		func(j *int, c fuzz.Continue) {
 			*j = int(c.Int31())
 		},
@@ -131,4 +136,26 @@ func FuzzerFor(funcs []interface{}, src rand.Source) *fuzz.Fuzzer {
 	}
 	f.Funcs(funcs...)
 	return f
+}
+
+// MergeFuzzerFuncs will merge the given funcLists, overriding early funcs with later ones if there first
+// argument has the same type.
+func MergeFuzzerFuncs(t TestingCommon, funcLists ...[]interface{}) []interface{} {
+	funcMap := map[string]interface{}{}
+	for _, list := range funcLists {
+		for _, f := range list {
+			fT := reflect.TypeOf(f)
+			if fT.Kind() != reflect.Func || fT.NumIn() != 2 {
+				t.Errorf("Fuzzer func with invalid type: %v", fT)
+				continue
+			}
+			funcMap[fT.In(0).String()] = f
+		}
+	}
+
+	result := []interface{}{}
+	for _, f := range funcMap {
+		result = append(result, f)
+	}
+	return result
 }
