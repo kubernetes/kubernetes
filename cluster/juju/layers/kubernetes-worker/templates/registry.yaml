@@ -88,6 +88,14 @@ spec:
   - name: registry
     port: 5000
     protocol: TCP
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: registry-access
+data:
+  .dockercfg: {{ dockercfg }}
+type: kubernetes.io/dockercfg
 {%- if ingress %}
 ---
 apiVersion: extensions/v1beta1
