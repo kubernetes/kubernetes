@@ -406,3 +406,8 @@ func parseSelector(selector string, fn TransformFunc) (Selector, error) {
 func OneTermEqualSelector(k, v string) Selector {
 	return &hasTerm{field: k, value: v}
 }
+
+// AndSelectors creates a selector that is the logical AND of all the given selectors
+func AndSelectors(selectors ...Selector) Selector {
+	return andTerm(selectors)
+}
