@@ -153,7 +153,6 @@ func NewDockerService(client dockertools.DockerInterface, seccompProfileRoot str
 		glog.Infof("Setting cgroupDriver to %s", cgroupDriver)
 	}
 	ds.cgroupDriver = cgroupDriver
-
 	return ds, nil
 }
 
@@ -179,6 +178,8 @@ type dockerService struct {
 	// cgroup driver used by Docker runtime.
 	cgroupDriver      string
 	checkpointHandler CheckpointHandler
+	// legacyCleanup indicates whether legacy cleanup has finished or not.
+	legacyCleanup legacyCleanupFlag
 }
 
 // Version returns the runtime name, runtime version and runtime API version
@@ -241,6 +242,8 @@ type dockerNetworkHost struct {
 
 // Start initializes and starts components in dockerService.
 func (ds *dockerService) Start() error {
+	// Initialize the legacy cleanup flag.
+	ds.LegacyCleanupInit()
 	return ds.containerManager.Start()
 }
 
