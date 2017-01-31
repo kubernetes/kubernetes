@@ -8057,11 +8057,16 @@ go_library(
 
 go_library(
     name = "k8s.io/apimachinery/pkg/apis/meta/v1/unstructured",
-    srcs = ["k8s.io/apimachinery/pkg/apis/meta/v1/unstructured/unstructured.go"],
+    srcs = [
+        "k8s.io/apimachinery/pkg/apis/meta/v1/unstructured/doc.go",
+        "k8s.io/apimachinery/pkg/apis/meta/v1/unstructured/unstructured.go",
+        "k8s.io/apimachinery/pkg/apis/meta/v1/unstructured/zz_generated.deepcopy.go",
+    ],
     tags = ["automanaged"],
     deps = [
         "//vendor:github.com/golang/glog",
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
+        "//vendor:k8s.io/apimachinery/pkg/conversion",
         "//vendor:k8s.io/apimachinery/pkg/runtime",
         "//vendor:k8s.io/apimachinery/pkg/runtime/schema",
         "//vendor:k8s.io/apimachinery/pkg/types",
@@ -14038,4 +14043,11 @@ go_library(
         "//vendor:k8s.io/client-go/tools/clientcmd",
         "//vendor:k8s.io/client-go/util/cert",
     ],
+)
+
+go_test(
+    name = "k8s.io/apimachinery/pkg/apis/meta/v1/unstructured_test",
+    srcs = ["k8s.io/apimachinery/pkg/apis/meta/v1/unstructured/unstructured_test.go"],
+    library = ":k8s.io/apimachinery/pkg/apis/meta/v1/unstructured",
+    tags = ["automanaged"],
 )
