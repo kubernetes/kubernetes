@@ -119,8 +119,10 @@ type DeltaFIFO struct {
 	// when Replace() or Delete() is called.
 	knownObjects KeyListerGetter
 
-	// SyncRunning, if set, is invoked at the beginning and end of a sync.
-	SyncRunning SyncRunningFunc
+	// ResyncRunning, if set, is invoked at the beginning and end of a resync.
+	ResyncRunning ResyncRunningFunc
+	// RelistRunning, if set, is invoked at the beginning and end of a list or relist.
+	RelistRunning RelistRunningFunc
 }
 
 var (
@@ -135,9 +137,13 @@ var (
 	ErrZeroLengthDeltasObject = errors.New("0 length Deltas object; can't get key")
 )
 
-// SyncRunningFunc is a function that is invoked at the beginning of a sync (running=true) and at
-// the end of a sync (running=false).
-type SyncRunningFunc func(running bool)
+// ResyncRunningFunc is a function that is invoked at the beginning of a resync (running=true) and at
+// the end of a resync (running=false).
+type ResyncRunningFunc func(running bool)
+
+// RelistRunningFunc is a function that is invoked at the beginning of a list or relist (running=true) and at
+// the end of a list or relist (running=false).
+type RelistRunningFunc func(running bool)
 
 // KeyOf exposes f's keyFunc, but also detects the key of a Deltas object or
 // DeletedFinalStateUnknown objects.
@@ -414,11 +420,15 @@ func (f *DeltaFIFO) Pop(process PopProcessFunc) (interface{}, error) {
 			f.cond.Wait()
 		}
 		id := f.queue[0]
-		if f.SyncRunning != nil && id == syncEndKey {
-			// pop off the syncEndKey
+		if id == resyncEndKey || id == relistEndKey {
+			// pop off the marker
 			f.queue = f.queue[1:]
 
-			f.SyncRunning(false)
+			if id == resyncEndKey && f.ResyncRunning != nil {
+				f.ResyncRunning(false)
+			} else if id == relistEndKey && f.RelistRunning != nil {
+				f.RelistRunning(false)
+			}
 
 			if len(f.queue) == 0 {
 				// if the queue is empty, go back to waiting for more items
@@ -450,7 +460,8 @@ func (f *DeltaFIFO) Pop(process PopProcessFunc) (interface{}, error) {
 }
 
 const (
-	syncEndKey = "DeltaFifo::internal::syncEnd"
+	resyncEndKey = "DeltaFifo::internal::resyncEnd"
+	relistEndKey = "DeltaFifo::internal::relistEnd"
 )
 
 // Replace will delete the contents of 'f', using instead the given map.
@@ -458,14 +469,14 @@ const (
 // after calling this function. f's queue is reset, too; upon return, it
 // will contain the items in the map, in no particular order.
 func (f *DeltaFIFO) Replace(list []interface{}, resourceVersion string) error {
-	if f.SyncRunning != nil {
-		f.SyncRunning(true)
+	if f.RelistRunning != nil {
+		f.RelistRunning(true)
 	}
 
 	f.lock.Lock()
 	defer func() {
-		if f.SyncRunning != nil {
-			f.queue = append(f.queue, syncEndKey)
+		if f.RelistRunning != nil {
+			f.queue = append(f.queue, relistEndKey)
 			f.cond.Broadcast()
 		}
 		f.lock.Unlock()
@@ -541,12 +552,12 @@ func (f *DeltaFIFO) Replace(list []interface{}, resourceVersion string) error {
 
 // Resync will send a sync event for each item
 func (f *DeltaFIFO) Resync() error {
-	if f.SyncRunning != nil {
-		f.SyncRunning(true)
+	if f.ResyncRunning != nil {
+		f.ResyncRunning(true)
 
 		defer func() {
 			f.lock.Lock()
-			f.queue = append(f.queue, syncEndKey)
+			f.queue = append(f.queue, resyncEndKey)
 			f.cond.Broadcast()
 			f.lock.Unlock()
 		}()

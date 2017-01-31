@@ -189,7 +189,8 @@ func (s *sharedIndexInformer) Run(stopCh <-chan struct{}) {
 	defer utilruntime.HandleCrash()
 
 	fifo := NewDeltaFIFO(MetaNamespaceKeyFunc, nil, s.indexer)
-	fifo.SyncRunning = s.syncRunning
+	fifo.ResyncRunning = s.resyncRunning
+	fifo.RelistRunning = s.relistRunning
 
 	cfg := &Config{
 		Queue:            fifo,
@@ -324,10 +325,16 @@ func (s *sharedIndexInformer) AddEventHandlerWithResyncPeriod(handler ResourceEv
 	}
 }
 
-// syncRunning is called at the start and end of a sync. It passes the
+// resyncRunning is called at the start and end of a resync. It passes the
 // event to the processor.
-func (s *sharedIndexInformer) syncRunning(running bool) {
-	s.processor.syncRunning(running)
+func (s *sharedIndexInformer) resyncRunning(running bool) {
+	s.processor.resyncRunning(running)
+}
+
+// relistRunning is called at the start and end of a list/relist. It passes the
+// event to the processor.
+func (s *sharedIndexInformer) relistRunning(running bool) {
+	s.processor.relistRunning(running)
 }
 
 func (s *sharedIndexInformer) HandleDeltas(obj interface{}) error {
@@ -387,14 +394,25 @@ func (p *sharedProcessor) distribute(obj interface{}, isSync bool) {
 	}
 }
 
-// syncRunning is called at the start and end of a sync. It passes the
+// resyncRunning is called at the start and end of a resync. It passes the
 // event to all the listeners.
-func (p *sharedProcessor) syncRunning(running bool) {
+func (p *sharedProcessor) resyncRunning(running bool) {
 	p.listenersLock.RLock()
 	defer p.listenersLock.RUnlock()
 
 	for _, listener := range p.listeners {
-		listener.syncRunning(running)
+		listener.resyncRunning(running)
+	}
+}
+
+// relistRunning is called at the start and end of a relist. It passes the
+// event to all the listeners.
+func (p *sharedProcessor) relistRunning(running bool) {
+	p.listenersLock.RLock()
+	defer p.listenersLock.RUnlock()
+
+	for _, listener := range p.listeners {
+		listener.relistRunning(running)
 	}
 }
 
@@ -452,9 +470,11 @@ type processorListener struct {
 	// wantSyncItems indicates if the listener should receive Sync items from the delta fifo (i.e.
 	// during a resync)
 	wantSyncItems bool
-	// syncing is set to true for the duration of a resync, even if the listener's nextResync is in
+	// resyncing is set to true for the duration of a resync, even if the listener's nextResync is in
 	// the future
-	syncing bool
+	resyncing bool
+	// relisting is set to true for the duration of a list or relist
+	relisting bool
 	// hasSynced is set to true as soon as the listener receives its first sync item. In the event
 	// that the shared informer's reflector's ListAndWatch is called multiple times, this allows the
 	// listener to continue attempting to handle a Sync if it hasn't ever received anything.
@@ -557,14 +577,10 @@ func (p *processorListener) shouldResync(now time.Time) bool {
 	return now.After(p.nextResync) || now.Equal(p.nextResync)
 }
 
-// shouldHandleSyncItem returns true if the reflector has started resyncing and the listener is
-// participating in the current resync.
+// shouldHandleSyncItem returns true if the reflector has started a relisting, or if it has started
+// resyncing and the listener is participating in the current resync.
 func (p *processorListener) shouldHandleSyncItem() bool {
-	handle := p.syncing && p.wantSyncItems
-	if handle && !p.hasSynced {
-		p.hasSynced = true
-	}
-	return handle
+	return p.relisting || p.resyncing && p.wantSyncItems
 }
 
 // prepareForResync sets the listener as participating in the current resync.
@@ -572,11 +588,22 @@ func (p *processorListener) prepareForResync(now time.Time) {
 	p.wantSyncItems = true
 }
 
-// syncRunning is called at the beginning and end of a sync. If it is the end of a sync and the
+// resyncRunning is called at the beginning and end of a resync. If it is the end of a resync and the
 // listener is participating in the current resync, the listener's nextResync time is recalculated.
-func (p *processorListener) syncRunning(running bool) {
-	p.syncing = running
-	if !running && p.wantSyncItems && p.hasSynced {
+func (p *processorListener) resyncRunning(running bool) {
+	p.resyncing = running
+	if !running && p.wantSyncItems {
+		if p.resyncPeriod > 0 {
+			now := p.clock.Now()
+			p.nextResync = now.Add(p.resyncPeriod)
+		}
+		p.wantSyncItems = false
+	}
+}
+
+func (p *processorListener) relistRunning(running bool) {
+	p.relisting = running
+	if !running {
 		if p.resyncPeriod > 0 {
 			now := p.clock.Now()
 			p.nextResync = now.Add(p.resyncPeriod)
