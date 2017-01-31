@@ -800,9 +800,10 @@ func IsRollingUpdate(deployment *extensions.Deployment) bool {
 }
 
 // DeploymentComplete considers a deployment to be complete once its desired replicas equals its
-// updatedReplicas and it doesn't violate minimum availability.
+// updatedReplicas, no old pods are running, and it doesn't violate minimum availability.
 func DeploymentComplete(deployment *extensions.Deployment, newStatus *extensions.DeploymentStatus) bool {
 	return newStatus.UpdatedReplicas == deployment.Spec.Replicas &&
+		newStatus.Replicas == deployment.Spec.Replicas &&
 		newStatus.AvailableReplicas >= deployment.Spec.Replicas-MaxUnavailable(*deployment)
 }
 
