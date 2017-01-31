@@ -27,6 +27,7 @@ go_library(
         "//plugin/pkg/scheduler/algorithm/priorities:go_default_library",
         "//plugin/pkg/scheduler/api:go_default_library",
         "//plugin/pkg/scheduler/api/validation:go_default_library",
+        "//plugin/pkg/scheduler/core:go_default_library",
         "//plugin/pkg/scheduler/schedulercache:go_default_library",
         "//plugin/pkg/scheduler/util:go_default_library",
         "//vendor:github.com/golang/glog",
