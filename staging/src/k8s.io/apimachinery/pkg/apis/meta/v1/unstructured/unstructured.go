@@ -80,6 +80,31 @@ func (obj *UnstructuredList) UnstructuredContent() map[string]interface{} {
 	return obj.Object
 }
 
+func (u Unstructured) DeepCopy() Unstructured {
+	return Unstructured{
+		Object: deepCopyJSON(u.Object).(map[string]interface{}),
+	}
+}
+
+func deepCopyJSON(x interface{}) interface{} {
+	switch x := x.(type) {
+	case map[string]interface{}:
+		clone := make(map[string]interface{}, len(x))
+		for k, v := range x {
+			clone[k] = deepCopyJSON(v)
+		}
+		return clone
+	case []interface{}:
+		clone := make([]interface{}, len(x))
+		for i := range x {
+			clone[i] = deepCopyJSON(x[i])
+		}
+		return clone
+	default:
+		return x
+	}
+}
+
 // MarshalJSON ensures that the unstructured object produces proper
 // JSON when passed to Go's standard JSON library.
 func (u *Unstructured) MarshalJSON() ([]byte, error) {
@@ -413,6 +438,18 @@ type UnstructuredList struct {
 
 	// Items is a list of unstructured objects.
 	Items []*Unstructured `json:"items"`
+}
+
+func (u UnstructuredList) DeepCopy() UnstructuredList {
+	clone := UnstructuredList{
+		Object: deepCopyJSON(u.Object).(map[string]interface{}),
+		Items: make([]*Unstructured, len(u.Items)),
+	}
+	for i := range u.Items {
+		x := u.Items[i].DeepCopy()
+		clone.Items[i] = &x
+	}
+	return clone
 }
 
 // MarshalJSON ensures that the unstructured list object produces proper
