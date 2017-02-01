@@ -25,12 +25,12 @@ import (
 
 	"golang.org/x/net/context"
 
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	runtimeserializer "k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apiserver/pkg/storage/storagebackend"
 	clientapi "k8s.io/client-go/pkg/api"
 	clientapiv1 "k8s.io/client-go/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/storage/etcd/testing/testingcert"
-	runtimeserializer "k8s.io/apimachinery/pkg/runtime/serializer"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 
 	"github.com/coreos/etcd/integration"
 	"github.com/coreos/etcd/pkg/transport"
@@ -40,7 +40,7 @@ import (
 func TestTLSConnection(t *testing.T) {
 	scheme := runtime.NewScheme()
 	codecs := runtimeserializer.NewCodecFactory(scheme)
-	codec := codecs.LegacyCodec(schema.GroupVersion{Version:"v1"})
+	codec := codecs.LegacyCodec(schema.GroupVersion{Version: "v1"})
 
 	// TODO: use k8s.io/apiserver internal type instead of borrowing it from client-go
 	clientapi.AddToScheme(scheme)

@@ -63,7 +63,6 @@ go_library(
     ],
     tags = ["automanaged"],
     deps = [
-        "//pkg/apis/extensions:go_default_library",
         "//pkg/genericapiserver/endpoints/handlers:go_default_library",
         "//pkg/genericapiserver/endpoints/handlers/responsewriters:go_default_library",
         "//pkg/genericapiserver/registry/rest:go_default_library",
