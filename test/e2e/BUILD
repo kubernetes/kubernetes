@@ -169,6 +169,7 @@ go_library(
         "//vendor:github.com/onsi/gomega",
         "//vendor:github.com/stretchr/testify/assert",
         "//vendor:golang.org/x/crypto/ssh",
+        "//vendor:golang.org/x/net/websocket",
         "//vendor:google.golang.org/api/compute/v1",
         "//vendor:google.golang.org/api/googleapi",
         "//vendor:gopkg.in/inf.v0",
