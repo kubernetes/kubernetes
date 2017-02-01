@@ -1260,7 +1260,10 @@ func formatHosts(rules []extensions.IngressRule) string {
 	return ret
 }
 
-func formatPorts(tls []extensions.IngressTLS) string {
+func formatPorts(annotations map[string]string, tls []extensions.IngressTLS) string {
+	if annotations[extensions.IngressPreSharedCertAnnotationKey] != "" {
+		return "80, 443"
+	}
 	if len(tls) != 0 {
 		return "80, 443"
 	}
@@ -1282,7 +1285,7 @@ func printIngress(ingress *extensions.Ingress, w io.Writer, options PrintOptions
 		name,
 		formatHosts(ingress.Spec.Rules),
 		loadBalancerStatusStringer(ingress.Status.LoadBalancer, options.Wide),
-		formatPorts(ingress.Spec.TLS),
+		formatPorts(ingress.Annotations, ingress.Spec.TLS),
 		translateTimestamp(ingress.CreationTimestamp),
 	); err != nil {
 		return err
