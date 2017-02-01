@@ -591,48 +591,17 @@ func (proxier *Proxier) OnEndpointsUpdate(allEndpoints []api.Endpoints) {
 	activeEndpoints := make(map[proxy.ServicePortName]bool) // use a map as a set
 	staleConnections := make(map[endpointServicePair]bool)
 	svcPortToInfoMap := make(map[proxy.ServicePortName][]hostPortInfo)
+	newEndpointsMap := make(map[proxy.ServicePortName][]*endpointsInfo)
 
 	// Update endpoints for services.
 	for i := range allEndpoints {
-		svcEndpoints := &allEndpoints[i]
-
-		// We need to build a map of portname -> all ip:ports for that
-		// portname.  Explode Endpoints.Subsets[*] into this structure.
-		portsToEndpoints := map[string][]hostPortInfo{}
-		for i := range svcEndpoints.Subsets {
-			ss := &svcEndpoints.Subsets[i]
-			for i := range ss.Ports {
-				port := &ss.Ports[i]
-				for i := range ss.Addresses {
-					addr := &ss.Addresses[i]
-					hostPortObject := hostPortInfo{
-						host:    addr.IP,
-						port:    int(port.Port),
-						isLocal: addr.NodeName != nil && *addr.NodeName == proxier.hostname,
-					}
-					portsToEndpoints[port.Name] = append(portsToEndpoints[port.Name], hostPortObject)
-				}
-			}
-		}
-		for portname := range portsToEndpoints {
-			svcPort := proxy.ServicePortName{NamespacedName: types.NamespacedName{Namespace: svcEndpoints.Namespace, Name: svcEndpoints.Name}, Port: portname}
-			svcPortToInfoMap[svcPort] = portsToEndpoints[portname]
-			curEndpoints := proxier.endpointsMap[svcPort]
-			newEndpoints := flattenValidEndpoints(portsToEndpoints[portname])
-			// Flatten the list of current endpoint infos to just a list of ips as strings
-			curEndpointIPs := flattenEndpointsInfo(curEndpoints)
-			if len(curEndpointIPs) != len(newEndpoints) || !slicesEquiv(slice.CopyStrings(curEndpointIPs), newEndpoints) {
-				removedEndpoints := getRemovedEndpoints(curEndpointIPs, newEndpoints)
-				for _, ep := range removedEndpoints {
-					staleConnections[endpointServicePair{endpoint: ep, servicePortName: svcPort}] = true
-				}
-				glog.V(3).Infof("Setting endpoints for %q to %+v", svcPort, newEndpoints)
-				// Once the set operations using the list of ips are complete, build the list of endpoint infos
-				proxier.endpointsMap[svcPort] = buildEndpointInfoList(portsToEndpoints[portname], newEndpoints)
-			}
-			activeEndpoints[svcPort] = true
-		}
+		accumulateEndpointsMap(&allEndpoints[i], proxier.hostname, proxier.endpointsMap, &newEndpointsMap,
+			&svcPortToInfoMap, &staleConnections, &activeEndpoints)
 	}
+	for k, v := range newEndpointsMap {
+		proxier.endpointsMap[k] = v
+	}
+
 	// Remove endpoints missing from the update.
 	for svcPort := range proxier.endpointsMap {
 		if !activeEndpoints[svcPort] {
@@ -649,6 +618,68 @@ func (proxier *Proxier) OnEndpointsUpdate(allEndpoints []api.Endpoints) {
 	}
 	proxier.syncProxyRules()
 	proxier.deleteEndpointConnections(staleConnections)
+}
+
+// Gather information about all the endpoint state for a given api.Endpoints.
+func accumulateEndpointsMap(endpoints *api.Endpoints, hostname string,
+	curEndpoints map[proxy.ServicePortName][]*endpointsInfo,
+	newEndpoints *map[proxy.ServicePortName][]*endpointsInfo,
+	svcPortToInfoMap *map[proxy.ServicePortName][]hostPortInfo,
+	staleConnections *map[endpointServicePair]bool,
+	activeEndpoints *map[proxy.ServicePortName]bool) {
+
+	// We need to build a map of portname -> all ip:ports for that
+	// portname.  Explode Endpoints.Subsets[*] into this structure.
+	portsToEndpoints := map[string][]hostPortInfo{}
+	for i := range endpoints.Subsets {
+		ss := &endpoints.Subsets[i]
+		for i := range ss.Ports {
+			port := &ss.Ports[i]
+			for i := range ss.Addresses {
+				addr := &ss.Addresses[i]
+				hostPortObject := hostPortInfo{
+					host:    addr.IP,
+					port:    int(port.Port),
+					isLocal: addr.NodeName != nil && *addr.NodeName == hostname,
+				}
+				portsToEndpoints[port.Name] = append(portsToEndpoints[port.Name], hostPortObject)
+			}
+		}
+	}
+	for portname := range portsToEndpoints {
+		svcPort := proxy.ServicePortName{
+			NamespacedName: types.NamespacedName{Namespace: endpoints.Namespace, Name: endpoints.Name},
+			Port:           portname,
+		}
+		(*svcPortToInfoMap)[svcPort] = portsToEndpoints[portname]
+		newEPList := flattenValidEndpoints(portsToEndpoints[portname])
+		// Flatten the list of current endpoint infos to just a list of ips as strings
+		curEndpointIPs := flattenEndpointsInfo(curEndpoints[svcPort])
+		if len(curEndpointIPs) != len(newEPList) || !slicesEquiv(slice.CopyStrings(curEndpointIPs), newEPList) {
+			removedEndpoints := getRemovedEndpoints(curEndpointIPs, newEPList)
+			for _, ep := range removedEndpoints {
+				(*staleConnections)[endpointServicePair{endpoint: ep, servicePortName: svcPort}] = true
+			}
+			glog.V(3).Infof("Setting endpoints for %q to %+v", svcPort, newEPList)
+			// Once the set operations using the list of ips are complete, build the list of endpoint infos
+			(*newEndpoints)[svcPort] = buildEndpointInfoList(portsToEndpoints[portname], newEPList)
+		}
+		(*activeEndpoints)[svcPort] = true
+	}
+	// If a port was renamed it would be absent from endpoints, and thus not
+	// processed in the above loop.
+	//
+	// TODO: we should really only mark a connection stale if the proto was UDP
+	// and the (ip, port, proto) was removed from the endpoints.
+	for svcPort := range curEndpoints {
+		if _, found := (*activeEndpoints)[svcPort]; !found {
+			curEndpointIPs := flattenEndpointsInfo(curEndpoints[svcPort])
+			removedEndpoints := getRemovedEndpoints(curEndpointIPs, []string{})
+			for _, ep := range removedEndpoints {
+				(*staleConnections)[endpointServicePair{endpoint: ep, servicePortName: svcPort}] = true
+			}
+		}
+	}
 }
 
 // updateHealthCheckEntries - send the new set of local endpoints to the health checker

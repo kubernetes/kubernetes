@@ -1172,4 +1172,318 @@ func TestBuildServiceMapServiceUpdate(t *testing.T) {
 	}
 }
 
+// This is a coarse test, but it offers some modicum of confidence as the code is evolved.
+func Test_accumulateEndpointsMap(t *testing.T) {
+	testCases := []struct {
+		endpoints      api.Endpoints
+		curEndpoints   map[proxy.ServicePortName][]*endpointsInfo
+		expectedNew    map[proxy.ServicePortName][]*endpointsInfo
+		expectedActive []proxy.ServicePortName
+		expectedStale  []endpointServicePair
+	}{{
+		// Case[0]: nothing
+		endpoints:      makeTestEndpoints("ns1", "ep1", func(ept *api.Endpoints) {}),
+		curEndpoints:   map[proxy.ServicePortName][]*endpointsInfo{},
+		expectedNew:    map[proxy.ServicePortName][]*endpointsInfo{},
+		expectedActive: []proxy.ServicePortName{},
+		expectedStale:  []endpointServicePair{},
+	}, {
+		// Case[1]: no changes, unnamed port
+		endpoints: makeTestEndpoints("ns1", "ep1", func(ept *api.Endpoints) {
+			ept.Subsets = []api.EndpointSubset{
+				{
+					Addresses: []api.EndpointAddress{{
+						IP: "1.1.1.1",
+					}},
+					Ports: []api.EndpointPort{{
+						Name: "",
+						Port: 11,
+					}},
+				},
+			}
+		}),
+		curEndpoints: map[proxy.ServicePortName][]*endpointsInfo{
+			makeServicePortName("ns1", "ep1", ""): []*endpointsInfo{
+				&endpointsInfo{"1.1.1.1:11", false},
+			},
+		},
+		expectedNew:    map[proxy.ServicePortName][]*endpointsInfo{},
+		expectedActive: []proxy.ServicePortName{makeServicePortName("ns1", "ep1", "")},
+		expectedStale:  []endpointServicePair{},
+	}, {
+		// Case[2]: no changes, named port
+		endpoints: makeTestEndpoints("ns1", "ep1", func(ept *api.Endpoints) {
+			ept.Subsets = []api.EndpointSubset{
+				{
+					Addresses: []api.EndpointAddress{{
+						IP: "1.1.1.1",
+					}},
+					Ports: []api.EndpointPort{{
+						Name: "port",
+						Port: 11,
+					}},
+				},
+			}
+		}),
+		curEndpoints: map[proxy.ServicePortName][]*endpointsInfo{
+			makeServicePortName("ns1", "ep1", "port"): []*endpointsInfo{
+				&endpointsInfo{"1.1.1.1:11", false},
+			},
+		},
+		expectedNew:    map[proxy.ServicePortName][]*endpointsInfo{},
+		expectedActive: []proxy.ServicePortName{makeServicePortName("ns1", "ep1", "port")},
+		expectedStale:  []endpointServicePair{},
+	}, {
+		// Case[3]: new port
+		endpoints: makeTestEndpoints("ns1", "ep1", func(ept *api.Endpoints) {
+			ept.Subsets = []api.EndpointSubset{
+				{
+					Addresses: []api.EndpointAddress{{
+						IP: "1.1.1.1",
+					}},
+					Ports: []api.EndpointPort{{
+						Port: 11,
+					}},
+				},
+			}
+		}),
+		curEndpoints: map[proxy.ServicePortName][]*endpointsInfo{
+			makeServicePortName("ns1", "ep1", ""): []*endpointsInfo{},
+		},
+		expectedNew: map[proxy.ServicePortName][]*endpointsInfo{
+			makeServicePortName("ns1", "ep1", ""): []*endpointsInfo{
+				&endpointsInfo{"1.1.1.1:11", false},
+			},
+		},
+		expectedActive: []proxy.ServicePortName{makeServicePortName("ns1", "ep1", "")},
+		expectedStale:  []endpointServicePair{},
+	}, {
+		// Case[4]: remove port
+		endpoints: makeTestEndpoints("ns1", "ep1", func(ept *api.Endpoints) {}),
+		curEndpoints: map[proxy.ServicePortName][]*endpointsInfo{
+			makeServicePortName("ns1", "ep1", ""): []*endpointsInfo{
+				&endpointsInfo{"1.1.1.1:11", false},
+			},
+		},
+		expectedNew:    map[proxy.ServicePortName][]*endpointsInfo{},
+		expectedActive: []proxy.ServicePortName{},
+		expectedStale: []endpointServicePair{{
+			endpoint:        "1.1.1.1:11",
+			servicePortName: makeServicePortName("ns1", "ep1", ""),
+		}},
+	}, {
+		// Case[5]: new IP and port
+		endpoints: makeTestEndpoints("ns1", "ep1", func(ept *api.Endpoints) {
+			ept.Subsets = []api.EndpointSubset{
+				{
+					Addresses: []api.EndpointAddress{{
+						IP: "1.1.1.1",
+					}, {
+						IP: "2.2.2.2",
+					}},
+					Ports: []api.EndpointPort{{
+						Name: "p1",
+						Port: 11,
+					}, {
+						Name: "p2",
+						Port: 22,
+					}},
+				},
+			}
+		}),
+		curEndpoints: map[proxy.ServicePortName][]*endpointsInfo{
+			makeServicePortName("ns1", "ep1", "p1"): []*endpointsInfo{
+				&endpointsInfo{"1.1.1.1:11", false},
+			},
+		},
+		expectedNew: map[proxy.ServicePortName][]*endpointsInfo{
+			makeServicePortName("ns1", "ep1", "p1"): []*endpointsInfo{
+				&endpointsInfo{"1.1.1.1:11", false},
+				&endpointsInfo{"2.2.2.2:11", false},
+			},
+			makeServicePortName("ns1", "ep1", "p2"): []*endpointsInfo{
+				&endpointsInfo{"1.1.1.1:22", false},
+				&endpointsInfo{"2.2.2.2:22", false},
+			},
+		},
+		expectedActive: []proxy.ServicePortName{
+			makeServicePortName("ns1", "ep1", "p1"),
+			makeServicePortName("ns1", "ep1", "p2"),
+		},
+		expectedStale: []endpointServicePair{},
+	}, {
+		// Case[6]: remove port
+		endpoints: makeTestEndpoints("ns1", "ep1", func(ept *api.Endpoints) {
+			ept.Subsets = []api.EndpointSubset{
+				{
+					Addresses: []api.EndpointAddress{{
+						IP: "1.1.1.1",
+					}},
+					Ports: []api.EndpointPort{{
+						Name: "p1",
+						Port: 11,
+					}},
+				},
+			}
+		}),
+		curEndpoints: map[proxy.ServicePortName][]*endpointsInfo{
+			makeServicePortName("ns1", "ep1", "p1"): []*endpointsInfo{
+				&endpointsInfo{"1.1.1.1:11", false},
+				&endpointsInfo{"2.2.2.2:11", false},
+			},
+			makeServicePortName("ns1", "ep1", "p2"): []*endpointsInfo{
+				&endpointsInfo{"1.1.1.1:22", false},
+				&endpointsInfo{"2.2.2.2:22", false},
+			},
+		},
+		expectedNew: map[proxy.ServicePortName][]*endpointsInfo{
+			makeServicePortName("ns1", "ep1", "p1"): []*endpointsInfo{
+				&endpointsInfo{"1.1.1.1:11", false},
+			},
+		},
+		expectedActive: []proxy.ServicePortName{
+			makeServicePortName("ns1", "ep1", "p1"),
+		},
+		expectedStale: []endpointServicePair{{
+			endpoint:        "1.1.1.1:22",
+			servicePortName: makeServicePortName("ns1", "ep1", "p2"),
+		}, {
+			endpoint:        "2.2.2.2:11",
+			servicePortName: makeServicePortName("ns1", "ep1", "p1"),
+		}, {
+			endpoint:        "2.2.2.2:22",
+			servicePortName: makeServicePortName("ns1", "ep1", "p2"),
+		}},
+	}, {
+		// Case[7]: rename port
+		endpoints: makeTestEndpoints("ns1", "ep1", func(ept *api.Endpoints) {
+			ept.Subsets = []api.EndpointSubset{
+				{
+					Addresses: []api.EndpointAddress{{
+						IP: "1.1.1.1",
+					}},
+					Ports: []api.EndpointPort{{
+						Name: "p2",
+						Port: 11,
+					}},
+				},
+			}
+		}),
+		curEndpoints: map[proxy.ServicePortName][]*endpointsInfo{
+			makeServicePortName("ns1", "ep1", "p1"): []*endpointsInfo{
+				&endpointsInfo{"1.1.1.1:11", false},
+			},
+		},
+		expectedNew: map[proxy.ServicePortName][]*endpointsInfo{
+			makeServicePortName("ns1", "ep1", "p2"): []*endpointsInfo{
+				&endpointsInfo{"1.1.1.1:11", false},
+			},
+		},
+		expectedActive: []proxy.ServicePortName{
+			makeServicePortName("ns1", "ep1", "p2"),
+		},
+		expectedStale: []endpointServicePair{{
+			endpoint:        "1.1.1.1:11",
+			servicePortName: makeServicePortName("ns1", "ep1", "p1"),
+		}},
+	}, {
+		// Case[8]: renumber port
+		endpoints: makeTestEndpoints("ns1", "ep1", func(ept *api.Endpoints) {
+			ept.Subsets = []api.EndpointSubset{
+				{
+					Addresses: []api.EndpointAddress{{
+						IP: "1.1.1.1",
+					}},
+					Ports: []api.EndpointPort{{
+						Name: "p1",
+						Port: 22,
+					}},
+				},
+			}
+		}),
+		curEndpoints: map[proxy.ServicePortName][]*endpointsInfo{
+			makeServicePortName("ns1", "ep1", "p1"): []*endpointsInfo{
+				&endpointsInfo{"1.1.1.1:11", false},
+			},
+		},
+		expectedNew: map[proxy.ServicePortName][]*endpointsInfo{
+			makeServicePortName("ns1", "ep1", "p1"): []*endpointsInfo{
+				&endpointsInfo{"1.1.1.1:22", false},
+			},
+		},
+		expectedActive: []proxy.ServicePortName{
+			makeServicePortName("ns1", "ep1", "p1"),
+		},
+		expectedStale: []endpointServicePair{{
+			endpoint:        "1.1.1.1:11",
+			servicePortName: makeServicePortName("ns1", "ep1", "p1"),
+		}},
+	}}
+
+	for tci, tc := range testCases {
+		// outputs
+		newEndpoints := map[proxy.ServicePortName][]*endpointsInfo{}
+		svcPortToInfoMap := map[proxy.ServicePortName][]hostPortInfo{}
+		staleConnections := map[endpointServicePair]bool{}
+		activeEndpoints := map[proxy.ServicePortName]bool{}
+		accumulateEndpointsMap(&tc.endpoints, "host", tc.curEndpoints,
+			&newEndpoints, &svcPortToInfoMap, &staleConnections, &activeEndpoints)
+
+		if len(newEndpoints) != len(tc.expectedNew) {
+			t.Errorf("[%d] expected %d new, got %d: %v", tci, len(tc.expectedNew), len(newEndpoints), newEndpoints)
+		}
+		for x := range tc.expectedNew {
+			if len(newEndpoints[x]) != len(tc.expectedNew[x]) {
+				t.Errorf("[%d] expected %d endpoints for %v, got %d", tci, len(tc.expectedNew[x]), x, len(newEndpoints[x]))
+			} else {
+				for i := range newEndpoints[x] {
+					if *(newEndpoints[x][i]) != *(tc.expectedNew[x][i]) {
+						t.Errorf("[%d] expected new[%v][%d] to be %v, got %v", tci, x, i, tc.expectedNew[x][i], *(newEndpoints[x][i]))
+					}
+				}
+			}
+		}
+		if len(activeEndpoints) != len(tc.expectedActive) {
+			t.Errorf("[%d] expected %d active, got %d: %v", tci, len(tc.expectedActive), len(activeEndpoints), activeEndpoints)
+		}
+		for _, x := range tc.expectedActive {
+			if activeEndpoints[x] != true {
+				t.Errorf("[%d] expected active[%v], but didn't find it: %v", tci, x, activeEndpoints)
+			}
+		}
+		if len(staleConnections) != len(tc.expectedStale) {
+			t.Errorf("[%d] expected %d stale, got %d: %v", tci, len(tc.expectedStale), len(staleConnections), staleConnections)
+		}
+		for _, x := range tc.expectedStale {
+			if staleConnections[x] != true {
+				t.Errorf("[%d] expected stale[%v], but didn't find it: %v", tci, x, staleConnections)
+			}
+		}
+	}
+}
+
+func makeTestEndpoints(namespace, name string, eptFunc func(*api.Endpoints)) api.Endpoints {
+	ept := api.Endpoints{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: namespace,
+		},
+	}
+	eptFunc(&ept)
+	return ept
+}
+
+func strPtr(s string) *string {
+	p := new(string)
+	*p = s
+	return p
+}
+
+func makeServicePortName(ns, name, port string) proxy.ServicePortName {
+	return proxy.ServicePortName{
+		NamespacedName: types.NamespacedName{ns, name},
+		Port:           port,
+	}
+}
+
 // TODO(thockin): add *more* tests for syncProxyRules() or break it down further and test the pieces.
