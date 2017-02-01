@@ -156,11 +156,19 @@ func TestEdit(t *testing.T) {
 	os.Setenv("KUBE_EDITOR_CALLBACK", server.URL+"/callback")
 
 	testcases := []string{
+		"create-list",
+		"edit-error-reedit",
+		"immutable-name",
+		"list",
+		"list-errors",
 		"missing-service",
+		"no-op",
+		"single-service",
 	}
 	for _, testcaseName := range testcases {
 		i = 0
 		name = testcaseName
+		testcase = EditTestCase{}
 		testcaseDir := filepath.Join("testdata", "edit", "testcase-"+name)
 		testcaseData, err := ioutil.ReadFile(filepath.Join(testcaseDir, "test.yaml"))
 		if err != nil {
