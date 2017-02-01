@@ -52,7 +52,7 @@ func TestStatefulPodControlCreatesPods(t *testing.T) {
 	}
 	events := collectEvents(recorder.Events)
 	if eventCount := len(events); eventCount != 2 {
-		t.Errorf("Expected 2 events for successful create found %s", eventCount)
+		t.Errorf("Expected 2 events for successful create found %d", eventCount)
 	}
 	for i := range events {
 		if !strings.Contains(events[i], v1.EventTypeNormal) {
@@ -85,7 +85,7 @@ func TestStatefulPodControlCreatePodExists(t *testing.T) {
 	}
 	events := collectEvents(recorder.Events)
 	if eventCount := len(events); eventCount != 0 {
-		t.Errorf("Expected 0 events when Pod and PVC exist found %s", eventCount)
+		t.Errorf("Expected 0 events when Pod and PVC exist found %d", eventCount)
 		for i := range events {
 			t.Log(events[i])
 		}
@@ -114,7 +114,7 @@ func TestStatefulPodControlCreatePodPvcCreateFailure(t *testing.T) {
 	}
 	events := collectEvents(recorder.Events)
 	if eventCount := len(events); eventCount != 2 {
-		t.Errorf("Expected 2 events for PVC create failure found %s", eventCount)
+		t.Errorf("Expected 2 events for PVC create failure found %d", eventCount)
 	}
 	for i := range events {
 		if !strings.Contains(events[i], v1.EventTypeWarning) {
@@ -145,7 +145,7 @@ func TestStatefulPodControlCreatePodPvcGetFailure(t *testing.T) {
 	}
 	events := collectEvents(recorder.Events)
 	if eventCount := len(events); eventCount != 2 {
-		t.Errorf("Expected 2 events for PVC create failure found %s", eventCount)
+		t.Errorf("Expected 2 events for PVC create failure found %d", eventCount)
 	}
 	for i := range events {
 		if !strings.Contains(events[i], v1.EventTypeWarning) {
@@ -176,7 +176,7 @@ func TestStatefulPodControlCreatePodFailed(t *testing.T) {
 	}
 	events := collectEvents(recorder.Events)
 	if eventCount := len(events); eventCount != 2 {
-		t.Errorf("Expected 2 events for failed Pod create found %s", eventCount)
+		t.Errorf("Expected 2 events for failed Pod create found %d", eventCount)
 	} else if !strings.Contains(events[0], v1.EventTypeNormal) {
 		t.Errorf("Expected normal event found %s", events[0])
 
@@ -215,7 +215,7 @@ func TestStatefulPodControlNoOpUpdate(t *testing.T) {
 	}
 	events := collectEvents(recorder.Events)
 	if eventCount := len(events); eventCount != 0 {
-		t.Errorf("Expected 0 events for no-op update found %s", eventCount)
+		t.Errorf("Expected 0 events for no-op update found %d", eventCount)
 	}
 }
 
@@ -483,7 +483,7 @@ func TestStatefulPodControlDeletesStatefulPod(t *testing.T) {
 	}
 	events := collectEvents(recorder.Events)
 	if eventCount := len(events); eventCount != 1 {
-		t.Errorf("Expected 1 events for successful delete found %s", eventCount)
+		t.Errorf("Expected 1 events for successful delete found %d", eventCount)
 	} else if !strings.Contains(events[0], v1.EventTypeNormal) {
 		t.Errorf("Expected normal event found %s", events[0])
 	}
@@ -503,7 +503,7 @@ func TestStatefulPodControlDeleteFailure(t *testing.T) {
 	}
 	events := collectEvents(recorder.Events)
 	if eventCount := len(events); eventCount != 1 {
-		t.Errorf("Expected 1 events for failed delete found %s", eventCount)
+		t.Errorf("Expected 1 events for failed delete found %d", eventCount)
 	} else if !strings.Contains(events[0], v1.EventTypeWarning) {
 		t.Errorf("Expected warning event found %s", events[0])
 	}
@@ -541,7 +541,7 @@ func TestStatefulPodControlUpdatesSetStatus(t *testing.T) {
 	}
 	events := collectEvents(recorder.Events)
 	if eventCount := len(events); eventCount != 0 {
-		t.Errorf("Expected 0 events for successful status update %s", eventCount)
+		t.Errorf("Expected 0 events for successful status update %d", eventCount)
 	}
 }
 
@@ -562,7 +562,7 @@ func TestStatefulPodControlUpdateStatusFailure(t *testing.T) {
 	}
 	events := collectEvents(recorder.Events)
 	if eventCount := len(events); eventCount != 0 {
-		t.Errorf("Expected 0 events for successful status update %s", eventCount)
+		t.Errorf("Expected 0 events for successful status update %d", eventCount)
 	}
 }
 
@@ -594,7 +594,7 @@ func TestStatefulPodControlUpdateStatusConflict(t *testing.T) {
 	}
 	events := collectEvents(recorder.Events)
 	if eventCount := len(events); eventCount != 0 {
-		t.Errorf("Expected 0 events for successful status update %s", eventCount)
+		t.Errorf("Expected 0 events for successful status update %d", eventCount)
 	}
 }
 
@@ -619,7 +619,7 @@ func TestStatefulPodControlUpdateStatusConflictFailure(t *testing.T) {
 	}
 	events := collectEvents(recorder.Events)
 	if eventCount := len(events); eventCount != 0 {
-		t.Errorf("Expected 0 events for successful status update %s", eventCount)
+		t.Errorf("Expected 0 events for successful status update %d", eventCount)
 	}
 }
 
@@ -644,7 +644,7 @@ func TestStatefulPodControlUpdateStatusConflictMaxRetries(t *testing.T) {
 	}
 	events := collectEvents(recorder.Events)
 	if eventCount := len(events); eventCount != 0 {
-		t.Errorf("Expected 0 events for successful status update %s", eventCount)
+		t.Errorf("Expected 0 events for successful status update %d", eventCount)
 	}
 }
 

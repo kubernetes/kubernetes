@@ -74,7 +74,7 @@ func (ssc *defaultStatefulSetControl) UpdateStatefulSet(set *apps.StatefulSet, p
 			// if the ordinal is greater than the number of replicas add it to the condemned list
 			condemned = append(condemned, pods[i])
 			// count the number of terminating condemned
-			if isTerminated(pods[i]) {
+			if isTerminated(pods[i]) || (isCreated(pods[i]) && !isFailed(pods[i])) {
 				terminatingCondemned++
 			}
 		}
