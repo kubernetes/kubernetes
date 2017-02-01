@@ -244,7 +244,10 @@ func (hc HostnameCheck) Check() (warnings, errors []error) {
 		errors = append(errors, fmt.Errorf("hostname \"%s\" %s", hostname, msg))
 	}
 	addr, err := net.LookupHost(hostname)
-	if addr == nil || err != nil {
+	if addr == nil {
+		errors = append(errors, fmt.Errorf("hostname \"%s\" could not be reached", hostname))
+	}
+	if err != nil {
 		errors = append(errors, fmt.Errorf("hostname \"%s\" %s", hostname, err))
 	}
 	return nil, errors
