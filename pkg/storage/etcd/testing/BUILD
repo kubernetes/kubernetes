@@ -24,6 +24,7 @@ go_library(
         "//vendor:github.com/coreos/etcd/pkg/types",
         "//vendor:github.com/golang/glog",
         "//vendor:golang.org/x/net/context",
+        "//vendor:k8s.io/apimachinery/pkg/runtime",
         "//vendor:k8s.io/apimachinery/pkg/util/wait",
         "//vendor:k8s.io/apiserver/pkg/storage/storagebackend",
     ],
