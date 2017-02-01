@@ -52,6 +52,7 @@ type TestContextType struct {
 	UpgradeImage             string
 	PrometheusPushGateway    string
 	ContainerRuntime         string
+	ContainerRuntimeEndpoint string
 	MasterOSDistro           string
 	NodeOSDistro             string
 	VerifyServiceAccount     bool
@@ -157,6 +158,7 @@ func RegisterCommonFlags() {
 	flag.StringVar(&TestContext.FeatureGates, "feature-gates", "", "A set of key=value pairs that describe feature gates for alpha/experimental features.")
 	flag.StringVar(&TestContext.Viper, "viper-config", "e2e", "The name of the viper config i.e. 'e2e' will read values from 'e2e.json' locally.  All e2e parameters are meant to be configurable by viper.")
 	flag.StringVar(&TestContext.ContainerRuntime, "container-runtime", "docker", "The container runtime of cluster VM instances (docker/rkt/remote).")
+	flag.StringVar(&TestContext.ContainerRuntimeEndpoint, "container-runtime-endpoint", "", "The container runtime endpoint of cluster VM instances.")
 }
 
 // Register flags specific to the cluster e2e test suite.
