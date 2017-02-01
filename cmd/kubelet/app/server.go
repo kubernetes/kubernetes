@@ -304,6 +304,39 @@ func initConfigz(kc *componentconfig.KubeletConfiguration) (*configz.Config, err
 	return cz, err
 }
 
+// makePodSourceConfig creates a config.PodConfig from the given
+// KubeletConfiguration or returns an error.
+func makePodSourceConfig(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *kubelet.KubeletDeps, nodeName types.NodeName) (*config.PodConfig, error) {
+	manifestURLHeader := make(http.Header)
+	if kubeCfg.ManifestURLHeader != "" {
+		pieces := strings.Split(kubeCfg.ManifestURLHeader, ":")
+		if len(pieces) != 2 {
+			return nil, fmt.Errorf("manifest-url-header must have a single ':' key-value separator, got %q", kubeCfg.ManifestURLHeader)
+		}
+		manifestURLHeader.Set(pieces[0], pieces[1])
+	}
+
+	// source of all configuration
+	cfg := config.NewPodConfig(config.PodConfigNotificationIncremental, kubeDeps.Recorder)
+
+	// define file config source
+	if kubeCfg.PodManifestPath != "" {
+		glog.Infof("Adding manifest file: %v", kubeCfg.PodManifestPath)
+		config.NewSourceFile(kubeCfg.PodManifestPath, nodeName, kubeCfg.FileCheckFrequency.Duration, cfg.Channel(kubetypes.FileSource))
+	}
+
+	// define url config source
+	if kubeCfg.ManifestURL != "" {
+		glog.Infof("Adding manifest url %q with HTTP header %v", kubeCfg.ManifestURL, manifestURLHeader)
+		config.NewSourceURL(kubeCfg.ManifestURL, manifestURLHeader, nodeName, kubeCfg.HTTPCheckFrequency.Duration, cfg.Channel(kubetypes.HTTPSource))
+	}
+	if kubeDeps.KubeClient != nil {
+		glog.Infof("Watching apiserver")
+		config.NewSourceApiserver(kubeDeps.KubeClient, nodeName, cfg.Channel(kubetypes.ApiserverSource))
+	}
+	return cfg, nil
+}
+
 func run(s *options.KubeletServer, kubeDeps *kubelet.KubeletDeps) (err error) {
 	// TODO: this should be replaced by a --standalone flag
 	standaloneMode := (len(s.APIServerList) == 0 && !s.RequireKubeConfig)
@@ -361,6 +394,7 @@ func run(s *options.KubeletServer, kubeDeps *kubelet.KubeletDeps) (err error) {
 		}
 	}
 
+	var nodeName types.NodeName
 	if kubeDeps == nil {
 		var kubeClient, eventClient *clientset.Clientset
 		var externalKubeClient clientgoclientset.Interface
@@ -378,11 +412,12 @@ func run(s *options.KubeletServer, kubeDeps *kubelet.KubeletDeps) (err error) {
 			}
 		}
 
+		nodeName, err = getNodeName(cloud, nodeutil.GetHostname(s.HostnameOverride))
+		if err != nil {
+			return err
+		}
+
 		if s.BootstrapKubeconfig != "" {
-			nodeName, err := getNodeName(cloud, nodeutil.GetHostname(s.HostnameOverride))
-			if err != nil {
-				return err
-			}
 			if err := bootstrapClientCert(s.KubeConfig.Value(), s.BootstrapKubeconfig, s.CertDirectory, nodeName); err != nil {
 				return err
 			}
@@ -444,9 +479,11 @@ func run(s *options.KubeletServer, kubeDeps *kubelet.KubeletDeps) (err error) {
 	}
 
 	if kubeDeps.Auth == nil {
-		nodeName, err := getNodeName(kubeDeps.Cloud, nodeutil.GetHostname(s.HostnameOverride))
-		if err != nil {
-			return err
+		if nodeName == "" {
+			nodeName, err = getNodeName(kubeDeps.Cloud, nodeutil.GetHostname(s.HostnameOverride))
+			if err != nil {
+				return err
+			}
 		}
 
 		auth, err := buildAuth(nodeName, kubeDeps.ExternalKubeClient, s.KubeletConfiguration)
@@ -454,6 +491,21 @@ func run(s *options.KubeletServer, kubeDeps *kubelet.KubeletDeps) (err error) {
 			return err
 		}
 		kubeDeps.Auth = auth
+	}
+
+	eventBroadcaster := record.NewBroadcaster()
+	kubeDeps.Recorder = eventBroadcaster.NewRecorder(v1.EventSource{Component: "kubelet", Host: string(nodeName)})
+
+	if kubeDeps.OSInterface == nil {
+		kubeDeps.OSInterface = kubecontainer.RealOS{}
+	}
+
+	if kubeDeps.PodConfig == nil {
+		var err error
+		kubeDeps.PodConfig, err = makePodSourceConfig(&s.KubeletConfiguration, kubeDeps, nodeName)
+		if err != nil {
+			return err
+		}
 	}
 
 	if kubeDeps.CAdvisorInterface == nil {
@@ -690,15 +742,7 @@ func addChaosToClientConfig(s *options.KubeletServer, config *restclient.Config)
 //   3 Standalone 'kubernetes' binary
 // Eventually, #2 will be replaced with instances of #3
 func RunKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *kubelet.KubeletDeps, runOnce bool, standaloneMode bool) error {
-	hostname := nodeutil.GetHostname(kubeCfg.HostnameOverride)
-	// Query the cloud provider for our node name, default to hostname if kcfg.Cloud == nil
-	nodeName, err := getNodeName(kubeDeps.Cloud, hostname)
-	if err != nil {
-		return err
-	}
-
 	eventBroadcaster := record.NewBroadcaster()
-	kubeDeps.Recorder = eventBroadcaster.NewRecorder(v1.EventSource{Component: "kubelet", Host: string(nodeName)})
 	eventBroadcaster.StartLogging(glog.V(3).Infof)
 	if kubeDeps.EventClient != nil {
 		glog.V(4).Infof("Sending events to api server.")
@@ -741,20 +785,10 @@ func RunKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *kubelet
 	if builder == nil {
 		builder = CreateAndInitKubelet
 	}
-	if kubeDeps.OSInterface == nil {
-		kubeDeps.OSInterface = kubecontainer.RealOS{}
-	}
 	k, err := builder(kubeCfg, kubeDeps, standaloneMode)
 	if err != nil {
 		return fmt.Errorf("failed to create kubelet: %v", err)
 	}
-
-	// NewMainKubelet should have set up a pod source config if one didn't exist
-	// when the builder was run. This is just a precaution.
-	if kubeDeps.PodConfig == nil {
-		return fmt.Errorf("failed to create kubelet, pod source config was nil!")
-	}
-	podCfg := kubeDeps.PodConfig
 
 	rlimit.RlimitNumFiles(uint64(kubeCfg.MaxOpenFiles))
 
@@ -796,12 +830,12 @@ func RunKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *kubelet
 
 	// process pods and exit.
 	if runOnce {
-		if _, err := k.RunOnce(podCfg.Updates()); err != nil {
+		if _, err := k.RunOnce(kubeDeps.PodConfig.Updates()); err != nil {
 			return fmt.Errorf("runonce failed: %v", err)
 		}
 		glog.Infof("Started kubelet %s as runonce", version.Get().String())
 	} else {
-		startKubelet(k, podCfg, kubeCfg, kubeDeps)
+		startKubelet(k, kubeDeps.PodConfig, kubeCfg, kubeDeps)
 		glog.Infof("Started kubelet %s", version.Get().String())
 	}
 	return nil
