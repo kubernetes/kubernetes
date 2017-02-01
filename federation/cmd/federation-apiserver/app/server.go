@@ -175,7 +175,7 @@ func Run(s *options.ServerRunOptions) error {
 	genericConfig.Authenticator = apiAuthenticator
 	genericConfig.Authorizer = apiAuthorizer
 	genericConfig.AdmissionControl = admissionController
-	genericConfig.OpenAPIConfig = genericapiserver.DefaultOpenAPIConfig(openapi.OpenAPIDefinitions)
+	genericConfig.OpenAPIConfig = genericapiserver.DefaultOpenAPIConfig(openapi.GetOpenAPIDefinitions)
 	genericConfig.OpenAPIConfig.SecurityDefinitions = securityDefinitions
 	genericConfig.SwaggerConfig = genericapiserver.DefaultSwaggerConfig()
 	genericConfig.LongRunningFunc = filters.BasicLongRunningRequestCheck(

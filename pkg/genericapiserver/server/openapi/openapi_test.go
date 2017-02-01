@@ -19,6 +19,7 @@ package openapi
 import (
 	"fmt"
 	"net/http"
+	"strings"
 	"testing"
 
 	"github.com/emicklei/go-restful"
@@ -186,9 +187,22 @@ func getConfig(fullMethods bool) (*openapi.Config, *restful.Container) {
 				Description: "Test API",
 			},
 		},
-		Definitions: &openapi.OpenAPIDefinitions{
-			"openapi.TestInput":  *TestInput{}.OpenAPIDefinition(),
-			"openapi.TestOutput": *TestOutput{}.OpenAPIDefinition(),
+		GetDefinitions: func(_ openapi.ReferenceCallback) map[string]openapi.OpenAPIDefinition {
+			return map[string]openapi.OpenAPIDefinition{
+				"k8s.io/kubernetes/pkg/genericapiserver/server/openapi.TestInput":  *TestInput{}.OpenAPIDefinition(),
+				"k8s.io/kubernetes/pkg/genericapiserver/server/openapi.TestOutput": *TestOutput{}.OpenAPIDefinition(),
+				// Bazel changes the package name, this is ok for testing, but we need to fix it if it happened
+				// in the main code.
+				"k8s.io/kubernetes/pkg/genericapiserver/server/openapi/go_default_test.TestInput":  *TestInput{}.OpenAPIDefinition(),
+				"k8s.io/kubernetes/pkg/genericapiserver/server/openapi/go_default_test.TestOutput": *TestOutput{}.OpenAPIDefinition(),
+			}
+		},
+		GetDefinitionName: func(_ string, name string) (string, spec.Extensions) {
+			friendlyName := name[strings.LastIndex(name, "/")+1:]
+			if strings.HasPrefix(friendlyName, "go_default_test") {
+				friendlyName = "openapi" + friendlyName[len("go_default_test"):]
+			}
+			return friendlyName, nil
 		},
 	}, container
 }
@@ -216,12 +230,18 @@ func getTestPathItem(allMethods bool, opPrefix string) spec.PathItem {
 	}
 	ret.Get.Parameters = getAdditionalTestParameters()
 	if allMethods {
-		ret.PathItemProps.Put = getTestOperation("put", opPrefix)
-		ret.PathItemProps.Post = getTestOperation("post", opPrefix)
-		ret.PathItemProps.Head = getTestOperation("head", opPrefix)
-		ret.PathItemProps.Patch = getTestOperation("patch", opPrefix)
-		ret.PathItemProps.Delete = getTestOperation("delete", opPrefix)
-		ret.PathItemProps.Options = getTestOperation("options", opPrefix)
+		ret.Put = getTestOperation("put", opPrefix)
+		ret.Put.Parameters = getTestParameters()
+		ret.Post = getTestOperation("post", opPrefix)
+		ret.Post.Parameters = getTestParameters()
+		ret.Head = getTestOperation("head", opPrefix)
+		ret.Head.Parameters = getTestParameters()
+		ret.Patch = getTestOperation("patch", opPrefix)
+		ret.Patch.Parameters = getTestParameters()
+		ret.Delete = getTestOperation("delete", opPrefix)
+		ret.Delete.Parameters = getTestParameters()
+		ret.Options = getTestOperation("options", opPrefix)
+		ret.Options.Parameters = getTestParameters()
 	}
 	return ret
 }
@@ -250,16 +270,8 @@ func getTestResponses() *spec.Responses {
 }
 
 func getTestCommonParameters() []spec.Parameter {
-	ret := make([]spec.Parameter, 3)
+	ret := make([]spec.Parameter, 2)
 	ret[0] = spec.Parameter{
-		ParamProps: spec.ParamProps{
-			Name:     "body",
-			In:       "body",
-			Required: true,
-			Schema:   getRefSchema("#/definitions/openapi.TestInput"),
-		},
-	}
-	ret[1] = spec.Parameter{
 		SimpleSchema: spec.SimpleSchema{
 			Type: "string",
 		},
@@ -273,7 +285,7 @@ func getTestCommonParameters() []spec.Parameter {
 			UniqueItems: true,
 		},
 	}
-	ret[2] = spec.Parameter{
+	ret[1] = spec.Parameter{
 		SimpleSchema: spec.SimpleSchema{
 			Type: "string",
 		},
@@ -289,9 +301,30 @@ func getTestCommonParameters() []spec.Parameter {
 	return ret
 }
 
-func getAdditionalTestParameters() []spec.Parameter {
-	ret := make([]spec.Parameter, 2)
+func getTestParameters() []spec.Parameter {
+	ret := make([]spec.Parameter, 1)
 	ret[0] = spec.Parameter{
+		ParamProps: spec.ParamProps{
+			Name:     "body",
+			In:       "body",
+			Required: true,
+			Schema:   getRefSchema("#/definitions/openapi.TestInput"),
+		},
+	}
+	return ret
+}
+
+func getAdditionalTestParameters() []spec.Parameter {
+	ret := make([]spec.Parameter, 3)
+	ret[0] = spec.Parameter{
+		ParamProps: spec.ParamProps{
+			Name:     "body",
+			In:       "body",
+			Required: true,
+			Schema:   getRefSchema("#/definitions/openapi.TestInput"),
+		},
+	}
+	ret[1] = spec.Parameter{
 		ParamProps: spec.ParamProps{
 			Name:        "fparam",
 			Description: "a test form parameter",
@@ -304,7 +337,7 @@ func getAdditionalTestParameters() []spec.Parameter {
 			UniqueItems: true,
 		},
 	}
-	ret[1] = spec.Parameter{
+	ret[2] = spec.Parameter{
 		SimpleSchema: spec.SimpleSchema{
 			Type: "integer",
 		},
