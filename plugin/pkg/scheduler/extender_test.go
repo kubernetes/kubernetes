@@ -104,12 +104,13 @@ func machine2Prioritizer(_ *v1.Pod, nodeNameToInfo map[string]*schedulercache.No
 }
 
 type FakeExtender struct {
-	predicates   []fitPredicate
-	prioritizers []priorityConfig
-	weight       int
+	predicates       []fitPredicate
+	prioritizers     []priorityConfig
+	weight           int
+	nodeCacheCapable bool
 }
 
-func (f *FakeExtender) Filter(pod *v1.Pod, nodes []*v1.Node) ([]*v1.Node, schedulerapi.FailedNodesMap, error) {
+func (f *FakeExtender) Filter(pod *v1.Pod, nodes []*v1.Node, nodeNameToInfo map[string]*schedulercache.NodeInfo) ([]*v1.Node, schedulerapi.FailedNodesMap, error) {
 	filtered := []*v1.Node{}
 	failedNodesMap := schedulerapi.FailedNodesMap{}
 	for _, node := range nodes {
@@ -129,6 +130,10 @@ func (f *FakeExtender) Filter(pod *v1.Pod, nodes []*v1.Node) ([]*v1.Node, schedu
 		} else {
 			failedNodesMap[node.Name] = "FakeExtender failed"
 		}
+	}
+
+	if f.nodeCacheCapable {
+		return filtered, failedNodesMap, nil
 	}
 	return filtered, failedNodesMap, nil
 }
