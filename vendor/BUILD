@@ -14002,3 +14002,9 @@ go_library(
         "//vendor:k8s.io/client-go/util/clock",
     ],
 )
+
+go_library(
+    name = "k8s.io/apiserver/pkg/server/routes/data/swagger",
+    srcs = ["k8s.io/apiserver/pkg/server/routes/data/swagger/datafile.go"],
+    tags = ["automanaged"],
+)
