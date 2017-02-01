@@ -75,7 +75,7 @@ func init() {
 
 // setUp is a convience function for setting up for (most) tests.
 func setUp(t *testing.T) (*etcdtesting.EtcdTestServer, Config, *assert.Assertions) {
-	etcdServer, _ := etcdtesting.NewUnsecuredEtcd3TestClientServer(t)
+	etcdServer, _ := etcdtesting.NewUnsecuredEtcd3TestClientServer(t, scheme)
 
 	config := NewConfig()
 	config.PublicAddress = net.ParseIP("192.168.10.4")

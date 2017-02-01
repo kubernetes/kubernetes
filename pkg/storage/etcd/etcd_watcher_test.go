@@ -21,12 +21,14 @@ import (
 	"testing"
 
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
+	apitesting "k8s.io/apimachinery/pkg/api/testing"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/watch"
+	"k8s.io/apiserver/pkg/apis/example"
+	examplev1 "k8s.io/apiserver/pkg/apis/example/v1"
 	"k8s.io/apiserver/pkg/storage"
-	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/storage/etcd/etcdtest"
 	etcdtesting "k8s.io/kubernetes/pkg/storage/etcd/testing"
 
@@ -49,11 +51,12 @@ func (f *fakeEtcdCache) addToCache(index uint64, obj runtime.Object) {
 var _ etcdCache = &fakeEtcdCache{}
 
 func TestWatchInterpretations(t *testing.T) {
-	codec := testapi.Default.Codec()
+	_, codecs := testScheme(t)
+	codec := apitesting.TestCodec(codecs, examplev1.SchemeGroupVersion)
 	// Declare some pods to make the test cases compact.
-	podFoo := &api.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}}
-	podBar := &api.Pod{ObjectMeta: metav1.ObjectMeta{Name: "bar"}}
-	podBaz := &api.Pod{ObjectMeta: metav1.ObjectMeta{Name: "baz"}}
+	podFoo := &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}}
+	podBar := &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "bar"}}
+	podBaz := &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "baz"}}
 
 	// All of these test cases will be run with the firstLetterIsB Filter.
 	table := map[string]struct {
@@ -126,7 +129,7 @@ func TestWatchInterpretations(t *testing.T) {
 		},
 	}
 	firstLetterIsB := func(obj runtime.Object) bool {
-		return obj.(*api.Pod).Name[0] == 'b'
+		return obj.(*example.Pod).Name[0] == 'b'
 	}
 	for name, item := range table {
 		for _, action := range item.actions {
@@ -168,7 +171,8 @@ func TestWatchInterpretations(t *testing.T) {
 }
 
 func TestWatchInterpretation_ResponseNotSet(t *testing.T) {
-	_, codec := testScheme(t)
+	_, codecs := testScheme(t)
+	codec := codecs.LegacyCodec(schema.GroupVersion{Version: "v1"})
 	w := newEtcdWatcher(false, false, nil, storage.SimpleFilter(storage.Everything), codec, versioner, nil, &fakeEtcdCache{})
 	w.emit = func(e watch.Event) {
 		t.Errorf("Unexpected emit: %v", e)
@@ -181,7 +185,8 @@ func TestWatchInterpretation_ResponseNotSet(t *testing.T) {
 }
 
 func TestWatchInterpretation_ResponseNoNode(t *testing.T) {
-	_, codec := testScheme(t)
+	_, codecs := testScheme(t)
+	codec := codecs.LegacyCodec(schema.GroupVersion{Version: "v1"})
 	actions := []string{"create", "set", "compareAndSwap", "delete"}
 	for _, action := range actions {
 		w := newEtcdWatcher(false, false, nil, storage.SimpleFilter(storage.Everything), codec, versioner, nil, &fakeEtcdCache{})
@@ -196,7 +201,8 @@ func TestWatchInterpretation_ResponseNoNode(t *testing.T) {
 }
 
 func TestWatchInterpretation_ResponseBadData(t *testing.T) {
-	_, codec := testScheme(t)
+	_, codecs := testScheme(t)
+	codec := codecs.LegacyCodec(schema.GroupVersion{Version: "v1"})
 	actions := []string{"create", "set", "compareAndSwap", "delete"}
 	for _, action := range actions {
 		w := newEtcdWatcher(false, false, nil, storage.SimpleFilter(storage.Everything), codec, versioner, nil, &fakeEtcdCache{})
@@ -220,9 +226,10 @@ func TestWatchInterpretation_ResponseBadData(t *testing.T) {
 }
 
 func TestSendResultDeleteEventHaveLatestIndex(t *testing.T) {
-	codec := testapi.Default.Codec()
+	_, codecs := testScheme(t)
+	codec := apitesting.TestCodec(codecs, examplev1.SchemeGroupVersion)
 	filter := func(obj runtime.Object) bool {
-		return obj.(*api.Pod).Name != "bar"
+		return obj.(*example.Pod).Name != "bar"
 	}
 	w := newEtcdWatcher(false, false, nil, filter, codec, versioner, nil, &fakeEtcdCache{})
 
@@ -231,8 +238,8 @@ func TestSendResultDeleteEventHaveLatestIndex(t *testing.T) {
 		eventChan <- e
 	}
 
-	fooPod := &api.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}}
-	barPod := &api.Pod{ObjectMeta: metav1.ObjectMeta{Name: "bar"}}
+	fooPod := &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}}
+	barPod := &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "bar"}}
 	fooBytes, err := runtime.Encode(codec, fooPod)
 	if err != nil {
 		t.Fatalf("Encode failed: %v", err)
@@ -279,7 +286,7 @@ func TestSendResultDeleteEventHaveLatestIndex(t *testing.T) {
 			t.Errorf("#%d: event type want=Deleted, get=%s", i, ev.Type)
 			return
 		}
-		rv := ev.Object.(*api.Pod).ResourceVersion
+		rv := ev.Object.(*example.Pod).ResourceVersion
 		if rv != tt.expRV {
 			t.Errorf("#%d: resource version want=%s, get=%s", i, tt.expRV, rv)
 		}
@@ -288,11 +295,12 @@ func TestSendResultDeleteEventHaveLatestIndex(t *testing.T) {
 }
 
 func TestWatch(t *testing.T) {
-	codec := testapi.Default.Codec()
+	scheme, codecs := testScheme(t)
+	codec := apitesting.TestCodec(codecs, examplev1.SchemeGroupVersion)
 	server := etcdtesting.NewEtcdTestClientServer(t)
 	defer server.Terminate(t)
 	key := "/some/key"
-	h := newEtcdHelper(server.Client, codec, etcdtest.PathPrefix())
+	h := newEtcdHelper(server.Client, scheme, codec, etcdtest.PathPrefix())
 
 	watching, err := h.Watch(context.TODO(), key, "0", storage.Everything)
 	if err != nil {
@@ -301,8 +309,8 @@ func TestWatch(t *testing.T) {
 	// watching is explicitly closed below.
 
 	// Test normal case
-	pod := &api.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}}
-	returnObj := &api.Pod{}
+	pod := &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}}
+	returnObj := &example.Pod{}
 	err = h.Create(context.TODO(), key, pod, returnObj, 0)
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
@@ -330,36 +338,25 @@ func TestWatch(t *testing.T) {
 	}
 }
 
-func emptySubsets() []api.EndpointSubset {
-	return []api.EndpointSubset{}
-}
-
-func makeSubsets(ip string, port int) []api.EndpointSubset {
-	return []api.EndpointSubset{{
-		Addresses: []api.EndpointAddress{{IP: ip}},
-		Ports:     []api.EndpointPort{{Port: int32(port)}},
-	}}
-}
-
 func TestWatchEtcdState(t *testing.T) {
-	codec := testapi.Default.Codec()
+	scheme, codecs := testScheme(t)
+	codec := apitesting.TestCodec(codecs, examplev1.SchemeGroupVersion)
 	key := "/somekey/foo"
 	server := etcdtesting.NewEtcdTestClientServer(t)
 	defer server.Terminate(t)
 
-	h := newEtcdHelper(server.Client, codec, etcdtest.PathPrefix())
+	h := newEtcdHelper(server.Client, scheme, codec, etcdtest.PathPrefix())
 	watching, err := h.Watch(context.TODO(), key, "0", storage.Everything)
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
 	defer watching.Stop()
 
-	endpoint := &api.Endpoints{
+	pod := &example.Pod{
 		ObjectMeta: metav1.ObjectMeta{Name: "foo"},
-		Subsets:    emptySubsets(),
 	}
 
-	err = h.Create(context.TODO(), key, endpoint, endpoint, 0)
+	err = h.Create(context.TODO(), key, pod, pod, 0)
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
@@ -369,20 +366,21 @@ func TestWatchEtcdState(t *testing.T) {
 		t.Errorf("Unexpected event %#v", event)
 	}
 
-	subset := makeSubsets("127.0.0.1", 9000)
-	endpoint.Subsets = subset
-	endpoint.ResourceVersion = ""
+	pod.ResourceVersion = ""
+	pod.Status = example.PodStatus{
+		Phase: example.PodPhase("Running"),
+	}
 
 	// CAS the previous value
 	updateFn := func(input runtime.Object, res storage.ResponseMeta) (runtime.Object, *uint64, error) {
-		newObj, err := api.Scheme.DeepCopy(endpoint)
+		newObj, err := scheme.DeepCopy(pod)
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
 			return nil, nil, err
 		}
-		return newObj.(*api.Endpoints), nil, nil
+		return newObj.(*example.Pod), nil, nil
 	}
-	err = h.GuaranteedUpdate(context.TODO(), key, &api.Endpoints{}, false, nil, updateFn)
+	err = h.GuaranteedUpdate(context.TODO(), key, &example.Pod{}, false, nil, updateFn)
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
@@ -392,20 +390,21 @@ func TestWatchEtcdState(t *testing.T) {
 		t.Errorf("Unexpected event %#v", event)
 	}
 
-	if e, a := endpoint, event.Object; !apiequality.Semantic.DeepDerivative(e, a) {
+	if e, a := pod, event.Object; !apiequality.Semantic.DeepDerivative(e, a) {
 		t.Errorf("Unexpected error: expected %#v, got %#v", e, a)
 	}
 }
 
 func TestWatchFromZeroIndex(t *testing.T) {
-	codec := testapi.Default.Codec()
-	pod := &api.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}}
+	scheme, codecs := testScheme(t)
+	codec := apitesting.TestCodec(codecs, examplev1.SchemeGroupVersion)
+	pod := &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}}
 
 	key := "/somekey/foo"
 	server := etcdtesting.NewEtcdTestClientServer(t)
 	defer server.Terminate(t)
 
-	h := newEtcdHelper(server.Client, codec, etcdtest.PathPrefix())
+	h := newEtcdHelper(server.Client, scheme, codec, etcdtest.PathPrefix())
 
 	// set before the watch and verify events
 	err := h.Create(context.TODO(), key, pod, pod, 0)
@@ -428,11 +427,11 @@ func TestWatchFromZeroIndex(t *testing.T) {
 
 	// check for concatenation on watch event with CAS
 	updateFn := func(input runtime.Object, res storage.ResponseMeta) (runtime.Object, *uint64, error) {
-		pod := input.(*api.Pod)
+		pod := input.(*example.Pod)
 		pod.Name = "bar"
 		return pod, nil, nil
 	}
-	err = h.GuaranteedUpdate(context.TODO(), key, &api.Pod{}, false, nil, updateFn)
+	err = h.GuaranteedUpdate(context.TODO(), key, &example.Pod{}, false, nil, updateFn)
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
@@ -451,11 +450,11 @@ func TestWatchFromZeroIndex(t *testing.T) {
 
 	pod.Name = "baz"
 	updateFn = func(input runtime.Object, res storage.ResponseMeta) (runtime.Object, *uint64, error) {
-		pod := input.(*api.Pod)
+		pod := input.(*example.Pod)
 		pod.Name = "baz"
 		return pod, nil, nil
 	}
-	err = h.GuaranteedUpdate(context.TODO(), key, &api.Pod{}, false, nil, updateFn)
+	err = h.GuaranteedUpdate(context.TODO(), key, &example.Pod{}, false, nil, updateFn)
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
@@ -471,11 +470,12 @@ func TestWatchFromZeroIndex(t *testing.T) {
 }
 
 func TestWatchListFromZeroIndex(t *testing.T) {
-	codec := testapi.Default.Codec()
+	scheme, codecs := testScheme(t)
+	codec := apitesting.TestCodec(codecs, examplev1.SchemeGroupVersion)
 	prefix := "/some/key"
 	server := etcdtesting.NewEtcdTestClientServer(t)
 	defer server.Terminate(t)
-	h := newEtcdHelper(server.Client, codec, prefix)
+	h := newEtcdHelper(server.Client, scheme, codec, prefix)
 
 	watching, err := h.WatchList(context.TODO(), "/", "0", storage.Everything)
 	if err != nil {
@@ -484,7 +484,7 @@ func TestWatchListFromZeroIndex(t *testing.T) {
 	defer watching.Stop()
 
 	// creates foo which should trigger the WatchList for "/"
-	pod := &api.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}}
+	pod := &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}}
 	err = h.Create(context.TODO(), pod.Name, pod, pod, 0)
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
@@ -501,12 +501,13 @@ func TestWatchListFromZeroIndex(t *testing.T) {
 }
 
 func TestWatchListIgnoresRootKey(t *testing.T) {
-	codec := testapi.Default.Codec()
-	pod := &api.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}}
+	scheme, codecs := testScheme(t)
+	codec := apitesting.TestCodec(codecs, examplev1.SchemeGroupVersion)
+	pod := &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}}
 	key := "/some/key"
 	server := etcdtesting.NewEtcdTestClientServer(t)
 	defer server.Terminate(t)
-	h := newEtcdHelper(server.Client, codec, key)
+	h := newEtcdHelper(server.Client, scheme, codec, key)
 
 	watching, err := h.WatchList(context.TODO(), key, "0", storage.Everything)
 	if err != nil {
@@ -532,11 +533,12 @@ func TestWatchListIgnoresRootKey(t *testing.T) {
 }
 
 func TestWatchPurposefulShutdown(t *testing.T) {
-	_, codec := testScheme(t)
+	scheme, codecs := testScheme(t)
+	codec := codecs.LegacyCodec(schema.GroupVersion{Version: "v1"})
 	server := etcdtesting.NewEtcdTestClientServer(t)
 	defer server.Terminate(t)
 	key := "/some/key"
-	h := newEtcdHelper(server.Client, codec, etcdtest.PathPrefix())
+	h := newEtcdHelper(server.Client, scheme, codec, etcdtest.PathPrefix())
 
 	// Test purposeful shutdown
 	watching, err := h.Watch(context.TODO(), key, "0", storage.Everything)
