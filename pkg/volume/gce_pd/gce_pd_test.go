@@ -86,10 +86,10 @@ func contains(modes []v1.PersistentVolumeAccessMode, mode v1.PersistentVolumeAcc
 type fakePDManager struct {
 }
 
-func (fake *fakePDManager) CreateVolume(c *gcePersistentDiskProvisioner) (volumeID string, volumeSizeGB int, labels map[string]string, err error) {
+func (fake *fakePDManager) CreateVolume(c *gcePersistentDiskProvisioner) (volumeID string, volumeSizeGB int, labels map[string]string, fstype string, err error) {
 	labels = make(map[string]string)
 	labels["fakepdmanager"] = "yes"
-	return "test-gce-volume-name", 100, labels, nil
+	return "test-gce-volume-name", 100, labels, "", nil
 }
 
 func (fake *fakePDManager) DeleteVolume(cd *gcePersistentDiskDeleter) error {
