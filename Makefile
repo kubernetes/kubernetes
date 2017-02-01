@@ -233,6 +233,10 @@ define TEST_E2E_NODE_HELP_INFO
 #  PARALLELISM: The number of gingko nodes to run.  Defaults to 8.
 #  RUNTIME: Container runtime to use (eg. docker, rkt, remote).
 #    Defaults to "docker".
+#  CONTAINER_RUNTIME_ENDPOINT: remote container endpoint to connect to.
+#   Used when RUNTIME is set to "remote".
+#  IMAGE_SERVICE_ENDPOINT: remote image endpoint to connect to, to prepull images.
+#   Used when RUNTIME is set to "remote".
 #
 # Example:
 #   make test-e2e-node FOCUS=Kubelet SKIP=container
