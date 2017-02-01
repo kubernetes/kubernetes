@@ -33,7 +33,7 @@ import (
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/discovery"
 	kubemaster "k8s.io/kubernetes/cmd/kubeadm/app/master"
-	"k8s.io/kubernetes/cmd/kubeadm/app/phases/apiconfig"
+	apiconfigphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/apiconfig"
 	certphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/certs"
 	kubeconfigphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/kubeconfig"
 	"k8s.io/kubernetes/cmd/kubeadm/app/preflight"
@@ -210,7 +210,7 @@ func (i *Init) Run(out io.Writer) error {
 		}
 	}
 
-	// Phase 3: Bootstrap the control plane
+	// PHASE 3: Bootstrap the control plane
 	if err := kubemaster.WriteStaticPodManifests(i.cfg); err != nil {
 		return err
 	}
@@ -220,36 +220,8 @@ func (i *Init) Run(out io.Writer) error {
 		return err
 	}
 
-	if i.cfg.AuthorizationMode == kubeadmconstants.AuthzModeRBAC {
-		err = apiconfig.CreateBootstrapRBACClusterRole(client)
-		if err != nil {
-			return err
-		}
-
-		err = apiconfig.CreateKubeDNSRBACClusterRole(client)
-		if err != nil {
-			return err
-		}
-
-		// TODO: remove this when https://github.com/kubernetes/kubeadm/issues/114 is fixed
-		err = apiconfig.CreateKubeProxyClusterRoleBinding(client)
-		if err != nil {
-			return err
-		}
-	}
-
-	if err := kubemaster.UpdateMasterRoleLabelsAndTaints(client, false); err != nil {
+	if err := apiconfigphase.UpdateMasterRoleLabelsAndTaints(client); err != nil {
 		return err
-	}
-
-	if i.cfg.Discovery.Token != nil {
-		fmt.Printf("[token-discovery] Using token: %s\n", kubeadmutil.BearerToken(i.cfg.Discovery.Token))
-		if err := kubemaster.CreateDiscoveryDeploymentAndSecret(i.cfg, client); err != nil {
-			return err
-		}
-		if err := kubeadmutil.UpdateOrCreateToken(client, i.cfg.Discovery.Token, kubeadmutil.DefaultTokenDuration); err != nil {
-			return err
-		}
 	}
 
 	// Is deployment type self-hosted?
@@ -262,6 +234,31 @@ func (i *Init) Run(out io.Writer) error {
 		}
 	}
 
+	// PHASE 4: Set up various things in the API
+	// Create the necessary ServiceAccounts
+	err = apiconfigphase.CreateServiceAccounts(client)
+	if err != nil {
+		return err
+	}
+
+	if i.cfg.AuthorizationMode == kubeadmconstants.AuthzModeRBAC {
+		err = apiconfigphase.CreateRBACRules(client)
+		if err != nil {
+			return err
+		}
+	}
+
+	if i.cfg.Discovery.Token != nil {
+		fmt.Printf("[token-discovery] Using token: %s\n", kubeadmutil.BearerToken(i.cfg.Discovery.Token))
+		if err := kubemaster.CreateDiscoveryDeploymentAndSecret(i.cfg, client); err != nil {
+			return err
+		}
+		if err := kubeadmutil.UpdateOrCreateToken(client, i.cfg.Discovery.Token, kubeadmutil.DefaultTokenDuration); err != nil {
+			return err
+		}
+	}
+
+	// PHASE 5: Deploy essential addons
 	if err := kubemaster.CreateEssentialAddons(i.cfg, client); err != nil {
 		return err
 	}
