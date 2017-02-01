@@ -349,6 +349,15 @@ func (v *vsphereVolumeProvisioner) Provision() (*v1.PersistentVolume, error) {
 		return nil, err
 	}
 
+	for k, val := range v.options.Parameters {
+		switch strings.ToLower(k) {
+		case volume.VolumeParameterFSType:
+			fstype = val
+		default:
+			return nil, fmt.Errorf("invalid option %q for volume plugin %s", k, v.plugin.GetPluginName())
+		}
+	}
+
 	if fstype == "" {
 		fstype = "ext4"
 	}
