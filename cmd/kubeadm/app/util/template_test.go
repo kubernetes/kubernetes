@@ -74,7 +74,7 @@ func TestParseTemplate(t *testing.T) {
 		outbytes, err := ParseTemplate(tt.template, tt.data)
 		if tt.errExpected != (err != nil) {
 			t.Errorf(
-				"failed TestParseTemplate:\n\texpected err: %s\n\t  actual: %s",
+				"failed TestParseTemplate:\n\texpected err: %t\n\t  actual: %s",
 				tt.errExpected,
 				err,
 			)
