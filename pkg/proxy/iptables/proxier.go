@@ -606,15 +606,10 @@ func (proxier *Proxier) OnEndpointsUpdate(allEndpoints []api.Endpoints) {
 				port := &ss.Ports[i]
 				for i := range ss.Addresses {
 					addr := &ss.Addresses[i]
-					var isLocalEndpoint bool
-					if addr.NodeName != nil {
-						isLocalEndpoint = *addr.NodeName == proxier.hostname
-						isLocalEndpoint = utilfeature.DefaultFeatureGate.Enabled(features.ExternalTrafficLocalOnly) && isLocalEndpoint
-					}
 					hostPortObject := hostPortInfo{
 						host:          addr.IP,
 						port:          int(port.Port),
-						localEndpoint: isLocalEndpoint,
+						localEndpoint: addr.NodeName != nil && *addr.NodeName == proxier.hostname,
 					}
 					portsToEndpoints[port.Name] = append(portsToEndpoints[port.Name], hostPortObject)
 				}
@@ -675,6 +670,10 @@ func (proxier *Proxier) OnEndpointsUpdate(allEndpoints []api.Endpoints) {
 
 // updateHealthCheckEntries - send the new set of local endpoints to the health checker
 func (proxier *Proxier) updateHealthCheckEntries(name types.NamespacedName, hostPorts []hostPortInfo) {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.ExternalTrafficLocalOnly) {
+		return
+	}
+
 	// Use a set instead of a slice to provide deduplication
 	endpoints := sets.NewString()
 	for _, portInfo := range hostPorts {
