@@ -189,7 +189,7 @@ func Run(s *options.ServerRunOptions) error {
 		}
 	}
 
-	storageGroupsToEncodingVersion, err := s.GenericServerRunOptions.StorageGroupsToEncodingVersion()
+	storageGroupsToEncodingVersion, err := s.StorageSerialization.StorageGroupsToEncodingVersion()
 	if err != nil {
 		return fmt.Errorf("error generating storage version map: %s", err)
 	}

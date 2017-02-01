@@ -22,11 +22,9 @@ import (
 	"strings"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apiserver/pkg/admission"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	utilflag "k8s.io/apiserver/pkg/util/flag"
-	"k8s.io/kubernetes/pkg/api"
 
 	// add the generic feature gates
 	_ "k8s.io/apiserver/pkg/features"
@@ -59,20 +57,14 @@ type ServerRunOptions struct {
 	MaxMutatingRequestsInFlight int
 	MinRequestTimeout           int
 	RuntimeConfig               utilflag.ConfigurationMap
-	StorageVersions             string
-	// The default values for StorageVersions. StorageVersions overrides
-	// these; you can change this if you want to change the defaults (e.g.,
-	// for testing). This is not actually exposed as a flag.
-	DefaultStorageVersions string
-	TargetRAMMB            int
-	WatchCacheSizes        []string
+	TargetRAMMB                 int
+	WatchCacheSizes             []string
 }
 
 func NewServerRunOptions() *ServerRunOptions {
 	return &ServerRunOptions{
 		AdmissionControl:            "AlwaysAdmit",
 		DefaultStorageMediaType:     "application/json",
-		DefaultStorageVersions:      api.Registry.AllPreferredGroupVersions(),
 		DeleteCollectionWorkers:     1,
 		EnableGarbageCollection:     true,
 		EnableProfiling:             true,
@@ -82,7 +74,6 @@ func NewServerRunOptions() *ServerRunOptions {
 		MaxMutatingRequestsInFlight: 200,
 		MinRequestTimeout:           1800,
 		RuntimeConfig:               make(utilflag.ConfigurationMap),
-		StorageVersions:             api.Registry.AllPreferredGroupVersions(),
 	}
 }
 
@@ -108,52 +99,6 @@ func (s *ServerRunOptions) DefaultAdvertiseAddress(secure *SecureServingOptions,
 					"Try to set the AdvertiseAddress directly or provide a valid BindAddress to fix this.", err)
 			}
 			s.AdvertiseAddress = hostIP
-		}
-	}
-
-	return nil
-}
-
-// StorageGroupsToEncodingVersion returns a map from group name to group version,
-// computed from s.StorageVersions flag.
-func (s *ServerRunOptions) StorageGroupsToEncodingVersion() (map[string]schema.GroupVersion, error) {
-	storageVersionMap := map[string]schema.GroupVersion{}
-
-	// First, get the defaults.
-	if err := mergeGroupVersionIntoMap(s.DefaultStorageVersions, storageVersionMap); err != nil {
-		return nil, err
-	}
-	// Override any defaults with the user settings.
-	if err := mergeGroupVersionIntoMap(s.StorageVersions, storageVersionMap); err != nil {
-		return nil, err
-	}
-
-	return storageVersionMap, nil
-}
-
-// dest must be a map of group to groupVersion.
-func mergeGroupVersionIntoMap(gvList string, dest map[string]schema.GroupVersion) error {
-	for _, gvString := range strings.Split(gvList, ",") {
-		if gvString == "" {
-			continue
-		}
-		// We accept two formats. "group/version" OR
-		// "group=group/version". The latter is used when types
-		// move between groups.
-		if !strings.Contains(gvString, "=") {
-			gv, err := schema.ParseGroupVersion(gvString)
-			if err != nil {
-				return err
-			}
-			dest[gv.Group] = gv
-
-		} else {
-			parts := strings.SplitN(gvString, "=", 2)
-			gv, err := schema.ParseGroupVersion(parts[1])
-			if err != nil {
-				return err
-			}
-			dest[parts[0]] = gv
 		}
 	}
 
@@ -249,21 +194,6 @@ func (s *ServerRunOptions) AddUniversalFlags(fs *pflag.FlagSet) {
 		"to apiserver. apis/<groupVersion> key can be used to turn on/off specific api versions. "+
 		"apis/<groupVersion>/<resource> can be used to turn on/off specific resources. api/all and "+
 		"api/legacy are special keys to control all and legacy api versions respectively.")
-
-	deprecatedStorageVersion := ""
-	fs.StringVar(&deprecatedStorageVersion, "storage-version", deprecatedStorageVersion,
-		"DEPRECATED: the version to store the legacy v1 resources with. Defaults to server preferred.")
-	fs.MarkDeprecated("storage-version", "--storage-version is deprecated and will be removed when the v1 API "+
-		"is retired. Setting this has no effect. See --storage-versions instead.")
-
-	fs.StringVar(&s.StorageVersions, "storage-versions", s.StorageVersions, ""+
-		"The per-group version to store resources in. "+
-		"Specified in the format \"group1/version1,group2/version2,...\". "+
-		"In the case where objects are moved from one group to the other, "+
-		"you may specify the format \"group1=group2/v1beta1,group3/v1beta1,...\". "+
-		"You only need to pass the groups you wish to change from the defaults. "+
-		"It defaults to a list of preferred versions of all registered groups, "+
-		"which is derived from the KUBE_API_VERSIONS environment variable.")
 
 	fs.StringSliceVar(&s.WatchCacheSizes, "watch-cache-sizes", s.WatchCacheSizes, ""+
 		"List of watch cache sizes for every resource (pods, nodes, etc.), comma separated. "+
