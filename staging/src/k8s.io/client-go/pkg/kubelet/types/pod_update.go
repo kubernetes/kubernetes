@@ -27,6 +27,15 @@ const ConfigMirrorAnnotationKey = "kubernetes.io/config.mirror"
 const ConfigFirstSeenAnnotationKey = "kubernetes.io/config.seen"
 const ConfigHashAnnotationKey = "kubernetes.io/config.hash"
 
+// This key needs to sync with the key used by the rescheduler, which currently
+// lives in contrib. Its presence indicates 2 things, as far as the kubelet is
+// concerned:
+// 1. Resource related admission checks will prioritize the admission of
+//    pods bearing the key, over pods without the key, regardless of QoS.
+// 2. The OOM score of pods bearing the key will be <= pods without
+//    the key (where the <= part is determied by QoS).
+const CriticalPodAnnotationKey = "scheduler.alpha.kubernetes.io/critical-pod"
+
 // PodOperation defines what changes will be made on a pod configuration.
 type PodOperation int
 
@@ -130,4 +139,12 @@ func (sp SyncPodType) String() string {
 	default:
 		return "unknown"
 	}
+}
+
+// IsCriticalPod returns true if the pod bears the critical pod annotation
+// key. Both the rescheduler and the kubelet use this key to make admission
+// and scheduling decisions.
+func IsCriticalPod(pod *api.Pod) bool {
+	_, ok := pod.Annotations[CriticalPodAnnotationKey]
+	return ok
 }
