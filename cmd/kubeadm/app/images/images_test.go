@@ -30,7 +30,10 @@ type getCoreImageTest struct {
 	o string
 }
 
-const testversion = "1"
+const (
+	testversion = "1"
+	gcrPrefix   = "gcr.io/google_containers"
+)
 
 func TestGetCoreImage(t *testing.T) {
 	var imageTest = []struct {
@@ -69,41 +72,6 @@ func TestGetCoreImage(t *testing.T) {
 		if actual != it.expected {
 			t.Errorf(
 				"failed GetCoreImage:\n\texpected: %s\n\t  actual: %s",
-				it.expected,
-				actual,
-			)
-		}
-	}
-}
-
-func TestGetAddonImage(t *testing.T) {
-	var imageTest = []struct {
-		t        string
-		expected string
-	}{
-		{"matches nothing", ""},
-		{
-			KubeDNSImage,
-			fmt.Sprintf("%s/%s-%s:%s", gcrPrefix, KubeDNSImage, runtime.GOARCH, kubeDNSVersion),
-		},
-		{
-			KubeDNSmasqImage,
-			fmt.Sprintf("%s/%s-%s:%s", gcrPrefix, KubeDNSmasqImage, runtime.GOARCH, kubeDNSVersion),
-		},
-		{
-			KubeDNSSidecarImage,
-			fmt.Sprintf("%s/%s-%s:%s", gcrPrefix, KubeDNSSidecarImage, runtime.GOARCH, kubeDNSVersion),
-		},
-		{
-			Pause,
-			fmt.Sprintf("%s/%s-%s:%s", gcrPrefix, Pause, runtime.GOARCH, pauseVersion),
-		},
-	}
-	for _, it := range imageTest {
-		actual := GetAddonImage(it.t)
-		if actual != it.expected {
-			t.Errorf(
-				"failed GetAddonImage:\n\texpected: %s\n\t  actual: %s",
 				it.expected,
 				actual,
 			)
