@@ -26,9 +26,10 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	runtimeserializer "k8s.io/apimachinery/pkg/runtime/serializer"
 )
 
-func GenericFuzzerFuncs(t TestingCommon) []interface{} {
+func GenericFuzzerFuncs(t TestingCommon, codecs runtimeserializer.CodecFactory) []interface{} {
 	return []interface{}{
 		func(j *int, c fuzz.Continue) {
 			*j = int(c.Int31())
@@ -92,7 +93,7 @@ func GenericFuzzerFuncs(t TestingCommon) []interface{} {
 
 			// Find a codec for converting the object to raw bytes.  This is necessary for the
 			// api version and kind to be correctly set be serialization.
-			var codec = Codec(metav1.SchemeGroupVersion)
+			var codec = TestCodec(codecs, metav1.SchemeGroupVersion)
 
 			// Convert the object to raw bytes
 			bytes, err := runtime.Encode(codec, obj)

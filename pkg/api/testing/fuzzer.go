@@ -30,6 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	runtimeserializer "k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	"k8s.io/kubernetes/pkg/api"
@@ -602,9 +603,9 @@ func certificateFuncs(t apitesting.TestingCommon) []interface{} {
 	}
 }
 
-func FuzzerFuncs(t apitesting.TestingCommon) []interface{} {
+func FuzzerFuncs(t apitesting.TestingCommon, codecs runtimeserializer.CodecFactory) []interface{} {
 	return mergeFuncLists(t,
-		apitesting.GenericFuzzerFuncs(t),
+		apitesting.GenericFuzzerFuncs(t, codecs),
 		overrideGenericFuncs(t),
 		coreFuncs(t),
 		extensionFuncs(t),
