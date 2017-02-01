@@ -241,6 +241,16 @@ func (plugin *cniNetworkPlugin) GetPodNetworkStatus(namespace string, name strin
 	return &network.PodNetworkStatus{IP: ip}, nil
 }
 
+// Verify the network interface exists
+func (plugin *cniNetworkPlugin) VerifyPodInterface(namespace string, name string, id kubecontainer.ContainerID) (error) {
+        netnsPath, err := plugin.host.GetNetNS(id.ID)
+	if err != nil {
+		return fmt.Errorf("CNI failed to retrieve network namespace path: %v", err)
+	}
+
+	return network.VerifyPodInterface(plugin.execer, plugin.nsenterPath, netnsPath, network.DefaultInterfaceName)
+}
+
 func (network *cniNetwork) addToNetwork(podName string, podNamespace string, podInfraContainerID kubecontainer.ContainerID, podNetnsPath string) (*cnitypes.Result, error) {
 	rt, err := buildCNIRuntimeConf(podName, podNamespace, podInfraContainerID, podNetnsPath)
 	if err != nil {
