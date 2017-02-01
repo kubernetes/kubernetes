@@ -20,13 +20,16 @@ registry:
      params:
       htpasswd:
         type: string
-        description: An htpasswd file used for authentication.
+        description: base64 encoded htpasswd file used for authentication.
+      htpasswd-plain:
+        type: string
+        description: base64 encoded plaintext version of the htpasswd file, needed by docker daemons to authenticate to the registry.
       tlscert:
         type: string
-        description: TLS certificate for the registry.
+        description: base64 encoded TLS certificate for the registry. Common Name must match the domain.
       tlskey:
         type: string
-        description: TLS key for the registry.
+        description: base64 encoded TLS key for the registry.
       domain:
         type: string
         description: The domain name for the registry. Must match the Common Name of the certificate.
