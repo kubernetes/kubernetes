@@ -34,6 +34,14 @@ import (
 	"k8s.io/kubernetes/pkg/util/mount"
 )
 
+const (
+	// Common parameter which can be specified in StorageClass to specify the desired FSType
+	// Provisioners SHOULD implement support for this if they are block device based
+	// Must be a filesystem type supported by the host operating system.
+	// Ex. "ext4", "xfs", "ntfs". Default value depends on the provisioner
+	VolumeParameterFSType = "fstype"
+)
+
 // VolumeOptions contains option information about a volume.
 type VolumeOptions struct {
 	// The attributes below are required by volume.Provisioner

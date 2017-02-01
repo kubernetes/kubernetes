@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"os"
 	"path"
+	"strings"
 	"strconv"
 
 	"github.com/golang/glog"
@@ -28,7 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/util/mount"
-	"k8s.io/kubernetes/pkg/util/strings"
+	kstrings "k8s.io/kubernetes/pkg/util/strings"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util"
 )
@@ -52,7 +53,7 @@ const (
 )
 
 func getPath(uid types.UID, volName string, host volume.VolumeHost) string {
-	return host.GetPodVolumeDir(uid, strings.EscapeQualifiedNameForDisk(gcePersistentDiskPluginName), volName)
+	return host.GetPodVolumeDir(uid, kstrings.EscapeQualifiedNameForDisk(gcePersistentDiskPluginName), volName)
 }
 
 func (plugin *gcePersistentDiskPlugin) Init(host volume.VolumeHost) error {
@@ -366,6 +367,17 @@ type gcePersistentDiskProvisioner struct {
 var _ volume.Provisioner = &gcePersistentDiskProvisioner{}
 
 func (c *gcePersistentDiskProvisioner) Provision() (*v1.PersistentVolume, error) {
+	var FSType string = "ext4"
+
+	for k, v := range c.options.Parameters {
+		switch strings.ToLower(k) {
+		case volume.VolumeParameterFSType:
+			FSType = v
+		default:
+			return nil, fmt.Errorf("invalid option %q for volume plugin %s", k, c.plugin.GetPluginName())
+		}
+	}
+
 	volumeID, sizeGB, labels, err := c.manager.CreateVolume(c)
 	if err != nil {
 		return nil, err
@@ -390,6 +402,7 @@ func (c *gcePersistentDiskProvisioner) Provision() (*v1.PersistentVolume, error)
 					PDName:    volumeID,
 					Partition: 0,
 					ReadOnly:  false,
+					FSType:    FSType,
 				},
 			},
 		},
