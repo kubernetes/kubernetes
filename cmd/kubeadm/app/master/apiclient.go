@@ -25,7 +25,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/tools/clientcmd"
-	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	"k8s.io/kubernetes/cmd/kubeadm/app/images"
 	"k8s.io/kubernetes/pkg/api/v1"
 	extensions "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
@@ -34,8 +33,11 @@ import (
 
 const apiCallRetryInterval = 500 * time.Millisecond
 
-// TODO: This method shouldn't exist as a standalone function but be integrated into CreateClientFromFile
-func createAPIClient(adminKubeconfig *clientcmdapi.Config) (*clientset.Clientset, error) {
+func CreateClientFromFile(path string) (*clientset.Clientset, error) {
+	adminKubeconfig, err := clientcmd.LoadFromFile(path)
+	if err != nil {
+		return nil, fmt.Errorf("failed to load admin kubeconfig [%v]", err)
+	}
 	adminClientConfig, err := clientcmd.NewDefaultClientConfig(
 		*adminKubeconfig,
 		&clientcmd.ConfigOverrides{},
@@ -49,14 +51,6 @@ func createAPIClient(adminKubeconfig *clientcmdapi.Config) (*clientset.Clientset
 		return nil, fmt.Errorf("failed to create API client [%v]", err)
 	}
 	return client, nil
-}
-
-func CreateClientFromFile(path string) (*clientset.Clientset, error) {
-	adminKubeconfig, err := clientcmd.LoadFromFile(path)
-	if err != nil {
-		return nil, fmt.Errorf("failed to load admin kubeconfig [%v]", err)
-	}
-	return createAPIClient(adminKubeconfig)
 }
 
 func CreateClientAndWaitForAPI(file string) (*clientset.Clientset, error) {
@@ -169,55 +163,6 @@ func NewDeployment(deploymentName string, replicas int32, podSpec v1.PodSpec) *e
 			},
 		},
 	}
-}
-
-// It's safe to do this for alpha, as we don't have HA and there is no way we can get
-// more then one node here (TODO(phase1+) use os.Hostname)
-func findMyself(client *clientset.Clientset) (*v1.Node, error) {
-	nodeList, err := client.Nodes().List(metav1.ListOptions{})
-	if err != nil {
-		return nil, fmt.Errorf("unable to list nodes [%v]", err)
-	}
-	if len(nodeList.Items) < 1 {
-		return nil, fmt.Errorf("no nodes found")
-	}
-	node := &nodeList.Items[0]
-	return node, nil
-}
-
-func attemptToUpdateMasterRoleLabelsAndTaints(client *clientset.Clientset, schedulable bool) error {
-	n, err := findMyself(client)
-	if err != nil {
-		return err
-	}
-
-	n.ObjectMeta.Labels[metav1.NodeLabelKubeadmAlphaRole] = metav1.NodeLabelRoleMaster
-
-	if !schedulable {
-		taintsAnnotation, _ := json.Marshal([]v1.Taint{{Key: "dedicated", Value: "master", Effect: "NoSchedule"}})
-		n.ObjectMeta.Annotations[v1.TaintsAnnotationKey] = string(taintsAnnotation)
-	}
-
-	if _, err := client.Nodes().Update(n); err != nil {
-		if apierrs.IsConflict(err) {
-			fmt.Println("[apiclient] Temporarily unable to update master node metadata due to conflict (will retry)")
-			time.Sleep(apiCallRetryInterval)
-			attemptToUpdateMasterRoleLabelsAndTaints(client, schedulable)
-		} else {
-			return err
-		}
-	}
-
-	return nil
-}
-
-func UpdateMasterRoleLabelsAndTaints(client *clientset.Clientset, schedulable bool) error {
-	// TODO(phase1+) use iterate instead of recursion
-	err := attemptToUpdateMasterRoleLabelsAndTaints(client, schedulable)
-	if err != nil {
-		return fmt.Errorf("failed to update master node - [%v]", err)
-	}
-	return nil
 }
 
 func SetMasterTaintTolerations(meta *metav1.ObjectMeta) {

@@ -310,11 +310,7 @@ func CreateEssentialAddons(cfg *kubeadmapi.MasterConfiguration, client *clientse
 
 	kubeDNSDeployment := NewDeployment(KubeDNS, 1, createKubeDNSPodSpec(cfg))
 	SetMasterTaintTolerations(&kubeDNSDeployment.Spec.Template.ObjectMeta)
-	kubeDNSServiceAccount := &v1.ServiceAccount{}
-	kubeDNSServiceAccount.ObjectMeta.Name = KubeDNS
-	if _, err := client.ServiceAccounts(metav1.NamespaceSystem).Create(kubeDNSServiceAccount); err != nil {
-		return fmt.Errorf("failed creating kube-dns service account [%v]", err)
-	}
+
 	if _, err := client.Extensions().Deployments(metav1.NamespaceSystem).Create(kubeDNSDeployment); err != nil {
 		return fmt.Errorf("failed creating essential kube-dns addon [%v]", err)
 	}
