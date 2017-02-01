@@ -23,28 +23,31 @@ import (
 	"path/filepath"
 	"testing"
 
-	"golang.org/x/net/context"
-
-	"k8s.io/apimachinery/pkg/runtime/schema"
-	runtimeserializer "k8s.io/apimachinery/pkg/runtime/serializer"
-	"k8s.io/apiserver/pkg/storage/storagebackend"
-	clientapi "k8s.io/client-go/pkg/api"
-	clientapiv1 "k8s.io/client-go/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/storage/etcd/testing/testingcert"
-
 	"github.com/coreos/etcd/integration"
 	"github.com/coreos/etcd/pkg/transport"
+	"golang.org/x/net/context"
+
+	apitesting "k8s.io/apimachinery/pkg/api/testing"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/serializer"
+	"k8s.io/apiserver/pkg/apis/example"
+	examplev1 "k8s.io/apiserver/pkg/apis/example/v1"
+	"k8s.io/apiserver/pkg/storage/storagebackend"
+	"k8s.io/kubernetes/pkg/storage/etcd/testing/testingcert"
 )
 
-func TestTLSConnection(t *testing.T) {
-	scheme := runtime.NewScheme()
-	codecs := runtimeserializer.NewCodecFactory(scheme)
-	codec := codecs.LegacyCodec(schema.GroupVersion{Version: "v1"})
+var scheme = runtime.NewScheme()
+var codecs = serializer.NewCodecFactory(scheme)
 
-	// TODO: use k8s.io/apiserver internal type instead of borrowing it from client-go
-	clientapi.AddToScheme(scheme)
-	clientapiv1.AddToScheme(scheme)
+func init() {
+	metav1.AddToGroupVersion(scheme, metav1.SchemeGroupVersion)
+	example.AddToScheme(scheme)
+	examplev1.AddToScheme(scheme)
+}
+
+func TestTLSConnection(t *testing.T) {
+	codec := apitesting.TestCodec(codecs, examplev1.SchemeGroupVersion)
 
 	certFile, keyFile, caFile := configureTLSCerts(t)
 	defer os.RemoveAll(filepath.Dir(certFile))
@@ -68,13 +71,14 @@ func TestTLSConnection(t *testing.T) {
 		KeyFile:    keyFile,
 		CAFile:     caFile,
 		Codec:      codec,
+		Copier:     scheme,
 	}
 	storage, destroyFunc, err := newETCD3Storage(cfg)
 	defer destroyFunc()
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = storage.Create(context.TODO(), "/abc", &clientapi.Pod{}, nil, 0)
+	err = storage.Create(context.TODO(), "/abc", &example.Pod{}, nil, 0)
 	if err != nil {
 		t.Fatalf("Create failed: %v", err)
 	}
