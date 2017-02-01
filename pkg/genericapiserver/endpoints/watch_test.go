@@ -114,7 +114,7 @@ func TestWatchWebsocket(t *testing.T) {
 		if err != nil {
 			t.Fatalf("Decode error: %v\n%v", err, got)
 		}
-		if _, err := api.GetReference(gotObj); err != nil {
+		if _, err := api.GetReference(api.Scheme, gotObj); err != nil {
 			t.Errorf("Unable to construct reference: %v", err)
 		}
 		if e, a := object, gotObj; !reflect.DeepEqual(e, a) {
@@ -167,7 +167,7 @@ func TestWatchWebsocketClientClose(t *testing.T) {
 		if err != nil {
 			t.Fatalf("Decode error: %v\n%v", err, got)
 		}
-		if _, err := api.GetReference(gotObj); err != nil {
+		if _, err := api.GetReference(api.Scheme, gotObj); err != nil {
 			t.Errorf("Unable to construct reference: %v", err)
 		}
 		if e, a := object, gotObj; !reflect.DeepEqual(e, a) {
@@ -346,7 +346,7 @@ func TestWatchRead(t *testing.T) {
 					if err != nil {
 						t.Fatalf("%s: Decode error: %v", name, err)
 					}
-					if _, err := api.GetReference(gotObj); err != nil {
+					if _, err := api.GetReference(api.Scheme, gotObj); err != nil {
 						t.Errorf("%s: Unable to construct reference: %v", name, err)
 					}
 					if e, a := object, gotObj; !api.Semantic.DeepEqual(e, a) {
