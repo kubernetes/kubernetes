@@ -85,6 +85,7 @@ function kube::release::package_tarballs() {
   mkdir -p "${RELEASE_DIR}"
   kube::release::package_src_tarball &
   kube::release::package_client_tarballs &
+  kube::release::package_node_tarballs &
   kube::release::package_server_tarballs &
   kube::release::package_salt_tarball &
   kube::release::package_kube_manifests_tarball &
@@ -146,6 +147,50 @@ function kube::release::package_client_tarballs() {
 
   kube::log::status "Waiting on tarballs"
   kube::util::wait-for-jobs || { kube::log::error "client tarball creation failed"; exit 1; }
+}
+
+# Package up all of the node binaries
+function kube::release::package_node_tarballs() {
+  local platform
+  for platform in "${KUBE_NODE_PLATFORMS[@]}"; do
+    local platform_tag=${platform/\//-} # Replace a "/" for a "-"
+    local arch=$(basename ${platform})
+    kube::log::status "Building tarball: node $platform_tag"
+
+    local release_stage="${RELEASE_STAGE}/node/${platform_tag}/kubernetes"
+    rm -rf "${release_stage}"
+    mkdir -p "${release_stage}/node/bin"
+
+    local node_bins=("${KUBE_NODE_BINARIES[@]}")
+    if [[ "${platform%/*}" == "windows" ]]; then
+      node_bins=("${KUBE_NODE_BINARIES_WIN[@]}")
+    fi
+    # This fancy expression will expand to prepend a path
+    # (${LOCAL_OUTPUT_BINPATH}/${platform}/) to every item in the
+    # KUBE_NODE_BINARIES array.
+    cp "${node_bins[@]/#/${LOCAL_OUTPUT_BINPATH}/${platform}/}" \
+      "${release_stage}/node/bin/"
+
+    # TODO: Docker images here
+    # kube::release::create_docker_images_for_server "${release_stage}/server/bin" "${arch}"
+
+    # Include the client binaries here too as they are useful debugging tools.
+    local client_bins=("${KUBE_CLIENT_BINARIES[@]}")
+    if [[ "${platform%/*}" == "windows" ]]; then
+      client_bins=("${KUBE_CLIENT_BINARIES_WIN[@]}")
+    fi
+    cp "${client_bins[@]/#/${LOCAL_OUTPUT_BINPATH}/${platform}/}" \
+      "${release_stage}/node/bin/"
+
+    cp "${KUBE_ROOT}/Godeps/LICENSES" "${release_stage}/"
+
+    cp "${RELEASE_DIR}/kubernetes-src.tar.gz" "${release_stage}/"
+
+    kube::release::clean_cruft
+
+    local package_name="${RELEASE_DIR}/kubernetes-node-${platform_tag}.tar.gz"
+    kube::release::create_tarball "${package_name}" "${release_stage}/.."
+  done
 }
 
 # Package up all of the server binaries
