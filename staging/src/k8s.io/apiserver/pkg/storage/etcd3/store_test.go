@@ -17,6 +17,7 @@ limitations under the License.
 package etcd3
 
 import (
+	"bytes"
 	"fmt"
 	"reflect"
 	"sync"
@@ -28,10 +29,12 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
+	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/apiserver/pkg/apis/example"
 	examplev1 "k8s.io/apiserver/pkg/apis/example/v1"
 	"k8s.io/apiserver/pkg/storage"
+	storagetests "k8s.io/apiserver/pkg/storage/tests"
 
 	"github.com/coreos/etcd/integration"
 	"golang.org/x/net/context"
@@ -44,6 +47,25 @@ func init() {
 	metav1.AddToGroupVersion(scheme, metav1.SchemeGroupVersion)
 	example.AddToScheme(scheme)
 	examplev1.AddToScheme(scheme)
+}
+
+// prefixTransformer adds and verifies that all data has the correct prefix on its way in and out.
+type prefixTransformer struct {
+	prefix []byte
+	err    error
+}
+
+func (p prefixTransformer) TransformFromStorage(b []byte) ([]byte, error) {
+	if !bytes.HasPrefix(b, p.prefix) {
+		return nil, fmt.Errorf("value does not have expected prefix: %s", string(b))
+	}
+	return bytes.TrimPrefix(b, p.prefix), p.err
+}
+func (p prefixTransformer) TransformToStorage(b []byte) ([]byte, error) {
+	if len(b) > 0 {
+		return append(append([]byte{}, p.prefix...), b...), p.err
+	}
+	return b, p.err
 }
 
 func TestCreate(t *testing.T) {
@@ -460,11 +482,91 @@ func TestGuaranteedUpdateWithConflict(t *testing.T) {
 	}
 }
 
+func TestTransformationFailure(t *testing.T) {
+	codec := apitesting.TestCodec(codecs, examplev1.SchemeGroupVersion)
+	cluster := integration.NewClusterV3(t, &integration.ClusterConfig{Size: 1})
+	defer cluster.Terminate(t)
+	store := newStore(cluster.RandClient(), false, codec, "", prefixTransformer{prefix: []byte("test!")})
+	ctx := context.Background()
+
+	preset := []struct {
+		key       string
+		obj       *example.Pod
+		storedObj *example.Pod
+	}{{
+		key: "/one-level/test",
+		obj: &example.Pod{
+			ObjectMeta: metav1.ObjectMeta{Name: "bar"},
+			Spec:       storagetests.DeepEqualSafePodSpec(),
+		},
+	}, {
+		key: "/two-level/1/test",
+		obj: &example.Pod{
+			ObjectMeta: metav1.ObjectMeta{Name: "baz"},
+			Spec:       storagetests.DeepEqualSafePodSpec(),
+		},
+	}}
+	for i, ps := range preset[:1] {
+		preset[i].storedObj = &example.Pod{}
+		err := store.Create(ctx, ps.key, ps.obj, preset[:1][i].storedObj, 0)
+		if err != nil {
+			t.Fatalf("Set failed: %v", err)
+		}
+	}
+
+	// create a second resource with an invalid prefix
+	oldTransformer := store.transformer
+	store.transformer = prefixTransformer{prefix: []byte("otherprefix!")}
+	for i, ps := range preset[1:] {
+		preset[1:][i].storedObj = &example.Pod{}
+		err := store.Create(ctx, ps.key, ps.obj, preset[1:][i].storedObj, 0)
+		if err != nil {
+			t.Fatalf("Set failed: %v", err)
+		}
+	}
+	store.transformer = oldTransformer
+
+	// only the first item is returned, and no error
+	var got example.PodList
+	if err := store.List(ctx, "/", "", storage.Everything, &got); err != nil {
+		t.Errorf("Unexpected error %v", err)
+	}
+	if e, a := []example.Pod{*preset[0].storedObj}, got.Items; !reflect.DeepEqual(e, a) {
+		t.Errorf("Unexpected: %s", diff.ObjectReflectDiff(e, a))
+	}
+
+	// Get should fail
+	if err := store.Get(ctx, preset[1].key, "", &example.Pod{}, false); !storage.IsInternalError(err) {
+		t.Errorf("Unexpected error: %v", err)
+	}
+	// GuaranteedUpdate without suggestion should return an error
+	if err := store.GuaranteedUpdate(ctx, preset[1].key, &example.Pod{}, false, nil, func(input runtime.Object, res storage.ResponseMeta) (output runtime.Object, ttl *uint64, err error) {
+		return input, nil, nil
+	}); !storage.IsInternalError(err) {
+		t.Errorf("Unexpected error: %v", err)
+	}
+	// GuaranteedUpdate with suggestion should not return an error if we don't change the object
+	if err := store.GuaranteedUpdate(ctx, preset[1].key, &example.Pod{}, false, nil, func(input runtime.Object, res storage.ResponseMeta) (output runtime.Object, ttl *uint64, err error) {
+		return input, nil, nil
+	}, preset[1].obj); err != nil {
+		t.Errorf("Unexpected error: %v", err)
+	}
+
+	// Delete succeeds but reports an error because we cannot access the body
+	if err := store.Delete(ctx, preset[1].key, &example.Pod{}, nil); !storage.IsInternalError(err) {
+		t.Errorf("Unexpected error: %v", err)
+	}
+
+	if err := store.Get(ctx, preset[1].key, "", &example.Pod{}, false); !storage.IsNotFound(err) {
+		t.Errorf("Unexpected error: %v", err)
+	}
+}
+
 func TestList(t *testing.T) {
 	codec := apitesting.TestCodec(codecs, examplev1.SchemeGroupVersion)
 	cluster := integration.NewClusterV3(t, &integration.ClusterConfig{Size: 1})
 	defer cluster.Terminate(t)
-	store := newStore(cluster.RandClient(), false, codec, "")
+	store := newStore(cluster.RandClient(), false, codec, "", prefixTransformer{prefix: []byte("test!")})
 	ctx := context.Background()
 
 	// Setup storage with the following structure:
@@ -552,7 +654,7 @@ func TestList(t *testing.T) {
 func testSetup(t *testing.T) (context.Context, *store, *integration.ClusterV3) {
 	codec := apitesting.TestCodec(codecs, examplev1.SchemeGroupVersion)
 	cluster := integration.NewClusterV3(t, &integration.ClusterConfig{Size: 1})
-	store := newStore(cluster.RandClient(), false, codec, "")
+	store := newStore(cluster.RandClient(), false, codec, "", prefixTransformer{prefix: []byte("test!")})
 	ctx := context.Background()
 	return ctx, store, cluster
 }
