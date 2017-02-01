@@ -9340,30 +9340,6 @@ go_library(
 )
 
 go_library(
-    name = "k8s.io/client-go/_vendor/github.com/docker/spdystream",
-    srcs = [
-        "k8s.io/client-go/_vendor/github.com/docker/spdystream/connection.go",
-        "k8s.io/client-go/_vendor/github.com/docker/spdystream/handlers.go",
-        "k8s.io/client-go/_vendor/github.com/docker/spdystream/priority.go",
-        "k8s.io/client-go/_vendor/github.com/docker/spdystream/stream.go",
-        "k8s.io/client-go/_vendor/github.com/docker/spdystream/utils.go",
-    ],
-    tags = ["automanaged"],
-    deps = ["//vendor:github.com/docker/spdystream/spdy"],
-)
-
-go_library(
-    name = "k8s.io/client-go/_vendor/github.com/docker/spdystream/spdy",
-    srcs = [
-        "k8s.io/client-go/_vendor/github.com/docker/spdystream/spdy/dictionary.go",
-        "k8s.io/client-go/_vendor/github.com/docker/spdystream/spdy/read.go",
-        "k8s.io/client-go/_vendor/github.com/docker/spdystream/spdy/types.go",
-        "k8s.io/client-go/_vendor/github.com/docker/spdystream/spdy/write.go",
-    ],
-    tags = ["automanaged"],
-)
-
-go_library(
     name = "k8s.io/client-go/_vendor/github.com/emicklei/go-restful",
     srcs = [
         "k8s.io/client-go/_vendor/github.com/emicklei/go-restful/compress.go",
@@ -12070,23 +12046,6 @@ go_library(
 )
 
 go_library(
-    name = "k8s.io/client-go/pkg/kubelet/server/portforward",
-    srcs = [
-        "k8s.io/client-go/pkg/kubelet/server/portforward/constants.go",
-        "k8s.io/client-go/pkg/kubelet/server/portforward/portforward.go",
-    ],
-    tags = ["automanaged"],
-    deps = [
-        "//vendor:github.com/golang/glog",
-        "//vendor:k8s.io/apimachinery/pkg/types",
-        "//vendor:k8s.io/apimachinery/pkg/util/httpstream",
-        "//vendor:k8s.io/apimachinery/pkg/util/httpstream/spdy",
-        "//vendor:k8s.io/apimachinery/pkg/util/runtime",
-        "//vendor:k8s.io/client-go/pkg/api",
-    ],
-)
-
-go_library(
     name = "k8s.io/client-go/pkg/util",
     srcs = [
         "k8s.io/client-go/pkg/util/doc.go",
@@ -13838,12 +13797,6 @@ go_library(
 )
 
 go_library(
-    name = "k8s.io/client-go/_vendor/k8s.io/apimachinery/third_party/forked/golang/netutil",
-    srcs = ["k8s.io/client-go/_vendor/k8s.io/apimachinery/third_party/forked/golang/netutil/addr.go"],
-    tags = ["automanaged"],
-)
-
-go_library(
     name = "k8s.io/client-go/third_party/forked/golang/template",
     srcs = [
         "k8s.io/client-go/third_party/forked/golang/template/exec.go",
@@ -13961,27 +13914,6 @@ go_library(
         "k8s.io/client-go/_vendor/k8s.io/apimachinery/pkg/util/httpstream/httpstream.go",
     ],
     tags = ["automanaged"],
-)
-
-go_library(
-    name = "k8s.io/client-go/_vendor/k8s.io/apimachinery/pkg/util/httpstream/spdy",
-    srcs = [
-        "k8s.io/client-go/_vendor/k8s.io/apimachinery/pkg/util/httpstream/spdy/connection.go",
-        "k8s.io/client-go/_vendor/k8s.io/apimachinery/pkg/util/httpstream/spdy/roundtripper.go",
-        "k8s.io/client-go/_vendor/k8s.io/apimachinery/pkg/util/httpstream/spdy/upgrade.go",
-    ],
-    tags = ["automanaged"],
-    deps = [
-        "//vendor:github.com/docker/spdystream",
-        "//vendor:github.com/golang/glog",
-        "//vendor:k8s.io/apimachinery/pkg/api/errors",
-        "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
-        "//vendor:k8s.io/apimachinery/pkg/runtime",
-        "//vendor:k8s.io/apimachinery/pkg/runtime/serializer",
-        "//vendor:k8s.io/apimachinery/pkg/util/httpstream",
-        "//vendor:k8s.io/apimachinery/pkg/util/runtime",
-        "//vendor:k8s.io/apimachinery/third_party/forked/golang/netutil",
-    ],
 )
 
 go_library(
