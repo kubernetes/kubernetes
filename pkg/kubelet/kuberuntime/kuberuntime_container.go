@@ -302,9 +302,7 @@ func (m *kubeGenericRuntimeManager) makeMounts(opts *kubecontainer.RunContainerO
 // The boolean parameter specifies whether returns all containers including
 // those already exited and dead containers (used for garbage collection).
 func (m *kubeGenericRuntimeManager) getKubeletContainers(allContainers bool) ([]*runtimeapi.Container, error) {
-	filter := &runtimeapi.ContainerFilter{
-		LabelSelector: map[string]string{kubernetesManagedLabel: "true"},
-	}
+	filter := &runtimeapi.ContainerFilter{}
 	if !allContainers {
 		runningState := runtimeapi.ContainerState_CONTAINER_RUNNING
 		filter.State = &runtimeapi.ContainerStateValue{
