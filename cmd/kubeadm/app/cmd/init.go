@@ -33,6 +33,7 @@ import (
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/discovery"
 	kubemaster "k8s.io/kubernetes/cmd/kubeadm/app/master"
+	addonsphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/addons"
 	apiconfigphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/apiconfig"
 	certphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/certs"
 	kubeconfigphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/kubeconfig"
@@ -259,7 +260,7 @@ func (i *Init) Run(out io.Writer) error {
 	}
 
 	// PHASE 5: Deploy essential addons
-	if err := kubemaster.CreateEssentialAddons(i.cfg, client); err != nil {
+	if err := addonsphase.CreateEssentialAddons(i.cfg, client); err != nil {
 		return err
 	}
 
