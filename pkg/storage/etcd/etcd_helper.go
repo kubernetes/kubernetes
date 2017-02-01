@@ -36,19 +36,18 @@ import (
 	"k8s.io/apiserver/pkg/storage/etcd/metrics"
 	utilcache "k8s.io/apiserver/pkg/util/cache"
 	utiltrace "k8s.io/apiserver/pkg/util/trace"
-	"k8s.io/kubernetes/pkg/api"
 	etcdutil "k8s.io/kubernetes/pkg/storage/etcd/util"
 )
 
 // Creates a new storage interface from the client
 // TODO: deprecate in favor of storage.Config abstraction over time
-func NewEtcdStorage(client etcd.Client, codec runtime.Codec, prefix string, quorum bool, cacheSize int) storage.Interface {
+func NewEtcdStorage(client etcd.Client, codec runtime.Codec, prefix string, quorum bool, cacheSize int, copier runtime.ObjectCopier) storage.Interface {
 	return &etcdHelper{
 		etcdMembersAPI: etcd.NewMembersAPI(client),
 		etcdKeysAPI:    etcd.NewKeysAPI(client),
 		codec:          codec,
 		versioner:      APIObjectVersioner{},
-		copier:         api.Scheme,
+		copier:         copier,
 		pathPrefix:     path.Join("/", prefix),
 		quorum:         quorum,
 		cache:          utilcache.NewCache(cacheSize),
