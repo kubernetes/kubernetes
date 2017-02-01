@@ -23,7 +23,6 @@ go_library(
         "//pkg/genericapiserver/registry/generic:go_default_library",
         "//pkg/genericapiserver/registry/rest:go_default_library",
         "//pkg/registry/cachesize:go_default_library",
-        "//pkg/storage:go_default_library",
         "//pkg/storage/etcd:go_default_library",
         "//pkg/storage/storagebackend/factory:go_default_library",
         "//vendor:github.com/golang/glog",
@@ -41,6 +40,7 @@ go_library(
         "//vendor:k8s.io/apimachinery/pkg/util/validation/field",
         "//vendor:k8s.io/apimachinery/pkg/watch",
         "//vendor:k8s.io/apiserver/pkg/endpoints/request",
+        "//vendor:k8s.io/apiserver/pkg/storage",
         "//vendor:k8s.io/apiserver/pkg/storage/storagebackend",
     ],
 )
@@ -59,7 +59,6 @@ go_test(
         "//pkg/genericapiserver/registry/generic:go_default_library",
         "//pkg/genericapiserver/registry/rest:go_default_library",
         "//pkg/registry/core/pod:go_default_library",
-        "//pkg/storage:go_default_library",
         "//pkg/storage/etcd:go_default_library",
         "//pkg/storage/etcd/testing:go_default_library",
         "//pkg/storage/storagebackend/factory:go_default_library",
@@ -77,6 +76,7 @@ go_test(
         "//vendor:k8s.io/apimachinery/pkg/util/wait",
         "//vendor:k8s.io/apimachinery/pkg/watch",
         "//vendor:k8s.io/apiserver/pkg/endpoints/request",
+        "//vendor:k8s.io/apiserver/pkg/storage",
         "//vendor:k8s.io/apiserver/pkg/storage/names",
     ],
 )

@@ -20,7 +20,6 @@ go_test(
         "//pkg/genericapiserver/registry/rest:go_default_library",
         "//pkg/registry/registrytest:go_default_library",
         "//pkg/securitycontext:go_default_library",
-        "//pkg/storage:go_default_library",
         "//pkg/storage/etcd/testing:go_default_library",
         "//vendor:golang.org/x/net/context",
         "//vendor:k8s.io/apimachinery/pkg/api/equality",
@@ -31,6 +30,7 @@ go_test(
         "//vendor:k8s.io/apimachinery/pkg/runtime",
         "//vendor:k8s.io/apimachinery/pkg/util/diff",
         "//vendor:k8s.io/apiserver/pkg/endpoints/request",
+        "//vendor:k8s.io/apiserver/pkg/storage",
     ],
 )
 
@@ -54,13 +54,13 @@ go_library(
         "//pkg/kubelet/client:go_default_library",
         "//pkg/registry/core/pod:go_default_library",
         "//pkg/registry/core/pod/rest:go_default_library",
-        "//pkg/storage:go_default_library",
         "//vendor:k8s.io/apimachinery/pkg/api/errors",
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
         "//vendor:k8s.io/apimachinery/pkg/labels",
         "//vendor:k8s.io/apimachinery/pkg/runtime",
         "//vendor:k8s.io/apimachinery/pkg/util/wait",
         "//vendor:k8s.io/apiserver/pkg/endpoints/request",
+        "//vendor:k8s.io/apiserver/pkg/storage",
     ],
 )
 

@@ -18,8 +18,8 @@ package generic
 
 import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/storagebackend"
-	"k8s.io/kubernetes/pkg/storage"
 )
 
 // RESTOptions is set of configuration options to generic registries.
