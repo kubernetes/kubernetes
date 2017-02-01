@@ -305,6 +305,8 @@ staging/src/k8s.io/client-go/tools/metrics
 staging/src/k8s.io/client-go/util/cert
 staging/src/k8s.io/client-go/util/homedir
 staging/src/k8s.io/client-go/util/workqueue
+staging/src/k8s.io/sample-apiserver
+staging/src/k8s.io/sample-apiserver/pkg/apis/wardle/install
 test/e2e/perftype
 test/e2e_node/runner/local
 test/images/clusterapi-tester
