@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"os"
 	"path"
+	"strings"
 
 	"github.com/golang/glog"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -334,6 +335,17 @@ func (plugin *photonPersistentDiskPlugin) newProvisionerInternal(options volume.
 }
 
 func (p *photonPersistentDiskProvisioner) Provision() (*v1.PersistentVolume, error) {
+	var fsType string = "ext4"
+
+	for k, v := range p.options.Parameters {
+		switch strings.ToLower(k) {
+		case volume.VolumeParameterFSType:
+			fsType = v
+		default:
+			return nil, fmt.Errorf("invalid option %q for volume plugin %s", k, p.plugin.GetPluginName())
+		}
+	}
+
 	pdID, sizeGB, err := p.manager.CreateVolume(p)
 	if err != nil {
 		return nil, err
@@ -356,7 +368,7 @@ func (p *photonPersistentDiskProvisioner) Provision() (*v1.PersistentVolume, err
 			PersistentVolumeSource: v1.PersistentVolumeSource{
 				PhotonPersistentDisk: &v1.PhotonPersistentDiskVolumeSource{
 					PdID:   pdID,
-					FSType: "ext4",
+					FSType: fsType,
 				},
 			},
 		},

@@ -107,6 +107,7 @@ var _ volume.Provisioner = &azureDiskProvisioner{}
 
 func (a *azureDiskProvisioner) Provision() (*v1.PersistentVolume, error) {
 	var sku, location, account string
+	var fsType *string
 
 	// maxLength = 79 - (4 for ".vhd") = 75
 	name := volume.GenerateVolumeName(a.options.ClusterName, a.options.PVName, 75)
@@ -124,6 +125,8 @@ func (a *azureDiskProvisioner) Provision() (*v1.PersistentVolume, error) {
 			location = v
 		case "storageaccount":
 			account = v
+		case volume.VolumeParameterFSType:
+			fsType = &v
 		default:
 			return nil, fmt.Errorf("invalid option %q for volume plugin %s", k, a.plugin.GetPluginName())
 		}
@@ -156,6 +159,7 @@ func (a *azureDiskProvisioner) Provision() (*v1.PersistentVolume, error) {
 				AzureDisk: &v1.AzureDiskVolumeSource{
 					DiskName:    diskName,
 					DataDiskURI: diskUri,
+					FSType:      fsType,
 				},
 			},
 		},
