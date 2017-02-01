@@ -6,6 +6,8 @@
 // translations/kubectl/default/LC_MESSAGES/k8s.po
 // translations/kubectl/en_US/LC_MESSAGES/k8s.mo
 // translations/kubectl/en_US/LC_MESSAGES/k8s.po
+// translations/kubectl/fr_FR/LC_MESSAGES/k8s.mo
+// translations/kubectl/fr_FR/LC_MESSAGES/k8s.po
 // translations/test/default/LC_MESSAGES/k8s.mo
 // translations/test/default/LC_MESSAGES/k8s.po
 // translations/test/en_US/LC_MESSAGES/k8s.mo
@@ -516,6 +518,154 @@ func translationsKubectlEn_usLc_messagesK8sPo() (*asset, error) {
 	return a, nil
 }
 
+var _translationsKubectlFr_frLc_messagesK8sMo = []byte("\xde\x12\x04\x95\x00\x00\x00\x00\x11\x00\x00\x00\x1c\x00\x00\x00\xa4\x00\x00\x00\x17\x00\x00\x00,\x01\x00\x00\x00\x00\x00\x00\x88\x01\x00\x00q\x00\x00\x00\x89\x01\x00\x00a\x00\x00\x00\xfb\x01\x00\x00a\x00\x00\x00]\x02\x00\x00;\x00\x00\x00\xbf\x02\x00\x00U\x00\x00\x00\xfb\x02\x00\x00\x83\x00\x00\x00Q\x03\x00\x009\x00\x00\x00\xd5\x03\x00\x00/\x00\x00\x00\x0f\x04\x00\x00E\x00\x00\x00?\x04\x00\x00E\x00\x00\x00\x85\x04\x00\x00?\x00\x00\x00\xcb\x04\x00\x00[\x00\x00\x00\v\x05\x00\x00[\x00\x00\x00g\x05\x00\x00_\x00\x00\x00\xc3\x05\x00\x00I\x00\x00\x00#\x06\x00\x00(\x01\x00\x00m\x06\x00\x00\xab\x01\x00\x00\x96\a\x00\x00O\x00\x00\x00B\t\x00\x00-\x00\x00\x00\x92\t\x00\x00.\x00\x00\x00\xc0\t\x00\x00\"\x00\x00\x00\xef\t\x00\x00-\x00\x00\x00\x12\n\x00\x00W\x00\x00\x00@\n\x00\x00\x1a\x00\x00\x00\x98\n\x00\x00 \x00\x00\x00\xb3\n\x00\x00#\x00\x00\x00\xd4\n\x00\x00$\x00\x00\x00\xf8\n\x00\x00'\x00\x00\x00\x1d\v\x00\x00;\x00\x00\x00E\v\x00\x007\x00\x00\x00\x81\v\x00\x00;\x00\x00\x00\xb9\v\x00\x00.\x00\x00\x00\xf5\v\x00\x00\x05\x01\x00\x00$\f\x00\x00\x01\x00\x00\x00\x0f\x00\x00\x00\x04\x00\x00\x00\x03\x00\x00\x00\a\x00\x00\x00\n\x00\x00\x00\x0e\x00\x00\x00\x00\x00\x00\x00\x10\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\b\x00\x00\x00\t\x00\x00\x00\x02\x00\x00\x00\x05\x00\x00\x00\x00\x00\x00\x00\x06\x00\x00\x00\v\x00\x00\x00\r\x00\x00\x00\f\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x11\x00\x00\x00\x00Apply a configuration to a resource by filename or stdin\x04Apply a configuration to a resource by filename or stdin\x00Delete the specified cluster from the kubeconfig\x04Delete the specified cluster from the kubeconfig\x00Delete the specified context from the kubeconfig\x04Delete the specified context from the kubeconfig\x00Describe one or many contexts\x04Describe one or many contexts\x00Display clusters defined in the kubeconfig\x04Display clusters defined in the kubeconfig\x00Display merged kubeconfig settings or a specified kubeconfig file\x04Display merged kubeconfig settings or a specified kubeconfig file\x00Displays the current-context\x04Displays the current-context\x00Modify kubeconfig files\x04Modify kubeconfig files\x00Sets a cluster entry in kubeconfig\x04Sets a cluster entry in kubeconfig\x00Sets a context entry in kubeconfig\x04Sets a context entry in kubeconfig\x00Sets a user entry in kubeconfig\x04Sets a user entry in kubeconfig\x00Sets an individual value in a kubeconfig file\x04Sets an individual value in a kubeconfig file\x00Sets the current-context in a kubeconfig file\x04Sets the current-context in a kubeconfig file\x00Unsets an individual value in a kubeconfig file\x04Unsets an individual value in a kubeconfig file\x00Update the annotations on a resource\x04Update the annotations on a resource\x00watch is only supported on individual resources and resource collections - %d resources were found\x04watch is only supported on individual resources and resource collections - %d resources were found\x00watch is only supported on individual resources and resource collections - %d resources were found\x00Project-Id-Version: gettext-go-examples-hello\nReport-Msgid-Bugs-To: \nPOT-Creation-Date: 2013-12-12 20:03+0000\nPO-Revision-Date: 2017-01-29 22:54-0800\nLast-Translator: Brendan Burns <brendan.d.burns@gmail.com>\nMIME-Version: 1.0\nContent-Type: text/plain; charset=UTF-8\nContent-Transfer-Encoding: 8bit\nX-Generator: Poedit 1.6.10\nX-Poedit-SourceCharset: UTF-8\nLanguage-Team: \nPlural-Forms: nplurals=2; plural=(n > 1);\nLanguage: fr\n\x00Appliquer une configuration \u00e0 une ressource par nom de fichier ou depuis stdin\x00Supprimer le cluster sp\u00e9cifi\u00e9 du kubeconfig\x00Supprimer le contexte sp\u00e9cifi\u00e9 du kubeconfig\x00D\u00e9crire un ou plusieurs contextes\x00Afficher les cluster d\u00e9finis dans kubeconfig\x00Afficher les param\u00e8tres fusionn\u00e9s de kubeconfig ou d'un fichier kubeconfig sp\u00e9cifi\u00e9\x00Affiche le contexte actuel\x00Modifier des fichiers kubeconfig\x00D\u00e9finit un cluster dans kubeconfig\x00D\u00e9finit un contexte dans kubeconfig\x00D\u00e9finit un utilisateur dans kubeconfig\x00D\u00e9finit une valeur individuelle dans un fichier kubeconfig\x00D\u00e9finit le contexte courant dans un fichier kubeconfig\x00Supprime une valeur individuelle dans un fichier kubeconfig\x00Mettre \u00e0 jour les annotations d'une ressource\x00watch n'est compatible qu'avec les ressources individuelles et les collections de ressources.  - %d ressource a \u00e9t\u00e9 trouv\u00e9e. \x00watch n'est compatible qu'avec les ressources individuelles et les collections de ressources.  - %d ressources ont \u00e9t\u00e9 trouv\u00e9es. \x00")
+
+func translationsKubectlFr_frLc_messagesK8sMoBytes() ([]byte, error) {
+	return _translationsKubectlFr_frLc_messagesK8sMo, nil
+}
+
+func translationsKubectlFr_frLc_messagesK8sMo() (*asset, error) {
+	bytes, err := translationsKubectlFr_frLc_messagesK8sMoBytes()
+	if err != nil {
+		return nil, err
+	}
+
+	info := bindataFileInfo{name: "translations/kubectl/fr_FR/LC_MESSAGES/k8s.mo", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
+	a := &asset{bytes: bytes, info: info}
+	return a, nil
+}
+
+var _translationsKubectlFr_frLc_messagesK8sPo = []byte(`# Test translations for unit tests.
+# Copyright (C) 2016
+# This file is distributed under the same license as the PACKAGE package.
+# FIRST AUTHOR brendan.d.burns@gmail.com, 2016.
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: gettext-go-examples-hello\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2013-12-12 20:03+0000\n"
+"PO-Revision-Date: 2017-01-29 22:54-0800\n"
+"Last-Translator: Brendan Burns <brendan.d.burns@gmail.com>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"X-Generator: Poedit 1.6.10\n"
+"X-Poedit-SourceCharset: UTF-8\n"
+"Language-Team: \n"
+"Plural-Forms: nplurals=2; plural=(n > 1);\n"
+"Language: fr\n"
+
+msgctxt "Update the annotations on a resource"
+msgid "Update the annotations on a resource"
+msgstr "Mettre à jour les annotations d'une ressource"
+
+msgctxt ""
+"watch is only supported on individual resources and resource collections - "
+"%d resources were found"
+msgid ""
+"watch is only supported on individual resources and resource collections - "
+"%d resources were found"
+msgid_plural ""
+"watch is only supported on individual resources and resource collections - "
+"%d resources were found"
+msgstr[0] ""
+"watch n'est compatible qu'avec les ressources individuelles et les "
+"collections de ressources.  - %d ressource a été trouvée. "
+msgstr[1] ""
+"watch n'est compatible qu'avec les ressources individuelles et les "
+"collections de ressources.  - %d ressources ont été trouvées. "
+
+# https://github.com/kubernetes/kubernetes/blob/masterpkg/kubectl/cmd/apply.go#L98
+msgctxt "Apply a configuration to a resource by filename or stdin"
+msgid "Apply a configuration to a resource by filename or stdin"
+msgstr ""
+"Appliquer une configuration à une ressource par nom de fichier ou depuis "
+"stdin"
+
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/config/config.go#L39
+msgctxt "Modify kubeconfig files"
+msgid "Modify kubeconfig files"
+msgstr "Modifier des fichiers kubeconfig"
+
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/config/create_authinfo.go#L103
+msgctxt "Sets a user entry in kubeconfig"
+msgid "Sets a user entry in kubeconfig"
+msgstr "Définit un utilisateur dans kubeconfig"
+
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/config/create_cluster.go#L67
+msgctxt "Sets a cluster entry in kubeconfig"
+msgid "Sets a cluster entry in kubeconfig"
+msgstr "Définit un cluster dans kubeconfig"
+
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/config/create_context.go#L57
+msgctxt "Sets a context entry in kubeconfig"
+msgid "Sets a context entry in kubeconfig"
+msgstr "Définit un contexte dans kubeconfig"
+
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/config/current_context.go#L48
+msgctxt "Displays the current-context"
+msgid "Displays the current-context"
+msgstr "Affiche le contexte actuel"
+
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/config/delete_cluster.go#L38
+msgctxt "Delete the specified cluster from the kubeconfig"
+msgid "Delete the specified cluster from the kubeconfig"
+msgstr "Supprimer le cluster spécifié du kubeconfig"
+
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/config/delete_context.go#L38
+msgctxt "Delete the specified context from the kubeconfig"
+msgid "Delete the specified context from the kubeconfig"
+msgstr "Supprimer le contexte spécifié du kubeconfig"
+
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/config/get_clusters.go#L40
+msgctxt "Display clusters defined in the kubeconfig"
+msgid "Display clusters defined in the kubeconfig"
+msgstr "Afficher les cluster définis dans kubeconfig"
+
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/config/get_contexts.go#L62
+msgctxt "Describe one or many contexts"
+msgid "Describe one or many contexts"
+msgstr "Décrire un ou plusieurs contextes"
+
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/config/set.go#L59
+msgctxt "Sets an individual value in a kubeconfig file"
+msgid "Sets an individual value in a kubeconfig file"
+msgstr "Définit une valeur individuelle dans un fichier kubeconfig"
+
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/config/unset.go#L47
+msgctxt "Unsets an individual value in a kubeconfig file"
+msgid "Unsets an individual value in a kubeconfig file"
+msgstr "Supprime une valeur individuelle dans un fichier kubeconfig"
+
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/config/use_context.go#L48
+msgctxt "Sets the current-context in a kubeconfig file"
+msgid "Sets the current-context in a kubeconfig file"
+msgstr "Définit le contexte courant dans un fichier kubeconfig"
+
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/config/view.go#L64
+msgctxt "Display merged kubeconfig settings or a specified kubeconfig file"
+msgid "Display merged kubeconfig settings or a specified kubeconfig file"
+msgstr ""
+"Afficher les paramètres fusionnés de kubeconfig ou d'un fichier kubeconfig "
+"spécifié"
+`)
+
+func translationsKubectlFr_frLc_messagesK8sPoBytes() ([]byte, error) {
+	return _translationsKubectlFr_frLc_messagesK8sPo, nil
+}
+
+func translationsKubectlFr_frLc_messagesK8sPo() (*asset, error) {
+	bytes, err := translationsKubectlFr_frLc_messagesK8sPoBytes()
+	if err != nil {
+		return nil, err
+	}
+
+	info := bindataFileInfo{name: "translations/kubectl/fr_FR/LC_MESSAGES/k8s.po", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
+	a := &asset{bytes: bytes, info: info}
+	return a, nil
+}
+
 var _translationsTestDefaultLc_messagesK8sMo = []byte("\xde\x12\x04\x95\x00\x00\x00\x00\x03\x00\x00\x00\x1c\x00\x00\x004\x00\x00\x00\x05\x00\x00\x00L\x00\x00\x00\x00\x00\x00\x00`\x00\x00\x00#\x00\x00\x00a\x00\x00\x00\x17\x00\x00\x00\x85\x00\x00\x00\xac\x01\x00\x00\x9d\x00\x00\x00%\x00\x00\x00J\x02\x00\x00\x03\x00\x00\x00p\x02\x00\x00\x01\x00\x00\x00\x00\x00\x00\x00\x02\x00\x00\x00\x03\x00\x00\x00\x00\x00\x00\x00\x00test_plural\x04test_plural\x00test_plural\x00test_string\x04test_string\x00Project-Id-Version: gettext-go-examples-hello\nReport-Msgid-Bugs-To: \nPOT-Creation-Date: 2013-12-12 20:03+0000\nPO-Revision-Date: 2016-12-13 21:35-0800\nLast-Translator: Brendan Burns <brendan.d.burns@gmail.com>\nMIME-Version: 1.0\nContent-Type: text/plain; charset=UTF-8\nContent-Transfer-Encoding: 8bit\nX-Generator: Poedit 1.6.10\nX-Poedit-SourceCharset: UTF-8\nLanguage-Team: \nPlural-Forms: nplurals=2; plural=(n != 1);\nLanguage: en\n\x00there was %d item\x00there were %d items\x00foo\x00")
 
 func translationsTestDefaultLc_messagesK8sMoBytes() ([]byte, error) {
@@ -702,6 +852,8 @@ var _bindata = map[string]func() (*asset, error){
 	"translations/kubectl/default/LC_MESSAGES/k8s.po": translationsKubectlDefaultLc_messagesK8sPo,
 	"translations/kubectl/en_US/LC_MESSAGES/k8s.mo":   translationsKubectlEn_usLc_messagesK8sMo,
 	"translations/kubectl/en_US/LC_MESSAGES/k8s.po":   translationsKubectlEn_usLc_messagesK8sPo,
+	"translations/kubectl/fr_FR/LC_MESSAGES/k8s.mo":   translationsKubectlFr_frLc_messagesK8sMo,
+	"translations/kubectl/fr_FR/LC_MESSAGES/k8s.po":   translationsKubectlFr_frLc_messagesK8sPo,
 	"translations/test/default/LC_MESSAGES/k8s.mo":    translationsTestDefaultLc_messagesK8sMo,
 	"translations/test/default/LC_MESSAGES/k8s.po":    translationsTestDefaultLc_messagesK8sPo,
 	"translations/test/en_US/LC_MESSAGES/k8s.mo":      translationsTestEn_usLc_messagesK8sMo,
@@ -763,6 +915,12 @@ var _bintree = &bintree{nil, map[string]*bintree{
 				"LC_MESSAGES": {nil, map[string]*bintree{
 					"k8s.mo": {translationsKubectlEn_usLc_messagesK8sMo, map[string]*bintree{}},
 					"k8s.po": {translationsKubectlEn_usLc_messagesK8sPo, map[string]*bintree{}},
+				}},
+			}},
+			"fr_FR": {nil, map[string]*bintree{
+				"LC_MESSAGES": {nil, map[string]*bintree{
+					"k8s.mo": {translationsKubectlFr_frLc_messagesK8sMo, map[string]*bintree{}},
+					"k8s.po": {translationsKubectlFr_frLc_messagesK8sPo, map[string]*bintree{}},
 				}},
 			}},
 		}},
