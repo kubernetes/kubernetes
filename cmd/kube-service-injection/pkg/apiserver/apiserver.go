@@ -20,6 +20,8 @@ import (
 	"k8s.io/kubernetes/pkg/genericapiserver/registry/generic"
 	genericapiserver "k8s.io/kubernetes/pkg/genericapiserver/server"
 	"k8s.io/kubernetes/pkg/version"
+
+	_ "k8s.io/kubernetes/cmd/kube-service-injection/pkg/apis/serviceinjection/install"
 )
 
 type Config struct {
