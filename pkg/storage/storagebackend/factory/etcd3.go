@@ -17,8 +17,8 @@ limitations under the License.
 package factory
 
 import (
+	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/storagebackend"
-	"k8s.io/kubernetes/pkg/storage"
 	"k8s.io/kubernetes/pkg/storage/etcd3"
 
 	"github.com/coreos/etcd/clientv3"

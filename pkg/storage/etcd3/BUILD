@@ -18,7 +18,6 @@ go_library(
     ],
     tags = ["automanaged"],
     deps = [
-        "//pkg/storage:go_default_library",
         "//pkg/storage/etcd:go_default_library",
         "//vendor:github.com/coreos/etcd/clientv3",
         "//vendor:github.com/coreos/etcd/etcdserver/api/v3rpc/rpctypes",
@@ -30,6 +29,7 @@ go_library(
         "//vendor:k8s.io/apimachinery/pkg/conversion",
         "//vendor:k8s.io/apimachinery/pkg/runtime",
         "//vendor:k8s.io/apimachinery/pkg/watch",
+        "//vendor:k8s.io/apiserver/pkg/storage",
         "//vendor:k8s.io/apiserver/pkg/util/trace",
     ],
 )
@@ -46,7 +46,6 @@ go_test(
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/api/testapi:go_default_library",
-        "//pkg/storage:go_default_library",
         "//vendor:github.com/coreos/etcd/clientv3",
         "//vendor:github.com/coreos/etcd/etcdserver/api/v3rpc/rpctypes",
         "//vendor:github.com/coreos/etcd/integration",
@@ -58,6 +57,7 @@ go_test(
         "//vendor:k8s.io/apimachinery/pkg/runtime/schema",
         "//vendor:k8s.io/apimachinery/pkg/util/wait",
         "//vendor:k8s.io/apimachinery/pkg/watch",
+        "//vendor:k8s.io/apiserver/pkg/storage",
     ],
 )
 
