@@ -24,6 +24,7 @@ go_library(
         "//pkg/apis/batch:go_default_library",
         "//pkg/apis/certificates:go_default_library",
         "//pkg/apis/extensions:go_default_library",
+        "//pkg/apis/extensions/v1beta1:go_default_library",
         "//pkg/apis/policy:go_default_library",
         "//pkg/apis/rbac:go_default_library",
         "//vendor:github.com/google/gofuzz",
@@ -34,6 +35,7 @@ go_library(
         "//vendor:k8s.io/apimachinery/pkg/labels",
         "//vendor:k8s.io/apimachinery/pkg/runtime",
         "//vendor:k8s.io/apimachinery/pkg/runtime/schema",
+        "//vendor:k8s.io/apimachinery/pkg/runtime/serializer",
         "//vendor:k8s.io/apimachinery/pkg/util/intstr",
     ],
 )
