@@ -89,7 +89,7 @@ type kubenetNetworkPlugin struct {
 	execer          utilexec.Interface
 	nsenterPath     string
 	hairpinMode     componentconfig.HairpinMode
-	hostportHandler hostport.HostportHandler
+	hostportSyncer  hostport.HostportSyncer
 	iptables        utiliptables.Interface
 	sysctl          utilsysctl.Interface
 	ebtables        utilebtables.Interface
@@ -113,7 +113,7 @@ func NewPlugin(networkPluginDir string) network.NetworkPlugin {
 		iptables:          iptInterface,
 		sysctl:            sysctl,
 		vendorDir:         networkPluginDir,
-		hostportHandler:   hostport.NewHostportHandler(),
+		hostportSyncer:    hostport.NewHostportSyncer(),
 		nonMasqueradeCIDR: "10.0.0.0/8",
 	}
 }
@@ -375,13 +375,13 @@ func (plugin *kubenetNetworkPlugin) setup(namespace string, name string, id kube
 	}
 
 	// Open any hostports the pod's containers want
-	activePods, err := plugin.getActivePods()
+	activePodPortMapping, err := plugin.getPodPortMapping()
 	if err != nil {
 		return err
 	}
 
-	newPod := &hostport.ActivePod{Pod: pod, IP: ip4}
-	if err := plugin.hostportHandler.OpenPodHostportsAndSync(newPod, BridgeName, activePods); err != nil {
+	newPodPortMapping := constructPodPortMapping(pod, ip4)
+	if err := plugin.hostportSyncer.OpenPodHostportsAndSync(newPodPortMapping, BridgeName, activePodPortMapping); err != nil {
 		return err
 	}
 
@@ -471,9 +471,9 @@ func (plugin *kubenetNetworkPlugin) teardown(namespace string, name string, id k
 		return utilerrors.NewAggregate(errList)
 	}
 
-	activePods, err := plugin.getActivePods()
+	activePodPortMapping, err := plugin.getPodPortMapping()
 	if err == nil {
-		err = plugin.hostportHandler.SyncHostports(BridgeName, activePods)
+		err = plugin.hostportSyncer.SyncHostports(BridgeName, activePodPortMapping)
 	}
 	if err != nil {
 		errList = append(errList, err)
@@ -589,15 +589,12 @@ func (plugin *kubenetNetworkPlugin) getNonExitedPods() ([]*kubecontainer.Pod, er
 	return ret, nil
 }
 
-// Returns a list of pods running or ready to run on this node and each pod's IP address.
-// Assumes PodSpecs retrieved from the runtime include the name and ID of containers in
-// each pod.
-func (plugin *kubenetNetworkPlugin) getActivePods() ([]*hostport.ActivePod, error) {
+func (plugin *kubenetNetworkPlugin) getPodPortMapping() ([]*hostport.PodPortMapping, error) {
 	pods, err := plugin.getNonExitedPods()
 	if err != nil {
 		return nil, err
 	}
-	activePods := make([]*hostport.ActivePod, 0)
+	activePodPortMappings := make([]*hostport.PodPortMapping, 0)
 	for _, p := range pods {
 		containerID, err := plugin.host.GetRuntime().GetPodContainerID(p)
 		if err != nil {
@@ -612,13 +609,33 @@ func (plugin *kubenetNetworkPlugin) getActivePods() ([]*hostport.ActivePod, erro
 			continue
 		}
 		if pod, ok := plugin.host.GetPodByName(p.Namespace, p.Name); ok {
-			activePods = append(activePods, &hostport.ActivePod{
-				Pod: pod,
-				IP:  podIP,
+			activePodPortMappings = append(activePodPortMappings, constructPodPortMapping(pod, podIP))
+		}
+	}
+	return activePodPortMappings, nil
+}
+
+func constructPodPortMapping(pod *v1.Pod, podIP net.IP) *hostport.PodPortMapping {
+	portMappings := make([]*hostport.PortMapping, 0)
+	for _, c := range pod.Spec.Containers {
+		for _, port := range c.Ports {
+			portMappings = append(portMappings, &hostport.PortMapping{
+				Name:          port.Name,
+				HostPort:      port.HostPort,
+				ContainerPort: port.ContainerPort,
+				Protocol:      port.Protocol,
+				HostIP:        port.HostIP,
 			})
 		}
 	}
-	return activePods, nil
+
+	return &hostport.PodPortMapping{
+		Namespace:    pod.Namespace,
+		Name:         pod.Name,
+		PortMappings: portMappings,
+		HostNetwork:  pod.Spec.HostNetwork,
+		IP:           podIP,
+	}
 }
 
 // ipamGarbageCollection will release unused IP.
