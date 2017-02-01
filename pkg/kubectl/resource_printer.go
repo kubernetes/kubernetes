@@ -419,6 +419,15 @@ func (h *HumanReadablePrinter) EnsurePrintWithKind(kind string) {
 	h.options.Kind = kind
 }
 
+// EnsurePrintHeaders sets the HumanReadablePrinter option "NoHeaders" to false
+// and removes the .lastType that was printed, which forces headers to be
+// printed in cases where multiple lists of the same resource are printed
+// consecutively, but are separated by non-printer related information.
+func (h *HumanReadablePrinter) EnsurePrintHeaders() {
+	h.options.NoHeaders = false
+	h.lastType = nil
+}
+
 // Handler adds a print handler with a given set of columns to HumanReadablePrinter instance.
 // See validatePrintHandlerFunc for required method signature.
 func (h *HumanReadablePrinter) Handler(columns, columnsWithWide []string, printFunc interface{}) error {
