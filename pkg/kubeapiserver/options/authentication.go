@@ -24,8 +24,8 @@ import (
 	"github.com/golang/glog"
 	"github.com/spf13/pflag"
 
+	genericoptions "k8s.io/apiserver/pkg/server/options"
 	genericapiserver "k8s.io/kubernetes/pkg/genericapiserver/server"
-	genericoptions "k8s.io/kubernetes/pkg/genericapiserver/server/options"
 	"k8s.io/kubernetes/pkg/kubeapiserver/authenticator"
 	"k8s.io/kubernetes/pkg/kubeapiserver/authorizer"
 )
