@@ -24,14 +24,15 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	core "k8s.io/client-go/testing"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
 	extensions "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset/fake"
-	"k8s.io/kubernetes/pkg/util/intstr"
 )
 
 func addListRSReactor(fakeClient *fake.Clientset, obj runtime.Object) *fake.Clientset {
@@ -256,7 +257,7 @@ func TestGetNewRC(t *testing.T) {
 		if err != nil {
 			t.Errorf("In test case %s, got unexpected error %v", test.test, err)
 		}
-		if !api.Semantic.DeepEqual(rs, test.expected) {
+		if !apiequality.Semantic.DeepEqual(rs, test.expected) {
 			t.Errorf("In test case %s, expected %#v, got %#v", test.test, test.expected, rs)
 		}
 	}

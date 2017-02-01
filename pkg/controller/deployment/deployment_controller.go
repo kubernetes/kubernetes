@@ -27,6 +27,7 @@ import (
 	"time"
 
 	"github.com/golang/glog"
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -34,19 +35,20 @@ import (
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
+	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
+	clientv1 "k8s.io/client-go/pkg/api/v1"
 	"k8s.io/client-go/tools/cache"
+	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/util/workqueue"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
 	extensions "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
-	v1core "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/core/v1"
 	"k8s.io/kubernetes/pkg/client/legacylisters"
-	"k8s.io/kubernetes/pkg/client/record"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/deployment/util"
 	"k8s.io/kubernetes/pkg/controller/informers"
 	"k8s.io/kubernetes/pkg/util/metrics"
-	"k8s.io/kubernetes/pkg/util/workqueue"
 )
 
 const (
@@ -105,14 +107,14 @@ func NewDeploymentController(dInformer informers.DeploymentInformer, rsInformer 
 	eventBroadcaster := record.NewBroadcaster()
 	eventBroadcaster.StartLogging(glog.Infof)
 	// TODO: remove the wrapper when every clients have moved to use the clientset.
-	eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: client.Core().Events("")})
+	eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: v1core.New(client.Core().RESTClient()).Events("")})
 
 	if client != nil && client.Core().RESTClient().GetRateLimiter() != nil {
 		metrics.RegisterMetricAndTrackRateLimiterUsage("deployment_controller", client.Core().RESTClient().GetRateLimiter())
 	}
 	dc := &DeploymentController{
 		client:        client,
-		eventRecorder: eventBroadcaster.NewRecorder(v1.EventSource{Component: "deployment-controller"}),
+		eventRecorder: eventBroadcaster.NewRecorder(api.Scheme, clientv1.EventSource{Component: "deployment-controller"}),
 		queue:         workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "deployment"),
 		progressQueue: workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "progress-check"),
 	}
@@ -285,7 +287,7 @@ func (dc *DeploymentController) updateReplicaSet(old, cur interface{}) {
 	}
 	// A number of things could affect the old deployment: labels changing,
 	// pod template changing, etc.
-	if !api.Semantic.DeepEqual(oldRS, curRS) {
+	if !apiequality.Semantic.DeepEqual(oldRS, curRS) {
 		if oldD := dc.getDeploymentForReplicaSet(oldRS); oldD != nil {
 			dc.enqueueDeployment(oldD)
 		}

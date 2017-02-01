@@ -17,9 +17,9 @@ limitations under the License.
 package validation
 
 import (
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/validation/field"
-	"k8s.io/kubernetes/pkg/api"
 	authorizationapi "k8s.io/kubernetes/pkg/apis/authorization"
 )
 
@@ -52,7 +52,7 @@ func ValidateSelfSubjectAccessReviewSpec(spec authorizationapi.SelfSubjectAccess
 
 func ValidateSubjectAccessReview(sar *authorizationapi.SubjectAccessReview) field.ErrorList {
 	allErrs := ValidateSubjectAccessReviewSpec(sar.Spec, field.NewPath("spec"))
-	if !api.Semantic.DeepEqual(metav1.ObjectMeta{}, sar.ObjectMeta) {
+	if !apiequality.Semantic.DeepEqual(metav1.ObjectMeta{}, sar.ObjectMeta) {
 		allErrs = append(allErrs, field.Invalid(field.NewPath("metadata"), sar.ObjectMeta, `must be empty`))
 	}
 	return allErrs
@@ -60,7 +60,7 @@ func ValidateSubjectAccessReview(sar *authorizationapi.SubjectAccessReview) fiel
 
 func ValidateSelfSubjectAccessReview(sar *authorizationapi.SelfSubjectAccessReview) field.ErrorList {
 	allErrs := ValidateSelfSubjectAccessReviewSpec(sar.Spec, field.NewPath("spec"))
-	if !api.Semantic.DeepEqual(metav1.ObjectMeta{}, sar.ObjectMeta) {
+	if !apiequality.Semantic.DeepEqual(metav1.ObjectMeta{}, sar.ObjectMeta) {
 		allErrs = append(allErrs, field.Invalid(field.NewPath("metadata"), sar.ObjectMeta, `must be empty`))
 	}
 	return allErrs
@@ -71,7 +71,7 @@ func ValidateLocalSubjectAccessReview(sar *authorizationapi.LocalSubjectAccessRe
 
 	objectMetaShallowCopy := sar.ObjectMeta
 	objectMetaShallowCopy.Namespace = ""
-	if !api.Semantic.DeepEqual(metav1.ObjectMeta{}, objectMetaShallowCopy) {
+	if !apiequality.Semantic.DeepEqual(metav1.ObjectMeta{}, objectMetaShallowCopy) {
 		allErrs = append(allErrs, field.Invalid(field.NewPath("metadata"), sar.ObjectMeta, `must be empty except for namespace`))
 	}
 

@@ -917,6 +917,40 @@ run_kubectl_create_filter_tests() {
   kubectl delete pods selector-test-pod
 }
 
+run_kubectl_apply_deployments_tests() {
+  ## kubectl apply should propagate user defined null values
+  # Pre-Condition: no Deployments, ReplicaSets, Pods exist
+  kube::test::get_object_assert deployments "{{range.items}}{{$id_field}}:{{end}}" ''
+  kube::test::get_object_assert replicasets "{{range.items}}{{$id_field}}:{{end}}" ''
+  kube::test::get_object_assert pods "{{range.items}}{{$id_field}}:{{end}}" ''
+  # apply base deployment
+  kubectl apply -f hack/testdata/null-propagation/deployment-l1.yaml "${kube_flags[@]}"
+  # check right deployment exists
+  kube::test::get_object_assert 'deployments my-depl' "{{${id_field}}}" 'my-depl'
+  # check right labels exists
+  kube::test::get_object_assert 'deployments my-depl' "{{.spec.template.metadata.labels.l1}}" 'l1'
+  kube::test::get_object_assert 'deployments my-depl' "{{.spec.selector.matchLabels.l1}}" 'l1'
+  kube::test::get_object_assert 'deployments my-depl' "{{.metadata.labels.l1}}" 'l1'
+
+  # apply new deployment with new template labels
+  kubectl apply -f hack/testdata/null-propagation/deployment-l2.yaml "${kube_flags[@]}"
+  # check right labels exists
+  kube::test::get_object_assert 'deployments my-depl' "{{.spec.template.metadata.labels.l1}}" '<no value>'
+  kube::test::get_object_assert 'deployments my-depl' "{{.spec.selector.matchLabels.l1}}" '<no value>'
+  kube::test::get_object_assert 'deployments my-depl' "{{.metadata.labels.l1}}" '<no value>'
+  kube::test::get_object_assert 'deployments my-depl' "{{.spec.template.metadata.labels.l2}}" 'l2'
+  kube::test::get_object_assert 'deployments my-depl' "{{.spec.selector.matchLabels.l2}}" 'l2'
+  kube::test::get_object_assert 'deployments my-depl' "{{.metadata.labels.l2}}" 'l2'
+
+  # cleanup
+  # need to explicitly remove replicasets and pods because we changed the deployment selector and orphaned things
+  kubectl delete deployments,rs,pods --all --cascade=false --grace-period=0
+  # Post-Condition: no Deployments, ReplicaSets, Pods exist
+  kube::test::get_object_assert deployments "{{range.items}}{{$id_field}}:{{end}}" ''
+  kube::test::get_object_assert replicasets "{{range.items}}{{$id_field}}:{{end}}" ''
+  kube::test::get_object_assert pods "{{range.items}}{{$id_field}}:{{end}}" ''
+}
+
 # Runs tests for --save-config tests.
 run_save_config_tests() {
   ## Configuration annotations should be set when --save-config is enabled
@@ -1036,6 +1070,46 @@ run_kubectl_get_tests() {
   output_message=$(! kubectl get pods abc 2>&1 "${kube_flags[@]}" -o name)
   # Post-condition: POD abc should error since it doesn't exist
   kube::test::if_has_string "${output_message}" 'pods "abc" not found'
+
+  ### Test retrieval of pods when none exist with non-human readable output format flag specified
+  # Pre-condition: no pods exist
+  kube::test::get_object_assert pods "{{range.items}}{{$id_field}}:{{end}}" ''
+  # Command
+  output_message=$(kubectl get pods 2>&1 "${kube_flags[@]}" -o json)
+  # Post-condition: The text "No resources found" should not be part of the output
+  kube::test::if_has_not_string "${output_message}" 'No resources found'
+  # Command
+  output_message=$(kubectl get pods 2>&1 "${kube_flags[@]}" -o yaml)
+  # Post-condition: The text "No resources found" should not be part of the output
+  kube::test::if_has_not_string "${output_message}" 'No resources found'
+  # Command
+  output_message=$(kubectl get pods 2>&1 "${kube_flags[@]}" -o name)
+  # Post-condition: The text "No resources found" should not be part of the output
+  kube::test::if_has_not_string "${output_message}" 'No resources found'
+  # Command
+  output_message=$(kubectl get pods 2>&1 "${kube_flags[@]}" -o jsonpath='{.items}')
+  # Post-condition: The text "No resources found" should not be part of the output
+  kube::test::if_has_not_string "${output_message}" 'No resources found'
+  # Command
+  output_message=$(kubectl get pods 2>&1 "${kube_flags[@]}" -o go-template='{{.items}}')
+  # Post-condition: The text "No resources found" should not be part of the output
+  kube::test::if_has_not_string "${output_message}" 'No resources found'
+  # Command
+  output_message=$(kubectl get pods 2>&1 "${kube_flags[@]}" -o custom-columns=NAME:.metadata.name)
+  # Post-condition: The text "No resources found" should not be part of the output
+  kube::test::if_has_not_string "${output_message}" 'No resources found'
+
+  ### Test retrieval of pods when none exist, with human-readable output format flag specified
+  # Pre-condition: no pods exist
+  kube::test::get_object_assert pods "{{range.items}}{{$id_field}}:{{end}}" ''
+  # Command
+  output_message=$(kubectl get pods 2>&1 "${kube_flags[@]}")
+  # Post-condition: The text "No resources found" should be part of the output
+  kube::test::if_has_string "${output_message}" 'No resources found'
+  # Command
+  output_message=$(kubectl get pods 2>&1 "${kube_flags[@]}" -o wide)
+  # Post-condition: The text "No resources found" should be part of the output
+  kube::test::if_has_string "${output_message}" 'No resources found'
 
   ### Test retrieval of non-existing POD with json output flag specified
   # Pre-condition: no POD exists
@@ -2161,12 +2235,7 @@ run_deployment_tests() {
   # Deletion of both deployments should not be blocked
    kubectl delete deployment nginx2 "${kube_flags[@]}"
   # Clean up
-  # TODO: cascading deletion of deployments is failing.
-  # TODO: re-enable this once https://github.com/kubernetes/kubernetes/issues/40433 is fixed
-  #   kubectl delete deployment nginx "${kube_flags[@]}"
-  # TODO: remove these once https://github.com/kubernetes/kubernetes/issues/40433 is fixed
-    kubectl delete deployment nginx --cascade=false "${kube_flags[@]}" 
-    kubectl delete replicaset --all "${kube_flags[@]}"
+  kubectl delete deployment nginx "${kube_flags[@]}"
 
   ### Set image of a deployment
   # Pre-condition: no deployment exists
@@ -2681,6 +2750,10 @@ runTests() {
     run_kubectl_apply_tests
     run_kubectl_run_tests
     run_kubectl_create_filter_tests
+  fi
+
+  if kube::test::if_supports_resource "${deployments}" ; then
+    run_kubectl_apply_deployments_tests
   fi
 
   ###############

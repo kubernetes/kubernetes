@@ -27,19 +27,20 @@ import (
 	"testing"
 	"time"
 
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
+	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/clock"
 	utiltesting "k8s.io/client-go/util/testing"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
-	"k8s.io/kubernetes/pkg/client/record"
 	"k8s.io/kubernetes/pkg/securitycontext"
 )
 
@@ -273,7 +274,7 @@ func TestCreatePods(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
-	if !api.Semantic.DeepDerivative(&expectedPod, actualPod) {
+	if !apiequality.Semantic.DeepDerivative(&expectedPod, actualPod) {
 		t.Logf("Body: %s", fakeHandler.RequestBody)
 		t.Errorf("Unexpected mismatch.  Expected\n %#v,\n Got:\n %#v", &expectedPod, actualPod)
 	}

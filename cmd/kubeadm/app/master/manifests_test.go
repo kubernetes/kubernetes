@@ -22,10 +22,10 @@ import (
 	"os"
 	"testing"
 
+	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	api "k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/util/intstr"
 )
 
 func TestWriteStaticPodManifests(t *testing.T) {
@@ -382,6 +382,7 @@ func TestGetAPIServerCommand(t *testing.T) {
 				fmt.Sprintf("--secure-port=%d", 123),
 				"--allow-privileged",
 				"--storage-backend=etcd3",
+				"--kubelet-preferred-address-types=InternalIP,ExternalIP,Hostname",
 				"--etcd-servers=http://127.0.0.1:2379",
 			},
 		},
@@ -405,6 +406,7 @@ func TestGetAPIServerCommand(t *testing.T) {
 				fmt.Sprintf("--secure-port=%d", 123),
 				"--allow-privileged",
 				"--storage-backend=etcd3",
+				"--kubelet-preferred-address-types=InternalIP,ExternalIP,Hostname",
 				"--advertise-address=foo",
 				"--etcd-servers=http://127.0.0.1:2379",
 			},
@@ -430,37 +432,10 @@ func TestGetAPIServerCommand(t *testing.T) {
 				fmt.Sprintf("--secure-port=%d", 123),
 				"--allow-privileged",
 				"--storage-backend=etcd3",
+				"--kubelet-preferred-address-types=InternalIP,ExternalIP,Hostname",
 				"--etcd-servers=http://127.0.0.1:2379",
 				"--etcd-certfile=fiz",
 				"--etcd-keyfile=faz",
-			},
-		},
-		// Make sure --kubelet-preferred-address-types
-		{
-			cfg: &kubeadmapi.MasterConfiguration{
-				API:               kubeadm.API{Port: 123, AdvertiseAddresses: []string{"foo"}},
-				Networking:        kubeadm.Networking{ServiceSubnet: "bar"},
-				KubernetesVersion: "v1.5.3",
-			},
-			expected: []string{
-				"kube-apiserver",
-				"--insecure-bind-address=127.0.0.1",
-				"--admission-control=NamespaceLifecycle,LimitRanger,ServiceAccount,PersistentVolumeLabel,DefaultStorageClass,ResourceQuota",
-				"--service-cluster-ip-range=bar",
-				"--service-account-key-file=" + kubeadmapi.GlobalEnvParams.HostPKIPath + "/apiserver.key",
-				"--client-ca-file=" + kubeadmapi.GlobalEnvParams.HostPKIPath + "/ca.crt",
-				"--tls-cert-file=" + kubeadmapi.GlobalEnvParams.HostPKIPath + "/apiserver.crt",
-				"--tls-private-key-file=" + kubeadmapi.GlobalEnvParams.HostPKIPath + "/apiserver.key",
-				"--kubelet-client-certificate=" + kubeadmapi.GlobalEnvParams.HostPKIPath + "/apiserver-kubelet-client.crt",
-				"--kubelet-client-key=" + kubeadmapi.GlobalEnvParams.HostPKIPath + "/apiserver-kubelet-client.key",
-				"--token-auth-file=" + kubeadmapi.GlobalEnvParams.HostPKIPath + "/tokens.csv",
-				fmt.Sprintf("--secure-port=%d", 123),
-				"--allow-privileged",
-				"--storage-backend=etcd3",
-				"--advertise-address=foo",
-				"--kubelet-preferred-address-types=InternalIP,ExternalIP,Hostname",
-				"--anonymous-auth=false",
-				"--etcd-servers=http://127.0.0.1:2379",
 			},
 		},
 	}

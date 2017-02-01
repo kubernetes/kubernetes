@@ -31,7 +31,9 @@ import (
 
 	"github.com/ghodss/yaml"
 
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/meta"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/serializer/streaming"
@@ -41,7 +43,6 @@ import (
 	restclientwatch "k8s.io/client-go/rest/watch"
 	utiltesting "k8s.io/client-go/util/testing"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
 	"k8s.io/kubernetes/pkg/api/v1"
@@ -591,7 +592,7 @@ func TestMultipleResourceByTheSameName(t *testing.T) {
 	if err != nil || singleItemImplied || len(test.Infos) != 4 {
 		t.Fatalf("unexpected response: %v %t %#v", err, singleItemImplied, test.Infos)
 	}
-	if !api.Semantic.DeepDerivative([]runtime.Object{&pods.Items[0], &pods.Items[1], &svcs.Items[0], &svcs.Items[0]}, test.Objects()) {
+	if !apiequality.Semantic.DeepDerivative([]runtime.Object{&pods.Items[0], &pods.Items[1], &svcs.Items[0], &svcs.Items[0]}, test.Objects()) {
 		t.Errorf("unexpected visited objects: %#v", test.Objects())
 	}
 
@@ -734,7 +735,7 @@ func TestSelector(t *testing.T) {
 	if err != nil || singleItemImplied || len(test.Infos) != 3 {
 		t.Fatalf("unexpected response: %v %t %#v", err, singleItemImplied, test.Infos)
 	}
-	if !api.Semantic.DeepDerivative([]runtime.Object{&pods.Items[0], &pods.Items[1], &svc.Items[0]}, test.Objects()) {
+	if !apiequality.Semantic.DeepDerivative([]runtime.Object{&pods.Items[0], &pods.Items[1], &svc.Items[0]}, test.Objects()) {
 		t.Errorf("unexpected visited objects: %#v", test.Objects())
 	}
 
@@ -866,7 +867,7 @@ func TestStream(t *testing.T) {
 	if err != nil || singleItemImplied || len(test.Infos) != 3 {
 		t.Fatalf("unexpected response: %v %t %#v", err, singleItemImplied, test.Infos)
 	}
-	if !api.Semantic.DeepDerivative([]runtime.Object{&pods.Items[0], &pods.Items[1], &rc.Items[0]}, test.Objects()) {
+	if !apiequality.Semantic.DeepDerivative([]runtime.Object{&pods.Items[0], &pods.Items[1], &rc.Items[0]}, test.Objects()) {
 		t.Errorf("unexpected visited objects: %#v", test.Objects())
 	}
 }
@@ -883,7 +884,7 @@ func TestYAMLStream(t *testing.T) {
 	if err != nil || singleItemImplied || len(test.Infos) != 3 {
 		t.Fatalf("unexpected response: %v %t %#v", err, singleItemImplied, test.Infos)
 	}
-	if !api.Semantic.DeepDerivative([]runtime.Object{&pods.Items[0], &pods.Items[1], &rc.Items[0]}, test.Objects()) {
+	if !apiequality.Semantic.DeepDerivative([]runtime.Object{&pods.Items[0], &pods.Items[1], &rc.Items[0]}, test.Objects()) {
 		t.Errorf("unexpected visited objects: %#v", test.Objects())
 	}
 }
@@ -905,7 +906,7 @@ func TestMultipleObject(t *testing.T) {
 			&svc.Items[0],
 		},
 	}
-	if !api.Semantic.DeepDerivative(expected, obj) {
+	if !apiequality.Semantic.DeepDerivative(expected, obj) {
 		t.Errorf("unexpected visited objects: %#v", obj)
 	}
 }
@@ -1136,7 +1137,7 @@ func TestLatest(t *testing.T) {
 	if err != nil || singleItemImplied || len(test.Infos) != 3 {
 		t.Fatalf("unexpected response: %v %t %#v", err, singleItemImplied, test.Infos)
 	}
-	if !api.Semantic.DeepDerivative([]runtime.Object{newPod, newPod2, newSvc}, test.Objects()) {
+	if !apiequality.Semantic.DeepDerivative([]runtime.Object{newPod, newPod2, newSvc}, test.Objects()) {
 		t.Errorf("unexpected visited objects: %#v", test.Objects())
 	}
 }

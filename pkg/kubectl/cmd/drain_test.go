@@ -745,7 +745,7 @@ func (m *MyReq) isFor(method string, path string) bool {
 }
 
 func refJson(t *testing.T, o runtime.Object) string {
-	ref, err := api.GetReference(o)
+	ref, err := api.GetReference(api.Scheme, o)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

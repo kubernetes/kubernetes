@@ -104,7 +104,7 @@ func Run(s *options.ServerRunOptions) error {
 		// When size of cache is not explicitly set, set it to 50000
 		s.Etcd.StorageConfig.DeserializationCacheSize = 50000
 	}
-	storageGroupsToEncodingVersion, err := s.GenericServerRunOptions.StorageGroupsToEncodingVersion()
+	storageGroupsToEncodingVersion, err := s.StorageSerialization.StorageGroupsToEncodingVersion()
 	if err != nil {
 		return fmt.Errorf("error generating storage version map: %s", err)
 	}
@@ -175,7 +175,7 @@ func Run(s *options.ServerRunOptions) error {
 	genericConfig.Authenticator = apiAuthenticator
 	genericConfig.Authorizer = apiAuthorizer
 	genericConfig.AdmissionControl = admissionController
-	genericConfig.OpenAPIConfig = genericapiserver.DefaultOpenAPIConfig(openapi.OpenAPIDefinitions)
+	genericConfig.OpenAPIConfig = genericapiserver.DefaultOpenAPIConfig(openapi.GetOpenAPIDefinitions)
 	genericConfig.OpenAPIConfig.SecurityDefinitions = securityDefinitions
 	genericConfig.SwaggerConfig = genericapiserver.DefaultSwaggerConfig()
 	genericConfig.LongRunningFunc = filters.BasicLongRunningRequestCheck(

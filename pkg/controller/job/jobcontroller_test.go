@@ -21,6 +21,7 @@ import (
 	"testing"
 	"time"
 
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -656,7 +657,7 @@ func TestWatchJobs(t *testing.T) {
 			t.Errorf("Expected to find job under key %v: %v", key, err)
 			return nil
 		}
-		if !api.Semantic.DeepDerivative(*job, testJob) {
+		if !apiequality.Semantic.DeepDerivative(*job, testJob) {
 			t.Errorf("Expected %#v, but got %#v", testJob, *job)
 		}
 		return nil
@@ -699,7 +700,7 @@ func TestWatchPods(t *testing.T) {
 		if err != nil {
 			t.Errorf("Expected to find job under key %v: %v", key, err)
 		}
-		if !api.Semantic.DeepDerivative(job, testJob) {
+		if !apiequality.Semantic.DeepDerivative(job, testJob) {
 			t.Errorf("\nExpected %#v,\nbut got %#v", testJob, job)
 			close(received)
 			return nil

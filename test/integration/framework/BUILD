@@ -17,7 +17,6 @@ go_library(
     tags = ["automanaged"],
     deps = [
         "//pkg/api:go_default_library",
-        "//pkg/api/resource:go_default_library",
         "//pkg/api/testapi:go_default_library",
         "//pkg/api/v1:go_default_library",
         "//pkg/apis/apps/v1beta1:go_default_library",
@@ -31,7 +30,6 @@ go_library(
         "//pkg/client/clientset_generated/clientset:go_default_library",
         "//pkg/client/clientset_generated/clientset/typed/core/v1:go_default_library",
         "//pkg/client/clientset_generated/internalclientset:go_default_library",
-        "//pkg/client/record:go_default_library",
         "//pkg/controller:go_default_library",
         "//pkg/controller/replication:go_default_library",
         "//pkg/generated/openapi:go_default_library",
@@ -47,6 +45,7 @@ go_library(
         "//vendor:github.com/go-openapi/spec",
         "//vendor:github.com/golang/glog",
         "//vendor:github.com/pborman/uuid",
+        "//vendor:k8s.io/apimachinery/pkg/api/resource",
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
         "//vendor:k8s.io/apimachinery/pkg/runtime",
         "//vendor:k8s.io/apimachinery/pkg/runtime/schema",
@@ -62,6 +61,7 @@ go_library(
         "//vendor:k8s.io/apiserver/pkg/authorization/union",
         "//vendor:k8s.io/apiserver/pkg/storage/storagebackend",
         "//vendor:k8s.io/client-go/rest",
+        "//vendor:k8s.io/client-go/tools/record",
     ],
 )
 

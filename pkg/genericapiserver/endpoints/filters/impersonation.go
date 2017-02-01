@@ -29,8 +29,8 @@ import (
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/server/httplog"
-	"k8s.io/kubernetes/pkg/api"
-	authenticationapi "k8s.io/kubernetes/pkg/apis/authentication"
+	"k8s.io/client-go/pkg/api"
+	authenticationapi "k8s.io/client-go/pkg/apis/authentication"
 	"k8s.io/kubernetes/pkg/genericapiserver/endpoints/handlers/responsewriters"
 )
 

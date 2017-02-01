@@ -16,7 +16,6 @@ go_library(
     ],
     tags = ["automanaged"],
     deps = [
-        "//pkg/storage:go_default_library",
         "//vendor:github.com/ugorji/go/codec",
         "//vendor:golang.org/x/net/context",
         "//vendor:k8s.io/apimachinery/pkg/api/meta",
@@ -24,6 +23,7 @@ go_library(
         "//vendor:k8s.io/apimachinery/pkg/runtime",
         "//vendor:k8s.io/apimachinery/pkg/runtime/schema",
         "//vendor:k8s.io/apimachinery/pkg/types",
+        "//vendor:k8s.io/apiserver/pkg/storage",
     ],
 )
 

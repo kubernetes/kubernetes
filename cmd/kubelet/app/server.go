@@ -44,10 +44,13 @@ import (
 	"k8s.io/apiserver/pkg/server/healthz"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	clientgoclientset "k8s.io/client-go/kubernetes"
+	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
+	clientv1 "k8s.io/client-go/pkg/api/v1"
 	restclient "k8s.io/client-go/rest"
 	clientauth "k8s.io/client-go/tools/auth"
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
+	"k8s.io/client-go/tools/record"
 	certutil "k8s.io/client-go/util/cert"
 	"k8s.io/kubernetes/cmd/kubelet/app/options"
 	"k8s.io/kubernetes/pkg/api"
@@ -57,8 +60,6 @@ import (
 	"k8s.io/kubernetes/pkg/capabilities"
 	"k8s.io/kubernetes/pkg/client/chaosclient"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
-	v1core "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/core/v1"
-	"k8s.io/kubernetes/pkg/client/record"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/credentialprovider"
 	"k8s.io/kubernetes/pkg/features"
@@ -182,7 +183,7 @@ func getRemoteKubeletConfig(s *options.KubeletServer, kubeDeps *kubelet.KubeletD
 		if kubeDeps != nil && kubeDeps.Cloud != nil {
 			instances, ok := kubeDeps.Cloud.Instances()
 			if !ok {
-				err = fmt.Errorf("failed to get instances from cloud provider, can't determine nodename.")
+				err = fmt.Errorf("failed to get instances from cloud provider, can't determine nodename")
 				return nil, err
 			}
 			nodename, err = instances.CurrentNodeName(hostname)
@@ -362,7 +363,8 @@ func run(s *options.KubeletServer, kubeDeps *kubelet.KubeletDeps) (err error) {
 	}
 
 	if kubeDeps == nil {
-		var kubeClient, eventClient *clientset.Clientset
+		var kubeClient *clientset.Clientset
+		var eventClient v1core.EventsGetter
 		var externalKubeClient clientgoclientset.Interface
 		var cloud cloudprovider.Interface
 
@@ -398,7 +400,7 @@ func run(s *options.KubeletServer, kubeDeps *kubelet.KubeletDeps) (err error) {
 			eventClientConfig := *clientConfig
 			eventClientConfig.QPS = float32(s.EventRecordQPS)
 			eventClientConfig.Burst = int(s.EventBurst)
-			eventClient, err = clientset.NewForConfig(&eventClientConfig)
+			eventClient, err = clientgoclientset.NewForConfig(&eventClientConfig)
 			if err != nil {
 				glog.Warningf("Failed to create API Server client: %v", err)
 			}
@@ -698,7 +700,7 @@ func RunKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *kubelet
 	}
 
 	eventBroadcaster := record.NewBroadcaster()
-	kubeDeps.Recorder = eventBroadcaster.NewRecorder(v1.EventSource{Component: "kubelet", Host: string(nodeName)})
+	kubeDeps.Recorder = eventBroadcaster.NewRecorder(api.Scheme, clientv1.EventSource{Component: "kubelet", Host: string(nodeName)})
 	eventBroadcaster.StartLogging(glog.V(3).Infof)
 	if kubeDeps.EventClient != nil {
 		glog.V(4).Infof("Sending events to api server.")
@@ -752,7 +754,7 @@ func RunKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *kubelet
 	// NewMainKubelet should have set up a pod source config if one didn't exist
 	// when the builder was run. This is just a precaution.
 	if kubeDeps.PodConfig == nil {
-		return fmt.Errorf("failed to create kubelet, pod source config was nil!")
+		return fmt.Errorf("failed to create kubelet, pod source config was nil")
 	}
 	podCfg := kubeDeps.PodConfig
 

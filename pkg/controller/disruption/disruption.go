@@ -24,23 +24,24 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
+	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
+	clientv1 "k8s.io/client-go/pkg/api/v1"
 	"k8s.io/client-go/tools/cache"
+	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/util/workqueue"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
 	apps "k8s.io/kubernetes/pkg/apis/apps/v1beta1"
 	extensions "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	policy "k8s.io/kubernetes/pkg/apis/policy/v1beta1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
-	v1core "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/core/v1"
 	policyclientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/policy/v1beta1"
 	"k8s.io/kubernetes/pkg/client/legacylisters"
-	"k8s.io/kubernetes/pkg/client/record"
 	"k8s.io/kubernetes/pkg/controller"
-	"k8s.io/kubernetes/pkg/util/intstr"
-	"k8s.io/kubernetes/pkg/util/workqueue"
 
 	"github.com/golang/glog"
 )
@@ -115,7 +116,7 @@ func NewDisruptionController(podInformer cache.SharedIndexInformer, kubeClient c
 		recheckQueue:  workqueue.NewNamedDelayingQueue("disruption-recheck"),
 		broadcaster:   record.NewBroadcaster(),
 	}
-	dc.recorder = dc.broadcaster.NewRecorder(v1.EventSource{Component: "controllermanager"})
+	dc.recorder = dc.broadcaster.NewRecorder(api.Scheme, clientv1.EventSource{Component: "controllermanager"})
 
 	dc.getUpdater = func() updater { return dc.writePdbStatus }
 
@@ -319,7 +320,7 @@ func (dc *DisruptionController) Run(stopCh <-chan struct{}) {
 	glog.V(0).Infof("Starting disruption controller")
 	if dc.kubeClient != nil {
 		glog.V(0).Infof("Sending events to api server.")
-		dc.broadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: dc.kubeClient.Core().Events("")})
+		dc.broadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: v1core.New(dc.kubeClient.Core().RESTClient()).Events("")})
 	} else {
 		glog.V(0).Infof("No api server defined - no events will be sent to API server.")
 	}

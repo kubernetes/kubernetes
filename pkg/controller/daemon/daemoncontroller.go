@@ -28,19 +28,20 @@ import (
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
+	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
+	clientv1 "k8s.io/client-go/pkg/api/v1"
 	"k8s.io/client-go/tools/cache"
+	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/util/workqueue"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
 	extensions "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
-	v1core "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/core/v1"
 	unversionedextensions "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/extensions/v1beta1"
 	"k8s.io/kubernetes/pkg/client/legacylisters"
-	"k8s.io/kubernetes/pkg/client/record"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/informers"
 	"k8s.io/kubernetes/pkg/util/metrics"
-	"k8s.io/kubernetes/pkg/util/workqueue"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm/predicates"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/schedulercache"
 
@@ -51,9 +52,8 @@ const (
 	// Daemon sets will periodically check that their daemon pods are running as expected.
 	FullDaemonSetResyncPeriod = 30 * time.Second // TODO: Figure out if this time seems reasonable.
 
-	// Realistic value of the burstReplica field for the replication manager based off
-	// performance requirements for kubernetes 1.0.
-	BurstReplicas = 500
+	// The value of 250 is chosen b/c values that are too high can cause registry DoS issues
+	BurstReplicas = 250
 
 	// If sending a status upate to API server fails, we retry a finite number of times.
 	StatusUpdateRetries = 1
@@ -100,17 +100,17 @@ func NewDaemonSetsController(daemonSetInformer informers.DaemonSetInformer, podI
 	eventBroadcaster := record.NewBroadcaster()
 	eventBroadcaster.StartLogging(glog.Infof)
 	// TODO: remove the wrapper when every clients have moved to use the clientset.
-	eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: kubeClient.Core().Events("")})
+	eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: v1core.New(kubeClient.Core().RESTClient()).Events("")})
 
 	if kubeClient != nil && kubeClient.Core().RESTClient().GetRateLimiter() != nil {
 		metrics.RegisterMetricAndTrackRateLimiterUsage("daemon_controller", kubeClient.Core().RESTClient().GetRateLimiter())
 	}
 	dsc := &DaemonSetsController{
 		kubeClient:    kubeClient,
-		eventRecorder: eventBroadcaster.NewRecorder(v1.EventSource{Component: "daemonset-controller"}),
+		eventRecorder: eventBroadcaster.NewRecorder(api.Scheme, clientv1.EventSource{Component: "daemonset-controller"}),
 		podControl: controller.RealPodControl{
 			KubeClient: kubeClient,
-			Recorder:   eventBroadcaster.NewRecorder(v1.EventSource{Component: "daemon-set"}),
+			Recorder:   eventBroadcaster.NewRecorder(api.Scheme, clientv1.EventSource{Component: "daemon-set"}),
 		},
 		burstReplicas: BurstReplicas,
 		expectations:  controller.NewControllerExpectations(),

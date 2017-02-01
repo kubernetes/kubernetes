@@ -23,7 +23,9 @@ import (
 	"sync"
 	"time"
 
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
@@ -32,8 +34,8 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/client-go/util/workqueue"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/v1"
 	batchinternal "k8s.io/kubernetes/pkg/apis/batch"
 	batch "k8s.io/kubernetes/pkg/apis/batch/v1"
@@ -41,7 +43,6 @@ import (
 	extensions "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
-	"k8s.io/kubernetes/pkg/util/workqueue"
 
 	"github.com/golang/glog"
 )
@@ -845,7 +846,7 @@ func DoCleanupNode(client clientset.Interface, nodeName string, strategy Prepare
 			return fmt.Errorf("Skipping cleanup of Node: failed to get Node %v: %v", nodeName, err)
 		}
 		updatedNode := strategy.CleanupNode(node)
-		if api.Semantic.DeepEqual(node, updatedNode) {
+		if apiequality.Semantic.DeepEqual(node, updatedNode) {
 			return nil
 		}
 		if _, err = client.Core().Nodes().Update(updatedNode); err == nil {

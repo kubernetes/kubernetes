@@ -13,12 +13,10 @@ go_library(
     srcs = [
         "doc.go",
         "template.go",
-        "trace.go",
         "umask.go",
         "util.go",
     ],
     tags = ["automanaged"],
-    deps = ["//vendor:github.com/golang/glog"],
 )
 
 go_test(
@@ -62,7 +60,6 @@ filegroup(
         "//pkg/util/framer:all-srcs",
         "//pkg/util/goroutinemap:all-srcs",
         "//pkg/util/hash:all-srcs",
-        "//pkg/util/httpstream:all-srcs",
         "//pkg/util/i18n:all-srcs",
         "//pkg/util/initsystem:all-srcs",
         "//pkg/util/interrupt:all-srcs",
@@ -101,7 +98,7 @@ filegroup(
         "//pkg/util/validation:all-srcs",
         "//pkg/util/version:all-srcs",
         "//pkg/util/wait:all-srcs",
-        "//pkg/util/workqueue:all-srcs",
+        "//pkg/util/workqueue/prometheus:all-srcs",
         "//pkg/util/yaml:all-srcs",
     ],
     tags = ["automanaged"],

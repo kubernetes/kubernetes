@@ -33,7 +33,7 @@ import (
 var _ = framework.KubeDescribe("[Feature:Federation]", func() {
 	f := fedframework.NewDefaultFederatedFramework("federation-apiserver-authn")
 
-	var _ = Describe("Federation API server authentication", func() {
+	var _ = Describe("Federation API server authentication [NoCluster]", func() {
 		BeforeEach(func() {
 			fedframework.SkipUnlessFederated(f.ClientSet)
 		})

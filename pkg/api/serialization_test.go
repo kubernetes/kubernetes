@@ -32,7 +32,9 @@ import (
 	flag "github.com/spf13/pflag"
 	"github.com/ugorji/go/codec"
 
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/meta"
+	apitesting "k8s.io/apimachinery/pkg/api/testing"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/conversion"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -43,7 +45,7 @@ import (
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
-	apitesting "k8s.io/kubernetes/pkg/api/testing"
+	kapitesting "k8s.io/kubernetes/pkg/api/testing"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
@@ -63,7 +65,7 @@ var codecsToTest = []func(version schema.GroupVersion, item runtime.Object) (run
 // fuzzInternalObject fuzzes an arbitrary runtime object using the appropriate
 // fuzzer registered with the apitesting package.
 func fuzzInternalObject(t *testing.T, forVersion schema.GroupVersion, item runtime.Object, seed int64) runtime.Object {
-	apitesting.FuzzerFor(t, forVersion, rand.NewSource(seed)).Fuzz(item)
+	apitesting.FuzzerFor(kapitesting.FuzzerFuncs(t), rand.NewSource(seed)).Fuzz(item)
 
 	j, err := meta.TypeAccessor(item)
 	if err != nil {
@@ -320,7 +322,7 @@ func roundTrip(t *testing.T, codec runtime.Codec, item runtime.Object) {
 
 	// ensure that the deep copy is equal to the original; neither the deep
 	// copy or conversion should alter the object
-	if !api.Semantic.DeepEqual(original, item) {
+	if !apiequality.Semantic.DeepEqual(original, item) {
 		t.Errorf("0: %v: encode altered the object, diff: %v", name, diff.ObjectReflectDiff(original, item))
 		return
 	}
@@ -334,7 +336,7 @@ func roundTrip(t *testing.T, codec runtime.Codec, item runtime.Object) {
 
 	// ensure that the object produced from decoding the encoded data is equal
 	// to the original object
-	if !api.Semantic.DeepEqual(original, obj2) {
+	if !apiequality.Semantic.DeepEqual(original, obj2) {
 		t.Errorf("\n1: %v: diff: %v\nCodec: %#v\nSource:\n\n%#v\n\nEncoded:\n\n%s\n\nFinal:\n\n%#v", name, diff.ObjectReflectDiff(item, obj2), codec, printer.Sprintf("%#v", item), dataAsString(data), printer.Sprintf("%#v", obj2))
 		return
 	}
@@ -349,7 +351,7 @@ func roundTrip(t *testing.T, codec runtime.Codec, item runtime.Object) {
 
 	// ensure that the new runtime object is equal to the original after being
 	// decoded into
-	if !api.Semantic.DeepEqual(item, obj3) {
+	if !apiequality.Semantic.DeepEqual(item, obj3) {
 		t.Errorf("3: %v: diff: %v\nCodec: %#v", name, diff.ObjectReflectDiff(item, obj3), codec)
 		return
 	}
@@ -382,7 +384,7 @@ func TestEncodePtr(t *testing.T) {
 	if _, ok := obj2.(*api.Pod); !ok {
 		t.Fatalf("Got wrong type")
 	}
-	if !api.Semantic.DeepEqual(obj2, pod) {
+	if !apiequality.Semantic.DeepEqual(obj2, pod) {
 		t.Errorf("\nExpected:\n\n %#v,\n\nGot:\n\n %#vDiff: %v\n\n", pod, obj2, diff.ObjectDiff(obj2, pod))
 	}
 }
@@ -440,7 +442,7 @@ func TestUnversionedTypes(t *testing.T) {
 // TestObjectWatchFraming establishes that a watch event can be encoded and
 // decoded correctly through each of the supported RFC2046 media types.
 func TestObjectWatchFraming(t *testing.T) {
-	f := apitesting.FuzzerFor(nil, api.SchemeGroupVersion, rand.NewSource(benchmarkSeed))
+	f := apitesting.FuzzerFor(kapitesting.FuzzerFuncs(t), rand.NewSource(benchmarkSeed))
 	secret := &api.Secret{}
 	f.Fuzz(secret)
 	secret.Data["binary"] = []byte{0x00, 0x10, 0x30, 0x55, 0xff, 0x00}
@@ -479,7 +481,7 @@ func TestObjectWatchFraming(t *testing.T) {
 		}
 		resultSecret.Kind = "Secret"
 		resultSecret.APIVersion = "v1"
-		if !api.Semantic.DeepEqual(v1secret, res) {
+		if !apiequality.Semantic.DeepEqual(v1secret, res) {
 			t.Fatalf("objects did not match: %s", diff.ObjectGoPrintDiff(v1secret, res))
 		}
 
@@ -513,7 +515,7 @@ func TestObjectWatchFraming(t *testing.T) {
 			}
 		}
 
-		if !api.Semantic.DeepEqual(secret, outEvent.Object.Object) {
+		if !apiequality.Semantic.DeepEqual(secret, outEvent.Object.Object) {
 			t.Fatalf("%s: did not match after frame decoding: %s", info.MediaType, diff.ObjectGoPrintDiff(secret, outEvent.Object.Object))
 		}
 	}
@@ -521,8 +523,8 @@ func TestObjectWatchFraming(t *testing.T) {
 
 const benchmarkSeed = 100
 
-func benchmarkItems() []v1.Pod {
-	apiObjectFuzzer := apitesting.FuzzerFor(nil, api.SchemeGroupVersion, rand.NewSource(benchmarkSeed))
+func benchmarkItems(b *testing.B) []v1.Pod {
+	apiObjectFuzzer := apitesting.FuzzerFor(kapitesting.FuzzerFuncs(b), rand.NewSource(benchmarkSeed))
 	items := make([]v1.Pod, 10)
 	for i := range items {
 		var pod api.Pod
@@ -540,7 +542,7 @@ func benchmarkItems() []v1.Pod {
 // BenchmarkEncodeCodec measures the cost of performing a codec encode, which includes
 // reflection (to clear APIVersion and Kind)
 func BenchmarkEncodeCodec(b *testing.B) {
-	items := benchmarkItems()
+	items := benchmarkItems(b)
 	width := len(items)
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
@@ -554,7 +556,7 @@ func BenchmarkEncodeCodec(b *testing.B) {
 // BenchmarkEncodeCodecFromInternal measures the cost of performing a codec encode,
 // including conversions.
 func BenchmarkEncodeCodecFromInternal(b *testing.B) {
-	items := benchmarkItems()
+	items := benchmarkItems(b)
 	width := len(items)
 	encodable := make([]api.Pod, width)
 	for i := range items {
@@ -573,7 +575,7 @@ func BenchmarkEncodeCodecFromInternal(b *testing.B) {
 
 // BenchmarkEncodeJSONMarshal provides a baseline for regular JSON encode performance
 func BenchmarkEncodeJSONMarshal(b *testing.B) {
-	items := benchmarkItems()
+	items := benchmarkItems(b)
 	width := len(items)
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
@@ -586,7 +588,7 @@ func BenchmarkEncodeJSONMarshal(b *testing.B) {
 
 func BenchmarkDecodeCodec(b *testing.B) {
 	codec := testapi.Default.Codec()
-	items := benchmarkItems()
+	items := benchmarkItems(b)
 	width := len(items)
 	encoded := make([][]byte, width)
 	for i := range items {
@@ -608,7 +610,7 @@ func BenchmarkDecodeCodec(b *testing.B) {
 
 func BenchmarkDecodeIntoExternalCodec(b *testing.B) {
 	codec := testapi.Default.Codec()
-	items := benchmarkItems()
+	items := benchmarkItems(b)
 	width := len(items)
 	encoded := make([][]byte, width)
 	for i := range items {
@@ -631,7 +633,7 @@ func BenchmarkDecodeIntoExternalCodec(b *testing.B) {
 
 func BenchmarkDecodeIntoInternalCodec(b *testing.B) {
 	codec := testapi.Default.Codec()
-	items := benchmarkItems()
+	items := benchmarkItems(b)
 	width := len(items)
 	encoded := make([][]byte, width)
 	for i := range items {
@@ -655,7 +657,7 @@ func BenchmarkDecodeIntoInternalCodec(b *testing.B) {
 // BenchmarkDecodeJSON provides a baseline for regular JSON decode performance
 func BenchmarkDecodeIntoJSON(b *testing.B) {
 	codec := testapi.Default.Codec()
-	items := benchmarkItems()
+	items := benchmarkItems(b)
 	width := len(items)
 	encoded := make([][]byte, width)
 	for i := range items {
@@ -679,7 +681,7 @@ func BenchmarkDecodeIntoJSON(b *testing.B) {
 // BenchmarkDecodeJSON provides a baseline for codecgen JSON decode performance
 func BenchmarkDecodeIntoJSONCodecGen(b *testing.B) {
 	kcodec := testapi.Default.Codec()
-	items := benchmarkItems()
+	items := benchmarkItems(b)
 	width := len(items)
 	encoded := make([][]byte, width)
 	for i := range items {

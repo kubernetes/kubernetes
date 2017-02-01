@@ -31,8 +31,10 @@ go_test(
         "//plugin/pkg/admission/deny:go_default_library",
         "//vendor:github.com/emicklei/go-restful",
         "//vendor:golang.org/x/net/websocket",
+        "//vendor:k8s.io/apimachinery/pkg/api/equality",
         "//vendor:k8s.io/apimachinery/pkg/api/errors",
         "//vendor:k8s.io/apimachinery/pkg/api/meta",
+        "//vendor:k8s.io/apimachinery/pkg/api/testing",
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/internalversion",
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
         "//vendor:k8s.io/apimachinery/pkg/fields",
@@ -61,7 +63,6 @@ go_library(
     ],
     tags = ["automanaged"],
     deps = [
-        "//pkg/apis/extensions:go_default_library",
         "//pkg/genericapiserver/endpoints/handlers:go_default_library",
         "//pkg/genericapiserver/endpoints/handlers/responsewriters:go_default_library",
         "//pkg/genericapiserver/registry/rest:go_default_library",

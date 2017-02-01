@@ -27,7 +27,9 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/watch"
+	clientv1 "k8s.io/client-go/pkg/api/v1"
 	"k8s.io/client-go/tools/cache"
+	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/flowcontrol"
 	federationapi "k8s.io/kubernetes/federation/apis/federation/v1beta1"
 	federationclientset "k8s.io/kubernetes/federation/client/clientset_generated/federation_clientset"
@@ -38,7 +40,6 @@ import (
 	"k8s.io/kubernetes/pkg/api/v1"
 	extensionsv1beta1 "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	kubeclientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
-	"k8s.io/kubernetes/pkg/client/record"
 	"k8s.io/kubernetes/pkg/controller"
 
 	"github.com/golang/glog"
@@ -119,7 +120,7 @@ func NewIngressController(client federationclientset.Interface) *IngressControll
 	glog.V(4).Infof("->NewIngressController V(4)")
 	broadcaster := record.NewBroadcaster()
 	broadcaster.StartRecordingToSink(eventsink.NewFederatedEventSink(client))
-	recorder := broadcaster.NewRecorder(v1.EventSource{Component: "federated-ingress-controller"})
+	recorder := broadcaster.NewRecorder(api.Scheme, clientv1.EventSource{Component: "federated-ingress-controller"})
 	ic := &IngressController{
 		federatedApiClient:    client,
 		ingressReviewDelay:    time.Second * 10,

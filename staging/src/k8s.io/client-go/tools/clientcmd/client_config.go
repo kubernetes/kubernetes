@@ -386,15 +386,15 @@ func (config *DirectClientConfig) getContext() (clientcmdapi.Context, error) {
 	contexts := config.config.Contexts
 	contextName, required := config.getContextName()
 
-	var mergedContext clientcmdapi.Context
+	mergedContext := clientcmdapi.NewContext()
 	if configContext, exists := contexts[contextName]; exists {
-		mergo.Merge(&mergedContext, configContext)
+		mergo.Merge(mergedContext, configContext)
 	} else if required {
 		return clientcmdapi.Context{}, fmt.Errorf("context %q does not exist", contextName)
 	}
-	mergo.Merge(&mergedContext, config.overrides.Context)
+	mergo.Merge(mergedContext, config.overrides.Context)
 
-	return mergedContext, nil
+	return *mergedContext, nil
 }
 
 // getAuthInfo returns the clientcmdapi.AuthInfo, or an error if a required auth info is not found.
@@ -402,15 +402,15 @@ func (config *DirectClientConfig) getAuthInfo() (clientcmdapi.AuthInfo, error) {
 	authInfos := config.config.AuthInfos
 	authInfoName, required := config.getAuthInfoName()
 
-	var mergedAuthInfo clientcmdapi.AuthInfo
+	mergedAuthInfo := clientcmdapi.NewAuthInfo()
 	if configAuthInfo, exists := authInfos[authInfoName]; exists {
-		mergo.Merge(&mergedAuthInfo, configAuthInfo)
+		mergo.Merge(mergedAuthInfo, configAuthInfo)
 	} else if required {
 		return clientcmdapi.AuthInfo{}, fmt.Errorf("auth info %q does not exist", authInfoName)
 	}
-	mergo.Merge(&mergedAuthInfo, config.overrides.AuthInfo)
+	mergo.Merge(mergedAuthInfo, config.overrides.AuthInfo)
 
-	return mergedAuthInfo, nil
+	return *mergedAuthInfo, nil
 }
 
 // getCluster returns the clientcmdapi.Cluster, or an error if a required cluster is not found.
@@ -418,14 +418,14 @@ func (config *DirectClientConfig) getCluster() (clientcmdapi.Cluster, error) {
 	clusterInfos := config.config.Clusters
 	clusterInfoName, required := config.getClusterName()
 
-	var mergedClusterInfo clientcmdapi.Cluster
-	mergo.Merge(&mergedClusterInfo, config.overrides.ClusterDefaults)
+	mergedClusterInfo := clientcmdapi.NewCluster()
+	mergo.Merge(mergedClusterInfo, config.overrides.ClusterDefaults)
 	if configClusterInfo, exists := clusterInfos[clusterInfoName]; exists {
-		mergo.Merge(&mergedClusterInfo, configClusterInfo)
+		mergo.Merge(mergedClusterInfo, configClusterInfo)
 	} else if required {
 		return clientcmdapi.Cluster{}, fmt.Errorf("cluster %q does not exist", clusterInfoName)
 	}
-	mergo.Merge(&mergedClusterInfo, config.overrides.ClusterInfo)
+	mergo.Merge(mergedClusterInfo, config.overrides.ClusterInfo)
 	// An override of --insecure-skip-tls-verify=true and no accompanying CA/CA data should clear already-set CA/CA data
 	// otherwise, a kubeconfig containing a CA reference would return an error that "CA and insecure-skip-tls-verify couldn't both be set"
 	caLen := len(config.overrides.ClusterInfo.CertificateAuthority)
@@ -435,7 +435,7 @@ func (config *DirectClientConfig) getCluster() (clientcmdapi.Cluster, error) {
 		mergedClusterInfo.CertificateAuthorityData = nil
 	}
 
-	return mergedClusterInfo, nil
+	return *mergedClusterInfo, nil
 }
 
 // inClusterClientConfig makes a config that will work from within a kubernetes cluster container environment.

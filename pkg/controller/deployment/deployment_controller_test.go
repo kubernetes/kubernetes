@@ -24,17 +24,17 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	core "k8s.io/client-go/testing"
+	"k8s.io/client-go/tools/record"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
 	extensions "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset/fake"
-	"k8s.io/kubernetes/pkg/client/record"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/deployment/util"
 	"k8s.io/kubernetes/pkg/controller/informers"
-	"k8s.io/kubernetes/pkg/util/intstr"
 )
 
 var (
@@ -497,16 +497,13 @@ func TestPodDeletionEnqueuesRecreateDeployment(t *testing.T) {
 	f.rsLister = append(f.rsLister, rs)
 	f.objects = append(f.objects, foo, rs)
 
-	c, informers := f.newController()
+	c, _ := f.newController()
 	enqueued := false
 	c.enqueueDeployment = func(d *extensions.Deployment) {
 		if d.Name == "foo" {
 			enqueued = true
 		}
 	}
-	stopCh := make(chan struct{})
-	defer close(stopCh)
-	informers.Start(stopCh)
 
 	c.deletePod(pod)
 
@@ -532,16 +529,13 @@ func TestPodDeletionDoesntEnqueueRecreateDeployment(t *testing.T) {
 	// return a non-empty list.
 	f.podLister = append(f.podLister, pod)
 
-	c, informers := f.newController()
+	c, _ := f.newController()
 	enqueued := false
 	c.enqueueDeployment = func(d *extensions.Deployment) {
 		if d.Name == "foo" {
 			enqueued = true
 		}
 	}
-	stopCh := make(chan struct{})
-	defer close(stopCh)
-	informers.Start(stopCh)
 
 	c.deletePod(pod)
 

@@ -22,6 +22,7 @@ import (
 	"testing"
 	"time"
 
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/serializer/streaming"
@@ -68,7 +69,7 @@ func TestDecoder(t *testing.T) {
 			if e, a := eventType, action; e != a {
 				t.Errorf("Expected %v, got %v", e, a)
 			}
-			if e, a := expect, got; !api.Semantic.DeepDerivative(e, a) {
+			if e, a := expect, got; !apiequality.Semantic.DeepDerivative(e, a) {
 				t.Errorf("Expected %v, got %v", e, a)
 			}
 			t.Logf("Exited read")

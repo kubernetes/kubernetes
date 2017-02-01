@@ -34,8 +34,12 @@ import (
 	"testing"
 	"time"
 
+	"github.com/emicklei/go-restful"
+
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
+	apitesting "k8s.io/apimachinery/pkg/api/testing"
 	metainternalversion "k8s.io/apimachinery/pkg/apis/meta/internalversion"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
@@ -48,7 +52,7 @@ import (
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/kubernetes/pkg/api"
-	apitesting "k8s.io/kubernetes/pkg/api/testing"
+	kapitesting "k8s.io/kubernetes/pkg/api/testing"
 	"k8s.io/kubernetes/pkg/api/v1"
 	genericapifilters "k8s.io/kubernetes/pkg/genericapiserver/endpoints/filters"
 	"k8s.io/kubernetes/pkg/genericapiserver/endpoints/handlers/responsewriters"
@@ -56,8 +60,6 @@ import (
 	"k8s.io/kubernetes/pkg/genericapiserver/registry/rest"
 	"k8s.io/kubernetes/plugin/pkg/admission/admit"
 	"k8s.io/kubernetes/plugin/pkg/admission/deny"
-
-	"github.com/emicklei/go-restful"
 )
 
 // This creates fake API versions, similar to api/latest.go.
@@ -1738,7 +1740,7 @@ func TestConnectResponderObject(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !api.Semantic.DeepEqual(obj, simple) {
+	if !apiequality.Semantic.DeepEqual(obj, simple) {
 		t.Errorf("Unexpected response: %#v", obj)
 	}
 }
@@ -1968,7 +1970,7 @@ func TestDeleteWithOptions(t *testing.T) {
 		t.Errorf("Unexpected delete: %s, expected %s", simpleStorage.deleted, ID)
 	}
 	simpleStorage.deleteOptions.GetObjectKind().SetGroupVersionKind(schema.GroupVersionKind{})
-	if !api.Semantic.DeepEqual(simpleStorage.deleteOptions, item) {
+	if !apiequality.Semantic.DeepEqual(simpleStorage.deleteOptions, item) {
 		t.Errorf("unexpected delete options: %s", diff.ObjectDiff(simpleStorage.deleteOptions, item))
 	}
 }
@@ -2005,7 +2007,7 @@ func TestDeleteWithOptionsQuery(t *testing.T) {
 		t.Fatalf("Unexpected delete: %s, expected %s", simpleStorage.deleted, ID)
 	}
 	simpleStorage.deleteOptions.GetObjectKind().SetGroupVersionKind(schema.GroupVersionKind{})
-	if !api.Semantic.DeepEqual(simpleStorage.deleteOptions, item) {
+	if !apiequality.Semantic.DeepEqual(simpleStorage.deleteOptions, item) {
 		t.Errorf("unexpected delete options: %s", diff.ObjectDiff(simpleStorage.deleteOptions, item))
 	}
 }
@@ -2045,7 +2047,7 @@ func TestDeleteWithOptionsQueryAndBody(t *testing.T) {
 		t.Errorf("Unexpected delete: %s, expected %s", simpleStorage.deleted, ID)
 	}
 	simpleStorage.deleteOptions.GetObjectKind().SetGroupVersionKind(schema.GroupVersionKind{})
-	if !api.Semantic.DeepEqual(simpleStorage.deleteOptions, item) {
+	if !apiequality.Semantic.DeepEqual(simpleStorage.deleteOptions, item) {
 		t.Errorf("unexpected delete options: %s", diff.ObjectDiff(simpleStorage.deleteOptions, item))
 	}
 }
@@ -3338,7 +3340,7 @@ func readBodyOrDie(r io.Reader) []byte {
 
 // BenchmarkUpdateProtobuf measures the cost of processing an update on the server in proto
 func BenchmarkUpdateProtobuf(b *testing.B) {
-	items := benchmarkItems()
+	items := benchmarkItems(b)
 
 	simpleStorage := &SimpleRESTStorage{}
 	handler := handle(map[string]rest.Storage{"simples": simpleStorage})
@@ -3394,8 +3396,8 @@ func newTestRequestInfoResolver() *request.RequestInfoFactory {
 
 const benchmarkSeed = 100
 
-func benchmarkItems() []api.Pod {
-	apiObjectFuzzer := apitesting.FuzzerFor(nil, api.SchemeGroupVersion, rand.NewSource(benchmarkSeed))
+func benchmarkItems(b *testing.B) []api.Pod {
+	apiObjectFuzzer := apitesting.FuzzerFor(kapitesting.FuzzerFuncs(b), rand.NewSource(benchmarkSeed))
 	items := make([]api.Pod, 3)
 	for i := range items {
 		apiObjectFuzzer.Fuzz(&items[i])

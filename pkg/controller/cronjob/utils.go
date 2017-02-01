@@ -215,7 +215,7 @@ func getTimeHash(scheduledTime time.Time) int64 {
 
 // makeCreatedByRefJson makes a json string with an object reference for use in "created-by" annotation value
 func makeCreatedByRefJson(object runtime.Object) (string, error) {
-	createdByRef, err := v1.GetReference(object)
+	createdByRef, err := v1.GetReference(api.Scheme, object)
 	if err != nil {
 		return "", fmt.Errorf("unable to get controller reference: %v", err)
 	}

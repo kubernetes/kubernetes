@@ -22,11 +22,8 @@ go_library(
         "//pkg/apis/certificates/v1beta1:go_default_library",
         "//pkg/client/clientset_generated/clientset:go_default_library",
         "//pkg/client/clientset_generated/clientset/typed/certificates/v1beta1:go_default_library",
-        "//pkg/client/clientset_generated/clientset/typed/core/v1:go_default_library",
         "//pkg/client/legacylisters:go_default_library",
-        "//pkg/client/record:go_default_library",
         "//pkg/controller:go_default_library",
-        "//pkg/util/workqueue:go_default_library",
         "//vendor:github.com/cloudflare/cfssl/config",
         "//vendor:github.com/cloudflare/cfssl/helpers",
         "//vendor:github.com/cloudflare/cfssl/signer",
@@ -37,7 +34,10 @@ go_library(
         "//vendor:k8s.io/apimachinery/pkg/util/runtime",
         "//vendor:k8s.io/apimachinery/pkg/util/wait",
         "//vendor:k8s.io/apimachinery/pkg/watch",
+        "//vendor:k8s.io/client-go/kubernetes/typed/core/v1",
         "//vendor:k8s.io/client-go/tools/cache",
+        "//vendor:k8s.io/client-go/tools/record",
+        "//vendor:k8s.io/client-go/util/workqueue",
     ],
 )
 

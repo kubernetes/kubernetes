@@ -26,6 +26,7 @@ import (
 	"testing"
 	"time"
 
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metainternalversion "k8s.io/apimachinery/pkg/apis/meta/internalversion"
@@ -37,13 +38,13 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apimachinery/pkg/util/wait"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
+	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/names"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/genericapiserver/registry/generic"
 	"k8s.io/kubernetes/pkg/genericapiserver/registry/rest"
 	"k8s.io/kubernetes/pkg/registry/core/pod"
-	"k8s.io/kubernetes/pkg/storage"
 	etcdstorage "k8s.io/kubernetes/pkg/storage/etcd"
 	etcdtesting "k8s.io/kubernetes/pkg/storage/etcd/testing"
 	"k8s.io/kubernetes/pkg/storage/storagebackend/factory"
@@ -204,7 +205,7 @@ func TestStoreList(t *testing.T) {
 		}
 
 		// DeepDerivative e,a is needed here b/c the storage layer sets ResourceVersion
-		if e, a := item.out, list; !api.Semantic.DeepDerivative(e, a) {
+		if e, a := item.out, list; !apiequality.Semantic.DeepDerivative(e, a) {
 			t.Errorf("%v: Expected %#v, got %#v", name, e, a)
 		}
 		destroyFunc()

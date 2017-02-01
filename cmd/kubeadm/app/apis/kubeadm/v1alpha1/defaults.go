@@ -21,13 +21,12 @@ import "k8s.io/apimachinery/pkg/runtime"
 const (
 	DefaultServiceDNSDomain  = "cluster.local"
 	DefaultServicesSubnet    = "10.96.0.0/12"
-	DefaultKubernetesVersion = "stable"
+	DefaultKubernetesVersion = "latest"
 	// This is only for clusters without internet, were the latest stable version can't be determined
-	DefaultKubernetesFallbackVersion = "v1.5.2"
+	DefaultKubernetesFallbackVersion = "v1.6.0-alpha.1"
 	DefaultAPIBindPort               = 6443
 	DefaultDiscoveryBindPort         = 9898
-	// TODO: Default this to RBAC when DefaultKubernetesFallbackVersion is v1.6-something
-	DefaultAuthorizationMode = "AlwaysAllow"
+	DefaultAuthorizationMode         = "RBAC"
 )
 
 func addDefaultingFuncs(scheme *runtime.Scheme) error {

@@ -45,7 +45,7 @@ const (
 var _ = framework.KubeDescribe("Federation deployments [Feature:Federation]", func() {
 	f := fedframework.NewDefaultFederatedFramework("federation-deployment")
 
-	Describe("Deployment objects", func() {
+	Describe("Deployment objects [NoCluster]", func() {
 		AfterEach(func() {
 			fedframework.SkipUnlessFederated(f.ClientSet)
 
@@ -89,7 +89,7 @@ var _ = framework.KubeDescribe("Federation deployments [Feature:Federation]", fu
 			unregisterClusters(clusters, f)
 		})
 
-		It("should create and update matching deployments in underling clusters", func() {
+		It("should create and update matching deployments in underlying clusters", func() {
 			nsName := f.FederationNamespace.Name
 			dep := createDeploymentOrFail(f.FederationClientset, nsName)
 			defer func() {

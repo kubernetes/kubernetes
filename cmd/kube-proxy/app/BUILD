@@ -20,8 +20,6 @@ go_library(
         "//pkg/api:go_default_library",
         "//pkg/api/v1:go_default_library",
         "//pkg/client/clientset_generated/internalclientset:go_default_library",
-        "//pkg/client/clientset_generated/internalclientset/typed/core/internalversion:go_default_library",
-        "//pkg/client/record:go_default_library",
         "//pkg/proxy:go_default_library",
         "//pkg/proxy/config:go_default_library",
         "//pkg/proxy/iptables:go_default_library",
@@ -44,8 +42,11 @@ go_library(
         "//vendor:k8s.io/apimachinery/pkg/types",
         "//vendor:k8s.io/apimachinery/pkg/util/net",
         "//vendor:k8s.io/apimachinery/pkg/util/wait",
+        "//vendor:k8s.io/client-go/kubernetes/typed/core/v1",
+        "//vendor:k8s.io/client-go/pkg/api/v1",
         "//vendor:k8s.io/client-go/tools/clientcmd",
         "//vendor:k8s.io/client-go/tools/clientcmd/api",
+        "//vendor:k8s.io/client-go/tools/record",
     ],
 )
 

@@ -25,11 +25,13 @@ import (
 
 	"github.com/golang/glog"
 
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/errors"
+	intstrutil "k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/util/integer"
 	"k8s.io/kubernetes/pkg/api"
@@ -40,7 +42,6 @@ import (
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/pkg/client/legacylisters"
 	"k8s.io/kubernetes/pkg/controller"
-	intstrutil "k8s.io/kubernetes/pkg/util/intstr"
 	labelsutil "k8s.io/kubernetes/pkg/util/labels"
 )
 
@@ -605,7 +606,7 @@ func EqualIgnoreHash(template1, template2 v1.PodTemplateSpec) bool {
 	}
 	// Then, compare the templates without comparing their labels
 	template1.Labels, template2.Labels = nil, nil
-	return api.Semantic.DeepEqual(template1, template2)
+	return apiequality.Semantic.DeepEqual(template1, template2)
 }
 
 // FindNewReplicaSet returns the new RS this given deployment targets (the one with the same pod template).

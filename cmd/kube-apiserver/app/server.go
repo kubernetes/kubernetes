@@ -189,7 +189,7 @@ func Run(s *options.ServerRunOptions) error {
 		}
 	}
 
-	storageGroupsToEncodingVersion, err := s.GenericServerRunOptions.StorageGroupsToEncodingVersion()
+	storageGroupsToEncodingVersion, err := s.StorageSerialization.StorageGroupsToEncodingVersion()
 	if err != nil {
 		return fmt.Errorf("error generating storage version map: %s", err)
 	}
@@ -295,7 +295,7 @@ func Run(s *options.ServerRunOptions) error {
 	genericConfig.Authenticator = apiAuthenticator
 	genericConfig.Authorizer = apiAuthorizer
 	genericConfig.AdmissionControl = admissionController
-	genericConfig.OpenAPIConfig = genericapiserver.DefaultOpenAPIConfig(generatedopenapi.OpenAPIDefinitions)
+	genericConfig.OpenAPIConfig = genericapiserver.DefaultOpenAPIConfig(generatedopenapi.GetOpenAPIDefinitions)
 	genericConfig.OpenAPIConfig.SecurityDefinitions = securityDefinitions
 	genericConfig.OpenAPIConfig.Info.Title = "Kubernetes"
 	genericConfig.SwaggerConfig = genericapiserver.DefaultSwaggerConfig()

@@ -29,6 +29,7 @@ import (
 
 	"github.com/golang/glog"
 
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -36,15 +37,14 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	core "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/cache"
+	"k8s.io/client-go/tools/record"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/api/v1"
 	storage "k8s.io/kubernetes/pkg/apis/storage/v1beta1"
 	storageutil "k8s.io/kubernetes/pkg/apis/storage/v1beta1/util"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset/fake"
-	"k8s.io/kubernetes/pkg/client/record"
 	fcache "k8s.io/kubernetes/pkg/controller/volume/persistentvolume/testing"
 	vol "k8s.io/kubernetes/pkg/volume"
 )

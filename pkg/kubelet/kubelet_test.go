@@ -28,19 +28,20 @@ import (
 	cadvisorapiv2 "github.com/google/cadvisor/info/v2"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
+	clientv1 "k8s.io/client-go/pkg/api/v1"
+	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/clock"
 	"k8s.io/client-go/util/flowcontrol"
-	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/apis/componentconfig"
 	"k8s.io/kubernetes/pkg/capabilities"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset/fake"
-	"k8s.io/kubernetes/pkg/client/record"
 	cadvisortest "k8s.io/kubernetes/pkg/kubelet/cadvisor/testing"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	"k8s.io/kubernetes/pkg/kubelet/config"
@@ -201,7 +202,7 @@ func newTestKubeletWithImageList(
 	kubelet.livenessManager = proberesults.NewManager()
 
 	kubelet.containerManager = cm.NewStubContainerManager()
-	fakeNodeRef := &v1.ObjectReference{
+	fakeNodeRef := &clientv1.ObjectReference{
 		Kind:      "Node",
 		Name:      testKubeletHostname,
 		UID:       types.UID(testKubeletHostname),
@@ -237,7 +238,7 @@ func newTestKubeletWithImageList(
 	// TODO: Factor out "StatsProvider" from Kubelet so we don't have a cyclic dependency
 	volumeStatsAggPeriod := time.Second * 10
 	kubelet.resourceAnalyzer = stats.NewResourceAnalyzer(kubelet, volumeStatsAggPeriod, kubelet.containerRuntime)
-	nodeRef := &v1.ObjectReference{
+	nodeRef := &clientv1.ObjectReference{
 		Kind:      "Node",
 		Name:      string(kubelet.nodeName),
 		UID:       types.UID(kubelet.nodeName),

@@ -41,6 +41,8 @@ import (
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/httpstream"
+	"k8s.io/apimachinery/pkg/util/httpstream/spdy"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
@@ -52,8 +54,6 @@ import (
 	kubecontainertesting "k8s.io/kubernetes/pkg/kubelet/container/testing"
 	"k8s.io/kubernetes/pkg/kubelet/server/remotecommand"
 	"k8s.io/kubernetes/pkg/kubelet/server/stats"
-	"k8s.io/kubernetes/pkg/util/httpstream"
-	"k8s.io/kubernetes/pkg/util/httpstream/spdy"
 	"k8s.io/kubernetes/pkg/util/term"
 	"k8s.io/kubernetes/pkg/volume"
 )

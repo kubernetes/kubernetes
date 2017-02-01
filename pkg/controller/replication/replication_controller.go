@@ -32,17 +32,19 @@ import (
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
+	utiltrace "k8s.io/apiserver/pkg/util/trace"
+	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
+	clientv1 "k8s.io/client-go/pkg/api/v1"
 	"k8s.io/client-go/tools/cache"
+	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/util/workqueue"
+	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
-	v1core "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/core/v1"
 	"k8s.io/kubernetes/pkg/client/legacylisters"
-	"k8s.io/kubernetes/pkg/client/record"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/informers"
-	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/metrics"
-	"k8s.io/kubernetes/pkg/util/workqueue"
 )
 
 const (
@@ -110,13 +112,13 @@ func NewReplicationManager(podInformer, rcInformer cache.SharedIndexInformer, ku
 
 	eventBroadcaster := record.NewBroadcaster()
 	eventBroadcaster.StartLogging(glog.Infof)
-	eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: kubeClient.Core().Events("")})
+	eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: v1core.New(kubeClient.Core().RESTClient()).Events("")})
 
 	rm := &ReplicationManager{
 		kubeClient: kubeClient,
 		podControl: controller.RealPodControl{
 			KubeClient: kubeClient,
-			Recorder:   eventBroadcaster.NewRecorder(v1.EventSource{Component: "replication-controller"}),
+			Recorder:   eventBroadcaster.NewRecorder(api.Scheme, clientv1.EventSource{Component: "replication-controller"}),
 		},
 		burstReplicas: burstReplicas,
 		expectations:  controller.NewUIDTrackingControllerExpectations(controller.NewControllerExpectations()),
@@ -596,7 +598,7 @@ func (rm *ReplicationManager) manageReplicas(filteredPods []*v1.Pod, rc *v1.Repl
 // it did not expect to see any more of its pods created or deleted. This function is not meant to be invoked
 // concurrently with the same key.
 func (rm *ReplicationManager) syncReplicationController(key string) error {
-	trace := util.NewTrace("syncReplicationController: " + key)
+	trace := utiltrace.New("syncReplicationController: " + key)
 	defer trace.LogIfLong(250 * time.Millisecond)
 
 	startTime := time.Now()

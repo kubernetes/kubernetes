@@ -20,7 +20,6 @@ go_library(
     tags = ["automanaged"],
     deps = [
         "//pkg/api:go_default_library",
-        "//pkg/api/resource:go_default_library",
         "//vendor:cloud.google.com/go/compute/metadata",
         "//vendor:github.com/golang/glog",
         "//vendor:github.com/hawkular/hawkular-client-go/metrics",
@@ -29,6 +28,7 @@ go_library(
         "//vendor:golang.org/x/oauth2/google",
         "//vendor:google.golang.org/api/cloudmonitoring/v2beta2",
         "//vendor:k8s.io/apimachinery/pkg/api/errors",
+        "//vendor:k8s.io/apimachinery/pkg/api/resource",
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
         "//vendor:k8s.io/apiserver/pkg/admission",
         "//vendor:k8s.io/client-go/rest",
@@ -46,8 +46,8 @@ go_test(
     tags = ["automanaged"],
     deps = [
         "//pkg/api:go_default_library",
-        "//pkg/api/resource:go_default_library",
         "//vendor:github.com/stretchr/testify/require",
+        "//vendor:k8s.io/apimachinery/pkg/api/resource",
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
         "//vendor:k8s.io/apiserver/pkg/admission",
     ],

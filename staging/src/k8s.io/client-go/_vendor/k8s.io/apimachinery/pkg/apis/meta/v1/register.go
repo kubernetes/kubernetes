@@ -42,6 +42,7 @@ func AddToGroupVersion(scheme *runtime.Scheme, groupVersion schema.GroupVersion)
 		schema.GroupVersion{Group: groupVersion.Group, Version: runtime.APIVersionInternal}.WithKind(WatchEventKind),
 		&InternalEvent{},
 	)
+	// Supports legacy code paths, most callers should use metav1.ParameterCodec for now
 	scheme.AddKnownTypes(groupVersion,
 		&ListOptions{},
 		&ExportOptions{},
@@ -65,5 +66,8 @@ var ParameterCodec = runtime.NewParameterCodec(scheme)
 func init() {
 	scheme.AddUnversionedTypes(SchemeGroupVersion,
 		&ListOptions{},
+		&ExportOptions{},
+		&GetOptions{},
+		&DeleteOptions{},
 	)
 }

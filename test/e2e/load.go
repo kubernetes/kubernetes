@@ -30,6 +30,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/transport"
@@ -39,7 +40,6 @@ import (
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
-	"k8s.io/kubernetes/pkg/util/intstr"
 	"k8s.io/kubernetes/test/e2e/framework"
 	testutils "k8s.io/kubernetes/test/utils"
 
@@ -156,7 +156,7 @@ var _ = framework.KubeDescribe("Load capacity", func() {
 			testArg.daemonsPerNode,
 		)
 		itArg := testArg
-		itArg.services = os.Getenv("CREATE_SERVICES") == "true"
+		itArg.services = os.Getenv("CREATE_SERVICES") != "false"
 
 		It(name, func() {
 			// Create a number of namespaces.
@@ -168,7 +168,11 @@ var _ = framework.KubeDescribe("Load capacity", func() {
 			configs, secretConfigs = generateConfigs(totalPods, itArg.image, itArg.command, namespaces, itArg.kind, itArg.secretsPerPod)
 			if itArg.services {
 				framework.Logf("Creating services")
-				services := generateServicesForConfigs(configs)
+				// If <totalPods> is large, we generate services only for every second
+				// config. Since those are sorted by the size, we will have both small,
+				// medium and large services, but only for half of pods.
+				onlyHalfServices := totalPods > 60000
+				services := generateServicesForConfigs(configs, onlyHalfServices)
 				for _, service := range services {
 					_, err := clientset.Core().Services(service.Namespace).Create(service)
 					framework.ExpectNoError(err)
@@ -418,9 +422,12 @@ func generateConfigsForGroup(
 	return configs, secretConfigs
 }
 
-func generateServicesForConfigs(configs []testutils.RunObjectConfig) []*v1.Service {
+func generateServicesForConfigs(configs []testutils.RunObjectConfig, onlyHalfServices bool) []*v1.Service {
 	services := make([]*v1.Service, 0, len(configs))
-	for _, config := range configs {
+	for i, config := range configs {
+		if onlyHalfServices && i%2 == 1 {
+			continue
+		}
 		serviceName := config.GetName() + "-svc"
 		labels := map[string]string{"name": config.GetName()}
 		service := &v1.Service{

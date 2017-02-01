@@ -26,9 +26,9 @@ import (
 
 	"github.com/golang/glog"
 	"k8s.io/apimachinery/pkg/util/errors"
+	utiltrace "k8s.io/apiserver/pkg/util/trace"
+	"k8s.io/client-go/util/workqueue"
 	"k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/util"
-	"k8s.io/kubernetes/pkg/util/workqueue"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm/predicates"
 	schedulerapi "k8s.io/kubernetes/plugin/pkg/scheduler/api"
@@ -87,7 +87,7 @@ type genericScheduler struct {
 // If it succeeds, it will return the name of the node.
 // If it fails, it will return a Fiterror error with reasons.
 func (g *genericScheduler) Schedule(pod *v1.Pod, nodeLister algorithm.NodeLister) (string, error) {
-	trace := util.NewTrace(fmt.Sprintf("Scheduling %s/%s", pod.Namespace, pod.Name))
+	trace := utiltrace.New(fmt.Sprintf("Scheduling %s/%s", pod.Namespace, pod.Name))
 	defer trace.LogIfLong(100 * time.Millisecond)
 
 	nodes, err := nodeLister.List()

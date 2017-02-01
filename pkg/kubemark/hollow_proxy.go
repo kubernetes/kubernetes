@@ -20,12 +20,12 @@ import (
 	"time"
 
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/tools/record"
 	proxyapp "k8s.io/kubernetes/cmd/kube-proxy/app"
 	"k8s.io/kubernetes/cmd/kube-proxy/app/options"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
-	"k8s.io/kubernetes/pkg/client/record"
 	proxyconfig "k8s.io/kubernetes/pkg/proxy/config"
 	"k8s.io/kubernetes/pkg/util"
 	utiliptables "k8s.io/kubernetes/pkg/util/iptables"

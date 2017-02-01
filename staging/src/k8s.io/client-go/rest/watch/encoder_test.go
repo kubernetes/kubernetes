@@ -21,6 +21,7 @@ import (
 	"io/ioutil"
 	"testing"
 
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/serializer/streaming"
@@ -71,7 +72,7 @@ func TestEncodeDecodeRoundTrip(t *testing.T) {
 			t.Errorf("%d: unexpected error: %v", i, err)
 			continue
 		}
-		if !api.Semantic.DeepDerivative(testCase.Object, obj) {
+		if !apiequality.Semantic.DeepDerivative(testCase.Object, obj) {
 			t.Errorf("%d: expected %#v, got %#v", i, testCase.Object, obj)
 		}
 		if event != testCase.Type {

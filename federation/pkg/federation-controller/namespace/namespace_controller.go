@@ -24,7 +24,9 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/watch"
+	clientv1 "k8s.io/client-go/pkg/api/v1"
 	"k8s.io/client-go/tools/cache"
+	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/flowcontrol"
 	federationapi "k8s.io/kubernetes/federation/apis/federation/v1beta1"
 	federationclientset "k8s.io/kubernetes/federation/client/clientset_generated/federation_clientset"
@@ -34,7 +36,6 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	apiv1 "k8s.io/kubernetes/pkg/api/v1"
 	kubeclientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
-	"k8s.io/kubernetes/pkg/client/record"
 	"k8s.io/kubernetes/pkg/controller"
 
 	"github.com/golang/glog"
@@ -84,7 +85,7 @@ type NamespaceController struct {
 func NewNamespaceController(client federationclientset.Interface) *NamespaceController {
 	broadcaster := record.NewBroadcaster()
 	broadcaster.StartRecordingToSink(eventsink.NewFederatedEventSink(client))
-	recorder := broadcaster.NewRecorder(apiv1.EventSource{Component: "federated-namespace-controller"})
+	recorder := broadcaster.NewRecorder(api.Scheme, clientv1.EventSource{Component: "federated-namespace-controller"})
 
 	nc := &NamespaceController{
 		federatedApiClient:    client,

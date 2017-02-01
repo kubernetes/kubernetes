@@ -512,5 +512,5 @@ bazel-release:
 	@echo "$$BAZEL_BUILD_HELP_INFO"
 else
 bazel-release:
-	bazel build //build/release-tars --define "EMBED_LICENSE_TARGETS=true"
+	bazel build //build/release-tars
 endif

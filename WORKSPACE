@@ -6,8 +6,8 @@ git_repository(
 
 git_repository(
     name = "io_kubernetes_build",
-    commit = "418b8e976cb32d94fd765c80f2b04e660c5ec4ec",
-    remote = "https://github.com/kubernetes/release.git",
+    commit = "685f15b90b454af3086ab071fdea1b6db213d1fb",
+    remote = "https://github.com/kubernetes/repo-infra.git",
 )
 
 git_repository(

@@ -46,9 +46,9 @@ import (
 	"k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	utilwait "k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/flowcontrol"
 	"k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/client/record"
 	"k8s.io/kubernetes/pkg/credentialprovider"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/events"
@@ -357,14 +357,22 @@ func setIsolators(app *appctypes.App, c *v1.Container, ctx *v1.SecurityContext) 
 			if err != nil {
 				return err
 			}
-			isolators = append(isolators, set.AsIsolator())
+			isolator, err := set.AsIsolator()
+			if err != nil {
+				return err
+			}
+			isolators = append(isolators, *isolator)
 		}
 		if len(dropCaps) > 0 {
 			set, err := appctypes.NewLinuxCapabilitiesRevokeSet(dropCaps...)
 			if err != nil {
 				return err
 			}
-			isolators = append(isolators, set.AsIsolator())
+			isolator, err := set.AsIsolator()
+			if err != nil {
+				return err
+			}
+			isolators = append(isolators, *isolator)
 		}
 	}
 
