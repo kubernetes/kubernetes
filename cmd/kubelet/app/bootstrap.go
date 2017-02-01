@@ -18,7 +18,6 @@ package app
 
 import (
 	"fmt"
-	"io/ioutil"
 	_ "net/http/pprof"
 	"os"
 	"path/filepath"
@@ -74,7 +73,7 @@ func bootstrapClientCert(kubeconfigPath string, bootstrapPath string, certDir st
 	if err != nil {
 		return fmt.Errorf("unable to build bootstrap key path: %v", err)
 	}
-	keyData, generatedKeyFile, err := loadOrGenerateKeyFile(keyPath)
+	keyData, generatedKeyFile, err := certutil.LoadOrGenerateKeyFile(keyPath)
 	if err != nil {
 		return err
 	}
@@ -160,23 +159,4 @@ func loadRESTClientConfig(kubeconfig string) (*restclient.Config, error) {
 		&clientcmd.ConfigOverrides{},
 		loader,
 	).ClientConfig()
-}
-
-func loadOrGenerateKeyFile(keyPath string) (data []byte, wasGenerated bool, err error) {
-	loadedData, err := ioutil.ReadFile(keyPath)
-	if err == nil {
-		return loadedData, false, err
-	}
-	if !os.IsNotExist(err) {
-		return nil, false, fmt.Errorf("error loading key from %s: %v", keyPath, err)
-	}
-
-	generatedData, err := certutil.MakeEllipticPrivateKeyPEM()
-	if err != nil {
-		return nil, false, fmt.Errorf("error generating key: %v", err)
-	}
-	if err := certutil.WriteKey(keyPath, generatedData); err != nil {
-		return nil, false, fmt.Errorf("error writing key to %s: %v", keyPath, err)
-	}
-	return generatedData, true, nil
 }
