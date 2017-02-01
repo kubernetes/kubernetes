@@ -32,6 +32,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/annotations"
 	kubeerr "k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/meta"
+	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/client/restclient"
@@ -241,55 +242,44 @@ func TestApplyObject(t *testing.T) {
 func TestApplyTPR(t *testing.T) {
 	initTestErrorHandler(t)
 	nameTPR, currentTPR := readAndAnnotateTPR(t, filenameTPR)
-	pathTPR := "/namespaces//" + nameTPR
+	pathTPR := "/thirdpartyresources/" + nameTPR
 
 	f, tf, _, ns := NewAPIFactory()
 	tf.Printer = &testPrinter{}
+	tf.JSONEncoder = testapi.Extensions.Codec()
 	tf.Client = &fake.RESTClient{
 		ContentConfig: restclient.ContentConfig{
 			ContentType: runtime.ContentTypeJSON,
 			GroupVersion: &unversioned.GroupVersion{
 				Group:   extensions.GroupName,
-				Version: runtime.APIVersionInternal,
+				Version: "v1beta1",
 			},
 			NegotiatedSerializer: ns,
 		},
 		NegotiatedSerializer: ns,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
-			p, m := req.URL.Path, req.Method
-			fmt.Printf("Path: %s, Method: %s", p, m)
-			bodyTPR := ioutil.NopCloser(bytes.NewReader(currentTPR))
-
-			return &http.Response{
-				StatusCode: 200,
-				Header:     defaultHeader(),
-				Body:       bodyTPR,
-				// Body:       ioutil.NopCloser(bytes.NewBufferString("")),
-			}, nil
-
-			// switch p, m := req.URL.Path, req.Method; {
-			// case p == pathRC && m == "GET":
-			// return &http.Response{
-			// StatusCode: 200,
-			// Header:     defaultHeader(),
-			// // Body:       bodyRC
-			// }, nil
-			// case p == pathRC && m == "PATCH":
-			// return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: bodyRC}, nil
-			// default:
-			// t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
-			// return nil, nil
-			// }
+			switch p, m := req.URL.Path, req.Method; {
+			case p == pathTPR && m == "GET":
+				bodyTPR := ioutil.NopCloser(bytes.NewReader(currentTPR))
+				return &http.Response{
+					StatusCode: 200,
+					Header:     defaultHeader(),
+					Body:       bodyTPR,
+				}, nil
+			case p == pathTPR && m == "PATCH":
+				bodyTPR := ioutil.NopCloser(bytes.NewReader(currentTPR))
+				return &http.Response{
+					StatusCode: 200,
+					Header:     defaultHeader(),
+					Body:       bodyTPR,
+				}, nil
+			default:
+				t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
+				return nil, nil
+			}
 		}),
 	}
 
-	_ = currentTPR
-	_ = pathTPR
-
-	// Not sure about the TPR namespace. The TRP itself does not have a namespace.
-	// But its entries will have namespaces.
-
-	// tf.Namespace = "test"
 	buf := bytes.NewBuffer([]byte{})
 
 	cmd := NewCmdApply(f, buf)
@@ -297,9 +287,13 @@ func TestApplyTPR(t *testing.T) {
 	cmd.Flags().Set("output", "name")
 	cmd.Run(cmd, []string{})
 
-	fmt.Print(buf.String())
-
+	// Check the output of the kubectl apply command.
+	expectTPR := "thirdpartyresource/" + nameTPR + "\n"
+	if buf.String() != expectTPR {
+		t.Fatalf("unexpected output: %s\nexpected: %s", buf.String(), expectTPR)
+	}
 }
+
 func TestApplyRetry(t *testing.T) {
 	initTestErrorHandler(t)
 	nameRC, currentRC := readAndAnnotateReplicationController(t, filenameRC)

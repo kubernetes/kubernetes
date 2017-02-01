@@ -95,7 +95,7 @@ func (c *RESTClient) request(verb string) *restclient.Request {
 	}
 	internalVersion.Version = runtime.APIVersionInternal
 	serializers := restclient.Serializers{
-		Encoder:             ns.EncoderForVersion(serializer, *testapi.Default.GroupVersion()),
+		Encoder:             ns.EncoderForVersion(serializer, *config.GroupVersion),
 		Decoder:             ns.DecoderToVersion(serializer, internalVersion),
 		StreamingSerializer: streamingSerializer,
 		Framer:              streamingSerializer.Framer,
