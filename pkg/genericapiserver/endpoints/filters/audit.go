@@ -31,7 +31,7 @@ import (
 
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apiserver/pkg/endpoints/request"
-	authenticationapi "k8s.io/kubernetes/pkg/apis/authentication"
+	authenticationapi "k8s.io/client-go/pkg/apis/authentication"
 	"k8s.io/kubernetes/pkg/genericapiserver/endpoints/handlers/responsewriters"
 )
 

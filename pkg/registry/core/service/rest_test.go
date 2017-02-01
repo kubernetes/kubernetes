@@ -98,7 +98,7 @@ func TestServiceRegistryCreate(t *testing.T) {
 		t.Fatalf("Unexpected error: %v", err)
 	}
 	created_service := created_svc.(*api.Service)
-	if !api.HasObjectMetaSystemFieldValues(&created_service.ObjectMeta) {
+	if !metav1.HasObjectMetaSystemFieldValues(&created_service.ObjectMeta) {
 		t.Errorf("storage did not populate object meta field values")
 	}
 	if created_service.Name != "foo" {
@@ -218,7 +218,7 @@ func TestServiceRegistryCreateMultiNodePortsService(t *testing.T) {
 			t.Fatalf("Unexpected error: %v", err)
 		}
 		created_service := created_svc.(*api.Service)
-		if !api.HasObjectMetaSystemFieldValues(&created_service.ObjectMeta) {
+		if !metav1.HasObjectMetaSystemFieldValues(&created_service.ObjectMeta) {
 			t.Errorf("storage did not populate object meta field values")
 		}
 		if created_service.Name != test.name {
