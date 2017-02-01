@@ -87,3 +87,39 @@ func HasRunAsUser(container *v1.Container) bool {
 func HasRootRunAsUser(container *v1.Container) bool {
 	return HasRunAsUser(container) && HasRootUID(container)
 }
+
+// DockerLabelUser returns the fragment of a Docker security opt that
+// describes the SELinux user. Note that strictly speaking this is not
+// actually the name of the security opt, but a fragment of the whole key-
+// value pair necessary to set the opt.
+func DockerLabelUser(separator rune) string {
+	return fmt.Sprintf("label%cuser", separator)
+}
+
+// DockerLabelRole returns the fragment of a Docker security opt that
+// describes the SELinux role. Note that strictly speaking this is not
+// actually the name of the security opt, but a fragment of the whole key-
+// value pair necessary to set the opt.
+func DockerLabelRole(separator rune) string {
+	return fmt.Sprintf("label%crole", separator)
+}
+
+// DockerLabelType returns the fragment of a Docker security opt that
+// describes the SELinux type. Note that strictly speaking this is not
+// actually the name of the security opt, but a fragment of the whole key-
+// value pair necessary to set the opt.
+func DockerLabelType(separator rune) string {
+	return fmt.Sprintf("label%ctype", separator)
+}
+
+// DockerLabelLevel returns the fragment of a Docker security opt that
+// describes the SELinux level. Note that strictly speaking this is not
+// actually the name of the security opt, but a fragment of the whole key-
+// value pair necessary to set the opt.
+func DockerLabelLevel(separator rune) string {
+	return fmt.Sprintf("label%clevel", separator)
+}
+
+func DockerLabelDisable(separator rune) string {
+	return fmt.Sprintf("label%cdisable", separator)
+}
