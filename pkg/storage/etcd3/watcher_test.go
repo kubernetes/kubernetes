@@ -224,13 +224,13 @@ func TestWatchFromNoneZero(t *testing.T) {
 func TestWatchError(t *testing.T) {
 	cluster := integration.NewClusterV3(t, &integration.ClusterConfig{Size: 1})
 	defer cluster.Terminate(t)
-	invalidStore := newStore(cluster.RandClient(), false, &testCodec{testapi.Default.Codec()}, "")
+	invalidStore := newStore(cluster.RandClient(), false, &testCodec{testapi.Default.Codec()}, "", prefixTransformer{prefix: []byte("test!")})
 	ctx := context.Background()
 	w, err := invalidStore.Watch(ctx, "/abc", "0", storage.Everything)
 	if err != nil {
 		t.Fatalf("Watch failed: %v", err)
 	}
-	validStore := newStore(cluster.RandClient(), false, testapi.Default.Codec(), "")
+	validStore := newStore(cluster.RandClient(), false, testapi.Default.Codec(), "", prefixTransformer{prefix: []byte("test!")})
 	validStore.GuaranteedUpdate(ctx, "/abc", &api.Pod{}, true, nil, storage.SimpleUpdate(
 		func(runtime.Object) (runtime.Object, error) {
 			return &api.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}}, nil

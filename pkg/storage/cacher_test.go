@@ -91,7 +91,7 @@ func AddObjectMetaFieldsSet(source fields.Set, objectMeta *metav1.ObjectMeta, ha
 
 func newEtcdTestStorage(t *testing.T, codec runtime.Codec, prefix string) (*etcdtesting.EtcdTestServer, storage.Interface) {
 	server, _ := etcdtesting.NewUnsecuredEtcd3TestClientServer(t)
-	storage := etcd3.New(server.V3Client, codec, prefix)
+	storage := etcd3.New(server.V3Client, codec, prefix, etcd3.IdentityTransformer)
 	return server, storage
 }
 

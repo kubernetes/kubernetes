@@ -17,6 +17,7 @@ limitations under the License.
 package etcd3
 
 import (
+	"bytes"
 	"fmt"
 	"reflect"
 	"sync"
@@ -34,6 +35,25 @@ import (
 	"golang.org/x/net/context"
 	"k8s.io/apimachinery/pkg/watch"
 )
+
+// prefixTransformer adds and verifies that all data has the correct prefix on its way in and out.
+type prefixTransformer struct {
+	prefix []byte
+	err    error
+}
+
+func (p prefixTransformer) TransformFromStorage(b []byte) ([]byte, error) {
+	if !bytes.HasPrefix(b, p.prefix) {
+		return nil, fmt.Errorf("value does not have expected prefix: %s", string(b))
+	}
+	return bytes.TrimPrefix(b, p.prefix), p.err
+}
+func (p prefixTransformer) TransformToStorage(b []byte) ([]byte, error) {
+	if len(b) > 0 {
+		return append(append([]byte{}, p.prefix...), b...), p.err
+	}
+	return b, p.err
+}
 
 func TestCreate(t *testing.T) {
 	ctx, store, cluster := testSetup(t)
@@ -452,7 +472,7 @@ func TestGuaranteedUpdateWithConflict(t *testing.T) {
 func TestList(t *testing.T) {
 	cluster := integration.NewClusterV3(t, &integration.ClusterConfig{Size: 1})
 	defer cluster.Terminate(t)
-	store := newStore(cluster.RandClient(), false, testapi.Default.Codec(), "")
+	store := newStore(cluster.RandClient(), false, testapi.Default.Codec(), "", prefixTransformer{prefix: []byte("test!")})
 	ctx := context.Background()
 
 	// Setup storage with the following structure:
@@ -539,7 +559,7 @@ func TestList(t *testing.T) {
 
 func testSetup(t *testing.T) (context.Context, *store, *integration.ClusterV3) {
 	cluster := integration.NewClusterV3(t, &integration.ClusterConfig{Size: 1})
-	store := newStore(cluster.RandClient(), false, testapi.Default.Codec(), "")
+	store := newStore(cluster.RandClient(), false, testapi.Default.Codec(), "", prefixTransformer{prefix: []byte("test!")})
 	ctx := context.Background()
 	return ctx, store, cluster
 }

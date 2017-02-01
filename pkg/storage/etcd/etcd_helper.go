@@ -55,6 +55,7 @@ type identityTransformer struct{}
 func (identityTransformer) TransformStringFromStorage(s string) (string, error) { return s, nil }
 func (identityTransformer) TransformStringToStorage(s string) (string, error)   { return s, nil }
 
+// IdentityTransformer performs no transformation on the provided values.
 var IdentityTransformer ValueTransformer = identityTransformer{}
 
 // Creates a new storage interface from the client
