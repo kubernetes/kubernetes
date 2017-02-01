@@ -21,37 +21,32 @@ import (
 	"mime"
 	"fmt"
 
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	runtimeserializer "k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
-var scheme = runtime.NewScheme()
-var codecs = runtimeserializer.NewCodecFactory(scheme)
-var serializer runtime.SerializerInfo
+var testCodecMediaType string
 
-// Codec returns the codec for the API version to test against, as set by the
+// TestCodec returns the codec for the API version to test against, as set by the
 // KUBE_TEST_API_TYPE env var.
-func Codec(gvs ...schema.GroupVersion) runtime.Codec {
-	if serializer.Serializer == nil {
-		return codecs.LegacyCodec(gvs...)
+func TestCodec(codecs runtimeserializer.CodecFactory, gvs ...schema.GroupVersion) runtime.Codec {
+	if len(testCodecMediaType) != 0 {
+		serializer, ok := runtime.SerializerInfoForMediaType(codecs.SupportedMediaTypes(), testCodecMediaType)
+		if !ok {
+			panic(fmt.Sprintf("no serializer for %s", testCodecMediaType))
+		}
+		return codecs.CodecForVersions(serializer.Serializer, codecs.UniversalDeserializer(), schema.GroupVersions(gvs), nil)
 	}
-	return codecs.CodecForVersions(serializer.Serializer, codecs.UniversalDeserializer(), schema.GroupVersions(gvs), nil)
+	return codecs.LegacyCodec(gvs...)
 }
 
 func init() {
-	metav1.AddToGroupVersion(scheme, metav1.SchemeGroupVersion)
-
 	if apiMediaType := os.Getenv("KUBE_TEST_API_TYPE"); len(apiMediaType) > 0 {
-		var ok bool
-		mediaType, _, err := mime.ParseMediaType(apiMediaType)
+		var err error
+		testCodecMediaType, _, err = mime.ParseMediaType(apiMediaType)
 		if err != nil {
 			panic(err)
-		}
-		serializer, ok = runtime.SerializerInfoForMediaType(codecs.SupportedMediaTypes(), mediaType)
-		if !ok {
-			panic(fmt.Sprintf("no serializer for %s", apiMediaType))
 		}
 	}
 }
