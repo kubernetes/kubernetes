@@ -86,7 +86,6 @@ else
     linux/amd64
     linux/arm
     linux/arm64
-    linux/s390x
     windows/amd64
   )
   if [[ "${KUBE_BUILD_PPC64LE:-}" =~ ^[yY]$ ]]; then
