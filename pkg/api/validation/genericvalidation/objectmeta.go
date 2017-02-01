@@ -28,8 +28,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
-	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/v1"
 )
 
 // TODO: delete this global variable when we enable the validation of common
@@ -42,7 +40,7 @@ const totalAnnotationSizeLimitB int = 256 * (1 << 10) // 256 kB
 
 // BannedOwners is a black list of object that are not allowed to be owners.
 var BannedOwners = map[schema.GroupVersionKind]struct{}{
-	v1.SchemeGroupVersion.WithKind("Event"): {},
+	schema.GroupVersionKind{Group: "", Version: "v1", Kind: "Event"}: {},
 }
 
 // ValidateClusterName can be used to check whether the given cluster name is valid.
@@ -109,17 +107,8 @@ func ValidateFinalizerName(stringValue string, fldPath *field.Path) field.ErrorL
 	for _, msg := range validation.IsQualifiedName(stringValue) {
 		allErrs = append(allErrs, field.Invalid(fldPath, stringValue, msg))
 	}
-	if len(allErrs) != 0 {
-		return allErrs
-	}
 
-	if len(strings.Split(stringValue, "/")) == 1 {
-		if !api.IsStandardFinalizerName(stringValue) {
-			return append(allErrs, field.Invalid(fldPath, stringValue, "name is neither a standard finalizer name nor is it fully qualified"))
-		}
-	}
-
-	return field.ErrorList{}
+	return allErrs
 }
 
 func ValidateNoNewFinalizers(newFinalizers []string, oldFinalizers []string, fldPath *field.Path) field.ErrorList {
