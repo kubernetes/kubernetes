@@ -12,12 +12,10 @@ go_library(
     srcs = ["server.go"],
     tags = ["automanaged"],
     deps = [
-        "//pkg/api/v1:go_default_library",
+        "//pkg/api:go_default_library",
         "//pkg/client/clientset_generated/clientset:go_default_library",
-        "//pkg/client/clientset_generated/clientset/typed/core/v1:go_default_library",
         "//pkg/client/leaderelection:go_default_library",
         "//pkg/client/leaderelection/resourcelock:go_default_library",
-        "//pkg/client/record:go_default_library",
         "//pkg/util/configz:go_default_library",
         "//plugin/cmd/kube-scheduler/app/options:go_default_library",
         "//plugin/pkg/scheduler:go_default_library",
@@ -32,8 +30,11 @@ go_library(
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
         "//vendor:k8s.io/apimachinery/pkg/runtime",
         "//vendor:k8s.io/apiserver/pkg/server/healthz",
+        "//vendor:k8s.io/client-go/kubernetes/typed/core/v1",
+        "//vendor:k8s.io/client-go/pkg/api/v1",
         "//vendor:k8s.io/client-go/rest",
         "//vendor:k8s.io/client-go/tools/clientcmd",
+        "//vendor:k8s.io/client-go/tools/record",
     ],
 )
 

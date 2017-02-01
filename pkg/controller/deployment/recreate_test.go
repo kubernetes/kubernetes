@@ -21,6 +21,7 @@ import (
 	"testing"
 
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/tools/record"
 	"k8s.io/kubernetes/pkg/api"
 	extensions "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset/fake"
@@ -69,6 +70,7 @@ func TestScaleDownOldReplicaSets(t *testing.T) {
 		kc := fake.NewSimpleClientset(expected...)
 		informers := informers.NewSharedInformerFactory(kc, nil, controller.NoResyncPeriodFunc())
 		c := NewDeploymentController(informers.Deployments(), informers.ReplicaSets(), informers.Pods(), kc)
+		c.eventRecorder = &record.FakeRecorder{}
 
 		c.scaleDownOldReplicaSetsForRecreate(oldRSs, test.d)
 		for j := range oldRSs {

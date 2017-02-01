@@ -22,6 +22,7 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/tools/record"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset/fake"
@@ -96,6 +97,7 @@ func TestCreateExternalLoadBalancer(t *testing.T) {
 		cloud.Region = region
 		client := &fake.Clientset{}
 		controller, _ := New(cloud, client, "test-cluster")
+		controller.eventRecorder = record.NewFakeRecorder(100)
 		controller.init()
 		cloud.Calls = nil     // ignore any cloud calls made in init()
 		client.ClearActions() // ignore any client calls made in init()
@@ -220,6 +222,7 @@ func TestUpdateNodesInExternalLoadBalancer(t *testing.T) {
 		cloud.Region = region
 		client := &fake.Clientset{}
 		controller, _ := New(cloud, client, "test-cluster2")
+		controller.eventRecorder = record.NewFakeRecorder(100)
 		controller.init()
 		cloud.Calls = nil // ignore any cloud calls made in init()
 

@@ -30,7 +30,6 @@ go_test(
     tags = ["automanaged"],
     deps = [
         "//pkg/api/v1:go_default_library",
-        "//pkg/client/record:go_default_library",
         "//pkg/controller/informers:go_default_library",
         "//pkg/controller/volume/attachdetach/cache:go_default_library",
         "//pkg/controller/volume/attachdetach/statusupdater:go_default_library",
@@ -40,6 +39,7 @@ go_test(
         "//pkg/volume/util/types:go_default_library",
         "//vendor:k8s.io/apimachinery/pkg/types",
         "//vendor:k8s.io/apimachinery/pkg/util/wait",
+        "//vendor:k8s.io/client-go/tools/record",
     ],
 )
 
