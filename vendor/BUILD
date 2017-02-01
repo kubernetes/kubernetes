@@ -13757,12 +13757,13 @@ go_test(
 go_library(
     name = "k8s.io/apimachinery/pkg/api/testing",
     srcs = [
+        "k8s.io/apimachinery/pkg/api/testing/codec.go",
         "k8s.io/apimachinery/pkg/api/testing/fuzzer.go",
-        "k8s.io/apimachinery/pkg/api/testing/register.go",
     ],
     tags = ["automanaged"],
     deps = [
         "//vendor:github.com/google/gofuzz",
+        "//vendor:k8s.io/apimachinery/pkg/api/resource",
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
         "//vendor:k8s.io/apimachinery/pkg/runtime",
         "//vendor:k8s.io/apimachinery/pkg/runtime/schema",
@@ -14037,5 +14038,76 @@ go_library(
         "//vendor:k8s.io/client-go/rest",
         "//vendor:k8s.io/client-go/tools/clientcmd",
         "//vendor:k8s.io/client-go/util/cert",
+    ],
+)
+
+go_library(
+    name = "k8s.io/apiserver/pkg/apis/example",
+    srcs = [
+        "k8s.io/apiserver/pkg/apis/example/doc.go",
+        "k8s.io/apiserver/pkg/apis/example/register.go",
+        "k8s.io/apiserver/pkg/apis/example/types.go",
+        "k8s.io/apiserver/pkg/apis/example/zz_generated.deepcopy.go",
+    ],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
+        "//vendor:k8s.io/apimachinery/pkg/conversion",
+        "//vendor:k8s.io/apimachinery/pkg/runtime",
+        "//vendor:k8s.io/apimachinery/pkg/runtime/schema",
+    ],
+)
+
+go_library(
+    name = "k8s.io/apiserver/pkg/apis/example/fuzzer",
+    srcs = ["k8s.io/apiserver/pkg/apis/example/fuzzer/fuzzer.go"],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:github.com/google/gofuzz",
+        "//vendor:k8s.io/apimachinery/pkg/api/testing",
+        "//vendor:k8s.io/apimachinery/pkg/runtime",
+        "//vendor:k8s.io/apimachinery/pkg/runtime/serializer",
+        "//vendor:k8s.io/apiserver/pkg/apis/example",
+        "//vendor:k8s.io/apiserver/pkg/apis/example/v1",
+    ],
+)
+
+go_library(
+    name = "k8s.io/apiserver/pkg/apis/example/install",
+    srcs = ["k8s.io/apiserver/pkg/apis/example/install/install.go"],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:k8s.io/apimachinery/pkg/apimachinery/announced",
+        "//vendor:k8s.io/apimachinery/pkg/apimachinery/registered",
+        "//vendor:k8s.io/apimachinery/pkg/runtime",
+        "//vendor:k8s.io/apiserver/pkg/apis/example",
+        "//vendor:k8s.io/apiserver/pkg/apis/example/v1",
+    ],
+)
+
+go_library(
+    name = "k8s.io/apiserver/pkg/apis/example/v1",
+    srcs = [
+        "k8s.io/apiserver/pkg/apis/example/v1/conversion.go",
+        "k8s.io/apiserver/pkg/apis/example/v1/defaults.go",
+        "k8s.io/apiserver/pkg/apis/example/v1/doc.go",
+        "k8s.io/apiserver/pkg/apis/example/v1/generated.pb.go",
+        "k8s.io/apiserver/pkg/apis/example/v1/register.go",
+        "k8s.io/apiserver/pkg/apis/example/v1/types.generated.go",
+        "k8s.io/apiserver/pkg/apis/example/v1/types.go",
+        "k8s.io/apiserver/pkg/apis/example/v1/types_swagger_doc_generated.go",
+        "k8s.io/apiserver/pkg/apis/example/v1/zz_generated.conversion.go",
+        "k8s.io/apiserver/pkg/apis/example/v1/zz_generated.deepcopy.go",
+        "k8s.io/apiserver/pkg/apis/example/v1/zz_generated.defaults.go",
+    ],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:github.com/gogo/protobuf/proto",
+        "//vendor:github.com/gogo/protobuf/sortkeys",
+        "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
+        "//vendor:k8s.io/apimachinery/pkg/conversion",
+        "//vendor:k8s.io/apimachinery/pkg/runtime",
+        "//vendor:k8s.io/apimachinery/pkg/runtime/schema",
+        "//vendor:k8s.io/apiserver/pkg/apis/example",
     ],
 )

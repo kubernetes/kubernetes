@@ -277,6 +277,7 @@ staging/src/k8s.io/apimachinery/pkg/util/json
 staging/src/k8s.io/apimachinery/pkg/util/validation/field
 staging/src/k8s.io/apimachinery/pkg/version
 staging/src/k8s.io/apimachinery/pkg/watch
+staging/src/k8s.io/apiserver/pkg/apis/example/install
 staging/src/k8s.io/apiserver/pkg/authentication/authenticator
 staging/src/k8s.io/apiserver/pkg/authentication/request/union
 staging/src/k8s.io/apiserver/pkg/authentication/request/x509
