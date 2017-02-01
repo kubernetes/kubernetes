@@ -1,3 +1,6 @@
+### Version 6.4-alpha.1 (Wed February 1 2017 Zihong Zheng <zihongz@google.com>)
+ - Update kubectl to v1.6.0-alpha.1 for supporting optional ConfigMap.
+
 ### Version 6.3 (Fri January 27 2017 Lucas Käldström <lucas.kaldstrom@hotmail.co.uk>)
  - Updated the arm base image to `armhf/busybox` and now using qemu v2.7 for emulation.
 
