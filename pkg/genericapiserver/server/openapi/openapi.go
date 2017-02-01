@@ -40,6 +40,7 @@ type openAPI struct {
 	swagger      *spec.Swagger
 	protocolList []string
 	servePath    string
+	definitions  map[string]openapi.OpenAPIDefinition
 }
 
 // RegisterOpenAPIService registers a handler to provides standard OpenAPI specification.
@@ -79,6 +80,15 @@ func (o *openAPI) init(webServices []*restful.WebService) error {
 			return r.Operation, nil, nil
 		}
 	}
+	if o.config.GetDefinitionName == nil {
+		o.config.GetDefinitionName = func(_, name string) (string, spec.Extensions) {
+			return name[strings.LastIndex(name, "/")+1:], nil
+		}
+	}
+	o.definitions = o.config.GetDefinitions(func(name string) spec.Ref {
+		defName, _ := o.config.GetDefinitionName(o.servePath, name)
+		return spec.MustCreateRef("#/definitions/" + openapi.EscapeJsonPointer(defName))
+	})
 	if o.config.CommonResponses == nil {
 		o.config.CommonResponses = map[int]spec.Response{}
 	}
@@ -90,15 +100,43 @@ func (o *openAPI) init(webServices []*restful.WebService) error {
 		o.swagger.SecurityDefinitions = *o.config.SecurityDefinitions
 		o.swagger.Security = o.config.DefaultSecurity
 	}
+	if o.config.PostProcessSpec != nil {
+		o.swagger, err = o.config.PostProcessSpec(o.swagger)
+		if err != nil {
+			return err
+		}
+	}
 	return nil
 }
 
+func getCanonicalizeTypeName(t reflect.Type) string {
+	if t.PkgPath() == "" {
+		return t.Name()
+	}
+	path := t.PkgPath()
+	if strings.Contains(path, "/vendor/") {
+		path = path[strings.Index(path, "/vendor/")+len("/vendor/"):]
+	}
+	return path + "." + t.Name()
+}
+
 func (o *openAPI) buildDefinitionRecursively(name string) error {
-	if _, ok := o.swagger.Definitions[name]; ok {
+	uniqueName, extensions := o.config.GetDefinitionName(o.servePath, name)
+	if _, ok := o.swagger.Definitions[uniqueName]; ok {
 		return nil
 	}
-	if item, ok := (*o.config.Definitions)[name]; ok {
-		o.swagger.Definitions[name] = item.Schema
+	if item, ok := o.definitions[name]; ok {
+		schema := spec.Schema{
+			SchemaProps:        item.Schema.SchemaProps,
+			SwaggerSchemaProps: item.Schema.SwaggerSchemaProps,
+		}
+		if extensions != nil {
+			schema.Extensions = spec.Extensions{}
+			for k, v := range extensions {
+				schema.Extensions[k] = v
+			}
+		}
+		o.swagger.Definitions[uniqueName] = schema
 		for _, v := range item.Dependencies {
 			if err := o.buildDefinitionRecursively(v); err != nil {
 				return err
@@ -118,11 +156,12 @@ func (o *openAPI) buildDefinitionForType(sample interface{}) (string, error) {
 	if t.Kind() == reflect.Ptr {
 		t = t.Elem()
 	}
-	name := t.String()
+	name := getCanonicalizeTypeName(t)
 	if err := o.buildDefinitionRecursively(name); err != nil {
 		return "", err
 	}
-	return "#/definitions/" + name, nil
+	defName, _ := o.config.GetDefinitionName(o.servePath, name)
+	return "#/definitions/" + openapi.EscapeJsonPointer(defName), nil
 }
 
 // buildPaths builds OpenAPI paths using go-restful's web services.
@@ -244,18 +283,12 @@ func (o *openAPI) buildOperations(route restful.Route, inPathCommonParamsMap map
 	if len(ret.Responses.StatusCodeResponses) == 0 {
 		ret.Responses.Default = o.config.DefaultResponse
 	}
-	// If there is a read sample, there will be a body param referring to it.
-	if route.ReadSample != nil {
-		if _, err := o.toSchema(reflect.TypeOf(route.ReadSample).String(), route.ReadSample); err != nil {
-			return ret, err
-		}
-	}
 
 	// Build non-common Parameters
 	ret.Parameters = make([]spec.Parameter, 0)
 	for _, param := range route.ParameterDocs {
 		if _, isCommon := inPathCommonParamsMap[mapKeyFromParam(param)]; !isCommon {
-			openAPIParam, err := o.buildParameter(param.Data())
+			openAPIParam, err := o.buildParameter(param.Data(), route.ReadSample)
 			if err != nil {
 				return ret, err
 			}
@@ -266,8 +299,7 @@ func (o *openAPI) buildOperations(route restful.Route, inPathCommonParamsMap map
 }
 
 func (o *openAPI) buildResponse(model interface{}, description string) (spec.Response, error) {
-	typeName := reflect.TypeOf(model).String()
-	schema, err := o.toSchema(typeName, model)
+	schema, err := o.toSchema(model)
 	if err != nil {
 		return spec.Response{}, err
 	}
@@ -300,8 +332,9 @@ func (o *openAPI) findCommonParameters(routes []restful.Route) (map[interface{}]
 		}
 	}
 	for key, count := range paramOpsCountByName {
-		if count == len(routes) {
-			openAPIParam, err := o.buildParameter(paramNameKindToDataMap[key])
+		paramData := paramNameKindToDataMap[key]
+		if count == len(routes) && paramData.Kind != restful.BodyParameterKind {
+			openAPIParam, err := o.buildParameter(paramData, nil)
 			if err != nil {
 				return commonParamsMap, err
 			}
@@ -311,8 +344,8 @@ func (o *openAPI) findCommonParameters(routes []restful.Route) (map[interface{}]
 	return commonParamsMap, nil
 }
 
-func (o *openAPI) toSchema(typeName string, model interface{}) (_ *spec.Schema, err error) {
-	if openAPIType, openAPIFormat := openapi.GetOpenAPITypeFormat(typeName); openAPIType != "" {
+func (o *openAPI) toSchema(model interface{}) (_ *spec.Schema, err error) {
+	if openAPIType, openAPIFormat := openapi.GetOpenAPITypeFormat(getCanonicalizeTypeName(reflect.TypeOf(model))); openAPIType != "" {
 		return &spec.Schema{
 			SchemaProps: spec.SchemaProps{
 				Type:   []string{openAPIType},
@@ -320,12 +353,9 @@ func (o *openAPI) toSchema(typeName string, model interface{}) (_ *spec.Schema, 
 			},
 		}, nil
 	} else {
-		ref := "#/definitions/" + typeName
-		if model != nil {
-			ref, err = o.buildDefinitionForType(model)
-			if err != nil {
-				return nil, err
-			}
+		ref, err := o.buildDefinitionForType(model)
+		if err != nil {
+			return nil, err
 		}
 		return &spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -335,7 +365,7 @@ func (o *openAPI) toSchema(typeName string, model interface{}) (_ *spec.Schema, 
 	}
 }
 
-func (o *openAPI) buildParameter(restParam restful.ParameterData) (ret spec.Parameter, err error) {
+func (o *openAPI) buildParameter(restParam restful.ParameterData, bodySample interface{}) (ret spec.Parameter, err error) {
 	ret = spec.Parameter{
 		ParamProps: spec.ParamProps{
 			Name:        restParam.Name,
@@ -345,9 +375,16 @@ func (o *openAPI) buildParameter(restParam restful.ParameterData) (ret spec.Para
 	}
 	switch restParam.Kind {
 	case restful.BodyParameterKind:
-		ret.In = "body"
-		ret.Schema, err = o.toSchema(restParam.DataType, nil)
-		return ret, err
+		if bodySample != nil {
+			ret.In = "body"
+			ret.Schema, err = o.toSchema(bodySample)
+			return ret, err
+		} else {
+			// There is not enough information in the body parameter to build the definition.
+			// Body parameter has a data type that is a short name but we need full package name
+			// of the type to create a definition.
+			return ret, fmt.Errorf("restful body parameters are not supported: %v", restParam.DataType)
+		}
 	case restful.PathParameterKind:
 		ret.In = "path"
 		if !restParam.Required {
@@ -375,7 +412,7 @@ func (o *openAPI) buildParameter(restParam restful.ParameterData) (ret spec.Para
 func (o *openAPI) buildParameters(restParam []*restful.Parameter) (ret []spec.Parameter, err error) {
 	ret = make([]spec.Parameter, len(restParam))
 	for i, v := range restParam {
-		ret[i], err = o.buildParameter(v.Data())
+		ret[i], err = o.buildParameter(v.Data(), nil)
 		if err != nil {
 			return ret, err
 		}
