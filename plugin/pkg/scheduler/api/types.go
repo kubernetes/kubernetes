@@ -128,6 +128,10 @@ type ExtenderConfig struct {
 	// HTTPTimeout specifies the timeout duration for a call to the extender. Filter timeout fails the scheduling of the pod. Prioritize
 	// timeout is ignored, k8s/other extenders priorities are used to select the node.
 	HTTPTimeout time.Duration
+	// NodeCacheCapable specifies that the extender is capable of caching node information,
+	// so the scheduler should only send minimal information about the eligible nodes
+	// assuming that the extender already cached full details of all nodes in the cluster
+	NodeCacheCapable bool
 }
 
 // ExtenderArgs represents the arguments needed by the extender to filter/prioritize
@@ -136,16 +140,27 @@ type ExtenderArgs struct {
 	// Pod being scheduled
 	Pod v1.Pod
 	// List of candidate nodes where the pod can be scheduled
-	Nodes v1.NodeList
+	Nodes *v1.NodeList
+	// List of candidate node names where the pod can be scheduled; to be
+	// populated only if extender is capable of maintaining its own node cache
+	NodeNames *[]string
 }
 
 // FailedNodesMap represents the filtered out nodes, with node names and failure messages
 type FailedNodesMap map[string]string
 
+// Annotations represents the annotations
+type Annotations map[string]string
+
 // ExtenderFilterResult represents the results of a filter call to an extender
 type ExtenderFilterResult struct {
 	// Filtered set of nodes where the pod can be scheduled
-	Nodes v1.NodeList
+	Nodes *v1.NodeList
+	// Filtered set of nodes where the pod can be scheduled; to be populated
+	// only if extender is capable of maintaining its own node cache
+	NodeNames *[]string
+	// Annotations are the pod annotations returned by the extender, if any
+	PodAnnotations *Annotations
 	// Filtered out nodes where the pod can't be scheduled and the failure messages
 	FailedNodes FailedNodesMap
 	// Error message indicating failure

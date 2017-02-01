@@ -86,34 +86,34 @@ type genericScheduler struct {
 // Schedule tries to schedule the given pod to one of node in the node list.
 // If it succeeds, it will return the name of the node.
 // If it fails, it will return a Fiterror error with reasons.
-func (g *genericScheduler) Schedule(pod *v1.Pod, nodeLister algorithm.NodeLister) (string, error) {
+func (g *genericScheduler) Schedule(pod *v1.Pod, nodeLister algorithm.NodeLister) (string, schedulerapi.Annotations, error) {
 	trace := utiltrace.New(fmt.Sprintf("Scheduling %s/%s", pod.Namespace, pod.Name))
 	defer trace.LogIfLong(100 * time.Millisecond)
 
 	nodes, err := nodeLister.List()
 	if err != nil {
-		return "", err
+		return "", nil, err
 	}
 	if len(nodes) == 0 {
-		return "", ErrNoNodesAvailable
+		return "", nil, ErrNoNodesAvailable
 	}
 
 	// Used for all fit and priority funcs.
 	err = g.cache.UpdateNodeNameToInfoMap(g.cachedNodeInfoMap)
 	if err != nil {
-		return "", err
+		return "", nil, err
 	}
 
 	// TODO(harryz) Check if equivalenceCache is enabled and call scheduleWithEquivalenceClass here
 
 	trace.Step("Computing predicates")
-	filteredNodes, failedPredicateMap, err := findNodesThatFit(pod, g.cachedNodeInfoMap, nodes, g.predicates, g.extenders, g.predicateMetaProducer)
+	filteredNodes, failedPredicateMap, podAnnotations, err := findNodesThatFit(pod, g.cachedNodeInfoMap, nodes, g.predicates, g.extenders, g.predicateMetaProducer)
 	if err != nil {
-		return "", err
+		return "", nil, err
 	}
 
 	if len(filteredNodes) == 0 {
-		return "", &FitError{
+		return "", nil, &FitError{
 			Pod:              pod,
 			FailedPredicates: failedPredicateMap,
 		}
@@ -123,11 +123,15 @@ func (g *genericScheduler) Schedule(pod *v1.Pod, nodeLister algorithm.NodeLister
 	metaPrioritiesInterface := g.priorityMetaProducer(pod, g.cachedNodeInfoMap)
 	priorityList, err := PrioritizeNodes(pod, g.cachedNodeInfoMap, metaPrioritiesInterface, g.prioritizers, filteredNodes, g.extenders)
 	if err != nil {
-		return "", err
+		return "", nil, err
 	}
 
 	trace.Step("Selecting host")
-	return g.selectHost(priorityList)
+	if host, err := g.selectHost(priorityList); err != nil {
+		return "", nil, err
+	} else {
+		return host, podAnnotations, nil
+	}
 }
 
 // selectHost takes a prioritized list of nodes and then picks one
@@ -158,8 +162,9 @@ func findNodesThatFit(
 	predicateFuncs map[string]algorithm.FitPredicate,
 	extenders []algorithm.SchedulerExtender,
 	metadataProducer algorithm.MetadataProducer,
-) ([]*v1.Node, FailedPredicateMap, error) {
+) ([]*v1.Node, FailedPredicateMap, schedulerapi.Annotations, error) {
 	var filtered []*v1.Node
+	var podAnnotations = make(schedulerapi.Annotations)
 	failedPredicateMap := FailedPredicateMap{}
 
 	if len(predicateFuncs) == 0 {
@@ -194,15 +199,15 @@ func findNodesThatFit(
 		workqueue.Parallelize(16, len(nodes), checkNode)
 		filtered = filtered[:filteredLen]
 		if len(errs) > 0 {
-			return []*v1.Node{}, FailedPredicateMap{}, errors.NewAggregate(errs)
+			return []*v1.Node{}, FailedPredicateMap{}, nil, errors.NewAggregate(errs)
 		}
 	}
 
 	if len(filtered) > 0 && len(extenders) != 0 {
 		for _, extender := range extenders {
-			filteredList, failedMap, err := extender.Filter(pod, filtered)
+			filteredList, failedMap, annotations, err := extender.Filter(pod, filtered, nodeNameToInfo)
 			if err != nil {
-				return []*v1.Node{}, FailedPredicateMap{}, err
+				return []*v1.Node{}, FailedPredicateMap{}, nil, err
 			}
 
 			for failedNodeName, failedMsg := range failedMap {
@@ -212,12 +217,16 @@ func findNodesThatFit(
 				failedPredicateMap[failedNodeName] = append(failedPredicateMap[failedNodeName], predicates.NewFailureReason(failedMsg))
 			}
 			filtered = filteredList
+			// Merge the pod annotations map
+			for k, v := range annotations {
+				podAnnotations[k] = v
+			}
 			if len(filtered) == 0 {
 				break
 			}
 		}
 	}
-	return filtered, failedPredicateMap, nil
+	return filtered, failedPredicateMap, podAnnotations, nil
 }
 
 // Checks whether node with a given name and NodeInfo satisfies all predicateFuncs.

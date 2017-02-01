@@ -109,7 +109,7 @@ type FakeExtender struct {
 	weight       int
 }
 
-func (f *FakeExtender) Filter(pod *v1.Pod, nodes []*v1.Node) ([]*v1.Node, schedulerapi.FailedNodesMap, error) {
+func (f *FakeExtender) Filter(pod *v1.Pod, nodes []*v1.Node, nodeNameToInfo map[string]*schedulercache.NodeInfo) ([]*v1.Node, schedulerapi.FailedNodesMap, schedulerapi.Annotations, error) {
 	filtered := []*v1.Node{}
 	failedNodesMap := schedulerapi.FailedNodesMap{}
 	for _, node := range nodes {
@@ -117,7 +117,7 @@ func (f *FakeExtender) Filter(pod *v1.Pod, nodes []*v1.Node) ([]*v1.Node, schedu
 		for _, predicate := range f.predicates {
 			fit, err := predicate(pod, node)
 			if err != nil {
-				return []*v1.Node{}, schedulerapi.FailedNodesMap{}, err
+				return []*v1.Node{}, schedulerapi.FailedNodesMap{}, nil, err
 			}
 			if !fit {
 				fits = false
@@ -130,7 +130,7 @@ func (f *FakeExtender) Filter(pod *v1.Pod, nodes []*v1.Node) ([]*v1.Node, schedu
 			failedNodesMap[node.Name] = "FakeExtender failed"
 		}
 	}
-	return filtered, failedNodesMap, nil
+	return filtered, failedNodesMap, nil, nil
 }
 
 func (f *FakeExtender) Prioritize(pod *v1.Pod, nodes []*v1.Node) (*schedulerapi.HostPriorityList, int, error) {
@@ -289,7 +289,7 @@ func TestGenericSchedulerWithExtenders(t *testing.T) {
 		scheduler := NewGenericScheduler(
 			cache, test.predicates, algorithm.EmptyMetadataProducer, test.prioritizers, algorithm.EmptyMetadataProducer, extenders)
 		podIgnored := &v1.Pod{}
-		machine, err := scheduler.Schedule(podIgnored, algorithm.FakeNodeLister(makeNodeList(test.nodes)))
+		machine, _, err := scheduler.Schedule(podIgnored, algorithm.FakeNodeLister(makeNodeList(test.nodes)))
 		if test.expectsErr {
 			if err == nil {
 				t.Errorf("Unexpected non-error for %s, machine %s", test.name, machine)
