@@ -347,7 +347,7 @@ func setIsolators(app *appctypes.App, c *v1.Container, ctx *v1.SecurityContext) 
 		var addCaps, dropCaps []string
 
 		if ctx.Capabilities != nil {
-			addCaps, dropCaps = securitycontext.MakeCapabilities(ctx.Capabilities.Add, ctx.Capabilities.Drop)
+			addCaps, dropCaps = kubecontainer.MakeCapabilities(ctx.Capabilities.Add, ctx.Capabilities.Drop)
 		}
 		if ctx.Privileged != nil && *ctx.Privileged {
 			addCaps, dropCaps = allCapabilities(), []string{}
