@@ -18,10 +18,14 @@ package apiserver
 
 import (
 	"k8s.io/kubernetes/pkg/genericapiserver/registry/generic"
+	"k8s.io/kubernetes/pkg/genericapiserver/registry/rest"
 	genericapiserver "k8s.io/kubernetes/pkg/genericapiserver/server"
 	"k8s.io/kubernetes/pkg/version"
 
+	"k8s.io/kubernetes/cmd/kube-service-injection/pkg/apis/serviceinjection"
 	_ "k8s.io/kubernetes/cmd/kube-service-injection/pkg/apis/serviceinjection/install"
+	"k8s.io/kubernetes/cmd/kube-service-injection/pkg/apis/serviceinjection/v1alpha1"
+	serviceinjectionstorage "k8s.io/kubernetes/cmd/kube-service-injection/pkg/registry/serviceinjection"
 )
 
 type Config struct {
@@ -64,6 +68,16 @@ func (c completedConfig) New() (*APIDiscoveryServer, error) {
 
 	s := &APIDiscoveryServer{
 		GenericAPIServer: genericServer,
+	}
+
+	apiGroupInfo := genericapiserver.NewDefaultAPIGroupInfo(serviceinjection.GroupName)
+	apiGroupInfo.GroupMeta.GroupVersion = v1alpha1.SchemeGroupVersion
+	v1alpha1storage := map[string]rest.Storage{}
+	v1alpha1storage["serviceinjections"] = serviceinjectionstorage.NewREST(c.RESTOptionsGetter)
+	apiGroupInfo.VersionedResourcesStorageMap["v1alpha1"] = v1alpha1storage
+
+	if err := s.GenericAPIServer.InstallAPIGroup(&apiGroupInfo); err != nil {
+		return nil, err
 	}
 
 	return s, nil

@@ -26,7 +26,9 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/storage/storagebackend"
+	"k8s.io/kubernetes/cmd/kube-service-injection/pkg/apis/serviceinjection/v1alpha1"
 	"k8s.io/kubernetes/cmd/kube-service-injection/pkg/apiserver"
+	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/genericapiserver/registry/generic"
 	"k8s.io/kubernetes/pkg/genericapiserver/registry/generic/registry"
 	genericapiserver "k8s.io/kubernetes/pkg/genericapiserver/server"
@@ -59,7 +61,7 @@ func NewCommandStartServiceInjectionServer(out, err io.Writer) *cobra.Command {
 	}
 	o.Etcd.StorageConfig.Type = storagebackend.StorageTypeETCD3
 	o.Etcd.StorageConfig.Prefix = defaultEtcdPathPrefix
-	// o.Etcd.StorageConfig.Codec = api.Codecs.LegacyCodec(v1alpha1.SchemeGroupVersion)
+	o.Etcd.StorageConfig.Codec = api.Codecs.LegacyCodec(v1alpha1.SchemeGroupVersion)
 	o.SecureServing.ServingOptions.BindPort = 443
 
 	cmd := &cobra.Command{
