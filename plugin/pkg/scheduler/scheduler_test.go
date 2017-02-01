@@ -34,6 +34,7 @@ import (
 	"k8s.io/kubernetes/pkg/client/record"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm/predicates"
+	schedulerapi "k8s.io/kubernetes/plugin/pkg/scheduler/api"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/schedulercache"
 	schedulertesting "k8s.io/kubernetes/plugin/pkg/scheduler/testing"
 )
@@ -90,8 +91,8 @@ type mockScheduler struct {
 	err     error
 }
 
-func (es mockScheduler) Schedule(pod *v1.Pod, ml algorithm.NodeLister) (string, error) {
-	return es.machine, es.err
+func (es mockScheduler) Schedule(pod *v1.Pod, ml algorithm.NodeLister) (string, *schedulerapi.Annotations, error) {
+	return es.machine, nil, es.err
 }
 
 func TestScheduler(t *testing.T) {

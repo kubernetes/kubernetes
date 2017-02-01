@@ -307,7 +307,7 @@ func TestGenericScheduler(t *testing.T) {
 		scheduler := NewGenericScheduler(
 			cache, test.predicates, algorithm.EmptyMetadataProducer, test.prioritizers, algorithm.EmptyMetadataProducer,
 			[]algorithm.SchedulerExtender{})
-		machine, err := scheduler.Schedule(test.pod, algorithm.FakeNodeLister(makeNodeList(test.nodes)))
+		machine, _, err := scheduler.Schedule(test.pod, algorithm.FakeNodeLister(makeNodeList(test.nodes)))
 
 		if !reflect.DeepEqual(err, test.wErr) {
 			t.Errorf("Failed : %s, Unexpected error: %v, expected: %v", test.name, err, test.wErr)
@@ -326,7 +326,7 @@ func TestFindFitAllError(t *testing.T) {
 		"2": schedulercache.NewNodeInfo(),
 		"1": schedulercache.NewNodeInfo(),
 	}
-	_, predicateMap, err := findNodesThatFit(&v1.Pod{}, nodeNameToInfo, makeNodeList(nodes), predicates, nil, algorithm.EmptyMetadataProducer)
+	_, predicateMap, _, err := findNodesThatFit(&v1.Pod{}, nodeNameToInfo, makeNodeList(nodes), predicates, nil, algorithm.EmptyMetadataProducer)
 
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
@@ -360,7 +360,7 @@ func TestFindFitSomeError(t *testing.T) {
 		nodeNameToInfo[name].SetNode(&v1.Node{ObjectMeta: metav1.ObjectMeta{Name: name}})
 	}
 
-	_, predicateMap, err := findNodesThatFit(pod, nodeNameToInfo, makeNodeList(nodes), predicates, nil, algorithm.EmptyMetadataProducer)
+	_, predicateMap, _, err := findNodesThatFit(pod, nodeNameToInfo, makeNodeList(nodes), predicates, nil, algorithm.EmptyMetadataProducer)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}

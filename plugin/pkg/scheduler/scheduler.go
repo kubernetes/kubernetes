@@ -147,6 +147,7 @@ func (s *Scheduler) Run() {
 }
 
 func (s *Scheduler) scheduleOne() {
+	var podAnnotations schedulerapi.Annotations
 	pod := s.config.NextPod()
 	if pod.DeletionTimestamp != nil {
 		s.config.Recorder.Eventf(pod, v1.EventTypeWarning, "FailedScheduling", "skip schedule deleting pod: %v/%v", pod.Namespace, pod.Name)
@@ -156,7 +157,7 @@ func (s *Scheduler) scheduleOne() {
 
 	glog.V(3).Infof("Attempting to schedule pod: %v/%v", pod.Namespace, pod.Name)
 	start := time.Now()
-	dest, err := s.config.Algorithm.Schedule(pod, s.config.NodeLister)
+	dest, annotations, err := s.config.Algorithm.Schedule(pod, s.config.NodeLister)
 	if err != nil {
 		glog.V(1).Infof("Failed to schedule pod: %v/%v", pod.Namespace, pod.Name)
 		s.config.Error(pod, err)
@@ -191,8 +192,11 @@ func (s *Scheduler) scheduleOne() {
 	go func() {
 		defer metrics.E2eSchedulingLatency.Observe(metrics.SinceInMicroseconds(start))
 
+		if annotations != nil {
+			podAnnotations = *annotations
+		}
 		b := &v1.Binding{
-			ObjectMeta: metav1.ObjectMeta{Namespace: pod.Namespace, Name: pod.Name},
+			ObjectMeta: metav1.ObjectMeta{Namespace: pod.Namespace, Name: pod.Name, Annotations: podAnnotations},
 			Target: v1.ObjectReference{
 				Kind: "Node",
 				Name: dest,
