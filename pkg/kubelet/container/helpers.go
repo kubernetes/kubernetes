@@ -291,3 +291,18 @@ func HasPrivilegedContainer(pod *v1.Pod) bool {
 	}
 	return false
 }
+
+// MakeCapabilities creates string slices from Capability slices
+func MakeCapabilities(capAdd []v1.Capability, capDrop []v1.Capability) ([]string, []string) {
+	var (
+		addCaps  []string
+		dropCaps []string
+	)
+	for _, cap := range capAdd {
+		addCaps = append(addCaps, string(cap))
+	}
+	for _, cap := range capDrop {
+		dropCaps = append(dropCaps, string(cap))
+	}
+	return addCaps, dropCaps
+}

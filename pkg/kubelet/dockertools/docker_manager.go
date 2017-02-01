@@ -54,6 +54,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
+	dockersecurity "k8s.io/kubernetes/pkg/kubelet/dockertools/securitycontext"
 	"k8s.io/kubernetes/pkg/kubelet/events"
 	"k8s.io/kubernetes/pkg/kubelet/images"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
@@ -812,7 +813,7 @@ func (dm *DockerManager) runContainer(
 	glog.V(3).Infof("Container %v/%v/%v: setting entrypoint \"%v\" and command \"%v\"", pod.Namespace, pod.Name, container.Name, dockerOpts.Config.Entrypoint, dockerOpts.Config.Cmd)
 
 	supplementalGids := dm.runtimeHelper.GetExtraSupplementalGroupsForPod(pod)
-	securityContextProvider := securitycontext.NewSimpleSecurityContextProvider()
+	securityContextProvider := dockersecurity.NewSimpleSecurityContextProvider()
 	securityContextProvider.ModifyContainerConfig(pod, container, dockerOpts.Config)
 	securityContextProvider.ModifyHostConfig(pod, container, dockerOpts.HostConfig, supplementalGids)
 	createResp, err := dm.client.CreateContainer(dockerOpts)
