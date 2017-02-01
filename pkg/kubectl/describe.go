@@ -694,7 +694,7 @@ func printGitRepoVolumeSource(git *api.GitRepoVolumeSource, w *PrefixWriter) {
 func printSecretVolumeSource(secret *api.SecretVolumeSource, w *PrefixWriter) {
 	optional := secret.Optional != nil && *secret.Optional
 	w.Write(LEVEL_2, "Type:\tSecret (a volume populated by a Secret)\n"+
-		"    SecretName:\t%v\n",
+		"    SecretName:\t%v\n"+
 		"    Optional:\t%v\n",
 		secret.SecretName, optional)
 }
