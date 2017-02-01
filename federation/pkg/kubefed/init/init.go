@@ -173,13 +173,11 @@ func initFederation(cmdOut io.Writer, config util.AdminConfig, cmd *cobra.Comman
 	}
 	apiServerAdvertiseAddress := cmdutil.GetFlagString(cmd, "api-server-advertise-address")
 	if apiServiceType == serviceTypeNodePort {
-		if apiServerAdvertiseAddress == "" {
-			return fmt.Errorf("api-server-advertise-address should be specified when 'api-service-type=nodeport'")
-		}
-
-		ip := net.ParseIP(apiServerAdvertiseAddress)
-		if ip == nil {
-			return fmt.Errorf("Invalid address provided for api-server-advertise-address")
+		if apiServerAdvertiseAddress != "" {
+			ip := net.ParseIP(apiServerAdvertiseAddress)
+			if ip == nil {
+				return fmt.Errorf("Invalid address provided for api-server-advertise-address")
+			}
 		}
 	}
 
@@ -349,7 +347,34 @@ func createService(clientset *client.Clientset, namespace, svcName, apiServiceTy
 			return
 		}
 	} else {
-		ips = append(ips, apiServerAdvertiseAddress)
+		if apiServerAdvertiseAddress != "" {
+			ips = append(ips, apiServerAdvertiseAddress)
+		} else {
+			preferredAddressTypes := []api.NodeAddressType{
+				api.NodeExternalIP,
+				api.NodeLegacyHostIP,
+				api.NodeInternalIP,
+			}
+			var nodeList *api.NodeList
+			nodeList, err = clientset.Nodes().List(metav1.ListOptions{})
+			if err != nil {
+				return
+			}
+			nodeAddress := ""
+			for _, addressType := range preferredAddressTypes {
+				for _, address := range nodeList.Items[0].Status.Addresses {
+					if address.Type == addressType {
+						nodeAddress = address.Address
+						break
+					}
+				}
+			}
+			if nodeAddress == "" {
+				err = fmt.Errorf("Unable to fetch node address")
+				return
+			}
+			ips = append(ips, nodeAddress)
+		}
 	}
 
 	svc, err = clientset.Core().Services(namespace).Create(svc)

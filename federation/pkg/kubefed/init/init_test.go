@@ -159,7 +159,7 @@ func TestInitFederation(t *testing.T) {
 			advertiseAddress:   "",
 			image:              "example.test/foo:bar",
 			etcdPVCapacity:     "5Gi",
-			expectedErr:        "error: api-server-advertise-address should be specified when 'api-service-type=nodeport'",
+			expectedErr:        "",
 			dnsProvider:        "test-dns-provider",
 			storageBackend:     "etcd3",
 			dryRun:             "",
@@ -665,6 +665,26 @@ func fakeInitHostFactory(federationName, namespaceName, apiServiceType, advertis
 		},
 	}
 
+	nodeList := v1.NodeList{}
+	node := v1.Node{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "Node",
+			APIVersion: testapi.Extensions.GroupVersion().String(),
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name: nodeIP,
+		},
+		Status: v1.NodeStatus{
+			Addresses: []v1.NodeAddress{
+				{
+					Type:    v1.NodeExternalIP,
+					Address: nodeIP,
+				},
+			},
+		},
+	}
+	nodeList.Items = append(nodeList.Items, node)
+
 	apiserver := v1beta1.Deployment{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "Deployment",
@@ -758,7 +778,11 @@ func fakeInitHostFactory(federationName, namespaceName, apiServiceType, advertis
 
 	address := lbIp
 	if apiServiceType == serviceTypeNodePort {
-		address = advertiseAddress
+		if advertiseAddress != "" {
+			address = advertiseAddress
+		} else {
+			address = nodeIP
+		}
 	}
 	apiserver.Spec.Template.Spec.Containers[0].Command = append(apiserver.Spec.Template.Spec.Containers[0].Command, fmt.Sprintf("--advertise-address=%s", address))
 
@@ -1013,6 +1037,8 @@ func fakeInitHostFactory(federationName, namespaceName, apiServiceType, advertis
 					return nil, fmt.Errorf("Unexpected rolebinding object\n\tDiff: %s", diff.ObjectGoPrintDiff(got, rolebinding))
 				}
 				return &http.Response{StatusCode: http.StatusCreated, Header: kubefedtesting.DefaultHeader(), Body: kubefedtesting.ObjBody(rbacCodec, &rolebinding)}, nil
+			case p == "/api/v1/nodes" && m == http.MethodGet:
+				return &http.Response{StatusCode: http.StatusOK, Header: kubefedtesting.DefaultHeader(), Body: kubefedtesting.ObjBody(codec, &nodeList)}, nil
 			default:
 				return nil, fmt.Errorf("unexpected request: %#v\n%#v", req.URL, req)
 			}
@@ -1213,7 +1239,11 @@ func copyTLSConfig(cfg *tls.Config) *tls.Config {
 func getEndpoint(apiServiceType, lbIP, advertiseAddress string) string {
 	endpoint := lbIP
 	if apiServiceType == serviceTypeNodePort {
-		endpoint = advertiseAddress + ":" + strconv.Itoa(federationApiserverNodeport)
+		if advertiseAddress != "" {
+			endpoint = advertiseAddress + ":" + strconv.Itoa(federationApiserverNodeport)
+		} else {
+			endpoint = nodeIP + ":" + strconv.Itoa(federationApiserverNodeport)
+		}
 	}
 	return endpoint
 }
