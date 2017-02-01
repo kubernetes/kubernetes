@@ -104,7 +104,7 @@ func Run(s *options.ServerRunOptions) error {
 		// When size of cache is not explicitly set, set it to 50000
 		s.Etcd.StorageConfig.DeserializationCacheSize = 50000
 	}
-	storageGroupsToEncodingVersion, err := s.GenericServerRunOptions.StorageGroupsToEncodingVersion()
+	storageGroupsToEncodingVersion, err := s.StorageSerialization.StorageGroupsToEncodingVersion()
 	if err != nil {
 		return fmt.Errorf("error generating storage version map: %s", err)
 	}
