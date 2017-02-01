@@ -17,7 +17,6 @@ limitations under the License.
 package master
 
 import (
-	"encoding/json"
 	"fmt"
 	"time"
 
@@ -25,13 +24,10 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/tools/clientcmd"
-	"k8s.io/kubernetes/cmd/kubeadm/app/images"
+	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/pkg/api/v1"
-	extensions "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 )
-
-const apiCallRetryInterval = 500 * time.Millisecond
 
 func CreateClientFromFile(path string) (*clientset.Clientset, error) {
 	adminKubeconfig, err := clientcmd.LoadFromFile(path)
@@ -64,7 +60,7 @@ func CreateClientAndWaitForAPI(file string) (*clientset.Clientset, error) {
 
 	fmt.Println("[apiclient] Waiting for at least one node to register and become ready")
 	start := time.Now()
-	wait.PollInfinite(apiCallRetryInterval, func() (bool, error) {
+	wait.PollInfinite(kubeadmconstants.APICallRetryInterval, func() (bool, error) {
 		nodeList, err := client.Nodes().List(metav1.ListOptions{})
 		if err != nil {
 			fmt.Println("[apiclient] Temporarily unable to list nodes (will retry)")
@@ -83,21 +79,16 @@ func CreateClientAndWaitForAPI(file string) (*clientset.Clientset, error) {
 		return true, nil
 	})
 
-	createDummyDeployment(client)
+	if err := createAndWaitForADummyDeployment(client); err != nil {
+		return nil, err
+	}
 
 	return client, nil
 }
 
-func standardLabels(n string) map[string]string {
-	return map[string]string{
-		"component": n, "name": n, "k8s-app": n,
-		"kubernetes.io/cluster-service": "true", "tier": "node",
-	}
-}
-
 func WaitForAPI(client *clientset.Clientset) {
 	start := time.Now()
-	wait.PollInfinite(apiCallRetryInterval, func() (bool, error) {
+	wait.PollInfinite(kubeadmconstants.APICallRetryInterval, func() (bool, error) {
 		// TODO: use /healthz API instead of this
 		cs, err := client.ComponentStatuses().List(metav1.ListOptions{})
 		if err != nil {
@@ -123,92 +114,4 @@ func WaitForAPI(client *clientset.Clientset) {
 		fmt.Printf("[apiclient] All control plane components are healthy after %f seconds\n", time.Since(start).Seconds())
 		return true, nil
 	})
-}
-
-func NewDaemonSet(daemonName string, podSpec v1.PodSpec) *extensions.DaemonSet {
-	l := standardLabels(daemonName)
-	return &extensions.DaemonSet{
-		ObjectMeta: metav1.ObjectMeta{Name: daemonName},
-		Spec: extensions.DaemonSetSpec{
-			Selector: &metav1.LabelSelector{MatchLabels: l},
-			Template: v1.PodTemplateSpec{
-				ObjectMeta: metav1.ObjectMeta{Labels: l},
-				Spec:       podSpec,
-			},
-		},
-	}
-}
-
-func NewService(serviceName string, spec v1.ServiceSpec) *v1.Service {
-	l := standardLabels(serviceName)
-	return &v1.Service{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:   serviceName,
-			Labels: l,
-		},
-		Spec: spec,
-	}
-}
-
-func NewDeployment(deploymentName string, replicas int32, podSpec v1.PodSpec) *extensions.Deployment {
-	l := standardLabels(deploymentName)
-	return &extensions.Deployment{
-		ObjectMeta: metav1.ObjectMeta{Name: deploymentName},
-		Spec: extensions.DeploymentSpec{
-			Replicas: &replicas,
-			Selector: &metav1.LabelSelector{MatchLabels: l},
-			Template: v1.PodTemplateSpec{
-				ObjectMeta: metav1.ObjectMeta{Labels: l},
-				Spec:       podSpec,
-			},
-		},
-	}
-}
-
-func SetMasterTaintTolerations(meta *metav1.ObjectMeta) {
-	tolerationsAnnotation, _ := json.Marshal([]v1.Toleration{{Key: "dedicated", Value: "master", Effect: "NoSchedule"}})
-	if meta.Annotations == nil {
-		meta.Annotations = map[string]string{}
-	}
-	meta.Annotations[v1.TolerationsAnnotationKey] = string(tolerationsAnnotation)
-}
-
-func createDummyDeployment(client *clientset.Clientset) {
-	fmt.Println("[apiclient] Creating a test deployment")
-	dummyDeployment := NewDeployment("dummy", 1, v1.PodSpec{
-		HostNetwork:     true,
-		SecurityContext: &v1.PodSecurityContext{},
-		Containers: []v1.Container{{
-			Name:  "dummy",
-			Image: images.GetAddonImage("pause"),
-		}},
-	})
-
-	wait.PollInfinite(apiCallRetryInterval, func() (bool, error) {
-		// TODO: we should check the error, as some cases may be fatal
-		if _, err := client.Extensions().Deployments(metav1.NamespaceSystem).Create(dummyDeployment); err != nil {
-			fmt.Printf("[apiclient] Failed to create test deployment [%v] (will retry)\n", err)
-			return false, nil
-		}
-		return true, nil
-	})
-
-	wait.PollInfinite(apiCallRetryInterval, func() (bool, error) {
-		d, err := client.Extensions().Deployments(metav1.NamespaceSystem).Get("dummy", metav1.GetOptions{})
-		if err != nil {
-			fmt.Printf("[apiclient] Failed to get test deployment [%v] (will retry)\n", err)
-			return false, nil
-		}
-		if d.Status.AvailableReplicas < 1 {
-			return false, nil
-		}
-		return true, nil
-	})
-
-	fmt.Println("[apiclient] Test deployment succeeded")
-
-	// TODO: In the future, make sure the ReplicaSet and Pod are garbage collected
-	if err := client.Extensions().Deployments(metav1.NamespaceSystem).Delete("dummy", &metav1.DeleteOptions{}); err != nil {
-		fmt.Printf("[apiclient] Failed to delete test deployment [%v] (will ignore)\n", err)
-	}
 }
