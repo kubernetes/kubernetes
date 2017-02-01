@@ -35,7 +35,6 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/genericapiserver/registry/rest"
 )
 
@@ -47,13 +46,15 @@ type Tester struct {
 	generatesName       bool
 	returnDeletedObject bool
 	namer               func(int) string
+	scheme              *runtime.Scheme
 }
 
-func New(t *testing.T, storage rest.Storage) *Tester {
+func New(t *testing.T, storage rest.Storage, scheme *runtime.Scheme) *Tester {
 	return &Tester{
 		T:       t,
 		storage: storage,
 		namer:   defaultNamer,
+		scheme:  scheme,
 	}
 }
 
@@ -126,8 +127,8 @@ func (t *Tester) setObjectMeta(obj runtime.Object, name string) {
 	meta.Generation = 1
 }
 
-func copyOrDie(obj runtime.Object) runtime.Object {
-	out, err := api.Scheme.Copy(obj)
+func copyOrDie(obj runtime.Object, copier runtime.ObjectCopier) runtime.Object {
+	out, err := copier.Copy(obj)
 	if err != nil {
 		panic(err)
 	}
@@ -146,81 +147,81 @@ type UpdateFunc func(runtime.Object) runtime.Object
 
 // Test creating an object.
 func (t *Tester) TestCreate(valid runtime.Object, createFn CreateFunc, getFn GetFunc, invalid ...runtime.Object) {
-	t.testCreateHasMetadata(copyOrDie(valid))
+	t.testCreateHasMetadata(copyOrDie(valid, t.scheme))
 	if !t.generatesName {
-		t.testCreateGeneratesName(copyOrDie(valid))
+		t.testCreateGeneratesName(copyOrDie(valid, t.scheme))
 	}
-	t.testCreateEquals(copyOrDie(valid), getFn)
-	t.testCreateAlreadyExisting(copyOrDie(valid), createFn)
+	t.testCreateEquals(copyOrDie(valid, t.scheme), getFn)
+	t.testCreateAlreadyExisting(copyOrDie(valid, t.scheme), createFn)
 	if t.clusterScope {
-		t.testCreateDiscardsObjectNamespace(copyOrDie(valid))
-		t.testCreateIgnoresContextNamespace(copyOrDie(valid))
-		t.testCreateIgnoresMismatchedNamespace(copyOrDie(valid))
-		t.testCreateResetsUserData(copyOrDie(valid))
+		t.testCreateDiscardsObjectNamespace(copyOrDie(valid, t.scheme))
+		t.testCreateIgnoresContextNamespace(copyOrDie(valid, t.scheme))
+		t.testCreateIgnoresMismatchedNamespace(copyOrDie(valid, t.scheme))
+		t.testCreateResetsUserData(copyOrDie(valid, t.scheme))
 	} else {
-		t.testCreateRejectsMismatchedNamespace(copyOrDie(valid))
+		t.testCreateRejectsMismatchedNamespace(copyOrDie(valid, t.scheme))
 	}
 	t.testCreateInvokesValidation(invalid...)
-	t.testCreateValidatesNames(copyOrDie(valid))
-	t.testCreateIgnoreClusterName(copyOrDie(valid))
+	t.testCreateValidatesNames(copyOrDie(valid, t.scheme))
+	t.testCreateIgnoreClusterName(copyOrDie(valid, t.scheme))
 }
 
 // Test updating an object.
 func (t *Tester) TestUpdate(valid runtime.Object, createFn CreateFunc, getFn GetFunc, updateFn UpdateFunc, invalidUpdateFn ...UpdateFunc) {
-	t.testUpdateEquals(copyOrDie(valid), createFn, getFn, updateFn)
-	t.testUpdateFailsOnVersionTooOld(copyOrDie(valid), createFn, getFn)
-	t.testUpdateOnNotFound(copyOrDie(valid))
+	t.testUpdateEquals(copyOrDie(valid, t.scheme), createFn, getFn, updateFn)
+	t.testUpdateFailsOnVersionTooOld(copyOrDie(valid, t.scheme), createFn, getFn)
+	t.testUpdateOnNotFound(copyOrDie(valid, t.scheme))
 	if !t.clusterScope {
-		t.testUpdateRejectsMismatchedNamespace(copyOrDie(valid), createFn, getFn)
+		t.testUpdateRejectsMismatchedNamespace(copyOrDie(valid, t.scheme), createFn, getFn)
 	}
-	t.testUpdateInvokesValidation(copyOrDie(valid), createFn, invalidUpdateFn...)
-	t.testUpdateWithWrongUID(copyOrDie(valid), createFn, getFn)
-	t.testUpdateRetrievesOldObject(copyOrDie(valid), createFn, getFn)
-	t.testUpdatePropagatesUpdatedObjectError(copyOrDie(valid), createFn, getFn)
-	t.testUpdateIgnoreGenerationUpdates(copyOrDie(valid), createFn, getFn)
-	t.testUpdateIgnoreClusterName(copyOrDie(valid), createFn, getFn)
+	t.testUpdateInvokesValidation(copyOrDie(valid, t.scheme), createFn, invalidUpdateFn...)
+	t.testUpdateWithWrongUID(copyOrDie(valid, t.scheme), createFn, getFn)
+	t.testUpdateRetrievesOldObject(copyOrDie(valid, t.scheme), createFn, getFn)
+	t.testUpdatePropagatesUpdatedObjectError(copyOrDie(valid, t.scheme), createFn, getFn)
+	t.testUpdateIgnoreGenerationUpdates(copyOrDie(valid, t.scheme), createFn, getFn)
+	t.testUpdateIgnoreClusterName(copyOrDie(valid, t.scheme), createFn, getFn)
 }
 
 // Test deleting an object.
 func (t *Tester) TestDelete(valid runtime.Object, createFn CreateFunc, getFn GetFunc, isNotFoundFn IsErrorFunc) {
-	t.testDeleteNonExist(copyOrDie(valid))
-	t.testDeleteNoGraceful(copyOrDie(valid), createFn, getFn, isNotFoundFn)
-	t.testDeleteWithUID(copyOrDie(valid), createFn, getFn, isNotFoundFn)
+	t.testDeleteNonExist(copyOrDie(valid, t.scheme))
+	t.testDeleteNoGraceful(copyOrDie(valid, t.scheme), createFn, getFn, isNotFoundFn)
+	t.testDeleteWithUID(copyOrDie(valid, t.scheme), createFn, getFn, isNotFoundFn)
 }
 
 // Test gracefully deleting an object.
 func (t *Tester) TestDeleteGraceful(valid runtime.Object, createFn CreateFunc, getFn GetFunc, expectedGrace int64) {
-	t.testDeleteGracefulHasDefault(copyOrDie(valid), createFn, getFn, expectedGrace)
-	t.testDeleteGracefulWithValue(copyOrDie(valid), createFn, getFn, expectedGrace)
-	t.testDeleteGracefulUsesZeroOnNil(copyOrDie(valid), createFn, expectedGrace)
-	t.testDeleteGracefulExtend(copyOrDie(valid), createFn, getFn, expectedGrace)
-	t.testDeleteGracefulShorten(copyOrDie(valid), createFn, getFn, expectedGrace)
-	t.testDeleteGracefulImmediate(copyOrDie(valid), createFn, getFn, expectedGrace)
+	t.testDeleteGracefulHasDefault(copyOrDie(valid, t.scheme), createFn, getFn, expectedGrace)
+	t.testDeleteGracefulWithValue(copyOrDie(valid, t.scheme), createFn, getFn, expectedGrace)
+	t.testDeleteGracefulUsesZeroOnNil(copyOrDie(valid, t.scheme), createFn, expectedGrace)
+	t.testDeleteGracefulExtend(copyOrDie(valid, t.scheme), createFn, getFn, expectedGrace)
+	t.testDeleteGracefulShorten(copyOrDie(valid, t.scheme), createFn, getFn, expectedGrace)
+	t.testDeleteGracefulImmediate(copyOrDie(valid, t.scheme), createFn, getFn, expectedGrace)
 }
 
 // Test getting object.
 func (t *Tester) TestGet(valid runtime.Object) {
-	t.testGetFound(copyOrDie(valid))
-	t.testGetNotFound(copyOrDie(valid))
-	t.testGetMimatchedNamespace(copyOrDie(valid))
+	t.testGetFound(copyOrDie(valid, t.scheme))
+	t.testGetNotFound(copyOrDie(valid, t.scheme))
+	t.testGetMimatchedNamespace(copyOrDie(valid, t.scheme))
 	if !t.clusterScope {
-		t.testGetDifferentNamespace(copyOrDie(valid))
+		t.testGetDifferentNamespace(copyOrDie(valid, t.scheme))
 	}
 }
 
 // Test listing objects.
 func (t *Tester) TestList(valid runtime.Object, assignFn AssignFunc) {
 	t.testListNotFound(assignFn)
-	t.testListFound(copyOrDie(valid), assignFn)
-	t.testListMatchLabels(copyOrDie(valid), assignFn)
+	t.testListFound(copyOrDie(valid, t.scheme), assignFn)
+	t.testListMatchLabels(copyOrDie(valid, t.scheme), assignFn)
 }
 
 // Test watching objects.
 func (t *Tester) TestWatch(
 	valid runtime.Object, emitFn EmitFunc,
 	labelsPass, labelsFail []labels.Set, fieldsPass, fieldsFail []fields.Set, actions []string) {
-	t.testWatchLabels(copyOrDie(valid), emitFn, labelsPass, labelsFail, actions)
-	t.testWatchFields(copyOrDie(valid), emitFn, fieldsPass, fieldsFail, actions)
+	t.testWatchLabels(copyOrDie(valid, t.scheme), emitFn, labelsPass, labelsFail, actions)
+	t.testWatchFields(copyOrDie(valid, t.scheme), emitFn, fieldsPass, fieldsFail, actions)
 }
 
 // =============================================================================
@@ -242,7 +243,7 @@ func (t *Tester) delete(ctx genericapirequest.Context, obj runtime.Object) error
 func (t *Tester) testCreateAlreadyExisting(obj runtime.Object, createFn CreateFunc) {
 	ctx := t.TestContext()
 
-	foo := copyOrDie(obj)
+	foo := copyOrDie(obj, t.scheme)
 	t.setObjectMeta(foo, t.namer(1))
 	if err := createFn(ctx, foo); err != nil {
 		t.Errorf("unexpected error: %v", err)
@@ -258,7 +259,7 @@ func (t *Tester) testCreateAlreadyExisting(obj runtime.Object, createFn CreateFu
 func (t *Tester) testCreateEquals(obj runtime.Object, getFn GetFunc) {
 	ctx := t.TestContext()
 
-	foo := copyOrDie(obj)
+	foo := copyOrDie(obj, t.scheme)
 	t.setObjectMeta(foo, t.namer(2))
 
 	created, err := t.storage.(rest.Creater).Create(ctx, foo)
@@ -289,7 +290,7 @@ func (t *Tester) testCreateDiscardsObjectNamespace(valid runtime.Object) {
 	objectMeta.Namespace = "not-default"
 
 	// Ideally, we'd get an error back here, but at least verify the namespace wasn't persisted
-	created, err := t.storage.(rest.Creater).Create(t.TestContext(), copyOrDie(valid))
+	created, err := t.storage.(rest.Creater).Create(t.TestContext(), copyOrDie(valid, t.scheme))
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
@@ -338,7 +339,7 @@ func (t *Tester) testCreateIgnoresContextNamespace(valid runtime.Object) {
 	ctx := genericapirequest.WithNamespace(genericapirequest.NewContext(), "not-default2")
 
 	// Ideally, we'd get an error back here, but at least verify the namespace wasn't persisted
-	created, err := t.storage.(rest.Creater).Create(ctx, copyOrDie(valid))
+	created, err := t.storage.(rest.Creater).Create(ctx, copyOrDie(valid, t.scheme))
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
@@ -357,7 +358,7 @@ func (t *Tester) testCreateIgnoresMismatchedNamespace(valid runtime.Object) {
 	ctx := genericapirequest.WithNamespace(genericapirequest.NewContext(), "not-default2")
 
 	// Ideally, we'd get an error back here, but at least verify the namespace wasn't persisted
-	created, err := t.storage.(rest.Creater).Create(ctx, copyOrDie(valid))
+	created, err := t.storage.(rest.Creater).Create(ctx, copyOrDie(valid, t.scheme))
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
@@ -370,7 +371,7 @@ func (t *Tester) testCreateIgnoresMismatchedNamespace(valid runtime.Object) {
 
 func (t *Tester) testCreateValidatesNames(valid runtime.Object) {
 	for _, invalidName := range path.NameMayNotBe {
-		objCopy := copyOrDie(valid)
+		objCopy := copyOrDie(valid, t.scheme)
 		objCopyMeta := t.getObjectMetaOrFail(objCopy)
 		objCopyMeta.Name = invalidName
 
@@ -382,7 +383,7 @@ func (t *Tester) testCreateValidatesNames(valid runtime.Object) {
 	}
 
 	for _, invalidSuffix := range path.NameMayNotContain {
-		objCopy := copyOrDie(valid)
+		objCopy := copyOrDie(valid, t.scheme)
 		objCopyMeta := t.getObjectMetaOrFail(objCopy)
 		objCopyMeta.Name += invalidSuffix
 
@@ -440,7 +441,7 @@ func (t *Tester) testCreateIgnoreClusterName(valid runtime.Object) {
 	objectMeta.Name = t.namer(3)
 	objectMeta.ClusterName = "clustername-to-ignore"
 
-	obj, err := t.storage.(rest.Creater).Create(t.TestContext(), copyOrDie(valid))
+	obj, err := t.storage.(rest.Creater).Create(t.TestContext(), copyOrDie(valid, t.scheme))
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
@@ -457,7 +458,7 @@ func (t *Tester) testCreateIgnoreClusterName(valid runtime.Object) {
 func (t *Tester) testUpdateEquals(obj runtime.Object, createFn CreateFunc, getFn GetFunc, updateFn UpdateFunc) {
 	ctx := t.TestContext()
 
-	foo := copyOrDie(obj)
+	foo := copyOrDie(obj, t.scheme)
 	t.setObjectMeta(foo, t.namer(2))
 	if err := createFn(ctx, foo); err != nil {
 		t.Errorf("unexpected error: %v", err)
@@ -469,7 +470,7 @@ func (t *Tester) testUpdateEquals(obj runtime.Object, createFn CreateFunc, getFn
 	}
 	toUpdate = updateFn(toUpdate)
 	toUpdateMeta := t.getObjectMetaOrFail(toUpdate)
-	updated, created, err := t.storage.(rest.Updater).Update(ctx, toUpdateMeta.Name, rest.DefaultUpdatedObjectInfo(toUpdate, api.Scheme))
+	updated, created, err := t.storage.(rest.Updater).Update(ctx, toUpdateMeta.Name, rest.DefaultUpdatedObjectInfo(toUpdate, t.scheme))
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -493,7 +494,7 @@ func (t *Tester) testUpdateEquals(obj runtime.Object, createFn CreateFunc, getFn
 func (t *Tester) testUpdateFailsOnVersionTooOld(obj runtime.Object, createFn CreateFunc, getFn GetFunc) {
 	ctx := t.TestContext()
 
-	foo := copyOrDie(obj)
+	foo := copyOrDie(obj, t.scheme)
 	t.setObjectMeta(foo, t.namer(3))
 
 	if err := createFn(ctx, foo); err != nil {
@@ -505,11 +506,11 @@ func (t *Tester) testUpdateFailsOnVersionTooOld(obj runtime.Object, createFn Cre
 		t.Errorf("unexpected error: %v", err)
 	}
 
-	older := copyOrDie(storedFoo)
+	older := copyOrDie(storedFoo, t.scheme)
 	olderMeta := t.getObjectMetaOrFail(older)
 	olderMeta.ResourceVersion = "1"
 
-	_, _, err = t.storage.(rest.Updater).Update(t.TestContext(), olderMeta.Name, rest.DefaultUpdatedObjectInfo(older, api.Scheme))
+	_, _, err = t.storage.(rest.Updater).Update(t.TestContext(), olderMeta.Name, rest.DefaultUpdatedObjectInfo(older, t.scheme))
 	if err == nil {
 		t.Errorf("Expected an error, but we didn't get one")
 	} else if !errors.IsConflict(err) {
@@ -520,16 +521,16 @@ func (t *Tester) testUpdateFailsOnVersionTooOld(obj runtime.Object, createFn Cre
 func (t *Tester) testUpdateInvokesValidation(obj runtime.Object, createFn CreateFunc, invalidUpdateFn ...UpdateFunc) {
 	ctx := t.TestContext()
 
-	foo := copyOrDie(obj)
+	foo := copyOrDie(obj, t.scheme)
 	t.setObjectMeta(foo, t.namer(4))
 	if err := createFn(ctx, foo); err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
 
 	for _, update := range invalidUpdateFn {
-		toUpdate := update(copyOrDie(foo))
+		toUpdate := update(copyOrDie(foo, t.scheme))
 		toUpdateMeta := t.getObjectMetaOrFail(toUpdate)
-		got, created, err := t.storage.(rest.Updater).Update(t.TestContext(), toUpdateMeta.Name, rest.DefaultUpdatedObjectInfo(toUpdate, api.Scheme))
+		got, created, err := t.storage.(rest.Updater).Update(t.TestContext(), toUpdateMeta.Name, rest.DefaultUpdatedObjectInfo(toUpdate, t.scheme))
 		if got != nil || created {
 			t.Errorf("expected nil object and no creation for object: %v", toUpdate)
 		}
@@ -541,7 +542,7 @@ func (t *Tester) testUpdateInvokesValidation(obj runtime.Object, createFn Create
 
 func (t *Tester) testUpdateWithWrongUID(obj runtime.Object, createFn CreateFunc, getFn GetFunc) {
 	ctx := t.TestContext()
-	foo := copyOrDie(obj)
+	foo := copyOrDie(obj, t.scheme)
 	t.setObjectMeta(foo, t.namer(5))
 	objectMeta := t.getObjectMetaOrFail(foo)
 	objectMeta.UID = types.UID("UID0000")
@@ -550,7 +551,7 @@ func (t *Tester) testUpdateWithWrongUID(obj runtime.Object, createFn CreateFunc,
 	}
 	objectMeta.UID = types.UID("UID1111")
 
-	obj, created, err := t.storage.(rest.Updater).Update(ctx, objectMeta.Name, rest.DefaultUpdatedObjectInfo(foo, api.Scheme))
+	obj, created, err := t.storage.(rest.Updater).Update(ctx, objectMeta.Name, rest.DefaultUpdatedObjectInfo(foo, t.scheme))
 	if created || obj != nil {
 		t.Errorf("expected nil object and no creation for object: %v", foo)
 	}
@@ -561,7 +562,7 @@ func (t *Tester) testUpdateWithWrongUID(obj runtime.Object, createFn CreateFunc,
 
 func (t *Tester) testUpdateRetrievesOldObject(obj runtime.Object, createFn CreateFunc, getFn GetFunc) {
 	ctx := t.TestContext()
-	foo := copyOrDie(obj)
+	foo := copyOrDie(obj, t.scheme)
 	t.setObjectMeta(foo, t.namer(6))
 	objectMeta := t.getObjectMetaOrFail(foo)
 	objectMeta.Annotations = map[string]string{"A": "1"}
@@ -576,7 +577,7 @@ func (t *Tester) testUpdateRetrievesOldObject(obj runtime.Object, createFn Creat
 		return
 	}
 
-	storedFooWithUpdates := copyOrDie(storedFoo)
+	storedFooWithUpdates := copyOrDie(storedFoo, t.scheme)
 	objectMeta = t.getObjectMetaOrFail(storedFooWithUpdates)
 	objectMeta.Annotations = map[string]string{"A": "2"}
 
@@ -594,7 +595,7 @@ func (t *Tester) testUpdateRetrievesOldObject(obj runtime.Object, createFn Creat
 		return updatedObject, nil
 	}
 
-	updatedObj, created, err := t.storage.(rest.Updater).Update(ctx, objectMeta.Name, rest.DefaultUpdatedObjectInfo(storedFooWithUpdates, api.Scheme, noopTransform))
+	updatedObj, created, err := t.storage.(rest.Updater).Update(ctx, objectMeta.Name, rest.DefaultUpdatedObjectInfo(storedFooWithUpdates, t.scheme, noopTransform))
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 		return
@@ -615,7 +616,7 @@ func (t *Tester) testUpdateRetrievesOldObject(obj runtime.Object, createFn Creat
 
 func (t *Tester) testUpdatePropagatesUpdatedObjectError(obj runtime.Object, createFn CreateFunc, getFn GetFunc) {
 	ctx := t.TestContext()
-	foo := copyOrDie(obj)
+	foo := copyOrDie(obj, t.scheme)
 	name := t.namer(7)
 	t.setObjectMeta(foo, name)
 	if err := createFn(ctx, foo); err != nil {
@@ -629,7 +630,7 @@ func (t *Tester) testUpdatePropagatesUpdatedObjectError(obj runtime.Object, crea
 		return nil, propagateErr
 	}
 
-	_, _, err := t.storage.(rest.Updater).Update(ctx, name, rest.DefaultUpdatedObjectInfo(foo, api.Scheme, noopTransform))
+	_, _, err := t.storage.(rest.Updater).Update(ctx, name, rest.DefaultUpdatedObjectInfo(foo, t.scheme, noopTransform))
 	if err != propagateErr {
 		t.Errorf("expected propagated error, got %#v", err)
 	}
@@ -638,7 +639,7 @@ func (t *Tester) testUpdatePropagatesUpdatedObjectError(obj runtime.Object, crea
 func (t *Tester) testUpdateIgnoreGenerationUpdates(obj runtime.Object, createFn CreateFunc, getFn GetFunc) {
 	ctx := t.TestContext()
 
-	foo := copyOrDie(obj)
+	foo := copyOrDie(obj, t.scheme)
 	name := t.namer(8)
 	t.setObjectMeta(foo, name)
 
@@ -651,11 +652,11 @@ func (t *Tester) testUpdateIgnoreGenerationUpdates(obj runtime.Object, createFn 
 		t.Errorf("unexpected error: %v", err)
 	}
 
-	older := copyOrDie(storedFoo)
+	older := copyOrDie(storedFoo, t.scheme)
 	olderMeta := t.getObjectMetaOrFail(older)
 	olderMeta.Generation = 2
 
-	_, _, err = t.storage.(rest.Updater).Update(t.TestContext(), olderMeta.Name, rest.DefaultUpdatedObjectInfo(older, api.Scheme))
+	_, _, err = t.storage.(rest.Updater).Update(t.TestContext(), olderMeta.Name, rest.DefaultUpdatedObjectInfo(older, t.scheme))
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
@@ -671,7 +672,7 @@ func (t *Tester) testUpdateIgnoreGenerationUpdates(obj runtime.Object, createFn 
 
 func (t *Tester) testUpdateOnNotFound(obj runtime.Object) {
 	t.setObjectMeta(obj, t.namer(0))
-	_, created, err := t.storage.(rest.Updater).Update(t.TestContext(), t.namer(0), rest.DefaultUpdatedObjectInfo(obj, api.Scheme))
+	_, created, err := t.storage.(rest.Updater).Update(t.TestContext(), t.namer(0), rest.DefaultUpdatedObjectInfo(obj, t.scheme))
 	if t.createOnUpdate {
 		if err != nil {
 			t.Errorf("creation allowed on updated, but got an error: %v", err)
@@ -691,7 +692,7 @@ func (t *Tester) testUpdateOnNotFound(obj runtime.Object) {
 func (t *Tester) testUpdateRejectsMismatchedNamespace(obj runtime.Object, createFn CreateFunc, getFn GetFunc) {
 	ctx := t.TestContext()
 
-	foo := copyOrDie(obj)
+	foo := copyOrDie(obj, t.scheme)
 	t.setObjectMeta(foo, t.namer(1))
 	if err := createFn(ctx, foo); err != nil {
 		t.Errorf("unexpected error: %v", err)
@@ -706,7 +707,7 @@ func (t *Tester) testUpdateRejectsMismatchedNamespace(obj runtime.Object, create
 	objectMeta.Name = t.namer(1)
 	objectMeta.Namespace = "not-default"
 
-	obj, updated, err := t.storage.(rest.Updater).Update(t.TestContext(), "foo1", rest.DefaultUpdatedObjectInfo(storedFoo, api.Scheme))
+	obj, updated, err := t.storage.(rest.Updater).Update(t.TestContext(), "foo1", rest.DefaultUpdatedObjectInfo(storedFoo, t.scheme))
 	if obj != nil || updated {
 		t.Errorf("expected nil object and not updated")
 	}
@@ -720,7 +721,7 @@ func (t *Tester) testUpdateRejectsMismatchedNamespace(obj runtime.Object, create
 func (t *Tester) testUpdateIgnoreClusterName(obj runtime.Object, createFn CreateFunc, getFn GetFunc) {
 	ctx := t.TestContext()
 
-	foo := copyOrDie(obj)
+	foo := copyOrDie(obj, t.scheme)
 	name := t.namer(9)
 	t.setObjectMeta(foo, name)
 
@@ -733,11 +734,11 @@ func (t *Tester) testUpdateIgnoreClusterName(obj runtime.Object, createFn Create
 		t.Errorf("unexpected error: %v", err)
 	}
 
-	older := copyOrDie(storedFoo)
+	older := copyOrDie(storedFoo, t.scheme)
 	olderMeta := t.getObjectMetaOrFail(older)
 	olderMeta.ClusterName = "clustername-to-ignore"
 
-	_, _, err = t.storage.(rest.Updater).Update(t.TestContext(), olderMeta.Name, rest.DefaultUpdatedObjectInfo(older, api.Scheme))
+	_, _, err = t.storage.(rest.Updater).Update(t.TestContext(), olderMeta.Name, rest.DefaultUpdatedObjectInfo(older, t.scheme))
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
@@ -758,7 +759,7 @@ func (t *Tester) testUpdateIgnoreClusterName(obj runtime.Object, createFn Create
 func (t *Tester) testDeleteNoGraceful(obj runtime.Object, createFn CreateFunc, getFn GetFunc, isNotFoundFn IsErrorFunc) {
 	ctx := t.TestContext()
 
-	foo := copyOrDie(obj)
+	foo := copyOrDie(obj, t.scheme)
 	t.setObjectMeta(foo, t.namer(1))
 	if err := createFn(ctx, foo); err != nil {
 		t.Errorf("unexpected error: %v", err)
@@ -797,7 +798,7 @@ func (t *Tester) testDeleteNonExist(obj runtime.Object) {
 func (t *Tester) testDeleteWithUID(obj runtime.Object, createFn CreateFunc, getFn GetFunc, isNotFoundFn IsErrorFunc) {
 	ctx := t.TestContext()
 
-	foo := copyOrDie(obj)
+	foo := copyOrDie(obj, t.scheme)
 	t.setObjectMeta(foo, t.namer(1))
 	objectMeta := t.getObjectMetaOrFail(foo)
 	objectMeta.UID = types.UID("UID0000")
@@ -834,7 +835,7 @@ func (t *Tester) testDeleteWithUID(obj runtime.Object, createFn CreateFunc, getF
 func (t *Tester) testDeleteGracefulHasDefault(obj runtime.Object, createFn CreateFunc, getFn GetFunc, expectedGrace int64) {
 	ctx := t.TestContext()
 
-	foo := copyOrDie(obj)
+	foo := copyOrDie(obj, t.scheme)
 	t.setObjectMeta(foo, t.namer(1))
 	if err := createFn(ctx, foo); err != nil {
 		t.Errorf("unexpected error: %v", err)
@@ -865,7 +866,7 @@ func (t *Tester) testDeleteGracefulHasDefault(obj runtime.Object, createFn Creat
 func (t *Tester) testDeleteGracefulWithValue(obj runtime.Object, createFn CreateFunc, getFn GetFunc, expectedGrace int64) {
 	ctx := t.TestContext()
 
-	foo := copyOrDie(obj)
+	foo := copyOrDie(obj, t.scheme)
 	t.setObjectMeta(foo, t.namer(2))
 	if err := createFn(ctx, foo); err != nil {
 		t.Errorf("unexpected error: %v", err)
@@ -896,7 +897,7 @@ func (t *Tester) testDeleteGracefulWithValue(obj runtime.Object, createFn Create
 func (t *Tester) testDeleteGracefulExtend(obj runtime.Object, createFn CreateFunc, getFn GetFunc, expectedGrace int64) {
 	ctx := t.TestContext()
 
-	foo := copyOrDie(obj)
+	foo := copyOrDie(obj, t.scheme)
 	t.setObjectMeta(foo, t.namer(3))
 	if err := createFn(ctx, foo); err != nil {
 		t.Errorf("unexpected error: %v", err)
@@ -932,7 +933,7 @@ func (t *Tester) testDeleteGracefulExtend(obj runtime.Object, createFn CreateFun
 func (t *Tester) testDeleteGracefulImmediate(obj runtime.Object, createFn CreateFunc, getFn GetFunc, expectedGrace int64) {
 	ctx := t.TestContext()
 
-	foo := copyOrDie(obj)
+	foo := copyOrDie(obj, t.scheme)
 	t.setObjectMeta(foo, "foo4")
 	if err := createFn(ctx, foo); err != nil {
 		t.Errorf("unexpected error: %v", err)
@@ -969,7 +970,7 @@ func (t *Tester) testDeleteGracefulImmediate(obj runtime.Object, createFn Create
 func (t *Tester) testDeleteGracefulUsesZeroOnNil(obj runtime.Object, createFn CreateFunc, expectedGrace int64) {
 	ctx := t.TestContext()
 
-	foo := copyOrDie(obj)
+	foo := copyOrDie(obj, t.scheme)
 	t.setObjectMeta(foo, t.namer(5))
 	if err := createFn(ctx, foo); err != nil {
 		t.Errorf("unexpected error: %v", err)
@@ -988,7 +989,7 @@ func (t *Tester) testDeleteGracefulUsesZeroOnNil(obj runtime.Object, createFn Cr
 func (t *Tester) testDeleteGracefulShorten(obj runtime.Object, createFn CreateFunc, getFn GetFunc, expectedGrace int64) {
 	ctx := t.TestContext()
 
-	foo := copyOrDie(obj)
+	foo := copyOrDie(obj, t.scheme)
 	t.setObjectMeta(foo, t.namer(6))
 	if err := createFn(ctx, foo); err != nil {
 		t.Errorf("unexpected error: %v", err)
@@ -1157,9 +1158,9 @@ func listToItems(listObj runtime.Object) ([]runtime.Object, error) {
 func (t *Tester) testListFound(obj runtime.Object, assignFn AssignFunc) {
 	ctx := t.TestContext()
 
-	foo1 := copyOrDie(obj)
+	foo1 := copyOrDie(obj, t.scheme)
 	t.setObjectMeta(foo1, t.namer(1))
-	foo2 := copyOrDie(obj)
+	foo2 := copyOrDie(obj, t.scheme)
 	t.setObjectMeta(foo2, t.namer(2))
 
 	existing := assignFn([]runtime.Object{foo1, foo2})
@@ -1184,9 +1185,9 @@ func (t *Tester) testListMatchLabels(obj runtime.Object, assignFn AssignFunc) {
 	ctx := t.TestContext()
 	testLabels := map[string]string{"key": "value"}
 
-	foo3 := copyOrDie(obj)
+	foo3 := copyOrDie(obj, t.scheme)
 	t.setObjectMeta(foo3, "foo3")
-	foo4 := copyOrDie(obj)
+	foo4 := copyOrDie(obj, t.scheme)
 	foo4Meta := t.getObjectMetaOrFail(foo4)
 	foo4Meta.Name = "foo4"
 	foo4Meta.Namespace = genericapirequest.NamespaceValue(ctx)
