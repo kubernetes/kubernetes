@@ -48,6 +48,7 @@ type RESTClient struct {
 	NegotiatedSerializer runtime.NegotiatedSerializer
 	GroupName            string
 	APIRegistry          *registered.APIRegistrationManager
+	VersionedAPIPath     string
 
 	Req  *http.Request
 	Resp *http.Response
@@ -62,8 +63,8 @@ func (c *RESTClient) Put() *restclient.Request {
 	return c.request("PUT")
 }
 
-func (c *RESTClient) Patch(_ types.PatchType) *restclient.Request {
-	return c.request("PATCH")
+func (c *RESTClient) Patch(pt types.PatchType) *restclient.Request {
+	return c.request("PATCH").SetHeader("Content-Type", string(pt))
 }
 
 func (c *RESTClient) Post() *restclient.Request {
@@ -110,7 +111,7 @@ func (c *RESTClient) request(verb string) *restclient.Request {
 		serializers.StreamingSerializer = info.StreamSerializer.Serializer
 		serializers.Framer = info.StreamSerializer.Framer
 	}
-	return restclient.NewRequest(c, verb, &url.URL{Host: "localhost"}, "", config, serializers, nil, nil)
+	return restclient.NewRequest(c, verb, &url.URL{Host: "localhost"}, c.VersionedAPIPath, config, serializers, nil, nil)
 }
 
 func (c *RESTClient) Do(req *http.Request) (*http.Response, error) {
