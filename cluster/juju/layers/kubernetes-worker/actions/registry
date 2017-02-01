@@ -4,13 +4,37 @@
 #
 # Registry creation
 #
-# juju run-action kubernetes-worker/0 registry domain=myregistry.internal \
-# htpasswd="$(cat htpasswd)" ingress=true \
-# tlscert="$(cat registry.crt)" tlskey="$(cat registry.key)"
+# First, setup the needed authentication files
 #
-# Registry deletion
+# $ echo "userA:passwordA" > htpasswd-plain
+# $ htpasswd -b -B htpasswd userA passwordA
+#
+# And then run the action
+#
+# $ juju run-action kubernetes-worker/0 registry domain=myregistry.internal \
+# htpasswd="$(base64 -w0 htpasswd)" htpasswd-plain="$(base64 -w0 htpasswd-plain) \
+# tlscert="$(base64 -w0 registry.crt)" tlskey="$(base64 -w0 registry.key) \
+# ingress=true
+#
+# To delete the registry
 #
 # juju run-action kubernetes-worker/0 registry delete=true ingress=true
+#
+#
+# TODO
+#
+# - make the action idempotent (i.e. if you run it multiple times, the first
+# run will create/delete the registry, and the reset will be a no-op and won't
+# error out)
+#
+# - take only a plain authentication file, and create the encrypted version in
+# the action
+#
+# - validate the parameters (make sure tlscert is a certificate, that tlskey is a
+# proper key, etc)
+#
+# - when https://bugs.launchpad.net/juju/+bug/1661015 is fixed, handle the
+# base64 encoding the parameters in the action itself
 
 import sys
 
@@ -26,13 +50,9 @@ deletion = action_get('delete')
 
 context = {}
 
-# List of config options we need to b64encode, as the registry image provided
-# by Google only accepts b64encoded values
-b64_params = ('tlscert', 'tlskey', 'htpasswd')
-
 # These config options must be defined in the case of a creation
 param_error = False
-for param in ('tlscert', 'tlskey', 'domain', 'htpasswd'):
+for param in ('tlscert', 'tlskey', 'domain', 'htpasswd', 'htpasswd-plain'):
     value = action_get(param)
     if not value and not deletion:
         key = "registry-create-parameter-{}".format(param)
@@ -40,14 +60,11 @@ for param in ('tlscert', 'tlskey', 'domain', 'htpasswd'):
         action_set({key: error})
         param_error = True
 
-    if param in b64_params:
-        value = b64encode(value.encode()).decode('ASCII')
-
     context[param] = value
 
-# Create the dockercfg template variable, using the base64 encoded htpasswd
+# Create the dockercfg template variable
 dockercfg = '{"https://%s/v2/": {"auth": "%s", "email": "root@localhost"}}' % \
-            (action_get('domain'), context['htpasswd'])
+            (context['domain'], context['htpasswd-plain'])
 context['dockercfg'] = b64encode(dockercfg.encode()).decode('ASCII')
 
 if param_error:
@@ -62,12 +79,12 @@ kubectl = ['kubectl', '--kubeconfig=/srv/kubernetes/config']
 # Remove deployment if requested
 if deletion:
     resources = ['svc/kube-registry', 'rc/kube-registry-v0', 'secrets/registry-tls-data',
-                 'secrets/registry-auth-data']
+                 'secrets/registry-auth-data', 'secrets/registry-access']
 
     if action_get('ingress'):
         resources.append('ing/registry-ing')
 
-    delete_command = kubectl + ['delete'] + resources
+    delete_command = kubectl + ['delete', '--ignore-not-found=true'] + resources
     delete_response = call(delete_command)
     if delete_response == 0:
         action_set({'registry-delete': 'success'})
