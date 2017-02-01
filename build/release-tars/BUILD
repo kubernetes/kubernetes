@@ -87,7 +87,7 @@ TEST_BINARY_TARGETS = [
     "//examples/k8petstore/web-server/src",
     "//federation/cmd/genfeddocs",
     "//test/e2e:e2e.test",
-    "//vendor:github.com/onsi/ginkgo/ginkgo_bin",
+    "//vendor/github.com/onsi/ginkgo/ginkgo:ginkgo",
     "//cmd/kubemark",  # TODO: server platforms only
     "//test/e2e_node:e2e_node.test",  # TODO: server platforms only
 ]
