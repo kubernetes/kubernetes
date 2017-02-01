@@ -350,7 +350,7 @@ func (f *ConfigFactory) CreateFromConfig(policy schedulerapi.Policy) (*scheduler
 	if len(policy.ExtenderConfigs) != 0 {
 		for ii := range policy.ExtenderConfigs {
 			glog.V(2).Infof("Creating extender with config %+v", policy.ExtenderConfigs[ii])
-			if extender, err := core.NewHTTPExtender(&policy.ExtenderConfigs[ii], policy.APIVersion); err != nil {
+			if extender, err := core.NewHTTPExtender(&policy.ExtenderConfigs[ii]); err != nil {
 				return nil, err
 			} else {
 				extenders = append(extenders, extender)
