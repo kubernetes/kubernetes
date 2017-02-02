@@ -224,6 +224,9 @@ function create-master-auth {
   fi
   local -r basic_auth_csv="${auth_dir}/basic_auth.csv"
   if [[ -n "${KUBE_PASSWORD:-}" && -n "${KUBE_USER:-}" ]]; then
+    if [[ -e "${basic_auth_csv}" ]]; then
+      sed -i '/admin,system:masters$/d' "${basic_auth_csv}"
+    fi
     replace_prefixed_line "${basic_auth_csv}" "${KUBE_PASSWORD},${KUBE_USER}," "admin,system:masters"
   fi
   local -r known_tokens_csv="${auth_dir}/known_tokens.csv"
