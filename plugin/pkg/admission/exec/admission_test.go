@@ -28,6 +28,15 @@ import (
 	"k8s.io/kubernetes/pkg/genericapiserver/registry/rest"
 )
 
+func newAllowEscalatingExec() admission.Interface {
+	return &denyExec{
+		Handler:    admission.NewHandler(admission.Connect),
+		hostIPC:    false,
+		hostPID:    false,
+		privileged: false,
+	}
+}
+
 func TestAdmission(t *testing.T) {
 	privPod := validPod("privileged")
 	priv := true
@@ -65,35 +74,22 @@ func TestAdmission(t *testing.T) {
 		},
 	}
 
-	// use the same code as NewDenyEscalatingExec, using the direct object though to allow testAdmission to
-	// inject the client
-	handler := &denyExec{
-		Handler:    admission.NewHandler(admission.Connect),
-		hostIPC:    true,
-		hostPID:    true,
-		privileged: true,
-	}
+	// Get the direct object though to allow testAdmission to inject the client
+	handler := NewDenyEscalatingExec().(*denyExec)
 
 	for _, tc := range testCases {
 		testAdmission(t, tc.pod, handler, tc.shouldAccept)
 	}
 
 	// run with a permissive config and all cases should pass
-	handler.privileged = false
-	handler.hostPID = false
-	handler.hostIPC = false
+	handler = newAllowEscalatingExec().(*denyExec)
 
 	for _, tc := range testCases {
 		testAdmission(t, tc.pod, handler, true)
 	}
 
 	// run against an init container
-	handler = &denyExec{
-		Handler:    admission.NewHandler(admission.Connect),
-		hostIPC:    true,
-		hostPID:    true,
-		privileged: true,
-	}
+	handler = NewDenyEscalatingExec().(*denyExec)
 
 	for _, tc := range testCases {
 		tc.pod.Spec.InitContainers = tc.pod.Spec.Containers
@@ -102,9 +98,7 @@ func TestAdmission(t *testing.T) {
 	}
 
 	// run with a permissive config and all cases should pass
-	handler.privileged = false
-	handler.hostPID = false
-	handler.hostIPC = false
+	handler = newAllowEscalatingExec().(*denyExec)
 
 	for _, tc := range testCases {
 		testAdmission(t, tc.pod, handler, true)
@@ -121,7 +115,8 @@ func testAdmission(t *testing.T, pod *api.Pod, handler *denyExec, shouldAccept b
 		return true, nil, nil
 	})
 
-	handler.client = mockClient
+	handler.SetInternalClientSet(mockClient)
+	admission.Validate(handler)
 
 	// pods/exec
 	{
@@ -186,14 +181,8 @@ func TestDenyExecOnPrivileged(t *testing.T) {
 		},
 	}
 
-	// use the same code as NewDenyExecOnPrivileged, using the direct object though to allow testAdmission to
-	// inject the client
-	handler := &denyExec{
-		Handler:    admission.NewHandler(admission.Connect),
-		hostIPC:    false,
-		hostPID:    false,
-		privileged: true,
-	}
+	handler := NewDenyExecOnPrivileged().(*denyExec)
+
 	for _, tc := range testCases {
 		testAdmission(t, tc.pod, handler, tc.shouldAccept)
 	}
