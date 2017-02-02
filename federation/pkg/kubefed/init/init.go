@@ -455,6 +455,7 @@ func createAPIServer(clientset *client.Clientset, namespace, name, image, creden
 		"--client-ca-file=/etc/federation/apiserver/ca.crt",
 		"--tls-cert-file=/etc/federation/apiserver/server.crt",
 		"--tls-private-key-file=/etc/federation/apiserver/server.key",
+		"--admission-control=NamespaceLifecycle",
 		fmt.Sprintf("--storage-backend=%s", storageBackend),
 	}
 
