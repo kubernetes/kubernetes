@@ -41,10 +41,12 @@ import (
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/version"
+	"k8s.io/apiserver/pkg/apis/example"
+	examplev1 "k8s.io/apiserver/pkg/apis/example/v1"
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
-	"k8s.io/kubernetes/pkg/api/testapi"
+	"k8s.io/client-go/pkg/api"
 	openapigen "k8s.io/kubernetes/pkg/generated/openapi"
 	"k8s.io/kubernetes/pkg/genericapiserver/registry/rest"
 	etcdtesting "k8s.io/kubernetes/pkg/storage/etcd/testing"
@@ -71,18 +73,20 @@ func init() {
 		&metav1.APIGroup{},
 		&metav1.APIResourceList{},
 	)
+	example.AddToScheme(scheme)
+	examplev1.AddToScheme(scheme)
 }
 
 // setUp is a convience function for setting up for (most) tests.
 func setUp(t *testing.T) (*etcdtesting.EtcdTestServer, Config, *assert.Assertions) {
 	etcdServer, _ := etcdtesting.NewUnsecuredEtcd3TestClientServer(t, scheme)
 
-	config := NewConfig()
+	config := NewConfig().WithSerializer(codecs)
 	config.PublicAddress = net.ParseIP("192.168.10.4")
 	config.RequestContextMapper = genericapirequest.NewRequestContextMapper()
 	config.LegacyAPIGroupPrefixes = sets.NewString("/api")
 
-	config.OpenAPIConfig = DefaultOpenAPIConfig(openapigen.GetOpenAPIDefinitions)
+	config.OpenAPIConfig = DefaultOpenAPIConfig(openapigen.GetOpenAPIDefinitions, api.Scheme)
 	config.OpenAPIConfig.Info = &spec.Info{
 		InfoProps: spec.InfoProps{
 			Title:   "Kubernetes",
@@ -483,8 +487,8 @@ func TestDiscoveryAtAPIS(t *testing.T) {
 	// Add a Group.
 	extensionsVersions := []metav1.GroupVersionForDiscovery{
 		{
-			GroupVersion: testapi.Extensions.GroupVersion().String(),
-			Version:      testapi.Extensions.GroupVersion().Version,
+			GroupVersion: examplev1.SchemeGroupVersion.String(),
+			Version:      examplev1.SchemeGroupVersion.Version,
 		},
 	}
 	extensionsPreferredVersion := metav1.GroupVersionForDiscovery{

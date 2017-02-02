@@ -24,6 +24,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	genericfilters "k8s.io/apiserver/pkg/server/filters"
+	"k8s.io/kubernetes/pkg/api"
 	kubeclientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	kubeinformers "k8s.io/kubernetes/pkg/client/informers/informers_generated"
 	v1listers "k8s.io/kubernetes/pkg/client/listers/core/v1"
@@ -140,7 +141,7 @@ func (c completedConfig) New() (*APIDiscoveryServer, error) {
 		proxyMux:         proxyMux,
 	}
 
-	apiGroupInfo := genericapiserver.NewDefaultAPIGroupInfo(apiregistration.GroupName)
+	apiGroupInfo := genericapiserver.NewDefaultAPIGroupInfo(apiregistration.GroupName, api.Registry, api.Scheme, api.ParameterCodec, api.Codecs)
 	apiGroupInfo.GroupMeta.GroupVersion = v1alpha1.SchemeGroupVersion
 	v1alpha1storage := map[string]rest.Storage{}
 	v1alpha1storage["apiservices"] = apiservicestorage.NewREST(c.RESTOptionsGetter)
