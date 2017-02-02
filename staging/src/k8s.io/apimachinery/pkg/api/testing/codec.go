@@ -24,27 +24,61 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	runtimeserializer "k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/runtime/serializer/recognizer"
 )
 
-var testCodecMediaType string
+var (
+	testCodecMediaType string
+	testStorageCodecMediaType string
+)
 
 // TestCodec returns the codec for the API version to test against, as set by the
 // KUBE_TEST_API_TYPE env var.
 func TestCodec(codecs runtimeserializer.CodecFactory, gvs ...schema.GroupVersion) runtime.Codec {
 	if len(testCodecMediaType) != 0 {
-		serializer, ok := runtime.SerializerInfoForMediaType(codecs.SupportedMediaTypes(), testCodecMediaType)
+		serializerInfo, ok := runtime.SerializerInfoForMediaType(codecs.SupportedMediaTypes(), testCodecMediaType)
 		if !ok {
 			panic(fmt.Sprintf("no serializer for %s", testCodecMediaType))
 		}
-		return codecs.CodecForVersions(serializer.Serializer, codecs.UniversalDeserializer(), schema.GroupVersions(gvs), nil)
+		return codecs.CodecForVersions(serializerInfo.Serializer, codecs.UniversalDeserializer(), schema.GroupVersions(gvs), nil)
+	}
+	return codecs.LegacyCodec(gvs...)
+}
+
+// TestStorageCodec returns the codec for the API version to test against used in storage, as set by the
+// KUBE_TEST_API_STORAGE_TYPE env var.
+func TestStorageCodec(codecs runtimeserializer.CodecFactory, gvs ...schema.GroupVersion) runtime.Codec {
+	if len(testStorageCodecMediaType) != 0 {
+		serializerInfo, ok := runtime.SerializerInfoForMediaType(codecs.SupportedMediaTypes(), testStorageCodecMediaType)
+		if !ok {
+			panic(fmt.Sprintf("no serializer for %s", testStorageCodecMediaType))
+		}
+
+		// etcd2 only supports string data - we must wrap any result before returning
+		// TODO: remove for etcd3 / make parameterizable
+		serializer := serializerInfo.Serializer
+		if !serializerInfo.EncodesAsText {
+			serializer = runtime.NewBase64Serializer(serializer)
+		}
+
+		decoder := recognizer.NewDecoder(serializer, codecs.UniversalDeserializer())
+		return codecs.CodecForVersions(serializer, decoder, schema.GroupVersions(gvs), nil)
+
 	}
 	return codecs.LegacyCodec(gvs...)
 }
 
 func init() {
+	var err error
 	if apiMediaType := os.Getenv("KUBE_TEST_API_TYPE"); len(apiMediaType) > 0 {
-		var err error
 		testCodecMediaType, _, err = mime.ParseMediaType(apiMediaType)
+		if err != nil {
+			panic(err)
+		}
+	}
+
+	if storageMediaType := os.Getenv("KUBE_TEST_API_STORAGE_TYPE"); len(storageMediaType) > 0 {
+		testStorageCodecMediaType, _, err = mime.ParseMediaType(storageMediaType)
 		if err != nil {
 			panic(err)
 		}
