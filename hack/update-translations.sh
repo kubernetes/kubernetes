@@ -16,6 +16,12 @@
 
 KUBECTL_FILES="pkg/kubectl/cmd/*.go pkg/kubectl/cmd/*/*.go"
 
+if ! which go-xgettext > /dev/null; then
+  echo 'Can not find go-xgettext, install with:'
+  echo 'go get github.com/gosexy/gettext/go-xgettext'
+  exit 1
+fi
+
 go-xgettext -k=i18n.T ${KUBECTL_FILES} > tmp.pot
 msgcat -s tmp.pot > translations/kubectl/template.pot
 rm tmp.pot
@@ -26,3 +32,5 @@ for x in translations/*/*/*/*.po; do
   echo "generating .mo file for: $x"
   msgfmt $x -o "$(dirname $x)/$(basename $x .po).mo"
 done
+
+./hack/generate-bindata.sh
