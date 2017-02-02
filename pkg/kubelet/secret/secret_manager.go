@@ -106,6 +106,9 @@ func newSecretStore(kubeClient clientset.Interface, clock clock.Clock, ttl time.
 }
 
 func isSecretOlder(newSecret, oldSecret *v1.Secret) bool {
+	if newSecret == nil || oldSecret == nil {
+		return false
+	}
 	newVersion, _ := storageetcd.Versioner.ObjectResourceVersion(newSecret)
 	oldVersion, _ := storageetcd.Versioner.ObjectResourceVersion(oldSecret)
 	return newVersion < oldVersion
@@ -181,7 +184,7 @@ func (s *secretStore) Get(namespace, name string) (*v1.Secret, error) {
 		// Update state, unless we got error different than "not-found".
 		if err == nil || apierrors.IsNotFound(err) {
 			// Ignore the update to the older version of a secret.
-			if data.secret == nil || secret == nil || !isSecretOlder(secret, data.secret) {
+			if apierrors.IsNotFound(err) || !isSecretOlder(secret, data.secret) {
 				data.secret = secret
 				data.err = err
 				data.lastUpdateTime = s.clock.Now()
