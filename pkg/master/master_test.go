@@ -33,6 +33,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/version"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
+	etcdtesting "k8s.io/apiserver/pkg/storage/etcd/testing"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
@@ -51,7 +52,6 @@ import (
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset/fake"
 	genericapiserver "k8s.io/kubernetes/pkg/genericapiserver/server"
 	kubeletclient "k8s.io/kubernetes/pkg/kubelet/client"
-	etcdtesting "k8s.io/kubernetes/pkg/storage/etcd/testing"
 	kubeversion "k8s.io/kubernetes/pkg/version"
 
 	"github.com/stretchr/testify/assert"

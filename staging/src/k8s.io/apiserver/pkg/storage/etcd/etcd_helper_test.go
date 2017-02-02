@@ -36,10 +36,10 @@ import (
 	"k8s.io/apiserver/pkg/apis/example"
 	examplev1 "k8s.io/apiserver/pkg/apis/example/v1"
 	"k8s.io/apiserver/pkg/storage"
-	"k8s.io/kubernetes/pkg/storage/etcd/etcdtest"
-	etcdtesting "k8s.io/kubernetes/pkg/storage/etcd/testing"
-	storagetesting "k8s.io/kubernetes/pkg/storage/testing"
-	storagetests "k8s.io/kubernetes/pkg/storage/tests"
+	"k8s.io/apiserver/pkg/storage/etcd/etcdtest"
+	etcdtesting "k8s.io/apiserver/pkg/storage/etcd/testing"
+	storagetesting "k8s.io/apiserver/pkg/storage/testing"
+	storagetests "k8s.io/apiserver/pkg/storage/tests"
 )
 
 func testScheme(t *testing.T) (*runtime.Scheme, serializer.CodecFactory) {

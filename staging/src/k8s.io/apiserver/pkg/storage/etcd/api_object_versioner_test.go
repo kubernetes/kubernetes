@@ -20,7 +20,7 @@ import (
 	"testing"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	storagetesting "k8s.io/kubernetes/pkg/storage/testing"
+	storagetesting "k8s.io/apiserver/pkg/storage/testing"
 )
 
 func TestObjectVersioner(t *testing.T) {

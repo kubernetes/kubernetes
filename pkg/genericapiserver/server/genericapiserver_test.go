@@ -46,10 +46,10 @@ import (
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
+	etcdtesting "k8s.io/apiserver/pkg/storage/etcd/testing"
 	"k8s.io/client-go/pkg/api"
 	openapigen "k8s.io/kubernetes/pkg/generated/openapi"
 	"k8s.io/kubernetes/pkg/genericapiserver/registry/rest"
-	etcdtesting "k8s.io/kubernetes/pkg/storage/etcd/testing"
 )
 
 const (

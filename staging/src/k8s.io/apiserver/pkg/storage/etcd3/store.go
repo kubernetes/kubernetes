@@ -36,7 +36,7 @@ import (
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/apiserver/pkg/storage"
 	utiltrace "k8s.io/apiserver/pkg/util/trace"
-	"k8s.io/kubernetes/pkg/storage/etcd"
+	"k8s.io/apiserver/pkg/storage/etcd"
 )
 
 type store struct {

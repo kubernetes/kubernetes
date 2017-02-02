@@ -36,7 +36,7 @@ import (
 	"k8s.io/apiserver/pkg/storage/etcd/metrics"
 	utilcache "k8s.io/apiserver/pkg/util/cache"
 	utiltrace "k8s.io/apiserver/pkg/util/trace"
-	etcdutil "k8s.io/kubernetes/pkg/storage/etcd/util"
+	etcdutil "k8s.io/apiserver/pkg/storage/etcd/util"
 )
 
 // Creates a new storage interface from the client
