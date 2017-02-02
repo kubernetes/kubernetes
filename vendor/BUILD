@@ -14002,3 +14002,40 @@ go_library(
         "//vendor:k8s.io/client-go/util/clock",
     ],
 )
+
+go_library(
+    name = "k8s.io/apiserver/pkg/server/routes/data/swagger",
+    srcs = ["k8s.io/apiserver/pkg/server/routes/data/swagger/datafile.go"],
+    tags = ["automanaged"],
+)
+
+go_library(
+    name = "k8s.io/apiserver/pkg/server/options",
+    srcs = [
+        "k8s.io/apiserver/pkg/server/options/authentication.go",
+        "k8s.io/apiserver/pkg/server/options/authorization.go",
+        "k8s.io/apiserver/pkg/server/options/doc.go",
+        "k8s.io/apiserver/pkg/server/options/etcd.go",
+        "k8s.io/apiserver/pkg/server/options/server_run_options.go",
+        "k8s.io/apiserver/pkg/server/options/serving.go",
+    ],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:github.com/golang/glog",
+        "//vendor:github.com/spf13/pflag",
+        "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
+        "//vendor:k8s.io/apimachinery/pkg/util/net",
+        "//vendor:k8s.io/apiserver/pkg/admission",
+        "//vendor:k8s.io/apiserver/pkg/authentication/authenticatorfactory",
+        "//vendor:k8s.io/apiserver/pkg/authorization/authorizerfactory",
+        "//vendor:k8s.io/apiserver/pkg/features",
+        "//vendor:k8s.io/apiserver/pkg/storage/storagebackend",
+        "//vendor:k8s.io/apiserver/pkg/util/feature",
+        "//vendor:k8s.io/apiserver/pkg/util/flag",
+        "//vendor:k8s.io/client-go/kubernetes/typed/authentication/v1beta1",
+        "//vendor:k8s.io/client-go/kubernetes/typed/authorization/v1beta1",
+        "//vendor:k8s.io/client-go/rest",
+        "//vendor:k8s.io/client-go/tools/clientcmd",
+        "//vendor:k8s.io/client-go/util/cert",
+    ],
+)

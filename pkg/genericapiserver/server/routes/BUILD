@@ -24,7 +24,6 @@ go_library(
         "//pkg/genericapiserver/endpoints/handlers/responsewriters:go_default_library",
         "//pkg/genericapiserver/server/mux:go_default_library",
         "//pkg/genericapiserver/server/openapi:go_default_library",
-        "//pkg/genericapiserver/server/routes/data/swagger:go_default_library",
         "//vendor:github.com/elazarl/go-bindata-assetfs",
         "//vendor:github.com/emicklei/go-restful",
         "//vendor:github.com/emicklei/go-restful/swagger",
@@ -34,6 +33,7 @@ go_library(
         "//vendor:k8s.io/apimachinery/pkg/openapi",
         "//vendor:k8s.io/apimachinery/pkg/version",
         "//vendor:k8s.io/apiserver/pkg/endpoints/metrics",
+        "//vendor:k8s.io/apiserver/pkg/server/routes/data/swagger",
         "//vendor:k8s.io/apiserver/pkg/storage/etcd/metrics",
     ],
 )
@@ -47,9 +47,6 @@ filegroup(
 
 filegroup(
     name = "all-srcs",
-    srcs = [
-        ":package-srcs",
-        "//pkg/genericapiserver/server/routes/data/swagger:all-srcs",
-    ],
+    srcs = [":package-srcs"],
     tags = ["automanaged"],
 )
