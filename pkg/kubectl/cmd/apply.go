@@ -145,7 +145,7 @@ func validatePruneAll(prune, all bool, selector string) error {
 	return nil
 }
 
-func parsePruneResources(gvks []string) ([]pruneResource, error) {
+func parsePruneResources(mapper meta.RESTMapper, gvks []string) ([]pruneResource, error) {
 	pruneResources := []pruneResource{}
 	for _, groupVersionKind := range gvks {
 		gvk := strings.Split(groupVersionKind, "/")
@@ -153,15 +153,24 @@ func parsePruneResources(gvks []string) ([]pruneResource, error) {
 			return nil, fmt.Errorf("invalid GroupVersionKind format: %v, please follow <group/version/kind>", groupVersionKind)
 		}
 
-		namespaced := true
-		if gvk[2] == "Namespace" ||
-			gvk[2] == "Node" ||
-			gvk[2] == "PersistentVolume" {
-			namespaced = false
-		}
 		if gvk[0] == "core" {
 			gvk[0] = ""
 		}
+		mapping, err := mapper.RESTMapping(schema.GroupKind{Group: gvk[0], Kind: gvk[2]}, gvk[1])
+		if err != nil {
+			return pruneResources, err
+		}
+		var namespaced bool
+		namespaceScope := mapping.Scope.Name()
+		switch namespaceScope {
+		case meta.RESTScopeNameNamespace:
+			namespaced = true
+		case meta.RESTScopeNameRoot:
+			namespaced = false
+		default:
+			return pruneResources, fmt.Errorf("Unknown namespace scope: %q", namespaceScope)
+		}
+
 		pruneResources = append(pruneResources, pruneResource{gvk[0], gvk[1], gvk[2], namespaced})
 	}
 	return pruneResources, nil
@@ -178,17 +187,18 @@ func RunApply(f cmdutil.Factory, cmd *cobra.Command, out, errOut io.Writer, opti
 		return err
 	}
 
+	mapper, typer, err := f.UnstructuredObject()
+	if err != nil {
+		return err
+	}
+
 	if options.Prune {
-		options.PruneResources, err = parsePruneResources(cmdutil.GetFlagStringArray(cmd, "prune-whitelist"))
+		options.PruneResources, err = parsePruneResources(mapper, cmdutil.GetFlagStringArray(cmd, "prune-whitelist"))
 		if err != nil {
 			return err
 		}
 	}
 
-	mapper, typer, err := f.UnstructuredObject()
-	if err != nil {
-		return err
-	}
 	r := resource.NewBuilder(mapper, typer, resource.ClientMapperFunc(f.UnstructuredClientForMapping), unstructured.UnstructuredJSONScheme).
 		Schema(schema).
 		ContinueOnError().
@@ -336,7 +346,7 @@ func RunApply(f cmdutil.Factory, cmd *cobra.Command, out, errOut io.Writer, opti
 	}
 	p := pruner{
 		mapper:        mapper,
-		clientFunc:    f.ClientForMapping,
+		clientFunc:    f.UnstructuredClientForMapping,
 		clientsetFunc: f.ClientSet,
 
 		selector:    selector,
@@ -349,7 +359,7 @@ func RunApply(f cmdutil.Factory, cmd *cobra.Command, out, errOut io.Writer, opti
 		out: out,
 	}
 
-	namespacedRESTMappings, nonNamespacedRESTMappings, err := getRESTMappings(&(options.PruneResources))
+	namespacedRESTMappings, nonNamespacedRESTMappings, err := getRESTMappings(mapper, &(options.PruneResources))
 	if err != nil {
 		return fmt.Errorf("error retrieving RESTMappings to prune: %v", err)
 	}
@@ -381,7 +391,7 @@ func (pr pruneResource) String() string {
 	return fmt.Sprintf("%v/%v, Kind=%v, Namespaced=%v", pr.group, pr.version, pr.kind, pr.namespaced)
 }
 
-func getRESTMappings(pruneResources *[]pruneResource) (namespaced, nonNamespaced []*meta.RESTMapping, err error) {
+func getRESTMappings(mapper meta.RESTMapper, pruneResources *[]pruneResource) (namespaced, nonNamespaced []*meta.RESTMapping, err error) {
 	if len(*pruneResources) == 0 {
 		// default whitelist
 		// TODO: need to handle the older api versions - e.g. v1beta1 jobs. Github issue: #35991
@@ -404,9 +414,9 @@ func getRESTMappings(pruneResources *[]pruneResource) (namespaced, nonNamespaced
 			{"apps", "v1beta1", "StatefulSet", true},
 		}
 	}
-	registeredMapper := api.Registry.RESTMapper()
+
 	for _, resource := range *pruneResources {
-		addedMapping, err := registeredMapper.RESTMapping(schema.GroupKind{Group: resource.group, Kind: resource.kind}, resource.version)
+		addedMapping, err := mapper.RESTMapping(schema.GroupKind{Group: resource.group, Kind: resource.kind}, resource.version)
 		if err != nil {
 			return nil, nil, fmt.Errorf("invalid resource %v: %v", resource, err)
 		}
