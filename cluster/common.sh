@@ -585,7 +585,6 @@ function build-kube-master-certs {
   cat >$file <<EOF
 KUBEAPISERVER_CERT: $(yaml-quote ${KUBEAPISERVER_CERT_BASE64:-})
 KUBEAPISERVER_KEY: $(yaml-quote ${KUBEAPISERVER_KEY_BASE64:-})
-KUBELET_AUTH_CA_CERT: $(yaml-quote ${KUBELET_AUTH_CA_CERT_BASE64:-})
 CA_KEY: $(yaml-quote ${CA_KEY_BASE64:-})
 EOF
 }
@@ -802,7 +801,6 @@ EOF
 KUBERNETES_MASTER: $(yaml-quote "false")
 ZONE: $(yaml-quote ${ZONE})
 EXTRA_DOCKER_OPTS: $(yaml-quote ${EXTRA_DOCKER_OPTS:-})
-KUBELET_AUTH_CA_CERT: $(yaml-quote ${KUBELET_AUTH_CA_CERT_BASE64:-})
 EOF
     if [ -n "${KUBEPROXY_TEST_ARGS:-}" ]; then
       cat >>$file <<EOF
@@ -970,9 +968,8 @@ function create-certs {
   KUBELET_KEY_BASE64=$(cat "${CERT_DIR}/pki/private/kubelet.key" | base64 | tr -d '\r\n')
   KUBECFG_CERT_BASE64=$(cat "${CERT_DIR}/pki/issued/kubecfg.crt" | base64 | tr -d '\r\n')
   KUBECFG_KEY_BASE64=$(cat "${CERT_DIR}/pki/private/kubecfg.key" | base64 | tr -d '\r\n')
-  KUBELET_AUTH_CA_CERT_BASE64=$(cat "${KUBE_TEMP}/easy-rsa-master/kubelet/pki/ca.crt" | base64 | tr -d '\r\n')
-  KUBEAPISERVER_CERT_BASE64=$(cat "${KUBE_TEMP}/easy-rsa-master/kubelet/pki/issued/kube-apiserver.crt" | base64 | tr -d '\r\n')
-  KUBEAPISERVER_KEY_BASE64=$(cat "${KUBE_TEMP}/easy-rsa-master/kubelet/pki/private/kube-apiserver.key" | base64 | tr -d '\r\n')
+  KUBEAPISERVER_CERT_BASE64=$(cat "${CERT_DIR}/pki/issued/kube-apiserver.crt" | base64 | tr -d '\r\n')
+  KUBEAPISERVER_KEY_BASE64=$(cat "${CERT_DIR}/pki/private/kube-apiserver.key" | base64 | tr -d '\r\n')
 }
 
 # Runs the easy RSA commands to generate certificate files.
@@ -999,6 +996,7 @@ function generate-certs {
     # this puts the cert into pki/ca.crt and the key into pki/private/ca.key
     ./easyrsa --batch "--req-cn=${PRIMARY_CN}@$(date +%s)" build-ca nopass
     ./easyrsa --subject-alt-name="${SANS}" build-server-full "${MASTER_NAME}" nopass
+    ./easyrsa build-client-full kube-apiserver nopass
 
     download-cfssl
 
@@ -1014,12 +1012,7 @@ function generate-certs {
     ./easyrsa --dn-mode=org \
       --req-cn=kubecfg --req-org=system:masters \
       --req-c= --req-st= --req-city= --req-email= --req-ou= \
-      build-client-full kubecfg nopass
-
-    cd ../kubelet
-    ./easyrsa init-pki
-    ./easyrsa --batch "--req-cn=kubelet@$(date +%s)" build-ca nopass
-    ./easyrsa build-client-full kube-apiserver nopass) &>${cert_create_debug_output} || {
+      build-client-full kubecfg nopass) &>${cert_create_debug_output} || {
     # If there was an error in the subshell, just die.
     # TODO(roberthbailey): add better error handling here
     cat "${cert_create_debug_output}" >&2
