@@ -349,6 +349,7 @@ func (rc *reconciler) reconcile() {
 						attachedVolume.VolumeSpec.Name())
 					err := rc.operationExecutor.VerifyControllerDetachedVolume(
 						attachedVolume.AttachedVolume,
+						rc.mounter,
 						rc.actualStateOfWorld)
 					if err != nil &&
 						!nestedpendingoperations.IsAlreadyExists(err) &&

@@ -90,7 +90,7 @@ type OperationGenerator interface {
 	GenerateVerifyControllerAttachedVolumeFunc(volumeToMount VolumeToMount, nodeName types.NodeName, actualStateOfWorld ActualStateOfWorldAttacherUpdater) (func() error, error)
 
 	// Generates the function needed to check if the attach_detach controller has detached the volume plugin
-	GenerateVerifyControllerDetachedVolumeFunc(volumeToDetach AttachedVolume, actualStateOfWorld ActualStateOfWorldAttacherUpdater) (func() error, error)
+	GenerateVerifyControllerDetachedVolumeFunc(volumeToDetach AttachedVolume, mounter mount.Interface, actualStateOfWorld ActualStateOfWorldAttacherUpdater) (func() error, error)
 }
 
 func (og *operationGenerator) GenerateVolumesAreAttachedFunc(
@@ -825,6 +825,7 @@ func (og *operationGenerator) GenerateVerifyControllerAttachedVolumeFunc(
 
 func (og *operationGenerator) GenerateVerifyControllerDetachedVolumeFunc(
 	volumeToDetach AttachedVolume,
+	mounter mount.Interface,
 	actualStateOfWorld ActualStateOfWorldAttacherUpdater) (func() error, error) {
 	return func() error {
 		if !volumeToDetach.PluginIsAttachable {
@@ -833,6 +834,22 @@ func (og *operationGenerator) GenerateVerifyControllerDetachedVolumeFunc(
 			// updated accordingly.
 			actualStateOfWorld.MarkVolumeAsDetached(volumeToDetach.VolumeName, volumeToDetach.NodeName)
 			return nil
+		}
+
+		attached, err := mounter.PathIsDevice(volumeToDetach.DevicePath)
+		if err != nil {
+			return fmt.Errorf(
+				"VerifyControllerDetachedVolume.PathIsDevice failed for volume %q (spec.Name: %q) with: %v",
+				volumeToDetach.VolumeName,
+				volumeToDetach.VolumeSpec.Name(),
+				err)
+		}
+
+		if attached {
+			return fmt.Errorf("Volume %q (spec.Name: %q) is still attached devicePath: %q",
+				volumeToDetach.VolumeName,
+				volumeToDetach.VolumeSpec.Name(),
+				volumeToDetach.DevicePath)
 		}
 
 		glog.Infof("Controller detached volume %q (spec.Name: %q) devicePath: %q",

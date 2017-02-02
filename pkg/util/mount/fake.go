@@ -24,11 +24,12 @@ import (
 
 // FakeMounter implements mount.Interface for tests.
 type FakeMounter struct {
-	MountPoints []MountPoint
-	Log         []FakeAction
+	MountPoints     []MountPoint
+	Log             []FakeAction
+	detachedDevices []string
 	// Some tests run things in parallel, make sure the mounter does not produce
 	// any golang's DATA RACE warnings.
-	mutex sync.Mutex
+	mutex           sync.Mutex
 }
 
 var _ Interface = &FakeMounter{}
@@ -137,7 +138,22 @@ func (f *FakeMounter) DeviceOpened(pathname string) (bool, error) {
 	return false, nil
 }
 
+func (f *FakeMounter) DeviceDetached(pathname string) {
+	f.mutex.Lock()
+	defer f.mutex.Unlock()
+
+	f.detachedDevices = append(f.detachedDevices, pathname)
+}
+
 func (f *FakeMounter) PathIsDevice(pathname string) (bool, error) {
+	f.mutex.Lock()
+	defer f.mutex.Unlock()
+
+	for _, dp := range f.detachedDevices {
+		if dp == pathname {
+			return false, nil
+		}
+	}
 	return true, nil
 }
 

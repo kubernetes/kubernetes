@@ -111,7 +111,7 @@ type OperationExecutor interface {
 	// detached immediately in the actual state of the world.
 	// If the volume is still present or there is an error, the error is returned which triggers exponential
 	// back off on retries.
-	VerifyControllerDetachedVolume(volumeToDetach AttachedVolume, actualStateOfWorld ActualStateOfWorldAttacherUpdater) error
+	VerifyControllerDetachedVolume(volumeToDetach AttachedVolume, mounter mount.Interface, actualStateOfWorld ActualStateOfWorldAttacherUpdater) error
 
 	// IsOperationPending returns true if an operation for the given volumeName and podName is pending,
 	// otherwise it returns false
@@ -479,9 +479,10 @@ func (oe *operationExecutor) VerifyControllerAttachedVolume(
 
 func (oe *operationExecutor) VerifyControllerDetachedVolume(
 	volumeToDetach AttachedVolume,
+	mounter mount.Interface,
 	actualStateOfWorld ActualStateOfWorldAttacherUpdater) error {
 	verifyControllerDetachedVolumeFunc, err :=
-		oe.operationGenerator.GenerateVerifyControllerDetachedVolumeFunc(volumeToDetach, actualStateOfWorld)
+		oe.operationGenerator.GenerateVerifyControllerDetachedVolumeFunc(volumeToDetach, mounter, actualStateOfWorld)
 	if err != nil {
 		return err
 	}
