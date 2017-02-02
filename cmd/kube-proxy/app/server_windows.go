@@ -19,6 +19,7 @@ limitations under the License.
 package app
 
 import (
+	"fmt"
 	"net"
 
 	"k8s.io/apimachinery/pkg/types"
@@ -167,12 +168,13 @@ func NewProxyServerDefault(config *options.ProxyServerConfig) (*ProxyServer, err
 		Namespace: "",
 	}
 
-	conntracker := realConntracker{}
+	// TODO implement when connection tracking is available for Windows.
+	//conntracker := realConntracker{}
 
-	return NewProxyServer(client, config, iptInterface, proxier, eventBroadcaster, recorder, conntracker, proxyMode)
+	return NewProxyServer(client, config, iptInterface, proxier, eventBroadcaster, recorder, nil, proxyMode)
 }
 
-// Not implemented on Windows
+// TODO implement when connection tracking is available for Windows.
 func (s *ProxyServer) tuneConnTracker() error {
-	return nil
+	return fmt.Errorf("Connection tracking is not supported on Windows")
 }

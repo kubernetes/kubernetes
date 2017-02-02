@@ -29,11 +29,7 @@ func NewProxyServerDefault(config *options.ProxyServerConfig) (*ProxyServer, err
 	return nil, fmt.Errorf("Proxying is not supported in this build")
 }
 
-// Tune conntrack, if requested
+// No-op
 func (s *ProxyServer) tuneConnTracker() error {
-	return fmt.Errorf("Proxying is not supported in this build")
-}
-
-func getConntrackMax(config *options.ProxyServerConfig) (int, error) {
-	return 0, fmt.Errorf("Proxying is not supported in this build")
+	return fmt.Errorf("Connection tracking is not supported in this build")
 }
