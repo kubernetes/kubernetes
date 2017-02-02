@@ -122,7 +122,7 @@ var _ = framework.KubeDescribe("ConfigMap", func() {
 				Containers: []v1.Container{
 					{
 						Name:    containerName,
-						Image:   "gcr.io/google_containers/mounttest:0.7",
+						Image:   "gcr.io/google_containers/mounttest:0.8",
 						Command: []string{"/mt", "--break_on_expected_content=false", "--retry_time=120", "--file_content_in_loop=/etc/configmap-volume/data-1"},
 						VolumeMounts: []v1.VolumeMount{
 							{
@@ -259,7 +259,7 @@ var _ = framework.KubeDescribe("ConfigMap", func() {
 				Containers: []v1.Container{
 					{
 						Name:    deleteContainerName,
-						Image:   "gcr.io/google_containers/mounttest:0.7",
+						Image:   "gcr.io/google_containers/mounttest:0.8",
 						Command: []string{"/mt", "--break_on_expected_content=false", "--retry_time=120", "--file_content_in_loop=/etc/configmap-volumes/delete/data-1"},
 						VolumeMounts: []v1.VolumeMount{
 							{
@@ -271,7 +271,7 @@ var _ = framework.KubeDescribe("ConfigMap", func() {
 					},
 					{
 						Name:    updateContainerName,
-						Image:   "gcr.io/google_containers/mounttest:0.7",
+						Image:   "gcr.io/google_containers/mounttest:0.8",
 						Command: []string{"/mt", "--break_on_expected_content=false", "--retry_time=120", "--file_content_in_loop=/etc/configmap-volumes/update/data-3"},
 						VolumeMounts: []v1.VolumeMount{
 							{
@@ -283,7 +283,7 @@ var _ = framework.KubeDescribe("ConfigMap", func() {
 					},
 					{
 						Name:    createContainerName,
-						Image:   "gcr.io/google_containers/mounttest:0.7",
+						Image:   "gcr.io/google_containers/mounttest:0.8",
 						Command: []string{"/mt", "--break_on_expected_content=false", "--retry_time=120", "--file_content_in_loop=/etc/configmap-volumes/create/data-1"},
 						VolumeMounts: []v1.VolumeMount{
 							{
@@ -467,7 +467,7 @@ var _ = framework.KubeDescribe("ConfigMap", func() {
 				Containers: []v1.Container{
 					{
 						Name:  "configmap-volume-test",
-						Image: "gcr.io/google_containers/mounttest:0.7",
+						Image: "gcr.io/google_containers/mounttest:0.8",
 						Args:  []string{"--file_content=/etc/configmap-volume/data-1"},
 						VolumeMounts: []v1.VolumeMount{
 							{
@@ -557,7 +557,7 @@ func doConfigMapE2EWithoutMappings(f *framework.Framework, uid, fsGroup int64, d
 			Containers: []v1.Container{
 				{
 					Name:  "configmap-volume-test",
-					Image: "gcr.io/google_containers/mounttest:0.7",
+					Image: "gcr.io/google_containers/mounttest:0.8",
 					Args: []string{
 						"--file_content=/etc/configmap-volume/data-1",
 						"--file_mode=/etc/configmap-volume/data-1"},
@@ -637,7 +637,7 @@ func doConfigMapE2EWithMappings(f *framework.Framework, uid, fsGroup int64, item
 			Containers: []v1.Container{
 				{
 					Name:  "configmap-volume-test",
-					Image: "gcr.io/google_containers/mounttest:0.7",
+					Image: "gcr.io/google_containers/mounttest:0.8",
 					Args: []string{"--file_content=/etc/configmap-volume/path/to/data-2",
 						"--file_mode=/etc/configmap-volume/path/to/data-2"},
 					VolumeMounts: []v1.VolumeMount{
