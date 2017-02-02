@@ -58,40 +58,40 @@ type JSONMap map[string]interface{}
 // IsPreconditionFailed returns true if the provided error indicates
 // a precondition failed.
 func IsPreconditionFailed(err error) bool {
-	_, ok := err.(errPreconditionFailed)
+	_, ok := err.(ErrPreconditionFailed)
 	return ok
 }
 
-type errPreconditionFailed struct {
+type ErrPreconditionFailed struct {
 	message string
 }
 
-func newErrPreconditionFailed(target map[string]interface{}) errPreconditionFailed {
+func NewErrPreconditionFailed(target map[string]interface{}) ErrPreconditionFailed {
 	s := fmt.Sprintf("precondition failed for: %v", target)
-	return errPreconditionFailed{s}
+	return ErrPreconditionFailed{s}
 }
 
-func (err errPreconditionFailed) Error() string {
+func (err ErrPreconditionFailed) Error() string {
 	return err.message
 }
 
-type errConflict struct {
+type ErrConflict struct {
 	message string
 }
 
-func newErrConflict(patch, current string) errConflict {
+func NewErrConflict(patch, current string) ErrConflict {
 	s := fmt.Sprintf("patch:\n%s\nconflicts with changes made from original to current:\n%s\n", patch, current)
-	return errConflict{s}
+	return ErrConflict{s}
 }
 
-func (err errConflict) Error() string {
+func (err ErrConflict) Error() string {
 	return err.message
 }
 
 // IsConflict returns true if the provided error indicates
 // a conflict between the patch and the current configuration.
 func IsConflict(err error) bool {
-	_, ok := err.(errConflict)
+	_, ok := err.(ErrConflict)
 	return ok
 }
 
@@ -187,7 +187,7 @@ func CreateTwoWayMergeMapPatch(original, modified JSONMap, dataStruct interface{
 	// Apply the preconditions to the patch, and return an error if any of them fail.
 	for _, fn := range fns {
 		if !fn(patchMap) {
-			return nil, newErrPreconditionFailed(patchMap)
+			return nil, NewErrPreconditionFailed(patchMap)
 		}
 	}
 
@@ -1340,7 +1340,7 @@ func CreateThreeWayMergePatch(original, modified, current []byte, dataStruct int
 	// Apply the preconditions to the patch, and return an error if any of them fail.
 	for _, fn := range fns {
 		if !fn(patchMap) {
-			return nil, newErrPreconditionFailed(patchMap)
+			return nil, NewErrPreconditionFailed(patchMap)
 		}
 	}
 
@@ -1358,14 +1358,14 @@ func CreateThreeWayMergePatch(original, modified, current []byte, dataStruct int
 		}
 
 		if hasConflicts {
-			return nil, newErrConflict(toYAMLOrError(patchMap), toYAMLOrError(changedMap))
+			return nil, NewErrConflict(ToYAMLOrError(patchMap), ToYAMLOrError(changedMap))
 		}
 	}
 
 	return json.Marshal(patchMap)
 }
 
-func toYAMLOrError(v interface{}) string {
+func ToYAMLOrError(v interface{}) string {
 	y, err := toYAML(v)
 	if err != nil {
 		return err.Error()
