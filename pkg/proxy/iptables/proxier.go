@@ -216,6 +216,8 @@ type Proxier struct {
 	haveReceivedServiceUpdate   bool // true once we've seen an OnServiceUpdate event
 	haveReceivedEndpointsUpdate bool // true once we've seen an OnEndpointsUpdate event
 	throttle                    *syncThrottle
+	staleUDPServices            sets.String
+	staleUDPEndpoints           map[endpointServicePair]bool
 
 	// These are effectively const and do not need the mutex to be held.
 	iptables       utiliptables.Interface
@@ -314,19 +316,21 @@ func NewProxier(ipt utiliptables.Interface,
 	go healthcheck.Run()
 
 	return &Proxier{
-		serviceMap:     make(proxyServiceMap),
-		endpointsMap:   make(proxyEndpointsMap),
-		portsMap:       make(map[localPort]closeable),
-		throttle:       newSyncThrottle(minSyncPeriod, syncPeriod),
-		iptables:       ipt,
-		masqueradeAll:  masqueradeAll,
-		masqueradeMark: masqueradeMark,
-		exec:           exec,
-		clusterCIDR:    clusterCIDR,
-		hostname:       hostname,
-		nodeIP:         nodeIP,
-		portMapper:     &listenPortOpener{},
-		recorder:       recorder,
+		serviceMap:        make(proxyServiceMap),
+		endpointsMap:      make(proxyEndpointsMap),
+		portsMap:          make(map[localPort]closeable),
+		throttle:          newSyncThrottle(minSyncPeriod, syncPeriod),
+		staleUDPServices:  sets.NewString(),
+		staleUDPEndpoints: make(map[endpointServicePair]bool),
+		iptables:          ipt,
+		masqueradeAll:     masqueradeAll,
+		masqueradeMark:    masqueradeMark,
+		exec:              exec,
+		clusterCIDR:       clusterCIDR,
+		hostname:          hostname,
+		nodeIP:            nodeIP,
+		portMapper:        &listenPortOpener{},
+		recorder:          recorder,
 	}, nil
 }
 
@@ -540,13 +544,12 @@ func (proxier *Proxier) OnServiceUpdate(allServices []api.Service) {
 	}
 
 	if len(newServiceMap) != len(proxier.serviceMap) || !reflect.DeepEqual(newServiceMap, proxier.serviceMap) {
+		proxier.staleUDPServices = proxier.staleUDPServices.Union(staleUDPServices)
 		proxier.serviceMap = newServiceMap
 		proxier.syncProxyRules()
 	} else {
 		glog.V(4).Infof("Skipping proxy iptables rule sync on service update because nothing changed")
 	}
-
-	proxier.deleteServiceConnections(staleUDPServices.List())
 }
 
 // Map of namespaced names (eg, service namespace/name) of a service to either
@@ -655,12 +658,13 @@ func (proxier *Proxier) OnEndpointsUpdate(allEndpoints []api.Endpoints) {
 
 	if len(endpointsMap) != len(proxier.endpointsMap) || !reflect.DeepEqual(endpointsMap, proxier.endpointsMap) {
 		proxier.endpointsMap = endpointsMap
+		for epSvcPair := range staleConnections {
+			proxier.staleUDPEndpoints[epSvcPair] = true
+		}
 		proxier.syncProxyRules()
 	} else {
 		glog.V(4).Infof("Skipping proxy iptables rule sync on endpoints update because nothing changed")
 	}
-
-	proxier.deleteEndpointConnections(staleConnections)
 }
 
 // portProtoHash takes the ServicePortName and protocol for a service
@@ -718,8 +722,8 @@ const noConnectionToDelete = "0 flow entries have been deleted"
 // After a UDP endpoint has been removed, we must flush any pending conntrack entries to it, or else we
 // risk sending more traffic to it, all of which will be lost (because UDP).
 // This assumes the proxier mutex is held
-func (proxier *Proxier) deleteEndpointConnections(connectionMap map[endpointServicePair]bool) {
-	for epSvcPair := range connectionMap {
+func (proxier *Proxier) deleteEndpointConnections() {
+	for epSvcPair := range proxier.staleUDPEndpoints {
 		if svcInfo, ok := proxier.serviceMap[epSvcPair.servicePortName]; ok && svcInfo.protocol == api.ProtocolUDP {
 			endpointIP := strings.Split(epSvcPair.endpoint, ":")[0]
 			glog.V(2).Infof("Deleting connection tracking state for service IP %s, endpoint IP %s", svcInfo.clusterIP.String(), endpointIP)
@@ -732,11 +736,12 @@ func (proxier *Proxier) deleteEndpointConnections(connectionMap map[endpointServ
 			}
 		}
 	}
+	proxier.staleUDPEndpoints = make(map[endpointServicePair]bool)
 }
 
 // deleteServiceConnection use conntrack-tool to delete UDP connection specified by service ip
-func (proxier *Proxier) deleteServiceConnections(svcIPs []string) {
-	for _, ip := range svcIPs {
+func (proxier *Proxier) deleteServiceConnections() {
+	for _, ip := range proxier.staleUDPServices.UnsortedList() {
 		glog.V(2).Infof("Deleting connection tracking state for service IP %s", ip)
 		err := proxier.execConntrackTool("-D", "--orig-dst", ip, "-p", "udp")
 		if err != nil && !strings.Contains(err.Error(), noConnectionToDelete) {
@@ -746,6 +751,7 @@ func (proxier *Proxier) deleteServiceConnections(svcIPs []string) {
 			glog.Errorf("conntrack return with error: %v", err)
 		}
 	}
+	proxier.staleUDPServices = sets.NewString()
 }
 
 //execConntrackTool executes conntrack tool using given parameters
@@ -1310,6 +1316,10 @@ func (proxier *Proxier) syncProxyRules() {
 		}
 	}
 	proxier.portsMap = replacementPortsMap
+
+	// Clean up stale connection tracking records
+	proxier.deleteServiceConnections()
+	proxier.deleteEndpointConnections()
 }
 
 // Clear UDP conntrack for port or all conntrack entries when port equal zero.
