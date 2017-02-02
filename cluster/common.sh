@@ -314,7 +314,7 @@ function load-or-gen-kube-bearertoken() {
 #   KUBE_TEMP
 function ensure-temp-dir {
   if [[ -z ${KUBE_TEMP-} ]]; then
-    KUBE_TEMP=$(mktemp -d -t kubernetes.XXXXXX)
+    export KUBE_TEMP=$(mktemp -d -t kubernetes.XXXXXX)
     trap 'rm -rf "${KUBE_TEMP}"' EXIT
   fi
 }
