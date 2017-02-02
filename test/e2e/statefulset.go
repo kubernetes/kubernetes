@@ -125,6 +125,9 @@ var _ = framework.KubeDescribe("StatefulSet", func() {
 			By("Verifying statefulset provides a stable hostname for each pod")
 			framework.ExpectNoError(sst.checkHostname(ss))
 
+			By("Verifying statefulset set proper service name")
+			framework.ExpectNoError(sst.checkServiceName(ss, headlessSvcName))
+
 			cmd := "echo $(hostname) > /data/hostname; sync;"
 			By("Running " + cmd + " in all stateful pods")
 			framework.ExpectNoError(sst.execInStatefulPods(ss, cmd))
@@ -961,6 +964,16 @@ func (s *statefulSetTester) waitForStatus(ss *apps.StatefulSet, expectedReplicas
 	if pollErr != nil {
 		framework.Failf("Failed waiting for stateful set status.replicas updated to %d: %v", expectedReplicas, pollErr)
 	}
+}
+
+func (p *statefulSetTester) checkServiceName(ps *apps.StatefulSet, expectedServiceName string) error {
+	framework.Logf("Checking if statefulset spec.serviceName is %s", expectedServiceName)
+
+	if expectedServiceName != ps.Spec.ServiceName {
+		return fmt.Errorf("Wrong service name governing statefulset. Expected %s got %s", expectedServiceName, ps.Spec.ServiceName)
+	}
+
+	return nil
 }
 
 func deleteAllStatefulSets(c clientset.Interface, ns string) {
