@@ -27,7 +27,6 @@ import (
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/kubernetes/pkg/api"
-	storeerr "k8s.io/kubernetes/pkg/api/errors/storage"
 	"k8s.io/kubernetes/pkg/api/validation"
 	policyclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/policy/internalversion"
 	"k8s.io/kubernetes/pkg/genericapiserver/registry/generic"
@@ -36,6 +35,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/client"
 	"k8s.io/kubernetes/pkg/registry/core/pod"
 	podrest "k8s.io/kubernetes/pkg/registry/core/pod/rest"
+	storeerr "k8s.io/kubernetes/pkg/storage/errors"
 )
 
 // PodStorage includes storage for pods and all sub resources
