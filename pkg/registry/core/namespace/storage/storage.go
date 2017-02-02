@@ -141,7 +141,7 @@ func (r *REST) Delete(ctx genericapirequest.Context, name string, options *metav
 					newFinalizers := []string{}
 					for i := range existingNamespace.ObjectMeta.Finalizers {
 						finalizer := existingNamespace.ObjectMeta.Finalizers[i]
-						if string(finalizer) != api.FinalizerOrphan {
+						if string(finalizer) != metav1.FinalizerOrphan {
 							newFinalizers = append(newFinalizers, finalizer)
 						}
 					}

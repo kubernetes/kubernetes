@@ -37,7 +37,6 @@ import (
 	"k8s.io/apimachinery/pkg/watch"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/storage"
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/genericapiserver/registry/generic"
 	"k8s.io/kubernetes/pkg/genericapiserver/registry/rest"
 	"k8s.io/kubernetes/pkg/registry/cachesize"
@@ -546,7 +545,7 @@ func shouldUpdateFinalizers(e *Store, accessor metav1.Object, options *metav1.De
 	hasOrphanFinalizer := false
 	finalizers := accessor.GetFinalizers()
 	for _, f := range finalizers {
-		if f == api.FinalizerOrphan {
+		if f == metav1.FinalizerOrphan {
 			shouldOrphan = true
 			hasOrphanFinalizer = true
 			break
@@ -558,13 +557,13 @@ func shouldUpdateFinalizers(e *Store, accessor metav1.Object, options *metav1.De
 		shouldOrphan = *options.OrphanDependents
 	}
 	if shouldOrphan && !hasOrphanFinalizer {
-		finalizers = append(finalizers, api.FinalizerOrphan)
+		finalizers = append(finalizers, metav1.FinalizerOrphan)
 		return true, finalizers
 	}
 	if !shouldOrphan && hasOrphanFinalizer {
 		var newFinalizers []string
 		for _, f := range finalizers {
-			if f == api.FinalizerOrphan {
+			if f == metav1.FinalizerOrphan {
 				continue
 			}
 			newFinalizers = append(newFinalizers, f)
