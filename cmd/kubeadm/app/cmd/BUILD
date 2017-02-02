@@ -29,6 +29,7 @@ go_library(
         "//cmd/kubeadm/app/discovery:go_default_library",
         "//cmd/kubeadm/app/master:go_default_library",
         "//cmd/kubeadm/app/node:go_default_library",
+        "//cmd/kubeadm/app/phases/addons:go_default_library",
         "//cmd/kubeadm/app/phases/apiconfig:go_default_library",
         "//cmd/kubeadm/app/phases/certs:go_default_library",
         "//cmd/kubeadm/app/phases/kubeconfig:go_default_library",

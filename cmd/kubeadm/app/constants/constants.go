@@ -16,6 +16,8 @@ limitations under the License.
 
 package constants
 
+import "time"
+
 const (
 	CACertAndKeyBaseName = "ca"
 	CACertName           = "ca.crt"
@@ -43,4 +45,7 @@ const (
 	// Constants for what we name our ServiceAccounts with limited access to the cluster in case of RBAC
 	KubeDNSServiceAccountName   = "kube-dns"
 	KubeProxyServiceAccountName = "kube-proxy"
+
+	// APICallRetryInterval defines how long kubeadm should wait before retrying a failed API operation
+	APICallRetryInterval = 500 * time.Millisecond
 )
