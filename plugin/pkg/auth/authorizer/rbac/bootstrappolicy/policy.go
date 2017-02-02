@@ -94,18 +94,25 @@ func ClusterRoles() []rbac.ClusterRole {
 			},
 		},
 		{
-			// a role which provides just enough power to determine if the server is ready and discover API versions for negotiation
+			// a role that provides just enough power to determine if the server is ready and discover API versions for negotiation
 			ObjectMeta: metav1.ObjectMeta{Name: "system:discovery"},
 			Rules: []rbac.PolicyRule{
 				rbac.NewRule("get").URLs("/healthz", "/version", "/swaggerapi", "/swaggerapi/*", "/api", "/api/*", "/apis", "/apis/*").RuleOrDie(),
 			},
 		},
 		{
-			// a role which provides minimal resource access to allow a "normal" user to learn information about themselves
+			// a role that provides minimal resource access to allow a "normal" user to learn information about themselves
 			ObjectMeta: metav1.ObjectMeta{Name: "system:basic-user"},
 			Rules: []rbac.PolicyRule{
 				// TODO add future selfsubjectrulesreview, project request APIs, project listing APIs
 				rbac.NewRule("create").Groups(authorizationGroup).Resources("selfsubjectaccessreviews").RuleOrDie(),
+			},
+		},
+		{
+			// a role for whole-system catalog viewing to allow editors to tailor their resources to what's available in the cluster
+			ObjectMeta: metav1.ObjectMeta{Name: "system:cluster-facilities"},
+			Rules: []rbac.PolicyRule{
+				rbac.NewRule(Read...).Groups(storageGroup).Resources("storageclasses").RuleOrDie(),
 			},
 		},
 
@@ -379,6 +386,7 @@ func ClusterRoleBindings() []rbac.ClusterRoleBinding {
 		rbac.NewClusterBinding("cluster-admin").Groups(user.SystemPrivilegedGroup).BindingOrDie(),
 		rbac.NewClusterBinding("system:discovery").Groups(user.AllAuthenticated, user.AllUnauthenticated).BindingOrDie(),
 		rbac.NewClusterBinding("system:basic-user").Groups(user.AllAuthenticated, user.AllUnauthenticated).BindingOrDie(),
+		rbac.NewClusterBinding("system:cluster-facilities").Groups(user.AllAuthenticated).BindingOrDie(),
 		rbac.NewClusterBinding("system:node").Groups(user.NodesGroup).BindingOrDie(),
 		rbac.NewClusterBinding("system:node-proxier").Users(user.KubeProxy).BindingOrDie(),
 		rbac.NewClusterBinding("system:kube-controller-manager").Users(user.KubeControllerManager).BindingOrDie(),
