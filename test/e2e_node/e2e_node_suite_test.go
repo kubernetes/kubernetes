@@ -70,6 +70,7 @@ func init() {
 
 func TestMain(m *testing.M) {
 	pflag.Parse()
+	framework.AfterReadingAllFlags(&framework.TestContext)
 	os.Exit(m.Run())
 }
 
