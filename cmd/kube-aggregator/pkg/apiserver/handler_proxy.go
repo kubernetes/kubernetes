@@ -23,11 +23,11 @@ import (
 
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/httpstream/spdy"
+	"k8s.io/apiserver/pkg/endpoints/handlers/responsewriters"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
+	genericrest "k8s.io/apiserver/pkg/registry/generic/rest"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/transport"
-	"k8s.io/kubernetes/pkg/genericapiserver/endpoints/handlers/responsewriters"
-	genericrest "k8s.io/kubernetes/pkg/genericapiserver/registry/generic/rest"
 
 	apiregistrationapi "k8s.io/kubernetes/cmd/kube-aggregator/pkg/apis/apiregistration"
 )

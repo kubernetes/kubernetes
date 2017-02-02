@@ -28,7 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/openapi"
 	"k8s.io/apimachinery/pkg/util/json"
 	"k8s.io/apiserver/pkg/util/trie"
-	genericmux "k8s.io/kubernetes/pkg/genericapiserver/server/mux"
+	genericmux "k8s.io/apiserver/pkg/server/mux"
 )
 
 const (

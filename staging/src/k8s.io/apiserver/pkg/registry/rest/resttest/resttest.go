@@ -35,7 +35,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
-	"k8s.io/kubernetes/pkg/genericapiserver/registry/rest"
+	"k8s.io/apiserver/pkg/registry/rest"
 )
 
 type Tester struct {

@@ -28,8 +28,8 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apiserver/pkg/endpoints/handlers/negotiation"
-	"k8s.io/kubernetes/pkg/genericapiserver/endpoints/handlers"
-	"k8s.io/kubernetes/pkg/genericapiserver/endpoints/handlers/responsewriters"
+	"k8s.io/apiserver/pkg/endpoints/handlers"
+	"k8s.io/apiserver/pkg/endpoints/handlers/responsewriters"
 )
 
 // AddApiWebService adds a service to return the supported api versions at the legacy /api.

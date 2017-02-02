@@ -18,8 +18,8 @@ package routes
 
 import (
 	"k8s.io/apimachinery/pkg/openapi"
-	"k8s.io/kubernetes/pkg/genericapiserver/server/mux"
-	apiserveropenapi "k8s.io/kubernetes/pkg/genericapiserver/server/openapi"
+	"k8s.io/apiserver/pkg/server/mux"
+	apiserveropenapi "k8s.io/apiserver/pkg/server/openapi"
 
 	"github.com/golang/glog"
 )
