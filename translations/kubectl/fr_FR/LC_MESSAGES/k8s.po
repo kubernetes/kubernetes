@@ -80,9 +80,7 @@ msgid "Unsets an individual value in a kubeconfig file"
 msgstr "Supprime une valeur individuelle dans un fichier kubeconfig"
 
 msgid "Update the annotations on a resource"
-msgstr ""
-"Mettre à jour les annotations d'une ressourcewatch is only supported on "
-"individual resources and resource collections - %d resources were found"
+msgstr "Mettre à jour les annotations d'une ressource"
 
 msgid ""
 "watch is only supported on individual resources and resource collections - "

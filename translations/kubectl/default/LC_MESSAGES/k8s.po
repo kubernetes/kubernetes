@@ -383,9 +383,7 @@ msgid "Undo a previous rollout"
 msgstr "Undo a previous rollout"
 
 msgid "Update the annotations on a resource"
-msgstr ""
-"Update the annotations on a resourcewatch is only supported on individual "
-"resources and resource collections - %d resources were found"
+msgstr "Update the annotations on a resource"
 
 msgid ""
 "watch is only supported on individual resources and resource collections - "

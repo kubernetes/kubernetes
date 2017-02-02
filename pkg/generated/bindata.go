@@ -581,9 +581,7 @@ msgid "Undo a previous rollout"
 msgstr "Undo a previous rollout"
 
 msgid "Update the annotations on a resource"
-msgstr ""
-"Update the annotations on a resourcewatch is only supported on individual "
-"resources and resource collections - %d resources were found"
+msgstr "Update the annotations on a resource"
 
 msgid ""
 "watch is only supported on individual resources and resource collections - "
@@ -1016,10 +1014,20 @@ msgstr "Undo a previous rollout"
 
 #: pkg/kubectl/cmd/annotate.go:115
 msgid "Update the annotations on a resource"
-msgstr ""
-"Update the annotations on a resourcewatch is only supported on individual "
-"resources and resource collections - %d resources were found"
+msgstr "Update the annotations on a resource"
 
+msgid ""
+"watch is only supported on individual resources and resource collections - "
+"%d resources were found"
+msgid_plural ""
+"watch is only supported on individual resources and resource collections - "
+"%d resources were found"
+msgstr[0] ""
+"watch is only supported on individual resources and resource collections - "
+"%d resource was found"
+msgstr[1] ""
+"watch is only supported on individual resources and resource collections - "
+"%d resources were found"
 `)
 
 func translationsKubectlEn_usLc_messagesK8sPoBytes() ([]byte, error) {
@@ -1037,7 +1045,7 @@ func translationsKubectlEn_usLc_messagesK8sPo() (*asset, error) {
 	return a, nil
 }
 
-var _translationsKubectlFr_frLc_messagesK8sMo = []byte("\xde\x12\x04\x95\x00\x00\x00\x00\x11\x00\x00\x00\x1c\x00\x00\x00\xa4\x00\x00\x00\x17\x00\x00\x00,\x01\x00\x00\x00\x00\x00\x00\x88\x01\x00\x008\x00\x00\x00\x89\x01\x00\x000\x00\x00\x00\xc2\x01\x00\x000\x00\x00\x00\xf3\x01\x00\x00\x1d\x00\x00\x00$\x02\x00\x00*\x00\x00\x00B\x02\x00\x00A\x00\x00\x00m\x02\x00\x00\x1c\x00\x00\x00\xaf\x02\x00\x00\x17\x00\x00\x00\xcc\x02\x00\x00\"\x00\x00\x00\xe4\x02\x00\x00\"\x00\x00\x00\a\x03\x00\x00\x1f\x00\x00\x00*\x03\x00\x00-\x00\x00\x00J\x03\x00\x00-\x00\x00\x00x\x03\x00\x00/\x00\x00\x00\xa6\x03\x00\x00$\x00\x00\x00\xd6\x03\x00\x00\xc5\x00\x00\x00\xfb\x03\x00\x00\xab\x01\x00\x00\xc1\x04\x00\x00O\x00\x00\x00m\x06\x00\x00-\x00\x00\x00\xbd\x06\x00\x00.\x00\x00\x00\xeb\x06\x00\x00\"\x00\x00\x00\x1a\a\x00\x00-\x00\x00\x00=\a\x00\x00W\x00\x00\x00k\a\x00\x00\x1a\x00\x00\x00\xc3\a\x00\x00 \x00\x00\x00\xde\a\x00\x00#\x00\x00\x00\xff\a\x00\x00$\x00\x00\x00#\b\x00\x00'\x00\x00\x00H\b\x00\x00;\x00\x00\x00p\b\x00\x007\x00\x00\x00\xac\b\x00\x00;\x00\x00\x00\xe4\b\x00\x00\x90\x00\x00\x00 \t\x00\x00\x05\x01\x00\x00\xb1\t\x00\x00\x01\x00\x00\x00\n\x00\x00\x00\v\x00\x00\x00\x03\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x11\x00\x00\x00\t\x00\x00\x00\x02\x00\x00\x00\x00\x00\x00\x00\a\x00\x00\x00\x04\x00\x00\x00\x00\x00\x00\x00\b\x00\x00\x00\x0e\x00\x00\x00\x00\x00\x00\x00\x0f\x00\x00\x00\f\x00\x00\x00\x05\x00\x00\x00\r\x00\x00\x00\x06\x00\x00\x00\x00\x00\x00\x00\x10\x00\x00\x00\x00Apply a configuration to a resource by filename or stdin\x00Delete the specified cluster from the kubeconfig\x00Delete the specified context from the kubeconfig\x00Describe one or many contexts\x00Display clusters defined in the kubeconfig\x00Display merged kubeconfig settings or a specified kubeconfig file\x00Displays the current-context\x00Modify kubeconfig files\x00Sets a cluster entry in kubeconfig\x00Sets a context entry in kubeconfig\x00Sets a user entry in kubeconfig\x00Sets an individual value in a kubeconfig file\x00Sets the current-context in a kubeconfig file\x00Unsets an individual value in a kubeconfig file\x00Update the annotations on a resource\x00watch is only supported on individual resources and resource collections - %d resources were found\x00watch is only supported on individual resources and resource collections - %d resources were found\x00Project-Id-Version: gettext-go-examples-hello\nReport-Msgid-Bugs-To: \nPOT-Creation-Date: 2013-12-12 20:03+0000\nPO-Revision-Date: 2017-01-29 22:54-0800\nLast-Translator: Brendan Burns <brendan.d.burns@gmail.com>\nMIME-Version: 1.0\nContent-Type: text/plain; charset=UTF-8\nContent-Transfer-Encoding: 8bit\nX-Generator: Poedit 1.6.10\nX-Poedit-SourceCharset: UTF-8\nLanguage-Team: \nPlural-Forms: nplurals=2; plural=(n > 1);\nLanguage: fr\n\x00Appliquer une configuration \u00e0 une ressource par nom de fichier ou depuis stdin\x00Supprimer le cluster sp\u00e9cifi\u00e9 du kubeconfig\x00Supprimer le contexte sp\u00e9cifi\u00e9 du kubeconfig\x00D\u00e9crire un ou plusieurs contextes\x00Afficher les cluster d\u00e9finis dans kubeconfig\x00Afficher les param\u00e8tres fusionn\u00e9s de kubeconfig ou d'un fichier kubeconfig sp\u00e9cifi\u00e9\x00Affiche le contexte actuel\x00Modifier des fichiers kubeconfig\x00D\u00e9finit un cluster dans kubeconfig\x00D\u00e9finit un contexte dans kubeconfig\x00D\u00e9finit un utilisateur dans kubeconfig\x00D\u00e9finit une valeur individuelle dans un fichier kubeconfig\x00D\u00e9finit le contexte courant dans un fichier kubeconfig\x00Supprime une valeur individuelle dans un fichier kubeconfig\x00Mettre \u00e0 jour les annotations d'une ressourcewatch is only supported on individual resources and resource collections - %d resources were found\x00watch n'est compatible qu'avec les ressources individuelles et les collections de ressources.  - %d ressource a \u00e9t\u00e9 trouv\u00e9e. \x00watch n'est compatible qu'avec les ressources individuelles et les collections de ressources.  - %d ressources ont \u00e9t\u00e9 trouv\u00e9es. \x00")
+var _translationsKubectlFr_frLc_messagesK8sMo = []byte("\xde\x12\x04\x95\x00\x00\x00\x00\x11\x00\x00\x00\x1c\x00\x00\x00\xa4\x00\x00\x00\x17\x00\x00\x00,\x01\x00\x00\x00\x00\x00\x00\x88\x01\x00\x008\x00\x00\x00\x89\x01\x00\x000\x00\x00\x00\xc2\x01\x00\x000\x00\x00\x00\xf3\x01\x00\x00\x1d\x00\x00\x00$\x02\x00\x00*\x00\x00\x00B\x02\x00\x00A\x00\x00\x00m\x02\x00\x00\x1c\x00\x00\x00\xaf\x02\x00\x00\x17\x00\x00\x00\xcc\x02\x00\x00\"\x00\x00\x00\xe4\x02\x00\x00\"\x00\x00\x00\a\x03\x00\x00\x1f\x00\x00\x00*\x03\x00\x00-\x00\x00\x00J\x03\x00\x00-\x00\x00\x00x\x03\x00\x00/\x00\x00\x00\xa6\x03\x00\x00$\x00\x00\x00\xd6\x03\x00\x00\xc5\x00\x00\x00\xfb\x03\x00\x00\xab\x01\x00\x00\xc1\x04\x00\x00O\x00\x00\x00m\x06\x00\x00-\x00\x00\x00\xbd\x06\x00\x00.\x00\x00\x00\xeb\x06\x00\x00\"\x00\x00\x00\x1a\a\x00\x00-\x00\x00\x00=\a\x00\x00W\x00\x00\x00k\a\x00\x00\x1a\x00\x00\x00\xc3\a\x00\x00 \x00\x00\x00\xde\a\x00\x00#\x00\x00\x00\xff\a\x00\x00$\x00\x00\x00#\b\x00\x00'\x00\x00\x00H\b\x00\x00;\x00\x00\x00p\b\x00\x007\x00\x00\x00\xac\b\x00\x00;\x00\x00\x00\xe4\b\x00\x00.\x00\x00\x00 \t\x00\x00\x05\x01\x00\x00O\t\x00\x00\x01\x00\x00\x00\n\x00\x00\x00\v\x00\x00\x00\x03\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x11\x00\x00\x00\t\x00\x00\x00\x02\x00\x00\x00\x00\x00\x00\x00\a\x00\x00\x00\x04\x00\x00\x00\x00\x00\x00\x00\b\x00\x00\x00\x0e\x00\x00\x00\x00\x00\x00\x00\x0f\x00\x00\x00\f\x00\x00\x00\x05\x00\x00\x00\r\x00\x00\x00\x06\x00\x00\x00\x00\x00\x00\x00\x10\x00\x00\x00\x00Apply a configuration to a resource by filename or stdin\x00Delete the specified cluster from the kubeconfig\x00Delete the specified context from the kubeconfig\x00Describe one or many contexts\x00Display clusters defined in the kubeconfig\x00Display merged kubeconfig settings or a specified kubeconfig file\x00Displays the current-context\x00Modify kubeconfig files\x00Sets a cluster entry in kubeconfig\x00Sets a context entry in kubeconfig\x00Sets a user entry in kubeconfig\x00Sets an individual value in a kubeconfig file\x00Sets the current-context in a kubeconfig file\x00Unsets an individual value in a kubeconfig file\x00Update the annotations on a resource\x00watch is only supported on individual resources and resource collections - %d resources were found\x00watch is only supported on individual resources and resource collections - %d resources were found\x00Project-Id-Version: gettext-go-examples-hello\nReport-Msgid-Bugs-To: \nPOT-Creation-Date: 2013-12-12 20:03+0000\nPO-Revision-Date: 2017-01-29 22:54-0800\nLast-Translator: Brendan Burns <brendan.d.burns@gmail.com>\nMIME-Version: 1.0\nContent-Type: text/plain; charset=UTF-8\nContent-Transfer-Encoding: 8bit\nX-Generator: Poedit 1.6.10\nX-Poedit-SourceCharset: UTF-8\nLanguage-Team: \nPlural-Forms: nplurals=2; plural=(n > 1);\nLanguage: fr\n\x00Appliquer une configuration \u00e0 une ressource par nom de fichier ou depuis stdin\x00Supprimer le cluster sp\u00e9cifi\u00e9 du kubeconfig\x00Supprimer le contexte sp\u00e9cifi\u00e9 du kubeconfig\x00D\u00e9crire un ou plusieurs contextes\x00Afficher les cluster d\u00e9finis dans kubeconfig\x00Afficher les param\u00e8tres fusionn\u00e9s de kubeconfig ou d'un fichier kubeconfig sp\u00e9cifi\u00e9\x00Affiche le contexte actuel\x00Modifier des fichiers kubeconfig\x00D\u00e9finit un cluster dans kubeconfig\x00D\u00e9finit un contexte dans kubeconfig\x00D\u00e9finit un utilisateur dans kubeconfig\x00D\u00e9finit une valeur individuelle dans un fichier kubeconfig\x00D\u00e9finit le contexte courant dans un fichier kubeconfig\x00Supprime une valeur individuelle dans un fichier kubeconfig\x00Mettre \u00e0 jour les annotations d'une ressource\x00watch n'est compatible qu'avec les ressources individuelles et les collections de ressources.  - %d ressource a \u00e9t\u00e9 trouv\u00e9e. \x00watch n'est compatible qu'avec les ressources individuelles et les collections de ressources.  - %d ressources ont \u00e9t\u00e9 trouv\u00e9es. \x00")
 
 func translationsKubectlFr_frLc_messagesK8sMoBytes() ([]byte, error) {
 	return _translationsKubectlFr_frLc_messagesK8sMo, nil
@@ -1136,9 +1144,7 @@ msgid "Unsets an individual value in a kubeconfig file"
 msgstr "Supprime une valeur individuelle dans un fichier kubeconfig"
 
 msgid "Update the annotations on a resource"
-msgstr ""
-"Mettre à jour les annotations d'une ressourcewatch is only supported on "
-"individual resources and resource collections - %d resources were found"
+msgstr "Mettre à jour les annotations d'une ressource"
 
 msgid ""
 "watch is only supported on individual resources and resource collections - "
@@ -1179,7 +1185,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: \n"
 "Report-Msgid-Bugs-To: EMAIL\n"
-"POT-Creation-Date: 2017-02-01 22:44-0800\n"
+"POT-Creation-Date: 2017-02-01 23:02-0800\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
