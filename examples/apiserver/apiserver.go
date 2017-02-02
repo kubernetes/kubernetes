@@ -51,7 +51,7 @@ func newStorageFactory() genericapiserver.StorageFactory {
 		ServerList: []string{"http://127.0.0.1:2379"},
 		Copier:     api.Scheme,
 	}
-	storageFactory := genericapiserver.NewDefaultStorageFactory(config, "application/json", api.Codecs, genericapiserver.NewDefaultResourceEncodingConfig(), genericapiserver.NewResourceConfig())
+	storageFactory := genericapiserver.NewDefaultStorageFactory(config, "application/json", api.Codecs, genericapiserver.NewDefaultResourceEncodingConfig(api.Registry), genericapiserver.NewResourceConfig())
 
 	return storageFactory
 }
@@ -104,6 +104,7 @@ func (serverOptions *ServerRunOptions) Run(stopCh <-chan struct{}) error {
 
 	// create config from options
 	config := genericapiserver.NewConfig().
+		WithSerializer(api.Codecs).
 		ApplyOptions(serverOptions.GenericServerRunOptions).
 		ApplyInsecureServingOptions(serverOptions.InsecureServing)
 

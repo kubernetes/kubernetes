@@ -116,7 +116,8 @@ func (o DiscoveryServerOptions) RunDiscoveryServer() error {
 		return fmt.Errorf("error creating self-signed certificates: %v", err)
 	}
 
-	genericAPIServerConfig := genericapiserver.NewConfig()
+	genericAPIServerConfig := genericapiserver.NewConfig().
+		WithSerializer(api.Codecs)
 	if _, err := genericAPIServerConfig.ApplySecureServingOptions(o.SecureServing); err != nil {
 		return err
 	}

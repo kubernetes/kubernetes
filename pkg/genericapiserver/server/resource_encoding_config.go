@@ -17,9 +17,9 @@ limitations under the License.
 package server
 
 import (
+	"k8s.io/apimachinery/pkg/apimachinery/registered"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/kubernetes/pkg/api"
 )
 
 type ResourceEncodingConfig interface {
@@ -33,7 +33,8 @@ type ResourceEncodingConfig interface {
 }
 
 type DefaultResourceEncodingConfig struct {
-	Groups map[string]*GroupResourceEncodingConfig
+	groups   map[string]*GroupResourceEncodingConfig
+	registry *registered.APIRegistrationManager
 }
 
 type GroupResourceEncodingConfig struct {
@@ -46,8 +47,8 @@ type GroupResourceEncodingConfig struct {
 
 var _ ResourceEncodingConfig = &DefaultResourceEncodingConfig{}
 
-func NewDefaultResourceEncodingConfig() *DefaultResourceEncodingConfig {
-	return &DefaultResourceEncodingConfig{Groups: map[string]*GroupResourceEncodingConfig{}}
+func NewDefaultResourceEncodingConfig(registry *registered.APIRegistrationManager) *DefaultResourceEncodingConfig {
+	return &DefaultResourceEncodingConfig{groups: map[string]*GroupResourceEncodingConfig{}, registry: registry}
 }
 
 func newGroupResourceEncodingConfig(defaultEncoding, defaultInternalVersion schema.GroupVersion) *GroupResourceEncodingConfig {
@@ -58,33 +59,33 @@ func newGroupResourceEncodingConfig(defaultEncoding, defaultInternalVersion sche
 }
 
 func (o *DefaultResourceEncodingConfig) SetVersionEncoding(group string, externalEncodingVersion, internalVersion schema.GroupVersion) {
-	_, groupExists := o.Groups[group]
+	_, groupExists := o.groups[group]
 	if !groupExists {
-		o.Groups[group] = newGroupResourceEncodingConfig(externalEncodingVersion, internalVersion)
+		o.groups[group] = newGroupResourceEncodingConfig(externalEncodingVersion, internalVersion)
 	}
 
-	o.Groups[group].DefaultExternalEncoding = externalEncodingVersion
-	o.Groups[group].DefaultInternalEncoding = internalVersion
+	o.groups[group].DefaultExternalEncoding = externalEncodingVersion
+	o.groups[group].DefaultInternalEncoding = internalVersion
 }
 
 func (o *DefaultResourceEncodingConfig) SetResourceEncoding(resourceBeingStored schema.GroupResource, externalEncodingVersion, internalVersion schema.GroupVersion) {
 	group := resourceBeingStored.Group
-	_, groupExists := o.Groups[group]
+	_, groupExists := o.groups[group]
 	if !groupExists {
-		o.Groups[group] = newGroupResourceEncodingConfig(externalEncodingVersion, internalVersion)
+		o.groups[group] = newGroupResourceEncodingConfig(externalEncodingVersion, internalVersion)
 	}
 
-	o.Groups[group].ExternalResourceEncodings[resourceBeingStored.Resource] = externalEncodingVersion
-	o.Groups[group].InternalResourceEncodings[resourceBeingStored.Resource] = internalVersion
+	o.groups[group].ExternalResourceEncodings[resourceBeingStored.Resource] = externalEncodingVersion
+	o.groups[group].InternalResourceEncodings[resourceBeingStored.Resource] = internalVersion
 }
 
 func (o *DefaultResourceEncodingConfig) StorageEncodingFor(resource schema.GroupResource) (schema.GroupVersion, error) {
-	groupMeta, err := api.Registry.Group(resource.Group)
+	groupMeta, err := o.registry.Group(resource.Group)
 	if err != nil {
 		return schema.GroupVersion{}, err
 	}
 
-	groupEncoding, groupExists := o.Groups[resource.Group]
+	groupEncoding, groupExists := o.groups[resource.Group]
 
 	if !groupExists {
 		// return the most preferred external version for the group
@@ -100,11 +101,11 @@ func (o *DefaultResourceEncodingConfig) StorageEncodingFor(resource schema.Group
 }
 
 func (o *DefaultResourceEncodingConfig) InMemoryEncodingFor(resource schema.GroupResource) (schema.GroupVersion, error) {
-	if _, err := api.Registry.Group(resource.Group); err != nil {
+	if _, err := o.registry.Group(resource.Group); err != nil {
 		return schema.GroupVersion{}, err
 	}
 
-	groupEncoding, groupExists := o.Groups[resource.Group]
+	groupEncoding, groupExists := o.groups[resource.Group]
 	if !groupExists {
 		return schema.GroupVersion{Group: resource.Group, Version: runtime.APIVersionInternal}, nil
 	}
