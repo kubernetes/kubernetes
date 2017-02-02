@@ -183,8 +183,6 @@ func startVolumeServer(client clientset.Interface, config VolumeTestConfig) *v1.
 		By(fmt.Sprintf("locating the %q server pod", serverPodName))
 		pod, err = podClient.Get(serverPodName, metav1.GetOptions{})
 		framework.ExpectNoError(err, "Cannot locate the server pod %q: %v", serverPodName, err)
-		By("sleeping a bit to give the server time to start")
-		time.Sleep(20 * time.Second)
 	}
 
 	return pod
