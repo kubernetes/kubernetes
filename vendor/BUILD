@@ -14130,3 +14130,27 @@ go_test(
         "//vendor:k8s.io/apimachinery/pkg/util/validation/field",
     ],
 )
+
+go_test(
+    name = "k8s.io/apimachinery/pkg/util/jsonmergepatch_test",
+    srcs = ["k8s.io/apimachinery/pkg/util/jsonmergepatch/patch_test.go"],
+    library = ":k8s.io/apimachinery/pkg/util/jsonmergepatch",
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:github.com/davecgh/go-spew/spew",
+        "//vendor:github.com/evanphx/json-patch",
+        "//vendor:github.com/ghodss/yaml",
+        "//vendor:k8s.io/apimachinery/pkg/util/json",
+    ],
+)
+
+go_library(
+    name = "k8s.io/apimachinery/pkg/util/jsonmergepatch",
+    srcs = ["k8s.io/apimachinery/pkg/util/jsonmergepatch/patch.go"],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:github.com/evanphx/json-patch",
+        "//vendor:k8s.io/apimachinery/pkg/util/json",
+        "//vendor:k8s.io/apimachinery/pkg/util/strategicpatch",
+    ],
+)
