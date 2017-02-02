@@ -34,7 +34,7 @@ import (
 	"k8s.io/apiserver/pkg/apis/example"
 	examplev1 "k8s.io/apiserver/pkg/apis/example/v1"
 	"k8s.io/apiserver/pkg/storage/storagebackend"
-	"k8s.io/kubernetes/pkg/storage/etcd/testing/testingcert"
+	"k8s.io/apiserver/pkg/storage/etcd/testing/testingcert"
 )
 
 var scheme = runtime.NewScheme()

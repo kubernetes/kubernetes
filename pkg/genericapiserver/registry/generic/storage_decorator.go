@@ -21,7 +21,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/storagebackend"
-	"k8s.io/kubernetes/pkg/storage/storagebackend/factory"
+	"k8s.io/apiserver/pkg/storage/storagebackend/factory"
 )
 
 // StorageDecorator is a function signature for producing a storage.Interface

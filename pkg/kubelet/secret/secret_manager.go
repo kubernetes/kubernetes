@@ -21,10 +21,10 @@ import (
 	"sync"
 	"time"
 
+	storageetcd "k8s.io/apiserver/pkg/storage/etcd"
 	"k8s.io/kubernetes/pkg/api/v1"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/pkg/kubelet/util"
-	storageetcd "k8s.io/kubernetes/pkg/storage/etcd"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
