@@ -26,7 +26,7 @@ registry:
         description: base64 encoded plaintext version of the htpasswd file, needed by docker daemons to authenticate to the registry.
       tlscert:
         type: string
-        description: base64 encoded TLS certificate for the registry. Common Name must match the domain.
+        description: base64 encoded TLS certificate for the registry. Common Name must match the domain name of the registry.
       tlskey:
         type: string
         description: base64 encoded TLS key for the registry.
@@ -36,7 +36,7 @@ registry:
       ingress:
         type: boolean
         default: false
-        description: Create an Ingress object for the registry (or delete said object if "delete" is True)
+        description: Create an Ingress resource for the registry (or delete resource object if "delete" is True)
       delete:
         type: boolean
         default: false

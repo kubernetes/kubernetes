@@ -41,6 +41,10 @@ a unit for maintenance.
 
 Resuming the workload will [uncordon](http://kubernetes.io/docs/user-guide/kubectl/kubectl_uncordon/) a paused unit. Workloads will automatically migrate unless otherwise directed via their application declaration.
 
+## Private registry
+
+With the "registry" action that is part for the kubernetes-worker charm, you can very easily create a private docker registry, with authentication, and available over TLS. Please note that the registry deployed with the action is not HA, and uses storage tied to the kubernetes node where the pod is running. So if the registry pod changes is migrated from one node to another for whatever reason, you will need to re-publish the images.
+
 ## Known Limitations
 
 Kubernetes workers currently only support 'phaux' HA scenarios. Even when configured with an HA cluster string, they will only ever contact the first unit in the cluster map. To enalbe a proper HA story, kubernetes-worker units are encouraged to proxy through a [kubeapi-load-balancer](https://jujucharms.com/kubeapi-load-balancer)
@@ -48,5 +52,4 @@ application. This enables a HA deployment without the need to
 re-render configuration and disrupt the worker services.
 
 External access to pods must be performed through a [Kubernetes
-Ingress Resource](http://kubernetes.io/docs/user-guide/ingress/). More
-information
+Ingress Resource](http://kubernetes.io/docs/user-guide/ingress/).
