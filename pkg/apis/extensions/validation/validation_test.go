@@ -1174,8 +1174,9 @@ func TestValidateIngress(t *testing.T) {
 	newValid := func() extensions.Ingress {
 		return extensions.Ingress{
 			ObjectMeta: metav1.ObjectMeta{
-				Name:      "foo",
-				Namespace: metav1.NamespaceDefault,
+				Name:        "foo",
+				Namespace:   metav1.NamespaceDefault,
+				Annotations: map[string]string{},
 			},
 			Spec: extensions.IngressSpec{
 				Backend: &extensions.IngressBackend{
@@ -1324,6 +1325,18 @@ func TestValidateIngressTLS(t *testing.T) {
 	}
 	badWildcardTLSErr := fmt.Sprintf("spec.tls[0].hosts: Invalid value: '%v'", wildcardHost)
 	errorCases[badWildcardTLSErr] = badWildcardTLS
+
+	secret := "tls-secret"
+	doubleTLSSource := newValid()
+	fmt.Println(doubleTLSSource)
+	doubleTLSSource.Annotations[extensions.IngressPreSharedCertAnnotationKey] = "reference-to-cert"
+	doubleTLSSource.Spec.TLS = []extensions.IngressTLS{
+		{
+			SecretName: secret,
+		},
+	}
+	doubleTLSSourceErr := fmt.Sprintf("metadata.annotations: Forbidden: may only specify 1 source for TLS (annotation or API)")
+	errorCases[doubleTLSSourceErr] = doubleTLSSource
 
 	for k, v := range errorCases {
 		errs := ValidateIngress(&v)
