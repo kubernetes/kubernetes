@@ -164,7 +164,6 @@ func TestAutoscalingGroupBackwardCompatibility(t *testing.T) {
 	}{
 		{"POST", autoscalingPath("horizontalpodautoscalers", metav1.NamespaceDefault, ""), hpaV1, integration.Code201, ""},
 		{"GET", autoscalingPath("horizontalpodautoscalers", metav1.NamespaceDefault, ""), "", integration.Code200, testapi.Autoscaling.GroupVersion().String()},
-		{"GET", extensionsPath("horizontalpodautoscalers", metav1.NamespaceDefault, ""), "", integration.Code200, testapi.Extensions.GroupVersion().String()},
 	}
 
 	for _, r := range requests {

@@ -46,9 +46,7 @@ import (
 	"k8s.io/apiserver/pkg/server/filters"
 	"k8s.io/kubernetes/cmd/kube-apiserver/app/options"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/apis/autoscaling"
 	"k8s.io/kubernetes/pkg/apis/batch"
-	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/capabilities"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/cloudprovider"
@@ -204,7 +202,6 @@ func Run(s *options.ServerRunOptions) error {
 	if err != nil {
 		return fmt.Errorf("error in initializing storage factory: %s", err)
 	}
-	storageFactory.AddCohabitatingResources(autoscaling.Resource("horizontalpodautoscalers"), extensions.Resource("horizontalpodautoscalers"))
 	for _, override := range s.Etcd.EtcdServersOverrides {
 		tokens := strings.Split(override, "#")
 		if len(tokens) != 2 {
