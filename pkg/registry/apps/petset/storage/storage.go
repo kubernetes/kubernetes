@@ -26,6 +26,7 @@ import (
 	genericregistry "k8s.io/kubernetes/pkg/genericapiserver/registry/generic/registry"
 	"k8s.io/kubernetes/pkg/genericapiserver/registry/rest"
 	"k8s.io/kubernetes/pkg/registry/apps/petset"
+	"k8s.io/kubernetes/pkg/registry/cachesize"
 )
 
 // rest implements a RESTStorage for replication controllers against etcd
@@ -44,6 +45,7 @@ func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, *StatusREST) {
 		},
 		PredicateFunc:     petset.MatchStatefulSet,
 		QualifiedResource: appsapi.Resource("statefulsets"),
+		WatchCacheSize:    cachesize.GetWatchCacheSizeByResource("statefulsets"),
 
 		CreateStrategy: petset.Strategy,
 		UpdateStrategy: petset.Strategy,

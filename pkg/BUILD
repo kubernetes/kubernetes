@@ -98,6 +98,7 @@ filegroup(
         "//pkg/securitycontext:all-srcs",
         "//pkg/serviceaccount:all-srcs",
         "//pkg/ssh:all-srcs",
+        "//pkg/storage/errors:all-srcs",
         "//pkg/storage/etcd:all-srcs",
         "//pkg/storage/etcd3:all-srcs",
         "//pkg/storage/storagebackend/factory:all-srcs",
