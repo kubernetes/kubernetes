@@ -63,28 +63,28 @@
 		},
 		{
 			"ImportPath": "github.com/Azure/go-autorest/autorest",
-			"Comment": "v7.2.2-8-ge0c77ec",
-			"Rev": "e0c77ecbe74311e03f2a629834d2110f031f1453"
+			"Comment": "v7.2.3",
+			"Rev": "d7c034a8af24eda120dd6460bfcd6d9ed14e43ca"
 		},
 		{
 			"ImportPath": "github.com/Azure/go-autorest/autorest/azure",
-			"Comment": "v7.2.2-8-ge0c77ec",
-			"Rev": "e0c77ecbe74311e03f2a629834d2110f031f1453"
+			"Comment": "v7.2.3",
+			"Rev": "d7c034a8af24eda120dd6460bfcd6d9ed14e43ca"
 		},
 		{
 			"ImportPath": "github.com/Azure/go-autorest/autorest/date",
-			"Comment": "v7.2.2-8-ge0c77ec",
-			"Rev": "e0c77ecbe74311e03f2a629834d2110f031f1453"
+			"Comment": "v7.2.3",
+			"Rev": "d7c034a8af24eda120dd6460bfcd6d9ed14e43ca"
 		},
 		{
 			"ImportPath": "github.com/Azure/go-autorest/autorest/to",
-			"Comment": "v7.2.2-8-ge0c77ec",
-			"Rev": "e0c77ecbe74311e03f2a629834d2110f031f1453"
+			"Comment": "v7.2.3",
+			"Rev": "d7c034a8af24eda120dd6460bfcd6d9ed14e43ca"
 		},
 		{
 			"ImportPath": "github.com/Azure/go-autorest/autorest/validation",
-			"Comment": "v7.2.2-8-ge0c77ec",
-			"Rev": "e0c77ecbe74311e03f2a629834d2110f031f1453"
+			"Comment": "v7.2.3",
+			"Rev": "d7c034a8af24eda120dd6460bfcd6d9ed14e43ca"
 		},
 		{
 			"ImportPath": "github.com/MakeNowJust/heredoc",
