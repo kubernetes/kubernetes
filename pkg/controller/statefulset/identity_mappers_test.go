@@ -57,7 +57,6 @@ func TestPetIDDNS(t *testing.T) {
 		if hostname, ok := pod.Annotations[apipod.PodHostnameAnnotation]; !ok || hostname != petName {
 			t.Errorf("Wrong hostname: %v", hostname)
 		}
-		// TODO: Check this against the governing service.
 		if subdomain, ok := pod.Annotations[apipod.PodSubdomainAnnotation]; !ok || subdomain != petSubdomain {
 			t.Errorf("Wrong subdomain: %v", subdomain)
 		}
