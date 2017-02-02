@@ -24,8 +24,6 @@ import (
 	"strings"
 	"time"
 
-	inf "gopkg.in/inf.v0"
-
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
