@@ -31,6 +31,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/util/clock"
+
+	"github.com/golang/glog"
 )
 
 const (
@@ -209,6 +211,7 @@ func (s *secretStore) Get(namespace, name string) (*v1.Secret, error) {
 	data.Lock()
 	defer data.Unlock()
 	if data.err != nil || !s.isSecretFresh(data) {
+		glog.Errorf("SS: %s %s send GET request", namespace, name)
 		opts := metav1.GetOptions{}
 		if data.secret != nil && data.err == nil {
 			// This is just a periodic refresh of a secret we successfully fetched previously.
@@ -218,9 +221,12 @@ func (s *secretStore) Get(namespace, name string) (*v1.Secret, error) {
 		}
 		secret, err := s.kubeClient.Core().Secrets(namespace).Get(name, opts)
 		// Update state, unless we got error different than "not-found".
+		glog.Errorf("SS: %s %s: %v %t", namespace, name, err, apierrors.IsNotFound(err))
 		if err == nil || apierrors.IsNotFound(err) {
+			glog.Errorf("SS: %s %s: %v", secret)
 			// Ignore the update to the older version of a secret.
 			if data.secret == nil || secret == nil || !isSecretOlder(secret, data.secret) {
+				glog.Errorf("SS: %s %s: overwriting", secret)
 				data.secret = secret
 				data.err = err
 				data.lastUpdateTime = s.clock.Now()
