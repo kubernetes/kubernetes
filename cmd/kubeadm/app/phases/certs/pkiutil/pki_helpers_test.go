@@ -92,7 +92,7 @@ func TestWriteCertAndKey(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Couldn't create tmpdir")
 	}
-	defer os.Remove(tmpdir)
+	defer os.RemoveAll(tmpdir)
 
 	caKey, err := rsa.GenerateKey(rand.Reader, 2048)
 	if err != nil {
@@ -105,5 +105,103 @@ func TestWriteCertAndKey(t *testing.T) {
 			"failed WriteCertAndKey with an error: %v",
 			actual,
 		)
+	}
+}
+
+func TestCertOrKeyExist(t *testing.T) {
+	tmpdir, err := ioutil.TempDir("", "")
+	if err != nil {
+		t.Fatalf("Couldn't create tmpdir")
+	}
+	defer os.RemoveAll(tmpdir)
+
+	caKey, err := rsa.GenerateKey(rand.Reader, 2048)
+	if err != nil {
+		t.Fatalf("Couldn't create rsa Private Key")
+	}
+	caCert := &x509.Certificate{}
+	actual := WriteCertAndKey(tmpdir, "foo", caCert, caKey)
+	if actual != nil {
+		t.Errorf(
+			"failed WriteCertAndKey with an error: %v",
+			actual,
+		)
+	}
+
+	var tests = []struct {
+		path     string
+		name     string
+		expected bool
+	}{
+		{
+			path:     "",
+			name:     "",
+			expected: false,
+		},
+		{
+			path:     tmpdir,
+			name:     "foo",
+			expected: true,
+		},
+	}
+	for _, rt := range tests {
+		actual := CertOrKeyExist(rt.path, rt.name)
+		if actual != rt.expected {
+			t.Errorf(
+				"failed CertOrKeyExist:\n\texpected: %t\n\t  actual: %t",
+				rt.expected,
+				actual,
+			)
+		}
+	}
+}
+
+func TestTryLoadCertAndKeyFromDisk(t *testing.T) {
+	tmpdir, err := ioutil.TempDir("", "")
+	if err != nil {
+		t.Fatalf("Couldn't create tmpdir")
+	}
+	defer os.RemoveAll(tmpdir)
+
+	caCert, caKey, err := NewCertificateAuthority()
+	if err != nil {
+		t.Errorf(
+			"failed to create cert and key with an error: %v",
+			err,
+		)
+	}
+	err = WriteCertAndKey(tmpdir, "foo", caCert, caKey)
+	if err != nil {
+		t.Errorf(
+			"failed to write cert and key with an error: %v",
+			err,
+		)
+	}
+
+	var tests = []struct {
+		path     string
+		name     string
+		expected bool
+	}{
+		{
+			path:     "",
+			name:     "",
+			expected: false,
+		},
+		{
+			path:     tmpdir,
+			name:     "foo",
+			expected: true,
+		},
+	}
+	for _, rt := range tests {
+		_, _, actual := TryLoadCertAndKeyFromDisk(rt.path, rt.name)
+		if (actual == nil) != rt.expected {
+			t.Errorf(
+				"failed TryLoadCertAndKeyFromDisk:\n\texpected: %t\n\t  actual: %t",
+				rt.expected,
+				(actual == nil),
+			)
+		}
 	}
 }
