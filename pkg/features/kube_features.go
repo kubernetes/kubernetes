@@ -64,6 +64,7 @@ const (
 	//
 	// Ensures guaranteed scheduling of pods marked with a special pod annotation `scheduler.alpha.kubernetes.io/critical-pod`
 	// and also prevents them from being evicted from a node.
+	// Note: This feature is not supported for `BestEffort` pods.
 	ExperimentalCriticalPodAnnotation utilfeature.Feature = "ExperimentalCriticalPodAnnotation"
 )
 
