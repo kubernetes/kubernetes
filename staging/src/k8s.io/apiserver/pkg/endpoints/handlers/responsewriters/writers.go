@@ -29,7 +29,7 @@ import (
 	"k8s.io/apiserver/pkg/endpoints/handlers/negotiation"
 	"k8s.io/apiserver/pkg/util/flushwriter"
 	"k8s.io/apiserver/pkg/util/wsstream"
-	"k8s.io/kubernetes/pkg/genericapiserver/registry/rest"
+	"k8s.io/apiserver/pkg/registry/rest"
 )
 
 // WriteObject renders a returned runtime.Object to the response as a stream or an encoded object. If the object

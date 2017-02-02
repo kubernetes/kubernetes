@@ -17,7 +17,7 @@ limitations under the License.
 package routes
 
 import (
-	"k8s.io/kubernetes/pkg/genericapiserver/server/mux"
+	"k8s.io/apiserver/pkg/server/mux"
 
 	"github.com/emicklei/go-restful/swagger"
 )
