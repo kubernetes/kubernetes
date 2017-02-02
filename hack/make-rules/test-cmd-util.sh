@@ -1361,14 +1361,14 @@ __EOF__
   # Test that apply an empty patch doesn't change fields
   kubectl "${kube_flags[@]}" apply -f hack/testdata/TPR/foo.yaml
 
-  # Test that the field has the same value
+  # Test that the field has the same value after re-apply
   kube::test::get_object_assert foos/test '{{.someField}}' 'field1'
 
   # Test that apply has updated the subfield
   kube::test::get_object_assert foos/test '{{.nestedField.someSubfield}}' 'subfield1'
 
   # Update a subfield and then apply the change
-  sed 's/someSubfield: subfield1/someSubfield: modifiedSubfield/g' hack/testdata/TPR/foo.yaml | kubectl "${kube_flags[@]}" apply -f -
+  kubectl "${kube_flags[@]}" apply -f hack/testdata/TPR/foo-updated-subfield.yaml
 
   # Test that apply has updated the subfield
   kube::test::get_object_assert foos/test '{{.nestedField.someSubfield}}' 'modifiedSubfield'
@@ -1376,8 +1376,8 @@ __EOF__
   # Test that the field has the expected value
   kube::test::get_object_assert foos/test '{{.nestedField.otherSubfield}}' 'subfield2'
 
-  # Delete a field and then apply the change
-  sed '/otherSubfield: subfield2/d' hack/testdata/TPR/foo.yaml | kubectl "${kube_flags[@]}" apply -f -
+  # Delete a subfield and then apply the change
+  kubectl "${kube_flags[@]}" apply -f hack/testdata/TPR/foo-deleted-subfield.yaml
 
   # Test that apply has deleted the field
   kube::test::get_object_assert foos/test '{{.nestedField.otherSubfield}}' '<no value>'
@@ -1386,7 +1386,7 @@ __EOF__
   kube::test::get_object_assert foos/test '{{.nestedField.newSubfield}}' '<no value>'
 
   # Add a field and then apply the change
-  sed '/someSubfield/ i \ \ newSubfield: subfield3' hack/testdata/TPR/foo.yaml | kubectl "${kube_flags[@]}" apply -f -
+  kubectl "${kube_flags[@]}" apply -f hack/testdata/TPR/foo-added-subfield.yaml
 
   # Test that apply has added the field
   kube::test::get_object_assert foos/test '{{.nestedField.newSubfield}}' 'subfield3'
@@ -1404,12 +1404,23 @@ __EOF__
   kube::test::get_object_assert foos "{{range.items}}{{$id_field}}:{{end}}" 'test-list:'
   kube::test::get_object_assert bars "{{range.items}}{{$id_field}}:{{end}}" 'test-list:'
 
+  # Test that the field has the expected value
+  kube::test::get_object_assert foos/test-list '{{.someField}}' 'field1'
+  kube::test::get_object_assert bars/test-list '{{.someField}}' 'field1'
+
+  # Test that re-apply an list doesn't change anything
+  kubectl "${kube_flags[@]}" apply -f hack/testdata/TPR/multi-tpr-list.yaml
+
+  # Test that the field has the same value after re-apply
+  kube::test::get_object_assert foos/test-list '{{.someField}}' 'field1'
+  kube::test::get_object_assert bars/test-list '{{.someField}}' 'field1'
+
   # Test that the fields have the expected value
   kube::test::get_object_assert foos/test-list '{{.someField}}' 'field1'
   kube::test::get_object_assert bars/test-list '{{.someField}}' 'field1'
 
   # Update fields and then apply the change
-  sed 's/someField: field1/someField: modifiedField/g' hack/testdata/TPR/multi-tpr-list.yaml | kubectl "${kube_flags[@]}" apply -f -
+  kubectl "${kube_flags[@]}" apply -f hack/testdata/TPR/multi-tpr-list-updated-field.yaml
 
   # Test that apply has updated the fields
   kube::test::get_object_assert foos/test-list '{{.someField}}' 'modifiedField'
@@ -1420,7 +1431,7 @@ __EOF__
   kube::test::get_object_assert bars/test-list '{{.otherField}}' 'field2'
 
   # Delete fields and then apply the change
-  sed '/otherField: field2/d' hack/testdata/TPR/multi-tpr-list.yaml | kubectl "${kube_flags[@]}" apply -f -
+  kubectl "${kube_flags[@]}" apply -f hack/testdata/TPR/multi-tpr-list-deleted-field.yaml
 
   # Test that apply has deleted the fields
   kube::test::get_object_assert foos/test-list '{{.otherField}}' '<no value>'
@@ -1431,7 +1442,7 @@ __EOF__
   kube::test::get_object_assert bars/test-list '{{.newField}}' '<no value>'
 
   # Add a field and then apply the change
-  sed '/someField/ i \ \ newField: field3' hack/testdata/TPR/multi-tpr-list.yaml | kubectl "${kube_flags[@]}" apply -f -
+  kubectl "${kube_flags[@]}" apply -f hack/testdata/TPR/multi-tpr-list-added-field.yaml
 
   # Test that apply has added the field
   kube::test::get_object_assert foos/test-list '{{.newField}}' 'field3'
