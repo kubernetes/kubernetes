@@ -284,6 +284,21 @@ func ClusterRoles() []rbac.ClusterRole {
 				rbac.NewRule("list", "watch").Groups(batchGroup).Resources("jobs", "cronjobs").RuleOrDie(),
 			},
 		},
+		{
+			// a role for an external/out-of-tree persistent volume provisioner
+			ObjectMeta: metav1.ObjectMeta{Name: "system:persistent-volume-provisioner"},
+			Rules: []rbac.PolicyRule{
+				rbac.NewRule("get", "list", "watch", "create", "delete").Groups(legacyGroup).Resources("persistentvolumes").RuleOrDie(),
+				// update is needed in addition to read access for setting lock annotations on PVCs
+				rbac.NewRule("get", "list", "watch", "update").Groups(legacyGroup).Resources("persistentvolumeclaims").RuleOrDie(),
+				rbac.NewRule(Read...).Groups(storageGroup).Resources("storageclasses").RuleOrDie(),
+
+				// Needed for watching provisioning success and failure events
+				rbac.NewRule("watch").Groups(legacyGroup).Resources("events").RuleOrDie(),
+
+				eventsRule(),
+			},
+		},
 	}
 	addClusterRoleLabel(roles)
 	return roles
