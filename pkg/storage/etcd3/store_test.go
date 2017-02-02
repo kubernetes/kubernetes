@@ -22,18 +22,29 @@ import (
 	"sync"
 	"testing"
 
+	apitesting "k8s.io/apimachinery/pkg/api/testing"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/serializer"
+	"k8s.io/apimachinery/pkg/watch"
+	"k8s.io/apiserver/pkg/apis/example"
+	examplev1 "k8s.io/apiserver/pkg/apis/example/v1"
 	"k8s.io/apiserver/pkg/storage"
-	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/testapi"
 
 	"github.com/coreos/etcd/integration"
 	"golang.org/x/net/context"
-	"k8s.io/apimachinery/pkg/watch"
 )
+
+var scheme = runtime.NewScheme()
+var codecs = serializer.NewCodecFactory(scheme)
+
+func init() {
+	metav1.AddToGroupVersion(scheme, metav1.SchemeGroupVersion)
+	example.AddToScheme(scheme)
+	examplev1.AddToScheme(scheme)
+}
 
 func TestCreate(t *testing.T) {
 	ctx, store, cluster := testSetup(t)
@@ -41,8 +52,8 @@ func TestCreate(t *testing.T) {
 	etcdClient := cluster.RandClient()
 
 	key := "/testkey"
-	out := &api.Pod{}
-	obj := &api.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}}
+	out := &example.Pod{}
+	obj := &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}}
 
 	// verify that kv pair is empty before set
 	getResp, err := etcdClient.KV.Get(ctx, key)
@@ -79,10 +90,10 @@ func TestCreateWithTTL(t *testing.T) {
 	ctx, store, cluster := testSetup(t)
 	defer cluster.Terminate(t)
 
-	input := &api.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}}
+	input := &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}}
 	key := "/somekey"
 
-	out := &api.Pod{}
+	out := &example.Pod{}
 	if err := store.Create(ctx, key, input, out, 1); err != nil {
 		t.Fatalf("Create failed: %v", err)
 	}
@@ -97,9 +108,9 @@ func TestCreateWithTTL(t *testing.T) {
 func TestCreateWithKeyExist(t *testing.T) {
 	ctx, store, cluster := testSetup(t)
 	defer cluster.Terminate(t)
-	obj := &api.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}}
+	obj := &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}}
 	key, _ := testPropogateStore(ctx, t, store, obj)
-	out := &api.Pod{}
+	out := &example.Pod{}
 	err := store.Create(ctx, key, obj, out, 0)
 	if err == nil || !storage.IsNodeExist(err) {
 		t.Errorf("expecting key exists error, but get: %s", err)
@@ -109,13 +120,13 @@ func TestCreateWithKeyExist(t *testing.T) {
 func TestGet(t *testing.T) {
 	ctx, store, cluster := testSetup(t)
 	defer cluster.Terminate(t)
-	key, storedObj := testPropogateStore(ctx, t, store, &api.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}})
+	key, storedObj := testPropogateStore(ctx, t, store, &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}})
 
 	tests := []struct {
 		key               string
 		ignoreNotFound    bool
 		expectNotFoundErr bool
-		expectedOut       *api.Pod
+		expectedOut       *example.Pod
 	}{{ // test get on existing item
 		key:               key,
 		ignoreNotFound:    false,
@@ -129,11 +140,11 @@ func TestGet(t *testing.T) {
 		key:               "/non-existing",
 		ignoreNotFound:    true,
 		expectNotFoundErr: false,
-		expectedOut:       &api.Pod{},
+		expectedOut:       &example.Pod{},
 	}}
 
 	for i, tt := range tests {
-		out := &api.Pod{}
+		out := &example.Pod{}
 		err := store.Get(ctx, tt.key, "", out, tt.ignoreNotFound)
 		if tt.expectNotFoundErr {
 			if err == nil || !storage.IsNotFound(err) {
@@ -153,11 +164,11 @@ func TestGet(t *testing.T) {
 func TestUnconditionalDelete(t *testing.T) {
 	ctx, store, cluster := testSetup(t)
 	defer cluster.Terminate(t)
-	key, storedObj := testPropogateStore(ctx, t, store, &api.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}})
+	key, storedObj := testPropogateStore(ctx, t, store, &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}})
 
 	tests := []struct {
 		key               string
-		expectedObj       *api.Pod
+		expectedObj       *example.Pod
 		expectNotFoundErr bool
 	}{{ // test unconditional delete on existing key
 		key:               key,
@@ -170,7 +181,7 @@ func TestUnconditionalDelete(t *testing.T) {
 	}}
 
 	for i, tt := range tests {
-		out := &api.Pod{} // reset
+		out := &example.Pod{} // reset
 		err := store.Delete(ctx, tt.key, out, nil)
 		if tt.expectNotFoundErr {
 			if err == nil || !storage.IsNotFound(err) {
@@ -190,7 +201,7 @@ func TestUnconditionalDelete(t *testing.T) {
 func TestConditionalDelete(t *testing.T) {
 	ctx, store, cluster := testSetup(t)
 	defer cluster.Terminate(t)
-	key, storedObj := testPropogateStore(ctx, t, store, &api.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo", UID: "A"}})
+	key, storedObj := testPropogateStore(ctx, t, store, &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo", UID: "A"}})
 
 	tests := []struct {
 		precondition        *storage.Preconditions
@@ -204,7 +215,7 @@ func TestConditionalDelete(t *testing.T) {
 	}}
 
 	for i, tt := range tests {
-		out := &api.Pod{}
+		out := &example.Pod{}
 		err := store.Delete(ctx, key, out, tt.precondition)
 		if tt.expectInvalidObjErr {
 			if err == nil || !storage.IsInvalidObj(err) {
@@ -218,23 +229,23 @@ func TestConditionalDelete(t *testing.T) {
 		if !reflect.DeepEqual(storedObj, out) {
 			t.Errorf("#%d: pod want=%#v, get=%#v", i, storedObj, out)
 		}
-		key, storedObj = testPropogateStore(ctx, t, store, &api.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo", UID: "A"}})
+		key, storedObj = testPropogateStore(ctx, t, store, &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo", UID: "A"}})
 	}
 }
 
 func TestGetToList(t *testing.T) {
 	ctx, store, cluster := testSetup(t)
 	defer cluster.Terminate(t)
-	key, storedObj := testPropogateStore(ctx, t, store, &api.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}})
+	key, storedObj := testPropogateStore(ctx, t, store, &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}})
 
 	tests := []struct {
 		key         string
 		pred        storage.SelectionPredicate
-		expectedOut []*api.Pod
+		expectedOut []*example.Pod
 	}{{ // test GetToList on existing key
 		key:         key,
 		pred:        storage.Everything,
-		expectedOut: []*api.Pod{storedObj},
+		expectedOut: []*example.Pod{storedObj},
 	}, { // test GetToList on non-existing key
 		key:         "/non-existing",
 		pred:        storage.Everything,
@@ -245,7 +256,7 @@ func TestGetToList(t *testing.T) {
 			Label: labels.Everything(),
 			Field: fields.ParseSelectorOrDie("metadata.name!=" + storedObj.Name),
 			GetAttrs: func(obj runtime.Object) (labels.Set, fields.Set, error) {
-				pod := obj.(*api.Pod)
+				pod := obj.(*example.Pod)
 				return nil, fields.Set{"metadata.name": pod.Name}, nil
 			},
 		},
@@ -253,7 +264,7 @@ func TestGetToList(t *testing.T) {
 	}}
 
 	for i, tt := range tests {
-		out := &api.PodList{}
+		out := &example.PodList{}
 		err := store.GetToList(ctx, tt.key, "", tt.pred, out)
 		if err != nil {
 			t.Fatalf("GetToList failed: %v", err)
@@ -274,7 +285,7 @@ func TestGetToList(t *testing.T) {
 func TestGuaranteedUpdate(t *testing.T) {
 	ctx, store, cluster := testSetup(t)
 	defer cluster.Terminate(t)
-	key, storeObj := testPropogateStore(ctx, t, store, &api.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo", UID: "A"}})
+	key, storeObj := testPropogateStore(ctx, t, store, &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo", UID: "A"}})
 
 	tests := []struct {
 		key                 string
@@ -328,7 +339,7 @@ func TestGuaranteedUpdate(t *testing.T) {
 	}}
 
 	for i, tt := range tests {
-		out := &api.Pod{}
+		out := &example.Pod{}
 		name := fmt.Sprintf("foo-%d", i)
 		if tt.expectNoUpdate {
 			name = storeObj.Name
@@ -337,7 +348,7 @@ func TestGuaranteedUpdate(t *testing.T) {
 		err := store.GuaranteedUpdate(ctx, tt.key, out, tt.ignoreNotFound, tt.precondition,
 			storage.SimpleUpdate(func(obj runtime.Object) (runtime.Object, error) {
 				if tt.expectNotFoundErr && tt.ignoreNotFound {
-					if pod := obj.(*api.Pod); pod.Name != "" {
+					if pod := obj.(*example.Pod); pod.Name != "" {
 						t.Errorf("#%d: expecting zero value, but get=%#v", i, pod)
 					}
 				}
@@ -382,10 +393,10 @@ func TestGuaranteedUpdateWithTTL(t *testing.T) {
 	ctx, store, cluster := testSetup(t)
 	defer cluster.Terminate(t)
 
-	input := &api.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}}
+	input := &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}}
 	key := "/somekey"
 
-	out := &api.Pod{}
+	out := &example.Pod{}
 	err := store.GuaranteedUpdate(ctx, key, out, true, nil,
 		func(_ runtime.Object, _ storage.ResponseMeta) (runtime.Object, *uint64, error) {
 			ttl := uint64(1)
@@ -405,7 +416,7 @@ func TestGuaranteedUpdateWithTTL(t *testing.T) {
 func TestGuaranteedUpdateWithConflict(t *testing.T) {
 	ctx, store, cluster := testSetup(t)
 	defer cluster.Terminate(t)
-	key, _ := testPropogateStore(ctx, t, store, &api.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}})
+	key, _ := testPropogateStore(ctx, t, store, &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}})
 
 	errChan := make(chan error, 1)
 	var firstToFinish sync.WaitGroup
@@ -414,9 +425,9 @@ func TestGuaranteedUpdateWithConflict(t *testing.T) {
 	secondToEnter.Add(1)
 
 	go func() {
-		err := store.GuaranteedUpdate(ctx, key, &api.Pod{}, false, nil,
+		err := store.GuaranteedUpdate(ctx, key, &example.Pod{}, false, nil,
 			storage.SimpleUpdate(func(obj runtime.Object) (runtime.Object, error) {
-				pod := obj.(*api.Pod)
+				pod := obj.(*example.Pod)
 				pod.Name = "foo-1"
 				secondToEnter.Wait()
 				return pod, nil
@@ -426,14 +437,14 @@ func TestGuaranteedUpdateWithConflict(t *testing.T) {
 	}()
 
 	updateCount := 0
-	err := store.GuaranteedUpdate(ctx, key, &api.Pod{}, false, nil,
+	err := store.GuaranteedUpdate(ctx, key, &example.Pod{}, false, nil,
 		storage.SimpleUpdate(func(obj runtime.Object) (runtime.Object, error) {
 			if updateCount == 0 {
 				secondToEnter.Done()
 				firstToFinish.Wait()
 			}
 			updateCount++
-			pod := obj.(*api.Pod)
+			pod := obj.(*example.Pod)
 			pod.Name = "foo-2"
 			return pod, nil
 		}))
@@ -450,9 +461,10 @@ func TestGuaranteedUpdateWithConflict(t *testing.T) {
 }
 
 func TestList(t *testing.T) {
+	codec := apitesting.TestCodec(codecs, examplev1.SchemeGroupVersion)
 	cluster := integration.NewClusterV3(t, &integration.ClusterConfig{Size: 1})
 	defer cluster.Terminate(t)
-	store := newStore(cluster.RandClient(), false, testapi.Default.Codec(), "")
+	store := newStore(cluster.RandClient(), false, codec, "")
 	ctx := context.Background()
 
 	// Setup storage with the following structure:
@@ -468,21 +480,21 @@ func TestList(t *testing.T) {
 	//                  - test
 	preset := []struct {
 		key       string
-		obj       *api.Pod
-		storedObj *api.Pod
+		obj       *example.Pod
+		storedObj *example.Pod
 	}{{
 		key: "/one-level/test",
-		obj: &api.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}},
+		obj: &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}},
 	}, {
 		key: "/two-level/1/test",
-		obj: &api.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}},
+		obj: &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}},
 	}, {
 		key: "/two-level/2/test",
-		obj: &api.Pod{ObjectMeta: metav1.ObjectMeta{Name: "bar"}},
+		obj: &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "bar"}},
 	}}
 
 	for i, ps := range preset {
-		preset[i].storedObj = &api.Pod{}
+		preset[i].storedObj = &example.Pod{}
 		err := store.Create(ctx, ps.key, ps.obj, preset[i].storedObj, 0)
 		if err != nil {
 			t.Fatalf("Set failed: %v", err)
@@ -492,11 +504,11 @@ func TestList(t *testing.T) {
 	tests := []struct {
 		prefix      string
 		pred        storage.SelectionPredicate
-		expectedOut []*api.Pod
+		expectedOut []*example.Pod
 	}{{ // test List on existing key
 		prefix:      "/one-level/",
 		pred:        storage.Everything,
-		expectedOut: []*api.Pod{preset[0].storedObj},
+		expectedOut: []*example.Pod{preset[0].storedObj},
 	}, { // test List on non-existing key
 		prefix:      "/non-existing/",
 		pred:        storage.Everything,
@@ -507,7 +519,7 @@ func TestList(t *testing.T) {
 			Label: labels.Everything(),
 			Field: fields.ParseSelectorOrDie("metadata.name!=" + preset[0].storedObj.Name),
 			GetAttrs: func(obj runtime.Object) (labels.Set, fields.Set, error) {
-				pod := obj.(*api.Pod)
+				pod := obj.(*example.Pod)
 				return nil, fields.Set{"metadata.name": pod.Name}, nil
 			},
 		},
@@ -515,11 +527,11 @@ func TestList(t *testing.T) {
 	}, { // test List with multiple levels of directories and expect flattened result
 		prefix:      "/two-level/",
 		pred:        storage.Everything,
-		expectedOut: []*api.Pod{preset[1].storedObj, preset[2].storedObj},
+		expectedOut: []*example.Pod{preset[1].storedObj, preset[2].storedObj},
 	}}
 
 	for i, tt := range tests {
-		out := &api.PodList{}
+		out := &example.PodList{}
 		err := store.List(ctx, tt.prefix, "0", tt.pred, out)
 		if err != nil {
 			t.Fatalf("List failed: %v", err)
@@ -538,18 +550,19 @@ func TestList(t *testing.T) {
 }
 
 func testSetup(t *testing.T) (context.Context, *store, *integration.ClusterV3) {
+	codec := apitesting.TestCodec(codecs, examplev1.SchemeGroupVersion)
 	cluster := integration.NewClusterV3(t, &integration.ClusterConfig{Size: 1})
-	store := newStore(cluster.RandClient(), false, testapi.Default.Codec(), "")
+	store := newStore(cluster.RandClient(), false, codec, "")
 	ctx := context.Background()
 	return ctx, store, cluster
 }
 
 // testPropogateStore helps propogates store with objects, automates key generation, and returns
 // keys and stored objects.
-func testPropogateStore(ctx context.Context, t *testing.T, store *store, obj *api.Pod) (string, *api.Pod) {
+func testPropogateStore(ctx context.Context, t *testing.T, store *store, obj *example.Pod) (string, *example.Pod) {
 	// Setup store with a key and grab the output for returning.
 	key := "/testkey"
-	setOutput := &api.Pod{}
+	setOutput := &example.Pod{}
 	err := store.Create(ctx, key, obj, setOutput, 0)
 	if err != nil {
 		t.Fatalf("Set failed: %v", err)

@@ -63,7 +63,7 @@ type DiscoveryServerOptions struct {
 // NewCommandStartMaster provides a CLI handler for 'start master' command
 func NewCommandStartDiscoveryServer(out, err io.Writer) *cobra.Command {
 	o := &DiscoveryServerOptions{
-		Etcd:           genericoptions.NewEtcdOptions(),
+		Etcd:           genericoptions.NewEtcdOptions(api.Scheme),
 		SecureServing:  genericoptions.NewSecureServingOptions(),
 		Authentication: genericoptions.NewDelegatingAuthenticationOptions(),
 		Authorization:  genericoptions.NewDelegatingAuthorizationOptions(),
