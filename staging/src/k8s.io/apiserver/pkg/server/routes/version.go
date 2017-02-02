@@ -22,8 +22,8 @@ import (
 	"github.com/emicklei/go-restful"
 
 	"k8s.io/apimachinery/pkg/version"
-	"k8s.io/kubernetes/pkg/genericapiserver/endpoints/handlers/responsewriters"
-	"k8s.io/kubernetes/pkg/genericapiserver/server/mux"
+	"k8s.io/apiserver/pkg/endpoints/handlers/responsewriters"
+	"k8s.io/apiserver/pkg/server/mux"
 )
 
 // Version provides a webservice with version information.

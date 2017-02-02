@@ -43,10 +43,10 @@ import (
 	apirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/server/healthz"
 	restclient "k8s.io/client-go/rest"
-	genericapi "k8s.io/kubernetes/pkg/genericapiserver/endpoints"
-	"k8s.io/kubernetes/pkg/genericapiserver/registry/rest"
-	genericmux "k8s.io/kubernetes/pkg/genericapiserver/server/mux"
-	"k8s.io/kubernetes/pkg/genericapiserver/server/routes"
+	genericapi "k8s.io/apiserver/pkg/endpoints"
+	"k8s.io/apiserver/pkg/registry/rest"
+	genericmux "k8s.io/apiserver/pkg/server/mux"
+	"k8s.io/apiserver/pkg/server/routes"
 )
 
 // Info about an API group.

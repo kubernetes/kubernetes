@@ -15,4 +15,4 @@ limitations under the License.
 */
 
 // Package handlers contains HTTP handlers to implement the apiserver APIs.
-package handlers // import "k8s.io/kubernetes/pkg/genericapiserver/endpoints/handlers"
+package handlers // import "k8s.io/apiserver/pkg/endpoints/handlers"

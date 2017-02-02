@@ -44,8 +44,8 @@ import (
 	"k8s.io/apiserver/pkg/endpoints/handlers/negotiation"
 	"k8s.io/apiserver/pkg/endpoints/request"
 	utiltrace "k8s.io/apiserver/pkg/util/trace"
-	"k8s.io/kubernetes/pkg/genericapiserver/endpoints/handlers/responsewriters"
-	"k8s.io/kubernetes/pkg/genericapiserver/registry/rest"
+	"k8s.io/apiserver/pkg/endpoints/handlers/responsewriters"
+	"k8s.io/apiserver/pkg/registry/rest"
 )
 
 // ContextFunc returns a Context given a request - a context must be returned
