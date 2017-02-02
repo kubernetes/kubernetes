@@ -24,10 +24,10 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 
 	core "k8s.io/client-go/testing"
+	"k8s.io/client-go/tools/record"
 
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset/fake"
-	"k8s.io/kubernetes/pkg/client/record"
 )
 
 func TestStatefulPodControlCreatesPods(t *testing.T) {
