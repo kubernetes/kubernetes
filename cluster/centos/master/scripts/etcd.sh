@@ -73,6 +73,7 @@ WorkingDirectory=${etcd_data_dir}
 EnvironmentFile=-/opt/kubernetes/cfg/etcd.conf
 # set GOMAXPROCS to number of processors
 ExecStart=/bin/bash -c "GOMAXPROCS=\$(nproc) /opt/kubernetes/bin/etcd"
+Type=notify
 
 [Install]
 WantedBy=multi-user.target
