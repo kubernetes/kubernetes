@@ -31,6 +31,7 @@ import (
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/resource"
 	apimachineryvalidation "k8s.io/apimachinery/pkg/api/validation"
+	genericvalidation "k8s.io/apimachinery/pkg/api/validation"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	unversionedvalidation "k8s.io/apimachinery/pkg/apis/meta/v1/validation"
 	"k8s.io/apimachinery/pkg/labels"
@@ -43,7 +44,6 @@ import (
 	utilpod "k8s.io/kubernetes/pkg/api/pod"
 	apiservice "k8s.io/kubernetes/pkg/api/service"
 	"k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/api/validation/genericvalidation"
 	storageutil "k8s.io/kubernetes/pkg/apis/storage/util"
 	"k8s.io/kubernetes/pkg/capabilities"
 	"k8s.io/kubernetes/pkg/features"
@@ -293,12 +293,24 @@ func ValidateImmutableAnnotation(newVal string, oldVal string, annotation string
 // It doesn't return an error for rootscoped resources with namespace, because namespace should already be cleared before.
 // TODO: Remove calls to this method scattered in validations of specific resources, e.g., ValidatePodUpdate.
 func ValidateObjectMeta(meta *metav1.ObjectMeta, requiresNamespace bool, nameFn ValidateNameFunc, fldPath *field.Path) field.ErrorList {
-	return genericvalidation.ValidateObjectMeta(meta, requiresNamespace, apimachineryvalidation.ValidateNameFunc(nameFn), fldPath)
+	allErrs := genericvalidation.ValidateObjectMeta(meta, requiresNamespace, apimachineryvalidation.ValidateNameFunc(nameFn), fldPath)
+	// run additional checks for the finalizer name
+	for i := range meta.Finalizers {
+		allErrs = append(allErrs, validateKubeFinalizerName(string(meta.Finalizers[i]), fldPath.Child("finalizers").Index(i))...)
+	}
+
+	return allErrs
 }
 
 // ValidateObjectMetaUpdate validates an object's metadata when updated
 func ValidateObjectMetaUpdate(newMeta, oldMeta *metav1.ObjectMeta, fldPath *field.Path) field.ErrorList {
-	return genericvalidation.ValidateObjectMetaUpdate(newMeta, oldMeta, fldPath)
+	allErrs := genericvalidation.ValidateObjectMetaUpdate(newMeta, oldMeta, fldPath)
+	// run additional checks for the finalizer name
+	for i := range newMeta.Finalizers {
+		allErrs = append(allErrs, validateKubeFinalizerName(string(newMeta.Finalizers[i]), fldPath.Child("finalizers").Index(i))...)
+	}
+
+	return allErrs
 }
 
 func ValidateNoNewFinalizers(newFinalizers []string, oldFinalizers []string, fldPath *field.Path) field.ErrorList {
@@ -3367,7 +3379,24 @@ func ValidateNamespace(namespace *api.Namespace) field.ErrorList {
 
 // Validate finalizer names
 func validateFinalizerName(stringValue string, fldPath *field.Path) field.ErrorList {
-	return genericvalidation.ValidateFinalizerName(stringValue, fldPath)
+	allErrs := genericvalidation.ValidateFinalizerName(stringValue, fldPath)
+	for _, err := range validateKubeFinalizerName(stringValue, fldPath) {
+		allErrs = append(allErrs, err)
+	}
+
+	return allErrs
+}
+
+// validateKubeFinalizerName checks for "standard" names of legacy finalizer
+func validateKubeFinalizerName(stringValue string, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	if len(strings.Split(stringValue, "/")) == 1 {
+		if !api.IsStandardFinalizerName(stringValue) {
+			return append(allErrs, field.Invalid(fldPath, stringValue, "name is neither a standard finalizer name nor is it fully qualified"))
+		}
+	}
+
+	return allErrs
 }
 
 // ValidateNamespaceUpdate tests to make sure a namespace update can be applied.

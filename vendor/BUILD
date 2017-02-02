@@ -7944,9 +7944,15 @@ go_library(
     srcs = [
         "k8s.io/apimachinery/pkg/api/validation/doc.go",
         "k8s.io/apimachinery/pkg/api/validation/generic.go",
+        "k8s.io/apimachinery/pkg/api/validation/objectmeta.go",
     ],
     tags = ["automanaged"],
     deps = [
+        "//vendor:k8s.io/apimachinery/pkg/api/equality",
+        "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
+        "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1/validation",
+        "//vendor:k8s.io/apimachinery/pkg/runtime/schema",
+        "//vendor:k8s.io/apimachinery/pkg/util/sets",
         "//vendor:k8s.io/apimachinery/pkg/util/validation",
         "//vendor:k8s.io/apimachinery/pkg/util/validation/field",
     ],
@@ -14110,5 +14116,16 @@ go_library(
         "//vendor:k8s.io/apimachinery/pkg/runtime",
         "//vendor:k8s.io/apimachinery/pkg/runtime/schema",
         "//vendor:k8s.io/apiserver/pkg/apis/example",
+    ],
+)
+
+go_test(
+    name = "k8s.io/apimachinery/pkg/api/validation_test",
+    srcs = ["k8s.io/apimachinery/pkg/api/validation/objectmeta_test.go"],
+    library = ":k8s.io/apimachinery/pkg/api/validation",
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
+        "//vendor:k8s.io/apimachinery/pkg/util/validation/field",
     ],
 )
