@@ -65,7 +65,7 @@ var codecsToTest = []func(version schema.GroupVersion, item runtime.Object) (run
 // fuzzInternalObject fuzzes an arbitrary runtime object using the appropriate
 // fuzzer registered with the apitesting package.
 func fuzzInternalObject(t *testing.T, forVersion schema.GroupVersion, item runtime.Object, seed int64) runtime.Object {
-	apitesting.FuzzerFor(kapitesting.FuzzerFuncs(t), rand.NewSource(seed)).Fuzz(item)
+	apitesting.FuzzerFor(kapitesting.FuzzerFuncs(t, api.Codecs), rand.NewSource(seed)).Fuzz(item)
 
 	j, err := meta.TypeAccessor(item)
 	if err != nil {
@@ -442,7 +442,7 @@ func TestUnversionedTypes(t *testing.T) {
 // TestObjectWatchFraming establishes that a watch event can be encoded and
 // decoded correctly through each of the supported RFC2046 media types.
 func TestObjectWatchFraming(t *testing.T) {
-	f := apitesting.FuzzerFor(kapitesting.FuzzerFuncs(t), rand.NewSource(benchmarkSeed))
+	f := apitesting.FuzzerFor(kapitesting.FuzzerFuncs(t, api.Codecs), rand.NewSource(benchmarkSeed))
 	secret := &api.Secret{}
 	f.Fuzz(secret)
 	secret.Data["binary"] = []byte{0x00, 0x10, 0x30, 0x55, 0xff, 0x00}
@@ -524,7 +524,7 @@ func TestObjectWatchFraming(t *testing.T) {
 const benchmarkSeed = 100
 
 func benchmarkItems(b *testing.B) []v1.Pod {
-	apiObjectFuzzer := apitesting.FuzzerFor(kapitesting.FuzzerFuncs(b), rand.NewSource(benchmarkSeed))
+	apiObjectFuzzer := apitesting.FuzzerFor(kapitesting.FuzzerFuncs(b, api.Codecs), rand.NewSource(benchmarkSeed))
 	items := make([]v1.Pod, 10)
 	for i := range items {
 		var pod api.Pod

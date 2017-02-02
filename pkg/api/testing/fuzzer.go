@@ -30,21 +30,24 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	runtimeserializer "k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
+	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/apis/autoscaling"
 	"k8s.io/kubernetes/pkg/apis/batch"
 	"k8s.io/kubernetes/pkg/apis/certificates"
 	"k8s.io/kubernetes/pkg/apis/extensions"
+	extensionsv1beta1 "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	"k8s.io/kubernetes/pkg/apis/policy"
 	"k8s.io/kubernetes/pkg/apis/rbac"
 )
 
 // overrideGenericFuncs override some generic fuzzer funcs from k8s.io/apiserver in order to have more realistic
 // values in a Kubernetes context.
-func overrideGenericFuncs(t apitesting.TestingCommon) []interface{} {
+func overrideGenericFuncs(t apitesting.TestingCommon, codecs runtimeserializer.CodecFactory) []interface{} {
 	return []interface{}{
 		func(j *runtime.Object, c fuzz.Continue) {
 			// TODO: uncomment when round trip starts from a versioned object
@@ -67,20 +70,12 @@ func overrideGenericFuncs(t apitesting.TestingCommon) []interface{} {
 			obj := types[c.Rand.Intn(len(types))]
 			c.Fuzz(obj)
 
-			// Find a codec for converting the object to raw bytes.  This is necessary for the
-			// api version and kind to be correctly set be serialization.
 			var codec runtime.Codec
 			switch obj.(type) {
-			case *api.Pod:
-				codec = testapi.Default.Codec()
 			case *extensions.Deployment:
-				codec = testapi.Extensions.Codec()
-			case *api.Service:
-				codec = testapi.Default.Codec()
+				codec = apitesting.TestCodec(codecs, extensionsv1beta1.SchemeGroupVersion)
 			default:
-
-				t.Errorf("Failed to find codec for object type: %T", obj)
-				return
+				codec = apitesting.TestCodec(codecs, v1.SchemeGroupVersion)
 			}
 
 			// Convert the object to raw bytes
@@ -602,10 +597,10 @@ func certificateFuncs(t apitesting.TestingCommon) []interface{} {
 	}
 }
 
-func FuzzerFuncs(t apitesting.TestingCommon) []interface{} {
-	return mergeFuncLists(t,
-		apitesting.GenericFuzzerFuncs(t),
-		overrideGenericFuncs(t),
+func FuzzerFuncs(t apitesting.TestingCommon, codecs runtimeserializer.CodecFactory) []interface{} {
+	return apitesting.MergeFuzzerFuncs(t,
+		apitesting.GenericFuzzerFuncs(t, codecs),
+		overrideGenericFuncs(t, codecs),
 		coreFuncs(t),
 		extensionFuncs(t),
 		batchFuncs(t),
@@ -621,26 +616,4 @@ func newBool(val bool) *bool {
 	p := new(bool)
 	*p = val
 	return p
-}
-
-// mergeFuncLists will merge the given funcLists, overriding early funcs with later ones if there first
-// argument has the same type.
-func mergeFuncLists(t apitesting.TestingCommon, funcLists ...[]interface{}) []interface{} {
-	funcMap := map[string]interface{}{}
-	for _, list := range funcLists {
-		for _, f := range list {
-			fT := reflect.TypeOf(f)
-			if fT.Kind() != reflect.Func || fT.NumIn() != 2 {
-				t.Errorf("Fuzzer func with invalid type: %v", fT)
-				continue
-			}
-			funcMap[fT.In(0).String()] = f
-		}
-	}
-
-	result := []interface{}{}
-	for _, f := range funcMap {
-		result = append(result, f)
-	}
-	return result
 }

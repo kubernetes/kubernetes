@@ -30,6 +30,7 @@ import (
 	"time"
 
 	"golang.org/x/net/websocket"
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
@@ -38,7 +39,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
-	"k8s.io/kubernetes/pkg/api"
+	example "k8s.io/apiserver/pkg/apis/example"
 	"k8s.io/kubernetes/pkg/genericapiserver/endpoints/handlers"
 	apitesting "k8s.io/kubernetes/pkg/genericapiserver/endpoints/testing"
 	"k8s.io/kubernetes/pkg/genericapiserver/registry/rest"
@@ -72,13 +73,19 @@ var watchTestTable = []struct {
 	{watch.Deleted, &apitesting.Simple{ObjectMeta: metav1.ObjectMeta{Name: "bar"}}},
 }
 
-var podWatchTestTable = []struct {
+func podWatchTestTable() []struct {
 	t   watch.EventType
 	obj runtime.Object
-}{
-	{watch.Added, roundTripOrDie(codec, &api.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}})},
-	{watch.Modified, roundTripOrDie(codec, &api.Pod{ObjectMeta: metav1.ObjectMeta{Name: "bar"}})},
-	{watch.Deleted, roundTripOrDie(codec, &api.Pod{ObjectMeta: metav1.ObjectMeta{Name: "bar"}})},
+} {
+	// creaze lazily here in a func because podWatchTestTable can only be used after all types are registered.
+	return []struct {
+		t   watch.EventType
+		obj runtime.Object
+	}{
+		{watch.Added, roundTripOrDie(codec, &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}})},
+		{watch.Modified, roundTripOrDie(codec, &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "bar"}})},
+		{watch.Deleted, roundTripOrDie(codec, &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "bar"}})},
+	}
 }
 
 func TestWatchWebsocket(t *testing.T) {
@@ -113,9 +120,6 @@ func TestWatchWebsocket(t *testing.T) {
 		gotObj, err := runtime.Decode(codec, got.Object)
 		if err != nil {
 			t.Fatalf("Decode error: %v\n%v", err, got)
-		}
-		if _, err := api.GetReference(api.Scheme, gotObj); err != nil {
-			t.Errorf("Unable to construct reference: %v", err)
 		}
 		if e, a := object, gotObj; !reflect.DeepEqual(e, a) {
 			t.Errorf("Expected %#v, got %#v", e, a)
@@ -166,9 +170,6 @@ func TestWatchWebsocketClientClose(t *testing.T) {
 		gotObj, err := runtime.Decode(codec, got.Object)
 		if err != nil {
 			t.Fatalf("Decode error: %v\n%v", err, got)
-		}
-		if _, err := api.GetReference(api.Scheme, gotObj); err != nil {
-			t.Errorf("Unable to construct reference: %v", err)
 		}
 		if e, a := object, gotObj; !reflect.DeepEqual(e, a) {
 			t.Errorf("Expected %#v, got %#v", e, a)
@@ -300,7 +301,7 @@ func TestWatchRead(t *testing.T) {
 	for _, protocol := range protocols {
 		for _, test := range testCases {
 			func() {
-				info, ok := runtime.SerializerInfoForMediaType(api.Codecs.SupportedMediaTypes(), test.MediaType)
+				info, ok := runtime.SerializerInfoForMediaType(codecs.SupportedMediaTypes(), test.MediaType)
 				if !ok || info.StreamSerializer == nil {
 					t.Fatal(info)
 				}
@@ -312,7 +313,7 @@ func TestWatchRead(t *testing.T) {
 				if contentType != "__default__" && contentType != test.ExpectedContentType {
 					t.Errorf("Unexpected content type: %#v", contentType)
 				}
-				objectCodec := api.Codecs.DecoderToVersion(info.Serializer, testInternalGroupVersion)
+				objectCodec := codecs.DecoderToVersion(info.Serializer, testInternalGroupVersion)
 
 				var fr io.ReadCloser = r
 				if !protocol.selfFraming {
@@ -326,7 +327,7 @@ func TestWatchRead(t *testing.T) {
 					time.Sleep(time.Millisecond)
 				}
 
-				for i, item := range podWatchTestTable {
+				for i, item := range podWatchTestTable() {
 					action, object := item.t, item.obj
 					name := fmt.Sprintf("%s-%s-%d", protocol.name, test.MediaType, i)
 
@@ -346,10 +347,7 @@ func TestWatchRead(t *testing.T) {
 					if err != nil {
 						t.Fatalf("%s: Decode error: %v", name, err)
 					}
-					if _, err := api.GetReference(api.Scheme, gotObj); err != nil {
-						t.Errorf("%s: Unable to construct reference: %v", name, err)
-					}
-					if e, a := object, gotObj; !api.Semantic.DeepEqual(e, a) {
+					if e, a := object, gotObj; !apiequality.Semantic.DeepEqual(e, a) {
 						t.Errorf("%s: different: %s", name, diff.ObjectDiff(e, a))
 					}
 				}
@@ -569,7 +567,7 @@ func TestWatchHTTPTimeout(t *testing.T) {
 	timeoutCh := make(chan time.Time)
 	done := make(chan struct{})
 
-	info, ok := runtime.SerializerInfoForMediaType(api.Codecs.SupportedMediaTypes(), runtime.ContentTypeJSON)
+	info, ok := runtime.SerializerInfoForMediaType(codecs.SupportedMediaTypes(), runtime.ContentTypeJSON)
 	if !ok || info.StreamSerializer == nil {
 		t.Fatal(info)
 	}

@@ -27,7 +27,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/watch"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
-	"k8s.io/kubernetes/pkg/api"
 )
 
 //TODO:
@@ -184,7 +183,7 @@ type UpdatedObjectInfo interface {
 	// Returns preconditions built from the updated object, if applicable.
 	// May return nil, or a preconditions object containing nil fields,
 	// if no preconditions can be determined from the updated object.
-	Preconditions() *api.Preconditions
+	Preconditions() *metav1.Preconditions
 
 	// UpdatedObject returns the updated object, given a context and old object.
 	// The only time an empty oldObj should be passed in is if a "create on update" is occurring (there is no oldObj).

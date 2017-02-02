@@ -51,7 +51,7 @@ type UpdateFunc func(runtime.Object) runtime.Object
 
 func New(t *testing.T, storage *genericregistry.Store) *Tester {
 	return &Tester{
-		tester:  resttest.New(t, storage),
+		tester:  resttest.New(t, storage, api.Scheme),
 		storage: storage,
 	}
 }
