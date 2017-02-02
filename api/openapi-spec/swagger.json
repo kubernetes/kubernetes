@@ -3798,6 +3798,13 @@
       "name": "namespace",
       "in": "path",
       "required": true
+     },
+     {
+      "uniqueItems": true,
+      "type": "integer",
+      "description": "List of ports to forward Required when using WebSockets",
+      "name": "ports",
+      "in": "query"
      }
     ]
    },

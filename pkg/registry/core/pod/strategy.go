@@ -383,6 +383,14 @@ func streamParams(params url.Values, opts runtime.Object) error {
 		if opts.TTY {
 			params.Add(api.ExecTTYParam, "1")
 		}
+	case *api.PodPortForwardOptions:
+		if len(opts.Ports) > 0 {
+			ports := make([]string, len(opts.Ports))
+			for i, p := range opts.Ports {
+				ports[i] = strconv.FormatInt(int64(p), 10)
+			}
+			params.Add(api.PortHeader, strings.Join(ports, ","))
+		}
 	default:
 		return fmt.Errorf("Unknown object for streaming: %v", opts)
 	}
@@ -477,6 +485,7 @@ func PortForwardLocation(
 	connInfo client.ConnectionInfoGetter,
 	ctx genericapirequest.Context,
 	name string,
+	opts *api.PodPortForwardOptions,
 ) (*url.URL, http.RoundTripper, error) {
 	pod, err := getPod(getter, ctx, name)
 	if err != nil {
@@ -492,10 +501,15 @@ func PortForwardLocation(
 	if err != nil {
 		return nil, nil, err
 	}
+	params := url.Values{}
+	if err := streamParams(params, opts); err != nil {
+		return nil, nil, err
+	}
 	loc := &url.URL{
-		Scheme: nodeInfo.Scheme,
-		Host:   net.JoinHostPort(nodeInfo.Hostname, nodeInfo.Port),
-		Path:   fmt.Sprintf("/portForward/%s/%s", pod.Namespace, pod.Name),
+		Scheme:   nodeInfo.Scheme,
+		Host:     net.JoinHostPort(nodeInfo.Hostname, nodeInfo.Port),
+		Path:     fmt.Sprintf("/portForward/%s/%s", pod.Namespace, pod.Name),
+		RawQuery: params.Encode(),
 	}
 	return loc, nodeInfo.Transport, nil
 }

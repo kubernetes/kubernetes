@@ -80,7 +80,12 @@ type Config struct {
 	// The streaming protocols the server supports (understands and permits).  See
 	// k8s.io/kubernetes/pkg/kubelet/server/remotecommand/constants.go for available protocols.
 	// Only used for SPDY streaming.
-	SupportedProtocols []string
+	SupportedRemoteCommandProtocols []string
+
+	// The streaming protocols the server supports (understands and permits).  See
+	// k8s.io/kubernetes/pkg/kubelet/server/portforward/constants.go for available protocols.
+	// Only used for SPDY streaming.
+	SupportedPortForwardProtocols []string
 
 	// The config for serving over TLS. If nil, TLS will not be used.
 	TLSConfig *tls.Config
@@ -89,9 +94,10 @@ type Config struct {
 // DefaultConfig provides default values for server Config. The DefaultConfig is partial, so
 // some fields like Addr must still be provided.
 var DefaultConfig = Config{
-	StreamIdleTimeout:     4 * time.Hour,
-	StreamCreationTimeout: remotecommand.DefaultStreamCreationTimeout,
-	SupportedProtocols:    remotecommand.SupportedStreamingProtocols,
+	StreamIdleTimeout:               4 * time.Hour,
+	StreamCreationTimeout:           remotecommand.DefaultStreamCreationTimeout,
+	SupportedRemoteCommandProtocols: remotecommand.SupportedStreamingProtocols,
+	SupportedPortForwardProtocols:   portforward.SupportedProtocols,
 }
 
 // TODO(timstclair): Add auth(n/z) interface & handling.
@@ -248,7 +254,7 @@ func (s *server) serveExec(req *restful.Request, resp *restful.Response) {
 		streamOpts,
 		s.config.StreamIdleTimeout,
 		s.config.StreamCreationTimeout,
-		s.config.SupportedProtocols)
+		s.config.SupportedRemoteCommandProtocols)
 }
 
 func (s *server) serveAttach(req *restful.Request, resp *restful.Response) {
@@ -280,7 +286,7 @@ func (s *server) serveAttach(req *restful.Request, resp *restful.Response) {
 		streamOpts,
 		s.config.StreamIdleTimeout,
 		s.config.StreamCreationTimeout,
-		s.config.SupportedProtocols)
+		s.config.SupportedRemoteCommandProtocols)
 }
 
 func (s *server) servePortForward(req *restful.Request, resp *restful.Response) {
@@ -296,14 +302,22 @@ func (s *server) servePortForward(req *restful.Request, resp *restful.Response) 
 		return
 	}
 
+	portForwardOptions, err := portforward.NewV4Options(req.Request)
+	if err != nil {
+		resp.WriteError(http.StatusBadRequest, err)
+		return
+	}
+
 	portforward.ServePortForward(
 		resp.ResponseWriter,
 		req.Request,
 		s.runtime,
 		pf.PodSandboxId,
 		"", // unused: podUID
+		portForwardOptions,
 		s.config.StreamIdleTimeout,
-		s.config.StreamCreationTimeout)
+		s.config.StreamCreationTimeout,
+		s.config.SupportedPortForwardProtocols)
 }
 
 // criAdapter wraps the Runtime functions to conform to the remotecommand interfaces.
@@ -324,6 +338,6 @@ func (a *criAdapter) AttachContainer(podName string, podUID types.UID, container
 	return a.Attach(container, in, out, err, tty, resize)
 }
 
-func (a *criAdapter) PortForward(podName string, podUID types.UID, port uint16, stream io.ReadWriteCloser) error {
-	return a.Runtime.PortForward(podName, int32(port), stream)
+func (a *criAdapter) PortForward(podName string, podUID types.UID, port int32, stream io.ReadWriteCloser) error {
+	return a.Runtime.PortForward(podName, port, stream)
 }

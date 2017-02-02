@@ -9096,6 +9096,14 @@
       "nickname": "connectGetNamespacedPodPortforward",
       "parameters": [
        {
+        "type": "integer",
+        "paramType": "query",
+        "name": "ports",
+        "description": "List of ports to forward Required when using WebSockets",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
         "type": "string",
         "paramType": "path",
         "name": "namespace",
@@ -9125,6 +9133,14 @@
       "summary": "connect POST requests to portforward of Pod",
       "nickname": "connectPostNamespacedPodPortforward",
       "parameters": [
+       {
+        "type": "integer",
+        "paramType": "query",
+        "name": "ports",
+        "description": "List of ports to forward Required when using WebSockets",
+        "required": false,
+        "allowMultiple": false
+       },
        {
         "type": "string",
         "paramType": "path",
