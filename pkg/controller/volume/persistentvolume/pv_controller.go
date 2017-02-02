@@ -251,6 +251,7 @@ func (ctrl *PersistentVolumeController) syncUnboundClaim(claim *v1.PersistentVol
 			}
 			// Mark the claim as Pending and try to find a match in the next
 			// periodic syncClaim
+			ctrl.eventRecorder.Event(claim, v1.EventTypeNormal, "FailedBinding", "no persistent volumes available for this claim and no storage class is set")
 			if _, err = ctrl.updateClaimStatus(claim, v1.ClaimPending, nil); err != nil {
 				return err
 			}
