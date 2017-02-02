@@ -469,6 +469,23 @@ def update_nrpe_config(unused=None):
     nrpe_setup.write()
 
 
+@when_not('nrpe-external-master.available')
+@when('nrpe-external-master.initial-config')
+def remove_nrpe_config(nagios=None):
+    remove_state('nrpe-external-master.initial-config')
+
+    # List of systemd services for which the checks will be removed
+    services = ('kubelet', 'kube-proxy')
+
+    # The current nrpe-external-master interface doesn't handle a lot of logic,
+    # use the charm-helpers code for now.
+    hostname = nrpe.get_nagios_hostname()
+    nrpe_setup = nrpe.NRPE(hostname=hostname)
+
+    for service in services:
+        nrpe_setup.remove_check(shortname=service)
+
+
 def _systemctl_is_active(application):
     ''' Poll systemctl to determine if the application is running '''
     cmd = ['systemctl', 'is-active', application]
