@@ -663,17 +663,17 @@ func patchResource(
 				return nil, err
 			}
 			if hasConflicts {
-				if glog.V(4) {
-					diff1, _ := json.Marshal(currentPatchMap)
-					diff2, _ := json.Marshal(originalPatchMap)
-					glog.Infof("patchResource failed for resource %s, because there is a meaningful conflict.\n diff1=%v\n, diff2=%v\n", name, diff1, diff2)
-				}
+				diff1, _ := json.Marshal(currentPatchMap)
+				diff2, _ := json.Marshal(originalPatchMap)
+				patchDiffErr := fmt.Errorf("there is a meaningful conflict:\n diff1=%v\n, diff2=%v\n", diff1, diff2)
+				glog.V(4).Infof("patchResource failed for resource %s, because there is a meaningful conflict.\n diff1=%v\n, diff2=%v\n", name, diff1, diff2)
+
 				// Return the last conflict error we got if we have one
 				if lastConflictErr != nil {
 					return nil, lastConflictErr
 				}
 				// Otherwise manufacture one of our own
-				return nil, errors.NewConflict(resource.GroupResource(), name, nil)
+				return nil, errors.NewConflict(resource.GroupResource(), name, patchDiffErr)
 			}
 
 			objToUpdate := patcher.New()
