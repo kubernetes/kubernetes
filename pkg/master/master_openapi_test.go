@@ -27,6 +27,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"k8s.io/kubernetes/pkg/api"
 	openapigen "k8s.io/kubernetes/pkg/generated/openapi"
 	genericapiserver "k8s.io/kubernetes/pkg/genericapiserver/server"
 
@@ -43,7 +44,7 @@ func TestValidOpenAPISpec(t *testing.T) {
 	defer etcdserver.Terminate(t)
 
 	config.GenericConfig.EnableIndex = true
-	config.GenericConfig.OpenAPIConfig = genericapiserver.DefaultOpenAPIConfig(openapigen.GetOpenAPIDefinitions)
+	config.GenericConfig.OpenAPIConfig = genericapiserver.DefaultOpenAPIConfig(openapigen.GetOpenAPIDefinitions, api.Scheme)
 	config.GenericConfig.OpenAPIConfig.Info = &spec.Info{
 		InfoProps: spec.InfoProps{
 			Title:   "Kubernetes",

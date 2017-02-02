@@ -39,6 +39,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	openapicommon "k8s.io/apimachinery/pkg/openapi"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/version"
 	"k8s.io/apiserver/pkg/admission"
@@ -55,7 +56,6 @@ import (
 	"k8s.io/apiserver/pkg/server/options"
 	restclient "k8s.io/client-go/rest"
 	certutil "k8s.io/client-go/util/cert"
-	"k8s.io/kubernetes/pkg/api"
 	genericapifilters "k8s.io/kubernetes/pkg/genericapiserver/endpoints/filters"
 	apiopenapi "k8s.io/kubernetes/pkg/genericapiserver/endpoints/openapi"
 	"k8s.io/kubernetes/pkg/genericapiserver/server/mux"
@@ -192,7 +192,6 @@ type SecureServingInfo struct {
 // NewConfig returns a Config struct with the default values
 func NewConfig() *Config {
 	config := &Config{
-		Serializer:             api.Codecs,
 		ReadWritePort:          6443,
 		RequestContextMapper:   apirequest.NewRequestContextMapper(),
 		BuildHandlerChainsFunc: DefaultBuildHandlerChain,
@@ -213,8 +212,13 @@ func NewConfig() *Config {
 	return config.ApplyOptions(defaultOptions)
 }
 
-func DefaultOpenAPIConfig(getDefinitions openapicommon.GetOpenAPIDefinitions) *openapicommon.Config {
-	defNamer := apiopenapi.NewDefinitionNamer(api.Scheme)
+func (c *Config) WithSerializer(codecs serializer.CodecFactory) *Config {
+	c.Serializer = codecs
+	return c
+}
+
+func DefaultOpenAPIConfig(getDefinitions openapicommon.GetOpenAPIDefinitions, scheme *runtime.Scheme) *openapicommon.Config {
+	defNamer := apiopenapi.NewDefinitionNamer(scheme)
 	return &openapicommon.Config{
 		ProtocolList:   []string{"https"},
 		IgnorePrefixes: []string{"/swaggerapi"},
