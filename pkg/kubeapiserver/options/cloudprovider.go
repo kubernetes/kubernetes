@@ -22,9 +22,9 @@ import (
 
 	"github.com/spf13/pflag"
 
+	genericoptions "k8s.io/apiserver/pkg/server/options"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/cloudprovider"
-	genericoptions "k8s.io/kubernetes/pkg/genericapiserver/server/options"
 )
 
 type CloudProviderOptions struct {

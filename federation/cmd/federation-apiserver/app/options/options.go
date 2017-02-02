@@ -20,7 +20,7 @@ package options
 import (
 	"time"
 
-	genericoptions "k8s.io/kubernetes/pkg/genericapiserver/server/options"
+	genericoptions "k8s.io/apiserver/pkg/server/options"
 	kubeoptions "k8s.io/kubernetes/pkg/kubeapiserver/options"
 
 	// add the kubernetes feature gates

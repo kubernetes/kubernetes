@@ -52,13 +52,13 @@ import (
 	apirequest "k8s.io/apiserver/pkg/endpoints/request"
 	genericfilters "k8s.io/apiserver/pkg/server/filters"
 	"k8s.io/apiserver/pkg/server/healthz"
+	"k8s.io/apiserver/pkg/server/options"
 	restclient "k8s.io/client-go/rest"
 	certutil "k8s.io/client-go/util/cert"
 	"k8s.io/kubernetes/pkg/api"
 	genericapifilters "k8s.io/kubernetes/pkg/genericapiserver/endpoints/filters"
 	apiopenapi "k8s.io/kubernetes/pkg/genericapiserver/endpoints/openapi"
 	"k8s.io/kubernetes/pkg/genericapiserver/server/mux"
-	"k8s.io/kubernetes/pkg/genericapiserver/server/options"
 	"k8s.io/kubernetes/pkg/genericapiserver/server/routes"
 )
 
