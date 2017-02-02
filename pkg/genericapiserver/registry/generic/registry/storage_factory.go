@@ -19,10 +19,10 @@ package registry
 import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apiserver/pkg/storage"
+	etcdstorage "k8s.io/apiserver/pkg/storage/etcd"
 	"k8s.io/apiserver/pkg/storage/storagebackend"
+	"k8s.io/apiserver/pkg/storage/storagebackend/factory"
 	"k8s.io/kubernetes/pkg/genericapiserver/registry/generic"
-	etcdstorage "k8s.io/kubernetes/pkg/storage/etcd"
-	"k8s.io/kubernetes/pkg/storage/storagebackend/factory"
 )
 
 var _ generic.StorageDecorator = StorageWithCacher

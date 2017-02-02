@@ -28,7 +28,7 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/apiserver/pkg/storage"
-	etcdutil "k8s.io/kubernetes/pkg/storage/etcd/util"
+	etcdutil "k8s.io/apiserver/pkg/storage/etcd/util"
 
 	etcd "github.com/coreos/etcd/client"
 	"github.com/golang/glog"
