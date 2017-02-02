@@ -25,6 +25,7 @@ import (
 	"k8s.io/kubernetes/pkg/genericapiserver/registry/generic"
 	genericregistry "k8s.io/kubernetes/pkg/genericapiserver/registry/generic/registry"
 	"k8s.io/kubernetes/pkg/genericapiserver/registry/rest"
+	"k8s.io/kubernetes/pkg/registry/cachesize"
 )
 
 type REST struct {
@@ -55,6 +56,7 @@ func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, *StatusREST) {
 		},
 		PredicateFunc:     cluster.MatchCluster,
 		QualifiedResource: federation.Resource("clusters"),
+		WatchCacheSize:    cachesize.GetWatchCacheSizeByResource("clusters"),
 
 		CreateStrategy:      cluster.Strategy,
 		UpdateStrategy:      cluster.Strategy,
