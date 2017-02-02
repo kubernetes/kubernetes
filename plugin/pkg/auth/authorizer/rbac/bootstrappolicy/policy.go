@@ -216,7 +216,7 @@ func ClusterRoles() []rbac.ClusterRole {
 				// TODO: restrict to namespaces of pods scheduled on bound node once supported
 				// TODO: change glusterfs to use DNS lookup so this isn't needed?
 				// Needed for glusterfs volumes
-				rbac.NewRule("get").Groups(legacyGroup).Resources("endpoints").RuleOrDie(),
+				rbac.NewRule("get", "list", "watch").Groups(legacyGroup).Resources("endpoints").RuleOrDie(),
 			},
 		},
 		{
