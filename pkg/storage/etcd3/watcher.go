@@ -19,6 +19,7 @@ package etcd3
 import (
 	"fmt"
 	"net/http"
+	goruntime "runtime"
 	"strings"
 	"sync"
 
@@ -138,6 +139,7 @@ func (wc *watchChan) run() {
 
 func (wc *watchChan) Stop() {
 	wc.cancel()
+	goruntime.Gosched()
 }
 
 func (wc *watchChan) ResultChan() <-chan watch.Event {
