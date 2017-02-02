@@ -49,10 +49,6 @@ var benchmarkPod api.Pod = api.Pod{
 		UID:               types.UID("a671734a-e8e5-11e4-8fde-42010af09327"),
 		ResourceVersion:   "22",
 		CreationTimestamp: parseTimeOrDie("2015-04-22T11:49:36Z"),
-		Annotations: map[string]string{
-			"kubernetes.io/config.mirror": "mirror",
-			"kubernetes.io/config.source": "file",
-		},
 	},
 	Spec: api.PodSpec{
 		Volumes: []api.Volume{
