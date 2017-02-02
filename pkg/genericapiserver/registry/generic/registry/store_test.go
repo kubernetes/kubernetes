@@ -798,7 +798,7 @@ func TestStoreDeleteWithOrphanDependents(t *testing.T) {
 	initialGeneration := int64(1)
 	podWithOrphanFinalizer := func(name string) *api.Pod {
 		return &api.Pod{
-			ObjectMeta: metav1.ObjectMeta{Name: name, Finalizers: []string{"foo.com/x", api.FinalizerOrphan, "bar.com/y"}, Generation: initialGeneration},
+			ObjectMeta: metav1.ObjectMeta{Name: name, Finalizers: []string{"foo.com/x", metav1.FinalizerOrphan, "bar.com/y"}, Generation: initialGeneration},
 			Spec:       api.PodSpec{NodeName: "machine"},
 		}
 	}
@@ -816,7 +816,7 @@ func TestStoreDeleteWithOrphanDependents(t *testing.T) {
 	}
 	podWithOnlyOrphanFinalizer := func(name string) *api.Pod {
 		return &api.Pod{
-			ObjectMeta: metav1.ObjectMeta{Name: name, Finalizers: []string{api.FinalizerOrphan}, Generation: initialGeneration},
+			ObjectMeta: metav1.ObjectMeta{Name: name, Finalizers: []string{metav1.FinalizerOrphan}, Generation: initialGeneration},
 			Spec:       api.PodSpec{NodeName: "machine"},
 		}
 	}
@@ -844,28 +844,28 @@ func TestStoreDeleteWithOrphanDependents(t *testing.T) {
 			orphanOptions,
 			defaultDeleteStrategy,
 			false,
-			[]string{"foo.com/x", api.FinalizerOrphan, "bar.com/y"},
+			[]string{"foo.com/x", metav1.FinalizerOrphan, "bar.com/y"},
 		},
 		{
 			podWithOtherFinalizers("pod2"),
 			orphanOptions,
 			defaultDeleteStrategy,
 			false,
-			[]string{"foo.com/x", "bar.com/y", api.FinalizerOrphan},
+			[]string{"foo.com/x", "bar.com/y", metav1.FinalizerOrphan},
 		},
 		{
 			podWithNoFinalizer("pod3"),
 			orphanOptions,
 			defaultDeleteStrategy,
 			false,
-			[]string{api.FinalizerOrphan},
+			[]string{metav1.FinalizerOrphan},
 		},
 		{
 			podWithOnlyOrphanFinalizer("pod4"),
 			orphanOptions,
 			defaultDeleteStrategy,
 			false,
-			[]string{api.FinalizerOrphan},
+			[]string{metav1.FinalizerOrphan},
 		},
 		// cases run with DeleteOptions.OrphanDedependents=false
 		// these cases all have oprhanDeleteStrategy, which should be ignored
@@ -907,14 +907,14 @@ func TestStoreDeleteWithOrphanDependents(t *testing.T) {
 			nilOrphanOptions,
 			defaultDeleteStrategy,
 			false,
-			[]string{"foo.com/x", api.FinalizerOrphan, "bar.com/y"},
+			[]string{"foo.com/x", metav1.FinalizerOrphan, "bar.com/y"},
 		},
 		{
 			podWithOrphanFinalizer("pod10"),
 			nilOrphanOptions,
 			orphanDeleteStrategy,
 			false,
-			[]string{"foo.com/x", api.FinalizerOrphan, "bar.com/y"},
+			[]string{"foo.com/x", metav1.FinalizerOrphan, "bar.com/y"},
 		},
 		{
 			podWithOtherFinalizers("pod11"),
@@ -928,7 +928,7 @@ func TestStoreDeleteWithOrphanDependents(t *testing.T) {
 			nilOrphanOptions,
 			orphanDeleteStrategy,
 			false,
-			[]string{"foo.com/x", "bar.com/y", api.FinalizerOrphan},
+			[]string{"foo.com/x", "bar.com/y", metav1.FinalizerOrphan},
 		},
 		{
 			podWithNoFinalizer("pod13"),
@@ -942,21 +942,21 @@ func TestStoreDeleteWithOrphanDependents(t *testing.T) {
 			nilOrphanOptions,
 			orphanDeleteStrategy,
 			false,
-			[]string{api.FinalizerOrphan},
+			[]string{metav1.FinalizerOrphan},
 		},
 		{
 			podWithOnlyOrphanFinalizer("pod15"),
 			nilOrphanOptions,
 			defaultDeleteStrategy,
 			false,
-			[]string{api.FinalizerOrphan},
+			[]string{metav1.FinalizerOrphan},
 		},
 		{
 			podWithOnlyOrphanFinalizer("pod16"),
 			nilOrphanOptions,
 			orphanDeleteStrategy,
 			false,
-			[]string{api.FinalizerOrphan},
+			[]string{metav1.FinalizerOrphan},
 		},
 
 		// cases run with nil DeleteOptions should have exact same behavior.
@@ -967,14 +967,14 @@ func TestStoreDeleteWithOrphanDependents(t *testing.T) {
 			nil,
 			defaultDeleteStrategy,
 			false,
-			[]string{"foo.com/x", api.FinalizerOrphan, "bar.com/y"},
+			[]string{"foo.com/x", metav1.FinalizerOrphan, "bar.com/y"},
 		},
 		{
 			podWithOrphanFinalizer("pod18"),
 			nil,
 			orphanDeleteStrategy,
 			false,
-			[]string{"foo.com/x", api.FinalizerOrphan, "bar.com/y"},
+			[]string{"foo.com/x", metav1.FinalizerOrphan, "bar.com/y"},
 		},
 		{
 			podWithOtherFinalizers("pod19"),
@@ -988,7 +988,7 @@ func TestStoreDeleteWithOrphanDependents(t *testing.T) {
 			nil,
 			orphanDeleteStrategy,
 			false,
-			[]string{"foo.com/x", "bar.com/y", api.FinalizerOrphan},
+			[]string{"foo.com/x", "bar.com/y", metav1.FinalizerOrphan},
 		},
 		{
 			podWithNoFinalizer("pod21"),
@@ -1002,21 +1002,21 @@ func TestStoreDeleteWithOrphanDependents(t *testing.T) {
 			nil,
 			orphanDeleteStrategy,
 			false,
-			[]string{api.FinalizerOrphan},
+			[]string{metav1.FinalizerOrphan},
 		},
 		{
 			podWithOnlyOrphanFinalizer("pod23"),
 			nil,
 			defaultDeleteStrategy,
 			false,
-			[]string{api.FinalizerOrphan},
+			[]string{metav1.FinalizerOrphan},
 		},
 		{
 			podWithOnlyOrphanFinalizer("pod24"),
 			nil,
 			orphanDeleteStrategy,
 			false,
-			[]string{api.FinalizerOrphan},
+			[]string{metav1.FinalizerOrphan},
 		},
 	}
 
