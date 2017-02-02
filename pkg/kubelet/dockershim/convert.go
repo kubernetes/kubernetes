@@ -148,7 +148,7 @@ func toRuntimeAPISandboxState(state string) runtimeapi.PodSandboxState {
 	}
 }
 
-func toRuntimeAPISandbox(c *dockertypes.Container) (*runtimeapi.PodSandbox, error) {
+func containerToRuntimeAPISandbox(c *dockertypes.Container) (*runtimeapi.PodSandbox, error) {
 	state := toRuntimeAPISandboxState(c.Status)
 	if len(c.Names) == 0 {
 		return nil, fmt.Errorf("unexpected empty sandbox name: %+v", c)
@@ -168,4 +168,16 @@ func toRuntimeAPISandbox(c *dockertypes.Container) (*runtimeapi.PodSandbox, erro
 		Labels:      labels,
 		Annotations: annotations,
 	}, nil
+}
+
+func checkpointToRuntimeAPISandbox(id string, checkpoint *PodSandboxCheckpoint) *runtimeapi.PodSandbox {
+	state := runtimeapi.PodSandboxState_SANDBOX_NOTREADY
+	return &runtimeapi.PodSandbox{
+		Id: id,
+		Metadata: &runtimeapi.PodSandboxMetadata{
+			Name:      checkpoint.Name,
+			Namespace: checkpoint.Namespace,
+		},
+		State: state,
+	}
 }
