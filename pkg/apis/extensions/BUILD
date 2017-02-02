@@ -8,6 +8,13 @@ load(
     "go_test",
 )
 
+go_test(
+    name = "go_default_test",
+    srcs = ["helpers_test.go"],
+    library = ":go_default_library",
+    tags = ["automanaged"],
+)
+
 go_library(
     name = "go_default_library",
     srcs = [
@@ -20,7 +27,6 @@ go_library(
     tags = ["automanaged"],
     deps = [
         "//pkg/api:go_default_library",
-        "//pkg/apis/autoscaling:go_default_library",
         "//vendor:k8s.io/apimachinery/pkg/api/resource",
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
         "//vendor:k8s.io/apimachinery/pkg/conversion",
@@ -28,13 +34,6 @@ go_library(
         "//vendor:k8s.io/apimachinery/pkg/runtime/schema",
         "//vendor:k8s.io/apimachinery/pkg/util/intstr",
     ],
-)
-
-go_test(
-    name = "go_default_test",
-    srcs = ["helpers_test.go"],
-    library = ":go_default_library",
-    tags = ["automanaged"],
 )
 
 filegroup(
