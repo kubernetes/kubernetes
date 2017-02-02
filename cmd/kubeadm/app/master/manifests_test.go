@@ -559,9 +559,14 @@ func TestGetProxyCommand(t *testing.T) {
 		expected []string
 	}{
 		{
-			cfg: &kubeadmapi.MasterConfiguration{},
+			cfg: &kubeadmapi.MasterConfiguration{
+				Networking: kubeadm.Networking{
+					PodSubnet: "bar",
+				},
+			},
 			expected: []string{
 				"kube-proxy",
+				"--cluster-cidr=bar",
 			},
 		},
 	}
