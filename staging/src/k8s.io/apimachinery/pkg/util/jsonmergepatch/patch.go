@@ -126,7 +126,7 @@ func keepOrDeleteNullInObj(m map[string]interface{}, keepNull bool) (map[string]
 					filteredMap[key] = val
 				}
 			default:
-				panic(fmt.Sprintf("unknown type: %v", reflect.TypeOf(typedVal)))
+				return nil, fmt.Errorf("unknown type: %v", reflect.TypeOf(typedVal))
 			}
 		}
 	}
