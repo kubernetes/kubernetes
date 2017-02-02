@@ -42,16 +42,16 @@ import (
 type fakePortForwarder struct {
 	lock sync.Mutex
 	// stores data expected from the stream per port
-	expected map[uint16]string
+	expected map[int32]string
 	// stores data received from the stream per port
-	received map[uint16]string
+	received map[int32]string
 	// data to be sent to the stream per port
-	send map[uint16]string
+	send map[int32]string
 }
 
 var _ portforward.PortForwarder = &fakePortForwarder{}
 
-func (pf *fakePortForwarder) PortForward(name string, uid types.UID, port uint16, stream io.ReadWriteCloser) error {
+func (pf *fakePortForwarder) PortForward(name string, uid types.UID, port int32, stream io.ReadWriteCloser) error {
 	defer stream.Close()
 
 	// read from the client
@@ -77,14 +77,14 @@ func (pf *fakePortForwarder) PortForward(name string, uid types.UID, port uint16
 
 // fakePortForwardServer creates an HTTP server that can handle port forwarding
 // requests.
-func fakePortForwardServer(t *testing.T, testName string, serverSends, expectedFromClient map[uint16]string) http.HandlerFunc {
+func fakePortForwardServer(t *testing.T, testName string, serverSends, expectedFromClient map[int32]string) http.HandlerFunc {
 	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		pf := &fakePortForwarder{
 			expected: expectedFromClient,
-			received: make(map[uint16]string),
+			received: make(map[int32]string),
 			send:     serverSends,
 		}
-		portforward.ServePortForward(w, req, pf, "pod", "uid", 0, 10*time.Second)
+		portforward.ServePortForward(w, req, pf, "pod", "uid", nil, 0, 10*time.Second, portforward.SupportedProtocols)
 
 		for port, expected := range expectedFromClient {
 			actual, ok := pf.received[port]
@@ -109,19 +109,19 @@ func fakePortForwardServer(t *testing.T, testName string, serverSends, expectedF
 func TestForwardPorts(t *testing.T) {
 	tests := map[string]struct {
 		ports       []string
-		clientSends map[uint16]string
-		serverSends map[uint16]string
+		clientSends map[int32]string
+		serverSends map[int32]string
 	}{
 		"forward 1 port with no data either direction": {
 			ports: []string{"5000"},
 		},
 		"forward 2 ports with bidirectional data": {
 			ports: []string{"5001", "6000"},
-			clientSends: map[uint16]string{
+			clientSends: map[int32]string{
 				5001: "abcd",
 				6000: "ghij",
 			},
-			serverSends: map[uint16]string{
+			serverSends: map[int32]string{
 				5001: "1234",
 				6000: "5678",
 			},
