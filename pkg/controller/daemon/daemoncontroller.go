@@ -57,6 +57,14 @@ const (
 
 	// If sending a status upate to API server fails, we retry a finite number of times.
 	StatusUpdateRetries = 1
+
+	// Reasons for DaemonSet events
+	// SelectingAllReason is added to an event when a DaemonSet selects all Pods.
+	SelectingAllReason = "SelectingAll"
+	// FailedPlacementReason is added to an event when a DaemonSet can't schedule a Pod to a specified node.
+	FailedPlacementReason = "FailedPlacement"
+	// FailedDaemonPodReason is added to an event when the status of a Pod of a DaemonSet is 'Failed'.
+	FailedDaemonPodReason = "FailedDaemonPod"
 )
 
 // DaemonSetsController is responsible for synchronizing DaemonSet objects stored
@@ -480,8 +488,15 @@ func (dsc *DaemonSetsController) manage(ds *extensions.DaemonSet) error {
 			var daemonPodsRunning []*v1.Pod
 			for i := range daemonPods {
 				pod := daemonPods[i]
+				// Skip terminating pods. We won't delete them again or count them as running daemon pods.
+				if pod.DeletionTimestamp != nil {
+					continue
+				}
 				if pod.Status.Phase == v1.PodFailed {
-					glog.V(2).Infof("Found failed daemon pod %s/%s on node %s, will try to kill it", pod.Namespace, node.Name, pod.Name)
+					msg := fmt.Sprintf("Found failed daemon pod %s/%s on node %s, will try to kill it", pod.Namespace, node.Name, pod.Name)
+					glog.V(2).Infof(msg)
+					// Emit an event so that it's discoverable to users.
+					dsc.eventRecorder.Eventf(ds, v1.EventTypeWarning, FailedDaemonPodReason, msg)
 					podsToDelete = append(podsToDelete, pod.Name)
 					failedPodsObserved++
 				} else {
@@ -674,7 +689,7 @@ func (dsc *DaemonSetsController) syncDaemonSet(key string) error {
 
 	everything := metav1.LabelSelector{}
 	if reflect.DeepEqual(ds.Spec.Selector, &everything) {
-		dsc.eventRecorder.Eventf(ds, v1.EventTypeWarning, "SelectingAll", "This daemon set is selecting all pods. A non-empty selector is required.")
+		dsc.eventRecorder.Eventf(ds, v1.EventTypeWarning, SelectingAllReason, "This daemon set is selecting all pods. A non-empty selector is required.")
 		return nil
 	}
 
@@ -760,7 +775,7 @@ func (dsc *DaemonSetsController) nodeShouldRunDaemonPod(node *v1.Node, ds *exten
 		glog.V(4).Infof("GeneralPredicates failed on ds '%s/%s' for reason: %v", ds.ObjectMeta.Namespace, ds.ObjectMeta.Name, r.GetReason())
 		switch reason := r.(type) {
 		case *predicates.InsufficientResourceError:
-			dsc.eventRecorder.Eventf(ds, v1.EventTypeNormal, "FailedPlacement", "failed to place pod on %q: %s", node.ObjectMeta.Name, reason.Error())
+			dsc.eventRecorder.Eventf(ds, v1.EventTypeNormal, FailedPlacementReason, "failed to place pod on %q: %s", node.ObjectMeta.Name, reason.Error())
 			shouldSchedule = false
 		case *predicates.PredicateFailureError:
 			var emitEvent bool
@@ -799,7 +814,7 @@ func (dsc *DaemonSetsController) nodeShouldRunDaemonPod(node *v1.Node, ds *exten
 				emitEvent = true
 			}
 			if emitEvent {
-				dsc.eventRecorder.Eventf(ds, v1.EventTypeNormal, "FailedPlacement", "failed to place pod on %q: %s", node.ObjectMeta.Name, reason.GetReason())
+				dsc.eventRecorder.Eventf(ds, v1.EventTypeNormal, FailedPlacementReason, "failed to place pod on %q: %s", node.ObjectMeta.Name, reason.GetReason())
 			}
 		}
 	}
