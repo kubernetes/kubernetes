@@ -17,7 +17,6 @@ limitations under the License.
 package replicaset
 
 import (
-	"flag"
 	"fmt"
 	"testing"
 	"time"
@@ -71,10 +70,6 @@ func TestParseFederationReplicaSetReference(t *testing.T) {
 }
 
 func TestReplicaSetController(t *testing.T) {
-	flag.Set("logtostderr", "true")
-	flag.Set("v", "5")
-	flag.Parse()
-
 	replicaSetReviewDelay = 10 * time.Millisecond
 	clusterAvailableDelay = 20 * time.Millisecond
 	clusterUnavailableDelay = 60 * time.Millisecond
@@ -178,6 +173,81 @@ func TestReplicaSetController(t *testing.T) {
 	assert.Equal(t, rs.Status.FullyLabeledReplicas, rs1.Status.FullyLabeledReplicas+rs2.Status.FullyLabeledReplicas)
 	assert.Equal(t, rs.Status.ReadyReplicas, rs1.Status.ReadyReplicas+rs2.Status.ReadyReplicas)
 	assert.Equal(t, rs.Status.AvailableReplicas, rs1.Status.AvailableReplicas+rs2.Status.AvailableReplicas)
+}
+
+func TestReplicaSetControllerPuppets(t *testing.T) {
+
+	replicaSetReviewDelay = 10 * time.Millisecond
+	clusterAvailableDelay = 20 * time.Millisecond
+	clusterUnavailableDelay = 60 * time.Millisecond
+	allReplicaSetReviewDelay = 120 * time.Millisecond
+
+	fedclientset := fedclientfake.NewSimpleClientset()
+	fedrswatch := watch.NewFake()
+	fedclientset.PrependWatchReactor("replicasets", core.DefaultWatchReactor(fedrswatch, nil))
+
+	fedclientset.Federation().Clusters().Create(testutil.NewCluster("k8s-1", apiv1.ConditionTrue))
+	fedclientset.Federation().Clusters().Create(testutil.NewCluster("k8s-2", apiv1.ConditionTrue))
+
+	kube1clientset := kubeclientfake.NewSimpleClientset()
+	kube1rswatch := watch.NewFake()
+	kube1clientset.PrependWatchReactor("replicasets", core.DefaultWatchReactor(kube1rswatch, nil))
+	kube1Podwatch := watch.NewFake()
+	kube1clientset.PrependWatchReactor("pods", core.DefaultWatchReactor(kube1Podwatch, nil))
+	kube2clientset := kubeclientfake.NewSimpleClientset()
+	kube2rswatch := watch.NewFake()
+	kube2clientset.PrependWatchReactor("replicasets", core.DefaultWatchReactor(kube2rswatch, nil))
+	kube2Podwatch := watch.NewFake()
+	kube2clientset.PrependWatchReactor("pods", core.DefaultWatchReactor(kube2Podwatch, nil))
+
+	fedInformerClientFactory := func(cluster *fedv1.Cluster) (kubeclientset.Interface, error) {
+		switch cluster.Name {
+		case "k8s-1":
+			return kube1clientset, nil
+		case "k8s-2":
+			return kube2clientset, nil
+		default:
+			return nil, fmt.Errorf("Unknown cluster: %v", cluster.Name)
+		}
+	}
+	replicaSetController := NewReplicaSetController(fedclientset)
+	rsFedinformer := testutil.ToFederatedInformerForTestOnly(replicaSetController.fedReplicaSetInformer)
+	rsFedinformer.SetClientFactory(fedInformerClientFactory)
+	podFedinformer := testutil.ToFederatedInformerForTestOnly(replicaSetController.fedPodInformer)
+	podFedinformer.SetClientFactory(fedInformerClientFactory)
+
+	stopChan := make(chan struct{})
+	defer close(stopChan)
+	go replicaSetController.Run(1, stopChan)
+
+	rs := newReplicaSetWithReplicas("rs", 9)
+	rs.Annotations = map[string]string{FedReplicaSetPupptetAnnotation: "true"}
+	rs, _ = fedclientset.Extensions().ReplicaSets(metav1.NamespaceDefault).Create(rs)
+	fedrswatch.Add(rs)
+
+	rs1 := newReplicaSetWithReplicas("rs", 5)
+	rs1.Status.Replicas = *rs1.Spec.Replicas
+	rs1.Status.FullyLabeledReplicas = *rs1.Spec.Replicas
+	rs1.Status.ReadyReplicas = *rs1.Spec.Replicas
+	rs1.Status.AvailableReplicas = *rs1.Spec.Replicas
+	rs1, _ = kube1clientset.Extensions().ReplicaSets(metav1.NamespaceDefault).Create(rs1)
+	kube1rswatch.Add(rs1)
+
+	rs2 := newReplicaSetWithReplicas("rs", 2)
+	rs2.Status.Replicas = *rs2.Spec.Replicas
+	rs2.Status.FullyLabeledReplicas = *rs2.Spec.Replicas
+	rs2.Status.ReadyReplicas = *rs2.Spec.Replicas
+	rs2.Status.AvailableReplicas = *rs2.Spec.Replicas
+	rs2, _ = kube2clientset.Extensions().ReplicaSets(metav1.NamespaceDefault).Create(rs2)
+	kube2rswatch.Add(rs2)
+
+	time.Sleep(1 * time.Second)
+	rs, _ = fedclientset.Extensions().ReplicaSets(metav1.NamespaceDefault).Get(rs.Name, metav1.GetOptions{})
+	assert.Equal(t, *rs1.Spec.Replicas+*rs2.Spec.Replicas, rs.Status.Replicas)
+	assert.Equal(t, rs1.Status.Replicas+rs2.Status.Replicas, rs.Status.Replicas)
+	assert.Equal(t, rs1.Status.FullyLabeledReplicas+rs2.Status.FullyLabeledReplicas, rs.Status.FullyLabeledReplicas)
+	assert.Equal(t, rs1.Status.ReadyReplicas+rs2.Status.ReadyReplicas, rs.Status.ReadyReplicas)
+	assert.Equal(t, rs1.Status.AvailableReplicas+rs2.Status.AvailableReplicas, rs.Status.AvailableReplicas)
 }
 
 func newReplicaSetWithReplicas(name string, replicas int32) *extensionsv1.ReplicaSet {
