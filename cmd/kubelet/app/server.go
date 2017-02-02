@@ -396,6 +396,10 @@ func run(s *options.KubeletServer, kubeDeps *kubelet.KubeletDeps) (err error) {
 			if err != nil {
 				glog.Warningf("New kubeClient from clientConfig error: %v", err)
 			}
+			externalKubeClient, err = clientgoclientset.NewForConfig(clientConfig)
+			if err != nil {
+				glog.Warningf("New kubeClient from clientConfig error: %v", err)
+			}
 			// make a separate client for events
 			eventClientConfig := *clientConfig
 			eventClientConfig.QPS = float32(s.EventRecordQPS)
@@ -403,27 +407,6 @@ func run(s *options.KubeletServer, kubeDeps *kubelet.KubeletDeps) (err error) {
 			eventClient, err = clientgoclientset.NewForConfig(&eventClientConfig)
 			if err != nil {
 				glog.Warningf("Failed to create API Server client: %v", err)
-			}
-		} else {
-			if s.RequireKubeConfig {
-				return fmt.Errorf("invalid kubeconfig: %v", err)
-			}
-			if standaloneMode {
-				glog.Warningf("No API client: %v", err)
-			}
-		}
-
-		// client-go and kuberenetes generated clients are incompatible because the runtime
-		// and runtime/serializer types have been duplicated in client-go.  This means that
-		// you can't reasonably convert from one to the other and its impossible for a single
-		// type to fulfill both interfaces.  Because of that, we have to build the clients
-		// up from scratch twice.
-		// TODO eventually the kubelet should only use the client-go library
-		clientGoConfig, err := createAPIServerClientGoConfig(s)
-		if err == nil {
-			externalKubeClient, err = clientgoclientset.NewForConfig(clientGoConfig)
-			if err != nil {
-				glog.Warningf("New kubeClient from clientConfig error: %v", err)
 			}
 		} else {
 			if s.RequireKubeConfig {
