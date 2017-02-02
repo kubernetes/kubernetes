@@ -13,13 +13,13 @@ go_library(
     tags = ["automanaged"],
     deps = [
         "//pkg/apis/rbac:go_default_library",
-        "//pkg/genericapiserver/registry/rest:go_default_library",
         "//pkg/registry/rbac:go_default_library",
         "//pkg/registry/rbac/validation:go_default_library",
         "//vendor:k8s.io/apimachinery/pkg/api/errors",
         "//vendor:k8s.io/apimachinery/pkg/runtime",
         "//vendor:k8s.io/apiserver/pkg/authorization/authorizer",
         "//vendor:k8s.io/apiserver/pkg/endpoints/request",
+        "//vendor:k8s.io/apiserver/pkg/registry/rest",
     ],
 )
 
