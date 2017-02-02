@@ -349,6 +349,23 @@ var GCEPDVolumeFilter VolumeFilter = VolumeFilter{
 	},
 }
 
+// AzureDiskVolumeFilter is a VolumeFilter for filtering Azure Disk Volumes
+var AzureDiskVolumeFilter VolumeFilter = VolumeFilter{
+	FilterVolume: func(vol *v1.Volume) (string, bool) {
+		if vol.AzureDisk != nil {
+			return vol.AzureDisk.DiskName, true
+		}
+		return "", false
+	},
+
+	FilterPersistentVolume: func(pv *v1.PersistentVolume) (string, bool) {
+		if pv.Spec.AzureDisk != nil {
+			return pv.Spec.AzureDisk.DiskName, true
+		}
+		return "", false
+	},
+}
+
 type VolumeZoneChecker struct {
 	pvInfo  PersistentVolumeInfo
 	pvcInfo PersistentVolumeClaimInfo
