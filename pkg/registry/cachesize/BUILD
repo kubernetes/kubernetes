@@ -11,7 +11,10 @@ go_library(
     name = "go_default_library",
     srcs = ["cachesize.go"],
     tags = ["automanaged"],
-    deps = ["//vendor:github.com/golang/glog"],
+    deps = [
+        "//pkg/genericapiserver/registry/generic/registry:go_default_library",
+        "//vendor:github.com/golang/glog",
+    ],
 )
 
 filegroup(
