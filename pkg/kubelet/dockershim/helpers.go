@@ -35,7 +35,8 @@ import (
 )
 
 const (
-	annotationPrefix = "annotation."
+	annotationPrefix            = "annotation."
+	noSuchContainerErrorMessage = "No such cotainer: "
 )
 
 var (
@@ -322,4 +323,9 @@ func recoverFromCreationConflictIfNeeded(client dockertools.DockerInterface, cre
 	createConfig.Name = randomizeName(createConfig.Name)
 	glog.V(2).Infof("Create the container with randomized name %s", createConfig.Name)
 	return client.CreateContainer(createConfig)
+}
+
+// containerNotExistErr returns if error message in given err is NoSuchContainer type error.
+func containerNotExistErr(err error) bool {
+	return strings.Contains(err.Error(), noSuchContainerErrorMessage)
 }
