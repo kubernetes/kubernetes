@@ -46,7 +46,6 @@ kind: Deployment
 metadata:
   labels:
     k8s-app: kube-discovery
-    kubernetes.io/cluster-service: "true"
   name: kube-discovery
   namespace: kube-system
 spec:
@@ -54,7 +53,6 @@ spec:
   selector:
     matchLabels:
       k8s-app: kube-discovery
-      kubernetes.io/cluster-service: "true"
   template:
     metadata:
       labels:
