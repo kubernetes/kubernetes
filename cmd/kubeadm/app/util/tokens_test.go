@@ -23,92 +23,95 @@ import (
 )
 
 func TestTokenParse(t *testing.T) {
-	invalidTokens := []string{
-		// invalid parcel size
-		"1234567890123456789012",
-		"12345:1234567890123456",
-		".1234567890123456",
-		// invalid separation
-		"123456:1234567890.123456",
-		"abcdef.1234567890123456",
-		// invalid token id
-		"Abcdef:1234567890123456",
-		// invalid token secret
-		"123456:AABBCCDDEEFFGGHH",
+	var tests = []struct {
+		token    string
+		expected bool
+	}{
+		{token: "1234567890123456789012", expected: false},   // invalid parcel size
+		{token: "12345:1234567890123456", expected: false},   // invalid parcel size
+		{token: ".1234567890123456", expected: false},        // invalid parcel size
+		{token: "123456:1234567890.123456", expected: false}, // invalid separation
+		{token: "abcdef.1234567890123456", expected: false},  // invalid separation
+		{token: "Abcdef:1234567890123456", expected: false},  // invalid token id
+		{token: "123456:AABBCCDDEEFFGGHH", expected: false},  // invalid token secret
+		{token: "abcdef:1234567890123456", expected: true},
+		{token: "123456:aabbccddeeffgghh", expected: true},
 	}
 
-	for _, token := range invalidTokens {
-		if _, _, err := ParseToken(token); err == nil {
-			t.Errorf("ParseToken did not return an error for this invalid token: [%s]", token)
+	for _, rt := range tests {
+		_, _, actual := ParseToken(rt.token)
+		if (actual == nil) != rt.expected {
+			t.Errorf(
+				"failed ParseToken for this token: [%s]\n\texpected: %t\n\t  actual: %t",
+				rt.token,
+				rt.expected,
+				(actual == nil),
+			)
 		}
 	}
 
-	validTokens := []string{
-		"abcdef:1234567890123456",
-		"123456:aabbccddeeffgghh",
-	}
-
-	for _, token := range validTokens {
-		if _, _, err := ParseToken(token); err != nil {
-			t.Errorf("ParseToken returned an error for this valid token: [%s]", token)
-		}
-	}
 }
 
 func TestParseTokenID(t *testing.T) {
-	invalidTokenIDs := []string{
-		"",
-		"1234567890123456789012",
-		"12345",
-		"Abcdef",
+	var tests = []struct {
+		tokenID  string
+		expected bool
+	}{
+		{tokenID: "", expected: false},
+		{tokenID: "1234567890123456789012", expected: false},
+		{tokenID: "12345", expected: false},
+		{tokenID: "Abcdef", expected: false},
+		{tokenID: "abcdef", expected: true},
+		{tokenID: "123456", expected: true},
 	}
-
-	for _, tokenID := range invalidTokenIDs {
-		if err := ParseTokenID(tokenID); err == nil {
-			t.Errorf("ParseTokenID did not return an error for this invalid token ID: [%q]", tokenID)
-		}
-	}
-
-	validTokens := []string{
-		"abcdef",
-		"123456",
-	}
-
-	for _, tokenID := range validTokens {
-		if err := ParseTokenID(tokenID); err != nil {
-			t.Errorf("ParseTokenID failed for a valid token ID [%q], err: %+v", tokenID, err)
+	for _, rt := range tests {
+		actual := ParseTokenID(rt.tokenID)
+		if (actual == nil) != rt.expected {
+			t.Errorf(
+				"failed ParseTokenID for this token ID: [%s]\n\texpected: %t\n\t  actual: %t",
+				rt.tokenID,
+				rt.expected,
+				(actual == nil),
+			)
 		}
 	}
 }
 
 func TestValidateToken(t *testing.T) {
-	invalidTokens := []*kubeadmapi.TokenDiscovery{
-		{ID: "", Secret: ""},
-		{ID: "1234567890123456789012", Secret: ""},
-		{ID: "", Secret: "1234567890123456789012"},
-		{ID: "12345", Secret: "1234567890123456"},
-		{ID: "Abcdef", Secret: "1234567890123456"},
-		{ID: "123456", Secret: "AABBCCDDEEFFGGHH"},
-		{ID: "abc*ef", Secret: "1234567890123456"},
-		{ID: "abcdef", Secret: "123456789*123456"},
+	var tests = []struct {
+		token    *kubeadmapi.TokenDiscovery
+		expected bool
+	}{
+		{token: &kubeadmapi.TokenDiscovery{ID: "", Secret: ""}, expected: false},
+		{token: &kubeadmapi.TokenDiscovery{ID: "1234567890123456789012", Secret: ""}, expected: false},
+		{token: &kubeadmapi.TokenDiscovery{ID: "", Secret: "1234567890123456789012"}, expected: false},
+		{token: &kubeadmapi.TokenDiscovery{ID: "12345", Secret: "1234567890123456"}, expected: false},
+		{token: &kubeadmapi.TokenDiscovery{ID: "Abcdef", Secret: "1234567890123456"}, expected: false},
+		{token: &kubeadmapi.TokenDiscovery{ID: "123456", Secret: "AABBCCDDEEFFGGHH"}, expected: false},
+		{token: &kubeadmapi.TokenDiscovery{ID: "abc*ef", Secret: "1234567890123456"}, expected: false},
+		{token: &kubeadmapi.TokenDiscovery{ID: "abcdef", Secret: "123456789*123456"}, expected: false},
+		{token: &kubeadmapi.TokenDiscovery{ID: "abcdef", Secret: "1234567890123456"}, expected: true},
+		{token: &kubeadmapi.TokenDiscovery{ID: "123456", Secret: "aabbccddeeffgghh"}, expected: true},
+		{token: &kubeadmapi.TokenDiscovery{ID: "abc456", Secret: "1234567890123456"}, expected: true},
+		{token: &kubeadmapi.TokenDiscovery{ID: "abcdef", Secret: "123456ddeeffgghh"}, expected: true},
 	}
-
-	for _, token := range invalidTokens {
-		if valid, err := ValidateToken(token); valid == true || err == nil {
-			t.Errorf("ValidateToken did not return an error for this invalid token: [%s]", token)
+	for _, rt := range tests {
+		valid, actual := ValidateToken(rt.token)
+		if (actual == nil) != rt.expected {
+			t.Errorf(
+				"failed ValidateToken for this token ID: [%s]\n\texpected: %t\n\t  actual: %t",
+				rt.token,
+				rt.expected,
+				(actual == nil),
+			)
 		}
-	}
-
-	validTokens := []*kubeadmapi.TokenDiscovery{
-		{ID: "abcdef", Secret: "1234567890123456"},
-		{ID: "123456", Secret: "aabbccddeeffgghh"},
-		{ID: "abc456", Secret: "1234567890123456"},
-		{ID: "abcdef", Secret: "123456ddeeffgghh"},
-	}
-
-	for _, token := range validTokens {
-		if valid, err := ValidateToken(token); valid == false || err != nil {
-			t.Errorf("ValidateToken failed for a valid token [%s], valid: %t, err: %+v", token, valid, err)
+		if (valid == true) != rt.expected {
+			t.Errorf(
+				"failed ValidateToken for this token ID: [%s]\n\texpected: %t\n\t  actual: %t",
+				rt.token,
+				rt.expected,
+				(actual == nil),
+			)
 		}
 	}
 }
