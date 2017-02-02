@@ -17,6 +17,7 @@ limitations under the License.
 package rest
 
 import (
+	"k8s.io/kubernetes/pkg/api"
 	storageapi "k8s.io/kubernetes/pkg/apis/storage"
 	storageapiv1beta1 "k8s.io/kubernetes/pkg/apis/storage/v1beta1"
 	"k8s.io/kubernetes/pkg/genericapiserver/registry/generic"
@@ -29,7 +30,7 @@ type RESTStorageProvider struct {
 }
 
 func (p RESTStorageProvider) NewRESTStorage(apiResourceConfigSource genericapiserver.APIResourceConfigSource, restOptionsGetter generic.RESTOptionsGetter) (genericapiserver.APIGroupInfo, bool) {
-	apiGroupInfo := genericapiserver.NewDefaultAPIGroupInfo(storageapi.GroupName)
+	apiGroupInfo := genericapiserver.NewDefaultAPIGroupInfo(storageapi.GroupName, api.Registry, api.Scheme, api.ParameterCodec, api.Codecs)
 
 	if apiResourceConfigSource.AnyResourcesForVersionEnabled(storageapiv1beta1.SchemeGroupVersion) {
 		apiGroupInfo.VersionedResourcesStorageMap[storageapiv1beta1.SchemeGroupVersion.Version] = p.v1beta1Storage(apiResourceConfigSource, restOptionsGetter)

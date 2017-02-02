@@ -18,6 +18,7 @@ package rest
 
 import (
 	"k8s.io/apiserver/pkg/authentication/authenticator"
+	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/authentication"
 	authenticationv1beta1 "k8s.io/kubernetes/pkg/apis/authentication/v1beta1"
 	"k8s.io/kubernetes/pkg/genericapiserver/registry/generic"
@@ -36,7 +37,7 @@ func (p RESTStorageProvider) NewRESTStorage(apiResourceConfigSource genericapise
 	// 	return genericapiserver.APIGroupInfo{}, false
 	// }
 
-	apiGroupInfo := genericapiserver.NewDefaultAPIGroupInfo(authentication.GroupName)
+	apiGroupInfo := genericapiserver.NewDefaultAPIGroupInfo(authentication.GroupName, api.Registry, api.Scheme, api.ParameterCodec, api.Codecs)
 
 	if apiResourceConfigSource.AnyResourcesForVersionEnabled(authenticationv1beta1.SchemeGroupVersion) {
 		apiGroupInfo.VersionedResourcesStorageMap[authenticationv1beta1.SchemeGroupVersion.Version] = p.v1beta1Storage(apiResourceConfigSource, restOptionsGetter)

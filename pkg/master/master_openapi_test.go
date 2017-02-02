@@ -43,7 +43,7 @@ func TestValidOpenAPISpec(t *testing.T) {
 	defer etcdserver.Terminate(t)
 
 	config.GenericConfig.EnableIndex = true
-	config.GenericConfig.OpenAPIConfig = genericapiserver.DefaultOpenAPIConfig(openapigen.GetOpenAPIDefinitions)
+	config.GenericConfig.OpenAPIConfig = genericapiserver.DefaultOpenAPIConfig(openapigen.GetOpenAPIDefinitions, api.Scheme)
 	config.GenericConfig.OpenAPIConfig.Info = &spec.Info{
 		InfoProps: spec.InfoProps{
 			Title:   "Kubernetes",
