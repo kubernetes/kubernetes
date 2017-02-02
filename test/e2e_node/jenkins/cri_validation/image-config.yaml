@@ -7,5 +7,5 @@ images:
     project: google-containers
     metadata: "user-data<test/e2e_node/jenkins/gci-init.yaml,gci-update-strategy=update_disabled"
   ubuntu-docker12:
-    image: e2e-node-ubuntu-trusty-docker12-v1-image
+    image: e2e-node-ubuntu-trusty-docker12-v2-image
     project: kubernetes-node-e2e-images
