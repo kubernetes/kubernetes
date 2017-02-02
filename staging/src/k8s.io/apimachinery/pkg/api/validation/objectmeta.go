@@ -14,22 +14,19 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package genericvalidation
+package validation
 
 import (
 	"fmt"
 	"strings"
 
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
-	apimachineyvalidation "k8s.io/apimachinery/pkg/api/validation"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	v1validation "k8s.io/apimachinery/pkg/apis/meta/v1/validation"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
-	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/v1"
 )
 
 // TODO: delete this global variable when we enable the validation of common
@@ -42,11 +39,11 @@ const totalAnnotationSizeLimitB int = 256 * (1 << 10) // 256 kB
 
 // BannedOwners is a black list of object that are not allowed to be owners.
 var BannedOwners = map[schema.GroupVersionKind]struct{}{
-	v1.SchemeGroupVersion.WithKind("Event"): {},
+	schema.GroupVersionKind{Group: "", Version: "v1", Kind: "Event"}: {},
 }
 
 // ValidateClusterName can be used to check whether the given cluster name is valid.
-var ValidateClusterName = apimachineyvalidation.NameIsDNS1035Label
+var ValidateClusterName = NameIsDNS1035Label
 
 // ValidateAnnotations validates that a set of annotations are correctly defined.
 func ValidateAnnotations(annotations map[string]string, fldPath *field.Path) field.ErrorList {
@@ -109,17 +106,8 @@ func ValidateFinalizerName(stringValue string, fldPath *field.Path) field.ErrorL
 	for _, msg := range validation.IsQualifiedName(stringValue) {
 		allErrs = append(allErrs, field.Invalid(fldPath, stringValue, msg))
 	}
-	if len(allErrs) != 0 {
-		return allErrs
-	}
 
-	if len(strings.Split(stringValue, "/")) == 1 {
-		if !api.IsStandardFinalizerName(stringValue) {
-			return append(allErrs, field.Invalid(fldPath, stringValue, "name is neither a standard finalizer name nor is it fully qualified"))
-		}
-	}
-
-	return field.ErrorList{}
+	return allErrs
 }
 
 func ValidateNoNewFinalizers(newFinalizers []string, oldFinalizers []string, fldPath *field.Path) field.ErrorList {
@@ -143,7 +131,7 @@ func ValidateImmutableField(newVal, oldVal interface{}, fldPath *field.Path) fie
 // ValidateObjectMeta validates an object's metadata on creation. It expects that name generation has already
 // been performed.
 // It doesn't return an error for rootscoped resources with namespace, because namespace should already be cleared before.
-func ValidateObjectMeta(meta *metav1.ObjectMeta, requiresNamespace bool, nameFn apimachineyvalidation.ValidateNameFunc, fldPath *field.Path) field.ErrorList {
+func ValidateObjectMeta(meta *metav1.ObjectMeta, requiresNamespace bool, nameFn ValidateNameFunc, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 
 	if len(meta.GenerateName) != 0 {
@@ -165,7 +153,7 @@ func ValidateObjectMeta(meta *metav1.ObjectMeta, requiresNamespace bool, nameFn 
 		if len(meta.Namespace) == 0 {
 			allErrs = append(allErrs, field.Required(fldPath.Child("namespace"), ""))
 		} else {
-			for _, msg := range apimachineyvalidation.ValidateNamespaceName(meta.Namespace, false) {
+			for _, msg := range ValidateNamespaceName(meta.Namespace, false) {
 				allErrs = append(allErrs, field.Invalid(fldPath.Child("namespace"), meta.Namespace, msg))
 			}
 		}
@@ -179,7 +167,7 @@ func ValidateObjectMeta(meta *metav1.ObjectMeta, requiresNamespace bool, nameFn 
 			allErrs = append(allErrs, field.Invalid(fldPath.Child("clusterName"), meta.ClusterName, msg))
 		}
 	}
-	allErrs = append(allErrs, apimachineyvalidation.ValidateNonnegativeField(meta.Generation, fldPath.Child("generation"))...)
+	allErrs = append(allErrs, ValidateNonnegativeField(meta.Generation, fldPath.Child("generation"))...)
 	allErrs = append(allErrs, v1validation.ValidateLabels(meta.Labels, fldPath.Child("labels"))...)
 	allErrs = append(allErrs, ValidateAnnotations(meta.Annotations, fldPath.Child("annotations"))...)
 	allErrs = append(allErrs, ValidateOwnerReferences(meta.OwnerReferences, fldPath.Child("ownerReferences"))...)

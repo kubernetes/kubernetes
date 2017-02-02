@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package genericvalidation
+package validation
 
 import (
 	"math/rand"
@@ -23,7 +23,6 @@ import (
 	"testing"
 	"time"
 
-	apimachineryvalidation "k8s.io/apimachinery/pkg/api/validation"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 )
@@ -409,7 +408,7 @@ func TestValidateObjectMetaTrimsTrailingSlash(t *testing.T) {
 	errs := ValidateObjectMeta(
 		&metav1.ObjectMeta{Name: "test", GenerateName: "foo-"},
 		false,
-		apimachineryvalidation.NameIsDNSSubdomain,
+		NameIsDNSSubdomain,
 		field.NewPath("field"))
 	if len(errs) != 0 {
 		t.Fatalf("unexpected errors: %v", errs)

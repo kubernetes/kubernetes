@@ -23,7 +23,6 @@ go_library(
         "//pkg/api/service:go_default_library",
         "//pkg/api/util:go_default_library",
         "//pkg/api/v1:go_default_library",
-        "//pkg/api/validation/genericvalidation:go_default_library",
         "//pkg/apis/storage/util:go_default_library",
         "//pkg/capabilities:go_default_library",
         "//pkg/features:go_default_library",
@@ -99,9 +98,6 @@ filegroup(
 
 filegroup(
     name = "all-srcs",
-    srcs = [
-        ":package-srcs",
-        "//pkg/api/validation/genericvalidation:all-srcs",
-    ],
+    srcs = [":package-srcs"],
     tags = ["automanaged"],
 )
