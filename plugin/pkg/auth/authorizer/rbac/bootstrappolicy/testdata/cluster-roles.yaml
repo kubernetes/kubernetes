@@ -587,12 +587,6 @@ items:
     name: system:node-bootstrapper
   rules:
   - apiGroups:
-    - ""
-    resources:
-    - nodes
-    verbs:
-    - get
-  - apiGroups:
     - certificates.k8s.io
     resources:
     - certificatesigningrequests

@@ -22,8 +22,6 @@ import (
 	"sync"
 	"time"
 
-	apierrs "k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/tools/clientcmd"
@@ -122,19 +120,6 @@ func createClients(caCert []byte, endpoint, token string, nodeName types.NodeNam
 		clientConfig: clientConfig,
 	}
 	return ac, nil
-}
-
-// checkForNodeNameDuplicates checks whether there are other nodes in the cluster with identical node names.
-func checkForNodeNameDuplicates(clientSet *clientset.Clientset) error {
-	hostName, err := os.Hostname()
-	if err != nil {
-		return fmt.Errorf("Failed to get node hostname [%v]", err)
-	}
-	_, err = clientSet.Nodes().Get(hostName, metav1.GetOptions{})
-	if err != nil && !apierrs.IsNotFound(err) {
-		return err
-	}
-	return nil
 }
 
 // checks the connection requirements for a specific API endpoint
