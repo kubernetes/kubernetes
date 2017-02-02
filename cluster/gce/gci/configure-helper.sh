@@ -273,12 +273,19 @@ function create-master-pki {
 
 # After the first boot and on upgrade, these files exist on the master-pd
 # and should never be touched again (except perhaps an additional service
-# account, see NB below.)
+# account, see NB below.) One exception is if METADATA_CLOBBERS_CONFIG is
+# enabled. In that case the basic_auth.csv file will be rewritten to make
+# sure it matches the metadata source of truth. 
 function create-master-auth {
   echo "Creating master auth files"
   local -r auth_dir="/etc/srv/kubernetes"
   local -r basic_auth_csv="${auth_dir}/basic_auth.csv"
   if [[ -n "${KUBE_PASSWORD:-}" && -n "${KUBE_USER:-}" ]]; then
+    if [[ -e "${basic_auth_csv}" && "${METADATA_CLOBBERS_CONFIG:-false}" == "true" ]]; then
+      sed -i "/,${KUBE_USER},admin,system:masters$/d" "${basic_auth_csv}"
+      # The following is for the legacy form of the password line.
+      sed -i "/,${KUBE_USER},admin$/d" "${basic_auth_csv}"
+    fi
     replace_prefixed_line "${basic_auth_csv}" "${KUBE_PASSWORD},${KUBE_USER}," "admin,system:masters"
   fi
   local -r known_tokens_csv="${auth_dir}/known_tokens.csv"
