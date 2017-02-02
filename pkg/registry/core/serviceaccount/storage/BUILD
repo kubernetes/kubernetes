@@ -15,13 +15,13 @@ go_test(
     tags = ["automanaged"],
     deps = [
         "//pkg/api:go_default_library",
-        "//pkg/genericapiserver/registry/generic:go_default_library",
         "//pkg/registry/registrytest:go_default_library",
-        "//pkg/storage/etcd/testing:go_default_library",
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
         "//vendor:k8s.io/apimachinery/pkg/fields",
         "//vendor:k8s.io/apimachinery/pkg/labels",
         "//vendor:k8s.io/apimachinery/pkg/runtime",
+        "//vendor:k8s.io/apiserver/pkg/registry/generic",
+        "//vendor:k8s.io/apiserver/pkg/storage/etcd/testing",
     ],
 )
 
@@ -31,11 +31,11 @@ go_library(
     tags = ["automanaged"],
     deps = [
         "//pkg/api:go_default_library",
-        "//pkg/genericapiserver/registry/generic:go_default_library",
-        "//pkg/genericapiserver/registry/generic/registry:go_default_library",
         "//pkg/registry/cachesize:go_default_library",
         "//pkg/registry/core/serviceaccount:go_default_library",
         "//vendor:k8s.io/apimachinery/pkg/runtime",
+        "//vendor:k8s.io/apiserver/pkg/registry/generic",
+        "//vendor:k8s.io/apiserver/pkg/registry/generic/registry",
     ],
 )
 
