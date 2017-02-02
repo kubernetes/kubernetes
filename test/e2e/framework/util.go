@@ -3075,6 +3075,36 @@ func WaitForReadyReplicaSet(c clientset.Interface, ns, name string) error {
 	return err
 }
 
+func NewDeployment(deploymentName string, replicas int32, podLabels map[string]string, imageName, image string, strategyType extensions.DeploymentStrategyType) *extensions.Deployment {
+	zero := int64(0)
+	return &extensions.Deployment{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: deploymentName,
+		},
+		Spec: extensions.DeploymentSpec{
+			Replicas: func(i int32) *int32 { return &i }(replicas),
+			Selector: &metav1.LabelSelector{MatchLabels: podLabels},
+			Strategy: extensions.DeploymentStrategy{
+				Type: strategyType,
+			},
+			Template: v1.PodTemplateSpec{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: podLabels,
+				},
+				Spec: v1.PodSpec{
+					TerminationGracePeriodSeconds: &zero,
+					Containers: []v1.Container{
+						{
+							Name:  imageName,
+							Image: image,
+						},
+					},
+				},
+			},
+		},
+	}
+}
+
 // Waits for the deployment status to become valid (i.e. max unavailable and max surge aren't violated anymore).
 // Note that the status should stay valid at all times unless shortly after a scaling event or the deployment is just created.
 // To verify that the deployment status is valid and wait for the rollout to finish, use WaitForDeploymentStatus instead.
