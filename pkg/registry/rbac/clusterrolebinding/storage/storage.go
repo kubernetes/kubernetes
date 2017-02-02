@@ -22,6 +22,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/rbac"
 	"k8s.io/kubernetes/pkg/genericapiserver/registry/generic"
 	genericregistry "k8s.io/kubernetes/pkg/genericapiserver/registry/generic/registry"
+	"k8s.io/kubernetes/pkg/registry/cachesize"
 	"k8s.io/kubernetes/pkg/registry/rbac/clusterrolebinding"
 )
 
@@ -41,6 +42,7 @@ func NewREST(optsGetter generic.RESTOptionsGetter) *REST {
 		},
 		PredicateFunc:     clusterrolebinding.Matcher,
 		QualifiedResource: rbac.Resource("clusterrolebindings"),
+		WatchCacheSize:    cachesize.GetWatchCacheSizeByResource("clusterrolebindings"),
 
 		CreateStrategy: clusterrolebinding.Strategy,
 		UpdateStrategy: clusterrolebinding.Strategy,

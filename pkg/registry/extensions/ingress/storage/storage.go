@@ -25,6 +25,7 @@ import (
 	"k8s.io/kubernetes/pkg/genericapiserver/registry/generic"
 	genericregistry "k8s.io/kubernetes/pkg/genericapiserver/registry/generic/registry"
 	"k8s.io/kubernetes/pkg/genericapiserver/registry/rest"
+	"k8s.io/kubernetes/pkg/registry/cachesize"
 	"k8s.io/kubernetes/pkg/registry/extensions/ingress"
 )
 
@@ -44,6 +45,7 @@ func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, *StatusREST) {
 		},
 		PredicateFunc:     ingress.MatchIngress,
 		QualifiedResource: extensions.Resource("ingresses"),
+		WatchCacheSize:    cachesize.GetWatchCacheSizeByResource("ingresses"),
 
 		CreateStrategy: ingress.Strategy,
 		UpdateStrategy: ingress.Strategy,

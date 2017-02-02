@@ -33,6 +33,7 @@ import (
 	genericregistry "k8s.io/kubernetes/pkg/genericapiserver/registry/generic/registry"
 	"k8s.io/kubernetes/pkg/genericapiserver/registry/rest"
 	"k8s.io/kubernetes/pkg/kubelet/client"
+	"k8s.io/kubernetes/pkg/registry/cachesize"
 	"k8s.io/kubernetes/pkg/registry/core/pod"
 	podrest "k8s.io/kubernetes/pkg/registry/core/pod/rest"
 	storeerr "k8s.io/kubernetes/pkg/storage/errors"
@@ -68,6 +69,7 @@ func NewStorage(optsGetter generic.RESTOptionsGetter, k client.ConnectionInfoGet
 		},
 		PredicateFunc:     pod.MatchPod,
 		QualifiedResource: api.Resource("pods"),
+		WatchCacheSize:    cachesize.GetWatchCacheSizeByResource("pods"),
 
 		CreateStrategy:      pod.Strategy,
 		UpdateStrategy:      pod.Strategy,

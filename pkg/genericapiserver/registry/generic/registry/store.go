@@ -39,11 +39,13 @@ import (
 	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/kubernetes/pkg/genericapiserver/registry/generic"
 	"k8s.io/kubernetes/pkg/genericapiserver/registry/rest"
-	"k8s.io/kubernetes/pkg/registry/cachesize"
 	storeerr "k8s.io/kubernetes/pkg/storage/errors"
 
 	"github.com/golang/glog"
 )
+
+// defaultWatchCacheSize is the default size of a watch catch per resource in number of entries.
+const DefaultWatchCacheSize = 100
 
 // ObjectFunc is a function to act on a given object. An error may be returned
 // if the hook cannot be completed. An ObjectFunc may transform the provided
@@ -161,6 +163,10 @@ type Store struct {
 	Storage storage.Interface
 	// Called to cleanup clients used by the underlying Storage; optional.
 	DestroyFunc func()
+	// Maximum size of the watch history cached in memory, in number of entries.
+	// A zero value here means that a default is used. This value is ignored if
+	// Storage is non-nil.
+	WatchCacheSize int
 }
 
 // Note: the rest.StandardStorage interface aggregates the common REST verbs
@@ -1117,10 +1123,14 @@ func (e *Store) CompleteWithOptions(options *generic.StoreOptions) error {
 	e.EnableGarbageCollection = opts.EnableGarbageCollection
 
 	if e.Storage == nil {
+		capacity := DefaultWatchCacheSize
+		if e.WatchCacheSize != 0 {
+			capacity = DefaultWatchCacheSize
+		}
 		e.Storage, e.DestroyFunc = opts.Decorator(
 			e.Copier,
 			opts.StorageConfig,
-			cachesize.GetWatchCacheSizeByResource(cachesize.Resource(e.QualifiedResource.Resource)),
+			capacity,
 			e.NewFunc(),
 			prefix,
 			keyFunc,
