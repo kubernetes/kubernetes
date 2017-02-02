@@ -47,6 +47,21 @@ func SetDefaults_DaemonSet(obj *DaemonSet) {
 			obj.Labels = labels
 		}
 	}
+	updateStrategy := &obj.Spec.UpdateStrategy
+	if updateStrategy.Type == "" {
+		updateStrategy.Type = OnDeleteDaemonSetStrategyType
+	}
+	if updateStrategy.Type == RollingUpdateDaemonSetStrategyType {
+		if updateStrategy.RollingUpdate == nil {
+			rollingUpdate := RollingUpdateDaemonSet{}
+			updateStrategy.RollingUpdate = &rollingUpdate
+		}
+		if updateStrategy.RollingUpdate.MaxUnavailable == nil {
+			// Set default MaxUnavailable as 1 by default.
+			maxUnavailable := intstr.FromInt(1)
+			updateStrategy.RollingUpdate.MaxUnavailable = &maxUnavailable
+		}
+	}
 }
 
 func SetDefaults_Deployment(obj *Deployment) {

@@ -508,6 +508,21 @@ func extensionFuncs(t apitesting.TestingCommon) []interface{} {
 				}
 			}
 		},
+		func(j *extensions.DaemonSetUpdateStrategy, c fuzz.Continue) {
+			c.FuzzNoCustom(j) // fuzz self without calling this function again
+			// Ensure that strategyType is one of valid values.
+			strategyTypes := []extensions.DaemonSetUpdateStrategyType{extensions.RollingUpdateDaemonSetStrategyType, extensions.OnDeleteDaemonSetStrategyType}
+			j.Type = strategyTypes[c.Rand.Intn(len(strategyTypes))]
+			if j.Type != extensions.RollingUpdateDaemonSetStrategyType {
+				j.RollingUpdate = nil
+			} else {
+				rollingUpdate := extensions.RollingUpdateDaemonSet{}
+				if c.RandBool() {
+					rollingUpdate.MaxUnavailable = intstr.FromInt(1 + int(c.RandUint64()))
+				}
+				j.RollingUpdate = &rollingUpdate
+			}
+		},
 	}
 }
 

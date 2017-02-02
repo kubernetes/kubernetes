@@ -44,6 +44,8 @@ import (
 	corelisters "k8s.io/kubernetes/pkg/client/listers/core/v1"
 	extensionslisters "k8s.io/kubernetes/pkg/client/listers/extensions/v1beta1"
 	"k8s.io/kubernetes/pkg/controller"
+	"k8s.io/kubernetes/pkg/controller/daemon/util"
+	podutil "k8s.io/kubernetes/pkg/controller/deployment/util"
 	"k8s.io/kubernetes/pkg/util/metrics"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm/predicates"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/schedulercache"
@@ -523,11 +525,21 @@ func (dsc *DaemonSetsController) manage(ds *extensions.DaemonSet) error {
 			}
 		}
 	}
+	errors := dsc.syncNodes(ds, podsToDelete, nodesNeedingDaemonPods)
 
+	// Throw an error when the daemon pods fail, to use ratelimiter to prevent kill-recreate hot loop
+	if failedPodsObserved > 0 {
+		errors = append(errors, fmt.Errorf("deleted %d failed pods of DaemonSet %s/%s", failedPodsObserved, ds.Namespace, ds.Name))
+	}
+
+	return utilerrors.NewAggregate(errors)
+}
+
+func (dsc *DaemonSetsController) syncNodes(ds *extensions.DaemonSet, podsToDelete, nodesNeedingDaemonPods []string) []error {
 	// We need to set expectations before creating/deleting pods to avoid race conditions.
 	dsKey, err := controller.KeyFunc(ds)
 	if err != nil {
-		return fmt.Errorf("couldn't get key for object %#v: %v", ds, err)
+		return []error{fmt.Errorf("couldn't get key for object %#v: %v", ds, err)}
 	}
 
 	createDiff := len(nodesNeedingDaemonPods)
@@ -548,10 +560,12 @@ func (dsc *DaemonSetsController) manage(ds *extensions.DaemonSet) error {
 	glog.V(4).Infof("Nodes needing daemon pods for daemon set %s: %+v, creating %d", ds.Name, nodesNeedingDaemonPods, createDiff)
 	createWait := sync.WaitGroup{}
 	createWait.Add(createDiff)
+	dsPodTemplateSpecHash := podutil.GetPodTemplateSpecHashFnv(ds.Spec.Template)
+	template := util.GetPodTemplateWithHash(ds, dsPodTemplateSpecHash)
 	for i := 0; i < createDiff; i++ {
 		go func(ix int) {
 			defer createWait.Done()
-			if err := dsc.podControl.CreatePodsOnNode(nodesNeedingDaemonPods[ix], ds.Namespace, &ds.Spec.Template, ds); err != nil {
+			if err := dsc.podControl.CreatePodsOnNode(nodesNeedingDaemonPods[ix], ds.Namespace, &template, ds); err != nil {
 				glog.V(2).Infof("Failed creation, decrementing expectations for set %q/%q", ds.Namespace, ds.Name)
 				dsc.expectations.CreationObserved(dsKey)
 				errCh <- err
@@ -583,18 +597,17 @@ func (dsc *DaemonSetsController) manage(ds *extensions.DaemonSet) error {
 	for err := range errCh {
 		errors = append(errors, err)
 	}
-	// Throw an error when the daemon pods fail, to use ratelimiter to prevent kill-recreate hot loop
-	if failedPodsObserved > 0 {
-		errors = append(errors, fmt.Errorf("deleted %d failed pods of DaemonSet %s/%s", failedPodsObserved, ds.Namespace, ds.Name))
-	}
-	return utilerrors.NewAggregate(errors)
+	return errors
 }
 
-func storeDaemonSetStatus(dsClient unversionedextensions.DaemonSetInterface, ds *extensions.DaemonSet, desiredNumberScheduled, currentNumberScheduled, numberMisscheduled, numberReady int) error {
+func storeDaemonSetStatus(dsClient unversionedextensions.DaemonSetInterface, ds *extensions.DaemonSet, desiredNumberScheduled, currentNumberScheduled, numberMisscheduled, numberReady, updatedNumberScheduled, numberAvailable, numberUnavailable int) error {
 	if int(ds.Status.DesiredNumberScheduled) == desiredNumberScheduled &&
 		int(ds.Status.CurrentNumberScheduled) == currentNumberScheduled &&
 		int(ds.Status.NumberMisscheduled) == numberMisscheduled &&
 		int(ds.Status.NumberReady) == numberReady &&
+		int(ds.Status.UpdatedNumberScheduled) == updatedNumberScheduled &&
+		int(ds.Status.NumberAvailable) == numberAvailable &&
+		int(ds.Status.NumberUnavailable) == numberUnavailable &&
 		ds.Status.ObservedGeneration >= ds.Generation {
 		return nil
 	}
@@ -613,6 +626,9 @@ func storeDaemonSetStatus(dsClient unversionedextensions.DaemonSetInterface, ds 
 		toUpdate.Status.CurrentNumberScheduled = int32(currentNumberScheduled)
 		toUpdate.Status.NumberMisscheduled = int32(numberMisscheduled)
 		toUpdate.Status.NumberReady = int32(numberReady)
+		toUpdate.Status.UpdatedNumberScheduled = int32(updatedNumberScheduled)
+		toUpdate.Status.NumberAvailable = int32(numberAvailable)
+		toUpdate.Status.NumberUnavailable = int32(numberUnavailable)
 
 		if _, updateErr = dsClient.UpdateStatus(toUpdate); updateErr == nil {
 			return nil
@@ -640,7 +656,9 @@ func (dsc *DaemonSetsController) updateDaemonSetStatus(ds *extensions.DaemonSet)
 		return fmt.Errorf("couldn't get list of nodes when updating daemon set %#v: %v", ds, err)
 	}
 
-	var desiredNumberScheduled, currentNumberScheduled, numberMisscheduled, numberReady int
+	dsPodTemplateSpecHash := podutil.GetPodTemplateSpecHashFnv(ds.Spec.Template)
+
+	var desiredNumberScheduled, currentNumberScheduled, numberMisscheduled, numberReady, updatedNumberScheduled, numberAvailable int
 	for i := range nodeList {
 		node := nodeList[i]
 		wantToRun, _, _, err := dsc.nodeShouldRunDaemonPod(node, ds)
@@ -657,8 +675,15 @@ func (dsc *DaemonSetsController) updateDaemonSetStatus(ds *extensions.DaemonSet)
 				// Sort the daemon pods by creation time, so the the oldest is first.
 				daemonPods, _ := nodeToDaemonPods[node.Name]
 				sort.Sort(podByCreationTimestamp(daemonPods))
-				if v1.IsPodReady(daemonPods[0]) {
+				pod := daemonPods[0]
+				if v1.IsPodReady(pod) {
 					numberReady++
+				}
+				if util.IsPodUpdated(dsPodTemplateSpecHash, pod) {
+					updatedNumberScheduled++
+				}
+				if v1.IsPodAvailable(pod, ds.Spec.MinReadySeconds, metav1.Now()) {
+					numberAvailable++
 				}
 			}
 		} else {
@@ -667,8 +692,9 @@ func (dsc *DaemonSetsController) updateDaemonSetStatus(ds *extensions.DaemonSet)
 			}
 		}
 	}
+	numberUnavailable := desiredNumberScheduled - numberAvailable
 
-	err = storeDaemonSetStatus(dsc.kubeClient.Extensions().DaemonSets(ds.Namespace), ds, desiredNumberScheduled, currentNumberScheduled, numberMisscheduled, numberReady)
+	err = storeDaemonSetStatus(dsc.kubeClient.Extensions().DaemonSets(ds.Namespace), ds, desiredNumberScheduled, currentNumberScheduled, numberMisscheduled, numberReady, updatedNumberScheduled, numberAvailable, numberUnavailable)
 	if err != nil {
 		return fmt.Errorf("error storing status for daemon set %#v: %v", ds, err)
 	}
@@ -712,6 +738,17 @@ func (dsc *DaemonSetsController) syncDaemonSet(key string) error {
 	dsNeedsSync := dsc.expectations.SatisfiedExpectations(dsKey)
 	if dsNeedsSync && ds.DeletionTimestamp == nil {
 		if err := dsc.manage(ds); err != nil {
+			return err
+		}
+	}
+
+	dsNeedsSync = dsc.expectations.SatisfiedExpectations(dsKey)
+	if dsNeedsSync && ds.DeletionTimestamp == nil {
+		switch ds.Spec.UpdateStrategy.Type {
+		case extensions.RollingUpdateDaemonSetStrategyType:
+			err = dsc.rollingUpdate(ds)
+		}
+		if err != nil {
 			return err
 		}
 	}

@@ -46,6 +46,9 @@ func TestValidateDaemonSetStatusUpdate(t *testing.T) {
 					NumberMisscheduled:     2,
 					DesiredNumberScheduled: 3,
 					NumberReady:            1,
+					UpdatedNumberScheduled: 1,
+					NumberAvailable:        1,
+					NumberUnavailable:      2,
 				},
 			},
 			update: extensions.DaemonSet{
@@ -55,6 +58,9 @@ func TestValidateDaemonSetStatusUpdate(t *testing.T) {
 					NumberMisscheduled:     1,
 					DesiredNumberScheduled: 3,
 					NumberReady:            1,
+					UpdatedNumberScheduled: 1,
+					NumberAvailable:        1,
+					NumberUnavailable:      2,
 				},
 			},
 		},
@@ -81,6 +87,9 @@ func TestValidateDaemonSetStatusUpdate(t *testing.T) {
 					DesiredNumberScheduled: 3,
 					NumberReady:            1,
 					ObservedGeneration:     3,
+					UpdatedNumberScheduled: 1,
+					NumberAvailable:        1,
+					NumberUnavailable:      2,
 				},
 			},
 			update: extensions.DaemonSet{
@@ -95,6 +104,9 @@ func TestValidateDaemonSetStatusUpdate(t *testing.T) {
 					DesiredNumberScheduled: -3,
 					NumberReady:            -1,
 					ObservedGeneration:     -3,
+					UpdatedNumberScheduled: -1,
+					NumberAvailable:        -1,
+					NumberUnavailable:      -2,
 				},
 			},
 		},
@@ -111,6 +123,9 @@ func TestValidateDaemonSetStatusUpdate(t *testing.T) {
 					DesiredNumberScheduled: 3,
 					NumberReady:            1,
 					ObservedGeneration:     3,
+					UpdatedNumberScheduled: 1,
+					NumberAvailable:        1,
+					NumberUnavailable:      2,
 				},
 			},
 			update: extensions.DaemonSet{
@@ -125,6 +140,9 @@ func TestValidateDaemonSetStatusUpdate(t *testing.T) {
 					DesiredNumberScheduled: 3,
 					NumberReady:            1,
 					ObservedGeneration:     3,
+					UpdatedNumberScheduled: 1,
+					NumberAvailable:        1,
+					NumberUnavailable:      2,
 				},
 			},
 		},
@@ -141,6 +159,9 @@ func TestValidateDaemonSetStatusUpdate(t *testing.T) {
 					DesiredNumberScheduled: 3,
 					NumberReady:            1,
 					ObservedGeneration:     3,
+					UpdatedNumberScheduled: 1,
+					NumberAvailable:        1,
+					NumberUnavailable:      2,
 				},
 			},
 			update: extensions.DaemonSet{
@@ -155,6 +176,9 @@ func TestValidateDaemonSetStatusUpdate(t *testing.T) {
 					DesiredNumberScheduled: 3,
 					NumberReady:            1,
 					ObservedGeneration:     3,
+					UpdatedNumberScheduled: 1,
+					NumberAvailable:        1,
+					NumberUnavailable:      2,
 				},
 			},
 		},
@@ -171,6 +195,9 @@ func TestValidateDaemonSetStatusUpdate(t *testing.T) {
 					DesiredNumberScheduled: 3,
 					NumberReady:            1,
 					ObservedGeneration:     3,
+					UpdatedNumberScheduled: 1,
+					NumberAvailable:        1,
+					NumberUnavailable:      2,
 				},
 			},
 			update: extensions.DaemonSet{
@@ -185,6 +212,9 @@ func TestValidateDaemonSetStatusUpdate(t *testing.T) {
 					DesiredNumberScheduled: -3,
 					NumberReady:            1,
 					ObservedGeneration:     3,
+					UpdatedNumberScheduled: 1,
+					NumberAvailable:        1,
+					NumberUnavailable:      2,
 				},
 			},
 		},
@@ -201,6 +231,9 @@ func TestValidateDaemonSetStatusUpdate(t *testing.T) {
 					DesiredNumberScheduled: 3,
 					NumberReady:            1,
 					ObservedGeneration:     3,
+					UpdatedNumberScheduled: 1,
+					NumberAvailable:        1,
+					NumberUnavailable:      2,
 				},
 			},
 			update: extensions.DaemonSet{
@@ -215,6 +248,9 @@ func TestValidateDaemonSetStatusUpdate(t *testing.T) {
 					DesiredNumberScheduled: 3,
 					NumberReady:            -1,
 					ObservedGeneration:     3,
+					UpdatedNumberScheduled: 1,
+					NumberAvailable:        1,
+					NumberUnavailable:      2,
 				},
 			},
 		},
@@ -231,6 +267,9 @@ func TestValidateDaemonSetStatusUpdate(t *testing.T) {
 					DesiredNumberScheduled: 3,
 					NumberReady:            1,
 					ObservedGeneration:     3,
+					UpdatedNumberScheduled: 1,
+					NumberAvailable:        1,
+					NumberUnavailable:      2,
 				},
 			},
 			update: extensions.DaemonSet{
@@ -245,6 +284,117 @@ func TestValidateDaemonSetStatusUpdate(t *testing.T) {
 					DesiredNumberScheduled: 3,
 					NumberReady:            1,
 					ObservedGeneration:     -3,
+					UpdatedNumberScheduled: 1,
+					NumberAvailable:        1,
+					NumberUnavailable:      2,
+				},
+			},
+		},
+		"negative UpdatedNumberScheduled": {
+			old: extensions.DaemonSet{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:            "abc",
+					Namespace:       metav1.NamespaceDefault,
+					ResourceVersion: "10",
+				},
+				Status: extensions.DaemonSetStatus{
+					CurrentNumberScheduled: 1,
+					NumberMisscheduled:     2,
+					DesiredNumberScheduled: 3,
+					NumberReady:            1,
+					ObservedGeneration:     3,
+					UpdatedNumberScheduled: 1,
+					NumberAvailable:        1,
+					NumberUnavailable:      2,
+				},
+			},
+			update: extensions.DaemonSet{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:            "abc",
+					Namespace:       metav1.NamespaceDefault,
+					ResourceVersion: "10",
+				},
+				Status: extensions.DaemonSetStatus{
+					CurrentNumberScheduled: 1,
+					NumberMisscheduled:     1,
+					DesiredNumberScheduled: 3,
+					NumberReady:            1,
+					ObservedGeneration:     3,
+					UpdatedNumberScheduled: -1,
+					NumberAvailable:        1,
+					NumberUnavailable:      2,
+				},
+			},
+		},
+		"negative NumberAvailable": {
+			old: extensions.DaemonSet{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:            "abc",
+					Namespace:       metav1.NamespaceDefault,
+					ResourceVersion: "10",
+				},
+				Status: extensions.DaemonSetStatus{
+					CurrentNumberScheduled: 1,
+					NumberMisscheduled:     2,
+					DesiredNumberScheduled: 3,
+					NumberReady:            1,
+					ObservedGeneration:     3,
+					UpdatedNumberScheduled: 1,
+					NumberAvailable:        1,
+					NumberUnavailable:      2,
+				},
+			},
+			update: extensions.DaemonSet{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:            "abc",
+					Namespace:       metav1.NamespaceDefault,
+					ResourceVersion: "10",
+				},
+				Status: extensions.DaemonSetStatus{
+					CurrentNumberScheduled: 1,
+					NumberMisscheduled:     1,
+					DesiredNumberScheduled: 3,
+					NumberReady:            1,
+					ObservedGeneration:     3,
+					UpdatedNumberScheduled: 1,
+					NumberAvailable:        -1,
+					NumberUnavailable:      2,
+				},
+			},
+		},
+		"negative NumberUnavailable": {
+			old: extensions.DaemonSet{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:            "abc",
+					Namespace:       metav1.NamespaceDefault,
+					ResourceVersion: "10",
+				},
+				Status: extensions.DaemonSetStatus{
+					CurrentNumberScheduled: 1,
+					NumberMisscheduled:     2,
+					DesiredNumberScheduled: 3,
+					NumberReady:            1,
+					ObservedGeneration:     3,
+					UpdatedNumberScheduled: 1,
+					NumberAvailable:        1,
+					NumberUnavailable:      2,
+				},
+			},
+			update: extensions.DaemonSet{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:            "abc",
+					Namespace:       metav1.NamespaceDefault,
+					ResourceVersion: "10",
+				},
+				Status: extensions.DaemonSetStatus{
+					CurrentNumberScheduled: 1,
+					NumberMisscheduled:     1,
+					DesiredNumberScheduled: 3,
+					NumberReady:            1,
+					ObservedGeneration:     3,
+					UpdatedNumberScheduled: 1,
+					NumberAvailable:        1,
+					NumberUnavailable:      -2,
 				},
 			},
 		},
@@ -349,6 +499,9 @@ func TestValidateDaemonSetUpdate(t *testing.T) {
 				Spec: extensions.DaemonSetSpec{
 					Selector: &metav1.LabelSelector{MatchLabels: validSelector},
 					Template: validPodTemplateAbc.Template,
+					UpdateStrategy: extensions.DaemonSetUpdateStrategy{
+						Type: extensions.OnDeleteDaemonSetStrategyType,
+					},
 				},
 			},
 			update: extensions.DaemonSet{
@@ -356,6 +509,9 @@ func TestValidateDaemonSetUpdate(t *testing.T) {
 				Spec: extensions.DaemonSetSpec{
 					Selector: &metav1.LabelSelector{MatchLabels: validSelector},
 					Template: validPodTemplateAbc.Template,
+					UpdateStrategy: extensions.DaemonSetUpdateStrategy{
+						Type: extensions.OnDeleteDaemonSetStrategyType,
+					},
 				},
 			},
 		},
@@ -365,6 +521,9 @@ func TestValidateDaemonSetUpdate(t *testing.T) {
 				Spec: extensions.DaemonSetSpec{
 					Selector: &metav1.LabelSelector{MatchLabels: validSelector},
 					Template: validPodTemplateAbc.Template,
+					UpdateStrategy: extensions.DaemonSetUpdateStrategy{
+						Type: extensions.OnDeleteDaemonSetStrategyType,
+					},
 				},
 			},
 			update: extensions.DaemonSet{
@@ -372,6 +531,9 @@ func TestValidateDaemonSetUpdate(t *testing.T) {
 				Spec: extensions.DaemonSetSpec{
 					Selector: &metav1.LabelSelector{MatchLabels: validSelector2},
 					Template: validPodTemplateAbc2.Template,
+					UpdateStrategy: extensions.DaemonSetUpdateStrategy{
+						Type: extensions.OnDeleteDaemonSetStrategyType,
+					},
 				},
 			},
 		},
@@ -381,6 +543,9 @@ func TestValidateDaemonSetUpdate(t *testing.T) {
 				Spec: extensions.DaemonSetSpec{
 					Selector: &metav1.LabelSelector{MatchLabels: validSelector},
 					Template: validPodTemplateAbc.Template,
+					UpdateStrategy: extensions.DaemonSetUpdateStrategy{
+						Type: extensions.OnDeleteDaemonSetStrategyType,
+					},
 				},
 			},
 			update: extensions.DaemonSet{
@@ -388,6 +553,9 @@ func TestValidateDaemonSetUpdate(t *testing.T) {
 				Spec: extensions.DaemonSetSpec{
 					Selector: &metav1.LabelSelector{MatchLabels: validSelector},
 					Template: validPodTemplateNodeSelector.Template,
+					UpdateStrategy: extensions.DaemonSetUpdateStrategy{
+						Type: extensions.OnDeleteDaemonSetStrategyType,
+					},
 				},
 			},
 		},
@@ -536,6 +704,9 @@ func TestValidateDaemonSet(t *testing.T) {
 			Spec: extensions.DaemonSetSpec{
 				Selector: &metav1.LabelSelector{MatchLabels: validSelector},
 				Template: validPodTemplate.Template,
+				UpdateStrategy: extensions.DaemonSetUpdateStrategy{
+					Type: extensions.OnDeleteDaemonSetStrategyType,
+				},
 			},
 		},
 		{
@@ -543,6 +714,9 @@ func TestValidateDaemonSet(t *testing.T) {
 			Spec: extensions.DaemonSetSpec{
 				Selector: &metav1.LabelSelector{MatchLabels: validSelector},
 				Template: validPodTemplate.Template,
+				UpdateStrategy: extensions.DaemonSetUpdateStrategy{
+					Type: extensions.OnDeleteDaemonSetStrategyType,
+				},
 			},
 		},
 	}
