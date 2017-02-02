@@ -64,12 +64,11 @@ func RequestNodeCertificate(client certificatesclient.CertificateSigningRequestI
 	})
 	if err != nil {
 		return nil, fmt.Errorf("cannot create certificate signing request: %v", err)
-
 	}
 
 	// Make a default timeout = 3600s.
 	var defaultTimeoutSeconds int64 = 3600
-	resultCh, err := client.Watch(metav1.ListOptions{
+	certWatch, err := client.Watch(metav1.ListOptions{
 		Watch:          true,
 		TimeoutSeconds: &defaultTimeoutSeconds,
 		FieldSelector:  fields.OneTermEqualSelector("metadata.name", req.Name).String(),
@@ -77,9 +76,8 @@ func RequestNodeCertificate(client certificatesclient.CertificateSigningRequestI
 	if err != nil {
 		return nil, fmt.Errorf("cannot watch on the certificate signing request: %v", err)
 	}
-
-	var status certificates.CertificateSigningRequestStatus
-	ch := resultCh.ResultChan()
+	defer certWatch.Stop()
+	ch := certWatch.ResultChan()
 
 	for {
 		event, ok := <-ch
@@ -91,7 +89,7 @@ func RequestNodeCertificate(client certificatesclient.CertificateSigningRequestI
 			if event.Object.(*certificates.CertificateSigningRequest).UID != req.UID {
 				continue
 			}
-			status = event.Object.(*certificates.CertificateSigningRequest).Status
+			status := event.Object.(*certificates.CertificateSigningRequest).Status
 			for _, c := range status.Conditions {
 				if c.Type == certificates.CertificateDenied {
 					return nil, fmt.Errorf("certificate signing request is not approved, reason: %v, message: %v", c.Reason, c.Message)
