@@ -54,8 +54,8 @@ func (ssc *defaultStatefulSetControl) UpdateStatefulSet(set *apps.StatefulSet, p
 	replicaCount := int(*set.Spec.Replicas)
 	replicas := make([]*v1.Pod, replicaCount)
 	condemned := make([]*v1.Pod, 0, len(pods))
-	readyReplicas := 0
-	terminatingCondemned := 0
+	ready := 0
+	unhealthy := 0
 
 	// First we partition pods into two lists, replicas will contain all Pods such that
 	// 0 <= getOrdinal(pod) < set.Spec.Replicas and condemned will contain all Pods such that
@@ -63,7 +63,7 @@ func (ssc *defaultStatefulSetControl) UpdateStatefulSet(set *apps.StatefulSet, p
 	for i := range pods {
 		//count the number of running and ready replicas
 		if isRunningAndReady(pods[i]) {
-			readyReplicas++
+			ready++
 		}
 		if ord := getOrdinal(pods[i]); 0 <= ord && ord < replicaCount {
 			// if the ordinal of the pod is withing the range of the current number of replicas,
@@ -73,10 +73,6 @@ func (ssc *defaultStatefulSetControl) UpdateStatefulSet(set *apps.StatefulSet, p
 		} else if ord >= replicaCount {
 			// if the ordinal is greater than the number of replicas add it to the condemned list
 			condemned = append(condemned, pods[i])
-			// count the number of terminating condemned
-			if isTerminated(pods[i]) || (isCreated(pods[i]) && !isFailed(pods[i])) {
-				terminatingCondemned++
-			}
 		}
 	}
 
@@ -85,12 +81,26 @@ func (ssc *defaultStatefulSetControl) UpdateStatefulSet(set *apps.StatefulSet, p
 		if replicas[ord] == nil {
 			replicas[ord] = newStatefulSetPod(set, ord)
 		}
+		unhealthy++
 	}
+
+	// count the number of unhealthy pods
+	for i := range replicas {
+		if !isHealthy(replicas[i]) {
+			unhealthy++
+		}
+	}
+	for i := range condemned {
+		if !isHealthy(condemned[i]) {
+			unhealthy++
+		}
+	}
+
 	// sort the condemned Pods by their ordinals
 	sort.Sort(ascendingOrdinal(condemned))
 
 	// attempt to update set with the current number of replicas
-	set.Status = apps.StatefulSetStatus{Replicas: int32(readyReplicas)}
+	set.Status = apps.StatefulSetStatus{Replicas: int32(ready)}
 	if err := ssc.podControl.UpdateStatefulSetStatus(set); err != nil {
 		return err
 	}
@@ -123,10 +133,12 @@ func (ssc *defaultStatefulSetControl) UpdateStatefulSet(set *apps.StatefulSet, p
 		}
 	}
 
-	// At this point, all of the current Replicas are Running and Ready, if no condemned Pod is terminating,
-	// terminate the the Pod with the highest ordinal.
-	if terminatingCondemned > 0 {
-		glog.V(2).Infof("StatefulSet %s is waiting for %d Pods to terminate", set.Name, terminatingCondemned)
+	// At this point, all of the current Replicas are Running and Ready, we can consider termination.
+	// We will wait for all predecessors to be Running and Ready prior to attempting a deletion.
+	// We will terminate Pods in a monotonically decreasing order over [len(pods),set.Spec.Replicas).
+	// Note that we do not resurrect Pods in this interval.
+	if unhealthy > 0 {
+		glog.V(2).Infof("StatefulSet %s is waiting on %d Pods", set.Name, unhealthy)
 	} else if target := len(condemned) - 1; target >= 0 {
 		glog.V(2).Infof("StatefulSet %s terminating Pod %s", set.Name, condemned[target])
 		return ssc.podControl.DeleteStatefulPod(set, condemned[target])

@@ -232,6 +232,10 @@ func isTerminated(pod *v1.Pod) bool {
 	return pod.DeletionTimestamp != nil
 }
 
+func isHealthy(pod *v1.Pod) bool {
+	return isRunningAndReady(pod) && !isTerminated(pod)
+}
+
 // Returns a new Pod conforming to the set's Spec with an identity generated from ordinal.
 func newStatefulSetPod(set *apps.StatefulSet, ordinal int) *v1.Pod {
 	pod, _ := controller.GetPodFromTemplate(&set.Spec.Template, set, nil)
