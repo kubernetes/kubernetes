@@ -1,25 +1,6 @@
 #!/usr/bin/python3
-
-# Example usage :
 #
-# Registry creation
-#
-# First, setup the needed authentication files
-#
-# $ echo "userA:passwordA" > htpasswd-plain
-# $ htpasswd -b -B htpasswd userA passwordA
-#
-# And then run the action
-#
-# $ juju run-action kubernetes-worker/0 registry domain=myregistry.internal \
-# htpasswd="$(base64 -w0 htpasswd)" htpasswd-plain="$(base64 -w0 htpasswd-plain) \
-# tlscert="$(base64 -w0 registry.crt)" tlskey="$(base64 -w0 registry.key) \
-# ingress=true
-#
-# To delete the registry
-#
-# juju run-action kubernetes-worker/0 registry delete=true ingress=true
-#
+# For a usage examples, see README.md
 #
 # TODO
 #
