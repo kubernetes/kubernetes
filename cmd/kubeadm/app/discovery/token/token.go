@@ -23,7 +23,7 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 )
 
-func Parse(u *url.URL, c *kubeadm.Discovery) error {
+func Parse(u *url.URL, c *kubeadm.Discovery) {
 	var (
 		hosts          []string
 		tokenID, token string
@@ -42,5 +42,4 @@ func Parse(u *url.URL, c *kubeadm.Discovery) error {
 		Secret:    token,
 		Addresses: hosts,
 	}
-	return nil
 }
