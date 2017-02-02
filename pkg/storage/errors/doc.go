@@ -15,4 +15,4 @@ limitations under the License.
 */
 
 // Package etcd provides conversion of etcd errors to API errors.
-package storage // import "k8s.io/kubernetes/pkg/api/errors/storage"
+package storage // import "k8s.io/kubernetes/pkg/storage/errors"
