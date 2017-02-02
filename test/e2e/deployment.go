@@ -1244,16 +1244,16 @@ func testFailedDeployment(f *framework.Framework) {
 	// Create a nginx deployment.
 	deploymentName := "nginx"
 	nonExistentImage := "nginx:not-there"
-	thirty := int32(30)
+	ten := int32(10)
 	d := newDeployment(deploymentName, replicas, podLabels, nginxImageName, nonExistentImage, extensions.RecreateDeploymentStrategyType, nil)
-	d.Spec.ProgressDeadlineSeconds = &thirty
+	d.Spec.ProgressDeadlineSeconds = &ten
 
-	framework.Logf("Creating deployment %q with progressDeadlineSeconds set to %ds and a non-existent image", deploymentName, thirty)
+	framework.Logf("Creating deployment %q with progressDeadlineSeconds set to %ds and a non-existent image", deploymentName, ten)
 	deployment, err := c.Extensions().Deployments(ns).Create(d)
 	Expect(err).NotTo(HaveOccurred())
 
-	framework.Logf("Waiting for deployment %q to be observed by the controller", deploymentName)
-	Expect(framework.WaitForObservedDeployment(c, ns, deploymentName, deployment.Generation)).NotTo(HaveOccurred())
+	framework.Logf("Waiting for deployment %q new replica set to come up", deploymentName)
+	Expect(framework.WaitForDeploymentUpdatedReplicasLTE(c, ns, deploymentName, 1, deployment.Generation))
 
 	framework.Logf("Checking deployment %q for a timeout condition", deploymentName)
 	Expect(framework.WaitForDeploymentWithCondition(c, ns, deploymentName, deploymentutil.TimedOutReason, extensions.DeploymentProgressing)).NotTo(HaveOccurred())
@@ -1264,8 +1264,8 @@ func testFailedDeployment(f *framework.Framework) {
 	})
 	Expect(err).NotTo(HaveOccurred())
 
-	framework.Logf("Waiting for deployment %q to be observed by the controller", deploymentName)
-	Expect(framework.WaitForObservedDeployment(c, ns, deploymentName, deployment.Generation)).NotTo(HaveOccurred())
+	framework.Logf("Waiting for deployment %q new replica set to come up", deploymentName)
+	Expect(framework.WaitForDeploymentUpdatedReplicasLTE(c, ns, deploymentName, 1, deployment.Generation))
 
 	framework.Logf("Waiting for deployment %q status", deploymentName)
 	Expect(framework.WaitForDeploymentStatusValid(c, deployment)).NotTo(HaveOccurred())
