@@ -10384,6 +10384,10 @@
    }
   },
   "definitions": {
+   "intstr.IntOrString": {
+    "description": "Deprecated. Please use io.k8s.apimachinery.pkg.util.intstr.IntOrString instead.",
+    "$ref": "#/definitions/io.k8s.apimachinery.pkg.util.intstr.IntOrString"
+   },
    "io.k8s.apimachinery.pkg.api.resource.Quantity": {
     "type": "string"
    },
@@ -14335,6 +14339,610 @@
       "type": "string"
      }
     }
+   },
+   "resource.Quantity": {
+    "description": "Deprecated. Please use io.k8s.apimachinery.pkg.api.resource.Quantity instead.",
+    "$ref": "#/definitions/io.k8s.apimachinery.pkg.api.resource.Quantity"
+   },
+   "runtime.RawExtension": {
+    "description": "Deprecated. Please use io.k8s.apimachinery.pkg.runtime.RawExtension instead.",
+    "$ref": "#/definitions/io.k8s.apimachinery.pkg.runtime.RawExtension"
+   },
+   "v1.APIGroup": {
+    "description": "Deprecated. Please use io.k8s.apimachinery.pkg.apis.meta.v1.APIGroup instead.",
+    "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.APIGroup"
+   },
+   "v1.APIGroupList": {
+    "description": "Deprecated. Please use io.k8s.apimachinery.pkg.apis.meta.v1.APIGroupList instead.",
+    "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.APIGroupList"
+   },
+   "v1.APIResource": {
+    "description": "Deprecated. Please use io.k8s.apimachinery.pkg.apis.meta.v1.APIResource instead.",
+    "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.APIResource"
+   },
+   "v1.APIResourceList": {
+    "description": "Deprecated. Please use io.k8s.apimachinery.pkg.apis.meta.v1.APIResourceList instead.",
+    "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.APIResourceList"
+   },
+   "v1.APIVersions": {
+    "description": "Deprecated. Please use io.k8s.apimachinery.pkg.apis.meta.v1.APIVersions instead.",
+    "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.APIVersions"
+   },
+   "v1.AWSElasticBlockStoreVolumeSource": {
+    "description": "Deprecated. Please use io.k8s.kubernetes.pkg.api.v1.AWSElasticBlockStoreVolumeSource instead.",
+    "$ref": "#/definitions/io.k8s.kubernetes.pkg.api.v1.AWSElasticBlockStoreVolumeSource"
+   },
+   "v1.Affinity": {
+    "description": "Deprecated. Please use io.k8s.kubernetes.pkg.api.v1.Affinity instead.",
+    "$ref": "#/definitions/io.k8s.kubernetes.pkg.api.v1.Affinity"
+   },
+   "v1.AzureDiskVolumeSource": {
+    "description": "Deprecated. Please use io.k8s.kubernetes.pkg.api.v1.AzureDiskVolumeSource instead.",
+    "$ref": "#/definitions/io.k8s.kubernetes.pkg.api.v1.AzureDiskVolumeSource"
+   },
+   "v1.AzureFileVolumeSource": {
+    "description": "Deprecated. Please use io.k8s.kubernetes.pkg.api.v1.AzureFileVolumeSource instead.",
+    "$ref": "#/definitions/io.k8s.kubernetes.pkg.api.v1.AzureFileVolumeSource"
+   },
+   "v1.Capabilities": {
+    "description": "Deprecated. Please use io.k8s.kubernetes.pkg.api.v1.Capabilities instead.",
+    "$ref": "#/definitions/io.k8s.kubernetes.pkg.api.v1.Capabilities"
+   },
+   "v1.CephFSVolumeSource": {
+    "description": "Deprecated. Please use io.k8s.kubernetes.pkg.api.v1.CephFSVolumeSource instead.",
+    "$ref": "#/definitions/io.k8s.kubernetes.pkg.api.v1.CephFSVolumeSource"
+   },
+   "v1.CinderVolumeSource": {
+    "description": "Deprecated. Please use io.k8s.kubernetes.pkg.api.v1.CinderVolumeSource instead.",
+    "$ref": "#/definitions/io.k8s.kubernetes.pkg.api.v1.CinderVolumeSource"
+   },
+   "v1.ConfigMap": {
+    "description": "Deprecated. Please use io.k8s.kubernetes.pkg.api.v1.ConfigMap instead.",
+    "$ref": "#/definitions/io.k8s.kubernetes.pkg.api.v1.ConfigMap"
+   },
+   "v1.ConfigMapEnvSource": {
+    "description": "Deprecated. Please use io.k8s.kubernetes.pkg.api.v1.ConfigMapEnvSource instead.",
+    "$ref": "#/definitions/io.k8s.kubernetes.pkg.api.v1.ConfigMapEnvSource"
+   },
+   "v1.ConfigMapKeySelector": {
+    "description": "Deprecated. Please use io.k8s.kubernetes.pkg.api.v1.ConfigMapKeySelector instead.",
+    "$ref": "#/definitions/io.k8s.kubernetes.pkg.api.v1.ConfigMapKeySelector"
+   },
+   "v1.ConfigMapList": {
+    "description": "Deprecated. Please use io.k8s.kubernetes.pkg.api.v1.ConfigMapList instead.",
+    "$ref": "#/definitions/io.k8s.kubernetes.pkg.api.v1.ConfigMapList"
+   },
+   "v1.ConfigMapVolumeSource": {
+    "description": "Deprecated. Please use io.k8s.kubernetes.pkg.api.v1.ConfigMapVolumeSource instead.",
+    "$ref": "#/definitions/io.k8s.kubernetes.pkg.api.v1.ConfigMapVolumeSource"
+   },
+   "v1.Container": {
+    "description": "Deprecated. Please use io.k8s.kubernetes.pkg.api.v1.Container instead.",
+    "$ref": "#/definitions/io.k8s.kubernetes.pkg.api.v1.Container"
+   },
+   "v1.ContainerPort": {
+    "description": "Deprecated. Please use io.k8s.kubernetes.pkg.api.v1.ContainerPort instead.",
+    "$ref": "#/definitions/io.k8s.kubernetes.pkg.api.v1.ContainerPort"
+   },
+   "v1.CrossVersionObjectReference": {
+    "description": "Deprecated. Please use io.k8s.kubernetes.pkg.apis.autoscaling.v1.CrossVersionObjectReference instead.",
+    "$ref": "#/definitions/io.k8s.kubernetes.pkg.apis.autoscaling.v1.CrossVersionObjectReference"
+   },
+   "v1.DeleteOptions": {
+    "description": "Deprecated. Please use io.k8s.apimachinery.pkg.apis.meta.v1.DeleteOptions instead.",
+    "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.DeleteOptions"
+   },
+   "v1.DownwardAPIVolumeFile": {
+    "description": "Deprecated. Please use io.k8s.kubernetes.pkg.api.v1.DownwardAPIVolumeFile instead.",
+    "$ref": "#/definitions/io.k8s.kubernetes.pkg.api.v1.DownwardAPIVolumeFile"
+   },
+   "v1.DownwardAPIVolumeSource": {
+    "description": "Deprecated. Please use io.k8s.kubernetes.pkg.api.v1.DownwardAPIVolumeSource instead.",
+    "$ref": "#/definitions/io.k8s.kubernetes.pkg.api.v1.DownwardAPIVolumeSource"
+   },
+   "v1.EmptyDirVolumeSource": {
+    "description": "Deprecated. Please use io.k8s.kubernetes.pkg.api.v1.EmptyDirVolumeSource instead.",
+    "$ref": "#/definitions/io.k8s.kubernetes.pkg.api.v1.EmptyDirVolumeSource"
+   },
+   "v1.EnvFromSource": {
+    "description": "Deprecated. Please use io.k8s.kubernetes.pkg.api.v1.EnvFromSource instead.",
+    "$ref": "#/definitions/io.k8s.kubernetes.pkg.api.v1.EnvFromSource"
+   },
+   "v1.EnvVar": {
+    "description": "Deprecated. Please use io.k8s.kubernetes.pkg.api.v1.EnvVar instead.",
+    "$ref": "#/definitions/io.k8s.kubernetes.pkg.api.v1.EnvVar"
+   },
+   "v1.EnvVarSource": {
+    "description": "Deprecated. Please use io.k8s.kubernetes.pkg.api.v1.EnvVarSource instead.",
+    "$ref": "#/definitions/io.k8s.kubernetes.pkg.api.v1.EnvVarSource"
+   },
+   "v1.Event": {
+    "description": "Deprecated. Please use io.k8s.kubernetes.pkg.api.v1.Event instead.",
+    "$ref": "#/definitions/io.k8s.kubernetes.pkg.api.v1.Event"
+   },
+   "v1.EventList": {
+    "description": "Deprecated. Please use io.k8s.kubernetes.pkg.api.v1.EventList instead.",
+    "$ref": "#/definitions/io.k8s.kubernetes.pkg.api.v1.EventList"
+   },
+   "v1.EventSource": {
+    "description": "Deprecated. Please use io.k8s.kubernetes.pkg.api.v1.EventSource instead.",
+    "$ref": "#/definitions/io.k8s.kubernetes.pkg.api.v1.EventSource"
+   },
+   "v1.ExecAction": {
+    "description": "Deprecated. Please use io.k8s.kubernetes.pkg.api.v1.ExecAction instead.",
+    "$ref": "#/definitions/io.k8s.kubernetes.pkg.api.v1.ExecAction"
+   },
+   "v1.FCVolumeSource": {
+    "description": "Deprecated. Please use io.k8s.kubernetes.pkg.api.v1.FCVolumeSource instead.",
+    "$ref": "#/definitions/io.k8s.kubernetes.pkg.api.v1.FCVolumeSource"
+   },
+   "v1.FlexVolumeSource": {
+    "description": "Deprecated. Please use io.k8s.kubernetes.pkg.api.v1.FlexVolumeSource instead.",
+    "$ref": "#/definitions/io.k8s.kubernetes.pkg.api.v1.FlexVolumeSource"
+   },
+   "v1.FlockerVolumeSource": {
+    "description": "Deprecated. Please use io.k8s.kubernetes.pkg.api.v1.FlockerVolumeSource instead.",
+    "$ref": "#/definitions/io.k8s.kubernetes.pkg.api.v1.FlockerVolumeSource"
+   },
+   "v1.GCEPersistentDiskVolumeSource": {
+    "description": "Deprecated. Please use io.k8s.kubernetes.pkg.api.v1.GCEPersistentDiskVolumeSource instead.",
+    "$ref": "#/definitions/io.k8s.kubernetes.pkg.api.v1.GCEPersistentDiskVolumeSource"
+   },
+   "v1.GitRepoVolumeSource": {
+    "description": "Deprecated. Please use io.k8s.kubernetes.pkg.api.v1.GitRepoVolumeSource instead.",
+    "$ref": "#/definitions/io.k8s.kubernetes.pkg.api.v1.GitRepoVolumeSource"
+   },
+   "v1.GlusterfsVolumeSource": {
+    "description": "Deprecated. Please use io.k8s.kubernetes.pkg.api.v1.GlusterfsVolumeSource instead.",
+    "$ref": "#/definitions/io.k8s.kubernetes.pkg.api.v1.GlusterfsVolumeSource"
+   },
+   "v1.GroupVersionForDiscovery": {
+    "description": "Deprecated. Please use io.k8s.apimachinery.pkg.apis.meta.v1.GroupVersionForDiscovery instead.",
+    "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.GroupVersionForDiscovery"
+   },
+   "v1.HTTPGetAction": {
+    "description": "Deprecated. Please use io.k8s.kubernetes.pkg.api.v1.HTTPGetAction instead.",
+    "$ref": "#/definitions/io.k8s.kubernetes.pkg.api.v1.HTTPGetAction"
+   },
+   "v1.HTTPHeader": {
+    "description": "Deprecated. Please use io.k8s.kubernetes.pkg.api.v1.HTTPHeader instead.",
+    "$ref": "#/definitions/io.k8s.kubernetes.pkg.api.v1.HTTPHeader"
+   },
+   "v1.Handler": {
+    "description": "Deprecated. Please use io.k8s.kubernetes.pkg.api.v1.Handler instead.",
+    "$ref": "#/definitions/io.k8s.kubernetes.pkg.api.v1.Handler"
+   },
+   "v1.HorizontalPodAutoscaler": {
+    "description": "Deprecated. Please use io.k8s.kubernetes.pkg.apis.autoscaling.v1.HorizontalPodAutoscaler instead.",
+    "$ref": "#/definitions/io.k8s.kubernetes.pkg.apis.autoscaling.v1.HorizontalPodAutoscaler"
+   },
+   "v1.HorizontalPodAutoscalerList": {
+    "description": "Deprecated. Please use io.k8s.kubernetes.pkg.apis.autoscaling.v1.HorizontalPodAutoscalerList instead.",
+    "$ref": "#/definitions/io.k8s.kubernetes.pkg.apis.autoscaling.v1.HorizontalPodAutoscalerList"
+   },
+   "v1.HorizontalPodAutoscalerSpec": {
+    "description": "Deprecated. Please use io.k8s.kubernetes.pkg.apis.autoscaling.v1.HorizontalPodAutoscalerSpec instead.",
+    "$ref": "#/definitions/io.k8s.kubernetes.pkg.apis.autoscaling.v1.HorizontalPodAutoscalerSpec"
+   },
+   "v1.HorizontalPodAutoscalerStatus": {
+    "description": "Deprecated. Please use io.k8s.kubernetes.pkg.apis.autoscaling.v1.HorizontalPodAutoscalerStatus instead.",
+    "$ref": "#/definitions/io.k8s.kubernetes.pkg.apis.autoscaling.v1.HorizontalPodAutoscalerStatus"
+   },
+   "v1.HostPathVolumeSource": {
+    "description": "Deprecated. Please use io.k8s.kubernetes.pkg.api.v1.HostPathVolumeSource instead.",
+    "$ref": "#/definitions/io.k8s.kubernetes.pkg.api.v1.HostPathVolumeSource"
+   },
+   "v1.ISCSIVolumeSource": {
+    "description": "Deprecated. Please use io.k8s.kubernetes.pkg.api.v1.ISCSIVolumeSource instead.",
+    "$ref": "#/definitions/io.k8s.kubernetes.pkg.api.v1.ISCSIVolumeSource"
+   },
+   "v1.Job": {
+    "description": "Deprecated. Please use io.k8s.kubernetes.pkg.apis.batch.v1.Job instead.",
+    "$ref": "#/definitions/io.k8s.kubernetes.pkg.apis.batch.v1.Job"
+   },
+   "v1.JobCondition": {
+    "description": "Deprecated. Please use io.k8s.kubernetes.pkg.apis.batch.v1.JobCondition instead.",
+    "$ref": "#/definitions/io.k8s.kubernetes.pkg.apis.batch.v1.JobCondition"
+   },
+   "v1.JobList": {
+    "description": "Deprecated. Please use io.k8s.kubernetes.pkg.apis.batch.v1.JobList instead.",
+    "$ref": "#/definitions/io.k8s.kubernetes.pkg.apis.batch.v1.JobList"
+   },
+   "v1.JobSpec": {
+    "description": "Deprecated. Please use io.k8s.kubernetes.pkg.apis.batch.v1.JobSpec instead.",
+    "$ref": "#/definitions/io.k8s.kubernetes.pkg.apis.batch.v1.JobSpec"
+   },
+   "v1.JobStatus": {
+    "description": "Deprecated. Please use io.k8s.kubernetes.pkg.apis.batch.v1.JobStatus instead.",
+    "$ref": "#/definitions/io.k8s.kubernetes.pkg.apis.batch.v1.JobStatus"
+   },
+   "v1.KeyToPath": {
+    "description": "Deprecated. Please use io.k8s.kubernetes.pkg.api.v1.KeyToPath instead.",
+    "$ref": "#/definitions/io.k8s.kubernetes.pkg.api.v1.KeyToPath"
+   },
+   "v1.LabelSelector": {
+    "description": "Deprecated. Please use io.k8s.apimachinery.pkg.apis.meta.v1.LabelSelector instead.",
+    "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.LabelSelector"
+   },
+   "v1.LabelSelectorRequirement": {
+    "description": "Deprecated. Please use io.k8s.apimachinery.pkg.apis.meta.v1.LabelSelectorRequirement instead.",
+    "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.LabelSelectorRequirement"
+   },
+   "v1.Lifecycle": {
+    "description": "Deprecated. Please use io.k8s.kubernetes.pkg.api.v1.Lifecycle instead.",
+    "$ref": "#/definitions/io.k8s.kubernetes.pkg.api.v1.Lifecycle"
+   },
+   "v1.ListMeta": {
+    "description": "Deprecated. Please use io.k8s.apimachinery.pkg.apis.meta.v1.ListMeta instead.",
+    "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.ListMeta"
+   },
+   "v1.LoadBalancerIngress": {
+    "description": "Deprecated. Please use io.k8s.kubernetes.pkg.api.v1.LoadBalancerIngress instead.",
+    "$ref": "#/definitions/io.k8s.kubernetes.pkg.api.v1.LoadBalancerIngress"
+   },
+   "v1.LoadBalancerStatus": {
+    "description": "Deprecated. Please use io.k8s.kubernetes.pkg.api.v1.LoadBalancerStatus instead.",
+    "$ref": "#/definitions/io.k8s.kubernetes.pkg.api.v1.LoadBalancerStatus"
+   },
+   "v1.LocalObjectReference": {
+    "description": "Deprecated. Please use io.k8s.kubernetes.pkg.api.v1.LocalObjectReference instead.",
+    "$ref": "#/definitions/io.k8s.kubernetes.pkg.api.v1.LocalObjectReference"
+   },
+   "v1.NFSVolumeSource": {
+    "description": "Deprecated. Please use io.k8s.kubernetes.pkg.api.v1.NFSVolumeSource instead.",
+    "$ref": "#/definitions/io.k8s.kubernetes.pkg.api.v1.NFSVolumeSource"
+   },
+   "v1.Namespace": {
+    "description": "Deprecated. Please use io.k8s.kubernetes.pkg.api.v1.Namespace instead.",
+    "$ref": "#/definitions/io.k8s.kubernetes.pkg.api.v1.Namespace"
+   },
+   "v1.NamespaceList": {
+    "description": "Deprecated. Please use io.k8s.kubernetes.pkg.api.v1.NamespaceList instead.",
+    "$ref": "#/definitions/io.k8s.kubernetes.pkg.api.v1.NamespaceList"
+   },
+   "v1.NamespaceSpec": {
+    "description": "Deprecated. Please use io.k8s.kubernetes.pkg.api.v1.NamespaceSpec instead.",
+    "$ref": "#/definitions/io.k8s.kubernetes.pkg.api.v1.NamespaceSpec"
+   },
+   "v1.NamespaceStatus": {
+    "description": "Deprecated. Please use io.k8s.kubernetes.pkg.api.v1.NamespaceStatus instead.",
+    "$ref": "#/definitions/io.k8s.kubernetes.pkg.api.v1.NamespaceStatus"
+   },
+   "v1.NodeAffinity": {
+    "description": "Deprecated. Please use io.k8s.kubernetes.pkg.api.v1.NodeAffinity instead.",
+    "$ref": "#/definitions/io.k8s.kubernetes.pkg.api.v1.NodeAffinity"
+   },
+   "v1.NodeSelector": {
+    "description": "Deprecated. Please use io.k8s.kubernetes.pkg.api.v1.NodeSelector instead.",
+    "$ref": "#/definitions/io.k8s.kubernetes.pkg.api.v1.NodeSelector"
+   },
+   "v1.NodeSelectorRequirement": {
+    "description": "Deprecated. Please use io.k8s.kubernetes.pkg.api.v1.NodeSelectorRequirement instead.",
+    "$ref": "#/definitions/io.k8s.kubernetes.pkg.api.v1.NodeSelectorRequirement"
+   },
+   "v1.NodeSelectorTerm": {
+    "description": "Deprecated. Please use io.k8s.kubernetes.pkg.api.v1.NodeSelectorTerm instead.",
+    "$ref": "#/definitions/io.k8s.kubernetes.pkg.api.v1.NodeSelectorTerm"
+   },
+   "v1.ObjectFieldSelector": {
+    "description": "Deprecated. Please use io.k8s.kubernetes.pkg.api.v1.ObjectFieldSelector instead.",
+    "$ref": "#/definitions/io.k8s.kubernetes.pkg.api.v1.ObjectFieldSelector"
+   },
+   "v1.ObjectMeta": {
+    "description": "Deprecated. Please use io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta instead.",
+    "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta"
+   },
+   "v1.ObjectReference": {
+    "description": "Deprecated. Please use io.k8s.kubernetes.pkg.api.v1.ObjectReference instead.",
+    "$ref": "#/definitions/io.k8s.kubernetes.pkg.api.v1.ObjectReference"
+   },
+   "v1.OwnerReference": {
+    "description": "Deprecated. Please use io.k8s.apimachinery.pkg.apis.meta.v1.OwnerReference instead.",
+    "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.OwnerReference"
+   },
+   "v1.Patch": {
+    "description": "Deprecated. Please use io.k8s.apimachinery.pkg.apis.meta.v1.Patch instead.",
+    "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Patch"
+   },
+   "v1.PersistentVolumeClaimVolumeSource": {
+    "description": "Deprecated. Please use io.k8s.kubernetes.pkg.api.v1.PersistentVolumeClaimVolumeSource instead.",
+    "$ref": "#/definitions/io.k8s.kubernetes.pkg.api.v1.PersistentVolumeClaimVolumeSource"
+   },
+   "v1.PhotonPersistentDiskVolumeSource": {
+    "description": "Deprecated. Please use io.k8s.kubernetes.pkg.api.v1.PhotonPersistentDiskVolumeSource instead.",
+    "$ref": "#/definitions/io.k8s.kubernetes.pkg.api.v1.PhotonPersistentDiskVolumeSource"
+   },
+   "v1.PodAffinity": {
+    "description": "Deprecated. Please use io.k8s.kubernetes.pkg.api.v1.PodAffinity instead.",
+    "$ref": "#/definitions/io.k8s.kubernetes.pkg.api.v1.PodAffinity"
+   },
+   "v1.PodAffinityTerm": {
+    "description": "Deprecated. Please use io.k8s.kubernetes.pkg.api.v1.PodAffinityTerm instead.",
+    "$ref": "#/definitions/io.k8s.kubernetes.pkg.api.v1.PodAffinityTerm"
+   },
+   "v1.PodAntiAffinity": {
+    "description": "Deprecated. Please use io.k8s.kubernetes.pkg.api.v1.PodAntiAffinity instead.",
+    "$ref": "#/definitions/io.k8s.kubernetes.pkg.api.v1.PodAntiAffinity"
+   },
+   "v1.PodSecurityContext": {
+    "description": "Deprecated. Please use io.k8s.kubernetes.pkg.api.v1.PodSecurityContext instead.",
+    "$ref": "#/definitions/io.k8s.kubernetes.pkg.api.v1.PodSecurityContext"
+   },
+   "v1.PodSpec": {
+    "description": "Deprecated. Please use io.k8s.kubernetes.pkg.api.v1.PodSpec instead.",
+    "$ref": "#/definitions/io.k8s.kubernetes.pkg.api.v1.PodSpec"
+   },
+   "v1.PodTemplateSpec": {
+    "description": "Deprecated. Please use io.k8s.kubernetes.pkg.api.v1.PodTemplateSpec instead.",
+    "$ref": "#/definitions/io.k8s.kubernetes.pkg.api.v1.PodTemplateSpec"
+   },
+   "v1.Preconditions": {
+    "description": "Deprecated. Please use io.k8s.apimachinery.pkg.apis.meta.v1.Preconditions instead.",
+    "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Preconditions"
+   },
+   "v1.PreferredSchedulingTerm": {
+    "description": "Deprecated. Please use io.k8s.kubernetes.pkg.api.v1.PreferredSchedulingTerm instead.",
+    "$ref": "#/definitions/io.k8s.kubernetes.pkg.api.v1.PreferredSchedulingTerm"
+   },
+   "v1.Probe": {
+    "description": "Deprecated. Please use io.k8s.kubernetes.pkg.api.v1.Probe instead.",
+    "$ref": "#/definitions/io.k8s.kubernetes.pkg.api.v1.Probe"
+   },
+   "v1.QuobyteVolumeSource": {
+    "description": "Deprecated. Please use io.k8s.kubernetes.pkg.api.v1.QuobyteVolumeSource instead.",
+    "$ref": "#/definitions/io.k8s.kubernetes.pkg.api.v1.QuobyteVolumeSource"
+   },
+   "v1.RBDVolumeSource": {
+    "description": "Deprecated. Please use io.k8s.kubernetes.pkg.api.v1.RBDVolumeSource instead.",
+    "$ref": "#/definitions/io.k8s.kubernetes.pkg.api.v1.RBDVolumeSource"
+   },
+   "v1.ResourceFieldSelector": {
+    "description": "Deprecated. Please use io.k8s.kubernetes.pkg.api.v1.ResourceFieldSelector instead.",
+    "$ref": "#/definitions/io.k8s.kubernetes.pkg.api.v1.ResourceFieldSelector"
+   },
+   "v1.ResourceRequirements": {
+    "description": "Deprecated. Please use io.k8s.kubernetes.pkg.api.v1.ResourceRequirements instead.",
+    "$ref": "#/definitions/io.k8s.kubernetes.pkg.api.v1.ResourceRequirements"
+   },
+   "v1.SELinuxOptions": {
+    "description": "Deprecated. Please use io.k8s.kubernetes.pkg.api.v1.SELinuxOptions instead.",
+    "$ref": "#/definitions/io.k8s.kubernetes.pkg.api.v1.SELinuxOptions"
+   },
+   "v1.Secret": {
+    "description": "Deprecated. Please use io.k8s.kubernetes.pkg.api.v1.Secret instead.",
+    "$ref": "#/definitions/io.k8s.kubernetes.pkg.api.v1.Secret"
+   },
+   "v1.SecretEnvSource": {
+    "description": "Deprecated. Please use io.k8s.kubernetes.pkg.api.v1.SecretEnvSource instead.",
+    "$ref": "#/definitions/io.k8s.kubernetes.pkg.api.v1.SecretEnvSource"
+   },
+   "v1.SecretKeySelector": {
+    "description": "Deprecated. Please use io.k8s.kubernetes.pkg.api.v1.SecretKeySelector instead.",
+    "$ref": "#/definitions/io.k8s.kubernetes.pkg.api.v1.SecretKeySelector"
+   },
+   "v1.SecretList": {
+    "description": "Deprecated. Please use io.k8s.kubernetes.pkg.api.v1.SecretList instead.",
+    "$ref": "#/definitions/io.k8s.kubernetes.pkg.api.v1.SecretList"
+   },
+   "v1.SecretVolumeSource": {
+    "description": "Deprecated. Please use io.k8s.kubernetes.pkg.api.v1.SecretVolumeSource instead.",
+    "$ref": "#/definitions/io.k8s.kubernetes.pkg.api.v1.SecretVolumeSource"
+   },
+   "v1.SecurityContext": {
+    "description": "Deprecated. Please use io.k8s.kubernetes.pkg.api.v1.SecurityContext instead.",
+    "$ref": "#/definitions/io.k8s.kubernetes.pkg.api.v1.SecurityContext"
+   },
+   "v1.ServerAddressByClientCIDR": {
+    "description": "Deprecated. Please use io.k8s.apimachinery.pkg.apis.meta.v1.ServerAddressByClientCIDR instead.",
+    "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.ServerAddressByClientCIDR"
+   },
+   "v1.Service": {
+    "description": "Deprecated. Please use io.k8s.kubernetes.pkg.api.v1.Service instead.",
+    "$ref": "#/definitions/io.k8s.kubernetes.pkg.api.v1.Service"
+   },
+   "v1.ServiceList": {
+    "description": "Deprecated. Please use io.k8s.kubernetes.pkg.api.v1.ServiceList instead.",
+    "$ref": "#/definitions/io.k8s.kubernetes.pkg.api.v1.ServiceList"
+   },
+   "v1.ServicePort": {
+    "description": "Deprecated. Please use io.k8s.kubernetes.pkg.api.v1.ServicePort instead.",
+    "$ref": "#/definitions/io.k8s.kubernetes.pkg.api.v1.ServicePort"
+   },
+   "v1.ServiceSpec": {
+    "description": "Deprecated. Please use io.k8s.kubernetes.pkg.api.v1.ServiceSpec instead.",
+    "$ref": "#/definitions/io.k8s.kubernetes.pkg.api.v1.ServiceSpec"
+   },
+   "v1.ServiceStatus": {
+    "description": "Deprecated. Please use io.k8s.kubernetes.pkg.api.v1.ServiceStatus instead.",
+    "$ref": "#/definitions/io.k8s.kubernetes.pkg.api.v1.ServiceStatus"
+   },
+   "v1.Status": {
+    "description": "Deprecated. Please use io.k8s.apimachinery.pkg.apis.meta.v1.Status instead.",
+    "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
+   },
+   "v1.StatusCause": {
+    "description": "Deprecated. Please use io.k8s.apimachinery.pkg.apis.meta.v1.StatusCause instead.",
+    "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.StatusCause"
+   },
+   "v1.StatusDetails": {
+    "description": "Deprecated. Please use io.k8s.apimachinery.pkg.apis.meta.v1.StatusDetails instead.",
+    "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.StatusDetails"
+   },
+   "v1.TCPSocketAction": {
+    "description": "Deprecated. Please use io.k8s.kubernetes.pkg.api.v1.TCPSocketAction instead.",
+    "$ref": "#/definitions/io.k8s.kubernetes.pkg.api.v1.TCPSocketAction"
+   },
+   "v1.Time": {
+    "description": "Deprecated. Please use io.k8s.apimachinery.pkg.apis.meta.v1.Time instead.",
+    "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Time"
+   },
+   "v1.Volume": {
+    "description": "Deprecated. Please use io.k8s.kubernetes.pkg.api.v1.Volume instead.",
+    "$ref": "#/definitions/io.k8s.kubernetes.pkg.api.v1.Volume"
+   },
+   "v1.VolumeMount": {
+    "description": "Deprecated. Please use io.k8s.kubernetes.pkg.api.v1.VolumeMount instead.",
+    "$ref": "#/definitions/io.k8s.kubernetes.pkg.api.v1.VolumeMount"
+   },
+   "v1.VsphereVirtualDiskVolumeSource": {
+    "description": "Deprecated. Please use io.k8s.kubernetes.pkg.api.v1.VsphereVirtualDiskVolumeSource instead.",
+    "$ref": "#/definitions/io.k8s.kubernetes.pkg.api.v1.VsphereVirtualDiskVolumeSource"
+   },
+   "v1.WatchEvent": {
+    "description": "Deprecated. Please use io.k8s.apimachinery.pkg.apis.meta.v1.WatchEvent instead.",
+    "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.WatchEvent"
+   },
+   "v1.WeightedPodAffinityTerm": {
+    "description": "Deprecated. Please use io.k8s.kubernetes.pkg.api.v1.WeightedPodAffinityTerm instead.",
+    "$ref": "#/definitions/io.k8s.kubernetes.pkg.api.v1.WeightedPodAffinityTerm"
+   },
+   "v1beta1.Cluster": {
+    "description": "Deprecated. Please use io.k8s.kubernetes.federation.apis.federation.v1beta1.Cluster instead.",
+    "$ref": "#/definitions/io.k8s.kubernetes.federation.apis.federation.v1beta1.Cluster"
+   },
+   "v1beta1.ClusterCondition": {
+    "description": "Deprecated. Please use io.k8s.kubernetes.federation.apis.federation.v1beta1.ClusterCondition instead.",
+    "$ref": "#/definitions/io.k8s.kubernetes.federation.apis.federation.v1beta1.ClusterCondition"
+   },
+   "v1beta1.ClusterList": {
+    "description": "Deprecated. Please use io.k8s.kubernetes.federation.apis.federation.v1beta1.ClusterList instead.",
+    "$ref": "#/definitions/io.k8s.kubernetes.federation.apis.federation.v1beta1.ClusterList"
+   },
+   "v1beta1.ClusterSpec": {
+    "description": "Deprecated. Please use io.k8s.kubernetes.federation.apis.federation.v1beta1.ClusterSpec instead.",
+    "$ref": "#/definitions/io.k8s.kubernetes.federation.apis.federation.v1beta1.ClusterSpec"
+   },
+   "v1beta1.ClusterStatus": {
+    "description": "Deprecated. Please use io.k8s.kubernetes.federation.apis.federation.v1beta1.ClusterStatus instead.",
+    "$ref": "#/definitions/io.k8s.kubernetes.federation.apis.federation.v1beta1.ClusterStatus"
+   },
+   "v1beta1.DaemonSet": {
+    "description": "Deprecated. Please use io.k8s.kubernetes.pkg.apis.extensions.v1beta1.DaemonSet instead.",
+    "$ref": "#/definitions/io.k8s.kubernetes.pkg.apis.extensions.v1beta1.DaemonSet"
+   },
+   "v1beta1.DaemonSetList": {
+    "description": "Deprecated. Please use io.k8s.kubernetes.pkg.apis.extensions.v1beta1.DaemonSetList instead.",
+    "$ref": "#/definitions/io.k8s.kubernetes.pkg.apis.extensions.v1beta1.DaemonSetList"
+   },
+   "v1beta1.DaemonSetSpec": {
+    "description": "Deprecated. Please use io.k8s.kubernetes.pkg.apis.extensions.v1beta1.DaemonSetSpec instead.",
+    "$ref": "#/definitions/io.k8s.kubernetes.pkg.apis.extensions.v1beta1.DaemonSetSpec"
+   },
+   "v1beta1.DaemonSetStatus": {
+    "description": "Deprecated. Please use io.k8s.kubernetes.pkg.apis.extensions.v1beta1.DaemonSetStatus instead.",
+    "$ref": "#/definitions/io.k8s.kubernetes.pkg.apis.extensions.v1beta1.DaemonSetStatus"
+   },
+   "v1beta1.Deployment": {
+    "description": "Deprecated. Please use io.k8s.kubernetes.pkg.apis.extensions.v1beta1.Deployment instead.",
+    "$ref": "#/definitions/io.k8s.kubernetes.pkg.apis.extensions.v1beta1.Deployment"
+   },
+   "v1beta1.DeploymentCondition": {
+    "description": "Deprecated. Please use io.k8s.kubernetes.pkg.apis.extensions.v1beta1.DeploymentCondition instead.",
+    "$ref": "#/definitions/io.k8s.kubernetes.pkg.apis.extensions.v1beta1.DeploymentCondition"
+   },
+   "v1beta1.DeploymentList": {
+    "description": "Deprecated. Please use io.k8s.kubernetes.pkg.apis.extensions.v1beta1.DeploymentList instead.",
+    "$ref": "#/definitions/io.k8s.kubernetes.pkg.apis.extensions.v1beta1.DeploymentList"
+   },
+   "v1beta1.DeploymentRollback": {
+    "description": "Deprecated. Please use io.k8s.kubernetes.pkg.apis.extensions.v1beta1.DeploymentRollback instead.",
+    "$ref": "#/definitions/io.k8s.kubernetes.pkg.apis.extensions.v1beta1.DeploymentRollback"
+   },
+   "v1beta1.DeploymentSpec": {
+    "description": "Deprecated. Please use io.k8s.kubernetes.pkg.apis.extensions.v1beta1.DeploymentSpec instead.",
+    "$ref": "#/definitions/io.k8s.kubernetes.pkg.apis.extensions.v1beta1.DeploymentSpec"
+   },
+   "v1beta1.DeploymentStatus": {
+    "description": "Deprecated. Please use io.k8s.kubernetes.pkg.apis.extensions.v1beta1.DeploymentStatus instead.",
+    "$ref": "#/definitions/io.k8s.kubernetes.pkg.apis.extensions.v1beta1.DeploymentStatus"
+   },
+   "v1beta1.DeploymentStrategy": {
+    "description": "Deprecated. Please use io.k8s.kubernetes.pkg.apis.extensions.v1beta1.DeploymentStrategy instead.",
+    "$ref": "#/definitions/io.k8s.kubernetes.pkg.apis.extensions.v1beta1.DeploymentStrategy"
+   },
+   "v1beta1.HTTPIngressPath": {
+    "description": "Deprecated. Please use io.k8s.kubernetes.pkg.apis.extensions.v1beta1.HTTPIngressPath instead.",
+    "$ref": "#/definitions/io.k8s.kubernetes.pkg.apis.extensions.v1beta1.HTTPIngressPath"
+   },
+   "v1beta1.HTTPIngressRuleValue": {
+    "description": "Deprecated. Please use io.k8s.kubernetes.pkg.apis.extensions.v1beta1.HTTPIngressRuleValue instead.",
+    "$ref": "#/definitions/io.k8s.kubernetes.pkg.apis.extensions.v1beta1.HTTPIngressRuleValue"
+   },
+   "v1beta1.Ingress": {
+    "description": "Deprecated. Please use io.k8s.kubernetes.pkg.apis.extensions.v1beta1.Ingress instead.",
+    "$ref": "#/definitions/io.k8s.kubernetes.pkg.apis.extensions.v1beta1.Ingress"
+   },
+   "v1beta1.IngressBackend": {
+    "description": "Deprecated. Please use io.k8s.kubernetes.pkg.apis.extensions.v1beta1.IngressBackend instead.",
+    "$ref": "#/definitions/io.k8s.kubernetes.pkg.apis.extensions.v1beta1.IngressBackend"
+   },
+   "v1beta1.IngressList": {
+    "description": "Deprecated. Please use io.k8s.kubernetes.pkg.apis.extensions.v1beta1.IngressList instead.",
+    "$ref": "#/definitions/io.k8s.kubernetes.pkg.apis.extensions.v1beta1.IngressList"
+   },
+   "v1beta1.IngressRule": {
+    "description": "Deprecated. Please use io.k8s.kubernetes.pkg.apis.extensions.v1beta1.IngressRule instead.",
+    "$ref": "#/definitions/io.k8s.kubernetes.pkg.apis.extensions.v1beta1.IngressRule"
+   },
+   "v1beta1.IngressSpec": {
+    "description": "Deprecated. Please use io.k8s.kubernetes.pkg.apis.extensions.v1beta1.IngressSpec instead.",
+    "$ref": "#/definitions/io.k8s.kubernetes.pkg.apis.extensions.v1beta1.IngressSpec"
+   },
+   "v1beta1.IngressStatus": {
+    "description": "Deprecated. Please use io.k8s.kubernetes.pkg.apis.extensions.v1beta1.IngressStatus instead.",
+    "$ref": "#/definitions/io.k8s.kubernetes.pkg.apis.extensions.v1beta1.IngressStatus"
+   },
+   "v1beta1.IngressTLS": {
+    "description": "Deprecated. Please use io.k8s.kubernetes.pkg.apis.extensions.v1beta1.IngressTLS instead.",
+    "$ref": "#/definitions/io.k8s.kubernetes.pkg.apis.extensions.v1beta1.IngressTLS"
+   },
+   "v1beta1.ReplicaSet": {
+    "description": "Deprecated. Please use io.k8s.kubernetes.pkg.apis.extensions.v1beta1.ReplicaSet instead.",
+    "$ref": "#/definitions/io.k8s.kubernetes.pkg.apis.extensions.v1beta1.ReplicaSet"
+   },
+   "v1beta1.ReplicaSetCondition": {
+    "description": "Deprecated. Please use io.k8s.kubernetes.pkg.apis.extensions.v1beta1.ReplicaSetCondition instead.",
+    "$ref": "#/definitions/io.k8s.kubernetes.pkg.apis.extensions.v1beta1.ReplicaSetCondition"
+   },
+   "v1beta1.ReplicaSetList": {
+    "description": "Deprecated. Please use io.k8s.kubernetes.pkg.apis.extensions.v1beta1.ReplicaSetList instead.",
+    "$ref": "#/definitions/io.k8s.kubernetes.pkg.apis.extensions.v1beta1.ReplicaSetList"
+   },
+   "v1beta1.ReplicaSetSpec": {
+    "description": "Deprecated. Please use io.k8s.kubernetes.pkg.apis.extensions.v1beta1.ReplicaSetSpec instead.",
+    "$ref": "#/definitions/io.k8s.kubernetes.pkg.apis.extensions.v1beta1.ReplicaSetSpec"
+   },
+   "v1beta1.ReplicaSetStatus": {
+    "description": "Deprecated. Please use io.k8s.kubernetes.pkg.apis.extensions.v1beta1.ReplicaSetStatus instead.",
+    "$ref": "#/definitions/io.k8s.kubernetes.pkg.apis.extensions.v1beta1.ReplicaSetStatus"
+   },
+   "v1beta1.RollbackConfig": {
+    "description": "Deprecated. Please use io.k8s.kubernetes.pkg.apis.extensions.v1beta1.RollbackConfig instead.",
+    "$ref": "#/definitions/io.k8s.kubernetes.pkg.apis.extensions.v1beta1.RollbackConfig"
+   },
+   "v1beta1.RollingUpdateDeployment": {
+    "description": "Deprecated. Please use io.k8s.kubernetes.pkg.apis.extensions.v1beta1.RollingUpdateDeployment instead.",
+    "$ref": "#/definitions/io.k8s.kubernetes.pkg.apis.extensions.v1beta1.RollingUpdateDeployment"
+   },
+   "v1beta1.Scale": {
+    "description": "Deprecated. Please use io.k8s.kubernetes.pkg.apis.extensions.v1beta1.Scale instead.",
+    "$ref": "#/definitions/io.k8s.kubernetes.pkg.apis.extensions.v1beta1.Scale"
+   },
+   "v1beta1.ScaleSpec": {
+    "description": "Deprecated. Please use io.k8s.kubernetes.pkg.apis.extensions.v1beta1.ScaleSpec instead.",
+    "$ref": "#/definitions/io.k8s.kubernetes.pkg.apis.extensions.v1beta1.ScaleSpec"
+   },
+   "v1beta1.ScaleStatus": {
+    "description": "Deprecated. Please use io.k8s.kubernetes.pkg.apis.extensions.v1beta1.ScaleStatus instead.",
+    "$ref": "#/definitions/io.k8s.kubernetes.pkg.apis.extensions.v1beta1.ScaleStatus"
+   },
+   "v1beta1.ServerAddressByClientCIDR": {
+    "description": "Deprecated. Please use io.k8s.kubernetes.federation.apis.federation.v1beta1.ServerAddressByClientCIDR instead.",
+    "$ref": "#/definitions/io.k8s.kubernetes.federation.apis.federation.v1beta1.ServerAddressByClientCIDR"
+   },
+   "version.Info": {
+    "description": "Deprecated. Please use io.k8s.apimachinery.pkg.version.Info instead.",
+    "$ref": "#/definitions/io.k8s.apimachinery.pkg.version.Info"
    }
   },
   "securityDefinitions": {
