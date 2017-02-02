@@ -369,12 +369,7 @@ contexts:
   name: service-account-context
 current-context: service-account-context
 EOF
-}
-
-function create-kubelet-auth-ca {
-  if [[ -n "${KUBELET_AUTH_CA_CERT:-}" ]]; then
-    echo "${KUBELET_AUTH_CA_CERT}" | base64 --decode > "/var/lib/kubelet/kubelet_auth_ca.crt"
-  fi
+  echo "${KUBELET_CA_CERT}" | base64 -d > /var/lib/kubelet/ca.crt
 }
 
 # Uses KUBELET_CA_CERT (falling back to CA_CERT), KUBELET_CERT, and KUBELET_KEY
@@ -388,7 +383,6 @@ function create-master-kubelet-auth {
     REGISTER_MASTER_KUBELET="true"
     create-kubelet-kubeconfig
   fi
-  
 }
 
 function create-kubeproxy-kubeconfig {
@@ -582,9 +576,7 @@ function start-kubelet {
        [[ "${HAIRPIN_MODE:-}" == "none" ]]; then
       flags+=" --hairpin-mode=${HAIRPIN_MODE}"
     fi
-    if [ -n "${KUBELET_AUTH_CA_CERT:-}" ]; then
-      flags+=" --anonymous-auth=false --client-ca-file=/var/lib/kubelet/kubelet_auth_ca.crt"
-    fi
+    flags+=" --anonymous-auth=false --authorization-mode=Webhook --client-ca-file=/var/lib/kubelet/ca.crt"
   fi
   # Network plugin
   if [[ -n "${NETWORK_PROVIDER:-}" ]]; then
@@ -1099,8 +1091,12 @@ function start-kube-addons {
   local -r src_dir="${KUBE_HOME}/kube-manifests/kubernetes/gci-trusty"
   local -r dst_dir="/etc/kubernetes/addons"
 
+  # TODO(mikedanese): only enable these in e2e
   # prep the additional bindings that are particular to e2e users and groups
   setup-addon-manifests "addons" "e2e-rbac-bindings"
+
+  # prep addition kube-up specific rbac objects
+  setup-addon-manifests "addons" "rbac"
 
   # Set up manifests of other addons.
   if [[ "${ENABLE_CLUSTER_MONITORING:-}" == "influxdb" ]] || \
@@ -1345,7 +1341,6 @@ if [[ "${KUBERNETES_MASTER:-}" == "true" ]]; then
   create-master-etcd-auth
 else
   create-kubelet-kubeconfig
-  create-kubelet-auth-ca
   create-kubeproxy-kubeconfig
 fi
 
