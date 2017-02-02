@@ -38,6 +38,7 @@ go_library(
         "//pkg/genericapiserver/registry/generic/registry:go_default_library",
         "//pkg/genericapiserver/registry/rest:go_default_library",
         "//pkg/kubelet/client:go_default_library",
+        "//pkg/registry/cachesize:go_default_library",
         "//pkg/registry/core/node:go_default_library",
         "//pkg/registry/core/node/rest:go_default_library",
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
