@@ -42,3 +42,6 @@ ENABLE_L7_LOADBALANCING="${KUBE_ENABLE_L7_LOADBALANCING:-glbc}"
 ENABLE_CLUSTER_MONITORING="${KUBE_ENABLE_CLUSTER_MONITORING:-standalone}"
 
 KUBE_DELETE_NETWORK=${KUBE_DELETE_NETWORK:-false}
+
+# Indicates if the values (eg. kube password) should be treated as canonical
+METADATA_CLOBBERS_CONFIG=true
