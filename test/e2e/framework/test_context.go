@@ -18,6 +18,7 @@ package framework
 
 import (
 	"flag"
+	"fmt"
 	"os"
 	"time"
 
@@ -27,6 +28,8 @@ import (
 	"k8s.io/kubernetes/pkg/apis/componentconfig"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 )
+
+const defaultHost = "http://127.0.0.1:8080"
 
 type TestContextType struct {
 	KubeConfig         string
@@ -162,7 +165,8 @@ func RegisterCommonFlags() {
 	flag.BoolVar(&TestContext.DeleteNamespace, "delete-namespace", true, "If true tests will delete namespace after completion. It is only designed to make debugging easier, DO NOT turn it off by default.")
 	flag.BoolVar(&TestContext.DeleteNamespaceOnFailure, "delete-namespace-on-failure", true, "If true, framework will delete test namespace on failure. Used only during test debugging.")
 	flag.IntVar(&TestContext.AllowedNotReadyNodes, "allowed-not-ready-nodes", 0, "If non-zero, framework will allow for that many non-ready nodes when checking for all ready nodes.")
-	flag.StringVar(&TestContext.Host, "host", "http://127.0.0.1:8080", "The host, or apiserver, to connect to")
+
+	flag.StringVar(&TestContext.Host, "host", "", fmt.Sprintf("The host, or apiserver, to connect to. Will default to %s if this argument and --kubeconfig are not set", defaultHost))
 	flag.StringVar(&TestContext.ReportPrefix, "report-prefix", "", "Optional prefix for JUnit XML reports. Default is empty, which doesn't prepend anything to the default name.")
 	flag.StringVar(&TestContext.ReportDir, "report-dir", "", "Path to the directory where the JUnit XML reports should be saved. Default is empty, which doesn't generate these reports.")
 	flag.StringVar(&TestContext.FeatureGates, "feature-gates", "", "A set of key=value pairs that describe feature gates for alpha/experimental features.")
@@ -259,4 +263,15 @@ func ViperizeFlags() {
 
 	// TODO Consider wether or not we want to use overwriteFlagsWithViperConfig().
 	viper.Unmarshal(&TestContext)
+
+	AfterReadingAllFlags(&TestContext)
+}
+
+// AfterReadingAllFlags makes changes to the context after all flags
+// have been read.
+func AfterReadingAllFlags(t *TestContextType) {
+	// Only set a default host if one won't be supplied via kubeconfig
+	if len(t.Host) == 0 && len(t.KubeConfig) == 0 {
+		t.Host = defaultHost
+	}
 }
