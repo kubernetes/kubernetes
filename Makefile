@@ -227,6 +227,8 @@ define TEST_E2E_NODE_HELP_INFO
 #  GUBERNATOR: For REMOTE=true only. Produce link to Gubernator to view logs.
 #	 Defaults to false.
 #  PARALLELISM: The number of gingko nodes to run.  Defaults to 8.
+#  RUNTIME: Container runtime to use (eg. docker, rkt, remote).
+#    Defaults to "docker".
 #
 # Example:
 #   make test-e2e-node FOCUS=Kubelet SKIP=container
