@@ -150,7 +150,7 @@ func (j *Join) Run(out io.Writer) error {
 	}
 
 	// Try to start the kubelet service in case it's inactive
-	preflight.TryStartKubelet()
+	kubeadmutil.TryStartKubelet()
 
 	fmt.Fprintf(out, joinDoneMsgf)
 	return nil

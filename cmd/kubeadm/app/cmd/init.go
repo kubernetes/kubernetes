@@ -199,7 +199,7 @@ func (i *Init) Run(out io.Writer) error {
 	}
 
 	// Try to start the kubelet service in case it's inactive
-	preflight.TryStartKubelet()
+	kubeadmutil.TryStartKubelet()
 
 	// TODO: It's not great to have an exception for token here, but necessary because the apiserver doesn't handle this properly in the API yet
 	// but relies on files on disk for now, which is daunting.
