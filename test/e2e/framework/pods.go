@@ -132,6 +132,10 @@ func (c *PodClient) DeleteSync(name string, options *metav1.DeleteOptions, timeo
 		2*time.Second, timeout)).To(Succeed(), "wait for pod %q to disappear", name)
 }
 
+func (c *PodClient) MungeSpec(pod *v1.Pod) {
+	c.mungeSpec(pod)
+}
+
 // mungeSpec apply test-suite specific transformations to the pod spec.
 func (c *PodClient) mungeSpec(pod *v1.Pod) {
 	if !TestContext.NodeE2E {
