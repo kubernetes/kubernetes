@@ -26,6 +26,7 @@ import (
 	genericregistry "k8s.io/kubernetes/pkg/genericapiserver/registry/generic/registry"
 	"k8s.io/kubernetes/pkg/genericapiserver/registry/rest"
 	"k8s.io/kubernetes/pkg/registry/autoscaling/horizontalpodautoscaler"
+	"k8s.io/kubernetes/pkg/registry/cachesize"
 )
 
 type REST struct {
@@ -43,6 +44,7 @@ func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, *StatusREST) {
 		},
 		PredicateFunc:     horizontalpodautoscaler.MatchAutoscaler,
 		QualifiedResource: autoscaling.Resource("horizontalpodautoscalers"),
+		WatchCacheSize:    cachesize.GetWatchCacheSizeByResource("horizontalpodautoscalers"),
 
 		CreateStrategy: horizontalpodautoscaler.Strategy,
 		UpdateStrategy: horizontalpodautoscaler.Strategy,

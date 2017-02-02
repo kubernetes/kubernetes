@@ -149,7 +149,7 @@ func TestNamespaceController(t *testing.T) {
 	// Delete the namespace with orphan finalizer (let namespaces
 	// in underlying clusters be as is).
 	// TODO: Add a test without orphan finalizer.
-	ns1.ObjectMeta.Finalizers = append(ns1.ObjectMeta.Finalizers, apiv1.FinalizerOrphan)
+	ns1.ObjectMeta.Finalizers = append(ns1.ObjectMeta.Finalizers, metav1.FinalizerOrphan)
 	ns1.DeletionTimestamp = &metav1.Time{Time: time.Now()}
 	namespaceWatch.Modify(&ns1)
 	assert.Equal(t, ns1.Name, GetStringFromChan(nsDeleteChan))

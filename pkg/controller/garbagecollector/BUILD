@@ -18,7 +18,6 @@ go_library(
     ],
     tags = ["automanaged"],
     deps = [
-        "//pkg/api/v1:go_default_library",
         "//pkg/controller/garbagecollector/metaonly:go_default_library",
         "//pkg/util/metrics:go_default_library",
         "//vendor:github.com/golang/glog",

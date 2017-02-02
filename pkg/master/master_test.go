@@ -62,13 +62,13 @@ func setUp(t *testing.T) (*Master, *etcdtesting.EtcdTestServer, Config, *assert.
 	server, storageConfig := etcdtesting.NewUnsecuredEtcd3TestClientServer(t, api.Scheme)
 
 	config := &Config{
-		GenericConfig:           genericapiserver.NewConfig(),
+		GenericConfig:           genericapiserver.NewConfig().WithSerializer(api.Codecs),
 		APIResourceConfigSource: DefaultAPIResourceConfigSource(),
 		APIServerServicePort:    443,
 		MasterCount:             1,
 	}
 
-	resourceEncoding := genericapiserver.NewDefaultResourceEncodingConfig()
+	resourceEncoding := genericapiserver.NewDefaultResourceEncodingConfig(api.Registry)
 	resourceEncoding.SetVersionEncoding(api.GroupName, api.Registry.GroupOrDie(api.GroupName).GroupVersion, schema.GroupVersion{Group: api.GroupName, Version: runtime.APIVersionInternal})
 	resourceEncoding.SetVersionEncoding(autoscaling.GroupName, *testapi.Autoscaling.GroupVersion(), schema.GroupVersion{Group: autoscaling.GroupName, Version: runtime.APIVersionInternal})
 	resourceEncoding.SetVersionEncoding(batch.GroupName, *testapi.Batch.GroupVersion(), schema.GroupVersion{Group: batch.GroupName, Version: runtime.APIVersionInternal})

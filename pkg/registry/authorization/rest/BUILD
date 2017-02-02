@@ -12,6 +12,7 @@ go_library(
     srcs = ["storage_authorization.go"],
     tags = ["automanaged"],
     deps = [
+        "//pkg/api:go_default_library",
         "//pkg/apis/authorization:go_default_library",
         "//pkg/apis/authorization/v1beta1:go_default_library",
         "//pkg/genericapiserver/registry/generic:go_default_library",
