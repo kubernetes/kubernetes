@@ -311,6 +311,7 @@ func NewMasterConfig() *master.Config {
 		// prefix code, so please don't change without ensuring
 		// sufficient coverage in other ways.
 		Prefix: uuid.New(),
+		Copier: api.Scheme,
 	}
 
 	info, _ := runtime.SerializerInfoForMediaType(api.Codecs.SupportedMediaTypes(), runtime.ContentTypeJSON)

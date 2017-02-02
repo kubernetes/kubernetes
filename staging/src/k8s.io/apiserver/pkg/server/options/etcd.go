@@ -21,6 +21,7 @@ import (
 
 	"github.com/spf13/pflag"
 
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apiserver/pkg/storage/storagebackend"
 )
 
@@ -34,13 +35,14 @@ type EtcdOptions struct {
 	EtcdServersOverrides []string
 }
 
-func NewEtcdOptions() *EtcdOptions {
+func NewEtcdOptions(scheme *runtime.Scheme) *EtcdOptions {
 	return &EtcdOptions{
 		StorageConfig: storagebackend.Config{
 			Prefix: DefaultEtcdPathPrefix,
 			// Default cache size to 0 - if unset, its size will be set based on target
 			// memory usage.
 			DeserializationCacheSize: 0,
+			Copier: scheme,
 		},
 	}
 }
