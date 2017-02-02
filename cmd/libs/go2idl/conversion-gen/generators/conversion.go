@@ -222,6 +222,27 @@ func Packages(context *generator.Context, arguments *args.GeneratorArgs) generat
 			skipUnsafe = customArgs.SkipUnsafe
 		}
 
+		// if the source path is within a /vendor/ directory (for example,
+		// k8s.io/kubernetes/vendor/k8s.io/apimachinery/pkg/apis/meta/v1), allow
+		// generation to output to the proper relative path (under vendor).
+		// Otherwise, the generator will create the file in the wrong location
+		// in the output directory.
+		// TODO: build a more fundamental concept in gengo for dealing with modifications
+		// to vendored packages.
+		vendorless := func(pkg string) string {
+			if pos := strings.LastIndex(pkg, "/vendor/"); pos != -1 {
+				return pkg[pos+len("/vendor/"):]
+			}
+			return pkg
+		}
+		fqPkgPath := pkg.Path
+		if strings.Contains(pkg.SourcePath, "/vendor/") {
+			fqPkgPath = filepath.Join("k8s.io", "kubernetes", "vendor", pkg.Path)
+		}
+		for i := range peerPkgs {
+			peerPkgs[i] = vendorless(peerPkgs[i])
+		}
+
 		// Make sure our peer-packages are added and fully parsed.
 		for _, pp := range peerPkgs {
 			context.AddDir(pp)
@@ -236,7 +257,7 @@ func Packages(context *generator.Context, arguments *args.GeneratorArgs) generat
 		packages = append(packages,
 			&generator.DefaultPackage{
 				PackageName: filepath.Base(pkg.Path),
-				PackagePath: pkg.Path,
+				PackagePath: fqPkgPath,
 				HeaderText:  header,
 				GeneratorFunc: func(c *generator.Context) (generators []generator.Generator) {
 					return []generator.Generator{

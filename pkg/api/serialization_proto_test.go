@@ -77,7 +77,7 @@ func TestUniversalDeserializer(t *testing.T) {
 
 func TestProtobufRoundTrip(t *testing.T) {
 	obj := &v1.Pod{}
-	apitesting.FuzzerFor(kapitesting.FuzzerFuncs(t), rand.NewSource(benchmarkSeed)).Fuzz(obj)
+	apitesting.FuzzerFor(kapitesting.FuzzerFuncs(t, api.Codecs), rand.NewSource(benchmarkSeed)).Fuzz(obj)
 	// InitContainers are turned into annotations by conversion.
 	obj.Spec.InitContainers = nil
 	obj.Status.InitContainerStatuses = nil
