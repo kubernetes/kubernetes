@@ -28,7 +28,7 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/kubernetes/pkg/genericapiserver/endpoints/handlers/responsewriters"
+	"k8s.io/apiserver/pkg/endpoints/handlers/responsewriters"
 )
 
 // APIContainer is a restful container which in addition support registering

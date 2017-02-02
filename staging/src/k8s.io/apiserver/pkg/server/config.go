@@ -56,10 +56,10 @@ import (
 	"k8s.io/apiserver/pkg/server/options"
 	restclient "k8s.io/client-go/rest"
 	certutil "k8s.io/client-go/util/cert"
-	genericapifilters "k8s.io/kubernetes/pkg/genericapiserver/endpoints/filters"
-	apiopenapi "k8s.io/kubernetes/pkg/genericapiserver/endpoints/openapi"
-	"k8s.io/kubernetes/pkg/genericapiserver/server/mux"
-	"k8s.io/kubernetes/pkg/genericapiserver/server/routes"
+	genericapifilters "k8s.io/apiserver/pkg/endpoints/filters"
+	apiopenapi "k8s.io/apiserver/pkg/endpoints/openapi"
+	"k8s.io/apiserver/pkg/server/mux"
+	"k8s.io/apiserver/pkg/server/routes"
 )
 
 const (

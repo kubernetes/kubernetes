@@ -189,12 +189,12 @@ func getConfig(fullMethods bool) (*openapi.Config, *restful.Container) {
 		},
 		GetDefinitions: func(_ openapi.ReferenceCallback) map[string]openapi.OpenAPIDefinition {
 			return map[string]openapi.OpenAPIDefinition{
-				"k8s.io/kubernetes/pkg/genericapiserver/server/openapi.TestInput":  *TestInput{}.OpenAPIDefinition(),
-				"k8s.io/kubernetes/pkg/genericapiserver/server/openapi.TestOutput": *TestOutput{}.OpenAPIDefinition(),
+				"k8s.io/apiserver/pkg/server/openapi.TestInput":  *TestInput{}.OpenAPIDefinition(),
+				"k8s.io/apiserver/pkg/server/openapi.TestOutput": *TestOutput{}.OpenAPIDefinition(),
 				// Bazel changes the package name, this is ok for testing, but we need to fix it if it happened
 				// in the main code.
-				"k8s.io/kubernetes/pkg/genericapiserver/server/openapi/go_default_test.TestInput":  *TestInput{}.OpenAPIDefinition(),
-				"k8s.io/kubernetes/pkg/genericapiserver/server/openapi/go_default_test.TestOutput": *TestOutput{}.OpenAPIDefinition(),
+				"k8s.io/apiserver/pkg/server/openapi/go_default_test.TestInput":  *TestInput{}.OpenAPIDefinition(),
+				"k8s.io/apiserver/pkg/server/openapi/go_default_test.TestOutput": *TestOutput{}.OpenAPIDefinition(),
 			}
 		},
 		GetDefinitionName: func(_ string, name string) (string, spec.Extensions) {

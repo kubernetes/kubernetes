@@ -36,8 +36,8 @@ import (
 	"k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/server/httplog"
 	proxyutil "k8s.io/apiserver/pkg/util/proxy"
-	"k8s.io/kubernetes/pkg/genericapiserver/endpoints/handlers/responsewriters"
-	"k8s.io/kubernetes/pkg/genericapiserver/registry/rest"
+	"k8s.io/apiserver/pkg/endpoints/handlers/responsewriters"
+	"k8s.io/apiserver/pkg/registry/rest"
 
 	"github.com/golang/glog"
 )

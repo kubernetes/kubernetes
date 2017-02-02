@@ -21,8 +21,8 @@ import (
 	"sort"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/kubernetes/pkg/genericapiserver/endpoints/handlers/responsewriters"
-	"k8s.io/kubernetes/pkg/genericapiserver/server/mux"
+	"k8s.io/apiserver/pkg/endpoints/handlers/responsewriters"
+	"k8s.io/apiserver/pkg/server/mux"
 )
 
 // Index provides a webservice for the http root / listing all known paths.

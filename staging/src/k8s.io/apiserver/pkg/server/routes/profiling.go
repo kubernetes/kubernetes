@@ -19,7 +19,7 @@ package routes
 import (
 	"net/http/pprof"
 
-	"k8s.io/kubernetes/pkg/genericapiserver/server/mux"
+	"k8s.io/apiserver/pkg/server/mux"
 )
 
 // Profiling adds handlers for pprof under /debug/pprof.
