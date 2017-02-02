@@ -19,21 +19,8 @@ package preflight
 import (
 	"testing"
 	"time"
+	"k8s.io/client-go/pkg/util/clock"
 )
-
-type testTimer struct {
-	timerCallCount int
-}
-
-func (t testTimer) Sleep(time.Duration) {
-	t.timerCallCount += 1
-}
-
-func (t testTimer) After(time.Duration) <-chan time.Time {
-	ch := make(chan time.Time, 1)
-	ch <- time.Now()
-	return ch
-}
 
 type mockEtcdConnection struct {
 	shouldSucceed bool
@@ -50,26 +37,26 @@ func makeEtcdConnection(shouldSucceed bool) mockEtcdConnection {
 }
 
 func TestWaitForEtcdSuccess(t *testing.T) {
-	timer := new(connectionTimer)
+	timer := new(clock.RealClock)
 	etcd := makeEtcdConnection(true)
 	servers := []string{"https://127.0.0.1:2379"}
-	err := WaitForEtcd(servers, timer, etcd)
+	err := WaitForAvailableEtcd(servers, timer, etcd)
 
 	if err != nil { t.Fatalf("Unexpected error: %v", err) }
 }
 
 
 func TestWaitForEtcdFail(t *testing.T) {
-	timer := new(testTimer)
+	timer := clock.NewFakeClock(time.Now())
 	etcd := makeEtcdConnection(false)
 
 	servers := []string{"https://127.0.0.1:2379"}
-	err := WaitForEtcd(servers, timer, etcd)
+	err := WaitForAvailableEtcd(servers, timer, etcd)
 	if err == nil { t.Fatal("Expected 'Unable to reach Etcd' error to occur") }
 }
 
 func TestCheckEtcdServerExpired(t *testing.T) {
-	timer := new(testTimer)
+	timer := clock.NewFakeClock(time.Now())
 	etcd := makeEtcdConnection(false)
 
 	address := "https://127.0.0.1:2379"
@@ -86,7 +73,7 @@ func TestCheckEtcdServerExpired(t *testing.T) {
 
 func TestCheckEtcdServerStop(t *testing.T) {
 	// use a timer that really sleeps
-	timer := new(connectionTimer)
+	timer := clock.NewFakeClock(time.Now())
 	etcd := makeEtcdConnection(false)
 
 	address := "https://127.0.0.1:2379"
@@ -110,9 +97,9 @@ func testEtcdConnection(t *testing.T) {
 }
 
 func TestBadConnectionString(t *testing.T) {
-	timer := new(testTimer)
+	timer := clock.NewFakeClock(time.Now())
 	etcd := makeEtcdConnection(false)
 	servers := []string{"-invalid uri$@#%"}
-	err := WaitForEtcd(servers, timer, etcd)
+	err := WaitForAvailableEtcd(servers, timer, etcd)
 	if err == nil { t.Fatal("Expected bad URI to raise parse error") }
 }

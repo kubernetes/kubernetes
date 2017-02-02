@@ -23,20 +23,16 @@ import (
 	"net/url"
 	"time"
 
+	"k8s.io/client-go/pkg/util/clock"
 	"k8s.io/kubernetes/cmd/kube-apiserver/app/options"
 )
 
 const retryLimit = 60
 const retryInterval = 1 * time.Second
 
-type clock interface {
-	Sleep(time.Duration)
-	After(time.Duration) <-chan time.Time
+type etcdClock interface {
+	clock.Clock
 }
-
-type connectionTimer struct{}
-func (connectionTimer) Sleep(d time.Duration) {time.Sleep(d)}
-func (connectionTimer) After(d time.Duration) <-chan time.Time {return time.After(d)}
 
 type connection interface {
 	serverReachable(address string) bool
@@ -52,7 +48,7 @@ func (etcdConnection) serverReachable(address string) bool {
 	return false
 }
 
-func checkEtcdServer(address string, foundEtcd chan struct{}, stop chan struct{}, timer clock, etcd connection) {
+func checkEtcdServer(address string, foundEtcd chan struct{}, stop chan struct{}, timer etcdClock, etcd connection) {
 	retries := 0
 	for retries < retryLimit {
 		retries += 1
@@ -70,7 +66,10 @@ func checkEtcdServer(address string, foundEtcd chan struct{}, stop chan struct{}
 	}
 }
 
-func WaitForEtcd(serverList []string, timer clock, etcd connection) error {
+// WaitForAvailableEtcd checks for connectivity to each etcd server in serverList.
+// Each item in serverList should be a valid URI. This function will return
+// once at least one etcd server responds before timeout.
+func WaitForAvailableEtcd(serverList []string, timer etcdClock, etcd connection) error {
 	foundEtcd := make(chan struct{}, 1)
 	stop := make(chan struct{})
 	defer close(stop)
@@ -94,8 +93,10 @@ func WaitForEtcd(serverList []string, timer clock, etcd connection) error {
 	}
 }
 
-func RunApiserverChecks(s *options.ServerRunOptions) error {
-	timer := new(connectionTimer)
+// RunAPIServerChecks ensures the apiserver is ready to execute. This function
+// will block until etcd is ready.
+func RunAPIServerChecks(s *options.ServerRunOptions) error {
+	timer := new(clock.RealClock)
 	etcd := new(etcdConnection)
-	return WaitForEtcd(s.Etcd.StorageConfig.ServerList, timer, etcd)
+	return WaitForAvailableEtcd(s.Etcd.StorageConfig.ServerList, timer, etcd)
 }
