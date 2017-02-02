@@ -30,8 +30,8 @@ import (
 )
 
 const (
-	testImageRootUid    = "gcr.io/google_containers/mounttest:0.7"
-	testImageNonRootUid = "gcr.io/google_containers/mounttest-user:0.3"
+	testImageRootUid    = "gcr.io/google_containers/mounttest:0.8"
+	testImageNonRootUid = "gcr.io/google_containers/mounttest-user:0.5"
 )
 
 var _ = framework.KubeDescribe("EmptyDir volumes", func() {
