@@ -101,7 +101,7 @@ func TestDaemonSetController(t *testing.T) {
 	updatedDaemonSet := GetDaemonSetFromChan(daemonsetUpdateChan)
 	assert.True(t, daemonsetController.hasFinalizerFunc(updatedDaemonSet, deletionhelper.FinalizerDeleteFromUnderlyingClusters))
 	updatedDaemonSet = GetDaemonSetFromChan(daemonsetUpdateChan)
-	assert.True(t, daemonsetController.hasFinalizerFunc(updatedDaemonSet, apiv1.FinalizerOrphan))
+	assert.True(t, daemonsetController.hasFinalizerFunc(updatedDaemonSet, metav1.FinalizerOrphan))
 	daemonset1 = *updatedDaemonSet
 
 	createdDaemonSet := GetDaemonSetFromChan(cluster1CreateChan)

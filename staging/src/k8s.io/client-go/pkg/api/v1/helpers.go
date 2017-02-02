@@ -26,6 +26,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/pkg/api"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 // IsOpaqueIntResourceName returns true if the resource name has the opaque
@@ -82,7 +83,7 @@ func IsServiceIPRequested(service *Service) bool {
 
 var standardFinalizers = sets.NewString(
 	string(FinalizerKubernetes),
-	FinalizerOrphan,
+	metav1.FinalizerOrphan,
 )
 
 func IsStandardFinalizerName(str string) bool {
