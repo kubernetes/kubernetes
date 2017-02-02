@@ -17,6 +17,9 @@ limitations under the License.
 package e2e
 
 import (
+	"strconv"
+	"time"
+
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -25,8 +28,6 @@ import (
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	vsphere "k8s.io/kubernetes/pkg/cloudprovider/providers/vsphere"
 	"k8s.io/kubernetes/test/e2e/framework"
-	"strconv"
-	"time"
 )
 
 // Validate PV/PVC, create and verify writer pod, delete the PVC, and validate the PV's

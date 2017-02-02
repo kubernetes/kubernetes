@@ -17,6 +17,9 @@ limitations under the License.
 package e2e
 
 import (
+	"strconv"
+	"time"
+
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -26,8 +29,6 @@ import (
 	vsphere "k8s.io/kubernetes/pkg/cloudprovider/providers/vsphere"
 	"k8s.io/kubernetes/pkg/volume/util/volumehelper"
 	"k8s.io/kubernetes/test/e2e/framework"
-	"strconv"
-	"time"
 )
 
 var _ = framework.KubeDescribe("persistentvolumereclaim", func() {
