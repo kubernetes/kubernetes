@@ -557,6 +557,8 @@ func shouldAssignNodePorts(service *api.Service) bool {
 		return true
 	case api.ServiceTypeClusterIP:
 		return false
+	case api.ServiceTypeExternalName:
+		return false
 	default:
 		glog.Errorf("Unknown service type: %v", service.Spec.Type)
 		return false

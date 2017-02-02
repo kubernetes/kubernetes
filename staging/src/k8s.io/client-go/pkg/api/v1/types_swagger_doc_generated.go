@@ -1767,10 +1767,11 @@ func (TCPSocketAction) SwaggerDoc() map[string]string {
 }
 
 var map_Taint = map[string]string{
-	"":       "The node this Taint is attached to has the effect \"effect\" on any pod that that does not tolerate the Taint.",
-	"key":    "Required. The taint key to be applied to a node.",
-	"value":  "Required. The taint value corresponding to the taint key.",
-	"effect": "Required. The effect of the taint on pods that do not tolerate the taint. Valid effects are NoSchedule and PreferNoSchedule.",
+	"":          "The node this Taint is attached to has the effect \"effect\" on any pod that that does not tolerate the Taint.",
+	"key":       "Required. The taint key to be applied to a node.",
+	"value":     "Required. The taint value corresponding to the taint key.",
+	"effect":    "Required. The effect of the taint on pods that do not tolerate the taint. Valid effects are NoSchedule, PreferNoSchedule and NoExecute.",
+	"timeAdded": "TimeAdded represents the time at which the taint was added. It is only written for NoExecute taints.",
 }
 
 func (Taint) SwaggerDoc() map[string]string {
@@ -1778,11 +1779,12 @@ func (Taint) SwaggerDoc() map[string]string {
 }
 
 var map_Toleration = map[string]string{
-	"":         "The pod this Toleration is attached to tolerates any taint that matches the triple <key,value,effect> using the matching operator <operator>.",
-	"key":      "Required. Key is the taint key that the toleration applies to.",
-	"operator": "operator represents a key's relationship to the value. Valid operators are Exists and Equal. Defaults to Equal. Exists is equivalent to wildcard for value, so that a pod can tolerate all taints of a particular category.",
-	"value":    "Value is the taint value the toleration matches to. If the operator is Exists, the value should be empty, otherwise just a regular string.",
-	"effect":   "Effect indicates the taint effect to match. Empty means match all taint effects. When specified, allowed values are NoSchedule and PreferNoSchedule.",
+	"":                  "The pod this Toleration is attached to tolerates any taint that matches the triple <key,value,effect> using the matching operator <operator>.",
+	"key":               "Key is the taint key that the toleration applies to. Empty means match all taint keys. If the key is empty, operator must be Exists; this combination means to match all values and all keys.",
+	"operator":          "Operator represents a key's relationship to the value. Valid operators are Exists and Equal. Defaults to Equal. Exists is equivalent to wildcard for value, so that a pod can tolerate all taints of a particular category.",
+	"value":             "Value is the taint value the toleration matches to. If the operator is Exists, the value should be empty, otherwise just a regular string.",
+	"effect":            "Effect indicates the taint effect to match. Empty means match all taint effects. When specified, allowed values are NoSchedule, PreferNoSchedule and NoExecute.",
+	"tolerationSeconds": "TolerationSeconds represents the period of time the toleration (which must be of effect NoExecute, otherwise this field is ignored) tolerates the taint. By default, it is not set, which means tolerate the taint forever (do not evict). Zero and negative values will be treated as 0 (evict immediately) by the system.",
 }
 
 func (Toleration) SwaggerDoc() map[string]string {

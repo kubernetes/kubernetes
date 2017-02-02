@@ -191,7 +191,7 @@ type Pod struct {
 type PodPair struct {
 	// APIPod is the v1.Pod
 	APIPod *v1.Pod
-	// RunningPod is the pod defined defined in pkg/kubelet/container/runtime#Pod
+	// RunningPod is the pod defined in pkg/kubelet/container/runtime#Pod
 	RunningPod *Pod
 }
 

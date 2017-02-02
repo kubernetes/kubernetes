@@ -112,7 +112,7 @@ type Blah struct {
 	if err != nil {
 		t.Fatal(err)
 	}
-	assert.Equal(`"foo.Blah": {
+	assert.Equal(`"base/foo.Blah": {
 Schema: spec.Schema{
 SchemaProps: spec.SchemaProps{
 Description: "Blah is a test.",
@@ -280,7 +280,7 @@ type Blah struct {
 	if err != nil {
 		t.Fatal(err)
 	}
-	assert.Equal(`"foo.Blah": {
+	assert.Equal(`"base/foo.Blah": {
 Schema: spec.Schema{
 SchemaProps: spec.SchemaProps{
 Description: "PointerSample demonstrate pointer's properties",
@@ -295,7 +295,7 @@ Format: "",
 "StructPointer": {
 SchemaProps: spec.SchemaProps{
 Description: "A struct pointer",
-Ref: spec.MustCreateRef("#/definitions/foo.Blah"),
+Ref: ref("base/foo.Blah"),
 },
 },
 "SlicePointer": {
@@ -331,7 +331,7 @@ Required: []string{"StringPointer","StructPointer","SlicePointer","MapPointer"},
 },
 },
 Dependencies: []string{
-"foo.Blah",},
+"base/foo.Blah",},
 },
 `, buffer.String())
 }

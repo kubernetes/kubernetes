@@ -19,7 +19,7 @@ import os
 import random
 import socket
 import string
-
+import json
 
 from shlex import split
 from subprocess import call
@@ -182,7 +182,9 @@ def set_app_version():
 @when('kube-dns.available', 'kubernetes-master.components.installed')
 def idle_status():
     ''' Signal at the end of the run that we are running. '''
-    if hookenv.config('service-cidr') != service_cidr():
+    if not all_kube_system_pods_running():
+        hookenv.status_set('waiting', 'Waiting for kube-system pods to start')
+    elif hookenv.config('service-cidr') != service_cidr():
         hookenv.status_set('active', 'WARN: cannot change service-cidr, still using ' + service_cidr())
     else:
         hookenv.status_set('active', 'Kubernetes master running.')
@@ -208,7 +210,6 @@ def start_master(etcd, tls):
         hookenv.log('Starting {0} service.'.format(service))
         host.service_start(service)
     hookenv.open_port(6443)
-    hookenv.status_set('active', 'Kubernetes master services ready.')
     set_state('kubernetes-master.components.started')
 
 
@@ -293,28 +294,11 @@ def remove_dashboard_addons():
         remove_state('kubernetes.dashboard.available')
 
 
-@when('kubernetes-master.components.installed')
+@when('kubernetes-master.components.started')
 @when_not('kube-dns.available')
 def start_kube_dns():
     ''' State guard to starting DNS '''
-
-    # Interrogate the cluster to find out if we have at least one worker
-    # that is capable of running the workload.
-
-    cmd = ['kubectl', 'get', 'nodes']
-    try:
-        out = check_output(cmd)
-        if b'NAME' not in out:
-            hookenv.log('Unable to determine node count, waiting '
-                        'until nodes are ready')
-            return
-    except CalledProcessError:
-        hookenv.log('kube-apiserver not ready, not requesting dns deployment')
-        return
-
-    message = 'Rendering the Kubernetes DNS files.'
-    hookenv.log(message)
-    hookenv.status_set('maintenance', message)
+    hookenv.status_set('maintenance', 'Deploying KubeDNS')
 
     context = {
         'arch': arch(),
@@ -325,8 +309,14 @@ def start_kube_dns():
             'dns_domain': hookenv.config('dns_domain')
         }
     }
-    create_addon('kubedns-controller.yaml', context)
-    create_addon('kubedns-svc.yaml', context)
+
+    try:
+        create_addon('kubedns-controller.yaml', context)
+        create_addon('kubedns-svc.yaml', context)
+    except CalledProcessError:
+        hookenv.status_set('waiting', 'Waiting to retry KubeDNS deployment')
+        return
+
     set_state('kube-dns.available')
 
 
@@ -666,3 +656,24 @@ def setup_tokens(token, username, user):
         token = ''.join(random.SystemRandom().choice(alpha) for _ in range(32))
     with open(known_tokens, 'w') as stream:
         stream.write('{0},{1},{2}'.format(token, username, user))
+
+
+def all_kube_system_pods_running():
+    ''' Check pod status in the kube-system namespace. Returns True if all
+    pods are running, False otherwise. '''
+    cmd = ['kubectl', 'get', 'po', '-n', 'kube-system', '-o', 'json']
+
+    try:
+        output = check_output(cmd).decode('utf-8')
+    except CalledProcessError:
+        hookenv.log('failed to get kube-system pod status')
+        return False
+
+    result = json.loads(output)
+
+    for pod in result['items']:
+        status = pod['status']['phase']
+        if status != 'Running':
+            return False
+
+    return True

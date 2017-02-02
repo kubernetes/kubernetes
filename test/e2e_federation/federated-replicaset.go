@@ -47,7 +47,7 @@ const (
 var _ = framework.KubeDescribe("Federation replicasets [Feature:Federation]", func() {
 	f := fedframework.NewDefaultFederatedFramework("federation-replicaset")
 
-	Describe("ReplicaSet objects", func() {
+	Describe("ReplicaSet objects [NoCluster]", func() {
 		AfterEach(func() {
 			fedframework.SkipUnlessFederated(f.ClientSet)
 

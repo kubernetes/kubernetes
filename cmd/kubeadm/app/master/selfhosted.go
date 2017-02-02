@@ -24,12 +24,19 @@ import (
 	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/wait"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	"k8s.io/kubernetes/cmd/kubeadm/app/images"
 	"k8s.io/kubernetes/pkg/api/v1"
 	ext "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
+)
+
+var (
+	// maximum unavailable and surge instances per self-hosted component deployment
+	maxUnavailable = intstr.FromInt(0)
+	maxSurge       = intstr.FromInt(1)
 )
 
 func CreateSelfHostedControlPlane(cfg *kubeadmapi.MasterConfiguration, client *clientset.Clientset) error {
@@ -234,6 +241,13 @@ func getControllerManagerDeployment(cfg *kubeadmapi.MasterConfiguration, volumes
 		},
 		Spec: ext.DeploymentSpec{
 			// TODO bootkube uses 2 replicas
+			Strategy: ext.DeploymentStrategy{
+				Type: ext.RollingUpdateDeploymentStrategyType,
+				RollingUpdate: &ext.RollingUpdateDeployment{
+					MaxUnavailable: &maxUnavailable,
+					MaxSurge:       &maxSurge,
+				},
+			},
 			Template: v1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{
@@ -281,6 +295,13 @@ func getSchedulerDeployment(cfg *kubeadmapi.MasterConfiguration) ext.Deployment 
 		},
 		Spec: ext.DeploymentSpec{
 			// TODO bootkube uses 2 replicas
+			Strategy: ext.DeploymentStrategy{
+				Type: ext.RollingUpdateDeploymentStrategyType,
+				RollingUpdate: &ext.RollingUpdateDeployment{
+					MaxUnavailable: &maxUnavailable,
+					MaxSurge:       &maxSurge,
+				},
+			},
 			Template: v1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{

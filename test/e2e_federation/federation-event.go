@@ -37,7 +37,7 @@ const (
 var _ = framework.KubeDescribe("Federation events [Feature:Federation]", func() {
 	f := fedframework.NewDefaultFederatedFramework("federation-event")
 
-	Describe("Event objects", func() {
+	Describe("Event objects [NoCluster]", func() {
 		AfterEach(func() {
 			fedframework.SkipUnlessFederated(f.ClientSet)
 

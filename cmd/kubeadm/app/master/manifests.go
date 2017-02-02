@@ -26,14 +26,12 @@ import (
 
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/images"
 	api "k8s.io/kubernetes/pkg/api/v1"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
-	"k8s.io/kubernetes/pkg/util/intstr"
-
-	"github.com/blang/semver"
 )
 
 // Static pod definitions in golang form are included below so that `kubeadm init` can get going.
@@ -52,14 +50,6 @@ const (
 	kubeProxy                      = "kube-proxy"
 	authorizationPolicyFile        = "abac_policy.json"
 	authorizationWebhookConfigFile = "webhook_authz.conf"
-)
-
-var (
-	// Minimum version of kube-apiserver that supports --kubelet-preferred-address-types
-	preferredAddressAPIServerMinVersion = semver.MustParse("1.5.0")
-
-	// Minimum version of kube-apiserver that has to have --anonymous-auth=false set
-	anonAuthDisableAPIServerMinVersion = semver.MustParse("1.5.0")
 )
 
 // WriteStaticPodManifests builds manifest objects based on user provided configuration and then dumps it to disk
@@ -110,7 +100,7 @@ func WriteStaticPodManifests(cfg *kubeadmapi.MasterConfiguration) error {
 
 	// Add etcd static pod spec only if external etcd is not configured
 	if len(cfg.Etcd.Endpoints) == 0 {
-		staticPodSpecs[etcd] = componentPod(api.Container{
+		etcdPod := componentPod(api.Container{
 			Name: etcd,
 			Command: []string{
 				"etcd",
@@ -122,16 +112,16 @@ func WriteStaticPodManifests(cfg *kubeadmapi.MasterConfiguration) error {
 			Image:         images.GetCoreImage(images.KubeEtcdImage, cfg, kubeadmapi.GlobalEnvParams.EtcdImage),
 			LivenessProbe: componentProbe(2379, "/health"),
 			Resources:     componentResources("200m"),
-			SecurityContext: &api.SecurityContext{
-				SELinuxOptions: &api.SELinuxOptions{
-					// TODO: This implies our etcd container is not being restricted by
-					// SELinux. This is not optimal and would be nice to adjust in future
-					// so it can create and write /var/lib/etcd, but for now this avoids
-					// recommending setenforce 0 system-wide.
-					Type: "spc_t",
-				},
-			},
 		}, certsVolume(cfg), etcdVolume(cfg), k8sVolume(cfg))
+
+		etcdPod.Spec.SecurityContext = &api.PodSecurityContext{
+			SELinuxOptions: &api.SELinuxOptions{
+				// Unconfine the etcd container so it can write to /var/lib/etcd with SELinux enforcing:
+				Type: "spc_t",
+			},
+		}
+
+		staticPodSpecs[etcd] = etcdPod
 	}
 
 	manifestsPath := path.Join(kubeadmapi.GlobalEnvParams.KubernetesDir, "manifests")
@@ -328,14 +318,15 @@ func getAPIServerCommand(cfg *kubeadmapi.MasterConfiguration, selfHosted bool) [
 		fmt.Sprintf("--secure-port=%d", cfg.API.Port),
 		"--allow-privileged",
 		"--storage-backend=etcd3",
+		"--kubelet-preferred-address-types=InternalIP,ExternalIP,Hostname",
 	)
 
 	if cfg.AuthorizationMode != "" {
 		command = append(command, "--authorization-mode="+cfg.AuthorizationMode)
 		switch cfg.AuthorizationMode {
-		case "ABAC":
+		case kubeadmconstants.AuthzModeABAC:
 			command = append(command, "--authorization-policy-file="+path.Join(kubeadmapi.GlobalEnvParams.KubernetesDir, authorizationPolicyFile))
-		case "Webhook":
+		case kubeadmconstants.AuthzModeWebhook:
 			command = append(command, "--authorization-webhook-config-file="+path.Join(kubeadmapi.GlobalEnvParams.KubernetesDir, authorizationWebhookConfigFile))
 		}
 	}
@@ -346,23 +337,6 @@ func getAPIServerCommand(cfg *kubeadmapi.MasterConfiguration, selfHosted bool) [
 			command = append(command, "--advertise-address=$(POD_IP)")
 		} else {
 			command = append(command, fmt.Sprintf("--advertise-address=%s", cfg.API.AdvertiseAddresses[0]))
-		}
-	}
-
-	if len(cfg.KubernetesVersion) != 0 {
-		// If the k8s version is v1.5-something, this argument is set and makes `kubectl logs` and `kubectl exec`
-		// work on bare-metal where hostnames aren't usually resolvable
-		// Omit the "v" in the beginning, otherwise semver will fail
-		k8sVersion, err := semver.Parse(cfg.KubernetesVersion[1:])
-
-		// If the k8s version is greater than this version, it supports telling it which way it should contact kubelets
-		if err == nil && k8sVersion.GTE(preferredAddressAPIServerMinVersion) {
-			command = append(command, "--kubelet-preferred-address-types=InternalIP,ExternalIP,Hostname")
-		}
-
-		// This is a critical "bugfix". Any version above this is vulnerable unless a RBAC/ABAC-authorizer is provided (which kubeadm doesn't for the time being)
-		if err == nil && k8sVersion.GTE(anonAuthDisableAPIServerMinVersion) {
-			command = append(command, "--anonymous-auth=false")
 		}
 	}
 
@@ -451,7 +425,9 @@ func getSchedulerCommand(cfg *kubeadmapi.MasterConfiguration, selfHosted bool) [
 }
 
 func getProxyCommand(cfg *kubeadmapi.MasterConfiguration) []string {
-	return getComponentBaseCommand(proxy)
+	return append(getComponentBaseCommand(proxy),
+		"--cluster-cidr="+cfg.Networking.PodSubnet,
+	)
 }
 
 func getProxyEnvVars() []api.EnvVar {

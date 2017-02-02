@@ -109,8 +109,8 @@ Downward API volume should update labels on modification,timothysc,1
 Dynamic provisioning DynamicProvisioner Alpha should create and delete alpha persistent volumes,rrati,0
 Dynamic provisioning DynamicProvisioner should create and delete persistent volumes,jsafrane,0
 DynamicKubeletConfiguration When a configmap called `kubelet-<node-name>` is added to the `kube-system` namespace The Kubelet on that node should restart to take up the new config,mwielgus,1
-ESIPP should handle updates to source ip annotation,jsafrane,1
 ESIPP should only target nodes with endpoints,rrati,0
+ESIPP should handle updates to source ip annotation,bprashanth,1
 ESIPP should work for type=LoadBalancer,fgrzadkowski,1
 ESIPP should work for type=NodePort,kargakis,1
 ESIPP should work from pods,cjcullen,1
@@ -552,7 +552,7 @@ k8s.io/kubernetes/federation/cmd/federation-controller-manager/app,kzwang,0
 k8s.io/kubernetes/federation/pkg/dnsprovider,sttts,1
 k8s.io/kubernetes/federation/pkg/dnsprovider/providers/aws/route53,cjcullen,1
 k8s.io/kubernetes/federation/pkg/dnsprovider/providers/coredns,brendandburns,0
-k8s.io/kubernetes/federation/pkg/dnsprovider/providers/google/clouddns,jsafrane,1
+k8s.io/kubernetes/federation/pkg/dnsprovider/providers/google/clouddns,madhusudancs,1
 k8s.io/kubernetes/federation/pkg/federation-controller/cluster,nikhiljindal,0
 k8s.io/kubernetes/federation/pkg/federation-controller/configmap,mwielgus,0
 k8s.io/kubernetes/federation/pkg/federation-controller/daemonset,childsb,1

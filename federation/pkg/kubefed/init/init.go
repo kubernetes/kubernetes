@@ -38,6 +38,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
@@ -47,10 +48,10 @@ import (
 	"k8s.io/kubernetes/federation/pkg/kubefed/util"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/extensions"
+	"k8s.io/kubernetes/pkg/apis/rbac"
 	client "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
-	"k8s.io/kubernetes/pkg/util/intstr"
 	"k8s.io/kubernetes/pkg/version"
 
 	"github.com/spf13/cobra"
@@ -61,6 +62,17 @@ const (
 	ControllerManagerCN         = "federation-controller-manager"
 	AdminCN                     = "admin"
 	HostClusterLocalDNSZoneName = "cluster.local."
+
+	// User name used by federation controller manager to make
+	// calls to federation API server.
+	ControllerManagerUser = "federation-controller-manager"
+
+	// Name of the ServiceAccount used by the federation controller manager
+	// to access the secrets in the host cluster.
+	ControllerManagerSA = "federation-controller-manager"
+
+	// Group name of the legacy/core API group
+	legacyAPIGroup = ""
 
 	lbAddrRetryInterval = 5 * time.Second
 	podWaitInterval     = 2 * time.Second
@@ -220,7 +232,22 @@ func initFederation(cmdOut io.Writer, config util.AdminConfig, cmd *cobra.Comman
 	}
 
 	// 7. Create federation controller manager
-	_, err = createControllerManager(hostClientset, initFlags.FederationSystemNamespace, initFlags.Name, svc.Name, cmName, image, cmKubeconfigName, dnsZoneName, dnsProvider, dryRun)
+	// 7a. Create a service account in the host cluster for federation
+	// controller manager.
+	sa, err := createControllerManagerSA(hostClientset, initFlags.FederationSystemNamespace, dryRun)
+	if err != nil {
+		return err
+	}
+
+	// 7b. Create RBAC role and role binding for federation controller
+	// manager service account.
+	_, _, err = createRoleBindings(hostClientset, initFlags.FederationSystemNamespace, sa.Name, dryRun)
+	if err != nil {
+		return err
+	}
+
+	// 7c. Create federation controller manager deployment.
+	_, err = createControllerManager(hostClientset, initFlags.FederationSystemNamespace, initFlags.Name, svc.Name, cmName, image, cmKubeconfigName, dnsZoneName, dnsProvider, sa.Name, dryRun)
 	if err != nil {
 		return err
 	}
@@ -375,7 +402,7 @@ func createControllerManagerKubeconfigSecret(clientset *client.Clientset, namesp
 	config := kubeadmkubeconfigphase.MakeClientConfigWithCerts(
 		fmt.Sprintf("https://%s", svcName),
 		name,
-		"federation-controller-manager",
+		ControllerManagerUser,
 		certutil.EncodeCertPEM(entKeyPairs.ca.Cert),
 		certutil.EncodePrivateKeyPEM(entKeyPairs.controllerManager.Key),
 		certutil.EncodeCertPEM(entKeyPairs.controllerManager.Cert),
@@ -520,7 +547,55 @@ func createAPIServer(clientset *client.Clientset, namespace, name, image, creden
 	return clientset.Extensions().Deployments(namespace).Create(dep)
 }
 
-func createControllerManager(clientset *client.Clientset, namespace, name, svcName, cmName, image, kubeconfigName, dnsZoneName, dnsProvider string, dryRun bool) (*extensions.Deployment, error) {
+func createControllerManagerSA(clientset *client.Clientset, namespace string, dryRun bool) (*api.ServiceAccount, error) {
+	sa := &api.ServiceAccount{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      ControllerManagerSA,
+			Namespace: namespace,
+			Labels:    componentLabel,
+		},
+	}
+	if dryRun {
+		return sa, nil
+	}
+	return clientset.Core().ServiceAccounts(namespace).Create(sa)
+}
+
+func createRoleBindings(clientset *client.Clientset, namespace, saName string, dryRun bool) (*rbac.Role, *rbac.RoleBinding, error) {
+	roleName := "federation-system:federation-controller-manager"
+	role := &rbac.Role{
+		// a role to use for bootstrapping the federation-controller-manager so it can access
+		// secrets in the host cluster to access other clusters.
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      roleName,
+			Namespace: namespace,
+			Labels:    componentLabel,
+		},
+		Rules: []rbac.PolicyRule{
+			rbac.NewRule("get", "list", "watch").Groups(legacyAPIGroup).Resources("secrets").RuleOrDie(),
+		},
+	}
+
+	rolebinding, err := rbac.NewRoleBinding(roleName, namespace).SAs(namespace, saName).Binding()
+	if err != nil {
+		return nil, nil, err
+	}
+	rolebinding.Labels = componentLabel
+
+	if dryRun {
+		return role, &rolebinding, nil
+	}
+
+	newRole, err := clientset.Rbac().Roles(namespace).Create(role)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	newRolebinding, err := clientset.Rbac().RoleBindings(namespace).Create(&rolebinding)
+	return newRole, newRolebinding, err
+}
+
+func createControllerManager(clientset *client.Clientset, namespace, name, svcName, cmName, image, kubeconfigName, dnsZoneName, dnsProvider, saName string, dryRun bool) (*extensions.Deployment, error) {
 	dep := &extensions.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      cmName,
@@ -578,6 +653,7 @@ func createControllerManager(clientset *client.Clientset, namespace, name, svcNa
 							},
 						},
 					},
+					ServiceAccountName: saName,
 				},
 			},
 		},

@@ -29,6 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/watch"
+	clientv1 "k8s.io/client-go/pkg/api/v1"
 	"k8s.io/client-go/util/clock"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
@@ -226,8 +227,8 @@ func (m *FakeNodeHandler) Patch(name string, pt types.PatchType, data []byte, su
 
 // FakeRecorder is used as a fake during testing.
 type FakeRecorder struct {
-	source v1.EventSource
-	Events []*v1.Event
+	source clientv1.EventSource
+	Events []*clientv1.Event
 	clock  clock.Clock
 }
 
@@ -246,7 +247,7 @@ func (f *FakeRecorder) PastEventf(obj runtime.Object, timestamp metav1.Time, eve
 }
 
 func (f *FakeRecorder) generateEvent(obj runtime.Object, timestamp metav1.Time, eventtype, reason, message string) {
-	ref, err := v1.GetReference(obj)
+	ref, err := v1.GetReference(api.Scheme, obj)
 	if err != nil {
 		return
 	}
@@ -258,19 +259,30 @@ func (f *FakeRecorder) generateEvent(obj runtime.Object, timestamp metav1.Time, 
 	}
 }
 
-func (f *FakeRecorder) makeEvent(ref *v1.ObjectReference, eventtype, reason, message string) *v1.Event {
+func (f *FakeRecorder) makeEvent(ref *v1.ObjectReference, eventtype, reason, message string) *clientv1.Event {
 	fmt.Println("make event")
 	t := metav1.Time{Time: f.clock.Now()}
 	namespace := ref.Namespace
 	if namespace == "" {
 		namespace = metav1.NamespaceDefault
 	}
-	return &v1.Event{
+
+	clientref := clientv1.ObjectReference{
+		Kind:            ref.Kind,
+		Namespace:       ref.Namespace,
+		Name:            ref.Name,
+		UID:             ref.UID,
+		APIVersion:      ref.APIVersion,
+		ResourceVersion: ref.ResourceVersion,
+		FieldPath:       ref.FieldPath,
+	}
+
+	return &clientv1.Event{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      fmt.Sprintf("%v.%x", ref.Name, t.UnixNano()),
 			Namespace: namespace,
 		},
-		InvolvedObject: *ref,
+		InvolvedObject: clientref,
 		Reason:         reason,
 		Message:        message,
 		FirstTimestamp: t,
@@ -283,8 +295,8 @@ func (f *FakeRecorder) makeEvent(ref *v1.ObjectReference, eventtype, reason, mes
 // NewFakeRecorder returns a pointer to a newly constructed FakeRecorder.
 func NewFakeRecorder() *FakeRecorder {
 	return &FakeRecorder{
-		source: v1.EventSource{Component: "nodeControllerTest"},
-		Events: []*v1.Event{},
+		source: clientv1.EventSource{Component: "nodeControllerTest"},
+		Events: []*clientv1.Event{},
 		clock:  clock.NewFakeClock(time.Now()),
 	}
 }

@@ -28,9 +28,10 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kubetypes "k8s.io/apimachinery/pkg/types"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/flowcontrol"
+	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/client/record"
 	"k8s.io/kubernetes/pkg/credentialprovider"
 	internalapi "k8s.io/kubernetes/pkg/kubelet/api"
 	runtimeapi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
@@ -322,7 +323,7 @@ func (m *kubeGenericRuntimeManager) GetPods(all bool) ([]*kubecontainer.Pod, err
 	return result, nil
 }
 
-// containerToKillInfo contains neccessary information to kill a container.
+// containerToKillInfo contains necessary information to kill a container.
 type containerToKillInfo struct {
 	// The spec of the container.
 	container *v1.Container
@@ -351,7 +352,7 @@ type podContainerSpecChanges struct {
 	ContainersToKeep map[kubecontainer.ContainerID]int
 	// ContainersToKill keeps a map of containers that need to be killed, note that
 	// the key is the container ID of the container, while
-	// the value contains neccessary information to kill a container.
+	// the value contains necessary information to kill a container.
 	ContainersToKill map[kubecontainer.ContainerID]containerToKillInfo
 
 	// InitFailed indicates whether init containers are failed.
@@ -364,7 +365,7 @@ type podContainerSpecChanges struct {
 
 // podSandboxChanged checks whether the spec of the pod is changed and returns
 // (changed, new attempt, original sandboxID if exist).
-func (m *kubeGenericRuntimeManager) podSandboxChanged(pod *v1.Pod, podStatus *kubecontainer.PodStatus) (changed bool, attempt uint32, sandboxID string) {
+func (m *kubeGenericRuntimeManager) podSandboxChanged(pod *v1.Pod, podStatus *kubecontainer.PodStatus) (bool, uint32, string) {
 	if len(podStatus.SandboxStatuses) == 0 {
 		glog.V(2).Infof("No sandbox for pod %q can be found. Need to start a new one", format.Pod(pod))
 		return true, 0, ""
@@ -547,7 +548,7 @@ func (m *kubeGenericRuntimeManager) SyncPod(pod *v1.Pod, _ v1.PodStatus, podStat
 	podContainerChanges := m.computePodContainerChanges(pod, podStatus)
 	glog.V(3).Infof("computePodContainerChanges got %+v for pod %q", podContainerChanges, format.Pod(pod))
 	if podContainerChanges.CreateSandbox {
-		ref, err := v1.GetReference(pod)
+		ref, err := v1.GetReference(api.Scheme, pod)
 		if err != nil {
 			glog.Errorf("Couldn't make a ref to pod %q: '%v'", format.Pod(pod), err)
 		}
@@ -802,7 +803,7 @@ func (m *kubeGenericRuntimeManager) isHostNetwork(podSandBoxID string, pod *v1.P
 }
 
 // GetPodStatus retrieves the status of the pod, including the
-// information of all containers in the pod that are visble in Runtime.
+// information of all containers in the pod that are visible in Runtime.
 func (m *kubeGenericRuntimeManager) GetPodStatus(uid kubetypes.UID, name, namespace string) (*kubecontainer.PodStatus, error) {
 	// Now we retain restart count of container as a container label. Each time a container
 	// restarts, pod will read the restart count from the registered dead container, increment

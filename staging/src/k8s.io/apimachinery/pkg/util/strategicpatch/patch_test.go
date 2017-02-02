@@ -64,17 +64,21 @@ type StrategicMergePatchTestCaseData struct {
 	ThreeWay map[string]interface{}
 	// Result is the expected object after applying the three-way patch on current object.
 	Result map[string]interface{}
+	// TwoWayResult is the expected object after applying the two-way patch on current object.
+	// If nil, Modified is used.
+	TwoWayResult map[string]interface{}
 }
 
 // The meaning of each field is the same as StrategicMergePatchTestCaseData's.
 // The difference is that all the fields in StrategicMergePatchRawTestCaseData are json-encoded data.
 type StrategicMergePatchRawTestCaseData struct {
-	Original []byte
-	Modified []byte
-	Current  []byte
-	TwoWay   []byte
-	ThreeWay []byte
-	Result   []byte
+	Original     []byte
+	Modified     []byte
+	Current      []byte
+	TwoWay       []byte
+	ThreeWay     []byte
+	Result       []byte
+	TwoWayResult []byte
 }
 
 type MergeItem struct {
@@ -360,8 +364,8 @@ func TestCustomStrategicMergePatch(t *testing.T) {
 	}
 
 	for _, c := range tc.TestCases {
-		original, twoWay, modified := twoWayTestCaseToJSONOrFail(t, c)
-		testPatchApplication(t, original, twoWay, modified, c.Description)
+		original, expectedTwoWayPatch, _, expectedResult := twoWayTestCaseToJSONOrFail(t, c)
+		testPatchApplication(t, original, expectedTwoWayPatch, expectedResult, c.Description)
 	}
 }
 
@@ -532,7 +536,7 @@ testCases:
     threeWay:
       name: null
       value: null
-    result: 
+    result:
       other: a
   - description: delete all fields from map with conflict
     original:
@@ -549,7 +553,7 @@ testCases:
     threeWay:
       name: null
       value: null
-    result: 
+    result:
       other: a
   - description: add field and delete all fields from map
     original:
@@ -677,12 +681,12 @@ testCases:
       mergingList:
         - name: 3
           value: 3
-        - name: 4 
-          value: 4 
+        - name: 4
+          value: 4
     modified:
       mergingList:
-        - name: 4 
-          value: 4 
+        - name: 4
+          value: 4
         - name: 1
         - name: 2
           value: 2
@@ -699,8 +703,8 @@ testCases:
       mergingList:
         - name: 3
           value: 3
-        - name: 4 
-          value: 4 
+        - name: 4
+          value: 4
     result:
       mergingList:
         - name: 1
@@ -710,8 +714,8 @@ testCases:
           other: b
         - name: 3
           value: 3
-        - name: 4 
-          value: 4 
+        - name: 4
+          value: 4
   - description: merge lists of maps with conflict
     original:
       mergingList:
@@ -1817,6 +1821,52 @@ testCases:
               other: b
         - name: 2
           other: b
+  - description: defined null values should propagate overwrite current fields (with conflict)
+    original:
+      name: 2
+    twoWay:
+      name: 1
+      value: 1
+      other: null
+    twoWayResult:
+      name: 1
+      value: 1
+    modified:
+      name: 1
+      value: 1
+      other: null
+    current:
+      name: a
+      other: a
+    threeWay:
+      name: 1
+      value: 1
+      other: null
+    result:
+      name: 1
+      value: 1
+  - description: defined null values should propagate removing original fields
+    original:
+      name: original-name
+      value: original-value
+    current:
+      name: original-name
+      value: original-value
+      other: current-other
+    modified:
+      name: modified-name
+      value: null
+    twoWay:
+      name: modified-name
+      value: null
+    twoWayResult:
+      name: modified-name
+    threeWay:
+      name: modified-name
+      value: null
+    result:
+      name: modified-name
+      other: current-other
 `)
 
 var strategicMergePatchRawTestCases = []StrategicMergePatchRawTestCase{
@@ -1982,43 +2032,53 @@ func testStrategicMergePatchWithCustomArguments(t *testing.T, description, origi
 }
 
 func testTwoWayPatch(t *testing.T, c StrategicMergePatchTestCase) {
-	original, expected, modified := twoWayTestCaseToJSONOrFail(t, c)
+	original, expectedPatch, modified, expectedResult := twoWayTestCaseToJSONOrFail(t, c)
 
-	actual, err := CreateTwoWayMergePatch(original, modified, mergeItem)
+	actualPatch, err := CreateTwoWayMergePatch(original, modified, mergeItem)
 	if err != nil {
 		t.Errorf("error: %s\nin test case: %s\ncannot create two way patch: %s:\n%s\n",
 			err, c.Description, original, toYAMLOrError(c.StrategicMergePatchTestCaseData))
 		return
 	}
 
-	testPatchCreation(t, expected, actual, c.Description)
-	testPatchApplication(t, original, actual, modified, c.Description)
+	testPatchCreation(t, expectedPatch, actualPatch, c.Description)
+	testPatchApplication(t, original, actualPatch, expectedResult, c.Description)
 }
 
 func testTwoWayPatchForRawTestCase(t *testing.T, c StrategicMergePatchRawTestCase) {
-	original, expected, modified := twoWayRawTestCaseToJSONOrFail(t, c)
+	original, expectedPatch, modified, expectedResult := twoWayRawTestCaseToJSONOrFail(t, c)
 
-	actual, err := CreateTwoWayMergePatch(original, modified, mergeItem)
+	actualPatch, err := CreateTwoWayMergePatch(original, modified, mergeItem)
 	if err != nil {
 		t.Errorf("error: %s\nin test case: %s\ncannot create two way patch:\noriginal:%s\ntwoWay:%s\nmodified:%s\ncurrent:%s\nthreeWay:%s\nresult:%s\n",
 			err, c.Description, c.Original, c.TwoWay, c.Modified, c.Current, c.ThreeWay, c.Result)
 		return
 	}
 
-	testPatchCreation(t, expected, actual, c.Description)
-	testPatchApplication(t, original, actual, modified, c.Description)
+	testPatchCreation(t, expectedPatch, actualPatch, c.Description)
+	testPatchApplication(t, original, actualPatch, expectedResult, c.Description)
 }
 
-func twoWayTestCaseToJSONOrFail(t *testing.T, c StrategicMergePatchTestCase) ([]byte, []byte, []byte) {
+func twoWayTestCaseToJSONOrFail(t *testing.T, c StrategicMergePatchTestCase) ([]byte, []byte, []byte, []byte) {
+	expectedResult := c.TwoWayResult
+	if expectedResult == nil {
+		expectedResult = c.Modified
+	}
 	return testObjectToJSONOrFail(t, c.Original, c.Description),
 		testObjectToJSONOrFail(t, c.TwoWay, c.Description),
-		testObjectToJSONOrFail(t, c.Modified, c.Description)
+		testObjectToJSONOrFail(t, c.Modified, c.Description),
+		testObjectToJSONOrFail(t, expectedResult, c.Description)
 }
 
-func twoWayRawTestCaseToJSONOrFail(t *testing.T, c StrategicMergePatchRawTestCase) ([]byte, []byte, []byte) {
+func twoWayRawTestCaseToJSONOrFail(t *testing.T, c StrategicMergePatchRawTestCase) ([]byte, []byte, []byte, []byte) {
+	expectedResult := c.TwoWayResult
+	if expectedResult == nil {
+		expectedResult = c.Modified
+	}
 	return yamlToJSONOrError(t, c.Original),
 		yamlToJSONOrError(t, c.TwoWay),
-		yamlToJSONOrError(t, c.Modified)
+		yamlToJSONOrError(t, c.Modified),
+		yamlToJSONOrError(t, expectedResult)
 }
 
 func testThreeWayPatch(t *testing.T, c StrategicMergePatchTestCase) {

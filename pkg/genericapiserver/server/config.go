@@ -52,13 +52,13 @@ import (
 	apirequest "k8s.io/apiserver/pkg/endpoints/request"
 	genericfilters "k8s.io/apiserver/pkg/server/filters"
 	"k8s.io/apiserver/pkg/server/healthz"
+	"k8s.io/apiserver/pkg/server/options"
 	restclient "k8s.io/client-go/rest"
 	certutil "k8s.io/client-go/util/cert"
 	"k8s.io/kubernetes/pkg/api"
 	genericapifilters "k8s.io/kubernetes/pkg/genericapiserver/endpoints/filters"
 	apiopenapi "k8s.io/kubernetes/pkg/genericapiserver/endpoints/openapi"
 	"k8s.io/kubernetes/pkg/genericapiserver/server/mux"
-	"k8s.io/kubernetes/pkg/genericapiserver/server/options"
 	"k8s.io/kubernetes/pkg/genericapiserver/server/routes"
 )
 
@@ -213,7 +213,8 @@ func NewConfig() *Config {
 	return config.ApplyOptions(defaultOptions)
 }
 
-func DefaultOpenAPIConfig(definitions *openapicommon.OpenAPIDefinitions) *openapicommon.Config {
+func DefaultOpenAPIConfig(getDefinitions openapicommon.GetOpenAPIDefinitions) *openapicommon.Config {
+	defNamer := apiopenapi.NewDefinitionNamer(api.Scheme)
 	return &openapicommon.Config{
 		ProtocolList:   []string{"https"},
 		IgnorePrefixes: []string{"/swaggerapi"},
@@ -228,7 +229,9 @@ func DefaultOpenAPIConfig(definitions *openapicommon.OpenAPIDefinitions) *openap
 			},
 		},
 		GetOperationIDAndTags: apiopenapi.GetOperationIDAndTags,
-		Definitions:           definitions,
+		GetDefinitionName:     defNamer.GetDefinitionName,
+		GetDefinitions:        getDefinitions,
+		PostProcessSpec:       apiopenapi.PostProcessSpec,
 	}
 }
 

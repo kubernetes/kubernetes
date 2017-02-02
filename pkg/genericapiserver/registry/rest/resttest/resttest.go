@@ -328,7 +328,7 @@ func (t *Tester) testCreateHasMetadata(valid runtime.Object) {
 		t.Fatalf("Unexpected object from result: %#v", obj)
 	}
 	defer t.delete(t.TestContext(), obj)
-	if !api.HasObjectMetaSystemFieldValues(objectMeta) {
+	if !metav1.HasObjectMetaSystemFieldValues(objectMeta) {
 		t.Errorf("storage did not populate object meta field values")
 	}
 }

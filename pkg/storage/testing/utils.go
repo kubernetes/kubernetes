@@ -22,7 +22,7 @@ import (
 	"golang.org/x/net/context"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/kubernetes/pkg/storage"
+	"k8s.io/apiserver/pkg/storage"
 )
 
 // CreateObj will create a single object using the storage interface

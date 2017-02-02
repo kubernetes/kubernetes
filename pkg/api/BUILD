@@ -17,7 +17,6 @@ go_library(
         "field_constants.go",
         "helpers.go",
         "json.go",
-        "meta.go",
         "ref.go",
         "register.go",
         "resource_helpers.go",
@@ -26,7 +25,6 @@ go_library(
     ],
     tags = ["automanaged"],
     deps = [
-        "//pkg/util/intstr:go_default_library",
         "//pkg/util/labels:go_default_library",
         "//vendor:github.com/davecgh/go-spew/spew",
         "//vendor:k8s.io/apimachinery/pkg/api/meta",
@@ -42,6 +40,7 @@ go_library(
         "//vendor:k8s.io/apimachinery/pkg/runtime/serializer",
         "//vendor:k8s.io/apimachinery/pkg/selection",
         "//vendor:k8s.io/apimachinery/pkg/types",
+        "//vendor:k8s.io/apimachinery/pkg/util/intstr",
         "//vendor:k8s.io/apimachinery/pkg/util/sets",
     ],
 )

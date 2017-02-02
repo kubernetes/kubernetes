@@ -24,13 +24,13 @@ import (
 
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	"k8s.io/kubernetes/cmd/kubeadm/app/images"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/kubeconfig"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/pkg/registry/core/service/ipallocator"
-	"k8s.io/kubernetes/pkg/util/intstr"
 )
 
 const KubeDNS = "kube-dns"
@@ -310,11 +310,7 @@ func CreateEssentialAddons(cfg *kubeadmapi.MasterConfiguration, client *clientse
 
 	kubeDNSDeployment := NewDeployment(KubeDNS, 1, createKubeDNSPodSpec(cfg))
 	SetMasterTaintTolerations(&kubeDNSDeployment.Spec.Template.ObjectMeta)
-	kubeDNSServiceAccount := &v1.ServiceAccount{}
-	kubeDNSServiceAccount.ObjectMeta.Name = KubeDNS
-	if _, err := client.ServiceAccounts(metav1.NamespaceSystem).Create(kubeDNSServiceAccount); err != nil {
-		return fmt.Errorf("failed creating kube-dns service account [%v]", err)
-	}
+
 	if _, err := client.Extensions().Deployments(metav1.NamespaceSystem).Create(kubeDNSDeployment); err != nil {
 		return fmt.Errorf("failed creating essential kube-dns addon [%v]", err)
 	}

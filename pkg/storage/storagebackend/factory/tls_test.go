@@ -25,16 +25,27 @@ import (
 
 	"golang.org/x/net/context"
 
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	runtimeserializer "k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apiserver/pkg/storage/storagebackend"
-	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/testapi"
+	clientapi "k8s.io/client-go/pkg/api"
+	clientapiv1 "k8s.io/client-go/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/storage/etcd/testing/testingcert"
 
 	"github.com/coreos/etcd/integration"
 	"github.com/coreos/etcd/pkg/transport"
+	"k8s.io/apimachinery/pkg/runtime"
 )
 
 func TestTLSConnection(t *testing.T) {
+	scheme := runtime.NewScheme()
+	codecs := runtimeserializer.NewCodecFactory(scheme)
+	codec := codecs.LegacyCodec(schema.GroupVersion{Version: "v1"})
+
+	// TODO: use k8s.io/apiserver internal type instead of borrowing it from client-go
+	clientapi.AddToScheme(scheme)
+	clientapiv1.AddToScheme(scheme)
+
 	certFile, keyFile, caFile := configureTLSCerts(t)
 	defer os.RemoveAll(filepath.Dir(certFile))
 
@@ -56,14 +67,14 @@ func TestTLSConnection(t *testing.T) {
 		CertFile:   certFile,
 		KeyFile:    keyFile,
 		CAFile:     caFile,
-		Codec:      testapi.Default.Codec(),
+		Codec:      codec,
 	}
 	storage, destroyFunc, err := newETCD3Storage(cfg)
 	defer destroyFunc()
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = storage.Create(context.TODO(), "/abc", &api.Pod{}, nil, 0)
+	err = storage.Create(context.TODO(), "/abc", &clientapi.Pod{}, nil, 0)
 	if err != nil {
 		t.Fatalf("Create failed: %v", err)
 	}

@@ -19,8 +19,8 @@ package kubelet
 import (
 	"testing"
 
-	"k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/client/record"
+	"k8s.io/client-go/pkg/api/v1"
+	"k8s.io/client-go/tools/record"
 	cadvisortest "k8s.io/kubernetes/pkg/kubelet/cadvisor/testing"
 )
 

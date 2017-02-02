@@ -8,6 +8,8 @@ This is a basic sketch of the workflow needed to add translations:
 Create `translations/kubectl/<language>/LC_MESSAGES/k8s.po`. There's
 no need to update `translations/test/...` which is only used for unit tests.
 
+There is an example [PR here](https://github.com/kubernetes/kubernetes/pull/40645) which adds support for French.
+
 Move on to Adding new translations
 
 ## Adding new translations
@@ -23,6 +25,11 @@ We use the English translation as both the `msg_id` and the `msg_context`.
 Run `./hack/generate-bindata.sh, this will turn the translation files
 into generated code which will in turn be packaged into the Kubernetes
 binaries.
+
+## Extracting strings
+
+There is a script in `translations/extract.py` that knows how to do some
+simple extraction. It needs a lot of work.
 
 # Using translations
 

@@ -19,7 +19,6 @@ go_library(
     tags = ["automanaged"],
     deps = [
         "//pkg/api:go_default_library",
-        "//pkg/storage:go_default_library",
         "//pkg/storage/etcd/util:go_default_library",
         "//vendor:github.com/coreos/etcd/client",
         "//vendor:github.com/golang/glog",
@@ -30,6 +29,7 @@ go_library(
         "//vendor:k8s.io/apimachinery/pkg/runtime",
         "//vendor:k8s.io/apimachinery/pkg/util/runtime",
         "//vendor:k8s.io/apimachinery/pkg/watch",
+        "//vendor:k8s.io/apiserver/pkg/storage",
         "//vendor:k8s.io/apiserver/pkg/storage/etcd/metrics",
         "//vendor:k8s.io/apiserver/pkg/util/cache",
         "//vendor:k8s.io/apiserver/pkg/util/trace",
@@ -49,7 +49,6 @@ go_test(
         "//pkg/api:go_default_library",
         "//pkg/api/testapi:go_default_library",
         "//pkg/api/testing:go_default_library",
-        "//pkg/storage:go_default_library",
         "//pkg/storage/etcd/etcdtest:go_default_library",
         "//pkg/storage/etcd/testing:go_default_library",
         "//pkg/storage/testing:go_default_library",
@@ -63,6 +62,7 @@ go_test(
         "//vendor:k8s.io/apimachinery/pkg/runtime",
         "//vendor:k8s.io/apimachinery/pkg/runtime/serializer",
         "//vendor:k8s.io/apimachinery/pkg/watch",
+        "//vendor:k8s.io/apiserver/pkg/storage",
     ],
 )
 

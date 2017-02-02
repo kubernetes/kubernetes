@@ -35,6 +35,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/diff"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/rest/fake"
 	"k8s.io/client-go/tools/clientcmd"
@@ -44,9 +45,9 @@ import (
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
+	rbacv1beta1 "k8s.io/kubernetes/pkg/apis/rbac/v1beta1"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
-	"k8s.io/kubernetes/pkg/util/intstr"
 )
 
 const (
@@ -555,6 +556,62 @@ func fakeInitHostFactory(federationName, namespaceName, ip, dnsZoneName, image, 
 		},
 	}
 
+	sa := v1.ServiceAccount{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "ServiceAccount",
+			APIVersion: testapi.Default.GroupVersion().String(),
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "federation-controller-manager",
+			Namespace: namespaceName,
+			Labels:    componentLabel,
+		},
+	}
+
+	role := rbacv1beta1.Role{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "Role",
+			APIVersion: testapi.Rbac.GroupVersion().String(),
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "federation-system:federation-controller-manager",
+			Namespace: namespaceName,
+			Labels:    componentLabel,
+		},
+		Rules: []rbacv1beta1.PolicyRule{
+			{
+				Verbs:     []string{"get", "list", "watch"},
+				APIGroups: []string{""},
+				Resources: []string{"secrets"},
+			},
+		},
+	}
+
+	rolebinding := rbacv1beta1.RoleBinding{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "RoleBinding",
+			APIVersion: testapi.Rbac.GroupVersion().String(),
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "federation-system:federation-controller-manager",
+			Namespace: namespaceName,
+			Labels:    componentLabel,
+		},
+		Subjects: []rbacv1beta1.Subject{
+			{
+				Kind:       "ServiceAccount",
+				APIVersion: "",
+				Name:       "federation-controller-manager",
+				Namespace:  "federation-system",
+			},
+		},
+		RoleRef: rbacv1beta1.RoleRef{
+			APIGroup: "rbac.authorization.k8s.io",
+			Kind:     "Role",
+			Name:     "federation-system:federation-controller-manager",
+		},
+	}
+
 	apiserver := v1beta1.Deployment{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "Deployment",
@@ -710,6 +767,8 @@ func fakeInitHostFactory(federationName, namespaceName, ip, dnsZoneName, image, 
 							},
 						},
 					},
+					ServiceAccountName:       "federation-controller-manager",
+					DeprecatedServiceAccount: "federation-controller-manager",
 				},
 			},
 		},
@@ -749,6 +808,7 @@ func fakeInitHostFactory(federationName, namespaceName, ip, dnsZoneName, image, 
 
 	f, tf, codec, _ := cmdtesting.NewAPIFactory()
 	extCodec := testapi.Extensions.Codec()
+	rbacCodec := testapi.Rbac.Codec()
 	ns := dynamic.ContentConfig().NegotiatedSerializer
 	tf.ClientConfig = kubefedtesting.DefaultClientConfig()
 	tf.Client = &fake.RESTClient{
@@ -853,6 +913,48 @@ func fakeInitHostFactory(federationName, namespaceName, ip, dnsZoneName, image, 
 				return &http.Response{StatusCode: http.StatusCreated, Header: kubefedtesting.DefaultHeader(), Body: kubefedtesting.ObjBody(extCodec, &want)}, nil
 			case p == "/api/v1/namespaces/federation-system/pods" && m == http.MethodGet:
 				return &http.Response{StatusCode: http.StatusOK, Header: kubefedtesting.DefaultHeader(), Body: kubefedtesting.ObjBody(codec, &podList)}, nil
+			case p == "/api/v1/namespaces/federation-system/serviceaccounts" && m == http.MethodPost:
+				body, err := ioutil.ReadAll(req.Body)
+				if err != nil {
+					return nil, err
+				}
+				var got v1.ServiceAccount
+				_, _, err = codec.Decode(body, nil, &got)
+				if err != nil {
+					return nil, err
+				}
+				if !api.Semantic.DeepEqual(got, sa) {
+					return nil, fmt.Errorf("Unexpected service account object\n\tDiff: %s", diff.ObjectGoPrintDiff(got, sa))
+				}
+				return &http.Response{StatusCode: http.StatusCreated, Header: kubefedtesting.DefaultHeader(), Body: kubefedtesting.ObjBody(codec, &sa)}, nil
+			case p == "/apis/rbac.authorization.k8s.io/v1beta1/namespaces/federation-system/roles" && m == http.MethodPost:
+				body, err := ioutil.ReadAll(req.Body)
+				if err != nil {
+					return nil, err
+				}
+				var got rbacv1beta1.Role
+				_, _, err = codec.Decode(body, nil, &got)
+				if err != nil {
+					return nil, err
+				}
+				if !api.Semantic.DeepEqual(got, role) {
+					return nil, fmt.Errorf("Unexpected role object\n\tDiff: %s", diff.ObjectGoPrintDiff(got, role))
+				}
+				return &http.Response{StatusCode: http.StatusCreated, Header: kubefedtesting.DefaultHeader(), Body: kubefedtesting.ObjBody(rbacCodec, &role)}, nil
+			case p == "/apis/rbac.authorization.k8s.io/v1beta1/namespaces/federation-system/rolebindings" && m == http.MethodPost:
+				body, err := ioutil.ReadAll(req.Body)
+				if err != nil {
+					return nil, err
+				}
+				var got rbacv1beta1.RoleBinding
+				_, _, err = codec.Decode(body, nil, &got)
+				if err != nil {
+					return nil, err
+				}
+				if !api.Semantic.DeepEqual(got, rolebinding) {
+					return nil, fmt.Errorf("Unexpected rolebinding object\n\tDiff: %s", diff.ObjectGoPrintDiff(got, rolebinding))
+				}
+				return &http.Response{StatusCode: http.StatusCreated, Header: kubefedtesting.DefaultHeader(), Body: kubefedtesting.ObjBody(rbacCodec, &rolebinding)}, nil
 			default:
 				return nil, fmt.Errorf("unexpected request: %#v\n%#v", req.URL, req)
 			}

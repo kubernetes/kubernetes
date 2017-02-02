@@ -32,11 +32,11 @@ import (
 	"k8s.io/apimachinery/pkg/conversion"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/watch"
+	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/etcd/metrics"
 	utilcache "k8s.io/apiserver/pkg/util/cache"
 	utiltrace "k8s.io/apiserver/pkg/util/trace"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/storage"
 	etcdutil "k8s.io/kubernetes/pkg/storage/etcd/util"
 )
 

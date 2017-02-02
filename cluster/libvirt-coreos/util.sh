@@ -345,6 +345,7 @@ function upload-server-tars {
   tar -x -C "$POOL_PATH/kubernetes" -f "$SERVER_BINARY_TAR" kubernetes
   rm -rf "$POOL_PATH/kubernetes/bin"
   mv "$POOL_PATH/kubernetes/kubernetes/server/bin" "$POOL_PATH/kubernetes/bin"
+  chmod -R 755 "$POOL_PATH/kubernetes/bin"
   rm -fr "$POOL_PATH/kubernetes/kubernetes"
 }
 

@@ -28,11 +28,11 @@ go_library(
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/api/v1:go_default_library",
-        "//pkg/client/record:go_default_library",
         "//pkg/credentialprovider:go_default_library",
         "//pkg/kubelet/cm:go_default_library",
         "//pkg/kubelet/container:go_default_library",
         "//pkg/kubelet/custommetrics:go_default_library",
+        "//pkg/kubelet/dockertools/securitycontext:go_default_library",
         "//pkg/kubelet/events:go_default_library",
         "//pkg/kubelet/images:go_default_library",
         "//pkg/kubelet/leaky:go_default_library",
@@ -76,6 +76,7 @@ go_library(
         "//vendor:k8s.io/apimachinery/pkg/util/errors",
         "//vendor:k8s.io/apimachinery/pkg/util/runtime",
         "//vendor:k8s.io/apimachinery/pkg/util/sets",
+        "//vendor:k8s.io/client-go/tools/record",
         "//vendor:k8s.io/client-go/util/clock",
         "//vendor:k8s.io/client-go/util/flowcontrol",
     ],
@@ -105,7 +106,6 @@ go_test(
         "//pkg/api/testapi:go_default_library",
         "//pkg/api/v1:go_default_library",
         "//pkg/apis/componentconfig:go_default_library",
-        "//pkg/client/record:go_default_library",
         "//pkg/credentialprovider:go_default_library",
         "//pkg/kubelet/container:go_default_library",
         "//pkg/kubelet/container/testing:go_default_library",
@@ -120,7 +120,6 @@ go_test(
         "//pkg/security/apparmor:go_default_library",
         "//pkg/util/exec:go_default_library",
         "//pkg/util/hash:go_default_library",
-        "//pkg/util/intstr:go_default_library",
         "//pkg/util/strings:go_default_library",
         "//vendor:github.com/docker/docker/pkg/jsonmessage",
         "//vendor:github.com/docker/engine-api/types",
@@ -134,7 +133,9 @@ go_test(
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
         "//vendor:k8s.io/apimachinery/pkg/runtime",
         "//vendor:k8s.io/apimachinery/pkg/types",
+        "//vendor:k8s.io/apimachinery/pkg/util/intstr",
         "//vendor:k8s.io/apimachinery/pkg/util/sets",
+        "//vendor:k8s.io/client-go/tools/record",
         "//vendor:k8s.io/client-go/util/clock",
         "//vendor:k8s.io/client-go/util/flowcontrol",
     ],
@@ -149,6 +150,9 @@ filegroup(
 
 filegroup(
     name = "all-srcs",
-    srcs = [":package-srcs"],
+    srcs = [
+        ":package-srcs",
+        "//pkg/kubelet/dockertools/securitycontext:all-srcs",
+    ],
     tags = ["automanaged"],
 )

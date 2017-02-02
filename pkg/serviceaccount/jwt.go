@@ -73,11 +73,25 @@ func ReadPrivateKey(file string) (interface{}, error) {
 
 // ReadPrivateKeyFromPEM is a helper function for reading a private key from a PEM-encoded file
 func ReadPrivateKeyFromPEM(data []byte) (interface{}, error) {
-	if key, err := jwt.ParseRSAPrivateKeyFromPEM(data); err == nil {
-		return key, nil
-	}
-	if key, err := jwt.ParseECPrivateKeyFromPEM(data); err == nil {
-		return key, nil
+	var block *pem.Block
+	for {
+		// read the next block
+		block, data = pem.Decode(data)
+		if block == nil {
+			break
+		}
+
+		// get PEM bytes for just this block
+		blockData := pem.EncodeToMemory(block)
+		if key, err := jwt.ParseRSAPrivateKeyFromPEM(blockData); err == nil {
+			return key, nil
+		}
+		if key, err := jwt.ParseECPrivateKeyFromPEM(blockData); err == nil {
+			return key, nil
+		}
+
+		// tolerate non-key PEM blocks for compatibility with things like "EC PARAMETERS" blocks
+		// originally, only the first PEM block was parsed and expected to be a key block
 	}
 	return nil, fmt.Errorf("data does not contain a valid RSA or ECDSA private key")
 }
