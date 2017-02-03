@@ -22,9 +22,9 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/blang/semver"
 	dockertypes "github.com/docker/engine-api/types"
 	dockerfilters "github.com/docker/engine-api/types/filters"
-	dockerapiversion "github.com/docker/engine-api/types/versions"
 	dockernat "github.com/docker/go-connections/nat"
 	"github.com/golang/glog"
 
@@ -40,25 +40,11 @@ const (
 
 var (
 	conflictRE = regexp.MustCompile(`Conflict. (?:.)+ is already in use by container ([0-9a-z]+)`)
+
+	// Docker changes the security option separator from ':' to '=' in the 1.23
+	// API version.
+	optsSeparatorChangeVersion = semver.MustParse(dockertools.SecurityOptSeparatorChangeVersion)
 )
-
-// apiVersion implements kubecontainer.Version interface by implementing
-// Compare() and String(). It uses the compare function of engine-api to
-// compare docker apiversions.
-type apiVersion string
-
-func (v apiVersion) String() string {
-	return string(v)
-}
-
-func (v apiVersion) Compare(other string) (int, error) {
-	if dockerapiversion.LessThan(string(v), other) {
-		return -1, nil
-	} else if dockerapiversion.GreaterThan(string(v), other) {
-		return 1, nil
-	}
-	return 0, nil
-}
 
 // generateEnvList converts KeyValue list to a list of strings, in the form of
 // '<key>=<value>', which can be understood by docker.
@@ -198,7 +184,7 @@ func makePortsAndBindings(pm []*runtimeapi.PortMapping) (map[dockernat.Port]stru
 // getContainerSecurityOpt gets container security options from container and sandbox config, currently from sandbox
 // annotations.
 // It is an experimental feature and may be promoted to official runtime api in the future.
-func getContainerSecurityOpts(containerName string, sandboxConfig *runtimeapi.PodSandboxConfig, seccompProfileRoot string) ([]string, error) {
+func getContainerSecurityOpts(containerName string, sandboxConfig *runtimeapi.PodSandboxConfig, seccompProfileRoot string, separator rune) ([]string, error) {
 	appArmorOpts, err := dockertools.GetAppArmorOpts(sandboxConfig.GetAnnotations(), containerName)
 	if err != nil {
 		return nil, err
@@ -208,17 +194,13 @@ func getContainerSecurityOpts(containerName string, sandboxConfig *runtimeapi.Po
 		return nil, err
 	}
 	securityOpts := append(appArmorOpts, seccompOpts...)
-	var opts []string
-	for _, securityOpt := range securityOpts {
-		k, v := securityOpt.GetKV()
-		opts = append(opts, fmt.Sprintf("%s=%s", k, v))
-	}
-	return opts, nil
+	fmtOpts := dockertools.FmtDockerOpts(securityOpts, separator)
+	return fmtOpts, nil
 }
 
-func getSandboxSecurityOpts(sandboxConfig *runtimeapi.PodSandboxConfig, seccompProfileRoot string) ([]string, error) {
+func getSandboxSecurityOpts(sandboxConfig *runtimeapi.PodSandboxConfig, seccompProfileRoot string, separator rune) ([]string, error) {
 	// sandboxContainerName doesn't exist in the pod, so pod security options will be returned by default.
-	return getContainerSecurityOpts(sandboxContainerName, sandboxConfig, seccompProfileRoot)
+	return getContainerSecurityOpts(sandboxContainerName, sandboxConfig, seccompProfileRoot, separator)
 }
 
 func getNetworkNamespace(c *dockertypes.ContainerJSON) string {
@@ -322,4 +304,19 @@ func recoverFromCreationConflictIfNeeded(client dockertools.DockerInterface, cre
 	createConfig.Name = randomizeName(createConfig.Name)
 	glog.V(2).Infof("Create the container with randomized name %s", createConfig.Name)
 	return client.CreateContainer(createConfig)
+}
+
+// getSecurityOptSeparator returns the security option separator based on the
+// docker API version.
+// TODO: Remove this function along with the relevant code when we no longer
+// need to support docker 1.10.
+func getSecurityOptSeparator(v *semver.Version) rune {
+	switch v.Compare(optsSeparatorChangeVersion) {
+	case -1:
+		// Current version is less than the API change version; use the old
+		// separator.
+		return dockertools.SecurityOptSeparatorOld
+	default:
+		return dockertools.SecurityOptSeparatorNew
+	}
 }

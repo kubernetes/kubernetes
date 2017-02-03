@@ -24,13 +24,12 @@ import (
 
 	"k8s.io/kubernetes/pkg/api/v1"
 	runtimeapi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
-	"k8s.io/kubernetes/pkg/kubelet/dockertools"
 	"k8s.io/kubernetes/pkg/kubelet/dockertools/securitycontext"
 	"k8s.io/kubernetes/pkg/kubelet/network"
 )
 
 // applySandboxSecurityContext updates docker sandbox options according to security context.
-func applySandboxSecurityContext(lc *runtimeapi.LinuxPodSandboxConfig, config *dockercontainer.Config, hc *dockercontainer.HostConfig, networkPlugin network.NetworkPlugin) {
+func applySandboxSecurityContext(lc *runtimeapi.LinuxPodSandboxConfig, config *dockercontainer.Config, hc *dockercontainer.HostConfig, networkPlugin network.NetworkPlugin, separator rune) {
 	if lc == nil {
 		return
 	}
@@ -47,19 +46,19 @@ func applySandboxSecurityContext(lc *runtimeapi.LinuxPodSandboxConfig, config *d
 	}
 
 	modifyContainerConfig(sc, config)
-	modifyHostConfig(sc, hc)
+	modifyHostConfig(sc, hc, separator)
 	modifySandboxNamespaceOptions(sc.GetNamespaceOptions(), hc, networkPlugin)
 
 }
 
 // applyContainerSecurityContext updates docker container options according to security context.
-func applyContainerSecurityContext(lc *runtimeapi.LinuxContainerConfig, sandboxID string, config *dockercontainer.Config, hc *dockercontainer.HostConfig) {
+func applyContainerSecurityContext(lc *runtimeapi.LinuxContainerConfig, sandboxID string, config *dockercontainer.Config, hc *dockercontainer.HostConfig, separator rune) {
 	if lc == nil {
 		return
 	}
 
 	modifyContainerConfig(lc.SecurityContext, config)
-	modifyHostConfig(lc.SecurityContext, hc)
+	modifyHostConfig(lc.SecurityContext, hc, separator)
 	modifyContainerNamespaceOptions(lc.SecurityContext.GetNamespaceOptions(), sandboxID, hc)
 	return
 }
@@ -78,7 +77,7 @@ func modifyContainerConfig(sc *runtimeapi.LinuxContainerSecurityContext, config 
 }
 
 // modifyHostConfig applies security context config to dockercontainer.HostConfig.
-func modifyHostConfig(sc *runtimeapi.LinuxContainerSecurityContext, hostConfig *dockercontainer.HostConfig) {
+func modifyHostConfig(sc *runtimeapi.LinuxContainerSecurityContext, hostConfig *dockercontainer.HostConfig, separator rune) {
 	if sc == nil {
 		return
 	}
@@ -104,7 +103,7 @@ func modifyHostConfig(sc *runtimeapi.LinuxContainerSecurityContext, hostConfig *
 				Type:  sc.SelinuxOptions.Type,
 				Level: sc.SelinuxOptions.Level,
 			},
-			dockertools.SecurityOptSeparatorNew,
+			separator,
 		)
 	}
 }
