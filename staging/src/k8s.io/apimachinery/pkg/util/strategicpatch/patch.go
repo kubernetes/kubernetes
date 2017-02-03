@@ -24,9 +24,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/util/json"
 	forkedjson "k8s.io/apimachinery/third_party/forked/golang/json"
-
-	"github.com/davecgh/go-spew/spew"
-	"github.com/ghodss/yaml"
+	"k8s.io/apimachinery/pkg/util/mergepatch"
 )
 
 // An alternate implementation of JSON Merge Patch
@@ -55,110 +53,26 @@ const (
 // json marshaling and/or unmarshaling operations.
 type JSONMap map[string]interface{}
 
-// IsPreconditionFailed returns true if the provided error indicates
-// a precondition failed.
-func IsPreconditionFailed(err error) bool {
-	_, ok := err.(ErrPreconditionFailed)
-	return ok
-}
-
-type ErrPreconditionFailed struct {
-	message string
-}
-
-func NewErrPreconditionFailed(target map[string]interface{}) ErrPreconditionFailed {
-	s := fmt.Sprintf("precondition failed for: %v", target)
-	return ErrPreconditionFailed{s}
-}
-
-func (err ErrPreconditionFailed) Error() string {
-	return err.message
-}
-
-type ErrConflict struct {
-	message string
-}
-
-func NewErrConflict(patch, current string) ErrConflict {
-	s := fmt.Sprintf("patch:\n%s\nconflicts with changes made from original to current:\n%s\n", patch, current)
-	return ErrConflict{s}
-}
-
-func (err ErrConflict) Error() string {
-	return err.message
-}
-
-// IsConflict returns true if the provided error indicates
-// a conflict between the patch and the current configuration.
-func IsConflict(err error) bool {
-	_, ok := err.(ErrConflict)
-	return ok
-}
-
-var errBadJSONDoc = fmt.Errorf("Invalid JSON document")
-var errNoListOfLists = fmt.Errorf("Lists of lists are not supported")
-var errBadPatchFormatForPrimitiveList = fmt.Errorf("Invalid patch format of primitive list")
-
 // The following code is adapted from github.com/openshift/origin/pkg/util/jsonmerge.
 // Instead of defining a Delta that holds an original, a patch and a set of preconditions,
 // the reconcile method accepts a set of preconditions as an argument.
-
-// PreconditionFunc asserts that an incompatible change is not present within a patch.
-type PreconditionFunc func(interface{}) bool
-
-// RequireKeyUnchanged returns a precondition function that fails if the provided key
-// is present in the patch (indicating that its value has changed).
-func RequireKeyUnchanged(key string) PreconditionFunc {
-	return func(patch interface{}) bool {
-		patchMap, ok := patch.(map[string]interface{})
-		if !ok {
-			return true
-		}
-
-		// The presence of key means that its value has been changed, so the test fails.
-		_, ok = patchMap[key]
-		return !ok
-	}
-}
-
-// RequireMetadataKeyUnchanged creates a precondition function that fails
-// if the metadata.key is present in the patch (indicating its value
-// has changed).
-func RequireMetadataKeyUnchanged(key string) PreconditionFunc {
-	return func(patch interface{}) bool {
-		patchMap, ok := patch.(map[string]interface{})
-		if !ok {
-			return true
-		}
-		patchMap1, ok := patchMap["metadata"]
-		if !ok {
-			return true
-		}
-		patchMap2, ok := patchMap1.(map[string]interface{})
-		if !ok {
-			return true
-		}
-		_, ok = patchMap2[key]
-		return !ok
-	}
-}
 
 // CreateTwoWayMergePatch creates a patch that can be passed to StrategicMergePatch from an original
 // document and a modified document, which are passed to the method as json encoded content. It will
 // return a patch that yields the modified document when applied to the original document, or an error
 // if either of the two documents is invalid.
-func CreateTwoWayMergePatch(original, modified []byte, dataStruct interface{}, fns ...PreconditionFunc) ([]byte, error) {
+func CreateTwoWayMergePatch(original, modified []byte, dataStruct interface{}, fns ...mergepatch.PreconditionFunc) ([]byte, error) {
 	originalMap := map[string]interface{}{}
 	if len(original) > 0 {
 		if err := json.Unmarshal(original, &originalMap); err != nil {
-			return nil, errBadJSONDoc
+			return nil, mergepatch.ErrBadJSONDoc
 		}
 	}
 
 	modifiedMap := map[string]interface{}{}
 	if len(modified) > 0 {
 		if err := json.Unmarshal(modified, &modifiedMap); err != nil {
-			return nil, errBadJSONDoc
+			return nil, mergepatch.ErrBadJSONDoc
 		}
 	}
 
@@ -173,7 +87,7 @@ func CreateTwoWayMergePatch(original, modified []byte, dataStruct interface{}, f
 // CreateTwoWayMergeMapPatch creates a patch from an original and modified JSON objects,
 // encoded JSONMap.
 // The serialized version of the map can then be passed to StrategicMergeMapPatch.
-func CreateTwoWayMergeMapPatch(original, modified JSONMap, dataStruct interface{}, fns ...PreconditionFunc) (JSONMap, error) {
+func CreateTwoWayMergeMapPatch(original, modified JSONMap, dataStruct interface{}, fns ...mergepatch.PreconditionFunc) (JSONMap, error) {
 	t, err := getTagStructType(dataStruct)
 	if err != nil {
 		return nil, err
@@ -187,7 +101,7 @@ func CreateTwoWayMergeMapPatch(original, modified JSONMap, dataStruct interface{
 	// Apply the preconditions to the patch, and return an error if any of them fail.
 	for _, fn := range fns {
 		if !fn(patchMap) {
-			return nil, NewErrPreconditionFailed(patchMap)
+			return nil, mergepatch.NewErrPreconditionFailed(patchMap)
 		}
 	}
 
@@ -332,7 +246,7 @@ func diffLists(original, modified []interface{}, t reflect.Type, mergeKey string
 		return patchList, nil, err
 	case reflect.Slice:
 		// Lists of Lists are not permitted by the api
-		return nil, nil, errNoListOfLists
+		return nil, nil, mergepatch.ErrNoListOfLists
 	default:
 		return diffListsOfScalars(original, modified, ignoreChangesAndAdditions, ignoreDeletions)
 	}
@@ -523,13 +437,13 @@ func StrategicMergePatch(original, patch []byte, dataStruct interface{}) ([]byte
 	originalMap := map[string]interface{}{}
 	err := json.Unmarshal(original, &originalMap)
 	if err != nil {
-		return nil, errBadJSONDoc
+		return nil, mergepatch.ErrBadJSONDoc
 	}
 
 	patchMap := map[string]interface{}{}
 	err = json.Unmarshal(patch, &patchMap)
 	if err != nil {
-		return nil, errBadJSONDoc
+		return nil, mergepatch.ErrBadJSONDoc
 	}
 
 	result, err := StrategicMergeMapPatch(originalMap, patchMap, dataStruct)
@@ -615,7 +529,7 @@ func mergeMap(original, patch map[string]interface{}, t reflect.Type, mergeDelet
 			}
 			substrings := strings.SplitN(k, "/", 2)
 			if len(substrings) <= 1 {
-				return nil, errBadPatchFormatForPrimitiveList
+				return nil, mergepatch.ErrBadPatchFormatForPrimitiveList
 			}
 			isDeleteList = true
 			k = substrings[1]
@@ -871,7 +785,7 @@ func sortMergeListsByNameMap(s map[string]interface{}, t reflect.Type) (map[stri
 		if strings.HasPrefix(k, deleteFromPrimitiveListDirectivePrefix) {
 			typedV, ok := v.([]interface{})
 			if !ok {
-				return nil, errBadPatchFormatForPrimitiveList
+				return nil, mergepatch.ErrBadPatchFormatForPrimitiveList
 			}
 			v = uniqifyAndSortScalars(typedV)
 		} else if k != directiveMarker {
@@ -1052,7 +966,7 @@ func sliceElementType(slices ...[]interface{}) (reflect.Type, error) {
 				prevType = currentType
 				// We don't support lists of lists yet.
 				if prevType.Kind() == reflect.Slice {
-					return nil, errNoListOfLists
+					return nil, mergepatch.ErrNoListOfLists
 				}
 			} else {
 				if prevType != currentType {
@@ -1068,49 +982,6 @@ func sliceElementType(slices ...[]interface{}) (reflect.Type, error) {
 	}
 
 	return prevType, nil
-}
-
-// HasConflicts returns true if the left and right JSON interface objects overlap with
-// different values in any key. All keys are required to be strings. Since patches of the
-// same Type have congruent keys, this is valid for multiple patch types. This method
-// supports JSON merge patch semantics.
-func HasConflicts(left, right interface{}) (bool, error) {
-	switch typedLeft := left.(type) {
-	case map[string]interface{}:
-		switch typedRight := right.(type) {
-		case map[string]interface{}:
-			for key, leftValue := range typedLeft {
-				rightValue, ok := typedRight[key]
-				if !ok {
-					return false, nil
-				}
-				return HasConflicts(leftValue, rightValue)
-			}
-
-			return false, nil
-		default:
-			return true, nil
-		}
-	case []interface{}:
-		switch typedRight := right.(type) {
-		case []interface{}:
-			if len(typedLeft) != len(typedRight) {
-				return true, nil
-			}
-
-			for i := range typedLeft {
-				return HasConflicts(typedLeft[i], typedRight[i])
-			}
-
-			return false, nil
-		default:
-			return true, nil
-		}
-	case string, float64, bool, int, int64, nil:
-		return !reflect.DeepEqual(left, right), nil
-	default:
-		return true, fmt.Errorf("unknown type: %v", reflect.TypeOf(left))
-	}
 }
 
 // MergingMapsHaveConflicts returns true if the left and right JSON interface
@@ -1291,25 +1162,25 @@ func mapsOfMapsHaveConflicts(typedLeft, typedRight map[string]interface{}, struc
 // in a way that is different from how it is changed in current (e.g., deleting it, changing its
 // value). We also propagate values fields that do not exist in original but are explicitly
 // defined in modified.
-func CreateThreeWayMergePatch(original, modified, current []byte, dataStruct interface{}, overwrite bool, fns ...PreconditionFunc) ([]byte, error) {
+func CreateThreeWayMergePatch(original, modified, current []byte, dataStruct interface{}, overwrite bool, fns ...mergepatch.PreconditionFunc) ([]byte, error) {
 	originalMap := map[string]interface{}{}
 	if len(original) > 0 {
 		if err := json.Unmarshal(original, &originalMap); err != nil {
-			return nil, errBadJSONDoc
+			return nil, mergepatch.ErrBadJSONDoc
 		}
 	}
 
 	modifiedMap := map[string]interface{}{}
 	if len(modified) > 0 {
 		if err := json.Unmarshal(modified, &modifiedMap); err != nil {
-			return nil, errBadJSONDoc
+			return nil, mergepatch.ErrBadJSONDoc
 		}
 	}
 
 	currentMap := map[string]interface{}{}
 	if len(current) > 0 {
 		if err := json.Unmarshal(current, &currentMap); err != nil {
-			return nil, errBadJSONDoc
+			return nil, mergepatch.ErrBadJSONDoc
 		}
 	}
 
@@ -1340,7 +1211,7 @@ func CreateThreeWayMergePatch(original, modified, current []byte, dataStruct int
 	// Apply the preconditions to the patch, and return an error if any of them fail.
 	for _, fn := range fns {
 		if !fn(patchMap) {
-			return nil, NewErrPreconditionFailed(patchMap)
+			return nil, mergepatch.NewErrPreconditionFailed(patchMap)
 		}
 	}
 
@@ -1358,27 +1229,9 @@ func CreateThreeWayMergePatch(original, modified, current []byte, dataStruct int
 		}
 
 		if hasConflicts {
-			return nil, NewErrConflict(ToYAMLOrError(patchMap), ToYAMLOrError(changedMap))
+			return nil, mergepatch.NewErrConflict(mergepatch.ToYAMLOrError(patchMap), mergepatch.ToYAMLOrError(changedMap))
 		}
 	}
 
 	return json.Marshal(patchMap)
-}
-
-func ToYAMLOrError(v interface{}) string {
-	y, err := toYAML(v)
-	if err != nil {
-		return err.Error()
-	}
-
-	return y
-}
-
-func toYAML(v interface{}) (string, error) {
-	y, err := yaml.Marshal(v)
-	if err != nil {
-		return "", fmt.Errorf("yaml marshal failed:%v\n%v\n", err, spew.Sdump(v))
-	}
-
-	return string(y), nil
 }
