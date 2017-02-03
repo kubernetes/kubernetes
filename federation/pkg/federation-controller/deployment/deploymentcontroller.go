@@ -420,8 +420,10 @@ func (fdc *DeploymentController) schedule(fd *extensionsv1.Deployment, clusters 
 	if fdPref != nil { // create a new planner if user specified a preference
 		plannerToBeUsed = planner.NewPlanner(fdPref)
 	}
-
-	replicas := int64(*fd.Spec.Replicas)
+	replicas := int64(0)
+	if fd.Spec.Replicas != nil {
+		replicas = int64(*fd.Spec.Replicas)
+	}
 	var clusterNames []string
 	for _, cluster := range clusters {
 		clusterNames = append(clusterNames, cluster.Name)
