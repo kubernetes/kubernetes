@@ -63,19 +63,6 @@ type persistentVolumeConfig struct {
 	namePrefix    string
 }
 
-// Delete the nfs-server pod. Only done once per KubeDescription().
-func nfsServerPodCleanup(c clientset.Interface, config VolumeTestConfig) {
-	defer GinkgoRecover()
-
-	podClient := c.Core().Pods(config.namespace)
-
-	if config.serverImage != "" {
-		podName := config.prefix + "-server"
-		err := podClient.Delete(podName, nil)
-		Expect(err).NotTo(HaveOccurred())
-	}
-}
-
 // Clean up a pv and pvc in a single pv/pvc test case.
 func pvPvcCleanup(c clientset.Interface, ns string, pv *v1.PersistentVolume, pvc *v1.PersistentVolumeClaim) {
 	deletePersistentVolumeClaim(c, pvc.Name, ns)
@@ -426,15 +413,6 @@ func createWaitAndDeletePod(f *framework.Framework, c clientset.Interface, ns st
 
 	// Wait for the test pod to complete its lifecycle
 	testPodSuccessOrFail(c, ns, runPod)
-}
-
-// Sanity check for GCE testing.  Verify the persistent disk attached to the node.
-func verifyGCEDiskAttached(diskName string, nodeName types.NodeName) bool {
-	gceCloud, err := getGCECloud()
-	Expect(err).NotTo(HaveOccurred())
-	isAttached, err := gceCloud.DiskIsAttached(diskName, nodeName)
-	Expect(err).NotTo(HaveOccurred())
-	return isAttached
 }
 
 // Return a pvckey struct.
