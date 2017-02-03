@@ -569,7 +569,8 @@ func (f *FakeDockerClient) PullImage(image string, auth dockertypes.AuthConfig, 
 func (f *FakeDockerClient) Version() (*dockertypes.Version, error) {
 	f.Lock()
 	defer f.Unlock()
-	return &f.VersionInfo, f.popError("version")
+	v := f.VersionInfo
+	return &v, f.popError("version")
 }
 
 func (f *FakeDockerClient) Info() (*dockertypes.Info, error) {
