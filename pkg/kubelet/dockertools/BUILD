@@ -32,6 +32,7 @@ go_library(
         "//pkg/kubelet/cm:go_default_library",
         "//pkg/kubelet/container:go_default_library",
         "//pkg/kubelet/custommetrics:go_default_library",
+        "//pkg/kubelet/dockertools/securitycontext:go_default_library",
         "//pkg/kubelet/events:go_default_library",
         "//pkg/kubelet/images:go_default_library",
         "//pkg/kubelet/leaky:go_default_library",
@@ -149,6 +150,9 @@ filegroup(
 
 filegroup(
     name = "all-srcs",
-    srcs = [":package-srcs"],
+    srcs = [
+        ":package-srcs",
+        "//pkg/kubelet/dockertools/securitycontext:all-srcs",
+    ],
     tags = ["automanaged"],
 )

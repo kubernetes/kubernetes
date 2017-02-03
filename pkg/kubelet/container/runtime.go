@@ -130,7 +130,7 @@ type DirectStreamingRuntime interface {
 	// tty.
 	ExecInContainer(containerID ContainerID, cmd []string, stdin io.Reader, stdout, stderr io.WriteCloser, tty bool, resize <-chan term.Size, timeout time.Duration) error
 	// Forward the specified port from the specified pod to the stream.
-	PortForward(pod *Pod, port uint16, stream io.ReadWriteCloser) error
+	PortForward(pod *Pod, port int32, stream io.ReadWriteCloser) error
 	// ContainerAttach encapsulates the attaching to containers for testability
 	ContainerAttacher
 }
@@ -141,7 +141,7 @@ type DirectStreamingRuntime interface {
 type IndirectStreamingRuntime interface {
 	GetExec(id ContainerID, cmd []string, stdin, stdout, stderr, tty bool) (*url.URL, error)
 	GetAttach(id ContainerID, stdin, stdout, stderr, tty bool) (*url.URL, error)
-	GetPortForward(podName, podNamespace string, podUID types.UID) (*url.URL, error)
+	GetPortForward(podName, podNamespace string, podUID types.UID, ports []int32) (*url.URL, error)
 }
 
 type ImageService interface {
@@ -191,7 +191,7 @@ type Pod struct {
 type PodPair struct {
 	// APIPod is the v1.Pod
 	APIPod *v1.Pod
-	// RunningPod is the pod defined defined in pkg/kubelet/container/runtime#Pod
+	// RunningPod is the pod defined in pkg/kubelet/container/runtime#Pod
 	RunningPod *Pod
 }
 

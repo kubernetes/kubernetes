@@ -44,8 +44,6 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 		&Deployment{},
 		&DeploymentList{},
 		&DeploymentRollback{},
-		&HorizontalPodAutoscaler{},
-		&HorizontalPodAutoscalerList{},
 		&ReplicationControllerDummy{},
 		&Scale{},
 		&ThirdPartyResource{},

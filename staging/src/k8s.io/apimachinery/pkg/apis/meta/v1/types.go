@@ -71,6 +71,11 @@ type ListMeta struct {
 	ResourceVersion string `json:"resourceVersion,omitempty" protobuf:"bytes,2,opt,name=resourceVersion"`
 }
 
+// These are internal finalizer values for Kubernetes-like APIs, must be qualified name unless defined here
+const (
+	FinalizerOrphan     string        = "orphan"
+)
+
 // ObjectMeta is metadata that all persisted resources must have, which includes all objects
 // users must create.
 type ObjectMeta struct {

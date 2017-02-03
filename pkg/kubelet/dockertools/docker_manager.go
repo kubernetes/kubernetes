@@ -54,6 +54,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
+	dockersecurity "k8s.io/kubernetes/pkg/kubelet/dockertools/securitycontext"
 	"k8s.io/kubernetes/pkg/kubelet/events"
 	"k8s.io/kubernetes/pkg/kubelet/images"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
@@ -812,7 +813,7 @@ func (dm *DockerManager) runContainer(
 	glog.V(3).Infof("Container %v/%v/%v: setting entrypoint \"%v\" and command \"%v\"", pod.Namespace, pod.Name, container.Name, dockerOpts.Config.Entrypoint, dockerOpts.Config.Cmd)
 
 	supplementalGids := dm.runtimeHelper.GetExtraSupplementalGroupsForPod(pod)
-	securityContextProvider := securitycontext.NewSimpleSecurityContextProvider()
+	securityContextProvider := dockersecurity.NewSimpleSecurityContextProvider()
 	securityContextProvider.ModifyContainerConfig(pod, container, dockerOpts.Config)
 	securityContextProvider.ModifyHostConfig(pod, container, dockerOpts.HostConfig, supplementalGids)
 	createResp, err := dm.client.CreateContainer(dockerOpts)
@@ -1353,7 +1354,7 @@ func noPodInfraContainerError(podName, podNamespace string) error {
 //  - match cgroups of container
 //  - should we support nsenter + socat on the host? (current impl)
 //  - should we support nsenter + socat in a container, running with elevated privs and --pid=host?
-func (dm *DockerManager) PortForward(pod *kubecontainer.Pod, port uint16, stream io.ReadWriteCloser) error {
+func (dm *DockerManager) PortForward(pod *kubecontainer.Pod, port int32, stream io.ReadWriteCloser) error {
 	podInfraContainer := pod.FindContainerByName(PodInfraContainerName)
 	if podInfraContainer == nil {
 		return noPodInfraContainerError(pod.Name, pod.Namespace)
@@ -1369,7 +1370,7 @@ func (dm *DockerManager) UpdatePodCIDR(podCIDR string) error {
 }
 
 // Temporarily export this function to share with dockershim.
-func PortForward(client DockerInterface, podInfraContainerID string, port uint16, stream io.ReadWriteCloser) error {
+func PortForward(client DockerInterface, podInfraContainerID string, port int32, stream io.ReadWriteCloser) error {
 	container, err := client.InspectContainer(podInfraContainerID)
 	if err != nil {
 		return err

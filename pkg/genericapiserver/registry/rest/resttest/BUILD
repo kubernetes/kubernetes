@@ -12,7 +12,6 @@ go_library(
     srcs = ["resttest.go"],
     tags = ["automanaged"],
     deps = [
-        "//pkg/api:go_default_library",
         "//pkg/genericapiserver/registry/rest:go_default_library",
         "//vendor:k8s.io/apimachinery/pkg/api/equality",
         "//vendor:k8s.io/apimachinery/pkg/api/errors",

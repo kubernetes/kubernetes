@@ -22,6 +22,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apiserver/pkg/authorization/authorizerfactory"
+	genericoptions "k8s.io/apiserver/pkg/server/options"
 	"k8s.io/apiserver/pkg/storage/storagebackend"
 	"k8s.io/kubernetes/cmd/libs/go2idl/client-gen/test_apis/testgroup/v1"
 	testgroupetcd "k8s.io/kubernetes/examples/apiserver/rest"
@@ -29,7 +30,6 @@ import (
 	"k8s.io/kubernetes/pkg/genericapiserver/registry/generic"
 	"k8s.io/kubernetes/pkg/genericapiserver/registry/rest"
 	genericapiserver "k8s.io/kubernetes/pkg/genericapiserver/server"
-	genericoptions "k8s.io/kubernetes/pkg/genericapiserver/server/options"
 	kubeoptions "k8s.io/kubernetes/pkg/kubeapiserver/options"
 
 	// Install the testgroup API
@@ -49,8 +49,9 @@ func newStorageFactory() genericapiserver.StorageFactory {
 	config := storagebackend.Config{
 		Prefix:     genericoptions.DefaultEtcdPathPrefix,
 		ServerList: []string{"http://127.0.0.1:2379"},
+		Copier:     api.Scheme,
 	}
-	storageFactory := genericapiserver.NewDefaultStorageFactory(config, "application/json", api.Codecs, genericapiserver.NewDefaultResourceEncodingConfig(), genericapiserver.NewResourceConfig())
+	storageFactory := genericapiserver.NewDefaultStorageFactory(config, "application/json", api.Codecs, genericapiserver.NewDefaultResourceEncodingConfig(api.Registry), genericapiserver.NewResourceConfig())
 
 	return storageFactory
 }
@@ -67,7 +68,7 @@ type ServerRunOptions struct {
 func NewServerRunOptions() *ServerRunOptions {
 	s := ServerRunOptions{
 		GenericServerRunOptions: genericoptions.NewServerRunOptions(),
-		Etcd:            genericoptions.NewEtcdOptions(),
+		Etcd:            genericoptions.NewEtcdOptions(api.Scheme),
 		SecureServing:   genericoptions.NewSecureServingOptions(),
 		InsecureServing: genericoptions.NewInsecureServingOptions(),
 		Authentication:  kubeoptions.NewBuiltInAuthenticationOptions().WithAll(),
@@ -103,6 +104,7 @@ func (serverOptions *ServerRunOptions) Run(stopCh <-chan struct{}) error {
 
 	// create config from options
 	config := genericapiserver.NewConfig().
+		WithSerializer(api.Codecs).
 		ApplyOptions(serverOptions.GenericServerRunOptions).
 		ApplyInsecureServingOptions(serverOptions.InsecureServing)
 

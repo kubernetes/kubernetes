@@ -19,12 +19,12 @@ go_library(
         "//pkg/api:go_default_library",
         "//pkg/api/validation:go_default_library",
         "//pkg/features:go_default_library",
-        "//pkg/genericapiserver/server/options:go_default_library",
         "//pkg/kubeapiserver/options:go_default_library",
         "//pkg/kubelet/client:go_default_library",
         "//pkg/master/ports:go_default_library",
         "//vendor:github.com/spf13/pflag",
         "//vendor:k8s.io/apimachinery/pkg/util/net",
+        "//vendor:k8s.io/apiserver/pkg/server/options",
     ],
 )
 

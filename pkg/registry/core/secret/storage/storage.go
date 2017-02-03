@@ -21,6 +21,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/genericapiserver/registry/generic"
 	genericregistry "k8s.io/kubernetes/pkg/genericapiserver/registry/generic/registry"
+	"k8s.io/kubernetes/pkg/registry/cachesize"
 	"k8s.io/kubernetes/pkg/registry/core/secret"
 )
 
@@ -39,6 +40,7 @@ func NewREST(optsGetter generic.RESTOptionsGetter) *REST {
 		},
 		PredicateFunc:     secret.Matcher,
 		QualifiedResource: api.Resource("secrets"),
+		WatchCacheSize:    cachesize.GetWatchCacheSizeByResource("secrets"),
 
 		CreateStrategy: secret.Strategy,
 		UpdateStrategy: secret.Strategy,

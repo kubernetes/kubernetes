@@ -25,23 +25,23 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
-	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/apiserver/pkg/apis/example"
 )
 
 func TestDecoratedWatcher(t *testing.T) {
 	w := watch.NewFake()
 	decorator := func(obj runtime.Object) error {
-		pod := obj.(*api.Pod)
+		pod := obj.(*example.Pod)
 		pod.Annotations = map[string]string{"decorated": "true"}
 		return nil
 	}
 	dw := newDecoratedWatcher(w, decorator)
 	defer dw.Stop()
 
-	go w.Add(&api.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}})
+	go w.Add(&example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}})
 	select {
 	case e := <-dw.ResultChan():
-		pod, ok := e.Object.(*api.Pod)
+		pod, ok := e.Object.(*example.Pod)
 		if !ok {
 			t.Errorf("Should received object of type *api.Pod, get type (%T)", e.Object)
 			return
@@ -63,7 +63,7 @@ func TestDecoratedWatcherError(t *testing.T) {
 	dw := newDecoratedWatcher(w, decorator)
 	defer dw.Stop()
 
-	go w.Add(&api.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}})
+	go w.Add(&example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}})
 	select {
 	case e := <-dw.ResultChan():
 		if e.Type != watch.Error {

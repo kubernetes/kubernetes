@@ -42,8 +42,10 @@ type VolumeOptions struct {
 
 	// Reclamation policy for a persistent volume
 	PersistentVolumeReclaimPolicy v1.PersistentVolumeReclaimPolicy
-	// PV.Name of the appropriate PersistentVolume. Used to generate cloud
-	// volume name.
+	// Suggested PV.Name of the PersistentVolume to provision.
+	// This is a generated name guaranteed to be unique in Kubernetes cluster.
+	// If you choose not to use it as volume name, ensure uniqueness by either
+	// combining it with your value or create unique values of your own.
 	PVName string
 	// PVC is reference to the claim that lead to provisioning of a new PV.
 	// Provisioners *must* create a PV that would be matched by this PVC,

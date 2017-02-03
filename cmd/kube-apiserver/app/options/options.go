@@ -22,9 +22,9 @@ import (
 	"time"
 
 	utilnet "k8s.io/apimachinery/pkg/util/net"
+	genericoptions "k8s.io/apiserver/pkg/server/options"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/validation"
-	genericoptions "k8s.io/kubernetes/pkg/genericapiserver/server/options"
 	kubeoptions "k8s.io/kubernetes/pkg/kubeapiserver/options"
 	kubeletclient "k8s.io/kubernetes/pkg/kubelet/client"
 	"k8s.io/kubernetes/pkg/master/ports"
@@ -65,7 +65,7 @@ type ServerRunOptions struct {
 func NewServerRunOptions() *ServerRunOptions {
 	s := ServerRunOptions{
 		GenericServerRunOptions: genericoptions.NewServerRunOptions(),
-		Etcd:                 genericoptions.NewEtcdOptions(),
+		Etcd:                 genericoptions.NewEtcdOptions(api.Scheme),
 		SecureServing:        genericoptions.NewSecureServingOptions(),
 		InsecureServing:      genericoptions.NewInsecureServingOptions(),
 		Authentication:       kubeoptions.NewBuiltInAuthenticationOptions().WithAll(),

@@ -27,6 +27,7 @@ import (
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
+	apitesting "k8s.io/apimachinery/pkg/api/testing"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
@@ -34,9 +35,9 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
+	"k8s.io/apiserver/pkg/apis/example"
+	examplev1 "k8s.io/apiserver/pkg/apis/example/v1"
 	"k8s.io/apiserver/pkg/storage"
-	"k8s.io/client-go/pkg/api"
-	"k8s.io/client-go/pkg/api/v1"
 	etcdstorage "k8s.io/kubernetes/pkg/storage/etcd"
 	"k8s.io/kubernetes/pkg/storage/etcd/etcdtest"
 	etcdtesting "k8s.io/kubernetes/pkg/storage/etcd/testing"
@@ -44,23 +45,24 @@ import (
 
 	"golang.org/x/net/context"
 
+	"k8s.io/apimachinery/pkg/runtime/serializer"
 	_ "k8s.io/client-go/pkg/api/install"
 )
 
-func DeepEqualSafePodSpec() api.PodSpec {
-	grace := int64(30)
-	return api.PodSpec{
-		RestartPolicy:                 api.RestartPolicyAlways,
-		DNSPolicy:                     api.DNSClusterFirst,
-		TerminationGracePeriodSeconds: &grace,
-		SecurityContext:               &api.PodSecurityContext{},
-		SchedulerName:                 api.DefaultSchedulerName,
-	}
+var (
+	scheme = runtime.NewScheme()
+	codecs = serializer.NewCodecFactory(scheme)
+)
+
+func init() {
+	metav1.AddToGroupVersion(scheme, metav1.SchemeGroupVersion)
+	example.AddToScheme(scheme)
+	examplev1.AddToScheme(scheme)
 }
 
 // GetAttrs returns labels and fields of a given object for filtering purposes.
 func GetAttrs(obj runtime.Object) (labels.Set, fields.Set, error) {
-	pod, ok := obj.(*api.Pod)
+	pod, ok := obj.(*example.Pod)
 	if !ok {
 		return nil, nil, fmt.Errorf("not a pod")
 	}
@@ -69,7 +71,7 @@ func GetAttrs(obj runtime.Object) (labels.Set, fields.Set, error) {
 
 // PodToSelectableFields returns a field set that represents the object
 // TODO: fields are not labels, and the validation rules for them do not apply.
-func PodToSelectableFields(pod *api.Pod) fields.Set {
+func PodToSelectableFields(pod *example.Pod) fields.Set {
 	// The purpose of allocation with a given number of elements is to reduce
 	// amount of allocations needed to create the fields.Set. If you add any
 	// field here or the number of object-meta related fields changes, this should
@@ -89,9 +91,9 @@ func AddObjectMetaFieldsSet(source fields.Set, objectMeta *metav1.ObjectMeta, ha
 	return source
 }
 
-func newEtcdTestStorage(t *testing.T, codec runtime.Codec, prefix string) (*etcdtesting.EtcdTestServer, storage.Interface) {
-	server, _ := etcdtesting.NewUnsecuredEtcd3TestClientServer(t)
-	storage := etcd3.New(server.V3Client, codec, prefix)
+func newEtcdTestStorage(t *testing.T, prefix string) (*etcdtesting.EtcdTestServer, storage.Interface) {
+	server, _ := etcdtesting.NewUnsecuredEtcd3TestClientServer(t, scheme)
+	storage := etcd3.New(server.V3Client, apitesting.TestCodec(codecs, examplev1.SchemeGroupVersion), prefix)
 	return server, storage
 }
 
@@ -101,39 +103,39 @@ func newTestCacher(s storage.Interface, cap int) *storage.Cacher {
 		CacheCapacity:  cap,
 		Storage:        s,
 		Versioner:      etcdstorage.APIObjectVersioner{},
-		Copier:         api.Scheme,
-		Type:           &api.Pod{},
+		Copier:         scheme,
+		Type:           &example.Pod{},
 		ResourcePrefix: prefix,
 		KeyFunc:        func(obj runtime.Object) (string, error) { return storage.NamespaceKeyFunc(prefix, obj) },
 		GetAttrsFunc:   GetAttrs,
-		NewListFunc:    func() runtime.Object { return &api.PodList{} },
-		Codec:          api.Codecs.LegacyCodec(v1.SchemeGroupVersion),
+		NewListFunc:    func() runtime.Object { return &example.PodList{} },
+		Codec:          codecs.LegacyCodec(examplev1.SchemeGroupVersion),
 	}
 	return storage.NewCacherFromConfig(config)
 }
 
-func makeTestPod(name string) *api.Pod {
-	return &api.Pod{
+func makeTestPod(name string) *example.Pod {
+	return &example.Pod{
 		ObjectMeta: metav1.ObjectMeta{Namespace: "ns", Name: name},
 		Spec:       DeepEqualSafePodSpec(),
 	}
 }
 
-func updatePod(t *testing.T, s storage.Interface, obj, old *api.Pod) *api.Pod {
+func updatePod(t *testing.T, s storage.Interface, obj, old *example.Pod) *example.Pod {
 	updateFn := func(input runtime.Object, res storage.ResponseMeta) (runtime.Object, *uint64, error) {
-		newObj, err := api.Scheme.DeepCopy(obj)
+		newObj, err := scheme.DeepCopy(obj)
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
 			return nil, nil, err
 		}
-		return newObj.(*api.Pod), nil, nil
+		return newObj.(*example.Pod), nil, nil
 	}
 	key := "pods/" + obj.Namespace + "/" + obj.Name
-	if err := s.GuaranteedUpdate(context.TODO(), key, &api.Pod{}, old == nil, nil, updateFn); err != nil {
+	if err := s.GuaranteedUpdate(context.TODO(), key, &example.Pod{}, old == nil, nil, updateFn); err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
 	obj.ResourceVersion = ""
-	result := &api.Pod{}
+	result := &example.Pod{}
 	if err := s.Get(context.TODO(), key, "", result, false); err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -141,7 +143,7 @@ func updatePod(t *testing.T, s storage.Interface, obj, old *api.Pod) *api.Pod {
 }
 
 func TestGet(t *testing.T) {
-	server, etcdStorage := newEtcdTestStorage(t, api.Codecs.LegacyCodec(v1.SchemeGroupVersion), etcdtest.PathPrefix())
+	server, etcdStorage := newEtcdTestStorage(t, etcdtest.PathPrefix())
 	defer server.Terminate(t)
 	cacher := newTestCacher(etcdStorage, 10)
 	defer cacher.Stop()
@@ -150,7 +152,7 @@ func TestGet(t *testing.T) {
 	fooCreated := updatePod(t, etcdStorage, podFoo, nil)
 
 	// We pass the ResourceVersion from the above Create() operation.
-	result := &api.Pod{}
+	result := &example.Pod{}
 	if err := cacher.Get(context.TODO(), "pods/ns/foo", fooCreated.ResourceVersion, result, true); err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
@@ -161,7 +163,7 @@ func TestGet(t *testing.T) {
 	if err := cacher.Get(context.TODO(), "pods/ns/bar", fooCreated.ResourceVersion, result, true); err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
-	emptyPod := api.Pod{}
+	emptyPod := example.Pod{}
 	if e, a := emptyPod, *result; !reflect.DeepEqual(e, a) {
 		t.Errorf("Expected: %#v, got: %#v", e, a)
 	}
@@ -172,7 +174,7 @@ func TestGet(t *testing.T) {
 }
 
 func TestList(t *testing.T) {
-	server, etcdStorage := newEtcdTestStorage(t, api.Codecs.LegacyCodec(v1.SchemeGroupVersion), etcdtest.PathPrefix())
+	server, etcdStorage := newEtcdTestStorage(t, etcdtest.PathPrefix())
 	defer server.Terminate(t)
 	cacher := newTestCacher(etcdStorage, 10)
 	defer cacher.Stop()
@@ -196,20 +198,20 @@ func TestList(t *testing.T) {
 	podFooNS2.Namespace += "2"
 	updatePod(t, etcdStorage, podFooNS2, nil)
 
-	deleted := api.Pod{}
+	deleted := example.Pod{}
 	if err := etcdStorage.Delete(context.TODO(), "pods/ns/bar", &deleted, nil); err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
 
 	// We first List directly from etcd by passing empty resourceVersion,
 	// to get the current etcd resourceVersion.
-	rvResult := &api.PodList{}
+	rvResult := &example.PodList{}
 	if err := cacher.List(context.TODO(), "pods/ns", "", storage.Everything, rvResult); err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
 	deletedPodRV := rvResult.ListMeta.ResourceVersion
 
-	result := &api.PodList{}
+	result := &example.PodList{}
 	// We pass the current etcd ResourceVersion received from the above List() operation,
 	// since there is not easy way to get ResourceVersion of barPod deletion operation.
 	if err := cacher.List(context.TODO(), "pods/ns", deletedPodRV, storage.Everything, result); err != nil {
@@ -237,7 +239,7 @@ func TestList(t *testing.T) {
 			t.Errorf("Unexpected namespace: %s", item.Namespace)
 		}
 
-		var expected *api.Pod
+		var expected *example.Pod
 		switch item.Name {
 		case "foo":
 			expected = podFooPrime
@@ -253,7 +255,7 @@ func TestList(t *testing.T) {
 }
 
 func TestInfiniteList(t *testing.T) {
-	server, etcdStorage := newEtcdTestStorage(t, api.Codecs.LegacyCodec(v1.SchemeGroupVersion), etcdtest.PathPrefix())
+	server, etcdStorage := newEtcdTestStorage(t, etcdtest.PathPrefix())
 	defer server.Terminate(t)
 	cacher := newTestCacher(etcdStorage, 10)
 	defer cacher.Stop()
@@ -268,7 +270,7 @@ func TestInfiniteList(t *testing.T) {
 	}
 	listRV := strconv.Itoa(int(rv + 10))
 
-	result := &api.PodList{}
+	result := &example.PodList{}
 	err = cacher.List(context.TODO(), "pods/ns", listRV, storage.Everything, result)
 	if !errors.IsTimeout(err) {
 		t.Errorf("Unexpected error: %v", err)
@@ -307,7 +309,7 @@ func (self *injectListError) List(ctx context.Context, key string, resourceVersi
 }
 
 func TestWatch(t *testing.T) {
-	server, etcdStorage := newEtcdTestStorage(t, api.Codecs.LegacyCodec(v1.SchemeGroupVersion), etcdtest.PathPrefix())
+	server, etcdStorage := newEtcdTestStorage(t, etcdtest.PathPrefix())
 	// Inject one list error to make sure we test the relist case.
 	etcdStorage = &injectListError{errors: 1, Interface: etcdStorage}
 	defer server.Terminate(t)
@@ -384,7 +386,7 @@ func TestWatch(t *testing.T) {
 }
 
 func TestWatcherTimeout(t *testing.T) {
-	server, etcdStorage := newEtcdTestStorage(t, api.Codecs.LegacyCodec(v1.SchemeGroupVersion), etcdtest.PathPrefix())
+	server, etcdStorage := newEtcdTestStorage(t, etcdtest.PathPrefix())
 	defer server.Terminate(t)
 	cacher := newTestCacher(etcdStorage, 10)
 	defer cacher.Stop()
@@ -426,7 +428,7 @@ func TestWatcherTimeout(t *testing.T) {
 }
 
 func TestFiltering(t *testing.T) {
-	server, etcdStorage := newEtcdTestStorage(t, api.Codecs.LegacyCodec(v1.SchemeGroupVersion), etcdtest.PathPrefix())
+	server, etcdStorage := newEtcdTestStorage(t, etcdtest.PathPrefix())
 	defer server.Terminate(t)
 	cacher := newTestCacher(etcdStorage, 10)
 	defer cacher.Stop()
@@ -458,7 +460,7 @@ func TestFiltering(t *testing.T) {
 	fooUnfiltered := updatePod(t, etcdStorage, podFoo, fooFiltered)
 	_ = updatePod(t, etcdStorage, podFooPrime, fooUnfiltered)
 
-	deleted := api.Pod{}
+	deleted := example.Pod{}
 	if err := etcdStorage.Delete(context.TODO(), "pods/ns/foo", &deleted, nil); err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
@@ -488,7 +490,7 @@ func TestFiltering(t *testing.T) {
 }
 
 func TestStartingResourceVersion(t *testing.T) {
-	server, etcdStorage := newEtcdTestStorage(t, api.Codecs.LegacyCodec(v1.SchemeGroupVersion), etcdtest.PathPrefix())
+	server, etcdStorage := newEtcdTestStorage(t, etcdtest.PathPrefix())
 	defer server.Terminate(t)
 	cacher := newTestCacher(etcdStorage, 10)
 	defer cacher.Stop()
@@ -520,7 +522,7 @@ func TestStartingResourceVersion(t *testing.T) {
 
 	select {
 	case e := <-watcher.ResultChan():
-		pod := e.Object.(*api.Pod)
+		pod := e.Object.(*example.Pod)
 		podRV, err := storage.ParseWatchResourceVersion(pod.ResourceVersion)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
@@ -536,7 +538,7 @@ func TestStartingResourceVersion(t *testing.T) {
 }
 
 func TestRandomWatchDeliver(t *testing.T) {
-	server, etcdStorage := newEtcdTestStorage(t, api.Codecs.LegacyCodec(v1.SchemeGroupVersion), etcdtest.PathPrefix())
+	server, etcdStorage := newEtcdTestStorage(t, etcdtest.PathPrefix())
 	defer server.Terminate(t)
 	cacher := newTestCacher(etcdStorage, 10)
 	defer cacher.Stop()
@@ -569,7 +571,7 @@ func TestRandomWatchDeliver(t *testing.T) {
 		if !ok {
 			break
 		}
-		if a, e := event.Object.(*api.Pod).Name, fmt.Sprintf("foo-%d", watched); e != a {
+		if a, e := event.Object.(*example.Pod).Name, fmt.Sprintf("foo-%d", watched); e != a {
 			t.Errorf("Unexpected object watched: %s, expected %s", a, e)
 		}
 		watched++

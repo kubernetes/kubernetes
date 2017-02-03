@@ -31,10 +31,10 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
+	"k8s.io/apiserver/pkg/server/options"
 	utilflag "k8s.io/apiserver/pkg/util/flag"
 	utilcert "k8s.io/client-go/util/cert"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
-	"k8s.io/kubernetes/pkg/genericapiserver/server/options"
 )
 
 type TestCertSpec struct {

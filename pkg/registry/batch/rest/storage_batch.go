@@ -18,6 +18,7 @@ package rest
 
 import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/batch"
 	batchapiv1 "k8s.io/kubernetes/pkg/apis/batch/v1"
 	batchapiv2alpha1 "k8s.io/kubernetes/pkg/apis/batch/v2alpha1"
@@ -31,7 +32,7 @@ import (
 type RESTStorageProvider struct{}
 
 func (p RESTStorageProvider) NewRESTStorage(apiResourceConfigSource genericapiserver.APIResourceConfigSource, restOptionsGetter generic.RESTOptionsGetter) (genericapiserver.APIGroupInfo, bool) {
-	apiGroupInfo := genericapiserver.NewDefaultAPIGroupInfo(batch.GroupName)
+	apiGroupInfo := genericapiserver.NewDefaultAPIGroupInfo(batch.GroupName, api.Registry, api.Scheme, api.ParameterCodec, api.Codecs)
 
 	if apiResourceConfigSource.AnyResourcesForVersionEnabled(batchapiv2alpha1.SchemeGroupVersion) {
 		apiGroupInfo.VersionedResourcesStorageMap[batchapiv2alpha1.SchemeGroupVersion.Version] = p.v2alpha1Storage(apiResourceConfigSource, restOptionsGetter)

@@ -17,31 +17,110 @@ limitations under the License.
 package server
 
 import (
+	"os"
 	"reflect"
 	"testing"
 
+	"k8s.io/apimachinery/pkg/apimachinery/announced"
+	"k8s.io/apimachinery/pkg/apimachinery/registered"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apiserver/pkg/apis/example"
+	exampleinstall "k8s.io/apiserver/pkg/apis/example/install"
+	examplev1 "k8s.io/apiserver/pkg/apis/example/v1"
+	"k8s.io/apiserver/pkg/server/options"
 	"k8s.io/apiserver/pkg/storage/storagebackend"
-	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/apis/extensions"
-	"k8s.io/kubernetes/pkg/genericapiserver/server/options"
 )
 
+var (
+	registry = registered.NewOrDie(os.Getenv("KUBE_API_VERSIONS"))
+	announce = make(announced.APIGroupFactoryRegistry)
+)
+
+func init() {
+	exampleinstall.Install(announce, registry, scheme)
+}
+
+type fakeNegotiater struct {
+	serializer, streamSerializer runtime.Serializer
+	framer                       runtime.Framer
+	types, streamTypes           []string
+}
+
+func (n *fakeNegotiater) SupportedMediaTypes() []runtime.SerializerInfo {
+	var out []runtime.SerializerInfo
+	for _, s := range n.types {
+		info := runtime.SerializerInfo{Serializer: n.serializer, MediaType: s, EncodesAsText: true}
+		for _, t := range n.streamTypes {
+			if t == s {
+				info.StreamSerializer = &runtime.StreamSerializerInfo{
+					EncodesAsText: true,
+					Framer:        n.framer,
+					Serializer:    n.streamSerializer,
+				}
+			}
+		}
+		out = append(out, info)
+	}
+	return out
+}
+
+func (n *fakeNegotiater) UniversalDeserializer() runtime.Decoder {
+	return n.serializer
+}
+
+func (n *fakeNegotiater) EncoderForVersion(serializer runtime.Encoder, gv runtime.GroupVersioner) runtime.Encoder {
+	return n.serializer
+}
+
+func (n *fakeNegotiater) DecoderToVersion(serializer runtime.Decoder, gv runtime.GroupVersioner) runtime.Decoder {
+	return n.serializer
+}
+
+func TestDefaultStorageFactory(t *testing.T) {
+	ns := &fakeNegotiater{types: []string{"test/test"}}
+	f := NewDefaultStorageFactory(storagebackend.Config{}, "test/test", ns, NewDefaultResourceEncodingConfig(registry), NewResourceConfig())
+	f.AddCohabitatingResources(example.Resource("test"), schema.GroupResource{Resource: "test2", Group: "2"})
+	called := false
+	testEncoderChain := func(e runtime.Encoder) runtime.Encoder {
+		called = true
+		return e
+	}
+	f.AddSerializationChains(testEncoderChain, nil, example.Resource("test"))
+	f.SetEtcdLocation(example.Resource("*"), []string{"/server2"})
+	f.SetEtcdPrefix(example.Resource("test"), "/prefix_for_test")
+
+	config, err := f.NewConfig(example.Resource("test"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if config.Prefix != "/prefix_for_test" || !reflect.DeepEqual(config.ServerList, []string{"/server2"}) {
+		t.Errorf("unexpected config %#v", config)
+	}
+	if !called {
+		t.Errorf("expected encoder chain to be called")
+	}
+}
+
 func TestUpdateEtcdOverrides(t *testing.T) {
+	registry := registered.NewOrDie(os.Getenv("KUBE_API_VERSIONS"))
+	announced := make(announced.APIGroupFactoryRegistry)
+	exampleinstall.Install(announced, registry, scheme)
+
 	testCases := []struct {
 		resource schema.GroupResource
 		servers  []string
 	}{
 		{
-			resource: schema.GroupResource{Group: api.GroupName, Resource: "resource"},
+			resource: schema.GroupResource{Group: example.GroupName, Resource: "resource"},
 			servers:  []string{"http://127.0.0.1:10000"},
 		},
 		{
-			resource: schema.GroupResource{Group: api.GroupName, Resource: "resource"},
+			resource: schema.GroupResource{Group: example.GroupName, Resource: "resource"},
 			servers:  []string{"http://127.0.0.1:10000", "http://127.0.0.1:20000"},
 		},
 		{
-			resource: schema.GroupResource{Group: extensions.GroupName, Resource: "resource"},
+			resource: schema.GroupResource{Group: example.GroupName, Resource: "resource"},
 			servers:  []string{"http://127.0.0.1:10000"},
 		},
 	}
@@ -51,8 +130,9 @@ func TestUpdateEtcdOverrides(t *testing.T) {
 		defaultConfig := storagebackend.Config{
 			Prefix:     options.DefaultEtcdPathPrefix,
 			ServerList: defaultEtcdLocation,
+			Copier:     scheme,
 		}
-		storageFactory := NewDefaultStorageFactory(defaultConfig, "", api.Codecs, NewDefaultResourceEncodingConfig(), NewResourceConfig())
+		storageFactory := NewDefaultStorageFactory(defaultConfig, "", codecs, NewDefaultResourceEncodingConfig(registry), NewResourceConfig())
 		storageFactory.SetEtcdLocation(test.resource, test.servers)
 
 		var err error
@@ -66,7 +146,7 @@ func TestUpdateEtcdOverrides(t *testing.T) {
 			continue
 		}
 
-		config, err = storageFactory.NewConfig(schema.GroupResource{Group: api.GroupName, Resource: "unlikely"})
+		config, err = storageFactory.NewConfig(schema.GroupResource{Group: examplev1.GroupName, Resource: "unlikely"})
 		if err != nil {
 			t.Errorf("%d: unexpected error %v", i, err)
 			continue

@@ -31,17 +31,18 @@ import (
 	"github.com/golang/glog"
 
 	"k8s.io/apimachinery/pkg/apimachinery"
+	"k8s.io/apimachinery/pkg/apimachinery/registered"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	openapicommon "k8s.io/apimachinery/pkg/openapi"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/runtime/serializer"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/admission"
 	apirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/server/healthz"
 	restclient "k8s.io/client-go/rest"
-	"k8s.io/kubernetes/pkg/api"
 	genericapi "k8s.io/kubernetes/pkg/genericapiserver/endpoints"
 	"k8s.io/kubernetes/pkg/genericapiserver/registry/rest"
 	genericmux "k8s.io/kubernetes/pkg/genericapiserver/server/mux"
@@ -376,15 +377,15 @@ func (s *GenericAPIServer) DynamicApisDiscovery() *restful.WebService {
 
 // NewDefaultAPIGroupInfo returns an APIGroupInfo stubbed with "normal" values
 // exposed for easier composition from other packages
-func NewDefaultAPIGroupInfo(group string) APIGroupInfo {
-	groupMeta := api.Registry.GroupOrDie(group)
+func NewDefaultAPIGroupInfo(group string, registry *registered.APIRegistrationManager, scheme *runtime.Scheme, parameterCodec runtime.ParameterCodec, codecs serializer.CodecFactory) APIGroupInfo {
+	groupMeta := registry.GroupOrDie(group)
 
 	return APIGroupInfo{
 		GroupMeta:                    *groupMeta,
 		VersionedResourcesStorageMap: map[string]map[string]rest.Storage{},
-		OptionsExternalVersion:       &api.Registry.GroupOrDie(api.GroupName).GroupVersion,
-		Scheme:                       api.Scheme,
-		ParameterCodec:               api.ParameterCodec,
-		NegotiatedSerializer:         api.Codecs,
+		OptionsExternalVersion:       &registry.GroupOrDie("").GroupVersion,
+		Scheme:                       scheme,
+		ParameterCodec:               parameterCodec,
+		NegotiatedSerializer:         codecs,
 	}
 }

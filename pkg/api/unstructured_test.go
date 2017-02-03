@@ -43,7 +43,7 @@ func doRoundTrip(t *testing.T, group testapi.TestGroup, kind string) {
 		t.Fatalf("Couldn't create internal object %v: %v", kind, err)
 	}
 	seed := rand.Int63()
-	apitesting.FuzzerFor(kapitesting.FuzzerFuncs(t), rand.NewSource(seed)).
+	apitesting.FuzzerFor(kapitesting.FuzzerFuncs(t, api.Codecs), rand.NewSource(seed)).
 		// We are explicitly overwriting custom fuzzing functions, to ensure
 		// that InitContainers and their statuses are not generated. This is
 		// because in thise test we are simply doing json operations, in which

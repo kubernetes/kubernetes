@@ -31,7 +31,7 @@ import (
 )
 
 func BenchmarkPodConversion(b *testing.B) {
-	apiObjectFuzzer := apitesting.FuzzerFor(kapitesting.FuzzerFuncs(b), rand.NewSource(benchmarkSeed))
+	apiObjectFuzzer := apitesting.FuzzerFor(kapitesting.FuzzerFuncs(b, api.Codecs), rand.NewSource(benchmarkSeed))
 	items := make([]api.Pod, 4)
 	for i := range items {
 		apiObjectFuzzer.Fuzz(&items[i])

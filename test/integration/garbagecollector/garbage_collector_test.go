@@ -297,7 +297,7 @@ func setupRCsPods(t *testing.T, gc *garbagecollector.GarbageCollector, clientSet
 		}
 		podUIDs = append(podUIDs, pod.ObjectMeta.UID)
 	}
-	orphan := (options != nil && options.OrphanDependents != nil && *options.OrphanDependents) || (options == nil && len(initialFinalizers) != 0 && initialFinalizers[0] == api.FinalizerOrphan)
+	orphan := (options != nil && options.OrphanDependents != nil && *options.OrphanDependents) || (options == nil && len(initialFinalizers) != 0 && initialFinalizers[0] == metav1.FinalizerOrphan)
 	// if we intend to orphan the pods, we need wait for the gc to observe the
 	// creation of the pods, otherwise if the deletion of RC is observed before
 	// the creation of the pods, the pods will not be orphaned.
@@ -356,9 +356,9 @@ func TestStressingCascadingDeletion(t *testing.T) {
 		// rc is created with empty finalizers, deleted with nil delete options, pods will remain.
 		go setupRCsPods(t, gc, clientSet, "collection1-"+strconv.Itoa(i), ns.Name, []string{}, nil, &wg, rcUIDs)
 		// rc is created with the orphan finalizer, deleted with nil options, pods will remain.
-		go setupRCsPods(t, gc, clientSet, "collection2-"+strconv.Itoa(i), ns.Name, []string{api.FinalizerOrphan}, nil, &wg, rcUIDs)
+		go setupRCsPods(t, gc, clientSet, "collection2-"+strconv.Itoa(i), ns.Name, []string{metav1.FinalizerOrphan}, nil, &wg, rcUIDs)
 		// rc is created with the orphan finalizer, deleted with DeleteOptions.OrphanDependents=false, pods will be deleted.
-		go setupRCsPods(t, gc, clientSet, "collection3-"+strconv.Itoa(i), ns.Name, []string{api.FinalizerOrphan}, getNonOrphanOptions(), &wg, rcUIDs)
+		go setupRCsPods(t, gc, clientSet, "collection3-"+strconv.Itoa(i), ns.Name, []string{metav1.FinalizerOrphan}, getNonOrphanOptions(), &wg, rcUIDs)
 		// rc is created with empty finalizers, deleted with DeleteOptions.OrphanDependents=true, pods will remain.
 		go setupRCsPods(t, gc, clientSet, "collection4-"+strconv.Itoa(i), ns.Name, []string{}, getOrphanOptions(), &wg, rcUIDs)
 	}

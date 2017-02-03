@@ -1047,10 +1047,14 @@ func typeToJSON(typeName string) string {
 		return "string"
 	case "byte", "*byte":
 		return "string"
+
+	// TODO: Fix these when go-restful supports a way to specify an array query param:
+	// https://github.com/emicklei/go-restful/issues/225
 	case "[]string", "[]*string":
-		// TODO: Fix this when go-restful supports a way to specify an array query param:
-		// https://github.com/emicklei/go-restful/issues/225
 		return "string"
+	case "[]int32", "[]*int32":
+		return "integer"
+
 	default:
 		return typeName
 	}

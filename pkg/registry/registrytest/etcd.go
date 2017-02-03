@@ -38,7 +38,7 @@ import (
 )
 
 func NewEtcdStorage(t *testing.T, group string) (*storagebackend.Config, *etcdtesting.EtcdTestServer) {
-	server, config := etcdtesting.NewUnsecuredEtcd3TestClientServer(t)
+	server, config := etcdtesting.NewUnsecuredEtcd3TestClientServer(t, api.Scheme)
 	config.Codec = testapi.Groups[group].StorageCodec()
 	return config, server
 }
@@ -51,7 +51,7 @@ type UpdateFunc func(runtime.Object) runtime.Object
 
 func New(t *testing.T, storage *genericregistry.Store) *Tester {
 	return &Tester{
-		tester:  resttest.New(t, storage),
+		tester:  resttest.New(t, storage, api.Scheme),
 		storage: storage,
 	}
 }

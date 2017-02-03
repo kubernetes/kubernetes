@@ -12,6 +12,7 @@ go_library(
     name = "go_default_library",
     srcs = [
         "error.go",
+        "template.go",
         "tokens.go",
         "version.go",
     ],
@@ -32,6 +33,7 @@ go_test(
     name = "go_default_test",
     srcs = [
         "error_test.go",
+        "template_test.go",
         "tokens_test.go",
         "version_test.go",
     ],

@@ -12,6 +12,7 @@ go_library(
     srcs = ["storage_apps.go"],
     tags = ["automanaged"],
     deps = [
+        "//pkg/api:go_default_library",
         "//pkg/apis/apps:go_default_library",
         "//pkg/apis/apps/v1beta1:go_default_library",
         "//pkg/genericapiserver/registry/generic:go_default_library",

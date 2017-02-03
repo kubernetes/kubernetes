@@ -26,6 +26,7 @@ import (
 	genericregistry "k8s.io/kubernetes/pkg/genericapiserver/registry/generic/registry"
 	"k8s.io/kubernetes/pkg/genericapiserver/registry/rest"
 	"k8s.io/kubernetes/pkg/registry/batch/job"
+	"k8s.io/kubernetes/pkg/registry/cachesize"
 )
 
 // JobStorage includes dummy storage for Job.
@@ -59,6 +60,7 @@ func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, *StatusREST) {
 		},
 		PredicateFunc:     job.MatchJob,
 		QualifiedResource: batch.Resource("jobs"),
+		WatchCacheSize:    cachesize.GetWatchCacheSizeByResource("jobs"),
 
 		CreateStrategy: job.Strategy,
 		UpdateStrategy: job.Strategy,

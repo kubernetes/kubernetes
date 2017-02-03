@@ -28,6 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/server/filters"
+	genericoptions "k8s.io/apiserver/pkg/server/options"
 	"k8s.io/apiserver/pkg/storage/storagebackend"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/kubernetes/cmd/kube-aggregator/pkg/apiserver"
@@ -37,7 +38,6 @@ import (
 	"k8s.io/kubernetes/pkg/genericapiserver/registry/generic"
 	"k8s.io/kubernetes/pkg/genericapiserver/registry/generic/registry"
 	genericapiserver "k8s.io/kubernetes/pkg/genericapiserver/server"
-	genericoptions "k8s.io/kubernetes/pkg/genericapiserver/server/options"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 
 	"k8s.io/kubernetes/cmd/kube-aggregator/pkg/apis/apiregistration/v1alpha1"
@@ -63,7 +63,7 @@ type DiscoveryServerOptions struct {
 // NewCommandStartMaster provides a CLI handler for 'start master' command
 func NewCommandStartDiscoveryServer(out, err io.Writer) *cobra.Command {
 	o := &DiscoveryServerOptions{
-		Etcd:           genericoptions.NewEtcdOptions(),
+		Etcd:           genericoptions.NewEtcdOptions(api.Scheme),
 		SecureServing:  genericoptions.NewSecureServingOptions(),
 		Authentication: genericoptions.NewDelegatingAuthenticationOptions(),
 		Authorization:  genericoptions.NewDelegatingAuthorizationOptions(),
@@ -116,7 +116,8 @@ func (o DiscoveryServerOptions) RunDiscoveryServer() error {
 		return fmt.Errorf("error creating self-signed certificates: %v", err)
 	}
 
-	genericAPIServerConfig := genericapiserver.NewConfig()
+	genericAPIServerConfig := genericapiserver.NewConfig().
+		WithSerializer(api.Codecs)
 	if _, err := genericAPIServerConfig.ApplySecureServingOptions(o.SecureServing); err != nil {
 		return err
 	}

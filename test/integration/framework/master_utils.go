@@ -183,7 +183,7 @@ func startMasterOrDie(masterConfig *master.Config, incomingServer *httptest.Serv
 		masterConfig = NewMasterConfig()
 		masterConfig.GenericConfig.EnableProfiling = true
 		masterConfig.GenericConfig.EnableMetrics = true
-		masterConfig.GenericConfig.OpenAPIConfig = genericapiserver.DefaultOpenAPIConfig(openapi.GetOpenAPIDefinitions)
+		masterConfig.GenericConfig.OpenAPIConfig = genericapiserver.DefaultOpenAPIConfig(openapi.GetOpenAPIDefinitions, api.Scheme)
 		masterConfig.GenericConfig.OpenAPIConfig.Info = &spec.Info{
 			InfoProps: spec.InfoProps{
 				Title:   "Kubernetes",
@@ -311,12 +311,13 @@ func NewMasterConfig() *master.Config {
 		// prefix code, so please don't change without ensuring
 		// sufficient coverage in other ways.
 		Prefix: uuid.New(),
+		Copier: api.Scheme,
 	}
 
 	info, _ := runtime.SerializerInfoForMediaType(api.Codecs.SupportedMediaTypes(), runtime.ContentTypeJSON)
 	ns := NewSingleContentTypeSerializer(api.Scheme, info)
 
-	storageFactory := genericapiserver.NewDefaultStorageFactory(config, runtime.ContentTypeJSON, ns, genericapiserver.NewDefaultResourceEncodingConfig(), master.DefaultAPIResourceConfigSource())
+	storageFactory := genericapiserver.NewDefaultStorageFactory(config, runtime.ContentTypeJSON, ns, genericapiserver.NewDefaultResourceEncodingConfig(api.Registry), master.DefaultAPIResourceConfigSource())
 	storageFactory.SetSerializer(
 		schema.GroupResource{Group: v1.GroupName, Resource: genericapiserver.AllResources},
 		"",
@@ -354,7 +355,7 @@ func NewMasterConfig() *master.Config {
 		"",
 		ns)
 
-	genericConfig := genericapiserver.NewConfig()
+	genericConfig := genericapiserver.NewConfig().WithSerializer(api.Codecs)
 	kubeVersion := version.Get()
 	genericConfig.Version = &kubeVersion
 	genericConfig.Authorizer = authorizerfactory.NewAlwaysAllowAuthorizer()

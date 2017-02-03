@@ -17,6 +17,8 @@ limitations under the License.
 package e2e
 
 import (
+	"time"
+
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -70,6 +72,17 @@ func completeMultiTest(f *framework.Framework, c clientset.Interface, ns string,
 	// 2. delete each PVC, wait for its bound PV to become "Available"
 	By("Deleting PVCs to invoke recycler")
 	deletePVCandValidatePVGroup(c, ns, pvols, claims)
+}
+
+// Creates a PV, PVC, and ClientPod that will run until killed by test or clean up.
+func initializeGCETestSpec(c clientset.Interface, ns string, pvConfig persistentVolumeConfig, isPrebound bool) (*v1.Pod, *v1.PersistentVolume, *v1.PersistentVolumeClaim) {
+	By("Creating the PV and PVC")
+	pv, pvc := createPVPVC(c, pvConfig, ns, isPrebound)
+	waitOnPVandPVC(c, ns, pv, pvc)
+
+	By("Creating the Client Pod")
+	clientPod := createClientPod(c, ns, pvc)
+	return clientPod, pv, pvc
 }
 
 var _ = framework.KubeDescribe("PersistentVolumes [Volume][Serial]", func() {
@@ -242,6 +255,7 @@ var _ = framework.KubeDescribe("PersistentVolumes [Volume][Serial]", func() {
 
 		var (
 			diskName  string
+			node      types.NodeName
 			err       error
 			pv        *v1.PersistentVolume
 			pvc       *v1.PersistentVolumeClaim
@@ -251,6 +265,7 @@ var _ = framework.KubeDescribe("PersistentVolumes [Volume][Serial]", func() {
 
 		BeforeEach(func() {
 			framework.SkipUnlessProviderIs("gce")
+			By("Initializing Test Spec")
 			if diskName == "" {
 				diskName, err = createPDWithRetry()
 				Expect(err).NotTo(HaveOccurred())
@@ -266,6 +281,8 @@ var _ = framework.KubeDescribe("PersistentVolumes [Volume][Serial]", func() {
 					prebind: nil,
 				}
 			}
+			clientPod, pv, pvc = initializeGCETestSpec(c, ns, pvConfig, false)
+			node = types.NodeName(clientPod.Spec.NodeName)
 		})
 
 		AfterEach(func() {
@@ -277,6 +294,7 @@ var _ = framework.KubeDescribe("PersistentVolumes [Volume][Serial]", func() {
 				pvc = nil
 				pv = nil
 			}
+			node, clientPod, pvc, pv = "", nil, nil, nil
 		})
 
 		AddCleanupAction(func() {
@@ -288,13 +306,6 @@ var _ = framework.KubeDescribe("PersistentVolumes [Volume][Serial]", func() {
 		// Attach a persistent disk to a pod using a PVC.
 		// Delete the PVC and then the pod.  Expect the pod to succeed in unmounting and detaching PD on delete.
 		It("should test that deleting a PVC before the pod does not cause pod deletion to fail on PD detach", func() {
-			By("Creating the PV and PVC")
-			pv, pvc = createPVPVC(c, pvConfig, ns, false)
-			waitOnPVandPVC(c, ns, pv, pvc)
-
-			By("Creating the Client Pod")
-			clientPod = createClientPod(c, ns, pvc)
-			node := types.NodeName(clientPod.Spec.NodeName)
 
 			By("Deleting the Claim")
 			deletePersistentVolumeClaim(c, pvc.Name, ns)
@@ -311,13 +322,6 @@ var _ = framework.KubeDescribe("PersistentVolumes [Volume][Serial]", func() {
 		// Attach a persistent disk to a pod using a PVC.
 		// Delete the PV and then the pod.  Expect the pod to succeed in unmounting and detaching PD on delete.
 		It("should test that deleting the PV before the pod does not cause pod deletion to fail on PD detach", func() {
-			By("Creating the PV and PVC")
-			pv, pvc = createPVPVC(c, pvConfig, ns, false)
-			waitOnPVandPVC(c, ns, pv, pvc)
-
-			By("Creating the Client Pod")
-			clientPod = createClientPod(c, ns, pvc)
-			node := types.NodeName(clientPod.Spec.NodeName)
 
 			By("Deleting the Persistent Volume")
 			deletePersistentVolume(c, pv.Name)
@@ -325,6 +329,21 @@ var _ = framework.KubeDescribe("PersistentVolumes [Volume][Serial]", func() {
 
 			By("Deleting the client pod")
 			deletePodWithWait(f, c, clientPod)
+
+			By("Verifying Persistent Disk detaches")
+			err = waitForPDDetach(diskName, node)
+			Expect(err).NotTo(HaveOccurred())
+		})
+
+		// Test that a Pod and PVC attached to a GCEPD successfully unmounts and detaches when the encompassing Namespace is deleted.
+		It("should test that deleting the Namespace of a PVC and Pod causes the successful detach of Persistent Disk", func() {
+
+			By("Deleting the Namespace")
+			err := c.Core().Namespaces().Delete(ns, nil)
+			Expect(err).NotTo(HaveOccurred())
+
+			err = framework.WaitForNamespacesDeleted(c, []string{ns}, 3*time.Minute)
+			Expect(err).NotTo(HaveOccurred())
 
 			By("Verifying Persistent Disk detaches")
 			err = waitForPDDetach(diskName, node)

@@ -16,6 +16,7 @@ go_library(
         "//pkg/apis/rbac:go_default_library",
         "//pkg/genericapiserver/registry/generic:go_default_library",
         "//pkg/genericapiserver/registry/generic/registry:go_default_library",
+        "//pkg/registry/cachesize:go_default_library",
         "//pkg/registry/rbac/rolebinding:go_default_library",
         "//vendor:k8s.io/apimachinery/pkg/runtime",
     ],

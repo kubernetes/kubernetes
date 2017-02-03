@@ -44,4 +44,5 @@ type Config struct {
 	DeserializationCacheSize int
 
 	Codec runtime.Codec
+	Copier runtime.ObjectCopier
 }

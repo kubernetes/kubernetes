@@ -26,6 +26,7 @@ import (
 	genericregistry "k8s.io/kubernetes/pkg/genericapiserver/registry/generic/registry"
 	"k8s.io/kubernetes/pkg/genericapiserver/registry/rest"
 	"k8s.io/kubernetes/pkg/registry/batch/cronjob"
+	"k8s.io/kubernetes/pkg/registry/cachesize"
 )
 
 // REST implements a RESTStorage for scheduled jobs against etcd
@@ -44,6 +45,7 @@ func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, *StatusREST) {
 		},
 		PredicateFunc:     cronjob.MatchCronJob,
 		QualifiedResource: batch.Resource("cronjobs"),
+		WatchCacheSize:    cachesize.GetWatchCacheSizeByResource("cronjobs"),
 
 		CreateStrategy: cronjob.Strategy,
 		UpdateStrategy: cronjob.Strategy,
