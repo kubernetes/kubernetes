@@ -127,7 +127,7 @@ func TestModifyHostConfig(t *testing.T) {
 
 	for _, tc := range cases {
 		dockerCfg := &dockercontainer.HostConfig{}
-		modifyHostConfig(tc.sc, dockerCfg)
+		modifyHostConfig(tc.sc, dockerCfg, '=')
 		assert.Equal(t, tc.expected, dockerCfg, "[Test case %q]", tc.name)
 	}
 }
@@ -157,7 +157,7 @@ func TestModifyHostConfigWithGroups(t *testing.T) {
 
 	for _, tc := range testCases {
 		dockerCfg := &dockercontainer.HostConfig{}
-		modifyHostConfig(tc.securityContext, dockerCfg)
+		modifyHostConfig(tc.securityContext, dockerCfg, '=')
 		assert.Equal(t, tc.expected, dockerCfg, "[Test case %q]", tc.name)
 	}
 }
@@ -218,7 +218,7 @@ func TestModifyHostConfigAndNamespaceOptionsForContainer(t *testing.T) {
 
 	for _, tc := range cases {
 		dockerCfg := &dockercontainer.HostConfig{}
-		modifyHostConfig(tc.sc, dockerCfg)
+		modifyHostConfig(tc.sc, dockerCfg, '=')
 		modifyContainerNamespaceOptions(tc.sc.GetNamespaceOptions(), sandboxID, dockerCfg)
 		assert.Equal(t, tc.expected, dockerCfg, "[Test case %q]", tc.name)
 	}
