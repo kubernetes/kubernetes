@@ -23,10 +23,10 @@ import (
 	schedulerapi "k8s.io/kubernetes/plugin/pkg/scheduler/api"
 )
 
-// Validate checks for errors in the Config
+// ValidatePolicy checks for errors in the Config
 // It does not return early so that it can find as many errors as possible
 func ValidatePolicy(policy schedulerapi.Policy) error {
-	validationErrors := make([]error, 0)
+	var validationErrors []error
 
 	for _, priority := range policy.Priorities {
 		if priority.Weight <= 0 {
