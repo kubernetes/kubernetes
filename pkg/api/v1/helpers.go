@@ -286,6 +286,10 @@ func GetTolerationsFromPodAnnotations(annotations map[string]string) ([]Tolerati
 	return tolerations, nil
 }
 
+func GetPodTolerations(pod *Pod) ([]Toleration, error) {
+	return GetTolerationsFromPodAnnotations(pod.Annotations)
+}
+
 // GetTaintsFromNodeAnnotations gets the json serialized taints data from Pod.Annotations
 // and converts it to the []Taint type in api.
 func GetTaintsFromNodeAnnotations(annotations map[string]string) ([]Taint, error) {
@@ -299,35 +303,97 @@ func GetTaintsFromNodeAnnotations(annotations map[string]string) ([]Taint, error
 	return taints, nil
 }
 
-// TolerationToleratesTaint checks if the toleration tolerates the taint.
-func TolerationToleratesTaint(toleration *Toleration, taint *Taint) bool {
-	if len(toleration.Effect) != 0 && toleration.Effect != taint.Effect {
+func GetNodeTaints(node *Node) ([]Taint, error) {
+	return GetTaintsFromNodeAnnotations(node.Annotations)
+}
+
+// ToleratesTaint checks if the toleration tolerates the taint.
+// The matching follows the rules below:
+// (1) Empty toleration.effect means to match all taint effects,
+//     otherwise taint effect must equal to toleration.effect.
+// (2) If toleration.operator is 'Exists', it means to match all taint values.
+// (3) Empty toleration.key means to match all taint keys.
+//     If toleration.key is empty, toleration.operator must be 'Exists';
+//     this combination means to match all taint values and all taint keys.
+func (t *Toleration) ToleratesTaint(taint *Taint) bool {
+	if len(t.Effect) > 0 && t.Effect != taint.Effect {
 		return false
 	}
 
-	if toleration.Key != taint.Key {
+	if len(t.Key) > 0 && t.Key != taint.Key {
 		return false
 	}
+
 	// TODO: Use proper defaulting when Toleration becomes a field of PodSpec
-	if (len(toleration.Operator) == 0 || toleration.Operator == TolerationOpEqual) && toleration.Value == taint.Value {
+	switch t.Operator {
+	// empty operator means Equal
+	case "", TolerationOpEqual:
+		return t.Value == taint.Value
+	case TolerationOpExists:
 		return true
+	default:
+		return false
 	}
-	if toleration.Operator == TolerationOpExists {
-		return true
+}
+
+// TolerationsTolerateTaint checks if taint is tolerated by any of the tolerations.
+func TolerationsTolerateTaint(tolerations []Toleration, taint *Taint) bool {
+	for i := range tolerations {
+		if tolerations[i].ToleratesTaint(taint) {
+			return true
+		}
 	}
 	return false
 }
 
-// TaintToleratedByTolerations checks if taint is tolerated by any of the tolerations.
-func TaintToleratedByTolerations(taint *Taint, tolerations []Toleration) bool {
-	tolerated := false
-	for i := range tolerations {
-		if TolerationToleratesTaint(&tolerations[i], taint) {
-			tolerated = true
-			break
+type taintsFilterFunc func(*Taint) bool
+
+// TolerationsTolerateTaintsWithFilter checks if given tolerations tolerates
+// all the taints that apply to the filter in given taint list.
+func TolerationsTolerateTaintsWithFilter(tolerations []Toleration, taints []Taint, applyFilter taintsFilterFunc) bool {
+	if len(taints) == 0 {
+		return true
+	}
+
+	for i := range taints {
+		if applyFilter != nil && !applyFilter(&taints[i]) {
+			continue
+		}
+
+		if !TolerationsTolerateTaint(tolerations, &taints[i]) {
+			return false
 		}
 	}
-	return tolerated
+
+	return true
+}
+
+// DeleteTaintsByKey removes all the taints that have the same key to given taintKey
+func DeleteTaintsByKey(taints []Taint, taintKey string) ([]Taint, bool) {
+	newTaints := []Taint{}
+	deleted := false
+	for i := range taints {
+		if taintKey == taints[i].Key {
+			deleted = true
+			continue
+		}
+		newTaints = append(newTaints, taints[i])
+	}
+	return newTaints, deleted
+}
+
+// DeleteTaint removes all the the taints that have the same key and effect to given taintToDelete.
+func DeleteTaint(taints []Taint, taintToDelete *Taint) ([]Taint, bool) {
+	newTaints := []Taint{}
+	deleted := false
+	for i := range taints {
+		if taintToDelete.MatchTaint(taints[i]) {
+			deleted = true
+			continue
+		}
+		newTaints = append(newTaints, taints[i])
+	}
+	return newTaints, deleted
 }
 
 // MatchTaint checks if the taint matches taintToMatch. Taints are unique by key:effect,
