@@ -233,7 +233,7 @@ define TEST_E2E_NODE_HELP_INFO
 # Example:
 #   make test-e2e-node FOCUS=Kubelet SKIP=container
 #   make test-e2e-node REMOTE=true DELETE_INSTANCES=true
-#   make test-e2e-node TEST_ARGS="--experimental-cgroups-per-qos=true"
+#   make test-e2e-node TEST_ARGS="--cgroups-per-qos=true"
 # Build and run tests.
 endef
 .PHONY: test-e2e-node
