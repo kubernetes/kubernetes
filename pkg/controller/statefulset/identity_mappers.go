@@ -165,6 +165,7 @@ func (v *VolumeIdentityMapper) GetClaims(id string) map[string]v1.PersistentVolu
 	for _, pvc := range v.ps.Spec.VolumeClaimTemplates {
 		claim := pvc
 		// TODO: Name length checking in validation.
+		// NOTE: This name format is used by the heuristics for zone spreading in ChooseZoneForVolume
 		claim.Name = fmt.Sprintf("%v-%v-%v", claim.Name, v.ps.Name, id)
 		claim.Namespace = v.ps.Namespace
 		claim.Labels = v.ps.Spec.Selector.MatchLabels
