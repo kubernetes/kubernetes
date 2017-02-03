@@ -16,6 +16,7 @@ go_library(
         "//pkg/client/clientset_generated/clientset:go_default_library",
         "//pkg/kubelet/container:go_default_library",
         "//pkg/kubelet/container/testing:go_default_library",
+        "//pkg/kubelet/network/hostport:go_default_library",
     ],
 )
 
