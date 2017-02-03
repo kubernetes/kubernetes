@@ -23,6 +23,7 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apiserver/pkg/admission"
+	"k8s.io/apiserver/pkg/server"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	utilflag "k8s.io/apiserver/pkg/util/flag"
 
@@ -30,6 +31,7 @@ import (
 	_ "k8s.io/apiserver/pkg/features"
 
 	"github.com/spf13/pflag"
+	"gopkg.in/natefinch/lumberjack.v2"
 )
 
 // ServerRunOptions contains the options while running a generic api server.
@@ -62,19 +64,46 @@ type ServerRunOptions struct {
 }
 
 func NewServerRunOptions() *ServerRunOptions {
+	defaults := server.NewConfig()
+
 	return &ServerRunOptions{
 		AdmissionControl:            "AlwaysAdmit",
 		DefaultStorageMediaType:     "application/json",
 		DeleteCollectionWorkers:     1,
-		EnableGarbageCollection:     true,
-		EnableProfiling:             true,
+		EnableGarbageCollection:     defaults.EnableGarbageCollection,
+		EnableProfiling:             defaults.EnableProfiling,
 		EnableContentionProfiling:   false,
 		EnableWatchCache:            true,
-		MaxRequestsInFlight:         400,
-		MaxMutatingRequestsInFlight: 200,
-		MinRequestTimeout:           1800,
+		MaxRequestsInFlight:         defaults.MaxRequestsInFlight,
+		MaxMutatingRequestsInFlight: defaults.MaxMutatingRequestsInFlight,
+		MinRequestTimeout:           defaults.MinRequestTimeout,
 		RuntimeConfig:               make(utilflag.ConfigurationMap),
 	}
+}
+
+// ApplyOptions applies the run options to the method receiver and returns self
+func (s *ServerRunOptions) ApplyTo(c *server.Config) error {
+	if len(s.AuditLogPath) != 0 {
+		c.AuditWriter = &lumberjack.Logger{
+			Filename:   s.AuditLogPath,
+			MaxAge:     s.AuditLogMaxAge,
+			MaxBackups: s.AuditLogMaxBackups,
+			MaxSize:    s.AuditLogMaxSize,
+		}
+	}
+
+	c.CorsAllowedOriginList = s.CorsAllowedOriginList
+	c.EnableGarbageCollection = s.EnableGarbageCollection
+	c.EnableProfiling = s.EnableProfiling
+	c.EnableContentionProfiling = s.EnableContentionProfiling
+	c.EnableSwaggerUI = s.EnableSwaggerUI
+	c.ExternalAddress = s.ExternalHost
+	c.MaxRequestsInFlight = s.MaxRequestsInFlight
+	c.MaxMutatingRequestsInFlight = s.MaxMutatingRequestsInFlight
+	c.MinRequestTimeout = s.MinRequestTimeout
+	c.PublicAddress = s.AdvertiseAddress
+
+	return nil
 }
 
 // DefaultAdvertiseAddress sets the field AdvertiseAddress if
