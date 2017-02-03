@@ -187,12 +187,8 @@ func unregisterClusters(clusters map[string]*cluster, f *fedframework.Framework)
 }
 
 // can not be moved to util, as By and Expect must be put in Ginkgo test unit
-func registerClusters(clusters map[string]*cluster, userAgentName, federationName string, f *fedframework.Framework) string {
+func getRegisteredClusters(clusters map[string]*cluster, userAgentName string, f *fedframework.Framework) string {
 	contexts := f.GetUnderlyingFederatedContexts()
-
-	for _, context := range contexts {
-		createClusterObjectOrFail(f, &context)
-	}
 
 	By("Obtaining a list of all the clusters")
 	clusterList := waitForAllClustersReady(f, len(contexts))
