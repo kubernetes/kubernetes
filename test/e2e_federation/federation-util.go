@@ -100,9 +100,9 @@ func clusterIsReadyOrFail(f *fedframework.Framework, context *fedframework.E2ECo
 	framework.Logf("Cluster %s is Ready", context.Name)
 }
 
-// waitForAllClustersReady wait for all clusters defined in e2e context to be created
+// waitForAllRegisteredClusters waits for all clusters defined in e2e context to be created
 // return ClusterList until the listed cluster items equals clusterCount
-func waitForAllClustersReady(f *fedframework.Framework, clusterCount int) *federationapi.ClusterList {
+func waitForAllRegisteredClusters(f *fedframework.Framework, clusterCount int) *federationapi.ClusterList {
 	var clusterList *federationapi.ClusterList
 	if err := wait.PollImmediate(framework.Poll, FederatedServiceTimeout, func() (bool, error) {
 		var err error
@@ -187,15 +187,12 @@ func unregisterClusters(clusters map[string]*cluster, f *fedframework.Framework)
 }
 
 // can not be moved to util, as By and Expect must be put in Ginkgo test unit
-func registerClusters(clusters map[string]*cluster, userAgentName, federationName string, f *fedframework.Framework) string {
+func getRegisteredClusters(userAgentName string, f *fedframework.Framework) (map[string]*cluster, string) {
+	clusters := make(map[string]*cluster)
 	contexts := f.GetUnderlyingFederatedContexts()
 
-	for _, context := range contexts {
-		createClusterObjectOrFail(f, &context)
-	}
-
 	By("Obtaining a list of all the clusters")
-	clusterList := waitForAllClustersReady(f, len(contexts))
+	clusterList := waitForAllRegisteredClusters(f, len(contexts))
 
 	framework.Logf("Checking that %d clusters are Ready", len(contexts))
 	for _, context := range contexts {
@@ -211,7 +208,7 @@ func registerClusters(clusters map[string]*cluster, userAgentName, federationNam
 		clusters[c.Name] = &cluster{c.Name, createClientsetForCluster(c, i, userAgentName), false, nil}
 	}
 	createNamespaceInClusters(clusters, f)
-	return primaryClusterName
+	return clusters, primaryClusterName
 }
 
 /*
