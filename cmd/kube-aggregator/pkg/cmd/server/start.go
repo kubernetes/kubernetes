@@ -45,10 +45,7 @@ import (
 const defaultEtcdPathPrefix = "/registry/kube-aggregator.kubernetes.io/"
 
 type AggregatorOptions struct {
-	Etcd           *genericoptions.EtcdOptions
-	SecureServing  *genericoptions.SecureServingOptions
-	Authentication *genericoptions.DelegatingAuthenticationOptions
-	Authorization  *genericoptions.DelegatingAuthorizationOptions
+	RecommendedOptions *genericoptions.RecommendedOptions
 
 	// ProxyClientCert/Key are the client cert used to identify this proxy. Backing APIServices use
 	// this to confirm the proxy's identity
@@ -62,18 +59,15 @@ type AggregatorOptions struct {
 // NewCommandStartMaster provides a CLI handler for 'start master' command
 func NewCommandStartAggregator(out, err io.Writer) *cobra.Command {
 	o := &AggregatorOptions{
-		Etcd:           genericoptions.NewEtcdOptions(api.Scheme),
-		SecureServing:  genericoptions.NewSecureServingOptions(),
-		Authentication: genericoptions.NewDelegatingAuthenticationOptions(),
-		Authorization:  genericoptions.NewDelegatingAuthorizationOptions(),
+		RecommendedOptions: genericoptions.NewRecommendedOptions(api.Scheme),
 
 		StdOut: out,
 		StdErr: err,
 	}
-	o.Etcd.StorageConfig.Type = storagebackend.StorageTypeETCD3
-	o.Etcd.StorageConfig.Prefix = defaultEtcdPathPrefix
-	o.Etcd.StorageConfig.Codec = api.Codecs.LegacyCodec(v1alpha1.SchemeGroupVersion)
-	o.SecureServing.ServingOptions.BindPort = 443
+	o.RecommendedOptions.Etcd.StorageConfig.Type = storagebackend.StorageTypeETCD3
+	o.RecommendedOptions.Etcd.StorageConfig.Prefix = defaultEtcdPathPrefix
+	o.RecommendedOptions.Etcd.StorageConfig.Codec = api.Codecs.LegacyCodec(v1alpha1.SchemeGroupVersion)
+	o.RecommendedOptions.SecureServing.ServingOptions.BindPort = 443
 
 	cmd := &cobra.Command{
 		Short: "Launch a API aggregator and proxy server",
@@ -86,10 +80,7 @@ func NewCommandStartAggregator(out, err io.Writer) *cobra.Command {
 	}
 
 	flags := cmd.Flags()
-	o.Etcd.AddFlags(flags)
-	o.SecureServing.AddFlags(flags)
-	o.Authentication.AddFlags(flags)
-	o.Authorization.AddFlags(flags)
+	o.RecommendedOptions.AddFlags(flags)
 	flags.StringVar(&o.ProxyClientCertFile, "proxy-client-cert-file", o.ProxyClientCertFile, "client certificate used identify the proxy to the API server")
 	flags.StringVar(&o.ProxyClientKeyFile, "proxy-client-key-file", o.ProxyClientKeyFile, "client certificate key used identify the proxy to the API server")
 
@@ -106,30 +97,24 @@ func (o *AggregatorOptions) Complete() error {
 
 func (o AggregatorOptions) RunAggregator() error {
 	// TODO have a "real" external address
-	if err := o.SecureServing.MaybeDefaultWithSelfSignedCerts("localhost"); err != nil {
+	if err := o.RecommendedOptions.SecureServing.MaybeDefaultWithSelfSignedCerts("localhost"); err != nil {
 		return fmt.Errorf("error creating self-signed certificates: %v", err)
 	}
 
-	genericAPIServerConfig := genericapiserver.NewConfig().
+	serverConfig := genericapiserver.NewConfig().
 		WithSerializer(api.Codecs)
 
-	if err := o.SecureServing.ApplyTo(genericAPIServerConfig); err != nil {
-		return fmt.Errorf("failed to configure https: %s", err)
-	}
-	if err := o.Authentication.ApplyTo(genericAPIServerConfig); err != nil {
+	if err := o.RecommendedOptions.ApplyTo(serverConfig); err != nil {
 		return err
 	}
-	if err := o.Authorization.ApplyTo(genericAPIServerConfig); err != nil {
-		return err
-	}
-	genericAPIServerConfig.LongRunningFunc = filters.BasicLongRunningRequestCheck(
+	serverConfig.LongRunningFunc = filters.BasicLongRunningRequestCheck(
 		sets.NewString("watch", "proxy"),
 		sets.NewString("attach", "exec", "proxy", "log", "portforward"),
 	)
 
 	var err error
 	privilegedLoopbackToken := uuid.NewRandom().String()
-	if genericAPIServerConfig.LoopbackClientConfig, err = genericAPIServerConfig.SecureServingInfo.NewSelfClientConfig(privilegedLoopbackToken); err != nil {
+	if serverConfig.LoopbackClientConfig, err = serverConfig.SecureServingInfo.NewSelfClientConfig(privilegedLoopbackToken); err != nil {
 		return err
 	}
 
@@ -143,8 +128,8 @@ func (o AggregatorOptions) RunAggregator() error {
 	}
 
 	config := apiserver.Config{
-		GenericConfig:       genericAPIServerConfig,
-		RESTOptionsGetter:   &restOptionsFactory{storageConfig: &o.Etcd.StorageConfig},
+		GenericConfig:       serverConfig,
+		RESTOptionsGetter:   &restOptionsFactory{storageConfig: &o.RecommendedOptions.Etcd.StorageConfig},
 		CoreAPIServerClient: coreAPIServerClient,
 	}
 
