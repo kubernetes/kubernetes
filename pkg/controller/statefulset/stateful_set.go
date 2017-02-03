@@ -239,9 +239,9 @@ func (ssc *StatefulSetController) getStatefulSetForPod(pod *v1.Pod) *apps.Statef
 		}
 		glog.V(4).Infof("No StatefulSets found for pod %v, StatefulSet controller will avoid syncing", pod.Name)
 		return nil
-	} else {
-		return &sets[0]
 	}
+	return &sets[0]
+
 }
 
 // enqueueStatefulSet enqueues the given statefulset in the work queue.
@@ -312,8 +312,7 @@ func (ssc *StatefulSetController) syncStatefulSet(set *apps.StatefulSet, pods []
 	err := ssc.control.UpdateStatefulSet(set, pods)
 	if err == nil {
 		glog.V(2).Infof("Succesfully synced StatefulSet %s/%s successful", set.Namespace, set.Name)
-	} else {
-		glog.V(2).Infof("Error syncing StatefulSet %s/%s with %d pods : %s", set.Namespace, set.Name, err)
 	}
+	glog.V(2).Infof("Error syncing StatefulSet %s/%s with %d pods : %s", set.Namespace, set.Name, err)
 	return err
 }

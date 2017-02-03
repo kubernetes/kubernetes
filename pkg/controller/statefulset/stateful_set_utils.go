@@ -17,7 +17,6 @@ limitations under the License.
 package statefulset
 
 import (
-	"errors"
 	"fmt"
 	"regexp"
 	"strconv"
@@ -32,9 +31,6 @@ import (
 
 // maxUpdateRetries is the maximum number of retries used for update conflict resolution prior to failure
 const maxUpdateRetries = 10
-
-// nilParameterError is the error used to indicate a nil pointer parameter to a method
-var nilParameterError = errors.New("nil pointer supplied to function")
 
 // updateConflictError is the error used to indicate that the maximum number of retries against the API server have
 // been attempted and we need to back off
@@ -63,13 +59,10 @@ var statefulPodRegex = regexp.MustCompile("(.*)-([0-9]+)$")
 func getParentNameAndOrdinal(pod *v1.Pod) (string, int) {
 	parent := ""
 	ordinal := -1
-	if pod == nil {
-		return parent, ordinal
-	}
-	if !statefulPodRegex.MatchString(pod.Name) {
-		return parent, ordinal
-	}
 	subMatches := statefulPodRegex.FindStringSubmatch(pod.Name)
+	if len(subMatches) < 3 {
+		return parent, ordinal
+	}
 	parent = subMatches[1]
 	if i, err := strconv.ParseInt(subMatches[2], 10, 32); err == nil {
 		ordinal = int(i)

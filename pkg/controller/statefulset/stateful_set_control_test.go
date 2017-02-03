@@ -520,9 +520,7 @@ func (spc *fakeStatefulPodControl) setPodTerminated(set *apps.StatefulSet, ordin
 
 func (spc *fakeStatefulPodControl) CreateStatefulPod(set *apps.StatefulSet, pod *v1.Pod) error {
 	defer spc.createPodTracker.inc()
-	if pod == nil || set == nil {
-		return nilParameterError
-	} else if spc.createPodTracker.errorReady() {
+	if spc.createPodTracker.errorReady() {
 		defer spc.createPodTracker.reset()
 		return spc.createPodTracker.err
 	}
@@ -536,9 +534,7 @@ func (spc *fakeStatefulPodControl) CreateStatefulPod(set *apps.StatefulSet, pod 
 
 func (spc *fakeStatefulPodControl) UpdateStatefulPod(set *apps.StatefulSet, pod *v1.Pod) error {
 	defer spc.updatePodTracker.inc()
-	if pod == nil || set == nil {
-		return nilParameterError
-	} else if spc.updatePodTracker.errorReady() {
+	if spc.updatePodTracker.errorReady() {
 		defer spc.updatePodTracker.reset()
 		return spc.updatePodTracker.err
 	}
@@ -557,9 +553,7 @@ func (spc *fakeStatefulPodControl) UpdateStatefulPod(set *apps.StatefulSet, pod 
 
 func (spc *fakeStatefulPodControl) DeleteStatefulPod(set *apps.StatefulSet, pod *v1.Pod) error {
 	defer spc.deletePodTracker.inc()
-	if pod == nil || set == nil {
-		return nilParameterError
-	} else if spc.deletePodTracker.errorReady() {
+	if spc.deletePodTracker.errorReady() {
 		defer spc.deletePodTracker.reset()
 		return spc.deletePodTracker.err
 	}
@@ -576,9 +570,7 @@ func (spc *fakeStatefulPodControl) DeleteStatefulPod(set *apps.StatefulSet, pod 
 
 func (spc *fakeStatefulPodControl) UpdateStatefulSetStatus(set *apps.StatefulSet) error {
 	defer spc.updateStatusTracker.inc()
-	if set == nil {
-		return nilParameterError
-	} else if spc.updateStatusTracker.errorReady() {
+	if spc.updateStatusTracker.errorReady() {
 		defer spc.updateStatusTracker.reset()
 		return spc.updateStatusTracker.err
 	}

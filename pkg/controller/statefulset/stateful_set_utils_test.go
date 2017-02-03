@@ -41,11 +41,6 @@ func TestGetParentNameAndOrdinal(t *testing.T) {
 	} else if ordinal != 1 {
 		t.Errorf("Extracted the wrong ordinal expected %d found %d", 1, ordinal)
 	}
-	if parent, ordinal := getParentNameAndOrdinal(nil); parent != "" {
-		t.Error("Expected empty string for nil Pod parent")
-	} else if ordinal != -1 {
-		t.Error("Expected -1 for nil Pod ordinal")
-	}
 	pod.Name = "1-bar"
 	if parent, ordinal := getParentNameAndOrdinal(pod); parent != "" {
 		t.Error("Expected empty string for non-member Pod parent")

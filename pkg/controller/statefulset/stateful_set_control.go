@@ -134,7 +134,9 @@ func (ssc *defaultStatefulSetControl) UpdateStatefulSet(set *apps.StatefulSet, p
 	// Note that we do not resurrect Pods in this interval.
 	if unhealthy > 0 {
 		glog.V(2).Infof("StatefulSet %s is waiting on %d Pods", set.Name, unhealthy)
-	} else if target := len(condemned) - 1; target >= 0 {
+		return nil
+	}
+	if target := len(condemned) - 1; target >= 0 {
 		glog.V(2).Infof("StatefulSet %s terminating Pod %s", set.Name, condemned[target])
 		return ssc.podControl.DeleteStatefulPod(set, condemned[target])
 	}

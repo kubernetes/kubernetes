@@ -187,20 +187,6 @@ func TestStatefulPodControlCreatePodFailed(t *testing.T) {
 	}
 }
 
-func TestStatefulPodControlCreatePodInvalidParameters(t *testing.T) {
-	recorder := record.NewFakeRecorder(10)
-	set := newStatefulSet(3)
-	pod := newStatefulSetPod(set, 0)
-	fakeClient := &fake.Clientset{}
-	control := NewRealStatefulPodControl(fakeClient, recorder)
-	if err := control.CreateStatefulPod(nil, pod); err == nil {
-		t.Error("Failed to produce error on nil Set parameter")
-	}
-	if err := control.CreateStatefulPod(set, nil); err == nil {
-		t.Error("Failed to produce error on nil Pod parameter")
-	}
-}
-
 func TestStatefulPodControlNoOpUpdate(t *testing.T) {
 	recorder := record.NewFakeRecorder(10)
 	set := newStatefulSet(3)
@@ -456,20 +442,6 @@ func TestStatefulPodControlUpdatePodConflictMaxRetries(t *testing.T) {
 	}
 }
 
-func TestStatefulPodControlUpdateStatefulPodBadParameters(t *testing.T) {
-	recorder := record.NewFakeRecorder(10)
-	set := newStatefulSet(3)
-	pod := newStatefulSetPod(set, 0)
-	fakeClient := &fake.Clientset{}
-	control := NewRealStatefulPodControl(fakeClient, recorder)
-	if err := control.UpdateStatefulPod(nil, pod); err == nil {
-		t.Error("Failed to produce error on nil Set parameter")
-	}
-	if err := control.UpdateStatefulPod(set, nil); err == nil {
-		t.Error("Failed to produce error on nil Pod parameter")
-	}
-}
-
 func TestStatefulPodControlDeletesStatefulPod(t *testing.T) {
 	recorder := record.NewFakeRecorder(10)
 	set := newStatefulSet(3)
@@ -507,20 +479,6 @@ func TestStatefulPodControlDeleteFailure(t *testing.T) {
 		t.Errorf("Expected 1 events for failed delete found %d", eventCount)
 	} else if !strings.Contains(events[0], v1.EventTypeWarning) {
 		t.Errorf("Expected warning event found %s", events[0])
-	}
-}
-
-func TestStatefulPodControlDeleteBadParameters(t *testing.T) {
-	recorder := record.NewFakeRecorder(10)
-	set := newStatefulSet(3)
-	pod := newStatefulSetPod(set, 0)
-	fakeClient := &fake.Clientset{}
-	control := NewRealStatefulPodControl(fakeClient, recorder)
-	if err := control.DeleteStatefulPod(nil, pod); err == nil {
-		t.Error("Failed to produce error on nil Set parameter")
-	}
-	if err := control.DeleteStatefulPod(set, nil); err == nil {
-		t.Error("Failed to produce error on nil Pod parameter")
 	}
 }
 
@@ -646,15 +604,6 @@ func TestStatefulPodControlUpdateStatusConflictMaxRetries(t *testing.T) {
 	events := collectEvents(recorder.Events)
 	if eventCount := len(events); eventCount != 0 {
 		t.Errorf("Expected 0 events for successful status update %d", eventCount)
-	}
-}
-
-func TestStatefulPodControlUpdateSetStatusBadParameters(t *testing.T) {
-	recorder := record.NewFakeRecorder(10)
-	fakeClient := &fake.Clientset{}
-	control := NewRealStatefulPodControl(fakeClient, recorder)
-	if err := control.UpdateStatefulSetStatus(nil); err == nil {
-		t.Error("UpddateStatefulSetStatus did not return an error for a nil StatefulSet")
 	}
 }
 
