@@ -1430,7 +1430,7 @@ func (ctrl *PersistentVolumeController) scheduleOperation(operationName string, 
 		if goroutinemap.IsAlreadyExists(err) {
 			glog.V(4).Infof("operation %q is already running, skipping", operationName)
 		} else {
-			glog.Errorf("error scheduling operaion %q: %v", operationName, err)
+			glog.Errorf("error scheduling operation %q: %v", operationName, err)
 		}
 	}
 }
