@@ -441,7 +441,7 @@ func testRolloverDeployment(f *framework.Framework) {
 	}
 
 	rsName := "test-rollover-controller"
-	rsReplicas := int32(4)
+	rsReplicas := int32(3)
 	_, err := c.Extensions().ReplicaSets(ns).Create(newRS(rsName, rsReplicas, rsPodLabels, nginxImageName, nginxImage))
 	Expect(err).NotTo(HaveOccurred())
 	// Verify that the required pods have come up.
@@ -458,7 +458,7 @@ func testRolloverDeployment(f *framework.Framework) {
 	// Create a deployment to delete nginx pods and instead bring up redis-slave pods.
 	// We use a nonexistent image here, so that we make sure it won't finish
 	deploymentName, deploymentImageName := "test-rollover-deployment", "redis-slave"
-	deploymentReplicas := int32(4)
+	deploymentReplicas := int32(3)
 	deploymentImage := "gcr.io/google_samples/gb-redisslave:nonexistent"
 	deploymentStrategyType := extensions.RollingUpdateDeploymentStrategyType
 	framework.Logf("Creating deployment %q", deploymentName)
