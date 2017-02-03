@@ -46,6 +46,7 @@ import (
 
 	"github.com/golang/glog"
 	"github.com/spf13/cobra"
+	"k8s.io/apimachinery/pkg/util/mergepatchutil"
 )
 
 var (
@@ -489,12 +490,12 @@ func visitToPatch(
 			return nil
 		}
 
-		preconditions := []strategicpatch.PreconditionFunc{strategicpatch.RequireKeyUnchanged("apiVersion"),
-			strategicpatch.RequireKeyUnchanged("kind"), strategicpatch.RequireMetadataKeyUnchanged("name")}
+		preconditions := []mergepatchutil.PreconditionFunc{mergepatchutil.RequireKeyUnchanged("apiVersion"),
+			mergepatchutil.RequireKeyUnchanged("kind"), mergepatchutil.RequireMetadataKeyUnchanged("name")}
 		patch, err := strategicpatch.CreateTwoWayMergePatch(originalJS, editedJS, currOriginalObj, preconditions...)
 		if err != nil {
 			glog.V(4).Infof("Unable to calculate diff, no merge is possible: %v", err)
-			if strategicpatch.IsPreconditionFailed(err) {
+			if mergepatchutil.IsPreconditionFailed(err) {
 				return fmt.Errorf("%s", "At least one of apiVersion, kind and name was changed")
 			}
 			return err

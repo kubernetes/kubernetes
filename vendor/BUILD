@@ -13508,6 +13508,7 @@ go_test(
     deps = [
         "//vendor:github.com/davecgh/go-spew/spew",
         "//vendor:github.com/ghodss/yaml",
+        "//vendor:k8s.io/apimachinery/pkg/util/mergepatchutil",
     ],
 )
 
@@ -13516,9 +13517,8 @@ go_library(
     srcs = ["k8s.io/apimachinery/pkg/util/strategicpatch/patch.go"],
     tags = ["automanaged"],
     deps = [
-        "//vendor:github.com/davecgh/go-spew/spew",
-        "//vendor:github.com/ghodss/yaml",
         "//vendor:k8s.io/apimachinery/pkg/util/json",
+        "//vendor:k8s.io/apimachinery/pkg/util/mergepatchutil",
         "//vendor:k8s.io/apimachinery/third_party/forked/golang/json",
     ],
 )
@@ -14269,7 +14269,7 @@ go_library(
     deps = [
         "//vendor:github.com/evanphx/json-patch",
         "//vendor:k8s.io/apimachinery/pkg/util/json",
-        "//vendor:k8s.io/apimachinery/pkg/util/strategicpatch",
+        "//vendor:k8s.io/apimachinery/pkg/util/mergepatchutil",
     ],
 )
 
@@ -15169,5 +15169,25 @@ go_library(
     deps = [
         "//vendor:k8s.io/apiserver/pkg/apis/example",
         "//vendor:k8s.io/client-go/pkg/api/install",
+    ],
+)
+
+go_test(
+    name = "k8s.io/apimachinery/pkg/util/mergepatchutil_test",
+    srcs = ["k8s.io/apimachinery/pkg/util/mergepatchutil/util_test.go"],
+    library = ":k8s.io/apimachinery/pkg/util/mergepatchutil",
+    tags = ["automanaged"],
+)
+
+go_library(
+    name = "k8s.io/apimachinery/pkg/util/mergepatchutil",
+    srcs = [
+        "k8s.io/apimachinery/pkg/util/mergepatchutil/errors.go",
+        "k8s.io/apimachinery/pkg/util/mergepatchutil/util.go",
+    ],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:github.com/davecgh/go-spew/spew",
+        "//vendor:github.com/ghodss/yaml",
     ],
 )
