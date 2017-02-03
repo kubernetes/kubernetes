@@ -14,23 +14,23 @@
 apiVersion: extensions/v1beta1
 kind: Deployment
 metadata:
-  name: heapster-v1.2.0
+  name: heapster-v1.2.0.1
   namespace: kube-system
   labels:
     k8s-app: heapster
     kubernetes.io/cluster-service: "true"
-    version: v1.2.0
+    version: v1.2.0.1
 spec:
   replicas: 1
   selector:
     matchLabels:
       k8s-app: heapster
-      version: v1.2.0
+      version: v1.2.0.1
   template:
     metadata:
       labels:
         k8s-app: heapster
-        version: v1.2.0
+        version: v1.2.0.1
       annotations:
         scheduler.alpha.kubernetes.io/critical-pod: ''
         scheduler.alpha.kubernetes.io/tolerations: '[{"key":"CriticalAddonsOnly", "operator":"Exists"}]'
@@ -64,7 +64,7 @@ spec:
             - name: ssl-certs
               mountPath: /etc/ssl/certs
               readOnly: true
-        - image: gcr.io/google_containers/addon-resizer:1.6
+        - image: gcr.io/google_containers/addon-resizer:1.7
           name: heapster-nanny
           resources:
             limits:
@@ -89,11 +89,11 @@ spec:
             - --memory={{ base_metrics_memory }}
             - --extra-memory={{ metrics_memory_per_node }}Mi
             - --threshold=5
-            - --deployment=heapster-v1.2.0
+            - --deployment=heapster-v1.2.0.1
             - --container=heapster
             - --poll-period=300000
             - --estimator=exponential
-        - image: gcr.io/google_containers/addon-resizer:1.6
+        - image: gcr.io/google_containers/addon-resizer:1.7
           name: eventer-nanny
           resources:
             limits:
@@ -118,7 +118,7 @@ spec:
             - --memory={{ base_eventer_memory }}
             - --extra-memory={{ eventer_memory_per_node }}Ki
             - --threshold=5
-            - --deployment=heapster-v1.2.0
+            - --deployment=heapster-v1.2.0.1
             - --container=eventer
             - --poll-period=300000
             - --estimator=exponential
