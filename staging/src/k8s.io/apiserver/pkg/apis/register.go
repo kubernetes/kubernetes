@@ -25,6 +25,8 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 )
 
+// TODO all of these fall out when we move the admission read back into apiserver
+
 // GroupFactoryRegistry is the APIGroupFactoryRegistry (overlaps a bit with Registry, see comments in package for details)
 var GroupFactoryRegistry = make(announced.APIGroupFactoryRegistry)
 
@@ -33,10 +35,6 @@ var GroupFactoryRegistry = make(announced.APIGroupFactoryRegistry)
 var Registry = registered.NewOrDie(os.Getenv("KUBE_API_VERSIONS"))
 
 // Scheme is the default instance of runtime.Scheme to which types in the Kubernetes API are already registered.
-// NOTE: If you are copying this file to start a new api group, STOP! Copy the
-// extensions group instead. This Scheme is special and should appear ONLY in
-// the api group, unless you really know what you're doing.
-// TODO(lavalamp): make the above error impossible.
 var Scheme = runtime.NewScheme()
 
 // Codecs provides access to encoding and decoding for the scheme
