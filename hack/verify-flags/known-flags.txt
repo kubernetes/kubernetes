@@ -176,6 +176,7 @@ etcd-keyfile
 etcd-mutation-timeout
 etcd-prefix
 etcd-pv-capacity
+etcd-persistent-storage
 etcd-quorum-read
 etcd-server
 etcd-servers
