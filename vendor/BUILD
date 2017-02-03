@@ -16810,6 +16810,7 @@ go_library(
         "//vendor:k8s.io/client-go/kubernetes",
         "//vendor:k8s.io/client-go/pkg/api",
         "//vendor:k8s.io/client-go/rest",
+        "//vendor:k8s.io/client-go/tools/clientcmd",
         "//vendor:k8s.io/kube-aggregator/pkg/apis/apiregistration/v1alpha1",
         "//vendor:k8s.io/kube-aggregator/pkg/apiserver",
     ],
