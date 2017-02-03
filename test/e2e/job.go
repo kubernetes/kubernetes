@@ -46,7 +46,6 @@ var _ = framework.KubeDescribe("Job", func() {
 	f := framework.NewDefaultFramework("job")
 	parallelism := int32(2)
 	completions := int32(4)
-	lotsOfFailures := int32(5) // more than completions
 
 	// Simplest case: all pods succeed promptly
 	It("should run a job to completion when tasks succeed", func() {
@@ -97,72 +96,6 @@ var _ = framework.KubeDescribe("Job", func() {
 		Expect(err).NotTo(HaveOccurred())
 	})
 
-	It("should keep restarting failed pods", func() {
-		By("Creating a job")
-		job := newTestJob("fail", "all-fail", v1.RestartPolicyNever, parallelism, completions)
-		job, err := createJob(f.ClientSet, f.Namespace.Name, job)
-		Expect(err).NotTo(HaveOccurred())
-
-		By("Ensuring job shows many failures")
-		err = wait.Poll(framework.Poll, jobTimeout, func() (bool, error) {
-			curr, err := getJob(f.ClientSet, f.Namespace.Name, job.Name)
-			if err != nil {
-				return false, err
-			}
-			return curr.Status.Failed > lotsOfFailures, nil
-		})
-	})
-
-	It("should scale a job up", func() {
-		startParallelism := int32(1)
-		endParallelism := int32(2)
-		By("Creating a job")
-		job := newTestJob("notTerminate", "scale-up", v1.RestartPolicyNever, startParallelism, completions)
-		job, err := createJob(f.ClientSet, f.Namespace.Name, job)
-		Expect(err).NotTo(HaveOccurred())
-
-		By("Ensuring active pods == startParallelism")
-		err = waitForAllPodsRunning(f.ClientSet, f.Namespace.Name, job.Name, startParallelism)
-		Expect(err).NotTo(HaveOccurred())
-
-		By("scale job up")
-		scaler, err := kubectl.ScalerFor(batchinternal.Kind("Job"), f.InternalClientset)
-		Expect(err).NotTo(HaveOccurred())
-		waitForScale := kubectl.NewRetryParams(5*time.Second, 1*time.Minute)
-		waitForReplicas := kubectl.NewRetryParams(5*time.Second, 5*time.Minute)
-		scaler.Scale(f.Namespace.Name, job.Name, uint(endParallelism), nil, waitForScale, waitForReplicas)
-		Expect(err).NotTo(HaveOccurred())
-
-		By("Ensuring active pods == endParallelism")
-		err = waitForAllPodsRunning(f.ClientSet, f.Namespace.Name, job.Name, endParallelism)
-		Expect(err).NotTo(HaveOccurred())
-	})
-
-	It("should scale a job down", func() {
-		startParallelism := int32(2)
-		endParallelism := int32(1)
-		By("Creating a job")
-		job := newTestJob("notTerminate", "scale-down", v1.RestartPolicyNever, startParallelism, completions)
-		job, err := createJob(f.ClientSet, f.Namespace.Name, job)
-		Expect(err).NotTo(HaveOccurred())
-
-		By("Ensuring active pods == startParallelism")
-		err = waitForAllPodsRunning(f.ClientSet, f.Namespace.Name, job.Name, startParallelism)
-		Expect(err).NotTo(HaveOccurred())
-
-		By("scale job down")
-		scaler, err := kubectl.ScalerFor(batchinternal.Kind("Job"), f.InternalClientset)
-		Expect(err).NotTo(HaveOccurred())
-		waitForScale := kubectl.NewRetryParams(5*time.Second, 1*time.Minute)
-		waitForReplicas := kubectl.NewRetryParams(5*time.Second, 5*time.Minute)
-		err = scaler.Scale(f.Namespace.Name, job.Name, uint(endParallelism), nil, waitForScale, waitForReplicas)
-		Expect(err).NotTo(HaveOccurred())
-
-		By("Ensuring active pods == endParallelism")
-		err = waitForAllPodsRunning(f.ClientSet, f.Namespace.Name, job.Name, endParallelism)
-		Expect(err).NotTo(HaveOccurred())
-	})
-
 	It("should delete a job", func() {
 		By("Creating a job")
 		job := newTestJob("notTerminate", "foo", v1.RestartPolicyNever, parallelism, completions)
@@ -184,31 +117,6 @@ var _ = framework.KubeDescribe("Job", func() {
 		_, err = getJob(f.ClientSet, f.Namespace.Name, job.Name)
 		Expect(err).To(HaveOccurred())
 		Expect(errors.IsNotFound(err)).To(BeTrue())
-	})
-
-	It("should fail a job", func() {
-		By("Creating a job")
-		job := newTestJob("notTerminate", "foo", v1.RestartPolicyNever, parallelism, completions)
-		activeDeadlineSeconds := int64(10)
-		job.Spec.ActiveDeadlineSeconds = &activeDeadlineSeconds
-		job, err := createJob(f.ClientSet, f.Namespace.Name, job)
-		Expect(err).NotTo(HaveOccurred())
-
-		By("Ensuring job was failed")
-		err = waitForJobFail(f.ClientSet, f.Namespace.Name, job.Name, 20*time.Second)
-		if err == wait.ErrWaitTimeout {
-			job, err = getJob(f.ClientSet, f.Namespace.Name, job.Name)
-			Expect(err).NotTo(HaveOccurred())
-			// the job stabilized and won't be synced until modification or full
-			// resync happens, we don't want to wait for the latter so we force
-			// sync modifying it
-			_, err = framework.UpdateJobWithRetries(f.ClientSet, f.Namespace.Name, job.Name, func(update *batch.Job) {
-				update.Spec.Parallelism = &completions
-			})
-			Expect(err).NotTo(HaveOccurred())
-			err = waitForJobFail(f.ClientSet, f.Namespace.Name, job.Name, jobTimeout)
-		}
-		Expect(err).NotTo(HaveOccurred())
 	})
 })
 
