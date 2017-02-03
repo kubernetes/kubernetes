@@ -385,7 +385,7 @@ func runDensityBatchTest(f *framework.Framework, rc *ResourceCollector, testArg 
 	batchLag := lastRunning.Time.Sub(firstCreate.Time)
 
 	rc.Stop()
-	deletePodsSync(f, append(pods, getCadvisorPod()))
+	deletePodsSync(f, pods)
 
 	// Log time series data.
 	if isLogTimeSeries {
@@ -393,6 +393,8 @@ func runDensityBatchTest(f *framework.Framework, rc *ResourceCollector, testArg 
 	}
 	// Log throughput data.
 	logPodCreateThroughput(batchLag, e2eLags, testArg.podsNr, testInfo)
+
+	deletePodsSync(f, []*v1.Pod{getCadvisorPod()})
 
 	return batchLag, e2eLags
 }
@@ -419,10 +421,12 @@ func runDensitySeqTest(f *framework.Framework, rc *ResourceCollector, testArg de
 	batchlag, e2eLags := createBatchPodSequential(f, testPods)
 
 	rc.Stop()
-	deletePodsSync(f, append(bgPods, append(testPods, getCadvisorPod())...))
+	deletePodsSync(f, append(bgPods, testPods...))
 
 	// Log throughput data.
 	logPodCreateThroughput(batchlag, e2eLags, testArg.podsNr, testInfo)
+
+	deletePodsSync(f, []*v1.Pod{getCadvisorPod()})
 
 	return batchlag, e2eLags
 }
