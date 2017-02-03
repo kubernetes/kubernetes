@@ -81,7 +81,7 @@ func TestStatefulPodControlCreatePodExists(t *testing.T) {
 		return true, pod, apierrors.NewAlreadyExists(action.GetResource().GroupResource(), pod.Name)
 	})
 	control = NewRealStatefulPodControl(fakeClient, recorder)
-	if err := control.CreateStatefulPod(set, pod); err != nil {
+	if err := control.CreateStatefulPod(set, pod); !apierrors.IsAlreadyExists(err) {
 		t.Errorf("Failed to create Pod error: %s", err)
 	}
 	events := collectEvents(recorder.Events)

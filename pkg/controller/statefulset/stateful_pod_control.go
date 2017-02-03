@@ -72,7 +72,7 @@ func (spc *realStatefulPodControl) CreateStatefulPod(set *apps.StatefulSet, pod 
 	_, err := spc.client.Core().Pods(set.Namespace).Create(pod)
 	// sink already exists errors
 	if apierrors.IsAlreadyExists(err) {
-		return nil
+		return err
 	}
 	spc.recordPodEvent("create", set, pod, err)
 	return err
@@ -213,10 +213,7 @@ func (spc *realStatefulPodControl) createPersistentVolumeClaims(set *apps.Statef
 		}
 		// TODO: Check resource requirements and accessmodes, update if necessary
 	}
-	if len(errs) > 0 {
-		return errorutils.NewAggregate(errs)
-	}
-	return nil
+	return errorutils.NewAggregate(errs)
 }
 
 var _ StatefulPodControlInterface = &realStatefulPodControl{}

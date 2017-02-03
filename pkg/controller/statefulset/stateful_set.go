@@ -309,10 +309,10 @@ func (ssc *StatefulSetController) Sync(key string) error {
 // syncStatefulSet syncs a tuple of (statefulset, []*v1.Pod).
 func (ssc *StatefulSetController) syncStatefulSet(set *apps.StatefulSet, pods []*v1.Pod) error {
 	glog.V(2).Infof("Syncing StatefulSet %v/%v with %d pods", set.Namespace, set.Name, len(pods))
-	err := ssc.control.UpdateStatefulSet(set, pods)
-	if err == nil {
-		glog.V(2).Infof("Succesfully synced StatefulSet %s/%s successful", set.Namespace, set.Name)
+	if err := ssc.control.UpdateStatefulSet(set, pods); err != nil {
+		glog.V(2).Infof("Error syncing StatefulSet %s/%s with %d pods : %s", set.Namespace, set.Name, err)
+		return err
 	}
-	glog.V(2).Infof("Error syncing StatefulSet %s/%s with %d pods : %s", set.Namespace, set.Name, err)
-	return err
+	glog.V(2).Infof("Succesfully synced StatefulSet %s/%s successful", set.Namespace, set.Name)
+	return nil
 }
