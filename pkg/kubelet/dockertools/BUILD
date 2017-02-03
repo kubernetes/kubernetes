@@ -129,6 +129,7 @@ go_test(
         "//vendor:github.com/golang/mock/gomock",
         "//vendor:github.com/google/cadvisor/info/v1",
         "//vendor:github.com/stretchr/testify/assert",
+        "//vendor:github.com/stretchr/testify/require",
         "//vendor:k8s.io/apimachinery/pkg/api/equality",
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
         "//vendor:k8s.io/apimachinery/pkg/runtime",
