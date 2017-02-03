@@ -821,8 +821,10 @@ function start-kube-apiserver {
   params+=" --secure-port=443"
   params+=" --tls-cert-file=/etc/srv/kubernetes/server.cert"
   params+=" --tls-private-key-file=/etc/srv/kubernetes/server.key"
-  params+=" --kubelet-client-certificate=/etc/srv/kubernetes/kubeapiserver.cert"
-  params+=" --kubelet-client-key=/etc/srv/kubernetes/kubeapiserver.key"
+  if [[ -e /etc/srv/kubernetes/kubeapiserver.cert ]] && [[ -e /etc/srv/kubernetes/kubeapiserver.key ]]; then
+    params+=" --kubelet-client-certificate=/etc/srv/kubernetes/kubeapiserver.cert"
+    params+=" --kubelet-client-key=/etc/srv/kubernetes/kubeapiserver.key"
+  fi
   params+=" --token-auth-file=/etc/srv/kubernetes/known_tokens.csv"
   if [[ -n "${KUBE_PASSWORD:-}" && -n "${KUBE_USER:-}" ]]; then
     params+=" --basic-auth-file=/etc/srv/kubernetes/basic_auth.csv"
