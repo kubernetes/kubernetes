@@ -89,7 +89,11 @@ type kubenetNetworkPlugin struct {
 	execer          utilexec.Interface
 	nsenterPath     string
 	hairpinMode     componentconfig.HairpinMode
+	// kubenet can use either hostportSyncer and hostportManager to implement hostports
+	// Currently, if network host supports legacy features, hostportSyncer will be used,
+	// otherwise, hostportManager will be used.
 	hostportSyncer  hostport.HostportSyncer
+	hostportManager hostport.HostPortManager
 	iptables        utiliptables.Interface
 	sysctl          utilsysctl.Interface
 	ebtables        utilebtables.Interface
@@ -114,6 +118,7 @@ func NewPlugin(networkPluginDir string) network.NetworkPlugin {
 		sysctl:            sysctl,
 		vendorDir:         networkPluginDir,
 		hostportSyncer:    hostport.NewHostportSyncer(),
+		hostportManager:   hostport.NewHostportManager(),
 		nonMasqueradeCIDR: "10.0.0.0/8",
 	}
 }
@@ -356,35 +361,48 @@ func (plugin *kubenetNetworkPlugin) setup(namespace string, name string, id kube
 
 	// The host can choose to not support "legacy" features. The remote
 	// shim doesn't support it (#35457), but the kubelet does.
-	if !plugin.host.SupportsLegacyFeatures() {
-		return nil
-	}
+	if plugin.host.SupportsLegacyFeatures() {
+		// The first SetUpPod call creates the bridge; get a shaper for the sake of
+		// initialization
+		shaper := plugin.shaper()
 
-	// The first SetUpPod call creates the bridge; get a shaper for the sake of
-	// initialization
-	shaper := plugin.shaper()
+		ingress, egress, err := bandwidth.ExtractPodBandwidthResources(pod.Annotations)
+		if err != nil {
+			return fmt.Errorf("Error reading pod bandwidth annotations: %v", err)
+		}
+		if egress != nil || ingress != nil {
+			if err := shaper.ReconcileCIDR(fmt.Sprintf("%s/32", ip4.String()), egress, ingress); err != nil {
+				return fmt.Errorf("Failed to add pod to shaper: %v", err)
+			}
+		}
 
-	ingress, egress, err := bandwidth.ExtractPodBandwidthResources(pod.Annotations)
-	if err != nil {
-		return fmt.Errorf("Error reading pod bandwidth annotations: %v", err)
-	}
-	if egress != nil || ingress != nil {
-		if err := shaper.ReconcileCIDR(fmt.Sprintf("%s/32", ip4.String()), egress, ingress); err != nil {
-			return fmt.Errorf("Failed to add pod to shaper: %v", err)
+		// Open any hostports the pod's containers want
+		activePodPortMapping, err := plugin.getPodPortMapping()
+		if err != nil {
+			return err
+		}
+
+		newPodPortMapping := constructPodPortMapping(pod, ip4)
+		if err := plugin.hostportSyncer.OpenPodHostportsAndSync(newPodPortMapping, BridgeName, activePodPortMapping); err != nil {
+			return err
+		}
+	} else {
+		portMappings, err := plugin.host.GetPodPortMappings(id.ID)
+		if err != nil {
+			return err
+		}
+		if portMappings != nil && len(portMappings) > 0 {
+			if err := plugin.hostportManager.Add(id.ID, &hostport.PodPortMapping{
+				Namespace:    namespace,
+				Name:         name,
+				PortMappings: portMappings,
+				IP:           ip4,
+				HostNetwork:  false,
+			}, BridgeName); err != nil {
+				return err
+			}
 		}
 	}
-
-	// Open any hostports the pod's containers want
-	activePodPortMapping, err := plugin.getPodPortMapping()
-	if err != nil {
-		return err
-	}
-
-	newPodPortMapping := constructPodPortMapping(pod, ip4)
-	if err := plugin.hostportSyncer.OpenPodHostportsAndSync(newPodPortMapping, BridgeName, activePodPortMapping); err != nil {
-		return err
-	}
-
 	return nil
 }
 
@@ -467,18 +485,29 @@ func (plugin *kubenetNetworkPlugin) teardown(namespace string, name string, id k
 
 	// The host can choose to not support "legacy" features. The remote
 	// shim doesn't support it (#35457), but the kubelet does.
-	if !plugin.host.SupportsLegacyFeatures() {
-		return utilerrors.NewAggregate(errList)
+	if plugin.host.SupportsLegacyFeatures() {
+		activePodPortMapping, err := plugin.getPodPortMapping()
+		if err == nil {
+			err = plugin.hostportSyncer.SyncHostports(BridgeName, activePodPortMapping)
+		}
+		if err != nil {
+			errList = append(errList, err)
+		}
+	} else {
+		portMappings, err := plugin.host.GetPodPortMappings(id.ID)
+		if err != nil {
+			errList = append(errList, err)
+		} else if portMappings != nil && len(portMappings) > 0 {
+			if err = plugin.hostportManager.Remove(id.ID, &hostport.PodPortMapping{
+				Namespace:    namespace,
+				Name:         name,
+				PortMappings: portMappings,
+				HostNetwork:  false,
+			}); err != nil {
+				errList = append(errList, err)
+			}
+		}
 	}
-
-	activePodPortMapping, err := plugin.getPodPortMapping()
-	if err == nil {
-		err = plugin.hostportSyncer.SyncHostports(BridgeName, activePodPortMapping)
-	}
-	if err != nil {
-		errList = append(errList, err)
-	}
-
 	return utilerrors.NewAggregate(errList)
 }
 
