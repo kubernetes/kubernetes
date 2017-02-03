@@ -114,6 +114,7 @@ container-runtime-endpoint
 contain-pod-resources
 contention-profiling
 controller-start-interval
+core-kubeconfig
 cors-allowed-origins
 cpu-cfs-quota
 cpu-percent
