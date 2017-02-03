@@ -22,13 +22,13 @@ import (
 
 	"k8s.io/apimachinery/pkg/util/json"
 	"github.com/evanphx/json-patch"
-	"k8s.io/apimachinery/pkg/util/strategicpatch"
+	"k8s.io/apimachinery/pkg/util/mergepatch"
 )
 
 // Create a 3-way merge patch based-on JSON merge patch.
 // Calculate addition-and-change patch between current and modified.
 // Calculate deletion patch between original and modified.
-func CreateThreeWayJSONMergePatch(original, modified, current []byte, fns ...strategicpatch.PreconditionFunc) ([]byte, error) {
+func CreateThreeWayJSONMergePatch(original, modified, current []byte, fns ...mergepatch.PreconditionFunc) ([]byte, error) {
 	if len(original) == 0 {
 		original = []byte(`{}`)
 	}
@@ -59,12 +59,12 @@ func CreateThreeWayJSONMergePatch(original, modified, current []byte, fns ...str
 		return nil, err
 	}
 
-	hasConflicts, err := strategicpatch.HasConflicts(addAndChangePatchObj, deletePatchObj)
+	hasConflicts, err := mergepatch.HasConflicts(addAndChangePatchObj, deletePatchObj)
 	if err != nil {
 		return nil, err
 	}
 	if hasConflicts {
-		return nil, strategicpatch.NewErrConflict(strategicpatch.ToYAMLOrError(addAndChangePatchObj), strategicpatch.ToYAMLOrError(deletePatchObj))
+		return nil, mergepatch.NewErrConflict(mergepatch.ToYAMLOrError(addAndChangePatchObj), mergepatch.ToYAMLOrError(deletePatchObj))
 	}
 	patch, err := jsonpatch.MergePatch(deletePatch, addAndChangePatch)
 	if err != nil {
@@ -81,7 +81,7 @@ func CreateThreeWayJSONMergePatch(original, modified, current []byte, fns ...str
 		return nil, err
 	}
 	if !meetPreconditions {
-		return nil, strategicpatch.NewErrPreconditionFailed(patchMap)
+		return nil, mergepatch.NewErrPreconditionFailed(patchMap)
 	}
 
 	return patch, nil
@@ -133,7 +133,7 @@ func keepOrDeleteNullInObj(m map[string]interface{}, keepNull bool) (map[string]
 	return filteredMap, nil
 }
 
-func meetPreconditions(patchObj map[string]interface{}, fns ...strategicpatch.PreconditionFunc) (bool, error) {
+func meetPreconditions(patchObj map[string]interface{}, fns ...mergepatch.PreconditionFunc) (bool, error) {
 	// Apply the preconditions to the patch, and return an error if any of them fail.
 	for _, fn := range fns {
 		if !fn(patchObj) {
