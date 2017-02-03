@@ -376,7 +376,7 @@ var _ = framework.KubeDescribe("kubelet", func() {
 	})
 
 	// Delete nfs server pod after another pods accesses the mounted nfs volume.
-	framework.KubeDescribe("host cleanup with volume mounts [HostCleanup]", func() {
+	framework.KubeDescribe("host cleanup with volume mounts [HostCleanup][Flaky]", func() {
 		type hostCleanupTest struct {
 			itDescr string
 			podCmd  string
