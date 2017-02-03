@@ -39,6 +39,7 @@ go_library(
         "//pkg/kubelet/leaky:go_default_library",
         "//pkg/kubelet/network:go_default_library",
         "//pkg/kubelet/network/cni:go_default_library",
+        "//pkg/kubelet/network/hostport:go_default_library",
         "//pkg/kubelet/network/kubenet:go_default_library",
         "//pkg/kubelet/qos:go_default_library",
         "//pkg/kubelet/server/streaming:go_default_library",
