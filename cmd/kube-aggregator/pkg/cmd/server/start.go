@@ -33,7 +33,8 @@ import (
 	"k8s.io/apiserver/pkg/server/filters"
 	genericoptions "k8s.io/apiserver/pkg/server/options"
 	"k8s.io/apiserver/pkg/storage/storagebackend"
-	restclient "k8s.io/client-go/rest"
+	"k8s.io/client-go/rest"
+	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/kubernetes/cmd/kube-aggregator/pkg/apiserver"
 	"k8s.io/kubernetes/cmd/kube-aggregator/pkg/legacy"
 	"k8s.io/kubernetes/pkg/api"
@@ -55,6 +56,10 @@ type DiscoveryServerOptions struct {
 	// this to confirm the proxy's identity
 	ProxyClientCertFile string
 	ProxyClientKeyFile  string
+
+	// CoreAPIKubeconfig is a filename for a kubeconfig file to contact the core API server wtih
+	// If it is not set, the in cluster config is used
+	CoreAPIKubeconfig string
 
 	StdOut io.Writer
 	StdErr io.Writer
@@ -93,6 +98,9 @@ func NewCommandStartDiscoveryServer(out, err io.Writer) *cobra.Command {
 	o.Authorization.AddFlags(flags)
 	flags.StringVar(&o.ProxyClientCertFile, "proxy-client-cert-file", o.ProxyClientCertFile, "client certificate used identify the proxy to the API server")
 	flags.StringVar(&o.ProxyClientKeyFile, "proxy-client-key-file", o.ProxyClientKeyFile, "client certificate key used identify the proxy to the API server")
+	flags.StringVar(&o.CoreAPIKubeconfig, "core-kubeconfig", o.CoreAPIKubeconfig, ""+
+		"kubeconfig file pointing at the 'core' kubernetes server with enough rights to get,list,watch "+
+		" services,endpoints.  If not set, the in cluster config is used")
 
 	return cmd
 }
@@ -138,10 +146,18 @@ func (o DiscoveryServerOptions) RunDiscoveryServer() error {
 		return err
 	}
 
-	kubeconfig, err := restclient.InClusterConfig()
-	if err != nil {
-		return err
+	var kubeconfig *rest.Config
+	if len(o.CoreAPIKubeconfig) > 0 {
+		loadingRules := &clientcmd.ClientConfigLoadingRules{ExplicitPath: o.CoreAPIKubeconfig}
+		loader := clientcmd.NewNonInteractiveDeferredLoadingClientConfig(loadingRules, &clientcmd.ConfigOverrides{})
+
+		kubeconfig, err = loader.ClientConfig()
+
+	} else {
+		// without the remote kubeconfig file, try to use the in-cluster config.  Most addon API servers will use this path
+		kubeconfig, err = rest.InClusterConfig()
 	}
+
 	coreAPIServerClient, err := kubeclientset.NewForConfig(kubeconfig)
 	if err != nil {
 		return err

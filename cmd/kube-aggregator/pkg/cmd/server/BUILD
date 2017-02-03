@@ -30,6 +30,7 @@ go_library(
         "//vendor:k8s.io/apiserver/pkg/server/options",
         "//vendor:k8s.io/apiserver/pkg/storage/storagebackend",
         "//vendor:k8s.io/client-go/rest",
+        "//vendor:k8s.io/client-go/tools/clientcmd",
     ],
 )
 
