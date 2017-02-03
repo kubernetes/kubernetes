@@ -30,6 +30,7 @@ Just periodically list jobs and SJs, and then reconcile them.
 
 import (
 	"fmt"
+	"sort"
 	"time"
 
 	"github.com/golang/glog"
@@ -119,8 +120,90 @@ func (jm *CronJobController) SyncAll() {
 	glog.V(4).Infof("Found %d groups", len(jobsBySj))
 
 	for _, sj := range sjs {
-		SyncOne(sj, jobsBySj[sj.UID], time.Now(), jm.jobControl, jm.sjControl, jm.podControl, jm.recorder)
+		jobsRemaining := CleanupFinishedJobs(sj, jobsBySj[sj.UID], jm.jobControl, jm.recorder)
+		SyncOne(sj, jobsRemaining, time.Now(), jm.jobControl, jm.sjControl, jm.podControl, jm.recorder)
 	}
+}
+
+// CleanupFinishedJobs cleanups finished jobs created by a CronJob
+func CleanupFinishedJobs(sj batch.CronJob, js []batch.Job, jc jobControlInterface, recorder record.EventRecorder) []batch.Job {
+	// If neither limits are active, there is no need to do anything.
+	if sj.Spec.FailedJobsHistoryLimit == nil && sj.Spec.SuccessfulJobsHistoryLimit == nil {
+		return js
+	}
+
+	finishedFailedJobs := []batch.Job{}
+	finishedSuccessfulJobs := []batch.Job{}
+	remainingJobs := []batch.Job{}
+
+	for _, job := range js {
+		isFinished, finishedStatus := getFinishedStatus(&job)
+		if isFinished && finishedStatus == batch.JobComplete {
+			finishedSuccessfulJobs = append(finishedSuccessfulJobs, job)
+		} else if isFinished && finishedStatus == batch.JobFailed {
+			finishedFailedJobs = append(finishedFailedJobs, job)
+		} else {
+			remainingJobs = append(remainingJobs, job)
+		}
+	}
+
+	remainingJobs = append(remainingJobs,
+		RemoveJobs(sj,
+			finishedSuccessfulJobs,
+			jc,
+			*sj.Spec.SuccessfulJobsHistoryLimit,
+			recorder)...)
+
+	remainingJobs = append(remainingJobs,
+		RemoveJobs(sj,
+			finishedFailedJobs,
+			jc,
+			*sj.Spec.FailedJobsHistoryLimit,
+			recorder)...)
+
+	return remainingJobs
+}
+
+// RemoveJobs removes the oldest jobs from a list of jobs
+func RemoveJobs(sj batch.CronJob, js []batch.Job, jc jobControlInterface, maxJobs int32, recorder record.EventRecorder) []batch.Job {
+	nameForLog := fmt.Sprintf("%s/%s", sj.Namespace, sj.Name)
+	numToDelete := len(js) - int(maxJobs)
+	glog.Infof("Cleaning up %d/%d jobs from %s", numToDelete, len(js), nameForLog, numToDelete)
+	if numToDelete <= 0 {
+		return js
+	}
+
+	remainingJobs := []batch.Job{}
+	sort.Sort(byJobStartTime(js))
+	for i := 0; i < numToDelete; i++ {
+		j := js[i]
+		glog.Infof("Removing job %s from %s", j.Name, nameForLog)
+
+		// Do not remove pods, this will be done by GC as they
+		// become orphaned.
+
+		if err := jc.DeleteJob(j.Namespace, j.Name); err != nil {
+			recorder.Eventf(&sj, v1.EventTypeWarning, "FailedDelete", "Deleted job %v", err)
+			glog.Errorf("Error deleting job %s from %s: %v", j.Name, nameForLog, err)
+
+			// Move on to next job
+			remainingJobs = append(remainingJobs, j)
+			continue
+		}
+
+		// Job may be in active list, if it has just finished
+		// and the controller has not removed it yet.
+		// Since we removed it now, it will generate a "missing job"
+		// warning when the controller processes its active list.
+		// Instead, we remove it from the active list by anticipation
+		// to avoid the warning, as this cleanup is normal behavior.
+		deleteFromActiveList(&sj, j.ObjectMeta.UID)
+
+		recorder.Eventf(&sj, v1.EventTypeNormal, "SuccessfulDelete", "Deleted job %v (history limit reached)", j.Name)
+	}
+
+	remainingJobs = append(remainingJobs, js[numToDelete:]...)
+	return remainingJobs
 }
 
 // SyncOne reconciles a CronJob with a list of any Jobs that it created.
