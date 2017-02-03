@@ -74,7 +74,7 @@ var _ = framework.KubeDescribe("StatefulSet", func() {
 		ns = f.Namespace.Name
 	})
 
-	framework.KubeDescribe("Basic StatefulSet functionality [Feature:StatefulSet] [StatefulSetBasic]", func() {
+	framework.KubeDescribe("Basic StatefulSet functionality [StatefulSetBasic]", func() {
 		ssName := "ss"
 		labels := map[string]string{
 			"foo": "bar",
