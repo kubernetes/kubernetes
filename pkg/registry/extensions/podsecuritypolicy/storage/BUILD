@@ -16,13 +16,13 @@ go_test(
     deps = [
         "//pkg/apis/extensions:go_default_library",
         "//pkg/apis/extensions/v1beta1:go_default_library",
-        "//pkg/genericapiserver/registry/generic:go_default_library",
         "//pkg/registry/registrytest:go_default_library",
-        "//pkg/storage/etcd/testing:go_default_library",
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
         "//vendor:k8s.io/apimachinery/pkg/fields",
         "//vendor:k8s.io/apimachinery/pkg/labels",
         "//vendor:k8s.io/apimachinery/pkg/runtime",
+        "//vendor:k8s.io/apiserver/pkg/registry/generic",
+        "//vendor:k8s.io/apiserver/pkg/storage/etcd/testing",
     ],
 )
 
@@ -33,11 +33,11 @@ go_library(
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/apis/extensions:go_default_library",
-        "//pkg/genericapiserver/registry/generic:go_default_library",
-        "//pkg/genericapiserver/registry/generic/registry:go_default_library",
         "//pkg/registry/cachesize:go_default_library",
         "//pkg/registry/extensions/podsecuritypolicy:go_default_library",
         "//vendor:k8s.io/apimachinery/pkg/runtime",
+        "//vendor:k8s.io/apiserver/pkg/registry/generic",
+        "//vendor:k8s.io/apiserver/pkg/registry/generic/registry",
     ],
 )
 
