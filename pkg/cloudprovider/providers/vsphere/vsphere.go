@@ -20,6 +20,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"net/url"
 	"path"
 	"path/filepath"
@@ -121,7 +122,9 @@ type VSphereConfig struct {
 		WorkingDir string `gcfg:"working-dir"`
 		// Soap round tripper count (retries = RoundTripper - 1)
 		RoundTripperCount uint `gcfg:"soap-roundtrip-count"`
-		// VMUUID is the virtual machine's UUID. If not set, will be fetched from the machine.
+		// VMUUID is the VM Instance UUID of virtual machine which can be retrieved from instanceUuid
+		// property in VmConfigInfo, or also set as vc.uuid in VMX file.
+		// If not set, will be fetched from the machine via sysfs (requires root)
 		VMUUID string `gcfg:"vm-uuid"`
 	}
 
@@ -212,6 +215,7 @@ func getVMName(client *govmomi.Client, cfg *VSphereConfig) (string, error) {
 	if cfg.Global.VMUUID != "" {
 		vmUUID = cfg.Global.VMUUID
 	} else {
+		// This needs root privileges on the host, and will fail otherwise.
 		vmUUIDbytes, err := ioutil.ReadFile("/sys/devices/virtual/dmi/id/product_uuid")
 		if err != nil {
 			return "", err
