@@ -2293,7 +2293,7 @@ type PodStatus struct {
 	// +optional
 	StartTime *metav1.Time `json:"startTime,omitempty" protobuf:"bytes,7,opt,name=startTime"`
 
-		// The list has one entry per init container in the manifest. The most recent successful
+	// The list has one entry per init container in the manifest. The most recent successful
 	// init container will have ready = true, the most recently started container will have
 	// startTime set.
 	// More info: http://kubernetes.io/docs/user-guide/pod-states#container-statuses
