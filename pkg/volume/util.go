@@ -300,16 +300,30 @@ func ChooseZoneForVolume(zones sets.String, pvcName string) string {
 
 		// Heuristic to make sure that volumes in a StatefulSet are spread across zones
 		// StatefulSet PVCs are (currently) named ClaimName-StatefulSetName-Id,
-		// where Id is an integer index
+		// where Id is an integer index.
+		// Note though that if a StatefulSet pod has multiple claims, we need them to be
+		// in the same zone, because otherwise the pod will be unable to mount both volumes,
+		// and will be unschedulable.  So we hash _only_ the "StatefulSetName" portion when
+		// it looks like `ClaimName-StatefulSetName-Id`.
+		// For compatibility, we continue to round-robin volume names that look like `Name-Id` also.
 		lastDash := strings.LastIndexByte(pvcName, '-')
 		if lastDash != -1 {
-			petIDString := pvcName[lastDash+1:]
-			petID, err := strconv.ParseUint(petIDString, 10, 32)
+			statefulsetIDString := pvcName[lastDash+1:]
+			statefulsetID, err := strconv.ParseUint(statefulsetIDString, 10, 32)
 			if err == nil {
-				// Offset by the pet id, so we round-robin across zones
-				index = uint32(petID)
-				// We still hash the volume name, but only the base
+				// Offset by the statefulsetID, so we round-robin across zones
+				index = uint32(statefulsetID)
+				// We still hash the volume name, but only the prefix
 				hashString = pvcName[:lastDash]
+
+				// In the special case where it looks like `ClaimName-StatefulSetName-Id`,
+				// hash only the StatefulSetName, so that different claims on the same StatefulSet
+				// member end up in the same zone.
+				firstDash := strings.IndexByte(hashString, '-')
+				if firstDash != -1 {
+					hashString = hashString[firstDash+1:]
+				}
+
 				glog.V(2).Infof("Detected StatefulSet-style volume name %q; index=%d", pvcName, index)
 			}
 		}
