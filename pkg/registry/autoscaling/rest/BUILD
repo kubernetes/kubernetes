@@ -15,10 +15,10 @@ go_library(
         "//pkg/api:go_default_library",
         "//pkg/apis/autoscaling:go_default_library",
         "//pkg/apis/autoscaling/v1:go_default_library",
-        "//pkg/genericapiserver/registry/generic:go_default_library",
-        "//pkg/genericapiserver/registry/rest:go_default_library",
-        "//pkg/genericapiserver/server:go_default_library",
         "//pkg/registry/autoscaling/horizontalpodautoscaler/storage:go_default_library",
+        "//vendor:k8s.io/apiserver/pkg/registry/generic",
+        "//vendor:k8s.io/apiserver/pkg/registry/rest",
+        "//vendor:k8s.io/apiserver/pkg/server",
     ],
 )
 

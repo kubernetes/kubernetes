@@ -25,7 +25,6 @@ go_library(
         "//pkg/controller/informers:go_default_library",
         "//pkg/controller/serviceaccount:go_default_library",
         "//pkg/generated/openapi:go_default_library",
-        "//pkg/genericapiserver/server:go_default_library",
         "//pkg/kubeapiserver:go_default_library",
         "//pkg/kubeapiserver/admission:go_default_library",
         "//pkg/kubeapiserver/authenticator:go_default_library",
@@ -64,6 +63,7 @@ go_library(
         "//vendor:k8s.io/apimachinery/pkg/util/sets",
         "//vendor:k8s.io/apimachinery/pkg/util/wait",
         "//vendor:k8s.io/apiserver/pkg/admission",
+        "//vendor:k8s.io/apiserver/pkg/server",
         "//vendor:k8s.io/apiserver/pkg/server/filters",
     ],
 )

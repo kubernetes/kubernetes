@@ -14,11 +14,11 @@ go_library(
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/apis/rbac:go_default_library",
-        "//pkg/genericapiserver/registry/generic:go_default_library",
-        "//pkg/genericapiserver/registry/generic/registry:go_default_library",
         "//pkg/registry/cachesize:go_default_library",
         "//pkg/registry/rbac/clusterrole:go_default_library",
         "//vendor:k8s.io/apimachinery/pkg/runtime",
+        "//vendor:k8s.io/apiserver/pkg/registry/generic",
+        "//vendor:k8s.io/apiserver/pkg/registry/generic/registry",
     ],
 )
 
