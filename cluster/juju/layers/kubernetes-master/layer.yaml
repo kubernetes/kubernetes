@@ -9,7 +9,6 @@ includes:
   - 'interface:http'
   - 'interface:kubernetes-cni'
   - 'interface:kube-dns'
-  - 'interface:nrpe-external-master'
   - 'interface:public-address'
 options:
   basic:

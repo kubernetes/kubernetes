@@ -8,7 +8,6 @@ includes:
   - 'interface:http'
   - 'interface:kubernetes-cni'
   - 'interface:kube-dns'
-  - 'interface:nrpe-external-master'
 options:
   basic:
     packages:
