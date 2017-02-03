@@ -27,6 +27,7 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"strconv"
+	"sort"
 	"strings"
 	"testing"
 	"time"
@@ -90,6 +91,8 @@ func TestInitFederation(t *testing.T) {
 		dnsProvider          string
 		storageBackend       string
 		dryRun               string
+		apiserverArgOverrides string
+		cmArgOverrides        string
 	}{
 		{
 			federation:           "union",
@@ -105,6 +108,8 @@ func TestInitFederation(t *testing.T) {
 			dnsProvider:          "test-dns-provider",
 			storageBackend:       "etcd2",
 			dryRun:               "",
+			apiserverArgOverrides: "--client-ca-file=override,--log-dir=override",
+			cmArgOverrides:        "",
 		},
 		{
 			federation:           "union",
@@ -120,6 +125,8 @@ func TestInitFederation(t *testing.T) {
 			dnsProvider:          "", //test for default value of dns provider
 			storageBackend:       "etcd2",
 			dryRun:               "",
+			apiserverArgOverrides: "",
+			cmArgOverrides:        "--dns-provider=override,--log-dir=override",
 		},
 		{
 			federation:           "union",
@@ -135,6 +142,8 @@ func TestInitFederation(t *testing.T) {
 			dnsProvider:          "test-dns-provider",
 			storageBackend:       "etcd2",
 			dryRun:               "valid-run",
+			apiserverArgOverrides: "--log-dir=override",
+			cmArgOverrides:        "--log-dir=override",
 		},
 		{
 			federation:           "union",
@@ -150,6 +159,8 @@ func TestInitFederation(t *testing.T) {
 			dnsProvider:          "test-dns-provider",
 			storageBackend:       "etcd3",
 			dryRun:               "",
+			apiserverArgOverrides: "",
+			cmArgOverrides:        "",
 		},
 		{
 			federation:           "union",
@@ -164,6 +175,8 @@ func TestInitFederation(t *testing.T) {
 			dnsProvider:          "test-dns-provider",
 			storageBackend:       "etcd3",
 			dryRun:               "",
+			apiserverArgOverrides: "",
+			cmArgOverrides:        "",			
 		},
 		{
 			federation:           "union",
@@ -179,6 +192,8 @@ func TestInitFederation(t *testing.T) {
 			dnsProvider:          "test-dns-provider",
 			storageBackend:       "etcd3",
 			dryRun:               "",
+			apiserverArgOverrides: "",
+			cmArgOverrides:        "",		
 		},
 	}
 
@@ -194,7 +209,7 @@ func TestInitFederation(t *testing.T) {
 		} else {
 			dnsProvider = "google-clouddns" //default value of dns-provider
 		}
-		hostFactory, err := fakeInitHostFactory(tc.apiserverServiceType, tc.federation, util.DefaultFederationSystemNamespace, tc.advertiseAddress, tc.lbIP, tc.dnsZoneName, tc.image, dnsProvider, tc.etcdPersistence, tc.etcdPVCapacity, tc.storageBackend)
+		hostFactory, err := fakeInitHostFactory(tc.apiserverServiceType, tc.federation, util.DefaultFederationSystemNamespace, tc.advertiseAddress, tc.lbIP, tc.dnsZoneName, tc.image, dnsProvider, tc.etcdPersistence, tc.etcdPVCapacity, tc.storageBackend, tc.apiserverArgOverrides, tc.cmArgOverrides)
 		if err != nil {
 			t.Fatalf("[%d] unexpected error: %v", i, err)
 		}
@@ -210,6 +225,9 @@ func TestInitFederation(t *testing.T) {
 		cmd.Flags().Set("host-cluster-context", "substrate")
 		cmd.Flags().Set("dns-zone-name", tc.dnsZoneName)
 		cmd.Flags().Set("image", tc.image)
+		cmd.Flags().Set("apiserver-arg-overrides", tc.apiserverArgOverrides)
+		cmd.Flags().Set("controllermgr-arg-overrides", tc.cmArgOverrides)
+
 		if tc.storageBackend != "" {
 			cmd.Flags().Set("storage-backend", tc.storageBackend)
 		}
@@ -498,7 +516,7 @@ func TestCertsHTTPS(t *testing.T) {
 	}
 }
 
-func fakeInitHostFactory(apiserverServiceType v1.ServiceType, federationName, namespaceName, advertiseAddress, lbIp, dnsZoneName, image, dnsProvider, etcdPersistence, etcdPVCapacity, storageProvider string) (cmdutil.Factory, error) {
+func fakeInitHostFactory(apiserverServiceType v1.ServiceType, federationName, namespaceName, advertiseAddress, lbIp, dnsZoneName, image, dnsProvider, etcdPersistence, etcdPVCapacity, storageProvider, apiserverOverrideArg, cmOverrideArg string) (cmdutil.Factory, error) {
 	svcName := federationName + "-apiserver"
 	svcUrlPrefix := "/api/v1/namespaces/federation-system/services"
 	credSecretName := svcName + "-credentials"
@@ -684,6 +702,39 @@ func fakeInitHostFactory(apiserverServiceType v1.ServiceType, federationName, na
 	nodeList := v1.NodeList{}
 	nodeList.Items = append(nodeList.Items, node)
 
+	address := lbIp
+	if apiserverServiceType == v1.ServiceTypeNodePort {
+		if advertiseAddress != "" {
+			address = advertiseAddress
+		} else {
+			address = nodeIP
+		}
+	}
+	//apiserver.Spec.Template.Spec.Containers[0].Command = append(apiserver.Spec.Template.Spec.Containers[0].Command, fmt.Sprintf("--advertise-address=%s", address))
+
+
+	apiserverCommand := []string{
+		"/hyperkube",
+		"federation-apiserver",
+	}
+	apiserverArgs := []string{}
+	apiserverArgsMap := apiserverDefaultArgs
+	apiserverArgsMap["--storage-backend"] = storageProvider
+	//apiserverArgsMap["--advertise-address"] = ip
+	apiserverArgsMap["--advertise-address"] = address
+	if strings.Contains(apiserverOverrideArg, "--client-ca-file=override") {
+		apiserverArgsMap["--client-ca-file"] = "override"
+	}
+	if strings.Contains(apiserverOverrideArg, "--log-dir=override") {
+		apiserverArgsMap["--log-dir"] = "override"
+	}
+
+	for key, value := range apiserverArgsMap {
+		apiserverArgs = append(apiserverArgs, fmt.Sprintf("%s=%s", key, value))
+	}
+	sort.Strings(apiserverArgs)
+	apiserverCommand = append(apiserverCommand, apiserverArgs...)
+
 	apiserver := v1beta1.Deployment{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "Deployment",
@@ -705,20 +756,9 @@ func fakeInitHostFactory(apiserverServiceType v1.ServiceType, federationName, na
 				Spec: v1.PodSpec{
 					Containers: []v1.Container{
 						{
-							Name:  "apiserver",
-							Image: image,
-							Command: []string{
-								"/hyperkube",
-								"federation-apiserver",
-								"--bind-address=0.0.0.0",
-								"--etcd-servers=http://localhost:2379",
-								"--secure-port=443",
-								"--client-ca-file=/etc/federation/apiserver/ca.crt",
-								"--tls-cert-file=/etc/federation/apiserver/server.crt",
-								"--tls-private-key-file=/etc/federation/apiserver/server.key",
-								"--admission-control=NamespaceLifecycle",
-								fmt.Sprintf("--storage-backend=%s", storageProvider),
-							},
+							Name:    "apiserver",
+							Image:   image,
+							Command: apiserverCommand,
 							Ports: []v1.ContainerPort{
 								{
 									Name:          "https",
@@ -784,15 +824,29 @@ func fakeInitHostFactory(apiserverServiceType v1.ServiceType, federationName, na
 		}
 	}
 
-	address := lbIp
-	if apiserverServiceType == v1.ServiceTypeNodePort {
-		if advertiseAddress != "" {
-			address = advertiseAddress
-		} else {
-			address = nodeIP
-		}
+	cmCommand := []string{
+		"/hyperkube",
+		"federation-controller-manager",
 	}
-	apiserver.Spec.Template.Spec.Containers[0].Command = append(apiserver.Spec.Template.Spec.Containers[0].Command, fmt.Sprintf("--advertise-address=%s", address))
+	cmArgs := []string{}
+	cmArgsMap := cmDefaultArgs
+	cmArgsMap["--federation-name"] = federationName
+	cmArgsMap["--zone-name"] = dnsZoneName
+	cmArgsMap["--master"] = "https://" + svcName
+	if strings.Contains(cmOverrideArg, "--dns-provider=override") {
+		cmArgsMap["--dns-provider"] = "override"
+	} else {
+		cmArgsMap["--dns-provider"] = dnsProvider
+	}
+	if strings.Contains(cmOverrideArg, "--log-dir=override") {
+		cmArgsMap["--log-dir"] = "override"
+	}
+
+	for key, value := range cmArgsMap {
+		cmArgs = append(cmArgs, fmt.Sprintf("%s=%s", key, value))
+	}
+	sort.Strings(cmArgs)
+	cmCommand = append(cmCommand, cmArgs...)
 
 	cmName := federationName + "-controller-manager"
 	cm := v1beta1.Deployment{
@@ -816,18 +870,9 @@ func fakeInitHostFactory(apiserverServiceType v1.ServiceType, federationName, na
 				Spec: v1.PodSpec{
 					Containers: []v1.Container{
 						{
-							Name:  "controller-manager",
-							Image: image,
-							Command: []string{
-								"/hyperkube",
-								"federation-controller-manager",
-								"--master=https://" + svcName,
-								"--kubeconfig=/etc/federation/controller-manager/kubeconfig",
-								fmt.Sprintf("--dns-provider=%s", dnsProvider),
-								"--dns-provider-config=",
-								fmt.Sprintf("--federation-name=%s", federationName),
-								fmt.Sprintf("--zone-name=%s", dnsZoneName),
-							},
+							Name:    "controller-manager",
+							Image:   image,
+							Command: cmCommand,
 							VolumeMounts: []v1.VolumeMount{
 								{
 									Name:      cmKubeconfigSecretName,
