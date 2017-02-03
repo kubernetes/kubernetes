@@ -128,8 +128,6 @@ go_library(
         "//pkg/controller/job:go_default_library",
         "//pkg/controller/replicaset:go_default_library",
         "//pkg/controller/replication:go_default_library",
-        "//pkg/controller/statefulset:go_default_library",
-        "//pkg/genericapiserver/registry/generic/registry:go_default_library",
         "//pkg/kubectl:go_default_library",
         "//pkg/kubectl/cmd/util:go_default_library",
         "//pkg/kubelet/api/v1alpha1/stats:go_default_library",
