@@ -239,20 +239,20 @@ func (daemonsetcontroller *DaemonSetController) removeFinalizerFunc(obj pkgrunti
 	return daemonset, nil
 }
 
-// Adds the given finalizer to the given objects ObjectMeta.
+// Adds the given finalizers to the given objects ObjectMeta.
 // Assumes that the given object is a daemonset.
-func (daemonsetcontroller *DaemonSetController) addFinalizerFunc(obj pkgruntime.Object, finalizer string) (pkgruntime.Object, error) {
+func (daemonsetcontroller *DaemonSetController) addFinalizerFunc(obj pkgruntime.Object, finalizers []string) (pkgruntime.Object, error) {
 	daemonset := obj.(*extensionsv1.DaemonSet)
-	daemonset.ObjectMeta.Finalizers = append(daemonset.ObjectMeta.Finalizers, finalizer)
+	daemonset.ObjectMeta.Finalizers = append(daemonset.ObjectMeta.Finalizers, finalizers...)
 	daemonset, err := daemonsetcontroller.federatedApiClient.Extensions().DaemonSets(daemonset.Namespace).Update(daemonset)
 	if err != nil {
-		return nil, fmt.Errorf("failed to add finalizer %s to daemonset %s: %v", finalizer, daemonset.Name, err)
+		return nil, fmt.Errorf("failed to add finalizers %v to daemonset %s: %v", finalizers, daemonset.Name, err)
 	}
 	return daemonset, nil
 }
 
 func (daemonsetcontroller *DaemonSetController) Run(stopChan <-chan struct{}) {
-	glog.V(1).Infof("Starting daemonset controllr")
+	glog.V(1).Infof("Starting daemonset controller")
 	go daemonsetcontroller.daemonsetInformerController.Run(stopChan)
 
 	glog.V(1).Infof("Starting daemonset federated informer")

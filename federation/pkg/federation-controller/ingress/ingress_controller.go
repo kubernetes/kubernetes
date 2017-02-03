@@ -339,14 +339,14 @@ func (ic *IngressController) removeFinalizerFunc(obj pkgruntime.Object, finalize
 	return ingress, nil
 }
 
-// Adds the given finalizer to the given objects ObjectMeta.
+// Adds the given finalizers to the given objects ObjectMeta.
 // Assumes that the given object is a ingress.
-func (ic *IngressController) addFinalizerFunc(obj pkgruntime.Object, finalizer string) (pkgruntime.Object, error) {
+func (ic *IngressController) addFinalizerFunc(obj pkgruntime.Object, finalizers []string) (pkgruntime.Object, error) {
 	ingress := obj.(*extensionsv1beta1.Ingress)
-	ingress.ObjectMeta.Finalizers = append(ingress.ObjectMeta.Finalizers, finalizer)
+	ingress.ObjectMeta.Finalizers = append(ingress.ObjectMeta.Finalizers, finalizers...)
 	ingress, err := ic.federatedApiClient.Extensions().Ingresses(ingress.Namespace).Update(ingress)
 	if err != nil {
-		return nil, fmt.Errorf("failed to add finalizer %s to ingress %s: %v", finalizer, ingress.Name, err)
+		return nil, fmt.Errorf("failed to add finalizers %v to ingress %s: %v", finalizers, ingress.Name, err)
 	}
 	return ingress, nil
 }
