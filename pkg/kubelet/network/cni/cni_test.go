@@ -39,6 +39,7 @@ import (
 	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
 	"k8s.io/kubernetes/pkg/kubelet/network"
 	"k8s.io/kubernetes/pkg/kubelet/network/cni/testing"
+	networktest "k8s.io/kubernetes/pkg/kubelet/network/testing"
 	utilexec "k8s.io/kubernetes/pkg/util/exec"
 )
 
@@ -111,6 +112,7 @@ func tearDownPlugin(tmpDir string) {
 }
 
 type fakeNetworkHost struct {
+	networktest.FakePortMappingGetter
 	kubeClient clientset.Interface
 	runtime    kubecontainer.Runtime
 }
