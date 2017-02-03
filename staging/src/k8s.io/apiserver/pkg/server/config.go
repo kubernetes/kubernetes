@@ -50,16 +50,18 @@ import (
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/apiserver/pkg/authorization/authorizerfactory"
 	authorizerunion "k8s.io/apiserver/pkg/authorization/union"
+	genericapifilters "k8s.io/apiserver/pkg/endpoints/filters"
+	apiopenapi "k8s.io/apiserver/pkg/endpoints/openapi"
 	apirequest "k8s.io/apiserver/pkg/endpoints/request"
 	genericfilters "k8s.io/apiserver/pkg/server/filters"
 	"k8s.io/apiserver/pkg/server/healthz"
+	"k8s.io/apiserver/pkg/server/mux"
 	"k8s.io/apiserver/pkg/server/options"
+	"k8s.io/apiserver/pkg/server/routes"
 	restclient "k8s.io/client-go/rest"
 	certutil "k8s.io/client-go/util/cert"
-	genericapifilters "k8s.io/apiserver/pkg/endpoints/filters"
-	apiopenapi "k8s.io/apiserver/pkg/endpoints/openapi"
-	"k8s.io/apiserver/pkg/server/mux"
-	"k8s.io/apiserver/pkg/server/routes"
+
+	_ "k8s.io/apiserver/pkg/apis/apiserver/install"
 )
 
 const (
