@@ -22,6 +22,7 @@ import (
 
 	"github.com/golang/glog"
 
+	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/apis/componentconfig"
 	internalapi "k8s.io/kubernetes/pkg/kubelet/api"
 	runtimeapi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
@@ -31,6 +32,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/dockertools"
 	"k8s.io/kubernetes/pkg/kubelet/network"
 	"k8s.io/kubernetes/pkg/kubelet/network/cni"
+	"k8s.io/kubernetes/pkg/kubelet/network/hostport"
 	"k8s.io/kubernetes/pkg/kubelet/network/kubenet"
 	"k8s.io/kubernetes/pkg/kubelet/server/streaming"
 )
@@ -130,7 +132,7 @@ func NewDockerService(client dockertools.DockerInterface, seccompProfileRoot str
 	cniPlugins = append(cniPlugins, kubenet.NewPlugin(pluginSettings.PluginBinDir))
 	netHost := &dockerNetworkHost{
 		pluginSettings.LegacyRuntimeHost,
-		&namespaceGetter{ds},
+		ds,
 	}
 	plug, err := network.InitNetworkPlugin(cniPlugins, pluginSettings.PluginName, netHost, pluginSettings.HairpinMode, pluginSettings.NonMasqueradeCIDR, pluginSettings.MTU)
 	if err != nil {
@@ -214,12 +216,6 @@ func (ds *dockerService) UpdateRuntimeConfig(runtimeConfig *runtimeapi.RuntimeCo
 	return
 }
 
-// namespaceGetter is a wrapper around the dockerService that implements
-// the network.NamespaceGetter interface.
-type namespaceGetter struct {
-	*dockerService
-}
-
 // GetNetNS returns the network namespace of the given containerID. The ID
 // supplied is typically the ID of a pod sandbox. This getter doesn't try
 // to map non-sandbox IDs to their respective sandboxes.
@@ -231,12 +227,32 @@ func (ds *dockerService) GetNetNS(podSandboxID string) (string, error) {
 	return getNetworkNamespace(r), nil
 }
 
-// dockerNetworkHost implements network.Host by wrapping the legacy host
-// passed in by the kubelet and adding NamespaceGetter methods. The legacy
-// host methods are slated for deletion.
+// GetPodPortMappings returns the port mappings of the given podSandbox ID.
+func (ds *dockerService) GetPodPortMappings(podSandboxID string) ([]*hostport.PortMapping, error) {
+	// TODO: get portmappings from docker labels for backward compatibility
+	checkpoint, err := ds.checkpointHandler.GetCheckpoint(podSandboxID)
+	if err != nil {
+		return nil, err
+	}
+
+	portMappings := []*hostport.PortMapping{}
+	for _, pm := range checkpoint.Data.PortMappings {
+		proto := toAPIProtocol(*pm.Protocol)
+		portMappings = append(portMappings, &hostport.PortMapping{
+			HostPort:      *pm.HostPort,
+			ContainerPort: *pm.ContainerPort,
+			Protocol:      proto,
+		})
+	}
+	return portMappings, nil
+}
+
+// dockerNetworkHost implements network.Host by wrapping the legacy host passed in by the kubelet
+// and dockerServices which implementes the rest of the network host interfaces.
+// The legacy host methods are slated for deletion.
 type dockerNetworkHost struct {
 	network.LegacyHost
-	*namespaceGetter
+	*dockerService
 }
 
 // Start initializes and starts components in dockerService.
@@ -294,4 +310,15 @@ func (ds *dockerService) GenerateExpectedCgroupParent(cgroupParent string) (stri
 	}
 	glog.V(3).Infof("Setting cgroup parent to: %q", cgroupParent)
 	return cgroupParent, nil
+}
+
+func toAPIProtocol(protocol Protocol) v1.Protocol {
+	switch protocol {
+	case protocolTCP:
+		return v1.ProtocolTCP
+	case protocolUDP:
+		return v1.ProtocolUDP
+	}
+	glog.Warningf("Unknown protocol %q: defaulting to TCP", protocol)
+	return v1.ProtocolTCP
 }

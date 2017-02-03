@@ -30,6 +30,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/componentconfig"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
+	"k8s.io/kubernetes/pkg/kubelet/network/hostport"
 	utilexec "k8s.io/kubernetes/pkg/util/exec"
 	utilsysctl "k8s.io/kubernetes/pkg/util/sysctl"
 )
@@ -124,23 +125,17 @@ type LegacyHost interface {
 // only require a way to access namespace information, which they can do
 // directly through the embedded NamespaceGetter.
 type Host interface {
-	// NamespaceGetter is a getter for sandbox namespace information.
-	// It's the only part of this interface that isn't currently deprecated.
-	NamespaceGetter
+	// GetNetNS returns network namespace information for the given containerID.
+	GetNetNS(containerID string) (string, error)
+
+	// GetPodPortMappings returns sandbox port mappings information.
+	GetPodPortMappings(containerID string) ([]*hostport.PortMapping, error)
 
 	// LegacyHost contains methods that trap back into the Kubelet. Dependence
 	// *do not* add more dependencies in this interface. In a post-cri world,
 	// network plugins will be invoked by the runtime shim, and should only
 	// require NamespaceGetter.
 	LegacyHost
-}
-
-// NamespaceGetter is an interface to retrieve namespace information for a given
-// sandboxID. Typically implemented by runtime shims that are closely coupled to
-// CNI plugin wrappers like kubenet.
-type NamespaceGetter interface {
-	// GetNetNS returns network namespace information for the given containerID.
-	GetNetNS(containerID string) (string, error)
 }
 
 // InitNetworkPlugin inits the plugin that matches networkPluginName. Plugins must have unique names.
@@ -275,4 +270,10 @@ func GetPodIP(execer utilexec.Interface, nsenterPath, netnsPath, interfaceName s
 	}
 
 	return ip, nil
+}
+
+type NoopPortMappingGetter struct{}
+
+func (*NoopPortMappingGetter) GetPodPortMappings(containerID string) ([]*hostport.PortMapping, error) {
+	return nil, nil
 }
