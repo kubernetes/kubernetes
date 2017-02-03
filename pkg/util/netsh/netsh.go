@@ -167,12 +167,12 @@ func (runner *runner) DeleteIPAddress(args []string) error {
 
 // GetInterfaceToAddIP returns the interface name where Service IP needs to be added
 // IP Address needs to be added for netsh portproxy to redirect traffic
-// Reads Environment variable INTERFACE_TO_ADD_SERVICE_IP, if it is not defined then "vEthernet (HNS Internal NIC)" is returned
+// Reads Environment variable INTERFACE_TO_ADD_SERVICE_IP, if it is not defined then "vEthernet (forwarder)" is returned
 func (runner *runner) GetInterfaceToAddIP() string {
 	if iface := os.Getenv("INTERFACE_TO_ADD_SERVICE_IP"); len(iface) > 0 {
 		return iface
 	}
-	return "vEthernet (HNS Internal NIC)"
+	return "vEthernet (forwarder)"
 }
 
 // Restore is part of Interface.

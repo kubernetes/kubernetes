@@ -40,7 +40,7 @@ type proxySocket interface {
 	// while sessions are active.
 	Close() error
 	// ProxyLoop proxies incoming connections for the specified service to the service endpoints.
-	ProxyLoop(service proxy.ServicePortName, info *serviceInfo, proxier *Proxier)
+	ProxyLoop(service proxy.ServicePortPortalName, info *serviceInfo, proxier *Proxier)
 	// ListenPort returns the host port that the proxySocket is listening on
 	ListenPort() int
 }
@@ -86,7 +86,7 @@ func (tcp *tcpProxySocket) ListenPort() int {
 	return tcp.port
 }
 
-func tryConnect(service proxy.ServicePortName, srcAddr net.Addr, protocol string, proxier *Proxier) (out net.Conn, err error) {
+func tryConnect(service proxy.ServicePortPortalName, srcAddr net.Addr, protocol string, proxier *Proxier) (out net.Conn, err error) {
 	sessionAffinityReset := false
 	for _, dialTimeout := range endpointDialTimeout {
 		endpoint, err := proxier.loadBalancer.NextEndpoint(service, srcAddr, sessionAffinityReset)
@@ -111,7 +111,7 @@ func tryConnect(service proxy.ServicePortName, srcAddr net.Addr, protocol string
 	return nil, fmt.Errorf("failed to connect to an endpoint.")
 }
 
-func (tcp *tcpProxySocket) ProxyLoop(service proxy.ServicePortName, myInfo *serviceInfo, proxier *Proxier) {
+func (tcp *tcpProxySocket) ProxyLoop(service proxy.ServicePortPortalName, myInfo *serviceInfo, proxier *Proxier) {
 	for {
 		if !myInfo.isAlive() {
 			// The service port was closed or replaced.
@@ -197,7 +197,7 @@ func newClientCache() *clientCache {
 	return &clientCache{clients: map[string]net.Conn{}}
 }
 
-func (udp *udpProxySocket) ProxyLoop(service proxy.ServicePortName, myInfo *serviceInfo, proxier *Proxier) {
+func (udp *udpProxySocket) ProxyLoop(service proxy.ServicePortPortalName, myInfo *serviceInfo, proxier *Proxier) {
 	var buffer [4096]byte // 4KiB should be enough for most whole-packets
 	for {
 		if !myInfo.isAlive() {
@@ -241,7 +241,7 @@ func (udp *udpProxySocket) ProxyLoop(service proxy.ServicePortName, myInfo *serv
 	}
 }
 
-func (udp *udpProxySocket) getBackendConn(activeClients *clientCache, cliAddr net.Addr, proxier *Proxier, service proxy.ServicePortName, timeout time.Duration) (net.Conn, error) {
+func (udp *udpProxySocket) getBackendConn(activeClients *clientCache, cliAddr net.Addr, proxier *Proxier, service proxy.ServicePortPortalName, timeout time.Duration) (net.Conn, error) {
 	activeClients.mu.Lock()
 	defer activeClients.mu.Unlock()
 
