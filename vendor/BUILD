@@ -14093,6 +14093,7 @@ go_library(
         "k8s.io/apiserver/pkg/server/options/authorization.go",
         "k8s.io/apiserver/pkg/server/options/doc.go",
         "k8s.io/apiserver/pkg/server/options/etcd.go",
+        "k8s.io/apiserver/pkg/server/options/recommended.go",
         "k8s.io/apiserver/pkg/server/options/server_run_options.go",
         "k8s.io/apiserver/pkg/server/options/serving.go",
     ],
