@@ -588,7 +588,6 @@ func (proxier *Proxier) OnEndpointsUpdate(allEndpoints []api.Endpoints) {
 	defer proxier.mu.Unlock()
 	proxier.haveReceivedEndpointsUpdate = true
 
-	activeEndpoints := make(map[proxy.ServicePortName]bool) // use a map as a set
 	staleConnections := make(map[endpointServicePair]bool)
 	svcPortToInfoMap := make(map[proxy.ServicePortName][]hostPortInfo)
 	newEndpointsMap := make(map[proxy.ServicePortName][]*endpointsInfo)
@@ -596,7 +595,7 @@ func (proxier *Proxier) OnEndpointsUpdate(allEndpoints []api.Endpoints) {
 	// Update endpoints for services.
 	for i := range allEndpoints {
 		accumulateEndpointsMap(&allEndpoints[i], proxier.hostname, proxier.endpointsMap, &newEndpointsMap,
-			&svcPortToInfoMap, &staleConnections, &activeEndpoints)
+			&svcPortToInfoMap, &staleConnections)
 	}
 	for k, v := range newEndpointsMap {
 		proxier.endpointsMap[k] = v
@@ -604,7 +603,7 @@ func (proxier *Proxier) OnEndpointsUpdate(allEndpoints []api.Endpoints) {
 
 	// Remove endpoints missing from the update.
 	for svcPort := range proxier.endpointsMap {
-		if !activeEndpoints[svcPort] {
+		if _, found := newEndpointsMap[svcPort]; !found {
 			// record endpoints of unactive service to stale connections
 			for _, ep := range proxier.endpointsMap[svcPort] {
 				staleConnections[endpointServicePair{endpoint: ep.endpoint, servicePortName: svcPort}] = true
@@ -625,8 +624,7 @@ func accumulateEndpointsMap(endpoints *api.Endpoints, hostname string,
 	curEndpoints map[proxy.ServicePortName][]*endpointsInfo,
 	newEndpoints *map[proxy.ServicePortName][]*endpointsInfo,
 	svcPortToInfoMap *map[proxy.ServicePortName][]hostPortInfo,
-	staleConnections *map[endpointServicePair]bool,
-	activeEndpoints *map[proxy.ServicePortName]bool) {
+	staleConnections *map[endpointServicePair]bool) {
 
 	// We need to build a map of portname -> all ip:ports for that
 	// portname.  Explode Endpoints.Subsets[*] into this structure.
@@ -660,11 +658,10 @@ func accumulateEndpointsMap(endpoints *api.Endpoints, hostname string,
 			for _, ep := range removedEndpoints {
 				(*staleConnections)[endpointServicePair{endpoint: ep, servicePortName: svcPort}] = true
 			}
-			glog.V(3).Infof("Setting endpoints for %q to %+v", svcPort, newEPList)
-			// Once the set operations using the list of ips are complete, build the list of endpoint infos
-			(*newEndpoints)[svcPort] = buildEndpointInfoList(portsToEndpoints[portname], newEPList)
 		}
-		(*activeEndpoints)[svcPort] = true
+		glog.V(3).Infof("Setting endpoints for %q to %+v", svcPort, newEPList)
+		// Once the set operations using the list of ips are complete, build the list of endpoint infos
+		(*newEndpoints)[svcPort] = buildEndpointInfoList(portsToEndpoints[portname], newEPList)
 	}
 	// If a port was renamed it would be absent from endpoints, and thus not
 	// processed in the above loop.
@@ -672,7 +669,7 @@ func accumulateEndpointsMap(endpoints *api.Endpoints, hostname string,
 	// TODO: we should really only mark a connection stale if the proto was UDP
 	// and the (ip, port, proto) was removed from the endpoints.
 	for svcPort := range curEndpoints {
-		if _, found := (*activeEndpoints)[svcPort]; !found {
+		if _, found := (*newEndpoints)[svcPort]; !found {
 			curEndpointIPs := flattenEndpointsInfo(curEndpoints[svcPort])
 			removedEndpoints := getRemovedEndpoints(curEndpointIPs, []string{})
 			for _, ep := range removedEndpoints {
