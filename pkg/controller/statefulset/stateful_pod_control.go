@@ -79,8 +79,8 @@ func (spc *realStatefulPodControl) CreateStatefulPod(set *apps.StatefulSet, pod 
 }
 
 func (spc *realStatefulPodControl) UpdateStatefulPod(set *apps.StatefulSet, pod *v1.Pod) error {
-	// we make a copy of the Pod on the stack and mutate the copy. Successful mutations are made visible my copying
-	// the address of the copy to back to memory location indicated by pod
+	// we make a copy of the Pod on the stack and mutate the copy
+	// we copy back to pod to notify the caller of successful mutation
 	obj, err := api.Scheme.Copy(pod)
 	if err != nil {
 		return fmt.Errorf("unable to copy pod: %v", err)
