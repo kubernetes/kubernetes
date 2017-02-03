@@ -17,28 +17,27 @@ limitations under the License.
 package preflight
 
 import (
-	"errors"
 	"fmt"
 	"net"
 	"net/url"
 	"time"
 
-	"k8s.io/client-go/pkg/util/clock"
+	utilwait "k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/cmd/kube-apiserver/app/options"
 )
 
 const retryLimit = 60
 const retryInterval = 1 * time.Second
 
-type etcdClock interface {
-	clock.Clock
-}
-
 type connection interface {
 	serverReachable(address string) bool
+	parseServerList(serverList []string) error
+	checkEtcdServers() (bool, error)
 }
 
-type etcdConnection struct {}
+type etcdConnection struct {
+	hosts []string
+}
 
 func (etcdConnection) serverReachable(address string) bool {
 	if conn, err := net.Dial("tcp", address); err == nil {
@@ -48,55 +47,41 @@ func (etcdConnection) serverReachable(address string) bool {
 	return false
 }
 
-func checkEtcdServer(address string, foundEtcd chan struct{}, stop chan struct{}, timer etcdClock, etcd connection) {
-	retries := 0
-	for retries < retryLimit {
-		retries += 1
-		select {
-		case <-stop: return
-		default:
-		}
-		if etcd.serverReachable(address) {
-			select {
-			case foundEtcd <- struct{}{}:
-			default:
-			}
-		}
-		timer.Sleep(retryInterval)
-	}
-}
-
-// WaitForAvailableEtcd checks for connectivity to each etcd server in serverList.
-// Each item in serverList should be a valid URI. This function will return
-// once at least one etcd server responds before timeout.
-func WaitForAvailableEtcd(serverList []string, timer etcdClock, etcd connection) error {
-	foundEtcd := make(chan struct{}, 1)
-	stop := make(chan struct{})
-	defer close(stop)
-
-	// Attempt to reach every Etcd server in goroutines
-	for _, serverURI := range serverList {
+func (con *etcdConnection) parseServerList(serverList []string) error {
+	con.hosts = make([]string, len(serverList))
+	for idx, serverURI := range(serverList) {
 		connUrl, err := url.Parse(serverURI)
 		if err != nil {
 			return fmt.Errorf("unable to parse etcd url: %v", err)
 		}
-		go checkEtcdServer(connUrl.Host, foundEtcd, stop, timer, etcd)
+		con.hosts[idx] = connUrl.Host
 	}
+	return nil
+}
 
-	timeout := timer.After(retryInterval * retryLimit)
-
-	select {
-	case <-foundEtcd:
-		return nil
-	case <- timeout:
-		return errors.New("unable to reach any etcd server")
+// checkEtcdServers will attempt to reach all etcd servers once. If any
+// can be reached, return true.
+func (con etcdConnection) checkEtcdServers() (done bool, err error) {
+	// Attempt to reach every Etcd server in order
+	for _, host := range con.hosts {
+		if con.serverReachable(host) {return true, nil}
 	}
+	return false, nil
+}
+
+func waitForAvailableEtcd(etcd connection) error {
+	err := utilwait.PollImmediate(retryInterval, retryLimit, etcd.checkEtcdServers)
+	if err != nil {
+		return fmt.Errorf("unable to reach any etcd server: %v", err)
+	}
+	return nil
 }
 
 // RunAPIServerChecks ensures the apiserver is ready to execute. This function
 // will block until etcd is ready.
 func RunAPIServerChecks(s *options.ServerRunOptions) error {
-	timer := new(clock.RealClock)
 	etcd := new(etcdConnection)
-	return WaitForAvailableEtcd(s.Etcd.StorageConfig.ServerList, timer, etcd)
+	err := etcd.parseServerList(s.Etcd.StorageConfig.ServerList)
+	if err != nil {return err}
+	return waitForAvailableEtcd(etcd)
 }

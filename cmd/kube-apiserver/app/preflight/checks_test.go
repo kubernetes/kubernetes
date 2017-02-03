@@ -17,17 +17,27 @@ limitations under the License.
 package preflight
 
 import (
+	"errors"
 	"testing"
-	"time"
-	"k8s.io/client-go/pkg/util/clock"
 )
 
 type mockEtcdConnection struct {
 	shouldSucceed bool
 }
 
-func (m mockEtcdConnection) serverReachable(address string) bool{
+func (m mockEtcdConnection) serverReachable(address string) bool {
 	return m.shouldSucceed
+}
+
+func (m mockEtcdConnection) parseServerList(serverList []string) error {
+	return nil
+}
+
+func (m mockEtcdConnection) checkEtcdServers() (bool, error) {
+	if !m.shouldSucceed {
+		return false, errors.New("artificial error for testing")
+	}
+	return true, nil
 }
 
 func makeEtcdConnection(shouldSucceed bool) mockEtcdConnection {
@@ -36,70 +46,54 @@ func makeEtcdConnection(shouldSucceed bool) mockEtcdConnection {
 	return conn
 }
 
-func TestWaitForEtcdSuccess(t *testing.T) {
-	timer := new(clock.RealClock)
-	etcd := makeEtcdConnection(true)
+
+func TestParseServerListGood(t *testing.T) {
+	etcd := new(etcdConnection)
 	servers := []string{"https://127.0.0.1:2379"}
-	err := WaitForAvailableEtcd(servers, timer, etcd)
-
-	if err != nil { t.Fatalf("Unexpected error: %v", err) }
+	err := etcd.parseServerList(servers)
+	if err != nil { t.Fatalf("unexpected error: %v", err) }
+	host := "127.0.0.1:2379"
+	if etcd.hosts[0] != host {t.Fatal("server uri was not parsed correctly")}
 }
 
-
-func TestWaitForEtcdFail(t *testing.T) {
-	timer := clock.NewFakeClock(time.Now())
-	etcd := makeEtcdConnection(false)
-
-	servers := []string{"https://127.0.0.1:2379"}
-	err := WaitForAvailableEtcd(servers, timer, etcd)
-	if err == nil { t.Fatal("Expected 'Unable to reach Etcd' error to occur") }
+func TestParseServerListBad(t *testing.T) {
+	etcd := new(etcdConnection)
+	servers := []string{"-invalid uri$@#%"}
+	err := etcd.parseServerList(servers)
+	if err == nil { t.Fatal("expected bad uri to raise parse error") }
 }
 
-func TestCheckEtcdServerExpired(t *testing.T) {
-	timer := clock.NewFakeClock(time.Now())
-	etcd := makeEtcdConnection(false)
-
-	address := "https://127.0.0.1:2379"
-	ch := make(chan struct{})
-	stop := make(chan struct{})
-	defer close(stop)
-	checkEtcdServer(address, ch, stop, timer, etcd)
-	select {
-		case <-ch:
-			{t.Fatal("received unexpected channel activity")}
-		default:
-	}
-}
-
-func TestCheckEtcdServerStop(t *testing.T) {
-	// use a timer that really sleeps
-	timer := clock.NewFakeClock(time.Now())
-	etcd := makeEtcdConnection(false)
-
-	address := "https://127.0.0.1:2379"
-	ch := make(chan struct{})
-	stop := make(chan struct{})
-	// close the channel before its even sent
-	close(stop)
-	checkEtcdServer(address, ch, stop, timer, etcd)
-	select {
-	case <-ch:
-		{t.Fatal("received unexpected channel activity")}
-	default:
-	}
-}
-
-func testEtcdConnection(t *testing.T) {
+func TestEtcdConnection(t *testing.T) {
 	etcd := new(etcdConnection)
 
 	result := etcd.serverReachable("-not a real network address-")
 	if result {t.Fatal("checkConnection should not have succeeded")}
 }
 
-func TestBadConnectionString(t *testing.T) {
-	timer := clock.NewFakeClock(time.Now())
+func TestCheckEtcdServersEmpty(t *testing.T) {
+	etcd := new(etcdConnection)
+	result, err := etcd.checkEtcdServers()
+	if err != nil { t.Fatalf("unexpected error: %v", err) }
+	if result {t.Fatal("checkEtcdServers should not have succeeded")}
+}
+
+func TestCheckEtcdServers(t *testing.T) {
+	etcd := new(etcdConnection)
+	etcd.hosts = []string{"-invalid uri$@#%"}
+	result, err := etcd.checkEtcdServers()
+	if err != nil { t.Fatalf("unexpected error: %v", err) }
+	if result {t.Fatal("checkEtcdServers should not have succeeded")}
+}
+
+
+func TestWaitForEtcdSuccess(t *testing.T) {
+	etcd := makeEtcdConnection(true)
+	err := waitForAvailableEtcd(etcd)
+	if err != nil { t.Fatalf("unexpected error: %v", err) }
+}
+
+func TestWaitForEtcdFail(t *testing.T) {
 	etcd := makeEtcdConnection(false)
-	servers := []string{"-invalid uri$@#%"}
-	err := WaitForAvailableEtcd(servers, timer, etcd)
-	if err == nil { t.Fatal("Expected bad URI to raise parse error") }
+	err := waitForAvailableEtcd(etcd)
+	if err == nil { t.Fatal("expected 'unable to reach etcd' error to occur") }
 }
