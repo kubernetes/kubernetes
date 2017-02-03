@@ -21,67 +21,46 @@ import (
 	"net"
 	"net/url"
 	"time"
-
-	utilwait "k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/kubernetes/cmd/kube-apiserver/app/options"
 )
 
-const retryLimit = 60
-const retryInterval = 1 * time.Second
+const RetryLimit = 60
+const RetryInterval = 1 * time.Second
+const connectionTimeout = 1 * time.Second
 
 type connection interface {
 	serverReachable(address string) bool
 	parseServerList(serverList []string) error
-	checkEtcdServers() (bool, error)
+	CheckEtcdServers() (bool, error)
 }
 
-type etcdConnection struct {
-	hosts []string
+type EtcdConnection struct {
+	ServerList [] string
 }
 
-func (etcdConnection) serverReachable(address string) bool {
-	if conn, err := net.Dial("tcp", address); err == nil {
+func (EtcdConnection) serverReachable(address string) bool {
+	if conn, err := net.DialTimeout("tcp", address, connectionTimeout); err == nil {
 		defer conn.Close()
 		return true
 	}
 	return false
 }
 
-func (con *etcdConnection) parseServerList(serverList []string) error {
-	con.hosts = make([]string, len(serverList))
-	for idx, serverURI := range(serverList) {
-		connUrl, err := url.Parse(serverURI)
-		if err != nil {
-			return fmt.Errorf("unable to parse etcd url: %v", err)
-		}
-		con.hosts[idx] = connUrl.Host
+func parseServerURI(serverURI string) (string, error) {
+	connUrl, err := url.Parse(serverURI)
+	if err != nil {
+		return "", fmt.Errorf("unable to parse etcd url: %v", err)
 	}
-	return nil
+	return connUrl.Host, nil
 }
 
-// checkEtcdServers will attempt to reach all etcd servers once. If any
+// CheckEtcdServers will attempt to reach all etcd servers once. If any
 // can be reached, return true.
-func (con etcdConnection) checkEtcdServers() (done bool, err error) {
+func (con EtcdConnection) CheckEtcdServers() (done bool, err error) {
 	// Attempt to reach every Etcd server in order
-	for _, host := range con.hosts {
+	for _, serverUri := range con.ServerList {
+		host, err := parseServerURI(serverUri)
+		if err != nil {return false, err}
 		if con.serverReachable(host) {return true, nil}
 	}
 	return false, nil
-}
-
-func waitForAvailableEtcd(etcd connection) error {
-	err := utilwait.PollImmediate(retryInterval, retryLimit, etcd.checkEtcdServers)
-	if err != nil {
-		return fmt.Errorf("unable to reach any etcd server: %v", err)
-	}
-	return nil
-}
-
-// RunAPIServerChecks ensures the apiserver is ready to execute. This function
-// will block until etcd is ready.
-func RunAPIServerChecks(s *options.ServerRunOptions) error {
-	etcd := new(etcdConnection)
-	err := etcd.parseServerList(s.Etcd.StorageConfig.ServerList)
-	if err != nil {return err}
-	return waitForAvailableEtcd(etcd)
 }

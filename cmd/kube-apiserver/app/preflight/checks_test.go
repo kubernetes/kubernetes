@@ -17,83 +17,58 @@ limitations under the License.
 package preflight
 
 import (
-	"errors"
 	"testing"
+	"time"
+
+	utilwait "k8s.io/apimachinery/pkg/util/wait"
 )
 
-type mockEtcdConnection struct {
-	shouldSucceed bool
-}
-
-func (m mockEtcdConnection) serverReachable(address string) bool {
-	return m.shouldSucceed
-}
-
-func (m mockEtcdConnection) parseServerList(serverList []string) error {
-	return nil
-}
-
-func (m mockEtcdConnection) checkEtcdServers() (bool, error) {
-	if !m.shouldSucceed {
-		return false, errors.New("artificial error for testing")
-	}
-	return true, nil
-}
-
-func makeEtcdConnection(shouldSucceed bool) mockEtcdConnection {
-	conn := mockEtcdConnection{}
-	conn.shouldSucceed = shouldSucceed
-	return conn
-}
-
-
-func TestParseServerListGood(t *testing.T) {
-	etcd := new(etcdConnection)
-	servers := []string{"https://127.0.0.1:2379"}
-	err := etcd.parseServerList(servers)
+func TestParseServerURIGood(t *testing.T) {
+	host, err := parseServerURI("https://127.0.0.1:2379")
 	if err != nil { t.Fatalf("unexpected error: %v", err) }
-	host := "127.0.0.1:2379"
-	if etcd.hosts[0] != host {t.Fatal("server uri was not parsed correctly")}
+
+	reference := "127.0.0.1:2379"
+	if host != reference {t.Fatal("server uri was not parsed correctly")}
 }
 
-func TestParseServerListBad(t *testing.T) {
-	etcd := new(etcdConnection)
-	servers := []string{"-invalid uri$@#%"}
-	err := etcd.parseServerList(servers)
+func TestParseServerURIBad(t *testing.T) {
+	_, err := parseServerURI("-invalid uri$@#%")
 	if err == nil { t.Fatal("expected bad uri to raise parse error") }
 }
 
 func TestEtcdConnection(t *testing.T) {
-	etcd := new(etcdConnection)
+	etcd := new(EtcdConnection)
 
 	result := etcd.serverReachable("-not a real network address-")
 	if result {t.Fatal("checkConnection should not have succeeded")}
 }
 
 func TestCheckEtcdServersEmpty(t *testing.T) {
-	etcd := new(etcdConnection)
-	result, err := etcd.checkEtcdServers()
+	etcd := new(EtcdConnection)
+	result, err := etcd.CheckEtcdServers()
 	if err != nil { t.Fatalf("unexpected error: %v", err) }
-	if result {t.Fatal("checkEtcdServers should not have succeeded")}
+	if result {t.Fatal("CheckEtcdServers should not have succeeded")}
+}
+
+func TestCheckEtcdServersUri(t *testing.T) {
+	etcd := new(EtcdConnection)
+	etcd.ServerList = []string{"-invalid uri$@#%"}
+	result, err := etcd.CheckEtcdServers()
+	if err == nil { t.Fatalf("expected bad uri to raise parse error") }
+	if result {t.Fatal("CheckEtcdServers should not have succeeded")}
 }
 
 func TestCheckEtcdServers(t *testing.T) {
-	etcd := new(etcdConnection)
-	etcd.hosts = []string{"-invalid uri$@#%"}
-	result, err := etcd.checkEtcdServers()
+	etcd := new(EtcdConnection)
+	etcd.ServerList = []string{""}
+	result, err := etcd.CheckEtcdServers()
 	if err != nil { t.Fatalf("unexpected error: %v", err) }
-	if result {t.Fatal("checkEtcdServers should not have succeeded")}
+	if result {t.Fatal("CheckEtcdServers should not have succeeded")}
 }
 
-
-func TestWaitForEtcdSuccess(t *testing.T) {
-	etcd := makeEtcdConnection(true)
-	err := waitForAvailableEtcd(etcd)
-	if err != nil { t.Fatalf("unexpected error: %v", err) }
-}
-
-func TestWaitForEtcdFail(t *testing.T) {
-	etcd := makeEtcdConnection(false)
-	err := waitForAvailableEtcd(etcd)
-	if err == nil { t.Fatal("expected 'unable to reach etcd' error to occur") }
+func TestPollCheckServer(t *testing.T) {
+	err := utilwait.PollImmediate(1 * time.Microsecond,
+		2 * time.Microsecond,
+		EtcdConnection{ServerList: []string{""}}.CheckEtcdServers)
+	if err == nil { t.Fatal("expected check to time out") }
 }
