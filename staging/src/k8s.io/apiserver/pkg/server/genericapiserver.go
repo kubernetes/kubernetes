@@ -40,13 +40,13 @@ import (
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/admission"
-	apirequest "k8s.io/apiserver/pkg/endpoints/request"
-	"k8s.io/apiserver/pkg/server/healthz"
-	restclient "k8s.io/client-go/rest"
 	genericapi "k8s.io/apiserver/pkg/endpoints"
+	apirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/rest"
+	"k8s.io/apiserver/pkg/server/healthz"
 	genericmux "k8s.io/apiserver/pkg/server/mux"
 	"k8s.io/apiserver/pkg/server/routes"
+	restclient "k8s.io/client-go/rest"
 )
 
 // Info about an API group.
@@ -210,6 +210,11 @@ func (s preparedGenericAPIServer) Run(stopCh <-chan struct{}) {
 	}
 
 	<-stopCh
+}
+
+// EffectiveSecurePort returns the secure port we bound to.
+func (s *GenericAPIServer) EffectiveSecurePort() int {
+	return s.effectiveSecurePort
 }
 
 // installAPIResources is a private method for installing the REST storage backing each api groupversionresource
