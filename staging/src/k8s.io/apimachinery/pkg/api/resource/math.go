@@ -247,19 +247,6 @@ func pow10Int64(b int64) int64 {
 	}
 }
 
-// powInt64 raises a to the bth power. Is not overflow aware.
-func powInt64(a, b int64) int64 {
-	p := int64(1)
-	for b > 0 {
-		if b&1 != 0 {
-			p *= a
-		}
-		b >>= 1
-		a *= a
-	}
-	return p
-}
-
 // negativeScaleInt64 returns the result of dividing base by scale * 10 and the remainder, or
 // false if no such division is possible. Dividing by negative scales is undefined.
 func divideByScaleInt64(base int64, scale Scale) (result, remainder int64, exact bool) {
