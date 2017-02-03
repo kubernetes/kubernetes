@@ -289,7 +289,7 @@ func testRollingUpdateDeployment(f *framework.Framework) {
 	_, err := c.Extensions().ReplicaSets(ns).Create(rs)
 	Expect(err).NotTo(HaveOccurred())
 	// Verify that the required pods have come up.
-	err = framework.VerifyPods(c, ns, "sample-pod", false, 3)
+	err = framework.VerifyPodsRunning(c, ns, "sample-pod", false, 3)
 	if err != nil {
 		framework.Logf("error in waiting for pods to come up: %s", err)
 		Expect(err).NotTo(HaveOccurred())
@@ -372,7 +372,7 @@ func testDeploymentCleanUpPolicy(f *framework.Framework) {
 	Expect(err).NotTo(HaveOccurred())
 
 	// Verify that the required pods have come up.
-	err = framework.VerifyPods(c, ns, "cleanup-pod", false, 1)
+	err = framework.VerifyPodsRunning(c, ns, "cleanup-pod", false, 1)
 	if err != nil {
 		framework.Logf("error in waiting for pods to come up: %s", err)
 		Expect(err).NotTo(HaveOccurred())
@@ -445,7 +445,7 @@ func testRolloverDeployment(f *framework.Framework) {
 	_, err := c.Extensions().ReplicaSets(ns).Create(newRS(rsName, rsReplicas, rsPodLabels, nginxImageName, nginxImage))
 	Expect(err).NotTo(HaveOccurred())
 	// Verify that the required pods have come up.
-	err = framework.VerifyPods(c, ns, podName, false, rsReplicas)
+	err = framework.VerifyPodsRunning(c, ns, podName, false, rsReplicas)
 	if err != nil {
 		framework.Logf("error in waiting for pods to come up: %s", err)
 		Expect(err).NotTo(HaveOccurred())
@@ -855,7 +855,7 @@ func testDeploymentLabelAdopted(f *framework.Framework) {
 	_, err := c.Extensions().ReplicaSets(ns).Create(newRS(rsName, replicas, podLabels, podName, image))
 	Expect(err).NotTo(HaveOccurred())
 	// Verify that the required pods have come up.
-	err = framework.VerifyPods(c, ns, podName, false, 3)
+	err = framework.VerifyPodsRunning(c, ns, podName, false, 3)
 	if err != nil {
 		framework.Logf("error in waiting for pods to come up: %s", err)
 		Expect(err).NotTo(HaveOccurred())
@@ -969,7 +969,7 @@ func testScaledRolloutDeployment(f *framework.Framework) {
 
 	// Verify that the required pods have come up.
 	By("Waiting for all required pods to come up")
-	err = framework.VerifyPods(f.ClientSet, ns, nginxImageName, false, *(deployment.Spec.Replicas))
+	err = framework.VerifyPodsRunning(f.ClientSet, ns, nginxImageName, false, *(deployment.Spec.Replicas))
 	if err != nil {
 		framework.Logf("error in waiting for pods to come up: %s", err)
 		Expect(err).NotTo(HaveOccurred())
