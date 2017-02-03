@@ -447,7 +447,7 @@ function start_apiserver {
             fi
         else
             # default to use basic authentication
-            AUTH_ARGS="--username=admin --password=admin"
+            AUTH_ARGS="--client-key=${CERT_DIR}/client-admin.key --client-certificate=${CERT_DIR}/client-admin.crt"
         fi
     fi
 }
