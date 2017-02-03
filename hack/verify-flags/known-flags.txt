@@ -21,6 +21,7 @@ api-server-port
 api-servers
 api-token
 api-version
+apiserver-arg-overrides
 apiserver-count
 apiserver-count
 audit-log-maxage
@@ -113,6 +114,7 @@ container-runtime
 container-runtime-endpoint
 contain-pod-resources
 contention-profiling
+controllermgr-arg-overrides
 controller-start-interval
 cors-allowed-origins
 cpu-cfs-quota
