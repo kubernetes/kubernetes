@@ -17,11 +17,13 @@ limitations under the License.
 package options
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/spf13/pflag"
 
 	"k8s.io/apiserver/pkg/authentication/authenticatorfactory"
+	"k8s.io/apiserver/pkg/server"
 	authenticationclient "k8s.io/client-go/kubernetes/typed/authentication/v1beta1"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
@@ -126,6 +128,35 @@ func (s *DelegatingAuthenticationOptions) AddFlags(fs *pflag.FlagSet) {
 
 	s.ClientCert.AddFlags(fs)
 	s.RequestHeader.AddFlags(fs)
+}
+
+func (s *DelegatingAuthenticationOptions) ApplyTo(c *server.Config) error {
+	var err error
+	c, err = c.ApplyClientCert(s.ClientCert.ClientCA)
+	if err != nil {
+		return fmt.Errorf("unable to load client CA file: %v", err)
+	}
+	c, err = c.ApplyClientCert(s.RequestHeader.ClientCAFile)
+	if err != nil {
+		return fmt.Errorf("unable to load client CA file: %v", err)
+	}
+
+	cfg, err := s.ToAuthenticationConfig()
+	if err != nil {
+		return err
+	}
+	authenticator, securityDefinitions, err := cfg.New()
+	if err != nil {
+		return err
+	}
+
+	c.Authenticator = authenticator
+	if c.OpenAPIConfig != nil {
+		c.OpenAPIConfig.SecurityDefinitions = securityDefinitions
+	}
+	c.SupportsBasicAuth = false
+
+	return nil
 }
 
 func (s *DelegatingAuthenticationOptions) ToAuthenticationConfig() (authenticatorfactory.DelegatingAuthenticatorConfig, error) {
