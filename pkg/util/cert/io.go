@@ -79,7 +79,7 @@ func WriteKey(keyPath string, data []byte) error {
 // NewPool returns an x509.CertPool containing the certificates in the given PEM-encoded file.
 // Returns an error if the file could not be read, a certificate could not be parsed, or if the file does not contain any certificates
 func NewPool(filename string) (*x509.CertPool, error) {
-	certs, err := certsFromFile(filename)
+	certs, err := CertsFromFile(filename)
 	if err != nil {
 		return nil, err
 	}
@@ -90,9 +90,9 @@ func NewPool(filename string) (*x509.CertPool, error) {
 	return pool, nil
 }
 
-// certsFromFile returns the x509.Certificates contained in the given PEM-encoded file.
+// CertsFromFile returns the x509.Certificates contained in the given PEM-encoded file.
 // Returns an error if the file could not be read, a certificate could not be parsed, or if the file does not contain any certificates
-func certsFromFile(file string) ([]*x509.Certificate, error) {
+func CertsFromFile(file string) ([]*x509.Certificate, error) {
 	if len(file) == 0 {
 		return nil, errors.New("error reading certificates from an empty filename")
 	}

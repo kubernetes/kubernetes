@@ -21,6 +21,7 @@ import (
 
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/genericapiserver/options"
+	certutil "k8s.io/kubernetes/pkg/util/cert"
 	utilerrors "k8s.io/kubernetes/pkg/util/errors"
 )
 
@@ -69,6 +70,22 @@ func verifySecureAndInsecurePort(options *options.ServerRunOptions) []error {
 	return errors
 }
 
+func verifyClientCAs(options *options.ServerRunOptions) []error {
+	errors := []error{}
+	if len(options.ClientCAFile) > 0 {
+		if _, err := certutil.CertsFromFile(options.ClientCAFile); err != nil {
+			errors = append(errors, fmt.Errorf("unable to load client CA file: %v", err))
+		}
+	}
+	if len(options.RequestHeaderClientCAFile) > 0 {
+		if _, err := certutil.CertsFromFile(options.RequestHeaderClientCAFile); err != nil {
+			errors = append(errors, fmt.Errorf("unable to load requestheader client CA file: %v", err))
+		}
+	}
+
+	return errors
+}
+
 func ValidateRunOptions(options *options.ServerRunOptions) {
 	errors := []error{}
 	if errs := verifyClusterIPFlags(options); len(errs) > 0 {
@@ -78,6 +95,9 @@ func ValidateRunOptions(options *options.ServerRunOptions) {
 		errors = append(errors, errs...)
 	}
 	if errs := verifySecureAndInsecurePort(options); len(errs) > 0 {
+		errors = append(errors, errs...)
+	}
+	if errs := verifyClientCAs(options); len(errs) > 0 {
 		errors = append(errors, errs...)
 	}
 	if err := utilerrors.NewAggregate(errors); err != nil {

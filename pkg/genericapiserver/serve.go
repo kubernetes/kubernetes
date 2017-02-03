@@ -26,7 +26,6 @@ import (
 	"sync"
 	"time"
 
-	certutil "k8s.io/kubernetes/pkg/util/cert"
 	utilruntime "k8s.io/kubernetes/pkg/util/runtime"
 	"k8s.io/kubernetes/pkg/util/validation"
 
@@ -78,16 +77,12 @@ func (s *GenericAPIServer) serveSecurely(stopCh <-chan struct{}) error {
 		secureServer.TLSConfig.Certificates = append(secureServer.TLSConfig.Certificates, *c)
 	}
 
-	if len(s.SecureServingInfo.ClientCA) > 0 {
-		clientCAs, err := certutil.NewPool(s.SecureServingInfo.ClientCA)
-		if err != nil {
-			return fmt.Errorf("unable to load client CA file: %v", err)
-		}
+	if s.SecureServingInfo.ClientCA != nil {
 		// Populate PeerCertificates in requests, but don't reject connections without certificates
 		// This allows certificates to be validated by authenticators, while still allowing other auth types
 		secureServer.TLSConfig.ClientAuth = tls.RequestClientCert
 		// Specify allowed CAs for client certificates
-		secureServer.TLSConfig.ClientCAs = clientCAs
+		secureServer.TLSConfig.ClientCAs = s.SecureServingInfo.ClientCA
 	}
 
 	glog.Infof("Serving securely on %s", s.SecureServingInfo.BindAddress)
