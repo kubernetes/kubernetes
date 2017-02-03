@@ -628,11 +628,14 @@ func accumulateEndpointsMap(endpoints *api.Endpoints, hostname string,
 
 	// We need to build a map of portname -> all ip:ports for that
 	// portname.  Explode Endpoints.Subsets[*] into this structure.
-	portsToEndpoints := map[string][]hostPortInfo{}
 	for i := range endpoints.Subsets {
 		ss := &endpoints.Subsets[i]
 		for i := range ss.Ports {
 			port := &ss.Ports[i]
+			svcPort := proxy.ServicePortName{
+				NamespacedName: types.NamespacedName{Namespace: endpoints.Namespace, Name: endpoints.Name},
+				Port:           port.Name,
+			}
 			for i := range ss.Addresses {
 				addr := &ss.Addresses[i]
 				hostPortObject := hostPortInfo{
@@ -640,17 +643,13 @@ func accumulateEndpointsMap(endpoints *api.Endpoints, hostname string,
 					port:    int(port.Port),
 					isLocal: addr.NodeName != nil && *addr.NodeName == hostname,
 				}
-				portsToEndpoints[port.Name] = append(portsToEndpoints[port.Name], hostPortObject)
+				(*svcPortToInfoMap)[svcPort] = append((*svcPortToInfoMap)[svcPort], hostPortObject)
 			}
 		}
 	}
-	for portname := range portsToEndpoints {
-		svcPort := proxy.ServicePortName{
-			NamespacedName: types.NamespacedName{Namespace: endpoints.Namespace, Name: endpoints.Name},
-			Port:           portname,
-		}
-		(*svcPortToInfoMap)[svcPort] = portsToEndpoints[portname]
-		newEPList := flattenValidEndpoints(portsToEndpoints[portname])
+	// Decompose the lists of endpoints into details of what was changed for the caller.
+	for svcPort, hostPortInfos := range *svcPortToInfoMap {
+		newEPList := flattenValidEndpoints(hostPortInfos)
 		// Flatten the list of current endpoint infos to just a list of ips as strings
 		curEndpointIPs := flattenEndpointsInfo(curEndpoints[svcPort])
 		if len(curEndpointIPs) != len(newEPList) || !slicesEquiv(slice.CopyStrings(curEndpointIPs), newEPList) {
@@ -661,7 +660,7 @@ func accumulateEndpointsMap(endpoints *api.Endpoints, hostname string,
 		}
 		glog.V(3).Infof("Setting endpoints for %q to %+v", svcPort, newEPList)
 		// Once the set operations using the list of ips are complete, build the list of endpoint infos
-		(*newEndpoints)[svcPort] = buildEndpointInfoList(portsToEndpoints[portname], newEPList)
+		(*newEndpoints)[svcPort] = buildEndpointInfoList(hostPortInfos, newEPList)
 	}
 	// If a port was renamed it would be absent from endpoints, and thus not
 	// processed in the above loop.
