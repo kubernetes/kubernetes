@@ -43,19 +43,17 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/admission"
+	genericapiserver "k8s.io/apiserver/pkg/server"
 	"k8s.io/apiserver/pkg/server/filters"
 	"k8s.io/kubernetes/cmd/kube-apiserver/app/options"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/apis/autoscaling"
 	"k8s.io/kubernetes/pkg/apis/batch"
-	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/capabilities"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/controller/informers"
 	serviceaccountcontroller "k8s.io/kubernetes/pkg/controller/serviceaccount"
 	generatedopenapi "k8s.io/kubernetes/pkg/generated/openapi"
-	genericapiserver "k8s.io/kubernetes/pkg/genericapiserver/server"
 	"k8s.io/kubernetes/pkg/kubeapiserver"
 	kubeadmission "k8s.io/kubernetes/pkg/kubeapiserver/admission"
 	kubeauthenticator "k8s.io/kubernetes/pkg/kubeapiserver/authenticator"
@@ -108,6 +106,7 @@ func Run(s *options.ServerRunOptions) error {
 
 	// create config from options
 	genericConfig := genericapiserver.NewConfig().
+		WithSerializer(api.Codecs).
 		ApplyOptions(s.GenericServerRunOptions).
 		ApplyInsecureServingOptions(s.InsecureServing)
 
@@ -197,14 +196,13 @@ func Run(s *options.ServerRunOptions) error {
 	}
 	storageFactory, err := kubeapiserver.BuildDefaultStorageFactory(
 		s.Etcd.StorageConfig, s.GenericServerRunOptions.DefaultStorageMediaType, api.Codecs,
-		genericapiserver.NewDefaultResourceEncodingConfig(), storageGroupsToEncodingVersion,
+		genericapiserver.NewDefaultResourceEncodingConfig(api.Registry), storageGroupsToEncodingVersion,
 		// FIXME: this GroupVersionResource override should be configurable
 		[]schema.GroupVersionResource{batch.Resource("cronjobs").WithVersion("v2alpha1")},
 		master.DefaultAPIResourceConfigSource(), s.GenericServerRunOptions.RuntimeConfig)
 	if err != nil {
 		return fmt.Errorf("error in initializing storage factory: %s", err)
 	}
-	storageFactory.AddCohabitatingResources(autoscaling.Resource("horizontalpodautoscalers"), extensions.Resource("horizontalpodautoscalers"))
 	for _, override := range s.Etcd.EtcdServersOverrides {
 		tokens := strings.Split(override, "#")
 		if len(tokens) != 2 {
@@ -297,7 +295,7 @@ func Run(s *options.ServerRunOptions) error {
 	genericConfig.Authenticator = apiAuthenticator
 	genericConfig.Authorizer = apiAuthorizer
 	genericConfig.AdmissionControl = admissionController
-	genericConfig.OpenAPIConfig = genericapiserver.DefaultOpenAPIConfig(generatedopenapi.GetOpenAPIDefinitions)
+	genericConfig.OpenAPIConfig = genericapiserver.DefaultOpenAPIConfig(generatedopenapi.GetOpenAPIDefinitions, api.Scheme)
 	genericConfig.OpenAPIConfig.PostProcessSpec = postProcessOpenAPISpecForBackwardCompatibility
 	genericConfig.OpenAPIConfig.SecurityDefinitions = securityDefinitions
 	genericConfig.OpenAPIConfig.Info.Title = "Kubernetes"

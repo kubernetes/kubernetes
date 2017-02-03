@@ -39,6 +39,7 @@ import (
 	authauthorizer "k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/apiserver/pkg/authorization/authorizerfactory"
 	authorizerunion "k8s.io/apiserver/pkg/authorization/union"
+	genericapiserver "k8s.io/apiserver/pkg/server"
 	"k8s.io/apiserver/pkg/storage/storagebackend"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/record"
@@ -59,7 +60,6 @@ import (
 	"k8s.io/kubernetes/pkg/controller"
 	replicationcontroller "k8s.io/kubernetes/pkg/controller/replication"
 	"k8s.io/kubernetes/pkg/generated/openapi"
-	genericapiserver "k8s.io/kubernetes/pkg/genericapiserver/server"
 	"k8s.io/kubernetes/pkg/kubectl"
 	kubeletclient "k8s.io/kubernetes/pkg/kubelet/client"
 	"k8s.io/kubernetes/pkg/master"
@@ -183,7 +183,7 @@ func startMasterOrDie(masterConfig *master.Config, incomingServer *httptest.Serv
 		masterConfig = NewMasterConfig()
 		masterConfig.GenericConfig.EnableProfiling = true
 		masterConfig.GenericConfig.EnableMetrics = true
-		masterConfig.GenericConfig.OpenAPIConfig = genericapiserver.DefaultOpenAPIConfig(openapi.GetOpenAPIDefinitions)
+		masterConfig.GenericConfig.OpenAPIConfig = genericapiserver.DefaultOpenAPIConfig(openapi.GetOpenAPIDefinitions, api.Scheme)
 		masterConfig.GenericConfig.OpenAPIConfig.Info = &spec.Info{
 			InfoProps: spec.InfoProps{
 				Title:   "Kubernetes",
@@ -317,7 +317,7 @@ func NewMasterConfig() *master.Config {
 	info, _ := runtime.SerializerInfoForMediaType(api.Codecs.SupportedMediaTypes(), runtime.ContentTypeJSON)
 	ns := NewSingleContentTypeSerializer(api.Scheme, info)
 
-	storageFactory := genericapiserver.NewDefaultStorageFactory(config, runtime.ContentTypeJSON, ns, genericapiserver.NewDefaultResourceEncodingConfig(), master.DefaultAPIResourceConfigSource())
+	storageFactory := genericapiserver.NewDefaultStorageFactory(config, runtime.ContentTypeJSON, ns, genericapiserver.NewDefaultResourceEncodingConfig(api.Registry), master.DefaultAPIResourceConfigSource())
 	storageFactory.SetSerializer(
 		schema.GroupResource{Group: v1.GroupName, Resource: genericapiserver.AllResources},
 		"",
@@ -355,7 +355,7 @@ func NewMasterConfig() *master.Config {
 		"",
 		ns)
 
-	genericConfig := genericapiserver.NewConfig()
+	genericConfig := genericapiserver.NewConfig().WithSerializer(api.Codecs)
 	kubeVersion := version.Get()
 	genericConfig.Version = &kubeVersion
 	genericConfig.Authorizer = authorizerfactory.NewAlwaysAllowAuthorizer()

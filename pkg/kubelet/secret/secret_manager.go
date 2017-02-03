@@ -21,10 +21,10 @@ import (
 	"sync"
 	"time"
 
+	storageetcd "k8s.io/apiserver/pkg/storage/etcd"
 	"k8s.io/kubernetes/pkg/api/v1"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/pkg/kubelet/util"
-	storageetcd "k8s.io/kubernetes/pkg/storage/etcd"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -106,6 +106,9 @@ func newSecretStore(kubeClient clientset.Interface, clock clock.Clock, ttl time.
 }
 
 func isSecretOlder(newSecret, oldSecret *v1.Secret) bool {
+	if newSecret == nil || oldSecret == nil {
+		return false
+	}
 	newVersion, _ := storageetcd.Versioner.ObjectResourceVersion(newSecret)
 	oldVersion, _ := storageetcd.Versioner.ObjectResourceVersion(oldSecret)
 	return newVersion < oldVersion
@@ -178,17 +181,18 @@ func (s *secretStore) Get(namespace, name string) (*v1.Secret, error) {
 			util.FromApiserverCache(&opts)
 		}
 		secret, err := s.kubeClient.Core().Secrets(namespace).Get(name, opts)
-		// Update state, unless we got error different than "not-found".
-		if err == nil || apierrors.IsNotFound(err) {
-			// Ignore the update to the older version of a secret.
-			if data.secret == nil || secret == nil || !isSecretOlder(secret, data.secret) {
-				data.secret = secret
-				data.err = err
-				data.lastUpdateTime = s.clock.Now()
-			}
-		} else if data.secret == nil && data.err == nil {
-			// We have unitialized secretData - return current result.
+		if err != nil && !apierrors.IsNotFound(err) && data.secret == nil && data.err == nil {
+			// Couldn't fetch the latest secret, but there is no cached data to return.
+			// Return the fetch result instead.
 			return secret, err
+		}
+		if (err == nil && !isSecretOlder(secret, data.secret)) || apierrors.IsNotFound(err) {
+			// If the fetch succeeded with a newer version of the secret, or if the
+			// secret could not be found in the apiserver, update the cached data to
+			// reflect the current status.
+			data.secret = secret
+			data.err = err
+			data.lastUpdateTime = s.clock.Now()
 		}
 	}
 	return data.secret, data.err

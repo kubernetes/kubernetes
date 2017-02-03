@@ -6084,6 +6084,19 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 								},
 							},
 						},
+						"initContainers": {
+							SchemaProps: spec.SchemaProps{
+								Description: "List of initialization containers belonging to the pod. Init containers are executed in order prior to containers being started. If any init container fails, the pod is considered to have failed and is handled according to its restartPolicy. The name for an init container or normal container must be unique among all containers. Init containers may not have Lifecycle actions, Readiness probes, or Liveness probes. The resourceRequirements of an init container are taken into account during scheduling by finding the highest request/limit for each resource type, and then using the max of of that value or the sum of the normal containers. Limits are applied to init containers in a similar fashion. Init containers cannot currently be added or removed. Cannot be updated. More info: http://kubernetes.io/docs/user-guide/containers",
+								Type:        []string{"array"},
+								Items: &spec.SchemaOrArray{
+									Schema: &spec.Schema{
+										SchemaProps: spec.SchemaProps{
+											Ref: ref("k8s.io/kubernetes/pkg/api/v1.Container"),
+										},
+									},
+								},
+							},
+						},
 						"containers": {
 							SchemaProps: spec.SchemaProps{
 								Description: "List of containers belonging to the pod. Containers cannot currently be added or removed. There must be at least one container in a Pod. Cannot be updated. More info: http://kubernetes.io/docs/user-guide/containers",
@@ -6291,6 +6304,19 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 							SchemaProps: spec.SchemaProps{
 								Description: "RFC 3339 date and time at which the object was acknowledged by the Kubelet. This is before the Kubelet pulled the container image(s) for the pod.",
 								Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.Time"),
+							},
+						},
+						"initContainerStatuses": {
+							SchemaProps: spec.SchemaProps{
+								Description: "The list has one entry per init container in the manifest. The most recent successful init container will have ready = true, the most recently started container will have startTime set. More info: http://kubernetes.io/docs/user-guide/pod-states#container-statuses",
+								Type:        []string{"array"},
+								Items: &spec.SchemaOrArray{
+									Schema: &spec.Schema{
+										SchemaProps: spec.SchemaProps{
+											Ref: ref("k8s.io/kubernetes/pkg/api/v1.ContainerStatus"),
+										},
+									},
+								},
 							},
 						},
 						"containerStatuses": {
@@ -11037,23 +11063,6 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 			},
 			Dependencies: []string{},
 		},
-		"k8s.io/kubernetes/pkg/apis/extensions/v1beta1.CPUTargetUtilization": {
-			Schema: spec.Schema{
-				SchemaProps: spec.SchemaProps{
-					Properties: map[string]spec.Schema{
-						"targetPercentage": {
-							SchemaProps: spec.SchemaProps{
-								Description: "fraction of the requested CPU that should be utilized/used, e.g. 70 means that 70% of the requested CPU should be in use.",
-								Type:        []string{"integer"},
-								Format:      "int32",
-							},
-						},
-					},
-					Required: []string{"targetPercentage"},
-				},
-			},
-			Dependencies: []string{},
-		},
 		"k8s.io/kubernetes/pkg/apis/certificates/v1beta1.CertificateSigningRequest": {
 			Schema: spec.Schema{
 				SchemaProps: spec.SchemaProps{
@@ -12407,178 +12416,6 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 			},
 			Dependencies: []string{
 				"k8s.io/kubernetes/pkg/apis/extensions/v1beta1.HTTPIngressPath"},
-		},
-		"k8s.io/kubernetes/pkg/apis/extensions/v1beta1.HorizontalPodAutoscaler": {
-			Schema: spec.Schema{
-				SchemaProps: spec.SchemaProps{
-					Description: "configuration of a horizontal pod autoscaler.",
-					Properties: map[string]spec.Schema{
-						"kind": {
-							SchemaProps: spec.SchemaProps{
-								Description: "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds",
-								Type:        []string{"string"},
-								Format:      "",
-							},
-						},
-						"apiVersion": {
-							SchemaProps: spec.SchemaProps{
-								Description: "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources",
-								Type:        []string{"string"},
-								Format:      "",
-							},
-						},
-						"metadata": {
-							SchemaProps: spec.SchemaProps{
-								Description: "Standard object metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata",
-								Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta"),
-							},
-						},
-						"spec": {
-							SchemaProps: spec.SchemaProps{
-								Description: "behaviour of autoscaler. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status.",
-								Ref:         ref("k8s.io/kubernetes/pkg/apis/extensions/v1beta1.HorizontalPodAutoscalerSpec"),
-							},
-						},
-						"status": {
-							SchemaProps: spec.SchemaProps{
-								Description: "current information about the autoscaler.",
-								Ref:         ref("k8s.io/kubernetes/pkg/apis/extensions/v1beta1.HorizontalPodAutoscalerStatus"),
-							},
-						},
-					},
-				},
-			},
-			Dependencies: []string{
-				"k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta", "k8s.io/kubernetes/pkg/apis/extensions/v1beta1.HorizontalPodAutoscalerSpec", "k8s.io/kubernetes/pkg/apis/extensions/v1beta1.HorizontalPodAutoscalerStatus"},
-		},
-		"k8s.io/kubernetes/pkg/apis/extensions/v1beta1.HorizontalPodAutoscalerList": {
-			Schema: spec.Schema{
-				SchemaProps: spec.SchemaProps{
-					Description: "list of horizontal pod autoscaler objects.",
-					Properties: map[string]spec.Schema{
-						"kind": {
-							SchemaProps: spec.SchemaProps{
-								Description: "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds",
-								Type:        []string{"string"},
-								Format:      "",
-							},
-						},
-						"apiVersion": {
-							SchemaProps: spec.SchemaProps{
-								Description: "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources",
-								Type:        []string{"string"},
-								Format:      "",
-							},
-						},
-						"metadata": {
-							SchemaProps: spec.SchemaProps{
-								Description: "Standard list metadata.",
-								Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.ListMeta"),
-							},
-						},
-						"items": {
-							SchemaProps: spec.SchemaProps{
-								Description: "list of horizontal pod autoscaler objects.",
-								Type:        []string{"array"},
-								Items: &spec.SchemaOrArray{
-									Schema: &spec.Schema{
-										SchemaProps: spec.SchemaProps{
-											Ref: ref("k8s.io/kubernetes/pkg/apis/extensions/v1beta1.HorizontalPodAutoscaler"),
-										},
-									},
-								},
-							},
-						},
-					},
-					Required: []string{"items"},
-				},
-			},
-			Dependencies: []string{
-				"k8s.io/apimachinery/pkg/apis/meta/v1.ListMeta", "k8s.io/kubernetes/pkg/apis/extensions/v1beta1.HorizontalPodAutoscaler"},
-		},
-		"k8s.io/kubernetes/pkg/apis/extensions/v1beta1.HorizontalPodAutoscalerSpec": {
-			Schema: spec.Schema{
-				SchemaProps: spec.SchemaProps{
-					Description: "specification of a horizontal pod autoscaler.",
-					Properties: map[string]spec.Schema{
-						"scaleRef": {
-							SchemaProps: spec.SchemaProps{
-								Description: "reference to Scale subresource; horizontal pod autoscaler will learn the current resource consumption from its status, and will set the desired number of pods by modifying its spec.",
-								Ref:         ref("k8s.io/kubernetes/pkg/apis/extensions/v1beta1.SubresourceReference"),
-							},
-						},
-						"minReplicas": {
-							SchemaProps: spec.SchemaProps{
-								Description: "lower limit for the number of pods that can be set by the autoscaler, default 1.",
-								Type:        []string{"integer"},
-								Format:      "int32",
-							},
-						},
-						"maxReplicas": {
-							SchemaProps: spec.SchemaProps{
-								Description: "upper limit for the number of pods that can be set by the autoscaler; cannot be smaller than MinReplicas.",
-								Type:        []string{"integer"},
-								Format:      "int32",
-							},
-						},
-						"cpuUtilization": {
-							SchemaProps: spec.SchemaProps{
-								Description: "target average CPU utilization (represented as a percentage of requested CPU) over all the pods; if not specified it defaults to the target CPU utilization at 80% of the requested resources.",
-								Ref:         ref("k8s.io/kubernetes/pkg/apis/extensions/v1beta1.CPUTargetUtilization"),
-							},
-						},
-					},
-					Required: []string{"scaleRef", "maxReplicas"},
-				},
-			},
-			Dependencies: []string{
-				"k8s.io/kubernetes/pkg/apis/extensions/v1beta1.CPUTargetUtilization", "k8s.io/kubernetes/pkg/apis/extensions/v1beta1.SubresourceReference"},
-		},
-		"k8s.io/kubernetes/pkg/apis/extensions/v1beta1.HorizontalPodAutoscalerStatus": {
-			Schema: spec.Schema{
-				SchemaProps: spec.SchemaProps{
-					Description: "current status of a horizontal pod autoscaler",
-					Properties: map[string]spec.Schema{
-						"observedGeneration": {
-							SchemaProps: spec.SchemaProps{
-								Description: "most recent generation observed by this autoscaler.",
-								Type:        []string{"integer"},
-								Format:      "int64",
-							},
-						},
-						"lastScaleTime": {
-							SchemaProps: spec.SchemaProps{
-								Description: "last time the HorizontalPodAutoscaler scaled the number of pods; used by the autoscaler to control how often the number of pods is changed.",
-								Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.Time"),
-							},
-						},
-						"currentReplicas": {
-							SchemaProps: spec.SchemaProps{
-								Description: "current number of replicas of pods managed by this autoscaler.",
-								Type:        []string{"integer"},
-								Format:      "int32",
-							},
-						},
-						"desiredReplicas": {
-							SchemaProps: spec.SchemaProps{
-								Description: "desired number of replicas of pods managed by this autoscaler.",
-								Type:        []string{"integer"},
-								Format:      "int32",
-							},
-						},
-						"currentCPUUtilizationPercentage": {
-							SchemaProps: spec.SchemaProps{
-								Description: "current average CPU utilization over all pods, represented as a percentage of requested CPU, e.g. 70 means that an average pod is using now 70% of its requested CPU.",
-								Type:        []string{"integer"},
-								Format:      "int32",
-							},
-						},
-					},
-					Required: []string{"currentReplicas", "desiredReplicas"},
-				},
-			},
-			Dependencies: []string{
-				"k8s.io/apimachinery/pkg/apis/meta/v1.Time"},
 		},
 		"k8s.io/kubernetes/pkg/apis/extensions/v1beta1.HostPortRange": {
 			Schema: spec.Schema{
@@ -14964,44 +14801,6 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 						},
 					},
 					Required: []string{"allowed"},
-				},
-			},
-			Dependencies: []string{},
-		},
-		"k8s.io/kubernetes/pkg/apis/extensions/v1beta1.SubresourceReference": {
-			Schema: spec.Schema{
-				SchemaProps: spec.SchemaProps{
-					Description: "SubresourceReference contains enough information to let you inspect or modify the referred subresource.",
-					Properties: map[string]spec.Schema{
-						"kind": {
-							SchemaProps: spec.SchemaProps{
-								Description: "Kind of the referent; More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds",
-								Type:        []string{"string"},
-								Format:      "",
-							},
-						},
-						"name": {
-							SchemaProps: spec.SchemaProps{
-								Description: "Name of the referent; More info: http://kubernetes.io/docs/user-guide/identifiers#names",
-								Type:        []string{"string"},
-								Format:      "",
-							},
-						},
-						"apiVersion": {
-							SchemaProps: spec.SchemaProps{
-								Description: "API version of the referent",
-								Type:        []string{"string"},
-								Format:      "",
-							},
-						},
-						"subresource": {
-							SchemaProps: spec.SchemaProps{
-								Description: "Subresource name of the referent",
-								Type:        []string{"string"},
-								Format:      "",
-							},
-						},
-					},
 				},
 			},
 			Dependencies: []string{},

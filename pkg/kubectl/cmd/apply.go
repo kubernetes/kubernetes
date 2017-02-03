@@ -34,6 +34,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/jsonmergepatch"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -144,7 +145,7 @@ func validatePruneAll(prune, all bool, selector string) error {
 	return nil
 }
 
-func parsePruneResources(gvks []string) ([]pruneResource, error) {
+func parsePruneResources(mapper meta.RESTMapper, gvks []string) ([]pruneResource, error) {
 	pruneResources := []pruneResource{}
 	for _, groupVersionKind := range gvks {
 		gvk := strings.Split(groupVersionKind, "/")
@@ -152,15 +153,24 @@ func parsePruneResources(gvks []string) ([]pruneResource, error) {
 			return nil, fmt.Errorf("invalid GroupVersionKind format: %v, please follow <group/version/kind>", groupVersionKind)
 		}
 
-		namespaced := true
-		if gvk[2] == "Namespace" ||
-			gvk[2] == "Node" ||
-			gvk[2] == "PersistentVolume" {
-			namespaced = false
-		}
 		if gvk[0] == "core" {
 			gvk[0] = ""
 		}
+		mapping, err := mapper.RESTMapping(schema.GroupKind{Group: gvk[0], Kind: gvk[2]}, gvk[1])
+		if err != nil {
+			return pruneResources, err
+		}
+		var namespaced bool
+		namespaceScope := mapping.Scope.Name()
+		switch namespaceScope {
+		case meta.RESTScopeNameNamespace:
+			namespaced = true
+		case meta.RESTScopeNameRoot:
+			namespaced = false
+		default:
+			return pruneResources, fmt.Errorf("Unknown namespace scope: %q", namespaceScope)
+		}
+
 		pruneResources = append(pruneResources, pruneResource{gvk[0], gvk[1], gvk[2], namespaced})
 	}
 	return pruneResources, nil
@@ -177,17 +187,18 @@ func RunApply(f cmdutil.Factory, cmd *cobra.Command, out, errOut io.Writer, opti
 		return err
 	}
 
+	mapper, typer, err := f.UnstructuredObject()
+	if err != nil {
+		return err
+	}
+
 	if options.Prune {
-		options.PruneResources, err = parsePruneResources(cmdutil.GetFlagStringArray(cmd, "prune-whitelist"))
+		options.PruneResources, err = parsePruneResources(mapper, cmdutil.GetFlagStringArray(cmd, "prune-whitelist"))
 		if err != nil {
 			return err
 		}
 	}
 
-	mapper, typer, err := f.UnstructuredObject()
-	if err != nil {
-		return err
-	}
 	r := resource.NewBuilder(mapper, typer, resource.ClientMapperFunc(f.UnstructuredClientForMapping), unstructured.UnstructuredJSONScheme).
 		Schema(schema).
 		ContinueOnError().
@@ -335,7 +346,7 @@ func RunApply(f cmdutil.Factory, cmd *cobra.Command, out, errOut io.Writer, opti
 	}
 	p := pruner{
 		mapper:        mapper,
-		clientFunc:    f.ClientForMapping,
+		clientFunc:    f.UnstructuredClientForMapping,
 		clientsetFunc: f.ClientSet,
 
 		selector:    selector,
@@ -348,7 +359,7 @@ func RunApply(f cmdutil.Factory, cmd *cobra.Command, out, errOut io.Writer, opti
 		out: out,
 	}
 
-	namespacedRESTMappings, nonNamespacedRESTMappings, err := getRESTMappings(&(options.PruneResources))
+	namespacedRESTMappings, nonNamespacedRESTMappings, err := getRESTMappings(mapper, &(options.PruneResources))
 	if err != nil {
 		return fmt.Errorf("error retrieving RESTMappings to prune: %v", err)
 	}
@@ -380,7 +391,7 @@ func (pr pruneResource) String() string {
 	return fmt.Sprintf("%v/%v, Kind=%v, Namespaced=%v", pr.group, pr.version, pr.kind, pr.namespaced)
 }
 
-func getRESTMappings(pruneResources *[]pruneResource) (namespaced, nonNamespaced []*meta.RESTMapping, err error) {
+func getRESTMappings(mapper meta.RESTMapper, pruneResources *[]pruneResource) (namespaced, nonNamespaced []*meta.RESTMapping, err error) {
 	if len(*pruneResources) == 0 {
 		// default whitelist
 		// TODO: need to handle the older api versions - e.g. v1beta1 jobs. Github issue: #35991
@@ -397,15 +408,14 @@ func getRESTMappings(pruneResources *[]pruneResource) (namespaced, nonNamespaced
 			{"batch", "v1", "Job", true},
 			{"extensions", "v1beta1", "DaemonSet", true},
 			{"extensions", "v1beta1", "Deployment", true},
-			{"extensions", "v1beta1", "HorizontalPodAutoscaler", true},
 			{"extensions", "v1beta1", "Ingress", true},
 			{"extensions", "v1beta1", "ReplicaSet", true},
 			{"apps", "v1beta1", "StatefulSet", true},
 		}
 	}
-	registeredMapper := api.Registry.RESTMapper()
+
 	for _, resource := range *pruneResources {
-		addedMapping, err := registeredMapper.RESTMapping(schema.GroupKind{Group: resource.group, Kind: resource.kind}, resource.version)
+		addedMapping, err := mapper.RESTMapping(schema.GroupKind{Group: resource.group, Kind: resource.kind}, resource.version)
 		if err != nil {
 			return nil, nil, fmt.Errorf("invalid resource %v: %v", resource, err)
 		}
@@ -549,18 +559,31 @@ func (p *patcher) patchSimple(obj runtime.Object, modified []byte, source, names
 	// Create the versioned struct from the type defined in the restmapping
 	// (which is the API version we'll be submitting the patch to)
 	versionedObject, err := api.Scheme.New(p.mapping.GroupVersionKind)
-	if err != nil {
+	var patchType types.PatchType
+	var patch []byte
+	createPatchErrFormat := "creating patch with:\noriginal:\n%s\nmodified:\n%s\ncurrent:\n%s\nfor:"
+	switch {
+	case runtime.IsNotRegisteredError(err):
+		// fall back to generic JSON merge patch
+		patchType = types.MergePatchType
+		preconditions := []strategicpatch.PreconditionFunc{strategicpatch.RequireKeyUnchanged("apiVersion"),
+			strategicpatch.RequireKeyUnchanged("kind"), strategicpatch.RequireMetadataKeyUnchanged("name")}
+		patch, err = jsonmergepatch.CreateThreeWayJSONMergePatch(original, modified, current, preconditions...)
+		if err != nil {
+			return nil, cmdutil.AddSourceToErr(fmt.Sprintf(createPatchErrFormat, original, modified, current), source, err)
+		}
+	case err != nil:
 		return nil, cmdutil.AddSourceToErr(fmt.Sprintf("getting instance of versioned object for %v:", p.mapping.GroupVersionKind), source, err)
+	case err == nil:
+		// Compute a three way strategic merge patch to send to server.
+		patchType = types.StrategicMergePatchType
+		patch, err = strategicpatch.CreateThreeWayMergePatch(original, modified, current, versionedObject, p.overwrite)
+		if err != nil {
+			return nil, cmdutil.AddSourceToErr(fmt.Sprintf(createPatchErrFormat, original, modified, current), source, err)
+		}
 	}
 
-	// Compute a three way strategic merge patch to send to server.
-	patch, err := strategicpatch.CreateThreeWayMergePatch(original, modified, current, versionedObject, p.overwrite)
-	if err != nil {
-		format := "creating patch with:\noriginal:\n%s\nmodified:\n%s\ncurrent:\n%s\nfor:"
-		return nil, cmdutil.AddSourceToErr(fmt.Sprintf(format, original, modified, current), source, err)
-	}
-
-	_, err = p.helper.Patch(namespace, name, types.StrategicMergePatchType, patch)
+	_, err = p.helper.Patch(namespace, name, patchType, patch)
 	return patch, err
 }
 

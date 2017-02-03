@@ -370,7 +370,6 @@ items:
   rules:
   - apiGroups:
     - autoscaling
-    - extensions
     resources:
     - horizontalpodautoscalers
     verbs:
@@ -379,7 +378,6 @@ items:
     - watch
   - apiGroups:
     - autoscaling
-    - extensions
     resources:
     - horizontalpodautoscalers/status
     verbs:

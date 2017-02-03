@@ -20,12 +20,13 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
+	"k8s.io/apiserver/pkg/registry/generic"
+	genericregistry "k8s.io/apiserver/pkg/registry/generic/registry"
+	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/batch"
-	"k8s.io/kubernetes/pkg/genericapiserver/registry/generic"
-	genericregistry "k8s.io/kubernetes/pkg/genericapiserver/registry/generic/registry"
-	"k8s.io/kubernetes/pkg/genericapiserver/registry/rest"
 	"k8s.io/kubernetes/pkg/registry/batch/cronjob"
+	"k8s.io/kubernetes/pkg/registry/cachesize"
 )
 
 // REST implements a RESTStorage for scheduled jobs against etcd
@@ -44,6 +45,7 @@ func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, *StatusREST) {
 		},
 		PredicateFunc:     cronjob.MatchCronJob,
 		QualifiedResource: batch.Resource("cronjobs"),
+		WatchCacheSize:    cachesize.GetWatchCacheSizeByResource("cronjobs"),
 
 		CreateStrategy: cronjob.Strategy,
 		UpdateStrategy: cronjob.Strategy,

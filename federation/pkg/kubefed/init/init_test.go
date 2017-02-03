@@ -79,6 +79,7 @@ func TestInitFederation(t *testing.T) {
 		lbIP               string
 		image              string
 		etcdPVCapacity     string
+		etcdPersistence    string
 		expectedErr        string
 		dnsProvider        string
 		storageBackend     string
@@ -92,6 +93,7 @@ func TestInitFederation(t *testing.T) {
 			lbIP:               "10.20.30.40",
 			image:              "example.test/foo:bar",
 			etcdPVCapacity:     "5Gi",
+			etcdPersistence:    "true",
 			expectedErr:        "",
 			dnsProvider:        "test-dns-provider",
 			storageBackend:     "etcd2",
@@ -105,6 +107,7 @@ func TestInitFederation(t *testing.T) {
 			lbIP:               "10.20.30.40",
 			image:              "example.test/foo:bar",
 			etcdPVCapacity:     "", //test for default value of pvc-size
+			etcdPersistence:    "true",
 			expectedErr:        "",
 			dnsProvider:        "", //test for default value of dns provider
 			storageBackend:     "etcd2",
@@ -118,6 +121,7 @@ func TestInitFederation(t *testing.T) {
 			lbIP:               "10.20.30.40",
 			image:              "example.test/foo:bar",
 			etcdPVCapacity:     "",
+			etcdPersistence:    "true",
 			expectedErr:        "",
 			dnsProvider:        "test-dns-provider",
 			storageBackend:     "etcd2",
@@ -131,6 +135,7 @@ func TestInitFederation(t *testing.T) {
 			lbIP:               "10.20.30.40",
 			image:              "example.test/foo:bar",
 			etcdPVCapacity:     "5Gi",
+			etcdPersistence:    "false",
 			expectedErr:        "",
 			dnsProvider:        "test-dns-provider",
 			storageBackend:     "etcd3",
@@ -150,7 +155,7 @@ func TestInitFederation(t *testing.T) {
 		} else {
 			dnsProvider = "google-clouddns" //default value of dns-provider
 		}
-		hostFactory, err := fakeInitHostFactory(tc.federation, util.DefaultFederationSystemNamespace, tc.lbIP, tc.dnsZoneName, tc.image, dnsProvider, tc.etcdPVCapacity, tc.storageBackend)
+		hostFactory, err := fakeInitHostFactory(tc.federation, util.DefaultFederationSystemNamespace, tc.lbIP, tc.dnsZoneName, tc.image, dnsProvider, tc.etcdPersistence, tc.etcdPVCapacity, tc.storageBackend)
 		if err != nil {
 			t.Fatalf("[%d] unexpected error: %v", i, err)
 		}
@@ -174,6 +179,9 @@ func TestInitFederation(t *testing.T) {
 		}
 		if tc.etcdPVCapacity != "" {
 			cmd.Flags().Set("etcd-pv-capacity", tc.etcdPVCapacity)
+		}
+		if tc.etcdPersistence != "true" {
+			cmd.Flags().Set("etcd-persistent-storage", tc.etcdPersistence)
 		}
 		if tc.dryRun == "valid-run" {
 			cmd.Flags().Set("dry-run", "true")
@@ -445,7 +453,7 @@ func TestCertsHTTPS(t *testing.T) {
 	}
 }
 
-func fakeInitHostFactory(federationName, namespaceName, ip, dnsZoneName, image, dnsProvider, etcdPVCapacity, storageProvider string) (cmdutil.Factory, error) {
+func fakeInitHostFactory(federationName, namespaceName, ip, dnsZoneName, image, dnsProvider, etcdPersistence, etcdPVCapacity, storageProvider string) (cmdutil.Factory, error) {
 	svcName := federationName + "-apiserver"
 	svcUrlPrefix := "/api/v1/namespaces/federation-system/services"
 	credSecretName := svcName + "-credentials"
@@ -644,6 +652,7 @@ func fakeInitHostFactory(federationName, namespaceName, ip, dnsZoneName, image, 
 								"--client-ca-file=/etc/federation/apiserver/ca.crt",
 								"--tls-cert-file=/etc/federation/apiserver/server.crt",
 								"--tls-private-key-file=/etc/federation/apiserver/server.key",
+								"--admission-control=NamespaceLifecycle",
 								fmt.Sprintf("--storage-backend=%s", storageProvider),
 								"--advertise-address=" + ip,
 							},
@@ -673,12 +682,6 @@ func fakeInitHostFactory(federationName, namespaceName, ip, dnsZoneName, image, 
 								"--data-dir",
 								"/var/etcd/data",
 							},
-							VolumeMounts: []v1.VolumeMount{
-								{
-									Name:      "etcddata",
-									MountPath: "/var/etcd",
-								},
-							},
 						},
 					},
 					Volumes: []v1.Volume{
@@ -690,18 +693,32 @@ func fakeInitHostFactory(federationName, namespaceName, ip, dnsZoneName, image, 
 								},
 							},
 						},
-						{
-							Name: "etcddata",
-							VolumeSource: v1.VolumeSource{
-								PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{
-									ClaimName: pvcName,
-								},
-							},
-						},
 					},
 				},
 			},
 		},
+	}
+	if etcdPersistence == "true" {
+		dataVolumeName := "etcddata"
+		etcdVolume := v1.Volume{
+			Name: dataVolumeName,
+			VolumeSource: v1.VolumeSource{
+				PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{
+					ClaimName: pvcName,
+				},
+			},
+		}
+		etcdVolumeMount := v1.VolumeMount{
+			Name:      dataVolumeName,
+			MountPath: "/var/etcd",
+		}
+
+		apiserver.Spec.Template.Spec.Volumes = append(apiserver.Spec.Template.Spec.Volumes, etcdVolume)
+		for i, container := range apiserver.Spec.Template.Spec.Containers {
+			if container.Name == "etcd" {
+				apiserver.Spec.Template.Spec.Containers[i].VolumeMounts = append(apiserver.Spec.Template.Spec.Containers[i].VolumeMounts, etcdVolumeMount)
+			}
+		}
 	}
 
 	cmName := federationName + "-controller-manager"

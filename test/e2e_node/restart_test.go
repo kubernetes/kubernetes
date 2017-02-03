@@ -79,7 +79,7 @@ var _ = framework.KubeDescribe("Restart [Serial] [Slow] [Disruptive]", func() {
 		Context("Network", func() {
 			It("should recover from ip leak", func() {
 
-				pods := newTestPods(podCount, framework.GetPauseImageNameForHostArch(), "restart-docker-test")
+				pods := newTestPods(podCount, false, framework.GetPauseImageNameForHostArch(), "restart-docker-test")
 				By(fmt.Sprintf("Trying to create %d pods on node", len(pods)))
 				createBatchPodWithRateControl(f, pods, podCreationInterval)
 				defer deletePodsSync(f, pods)

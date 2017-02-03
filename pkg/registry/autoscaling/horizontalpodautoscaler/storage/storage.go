@@ -20,12 +20,13 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
+	"k8s.io/apiserver/pkg/registry/generic"
+	genericregistry "k8s.io/apiserver/pkg/registry/generic/registry"
+	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/autoscaling"
-	"k8s.io/kubernetes/pkg/genericapiserver/registry/generic"
-	genericregistry "k8s.io/kubernetes/pkg/genericapiserver/registry/generic/registry"
-	"k8s.io/kubernetes/pkg/genericapiserver/registry/rest"
 	"k8s.io/kubernetes/pkg/registry/autoscaling/horizontalpodautoscaler"
+	"k8s.io/kubernetes/pkg/registry/cachesize"
 )
 
 type REST struct {
@@ -43,6 +44,7 @@ func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, *StatusREST) {
 		},
 		PredicateFunc:     horizontalpodautoscaler.MatchAutoscaler,
 		QualifiedResource: autoscaling.Resource("horizontalpodautoscalers"),
+		WatchCacheSize:    cachesize.GetWatchCacheSizeByResource("horizontalpodautoscalers"),
 
 		CreateStrategy: horizontalpodautoscaler.Strategy,
 		UpdateStrategy: horizontalpodautoscaler.Strategy,

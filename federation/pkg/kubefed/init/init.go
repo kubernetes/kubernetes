@@ -134,6 +134,7 @@ func NewCmdInit(cmdOut io.Writer, config util.AdminConfig) *cobra.Command {
 	cmd.Flags().String("image", defaultImage, "Image to use for federation API server and controller manager binaries.")
 	cmd.Flags().String("dns-provider", "google-clouddns", "Dns provider to be used for this deployment.")
 	cmd.Flags().String("etcd-pv-capacity", "10Gi", "Size of persistent volume claim to be used for etcd.")
+	cmd.Flags().Bool("etcd-persistent-storage", true, "Use persistent volume for etcd. Defaults to 'true'.")
 	cmd.Flags().Bool("dry-run", false, "dry run without sending commands to server.")
 	cmd.Flags().String("storage-backend", "etcd2", "The storage backend for persistence. Options: 'etcd2' (default), 'etcd3'.")
 	return cmd
@@ -158,6 +159,7 @@ func initFederation(cmdOut io.Writer, config util.AdminConfig, cmd *cobra.Comman
 	image := cmdutil.GetFlagString(cmd, "image")
 	dnsProvider := cmdutil.GetFlagString(cmd, "dns-provider")
 	etcdPVCapacity := cmdutil.GetFlagString(cmd, "etcd-pv-capacity")
+	etcdPersistence := cmdutil.GetFlagBool(cmd, "etcd-persistent-storage")
 	dryRun := cmdutil.GetDryRunFlag(cmd)
 	storageBackend := cmdutil.GetFlagString(cmd, "storage-backend")
 
@@ -208,9 +210,12 @@ func initFederation(cmdOut io.Writer, config util.AdminConfig, cmd *cobra.Comman
 	// 5. Create a persistent volume and a claim to store the federation
 	// API server's state. This is where federation API server's etcd
 	// stores its data.
-	pvc, err := createPVC(hostClientset, initFlags.FederationSystemNamespace, svc.Name, etcdPVCapacity, dryRun)
-	if err != nil {
-		return err
+	var pvc *api.PersistentVolumeClaim
+	if etcdPersistence {
+		pvc, err = createPVC(hostClientset, initFlags.FederationSystemNamespace, svc.Name, etcdPVCapacity, dryRun)
+		if err != nil {
+			return err
+		}
 	}
 
 	// Since only one IP address can be specified as advertise address,
@@ -226,7 +231,7 @@ func initFederation(cmdOut io.Writer, config util.AdminConfig, cmd *cobra.Comman
 	}
 
 	// 6. Create federation API server
-	_, err = createAPIServer(hostClientset, initFlags.FederationSystemNamespace, serverName, image, serverCredName, pvc.Name, advertiseAddress, storageBackend, dryRun)
+	_, err = createAPIServer(hostClientset, initFlags.FederationSystemNamespace, serverName, image, serverCredName, advertiseAddress, storageBackend, pvc, dryRun)
 	if err != nil {
 		return err
 	}
@@ -445,7 +450,7 @@ func createPVC(clientset *client.Clientset, namespace, svcName, etcdPVCapacity s
 	return clientset.Core().PersistentVolumeClaims(namespace).Create(pvc)
 }
 
-func createAPIServer(clientset *client.Clientset, namespace, name, image, credentialsName, pvcName, advertiseAddress, storageBackend string, dryRun bool) (*extensions.Deployment, error) {
+func createAPIServer(clientset *client.Clientset, namespace, name, image, credentialsName, advertiseAddress, storageBackend string, pvc *api.PersistentVolumeClaim, dryRun bool) (*extensions.Deployment, error) {
 	command := []string{
 		"/hyperkube",
 		"federation-apiserver",
@@ -455,14 +460,13 @@ func createAPIServer(clientset *client.Clientset, namespace, name, image, creden
 		"--client-ca-file=/etc/federation/apiserver/ca.crt",
 		"--tls-cert-file=/etc/federation/apiserver/server.crt",
 		"--tls-private-key-file=/etc/federation/apiserver/server.key",
+		"--admission-control=NamespaceLifecycle",
 		fmt.Sprintf("--storage-backend=%s", storageBackend),
 	}
 
 	if advertiseAddress != "" {
 		command = append(command, fmt.Sprintf("--advertise-address=%s", advertiseAddress))
 	}
-
-	dataVolumeName := "etcddata"
 
 	dep := &extensions.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
@@ -509,12 +513,6 @@ func createAPIServer(clientset *client.Clientset, namespace, name, image, creden
 								"--data-dir",
 								"/var/etcd/data",
 							},
-							VolumeMounts: []api.VolumeMount{
-								{
-									Name:      dataVolumeName,
-									MountPath: "/var/etcd",
-								},
-							},
 						},
 					},
 					Volumes: []api.Volume{
@@ -526,18 +524,33 @@ func createAPIServer(clientset *client.Clientset, namespace, name, image, creden
 								},
 							},
 						},
-						{
-							Name: dataVolumeName,
-							VolumeSource: api.VolumeSource{
-								PersistentVolumeClaim: &api.PersistentVolumeClaimVolumeSource{
-									ClaimName: pvcName,
-								},
-							},
-						},
 					},
 				},
 			},
 		},
+	}
+
+	if pvc != nil {
+		dataVolumeName := "etcddata"
+		etcdVolume := api.Volume{
+			Name: dataVolumeName,
+			VolumeSource: api.VolumeSource{
+				PersistentVolumeClaim: &api.PersistentVolumeClaimVolumeSource{
+					ClaimName: pvc.Name,
+				},
+			},
+		}
+		etcdVolumeMount := api.VolumeMount{
+			Name:      dataVolumeName,
+			MountPath: "/var/etcd",
+		}
+
+		dep.Spec.Template.Spec.Volumes = append(dep.Spec.Template.Spec.Volumes, etcdVolume)
+		for i, container := range dep.Spec.Template.Spec.Containers {
+			if container.Name == "etcd" {
+				dep.Spec.Template.Spec.Containers[i].VolumeMounts = append(dep.Spec.Template.Spec.Containers[i].VolumeMounts, etcdVolumeMount)
+			}
+		}
 	}
 
 	if dryRun {

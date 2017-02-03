@@ -18,10 +18,11 @@ package storage
 
 import (
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apiserver/pkg/registry/generic"
+	genericregistry "k8s.io/apiserver/pkg/registry/generic/registry"
 	"k8s.io/kubernetes/pkg/api"
 	storageapi "k8s.io/kubernetes/pkg/apis/storage"
-	"k8s.io/kubernetes/pkg/genericapiserver/registry/generic"
-	genericregistry "k8s.io/kubernetes/pkg/genericapiserver/registry/generic/registry"
+	"k8s.io/kubernetes/pkg/registry/cachesize"
 	"k8s.io/kubernetes/pkg/registry/storage/storageclass"
 )
 
@@ -40,6 +41,7 @@ func NewREST(optsGetter generic.RESTOptionsGetter) *REST {
 		},
 		PredicateFunc:     storageclass.MatchStorageClasses,
 		QualifiedResource: storageapi.Resource("storageclasses"),
+		WatchCacheSize:    cachesize.GetWatchCacheSizeByResource("storageclass"),
 
 		CreateStrategy:      storageclass.Strategy,
 		UpdateStrategy:      storageclass.Strategy,

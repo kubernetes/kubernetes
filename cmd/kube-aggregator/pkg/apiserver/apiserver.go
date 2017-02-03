@@ -22,15 +22,16 @@ import (
 	"time"
 
 	"k8s.io/apimachinery/pkg/util/wait"
+	genericapifilters "k8s.io/apiserver/pkg/endpoints/filters"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
+	"k8s.io/apiserver/pkg/registry/generic"
+	"k8s.io/apiserver/pkg/registry/rest"
+	genericapiserver "k8s.io/apiserver/pkg/server"
 	genericfilters "k8s.io/apiserver/pkg/server/filters"
+	"k8s.io/kubernetes/pkg/api"
 	kubeclientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	kubeinformers "k8s.io/kubernetes/pkg/client/informers/informers_generated"
 	v1listers "k8s.io/kubernetes/pkg/client/listers/core/v1"
-	genericapifilters "k8s.io/kubernetes/pkg/genericapiserver/endpoints/filters"
-	"k8s.io/kubernetes/pkg/genericapiserver/registry/generic"
-	"k8s.io/kubernetes/pkg/genericapiserver/registry/rest"
-	genericapiserver "k8s.io/kubernetes/pkg/genericapiserver/server"
 	"k8s.io/kubernetes/pkg/version"
 
 	"k8s.io/kubernetes/cmd/kube-aggregator/pkg/apis/apiregistration"
@@ -140,7 +141,7 @@ func (c completedConfig) New() (*APIDiscoveryServer, error) {
 		proxyMux:         proxyMux,
 	}
 
-	apiGroupInfo := genericapiserver.NewDefaultAPIGroupInfo(apiregistration.GroupName)
+	apiGroupInfo := genericapiserver.NewDefaultAPIGroupInfo(apiregistration.GroupName, api.Registry, api.Scheme, api.ParameterCodec, api.Codecs)
 	apiGroupInfo.GroupMeta.GroupVersion = v1alpha1.SchemeGroupVersion
 	v1alpha1storage := map[string]rest.Storage{}
 	v1alpha1storage["apiservices"] = apiservicestorage.NewREST(c.RESTOptionsGetter)

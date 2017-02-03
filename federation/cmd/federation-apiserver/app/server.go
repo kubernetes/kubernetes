@@ -36,15 +36,15 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/admission"
+	"k8s.io/apiserver/pkg/registry/generic"
+	genericregistry "k8s.io/apiserver/pkg/registry/generic/registry"
+	genericapiserver "k8s.io/apiserver/pkg/server"
 	"k8s.io/apiserver/pkg/server/filters"
 	"k8s.io/kubernetes/federation/cmd/federation-apiserver/app/options"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/controller/informers"
 	"k8s.io/kubernetes/pkg/generated/openapi"
-	"k8s.io/kubernetes/pkg/genericapiserver/registry/generic"
-	genericregistry "k8s.io/kubernetes/pkg/genericapiserver/registry/generic/registry"
-	genericapiserver "k8s.io/kubernetes/pkg/genericapiserver/server"
 	"k8s.io/kubernetes/pkg/kubeapiserver"
 	kubeapiserveradmission "k8s.io/kubernetes/pkg/kubeapiserver/admission"
 	"k8s.io/kubernetes/pkg/registry/cachesize"
@@ -88,9 +88,10 @@ func Run(s *options.ServerRunOptions) error {
 		return utilerrors.NewAggregate(errs)
 	}
 
-	genericConfig := genericapiserver.NewConfig(). // create the new config
-							ApplyOptions(s.GenericServerRunOptions). // apply the options selected
-							ApplyInsecureServingOptions(s.InsecureServing)
+	genericConfig := genericapiserver.NewConfig().
+		WithSerializer(api.Codecs).
+		ApplyOptions(s.GenericServerRunOptions).
+		ApplyInsecureServingOptions(s.InsecureServing)
 
 	if _, err := genericConfig.ApplySecureServingOptions(s.SecureServing); err != nil {
 		return fmt.Errorf("failed to configure https: %s", err)
@@ -112,7 +113,7 @@ func Run(s *options.ServerRunOptions) error {
 	}
 	storageFactory, err := kubeapiserver.BuildDefaultStorageFactory(
 		s.Etcd.StorageConfig, s.GenericServerRunOptions.DefaultStorageMediaType, api.Codecs,
-		genericapiserver.NewDefaultResourceEncodingConfig(), storageGroupsToEncodingVersion,
+		genericapiserver.NewDefaultResourceEncodingConfig(api.Registry), storageGroupsToEncodingVersion,
 		[]schema.GroupVersionResource{}, resourceConfig, s.GenericServerRunOptions.RuntimeConfig)
 	if err != nil {
 		return fmt.Errorf("error in initializing storage factory: %s", err)
@@ -177,7 +178,7 @@ func Run(s *options.ServerRunOptions) error {
 	genericConfig.Authenticator = apiAuthenticator
 	genericConfig.Authorizer = apiAuthorizer
 	genericConfig.AdmissionControl = admissionController
-	genericConfig.OpenAPIConfig = genericapiserver.DefaultOpenAPIConfig(openapi.GetOpenAPIDefinitions)
+	genericConfig.OpenAPIConfig = genericapiserver.DefaultOpenAPIConfig(openapi.GetOpenAPIDefinitions, api.Scheme)
 	genericConfig.OpenAPIConfig.PostProcessSpec = postProcessOpenAPISpecForBackwardCompatibility
 	genericConfig.OpenAPIConfig.SecurityDefinitions = securityDefinitions
 	genericConfig.SwaggerConfig = genericapiserver.DefaultSwaggerConfig()

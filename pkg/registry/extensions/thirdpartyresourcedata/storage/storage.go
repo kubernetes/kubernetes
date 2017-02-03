@@ -20,10 +20,11 @@ import (
 	"strings"
 
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apiserver/pkg/registry/generic"
+	genericregistry "k8s.io/apiserver/pkg/registry/generic/registry"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/extensions"
-	"k8s.io/kubernetes/pkg/genericapiserver/registry/generic"
-	genericregistry "k8s.io/kubernetes/pkg/genericapiserver/registry/generic/registry"
+	"k8s.io/kubernetes/pkg/registry/cachesize"
 	"k8s.io/kubernetes/pkg/registry/extensions/thirdpartyresourcedata"
 )
 
@@ -54,6 +55,7 @@ func NewREST(optsGetter generic.RESTOptionsGetter, group, kind string) *REST {
 		},
 		PredicateFunc:     thirdpartyresourcedata.Matcher,
 		QualifiedResource: resource,
+		WatchCacheSize:    cachesize.GetWatchCacheSizeByResource(resource.Resource),
 
 		CreateStrategy: thirdpartyresourcedata.Strategy,
 		UpdateStrategy: thirdpartyresourcedata.Strategy,

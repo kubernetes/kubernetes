@@ -18,9 +18,10 @@ package storage
 
 import (
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apiserver/pkg/registry/generic"
+	genericregistry "k8s.io/apiserver/pkg/registry/generic/registry"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/genericapiserver/registry/generic"
-	genericregistry "k8s.io/kubernetes/pkg/genericapiserver/registry/generic/registry"
+	"k8s.io/kubernetes/pkg/registry/cachesize"
 	"k8s.io/kubernetes/pkg/registry/core/endpoint"
 )
 
@@ -39,6 +40,7 @@ func NewREST(optsGetter generic.RESTOptionsGetter) *REST {
 		},
 		PredicateFunc:     endpoint.MatchEndpoints,
 		QualifiedResource: api.Resource("endpoints"),
+		WatchCacheSize:    cachesize.GetWatchCacheSizeByResource("endpoints"),
 
 		CreateStrategy: endpoint.Strategy,
 		UpdateStrategy: endpoint.Strategy,

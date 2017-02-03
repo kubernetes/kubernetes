@@ -159,7 +159,6 @@ duration-sec
 e2e-output-dir
 e2e-verify-service-account
 enable-controller-attach-detach
-enable-cri
 enable-custom-metrics
 enable-debugging-handlers
 enable-dynamic-provisioning
@@ -177,6 +176,7 @@ etcd-keyfile
 etcd-mutation-timeout
 etcd-prefix
 etcd-pv-capacity
+etcd-persistent-storage
 etcd-quorum-read
 etcd-server
 etcd-servers

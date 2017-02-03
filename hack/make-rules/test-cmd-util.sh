@@ -1015,12 +1015,10 @@ run_save_config_tests() {
   # Command: autoscale rc "frontend"
   kubectl autoscale -f hack/testdata/frontend-controller.yaml --save-config "${kube_flags[@]}" --max=2
   # Post-Condition: hpa "frontend" has configuration annotation
-  [[ "$(kubectl get hpa.v1beta1.extensions frontend -o yaml "${kube_flags[@]}" | grep kubectl.kubernetes.io/last-applied-configuration)" ]]
-  # Ensure we can interact with HPA objects in lists through both the extensions/v1beta1 and autoscaling/v1 APIs
+  [[ "$(kubectl get hpa frontend -o yaml "${kube_flags[@]}" | grep kubectl.kubernetes.io/last-applied-configuration)" ]]
+  # Ensure we can interact with HPA objects in lists through autoscaling/v1 APIs
   output_message=$(kubectl get hpa -o=jsonpath='{.items[0].apiVersion}' 2>&1 "${kube_flags[@]}")
   kube::test::if_has_string "${output_message}" 'autoscaling/v1'
-  output_message=$(kubectl get hpa.extensions -o=jsonpath='{.items[0].apiVersion}' 2>&1 "${kube_flags[@]}")
-  kube::test::if_has_string "${output_message}" 'extensions/v1beta1'
   output_message=$(kubectl get hpa.autoscaling -o=jsonpath='{.items[0].apiVersion}' 2>&1 "${kube_flags[@]}")
   kube::test::if_has_string "${output_message}" 'autoscaling/v1'
   # tests kubectl group prefix matching
@@ -1261,17 +1259,7 @@ __EOF__
   kube::test::get_object_assert bars "{{range.items}}{{$id_field}}:{{end}}" ''
 
   # Test that we can create a new resource of type Foo
-  kubectl "${kube_flags[@]}" create -f - "${kube_flags[@]}" << __EOF__
-{
-  "kind": "Foo",
-  "apiVersion": "company.com/v1",
-  "metadata": {
-    "name": "test"
-  },
-  "some-field": "field1",
-  "other-field": "field2"
-}
-__EOF__
+  kubectl "${kube_flags[@]}" create -f hack/testdata/TPR/foo.yaml "${kube_flags[@]}"
 
   # Test that we can list this new third party resource
   kube::test::get_object_assert foos "{{range.items}}{{$id_field}}:{{end}}" 'test:'
@@ -1293,10 +1281,10 @@ __EOF__
   kubectl "${kube_flags[@]}" get foos/test -o json
   kubectl "${kube_flags[@]}" get foos      -o yaml
   kubectl "${kube_flags[@]}" get foos/test -o yaml
-  kubectl "${kube_flags[@]}" get foos      -o "jsonpath={.items[*].some-field}" --allow-missing-template-keys=false
-  kubectl "${kube_flags[@]}" get foos/test -o "jsonpath={.some-field}"          --allow-missing-template-keys=false
-  kubectl "${kube_flags[@]}" get foos      -o "go-template={{range .items}}{{index . \"some-field\"}}{{end}}" --allow-missing-template-keys=false
-  kubectl "${kube_flags[@]}" get foos/test -o "go-template={{index . \"some-field\"}}"                        --allow-missing-template-keys=false
+  kubectl "${kube_flags[@]}" get foos      -o "jsonpath={.items[*].someField}" --allow-missing-template-keys=false
+  kubectl "${kube_flags[@]}" get foos/test -o "jsonpath={.someField}"          --allow-missing-template-keys=false
+  kubectl "${kube_flags[@]}" get foos      -o "go-template={{range .items}}{{.someField}}{{end}}" --allow-missing-template-keys=false
+  kubectl "${kube_flags[@]}" get foos/test -o "go-template={{.someField}}"                        --allow-missing-template-keys=false
 
   # Test patching
   kube::log::status "Testing ThirdPartyResource patching"
@@ -1350,17 +1338,7 @@ __EOF__
   kube::test::get_object_assert foos "{{range.items}}{{$id_field}}:{{end}}" ''
 
   # Test that we can create a new resource of type Bar
-  kubectl "${kube_flags[@]}" create -f - "${kube_flags[@]}" << __EOF__
-{
-  "kind": "Bar",
-  "apiVersion": "company.com/v1",
-  "metadata": {
-    "name": "test"
-  },
-  "some-field": "field1",
-  "other-field": "field2"
-}
-__EOF__
+  kubectl "${kube_flags[@]}" create -f hack/testdata/TPR/bar.yaml "${kube_flags[@]}"
 
   # Test that we can list this new third party resource
   kube::test::get_object_assert bars "{{range.items}}{{$id_field}}:{{end}}" 'test:'
@@ -1369,6 +1347,136 @@ __EOF__
   kubectl "${kube_flags[@]}" delete bars test
 
   # Make sure it's gone
+  kube::test::get_object_assert bars "{{range.items}}{{$id_field}}:{{end}}" ''
+
+  # Test that we can create single item via apply
+  kubectl "${kube_flags[@]}" apply -f hack/testdata/TPR/foo.yaml
+
+  # Test that we have create a foo named test
+  kube::test::get_object_assert foos "{{range.items}}{{$id_field}}:{{end}}" 'test:'
+
+  # Test that the field has the expected value
+  kube::test::get_object_assert foos/test '{{.someField}}' 'field1'
+
+  # Test that apply an empty patch doesn't change fields
+  kubectl "${kube_flags[@]}" apply -f hack/testdata/TPR/foo.yaml
+
+  # Test that the field has the same value after re-apply
+  kube::test::get_object_assert foos/test '{{.someField}}' 'field1'
+
+  # Test that apply has updated the subfield
+  kube::test::get_object_assert foos/test '{{.nestedField.someSubfield}}' 'subfield1'
+
+  # Update a subfield and then apply the change
+  kubectl "${kube_flags[@]}" apply -f hack/testdata/TPR/foo-updated-subfield.yaml
+
+  # Test that apply has updated the subfield
+  kube::test::get_object_assert foos/test '{{.nestedField.someSubfield}}' 'modifiedSubfield'
+
+  # Test that the field has the expected value
+  kube::test::get_object_assert foos/test '{{.nestedField.otherSubfield}}' 'subfield2'
+
+  # Delete a subfield and then apply the change
+  kubectl "${kube_flags[@]}" apply -f hack/testdata/TPR/foo-deleted-subfield.yaml
+
+  # Test that apply has deleted the field
+  kube::test::get_object_assert foos/test '{{.nestedField.otherSubfield}}' '<no value>'
+
+  # Test that the field does not exist
+  kube::test::get_object_assert foos/test '{{.nestedField.newSubfield}}' '<no value>'
+
+  # Add a field and then apply the change
+  kubectl "${kube_flags[@]}" apply -f hack/testdata/TPR/foo-added-subfield.yaml
+
+  # Test that apply has added the field
+  kube::test::get_object_assert foos/test '{{.nestedField.newSubfield}}' 'subfield3'
+
+  # Delete the resource
+  kubectl "${kube_flags[@]}" delete -f hack/testdata/TPR/foo.yaml
+
+  # Make sure it's gone
+  kube::test::get_object_assert foos "{{range.items}}{{$id_field}}:{{end}}" ''
+
+  # Test that we can create list via apply
+  kubectl "${kube_flags[@]}" apply -f hack/testdata/TPR/multi-tpr-list.yaml
+
+  # Test that we have create a foo and a bar from a list
+  kube::test::get_object_assert foos "{{range.items}}{{$id_field}}:{{end}}" 'test-list:'
+  kube::test::get_object_assert bars "{{range.items}}{{$id_field}}:{{end}}" 'test-list:'
+
+  # Test that the field has the expected value
+  kube::test::get_object_assert foos/test-list '{{.someField}}' 'field1'
+  kube::test::get_object_assert bars/test-list '{{.someField}}' 'field1'
+
+  # Test that re-apply an list doesn't change anything
+  kubectl "${kube_flags[@]}" apply -f hack/testdata/TPR/multi-tpr-list.yaml
+
+  # Test that the field has the same value after re-apply
+  kube::test::get_object_assert foos/test-list '{{.someField}}' 'field1'
+  kube::test::get_object_assert bars/test-list '{{.someField}}' 'field1'
+
+  # Test that the fields have the expected value
+  kube::test::get_object_assert foos/test-list '{{.someField}}' 'field1'
+  kube::test::get_object_assert bars/test-list '{{.someField}}' 'field1'
+
+  # Update fields and then apply the change
+  kubectl "${kube_flags[@]}" apply -f hack/testdata/TPR/multi-tpr-list-updated-field.yaml
+
+  # Test that apply has updated the fields
+  kube::test::get_object_assert foos/test-list '{{.someField}}' 'modifiedField'
+  kube::test::get_object_assert bars/test-list '{{.someField}}' 'modifiedField'
+
+  # Test that the field has the expected value
+  kube::test::get_object_assert foos/test-list '{{.otherField}}' 'field2'
+  kube::test::get_object_assert bars/test-list '{{.otherField}}' 'field2'
+
+  # Delete fields and then apply the change
+  kubectl "${kube_flags[@]}" apply -f hack/testdata/TPR/multi-tpr-list-deleted-field.yaml
+
+  # Test that apply has deleted the fields
+  kube::test::get_object_assert foos/test-list '{{.otherField}}' '<no value>'
+  kube::test::get_object_assert bars/test-list '{{.otherField}}' '<no value>'
+
+  # Test that the fields does not exist
+  kube::test::get_object_assert foos/test-list '{{.newField}}' '<no value>'
+  kube::test::get_object_assert bars/test-list '{{.newField}}' '<no value>'
+
+  # Add a field and then apply the change
+  kubectl "${kube_flags[@]}" apply -f hack/testdata/TPR/multi-tpr-list-added-field.yaml
+
+  # Test that apply has added the field
+  kube::test::get_object_assert foos/test-list '{{.newField}}' 'field3'
+  kube::test::get_object_assert bars/test-list '{{.newField}}' 'field3'
+
+  # Delete the resource
+  kubectl "${kube_flags[@]}" delete -f hack/testdata/TPR/multi-tpr-list.yaml
+
+  # Make sure it's gone
+  kube::test::get_object_assert foos "{{range.items}}{{$id_field}}:{{end}}" ''
+  kube::test::get_object_assert bars "{{range.items}}{{$id_field}}:{{end}}" ''
+
+  ## kubectl apply --prune
+  # Test that no foo or bar exist
+  kube::test::get_object_assert foos "{{range.items}}{{$id_field}}:{{end}}" ''
+  kube::test::get_object_assert bars "{{range.items}}{{$id_field}}:{{end}}" ''
+
+  # apply --prune on foo.yaml that has foo/test
+  kubectl apply --prune -l pruneGroup=true -f hack/testdata/TPR/foo.yaml "${kube_flags[@]}" --prune-whitelist=company.com/v1/Foo --prune-whitelist=company.com/v1/Bar
+  # check right tprs exist
+  kube::test::get_object_assert foos "{{range.items}}{{$id_field}}:{{end}}" 'test:'
+  kube::test::get_object_assert bars "{{range.items}}{{$id_field}}:{{end}}" ''
+
+  # apply --prune on bar.yaml that has bar/test
+  kubectl apply --prune -l pruneGroup=true -f hack/testdata/TPR/bar.yaml "${kube_flags[@]}" --prune-whitelist=company.com/v1/Foo --prune-whitelist=company.com/v1/Bar
+  # check right tprs exist
+  kube::test::get_object_assert foos "{{range.items}}{{$id_field}}:{{end}}" ''
+  kube::test::get_object_assert bars "{{range.items}}{{$id_field}}:{{end}}" 'test:'
+
+  # Delete the resource
+  kubectl "${kube_flags[@]}" delete -f hack/testdata/TPR/bar.yaml
+
+  # Make sure it's gone
+  kube::test::get_object_assert foos "{{range.items}}{{$id_field}}:{{end}}" ''
   kube::test::get_object_assert bars "{{range.items}}{{$id_field}}:{{end}}" ''
 
   # teardown
@@ -2111,16 +2219,8 @@ run_rc_tests() {
   kubectl autoscale -f hack/testdata/frontend-controller.yaml "${kube_flags[@]}" --max=2 --cpu-percent=70
   kube::test::get_object_assert 'hpa frontend' "{{$hpa_min_field}} {{$hpa_max_field}} {{$hpa_cpu_field}}" '1 2 70'
   kubectl delete hpa frontend "${kube_flags[@]}"
-  # autoscale 1~2 pods, CPU utilization 70%, rc specified by file, using old generator
-  kubectl autoscale -f hack/testdata/frontend-controller.yaml "${kube_flags[@]}" --max=2 --cpu-percent=70 --generator=horizontalpodautoscaler/v1beta1
-  kube::test::get_object_assert 'hpa frontend' "{{$hpa_min_field}} {{$hpa_max_field}} {{$hpa_cpu_field}}" '1 2 70'
-  kubectl delete hpa frontend "${kube_flags[@]}"
   # autoscale 2~3 pods, no CPU utilization specified, rc specified by name
   kubectl autoscale rc frontend "${kube_flags[@]}" --min=2 --max=3
-  kube::test::get_object_assert 'hpa frontend' "{{$hpa_min_field}} {{$hpa_max_field}} {{$hpa_cpu_field}}" '2 3 <no value>'
-  kubectl delete hpa frontend "${kube_flags[@]}"
-  # autoscale 2~3 pods, no CPU utilization specified, rc specified by name, using old generator
-  kubectl autoscale rc frontend "${kube_flags[@]}" --min=2 --max=3 --generator=horizontalpodautoscaler/v1beta1
   kube::test::get_object_assert 'hpa frontend' "{{$hpa_min_field}} {{$hpa_max_field}} {{$hpa_cpu_field}}" '2 3 <no value>'
   kubectl delete hpa frontend "${kube_flags[@]}"
   # autoscale without specifying --max should fail

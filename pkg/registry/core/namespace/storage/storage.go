@@ -23,12 +23,13 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
+	"k8s.io/apiserver/pkg/registry/generic"
+	genericregistry "k8s.io/apiserver/pkg/registry/generic/registry"
+	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/apiserver/pkg/storage"
+	storageerr "k8s.io/apiserver/pkg/storage/errors"
 	"k8s.io/kubernetes/pkg/api"
-	storageerr "k8s.io/kubernetes/pkg/api/errors/storage"
-	"k8s.io/kubernetes/pkg/genericapiserver/registry/generic"
-	genericregistry "k8s.io/kubernetes/pkg/genericapiserver/registry/generic/registry"
-	"k8s.io/kubernetes/pkg/genericapiserver/registry/rest"
+	"k8s.io/kubernetes/pkg/registry/cachesize"
 	"k8s.io/kubernetes/pkg/registry/core/namespace"
 )
 
@@ -59,6 +60,7 @@ func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, *StatusREST, *Finaliz
 		},
 		PredicateFunc:     namespace.MatchNamespace,
 		QualifiedResource: api.Resource("namespaces"),
+		WatchCacheSize:    cachesize.GetWatchCacheSizeByResource("namespaces"),
 
 		CreateStrategy:      namespace.Strategy,
 		UpdateStrategy:      namespace.Strategy,
@@ -141,7 +143,7 @@ func (r *REST) Delete(ctx genericapirequest.Context, name string, options *metav
 					newFinalizers := []string{}
 					for i := range existingNamespace.ObjectMeta.Finalizers {
 						finalizer := existingNamespace.ObjectMeta.Finalizers[i]
-						if string(finalizer) != api.FinalizerOrphan {
+						if string(finalizer) != metav1.FinalizerOrphan {
 							newFinalizers = append(newFinalizers, finalizer)
 						}
 					}

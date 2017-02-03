@@ -18,6 +18,7 @@ package secret
 
 import (
 	"fmt"
+	"reflect"
 	"strings"
 	"sync"
 	"testing"
@@ -26,7 +27,10 @@ import (
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset/fake"
 
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	core "k8s.io/client-go/testing"
 	"k8s.io/client-go/util/clock"
 
 	"github.com/stretchr/testify/assert"
@@ -74,6 +78,35 @@ func TestSecretStore(t *testing.T) {
 	checkSecret(t, store, "ns2", "name2", false)
 	checkSecret(t, store, "ns3", "name3", true)
 	checkSecret(t, store, "ns4", "name4", false)
+}
+
+func TestSecretStoreDeletingSecret(t *testing.T) {
+	fakeClient := &fake.Clientset{}
+	store := newSecretStore(fakeClient, clock.RealClock{}, 0)
+	store.Add("ns", "name")
+
+	result := &v1.Secret{ObjectMeta: metav1.ObjectMeta{Namespace: "ns", Name: "name", ResourceVersion: "10"}}
+	fakeClient.AddReactor("get", "secrets", func(action core.Action) (bool, runtime.Object, error) {
+		return true, result, nil
+	})
+	secret, err := store.Get("ns", "name")
+	if err != nil {
+		t.Errorf("Unexpected error: %v", err)
+	}
+	if !reflect.DeepEqual(secret, result) {
+		t.Errorf("Unexpected secret: %v", secret)
+	}
+
+	fakeClient.PrependReactor("get", "secrets", func(action core.Action) (bool, runtime.Object, error) {
+		return true, &v1.Secret{}, apierrors.NewNotFound(v1.Resource("secret"), "name")
+	})
+	secret, err = store.Get("ns", "name")
+	if err == nil || !apierrors.IsNotFound(err) {
+		t.Errorf("Unexpected error: %v", err)
+	}
+	if !reflect.DeepEqual(secret, &v1.Secret{}) {
+		t.Errorf("Unexpected secret: %v", secret)
+	}
 }
 
 func TestSecretStoreGetAlwaysRefresh(t *testing.T) {

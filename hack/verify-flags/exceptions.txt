@@ -120,6 +120,7 @@ pkg/kubelet/api/v1alpha1/runtime/api.proto:    int64 oom_score_adj = 5;
 pkg/kubelet/api/v1alpha1/runtime/api.proto:    string pod_cidr = 1;
 pkg/kubelet/cm/container_manager_linux.go:		glog.V(3).Infof("Failed to apply oom_score_adj %d for pid %d: %v", oomScoreAdj, pid, err)
 pkg/kubelet/cm/container_manager_linux.go:	glog.V(5).Infof("attempting to apply oom_score_adj of %d to pid %d", oomScoreAdj, pid)
+pkg/kubelet/dockershim/docker_checkpoint.go:	ContainerPort *int32 `json:"container_port,omitempty"`
 pkg/kubelet/network/hairpin/hairpin.go:	hairpinModeRelativePath = "hairpin_mode"
 pkg/kubelet/qos/policy_test.go:			t.Errorf("oom_score_adj should be between %d and %d, but was %d", test.lowOOMScoreAdj, test.highOOMScoreAdj, oomScoreAdj)
 pkg/kubelet/qos/policy_test.go:	highOOMScoreAdj int // The min oom_score_adj score the container should be assigned.

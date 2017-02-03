@@ -29,7 +29,6 @@ go_library(
     srcs = [
         "auth.go",
         "bootstrap.go",
-        "clientgo.go",
         "plugins.go",
         "server.go",
         "server_linux.go",
