@@ -29,7 +29,10 @@ func ResourceAttributesFrom(user user.Info, in authorizationapi.ResourceAttribut
 		Verb:            in.Verb,
 		Namespace:       in.Namespace,
 		APIGroup:        in.Group,
+		APIVersion:      in.Version,
 		Resource:        in.Resource,
+		Subresource:     in.Subresource,
+		Name:            in.Name,
 		ResourceRequest: true,
 	}
 }
