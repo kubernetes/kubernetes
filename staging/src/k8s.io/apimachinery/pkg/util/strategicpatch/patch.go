@@ -244,9 +244,14 @@ func diffMaps(original, modified map[string]interface{}, t reflect.Type, ignoreC
 		switch originalValueTyped := originalValue.(type) {
 		case map[string]interface{}:
 			modifiedValueTyped := modifiedValue.(map[string]interface{})
-			fieldType, _, _, err := forkedjson.LookupPatchMetadata(t, key)
+			fieldType, fieldPatchStrategy, _, err := forkedjson.LookupPatchMetadata(t, key)
 			if err != nil {
 				return nil, err
+			}
+
+			if !ignoreDeletions && fieldPatchStrategy == deleteDirective {
+				patch[key] = nil
+				continue
 			}
 
 			patchValue, err := diffMaps(originalValueTyped, modifiedValueTyped, fieldType, ignoreChangesAndAdditions, ignoreDeletions)
