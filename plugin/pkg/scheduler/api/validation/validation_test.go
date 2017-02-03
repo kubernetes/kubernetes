@@ -50,3 +50,18 @@ func TestValidatePriorityWithNegativeWeight(t *testing.T) {
 		t.Errorf("Expected error about priority weight not being positive")
 	}
 }
+
+func TestValidateExtenderWithNonNegativeWeight(t *testing.T) {
+	extenderPolicy := api.Policy{ExtenderConfigs: []api.ExtenderConfig{{URLPrefix: "http://127.0.0.1:8081/extender", FilterVerb: "filter", Weight: 2}}}
+	errs := ValidatePolicy(extenderPolicy)
+	if errs != nil {
+		t.Errorf("Unexpected errors %v", errs)
+	}
+}
+
+func TestValidateExtenderWithNegativeWeight(t *testing.T) {
+	extenderPolicy := api.Policy{ExtenderConfigs: []api.ExtenderConfig{{URLPrefix: "http://127.0.0.1:8081/extender", FilterVerb: "filter", Weight: -2}}}
+	if ValidatePolicy(extenderPolicy) == nil {
+		t.Errorf("Expected error about priority weight for extender not being positive")
+	}
+}
