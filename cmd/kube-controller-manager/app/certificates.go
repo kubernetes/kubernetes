@@ -38,6 +38,7 @@ func startCSRController(ctx ControllerContext) (bool, error) {
 		resyncPeriod,
 		ctx.Options.ClusterSigningCertFile,
 		ctx.Options.ClusterSigningKeyFile,
+		ctx.Options.ClusterSigningWebhookConfigFile,
 		certcontroller.NewGroupApprover(ctx.Options.ApproveAllKubeletCSRsForGroup),
 	)
 	if err != nil {

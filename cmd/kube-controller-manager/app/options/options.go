@@ -94,16 +94,17 @@ func NewCMServer() *CMServer {
 				},
 				FlexVolumePluginDir: "/usr/libexec/kubernetes/kubelet-plugins/volume/exec/",
 			},
-			ContentType:              "application/vnd.kubernetes.protobuf",
-			KubeAPIQPS:               20.0,
-			KubeAPIBurst:             30,
-			LeaderElection:           leaderelection.DefaultLeaderElectionConfiguration(),
-			ControllerStartInterval:  metav1.Duration{Duration: 0 * time.Second},
-			EnableGarbageCollector:   true,
-			ConcurrentGCSyncs:        20,
-			ClusterSigningCertFile:   "/etc/kubernetes/ca/ca.pem",
-			ClusterSigningKeyFile:    "/etc/kubernetes/ca/ca.key",
-			ReconcilerSyncLoopPeriod: metav1.Duration{Duration: 5 * time.Second},
+			ContentType:                     "application/vnd.kubernetes.protobuf",
+			KubeAPIQPS:                      20.0,
+			KubeAPIBurst:                    30,
+			LeaderElection:                  leaderelection.DefaultLeaderElectionConfiguration(),
+			ControllerStartInterval:         metav1.Duration{Duration: 0 * time.Second},
+			EnableGarbageCollector:          true,
+			ConcurrentGCSyncs:               20,
+			ClusterSigningCertFile:          "/etc/kubernetes/ca/ca.pem",
+			ClusterSigningKeyFile:           "/etc/kubernetes/ca/ca.key",
+			ClusterSigningWebhookConfigFile: "",
+			ReconcilerSyncLoopPeriod:        metav1.Duration{Duration: 5 * time.Second},
 		},
 	}
 	s.LeaderElection.LeaderElect = true
@@ -173,6 +174,7 @@ func (s *CMServer) AddFlags(fs *pflag.FlagSet, allControllers []string, disabled
 	fs.StringVar(&s.ServiceAccountKeyFile, "service-account-private-key-file", s.ServiceAccountKeyFile, "Filename containing a PEM-encoded private RSA or ECDSA key used to sign service account tokens.")
 	fs.StringVar(&s.ClusterSigningCertFile, "cluster-signing-cert-file", s.ClusterSigningCertFile, "Filename containing a PEM-encoded X509 CA certificate used to issue cluster-scoped certificates")
 	fs.StringVar(&s.ClusterSigningKeyFile, "cluster-signing-key-file", s.ClusterSigningKeyFile, "Filename containing a PEM-encoded RSA or ECDSA private key used to sign cluster-scoped certificates")
+	fs.StringVar(&s.ClusterSigningWebhookConfigFile, "cluster-signing-webhook-config-file", s.ClusterSigningWebhookConfigFile, "Filename containing configuration for using a webhook callback for certificate signing")
 	fs.StringVar(&s.ApproveAllKubeletCSRsForGroup, "insecure-experimental-approve-all-kubelet-csrs-for-group", s.ApproveAllKubeletCSRsForGroup, "The group for which the controller-manager will auto approve all CSRs for kubelet client certificates.")
 	fs.BoolVar(&s.EnableProfiling, "profiling", true, "Enable profiling via web interface host:port/debug/pprof/")
 	fs.StringVar(&s.ClusterName, "cluster-name", s.ClusterName, "The instance prefix for the cluster")

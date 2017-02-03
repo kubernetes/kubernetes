@@ -730,6 +730,12 @@ type KubeControllerManagerConfiguration struct {
 	// clusterSigningCertFile is the filename containing a PEM-encoded
 	// RSA or ECDSA private key used to issue cluster-scoped certificates
 	ClusterSigningKeyFile string
+	// clusterSigningWebhookConfigFile is the filename containing
+	// configuration to use a webhook for certificate signing instead of
+	// local files. This can be used to take advantage of an external CA
+	// for signing certificates, and causes the controller to ignore the
+	// values of ClusterSigningCertFile and ClusterSigningKeyFile.
+	ClusterSigningWebhookConfigFile string
 	// approveAllKubeletCSRs tells the CSR controller to approve all CSRs originating
 	// from the kubelet bootstrapping group automatically.
 	// WARNING: this grants all users with access to the certificates API group

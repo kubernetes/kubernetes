@@ -64,13 +64,23 @@ type CertificateController struct {
 	queue workqueue.RateLimitingInterface
 }
 
-func NewCertificateController(kubeClient clientset.Interface, syncPeriod time.Duration, caCertFile, caKeyFile string, approver AutoApprover) (*CertificateController, error) {
+func NewCertificateController(kubeClient clientset.Interface, syncPeriod time.Duration, caCertFile, caKeyFile, webhookConfigFile string, approver AutoApprover) (*CertificateController, error) {
 	// Send events to the apiserver
 	eventBroadcaster := record.NewBroadcaster()
 	eventBroadcaster.StartLogging(glog.Infof)
 	eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: v1core.New(kubeClient.Core().RESTClient()).Events("")})
 
-	s, err := NewCFSSLSigner(caCertFile, caKeyFile)
+	var s Signer
+	var err error
+
+	if webhookConfigFile != "" {
+		glog.Info("Creating webhook CertificateSigner")
+		s, err = NewWebhookSignerFromConfigFile(webhookConfigFile)
+	} else {
+		glog.Info("Creating CFSSL CertificateSigner")
+		s, err = NewCFSSLSigner(caCertFile, caKeyFile)
+	}
+
 	if err != nil {
 		return nil, err
 	}

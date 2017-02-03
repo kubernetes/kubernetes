@@ -88,6 +88,7 @@ cluster-monitor-period
 cluster-name
 cluster-signing-cert-file
 cluster-signing-key-file
+cluster-signing-webhook-config-file
 cluster-tag
 cni-bin-dir
 cni-conf-dir
