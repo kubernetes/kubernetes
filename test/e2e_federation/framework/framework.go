@@ -140,9 +140,6 @@ func (f *Framework) FederationAfterEach() {
 			framework.Logf("Warning: framework is marked federated, but has no federation 1.5 clientset")
 			return
 		}
-		if err := f.FederationClientset.Federation().Clusters().DeleteCollection(nil, metav1.ListOptions{}); err != nil {
-			framework.Logf("Error: failed to delete Clusters: %+v", err)
-		}
 	}()
 
 	// Print events if the test failed.

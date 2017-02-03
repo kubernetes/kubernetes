@@ -18,7 +18,6 @@ package e2e_federation
 
 import (
 	"fmt"
-	"os"
 	"strings"
 	"time"
 
@@ -44,19 +43,11 @@ var _ = framework.KubeDescribe("Federation namespace [Feature:Federation]", func
 	f := fedframework.NewDefaultFederatedFramework("federation-namespace")
 
 	Describe("Namespace objects", func() {
-		var federationName string
 		var clusters map[string]*cluster // All clusters, keyed by cluster name
 
 		BeforeEach(func() {
 			fedframework.SkipUnlessFederated(f.ClientSet)
-
-			// TODO: Federation API server should be able to answer this.
-			if federationName = os.Getenv("FEDERATION_NAME"); federationName == "" {
-				federationName = DefaultFederationName
-			}
-
-			clusters = map[string]*cluster{}
-			registerClusters(clusters, UserAgentName, federationName, f)
+			clusters, _ = getRegisteredClusters(UserAgentName, f)
 		})
 
 		AfterEach(func() {
@@ -69,7 +60,6 @@ var _ = framework.KubeDescribe("Federation namespace [Feature:Federation]", func
 					cluster.Core().Namespaces().List,
 					cluster.Core().Namespaces().Delete)
 			}
-			unregisterClusters(clusters, f)
 		})
 
 		It("should be created and deleted successfully", func() {

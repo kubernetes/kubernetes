@@ -18,7 +18,6 @@ package e2e_federation
 
 import (
 	"fmt"
-	"os"
 	"strings"
 	"time"
 
@@ -71,22 +70,16 @@ var _ = framework.KubeDescribe("Federation deployments [Feature:Federation]", fu
 	// e2e cases for federated deployment controller
 	Describe("Federated Deployment", func() {
 		var (
-			clusters       map[string]*cluster
-			federationName string
+			clusters map[string]*cluster
 		)
 		BeforeEach(func() {
 			fedframework.SkipUnlessFederated(f.ClientSet)
-			if federationName = os.Getenv("FEDERATION_NAME"); federationName == "" {
-				federationName = DefaultFederationName
-			}
-			clusters = map[string]*cluster{}
-			registerClusters(clusters, UserAgentName, federationName, f)
+			clusters, _ = getRegisteredClusters(UserAgentName, f)
 		})
 
 		AfterEach(func() {
 			nsName := f.FederationNamespace.Name
 			deleteAllDeploymentsOrFail(f.FederationClientset, nsName)
-			unregisterClusters(clusters, f)
 		})
 
 		It("should create and update matching deployments in underlying clusters", func() {
