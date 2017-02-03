@@ -31,9 +31,11 @@ import (
 
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/admission"
-	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/apis/componentconfig"
-	componentconfigv1alpha1 "k8s.io/kubernetes/pkg/apis/componentconfig/v1alpha1"
+	"k8s.io/apiserver/pkg/apis"
+	"k8s.io/apiserver/pkg/apis/apiserver"
+	apiserverv1alpha1 "k8s.io/apiserver/pkg/apis/apiserver/v1alpha1"
+
+	_ "k8s.io/apiserver/pkg/apis/apiserver/install"
 
 	runtime "k8s.io/apimachinery/pkg/runtime"
 )
@@ -60,18 +62,18 @@ func makeAbs(path, base string) (string, error) {
 // It returns an error if the file did not exist.
 func ReadAdmissionConfiguration(pluginNames []string, configFilePath string) (admission.ConfigProvider, error) {
 	if configFilePath == "" {
-		return configProvider{config: &componentconfig.AdmissionConfiguration{}}, nil
+		return configProvider{config: &apiserver.AdmissionConfiguration{}}, nil
 	}
 	// a file was provided, so we just read it.
 	data, err := ioutil.ReadFile(configFilePath)
 	if err != nil {
 		return nil, fmt.Errorf("unable to read admission control configuration from %q [%v]", configFilePath, err)
 	}
-	decoder := api.Codecs.UniversalDecoder()
+	decoder := apis.Codecs.UniversalDecoder()
 	decodedObj, err := runtime.Decode(decoder, data)
 	// we were able to decode the file successfully
 	if err == nil {
-		decodedConfig, ok := decodedObj.(*componentconfig.AdmissionConfiguration)
+		decodedConfig, ok := decodedObj.(*apiserver.AdmissionConfiguration)
 		if !ok {
 			return nil, fmt.Errorf("unexpected type: %T", decodedObj)
 		}
@@ -98,29 +100,29 @@ func ReadAdmissionConfiguration(pluginNames []string, configFilePath string) (ad
 	// previously read input from a non-versioned file configuration to the
 	// current input file.
 	legacyPluginsWithUnversionedConfig := sets.NewString("ImagePolicyWebhook", "PodNodeSelector")
-	externalConfig := &componentconfigv1alpha1.AdmissionConfiguration{}
+	externalConfig := &apiserverv1alpha1.AdmissionConfiguration{}
 	for _, pluginName := range pluginNames {
 		if legacyPluginsWithUnversionedConfig.Has(pluginName) {
 			externalConfig.Plugins = append(externalConfig.Plugins,
-				componentconfigv1alpha1.AdmissionPluginConfiguration{
+				apiserverv1alpha1.AdmissionPluginConfiguration{
 					Name: pluginName,
 					Path: configFilePath})
 		}
 	}
-	api.Scheme.Default(externalConfig)
-	internalConfig := &componentconfig.AdmissionConfiguration{}
-	if err := api.Scheme.Convert(externalConfig, internalConfig, nil); err != nil {
+	apis.Scheme.Default(externalConfig)
+	internalConfig := &apiserver.AdmissionConfiguration{}
+	if err := apis.Scheme.Convert(externalConfig, internalConfig, nil); err != nil {
 		return nil, err
 	}
 	return configProvider{config: internalConfig}, nil
 }
 
 type configProvider struct {
-	config *componentconfig.AdmissionConfiguration
+	config *apiserver.AdmissionConfiguration
 }
 
 // GetAdmissionPluginConfigurationFor returns a reader that holds the admission plugin configuration.
-func GetAdmissionPluginConfigurationFor(pluginCfg componentconfig.AdmissionPluginConfiguration) (io.Reader, error) {
+func GetAdmissionPluginConfigurationFor(pluginCfg apiserver.AdmissionPluginConfiguration) (io.Reader, error) {
 	// if there is nothing nested in the object, we return the named location
 	obj := pluginCfg.Configuration
 	if obj != nil {
@@ -168,7 +170,7 @@ func (p configProvider) ConfigFor(pluginName string) (io.Reader, error) {
 
 // writeYAML writes the specified object to a byte array as yaml.
 func writeYAML(obj runtime.Object) ([]byte, error) {
-	json, err := runtime.Encode(api.Codecs.LegacyCodec(), obj)
+	json, err := runtime.Encode(apis.Codecs.LegacyCodec(), obj)
 	if err != nil {
 		return nil, err
 	}
