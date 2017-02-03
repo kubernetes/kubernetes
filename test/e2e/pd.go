@@ -43,6 +43,11 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 )
 
+import (
+	"golang.org/x/net/context"
+	"google.golang.org/api/compute/v1"
+)
+
 const (
 	gcePDDetachTimeout  = 10 * time.Minute
 	gcePDDetachPollTime = 10 * time.Second
@@ -528,6 +533,47 @@ var _ = framework.KubeDescribe("Pod Disks", func() {
 		// The disk should be detached from host0 on its deletion
 		By("Waiting for pd to detach from host0")
 		framework.ExpectNoError(waitForPDDetach(diskName, host0Name), "Timed out waiting for detach pd")
+	})
+
+	It("[jon] Should not be able to create a PD in an unmanaged zone", func() {
+		framework.SkipUnlessProviderIs("gce", "gke")
+
+		var zoneList []string
+
+		gceCloud, err := getGCECloud()
+		Expect(err).NotTo(HaveOccurred())
+
+		// Get a list of all zones in the project
+		compSvc := gceCloud.GetComputeService()
+		call := compSvc.Zones.List(framework.TestContext.CloudConfig.ProjectID)
+		ctx := context.Background()
+		if err := call.Pages(ctx, func(page *compute.ZoneList) error {
+			for _, v := range page.Items {
+				framework.Logf("-[DEBUG]- Project Zone: %v", v.Name)
+				zoneList = append(zoneList, string(v.Name))
+				_ = v
+			}
+			return nil
+		}); err != nil {
+			framework.Failf("Failed to get project zone:\n\n %+v", err)
+		}
+
+		framework.Logf("-[DEBUG]- framework.TestContext.CloudConfig.Zone: %v", framework.TestContext.CloudConfig.Zone)
+		framework.Logf("-[DEBUG]- zoneList: %+v", zoneList)
+
+		var unmanagedZone string
+		//tags := map[string]string{}
+		for _, zone := range zoneList {
+			if zone != framework.TestContext.CloudConfig.Zone {
+				unmanagedZone = zone
+				break
+			}
+		}
+		framework.Logf("-[DEBUG]-  Using unmanaged zone: %s", unmanagedZone)
+
+		// TODO invoke via dynamic provisioning?
+		//err = gceCloud.CreateDisk("e2e-pd", gcecloud.DiskTypeStandard, unmanagedZone, 10 /*Gi*/, tags)
+		//Expect(err).NotTo(HaveOccurred())
 	})
 })
 
