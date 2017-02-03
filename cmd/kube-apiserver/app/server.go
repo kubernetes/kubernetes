@@ -38,6 +38,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
+	utilwait "k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/admission"
@@ -63,6 +64,9 @@ import (
 	"k8s.io/kubernetes/pkg/version"
 	"k8s.io/kubernetes/cmd/kube-apiserver/app/preflight"
 )
+
+const etcdRetryLimit = 60
+const etcdRetryInterval = 1 * time.Second
 
 // NewAPIServerCommand creates a *cobra.Command object with default parameters
 func NewAPIServerCommand() *cobra.Command {
@@ -116,7 +120,7 @@ func Run(s *options.ServerRunOptions) error {
 	if err = s.Authentication.Apply(genericConfig); err != nil {
 		return fmt.Errorf("failed to configure authentication: %s", err)
 	}
-	if err := preflight.RunAPIServerChecks(s); err != nil {
+	if err := utilwait.PollImmediate(etcdRetryInterval, etcdRetryLimit * etcdRetryInterval, preflight.EtcdConnection{ServerList: s.Etcd.StorageConfig.ServerList}.CheckEtcdServers); err != nil {
 		return fmt.Errorf("error starting apiserver: %v", err)
 	}
 

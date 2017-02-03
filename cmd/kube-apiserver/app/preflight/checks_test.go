@@ -19,87 +19,56 @@ package preflight
 import (
 	"testing"
 	"time"
-	"k8s.io/client-go/pkg/util/clock"
+
+	utilwait "k8s.io/apimachinery/pkg/util/wait"
 )
 
-type mockEtcdConnection struct {
-	shouldSucceed bool
+func TestParseServerURIGood(t *testing.T) {
+	host, err := parseServerURI("https://127.0.0.1:2379")
+	if err != nil { t.Fatalf("unexpected error: %v", err) }
+
+	reference := "127.0.0.1:2379"
+	if host != reference {t.Fatal("server uri was not parsed correctly")}
 }
 
-func (m mockEtcdConnection) serverReachable(address string) bool{
-	return m.shouldSucceed
+func TestParseServerURIBad(t *testing.T) {
+	_, err := parseServerURI("-invalid uri$@#%")
+	if err == nil { t.Fatal("expected bad uri to raise parse error") }
 }
 
-func makeEtcdConnection(shouldSucceed bool) mockEtcdConnection {
-	conn := mockEtcdConnection{}
-	conn.shouldSucceed = shouldSucceed
-	return conn
-}
-
-func TestWaitForEtcdSuccess(t *testing.T) {
-	timer := new(clock.RealClock)
-	etcd := makeEtcdConnection(true)
-	servers := []string{"https://127.0.0.1:2379"}
-	err := WaitForAvailableEtcd(servers, timer, etcd)
-
-	if err != nil { t.Fatalf("Unexpected error: %v", err) }
-}
-
-
-func TestWaitForEtcdFail(t *testing.T) {
-	timer := clock.NewFakeClock(time.Now())
-	etcd := makeEtcdConnection(false)
-
-	servers := []string{"https://127.0.0.1:2379"}
-	err := WaitForAvailableEtcd(servers, timer, etcd)
-	if err == nil { t.Fatal("Expected 'Unable to reach Etcd' error to occur") }
-}
-
-func TestCheckEtcdServerExpired(t *testing.T) {
-	timer := clock.NewFakeClock(time.Now())
-	etcd := makeEtcdConnection(false)
-
-	address := "https://127.0.0.1:2379"
-	ch := make(chan struct{})
-	stop := make(chan struct{})
-	defer close(stop)
-	checkEtcdServer(address, ch, stop, timer, etcd)
-	select {
-		case <-ch:
-			{t.Fatal("received unexpected channel activity")}
-		default:
-	}
-}
-
-func TestCheckEtcdServerStop(t *testing.T) {
-	// use a timer that really sleeps
-	timer := clock.NewFakeClock(time.Now())
-	etcd := makeEtcdConnection(false)
-
-	address := "https://127.0.0.1:2379"
-	ch := make(chan struct{})
-	stop := make(chan struct{})
-	// close the channel before its even sent
-	close(stop)
-	checkEtcdServer(address, ch, stop, timer, etcd)
-	select {
-	case <-ch:
-		{t.Fatal("received unexpected channel activity")}
-	default:
-	}
-}
-
-func testEtcdConnection(t *testing.T) {
-	etcd := new(etcdConnection)
+func TestEtcdConnection(t *testing.T) {
+	etcd := new(EtcdConnection)
 
 	result := etcd.serverReachable("-not a real network address-")
 	if result {t.Fatal("checkConnection should not have succeeded")}
 }
 
-func TestBadConnectionString(t *testing.T) {
-	timer := clock.NewFakeClock(time.Now())
-	etcd := makeEtcdConnection(false)
-	servers := []string{"-invalid uri$@#%"}
-	err := WaitForAvailableEtcd(servers, timer, etcd)
-	if err == nil { t.Fatal("Expected bad URI to raise parse error") }
+func TestCheckEtcdServersEmpty(t *testing.T) {
+	etcd := new(EtcdConnection)
+	result, err := etcd.CheckEtcdServers()
+	if err != nil { t.Fatalf("unexpected error: %v", err) }
+	if result {t.Fatal("CheckEtcdServers should not have succeeded")}
+}
+
+func TestCheckEtcdServersUri(t *testing.T) {
+	etcd := new(EtcdConnection)
+	etcd.ServerList = []string{"-invalid uri$@#%"}
+	result, err := etcd.CheckEtcdServers()
+	if err == nil { t.Fatalf("expected bad uri to raise parse error") }
+	if result {t.Fatal("CheckEtcdServers should not have succeeded")}
+}
+
+func TestCheckEtcdServers(t *testing.T) {
+	etcd := new(EtcdConnection)
+	etcd.ServerList = []string{""}
+	result, err := etcd.CheckEtcdServers()
+	if err != nil { t.Fatalf("unexpected error: %v", err) }
+	if result {t.Fatal("CheckEtcdServers should not have succeeded")}
+}
+
+func TestPollCheckServer(t *testing.T) {
+	err := utilwait.PollImmediate(1 * time.Microsecond,
+		2 * time.Microsecond,
+		EtcdConnection{ServerList: []string{""}}.CheckEtcdServers)
+	if err == nil { t.Fatal("expected check to time out") }
 }
