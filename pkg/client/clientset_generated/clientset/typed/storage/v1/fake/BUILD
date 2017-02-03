@@ -11,16 +11,20 @@ go_library(
     name = "go_default_library",
     srcs = [
         "doc.go",
-        "register.go",
-        "types.go",
-        "zz_generated.deepcopy.go",
+        "fake_storage_client.go",
+        "fake_storageclass.go",
     ],
     tags = ["automanaged"],
     deps = [
+        "//pkg/apis/storage/v1:go_default_library",
+        "//pkg/client/clientset_generated/clientset/typed/storage/v1:go_default_library",
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
-        "//vendor:k8s.io/apimachinery/pkg/conversion",
-        "//vendor:k8s.io/apimachinery/pkg/runtime",
+        "//vendor:k8s.io/apimachinery/pkg/labels",
         "//vendor:k8s.io/apimachinery/pkg/runtime/schema",
+        "//vendor:k8s.io/apimachinery/pkg/types",
+        "//vendor:k8s.io/apimachinery/pkg/watch",
+        "//vendor:k8s.io/client-go/rest",
+        "//vendor:k8s.io/client-go/testing",
     ],
 )
 
@@ -33,13 +37,6 @@ filegroup(
 
 filegroup(
     name = "all-srcs",
-    srcs = [
-        ":package-srcs",
-        "//pkg/apis/storage/install:all-srcs",
-        "//pkg/apis/storage/util:all-srcs",
-        "//pkg/apis/storage/v1:all-srcs",
-        "//pkg/apis/storage/v1beta1:all-srcs",
-        "//pkg/apis/storage/validation:all-srcs",
-    ],
+    srcs = [":package-srcs"],
     tags = ["automanaged"],
 )

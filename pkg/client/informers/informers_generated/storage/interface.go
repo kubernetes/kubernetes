@@ -21,6 +21,7 @@ package storage
 import (
 	internalinterfaces "k8s.io/kubernetes/pkg/client/informers/informers_generated/internalinterfaces"
 	internalversion "k8s.io/kubernetes/pkg/client/informers/informers_generated/storage/internalversion"
+	v1 "k8s.io/kubernetes/pkg/client/informers/informers_generated/storage/v1"
 	v1beta1 "k8s.io/kubernetes/pkg/client/informers/informers_generated/storage/v1beta1"
 )
 
@@ -28,6 +29,8 @@ import (
 type Interface interface {
 	// InternalVersion provides access to shared informers for resources in InternalVersion.
 	InternalVersion() internalversion.Interface
+	// V1 provides access to shared informers for resources in V1.
+	V1() v1.Interface
 	// V1beta1 provides access to shared informers for resources in V1beta1.
 	V1beta1() v1beta1.Interface
 }
@@ -44,6 +47,11 @@ func New(f internalinterfaces.SharedInformerFactory) Interface {
 // InternalVersion returns a new internalversion.Interface.
 func (g *group) InternalVersion() internalversion.Interface {
 	return internalversion.New(g.SharedInformerFactory)
+}
+
+// V1 returns a new v1.Interface.
+func (g *group) V1() v1.Interface {
+	return v1.New(g.SharedInformerFactory)
 }
 
 // V1beta1 returns a new v1beta1.Interface.
