@@ -324,7 +324,7 @@ func runDensityBatchTest(f *framework.Framework, rc *ResourceCollector, testArg 
 	)
 
 	// create test pod data structure
-	pods := newTestPods(testArg.podsNr, framework.GetPauseImageNameForHostArch(), podType)
+	pods := newTestPods(testArg.podsNr, true, framework.GetPauseImageNameForHostArch(), podType)
 
 	// the controller watches the change of pod status
 	controller := newInformerWatchPod(f, mutex, watchTimes, podType)
@@ -338,9 +338,6 @@ func runDensityBatchTest(f *framework.Framework, rc *ResourceCollector, testArg 
 	time.Sleep(sleepBeforeCreatePods)
 
 	rc.Start()
-	// Explicitly delete pods to prevent namespace controller cleanning up timeout
-	defer deletePodsSync(f, append(pods, getCadvisorPod()))
-	defer rc.Stop()
 
 	By("Creating a batch of pods")
 	// It returns a map['pod name']'creation time' containing the creation timestamps
@@ -387,6 +384,9 @@ func runDensityBatchTest(f *framework.Framework, rc *ResourceCollector, testArg 
 	sort.Sort(framework.LatencySlice(e2eLags))
 	batchLag := lastRunning.Time.Sub(firstCreate.Time)
 
+	rc.Stop()
+	deletePodsSync(f, append(pods, getCadvisorPod()))
+
 	// Log time series data.
 	if isLogTimeSeries {
 		logDensityTimeSeries(rc, createTimes, watchTimes, testInfo)
@@ -403,8 +403,8 @@ func runDensitySeqTest(f *framework.Framework, rc *ResourceCollector, testArg de
 		podType               = "density_test_pod"
 		sleepBeforeCreatePods = 30 * time.Second
 	)
-	bgPods := newTestPods(testArg.bgPodsNr, framework.GetPauseImageNameForHostArch(), "background_pod")
-	testPods := newTestPods(testArg.podsNr, framework.GetPauseImageNameForHostArch(), podType)
+	bgPods := newTestPods(testArg.bgPodsNr, true, framework.GetPauseImageNameForHostArch(), "background_pod")
+	testPods := newTestPods(testArg.podsNr, true, framework.GetPauseImageNameForHostArch(), podType)
 
 	By("Creating a batch of background pods")
 
@@ -414,12 +414,12 @@ func runDensitySeqTest(f *framework.Framework, rc *ResourceCollector, testArg de
 	time.Sleep(sleepBeforeCreatePods)
 
 	rc.Start()
-	// Explicitly delete pods to prevent namespace controller cleanning up timeout
-	defer deletePodsSync(f, append(bgPods, append(testPods, getCadvisorPod())...))
-	defer rc.Stop()
 
 	// Create pods sequentially (back-to-back). e2eLags have been sorted.
 	batchlag, e2eLags := createBatchPodSequential(f, testPods)
+
+	rc.Stop()
+	deletePodsSync(f, append(bgPods, append(testPods, getCadvisorPod())...))
 
 	// Log throughput data.
 	logPodCreateThroughput(batchlag, e2eLags, testArg.podsNr, testInfo)
