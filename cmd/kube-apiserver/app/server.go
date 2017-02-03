@@ -106,14 +106,15 @@ func Run(s *options.ServerRunOptions) error {
 
 	// create config from options
 	genericConfig := genericapiserver.NewConfig().
-		WithSerializer(api.Codecs).
-		ApplyOptions(s.GenericServerRunOptions).
-		ApplyInsecureServingOptions(s.InsecureServing)
+		WithSerializer(api.Codecs)
 
-	if _, err := genericConfig.ApplySecureServingOptions(s.SecureServing); err != nil {
+	s.GenericServerRunOptions.ApplyTo(genericConfig)
+	s.InsecureServing.ApplyTo(genericConfig)
+
+	if err := s.SecureServing.ApplyTo(genericConfig); err != nil {
 		return fmt.Errorf("failed to configure https: %s", err)
 	}
-	if err = s.Authentication.Apply(genericConfig); err != nil {
+	if err := s.Authentication.ApplyTo(genericConfig); err != nil {
 		return fmt.Errorf("failed to configure authentication: %s", err)
 	}
 

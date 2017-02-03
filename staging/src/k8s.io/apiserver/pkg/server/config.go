@@ -19,10 +19,8 @@ package server
 import (
 	"crypto/tls"
 	"crypto/x509"
-	"encoding/pem"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net"
 	"net/http"
 	goruntime "runtime"
@@ -34,7 +32,6 @@ import (
 	"github.com/emicklei/go-restful/swagger"
 	"github.com/go-openapi/spec"
 	"github.com/pborman/uuid"
-	"gopkg.in/natefinch/lumberjack.v2"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	openapicommon "k8s.io/apimachinery/pkg/openapi"
@@ -56,7 +53,6 @@ import (
 	genericfilters "k8s.io/apiserver/pkg/server/filters"
 	"k8s.io/apiserver/pkg/server/healthz"
 	"k8s.io/apiserver/pkg/server/mux"
-	"k8s.io/apiserver/pkg/server/options"
 	"k8s.io/apiserver/pkg/server/routes"
 	restclient "k8s.io/client-go/rest"
 	certutil "k8s.io/client-go/util/cert"
@@ -193,25 +189,23 @@ type SecureServingInfo struct {
 
 // NewConfig returns a Config struct with the default values
 func NewConfig() *Config {
-	config := &Config{
-		ReadWritePort:          6443,
-		RequestContextMapper:   apirequest.NewRequestContextMapper(),
-		BuildHandlerChainsFunc: DefaultBuildHandlerChain,
-		LegacyAPIGroupPrefixes: sets.NewString(DefaultLegacyAPIPrefix),
-		HealthzChecks:          []healthz.HealthzChecker{healthz.PingHealthz},
-		EnableIndex:            true,
+	return &Config{
+		ReadWritePort:               6443,
+		RequestContextMapper:        apirequest.NewRequestContextMapper(),
+		BuildHandlerChainsFunc:      DefaultBuildHandlerChain,
+		LegacyAPIGroupPrefixes:      sets.NewString(DefaultLegacyAPIPrefix),
+		HealthzChecks:               []healthz.HealthzChecker{healthz.PingHealthz},
+		EnableIndex:                 true,
+		EnableGarbageCollection:     true,
+		EnableProfiling:             true,
+		MaxRequestsInFlight:         400,
+		MaxMutatingRequestsInFlight: 200,
+		MinRequestTimeout:           1800,
 
 		// Default to treating watch as a long-running operation
 		// Generic API servers have no inherent long-running subresources
 		LongRunningFunc: genericfilters.BasicLongRunningRequestCheck(sets.NewString("watch"), sets.NewString()),
 	}
-
-	// this keeps the defaults in sync
-	defaultOptions := options.NewServerRunOptions()
-	// unset fields that can be overridden to avoid setting values so that we won't end up with lingering values.
-	// TODO we probably want to run the defaults the other way.  A default here drives it in the CLI flags
-	defaultOptions.AuditLogPath = ""
-	return config.ApplyOptions(defaultOptions)
 }
 
 func (c *Config) WithSerializer(codecs serializer.CodecFactory) *Config {
@@ -257,82 +251,6 @@ func DefaultSwaggerConfig() *swagger.Config {
 	}
 }
 
-func (c *Config) ApplySecureServingOptions(secureServing *options.SecureServingOptions) (*Config, error) {
-	if secureServing == nil || secureServing.ServingOptions.BindPort <= 0 {
-		return c, nil
-	}
-
-	secureServingInfo := &SecureServingInfo{
-		ServingInfo: ServingInfo{
-			BindAddress: net.JoinHostPort(secureServing.ServingOptions.BindAddress.String(), strconv.Itoa(secureServing.ServingOptions.BindPort)),
-		},
-	}
-
-	serverCertFile, serverKeyFile := secureServing.ServerCert.CertKey.CertFile, secureServing.ServerCert.CertKey.KeyFile
-
-	// load main cert
-	if len(serverCertFile) != 0 || len(serverKeyFile) != 0 {
-		tlsCert, err := tls.LoadX509KeyPair(serverCertFile, serverKeyFile)
-		if err != nil {
-			return nil, fmt.Errorf("unable to load server certificate: %v", err)
-		}
-		secureServingInfo.Cert = &tlsCert
-	}
-
-	// optionally load CA cert
-	if len(secureServing.ServerCert.CACertFile) != 0 {
-		pemData, err := ioutil.ReadFile(secureServing.ServerCert.CACertFile)
-		if err != nil {
-			return nil, fmt.Errorf("failed to read certificate authority from %q: %v", secureServing.ServerCert.CACertFile, err)
-		}
-		block, pemData := pem.Decode(pemData)
-		if block == nil {
-			return nil, fmt.Errorf("no certificate found in certificate authority file %q", secureServing.ServerCert.CACertFile)
-		}
-		if block.Type != "CERTIFICATE" {
-			return nil, fmt.Errorf("expected CERTIFICATE block in certiticate authority file %q, found: %s", secureServing.ServerCert.CACertFile, block.Type)
-		}
-		secureServingInfo.CACert = &tls.Certificate{
-			Certificate: [][]byte{block.Bytes},
-		}
-	}
-
-	// load SNI certs
-	namedTlsCerts := make([]namedTlsCert, 0, len(secureServing.SNICertKeys))
-	for _, nck := range secureServing.SNICertKeys {
-		tlsCert, err := tls.LoadX509KeyPair(nck.CertFile, nck.KeyFile)
-		namedTlsCerts = append(namedTlsCerts, namedTlsCert{
-			tlsCert: tlsCert,
-			names:   nck.Names,
-		})
-		if err != nil {
-			return nil, fmt.Errorf("failed to load SNI cert and key: %v", err)
-		}
-	}
-	var err error
-	secureServingInfo.SNICerts, err = getNamedCertificateMap(namedTlsCerts)
-	if err != nil {
-		return nil, err
-	}
-
-	c.SecureServingInfo = secureServingInfo
-	c.ReadWritePort = secureServing.ServingOptions.BindPort
-
-	return c, nil
-}
-
-func (c *Config) ApplyInsecureServingOptions(insecureServing *options.ServingOptions) *Config {
-	if insecureServing == nil || insecureServing.BindPort <= 0 {
-		return c
-	}
-
-	c.InsecureServingInfo = &ServingInfo{
-		BindAddress: net.JoinHostPort(insecureServing.BindAddress.String(), strconv.Itoa(insecureServing.BindPort)),
-	}
-
-	return c
-}
-
 func (c *Config) ApplyClientCert(clientCAFile string) (*Config, error) {
 	if c.SecureServingInfo != nil {
 		if len(clientCAFile) > 0 {
@@ -350,83 +268,6 @@ func (c *Config) ApplyClientCert(clientCAFile string) (*Config, error) {
 	}
 
 	return c, nil
-}
-
-func (c *Config) ApplyDelegatingAuthenticationOptions(o *options.DelegatingAuthenticationOptions) (*Config, error) {
-	if o == nil {
-		return c, nil
-	}
-
-	var err error
-	c, err = c.ApplyClientCert(o.ClientCert.ClientCA)
-	if err != nil {
-		return nil, fmt.Errorf("unable to load client CA file: %v", err)
-	}
-	c, err = c.ApplyClientCert(o.RequestHeader.ClientCAFile)
-	if err != nil {
-		return nil, fmt.Errorf("unable to load client CA file: %v", err)
-	}
-
-	cfg, err := o.ToAuthenticationConfig()
-	if err != nil {
-		return nil, err
-	}
-	authenticator, securityDefinitions, err := cfg.New()
-	if err != nil {
-		return nil, err
-	}
-
-	c.Authenticator = authenticator
-	if c.OpenAPIConfig != nil {
-		c.OpenAPIConfig.SecurityDefinitions = securityDefinitions
-	}
-	c.SupportsBasicAuth = false
-
-	return c, nil
-}
-
-func (c *Config) ApplyDelegatingAuthorizationOptions(o *options.DelegatingAuthorizationOptions) (*Config, error) {
-	if o == nil {
-		return c, nil
-	}
-
-	cfg, err := o.ToAuthorizationConfig()
-	if err != nil {
-		return nil, err
-	}
-	authorizer, err := cfg.New()
-	if err != nil {
-		return nil, err
-	}
-
-	c.Authorizer = authorizer
-
-	return c, nil
-}
-
-// ApplyOptions applies the run options to the method receiver and returns self
-func (c *Config) ApplyOptions(options *options.ServerRunOptions) *Config {
-	if len(options.AuditLogPath) != 0 {
-		c.AuditWriter = &lumberjack.Logger{
-			Filename:   options.AuditLogPath,
-			MaxAge:     options.AuditLogMaxAge,
-			MaxBackups: options.AuditLogMaxBackups,
-			MaxSize:    options.AuditLogMaxSize,
-		}
-	}
-
-	c.CorsAllowedOriginList = options.CorsAllowedOriginList
-	c.EnableGarbageCollection = options.EnableGarbageCollection
-	c.EnableProfiling = options.EnableProfiling
-	c.EnableContentionProfiling = options.EnableContentionProfiling
-	c.EnableSwaggerUI = options.EnableSwaggerUI
-	c.ExternalAddress = options.ExternalHost
-	c.MaxRequestsInFlight = options.MaxRequestsInFlight
-	c.MaxMutatingRequestsInFlight = options.MaxMutatingRequestsInFlight
-	c.MinRequestTimeout = options.MinRequestTimeout
-	c.PublicAddress = options.AdvertiseAddress
-
-	return c
 }
 
 type completedConfig struct {

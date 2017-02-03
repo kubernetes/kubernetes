@@ -173,25 +173,25 @@ func runServer(server *http.Server, network string, stopCh <-chan struct{}) (int
 	return tcpAddr.Port, nil
 }
 
-type namedTlsCert struct {
-	tlsCert tls.Certificate
+type NamedTLSCert struct {
+	TLSCert tls.Certificate
 
 	// names is a list of domain patterns: fully qualified domain names, possibly prefixed with
 	// wildcard segments.
-	names []string
+	Names []string
 }
 
 // getNamedCertificateMap returns a map of *tls.Certificate by name. It's is
 // suitable for use in tls.Config#NamedCertificates. Returns an error if any of the certs
 // cannot be loaded. Returns nil if len(certs) == 0
-func getNamedCertificateMap(certs []namedTlsCert) (map[string]*tls.Certificate, error) {
+func GetNamedCertificateMap(certs []NamedTLSCert) (map[string]*tls.Certificate, error) {
 	// register certs with implicit names first, reverse order such that earlier trump over the later
 	byName := map[string]*tls.Certificate{}
 	for i := len(certs) - 1; i >= 0; i-- {
-		if len(certs[i].names) > 0 {
+		if len(certs[i].Names) > 0 {
 			continue
 		}
-		cert := &certs[i].tlsCert
+		cert := &certs[i].TLSCert
 
 		// read names from certificate common names and DNS names
 		if len(cert.Certificate) == 0 {
@@ -216,8 +216,8 @@ func getNamedCertificateMap(certs []namedTlsCert) (map[string]*tls.Certificate, 
 	// again in reverse order.
 	for i := len(certs) - 1; i >= 0; i-- {
 		namedCert := &certs[i]
-		for _, name := range namedCert.names {
-			byName[name] = &certs[i].tlsCert
+		for _, name := range namedCert.Names {
+			byName[name] = &certs[i].TLSCert
 		}
 	}
 

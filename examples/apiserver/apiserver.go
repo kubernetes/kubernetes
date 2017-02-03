@@ -104,14 +104,18 @@ func (serverOptions *ServerRunOptions) Run(stopCh <-chan struct{}) error {
 
 	// create config from options
 	config := genericapiserver.NewConfig().
-		WithSerializer(api.Codecs).
-		ApplyOptions(serverOptions.GenericServerRunOptions).
-		ApplyInsecureServingOptions(serverOptions.InsecureServing)
+		WithSerializer(api.Codecs)
 
-	if _, err := config.ApplySecureServingOptions(serverOptions.SecureServing); err != nil {
+	if err := serverOptions.GenericServerRunOptions.ApplyTo(config); err != nil {
+		return err
+	}
+	if err := serverOptions.InsecureServing.ApplyTo(config); err != nil {
+		return err
+	}
+	if err := serverOptions.SecureServing.ApplyTo(config); err != nil {
 		return fmt.Errorf("failed to configure https: %s", err)
 	}
-	if err := serverOptions.Authentication.Apply(config); err != nil {
+	if err := serverOptions.Authentication.ApplyTo(config); err != nil {
 		return fmt.Errorf("failed to configure authentication: %s", err)
 	}
 
