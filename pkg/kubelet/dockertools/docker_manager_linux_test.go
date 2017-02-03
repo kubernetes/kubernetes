@@ -89,8 +89,7 @@ func TestGetSecurityOpts(t *testing.T) {
 	for i, test := range tests {
 		securityOpts, err := dm.getSecurityOpts(test.pod, containerName)
 		assert.NoError(t, err, "TestCase[%d]: %s", i, test.msg)
-		opts, err := dm.fmtDockerOpts(securityOpts)
-		assert.NoError(t, err, "TestCase[%d]: %s", i, test.msg)
+		opts := FmtDockerOpts(securityOpts, '=')
 		assert.Len(t, opts, len(test.expectedOpts), "TestCase[%d]: %s", i, test.msg)
 		for _, opt := range test.expectedOpts {
 			assert.Contains(t, opts, opt, "TestCase[%d]: %s", i, test.msg)
