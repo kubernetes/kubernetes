@@ -300,9 +300,20 @@ func (f *fakeIPTables) restore(restoreTableName utiliptables.Table, data []byte,
 				if err != nil {
 					return err
 				}
-			} else if strings.HasPrefix(line, "-X") {
+			} else if strings.HasPrefix(line, "-I") {
 				parts := strings.Split(line, " ")
 				if len(parts) < 3 {
+					return fmt.Errorf("Invalid iptables rule '%s'", line)
+				}
+				chainName := utiliptables.Chain(parts[1])
+				rule := strings.TrimPrefix(line, fmt.Sprintf("-I %s ", chainName))
+				_, err := f.ensureRule(utiliptables.Prepend, tableName, chainName, rule)
+				if err != nil {
+					return err
+				}
+			} else if strings.HasPrefix(line, "-X") {
+				parts := strings.Split(line, " ")
+				if len(parts) < 2 {
 					return fmt.Errorf("Invalid iptables rule '%s'", line)
 				}
 				if err := f.DeleteChain(tableName, utiliptables.Chain(parts[1])); err != nil {
