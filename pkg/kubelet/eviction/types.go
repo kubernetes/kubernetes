@@ -23,6 +23,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/api/v1"
 	statsapi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/stats"
+	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm/predicates"
 )
 
 // Signal defines a signal that can trigger eviction of pods on a node.
@@ -107,6 +108,11 @@ type Manager interface {
 
 	// IsUnderDiskPressure returns true if the node is under disk pressure.
 	IsUnderDiskPressure() bool
+
+	// PreemptyPods takes a list of insufficient resources, and attempts to free them by evicting pods
+	// based on requests.  For example, if the insufficient resource is 200Mb of memory, this function could
+	// evict a pod with request=250Mb.
+	PreemptPods(insufficientResources []predicates.InsufficientResourceError) error
 }
 
 // DiskInfoProvider is responsible for informing the manager how disk is configured.

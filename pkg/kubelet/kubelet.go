@@ -101,6 +101,7 @@ import (
 	"k8s.io/kubernetes/pkg/util/oom"
 	"k8s.io/kubernetes/pkg/util/procfs"
 	"k8s.io/kubernetes/pkg/volume"
+	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm/predicates"
 )
 
@@ -780,7 +781,7 @@ func NewMainKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *Kub
 	klet.AddPodSyncLoopHandler(activeDeadlineHandler)
 	klet.AddPodSyncHandler(activeDeadlineHandler)
 
-	klet.admitHandlers.AddPodAdmitHandler(lifecycle.NewPredicateAdmitHandler(klet.getNodeAnyWay))
+	klet.admitHandlers.AddPodAdmitHandler(lifecycle.NewPredicateAdmitHandler(klet.getNodeAnyWay, klet))
 	// apply functional Option's
 	for _, opt := range kubeDeps.Options {
 		opt(klet)
@@ -1669,6 +1670,32 @@ func (kl *Kubelet) canAdmitPod(pods []*v1.Pod, pod *v1.Pod) (bool, string, strin
 	}
 
 	return true, "", ""
+}
+
+// HandleAdmissionFailure allows the kubelet to gracefully handle admission rejection, and, in some cases,
+// to allow admission of the pod despite its previous failure.
+func (kl *Kubelet) HandleAdmissionFailure(pod *v1.Pod, failureReasons []algorithm.PredicateFailureReason) (bool, []algorithm.PredicateFailureReason, error) {
+	if kubetypes.IsCriticalPod(pod) {
+		// InsufficientResourceError is not a reason to reject a critical pod.
+		// Instead of rejecting, we free up resources to admit it, if no other reasons for rejection exist.
+		nonResourceReasons := []algorithm.PredicateFailureReason{}
+		resourceReasons := []predicates.InsufficientResourceError{}
+		for _, reason := range failureReasons {
+
+			if r, ok := reason.(*predicates.InsufficientResourceError); ok {
+				resourceReasons = append(resourceReasons, *r)
+			} else {
+				nonResourceReasons = append(nonResourceReasons, reason)
+			}
+		}
+		if len(nonResourceReasons) == 0 {
+			err := kl.evictionManager.PreemptPods(resourceReasons)
+			// if no error is returned, preemption succeeded and the pod is safe to admit.
+			return err == nil, []algorithm.PredicateFailureReason{}, err
+		}
+		return false, nonResourceReasons, nil
+	}
+	return false, failureReasons, nil
 }
 
 func (kl *Kubelet) canRunPod(pod *v1.Pod) lifecycle.PodAdmitResult {
