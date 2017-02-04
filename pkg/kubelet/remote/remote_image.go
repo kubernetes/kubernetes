@@ -35,16 +35,16 @@ type RemoteImageService struct {
 }
 
 // NewRemoteImageService creates a new internalapi.ImageManagerService.
-func NewRemoteImageService(addr string, connectionTimout time.Duration) (internalapi.ImageManagerService, error) {
+func NewRemoteImageService(addr string, connectionTimeout time.Duration) (internalapi.ImageManagerService, error) {
 	glog.V(3).Infof("Connecting to image service %s", addr)
-	conn, err := grpc.Dial(addr, grpc.WithInsecure(), grpc.WithTimeout(connectionTimout), grpc.WithDialer(dial))
+	conn, err := grpc.Dial(addr, grpc.WithInsecure(), grpc.WithTimeout(connectionTimeout), grpc.WithDialer(dial))
 	if err != nil {
 		glog.Errorf("Connect remote image service %s failed: %v", addr, err)
 		return nil, err
 	}
 
 	return &RemoteImageService{
-		timeout:     connectionTimout,
+		timeout:     connectionTimeout,
 		imageClient: runtimeapi.NewImageServiceClient(conn),
 	}, nil
 }
