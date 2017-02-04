@@ -14216,3 +14216,10 @@ go_library(
         "//vendor:k8s.io/apimachinery/pkg/util/strategicpatch",
     ],
 )
+
+go_library(
+    name = "github.com/reconquest/loreley",
+    srcs = ["github.com/reconquest/loreley/loreley.go"],
+    tags = ["automanaged"],
+    deps = ["//vendor:golang.org/x/crypto/ssh/terminal"],
+)

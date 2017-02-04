@@ -90,6 +90,7 @@ go_library(
         "//vendor:github.com/emicklei/go-restful/swagger",
         "//vendor:github.com/ghodss/yaml",
         "//vendor:github.com/golang/glog",
+        "//vendor:github.com/reconquest/loreley",
         "//vendor:github.com/spf13/cobra",
         "//vendor:github.com/spf13/pflag",
         "//vendor:k8s.io/apimachinery/pkg/api/errors",
