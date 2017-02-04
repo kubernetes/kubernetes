@@ -588,38 +588,55 @@ func (proxier *Proxier) OnEndpointsUpdate(allEndpoints []api.Endpoints) {
 	defer proxier.mu.Unlock()
 	proxier.haveReceivedEndpointsUpdate = true
 
-	staleConnections := make(map[endpointServicePair]bool)
-	svcPortToInfoMap := make(map[proxy.ServicePortName][]hostPortInfo)
-	newEndpointsMap := make(map[proxy.ServicePortName][]*endpointsInfo)
-
-	// Update endpoints for services.
-	for i := range allEndpoints {
-		accumulateEndpointsMap(&allEndpoints[i], proxier.hostname, proxier.endpointsMap, &newEndpointsMap,
-			&svcPortToInfoMap, &staleConnections)
-	}
-	for k, v := range newEndpointsMap {
-		proxier.endpointsMap[k] = v
-	}
-
-	// Remove endpoints missing from the update.
-	for svcPort := range proxier.endpointsMap {
-		if _, found := newEndpointsMap[svcPort]; !found {
-			// record endpoints of unactive service to stale connections
-			for _, ep := range proxier.endpointsMap[svcPort] {
-				staleConnections[endpointServicePair{endpoint: ep.endpoint, servicePortName: svcPort}] = true
-			}
-
-			glog.V(2).Infof("Removing endpoints for %q", svcPort)
-			delete(proxier.endpointsMap, svcPort)
-		}
-
-		proxier.updateHealthCheckEntries(svcPort.NamespacedName, svcPortToInfoMap[svcPort])
-	}
+	newMap, staleConnections := updateEndpoints(allEndpoints, proxier.endpointsMap, proxier.hostname, updateHealthCheckEntries)
+	proxier.endpointsMap = newMap
 	proxier.syncProxyRules()
 	proxier.deleteEndpointConnections(staleConnections)
 }
 
+// Convert a slice of api.Endpoints objects into a map of service-port -> endpoints.
+// TODO: the hcUpdater should be a method on an interface, but it is a global pkg for now
+func updateEndpoints(allEndpoints []api.Endpoints, curMap map[proxy.ServicePortName][]*endpointsInfo, hostname string,
+	hcUpdater func(types.NamespacedName, []hostPortInfo)) (newMap map[proxy.ServicePortName][]*endpointsInfo, stale map[endpointServicePair]bool) {
+
+	// return values
+	newMap = make(map[proxy.ServicePortName][]*endpointsInfo)
+	stale = make(map[endpointServicePair]bool)
+
+	// local
+	svcPortToInfoMap := make(map[proxy.ServicePortName][]hostPortInfo)
+
+	// Update endpoints for services.
+	for i := range allEndpoints {
+		accumulateEndpointsMap(&allEndpoints[i], hostname, curMap, &newMap, &svcPortToInfoMap, &stale)
+	}
+
+	// Remove endpoints missing from the update.
+	// TODO: we should really only mark a connection stale if the proto was UDP
+	// and the (ip, port, proto) was removed from the endpoints.
+	for svcPort := range curMap {
+		if _, found := newMap[svcPort]; !found {
+			// record endpoints of unactive service to stale connections
+			for _, ep := range curMap[svcPort] {
+				stale[endpointServicePair{endpoint: ep.endpoint, servicePortName: svcPort}] = true
+			}
+		}
+
+		hcUpdater(svcPort.NamespacedName, svcPortToInfoMap[svcPort])
+	}
+
+	return newMap, stale
+}
+
 // Gather information about all the endpoint state for a given api.Endpoints.
+// This can not report complete info on stale connections because it has limited
+// scope - it only knows one Endpoints, but sees the whole current map. That
+// cleanup has to be done above.
+//
+// TODO: this could be simplified:
+// - hostPortInfo and endpointsInfo overlap too much
+// - the test for this is overlapped by the test for updateEndpoints
+// - naming is poor and responsibilities are muddled
 func accumulateEndpointsMap(endpoints *api.Endpoints, hostname string,
 	curEndpoints map[proxy.ServicePortName][]*endpointsInfo,
 	newEndpoints *map[proxy.ServicePortName][]*endpointsInfo,
@@ -662,24 +679,10 @@ func accumulateEndpointsMap(endpoints *api.Endpoints, hostname string,
 		// Once the set operations using the list of ips are complete, build the list of endpoint infos
 		(*newEndpoints)[svcPort] = buildEndpointInfoList(hostPortInfos, newEPList)
 	}
-	// If a port was renamed it would be absent from endpoints, and thus not
-	// processed in the above loop.
-	//
-	// TODO: we should really only mark a connection stale if the proto was UDP
-	// and the (ip, port, proto) was removed from the endpoints.
-	for svcPort := range curEndpoints {
-		if _, found := (*newEndpoints)[svcPort]; !found {
-			curEndpointIPs := flattenEndpointsInfo(curEndpoints[svcPort])
-			removedEndpoints := getRemovedEndpoints(curEndpointIPs, []string{})
-			for _, ep := range removedEndpoints {
-				(*staleConnections)[endpointServicePair{endpoint: ep, servicePortName: svcPort}] = true
-			}
-		}
-	}
 }
 
 // updateHealthCheckEntries - send the new set of local endpoints to the health checker
-func (proxier *Proxier) updateHealthCheckEntries(name types.NamespacedName, hostPorts []hostPortInfo) {
+func updateHealthCheckEntries(name types.NamespacedName, hostPorts []hostPortInfo) {
 	if !utilfeature.DefaultFeatureGate.Enabled(features.ExternalTrafficLocalOnly) {
 		return
 	}
