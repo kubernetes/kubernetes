@@ -29,14 +29,6 @@ import (
 	"k8s.io/kubernetes/pkg/apis/extensions"
 )
 
-const (
-	// Annotation key used to identify mirror pods.
-	mirrorAnnotationKey = "kubernetes.io/config.mirror"
-
-	// Value used to identify mirror pods from pre-v1.1 kubelet.
-	mirrorAnnotationValue_1_0 = "mirror"
-)
-
 // This is a "fast-path" that avoids reflection for common types. It focuses on the objects that are
 // converted the most in the cluster.
 // TODO: generate one of these for every external API group - this is to prove the impact
@@ -587,17 +579,6 @@ func Convert_api_Pod_To_v1_Pod(in *api.Pod, out *Pod, s conversion.Scope) error 
 		out.Annotations[PodInitContainerStatusesBetaAnnotationKey] = string(value)
 	}
 
-	// We need to reset certain fields for mirror pods from pre-v1.1 kubelet
-	// (#15960).
-	// TODO: Remove this code after we drop support for v1.0 kubelets.
-	if value, ok := in.Annotations[mirrorAnnotationKey]; ok && value == mirrorAnnotationValue_1_0 {
-		// Reset the TerminationGracePeriodSeconds.
-		out.Spec.TerminationGracePeriodSeconds = nil
-		// Reset the resource requests.
-		for i := range out.Spec.Containers {
-			out.Spec.Containers[i].Resources.Requests = nil
-		}
-	}
 	return nil
 }
 
