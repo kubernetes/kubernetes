@@ -399,6 +399,7 @@ func (f *ring1Factory) PrinterForMapping(cmd *cobra.Command, mapping *meta.RESTM
 			ShowLabels:         GetFlagBool(cmd, "show-labels"),
 			AbsoluteTimestamps: isWatch(cmd),
 			ColumnLabels:       columnLabel,
+			Color:              GetFlagBool(cmd, "color"),
 		})
 		if err != nil {
 			return nil, err
