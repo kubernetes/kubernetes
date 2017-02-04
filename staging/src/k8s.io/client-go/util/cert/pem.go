@@ -58,21 +58,34 @@ func EncodeCertPEM(cert *x509.Certificate) []byte {
 // ParsePrivateKeyPEM returns a private key parsed from a PEM block in the supplied data.
 // Recognizes PEM blocks for "EC PRIVATE KEY" and "RSA PRIVATE KEY"
 func ParsePrivateKeyPEM(keyData []byte) (interface{}, error) {
+	var privateKeyPemBlock *pem.Block
 	for {
-		var privateKeyPemBlock *pem.Block
 		privateKeyPemBlock, keyData = pem.Decode(keyData)
 		if privateKeyPemBlock == nil {
-			// we read all the PEM blocks and didn't recognize one
-			return nil, fmt.Errorf("no private key PEM block found")
+			break
 		}
 
 		switch privateKeyPemBlock.Type {
 		case "EC PRIVATE KEY":
-			return x509.ParseECPrivateKey(privateKeyPemBlock.Bytes)
+			if key, err := x509.ParseECPrivateKey(privateKeyPemBlock.Bytes); err == nil {
+				return key, nil
+			}
 		case "RSA PRIVATE KEY":
-			return x509.ParsePKCS1PrivateKey(privateKeyPemBlock.Bytes)
+			if key, err := x509.ParsePKCS1PrivateKey(privateKeyPemBlock.Bytes); err == nil {
+				return key, nil
+			}
+		case "PRIVATE KEY":
+			if key, err := x509.ParsePKCS8PrivateKey(privateKeyPemBlock.Bytes); err == nil {
+				return key, nil
+			}
 		}
+
+		// tolerate non-key PEM blocks for compatibility with things like "EC PARAMETERS" blocks
+		// originally, only the first PEM block was parsed and expected to be a key block
 	}
+
+	// we read all the PEM blocks and didn't recognize one
+	return nil, fmt.Errorf("no private key PEM block found")
 }
 
 // ParseCertsPEM returns the x509.Certificates contained in the given PEM-encoded byte array
