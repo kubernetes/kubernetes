@@ -26,6 +26,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/service"
 	"k8s.io/kubernetes/pkg/proxy"
@@ -491,6 +492,10 @@ func (f *fakePortOpener) OpenLocalPort(lp *localPort) (closeable, error) {
 	return nil, nil
 }
 
+type fakeHealthChecker struct{}
+
+func (fakeHealthChecker) UpdateEndpoints(serviceName types.NamespacedName, endpointUIDs sets.String) {}
+
 func NewFakeProxier(ipt utiliptables.Interface) *Proxier {
 	// TODO: Call NewProxier after refactoring out the goroutine
 	// invocation into a Run() method.
@@ -505,6 +510,7 @@ func NewFakeProxier(ipt utiliptables.Interface) *Proxier {
 		hostname:                    "test-hostname",
 		portsMap:                    make(map[localPort]closeable),
 		portMapper:                  &fakePortOpener{[]*localPort{}},
+		healthChecker:               fakeHealthChecker{},
 	}
 }
 
@@ -2045,7 +2051,7 @@ func Test_updateEndpoints(t *testing.T) {
 	}}
 
 	for tci, tc := range testCases {
-		newMap, stale := updateEndpoints(tc.allEndpoints, tc.curMap, "host", func(types.NamespacedName, []hostPortInfo) {})
+		newMap, stale := updateEndpoints(tc.allEndpoints, tc.curMap, "host", fakeHealthChecker{})
 		if len(newMap) != len(tc.expectedResult) {
 			t.Errorf("[%d] expected %d results, got %d: %v", tci, len(tc.expectedResult), len(newMap), newMap)
 		}

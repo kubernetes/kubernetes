@@ -211,6 +211,7 @@ type Proxier struct {
 	nodeIP         net.IP
 	portMapper     portOpener
 	recorder       record.EventRecorder
+	healthChecker  healthChecker
 }
 
 type localPort struct {
@@ -240,6 +241,17 @@ type listenPortOpener struct{}
 // OpenLocalPort holds the given local port open.
 func (l *listenPortOpener) OpenLocalPort(lp *localPort) (closeable, error) {
 	return openLocalPort(lp)
+}
+
+type healthChecker interface {
+	UpdateEndpoints(serviceName types.NamespacedName, endpointUIDs sets.String)
+}
+
+// TODO: the healthcheck pkg should offer a type
+type globalHealthChecker struct{}
+
+func (globalHealthChecker) UpdateEndpoints(serviceName types.NamespacedName, endpointUIDs sets.String) {
+	healthcheck.UpdateEndpoints(serviceName, endpointUIDs)
 }
 
 // Proxier implements ProxyProvider
@@ -295,6 +307,7 @@ func NewProxier(ipt utiliptables.Interface,
 		glog.Warningf("clusterCIDR not specified, unable to distinguish between internal and external traffic")
 	}
 
+	healthChecker := globalHealthChecker{}
 	go healthcheck.Run()
 
 	var throttle flowcontrol.RateLimiter
@@ -321,6 +334,7 @@ func NewProxier(ipt utiliptables.Interface,
 		nodeIP:         nodeIP,
 		portMapper:     &listenPortOpener{},
 		recorder:       recorder,
+		healthChecker:  healthChecker,
 	}, nil
 }
 
@@ -588,16 +602,15 @@ func (proxier *Proxier) OnEndpointsUpdate(allEndpoints []api.Endpoints) {
 	defer proxier.mu.Unlock()
 	proxier.haveReceivedEndpointsUpdate = true
 
-	newMap, staleConnections := updateEndpoints(allEndpoints, proxier.endpointsMap, proxier.hostname, updateHealthCheckEntries)
+	newMap, staleConnections := updateEndpoints(allEndpoints, proxier.endpointsMap, proxier.hostname, proxier.healthChecker)
 	proxier.endpointsMap = newMap
 	proxier.syncProxyRules()
 	proxier.deleteEndpointConnections(staleConnections)
 }
 
 // Convert a slice of api.Endpoints objects into a map of service-port -> endpoints.
-// TODO: the hcUpdater should be a method on an interface, but it is a global pkg for now
 func updateEndpoints(allEndpoints []api.Endpoints, curMap map[proxy.ServicePortName][]*endpointsInfo, hostname string,
-	hcUpdater func(types.NamespacedName, []hostPortInfo)) (newMap map[proxy.ServicePortName][]*endpointsInfo, stale map[endpointServicePair]bool) {
+	healthChecker healthChecker) (newMap map[proxy.ServicePortName][]*endpointsInfo, stale map[endpointServicePair]bool) {
 
 	// return values
 	newMap = make(map[proxy.ServicePortName][]*endpointsInfo)
@@ -622,7 +635,7 @@ func updateEndpoints(allEndpoints []api.Endpoints, curMap map[proxy.ServicePortN
 			}
 		}
 
-		hcUpdater(svcPort.NamespacedName, svcPortToInfoMap[svcPort])
+		updateHealthCheckEntries(svcPort.NamespacedName, svcPortToInfoMap[svcPort], healthChecker)
 	}
 
 	return newMap, stale
@@ -682,7 +695,7 @@ func accumulateEndpointsMap(endpoints *api.Endpoints, hostname string,
 }
 
 // updateHealthCheckEntries - send the new set of local endpoints to the health checker
-func updateHealthCheckEntries(name types.NamespacedName, hostPorts []hostPortInfo) {
+func updateHealthCheckEntries(name types.NamespacedName, hostPorts []hostPortInfo, healthChecker healthChecker) {
 	if !utilfeature.DefaultFeatureGate.Enabled(features.ExternalTrafficLocalOnly) {
 		return
 	}
@@ -695,7 +708,7 @@ func updateHealthCheckEntries(name types.NamespacedName, hostPorts []hostPortInf
 			endpoints.Insert(fmt.Sprintf("%s/%s", name.Namespace, name.Name))
 		}
 	}
-	healthcheck.UpdateEndpoints(name, endpoints)
+	healthChecker.UpdateEndpoints(name, endpoints)
 }
 
 // used in OnEndpointsUpdate
