@@ -142,7 +142,7 @@ func GetHollowKubeletConfig(
 	c.EnableCustomMetrics = false
 	c.EnableDebuggingHandlers = true
 	c.EnableServer = true
-	c.ExperimentalCgroupsPerQOS = false
+	c.CgroupsPerQOS = false
 	// hairpin-veth is used to allow hairpin packets. Note that this deviates from
 	// what the "real" kubelet currently does, because there's no way to
 	// set promiscuous mode on docker0.
