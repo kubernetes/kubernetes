@@ -115,6 +115,103 @@ func TestGeneratePodReadyCondition(t *testing.T) {
 	}
 }
 
+func TestGeneratePodInitializedCondition(t *testing.T) {
+	tests := []struct {
+		spec              *v1.PodSpec
+		containerStatuses []v1.ContainerStatus
+		podPhase          v1.PodPhase
+		expected          v1.PodCondition
+	}{
+		{
+			spec: &v1.PodSpec{
+				InitContainers: []v1.Container{
+					{Name: "1234"},
+					{Name: "5678"},
+				},
+			},
+			containerStatuses: nil,
+			podPhase:          v1.PodRunning,
+			expected:          getInitializedCondition(false, "UnknownContainerStatuses", ""),
+		},
+		{
+			spec:              &v1.PodSpec{},
+			containerStatuses: []v1.ContainerStatus{},
+			podPhase:          v1.PodRunning,
+			expected:          getInitializedCondition(true, "", ""),
+		},
+		{
+			spec: &v1.PodSpec{
+				InitContainers: []v1.Container{
+					{Name: "1234"},
+				},
+			},
+			containerStatuses: []v1.ContainerStatus{},
+			podPhase:          v1.PodRunning,
+			expected:          getInitializedCondition(false, "ContainersNotInitialized", "containers with unknown status: [1234]"),
+		},
+		{
+			spec: &v1.PodSpec{
+				InitContainers: []v1.Container{
+					{Name: "1234"},
+					{Name: "5678"},
+				},
+			},
+			containerStatuses: []v1.ContainerStatus{
+				getReadyStatus("1234"),
+				getReadyStatus("5678"),
+			},
+			podPhase: v1.PodRunning,
+			expected: getInitializedCondition(true, "", ""),
+		},
+		{
+			spec: &v1.PodSpec{
+				InitContainers: []v1.Container{
+					{Name: "1234"},
+					{Name: "5678"},
+				},
+			},
+			containerStatuses: []v1.ContainerStatus{
+				getReadyStatus("1234"),
+			},
+			podPhase: v1.PodRunning,
+			expected: getInitializedCondition(false, "ContainersNotInitialized", "containers with unknown status: [5678]"),
+		},
+		{
+			spec: &v1.PodSpec{
+				InitContainers: []v1.Container{
+					{Name: "1234"},
+					{Name: "5678"},
+				},
+			},
+			containerStatuses: []v1.ContainerStatus{
+				getReadyStatus("1234"),
+				getNotReadyStatus("5678"),
+			},
+			podPhase: v1.PodRunning,
+			expected: getInitializedCondition(false, "ContainersNotInitialized", "containers with incomplete status: [5678]"),
+		},
+		{
+			spec: &v1.PodSpec{
+				InitContainers: []v1.Container{
+					{Name: "1234"},
+				},
+			},
+			containerStatuses: []v1.ContainerStatus{
+				getReadyStatus("1234"),
+			},
+			podPhase: v1.PodSucceeded,
+			expected: getInitializedCondition(true, "PodCompleted", ""),
+		},
+	}
+
+	for i, test := range tests {
+		condition := GeneratePodInitializedCondition(test.spec, test.containerStatuses, test.podPhase)
+		if !reflect.DeepEqual(condition, test.expected) {
+			t.Errorf("On test case %v, expected:\n%+v\ngot\n%+v\n", i, test.expected, condition)
+		}
+	}
+}
+
 func getReadyCondition(ready bool, reason, message string) v1.PodCondition {
 	status := v1.ConditionFalse
 	if ready {
@@ -122,6 +219,19 @@ func getReadyCondition(ready bool, reason, message string) v1.PodCondition {
 	}
 	return v1.PodCondition{
 		Type:    v1.PodReady,
+		Status:  status,
+		Reason:  reason,
+		Message: message,
+	}
+}
+
+func getInitializedCondition(initialized bool, reason, message string) v1.PodCondition {
+	status := v1.ConditionFalse
+	if initialized {
+		status = v1.ConditionTrue
+	}
+	return v1.PodCondition{
+		Type:    v1.PodInitialized,
 		Status:  status,
 		Reason:  reason,
 		Message: message,
