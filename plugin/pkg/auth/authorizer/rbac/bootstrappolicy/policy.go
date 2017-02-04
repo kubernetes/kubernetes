@@ -217,6 +217,9 @@ func ClusterRoles() []rbac.ClusterRole {
 				// TODO: change glusterfs to use DNS lookup so this isn't needed?
 				// Needed for glusterfs volumes
 				rbac.NewRule("get").Groups(legacyGroup).Resources("endpoints").RuleOrDie(),
+				// Used to create a certificatesigningrequest for a node-specific client certificate, and watch
+				// for it to be signed. This allows the kubelet to rotate it's own certificate.
+				rbac.NewRule("create", "get", "list", "watch").Groups(certificatesGroup).Resources("certificatesigningrequests").RuleOrDie(),
 			},
 		},
 		{
