@@ -17,6 +17,7 @@ go_library(
         "docker_checkpoint.go",
         "docker_container.go",
         "docker_image.go",
+        "docker_legacy.go",
         "docker_sandbox.go",
         "docker_service.go",
         "docker_streaming.go",
@@ -53,6 +54,8 @@ go_library(
         "//vendor:github.com/docker/go-connections/nat",
         "//vendor:github.com/golang/glog",
         "//vendor:k8s.io/apimachinery/pkg/util/errors",
+        "//vendor:k8s.io/apimachinery/pkg/util/sets",
+        "//vendor:k8s.io/apimachinery/pkg/util/wait",
     ],
 )
 
@@ -64,6 +67,7 @@ go_test(
         "docker_checkpoint_test.go",
         "docker_container_test.go",
         "docker_image_test.go",
+        "docker_legacy_test.go",
         "docker_sandbox_test.go",
         "docker_service_test.go",
         "helpers_test.go",
