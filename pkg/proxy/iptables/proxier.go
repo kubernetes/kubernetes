@@ -191,13 +191,13 @@ type proxyServiceMap map[proxy.ServicePortName]*serviceInfo
 // Proxier is an iptables based proxy for connections between a localhost:lport
 // and services that provide the actual backends.
 type Proxier struct {
-	mu                          sync.Mutex // protects the following fields
-	serviceMap                  proxyServiceMap
-	endpointsMap                map[proxy.ServicePortName][]*endpointsInfo
-	portsMap                    map[localPort]closeable
-	haveReceivedServiceUpdate   bool // true once we've seen an OnServiceUpdate event
-	haveReceivedEndpointsUpdate bool // true once we've seen an OnEndpointsUpdate event
-	throttle                    flowcontrol.RateLimiter
+	mu                        sync.Mutex // protects the following fields
+	serviceMap                proxyServiceMap
+	endpointsMap              map[proxy.ServicePortName][]*endpointsInfo
+	portsMap                  map[localPort]closeable
+	haveReceivedServiceUpdate bool            // true once we've seen an OnServiceUpdate event
+	allEndpoints              []api.Endpoints // nil until we have seen an OnEndpointsUpdate event
+	throttle                  flowcontrol.RateLimiter
 
 	// These are effectively const and do not need the mutex to be held.
 	syncPeriod     time.Duration
@@ -593,16 +593,15 @@ func buildEndpointInfoList(endPoints []hostPortInfo, endpointIPs []string) []*en
 
 // OnEndpointsUpdate takes in a slice of updated endpoints.
 func (proxier *Proxier) OnEndpointsUpdate(allEndpoints []api.Endpoints) {
-	start := time.Now()
-	defer func() {
-		glog.V(4).Infof("OnEndpointsUpdate took %v for %d endpoints", time.Since(start), len(allEndpoints))
-	}()
-
 	proxier.mu.Lock()
 	defer proxier.mu.Unlock()
-	proxier.haveReceivedEndpointsUpdate = true
+	if proxier.allEndpoints == nil {
+		glog.V(2).Info("Received first Endpoints update")
+	}
+	proxier.allEndpoints = allEndpoints
 
-	newMap, staleConnections := updateEndpoints(allEndpoints, proxier.endpointsMap, proxier.hostname, proxier.healthChecker)
+	// TODO: once service has made this same transform, move this into proxier.syncProxyRules()
+	newMap, staleConnections := updateEndpoints(proxier.allEndpoints, proxier.endpointsMap, proxier.hostname, proxier.healthChecker)
 	if len(newMap) != len(proxier.endpointsMap) || !reflect.DeepEqual(newMap, proxier.endpointsMap) {
 		proxier.endpointsMap = newMap
 		proxier.syncProxyRules()
@@ -874,7 +873,7 @@ func (proxier *Proxier) syncProxyRules() {
 		glog.V(4).Infof("syncProxyRules took %v", time.Since(start))
 	}()
 	// don't sync rules till we've received services and endpoints
-	if !proxier.haveReceivedEndpointsUpdate || !proxier.haveReceivedServiceUpdate {
+	if proxier.allEndpoints == nil || !proxier.haveReceivedServiceUpdate {
 		glog.V(2).Info("Not syncing iptables until Services and Endpoints have been received from master")
 		return
 	}
@@ -922,6 +921,10 @@ func (proxier *Proxier) syncProxyRules() {
 			return
 		}
 	}
+
+	//
+	// Below this point we will not return until we try to write the iptables rules.
+	//
 
 	// Get iptables-save output so we can check for existing chains and rules.
 	// This will be a map of chain name to chain with rules as stored in iptables-save/iptables-restore
