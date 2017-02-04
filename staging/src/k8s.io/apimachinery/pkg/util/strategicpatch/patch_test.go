@@ -25,6 +25,7 @@ import (
 
 	"github.com/davecgh/go-spew/spew"
 	"github.com/ghodss/yaml"
+	"k8s.io/apimachinery/pkg/util/mergepatch"
 )
 
 type SortMergeListTestCases struct {
@@ -266,7 +267,7 @@ func TestSortMergeLists(t *testing.T) {
 		sorted := testObjectToJSONOrFail(t, c.Sorted, c.Description)
 		if !reflect.DeepEqual(original, sorted) {
 			t.Errorf("error in test case: %s\ncannot sort object:\n%s\nexpected:\n%s\ngot:\n%s\n",
-				c.Description, ToYAMLOrError(c.Original), ToYAMLOrError(c.Sorted), jsonToYAMLOrError(original))
+				c.Description, mergepatch.ToYAMLOrError(c.Original), mergepatch.ToYAMLOrError(c.Sorted), jsonToYAMLOrError(original))
 		}
 	}
 }
@@ -1990,9 +1991,9 @@ mergingIntList:
 
 func TestStrategicMergePatch(t *testing.T) {
 	testStrategicMergePatchWithCustomArguments(t, "bad original",
-		"<THIS IS NOT JSON>", "{}", mergeItem, errBadJSONDoc)
+		"<THIS IS NOT JSON>", "{}", mergeItem, mergepatch.ErrBadJSONDoc)
 	testStrategicMergePatchWithCustomArguments(t, "bad patch",
-		"{}", "<THIS IS NOT JSON>", mergeItem, errBadJSONDoc)
+		"{}", "<THIS IS NOT JSON>", mergeItem, mergepatch.ErrBadJSONDoc)
 	testStrategicMergePatchWithCustomArguments(t, "bad struct",
 		"{}", "{}", []byte("<THIS IS NOT A STRUCT>"), fmt.Errorf(errBadArgTypeFmt, "struct", "slice"))
 	testStrategicMergePatchWithCustomArguments(t, "nil struct",
@@ -2037,7 +2038,7 @@ func testTwoWayPatch(t *testing.T, c StrategicMergePatchTestCase) {
 	actualPatch, err := CreateTwoWayMergePatch(original, modified, mergeItem)
 	if err != nil {
 		t.Errorf("error: %s\nin test case: %s\ncannot create two way patch: %s:\n%s\n",
-			err, c.Description, original, ToYAMLOrError(c.StrategicMergePatchTestCaseData))
+			err, c.Description, original, mergepatch.ToYAMLOrError(c.StrategicMergePatchTestCaseData))
 		return
 	}
 
@@ -2085,15 +2086,15 @@ func testThreeWayPatch(t *testing.T, c StrategicMergePatchTestCase) {
 	original, modified, current, expected, result := threeWayTestCaseToJSONOrFail(t, c)
 	actual, err := CreateThreeWayMergePatch(original, modified, current, mergeItem, false)
 	if err != nil {
-		if !IsConflict(err) {
+		if !mergepatch.IsConflict(err) {
 			t.Errorf("error: %s\nin test case: %s\ncannot create three way patch:\n%s\n",
-				err, c.Description, ToYAMLOrError(c.StrategicMergePatchTestCaseData))
+				err, c.Description, mergepatch.ToYAMLOrError(c.StrategicMergePatchTestCaseData))
 			return
 		}
 
 		if !strings.Contains(c.Description, "conflict") {
 			t.Errorf("unexpected conflict: %s\nin test case: %s\ncannot create three way patch:\n%s\n",
-				err, c.Description, ToYAMLOrError(c.StrategicMergePatchTestCaseData))
+				err, c.Description, mergepatch.ToYAMLOrError(c.StrategicMergePatchTestCaseData))
 			return
 		}
 
@@ -2101,7 +2102,7 @@ func testThreeWayPatch(t *testing.T, c StrategicMergePatchTestCase) {
 			actual, err := CreateThreeWayMergePatch(original, modified, current, mergeItem, true)
 			if err != nil {
 				t.Errorf("error: %s\nin test case: %s\ncannot force three way patch application:\n%s\n",
-					err, c.Description, ToYAMLOrError(c.StrategicMergePatchTestCaseData))
+					err, c.Description, mergepatch.ToYAMLOrError(c.StrategicMergePatchTestCaseData))
 				return
 			}
 
@@ -2114,7 +2115,7 @@ func testThreeWayPatch(t *testing.T, c StrategicMergePatchTestCase) {
 
 	if strings.Contains(c.Description, "conflict") || len(c.Result) < 1 {
 		t.Errorf("error in test case: %s\nexpected conflict did not occur:\n%s\n",
-			c.Description, ToYAMLOrError(c.StrategicMergePatchTestCaseData))
+			c.Description, mergepatch.ToYAMLOrError(c.StrategicMergePatchTestCaseData))
 		return
 	}
 
@@ -2126,7 +2127,7 @@ func testThreeWayPatchForRawTestCase(t *testing.T, c StrategicMergePatchRawTestC
 	original, modified, current, expected, result := threeWayRawTestCaseToJSONOrFail(t, c)
 	actual, err := CreateThreeWayMergePatch(original, modified, current, mergeItem, false)
 	if err != nil {
-		if !IsConflict(err) {
+		if !mergepatch.IsConflict(err) {
 			t.Errorf("error: %s\nin test case: %s\ncannot create three way patch:\noriginal:%s\ntwoWay:%s\nmodified:%s\ncurrent:%s\nthreeWay:%s\nresult:%s\n",
 				err, c.Description, c.Original, c.TwoWay, c.Modified, c.Current, c.ThreeWay, c.Result)
 			return
@@ -2280,69 +2281,6 @@ func yamlToJSONOrError(t *testing.T, y []byte) []byte {
 	}
 
 	return j
-}
-
-func TestHasConflicts(t *testing.T) {
-	testCases := []struct {
-		A   interface{}
-		B   interface{}
-		Ret bool
-	}{
-		{A: "hello", B: "hello", Ret: false}, // 0
-		{A: "hello", B: "hell", Ret: true},
-		{A: "hello", B: nil, Ret: true},
-		{A: "hello", B: 1, Ret: true},
-		{A: "hello", B: float64(1.0), Ret: true},
-		{A: "hello", B: false, Ret: true},
-		{A: 1, B: 1, Ret: false},
-		{A: false, B: false, Ret: false},
-		{A: float64(3), B: float64(3), Ret: false},
-
-		{A: "hello", B: []interface{}{}, Ret: true}, // 6
-		{A: []interface{}{1}, B: []interface{}{}, Ret: true},
-		{A: []interface{}{}, B: []interface{}{}, Ret: false},
-		{A: []interface{}{1}, B: []interface{}{1}, Ret: false},
-		{A: map[string]interface{}{}, B: []interface{}{1}, Ret: true},
-
-		{A: map[string]interface{}{}, B: map[string]interface{}{"a": 1}, Ret: false}, // 11
-		{A: map[string]interface{}{"a": 1}, B: map[string]interface{}{"a": 1}, Ret: false},
-		{A: map[string]interface{}{"a": 1}, B: map[string]interface{}{"a": 2}, Ret: true},
-		{A: map[string]interface{}{"a": 1}, B: map[string]interface{}{"b": 2}, Ret: false},
-
-		{ // 15
-			A:   map[string]interface{}{"a": []interface{}{1}},
-			B:   map[string]interface{}{"a": []interface{}{1}},
-			Ret: false,
-		},
-		{
-			A:   map[string]interface{}{"a": []interface{}{1}},
-			B:   map[string]interface{}{"a": []interface{}{}},
-			Ret: true,
-		},
-		{
-			A:   map[string]interface{}{"a": []interface{}{1}},
-			B:   map[string]interface{}{"a": 1},
-			Ret: true,
-		},
-	}
-
-	for i, testCase := range testCases {
-		out, err := HasConflicts(testCase.A, testCase.B)
-		if err != nil {
-			t.Errorf("%d: unexpected error: %v", i, err)
-		}
-		if out != testCase.Ret {
-			t.Errorf("%d: expected %t got %t", i, testCase.Ret, out)
-			continue
-		}
-		out, err = HasConflicts(testCase.B, testCase.A)
-		if err != nil {
-			t.Errorf("%d: unexpected error: %v", i, err)
-		}
-		if out != testCase.Ret {
-			t.Errorf("%d: expected reversed %t got %t", i, testCase.Ret, out)
-		}
-	}
 }
 
 type PrecisionItem struct {
