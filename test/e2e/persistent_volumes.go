@@ -102,7 +102,7 @@ var _ = framework.KubeDescribe("PersistentVolumes [Volume][Serial]", func() {
 	///////////////////////////////////////////////////////////////////////
 	// Testing configurations of a single a PV/PVC pair, multiple evenly paired PVs/PVCs,
 	// and multiple unevenly paired PV/PVCs
-	framework.KubeDescribe("PersistentVolumes:NFS", func() {
+	framework.KubeDescribe("PersistentVolumes:NFS[Flaky]", func() {
 
 		var (
 			NFSconfig    VolumeTestConfig
