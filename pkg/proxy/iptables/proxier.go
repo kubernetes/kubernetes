@@ -191,13 +191,13 @@ type proxyServiceMap map[proxy.ServicePortName]*serviceInfo
 // Proxier is an iptables based proxy for connections between a localhost:lport
 // and services that provide the actual backends.
 type Proxier struct {
-	mu                          sync.Mutex // protects the following fields
-	serviceMap                  proxyServiceMap
-	endpointsMap                map[proxy.ServicePortName][]*endpointsInfo
-	portsMap                    map[localPort]closeable
-	haveReceivedServiceUpdate   bool // true once we've seen an OnServiceUpdate event
-	haveReceivedEndpointsUpdate bool // true once we've seen an OnEndpointsUpdate event
-	throttle                    flowcontrol.RateLimiter
+	mu                        sync.Mutex // protects the following fields
+	serviceMap                proxyServiceMap
+	endpointsMap              map[proxy.ServicePortName][]*endpointsInfo
+	portsMap                  map[localPort]closeable
+	haveReceivedServiceUpdate bool            // true once we've seen an OnServiceUpdate event
+	allEndpoints              []api.Endpoints // nil until we have seen an OnEndpointsUpdate event
+	throttle                  flowcontrol.RateLimiter
 
 	// These are effectively const and do not need the mutex to be held.
 	syncPeriod     time.Duration
@@ -593,19 +593,14 @@ func buildEndpointInfoList(endPoints []hostPortInfo, endpointIPs []string) []*en
 
 // OnEndpointsUpdate takes in a slice of updated endpoints.
 func (proxier *Proxier) OnEndpointsUpdate(allEndpoints []api.Endpoints) {
-	start := time.Now()
-	defer func() {
-		glog.V(4).Infof("OnEndpointsUpdate took %v for %d endpoints", time.Since(start), len(allEndpoints))
-	}()
-
 	proxier.mu.Lock()
 	defer proxier.mu.Unlock()
-	proxier.haveReceivedEndpointsUpdate = true
+	if proxier.allEndpoints == nil {
+		glog.V(2).Info("Received first Endpoints update")
+	}
+	proxier.allEndpoints = allEndpoints
 
-	newMap, staleConnections := updateEndpoints(allEndpoints, proxier.endpointsMap, proxier.hostname, proxier.healthChecker)
-	proxier.endpointsMap = newMap
 	proxier.syncProxyRules()
-	proxier.deleteEndpointConnections(staleConnections)
 }
 
 // Convert a slice of api.Endpoints objects into a map of service-port -> endpoints.
@@ -857,7 +852,7 @@ func (proxier *Proxier) syncProxyRules() {
 		glog.V(4).Infof("syncProxyRules took %v", time.Since(start))
 	}()
 	// don't sync rules till we've received services and endpoints
-	if !proxier.haveReceivedEndpointsUpdate || !proxier.haveReceivedServiceUpdate {
+	if proxier.allEndpoints == nil || !proxier.haveReceivedServiceUpdate {
 		glog.V(2).Info("Not syncing iptables until Services and Endpoints have been received from master")
 		return
 	}
@@ -905,6 +900,13 @@ func (proxier *Proxier) syncProxyRules() {
 			return
 		}
 	}
+
+	//
+	// Below this point we will not return until we try to write the iptables rules.
+	//
+
+	// Figure out the new endpoints map.
+	newEndpointsMap, staleConnections := updateEndpoints(proxier.allEndpoints, proxier.endpointsMap, proxier.hostname, proxier.healthChecker)
 
 	// Get iptables-save output so we can check for existing chains and rules.
 	// This will be a map of chain name to chain with rules as stored in iptables-save/iptables-restore
@@ -1201,7 +1203,7 @@ func (proxier *Proxier) syncProxyRules() {
 		}
 
 		// If the service has no endpoints then reject packets.
-		if len(proxier.endpointsMap[svcName]) == 0 {
+		if len(newEndpointsMap[svcName]) == 0 {
 			writeLine(filterRules,
 				"-A", string(kubeServicesChain),
 				"-m", "comment", "--comment", fmt.Sprintf(`"%s has no endpoints"`, svcName.String()),
@@ -1218,7 +1220,7 @@ func (proxier *Proxier) syncProxyRules() {
 		// These two slices parallel each other - keep in sync
 		endpoints := make([]*endpointsInfo, 0)
 		endpointChains := make([]utiliptables.Chain, 0)
-		for _, ep := range proxier.endpointsMap[svcName] {
+		for _, ep := range newEndpointsMap[svcName] {
 			endpoints = append(endpoints, ep)
 			endpointChain := servicePortEndpointChainName(svcName, protocol, ep.endpoint)
 			endpointChains = append(endpointChains, endpointChain)
@@ -1387,6 +1389,11 @@ func (proxier *Proxier) syncProxyRules() {
 		revertPorts(replacementPortsMap, proxier.portsMap)
 		return
 	}
+
+	// Save the new map.
+	proxier.endpointsMap = newEndpointsMap
+	// Flush stale connection tracking stuff.
+	proxier.deleteEndpointConnections(staleConnections)
 
 	// Close old local ports and save new ones.
 	for k, v := range proxier.portsMap {

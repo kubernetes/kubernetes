@@ -17,6 +17,7 @@ limitations under the License.
 package iptables
 
 import (
+	"strconv"
 	"testing"
 
 	"fmt"
@@ -290,8 +291,8 @@ func TestDeleteEndpointConnections(t *testing.T) {
 	}
 
 	serviceMap := make(map[proxy.ServicePortName]*serviceInfo)
-	svc1 := proxy.ServicePortName{NamespacedName: types.NamespacedName{Namespace: "ns1", Name: "svc1"}, Port: "80"}
-	svc2 := proxy.ServicePortName{NamespacedName: types.NamespacedName{Namespace: "ns1", Name: "svc2"}, Port: "80"}
+	svc1 := proxy.ServicePortName{NamespacedName: types.NamespacedName{Namespace: "ns1", Name: "svc1"}, Port: "p80"}
+	svc2 := proxy.ServicePortName{NamespacedName: types.NamespacedName{Namespace: "ns1", Name: "svc2"}, Port: "p80"}
 	serviceMap[svc1] = newFakeServiceInfo(svc1, net.IPv4(10, 20, 30, 40), 80, api.ProtocolUDP, false)
 	serviceMap[svc2] = newFakeServiceInfo(svc1, net.IPv4(10, 20, 30, 41), 80, api.ProtocolTCP, false)
 
@@ -496,37 +497,39 @@ type fakeHealthChecker struct{}
 
 func (fakeHealthChecker) UpdateEndpoints(serviceName types.NamespacedName, endpointUIDs sets.String) {}
 
+const testHostname = "test-hostname"
+
 func NewFakeProxier(ipt utiliptables.Interface) *Proxier {
 	// TODO: Call NewProxier after refactoring out the goroutine
 	// invocation into a Run() method.
 	return &Proxier{
-		exec:                        &exec.FakeExec{},
-		serviceMap:                  make(map[proxy.ServicePortName]*serviceInfo),
-		iptables:                    ipt,
-		endpointsMap:                make(map[proxy.ServicePortName][]*endpointsInfo),
-		clusterCIDR:                 "10.0.0.0/24",
-		haveReceivedEndpointsUpdate: true,
-		haveReceivedServiceUpdate:   true,
-		hostname:                    "test-hostname",
-		portsMap:                    make(map[localPort]closeable),
-		portMapper:                  &fakePortOpener{[]*localPort{}},
-		healthChecker:               fakeHealthChecker{},
+		exec:                      &exec.FakeExec{},
+		serviceMap:                make(map[proxy.ServicePortName]*serviceInfo),
+		iptables:                  ipt,
+		clusterCIDR:               "10.0.0.0/24",
+		allEndpoints:              []api.Endpoints{},
+		haveReceivedServiceUpdate: true,
+		hostname:                  testHostname,
+		portsMap:                  make(map[localPort]closeable),
+		portMapper:                &fakePortOpener{[]*localPort{}},
+		healthChecker:             fakeHealthChecker{},
 	}
 }
 
-func hasJump(rules []iptablestest.Rule, destChain, destIP, destPort string) bool {
+func hasJump(rules []iptablestest.Rule, destChain, destIP string, destPort int) bool {
+	destPortStr := strconv.Itoa(destPort)
 	match := false
 	for _, r := range rules {
 		if r[iptablestest.Jump] == destChain {
 			match = true
 			if destIP != "" {
-				if strings.Contains(r[iptablestest.Destination], destIP) && (strings.Contains(r[iptablestest.DPort], destPort) || r[iptablestest.DPort] == "") {
+				if strings.Contains(r[iptablestest.Destination], destIP) && (strings.Contains(r[iptablestest.DPort], destPortStr) || r[iptablestest.DPort] == "") {
 					return true
 				}
 				match = false
 			}
-			if destPort != "" {
-				if strings.Contains(r[iptablestest.DPort], destPort) && (strings.Contains(r[iptablestest.Destination], destIP) || r[iptablestest.Destination] == "") {
+			if destPort != 0 {
+				if strings.Contains(r[iptablestest.DPort], destPortStr) && (strings.Contains(r[iptablestest.Destination], destIP) || r[iptablestest.Destination] == "") {
 					return true
 				}
 				match = false
@@ -541,7 +544,7 @@ func TestHasJump(t *testing.T) {
 		rules     []iptablestest.Rule
 		destChain string
 		destIP    string
-		destPort  string
+		destPort  int
 		expected  bool
 	}{
 		"case 1": {
@@ -552,7 +555,7 @@ func TestHasJump(t *testing.T) {
 			},
 			destChain: "REJECT",
 			destIP:    "10.20.30.41",
-			destPort:  "80",
+			destPort:  80,
 			expected:  true,
 		},
 		"case 2": {
@@ -563,7 +566,7 @@ func TestHasJump(t *testing.T) {
 			},
 			destChain: "REJECT",
 			destIP:    "",
-			destPort:  "3001",
+			destPort:  3001,
 			expected:  true,
 		},
 		"case 3": {
@@ -573,7 +576,7 @@ func TestHasJump(t *testing.T) {
 			},
 			destChain: "KUBE-XLB-GF53O3C2HZEXL2XN",
 			destIP:    "1.2.3.4",
-			destPort:  "80",
+			destPort:  80,
 			expected:  true,
 		},
 		"case 4": {
@@ -583,7 +586,7 @@ func TestHasJump(t *testing.T) {
 			},
 			destChain: "KUBE-XLB-GF53O3C2HZEXL2XN",
 			destIP:    "1.2.3.4",
-			destPort:  "8080",
+			destPort:  8080,
 			expected:  false,
 		},
 		"case 5": {
@@ -593,7 +596,7 @@ func TestHasJump(t *testing.T) {
 			},
 			destChain: "KUBE-XLB-GF53O3C2HZEXL2XN",
 			destIP:    "10.20.30.40",
-			destPort:  "80",
+			destPort:  80,
 			expected:  false,
 		},
 		"case 6": {
@@ -605,7 +608,7 @@ func TestHasJump(t *testing.T) {
 			},
 			destChain: "REJECT",
 			destIP:    "1.2.3.4",
-			destPort:  "8080",
+			destPort:  8080,
 			expected:  true,
 		},
 		"case 7": {
@@ -616,7 +619,7 @@ func TestHasJump(t *testing.T) {
 			},
 			destChain: "REJECT",
 			destIP:    "1.2.3.4",
-			destPort:  "3001",
+			destPort:  3001,
 			expected:  true,
 		},
 		"case 8": {
@@ -627,7 +630,7 @@ func TestHasJump(t *testing.T) {
 			},
 			destChain: "REJECT",
 			destIP:    "10.20.30.41",
-			destPort:  "8080",
+			destPort:  8080,
 			expected:  true,
 		},
 		"case 9": {
@@ -636,7 +639,7 @@ func TestHasJump(t *testing.T) {
 			},
 			destChain: "KUBE-SEP-LWSOSDSHMKPJHHJV",
 			destIP:    "",
-			destPort:  "",
+			destPort:  0,
 			expected:  true,
 		},
 		"case 10": {
@@ -645,7 +648,7 @@ func TestHasJump(t *testing.T) {
 			},
 			destChain: "KUBE-SEP-BAR",
 			destIP:    "",
-			destPort:  "",
+			destPort:  0,
 			expected:  false,
 		},
 	}
@@ -679,7 +682,7 @@ func TestClusterIPReject(t *testing.T) {
 	svcName := "svc1"
 	svcIP := net.IPv4(10, 20, 30, 41)
 
-	svc := proxy.ServicePortName{NamespacedName: types.NamespacedName{Namespace: "ns1", Name: svcName}, Port: "80"}
+	svc := proxy.ServicePortName{NamespacedName: types.NamespacedName{Namespace: "ns1", Name: svcName}, Port: "p80"}
 	fp.serviceMap[svc] = newFakeServiceInfo(svc, svcIP, 80, api.ProtocolTCP, false)
 	fp.syncProxyRules()
 
@@ -689,7 +692,7 @@ func TestClusterIPReject(t *testing.T) {
 		errorf(fmt.Sprintf("Unexpected rule for chain %v service %v without endpoints", svcChain, svcName), svcRules, t)
 	}
 	kubeSvcRules := ipt.GetRules(string(kubeServicesChain))
-	if !hasJump(kubeSvcRules, iptablestest.Reject, svcIP.String(), "80") {
+	if !hasJump(kubeSvcRules, iptablestest.Reject, svcIP.String(), 80) {
 		errorf(fmt.Sprintf("Failed to find a %v rule for service %v with no endpoints", iptablestest.Reject, svcName), kubeSvcRules, t)
 	}
 }
@@ -700,10 +703,24 @@ func TestClusterIPEndpointsJump(t *testing.T) {
 	svcName := "svc1"
 	svcIP := net.IPv4(10, 20, 30, 41)
 
-	svc := proxy.ServicePortName{NamespacedName: types.NamespacedName{Namespace: "ns1", Name: svcName}, Port: "80"}
+	svc := proxy.ServicePortName{NamespacedName: types.NamespacedName{Namespace: "ns1", Name: svcName}, Port: "p80"}
 	fp.serviceMap[svc] = newFakeServiceInfo(svc, svcIP, 80, api.ProtocolTCP, true)
-	ep := "10.180.0.1:80"
-	fp.endpointsMap[svc] = []*endpointsInfo{{ep, false}}
+	ip := "10.180.0.1"
+	port := 80
+	ep := fmt.Sprintf("%s:%d", ip, port)
+	fp.allEndpoints = []api.Endpoints{
+		makeTestEndpoints("ns1", svcName, func(ept *api.Endpoints) {
+			ept.Subsets = []api.EndpointSubset{{
+				Addresses: []api.EndpointAddress{{
+					IP: ip,
+				}},
+				Ports: []api.EndpointPort{{
+					Name: "p80",
+					Port: int32(port),
+				}},
+			}}
+		}),
+	}
 
 	fp.syncProxyRules()
 
@@ -711,12 +728,12 @@ func TestClusterIPEndpointsJump(t *testing.T) {
 	epChain := string(servicePortEndpointChainName(svc, strings.ToLower(string(api.ProtocolTCP)), ep))
 
 	kubeSvcRules := ipt.GetRules(string(kubeServicesChain))
-	if !hasJump(kubeSvcRules, svcChain, svcIP.String(), "80") {
+	if !hasJump(kubeSvcRules, svcChain, svcIP.String(), 80) {
 		errorf(fmt.Sprintf("Failed to find jump from KUBE-SERVICES to %v chain", svcChain), kubeSvcRules, t)
 	}
 
 	svcRules := ipt.GetRules(svcChain)
-	if !hasJump(svcRules, epChain, "", "") {
+	if !hasJump(svcRules, epChain, "", 0) {
 		errorf(fmt.Sprintf("Failed to jump to ep chain %v", epChain), svcRules, t)
 	}
 	epRules := ipt.GetRules(epChain)
@@ -739,12 +756,25 @@ func TestLoadBalancer(t *testing.T) {
 	svcName := "svc1"
 	svcIP := net.IPv4(10, 20, 30, 41)
 
-	svc := proxy.ServicePortName{NamespacedName: types.NamespacedName{Namespace: "ns1", Name: svcName}, Port: "80"}
+	svc := proxy.ServicePortName{NamespacedName: types.NamespacedName{Namespace: "ns1", Name: svcName}, Port: "p80"}
 	svcInfo := newFakeServiceInfo(svc, svcIP, 80, api.ProtocolTCP, false)
 	fp.serviceMap[svc] = typeLoadBalancer(svcInfo)
 
-	ep1 := "10.180.0.1:80"
-	fp.endpointsMap[svc] = []*endpointsInfo{{ep1, false}}
+	ip := "10.180.0.1"
+	port := 80
+	fp.allEndpoints = []api.Endpoints{
+		makeTestEndpoints("ns1", svcName, func(ept *api.Endpoints) {
+			ept.Subsets = []api.EndpointSubset{{
+				Addresses: []api.EndpointAddress{{
+					IP: ip,
+				}},
+				Ports: []api.EndpointPort{{
+					Name: "p80",
+					Port: int32(port),
+				}},
+			}}
+		}),
+	}
 
 	fp.syncProxyRules()
 
@@ -754,12 +784,12 @@ func TestLoadBalancer(t *testing.T) {
 	//lbChain := string(serviceLBChainName(svc, proto))
 
 	kubeSvcRules := ipt.GetRules(string(kubeServicesChain))
-	if !hasJump(kubeSvcRules, fwChain, svcInfo.loadBalancerStatus.Ingress[0].IP, "80") {
+	if !hasJump(kubeSvcRules, fwChain, svcInfo.loadBalancerStatus.Ingress[0].IP, 80) {
 		errorf(fmt.Sprintf("Failed to find jump to firewall chain %v", fwChain), kubeSvcRules, t)
 	}
 
 	fwRules := ipt.GetRules(fwChain)
-	if !hasJump(fwRules, svcChain, "", "") || !hasJump(fwRules, string(KubeMarkMasqChain), "", "") {
+	if !hasJump(fwRules, svcChain, "", 0) || !hasJump(fwRules, string(KubeMarkMasqChain), "", 0) {
 		errorf(fmt.Sprintf("Failed to find jump from firewall chain %v to svc chain %v", fwChain, svcChain), fwRules, t)
 	}
 }
@@ -770,13 +800,26 @@ func TestNodePort(t *testing.T) {
 	svcName := "svc1"
 	svcIP := net.IPv4(10, 20, 30, 41)
 
-	svc := proxy.ServicePortName{NamespacedName: types.NamespacedName{Namespace: "ns1", Name: svcName}, Port: "80"}
+	svc := proxy.ServicePortName{NamespacedName: types.NamespacedName{Namespace: "ns1", Name: svcName}, Port: "p80"}
 	svcInfo := newFakeServiceInfo(svc, svcIP, 80, api.ProtocolTCP, false)
 	svcInfo.nodePort = 3001
 	fp.serviceMap[svc] = svcInfo
 
-	ep1 := "10.180.0.1:80"
-	fp.endpointsMap[svc] = []*endpointsInfo{{ep1, false}}
+	ip := "10.180.0.1"
+	port := 80
+	fp.allEndpoints = []api.Endpoints{
+		makeTestEndpoints("ns1", svcName, func(ept *api.Endpoints) {
+			ept.Subsets = []api.EndpointSubset{{
+				Addresses: []api.EndpointAddress{{
+					IP: ip,
+				}},
+				Ports: []api.EndpointPort{{
+					Name: "p80",
+					Port: int32(port),
+				}},
+			}}
+		}),
+	}
 
 	fp.syncProxyRules()
 
@@ -784,9 +827,13 @@ func TestNodePort(t *testing.T) {
 	svcChain := string(servicePortChainName(svc, strings.ToLower(proto)))
 
 	kubeNodePortRules := ipt.GetRules(string(kubeNodePortsChain))
-	if !hasJump(kubeNodePortRules, svcChain, "", fmt.Sprintf("%v", svcInfo.nodePort)) {
+	if !hasJump(kubeNodePortRules, svcChain, "", svcInfo.nodePort) {
 		errorf(fmt.Sprintf("Failed to find jump to svc chain %v", svcChain), kubeNodePortRules, t)
 	}
+}
+
+func strPtr(s string) *string {
+	return &s
 }
 
 func TestOnlyLocalLoadBalancing(t *testing.T) {
@@ -795,13 +842,32 @@ func TestOnlyLocalLoadBalancing(t *testing.T) {
 	svcName := "svc1"
 	svcIP := net.IPv4(10, 20, 30, 41)
 
-	svc := proxy.ServicePortName{NamespacedName: types.NamespacedName{Namespace: "ns1", Name: svcName}, Port: "80"}
+	svc := proxy.ServicePortName{NamespacedName: types.NamespacedName{Namespace: "ns1", Name: svcName}, Port: "p80"}
 	svcInfo := newFakeServiceInfo(svc, svcIP, 80, api.ProtocolTCP, true)
 	fp.serviceMap[svc] = typeLoadBalancer(svcInfo)
 
-	nonLocalEp := "10.180.0.1:80"
-	localEp := "10.180.2.1:80"
-	fp.endpointsMap[svc] = []*endpointsInfo{{nonLocalEp, false}, {localEp, true}}
+	ip1 := "10.180.0.1"
+	ip2 := "10.180.2.1"
+	port := 80
+	nonLocalEp := fmt.Sprintf("%s:%d", ip1, port)
+	localEp := fmt.Sprintf("%s:%d", ip2, port)
+	fp.allEndpoints = []api.Endpoints{
+		makeTestEndpoints("ns1", svcName, func(ept *api.Endpoints) {
+			ept.Subsets = []api.EndpointSubset{{
+				Addresses: []api.EndpointAddress{{
+					IP:       ip1,
+					NodeName: strPtr(""),
+				}, {
+					IP:       ip2,
+					NodeName: strPtr(testHostname),
+				}},
+				Ports: []api.EndpointPort{{
+					Name: "p80",
+					Port: int32(port),
+				}},
+			}}
+		}),
+	}
 
 	fp.syncProxyRules()
 
@@ -813,24 +879,24 @@ func TestOnlyLocalLoadBalancing(t *testing.T) {
 	localEpChain := string(servicePortEndpointChainName(svc, strings.ToLower(string(api.ProtocolTCP)), localEp))
 
 	kubeSvcRules := ipt.GetRules(string(kubeServicesChain))
-	if !hasJump(kubeSvcRules, fwChain, svcInfo.loadBalancerStatus.Ingress[0].IP, "") {
+	if !hasJump(kubeSvcRules, fwChain, svcInfo.loadBalancerStatus.Ingress[0].IP, 0) {
 		errorf(fmt.Sprintf("Failed to find jump to firewall chain %v", fwChain), kubeSvcRules, t)
 	}
 
 	fwRules := ipt.GetRules(fwChain)
-	if !hasJump(fwRules, lbChain, "", "") {
+	if !hasJump(fwRules, lbChain, "", 0) {
 		errorf(fmt.Sprintf("Failed to find jump from firewall chain %v to svc chain %v", fwChain, lbChain), fwRules, t)
 	}
-	if hasJump(fwRules, string(KubeMarkMasqChain), "", "") {
+	if hasJump(fwRules, string(KubeMarkMasqChain), "", 0) {
 		errorf(fmt.Sprintf("Found jump from fw chain %v to MASQUERADE", fwChain), fwRules, t)
 	}
 
 	lbRules := ipt.GetRules(lbChain)
-	if hasJump(lbRules, nonLocalEpChain, "", "") {
+	if hasJump(lbRules, nonLocalEpChain, "", 0) {
 		errorf(fmt.Sprintf("Found jump from lb chain %v to non-local ep %v", lbChain, nonLocalEp), lbRules, t)
 	}
-	if !hasJump(lbRules, localEpChain, "", "") {
-		errorf(fmt.Sprintf("Didn't find jump from lb chain %v to local ep %v", lbChain, nonLocalEp), lbRules, t)
+	if !hasJump(lbRules, localEpChain, "", 0) {
+		errorf(fmt.Sprintf("Didn't find jump from lb chain %v to local ep %v", lbChain, localEp), lbRules, t)
 	}
 }
 
@@ -853,14 +919,33 @@ func onlyLocalNodePorts(t *testing.T, fp *Proxier, ipt *iptablestest.FakeIPTable
 	svcName := "svc1"
 	svcIP := net.IPv4(10, 20, 30, 41)
 
-	svc := proxy.ServicePortName{NamespacedName: types.NamespacedName{Namespace: "ns1", Name: svcName}, Port: "80"}
+	svc := proxy.ServicePortName{NamespacedName: types.NamespacedName{Namespace: "ns1", Name: svcName}, Port: "p80"}
 	svcInfo := newFakeServiceInfo(svc, svcIP, 80, api.ProtocolTCP, true)
 	svcInfo.nodePort = 3001
 	fp.serviceMap[svc] = svcInfo
 
-	nonLocalEp := "10.180.0.1:80"
-	localEp := "10.180.2.1:80"
-	fp.endpointsMap[svc] = []*endpointsInfo{{nonLocalEp, false}, {localEp, true}}
+	ip1 := "10.180.0.1"
+	ip2 := "10.180.2.1"
+	port := 80
+	nonLocalEp := fmt.Sprintf("%s:%d", ip1, port)
+	localEp := fmt.Sprintf("%s:%d", ip2, port)
+	fp.allEndpoints = []api.Endpoints{
+		makeTestEndpoints("ns1", svcName, func(ept *api.Endpoints) {
+			ept.Subsets = []api.EndpointSubset{{
+				Addresses: []api.EndpointAddress{{
+					IP:       ip1,
+					NodeName: strPtr(""),
+				}, {
+					IP:       ip2,
+					NodeName: strPtr(testHostname),
+				}},
+				Ports: []api.EndpointPort{{
+					Name: "p80",
+					Port: int32(port),
+				}},
+			}}
+		}),
+	}
 
 	fp.syncProxyRules()
 
@@ -871,23 +956,23 @@ func onlyLocalNodePorts(t *testing.T, fp *Proxier, ipt *iptablestest.FakeIPTable
 	localEpChain := string(servicePortEndpointChainName(svc, strings.ToLower(string(api.ProtocolTCP)), localEp))
 
 	kubeNodePortRules := ipt.GetRules(string(kubeNodePortsChain))
-	if !hasJump(kubeNodePortRules, lbChain, "", fmt.Sprintf("%v", svcInfo.nodePort)) {
+	if !hasJump(kubeNodePortRules, lbChain, "", svcInfo.nodePort) {
 		errorf(fmt.Sprintf("Failed to find jump to lb chain %v", lbChain), kubeNodePortRules, t)
 	}
 
 	svcChain := string(servicePortChainName(svc, strings.ToLower(string(api.ProtocolTCP))))
 	lbRules := ipt.GetRules(lbChain)
-	if hasJump(lbRules, nonLocalEpChain, "", "") {
+	if hasJump(lbRules, nonLocalEpChain, "", 0) {
 		errorf(fmt.Sprintf("Found jump from lb chain %v to non-local ep %v", lbChain, nonLocalEp), lbRules, t)
 	}
-	if hasJump(lbRules, svcChain, "", "") != shouldLBTOSVCRuleExist {
+	if hasJump(lbRules, svcChain, "", 0) != shouldLBTOSVCRuleExist {
 		prefix := "Did not find "
 		if !shouldLBTOSVCRuleExist {
 			prefix = "Found "
 		}
 		errorf(fmt.Sprintf("%s jump from lb chain %v to svc %v", prefix, lbChain, svcChain), lbRules, t)
 	}
-	if !hasJump(lbRules, localEpChain, "", "") {
+	if !hasJump(lbRules, localEpChain, "", 0) {
 		errorf(fmt.Sprintf("Didn't find jump from lb chain %v to local ep %v", lbChain, nonLocalEp), lbRules, t)
 	}
 }
