@@ -97,10 +97,9 @@ func TestDaemonSetController(t *testing.T) {
 	// Test add federated daemonset.
 	daemonsetWatch.Add(&daemonset1)
 
-	// There should be 2 updates to add both the finalizers.
+	// There should be an update to add both the finalizers.
 	updatedDaemonSet := GetDaemonSetFromChan(daemonsetUpdateChan)
 	assert.True(t, daemonsetController.hasFinalizerFunc(updatedDaemonSet, deletionhelper.FinalizerDeleteFromUnderlyingClusters))
-	updatedDaemonSet = GetDaemonSetFromChan(daemonsetUpdateChan)
 	assert.True(t, daemonsetController.hasFinalizerFunc(updatedDaemonSet, metav1.FinalizerOrphan))
 	daemonset1 = *updatedDaemonSet
 

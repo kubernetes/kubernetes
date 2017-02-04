@@ -13508,6 +13508,7 @@ go_test(
     deps = [
         "//vendor:github.com/davecgh/go-spew/spew",
         "//vendor:github.com/ghodss/yaml",
+        "//vendor:k8s.io/apimachinery/pkg/util/mergepatch",
     ],
 )
 
@@ -13516,9 +13517,8 @@ go_library(
     srcs = ["k8s.io/apimachinery/pkg/util/strategicpatch/patch.go"],
     tags = ["automanaged"],
     deps = [
-        "//vendor:github.com/davecgh/go-spew/spew",
-        "//vendor:github.com/ghodss/yaml",
         "//vendor:k8s.io/apimachinery/pkg/util/json",
+        "//vendor:k8s.io/apimachinery/pkg/util/mergepatch",
         "//vendor:k8s.io/apimachinery/third_party/forked/golang/json",
     ],
 )
@@ -14269,7 +14269,7 @@ go_library(
     deps = [
         "//vendor:github.com/evanphx/json-patch",
         "//vendor:k8s.io/apimachinery/pkg/util/json",
-        "//vendor:k8s.io/apimachinery/pkg/util/strategicpatch",
+        "//vendor:k8s.io/apimachinery/pkg/util/mergepatch",
     ],
 )
 
@@ -14450,6 +14450,7 @@ go_library(
         "//vendor:k8s.io/apimachinery/pkg/runtime/serializer/streaming",
         "//vendor:k8s.io/apimachinery/pkg/types",
         "//vendor:k8s.io/apimachinery/pkg/util/httpstream",
+        "//vendor:k8s.io/apimachinery/pkg/util/mergepatch",
         "//vendor:k8s.io/apimachinery/pkg/util/net",
         "//vendor:k8s.io/apimachinery/pkg/util/runtime",
         "//vendor:k8s.io/apimachinery/pkg/util/strategicpatch",
@@ -15169,5 +15170,25 @@ go_library(
     deps = [
         "//vendor:k8s.io/apiserver/pkg/apis/example",
         "//vendor:k8s.io/client-go/pkg/api/install",
+    ],
+)
+
+go_test(
+    name = "k8s.io/apimachinery/pkg/util/mergepatch_test",
+    srcs = ["k8s.io/apimachinery/pkg/util/mergepatch/util_test.go"],
+    library = ":k8s.io/apimachinery/pkg/util/mergepatch",
+    tags = ["automanaged"],
+)
+
+go_library(
+    name = "k8s.io/apimachinery/pkg/util/mergepatch",
+    srcs = [
+        "k8s.io/apimachinery/pkg/util/mergepatch/errors.go",
+        "k8s.io/apimachinery/pkg/util/mergepatch/util.go",
+    ],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:github.com/davecgh/go-spew/spew",
+        "//vendor:github.com/ghodss/yaml",
     ],
 )

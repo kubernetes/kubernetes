@@ -85,6 +85,18 @@ func initializeGCETestSpec(c clientset.Interface, ns string, pvConfig persistent
 	return clientPod, pv, pvc
 }
 
+// initNFSserverPod wraps volumes.go's startVolumeServer to return a running nfs host pod
+// commonly used by persistent volume testing
+func initNFSserverPod(c clientset.Interface, ns string) *v1.Pod {
+	return startVolumeServer(c, VolumeTestConfig{
+		namespace:   ns,
+		prefix:      "nfs",
+		serverImage: NfsServerImage,
+		serverPorts: []int{2049},
+		serverArgs:  []string{"-G", "777", "/exports"},
+	})
+}
+
 var _ = framework.KubeDescribe("PersistentVolumes [Volume][Serial]", func() {
 
 	// global vars for the Context()s and It()'s below
@@ -102,33 +114,19 @@ var _ = framework.KubeDescribe("PersistentVolumes [Volume][Serial]", func() {
 	///////////////////////////////////////////////////////////////////////
 	// Testing configurations of a single a PV/PVC pair, multiple evenly paired PVs/PVCs,
 	// and multiple unevenly paired PV/PVCs
-	framework.KubeDescribe("PersistentVolumes:NFS", func() {
+	framework.KubeDescribe("PersistentVolumes:NFS[Flaky]", func() {
 
 		var (
-			NFSconfig    VolumeTestConfig
 			nfsServerPod *v1.Pod
 			serverIP     string
 			pvConfig     persistentVolumeConfig
 		)
 
-		// config for the nfs-server pod in the default namespace
-		NFSconfig = VolumeTestConfig{
-			namespace:   metav1.NamespaceDefault,
-			prefix:      "nfs",
-			serverImage: NfsServerImage,
-			serverPorts: []int{2049},
-			serverArgs:  []string{"-G", "777", "/exports"},
-		}
-
 		BeforeEach(func() {
-			// If it doesn't exist, create the nfs server pod in the "default" ns.
-			// The "default" ns is used so that individual tests can delete their
-			// ns without impacting the nfs-server pod.
-			if nfsServerPod == nil {
-				nfsServerPod = startVolumeServer(c, NFSconfig)
-				serverIP = nfsServerPod.Status.PodIP
-				framework.Logf("NFS server IP address: %v", serverIP)
-			}
+			framework.Logf("[BeforeEach] Creating NFS Server Pod")
+			nfsServerPod = initNFSserverPod(c, ns)
+			serverIP = nfsServerPod.Status.PodIP
+			framework.Logf("[BeforeEach] Configuring PersistentVolume")
 			pvConfig = persistentVolumeConfig{
 				namePrefix: "nfs-",
 				pvSource: v1.PersistentVolumeSource{
@@ -141,13 +139,8 @@ var _ = framework.KubeDescribe("PersistentVolumes [Volume][Serial]", func() {
 			}
 		})
 
-		// Execute after *all* the tests have run
-		AddCleanupAction(func() {
-			if nfsServerPod != nil && c != nil {
-				framework.Logf("AfterSuite: nfs-server pod %v is non-nil, deleting pod", nfsServerPod.Name)
-				nfsServerPodCleanup(c, NFSconfig)
-				nfsServerPod = nil
-			}
+		AfterEach(func() {
+			deletePodWithWait(f, c, nfsServerPod)
 		})
 
 		Context("with Single PV - PVC pairs", func() {

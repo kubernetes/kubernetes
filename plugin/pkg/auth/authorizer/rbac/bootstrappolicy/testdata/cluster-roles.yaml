@@ -569,6 +569,15 @@ items:
     - endpoints
     verbs:
     - get
+  - apiGroups:
+    - certificates.k8s.io
+    resources:
+    - certificatesigningrequests
+    verbs:
+    - create
+    - get
+    - list
+    - watch
 - apiVersion: rbac.authorization.k8s.io/v1beta1
   kind: ClusterRole
   metadata:
