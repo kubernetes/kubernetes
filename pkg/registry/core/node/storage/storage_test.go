@@ -150,3 +150,11 @@ func TestWatch(t *testing.T) {
 		},
 	)
 }
+
+func TestShortNames(t *testing.T) {
+	storage, server := newStorage(t)
+	defer server.Terminate(t)
+	defer storage.Store.DestroyFunc()
+	expected := []string{"no"}
+	registrytest.AssertShortNames(t, storage, expected)
+}
