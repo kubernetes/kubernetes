@@ -112,20 +112,6 @@ var (
 	}
 
 	hyperkubeImageName = "gcr.io/google_containers/hyperkube-amd64"
-
-	apiserverDefaultArgs = map[string]string{
-		"--bind-address":         "0.0.0.0",
-		"--etcd-servers":         "http://localhost:2379",
-		"--secure-port":          "443",
-		"--client-ca-file":       "/etc/federation/apiserver/ca.crt",
-		"--tls-cert-file":        "/etc/federation/apiserver/server.crt",
-		"--tls-private-key-file": "/etc/federation/apiserver/server.key",
-	}
-
-	cmDefaultArgs = map[string]string{
-		"--kubeconfig":          "/etc/federation/controller-manager/kubeconfig",
-		"--dns-provider-config": "",
-	}
 )
 
 // NewCmdInit defines the `init` command that bootstraps a federation
@@ -151,8 +137,8 @@ func NewCmdInit(cmdOut io.Writer, config util.AdminConfig) *cobra.Command {
 	cmd.Flags().String("etcd-pv-capacity", "10Gi", "Size of persistent volume claim to be used for etcd.")
 	cmd.Flags().Bool("etcd-persistent-storage", true, "Use persistent volume for etcd. Defaults to 'true'.")
 	cmd.Flags().Bool("dry-run", false, "dry run without sending commands to server.")
-	cmd.Flags().String("apiserver-arg-overrides", "", "comma sapareted list of all or subset of the federation-apiserver arguments as \"--arg1=value1,--arg2=value2...\"")
-	cmd.Flags().String("controllermgr-arg-overrides", "", "comma sapareted list of all or subset of the federation-controller-manager arguments as \"--arg1=value1,--arg2=value2...\"")
+	cmd.Flags().String("apiserver-arg-overrides", "", "comma separated list of federation-apiserver arguments to override: Example \"--arg1=value1,--arg2=value2...\"")
+	cmd.Flags().String("controllermanager-arg-overrides", "", "comma separated list of federation-controller-manager arguments to override: Example \"--arg1=value1,--arg2=value2...\"")
 	cmd.Flags().String("storage-backend", "etcd2", "The storage backend for persistence. Options: 'etcd2' (default), 'etcd3'.")
 	return cmd
 }
@@ -178,9 +164,15 @@ func initFederation(cmdOut io.Writer, config util.AdminConfig, cmd *cobra.Comman
 	etcdPVCapacity := cmdutil.GetFlagString(cmd, "etcd-pv-capacity")
 	etcdPersistence := cmdutil.GetFlagBool(cmd, "etcd-persistent-storage")
 	dryRun := cmdutil.GetDryRunFlag(cmd)
-	apiserverArgOverrides := cmdutil.GetFlagString(cmd, "apiserver-arg-overrides")
-	cmArgOverrides := cmdutil.GetFlagString(cmd, "controllermgr-arg-overrides")
 	storageBackend := cmdutil.GetFlagString(cmd, "storage-backend")
+	apiserverArgOverrides, err := marshallOverrides(cmdutil.GetFlagString(cmd, "apiserver-arg-overrides"))
+	if err != nil {
+		return err
+	}
+	cmArgOverrides, err := marshallOverrides(cmdutil.GetFlagString(cmd, "controllermanager-arg-overrides"))
+	if err != nil {
+		return err
+	}
 
 	hostFactory := config.HostFactory(initFlags.Host, initFlags.Kubeconfig)
 	hostClientset, err := hostFactory.ClientSet()
@@ -469,34 +461,28 @@ func createPVC(clientset *client.Clientset, namespace, svcName, etcdPVCapacity s
 	return clientset.Core().PersistentVolumeClaims(namespace).Create(pvc)
 }
 
-func createAPIServer(clientset *client.Clientset, namespace, name, image, credentialsName, advertiseAddress, storageBackend, apiserverArgOverrides string, pvc *api.PersistentVolumeClaim, dryRun bool) (*extensions.Deployment, error) {
+func createAPIServer(clientset *client.Clientset, namespace, name, image, credentialsName, advertiseAddress, storageBackend string, argOverrides map[string]string, pvc *api.PersistentVolumeClaim, dryRun bool) (*extensions.Deployment, error) {
 	command := []string{
 		"/hyperkube",
 		"federation-apiserver",
 	}
-	apiserverArgs := []string{}
-	apiserverArgsMap := apiserverDefaultArgs
+	argsMap := map[string]string{
+		"--bind-address":         "0.0.0.0",
+		"--etcd-servers":         "http://localhost:2379",
+		"--secure-port":          "443",
+		"--client-ca-file":       "/etc/federation/apiserver/ca.crt",
+		"--tls-cert-file":        "/etc/federation/apiserver/server.crt",
+		"--tls-private-key-file": "/etc/federation/apiserver/server.key",
+		"--admission-control":    "NamespaceLifecycle",
+	}
 
-	apiserverArgsMap["--storage-backend"] = storageBackend
+	argsMap["--storage-backend"] = storageBackend
 	if advertiseAddress != "" {
-		// This will be overridden with the override arg if user specifies one
-		apiserverArgsMap["--advertise-address"] = advertiseAddress
+		argsMap["--advertise-address"] = advertiseAddress
 	}
 
-	if apiserverArgOverrides != "" {
-		var err error
-		apiserverArgsMap, err = overrideArgs(apiserverArgsMap, apiserverArgOverrides)
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	for key, value := range apiserverArgsMap {
-		apiserverArgs = append(apiserverArgs, fmt.Sprintf("%s=%s", key, value))
-	}
-	// This is needed for the unit test deep copy to get an exact match
-	sort.Strings(apiserverArgs)
-	command = append(command, apiserverArgs...)
+	args := mergeArgs(argsMap, argOverrides)
+	command = append(command, args...)
 
 	dep := &extensions.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
@@ -638,33 +624,23 @@ func createRoleBindings(clientset *client.Clientset, namespace, saName string, d
 	return newRole, newRolebinding, err
 }
 
-func createControllerManager(clientset *client.Clientset, namespace, name, svcName, cmName, image, kubeconfigName, dnsZoneName, dnsProvider, saName, cmArgOverrides string, dryRun bool) (*extensions.Deployment, error) {
+func createControllerManager(clientset *client.Clientset, namespace, name, svcName, cmName, image, kubeconfigName, dnsZoneName, dnsProvider, saName string, argOverrides map[string]string, dryRun bool) (*extensions.Deployment, error) {
 	command := []string{
 		"/hyperkube",
 		"federation-controller-manager",
 	}
-	cmArgs := []string{}
-	cmArgsMap := cmDefaultArgs
-
-	cmArgsMap["--master"] = fmt.Sprintf("https://%s", svcName)
-	cmArgsMap["--dns-provider"] = dnsProvider
-	cmArgsMap["--federation-name"] = name
-	cmArgsMap["--zone-name"] = dnsZoneName
-
-	if cmArgOverrides != "" {
-		var err error
-		cmArgsMap, err = overrideArgs(cmArgsMap, cmArgOverrides)
-		if err != nil {
-			return nil, err
-		}
+	argsMap := map[string]string{
+		"--kubeconfig":          "/etc/federation/controller-manager/kubeconfig",
+		"--dns-provider-config": "",
 	}
 
-	for key, value := range cmArgsMap {
-		cmArgs = append(cmArgs, fmt.Sprintf("%s=%s", key, value))
-	}
-	// This is needed for the unit test deep copy to get an exact match
-	sort.Strings(cmArgs)
-	command = append(command, cmArgs...)
+	argsMap["--master"] = fmt.Sprintf("https://%s", svcName)
+	argsMap["--dns-provider"] = dnsProvider
+	argsMap["--federation-name"] = name
+	argsMap["--zone-name"] = dnsZoneName
+
+	args := mergeArgs(argsMap, argOverrides)
+	command = append(command, args...)
 
 	dep := &extensions.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
@@ -726,32 +702,39 @@ func createControllerManager(clientset *client.Clientset, namespace, name, svcNa
 	return clientset.Extensions().Deployments(namespace).Create(dep)
 }
 
-func overrideArgs(serverArgs map[string]string, argOverrides string) (map[string]string, error) {
-	overrideArgs := strings.Split(argOverrides, ",")
-	argsMap := serverArgs
+func marshallOverrides(overrideArgString string) (map[string]string, error) {
+	if overrideArgString == "" {
+		return nil, nil
+	}
 
+	argsMap := make(map[string]string)
+	overrideArgs := strings.Split(overrideArgString, ",")
 	for _, overrideArg := range overrideArgs {
-		overrideArgSplitted := strings.Split(overrideArg, "=")
-		if len(overrideArgSplitted) != 2 {
+		splitArg := strings.Split(overrideArg, "=")
+		if len(splitArg) != 2 {
 			return nil, fmt.Errorf("Wrong format for override arg: %s", overrideArg)
 		}
-		found := false
-		for key := range argsMap {
-			if key == overrideArgSplitted[0] {
-				// Replace the default value by user specified value
-				argsMap[key] = overrideArgSplitted[1]
-				found = true
-				break
-			}
+		key := strings.TrimSpace(splitArg[0])
+		val := strings.TrimSpace(splitArg[1])
+		if len(key) == 0 {
+			return nil, fmt.Errorf("Wrong format for override arg: %s, Arg name cannot be empty", overrideArg)
 		}
-		// This arg is not in defaults, append it.
-		// We do not care if the argument name or value used is not correct
-		// To verify the wrong args is the particular server apps job.
-		if found == false {
-			argsMap[overrideArgSplitted[0]] = overrideArgSplitted[1]
-		}
+		argsMap[key] = val
 	}
 	return argsMap, nil
+}
+
+func mergeArgs(argsMap, overrides map[string]string) []string {
+	for key, val := range overrides {
+		argsMap[key] = val
+	}
+	args := []string{}
+	for key, value := range argsMap {
+		args = append(args, fmt.Sprintf("%s=%s", key, value))
+	}
+	// This is needed for the unit test deep copy to get an exact match
+	sort.Strings(args)
+	return args
 }
 
 func waitForPods(clientset *client.Clientset, fedPods []string, namespace string) error {
