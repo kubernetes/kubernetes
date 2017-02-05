@@ -181,4 +181,12 @@ func TestWatch(t *testing.T) {
 	)
 }
 
+func TestShortNames(t *testing.T) {
+	storage, _, server := newStorage(t)
+	defer server.Terminate(t)
+	defer storage.Store.DestroyFunc()
+	expected := []string{"ds"}
+	registrytest.AssertShortNames(t, storage, expected)
+}
+
 // TODO TestUpdateStatus

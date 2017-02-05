@@ -87,6 +87,14 @@ func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, *StatusREST, *Rollbac
 	return &REST{store}, &StatusREST{store: &statusStore}, &RollbackREST{store: store}
 }
 
+// Implement ShortNamesProvider
+var _ rest.ShortNamesProvider = &REST{}
+
+// ShortNames implements the ShortNamesProvider interface. Returns a list of short names for a resource.
+func (r *REST) ShortNames() []string {
+	return []string{"deploy"}
+}
+
 // StatusREST implements the REST endpoint for changing the status of a deployment
 type StatusREST struct {
 	store *genericregistry.Store

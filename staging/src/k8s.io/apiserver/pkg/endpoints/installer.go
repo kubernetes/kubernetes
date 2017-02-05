@@ -35,10 +35,10 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apiserver/pkg/endpoints/handlers"
 	"k8s.io/apiserver/pkg/endpoints/handlers/negotiation"
 	"k8s.io/apiserver/pkg/endpoints/metrics"
 	"k8s.io/apiserver/pkg/endpoints/request"
-	"k8s.io/apiserver/pkg/endpoints/handlers"
 	"k8s.io/apiserver/pkg/registry/rest"
 
 	"github.com/emicklei/go-restful"
@@ -366,6 +366,12 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 		resourceKind = kindProvider.Kind()
 	} else {
 		resourceKind = kind
+	}
+
+	var shortNames []string
+	shortNamesProvider, ok := storage.(rest.ShortNamesProvider)
+	if ok {
+		shortNames = shortNamesProvider.ShortNames()
 	}
 
 	var apiResource metav1.APIResource
@@ -796,6 +802,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 		apiResource.Verbs = append(apiResource.Verbs, kubeVerb)
 	}
 	sort.Strings(apiResource.Verbs)
+	apiResource.ShortNames = shortNames
 
 	return &apiResource, nil
 }
