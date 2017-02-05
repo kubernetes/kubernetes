@@ -98,7 +98,6 @@ func TestStatefulSetControlReplacesPods(t *testing.T) {
 		t.Error(err)
 	}
 	sort.Sort(ascendingOrdinal(pods))
-	println(len(pods))
 	spc.podsIndexer.Delete(pods[0])
 	spc.podsIndexer.Delete(pods[2])
 	spc.podsIndexer.Delete(pods[4])

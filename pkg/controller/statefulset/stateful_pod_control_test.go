@@ -503,9 +503,10 @@ func TestStatefulPodControlUpdatesSetStatus(t *testing.T) {
 	}
 }
 
-func TestStatefulPodControlUpdateStatusFailure(t *testing.T) {
+func TestStatefulPodControlUpdateReplicasFailure(t *testing.T) {
 	recorder := record.NewFakeRecorder(10)
 	set := newStatefulSet(3)
+	replicas := set.Status.Replicas
 	fakeClient := &fake.Clientset{}
 	control := NewRealStatefulPodControl(fakeClient, recorder)
 	fakeClient.AddReactor("update", "statefulsets", func(action core.Action) (bool, runtime.Object, error) {
@@ -514,8 +515,8 @@ func TestStatefulPodControlUpdateStatusFailure(t *testing.T) {
 	if err := control.UpdateStatefulSetReplicas(set, 2); err == nil {
 		t.Error("Failed update did not return error")
 	}
-	if set.Status.Replicas != 2 {
-		t.Errorf("UpdateStatefulSetStatus mutated the sets replicas %d", set.Status.Replicas)
+	if set.Status.Replicas != replicas {
+		t.Errorf("UpdateStatefulSetStatus mutated the sets replicas %d", replicas)
 	}
 	events := collectEvents(recorder.Events)
 	if eventCount := len(events); eventCount != 0 {
@@ -523,7 +524,7 @@ func TestStatefulPodControlUpdateStatusFailure(t *testing.T) {
 	}
 }
 
-func TestStatefulPodControlUpdateStatusConflict(t *testing.T) {
+func TestStatefulPodControlUpdateReplicasConflict(t *testing.T) {
 	recorder := record.NewFakeRecorder(10)
 	set := newStatefulSet(3)
 	attempts := 0
@@ -554,9 +555,10 @@ func TestStatefulPodControlUpdateStatusConflict(t *testing.T) {
 	}
 }
 
-func TestStatefulPodControlUpdateStatusConflictFailure(t *testing.T) {
+func TestStatefulPodControlUpdateReplicasConflictFailure(t *testing.T) {
 	recorder := record.NewFakeRecorder(10)
 	set := newStatefulSet(3)
+	replicas := set.Status.Replicas
 	fakeClient := &fake.Clientset{}
 	control := NewRealStatefulPodControl(fakeClient, recorder)
 	fakeClient.AddReactor("update", "statefulsets", func(action core.Action) (bool, runtime.Object, error) {
@@ -569,7 +571,7 @@ func TestStatefulPodControlUpdateStatusConflictFailure(t *testing.T) {
 	if err := control.UpdateStatefulSetReplicas(set, 2); err == nil {
 		t.Error("UpdateStatefulSetStatus failed to return an error on get failure")
 	}
-	if set.Status.Replicas != 2 {
+	if set.Status.Replicas != replicas {
 		t.Errorf("UpdateStatefulSetStatus mutated the sets replicas %d", set.Status.Replicas)
 	}
 	events := collectEvents(recorder.Events)
@@ -578,22 +580,22 @@ func TestStatefulPodControlUpdateStatusConflictFailure(t *testing.T) {
 	}
 }
 
-func TestStatefulPodControlUpdateStatusConflictMaxRetries(t *testing.T) {
+func TestStatefulPodControlUpdateReplicasConflictMaxRetries(t *testing.T) {
 	recorder := record.NewFakeRecorder(10)
 	set := newStatefulSet(3)
+	replicas := set.Status.Replicas
 	fakeClient := &fake.Clientset{}
 	control := NewRealStatefulPodControl(fakeClient, recorder)
 	fakeClient.AddReactor("update", "statefulsets", func(action core.Action) (bool, runtime.Object, error) {
-		update := action.(core.UpdateAction)
-		return true, update.GetObject(), apierrors.NewConflict(action.GetResource().GroupResource(), set.Name, errors.New("Object already exists"))
+		return true, newStatefulSet(3), apierrors.NewConflict(action.GetResource().GroupResource(), set.Name, errors.New("Object already exists"))
 	})
 	fakeClient.AddReactor("get", "statefulsets", func(action core.Action) (bool, runtime.Object, error) {
-		return true, set, nil
+		return true, newStatefulSet(3), nil
 	})
 	if err := control.UpdateStatefulSetReplicas(set, 2); err == nil {
 		t.Error("UpdateStatefulSetStatus failure did not return an error ")
 	}
-	if set.Status.Replicas != 2 {
+	if set.Status.Replicas != replicas {
 		t.Errorf("UpdateStatefulSetStatus mutated the sets replicas %d", set.Status.Replicas)
 	}
 	events := collectEvents(recorder.Events)

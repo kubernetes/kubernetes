@@ -161,7 +161,6 @@ func (spc *realStatefulPodControl) UpdateStatefulSetReplicas(set *apps.StatefulS
 		conflicting.Status.Replicas = setCopy.Status.Replicas
 		*setCopy = *conflicting
 	}
-	*set = *setCopy
 	return updateConflictError
 }
 
