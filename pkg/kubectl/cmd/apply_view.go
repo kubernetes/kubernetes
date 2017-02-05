@@ -22,10 +22,11 @@ import (
 
 	"github.com/spf13/cobra"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
-	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/kubernetes/pkg/api/annotations"
+	"k8s.io/kubernetes/pkg/kubectl"
+	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 )
 
 var (
@@ -47,7 +48,7 @@ var (
 func NewCmdApplyView(f cmdutil.Factory, cmdOut io.Writer) *cobra.Command {
 	options := &ApplyOptions {}
 	cmd := &cobra.Command{
-		Use:     "view",
+		Use:     "view (TYPE [NAME | -l label] | TYPE/NAME | -f FILENAME)",
 		Short:   "Get the last-applied-configuration annotations",
 		Long:    applyViewLong,
 		Example: applyViewExample,
@@ -67,7 +68,6 @@ func ApplyViewLastApplied(f cmdutil.Factory, errOut io.Writer, cmd *cobra.Comman
 		return cmdutil.UsageError(cmd, "for now apply %s only support last-applied")
 	}
 
-	allNamespaces := cmdutil.GetFlagBool(cmd, "all-namespaces")
 	mapper, typer, err := f.UnstructuredObject()
 	if err != nil {
 		return err
@@ -78,14 +78,10 @@ func ApplyViewLastApplied(f cmdutil.Factory, errOut io.Writer, cmd *cobra.Comman
 		return err
 	}
 
-	if allNamespaces {
-		enforceNamespace = false
-	}
-
 	r := resource.NewBuilder(mapper, typer, resource.ClientMapperFunc(f.UnstructuredClientForMapping), unstructured.UnstructuredJSONScheme).
-		NamespaceParam(cmdNamespace).DefaultNamespace().AllNamespaces(allNamespaces).
+		NamespaceParam(cmdNamespace).DefaultNamespace().
 		FilenameParam(enforceNamespace, &options.FilenameOptions).
-		ResourceTypeOrNameArgs(true, args...).
+		ResourceTypeOrNameArgs(true, args[1:]...).
 		SingleResourceType().
 		Latest().
 		Do()
@@ -97,33 +93,34 @@ func ApplyViewLastApplied(f cmdutil.Factory, errOut io.Writer, cmd *cobra.Comman
 	if err != nil {
 		return err
 	}
-
-	if len(infos) != 1 {
-		//return i18n.Errorf("watch is only supported on individual resources and resource collections - %d resources were found", len(infos))
-	}
 	info := infos[0]
+	encoder := f.JSONEncoder()
+	_, err = kubectl.GetModifiedConfiguration(info, false, encoder)
+	if err != nil {
+		return err
+	}
 
 	annotationMap, err := info.Mapping.MetadataAccessor.Annotations(info.Object)
 	if err != nil {
 		return err
 	}
+
 	if _, ok := annotationMap[annotations.LastAppliedConfigAnnotation]; !ok {
 		fmt.Fprintf(errOut, warningNoLastAppliedConfigAnnotation)
 	}
 
-	fmt.Println(annotationMap[annotations.LastAppliedConfigAnnotation])
-
 	/*
-	mapping := info.ResourceMapping()
-	printer, err := f.PrinterForMapping(cmd, mapping, allNamespaces)
+	outputFormat := cmdutil.GetFlagString(cmd, "output")
+	o.printer, _, err = kubectl.GetPrinter(outputFormat, templateFile, false, cmdutil.GetFlagBool(cmd, "allow-missing-template-keys"))
 	if err != nil {
 		return err
 	}
-	obj, err := r.Object()
+	printer, generic, err := cmdutil.PrinterForCommand(cmd)
 	if err != nil {
 		return err
-	}
-	*/
+	}*/
+
+	fmt.Println(annotationMap[annotations.LastAppliedConfigAnnotation])
 
 	return nil
 }
