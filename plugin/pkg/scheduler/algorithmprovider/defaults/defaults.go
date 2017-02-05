@@ -159,6 +159,9 @@ func defaultPredicates() sets.String {
 
 		// Fit is determined by node disk pressure condition.
 		factory.RegisterFitPredicate("CheckNodeDiskPressure", predicates.CheckNodeDiskPressurePredicate),
+
+		// Fir is determined by image present on node
+		factory.RegisterFitPredicate("CheckImageNotPresent", predicates.CheckImageNotPresentPredicate),
 	)
 }
 
