@@ -491,7 +491,7 @@ func TestStatefulPodControlUpdatesSetStatus(t *testing.T) {
 		update := action.(core.UpdateAction)
 		return true, update.GetObject(), nil
 	})
-	if err := control.UpdateStatefulSetReplicas(set,2); err != nil {
+	if err := control.UpdateStatefulSetReplicas(set, 2); err != nil {
 		t.Errorf("Error returned on successful status update: %s", err)
 	}
 	if set.Status.Replicas != 2 {
@@ -511,7 +511,7 @@ func TestStatefulPodControlUpdateStatusFailure(t *testing.T) {
 	fakeClient.AddReactor("update", "statefulsets", func(action core.Action) (bool, runtime.Object, error) {
 		return true, nil, apierrors.NewInternalError(errors.New("API server down"))
 	})
-	if err := control.UpdateStatefulSetReplicas(set,2); err == nil {
+	if err := control.UpdateStatefulSetReplicas(set, 2); err == nil {
 		t.Error("Failed update did not return error")
 	}
 	if set.Status.Replicas != 2 {
@@ -542,7 +542,7 @@ func TestStatefulPodControlUpdateStatusConflict(t *testing.T) {
 	fakeClient.AddReactor("get", "statefulsets", func(action core.Action) (bool, runtime.Object, error) {
 		return true, set, nil
 	})
-	if err := control.UpdateStatefulSetReplicas(set,2); err != nil {
+	if err := control.UpdateStatefulSetReplicas(set, 2); err != nil {
 		t.Errorf("UpdateStatefulSetStatus returned an error: %s", err)
 	}
 	if set.Status.Replicas != 2 {
@@ -566,7 +566,7 @@ func TestStatefulPodControlUpdateStatusConflictFailure(t *testing.T) {
 	fakeClient.AddReactor("get", "statefulsets", func(action core.Action) (bool, runtime.Object, error) {
 		return true, nil, apierrors.NewInternalError(errors.New("API server down"))
 	})
-	if err := control.UpdateStatefulSetReplicas(set,2); err == nil {
+	if err := control.UpdateStatefulSetReplicas(set, 2); err == nil {
 		t.Error("UpdateStatefulSetStatus failed to return an error on get failure")
 	}
 	if set.Status.Replicas != 2 {
@@ -590,7 +590,7 @@ func TestStatefulPodControlUpdateStatusConflictMaxRetries(t *testing.T) {
 	fakeClient.AddReactor("get", "statefulsets", func(action core.Action) (bool, runtime.Object, error) {
 		return true, set, nil
 	})
-	if err := control.UpdateStatefulSetReplicas(set,2); err == nil {
+	if err := control.UpdateStatefulSetReplicas(set, 2); err == nil {
 		t.Error("UpdateStatefulSetStatus failure did not return an error ")
 	}
 	if set.Status.Replicas != 2 {
