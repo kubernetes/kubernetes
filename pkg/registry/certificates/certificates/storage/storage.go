@@ -67,6 +67,14 @@ func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, *StatusREST, *Approva
 	return &REST{store}, &StatusREST{store: &statusStore}, &ApprovalREST{store: &approvalStore}
 }
 
+// Implement ShortNamesProvider
+var _ rest.ShortNamesProvider = &REST{}
+
+// ShortNames implements the ShortNamesProvider interface. Returns a list of short names for a resource.
+func (r *REST) ShortNames() []string {
+	return []string{"csr"}
+}
+
 // StatusREST implements the REST endpoint for changing the status of a CSR.
 type StatusREST struct {
 	store *genericregistry.Store

@@ -99,3 +99,11 @@ func TestDelete(t *testing.T) {
 	test := registrytest.New(t, storage.Store)
 	test.TestDelete(validNewEvent(test.TestNamespace()))
 }
+
+func TestShortNames(t *testing.T) {
+	storage, server := newStorage(t)
+	defer server.Terminate(t)
+	defer storage.Store.DestroyFunc()
+	expected := []string{"ev"}
+	registrytest.AssertShortNames(t, storage, expected)
+}

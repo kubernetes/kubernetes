@@ -795,3 +795,11 @@ func TestEtcdUpdateStatus(t *testing.T) {
 		t.Errorf("objects differ: %v", diff.ObjectDiff(podOut, expected))
 	}
 }
+
+func TestShortNames(t *testing.T) {
+	storage, _, _, server := newStorage(t)
+	defer server.Terminate(t)
+	defer storage.Store.DestroyFunc()
+	expected := []string{"po"}
+	registrytest.AssertShortNames(t, storage, expected)
+}

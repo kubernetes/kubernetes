@@ -173,6 +173,14 @@ func (r *REST) Delete(ctx genericapirequest.Context, name string, options *metav
 	return r.Store.Delete(ctx, name, options)
 }
 
+// Implement ShortNamesProvider
+var _ rest.ShortNamesProvider = &REST{}
+
+// ShortNames implements the ShortNamesProvider interface. Returns a list of short names for a resource.
+func (r *REST) ShortNames() []string {
+	return []string{"ns"}
+}
+
 func (r *StatusREST) New() runtime.Object {
 	return r.store.New()
 }
