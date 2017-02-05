@@ -23,7 +23,6 @@ import (
 	"k8s.io/apimachinery/pkg/conversion"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/intstr"
-	"k8s.io/kubernetes/pkg/api"
 	v1 "k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 )
@@ -49,7 +48,7 @@ func addConversionFuncs(scheme *runtime.Scheme) error {
 	// Add field label conversions for kinds having selectable nothing but ObjectMeta fields.
 	for _, k := range []string{"DaemonSet", "Deployment", "Ingress"} {
 		kind := k // don't close over range variables
-		err = api.Scheme.AddFieldLabelConversionFunc("extensions/v1beta1", kind,
+		err = scheme.AddFieldLabelConversionFunc("extensions/v1beta1", kind,
 			func(label, value string) (string, string, error) {
 				switch label {
 				case "metadata.name", "metadata.namespace":

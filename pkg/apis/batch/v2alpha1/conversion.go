@@ -21,7 +21,6 @@ import (
 
 	"k8s.io/apimachinery/pkg/conversion"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/kubernetes/pkg/api"
 	v1 "k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/apis/batch"
 )
@@ -38,7 +37,7 @@ func addConversionFuncs(scheme *runtime.Scheme) error {
 
 	// Add field label conversions for kinds having selectable nothing but ObjectMeta fields.
 	for _, kind := range []string{"Job", "JobTemplate", "CronJob"} {
-		err = api.Scheme.AddFieldLabelConversionFunc("batch/v2alpha1", kind,
+		err = scheme.AddFieldLabelConversionFunc("batch/v2alpha1", kind,
 			func(label, value string) (string, string, error) {
 				switch label {
 				case "metadata.name", "metadata.namespace", "status.successful":
