@@ -19,6 +19,8 @@ api-prefix
 api-rate
 api-server-port
 api-servers
+api-server-advertise-address
+api-server-service-type
 api-token
 api-version
 apiserver-count
