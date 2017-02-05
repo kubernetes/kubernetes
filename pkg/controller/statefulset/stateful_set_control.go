@@ -50,14 +50,14 @@ type defaultStatefulSetControl struct {
 
 func (ssc *defaultStatefulSetControl) UpdateStatefulSet(set *apps.StatefulSet, pods []*v1.Pod) error {
 	replicaCount := int(*set.Spec.Replicas)
+	// slice that will contain all Pods such that 0 <= getOrdinal(pod) < set.Spec.Replicas
 	replicas := make([]*v1.Pod, replicaCount)
+	// slice that will contain all Pods such that set.Spec.Replicas <= getOrdinal(pod)
 	condemned := make([]*v1.Pod, 0, len(pods))
 	ready := 0
 	unhealthy := 0
 
-	// First we partition pods into two lists, replicas will contain all Pods such that
-	// 0 <= getOrdinal(pod) < set.Spec.Replicas and condemned will contain all Pods such that
-	// set.Spec.Replicas <= getOrdinal(pod)
+	// First we partition pods into two lists valid replicas and condemned Pods
 	for i := range pods {
 		//count the number of running and ready replicas
 		if isRunningAndReady(pods[i]) {
@@ -96,9 +96,8 @@ func (ssc *defaultStatefulSetControl) UpdateStatefulSet(set *apps.StatefulSet, p
 	// sort the condemned Pods by their ordinals
 	sort.Sort(ascendingOrdinal(condemned))
 
-	// attempt to update set with the current number of replicas
-	set.Status = apps.StatefulSetStatus{Replicas: int32(ready)}
-	if err := ssc.podControl.UpdateStatefulSetStatus(set); err != nil {
+	// if the current number of replicas has changed update the statefulSets replicas
+	if err := ssc.podControl.UpdateStatefulSetReplicas(set, int32(ready)); err != nil {
 		return err
 	}
 

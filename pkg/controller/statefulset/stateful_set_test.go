@@ -357,7 +357,7 @@ func newFakeStatefulSetController() (*StatefulSetController, *fakeStatefulPodCon
 
 func fakeWorker(ssc *StatefulSetController) {
 	if obj, done := ssc.queue.Get(); !done {
-		ssc.Sync(obj.(string))
+		ssc.sync(obj.(string))
 		ssc.queue.Done(obj)
 	}
 }

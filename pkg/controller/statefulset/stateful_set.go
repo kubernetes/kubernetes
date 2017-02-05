@@ -17,7 +17,6 @@ limitations under the License.
 package statefulset
 
 import (
-	"fmt"
 	"reflect"
 	"sort"
 	"time"
@@ -62,7 +61,7 @@ type StatefulSetController struct {
 	podStore listers.StoreToPodLister
 
 	// podStoreSynced returns true if the pod store has synced at least once.
-	podStoreSynced func() bool
+	podStoreSynced cache.InformerSynced
 	// Watches changes to all pods.
 	podController cache.Controller
 	// A store of StatefulSets, populated by the psController.
@@ -130,6 +129,9 @@ func NewStatefulSetController(podInformer cache.SharedIndexInformer, kubeClient 
 func (ssc *StatefulSetController) Run(workers int, stopCh <-chan struct{}) {
 	defer utilruntime.HandleCrash()
 	glog.Infof("Starting statefulset controller")
+	if !cache.WaitForCacheSync(stopCh, ssc.podStoreSynced) {
+		return
+	}
 	go ssc.podController.Run(stopCh)
 	go ssc.setController.Run(stopCh)
 	for i := 0; i < workers; i++ {
@@ -206,16 +208,7 @@ func (ssc *StatefulSetController) getPodsForStatefulSet(set *apps.StatefulSet) (
 	if err != nil {
 		return []*v1.Pod{}, err
 	}
-	pods, err := ssc.podStore.Pods(set.Namespace).List(sel)
-	if err != nil {
-		return []*v1.Pod{}, err
-	}
-	// TODO: Do we need to copy?
-	result := make([]*v1.Pod, 0, len(pods))
-	for i := range pods {
-		result = append(result, &(*pods[i]))
-	}
-	return result, nil
+	return ssc.podStore.Pods(set.Namespace).List(sel)
 }
 
 // getStatefulSetForPod returns the StatefulSet managing the given pod.
@@ -254,38 +247,36 @@ func (ssc *StatefulSetController) enqueueStatefulSet(obj interface{}) {
 	ssc.queue.Add(key)
 }
 
-// worker runs a worker thread that just dequeues items, processes them, and marks them done.
-// It enforces that the syncHandler is never invoked concurrently with the same key.
+// processNextWorkItem dequeues items, processes them, and marks them done. It enforces that the syncHandler is never
+// invoked concurrently with the same key.
+func (ssc *StatefulSetController) processNextWorkItem() bool {
+	key, quit := ssc.queue.Get()
+	if quit {
+		return false
+	}
+	defer ssc.queue.Done(key)
+	if err := ssc.sync(key.(string)); err != nil {
+		glog.Errorf("Error syncing StatefulSet %v, requeuing: %v", key.(string), err)
+		ssc.queue.AddRateLimited(key)
+	} else {
+		ssc.queue.Forget(key)
+	}
+	return true
+}
+
+// worker runs a worker goroutine that invokes processNextWorkItem until the the controller's queue is closed
 func (ssc *StatefulSetController) worker() {
-	for {
-		func() {
-			key, quit := ssc.queue.Get()
-			if quit {
-				return
-			}
-			defer ssc.queue.Done(key)
-			if err := ssc.Sync(key.(string)); err != nil {
-				glog.Errorf("Error syncing StatefulSet %v, requeuing: %v", key.(string), err)
-				ssc.queue.AddRateLimited(key)
-			} else {
-				ssc.queue.Forget(key)
-			}
-		}()
+	for ssc.processNextWorkItem() {
+
 	}
 }
 
-// Sync syncs the given statefulset.
-func (ssc *StatefulSetController) Sync(key string) error {
+// sync syncs the given statefulset.
+func (ssc *StatefulSetController) sync(key string) error {
 	startTime := time.Now()
 	defer func() {
 		glog.V(4).Infof("Finished syncing statefulset %q (%v)", key, time.Now().Sub(startTime))
 	}()
-
-	if !ssc.podStoreSynced() {
-		// Sleep so we give the pod reflector goroutine a chance to run.
-		time.Sleep(PodStoreSyncedPollPeriod)
-		return fmt.Errorf("waiting for pods controller to sync")
-	}
 
 	obj, exists, err := ssc.setStore.Store.GetByKey(key)
 	if !exists {

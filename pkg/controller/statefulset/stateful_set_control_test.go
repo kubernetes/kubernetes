@@ -98,6 +98,7 @@ func TestStatefulSetControlReplacesPods(t *testing.T) {
 		t.Error(err)
 	}
 	sort.Sort(ascendingOrdinal(pods))
+	println(len(pods))
 	spc.podsIndexer.Delete(pods[0])
 	spc.podsIndexer.Delete(pods[2])
 	spc.podsIndexer.Delete(pods[4])
@@ -568,12 +569,13 @@ func (spc *fakeStatefulPodControl) DeleteStatefulPod(set *apps.StatefulSet, pod 
 	return nil
 }
 
-func (spc *fakeStatefulPodControl) UpdateStatefulSetStatus(set *apps.StatefulSet) error {
+func (spc *fakeStatefulPodControl) UpdateStatefulSetReplicas(set *apps.StatefulSet, replicas int32) error {
 	defer spc.updateStatusTracker.inc()
 	if spc.updateStatusTracker.errorReady() {
 		defer spc.updateStatusTracker.reset()
 		return spc.updateStatusTracker.err
 	}
+	set.Status.Replicas = replicas
 	spc.setsIndexer.Update(set)
 	return nil
 }

@@ -46,9 +46,10 @@ type StatefulPodControlInterface interface {
 	// DeleteStatefulPod deletes a Pod in a StatefulSet. The pods PVCs are not deleted. If the delete is successful,
 	// the returned error is nil.
 	DeleteStatefulPod(set *apps.StatefulSet, pod *v1.Pod) error
-	// UpdateStatefulSetStatus Updates the Status of a StatefulSet. set is an in-out parameter, and any updates made
-	// to the set are made visible as mutations to the parameter. If the method is successful, the returned error is nil.
-	UpdateStatefulSetStatus(set *apps.StatefulSet) error
+	// UpdateStatefulSetStatus Updates the Status.Replicas of a StatefulSet. set is an in-out parameter, and any
+	// updates made to the set are made visible as mutations to the parameter. If the method is successful, the
+	// returned error is nil, and set has its Status.Replicas field set to replicas.
+	UpdateStatefulSetReplicas(set *apps.StatefulSet, replicas int32) error
 }
 
 func NewRealStatefulPodControl(client clientset.Interface, recorder record.EventRecorder) StatefulPodControlInterface {
@@ -135,24 +136,30 @@ func (spc *realStatefulPodControl) DeleteStatefulPod(set *apps.StatefulSet, pod 
 	return err
 }
 
-func (spc *realStatefulPodControl) UpdateStatefulSetStatus(set *apps.StatefulSet) error {
+func (spc *realStatefulPodControl) UpdateStatefulSetReplicas(set *apps.StatefulSet, replicas int32) error {
+	if set.Status.Replicas == replicas {
+		return nil
+	}
 	obj, err := api.Scheme.Copy(set)
 	if err != nil {
 		return fmt.Errorf("unable to copy set: %v", err)
 	}
 	setCopy := obj.(*apps.StatefulSet)
+	setCopy.Status.Replicas = replicas
 	for attempt := 0; attempt < maxUpdateRetries; attempt++ {
 		_, err := spc.client.Apps().StatefulSets(setCopy.Namespace).UpdateStatus(setCopy)
 		if !apierrors.IsConflict(err) {
+			if err == nil {
+				*set = *setCopy
+			}
 			return err
 		}
 		conflicting, err := spc.client.Apps().StatefulSets(setCopy.Namespace).Get(setCopy.Name, metav1.GetOptions{})
 		if err != nil {
 			return err
 		}
-		conflicting.Status = setCopy.Status
+		conflicting.Status.Replicas = setCopy.Status.Replicas
 		*setCopy = *conflicting
-
 	}
 	*set = *setCopy
 	return updateConflictError
