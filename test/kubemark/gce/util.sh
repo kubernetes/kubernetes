@@ -104,6 +104,10 @@ function delete-master-instance-and-resources {
   fi
 }
 
+function build-and-push-kubemark {
+    make gcloudpush PROJECT=${PROJECT} REGISTRY=${REGISTRY}
+}
+
 function delete-master-instance-and-resources {
   GCLOUD_COMMON_ARGS="--project ${PROJECT} --zone ${ZONE} --quiet"
 

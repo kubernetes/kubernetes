@@ -168,7 +168,7 @@ function create-and-upload-hollow-node-image {
   cd "${MAKE_DIR}"
   RETRIES=3
   for attempt in $(seq 1 ${RETRIES}); do
-    if ! make; then
+    if ! build-and-push-kubemark; then
       if [[ $((attempt)) -eq "${RETRIES}" ]]; then
         echo "${color_red}Make failed. Exiting.${color_norm}"
         exit 1
@@ -296,6 +296,7 @@ current-context: kubemark-context")
   # TODO(shyamjvs): Make path to docker image variable in hollow-node_template.json.
   sed "s/{{numreplicas}}/${NUM_NODES:-10}/g" "${RESOURCE_DIRECTORY}/hollow-node_template.json" > "${RESOURCE_DIRECTORY}/hollow-node.json"
   sed -i'' -e "s/{{project}}/${PROJECT}/g" "${RESOURCE_DIRECTORY}/hollow-node.json"
+  sed -i'' -e "s/{{registry}}/${REGISTRY}/g" "${RESOURCE_DIRECTORY}/hollow-node.json"
   sed -i'' -e "s/{{master_ip}}/${MASTER_IP}/g" "${RESOURCE_DIRECTORY}/hollow-node.json"
   "${KUBECTL}" create -f "${RESOURCE_DIRECTORY}/hollow-node.json" --namespace="kubemark"
 

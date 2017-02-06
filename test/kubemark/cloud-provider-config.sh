@@ -15,3 +15,5 @@
 # limitations under the License.
 
 CLOUD_PROVIDER="${CLOUD_PROVIDER:-gce}"
+PROJECT="${PROJECT:-google_containers}"
+REGISTRY="${REGISTRY:-gcr.io}"
