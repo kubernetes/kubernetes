@@ -195,14 +195,14 @@ func isRunningAndReady(pod *v1.Pod) bool {
 	}
 	podReady := v1.IsPodReady(pod)
 	// User may have specified a pod readiness override through a debug annotation.
-	initialized, ok := pod.Annotations[v1.StatefulSetInitAnnotation]
+	initialized, ok := pod.Annotations[apps.StatefulSetInitAnnotation]
 	if ok {
 		if initAnnotation, err := strconv.ParseBool(initialized); err != nil {
 			glog.V(4).Infof("Failed to parse %v annotation on pod %v: %v",
-				v1.StatefulSetInitAnnotation, pod.Name, err)
+				apps.StatefulSetInitAnnotation, pod.Name, err)
 		} else if !initAnnotation {
 			glog.V(4).Infof("StatefulSet pod %v waiting on annotation %v", pod.Name,
-				v1.StatefulSetInitAnnotation)
+				apps.StatefulSetInitAnnotation)
 			podReady = initAnnotation
 		}
 	}

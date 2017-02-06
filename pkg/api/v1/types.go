@@ -4166,8 +4166,3 @@ const (
 	// DefaultFailureDomains defines the set of label keys used when TopologyKey is empty in PreferredDuringScheduling anti-affinity.
 	DefaultFailureDomains string = metav1.LabelHostname + "," + metav1.LabelZoneFailureDomain + "," + metav1.LabelZoneRegion
 )
-
-const (
-	// StatefulSetInitAnnotation if present, and set to false, indicates that a Pod's readiness should be ignored.
-	StatefulSetInitAnnotation = "pod.alpha.kubernetes.io/initialized"
-)

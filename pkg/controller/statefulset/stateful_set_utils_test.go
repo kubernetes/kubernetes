@@ -220,15 +220,15 @@ func TestIsRunningAndReady(t *testing.T) {
 	if !isRunningAndReady(pod) {
 		t.Error("Pod should be running and ready")
 	}
-	pod.Annotations[v1.StatefulSetInitAnnotation] = "true"
+	pod.Annotations[apps.StatefulSetInitAnnotation] = "true"
 	if !isRunningAndReady(pod) {
 		t.Error("isRunningAndReady does not respected init annotation set to true")
 	}
-	pod.Annotations[v1.StatefulSetInitAnnotation] = "false"
+	pod.Annotations[apps.StatefulSetInitAnnotation] = "false"
 	if isRunningAndReady(pod) {
 		t.Error("isRunningAndReady does not respected init annotation set to false")
 	}
-	pod.Annotations[v1.StatefulSetInitAnnotation] = "blah"
+	pod.Annotations[apps.StatefulSetInitAnnotation] = "blah"
 	if !isRunningAndReady(pod) {
 		t.Error("isRunningAndReady does not erroneous init annotation")
 	}

@@ -205,7 +205,7 @@ func TestDefaultStatefulSetControlInitAnnotation(t *testing.T) {
 		t.Error(err)
 	}
 	if replicas != int(set.Status.Replicas) {
-		t.Errorf("StatefulSetControl does not block on %s=false", v1.StatefulSetInitAnnotation)
+		t.Errorf("StatefulSetControl does not block on %s=false", apps.StatefulSetInitAnnotation)
 	}
 	if pods, err = spc.setPodInitStatus(set, 0, true); err != nil {
 		t.Error(err)
@@ -214,7 +214,7 @@ func TestDefaultStatefulSetControlInitAnnotation(t *testing.T) {
 		t.Errorf("Failed to turn up StatefulSet : %s", err)
 	}
 	if int(set.Status.Replicas) != 3 {
-		t.Errorf("StatefulSetControl does not unblock on %s=true", v1.StatefulSetInitAnnotation)
+		t.Errorf("StatefulSetControl does not unblock on %s=true", apps.StatefulSetInitAnnotation)
 	}
 }
 
@@ -480,9 +480,9 @@ func (spc *fakeStatefulPodControl) setPodInitStatus(set *apps.StatefulSet, ordin
 	sort.Sort(ascendingOrdinal(pods))
 	pod := pods[ordinal]
 	if init {
-		pod.Annotations[v1.StatefulSetInitAnnotation] = "true"
+		pod.Annotations[apps.StatefulSetInitAnnotation] = "true"
 	} else {
-		pod.Annotations[v1.StatefulSetInitAnnotation] = "false"
+		pod.Annotations[apps.StatefulSetInitAnnotation] = "false"
 	}
 	fakeResourceVersion(pod)
 	spc.podsIndexer.Update(pod)
