@@ -207,6 +207,9 @@ func SetDefaults_KubeletConfiguration(obj *KubeletConfiguration) {
 	if obj.CgroupsPerQOS == nil {
 		obj.CgroupsPerQOS = boolVar(false)
 	}
+	if obj.CertRotation == nil {
+		obj.CertRotation = boolVar(false)
+	}
 	if obj.ContainerRuntime == "" {
 		obj.ContainerRuntime = "docker"
 	}

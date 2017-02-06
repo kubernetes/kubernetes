@@ -163,6 +163,9 @@ type KubeletConfiguration struct {
 	// default /var/run/kubernetes). If tlsCertFile and tlsPrivateKeyFile
 	// are provided, this flag will be ignored.
 	CertDirectory string
+	// CertRotation is the flag to turn on automatic rotation of the kubelet's
+	// certificate for communicating with the API server.
+	CertRotation bool
 	// authentication specifies how requests to the Kubelet's server are authenticated
 	Authentication KubeletAuthentication
 	// authorization specifies how requests to the Kubelet's server are authorized
