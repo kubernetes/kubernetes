@@ -768,7 +768,7 @@ func WaitForMatchPodsCondition(c clientset.Interface, opts metav1.ListOptions, d
 		if len(conditionNotMatch) <= 0 {
 			return err
 		}
-		Logf("%d pods are not %s", len(conditionNotMatch), desc)
+		Logf("%d pods are not %s: %v", len(conditionNotMatch), desc, conditionNotMatch)
 	}
 	return fmt.Errorf("gave up waiting for matching pods to be '%s' after %v", desc, timeout)
 }
@@ -2490,7 +2490,7 @@ func ExpectNodeHasLabel(c clientset.Interface, nodeName string, labelKey string,
 }
 
 func RemoveTaintOffNode(c clientset.Interface, nodeName string, taint v1.Taint) {
-	ExpectNoError(controller.RemoveTaintOffNode(c, nodeName, &taint))
+	ExpectNoError(controller.RemoveTaintOffNode(c, nodeName, &taint, nil))
 	VerifyThatTaintIsGone(c, nodeName, &taint)
 }
 
