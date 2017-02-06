@@ -274,7 +274,7 @@ func TestMatchTaint(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		if tc.expectMatch != tc.taint.MatchTaint(tc.taintToMatch) {
+		if tc.expectMatch != tc.taint.MatchTaint(&tc.taintToMatch) {
 			t.Errorf("[%s] expect taint %s match taint %s", tc.description, tc.taint.ToString(), tc.taintToMatch.ToString())
 		}
 	}
