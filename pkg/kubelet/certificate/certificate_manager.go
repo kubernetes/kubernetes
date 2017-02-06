@@ -46,17 +46,29 @@ const (
 // manager. In the background it communicates with the API server to get new
 // certificates for certificates about to expire.
 type Manager interface {
+	// CertificateSigningRequestClient sets the client interface that is used for
+	// signing new certificates generated as part of rotation.
+	CertificateSigningRequestClient(certificatesclient.CertificateSigningRequestInterface)
 	// Start the API server status sync loop.
 	Start()
 	// Current returns the currently selected certificate from the
-	// certificate manager.
-	Current() *tls.Certificate
+	// certificate manager, as well as the associated certificate and key data
+	// in PEM format.
+	Current() *CertKeyData
+}
+
+type CertKeyData struct {
+	Certificate *tls.Certificate
+	CertPEM     []byte
+	KeyPEM      []byte
 }
 
 // Config is the set of configuration parameters available for a new Manager.
 type Config struct {
 	// CertificateSigningRequestClient will be used for signing new certificate
-	// requests generated when a key rotation occurs.
+	// requests generated when a key rotation occurs. It must be set either at
+	// initialization or by using CertificateSigningRequestClient before
+	// Manager.Start() is called.
 	CertificateSigningRequestClient certificatesclient.CertificateSigningRequestInterface
 	// Template is the CertificateRequest that will be used as a template for
 	// generating certificate signing requests for all new keys generated as
@@ -70,6 +82,9 @@ type Config struct {
 	// kept and future cert/key pairs will be persisted after they are
 	// generated.
 	CertificateStore Store
+	// Rotation is a call back function which, if provided, will be invoked
+	// after a rotation has occurred.
+	Rotation func()
 	// BootstrapCertificatePEM is the certificate data that will be returned
 	// from the Manager if the CertificateStore doesn't have any cert/key pairs
 	// currently available. If the CertificateStore does have a cert/key pair,
@@ -94,15 +109,16 @@ type Config struct {
 // Depending on the concrete implementation, the backing store for this
 // behavior may vary.
 type Store interface {
-	// Current returns the currently selected certificate. If the Store doesn't
+	// Current returns the currently selected certificate, as well as the
+	// associated certificate and key data in PEM format. If the Store doesn't
 	// have a cert/key pair currently, it should return a NoCertKeyError so
 	// that the Manager can recover by using bootstrap certificates to request
 	// a new cert/key pair.
-	Current() (*tls.Certificate, error)
+	Current() (*CertKeyData, error)
 	// Update accepts the PEM data for the cert/key pair and makes the new
 	// cert/key pair the 'current' pair, that will be returned by future calls
 	// to Current().
-	Update(cert, key []byte) (*tls.Certificate, error)
+	Update(cert, key []byte) (*CertKeyData, error)
 }
 
 // NoCertKeyError indicates there is no cert/key currently available.
@@ -116,15 +132,16 @@ type manager struct {
 	usages                   []certificates.KeyUsage
 	certStore                Store
 	certAccessLock           sync.RWMutex
-	cert                     *tls.Certificate
+	certKeyData              *CertKeyData
 	forceRotation            bool
+	rotation                 func()
 }
 
 // NewManager returns a new certificate manager. A certificate manager is
 // responsible for being the authoritative source of certificates in the
 // Kubelet and handling updates due to rotation.
 func NewManager(config *Config) (Manager, error) {
-	cert, forceRotation, err := getCurrentCertificateOrBootstrap(
+	certKeyData, forceRotation, err := getCurrentCertificateOrBootstrap(
 		config.CertificateStore,
 		config.BootstrapCertificatePEM,
 		config.BootstrapKeyPEM)
@@ -137,19 +154,27 @@ func NewManager(config *Config) (Manager, error) {
 		template:                 config.Template,
 		usages:                   config.Usages,
 		certStore:                config.CertificateStore,
-		cert:                     cert,
+		certKeyData:              certKeyData,
 		forceRotation:            forceRotation,
+		rotation:                 config.Rotation,
 	}
 
 	return &m, nil
 }
 
 // Current returns the currently selected certificate from the
-// certificate manager.
-func (m *manager) Current() *tls.Certificate {
+// certificate manager, as well as the associated certificate and key data
+// in PEM format.
+func (m *manager) Current() *CertKeyData {
 	m.certAccessLock.RLock()
 	defer m.certAccessLock.RUnlock()
-	return m.cert
+	return m.certKeyData
+}
+
+// CertificateSigningRequestClient sets the client interface that is used for
+// signing new certificates generated as part of rotation.
+func (m *manager) CertificateSigningRequestClient(certSigningRequestClient certificatesclient.CertificateSigningRequestInterface) {
+	m.certSigningRequestClient = certSigningRequestClient
 }
 
 // Start will start the background work of rotating the certificates.
@@ -177,11 +202,11 @@ func (m *manager) Start() {
 func getCurrentCertificateOrBootstrap(
 	store Store,
 	bootstrapCertificatePEM []byte,
-	bootstrapKeyPEM []byte) (cert *tls.Certificate, shouldRotate bool, errResult error) {
+	bootstrapKeyPEM []byte) (certKeyData *CertKeyData, rotated bool, errResult error) {
 
-	currentCert, err := store.Current()
+	certKeyData, err := store.Current()
 	if err == nil {
-		return currentCert, false, nil
+		return certKeyData, false, nil
 	}
 
 	if _, ok := err.(*NoCertKeyError); !ok {
@@ -205,7 +230,7 @@ func getCurrentCertificateOrBootstrap(
 		return nil, false, fmt.Errorf("unable to parse certificate data: %v", err)
 	}
 	bootstrapCert.Leaf = certs[0]
-	return &bootstrapCert, true, nil
+	return &CertKeyData{&bootstrapCert, bootstrapCertificatePEM, bootstrapKeyPEM}, true, nil
 }
 
 // shouldRotate looks at how close the current certificate is to expiring and
@@ -213,8 +238,8 @@ func getCurrentCertificateOrBootstrap(
 func (m *manager) shouldRotate() bool {
 	m.certAccessLock.RLock()
 	defer m.certAccessLock.RUnlock()
-	notAfter := m.cert.Leaf.NotAfter
-	totalDuration := float64(notAfter.Sub(m.cert.Leaf.NotBefore))
+	notAfter := m.certKeyData.Certificate.Leaf.NotAfter
+	totalDuration := float64(notAfter.Sub(m.certKeyData.Certificate.Leaf.NotBefore))
 
 	// Use some jitter to set the rotation threshold so each node will rotate
 	// at approximately 70-90% of the total lifetime of the certificate.  With
@@ -223,7 +248,7 @@ func (m *manager) shouldRotate() bool {
 	// certificates at the same time for the rest of the life of the cluster.
 	jitteryDuration := wait.Jitter(time.Duration(totalDuration), 0.2) - time.Duration(totalDuration*0.3)
 
-	rotationThreshold := m.cert.Leaf.NotBefore.Add(jitteryDuration)
+	rotationThreshold := m.certKeyData.Certificate.Leaf.NotBefore.Add(jitteryDuration)
 	passedThreshold := time.Now().After(rotationThreshold)
 	return m.forceRotation || passedThreshold
 }
@@ -245,20 +270,23 @@ func (m *manager) rotateCerts() error {
 		return fmt.Errorf("unable to get a new key signed: %v", err)
 	}
 
-	cert, err := m.certStore.Update(crtPEM, keyPEM)
+	certKeyData, err := m.certStore.Update(crtPEM, keyPEM)
 	if err != nil {
 		return fmt.Errorf("unable to store the new cert/key pair: %v", err)
 	}
 
-	m.updateCached(cert)
+	m.updateCached(certKeyData)
 	m.forceRotation = false
+	if m.rotation != nil {
+		m.rotation()
+	}
 	return nil
 }
 
-func (m *manager) updateCached(cert *tls.Certificate) {
+func (m *manager) updateCached(certKeyData *CertKeyData) {
 	m.certAccessLock.Lock()
 	defer m.certAccessLock.Unlock()
-	m.cert = cert
+	m.certKeyData = certKeyData
 }
 
 func (m *manager) generateCSR() (csrPEM []byte, keyPEM []byte, err error) {

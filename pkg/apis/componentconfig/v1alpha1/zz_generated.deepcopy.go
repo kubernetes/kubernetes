@@ -132,6 +132,11 @@ func DeepCopy_v1alpha1_KubeletConfiguration(in interface{}, out interface{}, c *
 			*out = new(bool)
 			**out = **in
 		}
+		if in.CertRotation != nil {
+			in, out := &in.CertRotation, &out.CertRotation
+			*out = new(int32)
+			**out = **in
+		}
 		if err := DeepCopy_v1alpha1_KubeletAuthentication(&in.Authentication, &out.Authentication, c); err != nil {
 			return err
 		}
