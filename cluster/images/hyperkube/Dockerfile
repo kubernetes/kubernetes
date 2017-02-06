@@ -66,6 +66,8 @@ COPY cni-bin/bin /opt/cni/bin
 COPY cni-conf /etc/cni/net.d
 
 # Create symlinks for each hyperkube server
+# Also create symlinks to /usr/local/bin/ where the server image binaries live, so the hyperkube image may be 
+# used instead of gcr.io/google_containers/kube-* without any modifications.
 # TODO: replace manual symlink creation with --make-symlink command once
 # cross-building with qemu supports go binaries. See #28702
 # RUN /hyperkube --make-symlinks
@@ -76,8 +78,11 @@ RUN ln -s /hyperkube /apiserver \
  && ln -s /hyperkube /kubectl \
  && ln -s /hyperkube /kubelet \
  && ln -s /hyperkube /proxy \
- && ln -s /hyperkube /scheduler
+ && ln -s /hyperkube /scheduler \
+ && ln -s /hyperkube /usr/local/bin/kube-apiserver \
+ && ln -s /hyperkube /usr/local/bin/kube-controller-manager \
+ && ln -s /hyperkube /usr/local/bin/kube-proxy \
+ && ln -s /hyperkube /usr/local/bin/kube-scheduler
 
 # Copy the hyperkube binary
 COPY hyperkube /hyperkube
-
