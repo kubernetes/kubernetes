@@ -45,7 +45,7 @@ If you cannot reach your Kubernetes nodes from your network, you can proxy via k
 
 ```console
 export PODNAME=`kubectl get pods --selector="app=selenium-hub" --output=template --template="{{with index .items 0}}{{.metadata.name}}{{end}}"`
-kubectl port-forward --pod=$PODNAME 4444:4444
+kubectl port-forward $PODNAME 4444:4444
 ```
 
 In a separate terminal, you can now check the status.
