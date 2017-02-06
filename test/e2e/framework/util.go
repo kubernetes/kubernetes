@@ -82,6 +82,7 @@ import (
 	gcecloud "k8s.io/kubernetes/pkg/cloudprovider/providers/gce"
 	"k8s.io/kubernetes/pkg/controller"
 	deploymentutil "k8s.io/kubernetes/pkg/controller/deployment/util"
+	nodectlr "k8s.io/kubernetes/pkg/controller/node"
 	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
 	"k8s.io/kubernetes/pkg/master/ports"
@@ -774,7 +775,7 @@ func WaitForMatchPodsCondition(c clientset.Interface, opts metav1.ListOptions, d
 		if len(conditionNotMatch) <= 0 {
 			return err
 		}
-		Logf("%d pods are not %s", len(conditionNotMatch), desc)
+		Logf("%d pods are not %s: %v", len(conditionNotMatch), desc, conditionNotMatch)
 	}
 	return fmt.Errorf("gave up waiting for matching pods to be '%s' after %v", desc, timeout)
 }
@@ -2496,7 +2497,7 @@ func ExpectNodeHasLabel(c clientset.Interface, nodeName string, labelKey string,
 }
 
 func RemoveTaintOffNode(c clientset.Interface, nodeName string, taint v1.Taint) {
-	ExpectNoError(controller.RemoveTaintOffNode(c, nodeName, &taint))
+	ExpectNoError(controller.RemoveTaintOffNode(c, nodeName, &taint, nil))
 	VerifyThatTaintIsGone(c, nodeName, &taint)
 }
 
@@ -2525,14 +2526,24 @@ func VerifyThatTaintIsGone(c clientset.Interface, nodeName string, taint *v1.Tai
 
 func ExpectNodeHasTaint(c clientset.Interface, nodeName string, taint *v1.Taint) {
 	By("verifying the node has the taint " + taint.ToString())
+	if has, err := NodeHasTaint(c, nodeName, taint); !has {
+		ExpectNoError(err)
+		Failf("Failed to find taint %s on node %s", taint.ToString(), nodeName)
+	}
+}
+
+func NodeHasTaint(c clientset.Interface, nodeName string, taint *v1.Taint) (bool, error) {
 	node, err := c.Core().Nodes().Get(nodeName, metav1.GetOptions{})
-	ExpectNoError(err)
+	if err != nil {
+		return false, err
+	}
 
 	nodeTaints := node.Spec.Taints
 
 	if len(nodeTaints) == 0 || !v1.TaintExists(nodeTaints, taint) {
-		Failf("Failed to find taint %s on node %s", taint.ToString(), nodeName)
+		return false, nil
 	}
+	return true, nil
 }
 
 func getScalerForKind(internalClientset internalclientset.Interface, kind schema.GroupKind) (kubectl.Scaler, error) {
@@ -3961,7 +3972,47 @@ func isNodeConditionSetAsExpected(node *v1.Node, conditionType v1.NodeConditionT
 	for _, cond := range node.Status.Conditions {
 		// Ensure that the condition type and the status matches as desired.
 		if cond.Type == conditionType {
-			if (cond.Status == v1.ConditionTrue) == wantTrue {
+			// For NodeReady condition we need to check Taints as well
+			if cond.Type == v1.NodeReady {
+				hasNodeControllerTaints := false
+				// For NodeReady we need to check if Taints are gone as well
+				taints := node.Spec.Taints
+				for _, taint := range taints {
+					if taint.MatchTaint(nodectlr.UnreachableTaintTemplate) || taint.MatchTaint(nodectlr.NotReadyTaintTemplate) {
+						hasNodeControllerTaints = true
+						break
+					}
+				}
+				if wantTrue {
+					if (cond.Status == v1.ConditionTrue) && !hasNodeControllerTaints {
+						return true
+					} else {
+						msg := ""
+						if !hasNodeControllerTaints {
+							msg = fmt.Sprintf("Condition %s of node %s is %v instead of %t. Reason: %v, message: %v",
+								conditionType, node.Name, cond.Status == v1.ConditionTrue, wantTrue, cond.Reason, cond.Message)
+						} else {
+							msg = fmt.Sprintf("Condition %s of node %s is %v, but Node is tainted by NodeController with %v. Failure",
+								conditionType, node.Name, cond.Status == v1.ConditionTrue, taints)
+						}
+						if !silent {
+							Logf(msg)
+						}
+						return false
+					}
+				} else {
+					// TODO: check if the Node is tainted once we enable NC notReady/unreachable taints by default
+					if cond.Status != v1.ConditionTrue {
+						return true
+					}
+					if !silent {
+						Logf("Condition %s of node %s is %v instead of %t. Reason: %v, message: %v",
+							conditionType, node.Name, cond.Status == v1.ConditionTrue, wantTrue, cond.Reason, cond.Message)
+					}
+					return false
+				}
+			}
+			if (wantTrue && (cond.Status == v1.ConditionTrue)) || (!wantTrue && (cond.Status != v1.ConditionTrue)) {
 				return true
 			} else {
 				if !silent {
@@ -3971,6 +4022,7 @@ func isNodeConditionSetAsExpected(node *v1.Node, conditionType v1.NodeConditionT
 				return false
 			}
 		}
+
 	}
 	if !silent {
 		Logf("Couldn't find condition %v on node %v", conditionType, node.Name)
