@@ -215,7 +215,7 @@ func TestCreatePod(t *testing.T) {
 	for _, item := range testCases {
 		stopCh := make(chan struct{})
 		fakeClientset := fake.NewSimpleClientset()
-		controller := NewTaintController(fakeClientset)
+		controller := NewNoExecuteTaintManager(fakeClientset)
 		go controller.Run(stopCh)
 		controller.taintedNodes = item.taintedNodes
 		controller.PodUpdated(nil, item.pod)
@@ -238,7 +238,7 @@ func TestCreatePod(t *testing.T) {
 func TestDeletePod(t *testing.T) {
 	stopCh := make(chan struct{})
 	fakeClientset := fake.NewSimpleClientset()
-	controller := NewTaintController(fakeClientset)
+	controller := NewNoExecuteTaintManager(fakeClientset)
 	go controller.Run(stopCh)
 	controller.taintedNodes = map[string][]v1.Taint{
 		"node1": {createNoExecuteTaint(1)},
@@ -300,7 +300,7 @@ func TestUpdatePod(t *testing.T) {
 	for _, item := range testCases {
 		stopCh := make(chan struct{})
 		fakeClientset := fake.NewSimpleClientset()
-		controller := NewTaintController(fakeClientset)
+		controller := NewNoExecuteTaintManager(fakeClientset)
 		go controller.Run(stopCh)
 		controller.taintedNodes = item.taintedNodes
 
@@ -380,7 +380,7 @@ func TestCreateNode(t *testing.T) {
 	for _, item := range testCases {
 		stopCh := make(chan struct{})
 		fakeClientset := fake.NewSimpleClientset(&v1.PodList{Items: item.pods})
-		controller := NewTaintController(fakeClientset)
+		controller := NewNoExecuteTaintManager(fakeClientset)
 		go controller.Run(stopCh)
 		controller.NodeUpdated(nil, item.node)
 		// wait a bit
@@ -402,7 +402,7 @@ func TestCreateNode(t *testing.T) {
 func TestDeleteNode(t *testing.T) {
 	stopCh := make(chan struct{})
 	fakeClientset := fake.NewSimpleClientset()
-	controller := NewTaintController(fakeClientset)
+	controller := NewNoExecuteTaintManager(fakeClientset)
 	controller.taintedNodes = map[string][]v1.Taint{
 		"node1": {createNoExecuteTaint(1)},
 	}
@@ -469,7 +469,7 @@ func TestUpdateNode(t *testing.T) {
 	for _, item := range testCases {
 		stopCh := make(chan struct{})
 		fakeClientset := fake.NewSimpleClientset(&v1.PodList{Items: item.pods})
-		controller := NewTaintController(fakeClientset)
+		controller := NewNoExecuteTaintManager(fakeClientset)
 		go controller.Run(stopCh)
 		controller.NodeUpdated(item.oldNode, item.newNode)
 		// wait a bit
