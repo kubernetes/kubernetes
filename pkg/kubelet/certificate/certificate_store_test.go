@@ -282,14 +282,14 @@ func TestLoadFile(t *testing.T) {
 		t.Fatalf("Unable to create the file %q: %v", pairFile, err)
 	}
 
-	cert, err := loadFile(pairFile)
+	certKeyData, err := loadFile(pairFile)
 	if err != nil {
 		t.Fatalf("Could not load certificate from disk: %v", err)
 	}
-	if cert == nil {
+	if certKeyData.Certificate == nil {
 		t.Fatalf("There was no error, but no certificate data was returned.")
 	}
-	if cert.Leaf == nil {
+	if certKeyData.Certificate.Leaf == nil {
 		t.Fatalf("Got an empty leaf, expected private data.")
 	}
 }
@@ -319,11 +319,11 @@ func TestUpdateNoRotation(t *testing.T) {
 		t.Fatalf("Got %v while creating a new store.", err)
 	}
 
-	cert, err := s.Update([]byte(certificateData), []byte(privateKeyData))
+	certKeyData, err := s.Update([]byte(certificateData), []byte(privateKeyData))
 	if err != nil {
 		t.Errorf("Got %v while updating certificate store.", err)
 	}
-	if cert == nil {
+	if certKeyData.Certificate == nil {
 		t.Errorf("Got nil certificate, expected something real.")
 	}
 }
@@ -353,11 +353,11 @@ func TestUpdateRotation(t *testing.T) {
 		t.Fatalf("Got %v while creating a new store.", err)
 	}
 
-	cert, err := s.Update([]byte(certificateData), []byte(privateKeyData))
+	certKeyData, err := s.Update([]byte(certificateData), []byte(privateKeyData))
 	if err != nil {
 		t.Fatalf("Got %v while updating certificate store.", err)
 	}
-	if cert == nil {
+	if certKeyData.Certificate == nil {
 		t.Fatalf("Got nil certificate, expected something real.")
 	}
 }
@@ -387,12 +387,12 @@ func TestUpdateWithBadCertKeyData(t *testing.T) {
 		t.Fatalf("Got %v while creating a new store.", err)
 	}
 
-	cert, err := s.Update([]byte{0, 0}, []byte(privateKeyData))
+	certKeyData, err := s.Update([]byte{0, 0}, []byte(privateKeyData))
 	if err == nil {
 		t.Fatalf("Got no error while updating certificate store with invalid data.")
 	}
-	if cert != nil {
-		t.Fatalf("Got %v certificate returned from the update, expected nil.", cert)
+	if certKeyData != nil {
+		t.Fatalf("Got %v certificate data returned from the update, expected nil.", certKeyData)
 	}
 }
 
@@ -421,14 +421,14 @@ func TestCurrentPairFile(t *testing.T) {
 		t.Fatalf("Failed to initialize certificate store: %v", err)
 	}
 
-	cert, err := store.Current()
+	certKeyData, err := store.Current()
 	if err != nil {
 		t.Fatalf("Could not load certificate from disk: %v", err)
 	}
-	if cert == nil {
+	if certKeyData.Certificate == nil {
 		t.Fatalf("There was no error, but no certificate data was returned.")
 	}
-	if cert.Leaf == nil {
+	if certKeyData.Certificate.Leaf == nil {
 		t.Fatalf("Got an empty leaf, expected private data.")
 	}
 }
@@ -458,14 +458,14 @@ func TestCurrentCertKeyFiles(t *testing.T) {
 		t.Fatalf("Failed to initialize certificate store: %v", err)
 	}
 
-	cert, err := store.Current()
+	certKeyData, err := store.Current()
 	if err != nil {
 		t.Fatalf("Could not load certificate from disk: %v", err)
 	}
-	if cert == nil {
+	if certKeyData.Certificate == nil {
 		t.Fatalf("There was no error, but no certificate data was returned.")
 	}
-	if cert.Leaf == nil {
+	if certKeyData.Certificate.Leaf == nil {
 		t.Fatalf("Got an empty leaf, expected private data.")
 	}
 }

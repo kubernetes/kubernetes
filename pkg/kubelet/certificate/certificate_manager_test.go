@@ -17,6 +17,7 @@ limitations under the License.
 package certificate
 
 import (
+	"bytes"
 	"crypto/tls"
 	"crypto/x509"
 	"fmt"
@@ -84,8 +85,17 @@ func TestNewManagerNoRotation(t *testing.T) {
 		t.Fatalf("Unable to initialize a certificate: %v", err)
 	}
 
-	store := &fakeStore{cert: &cert}
-	if _, err := NewManager(nil, &x509.CertificateRequest{}, []certificates.KeyUsage{}, store, 0); err != nil {
+	store := &fakeStore{
+		cert:    &cert,
+		certPEM: []byte(certificateData),
+		keyPEM:  []byte(privateKeyData),
+	}
+	if _, err := NewManager(&Config{
+		Template:                   &x509.CertificateRequest{},
+		Usages:                     []certificates.KeyUsage{},
+		CertificateStore:           store,
+		CertificateRotationPercent: 0,
+	}); err != nil {
 		t.Fatalf("Failed to initialize the certificate manager: %v", err)
 	}
 }
@@ -105,10 +115,12 @@ func TestShouldRotate(t *testing.T) {
 
 	for _, test := range tests {
 		m := manager{
-			cert: &tls.Certificate{
-				Leaf: &x509.Certificate{
-					NotAfter:  test.notAfter,
-					NotBefore: test.notBefore,
+			certKeyData: &CertKeyData{
+				Certificate: &tls.Certificate{
+					Leaf: &x509.Certificate{
+						NotBefore: test.notBefore,
+						NotAfter:  test.notAfter,
+					},
 				},
 			},
 			template:            &x509.CertificateRequest{},
@@ -120,8 +132,8 @@ func TestShouldRotate(t *testing.T) {
 			t.Errorf("For test case %s, time %v, a certificate issued for (%v, %v) should rotate should be %t.",
 				test.name,
 				now,
-				m.cert.Leaf.NotBefore,
-				m.cert.Leaf.NotAfter,
+				m.certKeyData.Certificate.Leaf.NotBefore,
+				m.certKeyData.Certificate.Leaf.NotAfter,
 				test.shouldRotate)
 		}
 	}
@@ -130,10 +142,12 @@ func TestShouldRotate(t *testing.T) {
 func TestRotateCertCreateCSRError(t *testing.T) {
 	now := time.Now()
 	m := manager{
-		cert: &tls.Certificate{
-			Leaf: &x509.Certificate{
-				NotAfter:  now.Add(-1 * time.Hour),
-				NotBefore: now.Add(-2 * time.Hour),
+		certKeyData: &CertKeyData{
+			Certificate: &tls.Certificate{
+				Leaf: &x509.Certificate{
+					NotBefore: now.Add(-2 * time.Hour),
+					NotAfter:  now.Add(-1 * time.Hour),
+				},
 			},
 		},
 		template: &x509.CertificateRequest{},
@@ -151,10 +165,12 @@ func TestRotateCertCreateCSRError(t *testing.T) {
 func TestRotateCertWaitingForResultError(t *testing.T) {
 	now := time.Now()
 	m := manager{
-		cert: &tls.Certificate{
-			Leaf: &x509.Certificate{
-				NotAfter:  now.Add(-1 * time.Hour),
-				NotBefore: now.Add(-2 * time.Hour),
+		certKeyData: &CertKeyData{
+			Certificate: &tls.Certificate{
+				Leaf: &x509.Certificate{
+					NotBefore: now.Add(-2 * time.Hour),
+					NotAfter:  now.Add(-1 * time.Hour),
+				},
 			},
 		},
 		template: &x509.CertificateRequest{},
@@ -166,6 +182,89 @@ func TestRotateCertWaitingForResultError(t *testing.T) {
 
 	if err := m.rotateCerts(); err == nil {
 		t.Errorf("Expected an error receiving results from the CSR request but nothing was received.")
+	}
+}
+
+func TestNewManagerBootstrap(t *testing.T) {
+	store := &fakeStore{}
+
+	cm, err := NewManager(&Config{
+		Template:                   &x509.CertificateRequest{},
+		Usages:                     []certificates.KeyUsage{},
+		CertificateStore:           store,
+		CertificateRotationPercent: 1,
+		BootstrapCertificatePEM:    []byte(certificateData),
+		BootstrapKeyPEM:            []byte(privateKeyData),
+	})
+
+	if err != nil {
+		t.Fatalf("Failed to initialize the certificate manager: %v", err)
+	}
+
+	certKeyData := cm.Current()
+
+	if certKeyData.Certificate == nil {
+		t.Errorf("Certificate was nil, expected something.")
+	}
+	if bytes.Compare([]byte(certificateData), certKeyData.CertPEM) != 0 {
+		t.Errorf("Certificate retrieved from the certificate manager does not match expected.")
+	}
+	if bytes.Compare([]byte(privateKeyData), certKeyData.KeyPEM) != 0 {
+		t.Errorf("Key retrieved from the certificate manager does not match expected.")
+	}
+
+	if m, ok := cm.(*manager); !ok {
+		t.Errorf("Expected a '*manager' from 'NewManager'")
+	} else if !m.shouldRotate() {
+		t.Errorf("Expected rotation should happen during bootstrap, but it won't.")
+	}
+}
+
+func TestNewManagerNoBootstrap(t *testing.T) {
+	now := time.Now()
+	cert, err := tls.X509KeyPair([]byte(certificateData), []byte(privateKeyData))
+	cert.Leaf = &x509.Certificate{
+		NotBefore: now.Add(-24 * time.Hour),
+		NotAfter:  now.Add(24 * time.Hour),
+	}
+	if err != nil {
+		t.Fatalf("Unable to initialize a certificate: %v", err)
+	}
+	store := &fakeStore{
+		cert:    &cert,
+		certPEM: []byte(certificateData),
+		keyPEM:  []byte(privateKeyData),
+	}
+
+	cm, err := NewManager(&Config{
+		Template:                   &x509.CertificateRequest{},
+		Usages:                     []certificates.KeyUsage{},
+		CertificateStore:           store,
+		CertificateRotationPercent: 1,
+		BootstrapCertificatePEM:    []byte(certificateData),
+		BootstrapKeyPEM:            []byte(privateKeyData),
+	})
+
+	if err != nil {
+		t.Fatalf("Failed to initialize the certificate manager: %v", err)
+	}
+
+	certKeyData := cm.Current()
+
+	if certKeyData.Certificate == nil {
+		t.Errorf("Certificate was nil, expected something.")
+	}
+	if bytes.Compare([]byte(certificateData), certKeyData.CertPEM) != 0 {
+		t.Errorf("Certificate retrieved from the certificate manager does not match expected.")
+	}
+	if bytes.Compare([]byte(privateKeyData), certKeyData.KeyPEM) != 0 {
+		t.Errorf("Key retrieved from the certificate manager does not match expected.")
+	}
+
+	if m, ok := cm.(*manager); !ok {
+		t.Errorf("Expected a '*manager' from 'NewManager'")
+	} else if m.shouldRotate() {
+		t.Errorf("Expected rotation should happen during bootstrap, but it won't.")
 	}
 }
 
@@ -239,21 +338,33 @@ func (w *fakeWatch) ResultChan() <-chan watch.Event {
 }
 
 type fakeStore struct {
-	cert *tls.Certificate
+	cert    *tls.Certificate
+	certPEM []byte
+	keyPEM  []byte
 }
 
-func (s *fakeStore) Current() (*tls.Certificate, error) {
-	return s.cert, nil
+func (s *fakeStore) Current() (*CertKeyData, error) {
+	if s.cert == nil {
+		return nil, &NoCertKeyError{}
+	}
+	return &CertKeyData{s.cert, s.certPEM, s.keyPEM}, nil
 }
 
 // Accepts the PEM data for the cert/key pair and makes the new cert/key
 // pair the 'current' pair, that will be returned by future calls to
 // Current().
-func (s *fakeStore) Update(certPEM, keyPEM []byte) (*tls.Certificate, error) {
+func (s *fakeStore) Update(certPEM, keyPEM []byte) (*CertKeyData, error) {
 	cert, err := tls.X509KeyPair(certPEM, keyPEM)
 	if err != nil {
 		return nil, err
 	}
+	now := time.Now()
 	s.cert = &cert
-	return s.cert, nil
+	s.cert.Leaf = &x509.Certificate{
+		NotBefore: now.Add(-24 * time.Hour),
+		NotAfter:  now.Add(24 * time.Hour),
+	}
+	s.certPEM = certPEM
+	s.keyPEM = keyPEM
+	return &CertKeyData{s.cert, s.certPEM, s.keyPEM}, nil
 }

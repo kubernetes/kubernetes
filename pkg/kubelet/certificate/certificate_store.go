@@ -111,7 +111,7 @@ func (s *fileStore) recover() error {
 	return nil
 }
 
-func (s *fileStore) Current() (*tls.Certificate, error) {
+func (s *fileStore) Current() (*CertKeyData, error) {
 	pairFile := filepath.Join(s.certDirectory, s.filename(currentPair))
 	if pairFileExists, err := util.FileExists(pairFile); err != nil {
 		return nil, err
@@ -148,20 +148,24 @@ func (s *fileStore) Current() (*tls.Certificate, error) {
 		return loadX509KeyPair(c, k)
 	}
 
-	return nil, fmt.Errorf("no cert/key files read at %q, (%q, %q) or (%q, %q)",
-		pairFile,
-		s.certFile,
-		s.keyFile,
-		s.certDirectory,
-		s.keyDirectory)
+	return nil, &NoCertKeyError{
+		msg: fmt.Sprintf("no cert/key files read at %q, (%q, %q) or (%q, %q)",
+			pairFile,
+			s.certFile,
+			s.keyFile,
+			s.certDirectory,
+			s.keyDirectory),
+	}
 }
 
-func loadFile(pairFile string) (*tls.Certificate, error) {
+func loadFile(pairFile string) (*CertKeyData, error) {
 	certBlock, keyBlock, err := loadCertKeyBlocks(pairFile)
 	if err != nil {
 		return nil, err
 	}
-	cert, err := tls.X509KeyPair(pem.EncodeToMemory(certBlock), pem.EncodeToMemory(keyBlock))
+	certPEM := pem.EncodeToMemory(certBlock)
+	keyPEM := pem.EncodeToMemory(keyBlock)
+	cert, err := tls.X509KeyPair(certPEM, keyPEM)
 	if err != nil {
 		return nil, fmt.Errorf("could not convert data from %q into cert/key pair: %v", pairFile, err)
 	}
@@ -170,7 +174,7 @@ func loadFile(pairFile string) (*tls.Certificate, error) {
 		return nil, fmt.Errorf("unable to parse certificate data: %v", err)
 	}
 	cert.Leaf = certs[0]
-	return &cert, nil
+	return &CertKeyData{&cert, certPEM, keyPEM}, nil
 }
 
 func loadCertKeyBlocks(pairFile string) (cert *pem.Block, key *pem.Block, err error) {
@@ -189,7 +193,7 @@ func loadCertKeyBlocks(pairFile string) (cert *pem.Block, key *pem.Block, err er
 	return certBlock, keyBlock, nil
 }
 
-func (s *fileStore) Update(certData, keyData []byte) (*tls.Certificate, error) {
+func (s *fileStore) Update(certData, keyData []byte) (*CertKeyData, error) {
 	ts := time.Now().Format("2006-01-02-15-04-05")
 	pemFilename := s.filename(ts)
 
@@ -211,7 +215,7 @@ func (s *fileStore) Update(certData, keyData []byte) (*tls.Certificate, error) {
 	}
 	pem.Encode(f, keyBlock)
 
-	cert, err := loadFile(certPath)
+	certKeyData, err := loadFile(certPath)
 	if err != nil {
 		return nil, err
 	}
@@ -219,7 +223,7 @@ func (s *fileStore) Update(certData, keyData []byte) (*tls.Certificate, error) {
 	if err := s.updateSymlink(certPath); err != nil {
 		return nil, err
 	}
-	return cert, nil
+	return certKeyData, nil
 }
 
 // updateSymLink updates the current symlink to point to the file that is
@@ -290,8 +294,16 @@ func withoutExt(filename string) string {
 	return strings.TrimSuffix(filename, filepath.Ext(filename))
 }
 
-func loadX509KeyPair(certFile, keyFile string) (*tls.Certificate, error) {
-	cert, err := tls.LoadX509KeyPair(certFile, keyFile)
+func loadX509KeyPair(certFile, keyFile string) (*CertKeyData, error) {
+	certPEM, err := ioutil.ReadFile(certFile)
+	if err != nil {
+		return nil, err
+	}
+	keyPEM, err := ioutil.ReadFile(keyFile)
+	if err != nil {
+		return nil, err
+	}
+	cert, err := tls.X509KeyPair(certPEM, keyPEM)
 	if err != nil {
 		return nil, err
 	}
@@ -300,5 +312,5 @@ func loadX509KeyPair(certFile, keyFile string) (*tls.Certificate, error) {
 		return nil, fmt.Errorf("unable to parse certificate data: %v", err)
 	}
 	cert.Leaf = certs[0]
-	return &cert, nil
+	return &CertKeyData{&cert, certPEM, keyPEM}, nil
 }

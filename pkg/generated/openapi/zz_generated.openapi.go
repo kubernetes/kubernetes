@@ -10736,6 +10736,13 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 								Format:      "",
 							},
 						},
+						"certRotation": {
+							SchemaProps: spec.SchemaProps{
+								Description: "CertRotation is the flag to turn on automatic rotation of the kubelet's certificate for communicating with the API server.",
+								Type:        []string{"integer"},
+								Format:      "int32",
+							},
+						},
 						"authentication": {
 							SchemaProps: spec.SchemaProps{
 								Description: "authentication specifies how requests to the Kubelet's server are authenticated",
