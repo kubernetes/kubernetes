@@ -249,6 +249,8 @@ func Convert_componentconfig_KubeletAuthorization_To_v1alpha1_KubeletAuthorizati
 }
 
 func autoConvert_v1alpha1_KubeletConfiguration_To_componentconfig_KubeletConfiguration(in *KubeletConfiguration, out *componentconfig.KubeletConfiguration, s conversion.Scope) error {
+	out.Experimental = in.Experimental
+	out.FeatureGates = in.FeatureGates
 	out.PodManifestPath = in.PodManifestPath
 	out.SyncFrequency = in.SyncFrequency
 	out.FileCheckFrequency = in.FileCheckFrequency
@@ -337,12 +339,9 @@ func autoConvert_v1alpha1_KubeletConfiguration_To_componentconfig_KubeletConfigu
 	}
 	out.CgroupDriver = in.CgroupDriver
 	out.ContainerRuntime = in.ContainerRuntime
-	out.RemoteRuntimeEndpoint = in.RemoteRuntimeEndpoint
-	out.RemoteImageEndpoint = in.RemoteImageEndpoint
 	out.RuntimeRequestTimeout = in.RuntimeRequestTimeout
 	out.ImagePullProgressDeadline = in.ImagePullProgressDeadline
 	out.RktPath = in.RktPath
-	out.ExperimentalMounterPath = in.ExperimentalMounterPath
 	out.RktAPIEndpoint = in.RktAPIEndpoint
 	out.RktStage1Image = in.RktStage1Image
 	if err := api.Convert_Pointer_string_To_string(&in.LockFilePath, &out.LockFilePath, s); err != nil {
@@ -352,14 +351,10 @@ func autoConvert_v1alpha1_KubeletConfiguration_To_componentconfig_KubeletConfigu
 	out.HairpinMode = in.HairpinMode
 	out.BabysitDaemons = in.BabysitDaemons
 	out.MaxPods = in.MaxPods
-	out.NvidiaGPUs = in.NvidiaGPUs
 	out.DockerExecHandlerName = in.DockerExecHandlerName
 	out.PodCIDR = in.PodCIDR
 	out.ResolverConfig = in.ResolverConfig
 	if err := api.Convert_Pointer_bool_To_bool(&in.CPUCFSQuota, &out.CPUCFSQuota, s); err != nil {
-		return err
-	}
-	if err := api.Convert_Pointer_bool_To_bool(&in.Containerized, &out.Containerized, s); err != nil {
 		return err
 	}
 	out.MaxOpenFiles = in.MaxOpenFiles
@@ -388,9 +383,6 @@ func autoConvert_v1alpha1_KubeletConfiguration_To_componentconfig_KubeletConfigu
 	out.EvictionPressureTransitionPeriod = in.EvictionPressureTransitionPeriod
 	out.EvictionMaxPodGracePeriod = in.EvictionMaxPodGracePeriod
 	out.EvictionMinimumReclaim = in.EvictionMinimumReclaim
-	if err := api.Convert_Pointer_bool_To_bool(&in.ExperimentalKernelMemcgNotification, &out.ExperimentalKernelMemcgNotification, s); err != nil {
-		return err
-	}
 	out.PodsPerCore = in.PodsPerCore
 	if err := api.Convert_Pointer_bool_To_bool(&in.EnableControllerAttachDetach, &out.EnableControllerAttachDetach, s); err != nil {
 		return err
@@ -407,11 +399,6 @@ func autoConvert_v1alpha1_KubeletConfiguration_To_componentconfig_KubeletConfigu
 	if err := api.Convert_Pointer_int32_To_int32(&in.IPTablesDropBit, &out.IPTablesDropBit, s); err != nil {
 		return err
 	}
-	out.AllowedUnsafeSysctls = *(*[]string)(unsafe.Pointer(&in.AllowedUnsafeSysctls))
-	out.FeatureGates = in.FeatureGates
-	out.EnableCRI = in.EnableCRI
-	out.ExperimentalFailSwapOn = in.ExperimentalFailSwapOn
-	out.ExperimentalCheckNodeCapabilitiesBeforeMount = in.ExperimentalCheckNodeCapabilitiesBeforeMount
 	out.KeepTerminatedPodVolumes = in.KeepTerminatedPodVolumes
 	return nil
 }
@@ -421,6 +408,8 @@ func Convert_v1alpha1_KubeletConfiguration_To_componentconfig_KubeletConfigurati
 }
 
 func autoConvert_componentconfig_KubeletConfiguration_To_v1alpha1_KubeletConfiguration(in *componentconfig.KubeletConfiguration, out *KubeletConfiguration, s conversion.Scope) error {
+	out.Experimental = in.Experimental
+	out.FeatureGates = in.FeatureGates
 	out.PodManifestPath = in.PodManifestPath
 	out.SyncFrequency = in.SyncFrequency
 	out.FileCheckFrequency = in.FileCheckFrequency
@@ -509,12 +498,9 @@ func autoConvert_componentconfig_KubeletConfiguration_To_v1alpha1_KubeletConfigu
 	out.SystemCgroups = in.SystemCgroups
 	out.CgroupRoot = in.CgroupRoot
 	out.ContainerRuntime = in.ContainerRuntime
-	out.RemoteRuntimeEndpoint = in.RemoteRuntimeEndpoint
-	out.RemoteImageEndpoint = in.RemoteImageEndpoint
 	out.RuntimeRequestTimeout = in.RuntimeRequestTimeout
 	out.ImagePullProgressDeadline = in.ImagePullProgressDeadline
 	out.RktPath = in.RktPath
-	out.ExperimentalMounterPath = in.ExperimentalMounterPath
 	out.RktAPIEndpoint = in.RktAPIEndpoint
 	out.RktStage1Image = in.RktStage1Image
 	if err := api.Convert_string_To_Pointer_string(&in.LockFilePath, &out.LockFilePath, s); err != nil {
@@ -524,14 +510,10 @@ func autoConvert_componentconfig_KubeletConfiguration_To_v1alpha1_KubeletConfigu
 	out.HairpinMode = in.HairpinMode
 	out.BabysitDaemons = in.BabysitDaemons
 	out.MaxPods = in.MaxPods
-	out.NvidiaGPUs = in.NvidiaGPUs
 	out.DockerExecHandlerName = in.DockerExecHandlerName
 	out.PodCIDR = in.PodCIDR
 	out.ResolverConfig = in.ResolverConfig
 	if err := api.Convert_bool_To_Pointer_bool(&in.CPUCFSQuota, &out.CPUCFSQuota, s); err != nil {
-		return err
-	}
-	if err := api.Convert_bool_To_Pointer_bool(&in.Containerized, &out.Containerized, s); err != nil {
 		return err
 	}
 	out.MaxOpenFiles = in.MaxOpenFiles
@@ -560,9 +542,6 @@ func autoConvert_componentconfig_KubeletConfiguration_To_v1alpha1_KubeletConfigu
 	out.EvictionPressureTransitionPeriod = in.EvictionPressureTransitionPeriod
 	out.EvictionMaxPodGracePeriod = in.EvictionMaxPodGracePeriod
 	out.EvictionMinimumReclaim = in.EvictionMinimumReclaim
-	if err := api.Convert_bool_To_Pointer_bool(&in.ExperimentalKernelMemcgNotification, &out.ExperimentalKernelMemcgNotification, s); err != nil {
-		return err
-	}
 	out.PodsPerCore = in.PodsPerCore
 	if err := api.Convert_bool_To_Pointer_bool(&in.EnableControllerAttachDetach, &out.EnableControllerAttachDetach, s); err != nil {
 		return err
@@ -579,11 +558,6 @@ func autoConvert_componentconfig_KubeletConfiguration_To_v1alpha1_KubeletConfigu
 	if err := api.Convert_int32_To_Pointer_int32(&in.IPTablesDropBit, &out.IPTablesDropBit, s); err != nil {
 		return err
 	}
-	out.AllowedUnsafeSysctls = *(*[]string)(unsafe.Pointer(&in.AllowedUnsafeSysctls))
-	out.FeatureGates = in.FeatureGates
-	out.EnableCRI = in.EnableCRI
-	out.ExperimentalFailSwapOn = in.ExperimentalFailSwapOn
-	out.ExperimentalCheckNodeCapabilitiesBeforeMount = in.ExperimentalCheckNodeCapabilitiesBeforeMount
 	out.KeepTerminatedPodVolumes = in.KeepTerminatedPodVolumes
 	return nil
 }

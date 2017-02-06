@@ -43,6 +43,7 @@ import (
 
 type HollowKubelet struct {
 	KubeletConfiguration *componentconfig.KubeletConfiguration
+	Experimental         *componentconfig.ExperimentalKubeletConfiguration
 	KubeletDeps          *kubelet.KubeletDeps
 }
 
@@ -81,13 +82,14 @@ func NewHollowKubelet(
 
 	return &HollowKubelet{
 		KubeletConfiguration: c,
+		Experimental:         componentconfig.DefaultExperimentalKubeletConfiguration(),
 		KubeletDeps:          d,
 	}
 }
 
 // Starts this HollowKubelet and blocks.
 func (hk *HollowKubelet) Run() {
-	kubeletapp.RunKubelet(hk.KubeletConfiguration, hk.KubeletDeps, false, false)
+	kubeletapp.RunKubelet(hk.KubeletConfiguration, hk.Experimental, hk.KubeletDeps, false, false)
 	select {}
 }
 
@@ -150,7 +152,6 @@ func GetHollowKubeletConfig(
 	c.MaxContainerCount = 100
 	c.MaxOpenFiles = 1024
 	c.MaxPerPodContainerCount = 2
-	c.NvidiaGPUs = 0
 	c.RegisterNode = true
 	c.RegisterSchedulable = true
 	c.RegistryBurst = 10

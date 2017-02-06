@@ -859,7 +859,7 @@ func TestUpdateNodeStatusWithRuntimeStateError(t *testing.T) {
 	checkNodeStatus(v1.ConditionFalse, "KubeletNotReady")
 
 	// Test cri integration.
-	kubelet.kubeletConfiguration.EnableCRI = true
+	kubelet.experimentalKubeletConfiguration.EnableCRI = true
 	fakeRuntime.StatusErr = nil
 
 	// Should report node not ready if runtime status is nil.

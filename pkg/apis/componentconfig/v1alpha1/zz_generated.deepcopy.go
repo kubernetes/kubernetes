@@ -210,11 +210,6 @@ func DeepCopy_v1alpha1_KubeletConfiguration(in interface{}, out interface{}, c *
 			*out = new(bool)
 			**out = **in
 		}
-		if in.Containerized != nil {
-			in, out := &in.Containerized, &out.Containerized
-			*out = new(bool)
-			**out = **in
-		}
 		if in.RegisterSchedulable != nil {
 			in, out := &in.RegisterSchedulable, &out.RegisterSchedulable
 			*out = new(bool)
@@ -251,11 +246,6 @@ func DeepCopy_v1alpha1_KubeletConfiguration(in interface{}, out interface{}, c *
 			*out = new(string)
 			**out = **in
 		}
-		if in.ExperimentalKernelMemcgNotification != nil {
-			in, out := &in.ExperimentalKernelMemcgNotification, &out.ExperimentalKernelMemcgNotification
-			*out = new(bool)
-			**out = **in
-		}
 		if in.EnableControllerAttachDetach != nil {
 			in, out := &in.EnableControllerAttachDetach, &out.EnableControllerAttachDetach
 			*out = new(bool)
@@ -289,11 +279,6 @@ func DeepCopy_v1alpha1_KubeletConfiguration(in interface{}, out interface{}, c *
 			in, out := &in.IPTablesDropBit, &out.IPTablesDropBit
 			*out = new(int32)
 			**out = **in
-		}
-		if in.AllowedUnsafeSysctls != nil {
-			in, out := &in.AllowedUnsafeSysctls, &out.AllowedUnsafeSysctls
-			*out = make([]string, len(*in))
-			copy(*out, *in)
 		}
 		return nil
 	}
