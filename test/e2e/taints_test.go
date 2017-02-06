@@ -151,7 +151,7 @@ func createTestController(cs clientset.Interface, observedDeletions chan struct{
 	go controller.Run(stopCh)
 }
 
-var _ = framework.KubeDescribe("TaintController [Serial]", func() {
+var _ = framework.KubeDescribe("NoExecuteTaintManager [Serial]", func() {
 	var cs clientset.Interface
 	var nodeList *v1.NodeList
 	var ns string

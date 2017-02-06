@@ -25,18 +25,22 @@ import (
 	"github.com/golang/glog"
 )
 
+// WorkArgs keeps arguments that will be passed to tha function executed by the worker.
 type WorkArgs struct {
 	NamespacedName types.NamespacedName
 }
 
+// KeyFromWorkArgs creates a key for the given `WorkArgs`
 func (w *WorkArgs) KeyFromWorkArgs() string {
 	return w.NamespacedName.String()
 }
 
+// NewWorkArgs is a helper function to create new `WorkArgs`
 func NewWorkArgs(name, namespace string) *WorkArgs {
 	return &WorkArgs{types.NamespacedName{Namespace: namespace, Name: name}}
 }
 
+// TimedWorker is a responsible for executing a function no earlier than at FireAt time.
 type TimedWorker struct {
 	WorkItem  *WorkArgs
 	CreatedAt time.Time
@@ -44,6 +48,7 @@ type TimedWorker struct {
 	Timer     *time.Timer
 }
 
+// CreateWorker creates a TimedWorker that will execute `f` not earlier than `fireAt`.
 func CreateWorker(args *WorkArgs, createdAt time.Time, fireAt time.Time, f func(args *WorkArgs)) *TimedWorker {
 	delay := fireAt.Sub(time.Now())
 	if delay <= 0 {
@@ -59,16 +64,20 @@ func CreateWorker(args *WorkArgs, createdAt time.Time, fireAt time.Time, f func(
 	}
 }
 
+// Cancel cancels the execution of function by the `TimedWorker`
 func (w *TimedWorker) Cancel() {
 	w.Timer.Stop()
 }
 
+// TimedWorkerQueue keeps a set of TimedWorkers that still wait for execution.
 type TimedWorkerQueue struct {
 	sync.Mutex
 	workers  map[string]*TimedWorker
 	workFunc func(args *WorkArgs)
 }
 
+// CreateWorkerQueue creates a new TimedWorkerQueue for workers that will execute
+// given function `f`.
 func CreateWorkerQueue(f func(args *WorkArgs)) *TimedWorkerQueue {
 	return &TimedWorkerQueue{
 		workers:  make(map[string]*TimedWorker),
@@ -85,6 +94,7 @@ func (q *TimedWorkerQueue) getWrappedWorkerFunc(key string) func(args *WorkArgs)
 	}
 }
 
+// AddWork adds a work to the WorkerQueue which will be executed not earlier than `fireAt`.
 func (q *TimedWorkerQueue) AddWork(args *WorkArgs, createdAt time.Time, fireAt time.Time) {
 	key := args.KeyFromWorkArgs()
 
@@ -101,6 +111,7 @@ func (q *TimedWorkerQueue) AddWork(args *WorkArgs, createdAt time.Time, fireAt t
 	q.workers[key] = worker
 }
 
+// CancelWork removes scheduled function execution from the queue.
 func (q *TimedWorkerQueue) CancelWork(key string) {
 	q.Lock()
 	defer q.Unlock()
@@ -111,6 +122,7 @@ func (q *TimedWorkerQueue) CancelWork(key string) {
 	}
 }
 
+// GetWorkerUnsafe returns a TimedWorker corresponding to the given key.
 // Unsafe method - workers have attached goroutines which can fire afater this function is called.
 func (q *TimedWorkerQueue) GetWorkerUnsafe(key string) *TimedWorker {
 	q.Lock()

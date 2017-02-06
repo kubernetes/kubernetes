@@ -792,7 +792,7 @@ type KubeControllerManagerConfiguration struct {
 	// wait between successive executions. Is set to 5 sec by default.
 	ReconcilerSyncLoopPeriod metav1.Duration
 	// If set to true enables NoExecute Taints and will evict all not-tolerating
-	//Pod running on Nodes tainted with this kind of Taints.
+	// Pod running on Nodes tainted with this kind of Taints.
 	EnableTaintManager bool
 }
 
