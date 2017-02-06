@@ -61,12 +61,12 @@ func RunVersion(f cmdutil.Factory, out io.Writer, cmd *cobra.Command) error {
 		return nil
 	}
 
-	clientset, err := f.ClientSet()
+	discoveryclient, err := f.DiscoveryClient()
 	if err != nil {
 		return err
 	}
 
-	serverVersion, err := clientset.Discovery().ServerVersion()
+	serverVersion, err := discoveryclient.ServerVersion()
 	if err != nil {
 		return err
 	}
