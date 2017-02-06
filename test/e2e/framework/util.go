@@ -2443,6 +2443,7 @@ func ExpectNodeHasLabel(c clientset.Interface, nodeName string, labelKey string,
 
 func RemoveTaintOffNode(c clientset.Interface, nodeName string, taint v1.Taint) {
 	ExpectNoError(controller.RemoveTaintOffNode(c, nodeName, &taint))
+	VerifyThatTaintIsGone(c, nodeName, &taint)
 }
 
 func AddOrUpdateTaintOnNode(c clientset.Interface, nodeName string, taint v1.Taint) {
