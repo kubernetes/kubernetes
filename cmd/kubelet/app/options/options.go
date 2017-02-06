@@ -134,6 +134,7 @@ func (s *KubeletServer) AddFlags(fs *pflag.FlagSet) {
 	fs.StringVar(&s.TLSPrivateKeyFile, "tls-private-key-file", s.TLSPrivateKeyFile, "File containing x509 private key matching --tls-cert-file.")
 	fs.StringVar(&s.CertDirectory, "cert-dir", s.CertDirectory, "The directory where the TLS certs are located (by default /var/run/kubernetes). "+
 		"If --tls-cert-file and --tls-private-key-file are provided, this flag will be ignored.")
+	fs.BoolVar(&s.CertRotation, "experimental-cert-rotation", s.CertRotation, "<Warning: Experimental feature> If true, turns on certificate rotation for the kubelet. The kubelet will periodically request new certificates from the API server. [default=false]")
 	fs.StringVar(&s.BootstrapKubeconfig, "experimental-bootstrap-kubeconfig", s.BootstrapKubeconfig, "<Warning: Experimental feature> Path to a kubeconfig file that will be used to get client certificate for kubelet. "+
 		"If the file specified by --kubeconfig does not exist, the bootstrap kubeconfig is used to request a client certificate from the API server. "+
 		"On success, a kubeconfig file referencing the generated key and obtained certificate is written to the path specified by --kubeconfig. "+

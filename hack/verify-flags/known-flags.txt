@@ -643,3 +643,4 @@ log-lines-total
 run-duration
 attach-detach-reconcile-sync-period
 disable-attach-detach-reconcile-sync
+experimental-cert-rotation

@@ -264,6 +264,9 @@ func autoConvert_v1alpha1_KubeletConfiguration_To_componentconfig_KubeletConfigu
 	out.TLSCertFile = in.TLSCertFile
 	out.TLSPrivateKeyFile = in.TLSPrivateKeyFile
 	out.CertDirectory = in.CertDirectory
+	if err := api.Convert_Pointer_bool_To_bool(&in.CertRotation, &out.CertRotation, s); err != nil {
+		return err
+	}
 	if err := Convert_v1alpha1_KubeletAuthentication_To_componentconfig_KubeletAuthentication(&in.Authentication, &out.Authentication, s); err != nil {
 		return err
 	}
@@ -436,6 +439,9 @@ func autoConvert_componentconfig_KubeletConfiguration_To_v1alpha1_KubeletConfigu
 	out.TLSCertFile = in.TLSCertFile
 	out.TLSPrivateKeyFile = in.TLSPrivateKeyFile
 	out.CertDirectory = in.CertDirectory
+	if err := api.Convert_bool_To_Pointer_bool(&in.CertRotation, &out.CertRotation, s); err != nil {
+		return err
+	}
 	if err := Convert_componentconfig_KubeletAuthentication_To_v1alpha1_KubeletAuthentication(&in.Authentication, &out.Authentication, s); err != nil {
 		return err
 	}

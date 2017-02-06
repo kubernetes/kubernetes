@@ -60,6 +60,7 @@ import (
 	"k8s.io/kubernetes/pkg/features"
 	internalapi "k8s.io/kubernetes/pkg/kubelet/api"
 	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
+	"k8s.io/kubernetes/pkg/kubelet/certificate"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	"k8s.io/kubernetes/pkg/kubelet/config"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
@@ -699,6 +700,18 @@ func NewMainKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *Kub
 	}
 	klet.imageManager = imageManager
 
+	klet.certificateManager, err = certificate.NewManager(
+		kubeClient.Certificates().CertificateSigningRequests(),
+		nodeName,
+		kubeCfg.CertDirectory,
+		kubeCfg.CertDirectory,
+		kubeCfg.TLSCertFile,
+		kubeCfg.TLSPrivateKeyFile,
+		kubeCfg.CertRotation)
+	if err != nil {
+		return nil, fmt.Errorf("failed to initialize certificate manager: %v", err)
+	}
+
 	klet.statusManager = status.NewManager(kubeClient, klet.podManager)
 
 	klet.probeManager = prober.NewManager(
@@ -910,6 +923,9 @@ type Kubelet struct {
 
 	// Cached MachineInfo returned by cadvisor.
 	machineInfo *cadvisorapi.MachineInfo
+
+	// Handles certificate rotations.
+	certificateManager certificate.Manager
 
 	// Syncs pods statuses with apiserver; also used as a cache of statuses.
 	statusManager status.Manager
@@ -1173,7 +1189,10 @@ func (kl *Kubelet) initializeModules() error {
 	// Step 4: Start the image manager.
 	kl.imageManager.Start()
 
-	// Step 5: Start container manager.
+	// Step 5: Start the certificate manager.
+	kl.certificateManager.Start()
+
+	// Step 6: Start container manager.
 	node, err := kl.getNodeAnyWay()
 	if err != nil {
 		return fmt.Errorf("Kubelet failed to get node info: %v", err)
@@ -1183,12 +1202,12 @@ func (kl *Kubelet) initializeModules() error {
 		return fmt.Errorf("Failed to start ContainerManager %v", err)
 	}
 
-	// Step 6: Start out of memory watcher.
+	// Step 7: Start out of memory watcher.
 	if err := kl.oomWatcher.Start(kl.nodeRef); err != nil {
 		return fmt.Errorf("Failed to start OOM watcher %v", err)
 	}
 
-	// Step 7: Start resource analyzer
+	// Step 8: Start resource analyzer
 	kl.resourceAnalyzer.Start()
 
 	return nil
@@ -2084,6 +2103,10 @@ func (kl *Kubelet) ResyncInterval() time.Duration {
 
 // ListenAndServe runs the kubelet HTTP server.
 func (kl *Kubelet) ListenAndServe(address net.IP, port uint, tlsOptions *server.TLSOptions, auth server.AuthInterface, enableDebuggingHandlers bool) {
+	if tlsOptions != nil {
+		glog.Infof("Enabling rotating certificates.")
+		tlsOptions.Config.GetCertificate = kl.certificateManager.GetCertificate
+	}
 	server.ListenAndServeKubeletServer(kl, kl.resourceAnalyzer, address, port, tlsOptions, auth, enableDebuggingHandlers, kl.containerRuntime, kl.criHandler)
 }
 

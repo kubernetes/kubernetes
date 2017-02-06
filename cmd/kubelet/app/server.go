@@ -275,7 +275,6 @@ func initKubeletConfigSync(s *options.KubeletServer) (*componentconfig.KubeletCo
 func Run(s *options.KubeletServer, kubeDeps *kubelet.KubeletDeps) error {
 	if err := run(s, kubeDeps); err != nil {
 		return fmt.Errorf("failed to run Kubelet: %v", err)
-
 	}
 	return nil
 }
@@ -566,8 +565,6 @@ func InitializeTLS(kc *componentconfig.KubeletConfiguration) (*server.TLSOptions
 			// Can't use TLSv1.1 because of RC4 cipher usage
 			MinVersion: tls.VersionTLS12,
 		},
-		CertFile: kc.TLSCertFile,
-		KeyFile:  kc.TLSPrivateKeyFile,
 	}
 
 	if len(kc.Authentication.X509.ClientCAFile) > 0 {
