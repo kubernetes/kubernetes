@@ -35,7 +35,6 @@ import (
 	"k8s.io/apiserver/pkg/storage/storagebackend"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/kubernetes/cmd/kube-aggregator/pkg/apiserver"
-	"k8s.io/kubernetes/cmd/kube-aggregator/pkg/legacy"
 	"k8s.io/kubernetes/pkg/api"
 	kubeclientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
@@ -43,9 +42,9 @@ import (
 	"k8s.io/kubernetes/cmd/kube-aggregator/pkg/apis/apiregistration/v1alpha1"
 )
 
-const defaultEtcdPathPrefix = "/registry/kubernetes.io/kube-aggregator"
+const defaultEtcdPathPrefix = "/registry/kube-aggregator.kubernetes.io/"
 
-type DiscoveryServerOptions struct {
+type AggregatorOptions struct {
 	Etcd           *genericoptions.EtcdOptions
 	SecureServing  *genericoptions.SecureServingOptions
 	Authentication *genericoptions.DelegatingAuthenticationOptions
@@ -61,8 +60,8 @@ type DiscoveryServerOptions struct {
 }
 
 // NewCommandStartMaster provides a CLI handler for 'start master' command
-func NewCommandStartDiscoveryServer(out, err io.Writer) *cobra.Command {
-	o := &DiscoveryServerOptions{
+func NewCommandStartAggregator(out, err io.Writer) *cobra.Command {
+	o := &AggregatorOptions{
 		Etcd:           genericoptions.NewEtcdOptions(api.Scheme),
 		SecureServing:  genericoptions.NewSecureServingOptions(),
 		Authentication: genericoptions.NewDelegatingAuthenticationOptions(),
@@ -77,12 +76,12 @@ func NewCommandStartDiscoveryServer(out, err io.Writer) *cobra.Command {
 	o.SecureServing.ServingOptions.BindPort = 443
 
 	cmd := &cobra.Command{
-		Short: "Launch a discovery summarizer and proxy server",
-		Long:  "Launch a discovery summarizer and proxy server",
+		Short: "Launch a API aggregator and proxy server",
+		Long:  "Launch a API aggregator and proxy server",
 		Run: func(c *cobra.Command, args []string) {
 			cmdutil.CheckErr(o.Complete())
 			cmdutil.CheckErr(o.Validate(args))
-			cmdutil.CheckErr(o.RunDiscoveryServer())
+			cmdutil.CheckErr(o.RunAggregator())
 		},
 	}
 
@@ -97,20 +96,15 @@ func NewCommandStartDiscoveryServer(out, err io.Writer) *cobra.Command {
 	return cmd
 }
 
-func (o DiscoveryServerOptions) Validate(args []string) error {
+func (o AggregatorOptions) Validate(args []string) error {
 	return nil
 }
 
-func (o *DiscoveryServerOptions) Complete() error {
+func (o *AggregatorOptions) Complete() error {
 	return nil
 }
 
-func (o DiscoveryServerOptions) RunDiscoveryServer() error {
-	// if we don't have an etcd to back the server, we must be a legacy server
-	if len(o.Etcd.StorageConfig.ServerList) == 0 {
-		return o.RunLegacyDiscoveryServer()
-	}
-
+func (o AggregatorOptions) RunAggregator() error {
 	// TODO have a "real" external address
 	if err := o.SecureServing.MaybeDefaultWithSelfSignedCerts("localhost"); err != nil {
 		return fmt.Errorf("error creating self-signed certificates: %v", err)
@@ -169,17 +163,6 @@ func (o DiscoveryServerOptions) RunDiscoveryServer() error {
 	server.GenericAPIServer.PrepareRun().Run(wait.NeverStop)
 
 	return nil
-}
-
-// RunLegacyDiscoveryServer runs the legacy mode of discovery
-func (o DiscoveryServerOptions) RunLegacyDiscoveryServer() error {
-	configFilePath := "config.json"
-	port := "9090"
-	s, err := legacy.NewDiscoverySummarizer(configFilePath)
-	if err != nil {
-		return err
-	}
-	return s.Run(port)
 }
 
 type restOptionsFactory struct {
