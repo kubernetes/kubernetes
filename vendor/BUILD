@@ -8724,10 +8724,16 @@ go_library(
 
 go_test(
     name = "k8s.io/apiserver/pkg/admission_test",
-    srcs = ["k8s.io/apiserver/pkg/admission/chain_test.go"],
+    srcs = [
+        "k8s.io/apiserver/pkg/admission/chain_test.go",
+        "k8s.io/apiserver/pkg/admission/config_test.go",
+    ],
     library = ":k8s.io/apiserver/pkg/admission",
     tags = ["automanaged"],
-    deps = ["//vendor:k8s.io/apimachinery/pkg/runtime/schema"],
+    deps = [
+        "//vendor:k8s.io/apimachinery/pkg/runtime/schema",
+        "//vendor:k8s.io/apiserver/pkg/apis/apiserver",
+    ],
 )
 
 go_library(
@@ -8735,6 +8741,7 @@ go_library(
     srcs = [
         "k8s.io/apiserver/pkg/admission/attributes.go",
         "k8s.io/apiserver/pkg/admission/chain.go",
+        "k8s.io/apiserver/pkg/admission/config.go",
         "k8s.io/apiserver/pkg/admission/errors.go",
         "k8s.io/apiserver/pkg/admission/handler.go",
         "k8s.io/apiserver/pkg/admission/interfaces.go",
@@ -8742,13 +8749,20 @@ go_library(
     ],
     tags = ["automanaged"],
     deps = [
+        "//vendor:github.com/ghodss/yaml",
         "//vendor:github.com/golang/glog",
         "//vendor:k8s.io/apimachinery/pkg/api/errors",
         "//vendor:k8s.io/apimachinery/pkg/api/meta",
+        "//vendor:k8s.io/apimachinery/pkg/apimachinery/announced",
+        "//vendor:k8s.io/apimachinery/pkg/apimachinery/registered",
         "//vendor:k8s.io/apimachinery/pkg/runtime",
         "//vendor:k8s.io/apimachinery/pkg/runtime/schema",
+        "//vendor:k8s.io/apimachinery/pkg/runtime/serializer",
         "//vendor:k8s.io/apimachinery/pkg/util/errors",
         "//vendor:k8s.io/apimachinery/pkg/util/sets",
+        "//vendor:k8s.io/apiserver/pkg/apis/apiserver",
+        "//vendor:k8s.io/apiserver/pkg/apis/apiserver/install",
+        "//vendor:k8s.io/apiserver/pkg/apis/apiserver/v1alpha1",
         "//vendor:k8s.io/apiserver/pkg/authentication/user",
     ],
 )
@@ -15195,18 +15209,6 @@ go_library(
 )
 
 go_library(
-    name = "k8s.io/apiserver/pkg/apis",
-    srcs = ["k8s.io/apiserver/pkg/apis/register.go"],
-    tags = ["automanaged"],
-    deps = [
-        "//vendor:k8s.io/apimachinery/pkg/apimachinery/announced",
-        "//vendor:k8s.io/apimachinery/pkg/apimachinery/registered",
-        "//vendor:k8s.io/apimachinery/pkg/runtime",
-        "//vendor:k8s.io/apimachinery/pkg/runtime/serializer",
-    ],
-)
-
-go_library(
     name = "k8s.io/apiserver/pkg/apis/apiserver",
     srcs = [
         "k8s.io/apiserver/pkg/apis/apiserver/doc.go",
@@ -15232,7 +15234,6 @@ go_library(
         "//vendor:k8s.io/apimachinery/pkg/apimachinery/registered",
         "//vendor:k8s.io/apimachinery/pkg/runtime",
         "//vendor:k8s.io/apimachinery/pkg/util/sets",
-        "//vendor:k8s.io/apiserver/pkg/apis",
         "//vendor:k8s.io/apiserver/pkg/apis/apiserver",
         "//vendor:k8s.io/apiserver/pkg/apis/apiserver/v1alpha1",
     ],
