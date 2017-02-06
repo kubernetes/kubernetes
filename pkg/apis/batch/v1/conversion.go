@@ -41,7 +41,7 @@ func addConversionFuncs(scheme *runtime.Scheme) error {
 			case "metadata.name", "metadata.namespace", "status.successful":
 				return label, value, nil
 			default:
-				return "", "", fmt.Errorf("field label not supported: %s", label)
+				return "", "", fmt.Errorf("field label %q not supported for Job", label)
 			}
 		},
 	)
