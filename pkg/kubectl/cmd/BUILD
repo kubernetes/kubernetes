@@ -157,6 +157,7 @@ go_test(
         "create_namespace_test.go",
         "create_quota_test.go",
         "create_role_test.go",
+        "create_rolebinding_test.go",
         "create_secret_test.go",
         "create_service_test.go",
         "create_serviceaccount_test.go",
