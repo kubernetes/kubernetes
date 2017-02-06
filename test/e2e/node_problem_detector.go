@@ -19,6 +19,7 @@ package e2e
 import (
 	"fmt"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
@@ -45,13 +46,13 @@ var _ = framework.KubeDescribe("NodeProblemDetector", func() {
 		pollInterval   = 1 * time.Second
 		pollConsistent = 5 * time.Second
 		pollTimeout    = 1 * time.Minute
-		image          = "gcr.io/google_containers/node-problem-detector:v0.2"
+		image          = "gcr.io/google_containers/node-problem-detector:v0.3.0-alpha.1"
 	)
 	f := framework.NewDefaultFramework("node-problem-detector")
 	var c clientset.Interface
 	var uid string
 	var ns, name, configName, eventNamespace string
-	var nodeTime time.Time
+	var bootTime, nodeTime time.Time
 	BeforeEach(func() {
 		c = f.ClientSet
 		ns = f.Namespace.Name
@@ -72,14 +73,13 @@ var _ = framework.KubeDescribe("NodeProblemDetector", func() {
 		framework.ExpectNoError(err)
 	})
 
-	// Test kernel monitor. We may add other tests if we have more problem daemons in the future.
-	framework.KubeDescribe("KernelMonitor", func() {
+	// Test system log monitor. We may add other tests if we have more problem daemons in the future.
+	framework.KubeDescribe("SystemLogMonitor", func() {
 		const (
 			// Use test condition to avoid conflict with real node problem detector
 			// TODO(random-liu): Now node condition could be arbitrary string, consider wether we need to
 			// add TestCondition when switching to predefined condition list.
 			condition    = v1.NodeConditionType("TestCondition")
-			lookback     = time.Hour // Assume the test won't take more than 1 hour, in fact it usually only takes 90 seconds.
 			startPattern = "test reboot"
 
 			// File paths used in the test.
@@ -99,10 +99,13 @@ var _ = framework.KubeDescribe("NodeProblemDetector", func() {
 			defaultMessage = "default message"
 			tempReason     = "Temporary"
 			tempMessage    = "temporary error"
-			permReason     = "Permanent"
-			permMessage    = "permanent error"
+			permReason1    = "Permanent1"
+			permMessage1   = "permanent error 1"
+			permReason2    = "Permanent2"
+			permMessage2   = "permanent error 2"
 		)
 		var source, config, tmpDir string
+		var lookback time.Duration
 		var node *v1.Node
 		var eventListOptions metav1.ListOptions
 		injectCommand := func(timestamp time.Time, log string, num int) string {
@@ -116,13 +119,36 @@ var _ = framework.KubeDescribe("NodeProblemDetector", func() {
 
 		BeforeEach(func() {
 			framework.SkipUnlessProviderIs(framework.ProvidersWithSSH...)
+			By("Get a non master node to run the pod")
+			nodes, err := c.Core().Nodes().List(metav1.ListOptions{})
+			Expect(err).NotTo(HaveOccurred())
+			node = nil
+			for _, n := range nodes.Items {
+				if !system.IsMasterNode(n.Name) {
+					node = &n
+					break
+				}
+			}
+			Expect(node).NotTo(BeNil())
+			By("Calculate Lookback duration")
+			nodeTime, bootTime, err = getNodeTime(node)
+			Expect(err).To(BeNil())
+			// Set lookback duration longer than node up time.
+			// Assume the test won't take more than 1 hour, in fact it usually only takes 90 seconds.
+			lookback = nodeTime.Sub(bootTime) + time.Hour
+
 			// Randomize the source name to avoid conflict with real node problem detector
 			source = "kernel-monitor-" + uid
 			config = `
 			{
+				"plugin": "filelog",
+				"pluginConfig": {
+					"timestamp": "^.{15}",
+					"message": "kernel: \\[.*\\] (.*)",
+					"timestampFormat": "` + time.Stamp + `"
+				},
 				"logPath": "` + filepath.Join(logDir, logFile) + `",
 				"lookback": "` + lookback.String() + `",
-				"startPattern": "` + startPattern + `",
 				"bufferSize": 10,
 				"source": "` + source + `",
 				"conditions": [
@@ -141,22 +167,17 @@ var _ = framework.KubeDescribe("NodeProblemDetector", func() {
 				{
 					"type": "permanent",
 					"condition": "` + string(condition) + `",
-					"reason": "` + permReason + `",
-					"pattern": "` + permMessage + `"
+					"reason": "` + permReason1 + `",
+					"pattern": "` + permMessage1 + ".*" + `"
+				},
+				{
+					"type": "permanent",
+					"condition": "` + string(condition) + `",
+					"reason": "` + permReason2 + `",
+					"pattern": "` + permMessage2 + ".*" + `"
 				}
 				]
 			}`
-			By("Get a non master node to run the pod")
-			nodes, err := c.Core().Nodes().List(metav1.ListOptions{})
-			Expect(err).NotTo(HaveOccurred())
-			node = nil
-			for _, n := range nodes.Items {
-				if !system.IsMasterNode(n.Name) {
-					node = &n
-					break
-				}
-			}
-			Expect(node).NotTo(BeNil())
 			By("Generate event list options")
 			selector := fields.Set{
 				"involvedObject.kind":      "Node",
@@ -184,7 +205,6 @@ var _ = framework.KubeDescribe("NodeProblemDetector", func() {
 				},
 				Spec: v1.PodSpec{
 					NodeName:        node.Name,
-					HostNetwork:     true,
 					SecurityContext: &v1.PodSecurityContext{},
 					Volumes: []v1.Volume{
 						{
@@ -212,7 +232,7 @@ var _ = framework.KubeDescribe("NodeProblemDetector", func() {
 						{
 							Name:            name,
 							Image:           image,
-							Command:         []string{"/node-problem-detector", "--kernel-monitor=" + filepath.Join(configDir, configFile)},
+							Command:         []string{"/node-problem-detector", "--system-log-monitors=" + filepath.Join(configDir, configFile), "--logtostderr"},
 							ImagePullPolicy: v1.PullAlways,
 							Env: []v1.EnvVar{
 								{
@@ -246,13 +266,6 @@ var _ = framework.KubeDescribe("NodeProblemDetector", func() {
 			Expect(err).NotTo(HaveOccurred())
 			By("Wait for node problem detector running")
 			Expect(f.WaitForPodRunning(name)).To(Succeed())
-			// Get the node time
-			nodeIP := framework.GetNodeExternalIP(node)
-			result, err := framework.SSH("date '+%FT%T.%N%:z'", nodeIP, framework.TestContext.Provider)
-			Expect(err).ShouldNot(HaveOccurred())
-			Expect(result.Code).Should(BeZero())
-			nodeTime, err = time.Parse(time.RFC3339, strings.TrimSpace(result.Stdout))
-			Expect(err).ShouldNot(HaveOccurred())
 		})
 
 		It("should generate node condition and events for corresponding errors", func() {
@@ -274,7 +287,7 @@ var _ = framework.KubeDescribe("NodeProblemDetector", func() {
 				},
 				{
 					description:      "should not generate events for too old log",
-					timestamp:        nodeTime.Add(-3 * lookback), // Assume 3*lookback is old enough
+					timestamp:        bootTime.Add(-1 * time.Minute),
 					message:          tempMessage,
 					messageNum:       3,
 					conditionReason:  defaultReason,
@@ -283,8 +296,8 @@ var _ = framework.KubeDescribe("NodeProblemDetector", func() {
 				},
 				{
 					description:      "should not change node condition for too old log",
-					timestamp:        nodeTime.Add(-3 * lookback), // Assume 3*lookback is old enough
-					message:          permMessage,
+					timestamp:        bootTime.Add(-1 * time.Minute),
+					message:          permMessage1,
 					messageNum:       1,
 					conditionReason:  defaultReason,
 					conditionMessage: defaultMessage,
@@ -292,7 +305,7 @@ var _ = framework.KubeDescribe("NodeProblemDetector", func() {
 				},
 				{
 					description:      "should generate event for old log within lookback duration",
-					timestamp:        nodeTime.Add(-1 * time.Minute),
+					timestamp:        nodeTime,
 					message:          tempMessage,
 					messageNum:       3,
 					events:           3,
@@ -302,23 +315,13 @@ var _ = framework.KubeDescribe("NodeProblemDetector", func() {
 				},
 				{
 					description:      "should change node condition for old log within lookback duration",
-					timestamp:        nodeTime.Add(-1 * time.Minute),
-					message:          permMessage,
-					messageNum:       1,
-					events:           3, // event number should not change
-					conditionReason:  permReason,
-					conditionMessage: permMessage,
-					conditionType:    v1.ConditionTrue,
-				},
-				{
-					description:      "should reset node condition if the node is reboot",
 					timestamp:        nodeTime,
-					message:          startPattern,
+					message:          permMessage1,
 					messageNum:       1,
 					events:           3, // event number should not change
-					conditionReason:  defaultReason,
-					conditionMessage: defaultMessage,
-					conditionType:    v1.ConditionFalse,
+					conditionReason:  permReason1,
+					conditionMessage: permMessage1,
+					conditionType:    v1.ConditionTrue,
 				},
 				{
 					description:      "should generate event for new log",
@@ -326,18 +329,28 @@ var _ = framework.KubeDescribe("NodeProblemDetector", func() {
 					message:          tempMessage,
 					messageNum:       3,
 					events:           6,
-					conditionReason:  defaultReason,
-					conditionMessage: defaultMessage,
-					conditionType:    v1.ConditionFalse,
+					conditionReason:  permReason1,
+					conditionMessage: permMessage1,
+					conditionType:    v1.ConditionTrue,
+				},
+				{
+					description:      "should not update node condition with the same reason",
+					timestamp:        nodeTime.Add(5 * time.Minute),
+					message:          permMessage1 + "different message",
+					messageNum:       1,
+					events:           6, // event number should not change
+					conditionReason:  permReason1,
+					conditionMessage: permMessage1,
+					conditionType:    v1.ConditionTrue,
 				},
 				{
 					description:      "should change node condition for new log",
 					timestamp:        nodeTime.Add(5 * time.Minute),
-					message:          permMessage,
+					message:          permMessage2,
 					messageNum:       1,
 					events:           6, // event number should not change
-					conditionReason:  permReason,
-					conditionMessage: permMessage,
+					conditionReason:  permReason2,
+					conditionMessage: permMessage2,
 					conditionType:    v1.ConditionTrue,
 				},
 			} {
@@ -391,6 +404,45 @@ var _ = framework.KubeDescribe("NodeProblemDetector", func() {
 		})
 	})
 })
+
+// getNodeTime gets node boot time and current time by running ssh command on the node.
+func getNodeTime(node *v1.Node) (time.Time, time.Time, error) {
+	nodeIP := framework.GetNodeExternalIP(node)
+
+	// Get node current time.
+	result, err := framework.SSH("date '+%FT%T.%N%:z'", nodeIP, framework.TestContext.Provider)
+	if err != nil {
+		return time.Time{}, time.Time{}, fmt.Errorf("failed to run ssh command to get node time: %v", err)
+	}
+	if result.Code != 0 {
+		return time.Time{}, time.Time{}, fmt.Errorf("failed to run ssh command with error code: %d", result.Code)
+	}
+	timestamp := strings.TrimSpace(result.Stdout)
+	nodeTime, err := time.Parse(time.RFC3339, timestamp)
+	if err != nil {
+		return time.Time{}, time.Time{}, fmt.Errorf("failed to parse node time %q: %v", timestamp, err)
+	}
+
+	// Get system uptime.
+	result, err = framework.SSH(`cat /proc/uptime | cut -d " " -f 1`, nodeIP, framework.TestContext.Provider)
+	if err != nil {
+		return time.Time{}, time.Time{}, fmt.Errorf("failed to run ssh command to get node boot time: %v", err)
+	}
+	if result.Code != 0 {
+		return time.Time{}, time.Time{}, fmt.Errorf("failed to run ssh command with error code: %d, stdout: %q, stderr: %q",
+			result.Code, result.Stdout, result.Stderr)
+	}
+	uptime, err := strconv.ParseFloat(strings.TrimSpace(result.Stdout), 64)
+	if err != nil {
+		return time.Time{}, time.Time{}, fmt.Errorf("failed to parse node uptime %q: %v", result.Stdout, err)
+	}
+
+	// Get node boot time. NOTE that because we get node current time before uptime, the boot time
+	// calculated will be a little earlier than the real boot time. This won't affect the correctness
+	// of the test result.
+	bootTime := nodeTime.Add(-time.Duration(uptime * float64(time.Second)))
+	return nodeTime, bootTime, nil
+}
 
 // verifyEvents verifies there are num specific events generated
 func verifyEvents(e coreclientset.EventInterface, options metav1.ListOptions, num int, reason, message string) error {
