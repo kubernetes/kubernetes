@@ -552,35 +552,3 @@ func TestGetSchedulerCommand(t *testing.T) {
 		}
 	}
 }
-
-func TestGetProxyCommand(t *testing.T) {
-	var tests = []struct {
-		cfg      *kubeadmapi.MasterConfiguration
-		expected []string
-	}{
-		{
-			cfg: &kubeadmapi.MasterConfiguration{
-				Networking: kubeadm.Networking{
-					PodSubnet: "bar",
-				},
-			},
-			expected: []string{
-				"kube-proxy",
-				"--cluster-cidr=bar",
-			},
-		},
-	}
-
-	for _, rt := range tests {
-		actual := getProxyCommand(rt.cfg)
-		for i := range actual {
-			if actual[i] != rt.expected[i] {
-				t.Errorf(
-					"failed getProxyCommand:\n\texpected: %s\n\t  actual: %s",
-					rt.expected[i],
-					actual[i],
-				)
-			}
-		}
-	}
-}
