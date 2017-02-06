@@ -343,7 +343,7 @@ func (wc *watchChan) sendEvent(e *event) {
 
 func (wc *watchChan) prepareObjs(e *event) (curObj runtime.Object, oldObj runtime.Object, err error) {
 	if !e.isDeleted {
-		data, err := wc.watcher.transformer.TransformFromStorage(e.value)
+		data, _, err := wc.watcher.transformer.TransformFromStorage(e.value)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -358,7 +358,7 @@ func (wc *watchChan) prepareObjs(e *event) (curObj runtime.Object, oldObj runtim
 	// we need the object only to compute whether it was filtered out
 	// before).
 	if len(e.prevValue) > 0 && (e.isDeleted || !wc.acceptAll()) {
-		data, err := wc.watcher.transformer.TransformFromStorage(e.prevValue)
+		data, _, err := wc.watcher.transformer.TransformFromStorage(e.prevValue)
 		if err != nil {
 			return nil, nil, err
 		}

@@ -319,7 +319,7 @@ func (w *etcdWatcher) decodeObject(node *etcd.Node) (runtime.Object, error) {
 		return obj, nil
 	}
 
-	body, err := w.valueTransformer.TransformStringFromStorage(node.Value)
+	body, _, err := w.valueTransformer.TransformStringFromStorage(node.Value)
 	if err != nil {
 		return nil, err
 	}

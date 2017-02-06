@@ -48,14 +48,15 @@ import (
 // prefixTransformer adds and verifies that all data has the correct prefix on its way in and out.
 type prefixTransformer struct {
 	prefix string
+	stale  bool
 	err    error
 }
 
-func (p prefixTransformer) TransformStringFromStorage(s string) (string, error) {
+func (p prefixTransformer) TransformStringFromStorage(s string) (string, bool, error) {
 	if !strings.HasPrefix(s, p.prefix) {
-		return "", fmt.Errorf("value does not have expected prefix: %s", s)
+		return "", false, fmt.Errorf("value does not have expected prefix: %s", s)
 	}
-	return strings.TrimPrefix(s, p.prefix), p.err
+	return strings.TrimPrefix(s, p.prefix), p.stale, p.err
 }
 func (p prefixTransformer) TransformStringToStorage(s string) (string, error) {
 	if len(s) > 0 {
@@ -449,7 +450,8 @@ func TestGuaranteedUpdateNoChange(t *testing.T) {
 	helper := newEtcdHelper(server.Client, scheme, codec, etcdtest.PathPrefix())
 
 	obj := &storagetesting.TestResource{ObjectMeta: metav1.ObjectMeta{Name: "foo"}, Value: 1}
-	err := helper.GuaranteedUpdate(context.TODO(), key, &storagetesting.TestResource{}, true, nil, storage.SimpleUpdate(func(in runtime.Object) (runtime.Object, error) {
+	original := &storagetesting.TestResource{}
+	err := helper.GuaranteedUpdate(context.TODO(), key, original, true, nil, storage.SimpleUpdate(func(in runtime.Object) (runtime.Object, error) {
 		return obj, nil
 	}))
 	if err != nil {
@@ -458,7 +460,27 @@ func TestGuaranteedUpdateNoChange(t *testing.T) {
 
 	// Update an existing node with the same data
 	callbackCalled := false
-	objUpdate := &storagetesting.TestResource{ObjectMeta: metav1.ObjectMeta{Name: "foo"}, Value: 1}
+	objUpdate := &storagetesting.TestResource{ObjectMeta: metav1.ObjectMeta{Name: "foo", ResourceVersion: original.ResourceVersion}, Value: 1}
+	result := &storagetesting.TestResource{}
+	err = helper.GuaranteedUpdate(context.TODO(), key, result, true, nil, storage.SimpleUpdate(func(in runtime.Object) (runtime.Object, error) {
+		callbackCalled = true
+		return objUpdate, nil
+	}))
+	if err != nil {
+		t.Fatalf("Unexpected error %#v", err)
+	}
+	if !callbackCalled {
+		t.Errorf("tryUpdate callback should have been called.")
+	}
+	if result.ResourceVersion != original.ResourceVersion {
+		t.Fatalf("updated the object resource version")
+	}
+
+	// Update an existing node with the same data but return stale
+	helper.transformer = prefixTransformer{prefix: "test!", stale: true}
+	callbackCalled = false
+	result = &storagetesting.TestResource{}
+	objUpdate = &storagetesting.TestResource{ObjectMeta: metav1.ObjectMeta{Name: "foo"}, Value: 1}
 	err = helper.GuaranteedUpdate(context.TODO(), key, &storagetesting.TestResource{}, true, nil, storage.SimpleUpdate(func(in runtime.Object) (runtime.Object, error) {
 		callbackCalled = true
 		return objUpdate, nil
@@ -468,6 +490,9 @@ func TestGuaranteedUpdateNoChange(t *testing.T) {
 	}
 	if !callbackCalled {
 		t.Errorf("tryUpdate callback should have been called.")
+	}
+	if result.ResourceVersion == original.ResourceVersion {
+		t.Errorf("did not update the object resource version")
 	}
 }
 
