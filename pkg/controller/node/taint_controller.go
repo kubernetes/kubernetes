@@ -25,7 +25,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 
-	amv1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
@@ -88,7 +88,9 @@ type podUpdateItem struct {
 	newTolerations []v1.Toleration
 }
 
-type TaintController struct {
+// NoExecuteTaint manager listens to Taint/Toleration changes and is resposible for removing Pods
+// from Nodes tainted with NoExecute Taints.
+type NoExecuteTaintManager struct {
 	client             clientset.Interface
 	taintEvictionQueue *TimedWorkerQueue
 	// keeps a map from nodeName to all noExecute taints on that Node
@@ -103,8 +105,8 @@ func deletePodHandler(c clientset.Interface) func(args *WorkArgs) {
 	return func(args *WorkArgs) {
 		ns := args.NamespacedName.Namespace
 		name := args.NamespacedName.Name
-		glog.V(0).Infof("TaintController is deleting Pod: %v", args.NamespacedName.String())
-		c.Core().Pods(ns).Delete(name, &amv1.DeleteOptions{})
+		glog.V(0).Infof("NoExecuteTaintManager is deleting Pod: %v", args.NamespacedName.String())
+		c.Core().Pods(ns).Delete(name, &metav1.DeleteOptions{})
 	}
 }
 
@@ -140,25 +142,26 @@ func getMatchingTolerations(taints []v1.Taint, tolerations []v1.Toleration) (boo
 	return true, result
 }
 
-func getPodsAssignedToNode(c clientset.Interface, nodeName string) []v1.Pod {
+func getPodsAssignedToNode(c clientset.Interface, nodeName string) ([]v1.Pod, error) {
 	selector := fields.SelectorFromSet(fields.Set{"spec.nodeName": nodeName})
-	pods, err := c.Core().Pods(v1.NamespaceAll).List(amv1.ListOptions{
+	pods, err := c.Core().Pods(v1.NamespaceAll).List(metav1.ListOptions{
 		FieldSelector: selector.String(),
 		LabelSelector: labels.Everything().String(),
 	})
 	for i := 0; i < retries && err != nil; i++ {
-		pods, err = c.Core().Pods(v1.NamespaceAll).List(amv1.ListOptions{
+		pods, err = c.Core().Pods(v1.NamespaceAll).List(metav1.ListOptions{
 			FieldSelector: selector.String(),
 			LabelSelector: labels.Everything().String(),
 		})
 		time.Sleep(100 * time.Millisecond)
 	}
 	if err != nil {
-		glog.Errorf("Failed to get Pods assigned to node %v. Skipping update.", nodeName)
+		return []v1.Pod{}, fmt.Errorf("Failed to get Pods assigned to node %v. Skipping update.", nodeName)
 	}
-	return pods.Items
+	return pods.Items, nil
 }
 
+// Returns minimal toleration time from the given slice, or -1 if it's infinite.
 func getMinTolerationTime(tolerations []v1.Toleration) time.Duration {
 	minTolerationTime := int64(-1)
 	for i := range tolerations {
@@ -180,8 +183,10 @@ func getMinTolerationTime(tolerations []v1.Toleration) time.Duration {
 	return time.Duration(minTolerationTime) * time.Second
 }
 
-func NewTaintController(c clientset.Interface) *TaintController {
-	return &TaintController{
+// NewNoExecuteTaintManager creates a new NoExecuteTaintManager that will use passed clientset to
+// communicate with the API server.
+func NewNoExecuteTaintManager(c clientset.Interface) *NoExecuteTaintManager {
+	return &NoExecuteTaintManager{
 		client:             c,
 		taintEvictionQueue: CreateWorkerQueue(deletePodHandler(c)),
 		taintedNodes:       make(map[string][]v1.Taint),
@@ -190,7 +195,12 @@ func NewTaintController(c clientset.Interface) *TaintController {
 	}
 }
 
-func (tc *TaintController) Run(stopCh <-chan struct{}) {
+// Run starts NoExecuteTaintManager which will run in loop until `stopCh` is closed.
+func (tc *NoExecuteTaintManager) Run(stopCh <-chan struct{}) {
+	// When processing events we want to prioritize Node updates over Pod updates,
+	// as NodeUpdates that interest NoExecuteTaintManager should be handled as soon as possible -
+	// we don't want user (or system) to wait until PodUpdate queue is drained before it can
+	// start evicting Pods from tainted Nodes.
 	for {
 		select {
 		case <-stopCh:
@@ -198,6 +208,7 @@ func (tc *TaintController) Run(stopCh <-chan struct{}) {
 		case nodeUpdate := <-tc.nodeUpdateChannel:
 			tc.handleNodeUpdate(nodeUpdate)
 		case podUpdate := <-tc.podUpdateChannel:
+			// If we found a Pod update we need to empty Node queue first.
 		priority:
 			for {
 				select {
@@ -207,12 +218,14 @@ func (tc *TaintController) Run(stopCh <-chan struct{}) {
 					break priority
 				}
 			}
+			// After Node queue is emptied we process podUpdate.
 			tc.handlePodUpdate(podUpdate)
 		}
 	}
 }
 
-func (tc *TaintController) PodUpdated(oldPod *v1.Pod, newPod *v1.Pod) {
+// PodUpdated is used to notify NoExecuteTaintManager about Pod changes.
+func (tc *NoExecuteTaintManager) PodUpdated(oldPod *v1.Pod, newPod *v1.Pod) {
 	var err error
 	oldTolerations := []v1.Toleration{}
 	if oldPod != nil {
@@ -244,11 +257,12 @@ func (tc *TaintController) PodUpdated(oldPod *v1.Pod, newPod *v1.Pod) {
 	default:
 		// If our update queue is full it means that something's blocked, and we
 		// should try restarting controller.
-		panic(fmt.Errorf("TaintController Pod update queue is full"))
+		panic(fmt.Errorf("NoExecuteTaintManager Pod update queue is full"))
 	}
 }
 
-func (tc *TaintController) NodeUpdated(oldNode *v1.Node, newNode *v1.Node) {
+// NodeUpdated is used to notify NoExecuteTaintManager about Node changes.
+func (tc *NoExecuteTaintManager) NodeUpdated(oldNode *v1.Node, newNode *v1.Node) {
 	var err error
 	oldTaints := []v1.Taint{}
 	if oldNode != nil {
@@ -283,11 +297,11 @@ func (tc *TaintController) NodeUpdated(oldNode *v1.Node, newNode *v1.Node) {
 	default:
 		// If our update queue is full it means that something's blocked, and we
 		// should try restarting controller.
-		panic(fmt.Errorf("TaintController Node update queue is full"))
+		panic(fmt.Errorf("NoExecuteTaintManager Node update queue is full"))
 	}
 }
 
-func (tc *TaintController) processPodOnNode(
+func (tc *NoExecuteTaintManager) processPodOnNode(
 	podNamespacedName types.NamespacedName,
 	nodeName string,
 	tolerations []v1.Toleration,
@@ -302,6 +316,7 @@ func (tc *TaintController) processPodOnNode(
 		return
 	}
 	minTolerationTime := getMinTolerationTime(usedTolerations)
+	// getMinTolerationTime returns negative value to denote infinite toleration.
 	if minTolerationTime < 0 {
 		glog.V(4).Infof("New tolerations for %v tolerate forever. Scheduled deletion won't be cancelled if already scheduled.", podNamespacedName.String())
 		return
@@ -321,7 +336,7 @@ func (tc *TaintController) processPodOnNode(
 	tc.taintEvictionQueue.AddWork(NewWorkArgs(podNamespacedName.Name, podNamespacedName.Namespace), startTime, triggerTime)
 }
 
-func (tc *TaintController) handlePodUpdate(podUpdate podUpdateItem) {
+func (tc *NoExecuteTaintManager) handlePodUpdate(podUpdate podUpdateItem) {
 	// Delete
 	if podUpdate.newPod == nil {
 		pod := podUpdate.oldPod
@@ -350,7 +365,7 @@ func (tc *TaintController) handlePodUpdate(podUpdate podUpdateItem) {
 	tc.processPodOnNode(podNamespacedName, nodeName, podUpdate.newTolerations, taints, time.Now())
 }
 
-func (tc *TaintController) handleNodeUpdate(nodeUpdate nodeUpdateItem) {
+func (tc *NoExecuteTaintManager) handleNodeUpdate(nodeUpdate nodeUpdateItem) {
 	// Delete
 	if nodeUpdate.newNode == nil {
 		node := nodeUpdate.oldNode
@@ -369,7 +384,11 @@ func (tc *TaintController) handleNodeUpdate(nodeUpdate nodeUpdateItem) {
 		defer tc.taintedNodesLock.Unlock()
 		tc.taintedNodes[node.Name] = taints
 	}()
-	pods := getPodsAssignedToNode(tc.client, node.Name)
+	pods, err := getPodsAssignedToNode(tc.client, node.Name)
+	if err != nil {
+		glog.Errorf(err.Error())
+		return
+	}
 	if len(pods) == 0 {
 		return
 	}
@@ -378,6 +397,7 @@ func (tc *TaintController) handleNodeUpdate(nodeUpdate nodeUpdateItem) {
 		for i := range pods {
 			tc.taintEvictionQueue.CancelWork(types.NamespacedName{Namespace: pods[i].Namespace, Name: pods[i].Name}.String())
 		}
+		return
 	}
 
 	now := time.Now()
