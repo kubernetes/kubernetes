@@ -69,11 +69,13 @@ spec:
     spec:
       containers:
       - name: kube-proxy
-        image: {{ .ImageRepository }}/kube-proxy-{{ .Arch }}:{{ .Version }}
+        image: {{ .Image }}
         imagePullPolicy: IfNotPresent
+        # TODO: This is gonna work with hyperkube v1.6.0-alpha.2+: https://github.com/kubernetes/kubernetes/pull/41017
         command:
         - kube-proxy
         - --kubeconfig=/var/lib/kube-proxy/kubeconfig.conf
+        {{ .ClusterCIDR }}
         securityContext:
           privileged: true
         volumeMounts:
