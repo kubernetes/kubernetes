@@ -25,6 +25,7 @@ import (
 
 	"github.com/golang/glog"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
@@ -39,9 +40,11 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
-	"k8s.io/kubernetes/pkg/client/legacylisters"
+	coreinformers "k8s.io/kubernetes/pkg/client/informers/informers_generated/core/v1"
+	extensionsinformers "k8s.io/kubernetes/pkg/client/informers/informers_generated/extensions/v1beta1"
+	corelisters "k8s.io/kubernetes/pkg/client/listers/core/v1"
+	extensionslisters "k8s.io/kubernetes/pkg/client/listers/extensions/v1beta1"
 	"k8s.io/kubernetes/pkg/cloudprovider"
-	"k8s.io/kubernetes/pkg/controller/informers"
 	"k8s.io/kubernetes/pkg/util/metrics"
 	utilnode "k8s.io/kubernetes/pkg/util/node"
 	"k8s.io/kubernetes/pkg/util/system"
@@ -134,13 +137,15 @@ type NodeController struct {
 	// The maximum duration before a pod evicted from a node can be forcefully terminated.
 	maximumGracePeriod time.Duration
 	recorder           record.EventRecorder
-	podInformer        informers.PodInformer
-	nodeInformer       informers.NodeInformer
-	daemonSetInformer  informers.DaemonSetInformer
 
-	podStore       listers.StoreToPodLister
-	nodeStore      listers.StoreToNodeLister
-	daemonSetStore listers.StoreToDaemonSetLister
+	nodeLister         corelisters.NodeLister
+	nodeInformerSynced cache.InformerSynced
+
+	daemonSetStore          extensionslisters.DaemonSetLister
+	daemonSetInformerSynced cache.InformerSynced
+
+	podInformerSynced cache.InformerSynced
+
 	// allocate/recycle CIDRs for node if allocateNodeCIDRs == true
 	cidrAllocator CIDRAllocator
 
@@ -155,13 +160,6 @@ type NodeController struct {
 	secondaryEvictionLimiterQPS float32
 	largeClusterThreshold       int32
 	unhealthyZoneThreshold      float32
-
-	// internalPodInformer is used to hold a personal informer.  If we're using
-	// a normal shared informer, then the informer will be started for us.  If
-	// we have a personal informer, we must start it ourselves.   If you start
-	// the controller using NewDaemonSetsController(passing SharedInformer), this
-	// will be null
-	internalPodInformer cache.SharedIndexInformer
 }
 
 // NewNodeController returns a new node controller to sync instances from cloudprovider.
@@ -169,9 +167,9 @@ type NodeController struct {
 // podCIDRs it has already allocated to nodes. Since we don't allow podCIDR changes
 // currently, this should be handled as a fatal error.
 func NewNodeController(
-	podInformer informers.PodInformer,
-	nodeInformer informers.NodeInformer,
-	daemonSetInformer informers.DaemonSetInformer,
+	podInformer coreinformers.PodInformer,
+	nodeInformer coreinformers.NodeInformer,
+	daemonSetInformer extensionsinformers.DaemonSetInformer,
 	cloud cloudprovider.Interface,
 	kubeClient clientset.Interface,
 	podEvictionTimeout time.Duration,
@@ -234,9 +232,6 @@ func NewNodeController(
 		largeClusterThreshold:       largeClusterThreshold,
 		unhealthyZoneThreshold:      unhealthyZoneThreshold,
 		zoneStates:                  make(map[string]zoneState),
-		podInformer:                 podInformer,
-		nodeInformer:                nodeInformer,
-		daemonSetInformer:           daemonSetInformer,
 	}
 	nc.enterPartialDisruptionFunc = nc.ReducedQPSFunc
 	nc.enterFullDisruptionFunc = nc.HealthyQPSFunc
@@ -246,7 +241,7 @@ func NewNodeController(
 		AddFunc:    nc.maybeDeleteTerminatingPod,
 		UpdateFunc: func(_, obj interface{}) { nc.maybeDeleteTerminatingPod(obj) },
 	})
-	nc.podStore = *podInformer.Lister()
+	nc.podInformerSynced = podInformer.Informer().HasSynced
 
 	nodeEventHandlerFuncs := cache.ResourceEventHandlerFuncs{}
 	if nc.allocateNodeCIDRs {
@@ -347,9 +342,11 @@ func NewNodeController(
 	}
 
 	nodeInformer.Informer().AddEventHandler(nodeEventHandlerFuncs)
-	nc.nodeStore = *nodeInformer.Lister()
+	nc.nodeLister = nodeInformer.Lister()
+	nc.nodeInformerSynced = nodeInformer.Informer().HasSynced
 
-	nc.daemonSetStore = *daemonSetInformer.Lister()
+	nc.daemonSetStore = daemonSetInformer.Lister()
+	nc.daemonSetInformerSynced = daemonSetInformer.Informer().HasSynced
 
 	return nc, nil
 }
@@ -359,8 +356,8 @@ func (nc *NodeController) Run() {
 	go func() {
 		defer utilruntime.HandleCrash()
 
-		if !cache.WaitForCacheSync(wait.NeverStop, nc.nodeInformer.Informer().HasSynced, nc.podInformer.Informer().HasSynced, nc.daemonSetInformer.Informer().HasSynced) {
-			utilruntime.HandleError(errors.New("NodeController timed out while waiting for informers to sync..."))
+		if !cache.WaitForCacheSync(wait.NeverStop, nc.nodeInformerSynced, nc.podInformerSynced, nc.daemonSetInformerSynced) {
+			utilruntime.HandleError(fmt.Errorf("timed out waiting for caches to sync"))
 			return
 		}
 
@@ -379,13 +376,13 @@ func (nc *NodeController) Run() {
 			defer nc.evictorLock.Unlock()
 			for k := range nc.zonePodEvictor {
 				nc.zonePodEvictor[k].Try(func(value TimedValue) (bool, time.Duration) {
-					obj, exists, err := nc.nodeStore.GetByKey(value.Value)
+					node, err := nc.nodeLister.Get(value.Value)
+					if apierrors.IsNotFound(err) {
+						glog.Warningf("Node %v no longer present in nodeLister!", value.Value)
+					}
 					if err != nil {
-						glog.Warningf("Failed to get Node %v from the nodeStore: %v", value.Value, err)
-					} else if !exists {
-						glog.Warningf("Node %v no longer present in nodeStore!", value.Value)
+						glog.Warningf("Failed to get Node %v from the nodeLister: %v", value.Value, err)
 					} else {
-						node, _ := obj.(*v1.Node)
 						zone := utilnode.GetZoneKey(node)
 						EvictionsNumber.WithLabelValues(zone).Inc()
 					}
@@ -413,11 +410,11 @@ func (nc *NodeController) Run() {
 func (nc *NodeController) monitorNodeStatus() error {
 	// We are listing nodes from local cache as we can tolerate some small delays
 	// comparing to state from etcd and there is eventual consistency anyway.
-	nodes, err := nc.nodeStore.List()
+	nodes, err := nc.nodeLister.List(labels.Everything())
 	if err != nil {
 		return err
 	}
-	added, deleted := nc.checkForNodeAddedDeleted(&nodes)
+	added, deleted := nc.checkForNodeAddedDeleted(nodes)
 	for i := range added {
 		glog.V(1).Infof("NodeController observed a new Node: %#v", added[i].Name)
 		recordNodeEvent(nc.recorder, added[i].Name, string(added[i].UID), v1.EventTypeNormal, "RegisteredNode", fmt.Sprintf("Registered Node %v in NodeController", added[i].Name))
@@ -442,11 +439,11 @@ func (nc *NodeController) monitorNodeStatus() error {
 	}
 
 	zoneToNodeConditions := map[string][]*v1.NodeCondition{}
-	for i := range nodes.Items {
+	for i := range nodes {
 		var gracePeriod time.Duration
 		var observedReadyCondition v1.NodeCondition
 		var currentReadyCondition *v1.NodeCondition
-		nodeCopy, err := api.Scheme.DeepCopy(&nodes.Items[i])
+		nodeCopy, err := api.Scheme.DeepCopy(nodes[i])
 		if err != nil {
 			utilruntime.HandleError(err)
 			continue
@@ -528,12 +525,12 @@ func (nc *NodeController) monitorNodeStatus() error {
 			}
 		}
 	}
-	nc.handleDisruption(zoneToNodeConditions, &nodes)
+	nc.handleDisruption(zoneToNodeConditions, nodes)
 
 	return nil
 }
 
-func (nc *NodeController) handleDisruption(zoneToNodeConditions map[string][]*v1.NodeCondition, nodes *v1.NodeList) {
+func (nc *NodeController) handleDisruption(zoneToNodeConditions map[string][]*v1.NodeCondition, nodes []*v1.Node) {
 	newZoneStates := map[string]zoneState{}
 	allAreFullyDisrupted := true
 	for k, v := range zoneToNodeConditions {
@@ -574,8 +571,8 @@ func (nc *NodeController) handleDisruption(zoneToNodeConditions map[string][]*v1
 		// We're switching to full disruption mode
 		if allAreFullyDisrupted {
 			glog.V(0).Info("NodeController detected that all Nodes are not-Ready. Entering master disruption mode.")
-			for i := range nodes.Items {
-				nc.cancelPodEviction(&nodes.Items[i])
+			for i := range nodes {
+				nc.cancelPodEviction(nodes[i])
 			}
 			// We stop all evictions.
 			for k := range nc.zonePodEvictor {
@@ -592,11 +589,11 @@ func (nc *NodeController) handleDisruption(zoneToNodeConditions map[string][]*v1
 			glog.V(0).Info("NodeController detected that some Nodes are Ready. Exiting master disruption mode.")
 			// When exiting disruption mode update probe timestamps on all Nodes.
 			now := nc.now()
-			for i := range nodes.Items {
-				v := nc.nodeStatusMap[nodes.Items[i].Name]
+			for i := range nodes {
+				v := nc.nodeStatusMap[nodes[i].Name]
 				v.probeTimestamp = now
 				v.readyTransitionTimestamp = now
-				nc.nodeStatusMap[nodes.Items[i].Name] = v
+				nc.nodeStatusMap[nodes[i].Name] = v
 			}
 			// We reset all rate limiters to settings appropriate for the given state.
 			for k := range nc.zonePodEvictor {
@@ -797,21 +794,21 @@ func (nc *NodeController) tryUpdateNodeStatus(node *v1.Node) (time.Duration, v1.
 	return gracePeriod, observedReadyCondition, currentReadyCondition, err
 }
 
-func (nc *NodeController) checkForNodeAddedDeleted(nodes *v1.NodeList) (added, deleted []*v1.Node) {
-	for i := range nodes.Items {
-		if _, has := nc.knownNodeSet[nodes.Items[i].Name]; !has {
-			added = append(added, &nodes.Items[i])
+func (nc *NodeController) checkForNodeAddedDeleted(nodes []*v1.Node) (added, deleted []*v1.Node) {
+	for i := range nodes {
+		if _, has := nc.knownNodeSet[nodes[i].Name]; !has {
+			added = append(added, nodes[i])
 		}
 	}
 	// If there's a difference between lengths of known Nodes and observed nodes
 	// we must have removed some Node.
-	if len(nc.knownNodeSet)+len(added) != len(nodes.Items) {
+	if len(nc.knownNodeSet)+len(added) != len(nodes) {
 		knowSetCopy := map[string]*v1.Node{}
 		for k, v := range nc.knownNodeSet {
 			knowSetCopy[k] = v
 		}
-		for i := range nodes.Items {
-			delete(knowSetCopy, nodes.Items[i].Name)
+		for i := range nodes {
+			delete(knowSetCopy, nodes[i].Name)
 		}
 		for i := range knowSetCopy {
 			deleted = append(deleted, knowSetCopy[i])
