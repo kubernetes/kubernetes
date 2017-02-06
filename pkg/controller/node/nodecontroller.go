@@ -149,7 +149,7 @@ type NodeController struct {
 	// allocate/recycle CIDRs for node if allocateNodeCIDRs == true
 	cidrAllocator CIDRAllocator
 	// manages taints
-	taintManager *TaintController
+	taintManager *NoExecuteTaintManager
 
 	forcefullyDeletePod        func(*v1.Pod) error
 	nodeExistsInCloudProvider  func(types.NodeName) (bool, error)
@@ -313,7 +313,9 @@ func NewNodeController(
 				if err := nc.cidrAllocator.AllocateOrOccupyCIDR(node); err != nil {
 					utilruntime.HandleError(fmt.Errorf("Error allocating CIDR: %v", err))
 				}
-				nc.taintManager.NodeUpdated(nil, node)
+				if nc.taintManager != nil {
+					nc.taintManager.NodeUpdated(nil, node)
+				}
 			},
 			UpdateFunc: func(oldNode, newNode interface{}) {
 				node := newNode.(*v1.Node)
@@ -348,7 +350,9 @@ func NewNodeController(
 						utilruntime.HandleError(fmt.Errorf("Error allocating CIDR: %v", err))
 					}
 				}
-				nc.taintManager.NodeUpdated(prevNode, node)
+				if nc.taintManager != nil {
+					nc.taintManager.NodeUpdated(prevNode, node)
+				}
 			},
 			DeleteFunc: func(originalObj interface{}) {
 				obj, err := api.Scheme.DeepCopy(originalObj)
@@ -371,7 +375,9 @@ func NewNodeController(
 						return
 					}
 				}
-				nc.taintManager.NodeUpdated(node, nil)
+				if nc.taintManager != nil {
+					nc.taintManager.NodeUpdated(node, nil)
+				}
 				if err := nc.cidrAllocator.ReleaseCIDR(node); err != nil {
 					glog.Errorf("Error releasing CIDR: %v", err)
 				}
@@ -380,7 +386,7 @@ func NewNodeController(
 	}
 
 	if nc.runTaintManager {
-		nc.taintManager = NewTaintController(kubeClient)
+		nc.taintManager = NewNoExecuteTaintManager(kubeClient)
 	}
 
 	nodeInformer.Informer().AddEventHandler(nodeEventHandlerFuncs)
