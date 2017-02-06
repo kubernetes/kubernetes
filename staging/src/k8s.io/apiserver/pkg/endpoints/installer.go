@@ -35,10 +35,10 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apiserver/pkg/endpoints/handlers"
 	"k8s.io/apiserver/pkg/endpoints/handlers/negotiation"
 	"k8s.io/apiserver/pkg/endpoints/metrics"
 	"k8s.io/apiserver/pkg/endpoints/request"
-	"k8s.io/apiserver/pkg/endpoints/handlers"
 	"k8s.io/apiserver/pkg/registry/rest"
 
 	"github.com/emicklei/go-restful"
@@ -839,7 +839,10 @@ func (n rootScopeNaming) GenerateLink(req *restful.Request, obj runtime.Object) 
 			return "", err
 		}
 	}
-	return n.pathPrefix + url.QueryEscape(name) + n.pathSuffix, nil
+	if len(n.pathSuffix) == 0 {
+		return n.pathPrefix + "/" + url.QueryEscape(name), nil
+	}
+	return n.pathPrefix + "/" + url.QueryEscape(name) + "/" + n.pathSuffix, nil
 }
 
 // GenerateListLink returns the appropriate path and query to locate a list by its canonical path.
