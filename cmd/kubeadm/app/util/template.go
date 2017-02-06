@@ -22,7 +22,6 @@ import (
 	"text/template"
 )
 
-// TODO: Should be unit-tested
 func ParseTemplate(strtmpl string, obj interface{}) ([]byte, error) {
 	var buf bytes.Buffer
 	tmpl, err := template.New("template").Parse(strtmpl)
