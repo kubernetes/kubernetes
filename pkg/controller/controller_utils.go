@@ -873,7 +873,26 @@ func AddOrUpdateTaintOnNode(c clientset.Interface, nodeName string, taint *v1.Ta
 
 // RemoveTaintOffNode is for cleaning up taints temporarily added to node,
 // won't fail if target taint doesn't exist or has been removed.
-func RemoveTaintOffNode(c clientset.Interface, nodeName string, taint *v1.Taint) error {
+// If passed a node it'll check if there's anything to be done, if taint is not present it won't issue
+// any API calls.
+func RemoveTaintOffNode(c clientset.Interface, nodeName string, taint *v1.Taint, node *v1.Node) error {
+	// Short circuit for limiting amout of API calls.
+	if node != nil {
+		taints, err := v1.GetNodeTaints(node)
+		if err != nil {
+			return err
+		}
+		match := false
+		for i := range taints {
+			if taints[i].MatchTaint(taint) {
+				match = true
+				break
+			}
+		}
+		if !match {
+			return nil
+		}
+	}
 	firstTry := true
 	return clientretry.RetryOnConflict(UpdateTaintBackoff, func() error {
 		var err error
