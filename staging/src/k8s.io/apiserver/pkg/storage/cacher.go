@@ -752,7 +752,7 @@ func (c *errWatcher) Stop() {
 type cacheWatcher struct {
 	sync.Mutex
 	copier  runtime.ObjectCopier
-	input   chan *watchCacheEvent
+	input   chan watchCacheEvent
 	result  chan watch.Event
 	done    chan struct{}
 	filter  watchFilterFunc
@@ -763,7 +763,7 @@ type cacheWatcher struct {
 func newCacheWatcher(copier runtime.ObjectCopier, resourceVersion uint64, chanSize int, initEvents []*watchCacheEvent, filter watchFilterFunc, forget func(bool)) *cacheWatcher {
 	watcher := &cacheWatcher{
 		copier:  copier,
-		input:   make(chan *watchCacheEvent, chanSize),
+		input:   make(chan watchCacheEvent, chanSize),
 		result:  make(chan watch.Event, chanSize),
 		done:    make(chan struct{}),
 		filter:  filter,
@@ -800,7 +800,7 @@ var timerPool sync.Pool
 func (c *cacheWatcher) add(event *watchCacheEvent, budget *timeBudget) {
 	// Try to send the event immediately, without blocking.
 	select {
-	case c.input <- event:
+	case c.input <- *event:
 		return
 	default:
 	}
@@ -820,7 +820,7 @@ func (c *cacheWatcher) add(event *watchCacheEvent, budget *timeBudget) {
 	defer timerPool.Put(t)
 
 	select {
-	case c.input <- event:
+	case c.input <- *event:
 		stopped := t.Stop()
 		if !stopped {
 			// Consume triggered (but not yet received) timer event
@@ -928,7 +928,7 @@ func (c *cacheWatcher) process(initEvents []*watchCacheEvent, resourceVersion ui
 		}
 		// only send events newer than resourceVersion
 		if event.ResourceVersion > resourceVersion {
-			c.sendWatchCacheEvent(event)
+			c.sendWatchCacheEvent(&event)
 		}
 	}
 }
