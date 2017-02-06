@@ -2588,7 +2588,7 @@ func (gce *GCECloud) AttachDisk(diskName string, nodeName types.NodeName, readOn
 	}
 	attachedDisk := gce.convertDiskToAttachedDisk(disk, readWrite)
 
-	attachOp, err := gce.service.Instances.AttachDisk(gce.projectID, disk.Zone, instanceName, attachedDisk).Do()
+	attachOp, err := gce.service.Instances.AttachDisk(gce.projectID, disk.Zone, instance.Name, attachedDisk).Do()
 	if err != nil {
 		return err
 	}
