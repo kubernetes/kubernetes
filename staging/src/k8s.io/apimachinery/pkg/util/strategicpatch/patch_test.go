@@ -25,6 +25,7 @@ import (
 
 	"github.com/davecgh/go-spew/spew"
 	"github.com/ghodss/yaml"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/mergepatch"
 )
 
@@ -92,6 +93,7 @@ type MergeItem struct {
 	NonMergingIntList []int
 	MergeItemPtr      *MergeItem `patchStrategy:"merge" patchMergeKey:"name"`
 	SimpleMap         map[string]string
+	ReplacingItem     runtime.RawExtension `patchStrategy:"replace"`
 }
 
 var mergeItem MergeItem
@@ -2363,6 +2365,51 @@ func TestNumberConversion(t *testing.T) {
 		if tc.ExpectedResult != string(result) {
 			t.Errorf("%s: expected %s, got %s", k, tc.ExpectedResult, string(result))
 			continue
+		}
+	}
+}
+
+var replaceRawExtensionPatchTestCases = []StrategicMergePatchRawTestCase{
+	{
+		Description: "replace RawExtension field",
+		StrategicMergePatchRawTestCaseData: StrategicMergePatchRawTestCaseData{
+			Original: []byte(`
+replacingItem:
+  Some: Generic
+  Yaml: Inside
+  The: RawExtension
+  Field: Period
+other: current-other
+`),
+			Modified: []byte(`
+replacingItem:
+  Newly: Modified
+  Yaml: Inside
+  The: RawExtension
+other: current-other
+`),
+			TwoWay: []byte(`
+replacingItem:
+  Newly: Modified
+  Yaml: Inside
+  The: RawExtension
+`),
+		},
+	},
+}
+
+func TestReplaceWithRawExtension(t *testing.T) {
+	for _, c := range replaceRawExtensionPatchTestCases {
+		original, twoWay, modified, _ := twoWayRawTestCaseToJSONOrFail(t, c)
+		actualPatch, err := CreateTwoWayMergePatch(original, modified, mergeItem)
+		if err != nil {
+			t.Errorf("error: %s\nin test case: %s\ncannot create two way patch:\noriginal:%s\ntwoWay:%s\nmodified:%s\n",
+				err, c.Description, c.Original, c.TwoWay, c.Modified)
+			return
+		}
+		if !reflect.DeepEqual(actualPatch, twoWay) {
+			t.Errorf("error: twoWay patch differs\nin test case: %s\nexpected patch:%s\ngot:%s\n",
+				c.Description, twoWay, actualPatch)
 		}
 	}
 }
