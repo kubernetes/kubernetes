@@ -22,8 +22,8 @@ import (
 	"reflect"
 	"testing"
 
-	"k8s.io/kubernetes/pkg/apis/componentconfig"
-	_ "k8s.io/kubernetes/pkg/apis/componentconfig/install"
+	"k8s.io/apiserver/pkg/apis/apiserver"
+	_ "k8s.io/apiserver/pkg/apis/apiserver/install"
 )
 
 func TestReadAdmissionConfiguration(t *testing.T) {
@@ -44,19 +44,19 @@ func TestReadAdmissionConfiguration(t *testing.T) {
 	// individual test scenarios
 	testCases := map[string]struct {
 		ConfigBody              string
-		ExpectedAdmissionConfig *componentconfig.AdmissionConfiguration
+		ExpectedAdmissionConfig *apiserver.AdmissionConfiguration
 		PluginNames             []string
 	}{
 		"v1Alpha1 configuration - path fixup": {
 			ConfigBody: `{
-"apiVersion": "componentconfig/v1alpha1",
+"apiVersion": "apiserver.k8s.io/v1alpha1",
 "kind": "AdmissionConfiguration",
 "plugins": [
   {"name": "ImagePolicyWebhook", "path": "image-policy-webhook.json"},
   {"name": "ResourceQuota"}
 ]}`,
-			ExpectedAdmissionConfig: &componentconfig.AdmissionConfiguration{
-				Plugins: []componentconfig.AdmissionPluginConfiguration{
+			ExpectedAdmissionConfig: &apiserver.AdmissionConfiguration{
+				Plugins: []apiserver.AdmissionPluginConfiguration{
 					{
 						Name: "ImagePolicyWebhook",
 						Path: imagePolicyWebhookFile,
@@ -70,14 +70,14 @@ func TestReadAdmissionConfiguration(t *testing.T) {
 		},
 		"v1Alpha1 configuration - abspath": {
 			ConfigBody: `{
-"apiVersion": "componentconfig/v1alpha1",
+"apiVersion": "apiserver.k8s.io/v1alpha1",
 "kind": "AdmissionConfiguration",
 "plugins": [
   {"name": "ImagePolicyWebhook", "path": "/tmp/image-policy-webhook.json"},
   {"name": "ResourceQuota"}
 ]}`,
-			ExpectedAdmissionConfig: &componentconfig.AdmissionConfiguration{
-				Plugins: []componentconfig.AdmissionPluginConfiguration{
+			ExpectedAdmissionConfig: &apiserver.AdmissionConfiguration{
+				Plugins: []apiserver.AdmissionPluginConfiguration{
 					{
 						Name: "ImagePolicyWebhook",
 						Path: "/tmp/image-policy-webhook.json",
@@ -102,8 +102,8 @@ func TestReadAdmissionConfiguration(t *testing.T) {
   "clusterDefaultNodeSelector": ""
 }  
 }`,
-			ExpectedAdmissionConfig: &componentconfig.AdmissionConfiguration{
-				Plugins: []componentconfig.AdmissionPluginConfiguration{
+			ExpectedAdmissionConfig: &apiserver.AdmissionConfiguration{
+				Plugins: []apiserver.AdmissionPluginConfiguration{
 					{
 						Name: "ImagePolicyWebhook",
 						Path: configFileName,
@@ -129,7 +129,7 @@ func TestReadAdmissionConfiguration(t *testing.T) {
   "clusterDefaultNodeSelector": ""
 }  
 }`,
-			ExpectedAdmissionConfig: &componentconfig.AdmissionConfiguration{},
+			ExpectedAdmissionConfig: &apiserver.AdmissionConfiguration{},
 			PluginNames:             []string{"NamespaceLifecycle", "InitialResources"},
 		},
 	}

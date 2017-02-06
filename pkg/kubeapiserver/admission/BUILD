@@ -17,9 +17,9 @@ go_test(
     library = ":go_default_library",
     tags = ["automanaged"],
     deps = [
-        "//pkg/apis/componentconfig:go_default_library",
-        "//pkg/apis/componentconfig/install:go_default_library",
         "//vendor:k8s.io/apiserver/pkg/admission",
+        "//vendor:k8s.io/apiserver/pkg/apis/apiserver",
+        "//vendor:k8s.io/apiserver/pkg/apis/apiserver/install",
         "//vendor:k8s.io/apiserver/pkg/authorization/authorizer",
     ],
 )
@@ -32,9 +32,6 @@ go_library(
     ],
     tags = ["automanaged"],
     deps = [
-        "//pkg/api:go_default_library",
-        "//pkg/apis/componentconfig:go_default_library",
-        "//pkg/apis/componentconfig/v1alpha1:go_default_library",
         "//pkg/client/clientset_generated/internalclientset:go_default_library",
         "//pkg/controller/informers:go_default_library",
         "//vendor:github.com/ghodss/yaml",
@@ -42,6 +39,10 @@ go_library(
         "//vendor:k8s.io/apimachinery/pkg/runtime",
         "//vendor:k8s.io/apimachinery/pkg/util/sets",
         "//vendor:k8s.io/apiserver/pkg/admission",
+        "//vendor:k8s.io/apiserver/pkg/apis",
+        "//vendor:k8s.io/apiserver/pkg/apis/apiserver",
+        "//vendor:k8s.io/apiserver/pkg/apis/apiserver/install",
+        "//vendor:k8s.io/apiserver/pkg/apis/apiserver/v1alpha1",
         "//vendor:k8s.io/apiserver/pkg/authorization/authorizer",
     ],
 )
