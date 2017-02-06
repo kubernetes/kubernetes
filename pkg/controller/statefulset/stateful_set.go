@@ -133,7 +133,6 @@ func (ssc *StatefulSetController) Run(workers int, stopCh <-chan struct{}) {
 	if !cache.WaitForCacheSync(stopCh, ssc.podStoreSynced) {
 		return
 	}
-	go ssc.podController.Run(stopCh)
 	go ssc.setController.Run(stopCh)
 	for i := 0; i < workers; i++ {
 		go wait.Until(ssc.worker, time.Second, stopCh)
