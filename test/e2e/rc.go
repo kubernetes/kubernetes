@@ -23,6 +23,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/api/v1"
@@ -50,6 +51,14 @@ var _ = framework.KubeDescribe("ReplicationController", func() {
 	It("should surface a failure condition on a common issue like exceeded quota", func() {
 		rcConditionCheck(f)
 	})
+
+	It("should adopt matching pods on creation", func() {
+		testRCAdoptMatchingOrphans(f)
+	})
+
+	It("should release no longer matching pods", func() {
+		testRCReleaseControlledNotMatching(f)
+	})
 })
 
 func newRC(rsName string, replicas int32, rcPodLabels map[string]string, imageName string, image string) *v1.ReplicationController {
@@ -76,6 +85,14 @@ func newRC(rsName string, replicas int32, rcPodLabels map[string]string, imageNa
 			},
 		},
 	}
+}
+
+func newRCWithSelector(rcName string, replicas int32, rcPodLabels map[string]string, imageName string, image string, nameLabelSelector string) *v1.ReplicationController {
+	rcObj := newRC(rcName, replicas, rcPodLabels, imageName, image)
+
+	rcObj.Spec.Selector = map[string]string{"name": nameLabelSelector}
+
+	return rcObj
 }
 
 // A basic test to check the deployment of an image using
@@ -233,5 +250,93 @@ func rcConditionCheck(f *framework.Framework) {
 	if err == wait.ErrWaitTimeout {
 		err = fmt.Errorf("rc manager never removed the failure condition for rc %q: %#v", name, conditions)
 	}
+	Expect(err).NotTo(HaveOccurred())
+}
+
+func testRCAdoptMatchingOrphans(f *framework.Framework) {
+	name := "pod-adoption"
+	By(fmt.Sprintf("Given a Pod with a 'name' label %s is created", name))
+	p := f.PodClient().CreateSync(&v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: name,
+			Labels: map[string]string{
+				"name": name,
+			},
+		},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
+				{
+					Name:  name,
+					Image: nginxImageName,
+				},
+			},
+		},
+	})
+
+	By(fmt.Sprintf("When a replication controller with a matching selector is created"))
+	replicas := int32(2)
+	rcSt := newRCWithSelector(name, replicas, map[string]string{"name": name}, name, nginxImageName, name)
+	rc, err := f.ClientSet.Core().ReplicationControllers(f.Namespace.Name).Create(rcSt)
+	Expect(err).NotTo(HaveOccurred())
+	// Cleanup the ReplicationController when we are done.
+	defer func() {
+		if err := framework.DeleteRCAndPods(f.ClientSet, f.InternalClientset, f.Namespace.Name, rc.Name); err != nil {
+			framework.Logf("Failed to cleanup ReplicationController %v: %v.", rc.Name, err)
+		}
+	}()
+
+	By("Then the orphan pod is adopted")
+	err = wait.PollImmediate(1*time.Second, 1*time.Minute, func() (bool, error) {
+		p2, err := f.ClientSet.Core().Pods(f.Namespace.Name).Get(p.Name, metav1.GetOptions{})
+		Expect(err).NotTo(HaveOccurred())
+		for _, owner := range p2.OwnerReferences {
+			if *owner.Controller && owner.UID == rc.UID {
+				// pod adopted
+				return true, nil
+			}
+		}
+		// pod still not adopted
+		return false, nil
+	})
+	Expect(err).NotTo(HaveOccurred())
+}
+
+func testRCReleaseControlledNotMatching(f *framework.Framework) {
+	name := "pod-release"
+	By("Given a ReplicationController is created")
+	replicas := int32(2)
+	rcSt := newRCWithSelector(name, replicas, map[string]string{"name": name}, name, nginxImageName, name)
+	rc, err := f.ClientSet.Core().ReplicationControllers(f.Namespace.Name).Create(rcSt)
+	Expect(err).NotTo(HaveOccurred())
+	// Cleanup the rc when we are done.
+	defer func() {
+		if err := framework.DeleteRCAndPods(f.ClientSet, f.InternalClientset, f.Namespace.Name, rc.Name); err != nil {
+			framework.Logf("Failed to cleanup ReplicationController %v: %v.", rc.Name, err)
+		}
+	}()
+
+	By("When the matched label of one of its pods change")
+	pods, err := framework.PodsCreated(f.ClientSet, f.Namespace.Name, rc.Name, replicas)
+	Expect(err).NotTo(HaveOccurred())
+
+	p := pods.Items[0]
+	podClient := f.ClientSet.Core().Pods(f.Namespace.Name)
+	patch := []byte("{\"metadata\":{\"labels\":{\"name\":\"not-matching-name\"}}}")
+	_, err = podClient.Patch(p.Name, types.StrategicMergePatchType, patch)
+	Expect(err).NotTo(HaveOccurred())
+
+	By("Then the pod is released")
+	err = wait.PollImmediate(1*time.Second, 1*time.Minute, func() (bool, error) {
+		p2, err := podClient.Get(p.Name, metav1.GetOptions{})
+		Expect(err).NotTo(HaveOccurred())
+		for _, owner := range p2.OwnerReferences {
+			if *owner.Controller && owner.UID == rc.UID {
+				// pod still belonging to the replicaset
+				return false, nil
+			}
+		}
+		// pod already released
+		return true, nil
+	})
 	Expect(err).NotTo(HaveOccurred())
 }
