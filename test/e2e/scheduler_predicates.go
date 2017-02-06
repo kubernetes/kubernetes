@@ -676,7 +676,7 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 			Effect: v1.TaintEffectNoSchedule,
 		}
 		framework.AddOrUpdateTaintOnNode(cs, nodeName, testTaint)
-		framework.ExpectNodeHasTaint(cs, nodeName, testTaint)
+		framework.ExpectNodeHasTaint(cs, nodeName, &testTaint)
 		defer framework.RemoveTaintOffNode(cs, nodeName, testTaint)
 
 		By("Trying to apply a random label on the found node.")
@@ -728,7 +728,7 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 			Effect: v1.TaintEffectNoSchedule,
 		}
 		framework.AddOrUpdateTaintOnNode(cs, nodeName, testTaint)
-		framework.ExpectNodeHasTaint(cs, nodeName, testTaint)
+		framework.ExpectNodeHasTaint(cs, nodeName, &testTaint)
 		defer framework.RemoveTaintOffNode(cs, nodeName, testTaint)
 
 		By("Trying to apply a random label on the found node.")
