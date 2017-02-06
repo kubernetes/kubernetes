@@ -450,16 +450,16 @@ function start_apiserver {
     kube::util::write_client_kubeconfig "${CONTROLPLANE_SUDO}" "${CERT_DIR}" "${ROOT_CA_FILE}" "${API_HOST}" "${API_SECURE_PORT}" controller
     kube::util::write_client_kubeconfig "${CONTROLPLANE_SUDO}" "${CERT_DIR}" "${ROOT_CA_FILE}" "${API_HOST}" "${API_SECURE_PORT}" scheduler
 
-    if [[ -z "${AUTH_ARGS}"  ]]; then
-        if [[ "${ALLOW_ANY_TOKEN}" = true  ]]; then
+    if [[ -z "${AUTH_ARGS}" ]]; then
+        if [[ "${ALLOW_ANY_TOKEN}" = true ]]; then
             # use token authentication
-            if [[ -n "${KUBECONFIG_TOKEN}"  ]]; then
+            if [[ -n "${KUBECONFIG_TOKEN}" ]]; then
                 AUTH_ARGS="--token=${KUBECONFIG_TOKEN}"
             else
                 AUTH_ARGS="--token=system:admin/system:masters"
             fi
         else
-            # default to use certificate authentication
+            # default to the admin client cert/key
             AUTH_ARGS="--client-key=${CERT_DIR}/client-admin.key --client-certificate=${CERT_DIR}/client-admin.crt"
         fi
     fi
@@ -688,7 +688,12 @@ fi
 if [[ "${START_MODE}" != "kubeletonly" ]]; then
   echo
   cat <<EOF
-To start using your cluster, open up another terminal/tab and run:
+To start using your cluster, you can open up another terminal/tab and run:
+
+  export KUBECONFIG=${CERT_DIR}/admin.kubeconfig
+  cluster/kubectl.sh
+
+Alternatively, you can write to the default kubeconfig:
 
   export KUBERNETES_PROVIDER=local
 
@@ -728,13 +733,13 @@ kube::util::test_cfssl_installed
 
 ### IF the user didn't supply an output/ for the build... Then we detect.
 if [ "$GO_OUT" == "" ]; then
-    detect_binary
+  detect_binary
 fi
 echo "Detected host and ready to start services.  Doing some housekeeping first..."
 echo "Using GO_OUT $GO_OUT"
 KUBELET_CIDFILE=/tmp/kubelet.cid
 if [[ "${ENABLE_DAEMON}" = false ]]; then
-trap cleanup EXIT
+  trap cleanup EXIT
 fi
 
 echo "Starting services now!"
@@ -765,13 +770,13 @@ if [[ "${START_MODE}" != "nokubelet" ]]; then
 fi
 
 if [[ -n "${PSP_ADMISSION}" && "${ENABLE_RBAC}" = true ]]; then
-    create_psp_policy
+  create_psp_policy
 fi
 
 print_success
 
 if [[ "${ENABLE_DAEMON}" = false ]]; then
-   while true; do sleep 1; done
+  while true; do sleep 1; done
 fi
 
 
