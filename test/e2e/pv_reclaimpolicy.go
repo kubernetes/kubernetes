@@ -18,6 +18,7 @@ package e2e
 
 import (
 	"fmt"
+	"strconv"
 	"time"
 
 	. "github.com/onsi/ginkgo"
@@ -99,25 +100,53 @@ var _ = framework.KubeDescribe("PersistentVolumes [Feature:ReclaimPolicy]", func
 			2. Create PV Spec with volume path set to VMDK file created in Step-1, and PersistentVolumeReclaimPolicy is set to Retain
 			3. Create PVC with the storage request set to PV's storage capacity.
 			4. Wait for PV and PVC to bound.
-			5. Delete PVC
-			6. Verify PV is retained.
-			7. Delete PV.
+			5. Write some content in the volume.
+			6. Delete PVC
+			7. Verify PV is retained.
+			8. Delete retained PV.
+			9. Create PV Spec with the same volume path used in step 2.
+			10. Create PVC with the storage request set to PV's storage capacity.
+			11. Created POD using PVC created in Step 10 and verify volume content is matching.
 		*/
 
 		It("should retain persistent volume when reclaimPolicy set to retain when associated claim is deleted", func() {
+			var volumeFileContent = "hello from vsphere cloud provider, Random Content is :" + strconv.FormatInt(time.Now().UnixNano(), 10)
 			vsp, err := vsphere.GetVSphere()
 			Expect(err).NotTo(HaveOccurred())
 
 			volumePath, pv, pvc, err = testSetupVSpherePersistentVolumeReclaim(vsp, c, ns, v1.PersistentVolumeReclaimRetain)
 			Expect(err).NotTo(HaveOccurred())
 
-			deletePVCAfterBind(c, ns, pvc, pv)
+			writeContentToVSpherePV(c, ns, pvc, volumeFileContent)
+
+			By("Delete PVC")
+			deletePersistentVolumeClaim(c, pvc.Name, ns)
 			pvc = nil
 
-			By("verify pv is retained")
+			By("Verify PV is retained")
 			framework.Logf("Waiting for PV %v to become Released", pv.Name)
 			err = framework.WaitForPersistentVolumePhase(v1.VolumeReleased, c, pv.Name, 3*time.Second, 300*time.Second)
 			Expect(err).NotTo(HaveOccurred())
+			deletePersistentVolume(c, pv.Name)
+
+			By("Creating the PV for same volume path")
+			pv = getVSpherePersistentVolumeSpec(volumePath, v1.PersistentVolumeReclaimRetain, nil)
+			pv, err = c.CoreV1().PersistentVolumes().Create(pv)
+			if err != nil {
+				_ = fmt.Errorf("failed to create pv")
+				return
+			}
+			By("creating the pvc")
+			pvc = getVSpherePersistentVolumeClaimSpec(ns, nil)
+			pvc, err = c.CoreV1().PersistentVolumeClaims(ns).Create(pvc)
+			if err != nil {
+				_ = fmt.Errorf("failed to create pvc")
+			}
+
+			By("wait for the pv and pvc to bind")
+			waitOnPVandPVC(c, ns, pv, pvc)
+			verifyContentOfVSpherePV(c, ns, pvc, volumeFileContent)
+
 		})
 	})
 })

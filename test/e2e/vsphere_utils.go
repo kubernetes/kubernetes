@@ -26,6 +26,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/api/v1"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	vsphere "k8s.io/kubernetes/pkg/cloudprovider/providers/vsphere"
 	"k8s.io/kubernetes/pkg/volume/util/volumehelper"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -150,4 +151,116 @@ func createVSphereVolume(vsp *vsphere.VSphere, volumeOptions *vsphere.VolumeOpti
 	volumePath, err = vsp.CreateVolume(volumeOptions)
 	Expect(err).NotTo(HaveOccurred())
 	return volumePath, nil
+}
+
+// function to write content to the volume backed by given PVC
+func writeContentToVSpherePV(client clientset.Interface, ns string, pvc *v1.PersistentVolumeClaim, content string) {
+	podClient := client.CoreV1().Pods(ns)
+	name := "writerpod" + strconv.FormatInt(time.Now().UnixNano(), 10)
+	framework.Logf("Creating POD: %s to write content to volume", name)
+
+	writerPod := &v1.Pod{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "Pod",
+			APIVersion: "v1",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name: name,
+		},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
+				{
+					Name:    name,
+					Image:   "gcr.io/google_containers/busybox:1.24",
+					Command: []string{"/bin/sh"},
+					Args:    []string{"-c", "echo '" + content + "' > /mnt/file.txt && chmod o+rX /mnt /mnt/file.txt"},
+					VolumeMounts: []v1.VolumeMount{
+						{
+							Name:      pvc.Name,
+							MountPath: "/mnt",
+						},
+					},
+				},
+			},
+			RestartPolicy: v1.RestartPolicyNever,
+			Volumes: []v1.Volume{
+				{
+					Name: pvc.Name,
+					VolumeSource: v1.VolumeSource{
+						PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{
+							ClaimName: pvc.Name,
+						},
+					},
+				},
+			},
+		},
+	}
+
+	defer func() {
+		podClient.Delete(name, nil)
+	}()
+
+	writerPod, err := podClient.Create(writerPod)
+	framework.ExpectNoError(err, "Failed to create write pod: %v", err)
+	err = framework.WaitForPodSuccessInNamespace(client, writerPod.Name, writerPod.Namespace)
+	Expect(err).NotTo(HaveOccurred())
+	framework.Logf("Done with writing content to volume")
+}
+
+// function to verify content is matching on the volume backed for given PVC
+func verifyContentOfVSpherePV(client clientset.Interface, ns string, pvc *v1.PersistentVolumeClaim, expectedContent string) {
+	framework.Logf("Creating POD to read content of the volume")
+	podClient := client.CoreV1().Pods(ns)
+	name := "readerpod" + strconv.FormatInt(time.Now().UnixNano(), 10)
+	readerPod := &v1.Pod{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "Pod",
+			APIVersion: "v1",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name: name,
+		},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
+				{
+					Name:  name,
+					Image: "gcr.io/google_containers/busybox:1.24",
+					Command: []string{
+						"/bin/sh",
+						"-c",
+						"while true ; do cat /mnt/file.txt ; sleep 2 ; done ",
+					},
+					VolumeMounts: []v1.VolumeMount{
+						{
+							Name:      pvc.Name,
+							MountPath: "/mnt",
+						},
+					},
+				},
+			},
+			RestartPolicy: v1.RestartPolicyNever,
+			Volumes: []v1.Volume{
+				{
+					Name: pvc.Name,
+					VolumeSource: v1.VolumeSource{
+						PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{
+							ClaimName: pvc.Name,
+						},
+					},
+				},
+			},
+		},
+	}
+
+	defer func() {
+		podClient.Delete(name, nil)
+	}()
+
+	readerPod, err := podClient.Create(readerPod)
+	framework.ExpectNoError(err, "Failed to create reader pod: %v", err)
+	framework.ExpectNoError(framework.WaitForPodRunningInNamespace(client, readerPod))
+
+	_, err = framework.LookForStringInPodExec(ns, readerPod.Name, []string{"cat", "/mnt/file.txt"}, expectedContent, time.Minute)
+	Expect(err).NotTo(HaveOccurred(), "failed to find expected content in the volume")
+	framework.Logf("Sucessfully verified content of the volume")
 }
