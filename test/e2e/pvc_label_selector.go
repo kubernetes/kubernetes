@@ -17,7 +17,6 @@ limitations under the License.
 package e2e
 
 import (
-	"fmt"
 	"time"
 
 	. "github.com/onsi/ginkgo"
@@ -45,7 +44,7 @@ import (
    9. delete pvc_vvol
 
 */
-var _ = framework.KubeDescribe("pvclabelselector", func() {
+var _ = framework.KubeDescribe("PersistentVolumes [Feature:LabelSelector]", func() {
 	f := framework.NewDefaultFramework("pvclabelselector")
 	var (
 		c          clientset.Interface
@@ -78,8 +77,6 @@ var _ = framework.KubeDescribe("pvclabelselector", func() {
 			}
 		})
 		It("should bind volume with claim for given label", func() {
-
-			framework.SkipUnlessProviderIs("vsphere")
 			volumePath, pv_ssd, pvc_ssd, pvc_vvol, err = testSetupVSpherePVClabelselector(c, ns, ssdlabels, vvollabels)
 			Expect(err).NotTo(HaveOccurred())
 
@@ -111,7 +108,6 @@ func testSetupVSpherePVClabelselector(c clientset.Interface, ns string, ssdlabel
 	Expect(err).NotTo(HaveOccurred())
 	volumePath, err = createVSphereVolume(vsp, nil)
 	if err != nil {
-		_ = fmt.Errorf("failed to create vmdk")
 		return
 	}
 
@@ -119,7 +115,6 @@ func testSetupVSpherePVClabelselector(c clientset.Interface, ns string, ssdlabel
 	pv_ssd = getVSpherePersistentVolumeSpec(volumePath, v1.PersistentVolumeReclaimDelete, ssdlabels)
 	pv_ssd, err = c.CoreV1().PersistentVolumes().Create(pv_ssd)
 	if err != nil {
-		_ = fmt.Errorf("failed to PV")
 		return
 	}
 
@@ -127,16 +122,12 @@ func testSetupVSpherePVClabelselector(c clientset.Interface, ns string, ssdlabel
 	pvc_vvol = getVSpherePersistentVolumeClaimSpec(ns, vvollabels)
 	pvc_vvol, err = c.CoreV1().PersistentVolumeClaims(ns).Create(pvc_vvol)
 	if err != nil {
-		_ = fmt.Errorf("failed to PVC")
 		return
 	}
 
 	By("creating pvc with label selector to match with volume-type:ssd")
 	pvc_ssd = getVSpherePersistentVolumeClaimSpec(ns, ssdlabels)
 	pvc_ssd, err = c.CoreV1().PersistentVolumeClaims(ns).Create(pvc_ssd)
-	if err != nil {
-		_ = fmt.Errorf("failed to PVC")
-	}
 	return
 }
 

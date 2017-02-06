@@ -33,6 +33,7 @@ var _ = framework.KubeDescribe("vsphere-volume-placement", func() {
 	var (
 		c                  clientset.Interface
 		ns                 string
+		vsp                *vsphere.VSphere
 		volumePath         string
 		node1Name          string
 		node1LabelValue    string
@@ -49,6 +50,13 @@ var _ = framework.KubeDescribe("vsphere-volume-placement", func() {
 		c = f.ClientSet
 		ns = f.Namespace.Name
 		framework.ExpectNoError(framework.WaitForAllNodesSchedulable(c, framework.TestContext.NodeSchedulableTimeout))
+
+		By("creating vmdk")
+		vsp, err := vsphere.GetVSphere()
+		Expect(err).NotTo(HaveOccurred())
+
+		volumePath, err = createVSphereVolume(vsp, nil)
+		Expect(err).NotTo(HaveOccurred())
 
 		if !isNodeLabeled {
 			nodeList := framework.GetReadySchedulableNodesOrDie(f.ClientSet)
@@ -79,6 +87,11 @@ var _ = framework.KubeDescribe("vsphere-volume-placement", func() {
 		if len(node2LabelValue) > 0 {
 			framework.RemoveLabelOffNode(c, node2Name, "vsphere_e2e_label")
 		}
+		if len(volumePath) > 0 {
+			vsp, err := vsphere.GetVSphere()
+			Expect(err).NotTo(HaveOccurred())
+			vsp.DeleteVolume(volumePath)
+		}
 	})
 
 	/*
@@ -97,57 +110,12 @@ var _ = framework.KubeDescribe("vsphere-volume-placement", func() {
 	*/
 	framework.KubeDescribe("Test Back-to-back pod creation/deletion with the same volume source on the same worker node", func() {
 		It("should provision pod on the node with matching label", func() {
-			By("creating vmdk")
-			vsp, err := vsphere.GetVSphere()
-			Expect(err).NotTo(HaveOccurred())
-
-			volumePath, err = createVSphereVolume(vsp, nil)
-			Expect(err).NotTo(HaveOccurred())
-
-			By("Creating pod on the node: " + node1Name)
-			pod := getPodSpec(volumePath, node1KeyValueLabel, nil)
-
-			pod, err = c.CoreV1().Pods(ns).Create(pod)
-			Expect(err).NotTo(HaveOccurred())
-			By("Waiting for pod to be ready")
-			Expect(f.WaitForPodRunning(pod.Name)).To(Succeed())
-
-			By("Verify volume is attached to the node: " + node1Name)
-			isAttached, err := verifyVSphereDiskAttached(vsp, volumePath, types.NodeName(node1Name))
-			Expect(err).NotTo(HaveOccurred())
-			Expect(isAttached).To(BeTrue(), "disk is not attached with the node")
-
-			By("Deleting pod")
-			err = c.CoreV1().Pods(ns).Delete(pod.Name, nil)
-			Expect(err).NotTo(HaveOccurred())
-
-			By("Waiting for volume to be detached from the node")
-			waitForVSphereDiskToDetach(vsp, volumePath, types.NodeName(node1Name))
+			pod := createPodWithVolumeAndNodeSelector(c, ns, vsp, node1Name, node1KeyValueLabel, volumePath)
+			deletePodAndWaitForVolumeToDetach(c, ns, vsp, node1Name, pod, volumePath)
 
 			By("Creating pod on the same node: " + node1Name)
-			pod = getPodSpec(volumePath, node1KeyValueLabel, nil)
-			pod, err = c.CoreV1().Pods(ns).Create(pod)
-			Expect(err).NotTo(HaveOccurred())
-
-			By("Waiting for pod to be running")
-			Expect(f.WaitForPodRunning(pod.Name)).To(Succeed())
-
-			By("Verify volume is attached to the node: " + node1Name)
-			isAttached, err = verifyVSphereDiskAttached(vsp, volumePath, types.NodeName(node1Name))
-			Expect(err).NotTo(HaveOccurred())
-			Expect(isAttached).To(BeTrue(), "disk is not attached with the node")
-
-			By("Deleting pod")
-			err = c.CoreV1().Pods(ns).Delete(pod.Name, nil)
-			Expect(err).NotTo(HaveOccurred())
-
-			By("Waiting for volume to be detached from the node: " + node1Name)
-			waitForVSphereDiskToDetach(vsp, volumePath, types.NodeName(node1Name))
-
-			By("Deleting vmdk")
-			if len(volumePath) > 0 {
-				vsp.DeleteVolume(volumePath)
-			}
+			pod = createPodWithVolumeAndNodeSelector(c, ns, vsp, node1Name, node1KeyValueLabel, volumePath)
+			deletePodAndWaitForVolumeToDetach(c, ns, vsp, node1Name, pod, volumePath)
 		})
 	})
 
@@ -170,60 +138,41 @@ var _ = framework.KubeDescribe("vsphere-volume-placement", func() {
 	*/
 	framework.KubeDescribe("Test Back-to-back pod creation/deletion with the same volume source attach/detach to different worker nodes", func() {
 		It("should provision pod on the node with matching label", func() {
-			By("creating vmdk")
-			vsp, err := vsphere.GetVSphere()
-			Expect(err).NotTo(HaveOccurred())
-
-			volumePath, err = createVSphereVolume(vsp, nil)
-			Expect(err).NotTo(HaveOccurred())
-
-			By("Creating pod on the node: " + node1Name)
-			pod := getPodSpec(volumePath, node1KeyValueLabel, nil)
-
-			pod, err = c.CoreV1().Pods(ns).Create(pod)
-			Expect(err).NotTo(HaveOccurred())
-			By("Waiting for pod to be ready")
-			Expect(f.WaitForPodRunning(pod.Name)).To(Succeed())
-
-			By("Verify volume is attached to the node: " + node1Name)
-			isAttached, err := verifyVSphereDiskAttached(vsp, volumePath, types.NodeName(node1Name))
-			Expect(err).NotTo(HaveOccurred())
-			Expect(isAttached).To(BeTrue(), "disk is not attached with the node")
-
-			By("Deleting pod")
-			err = c.CoreV1().Pods(ns).Delete(pod.Name, nil)
-			Expect(err).NotTo(HaveOccurred())
-
-			By("Waiting for volume to be detached from the node")
-			waitForVSphereDiskToDetach(vsp, volumePath, types.NodeName(node1Name))
+			pod := createPodWithVolumeAndNodeSelector(c, ns, vsp, node1Name, node1KeyValueLabel, volumePath)
+			deletePodAndWaitForVolumeToDetach(c, ns, vsp, node1Name, pod, volumePath)
 
 			By("Creating pod on the another node: " + node2Name)
-			pod = getPodSpec(volumePath, node2KeyValueLabel, nil)
-			pod, err = c.CoreV1().Pods(ns).Create(pod)
-			Expect(err).NotTo(HaveOccurred())
-
-			By("Waiting for pod to be running")
-			Expect(f.WaitForPodRunning(pod.Name)).To(Succeed())
-
-			By("Verify volume is attached to the node: " + node2Name)
-			isAttached, err = verifyVSphereDiskAttached(vsp, volumePath, types.NodeName(node2Name))
-			Expect(err).NotTo(HaveOccurred())
-			Expect(isAttached).To(BeTrue(), "disk is not attached with the node")
-
-			By("Deleting pod")
-			err = c.CoreV1().Pods(ns).Delete(pod.Name, nil)
-			Expect(err).NotTo(HaveOccurred())
-
-			By("Waiting for volume to be detached from the node: " + node2Name)
-			waitForVSphereDiskToDetach(vsp, volumePath, types.NodeName(node2Name))
-
-			By("Deleting vmdk")
-			if len(volumePath) > 0 {
-				vsp.DeleteVolume(volumePath)
-			}
+			pod = createPodWithVolumeAndNodeSelector(c, ns, vsp, node2Name, node2KeyValueLabel, volumePath)
+			deletePodAndWaitForVolumeToDetach(c, ns, vsp, node2Name, pod, volumePath)
 		})
 	})
 })
+
+func createPodWithVolumeAndNodeSelector(client clientset.Interface, namespace string, vsp *vsphere.VSphere, nodeName string, nodeKeyValueLabel map[string]string, volumePath string) (pod *v1.Pod) {
+	var err error
+	By("Creating pod on the node: " + nodeName)
+	podspec := getPodSpec(volumePath, nodeKeyValueLabel, nil)
+
+	pod, err = client.CoreV1().Pods(namespace).Create(podspec)
+	Expect(err).NotTo(HaveOccurred())
+	By("Waiting for pod to be ready")
+	Expect(framework.WaitForPodNameRunningInNamespace(client, pod.Name, namespace)).To(Succeed())
+
+	By("Verify volume is attached to the node: " + nodeName)
+	isAttached, err := verifyVSphereDiskAttached(vsp, volumePath, types.NodeName(nodeName))
+	Expect(err).NotTo(HaveOccurred())
+	Expect(isAttached).To(BeTrue(), "disk is not attached with the node")
+	return
+}
+func deletePodAndWaitForVolumeToDetach(client clientset.Interface, namespace string, vsp *vsphere.VSphere, nodeName string, pod *v1.Pod, volumePath string) {
+	var err error
+	By("Deleting pod")
+	err = client.CoreV1().Pods(namespace).Delete(pod.Name, nil)
+	Expect(err).NotTo(HaveOccurred())
+
+	By("Waiting for volume to be detached from the node")
+	waitForVSphereDiskToDetach(vsp, volumePath, types.NodeName(nodeName))
+}
 
 func getPodSpec(volumePath string, keyValuelabel map[string]string, commands []string) *v1.Pod {
 	if commands == nil || len(commands) == 0 {

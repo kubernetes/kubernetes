@@ -17,14 +17,15 @@ limitations under the License.
 package e2e
 
 import (
-	"fmt"
 	"strconv"
 	"time"
 
+	"fmt"
 	. "github.com/onsi/gomega"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	vsphere "k8s.io/kubernetes/pkg/cloudprovider/providers/vsphere"
@@ -45,29 +46,34 @@ func verifyVSphereDiskAttached(vsp *vsphere.VSphere, volumePath string, nodeName
 
 // Wait until vsphere vmdk is deteched from the given node or time out after 5 minutes
 func waitForVSphereDiskToDetach(vsp *vsphere.VSphere, volumePath string, nodeName types.NodeName) {
-	var err error
+	var (
+		err            error
+		diskAttached   = true
+		detachTimeout  = 5 * time.Minute
+		detachPollTime = 10 * time.Second
+	)
 	if vsp == nil {
 		vsp, err = vsphere.GetVSphere()
 		Expect(err).NotTo(HaveOccurred())
 	}
-	var diskAttached = true
-	var detachTimeout = 5 * time.Minute
-	var detachPollTime = 10 * time.Second
-	for start := time.Now(); time.Since(start) < detachTimeout; time.Sleep(detachPollTime) {
+	err = wait.Poll(detachPollTime, detachTimeout, func() (bool, error) {
 		diskAttached, err = verifyVSphereDiskAttached(vsp, volumePath, nodeName)
-		Expect(err).NotTo(HaveOccurred())
+		if err != nil {
+			return true, err
+		}
 		if !diskAttached {
-			// Specified disk does not appear to be attached to specified node
 			framework.Logf("Volume %q appears to have successfully detached from %q.",
 				volumePath, nodeName)
-			break
+			return true, nil
 		}
 		framework.Logf("Waiting for Volume %q to detach from %q.", volumePath, nodeName)
-	}
+		return false, nil
+	})
+	Expect(err).NotTo(HaveOccurred())
 	if diskAttached {
-		_ = fmt.Errorf("Gave up waiting for Volume %q to detach from %q after %v",
-			volumePath, nodeName, detachTimeout)
+		Expect(fmt.Errorf("Gave up waiting for Volume %q to detach from %q after %v", volumePath, nodeName, detachTimeout)).NotTo(HaveOccurred())
 	}
+
 }
 
 // function to create vsphere volume spec with given VMDK volume path, Reclaim Policy and labels
@@ -154,113 +160,13 @@ func createVSphereVolume(vsp *vsphere.VSphere, volumeOptions *vsphere.VolumeOpti
 }
 
 // function to write content to the volume backed by given PVC
-func writeContentToVSpherePV(client clientset.Interface, ns string, pvc *v1.PersistentVolumeClaim, content string) {
-	podClient := client.CoreV1().Pods(ns)
-	name := "writerpod" + strconv.FormatInt(time.Now().UnixNano(), 10)
-	framework.Logf("Creating POD: %s to write content to volume", name)
-
-	writerPod := &v1.Pod{
-		TypeMeta: metav1.TypeMeta{
-			Kind:       "Pod",
-			APIVersion: "v1",
-		},
-		ObjectMeta: metav1.ObjectMeta{
-			Name: name,
-		},
-		Spec: v1.PodSpec{
-			Containers: []v1.Container{
-				{
-					Name:    name,
-					Image:   "gcr.io/google_containers/busybox:1.24",
-					Command: []string{"/bin/sh"},
-					Args:    []string{"-c", "echo '" + content + "' > /mnt/file.txt && chmod o+rX /mnt /mnt/file.txt"},
-					VolumeMounts: []v1.VolumeMount{
-						{
-							Name:      pvc.Name,
-							MountPath: "/mnt",
-						},
-					},
-				},
-			},
-			RestartPolicy: v1.RestartPolicyNever,
-			Volumes: []v1.Volume{
-				{
-					Name: pvc.Name,
-					VolumeSource: v1.VolumeSource{
-						PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{
-							ClaimName: pvc.Name,
-						},
-					},
-				},
-			},
-		},
-	}
-
-	defer func() {
-		podClient.Delete(name, nil)
-	}()
-
-	writerPod, err := podClient.Create(writerPod)
-	framework.ExpectNoError(err, "Failed to create write pod: %v", err)
-	err = framework.WaitForPodSuccessInNamespace(client, writerPod.Name, writerPod.Namespace)
-	Expect(err).NotTo(HaveOccurred())
+func writeContentToVSpherePV(client clientset.Interface, pvc *v1.PersistentVolumeClaim, expectedContent string) {
+	runInPodWithVolume(client, pvc.Namespace, pvc.Name, "echo "+expectedContent+" > /mnt/test/data")
 	framework.Logf("Done with writing content to volume")
 }
 
 // function to verify content is matching on the volume backed for given PVC
-func verifyContentOfVSpherePV(client clientset.Interface, ns string, pvc *v1.PersistentVolumeClaim, expectedContent string) {
-	framework.Logf("Creating POD to read content of the volume")
-	podClient := client.CoreV1().Pods(ns)
-	name := "readerpod" + strconv.FormatInt(time.Now().UnixNano(), 10)
-	readerPod := &v1.Pod{
-		TypeMeta: metav1.TypeMeta{
-			Kind:       "Pod",
-			APIVersion: "v1",
-		},
-		ObjectMeta: metav1.ObjectMeta{
-			Name: name,
-		},
-		Spec: v1.PodSpec{
-			Containers: []v1.Container{
-				{
-					Name:  name,
-					Image: "gcr.io/google_containers/busybox:1.24",
-					Command: []string{
-						"/bin/sh",
-						"-c",
-						"while true ; do cat /mnt/file.txt ; sleep 2 ; done ",
-					},
-					VolumeMounts: []v1.VolumeMount{
-						{
-							Name:      pvc.Name,
-							MountPath: "/mnt",
-						},
-					},
-				},
-			},
-			RestartPolicy: v1.RestartPolicyNever,
-			Volumes: []v1.Volume{
-				{
-					Name: pvc.Name,
-					VolumeSource: v1.VolumeSource{
-						PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{
-							ClaimName: pvc.Name,
-						},
-					},
-				},
-			},
-		},
-	}
-
-	defer func() {
-		podClient.Delete(name, nil)
-	}()
-
-	readerPod, err := podClient.Create(readerPod)
-	framework.ExpectNoError(err, "Failed to create reader pod: %v", err)
-	framework.ExpectNoError(framework.WaitForPodRunningInNamespace(client, readerPod))
-
-	_, err = framework.LookForStringInPodExec(ns, readerPod.Name, []string{"cat", "/mnt/file.txt"}, expectedContent, time.Minute)
-	Expect(err).NotTo(HaveOccurred(), "failed to find expected content in the volume")
+func verifyContentOfVSpherePV(client clientset.Interface, pvc *v1.PersistentVolumeClaim, expectedContent string) {
+	runInPodWithVolume(client, pvc.Namespace, pvc.Name, "grep '"+expectedContent+"' /mnt/test/data")
 	framework.Logf("Sucessfully verified content of the volume")
 }

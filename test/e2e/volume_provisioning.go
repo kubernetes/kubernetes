@@ -34,9 +34,10 @@ import (
 const (
 	// Requested size of the volume
 	requestedSize = "1500Mi"
-	// Expected size of the volume is 2GiB, because all three supported cloud
-	// providers allocate volumes in 1GiB chunks.
+	// Expected size of the volume is 2GiB, for "openstack", "gce", "aws", "gke", as they allocate volumes in 1GiB chunks
 	expectedSize = "2Gi"
+	// vsphere provider does not allocate volumes in 1GiB chunks, so setting expected size equal to requestedSize
+	vsphereExpectedSize = "1500Mi"
 )
 
 func testDynamicProvisioning(client clientset.Interface, claim *v1.PersistentVolumeClaim) {
@@ -55,8 +56,7 @@ func testDynamicProvisioning(client clientset.Interface, claim *v1.PersistentVol
 	// Check sizes
 	expectedCapacity := resource.MustParse(expectedSize)
 	if framework.ProviderIs("vsphere") {
-		// vsphere provider does not allocate volumes in 1GiB chunks
-		expectedCapacity = resource.MustParse(requestedSize)
+		expectedCapacity = resource.MustParse(vsphereExpectedSize)
 	}
 	pvCapacity := pv.Spec.Capacity[v1.ResourceName(v1.ResourceStorage)]
 	Expect(pvCapacity.Value()).To(Equal(expectedCapacity.Value()), "pvCapacity is not equal to expectedCapacity")

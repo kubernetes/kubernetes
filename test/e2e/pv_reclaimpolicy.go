@@ -17,7 +17,6 @@ limitations under the License.
 package e2e
 
 import (
-	"fmt"
 	"strconv"
 	"time"
 
@@ -117,7 +116,7 @@ var _ = framework.KubeDescribe("PersistentVolumes [Feature:ReclaimPolicy]", func
 			volumePath, pv, pvc, err = testSetupVSpherePersistentVolumeReclaim(vsp, c, ns, v1.PersistentVolumeReclaimRetain)
 			Expect(err).NotTo(HaveOccurred())
 
-			writeContentToVSpherePV(c, ns, pvc, volumeFileContent)
+			writeContentToVSpherePV(c, pvc, volumeFileContent)
 
 			By("Delete PVC")
 			deletePersistentVolumeClaim(c, pvc.Name, ns)
@@ -132,20 +131,16 @@ var _ = framework.KubeDescribe("PersistentVolumes [Feature:ReclaimPolicy]", func
 			By("Creating the PV for same volume path")
 			pv = getVSpherePersistentVolumeSpec(volumePath, v1.PersistentVolumeReclaimRetain, nil)
 			pv, err = c.CoreV1().PersistentVolumes().Create(pv)
-			if err != nil {
-				_ = fmt.Errorf("failed to create pv")
-				return
-			}
+			Expect(err).NotTo(HaveOccurred())
+
 			By("creating the pvc")
 			pvc = getVSpherePersistentVolumeClaimSpec(ns, nil)
 			pvc, err = c.CoreV1().PersistentVolumeClaims(ns).Create(pvc)
-			if err != nil {
-				_ = fmt.Errorf("failed to create pvc")
-			}
+			Expect(err).NotTo(HaveOccurred())
 
 			By("wait for the pv and pvc to bind")
 			waitOnPVandPVC(c, ns, pv, pvc)
-			verifyContentOfVSpherePV(c, ns, pvc, volumeFileContent)
+			verifyContentOfVSpherePV(c, pvc, volumeFileContent)
 
 		})
 	})
@@ -157,22 +152,17 @@ func testSetupVSpherePersistentVolumeReclaim(vsp *vsphere.VSphere, c clientset.I
 	By("creating vmdk")
 	volumePath, err = createVSphereVolume(vsp, nil)
 	if err != nil {
-		_ = fmt.Errorf("failed to create vmdk")
 		return
 	}
 	By("creating the pv")
 	pv = getVSpherePersistentVolumeSpec(volumePath, persistentVolumeReclaimPolicy, nil)
 	pv, err = c.CoreV1().PersistentVolumes().Create(pv)
 	if err != nil {
-		_ = fmt.Errorf("failed to create pv")
 		return
 	}
 	By("creating the pvc")
 	pvc = getVSpherePersistentVolumeClaimSpec(ns, nil)
 	pvc, err = c.CoreV1().PersistentVolumeClaims(ns).Create(pvc)
-	if err != nil {
-		_ = fmt.Errorf("failed to create pvc")
-	}
 	return
 }
 
