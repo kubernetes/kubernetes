@@ -20,10 +20,22 @@ package taints
 import (
 	"fmt"
 	"strings"
+	"time"
 
+	apierrs "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/validation"
+
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
+
+	"github.com/golang/glog"
+)
+
+const (
+	// Number of times we want to retry Updates in case of conflict
+	UpdateRetries = 5
 )
 
 // ParseTaint parses a taint from a string. Taint must be off the format '<key>=<value>:<effect>'.
@@ -93,4 +105,61 @@ func (t taintsVar) String() string {
 
 func (t taintsVar) Type() string {
 	return "[]api.Taint"
+}
+
+func AddOrUpdateTaintOnNode(c clientset.Interface, nodeName string, taint *v1.Taint) error {
+	for attempt := 0; attempt < UpdateRetries; attempt++ {
+		node, err := c.Core().Nodes().Get(nodeName, metav1.GetOptions{})
+		if err != nil {
+			return err
+		}
+		node, ok := v1.AddOrUpdateTaint(node, taint)
+		if !ok {
+			return fmt.Errorf("Failed to update taint annotation!")
+		}
+
+		_, err = c.Core().Nodes().Update(node)
+		if err != nil {
+			if !apierrs.IsConflict(err) {
+				return err
+			} else {
+				glog.V(4).Infof("Conflict when trying to add/update taint %#v to %v", taint, nodeName)
+			}
+		} else {
+			break
+		}
+		time.Sleep(100 * time.Millisecond)
+	}
+	return nil
+}
+
+// RemoveTaintOffNode is for cleaning up taints temporarily added to node,
+// won't fail if target taint doesn't exist or has been removed.
+func RemoveTaintOffNode(c clientset.Interface, nodeName string, taint *v1.Taint) error {
+	for attempt := 0; attempt < UpdateRetries; attempt++ {
+		node, err := c.Core().Nodes().Get(nodeName, metav1.GetOptions{})
+		if err != nil {
+			return err
+		}
+		node, ok := v1.RemoveTaint(node, taint)
+		if !ok {
+			return fmt.Errorf("Failed to update taint annotation!")
+		}
+
+		_, err = c.Core().Nodes().Update(node)
+		if err != nil {
+			if !apierrs.IsConflict(err) {
+				if err != nil {
+					return err
+				}
+			} else {
+				glog.V(4).Infof("Conflict when trying to add/update taint %s to node %v", taint.ToString(), nodeName)
+			}
+		} else {
+			break
+		}
+		time.Sleep(100 * time.Millisecond)
+	}
+
+	return nil
 }

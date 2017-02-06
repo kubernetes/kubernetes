@@ -186,7 +186,7 @@ var _ = framework.KubeDescribe("NoExecuteTaintManager [Serial]", func() {
 		By("Trying to apply a taint on the Node")
 		testTaint := getTestTaint()
 		framework.AddOrUpdateTaintOnNode(cs, nodeName, testTaint)
-		framework.ExpectNodeHasTaint(cs, nodeName, testTaint)
+		framework.ExpectNodeHasTaint(cs, nodeName, &testTaint)
 		defer framework.RemoveTaintOffNode(cs, nodeName, testTaint)
 
 		// Wait a bit
@@ -218,7 +218,7 @@ var _ = framework.KubeDescribe("NoExecuteTaintManager [Serial]", func() {
 		By("Trying to apply a taint on the Node")
 		testTaint := getTestTaint()
 		framework.AddOrUpdateTaintOnNode(cs, nodeName, testTaint)
-		framework.ExpectNodeHasTaint(cs, nodeName, testTaint)
+		framework.ExpectNodeHasTaint(cs, nodeName, &testTaint)
 		defer framework.RemoveTaintOffNode(cs, nodeName, testTaint)
 
 		// Wait a bit
@@ -251,7 +251,7 @@ var _ = framework.KubeDescribe("NoExecuteTaintManager [Serial]", func() {
 		By("Trying to apply a taint on the Node")
 		testTaint := getTestTaint()
 		framework.AddOrUpdateTaintOnNode(cs, nodeName, testTaint)
-		framework.ExpectNodeHasTaint(cs, nodeName, testTaint)
+		framework.ExpectNodeHasTaint(cs, nodeName, &testTaint)
 		defer framework.RemoveTaintOffNode(cs, nodeName, testTaint)
 
 		// Wait a bit
@@ -295,7 +295,7 @@ var _ = framework.KubeDescribe("NoExecuteTaintManager [Serial]", func() {
 		By("Trying to apply a taint on the Node")
 		testTaint := getTestTaint()
 		framework.AddOrUpdateTaintOnNode(cs, nodeName, testTaint)
-		framework.ExpectNodeHasTaint(cs, nodeName, testTaint)
+		framework.ExpectNodeHasTaint(cs, nodeName, &testTaint)
 		taintRemoved := false
 		defer func() {
 			if !taintRemoved {

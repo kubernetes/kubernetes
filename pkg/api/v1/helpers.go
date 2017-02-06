@@ -387,7 +387,7 @@ func DeleteTaint(taints []Taint, taintToDelete *Taint) ([]Taint, bool) {
 	newTaints := []Taint{}
 	deleted := false
 	for i := range taints {
-		if taintToDelete.MatchTaint(taints[i]) {
+		if taintToDelete.MatchTaint(&taints[i]) {
 			deleted = true
 			continue
 		}
@@ -398,7 +398,7 @@ func DeleteTaint(taints []Taint, taintToDelete *Taint) ([]Taint, bool) {
 
 // MatchTaint checks if the taint matches taintToMatch. Taints are unique by key:effect,
 // if the two taints have same key:effect, regard as they match.
-func (t *Taint) MatchTaint(taintToMatch Taint) bool {
+func (t *Taint) MatchTaint(taintToMatch *Taint) bool {
 	return t.Key == taintToMatch.Key && t.Effect == taintToMatch.Effect
 }
 
@@ -479,4 +479,77 @@ type Sysctl struct {
 type NodeResources struct {
 	// Capacity represents the available resources of a node
 	Capacity ResourceList `protobuf:"bytes,1,rep,name=capacity,casttype=ResourceList,castkey=ResourceName"`
+}
+
+// Tries to add a taint to annotations list. Returns updated Node and true if it was successful
+// or false otherwise.
+func AddOrUpdateTaint(node *Node, taint *Taint) (*Node, bool) {
+	nodeTaints, err := GetTaintsFromNodeAnnotations(node.Annotations)
+	if err != nil {
+		return nil, false
+	}
+
+	var newTaints []*Taint
+	updated := false
+	for i := range nodeTaints {
+		if taint.MatchTaint(&nodeTaints[i]) {
+			newTaints = append(newTaints, taint)
+			updated = true
+			continue
+		}
+
+		newTaints = append(newTaints, &nodeTaints[i])
+	}
+
+	if !updated {
+		newTaints = append(newTaints, taint)
+	}
+
+	taintsData, err := json.Marshal(newTaints)
+	if err != nil {
+		return nil, false
+	}
+
+	if node.Annotations == nil {
+		node.Annotations = make(map[string]string)
+	}
+	node.Annotations[TaintsAnnotationKey] = string(taintsData)
+	return node, true
+}
+
+func TaintExists(taints []Taint, taintToFind *Taint) bool {
+	for _, taint := range taints {
+		if taint.MatchTaint(taintToFind) {
+			return true
+		}
+	}
+	return false
+}
+
+// Tries to remove a taint from annotations list. Returns updated Node and true if it was successful
+// or false otherwise.
+func RemoveTaint(node *Node, taint *Taint) (*Node, bool) {
+	nodeTaints, err := GetTaintsFromNodeAnnotations(node.Annotations)
+	if err != nil {
+		return nil, false
+	}
+	if len(nodeTaints) == 0 {
+		return node, true
+	}
+
+	if !TaintExists(nodeTaints, taint) {
+		return node, true
+	}
+
+	newTaints, _ := DeleteTaint(nodeTaints, taint)
+	if len(newTaints) == 0 {
+		delete(node.Annotations, TaintsAnnotationKey)
+	} else {
+		taintsData, err := json.Marshal(newTaints)
+		if err != nil {
+			return nil, false
+		}
+		node.Annotations[TaintsAnnotationKey] = string(taintsData)
+	}
+	return node, true
 }
