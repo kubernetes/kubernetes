@@ -31,8 +31,6 @@ func TestCmdInitToken(t *testing.T) {
 	}{
 		{"--discovery=token://abcd:1234567890abcd", false},     // invalid token size
 		{"--discovery=token://Abcdef:1234567890abcdef", false}, // invalid token non-lowercase
-		{"--discovery=token://abcdef:1234567890abcdef", true},  // valid token
-		{"", true}, // no token provided, so generate
 	}
 
 	for _, rt := range initTest {
