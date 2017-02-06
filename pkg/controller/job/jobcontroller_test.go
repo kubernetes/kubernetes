@@ -34,8 +34,8 @@ import (
 	batch "k8s.io/kubernetes/pkg/apis/batch/v1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset/fake"
+	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated"
 	"k8s.io/kubernetes/pkg/controller"
-	"k8s.io/kubernetes/pkg/controller/informers"
 )
 
 var alwaysReady = func() bool { return true }
@@ -89,8 +89,8 @@ func getKey(job *batch.Job, t *testing.T) string {
 }
 
 func newJobControllerFromClient(kubeClient clientset.Interface, resyncPeriod controller.ResyncPeriodFunc) (*JobController, informers.SharedInformerFactory) {
-	sharedInformers := informers.NewSharedInformerFactory(kubeClient, nil, resyncPeriod())
-	jm := NewJobController(sharedInformers.Pods().Informer(), sharedInformers.Jobs(), kubeClient)
+	sharedInformers := informers.NewSharedInformerFactory(nil, kubeClient, resyncPeriod())
+	jm := NewJobController(sharedInformers.Core().V1().Pods(), sharedInformers.Batch().V1().Jobs(), kubeClient)
 
 	return jm, sharedInformers
 }
@@ -246,8 +246,8 @@ func TestControllerSyncJob(t *testing.T) {
 			now := metav1.Now()
 			job.DeletionTimestamp = &now
 		}
-		sharedInformerFactory.Jobs().Informer().GetIndexer().Add(job)
-		podIndexer := sharedInformerFactory.Pods().Informer().GetIndexer()
+		sharedInformerFactory.Batch().V1().Jobs().Informer().GetIndexer().Add(job)
+		podIndexer := sharedInformerFactory.Core().V1().Pods().Informer().GetIndexer()
 		for _, pod := range newPodList(tc.pendingPods, v1.PodPending, job) {
 			podIndexer.Add(&pod)
 		}
@@ -349,8 +349,8 @@ func TestSyncJobPastDeadline(t *testing.T) {
 		job.Spec.ActiveDeadlineSeconds = &tc.activeDeadlineSeconds
 		start := metav1.Unix(metav1.Now().Time.Unix()-tc.startTime, 0)
 		job.Status.StartTime = &start
-		sharedInformerFactory.Jobs().Informer().GetIndexer().Add(job)
-		podIndexer := sharedInformerFactory.Pods().Informer().GetIndexer()
+		sharedInformerFactory.Batch().V1().Jobs().Informer().GetIndexer().Add(job)
+		podIndexer := sharedInformerFactory.Core().V1().Pods().Informer().GetIndexer()
 		for _, pod := range newPodList(tc.activePods, v1.PodRunning, job) {
 			podIndexer.Add(&pod)
 		}
@@ -422,7 +422,7 @@ func TestSyncPastDeadlineJobFinished(t *testing.T) {
 	start := metav1.Unix(metav1.Now().Time.Unix()-15, 0)
 	job.Status.StartTime = &start
 	job.Status.Conditions = append(job.Status.Conditions, newCondition(batch.JobFailed, "DeadlineExceeded", "Job was active longer than specified deadline"))
-	sharedInformerFactory.Jobs().Informer().GetIndexer().Add(job)
+	sharedInformerFactory.Batch().V1().Jobs().Informer().GetIndexer().Add(job)
 	err := manager.syncJob(getKey(job, t))
 	if err != nil {
 		t.Errorf("Unexpected error when syncing jobs %v", err)
@@ -448,7 +448,7 @@ func TestSyncJobComplete(t *testing.T) {
 
 	job := newJob(1, 1)
 	job.Status.Conditions = append(job.Status.Conditions, newCondition(batch.JobComplete, "", ""))
-	sharedInformerFactory.Jobs().Informer().GetIndexer().Add(job)
+	sharedInformerFactory.Batch().V1().Jobs().Informer().GetIndexer().Add(job)
 	err := manager.syncJob(getKey(job, t))
 	if err != nil {
 		t.Fatalf("Unexpected error when syncing jobs %v", err)
@@ -497,7 +497,7 @@ func TestSyncJobUpdateRequeue(t *testing.T) {
 		return updateError
 	}
 	job := newJob(2, 2)
-	sharedInformerFactory.Jobs().Informer().GetIndexer().Add(job)
+	sharedInformerFactory.Batch().V1().Jobs().Informer().GetIndexer().Add(job)
 	err := manager.syncJob(getKey(job, t))
 	if err == nil || err != updateError {
 		t.Errorf("Expected error %v when syncing jobs, got %v", updateError, err)
@@ -577,7 +577,7 @@ func TestJobPodLookup(t *testing.T) {
 		},
 	}
 	for _, tc := range testCases {
-		sharedInformerFactory.Jobs().Informer().GetIndexer().Add(tc.job)
+		sharedInformerFactory.Batch().V1().Jobs().Informer().GetIndexer().Add(tc.job)
 		if job := manager.getPodJob(tc.pod); job != nil {
 			if tc.expectedName != job.Name {
 				t.Errorf("Got job %+v expected %+v", job.Name, tc.expectedName)
@@ -611,9 +611,9 @@ func TestSyncJobExpectations(t *testing.T) {
 	manager.updateHandler = func(job *batch.Job) error { return nil }
 
 	job := newJob(2, 2)
-	sharedInformerFactory.Jobs().Informer().GetIndexer().Add(job)
+	sharedInformerFactory.Batch().V1().Jobs().Informer().GetIndexer().Add(job)
 	pods := newPodList(2, v1.PodPending, job)
-	podIndexer := sharedInformerFactory.Pods().Informer().GetIndexer()
+	podIndexer := sharedInformerFactory.Core().V1().Pods().Informer().GetIndexer()
 	podIndexer.Add(&pods[0])
 
 	manager.expectations = FakeJobExpectations{
@@ -687,7 +687,7 @@ func TestWatchPods(t *testing.T) {
 	manager.jobStoreSynced = alwaysReady
 
 	// Put one job and one pod into the store
-	sharedInformerFactory.Jobs().Informer().GetIndexer().Add(testJob)
+	sharedInformerFactory.Batch().V1().Jobs().Informer().GetIndexer().Add(testJob)
 	received := make(chan struct{})
 	// The pod update sent through the fakeWatcher should figure out the managing job and
 	// send it into the syncHandler.
@@ -712,7 +712,7 @@ func TestWatchPods(t *testing.T) {
 	// and make sure it hits the sync method for the right job.
 	stopCh := make(chan struct{})
 	defer close(stopCh)
-	go sharedInformerFactory.Pods().Informer().Run(stopCh)
+	go sharedInformerFactory.Core().V1().Pods().Informer().Run(stopCh)
 	go wait.Until(manager.worker, 10*time.Millisecond, stopCh)
 
 	pods := newPodList(1, v1.PodRunning, testJob)

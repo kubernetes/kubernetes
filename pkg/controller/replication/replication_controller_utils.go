@@ -84,7 +84,7 @@ func (o OverlappingControllers) Less(i, j int) bool {
 	return o[i].CreationTimestamp.Before(o[j].CreationTimestamp)
 }
 
-func calculateStatus(rc v1.ReplicationController, filteredPods []*v1.Pod, manageReplicasErr error) v1.ReplicationControllerStatus {
+func calculateStatus(rc *v1.ReplicationController, filteredPods []*v1.Pod, manageReplicasErr error) v1.ReplicationControllerStatus {
 	newStatus := rc.Status
 	// Count the number of pods that have labels matching the labels of the pod
 	// template of the replication controller, the matching pods may have more

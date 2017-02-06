@@ -24,7 +24,8 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/controller/informers"
+	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated"
+	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/volume/attachdetach/cache"
 	"k8s.io/kubernetes/pkg/controller/volume/attachdetach/statusupdater"
 	controllervolumetesting "k8s.io/kubernetes/pkg/controller/volume/attachdetach/testing"
@@ -50,10 +51,9 @@ func Test_Run_Positive_DoNothing(t *testing.T) {
 	fakeKubeClient := controllervolumetesting.CreateTestClient()
 	fakeRecorder := &record.FakeRecorder{}
 	ad := operationexecutor.NewOperationExecutor(operationexecutor.NewOperationGenerator(fakeKubeClient, volumePluginMgr, fakeRecorder, false /* checkNodeCapabilitiesBeforeMount */))
-	nodeInformer := informers.NewNodeInformer(
-		fakeKubeClient, resyncPeriod)
+	informerFactory := informers.NewSharedInformerFactory(nil, fakeKubeClient, controller.NoResyncPeriodFunc())
 	nsu := statusupdater.NewNodeStatusUpdater(
-		fakeKubeClient, nodeInformer, asw)
+		fakeKubeClient, informerFactory.Core().V1().Nodes().Lister(), asw)
 	reconciler := NewReconciler(
 		reconcilerLoopPeriod, maxWaitForUnmountDuration, syncLoopPeriod, false, dsw, asw, ad, nsu)
 
