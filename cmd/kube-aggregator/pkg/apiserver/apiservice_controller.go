@@ -89,7 +89,7 @@ func (c *APIServiceRegistrationController) Run(stopCh <-chan struct{}) {
 
 	glog.Infof("Starting APIServiceRegistrationController")
 
-	// only start one worker thread since its a slow moving API and the discovery server adding bits
+	// only start one worker thread since its a slow moving API and the aggregation server adding bits
 	// aren't threadsafe
 	go wait.Until(c.runWorker, time.Second, stopCh)
 
