@@ -11,7 +11,7 @@ go_library(
     name = "go_default_library",
     srcs = [
         "doc.go",
-        "resource.go",
+        "resourceadapter.go",
         "secret.go",
     ],
     tags = ["automanaged"],
@@ -23,6 +23,7 @@ go_library(
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
         "//vendor:k8s.io/apimachinery/pkg/runtime",
         "//vendor:k8s.io/apimachinery/pkg/types",
+        "//vendor:k8s.io/apimachinery/pkg/watch",
     ],
 )
 
