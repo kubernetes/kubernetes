@@ -18,6 +18,7 @@ go_library(
         "//federation/pkg/federation-controller/util:go_default_library",
         "//federation/pkg/federation-controller/util/deletionhelper:go_default_library",
         "//federation/pkg/federation-controller/util/eventsink:go_default_library",
+        "//federation/pkg/typeadapters:go_default_library",
         "//pkg/api:go_default_library",
         "//pkg/api/v1:go_default_library",
         "//pkg/client/clientset_generated/clientset:go_default_library",
