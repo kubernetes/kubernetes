@@ -69,6 +69,9 @@ if [ $? -eq 0 ]; then
      sudo cp nsenter /usr/local/bin
      rm -rf /tmp/nsenter-install
    fi
+  if ! which socat > /dev/null; then
+     sudo apt-get --yes install socat
+  fi
 fi
 
 # Install docker

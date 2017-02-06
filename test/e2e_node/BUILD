@@ -17,6 +17,7 @@ go_library(
         "gpus.go",
         "image_list.go",
         "node_problem_detector_linux.go",
+        "portforward.go",
         "resource_collector.go",
         "simple_mount.go",
         "util.go",
