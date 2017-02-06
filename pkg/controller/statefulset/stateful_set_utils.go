@@ -122,20 +122,20 @@ func storageMatches(set *apps.StatefulSet, pod *v1.Pod) bool {
 		volumes[volume.Name] = volume
 	}
 	for _, claim := range set.Spec.VolumeClaimTemplates {
-		if volume, found := volumes[claim.Name]; !found {
-			return false
-		} else if volume.VolumeSource.PersistentVolumeClaim == nil {
-			return false
-		} else if volume.VolumeSource.PersistentVolumeClaim.ClaimName !=
-			getPersistentVolumeClaimName(set, &claim, ordinal) {
+		volume, found := volumes[claim.Name]
+		if !found ||
+			volume.VolumeSource.PersistentVolumeClaim == nil ||
+			volume.VolumeSource.PersistentVolumeClaim.ClaimName !=
+				getPersistentVolumeClaimName(set, &claim, ordinal) {
 			return false
 		}
 	}
 	return true
 }
 
-// getPersistentVolumeClaims gets a map of PersistentVolumeClaims to their template names. The returned
-// PersistentVolumeClaims are constructed with the names Pod specific name for pod.
+// getPersistentVolumeClaims gets a map of PersistentVolumeClaims to their template names, as defined in set. The
+// returned PersistentVolumeClaims are each constructed with a the name specific to the Pod. This name is determined
+// by getPersistentVolumeClaimName.
 func getPersistentVolumeClaims(set *apps.StatefulSet, pod *v1.Pod) map[string]v1.PersistentVolumeClaim {
 	ordinal := getOrdinal(pod)
 	templates := set.Spec.VolumeClaimTemplates

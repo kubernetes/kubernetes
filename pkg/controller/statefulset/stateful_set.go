@@ -40,6 +40,7 @@ import (
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/kubernetes/pkg/controller"
 
+	"fmt"
 	"github.com/golang/glog"
 )
 
@@ -132,8 +133,6 @@ func (ssc *StatefulSetController) Run(workers int, stopCh <-chan struct{}) {
 	if !cache.WaitForCacheSync(stopCh, ssc.podStoreSynced) {
 		return
 	}
-	go ssc.podController.Run(stopCh)
-	go ssc.setController.Run(stopCh)
 	for i := 0; i < workers; i++ {
 		go wait.Until(ssc.worker, time.Second, stopCh)
 	}
@@ -187,12 +186,12 @@ func (ssc *StatefulSetController) deletePod(obj interface{}) {
 	if !ok {
 		tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
 		if !ok {
-			glog.Errorf("couldn't get object from tombstone %+v", obj)
+			utilruntime.HandleError(fmt.Errorf("couldn't get object from tombstone %+v", obj))
 			return
 		}
 		pod, ok = tombstone.Obj.(*v1.Pod)
 		if !ok {
-			glog.Errorf("tombstone contained object that is not a pod %+v", obj)
+			utilruntime.HandleError(fmt.Errorf("tombstone contained object that is not a pod %+v", obj))
 			return
 		}
 	}
@@ -220,7 +219,10 @@ func (ssc *StatefulSetController) getStatefulSetForPod(pod *v1.Pod) *apps.Statef
 	}
 	// More than one set is selecting the same Pod
 	if len(sets) > 1 {
-		glog.Errorf("user error: more than one StatefulSet is selecting pods with labels: %+v", pod.Labels)
+		utilruntime.HandleError(
+			fmt.Errorf(
+				"user error: more than one StatefulSet is selecting pods with labels: %+v",
+				pod.Labels))
 		// The timestamp sort should not be necessary because we will enforce the CreatedBy requirement by
 		// name
 		sort.Sort(overlappingStatefulSets(sets))
@@ -241,7 +243,7 @@ func (ssc *StatefulSetController) getStatefulSetForPod(pod *v1.Pod) *apps.Statef
 func (ssc *StatefulSetController) enqueueStatefulSet(obj interface{}) {
 	key, err := controller.KeyFunc(obj)
 	if err != nil {
-		glog.Errorf("Cound't get key for object %+v: %v", obj, err)
+		utilruntime.HandleError(fmt.Errorf("Cound't get key for object %+v: %v", obj, err))
 		return
 	}
 	ssc.queue.Add(key)
@@ -256,7 +258,7 @@ func (ssc *StatefulSetController) processNextWorkItem() bool {
 	}
 	defer ssc.queue.Done(key)
 	if err := ssc.sync(key.(string)); err != nil {
-		glog.Errorf("Error syncing StatefulSet %v, requeuing: %v", key.(string), err)
+		utilruntime.HandleError(fmt.Errorf("Error syncing StatefulSet %v, requeuing: %v", key.(string), err))
 		ssc.queue.AddRateLimited(key)
 	} else {
 		ssc.queue.Forget(key)
@@ -284,7 +286,7 @@ func (ssc *StatefulSetController) sync(key string) error {
 		return nil
 	}
 	if err != nil {
-		glog.Errorf("Unable to retrieve StatefulSet %v from store: %v", key, err)
+		utilruntime.HandleError(fmt.Errorf("Unable to retrieve StatefulSet %v from store: %v", key, err))
 		return err
 	}
 
