@@ -22,7 +22,6 @@ import (
 	"strings"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	runtime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/kubernetes/pkg/api"
 )
 
@@ -839,31 +838,6 @@ type PersistentVolumeRecyclerConfiguration struct {
 	// for a HostPath scrubber pod.  This is for development and testing only and will not work
 	// in a multi-node cluster.
 	IncrementTimeoutHostPath int32
-}
-
-// AdmissionConfiguration provides versioned configuration for admission controllers.
-type AdmissionConfiguration struct {
-	metav1.TypeMeta
-
-	// Plugins allows specifying a configuration per admission control plugin.
-	Plugins []AdmissionPluginConfiguration
-}
-
-// AdmissionPluginConfiguration provides the configuration for a single plug-in.
-type AdmissionPluginConfiguration struct {
-	// Name is the name of the admission controller.
-	// It must match the registered admission plugin name.
-	Name string
-
-	// Path is the path to a configuration file that contains the plugin's
-	// configuration
-	// +optional
-	Path string
-
-	// Configuration is an embedded configuration object to be used as the plugin's
-	// configuration. If present, it will be used instead of the path to the configuration file.
-	// +optional
-	Configuration runtime.Object
 }
 
 type ConfigurationMap map[string]string
