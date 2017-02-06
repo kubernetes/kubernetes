@@ -1140,6 +1140,11 @@ func DeepCopy_v1_ISCSIVolumeSource(in interface{}, out interface{}, c *conversio
 		in := in.(*ISCSIVolumeSource)
 		out := out.(*ISCSIVolumeSource)
 		*out = *in
+		if in.Portals != nil {
+			in, out := &in.Portals, &out.Portals
+			*out = make([]string, len(*in))
+			copy(*out, *in)
+		}
 		return nil
 	}
 }
@@ -1885,7 +1890,9 @@ func DeepCopy_v1_PersistentVolumeSource(in interface{}, out interface{}, c *conv
 		if in.ISCSI != nil {
 			in, out := &in.ISCSI, &out.ISCSI
 			*out = new(ISCSIVolumeSource)
-			**out = **in
+			if err := DeepCopy_v1_ISCSIVolumeSource(*in, *out, c); err != nil {
+				return err
+			}
 		}
 		if in.Cinder != nil {
 			in, out := &in.Cinder, &out.Cinder
@@ -3155,7 +3162,9 @@ func DeepCopy_v1_VolumeSource(in interface{}, out interface{}, c *conversion.Clo
 		if in.ISCSI != nil {
 			in, out := &in.ISCSI, &out.ISCSI
 			*out = new(ISCSIVolumeSource)
-			**out = **in
+			if err := DeepCopy_v1_ISCSIVolumeSource(*in, *out, c); err != nil {
+				return err
+			}
 		}
 		if in.Glusterfs != nil {
 			in, out := &in.Glusterfs, &out.Glusterfs
