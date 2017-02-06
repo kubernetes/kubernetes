@@ -48,4 +48,8 @@ const (
 
 	// APICallRetryInterval defines how long kubeadm should wait before retrying a failed API operation
 	APICallRetryInterval = 500 * time.Millisecond
+
+	// Minimum amount of nodes the Service subnet should allow.
+	// We need at least ten, because the DNS service is always at the tenth cluster clusterIP
+	MinimumAddressesInServiceSubnet = 10
 )
