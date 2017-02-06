@@ -29,16 +29,26 @@ import (
 
 	"bytes"
 
+	"k8s.io/apimachinery/pkg/apimachinery/announced"
+	"k8s.io/apimachinery/pkg/apimachinery/registered"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/apiserver/pkg/admission"
-	"k8s.io/apiserver/pkg/apis"
 	"k8s.io/apiserver/pkg/apis/apiserver"
+	"k8s.io/apiserver/pkg/apis/apiserver/install"
 	apiserverv1alpha1 "k8s.io/apiserver/pkg/apis/apiserver/v1alpha1"
-
-	_ "k8s.io/apiserver/pkg/apis/apiserver/install"
-
-	runtime "k8s.io/apimachinery/pkg/runtime"
 )
+
+var (
+	groupFactoryRegistry = make(announced.APIGroupFactoryRegistry)
+	registry             = registered.NewOrDie(os.Getenv("KUBE_API_VERSIONS"))
+	scheme               = runtime.NewScheme()
+	codecs               = serializer.NewCodecFactory(scheme)
+)
+
+func init() {
+	install.Install(groupFactoryRegistry, registry, scheme)
+}
 
 func makeAbs(path, base string) (string, error) {
 	if filepath.IsAbs(path) {
@@ -60,7 +70,7 @@ func makeAbs(path, base string) (string, error) {
 // set of pluginNames whose config location references the specified configFilePath.
 // It does this to preserve backward compatibility when admission control files were opaque.
 // It returns an error if the file did not exist.
-func ReadAdmissionConfiguration(pluginNames []string, configFilePath string) (admission.ConfigProvider, error) {
+func ReadAdmissionConfiguration(pluginNames []string, configFilePath string) (ConfigProvider, error) {
 	if configFilePath == "" {
 		return configProvider{config: &apiserver.AdmissionConfiguration{}}, nil
 	}
@@ -69,7 +79,7 @@ func ReadAdmissionConfiguration(pluginNames []string, configFilePath string) (ad
 	if err != nil {
 		return nil, fmt.Errorf("unable to read admission control configuration from %q [%v]", configFilePath, err)
 	}
-	decoder := apis.Codecs.UniversalDecoder()
+	decoder := codecs.UniversalDecoder()
 	decodedObj, err := runtime.Decode(decoder, data)
 	// we were able to decode the file successfully
 	if err == nil {
@@ -109,9 +119,9 @@ func ReadAdmissionConfiguration(pluginNames []string, configFilePath string) (ad
 					Path: configFilePath})
 		}
 	}
-	apis.Scheme.Default(externalConfig)
+	scheme.Default(externalConfig)
 	internalConfig := &apiserver.AdmissionConfiguration{}
-	if err := apis.Scheme.Convert(externalConfig, internalConfig, nil); err != nil {
+	if err := scheme.Convert(externalConfig, internalConfig, nil); err != nil {
 		return nil, err
 	}
 	return configProvider{config: internalConfig}, nil
@@ -170,7 +180,7 @@ func (p configProvider) ConfigFor(pluginName string) (io.Reader, error) {
 
 // writeYAML writes the specified object to a byte array as yaml.
 func writeYAML(obj runtime.Object) ([]byte, error) {
-	json, err := runtime.Encode(apis.Codecs.LegacyCodec(), obj)
+	json, err := runtime.Encode(codecs.LegacyCodec(), obj)
 	if err != nil {
 		return nil, err
 	}
