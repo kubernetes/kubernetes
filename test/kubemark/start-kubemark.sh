@@ -167,18 +167,7 @@ function create-and-upload-hollow-node-image {
   CURR_DIR=`pwd`
   cd "${MAKE_DIR}"
   RETRIES=3
-  for attempt in $(seq 1 ${RETRIES}); do
-    if ! make; then
-      if [[ $((attempt)) -eq "${RETRIES}" ]]; then
-        echo "${color_red}Make failed. Exiting.${color_norm}"
-        exit 1
-      fi
-      echo -e "${color_yellow}Make attempt $(($attempt)) failed. Retrying.${color_norm}" >& 2
-      sleep $(($attempt * 5))
-    else
-      break
-    fi
-  done
+  make-kubemark-container
   rm kubemark
   cd $CURR_DIR
   echo "Created and uploaded the kubemark hollow-node image to docker registry."

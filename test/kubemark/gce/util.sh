@@ -104,6 +104,21 @@ function delete-master-instance-and-resources {
   fi
 }
 
+function make-kubemark-container {
+  for attempt in $(seq 1 ${RETRIES}); do
+    if ! make gcloudpush; then
+      if [[ $((attempt)) -eq "${RETRIES}" ]]; then
+        echo "${color_red}Make failed. Exiting.${color_norm}"
+        exit 1
+      fi
+      echo -e "${color_yellow}Make attempt $(($attempt)) failed. Retrying.${color_norm}" >& 2
+      sleep $(($attempt * 5))
+    else
+      break
+    fi
+  done
+}
+
 function delete-master-instance-and-resources {
   GCLOUD_COMMON_ARGS="--project ${PROJECT} --zone ${ZONE} --quiet"
 

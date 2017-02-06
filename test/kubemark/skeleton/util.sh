@@ -52,6 +52,14 @@ function copy-files() {
 	echo "Copying files" 1>&2
 }
 
+# This function should use the kubemark Makefile to build and push the kubemark
+# image to registry denoted as: $REGISTRY/$PROJECT/kubemark
+#
+# Recommended for this function to include retrying logic in case of failures.
+function make-kubemark-container {
+	echo "Building and pushing the kubemark container" 1>&2
+}
+
 # This function should delete the master instance along with all the
 # resources that have been allocated inside the function
 # 'create-master-instance-with-resources' above.
