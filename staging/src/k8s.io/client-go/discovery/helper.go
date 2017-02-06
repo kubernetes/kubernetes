@@ -104,8 +104,8 @@ func NegotiateVersion(client DiscoveryInterface, requiredGV *schema.GroupVersion
 		return &clientRegisteredGVs[0], nil
 	}
 
-	return nil, fmt.Errorf("failed to negotiate an api version; server supports: %v, client supports: %v",
-		serverVersions, clientVersions)
+	// fall back to an empty GroupVersion.  Most client commands no longer respect a GroupVersion anyway
+	return &schema.GroupVersion{}, nil
 }
 
 // GroupVersionResources converts APIResourceLists to the GroupVersionResources.
