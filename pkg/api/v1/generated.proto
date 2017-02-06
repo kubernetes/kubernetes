@@ -1179,6 +1179,11 @@ message ISCSIVolumeSource {
   // Defaults to false.
   // +optional
   optional bool readOnly = 6;
+
+  // iSCSI target portal List. The portal is either an IP or ip_addr:port if the port
+  // is other than default (typically TCP ports 860 and 3260).
+  // +optional
+  repeated string portals = 7;
 }
 
 // Maps a string key to a path within a volume.
