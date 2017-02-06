@@ -77,7 +77,7 @@ func (s ClusterRoleBindingGeneratorV1) Generate(genericParams map[string]interfa
 			return nil, fmt.Errorf("expected []string, found :%v", fromFileStrings)
 		}
 		delegate.ServiceAccounts = fromLiteralArray
-		delete(genericParams, "serviceaccounts")
+		delete(genericParams, "serviceaccount")
 	}
 	params := map[string]string{}
 	for key, value := range genericParams {
