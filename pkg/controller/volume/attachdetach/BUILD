@@ -16,6 +16,8 @@ go_library(
         "//pkg/api:go_default_library",
         "//pkg/api/v1:go_default_library",
         "//pkg/client/clientset_generated/clientset:go_default_library",
+        "//pkg/client/informers/informers_generated/core/v1:go_default_library",
+        "//pkg/client/listers/core/v1:go_default_library",
         "//pkg/cloudprovider:go_default_library",
         "//pkg/controller/volume/attachdetach/cache:go_default_library",
         "//pkg/controller/volume/attachdetach/populator:go_default_library",
@@ -42,7 +44,8 @@ go_test(
     library = ":go_default_library",
     tags = ["automanaged"],
     deps = [
-        "//pkg/controller/informers:go_default_library",
+        "//pkg/client/informers/informers_generated:go_default_library",
+        "//pkg/controller:go_default_library",
         "//pkg/controller/volume/attachdetach/testing:go_default_library",
     ],
 )

@@ -32,12 +32,12 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
+	coreinformers "k8s.io/kubernetes/pkg/client/informers/informers_generated/core/v1"
 	"k8s.io/kubernetes/pkg/cloudprovider"
-	"k8s.io/kubernetes/pkg/controller/informers"
 )
 
 type CloudNodeController struct {
-	nodeInformer informers.NodeInformer
+	nodeInformer coreinformers.NodeInformer
 	kubeClient   clientset.Interface
 	recorder     record.EventRecorder
 
@@ -59,7 +59,7 @@ const (
 
 // NewCloudNodeController creates a CloudNodeController object
 func NewCloudNodeController(
-	nodeInformer informers.NodeInformer,
+	nodeInformer coreinformers.NodeInformer,
 	kubeClient clientset.Interface,
 	cloud cloudprovider.Interface,
 	nodeMonitorPeriod time.Duration) (*CloudNodeController, error) {
