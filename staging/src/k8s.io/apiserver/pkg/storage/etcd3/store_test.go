@@ -52,14 +52,15 @@ func init() {
 // prefixTransformer adds and verifies that all data has the correct prefix on its way in and out.
 type prefixTransformer struct {
 	prefix []byte
+	stale  bool
 	err    error
 }
 
-func (p prefixTransformer) TransformFromStorage(b []byte) ([]byte, error) {
+func (p prefixTransformer) TransformFromStorage(b []byte) ([]byte, bool, error) {
 	if !bytes.HasPrefix(b, p.prefix) {
-		return nil, fmt.Errorf("value does not have expected prefix: %s", string(b))
+		return nil, false, fmt.Errorf("value does not have expected prefix: %s", string(b))
 	}
-	return bytes.TrimPrefix(b, p.prefix), p.err
+	return bytes.TrimPrefix(b, p.prefix), p.stale, p.err
 }
 func (p prefixTransformer) TransformToStorage(b []byte) ([]byte, error) {
 	if len(b) > 0 {
@@ -316,6 +317,7 @@ func TestGuaranteedUpdate(t *testing.T) {
 		expectNotFoundErr   bool
 		expectInvalidObjErr bool
 		expectNoUpdate      bool
+		transformStale      bool
 	}{{ // GuaranteedUpdate on non-existing key with ignoreNotFound=false
 		key:                 "/non-existing",
 		ignoreNotFound:      false,
@@ -344,6 +346,14 @@ func TestGuaranteedUpdate(t *testing.T) {
 		expectNotFoundErr:   false,
 		expectInvalidObjErr: false,
 		expectNoUpdate:      true,
+	}, { // GuaranteedUpdate with same data but stale
+		key:                 key,
+		ignoreNotFound:      false,
+		precondition:        nil,
+		expectNotFoundErr:   false,
+		expectInvalidObjErr: false,
+		expectNoUpdate:      false,
+		transformStale:      true,
 	}, { // GuaranteedUpdate with UID match
 		key:                 key,
 		ignoreNotFound:      false,
@@ -366,6 +376,12 @@ func TestGuaranteedUpdate(t *testing.T) {
 		if tt.expectNoUpdate {
 			name = storeObj.Name
 		}
+		originalTransformer := store.transformer.(prefixTransformer)
+		if tt.transformStale {
+			transformer := originalTransformer
+			transformer.stale = true
+			store.transformer = transformer
+		}
 		version := storeObj.ResourceVersion
 		err := store.GuaranteedUpdate(ctx, tt.key, out, tt.ignoreNotFound, tt.precondition,
 			storage.SimpleUpdate(func(obj runtime.Object) (runtime.Object, error) {
@@ -378,6 +394,7 @@ func TestGuaranteedUpdate(t *testing.T) {
 				pod.Name = name
 				return &pod, nil
 			}))
+		store.transformer = originalTransformer
 
 		if tt.expectNotFoundErr {
 			if err == nil || !storage.IsNotFound(err) {
