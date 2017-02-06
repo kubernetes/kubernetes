@@ -151,7 +151,7 @@ func createTestController(cs clientset.Interface, observedDeletions chan struct{
 	go controller.Run(stopCh)
 }
 
-var _ = framework.KubeDescribe("TaintController [Serial]", func() {
+var _ = framework.KubeDescribe("NoExecuteTaintManager [Serial]", func() {
 	var cs clientset.Interface
 	var nodeList *v1.NodeList
 	var ns string
@@ -172,7 +172,7 @@ var _ = framework.KubeDescribe("TaintController [Serial]", func() {
 	// 2. Taint the node running this pod with a no-execute taint
 	// 3. See if pod will get evicted
 	It("evicts pods from tainted nodes", func() {
-		podName := "taint-eviction"
+		podName := "taint-eviction-1"
 		pod := getPodForTaintsTest(false, 0, podName, ns)
 		observedDeletions := make(chan struct{}, 100)
 		stopCh := make(chan struct{})
@@ -204,7 +204,7 @@ var _ = framework.KubeDescribe("TaintController [Serial]", func() {
 	// 2. Taint the node running this pod with a no-execute taint
 	// 3. See if pod wont get evicted
 	It("doesn't evict pod with tolerations from tainted nodes", func() {
-		podName := "taint-eviction"
+		podName := "taint-eviction-2"
 		pod := getPodForTaintsTest(true, 0, podName, ns)
 		observedDeletions := make(chan struct{}, 100)
 		stopCh := make(chan struct{})
@@ -237,7 +237,7 @@ var _ = framework.KubeDescribe("TaintController [Serial]", func() {
 	// 3. See if pod wont get evicted before toleration time runs out
 	// 4. See if pod will get evicted after toleration time runs out
 	It("eventually evict pod with finite tolerations from tainted nodes", func() {
-		podName := "taint-eviction"
+		podName := "taint-eviction-3"
 		pod := getPodForTaintsTest(true, 5, podName, ns)
 		observedDeletions := make(chan struct{}, 100)
 		stopCh := make(chan struct{})
@@ -281,7 +281,7 @@ var _ = framework.KubeDescribe("TaintController [Serial]", func() {
 	// 4. Remove the taint
 	// 5. See if Pod won't be evicted.
 	It("removing taint cancels eviction", func() {
-		podName := "taint-eviction"
+		podName := "taint-eviction-4"
 		pod := getPodForTaintsTest(true, 5, podName, ns)
 		observedDeletions := make(chan struct{}, 100)
 		stopCh := make(chan struct{})
