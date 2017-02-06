@@ -131,7 +131,7 @@ func reorganizeTaints(accessor metav1.Object, overwrite bool, taintsToAdd []v1.T
 	for _, oldTaint := range oldTaints {
 		existsInNew := false
 		for _, taint := range newTaints {
-			if taint.MatchTaint(oldTaint) {
+			if taint.MatchTaint(&oldTaint) {
 				existsInNew = true
 				break
 			}
