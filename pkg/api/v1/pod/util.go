@@ -63,21 +63,30 @@ func FindPort(pod *v1.Pod, svcPort *v1.ServicePort) (int, error) {
 
 // TODO: remove this function when init containers becomes a stable feature
 func SetInitContainersAndStatuses(pod *v1.Pod) error {
-	var initContainersAnnotation string
-	initContainersAnnotation = pod.Annotations[v1.PodInitContainersAnnotationKey]
-	initContainersAnnotation = pod.Annotations[v1.PodInitContainersBetaAnnotationKey]
-	if len(initContainersAnnotation) > 0 {
+	// If there is a beta annotation, copy to alpha key.
+	// See commit log for PR #31026 for why we do this.
+	if valueBeta, okBeta := pod.Annotations[v1.PodInitContainersBetaAnnotationKey]; okBeta {
+		pod.Annotations[v1.PodInitContainersAnnotationKey] = valueBeta
+	}
+	if initContainersAnnotation, ok := pod.Annotations[v1.PodInitContainersAnnotationKey]; ok {
 		var values []v1.Container
 		if err := json.Unmarshal([]byte(initContainersAnnotation), &values); err != nil {
 			return err
 		}
 		pod.Spec.InitContainers = values
+		// Call defaulters explicitly until annotations are removed
+		for i := range pod.Spec.InitContainers {
+			c := &pod.Spec.InitContainers[i]
+			v1.SetDefaults_Container(c)
+		}
 	}
 
-	var initContainerStatusesAnnotation string
-	initContainerStatusesAnnotation = pod.Annotations[v1.PodInitContainerStatusesAnnotationKey]
-	initContainerStatusesAnnotation = pod.Annotations[v1.PodInitContainerStatusesBetaAnnotationKey]
-	if len(initContainerStatusesAnnotation) > 0 {
+	// If there is a beta annotation, copy to alpha key.
+	// See commit log for PR #31026 for why we do this.
+	if valueBeta, okBeta := pod.Annotations[v1.PodInitContainerStatusesBetaAnnotationKey]; okBeta {
+		pod.Annotations[v1.PodInitContainerStatusesAnnotationKey] = valueBeta
+	}
+	if initContainerStatusesAnnotation, ok := pod.Annotations[v1.PodInitContainerStatusesAnnotationKey]; ok {
 		var values []v1.ContainerStatus
 		if err := json.Unmarshal([]byte(initContainerStatusesAnnotation), &values); err != nil {
 			return err
