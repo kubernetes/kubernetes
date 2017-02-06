@@ -53,7 +53,6 @@ kind: DaemonSet
 metadata:
   labels:
     k8s-app: kube-proxy
-    kubernetes.io/cluster-service: "true"
   name: kube-proxy
   namespace: kube-system
 spec:
@@ -64,7 +63,6 @@ spec:
     metadata:
       labels:
         k8s-app: kube-proxy
-        kubernetes.io/cluster-service: "true"
       annotations:
         # TODO: Move this to the beta tolerations field below as soon as the Tolerations field exists in PodSpec
         scheduler.alpha.kubernetes.io/tolerations: '[{"key":"dedicated","value":"master","effect":"NoSchedule"}]'
@@ -102,7 +100,6 @@ kind: Deployment
 metadata:
   labels:
     k8s-app: kube-dns
-    kubernetes.io/cluster-service: "true"
   name: kube-dns
   namespace: kube-system
 spec:
@@ -110,7 +107,6 @@ spec:
   selector:
     matchLabels:
       k8s-app: kube-dns
-      kubernetes.io/cluster-service: "true"
   strategy:
     rollingUpdate:
       maxSurge: 1
@@ -120,7 +116,6 @@ spec:
     metadata:
       labels:
         k8s-app: kube-dns
-        kubernetes.io/cluster-service: "true"
       annotations:
         # TODO: Move this to the beta tolerations field below as soon as the Tolerations field exists in PodSpec
         scheduler.alpha.kubernetes.io/tolerations: '[{"key":"dedicated","value":"master","effect":"NoSchedule"}]'
