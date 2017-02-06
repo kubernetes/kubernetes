@@ -66,9 +66,10 @@ func TLSConfigFor(c *Config) (*tls.Config, error) {
 		// Can't use SSLv3 because of POODLE and BEAST
 		// Can't use TLSv1.0 because of POODLE and BEAST using CBC cipher
 		// Can't use TLSv1.1 because of RC4 cipher usage
-		MinVersion:         tls.VersionTLS12,
-		InsecureSkipVerify: c.TLS.Insecure,
-		ServerName:         c.TLS.ServerName,
+		MinVersion:           tls.VersionTLS12,
+		InsecureSkipVerify:   c.TLS.Insecure,
+		ServerName:           c.TLS.ServerName,
+		GetClientCertificate: c.TLS.GetClientCertificate,
 	}
 
 	if c.HasCA() {

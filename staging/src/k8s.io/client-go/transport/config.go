@@ -16,7 +16,10 @@ limitations under the License.
 
 package transport
 
-import "net/http"
+import (
+	"crypto/tls"
+	"net/http"
+)
 
 // Config holds various options for establishing a transport.
 type Config struct {
@@ -77,7 +80,7 @@ func (c *Config) HasTokenAuth() bool {
 
 // HasCertAuth returns whether the configuration has certificate authentication or not.
 func (c *Config) HasCertAuth() bool {
-	return len(c.TLS.CertData) != 0 || len(c.TLS.CertFile) != 0
+	return len(c.TLS.CertData) != 0 || len(c.TLS.CertFile) != 0 || c.TLS.GetClientCertificate != nil
 }
 
 // TLSConfig holds the information needed to set up a TLS transport.
@@ -92,4 +95,19 @@ type TLSConfig struct {
 	CAData   []byte // Bytes of the PEM-encoded server trusted root certificates. Supercedes CAFile.
 	CertData []byte // Bytes of the PEM-encoded client certificate. Supercedes CertFile.
 	KeyData  []byte // Bytes of the PEM-encoded client key. Supercedes KeyFile.
+
+	// GetClientCertificate, if not nil, is called when a server requests a
+	// certificate from a client. If set, the contents of Certificates will
+	// be ignored.
+	//
+	// If GetClientCertificate returns an error, the handshake will be
+	// aborted and that error will be returned. Otherwise
+	// GetClientCertificate must return a non-nil Certificate. If
+	// Certificate.Certificate is empty then no certificate will be sent to
+	// the server. If this is unacceptable to the server then it may abort
+	// the handshake.
+	//
+	// GetClientCertificate may be called multiple times for the same
+	// connection if renegotiation occurs or if TLS 1.3 is in use.
+	GetClientCertificate func(*tls.CertificateRequestInfo) (*tls.Certificate, error)
 }

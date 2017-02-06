@@ -138,15 +138,16 @@ func TestShouldRotate(t *testing.T) {
 			m := manager{
 				cert: &tls.Certificate{
 					Leaf: &x509.Certificate{
-						NotAfter:  test.notAfter,
 						NotBefore: test.notBefore,
+						NotAfter:  test.notAfter,
 					},
 				},
 				template: &x509.CertificateRequest{},
 				usages:   []certificates.KeyUsage{},
 			}
+
 			if m.shouldRotate() != test.shouldRotate {
-				t.Errorf("For time %v, a certificate issued for (%v, %v) should rotate should be %t.",
+				t.Errorf("Time %v, a certificate issued for (%v, %v) should rotate should be %t.",
 					now,
 					m.cert.Leaf.NotBefore,
 					m.cert.Leaf.NotAfter,
@@ -218,7 +219,6 @@ func TestNewManagerBootstrap(t *testing.T) {
 	if cert == nil {
 		t.Errorf("Certificate was nil, expected something.")
 	}
-
 	if m, ok := cm.(*manager); !ok {
 		t.Errorf("Expected a '*manager' from 'NewManager'")
 	} else if !m.shouldRotate() {
@@ -257,7 +257,6 @@ func TestNewManagerNoBootstrap(t *testing.T) {
 	if currentCert == nil {
 		t.Errorf("Certificate was nil, expected something.")
 	}
-
 	if m, ok := cm.(*manager); !ok {
 		t.Errorf("Expected a '*manager' from 'NewManager'")
 	} else if m.shouldRotate() {
@@ -305,8 +304,8 @@ func TestGetCurrentCertificateOrBootstrap(t *testing.T) {
 				store,
 				tc.bootstrapCertData,
 				tc.bootstrapKeyData)
-			if certResult == nil || tc.expectedCert == nil {
-				if certResult != tc.expectedCert {
+			if certResult == nil || certResult.Certificate == nil || tc.expectedCert == nil {
+				if certResult != nil && tc.expectedCert != nil {
 					t.Errorf("Got certificate %v, wanted %v", certResult, tc.expectedCert)
 				}
 			} else {

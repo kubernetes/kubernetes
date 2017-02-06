@@ -19,6 +19,8 @@ package app
 
 import (
 	"crypto/tls"
+	"crypto/x509"
+	"crypto/x509/pkix"
 	"errors"
 	"fmt"
 	"io/ioutil"
@@ -58,6 +60,7 @@ import (
 	"k8s.io/kubernetes/cmd/kubelet/app/options"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
+	certificates "k8s.io/kubernetes/pkg/apis/certificates/v1beta1"
 	"k8s.io/kubernetes/pkg/apis/componentconfig"
 	componentconfigv1alpha1 "k8s.io/kubernetes/pkg/apis/componentconfig/v1alpha1"
 	"k8s.io/kubernetes/pkg/capabilities"
@@ -68,6 +71,7 @@ import (
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet"
 	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
+	"k8s.io/kubernetes/pkg/kubelet/certificate"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	"k8s.io/kubernetes/pkg/kubelet/config"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
@@ -447,10 +451,35 @@ func run(s *options.KubeletServer, kubeDeps *kubelet.KubeletDeps) (err error) {
 		}
 
 		clientConfig, err := CreateAPIServerClientConfig(s)
+
+		var clientCertificateManager certificate.Manager
 		if err == nil {
+			if utilfeature.DefaultFeatureGate.Enabled(features.RotateKubeletClientCertificate) {
+				nodeName, err := getNodeName(cloud, nodeutil.GetHostname(s.HostnameOverride))
+				if err != nil {
+					return err
+				}
+				clientCertificateManager, err = initializeCertificateManager(s.CertDirectory, nodeName, clientConfig.CertData, clientConfig.KeyData)
+				if err != nil {
+					glog.Warningf("Unable to initialize the certificate manager: %v", err)
+				} else {
+					clientConfig.GetClientCertificate = func(*tls.CertificateRequestInfo) (*tls.Certificate, error) {
+						cert := clientCertificateManager.Current()
+						if cert == nil {
+							return nil, fmt.Errorf("No certificate available.")
+						}
+						return cert, nil
+					}
+				}
+			}
+
 			kubeClient, err = clientset.NewForConfig(clientConfig)
 			if err != nil {
 				glog.Warningf("New kubeClient from clientConfig error: %v", err)
+			} else if kubeClient.Certificates() != nil && clientCertificateManager != nil {
+				glog.V(2).Info("Starting client certificate rotation.")
+				clientCertificateManager.CertificateSigningRequestClient(kubeClient.Certificates().CertificateSigningRequests())
+				clientCertificateManager.Start()
 			}
 			externalKubeClient, err = clientgoclientset.NewForConfig(clientConfig)
 			if err != nil {
@@ -478,6 +507,7 @@ func run(s *options.KubeletServer, kubeDeps *kubelet.KubeletDeps) (err error) {
 			return err
 		}
 
+		kubeDeps.ClientCertificateManager = clientCertificateManager
 		kubeDeps.Cloud = cloud
 		kubeDeps.KubeClient = kubeClient
 		kubeDeps.ExternalKubeClient = externalKubeClient
@@ -597,6 +627,38 @@ func run(s *options.KubeletServer, kubeDeps *kubelet.KubeletDeps) (err error) {
 
 	<-done
 	return nil
+}
+
+func initializeCertificateManager(certDirectory string, nodeName types.NodeName, certData []byte, keyData []byte) (certificate.Manager, error) {
+	certificateStore, err := certificate.NewFileStore(
+		"kubelet-client",
+		certDirectory,
+		certDirectory,
+		"",
+		"")
+	if err != nil {
+		return nil, fmt.Errorf("failed to initialize certificate store: %v", err)
+	}
+	clientCertificateManager, err := certificate.NewManager(&certificate.Config{
+		Template: &x509.CertificateRequest{
+			Subject: pkix.Name{
+				Organization: []string{"system:nodes"},
+				CommonName:   fmt.Sprintf("system:node:%s", nodeName),
+			},
+		},
+		Usages: []certificates.KeyUsage{
+			certificates.UsageDigitalSignature,
+			certificates.UsageKeyEncipherment,
+			certificates.UsageClientAuth,
+		},
+		CertificateStore:        certificateStore,
+		BootstrapCertificatePEM: certData,
+		BootstrapKeyPEM:         keyData,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to initialize certificate manager: %v", err)
+	}
+	return clientCertificateManager, nil
 }
 
 // getNodeName returns the node name according to the cloud provider

@@ -17,6 +17,7 @@ limitations under the License.
 package rest
 
 import (
+	"crypto/tls"
 	"io"
 	"net/http"
 	"path/filepath"
@@ -236,6 +237,7 @@ func TestAnonymousConfig(t *testing.T) {
 		func(r *clientcmdapi.AuthProviderConfig, f fuzz.Continue) {
 			r.Config = map[string]string{}
 		},
+		func(r *func(*tls.CertificateRequestInfo) (*tls.Certificate, error), f fuzz.Continue) {},
 	)
 	for i := 0; i < 20; i++ {
 		original := &Config{}

@@ -17,6 +17,7 @@ limitations under the License.
 package rest
 
 import (
+	"crypto/tls"
 	"fmt"
 	"io/ioutil"
 	"net"
@@ -151,6 +152,21 @@ type TLSClientConfig struct {
 	// CAData holds PEM-encoded bytes (typically read from a root certificates bundle).
 	// CAData takes precedence over CAFile
 	CAData []byte
+
+	// GetClientCertificate, if not nil, is called when a server requests a
+	// certificate from a client. If set, the contents of Certificates will
+	// be ignored.
+	//
+	// If GetClientCertificate returns an error, the handshake will be
+	// aborted and that error will be returned. Otherwise
+	// GetClientCertificate must return a non-nil Certificate. If
+	// Certificate.Certificate is empty then no certificate will be sent to
+	// the server. If this is unacceptable to the server then it may abort
+	// the handshake.
+	//
+	// GetClientCertificate may be called multiple times for the same
+	// connection if renegotiation occurs or if TLS 1.3 is in use.
+	GetClientCertificate func(*tls.CertificateRequestInfo) (*tls.Certificate, error)
 }
 
 type ContentConfig struct {
