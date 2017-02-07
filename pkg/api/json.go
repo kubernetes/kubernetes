@@ -16,12 +16,12 @@ limitations under the License.
 
 package api
 
-import "encoding/json"
+//import "encoding/json"
 
 // This file implements json marshaling/unmarshaling interfaces on objects that are currently marshaled into annotations
 // to prevent anyone from marshaling these internal structs.
 
-var _ = json.Marshaler(Taint{})
+/*var _ = json.Marshaler(Taint{})
 var _ = json.Unmarshaler(&Taint{})
 
 func (Taint) MarshalJSON() ([]byte, error) { panic("do not marshal internal struct") }
@@ -34,7 +34,7 @@ func (Toleration) MarshalJSON() ([]byte, error) { panic("do not marshal internal
 func (*Toleration) UnmarshalJSON([]byte) error  { panic("do not unmarshal to internal struct") }
 
 var _ = json.Marshaler(&AvoidPods{})
-var _ = json.Unmarshaler(&AvoidPods{})
+var _ = json.Unmarshaler(&AvoidPods{})*/
 
 func (AvoidPods) MarshalJSON() ([]byte, error) { panic("do not marshal internal struct") }
 func (*AvoidPods) UnmarshalJSON([]byte) error  { panic("do not unmarshal to internal struct") }

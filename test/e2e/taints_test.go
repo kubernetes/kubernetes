@@ -75,16 +75,6 @@ func getPodForTaintsTest(hasToleration bool, tolerationSeconds int, podName, ns 
 					Labels:    map[string]string{"name": podName},
 					DeletionGracePeriodSeconds: &grace,
 					// default - tolerate forever
-					Annotations: map[string]string{
-						"scheduler.alpha.kubernetes.io/tolerations": `
-					[
-						{
-							"key": "kubernetes.io/e2e-evict-taint-key",
-							"value": "evictTaintVal",
-							"effect": "` + string(v1.TaintEffectNoExecute) + `"
-						}
-					]`,
-					},
 				},
 				Spec: v1.PodSpec{
 					Containers: []v1.Container{
@@ -93,27 +83,17 @@ func getPodForTaintsTest(hasToleration bool, tolerationSeconds int, podName, ns 
 							Image: "kubernetes/pause",
 						},
 					},
+					Tolerations: []v1.Toleration{{Key: "kubernetes.io/e2e-evict-taint-key", Value: "evictTaintVal", Effect: v1.TaintEffectNoExecute}},
 				},
 			}
 		} else {
+			ts := int64(tolerationSeconds)
 			return &v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      podName,
 					Namespace: ns,
 					Labels:    map[string]string{"name": podName},
 					DeletionGracePeriodSeconds: &grace,
-					// default - tolerate forever
-					Annotations: map[string]string{
-						"scheduler.alpha.kubernetes.io/tolerations": `
-					[
-						{
-							"key": "kubernetes.io/e2e-evict-taint-key",
-							"value": "evictTaintVal",
-							"effect": "` + string(v1.TaintEffectNoExecute) + `",
-							"tolerationSeconds": ` + fmt.Sprintf("%v", tolerationSeconds) + `
-						}
-					]`,
-					},
 				},
 				Spec: v1.PodSpec{
 					Containers: []v1.Container{
@@ -122,6 +102,8 @@ func getPodForTaintsTest(hasToleration bool, tolerationSeconds int, podName, ns 
 							Image: "kubernetes/pause",
 						},
 					},
+					// default - tolerate forever
+					Tolerations: []v1.Toleration{{Key: "kubernetes.io/e2e-evict-taint-key", Value: "evictTaintVal", Effect: v1.TaintEffectNoExecute, TolerationSeconds: &ts}},
 				},
 			}
 		}
