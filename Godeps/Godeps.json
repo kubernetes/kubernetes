@@ -2657,6 +2657,10 @@
 			"Rev": "55146ba61254fdb1c26d65ff3c04bc1611ad73fb"
 		},
 		{
+			"ImportPath": "google.golang.org/api/monitoring/v3",
+			"Rev": "55146ba61254fdb1c26d65ff3c04bc1611ad73fb"
+		},
+		{
 			"ImportPath": "google.golang.org/appengine",
 			"Rev": "4f7eeb5305a4ba1966344836ba4af9996b7b4e05"
 		},

@@ -7961,8 +7961,8 @@ go_library(
 )
 
 go_library(
-    name = "google.golang.org/api/logging/v2beta1",
-    srcs = ["google.golang.org/api/logging/v2beta1/logging-gen.go"],
+    name = "google.golang.org/api/monitoring/v3",
+    srcs = ["google.golang.org/api/monitoring/v3/monitoring-gen.go"],
     tags = ["automanaged"],
     deps = [
         "//vendor:golang.org/x/net/context",
@@ -16427,5 +16427,17 @@ go_test(
         "//vendor:k8s.io/client-go/informers",
         "//vendor:k8s.io/client-go/kubernetes",
         "//vendor:k8s.io/client-go/kubernetes/fake",
+    ],
+)
+
+go_library(
+    name = "google.golang.org/api/logging/v2beta1",
+    srcs = ["google.golang.org/api/logging/v2beta1/logging-gen.go"],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:golang.org/x/net/context",
+        "//vendor:golang.org/x/net/context/ctxhttp",
+        "//vendor:google.golang.org/api/gensupport",
+        "//vendor:google.golang.org/api/googleapi",
     ],
 )
