@@ -30,6 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/server/healthz"
 	utilflag "k8s.io/apiserver/pkg/util/flag"
+	"k8s.io/client-go/dynamic"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	federationclientset "k8s.io/kubernetes/federation/client/clientset_generated/federation_clientset"
@@ -167,7 +168,7 @@ func StartControllers(s *options.CMServer, restClientCfg *restclient.Config) err
 
 	glog.Infof("Loading client config for namespace controller %q", "namespace-controller")
 	nsClientset := federationclientset.NewForConfigOrDie(restclient.AddUserAgent(restClientCfg, "namespace-controller"))
-	namespaceController := namespacecontroller.NewNamespaceController(nsClientset)
+	namespaceController := namespacecontroller.NewNamespaceController(nsClientset, dynamic.NewDynamicClientPool(restclient.AddUserAgent(restClientCfg, "namespace-controller")))
 	glog.Infof("Running namespace controller")
 	namespaceController.Run(wait.NeverStop)
 
