@@ -77,6 +77,6 @@ func (s *storage) UpdateNamespace(ctx genericapirequest.Context, namespace *api.
 }
 
 func (s *storage) DeleteNamespace(ctx genericapirequest.Context, namespaceID string) error {
-	_, err := s.Delete(ctx, namespaceID, nil)
+	_, _, err := s.Delete(ctx, namespaceID, nil)
 	return err
 }
