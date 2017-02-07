@@ -20,7 +20,6 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/pborman/uuid"
 	"github.com/spf13/cobra"
 
 	genericapiserver "k8s.io/apiserver/pkg/server"
@@ -93,12 +92,6 @@ func (o WardleServerOptions) Config() (*apiserver.Config, error) {
 
 	serverConfig := genericapiserver.NewConfig().WithSerializer(apiserver.Codecs)
 	if err := o.RecommendedOptions.ApplyTo(serverConfig); err != nil {
-		return nil, err
-	}
-
-	var err error
-	privilegedLoopbackToken := uuid.NewRandom().String()
-	if serverConfig.LoopbackClientConfig, err = serverConfig.SecureServingInfo.NewSelfClientConfig(privilegedLoopbackToken); err != nil {
 		return nil, err
 	}
 
