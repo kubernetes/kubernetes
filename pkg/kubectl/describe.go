@@ -1074,7 +1074,7 @@ func describeContainerEnvVars(container api.Container, resolverFn EnvVarResolver
 			}
 			w.Write(LEVEL_3, "%s:\t%s (%s:%s)\n", e.Name, valueFrom, e.ValueFrom.FieldRef.APIVersion, e.ValueFrom.FieldRef.FieldPath)
 		case e.ValueFrom.ResourceFieldRef != nil:
-			valueFrom, err := fieldpath.InternalExtractContainerResourceValue(e.ValueFrom.ResourceFieldRef, &container)
+			valueFrom, err := v1.InternalExtractContainerResourceValue(e.ValueFrom.ResourceFieldRef, &container)
 			if err != nil {
 				valueFrom = ""
 			}
