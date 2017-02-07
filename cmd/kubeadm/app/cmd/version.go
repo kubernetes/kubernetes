@@ -22,8 +22,8 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"k8s.io/client-go/pkg/version"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
-	"k8s.io/kubernetes/pkg/version"
 )
 
 func NewCmdVersion(out io.Writer) *cobra.Command {
