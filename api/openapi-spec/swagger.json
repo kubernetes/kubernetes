@@ -15698,6 +15698,197 @@
      }
     }
    },
+   "/apis/authorization.k8s.io/v1/": {
+    "get": {
+     "description": "get available resources",
+     "consumes": [
+      "application/json",
+      "application/yaml",
+      "application/vnd.kubernetes.protobuf"
+     ],
+     "produces": [
+      "application/json",
+      "application/yaml",
+      "application/vnd.kubernetes.protobuf"
+     ],
+     "schemes": [
+      "https"
+     ],
+     "tags": [
+      "authorization_v1"
+     ],
+     "operationId": "getAuthorizationV1APIResources",
+     "responses": {
+      "200": {
+       "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.APIResourceList"
+       }
+      },
+      "401": {
+       "description": "Unauthorized"
+      }
+     }
+    }
+   },
+   "/apis/authorization.k8s.io/v1/namespaces/{namespace}/localsubjectaccessreviews": {
+    "post": {
+     "description": "create a LocalSubjectAccessReview",
+     "consumes": [
+      "*/*"
+     ],
+     "produces": [
+      "application/json",
+      "application/yaml",
+      "application/vnd.kubernetes.protobuf"
+     ],
+     "schemes": [
+      "https"
+     ],
+     "tags": [
+      "authorization_v1"
+     ],
+     "operationId": "createAuthorizationV1NamespacedLocalSubjectAccessReview",
+     "parameters": [
+      {
+       "name": "body",
+       "in": "body",
+       "required": true,
+       "schema": {
+        "$ref": "#/definitions/io.k8s.kubernetes.pkg.apis.authorization.v1.LocalSubjectAccessReview"
+       }
+      }
+     ],
+     "responses": {
+      "200": {
+       "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.kubernetes.pkg.apis.authorization.v1.LocalSubjectAccessReview"
+       }
+      },
+      "401": {
+       "description": "Unauthorized"
+      }
+     }
+    },
+    "parameters": [
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "object name and auth scope, such as for teams and projects",
+      "name": "namespace",
+      "in": "path",
+      "required": true
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "If 'true', then the output is pretty printed.",
+      "name": "pretty",
+      "in": "query"
+     }
+    ]
+   },
+   "/apis/authorization.k8s.io/v1/selfsubjectaccessreviews": {
+    "post": {
+     "description": "create a SelfSubjectAccessReview",
+     "consumes": [
+      "*/*"
+     ],
+     "produces": [
+      "application/json",
+      "application/yaml",
+      "application/vnd.kubernetes.protobuf"
+     ],
+     "schemes": [
+      "https"
+     ],
+     "tags": [
+      "authorization_v1"
+     ],
+     "operationId": "createAuthorizationV1SelfSubjectAccessReview",
+     "parameters": [
+      {
+       "name": "body",
+       "in": "body",
+       "required": true,
+       "schema": {
+        "$ref": "#/definitions/io.k8s.kubernetes.pkg.apis.authorization.v1.SelfSubjectAccessReview"
+       }
+      }
+     ],
+     "responses": {
+      "200": {
+       "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.kubernetes.pkg.apis.authorization.v1.SelfSubjectAccessReview"
+       }
+      },
+      "401": {
+       "description": "Unauthorized"
+      }
+     }
+    },
+    "parameters": [
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "If 'true', then the output is pretty printed.",
+      "name": "pretty",
+      "in": "query"
+     }
+    ]
+   },
+   "/apis/authorization.k8s.io/v1/subjectaccessreviews": {
+    "post": {
+     "description": "create a SubjectAccessReview",
+     "consumes": [
+      "*/*"
+     ],
+     "produces": [
+      "application/json",
+      "application/yaml",
+      "application/vnd.kubernetes.protobuf"
+     ],
+     "schemes": [
+      "https"
+     ],
+     "tags": [
+      "authorization_v1"
+     ],
+     "operationId": "createAuthorizationV1SubjectAccessReview",
+     "parameters": [
+      {
+       "name": "body",
+       "in": "body",
+       "required": true,
+       "schema": {
+        "$ref": "#/definitions/io.k8s.kubernetes.pkg.apis.authorization.v1.SubjectAccessReview"
+       }
+      }
+     ],
+     "responses": {
+      "200": {
+       "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.kubernetes.pkg.apis.authorization.v1.SubjectAccessReview"
+       }
+      },
+      "401": {
+       "description": "Unauthorized"
+      }
+     }
+    },
+    "parameters": [
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "If 'true', then the output is pretty printed.",
+      "name": "pretty",
+      "in": "query"
+     }
+    ]
+   },
    "/apis/authorization.k8s.io/v1beta1/": {
     "get": {
      "description": "get available resources",
@@ -38161,6 +38352,221 @@
      },
      "username": {
       "description": "The name that uniquely identifies this user among all active users.",
+      "type": "string"
+     }
+    }
+   },
+   "io.k8s.kubernetes.pkg.apis.authorization.v1.LocalSubjectAccessReview": {
+    "description": "LocalSubjectAccessReview checks whether or not a user or group can perform an action in a given namespace. Having a namespace scoped resource makes it much easier to grant namespace scoped policy that includes permissions checking.",
+    "required": [
+     "spec"
+    ],
+    "properties": {
+     "apiVersion": {
+      "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources",
+      "type": "string"
+     },
+     "kind": {
+      "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds",
+      "type": "string"
+     },
+     "metadata": {
+      "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta"
+     },
+     "spec": {
+      "description": "Spec holds information about the request being evaluated.  spec.namespace must be equal to the namespace you made the request against.  If empty, it is defaulted.",
+      "$ref": "#/definitions/io.k8s.kubernetes.pkg.apis.authorization.v1.SubjectAccessReviewSpec"
+     },
+     "status": {
+      "description": "Status is filled in by the server and indicates whether the request is allowed or not",
+      "$ref": "#/definitions/io.k8s.kubernetes.pkg.apis.authorization.v1.SubjectAccessReviewStatus"
+     }
+    },
+    "x-kubernetes-group-version-kind": [
+     {
+      "Group": "authorization.k8s.io",
+      "Version": "v1",
+      "Kind": "LocalSubjectAccessReview"
+     }
+    ]
+   },
+   "io.k8s.kubernetes.pkg.apis.authorization.v1.NonResourceAttributes": {
+    "description": "NonResourceAttributes includes the authorization attributes available for non-resource requests to the Authorizer interface",
+    "properties": {
+     "path": {
+      "description": "Path is the URL path of the request",
+      "type": "string"
+     },
+     "verb": {
+      "description": "Verb is the standard HTTP verb",
+      "type": "string"
+     }
+    }
+   },
+   "io.k8s.kubernetes.pkg.apis.authorization.v1.ResourceAttributes": {
+    "description": "ResourceAttributes includes the authorization attributes available for resource requests to the Authorizer interface",
+    "properties": {
+     "group": {
+      "description": "Group is the API Group of the Resource.  \"*\" means all.",
+      "type": "string"
+     },
+     "name": {
+      "description": "Name is the name of the resource being requested for a \"get\" or deleted for a \"delete\". \"\" (empty) means all.",
+      "type": "string"
+     },
+     "namespace": {
+      "description": "Namespace is the namespace of the action being requested.  Currently, there is no distinction between no namespace and all namespaces \"\" (empty) is defaulted for LocalSubjectAccessReviews \"\" (empty) is empty for cluster-scoped resources \"\" (empty) means \"all\" for namespace scoped resources from a SubjectAccessReview or SelfSubjectAccessReview",
+      "type": "string"
+     },
+     "resource": {
+      "description": "Resource is one of the existing resource types.  \"*\" means all.",
+      "type": "string"
+     },
+     "subresource": {
+      "description": "Subresource is one of the existing resource types.  \"\" means none.",
+      "type": "string"
+     },
+     "verb": {
+      "description": "Verb is a kubernetes resource API verb, like: get, list, watch, create, update, delete, proxy.  \"*\" means all.",
+      "type": "string"
+     },
+     "version": {
+      "description": "Version is the API Version of the Resource.  \"*\" means all.",
+      "type": "string"
+     }
+    }
+   },
+   "io.k8s.kubernetes.pkg.apis.authorization.v1.SelfSubjectAccessReview": {
+    "description": "SelfSubjectAccessReview checks whether or the current user can perform an action.  Not filling in a spec.namespace means \"in all namespaces\".  Self is a special case, because users should always be able to check whether they can perform an action",
+    "required": [
+     "spec"
+    ],
+    "properties": {
+     "apiVersion": {
+      "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources",
+      "type": "string"
+     },
+     "kind": {
+      "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds",
+      "type": "string"
+     },
+     "metadata": {
+      "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta"
+     },
+     "spec": {
+      "description": "Spec holds information about the request being evaluated.  user and groups must be empty",
+      "$ref": "#/definitions/io.k8s.kubernetes.pkg.apis.authorization.v1.SelfSubjectAccessReviewSpec"
+     },
+     "status": {
+      "description": "Status is filled in by the server and indicates whether the request is allowed or not",
+      "$ref": "#/definitions/io.k8s.kubernetes.pkg.apis.authorization.v1.SubjectAccessReviewStatus"
+     }
+    },
+    "x-kubernetes-group-version-kind": [
+     {
+      "Group": "authorization.k8s.io",
+      "Version": "v1",
+      "Kind": "SelfSubjectAccessReview"
+     }
+    ]
+   },
+   "io.k8s.kubernetes.pkg.apis.authorization.v1.SelfSubjectAccessReviewSpec": {
+    "description": "SelfSubjectAccessReviewSpec is a description of the access request.  Exactly one of ResourceAuthorizationAttributes and NonResourceAuthorizationAttributes must be set",
+    "properties": {
+     "nonResourceAttributes": {
+      "description": "NonResourceAttributes describes information for a non-resource access request",
+      "$ref": "#/definitions/io.k8s.kubernetes.pkg.apis.authorization.v1.NonResourceAttributes"
+     },
+     "resourceAttributes": {
+      "description": "ResourceAuthorizationAttributes describes information for a resource access request",
+      "$ref": "#/definitions/io.k8s.kubernetes.pkg.apis.authorization.v1.ResourceAttributes"
+     }
+    }
+   },
+   "io.k8s.kubernetes.pkg.apis.authorization.v1.SubjectAccessReview": {
+    "description": "SubjectAccessReview checks whether or not a user or group can perform an action.",
+    "required": [
+     "spec"
+    ],
+    "properties": {
+     "apiVersion": {
+      "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources",
+      "type": "string"
+     },
+     "kind": {
+      "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds",
+      "type": "string"
+     },
+     "metadata": {
+      "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta"
+     },
+     "spec": {
+      "description": "Spec holds information about the request being evaluated",
+      "$ref": "#/definitions/io.k8s.kubernetes.pkg.apis.authorization.v1.SubjectAccessReviewSpec"
+     },
+     "status": {
+      "description": "Status is filled in by the server and indicates whether the request is allowed or not",
+      "$ref": "#/definitions/io.k8s.kubernetes.pkg.apis.authorization.v1.SubjectAccessReviewStatus"
+     }
+    },
+    "x-kubernetes-group-version-kind": [
+     {
+      "Group": "authorization.k8s.io",
+      "Version": "v1",
+      "Kind": "SubjectAccessReview"
+     }
+    ]
+   },
+   "io.k8s.kubernetes.pkg.apis.authorization.v1.SubjectAccessReviewSpec": {
+    "description": "SubjectAccessReviewSpec is a description of the access request.  Exactly one of ResourceAuthorizationAttributes and NonResourceAuthorizationAttributes must be set",
+    "properties": {
+     "extra": {
+      "description": "Extra corresponds to the user.Info.GetExtra() method from the authenticator.  Since that is input to the authorizer it needs a reflection here.",
+      "type": "object",
+      "additionalProperties": {
+       "type": "array",
+       "items": {
+        "type": "string"
+       }
+      }
+     },
+     "groups": {
+      "description": "Groups is the groups you're testing for.",
+      "type": "array",
+      "items": {
+       "type": "string"
+      }
+     },
+     "nonResourceAttributes": {
+      "description": "NonResourceAttributes describes information for a non-resource access request",
+      "$ref": "#/definitions/io.k8s.kubernetes.pkg.apis.authorization.v1.NonResourceAttributes"
+     },
+     "resourceAttributes": {
+      "description": "ResourceAuthorizationAttributes describes information for a resource access request",
+      "$ref": "#/definitions/io.k8s.kubernetes.pkg.apis.authorization.v1.ResourceAttributes"
+     },
+     "user": {
+      "description": "User is the user you're testing for. If you specify \"User\" but not \"Groups\", then is it interpreted as \"What if User were not a member of any groups",
+      "type": "string"
+     }
+    }
+   },
+   "io.k8s.kubernetes.pkg.apis.authorization.v1.SubjectAccessReviewStatus": {
+    "description": "SubjectAccessReviewStatus",
+    "required": [
+     "allowed"
+    ],
+    "properties": {
+     "allowed": {
+      "description": "Allowed is required.  True if the action would be allowed, false otherwise.",
+      "type": "boolean"
+     },
+     "evaluationError": {
+      "description": "EvaluationError is an indication that some error occurred during the authorization check. It is entirely possible to get an error and be able to continue determine authorization status in spite of it. For instance, RBAC can be missing a role, but enough roles are still present and bound to reason about the request.",
+      "type": "string"
+     },
+     "reason": {
+      "description": "Reason is optional.  It indicates why a request was allowed or denied.",
       "type": "string"
      }
     }

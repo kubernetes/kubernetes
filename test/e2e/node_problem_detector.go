@@ -66,7 +66,7 @@ var _ = framework.KubeDescribe("NodeProblemDetector", func() {
 		framework.BindClusterRole(f.ClientSet.Rbac(), "cluster-admin", f.Namespace.Name,
 			rbacv1beta1.Subject{Kind: rbacv1beta1.ServiceAccountKind, Namespace: f.Namespace.Name, Name: "default"})
 
-		err := framework.WaitForAuthorizationUpdate(f.ClientSet.Authorization(),
+		err := framework.WaitForAuthorizationUpdate(f.ClientSet.AuthorizationV1beta1(),
 			serviceaccount.MakeUsername(f.Namespace.Name, "default"),
 			"", "create", schema.GroupResource{Resource: "pods"}, true)
 		framework.ExpectNoError(err)

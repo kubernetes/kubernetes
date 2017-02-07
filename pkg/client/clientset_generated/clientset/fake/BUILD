@@ -21,6 +21,8 @@ go_library(
         "//pkg/client/clientset_generated/clientset/typed/apps/v1beta1/fake:go_default_library",
         "//pkg/client/clientset_generated/clientset/typed/authentication/v1beta1:go_default_library",
         "//pkg/client/clientset_generated/clientset/typed/authentication/v1beta1/fake:go_default_library",
+        "//pkg/client/clientset_generated/clientset/typed/authorization/v1:go_default_library",
+        "//pkg/client/clientset_generated/clientset/typed/authorization/v1/fake:go_default_library",
         "//pkg/client/clientset_generated/clientset/typed/authorization/v1beta1:go_default_library",
         "//pkg/client/clientset_generated/clientset/typed/authorization/v1beta1/fake:go_default_library",
         "//pkg/client/clientset_generated/clientset/typed/autoscaling/v1:go_default_library",

@@ -3,7 +3,7 @@
   "kind": "SubjectAccessReview",
   "spec": {
     "user": "bob",
-    "groups": [
+    "group": [
       "the-group"
     ],
     "resourceAttributes": {
