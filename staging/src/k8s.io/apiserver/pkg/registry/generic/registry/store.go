@@ -1125,7 +1125,7 @@ func (e *Store) CompleteWithOptions(options *generic.StoreOptions) error {
 	if e.Storage == nil {
 		capacity := DefaultWatchCacheSize
 		if e.WatchCacheSize != 0 {
-			capacity = DefaultWatchCacheSize
+			capacity = e.WatchCacheSize
 		}
 		e.Storage, e.DestroyFunc = opts.Decorator(
 			e.Copier,
