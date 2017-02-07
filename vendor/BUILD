@@ -14089,6 +14089,7 @@ go_library(
 go_library(
     name = "k8s.io/apiserver/pkg/server/options",
     srcs = [
+        "k8s.io/apiserver/pkg/server/options/audit.go",
         "k8s.io/apiserver/pkg/server/options/authentication.go",
         "k8s.io/apiserver/pkg/server/options/authorization.go",
         "k8s.io/apiserver/pkg/server/options/doc.go",

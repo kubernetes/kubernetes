@@ -31,7 +31,6 @@ import (
 	_ "k8s.io/apiserver/pkg/features"
 
 	"github.com/spf13/pflag"
-	"gopkg.in/natefinch/lumberjack.v2"
 )
 
 // ServerRunOptions contains the options while running a generic api server.
@@ -45,10 +44,6 @@ type ServerRunOptions struct {
 	// to set it to "application/vnd.kubernetes.protobuf".
 	DefaultStorageMediaType     string
 	DeleteCollectionWorkers     int
-	AuditLogPath                string
-	AuditLogMaxAge              int
-	AuditLogMaxBackups          int
-	AuditLogMaxSize             int
 	EnableGarbageCollection     bool
 	EnableProfiling             bool
 	EnableContentionProfiling   bool
@@ -83,15 +78,6 @@ func NewServerRunOptions() *ServerRunOptions {
 
 // ApplyOptions applies the run options to the method receiver and returns self
 func (s *ServerRunOptions) ApplyTo(c *server.Config) error {
-	if len(s.AuditLogPath) != 0 {
-		c.AuditWriter = &lumberjack.Logger{
-			Filename:   s.AuditLogPath,
-			MaxAge:     s.AuditLogMaxAge,
-			MaxBackups: s.AuditLogMaxBackups,
-			MaxSize:    s.AuditLogMaxSize,
-		}
-	}
-
 	c.CorsAllowedOriginList = s.CorsAllowedOriginList
 	c.EnableGarbageCollection = s.EnableGarbageCollection
 	c.EnableProfiling = s.EnableProfiling
@@ -162,15 +148,6 @@ func (s *ServerRunOptions) AddUniversalFlags(fs *pflag.FlagSet) {
 
 	fs.IntVar(&s.DeleteCollectionWorkers, "delete-collection-workers", s.DeleteCollectionWorkers,
 		"Number of workers spawned for DeleteCollection call. These are used to speed up namespace cleanup.")
-
-	fs.StringVar(&s.AuditLogPath, "audit-log-path", s.AuditLogPath,
-		"If set, all requests coming to the apiserver will be logged to this file.")
-	fs.IntVar(&s.AuditLogMaxAge, "audit-log-maxage", s.AuditLogMaxBackups,
-		"The maximum number of days to retain old audit log files based on the timestamp encoded in their filename.")
-	fs.IntVar(&s.AuditLogMaxBackups, "audit-log-maxbackup", s.AuditLogMaxBackups,
-		"The maximum number of old audit log files to retain.")
-	fs.IntVar(&s.AuditLogMaxSize, "audit-log-maxsize", s.AuditLogMaxSize,
-		"The maximum size in megabytes of the audit log file before it gets rotated. Defaults to 100MB.")
 
 	fs.BoolVar(&s.EnableGarbageCollection, "enable-garbage-collector", s.EnableGarbageCollection, ""+
 		"Enables the generic garbage collector. MUST be synced with the corresponding flag "+

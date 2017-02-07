@@ -103,6 +103,9 @@ func Run(s *options.ServerRunOptions) error {
 	if err := s.Authentication.ApplyTo(genericConfig); err != nil {
 		return err
 	}
+	if err := s.Audit.ApplyTo(genericConfig); err != nil {
+		return err
+	}
 
 	// TODO: register cluster federation resources here.
 	resourceConfig := genericapiserver.NewResourceConfig()
