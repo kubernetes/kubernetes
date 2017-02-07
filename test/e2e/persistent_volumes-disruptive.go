@@ -47,7 +47,7 @@ const (
 	kRestart         kubeletOpt = "restart"
 )
 
-var _ = framework.KubeDescribe("PersistentVolumes [Disruptive]", func() {
+var _ = framework.KubeDescribe("PersistentVolumes [Volume][Disruptive][Flaky]", func() {
 
 	f := framework.NewDefaultFramework("disruptive-pv")
 	var (
@@ -59,14 +59,6 @@ var _ = framework.KubeDescribe("PersistentVolumes [Disruptive]", func() {
 		clientNode                *v1.Node
 	)
 
-	nfsServerConfig := VolumeTestConfig{
-		namespace:   v1.NamespaceDefault,
-		prefix:      "nfs",
-		serverImage: NfsServerImage,
-		serverPorts: []int{2049},
-		serverArgs:  []string{"-G", "777", "/exports"},
-	}
-
 	BeforeEach(func() {
 		// To protect the NFS volume pod from the kubelet restart, we isolate it on its own node.
 		framework.SkipUnlessNodeCountIsAtLeast(MinNodes)
@@ -74,23 +66,21 @@ var _ = framework.KubeDescribe("PersistentVolumes [Disruptive]", func() {
 		ns = f.Namespace.Name
 
 		// Start the NFS server pod.
-		if nfsServerPod == nil {
-			framework.Logf("[BeforeEach] Initializing NFS Server Pod")
-			nfsServerPod = startVolumeServer(c, nfsServerConfig)
+		framework.Logf("[BeforeEach] Creating NFS Server Pod")
+		nfsServerPod = initNFSserverPod(c, ns)
 
-			framework.Logf("[BeforeEach] Configuring PersistentVolume")
-			nfsServerIP = nfsServerPod.Status.PodIP
-			Expect(nfsServerIP).NotTo(BeEmpty())
-			nfsPVconfig = persistentVolumeConfig{
-				namePrefix: "nfs-",
-				pvSource: v1.PersistentVolumeSource{
-					NFS: &v1.NFSVolumeSource{
-						Server:   nfsServerIP,
-						Path:     "/exports",
-						ReadOnly: false,
-					},
+		framework.Logf("[BeforeEach] Configuring PersistentVolume")
+		nfsServerIP = nfsServerPod.Status.PodIP
+		Expect(nfsServerIP).NotTo(BeEmpty())
+		nfsPVconfig = persistentVolumeConfig{
+			namePrefix: "nfs-",
+			pvSource: v1.PersistentVolumeSource{
+				NFS: &v1.NFSVolumeSource{
+					Server:   nfsServerIP,
+					Path:     "/exports",
+					ReadOnly: false,
 				},
-			}
+			},
 		}
 		// Get the first ready node IP that is not hosting the NFS pod.
 		if clientNodeIP == "" {
@@ -100,19 +90,15 @@ var _ = framework.KubeDescribe("PersistentVolumes [Disruptive]", func() {
 				if node.Name != nfsServerPod.Spec.NodeName {
 					clientNode = &node
 					clientNodeIP = framework.GetNodeExternalIP(clientNode)
-					Expect(clientNodeIP).NotTo(BeEmpty())
 					break
 				}
 			}
+			Expect(clientNodeIP).NotTo(BeEmpty())
 		}
 	})
 
-	AddCleanupAction(func() {
-		if nfsServerPod != nil && c != nil {
-			By("Deleting NFS server pod")
-			nfsServerPodCleanup(c, nfsServerConfig)
-			nfsServerPod = nil
-		}
+	AfterEach(func() {
+		deletePodWithWait(f, c, nfsServerPod)
 	})
 
 	Context("when kubelet restarts", func() {
@@ -189,7 +175,7 @@ func testVolumeUnmountsFromDeletedPod(c clientset.Interface, f *framework.Framew
 
 	By("Restarting the kubelet.")
 	kubeletCommand(kStop, c, clientPod)
-	deletePod(f, c, clientPod.Namespace, clientPod)
+	deletePodWithWait(f, c, clientPod)
 	kubeletCommand(kStart, c, clientPod)
 
 	By("Expecting the volume mount not to be found.")
@@ -222,7 +208,7 @@ func initTestCase(f *framework.Framework, c clientset.Interface, pvConfig persis
 
 // tearDownTestCase destroy resources created by initTestCase.
 func tearDownTestCase(c clientset.Interface, f *framework.Framework, ns string, pod *v1.Pod, pvc *v1.PersistentVolumeClaim, pv *v1.PersistentVolume) {
-	deletePod(f, c, ns, pod)
+	deletePodWithWait(f, c, pod)
 	deletePersistentVolumeClaim(c, pvc.Name, ns)
 	deletePersistentVolume(c, pv.Name)
 }

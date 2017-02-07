@@ -25,12 +25,12 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/dynamic"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
-	"k8s.io/kubernetes/pkg/client/typed/dynamic"
 	"k8s.io/kubernetes/test/integration/framework"
 )
 
@@ -93,7 +93,7 @@ func TestDynamicClient(t *testing.T) {
 	}
 
 	// check dynamic list
-	obj, err := dynamicClient.Resource(&resource, ns.Name).List(&v1.ListOptions{})
+	obj, err := dynamicClient.Resource(&resource, ns.Name).List(&metav1.ListOptions{})
 	unstructuredList, ok := obj.(*unstructured.UnstructuredList)
 	if !ok {
 		t.Fatalf("expected *unstructured.UnstructuredList, got %#v", obj)
@@ -136,7 +136,7 @@ func TestDynamicClient(t *testing.T) {
 		t.Fatalf("unexpected error when deleting pod: %v", err)
 	}
 
-	list, err := client.Core().Pods(ns.Name).List(v1.ListOptions{})
+	list, err := client.Core().Pods(ns.Name).List(metav1.ListOptions{})
 	if err != nil {
 		t.Fatalf("unexpected error when listing pods: %v", err)
 	}

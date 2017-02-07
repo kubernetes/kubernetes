@@ -21,14 +21,15 @@ import (
 	"sync"
 	"time"
 
+	storageetcd "k8s.io/apiserver/pkg/storage/etcd"
 	"k8s.io/kubernetes/pkg/api/v1"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
-	storageetcd "k8s.io/kubernetes/pkg/storage/etcd"
+	"k8s.io/kubernetes/pkg/kubelet/util"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/client-go/pkg/util/clock"
+	"k8s.io/client-go/util/clock"
 )
 
 type Manager interface {
@@ -105,6 +106,9 @@ func newSecretStore(kubeClient clientset.Interface, clock clock.Clock, ttl time.
 }
 
 func isSecretOlder(newSecret, oldSecret *v1.Secret) bool {
+	if newSecret == nil || oldSecret == nil {
+		return false
+	}
 	newVersion, _ := storageetcd.Versioner.ObjectResourceVersion(newSecret)
 	oldVersion, _ := storageetcd.Versioner.ObjectResourceVersion(oldSecret)
 	return newVersion < oldVersion
@@ -169,18 +173,26 @@ func (s *secretStore) Get(namespace, name string) (*v1.Secret, error) {
 	data.Lock()
 	defer data.Unlock()
 	if data.err != nil || !s.clock.Now().Before(data.lastUpdateTime.Add(s.ttl)) {
-		secret, err := s.kubeClient.Core().Secrets(namespace).Get(name, metav1.GetOptions{})
-		// Update state, unless we got error different than "not-found".
-		if err == nil || apierrors.IsNotFound(err) {
-			// Ignore the update to the older version of a secret.
-			if data.secret == nil || secret == nil || !isSecretOlder(secret, data.secret) {
-				data.secret = secret
-				data.err = err
-				data.lastUpdateTime = s.clock.Now()
-			}
-		} else if data.secret == nil && data.err == nil {
-			// We have unitialized secretData - return current result.
+		opts := metav1.GetOptions{}
+		if data.secret != nil && data.err == nil {
+			// This is just a periodic refresh of a secret we successfully fetched previously.
+			// In this case, server data from apiserver cache to reduce the load on both
+			// etcd and apiserver (the cache is eventually consistent).
+			util.FromApiserverCache(&opts)
+		}
+		secret, err := s.kubeClient.Core().Secrets(namespace).Get(name, opts)
+		if err != nil && !apierrors.IsNotFound(err) && data.secret == nil && data.err == nil {
+			// Couldn't fetch the latest secret, but there is no cached data to return.
+			// Return the fetch result instead.
 			return secret, err
+		}
+		if (err == nil && !isSecretOlder(secret, data.secret)) || apierrors.IsNotFound(err) {
+			// If the fetch succeeded with a newer version of the secret, or if the
+			// secret could not be found in the apiserver, update the cached data to
+			// reflect the current status.
+			data.secret = secret
+			data.err = err
+			data.lastUpdateTime = s.clock.Now()
 		}
 	}
 	return data.secret, data.err
@@ -212,18 +224,26 @@ func (c *cachingSecretManager) GetSecret(namespace, name string) (*v1.Secret, er
 	return c.secretStore.Get(namespace, name)
 }
 
-// TODO: Before we will use secretManager in other places (e.g. for secret volumes)
-// we should update this function to also get secrets from those places.
 func getSecretNames(pod *v1.Pod) sets.String {
 	result := sets.NewString()
 	for _, reference := range pod.Spec.ImagePullSecrets {
 		result.Insert(reference.Name)
 	}
 	for i := range pod.Spec.Containers {
+		for _, env := range pod.Spec.Containers[i].EnvFrom {
+			if env.SecretRef != nil {
+				result.Insert(env.SecretRef.Name)
+			}
+		}
 		for _, envVar := range pod.Spec.Containers[i].Env {
 			if envVar.ValueFrom != nil && envVar.ValueFrom.SecretKeyRef != nil {
 				result.Insert(envVar.ValueFrom.SecretKeyRef.Name)
 			}
+		}
+	}
+	for i := range pod.Spec.Volumes {
+		if source := pod.Spec.Volumes[i].Secret; source != nil {
+			result.Insert(source.SecretName)
 		}
 	}
 	return result

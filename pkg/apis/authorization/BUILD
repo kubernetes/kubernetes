@@ -17,7 +17,6 @@ go_library(
     ],
     tags = ["automanaged"],
     deps = [
-        "//pkg/api:go_default_library",
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
         "//vendor:k8s.io/apimachinery/pkg/conversion",
         "//vendor:k8s.io/apimachinery/pkg/runtime",
@@ -37,6 +36,7 @@ filegroup(
     srcs = [
         ":package-srcs",
         "//pkg/apis/authorization/install:all-srcs",
+        "//pkg/apis/authorization/v1:all-srcs",
         "//pkg/apis/authorization/v1beta1:all-srcs",
         "//pkg/apis/authorization/validation:all-srcs",
     ],

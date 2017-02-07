@@ -20,10 +20,11 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
+	"k8s.io/apiserver/pkg/registry/generic"
+	genericregistry "k8s.io/apiserver/pkg/registry/generic/registry"
+	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/genericapiserver/registry/generic"
-	genericregistry "k8s.io/kubernetes/pkg/genericapiserver/registry/generic/registry"
-	"k8s.io/kubernetes/pkg/genericapiserver/registry/rest"
+	"k8s.io/kubernetes/pkg/registry/cachesize"
 	"k8s.io/kubernetes/pkg/registry/core/persistentvolumeclaim"
 )
 
@@ -34,6 +35,7 @@ type REST struct {
 // NewREST returns a RESTStorage object that will work against persistent volume claims.
 func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, *StatusREST) {
 	store := &genericregistry.Store{
+		Copier:      api.Scheme,
 		NewFunc:     func() runtime.Object { return &api.PersistentVolumeClaim{} },
 		NewListFunc: func() runtime.Object { return &api.PersistentVolumeClaimList{} },
 		ObjectNameFunc: func(obj runtime.Object) (string, error) {
@@ -41,6 +43,7 @@ func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, *StatusREST) {
 		},
 		PredicateFunc:     persistentvolumeclaim.MatchPersistentVolumeClaim,
 		QualifiedResource: api.Resource("persistentvolumeclaims"),
+		WatchCacheSize:    cachesize.GetWatchCacheSizeByResource("persistentvolumeclaims"),
 
 		CreateStrategy:      persistentvolumeclaim.Strategy,
 		UpdateStrategy:      persistentvolumeclaim.Strategy,
@@ -56,6 +59,14 @@ func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, *StatusREST) {
 	statusStore.UpdateStrategy = persistentvolumeclaim.StatusStrategy
 
 	return &REST{store}, &StatusREST{store: &statusStore}
+}
+
+// Implement ShortNamesProvider
+var _ rest.ShortNamesProvider = &REST{}
+
+// ShortNames implements the ShortNamesProvider interface. Returns a list of short names for a resource.
+func (r *REST) ShortNames() []string {
+	return []string{"pvc"}
 }
 
 // StatusREST implements the REST endpoint for changing the status of a persistentvolumeclaim.

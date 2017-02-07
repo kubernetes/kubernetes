@@ -36,11 +36,11 @@ type CronJobInterface interface {
 	Create(*batch.CronJob) (*batch.CronJob, error)
 	Update(*batch.CronJob) (*batch.CronJob, error)
 	UpdateStatus(*batch.CronJob) (*batch.CronJob, error)
-	Delete(name string, options *api.DeleteOptions) error
-	DeleteCollection(options *api.DeleteOptions, listOptions api.ListOptions) error
+	Delete(name string, options *v1.DeleteOptions) error
+	DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error
 	Get(name string, options v1.GetOptions) (*batch.CronJob, error)
-	List(opts api.ListOptions) (*batch.CronJobList, error)
-	Watch(opts api.ListOptions) (watch.Interface, error)
+	List(opts v1.ListOptions) (*batch.CronJobList, error)
+	Watch(opts v1.ListOptions) (watch.Interface, error)
 	Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *batch.CronJob, err error)
 	CronJobExpansion
 }
@@ -101,7 +101,7 @@ func (c *cronJobs) UpdateStatus(cronJob *batch.CronJob) (result *batch.CronJob, 
 }
 
 // Delete takes name of the cronJob and deletes it. Returns an error if one occurs.
-func (c *cronJobs) Delete(name string, options *api.DeleteOptions) error {
+func (c *cronJobs) Delete(name string, options *v1.DeleteOptions) error {
 	return c.client.Delete().
 		Namespace(c.ns).
 		Resource("cronjobs").
@@ -112,7 +112,7 @@ func (c *cronJobs) Delete(name string, options *api.DeleteOptions) error {
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *cronJobs) DeleteCollection(options *api.DeleteOptions, listOptions api.ListOptions) error {
+func (c *cronJobs) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
 	return c.client.Delete().
 		Namespace(c.ns).
 		Resource("cronjobs").
@@ -136,7 +136,7 @@ func (c *cronJobs) Get(name string, options v1.GetOptions) (result *batch.CronJo
 }
 
 // List takes label and field selectors, and returns the list of CronJobs that match those selectors.
-func (c *cronJobs) List(opts api.ListOptions) (result *batch.CronJobList, err error) {
+func (c *cronJobs) List(opts v1.ListOptions) (result *batch.CronJobList, err error) {
 	result = &batch.CronJobList{}
 	err = c.client.Get().
 		Namespace(c.ns).
@@ -148,7 +148,7 @@ func (c *cronJobs) List(opts api.ListOptions) (result *batch.CronJobList, err er
 }
 
 // Watch returns a watch.Interface that watches the requested cronJobs.
-func (c *cronJobs) Watch(opts api.ListOptions) (watch.Interface, error) {
+func (c *cronJobs) Watch(opts v1.ListOptions) (watch.Interface, error) {
 	return c.client.Get().
 		Prefix("watch").
 		Namespace(c.ns).

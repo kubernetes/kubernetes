@@ -18,12 +18,12 @@ package fake
 
 import (
 	rest "k8s.io/client-go/rest"
+	testing "k8s.io/client-go/testing"
 	v1beta1 "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/authentication/v1beta1"
-	core "k8s.io/kubernetes/pkg/client/testing/core"
 )
 
 type FakeAuthenticationV1beta1 struct {
-	*core.Fake
+	*testing.Fake
 }
 
 func (c *FakeAuthenticationV1beta1) TokenReviews() v1beta1.TokenReviewInterface {

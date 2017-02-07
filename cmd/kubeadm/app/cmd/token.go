@@ -27,13 +27,13 @@ import (
 	"github.com/renstrom/dedent"
 	"github.com/spf13/cobra"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubemaster "k8s.io/kubernetes/cmd/kubeadm/app/master"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/kubeconfig"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/kubectl"
 )
 
@@ -167,11 +167,11 @@ func RunListTokens(out io.Writer, errW io.Writer, cmd *cobra.Command) error {
 			api.SecretTypeField: string(api.SecretTypeBootstrapToken),
 		},
 	)
-	listOptions := v1.ListOptions{
+	listOptions := metav1.ListOptions{
 		FieldSelector: tokenSelector.String(),
 	}
 
-	results, err := client.Secrets(api.NamespaceSystem).List(listOptions)
+	results, err := client.Secrets(metav1.NamespaceSystem).List(listOptions)
 	if err != nil {
 		return fmt.Errorf("failed to list bootstrap tokens [%v]", err)
 	}
@@ -222,7 +222,7 @@ func RunDeleteToken(out io.Writer, cmd *cobra.Command, tokenId string) error {
 	}
 
 	tokenSecretName := fmt.Sprintf("%s%s", kubeadmutil.BootstrapTokenSecretPrefix, tokenId)
-	if err := client.Secrets(api.NamespaceSystem).Delete(tokenSecretName, nil); err != nil {
+	if err := client.Secrets(metav1.NamespaceSystem).Delete(tokenSecretName, nil); err != nil {
 		return fmt.Errorf("failed to delete bootstrap token [%v]", err)
 	}
 	fmt.Fprintf(out, "[token] bootstrap token deleted: %s\n", tokenId)

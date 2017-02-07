@@ -37,6 +37,7 @@ filegroup(
         "//cmd/kubeadm/app/images:all-srcs",
         "//cmd/kubeadm/app/master:all-srcs",
         "//cmd/kubeadm/app/node:all-srcs",
+        "//cmd/kubeadm/app/phases/addons:all-srcs",
         "//cmd/kubeadm/app/phases/apiconfig:all-srcs",
         "//cmd/kubeadm/app/phases/certs:all-srcs",
         "//cmd/kubeadm/app/phases/kubeconfig:all-srcs",

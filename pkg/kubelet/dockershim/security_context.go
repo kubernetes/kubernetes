@@ -24,8 +24,9 @@ import (
 
 	"k8s.io/kubernetes/pkg/api/v1"
 	runtimeapi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
+	"k8s.io/kubernetes/pkg/kubelet/dockertools"
+	"k8s.io/kubernetes/pkg/kubelet/dockertools/securitycontext"
 	"k8s.io/kubernetes/pkg/kubelet/network"
-	"k8s.io/kubernetes/pkg/securitycontext"
 )
 
 // applySandboxSecurityContext updates docker sandbox options according to security context.
@@ -103,6 +104,7 @@ func modifyHostConfig(sc *runtimeapi.LinuxContainerSecurityContext, hostConfig *
 				Type:  sc.SelinuxOptions.Type,
 				Level: sc.SelinuxOptions.Level,
 			},
+			dockertools.SecurityOptSeparatorNew,
 		)
 	}
 }

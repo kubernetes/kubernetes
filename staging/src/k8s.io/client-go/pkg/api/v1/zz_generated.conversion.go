@@ -251,6 +251,8 @@ func RegisterConversions(scheme *runtime.Scheme) error {
 		Convert_api_PodList_To_v1_PodList,
 		Convert_v1_PodLogOptions_To_api_PodLogOptions,
 		Convert_api_PodLogOptions_To_v1_PodLogOptions,
+		Convert_v1_PodPortForwardOptions_To_api_PodPortForwardOptions,
+		Convert_api_PodPortForwardOptions_To_v1_PodPortForwardOptions,
 		Convert_v1_PodProxyOptions_To_api_PodProxyOptions,
 		Convert_api_PodProxyOptions_To_v1_PodProxyOptions,
 		Convert_v1_PodSecurityContext_To_api_PodSecurityContext,
@@ -309,6 +311,8 @@ func RegisterConversions(scheme *runtime.Scheme) error {
 		Convert_api_SELinuxOptions_To_v1_SELinuxOptions,
 		Convert_v1_Secret_To_api_Secret,
 		Convert_api_Secret_To_v1_Secret,
+		Convert_v1_SecretEnvSource_To_api_SecretEnvSource,
+		Convert_api_SecretEnvSource_To_v1_SecretEnvSource,
 		Convert_v1_SecretKeySelector_To_api_SecretKeySelector,
 		Convert_api_SecretKeySelector_To_v1_SecretKeySelector,
 		Convert_v1_SecretList_To_api_SecretList,
@@ -670,6 +674,7 @@ func autoConvert_v1_ConfigMapEnvSource_To_api_ConfigMapEnvSource(in *ConfigMapEn
 	if err := Convert_v1_LocalObjectReference_To_api_LocalObjectReference(&in.LocalObjectReference, &out.LocalObjectReference, s); err != nil {
 		return err
 	}
+	out.Optional = (*bool)(unsafe.Pointer(in.Optional))
 	return nil
 }
 
@@ -681,6 +686,7 @@ func autoConvert_api_ConfigMapEnvSource_To_v1_ConfigMapEnvSource(in *api.ConfigM
 	if err := Convert_api_LocalObjectReference_To_v1_LocalObjectReference(&in.LocalObjectReference, &out.LocalObjectReference, s); err != nil {
 		return err
 	}
+	out.Optional = (*bool)(unsafe.Pointer(in.Optional))
 	return nil
 }
 
@@ -693,6 +699,7 @@ func autoConvert_v1_ConfigMapKeySelector_To_api_ConfigMapKeySelector(in *ConfigM
 		return err
 	}
 	out.Key = in.Key
+	out.Optional = (*bool)(unsafe.Pointer(in.Optional))
 	return nil
 }
 
@@ -705,6 +712,7 @@ func autoConvert_api_ConfigMapKeySelector_To_v1_ConfigMapKeySelector(in *api.Con
 		return err
 	}
 	out.Key = in.Key
+	out.Optional = (*bool)(unsafe.Pointer(in.Optional))
 	return nil
 }
 
@@ -738,6 +746,7 @@ func autoConvert_v1_ConfigMapVolumeSource_To_api_ConfigMapVolumeSource(in *Confi
 	}
 	out.Items = *(*[]api.KeyToPath)(unsafe.Pointer(&in.Items))
 	out.DefaultMode = (*int32)(unsafe.Pointer(in.DefaultMode))
+	out.Optional = (*bool)(unsafe.Pointer(in.Optional))
 	return nil
 }
 
@@ -751,6 +760,7 @@ func autoConvert_api_ConfigMapVolumeSource_To_v1_ConfigMapVolumeSource(in *api.C
 	}
 	out.Items = *(*[]KeyToPath)(unsafe.Pointer(&in.Items))
 	out.DefaultMode = (*int32)(unsafe.Pointer(in.DefaultMode))
+	out.Optional = (*bool)(unsafe.Pointer(in.Optional))
 	return nil
 }
 
@@ -775,6 +785,7 @@ func autoConvert_v1_Container_To_api_Container(in *Container, out *api.Container
 	out.ReadinessProbe = (*api.Probe)(unsafe.Pointer(in.ReadinessProbe))
 	out.Lifecycle = (*api.Lifecycle)(unsafe.Pointer(in.Lifecycle))
 	out.TerminationMessagePath = in.TerminationMessagePath
+	out.TerminationMessagePolicy = api.TerminationMessagePolicy(in.TerminationMessagePolicy)
 	out.ImagePullPolicy = api.PullPolicy(in.ImagePullPolicy)
 	out.SecurityContext = (*api.SecurityContext)(unsafe.Pointer(in.SecurityContext))
 	out.Stdin = in.Stdin
@@ -804,6 +815,7 @@ func autoConvert_api_Container_To_v1_Container(in *api.Container, out *Container
 	out.ReadinessProbe = (*Probe)(unsafe.Pointer(in.ReadinessProbe))
 	out.Lifecycle = (*Lifecycle)(unsafe.Pointer(in.Lifecycle))
 	out.TerminationMessagePath = in.TerminationMessagePath
+	out.TerminationMessagePolicy = TerminationMessagePolicy(in.TerminationMessagePolicy)
 	out.ImagePullPolicy = PullPolicy(in.ImagePullPolicy)
 	out.SecurityContext = (*SecurityContext)(unsafe.Pointer(in.SecurityContext))
 	out.Stdin = in.Stdin
@@ -1205,6 +1217,7 @@ func Convert_api_EndpointsList_To_v1_EndpointsList(in *api.EndpointsList, out *E
 func autoConvert_v1_EnvFromSource_To_api_EnvFromSource(in *EnvFromSource, out *api.EnvFromSource, s conversion.Scope) error {
 	out.Prefix = in.Prefix
 	out.ConfigMapRef = (*api.ConfigMapEnvSource)(unsafe.Pointer(in.ConfigMapRef))
+	out.SecretRef = (*api.SecretEnvSource)(unsafe.Pointer(in.SecretRef))
 	return nil
 }
 
@@ -1215,6 +1228,7 @@ func Convert_v1_EnvFromSource_To_api_EnvFromSource(in *EnvFromSource, out *api.E
 func autoConvert_api_EnvFromSource_To_v1_EnvFromSource(in *api.EnvFromSource, out *EnvFromSource, s conversion.Scope) error {
 	out.Prefix = in.Prefix
 	out.ConfigMapRef = (*ConfigMapEnvSource)(unsafe.Pointer(in.ConfigMapRef))
+	out.SecretRef = (*SecretEnvSource)(unsafe.Pointer(in.SecretRef))
 	return nil
 }
 
@@ -2974,6 +2988,24 @@ func Convert_api_PodLogOptions_To_v1_PodLogOptions(in *api.PodLogOptions, out *P
 	return autoConvert_api_PodLogOptions_To_v1_PodLogOptions(in, out, s)
 }
 
+func autoConvert_v1_PodPortForwardOptions_To_api_PodPortForwardOptions(in *PodPortForwardOptions, out *api.PodPortForwardOptions, s conversion.Scope) error {
+	out.Ports = *(*[]int32)(unsafe.Pointer(&in.Ports))
+	return nil
+}
+
+func Convert_v1_PodPortForwardOptions_To_api_PodPortForwardOptions(in *PodPortForwardOptions, out *api.PodPortForwardOptions, s conversion.Scope) error {
+	return autoConvert_v1_PodPortForwardOptions_To_api_PodPortForwardOptions(in, out, s)
+}
+
+func autoConvert_api_PodPortForwardOptions_To_v1_PodPortForwardOptions(in *api.PodPortForwardOptions, out *PodPortForwardOptions, s conversion.Scope) error {
+	out.Ports = *(*[]int32)(unsafe.Pointer(&in.Ports))
+	return nil
+}
+
+func Convert_api_PodPortForwardOptions_To_v1_PodPortForwardOptions(in *api.PodPortForwardOptions, out *PodPortForwardOptions, s conversion.Scope) error {
+	return autoConvert_api_PodPortForwardOptions_To_v1_PodPortForwardOptions(in, out, s)
+}
+
 func autoConvert_v1_PodProxyOptions_To_api_PodProxyOptions(in *PodProxyOptions, out *api.PodProxyOptions, s conversion.Scope) error {
 	out.Path = in.Path
 	return nil
@@ -3760,11 +3792,36 @@ func Convert_api_Secret_To_v1_Secret(in *api.Secret, out *Secret, s conversion.S
 	return autoConvert_api_Secret_To_v1_Secret(in, out, s)
 }
 
+func autoConvert_v1_SecretEnvSource_To_api_SecretEnvSource(in *SecretEnvSource, out *api.SecretEnvSource, s conversion.Scope) error {
+	if err := Convert_v1_LocalObjectReference_To_api_LocalObjectReference(&in.LocalObjectReference, &out.LocalObjectReference, s); err != nil {
+		return err
+	}
+	out.Optional = (*bool)(unsafe.Pointer(in.Optional))
+	return nil
+}
+
+func Convert_v1_SecretEnvSource_To_api_SecretEnvSource(in *SecretEnvSource, out *api.SecretEnvSource, s conversion.Scope) error {
+	return autoConvert_v1_SecretEnvSource_To_api_SecretEnvSource(in, out, s)
+}
+
+func autoConvert_api_SecretEnvSource_To_v1_SecretEnvSource(in *api.SecretEnvSource, out *SecretEnvSource, s conversion.Scope) error {
+	if err := Convert_api_LocalObjectReference_To_v1_LocalObjectReference(&in.LocalObjectReference, &out.LocalObjectReference, s); err != nil {
+		return err
+	}
+	out.Optional = (*bool)(unsafe.Pointer(in.Optional))
+	return nil
+}
+
+func Convert_api_SecretEnvSource_To_v1_SecretEnvSource(in *api.SecretEnvSource, out *SecretEnvSource, s conversion.Scope) error {
+	return autoConvert_api_SecretEnvSource_To_v1_SecretEnvSource(in, out, s)
+}
+
 func autoConvert_v1_SecretKeySelector_To_api_SecretKeySelector(in *SecretKeySelector, out *api.SecretKeySelector, s conversion.Scope) error {
 	if err := Convert_v1_LocalObjectReference_To_api_LocalObjectReference(&in.LocalObjectReference, &out.LocalObjectReference, s); err != nil {
 		return err
 	}
 	out.Key = in.Key
+	out.Optional = (*bool)(unsafe.Pointer(in.Optional))
 	return nil
 }
 
@@ -3777,6 +3834,7 @@ func autoConvert_api_SecretKeySelector_To_v1_SecretKeySelector(in *api.SecretKey
 		return err
 	}
 	out.Key = in.Key
+	out.Optional = (*bool)(unsafe.Pointer(in.Optional))
 	return nil
 }
 
@@ -3828,6 +3886,7 @@ func autoConvert_v1_SecretVolumeSource_To_api_SecretVolumeSource(in *SecretVolum
 	out.SecretName = in.SecretName
 	out.Items = *(*[]api.KeyToPath)(unsafe.Pointer(&in.Items))
 	out.DefaultMode = (*int32)(unsafe.Pointer(in.DefaultMode))
+	out.Optional = (*bool)(unsafe.Pointer(in.Optional))
 	return nil
 }
 
@@ -3839,6 +3898,7 @@ func autoConvert_api_SecretVolumeSource_To_v1_SecretVolumeSource(in *api.SecretV
 	out.SecretName = in.SecretName
 	out.Items = *(*[]KeyToPath)(unsafe.Pointer(&in.Items))
 	out.DefaultMode = (*int32)(unsafe.Pointer(in.DefaultMode))
+	out.Optional = (*bool)(unsafe.Pointer(in.Optional))
 	return nil
 }
 
@@ -4143,6 +4203,7 @@ func autoConvert_v1_Taint_To_api_Taint(in *Taint, out *api.Taint, s conversion.S
 	out.Key = in.Key
 	out.Value = in.Value
 	out.Effect = api.TaintEffect(in.Effect)
+	out.TimeAdded = in.TimeAdded
 	return nil
 }
 
@@ -4154,6 +4215,7 @@ func autoConvert_api_Taint_To_v1_Taint(in *api.Taint, out *Taint, s conversion.S
 	out.Key = in.Key
 	out.Value = in.Value
 	out.Effect = TaintEffect(in.Effect)
+	out.TimeAdded = in.TimeAdded
 	return nil
 }
 
@@ -4166,6 +4228,7 @@ func autoConvert_v1_Toleration_To_api_Toleration(in *Toleration, out *api.Tolera
 	out.Operator = api.TolerationOperator(in.Operator)
 	out.Value = in.Value
 	out.Effect = api.TaintEffect(in.Effect)
+	out.TolerationSeconds = (*int64)(unsafe.Pointer(in.TolerationSeconds))
 	return nil
 }
 
@@ -4178,6 +4241,7 @@ func autoConvert_api_Toleration_To_v1_Toleration(in *api.Toleration, out *Tolera
 	out.Operator = TolerationOperator(in.Operator)
 	out.Value = in.Value
 	out.Effect = TaintEffect(in.Effect)
+	out.TolerationSeconds = (*int64)(unsafe.Pointer(in.TolerationSeconds))
 	return nil
 }
 

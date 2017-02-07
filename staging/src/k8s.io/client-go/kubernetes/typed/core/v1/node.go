@@ -36,11 +36,11 @@ type NodeInterface interface {
 	Create(*v1.Node) (*v1.Node, error)
 	Update(*v1.Node) (*v1.Node, error)
 	UpdateStatus(*v1.Node) (*v1.Node, error)
-	Delete(name string, options *v1.DeleteOptions) error
-	DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error
+	Delete(name string, options *meta_v1.DeleteOptions) error
+	DeleteCollection(options *meta_v1.DeleteOptions, listOptions meta_v1.ListOptions) error
 	Get(name string, options meta_v1.GetOptions) (*v1.Node, error)
-	List(opts v1.ListOptions) (*v1.NodeList, error)
-	Watch(opts v1.ListOptions) (watch.Interface, error)
+	List(opts meta_v1.ListOptions) (*v1.NodeList, error)
+	Watch(opts meta_v1.ListOptions) (watch.Interface, error)
 	Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v1.Node, err error)
 	NodeExpansion
 }
@@ -96,7 +96,7 @@ func (c *nodes) UpdateStatus(node *v1.Node) (result *v1.Node, err error) {
 }
 
 // Delete takes name of the node and deletes it. Returns an error if one occurs.
-func (c *nodes) Delete(name string, options *v1.DeleteOptions) error {
+func (c *nodes) Delete(name string, options *meta_v1.DeleteOptions) error {
 	return c.client.Delete().
 		Resource("nodes").
 		Name(name).
@@ -106,7 +106,7 @@ func (c *nodes) Delete(name string, options *v1.DeleteOptions) error {
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *nodes) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
+func (c *nodes) DeleteCollection(options *meta_v1.DeleteOptions, listOptions meta_v1.ListOptions) error {
 	return c.client.Delete().
 		Resource("nodes").
 		VersionedParams(&listOptions, api.ParameterCodec).
@@ -128,7 +128,7 @@ func (c *nodes) Get(name string, options meta_v1.GetOptions) (result *v1.Node, e
 }
 
 // List takes label and field selectors, and returns the list of Nodes that match those selectors.
-func (c *nodes) List(opts v1.ListOptions) (result *v1.NodeList, err error) {
+func (c *nodes) List(opts meta_v1.ListOptions) (result *v1.NodeList, err error) {
 	result = &v1.NodeList{}
 	err = c.client.Get().
 		Resource("nodes").
@@ -139,7 +139,7 @@ func (c *nodes) List(opts v1.ListOptions) (result *v1.NodeList, err error) {
 }
 
 // Watch returns a watch.Interface that watches the requested nodes.
-func (c *nodes) Watch(opts v1.ListOptions) (watch.Interface, error) {
+func (c *nodes) Watch(opts meta_v1.ListOptions) (watch.Interface, error) {
 	return c.client.Get().
 		Prefix("watch").
 		Resource("nodes").

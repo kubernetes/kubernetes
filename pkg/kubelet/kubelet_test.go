@@ -28,19 +28,20 @@ import (
 	cadvisorapiv2 "github.com/google/cadvisor/info/v2"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/client-go/pkg/util/clock"
-	"k8s.io/client-go/pkg/util/flowcontrol"
-	"k8s.io/kubernetes/pkg/api/resource"
+	clientv1 "k8s.io/client-go/pkg/api/v1"
+	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/util/clock"
+	"k8s.io/client-go/util/flowcontrol"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/apis/componentconfig"
 	"k8s.io/kubernetes/pkg/capabilities"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset/fake"
-	"k8s.io/kubernetes/pkg/client/record"
 	cadvisortest "k8s.io/kubernetes/pkg/kubelet/cadvisor/testing"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	"k8s.io/kubernetes/pkg/kubelet/config"
@@ -159,7 +160,7 @@ func newTestKubeletWithImageList(
 		t.Fatalf("can't mkdir(%q): %v", kubelet.rootDirectory, err)
 	}
 	kubelet.sourcesReady = config.NewSourcesReady(func(_ sets.String) bool { return true })
-	kubelet.masterServiceNamespace = v1.NamespaceDefault
+	kubelet.masterServiceNamespace = metav1.NamespaceDefault
 	kubelet.serviceLister = testServiceLister{}
 	kubelet.nodeLister = testNodeLister{}
 	kubelet.nodeInfo = testNodeInfo{}
@@ -173,8 +174,12 @@ func newTestKubeletWithImageList(
 	kubelet.cadvisor = mockCadvisor
 
 	fakeMirrorClient := podtest.NewFakeMirrorClient()
-	fakeSecretManager := secret.NewFakeManager()
-	kubelet.podManager = kubepod.NewBasicPodManager(fakeMirrorClient, fakeSecretManager)
+	secretManager, err := secret.NewSimpleSecretManager(kubelet.kubeClient)
+	if err != nil {
+		t.Fatalf("can't create a secret manager: %v", err)
+	}
+	kubelet.secretManager = secretManager
+	kubelet.podManager = kubepod.NewBasicPodManager(fakeMirrorClient, kubelet.secretManager)
 	kubelet.statusManager = status.NewManager(fakeKubeClient, kubelet.podManager)
 	kubelet.containerRefManager = kubecontainer.NewRefManager()
 	diskSpaceManager, err := newDiskSpaceManager(mockCadvisor, DiskSpacePolicy{})
@@ -197,7 +202,7 @@ func newTestKubeletWithImageList(
 	kubelet.livenessManager = proberesults.NewManager()
 
 	kubelet.containerManager = cm.NewStubContainerManager()
-	fakeNodeRef := &v1.ObjectReference{
+	fakeNodeRef := &clientv1.ObjectReference{
 		Kind:      "Node",
 		Name:      testKubeletHostname,
 		UID:       types.UID(testKubeletHostname),
@@ -233,7 +238,7 @@ func newTestKubeletWithImageList(
 	// TODO: Factor out "StatsProvider" from Kubelet so we don't have a cyclic dependency
 	volumeStatsAggPeriod := time.Second * 10
 	kubelet.resourceAnalyzer = stats.NewResourceAnalyzer(kubelet, volumeStatsAggPeriod, kubelet.containerRuntime)
-	nodeRef := &v1.ObjectReference{
+	nodeRef := &clientv1.ObjectReference{
 		Kind:      "Node",
 		Name:      string(kubelet.nodeName),
 		UID:       types.UID(kubelet.nodeName),
@@ -249,7 +254,7 @@ func newTestKubeletWithImageList(
 
 	plug := &volumetest.FakeVolumePlugin{PluginName: "fake", Host: nil}
 	kubelet.volumePluginMgr, err =
-		NewInitializedVolumePluginMgr(kubelet, []volume.VolumePlugin{plug})
+		NewInitializedVolumePluginMgr(kubelet, kubelet.secretManager, []volume.VolumePlugin{plug})
 	require.NoError(t, err, "Failed to initialize VolumePluginMgr")
 
 	kubelet.mounter = &mount.FakeMounter{}
@@ -470,69 +475,6 @@ func TestHandlePortConflicts(t *testing.T) {
 
 	// fittingPod should be Pending
 	status, found = kl.statusManager.GetPodStatus(fittingPod.UID)
-	require.True(t, found, "Status of pod %q is not found in the status map", fittingPod.UID)
-	require.Equal(t, v1.PodPending, status.Phase)
-}
-
-// Tests that we sort pods based on criticality.
-func TestCriticalPrioritySorting(t *testing.T) {
-	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
-	kl := testKubelet.kubelet
-	nodes := []v1.Node{
-		{ObjectMeta: metav1.ObjectMeta{Name: testKubeletHostname},
-			Status: v1.NodeStatus{Capacity: v1.ResourceList{}, Allocatable: v1.ResourceList{
-				v1.ResourceCPU:    *resource.NewMilliQuantity(10, resource.DecimalSI),
-				v1.ResourceMemory: *resource.NewQuantity(100, resource.BinarySI),
-				v1.ResourcePods:   *resource.NewQuantity(40, resource.DecimalSI),
-			}}},
-	}
-	kl.nodeLister = testNodeLister{nodes: nodes}
-	kl.nodeInfo = testNodeInfo{nodes: nodes}
-	testKubelet.fakeCadvisor.On("MachineInfo").Return(&cadvisorapi.MachineInfo{}, nil)
-	testKubelet.fakeCadvisor.On("ImagesFsInfo").Return(cadvisorapiv2.FsInfo{}, nil)
-	testKubelet.fakeCadvisor.On("RootFsInfo").Return(cadvisorapiv2.FsInfo{}, nil)
-
-	spec := v1.PodSpec{NodeName: string(kl.nodeName),
-		Containers: []v1.Container{{Resources: v1.ResourceRequirements{
-			Requests: v1.ResourceList{
-				"memory": resource.MustParse("90"),
-			},
-		}}},
-	}
-	pods := []*v1.Pod{
-		podWithUidNameNsSpec("000000000", "newpod", "foo", spec),
-		podWithUidNameNsSpec("987654321", "oldpod", "foo", spec),
-		podWithUidNameNsSpec("123456789", "middlepod", "foo", spec),
-	}
-
-	// Pods are not sorted by creation time.
-	startTime := time.Now()
-	pods[0].CreationTimestamp = metav1.NewTime(startTime.Add(10 * time.Second))
-	pods[1].CreationTimestamp = metav1.NewTime(startTime)
-	pods[2].CreationTimestamp = metav1.NewTime(startTime.Add(1 * time.Second))
-
-	// Make the middle and new pod critical, the middle pod should win
-	// even though it comes later in the list
-	critical := map[string]string{kubetypes.CriticalPodAnnotationKey: ""}
-	pods[0].Annotations = critical
-	pods[1].Annotations = map[string]string{}
-	pods[2].Annotations = critical
-
-	// The non-critical pod should be rejected
-	notfittingPods := []*v1.Pod{pods[0], pods[1]}
-	fittingPod := pods[2]
-
-	kl.HandlePodAdditions(pods)
-	// Check pod status stored in the status map.
-	// notfittingPod should be Failed
-	for _, p := range notfittingPods {
-		status, found := kl.statusManager.GetPodStatus(p.UID)
-		require.True(t, found, "Status of pod %q is not found in the status map", p.UID)
-		require.Equal(t, v1.PodFailed, status.Phase)
-	}
-
-	// fittingPod should be Pending
-	status, found := kl.statusManager.GetPodStatus(fittingPod.UID)
 	require.True(t, found, "Status of pod %q is not found in the status map", fittingPod.UID)
 	require.Equal(t, v1.PodPending, status.Phase)
 }

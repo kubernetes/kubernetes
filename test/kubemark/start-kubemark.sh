@@ -18,26 +18,11 @@
 
 TMP_ROOT="$(dirname "${BASH_SOURCE}")/../.."
 KUBE_ROOT=$(readlink -e ${TMP_ROOT} 2> /dev/null || perl -MCwd -e 'print Cwd::abs_path shift' ${TMP_ROOT})
-KUBECTL="${KUBE_ROOT}/cluster/kubectl.sh"
-KUBEMARK_DIRECTORY="${KUBE_ROOT}/test/kubemark"
-RESOURCE_DIRECTORY="${KUBEMARK_DIRECTORY}/resources"
 
+source "${KUBE_ROOT}/test/kubemark/common.sh"
 source "${KUBE_ROOT}/test/kubemark/skeleton/util.sh"
 source "${KUBE_ROOT}/test/kubemark/cloud-provider-config.sh"
 source "${KUBE_ROOT}/test/kubemark/${CLOUD_PROVIDER}/util.sh"
-source "${KUBE_ROOT}/cluster/kubemark/${CLOUD_PROVIDER}/config-default.sh"
-
-# hack/lib/init.sh will ovewrite ETCD_VERSION if this is unset
-# to what is default in hack/lib/etcd.sh
-# To avoid it, if it is empty, we set it to 'avoid-overwrite' and
-# clean it after that.
-if [ -z "${ETCD_VERSION:-}" ]; then
-  ETCD_VERSION="avoid-overwrite"
-fi
-source "${KUBE_ROOT}/hack/lib/init.sh"
-if [ "${ETCD_VERSION:-}" == "avoid-overwrite" ]; then
-  ETCD_VERSION=""
-fi
 
 # Write all environment variables that we need to pass to the kubemark master,
 # locally to the file ${RESOURCE_DIRECTORY}/kubemark-master-env.sh.
@@ -101,8 +86,8 @@ function write-pki-config-to-master {
     sudo bash -c \"echo \"${KUBE_BEARER_TOKEN},admin,admin\" > /etc/srv/kubernetes/known_tokens.csv\" && \
     sudo bash -c \"echo \"${KUBELET_TOKEN},system:node:node-name,uid:kubelet,system:nodes\" >> /etc/srv/kubernetes/known_tokens.csv\" && \
     sudo bash -c \"echo \"${KUBE_PROXY_TOKEN},system:kube-proxy,uid:kube_proxy\" >> /etc/srv/kubernetes/known_tokens.csv\" && \
-    sudo bash -c \"echo \"${NODE_PROBLEM_DETECTOR_TOKEN},system:node-problem-detector,uid:system:node-problem-detector\" >> /etc/srv/kubernetes/known_tokens.csv\" && \
     sudo bash -c \"echo \"${HEAPSTER_TOKEN},system:heapster,uid:heapster\" >> /etc/srv/kubernetes/known_tokens.csv\" && \
+    sudo bash -c \"echo \"${NODE_PROBLEM_DETECTOR_TOKEN},system:node-problem-detector,uid:system:node-problem-detector\" >> /etc/srv/kubernetes/known_tokens.csv\" && \
     sudo bash -c \"echo ${KUBE_PASSWORD},admin,admin > /etc/srv/kubernetes/basic_auth.csv\""
   execute-cmd-on-master-with-retries "${PKI_SETUP_CMD}" 3
   echo "Wrote PKI certs, keys, tokens and admin password to master."
@@ -111,18 +96,18 @@ function write-pki-config-to-master {
 # Copy all the necessary resource files (scripts/configs/manifests) to the master.
 function copy-resource-files-to-master {
   copy-files \
-  "${SERVER_BINARY_TAR}" \
-  "${RESOURCE_DIRECTORY}/kubemark-master-env.sh" \
-  "${RESOURCE_DIRECTORY}/start-kubemark-master.sh" \
-  "${KUBEMARK_DIRECTORY}/configure-kubectl.sh" \
-  "${RESOURCE_DIRECTORY}/manifests/etcd.yaml" \
-  "${RESOURCE_DIRECTORY}/manifests/etcd-events.yaml" \
-  "${RESOURCE_DIRECTORY}/manifests/kube-apiserver.yaml" \
-  "${RESOURCE_DIRECTORY}/manifests/kube-scheduler.yaml" \
-  "${RESOURCE_DIRECTORY}/manifests/kube-controller-manager.yaml" \
-  "${RESOURCE_DIRECTORY}/manifests/kube-addon-manager.yaml" \
-  "${RESOURCE_DIRECTORY}/manifests/addons/kubemark-rbac-bindings" \
-  "kubernetes@${MASTER_NAME}":/home/kubernetes/
+    "${SERVER_BINARY_TAR}" \
+    "${RESOURCE_DIRECTORY}/kubemark-master-env.sh" \
+    "${RESOURCE_DIRECTORY}/start-kubemark-master.sh" \
+    "${KUBEMARK_DIRECTORY}/configure-kubectl.sh" \
+    "${RESOURCE_DIRECTORY}/manifests/etcd.yaml" \
+    "${RESOURCE_DIRECTORY}/manifests/etcd-events.yaml" \
+    "${RESOURCE_DIRECTORY}/manifests/kube-apiserver.yaml" \
+    "${RESOURCE_DIRECTORY}/manifests/kube-scheduler.yaml" \
+    "${RESOURCE_DIRECTORY}/manifests/kube-controller-manager.yaml" \
+    "${RESOURCE_DIRECTORY}/manifests/kube-addon-manager.yaml" \
+    "${RESOURCE_DIRECTORY}/manifests/addons/kubemark-rbac-bindings" \
+    "kubernetes@${MASTER_NAME}":/home/kubernetes/
   echo "Copied server binary, master startup scripts, configs and resource manifests to master."
 }
 
@@ -242,25 +227,6 @@ contexts:
   name: kubemark-context
 current-context: kubemark-context")
 
-  # Create kubeconfig for NodeProblemDetector.
-  NPD_KUBECONFIG_CONTENTS=$(echo "apiVersion: v1
-kind: Config
-users:
-- name: node-problem-detector
-  user:
-    token: ${NODE_PROBLEM_DETECTOR_TOKEN}
-clusters:
-- name: kubemark
-  cluster:
-    insecure-skip-tls-verify: true
-    server: https://${MASTER_IP}
-contexts:
-- context:
-    cluster: kubemark
-    user: node-problem-detector
-  name: kubemark-context
-current-context: kubemark-context")
-
   # Create kubeconfig for Heapster.
   HEAPSTER_KUBECONFIG_CONTENTS=$(echo "apiVersion: v1
 kind: Config
@@ -277,6 +243,25 @@ contexts:
 - context:
     cluster: kubemark
     user: heapster
+  name: kubemark-context
+current-context: kubemark-context")
+
+  # Create kubeconfig for NodeProblemDetector.
+  NPD_KUBECONFIG_CONTENTS=$(echo "apiVersion: v1
+kind: Config
+users:
+- name: node-problem-detector
+  user:
+    token: ${NODE_PROBLEM_DETECTOR_TOKEN}
+clusters:
+- name: kubemark
+  cluster:
+    insecure-skip-tls-verify: true
+    server: https://${MASTER_IP}
+contexts:
+- context:
+    cluster: kubemark
+    user: node-problem-detector
   name: kubemark-context
 current-context: kubemark-context")
 
@@ -321,7 +306,7 @@ current-context: kubemark-context")
 function wait-for-hollow-nodes-to-run-or-timeout {
   echo -n "Waiting for all hollow-nodes to become Running"
   start=$(date +%s)
-  nodes=$("${KUBECTL}" --kubeconfig="${LOCAL_KUBECONFIG}" get node) || true
+  nodes=$("${KUBECTL}" --kubeconfig="${LOCAL_KUBECONFIG}" get node 2> /dev/null) || true
   ready=$(($(echo "${nodes}" | grep -v "NotReady" | wc -l) - 1))
   
   until [[ "${ready}" -ge "${NUM_NODES}" ]]; do
@@ -346,7 +331,7 @@ function wait-for-hollow-nodes-to-run-or-timeout {
       echo $(echo "${pods}" | grep -v "Running")
       exit 1
     fi
-    nodes=$("${KUBECTL}" --kubeconfig="${LOCAL_KUBECONFIG}" get node) || true
+    nodes=$("${KUBECTL}" --kubeconfig="${LOCAL_KUBECONFIG}" get node 2> /dev/null) || true
     ready=$(($(echo "${nodes}" | grep -v "NotReady" | wc -l) - 1))
   done
   echo -e "${color_green} Done!${color_norm}"
@@ -355,7 +340,6 @@ function wait-for-hollow-nodes-to-run-or-timeout {
 ############################### Main Function ########################################
 # Setup for master.
 echo -e "${color_yellow}STARTING SETUP FOR MASTER${color_norm}"
-find-release-tars
 create-master-environment-file
 create-master-instance-with-resources
 generate-pki-config

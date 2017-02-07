@@ -18,12 +18,12 @@ package fake
 
 import (
 	rest "k8s.io/client-go/rest"
+	testing "k8s.io/client-go/testing"
 	v1alpha1 "k8s.io/kubernetes/cmd/kube-aggregator/pkg/client/clientset_generated/clientset/typed/apiregistration/v1alpha1"
-	core "k8s.io/kubernetes/pkg/client/testing/core"
 )
 
 type FakeApiregistrationV1alpha1 struct {
-	*core.Fake
+	*testing.Fake
 }
 
 func (c *FakeApiregistrationV1alpha1) APIServices() v1alpha1.APIServiceInterface {

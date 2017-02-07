@@ -64,14 +64,14 @@ func (c *FakeResourceQuotas) UpdateStatus(resourceQuota *v1.ResourceQuota) (*v1.
 	return obj.(*v1.ResourceQuota), err
 }
 
-func (c *FakeResourceQuotas) Delete(name string, options *v1.DeleteOptions) error {
+func (c *FakeResourceQuotas) Delete(name string, options *meta_v1.DeleteOptions) error {
 	_, err := c.Fake.
 		Invokes(testing.NewDeleteAction(resourcequotasResource, c.ns, name), &v1.ResourceQuota{})
 
 	return err
 }
 
-func (c *FakeResourceQuotas) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
+func (c *FakeResourceQuotas) DeleteCollection(options *meta_v1.DeleteOptions, listOptions meta_v1.ListOptions) error {
 	action := testing.NewDeleteCollectionAction(resourcequotasResource, c.ns, listOptions)
 
 	_, err := c.Fake.Invokes(action, &v1.ResourceQuotaList{})
@@ -88,7 +88,7 @@ func (c *FakeResourceQuotas) Get(name string, options meta_v1.GetOptions) (resul
 	return obj.(*v1.ResourceQuota), err
 }
 
-func (c *FakeResourceQuotas) List(opts v1.ListOptions) (result *v1.ResourceQuotaList, err error) {
+func (c *FakeResourceQuotas) List(opts meta_v1.ListOptions) (result *v1.ResourceQuotaList, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewListAction(resourcequotasResource, c.ns, opts), &v1.ResourceQuotaList{})
 
@@ -110,7 +110,7 @@ func (c *FakeResourceQuotas) List(opts v1.ListOptions) (result *v1.ResourceQuota
 }
 
 // Watch returns a watch.Interface that watches the requested resourceQuotas.
-func (c *FakeResourceQuotas) Watch(opts v1.ListOptions) (watch.Interface, error) {
+func (c *FakeResourceQuotas) Watch(opts meta_v1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
 		InvokesWatch(testing.NewWatchAction(resourcequotasResource, c.ns, opts))
 

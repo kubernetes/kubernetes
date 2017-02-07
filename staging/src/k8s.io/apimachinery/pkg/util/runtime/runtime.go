@@ -19,6 +19,8 @@ package runtime
 import (
 	"fmt"
 	"runtime"
+	"sync"
+	"time"
 
 	"github.com/golang/glog"
 )
@@ -79,7 +81,18 @@ func getCallers(r interface{}) string {
 
 // ErrorHandlers is a list of functions which will be invoked when an unreturnable
 // error occurs.
-var ErrorHandlers = []func(error){logError}
+// TODO(lavalamp): for testability, this and the below HandleError function
+// should be packaged up into a testable and reusable object.
+var ErrorHandlers = []func(error){
+	logError,
+	(&rudimentaryErrorBackoff{
+		lastErrorTime: time.Now(),
+		// 1ms was the number folks were able to stomach as a global rate limit.
+		// If you need to log errors more than 1000 times a second you
+		// should probably consider fixing your code instead. :)
+		minPeriod: time.Millisecond,
+	}).OnError,
+}
 
 // HandlerError is a method to invoke when a non-user facing piece of code cannot
 // return an error and needs to indicate it has been ignored. Invoking this method
@@ -99,6 +112,26 @@ func HandleError(err error) {
 // logError prints an error with the call stack of the location it was reported
 func logError(err error) {
 	glog.ErrorDepth(2, err)
+}
+
+type rudimentaryErrorBackoff struct {
+	minPeriod time.Duration // immutable
+	// TODO(lavalamp): use the clock for testability. Need to move that
+	// package for that to be accessible here.
+	lastErrorTimeLock sync.Mutex
+	lastErrorTime     time.Time
+}
+
+// OnError will block if it is called more often than the embedded period time.
+// This will prevent overly tight hot error loops.
+func (r *rudimentaryErrorBackoff) OnError(error) {
+	r.lastErrorTimeLock.Lock()
+	defer r.lastErrorTimeLock.Unlock()
+	d := time.Since(r.lastErrorTime)
+	if d < r.minPeriod {
+		time.Sleep(r.minPeriod - d)
+	}
+	r.lastErrorTime = time.Now()
 }
 
 // GetCaller returns the caller of the function that calls it.

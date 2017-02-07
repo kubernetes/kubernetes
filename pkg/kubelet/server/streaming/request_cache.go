@@ -25,7 +25,7 @@ import (
 	"sync"
 	"time"
 
-	"k8s.io/client-go/pkg/util/clock"
+	"k8s.io/client-go/util/clock"
 )
 
 var (

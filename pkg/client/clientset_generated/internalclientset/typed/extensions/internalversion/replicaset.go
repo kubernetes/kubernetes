@@ -36,11 +36,11 @@ type ReplicaSetInterface interface {
 	Create(*extensions.ReplicaSet) (*extensions.ReplicaSet, error)
 	Update(*extensions.ReplicaSet) (*extensions.ReplicaSet, error)
 	UpdateStatus(*extensions.ReplicaSet) (*extensions.ReplicaSet, error)
-	Delete(name string, options *api.DeleteOptions) error
-	DeleteCollection(options *api.DeleteOptions, listOptions api.ListOptions) error
+	Delete(name string, options *v1.DeleteOptions) error
+	DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error
 	Get(name string, options v1.GetOptions) (*extensions.ReplicaSet, error)
-	List(opts api.ListOptions) (*extensions.ReplicaSetList, error)
-	Watch(opts api.ListOptions) (watch.Interface, error)
+	List(opts v1.ListOptions) (*extensions.ReplicaSetList, error)
+	Watch(opts v1.ListOptions) (watch.Interface, error)
 	Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *extensions.ReplicaSet, err error)
 	ReplicaSetExpansion
 }
@@ -101,7 +101,7 @@ func (c *replicaSets) UpdateStatus(replicaSet *extensions.ReplicaSet) (result *e
 }
 
 // Delete takes name of the replicaSet and deletes it. Returns an error if one occurs.
-func (c *replicaSets) Delete(name string, options *api.DeleteOptions) error {
+func (c *replicaSets) Delete(name string, options *v1.DeleteOptions) error {
 	return c.client.Delete().
 		Namespace(c.ns).
 		Resource("replicasets").
@@ -112,7 +112,7 @@ func (c *replicaSets) Delete(name string, options *api.DeleteOptions) error {
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *replicaSets) DeleteCollection(options *api.DeleteOptions, listOptions api.ListOptions) error {
+func (c *replicaSets) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
 	return c.client.Delete().
 		Namespace(c.ns).
 		Resource("replicasets").
@@ -136,7 +136,7 @@ func (c *replicaSets) Get(name string, options v1.GetOptions) (result *extension
 }
 
 // List takes label and field selectors, and returns the list of ReplicaSets that match those selectors.
-func (c *replicaSets) List(opts api.ListOptions) (result *extensions.ReplicaSetList, err error) {
+func (c *replicaSets) List(opts v1.ListOptions) (result *extensions.ReplicaSetList, err error) {
 	result = &extensions.ReplicaSetList{}
 	err = c.client.Get().
 		Namespace(c.ns).
@@ -148,7 +148,7 @@ func (c *replicaSets) List(opts api.ListOptions) (result *extensions.ReplicaSetL
 }
 
 // Watch returns a watch.Interface that watches the requested replicaSets.
-func (c *replicaSets) Watch(opts api.ListOptions) (watch.Interface, error) {
+func (c *replicaSets) Watch(opts v1.ListOptions) (watch.Interface, error) {
 	return c.client.Get().
 		Prefix("watch").
 		Namespace(c.ns).

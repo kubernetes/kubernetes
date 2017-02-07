@@ -22,10 +22,10 @@ import (
 	"testing"
 
 	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/v1"
 )
 
@@ -58,7 +58,7 @@ func newEvent(eventtype, message string) watch.Event {
 		Type: watch.Added,
 		Object: &v1.Event{
 			ObjectMeta: metav1.ObjectMeta{
-				Namespace: v1.NamespaceDefault,
+				Namespace: metav1.NamespaceDefault,
 			},
 			Reason:  "MockEvent",
 			Message: message,
@@ -70,7 +70,7 @@ func newEvent(eventtype, message string) watch.Event {
 func newPod(name string, phase v1.PodPhase, message string) *v1.Pod {
 	return &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
-			Namespace: v1.NamespaceDefault,
+			Namespace: metav1.NamespaceDefault,
 			Name:      name,
 		},
 		Status: v1.PodStatus{

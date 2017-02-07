@@ -21,6 +21,8 @@ go_library(
         "//pkg/client/clientset_generated/clientset/typed/apps/v1beta1/fake:go_default_library",
         "//pkg/client/clientset_generated/clientset/typed/authentication/v1beta1:go_default_library",
         "//pkg/client/clientset_generated/clientset/typed/authentication/v1beta1/fake:go_default_library",
+        "//pkg/client/clientset_generated/clientset/typed/authorization/v1:go_default_library",
+        "//pkg/client/clientset_generated/clientset/typed/authorization/v1/fake:go_default_library",
         "//pkg/client/clientset_generated/clientset/typed/authorization/v1beta1:go_default_library",
         "//pkg/client/clientset_generated/clientset/typed/authorization/v1beta1/fake:go_default_library",
         "//pkg/client/clientset_generated/clientset/typed/autoscaling/v1:go_default_library",
@@ -43,11 +45,11 @@ go_library(
         "//pkg/client/clientset_generated/clientset/typed/rbac/v1beta1/fake:go_default_library",
         "//pkg/client/clientset_generated/clientset/typed/storage/v1beta1:go_default_library",
         "//pkg/client/clientset_generated/clientset/typed/storage/v1beta1/fake:go_default_library",
-        "//pkg/client/testing/core:go_default_library",
-        "//pkg/client/typed/discovery:go_default_library",
-        "//pkg/client/typed/discovery/fake:go_default_library",
         "//vendor:k8s.io/apimachinery/pkg/runtime",
         "//vendor:k8s.io/apimachinery/pkg/watch",
+        "//vendor:k8s.io/client-go/discovery",
+        "//vendor:k8s.io/client-go/discovery/fake",
+        "//vendor:k8s.io/client-go/testing",
     ],
 )
 

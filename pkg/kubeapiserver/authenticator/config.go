@@ -22,6 +22,7 @@ import (
 	"github.com/go-openapi/spec"
 
 	"k8s.io/apiserver/pkg/authentication/authenticator"
+	"k8s.io/apiserver/pkg/authentication/authenticatorfactory"
 	"k8s.io/apiserver/pkg/authentication/group"
 	"k8s.io/apiserver/pkg/authentication/request/anonymous"
 	"k8s.io/apiserver/pkg/authentication/request/bearertoken"
@@ -30,15 +31,14 @@ import (
 	"k8s.io/apiserver/pkg/authentication/request/x509"
 	"k8s.io/apiserver/pkg/authentication/token/tokenfile"
 	"k8s.io/apiserver/pkg/authentication/user"
-	certutil "k8s.io/client-go/pkg/util/cert"
-	genericauthenticator "k8s.io/kubernetes/pkg/genericapiserver/authenticator"
+	"k8s.io/apiserver/plugin/pkg/authenticator/password/keystone"
+	"k8s.io/apiserver/plugin/pkg/authenticator/password/passwordfile"
+	"k8s.io/apiserver/plugin/pkg/authenticator/request/basicauth"
+	"k8s.io/apiserver/plugin/pkg/authenticator/token/anytoken"
+	"k8s.io/apiserver/plugin/pkg/authenticator/token/oidc"
+	"k8s.io/apiserver/plugin/pkg/authenticator/token/webhook"
+	certutil "k8s.io/client-go/util/cert"
 	"k8s.io/kubernetes/pkg/serviceaccount"
-	"k8s.io/kubernetes/plugin/pkg/auth/authenticator/password/keystone"
-	"k8s.io/kubernetes/plugin/pkg/auth/authenticator/password/passwordfile"
-	"k8s.io/kubernetes/plugin/pkg/auth/authenticator/request/basicauth"
-	"k8s.io/kubernetes/plugin/pkg/auth/authenticator/token/anytoken"
-	"k8s.io/kubernetes/plugin/pkg/auth/authenticator/token/oidc"
-	"k8s.io/kubernetes/plugin/pkg/auth/authenticator/token/webhook"
 
 	// Initialize all known client auth plugins.
 	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
@@ -63,7 +63,7 @@ type AuthenticatorConfig struct {
 	WebhookTokenAuthnConfigFile string
 	WebhookTokenAuthnCacheTTL   time.Duration
 
-	RequestHeaderConfig *genericauthenticator.RequestHeaderConfig
+	RequestHeaderConfig *authenticatorfactory.RequestHeaderConfig
 
 	// TODO, this is the only non-serializable part of the entire config.  Factor it out into a clientconfig
 	ServiceAccountTokenGetter serviceaccount.ServiceAccountTokenGetter

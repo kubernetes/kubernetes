@@ -19,7 +19,6 @@ package apps
 import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/kubernetes/pkg/api"
 )
 
 var (
@@ -49,8 +48,6 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 	scheme.AddKnownTypes(SchemeGroupVersion,
 		&StatefulSet{},
 		&StatefulSetList{},
-		&api.ListOptions{},
-		&api.DeleteOptions{},
 	)
 	return nil
 }

@@ -34,7 +34,7 @@ NET_PLUGIN=${NET_PLUGIN:-""}
 NET_PLUGIN_DIR=${NET_PLUGIN_DIR:-""}
 SERVICE_CLUSTER_IP_RANGE=${SERVICE_CLUSTER_IP_RANGE:-10.0.0.0/24}
 # if enabled, must set CGROUP_ROOT
-EXPERIMENTAL_CGROUPS_PER_QOS=${EXPERIMENTAL_CGROUPS_PER_QOS:-false}
+CGROUPS_PER_QOS=${CGROUPS_PER_QOS:-false}
 # this is not defaulted to preserve backward compatibility.
 # if EXPERIMENTAL_CGROUPS_PER_QOS is enabled, recommend setting to /
 CGROUP_ROOT=${CGROUP_ROOT:-""}
@@ -189,6 +189,17 @@ CERT_DIR=${CERT_DIR:-"/var/run/kubernetes"}
 ROOT_CA_FILE=$CERT_DIR/apiserver.crt
 EXPERIMENTAL_CRI=${EXPERIMENTAL_CRI:-"false"}
 
+# name of the cgroup driver, i.e. cgroupfs or systemd
+if [[ ${CONTAINER_RUNTIME} == "docker" ]]; then
+  # default cgroup driver to match what is reported by docker to simplify local development
+  if [[ -z ${CGROUP_DRIVER} ]]; then
+    # match driver with docker runtime reported value (they must match)
+    CGROUP_DRIVER=$(docker info | grep "Cgroup Driver:" | cut -f3- -d' ')
+    echo "Kubelet cgroup driver defaulted to use: ${CGROUP_DRIVER}"
+  fi
+fi
+
+
 
 # Ensure CERT_DIR is created for auto-generated crt/key and kubeconfig
 mkdir -p "${CERT_DIR}" &>/dev/null || sudo mkdir -p "${CERT_DIR}"
@@ -318,6 +329,14 @@ cleanup()
   exit 0
 }
 
+function warning {
+  message=$1
+
+  echo $(tput bold)$(tput setaf 1)
+  echo "WARNING: ${message}"
+  echo $(tput sgr0)
+}
+
 function start_etcd {
     echo "Starting etcd"
     kube::etcd::start
@@ -420,26 +439,28 @@ function start_apiserver {
     # this uses the API port because if you don't have any authenticator, you can't seem to use the secure port at all.
     # this matches what happened with the combination in 1.4.
     # TODO change this conditionally based on whether API_PORT is on or off
-    kube::util::wait_for_url "http://${API_HOST}:${API_PORT}/version" "apiserver: " 1 ${WAIT_FOR_URL_API_SERVER} || exit 1
+    kube::util::wait_for_url "http://${API_HOST_IP}:${API_PORT}/version" "apiserver: " 1 ${WAIT_FOR_URL_API_SERVER} \
+        || { echo "check apiserver logs: ${APISERVER_LOG}" ; exit 1 ; }
 
     # Create kubeconfigs for all components, using client certs
     kube::util::write_client_kubeconfig "${CONTROLPLANE_SUDO}" "${CERT_DIR}" "${ROOT_CA_FILE}" "${API_HOST}" "${API_SECURE_PORT}" admin
+    ${CONTROLPLANE_SUDO} chown "${USER}" "${CERT_DIR}/client-admin.key" # make readable for kubectl
     kube::util::write_client_kubeconfig "${CONTROLPLANE_SUDO}" "${CERT_DIR}" "${ROOT_CA_FILE}" "${API_HOST}" "${API_SECURE_PORT}" kubelet
     kube::util::write_client_kubeconfig "${CONTROLPLANE_SUDO}" "${CERT_DIR}" "${ROOT_CA_FILE}" "${API_HOST}" "${API_SECURE_PORT}" kube-proxy
     kube::util::write_client_kubeconfig "${CONTROLPLANE_SUDO}" "${CERT_DIR}" "${ROOT_CA_FILE}" "${API_HOST}" "${API_SECURE_PORT}" controller
     kube::util::write_client_kubeconfig "${CONTROLPLANE_SUDO}" "${CERT_DIR}" "${ROOT_CA_FILE}" "${API_HOST}" "${API_SECURE_PORT}" scheduler
 
-    if [[ -z "${AUTH_ARGS}"  ]]; then
-        if [[ "${ALLOW_ANY_TOKEN}" = true  ]]; then
+    if [[ -z "${AUTH_ARGS}" ]]; then
+        if [[ "${ALLOW_ANY_TOKEN}" = true ]]; then
             # use token authentication
-            if [[ -n "${KUBECONFIG_TOKEN}"  ]]; then
+            if [[ -n "${KUBECONFIG_TOKEN}" ]]; then
                 AUTH_ARGS="--token=${KUBECONFIG_TOKEN}"
             else
                 AUTH_ARGS="--token=system:admin/system:masters"
             fi
         else
-            # default to use basic authentication
-            AUTH_ARGS="--username=admin --password=admin"
+            # default to the admin client cert/key
+            AUTH_ARGS="--client-key=${CERT_DIR}/client-admin.key --client-certificate=${CERT_DIR}/client-admin.crt"
         fi
     fi
 }
@@ -533,7 +554,7 @@ function start_kubelet {
         --feature-gates="${FEATURE_GATES}" \
         --cpu-cfs-quota=${CPU_CFS_QUOTA} \
         --enable-controller-attach-detach="${ENABLE_CONTROLLER_ATTACH_DETACH}" \
-        --experimental-cgroups-per-qos=${EXPERIMENTAL_CGROUPS_PER_QOS} \
+        --cgroups-per-qos=${CGROUPS_PER_QOS} \
         --cgroup-driver=${CGROUP_DRIVER} \
         --cgroup-root=${CGROUP_ROOT} \
         --keep-terminated-pod-volumes=true \
@@ -667,7 +688,12 @@ fi
 if [[ "${START_MODE}" != "kubeletonly" ]]; then
   echo
   cat <<EOF
-To start using your cluster, open up another terminal/tab and run:
+To start using your cluster, you can open up another terminal/tab and run:
+
+  export KUBECONFIG=${CERT_DIR}/admin.kubeconfig
+  cluster/kubectl.sh
+
+Alternatively, you can write to the default kubeconfig:
 
   export KUBERNETES_PROVIDER=local
 
@@ -707,13 +733,13 @@ kube::util::test_cfssl_installed
 
 ### IF the user didn't supply an output/ for the build... Then we detect.
 if [ "$GO_OUT" == "" ]; then
-    detect_binary
+  detect_binary
 fi
 echo "Detected host and ready to start services.  Doing some housekeeping first..."
 echo "Using GO_OUT $GO_OUT"
 KUBELET_CIDFILE=/tmp/kubelet.cid
 if [[ "${ENABLE_DAEMON}" = false ]]; then
-trap cleanup EXIT
+  trap cleanup EXIT
 fi
 
 echo "Starting services now!"
@@ -727,15 +753,30 @@ if [[ "${START_MODE}" != "kubeletonly" ]]; then
 fi
 
 if [[ "${START_MODE}" != "nokubelet" ]]; then
-  start_kubelet
+  ## TODO remove this check if/when kubelet is supported on darwin
+  # Detect the OS name/arch and display appropriate error.
+    case "$(uname -s)" in
+      Darwin)
+        warning "kubelet is not currently supported in darwin, kubelet aborted."
+        KUBELET_LOG=""
+        ;;
+      Linux)
+        start_kubelet
+        ;;
+      *)
+        warning "Unsupported host OS.  Must be Linux or Mac OS X, kubelet aborted."
+        ;;
+    esac
 fi
 
 if [[ -n "${PSP_ADMISSION}" && "${ENABLE_RBAC}" = true ]]; then
-    create_psp_policy
+  create_psp_policy
 fi
 
 print_success
 
 if [[ "${ENABLE_DAEMON}" = false ]]; then
-   while true; do sleep 1; done
+  while true; do sleep 1; done
 fi
+
+

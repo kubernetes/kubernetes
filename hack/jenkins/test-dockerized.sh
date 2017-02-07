@@ -55,6 +55,7 @@ make generated_files
 go install ./cmd/...
 ./hack/install-etcd.sh
 
+make test
 make test-cmd
 make test-integration
 ./hack/test-update-storage-objects.sh

@@ -18,7 +18,6 @@
 # Kubermark must implement to use test/kubemark/start-kubemark.sh and
 # test/kubemark/stop-kubemark.sh scripts.
 
-
 # This function should create a machine instance for the master along
 # with any/all of the following resources:
 # - Attach a PD to the master (optionally 1 more for storing events)

@@ -15,9 +15,11 @@ go_library(
     ],
     tags = ["automanaged"],
     deps = [
-        "//pkg/genericapiserver/server/options:go_default_library",
+        "//pkg/api:go_default_library",
+        "//pkg/features:go_default_library",
         "//pkg/kubeapiserver/options:go_default_library",
         "//vendor:github.com/spf13/pflag",
+        "//vendor:k8s.io/apiserver/pkg/server/options",
     ],
 )
 

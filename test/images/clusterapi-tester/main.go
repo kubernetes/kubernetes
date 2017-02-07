@@ -24,10 +24,8 @@ import (
 	"fmt"
 	"net/http"
 
-	"k8s.io/apimachinery/pkg/fields"
-	"k8s.io/apimachinery/pkg/labels"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	restclient "k8s.io/client-go/rest"
-	"k8s.io/kubernetes/pkg/api"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 )
 
@@ -41,7 +39,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("Failed to create client: %v", err)
 	}
-	listAll := api.ListOptions{LabelSelector: labels.Everything(), FieldSelector: fields.Everything()}
+	listAll := metav1.ListOptions{}
 	nodes, err := kubeClient.Core().Nodes().List(listAll)
 	if err != nil {
 		log.Fatalf("Failed to list nodes: %v", err)
@@ -50,7 +48,7 @@ func main() {
 	for _, node := range nodes.Items {
 		log.Printf("\t%v", node.Name)
 	}
-	services, err := kubeClient.Core().Services(api.NamespaceDefault).List(listAll)
+	services, err := kubeClient.Core().Services(metav1.NamespaceDefault).List(listAll)
 	if err != nil {
 		log.Fatalf("Failed to list services: %v", err)
 	}

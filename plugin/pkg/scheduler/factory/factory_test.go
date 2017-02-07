@@ -25,13 +25,13 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	utiltesting "k8s.io/client-go/pkg/util/testing"
 	restclient "k8s.io/client-go/rest"
+	"k8s.io/client-go/tools/cache"
+	utiltesting "k8s.io/client-go/util/testing"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
 	"k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/client/cache"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm"
 	schedulerapi "k8s.io/kubernetes/plugin/pkg/scheduler/api"
@@ -203,7 +203,7 @@ func TestBind(t *testing.T) {
 	}{
 		{binding: &v1.Binding{
 			ObjectMeta: metav1.ObjectMeta{
-				Namespace: v1.NamespaceDefault,
+				Namespace: metav1.NamespaceDefault,
 				Name:      "foo",
 			},
 			Target: v1.ObjectReference{
@@ -228,7 +228,7 @@ func TestBind(t *testing.T) {
 			continue
 		}
 		expectedBody := runtime.EncodeOrDie(testapi.Default.Codec(), item.binding)
-		handler.ValidateRequest(t, testapi.Default.ResourcePath("bindings", v1.NamespaceDefault, ""), "POST", &expectedBody)
+		handler.ValidateRequest(t, testapi.Default.ResourcePath("bindings", metav1.NamespaceDefault, ""), "POST", &expectedBody)
 	}
 }
 

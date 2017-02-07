@@ -32,9 +32,9 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	restclient "k8s.io/client-go/rest"
+	"k8s.io/client-go/rest/fake"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
-	"k8s.io/kubernetes/pkg/client/restclient/fake"
 	"k8s.io/kubernetes/pkg/kubectl"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
@@ -151,6 +151,7 @@ func Example_printReplicationControllerWithNamespace() {
 		ColumnLabels:  []string{},
 	})
 	tf.Client = &fake.RESTClient{
+		APIRegistry:          api.Registry,
 		NegotiatedSerializer: ns,
 		Client:               nil,
 	}
@@ -201,6 +202,7 @@ func Example_printMultiContainersReplicationControllerWithWide() {
 		ColumnLabels: []string{},
 	})
 	tf.Client = &fake.RESTClient{
+		APIRegistry:          api.Registry,
 		NegotiatedSerializer: ns,
 		Client:               nil,
 	}
@@ -252,6 +254,7 @@ func Example_printReplicationController() {
 		ColumnLabels: []string{},
 	})
 	tf.Client = &fake.RESTClient{
+		APIRegistry:          api.Registry,
 		NegotiatedSerializer: ns,
 		Client:               nil,
 	}
@@ -304,6 +307,7 @@ func Example_printPodWithWideFormat() {
 		ColumnLabels: []string{},
 	})
 	tf.Client = &fake.RESTClient{
+		APIRegistry:          api.Registry,
 		NegotiatedSerializer: ns,
 		Client:               nil,
 	}
@@ -344,6 +348,7 @@ func Example_printPodWithShowLabels() {
 		ColumnLabels: []string{},
 	})
 	tf.Client = &fake.RESTClient{
+		APIRegistry:          api.Registry,
 		NegotiatedSerializer: ns,
 		Client:               nil,
 	}
@@ -478,6 +483,7 @@ func Example_printPodHideTerminated() {
 		ColumnLabels: []string{},
 	})
 	tf.Client = &fake.RESTClient{
+		APIRegistry:          api.Registry,
 		NegotiatedSerializer: ns,
 		Client:               nil,
 	}
@@ -511,6 +517,7 @@ func Example_printPodShowAll() {
 		ColumnLabels: []string{},
 	})
 	tf.Client = &fake.RESTClient{
+		APIRegistry:          api.Registry,
 		NegotiatedSerializer: ns,
 		Client:               nil,
 	}
@@ -537,6 +544,7 @@ func Example_printServiceWithNamespacesAndLabels() {
 		ColumnLabels:  []string{"l1"},
 	})
 	tf.Client = &fake.RESTClient{
+		APIRegistry:          api.Registry,
 		NegotiatedSerializer: ns,
 		Client:               nil,
 	}

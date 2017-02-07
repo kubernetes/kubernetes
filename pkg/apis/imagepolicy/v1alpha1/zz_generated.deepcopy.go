@@ -76,9 +76,7 @@ func DeepCopy_v1alpha1_ImageReviewSpec(in interface{}, out interface{}, c *conve
 		if in.Containers != nil {
 			in, out := &in.Containers, &out.Containers
 			*out = make([]ImageReviewContainerSpec, len(*in))
-			for i := range *in {
-				(*out)[i] = (*in)[i]
-			}
+			copy(*out, *in)
 		}
 		if in.Annotations != nil {
 			in, out := &in.Annotations, &out.Annotations

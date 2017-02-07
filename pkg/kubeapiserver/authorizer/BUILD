@@ -25,11 +25,11 @@ go_library(
     deps = [
         "//pkg/auth/authorizer/abac:go_default_library",
         "//pkg/controller/informers:go_default_library",
-        "//pkg/genericapiserver/authorizer:go_default_library",
         "//plugin/pkg/auth/authorizer/rbac:go_default_library",
-        "//plugin/pkg/auth/authorizer/webhook:go_default_library",
         "//vendor:k8s.io/apiserver/pkg/authorization/authorizer",
+        "//vendor:k8s.io/apiserver/pkg/authorization/authorizerfactory",
         "//vendor:k8s.io/apiserver/pkg/authorization/union",
+        "//vendor:k8s.io/apiserver/plugin/pkg/authorizer/webhook",
     ],
 )
 

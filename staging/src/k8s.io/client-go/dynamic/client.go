@@ -36,8 +36,8 @@ import (
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/pkg/api"
 	"k8s.io/client-go/pkg/api/v1"
-	"k8s.io/client-go/pkg/util/flowcontrol"
 	restclient "k8s.io/client-go/rest"
+	"k8s.io/client-go/util/flowcontrol"
 )
 
 // Client is a Kubernetes client that allows you to access metadata
@@ -138,7 +138,7 @@ func (rc *ResourceClient) Get(name string) (*unstructured.Unstructured, error) {
 }
 
 // Delete deletes the resource with the specified name.
-func (rc *ResourceClient) Delete(name string, opts *v1.DeleteOptions) error {
+func (rc *ResourceClient) Delete(name string, opts *metav1.DeleteOptions) error {
 	return rc.cl.Delete().
 		NamespaceIfScoped(rc.ns, rc.resource.Namespaced).
 		Resource(rc.resource.Name).
@@ -149,7 +149,7 @@ func (rc *ResourceClient) Delete(name string, opts *v1.DeleteOptions) error {
 }
 
 // DeleteCollection deletes a collection of objects.
-func (rc *ResourceClient) DeleteCollection(deleteOptions *v1.DeleteOptions, listOptions runtime.Object) error {
+func (rc *ResourceClient) DeleteCollection(deleteOptions *metav1.DeleteOptions, listOptions runtime.Object) error {
 	parameterEncoder := rc.parameterCodec
 	if parameterEncoder == nil {
 		parameterEncoder = defaultParameterEncoder

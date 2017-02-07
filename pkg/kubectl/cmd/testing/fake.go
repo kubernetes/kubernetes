@@ -30,14 +30,14 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
+	"k8s.io/client-go/discovery"
 	restclient "k8s.io/client-go/rest"
+	"k8s.io/client-go/rest/fake"
 	fedclientset "k8s.io/kubernetes/federation/client/clientset_generated/federation_internalclientset"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/api/validation"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
-	"k8s.io/kubernetes/pkg/client/restclient/fake"
-	"k8s.io/kubernetes/pkg/client/typed/discovery"
 	"k8s.io/kubernetes/pkg/kubectl"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
@@ -93,6 +93,60 @@ func NewInternalType(kind, apiversion, name string) *InternalType {
 	return &item
 }
 
+type InternalNamespacedType struct {
+	Kind       string
+	APIVersion string
+
+	Name      string
+	Namespace string
+}
+
+type ExternalNamespacedType struct {
+	Kind       string `json:"kind"`
+	APIVersion string `json:"apiVersion"`
+
+	Name      string `json:"name"`
+	Namespace string `json:"namespace"`
+}
+
+type ExternalNamespacedType2 struct {
+	Kind       string `json:"kind"`
+	APIVersion string `json:"apiVersion"`
+
+	Name      string `json:"name"`
+	Namespace string `json:"namespace"`
+}
+
+func (obj *InternalNamespacedType) GetObjectKind() schema.ObjectKind { return obj }
+func (obj *InternalNamespacedType) SetGroupVersionKind(gvk schema.GroupVersionKind) {
+	obj.APIVersion, obj.Kind = gvk.ToAPIVersionAndKind()
+}
+func (obj *InternalNamespacedType) GroupVersionKind() schema.GroupVersionKind {
+	return schema.FromAPIVersionAndKind(obj.APIVersion, obj.Kind)
+}
+func (obj *ExternalNamespacedType) GetObjectKind() schema.ObjectKind { return obj }
+func (obj *ExternalNamespacedType) SetGroupVersionKind(gvk schema.GroupVersionKind) {
+	obj.APIVersion, obj.Kind = gvk.ToAPIVersionAndKind()
+}
+func (obj *ExternalNamespacedType) GroupVersionKind() schema.GroupVersionKind {
+	return schema.FromAPIVersionAndKind(obj.APIVersion, obj.Kind)
+}
+func (obj *ExternalNamespacedType2) GetObjectKind() schema.ObjectKind { return obj }
+func (obj *ExternalNamespacedType2) SetGroupVersionKind(gvk schema.GroupVersionKind) {
+	obj.APIVersion, obj.Kind = gvk.ToAPIVersionAndKind()
+}
+func (obj *ExternalNamespacedType2) GroupVersionKind() schema.GroupVersionKind {
+	return schema.FromAPIVersionAndKind(obj.APIVersion, obj.Kind)
+}
+
+func NewInternalNamespacedType(kind, apiversion, name, namespace string) *InternalNamespacedType {
+	item := InternalNamespacedType{Kind: kind,
+		APIVersion: apiversion,
+		Name:       name,
+		Namespace:  namespace}
+	return &item
+}
+
 var versionErr = errors.New("not a version")
 
 func versionErrIfFalse(b bool) error {
@@ -109,10 +163,16 @@ var ValidVersionGV = schema.GroupVersion{Group: "apitest", Version: ValidVersion
 
 func newExternalScheme() (*runtime.Scheme, meta.RESTMapper, runtime.Codec) {
 	scheme := runtime.NewScheme()
+
 	scheme.AddKnownTypeWithName(InternalGV.WithKind("Type"), &InternalType{})
 	scheme.AddKnownTypeWithName(UnlikelyGV.WithKind("Type"), &ExternalType{})
 	//This tests that kubectl will not confuse the external scheme with the internal scheme, even when they accidentally have versions of the same name.
 	scheme.AddKnownTypeWithName(ValidVersionGV.WithKind("Type"), &ExternalType2{})
+
+	scheme.AddKnownTypeWithName(InternalGV.WithKind("NamespacedType"), &InternalNamespacedType{})
+	scheme.AddKnownTypeWithName(UnlikelyGV.WithKind("NamespacedType"), &ExternalNamespacedType{})
+	//This tests that kubectl will not confuse the external scheme with the internal scheme, even when they accidentally have versions of the same name.
+	scheme.AddKnownTypeWithName(ValidVersionGV.WithKind("NamespacedType"), &ExternalNamespacedType2{})
 
 	codecs := serializer.NewCodecFactory(scheme)
 	codec := codecs.LegacyCodec(UnlikelyGV)
@@ -146,15 +206,16 @@ func (d *fakeCachedDiscoveryClient) Invalidate() {
 }
 
 type TestFactory struct {
-	Mapper       meta.RESTMapper
-	Typer        runtime.ObjectTyper
-	Client       kubectl.RESTClient
-	Describer    kubectl.Describer
-	Printer      kubectl.ResourcePrinter
-	Validator    validation.Schema
-	Namespace    string
-	ClientConfig *restclient.Config
-	Err          error
+	Mapper             meta.RESTMapper
+	Typer              runtime.ObjectTyper
+	Client             kubectl.RESTClient
+	UnstructuredClient kubectl.RESTClient
+	Describer          kubectl.Describer
+	Printer            kubectl.ResourcePrinter
+	Validator          validation.Schema
+	Namespace          string
+	ClientConfig       *restclient.Config
+	Err                error
 }
 
 type FakeFactory struct {
@@ -251,7 +312,7 @@ func (f *FakeFactory) ClientConfigForVersion(requiredVersion *schema.GroupVersio
 }
 
 func (f *FakeFactory) UnstructuredClientForMapping(*meta.RESTMapping) (resource.RESTClient, error) {
-	return nil, nil
+	return f.tf.UnstructuredClient, f.tf.Err
 }
 
 func (f *FakeFactory) Describer(*meta.RESTMapping) (kubectl.Describer, error) {
@@ -497,7 +558,7 @@ func (f *fakeAPIFactory) ClientForMapping(*meta.RESTMapping) (resource.RESTClien
 }
 
 func (f *fakeAPIFactory) UnstructuredClientForMapping(*meta.RESTMapping) (resource.RESTClient, error) {
-	return f.tf.Client, f.tf.Err
+	return f.tf.UnstructuredClient, f.tf.Err
 }
 
 func (f *fakeAPIFactory) Describer(*meta.RESTMapping) (kubectl.Describer, error) {
@@ -601,7 +662,24 @@ func testDynamicResources() []*discovery.APIGroupResources {
 					{Name: "replicationcontrollers", Namespaced: true, Kind: "ReplicationController"},
 					{Name: "componentstatuses", Namespaced: false, Kind: "ComponentStatus"},
 					{Name: "nodes", Namespaced: false, Kind: "Node"},
+					{Name: "secrets", Namespaced: true, Kind: "Secret"},
+					{Name: "configmaps", Namespaced: true, Kind: "ConfigMap"},
 					{Name: "type", Namespaced: false, Kind: "Type"},
+					{Name: "namespacedtype", Namespaced: true, Kind: "NamespacedType"},
+				},
+			},
+		},
+		{
+			Group: metav1.APIGroup{
+				Name: "extensions",
+				Versions: []metav1.GroupVersionForDiscovery{
+					{Version: "v1beta1"},
+				},
+				PreferredVersion: metav1.GroupVersionForDiscovery{Version: "v1beta1"},
+			},
+			VersionedResources: map[string][]metav1.APIResource{
+				"v1beta1": {
+					{Name: "deployments", Namespaced: true, Kind: "Deployment"},
 				},
 			},
 		},

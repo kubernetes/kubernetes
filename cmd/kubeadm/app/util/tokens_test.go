@@ -89,6 +89,8 @@ func TestValidateToken(t *testing.T) {
 		{ID: "12345", Secret: "1234567890123456"},
 		{ID: "Abcdef", Secret: "1234567890123456"},
 		{ID: "123456", Secret: "AABBCCDDEEFFGGHH"},
+		{ID: "abc*ef", Secret: "1234567890123456"},
+		{ID: "abcdef", Secret: "123456789*123456"},
 	}
 
 	for _, token := range invalidTokens {
@@ -100,6 +102,8 @@ func TestValidateToken(t *testing.T) {
 	validTokens := []*kubeadmapi.TokenDiscovery{
 		{ID: "abcdef", Secret: "1234567890123456"},
 		{ID: "123456", Secret: "aabbccddeeffgghh"},
+		{ID: "abc456", Secret: "1234567890123456"},
+		{ID: "abcdef", Secret: "123456ddeeffgghh"},
 	}
 
 	for _, token := range validTokens {

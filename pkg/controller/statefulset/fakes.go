@@ -22,14 +22,14 @@ import (
 
 	inf "gopkg.in/inf.v0"
 
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/kubernetes/pkg/api/resource"
+	"k8s.io/client-go/tools/record"
 	"k8s.io/kubernetes/pkg/api/v1"
 	apipod "k8s.io/kubernetes/pkg/api/v1/pod"
 	apps "k8s.io/kubernetes/pkg/apis/apps/v1beta1"
-	"k8s.io/kubernetes/pkg/client/record"
 )
 
 func dec(i int64, exponent int) *inf.Dec {
@@ -77,7 +77,7 @@ func newStatefulSetWithVolumes(replicas int, name string, petMounts []v1.VolumeM
 		},
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
-			Namespace: v1.NamespaceDefault,
+			Namespace: metav1.NamespaceDefault,
 			UID:       types.UID("test"),
 		},
 		Spec: apps.StatefulSetSpec{

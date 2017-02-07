@@ -18,9 +18,9 @@ package fake
 
 import (
 	restclient "k8s.io/client-go/rest"
-	"k8s.io/client-go/testing"
+	core "k8s.io/client-go/testing"
 )
 
 func (c *FakeServices) ProxyGet(scheme, name, port, path string, params map[string]string) restclient.ResponseWrapper {
-	return c.Fake.InvokesProxy(testing.NewProxyGetAction(servicesResource, c.ns, scheme, name, port, path, params))
+	return c.Fake.InvokesProxy(core.NewProxyGetAction(servicesResource, c.ns, scheme, name, port, path, params))
 }

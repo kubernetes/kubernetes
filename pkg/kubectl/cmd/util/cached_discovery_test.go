@@ -29,9 +29,9 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/version"
+	"k8s.io/client-go/discovery"
 	restclient "k8s.io/client-go/rest"
-	"k8s.io/kubernetes/pkg/client/restclient/fake"
-	"k8s.io/kubernetes/pkg/client/typed/discovery"
+	"k8s.io/client-go/rest/fake"
 )
 
 func TestCachedDiscoveryClient_Fresh(t *testing.T) {

@@ -32,8 +32,9 @@ go_test(
         "//pkg/util/io:go_default_library",
         "//pkg/volume:go_default_library",
         "//vendor:github.com/pborman/uuid",
+        "//vendor:k8s.io/apimachinery/pkg/api/equality",
         "//vendor:k8s.io/apimachinery/pkg/runtime",
-        "//vendor:k8s.io/client-go/pkg/util/testing",
+        "//vendor:k8s.io/client-go/util/testing",
     ],
 )
 

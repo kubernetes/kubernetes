@@ -60,13 +60,13 @@ func (c *FakeNamespaces) UpdateStatus(namespace *v1.Namespace) (*v1.Namespace, e
 	return obj.(*v1.Namespace), err
 }
 
-func (c *FakeNamespaces) Delete(name string, options *v1.DeleteOptions) error {
+func (c *FakeNamespaces) Delete(name string, options *meta_v1.DeleteOptions) error {
 	_, err := c.Fake.
 		Invokes(testing.NewRootDeleteAction(namespacesResource, name), &v1.Namespace{})
 	return err
 }
 
-func (c *FakeNamespaces) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
+func (c *FakeNamespaces) DeleteCollection(options *meta_v1.DeleteOptions, listOptions meta_v1.ListOptions) error {
 	action := testing.NewRootDeleteCollectionAction(namespacesResource, listOptions)
 
 	_, err := c.Fake.Invokes(action, &v1.NamespaceList{})
@@ -82,7 +82,7 @@ func (c *FakeNamespaces) Get(name string, options meta_v1.GetOptions) (result *v
 	return obj.(*v1.Namespace), err
 }
 
-func (c *FakeNamespaces) List(opts v1.ListOptions) (result *v1.NamespaceList, err error) {
+func (c *FakeNamespaces) List(opts meta_v1.ListOptions) (result *v1.NamespaceList, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewRootListAction(namespacesResource, opts), &v1.NamespaceList{})
 	if obj == nil {
@@ -103,7 +103,7 @@ func (c *FakeNamespaces) List(opts v1.ListOptions) (result *v1.NamespaceList, er
 }
 
 // Watch returns a watch.Interface that watches the requested namespaces.
-func (c *FakeNamespaces) Watch(opts v1.ListOptions) (watch.Interface, error) {
+func (c *FakeNamespaces) Watch(opts meta_v1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
 		InvokesWatch(testing.NewRootWatchAction(namespacesResource, opts))
 }

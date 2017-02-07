@@ -20,11 +20,12 @@ import (
 	"fmt"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/kubelet/events"
 	"k8s.io/kubernetes/pkg/kubelet/sysctl"
-	"k8s.io/kubernetes/pkg/util/uuid"
 	"k8s.io/kubernetes/test/e2e/framework"
 
 	. "github.com/onsi/ginkgo"
@@ -59,7 +60,7 @@ var _ = framework.KubeDescribe("Sysctls", func() {
 	waitForPodErrorEventOrStarted := func(pod *v1.Pod) (*v1.Event, error) {
 		var ev *v1.Event
 		err := wait.Poll(framework.Poll, framework.PodStartTimeout, func() (bool, error) {
-			evnts, err := f.ClientSet.Core().Events(pod.Namespace).Search(pod)
+			evnts, err := f.ClientSet.Core().Events(pod.Namespace).Search(api.Scheme, pod)
 			if err != nil {
 				return false, fmt.Errorf("error in listing events: %s", err)
 			}

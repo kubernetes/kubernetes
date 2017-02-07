@@ -23,10 +23,11 @@ import (
 	"testing"
 	"time"
 
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
-	utiltesting "k8s.io/client-go/pkg/util/testing"
+	utiltesting "k8s.io/client-go/util/testing"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/api/v1"
@@ -145,7 +146,7 @@ func TestExtractPodsFromHTTP(t *testing.T) {
 				},
 				Spec: v1.PodSpec{
 					NodeName:        string(nodeName),
-					Containers:      []v1.Container{{Name: "1", Image: "foo", ImagePullPolicy: v1.PullAlways}},
+					Containers:      []v1.Container{{Name: "1", Image: "foo", ImagePullPolicy: v1.PullAlways, TerminationMessagePolicy: v1.TerminationMessageReadFile}},
 					SecurityContext: &v1.PodSecurityContext{},
 					SchedulerName:   api.DefaultSchedulerName,
 				},
@@ -174,8 +175,9 @@ func TestExtractPodsFromHTTP(t *testing.T) {
 						Containers: []v1.Container{{
 							Name:  "1",
 							Image: "foo",
-							TerminationMessagePath: "/dev/termination-log",
-							ImagePullPolicy:        "Always",
+							TerminationMessagePath:   "/dev/termination-log",
+							ImagePullPolicy:          "Always",
+							TerminationMessagePolicy: v1.TerminationMessageReadFile,
 						}},
 					},
 					Status: v1.PodStatus{
@@ -198,7 +200,7 @@ func TestExtractPodsFromHTTP(t *testing.T) {
 						},
 						Spec: v1.PodSpec{
 							NodeName:        nodeName,
-							Containers:      []v1.Container{{Name: "1", Image: "foo", ImagePullPolicy: v1.PullAlways}},
+							Containers:      []v1.Container{{Name: "1", Image: "foo", ImagePullPolicy: v1.PullAlways, TerminationMessagePolicy: v1.TerminationMessageReadFile}},
 							SecurityContext: &v1.PodSecurityContext{},
 							SchedulerName:   api.DefaultSchedulerName,
 						},
@@ -213,7 +215,7 @@ func TestExtractPodsFromHTTP(t *testing.T) {
 						},
 						Spec: v1.PodSpec{
 							NodeName:        nodeName,
-							Containers:      []v1.Container{{Name: "2", Image: "bar:bartag", ImagePullPolicy: ""}},
+							Containers:      []v1.Container{{Name: "2", Image: "bar:bartag", ImagePullPolicy: "", TerminationMessagePolicy: v1.TerminationMessageReadFile}},
 							SecurityContext: &v1.PodSecurityContext{},
 							SchedulerName:   api.DefaultSchedulerName,
 						},
@@ -231,7 +233,7 @@ func TestExtractPodsFromHTTP(t *testing.T) {
 						Name:        "foo" + "-" + nodeName,
 						Namespace:   "default",
 						Annotations: map[string]string{kubetypes.ConfigHashAnnotationKey: "111"},
-						SelfLink:    getSelfLink("foo-"+nodeName, kubetypes.NamespaceDefault),
+						SelfLink:    getSelfLink("foo-"+nodeName, metav1.NamespaceDefault),
 					},
 					Spec: v1.PodSpec{
 						NodeName:                      nodeName,
@@ -244,8 +246,9 @@ func TestExtractPodsFromHTTP(t *testing.T) {
 						Containers: []v1.Container{{
 							Name:  "1",
 							Image: "foo",
-							TerminationMessagePath: "/dev/termination-log",
-							ImagePullPolicy:        "Always",
+							TerminationMessagePath:   "/dev/termination-log",
+							ImagePullPolicy:          "Always",
+							TerminationMessagePolicy: v1.TerminationMessageReadFile,
 						}},
 					},
 					Status: v1.PodStatus{
@@ -258,7 +261,7 @@ func TestExtractPodsFromHTTP(t *testing.T) {
 						Name:        "bar" + "-" + nodeName,
 						Namespace:   "default",
 						Annotations: map[string]string{kubetypes.ConfigHashAnnotationKey: "222"},
-						SelfLink:    getSelfLink("bar-"+nodeName, kubetypes.NamespaceDefault),
+						SelfLink:    getSelfLink("bar-"+nodeName, metav1.NamespaceDefault),
 					},
 					Spec: v1.PodSpec{
 						NodeName:                      nodeName,
@@ -271,8 +274,9 @@ func TestExtractPodsFromHTTP(t *testing.T) {
 						Containers: []v1.Container{{
 							Name:  "2",
 							Image: "bar:bartag",
-							TerminationMessagePath: "/dev/termination-log",
-							ImagePullPolicy:        "IfNotPresent",
+							TerminationMessagePath:   "/dev/termination-log",
+							ImagePullPolicy:          "IfNotPresent",
+							TerminationMessagePolicy: v1.TerminationMessageReadFile,
 						}},
 					},
 					Status: v1.PodStatus{
@@ -306,7 +310,7 @@ func TestExtractPodsFromHTTP(t *testing.T) {
 		}
 		update := (<-ch).(kubetypes.PodUpdate)
 
-		if !api.Semantic.DeepEqual(testCase.expected, update) {
+		if !apiequality.Semantic.DeepEqual(testCase.expected, update) {
 			t.Errorf("%s: Expected: %#v, Got: %#v", testCase.desc, testCase.expected, update)
 		}
 		for _, pod := range update.Pods {

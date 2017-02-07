@@ -19,7 +19,7 @@ package fake
 import (
 	authorizationapi "k8s.io/kubernetes/pkg/apis/authorization"
 
-	"k8s.io/kubernetes/pkg/client/testing/core"
+	core "k8s.io/client-go/testing"
 )
 
 func (c *FakeSubjectAccessReviews) Create(sar *authorizationapi.SubjectAccessReview) (result *authorizationapi.SubjectAccessReview, err error) {

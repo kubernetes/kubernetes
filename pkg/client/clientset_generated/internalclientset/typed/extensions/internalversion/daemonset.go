@@ -36,11 +36,11 @@ type DaemonSetInterface interface {
 	Create(*extensions.DaemonSet) (*extensions.DaemonSet, error)
 	Update(*extensions.DaemonSet) (*extensions.DaemonSet, error)
 	UpdateStatus(*extensions.DaemonSet) (*extensions.DaemonSet, error)
-	Delete(name string, options *api.DeleteOptions) error
-	DeleteCollection(options *api.DeleteOptions, listOptions api.ListOptions) error
+	Delete(name string, options *v1.DeleteOptions) error
+	DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error
 	Get(name string, options v1.GetOptions) (*extensions.DaemonSet, error)
-	List(opts api.ListOptions) (*extensions.DaemonSetList, error)
-	Watch(opts api.ListOptions) (watch.Interface, error)
+	List(opts v1.ListOptions) (*extensions.DaemonSetList, error)
+	Watch(opts v1.ListOptions) (watch.Interface, error)
 	Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *extensions.DaemonSet, err error)
 	DaemonSetExpansion
 }
@@ -101,7 +101,7 @@ func (c *daemonSets) UpdateStatus(daemonSet *extensions.DaemonSet) (result *exte
 }
 
 // Delete takes name of the daemonSet and deletes it. Returns an error if one occurs.
-func (c *daemonSets) Delete(name string, options *api.DeleteOptions) error {
+func (c *daemonSets) Delete(name string, options *v1.DeleteOptions) error {
 	return c.client.Delete().
 		Namespace(c.ns).
 		Resource("daemonsets").
@@ -112,7 +112,7 @@ func (c *daemonSets) Delete(name string, options *api.DeleteOptions) error {
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *daemonSets) DeleteCollection(options *api.DeleteOptions, listOptions api.ListOptions) error {
+func (c *daemonSets) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
 	return c.client.Delete().
 		Namespace(c.ns).
 		Resource("daemonsets").
@@ -136,7 +136,7 @@ func (c *daemonSets) Get(name string, options v1.GetOptions) (result *extensions
 }
 
 // List takes label and field selectors, and returns the list of DaemonSets that match those selectors.
-func (c *daemonSets) List(opts api.ListOptions) (result *extensions.DaemonSetList, err error) {
+func (c *daemonSets) List(opts v1.ListOptions) (result *extensions.DaemonSetList, err error) {
 	result = &extensions.DaemonSetList{}
 	err = c.client.Get().
 		Namespace(c.ns).
@@ -148,7 +148,7 @@ func (c *daemonSets) List(opts api.ListOptions) (result *extensions.DaemonSetLis
 }
 
 // Watch returns a watch.Interface that watches the requested daemonSets.
-func (c *daemonSets) Watch(opts api.ListOptions) (watch.Interface, error) {
+func (c *daemonSets) Watch(opts v1.ListOptions) (watch.Interface, error) {
 	return c.client.Get().
 		Prefix("watch").
 		Namespace(c.ns).

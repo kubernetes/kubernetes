@@ -224,8 +224,8 @@ func (scaler *ReplicationControllerScaler) Scale(namespace, name string, newSize
 			return err
 		}
 		if !checkRC(currentRC) {
-			watchOptions := api.ListOptions{
-				FieldSelector:   fields.OneTermEqualSelector("metadata.name", name),
+			watchOptions := metav1.ListOptions{
+				FieldSelector:   fields.OneTermEqualSelector("metadata.name", name).String(),
 				ResourceVersion: updatedResourceVersion,
 			}
 			watcher, err := scaler.c.ReplicationControllers(namespace).Watch(watchOptions)

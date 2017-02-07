@@ -25,11 +25,12 @@ import (
 
 	"net/url"
 
+	"k8s.io/apimachinery/pkg/api/resource"
+	"k8s.io/client-go/rest/fake"
 	metricsapi "k8s.io/heapster/metrics/apis/metrics/v1alpha1"
-	"k8s.io/kubernetes/pkg/api/resource"
+	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	v1 "k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/client/restclient/fake"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
 )
 
@@ -117,6 +118,7 @@ func TestTopPod(t *testing.T) {
 		f, tf, _, ns := cmdtesting.NewAPIFactory()
 		tf.Printer = &testPrinter{}
 		tf.Client = &fake.RESTClient{
+			APIRegistry:          api.Registry,
 			NegotiatedSerializer: ns,
 			Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 				switch p, m, q := req.URL.Path, req.Method, req.URL.RawQuery; {

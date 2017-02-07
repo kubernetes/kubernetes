@@ -34,11 +34,11 @@ type ConfigMapsGetter interface {
 type ConfigMapInterface interface {
 	Create(*api.ConfigMap) (*api.ConfigMap, error)
 	Update(*api.ConfigMap) (*api.ConfigMap, error)
-	Delete(name string, options *api.DeleteOptions) error
-	DeleteCollection(options *api.DeleteOptions, listOptions api.ListOptions) error
+	Delete(name string, options *v1.DeleteOptions) error
+	DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error
 	Get(name string, options v1.GetOptions) (*api.ConfigMap, error)
-	List(opts api.ListOptions) (*api.ConfigMapList, error)
-	Watch(opts api.ListOptions) (watch.Interface, error)
+	List(opts v1.ListOptions) (*api.ConfigMapList, error)
+	Watch(opts v1.ListOptions) (watch.Interface, error)
 	Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *api.ConfigMap, err error)
 	ConfigMapExpansion
 }
@@ -83,7 +83,7 @@ func (c *configMaps) Update(configMap *api.ConfigMap) (result *api.ConfigMap, er
 }
 
 // Delete takes name of the configMap and deletes it. Returns an error if one occurs.
-func (c *configMaps) Delete(name string, options *api.DeleteOptions) error {
+func (c *configMaps) Delete(name string, options *v1.DeleteOptions) error {
 	return c.client.Delete().
 		Namespace(c.ns).
 		Resource("configmaps").
@@ -94,7 +94,7 @@ func (c *configMaps) Delete(name string, options *api.DeleteOptions) error {
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *configMaps) DeleteCollection(options *api.DeleteOptions, listOptions api.ListOptions) error {
+func (c *configMaps) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
 	return c.client.Delete().
 		Namespace(c.ns).
 		Resource("configmaps").
@@ -118,7 +118,7 @@ func (c *configMaps) Get(name string, options v1.GetOptions) (result *api.Config
 }
 
 // List takes label and field selectors, and returns the list of ConfigMaps that match those selectors.
-func (c *configMaps) List(opts api.ListOptions) (result *api.ConfigMapList, err error) {
+func (c *configMaps) List(opts v1.ListOptions) (result *api.ConfigMapList, err error) {
 	result = &api.ConfigMapList{}
 	err = c.client.Get().
 		Namespace(c.ns).
@@ -130,7 +130,7 @@ func (c *configMaps) List(opts api.ListOptions) (result *api.ConfigMapList, err 
 }
 
 // Watch returns a watch.Interface that watches the requested configMaps.
-func (c *configMaps) Watch(opts api.ListOptions) (watch.Interface, error) {
+func (c *configMaps) Watch(opts v1.ListOptions) (watch.Interface, error) {
 	return c.client.Get().
 		Prefix("watch").
 		Namespace(c.ns).

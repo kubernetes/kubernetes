@@ -202,7 +202,7 @@ func TestGCAdmission(t *testing.T) {
 			operation = admission.Update
 		}
 		user := &user.DefaultInfo{Name: tc.username}
-		attributes := admission.NewAttributesRecord(tc.newObj, tc.oldObj, schema.GroupVersionKind{}, api.NamespaceDefault, "foo", tc.resource, "", operation, user)
+		attributes := admission.NewAttributesRecord(tc.newObj, tc.oldObj, schema.GroupVersionKind{}, metav1.NamespaceDefault, "foo", tc.resource, "", operation, user)
 
 		err := gcAdmit.Admit(attributes)
 		switch {

@@ -24,11 +24,11 @@ import (
 
 	"k8s.io/apimachinery/pkg/runtime"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
+	genericregistry "k8s.io/apiserver/pkg/registry/generic/registry"
+	genericrest "k8s.io/apiserver/pkg/registry/generic/rest"
+	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/capabilities"
-	genericregistry "k8s.io/kubernetes/pkg/genericapiserver/registry/generic/registry"
-	genericrest "k8s.io/kubernetes/pkg/genericapiserver/registry/generic/rest"
-	"k8s.io/kubernetes/pkg/genericapiserver/registry/rest"
 	"k8s.io/kubernetes/pkg/kubelet/client"
 	"k8s.io/kubernetes/pkg/registry/core/pod"
 )
@@ -165,9 +165,10 @@ func (r *PortForwardREST) New() runtime.Object {
 	return &api.Pod{}
 }
 
-// NewConnectOptions returns nil since portforward doesn't take additional parameters
+// NewConnectOptions returns the versioned object that represents the
+// portforward parameters
 func (r *PortForwardREST) NewConnectOptions() (runtime.Object, bool, string) {
-	return nil, false, ""
+	return &api.PodPortForwardOptions{}, false, ""
 }
 
 // ConnectMethods returns the methods supported by portforward
@@ -177,7 +178,11 @@ func (r *PortForwardREST) ConnectMethods() []string {
 
 // Connect returns a handler for the pod portforward proxy
 func (r *PortForwardREST) Connect(ctx genericapirequest.Context, name string, opts runtime.Object, responder rest.Responder) (http.Handler, error) {
-	location, transport, err := pod.PortForwardLocation(r.Store, r.KubeletConn, ctx, name)
+	portForwardOpts, ok := opts.(*api.PodPortForwardOptions)
+	if !ok {
+		return nil, fmt.Errorf("invalid options object: %#v", opts)
+	}
+	location, transport, err := pod.PortForwardLocation(r.Store, r.KubeletConn, ctx, name, portForwardOpts)
 	if err != nil {
 		return nil, err
 	}

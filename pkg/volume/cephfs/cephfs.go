@@ -201,7 +201,7 @@ func (cephfsVolume *cephfsMounter) GetAttributes() volume.Attributes {
 // Checks prior to mount operations to verify that the required components (binaries, etc.)
 // to mount the volume are available on the underlying node.
 // If not, it returns an error
-func (caphfsMounter *cephfsMounter) CanMount() error {
+func (cephfsMounter *cephfsMounter) CanMount() error {
 	return nil
 }
 

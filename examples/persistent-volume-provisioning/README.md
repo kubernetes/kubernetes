@@ -136,8 +136,8 @@ parameters:
   kind: StorageClass
   metadata:
     name: fast
-    provisioner: kubernetes.io/rbd
-    parameters:
+  provisioner: kubernetes.io/rbd
+  parameters:
     monitors: 10.16.153.105:6789
     adminId: kube
     adminSecretName: ceph-secret
@@ -258,7 +258,7 @@ parameters:
 
 * `skuName`: Azure storage account Sku tier. Default is empty.
 * `location`: Azure storage account location. Default is empty.
-* `storageAccount`: Azure storage account name. If storage account is not provided, all storage accounts associated with the resource group are searched to find one that matches `skuName` and `location`. If storage account is provided, `skuName` and `location` are ignored.
+* `storageAccount`: Azure storage account name. If storage account is not provided, all storage accounts associated with the resource group are searched to find one that matches `skuName` and `location`. If storage account is provided, it must reside in the same resource group as the cluster, and `skuName` and `location` are ignored.
 
 ### User provisioning requests
 

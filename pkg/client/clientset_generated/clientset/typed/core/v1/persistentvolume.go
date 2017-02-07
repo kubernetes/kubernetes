@@ -36,11 +36,11 @@ type PersistentVolumeInterface interface {
 	Create(*v1.PersistentVolume) (*v1.PersistentVolume, error)
 	Update(*v1.PersistentVolume) (*v1.PersistentVolume, error)
 	UpdateStatus(*v1.PersistentVolume) (*v1.PersistentVolume, error)
-	Delete(name string, options *v1.DeleteOptions) error
-	DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error
+	Delete(name string, options *meta_v1.DeleteOptions) error
+	DeleteCollection(options *meta_v1.DeleteOptions, listOptions meta_v1.ListOptions) error
 	Get(name string, options meta_v1.GetOptions) (*v1.PersistentVolume, error)
-	List(opts v1.ListOptions) (*v1.PersistentVolumeList, error)
-	Watch(opts v1.ListOptions) (watch.Interface, error)
+	List(opts meta_v1.ListOptions) (*v1.PersistentVolumeList, error)
+	Watch(opts meta_v1.ListOptions) (watch.Interface, error)
 	Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v1.PersistentVolume, err error)
 	PersistentVolumeExpansion
 }
@@ -96,7 +96,7 @@ func (c *persistentVolumes) UpdateStatus(persistentVolume *v1.PersistentVolume) 
 }
 
 // Delete takes name of the persistentVolume and deletes it. Returns an error if one occurs.
-func (c *persistentVolumes) Delete(name string, options *v1.DeleteOptions) error {
+func (c *persistentVolumes) Delete(name string, options *meta_v1.DeleteOptions) error {
 	return c.client.Delete().
 		Resource("persistentvolumes").
 		Name(name).
@@ -106,7 +106,7 @@ func (c *persistentVolumes) Delete(name string, options *v1.DeleteOptions) error
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *persistentVolumes) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
+func (c *persistentVolumes) DeleteCollection(options *meta_v1.DeleteOptions, listOptions meta_v1.ListOptions) error {
 	return c.client.Delete().
 		Resource("persistentvolumes").
 		VersionedParams(&listOptions, api.ParameterCodec).
@@ -128,7 +128,7 @@ func (c *persistentVolumes) Get(name string, options meta_v1.GetOptions) (result
 }
 
 // List takes label and field selectors, and returns the list of PersistentVolumes that match those selectors.
-func (c *persistentVolumes) List(opts v1.ListOptions) (result *v1.PersistentVolumeList, err error) {
+func (c *persistentVolumes) List(opts meta_v1.ListOptions) (result *v1.PersistentVolumeList, err error) {
 	result = &v1.PersistentVolumeList{}
 	err = c.client.Get().
 		Resource("persistentvolumes").
@@ -139,7 +139,7 @@ func (c *persistentVolumes) List(opts v1.ListOptions) (result *v1.PersistentVolu
 }
 
 // Watch returns a watch.Interface that watches the requested persistentVolumes.
-func (c *persistentVolumes) Watch(opts v1.ListOptions) (watch.Interface, error) {
+func (c *persistentVolumes) Watch(opts meta_v1.ListOptions) (watch.Interface, error) {
 	return c.client.Get().
 		Prefix("watch").
 		Resource("persistentvolumes").

@@ -351,12 +351,12 @@ func TestUpdate(t *testing.T) {
 	watchCh := make(chan struct{})
 	_, controller := NewInformer(
 		&testLW{
-			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
+			WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
 				watch, err := source.Watch(options)
 				close(watchCh)
 				return watch, err
 			},
-			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
+			ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
 				return source.List(options)
 			},
 		},

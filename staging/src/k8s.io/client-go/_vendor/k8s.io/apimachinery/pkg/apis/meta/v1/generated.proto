@@ -23,8 +23,7 @@ package k8s.io.apimachinery.pkg.apis.meta.v1;
 
 import "k8s.io/apimachinery/pkg/runtime/generated.proto";
 import "k8s.io/apimachinery/pkg/runtime/schema/generated.proto";
-import "k8s.io/kubernetes/pkg/api/resource/generated.proto";
-import "k8s.io/kubernetes/pkg/util/intstr/generated.proto";
+import "k8s.io/apimachinery/pkg/util/intstr/generated.proto";
 
 // Package-wide variables from generator "generated".
 option go_package = "v1";
@@ -74,6 +73,9 @@ message APIResource {
   // verbs is a list of supported kube verbs (this includes get, list, watch, create,
   // update, patch, delete, deletecollection, and proxy)
   optional Verbs verbs = 4;
+
+  // shortNames is a list of suggested short names of the resource.
+  repeated string shortNames = 5;
 }
 
 // APIResourceList is a list of APIResource, it is used to expose the name of the
@@ -103,6 +105,26 @@ message APIVersions {
   // For example: the master will return an internal IP CIDR only, if the client reaches the server using an internal IP.
   // Server looks at X-Forwarded-For header or X-Real-Ip header or request.RemoteAddr (in that order) to get the client IP.
   repeated ServerAddressByClientCIDR serverAddressByClientCIDRs = 2;
+}
+
+// DeleteOptions may be provided when deleting an API object.
+message DeleteOptions {
+  // The duration in seconds before the object should be deleted. Value must be non-negative integer.
+  // The value zero indicates delete immediately. If this value is nil, the default grace period for the
+  // specified type will be used.
+  // Defaults to a per object value if not specified. zero means delete immediately.
+  // +optional
+  optional int64 gracePeriodSeconds = 1;
+
+  // Must be fulfilled before a deletion is carried out. If not possible, a 409 Conflict status will be
+  // returned.
+  // +optional
+  optional Preconditions preconditions = 2;
+
+  // Should the dependent objects be orphaned. If true/false, the "orphan"
+  // finalizer will be added to/removed from the object's finalizers list.
+  // +optional
+  optional bool orphanDependents = 3;
 }
 
 // Duration is a wrapper around time.Duration which supports correct
@@ -244,6 +266,37 @@ message ListMeta {
   // More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#concurrency-control-and-consistency
   // +optional
   optional string resourceVersion = 2;
+}
+
+// ListOptions is the query options to a standard REST list call.
+message ListOptions {
+  // A selector to restrict the list of returned objects by their labels.
+  // Defaults to everything.
+  // +optional
+  optional string labelSelector = 1;
+
+  // A selector to restrict the list of returned objects by their fields.
+  // Defaults to everything.
+  // +optional
+  optional string fieldSelector = 2;
+
+  // Watch for changes to the described resources and return them as a stream of
+  // add, update, and remove notifications. Specify resourceVersion.
+  // +optional
+  optional bool watch = 3;
+
+  // When specified with a watch call, shows changes that occur after that particular version of a resource.
+  // Defaults to changes from the beginning of history.
+  // When specified for list:
+  // - if unset, then the result is returned from remote storage based on quorum-read flag;
+  // - if it's 0, then we simply return what we currently have in cache, no guarantee;
+  // - if set to non zero, then the result is at least as fresh as given rv.
+  // +optional
+  optional string resourceVersion = 4;
+
+  // Timeout for the list/watch call.
+  // +optional
+  optional int64 timeoutSeconds = 5;
 }
 
 // ObjectMeta is metadata that all persisted resources must have, which includes all objects
@@ -416,6 +469,13 @@ message OwnerReference {
   // If true, this reference points to the managing controller.
   // +optional
   optional bool controller = 6;
+}
+
+// Preconditions must be fulfilled before an operation (update, delete, etc.) is carried out.
+message Preconditions {
+  // Specifies the target UID.
+  // +optional
+  optional string uid = 1;
 }
 
 // RootPaths lists the paths available at root.

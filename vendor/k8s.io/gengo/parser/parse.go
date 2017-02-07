@@ -695,16 +695,16 @@ func (b *Builder) walkType(u types.Universe, useName *types.Name, in tc.Type) *t
 		}
 		return out
 	case *tc.Named:
+		var out *types.Type
 		switch t.Underlying().(type) {
 		case *tc.Named, *tc.Basic, *tc.Map, *tc.Slice:
 			name := tcNameToName(t.String())
-			out := u.Type(name)
+			out = u.Type(name)
 			if out.Kind != types.Unknown {
 				return out
 			}
 			out.Kind = types.Alias
 			out.Underlying = b.walkType(u, nil, t.Underlying())
-			return out
 		default:
 			// tc package makes everything "named" with an
 			// underlying anonymous type--we remove that annoying
@@ -714,20 +714,19 @@ func (b *Builder) walkType(u types.Universe, useName *types.Name, in tc.Type) *t
 			if out := u.Type(name); out.Kind != types.Unknown {
 				return out // short circuit if we've already made this.
 			}
-			out := b.walkType(u, &name, t.Underlying())
-			if len(out.Methods) == 0 {
-				// If the underlying type didn't already add
-				// methods, add them. (Interface types will
-				// have already added methods.)
-				for i := 0; i < t.NumMethods(); i++ {
-					if out.Methods == nil {
-						out.Methods = map[string]*types.Type{}
-					}
-					out.Methods[t.Method(i).Name()] = b.walkType(u, nil, t.Method(i).Type())
-				}
-			}
-			return out
+			out = b.walkType(u, &name, t.Underlying())
 		}
+		// If the underlying type didn't already add methods, add them.
+		// (Interface types will have already added methods.)
+		if len(out.Methods) == 0 {
+			for i := 0; i < t.NumMethods(); i++ {
+				if out.Methods == nil {
+					out.Methods = map[string]*types.Type{}
+				}
+				out.Methods[t.Method(i).Name()] = b.walkType(u, nil, t.Method(i).Type())
+			}
+		}
+		return out
 	default:
 		out := u.Type(name)
 		if out.Kind != types.Unknown {

@@ -17,8 +17,8 @@ limitations under the License.
 package framework
 
 import (
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	e2eframework "k8s.io/kubernetes/test/e2e/framework"
@@ -96,7 +96,7 @@ func (p *IntegrationTestNodePreparer) PrepareNodes() error {
 func (p *IntegrationTestNodePreparer) CleanupNodes() error {
 	nodes := e2eframework.GetReadySchedulableNodesOrDie(p.client)
 	for i := range nodes.Items {
-		if err := p.client.Core().Nodes().Delete(nodes.Items[i].Name, &v1.DeleteOptions{}); err != nil {
+		if err := p.client.Core().Nodes().Delete(nodes.Items[i].Name, &metav1.DeleteOptions{}); err != nil {
 			glog.Errorf("Error while deleting Node: %v", err)
 		}
 	}

@@ -37,11 +37,11 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/stats"
 	"k8s.io/kubernetes/pkg/util/procfs"
-	"k8s.io/kubernetes/pkg/util/uuid"
 	"k8s.io/kubernetes/test/e2e/framework"
 
 	. "github.com/onsi/gomega"
@@ -374,7 +374,7 @@ func deletePodsSync(f *framework.Framework, pods []*v1.Pod) {
 		go func(pod *v1.Pod) {
 			defer wg.Done()
 
-			err := f.PodClient().Delete(pod.ObjectMeta.Name, v1.NewDeleteOptions(30))
+			err := f.PodClient().Delete(pod.ObjectMeta.Name, metav1.NewDeleteOptions(30))
 			Expect(err).NotTo(HaveOccurred())
 
 			Expect(framework.WaitForPodToDisappear(f.ClientSet, f.Namespace.Name, pod.ObjectMeta.Name, labels.Everything(),
@@ -386,7 +386,7 @@ func deletePodsSync(f *framework.Framework, pods []*v1.Pod) {
 }
 
 // newTestPods creates a list of pods (specification) for test.
-func newTestPods(numPods int, imageName, podType string) []*v1.Pod {
+func newTestPods(numPods int, volume bool, imageName, podType string) []*v1.Pod {
 	var pods []*v1.Pod
 	for i := 0; i < numPods; i++ {
 		podName := "test-" + string(uuid.NewUUID())
@@ -394,22 +394,48 @@ func newTestPods(numPods int, imageName, podType string) []*v1.Pod {
 			"type": podType,
 			"name": podName,
 		}
-		pods = append(pods,
-			&v1.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:   podName,
-					Labels: labels,
-				},
-				Spec: v1.PodSpec{
-					// Restart policy is always (default).
-					Containers: []v1.Container{
-						{
-							Image: imageName,
-							Name:  podName,
+		if volume {
+			pods = append(pods,
+				&v1.Pod{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:   podName,
+						Labels: labels,
+					},
+					Spec: v1.PodSpec{
+						// Restart policy is always (default).
+						Containers: []v1.Container{
+							{
+								Image: imageName,
+								Name:  podName,
+								VolumeMounts: []v1.VolumeMount{
+									{MountPath: "/test-volume-mnt", Name: podName + "-volume"},
+								},
+							},
+						},
+						Volumes: []v1.Volume{
+							{Name: podName + "-volume", VolumeSource: v1.VolumeSource{EmptyDir: &v1.EmptyDirVolumeSource{}}},
 						},
 					},
-				},
-			})
+				})
+		} else {
+			pods = append(pods,
+				&v1.Pod{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:   podName,
+						Labels: labels,
+					},
+					Spec: v1.PodSpec{
+						// Restart policy is always (default).
+						Containers: []v1.Container{
+							{
+								Image: imageName,
+								Name:  podName,
+							},
+						},
+					},
+				})
+		}
+
 	}
 	return pods
 }

@@ -22,6 +22,8 @@ set -o nounset
 set -o pipefail
 
 KUBE_ROOT=$(dirname "${BASH_SOURCE}")/../..
+source "${KUBE_ROOT}/hack/lib/init.sh"
+source "${KUBE_ROOT}/hack/lib/test.sh"
 source "${KUBE_ROOT}/hack/make-rules/test-cmd-util.sh"
 
 function run_federation_apiserver() {
@@ -73,12 +75,10 @@ kube::log::status "Running kubectl tests for federation-apiserver"
 setup
 run_federation_apiserver
 run_federation_controller_manager
-# TODO: Fix for replicasets and deployments.
-SUPPORTED_RESOURCES=("configmaps" "daemonsets" "events" "ingress" "namespaces" "secrets" "services")
-output_message=$(runTests "SUPPORTED_RESOURCES=${SUPPORTED_RESOURCES[@]}")
-# Ensure that tests were run. We cannot check all resources here. We check a few
-# to catch bugs due to which no tests run.
-kube::test::if_has_string "${output_message}" "Testing kubectl(v1:namespaces)"
-kube::test::if_has_string "${output_message}" "Testing kubectl(v1:services)"
+# TODO: Fix for secrets, replicasets and deployments.
+SUPPORTED_RESOURCES=("configmaps" "daemonsets" "events" "ingress" "namespaces" "services")
+# WARNING: Do not wrap this call in a subshell to capture output, e.g. output=$(runTests)
+# Doing so will suppress errexit behavior inside runTests
+runTests
 
 kube::log::status "TESTS PASSED"

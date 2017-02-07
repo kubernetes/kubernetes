@@ -24,17 +24,17 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/apimachinery/pkg/util/uuid"
+	core "k8s.io/client-go/testing"
+	"k8s.io/client-go/tools/record"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
 	extensions "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset/fake"
-	"k8s.io/kubernetes/pkg/client/record"
-	"k8s.io/kubernetes/pkg/client/testing/core"
+	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/deployment/util"
-	"k8s.io/kubernetes/pkg/controller/informers"
-	"k8s.io/kubernetes/pkg/util/intstr"
-	"k8s.io/kubernetes/pkg/util/uuid"
 )
 
 var (
@@ -47,7 +47,7 @@ func rs(name string, replicas int, selector map[string]string, timestamp metav1.
 		ObjectMeta: metav1.ObjectMeta{
 			Name:              name,
 			CreationTimestamp: timestamp,
-			Namespace:         v1.NamespaceDefault,
+			Namespace:         metav1.NamespaceDefault,
 		},
 		Spec: extensions.ReplicaSetSpec{
 			Replicas: func() *int32 { i := int32(replicas); return &i }(),
@@ -71,7 +71,7 @@ func newDeployment(name string, replicas int, revisionHistoryLimit *int32, maxSu
 		ObjectMeta: metav1.ObjectMeta{
 			UID:         uuid.NewUUID(),
 			Name:        name,
-			Namespace:   v1.NamespaceDefault,
+			Namespace:   metav1.NamespaceDefault,
 			Annotations: make(map[string]string),
 		},
 		Spec: extensions.DeploymentSpec{
@@ -112,7 +112,7 @@ func newReplicaSet(d *extensions.Deployment, name string, replicas int) *extensi
 	return &extensions.ReplicaSet{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
-			Namespace: v1.NamespaceDefault,
+			Namespace: metav1.NamespaceDefault,
 			Labels:    d.Spec.Selector.MatchLabels,
 		},
 		Spec: extensions.ReplicaSetSpec{
@@ -166,20 +166,20 @@ func newFixture(t *testing.T) *fixture {
 
 func (f *fixture) newController() (*DeploymentController, informers.SharedInformerFactory) {
 	f.client = fake.NewSimpleClientset(f.objects...)
-	informers := informers.NewSharedInformerFactory(f.client, nil, controller.NoResyncPeriodFunc())
-	c := NewDeploymentController(informers.Deployments(), informers.ReplicaSets(), informers.Pods(), f.client)
+	informers := informers.NewSharedInformerFactory(nil, f.client, controller.NoResyncPeriodFunc())
+	c := NewDeploymentController(informers.Extensions().V1beta1().Deployments(), informers.Extensions().V1beta1().ReplicaSets(), informers.Core().V1().Pods(), f.client)
 	c.eventRecorder = &record.FakeRecorder{}
 	c.dListerSynced = alwaysReady
 	c.rsListerSynced = alwaysReady
 	c.podListerSynced = alwaysReady
 	for _, d := range f.dLister {
-		c.dLister.Indexer.Add(d)
+		informers.Extensions().V1beta1().Deployments().Informer().GetIndexer().Add(d)
 	}
 	for _, rs := range f.rsLister {
-		c.rsLister.Indexer.Add(rs)
+		informers.Extensions().V1beta1().ReplicaSets().Informer().GetIndexer().Add(rs)
 	}
 	for _, pod := range f.podLister {
-		c.podLister.Indexer.Add(pod)
+		informers.Core().V1().Pods().Informer().GetIndexer().Add(pod)
 	}
 	return c, informers
 }
@@ -246,8 +246,8 @@ func TestSyncDeploymentDontDoAnythingDuringDeletion(t *testing.T) {
 // issue: https://github.com/kubernetes/kubernetes/issues/23218
 func TestDeploymentController_dontSyncDeploymentsWithEmptyPodSelector(t *testing.T) {
 	fake := &fake.Clientset{}
-	informers := informers.NewSharedInformerFactory(fake, nil, controller.NoResyncPeriodFunc())
-	controller := NewDeploymentController(informers.Deployments(), informers.ReplicaSets(), informers.Pods(), fake)
+	informers := informers.NewSharedInformerFactory(nil, fake, controller.NoResyncPeriodFunc())
+	controller := NewDeploymentController(informers.Extensions().V1beta1().Deployments(), informers.Extensions().V1beta1().ReplicaSets(), informers.Core().V1().Pods(), fake)
 	controller.eventRecorder = &record.FakeRecorder{}
 	controller.dListerSynced = alwaysReady
 	controller.rsListerSynced = alwaysReady
@@ -260,7 +260,7 @@ func TestDeploymentController_dontSyncDeploymentsWithEmptyPodSelector(t *testing
 	d := newDeployment("foo", 1, nil, nil, nil, map[string]string{"foo": "bar"})
 	empty := metav1.LabelSelector{}
 	d.Spec.Selector = &empty
-	controller.dLister.Indexer.Add(d)
+	informers.Extensions().V1beta1().Deployments().Informer().GetIndexer().Add(d)
 	// We expect the deployment controller to not take action here since it's configuration
 	// is invalid, even though no replicasets exist that match it's selector.
 	controller.syncDeployment(fmt.Sprintf("%s/%s", d.ObjectMeta.Namespace, d.ObjectMeta.Name))
@@ -497,16 +497,13 @@ func TestPodDeletionEnqueuesRecreateDeployment(t *testing.T) {
 	f.rsLister = append(f.rsLister, rs)
 	f.objects = append(f.objects, foo, rs)
 
-	c, informers := f.newController()
+	c, _ := f.newController()
 	enqueued := false
 	c.enqueueDeployment = func(d *extensions.Deployment) {
 		if d.Name == "foo" {
 			enqueued = true
 		}
 	}
-	stopCh := make(chan struct{})
-	defer close(stopCh)
-	informers.Start(stopCh)
 
 	c.deletePod(pod)
 
@@ -532,16 +529,13 @@ func TestPodDeletionDoesntEnqueueRecreateDeployment(t *testing.T) {
 	// return a non-empty list.
 	f.podLister = append(f.podLister, pod)
 
-	c, informers := f.newController()
+	c, _ := f.newController()
 	enqueued := false
 	c.enqueueDeployment = func(d *extensions.Deployment) {
 		if d.Name == "foo" {
 			enqueued = true
 		}
 	}
-	stopCh := make(chan struct{})
-	defer close(stopCh)
-	informers.Start(stopCh)
 
 	c.deletePod(pod)
 

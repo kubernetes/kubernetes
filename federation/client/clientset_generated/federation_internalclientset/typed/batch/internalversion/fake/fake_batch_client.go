@@ -18,12 +18,12 @@ package fake
 
 import (
 	rest "k8s.io/client-go/rest"
+	testing "k8s.io/client-go/testing"
 	internalversion "k8s.io/kubernetes/federation/client/clientset_generated/federation_internalclientset/typed/batch/internalversion"
-	core "k8s.io/kubernetes/pkg/client/testing/core"
 )
 
 type FakeBatch struct {
-	*core.Fake
+	*testing.Fake
 }
 
 func (c *FakeBatch) Jobs(namespace string) internalversion.JobInterface {

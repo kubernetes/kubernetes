@@ -21,15 +21,17 @@ import (
 	"math/rand"
 	"testing"
 
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
+	apitesting "k8s.io/apimachinery/pkg/api/testing"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
-	apitesting "k8s.io/kubernetes/pkg/api/testing"
+	kapitesting "k8s.io/kubernetes/pkg/api/testing"
 )
 
 func BenchmarkPodConversion(b *testing.B) {
-	apiObjectFuzzer := apitesting.FuzzerFor(nil, api.SchemeGroupVersion, rand.NewSource(benchmarkSeed))
+	apiObjectFuzzer := apitesting.FuzzerFor(kapitesting.FuzzerFuncs(b, api.Codecs), rand.NewSource(benchmarkSeed))
 	items := make([]api.Pod, 4)
 	for i := range items {
 		apiObjectFuzzer.Fuzz(&items[i])
@@ -79,7 +81,7 @@ func BenchmarkNodeConversion(b *testing.B) {
 		result = obj.(*api.Node)
 	}
 	b.StopTimer()
-	if !api.Semantic.DeepDerivative(node, *result) {
+	if !apiequality.Semantic.DeepDerivative(node, *result) {
 		b.Fatalf("Incorrect conversion: %s", diff.ObjectDiff(node, *result))
 	}
 }
@@ -109,7 +111,7 @@ func BenchmarkReplicationControllerConversion(b *testing.B) {
 		result = obj.(*api.ReplicationController)
 	}
 	b.StopTimer()
-	if !api.Semantic.DeepDerivative(replicationController, *result) {
+	if !apiequality.Semantic.DeepDerivative(replicationController, *result) {
 		b.Fatalf("Incorrect conversion: expected %v, got %v", replicationController, *result)
 	}
 }

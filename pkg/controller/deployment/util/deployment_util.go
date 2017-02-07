@@ -25,22 +25,23 @@ import (
 
 	"github.com/golang/glog"
 
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/errors"
+	intstrutil "k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/client-go/pkg/util/integer"
+	"k8s.io/client-go/util/integer"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/annotations"
 	"k8s.io/kubernetes/pkg/api/v1"
 	internalextensions "k8s.io/kubernetes/pkg/apis/extensions"
 	extensions "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
-	"k8s.io/kubernetes/pkg/client/legacylisters"
+	corelisters "k8s.io/kubernetes/pkg/client/listers/core/v1"
 	"k8s.io/kubernetes/pkg/controller"
-	intstrutil "k8s.io/kubernetes/pkg/util/intstr"
 	labelsutil "k8s.io/kubernetes/pkg/util/labels"
 )
 
@@ -537,7 +538,7 @@ func GetNewReplicaSet(deployment *extensions.Deployment, c clientset.Interface) 
 // listReplicaSets lists all RSes the given deployment targets with the given client interface.
 func listReplicaSets(deployment *extensions.Deployment, c clientset.Interface) ([]*extensions.ReplicaSet, error) {
 	return ListReplicaSets(deployment,
-		func(namespace string, options v1.ListOptions) ([]*extensions.ReplicaSet, error) {
+		func(namespace string, options metav1.ListOptions) ([]*extensions.ReplicaSet, error) {
 			rsList, err := c.Extensions().ReplicaSets(namespace).List(options)
 			if err != nil {
 				return nil, err
@@ -553,14 +554,14 @@ func listReplicaSets(deployment *extensions.Deployment, c clientset.Interface) (
 // listReplicaSets lists all Pods the given deployment targets with the given client interface.
 func listPods(deployment *extensions.Deployment, c clientset.Interface) (*v1.PodList, error) {
 	return ListPods(deployment,
-		func(namespace string, options v1.ListOptions) (*v1.PodList, error) {
+		func(namespace string, options metav1.ListOptions) (*v1.PodList, error) {
 			return c.Core().Pods(namespace).List(options)
 		})
 }
 
 // TODO: switch this to full namespacers
-type rsListFunc func(string, v1.ListOptions) ([]*extensions.ReplicaSet, error)
-type podListFunc func(string, v1.ListOptions) (*v1.PodList, error)
+type rsListFunc func(string, metav1.ListOptions) ([]*extensions.ReplicaSet, error)
+type podListFunc func(string, metav1.ListOptions) (*v1.PodList, error)
 
 // ListReplicaSets returns a slice of RSes the given deployment targets.
 func ListReplicaSets(deployment *extensions.Deployment, getRSList rsListFunc) ([]*extensions.ReplicaSet, error) {
@@ -572,7 +573,7 @@ func ListReplicaSets(deployment *extensions.Deployment, getRSList rsListFunc) ([
 	if err != nil {
 		return nil, err
 	}
-	options := v1.ListOptions{LabelSelector: selector.String()}
+	options := metav1.ListOptions{LabelSelector: selector.String()}
 	return getRSList(namespace, options)
 }
 
@@ -583,7 +584,7 @@ func ListPods(deployment *extensions.Deployment, getPodList podListFunc) (*v1.Po
 	if err != nil {
 		return nil, err
 	}
-	options := v1.ListOptions{LabelSelector: selector.String()}
+	options := metav1.ListOptions{LabelSelector: selector.String()}
 	return getPodList(namespace, options)
 }
 
@@ -605,7 +606,7 @@ func EqualIgnoreHash(template1, template2 v1.PodTemplateSpec) bool {
 	}
 	// Then, compare the templates without comparing their labels
 	template1.Labels, template2.Labels = nil, nil
-	return api.Semantic.DeepEqual(template1, template2)
+	return apiequality.Semantic.DeepEqual(template1, template2)
 }
 
 // FindNewReplicaSet returns the new RS this given deployment targets (the one with the same pod template).
@@ -684,7 +685,7 @@ func WaitForPodsHashPopulated(c clientset.Interface, desiredGeneration int64, na
 
 // LabelPodsWithHash labels all pods in the given podList with the new hash label.
 // The returned bool value can be used to tell if all pods are actually labeled.
-func LabelPodsWithHash(podList *v1.PodList, c clientset.Interface, podLister *listers.StoreToPodLister, namespace, name, hash string) error {
+func LabelPodsWithHash(podList *v1.PodList, c clientset.Interface, podLister corelisters.PodLister, namespace, name, hash string) error {
 	for _, pod := range podList.Items {
 		// Only label the pod that doesn't already have the new hash
 		if pod.Labels[extensions.DefaultDeploymentUniqueLabelKey] != hash {
@@ -816,9 +817,10 @@ func IsRollingUpdate(deployment *extensions.Deployment) bool {
 }
 
 // DeploymentComplete considers a deployment to be complete once its desired replicas equals its
-// updatedReplicas and it doesn't violate minimum availability.
+// updatedReplicas, no old pods are running, and it doesn't violate minimum availability.
 func DeploymentComplete(deployment *extensions.Deployment, newStatus *extensions.DeploymentStatus) bool {
 	return newStatus.UpdatedReplicas == *(deployment.Spec.Replicas) &&
+		newStatus.Replicas == *(deployment.Spec.Replicas) &&
 		newStatus.AvailableReplicas >= *(deployment.Spec.Replicas)-MaxUnavailable(*deployment) &&
 		newStatus.ObservedGeneration >= deployment.Generation
 }

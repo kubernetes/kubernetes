@@ -26,7 +26,6 @@ import (
 	api "k8s.io/kubernetes/pkg/api"
 	v1 "k8s.io/kubernetes/pkg/api/v1"
 	componentconfig "k8s.io/kubernetes/pkg/apis/componentconfig"
-	config "k8s.io/kubernetes/pkg/util/config"
 	unsafe "unsafe"
 )
 
@@ -38,10 +37,6 @@ func init() {
 // Public to allow building arbitrary schemes.
 func RegisterConversions(scheme *runtime.Scheme) error {
 	return scheme.AddGeneratedConversionFuncs(
-		Convert_v1alpha1_AdmissionConfiguration_To_componentconfig_AdmissionConfiguration,
-		Convert_componentconfig_AdmissionConfiguration_To_v1alpha1_AdmissionConfiguration,
-		Convert_v1alpha1_AdmissionPluginConfiguration_To_componentconfig_AdmissionPluginConfiguration,
-		Convert_componentconfig_AdmissionPluginConfiguration_To_v1alpha1_AdmissionPluginConfiguration,
 		Convert_v1alpha1_KubeProxyConfiguration_To_componentconfig_KubeProxyConfiguration,
 		Convert_componentconfig_KubeProxyConfiguration_To_v1alpha1_KubeProxyConfiguration,
 		Convert_v1alpha1_KubeSchedulerConfiguration_To_componentconfig_KubeSchedulerConfiguration,
@@ -63,70 +58,6 @@ func RegisterConversions(scheme *runtime.Scheme) error {
 		Convert_v1alpha1_LeaderElectionConfiguration_To_componentconfig_LeaderElectionConfiguration,
 		Convert_componentconfig_LeaderElectionConfiguration_To_v1alpha1_LeaderElectionConfiguration,
 	)
-}
-
-func autoConvert_v1alpha1_AdmissionConfiguration_To_componentconfig_AdmissionConfiguration(in *AdmissionConfiguration, out *componentconfig.AdmissionConfiguration, s conversion.Scope) error {
-	if in.Plugins != nil {
-		in, out := &in.Plugins, &out.Plugins
-		*out = make([]componentconfig.AdmissionPluginConfiguration, len(*in))
-		for i := range *in {
-			if err := Convert_v1alpha1_AdmissionPluginConfiguration_To_componentconfig_AdmissionPluginConfiguration(&(*in)[i], &(*out)[i], s); err != nil {
-				return err
-			}
-		}
-	} else {
-		out.Plugins = nil
-	}
-	return nil
-}
-
-func Convert_v1alpha1_AdmissionConfiguration_To_componentconfig_AdmissionConfiguration(in *AdmissionConfiguration, out *componentconfig.AdmissionConfiguration, s conversion.Scope) error {
-	return autoConvert_v1alpha1_AdmissionConfiguration_To_componentconfig_AdmissionConfiguration(in, out, s)
-}
-
-func autoConvert_componentconfig_AdmissionConfiguration_To_v1alpha1_AdmissionConfiguration(in *componentconfig.AdmissionConfiguration, out *AdmissionConfiguration, s conversion.Scope) error {
-	if in.Plugins != nil {
-		in, out := &in.Plugins, &out.Plugins
-		*out = make([]AdmissionPluginConfiguration, len(*in))
-		for i := range *in {
-			if err := Convert_componentconfig_AdmissionPluginConfiguration_To_v1alpha1_AdmissionPluginConfiguration(&(*in)[i], &(*out)[i], s); err != nil {
-				return err
-			}
-		}
-	} else {
-		out.Plugins = nil
-	}
-	return nil
-}
-
-func Convert_componentconfig_AdmissionConfiguration_To_v1alpha1_AdmissionConfiguration(in *componentconfig.AdmissionConfiguration, out *AdmissionConfiguration, s conversion.Scope) error {
-	return autoConvert_componentconfig_AdmissionConfiguration_To_v1alpha1_AdmissionConfiguration(in, out, s)
-}
-
-func autoConvert_v1alpha1_AdmissionPluginConfiguration_To_componentconfig_AdmissionPluginConfiguration(in *AdmissionPluginConfiguration, out *componentconfig.AdmissionPluginConfiguration, s conversion.Scope) error {
-	out.Name = in.Name
-	out.Path = in.Path
-	if err := runtime.Convert_runtime_RawExtension_To_runtime_Object(&in.Configuration, &out.Configuration, s); err != nil {
-		return err
-	}
-	return nil
-}
-
-func Convert_v1alpha1_AdmissionPluginConfiguration_To_componentconfig_AdmissionPluginConfiguration(in *AdmissionPluginConfiguration, out *componentconfig.AdmissionPluginConfiguration, s conversion.Scope) error {
-	return autoConvert_v1alpha1_AdmissionPluginConfiguration_To_componentconfig_AdmissionPluginConfiguration(in, out, s)
-}
-
-func autoConvert_componentconfig_AdmissionPluginConfiguration_To_v1alpha1_AdmissionPluginConfiguration(in *componentconfig.AdmissionPluginConfiguration, out *AdmissionPluginConfiguration, s conversion.Scope) error {
-	out.Name = in.Name
-	out.Path = in.Path
-	if err := runtime.Convert_runtime_Object_To_runtime_RawExtension(&in.Configuration, &out.Configuration, s); err != nil {
-		return err
-	}
-	return nil
-}
-
-func Convert_componentconfig_AdmissionPluginConfiguration_To_v1alpha1_AdmissionPluginConfiguration(in *componentconfig.AdmissionPluginConfiguration, out *AdmissionPluginConfiguration, s conversion.Scope) error {
-	return autoConvert_componentconfig_AdmissionPluginConfiguration_To_v1alpha1_AdmissionPluginConfiguration(in, out, s)
 }
 
 func autoConvert_v1alpha1_KubeProxyConfiguration_To_componentconfig_KubeProxyConfiguration(in *KubeProxyConfiguration, out *componentconfig.KubeProxyConfiguration, s conversion.Scope) error {
@@ -401,7 +332,7 @@ func autoConvert_v1alpha1_KubeletConfiguration_To_componentconfig_KubeletConfigu
 	out.RuntimeCgroups = in.RuntimeCgroups
 	out.SystemCgroups = in.SystemCgroups
 	out.CgroupRoot = in.CgroupRoot
-	if err := api.Convert_Pointer_bool_To_bool(&in.ExperimentalCgroupsPerQOS, &out.ExperimentalCgroupsPerQOS, s); err != nil {
+	if err := api.Convert_Pointer_bool_To_bool(&in.CgroupsPerQOS, &out.CgroupsPerQOS, s); err != nil {
 		return err
 	}
 	out.CgroupDriver = in.CgroupDriver
@@ -464,8 +395,8 @@ func autoConvert_v1alpha1_KubeletConfiguration_To_componentconfig_KubeletConfigu
 	if err := api.Convert_Pointer_bool_To_bool(&in.EnableControllerAttachDetach, &out.EnableControllerAttachDetach, s); err != nil {
 		return err
 	}
-	out.SystemReserved = *(*config.ConfigurationMap)(unsafe.Pointer(&in.SystemReserved))
-	out.KubeReserved = *(*config.ConfigurationMap)(unsafe.Pointer(&in.KubeReserved))
+	out.SystemReserved = *(*componentconfig.ConfigurationMap)(unsafe.Pointer(&in.SystemReserved))
+	out.KubeReserved = *(*componentconfig.ConfigurationMap)(unsafe.Pointer(&in.KubeReserved))
 	out.ProtectKernelDefaults = in.ProtectKernelDefaults
 	if err := api.Convert_Pointer_bool_To_bool(&in.MakeIPTablesUtilChains, &out.MakeIPTablesUtilChains, s); err != nil {
 		return err
@@ -570,7 +501,7 @@ func autoConvert_componentconfig_KubeletConfiguration_To_v1alpha1_KubeletConfigu
 	out.CloudProvider = in.CloudProvider
 	out.CloudConfigFile = in.CloudConfigFile
 	out.KubeletCgroups = in.KubeletCgroups
-	if err := api.Convert_bool_To_Pointer_bool(&in.ExperimentalCgroupsPerQOS, &out.ExperimentalCgroupsPerQOS, s); err != nil {
+	if err := api.Convert_bool_To_Pointer_bool(&in.CgroupsPerQOS, &out.CgroupsPerQOS, s); err != nil {
 		return err
 	}
 	out.CgroupDriver = in.CgroupDriver

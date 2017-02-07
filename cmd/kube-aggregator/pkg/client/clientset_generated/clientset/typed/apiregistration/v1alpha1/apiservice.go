@@ -17,13 +17,12 @@ limitations under the License.
 package v1alpha1
 
 import (
-	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	rest "k8s.io/client-go/rest"
 	v1alpha1 "k8s.io/kubernetes/cmd/kube-aggregator/pkg/apis/apiregistration/v1alpha1"
 	api "k8s.io/kubernetes/pkg/api"
-	v1 "k8s.io/kubernetes/pkg/api/v1"
 )
 
 // APIServicesGetter has a method to return a APIServiceInterface.
@@ -39,7 +38,7 @@ type APIServiceInterface interface {
 	UpdateStatus(*v1alpha1.APIService) (*v1alpha1.APIService, error)
 	Delete(name string, options *v1.DeleteOptions) error
 	DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error
-	Get(name string, options meta_v1.GetOptions) (*v1alpha1.APIService, error)
+	Get(name string, options v1.GetOptions) (*v1alpha1.APIService, error)
 	List(opts v1.ListOptions) (*v1alpha1.APIServiceList, error)
 	Watch(opts v1.ListOptions) (watch.Interface, error)
 	Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v1alpha1.APIService, err error)
@@ -117,7 +116,7 @@ func (c *aPIServices) DeleteCollection(options *v1.DeleteOptions, listOptions v1
 }
 
 // Get takes name of the aPIService, and returns the corresponding aPIService object, and an error if there is any.
-func (c *aPIServices) Get(name string, options meta_v1.GetOptions) (result *v1alpha1.APIService, err error) {
+func (c *aPIServices) Get(name string, options v1.GetOptions) (result *v1alpha1.APIService, err error) {
 	result = &v1alpha1.APIService{}
 	err = c.client.Get().
 		Resource("apiservices").

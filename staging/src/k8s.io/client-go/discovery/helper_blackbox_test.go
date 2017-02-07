@@ -33,9 +33,10 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/pkg/api"
-	"k8s.io/client-go/pkg/api/testapi"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/rest/fake"
+
+	_ "k8s.io/client-go/pkg/api/install"
 )
 
 func objBody(object interface{}) io.ReadCloser {
@@ -117,15 +118,16 @@ func TestNegotiateVersion(t *testing.T) {
 			statusCode:      http.StatusNotFound,
 		},
 		{
-			name:       "discovery fails due to 403 Forbidden errors and thus serverVersions is empty, no fallback GroupVersion",
-			expectErr:  func(err error) bool { return strings.Contains(err.Error(), "failed to negotiate an api version;") },
-			statusCode: http.StatusForbidden,
+			name:            "discovery fails due to 403 Forbidden errors and thus serverVersions is empty, fallback to empty GroupVersion",
+			expectedVersion: &schema.GroupVersion{},
+			statusCode:      http.StatusForbidden,
 		},
 	}
 
 	for _, test := range tests {
 		fakeClient := &fake.RESTClient{
-			NegotiatedSerializer: testapi.Default.NegotiatedSerializer(),
+			APIRegistry:          api.Registry,
+			NegotiatedSerializer: api.Codecs,
 			Resp: &http.Response{
 				StatusCode: test.statusCode,
 				Body:       objBody(&uapi.APIVersions{Versions: test.serverVersions}),

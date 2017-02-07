@@ -161,7 +161,7 @@ func runEvictionTest(f *framework.Framework, testCondition string, podTestSpecs 
 
 			Eventually(func() error {
 				// Gather current information
-				updatedPodList, err := f.ClientSet.Core().Pods(f.Namespace.Name).List(v1.ListOptions{})
+				updatedPodList, err := f.ClientSet.Core().Pods(f.Namespace.Name).List(metav1.ListOptions{})
 				updatedPods := updatedPodList.Items
 				for _, p := range updatedPods {
 					framework.Logf("fetching pod %s; phase= %v", p.Name, p.Status.Phase)
@@ -270,7 +270,7 @@ func runEvictionTest(f *framework.Framework, testCondition string, podTestSpecs 
 			By("deleting pods")
 			for _, spec := range podTestSpecs {
 				By(fmt.Sprintf("deleting pod: %s", spec.pod.Name))
-				f.PodClient().DeleteSync(spec.pod.Name, &v1.DeleteOptions{}, podDisappearTimeout)
+				f.PodClient().DeleteSync(spec.pod.Name, &metav1.DeleteOptions{}, podDisappearTimeout)
 			}
 
 			if CurrentGinkgoTestDescription().Failed {
@@ -288,7 +288,7 @@ func runEvictionTest(f *framework.Framework, testCondition string, podTestSpecs 
 // Returns TRUE if the node has disk pressure due to inodes exists on the node, FALSE otherwise
 func hasInodePressure(f *framework.Framework, testCondition string) (bool, error) {
 
-	nodeList, err := f.ClientSet.Core().Nodes().List(v1.ListOptions{})
+	nodeList, err := f.ClientSet.Core().Nodes().List(metav1.ListOptions{})
 	framework.ExpectNoError(err, "getting node list")
 	if len(nodeList.Items) != 1 {
 		return false, fmt.Errorf("expected 1 node, but see %d. List: %v", len(nodeList.Items), nodeList.Items)

@@ -22,7 +22,7 @@ import (
 	"reflect"
 	"testing"
 
-	"k8s.io/client-go/pkg/util/cert"
+	"k8s.io/client-go/util/cert"
 	capi "k8s.io/kubernetes/pkg/apis/certificates/v1beta1"
 )
 

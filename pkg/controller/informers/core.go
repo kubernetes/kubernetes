@@ -20,11 +20,12 @@ import (
 	"reflect"
 	"time"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/watch"
+	"k8s.io/client-go/tools/cache"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/client/cache"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/client/legacylisters"
@@ -359,11 +360,11 @@ func (f *replicationControllerInformer) Lister() *listers.StoreToReplicationCont
 func NewPodInformer(client clientset.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
 	sharedIndexInformer := cache.NewSharedIndexInformer(
 		&cache.ListWatch{
-			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
-				return client.Core().Pods(v1.NamespaceAll).List(options)
+			ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
+				return client.Core().Pods(metav1.NamespaceAll).List(options)
 			},
-			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
-				return client.Core().Pods(v1.NamespaceAll).Watch(options)
+			WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
+				return client.Core().Pods(metav1.NamespaceAll).Watch(options)
 			},
 		},
 		&v1.Pod{},
@@ -378,10 +379,10 @@ func NewPodInformer(client clientset.Interface, resyncPeriod time.Duration) cach
 func NewNodeInformer(client clientset.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
 	sharedIndexInformer := cache.NewSharedIndexInformer(
 		&cache.ListWatch{
-			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
+			ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
 				return client.Core().Nodes().List(options)
 			},
-			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
+			WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
 				return client.Core().Nodes().Watch(options)
 			},
 		},
@@ -396,11 +397,11 @@ func NewNodeInformer(client clientset.Interface, resyncPeriod time.Duration) cac
 func NewPVCInformer(client clientset.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
 	sharedIndexInformer := cache.NewSharedIndexInformer(
 		&cache.ListWatch{
-			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
-				return client.Core().PersistentVolumeClaims(v1.NamespaceAll).List(options)
+			ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
+				return client.Core().PersistentVolumeClaims(metav1.NamespaceAll).List(options)
 			},
-			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
-				return client.Core().PersistentVolumeClaims(v1.NamespaceAll).Watch(options)
+			WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
+				return client.Core().PersistentVolumeClaims(metav1.NamespaceAll).Watch(options)
 			},
 		},
 		&v1.PersistentVolumeClaim{},
@@ -415,10 +416,10 @@ func NewPVCInformer(client clientset.Interface, resyncPeriod time.Duration) cach
 func NewPVInformer(client clientset.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
 	sharedIndexInformer := cache.NewSharedIndexInformer(
 		&cache.ListWatch{
-			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
+			ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
 				return client.Core().PersistentVolumes().List(options)
 			},
-			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
+			WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
 				return client.Core().PersistentVolumes().Watch(options)
 			},
 		},
@@ -433,10 +434,10 @@ func NewPVInformer(client clientset.Interface, resyncPeriod time.Duration) cache
 func NewNamespaceInformer(client clientset.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
 	sharedIndexInformer := cache.NewSharedIndexInformer(
 		&cache.ListWatch{
-			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
+			ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
 				return client.Core().Namespaces().List(options)
 			},
-			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
+			WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
 				return client.Core().Namespaces().Watch(options)
 			},
 		},
@@ -451,15 +452,11 @@ func NewNamespaceInformer(client clientset.Interface, resyncPeriod time.Duration
 func NewInternalNamespaceInformer(client internalclientset.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
 	sharedIndexInformer := cache.NewSharedIndexInformer(
 		&cache.ListWatch{
-			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
-				internalOptions := api.ListOptions{}
-				v1.Convert_v1_ListOptions_To_api_ListOptions(&options, &internalOptions, nil)
-				return client.Core().Namespaces().List(internalOptions)
+			ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
+				return client.Core().Namespaces().List(options)
 			},
-			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
-				internalOptions := api.ListOptions{}
-				v1.Convert_v1_ListOptions_To_api_ListOptions(&options, &internalOptions, nil)
-				return client.Core().Namespaces().Watch(internalOptions)
+			WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
+				return client.Core().Namespaces().Watch(options)
 			},
 		},
 		&api.Namespace{},
@@ -473,11 +470,11 @@ func NewInternalNamespaceInformer(client internalclientset.Interface, resyncPeri
 func NewLimitRangeInformer(client clientset.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
 	sharedIndexInformer := cache.NewSharedIndexInformer(
 		&cache.ListWatch{
-			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
-				return client.Core().LimitRanges(v1.NamespaceAll).List(options)
+			ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
+				return client.Core().LimitRanges(metav1.NamespaceAll).List(options)
 			},
-			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
-				return client.Core().LimitRanges(v1.NamespaceAll).Watch(options)
+			WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
+				return client.Core().LimitRanges(metav1.NamespaceAll).Watch(options)
 			},
 		},
 		&v1.LimitRange{},
@@ -491,15 +488,11 @@ func NewLimitRangeInformer(client clientset.Interface, resyncPeriod time.Duratio
 func NewInternalLimitRangeInformer(internalclient internalclientset.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
 	sharedIndexInformer := cache.NewSharedIndexInformer(
 		&cache.ListWatch{
-			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
-				internalOptions := api.ListOptions{}
-				v1.Convert_v1_ListOptions_To_api_ListOptions(&options, &internalOptions, nil)
-				return internalclient.Core().LimitRanges(v1.NamespaceAll).List(internalOptions)
+			ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
+				return internalclient.Core().LimitRanges(metav1.NamespaceAll).List(options)
 			},
-			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
-				internalOptions := api.ListOptions{}
-				v1.Convert_v1_ListOptions_To_api_ListOptions(&options, &internalOptions, nil)
-				return internalclient.Core().LimitRanges(v1.NamespaceAll).Watch(internalOptions)
+			WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
+				return internalclient.Core().LimitRanges(metav1.NamespaceAll).Watch(options)
 			},
 		},
 		&api.LimitRange{},
@@ -513,11 +506,11 @@ func NewInternalLimitRangeInformer(internalclient internalclientset.Interface, r
 func NewReplicationControllerInformer(client clientset.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
 	sharedIndexInformer := cache.NewSharedIndexInformer(
 		&cache.ListWatch{
-			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
-				return client.Core().ReplicationControllers(v1.NamespaceAll).List(options)
+			ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
+				return client.Core().ReplicationControllers(metav1.NamespaceAll).List(options)
 			},
-			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
-				return client.Core().ReplicationControllers(v1.NamespaceAll).Watch(options)
+			WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
+				return client.Core().ReplicationControllers(metav1.NamespaceAll).Watch(options)
 			},
 		},
 		&v1.ReplicationController{},
@@ -568,11 +561,11 @@ func (f *serviceAccountInformer) Lister() *listers.StoreToServiceAccountLister {
 func NewServiceAccountInformer(client clientset.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
 	sharedIndexInformer := cache.NewSharedIndexInformer(
 		&cache.ListWatch{
-			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
-				return client.Core().ServiceAccounts(v1.NamespaceAll).List(options)
+			ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
+				return client.Core().ServiceAccounts(metav1.NamespaceAll).List(options)
 			},
-			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
-				return client.Core().ServiceAccounts(v1.NamespaceAll).Watch(options)
+			WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
+				return client.Core().ServiceAccounts(metav1.NamespaceAll).Watch(options)
 			},
 		},
 		&v1.ServiceAccount{},

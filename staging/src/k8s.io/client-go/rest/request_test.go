@@ -34,6 +34,7 @@ import (
 	"testing"
 	"time"
 
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -41,16 +42,17 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer/streaming"
 	"k8s.io/apimachinery/pkg/util/diff"
+	"k8s.io/apimachinery/pkg/util/httpstream"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/pkg/api"
-	"k8s.io/client-go/pkg/api/testapi"
 	"k8s.io/client-go/pkg/api/v1"
-	"k8s.io/client-go/pkg/util/clock"
-	"k8s.io/client-go/pkg/util/flowcontrol"
-	"k8s.io/client-go/pkg/util/httpstream"
-	"k8s.io/client-go/pkg/util/intstr"
-	utiltesting "k8s.io/client-go/pkg/util/testing"
 	restclientwatch "k8s.io/client-go/rest/watch"
+	"k8s.io/client-go/util/clock"
+	"k8s.io/client-go/util/flowcontrol"
+	utiltesting "k8s.io/client-go/util/testing"
+
+	_ "k8s.io/client-go/pkg/api/install"
 )
 
 func TestNewRequestSetsAccept(t *testing.T) {
@@ -242,7 +244,7 @@ func TestRequestVersionedParams(t *testing.T) {
 
 func TestRequestVersionedParamsFromListOptions(t *testing.T) {
 	r := &Request{content: ContentConfig{GroupVersion: &v1.SchemeGroupVersion}}
-	r.VersionedParams(&api.ListOptions{ResourceVersion: "1"}, api.ParameterCodec)
+	r.VersionedParams(&metav1.ListOptions{ResourceVersion: "1"}, api.ParameterCodec)
 	if !reflect.DeepEqual(r.params, url.Values{
 		"resourceVersion": []string{"1"},
 	}) {
@@ -250,7 +252,7 @@ func TestRequestVersionedParamsFromListOptions(t *testing.T) {
 	}
 
 	var timeout int64 = 10
-	r.VersionedParams(&api.ListOptions{ResourceVersion: "2", TimeoutSeconds: &timeout}, api.ParameterCodec)
+	r.VersionedParams(&metav1.ListOptions{ResourceVersion: "2", TimeoutSeconds: &timeout}, api.ParameterCodec)
 	if !reflect.DeepEqual(r.params, url.Values{
 		"resourceVersion": []string{"1", "2"},
 		"timeoutSeconds":  []string{"10"},
@@ -279,18 +281,18 @@ func (obj NotAnAPIObject) SetGroupVersionKind(gvk *schema.GroupVersionKind) {}
 func defaultContentConfig() ContentConfig {
 	return ContentConfig{
 		GroupVersion:         &api.Registry.GroupOrDie(api.GroupName).GroupVersion,
-		NegotiatedSerializer: testapi.Default.NegotiatedSerializer(),
+		NegotiatedSerializer: api.Codecs,
 	}
 }
 
 func defaultSerializers() Serializers {
 	return Serializers{
-		Encoder:             testapi.Default.Codec(),
-		Decoder:             testapi.Default.Codec(),
-		StreamingSerializer: testapi.Default.Codec(),
+		Encoder:             api.Codecs.LegacyCodec(v1.SchemeGroupVersion),
+		Decoder:             api.Codecs.LegacyCodec(v1.SchemeGroupVersion),
+		StreamingSerializer: api.Codecs.LegacyCodec(v1.SchemeGroupVersion),
 		Framer:              runtime.DefaultFramer,
 		RenegotiatedDecoder: func(contentType string, params map[string]string) (runtime.Decoder, error) {
-			return testapi.Default.Codec(), nil
+			return api.Codecs.LegacyCodec(v1.SchemeGroupVersion), nil
 		},
 	}
 }
@@ -414,7 +416,7 @@ func TestTransformResponse(t *testing.T) {
 		if test.ErrFn != nil && !test.ErrFn(err) {
 			t.Errorf("%d: error function did not match: %v", i, err)
 		}
-		if !(test.Data == nil && response == nil) && !api.Semantic.DeepDerivative(test.Data, response) {
+		if !(test.Data == nil && response == nil) && !apiequality.Semantic.DeepDerivative(test.Data, response) {
 			t.Errorf("%d: unexpected response: %#v %#v", i, test.Data, response)
 		}
 		if test.Created != created {
@@ -473,7 +475,7 @@ func TestTransformResponseNegotiate(t *testing.T) {
 				Header:     http.Header{"Content-Type": []string{"application/protobuf"}},
 				Body:       ioutil.NopCloser(bytes.NewReader(invalid)),
 			},
-			Decoder: testapi.Default.Codec(),
+			Decoder: api.Codecs.LegacyCodec(v1.SchemeGroupVersion),
 
 			Called:            true,
 			ExpectContentType: "application/protobuf",
@@ -489,7 +491,7 @@ func TestTransformResponseNegotiate(t *testing.T) {
 				StatusCode: 500,
 				Header:     http.Header{"Content-Type": []string{"application/,others"}},
 			},
-			Decoder: testapi.Default.Codec(),
+			Decoder: api.Codecs.LegacyCodec(v1.SchemeGroupVersion),
 
 			Error: true,
 			ErrFn: func(err error) bool {
@@ -503,7 +505,7 @@ func TestTransformResponseNegotiate(t *testing.T) {
 				Header:     http.Header{"Content-Type": []string{"text/any"}},
 				Body:       ioutil.NopCloser(bytes.NewReader(invalid)),
 			},
-			Decoder: testapi.Default.Codec(),
+			Decoder: api.Codecs.LegacyCodec(v1.SchemeGroupVersion),
 		},
 		{
 			// no negotiation when no response content type specified
@@ -512,7 +514,7 @@ func TestTransformResponseNegotiate(t *testing.T) {
 				StatusCode: 200,
 				Body:       ioutil.NopCloser(bytes.NewReader(invalid)),
 			},
-			Decoder: testapi.Default.Codec(),
+			Decoder: api.Codecs.LegacyCodec(v1.SchemeGroupVersion),
 		},
 		{
 			// unrecognized content type is not handled
@@ -522,7 +524,7 @@ func TestTransformResponseNegotiate(t *testing.T) {
 				Header:     http.Header{"Content-Type": []string{"application/unrecognized"}},
 				Body:       ioutil.NopCloser(bytes.NewReader(invalid)),
 			},
-			Decoder: testapi.Default.Codec(),
+			Decoder: api.Codecs.LegacyCodec(v1.SchemeGroupVersion),
 
 			NegotiateErr:      fmt.Errorf("aaaa"),
 			Called:            true,
@@ -785,7 +787,7 @@ func TestRequestWatch(t *testing.T) {
 				client: clientFunc(func(req *http.Request) (*http.Response, error) {
 					return &http.Response{
 						StatusCode: http.StatusUnauthorized,
-						Body: ioutil.NopCloser(bytes.NewReader([]byte(runtime.EncodeOrDie(testapi.Default.Codec(), &metav1.Status{
+						Body: ioutil.NopCloser(bytes.NewReader([]byte(runtime.EncodeOrDie(api.Codecs.LegacyCodec(v1.SchemeGroupVersion), &metav1.Status{
 							Status: metav1.StatusFailure,
 							Reason: metav1.StatusReasonUnauthorized,
 						})))),
@@ -892,7 +894,7 @@ func TestRequestStream(t *testing.T) {
 				client: clientFunc(func(req *http.Request) (*http.Response, error) {
 					return &http.Response{
 						StatusCode: http.StatusUnauthorized,
-						Body: ioutil.NopCloser(bytes.NewReader([]byte(runtime.EncodeOrDie(testapi.Default.Codec(), &metav1.Status{
+						Body: ioutil.NopCloser(bytes.NewReader([]byte(runtime.EncodeOrDie(api.Codecs.LegacyCodec(v1.SchemeGroupVersion), &metav1.Status{
 							Status: metav1.StatusFailure,
 							Reason: metav1.StatusReasonUnauthorized,
 						})))),
@@ -1021,7 +1023,7 @@ func TestDoRequestNewWay(t *testing.T) {
 		Port:       12345,
 		TargetPort: intstr.FromInt(12345),
 	}}}}
-	expectedBody, _ := runtime.Encode(testapi.Default.Codec(), expectedObj)
+	expectedBody, _ := runtime.Encode(api.Codecs.LegacyCodec(v1.SchemeGroupVersion), expectedObj)
 	fakeHandler := utiltesting.FakeHandler{
 		StatusCode:   200,
 		ResponseBody: string(expectedBody),
@@ -1042,10 +1044,10 @@ func TestDoRequestNewWay(t *testing.T) {
 	}
 	if obj == nil {
 		t.Error("nil obj")
-	} else if !api.Semantic.DeepDerivative(expectedObj, obj) {
+	} else if !apiequality.Semantic.DeepDerivative(expectedObj, obj) {
 		t.Errorf("Expected: %#v, got %#v", expectedObj, obj)
 	}
-	requestURL := testapi.Default.ResourcePathWithPrefix("foo/bar", "", "", "baz")
+	requestURL := defaultResourcePathWithPrefix("foo/bar", "", "", "baz")
 	requestURL += "?timeout=1s"
 	fakeHandler.ValidateRequest(t, requestURL, "POST", &reqBody)
 }
@@ -1246,13 +1248,13 @@ func BenchmarkCheckRetryClosesBody(b *testing.B) {
 
 func TestDoRequestNewWayReader(t *testing.T) {
 	reqObj := &api.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}}
-	reqBodyExpected, _ := runtime.Encode(testapi.Default.Codec(), reqObj)
+	reqBodyExpected, _ := runtime.Encode(api.Codecs.LegacyCodec(v1.SchemeGroupVersion), reqObj)
 	expectedObj := &api.Service{Spec: api.ServiceSpec{Ports: []api.ServicePort{{
 		Protocol:   "TCP",
 		Port:       12345,
 		TargetPort: intstr.FromInt(12345),
 	}}}}
-	expectedBody, _ := runtime.Encode(testapi.Default.Codec(), expectedObj)
+	expectedBody, _ := runtime.Encode(api.Codecs.LegacyCodec(v1.SchemeGroupVersion), expectedObj)
 	fakeHandler := utiltesting.FakeHandler{
 		StatusCode:   200,
 		ResponseBody: string(expectedBody),
@@ -1275,24 +1277,24 @@ func TestDoRequestNewWayReader(t *testing.T) {
 	}
 	if obj == nil {
 		t.Error("nil obj")
-	} else if !api.Semantic.DeepDerivative(expectedObj, obj) {
+	} else if !apiequality.Semantic.DeepDerivative(expectedObj, obj) {
 		t.Errorf("Expected: %#v, got %#v", expectedObj, obj)
 	}
 	tmpStr := string(reqBodyExpected)
-	requestURL := testapi.Default.ResourcePathWithPrefix("foo", "bar", "", "baz")
+	requestURL := defaultResourcePathWithPrefix("foo", "bar", "", "baz")
 	requestURL += "?" + metav1.LabelSelectorQueryParam(api.Registry.GroupOrDie(api.GroupName).GroupVersion.String()) + "=name%3Dfoo&timeout=1s"
 	fakeHandler.ValidateRequest(t, requestURL, "POST", &tmpStr)
 }
 
 func TestDoRequestNewWayObj(t *testing.T) {
 	reqObj := &api.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}}
-	reqBodyExpected, _ := runtime.Encode(testapi.Default.Codec(), reqObj)
+	reqBodyExpected, _ := runtime.Encode(api.Codecs.LegacyCodec(v1.SchemeGroupVersion), reqObj)
 	expectedObj := &api.Service{Spec: api.ServiceSpec{Ports: []api.ServicePort{{
 		Protocol:   "TCP",
 		Port:       12345,
 		TargetPort: intstr.FromInt(12345),
 	}}}}
-	expectedBody, _ := runtime.Encode(testapi.Default.Codec(), expectedObj)
+	expectedBody, _ := runtime.Encode(api.Codecs.LegacyCodec(v1.SchemeGroupVersion), expectedObj)
 	fakeHandler := utiltesting.FakeHandler{
 		StatusCode:   200,
 		ResponseBody: string(expectedBody),
@@ -1315,18 +1317,18 @@ func TestDoRequestNewWayObj(t *testing.T) {
 	}
 	if obj == nil {
 		t.Error("nil obj")
-	} else if !api.Semantic.DeepDerivative(expectedObj, obj) {
+	} else if !apiequality.Semantic.DeepDerivative(expectedObj, obj) {
 		t.Errorf("Expected: %#v, got %#v", expectedObj, obj)
 	}
 	tmpStr := string(reqBodyExpected)
-	requestURL := testapi.Default.ResourcePath("foo", "", "bar/baz")
+	requestURL := defaultResourcePathWithPrefix("", "foo", "", "bar/baz")
 	requestURL += "?" + metav1.LabelSelectorQueryParam(api.Registry.GroupOrDie(api.GroupName).GroupVersion.String()) + "=name%3Dfoo&timeout=1s"
 	fakeHandler.ValidateRequest(t, requestURL, "POST", &tmpStr)
 }
 
 func TestDoRequestNewWayFile(t *testing.T) {
 	reqObj := &api.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}}
-	reqBodyExpected, err := runtime.Encode(testapi.Default.Codec(), reqObj)
+	reqBodyExpected, err := runtime.Encode(api.Codecs.LegacyCodec(v1.SchemeGroupVersion), reqObj)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -1348,7 +1350,7 @@ func TestDoRequestNewWayFile(t *testing.T) {
 		Port:       12345,
 		TargetPort: intstr.FromInt(12345),
 	}}}}
-	expectedBody, _ := runtime.Encode(testapi.Default.Codec(), expectedObj)
+	expectedBody, _ := runtime.Encode(api.Codecs.LegacyCodec(v1.SchemeGroupVersion), expectedObj)
 	fakeHandler := utiltesting.FakeHandler{
 		StatusCode:   200,
 		ResponseBody: string(expectedBody),
@@ -1369,21 +1371,21 @@ func TestDoRequestNewWayFile(t *testing.T) {
 	}
 	if obj == nil {
 		t.Error("nil obj")
-	} else if !api.Semantic.DeepDerivative(expectedObj, obj) {
+	} else if !apiequality.Semantic.DeepDerivative(expectedObj, obj) {
 		t.Errorf("Expected: %#v, got %#v", expectedObj, obj)
 	}
 	if wasCreated {
 		t.Errorf("expected object was created")
 	}
 	tmpStr := string(reqBodyExpected)
-	requestURL := testapi.Default.ResourcePathWithPrefix("foo/bar/baz", "", "", "")
+	requestURL := defaultResourcePathWithPrefix("foo/bar/baz", "", "", "")
 	requestURL += "?timeout=1s"
 	fakeHandler.ValidateRequest(t, requestURL, "POST", &tmpStr)
 }
 
 func TestWasCreated(t *testing.T) {
 	reqObj := &api.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}}
-	reqBodyExpected, err := runtime.Encode(testapi.Default.Codec(), reqObj)
+	reqBodyExpected, err := runtime.Encode(api.Codecs.LegacyCodec(v1.SchemeGroupVersion), reqObj)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -1393,7 +1395,7 @@ func TestWasCreated(t *testing.T) {
 		Port:       12345,
 		TargetPort: intstr.FromInt(12345),
 	}}}}
-	expectedBody, _ := runtime.Encode(testapi.Default.Codec(), expectedObj)
+	expectedBody, _ := runtime.Encode(api.Codecs.LegacyCodec(v1.SchemeGroupVersion), expectedObj)
 	fakeHandler := utiltesting.FakeHandler{
 		StatusCode:   201,
 		ResponseBody: string(expectedBody),
@@ -1414,7 +1416,7 @@ func TestWasCreated(t *testing.T) {
 	}
 	if obj == nil {
 		t.Error("nil obj")
-	} else if !api.Semantic.DeepDerivative(expectedObj, obj) {
+	} else if !apiequality.Semantic.DeepDerivative(expectedObj, obj) {
 		t.Errorf("Expected: %#v, got %#v", expectedObj, obj)
 	}
 	if !wasCreated {
@@ -1422,7 +1424,7 @@ func TestWasCreated(t *testing.T) {
 	}
 
 	tmpStr := string(reqBodyExpected)
-	requestURL := testapi.Default.ResourcePathWithPrefix("foo/bar/baz", "", "", "")
+	requestURL := defaultResourcePathWithPrefix("foo/bar/baz", "", "", "")
 	requestURL += "?timeout=1s"
 	fakeHandler.ValidateRequest(t, requestURL, "PUT", &tmpStr)
 }
@@ -1520,7 +1522,7 @@ func TestBody(t *testing.T) {
 	const data = "test payload"
 
 	obj := &api.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}}
-	bodyExpected, _ := runtime.Encode(testapi.Default.Codec(), obj)
+	bodyExpected, _ := runtime.Encode(api.Codecs.LegacyCodec(v1.SchemeGroupVersion), obj)
 
 	f, err := ioutil.TempFile("", "test_body")
 	if err != nil {
@@ -1598,7 +1600,7 @@ func TestWatch(t *testing.T) {
 		w.WriteHeader(http.StatusOK)
 		flusher.Flush()
 
-		encoder := restclientwatch.NewEncoder(streaming.NewEncoder(w, testapi.Default.Codec()), testapi.Default.Codec())
+		encoder := restclientwatch.NewEncoder(streaming.NewEncoder(w, api.Codecs.LegacyCodec(v1.SchemeGroupVersion)), api.Codecs.LegacyCodec(v1.SchemeGroupVersion))
 		for _, item := range table {
 			if err := encoder.Encode(&watch.Event{Type: item.t, Object: item.obj}); err != nil {
 				panic(err)
@@ -1622,7 +1624,7 @@ func TestWatch(t *testing.T) {
 		if e, a := item.t, got.Type; e != a {
 			t.Errorf("Expected %v, got %v", e, a)
 		}
-		if e, a := item.obj, got.Object; !api.Semantic.DeepDerivative(e, a) {
+		if e, a := item.obj, got.Object; !apiequality.Semantic.DeepDerivative(e, a) {
 			t.Errorf("Expected %v, got %v", e, a)
 		}
 	}
@@ -1672,7 +1674,7 @@ func testRESTClient(t testing.TB, srv *httptest.Server) *RESTClient {
 			t.Fatalf("failed to parse test URL: %v", err)
 		}
 	}
-	versionedAPIPath := testapi.Default.ResourcePath("", "", "")
+	versionedAPIPath := defaultResourcePathWithPrefix("", "", "", "")
 	client, err := NewRESTClient(baseURL, versionedAPIPath, defaultContentConfig(), 0, 0, nil, nil)
 	if err != nil {
 		t.Fatalf("failed to create a client: %v", err)
@@ -1707,4 +1709,25 @@ func TestDoContext(t *testing.T) {
 	if err == nil {
 		t.Fatal("Expected context cancellation error")
 	}
+}
+
+func defaultResourcePathWithPrefix(prefix, resource, namespace, name string) string {
+	var path string
+	path = "/api/" + v1.SchemeGroupVersion.Version
+
+	if prefix != "" {
+		path = path + "/" + prefix
+	}
+	if namespace != "" {
+		path = path + "/namespaces/" + namespace
+	}
+	// Resource names are lower case.
+	resource = strings.ToLower(resource)
+	if resource != "" {
+		path = path + "/" + resource
+	}
+	if name != "" {
+		path = path + "/" + name
+	}
+	return path
 }

@@ -23,7 +23,7 @@ import (
 	"os"
 	"testing"
 
-	certutil "k8s.io/client-go/pkg/util/cert"
+	certutil "k8s.io/client-go/util/cert"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 )
 
@@ -32,7 +32,7 @@ func TestCreatePKIAssets(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Couldn't create tmpdir")
 	}
-	defer os.Remove(tmpdir)
+	defer os.RemoveAll(tmpdir)
 
 	var tests = []struct {
 		cfg      *kubeadmapi.MasterConfiguration

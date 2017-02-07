@@ -56,7 +56,7 @@ func TestValidateEvent(t *testing.T) {
 			&api.Event{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "test3",
-					Namespace: api.NamespaceDefault,
+					Namespace: metav1.NamespaceDefault,
 				},
 				InvolvedObject: api.ObjectReference{
 					APIVersion: "v1",
@@ -68,7 +68,7 @@ func TestValidateEvent(t *testing.T) {
 			&api.Event{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "test4",
-					Namespace: api.NamespaceDefault,
+					Namespace: metav1.NamespaceDefault,
 				},
 				InvolvedObject: api.ObjectReference{
 					APIVersion: "v1",
@@ -80,12 +80,12 @@ func TestValidateEvent(t *testing.T) {
 			&api.Event{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "test5",
-					Namespace: api.NamespaceDefault,
+					Namespace: metav1.NamespaceDefault,
 				},
 				InvolvedObject: api.ObjectReference{
 					APIVersion: "extensions/v1beta1",
 					Kind:       "NoKind",
-					Namespace:  api.NamespaceDefault,
+					Namespace:  metav1.NamespaceDefault,
 				},
 			},
 			true,
@@ -93,7 +93,7 @@ func TestValidateEvent(t *testing.T) {
 			&api.Event{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "test6",
-					Namespace: api.NamespaceDefault,
+					Namespace: metav1.NamespaceDefault,
 				},
 				InvolvedObject: api.ObjectReference{
 					APIVersion: "extensions/v1beta1",
@@ -106,12 +106,12 @@ func TestValidateEvent(t *testing.T) {
 			&api.Event{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "test7",
-					Namespace: api.NamespaceDefault,
+					Namespace: metav1.NamespaceDefault,
 				},
 				InvolvedObject: api.ObjectReference{
 					APIVersion: "extensions/v1beta1",
 					Kind:       "Job",
-					Namespace:  api.NamespaceDefault,
+					Namespace:  metav1.NamespaceDefault,
 				},
 			},
 			true,
@@ -119,7 +119,7 @@ func TestValidateEvent(t *testing.T) {
 			&api.Event{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "test8",
-					Namespace: api.NamespaceDefault,
+					Namespace: metav1.NamespaceDefault,
 				},
 				InvolvedObject: api.ObjectReference{
 					APIVersion: "other/v1beta1",
@@ -145,7 +145,7 @@ func TestValidateEvent(t *testing.T) {
 			&api.Event{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "test10",
-					Namespace: api.NamespaceDefault,
+					Namespace: metav1.NamespaceDefault,
 				},
 				InvolvedObject: api.ObjectReference{
 					APIVersion: "extensions",

@@ -18,12 +18,12 @@ package fake
 
 import (
 	rest "k8s.io/client-go/rest"
+	testing "k8s.io/client-go/testing"
 	internalversion "k8s.io/kubernetes/cmd/libs/go2idl/client-gen/testoutput/clientset_generated/test_internalclientset/typed/testgroup/internalversion"
-	core "k8s.io/kubernetes/pkg/client/testing/core"
 )
 
 type FakeTestgroup struct {
-	*core.Fake
+	*testing.Fake
 }
 
 func (c *FakeTestgroup) TestTypes(namespace string) internalversion.TestTypeInterface {

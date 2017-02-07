@@ -14,8 +14,8 @@ go_library(
     deps = [
         "//cmd/kube-aggregator/pkg/client/clientset_generated/clientset:go_default_library",
         "//cmd/kube-aggregator/pkg/client/clientset_generated/internalclientset:go_default_library",
-        "//pkg/client/cache:go_default_library",
         "//vendor:k8s.io/apimachinery/pkg/runtime",
+        "//vendor:k8s.io/client-go/tools/cache",
     ],
 )
 

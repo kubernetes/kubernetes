@@ -31,7 +31,7 @@ type instrumentedRuntimeService struct {
 }
 
 // Creates an instrumented RuntimeInterface from an existing RuntimeService.
-func NewInstrumentedRuntimeService(service internalapi.RuntimeService) internalapi.RuntimeService {
+func newInstrumentedRuntimeService(service internalapi.RuntimeService) internalapi.RuntimeService {
 	return &instrumentedRuntimeService{service: service}
 }
 
@@ -42,7 +42,7 @@ type instrumentedImageManagerService struct {
 }
 
 // Creates an instrumented ImageManagerService from an existing ImageManagerService.
-func NewInstrumentedImageManagerService(service internalapi.ImageManagerService) internalapi.ImageManagerService {
+func newInstrumentedImageManagerService(service internalapi.ImageManagerService) internalapi.ImageManagerService {
 	return &instrumentedImageManagerService{service: service}
 }
 

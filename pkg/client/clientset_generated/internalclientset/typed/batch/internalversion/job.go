@@ -36,11 +36,11 @@ type JobInterface interface {
 	Create(*batch.Job) (*batch.Job, error)
 	Update(*batch.Job) (*batch.Job, error)
 	UpdateStatus(*batch.Job) (*batch.Job, error)
-	Delete(name string, options *api.DeleteOptions) error
-	DeleteCollection(options *api.DeleteOptions, listOptions api.ListOptions) error
+	Delete(name string, options *v1.DeleteOptions) error
+	DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error
 	Get(name string, options v1.GetOptions) (*batch.Job, error)
-	List(opts api.ListOptions) (*batch.JobList, error)
-	Watch(opts api.ListOptions) (watch.Interface, error)
+	List(opts v1.ListOptions) (*batch.JobList, error)
+	Watch(opts v1.ListOptions) (watch.Interface, error)
 	Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *batch.Job, err error)
 	JobExpansion
 }
@@ -101,7 +101,7 @@ func (c *jobs) UpdateStatus(job *batch.Job) (result *batch.Job, err error) {
 }
 
 // Delete takes name of the job and deletes it. Returns an error if one occurs.
-func (c *jobs) Delete(name string, options *api.DeleteOptions) error {
+func (c *jobs) Delete(name string, options *v1.DeleteOptions) error {
 	return c.client.Delete().
 		Namespace(c.ns).
 		Resource("jobs").
@@ -112,7 +112,7 @@ func (c *jobs) Delete(name string, options *api.DeleteOptions) error {
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *jobs) DeleteCollection(options *api.DeleteOptions, listOptions api.ListOptions) error {
+func (c *jobs) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
 	return c.client.Delete().
 		Namespace(c.ns).
 		Resource("jobs").
@@ -136,7 +136,7 @@ func (c *jobs) Get(name string, options v1.GetOptions) (result *batch.Job, err e
 }
 
 // List takes label and field selectors, and returns the list of Jobs that match those selectors.
-func (c *jobs) List(opts api.ListOptions) (result *batch.JobList, err error) {
+func (c *jobs) List(opts v1.ListOptions) (result *batch.JobList, err error) {
 	result = &batch.JobList{}
 	err = c.client.Get().
 		Namespace(c.ns).
@@ -148,7 +148,7 @@ func (c *jobs) List(opts api.ListOptions) (result *batch.JobList, err error) {
 }
 
 // Watch returns a watch.Interface that watches the requested jobs.
-func (c *jobs) Watch(opts api.ListOptions) (watch.Interface, error) {
+func (c *jobs) Watch(opts v1.ListOptions) (watch.Interface, error) {
 	return c.client.Get().
 		Prefix("watch").
 		Namespace(c.ns).

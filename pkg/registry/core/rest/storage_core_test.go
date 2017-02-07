@@ -20,7 +20,7 @@ import (
 	"testing"
 
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/kubernetes/pkg/storage/storagebackend"
+	"k8s.io/apiserver/pkg/storage/storagebackend"
 )
 
 func TestGetServersToValidate(t *testing.T) {

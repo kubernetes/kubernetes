@@ -19,6 +19,8 @@ api-prefix
 api-rate
 api-server-port
 api-servers
+api-server-advertise-address
+api-server-service-type
 api-token
 api-version
 apiserver-count
@@ -63,6 +65,7 @@ cert-dir
 certificate-authority
 cgroup-driver
 cgroup-root
+cgroups-per-qos
 chaos-chance
 clean-start
 cleanup
@@ -159,7 +162,6 @@ duration-sec
 e2e-output-dir
 e2e-verify-service-account
 enable-controller-attach-detach
-enable-cri
 enable-custom-metrics
 enable-debugging-handlers
 enable-dynamic-provisioning
@@ -177,6 +179,7 @@ etcd-keyfile
 etcd-mutation-timeout
 etcd-prefix
 etcd-pv-capacity
+etcd-persistent-storage
 etcd-quorum-read
 etcd-server
 etcd-servers
@@ -197,7 +200,6 @@ executor-suicide-timeout
 exit-on-lock-contention
 experimental-allowed-unsafe-sysctls
 experimental-bootstrap-kubeconfig
-experimental-cgroups-per-qos
 experimental-keystone-url
 experimental-keystone-ca-file
 experimental-mounter-path
@@ -576,6 +578,7 @@ sort-by
 source-file
 ssh-env
 ssh-keyfile
+ssh-key
 ssh-options
 ssh-user
 start-services

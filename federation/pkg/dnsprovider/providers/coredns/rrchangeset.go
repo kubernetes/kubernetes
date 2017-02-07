@@ -19,10 +19,11 @@ package coredns
 import (
 	"encoding/json"
 	"fmt"
+	"hash/fnv"
+
 	etcdc "github.com/coreos/etcd/client"
 	dnsmsg "github.com/miekg/coredns/middleware/etcd/msg"
 	"golang.org/x/net/context"
-	"hash/fnv"
 	"k8s.io/kubernetes/federation/pkg/dnsprovider"
 )
 
@@ -56,6 +57,10 @@ func (c *ResourceRecordChangeset) Add(rrset dnsprovider.ResourceRecordSet) dnspr
 func (c *ResourceRecordChangeset) Remove(rrset dnsprovider.ResourceRecordSet) dnsprovider.ResourceRecordChangeset {
 	c.changeset = append(c.changeset, ChangeSet{cstype: DELETION, rrset: rrset})
 	return c
+}
+
+func (c *ResourceRecordChangeset) IsEmpty() bool {
+	return len(c.changeset) == 0
 }
 
 func (c *ResourceRecordChangeset) Apply() error {

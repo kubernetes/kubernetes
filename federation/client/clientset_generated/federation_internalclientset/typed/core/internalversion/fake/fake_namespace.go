@@ -22,8 +22,8 @@ import (
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
+	testing "k8s.io/client-go/testing"
 	api "k8s.io/kubernetes/pkg/api"
-	core "k8s.io/kubernetes/pkg/client/testing/core"
 )
 
 // FakeNamespaces implements NamespaceInterface
@@ -35,7 +35,7 @@ var namespacesResource = schema.GroupVersionResource{Group: "", Version: "", Res
 
 func (c *FakeNamespaces) Create(namespace *api.Namespace) (result *api.Namespace, err error) {
 	obj, err := c.Fake.
-		Invokes(core.NewRootCreateAction(namespacesResource, namespace), &api.Namespace{})
+		Invokes(testing.NewRootCreateAction(namespacesResource, namespace), &api.Namespace{})
 	if obj == nil {
 		return nil, err
 	}
@@ -44,7 +44,7 @@ func (c *FakeNamespaces) Create(namespace *api.Namespace) (result *api.Namespace
 
 func (c *FakeNamespaces) Update(namespace *api.Namespace) (result *api.Namespace, err error) {
 	obj, err := c.Fake.
-		Invokes(core.NewRootUpdateAction(namespacesResource, namespace), &api.Namespace{})
+		Invokes(testing.NewRootUpdateAction(namespacesResource, namespace), &api.Namespace{})
 	if obj == nil {
 		return nil, err
 	}
@@ -53,21 +53,21 @@ func (c *FakeNamespaces) Update(namespace *api.Namespace) (result *api.Namespace
 
 func (c *FakeNamespaces) UpdateStatus(namespace *api.Namespace) (*api.Namespace, error) {
 	obj, err := c.Fake.
-		Invokes(core.NewRootUpdateSubresourceAction(namespacesResource, "status", namespace), &api.Namespace{})
+		Invokes(testing.NewRootUpdateSubresourceAction(namespacesResource, "status", namespace), &api.Namespace{})
 	if obj == nil {
 		return nil, err
 	}
 	return obj.(*api.Namespace), err
 }
 
-func (c *FakeNamespaces) Delete(name string, options *api.DeleteOptions) error {
+func (c *FakeNamespaces) Delete(name string, options *v1.DeleteOptions) error {
 	_, err := c.Fake.
-		Invokes(core.NewRootDeleteAction(namespacesResource, name), &api.Namespace{})
+		Invokes(testing.NewRootDeleteAction(namespacesResource, name), &api.Namespace{})
 	return err
 }
 
-func (c *FakeNamespaces) DeleteCollection(options *api.DeleteOptions, listOptions api.ListOptions) error {
-	action := core.NewRootDeleteCollectionAction(namespacesResource, listOptions)
+func (c *FakeNamespaces) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
+	action := testing.NewRootDeleteCollectionAction(namespacesResource, listOptions)
 
 	_, err := c.Fake.Invokes(action, &api.NamespaceList{})
 	return err
@@ -75,21 +75,21 @@ func (c *FakeNamespaces) DeleteCollection(options *api.DeleteOptions, listOption
 
 func (c *FakeNamespaces) Get(name string, options v1.GetOptions) (result *api.Namespace, err error) {
 	obj, err := c.Fake.
-		Invokes(core.NewRootGetAction(namespacesResource, name), &api.Namespace{})
+		Invokes(testing.NewRootGetAction(namespacesResource, name), &api.Namespace{})
 	if obj == nil {
 		return nil, err
 	}
 	return obj.(*api.Namespace), err
 }
 
-func (c *FakeNamespaces) List(opts api.ListOptions) (result *api.NamespaceList, err error) {
+func (c *FakeNamespaces) List(opts v1.ListOptions) (result *api.NamespaceList, err error) {
 	obj, err := c.Fake.
-		Invokes(core.NewRootListAction(namespacesResource, opts), &api.NamespaceList{})
+		Invokes(testing.NewRootListAction(namespacesResource, opts), &api.NamespaceList{})
 	if obj == nil {
 		return nil, err
 	}
 
-	label, _, _ := core.ExtractFromListOptions(opts)
+	label, _, _ := testing.ExtractFromListOptions(opts)
 	if label == nil {
 		label = labels.Everything()
 	}
@@ -103,15 +103,15 @@ func (c *FakeNamespaces) List(opts api.ListOptions) (result *api.NamespaceList, 
 }
 
 // Watch returns a watch.Interface that watches the requested namespaces.
-func (c *FakeNamespaces) Watch(opts api.ListOptions) (watch.Interface, error) {
+func (c *FakeNamespaces) Watch(opts v1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
-		InvokesWatch(core.NewRootWatchAction(namespacesResource, opts))
+		InvokesWatch(testing.NewRootWatchAction(namespacesResource, opts))
 }
 
 // Patch applies the patch and returns the patched namespace.
 func (c *FakeNamespaces) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *api.Namespace, err error) {
 	obj, err := c.Fake.
-		Invokes(core.NewRootPatchSubresourceAction(namespacesResource, name, data, subresources...), &api.Namespace{})
+		Invokes(testing.NewRootPatchSubresourceAction(namespacesResource, name, data, subresources...), &api.Namespace{})
 	if obj == nil {
 		return nil, err
 	}

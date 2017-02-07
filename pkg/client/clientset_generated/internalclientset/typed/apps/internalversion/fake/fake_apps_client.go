@@ -18,12 +18,12 @@ package fake
 
 import (
 	rest "k8s.io/client-go/rest"
+	testing "k8s.io/client-go/testing"
 	internalversion "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/apps/internalversion"
-	core "k8s.io/kubernetes/pkg/client/testing/core"
 )
 
 type FakeApps struct {
-	*core.Fake
+	*testing.Fake
 }
 
 func (c *FakeApps) StatefulSets(namespace string) internalversion.StatefulSetInterface {

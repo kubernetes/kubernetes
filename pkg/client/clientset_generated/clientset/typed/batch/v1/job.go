@@ -22,7 +22,6 @@ import (
 	watch "k8s.io/apimachinery/pkg/watch"
 	rest "k8s.io/client-go/rest"
 	api "k8s.io/kubernetes/pkg/api"
-	api_v1 "k8s.io/kubernetes/pkg/api/v1"
 	v1 "k8s.io/kubernetes/pkg/apis/batch/v1"
 )
 
@@ -37,11 +36,11 @@ type JobInterface interface {
 	Create(*v1.Job) (*v1.Job, error)
 	Update(*v1.Job) (*v1.Job, error)
 	UpdateStatus(*v1.Job) (*v1.Job, error)
-	Delete(name string, options *api_v1.DeleteOptions) error
-	DeleteCollection(options *api_v1.DeleteOptions, listOptions api_v1.ListOptions) error
+	Delete(name string, options *meta_v1.DeleteOptions) error
+	DeleteCollection(options *meta_v1.DeleteOptions, listOptions meta_v1.ListOptions) error
 	Get(name string, options meta_v1.GetOptions) (*v1.Job, error)
-	List(opts api_v1.ListOptions) (*v1.JobList, error)
-	Watch(opts api_v1.ListOptions) (watch.Interface, error)
+	List(opts meta_v1.ListOptions) (*v1.JobList, error)
+	Watch(opts meta_v1.ListOptions) (watch.Interface, error)
 	Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v1.Job, err error)
 	JobExpansion
 }
@@ -102,7 +101,7 @@ func (c *jobs) UpdateStatus(job *v1.Job) (result *v1.Job, err error) {
 }
 
 // Delete takes name of the job and deletes it. Returns an error if one occurs.
-func (c *jobs) Delete(name string, options *api_v1.DeleteOptions) error {
+func (c *jobs) Delete(name string, options *meta_v1.DeleteOptions) error {
 	return c.client.Delete().
 		Namespace(c.ns).
 		Resource("jobs").
@@ -113,7 +112,7 @@ func (c *jobs) Delete(name string, options *api_v1.DeleteOptions) error {
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *jobs) DeleteCollection(options *api_v1.DeleteOptions, listOptions api_v1.ListOptions) error {
+func (c *jobs) DeleteCollection(options *meta_v1.DeleteOptions, listOptions meta_v1.ListOptions) error {
 	return c.client.Delete().
 		Namespace(c.ns).
 		Resource("jobs").
@@ -137,7 +136,7 @@ func (c *jobs) Get(name string, options meta_v1.GetOptions) (result *v1.Job, err
 }
 
 // List takes label and field selectors, and returns the list of Jobs that match those selectors.
-func (c *jobs) List(opts api_v1.ListOptions) (result *v1.JobList, err error) {
+func (c *jobs) List(opts meta_v1.ListOptions) (result *v1.JobList, err error) {
 	result = &v1.JobList{}
 	err = c.client.Get().
 		Namespace(c.ns).
@@ -149,7 +148,7 @@ func (c *jobs) List(opts api_v1.ListOptions) (result *v1.JobList, err error) {
 }
 
 // Watch returns a watch.Interface that watches the requested jobs.
-func (c *jobs) Watch(opts api_v1.ListOptions) (watch.Interface, error) {
+func (c *jobs) Watch(opts meta_v1.ListOptions) (watch.Interface, error) {
 	return c.client.Get().
 		Prefix("watch").
 		Namespace(c.ns).

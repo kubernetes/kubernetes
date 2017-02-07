@@ -60,13 +60,13 @@ func (c *FakePersistentVolumes) UpdateStatus(persistentVolume *v1.PersistentVolu
 	return obj.(*v1.PersistentVolume), err
 }
 
-func (c *FakePersistentVolumes) Delete(name string, options *v1.DeleteOptions) error {
+func (c *FakePersistentVolumes) Delete(name string, options *meta_v1.DeleteOptions) error {
 	_, err := c.Fake.
 		Invokes(testing.NewRootDeleteAction(persistentvolumesResource, name), &v1.PersistentVolume{})
 	return err
 }
 
-func (c *FakePersistentVolumes) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
+func (c *FakePersistentVolumes) DeleteCollection(options *meta_v1.DeleteOptions, listOptions meta_v1.ListOptions) error {
 	action := testing.NewRootDeleteCollectionAction(persistentvolumesResource, listOptions)
 
 	_, err := c.Fake.Invokes(action, &v1.PersistentVolumeList{})
@@ -82,7 +82,7 @@ func (c *FakePersistentVolumes) Get(name string, options meta_v1.GetOptions) (re
 	return obj.(*v1.PersistentVolume), err
 }
 
-func (c *FakePersistentVolumes) List(opts v1.ListOptions) (result *v1.PersistentVolumeList, err error) {
+func (c *FakePersistentVolumes) List(opts meta_v1.ListOptions) (result *v1.PersistentVolumeList, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewRootListAction(persistentvolumesResource, opts), &v1.PersistentVolumeList{})
 	if obj == nil {
@@ -103,7 +103,7 @@ func (c *FakePersistentVolumes) List(opts v1.ListOptions) (result *v1.Persistent
 }
 
 // Watch returns a watch.Interface that watches the requested persistentVolumes.
-func (c *FakePersistentVolumes) Watch(opts v1.ListOptions) (watch.Interface, error) {
+func (c *FakePersistentVolumes) Watch(opts meta_v1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
 		InvokesWatch(testing.NewRootWatchAction(persistentvolumesResource, opts))
 }

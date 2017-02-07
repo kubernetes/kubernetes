@@ -23,13 +23,13 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
+	"k8s.io/apiserver/pkg/registry/generic"
+	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	extvalidation "k8s.io/kubernetes/pkg/apis/extensions/validation"
-	"k8s.io/kubernetes/pkg/genericapiserver/registry/generic"
-	"k8s.io/kubernetes/pkg/genericapiserver/registry/rest"
-	"k8s.io/kubernetes/pkg/registry/core/controller"
-	controllerstore "k8s.io/kubernetes/pkg/registry/core/controller/storage"
+	"k8s.io/kubernetes/pkg/registry/core/replicationcontroller"
+	controllerstore "k8s.io/kubernetes/pkg/registry/core/replicationcontroller/storage"
 )
 
 // Container includes dummy storage for RC pods and experimental storage for Scale.
@@ -41,7 +41,7 @@ type ContainerStorage struct {
 func NewStorage(optsGetter generic.RESTOptionsGetter) ContainerStorage {
 	// scale does not set status, only updates spec so we ignore the status
 	controllerREST, _ := controllerstore.NewREST(optsGetter)
-	rcRegistry := controller.NewRegistry(controllerREST)
+	rcRegistry := replicationcontroller.NewRegistry(controllerREST)
 
 	return ContainerStorage{
 		ReplicationController: &RcREST{},
@@ -50,7 +50,7 @@ func NewStorage(optsGetter generic.RESTOptionsGetter) ContainerStorage {
 }
 
 type ScaleREST struct {
-	registry *controller.Registry
+	registry *replicationcontroller.Registry
 }
 
 // ScaleREST implements Patcher

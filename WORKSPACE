@@ -1,13 +1,13 @@
 git_repository(
     name = "io_bazel_rules_go",
-    commit = "d0142854a22a0dd98306280e897e64086289a0de",
+    commit = "7828452850597b52b49ec603b23f8ad2bcb22aed",
     remote = "https://github.com/bazelbuild/rules_go.git",
 )
 
 git_repository(
     name = "io_kubernetes_build",
-    commit = "418b8e976cb32d94fd765c80f2b04e660c5ec4ec",
-    remote = "https://github.com/kubernetes/release.git",
+    commit = "685f15b90b454af3086ab071fdea1b6db213d1fb",
+    remote = "https://github.com/kubernetes/repo-infra.git",
 )
 
 git_repository(

@@ -18,8 +18,8 @@ package v1
 
 import (
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/client-go/pkg/util"
-	"k8s.io/client-go/pkg/util/intstr"
 	"k8s.io/client-go/pkg/util/parsers"
 )
 
@@ -120,6 +120,9 @@ func SetDefaults_Container(obj *Container) {
 	}
 	if obj.TerminationMessagePath == "" {
 		obj.TerminationMessagePath = TerminationMessagePathDefault
+	}
+	if obj.TerminationMessagePolicy == "" {
+		obj.TerminationMessagePolicy = TerminationMessageReadFile
 	}
 }
 func SetDefaults_ServiceSpec(obj *ServiceSpec) {

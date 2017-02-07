@@ -49,6 +49,16 @@ func (f *Framework) PodClient() *PodClient {
 	}
 }
 
+// Convenience method for getting a pod client interface in an alternative namespace,
+// possibly applying test-suite specific transformations to the pod spec, e.g. for
+// node e2e pod scheduling.
+func (f *Framework) PodClientNS(namespace string) *PodClient {
+	return &PodClient{
+		f:            f,
+		PodInterface: f.ClientSet.Core().Pods(namespace),
+	}
+}
+
 type PodClient struct {
 	f *Framework
 	v1core.PodInterface
@@ -113,7 +123,7 @@ func (c *PodClient) Update(name string, updateFn func(pod *v1.Pod)) {
 
 // DeleteSync deletes the pod and wait for the pod to disappear for `timeout`. If the pod doesn't
 // disappear before the timeout, it will fail the test.
-func (c *PodClient) DeleteSync(name string, options *v1.DeleteOptions, timeout time.Duration) {
+func (c *PodClient) DeleteSync(name string, options *metav1.DeleteOptions, timeout time.Duration) {
 	err := c.Delete(name, options)
 	if err != nil && !errors.IsNotFound(err) {
 		Failf("Failed to delete pod %q: %v", name, err)

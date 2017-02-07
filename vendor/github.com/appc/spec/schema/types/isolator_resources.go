@@ -19,7 +19,7 @@ import (
 	"errors"
 	"fmt"
 
-	"k8s.io/kubernetes/pkg/api/resource"
+	"github.com/appc/spec/schema/types/resource"
 )
 
 var (
@@ -82,6 +82,15 @@ func (r *ResourceBase) UnmarshalJSON(b []byte) error {
 }
 
 func (r ResourceBase) AssertValid() error {
+	return nil
+}
+
+// TODO(lucab): both need to be clarified in spec,
+// see https://github.com/appc/spec/issues/625
+func (l ResourceBase) multipleAllowed() bool {
+	return true
+}
+func (l ResourceBase) Conflicts() []ACIdentifier {
 	return nil
 }
 

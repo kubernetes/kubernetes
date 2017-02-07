@@ -35,11 +35,11 @@ type NetworkPoliciesGetter interface {
 type NetworkPolicyInterface interface {
 	Create(*extensions.NetworkPolicy) (*extensions.NetworkPolicy, error)
 	Update(*extensions.NetworkPolicy) (*extensions.NetworkPolicy, error)
-	Delete(name string, options *api.DeleteOptions) error
-	DeleteCollection(options *api.DeleteOptions, listOptions api.ListOptions) error
+	Delete(name string, options *v1.DeleteOptions) error
+	DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error
 	Get(name string, options v1.GetOptions) (*extensions.NetworkPolicy, error)
-	List(opts api.ListOptions) (*extensions.NetworkPolicyList, error)
-	Watch(opts api.ListOptions) (watch.Interface, error)
+	List(opts v1.ListOptions) (*extensions.NetworkPolicyList, error)
+	Watch(opts v1.ListOptions) (watch.Interface, error)
 	Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *extensions.NetworkPolicy, err error)
 	NetworkPolicyExpansion
 }
@@ -84,7 +84,7 @@ func (c *networkPolicies) Update(networkPolicy *extensions.NetworkPolicy) (resul
 }
 
 // Delete takes name of the networkPolicy and deletes it. Returns an error if one occurs.
-func (c *networkPolicies) Delete(name string, options *api.DeleteOptions) error {
+func (c *networkPolicies) Delete(name string, options *v1.DeleteOptions) error {
 	return c.client.Delete().
 		Namespace(c.ns).
 		Resource("networkpolicies").
@@ -95,7 +95,7 @@ func (c *networkPolicies) Delete(name string, options *api.DeleteOptions) error 
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *networkPolicies) DeleteCollection(options *api.DeleteOptions, listOptions api.ListOptions) error {
+func (c *networkPolicies) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
 	return c.client.Delete().
 		Namespace(c.ns).
 		Resource("networkpolicies").
@@ -119,7 +119,7 @@ func (c *networkPolicies) Get(name string, options v1.GetOptions) (result *exten
 }
 
 // List takes label and field selectors, and returns the list of NetworkPolicies that match those selectors.
-func (c *networkPolicies) List(opts api.ListOptions) (result *extensions.NetworkPolicyList, err error) {
+func (c *networkPolicies) List(opts v1.ListOptions) (result *extensions.NetworkPolicyList, err error) {
 	result = &extensions.NetworkPolicyList{}
 	err = c.client.Get().
 		Namespace(c.ns).
@@ -131,7 +131,7 @@ func (c *networkPolicies) List(opts api.ListOptions) (result *extensions.Network
 }
 
 // Watch returns a watch.Interface that watches the requested networkPolicies.
-func (c *networkPolicies) Watch(opts api.ListOptions) (watch.Interface, error) {
+func (c *networkPolicies) Watch(opts v1.ListOptions) (watch.Interface, error) {
 	return c.client.Get().
 		Prefix("watch").
 		Namespace(c.ns).

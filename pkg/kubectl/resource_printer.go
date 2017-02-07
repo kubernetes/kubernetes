@@ -38,7 +38,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/client-go/pkg/util/jsonpath"
+	"k8s.io/client-go/util/jsonpath"
 	"k8s.io/kubernetes/federation/apis/federation"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/events"
@@ -419,6 +419,15 @@ func (h *HumanReadablePrinter) EnsurePrintWithKind(kind string) {
 	h.options.Kind = kind
 }
 
+// EnsurePrintHeaders sets the HumanReadablePrinter option "NoHeaders" to false
+// and removes the .lastType that was printed, which forces headers to be
+// printed in cases where multiple lists of the same resource are printed
+// consecutively, but are separated by non-printer related information.
+func (h *HumanReadablePrinter) EnsurePrintHeaders() {
+	h.options.NoHeaders = false
+	h.lastType = nil
+}
+
 // Handler adds a print handler with a given set of columns to HumanReadablePrinter instance.
 // See validatePrintHandlerFunc for required method signature.
 func (h *HumanReadablePrinter) Handler(columns, columnsWithWide []string, printFunc interface{}) error {
@@ -524,7 +533,7 @@ var (
 
 	// TODO: consider having 'KIND' for third party resource data
 	thirdPartyResourceDataColumns    = []string{"NAME", "LABELS", "DATA"}
-	horizontalPodAutoscalerColumns   = []string{"NAME", "REFERENCE", "TARGET", "CURRENT", "MINPODS", "MAXPODS", "AGE"}
+	horizontalPodAutoscalerColumns   = []string{"NAME", "REFERENCE", "TARGET", "CURRENT", "MINPODS", "MAXPODS", "REPLICAS", "AGE"}
 	withNamespacePrefixColumns       = []string{"NAMESPACE"} // TODO(erictune): print cluster name too.
 	deploymentColumns                = []string{"NAME", "DESIRED", "CURRENT", "UP-TO-DATE", "AVAILABLE", "AGE"}
 	deploymentWideColumns            = []string{"CONTAINER(S)", "IMAGE(S)", "SELECTOR"}
@@ -1728,7 +1737,7 @@ func printEvent(event *api.Event, w io.Writer, options PrintOptions) error {
 		event.InvolvedObject.FieldPath,
 		event.Type,
 		event.Reason,
-		event.Source,
+		formatEventSource(event.Source),
 		event.Message,
 	); err != nil {
 		return err
@@ -2156,6 +2165,7 @@ func printHorizontalPodAutoscaler(hpa *autoscaling.HorizontalPodAutoscaler, w io
 		minPods = fmt.Sprintf("%d", *hpa.Spec.MinReplicas)
 	}
 	maxPods := hpa.Spec.MaxReplicas
+	currentReplicas := hpa.Status.CurrentReplicas
 
 	if options.WithNamespace {
 		if _, err := fmt.Fprintf(w, "%s\t", namespace); err != nil {
@@ -2163,13 +2173,14 @@ func printHorizontalPodAutoscaler(hpa *autoscaling.HorizontalPodAutoscaler, w io
 		}
 	}
 
-	if _, err := fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\t%d\t%s",
+	if _, err := fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\t%d\t%d\t%s",
 		name,
 		reference,
 		target,
 		current,
 		minPods,
 		maxPods,
+		currentReplicas,
 		translateTimestamp(hpa.CreationTimestamp),
 	); err != nil {
 		return err
@@ -2726,4 +2737,13 @@ func (j *JSONPathPrinter) PrintObj(obj runtime.Object, w io.Writer) error {
 // TODO: implement HandledResources()
 func (p *JSONPathPrinter) HandledResources() []string {
 	return []string{}
+}
+
+// formatEventSource formats EventSource as a comma separated string excluding Host when empty
+func formatEventSource(es api.EventSource) string {
+	EventSourceString := []string{es.Component}
+	if len(es.Host) > 0 {
+		EventSourceString = append(EventSourceString, es.Host)
+	}
+	return strings.Join(EventSourceString, ", ")
 }

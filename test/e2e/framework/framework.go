@@ -30,8 +30,10 @@ import (
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/client-go/dynamic"
 	staging "k8s.io/client-go/kubernetes"
 	clientreporestclient "k8s.io/client-go/rest"
 	restclient "k8s.io/client-go/rest"
@@ -39,9 +41,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
-	"k8s.io/kubernetes/pkg/client/typed/dynamic"
 	"k8s.io/kubernetes/pkg/metrics"
-	"k8s.io/kubernetes/pkg/util/intstr"
 	testutils "k8s.io/kubernetes/test/utils"
 
 	. "github.com/onsi/ginkgo"
@@ -84,7 +84,7 @@ type Framework struct {
 	cleanupHandle CleanupActionHandle
 
 	// configuration for framework's client
-	options FrameworkOptions
+	Options FrameworkOptions
 }
 
 type TestDataSummary interface {
@@ -110,7 +110,7 @@ func NewDefaultFramework(baseName string) *Framework {
 
 func NewDefaultGroupVersionFramework(baseName string, groupVersion schema.GroupVersion) *Framework {
 	f := NewDefaultFramework(baseName)
-	f.options.GroupVersion = &groupVersion
+	f.Options.GroupVersion = &groupVersion
 	return f
 }
 
@@ -118,7 +118,7 @@ func NewFramework(baseName string, options FrameworkOptions, client clientset.In
 	f := &Framework{
 		BaseName:                 baseName,
 		AddonResourceConstraints: make(map[string]ResourceConstraint),
-		options:                  options,
+		Options:                  options,
 		ClientSet:                client,
 	}
 
@@ -169,10 +169,10 @@ func (f *Framework) BeforeEach() {
 		By("Creating a kubernetes client")
 		config, err := LoadConfig()
 		Expect(err).NotTo(HaveOccurred())
-		config.QPS = f.options.ClientQPS
-		config.Burst = f.options.ClientBurst
-		if f.options.GroupVersion != nil {
-			config.GroupVersion = f.options.GroupVersion
+		config.QPS = f.Options.ClientQPS
+		config.Burst = f.Options.ClientBurst
+		if f.Options.GroupVersion != nil {
+			config.GroupVersion = f.Options.GroupVersion
 		}
 		if TestContext.KubeAPIContentType != "" {
 			config.ContentType = TestContext.KubeAPIContentType
@@ -282,7 +282,7 @@ func (f *Framework) AfterEach() {
 		// Pass both unversioned client and and versioned clientset, till we have removed all uses of the unversioned client.
 		DumpAllNamespaceInfo(f.ClientSet, f.Namespace.Name)
 		By(fmt.Sprintf("Dumping a list of prepulled images on each node"))
-		LogContainersInPodsWithLabels(f.ClientSet, api.NamespaceSystem, ImagePullerLabels, "image-puller", Logf)
+		LogContainersInPodsWithLabels(f.ClientSet, metav1.NamespaceSystem, ImagePullerLabels, "image-puller", Logf)
 	}
 
 	summaries := make([]TestDataSummary, 0)
@@ -404,7 +404,7 @@ func (f *Framework) WaitForAnEndpoint(serviceName string) error {
 	for {
 		// TODO: Endpoints client should take a field selector so we
 		// don't have to list everything.
-		list, err := f.ClientSet.Core().Endpoints(f.Namespace.Name).List(v1.ListOptions{})
+		list, err := f.ClientSet.Core().Endpoints(f.Namespace.Name).List(metav1.ListOptions{})
 		if err != nil {
 			return err
 		}
@@ -419,7 +419,7 @@ func (f *Framework) WaitForAnEndpoint(serviceName string) error {
 			}
 		}
 
-		options := v1.ListOptions{
+		options := metav1.ListOptions{
 			FieldSelector:   fields.Set{"metadata.name": serviceName}.AsSelector().String(),
 			ResourceVersion: rv,
 		}
@@ -728,10 +728,10 @@ func filterLabels(selectors map[string]string, cli clientset.Interface, ns strin
 	// everything manually.
 	if len(selectors) > 0 {
 		selector = labels.SelectorFromSet(labels.Set(selectors))
-		options := v1.ListOptions{LabelSelector: selector.String()}
+		options := metav1.ListOptions{LabelSelector: selector.String()}
 		pl, err = cli.Core().Pods(ns).List(options)
 	} else {
-		pl, err = cli.Core().Pods(ns).List(v1.ListOptions{})
+		pl, err = cli.Core().Pods(ns).List(metav1.ListOptions{})
 	}
 	return pl, err
 }

@@ -295,22 +295,31 @@ func getUserFromImageUser(imageUser string) (*int64, string) {
 // create a new container named FOO. To work around this, we parse the error
 // message to identify failure caused by naming conflict, and try to remove
 // the old container FOO.
+// See #40443. Sometimes even removal may fail with "no such container" error.
+// In that case we have to create the container with a randomized name.
+// TODO(random-liu): Remove this work around after docker 1.11 is deprecated.
 // TODO(#33189): Monitor the tests to see if the fix is sufficent.
-func recoverFromConflictIfNeeded(client dockertools.DockerInterface, err error) {
-	if err == nil {
-		return
-	}
-
+func recoverFromCreationConflictIfNeeded(client dockertools.DockerInterface, createConfig dockertypes.ContainerCreateConfig, err error) (*dockertypes.ContainerCreateResponse, error) {
 	matches := conflictRE.FindStringSubmatch(err.Error())
 	if len(matches) != 2 {
-		return
+		return nil, err
 	}
 
 	id := matches[1]
 	glog.Warningf("Unable to create pod sandbox due to conflict. Attempting to remove sandbox %q", id)
-	if err := client.RemoveContainer(id, dockertypes.ContainerRemoveOptions{RemoveVolumes: true}); err != nil {
-		glog.Errorf("Failed to remove the conflicting sandbox container: %v", err)
+	if rmErr := client.RemoveContainer(id, dockertypes.ContainerRemoveOptions{RemoveVolumes: true}); rmErr == nil {
+		glog.V(2).Infof("Successfully removed conflicting container %q", id)
+		return nil, err
 	} else {
-		glog.V(2).Infof("Successfully removed conflicting sandbox %q", id)
+		glog.Errorf("Failed to remove the conflicting container %q: %v", id, rmErr)
+		// Return if the error is not container not found error.
+		if !dockertools.IsContainerNotFoundError(rmErr) {
+			return nil, err
+		}
 	}
+
+	// randomize the name to avoid conflict.
+	createConfig.Name = randomizeName(createConfig.Name)
+	glog.V(2).Infof("Create the container with randomized name %s", createConfig.Name)
+	return client.CreateContainer(createConfig)
 }

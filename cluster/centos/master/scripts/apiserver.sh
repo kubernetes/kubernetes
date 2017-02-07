@@ -32,7 +32,7 @@ KUBE_LOG_LEVEL="--v=4"
 KUBE_ETCD_SERVERS="--etcd-servers=${ETCD_SERVERS}"
 
 # --insecure-bind-address=127.0.0.1: The IP address on which to serve the --insecure-port.
-KUBE_API_ADDRESS="--insecure-bind-address=${MASTER_ADDRESS}"
+KUBE_API_ADDRESS="--insecure-bind-address=0.0.0.0"
 
 # --insecure-port=8080: The port on which to serve unsecured, unauthenticated access.
 KUBE_API_PORT="--insecure-port=8080"

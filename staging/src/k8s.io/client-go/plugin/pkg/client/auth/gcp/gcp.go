@@ -31,8 +31,8 @@ import (
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
 	"k8s.io/apimachinery/pkg/util/yaml"
-	"k8s.io/client-go/pkg/util/jsonpath"
 	restclient "k8s.io/client-go/rest"
+	"k8s.io/client-go/util/jsonpath"
 )
 
 func init() {

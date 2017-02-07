@@ -24,13 +24,20 @@ import (
 	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/wait"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
+	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/images"
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
 	ext "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
+)
+
+var (
+	// maximum unavailable and surge instances per self-hosted component deployment
+	maxUnavailable = intstr.FromInt(0)
+	maxSurge       = intstr.FromInt(1)
 )
 
 func CreateSelfHostedControlPlane(cfg *kubeadmapi.MasterConfiguration, client *clientset.Clientset) error {
@@ -69,15 +76,15 @@ func launchSelfHostedAPIServer(cfg *kubeadmapi.MasterConfiguration, client *clie
 	start := time.Now()
 
 	apiServer := getAPIServerDS(cfg, volumes, volumeMounts)
-	if _, err := client.Extensions().DaemonSets(api.NamespaceSystem).Create(&apiServer); err != nil {
+	if _, err := client.Extensions().DaemonSets(metav1.NamespaceSystem).Create(&apiServer); err != nil {
 		return fmt.Errorf("failed to create self-hosted %q daemon set [%v]", kubeAPIServer, err)
 	}
 
-	wait.PollInfinite(apiCallRetryInterval, func() (bool, error) {
+	wait.PollInfinite(kubeadmconstants.APICallRetryInterval, func() (bool, error) {
 		// TODO: This might be pointless, checking the pods is probably enough.
 		// It does however get us a count of how many there should be which may be useful
 		// with HA.
-		apiDS, err := client.DaemonSets(api.NamespaceSystem).Get("self-hosted-"+kubeAPIServer,
+		apiDS, err := client.DaemonSets(metav1.NamespaceSystem).Get("self-hosted-"+kubeAPIServer,
 			metav1.GetOptions{})
 		if err != nil {
 			fmt.Println("[self-hosted] error getting apiserver DaemonSet:", err)
@@ -114,11 +121,11 @@ func launchSelfHostedControllerManager(cfg *kubeadmapi.MasterConfiguration, clie
 	start := time.Now()
 
 	ctrlMgr := getControllerManagerDeployment(cfg, volumes, volumeMounts)
-	if _, err := client.Extensions().Deployments(api.NamespaceSystem).Create(&ctrlMgr); err != nil {
+	if _, err := client.Extensions().Deployments(metav1.NamespaceSystem).Create(&ctrlMgr); err != nil {
 		return fmt.Errorf("failed to create self-hosted %q deployment [%v]", kubeControllerManager, err)
 	}
 
-	waitForPodsWithLabel(client, "self-hosted-"+kubeControllerManager, false)
+	waitForPodsWithLabel(client, "self-hosted-"+kubeControllerManager, true)
 
 	ctrlMgrStaticManifestPath := buildStaticManifestFilepath(kubeControllerManager)
 	if err := os.RemoveAll(ctrlMgrStaticManifestPath); err != nil {
@@ -133,11 +140,11 @@ func launchSelfHostedControllerManager(cfg *kubeadmapi.MasterConfiguration, clie
 func launchSelfHostedScheduler(cfg *kubeadmapi.MasterConfiguration, client *clientset.Clientset, volumes []v1.Volume, volumeMounts []v1.VolumeMount) error {
 	start := time.Now()
 	scheduler := getSchedulerDeployment(cfg)
-	if _, err := client.Extensions().Deployments(api.NamespaceSystem).Create(&scheduler); err != nil {
+	if _, err := client.Extensions().Deployments(metav1.NamespaceSystem).Create(&scheduler); err != nil {
 		return fmt.Errorf("failed to create self-hosted %q deployment [%v]", kubeScheduler, err)
 	}
 
-	waitForPodsWithLabel(client, "self-hosted-"+kubeScheduler, false)
+	waitForPodsWithLabel(client, "self-hosted-"+kubeScheduler, true)
 
 	schedulerStaticManifestPath := buildStaticManifestFilepath(kubeScheduler)
 	if err := os.RemoveAll(schedulerStaticManifestPath); err != nil {
@@ -151,10 +158,10 @@ func launchSelfHostedScheduler(cfg *kubeadmapi.MasterConfiguration, client *clie
 // waitForPodsWithLabel will lookup pods with the given label and wait until they are all
 // reporting status as running.
 func waitForPodsWithLabel(client *clientset.Clientset, appLabel string, mustBeRunning bool) {
-	wait.PollInfinite(apiCallRetryInterval, func() (bool, error) {
+	wait.PollInfinite(kubeadmconstants.APICallRetryInterval, func() (bool, error) {
 		// TODO: Do we need a stronger label link than this?
-		listOpts := v1.ListOptions{LabelSelector: fmt.Sprintf("k8s-app=%s", appLabel)}
-		apiPods, err := client.Pods(api.NamespaceSystem).List(listOpts)
+		listOpts := metav1.ListOptions{LabelSelector: fmt.Sprintf("k8s-app=%s", appLabel)}
+		apiPods, err := client.Pods(metav1.NamespaceSystem).List(listOpts)
 		if err != nil {
 			fmt.Printf("[self-hosted] error getting %s pods [%v]\n", appLabel, err)
 			return false, nil
@@ -235,6 +242,13 @@ func getControllerManagerDeployment(cfg *kubeadmapi.MasterConfiguration, volumes
 		},
 		Spec: ext.DeploymentSpec{
 			// TODO bootkube uses 2 replicas
+			Strategy: ext.DeploymentStrategy{
+				Type: ext.RollingUpdateDeploymentStrategyType,
+				RollingUpdate: &ext.RollingUpdateDeployment{
+					MaxUnavailable: &maxUnavailable,
+					MaxSurge:       &maxSurge,
+				},
+			},
 			Template: v1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{
@@ -282,6 +296,13 @@ func getSchedulerDeployment(cfg *kubeadmapi.MasterConfiguration) ext.Deployment 
 		},
 		Spec: ext.DeploymentSpec{
 			// TODO bootkube uses 2 replicas
+			Strategy: ext.DeploymentStrategy{
+				Type: ext.RollingUpdateDeploymentStrategyType,
+				RollingUpdate: &ext.RollingUpdateDeployment{
+					MaxUnavailable: &maxUnavailable,
+					MaxSurge:       &maxSurge,
+				},
+			},
 			Template: v1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{

@@ -24,10 +24,10 @@ go_library(
         "//federation/pkg/dnsprovider:go_default_library",
         "//federation/pkg/dnsprovider/providers/aws/route53/stubs:go_default_library",
         "//federation/pkg/dnsprovider/rrstype:go_default_library",
-        "//pkg/util/uuid:go_default_library",
         "//vendor:github.com/aws/aws-sdk-go/aws",
         "//vendor:github.com/aws/aws-sdk-go/aws/session",
         "//vendor:github.com/aws/aws-sdk-go/service/route53",
+        "//vendor:k8s.io/apimachinery/pkg/util/uuid",
     ],
 )
 

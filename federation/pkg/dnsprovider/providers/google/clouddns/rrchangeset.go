@@ -72,3 +72,7 @@ func (c *ResourceRecordChangeset) Apply() error {
 
 	return nil
 }
+
+func (c *ResourceRecordChangeset) IsEmpty() bool {
+	return len(c.additions) == 0 && len(c.removals) == 0
+}

@@ -17,22 +17,23 @@ limitations under the License.
 package clusterrole
 
 import (
+	metainternalversion "k8s.io/apimachinery/pkg/apis/meta/internalversion"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/watch"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
+	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/rbac"
-	"k8s.io/kubernetes/pkg/genericapiserver/registry/rest"
 )
 
 // Registry is an interface for things that know how to store ClusterRoles.
 type Registry interface {
-	ListClusterRoles(ctx genericapirequest.Context, options *api.ListOptions) (*rbac.ClusterRoleList, error)
+	ListClusterRoles(ctx genericapirequest.Context, options *metainternalversion.ListOptions) (*rbac.ClusterRoleList, error)
 	CreateClusterRole(ctx genericapirequest.Context, clusterRole *rbac.ClusterRole) error
 	UpdateClusterRole(ctx genericapirequest.Context, clusterRole *rbac.ClusterRole) error
 	GetClusterRole(ctx genericapirequest.Context, name string, options *metav1.GetOptions) (*rbac.ClusterRole, error)
 	DeleteClusterRole(ctx genericapirequest.Context, name string) error
-	WatchClusterRoles(ctx genericapirequest.Context, options *api.ListOptions) (watch.Interface, error)
+	WatchClusterRoles(ctx genericapirequest.Context, options *metainternalversion.ListOptions) (watch.Interface, error)
 }
 
 // storage puts strong typing around storage calls
@@ -46,7 +47,7 @@ func NewRegistry(s rest.StandardStorage) Registry {
 	return &storage{s}
 }
 
-func (s *storage) ListClusterRoles(ctx genericapirequest.Context, options *api.ListOptions) (*rbac.ClusterRoleList, error) {
+func (s *storage) ListClusterRoles(ctx genericapirequest.Context, options *metainternalversion.ListOptions) (*rbac.ClusterRoleList, error) {
 	obj, err := s.List(ctx, options)
 	if err != nil {
 		return nil, err
@@ -65,7 +66,7 @@ func (s *storage) UpdateClusterRole(ctx genericapirequest.Context, clusterRole *
 	return err
 }
 
-func (s *storage) WatchClusterRoles(ctx genericapirequest.Context, options *api.ListOptions) (watch.Interface, error) {
+func (s *storage) WatchClusterRoles(ctx genericapirequest.Context, options *metainternalversion.ListOptions) (watch.Interface, error) {
 	return s.Watch(ctx, options)
 }
 

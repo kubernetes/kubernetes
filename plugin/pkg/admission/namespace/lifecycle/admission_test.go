@@ -26,11 +26,11 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/admission"
-	"k8s.io/client-go/pkg/util/clock"
+	core "k8s.io/client-go/testing"
+	"k8s.io/client-go/util/clock"
 	"k8s.io/kubernetes/pkg/api"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/fake"
-	"k8s.io/kubernetes/pkg/client/testing/core"
 	"k8s.io/kubernetes/pkg/controller/informers"
 	kubeadmission "k8s.io/kubernetes/pkg/kubeapiserver/admission"
 )
@@ -43,7 +43,7 @@ func newHandlerForTest(c clientset.Interface) (admission.Interface, informers.Sh
 // newHandlerForTestWithClock returns a configured handler for testing.
 func newHandlerForTestWithClock(c clientset.Interface, cacheClock clock.Clock) (admission.Interface, informers.SharedInformerFactory, error) {
 	f := informers.NewSharedInformerFactory(nil, c, 5*time.Minute)
-	handler, err := newLifecycleWithClock(sets.NewString(api.NamespaceDefault, api.NamespaceSystem), cacheClock)
+	handler, err := newLifecycleWithClock(sets.NewString(metav1.NamespaceDefault, metav1.NamespaceSystem), cacheClock)
 	if err != nil {
 		return nil, f, err
 	}
@@ -168,7 +168,7 @@ func TestAdmissionNamespaceTerminating(t *testing.T) {
 	}
 
 	// verify delete of namespace default can never proceed
-	err = handler.Admit(admission.NewAttributesRecord(nil, nil, api.Kind("Namespace").WithVersion("version"), "", api.NamespaceDefault, api.Resource("namespaces").WithVersion("version"), "", admission.Delete, nil))
+	err = handler.Admit(admission.NewAttributesRecord(nil, nil, api.Kind("Namespace").WithVersion("version"), "", metav1.NamespaceDefault, api.Resource("namespaces").WithVersion("version"), "", admission.Delete, nil))
 	if err == nil {
 		t.Errorf("Expected an error that this namespace can never be deleted")
 	}

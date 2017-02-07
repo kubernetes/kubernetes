@@ -22,8 +22,8 @@ import (
 	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/util/uuid"
 	"k8s.io/kubernetes/test/e2e/framework"
 
 	. "github.com/onsi/ginkgo"
@@ -112,7 +112,7 @@ var _ = framework.KubeDescribe("Kubelet", func() {
 		})
 
 		It("should be possible to delete", func() {
-			err := podClient.Delete(podName, &v1.DeleteOptions{})
+			err := podClient.Delete(podName, &metav1.DeleteOptions{})
 			Expect(err).To(BeNil(), fmt.Sprintf("Error deleting Pod %v", err))
 		})
 	})
@@ -131,7 +131,7 @@ var _ = framework.KubeDescribe("Kubelet", func() {
 						{
 							Image:   "gcr.io/google_containers/busybox:1.24",
 							Name:    podName,
-							Command: []string{"sh", "-c", "echo test > /file; sleep 240"},
+							Command: []string{"/bin/sh", "-c", "echo test > /file; sleep 240"},
 							SecurityContext: &v1.SecurityContext{
 								ReadOnlyRootFilesystem: &isReadOnly,
 							},
@@ -148,7 +148,7 @@ var _ = framework.KubeDescribe("Kubelet", func() {
 				buf := new(bytes.Buffer)
 				buf.ReadFrom(rc)
 				return buf.String()
-			}, time.Minute, time.Second*4).Should(Equal("sh: can't create /file: Read-only file system\n"))
+			}, time.Minute, time.Second*4).Should(Equal("/bin/sh: can't create /file: Read-only file system\n"))
 		})
 	})
 })

@@ -48,7 +48,3 @@ kube::util::remove-gen-docs
 shopt -s dotglob
 cp -af "${KUBE_TEMP}"/* "${KUBE_ROOT}"
 shopt -u dotglob
-
-echo "Generated docs have been placed in the repository tree. Running hack/update-munge-docs.sh."
-
-"${KUBE_ROOT}/hack/update-munge-docs.sh"

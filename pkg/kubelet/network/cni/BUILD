@@ -40,7 +40,7 @@ go_test(
         "//pkg/util/exec:go_default_library",
         "//vendor:github.com/containernetworking/cni/pkg/types",
         "//vendor:github.com/stretchr/testify/mock",
-        "//vendor:k8s.io/client-go/pkg/util/testing",
+        "//vendor:k8s.io/client-go/util/testing",
     ],
 )
 

@@ -8,6 +8,19 @@ load(
     "go_test",
 )
 
+go_test(
+    name = "go_default_test",
+    srcs = ["thirdparty_controller_test.go"],
+    library = ":go_default_library",
+    tags = ["automanaged"],
+    deps = [
+        "//pkg/apis/extensions:go_default_library",
+        "//pkg/registry/extensions/thirdpartyresourcedata:go_default_library",
+        "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
+        "//vendor:k8s.io/apimachinery/pkg/util/sets",
+    ],
+)
+
 go_library(
     name = "go_default_library",
     srcs = [
@@ -20,11 +33,6 @@ go_library(
         "//pkg/apis/extensions:go_default_library",
         "//pkg/apis/extensions/v1beta1:go_default_library",
         "//pkg/client/clientset_generated/internalclientset/typed/extensions/internalversion:go_default_library",
-        "//pkg/genericapiserver/registry/generic:go_default_library",
-        "//pkg/genericapiserver/registry/rest:go_default_library",
-        "//pkg/genericapiserver/server:go_default_library",
-        "//pkg/registry/autoscaling/horizontalpodautoscaler/storage:go_default_library",
-        "//pkg/registry/batch/job/storage:go_default_library",
         "//pkg/registry/extensions/controller/storage:go_default_library",
         "//pkg/registry/extensions/daemonset/storage:go_default_library",
         "//pkg/registry/extensions/deployment/storage:go_default_library",
@@ -35,23 +43,14 @@ go_library(
         "//pkg/registry/extensions/thirdpartyresource/storage:go_default_library",
         "//pkg/registry/extensions/thirdpartyresourcedata:go_default_library",
         "//vendor:github.com/golang/glog",
+        "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
         "//vendor:k8s.io/apimachinery/pkg/runtime",
         "//vendor:k8s.io/apimachinery/pkg/util/runtime",
         "//vendor:k8s.io/apimachinery/pkg/util/sets",
         "//vendor:k8s.io/apimachinery/pkg/util/wait",
-    ],
-)
-
-go_test(
-    name = "go_default_test",
-    srcs = ["thirdparty_controller_test.go"],
-    library = ":go_default_library",
-    tags = ["automanaged"],
-    deps = [
-        "//pkg/apis/extensions:go_default_library",
-        "//pkg/registry/extensions/thirdpartyresourcedata:go_default_library",
-        "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
-        "//vendor:k8s.io/apimachinery/pkg/util/sets",
+        "//vendor:k8s.io/apiserver/pkg/registry/generic",
+        "//vendor:k8s.io/apiserver/pkg/registry/rest",
+        "//vendor:k8s.io/apiserver/pkg/server",
     ],
 )
 

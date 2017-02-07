@@ -22,6 +22,7 @@ import (
 
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	testcore "k8s.io/client-go/testing"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/batch"
 	"k8s.io/kubernetes/pkg/apis/extensions"
@@ -29,7 +30,6 @@ import (
 	batchclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/batch/internalversion"
 	coreclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/core/internalversion"
 	extensionsclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/extensions/internalversion"
-	testcore "k8s.io/kubernetes/pkg/client/testing/core"
 )
 
 type ErrorReplicationControllers struct {
@@ -68,7 +68,7 @@ func TestReplicationControllerScaleRetry(t *testing.T) {
 	preconditions := ScalePrecondition{-1, ""}
 	count := uint(3)
 	name := "foo-v1"
-	namespace := api.NamespaceDefault
+	namespace := metav1.NamespaceDefault
 
 	scaleFunc := ScaleCondition(&scaler, &preconditions, namespace, name, count, nil)
 	pass, err := scaleFunc()
@@ -127,7 +127,7 @@ func TestReplicationControllerScale(t *testing.T) {
 
 func TestReplicationControllerScaleFailsPreconditions(t *testing.T) {
 	fake := fake.NewSimpleClientset(&api.ReplicationController{
-		ObjectMeta: metav1.ObjectMeta{Namespace: api.NamespaceDefault, Name: "foo"},
+		ObjectMeta: metav1.ObjectMeta{Namespace: metav1.NamespaceDefault, Name: "foo"},
 		Spec: api.ReplicationControllerSpec{
 			Replicas: 10,
 		},
@@ -328,7 +328,7 @@ func TestJobScaleRetry(t *testing.T) {
 func job() *batch.Job {
 	return &batch.Job{
 		ObjectMeta: metav1.ObjectMeta{
-			Namespace: api.NamespaceDefault,
+			Namespace: metav1.NamespaceDefault,
 			Name:      "foo",
 		},
 	}
@@ -377,7 +377,7 @@ func TestJobScaleFailsPreconditions(t *testing.T) {
 	ten := int32(10)
 	fake := fake.NewSimpleClientset(&batch.Job{
 		ObjectMeta: metav1.ObjectMeta{
-			Namespace: api.NamespaceDefault,
+			Namespace: metav1.NamespaceDefault,
 			Name:      "foo",
 		},
 		Spec: batch.JobSpec{
@@ -590,7 +590,7 @@ func TestDeploymentScaleRetry(t *testing.T) {
 func deployment() *extensions.Deployment {
 	return &extensions.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
-			Namespace: api.NamespaceDefault,
+			Namespace: metav1.NamespaceDefault,
 			Name:      "foo",
 		},
 	}
@@ -638,7 +638,7 @@ func TestDeploymentScaleInvalid(t *testing.T) {
 func TestDeploymentScaleFailsPreconditions(t *testing.T) {
 	fake := fake.NewSimpleClientset(&extensions.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
-			Namespace: api.NamespaceDefault,
+			Namespace: metav1.NamespaceDefault,
 			Name:      "foo",
 		},
 		Spec: extensions.DeploymentSpec{

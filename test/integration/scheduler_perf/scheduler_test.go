@@ -28,7 +28,6 @@ import (
 	testutils "k8s.io/kubernetes/test/utils"
 
 	"github.com/golang/glog"
-	"github.com/renstrom/dedent"
 	"k8s.io/kubernetes/plugin/pkg/scheduler"
 )
 
@@ -79,31 +78,34 @@ func TestSchedule100Node3KNodeAffinityPods(t *testing.T) {
 		"scheduler-perf-",
 	)
 
-	affinityTemplate := dedent.Dedent(`
-		{
-			"nodeAffinity": {
-				"requiredDuringSchedulingIgnoredDuringExecution": {
-					"nodeSelectorTerms": [{
-						"matchExpressions": [{
-							"key": "` + nodeAffinityKey + `",
-							"operator": "In",
-							"values": ["%v"]
-						}]
-					}]
-				}
-			}
-		}`)
-
 	podCreatorConfig := testutils.NewTestPodCreatorConfig()
 	for i := 0; i < numGroups; i++ {
-		podCreatorConfig.AddStrategy("sched-perf-node-affinity", config.numPods/numGroups,
-			testutils.NewCustomCreatePodStrategy(&v1.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					GenerateName: "sched-perf-node-affinity-pod-",
-					Annotations:  map[string]string{v1.AffinityAnnotationKey: fmt.Sprintf(affinityTemplate, i)},
+		pod := &v1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				GenerateName: "sched-perf-node-affinity-pod-",
+			},
+			Spec: testutils.MakePodSpec(),
+		}
+		pod.Spec.Affinity = &v1.Affinity{
+			NodeAffinity: &v1.NodeAffinity{
+				RequiredDuringSchedulingIgnoredDuringExecution: &v1.NodeSelector{
+					NodeSelectorTerms: []v1.NodeSelectorTerm{
+						{
+							MatchExpressions: []v1.NodeSelectorRequirement{
+								{
+									Key:      nodeAffinityKey,
+									Operator: v1.NodeSelectorOpIn,
+									Values:   []string{string(i)},
+								},
+							},
+						},
+					},
 				},
-				Spec: testutils.MakePodSpec(),
-			}),
+			},
+		}
+
+		podCreatorConfig.AddStrategy("sched-perf-node-affinity", config.numPods/numGroups,
+			testutils.NewCustomCreatePodStrategy(pod),
 		)
 	}
 	config.podCreator = testutils.NewTestPodCreator(config.schedulerSupportFunctions.GetClient(), podCreatorConfig)

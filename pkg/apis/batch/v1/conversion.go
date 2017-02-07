@@ -21,7 +21,6 @@ import (
 
 	"k8s.io/apimachinery/pkg/conversion"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/kubernetes/pkg/api"
 	v1 "k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/apis/batch"
 )
@@ -36,13 +35,13 @@ func addConversionFuncs(scheme *runtime.Scheme) error {
 		return err
 	}
 
-	return api.Scheme.AddFieldLabelConversionFunc("batch/v1", "Job",
+	return scheme.AddFieldLabelConversionFunc("batch/v1", "Job",
 		func(label, value string) (string, string, error) {
 			switch label {
 			case "metadata.name", "metadata.namespace", "status.successful":
 				return label, value, nil
 			default:
-				return "", "", fmt.Errorf("field label not supported: %s", label)
+				return "", "", fmt.Errorf("field label %q not supported for Job", label)
 			}
 		},
 	)

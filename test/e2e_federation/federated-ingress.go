@@ -27,12 +27,12 @@ import (
 
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/wait"
 	fedclientset "k8s.io/kubernetes/federation/client/clientset_generated/federation_clientset"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	kubeclientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
-	"k8s.io/kubernetes/pkg/util/intstr"
 	"k8s.io/kubernetes/test/e2e/framework"
 	fedframework "k8s.io/kubernetes/test/e2e_federation/framework"
 
@@ -58,7 +58,7 @@ var _ = framework.KubeDescribe("Federated ingresses [Feature:Federation]", func(
 
 	// Create/delete ingress api objects
 	// Validate federation apiserver, does not rely on underlying clusters or federation ingress controller.
-	Describe("Federated Ingresses", func() {
+	Describe("Federated Ingresses [NoCluster]", func() {
 		AfterEach(func() {
 			nsName := f.FederationNamespace.Name
 			// Delete all ingresses.
@@ -72,7 +72,7 @@ var _ = framework.KubeDescribe("Federated ingresses [Feature:Federation]", func(
 			ingress := createIngressOrFail(f.FederationClientset, nsName)
 			By(fmt.Sprintf("Creation of ingress %q in namespace %q succeeded.  Deleting ingress.", ingress.Name, nsName))
 			// Cleanup
-			err := f.FederationClientset.Extensions().Ingresses(nsName).Delete(ingress.Name, &v1.DeleteOptions{})
+			err := f.FederationClientset.Extensions().Ingresses(nsName).Delete(ingress.Name, &metav1.DeleteOptions{})
 			framework.ExpectNoError(err, "Error deleting ingress %q in namespace %q", ingress.Name, ingress.Namespace)
 			By(fmt.Sprintf("Deletion of ingress %q in namespace %q succeeded.", ingress.Name, nsName))
 		})
@@ -205,7 +205,7 @@ var _ = framework.KubeDescribe("Federated ingresses [Feature:Federation]", func(
 // Deletes all Ingresses in the given namespace name.
 func deleteAllIngressesOrFail(clientset *fedclientset.Clientset, nsName string) {
 	orphanDependents := false
-	err := clientset.Extensions().Ingresses(nsName).DeleteCollection(&v1.DeleteOptions{OrphanDependents: &orphanDependents}, v1.ListOptions{})
+	err := clientset.Extensions().Ingresses(nsName).DeleteCollection(&metav1.DeleteOptions{OrphanDependents: &orphanDependents}, metav1.ListOptions{})
 	Expect(err).NotTo(HaveOccurred(), fmt.Sprintf("Error in deleting ingresses in namespace: %s", nsName))
 }
 
@@ -329,7 +329,7 @@ func deleteIngressOrFail(clientset *fedclientset.Clientset, namespace string, in
 	if clientset == nil || len(namespace) == 0 || len(ingressName) == 0 {
 		Fail(fmt.Sprintf("Internal error: invalid parameters passed to deleteIngressOrFail: clientset: %v, namespace: %v, ingress: %v", clientset, namespace, ingressName))
 	}
-	err := clientset.Ingresses(namespace).Delete(ingressName, &v1.DeleteOptions{OrphanDependents: orphanDependents})
+	err := clientset.Ingresses(namespace).Delete(ingressName, &metav1.DeleteOptions{OrphanDependents: orphanDependents})
 	framework.ExpectNoError(err, "Error deleting ingress %q from namespace %q", ingressName, namespace)
 	// Wait for the ingress to be deleted.
 	err = wait.Poll(framework.Poll, wait.ForeverTestTimeout, func() (bool, error) {
@@ -349,7 +349,7 @@ func deleteClusterIngressOrFail(clusterName string, clientset *kubeclientset.Cli
 	if clientset == nil || len(namespace) == 0 || len(ingressName) == 0 {
 		Fail(fmt.Sprintf("Internal error: invalid parameters passed to deleteClusterIngressOrFail: cluster: %q, clientset: %v, namespace: %v, ingress: %v", clusterName, clientset, namespace, ingressName))
 	}
-	err := clientset.Ingresses(namespace).Delete(ingressName, v1.NewDeleteOptions(0))
+	err := clientset.Ingresses(namespace).Delete(ingressName, metav1.NewDeleteOptions(0))
 	framework.ExpectNoError(err, "Error deleting cluster ingress %q/%q from cluster %q", namespace, ingressName, clusterName)
 }
 

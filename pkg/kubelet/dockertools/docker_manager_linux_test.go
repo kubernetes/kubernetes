@@ -28,8 +28,8 @@ import (
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/assert"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/tools/record"
 	"k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/client/record"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/events"
 	"k8s.io/kubernetes/pkg/kubelet/network"
@@ -89,8 +89,7 @@ func TestGetSecurityOpts(t *testing.T) {
 	for i, test := range tests {
 		securityOpts, err := dm.getSecurityOpts(test.pod, containerName)
 		assert.NoError(t, err, "TestCase[%d]: %s", i, test.msg)
-		opts, err := dm.fmtDockerOpts(securityOpts)
-		assert.NoError(t, err, "TestCase[%d]: %s", i, test.msg)
+		opts := FmtDockerOpts(securityOpts, '=')
 		assert.Len(t, opts, len(test.expectedOpts), "TestCase[%d]: %s", i, test.msg)
 		for _, opt := range test.expectedOpts {
 			assert.Contains(t, opts, opt, "TestCase[%d]: %s", i, test.msg)

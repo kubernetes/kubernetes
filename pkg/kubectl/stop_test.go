@@ -28,12 +28,12 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/watch"
+	testcore "k8s.io/client-go/testing"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/batch"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/fake"
 	coreclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/core/internalversion"
-	testcore "k8s.io/kubernetes/pkg/client/testing/core"
 	deploymentutil "k8s.io/kubernetes/pkg/controller/deployment/util"
 )
 
@@ -535,7 +535,7 @@ type noDeleteService struct {
 	coreclient.ServiceInterface
 }
 
-func (c *noDeleteService) Delete(service string, o *api.DeleteOptions) error {
+func (c *noDeleteService) Delete(service string, o *metav1.DeleteOptions) error {
 	return fmt.Errorf("I'm afraid I can't do that, Dave")
 }
 
@@ -570,11 +570,11 @@ func (c *reaperCoreFake) Services(namespace string) coreclient.ServiceInterface 
 }
 
 func pod() *api.Pod {
-	return &api.Pod{ObjectMeta: metav1.ObjectMeta{Namespace: api.NamespaceDefault, Name: "foo"}}
+	return &api.Pod{ObjectMeta: metav1.ObjectMeta{Namespace: metav1.NamespaceDefault, Name: "foo"}}
 }
 
 func service() *api.Service {
-	return &api.Service{ObjectMeta: metav1.ObjectMeta{Namespace: api.NamespaceDefault, Name: "foo"}}
+	return &api.Service{ObjectMeta: metav1.ObjectMeta{Namespace: metav1.NamespaceDefault, Name: "foo"}}
 }
 
 func TestSimpleStop(t *testing.T) {
@@ -591,8 +591,8 @@ func TestSimpleStop(t *testing.T) {
 			},
 			kind: api.Kind("Pod"),
 			actions: []testcore.Action{
-				testcore.NewGetAction(api.Resource("pods").WithVersion(""), api.NamespaceDefault, "foo"),
-				testcore.NewDeleteAction(api.Resource("pods").WithVersion(""), api.NamespaceDefault, "foo"),
+				testcore.NewGetAction(api.Resource("pods").WithVersion(""), metav1.NamespaceDefault, "foo"),
+				testcore.NewDeleteAction(api.Resource("pods").WithVersion(""), metav1.NamespaceDefault, "foo"),
 			},
 			expectError: false,
 			test:        "stop pod succeeds",
@@ -603,8 +603,8 @@ func TestSimpleStop(t *testing.T) {
 			},
 			kind: api.Kind("Service"),
 			actions: []testcore.Action{
-				testcore.NewGetAction(api.Resource("services").WithVersion(""), api.NamespaceDefault, "foo"),
-				testcore.NewDeleteAction(api.Resource("services").WithVersion(""), api.NamespaceDefault, "foo"),
+				testcore.NewGetAction(api.Resource("services").WithVersion(""), metav1.NamespaceDefault, "foo"),
+				testcore.NewDeleteAction(api.Resource("services").WithVersion(""), metav1.NamespaceDefault, "foo"),
 			},
 			expectError: false,
 			test:        "stop service succeeds",
@@ -626,7 +626,7 @@ func TestSimpleStop(t *testing.T) {
 			},
 			kind: api.Kind("Service"),
 			actions: []testcore.Action{
-				testcore.NewGetAction(api.Resource("services").WithVersion(""), api.NamespaceDefault, "foo"),
+				testcore.NewGetAction(api.Resource("services").WithVersion(""), metav1.NamespaceDefault, "foo"),
 			},
 			expectError: true,
 			test:        "stop service fails, can't delete",

@@ -20,6 +20,7 @@ import (
 	"fmt"
 
 	"k8s.io/apimachinery/pkg/api/meta"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
@@ -34,7 +35,7 @@ func ValidateEvent(event *api.Event) field.ErrorList {
 	// Make sure event.Namespace and the involvedObject.Namespace agree
 	if len(event.InvolvedObject.Namespace) == 0 {
 		// event.Namespace must also be empty (or "default", for compatibility with old clients)
-		if event.Namespace != api.NamespaceNone && event.Namespace != api.NamespaceDefault {
+		if event.Namespace != metav1.NamespaceNone && event.Namespace != metav1.NamespaceDefault {
 			allErrs = append(allErrs, field.Invalid(field.NewPath("involvedObject", "namespace"), event.InvolvedObject.Namespace, "does not match event.namespace"))
 		}
 	} else {

@@ -21,20 +21,21 @@ import (
 	"testing"
 	"time"
 
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	restclient "k8s.io/client-go/rest"
+	core "k8s.io/client-go/testing"
+	"k8s.io/client-go/tools/cache"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
 	batch "k8s.io/kubernetes/pkg/apis/batch/v1"
-	"k8s.io/kubernetes/pkg/client/cache"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset/fake"
-	"k8s.io/kubernetes/pkg/client/testing/core"
+	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated"
 	"k8s.io/kubernetes/pkg/controller"
-	"k8s.io/kubernetes/pkg/controller/informers"
 )
 
 var alwaysReady = func() bool { return true }
@@ -43,7 +44,7 @@ func newJob(parallelism, completions int32) *batch.Job {
 	j := &batch.Job{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "foobar",
-			Namespace: v1.NamespaceDefault,
+			Namespace: metav1.NamespaceDefault,
 		},
 		Spec: batch.JobSpec{
 			Selector: &metav1.LabelSelector{
@@ -88,8 +89,8 @@ func getKey(job *batch.Job, t *testing.T) string {
 }
 
 func newJobControllerFromClient(kubeClient clientset.Interface, resyncPeriod controller.ResyncPeriodFunc) (*JobController, informers.SharedInformerFactory) {
-	sharedInformers := informers.NewSharedInformerFactory(kubeClient, nil, resyncPeriod())
-	jm := NewJobController(sharedInformers.Pods().Informer(), sharedInformers.Jobs(), kubeClient)
+	sharedInformers := informers.NewSharedInformerFactory(nil, kubeClient, resyncPeriod())
+	jm := NewJobController(sharedInformers.Core().V1().Pods(), sharedInformers.Batch().V1().Jobs(), kubeClient)
 
 	return jm, sharedInformers
 }
@@ -245,8 +246,8 @@ func TestControllerSyncJob(t *testing.T) {
 			now := metav1.Now()
 			job.DeletionTimestamp = &now
 		}
-		sharedInformerFactory.Jobs().Informer().GetIndexer().Add(job)
-		podIndexer := sharedInformerFactory.Pods().Informer().GetIndexer()
+		sharedInformerFactory.Batch().V1().Jobs().Informer().GetIndexer().Add(job)
+		podIndexer := sharedInformerFactory.Core().V1().Pods().Informer().GetIndexer()
 		for _, pod := range newPodList(tc.pendingPods, v1.PodPending, job) {
 			podIndexer.Add(&pod)
 		}
@@ -348,8 +349,8 @@ func TestSyncJobPastDeadline(t *testing.T) {
 		job.Spec.ActiveDeadlineSeconds = &tc.activeDeadlineSeconds
 		start := metav1.Unix(metav1.Now().Time.Unix()-tc.startTime, 0)
 		job.Status.StartTime = &start
-		sharedInformerFactory.Jobs().Informer().GetIndexer().Add(job)
-		podIndexer := sharedInformerFactory.Pods().Informer().GetIndexer()
+		sharedInformerFactory.Batch().V1().Jobs().Informer().GetIndexer().Add(job)
+		podIndexer := sharedInformerFactory.Core().V1().Pods().Informer().GetIndexer()
 		for _, pod := range newPodList(tc.activePods, v1.PodRunning, job) {
 			podIndexer.Add(&pod)
 		}
@@ -421,7 +422,7 @@ func TestSyncPastDeadlineJobFinished(t *testing.T) {
 	start := metav1.Unix(metav1.Now().Time.Unix()-15, 0)
 	job.Status.StartTime = &start
 	job.Status.Conditions = append(job.Status.Conditions, newCondition(batch.JobFailed, "DeadlineExceeded", "Job was active longer than specified deadline"))
-	sharedInformerFactory.Jobs().Informer().GetIndexer().Add(job)
+	sharedInformerFactory.Batch().V1().Jobs().Informer().GetIndexer().Add(job)
 	err := manager.syncJob(getKey(job, t))
 	if err != nil {
 		t.Errorf("Unexpected error when syncing jobs %v", err)
@@ -447,7 +448,7 @@ func TestSyncJobComplete(t *testing.T) {
 
 	job := newJob(1, 1)
 	job.Status.Conditions = append(job.Status.Conditions, newCondition(batch.JobComplete, "", ""))
-	sharedInformerFactory.Jobs().Informer().GetIndexer().Add(job)
+	sharedInformerFactory.Batch().V1().Jobs().Informer().GetIndexer().Add(job)
 	err := manager.syncJob(getKey(job, t))
 	if err != nil {
 		t.Fatalf("Unexpected error when syncing jobs %v", err)
@@ -496,7 +497,7 @@ func TestSyncJobUpdateRequeue(t *testing.T) {
 		return updateError
 	}
 	job := newJob(2, 2)
-	sharedInformerFactory.Jobs().Informer().GetIndexer().Add(job)
+	sharedInformerFactory.Batch().V1().Jobs().Informer().GetIndexer().Add(job)
 	err := manager.syncJob(getKey(job, t))
 	if err == nil || err != updateError {
 		t.Errorf("Expected error %v when syncing jobs, got %v", updateError, err)
@@ -526,7 +527,7 @@ func TestJobPodLookup(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{Name: "basic"},
 			},
 			pod: &v1.Pod{
-				ObjectMeta: metav1.ObjectMeta{Name: "foo1", Namespace: v1.NamespaceAll},
+				ObjectMeta: metav1.ObjectMeta{Name: "foo1", Namespace: metav1.NamespaceAll},
 			},
 			expectedName: "",
 		},
@@ -576,7 +577,7 @@ func TestJobPodLookup(t *testing.T) {
 		},
 	}
 	for _, tc := range testCases {
-		sharedInformerFactory.Jobs().Informer().GetIndexer().Add(tc.job)
+		sharedInformerFactory.Batch().V1().Jobs().Informer().GetIndexer().Add(tc.job)
 		if job := manager.getPodJob(tc.pod); job != nil {
 			if tc.expectedName != job.Name {
 				t.Errorf("Got job %+v expected %+v", job.Name, tc.expectedName)
@@ -610,9 +611,9 @@ func TestSyncJobExpectations(t *testing.T) {
 	manager.updateHandler = func(job *batch.Job) error { return nil }
 
 	job := newJob(2, 2)
-	sharedInformerFactory.Jobs().Informer().GetIndexer().Add(job)
+	sharedInformerFactory.Batch().V1().Jobs().Informer().GetIndexer().Add(job)
 	pods := newPodList(2, v1.PodPending, job)
-	podIndexer := sharedInformerFactory.Pods().Informer().GetIndexer()
+	podIndexer := sharedInformerFactory.Core().V1().Pods().Informer().GetIndexer()
 	podIndexer.Add(&pods[0])
 
 	manager.expectations = FakeJobExpectations{
@@ -656,7 +657,7 @@ func TestWatchJobs(t *testing.T) {
 			t.Errorf("Expected to find job under key %v: %v", key, err)
 			return nil
 		}
-		if !api.Semantic.DeepDerivative(*job, testJob) {
+		if !apiequality.Semantic.DeepDerivative(*job, testJob) {
 			t.Errorf("Expected %#v, but got %#v", testJob, *job)
 		}
 		return nil
@@ -686,7 +687,7 @@ func TestWatchPods(t *testing.T) {
 	manager.jobStoreSynced = alwaysReady
 
 	// Put one job and one pod into the store
-	sharedInformerFactory.Jobs().Informer().GetIndexer().Add(testJob)
+	sharedInformerFactory.Batch().V1().Jobs().Informer().GetIndexer().Add(testJob)
 	received := make(chan struct{})
 	// The pod update sent through the fakeWatcher should figure out the managing job and
 	// send it into the syncHandler.
@@ -699,7 +700,7 @@ func TestWatchPods(t *testing.T) {
 		if err != nil {
 			t.Errorf("Expected to find job under key %v: %v", key, err)
 		}
-		if !api.Semantic.DeepDerivative(job, testJob) {
+		if !apiequality.Semantic.DeepDerivative(job, testJob) {
 			t.Errorf("\nExpected %#v,\nbut got %#v", testJob, job)
 			close(received)
 			return nil
@@ -711,7 +712,7 @@ func TestWatchPods(t *testing.T) {
 	// and make sure it hits the sync method for the right job.
 	stopCh := make(chan struct{})
 	defer close(stopCh)
-	go sharedInformerFactory.Pods().Informer().Run(stopCh)
+	go sharedInformerFactory.Core().V1().Pods().Informer().Run(stopCh)
 	go wait.Until(manager.worker, 10*time.Millisecond, stopCh)
 
 	pods := newPodList(1, v1.PodRunning, testJob)

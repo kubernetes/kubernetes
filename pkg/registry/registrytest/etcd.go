@@ -27,18 +27,18 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
+	genericregistry "k8s.io/apiserver/pkg/registry/generic/registry"
+	"k8s.io/apiserver/pkg/registry/rest/resttest"
+	etcdstorage "k8s.io/apiserver/pkg/storage/etcd"
+	etcdtesting "k8s.io/apiserver/pkg/storage/etcd/testing"
+	"k8s.io/apiserver/pkg/storage/storagebackend"
+	storagetesting "k8s.io/apiserver/pkg/storage/testing"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
-	genericregistry "k8s.io/kubernetes/pkg/genericapiserver/registry/generic/registry"
-	"k8s.io/kubernetes/pkg/genericapiserver/registry/rest/resttest"
-	etcdstorage "k8s.io/kubernetes/pkg/storage/etcd"
-	etcdtesting "k8s.io/kubernetes/pkg/storage/etcd/testing"
-	"k8s.io/kubernetes/pkg/storage/storagebackend"
-	storagetesting "k8s.io/kubernetes/pkg/storage/testing"
 )
 
 func NewEtcdStorage(t *testing.T, group string) (*storagebackend.Config, *etcdtesting.EtcdTestServer) {
-	server, config := etcdtesting.NewUnsecuredEtcd3TestClientServer(t)
+	server, config := etcdtesting.NewUnsecuredEtcd3TestClientServer(t, api.Scheme)
 	config.Codec = testapi.Groups[group].StorageCodec()
 	return config, server
 }
@@ -51,7 +51,7 @@ type UpdateFunc func(runtime.Object) runtime.Object
 
 func New(t *testing.T, storage *genericregistry.Store) *Tester {
 	return &Tester{
-		tester:  resttest.New(t, storage),
+		tester:  resttest.New(t, storage, api.Scheme),
 		storage: storage,
 	}
 }

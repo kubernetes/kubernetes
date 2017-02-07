@@ -1,4 +1,8 @@
-assignees:
-  - euank
-  - yifan-gu
-  - ethernetdan
+approvers:
+- euank
+- yifan-gu
+- ethernetdan
+reviewers:
+- euank
+- yifan-gu
+- ethernetdan

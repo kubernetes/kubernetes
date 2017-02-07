@@ -141,7 +141,7 @@ stuff: 1
 		t.Fatal("expected error with yaml: violate, got no error")
 	}
 	fmt.Printf("err: %s\n", err.Error())
-	if !strings.HasPrefix(err.Error(), "yaml: line 2:") {
+	if !strings.Contains(err.Error(), "yaml: line 2:") {
 		t.Fatalf("expected %q to have 'yaml: line 2:' found a tab character", err.Error())
 	}
 }
@@ -312,5 +312,38 @@ func testReadLines(t *testing.T, lineLengths []int) {
 		if !reflect.DeepEqual(lines[i], readLines[i]) {
 			t.Fatalf("expected line: %v, but got %v", lines[i], readLines[i])
 		}
+	}
+}
+
+func TestTypedJSONOrYamlErrors(t *testing.T) {
+	s := NewYAMLOrJSONDecoder(bytes.NewReader([]byte(`{
+	"foo": {
+		"stuff": 1
+		"otherStuff": 2
+	}
+}
+  `)), 100)
+	obj := generic{}
+	err := s.Decode(&obj)
+	if err == nil {
+		t.Fatal("expected error with json: prefix, got no error")
+	}
+	if _, ok := err.(JSONSyntaxError); !ok {
+		t.Fatalf("expected %q to be of type JSONSyntaxError", err.Error())
+	}
+
+	s = NewYAMLOrJSONDecoder(bytes.NewReader([]byte(`---
+stuff: 1
+		test-foo: 1
+
+---
+  `)), 100)
+	obj = generic{}
+	err = s.Decode(&obj)
+	if err == nil {
+		t.Fatal("expected error with yaml: prefix, got no error")
+	}
+	if _, ok := err.(YAMLSyntaxError); !ok {
+		t.Fatalf("expected %q to be of type YAMLSyntaxError", err.Error())
 	}
 }

@@ -277,7 +277,7 @@ func (detacher *cinderDiskDetacher) Detach(deviceMountPath string, nodeName type
 		glog.Errorf("Error detaching volume %q: %v", volumeID, err)
 		return err
 	}
-	glog.Infof("detatached volume %q from instance %q", volumeID, instanceid)
+	glog.Infof("detached volume %q from instance %q", volumeID, instanceid)
 	return nil
 }
 

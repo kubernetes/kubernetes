@@ -18,12 +18,12 @@ package fake
 
 import (
 	rest "k8s.io/client-go/rest"
+	testing "k8s.io/client-go/testing"
 	internalversion "k8s.io/kubernetes/federation/client/clientset_generated/federation_internalclientset/typed/core/internalversion"
-	core "k8s.io/kubernetes/pkg/client/testing/core"
 )
 
 type FakeCore struct {
-	*core.Fake
+	*testing.Fake
 }
 
 func (c *FakeCore) ConfigMaps(namespace string) internalversion.ConfigMapInterface {

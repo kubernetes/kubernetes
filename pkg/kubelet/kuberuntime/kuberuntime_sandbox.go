@@ -188,18 +188,7 @@ func (m *kubeGenericRuntimeManager) getKubeletSandboxes(all bool) ([]*runtimeapi
 		return nil, err
 	}
 
-	result := []*runtimeapi.PodSandbox{}
-	for _, s := range resp {
-		if !isManagedByKubelet(s.Labels) {
-			glog.V(5).Infof("Sandbox %s is not managed by kubelet", kubecontainer.BuildPodFullName(
-				s.Metadata.Name, s.Metadata.Namespace))
-			continue
-		}
-
-		result = append(result, s)
-	}
-
-	return result, nil
+	return resp, nil
 }
 
 // determinePodSandboxIP determines the IP address of the given pod sandbox.
@@ -248,7 +237,7 @@ func (m *kubeGenericRuntimeManager) getSandboxIDByPodUID(podUID kubetypes.UID, s
 }
 
 // GetPortForward gets the endpoint the runtime will serve the port-forward request from.
-func (m *kubeGenericRuntimeManager) GetPortForward(podName, podNamespace string, podUID kubetypes.UID) (*url.URL, error) {
+func (m *kubeGenericRuntimeManager) GetPortForward(podName, podNamespace string, podUID kubetypes.UID, ports []int32) (*url.URL, error) {
 	sandboxIDs, err := m.getSandboxIDByPodUID(podUID, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find sandboxID for pod %s: %v", format.PodDesc(podName, podNamespace, podUID), err)
@@ -256,9 +245,9 @@ func (m *kubeGenericRuntimeManager) GetPortForward(podName, podNamespace string,
 	if len(sandboxIDs) == 0 {
 		return nil, fmt.Errorf("failed to find sandboxID for pod %s", format.PodDesc(podName, podNamespace, podUID))
 	}
-	// TODO: Port is unused for now, but we may need it in the future.
 	req := &runtimeapi.PortForwardRequest{
 		PodSandboxId: sandboxIDs[0],
+		Port:         ports,
 	}
 	resp, err := m.runtimeService.PortForward(req)
 	if err != nil {

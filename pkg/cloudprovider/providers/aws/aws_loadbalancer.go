@@ -293,7 +293,7 @@ func (c *Cloud) ensureLoadBalancer(namespacedName types.NamespacedName, loadBala
 
 		// Update attributes if they're dirty
 		if !reflect.DeepEqual(loadBalancerAttributes, foundAttributes) {
-			glog.V(2).Info("Updating load-balancer attributes for %q", loadBalancerName)
+			glog.V(2).Infof("Updating load-balancer attributes for %q", loadBalancerName)
 
 			modifyAttributesRequest := &elb.ModifyLoadBalancerAttributesInput{}
 			modifyAttributesRequest.LoadBalancerName = aws.String(loadBalancerName)
@@ -351,7 +351,7 @@ func (c *Cloud) ensureLoadBalancerHealthCheck(loadBalancer *elb.LoadBalancerDesc
 		return nil
 	}
 
-	glog.V(2).Info("Updating load-balancer health-check for %q", name)
+	glog.V(2).Infof("Updating load-balancer health-check for %q", name)
 
 	healthCheck := &elb.HealthCheck{}
 	healthCheck.HealthyThreshold = &expectedHealthyThreshold

@@ -33,9 +33,9 @@ import (
 
 	"github.com/golang/glog"
 	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/kubernetes/pkg/api/resource"
 	volutil "k8s.io/kubernetes/pkg/volume/util"
 )
 
@@ -178,7 +178,7 @@ func (c *realRecyclerClient) Event(eventtype, message string) {
 
 func (c *realRecyclerClient) WatchPod(name, namespace string, stopChannel chan struct{}) (<-chan watch.Event, error) {
 	podSelector, _ := fields.ParseSelector("metadata.name=" + name)
-	options := v1.ListOptions{
+	options := metav1.ListOptions{
 		FieldSelector: podSelector.String(),
 		Watch:         true,
 	}
@@ -189,7 +189,7 @@ func (c *realRecyclerClient) WatchPod(name, namespace string, stopChannel chan s
 	}
 
 	eventSelector, _ := fields.ParseSelector("involvedObject.name=" + name)
-	eventWatch, err := c.client.Core().Events(namespace).Watch(v1.ListOptions{
+	eventWatch, err := c.client.Core().Events(namespace).Watch(metav1.ListOptions{
 		FieldSelector: eventSelector.String(),
 		Watch:         true,
 	})

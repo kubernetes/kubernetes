@@ -69,7 +69,7 @@ spec:
             - name: usr-ca-certs
               mountPath: /usr/share/ca-certificates
               readOnly: true
-        - image: gcr.io/google_containers/addon-resizer:1.6
+        - image: gcr.io/google_containers/addon-resizer:1.7
           name: heapster-nanny
           resources:
             limits:
@@ -98,7 +98,7 @@ spec:
             - --container=heapster
             - --poll-period=300000
             - --estimator=exponential
-        - image: gcr.io/google_containers/addon-resizer:1.6
+        - image: gcr.io/google_containers/addon-resizer:1.7
           name: eventer-nanny
           resources:
             limits:

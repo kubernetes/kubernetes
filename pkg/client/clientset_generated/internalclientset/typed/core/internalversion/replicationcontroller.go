@@ -35,11 +35,11 @@ type ReplicationControllerInterface interface {
 	Create(*api.ReplicationController) (*api.ReplicationController, error)
 	Update(*api.ReplicationController) (*api.ReplicationController, error)
 	UpdateStatus(*api.ReplicationController) (*api.ReplicationController, error)
-	Delete(name string, options *api.DeleteOptions) error
-	DeleteCollection(options *api.DeleteOptions, listOptions api.ListOptions) error
+	Delete(name string, options *v1.DeleteOptions) error
+	DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error
 	Get(name string, options v1.GetOptions) (*api.ReplicationController, error)
-	List(opts api.ListOptions) (*api.ReplicationControllerList, error)
-	Watch(opts api.ListOptions) (watch.Interface, error)
+	List(opts v1.ListOptions) (*api.ReplicationControllerList, error)
+	Watch(opts v1.ListOptions) (watch.Interface, error)
 	Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *api.ReplicationController, err error)
 	ReplicationControllerExpansion
 }
@@ -100,7 +100,7 @@ func (c *replicationControllers) UpdateStatus(replicationController *api.Replica
 }
 
 // Delete takes name of the replicationController and deletes it. Returns an error if one occurs.
-func (c *replicationControllers) Delete(name string, options *api.DeleteOptions) error {
+func (c *replicationControllers) Delete(name string, options *v1.DeleteOptions) error {
 	return c.client.Delete().
 		Namespace(c.ns).
 		Resource("replicationcontrollers").
@@ -111,7 +111,7 @@ func (c *replicationControllers) Delete(name string, options *api.DeleteOptions)
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *replicationControllers) DeleteCollection(options *api.DeleteOptions, listOptions api.ListOptions) error {
+func (c *replicationControllers) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
 	return c.client.Delete().
 		Namespace(c.ns).
 		Resource("replicationcontrollers").
@@ -135,7 +135,7 @@ func (c *replicationControllers) Get(name string, options v1.GetOptions) (result
 }
 
 // List takes label and field selectors, and returns the list of ReplicationControllers that match those selectors.
-func (c *replicationControllers) List(opts api.ListOptions) (result *api.ReplicationControllerList, err error) {
+func (c *replicationControllers) List(opts v1.ListOptions) (result *api.ReplicationControllerList, err error) {
 	result = &api.ReplicationControllerList{}
 	err = c.client.Get().
 		Namespace(c.ns).
@@ -147,7 +147,7 @@ func (c *replicationControllers) List(opts api.ListOptions) (result *api.Replica
 }
 
 // Watch returns a watch.Interface that watches the requested replicationControllers.
-func (c *replicationControllers) Watch(opts api.ListOptions) (watch.Interface, error) {
+func (c *replicationControllers) Watch(opts v1.ListOptions) (watch.Interface, error) {
 	return c.client.Get().
 		Prefix("watch").
 		Namespace(c.ns).

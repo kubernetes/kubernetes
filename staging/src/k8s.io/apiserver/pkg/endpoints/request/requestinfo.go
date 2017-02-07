@@ -176,7 +176,7 @@ func (r *RequestInfoFactory) NewRequestInfo(req *http.Request) (*RequestInfo, er
 			}
 		}
 	} else {
-		requestInfo.Namespace = "" // TODO(sttts): solve import cycle when using api.NamespaceNone
+		requestInfo.Namespace = "" // TODO(sttts): solve import cycle when using metav1.NamespaceNone
 	}
 
 	// parsing successful, so we now know the proper value for .Parts

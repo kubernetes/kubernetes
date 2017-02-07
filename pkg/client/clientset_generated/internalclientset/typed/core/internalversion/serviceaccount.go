@@ -34,11 +34,11 @@ type ServiceAccountsGetter interface {
 type ServiceAccountInterface interface {
 	Create(*api.ServiceAccount) (*api.ServiceAccount, error)
 	Update(*api.ServiceAccount) (*api.ServiceAccount, error)
-	Delete(name string, options *api.DeleteOptions) error
-	DeleteCollection(options *api.DeleteOptions, listOptions api.ListOptions) error
+	Delete(name string, options *v1.DeleteOptions) error
+	DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error
 	Get(name string, options v1.GetOptions) (*api.ServiceAccount, error)
-	List(opts api.ListOptions) (*api.ServiceAccountList, error)
-	Watch(opts api.ListOptions) (watch.Interface, error)
+	List(opts v1.ListOptions) (*api.ServiceAccountList, error)
+	Watch(opts v1.ListOptions) (watch.Interface, error)
 	Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *api.ServiceAccount, err error)
 	ServiceAccountExpansion
 }
@@ -83,7 +83,7 @@ func (c *serviceAccounts) Update(serviceAccount *api.ServiceAccount) (result *ap
 }
 
 // Delete takes name of the serviceAccount and deletes it. Returns an error if one occurs.
-func (c *serviceAccounts) Delete(name string, options *api.DeleteOptions) error {
+func (c *serviceAccounts) Delete(name string, options *v1.DeleteOptions) error {
 	return c.client.Delete().
 		Namespace(c.ns).
 		Resource("serviceaccounts").
@@ -94,7 +94,7 @@ func (c *serviceAccounts) Delete(name string, options *api.DeleteOptions) error 
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *serviceAccounts) DeleteCollection(options *api.DeleteOptions, listOptions api.ListOptions) error {
+func (c *serviceAccounts) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
 	return c.client.Delete().
 		Namespace(c.ns).
 		Resource("serviceaccounts").
@@ -118,7 +118,7 @@ func (c *serviceAccounts) Get(name string, options v1.GetOptions) (result *api.S
 }
 
 // List takes label and field selectors, and returns the list of ServiceAccounts that match those selectors.
-func (c *serviceAccounts) List(opts api.ListOptions) (result *api.ServiceAccountList, err error) {
+func (c *serviceAccounts) List(opts v1.ListOptions) (result *api.ServiceAccountList, err error) {
 	result = &api.ServiceAccountList{}
 	err = c.client.Get().
 		Namespace(c.ns).
@@ -130,7 +130,7 @@ func (c *serviceAccounts) List(opts api.ListOptions) (result *api.ServiceAccount
 }
 
 // Watch returns a watch.Interface that watches the requested serviceAccounts.
-func (c *serviceAccounts) Watch(opts api.ListOptions) (watch.Interface, error) {
+func (c *serviceAccounts) Watch(opts v1.ListOptions) (watch.Interface, error) {
 	return c.client.Get().
 		Prefix("watch").
 		Namespace(c.ns).

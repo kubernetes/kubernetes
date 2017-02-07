@@ -19,11 +19,12 @@ package common
 import (
 	"fmt"
 	"os"
+	"path"
 	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/util/uuid"
 	"k8s.io/kubernetes/test/e2e/framework"
 
 	. "github.com/onsi/ginkgo"
@@ -152,6 +153,189 @@ var _ = framework.KubeDescribe("ConfigMap", func() {
 
 		By("waiting to observe update in volume")
 		Eventually(pollLogs, podLogTimeout, framework.Poll).Should(ContainSubstring("value-2"))
+	})
+
+	It("optional updates should be reflected in volume [Conformance] [Volume]", func() {
+
+		// We may have to wait or a full sync period to elapse before the
+		// Kubelet projects the update into the volume and the container picks
+		// it up. This timeout is based on the default Kubelet sync period (1
+		// minute) plus additional time for fudge factor.
+		const podLogTimeout = 300 * time.Second
+		trueVal := true
+
+		volumeMountPath := "/etc/configmap-volumes"
+
+		deleteName := "cm-test-opt-del-" + string(uuid.NewUUID())
+		deleteContainerName := "delcm-volume-test"
+		deleteVolumeName := "deletecm-volume"
+		deleteConfigMap := &v1.ConfigMap{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: f.Namespace.Name,
+				Name:      deleteName,
+			},
+			Data: map[string]string{
+				"data-1": "value-1",
+			},
+		}
+
+		updateName := "cm-test-opt-upd-" + string(uuid.NewUUID())
+		updateContainerName := "updcm-volume-test"
+		updateVolumeName := "updatecm-volume"
+		updateConfigMap := &v1.ConfigMap{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: f.Namespace.Name,
+				Name:      updateName,
+			},
+			Data: map[string]string{
+				"data-1": "value-1",
+			},
+		}
+
+		createName := "cm-test-opt-create-" + string(uuid.NewUUID())
+		createContainerName := "createcm-volume-test"
+		createVolumeName := "createcm-volume"
+		createConfigMap := &v1.ConfigMap{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: f.Namespace.Name,
+				Name:      createName,
+			},
+			Data: map[string]string{
+				"data-1": "value-1",
+			},
+		}
+
+		By(fmt.Sprintf("Creating configMap with name %s", deleteConfigMap.Name))
+		var err error
+		if deleteConfigMap, err = f.ClientSet.Core().ConfigMaps(f.Namespace.Name).Create(deleteConfigMap); err != nil {
+			framework.Failf("unable to create test configMap %s: %v", deleteConfigMap.Name, err)
+		}
+
+		By(fmt.Sprintf("Creating configMap with name %s", updateConfigMap.Name))
+		if updateConfigMap, err = f.ClientSet.Core().ConfigMaps(f.Namespace.Name).Create(updateConfigMap); err != nil {
+			framework.Failf("unable to create test configMap %s: %v", updateConfigMap.Name, err)
+		}
+
+		pod := &v1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "pod-configmaps-" + string(uuid.NewUUID()),
+			},
+			Spec: v1.PodSpec{
+				Volumes: []v1.Volume{
+					{
+						Name: deleteVolumeName,
+						VolumeSource: v1.VolumeSource{
+							ConfigMap: &v1.ConfigMapVolumeSource{
+								LocalObjectReference: v1.LocalObjectReference{
+									Name: deleteName,
+								},
+								Optional: &trueVal,
+							},
+						},
+					},
+					{
+						Name: updateVolumeName,
+						VolumeSource: v1.VolumeSource{
+							ConfigMap: &v1.ConfigMapVolumeSource{
+								LocalObjectReference: v1.LocalObjectReference{
+									Name: updateName,
+								},
+								Optional: &trueVal,
+							},
+						},
+					},
+					{
+						Name: createVolumeName,
+						VolumeSource: v1.VolumeSource{
+							ConfigMap: &v1.ConfigMapVolumeSource{
+								LocalObjectReference: v1.LocalObjectReference{
+									Name: createName,
+								},
+								Optional: &trueVal,
+							},
+						},
+					},
+				},
+				Containers: []v1.Container{
+					{
+						Name:    deleteContainerName,
+						Image:   "gcr.io/google_containers/mounttest:0.7",
+						Command: []string{"/mt", "--break_on_expected_content=false", "--retry_time=120", "--file_content_in_loop=/etc/configmap-volumes/delete/data-1"},
+						VolumeMounts: []v1.VolumeMount{
+							{
+								Name:      deleteVolumeName,
+								MountPath: path.Join(volumeMountPath, "delete"),
+								ReadOnly:  true,
+							},
+						},
+					},
+					{
+						Name:    updateContainerName,
+						Image:   "gcr.io/google_containers/mounttest:0.7",
+						Command: []string{"/mt", "--break_on_expected_content=false", "--retry_time=120", "--file_content_in_loop=/etc/configmap-volumes/update/data-3"},
+						VolumeMounts: []v1.VolumeMount{
+							{
+								Name:      updateVolumeName,
+								MountPath: path.Join(volumeMountPath, "update"),
+								ReadOnly:  true,
+							},
+						},
+					},
+					{
+						Name:    createContainerName,
+						Image:   "gcr.io/google_containers/mounttest:0.7",
+						Command: []string{"/mt", "--break_on_expected_content=false", "--retry_time=120", "--file_content_in_loop=/etc/configmap-volumes/create/data-1"},
+						VolumeMounts: []v1.VolumeMount{
+							{
+								Name:      createVolumeName,
+								MountPath: path.Join(volumeMountPath, "create"),
+								ReadOnly:  true,
+							},
+						},
+					},
+				},
+				RestartPolicy: v1.RestartPolicyNever,
+			},
+		}
+		By("Creating the pod")
+		f.PodClient().CreateSync(pod)
+
+		pollCreateLogs := func() (string, error) {
+			return framework.GetPodLogs(f.ClientSet, f.Namespace.Name, pod.Name, createContainerName)
+		}
+		Eventually(pollCreateLogs, podLogTimeout, framework.Poll).Should(ContainSubstring("Error reading file /etc/configmap-volumes/create/data-1"))
+
+		pollUpdateLogs := func() (string, error) {
+			return framework.GetPodLogs(f.ClientSet, f.Namespace.Name, pod.Name, updateContainerName)
+		}
+		Eventually(pollUpdateLogs, podLogTimeout, framework.Poll).Should(ContainSubstring("Error reading file /etc/configmap-volumes/update/data-3"))
+
+		pollDeleteLogs := func() (string, error) {
+			return framework.GetPodLogs(f.ClientSet, f.Namespace.Name, pod.Name, deleteContainerName)
+		}
+		Eventually(pollDeleteLogs, podLogTimeout, framework.Poll).Should(ContainSubstring("value-1"))
+
+		By(fmt.Sprintf("Deleting configmap %v", deleteConfigMap.Name))
+		err = f.ClientSet.Core().ConfigMaps(f.Namespace.Name).Delete(deleteConfigMap.Name, &metav1.DeleteOptions{})
+		Expect(err).NotTo(HaveOccurred(), "Failed to delete configmap %q in namespace %q", deleteConfigMap.Name, f.Namespace.Name)
+
+		By(fmt.Sprintf("Updating configmap %v", updateConfigMap.Name))
+		updateConfigMap.ResourceVersion = "" // to force update
+		delete(updateConfigMap.Data, "data-1")
+		updateConfigMap.Data["data-3"] = "value-3"
+		_, err = f.ClientSet.Core().ConfigMaps(f.Namespace.Name).Update(updateConfigMap)
+		Expect(err).NotTo(HaveOccurred(), "Failed to update configmap %q in namespace %q", updateConfigMap.Name, f.Namespace.Name)
+
+		By(fmt.Sprintf("Creating configMap with name %s", createConfigMap.Name))
+		if createConfigMap, err = f.ClientSet.Core().ConfigMaps(f.Namespace.Name).Create(createConfigMap); err != nil {
+			framework.Failf("unable to create test configMap %s: %v", createConfigMap.Name, err)
+		}
+
+		By("waiting to observe update in volume")
+
+		Eventually(pollCreateLogs, podLogTimeout, framework.Poll).Should(ContainSubstring("value-1"))
+		Eventually(pollUpdateLogs, podLogTimeout, framework.Poll).Should(ContainSubstring("value-3"))
+		Eventually(pollDeleteLogs, podLogTimeout, framework.Poll).Should(ContainSubstring("Error reading file /etc/configmap-volumes/delete/data-1"))
 	})
 
 	It("should be consumable via environment variable [Conformance]", func() {

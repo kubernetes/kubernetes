@@ -18,9 +18,11 @@ package storage
 
 import (
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apiserver/pkg/registry/generic"
+	genericregistry "k8s.io/apiserver/pkg/registry/generic/registry"
+	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/genericapiserver/registry/generic"
-	genericregistry "k8s.io/kubernetes/pkg/genericapiserver/registry/generic/registry"
+	"k8s.io/kubernetes/pkg/registry/cachesize"
 	"k8s.io/kubernetes/pkg/registry/core/endpoint"
 )
 
@@ -31,6 +33,7 @@ type REST struct {
 // NewREST returns a RESTStorage object that will work against endpoints.
 func NewREST(optsGetter generic.RESTOptionsGetter) *REST {
 	store := &genericregistry.Store{
+		Copier:      api.Scheme,
 		NewFunc:     func() runtime.Object { return &api.Endpoints{} },
 		NewListFunc: func() runtime.Object { return &api.EndpointsList{} },
 		ObjectNameFunc: func(obj runtime.Object) (string, error) {
@@ -38,6 +41,7 @@ func NewREST(optsGetter generic.RESTOptionsGetter) *REST {
 		},
 		PredicateFunc:     endpoint.MatchEndpoints,
 		QualifiedResource: api.Resource("endpoints"),
+		WatchCacheSize:    cachesize.GetWatchCacheSizeByResource("endpoints"),
 
 		CreateStrategy: endpoint.Strategy,
 		UpdateStrategy: endpoint.Strategy,
@@ -48,4 +52,12 @@ func NewREST(optsGetter generic.RESTOptionsGetter) *REST {
 		panic(err) // TODO: Propagate error up
 	}
 	return &REST{store}
+}
+
+// Implement ShortNamesProvider
+var _ rest.ShortNamesProvider = &REST{}
+
+// ShortNames implements the ShortNamesProvider interface. Returns a list of short names for a resource.
+func (r *REST) ShortNames() []string {
+	return []string{"ep"}
 }

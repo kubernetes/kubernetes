@@ -26,26 +26,28 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
 
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/diff"
+	"k8s.io/client-go/dynamic"
+	"k8s.io/client-go/rest/fake"
+	"k8s.io/client-go/tools/clientcmd"
 	kubefedtesting "k8s.io/kubernetes/federation/pkg/kubefed/testing"
 	"k8s.io/kubernetes/federation/pkg/kubefed/util"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
-	"k8s.io/kubernetes/pkg/client/restclient/fake"
-	"k8s.io/kubernetes/pkg/client/typed/dynamic"
-	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
+	rbacv1beta1 "k8s.io/kubernetes/pkg/apis/rbac/v1beta1"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
-	"k8s.io/kubernetes/pkg/util/intstr"
 )
 
 const (
@@ -54,6 +56,10 @@ const (
 	testCertValidity = 1 * time.Hour
 
 	helloMsg = "Hello, certificate test!"
+
+	lbIP     = "10.20.30.40"
+	nodeIP   = "10.20.30.50"
+	nodePort = 32111
 )
 
 func TestInitFederation(t *testing.T) {
@@ -70,69 +76,109 @@ func TestInitFederation(t *testing.T) {
 	defer kubefedtesting.RemoveFakeKubeconfigFiles(fakeKubeFiles)
 
 	testCases := []struct {
-		federation         string
-		kubeconfigGlobal   string
-		kubeconfigExplicit string
-		dnsZoneName        string
-		lbIP               string
-		image              string
-		etcdPVCapacity     string
-		expectedErr        string
-		dnsProvider        string
-		storageBackend     string
-		dryRun             string
+		federation           string
+		kubeconfigGlobal     string
+		kubeconfigExplicit   string
+		dnsZoneName          string
+		lbIP                 string
+		apiserverServiceType v1.ServiceType
+		advertiseAddress     string
+		image                string
+		etcdPVCapacity       string
+		etcdPersistence      string
+		expectedErr          string
+		dnsProvider          string
+		storageBackend       string
+		dryRun               string
 	}{
 		{
-			federation:         "union",
-			kubeconfigGlobal:   fakeKubeFiles[0],
-			kubeconfigExplicit: "",
-			dnsZoneName:        "example.test.",
-			lbIP:               "10.20.30.40",
-			image:              "example.test/foo:bar",
-			etcdPVCapacity:     "5Gi",
-			expectedErr:        "",
-			dnsProvider:        "test-dns-provider",
-			storageBackend:     "etcd2",
-			dryRun:             "",
+			federation:           "union",
+			kubeconfigGlobal:     fakeKubeFiles[0],
+			kubeconfigExplicit:   "",
+			dnsZoneName:          "example.test.",
+			lbIP:                 lbIP,
+			apiserverServiceType: v1.ServiceTypeLoadBalancer,
+			image:                "example.test/foo:bar",
+			etcdPVCapacity:       "5Gi",
+			etcdPersistence:      "true",
+			expectedErr:          "",
+			dnsProvider:          "test-dns-provider",
+			storageBackend:       "etcd2",
+			dryRun:               "",
 		},
 		{
-			federation:         "union",
-			kubeconfigGlobal:   fakeKubeFiles[0],
-			kubeconfigExplicit: "",
-			dnsZoneName:        "example.test.",
-			lbIP:               "10.20.30.40",
-			image:              "example.test/foo:bar",
-			etcdPVCapacity:     "", //test for default value of pvc-size
-			expectedErr:        "",
-			dnsProvider:        "", //test for default value of dns provider
-			storageBackend:     "etcd2",
-			dryRun:             "",
+			federation:           "union",
+			kubeconfigGlobal:     fakeKubeFiles[0],
+			kubeconfigExplicit:   "",
+			dnsZoneName:          "example.test.",
+			lbIP:                 lbIP,
+			apiserverServiceType: v1.ServiceTypeLoadBalancer,
+			image:                "example.test/foo:bar",
+			etcdPVCapacity:       "", //test for default value of pvc-size
+			etcdPersistence:      "true",
+			expectedErr:          "",
+			dnsProvider:          "", //test for default value of dns provider
+			storageBackend:       "etcd2",
+			dryRun:               "",
 		},
 		{
-			federation:         "union",
-			kubeconfigGlobal:   fakeKubeFiles[0],
-			kubeconfigExplicit: "",
-			dnsZoneName:        "example.test.",
-			lbIP:               "10.20.30.40",
-			image:              "example.test/foo:bar",
-			etcdPVCapacity:     "",
-			expectedErr:        "",
-			dnsProvider:        "test-dns-provider",
-			storageBackend:     "etcd2",
-			dryRun:             "valid-run",
+			federation:           "union",
+			kubeconfigGlobal:     fakeKubeFiles[0],
+			kubeconfigExplicit:   "",
+			dnsZoneName:          "example.test.",
+			lbIP:                 lbIP,
+			apiserverServiceType: v1.ServiceTypeLoadBalancer,
+			image:                "example.test/foo:bar",
+			etcdPVCapacity:       "",
+			etcdPersistence:      "true",
+			expectedErr:          "",
+			dnsProvider:          "test-dns-provider",
+			storageBackend:       "etcd2",
+			dryRun:               "valid-run",
 		},
 		{
-			federation:         "union",
-			kubeconfigGlobal:   fakeKubeFiles[0],
-			kubeconfigExplicit: "",
-			dnsZoneName:        "example.test.",
-			lbIP:               "10.20.30.40",
-			image:              "example.test/foo:bar",
-			etcdPVCapacity:     "5Gi",
-			expectedErr:        "",
-			dnsProvider:        "test-dns-provider",
-			storageBackend:     "etcd3",
-			dryRun:             "",
+			federation:           "union",
+			kubeconfigGlobal:     fakeKubeFiles[0],
+			kubeconfigExplicit:   "",
+			dnsZoneName:          "example.test.",
+			lbIP:                 lbIP,
+			apiserverServiceType: v1.ServiceTypeLoadBalancer,
+			image:                "example.test/foo:bar",
+			etcdPVCapacity:       "5Gi",
+			etcdPersistence:      "false",
+			expectedErr:          "",
+			dnsProvider:          "test-dns-provider",
+			storageBackend:       "etcd3",
+			dryRun:               "",
+		},
+		{
+			federation:           "union",
+			kubeconfigGlobal:     fakeKubeFiles[0],
+			kubeconfigExplicit:   "",
+			dnsZoneName:          "example.test.",
+			apiserverServiceType: v1.ServiceTypeNodePort,
+			image:                "example.test/foo:bar",
+			etcdPVCapacity:       "5Gi",
+			etcdPersistence:      "true",
+			expectedErr:          "",
+			dnsProvider:          "test-dns-provider",
+			storageBackend:       "etcd3",
+			dryRun:               "",
+		},
+		{
+			federation:           "union",
+			kubeconfigGlobal:     fakeKubeFiles[0],
+			kubeconfigExplicit:   "",
+			dnsZoneName:          "example.test.",
+			apiserverServiceType: v1.ServiceTypeNodePort,
+			advertiseAddress:     nodeIP,
+			image:                "example.test/foo:bar",
+			etcdPVCapacity:       "5Gi",
+			etcdPersistence:      "true",
+			expectedErr:          "",
+			dnsProvider:          "test-dns-provider",
+			storageBackend:       "etcd3",
+			dryRun:               "",
 		},
 	}
 
@@ -148,7 +194,7 @@ func TestInitFederation(t *testing.T) {
 		} else {
 			dnsProvider = "google-clouddns" //default value of dns-provider
 		}
-		hostFactory, err := fakeInitHostFactory(tc.federation, util.DefaultFederationSystemNamespace, tc.lbIP, tc.dnsZoneName, tc.image, dnsProvider, tc.etcdPVCapacity, tc.storageBackend)
+		hostFactory, err := fakeInitHostFactory(tc.apiserverServiceType, tc.federation, util.DefaultFederationSystemNamespace, tc.advertiseAddress, tc.lbIP, tc.dnsZoneName, tc.image, dnsProvider, tc.etcdPersistence, tc.etcdPVCapacity, tc.storageBackend)
 		if err != nil {
 			t.Fatalf("[%d] unexpected error: %v", i, err)
 		}
@@ -173,6 +219,13 @@ func TestInitFederation(t *testing.T) {
 		if tc.etcdPVCapacity != "" {
 			cmd.Flags().Set("etcd-pv-capacity", tc.etcdPVCapacity)
 		}
+		if tc.etcdPersistence != "true" {
+			cmd.Flags().Set("etcd-persistent-storage", tc.etcdPersistence)
+		}
+		if tc.apiserverServiceType != v1.ServiceTypeLoadBalancer {
+			cmd.Flags().Set(apiserverServiceTypeFlag, string(tc.apiserverServiceType))
+			cmd.Flags().Set(apiserverAdvertiseAddressFlag, tc.advertiseAddress)
+		}
 		if tc.dryRun == "valid-run" {
 			cmd.Flags().Set("dry-run", "true")
 		}
@@ -183,7 +236,8 @@ func TestInitFederation(t *testing.T) {
 			// uses the name from the federation, not the response
 			// Actual data passed are tested in the fake secret and cluster
 			// REST clients.
-			want := fmt.Sprintf("Federation API server is running at: %s\n", tc.lbIP)
+			endpoint := getEndpoint(tc.apiserverServiceType, tc.lbIP, tc.advertiseAddress)
+			want := fmt.Sprintf("Federation API server is running at: %s\n", endpoint)
 			if tc.dryRun != "" {
 				want = fmt.Sprintf("Federation control plane runs (dry run)\n")
 			}
@@ -198,9 +252,10 @@ func TestInitFederation(t *testing.T) {
 			if cmdErrMsg != tc.expectedErr {
 				t.Errorf("[%d] expected error: %s, got: %s, output: %s", i, tc.expectedErr, cmdErrMsg, buf.String())
 			}
+			return
 		}
 
-		testKubeconfigUpdate(t, tc.federation, tc.lbIP, tc.kubeconfigGlobal, tc.kubeconfigExplicit)
+		testKubeconfigUpdate(t, tc.apiserverServiceType, tc.federation, tc.advertiseAddress, tc.lbIP, tc.kubeconfigGlobal, tc.kubeconfigExplicit)
 	}
 }
 
@@ -443,7 +498,7 @@ func TestCertsHTTPS(t *testing.T) {
 	}
 }
 
-func fakeInitHostFactory(federationName, namespaceName, ip, dnsZoneName, image, dnsProvider, etcdPVCapacity, storageProvider string) (cmdutil.Factory, error) {
+func fakeInitHostFactory(apiserverServiceType v1.ServiceType, federationName, namespaceName, advertiseAddress, lbIp, dnsZoneName, image, dnsProvider, etcdPersistence, etcdPVCapacity, storageProvider string) (cmdutil.Factory, error) {
 	svcName := federationName + "-apiserver"
 	svcUrlPrefix := "/api/v1/namespaces/federation-system/services"
 	credSecretName := svcName + "-credentials"
@@ -481,14 +536,13 @@ func fakeInitHostFactory(federationName, namespaceName, ip, dnsZoneName, image, 
 			Labels:    componentLabel,
 		},
 		Spec: v1.ServiceSpec{
-			Type:     v1.ServiceTypeLoadBalancer,
+			Type:     apiserverServiceType,
 			Selector: apiserverSvcSelector,
 			Ports: []v1.ServicePort{
 				{
-					Name:       "https",
-					Protocol:   "TCP",
-					Port:       443,
-					TargetPort: intstr.FromInt(443),
+					Name:     "https",
+					Protocol: "TCP",
+					Port:     443,
 				},
 			},
 		},
@@ -499,7 +553,7 @@ func fakeInitHostFactory(federationName, namespaceName, ip, dnsZoneName, image, 
 		LoadBalancer: v1.LoadBalancerStatus{
 			Ingress: []v1.LoadBalancerIngress{
 				{
-					IP: ip,
+					IP: lbIp,
 				},
 			},
 		},
@@ -554,6 +608,82 @@ func fakeInitHostFactory(federationName, namespaceName, ip, dnsZoneName, image, 
 		},
 	}
 
+	sa := v1.ServiceAccount{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "ServiceAccount",
+			APIVersion: testapi.Default.GroupVersion().String(),
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "federation-controller-manager",
+			Namespace: namespaceName,
+			Labels:    componentLabel,
+		},
+	}
+
+	role := rbacv1beta1.Role{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "Role",
+			APIVersion: testapi.Rbac.GroupVersion().String(),
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "federation-system:federation-controller-manager",
+			Namespace: namespaceName,
+			Labels:    componentLabel,
+		},
+		Rules: []rbacv1beta1.PolicyRule{
+			{
+				Verbs:     []string{"get", "list", "watch"},
+				APIGroups: []string{""},
+				Resources: []string{"secrets"},
+			},
+		},
+	}
+
+	rolebinding := rbacv1beta1.RoleBinding{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "RoleBinding",
+			APIVersion: testapi.Rbac.GroupVersion().String(),
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "federation-system:federation-controller-manager",
+			Namespace: namespaceName,
+			Labels:    componentLabel,
+		},
+		Subjects: []rbacv1beta1.Subject{
+			{
+				Kind:       "ServiceAccount",
+				APIVersion: "",
+				Name:       "federation-controller-manager",
+				Namespace:  "federation-system",
+			},
+		},
+		RoleRef: rbacv1beta1.RoleRef{
+			APIGroup: "rbac.authorization.k8s.io",
+			Kind:     "Role",
+			Name:     "federation-system:federation-controller-manager",
+		},
+	}
+
+	node := v1.Node{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "Node",
+			APIVersion: testapi.Extensions.GroupVersion().String(),
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name: nodeIP,
+		},
+		Status: v1.NodeStatus{
+			Addresses: []v1.NodeAddress{
+				{
+					Type:    v1.NodeExternalIP,
+					Address: nodeIP,
+				},
+			},
+		},
+	}
+	nodeList := v1.NodeList{}
+	nodeList.Items = append(nodeList.Items, node)
+
 	apiserver := v1beta1.Deployment{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "Deployment",
@@ -586,8 +716,8 @@ func fakeInitHostFactory(federationName, namespaceName, ip, dnsZoneName, image, 
 								"--client-ca-file=/etc/federation/apiserver/ca.crt",
 								"--tls-cert-file=/etc/federation/apiserver/server.crt",
 								"--tls-private-key-file=/etc/federation/apiserver/server.key",
+								"--admission-control=NamespaceLifecycle",
 								fmt.Sprintf("--storage-backend=%s", storageProvider),
-								"--advertise-address=" + ip,
 							},
 							Ports: []v1.ContainerPort{
 								{
@@ -615,12 +745,6 @@ func fakeInitHostFactory(federationName, namespaceName, ip, dnsZoneName, image, 
 								"--data-dir",
 								"/var/etcd/data",
 							},
-							VolumeMounts: []v1.VolumeMount{
-								{
-									Name:      "etcddata",
-									MountPath: "/var/etcd",
-								},
-							},
 						},
 					},
 					Volumes: []v1.Volume{
@@ -632,19 +756,43 @@ func fakeInitHostFactory(federationName, namespaceName, ip, dnsZoneName, image, 
 								},
 							},
 						},
-						{
-							Name: "etcddata",
-							VolumeSource: v1.VolumeSource{
-								PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{
-									ClaimName: pvcName,
-								},
-							},
-						},
 					},
 				},
 			},
 		},
 	}
+	if etcdPersistence == "true" {
+		dataVolumeName := "etcddata"
+		etcdVolume := v1.Volume{
+			Name: dataVolumeName,
+			VolumeSource: v1.VolumeSource{
+				PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{
+					ClaimName: pvcName,
+				},
+			},
+		}
+		etcdVolumeMount := v1.VolumeMount{
+			Name:      dataVolumeName,
+			MountPath: "/var/etcd",
+		}
+
+		apiserver.Spec.Template.Spec.Volumes = append(apiserver.Spec.Template.Spec.Volumes, etcdVolume)
+		for i, container := range apiserver.Spec.Template.Spec.Containers {
+			if container.Name == "etcd" {
+				apiserver.Spec.Template.Spec.Containers[i].VolumeMounts = append(apiserver.Spec.Template.Spec.Containers[i].VolumeMounts, etcdVolumeMount)
+			}
+		}
+	}
+
+	address := lbIp
+	if apiserverServiceType == v1.ServiceTypeNodePort {
+		if advertiseAddress != "" {
+			address = advertiseAddress
+		} else {
+			address = nodeIP
+		}
+	}
+	apiserver.Spec.Template.Spec.Containers[0].Command = append(apiserver.Spec.Template.Spec.Containers[0].Command, fmt.Sprintf("--advertise-address=%s", address))
 
 	cmName := federationName + "-controller-manager"
 	cm := v1beta1.Deployment{
@@ -709,6 +857,8 @@ func fakeInitHostFactory(federationName, namespaceName, ip, dnsZoneName, image, 
 							},
 						},
 					},
+					ServiceAccountName:       "federation-controller-manager",
+					DeprecatedServiceAccount: "federation-controller-manager",
 				},
 			},
 		},
@@ -748,9 +898,11 @@ func fakeInitHostFactory(federationName, namespaceName, ip, dnsZoneName, image, 
 
 	f, tf, codec, _ := cmdtesting.NewAPIFactory()
 	extCodec := testapi.Extensions.Codec()
+	rbacCodec := testapi.Rbac.Codec()
 	ns := dynamic.ContentConfig().NegotiatedSerializer
 	tf.ClientConfig = kubefedtesting.DefaultClientConfig()
 	tf.Client = &fake.RESTClient{
+		APIRegistry:          api.Registry,
 		NegotiatedSerializer: ns,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch p, m := req.URL.Path, req.Method; {
@@ -766,7 +918,7 @@ func fakeInitHostFactory(federationName, namespaceName, ip, dnsZoneName, image, 
 				if err != nil {
 					return nil, err
 				}
-				if !api.Semantic.DeepEqual(got, namespace) {
+				if !apiequality.Semantic.DeepEqual(got, namespace) {
 					return nil, fmt.Errorf("Unexpected namespace object\n\tDiff: %s", diff.ObjectGoPrintDiff(got, namespace))
 				}
 				return &http.Response{StatusCode: http.StatusCreated, Header: kubefedtesting.DefaultHeader(), Body: kubefedtesting.ObjBody(codec, &namespace)}, nil
@@ -780,8 +932,12 @@ func fakeInitHostFactory(federationName, namespaceName, ip, dnsZoneName, image, 
 				if err != nil {
 					return nil, err
 				}
-				if !api.Semantic.DeepEqual(got, svc) {
+				if !apiequality.Semantic.DeepEqual(got, svc) {
 					return nil, fmt.Errorf("Unexpected service object\n\tDiff: %s", diff.ObjectGoPrintDiff(got, svc))
+				}
+				if apiserverServiceType == v1.ServiceTypeNodePort {
+					svc.Spec.Type = v1.ServiceTypeNodePort
+					svc.Spec.Ports[0].NodePort = nodePort
 				}
 				return &http.Response{StatusCode: http.StatusCreated, Header: kubefedtesting.DefaultHeader(), Body: kubefedtesting.ObjBody(codec, &svc)}, nil
 			case strings.HasPrefix(p, svcUrlPrefix) && m == http.MethodGet:
@@ -811,7 +967,7 @@ func fakeInitHostFactory(federationName, namespaceName, ip, dnsZoneName, image, 
 				case cmKubeconfigSecretName:
 					want = cmKubeconfigSecret
 				}
-				if !api.Semantic.DeepEqual(got, want) {
+				if !apiequality.Semantic.DeepEqual(got, want) {
 					return nil, fmt.Errorf("Unexpected secret object\n\tDiff: %s", diff.ObjectGoPrintDiff(got, want))
 				}
 				return &http.Response{StatusCode: http.StatusCreated, Header: kubefedtesting.DefaultHeader(), Body: kubefedtesting.ObjBody(codec, &want)}, nil
@@ -825,7 +981,7 @@ func fakeInitHostFactory(federationName, namespaceName, ip, dnsZoneName, image, 
 				if err != nil {
 					return nil, err
 				}
-				if !api.Semantic.DeepEqual(got, pvc) {
+				if !apiequality.Semantic.DeepEqual(got, pvc) {
 					return nil, fmt.Errorf("Unexpected PVC object\n\tDiff: %s", diff.ObjectGoPrintDiff(got, pvc))
 				}
 				return &http.Response{StatusCode: http.StatusCreated, Header: kubefedtesting.DefaultHeader(), Body: kubefedtesting.ObjBody(codec, &pvc)}, nil
@@ -845,12 +1001,56 @@ func fakeInitHostFactory(federationName, namespaceName, ip, dnsZoneName, image, 
 				case cmName:
 					want = cm
 				}
-				if !api.Semantic.DeepEqual(got, want) {
+				if !apiequality.Semantic.DeepEqual(got, want) {
 					return nil, fmt.Errorf("Unexpected deployment object\n\tDiff: %s", diff.ObjectGoPrintDiff(got, want))
 				}
 				return &http.Response{StatusCode: http.StatusCreated, Header: kubefedtesting.DefaultHeader(), Body: kubefedtesting.ObjBody(extCodec, &want)}, nil
 			case p == "/api/v1/namespaces/federation-system/pods" && m == http.MethodGet:
 				return &http.Response{StatusCode: http.StatusOK, Header: kubefedtesting.DefaultHeader(), Body: kubefedtesting.ObjBody(codec, &podList)}, nil
+			case p == "/api/v1/namespaces/federation-system/serviceaccounts" && m == http.MethodPost:
+				body, err := ioutil.ReadAll(req.Body)
+				if err != nil {
+					return nil, err
+				}
+				var got v1.ServiceAccount
+				_, _, err = codec.Decode(body, nil, &got)
+				if err != nil {
+					return nil, err
+				}
+				if !api.Semantic.DeepEqual(got, sa) {
+					return nil, fmt.Errorf("Unexpected service account object\n\tDiff: %s", diff.ObjectGoPrintDiff(got, sa))
+				}
+				return &http.Response{StatusCode: http.StatusCreated, Header: kubefedtesting.DefaultHeader(), Body: kubefedtesting.ObjBody(codec, &sa)}, nil
+			case p == "/apis/rbac.authorization.k8s.io/v1beta1/namespaces/federation-system/roles" && m == http.MethodPost:
+				body, err := ioutil.ReadAll(req.Body)
+				if err != nil {
+					return nil, err
+				}
+				var got rbacv1beta1.Role
+				_, _, err = codec.Decode(body, nil, &got)
+				if err != nil {
+					return nil, err
+				}
+				if !api.Semantic.DeepEqual(got, role) {
+					return nil, fmt.Errorf("Unexpected role object\n\tDiff: %s", diff.ObjectGoPrintDiff(got, role))
+				}
+				return &http.Response{StatusCode: http.StatusCreated, Header: kubefedtesting.DefaultHeader(), Body: kubefedtesting.ObjBody(rbacCodec, &role)}, nil
+			case p == "/apis/rbac.authorization.k8s.io/v1beta1/namespaces/federation-system/rolebindings" && m == http.MethodPost:
+				body, err := ioutil.ReadAll(req.Body)
+				if err != nil {
+					return nil, err
+				}
+				var got rbacv1beta1.RoleBinding
+				_, _, err = codec.Decode(body, nil, &got)
+				if err != nil {
+					return nil, err
+				}
+				if !api.Semantic.DeepEqual(got, rolebinding) {
+					return nil, fmt.Errorf("Unexpected rolebinding object\n\tDiff: %s", diff.ObjectGoPrintDiff(got, rolebinding))
+				}
+				return &http.Response{StatusCode: http.StatusCreated, Header: kubefedtesting.DefaultHeader(), Body: kubefedtesting.ObjBody(rbacCodec, &rolebinding)}, nil
+			case p == "/api/v1/nodes" && m == http.MethodGet:
+				return &http.Response{StatusCode: http.StatusOK, Header: kubefedtesting.DefaultHeader(), Body: kubefedtesting.ObjBody(codec, &nodeList)}, nil
 			default:
 				return nil, fmt.Errorf("unexpected request: %#v\n%#v", req.URL, req)
 			}
@@ -859,7 +1059,7 @@ func fakeInitHostFactory(federationName, namespaceName, ip, dnsZoneName, image, 
 	return f, nil
 }
 
-func testKubeconfigUpdate(t *testing.T, federationName, lbIP, kubeconfigGlobal, kubeconfigExplicit string) {
+func testKubeconfigUpdate(t *testing.T, apiserverServiceType v1.ServiceType, federationName, advertiseAddress, lbIP, kubeconfigGlobal, kubeconfigExplicit string) {
 	filename := kubeconfigGlobal
 	if kubeconfigExplicit != "" {
 		filename = kubeconfigExplicit
@@ -875,9 +1075,9 @@ func testKubeconfigUpdate(t *testing.T, federationName, lbIP, kubeconfigGlobal, 
 		t.Errorf("No cluster info for %q", federationName)
 		return
 	}
-	endpoint := lbIP
-	if !strings.HasSuffix(lbIP, "https://") {
-		endpoint = fmt.Sprintf("https://%s", lbIP)
+	endpoint := getEndpoint(apiserverServiceType, lbIP, advertiseAddress)
+	if !strings.HasSuffix(endpoint, "https://") {
+		endpoint = fmt.Sprintf("https://%s", endpoint)
 	}
 	if cluster.Server != endpoint {
 		t.Errorf("Want federation API server endpoint %q, got %q", endpoint, cluster.Server)
@@ -1046,4 +1246,16 @@ func copyTLSConfig(cfg *tls.Config) *tls.Config {
 		ClientCAs:          cfg.ClientCAs,
 		InsecureSkipVerify: cfg.InsecureSkipVerify,
 	}
+}
+
+func getEndpoint(apiserverServiceType v1.ServiceType, lbIP, advertiseAddress string) string {
+	endpoint := lbIP
+	if apiserverServiceType == v1.ServiceTypeNodePort {
+		if advertiseAddress != "" {
+			endpoint = advertiseAddress + ":" + strconv.Itoa(nodePort)
+		} else {
+			endpoint = nodeIP + ":" + strconv.Itoa(nodePort)
+		}
+	}
+	return endpoint
 }

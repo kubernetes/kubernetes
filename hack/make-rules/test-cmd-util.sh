@@ -21,8 +21,9 @@ set -o nounset
 set -o pipefail
 
 KUBE_ROOT=$(dirname "${BASH_SOURCE}")/../..
-source "${KUBE_ROOT}/hack/lib/init.sh"
-source "${KUBE_ROOT}/hack/lib/test.sh"
+# Expects the following has already been done by whatever sources this script
+# source "${KUBE_ROOT}/hack/lib/init.sh"
+# source "${KUBE_ROOT}/hack/lib/test.sh"
 
 ETCD_HOST=${ETCD_HOST:-127.0.0.1}
 ETCD_PORT=${ETCD_PORT:-2379}
@@ -900,6 +901,56 @@ run_kubectl_apply_tests() {
   kubectl delete svc prune-svc 2>&1 "${kube_flags[@]}"
 }
 
+# Runs tests related to kubectl create --filename(-f) --selector(-l).
+run_kubectl_create_filter_tests() {
+  ## kubectl create -f with label selector should only create matching objects
+  # Pre-Condition: no POD exists
+  kube::test::get_object_assert pods "{{range.items}}{{$id_field}}:{{end}}" ''
+  # create
+  kubectl create -l unique-label=bingbang -f hack/testdata/filter "${kube_flags[@]}"
+  # check right pod exists
+  kube::test::get_object_assert 'pods selector-test-pod' "{{${labels_field}.name}}" 'selector-test-pod'
+  # check wrong pod doesn't exist
+  output_message=$(! kubectl get pods selector-test-pod-dont-apply 2>&1 "${kube_flags[@]}")
+  kube::test::if_has_string "${output_message}" 'pods "selector-test-pod-dont-apply" not found'
+  # cleanup
+  kubectl delete pods selector-test-pod
+}
+
+run_kubectl_apply_deployments_tests() {
+  ## kubectl apply should propagate user defined null values
+  # Pre-Condition: no Deployments, ReplicaSets, Pods exist
+  kube::test::get_object_assert deployments "{{range.items}}{{$id_field}}:{{end}}" ''
+  kube::test::get_object_assert replicasets "{{range.items}}{{$id_field}}:{{end}}" ''
+  kube::test::get_object_assert pods "{{range.items}}{{$id_field}}:{{end}}" ''
+  # apply base deployment
+  kubectl apply -f hack/testdata/null-propagation/deployment-l1.yaml "${kube_flags[@]}"
+  # check right deployment exists
+  kube::test::get_object_assert 'deployments my-depl' "{{${id_field}}}" 'my-depl'
+  # check right labels exists
+  kube::test::get_object_assert 'deployments my-depl' "{{.spec.template.metadata.labels.l1}}" 'l1'
+  kube::test::get_object_assert 'deployments my-depl' "{{.spec.selector.matchLabels.l1}}" 'l1'
+  kube::test::get_object_assert 'deployments my-depl' "{{.metadata.labels.l1}}" 'l1'
+
+  # apply new deployment with new template labels
+  kubectl apply -f hack/testdata/null-propagation/deployment-l2.yaml "${kube_flags[@]}"
+  # check right labels exists
+  kube::test::get_object_assert 'deployments my-depl' "{{.spec.template.metadata.labels.l1}}" '<no value>'
+  kube::test::get_object_assert 'deployments my-depl' "{{.spec.selector.matchLabels.l1}}" '<no value>'
+  kube::test::get_object_assert 'deployments my-depl' "{{.metadata.labels.l1}}" '<no value>'
+  kube::test::get_object_assert 'deployments my-depl' "{{.spec.template.metadata.labels.l2}}" 'l2'
+  kube::test::get_object_assert 'deployments my-depl' "{{.spec.selector.matchLabels.l2}}" 'l2'
+  kube::test::get_object_assert 'deployments my-depl' "{{.metadata.labels.l2}}" 'l2'
+
+  # cleanup
+  # need to explicitly remove replicasets and pods because we changed the deployment selector and orphaned things
+  kubectl delete deployments,rs,pods --all --cascade=false --grace-period=0
+  # Post-Condition: no Deployments, ReplicaSets, Pods exist
+  kube::test::get_object_assert deployments "{{range.items}}{{$id_field}}:{{end}}" ''
+  kube::test::get_object_assert replicasets "{{range.items}}{{$id_field}}:{{end}}" ''
+  kube::test::get_object_assert pods "{{range.items}}{{$id_field}}:{{end}}" ''
+}
+
 # Runs tests for --save-config tests.
 run_save_config_tests() {
   ## Configuration annotations should be set when --save-config is enabled
@@ -964,12 +1015,10 @@ run_save_config_tests() {
   # Command: autoscale rc "frontend"
   kubectl autoscale -f hack/testdata/frontend-controller.yaml --save-config "${kube_flags[@]}" --max=2
   # Post-Condition: hpa "frontend" has configuration annotation
-  [[ "$(kubectl get hpa.v1beta1.extensions frontend -o yaml "${kube_flags[@]}" | grep kubectl.kubernetes.io/last-applied-configuration)" ]]
-  # Ensure we can interact with HPA objects in lists through both the extensions/v1beta1 and autoscaling/v1 APIs
+  [[ "$(kubectl get hpa frontend -o yaml "${kube_flags[@]}" | grep kubectl.kubernetes.io/last-applied-configuration)" ]]
+  # Ensure we can interact with HPA objects in lists through autoscaling/v1 APIs
   output_message=$(kubectl get hpa -o=jsonpath='{.items[0].apiVersion}' 2>&1 "${kube_flags[@]}")
   kube::test::if_has_string "${output_message}" 'autoscaling/v1'
-  output_message=$(kubectl get hpa.extensions -o=jsonpath='{.items[0].apiVersion}' 2>&1 "${kube_flags[@]}")
-  kube::test::if_has_string "${output_message}" 'extensions/v1beta1'
   output_message=$(kubectl get hpa.autoscaling -o=jsonpath='{.items[0].apiVersion}' 2>&1 "${kube_flags[@]}")
   kube::test::if_has_string "${output_message}" 'autoscaling/v1'
   # tests kubectl group prefix matching
@@ -1019,6 +1068,46 @@ run_kubectl_get_tests() {
   output_message=$(! kubectl get pods abc 2>&1 "${kube_flags[@]}" -o name)
   # Post-condition: POD abc should error since it doesn't exist
   kube::test::if_has_string "${output_message}" 'pods "abc" not found'
+
+  ### Test retrieval of pods when none exist with non-human readable output format flag specified
+  # Pre-condition: no pods exist
+  kube::test::get_object_assert pods "{{range.items}}{{$id_field}}:{{end}}" ''
+  # Command
+  output_message=$(kubectl get pods 2>&1 "${kube_flags[@]}" -o json)
+  # Post-condition: The text "No resources found" should not be part of the output
+  kube::test::if_has_not_string "${output_message}" 'No resources found'
+  # Command
+  output_message=$(kubectl get pods 2>&1 "${kube_flags[@]}" -o yaml)
+  # Post-condition: The text "No resources found" should not be part of the output
+  kube::test::if_has_not_string "${output_message}" 'No resources found'
+  # Command
+  output_message=$(kubectl get pods 2>&1 "${kube_flags[@]}" -o name)
+  # Post-condition: The text "No resources found" should not be part of the output
+  kube::test::if_has_not_string "${output_message}" 'No resources found'
+  # Command
+  output_message=$(kubectl get pods 2>&1 "${kube_flags[@]}" -o jsonpath='{.items}')
+  # Post-condition: The text "No resources found" should not be part of the output
+  kube::test::if_has_not_string "${output_message}" 'No resources found'
+  # Command
+  output_message=$(kubectl get pods 2>&1 "${kube_flags[@]}" -o go-template='{{.items}}')
+  # Post-condition: The text "No resources found" should not be part of the output
+  kube::test::if_has_not_string "${output_message}" 'No resources found'
+  # Command
+  output_message=$(kubectl get pods 2>&1 "${kube_flags[@]}" -o custom-columns=NAME:.metadata.name)
+  # Post-condition: The text "No resources found" should not be part of the output
+  kube::test::if_has_not_string "${output_message}" 'No resources found'
+
+  ### Test retrieval of pods when none exist, with human-readable output format flag specified
+  # Pre-condition: no pods exist
+  kube::test::get_object_assert pods "{{range.items}}{{$id_field}}:{{end}}" ''
+  # Command
+  output_message=$(kubectl get pods 2>&1 "${kube_flags[@]}")
+  # Post-condition: The text "No resources found" should be part of the output
+  kube::test::if_has_string "${output_message}" 'No resources found'
+  # Command
+  output_message=$(kubectl get pods 2>&1 "${kube_flags[@]}" -o wide)
+  # Post-condition: The text "No resources found" should be part of the output
+  kube::test::if_has_string "${output_message}" 'No resources found'
 
   ### Test retrieval of non-existing POD with json output flag specified
   # Pre-condition: no POD exists
@@ -1170,20 +1259,77 @@ __EOF__
   kube::test::get_object_assert bars "{{range.items}}{{$id_field}}:{{end}}" ''
 
   # Test that we can create a new resource of type Foo
-  kubectl "${kube_flags[@]}" create -f - "${kube_flags[@]}" << __EOF__
-{
-  "kind": "Foo",
-  "apiVersion": "company.com/v1",
-  "metadata": {
-    "name": "test"
-  },
-  "some-field": "field1",
-  "other-field": "field2"
-}
-__EOF__
+  kubectl "${kube_flags[@]}" create -f hack/testdata/TPR/foo.yaml "${kube_flags[@]}"
 
   # Test that we can list this new third party resource
   kube::test::get_object_assert foos "{{range.items}}{{$id_field}}:{{end}}" 'test:'
+
+  # Test alternate forms
+  kube::test::get_object_assert foo                 "{{range.items}}{{$id_field}}:{{end}}" 'test:'
+  kube::test::get_object_assert foos.company.com    "{{range.items}}{{$id_field}}:{{end}}" 'test:'
+  kube::test::get_object_assert foos.v1.company.com "{{range.items}}{{$id_field}}:{{end}}" 'test:'
+
+  # Test all printers, with lists and individual items
+  kube::log::status "Testing ThirdPartyResource printing"
+  kubectl "${kube_flags[@]}" get foos
+  kubectl "${kube_flags[@]}" get foos/test
+  kubectl "${kube_flags[@]}" get foos      -o name
+  kubectl "${kube_flags[@]}" get foos/test -o name
+  kubectl "${kube_flags[@]}" get foos      -o wide
+  kubectl "${kube_flags[@]}" get foos/test -o wide
+  kubectl "${kube_flags[@]}" get foos      -o json
+  kubectl "${kube_flags[@]}" get foos/test -o json
+  kubectl "${kube_flags[@]}" get foos      -o yaml
+  kubectl "${kube_flags[@]}" get foos/test -o yaml
+  kubectl "${kube_flags[@]}" get foos      -o "jsonpath={.items[*].someField}" --allow-missing-template-keys=false
+  kubectl "${kube_flags[@]}" get foos/test -o "jsonpath={.someField}"          --allow-missing-template-keys=false
+  kubectl "${kube_flags[@]}" get foos      -o "go-template={{range .items}}{{.someField}}{{end}}" --allow-missing-template-keys=false
+  kubectl "${kube_flags[@]}" get foos/test -o "go-template={{.someField}}"                        --allow-missing-template-keys=false
+
+  # Test patching
+  kube::log::status "Testing ThirdPartyResource patching"
+  kubectl "${kube_flags[@]}" patch foos/test -p '{"patched":"value1"}' --type=merge
+  kube::test::get_object_assert foos/test "{{.patched}}" 'value1'
+  kubectl "${kube_flags[@]}" patch foos/test -p '{"patched":"value2"}' --type=merge --record
+  kube::test::get_object_assert foos/test "{{.patched}}" 'value2'
+  kubectl "${kube_flags[@]}" patch foos/test -p '{"patched":null}' --type=merge --record
+  kube::test::get_object_assert foos/test "{{.patched}}" '<no value>'
+  # Get local version
+  TPR_RESOURCE_FILE="${KUBE_TEMP}/tpr-foos-test.json"
+  kubectl "${kube_flags[@]}" get foos/test -o json > "${TPR_RESOURCE_FILE}"
+  # cannot apply strategic patch locally
+  TPR_PATCH_ERROR_FILE="${KUBE_TEMP}/tpr-foos-test-error"
+  ! kubectl "${kube_flags[@]}" patch --local -f "${TPR_RESOURCE_FILE}" -p '{"patched":"value3"}' 2> "${TPR_PATCH_ERROR_FILE}"
+  if grep -q "try --type merge" "${TPR_PATCH_ERROR_FILE}"; then
+    kube::log::status "\"kubectl patch --local\" returns error as expected for ThirdPartyResource: $(cat ${TPR_PATCH_ERROR_FILE})"
+  else
+    kube::log::status "\"kubectl patch --local\" returns unexpected error or non-error: $(cat ${TPR_PATCH_ERROR_FILE})"
+    exit 1
+  fi
+  # can apply merge patch locally
+  kubectl "${kube_flags[@]}" patch --local -f "${TPR_RESOURCE_FILE}" -p '{"patched":"value3"}' --type=merge -o json
+  # can apply merge patch remotely
+  kubectl "${kube_flags[@]}" patch --record -f "${TPR_RESOURCE_FILE}" -p '{"patched":"value3"}' --type=merge -o json
+  kube::test::get_object_assert foos/test "{{.patched}}" 'value3'
+  rm "${TPR_RESOURCE_FILE}"
+  rm "${TPR_PATCH_ERROR_FILE}"
+
+  # Test labeling
+  kube::log::status "Testing ThirdPartyResource labeling"
+  kubectl "${kube_flags[@]}" label foos --all listlabel=true
+  kubectl "${kube_flags[@]}" label foo/test itemlabel=true
+
+  # Test annotating
+  kube::log::status "Testing ThirdPartyResource annotating"
+  kubectl "${kube_flags[@]}" annotate foos --all listannotation=true
+  kubectl "${kube_flags[@]}" annotate foo/test itemannotation=true
+
+  # Test describing
+  kube::log::status "Testing ThirdPartyResource describing"
+  kubectl "${kube_flags[@]}" describe foos
+  kubectl "${kube_flags[@]}" describe foos/test
+  kubectl "${kube_flags[@]}" describe foos | grep listlabel=true
+  kubectl "${kube_flags[@]}" describe foos | grep itemlabel=true
 
   # Delete the resource
   kubectl "${kube_flags[@]}" delete foos test
@@ -1192,17 +1338,7 @@ __EOF__
   kube::test::get_object_assert foos "{{range.items}}{{$id_field}}:{{end}}" ''
 
   # Test that we can create a new resource of type Bar
-  kubectl "${kube_flags[@]}" create -f - "${kube_flags[@]}" << __EOF__
-{
-  "kind": "Bar",
-  "apiVersion": "company.com/v1",
-  "metadata": {
-    "name": "test"
-  },
-  "some-field": "field1",
-  "other-field": "field2"
-}
-__EOF__
+  kubectl "${kube_flags[@]}" create -f hack/testdata/TPR/bar.yaml "${kube_flags[@]}"
 
   # Test that we can list this new third party resource
   kube::test::get_object_assert bars "{{range.items}}{{$id_field}}:{{end}}" 'test:'
@@ -1211,6 +1347,136 @@ __EOF__
   kubectl "${kube_flags[@]}" delete bars test
 
   # Make sure it's gone
+  kube::test::get_object_assert bars "{{range.items}}{{$id_field}}:{{end}}" ''
+
+  # Test that we can create single item via apply
+  kubectl "${kube_flags[@]}" apply -f hack/testdata/TPR/foo.yaml
+
+  # Test that we have create a foo named test
+  kube::test::get_object_assert foos "{{range.items}}{{$id_field}}:{{end}}" 'test:'
+
+  # Test that the field has the expected value
+  kube::test::get_object_assert foos/test '{{.someField}}' 'field1'
+
+  # Test that apply an empty patch doesn't change fields
+  kubectl "${kube_flags[@]}" apply -f hack/testdata/TPR/foo.yaml
+
+  # Test that the field has the same value after re-apply
+  kube::test::get_object_assert foos/test '{{.someField}}' 'field1'
+
+  # Test that apply has updated the subfield
+  kube::test::get_object_assert foos/test '{{.nestedField.someSubfield}}' 'subfield1'
+
+  # Update a subfield and then apply the change
+  kubectl "${kube_flags[@]}" apply -f hack/testdata/TPR/foo-updated-subfield.yaml
+
+  # Test that apply has updated the subfield
+  kube::test::get_object_assert foos/test '{{.nestedField.someSubfield}}' 'modifiedSubfield'
+
+  # Test that the field has the expected value
+  kube::test::get_object_assert foos/test '{{.nestedField.otherSubfield}}' 'subfield2'
+
+  # Delete a subfield and then apply the change
+  kubectl "${kube_flags[@]}" apply -f hack/testdata/TPR/foo-deleted-subfield.yaml
+
+  # Test that apply has deleted the field
+  kube::test::get_object_assert foos/test '{{.nestedField.otherSubfield}}' '<no value>'
+
+  # Test that the field does not exist
+  kube::test::get_object_assert foos/test '{{.nestedField.newSubfield}}' '<no value>'
+
+  # Add a field and then apply the change
+  kubectl "${kube_flags[@]}" apply -f hack/testdata/TPR/foo-added-subfield.yaml
+
+  # Test that apply has added the field
+  kube::test::get_object_assert foos/test '{{.nestedField.newSubfield}}' 'subfield3'
+
+  # Delete the resource
+  kubectl "${kube_flags[@]}" delete -f hack/testdata/TPR/foo.yaml
+
+  # Make sure it's gone
+  kube::test::get_object_assert foos "{{range.items}}{{$id_field}}:{{end}}" ''
+
+  # Test that we can create list via apply
+  kubectl "${kube_flags[@]}" apply -f hack/testdata/TPR/multi-tpr-list.yaml
+
+  # Test that we have create a foo and a bar from a list
+  kube::test::get_object_assert foos "{{range.items}}{{$id_field}}:{{end}}" 'test-list:'
+  kube::test::get_object_assert bars "{{range.items}}{{$id_field}}:{{end}}" 'test-list:'
+
+  # Test that the field has the expected value
+  kube::test::get_object_assert foos/test-list '{{.someField}}' 'field1'
+  kube::test::get_object_assert bars/test-list '{{.someField}}' 'field1'
+
+  # Test that re-apply an list doesn't change anything
+  kubectl "${kube_flags[@]}" apply -f hack/testdata/TPR/multi-tpr-list.yaml
+
+  # Test that the field has the same value after re-apply
+  kube::test::get_object_assert foos/test-list '{{.someField}}' 'field1'
+  kube::test::get_object_assert bars/test-list '{{.someField}}' 'field1'
+
+  # Test that the fields have the expected value
+  kube::test::get_object_assert foos/test-list '{{.someField}}' 'field1'
+  kube::test::get_object_assert bars/test-list '{{.someField}}' 'field1'
+
+  # Update fields and then apply the change
+  kubectl "${kube_flags[@]}" apply -f hack/testdata/TPR/multi-tpr-list-updated-field.yaml
+
+  # Test that apply has updated the fields
+  kube::test::get_object_assert foos/test-list '{{.someField}}' 'modifiedField'
+  kube::test::get_object_assert bars/test-list '{{.someField}}' 'modifiedField'
+
+  # Test that the field has the expected value
+  kube::test::get_object_assert foos/test-list '{{.otherField}}' 'field2'
+  kube::test::get_object_assert bars/test-list '{{.otherField}}' 'field2'
+
+  # Delete fields and then apply the change
+  kubectl "${kube_flags[@]}" apply -f hack/testdata/TPR/multi-tpr-list-deleted-field.yaml
+
+  # Test that apply has deleted the fields
+  kube::test::get_object_assert foos/test-list '{{.otherField}}' '<no value>'
+  kube::test::get_object_assert bars/test-list '{{.otherField}}' '<no value>'
+
+  # Test that the fields does not exist
+  kube::test::get_object_assert foos/test-list '{{.newField}}' '<no value>'
+  kube::test::get_object_assert bars/test-list '{{.newField}}' '<no value>'
+
+  # Add a field and then apply the change
+  kubectl "${kube_flags[@]}" apply -f hack/testdata/TPR/multi-tpr-list-added-field.yaml
+
+  # Test that apply has added the field
+  kube::test::get_object_assert foos/test-list '{{.newField}}' 'field3'
+  kube::test::get_object_assert bars/test-list '{{.newField}}' 'field3'
+
+  # Delete the resource
+  kubectl "${kube_flags[@]}" delete -f hack/testdata/TPR/multi-tpr-list.yaml
+
+  # Make sure it's gone
+  kube::test::get_object_assert foos "{{range.items}}{{$id_field}}:{{end}}" ''
+  kube::test::get_object_assert bars "{{range.items}}{{$id_field}}:{{end}}" ''
+
+  ## kubectl apply --prune
+  # Test that no foo or bar exist
+  kube::test::get_object_assert foos "{{range.items}}{{$id_field}}:{{end}}" ''
+  kube::test::get_object_assert bars "{{range.items}}{{$id_field}}:{{end}}" ''
+
+  # apply --prune on foo.yaml that has foo/test
+  kubectl apply --prune -l pruneGroup=true -f hack/testdata/TPR/foo.yaml "${kube_flags[@]}" --prune-whitelist=company.com/v1/Foo --prune-whitelist=company.com/v1/Bar
+  # check right tprs exist
+  kube::test::get_object_assert foos "{{range.items}}{{$id_field}}:{{end}}" 'test:'
+  kube::test::get_object_assert bars "{{range.items}}{{$id_field}}:{{end}}" ''
+
+  # apply --prune on bar.yaml that has bar/test
+  kubectl apply --prune -l pruneGroup=true -f hack/testdata/TPR/bar.yaml "${kube_flags[@]}" --prune-whitelist=company.com/v1/Foo --prune-whitelist=company.com/v1/Bar
+  # check right tprs exist
+  kube::test::get_object_assert foos "{{range.items}}{{$id_field}}:{{end}}" ''
+  kube::test::get_object_assert bars "{{range.items}}{{$id_field}}:{{end}}" 'test:'
+
+  # Delete the resource
+  kubectl "${kube_flags[@]}" delete -f hack/testdata/TPR/bar.yaml
+
+  # Make sure it's gone
+  kube::test::get_object_assert foos "{{range.items}}{{$id_field}}:{{end}}" ''
   kube::test::get_object_assert bars "{{range.items}}{{$id_field}}:{{end}}" ''
 
   # teardown
@@ -1953,16 +2219,8 @@ run_rc_tests() {
   kubectl autoscale -f hack/testdata/frontend-controller.yaml "${kube_flags[@]}" --max=2 --cpu-percent=70
   kube::test::get_object_assert 'hpa frontend' "{{$hpa_min_field}} {{$hpa_max_field}} {{$hpa_cpu_field}}" '1 2 70'
   kubectl delete hpa frontend "${kube_flags[@]}"
-  # autoscale 1~2 pods, CPU utilization 70%, rc specified by file, using old generator
-  kubectl autoscale -f hack/testdata/frontend-controller.yaml "${kube_flags[@]}" --max=2 --cpu-percent=70 --generator=horizontalpodautoscaler/v1beta1
-  kube::test::get_object_assert 'hpa frontend' "{{$hpa_min_field}} {{$hpa_max_field}} {{$hpa_cpu_field}}" '1 2 70'
-  kubectl delete hpa frontend "${kube_flags[@]}"
   # autoscale 2~3 pods, no CPU utilization specified, rc specified by name
   kubectl autoscale rc frontend "${kube_flags[@]}" --min=2 --max=3
-  kube::test::get_object_assert 'hpa frontend' "{{$hpa_min_field}} {{$hpa_max_field}} {{$hpa_cpu_field}}" '2 3 <no value>'
-  kubectl delete hpa frontend "${kube_flags[@]}"
-  # autoscale 2~3 pods, no CPU utilization specified, rc specified by name, using old generator
-  kubectl autoscale rc frontend "${kube_flags[@]}" --min=2 --max=3 --generator=horizontalpodautoscaler/v1beta1
   kube::test::get_object_assert 'hpa frontend' "{{$hpa_min_field}} {{$hpa_max_field}} {{$hpa_cpu_field}}" '2 3 <no value>'
   kubectl delete hpa frontend "${kube_flags[@]}"
   # autoscale without specifying --max should fail
@@ -2393,9 +2651,9 @@ run_multi_resources_tests() {
 # Requires an env var SUPPORTED_RESOURCES which is a comma separated list of
 # resources for which tests should be run.
 runTests() {
-  if [ -z "${SUPPORTED_RESOURCES}" ]; then
-    echo "Need to set SUPPORTED_RESOURCES env var. It is a comma separated list of resources that are supported and hence should be tested. Set it to (*) to test all resources"
-    return
+  if [ -z "${SUPPORTED_RESOURCES:-}" ]; then
+    echo "Need to set SUPPORTED_RESOURCES env var. It is a list of resources that are supported and hence should be tested. Set it to (*) to test all resources"
+    exit 1
   fi
   kube::log::status "Checking kubectl version"
   kubectl version
@@ -2456,11 +2714,10 @@ runTests() {
 
   # Make sure "kubernetes" service exists.
   if kube::test::if_supports_resource "${services}" ; then
-    output_message=$(kubectl get "${kube_flags[@]}" svc)
-    if [[ ! $(echo "${output_message}" | grep "kubernetes") ]]; then
-      # Create kubernetes service
-      kubectl create "${kube_flags[@]}" -f hack/testdata/kubernetes-service.yaml
-    fi
+    # Attempt to create the kubernetes service, tolerating failure (since it might already exist)
+    kubectl create "${kube_flags[@]}" -f hack/testdata/kubernetes-service.yaml || true
+    # Require the service to exist (either we created it or the API server did)
+    kubectl get "${kube_flags[@]}" -f hack/testdata/kubernetes-service.yaml
   fi
 
   # Passing no arguments to create is an error
@@ -2561,6 +2818,16 @@ runTests() {
     kube::test::get_object_assert rolebinding/sarole "{{range.subjects}}{{.name}}:{{end}}" 'sa-name:'
   fi
 
+  #########################
+  # Assert short name     #
+  #########################
+
+  kube::log::status "Testing propagation of short names for resources"
+  output_message=$(kubectl get --raw=/api/v1)
+
+  ## test if a short name is exported during discovery
+  kube::test::if_has_string "${output_message}" '{"name":"configmaps","namespaced":true,"kind":"ConfigMap","verbs":\["create","delete","deletecollection","get","list","patch","update","watch"\],"shortNames":\["cm"\]}'
+
   ###########################
   # POD creation / deletion #
   ###########################
@@ -2592,6 +2859,11 @@ runTests() {
     # run for federation apiserver as well.
     run_kubectl_apply_tests
     run_kubectl_run_tests
+    run_kubectl_create_filter_tests
+  fi
+
+  if kube::test::if_supports_resource "${deployments}" ; then
+    run_kubectl_apply_deployments_tests
   fi
 
   ###############
@@ -2989,10 +3261,21 @@ __EOF__
   if kube::test::if_supports_resource "${subjectaccessreviews}" ; then
     # check remote authorization endpoint, kubectl doesn't actually display the returned object so this isn't super useful
     # but it proves that works
-    kubectl create -f test/fixtures/pkg/kubectl/cmd/create/sar.json --validate=false
+    kubectl create -f test/fixtures/pkg/kubectl/cmd/create/sar-v1.json --validate=false
+    kubectl create -f test/fixtures/pkg/kubectl/cmd/create/sar-v1beta1.json --validate=false
 
     SAR_RESULT_FILE="${KUBE_TEMP}/sar-result.json"
-    curl -k -H "Content-Type:" http://localhost:8080/apis/authorization.k8s.io/v1beta1/subjectaccessreviews -XPOST -d @test/fixtures/pkg/kubectl/cmd/create/sar.json > "${SAR_RESULT_FILE}"
+    curl -k -H "Content-Type:" http://localhost:8080/apis/authorization.k8s.io/v1beta1/subjectaccessreviews -XPOST -d @test/fixtures/pkg/kubectl/cmd/create/sar-v1beta1.json > "${SAR_RESULT_FILE}"
+    if grep -q '"allowed": true' "${SAR_RESULT_FILE}"; then
+      kube::log::status "\"authorization.k8s.io/subjectaccessreviews\" returns as expected: $(cat "${SAR_RESULT_FILE}")"
+    else
+      kube::log::status "\"authorization.k8s.io/subjectaccessreviews\" does not return as expected: $(cat "${SAR_RESULT_FILE}")"
+      exit 1
+    fi
+    rm "${SAR_RESULT_FILE}"
+
+    SAR_RESULT_FILE="${KUBE_TEMP}/sar-result.json"
+    curl -k -H "Content-Type:" http://localhost:8080/apis/authorization.k8s.io/v1/subjectaccessreviews -XPOST -d @test/fixtures/pkg/kubectl/cmd/create/sar-v1.json > "${SAR_RESULT_FILE}"
     if grep -q '"allowed": true' "${SAR_RESULT_FILE}"; then
       kube::log::status "\"authorization.k8s.io/subjectaccessreviews\" returns as expected: $(cat "${SAR_RESULT_FILE}")"
     else

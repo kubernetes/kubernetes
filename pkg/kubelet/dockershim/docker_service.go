@@ -48,6 +48,9 @@ const (
 
 	defaultSeccompProfile = "unconfined"
 
+	// dockershimRootDir is the root directory for dockershim
+	dockershimRootDir = "/var/lib/dockershim"
+
 	// Internal docker labels used to identify whether a container is a sandbox
 	// or a regular container.
 	// TODO: This is not backward compatible with older containers. We will
@@ -112,7 +115,8 @@ func NewDockerService(client dockertools.DockerInterface, seccompProfileRoot str
 			client:      client,
 			execHandler: execHandler,
 		},
-		containerManager: cm.NewContainerManager(cgroupsName, client),
+		containerManager:  cm.NewContainerManager(cgroupsName, client),
+		checkpointHandler: NewPersistentCheckpointHandler(),
 	}
 	if streamingConfig != nil {
 		var err error
@@ -149,7 +153,6 @@ func NewDockerService(client dockertools.DockerInterface, seccompProfileRoot str
 		glog.Infof("Setting cgroupDriver to %s", cgroupDriver)
 	}
 	ds.cgroupDriver = cgroupDriver
-
 	return ds, nil
 }
 
@@ -173,7 +176,10 @@ type dockerService struct {
 	networkPlugin      network.NetworkPlugin
 	containerManager   cm.ContainerManager
 	// cgroup driver used by Docker runtime.
-	cgroupDriver string
+	cgroupDriver      string
+	checkpointHandler CheckpointHandler
+	// legacyCleanup indicates whether legacy cleanup has finished or not.
+	legacyCleanup legacyCleanupFlag
 }
 
 // Version returns the runtime name, runtime version and runtime API version
@@ -236,6 +242,8 @@ type dockerNetworkHost struct {
 
 // Start initializes and starts components in dockerService.
 func (ds *dockerService) Start() error {
+	// Initialize the legacy cleanup flag.
+	ds.LegacyCleanupInit()
 	return ds.containerManager.Start()
 }
 

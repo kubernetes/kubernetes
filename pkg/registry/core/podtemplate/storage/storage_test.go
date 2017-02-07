@@ -23,10 +23,10 @@ import (
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apiserver/pkg/registry/generic"
+	etcdtesting "k8s.io/apiserver/pkg/storage/etcd/testing"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/genericapiserver/registry/generic"
 	"k8s.io/kubernetes/pkg/registry/registrytest"
-	etcdtesting "k8s.io/kubernetes/pkg/storage/etcd/testing"
 )
 
 func newStorage(t *testing.T) (*REST, *etcdtesting.EtcdTestServer) {
@@ -44,7 +44,7 @@ func validNewPodTemplate(name string) *api.PodTemplate {
 	return &api.PodTemplate{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
-			Namespace: api.NamespaceDefault,
+			Namespace: metav1.NamespaceDefault,
 		},
 		Template: api.PodTemplateSpec{
 			ObjectMeta: metav1.ObjectMeta{
@@ -59,7 +59,8 @@ func validNewPodTemplate(name string) *api.PodTemplate {
 						Image:           "test",
 						ImagePullPolicy: api.PullAlways,
 
-						TerminationMessagePath: api.TerminationMessagePathDefault,
+						TerminationMessagePath:   api.TerminationMessagePathDefault,
+						TerminationMessagePolicy: api.TerminationMessageReadFile,
 					},
 				},
 			},

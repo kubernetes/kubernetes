@@ -17,11 +17,10 @@ limitations under the License.
 package v1beta1
 
 import (
-	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	api "k8s.io/client-go/pkg/api"
-	v1 "k8s.io/client-go/pkg/api/v1"
 	v1beta1 "k8s.io/client-go/pkg/apis/rbac/v1beta1"
 	rest "k8s.io/client-go/rest"
 )
@@ -38,7 +37,7 @@ type ClusterRoleBindingInterface interface {
 	Update(*v1beta1.ClusterRoleBinding) (*v1beta1.ClusterRoleBinding, error)
 	Delete(name string, options *v1.DeleteOptions) error
 	DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error
-	Get(name string, options meta_v1.GetOptions) (*v1beta1.ClusterRoleBinding, error)
+	Get(name string, options v1.GetOptions) (*v1beta1.ClusterRoleBinding, error)
 	List(opts v1.ListOptions) (*v1beta1.ClusterRoleBindingList, error)
 	Watch(opts v1.ListOptions) (watch.Interface, error)
 	Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v1beta1.ClusterRoleBinding, err error)
@@ -101,7 +100,7 @@ func (c *clusterRoleBindings) DeleteCollection(options *v1.DeleteOptions, listOp
 }
 
 // Get takes name of the clusterRoleBinding, and returns the corresponding clusterRoleBinding object, and an error if there is any.
-func (c *clusterRoleBindings) Get(name string, options meta_v1.GetOptions) (result *v1beta1.ClusterRoleBinding, err error) {
+func (c *clusterRoleBindings) Get(name string, options v1.GetOptions) (result *v1beta1.ClusterRoleBinding, err error) {
 	result = &v1beta1.ClusterRoleBinding{}
 	err = c.client.Get().
 		Resource("clusterrolebindings").
