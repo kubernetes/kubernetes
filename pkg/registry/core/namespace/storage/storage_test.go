@@ -186,3 +186,11 @@ func TestDeleteNamespaceWithCompleteFinalizers(t *testing.T) {
 		t.Errorf("unexpected error: %v", err)
 	}
 }
+
+func TestShortNames(t *testing.T) {
+	storage, server := newStorage(t)
+	defer server.Terminate(t)
+	defer storage.Store.DestroyFunc()
+	expected := []string{"ns"}
+	registrytest.AssertShortNames(t, storage, expected)
+}

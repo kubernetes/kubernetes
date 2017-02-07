@@ -140,3 +140,8 @@ var _ = rest.Redirector(&REST{})
 func (r *REST) ResourceLocation(ctx genericapirequest.Context, id string) (*url.URL, http.RoundTripper, error) {
 	return node.ResourceLocation(r, r.connection, r.proxyTransport, ctx, id)
 }
+
+// ShortNames implements the ShortNamesProvider interface. Returns a list of short names for a resource.
+func (r *REST) ShortNames() []string {
+	return []string{"no"}
+}

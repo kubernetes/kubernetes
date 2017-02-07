@@ -192,3 +192,11 @@ func TestUpdateStatus(t *testing.T) {
 		t.Errorf("unexpected object: %s", diff.ObjectDiff(pvc.Status, pvcOut.Status))
 	}
 }
+
+func TestShortNames(t *testing.T) {
+	storage, _, server := newStorage(t)
+	defer server.Terminate(t)
+	defer storage.Store.DestroyFunc()
+	expected := []string{"pvc"}
+	registrytest.AssertShortNames(t, storage, expected)
+}

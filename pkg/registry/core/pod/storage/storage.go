@@ -105,6 +105,14 @@ func (r *REST) ResourceLocation(ctx genericapirequest.Context, name string) (*ur
 	return pod.ResourceLocation(r, r.proxyTransport, ctx, name)
 }
 
+// Implement ShortNamesProvider
+var _ rest.ShortNamesProvider = &REST{}
+
+// ShortNames implements the ShortNamesProvider interface. Returns a list of short names for a resource.
+func (r *REST) ShortNames() []string {
+	return []string{"po"}
+}
+
 // BindingREST implements the REST endpoint for binding pods to nodes when etcd is in use.
 type BindingREST struct {
 	store *genericregistry.Store
