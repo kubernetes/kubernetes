@@ -37,6 +37,7 @@ import (
 	"github.com/golang/mock/gomock"
 	cadvisorapi "github.com/google/cadvisor/info/v1"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -1644,27 +1645,29 @@ func verifySyncResults(t *testing.T, expectedResults []*kubecontainer.SyncResult
 		}
 	}
 }
-
-func TestSecurityOptsOperator(t *testing.T) {
+func TestGetDockerOptSeparator(t *testing.T) {
 	dm110, _ := newTestDockerManagerWithVersion("1.10.1", "1.22")
 	dm111, _ := newTestDockerManagerWithVersion("1.11.0", "1.23")
 
-	secOpts := []dockerOpt{{"seccomp", "unconfined", ""}}
-	opts, err := dm110.fmtDockerOpts(secOpts)
-	if err != nil {
-		t.Fatalf("error getting security opts for Docker 1.10: %v", err)
-	}
-	if expected := []string{"seccomp:unconfined"}; len(opts) != 1 || opts[0] != expected[0] {
-		t.Fatalf("security opts for Docker 1.10: expected %v, got: %v", expected, opts)
-	}
+	sep, err := dm110.getDockerOptSeparator()
+	require.NoError(t, err, "error getting docker opt separator for 1.10.1")
+	assert.Equal(t, SecurityOptSeparatorOld, sep, "security opt separator for docker 1.10")
 
-	opts, err = dm111.fmtDockerOpts(secOpts)
-	if err != nil {
-		t.Fatalf("error getting security opts for Docker 1.11: %v", err)
-	}
-	if expected := []string{"seccomp=unconfined"}; len(opts) != 1 || opts[0] != expected[0] {
-		t.Fatalf("security opts for Docker 1.11: expected %v, got: %v", expected, opts)
-	}
+	sep, err = dm111.getDockerOptSeparator()
+	require.NoError(t, err, "error getting docker opt separator for 1.11.1")
+	assert.Equal(t, SecurityOptSeparatorNew, sep, "security opt separator for docker 1.11")
+}
+
+func TestFmtDockerOpts(t *testing.T) {
+	secOpts := []dockerOpt{{"seccomp", "unconfined", ""}}
+
+	opts := FmtDockerOpts(secOpts, ':')
+	assert.Len(t, opts, 1)
+	assert.Contains(t, opts, "seccomp:unconfined", "Docker 1.10")
+
+	opts = FmtDockerOpts(secOpts, '=')
+	assert.Len(t, opts, 1)
+	assert.Contains(t, opts, "seccomp=unconfined", "Docker 1.11")
 }
 
 func TestCheckVersionCompatibility(t *testing.T) {
