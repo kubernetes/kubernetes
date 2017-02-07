@@ -22,5 +22,8 @@ source "${KUBE_ROOT}/hack/lib/init.sh"
 
 git config http.https://gopkg.in.followRedirects true
 
-go get -u gopkg.in/mikedanese/gazel.v13/gazel
+# Remove generated files prior to running gazel.
+rm -f "${KUBE_ROOT}/pkg/generated/openapi/zz_generated.openapi.go"
+
+go get -u gopkg.in/mikedanese/gazel.v14/gazel
 "${GOPATH}/bin/gazel" -root="$(kube::realpath ${KUBE_ROOT})"
