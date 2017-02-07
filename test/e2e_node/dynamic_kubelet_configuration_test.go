@@ -21,6 +21,7 @@ import (
 
 	"github.com/golang/glog"
 
+	"k8s.io/kubernetes/pkg/apis/componentconfig"
 	"k8s.io/kubernetes/test/e2e/framework"
 
 	. "github.com/onsi/ginkgo"
@@ -30,33 +31,34 @@ import (
 var _ = framework.KubeDescribe("DynamicKubeletConfiguration [Feature:DynamicKubeletConfig] [Serial] [Disruptive]", func() {
 	f := framework.NewDefaultFramework("dynamic-kubelet-configuration-test")
 
-	Context("When a configmap called `kubelet-{node-name}` is added to the `kube-system` namespace", func() {
-		It("The Kubelet on that node should restart to take up the new config", func() {
-			// Get the current KubeletConfiguration (known to be valid) by
-			// querying the configz endpoint for the current node.
-			kubeCfg, err := getCurrentKubeletConfig()
-			framework.ExpectNoError(err)
+	Context("When a configmap called `kubelet-{node-name}` with a different file check frequency is added to the `kube-system` namespace", func() {
+		tempSetCurrentKubeletConfig(f, func(kubeCfg *componentconfig.KubeletConfiguration) {
 			glog.Infof("KubeletConfiguration - Initial values: %+v", *kubeCfg)
-
 			// Change a safe value e.g. file check frequency.
 			// Make sure we're providing a value distinct from the current one.
-			oldFileCheckFrequency := kubeCfg.FileCheckFrequency.Duration
 			newFileCheckFrequency := 11 * time.Second
 			if kubeCfg.FileCheckFrequency.Duration == newFileCheckFrequency {
 				newFileCheckFrequency = 10 * time.Second
 			}
 			kubeCfg.FileCheckFrequency.Duration = newFileCheckFrequency
-
-			// Use the new config to create a new kube-{node-name} configmap in `kube-system` namespace.
-			// Note: setKubeletConfiguration will return an error if the Kubelet does not present the
-			//       modified configuration via /configz when it comes back up.
-			err = setKubeletConfiguration(f, kubeCfg)
-			framework.ExpectNoError(err)
-
-			// Change the config back to what it originally was.
-			kubeCfg.FileCheckFrequency.Duration = oldFileCheckFrequency
-			err = setKubeletConfiguration(f, kubeCfg)
-			framework.ExpectNoError(err)
 		})
+		// Dummy It() so that the BeforeEach and AfterEach used by tempSetCurrentKubeletConfig are run
+		It("the Kubelet on that node should restart use up the new config", func() {})
+	})
+
+	Context("When a configmap called `kubelet-{node-name}` that sets an experimental field (FailSwapOn) is added to the `kube-system` namespace", func() {
+		tempSetCurrentKubeletConfig(f, func(kubeCfg *componentconfig.KubeletConfiguration) {
+			glog.Infof("KubeletConfiguration - Initial values: %+v", *kubeCfg)
+			ekc, err := componentconfig.ExperimentalKubeletConfigurationFromString(kubeCfg.Experimental)
+			framework.ExpectNoError(err)
+			// Toggle a not-so-dangerous value (FailSwapOn)
+			ekc.FailSwapOn = !ekc.FailSwapOn
+			// Serialize back into kubeCfg.Experimental
+			s, err := componentconfig.ExperimentalKubeletConfigurationToString(ekc)
+			framework.ExpectNoError(err)
+			kubeCfg.Experimental = s
+		})
+		// Dummy It() so that the BeforeEach and AfterEach used by tempSetCurrentKubeletConfig are run
+		It("the Kubelet on that node should restart and use the new config", func() {})
 	})
 })
