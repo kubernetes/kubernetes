@@ -32,9 +32,9 @@ import (
 	"k8s.io/kubernetes/pkg/api/v1"
 	extensions "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset/fake"
+	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/deployment/util"
-	"k8s.io/kubernetes/pkg/controller/informers"
 )
 
 var (
@@ -166,20 +166,20 @@ func newFixture(t *testing.T) *fixture {
 
 func (f *fixture) newController() (*DeploymentController, informers.SharedInformerFactory) {
 	f.client = fake.NewSimpleClientset(f.objects...)
-	informers := informers.NewSharedInformerFactory(f.client, nil, controller.NoResyncPeriodFunc())
-	c := NewDeploymentController(informers.Deployments(), informers.ReplicaSets(), informers.Pods(), f.client)
+	informers := informers.NewSharedInformerFactory(nil, f.client, controller.NoResyncPeriodFunc())
+	c := NewDeploymentController(informers.Extensions().V1beta1().Deployments(), informers.Extensions().V1beta1().ReplicaSets(), informers.Core().V1().Pods(), f.client)
 	c.eventRecorder = &record.FakeRecorder{}
 	c.dListerSynced = alwaysReady
 	c.rsListerSynced = alwaysReady
 	c.podListerSynced = alwaysReady
 	for _, d := range f.dLister {
-		c.dLister.Indexer.Add(d)
+		informers.Extensions().V1beta1().Deployments().Informer().GetIndexer().Add(d)
 	}
 	for _, rs := range f.rsLister {
-		c.rsLister.Indexer.Add(rs)
+		informers.Extensions().V1beta1().ReplicaSets().Informer().GetIndexer().Add(rs)
 	}
 	for _, pod := range f.podLister {
-		c.podLister.Indexer.Add(pod)
+		informers.Core().V1().Pods().Informer().GetIndexer().Add(pod)
 	}
 	return c, informers
 }
@@ -246,8 +246,8 @@ func TestSyncDeploymentDontDoAnythingDuringDeletion(t *testing.T) {
 // issue: https://github.com/kubernetes/kubernetes/issues/23218
 func TestDeploymentController_dontSyncDeploymentsWithEmptyPodSelector(t *testing.T) {
 	fake := &fake.Clientset{}
-	informers := informers.NewSharedInformerFactory(fake, nil, controller.NoResyncPeriodFunc())
-	controller := NewDeploymentController(informers.Deployments(), informers.ReplicaSets(), informers.Pods(), fake)
+	informers := informers.NewSharedInformerFactory(nil, fake, controller.NoResyncPeriodFunc())
+	controller := NewDeploymentController(informers.Extensions().V1beta1().Deployments(), informers.Extensions().V1beta1().ReplicaSets(), informers.Core().V1().Pods(), fake)
 	controller.eventRecorder = &record.FakeRecorder{}
 	controller.dListerSynced = alwaysReady
 	controller.rsListerSynced = alwaysReady
@@ -260,7 +260,7 @@ func TestDeploymentController_dontSyncDeploymentsWithEmptyPodSelector(t *testing
 	d := newDeployment("foo", 1, nil, nil, nil, map[string]string{"foo": "bar"})
 	empty := metav1.LabelSelector{}
 	d.Spec.Selector = &empty
-	controller.dLister.Indexer.Add(d)
+	informers.Extensions().V1beta1().Deployments().Informer().GetIndexer().Add(d)
 	// We expect the deployment controller to not take action here since it's configuration
 	// is invalid, even though no replicasets exist that match it's selector.
 	controller.syncDeployment(fmt.Sprintf("%s/%s", d.ObjectMeta.Namespace, d.ObjectMeta.Name))
