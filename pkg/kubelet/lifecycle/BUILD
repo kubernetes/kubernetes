@@ -12,6 +12,7 @@ go_library(
     name = "go_default_library",
     srcs = [
         "doc.go",
+        "dummy_failure_handler.go",
         "fake_handler_runner.go",
         "handlers.go",
         "interfaces.go",
@@ -24,6 +25,7 @@ go_library(
         "//pkg/kubelet/types:go_default_library",
         "//pkg/kubelet/util/format:go_default_library",
         "//pkg/security/apparmor:go_default_library",
+        "//plugin/pkg/scheduler/algorithm:go_default_library",
         "//plugin/pkg/scheduler/algorithm/predicates:go_default_library",
         "//plugin/pkg/scheduler/schedulercache:go_default_library",
         "//vendor:github.com/golang/glog",
