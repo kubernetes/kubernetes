@@ -1215,7 +1215,7 @@ func testFailedDeployment(f *framework.Framework) {
 	replicas := int32(1)
 
 	// Create a nginx deployment.
-	deploymentName := "nginx"
+	deploymentName := "progress-check"
 	nonExistentImage := "nginx:not-there"
 	ten := int32(10)
 	d := framework.NewDeployment(deploymentName, replicas, podLabels, nginxImageName, nonExistentImage, extensions.RecreateDeploymentStrategyType)
