@@ -23,7 +23,6 @@ import (
 	"testing"
 
 	"k8s.io/apiserver/pkg/apis/apiserver"
-	_ "k8s.io/apiserver/pkg/apis/apiserver/install"
 )
 
 func TestReadAdmissionConfiguration(t *testing.T) {

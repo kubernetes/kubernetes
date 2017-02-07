@@ -16,6 +16,6 @@ limitations under the License.
 
 // +k8s:deepcopy-gen=package,register
 
-// Package api is the internal version of the API.
+// Package apiserver is the internal version of the API.
 // +groupName=apiserver.k8s.io
 package apiserver // import "k8s.io/apiserver/pkg/apis/apiserver"
