@@ -75,6 +75,7 @@ go_library(
         "//pkg/client/unversioned:go_default_library",
         "//pkg/client/unversioned/remotecommand:go_default_library",
         "//pkg/kubectl:go_default_library",
+        "//pkg/kubectl/cmd/auth:go_default_library",
         "//pkg/kubectl/cmd/config:go_default_library",
         "//pkg/kubectl/cmd/rollout:go_default_library",
         "//pkg/kubectl/cmd/set:go_default_library",
@@ -224,6 +225,7 @@ filegroup(
     name = "all-srcs",
     srcs = [
         ":package-srcs",
+        "//pkg/kubectl/cmd/auth:all-srcs",
         "//pkg/kubectl/cmd/config:all-srcs",
         "//pkg/kubectl/cmd/rollout:all-srcs",
         "//pkg/kubectl/cmd/set:all-srcs",
