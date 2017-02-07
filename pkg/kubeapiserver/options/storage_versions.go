@@ -25,6 +25,10 @@ import (
 	"github.com/spf13/pflag"
 )
 
+const (
+	DefaultEtcdPathPrefix = "/registry"
+)
+
 // StorageSerializationOptions contains the options for encoding resources.
 type StorageSerializationOptions struct {
 	StorageVersions string

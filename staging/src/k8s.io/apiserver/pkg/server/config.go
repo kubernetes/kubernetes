@@ -50,6 +50,7 @@ import (
 	genericapifilters "k8s.io/apiserver/pkg/endpoints/filters"
 	apiopenapi "k8s.io/apiserver/pkg/endpoints/openapi"
 	apirequest "k8s.io/apiserver/pkg/endpoints/request"
+	genericregistry "k8s.io/apiserver/pkg/registry/generic"
 	genericfilters "k8s.io/apiserver/pkg/server/filters"
 	"k8s.io/apiserver/pkg/server/healthz"
 	"k8s.io/apiserver/pkg/server/mux"
@@ -92,7 +93,6 @@ type Config struct {
 	EnableProfiling bool
 	// Requires generic profiling enabled
 	EnableContentionProfiling bool
-	EnableGarbageCollection   bool
 	EnableMetrics             bool
 
 	// Version will enable the /version endpoint if non-nil
@@ -131,6 +131,8 @@ type Config struct {
 	OpenAPIConfig *openapicommon.Config
 	// SwaggerConfig will be used in generating Swagger spec. This is nil by default. Use DefaultSwaggerConfig for "working" defaults.
 	SwaggerConfig *swagger.Config
+	// RESTOptionsGetter is used to construct "normal" RESTStorage types
+	RESTOptionsGetter genericregistry.RESTOptionsGetter
 
 	// If specified, requests will be allocated a random timeout between this value, and twice this value.
 	// Note that it is up to the request handlers to ignore or honor this timeout. In seconds.
@@ -196,7 +198,6 @@ func NewConfig() *Config {
 		LegacyAPIGroupPrefixes:      sets.NewString(DefaultLegacyAPIPrefix),
 		HealthzChecks:               []healthz.HealthzChecker{healthz.PingHealthz},
 		EnableIndex:                 true,
-		EnableGarbageCollection:     true,
 		EnableProfiling:             true,
 		MaxRequestsInFlight:         400,
 		MaxMutatingRequestsInFlight: 200,

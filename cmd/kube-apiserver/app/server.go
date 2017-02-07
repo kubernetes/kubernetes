@@ -321,9 +321,10 @@ func Run(s *options.ServerRunOptions) error {
 
 		APIResourceConfigSource: storageFactory.APIResourceConfigSource,
 		StorageFactory:          storageFactory,
-		EnableWatchCache:        s.GenericServerRunOptions.EnableWatchCache,
+		EnableGarbageCollection: s.Etcd.EnableGarbageCollection,
+		EnableWatchCache:        s.Etcd.EnableWatchCache,
 		EnableCoreControllers:   true,
-		DeleteCollectionWorkers: s.GenericServerRunOptions.DeleteCollectionWorkers,
+		DeleteCollectionWorkers: s.Etcd.DeleteCollectionWorkers,
 		EventTTL:                s.EventTTL,
 		KubeletClientConfig:     s.KubeletConfig,
 		EnableUISupport:         true,
@@ -342,7 +343,7 @@ func Run(s *options.ServerRunOptions) error {
 		MasterCount: s.MasterCount,
 	}
 
-	if s.GenericServerRunOptions.EnableWatchCache {
+	if s.Etcd.EnableWatchCache {
 		glog.V(2).Infof("Initializing cache sizes based on %dMB limit", s.GenericServerRunOptions.TargetRAMMB)
 		cachesize.InitializeWatchCacheSizes(s.GenericServerRunOptions.TargetRAMMB)
 		cachesize.SetWatchCacheSizes(s.GenericServerRunOptions.WatchCacheSizes)
