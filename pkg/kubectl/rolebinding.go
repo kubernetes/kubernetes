@@ -79,7 +79,7 @@ func (s RoleBindingGeneratorV1) Generate(genericParams map[string]interface{}) (
 			return nil, fmt.Errorf("expected []string, found :%v", fromFileStrings)
 		}
 		delegate.ServiceAccounts = fromLiteralArray
-		delete(genericParams, "serviceaccounts")
+		delete(genericParams, "serviceaccount")
 	}
 	params := map[string]string{}
 	for key, value := range genericParams {
