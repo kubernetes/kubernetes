@@ -36,9 +36,6 @@ import (
 )
 
 const (
-	// emptyUniquePodName is a UniquePodName for empty string.
-	emptyUniquePodName types.UniquePodName = types.UniquePodName("")
-
 	// emptyUniqueVolumeName is a UniqueVolumeName for empty string
 	emptyUniqueVolumeName v1.UniqueVolumeName = v1.UniqueVolumeName("")
 )
@@ -170,8 +167,8 @@ func (grm *nestedPendingOperations) isOperationExists(
 			continue
 		}
 
-		if previousOp.podName != emptyUniquePodName &&
-			podName != emptyUniquePodName &&
+		if previousOp.podName != types.EmptyUniquePodName &&
+			podName != types.EmptyUniquePodName &&
 			previousOp.podName != podName {
 			// No match, keep searching
 			continue
@@ -274,7 +271,7 @@ func (grm *nestedPendingOperations) Wait() {
 func getOperationName(
 	volumeName v1.UniqueVolumeName, podName types.UniquePodName) string {
 	podNameStr := ""
-	if podName != emptyUniquePodName {
+	if podName != types.EmptyUniquePodName {
 		podNameStr = fmt.Sprintf(" (%q)", podName)
 	}
 

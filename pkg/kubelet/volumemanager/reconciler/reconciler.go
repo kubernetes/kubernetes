@@ -342,31 +342,14 @@ func (rc *reconciler) reconcile() {
 			} else {
 				// Volume is attached to node, detach it
 				if rc.controllerAttachDetachEnabled || !attachedVolume.PluginIsAttachable {
-					// Kubelet not responsible for detaching or this volume has a non-attachable volume plugin,
-					// wait for controller to finish detaching the volume.
-					glog.V(12).Infof("Attempting to start VerifyControllerDetachedVolume for volume %q (spec.Name: %q)",
-						attachedVolume.VolumeName,
-						attachedVolume.VolumeSpec.Name())
-					err := rc.operationExecutor.VerifyControllerDetachedVolume(
-						attachedVolume.AttachedVolume,
-						rc.mounter,
-						rc.actualStateOfWorld)
-					if err != nil &&
-						!nestedpendingoperations.IsAlreadyExists(err) &&
-						!exponentialbackoff.IsExponentialBackoff(err) {
-						// Ignore nestedpendingoperations.IsAlreadyExists and exponentialbackoff.IsExponentialBackoff errors, they are expected.
-						// Log all other errors.
-						glog.Errorf(
-							"operationExecutor.VerifyControllerDetachedVolume failed for volume %q (spec.Name: %q) controllerAttachDetachEnabled: %v with err: %v",
+					// Kubelet not responsible for detaching or this volume has a non-attachable volume plugin.
+					// Mark as detached once all pending operations, such as unmounting the global mount, have finished.
+					if !rc.operationExecutor.IsOperationPending(attachedVolume.VolumeName, volumetypes.EmptyUniquePodName) {
+						rc.actualStateOfWorld.MarkVolumeAsDetached(attachedVolume.VolumeName, attachedVolume.NodeName)
+						glog.Infof("Detached volume %q (spec.Name: %q) devicePath: %q",
 							attachedVolume.VolumeName,
 							attachedVolume.VolumeSpec.Name(),
-							rc.controllerAttachDetachEnabled,
-							err)
-					}
-					if err == nil {
-						glog.Infof("VerifyControllerDetachedVolume operation started for volume %q (spec.Name: %q)",
-							attachedVolume.VolumeName,
-							attachedVolume.VolumeSpec.Name())
+							attachedVolume.DevicePath)
 					}
 				} else {
 					// Only detach if kubelet detach is enabled

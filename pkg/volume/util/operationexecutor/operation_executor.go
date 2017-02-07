@@ -105,14 +105,6 @@ type OperationExecutor interface {
 	// back off on retries.
 	VerifyControllerAttachedVolume(volumeToMount VolumeToMount, nodeName types.NodeName, actualStateOfWorld ActualStateOfWorldAttacherUpdater) error
 
-	// VerifyControllerDetachedVolume checks if the specified volume is absent from the nodes AttachedVolumes Status field.
-	// If the volume is absent, the actual state of the world is updated to mark the volume as detached.
-	// If the volume does not implement the attacher interface, it is assumed to be detached and is marked as
-	// detached immediately in the actual state of the world.
-	// If the volume is still present or there is an error, the error is returned which triggers exponential
-	// back off on retries.
-	VerifyControllerDetachedVolume(volumeToDetach AttachedVolume, mounter mount.Interface, actualStateOfWorld ActualStateOfWorldAttacherUpdater) error
-
 	// IsOperationPending returns true if an operation for the given volumeName and podName is pending,
 	// otherwise it returns false
 	IsOperationPending(volumeName v1.UniqueVolumeName, podName volumetypes.UniquePodName) bool
@@ -419,7 +411,7 @@ func (oe *operationExecutor) MountVolume(
 		return err
 	}
 
-	podName := volumetypes.UniquePodName("")
+	podName := volumetypes.EmptyUniquePodName
 	// TODO: remove this -- not necessary
 	if !volumeToMount.PluginIsAttachable {
 		// Non-attachable volume plugins can execute mount for multiple pods
@@ -475,22 +467,6 @@ func (oe *operationExecutor) VerifyControllerAttachedVolume(
 
 	return oe.pendingOperations.Run(
 		volumeToMount.VolumeName, "" /* podName */, verifyControllerAttachedVolumeFunc)
-}
-
-func (oe *operationExecutor) VerifyControllerDetachedVolume(
-	volumeToDetach AttachedVolume,
-	mounter mount.Interface,
-	actualStateOfWorld ActualStateOfWorldAttacherUpdater) error {
-	verifyControllerDetachedVolumeFunc, err :=
-		oe.operationGenerator.GenerateVerifyControllerDetachedVolumeFunc(volumeToDetach, mounter, actualStateOfWorld)
-	if err != nil {
-		return err
-	}
-
-	return oe.pendingOperations.Run(
-		volumeToDetach.VolumeName, "" /* podName */, verifyControllerDetachedVolumeFunc)
-
-	return nil
 }
 
 // TODO: this is a workaround for the unmount device issue caused by gci mounter.

@@ -325,7 +325,6 @@ func Test_Run_Positive_VolumeUnmountControllerAttachEnabled(t *testing.T) {
 	kubeClient := createTestClient()
 	fakeRecorder := &record.FakeRecorder{}
 	oex := operationexecutor.NewOperationExecutor(operationexecutor.NewOperationGenerator(kubeClient, volumePluginMgr, fakeRecorder, false /* checkNodeCapabilitiesBeforeMount */))
-	fakeMounter := mount.FakeMounter{}
 	reconciler := NewReconciler(
 		kubeClient,
 		true, /* controllerAttachDetachEnabled */
@@ -336,7 +335,7 @@ func Test_Run_Positive_VolumeUnmountControllerAttachEnabled(t *testing.T) {
 		dsw,
 		asw,
 		oex,
-		&fakeMounter,
+		&mount.FakeMounter{},
 		volumePluginMgr,
 		kubeletPodsDir)
 	pod := &v1.Pod{
@@ -387,7 +386,6 @@ func Test_Run_Positive_VolumeUnmountControllerAttachEnabled(t *testing.T) {
 
 	// Act
 	dsw.DeletePodFromVolume(podName, generatedVolumeName)
-	fakeMounter.DeviceDetached("fake/path")
 	waitForDetach(t, fakePlugin, generatedVolumeName, asw)
 
 	// Assert
