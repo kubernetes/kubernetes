@@ -122,9 +122,9 @@ func UnsecuredKubeletDeps(s *options.KubeletServer) (*kubelet.KubeletDeps, error
 		return nil, err
 	}
 
-	mounter := mount.New(s.ExperimentalMounterPath)
+	mounter := mount.New(s.Experimental.MounterPath)
 	var writer kubeio.Writer = &kubeio.StdWriter{}
-	if s.Containerized {
+	if s.Experimental.Containerized {
 		glog.V(2).Info("Running kubelet in containerized mode (experimental)")
 		mounter = mount.NewNsenterMounter()
 		writer = &kubeio.NsenterWriter{}
@@ -345,6 +345,14 @@ func run(s *options.KubeletServer, kubeDeps *kubelet.KubeletDeps) (err error) {
 			if err == nil {
 				// Update s (KubeletServer) with new config from API server
 				s.KubeletConfiguration = *remoteKC
+				// Decode experimental fields from KubeletConfiguration into the KubeletServer
+				// Only do this in the dynamic config case, doing so otherwise would improperly override experimental flag values
+				experimental, err := componentconfig.ExperimentalKubeletConfigurationFromString(s.KubeletConfiguration.Experimental)
+				if err != nil {
+					return fmt.Errorf("error decoding experimental fields: %v", err)
+				}
+				s.Experimental = *experimental
+
 				// Ensure that /configz is up to date with the new config
 				if cfgzErr != nil {
 					glog.Errorf("was unable to register configz before due to %s, will not be able to set now", cfgzErr)
@@ -464,9 +472,9 @@ func run(s *options.KubeletServer, kubeDeps *kubelet.KubeletDeps) (err error) {
 				CgroupRoot:            s.CgroupRoot,
 				CgroupDriver:          s.CgroupDriver,
 				ProtectKernelDefaults: s.ProtectKernelDefaults,
-				EnableCRI:             s.EnableCRI,
+				EnableCRI:             s.Experimental.EnableCRI,
 			},
-			s.ExperimentalFailSwapOn)
+			s.Experimental.FailSwapOn)
 
 		if err != nil {
 			return err
@@ -487,7 +495,7 @@ func run(s *options.KubeletServer, kubeDeps *kubelet.KubeletDeps) (err error) {
 		glog.Warning(err)
 	}
 
-	if err := RunKubelet(&s.KubeletConfiguration, kubeDeps, s.RunOnce, standaloneMode); err != nil {
+	if err := RunKubelet(&s.KubeletConfiguration, &s.Experimental, kubeDeps, s.RunOnce, standaloneMode); err != nil {
 		return err
 	}
 
@@ -674,7 +682,11 @@ func addChaosToClientConfig(s *options.KubeletServer, config *restclient.Config)
 //   2 Kubelet binary
 //   3 Standalone 'kubernetes' binary
 // Eventually, #2 will be replaced with instances of #3
-func RunKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *kubelet.KubeletDeps, runOnce bool, standaloneMode bool) error {
+func RunKubelet(kubeCfg *componentconfig.KubeletConfiguration,
+	expKubeCfg *componentconfig.ExperimentalKubeletConfiguration,
+	kubeDeps *kubelet.KubeletDeps,
+	runOnce bool,
+	standaloneMode bool) error {
 	hostname := nodeutil.GetHostname(kubeCfg.HostnameOverride)
 	// Query the cloud provider for our node name, default to hostname if kcfg.Cloud == nil
 	nodeName, err := getNodeName(kubeDeps.Cloud, hostname)
@@ -729,7 +741,7 @@ func RunKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *kubelet
 	if kubeDeps.OSInterface == nil {
 		kubeDeps.OSInterface = kubecontainer.RealOS{}
 	}
-	k, err := builder(kubeCfg, kubeDeps, standaloneMode)
+	k, err := builder(kubeCfg, expKubeCfg, kubeDeps, standaloneMode)
 	if err != nil {
 		return fmt.Errorf("failed to create kubelet: %v", err)
 	}
@@ -809,11 +821,11 @@ func startKubelet(k kubelet.KubeletBootstrap, podCfg *config.PodConfig, kubeCfg 
 	}
 }
 
-func CreateAndInitKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *kubelet.KubeletDeps, standaloneMode bool) (k kubelet.KubeletBootstrap, err error) {
+func CreateAndInitKubelet(kubeCfg *componentconfig.KubeletConfiguration, expKubeCfg *componentconfig.ExperimentalKubeletConfiguration, kubeDeps *kubelet.KubeletDeps, standaloneMode bool) (k kubelet.KubeletBootstrap, err error) {
 	// TODO: block until all sources have delivered at least one update to the channel, or break the sync loop
 	// up into "per source" synchronizations
 
-	k, err = kubelet.NewMainKubelet(kubeCfg, kubeDeps, standaloneMode)
+	k, err = kubelet.NewMainKubelet(kubeCfg, expKubeCfg, kubeDeps, standaloneMode)
 	if err != nil {
 		return nil, err
 	}
