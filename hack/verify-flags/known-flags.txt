@@ -120,7 +120,6 @@ controller-start-interval
 cors-allowed-origins
 cpu-cfs-quota
 cpu-percent
-create-external-load-balancer
 current-release-pr
 current-replicas
 daemonset-lookup-cache-size
