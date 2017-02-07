@@ -96,7 +96,7 @@ func NewServerRunOptions() *ServerRunOptions {
 		ServiceNodePortRange: DefaultServiceNodePortRange,
 	}
 	// Overwrite the default for storage data format.
-	s.GenericServerRunOptions.DefaultStorageMediaType = "application/vnd.kubernetes.protobuf"
+	s.Etcd.DefaultStorageMediaType = "application/vnd.kubernetes.protobuf"
 	return &s
 }
 

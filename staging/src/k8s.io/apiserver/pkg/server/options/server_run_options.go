@@ -38,10 +38,7 @@ type ServerRunOptions struct {
 	AdmissionControlConfigFile string
 	AdvertiseAddress           net.IP
 
-	CorsAllowedOriginList []string
-	// To enable protobuf as storage format, it is enough
-	// to set it to "application/vnd.kubernetes.protobuf".
-	DefaultStorageMediaType     string
+	CorsAllowedOriginList       []string
 	DeleteCollectionWorkers     int
 	EnableWatchCache            bool
 	ExternalHost                string
@@ -57,7 +54,6 @@ func NewServerRunOptions() *ServerRunOptions {
 
 	return &ServerRunOptions{
 		AdmissionControl:            "AlwaysAdmit",
-		DefaultStorageMediaType:     "application/json",
 		DeleteCollectionWorkers:     1,
 		EnableWatchCache:            true,
 		MaxRequestsInFlight:         defaults.MaxRequestsInFlight,
@@ -127,10 +123,6 @@ func (s *ServerRunOptions) AddUniversalFlags(fs *pflag.FlagSet) {
 	fs.StringSliceVar(&s.CorsAllowedOriginList, "cors-allowed-origins", s.CorsAllowedOriginList, ""+
 		"List of allowed origins for CORS, comma separated.  An allowed origin can be a regular "+
 		"expression to support subdomain matching. If this list is empty CORS will not be enabled.")
-
-	fs.StringVar(&s.DefaultStorageMediaType, "storage-media-type", s.DefaultStorageMediaType, ""+
-		"The media type to use to store objects in storage. Defaults to application/json. "+
-		"Some resources may only support a specific media type and will ignore this setting.")
 
 	fs.IntVar(&s.DeleteCollectionWorkers, "delete-collection-workers", s.DeleteCollectionWorkers,
 		"Number of workers spawned for DeleteCollection call. These are used to speed up namespace cleanup.")
