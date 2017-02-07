@@ -535,6 +535,8 @@ message LinuxContainerConfig {
     LinuxContainerResources resources = 1;
     // LinuxContainerSecurityContext configuration for the container.
     LinuxContainerSecurityContext security_context = 2;
+    // StopSignal defines the signal to use when stopping the container.
+    uint32 stop_signal = 3;
 }
 
 // ContainerMetadata holds all necessary information for building the container
