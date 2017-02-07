@@ -29,6 +29,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
+	"k8s.io/kubernetes/pkg/util/i18n"
 )
 
 type CreateOptions struct {
@@ -59,7 +60,7 @@ func NewCmdCreate(f cmdutil.Factory, out, errOut io.Writer) *cobra.Command {
 
 	cmd := &cobra.Command{
 		Use:     "create -f FILENAME",
-		Short:   "Create a resource by filename or stdin",
+		Short:   i18n.T("Create a resource by filename or stdin"),
 		Long:    create_long,
 		Example: create_example,
 		Run: func(cmd *cobra.Command, args []string) {

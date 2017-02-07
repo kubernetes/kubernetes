@@ -24,6 +24,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
+	"k8s.io/kubernetes/pkg/util/i18n"
 )
 
 const defaultBoilerPlate = `
@@ -94,7 +95,7 @@ func NewCmdCompletion(f cmdutil.Factory, out io.Writer, boilerPlate string) *cob
 
 	cmd := &cobra.Command{
 		Use:     "completion SHELL",
-		Short:   "Output shell completion code for the specified shell (bash or zsh)",
+		Short:   i18n.T("Output shell completion code for the specified shell (bash or zsh)"),
 		Long:    completion_long,
 		Example: completion_example,
 		Run: func(cmd *cobra.Command, args []string) {
