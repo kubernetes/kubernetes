@@ -37,12 +37,16 @@ import (
 	"github.com/golang/glog"
 )
 
+// err returned from these interfaces should indicate utter failure that
+// should be retried. "Buisness logic" errors should be indicated by adding
+// a condition to the CSRs status, not by returning an error.
+
 type AutoApprover interface {
 	AutoApprove(csr *certificates.CertificateSigningRequest) (*certificates.CertificateSigningRequest, error)
 }
 
 type Signer interface {
-	Sign(csr *certificates.CertificateSigningRequest) ([]byte, error)
+	Sign(csr *certificates.CertificateSigningRequest) (*certificates.CertificateSigningRequest, error)
 }
 
 type CertificateController struct {
@@ -197,6 +201,10 @@ func (cc *CertificateController) maybeSignCertificate(key string) error {
 		if err != nil {
 			return fmt.Errorf("error auto approving csr: %v", err)
 		}
+		_, err = cc.kubeClient.Certificates().CertificateSigningRequests().UpdateApproval(csr)
+		if err != nil {
+			return fmt.Errorf("error updating approval for csr: %v", err)
+		}
 	}
 
 	// At this point, the controller needs to:
@@ -204,14 +212,16 @@ func (cc *CertificateController) maybeSignCertificate(key string) error {
 	// 2. Generate a signed certificate
 	// 3. Update the Status subresource
 
-	if csr.Status.Certificate == nil && IsCertificateRequestApproved(csr) {
-		certBytes, err := cc.signer.Sign(csr)
+	if cc.signer != nil && csr.Status.Certificate == nil && IsCertificateRequestApproved(csr) {
+		csr, err := cc.signer.Sign(csr)
 		if err != nil {
-			return err
+			return fmt.Errorf("error auto signing csr: %v", err)
 		}
-		csr.Status.Certificate = certBytes
+		_, err = cc.kubeClient.Certificates().CertificateSigningRequests().UpdateStatus(csr)
+		if err != nil {
+			return fmt.Errorf("error updating signature for csr: %v", err)
+		}
 	}
 
-	_, err = cc.kubeClient.Certificates().CertificateSigningRequests().UpdateStatus(csr)
-	return err
+	return nil
 }

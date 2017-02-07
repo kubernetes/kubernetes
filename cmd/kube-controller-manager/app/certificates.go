@@ -38,7 +38,7 @@ func startCSRController(ctx ControllerContext) (bool, error) {
 		resyncPeriod,
 		ctx.Options.ClusterSigningCertFile,
 		ctx.Options.ClusterSigningKeyFile,
-		certcontroller.NewGroupApprover(c.Certificates().CertificateSigningRequests(), ctx.Options.ApproveAllKubeletCSRsForGroup),
+		certcontroller.NewGroupApprover(ctx.Options.ApproveAllKubeletCSRsForGroup),
 	)
 	if err != nil {
 		// TODO this is failing consistently in test-cmd and local-up-cluster.sh.  Fix them and make it consistent with all others which
