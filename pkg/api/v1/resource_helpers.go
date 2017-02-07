@@ -17,10 +17,12 @@ limitations under the License.
 package v1
 
 import (
+	"fmt"
 	"time"
 
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/kubernetes/pkg/api"
 )
 
 // Returns string version of ResourceName.
@@ -226,4 +228,87 @@ func PodRequestsAndLimits(pod *Pod) (reqs map[ResourceName]resource.Quantity, li
 		}
 	}
 	return
+}
+
+// ExtractResourceValueByContainerName extracts the value of a resource
+// by providing container name
+func ExtractResourceValueByContainerName(fs *ResourceFieldSelector, pod *Pod, containerName string) (string, error) {
+	container, err := findContainerInPod(pod, containerName)
+	if err != nil {
+		return "", err
+	}
+	return ExtractContainerResourceValue(fs, container)
+}
+
+// ExtractResourceValueByContainerNameAndNodeAllocatable extracts the value of a resource
+// by providing container name and node allocatable
+func ExtractResourceValueByContainerNameAndNodeAllocatable(fs *ResourceFieldSelector, pod *Pod, containerName string, nodeAllocatable ResourceList) (string, error) {
+	realContainer, err := findContainerInPod(pod, containerName)
+	if err != nil {
+		return "", err
+	}
+
+	containerCopy, err := api.Scheme.DeepCopy(realContainer)
+	if err != nil {
+		return "", fmt.Errorf("failed to perform a deep copy of container object: %v", err)
+	}
+
+	container, ok := containerCopy.(*Container)
+	if !ok {
+		return "", fmt.Errorf("unexpected type returned from deep copy of container object")
+	}
+
+	MergeContainerResourceLimits(container, nodeAllocatable)
+
+	return ExtractContainerResourceValue(fs, container)
+}
+
+// ExtractContainerResourceValue extracts the value of a resource
+// in an already known container
+func ExtractContainerResourceValue(fs *ResourceFieldSelector, container *Container) (string, error) {
+	divisor := resource.Quantity{}
+	if divisor.Cmp(fs.Divisor) == 0 {
+		divisor = resource.MustParse("1")
+	} else {
+		divisor = fs.Divisor
+	}
+
+	switch fs.Resource {
+	case "limits.cpu":
+		return api.ConvertResourceCPUToString(container.Resources.Limits.Cpu(), divisor)
+	case "limits.memory":
+		return api.ConvertResourceMemoryToString(container.Resources.Limits.Memory(), divisor)
+	case "requests.cpu":
+		return api.ConvertResourceCPUToString(container.Resources.Requests.Cpu(), divisor)
+	case "requests.memory":
+		return api.ConvertResourceMemoryToString(container.Resources.Requests.Memory(), divisor)
+	}
+
+	return "", fmt.Errorf("Unsupported container resource : %v", fs.Resource)
+}
+
+// findContainerInPod finds a container by its name in the provided pod
+func findContainerInPod(pod *Pod, containerName string) (*Container, error) {
+	for _, container := range pod.Spec.Containers {
+		if container.Name == containerName {
+			return &container, nil
+		}
+	}
+	return nil, fmt.Errorf("container %s not found", containerName)
+}
+
+// MergeContainerResourceLimits checks if a limit is applied for
+// the container, and if not, it sets the limit to the passed resource list.
+func MergeContainerResourceLimits(container *Container,
+	allocatable ResourceList) {
+	if container.Resources.Limits == nil {
+		container.Resources.Limits = make(ResourceList)
+	}
+	for _, resource := range []ResourceName{ResourceCPU, ResourceMemory} {
+		if quantity, exists := container.Resources.Limits[resource]; !exists || quantity.IsZero() {
+			if cap, exists := allocatable[resource]; exists {
+				container.Resources.Limits[resource] = *cap.Copy()
+			}
+		}
+	}
 }
