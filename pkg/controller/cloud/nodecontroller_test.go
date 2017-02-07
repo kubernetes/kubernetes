@@ -30,10 +30,10 @@ import (
 	clientv1 "k8s.io/client-go/pkg/api/v1"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/kubernetes/pkg/api"
+	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	fakecloud "k8s.io/kubernetes/pkg/cloudprovider/providers/fake"
 	"k8s.io/kubernetes/pkg/controller"
-	"k8s.io/kubernetes/pkg/controller/informers"
 	"k8s.io/kubernetes/pkg/controller/node/testutil"
 )
 
@@ -99,12 +99,12 @@ func TestNodeDeleted(t *testing.T) {
 		DeleteWaitChan: make(chan struct{}),
 	}
 
-	factory := informers.NewSharedInformerFactory(fnh, nil, controller.NoResyncPeriodFunc())
+	factory := informers.NewSharedInformerFactory(nil, fnh, controller.NoResyncPeriodFunc())
 
 	eventBroadcaster := record.NewBroadcaster()
 	cloudNodeController := &CloudNodeController{
 		kubeClient:        fnh,
-		nodeInformer:      factory.Nodes(),
+		nodeInformer:      factory.Core().V1().Nodes(),
 		cloud:             &fakecloud.FakeCloud{Err: cloudprovider.InstanceNotFound},
 		nodeMonitorPeriod: 5 * time.Second,
 		recorder:          eventBroadcaster.NewRecorder(api.Scheme, clientv1.EventSource{Component: "controllermanager"}),
