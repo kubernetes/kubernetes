@@ -858,7 +858,8 @@ func DeleteResource(r rest.GracefulDeleter, allowsOptions bool, scope RequestSco
 
 		trace.Step("About do delete object from database")
 		result, err := finishRequest(timeout, func() (runtime.Object, error) {
-			return r.Delete(ctx, name, options)
+			obj, _, err := r.Delete(ctx, name, options)
+			return obj, err
 		})
 		if err != nil {
 			scope.err(err, res.ResponseWriter, req.Request)
