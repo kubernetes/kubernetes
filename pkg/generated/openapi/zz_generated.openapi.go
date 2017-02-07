@@ -3811,6 +3811,49 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 			},
 			Dependencies: []string{},
 		},
+		"k8s.io/kubernetes/pkg/apis/authorization/v1.LocalSubjectAccessReview": {
+			Schema: spec.Schema{
+				SchemaProps: spec.SchemaProps{
+					Description: "LocalSubjectAccessReview checks whether or not a user or group can perform an action in a given namespace. Having a namespace scoped resource makes it much easier to grant namespace scoped policy that includes permissions checking.",
+					Properties: map[string]spec.Schema{
+						"kind": {
+							SchemaProps: spec.SchemaProps{
+								Description: "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds",
+								Type:        []string{"string"},
+								Format:      "",
+							},
+						},
+						"apiVersion": {
+							SchemaProps: spec.SchemaProps{
+								Description: "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources",
+								Type:        []string{"string"},
+								Format:      "",
+							},
+						},
+						"metadata": {
+							SchemaProps: spec.SchemaProps{
+								Ref: ref("k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta"),
+							},
+						},
+						"spec": {
+							SchemaProps: spec.SchemaProps{
+								Description: "Spec holds information about the request being evaluated.  spec.namespace must be equal to the namespace you made the request against.  If empty, it is defaulted.",
+								Ref:         ref("k8s.io/kubernetes/pkg/apis/authorization/v1.SubjectAccessReviewSpec"),
+							},
+						},
+						"status": {
+							SchemaProps: spec.SchemaProps{
+								Description: "Status is filled in by the server and indicates whether the request is allowed or not",
+								Ref:         ref("k8s.io/kubernetes/pkg/apis/authorization/v1.SubjectAccessReviewStatus"),
+							},
+						},
+					},
+					Required: []string{"spec"},
+				},
+			},
+			Dependencies: []string{
+				"k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta", "k8s.io/kubernetes/pkg/apis/authorization/v1.SubjectAccessReviewSpec", "k8s.io/kubernetes/pkg/apis/authorization/v1.SubjectAccessReviewStatus"},
+		},
 		"k8s.io/kubernetes/pkg/api/v1.NFSVolumeSource": {
 			Schema: spec.Schema{
 				SchemaProps: spec.SchemaProps{
@@ -4566,6 +4609,30 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 						},
 					},
 					Required: []string{"machineID", "systemUUID", "bootID", "kernelVersion", "osImage", "containerRuntimeVersion", "kubeletVersion", "kubeProxyVersion", "operatingSystem", "architecture"},
+				},
+			},
+			Dependencies: []string{},
+		},
+		"k8s.io/kubernetes/pkg/apis/authorization/v1.NonResourceAttributes": {
+			Schema: spec.Schema{
+				SchemaProps: spec.SchemaProps{
+					Description: "NonResourceAttributes includes the authorization attributes available for non-resource requests to the Authorizer interface",
+					Properties: map[string]spec.Schema{
+						"path": {
+							SchemaProps: spec.SchemaProps{
+								Description: "Path is the URL path of the request",
+								Type:        []string{"string"},
+								Format:      "",
+							},
+						},
+						"verb": {
+							SchemaProps: spec.SchemaProps{
+								Description: "Verb is the standard HTTP verb",
+								Type:        []string{"string"},
+								Format:      "",
+							},
+						},
+					},
 				},
 			},
 			Dependencies: []string{},
@@ -7036,6 +7103,65 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 			Dependencies: []string{
 				"k8s.io/kubernetes/pkg/api/v1.ReplicationControllerCondition"},
 		},
+		"k8s.io/kubernetes/pkg/apis/authorization/v1.ResourceAttributes": {
+			Schema: spec.Schema{
+				SchemaProps: spec.SchemaProps{
+					Description: "ResourceAttributes includes the authorization attributes available for resource requests to the Authorizer interface",
+					Properties: map[string]spec.Schema{
+						"namespace": {
+							SchemaProps: spec.SchemaProps{
+								Description: "Namespace is the namespace of the action being requested.  Currently, there is no distinction between no namespace and all namespaces \"\" (empty) is defaulted for LocalSubjectAccessReviews \"\" (empty) is empty for cluster-scoped resources \"\" (empty) means \"all\" for namespace scoped resources from a SubjectAccessReview or SelfSubjectAccessReview",
+								Type:        []string{"string"},
+								Format:      "",
+							},
+						},
+						"verb": {
+							SchemaProps: spec.SchemaProps{
+								Description: "Verb is a kubernetes resource API verb, like: get, list, watch, create, update, delete, proxy.  \"*\" means all.",
+								Type:        []string{"string"},
+								Format:      "",
+							},
+						},
+						"group": {
+							SchemaProps: spec.SchemaProps{
+								Description: "Group is the API Group of the Resource.  \"*\" means all.",
+								Type:        []string{"string"},
+								Format:      "",
+							},
+						},
+						"version": {
+							SchemaProps: spec.SchemaProps{
+								Description: "Version is the API Version of the Resource.  \"*\" means all.",
+								Type:        []string{"string"},
+								Format:      "",
+							},
+						},
+						"resource": {
+							SchemaProps: spec.SchemaProps{
+								Description: "Resource is one of the existing resource types.  \"*\" means all.",
+								Type:        []string{"string"},
+								Format:      "",
+							},
+						},
+						"subresource": {
+							SchemaProps: spec.SchemaProps{
+								Description: "Subresource is one of the existing resource types.  \"\" means none.",
+								Type:        []string{"string"},
+								Format:      "",
+							},
+						},
+						"name": {
+							SchemaProps: spec.SchemaProps{
+								Description: "Name is the name of the resource being requested for a \"get\" or deleted for a \"delete\". \"\" (empty) means all.",
+								Type:        []string{"string"},
+								Format:      "",
+							},
+						},
+					},
+				},
+			},
+			Dependencies: []string{},
+		},
 		"k8s.io/kubernetes/pkg/api/v1.ResourceFieldSelector": {
 			Schema: spec.Schema{
 				SchemaProps: spec.SchemaProps{
@@ -7679,6 +7805,72 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 			Dependencies: []string{
 				"k8s.io/kubernetes/pkg/api/v1.Capabilities", "k8s.io/kubernetes/pkg/api/v1.SELinuxOptions"},
 		},
+		"k8s.io/kubernetes/pkg/apis/authorization/v1.SelfSubjectAccessReview": {
+			Schema: spec.Schema{
+				SchemaProps: spec.SchemaProps{
+					Description: "SelfSubjectAccessReview checks whether or the current user can perform an action.  Not filling in a spec.namespace means \"in all namespaces\".  Self is a special case, because users should always be able to check whether they can perform an action",
+					Properties: map[string]spec.Schema{
+						"kind": {
+							SchemaProps: spec.SchemaProps{
+								Description: "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds",
+								Type:        []string{"string"},
+								Format:      "",
+							},
+						},
+						"apiVersion": {
+							SchemaProps: spec.SchemaProps{
+								Description: "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources",
+								Type:        []string{"string"},
+								Format:      "",
+							},
+						},
+						"metadata": {
+							SchemaProps: spec.SchemaProps{
+								Ref: ref("k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta"),
+							},
+						},
+						"spec": {
+							SchemaProps: spec.SchemaProps{
+								Description: "Spec holds information about the request being evaluated.  user and groups must be empty",
+								Ref:         ref("k8s.io/kubernetes/pkg/apis/authorization/v1.SelfSubjectAccessReviewSpec"),
+							},
+						},
+						"status": {
+							SchemaProps: spec.SchemaProps{
+								Description: "Status is filled in by the server and indicates whether the request is allowed or not",
+								Ref:         ref("k8s.io/kubernetes/pkg/apis/authorization/v1.SubjectAccessReviewStatus"),
+							},
+						},
+					},
+					Required: []string{"spec"},
+				},
+			},
+			Dependencies: []string{
+				"k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta", "k8s.io/kubernetes/pkg/apis/authorization/v1.SelfSubjectAccessReviewSpec", "k8s.io/kubernetes/pkg/apis/authorization/v1.SubjectAccessReviewStatus"},
+		},
+		"k8s.io/kubernetes/pkg/apis/authorization/v1.SelfSubjectAccessReviewSpec": {
+			Schema: spec.Schema{
+				SchemaProps: spec.SchemaProps{
+					Description: "SelfSubjectAccessReviewSpec is a description of the access request.  Exactly one of ResourceAuthorizationAttributes and NonResourceAuthorizationAttributes must be set",
+					Properties: map[string]spec.Schema{
+						"resourceAttributes": {
+							SchemaProps: spec.SchemaProps{
+								Description: "ResourceAuthorizationAttributes describes information for a resource access request",
+								Ref:         ref("k8s.io/kubernetes/pkg/apis/authorization/v1.ResourceAttributes"),
+							},
+						},
+						"nonResourceAttributes": {
+							SchemaProps: spec.SchemaProps{
+								Description: "NonResourceAttributes describes information for a non-resource access request",
+								Ref:         ref("k8s.io/kubernetes/pkg/apis/authorization/v1.NonResourceAttributes"),
+							},
+						},
+					},
+				},
+			},
+			Dependencies: []string{
+				"k8s.io/kubernetes/pkg/apis/authorization/v1.NonResourceAttributes", "k8s.io/kubernetes/pkg/apis/authorization/v1.ResourceAttributes"},
+		},
 		"k8s.io/kubernetes/pkg/api/v1.SerializedReference": {
 			Schema: spec.Schema{
 				SchemaProps: spec.SchemaProps{
@@ -8281,6 +8473,146 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 			},
 			Dependencies: []string{
 				"k8s.io/apimachinery/pkg/apis/meta/v1.StatusCause"},
+		},
+		"k8s.io/kubernetes/pkg/apis/authorization/v1.SubjectAccessReview": {
+			Schema: spec.Schema{
+				SchemaProps: spec.SchemaProps{
+					Description: "SubjectAccessReview checks whether or not a user or group can perform an action.",
+					Properties: map[string]spec.Schema{
+						"kind": {
+							SchemaProps: spec.SchemaProps{
+								Description: "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds",
+								Type:        []string{"string"},
+								Format:      "",
+							},
+						},
+						"apiVersion": {
+							SchemaProps: spec.SchemaProps{
+								Description: "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources",
+								Type:        []string{"string"},
+								Format:      "",
+							},
+						},
+						"metadata": {
+							SchemaProps: spec.SchemaProps{
+								Ref: ref("k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta"),
+							},
+						},
+						"spec": {
+							SchemaProps: spec.SchemaProps{
+								Description: "Spec holds information about the request being evaluated",
+								Ref:         ref("k8s.io/kubernetes/pkg/apis/authorization/v1.SubjectAccessReviewSpec"),
+							},
+						},
+						"status": {
+							SchemaProps: spec.SchemaProps{
+								Description: "Status is filled in by the server and indicates whether the request is allowed or not",
+								Ref:         ref("k8s.io/kubernetes/pkg/apis/authorization/v1.SubjectAccessReviewStatus"),
+							},
+						},
+					},
+					Required: []string{"spec"},
+				},
+			},
+			Dependencies: []string{
+				"k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta", "k8s.io/kubernetes/pkg/apis/authorization/v1.SubjectAccessReviewSpec", "k8s.io/kubernetes/pkg/apis/authorization/v1.SubjectAccessReviewStatus"},
+		},
+		"k8s.io/kubernetes/pkg/apis/authorization/v1.SubjectAccessReviewSpec": {
+			Schema: spec.Schema{
+				SchemaProps: spec.SchemaProps{
+					Description: "SubjectAccessReviewSpec is a description of the access request.  Exactly one of ResourceAuthorizationAttributes and NonResourceAuthorizationAttributes must be set",
+					Properties: map[string]spec.Schema{
+						"resourceAttributes": {
+							SchemaProps: spec.SchemaProps{
+								Description: "ResourceAuthorizationAttributes describes information for a resource access request",
+								Ref:         ref("k8s.io/kubernetes/pkg/apis/authorization/v1.ResourceAttributes"),
+							},
+						},
+						"nonResourceAttributes": {
+							SchemaProps: spec.SchemaProps{
+								Description: "NonResourceAttributes describes information for a non-resource access request",
+								Ref:         ref("k8s.io/kubernetes/pkg/apis/authorization/v1.NonResourceAttributes"),
+							},
+						},
+						"user": {
+							SchemaProps: spec.SchemaProps{
+								Description: "User is the user you're testing for. If you specify \"User\" but not \"Groups\", then is it interpreted as \"What if User were not a member of any groups",
+								Type:        []string{"string"},
+								Format:      "",
+							},
+						},
+						"groups": {
+							SchemaProps: spec.SchemaProps{
+								Description: "Groups is the groups you're testing for.",
+								Type:        []string{"array"},
+								Items: &spec.SchemaOrArray{
+									Schema: &spec.Schema{
+										SchemaProps: spec.SchemaProps{
+											Type:   []string{"string"},
+											Format: "",
+										},
+									},
+								},
+							},
+						},
+						"extra": {
+							SchemaProps: spec.SchemaProps{
+								Description: "Extra corresponds to the user.Info.GetExtra() method from the authenticator.  Since that is input to the authorizer it needs a reflection here.",
+								Type:        []string{"object"},
+								AdditionalProperties: &spec.SchemaOrBool{
+									Schema: &spec.Schema{
+										SchemaProps: spec.SchemaProps{
+											Type: []string{"array"},
+											Items: &spec.SchemaOrArray{
+												Schema: &spec.Schema{
+													SchemaProps: spec.SchemaProps{
+														Type:   []string{"string"},
+														Format: "",
+													},
+												},
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			Dependencies: []string{
+				"k8s.io/kubernetes/pkg/apis/authorization/v1.NonResourceAttributes", "k8s.io/kubernetes/pkg/apis/authorization/v1.ResourceAttributes"},
+		},
+		"k8s.io/kubernetes/pkg/apis/authorization/v1.SubjectAccessReviewStatus": {
+			Schema: spec.Schema{
+				SchemaProps: spec.SchemaProps{
+					Description: "SubjectAccessReviewStatus",
+					Properties: map[string]spec.Schema{
+						"allowed": {
+							SchemaProps: spec.SchemaProps{
+								Description: "Allowed is required.  True if the action would be allowed, false otherwise.",
+								Type:        []string{"boolean"},
+								Format:      "",
+							},
+						},
+						"reason": {
+							SchemaProps: spec.SchemaProps{
+								Description: "Reason is optional.  It indicates why a request was allowed or denied.",
+								Type:        []string{"string"},
+								Format:      "",
+							},
+						},
+						"evaluationError": {
+							SchemaProps: spec.SchemaProps{
+								Description: "EvaluationError is an indication that some error occurred during the authorization check. It is entirely possible to get an error and be able to continue determine authorization status in spite of it. For instance, RBAC can be missing a role, but enough roles are still present and bound to reason about the request.",
+								Type:        []string{"string"},
+								Format:      "",
+							},
+						},
+					},
+					Required: []string{"allowed"},
+				},
+			},
+			Dependencies: []string{},
 		},
 		"k8s.io/kubernetes/pkg/api/v1.Sysctl": {
 			Schema: spec.Schema{
