@@ -36,7 +36,7 @@ import (
 
 	"k8s.io/kubernetes/cmd/kube-aggregator/pkg/apis/apiregistration"
 	"k8s.io/kubernetes/cmd/kube-aggregator/pkg/apis/apiregistration/v1alpha1"
-	discoveryclientset "k8s.io/kubernetes/cmd/kube-aggregator/pkg/client/clientset_generated/clientset"
+	aggregatorclient "k8s.io/kubernetes/cmd/kube-aggregator/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/cmd/kube-aggregator/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/cmd/kube-aggregator/pkg/client/informers"
 	listers "k8s.io/kubernetes/cmd/kube-aggregator/pkg/client/listers/apiregistration/internalversion"
@@ -59,8 +59,8 @@ type Config struct {
 	RESTOptionsGetter generic.RESTOptionsGetter
 }
 
-// APIDiscoveryServer contains state for a Kubernetes cluster master/api server.
-type APIDiscoveryServer struct {
+// APIAggregator contains state for a Kubernetes cluster master/api server.
+type APIAggregator struct {
 	GenericAPIServer *genericapiserver.GenericAPIServer
 
 	contextMapper genericapirequest.RequestContextMapper
@@ -73,13 +73,13 @@ type APIDiscoveryServer struct {
 	// proxyHandlers are the proxy handlers that are currently registered, keyed by apiservice.name
 	proxyHandlers map[string]*proxyHandler
 
-	// lister is used to add group handling for /apis/<group> discovery lookups based on
+	// lister is used to add group handling for /apis/<group> aggregator lookups based on
 	// controller state
 	lister listers.APIServiceLister
 
-	// serviceLister is used by the discovery handler to determine whether or not to try to expose the group
+	// serviceLister is used by the aggregator handler to determine whether or not to try to expose the group
 	serviceLister v1listers.ServiceLister
-	// endpointsLister is used by the discovery handler to determine whether or not to try to expose the group
+	// endpointsLister is used by the aggregator handler to determine whether or not to try to expose the group
 	endpointsLister v1listers.EndpointsLister
 
 	// proxyMux intercepts requests that need to be proxied to backing API servers
@@ -105,11 +105,11 @@ func (c *Config) SkipComplete() completedConfig {
 	return completedConfig{c}
 }
 
-// New returns a new instance of APIDiscoveryServer from the given config.
-func (c completedConfig) New() (*APIDiscoveryServer, error) {
+// New returns a new instance of APIAggregator from the given config.
+func (c completedConfig) New() (*APIAggregator, error) {
 	informerFactory := informers.NewSharedInformerFactory(
 		internalclientset.NewForConfigOrDie(c.Config.GenericConfig.LoopbackClientConfig),
-		discoveryclientset.NewForConfigOrDie(c.Config.GenericConfig.LoopbackClientConfig),
+		aggregatorclient.NewForConfigOrDie(c.Config.GenericConfig.LoopbackClientConfig),
 		5*time.Minute, // this is effectively used as a refresh interval right now.  Might want to do something nicer later on.
 	)
 	kubeInformers := kubeinformers.NewSharedInformerFactory(nil, c.CoreAPIServerClient, 5*time.Minute)
@@ -129,7 +129,7 @@ func (c completedConfig) New() (*APIDiscoveryServer, error) {
 		return nil, err
 	}
 
-	s := &APIDiscoveryServer{
+	s := &APIAggregator{
 		GenericAPIServer: genericServer,
 		contextMapper:    c.GenericConfig.RequestContextMapper,
 		proxyClientCert:  c.ProxyClientCert,
@@ -175,7 +175,7 @@ type handlerChainConfig struct {
 }
 
 // handlerChain is a method to build the handler chain for this API server.  We need a custom handler chain so that we
-// can have custom handling for `/apis`, since we're hosting discovery differently from anyone else and we're hosting
+// can have custom handling for `/apis`, since we're hosting aggregation differently from anyone else and we're hosting
 // the endpoints differently, since we're proxying all groups except for apiregistration.k8s.io.
 func (h *handlerChainConfig) handlerChain(apiHandler http.Handler, c *genericapiserver.Config) (secure, insecure http.Handler) {
 	// add this as a filter so that we never collide with "already registered" failures on `/apis`
@@ -205,8 +205,8 @@ func (h *handlerChainConfig) handlerChain(apiHandler http.Handler, c *genericapi
 
 // AddAPIService adds an API service.  It is not thread-safe, so only call it on one thread at a time please.
 // It's a slow moving API, so its ok to run the controller on a single thread
-func (s *APIDiscoveryServer) AddAPIService(apiService *apiregistration.APIService) {
-	// if the proxyHandler already exists, it needs to be updated. The discovery bits do not
+func (s *APIAggregator) AddAPIService(apiService *apiregistration.APIService) {
+	// if the proxyHandler already exists, it needs to be updated. The aggregation bits do not
 	// since they are wired against listers because they require multiple resources to respond
 	if proxyHandler, exists := s.proxyHandlers[apiService.Name]; exists {
 		proxyHandler.updateAPIService(apiService)
@@ -237,7 +237,7 @@ func (s *APIDiscoveryServer) AddAPIService(apiService *apiregistration.APIServic
 		return
 	}
 
-	// it's time to register the group discovery endpoint
+	// it's time to register the group aggregation endpoint
 	groupPath := "/apis/" + apiService.Spec.Group
 	groupDiscoveryHandler := &apiGroupHandler{
 		groupName:       apiService.Spec.Group,
@@ -245,7 +245,7 @@ func (s *APIDiscoveryServer) AddAPIService(apiService *apiregistration.APIServic
 		serviceLister:   s.serviceLister,
 		endpointsLister: s.endpointsLister,
 	}
-	// discovery is protected
+	// aggregation is protected
 	s.GenericAPIServer.HandlerContainer.UnlistedRoutes.Handle(groupPath, groupDiscoveryHandler)
 	s.GenericAPIServer.HandlerContainer.UnlistedRoutes.Handle(groupPath+"/", groupDiscoveryHandler)
 
@@ -253,7 +253,7 @@ func (s *APIDiscoveryServer) AddAPIService(apiService *apiregistration.APIServic
 
 // RemoveAPIService removes the APIService from being handled.  Later on it will disable the proxy endpoint.
 // Right now it does nothing because our handler has to properly 404 itself since muxes don't unregister
-func (s *APIDiscoveryServer) RemoveAPIService(apiServiceName string) {
+func (s *APIAggregator) RemoveAPIService(apiServiceName string) {
 	proxyHandler, exists := s.proxyHandlers[apiServiceName]
 	if !exists {
 		return

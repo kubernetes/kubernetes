@@ -45,7 +45,6 @@ filegroup(
         "//cmd/kube-aggregator/pkg/client/listers/apiregistration/internalversion:all-srcs",
         "//cmd/kube-aggregator/pkg/client/listers/apiregistration/v1alpha1:all-srcs",
         "//cmd/kube-aggregator/pkg/cmd/server:all-srcs",
-        "//cmd/kube-aggregator/pkg/legacy:all-srcs",
         "//cmd/kube-aggregator/pkg/registry/apiservice:all-srcs",
     ],
     tags = ["automanaged"],

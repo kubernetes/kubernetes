@@ -34,10 +34,10 @@ filegroup(
     name = "all-srcs",
     srcs = [
         ":package-srcs",
-        "//test/integration/discoverysummarizer:all-srcs",
         "//test/integration/examples:all-srcs",
         "//test/integration/federation:all-srcs",
         "//test/integration/framework:all-srcs",
+        "//test/integration/kubeaggregator:all-srcs",
         "//test/integration/metrics:all-srcs",
         "//test/integration/objectmeta:all-srcs",
         "//test/integration/openshift:all-srcs",
