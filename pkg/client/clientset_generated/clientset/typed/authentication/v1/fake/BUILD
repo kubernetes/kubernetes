@@ -9,17 +9,18 @@ load(
 
 go_library(
     name = "go_default_library",
-    srcs = ["install.go"],
+    srcs = [
+        "doc.go",
+        "fake_authentication_client.go",
+        "fake_tokenreview.go",
+        "fake_tokenreview_expansion.go",
+    ],
     tags = ["automanaged"],
     deps = [
-        "//pkg/api:go_default_library",
-        "//pkg/apis/authentication:go_default_library",
         "//pkg/apis/authentication/v1:go_default_library",
-        "//pkg/apis/authentication/v1beta1:go_default_library",
-        "//vendor:k8s.io/apimachinery/pkg/apimachinery/announced",
-        "//vendor:k8s.io/apimachinery/pkg/apimachinery/registered",
-        "//vendor:k8s.io/apimachinery/pkg/runtime",
-        "//vendor:k8s.io/apimachinery/pkg/util/sets",
+        "//pkg/client/clientset_generated/clientset/typed/authentication/v1:go_default_library",
+        "//vendor:k8s.io/client-go/rest",
+        "//vendor:k8s.io/client-go/testing",
     ],
 )
 
