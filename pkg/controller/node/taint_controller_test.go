@@ -17,7 +17,6 @@ limitations under the License.
 package node
 
 import (
-	"encoding/json"
 	"fmt"
 	"testing"
 	"time"
@@ -133,28 +132,10 @@ func createNoExecuteTaint(index int) v1.Taint {
 }
 
 func addToleration(pod *v1.Pod, index int, duration int64) *v1.Pod {
-	if pod.Annotations == nil {
-		pod.Annotations = map[string]string{}
-	}
 	if duration < 0 {
-		pod.Annotations["scheduler.alpha.kubernetes.io/tolerations"] = `
-  [
-    {
-      "key": "testTaint` + fmt.Sprintf("%v", index) + `",
-      "value": "test` + fmt.Sprintf("%v", index) + `",
-      "effect": "` + string(v1.TaintEffectNoExecute) + `"
-    }
-  ]`
+		pod.Spec.Tolerations = []v1.Toleration{{Key: "testTaint" + fmt.Sprintf("%v", index), Value: "test" + fmt.Sprintf("%v", index), Effect: v1.TaintEffectNoExecute}}
 	} else {
-		pod.Annotations["scheduler.alpha.kubernetes.io/tolerations"] = `
-  [
-    {
-      "key": "testTaint` + fmt.Sprintf("%v", index) + `",
-      "value": "test` + fmt.Sprintf("%v", index) + `",
-      "effect": "` + string(v1.TaintEffectNoExecute) + `",
-      "tolerationSeconds": ` + fmt.Sprintf("%v", duration) + `
-    }
-  ]`
+		pod.Spec.Tolerations = []v1.Toleration{{Key: "testTaint" + fmt.Sprintf("%v", index), Value: "test" + fmt.Sprintf("%v", index), Effect: v1.TaintEffectNoExecute, TolerationSeconds: &duration}}
 	}
 	return pod
 }
@@ -332,15 +313,7 @@ func addTaintsToNode(node *v1.Node, key, value string, indices []int) *v1.Node {
 	for _, index := range indices {
 		taints = append(taints, createNoExecuteTaint(index))
 	}
-	taintsData, err := json.Marshal(taints)
-	if err != nil {
-		panic(err)
-	}
-
-	if node.Annotations == nil {
-		node.Annotations = make(map[string]string)
-	}
-	node.Annotations[v1.TaintsAnnotationKey] = string(taintsData)
+	node.Spec.Taints = taints
 	return node
 }
 
