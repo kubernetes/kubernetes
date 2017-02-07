@@ -2,12 +2,9 @@ package(default_visibility = ["//visibility:public"])
 
 licenses(["notice"])
 
-load(
-    "@io_bazel_rules_go//go:def.bzl",
-    "go_library",
-)
+load("@io_kubernetes_build//defs:go.bzl", "api_group")
 
-go_library(
+api_group(
     name = "go_default_library",
     srcs = [
         "conversion.go",
@@ -18,10 +15,54 @@ go_library(
         "types.generated.go",
         "types.go",
         "types_swagger_doc_generated.go",
-        "zz_generated.conversion.go",
-        "zz_generated.deepcopy.go",
-        "zz_generated.defaults.go",
     ],
+    gen_types = [
+        "conversion",
+        "deepcopy",
+        "defaulter",
+    ],
+    gen_deps = [
+        "//cmd/kubeadm/app/apis/kubeadm/v1alpha1:go_default_library",
+        "//federation/apis/federation/v1beta1:go_default_library",
+        "//pkg/apis/abac/v1beta1:go_default_library",
+        "//pkg/apis/authentication/v1beta1:go_default_library",
+        "//pkg/apis/authorization/v1:go_default_library",
+        "//pkg/apis/authorization/v1beta1:go_default_library",
+        "//pkg/apis/autoscaling:go_default_library",
+        "//pkg/apis/autoscaling/v1:go_default_library",
+        "//pkg/apis/batch:go_default_library",
+        "//pkg/apis/batch/v1:go_default_library",
+        "//pkg/apis/batch/v2alpha1:go_default_library",
+        "//pkg/apis/certificates/v1beta1:go_default_library",
+        "//pkg/apis/componentconfig/v1alpha1:go_default_library",
+        "//pkg/apis/imagepolicy/v1alpha1:go_default_library",
+        "//pkg/apis/rbac/v1alpha1:go_default_library",
+        "//pkg/apis/rbac/v1beta1:go_default_library",
+        "//pkg/apis/storage/v1beta1:go_default_library",
+        "//vendor:k8s.io/apiserver/pkg/apis/example/v1",
+    ],
+    extra_peers = [
+        "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha1",
+        "k8s.io/kubernetes/federation/apis/federation/v1beta1",
+        "k8s.io/kubernetes/pkg/api/v1",
+        "k8s.io/kubernetes/pkg/apis/abac/v1beta1",
+        "k8s.io/kubernetes/pkg/apis/apps/v1beta1",
+        "k8s.io/kubernetes/pkg/apis/authentication/v1beta1",
+        "k8s.io/kubernetes/pkg/apis/authorization/v1",
+        "k8s.io/kubernetes/pkg/apis/authorization/v1beta1",
+        "k8s.io/kubernetes/pkg/apis/autoscaling/v1",
+        "k8s.io/kubernetes/pkg/apis/batch/v1",
+        "k8s.io/kubernetes/pkg/apis/batch/v2alpha1",
+        "k8s.io/kubernetes/pkg/apis/certificates/v1beta1",
+        "k8s.io/kubernetes/pkg/apis/componentconfig/v1alpha1",
+        "k8s.io/kubernetes/pkg/apis/imagepolicy/v1alpha1",
+        "k8s.io/kubernetes/pkg/apis/rbac/v1alpha1",
+        "k8s.io/kubernetes/pkg/apis/rbac/v1beta1",
+        "k8s.io/kubernetes/pkg/apis/storage/v1beta1",
+        "k8s.io/kubernetes/vendor/k8s.io/apimachinery/pkg/apis/meta/v1",
+        "k8s.io/kubernetes/vendor/k8s.io/apiserver/pkg/apis/example/v1",
+    ],
+    package = "pkg/apis/apps/v1beta1",
     tags = ["automanaged"],
     deps = [
         "//pkg/api:go_default_library",

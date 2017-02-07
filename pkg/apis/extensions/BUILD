@@ -4,9 +4,9 @@ licenses(["notice"])
 
 load(
     "@io_bazel_rules_go//go:def.bzl",
-    "go_library",
     "go_test",
 )
+load("@io_kubernetes_build//defs:go.bzl", "api_group")
 
 go_test(
     name = "go_default_test",
@@ -15,21 +15,22 @@ go_test(
     tags = ["automanaged"],
 )
 
-go_library(
+api_group(
     name = "go_default_library",
     srcs = [
         "doc.go",
         "helpers.go",
         "register.go",
         "types.go",
-        "zz_generated.deepcopy.go",
     ],
+    gen_deps = ["//vendor:k8s.io/apimachinery/pkg/conversion"],
+    gen_types = ["deepcopy"],
+    package = "pkg/apis/extensions",
     tags = ["automanaged"],
     deps = [
         "//pkg/api:go_default_library",
         "//vendor:k8s.io/apimachinery/pkg/api/resource",
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
-        "//vendor:k8s.io/apimachinery/pkg/conversion",
         "//vendor:k8s.io/apimachinery/pkg/runtime",
         "//vendor:k8s.io/apimachinery/pkg/runtime/schema",
         "//vendor:k8s.io/apimachinery/pkg/util/intstr",

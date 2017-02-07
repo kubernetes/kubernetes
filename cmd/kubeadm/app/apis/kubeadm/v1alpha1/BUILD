@@ -3,19 +3,20 @@ package(default_visibility = ["//visibility:public"])
 licenses(["notice"])
 
 load(
-    "@io_bazel_rules_go//go:def.bzl",
-    "go_library",
+    "@io_kubernetes_build//defs:go.bzl",
+    "api_group",
 )
 
-go_library(
+api_group(
     name = "go_default_library",
     srcs = [
         "defaults.go",
         "doc.go",
         "register.go",
         "types.go",
-        "zz_generated.defaults.go",
     ],
+    gen_types = ["defaulter"],
+    package = "cmd/kubeadm/app/apis/kubeadm/v1alpha1",
     tags = ["automanaged"],
     deps = [
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
