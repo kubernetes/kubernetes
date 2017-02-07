@@ -10,12 +10,9 @@ load(
 
 go_library(
     name = "go_default_library",
-    srcs = [
-        "certificate_manager.go",
-    ],
+    srcs = ["certificate_manager.go"],
     tags = ["automanaged"],
     deps = [
-        "//pkg/api:go_default_library",
         "//pkg/client/clientset_generated/clientset/typed/certificates/v1beta1:go_default_library",
         "//pkg/kubelet/util/csr:go_default_library",
         "//vendor:github.com/golang/glog",
@@ -27,12 +24,14 @@ go_library(
 
 go_test(
     name = "go_default_test",
-    srcs = [
-        "certificate_manager_test.go",
-    ],
+    srcs = ["certificate_manager_test.go"],
     library = ":go_default_library",
     tags = ["automanaged"],
     deps = [
+        "//pkg/apis/certificates/v1beta1:go_default_library",
+        "//pkg/client/clientset_generated/clientset/typed/certificates/v1beta1:go_default_library",
+        "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
+        "//vendor:k8s.io/apimachinery/pkg/watch",
     ],
 )
 
