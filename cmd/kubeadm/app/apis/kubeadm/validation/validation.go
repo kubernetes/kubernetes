@@ -17,12 +17,12 @@ limitations under the License.
 package validation
 
 import (
-	"math"
 	"net"
 
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
+	"k8s.io/kubernetes/pkg/registry/core/service/ipallocator"
 )
 
 func ValidateMasterConfiguration(c *kubeadm.MasterConfiguration) field.ErrorList {
@@ -79,8 +79,7 @@ func ValidateServiceSubnet(subnet string, fldPath *field.Path) field.ErrorList {
 	if err != nil {
 		return field.ErrorList{field.Invalid(fldPath, nil, "couldn't parse the service subnet")}
 	}
-	cidrBytesMask, _ := svcSubnet.Mask.Size()
-	numAddresses := int32(math.Pow(2, float64(32-cidrBytesMask)))
+	numAddresses := ipallocator.RangeSize(svcSubnet)
 	if numAddresses < kubeadmconstants.MinimumAddressesInServiceSubnet {
 		return field.ErrorList{field.Invalid(fldPath, nil, "service subnet is too small")}
 	}
