@@ -21,5 +21,3 @@ import "k8s.io/apimachinery/pkg/types"
 
 // UniquePodName defines the type to key pods off of
 type UniquePodName types.UID
-
-const EmptyUniquePodName UniquePodName = UniquePodName("")

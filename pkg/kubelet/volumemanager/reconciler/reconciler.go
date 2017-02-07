@@ -314,7 +314,9 @@ func (rc *reconciler) reconcile() {
 
 	// Ensure devices that should be detached/unmounted are detached/unmounted.
 	for _, attachedVolume := range rc.actualStateOfWorld.GetUnmountedVolumes() {
-		if !rc.desiredStateOfWorld.VolumeExists(attachedVolume.VolumeName) {
+		// Check IsOperationPending to avoid marking a volume as detached if it's in the process of mounting.
+		if !rc.desiredStateOfWorld.VolumeExists(attachedVolume.VolumeName) &&
+			!rc.operationExecutor.IsOperationPending(attachedVolume.VolumeName, nestedpendingoperations.EmptyUniquePodName) {
 			if attachedVolume.GloballyMounted {
 				// Volume is globally mounted to device, unmount it
 				glog.V(12).Infof("Attempting to start UnmountDevice for volume %q (spec.Name: %q)",
@@ -343,14 +345,11 @@ func (rc *reconciler) reconcile() {
 				// Volume is attached to node, detach it
 				if rc.controllerAttachDetachEnabled || !attachedVolume.PluginIsAttachable {
 					// Kubelet not responsible for detaching or this volume has a non-attachable volume plugin.
-					// Mark as detached once all pending operations, such as unmounting the global mount, have finished.
-					if !rc.operationExecutor.IsOperationPending(attachedVolume.VolumeName, volumetypes.EmptyUniquePodName) {
-						rc.actualStateOfWorld.MarkVolumeAsDetached(attachedVolume.VolumeName, attachedVolume.NodeName)
-						glog.Infof("Detached volume %q (spec.Name: %q) devicePath: %q",
-							attachedVolume.VolumeName,
-							attachedVolume.VolumeSpec.Name(),
-							attachedVolume.DevicePath)
-					}
+					rc.actualStateOfWorld.MarkVolumeAsDetached(attachedVolume.VolumeName, attachedVolume.NodeName)
+					glog.Infof("Detached volume %q (spec.Name: %q) devicePath: %q",
+						attachedVolume.VolumeName,
+						attachedVolume.VolumeSpec.Name(),
+						attachedVolume.DevicePath)
 				} else {
 					// Only detach if kubelet detach is enabled
 					glog.V(12).Infof("Attempting to start DetachVolume for volume %q (spec.Name: %q)",
