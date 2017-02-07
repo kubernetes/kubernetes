@@ -1700,6 +1700,14 @@ func podsRunning(c clientset.Interface, pods *v1.PodList) []error {
 }
 
 func VerifyPods(c clientset.Interface, ns, name string, wantName bool, replicas int32) error {
+	return podRunningMaybeResponding(c, ns, name, wantName, replicas, true)
+}
+
+func VerifyPodsRunning(c clientset.Interface, ns, name string, wantName bool, replicas int32) error {
+	return podRunningMaybeResponding(c, ns, name, wantName, replicas, false)
+}
+
+func podRunningMaybeResponding(c clientset.Interface, ns, name string, wantName bool, replicas int32, checkResponding bool) error {
 	pods, err := PodsCreated(c, ns, name, replicas)
 	if err != nil {
 		return err
@@ -1708,9 +1716,11 @@ func VerifyPods(c clientset.Interface, ns, name string, wantName bool, replicas 
 	if len(e) > 0 {
 		return fmt.Errorf("failed to wait for pods running: %v", e)
 	}
-	err = PodsResponding(c, ns, name, wantName, pods)
-	if err != nil {
-		return fmt.Errorf("failed to wait for pods responding: %v", err)
+	if checkResponding {
+		err = PodsResponding(c, ns, name, wantName, pods)
+		if err != nil {
+			return fmt.Errorf("failed to wait for pods responding: %v", err)
+		}
 	}
 	return nil
 }

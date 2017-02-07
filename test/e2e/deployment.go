@@ -279,7 +279,7 @@ func testRollingUpdateDeployment(f *framework.Framework) {
 	}
 
 	rsName := "test-rolling-update-controller"
-	replicas := int32(3)
+	replicas := int32(1)
 	rsRevision := "3546343826724305832"
 	annotations := make(map[string]string)
 	annotations[deploymentutil.RevisionAnnotation] = rsRevision
@@ -289,7 +289,7 @@ func testRollingUpdateDeployment(f *framework.Framework) {
 	_, err := c.Extensions().ReplicaSets(ns).Create(rs)
 	Expect(err).NotTo(HaveOccurred())
 	// Verify that the required pods have come up.
-	err = framework.VerifyPods(c, ns, "sample-pod", false, 3)
+	err = framework.VerifyPodsRunning(c, ns, "sample-pod", false, replicas)
 	if err != nil {
 		framework.Logf("error in waiting for pods to come up: %s", err)
 		Expect(err).NotTo(HaveOccurred())
@@ -372,7 +372,7 @@ func testDeploymentCleanUpPolicy(f *framework.Framework) {
 	Expect(err).NotTo(HaveOccurred())
 
 	// Verify that the required pods have come up.
-	err = framework.VerifyPods(c, ns, "cleanup-pod", false, 1)
+	err = framework.VerifyPodsRunning(c, ns, "cleanup-pod", false, 1)
 	if err != nil {
 		framework.Logf("error in waiting for pods to come up: %s", err)
 		Expect(err).NotTo(HaveOccurred())
@@ -441,11 +441,11 @@ func testRolloverDeployment(f *framework.Framework) {
 	}
 
 	rsName := "test-rollover-controller"
-	rsReplicas := int32(4)
+	rsReplicas := int32(3)
 	_, err := c.Extensions().ReplicaSets(ns).Create(newRS(rsName, rsReplicas, rsPodLabels, nginxImageName, nginxImage))
 	Expect(err).NotTo(HaveOccurred())
 	// Verify that the required pods have come up.
-	err = framework.VerifyPods(c, ns, podName, false, rsReplicas)
+	err = framework.VerifyPodsRunning(c, ns, podName, false, rsReplicas)
 	if err != nil {
 		framework.Logf("error in waiting for pods to come up: %s", err)
 		Expect(err).NotTo(HaveOccurred())
@@ -458,7 +458,7 @@ func testRolloverDeployment(f *framework.Framework) {
 	// Create a deployment to delete nginx pods and instead bring up redis-slave pods.
 	// We use a nonexistent image here, so that we make sure it won't finish
 	deploymentName, deploymentImageName := "test-rollover-deployment", "redis-slave"
-	deploymentReplicas := int32(4)
+	deploymentReplicas := int32(3)
 	deploymentImage := "gcr.io/google_samples/gb-redisslave:nonexistent"
 	deploymentStrategyType := extensions.RollingUpdateDeploymentStrategyType
 	framework.Logf("Creating deployment %q", deploymentName)
@@ -855,7 +855,7 @@ func testDeploymentLabelAdopted(f *framework.Framework) {
 	_, err := c.Extensions().ReplicaSets(ns).Create(newRS(rsName, replicas, podLabels, podName, image))
 	Expect(err).NotTo(HaveOccurred())
 	// Verify that the required pods have come up.
-	err = framework.VerifyPods(c, ns, podName, false, 3)
+	err = framework.VerifyPodsRunning(c, ns, podName, false, 3)
 	if err != nil {
 		framework.Logf("error in waiting for pods to come up: %s", err)
 		Expect(err).NotTo(HaveOccurred())
@@ -969,7 +969,7 @@ func testScaledRolloutDeployment(f *framework.Framework) {
 
 	// Verify that the required pods have come up.
 	By("Waiting for all required pods to come up")
-	err = framework.VerifyPods(f.ClientSet, ns, nginxImageName, false, *(deployment.Spec.Replicas))
+	err = framework.VerifyPodsRunning(f.ClientSet, ns, nginxImageName, false, *(deployment.Spec.Replicas))
 	if err != nil {
 		framework.Logf("error in waiting for pods to come up: %s", err)
 		Expect(err).NotTo(HaveOccurred())
