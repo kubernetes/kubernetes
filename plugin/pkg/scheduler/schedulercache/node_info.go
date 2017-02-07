@@ -337,7 +337,7 @@ func (n *NodeInfo) SetNode(node *v1.Node) error {
 			}
 		}
 	}
-	n.taints, n.taintsErr = v1.GetTaintsFromNodeAnnotations(node.Annotations)
+	n.taints = node.Spec.Taints
 	for i := range node.Status.Conditions {
 		cond := &node.Status.Conditions[i]
 		switch cond.Type {
