@@ -21,7 +21,6 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/fieldpath"
 )
 
 // defaultPodLimitsForDownwardApi copies the input pod, and optional container,
@@ -51,7 +50,7 @@ func (kl *Kubelet) defaultPodLimitsForDownwardApi(pod *v1.Pod, container *v1.Con
 		return nil, nil, fmt.Errorf("unexpected type returned from deep copy of pod object")
 	}
 	for idx := range outputPod.Spec.Containers {
-		fieldpath.MergeContainerResourceLimits(&outputPod.Spec.Containers[idx], allocatable)
+		v1.MergeContainerResourceLimits(&outputPod.Spec.Containers[idx], allocatable)
 	}
 
 	var outputContainer *v1.Container
@@ -64,7 +63,7 @@ func (kl *Kubelet) defaultPodLimitsForDownwardApi(pod *v1.Pod, container *v1.Con
 		if !ok {
 			return nil, nil, fmt.Errorf("unexpected type returned from deep copy of container object")
 		}
-		fieldpath.MergeContainerResourceLimits(outputContainer, allocatable)
+		v1.MergeContainerResourceLimits(outputContainer, allocatable)
 	}
 	return outputPod, outputContainer, nil
 }
