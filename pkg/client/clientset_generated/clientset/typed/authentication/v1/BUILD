@@ -9,17 +9,20 @@ load(
 
 go_library(
     name = "go_default_library",
-    srcs = ["install.go"],
+    srcs = [
+        "authentication_client.go",
+        "doc.go",
+        "generated_expansion.go",
+        "tokenreview.go",
+        "tokenreview_expansion.go",
+    ],
     tags = ["automanaged"],
     deps = [
         "//pkg/api:go_default_library",
-        "//pkg/apis/authentication:go_default_library",
         "//pkg/apis/authentication/v1:go_default_library",
-        "//pkg/apis/authentication/v1beta1:go_default_library",
-        "//vendor:k8s.io/apimachinery/pkg/apimachinery/announced",
-        "//vendor:k8s.io/apimachinery/pkg/apimachinery/registered",
-        "//vendor:k8s.io/apimachinery/pkg/runtime",
-        "//vendor:k8s.io/apimachinery/pkg/util/sets",
+        "//vendor:k8s.io/apimachinery/pkg/runtime/schema",
+        "//vendor:k8s.io/apimachinery/pkg/runtime/serializer",
+        "//vendor:k8s.io/client-go/rest",
     ],
 )
 
@@ -32,6 +35,9 @@ filegroup(
 
 filegroup(
     name = "all-srcs",
-    srcs = [":package-srcs"],
+    srcs = [
+        ":package-srcs",
+        "//pkg/client/clientset_generated/clientset/typed/authentication/v1/fake:all-srcs",
+    ],
     tags = ["automanaged"],
 )
