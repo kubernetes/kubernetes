@@ -94,3 +94,11 @@ func (t taintsVar) String() string {
 func (t taintsVar) Type() string {
 	return "[]api.Taint"
 }
+
+func ConvertTaintToVersioned(in api.Taint) v1.Taint {
+	var out v1.Taint
+	out.Key = in.Key
+	out.Value = in.Value
+	out.Effect = v1.TaintEffect(in.Effect)
+	return out
+}

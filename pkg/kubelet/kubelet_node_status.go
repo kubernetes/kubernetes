@@ -17,7 +17,6 @@ limitations under the License.
 package kubelet
 
 import (
-	"encoding/json"
 	"fmt"
 	"math"
 	"net"
@@ -40,6 +39,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/util"
 	"k8s.io/kubernetes/pkg/kubelet/util/sliceutils"
 	nodeutil "k8s.io/kubernetes/pkg/util/node"
+	utiltaints "k8s.io/kubernetes/pkg/util/taints"
 	"k8s.io/kubernetes/pkg/version"
 	"k8s.io/kubernetes/pkg/volume/util/volumehelper"
 )
@@ -204,19 +204,9 @@ func (kl *Kubelet) initialNode() (*v1.Node, error) {
 		},
 	}
 	if len(kl.kubeletConfiguration.RegisterWithTaints) > 0 {
-		annotations := make(map[string]string)
-		taints := make([]v1.Taint, len(kl.kubeletConfiguration.RegisterWithTaints))
-		for i := range kl.kubeletConfiguration.RegisterWithTaints {
-			if err := v1.Convert_api_Taint_To_v1_Taint(&kl.kubeletConfiguration.RegisterWithTaints[i], &taints[i], nil); err != nil {
-				return nil, err
-			}
+		for _, taint := range kl.kubeletConfiguration.RegisterWithTaints {
+			node.Spec.Taints = append(node.Spec.Taints, utiltaints.ConvertTaintToVersioned(taint))
 		}
-		b, err := json.Marshal(taints)
-		if err != nil {
-			return nil, err
-		}
-		annotations[v1.TaintsAnnotationKey] = string(b)
-		node.ObjectMeta.Annotations = annotations
 
 	}
 	// Initially, set NodeNetworkUnavailable to true.

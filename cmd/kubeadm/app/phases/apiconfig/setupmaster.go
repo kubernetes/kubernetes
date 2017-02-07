@@ -17,7 +17,6 @@ limitations under the License.
 package apiconfig
 
 import (
-	"encoding/json"
 	"fmt"
 	"time"
 
@@ -54,9 +53,7 @@ func attemptToUpdateMasterRoleLabelsAndTaints(client *clientset.Clientset) error
 	// TODO: Switch to the new master label defined in https://github.com/kubernetes/kubernetes/pull/39112
 	n.ObjectMeta.Labels[metav1.NodeLabelKubeadmAlphaRole] = metav1.NodeLabelRoleMaster
 
-	// TODO: Use the Taints beta field on the NodeSpec now
-	taintsAnnotation, _ := json.Marshal([]v1.Taint{{Key: "dedicated", Value: "master", Effect: "NoSchedule"}})
-	n.ObjectMeta.Annotations[v1.TaintsAnnotationKey] = string(taintsAnnotation)
+	n.Spec.Taints = []v1.Taint{{Key: "dedicated", Value: "master", Effect: "NoSchedule"}}
 
 	// TODO: Use a patch instead of an Update
 	if _, err := client.Nodes().Update(n); err != nil {

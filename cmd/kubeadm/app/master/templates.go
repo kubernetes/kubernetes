@@ -59,9 +59,6 @@ spec:
         k8s-app: kube-discovery
         # TODO: I guess we can remove all these cluster-service labels...
         kubernetes.io/cluster-service: "true"
-      annotations:
-        # TODO: Move this to the beta tolerations field below as soon as the Tolerations field exists in PodSpec
-        scheduler.alpha.kubernetes.io/tolerations: '[{"key":"dedicated","value":"master","effect":"NoSchedule"}]'
     spec:
       containers:
       - name: kube-discovery
@@ -85,6 +82,10 @@ spec:
       securityContext:
           seLinuxOptions:
             type: spc_t
+      tolerations:
+      - key: "dedicated"
+        value: "master"
+	effect:"NoSchedule"
       affinity:
         nodeAffinity:
           requiredDuringSchedulingIgnoredDuringExecution:

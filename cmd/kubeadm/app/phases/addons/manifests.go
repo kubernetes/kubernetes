@@ -63,9 +63,6 @@ spec:
     metadata:
       labels:
         k8s-app: kube-proxy
-      annotations:
-        # TODO: Move this to the beta tolerations field below as soon as the Tolerations field exists in PodSpec
-        scheduler.alpha.kubernetes.io/tolerations: '[{"key":"dedicated","value":"master","effect":"NoSchedule"}]'
     spec:
       containers:
       - name: kube-proxy
@@ -81,11 +78,10 @@ spec:
           name: kube-proxy
       hostNetwork: true
       serviceAccountName: kube-proxy
-      # Tolerate running on the master
-      # tolerations:
-      # - key: dedicated
-      #   value: master
-      #   effect: NoSchedule
+      tolerations:
+      - key: dedicated
+        value: master
+        effect: NoSchedule
       volumes:
       - name: kube-proxy
         configMap:
@@ -116,9 +112,6 @@ spec:
     metadata:
       labels:
         k8s-app: kube-dns
-      annotations:
-        # TODO: Move this to the beta tolerations field below as soon as the Tolerations field exists in PodSpec
-        scheduler.alpha.kubernetes.io/tolerations: '[{"key":"dedicated","value":"master","effect":"NoSchedule"}]'
     spec:
       containers:
       - name: kubedns
@@ -225,10 +218,10 @@ spec:
             memory: 20Mi
       dnsPolicy: Default
       serviceAccountName: kube-dns
-      # tolerations:
-      # - key: dedicated
-      #   value: master
-      #   effect: NoSchedule
+      tolerations:
+      - key: dedicated
+        value: master
+        effect: NoSchedule
       # TODO: Remove this affinity field as soon as we are using manifest lists
       affinity:
         nodeAffinity:
