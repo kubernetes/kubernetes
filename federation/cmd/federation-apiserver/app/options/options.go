@@ -41,6 +41,7 @@ type ServerRunOptions struct {
 	Authorization           *kubeoptions.BuiltInAuthorizationOptions
 	CloudProvider           *kubeoptions.CloudProviderOptions
 	StorageSerialization    *kubeoptions.StorageSerializationOptions
+	APIEnablement           *kubeoptions.APIEnablementOptions
 
 	EventTTL time.Duration
 }
@@ -57,6 +58,7 @@ func NewServerRunOptions() *ServerRunOptions {
 		Authorization:        kubeoptions.NewBuiltInAuthorizationOptions(),
 		CloudProvider:        kubeoptions.NewCloudProviderOptions(),
 		StorageSerialization: kubeoptions.NewStorageSerializationOptions(),
+		APIEnablement:        kubeoptions.NewAPIEnablementOptions(),
 
 		EventTTL: 1 * time.Hour,
 	}
@@ -77,6 +79,7 @@ func (s *ServerRunOptions) AddFlags(fs *pflag.FlagSet) {
 	s.Authorization.AddFlags(fs)
 	s.CloudProvider.AddFlags(fs)
 	s.StorageSerialization.AddFlags(fs)
+	s.APIEnablement.AddFlags(fs)
 
 	fs.DurationVar(&s.EventTTL, "event-ttl", s.EventTTL,
 		"Amount of time to retain events. Default is 1h.")
