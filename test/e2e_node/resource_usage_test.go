@@ -155,7 +155,32 @@ func runResourceUsageTest(f *framework.Framework, rc *ResourceCollector, testArg
 		namespaces = append(namespaces, ns)
 	}
 	framework.Logf("namespaces created")
-	pods := newTestPodsInNamespaces(testArg.podsNr, framework.GetPauseImageNameForHostArch(), "test_pod", namespaces)
+	var secrets []*v1.Secret
+	for i := 0; i < testArg.podsNr; i++ {
+		secret := &v1.Secret{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      fmt.Sprintf("secret-%d", i),
+				Namespace: namespaces[i].Name,
+			},
+			Data: map[string][]byte{
+				"sfjdkjflds": []byte("sfksjdlf kjsd kfjsdlk fjlkds jflksd jflksjd lkfsj liferjlkjsadlkjfl kjd lijdsif jds l dskjf lkdsj flksdj flisdj fsld jdsk jflkdsj fks "),
+				"adndbsnfbf": []byte("sfksjdlf kjsd kfjsdlk fjlkds jflksd jflksjd lkfsj liferjlkjsadlkjfl kjd lijdsif jds l dskjf lkdsj flksdj flisdj fsld jdsk jflkdsj fks "),
+				"ewoiroeiwr": []byte("sfksjdlf kjsd kfjsdlk fjlkds jflksd jflksjd lkfsj liferjlkjsadlkjfl kjd lijdsif jds l dskjf lkdsj flksdj flisdj fsld jdsk jflkdsj fks "),
+				"lkslkfdsfk": []byte("sfksjdlf kjsd kfjsdlk fjlkds jflksd jflksjd lkfsj liferjlkjsadlkjfl kjd lijdsif jds l dskjf lkdsj flksdj flisdj fsld jdsk jflkdsj fks "),
+				"poewproerd": []byte("sfksjdlf kjsd kfjsdlk fjlkds jflksd jflksjd lkfsj liferjlkjsadlkjfl kjd lijdsif jds l dskjf lkdsj flksdj flisdj fsld jdsk jflkdsj fks "),
+				"yryeutyrue": []byte("sfksjdlf kjsd kfjsdlk fjlkds jflksd jflksjd lkfsj liferjlkjsadlkjfl kjd lijdsif jds l dskjf lkdsj flksdj flisdj fsld jdsk jflkdsj fks "),
+				"qweioieiei": []byte("sfksjdlf kjsd kfjsdlk fjlkds jflksd jflksjd lkfsj liferjlkjsadlkjfl kjd lijdsif jds l dskjf lkdsj flksdj flisdj fsld jdsk jflkdsj fks "),
+				"rtrueiutuq": []byte("sfksjdlf kjsd kfjsdlk fjlkds jflksd jflksjd lkfsj liferjlkjsadlkjfl kjd lijdsif jds l dskjf lkdsj flksdj flisdj fsld jdsk jflkdsj fks "),
+				"mgfkjdgkfd": []byte("sfksjdlf kjsd kfjsdlk fjlkds jflksd jflksjd lkfsj liferjlkjsadlkjfl kjd lijdsif jds l dskjf lkdsj flksdj flisdj fsld jdsk jflkdsj fks "),
+				"gjflkdkslk": []byte("sfksjdlf kjsd kfjsdlk fjlkds jflksd jflksjd lkfsj liferjlkjsadlkjfl kjd lijdsif jds l dskjf lkdsj flksdj flisdj fsld jdsk jflkdsj fks "),
+			},
+			Type: v1.SecretTypeOpaque,
+		}
+		s, err := f.ClientSet.Core().Secrets(secret.Namespace).Create(secret)
+		framework.ExpectNoError(err)
+		secrets = append(secrets, s)
+	}
+	pods := newTestPodsInNamespaces(testArg.podsNr, framework.GetPauseImageNameForHostArch(), "test_pod", namespaces, secrets)
 	framework.Logf("pods created")
 //	pods := newTestPods(testArg.podsNr, true, framework.GetPauseImageNameForHostArch(), "test_pod")
 

@@ -441,7 +441,7 @@ func newTestPods(numPods int, volume bool, imageName, podType string) []*v1.Pod 
 }
 
 // newTestPods creates a list of pods (specification) for test.
-func newTestPodsInNamespaces(numPods int, imageName, podType string, nss []*v1.Namespace) []*v1.Pod {
+func newTestPodsInNamespaces(numPods int, imageName, podType string, nss []*v1.Namespace, secrets []*v1.Secret) []*v1.Pod {
 	var pods []*v1.Pod
 	for i := 0; i < numPods; i++ {
 		podName := "test-" + string(uuid.NewUUID())
@@ -462,6 +462,23 @@ func newTestPodsInNamespaces(numPods int, imageName, podType string, nss []*v1.N
 						{
 							Image: imageName,
 							Name:  podName,
+							VolumeMounts: []v1.VolumeMount{
+								{
+									Name:      "foo",
+									MountPath: "/etc/foo",
+									ReadOnly:  true,
+								},
+							},
+						},
+					},
+					Volumes: []v1.Volume{
+						{
+							Name: "foo",
+							VolumeSource: v1.VolumeSource{
+								Secret: &v1.SecretVolumeSource{
+									SecretName: secrets[i].Name,
+								},
+							},
 						},
 					},
 				},
