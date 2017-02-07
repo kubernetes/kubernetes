@@ -44,10 +44,6 @@ type ServerRunOptions struct {
 	// to set it to "application/vnd.kubernetes.protobuf".
 	DefaultStorageMediaType     string
 	DeleteCollectionWorkers     int
-	EnableGarbageCollection     bool
-	EnableProfiling             bool
-	EnableContentionProfiling   bool
-	EnableSwaggerUI             bool
 	EnableWatchCache            bool
 	ExternalHost                string
 	MaxRequestsInFlight         int
@@ -65,9 +61,6 @@ func NewServerRunOptions() *ServerRunOptions {
 		AdmissionControl:            "AlwaysAdmit",
 		DefaultStorageMediaType:     "application/json",
 		DeleteCollectionWorkers:     1,
-		EnableGarbageCollection:     defaults.EnableGarbageCollection,
-		EnableProfiling:             defaults.EnableProfiling,
-		EnableContentionProfiling:   false,
 		EnableWatchCache:            true,
 		MaxRequestsInFlight:         defaults.MaxRequestsInFlight,
 		MaxMutatingRequestsInFlight: defaults.MaxMutatingRequestsInFlight,
@@ -79,10 +72,6 @@ func NewServerRunOptions() *ServerRunOptions {
 // ApplyOptions applies the run options to the method receiver and returns self
 func (s *ServerRunOptions) ApplyTo(c *server.Config) error {
 	c.CorsAllowedOriginList = s.CorsAllowedOriginList
-	c.EnableGarbageCollection = s.EnableGarbageCollection
-	c.EnableProfiling = s.EnableProfiling
-	c.EnableContentionProfiling = s.EnableContentionProfiling
-	c.EnableSwaggerUI = s.EnableSwaggerUI
 	c.ExternalAddress = s.ExternalHost
 	c.MaxRequestsInFlight = s.MaxRequestsInFlight
 	c.MaxMutatingRequestsInFlight = s.MaxMutatingRequestsInFlight
@@ -148,18 +137,6 @@ func (s *ServerRunOptions) AddUniversalFlags(fs *pflag.FlagSet) {
 
 	fs.IntVar(&s.DeleteCollectionWorkers, "delete-collection-workers", s.DeleteCollectionWorkers,
 		"Number of workers spawned for DeleteCollection call. These are used to speed up namespace cleanup.")
-
-	fs.BoolVar(&s.EnableGarbageCollection, "enable-garbage-collector", s.EnableGarbageCollection, ""+
-		"Enables the generic garbage collector. MUST be synced with the corresponding flag "+
-		"of the kube-controller-manager.")
-
-	fs.BoolVar(&s.EnableProfiling, "profiling", s.EnableProfiling,
-		"Enable profiling via web interface host:port/debug/pprof/")
-	fs.BoolVar(&s.EnableContentionProfiling, "contention-profiling", s.EnableContentionProfiling,
-		"Enable contention profiling. Requires --profiling to be set to work.")
-
-	fs.BoolVar(&s.EnableSwaggerUI, "enable-swagger-ui", s.EnableSwaggerUI,
-		"Enables swagger ui on the apiserver at /swagger-ui")
 
 	// TODO: enable cache in integration tests.
 	fs.BoolVar(&s.EnableWatchCache, "watch-cache", s.EnableWatchCache,

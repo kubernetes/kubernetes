@@ -106,6 +106,9 @@ func Run(s *options.ServerRunOptions) error {
 	if err := s.Audit.ApplyTo(genericConfig); err != nil {
 		return err
 	}
+	if err := s.Features.ApplyTo(genericConfig); err != nil {
+		return err
+	}
 
 	// TODO: register cluster federation resources here.
 	resourceConfig := genericapiserver.NewResourceConfig()
@@ -211,7 +214,7 @@ func Run(s *options.ServerRunOptions) error {
 	// TODO: Refactor this code to share it with kube-apiserver rather than duplicating it here.
 	restOptionsFactory := &restOptionsFactory{
 		storageFactory:          storageFactory,
-		enableGarbageCollection: s.GenericServerRunOptions.EnableGarbageCollection,
+		enableGarbageCollection: s.Features.EnableGarbageCollection,
 		deleteCollectionWorkers: s.GenericServerRunOptions.DeleteCollectionWorkers,
 	}
 	if s.GenericServerRunOptions.EnableWatchCache {
