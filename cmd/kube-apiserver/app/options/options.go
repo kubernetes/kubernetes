@@ -68,7 +68,7 @@ type ServerRunOptions struct {
 func NewServerRunOptions() *ServerRunOptions {
 	s := ServerRunOptions{
 		GenericServerRunOptions: genericoptions.NewServerRunOptions(),
-		Etcd:                 genericoptions.NewEtcdOptions(api.Scheme),
+		Etcd:                 genericoptions.NewEtcdOptions(kubeoptions.DefaultEtcdPathPrefix, api.Scheme, nil),
 		SecureServing:        genericoptions.NewSecureServingOptions(),
 		InsecureServing:      genericoptions.NewInsecureServingOptions(),
 		Audit:                genericoptions.NewAuditLogOptions(),

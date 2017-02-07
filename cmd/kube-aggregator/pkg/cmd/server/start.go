@@ -24,15 +24,11 @@ import (
 	"github.com/pborman/uuid"
 	"github.com/spf13/cobra"
 
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/apiserver/pkg/registry/generic"
-	"k8s.io/apiserver/pkg/registry/generic/registry"
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	"k8s.io/apiserver/pkg/server/filters"
 	genericoptions "k8s.io/apiserver/pkg/server/options"
-	"k8s.io/apiserver/pkg/storage/storagebackend"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/kubernetes/cmd/kube-aggregator/pkg/apiserver"
 	"k8s.io/kubernetes/pkg/api"
@@ -59,14 +55,11 @@ type AggregatorOptions struct {
 // NewCommandStartMaster provides a CLI handler for 'start master' command
 func NewCommandStartAggregator(out, err io.Writer) *cobra.Command {
 	o := &AggregatorOptions{
-		RecommendedOptions: genericoptions.NewRecommendedOptions(api.Scheme),
+		RecommendedOptions: genericoptions.NewRecommendedOptions(defaultEtcdPathPrefix, api.Scheme, api.Codecs.LegacyCodec(v1alpha1.SchemeGroupVersion)),
 
 		StdOut: out,
 		StdErr: err,
 	}
-	o.RecommendedOptions.Etcd.StorageConfig.Type = storagebackend.StorageTypeETCD3
-	o.RecommendedOptions.Etcd.StorageConfig.Prefix = defaultEtcdPathPrefix
-	o.RecommendedOptions.Etcd.StorageConfig.Codec = api.Codecs.LegacyCodec(v1alpha1.SchemeGroupVersion)
 	o.RecommendedOptions.SecureServing.ServingOptions.BindPort = 443
 
 	cmd := &cobra.Command{
@@ -129,7 +122,6 @@ func (o AggregatorOptions) RunAggregator() error {
 
 	config := apiserver.Config{
 		GenericConfig:       serverConfig,
-		RESTOptionsGetter:   &restOptionsFactory{storageConfig: &o.RecommendedOptions.Etcd.StorageConfig},
 		CoreAPIServerClient: coreAPIServerClient,
 	}
 
@@ -149,18 +141,4 @@ func (o AggregatorOptions) RunAggregator() error {
 	server.GenericAPIServer.PrepareRun().Run(wait.NeverStop)
 
 	return nil
-}
-
-type restOptionsFactory struct {
-	storageConfig *storagebackend.Config
-}
-
-func (f *restOptionsFactory) GetRESTOptions(resource schema.GroupResource) (generic.RESTOptions, error) {
-	return generic.RESTOptions{
-		StorageConfig:           f.storageConfig,
-		Decorator:               registry.StorageWithCacher,
-		DeleteCollectionWorkers: 1,
-		EnableGarbageCollection: false,
-		ResourcePrefix:          f.storageConfig.Prefix + "/" + resource.Group + "/" + resource.Resource,
-	}, nil
 }

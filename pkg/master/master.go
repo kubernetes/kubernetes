@@ -83,6 +83,7 @@ type Config struct {
 
 	APIResourceConfigSource  genericapiserver.APIResourceConfigSource
 	StorageFactory           genericapiserver.StorageFactory
+	EnableGarbageCollection  bool
 	EnableWatchCache         bool
 	EnableCoreControllers    bool
 	EndpointReconcilerConfig EndpointReconcilerConfig
@@ -224,7 +225,7 @@ func (c completedConfig) New() (*Master, error) {
 
 	restOptionsFactory := &restOptionsFactory{
 		deleteCollectionWorkers: c.DeleteCollectionWorkers,
-		enableGarbageCollection: c.GenericConfig.EnableGarbageCollection,
+		enableGarbageCollection: c.EnableGarbageCollection,
 		storageFactory:          c.StorageFactory,
 	}
 
