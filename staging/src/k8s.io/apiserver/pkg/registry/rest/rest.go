@@ -65,6 +65,11 @@ type KindProvider interface {
 	Kind() string
 }
 
+// ShortNamesProvider is an interface for RESTful storage services. Delivers a list of short names for a resource. The list is used by kubectl to have short names representation of resources.
+type ShortNamesProvider interface {
+	ShortNames() []string
+}
+
 // Lister is an object that can retrieve resources that match the provided field and label criteria.
 type Lister interface {
 	// NewList returns an empty object that can be used with the List call.

@@ -2818,6 +2818,16 @@ runTests() {
     kube::test::get_object_assert rolebinding/sarole "{{range.subjects}}{{.name}}:{{end}}" 'sa-name:'
   fi
 
+  #########################
+  # Assert short name     #
+  #########################
+
+  kube::log::status "Testing propagation of short names for resources"
+  output_message=$(kubectl get --raw=/api/v1)
+
+  ## test if a short name is exported during discovery
+  kube::test::if_has_string "${output_message}" '{"name":"configmaps","namespaced":true,"kind":"ConfigMap","verbs":\["create","delete","deletecollection","get","list","patch","update","watch"\],"shortNames":\["cm"\]}'
+
   ###########################
   # POD creation / deletion #
   ###########################

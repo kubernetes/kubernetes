@@ -368,3 +368,11 @@ func TestStatusUpdate(t *testing.T) {
 		t.Errorf("we expected .status.replicas to be updated to %d but it was %v", defaultReplicas, rs.Status.Replicas)
 	}
 }
+
+func TestShortNames(t *testing.T) {
+	storage, server := newStorage(t)
+	defer server.Terminate(t)
+	defer storage.ReplicaSet.DestroyFunc()
+	expected := []string{"rs"}
+	registrytest.AssertShortNames(t, storage.ReplicaSet, expected)
+}

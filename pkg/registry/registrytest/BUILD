@@ -15,6 +15,7 @@ go_library(
         "etcd.go",
         "node.go",
         "service.go",
+        "shortNamesProvider.go",
     ],
     tags = ["automanaged"],
     deps = [
@@ -30,6 +31,7 @@ go_library(
         "//vendor:k8s.io/apimachinery/pkg/watch",
         "//vendor:k8s.io/apiserver/pkg/endpoints/request",
         "//vendor:k8s.io/apiserver/pkg/registry/generic/registry",
+        "//vendor:k8s.io/apiserver/pkg/registry/rest",
         "//vendor:k8s.io/apiserver/pkg/registry/rest/resttest",
         "//vendor:k8s.io/apiserver/pkg/storage/etcd",
         "//vendor:k8s.io/apiserver/pkg/storage/etcd/testing",

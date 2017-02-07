@@ -61,6 +61,11 @@ func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, *StatusREST) {
 	return &REST{store}, &StatusREST{store: &statusStore}
 }
 
+// ShortNames implements the ShortNamesProvider interface. Returns a list of short names for a resource.
+func (r *REST) ShortNames() []string {
+	return []string{"pdb"}
+}
+
 // StatusREST implements the REST endpoint for changing the status of an podDisruptionBudget
 type StatusREST struct {
 	store *genericregistry.Store
