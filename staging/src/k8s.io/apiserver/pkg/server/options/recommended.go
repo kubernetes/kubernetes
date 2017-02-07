@@ -30,6 +30,7 @@ type RecommendedOptions struct {
 	SecureServing  *SecureServingOptions
 	Authentication *DelegatingAuthenticationOptions
 	Authorization  *DelegatingAuthorizationOptions
+	Audit          *AuditLogOptions
 }
 
 func NewRecommendedOptions(scheme *runtime.Scheme) *RecommendedOptions {
@@ -38,6 +39,7 @@ func NewRecommendedOptions(scheme *runtime.Scheme) *RecommendedOptions {
 		SecureServing:  NewSecureServingOptions(),
 		Authentication: NewDelegatingAuthenticationOptions(),
 		Authorization:  NewDelegatingAuthorizationOptions(),
+		Audit:          NewAuditLogOptions(),
 	}
 }
 
@@ -46,6 +48,7 @@ func (o *RecommendedOptions) AddFlags(fs *pflag.FlagSet) {
 	o.SecureServing.AddFlags(fs)
 	o.Authentication.AddFlags(fs)
 	o.Authorization.AddFlags(fs)
+	o.Audit.AddFlags(fs)
 }
 
 func (o *RecommendedOptions) ApplyTo(config *server.Config) error {
@@ -56,6 +59,9 @@ func (o *RecommendedOptions) ApplyTo(config *server.Config) error {
 		return err
 	}
 	if err := o.Authorization.ApplyTo(config); err != nil {
+		return err
+	}
+	if err := o.Audit.ApplyTo(config); err != nil {
 		return err
 	}
 

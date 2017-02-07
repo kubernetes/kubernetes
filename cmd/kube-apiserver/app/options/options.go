@@ -44,6 +44,7 @@ type ServerRunOptions struct {
 	Etcd                    *genericoptions.EtcdOptions
 	SecureServing           *genericoptions.SecureServingOptions
 	InsecureServing         *genericoptions.ServingOptions
+	Audit                   *genericoptions.AuditLogOptions
 	Authentication          *kubeoptions.BuiltInAuthenticationOptions
 	Authorization           *kubeoptions.BuiltInAuthorizationOptions
 	CloudProvider           *kubeoptions.CloudProviderOptions
@@ -68,6 +69,7 @@ func NewServerRunOptions() *ServerRunOptions {
 		Etcd:                 genericoptions.NewEtcdOptions(api.Scheme),
 		SecureServing:        genericoptions.NewSecureServingOptions(),
 		InsecureServing:      genericoptions.NewInsecureServingOptions(),
+		Audit:                genericoptions.NewAuditLogOptions(),
 		Authentication:       kubeoptions.NewBuiltInAuthenticationOptions().WithAll(),
 		Authorization:        kubeoptions.NewBuiltInAuthorizationOptions(),
 		CloudProvider:        kubeoptions.NewCloudProviderOptions(),
@@ -103,6 +105,7 @@ func (s *ServerRunOptions) AddFlags(fs *pflag.FlagSet) {
 	s.SecureServing.AddDeprecatedFlags(fs)
 	s.InsecureServing.AddFlags(fs)
 	s.InsecureServing.AddDeprecatedFlags(fs)
+	s.Audit.AddFlags(fs)
 	s.Authentication.AddFlags(fs)
 	s.Authorization.AddFlags(fs)
 	s.CloudProvider.AddFlags(fs)
