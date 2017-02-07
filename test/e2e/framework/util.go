@@ -3447,7 +3447,7 @@ func WaitForObservedDeployment(c clientset.Interface, ns, deploymentName string,
 
 func WaitForDeploymentWithCondition(c clientset.Interface, ns, deploymentName, reason string, condType extensions.DeploymentConditionType) error {
 	var conditions []extensions.DeploymentCondition
-	pollErr := wait.PollImmediate(time.Second, 1*time.Minute, func() (bool, error) {
+	pollErr := wait.PollImmediate(time.Second, 5*time.Minute, func() (bool, error) {
 		deployment, err := c.Extensions().Deployments(ns).Get(deploymentName, metav1.GetOptions{})
 		if err != nil {
 			return false, err
