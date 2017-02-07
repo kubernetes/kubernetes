@@ -36,11 +36,11 @@ import (
 )
 
 const (
-	// emptyUniquePodName is a UniquePodName for empty string.
+	// EmptyUniquePodName is a UniquePodName for empty string.
 	EmptyUniquePodName types.UniquePodName = types.UniquePodName("")
 
-	// emptyUniqueVolumeName is a UniqueVolumeName for empty string
-	emptyUniqueVolumeName v1.UniqueVolumeName = v1.UniqueVolumeName("")
+	// EmptyUniqueVolumeName is a UniqueVolumeName for empty string
+	EmptyUniqueVolumeName v1.UniqueVolumeName = v1.UniqueVolumeName("")
 )
 
 // NestedPendingOperations defines the supported set of operations.
@@ -160,7 +160,7 @@ func (grm *nestedPendingOperations) isOperationExists(
 	podName types.UniquePodName) (bool, int) {
 
 	// If volumeName is empty, operation can be executed concurrently
-	if volumeName == emptyUniqueVolumeName {
+	if volumeName == EmptyUniqueVolumeName {
 		return false, -1
 	}
 
