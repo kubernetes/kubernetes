@@ -315,16 +315,19 @@ func Run(s *options.ServerRunOptions) error {
 		sets.NewString("watch", "proxy"),
 		sets.NewString("attach", "exec", "proxy", "log", "portforward"),
 	)
+	genericConfig.RESTOptionsGetter = &kubeapiserver.RESTOptionsFactory{
+		StorageFactory:          storageFactory,
+		EnableWatchCache:        s.Etcd.EnableWatchCache,
+		EnableGarbageCollection: s.Etcd.EnableGarbageCollection,
+		DeleteCollectionWorkers: s.Etcd.DeleteCollectionWorkers,
+	}
 
 	config := &master.Config{
 		GenericConfig: genericConfig,
 
 		APIResourceConfigSource: storageFactory.APIResourceConfigSource,
 		StorageFactory:          storageFactory,
-		EnableGarbageCollection: s.Etcd.EnableGarbageCollection,
-		EnableWatchCache:        s.Etcd.EnableWatchCache,
 		EnableCoreControllers:   true,
-		DeleteCollectionWorkers: s.Etcd.DeleteCollectionWorkers,
 		EventTTL:                s.EventTTL,
 		KubeletClientConfig:     s.KubeletConfig,
 		EnableUISupport:         true,
