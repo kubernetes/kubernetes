@@ -3177,6 +3177,15 @@ func TestValidatePodSpec(t *testing.T) {
 	}
 }
 
+func extendPodSpecwithTolerations(in api.PodSpec, tolerations []api.Toleration) api.PodSpec {
+	var out api.PodSpec
+	out.Containers = in.Containers
+	out.RestartPolicy = in.RestartPolicy
+	out.DNSPolicy = in.DNSPolicy
+	out.Tolerations = tolerations
+	return out
+}
+
 func TestValidatePod(t *testing.T) {
 	validPodSpec := func(affinity *api.Affinity) api.PodSpec {
 		spec := api.PodSpec{
@@ -3382,64 +3391,27 @@ func TestValidatePod(t *testing.T) {
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "123",
 				Namespace: "ns",
-				Annotations: map[string]string{
-					api.TolerationsAnnotationKey: `
-					[{
-						"key": "foo",
-						"operator": "Exists",
-						"value": "",
-						"effect": "NoExecute",
-						"tolerationSeconds": 60
-					}]`,
-				},
 			},
-			Spec: validPodSpec(nil),
+			Spec: extendPodSpecwithTolerations(validPodSpec(nil), []api.Toleration{{Key: "foo", Operator: "Exists", Value: "", Effect: "NoExecute", TolerationSeconds: &[]int64{60}[0]}}),
 		},
 		{ // populate forgiveness tolerations with equal operator in annotations.
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "123",
 				Namespace: "ns",
-				Annotations: map[string]string{
-					api.TolerationsAnnotationKey: `
-					[{
-						"key": "foo",
-						"operator": "Equal",
-						"value": "bar",
-						"effect": "NoExecute",
-						"tolerationSeconds": 60
-					}]`,
-				},
 			},
-			Spec: validPodSpec(nil),
+			Spec: extendPodSpecwithTolerations(validPodSpec(nil), []api.Toleration{{Key: "foo", Operator: "Equal", Value: "bar", Effect: "NoExecute", TolerationSeconds: &[]int64{60}[0]}}),
 		},
 		{ // populate tolerations equal operator in annotations.
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "123",
 				Namespace: "ns",
-				Annotations: map[string]string{
-					api.TolerationsAnnotationKey: `
-					[{
-						"key": "foo",
-						"operator": "Equal",
-						"value": "bar",
-						"effect": "NoSchedule"
-					}]`,
-				},
 			},
-			Spec: validPodSpec(nil),
+			Spec: extendPodSpecwithTolerations(validPodSpec(nil), []api.Toleration{{Key: "foo", Operator: "Equal", Value: "bar", Effect: "NoSchedule"}}),
 		},
 		{ // populate tolerations exists operator in annotations.
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "123",
 				Namespace: "ns",
-				Annotations: map[string]string{
-					api.TolerationsAnnotationKey: `
-					[{
-						"key": "foo",
-						"operator": "Exists",
-						"effect": "NoSchedule"
-					}]`,
-				},
 			},
 			Spec: validPodSpec(nil),
 		},
@@ -3447,61 +3419,29 @@ func TestValidatePod(t *testing.T) {
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "123",
 				Namespace: "ns",
-				Annotations: map[string]string{
-					api.TolerationsAnnotationKey: `
-					[{
-						"operator": "Exists",
-						"effect": "NoSchedule"
-					}]`,
-				},
 			},
-			Spec: validPodSpec(nil),
+			Spec: extendPodSpecwithTolerations(validPodSpec(nil), []api.Toleration{{Operator: "Exists", Effect: "NoSchedule"}}),
 		},
 		{ // empty operator is OK for toleration, defaults to Equal.
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "123",
 				Namespace: "ns",
-				Annotations: map[string]string{
-					api.TolerationsAnnotationKey: `
-					[{
-						"key": "foo",
-						"value": "bar",
-						"effect": "NoSchedule"
-					}]`,
-				},
 			},
-			Spec: validPodSpec(nil),
+			Spec: extendPodSpecwithTolerations(validPodSpec(nil), []api.Toleration{{Key: "foo", Value: "bar", Effect: "NoSchedule"}}),
 		},
 		{ // empty effect is OK for toleration, empty toleration effect means match all taint effects.
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "123",
 				Namespace: "ns",
-				Annotations: map[string]string{
-					api.TolerationsAnnotationKey: `
-					[{
-						"key": "foo",
-						"operator": "Equal",
-						"value": "bar"
-					}]`,
-				},
 			},
-			Spec: validPodSpec(nil),
+			Spec: extendPodSpecwithTolerations(validPodSpec(nil), []api.Toleration{{Key: "foo", Operator: "Equal", Value: "bar"}}),
 		},
 		{ // negative tolerationSeconds is OK for toleration.
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "pod-forgiveness-invalid",
 				Namespace: "ns",
-				Annotations: map[string]string{
-					api.TolerationsAnnotationKey: `
-					[{
-						"key": "node.alpha.kubernetes.io/notReady",
-						"operator": "Exists",
-						"effect": "NoExecute",
-						"tolerationSeconds": -2
-					}]`,
-				},
 			},
-			Spec: validPodSpec(nil),
+			Spec: extendPodSpecwithTolerations(validPodSpec(nil), []api.Toleration{{Key: "node.alpha.kubernetes.io/notReady", Operator: "Exists", Effect: "NoExecute", TolerationSeconds: &[]int64{-2}[0]}}),
 		},
 		{ // docker default seccomp profile
 			ObjectMeta: metav1.ObjectMeta{
@@ -3918,81 +3858,37 @@ func TestValidatePod(t *testing.T) {
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "123",
 				Namespace: "ns",
-				Annotations: map[string]string{
-					api.TolerationsAnnotationKey: `
-					[{
-						"key": "nospecialchars^=@",
-						"operator": "Equal",
-						"value": "bar",
-						"effect": "NoSchedule"
-					}]`,
-				},
 			},
-			Spec: validPodSpec(nil),
+			Spec: extendPodSpecwithTolerations(validPodSpec(nil), []api.Toleration{{Key: "nospecialchars^=@", Operator: "Equal", Value: "bar", Effect: "NoSchedule"}}),
 		},
 		"invalid toleration operator": {
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "123",
 				Namespace: "ns",
-				Annotations: map[string]string{
-					api.TolerationsAnnotationKey: `
-					[{
-						"key": "foo",
-						"operator": "In",
-						"value": "bar",
-						"effect": "NoSchedule"
-					}]`,
-				},
 			},
-			Spec: validPodSpec(nil),
+			Spec: extendPodSpecwithTolerations(validPodSpec(nil), []api.Toleration{{Key: "foo", Operator: "In", Value: "bar", Effect: "NoSchedule"}}),
 		},
 		"value must be empty when `operator` is 'Exists'": {
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "123",
 				Namespace: "ns",
-				Annotations: map[string]string{
-					api.TolerationsAnnotationKey: `
-					[{
-						"key": "foo",
-						"operator": "Exists",
-						"value": "bar",
-						"effect": "NoSchedule"
-					}]`,
-				},
 			},
-			Spec: validPodSpec(nil),
+			Spec: extendPodSpecwithTolerations(validPodSpec(nil), []api.Toleration{{Key: "foo", Operator: "Exists", Value: "bar", Effect: "NoSchedule"}}),
 		},
 
 		"operator must be 'Exists' when `key` is empty": {
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "123",
 				Namespace: "ns",
-				Annotations: map[string]string{
-					api.TolerationsAnnotationKey: `
-					[{
-						"operator": "Equal",
-						"value": "bar",
-						"effect": "NoSchedule"
-					}]`,
-				},
 			},
-			Spec: validPodSpec(nil),
+			Spec: extendPodSpecwithTolerations(validPodSpec(nil), []api.Toleration{{Operator: "Equal", Value: "bar", Effect: "NoSchedule"}}),
 		},
 		"effect must be 'NoExecute' when `TolerationSeconds` is set": {
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "pod-forgiveness-invalid",
 				Namespace: "ns",
-				Annotations: map[string]string{
-					api.TolerationsAnnotationKey: `
-					[{
-						"key": "node.alpha.kubernetes.io/notReady",
-						"operator": "Exists",
-						"effect": "NoSchedule",
-						"tolerationSeconds": 20
-					}]`,
-				},
 			},
-			Spec: validPodSpec(nil),
+			Spec: extendPodSpecwithTolerations(validPodSpec(nil), []api.Toleration{{Key: "node.alpha.kubernetes.io/notReady", Operator: "Exists", Effect: "NoSchedule", TolerationSeconds: &[]int64{20}[0]}}),
 		},
 		"must be a valid pod seccomp profile": {
 			ObjectMeta: metav1.ObjectMeta{
@@ -5826,15 +5722,6 @@ func TestValidateNode(t *testing.T) {
 		{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "dedicated-node1",
-				// Add a valid taint to a node
-				Annotations: map[string]string{
-					api.TaintsAnnotationKey: `
-					[{
-						"key": "GPU",
-						"value": "true",
-						"effect": "NoSchedule"
-					}]`,
-				},
 			},
 			Status: api.NodeStatus{
 				Addresses: []api.NodeAddress{
@@ -5847,6 +5734,8 @@ func TestValidateNode(t *testing.T) {
 			},
 			Spec: api.NodeSpec{
 				ExternalID: "external",
+				// Add a valid taint to a node
+				Taints: []api.Taint{{Key: "GPU", Value: "true", Effect: "NoSchedule"}},
 			},
 		},
 		{
@@ -5940,48 +5829,26 @@ func TestValidateNode(t *testing.T) {
 		"missing-taint-key": {
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "dedicated-node1",
-				// Add a taint with an empty key to a node
-				Annotations: map[string]string{
-					api.TaintsAnnotationKey: `
-					[{
-						"key": "",
-						"value": "special-user-1",
-						"effect": "NoSchedule"
-					}]`,
-				},
 			},
 			Spec: api.NodeSpec{
 				ExternalID: "external",
+				// Add a taint with an empty key to a node
+				Taints: []api.Taint{{Key: "", Value: "special-user-1", Effect: "NoSchedule"}},
 			},
 		},
 		"bad-taint-key": {
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "dedicated-node1",
-				// Add a taint with an empty key to a node
-				Annotations: map[string]string{
-					api.TaintsAnnotationKey: `
-					[{
-						"key": "NoUppercaseOrSpecialCharsLike=Equals",
-						"value": "special-user-1",
-						"effect": "NoSchedule"
-					}]`,
-				},
 			},
 			Spec: api.NodeSpec{
 				ExternalID: "external",
+				// Add a taint with an invalid  key to a node
+				Taints: []api.Taint{{Key: "NoUppercaseOrSpecialCharsLike=Equals", Value: "special-user-1", Effect: "NoSchedule"}},
 			},
 		},
 		"bad-taint-value": {
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "dedicated-node2",
-				Annotations: map[string]string{
-					api.TaintsAnnotationKey: `
-					[{
-						"key": "dedicated",
-						"value": "some\\bad\\value",
-						"effect": "NoSchedule"
-					}]`,
-				},
 			},
 			Status: api.NodeStatus{
 				Addresses: []api.NodeAddress{
@@ -5992,23 +5859,15 @@ func TestValidateNode(t *testing.T) {
 					api.ResourceName(api.ResourceMemory): resource.MustParse("0"),
 				},
 			},
-			// Add a taint with an empty value to a node
 			Spec: api.NodeSpec{
 				ExternalID: "external",
+				// Add a taint with a bad value to a node
+				Taints: []api.Taint{{Key: "dedicated", Value: "some\\bad\\value", Effect: "NoSchedule"}},
 			},
 		},
 		"missing-taint-effect": {
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "dedicated-node3",
-				// Add a taint with an empty effect to a node
-				Annotations: map[string]string{
-					api.TaintsAnnotationKey: `
-					[{
-						"key": "dedicated",
-						"value": "special-user-3",
-						"effect": ""
-					}]`,
-				},
 			},
 			Status: api.NodeStatus{
 				Addresses: []api.NodeAddress{
@@ -6021,20 +5880,13 @@ func TestValidateNode(t *testing.T) {
 			},
 			Spec: api.NodeSpec{
 				ExternalID: "external",
+				// Add a taint with an empty effect to a node
+				Taints: []api.Taint{{Key: "dedicated", Value: "special-user-3", Effect: ""}},
 			},
 		},
 		"invalid-taint-effect": {
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "dedicated-node3",
-				// Add a taint with an empty effect to a node
-				Annotations: map[string]string{
-					api.TaintsAnnotationKey: `
-					[{
-						"key": "dedicated",
-						"value": "special-user-3",
-						"effect": "NoScheduleNoAdmit"
-					}]`,
-				},
 			},
 			Status: api.NodeStatus{
 				Addresses: []api.NodeAddress{
@@ -6047,27 +5899,21 @@ func TestValidateNode(t *testing.T) {
 			},
 			Spec: api.NodeSpec{
 				ExternalID: "external",
+				// Add a taint with NoExecute effect to a node
+				Taints: []api.Taint{{Key: "dedicated", Value: "special-user-3", Effect: "NoScheduleNoAdmit"}},
 			},
 		},
 		"duplicated-taints-with-same-key-effect": {
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "dedicated-node1",
-				// Add two taints to the node with the same key and effect; should be rejected.
-				Annotations: map[string]string{
-					api.TaintsAnnotationKey: `
-					[{
-						"key": "dedicated",
-						"value": "special-user-1",
-						"effect": "NoSchedule"
-					}, {
-						"key": "dedicated",
-						"value": "special-user-2",
-						"effect": "NoSchedule"
-					}]`,
-				},
 			},
 			Spec: api.NodeSpec{
 				ExternalID: "external",
+				// Add two taints to the node with the same key and effect; should be rejected.
+				Taints: []api.Taint{
+					{Key: "dedicated", Value: "special-user-1", Effect: "NoSchedule"},
+					{Key: "dedicated", Value: "special-user-2", Effect: "NoSchedule"},
+				},
 			},
 		},
 		"missing-podSignature": {
@@ -6145,9 +5991,9 @@ func TestValidateNode(t *testing.T) {
 				"metadata.annotations":                                                                                        true,
 				"metadata.namespace":                                                                                          true,
 				"spec.externalID":                                                                                             true,
-				"metadata.annotations.scheduler.alpha.kubernetes.io/taints[0].key":                                            true,
-				"metadata.annotations.scheduler.alpha.kubernetes.io/taints[0].value":                                          true,
-				"metadata.annotations.scheduler.alpha.kubernetes.io/taints[0].effect":                                         true,
+				"spec.taints[0].key":                                                                                          true,
+				"spec.taints[0].value":                                                                                        true,
+				"spec.taints[0].effect":                                                                                       true,
 				"metadata.annotations.scheduler.alpha.kubernetes.io/preferAvoidPods[0].PodSignature":                          true,
 				"metadata.annotations.scheduler.alpha.kubernetes.io/preferAvoidPods[0].PodSignature.PodController.Controller": true,
 			}

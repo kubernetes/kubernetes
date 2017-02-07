@@ -2522,8 +2522,7 @@ func ExpectNodeHasTaint(c clientset.Interface, nodeName string, taint *v1.Taint)
 	node, err := c.Core().Nodes().Get(nodeName, metav1.GetOptions{})
 	ExpectNoError(err)
 
-	nodeTaints, err := v1.GetTaintsFromNodeAnnotations(node.Annotations)
-	ExpectNoError(err)
+	nodeTaints := node.Spec.Taints
 
 	if len(nodeTaints) == 0 || !v1.TaintExists(nodeTaints, taint) {
 		Failf("Failed to find taint %s on node %s", taint.ToString(), nodeName)
