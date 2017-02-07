@@ -61,7 +61,6 @@ go_library(
         "//plugin/pkg/admission/namespace/lifecycle:go_default_library",
         "//vendor:github.com/go-openapi/spec",
         "//vendor:github.com/golang/glog",
-        "//vendor:github.com/pborman/uuid",
         "//vendor:github.com/spf13/cobra",
         "//vendor:github.com/spf13/pflag",
         "//vendor:k8s.io/apimachinery/pkg/openapi",

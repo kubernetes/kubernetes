@@ -14099,6 +14099,7 @@ go_library(
     tags = ["automanaged"],
     deps = [
         "//vendor:github.com/golang/glog",
+        "//vendor:github.com/pborman/uuid",
         "//vendor:github.com/spf13/pflag",
         "//vendor:gopkg.in/natefinch/lumberjack.v2",
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",

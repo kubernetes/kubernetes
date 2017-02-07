@@ -493,7 +493,7 @@ NextTest:
 			},
 			SNICertKeys: namedCertKeys,
 		}
-		if err := secureOptions.ApplyTo(&config); err != nil {
+		if err := secureOptions.applyServingInfoTo(&config); err != nil {
 			t.Errorf("%q - failed applying the SecureServingOptions: %v", title, err)
 			continue NextTest
 		}

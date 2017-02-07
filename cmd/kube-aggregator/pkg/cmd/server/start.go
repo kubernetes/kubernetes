@@ -21,7 +21,6 @@ import (
 	"io"
 	"io/ioutil"
 
-	"github.com/pborman/uuid"
 	"github.com/spf13/cobra"
 
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -114,7 +113,7 @@ func (o AggregatorOptions) RunAggregator() error {
 		WithSerializer(api.Codecs)
 
 	if err := o.SecureServing.ApplyTo(genericAPIServerConfig); err != nil {
-		return fmt.Errorf("failed to configure https: %s", err)
+		return err
 	}
 	if err := o.Authentication.ApplyTo(genericAPIServerConfig); err != nil {
 		return err
@@ -126,12 +125,6 @@ func (o AggregatorOptions) RunAggregator() error {
 		sets.NewString("watch", "proxy"),
 		sets.NewString("attach", "exec", "proxy", "log", "portforward"),
 	)
-
-	var err error
-	privilegedLoopbackToken := uuid.NewRandom().String()
-	if genericAPIServerConfig.LoopbackClientConfig, err = genericAPIServerConfig.SecureServingInfo.NewSelfClientConfig(privilegedLoopbackToken); err != nil {
-		return err
-	}
 
 	kubeconfig, err := restclient.InClusterConfig()
 	if err != nil {
