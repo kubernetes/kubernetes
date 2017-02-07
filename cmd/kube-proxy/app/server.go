@@ -32,6 +32,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/wait"
+	clientgoclientset "k8s.io/client-go/kubernetes"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	clientv1 "k8s.io/client-go/pkg/api/v1"
 	"k8s.io/client-go/tools/clientcmd"
@@ -39,7 +40,6 @@ import (
 	"k8s.io/client-go/tools/record"
 	"k8s.io/kubernetes/cmd/kube-proxy/app/options"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/v1"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/proxy"
 	proxyconfig "k8s.io/kubernetes/pkg/proxy/config"
@@ -63,6 +63,7 @@ import (
 
 type ProxyServer struct {
 	Client       clientset.Interface
+	EventClient  v1core.EventsGetter
 	Config       *options.ProxyServerConfig
 	IptInterface utiliptables.Interface
 	Proxier      proxy.ProxyProvider
@@ -87,6 +88,7 @@ func checkKnownProxyMode(proxyMode string) bool {
 
 func NewProxyServer(
 	client clientset.Interface,
+	eventClient v1core.EventsGetter,
 	config *options.ProxyServerConfig,
 	iptInterface utiliptables.Interface,
 	proxier proxy.ProxyProvider,
@@ -97,6 +99,7 @@ func NewProxyServer(
 ) (*ProxyServer, error) {
 	return &ProxyServer{
 		Client:       client,
+		EventClient:  eventClient,
 		Config:       config,
 		IptInterface: iptInterface,
 		Proxier:      proxier,
@@ -203,6 +206,11 @@ func NewProxyServerDefault(config *options.ProxyServerConfig) (*ProxyServer, err
 		glog.Fatalf("Invalid API configuration: %v", err)
 	}
 
+	eventClient, err := clientgoclientset.NewForConfig(kubeconfig)
+	if err != nil {
+		return nil, err
+	}
+
 	// Create event recorder
 	hostname := nodeutil.GetHostname(config.HostnameOverride)
 	eventBroadcaster := record.NewBroadcaster()
@@ -303,7 +311,7 @@ func NewProxyServerDefault(config *options.ProxyServerConfig) (*ProxyServer, err
 		endpointsConfig.Channel("api"),
 	)
 
-	config.NodeRef = &v1.ObjectReference{
+	config.NodeRef = &clientv1.ObjectReference{
 		Kind:      "Node",
 		Name:      hostname,
 		UID:       types.UID(hostname),
@@ -312,7 +320,7 @@ func NewProxyServerDefault(config *options.ProxyServerConfig) (*ProxyServer, err
 
 	conntracker := realConntracker{}
 
-	return NewProxyServer(client, config, iptInterface, proxier, eventBroadcaster, recorder, conntracker, proxyMode)
+	return NewProxyServer(client, eventClient, config, iptInterface, proxier, eventBroadcaster, recorder, conntracker, proxyMode)
 }
 
 // Run runs the specified ProxyServer.  This should never exit (unless CleanupAndExit is set).
@@ -327,7 +335,7 @@ func (s *ProxyServer) Run() error {
 		return nil
 	}
 
-	s.Broadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: v1core.New(s.Client.Core().RESTClient()).Events("")})
+	s.Broadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: s.EventClient.Events("")})
 
 	// Start up a webserver if requested
 	if s.Config.HealthzPort > 0 {
