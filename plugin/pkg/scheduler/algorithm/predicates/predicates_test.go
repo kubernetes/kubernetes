@@ -2955,15 +2955,8 @@ func TestPodToleratesTaints(t *testing.T) {
 				},
 			},
 			node: v1.Node{
-				ObjectMeta: metav1.ObjectMeta{
-					Annotations: map[string]string{
-						v1.TaintsAnnotationKey: `
-						[{
-							"key": "dedicated",
-							"value": "user1",
-							"effect": "NoSchedule"
-						}]`,
-					},
+				Spec: v1.NodeSpec{
+					Taints: []v1.Taint{{Key: "dedicated", Value: "user1", Effect: "NoSchedule"}},
 				},
 			},
 			fits: false,
@@ -2973,29 +2966,15 @@ func TestPodToleratesTaints(t *testing.T) {
 			pod: &v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "pod1",
-					Annotations: map[string]string{
-						v1.TolerationsAnnotationKey: `
-						[{
-							"key": "dedicated",
-							"value": "user1",
-							"effect": "NoSchedule"
-						}]`,
-					},
 				},
 				Spec: v1.PodSpec{
-					Containers: []v1.Container{{Image: "pod1:V1"}},
+					Containers:  []v1.Container{{Image: "pod1:V1"}},
+					Tolerations: []v1.Toleration{{Key: "dedicated", Value: "user1", Effect: "NoSchedule"}},
 				},
 			},
 			node: v1.Node{
-				ObjectMeta: metav1.ObjectMeta{
-					Annotations: map[string]string{
-						v1.TaintsAnnotationKey: `
-						[{
-							"key": "dedicated",
-							"value": "user1",
-							"effect": "NoSchedule"
-						}]`,
-					},
+				Spec: v1.NodeSpec{
+					Taints: []v1.Taint{{Key: "dedicated", Value: "user1", Effect: "NoSchedule"}},
 				},
 			},
 			fits: true,
@@ -3005,30 +2984,15 @@ func TestPodToleratesTaints(t *testing.T) {
 			pod: &v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "pod2",
-					Annotations: map[string]string{
-						v1.TolerationsAnnotationKey: `
-						[{
-							"key": "dedicated",
-							"operator": "Equal",
-							"value": "user2",
-							"effect": "NoSchedule"
-						}]`,
-					},
 				},
 				Spec: v1.PodSpec{
-					Containers: []v1.Container{{Image: "pod2:V1"}},
+					Containers:  []v1.Container{{Image: "pod2:V1"}},
+					Tolerations: []v1.Toleration{{Key: "dedicated", Operator: "Equal", Value: "user2", Effect: "NoSchedule"}},
 				},
 			},
 			node: v1.Node{
-				ObjectMeta: metav1.ObjectMeta{
-					Annotations: map[string]string{
-						v1.TaintsAnnotationKey: `
-						[{
-							"key": "dedicated",
-							"value": "user1",
-							"effect": "NoSchedule"
-						}]`,
-					},
+				Spec: v1.NodeSpec{
+					Taints: []v1.Taint{{Key: "dedicated", Value: "user1", Effect: "NoSchedule"}},
 				},
 			},
 			fits: false,
@@ -3038,29 +3002,15 @@ func TestPodToleratesTaints(t *testing.T) {
 			pod: &v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "pod2",
-					Annotations: map[string]string{
-						v1.TolerationsAnnotationKey: `
-						[{
-							"key": "foo",
-							"operator": "Exists",
-							"effect": "NoSchedule"
-						}]`,
-					},
 				},
 				Spec: v1.PodSpec{
-					Containers: []v1.Container{{Image: "pod2:V1"}},
+					Containers:  []v1.Container{{Image: "pod2:V1"}},
+					Tolerations: []v1.Toleration{{Key: "foo", Operator: "Exists", Effect: "NoSchedule"}},
 				},
 			},
 			node: v1.Node{
-				ObjectMeta: metav1.ObjectMeta{
-					Annotations: map[string]string{
-						v1.TaintsAnnotationKey: `
-						[{
-							"key": "foo",
-							"value": "bar",
-							"effect": "NoSchedule"
-						}]`,
-					},
+				Spec: v1.NodeSpec{
+					Taints: []v1.Taint{{Key: "foo", Value: "bar", Effect: "NoSchedule"}},
 				},
 			},
 			fits: true,
@@ -3070,37 +3020,20 @@ func TestPodToleratesTaints(t *testing.T) {
 			pod: &v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "pod2",
-					Annotations: map[string]string{
-						v1.TolerationsAnnotationKey: `
-						[{
-							"key": "dedicated",
-							"operator": "Equal",
-							"value": "user2",
-							"effect": "NoSchedule"
-						}, {
-							"key": "foo",
-							"operator": "Exists",
-							"effect": "NoSchedule"
-						}]`,
-					},
 				},
 				Spec: v1.PodSpec{
 					Containers: []v1.Container{{Image: "pod2:V1"}},
+					Tolerations: []v1.Toleration{
+						{Key: "dedicated", Operator: "Equal", Value: "user2", Effect: "NoSchedule"},
+						{Key: "foo", Operator: "Exists", Effect: "NoSchedule"},
+					},
 				},
 			},
 			node: v1.Node{
-				ObjectMeta: metav1.ObjectMeta{
-					Annotations: map[string]string{
-						v1.TaintsAnnotationKey: `
-						[{
-							"key": "dedicated",
-							"value": "user2",
-							"effect": "NoSchedule"
-						}, {
-							"key": "foo",
-							"value": "bar",
-							"effect": "NoSchedule"
-						}]`,
+				Spec: v1.NodeSpec{
+					Taints: []v1.Taint{
+						{Key: "dedicated", Value: "user2", Effect: "NoSchedule"},
+						{Key: "foo", Value: "bar", Effect: "NoSchedule"},
 					},
 				},
 			},
@@ -3111,29 +3044,16 @@ func TestPodToleratesTaints(t *testing.T) {
 			pod: &v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "pod2",
-					Annotations: map[string]string{
-						v1.TolerationsAnnotationKey: `
-						[{
-							"key": "foo",
-							"operator": "Equal",
-							"value": "bar",
-							"effect": "PreferNoSchedule"
-						}]`,
-					},
 				},
 				Spec: v1.PodSpec{
-					Containers: []v1.Container{{Image: "pod2:V1"}},
+					Containers:  []v1.Container{{Image: "pod2:V1"}},
+					Tolerations: []v1.Toleration{{Key: "foo", Operator: "Equal", Value: "bar", Effect: "PreferNoSchedule"}},
 				},
 			},
 			node: v1.Node{
-				ObjectMeta: metav1.ObjectMeta{
-					Annotations: map[string]string{
-						v1.TaintsAnnotationKey: `
-						[{
-							"key": "foo",
-							"value": "bar",
-							"effect": "NoSchedule"
-						}]`,
+				Spec: v1.NodeSpec{
+					Taints: []v1.Taint{
+						{Key: "foo", Value: "bar", Effect: "NoSchedule"},
 					},
 				},
 			},
@@ -3145,28 +3065,16 @@ func TestPodToleratesTaints(t *testing.T) {
 			pod: &v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "pod2",
-					Annotations: map[string]string{
-						v1.TolerationsAnnotationKey: `
-						[{
-							"key": "foo",
-							"operator": "Equal",
-							"value": "bar"
-						}]`,
-					},
 				},
 				Spec: v1.PodSpec{
-					Containers: []v1.Container{{Image: "pod2:V1"}},
+					Containers:  []v1.Container{{Image: "pod2:V1"}},
+					Tolerations: []v1.Toleration{{Key: "foo", Operator: "Equal", Value: "bar"}},
 				},
 			},
 			node: v1.Node{
-				ObjectMeta: metav1.ObjectMeta{
-					Annotations: map[string]string{
-						v1.TaintsAnnotationKey: `
-						[{
-							"key": "foo",
-							"value": "bar",
-							"effect": "NoSchedule"
-						}]`,
+				Spec: v1.NodeSpec{
+					Taints: []v1.Taint{
+						{Key: "foo", Value: "bar", Effect: "NoSchedule"},
 					},
 				},
 			},
@@ -3178,29 +3086,16 @@ func TestPodToleratesTaints(t *testing.T) {
 			pod: &v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "pod2",
-					Annotations: map[string]string{
-						v1.TolerationsAnnotationKey: `
-						[{
-							"key": "dedicated",
-							"operator": "Equal",
-							"value": "user2",
-							"effect": "NoSchedule"
-						}]`,
-					},
 				},
 				Spec: v1.PodSpec{
-					Containers: []v1.Container{{Image: "pod2:V1"}},
+					Containers:  []v1.Container{{Image: "pod2:V1"}},
+					Tolerations: []v1.Toleration{{Key: "dedicated", Operator: "Equal", Value: "user2", Effect: "NoSchedule"}},
 				},
 			},
 			node: v1.Node{
-				ObjectMeta: metav1.ObjectMeta{
-					Annotations: map[string]string{
-						v1.TaintsAnnotationKey: `
-						[{
-							"key": "dedicated",
-							"value": "user1",
-							"effect": "PreferNoSchedule"
-						}]`,
+				Spec: v1.NodeSpec{
+					Taints: []v1.Taint{
+						{Key: "dedicated", Value: "user1", Effect: "PreferNoSchedule"},
 					},
 				},
 			},
@@ -3218,14 +3113,9 @@ func TestPodToleratesTaints(t *testing.T) {
 				},
 			},
 			node: v1.Node{
-				ObjectMeta: metav1.ObjectMeta{
-					Annotations: map[string]string{
-						v1.TaintsAnnotationKey: `
-						[{
-							"key": "dedicated",
-							"value": "user1",
-							"effect": "PreferNoSchedule"
-						}]`,
+				Spec: v1.NodeSpec{
+					Taints: []v1.Taint{
+						{Key: "dedicated", Value: "user1", Effect: "PreferNoSchedule"},
 					},
 				},
 			},

@@ -45,13 +45,9 @@ var (
 	alwaysReady           = func() bool { return true }
 )
 
-const (
-	noSchedule = `
-	[{
-		"key": "dedicated",
-		"value": "user1",
-		"effect": "NoSchedule"
-	}]`
+var (
+	noScheduleTolerations = []v1.Toleration{{Key: "dedicated", Value: "user1", Effect: "NoSchedule"}}
+	noScheduleTaints      = []v1.Taint{{Key: "dedicated", Value: "user1", Effect: "NoSchedule"}}
 )
 
 func getKey(ds *extensions.DaemonSet, t *testing.T) string {
@@ -722,7 +718,7 @@ func TestTaintedNodeDaemonDoesNotLaunchUntoleratePod(t *testing.T) {
 	manager, podControl, _ := newTestController()
 
 	node := newNode("tainted", nil)
-	setNodeTaint(node, noSchedule)
+	setNodeTaint(node, noScheduleTaints)
 	manager.nodeStore.Add(node)
 
 	ds := newDaemonSet("untolerate")
@@ -736,11 +732,11 @@ func TestTaintedNodeDaemonLaunchesToleratePod(t *testing.T) {
 	manager, podControl, _ := newTestController()
 
 	node := newNode("tainted", nil)
-	setNodeTaint(node, noSchedule)
+	setNodeTaint(node, noScheduleTaints)
 	manager.nodeStore.Add(node)
 
 	ds := newDaemonSet("tolerate")
-	setDaemonSetToleration(ds, noSchedule)
+	setDaemonSetToleration(ds, noScheduleTolerations)
 	manager.dsStore.Add(ds)
 
 	syncAndValidateDaemonSets(t, manager, ds, podControl, 1, 0)
@@ -754,24 +750,18 @@ func TestNodeDaemonLaunchesToleratePod(t *testing.T) {
 	manager.nodeStore.Add(node)
 
 	ds := newDaemonSet("tolerate")
-	setDaemonSetToleration(ds, noSchedule)
+	setDaemonSetToleration(ds, noScheduleTolerations)
 	manager.dsStore.Add(ds)
 
 	syncAndValidateDaemonSets(t, manager, ds, podControl, 1, 0)
 }
 
-func setNodeTaint(node *v1.Node, taint string) {
-	if node.ObjectMeta.Annotations == nil {
-		node.ObjectMeta.Annotations = make(map[string]string)
-	}
-	node.ObjectMeta.Annotations[v1.TaintsAnnotationKey] = taint
+func setNodeTaint(node *v1.Node, taints []v1.Taint) {
+	node.Spec.Taints = taints
 }
 
-func setDaemonSetToleration(ds *extensions.DaemonSet, toleration string) {
-	if ds.Spec.Template.ObjectMeta.Annotations == nil {
-		ds.Spec.Template.ObjectMeta.Annotations = make(map[string]string)
-	}
-	ds.Spec.Template.ObjectMeta.Annotations[v1.TolerationsAnnotationKey] = toleration
+func setDaemonSetToleration(ds *extensions.DaemonSet, tolerations []v1.Toleration) {
+	ds.Spec.Template.Spec.Tolerations = tolerations
 }
 
 func TestNodeShouldRunDaemonPod(t *testing.T) {
