@@ -109,6 +109,7 @@ mkcp "pkg/client/clientset_generated/${CLIENTSET}" "pkg/client/clientset_generat
 
 pushd "${CLIENT_REPO_TEMP}" > /dev/null
 echo "generating vendor/"
+GOPATH="${GOPATH}:${MAIN_REPO}/staging"
 GO15VENDOREXPERIMENT=1 godep save ./...
 popd > /dev/null
 
@@ -186,6 +187,7 @@ find "${CLIENT_REPO_TEMP}" -type f \( \
 
 echo "remove cyclical godep"
 rm -rf "${CLIENT_REPO_TEMP}/_vendor/k8s.io/client-go"
+rm -rf "${CLIENT_REPO_TEMP}/staging"
 
 if [ "${FAIL_ON_CHANGES}" = true ]; then
     echo "running FAIL_ON_CHANGES"
