@@ -80,7 +80,7 @@ func (s *storage) GetRoleBinding(ctx genericapirequest.Context, name string, opt
 }
 
 func (s *storage) DeleteRoleBinding(ctx genericapirequest.Context, name string) error {
-	_, err := s.Delete(ctx, name, nil)
+	_, _, err := s.Delete(ctx, name, nil)
 	return err
 }
 

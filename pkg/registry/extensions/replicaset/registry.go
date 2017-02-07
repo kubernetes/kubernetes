@@ -91,6 +91,6 @@ func (s *storage) UpdateReplicaSet(ctx genericapirequest.Context, replicaSet *ex
 }
 
 func (s *storage) DeleteReplicaSet(ctx genericapirequest.Context, replicaSetID string) error {
-	_, err := s.Delete(ctx, replicaSetID, nil)
+	_, _, err := s.Delete(ctx, replicaSetID, nil)
 	return err
 }
