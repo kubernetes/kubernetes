@@ -73,7 +73,7 @@ func NewCmdPortForward(f cmdutil.Factory, cmdOut, cmdErr io.Writer) *cobra.Comma
 	cmd := &cobra.Command{
 		Use:     "port-forward POD [LOCAL_PORT:]REMOTE_PORT [...[LOCAL_PORT_N:]REMOTE_PORT_N]",
 		Short:   "Forward one or more local ports to a pod",
-		Long:    "Forward one or more local ports to a pod.",
+		Long:    "Forward one or more local ports to a pod. This command requires nsenter to be correctly configured and available on the server.",
 		Example: portforward_example,
 		Run: func(cmd *cobra.Command, args []string) {
 			if err := opts.Complete(f, cmd, args, cmdOut, cmdErr); err != nil {
