@@ -198,7 +198,7 @@ func Run(s *options.ServerRunOptions) error {
 	)
 
 	// TODO: Move this to generic api server (Need to move the command line flag).
-	if s.GenericServerRunOptions.EnableWatchCache {
+	if s.Etcd.EnableWatchCache {
 		cachesize.InitializeWatchCacheSizes(s.GenericServerRunOptions.TargetRAMMB)
 		cachesize.SetWatchCacheSizes(s.GenericServerRunOptions.WatchCacheSizes)
 	}
@@ -214,14 +214,15 @@ func Run(s *options.ServerRunOptions) error {
 	// TODO: Refactor this code to share it with kube-apiserver rather than duplicating it here.
 	restOptionsFactory := &restOptionsFactory{
 		storageFactory:          storageFactory,
-		enableGarbageCollection: s.Features.EnableGarbageCollection,
-		deleteCollectionWorkers: s.GenericServerRunOptions.DeleteCollectionWorkers,
+		enableGarbageCollection: s.Etcd.EnableGarbageCollection,
+		deleteCollectionWorkers: s.Etcd.DeleteCollectionWorkers,
 	}
-	if s.GenericServerRunOptions.EnableWatchCache {
+	if s.Etcd.EnableWatchCache {
 		restOptionsFactory.storageDecorator = genericregistry.StorageWithCacher
 	} else {
 		restOptionsFactory.storageDecorator = generic.UndecoratedStorage
 	}
+	genericConfig.RESTOptionsGetter = restOptionsFactory
 
 	installFederationAPIs(m, restOptionsFactory)
 	installCoreAPIs(s, m, restOptionsFactory)

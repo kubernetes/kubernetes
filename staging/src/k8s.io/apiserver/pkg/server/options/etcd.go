@@ -22,11 +22,11 @@ import (
 	"github.com/spf13/pflag"
 
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apiserver/pkg/registry/generic"
+	"k8s.io/apiserver/pkg/registry/generic/registry"
+	"k8s.io/apiserver/pkg/server"
 	"k8s.io/apiserver/pkg/storage/storagebackend"
-)
-
-const (
-	DefaultEtcdPathPrefix = "/registry"
 )
 
 type EtcdOptions struct {
@@ -37,18 +37,25 @@ type EtcdOptions struct {
 	// To enable protobuf as storage format, it is enough
 	// to set it to "application/vnd.kubernetes.protobuf".
 	DefaultStorageMediaType string
+	DeleteCollectionWorkers int
+	EnableGarbageCollection bool
+	EnableWatchCache        bool
 }
 
-func NewEtcdOptions(scheme *runtime.Scheme) *EtcdOptions {
+func NewEtcdOptions(prefix string, copier runtime.ObjectCopier, codec runtime.Codec) *EtcdOptions {
 	return &EtcdOptions{
 		StorageConfig: storagebackend.Config{
-			Prefix: DefaultEtcdPathPrefix,
+			Prefix: prefix,
 			// Default cache size to 0 - if unset, its size will be set based on target
 			// memory usage.
 			DeserializationCacheSize: 0,
-			Copier: scheme,
+			Copier: copier,
+			Codec:  codec,
 		},
 		DefaultStorageMediaType: "application/json",
+		DeleteCollectionWorkers: 1,
+		EnableGarbageCollection: true,
+		EnableWatchCache:        true,
 	}
 }
 
@@ -70,6 +77,16 @@ func (s *EtcdOptions) AddFlags(fs *pflag.FlagSet) {
 	fs.StringVar(&s.DefaultStorageMediaType, "storage-media-type", s.DefaultStorageMediaType, ""+
 		"The media type to use to store objects in storage. Defaults to application/json. "+
 		"Some resources may only support a specific media type and will ignore this setting.")
+	fs.IntVar(&s.DeleteCollectionWorkers, "delete-collection-workers", s.DeleteCollectionWorkers,
+		"Number of workers spawned for DeleteCollection call. These are used to speed up namespace cleanup.")
+
+	fs.BoolVar(&s.EnableGarbageCollection, "enable-garbage-collector", s.EnableGarbageCollection, ""+
+		"Enables the generic garbage collector. MUST be synced with the corresponding flag "+
+		"of the kube-controller-manager.")
+
+	// TODO: enable cache in integration tests.
+	fs.BoolVar(&s.EnableWatchCache, "watch-cache", s.EnableWatchCache,
+		"Enable watch caching in the apiserver")
 
 	fs.StringVar(&s.StorageConfig.Type, "storage-backend", s.StorageConfig.Type,
 		"The storage backend for persistence. Options: 'etcd3' (default), 'etcd2'.")
@@ -94,4 +111,32 @@ func (s *EtcdOptions) AddFlags(fs *pflag.FlagSet) {
 
 	fs.BoolVar(&s.StorageConfig.Quorum, "etcd-quorum-read", s.StorageConfig.Quorum,
 		"If true, enable quorum read.")
+}
+
+func (s *EtcdOptions) ApplyTo(c *server.Config) error {
+	c.RESTOptionsGetter = &restOptionsFactory{options: s}
+
+	return nil
+}
+
+// restOptionsFactory is a default implementation of a RESTOptionsGetter
+// This will work well for most aggregated API servers.  The legacy kube server needs more customization
+type restOptionsFactory struct {
+	options *EtcdOptions
+}
+
+func (f *restOptionsFactory) GetRESTOptions(resource schema.GroupResource) (generic.RESTOptions, error) {
+	ret := generic.RESTOptions{
+		StorageConfig:           &f.options.StorageConfig,
+		Decorator:               registry.StorageWithCacher,
+		DeleteCollectionWorkers: f.options.DeleteCollectionWorkers,
+		EnableGarbageCollection: f.options.EnableGarbageCollection,
+		ResourcePrefix:          f.options.StorageConfig.Prefix + "/" + resource.Group + "/" + resource.Resource,
+	}
+
+	if !f.options.EnableWatchCache {
+		ret.Decorator = generic.UndecoratedStorage
+	}
+
+	return ret, nil
 }

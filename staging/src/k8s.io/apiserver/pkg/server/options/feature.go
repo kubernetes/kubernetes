@@ -23,7 +23,6 @@ import (
 )
 
 type FeatureOptions struct {
-	EnableGarbageCollection   bool
 	EnableProfiling           bool
 	EnableContentionProfiling bool
 	EnableSwaggerUI           bool
@@ -33,7 +32,6 @@ func NewFeatureOptions() *FeatureOptions {
 	defaults := server.NewConfig()
 
 	return &FeatureOptions{
-		EnableGarbageCollection:   defaults.EnableGarbageCollection,
 		EnableProfiling:           defaults.EnableProfiling,
 		EnableContentionProfiling: defaults.EnableContentionProfiling,
 		EnableSwaggerUI:           defaults.EnableSwaggerUI,
@@ -41,9 +39,6 @@ func NewFeatureOptions() *FeatureOptions {
 }
 
 func (o *FeatureOptions) AddFlags(fs *pflag.FlagSet) {
-	fs.BoolVar(&o.EnableGarbageCollection, "enable-garbage-collector", o.EnableGarbageCollection, ""+
-		"Enables the generic garbage collector. MUST be synced with the corresponding flag "+
-		"of the kube-controller-manager.")
 	fs.BoolVar(&o.EnableProfiling, "profiling", o.EnableProfiling,
 		"Enable profiling via web interface host:port/debug/pprof/")
 	fs.BoolVar(&o.EnableContentionProfiling, "contention-profiling", o.EnableContentionProfiling,
@@ -53,7 +48,6 @@ func (o *FeatureOptions) AddFlags(fs *pflag.FlagSet) {
 }
 
 func (o *FeatureOptions) ApplyTo(c *server.Config) error {
-	c.EnableGarbageCollection = o.EnableGarbageCollection
 	c.EnableProfiling = o.EnableProfiling
 	c.EnableContentionProfiling = o.EnableContentionProfiling
 	c.EnableSwaggerUI = o.EnableSwaggerUI
