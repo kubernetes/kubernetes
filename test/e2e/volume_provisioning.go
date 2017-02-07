@@ -28,8 +28,6 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
-	"golang.org/x/net/context"
-	"google.golang.org/api/compute/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 )
 
@@ -128,38 +126,33 @@ var _ = framework.KubeDescribe("Dynamic provisioning", func() {
 			testDynamicProvisioning(c, claim)
 		})
 
-		It("should not provision a volume in an unmanaged zone. [Slow]", func() {
+		// NOTE: Slow!  The test will wait up to 5 minutes (framework.ClaimProvisionTimeout) when there is
+		// no regression.
+		It("should not provision a volume in an unmanaged GCE zone. [Slow]", func() {
 			framework.SkipUnlessProviderIs("gce", "gke")
 			By("Discovering an unmanaged zone")
-			var unmanagedZone string
 			allZones := sets.NewString()      // all zones in the project
 			managedZones := sets.NewString()  // subset of allZones
 
 			gceCloud, err := getGCECloud()
 			Expect(err).NotTo(HaveOccurred())
 
-			// Get the master node zone
+			// Get all k8s managed zones
 			managedZones, err = gceCloud.GetAllZones()
 			Expect(err).NotTo(HaveOccurred())
 
 			// Get a list of all zones in the project
-			compSvc := gceCloud.GetComputeService()
-			call := compSvc.Zones.List(framework.TestContext.CloudConfig.ProjectID)
-			ctx := context.Background()
-			if err := call.Pages(ctx, func(page *compute.ZoneList) error {
-				for _, v := range page.Items {
-					allZones.Insert(v.Name)
-				}
-				return nil
-			}); err != nil {
-				framework.Failf("Failed to get project zones:\n %+v", err)
+			zones, err := gceCloud.GetComputeService().Zones.List(framework.TestContext.CloudConfig.ProjectID).Do()
+			for _, z := range zones.Items {
+				allZones.Insert(z.Name)
 			}
 
-			// Find the subset of zones not managed by k8s
+			// Get the subset of zones not managed by k8s
+			var unmanagedZone string
+			var popped bool
 			unmanagedZones := allZones.Difference(managedZones)
-			// And get one of them.
-			unmanagedZone, popped := unmanagedZones.PopAny()
-			if ! popped {
+			// And select one of them at random.
+			if unmanagedZone, popped = unmanagedZones.PopAny(); ! popped {
 				framework.Failf("No unmanaged zones found.")
 			}
 
