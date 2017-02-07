@@ -65,6 +65,9 @@ const (
 	FailedPlacementReason = "FailedPlacement"
 	// FailedDaemonPodReason is added to an event when the status of a Pod of a DaemonSet is 'Failed'.
 	FailedDaemonPodReason = "FailedDaemonPod"
+
+	// metricsCacheSize defines the size of the metrics cache
+	metricsCacheSize = 1000
 )
 
 // DaemonSetsController is responsible for synchronizing DaemonSet objects stored
@@ -102,6 +105,8 @@ type DaemonSetsController struct {
 
 	// DaemonSet keys that need to be synced.
 	queue workqueue.RateLimitingInterface
+
+	metricsCache *MetricsCache
 }
 
 func NewDaemonSetsController(daemonSetInformer informers.DaemonSetInformer, podInformer informers.PodInformer, nodeInformer informers.NodeInformer, kubeClient clientset.Interface, lookupCacheSize int) *DaemonSetsController {
@@ -177,6 +182,7 @@ func NewDaemonSetsController(daemonSetInformer informers.DaemonSetInformer, podI
 
 	dsc.syncHandler = dsc.syncDaemonSet
 	dsc.lookupCache = controller.NewMatchingCache(lookupCacheSize)
+	dsc.metricsCache = NewMetricsCache(metricsCacheSize)
 	return dsc
 }
 
@@ -376,6 +382,7 @@ func (dsc *DaemonSetsController) deletePod(obj interface{}) {
 	}
 	glog.V(4).Infof("Pod %s deleted.", pod.Name)
 	if ds := dsc.getPodDaemonSet(pod); ds != nil {
+		dsc.metricsCache.RecordDeletePod(ds, pod, time.Now())
 		dsKey, err := controller.KeyFunc(ds)
 		if err != nil {
 			glog.Errorf("Couldn't get key for object %#v: %v", ds, err)
