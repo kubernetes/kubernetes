@@ -112,13 +112,14 @@ func (o AggregatorOptions) RunAggregator() error {
 
 	genericAPIServerConfig := genericapiserver.NewConfig().
 		WithSerializer(api.Codecs)
-	if _, err := genericAPIServerConfig.ApplySecureServingOptions(o.SecureServing); err != nil {
+
+	if err := o.SecureServing.ApplyTo(genericAPIServerConfig); err != nil {
+		return fmt.Errorf("failed to configure https: %s", err)
+	}
+	if err := o.Authentication.ApplyTo(genericAPIServerConfig); err != nil {
 		return err
 	}
-	if _, err := genericAPIServerConfig.ApplyDelegatingAuthenticationOptions(o.Authentication); err != nil {
-		return err
-	}
-	if _, err := genericAPIServerConfig.ApplyDelegatingAuthorizationOptions(o.Authorization); err != nil {
+	if err := o.Authorization.ApplyTo(genericAPIServerConfig); err != nil {
 		return err
 	}
 	genericAPIServerConfig.LongRunningFunc = filters.BasicLongRunningRequestCheck(

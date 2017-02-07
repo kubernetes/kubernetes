@@ -28,7 +28,6 @@ import (
 	"k8s.io/apiserver/pkg/apis/example"
 	exampleinstall "k8s.io/apiserver/pkg/apis/example/install"
 	examplev1 "k8s.io/apiserver/pkg/apis/example/v1"
-	"k8s.io/apiserver/pkg/server/options"
 	"k8s.io/apiserver/pkg/storage/storagebackend"
 )
 
@@ -128,7 +127,7 @@ func TestUpdateEtcdOverrides(t *testing.T) {
 	defaultEtcdLocation := []string{"http://127.0.0.1"}
 	for i, test := range testCases {
 		defaultConfig := storagebackend.Config{
-			Prefix:     options.DefaultEtcdPathPrefix,
+			Prefix:     "/registry",
 			ServerList: defaultEtcdLocation,
 			Copier:     scheme,
 		}
