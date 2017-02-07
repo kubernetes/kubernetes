@@ -28,6 +28,7 @@ import (
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util/clock"
+	utilconfig "k8s.io/kubernetes/pkg/util/config"
 )
 
 // mockPodKiller is used to testing which pod is killed
@@ -208,6 +209,7 @@ func TestMemoryPressure(t *testing.T) {
 		thresholdsFirstObservedAt:    thresholdsObservedAt{},
 	}
 
+	utilconfig.DefaultFeatureGate.Set("ExperimentalCriticalPodAnnotation=True")
 	// create a best effort pod to test admission
 	bestEffortPodToAdmit, _ := podMaker("best-admit", newResourceList("", ""), newResourceList("", ""), "0Gi")
 	burstablePodToAdmit, _ := podMaker("burst-admit", newResourceList("100m", "100Mi"), newResourceList("200m", "200Mi"), "0Gi")

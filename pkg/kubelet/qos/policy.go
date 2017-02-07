@@ -19,6 +19,7 @@ package qos
 import (
 	"k8s.io/kubernetes/pkg/api"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
+	utilconfig "k8s.io/kubernetes/pkg/util/config"
 )
 
 const (
@@ -44,7 +45,7 @@ const (
 // and 1000. Containers with higher OOM scores are killed if the system runs out of memory.
 // See https://lwn.net/Articles/391222/ for more information.
 func GetContainerOOMScoreAdjust(pod *api.Pod, container *api.Container, memoryCapacity int64) int {
-	if kubetypes.IsCriticalPod(pod) {
+	if utilconfig.DefaultFeatureGate.ExperimentalCriticalPodAnnotation() && kubetypes.IsCriticalPod(pod) {
 		return CriticalPodOOMAdj
 	}
 
