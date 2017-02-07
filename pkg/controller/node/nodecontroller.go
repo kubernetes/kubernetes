@@ -379,8 +379,7 @@ func (nc *NodeController) Run() {
 					node, err := nc.nodeLister.Get(value.Value)
 					if apierrors.IsNotFound(err) {
 						glog.Warningf("Node %v no longer present in nodeLister!", value.Value)
-					}
-					if err != nil {
+					} else if err != nil {
 						glog.Warningf("Failed to get Node %v from the nodeLister: %v", value.Value, err)
 					} else {
 						zone := utilnode.GetZoneKey(node)
