@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package discoverysummarizer
+package kubeaggregator
 
 import (
 	"fmt"
@@ -22,7 +22,6 @@ import (
 	"testing"
 	"time"
 
-	"k8s.io/kubernetes/cmd/kube-aggregator/pkg/legacy"
 	"k8s.io/kubernetes/examples/apiserver"
 )
 
@@ -42,27 +41,8 @@ func testResponse(t *testing.T, serverURL, path string, expectedStatusCode int) 
 		t.Errorf("unexpected error in GET %s: %v", path, err)
 	}
 	if response.StatusCode != expectedStatusCode {
-		t.Errorf("unexpected status code: %v, expected: %v", response.StatusCode, expectedStatusCode)
+		t.Errorf("unexpected status code for %q: %v, expected: %v", path, response.StatusCode, expectedStatusCode)
 	}
-}
-
-func runDiscoverySummarizer(t *testing.T) string {
-	configFilePath := "../../../cmd/kube-aggregator/config.json"
-	port := "9090"
-	serverURL := "http://localhost:" + port
-	s, err := legacy.NewDiscoverySummarizer(configFilePath)
-	if err != nil {
-		t.Errorf("unexpected error: %v\n", err)
-	}
-	go func() {
-		if err := s.Run(port); err != nil {
-			t.Fatalf("error in bringing up the server: %v", err)
-		}
-	}()
-	if err := waitForServerUp(serverURL); err != nil {
-		t.Fatalf("%v", err)
-	}
-	return serverURL
 }
 
 func runAPIServer(t *testing.T, stopCh <-chan struct{}) string {
@@ -84,28 +64,15 @@ func runAPIServer(t *testing.T, stopCh <-chan struct{}) string {
 }
 
 // Runs a discovery summarizer server and tests that all endpoints work as expected.
-func TestRunDiscoverySummarizer(t *testing.T) {
-	discoveryURL := runDiscoverySummarizer(t)
-
-	// Test /api path.
-	// There is no server running at that URL, so we will get a 500.
-	testResponse(t, discoveryURL, "/api", http.StatusBadGateway)
-
-	// Test /apis path.
-	// There is no server running at that URL, so we will get a 500.
-	testResponse(t, discoveryURL, "/apis", http.StatusBadGateway)
-
-	// Test a random path, which should give a 404.
-	testResponse(t, discoveryURL, "/randomPath", http.StatusNotFound)
-
+func TestRunKubeAggregator(t *testing.T) {
 	// Run the APIServer now to test the good case.
 	stopCh := make(chan struct{})
-	runAPIServer(t, stopCh)
+	discoveryURL := runAPIServer(t, stopCh)
 	defer close(stopCh)
 
 	// Test /api path.
 	// There is no server running at that URL, so we will get a 500.
-	testResponse(t, discoveryURL, "/api", http.StatusOK)
+	testResponse(t, discoveryURL, "/api", http.StatusNotFound)
 
 	// Test /apis path.
 	// There is no server running at that URL, so we will get a 500.

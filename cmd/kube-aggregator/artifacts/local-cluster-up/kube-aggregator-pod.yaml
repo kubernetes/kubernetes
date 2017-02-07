@@ -84,14 +84,14 @@ spec:
       - name: volume-etcd-client-cert
         secret:
           defaultMode: 420
-          secretName: discovery-etcd
+          secretName: kube-aggregator-etcd
       - name: volume-serving-cert
         secret:
           defaultMode: 420
-          secretName: serving-discovery
+          secretName: serving-kube-aggregator
       - configMap:
           defaultMode: 420
-          name: discovery-ca
+          name: kube-aggregator-ca
         name: volume-serving-ca
       - configMap:
           defaultMode: 420

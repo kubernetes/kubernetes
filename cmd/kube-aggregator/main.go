@@ -43,7 +43,7 @@ func main() {
 		runtime.GOMAXPROCS(runtime.NumCPU())
 	}
 
-	cmd := server.NewCommandStartDiscoveryServer(os.Stdout, os.Stderr)
+	cmd := server.NewCommandStartAggregator(os.Stdout, os.Stderr)
 	cmd.Flags().AddGoFlagSet(flag.CommandLine)
 	if err := cmd.Execute(); err != nil {
 		cmdutil.CheckErr(err)
