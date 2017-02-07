@@ -297,7 +297,7 @@ func (s *BuiltInAuthenticationOptions) ToAuthenticationConfig() authenticator.Au
 	return ret
 }
 
-func (o *BuiltInAuthenticationOptions) Apply(c *genericapiserver.Config) error {
+func (o *BuiltInAuthenticationOptions) ApplyTo(c *genericapiserver.Config) error {
 	if o == nil {
 		return nil
 	}

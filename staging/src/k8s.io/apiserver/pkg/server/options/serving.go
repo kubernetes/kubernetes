@@ -17,14 +17,19 @@ limitations under the License.
 package options
 
 import (
+	"crypto/tls"
+	"encoding/pem"
 	"fmt"
+	"io/ioutil"
 	"net"
 	"path"
+	"strconv"
 
 	"github.com/golang/glog"
 	"github.com/spf13/pflag"
 
 	utilnet "k8s.io/apimachinery/pkg/util/net"
+	"k8s.io/apiserver/pkg/server"
 	utilflag "k8s.io/apiserver/pkg/util/flag"
 	certutil "k8s.io/client-go/util/cert"
 )
@@ -130,6 +135,70 @@ func (s *SecureServingOptions) AddDeprecatedFlags(fs *pflag.FlagSet) {
 	fs.MarkDeprecated("public-address-override", "see --bind-address instead.")
 }
 
+func (s *SecureServingOptions) ApplyTo(c *server.Config) error {
+	if s.ServingOptions.BindPort <= 0 {
+		return nil
+	}
+
+	secureServingInfo := &server.SecureServingInfo{
+		ServingInfo: server.ServingInfo{
+			BindAddress: net.JoinHostPort(s.ServingOptions.BindAddress.String(), strconv.Itoa(s.ServingOptions.BindPort)),
+		},
+	}
+
+	serverCertFile, serverKeyFile := s.ServerCert.CertKey.CertFile, s.ServerCert.CertKey.KeyFile
+
+	// load main cert
+	if len(serverCertFile) != 0 || len(serverKeyFile) != 0 {
+		tlsCert, err := tls.LoadX509KeyPair(serverCertFile, serverKeyFile)
+		if err != nil {
+			return fmt.Errorf("unable to load server certificate: %v", err)
+		}
+		secureServingInfo.Cert = &tlsCert
+	}
+
+	// optionally load CA cert
+	if len(s.ServerCert.CACertFile) != 0 {
+		pemData, err := ioutil.ReadFile(s.ServerCert.CACertFile)
+		if err != nil {
+			return fmt.Errorf("failed to read certificate authority from %q: %v", s.ServerCert.CACertFile, err)
+		}
+		block, pemData := pem.Decode(pemData)
+		if block == nil {
+			return fmt.Errorf("no certificate found in certificate authority file %q", s.ServerCert.CACertFile)
+		}
+		if block.Type != "CERTIFICATE" {
+			return fmt.Errorf("expected CERTIFICATE block in certiticate authority file %q, found: %s", s.ServerCert.CACertFile, block.Type)
+		}
+		secureServingInfo.CACert = &tls.Certificate{
+			Certificate: [][]byte{block.Bytes},
+		}
+	}
+
+	// load SNI certs
+	namedTLSCerts := make([]server.NamedTLSCert, 0, len(s.SNICertKeys))
+	for _, nck := range s.SNICertKeys {
+		tlsCert, err := tls.LoadX509KeyPair(nck.CertFile, nck.KeyFile)
+		namedTLSCerts = append(namedTLSCerts, server.NamedTLSCert{
+			TLSCert: tlsCert,
+			Names:   nck.Names,
+		})
+		if err != nil {
+			return fmt.Errorf("failed to load SNI cert and key: %v", err)
+		}
+	}
+	var err error
+	secureServingInfo.SNICerts, err = server.GetNamedCertificateMap(namedTLSCerts)
+	if err != nil {
+		return err
+	}
+
+	c.SecureServingInfo = secureServingInfo
+	c.ReadWritePort = s.ServingOptions.BindPort
+
+	return nil
+}
+
 func NewInsecureServingOptions() *ServingOptions {
 	return &ServingOptions{
 		BindAddress: net.ParseIP("127.0.0.1"),
@@ -170,6 +239,18 @@ func (s *ServingOptions) AddDeprecatedFlags(fs *pflag.FlagSet) {
 
 	fs.IntVar(&s.BindPort, "port", s.BindPort, "DEPRECATED: see --insecure-port instead.")
 	fs.MarkDeprecated("port", "see --insecure-port instead.")
+}
+
+func (s *ServingOptions) ApplyTo(c *server.Config) error {
+	if s.BindPort <= 0 {
+		return nil
+	}
+
+	c.InsecureServingInfo = &server.ServingInfo{
+		BindAddress: net.JoinHostPort(s.BindAddress.String(), strconv.Itoa(s.BindPort)),
+	}
+
+	return nil
 }
 
 func (s *SecureServingOptions) MaybeDefaultWithSelfSignedCerts(publicAddress string, alternateIPs ...net.IP) error {

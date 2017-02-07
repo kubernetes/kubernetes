@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package server
+package options
 
 import (
 	"crypto/tls"
@@ -26,16 +26,29 @@ import (
 	"net"
 	"os"
 	"reflect"
-	"strconv"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 
-	"k8s.io/apiserver/pkg/server/options"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/serializer"
+	"k8s.io/apimachinery/pkg/version"
+	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
+	. "k8s.io/apiserver/pkg/server"
 	utilflag "k8s.io/apiserver/pkg/util/flag"
 	utilcert "k8s.io/client-go/util/cert"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 )
+
+func setUp(t *testing.T) Config {
+	scheme := runtime.NewScheme()
+	codecs := serializer.NewCodecFactory(scheme)
+
+	config := NewConfig().WithSerializer(codecs)
+	config.RequestContextMapper = genericapirequest.NewRequestContextMapper()
+
+	return *config
+}
 
 type TestCertSpec struct {
 	host       string
@@ -190,7 +203,7 @@ func TestGetNamedCertificateMap(t *testing.T) {
 
 NextTest:
 	for i, test := range tests {
-		var namedTLSCerts []namedTlsCert
+		var namedTLSCerts []NamedTLSCert
 		bySignature := map[string]int{} // index in test.certs by cert signature
 		for j, c := range test.certs {
 			cert, err := createTestTLSCerts(c.TestCertSpec)
@@ -199,9 +212,9 @@ NextTest:
 				continue NextTest
 			}
 
-			namedTLSCerts = append(namedTLSCerts, namedTlsCert{
-				tlsCert: cert,
-				names:   c.explicitNames,
+			namedTLSCerts = append(namedTLSCerts, NamedTLSCert{
+				TLSCert: cert,
+				Names:   c.explicitNames,
 			})
 
 			sig, err := certSignature(cert)
@@ -212,7 +225,7 @@ NextTest:
 			bySignature[sig] = j
 		}
 
-		certMap, err := getNamedCertificateMap(namedTLSCerts)
+		certMap, err := GetNamedCertificateMap(namedTLSCerts)
 		if err == nil && len(test.errorString) != 0 {
 			t.Errorf("%d - expected no error, got: %v", i, err)
 		} else if err != nil && err.Error() != test.errorString {
@@ -461,27 +474,26 @@ NextTest:
 		stopCh := make(chan struct{})
 
 		// launch server
-		etcdserver, config, _ := setUp(t)
-		defer etcdserver.Terminate(t)
+		config := setUp(t)
 
 		v := fakeVersion()
 		config.Version = &v
 
 		config.EnableIndex = true
-		_, err = config.ApplySecureServingOptions(&options.SecureServingOptions{
-			ServingOptions: options.ServingOptions{
+		secureOptions := &SecureServingOptions{
+			ServingOptions: ServingOptions{
 				BindAddress: net.ParseIP("127.0.0.1"),
 				BindPort:    6443,
 			},
-			ServerCert: options.GeneratableKeyCert{
-				CertKey: options.CertKey{
+			ServerCert: GeneratableKeyCert{
+				CertKey: CertKey{
 					CertFile: serverCertBundleFile,
 					KeyFile:  serverKeyFile,
 				},
 			},
 			SNICertKeys: namedCertKeys,
-		})
-		if err != nil {
+		}
+		if err := secureOptions.ApplyTo(&config); err != nil {
 			t.Errorf("%q - failed applying the SecureServingOptions: %v", title, err)
 			continue NextTest
 		}
@@ -496,10 +508,14 @@ NextTest:
 		// patch in a 0-port to enable auto port allocation
 		s.SecureServingInfo.BindAddress = "127.0.0.1:0"
 
-		if err := s.serveSecurely(stopCh); err != nil {
-			t.Errorf("%q - failed running the server: %v", title, err)
-			continue NextTest
-		}
+		// add poststart hook to know when the server is up.
+		startedCh := make(chan struct{})
+		s.AddPostStartHook("test-notifier", func(context PostStartHookContext) error {
+			close(startedCh)
+			return nil
+		})
+		preparedServer := s.PrepareRun()
+		go preparedServer.Run(stopCh)
 
 		// load ca certificates into a pool
 		roots := x509.NewCertPool()
@@ -507,8 +523,11 @@ NextTest:
 			roots.AddCert(caCert)
 		}
 
+		<-startedCh
+
+		effectiveSecurePort := fmt.Sprintf("%d", preparedServer.EffectiveSecurePort())
 		// try to dial
-		addr := fmt.Sprintf("localhost:%d", s.effectiveSecurePort)
+		addr := fmt.Sprintf("localhost:%s", effectiveSecurePort)
 		t.Logf("Dialing %s as %q", addr, test.ServerName)
 		conn, err := tls.Dial("tcp", addr, &tls.Config{
 			RootCAs:    roots,
@@ -536,7 +555,7 @@ NextTest:
 		if len(test.SelfClientBindAddressOverride) != 0 {
 			host = test.SelfClientBindAddressOverride
 		}
-		config.SecureServingInfo.ServingInfo.BindAddress = net.JoinHostPort(host, strconv.Itoa(s.effectiveSecurePort))
+		config.SecureServingInfo.ServingInfo.BindAddress = net.JoinHostPort(host, effectiveSecurePort)
 		cfg, err := config.SecureServingInfo.NewSelfClientConfig("some-token")
 		if test.ExpectSelfClientError {
 			if err == nil {
@@ -653,4 +672,14 @@ func certSignature(cert tls.Certificate) (string, error) {
 		return "", err
 	}
 	return x509CertSignature(x509Certs[0]), nil
+}
+
+func fakeVersion() version.Info {
+	return version.Info{
+		Major:        "42",
+		Minor:        "42",
+		GitVersion:   "42",
+		GitCommit:    "34973274ccef6ab4dfaaf86599792fa9c3fe4689",
+		GitTreeState: "Dirty",
+	}
 }
