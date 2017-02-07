@@ -724,6 +724,7 @@ func NewMainKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *Kub
 		kubeCfg.EnableControllerAttachDetach,
 		nodeName,
 		klet.podManager,
+		klet.statusManager,
 		klet.kubeClient,
 		klet.volumePluginMgr,
 		klet.containerRuntime,

@@ -263,6 +263,7 @@ func newTestKubeletWithImageList(
 		controllerAttachDetachEnabled,
 		kubelet.nodeName,
 		kubelet.podManager,
+		kubelet.statusManager,
 		fakeKubeClient,
 		kubelet.volumePluginMgr,
 		fakeRuntime,
