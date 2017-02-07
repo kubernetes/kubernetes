@@ -25,10 +25,8 @@ import (
 	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apiserver/pkg/registry/generic"
-	genericregistry "k8s.io/apiserver/pkg/registry/generic/registry"
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	"k8s.io/apiserver/pkg/server/healthz"
 	"k8s.io/kubernetes/cmd/kube-apiserver/app/options"
@@ -83,11 +81,8 @@ type Config struct {
 
 	APIResourceConfigSource  genericapiserver.APIResourceConfigSource
 	StorageFactory           genericapiserver.StorageFactory
-	EnableGarbageCollection  bool
-	EnableWatchCache         bool
 	EnableCoreControllers    bool
 	EndpointReconcilerConfig EndpointReconcilerConfig
-	DeleteCollectionWorkers  int
 	EventTTL                 time.Duration
 	KubeletClientConfig      kubeletclient.KubeletClientConfig
 
@@ -223,18 +218,6 @@ func (c completedConfig) New() (*Master, error) {
 		GenericAPIServer: s,
 	}
 
-	restOptionsFactory := &restOptionsFactory{
-		deleteCollectionWorkers: c.DeleteCollectionWorkers,
-		enableGarbageCollection: c.EnableGarbageCollection,
-		storageFactory:          c.StorageFactory,
-	}
-
-	if c.EnableWatchCache {
-		restOptionsFactory.storageDecorator = genericregistry.StorageWithCacher
-	} else {
-		restOptionsFactory.storageDecorator = generic.UndecoratedStorage
-	}
-
 	// install legacy rest storage
 	if c.APIResourceConfigSource.AnyResourcesForVersionEnabled(apiv1.SchemeGroupVersion) {
 		legacyRESTStorageProvider := corerest.LegacyRESTStorageProvider{
@@ -246,7 +229,7 @@ func (c completedConfig) New() (*Master, error) {
 			ServiceNodePortRange: c.ServiceNodePortRange,
 			LoopbackClientConfig: c.GenericConfig.LoopbackClientConfig,
 		}
-		m.InstallLegacyAPI(c.Config, restOptionsFactory, legacyRESTStorageProvider)
+		m.InstallLegacyAPI(c.Config, c.Config.GenericConfig.RESTOptionsGetter, legacyRESTStorageProvider)
 	}
 
 	restStorageProviders := []RESTStorageProvider{
@@ -261,7 +244,7 @@ func (c completedConfig) New() (*Master, error) {
 		rbacrest.RESTStorageProvider{Authorizer: c.GenericConfig.Authorizer},
 		storagerest.RESTStorageProvider{},
 	}
-	m.InstallAPIs(c.Config.APIResourceConfigSource, restOptionsFactory, restStorageProviders...)
+	m.InstallAPIs(c.Config.APIResourceConfigSource, c.Config.GenericConfig.RESTOptionsGetter, restStorageProviders...)
 
 	if c.Tunneler != nil {
 		m.installTunneler(c.Tunneler, corev1client.NewForConfigOrDie(c.GenericConfig.LoopbackClientConfig).Nodes())
@@ -339,28 +322,6 @@ func (m *Master) InstallAPIs(apiResourceConfigSource genericapiserver.APIResourc
 			glog.Fatalf("Error in registering group versions: %v", err)
 		}
 	}
-}
-
-type restOptionsFactory struct {
-	deleteCollectionWorkers int
-	enableGarbageCollection bool
-	storageFactory          genericapiserver.StorageFactory
-	storageDecorator        generic.StorageDecorator
-}
-
-func (f *restOptionsFactory) GetRESTOptions(resource schema.GroupResource) (generic.RESTOptions, error) {
-	storageConfig, err := f.storageFactory.NewConfig(resource)
-	if err != nil {
-		return generic.RESTOptions{}, fmt.Errorf("Unable to find storage destination for %v, due to %v", resource, err.Error())
-	}
-
-	return generic.RESTOptions{
-		StorageConfig:           storageConfig,
-		Decorator:               f.storageDecorator,
-		DeleteCollectionWorkers: f.deleteCollectionWorkers,
-		EnableGarbageCollection: f.enableGarbageCollection,
-		ResourcePrefix:          f.storageFactory.ResourcePrefix(resource),
-	}, nil
 }
 
 type nodeAddressProvider struct {

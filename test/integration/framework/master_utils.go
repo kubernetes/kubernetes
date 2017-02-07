@@ -61,6 +61,7 @@ import (
 	"k8s.io/kubernetes/pkg/controller"
 	replicationcontroller "k8s.io/kubernetes/pkg/controller/replication"
 	"k8s.io/kubernetes/pkg/generated/openapi"
+	"k8s.io/kubernetes/pkg/kubeapiserver"
 	"k8s.io/kubernetes/pkg/kubectl"
 	kubeletclient "k8s.io/kubernetes/pkg/kubelet/client"
 	"k8s.io/kubernetes/pkg/master"
@@ -364,13 +365,18 @@ func NewMasterConfig() *master.Config {
 	genericConfig.Authorizer = authorizerfactory.NewAlwaysAllowAuthorizer()
 	genericConfig.AdmissionControl = admit.NewAlwaysAdmit()
 	genericConfig.EnableMetrics = true
+	genericConfig.RESTOptionsGetter = &kubeapiserver.RESTOptionsFactory{
+		StorageFactory:          storageFactory,
+		EnableWatchCache:        true,
+		EnableGarbageCollection: true,
+		DeleteCollectionWorkers: 1,
+	}
 
 	return &master.Config{
 		GenericConfig:           genericConfig,
 		APIResourceConfigSource: master.DefaultAPIResourceConfigSource(),
 		StorageFactory:          storageFactory,
 		EnableCoreControllers:   true,
-		EnableWatchCache:        true,
 		KubeletClientConfig:     kubeletclient.KubeletClientConfig{Port: 10250},
 		APIServerServicePort:    443,
 		MasterCount:             1,
