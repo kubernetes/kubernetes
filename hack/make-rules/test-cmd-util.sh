@@ -2658,6 +2658,8 @@ runTests() {
   kube::log::status "Checking kubectl version"
   kubectl version
 
+  kubectl auth can-i get pods
+
   i=0
   create_and_use_new_namespace() {
     i=$(($i+1))
