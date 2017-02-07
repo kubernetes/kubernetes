@@ -40,8 +40,7 @@ generated_files: gen_deepcopy gen_defaulter gen_conversion gen_openapi
 .PHONY: verify_generated_files
 verify_generated_files: verify_gen_deepcopy    \
                         verify_gen_defaulter   \
-                        verify_gen_conversion  \
-                        verify_gen_openapi
+                        verify_gen_conversion
 
 # Code-generation logic.
 #
@@ -480,26 +479,9 @@ OPENAPI_DIRS := $(shell                                             \
 
 OPENAPI_OUTFILE := $(OPENAPI_OUTPUT_PKG)/$(OPENAPI_FILENAME)
 
-# Shell function for reuse in rules.
-RUN_GEN_OPENAPI =                                                                       \
-    function run_gen_openapi() {                                                        \
-        ./hack/run-in-gopath.sh $(OPENAPI_GEN)                                          \
-            --v $(KUBE_VERBOSE)                                                         \
-            --logtostderr                                                               \
-            -i $$(echo $(addprefix $(PRJ_SRC_PATH)/, $(OPENAPI_DIRS)) | sed 's/ /,/g')  \
-            -p $(PRJ_SRC_PATH)/$(OPENAPI_OUTPUT_PKG)                                    \
-            -O $(OPENAPI_BASENAME)                                                      \
-            "$$@";                                                                      \
-    };                                                                                  \
-    run_gen_openapi
-
 # This rule is the user-friendly entrypoint for openapi generation.
 .PHONY: gen_openapi
 gen_openapi: $(OPENAPI_OUTFILE) $(OPENAPI_GEN)
-
-.PHONY: verify_gen_openapi
-verify_gen_openapi: $(OPENAPI_GEN)
-	$(RUN_GEN_OPENAPI) --verify-only
 
 # For each dir in OPENAPI_DIRS, this establishes a dependency between the
 # output file and the input files that should trigger a rebuild.
@@ -520,7 +502,16 @@ $(foreach dir, $(OPENAPI_DIRS), $(eval                                     \
 
 # How to regenerate open-api code.  This emits a single file for all results.
 $(OPENAPI_OUTFILE): $(OPENAPI_GEN) $(OPENAPI_GEN)
-	$(RUN_GEN_OPENAPI)
+	function run_gen_openapi() {                                                        \
+        ./hack/run-in-gopath.sh $(OPENAPI_GEN)                                          \
+            --v $(KUBE_VERBOSE)                                                         \
+            --logtostderr                                                               \
+            -i $$(echo $(addprefix $(PRJ_SRC_PATH)/, $(OPENAPI_DIRS)) | sed 's/ /,/g')  \
+            -p $(PRJ_SRC_PATH)/$(OPENAPI_OUTPUT_PKG)                                    \
+            -O $(OPENAPI_BASENAME)                                                      \
+            "$$@";                                                                      \
+    };                                                                                  \
+    run_gen_openapi
 
 # This calculates the dependencies for the generator tool, so we only rebuild
 # it when needed.  It is PHONY so that it always runs, but it only updates the

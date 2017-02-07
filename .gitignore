@@ -110,6 +110,7 @@ kubernetes.tar.gz
 # generated files in any directory
 # TODO(thockin): uncomment this when we stop committing the generated files.
 #zz_generated.*
+zz_generated.openapi.go
 
 # make-related metadata
 /.make/
