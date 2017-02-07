@@ -27,6 +27,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
+	"k8s.io/kubernetes/pkg/util/i18n"
 )
 
 var (
@@ -47,7 +48,7 @@ var (
 func NewCmdExplain(f cmdutil.Factory, out, cmdErr io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "explain RESOURCE",
-		Short:   "Documentation of resources",
+		Short:   i18n.T("Documentation of resources"),
 		Long:    explainLong,
 		Example: explainExamples,
 		Run: func(cmd *cobra.Command, args []string) {

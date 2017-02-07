@@ -29,6 +29,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/metricsutil"
+	"k8s.io/kubernetes/pkg/util/i18n"
 
 	"github.com/golang/glog"
 	"github.com/spf13/cobra"
@@ -76,7 +77,7 @@ func NewCmdTopPod(f cmdutil.Factory, out io.Writer) *cobra.Command {
 
 	cmd := &cobra.Command{
 		Use:     "pod [NAME | -l label]",
-		Short:   "Display Resource (CPU/Memory/Storage) usage of pods",
+		Short:   i18n.T("Display Resource (CPU/Memory/Storage) usage of pods"),
 		Long:    topPodLong,
 		Example: topPodExample,
 		Run: func(cmd *cobra.Command, args []string) {
