@@ -343,8 +343,8 @@ func (rc *reconciler) reconcile() {
 				}
 			} else {
 				// Volume is attached to node, detach it
+				// Kubelet not responsible for detaching or this volume has a non-attachable volume plugin.
 				if rc.controllerAttachDetachEnabled || !attachedVolume.PluginIsAttachable {
-					// Kubelet not responsible for detaching or this volume has a non-attachable volume plugin.
 					rc.actualStateOfWorld.MarkVolumeAsDetached(attachedVolume.VolumeName, attachedVolume.NodeName)
 					glog.Infof("Detached volume %q (spec.Name: %q) devicePath: %q",
 						attachedVolume.VolumeName,
