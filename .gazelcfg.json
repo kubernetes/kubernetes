@@ -15,5 +15,6 @@
 		"_vendor"
 	],
 	"AddSourcesRules": true,
-	"VendorMultipleBuildFiles": true
+	"VendorMultipleBuildFiles": true,
+	"K8sOpenAPIGen": true
 }
