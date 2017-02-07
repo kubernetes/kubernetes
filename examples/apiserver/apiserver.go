@@ -47,7 +47,7 @@ const (
 
 func newStorageFactory() genericapiserver.StorageFactory {
 	config := storagebackend.Config{
-		Prefix:     genericoptions.DefaultEtcdPathPrefix,
+		Prefix:     kubeoptions.DefaultEtcdPathPrefix,
 		ServerList: []string{"http://127.0.0.1:2379"},
 		Copier:     api.Scheme,
 	}

@@ -34,6 +34,7 @@ go_library(
         "//pkg/controller:go_default_library",
         "//pkg/controller/replication:go_default_library",
         "//pkg/generated/openapi:go_default_library",
+        "//pkg/kubeapiserver:go_default_library",
         "//pkg/kubectl:go_default_library",
         "//pkg/kubelet/client:go_default_library",
         "//pkg/master:go_default_library",
