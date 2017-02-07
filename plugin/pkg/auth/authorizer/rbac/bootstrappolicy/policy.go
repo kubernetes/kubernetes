@@ -26,7 +26,8 @@ var (
 	ReadWrite = []string{"get", "list", "watch", "create", "update", "patch", "delete", "deletecollection"}
 	Read      = []string{"get", "list", "watch"}
 
-	Label = map[string]string{"kubernetes.io/bootstrapping": "rbac-defaults"}
+	Label      = map[string]string{"kubernetes.io/bootstrapping": "rbac-defaults"}
+	Annotation = map[string]string{rbac.AutoUpdateAnnotationKey: "true"}
 )
 
 const (
@@ -51,6 +52,13 @@ func addClusterRoleLabel(roles []rbac.ClusterRole) {
 		for k, v := range Label {
 			roles[i].ObjectMeta.Labels[k] = v
 		}
+
+		if roles[i].ObjectMeta.Annotations == nil {
+			roles[i].ObjectMeta.Annotations = make(map[string]string)
+		}
+		for k, v := range Annotation {
+			roles[i].ObjectMeta.Annotations[k] = v
+		}
 	}
 	return
 }
@@ -62,6 +70,13 @@ func addClusterRoleBindingLabel(rolebindings []rbac.ClusterRoleBinding) {
 		}
 		for k, v := range Label {
 			rolebindings[i].ObjectMeta.Labels[k] = v
+		}
+
+		if rolebindings[i].ObjectMeta.Annotations == nil {
+			rolebindings[i].ObjectMeta.Annotations = make(map[string]string)
+		}
+		for k, v := range Annotation {
+			rolebindings[i].ObjectMeta.Annotations[k] = v
 		}
 	}
 	return

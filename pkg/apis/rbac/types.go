@@ -34,6 +34,9 @@ const (
 	GroupKind          = "Group"
 	ServiceAccountKind = "ServiceAccount"
 	UserKind           = "User"
+
+	// AutoUpdateAnnotationKey is the name of an annotation which prevents reconciliation if set to "false"
+	AutoUpdateAnnotationKey = "rbac.authorization.kubernetes.io/autoupdate"
 )
 
 // PolicyRule holds information that describes a policy rule, but does not contain information
