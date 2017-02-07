@@ -14,10 +14,11 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package namespace
+package deletion
 
 import (
 	"fmt"
+	"reflect"
 	"sync"
 	"time"
 
@@ -28,18 +29,190 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/kubernetes/pkg/api/v1"
+	// "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/dynamic"
-	"k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
+	v1clientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/core/v1"
 )
 
-// contentRemainingError is used to inform the caller that content is not fully removed from the namespace
-type contentRemainingError struct {
+// Interface to delete a namespace with all resources in it.
+type NamespacedResourcesDeleterInterface interface {
+	Delete(nsName string) error
+}
+
+func NewNamespacedResourcesDeleter(nsClient v1clientset.NamespaceInterface,
+	clientPool dynamic.ClientPool, podsGetter v1clientset.PodsGetter,
+	discoverResourcesFn func() ([]*metav1.APIResourceList, error),
+	finalizerToken v1.FinalizerName, deleteNamespaceWhenDone bool) NamespacedResourcesDeleterInterface {
+	d := &namespacedResourcesDeleter{
+		nsClient:   nsClient,
+		clientPool: clientPool,
+		podsGetter: podsGetter,
+		opCache: &operationNotSupportedCache{
+			m: make(map[operationKey]bool),
+		},
+		discoverResourcesFn:     discoverResourcesFn,
+		finalizerToken:          finalizerToken,
+		deleteNamespaceWhenDone: deleteNamespaceWhenDone,
+	}
+	d.initOpCache()
+	return d
+}
+
+var _ NamespacedResourcesDeleterInterface = &namespacedResourcesDeleter{}
+
+// namespacedResourcesDeleter is used to delete all resources in a given namespace.
+type namespacedResourcesDeleter struct {
+	// Client to manipulate the namespace.
+	nsClient v1clientset.NamespaceInterface
+	// Dynamic client to list and delete all namespaced resources.
+	clientPool dynamic.ClientPool
+	// Interface to get PodInterface.
+	podsGetter v1clientset.PodsGetter
+	// Cache of what operations are not supported on each group version resource.
+	opCache             *operationNotSupportedCache
+	discoverResourcesFn func() ([]*metav1.APIResourceList, error)
+	// The finalizer token that should be removed from the namespace
+	// when all resources in that namespace have been deleted.
+	finalizerToken v1.FinalizerName
+	// Also delete the namespace when all resources in the namespace have been deleted.
+	deleteNamespaceWhenDone bool
+}
+
+// Delete deletes all resources in the given namespace.
+// Before deleting resources:
+// * It ensures that deletion timestamp is set on the
+//   namespace (does nothing if deletion timestamp is missing).
+// * Verifies that the namespace is in the "terminating" phase
+//   (updates the namespace phase if it is not yet marked terminating)
+// After deleting the resources:
+// * It removes finalizer token from the given namespace.
+// * Deletes the namespace if deleteNamespaceWhenDone is true.
+//
+// Returns an error if any of those steps fail.
+// Returns ResourcesRemainingError if it deleted some resources but needs
+// to wait for them to go away.
+// Caller is expected to keep calling this until it succeeds.
+func (d *namespacedResourcesDeleter) Delete(nsName string) error {
+	// Multiple controllers may edit a namespace during termination
+	// first get the latest state of the namespace before proceeding
+	// if the namespace was deleted already, don't do anything
+	namespace, err := d.nsClient.Get(nsName, metav1.GetOptions{})
+	if err != nil {
+		if errors.IsNotFound(err) {
+			return nil
+		}
+		return err
+	}
+	if namespace.DeletionTimestamp == nil {
+		return nil
+	}
+
+	glog.V(5).Infof("namespace controller - syncNamespace - namespace: %s, finalizerToken: %s", namespace.Name, d.finalizerToken)
+
+	// ensure that the status is up to date on the namespace
+	// if we get a not found error, we assume the namespace is truly gone
+	namespace, err = d.retryOnConflictError(namespace, d.updateNamespaceStatusFunc)
+	if err != nil {
+		if errors.IsNotFound(err) {
+			return nil
+		}
+		return err
+	}
+
+	// the latest view of the namespace asserts that namespace is no longer deleting..
+	if namespace.DeletionTimestamp.IsZero() {
+		return nil
+	}
+
+	// Delete the namespace if it is already finalized.
+	if d.deleteNamespaceWhenDone && finalized(namespace) {
+		return d.deleteNamespace(namespace)
+	}
+
+	// there may still be content for us to remove
+	estimate, err := d.deleteAllContent(namespace.Name, *namespace.DeletionTimestamp)
+	if err != nil {
+		return err
+	}
+	if estimate > 0 {
+		return &ResourcesRemainingError{estimate}
+	}
+
+	// we have removed content, so mark it finalized by us
+	namespace, err = d.retryOnConflictError(namespace, d.finalizeNamespace)
+	if err != nil {
+		// in normal practice, this should not be possible, but if a deployment is running
+		// two controllers to do namespace deletion that share a common finalizer token it's
+		// possible that a not found could occur since the other controller would have finished the delete.
+		if errors.IsNotFound(err) {
+			return nil
+		}
+		return err
+	}
+
+	// Check if we can delete now.
+	if d.deleteNamespaceWhenDone && finalized(namespace) {
+		return d.deleteNamespace(namespace)
+	}
+	return nil
+}
+
+func (d *namespacedResourcesDeleter) initOpCache() {
+	// pre-fill opCache with the discovery info
+	//
+	// TODO(sttts): get rid of opCache and http 405 logic around it and trust discovery info
+	resources, err := d.discoverResourcesFn()
+	if err != nil {
+		glog.Fatalf("Failed to get supported resources: %v", err)
+	}
+	deletableGroupVersionResources := []schema.GroupVersionResource{}
+	for _, rl := range resources {
+		gv, err := schema.ParseGroupVersion(rl.GroupVersion)
+		if err != nil {
+			glog.Errorf("Failed to parse GroupVersion %q, skipping: %v", rl.GroupVersion, err)
+			continue
+		}
+
+		for _, r := range rl.APIResources {
+			gvr := schema.GroupVersionResource{Group: gv.Group, Version: gv.Version, Resource: r.Name}
+			verbs := sets.NewString([]string(r.Verbs)...)
+
+			if !verbs.Has("delete") {
+				glog.V(6).Infof("Skipping resource %v because it cannot be deleted.", gvr)
+			}
+
+			for _, op := range []operation{operationList, operationDeleteCollection} {
+				if !verbs.Has(string(op)) {
+					d.opCache.setNotSupported(operationKey{operation: op, gvr: gvr})
+				}
+			}
+			deletableGroupVersionResources = append(deletableGroupVersionResources, gvr)
+		}
+	}
+}
+
+// Deletes the given namespace.
+func (d *namespacedResourcesDeleter) deleteNamespace(namespace *v1.Namespace) error {
+	var opts *metav1.DeleteOptions
+	uid := namespace.UID
+	if len(uid) > 0 {
+		opts = &metav1.DeleteOptions{Preconditions: &metav1.Preconditions{UID: &uid}}
+	}
+	err := d.nsClient.Delete(namespace.Name, opts)
+	if err != nil && !errors.IsNotFound(err) {
+		return err
+	}
+	return nil
+}
+
+// ResourcesRemainingError is used to inform the caller that all resources are not yet fully removed from the namespace.
+type ResourcesRemainingError struct {
 	Estimate int64
 }
 
-func (e *contentRemainingError) Error() string {
+func (e *ResourcesRemainingError) Error() string {
 	return fmt.Sprintf("some content remains in the namespace, estimate %d seconds before it is removed", e.Estimate)
 }
 
@@ -47,7 +220,7 @@ func (e *contentRemainingError) Error() string {
 type operation string
 
 const (
-	operationDeleteCollection operation = "deleteCollection"
+	operationDeleteCollection operation = "deletecollection"
 	operationList             operation = "list"
 	// assume a default estimate for finalizers to complete when found on items pending deletion.
 	finalizerEstimateSeconds int64 = int64(15)
@@ -55,8 +228,8 @@ const (
 
 // operationKey is an entry in a cache.
 type operationKey struct {
-	op  operation
-	gvr schema.GroupVersionResource
+	operation operation
+	gvr       schema.GroupVersionResource
 }
 
 // operationNotSupportedCache is a simple cache to remember if an operation is not supported for a resource.
@@ -80,15 +253,15 @@ func (o *operationNotSupportedCache) setNotSupported(key operationKey) {
 }
 
 // updateNamespaceFunc is a function that makes an update to a namespace
-type updateNamespaceFunc func(kubeClient clientset.Interface, namespace *v1.Namespace) (*v1.Namespace, error)
+type updateNamespaceFunc func(namespace *v1.Namespace) (*v1.Namespace, error)
 
 // retryOnConflictError retries the specified fn if there was a conflict error
 // it will return an error if the UID for an object changes across retry operations.
 // TODO RetryOnConflict should be a generic concept in client code
-func retryOnConflictError(kubeClient clientset.Interface, namespace *v1.Namespace, fn updateNamespaceFunc) (result *v1.Namespace, err error) {
+func (d *namespacedResourcesDeleter) retryOnConflictError(namespace *v1.Namespace, fn updateNamespaceFunc) (result *v1.Namespace, err error) {
 	latestNamespace := namespace
 	for {
-		result, err = fn(kubeClient, latestNamespace)
+		result, err = fn(latestNamespace)
 		if err == nil {
 			return result, nil
 		}
@@ -96,7 +269,7 @@ func retryOnConflictError(kubeClient clientset.Interface, namespace *v1.Namespac
 			return nil, err
 		}
 		prevNamespace := latestNamespace
-		latestNamespace, err = kubeClient.Core().Namespaces().Get(latestNamespace.Name, metav1.GetOptions{})
+		latestNamespace, err = d.nsClient.Get(latestNamespace.Name, metav1.GetOptions{})
 		if err != nil {
 			return nil, err
 		}
@@ -107,7 +280,7 @@ func retryOnConflictError(kubeClient clientset.Interface, namespace *v1.Namespac
 }
 
 // updateNamespaceStatusFunc will verify that the status of the namespace is correct
-func updateNamespaceStatusFunc(kubeClient clientset.Interface, namespace *v1.Namespace) (*v1.Namespace, error) {
+func (d *namespacedResourcesDeleter) updateNamespaceStatusFunc(namespace *v1.Namespace) (*v1.Namespace, error) {
 	if namespace.DeletionTimestamp.IsZero() || namespace.Status.Phase == v1.NamespaceTerminating {
 		return namespace, nil
 	}
@@ -115,7 +288,7 @@ func updateNamespaceStatusFunc(kubeClient clientset.Interface, namespace *v1.Nam
 	newNamespace.ObjectMeta = namespace.ObjectMeta
 	newNamespace.Status = namespace.Status
 	newNamespace.Status.Phase = v1.NamespaceTerminating
-	return kubeClient.Core().Namespaces().UpdateStatus(&newNamespace)
+	return d.nsClient.UpdateStatus(&newNamespace)
 }
 
 // finalized returns true if the namespace.Spec.Finalizers is an empty list
@@ -123,21 +296,14 @@ func finalized(namespace *v1.Namespace) bool {
 	return len(namespace.Spec.Finalizers) == 0
 }
 
-// finalizeNamespaceFunc returns a function that knows how to finalize a namespace for specified token.
-func finalizeNamespaceFunc(finalizerToken v1.FinalizerName) updateNamespaceFunc {
-	return func(kubeClient clientset.Interface, namespace *v1.Namespace) (*v1.Namespace, error) {
-		return finalizeNamespace(kubeClient, namespace, finalizerToken)
-	}
-}
-
 // finalizeNamespace removes the specified finalizerToken and finalizes the namespace
-func finalizeNamespace(kubeClient clientset.Interface, namespace *v1.Namespace, finalizerToken v1.FinalizerName) (*v1.Namespace, error) {
+func (d *namespacedResourcesDeleter) finalizeNamespace(namespace *v1.Namespace) (*v1.Namespace, error) {
 	namespaceFinalize := v1.Namespace{}
 	namespaceFinalize.ObjectMeta = namespace.ObjectMeta
 	namespaceFinalize.Spec = namespace.Spec
 	finalizerSet := sets.NewString()
 	for i := range namespace.Spec.Finalizers {
-		if namespace.Spec.Finalizers[i] != finalizerToken {
+		if namespace.Spec.Finalizers[i] != d.finalizerToken {
 			finalizerSet.Insert(string(namespace.Spec.Finalizers[i]))
 		}
 	}
@@ -145,7 +311,7 @@ func finalizeNamespace(kubeClient clientset.Interface, namespace *v1.Namespace, 
 	for _, value := range finalizerSet.List() {
 		namespaceFinalize.Spec.Finalizers = append(namespaceFinalize.Spec.Finalizers, v1.FinalizerName(value))
 	}
-	namespace, err := kubeClient.Core().Namespaces().Finalize(&namespaceFinalize)
+	namespace, err := d.nsClient.Finalize(&namespaceFinalize)
 	if err != nil {
 		// it was removed already, so life is good
 		if errors.IsNotFound(err) {
@@ -158,16 +324,13 @@ func finalizeNamespace(kubeClient clientset.Interface, namespace *v1.Namespace, 
 // deleteCollection is a helper function that will delete the collection of resources
 // it returns true if the operation was supported on the server.
 // it returns an error if the operation was supported on the server but was unable to complete.
-func deleteCollection(
-	dynamicClient *dynamic.Client,
-	opCache *operationNotSupportedCache,
-	gvr schema.GroupVersionResource,
-	namespace string,
-) (bool, error) {
+func (d *namespacedResourcesDeleter) deleteCollection(
+	dynamicClient *dynamic.Client, gvr schema.GroupVersionResource,
+	namespace string) (bool, error) {
 	glog.V(5).Infof("namespace controller - deleteCollection - namespace: %s, gvr: %v", namespace, gvr)
 
-	key := operationKey{op: operationDeleteCollection, gvr: gvr}
-	if !opCache.isSupported(key) {
+	key := operationKey{operation: operationDeleteCollection, gvr: gvr}
+	if !d.opCache.isSupported(key) {
 		glog.V(5).Infof("namespace controller - deleteCollection ignored since not supported - namespace: %s, gvr: %v", namespace, gvr)
 		return false, nil
 	}
@@ -192,7 +355,7 @@ func deleteCollection(
 	// remember next time that this resource does not support delete collection...
 	if errors.IsMethodNotSupported(err) || errors.IsNotFound(err) {
 		glog.V(5).Infof("namespace controller - deleteCollection not supported - namespace: %s, gvr: %v", namespace, gvr)
-		opCache.setNotSupported(key)
+		d.opCache.setNotSupported(key)
 		return false, nil
 	}
 
@@ -205,16 +368,12 @@ func deleteCollection(
 //  the list of items in the collection (if found)
 //  a boolean if the operation is supported
 //  an error if the operation is supported but could not be completed.
-func listCollection(
-	dynamicClient *dynamic.Client,
-	opCache *operationNotSupportedCache,
-	gvr schema.GroupVersionResource,
-	namespace string,
-) (*unstructured.UnstructuredList, bool, error) {
+func (d *namespacedResourcesDeleter) listCollection(
+	dynamicClient *dynamic.Client, gvr schema.GroupVersionResource, namespace string) (*unstructured.UnstructuredList, bool, error) {
 	glog.V(5).Infof("namespace controller - listCollection - namespace: %s, gvr: %v", namespace, gvr)
 
-	key := operationKey{op: operationList, gvr: gvr}
-	if !opCache.isSupported(key) {
+	key := operationKey{operation: operationList, gvr: gvr}
+	if !d.opCache.isSupported(key) {
 		glog.V(5).Infof("namespace controller - listCollection ignored since not supported - namespace: %s, gvr: %v", namespace, gvr)
 		return nil, false, nil
 	}
@@ -237,7 +396,7 @@ func listCollection(
 	// remember next time that this resource does not support delete collection...
 	if errors.IsMethodNotSupported(err) || errors.IsNotFound(err) {
 		glog.V(5).Infof("namespace controller - listCollection not supported - namespace: %s, gvr: %v", namespace, gvr)
-		opCache.setNotSupported(key)
+		d.opCache.setNotSupported(key)
 		return nil, false, nil
 	}
 
@@ -245,15 +404,11 @@ func listCollection(
 }
 
 // deleteEachItem is a helper function that will list the collection of resources and delete each item 1 by 1.
-func deleteEachItem(
-	dynamicClient *dynamic.Client,
-	opCache *operationNotSupportedCache,
-	gvr schema.GroupVersionResource,
-	namespace string,
-) error {
+func (d *namespacedResourcesDeleter) deleteEachItem(
+	dynamicClient *dynamic.Client, gvr schema.GroupVersionResource, namespace string) error {
 	glog.V(5).Infof("namespace controller - deleteEachItem - namespace: %s, gvr: %v", namespace, gvr)
 
-	unstructuredList, listSupported, err := listCollection(dynamicClient, opCache, gvr, namespace)
+	unstructuredList, listSupported, err := d.listCollection(dynamicClient, gvr, namespace)
 	if err != nil {
 		return err
 	}
@@ -272,18 +427,13 @@ func deleteEachItem(
 // deleteAllContentForGroupVersionResource will use the dynamic client to delete each resource identified in gvr.
 // It returns an estimate of the time remaining before the remaining resources are deleted.
 // If estimate > 0, not all resources are guaranteed to be gone.
-func deleteAllContentForGroupVersionResource(
-	kubeClient clientset.Interface,
-	clientPool dynamic.ClientPool,
-	opCache *operationNotSupportedCache,
-	gvr schema.GroupVersionResource,
-	namespace string,
-	namespaceDeletedAt metav1.Time,
-) (int64, error) {
+func (d *namespacedResourcesDeleter) deleteAllContentForGroupVersionResource(
+	gvr schema.GroupVersionResource, namespace string,
+	namespaceDeletedAt metav1.Time) (int64, error) {
 	glog.V(5).Infof("namespace controller - deleteAllContentForGroupVersionResource - namespace: %s, gvr: %v", namespace, gvr)
 
 	// estimate how long it will take for the resource to be deleted (needed for objects that support graceful delete)
-	estimate, err := estimateGracefulTermination(kubeClient, gvr, namespace, namespaceDeletedAt)
+	estimate, err := d.estimateGracefulTermination(gvr, namespace, namespaceDeletedAt)
 	if err != nil {
 		glog.V(5).Infof("namespace controller - deleteAllContentForGroupVersionResource - unable to estimate - namespace: %s, gvr: %v, err: %v", namespace, gvr, err)
 		return estimate, err
@@ -291,21 +441,21 @@ func deleteAllContentForGroupVersionResource(
 	glog.V(5).Infof("namespace controller - deleteAllContentForGroupVersionResource - estimate - namespace: %s, gvr: %v, estimate: %v", namespace, gvr, estimate)
 
 	// get a client for this group version...
-	dynamicClient, err := clientPool.ClientForGroupVersionResource(gvr)
+	dynamicClient, err := d.clientPool.ClientForGroupVersionResource(gvr)
 	if err != nil {
 		glog.V(5).Infof("namespace controller - deleteAllContentForGroupVersionResource - unable to get client - namespace: %s, gvr: %v, err: %v", namespace, gvr, err)
 		return estimate, err
 	}
 
 	// first try to delete the entire collection
-	deleteCollectionSupported, err := deleteCollection(dynamicClient, opCache, gvr, namespace)
+	deleteCollectionSupported, err := d.deleteCollection(dynamicClient, gvr, namespace)
 	if err != nil {
 		return estimate, err
 	}
 
 	// delete collection was not supported, so we list and delete each item...
 	if !deleteCollectionSupported {
-		err = deleteEachItem(dynamicClient, opCache, gvr, namespace)
+		err = d.deleteEachItem(dynamicClient, gvr, namespace)
 		if err != nil {
 			return estimate, err
 		}
@@ -314,7 +464,7 @@ func deleteAllContentForGroupVersionResource(
 	// verify there are no more remaining items
 	// it is not an error condition for there to be remaining items if local estimate is non-zero
 	glog.V(5).Infof("namespace controller - deleteAllContentForGroupVersionResource - checking for no more items in namespace: %s, gvr: %v", namespace, gvr)
-	unstructuredList, listSupported, err := listCollection(dynamicClient, opCache, gvr, namespace)
+	unstructuredList, listSupported, err := d.listCollection(dynamicClient, gvr, namespace)
 	if err != nil {
 		glog.V(5).Infof("namespace controller - deleteAllContentForGroupVersionResource - error verifying no items in namespace: %s, gvr: %v, err: %v", namespace, gvr, err)
 		return estimate, err
@@ -340,18 +490,22 @@ func deleteAllContentForGroupVersionResource(
 // deleteAllContent will use the dynamic client to delete each resource identified in groupVersionResources.
 // It returns an estimate of the time remaining before the remaining resources are deleted.
 // If estimate > 0, not all resources are guaranteed to be gone.
-func deleteAllContent(
-	kubeClient clientset.Interface,
-	clientPool dynamic.ClientPool,
-	opCache *operationNotSupportedCache,
-	groupVersionResources map[schema.GroupVersionResource]struct{},
-	namespace string,
-	namespaceDeletedAt metav1.Time,
-) (int64, error) {
+func (d *namespacedResourcesDeleter) deleteAllContent(
+	namespace string, namespaceDeletedAt metav1.Time) (int64, error) {
 	estimate := int64(0)
-	glog.V(4).Infof("namespace controller - deleteAllContent - namespace: %s, gvrs: %v", namespace, groupVersionResources)
+	glog.V(4).Infof("namespace controller - deleteAllContent - namespace: %s", namespace)
+	resources, err := d.discoverResourcesFn()
+	if err != nil {
+		return estimate, err
+	}
+	// TODO(sttts): get rid of opCache and pass the verbs (especially "deletecollection") down into the deleter
+	deletableResources := discovery.FilteredBy(discovery.SupportsAllVerbs{Verbs: []string{"delete"}}, resources)
+	groupVersionResources, err := discovery.GroupVersionResources(deletableResources)
+	if err != nil {
+		return estimate, err
+	}
 	for gvr := range groupVersionResources {
-		gvrEstimate, err := deleteAllContentForGroupVersionResource(kubeClient, clientPool, opCache, gvr, namespace, namespaceDeletedAt)
+		gvrEstimate, err := d.deleteAllContentForGroupVersionResource(gvr, namespace, namespaceDeletedAt)
 		if err != nil {
 			return estimate, err
 		}
@@ -363,112 +517,15 @@ func deleteAllContent(
 	return estimate, nil
 }
 
-// syncNamespace orchestrates deletion of a Namespace and its associated content.
-func syncNamespace(
-	kubeClient clientset.Interface,
-	clientPool dynamic.ClientPool,
-	opCache *operationNotSupportedCache,
-	discoverResourcesFn func() ([]*metav1.APIResourceList, error),
-	namespace *v1.Namespace,
-	finalizerToken v1.FinalizerName,
-) error {
-	if namespace.DeletionTimestamp == nil {
-		return nil
-	}
-
-	// multiple controllers may edit a namespace during termination
-	// first get the latest state of the namespace before proceeding
-	// if the namespace was deleted already, don't do anything
-	namespace, err := kubeClient.Core().Namespaces().Get(namespace.Name, metav1.GetOptions{})
-	if err != nil {
-		if errors.IsNotFound(err) {
-			return nil
-		}
-		return err
-	}
-
-	glog.V(5).Infof("namespace controller - syncNamespace - namespace: %s, finalizerToken: %s", namespace.Name, finalizerToken)
-
-	// ensure that the status is up to date on the namespace
-	// if we get a not found error, we assume the namespace is truly gone
-	namespace, err = retryOnConflictError(kubeClient, namespace, updateNamespaceStatusFunc)
-	if err != nil {
-		if errors.IsNotFound(err) {
-			return nil
-		}
-		return err
-	}
-
-	// the latest view of the namespace asserts that namespace is no longer deleting..
-	if namespace.DeletionTimestamp.IsZero() {
-		return nil
-	}
-
-	// if the namespace is already finalized, delete it
-	if finalized(namespace) {
-		var opts *metav1.DeleteOptions
-		uid := namespace.UID
-		if len(uid) > 0 {
-			opts = &metav1.DeleteOptions{Preconditions: &metav1.Preconditions{UID: &uid}}
-		}
-		err = kubeClient.Core().Namespaces().Delete(namespace.Name, opts)
-		if err != nil && !errors.IsNotFound(err) {
-			return err
-		}
-		return nil
-	}
-
-	// there may still be content for us to remove
-	resources, err := discoverResourcesFn()
-	if err != nil {
-		return err
-	}
-	// TODO(sttts): get rid of opCache and pass the verbs (especially "deletecollection") down into the deleter
-	deletableResources := discovery.FilteredBy(discovery.SupportsAllVerbs{Verbs: []string{"delete"}}, resources)
-	groupVersionResources, err := discovery.GroupVersionResources(deletableResources)
-	if err != nil {
-		return err
-	}
-	estimate, err := deleteAllContent(kubeClient, clientPool, opCache, groupVersionResources, namespace.Name, *namespace.DeletionTimestamp)
-	if err != nil {
-		return err
-	}
-	if estimate > 0 {
-		return &contentRemainingError{estimate}
-	}
-
-	// we have removed content, so mark it finalized by us
-	result, err := retryOnConflictError(kubeClient, namespace, finalizeNamespaceFunc(finalizerToken))
-	if err != nil {
-		// in normal practice, this should not be possible, but if a deployment is running
-		// two controllers to do namespace deletion that share a common finalizer token it's
-		// possible that a not found could occur since the other controller would have finished the delete.
-		if errors.IsNotFound(err) {
-			return nil
-		}
-		return err
-	}
-
-	// now check if all finalizers have reported that we delete now
-	if finalized(result) {
-		err = kubeClient.Core().Namespaces().Delete(namespace.Name, nil)
-		if err != nil && !errors.IsNotFound(err) {
-			return err
-		}
-	}
-
-	return nil
-}
-
 // estimateGrracefulTermination will estimate the graceful termination required for the specific entity in the namespace
-func estimateGracefulTermination(kubeClient clientset.Interface, groupVersionResource schema.GroupVersionResource, ns string, namespaceDeletedAt metav1.Time) (int64, error) {
-	groupResource := groupVersionResource.GroupResource()
+func (d *namespacedResourcesDeleter) estimateGracefulTermination(gvr schema.GroupVersionResource, ns string, namespaceDeletedAt metav1.Time) (int64, error) {
+	groupResource := gvr.GroupResource()
 	glog.V(5).Infof("namespace controller - estimateGracefulTermination - group %s, resource: %s", groupResource.Group, groupResource.Resource)
 	estimate := int64(0)
 	var err error
 	switch groupResource {
 	case schema.GroupResource{Group: "", Resource: "pods"}:
-		estimate, err = estimateGracefulTerminationForPods(kubeClient, ns)
+		estimate, err = d.estimateGracefulTerminationForPods(ns)
 	}
 	if err != nil {
 		return estimate, err
@@ -483,21 +540,26 @@ func estimateGracefulTermination(kubeClient clientset.Interface, groupVersionRes
 }
 
 // estimateGracefulTerminationForPods determines the graceful termination period for pods in the namespace
-func estimateGracefulTerminationForPods(kubeClient clientset.Interface, ns string) (int64, error) {
+func (d *namespacedResourcesDeleter) estimateGracefulTerminationForPods(ns string) (int64, error) {
 	glog.V(5).Infof("namespace controller - estimateGracefulTerminationForPods - namespace %s", ns)
 	estimate := int64(0)
-	items, err := kubeClient.Core().Pods(ns).List(metav1.ListOptions{})
+	podsGetter := d.podsGetter
+	if podsGetter == nil || reflect.ValueOf(podsGetter).IsNil() {
+		return estimate, fmt.Errorf("unexpected: podsGetter is nil. Cannot estimate grace period seconds for pods")
+	}
+	items, err := podsGetter.Pods(ns).List(metav1.ListOptions{})
 	if err != nil {
 		return estimate, err
 	}
 	for i := range items.Items {
+		pod := items.Items[i]
 		// filter out terminal pods
-		phase := items.Items[i].Status.Phase
+		phase := pod.Status.Phase
 		if v1.PodSucceeded == phase || v1.PodFailed == phase {
 			continue
 		}
-		if items.Items[i].Spec.TerminationGracePeriodSeconds != nil {
-			grace := *items.Items[i].Spec.TerminationGracePeriodSeconds
+		if pod.Spec.TerminationGracePeriodSeconds != nil {
+			grace := *pod.Spec.TerminationGracePeriodSeconds
 			if grace > estimate {
 				estimate = grace
 			}
