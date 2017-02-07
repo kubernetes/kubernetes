@@ -20,7 +20,6 @@
 {% endfor -%}
 {% set etcd_cluster = vars.etcd_cluster -%}
 {% set cluster_state = vars.cluster_state -%}
-{% set storage_backend = pillar.get('storage_backend', 'etcd3') -%}
 {% set quota_bytes = '' -%}
 {% if pillar.get('storage_backend', 'etcd3') == 'etcd3' -%}
   {% set quota_bytes = '--quota-backend-bytes=4294967296' -%}
@@ -52,7 +51,7 @@
             ],
     "env": [
       { "name": "TARGET_STORAGE",
-        "value": "{{ storage_backend }}"
+        "value": "{{ pillar.get('storage_backend', 'etcd3') }}"
       },
       { "name": "TARGET_VERSION",
         "value": "{{ pillar.get('etcd_version', '3.0.14') }}"
