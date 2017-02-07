@@ -38,11 +38,11 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	clientv1 "k8s.io/client-go/pkg/api/v1"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/flowcontrol"
 	"k8s.io/kubernetes/pkg/api"
 	apiservice "k8s.io/kubernetes/pkg/api/service"
-	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/proxy"
 	"k8s.io/kubernetes/pkg/proxy/healthcheck"
@@ -1010,7 +1010,7 @@ func (proxier *Proxier) syncProxyRules() {
 						msg := fmt.Sprintf("can't open %s, skipping this externalIP: %v", lp.String(), err)
 
 						proxier.recorder.Eventf(
-							&v1.ObjectReference{
+							&clientv1.ObjectReference{
 								Kind:      "Node",
 								Name:      proxier.hostname,
 								UID:       types.UID(proxier.hostname),
