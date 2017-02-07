@@ -205,7 +205,7 @@ func Run(s *options.ServerRunOptions) error {
 		return fmt.Errorf("error generating storage version map: %s", err)
 	}
 	storageFactory, err := kubeapiserver.BuildDefaultStorageFactory(
-		s.Etcd.StorageConfig, s.GenericServerRunOptions.DefaultStorageMediaType, api.Codecs,
+		s.Etcd.StorageConfig, s.Etcd.DefaultStorageMediaType, api.Codecs,
 		genericapiserver.NewDefaultResourceEncodingConfig(api.Registry), storageGroupsToEncodingVersion,
 		// FIXME: this GroupVersionResource override should be configurable
 		[]schema.GroupVersionResource{batch.Resource("cronjobs").WithVersion("v2alpha1")},
