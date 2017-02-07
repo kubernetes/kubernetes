@@ -55,6 +55,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/componentconfig"
 	componentconfigv1alpha1 "k8s.io/kubernetes/pkg/apis/componentconfig/v1alpha1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
+	clientcertificates "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/certificates/v1beta1"
 	"k8s.io/kubernetes/pkg/client/legacylisters"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/features"
@@ -694,8 +695,12 @@ func NewMainKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *Kub
 
 	klet.statusManager = status.NewManager(klet.kubeClient, klet.podManager)
 
+	var certSigningRequestClient clientcertificates.CertificateSigningRequestInterface
+	if klet.kubeClient != nil && klet.kubeClient.Certificates() != nil {
+		certSigningRequestClient = klet.kubeClient.Certificates().CertificateSigningRequests()
+	}
 	klet.certificateManager, err = certificate.NewManager(
-		kubeClient.Certificates().CertificateSigningRequests(),
+		certSigningRequestClient,
 		nodeName,
 		kubeCfg.CertDirectory,
 		kubeCfg.CertDirectory,

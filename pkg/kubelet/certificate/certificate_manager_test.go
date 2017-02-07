@@ -98,15 +98,16 @@ func TestFixSymlink(t *testing.T) {
 	fixSymlink(keyFile)
 
 	if _, err := os.Stat(keyFile); err != nil {
-		t.Errorf("Expected the file %q to be there: %v", err)
+		t.Errorf("Expected the file %q to be there: %v", keyFile, err)
 	}
 	if fi, err := os.Lstat(keyFile); err != nil {
-		t.Errorf("Expected the file %q to be there: %v", err)
+		t.Errorf("Expected the file %q to be there: %v", keyFile, err)
 	} else if fi.Mode()&os.ModeSymlink != os.ModeSymlink {
-		t.Errorf("Expected %q to be a symlink.")
+		t.Errorf("Expected %q to be a symlink.", keyFile)
 	}
-	if _, err := os.Stat(filepath.Join(dir, "kubelet.orig.key")); err != nil {
-		t.Errorf("Expected the file %q to be there: %v", err)
+	origKeyFile := filepath.Join(dir, "kubelet.orig.key")
+	if _, err := os.Stat(origKeyFile); err != nil {
+		t.Errorf("Expected the file %q to be there: %v", origKeyFile, err)
 	}
 }
 
