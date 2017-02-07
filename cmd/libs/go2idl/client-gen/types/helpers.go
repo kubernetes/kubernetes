@@ -36,7 +36,7 @@ func ToGroupVersion(gv string) (GroupVersion, error) {
 
 	switch strings.Count(gv, "/") {
 	case 0:
-		return GroupVersion{"", Version(gv)}, nil
+		return GroupVersion{Group(gv), ""}, nil
 	case 1:
 		i := strings.Index(gv, "/")
 		return GroupVersion{Group(gv[:i]), Version(gv[i+1:])}, nil
