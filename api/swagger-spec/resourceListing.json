@@ -30,6 +30,10 @@
     "description": "get information of a group"
    },
    {
+    "path": "/apis/authentication.k8s.io/v1",
+    "description": "API at /apis/authentication.k8s.io/v1"
+   },
+   {
     "path": "/apis/authentication.k8s.io/v1beta1",
     "description": "API at /apis/authentication.k8s.io/v1beta1"
    },
