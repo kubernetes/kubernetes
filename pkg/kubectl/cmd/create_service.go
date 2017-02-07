@@ -79,7 +79,7 @@ func NewCmdCreateServiceClusterIP(f cmdutil.Factory, cmdOut io.Writer) *cobra.Co
 	cmdutil.AddPrinterFlags(cmd)
 	cmdutil.AddGeneratorFlags(cmd, cmdutil.ServiceClusterIPGeneratorV1Name)
 	addPortFlags(cmd)
-	cmd.Flags().String("clusterip", "", "Assign your own ClusterIP or set to 'None' for a 'headless' service (no loadbalancing).")
+	cmd.Flags().String("clusterip", "", i18n.T("Assign your own ClusterIP or set to 'None' for a 'headless' service (no loadbalancing)."))
 	return cmd
 }
 
@@ -251,7 +251,7 @@ func NewCmdCreateServiceExternalName(f cmdutil.Factory, cmdOut io.Writer) *cobra
 	cmdutil.AddPrinterFlags(cmd)
 	cmdutil.AddGeneratorFlags(cmd, cmdutil.ServiceExternalNameGeneratorV1Name)
 	addPortFlags(cmd)
-	cmd.Flags().String("external-name", "", "external name of service")
+	cmd.Flags().String("external-name", "", i18n.T("external name of service"))
 	cmd.MarkFlagRequired("external-name")
 	return cmd
 }
