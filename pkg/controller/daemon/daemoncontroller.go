@@ -108,7 +108,7 @@ type DaemonSetsController struct {
 	// DaemonSet keys that need to be synced.
 	queue workqueue.RateLimitingInterface
 
-	metricsCache *MetricsCache
+	metricsCache *metricsCache
 }
 
 func NewDaemonSetsController(daemonSetInformer extensionsinformers.DaemonSetInformer, podInformer coreinformers.PodInformer, nodeInformer coreinformers.NodeInformer, kubeClient clientset.Interface, lookupCacheSize int) *DaemonSetsController {
@@ -184,7 +184,7 @@ func NewDaemonSetsController(daemonSetInformer extensionsinformers.DaemonSetInfo
 
 	dsc.syncHandler = dsc.syncDaemonSet
 	dsc.lookupCache = controller.NewMatchingCache(lookupCacheSize)
-	dsc.metricsCache = NewMetricsCache(metricsCacheSize)
+	dsc.metricsCache = newMetricsCache(metricsCacheSize)
 	return dsc
 }
 
@@ -221,6 +221,8 @@ func (dsc *DaemonSetsController) Run(workers int, stopCh <-chan struct{}) {
 	for i := 0; i < workers; i++ {
 		go wait.Until(dsc.runWorker, time.Second, stopCh)
 	}
+
+	Register()
 
 	<-stopCh
 	glog.Infof("Shutting down Daemon Set Controller")
@@ -402,7 +404,7 @@ func (dsc *DaemonSetsController) deletePod(obj interface{}) {
 	}
 	glog.V(4).Infof("Pod %s deleted.", pod.Name)
 	if ds := dsc.getPodDaemonSet(pod); ds != nil {
-		dsc.metricsCache.RecordDeletePod(ds, pod, time.Now())
+		dsc.metricsCache.recordDeletePod(ds, pod, time.Now())
 		dsKey, err := controller.KeyFunc(ds)
 		if err != nil {
 			utilruntime.HandleError(fmt.Errorf("Couldn't get key for object %#v: %v", ds, err))

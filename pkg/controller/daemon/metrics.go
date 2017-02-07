@@ -24,23 +24,23 @@ import (
 )
 
 const (
-	DaemonSetUpdateSubsystem = "daemonset_rollingupdate"
-	PodKillCreateLatencyKey  = "pod_kill_create_latency_microseconds"
-	PodKillRunningLatencyKey = "pod_kill_running_latency_microseconds"
+	daemonSetUpdateSubsystem = "daemonset_rollingupdate"
+	podKillCreateLatencyKey  = "pod_kill_create_latency_microseconds"
+	podKillRunningLatencyKey = "pod_kill_running_latency_microseconds"
 )
 
 var (
-	PodKillCreateLatency = prometheus.NewSummary(
+	podKillCreateLatency = prometheus.NewSummary(
 		prometheus.SummaryOpts{
-			Subsystem: DaemonSetUpdateSubsystem,
-			Name:      PodKillCreateLatencyKey,
+			Subsystem: daemonSetUpdateSubsystem,
+			Name:      podKillCreateLatencyKey,
 			Help:      "Time in milliseconds of a killed daemon pod on a node being created during daemonset rolling update",
 		},
 	)
-	PodKillRunningLatency = prometheus.NewSummary(
+	podKillRunningLatency = prometheus.NewSummary(
 		prometheus.SummaryOpts{
-			Subsystem: DaemonSetUpdateSubsystem,
-			Name:      PodKillRunningLatencyKey,
+			Subsystem: daemonSetUpdateSubsystem,
+			Name:      podKillRunningLatencyKey,
 			Help:      "Time in milliseconds of a killed daemon pod on a node being created and running during daemonset rolling update",
 		},
 	)
@@ -52,8 +52,8 @@ var registerMetrics sync.Once
 func Register() {
 	// Register the metrics.
 	registerMetrics.Do(func() {
-		prometheus.MustRegister(PodKillCreateLatency)
-		prometheus.MustRegister(PodKillRunningLatency)
+		prometheus.MustRegister(podKillCreateLatency)
+		prometheus.MustRegister(podKillRunningLatency)
 	})
 }
 

@@ -17,7 +17,7 @@ limitations under the License.
 package daemon
 
 import (
-	"hash/adler32"
+	"hash/fnv"
 	"sync"
 	"time"
 
@@ -39,20 +39,20 @@ type podMetrics struct {
 	recreateTime    time.Time
 }
 
-// MetricsCache save metrics about pod per node of daemon set
-type MetricsCache struct {
+// metricsCache save metrics about pod per node of daemon set
+type metricsCache struct {
 	mutex sync.RWMutex
 	cache *lru.Cache
 }
 
-// NewMetricsCache return a new MetricsCache
-func NewMetricsCache(maxCacheEntries int) *MetricsCache {
-	return &MetricsCache{
+// newMetricsCache return a new metricsCache
+func newMetricsCache(maxCacheEntries int) *metricsCache {
+	return &metricsCache{
 		cache: lru.New(maxCacheEntries),
 	}
 }
 
-func (c *MetricsCache) RecordDeletePod(ds *v1beta1.DaemonSet, pod *v1.Pod, deleteTime time.Time) {
+func (c *metricsCache) recordDeletePod(ds *v1beta1.DaemonSet, pod *v1.Pod, deleteTime time.Time) {
 	if ds.Namespace != pod.Namespace || len(pod.Spec.NodeName) == 0 {
 		return
 	}
@@ -60,7 +60,7 @@ func (c *MetricsCache) RecordDeletePod(ds *v1beta1.DaemonSet, pod *v1.Pod, delet
 		podMetrics{deletedPodName: pod.Name, deleteTime: deleteTime})
 }
 
-func (c *MetricsCache) RecordRecreatePod(ds *v1beta1.DaemonSet, pod *v1.Pod, recreateTime time.Time) {
+func (c *metricsCache) recordRecreatePod(ds *v1beta1.DaemonSet, pod *v1.Pod, recreateTime time.Time) {
 	if ds.Namespace != pod.Namespace || len(pod.Spec.NodeName) == 0 {
 		return
 	}
@@ -73,7 +73,7 @@ func (c *MetricsCache) RecordRecreatePod(ds *v1beta1.DaemonSet, pod *v1.Pod, rec
 		m.recreatePodName = pod.Name
 		m.recreateTime = recreateTime
 		c.Update(dsNode, m)
-		PodKillCreateLatency.Observe(subInMilliseconds(m.deleteTime, recreateTime))
+		podKillCreateLatency.Observe(subInMilliseconds(m.deleteTime, recreateTime))
 	}
 }
 
@@ -81,7 +81,7 @@ func validForRecreate(metrics podMetrics, recreateTime time.Time) bool {
 	return !metrics.deleteTime.IsZero() && len(metrics.deletedPodName) > 0
 }
 
-func (c *MetricsCache) RecordRunningPod(ds *v1beta1.DaemonSet, pod *v1.Pod, runningTime time.Time) {
+func (c *metricsCache) RecordRunningPod(ds *v1beta1.DaemonSet, pod *v1.Pod, runningTime time.Time) {
 	if ds.Namespace != pod.Namespace || len(pod.Spec.NodeName) == 0 {
 		return
 	}
@@ -91,7 +91,7 @@ func (c *MetricsCache) RecordRunningPod(ds *v1beta1.DaemonSet, pod *v1.Pod, runn
 		if !ok || !validForRunning(m, runningTime) {
 			return
 		}
-		PodKillRunningLatency.Observe(subInMilliseconds(m.deleteTime, runningTime))
+		podKillRunningLatency.Observe(subInMilliseconds(m.deleteTime, runningTime))
 	}
 }
 
@@ -100,7 +100,7 @@ func validForRunning(metrics podMetrics, runningTime time.Time) bool {
 }
 
 // Add will add matching information to the cache.
-func (c *MetricsCache) Add(dsNode daemonSetNode, metrics podMetrics) {
+func (c *metricsCache) Add(dsNode daemonSetNode, metrics podMetrics) {
 	key := keyFunc(dsNode)
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
@@ -109,7 +109,7 @@ func (c *MetricsCache) Add(dsNode daemonSetNode, metrics podMetrics) {
 
 // keyFunc returns the key of an object, which is used to look up in the cache for it's matching object.
 func keyFunc(dsNode daemonSetNode) uint64 {
-	hash := adler32.New()
+	hash := fnv.New32a()
 	hashutil.DeepHashObject(hash, &dsNode)
 	return uint64(hash.Sum32())
 }
@@ -117,7 +117,7 @@ func keyFunc(dsNode daemonSetNode) uint64 {
 // Get lookup the matching metrics for a given daemonSetNode.
 // Note: the cache information may be invalid since the controller may be deleted or updated,
 // we need check in the external request to ensure the cache data is not dirty.
-func (c *MetricsCache) Get(dsNode daemonSetNode) (obj interface{}, exists bool) {
+func (c *metricsCache) Get(dsNode daemonSetNode) (obj interface{}, exists bool) {
 	key := keyFunc(dsNode)
 	// NOTE: we use Lock() instead of RLock() here because lru's Get() method also modifies state(
 	// it need update the least recently usage information). So we can not call it concurrently.
@@ -127,6 +127,6 @@ func (c *MetricsCache) Get(dsNode daemonSetNode) (obj interface{}, exists bool) 
 }
 
 // Update update the cached matching metrics.
-func (c *MetricsCache) Update(dsNode daemonSetNode, metrics podMetrics) {
+func (c *metricsCache) Update(dsNode daemonSetNode, metrics podMetrics) {
 	c.Add(dsNode, metrics)
 }
