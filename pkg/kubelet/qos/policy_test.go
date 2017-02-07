@@ -23,6 +23,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
+	utilconfig "k8s.io/kubernetes/pkg/util/config"
 )
 
 const (
@@ -215,6 +216,7 @@ func TestGetContainerOOMScoreAdjust(t *testing.T) {
 			highOOMScoreAdj: -998,
 		},
 	}
+	utilconfig.DefaultFeatureGate.Set("ExperimentalCriticalPodAnnotation=True")
 	for _, test := range oomTests {
 		oomScoreAdj := GetContainerOOMScoreAdjust(test.pod, &test.pod.Spec.Containers[0], test.memoryCapacity)
 		if oomScoreAdj < test.lowOOMScoreAdj || oomScoreAdj > test.highOOMScoreAdj {
