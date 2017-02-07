@@ -23,7 +23,10 @@ api_group(
     extra_peers = [
         "k8s.io/kubernetes/pkg/api/v1",
     ],
-    gen_deps = ["//pkg/apis/batch/v1:go_default_library"],
+    gen_deps = [
+        "//pkg/api:go_default_library",
+        "//pkg/apis/batch/v1:go_default_library",
+    ],
     gen_types = [
         "conversion",
         "deepcopy",
@@ -32,7 +35,6 @@ api_group(
     package = "pkg/apis/batch/v2alpha1",
     tags = ["automanaged"],
     deps = [
-        "//pkg/api:go_default_library",
         "//pkg/api/v1:go_default_library",
         "//pkg/apis/batch:go_default_library",
         "//vendor:github.com/gogo/protobuf/proto",

@@ -26,10 +26,12 @@ api_group(
         "deepcopy",
         "defaulter",
     ],
+    gen_deps = [
+        "//pkg/api:go_default_library",
+    ],
     package = "pkg/apis/batch/v1",
     tags = ["automanaged"],
     deps = [
-        "//pkg/api:go_default_library",
         "//pkg/api/v1:go_default_library",
         "//pkg/apis/batch:go_default_library",
         "//vendor:github.com/gogo/protobuf/proto",

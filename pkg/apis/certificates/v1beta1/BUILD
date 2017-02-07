@@ -19,6 +19,7 @@ api_group(
     ],
     gen_deps = [
         "//pkg/api/v1:go_default_library",
+        "//pkg/apis/certificates:go_default_library",
         "//vendor:k8s.io/apimachinery/pkg/conversion",
     ],
     gen_types = [
@@ -29,7 +30,6 @@ api_group(
     package = "pkg/apis/certificates/v1beta1",
     tags = ["automanaged"],
     deps = [
-        "//pkg/apis/certificates:go_default_library",
         "//vendor:github.com/gogo/protobuf/proto",
         "//vendor:github.com/ugorji/go/codec",
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
