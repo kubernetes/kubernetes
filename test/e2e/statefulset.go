@@ -934,10 +934,10 @@ func (s *statefulSetTester) setHealthy(ss *apps.StatefulSet) {
 			framework.Failf("Found multiple non-healthy stateful pods: %v and %v", pod.Name, markedHealthyPod)
 		}
 		p, err := framework.UpdatePodWithRetries(s.c, pod.Namespace, pod.Name, func(update *v1.Pod) {
-			update.Annotations[v1.StatefulSetInitAnnotation] = "true"
+			update.Annotations[apps.StatefulSetInitAnnotation] = "true"
 		})
 		framework.ExpectNoError(err)
-		framework.Logf("Set annotation %v to %v on pod %v", v1.StatefulSetInitAnnotation, p.Annotations[v1.StatefulSetInitAnnotation], pod.Name)
+		framework.Logf("Set annotation %v to %v on pod %v", apps.StatefulSetInitAnnotation, p.Annotations[apps.StatefulSetInitAnnotation], pod.Name)
 		markedHealthyPod = pod.Name
 	}
 }
@@ -1060,7 +1060,7 @@ func pollReadWithTimeout(statefulPod statefulPodTester, statefulPodNumber int, k
 }
 
 func isInitialized(pod v1.Pod) bool {
-	initialized, ok := pod.Annotations[v1.StatefulSetInitAnnotation]
+	initialized, ok := pod.Annotations[apps.StatefulSetInitAnnotation]
 	if !ok {
 		return false
 	}
