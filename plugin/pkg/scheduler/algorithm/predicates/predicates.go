@@ -692,7 +692,7 @@ type ServiceAffinity struct {
 // only should be referenced by NewServiceAffinityPredicate.
 func (s *ServiceAffinity) serviceAffinityPrecomputation(pm *predicateMetadata) {
 	if pm.pod == nil {
-		glog.Errorf("Cannot precompute service affinity, a pod is required to caluculate service affinity.")
+		glog.Errorf("Cannot precompute service affinity, a pod is required to calculate service affinity.")
 		return
 	}
 
