@@ -99,6 +99,10 @@ func New(c *Config) Controller {
 // Run blocks; call via go.
 func (c *controller) Run(stopCh <-chan struct{}) {
 	defer utilruntime.HandleCrash()
+	go func() {
+		<-stopCh
+		c.config.Queue.Close()
+	}()
 	r := NewReflector(
 		c.config.ListerWatcher,
 		c.config.ObjectType,
@@ -142,6 +146,9 @@ func (c *controller) processLoop() {
 	for {
 		obj, err := c.config.Queue.Pop(PopProcessFunc(c.config.Process))
 		if err != nil {
+			if err == FIFOClosedError {
+				return
+			}
 			if c.config.RetryOnError {
 				// This is the safe way to re-enqueue.
 				c.config.Queue.AddIfNotPresent(obj)
