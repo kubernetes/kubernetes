@@ -61,7 +61,7 @@ func Until(timeout time.Duration, watcher Interface, conditions ...ConditionFunc
 			select {
 			case event, ok := <-ch:
 				if !ok {
-					return lastEvent, wait.ErrWaitTimeout
+					return lastEvent, wait.ErrChannelClosed
 				}
 				lastEvent = &event
 
