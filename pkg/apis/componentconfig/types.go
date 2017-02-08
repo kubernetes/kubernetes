@@ -421,7 +421,7 @@ type KubeletConfiguration struct {
 	// Comma-delimited list of soft eviction expressions.  For example, 'memory.available<300Mi'.
 	// +optional
 	EvictionSoft string
-	// Comma-delimeted list of grace periods for each soft eviction signal.  For example, 'memory.available=30s'.
+	// Comma-delimited list of grace periods for each soft eviction signal.  For example, 'memory.available=30s'.
 	// +optional
 	EvictionSoftGracePeriod string
 	// Duration for which the kubelet has to wait before transitioning out of an eviction pressure condition.
@@ -436,6 +436,9 @@ type KubeletConfiguration struct {
 	// If enabled, the kubelet will integrate with the kernel memcg notification to determine if memory eviction thresholds are crossed rather than polling.
 	// +optional
 	ExperimentalKernelMemcgNotification bool
+	// Comma-delimited list of cgroup subsystems and precentages at which to reserve pod resource limits at the QoS-level cgroup. For example, 'memory=50%'.
+	// +optional
+	QOSReserveLimits string
 	// Maximum number of pods per core. Cannot exceed MaxPods
 	PodsPerCore int32
 	// enableControllerAttachDetach enables the Attach/Detach controller to

@@ -31,7 +31,7 @@ type unsupportedContainerManager struct {
 
 var _ ContainerManager = &unsupportedContainerManager{}
 
-func (unsupportedContainerManager) Start(_ *v1.Node) error {
+func (unsupportedContainerManager) Start(_ *v1.Node, _ func() []*v1.Pod) error {
 	return fmt.Errorf("Container Manager is unsupported in this build")
 }
 

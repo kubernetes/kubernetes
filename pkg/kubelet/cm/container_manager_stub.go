@@ -25,7 +25,7 @@ type containerManagerStub struct{}
 
 var _ ContainerManager = &containerManagerStub{}
 
-func (cm *containerManagerStub) Start(_ *v1.Node) error {
+func (cm *containerManagerStub) Start(_ *v1.Node, _ func() []*v1.Pod) error {
 	glog.V(2).Infof("Starting stub container manager")
 	return nil
 }

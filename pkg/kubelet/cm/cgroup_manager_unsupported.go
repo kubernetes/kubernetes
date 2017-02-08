@@ -66,6 +66,10 @@ func (m *unsupportedCgroupManager) ReduceCPULimits(cgroupName CgroupName) error 
 	return nil
 }
 
+func (m *cgroupManagerImpl) Get(cgroupConfig *CgroupConfig) error {
+	return nil
+}
+
 func ConvertCgroupFsNameToSystemd(cgroupfsName string) (string, error) {
 	return "", nil
 }

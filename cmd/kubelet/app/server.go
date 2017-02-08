@@ -69,6 +69,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/config"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/dockertools"
+	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 	"k8s.io/kubernetes/pkg/kubelet/server"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/util/configz"
@@ -448,11 +449,17 @@ func run(s *options.KubeletServer, kubeDeps *kubelet.KubeletDeps) (err error) {
 		}
 	}
 
+	qosReserveLimits, err := cm.ParseQOSReserveLimits(s.QOSReserveLimits)
+	if err != nil {
+		return err
+	}
+
 	if kubeDeps.ContainerManager == nil {
 		if s.SystemCgroups != "" && s.CgroupRoot == "" {
 			return fmt.Errorf("invalid configuration: system container was specified and cgroup root was not specified")
 		}
-		kubeDeps.ContainerManager, err = cm.NewContainerManager(
+		var containerManagerAdmitHandler lifecycle.PodAdmitHandler
+		kubeDeps.ContainerManager, containerManagerAdmitHandler, err = cm.NewContainerManager(
 			kubeDeps.Mounter,
 			kubeDeps.CAdvisorInterface,
 			cm.NodeConfig{
@@ -465,12 +472,14 @@ func run(s *options.KubeletServer, kubeDeps *kubelet.KubeletDeps) (err error) {
 				CgroupDriver:          s.CgroupDriver,
 				ProtectKernelDefaults: s.ProtectKernelDefaults,
 				EnableCRI:             s.EnableCRI,
+				QOSReserveLimits:      qosReserveLimits,
 			},
 			s.ExperimentalFailSwapOn)
 
 		if err != nil {
 			return err
 		}
+		kubeDeps.PodAdmitHandlers = append(kubeDeps.PodAdmitHandlers, containerManagerAdmitHandler)
 	}
 
 	if err := checkPermissions(); err != nil {

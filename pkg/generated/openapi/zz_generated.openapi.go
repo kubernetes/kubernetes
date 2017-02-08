@@ -10694,7 +10694,7 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 						},
 						"evictionSoftGracePeriod": {
 							SchemaProps: spec.SchemaProps{
-								Description: "Comma-delimeted list of grace periods for each soft eviction signal.  For example, 'memory.available=30s'.",
+								Description: "Comma-delimited list of grace periods for each soft eviction signal.  For example, 'memory.available=30s'.",
 								Type:        []string{"string"},
 								Format:      "",
 							},
@@ -10723,6 +10723,13 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 							SchemaProps: spec.SchemaProps{
 								Description: "If enabled, the kubelet will integrate with the kernel memcg notification to determine if memory eviction thresholds are crossed rather than polling.",
 								Type:        []string{"boolean"},
+								Format:      "",
+							},
+						},
+						"qosReserveLimits": {
+							SchemaProps: spec.SchemaProps{
+								Description: "Comma-delimited list of cgroup subsystems and precentages at which to reserve pod resource limits at the QoS-level cgroup. For example, 'memory=50%'.",
+								Type:        []string{"string"},
 								Format:      "",
 							},
 						},
