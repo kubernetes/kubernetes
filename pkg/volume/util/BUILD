@@ -57,6 +57,7 @@ filegroup(
     name = "all-srcs",
     srcs = [
         ":package-srcs",
+        "//pkg/volume/util/metrics:all-srcs",
         "//pkg/volume/util/nestedpendingoperations:all-srcs",
         "//pkg/volume/util/operationexecutor:all-srcs",
         "//pkg/volume/util/types:all-srcs",
