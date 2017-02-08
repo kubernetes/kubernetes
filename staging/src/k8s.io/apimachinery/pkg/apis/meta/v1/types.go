@@ -73,7 +73,7 @@ type ListMeta struct {
 
 // These are internal finalizer values for Kubernetes-like APIs, must be qualified name unless defined here
 const (
-	FinalizerOrphan     string        = "orphan"
+	FinalizerOrphan string = "orphan"
 )
 
 // ObjectMeta is metadata that all persisted resources must have, which includes all objects
