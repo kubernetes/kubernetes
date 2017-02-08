@@ -2,23 +2,21 @@ package(default_visibility = ["//visibility:public"])
 
 licenses(["notice"])
 
-load(
-    "@io_bazel_rules_go//go:def.bzl",
-    "go_library",
-)
+load("@io_kubernetes_build//defs:go.bzl", "api_group")
 
-go_library(
+api_group(
     name = "go_default_library",
     srcs = [
         "doc.go",
         "register.go",
         "types.go",
-        "zz_generated.deepcopy.go",
     ],
+    gen_deps = ["//vendor:k8s.io/apimachinery/pkg/conversion"],
+    gen_types = ["deepcopy"],
+    package = "pkg/apis/authorization",
     tags = ["automanaged"],
     deps = [
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
-        "//vendor:k8s.io/apimachinery/pkg/conversion",
         "//vendor:k8s.io/apimachinery/pkg/runtime",
         "//vendor:k8s.io/apimachinery/pkg/runtime/schema",
     ],

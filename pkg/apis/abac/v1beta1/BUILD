@@ -4,21 +4,28 @@ licenses(["notice"])
 
 load(
     "@io_bazel_rules_go//go:def.bzl",
-    "go_library",
     "go_test",
 )
+load("@io_kubernetes_build//defs:go.bzl", "api_group")
 
-go_library(
+api_group(
     name = "go_default_library",
     srcs = [
         "conversion.go",
         "doc.go",
         "register.go",
         "types.go",
-        "zz_generated.conversion.go",
-        "zz_generated.deepcopy.go",
-        "zz_generated.defaults.go",
     ],
+    gen_deps = [
+        "//pkg/api:go_default_library",
+        "//pkg/api/v1:go_default_library",
+    ],
+    gen_types = [
+        "conversion",
+        "deepcopy",
+        "defaulter",
+    ],
+    package = "pkg/apis/abac/v1beta1",
     tags = ["automanaged"],
     deps = [
         "//pkg/apis/abac:go_default_library",
