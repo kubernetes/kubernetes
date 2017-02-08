@@ -52,6 +52,24 @@ const (
 	nonExist = "NonExist"
 )
 
+func WaitUntilPodIsScheduled(c clientset.Interface, name, namespace string, timeout time.Duration) (*v1.Pod, error) {
+	// Wait until it's scheduled
+	p, err := c.Core().Pods(namespace).Get(name, metav1.GetOptions{ResourceVersion: "0"})
+	if err == nil && p.Spec.NodeName != "" {
+		return p, nil
+	}
+	pollingPeriod := 200 * time.Millisecond
+	startTime := time.Now()
+	for startTime.Add(timeout).After(time.Now()) {
+		time.Sleep(pollingPeriod)
+		p, err := c.Core().Pods(namespace).Get(name, metav1.GetOptions{ResourceVersion: "0"})
+		if err == nil && p.Spec.NodeName != "" {
+			return p, nil
+		}
+	}
+	return nil, fmt.Errorf("Timed out after %v when waiting for pod %v/%v to start.", timeout, namespace, name)
+}
+
 func RunPodAndGetNodeName(c clientset.Interface, pod *v1.Pod, timeout time.Duration) (string, error) {
 	retries := 5
 	name := pod.Name
@@ -67,21 +85,11 @@ func RunPodAndGetNodeName(c clientset.Interface, pod *v1.Pod, timeout time.Durat
 	if err != nil && !apierrs.IsAlreadyExists(err) {
 		return "", err
 	}
-	// Wait until it's scheduled
-	p, err := c.Core().Pods(namespace).Get(name, metav1.GetOptions{ResourceVersion: "0"})
-	if err == nil && p.Spec.NodeName != "" {
-		return p.Spec.NodeName, nil
+	p, err := WaitUntilPodIsScheduled(c, name, namespace, timeout)
+	if err != nil {
+		return "", err
 	}
-	pollingPeriod := 200 * time.Millisecond
-	startTime := time.Now()
-	for startTime.Add(timeout).After(time.Now()) {
-		time.Sleep(pollingPeriod)
-		p, err := c.Core().Pods(namespace).Get(name, metav1.GetOptions{ResourceVersion: "0"})
-		if err == nil && p.Spec.NodeName != "" {
-			return p.Spec.NodeName, nil
-		}
-	}
-	return "", fmt.Errorf("Timed out after %v when waiting for pod %v/%v to start.", timeout, namespace, name)
+	return p.Spec.NodeName, nil
 }
 
 type RunObjectConfig interface {
