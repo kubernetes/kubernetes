@@ -857,8 +857,10 @@ func DeleteResource(r rest.GracefulDeleter, allowsOptions bool, scope RequestSco
 		}
 
 		trace.Step("About do delete object from database")
+		wasDeleted := true
 		result, err := finishRequest(timeout, func() (runtime.Object, error) {
-			obj, _, err := r.Delete(ctx, name, options)
+			obj, deleted, err := r.Delete(ctx, name, options)
+			wasDeleted = deleted
 			return obj, err
 		})
 		if err != nil {
@@ -867,12 +869,22 @@ func DeleteResource(r rest.GracefulDeleter, allowsOptions bool, scope RequestSco
 		}
 		trace.Step("Object deleted from database")
 
+		status := http.StatusOK
+		// Return http.StatusAccepted if the resource was not deleted immediately and
+		// user requested cascading deletion by setting OrphanDependents=false.
+		// Note: We want to do this always if resource was not deleted immediately, but
+		// that will break existing clients.
+		// Other cases where resource is not instantly deleted are: namespace deletion
+		// and pod graceful deletion.
+		if !wasDeleted && options.OrphanDependents != nil && *options.OrphanDependents == false {
+			status = http.StatusAccepted
+		}
 		// if the rest.Deleter returns a nil object, fill out a status. Callers may return a valid
 		// object with the response.
 		if result == nil {
 			result = &metav1.Status{
 				Status: metav1.StatusSuccess,
-				Code:   http.StatusOK,
+				Code:   int32(status),
 				Details: &metav1.StatusDetails{
 					Name: name,
 					Kind: scope.Kind.Kind,
@@ -887,7 +899,7 @@ func DeleteResource(r rest.GracefulDeleter, allowsOptions bool, scope RequestSco
 				}
 			}
 		}
-		responsewriters.WriteObject(http.StatusOK, scope.Kind.GroupVersion(), scope.Serializer, result, w, req.Request)
+		responsewriters.WriteObject(status, scope.Kind.GroupVersion(), scope.Serializer, result, w, req.Request)
 	}
 }
 
