@@ -763,6 +763,7 @@ func (dc *DeploymentController) checkNextItemForProgress() bool {
 		utilruntime.HandleError(err)
 	}
 	if err == nil && needsResync {
+		glog.V(2).Infof("Deployment %q has failed progressing - syncing it back to the main queue for an update", key.(string))
 		dc.queue.AddRateLimited(key)
 	}
 	dc.progressQueue.Forget(key)
@@ -796,5 +797,6 @@ func (dc *DeploymentController) checkForProgress(key string) (bool, error) {
 	if err != nil {
 		return false, err
 	}
+	glog.V(2).Infof("Syncing deployment %q for a progress check", key)
 	return dc.hasFailed(d)
 }
