@@ -60,7 +60,7 @@ import (
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util/volumehelper"
 	"k8s.io/kubernetes/third_party/forked/golang/expansion"
-	"k8s.io/kubernetes/pkg/kubelet/nvidiagpu"
+	"k8s.io/kubernetes/pkg/kubelet/gpu/nvidia"
 )
 
 // Get a list of pods that have data directories.
@@ -91,8 +91,8 @@ func (kl *Kubelet) makeDevices(container *v1.Container) []kubecontainer.DeviceIn
 
 	if nvidiaGPULimit.Value() != 0 {
 		if nvidiaGPUPaths, err := kl.nvidiaGPUManager.AllocateGPUs(int(nvidiaGPULimit.Value())); err == nil {
-			devices := []kubecontainer.DeviceInfo{{PathOnHost: nvidiagpu.NvidiaCtlDevice, PathInContainer: nvidiagpu.NvidiaCtlDevice, Permissions: "mrw"},
-				{PathOnHost: nvidiagpu.NvidiaUVMDevice, PathInContainer: nvidiagpu.NvidiaUVMDevice, Permissions: "mrw"}}
+			devices := []kubecontainer.DeviceInfo{{PathOnHost: nvidia.NvidiaCtlDevice, PathInContainer: nvidia.NvidiaCtlDevice, Permissions: "mrw"},
+				{PathOnHost: nvidia.NvidiaUVMDevice, PathInContainer: nvidia.NvidiaUVMDevice, Permissions: "mrw"}}
 
 			for i, path := range nvidiaGPUPaths {
 				devices = append(devices, kubecontainer.DeviceInfo{PathOnHost: path, PathInContainer: "/dev/nvidia" + strconv.Itoa(i), Permissions: "mrw"})

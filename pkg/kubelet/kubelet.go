@@ -102,7 +102,7 @@ import (
 	"k8s.io/kubernetes/pkg/util/procfs"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm/predicates"
-	"k8s.io/kubernetes/pkg/kubelet/nvidiagpu"
+	"k8s.io/kubernetes/pkg/kubelet/gpu/nvidia"
 )
 
 const (
@@ -1094,7 +1094,7 @@ type Kubelet struct {
 	experimentalHostUserNamespaceDefaulting bool
 
 	// NVIDIA GPU Manager
-	nvidiaGPUManager nvidiagpu.NvidiaGPUManager
+	nvidiaGPUManager nvidia.NvidiaGPUManager
 }
 
 // setupDataDirs creates:

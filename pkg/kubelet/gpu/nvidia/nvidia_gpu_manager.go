@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package nvidiagpu
+package nvidia
 
 import (
 	"fmt"
@@ -24,7 +24,6 @@ import (
 	"regexp"
 
 	"k8s.io/kubernetes/pkg/kubelet/dockertools"
-	dockertypes "github.com/docker/engine-api/types"
 )
 
 
@@ -119,7 +118,7 @@ func (ngm *NvidiaGPUManager) Capacity() int {
 // Check whether the GPU device could be assigned to a container.
 // Only check alive containers.
 func (ngm *NvidiaGPUManager) isAvailable(path string) bool {
-	containers, err := ngm.dockerClient.ListContainers(dockertypes.ContainerListOptions{All: true})
+	containers, err := dockertools.GetKubeletDockerContainers(ngm.dockerClient, false)
 
 	if err != nil {
 		return true
@@ -133,11 +132,6 @@ func (ngm *NvidiaGPUManager) isAvailable(path string) bool {
 
 		devices := containerJSON.HostConfig.Devices
 		if devices == nil {
-			continue
-		}
-
-		status := containerJSON.State.Status
-		if status == "exited" || status == "dead" {
 			continue
 		}
 
