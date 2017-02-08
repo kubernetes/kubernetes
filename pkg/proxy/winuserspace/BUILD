@@ -16,6 +16,7 @@ go_library(
         "proxier.go",
         "proxysocket.go",
         "roundrobin.go",
+        "types.go",
         "udp_server.go",
     ],
     tags = ["automanaged"],
