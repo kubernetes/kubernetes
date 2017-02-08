@@ -121,6 +121,9 @@ func (o createClusterOptions) run() error {
 func (o *createClusterOptions) modifyCluster(existingCluster clientcmdapi.Cluster) clientcmdapi.Cluster {
 	modifiedCluster := existingCluster
 
+	if o.apiVersion.Provided() {
+		modifiedCluster.APIVersion = o.apiVersion.Value()
+	}
 	if o.server.Provided() {
 		modifiedCluster.Server = o.server.Value()
 	}
