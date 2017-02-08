@@ -84,6 +84,7 @@ function build_binaries() {
   kube::build::verify_prereqs
   kube::build::build_image
   kube::build::run_build_command make WHAT="cmd/kubectl cmd/hyperkube"
+  kube::build::copy_output
 }
 
 function build_image() {
