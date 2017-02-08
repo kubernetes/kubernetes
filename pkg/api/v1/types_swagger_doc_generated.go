@@ -591,7 +591,7 @@ var map_HTTPGetAction = map[string]string{
 	"path":        "Path to access on the HTTP server.",
 	"port":        "Name or number of the port to access on the container. Number must be in the range 1 to 65535. Name must be an IANA_SVC_NAME.",
 	"host":        "Host name to connect to, defaults to the pod IP. You probably want to set \"Host\" in httpHeaders instead.",
-	"scheme":      "Scheme to use for connecting to the host. Defaults to HTTP.",
+	"scheme":      "Scheme to use for connecting to the host. Defaults to HTTP.  For HTTPS, be aware that the probe will by design not attempt certificate path validation.",
 	"httpHeaders": "Custom headers to set in the request. HTTP allows repeated headers.",
 }
 

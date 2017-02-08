@@ -1104,7 +1104,7 @@ message HTTPGetAction {
   optional string host = 3;
 
   // Scheme to use for connecting to the host.
-  // Defaults to HTTP.
+  // Defaults to HTTP.  For HTTPS, be aware that the probe will by design not attempt certificate path validation.
   // +optional
   optional string scheme = 4;
 
