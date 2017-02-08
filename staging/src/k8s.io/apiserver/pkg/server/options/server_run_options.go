@@ -30,7 +30,6 @@ import (
 	_ "k8s.io/apiserver/pkg/features"
 
 	"github.com/spf13/pflag"
-	"gopkg.in/natefinch/lumberjack.v2"
 )
 
 // ServerRunOptions contains the options while running a generic api server.
@@ -39,19 +38,8 @@ type ServerRunOptions struct {
 	AdmissionControlConfigFile string
 	AdvertiseAddress           net.IP
 
-	CorsAllowedOriginList []string
-	// To enable protobuf as storage format, it is enough
-	// to set it to "application/vnd.kubernetes.protobuf".
-	DefaultStorageMediaType     string
+	CorsAllowedOriginList       []string
 	DeleteCollectionWorkers     int
-	AuditLogPath                string
-	AuditLogMaxAge              int
-	AuditLogMaxBackups          int
-	AuditLogMaxSize             int
-	EnableGarbageCollection     bool
-	EnableProfiling             bool
-	EnableContentionProfiling   bool
-	EnableSwaggerUI             bool
 	EnableWatchCache            bool
 	ExternalHost                string
 	MaxRequestsInFlight         int
@@ -66,11 +54,7 @@ func NewServerRunOptions() *ServerRunOptions {
 
 	return &ServerRunOptions{
 		AdmissionControl:            "AlwaysAdmit",
-		DefaultStorageMediaType:     "application/json",
 		DeleteCollectionWorkers:     1,
-		EnableGarbageCollection:     defaults.EnableGarbageCollection,
-		EnableProfiling:             defaults.EnableProfiling,
-		EnableContentionProfiling:   false,
 		EnableWatchCache:            true,
 		MaxRequestsInFlight:         defaults.MaxRequestsInFlight,
 		MaxMutatingRequestsInFlight: defaults.MaxMutatingRequestsInFlight,
@@ -80,20 +64,7 @@ func NewServerRunOptions() *ServerRunOptions {
 
 // ApplyOptions applies the run options to the method receiver and returns self
 func (s *ServerRunOptions) ApplyTo(c *server.Config) error {
-	if len(s.AuditLogPath) != 0 {
-		c.AuditWriter = &lumberjack.Logger{
-			Filename:   s.AuditLogPath,
-			MaxAge:     s.AuditLogMaxAge,
-			MaxBackups: s.AuditLogMaxBackups,
-			MaxSize:    s.AuditLogMaxSize,
-		}
-	}
-
 	c.CorsAllowedOriginList = s.CorsAllowedOriginList
-	c.EnableGarbageCollection = s.EnableGarbageCollection
-	c.EnableProfiling = s.EnableProfiling
-	c.EnableContentionProfiling = s.EnableContentionProfiling
-	c.EnableSwaggerUI = s.EnableSwaggerUI
 	c.ExternalAddress = s.ExternalHost
 	c.MaxRequestsInFlight = s.MaxRequestsInFlight
 	c.MaxMutatingRequestsInFlight = s.MaxMutatingRequestsInFlight
@@ -153,33 +124,8 @@ func (s *ServerRunOptions) AddUniversalFlags(fs *pflag.FlagSet) {
 		"List of allowed origins for CORS, comma separated.  An allowed origin can be a regular "+
 		"expression to support subdomain matching. If this list is empty CORS will not be enabled.")
 
-	fs.StringVar(&s.DefaultStorageMediaType, "storage-media-type", s.DefaultStorageMediaType, ""+
-		"The media type to use to store objects in storage. Defaults to application/json. "+
-		"Some resources may only support a specific media type and will ignore this setting.")
-
 	fs.IntVar(&s.DeleteCollectionWorkers, "delete-collection-workers", s.DeleteCollectionWorkers,
 		"Number of workers spawned for DeleteCollection call. These are used to speed up namespace cleanup.")
-
-	fs.StringVar(&s.AuditLogPath, "audit-log-path", s.AuditLogPath,
-		"If set, all requests coming to the apiserver will be logged to this file.")
-	fs.IntVar(&s.AuditLogMaxAge, "audit-log-maxage", s.AuditLogMaxBackups,
-		"The maximum number of days to retain old audit log files based on the timestamp encoded in their filename.")
-	fs.IntVar(&s.AuditLogMaxBackups, "audit-log-maxbackup", s.AuditLogMaxBackups,
-		"The maximum number of old audit log files to retain.")
-	fs.IntVar(&s.AuditLogMaxSize, "audit-log-maxsize", s.AuditLogMaxSize,
-		"The maximum size in megabytes of the audit log file before it gets rotated. Defaults to 100MB.")
-
-	fs.BoolVar(&s.EnableGarbageCollection, "enable-garbage-collector", s.EnableGarbageCollection, ""+
-		"Enables the generic garbage collector. MUST be synced with the corresponding flag "+
-		"of the kube-controller-manager.")
-
-	fs.BoolVar(&s.EnableProfiling, "profiling", s.EnableProfiling,
-		"Enable profiling via web interface host:port/debug/pprof/")
-	fs.BoolVar(&s.EnableContentionProfiling, "contention-profiling", s.EnableContentionProfiling,
-		"Enable contention profiling. Requires --profiling to be set to work.")
-
-	fs.BoolVar(&s.EnableSwaggerUI, "enable-swagger-ui", s.EnableSwaggerUI,
-		"Enables swagger ui on the apiserver at /swagger-ui")
 
 	// TODO: enable cache in integration tests.
 	fs.BoolVar(&s.EnableWatchCache, "watch-cache", s.EnableWatchCache,
