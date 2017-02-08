@@ -158,7 +158,7 @@ func (dc *DeploymentController) syncRolloutStatus(allRSs []*extensions.ReplicaSe
 			currentCond != nil {
 
 			after := time.Now().Add(time.Duration(*d.Spec.ProgressDeadlineSeconds) * time.Second).Sub(currentCond.LastUpdateTime.Time)
-			glog.V(4).Infof("Queueing up deployment %q for a progress check after %ds", d.Name, int(after.Seconds()))
+			glog.V(2).Infof("Queueing up deployment %q for a progress check after %ds", d.Name, int(after.Seconds()))
 			dc.checkProgressAfter(d, after)
 		}
 		return nil
