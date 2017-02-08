@@ -25,7 +25,6 @@ import (
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/server"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	utilflag "k8s.io/apiserver/pkg/util/flag"
 
 	// add the generic feature gates
 	_ "k8s.io/apiserver/pkg/features"
@@ -58,7 +57,6 @@ type ServerRunOptions struct {
 	MaxRequestsInFlight         int
 	MaxMutatingRequestsInFlight int
 	MinRequestTimeout           int
-	RuntimeConfig               utilflag.ConfigurationMap
 	TargetRAMMB                 int
 	WatchCacheSizes             []string
 }
@@ -77,7 +75,6 @@ func NewServerRunOptions() *ServerRunOptions {
 		MaxRequestsInFlight:         defaults.MaxRequestsInFlight,
 		MaxMutatingRequestsInFlight: defaults.MaxMutatingRequestsInFlight,
 		MinRequestTimeout:           defaults.MinRequestTimeout,
-		RuntimeConfig:               make(utilflag.ConfigurationMap),
 	}
 }
 
@@ -217,12 +214,6 @@ func (s *ServerRunOptions) AddUniversalFlags(fs *pflag.FlagSet) {
 		"a request open before timing it out. Currently only honored by the watch request "+
 		"handler, which picks a randomized value above this number as the connection timeout, "+
 		"to spread out load.")
-
-	fs.Var(&s.RuntimeConfig, "runtime-config", ""+
-		"A set of key=value pairs that describe runtime configuration that may be passed "+
-		"to apiserver. apis/<groupVersion> key can be used to turn on/off specific api versions. "+
-		"apis/<groupVersion>/<resource> can be used to turn on/off specific resources. api/all and "+
-		"api/legacy are special keys to control all and legacy api versions respectively.")
 
 	fs.StringSliceVar(&s.WatchCacheSizes, "watch-cache-sizes", s.WatchCacheSizes, ""+
 		"List of watch cache sizes for every resource (pods, nodes, etc.), comma separated. "+

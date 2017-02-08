@@ -11,6 +11,7 @@ load(
 go_library(
     name = "go_default_library",
     srcs = [
+        "api_enablement.go",
         "authentication.go",
         "authorization.go",
         "cloudprovider.go",
@@ -29,6 +30,7 @@ go_library(
         "//vendor:k8s.io/apimachinery/pkg/runtime/schema",
         "//vendor:k8s.io/apiserver/pkg/server",
         "//vendor:k8s.io/apiserver/pkg/server/options",
+        "//vendor:k8s.io/apiserver/pkg/util/flag",
     ],
 )
 

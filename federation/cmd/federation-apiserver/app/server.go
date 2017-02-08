@@ -118,7 +118,7 @@ func Run(s *options.ServerRunOptions) error {
 	storageFactory, err := kubeapiserver.BuildDefaultStorageFactory(
 		s.Etcd.StorageConfig, s.GenericServerRunOptions.DefaultStorageMediaType, api.Codecs,
 		genericapiserver.NewDefaultResourceEncodingConfig(api.Registry), storageGroupsToEncodingVersion,
-		[]schema.GroupVersionResource{}, resourceConfig, s.GenericServerRunOptions.RuntimeConfig)
+		[]schema.GroupVersionResource{}, resourceConfig, s.APIEnablement.RuntimeConfig)
 	if err != nil {
 		return fmt.Errorf("error in initializing storage factory: %s", err)
 	}
