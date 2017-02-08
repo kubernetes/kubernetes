@@ -40,9 +40,10 @@ const (
 )
 
 type watcher struct {
-	client    *clientv3.Client
-	codec     runtime.Codec
-	versioner storage.Versioner
+	client      *clientv3.Client
+	codec       runtime.Codec
+	versioner   storage.Versioner
+	transformer ValueTransformer
 }
 
 // watchChan implements watch.Interface.
@@ -59,11 +60,12 @@ type watchChan struct {
 	errChan           chan error
 }
 
-func newWatcher(client *clientv3.Client, codec runtime.Codec, versioner storage.Versioner) *watcher {
+func newWatcher(client *clientv3.Client, codec runtime.Codec, versioner storage.Versioner, transformer ValueTransformer) *watcher {
 	return &watcher{
-		client:    client,
-		codec:     codec,
-		versioner: versioner,
+		client:      client,
+		codec:       codec,
+		versioner:   versioner,
+		transformer: transformer,
 	}
 }
 
@@ -341,7 +343,11 @@ func (wc *watchChan) sendEvent(e *event) {
 
 func (wc *watchChan) prepareObjs(e *event) (curObj runtime.Object, oldObj runtime.Object, err error) {
 	if !e.isDeleted {
-		curObj, err = decodeObj(wc.watcher.codec, wc.watcher.versioner, e.value, e.rev)
+		data, _, err := wc.watcher.transformer.TransformFromStorage(e.value)
+		if err != nil {
+			return nil, nil, err
+		}
+		curObj, err = decodeObj(wc.watcher.codec, wc.watcher.versioner, data, e.rev)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -352,9 +358,13 @@ func (wc *watchChan) prepareObjs(e *event) (curObj runtime.Object, oldObj runtim
 	// we need the object only to compute whether it was filtered out
 	// before).
 	if len(e.prevValue) > 0 && (e.isDeleted || !wc.acceptAll()) {
+		data, _, err := wc.watcher.transformer.TransformFromStorage(e.prevValue)
+		if err != nil {
+			return nil, nil, err
+		}
 		// Note that this sends the *old* object with the etcd revision for the time at
 		// which it gets deleted.
-		oldObj, err = decodeObj(wc.watcher.codec, wc.watcher.versioner, e.prevValue, e.rev)
+		oldObj, err = decodeObj(wc.watcher.codec, wc.watcher.versioner, data, e.rev)
 		if err != nil {
 			return nil, nil, err
 		}

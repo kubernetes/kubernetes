@@ -17,8 +17,10 @@ limitations under the License.
 package etcd
 
 import (
+	"fmt"
 	"path"
 	"reflect"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -33,6 +35,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
+	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apiserver/pkg/apis/example"
 	examplev1 "k8s.io/apiserver/pkg/apis/example/v1"
 	"k8s.io/apiserver/pkg/storage"
@@ -41,6 +44,34 @@ import (
 	storagetesting "k8s.io/apiserver/pkg/storage/testing"
 	storagetests "k8s.io/apiserver/pkg/storage/tests"
 )
+
+// prefixTransformer adds and verifies that all data has the correct prefix on its way in and out.
+type prefixTransformer struct {
+	prefix string
+	stale  bool
+	err    error
+}
+
+func (p prefixTransformer) TransformStringFromStorage(s string) (string, bool, error) {
+	if !strings.HasPrefix(s, p.prefix) {
+		return "", false, fmt.Errorf("value does not have expected prefix: %s", s)
+	}
+	return strings.TrimPrefix(s, p.prefix), p.stale, p.err
+}
+func (p prefixTransformer) TransformStringToStorage(s string) (string, error) {
+	if len(s) > 0 {
+		return p.prefix + s, p.err
+	}
+	return s, p.err
+}
+
+func defaultPrefix(s string) string {
+	return "test!" + s
+}
+
+func defaultPrefixValue(value []byte) string {
+	return defaultPrefix(string(value))
+}
 
 func testScheme(t *testing.T) (*runtime.Scheme, serializer.CodecFactory) {
 	scheme := runtime.NewScheme()
@@ -66,7 +97,7 @@ func testScheme(t *testing.T) (*runtime.Scheme, serializer.CodecFactory) {
 }
 
 func newEtcdHelper(client etcd.Client, scheme *runtime.Scheme, codec runtime.Codec, prefix string) etcdHelper {
-	return *NewEtcdStorage(client, codec, prefix, false, etcdtest.DeserializationCacheSize, scheme).(*etcdHelper)
+	return *NewEtcdStorage(client, codec, prefix, false, etcdtest.DeserializationCacheSize, scheme, prefixTransformer{prefix: "test!"}).(*etcdHelper)
 }
 
 // Returns an encoded version of example.Pod with the given name.
@@ -132,6 +163,61 @@ func TestList(t *testing.T) {
 
 	if e, a := list.Items, got.Items; !reflect.DeepEqual(e, a) {
 		t.Errorf("Expected %#v, got %#v", e, a)
+	}
+}
+
+func TestTransformationFailure(t *testing.T) {
+	scheme, codecs := testScheme(t)
+	codec := apitesting.TestCodec(codecs, examplev1.SchemeGroupVersion)
+	server := etcdtesting.NewEtcdTestClientServer(t)
+	defer server.Terminate(t)
+	helper := newEtcdHelper(server.Client, scheme, codec, etcdtest.PathPrefix())
+
+	pods := []example.Pod{
+		{
+			ObjectMeta: metav1.ObjectMeta{Name: "bar"},
+			Spec:       storagetests.DeepEqualSafePodSpec(),
+		},
+		{
+			ObjectMeta: metav1.ObjectMeta{Name: "baz"},
+			Spec:       storagetests.DeepEqualSafePodSpec(),
+		},
+	}
+	createPodList(t, helper, &example.PodList{Items: pods[:1]})
+
+	// create a second resource with an invalid prefix
+	oldTransformer := helper.transformer
+	helper.transformer = prefixTransformer{prefix: "otherprefix!"}
+	createPodList(t, helper, &example.PodList{Items: pods[1:]})
+	helper.transformer = oldTransformer
+
+	// only the first item is returned, and no error
+	var got example.PodList
+	if err := helper.List(context.TODO(), "/", "", storage.Everything, &got); err != nil {
+		t.Errorf("Unexpected error %v", err)
+	}
+	if e, a := pods[:1], got.Items; !reflect.DeepEqual(e, a) {
+		t.Errorf("Unexpected: %s", diff.ObjectReflectDiff(e, a))
+	}
+
+	// Get should fail
+	if err := helper.Get(context.TODO(), "/baz", "", &example.Pod{}, false); !storage.IsInternalError(err) {
+		t.Errorf("Unexpected error: %v", err)
+	}
+	// GuaranteedUpdate should return an error
+	if err := helper.GuaranteedUpdate(context.TODO(), "/baz", &example.Pod{}, false, nil, func(input runtime.Object, res storage.ResponseMeta) (output runtime.Object, ttl *uint64, err error) {
+		return input, nil, nil
+	}, &pods[1]); !storage.IsInternalError(err) {
+		t.Errorf("Unexpected error: %v", err)
+	}
+
+	// Delete succeeds but reports an error because we cannot access the body
+	if err := helper.Delete(context.TODO(), "/baz", &example.Pod{}, nil); !storage.IsInternalError(err) {
+		t.Errorf("Unexpected error: %v", err)
+	}
+
+	if err := helper.Get(context.TODO(), "/baz", "", &example.Pod{}, false); !storage.IsNotFound(err) {
+		t.Errorf("Unexpected error: %v", err)
 	}
 }
 
@@ -364,7 +450,8 @@ func TestGuaranteedUpdateNoChange(t *testing.T) {
 	helper := newEtcdHelper(server.Client, scheme, codec, etcdtest.PathPrefix())
 
 	obj := &storagetesting.TestResource{ObjectMeta: metav1.ObjectMeta{Name: "foo"}, Value: 1}
-	err := helper.GuaranteedUpdate(context.TODO(), key, &storagetesting.TestResource{}, true, nil, storage.SimpleUpdate(func(in runtime.Object) (runtime.Object, error) {
+	original := &storagetesting.TestResource{}
+	err := helper.GuaranteedUpdate(context.TODO(), key, original, true, nil, storage.SimpleUpdate(func(in runtime.Object) (runtime.Object, error) {
 		return obj, nil
 	}))
 	if err != nil {
@@ -373,7 +460,27 @@ func TestGuaranteedUpdateNoChange(t *testing.T) {
 
 	// Update an existing node with the same data
 	callbackCalled := false
-	objUpdate := &storagetesting.TestResource{ObjectMeta: metav1.ObjectMeta{Name: "foo"}, Value: 1}
+	objUpdate := &storagetesting.TestResource{ObjectMeta: metav1.ObjectMeta{Name: "foo", ResourceVersion: original.ResourceVersion}, Value: 1}
+	result := &storagetesting.TestResource{}
+	err = helper.GuaranteedUpdate(context.TODO(), key, result, true, nil, storage.SimpleUpdate(func(in runtime.Object) (runtime.Object, error) {
+		callbackCalled = true
+		return objUpdate, nil
+	}))
+	if err != nil {
+		t.Fatalf("Unexpected error %#v", err)
+	}
+	if !callbackCalled {
+		t.Errorf("tryUpdate callback should have been called.")
+	}
+	if result.ResourceVersion != original.ResourceVersion {
+		t.Fatalf("updated the object resource version")
+	}
+
+	// Update an existing node with the same data but return stale
+	helper.transformer = prefixTransformer{prefix: "test!", stale: true}
+	callbackCalled = false
+	result = &storagetesting.TestResource{}
+	objUpdate = &storagetesting.TestResource{ObjectMeta: metav1.ObjectMeta{Name: "foo"}, Value: 1}
 	err = helper.GuaranteedUpdate(context.TODO(), key, &storagetesting.TestResource{}, true, nil, storage.SimpleUpdate(func(in runtime.Object) (runtime.Object, error) {
 		callbackCalled = true
 		return objUpdate, nil
@@ -383,6 +490,9 @@ func TestGuaranteedUpdateNoChange(t *testing.T) {
 	}
 	if !callbackCalled {
 		t.Errorf("tryUpdate callback should have been called.")
+	}
+	if result.ResourceVersion == original.ResourceVersion {
+		t.Errorf("did not update the object resource version")
 	}
 }
 
@@ -540,7 +650,7 @@ func TestDeleteWithRetry(t *testing.T) {
 	// party has updated the object.
 	fakeGet := func(ctx context.Context, key string, opts *etcd.GetOptions) (*etcd.Response, error) {
 		data, _ := runtime.Encode(codec, obj)
-		return &etcd.Response{Node: &etcd.Node{Value: string(data), ModifiedIndex: 99}}, nil
+		return &etcd.Response{Node: &etcd.Node{Value: defaultPrefixValue(data), ModifiedIndex: 99}}, nil
 	}
 	expectedRetries := 3
 	helper := newEtcdHelper(server.Client, scheme, codec, prefix)

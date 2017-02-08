@@ -33,21 +33,42 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/conversion"
 	"k8s.io/apimachinery/pkg/runtime"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/apiserver/pkg/storage"
-	utiltrace "k8s.io/apiserver/pkg/util/trace"
 	"k8s.io/apiserver/pkg/storage/etcd"
+	utiltrace "k8s.io/apiserver/pkg/util/trace"
 )
+
+// ValueTransformer allows a string value to be transformed before being read from or written to the underlying store. The methods
+// must be able to undo the transformation caused by the other.
+type ValueTransformer interface {
+	// TransformFromStorage may transform the provided data from its underlying storage representation or return an error.
+	// Stale is true if the object on disk is stale and a write to etcd should be issued, even if the contents of the object
+	// have not changed.
+	TransformFromStorage([]byte) (data []byte, stale bool, err error)
+	// TransformToStorage may transform the provided data into the appropriate form in storage or return an error.
+	TransformToStorage([]byte) (data []byte, err error)
+}
+
+type identityTransformer struct{}
+
+func (identityTransformer) TransformFromStorage(b []byte) ([]byte, bool, error) { return b, false, nil }
+func (identityTransformer) TransformToStorage(b []byte) ([]byte, error)         { return b, nil }
+
+// IdentityTransformer performs no transformation on the provided values.
+var IdentityTransformer ValueTransformer = identityTransformer{}
 
 type store struct {
 	client *clientv3.Client
 	// getOpts contains additional options that should be passed
 	// to all Get() calls.
-	getOps     []clientv3.OpOption
-	codec      runtime.Codec
-	versioner  storage.Versioner
-	pathPrefix string
-	watcher    *watcher
+	getOps      []clientv3.OpOption
+	codec       runtime.Codec
+	versioner   storage.Versioner
+	transformer ValueTransformer
+	pathPrefix  string
+	watcher     *watcher
 }
 
 type elemForDecode struct {
@@ -56,31 +77,33 @@ type elemForDecode struct {
 }
 
 type objState struct {
-	obj  runtime.Object
-	meta *storage.ResponseMeta
-	rev  int64
-	data []byte
+	obj   runtime.Object
+	meta  *storage.ResponseMeta
+	rev   int64
+	data  []byte
+	stale bool
 }
 
 // New returns an etcd3 implementation of storage.Interface.
-func New(c *clientv3.Client, codec runtime.Codec, prefix string) storage.Interface {
-	return newStore(c, true, codec, prefix)
+func New(c *clientv3.Client, codec runtime.Codec, prefix string, transformer ValueTransformer) storage.Interface {
+	return newStore(c, true, codec, prefix, transformer)
 }
 
 // NewWithNoQuorumRead returns etcd3 implementation of storage.Interface
 // where Get operations don't require quorum read.
-func NewWithNoQuorumRead(c *clientv3.Client, codec runtime.Codec, prefix string) storage.Interface {
-	return newStore(c, false, codec, prefix)
+func NewWithNoQuorumRead(c *clientv3.Client, codec runtime.Codec, prefix string, transformer ValueTransformer) storage.Interface {
+	return newStore(c, false, codec, prefix, transformer)
 }
 
-func newStore(c *clientv3.Client, quorumRead bool, codec runtime.Codec, prefix string) *store {
+func newStore(c *clientv3.Client, quorumRead bool, codec runtime.Codec, prefix string, transformer ValueTransformer) *store {
 	versioner := etcd.APIObjectVersioner{}
 	result := &store{
-		client:     c,
-		versioner:  versioner,
-		codec:      codec,
-		pathPrefix: prefix,
-		watcher:    newWatcher(c, codec, versioner),
+		client:      c,
+		codec:       codec,
+		versioner:   versioner,
+		transformer: transformer,
+		pathPrefix:  prefix,
+		watcher:     newWatcher(c, codec, versioner, transformer),
 	}
 	if !quorumRead {
 		// In case of non-quorum reads, we can set WithSerializable()
@@ -110,7 +133,13 @@ func (s *store) Get(ctx context.Context, key string, resourceVersion string, out
 		return storage.NewKeyNotFoundError(key, 0)
 	}
 	kv := getResp.Kvs[0]
-	return decode(s.codec, s.versioner, kv.Value, out, kv.ModRevision)
+
+	data, _, err := s.transformer.TransformFromStorage(kv.Value)
+	if err != nil {
+		return storage.NewInternalError(err.Error())
+	}
+
+	return decode(s.codec, s.versioner, data, out, kv.ModRevision)
 }
 
 // Create implements storage.Interface.Create.
@@ -129,10 +158,15 @@ func (s *store) Create(ctx context.Context, key string, obj, out runtime.Object,
 		return err
 	}
 
+	newData, err := s.transformer.TransformToStorage(data)
+	if err != nil {
+		return storage.NewInternalError(err.Error())
+	}
+
 	txnResp, err := s.client.KV.Txn(ctx).If(
 		notFound(key),
 	).Then(
-		clientv3.OpPut(key, string(data), opts...),
+		clientv3.OpPut(key, string(newData), opts...),
 	).Commit()
 	if err != nil {
 		return err
@@ -177,7 +211,11 @@ func (s *store) unconditionalDelete(ctx context.Context, key string, out runtime
 	}
 
 	kv := getResp.Kvs[0]
-	return decode(s.codec, s.versioner, kv.Value, out, kv.ModRevision)
+	data, _, err := s.transformer.TransformFromStorage(kv.Value)
+	if err != nil {
+		return storage.NewInternalError(err.Error())
+	}
+	return decode(s.codec, s.versioner, data, out, kv.ModRevision)
 }
 
 func (s *store) conditionalDelete(ctx context.Context, key string, out runtime.Object, v reflect.Value, precondtions *storage.Preconditions) error {
@@ -257,8 +295,13 @@ func (s *store) GuaranteedUpdate(
 		if err != nil {
 			return err
 		}
-		if bytes.Equal(data, origState.data) {
+		if !origState.stale && bytes.Equal(data, origState.data) {
 			return decode(s.codec, s.versioner, origState.data, out, origState.rev)
+		}
+
+		newData, err := s.transformer.TransformToStorage(data)
+		if err != nil {
+			return storage.NewInternalError(err.Error())
 		}
 
 		opts, err := s.ttlOpts(ctx, int64(ttl))
@@ -270,7 +313,7 @@ func (s *store) GuaranteedUpdate(
 		txnResp, err := s.client.KV.Txn(ctx).If(
 			clientv3.Compare(clientv3.ModRevision(key), "=", origState.rev),
 		).Then(
-			clientv3.OpPut(key, string(data), opts...),
+			clientv3.OpPut(key, string(newData), opts...),
 		).Else(
 			clientv3.OpGet(key),
 		).Commit()
@@ -289,6 +332,7 @@ func (s *store) GuaranteedUpdate(
 			continue
 		}
 		putResp := txnResp.Responses[0].GetResponsePut()
+
 		return decode(s.codec, s.versioner, data, out, putResp.Header.Revision)
 	}
 }
@@ -308,8 +352,12 @@ func (s *store) GetToList(ctx context.Context, key string, resourceVersion strin
 	if len(getResp.Kvs) == 0 {
 		return nil
 	}
+	data, _, err := s.transformer.TransformFromStorage(getResp.Kvs[0].Value)
+	if err != nil {
+		return storage.NewInternalError(err.Error())
+	}
 	elems := []*elemForDecode{{
-		data: getResp.Kvs[0].Value,
+		data: data,
 		rev:  uint64(getResp.Kvs[0].ModRevision),
 	}}
 	if err := decodeList(elems, storage.SimpleFilter(pred), listPtr, s.codec, s.versioner); err != nil {
@@ -337,12 +385,18 @@ func (s *store) List(ctx context.Context, key, resourceVersion string, pred stor
 		return err
 	}
 
-	elems := make([]*elemForDecode, len(getResp.Kvs))
-	for i, kv := range getResp.Kvs {
-		elems[i] = &elemForDecode{
-			data: kv.Value,
-			rev:  uint64(kv.ModRevision),
+	elems := make([]*elemForDecode, 0, len(getResp.Kvs))
+	for _, kv := range getResp.Kvs {
+		data, _, err := s.transformer.TransformFromStorage(kv.Value)
+		if err != nil {
+			utilruntime.HandleError(fmt.Errorf("unable to transform key %q: %v", key, err))
+			continue
 		}
+
+		elems = append(elems, &elemForDecode{
+			data: data,
+			rev:  uint64(kv.ModRevision),
+		})
 	}
 	if err := decodeList(elems, storage.SimpleFilter(pred), listPtr, s.codec, s.versioner); err != nil {
 		return err
@@ -383,9 +437,14 @@ func (s *store) getState(getResp *clientv3.GetResponse, key string, v reflect.Va
 			return nil, err
 		}
 	} else {
+		data, stale, err := s.transformer.TransformFromStorage(getResp.Kvs[0].Value)
+		if err != nil {
+			return nil, storage.NewInternalError(err.Error())
+		}
 		state.rev = getResp.Kvs[0].ModRevision
 		state.meta.ResourceVersion = uint64(state.rev)
-		state.data = getResp.Kvs[0].Value
+		state.data = data
+		state.stale = stale
 		if err := decode(s.codec, s.versioner, state.data, state.obj, state.rev); err != nil {
 			return nil, err
 		}
