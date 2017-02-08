@@ -39,8 +39,10 @@ func RegisterDeepCopies(scheme *runtime.Scheme) error {
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1beta1_Cluster, InType: reflect.TypeOf(&Cluster{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1beta1_ClusterCondition, InType: reflect.TypeOf(&ClusterCondition{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1beta1_ClusterList, InType: reflect.TypeOf(&ClusterList{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1beta1_ClusterServiceIngress, InType: reflect.TypeOf(&ClusterServiceIngress{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1beta1_ClusterSpec, InType: reflect.TypeOf(&ClusterSpec{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1beta1_ClusterStatus, InType: reflect.TypeOf(&ClusterStatus{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1beta1_FederatedServiceIngress, InType: reflect.TypeOf(&FederatedServiceIngress{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1beta1_ServerAddressByClientCIDR, InType: reflect.TypeOf(&ServerAddressByClientCIDR{})},
 	)
 }
@@ -94,6 +96,25 @@ func DeepCopy_v1beta1_ClusterList(in interface{}, out interface{}, c *conversion
 	}
 }
 
+func DeepCopy_v1beta1_ClusterServiceIngress(in interface{}, out interface{}, c *conversion.Cloner) error {
+	{
+		in := in.(*ClusterServiceIngress)
+		out := out.(*ClusterServiceIngress)
+		*out = *in
+		if in.Zones != nil {
+			in, out := &in.Zones, &out.Zones
+			*out = make([]string, len(*in))
+			copy(*out, *in)
+		}
+		if in.Items != nil {
+			in, out := &in.Items, &out.Items
+			*out = make([]api_v1.LoadBalancerIngress, len(*in))
+			copy(*out, *in)
+		}
+		return nil
+	}
+}
+
 func DeepCopy_v1beta1_ClusterSpec(in interface{}, out interface{}, c *conversion.Cloner) error {
 	{
 		in := in.(*ClusterSpec)
@@ -131,6 +152,24 @@ func DeepCopy_v1beta1_ClusterStatus(in interface{}, out interface{}, c *conversi
 			in, out := &in.Zones, &out.Zones
 			*out = make([]string, len(*in))
 			copy(*out, *in)
+		}
+		return nil
+	}
+}
+
+func DeepCopy_v1beta1_FederatedServiceIngress(in interface{}, out interface{}, c *conversion.Cloner) error {
+	{
+		in := in.(*FederatedServiceIngress)
+		out := out.(*FederatedServiceIngress)
+		*out = *in
+		if in.Items != nil {
+			in, out := &in.Items, &out.Items
+			*out = make([]ClusterServiceIngress, len(*in))
+			for i := range *in {
+				if err := DeepCopy_v1beta1_ClusterServiceIngress(&(*in)[i], &(*out)[i], c); err != nil {
+					return err
+				}
+			}
 		}
 		return nil
 	}

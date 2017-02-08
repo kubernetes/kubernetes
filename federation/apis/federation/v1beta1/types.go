@@ -125,3 +125,22 @@ const (
 	// FederationNamespaceSystem is the system namespace where we place federation control plane components.
 	FederationNamespaceSystem string = "federation-system"
 )
+
+// Annotation for a federated service to keep record of service loadbalancer ingresses in federated cluster
+type FederatedServiceIngress struct {
+	// List of loadbalancer ingress of a service in all federated clusters
+	// +optional
+	Items []ClusterServiceIngress `json:"items,omitempty"`
+}
+
+// Loadbalancer ingresses of a service within a federated cluster
+type ClusterServiceIngress struct {
+	// Region is the name of the region to which the cluster belongs. e.g. 'us-east1'.
+	Region string `json:"region"`
+	// Zones are the name of the availability zones to which the cluster belongs. e.g. 'us-east1-a', 'us-east1-b'.
+	Zones []string `json:"zones"`
+	// Cluster is the name of the federated cluster
+	Cluster string `json:"cluster"`
+	// List of loadbalancer ingress of a federated service within a federated cluster
+	Items []v1.LoadBalancerIngress `json:"items"`
+}
