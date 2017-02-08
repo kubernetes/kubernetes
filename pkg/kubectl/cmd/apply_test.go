@@ -29,6 +29,7 @@ import (
 
 	kubeerr "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/rest/fake"
@@ -62,6 +63,8 @@ const (
 	filenameRC    = "../../../test/fixtures/pkg/kubectl/cmd/apply/rc.yaml"
 	filenameSVC   = "../../../test/fixtures/pkg/kubectl/cmd/apply/service.yaml"
 	filenameRCSVC = "../../../test/fixtures/pkg/kubectl/cmd/apply/rc-service.yaml"
+
+	filenameIdempotentTPREntry = "../../../test/fixtures/pkg/kubectl/cmd/apply/tpr-entry.yaml"
 )
 
 func readBytesFromFile(t *testing.T, filename string) []byte {
@@ -523,6 +526,92 @@ func TestApplyNULLPreservation(t *testing.T) {
 	cmd.Run(cmd, []string{})
 
 	expected := "deployment/" + deploymentName + "\n"
+	if buf.String() != expected {
+		t.Fatalf("unexpected output: %s\nexpected: %s", buf.String(), expected)
+	}
+
+	if !verifiedPatch {
+		t.Fatal("No server-side patch call detected")
+	}
+}
+
+func readTPREntryFromFile(t *testing.T, filename string) []byte {
+	raw := readBytesFromFile(t, filename)
+	obj := &unstructured.Unstructured{}
+	if err := runtime.DecodeInto(testapi.Extensions.Codec(), raw, obj); err != nil {
+		t.Fatal(err)
+	}
+
+	objJSON, err := runtime.Encode(testapi.Extensions.Codec(), obj)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return objJSON
+}
+
+// TestApplyIdempotentTPREntry check repeated apply operations on TPR entries
+// without any change.
+func TestApplyIdempotentTPREntry(t *testing.T) {
+	initTestErrorHandler(t)
+	name := "test-tpr-entry"
+	path := "/namespaces/test/testtprs/" + name
+	curr := readTPREntryFromFile(t, filenameIdempotentTPREntry)
+
+	verifiedPatch := false
+
+	f, tf, _, _ := cmdtesting.NewAPIFactory()
+	tf.Printer = &testPrinter{}
+	tf.UnstructuredClient = &fake.RESTClient{
+		APIRegistry:          api.Registry,
+		NegotiatedSerializer: unstructuredSerializer,
+		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
+			switch p, m := req.URL.Path, req.Method; {
+			case p == path && m == "GET":
+				body := ioutil.NopCloser(bytes.NewReader(curr))
+				return &http.Response{
+					StatusCode: 200,
+					Header:     defaultHeader(),
+					Body:       body}, nil
+			case p == path && m == "PATCH":
+				patch, err := ioutil.ReadAll(req.Body)
+				if err != nil {
+					t.Fatal(err)
+				}
+
+				patchMap := map[string]interface{}{}
+				if err := json.Unmarshal(patch, &patchMap); err != nil {
+					t.Fatal(err)
+				}
+
+				annotationsMap := walkMapPath(t, patchMap, []string{"metadata", "annotations"})
+				if _, ok := annotationsMap[annotations.LastAppliedConfigAnnotation]; !ok {
+					t.Fatalf("patch does not contain annotation:\n%s\n", patch)
+				}
+
+				verifiedPatch = true
+
+				body := ioutil.NopCloser(bytes.NewReader(curr))
+				return &http.Response{
+					StatusCode: 200,
+					Header:     defaultHeader(),
+					Body:       body}, nil
+			default:
+				t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
+				return nil, nil
+			}
+		}),
+	}
+
+	tf.Namespace = "test"
+	buf := bytes.NewBuffer([]byte{})
+	errBuf := bytes.NewBuffer([]byte{})
+
+	cmd := NewCmdApply(f, buf, errBuf)
+	cmd.Flags().Set("filename", filenameIdempotentTPREntry)
+	cmd.Flags().Set("output", "name")
+	cmd.Run(cmd, []string{})
+
+	expected := "testtpr/" + name + "\n"
 	if buf.String() != expected {
 		t.Fatalf("unexpected output: %s\nexpected: %s", buf.String(), expected)
 	}
