@@ -131,6 +131,41 @@ var _ = framework.KubeDescribe("Dynamic provisioning", func() {
 				testDynamicProvisioning(c, claim, "2Gi")
 			}
 		})
+
+		It("should test the persistent volume is deleted when the claim is deleted. [Slow][Volume]", func() {
+			// This case tests for the regressions of a bug fixed by PR #21268
+			// REGRESSION: Deleting the PVC before the PV is provisioned can result in PV
+			// not being deleted
+			By("creating a StorageClass")
+			class := newStorageClass()
+			_, err := c.Storage().StorageClasses().Create(class)
+			defer c.Storage().StorageClasses().Delete(class.Name, nil)
+			Expect(err).NotTo(HaveOccurred())
+
+			By("creating and then deleting the claim")
+			claim := newClaim(ns, false)
+			claim, err = c.Core().PersistentVolumeClaims(ns).Create(claim)
+			Expect(err).NotTo(HaveOccurred())
+
+			// Wait for the claim to create before deleting it.
+			err = framework.WaitForPersistentVolumeClaimPhase(v1.ClaimPending, c, ns, claim.Name, 1*time.Second, 60*time.Second)
+			Expect(err).NotTo(HaveOccurred())
+
+			// The provisioner uses a deterministic convention of "pvc-" + the claim UID for volume names,
+			// so we do not need to wait for the claim to bind to know the volume.
+			pv := "pvc-" + string(claim.UID)
+			// In case of a regression, manually delete the volume
+			defer c.Core().PersistentVolumes().Delete(pv, nil)
+
+			By("deleting the claim")
+			err = c.Core().PersistentVolumeClaims(ns).Delete(claim.Name, nil)
+			Expect(err).NotTo(HaveOccurred())
+
+			By("waiting for the PV to delete")
+			// Regression: the PV is not released & deleted.
+			err = framework.WaitForPersistentVolumeDeleted(c, pv, 1*time.Second, 60*time.Second)
+			Expect(err).NotTo(HaveOccurred())
+		})
 	})
 
 	framework.KubeDescribe("DynamicProvisioner Alpha", func() {
