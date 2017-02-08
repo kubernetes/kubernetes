@@ -142,6 +142,27 @@ var _ = framework.KubeDescribe("Federated Services [Feature:Federation]", func()
 				verifyCascadingDeletionForService(f.FederationClientset, clusters, nil, nsName)
 				By(fmt.Sprintf("Verified that services were not deleted from underlying clusters"))
 			})
+
+			It("should recreate service shard in underlying clusters when service shard is deleted", func() {
+				fedframework.SkipUnlessFederated(f.ClientSet)
+				service = createServiceOrFail(f.FederationClientset, nsName, FederatedServiceName)
+				defer func() {
+					// Cleanup
+					By(fmt.Sprintf("Deleting service %q in namespace %q", service.Name, nsName))
+					err := f.FederationClientset.Services(nsName).Delete(service.Name, &metav1.DeleteOptions{})
+					framework.ExpectNoError(err, "Error deleting service %q in namespace %q", service.Name, nsName)
+				}()
+				waitForServiceShardsOrFail(nsName, service, clusters)
+				By(fmt.Sprintf("Successfuly created and synced service %q/%q to clusters", nsName, service.Name))
+
+				By(fmt.Sprintf("Deleting a service shard in one underlying cluster"))
+				primaryClusterName := clusters[0].Name
+				err := deleteServiceShard(clusters[0], nsName, FederatedServiceName)
+				framework.ExpectNoError(err, fmt.Sprintf("while deleting service shard %q in cluster %q", FederatedServiceName, primaryClusterName))
+
+				waitForServiceShardsOrFail(nsName, service, clusters)
+				By(fmt.Sprintf("Successfuly recreated service shard %q/%q in %q cluster", nsName, service.Name, primaryClusterName))
+			})
 		})
 
 		var _ = Describe("DNS", func() {
@@ -341,6 +362,16 @@ func updateServiceOrFail(clientset *fedclientset.Clientset, namespace, name stri
 	newService, err := clientset.Services(namespace).Update(service)
 	By(fmt.Sprintf("Successfully updated federated service %q in namespace %q", name, namespace))
 	return newService
+}
+
+func deleteServiceShard(c *fedframework.Cluster, namespace, service string) error {
+	err := c.Clientset.Services(namespace).Delete(service, &metav1.DeleteOptions{})
+	if err != nil && !errors.IsNotFound(err) {
+		framework.Logf("Failed to delete service %q in namespace %q, in cluster %q", service, namespace, c.Name)
+		return err
+	}
+	By(fmt.Sprintf("Service %q in namespace %q in cluster %q deleted", service, namespace, c.Name))
+	return nil
 }
 
 // equivalent returns true if the two services are equivalent.  Fields which are expected to differ between
