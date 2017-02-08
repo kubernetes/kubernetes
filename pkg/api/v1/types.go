@@ -1120,10 +1120,6 @@ type VolumeProjection struct {
 	ConfigMap   *ConfigMapVolumeSource   `json:"configMap,omitempty"`
 }
 
-const (
-	ProjectionsVolumeSourceDefaultMode int32 = 0644
-)
-
 // Maps a string key to a path within a volume.
 type KeyToPath struct {
 	// The key to project.

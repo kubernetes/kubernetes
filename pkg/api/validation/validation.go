@@ -776,6 +776,7 @@ func validateProjectionsVolumeSource(projection *api.Projections, fldPath *field
 			if numSources > 0 {
 				allErrs = append(allErrs, field.Forbidden(fldPath.Child("secret"), "may not specify more than 1 volume type"))
 			} else {
+				// JPEELER: this can't happen with defaults applied
 				if source.Secret.DefaultMode == nil {
 					source.Secret.DefaultMode = projectionMode
 				}

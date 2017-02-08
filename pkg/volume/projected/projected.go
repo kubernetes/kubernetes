@@ -210,10 +210,6 @@ func (s *projectedVolumeMounter) SetUpAt(dir string, fsGroup *int64) error {
 }
 
 func (s *projectedVolumeMounter) collectData() (map[string]volumeutil.FileProjection, error) {
-	if s.source.DefaultMode == nil {
-		return nil, fmt.Errorf("No defaultMode used, not even the default value for it")
-	}
-
 	kubeClient := s.plugin.host.GetKubeClient()
 	if kubeClient == nil {
 		return nil, fmt.Errorf("Cannot setup projected volume %v because kube client is not configured", s.volName)
@@ -240,7 +236,13 @@ func (s *projectedVolumeMounter) collectData() (map[string]volumeutil.FileProjec
 					},
 				}
 			}
-			secretPayload, err := secret.MakePayload(source.Secret.Items, secretapi, s.source.DefaultMode, optional)
+			var defaultMode *int32
+			if s.source.DefaultMode != nil {
+				defaultMode = s.source.DefaultMode
+			} else {
+				defaultMode = source.Secret.DefaultMode
+			}
+			secretPayload, err := secret.MakePayload(source.Secret.Items, secretapi, defaultMode, optional)
 			if err != nil {
 				glog.Errorf("Couldn't get secret %v/%v: %v", s.pod.Namespace, source.Secret.SecretName, err)
 				errlist = append(errlist, err)
@@ -266,7 +268,13 @@ func (s *projectedVolumeMounter) collectData() (map[string]volumeutil.FileProjec
 					},
 				}
 			}
-			configMapPayload, err := configmap.MakePayload(source.ConfigMap.Items, configMap, s.source.DefaultMode, optional)
+			var defaultMode *int32
+			if s.source.DefaultMode != nil {
+				defaultMode = s.source.DefaultMode
+			} else {
+				defaultMode = source.ConfigMap.DefaultMode
+			}
+			configMapPayload, err := configmap.MakePayload(source.ConfigMap.Items, configMap, defaultMode, optional)
 			if err != nil {
 				errlist = append(errlist, err)
 				continue
@@ -275,7 +283,13 @@ func (s *projectedVolumeMounter) collectData() (map[string]volumeutil.FileProjec
 				payload[k] = v
 			}
 		} else if source.DownwardAPI != nil {
-			downwardAPIPayload, err := downwardapi.CollectData(source.DownwardAPI.Items, s.pod, s.plugin.host, s.source.DefaultMode)
+			var defaultMode *int32
+			if s.source.DefaultMode != nil {
+				defaultMode = s.source.DefaultMode
+			} else {
+				defaultMode = source.DownwardAPI.DefaultMode
+			}
+			downwardAPIPayload, err := downwardapi.CollectData(source.DownwardAPI.Items, s.pod, s.plugin.host, defaultMode)
 			if err != nil {
 				errlist = append(errlist, err)
 				continue
