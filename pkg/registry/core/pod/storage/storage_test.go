@@ -176,7 +176,7 @@ func TestIgnoreDeleteNotFound(t *testing.T) {
 	defer registry.Store.DestroyFunc()
 
 	// should fail if pod A is not created yet.
-	_, err := registry.Delete(testContext, pod.Name, nil)
+	_, _, err := registry.Delete(testContext, pod.Name, nil)
 	if !errors.IsNotFound(err) {
 		t.Errorf("Unexpected error: %v", err)
 	}
@@ -191,7 +191,7 @@ func TestIgnoreDeleteNotFound(t *testing.T) {
 	// registry shouldn't get any error since we ignore the NotFound error.
 	zero := int64(0)
 	opt := &metav1.DeleteOptions{GracePeriodSeconds: &zero}
-	obj, err := registry.Delete(testContext, pod.Name, opt)
+	obj, _, err := registry.Delete(testContext, pod.Name, opt)
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
