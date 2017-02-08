@@ -71,8 +71,9 @@ type etcdWatcher struct {
 	// Note that versioner is required for etcdWatcher to work correctly.
 	// There is no public constructor of it, so be careful when manipulating
 	// with it manually.
-	versioner storage.Versioner
-	transform TransformFunc
+	versioner        storage.Versioner
+	transform        TransformFunc
+	valueTransformer ValueTransformer
 
 	list    bool // If we're doing a recursive watch, should be true.
 	quorum  bool // If we enable quorum, shoule be true
@@ -107,15 +108,18 @@ const watchWaitDuration = 100 * time.Millisecond
 func newEtcdWatcher(
 	list bool, quorum bool, include includeFunc, filter storage.FilterFunc,
 	encoding runtime.Codec, versioner storage.Versioner, transform TransformFunc,
+	valueTransformer ValueTransformer,
 	cache etcdCache) *etcdWatcher {
 	w := &etcdWatcher{
-		encoding:  encoding,
-		versioner: versioner,
-		transform: transform,
-		list:      list,
-		quorum:    quorum,
-		include:   include,
-		filter:    filter,
+		encoding:         encoding,
+		versioner:        versioner,
+		transform:        transform,
+		valueTransformer: valueTransformer,
+
+		list:    list,
+		quorum:  quorum,
+		include: include,
+		filter:  filter,
 		// Buffer this channel, so that the etcd client is not forced
 		// to context switch with every object it gets, and so that a
 		// long time spent decoding an object won't block the *next*
@@ -309,12 +313,18 @@ func (w *etcdWatcher) translate() {
 	}
 }
 
+// decodeObject extracts an object from the provided etcd node or returns an error.
 func (w *etcdWatcher) decodeObject(node *etcd.Node) (runtime.Object, error) {
 	if obj, found := w.cache.getFromCache(node.ModifiedIndex, storage.SimpleFilter(storage.Everything)); found {
 		return obj, nil
 	}
 
-	obj, err := runtime.Decode(w.encoding, []byte(node.Value))
+	body, _, err := w.valueTransformer.TransformStringFromStorage(node.Value)
+	if err != nil {
+		return nil, err
+	}
+
+	obj, err := runtime.Decode(w.encoding, []byte(body))
 	if err != nil {
 		return nil, err
 	}
