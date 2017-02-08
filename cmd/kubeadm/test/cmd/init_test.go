@@ -20,11 +20,16 @@ import "testing"
 
 // kubeadmReset executes "kubeadm reset" and restarts kubelet.
 func kubeadmReset() error {
-	_, _, err := RunCmd(kubeadmPath, "reset")
+	_, _, err := RunCmd(*kubeadmPath, "reset")
 	return err
 }
 
 func TestCmdInitToken(t *testing.T) {
+	if *kubeadmCmdSkip {
+		t.Log("kubeadm cmd tests being skipped")
+		t.Skip()
+	}
+
 	var initTest = []struct {
 		args     string
 		expected bool
@@ -34,7 +39,7 @@ func TestCmdInitToken(t *testing.T) {
 	}
 
 	for _, rt := range initTest {
-		_, _, actual := RunCmd(kubeadmPath, "init", rt.args, "--skip-preflight-checks")
+		_, _, actual := RunCmd(*kubeadmPath, "init", rt.args, "--skip-preflight-checks")
 		if (actual == nil) != rt.expected {
 			t.Errorf(
 				"failed CmdInitToken running 'kubeadm init %s' with an error: %v\n\texpected: %t\n\t  actual: %t",
