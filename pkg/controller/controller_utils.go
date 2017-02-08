@@ -754,15 +754,21 @@ func IsPodActive(p *v1.Pod) bool {
 
 // FilterActiveReplicaSets returns replica sets that have (or at least ought to have) pods.
 func FilterActiveReplicaSets(replicaSets []*extensions.ReplicaSet) []*extensions.ReplicaSet {
-	active := []*extensions.ReplicaSet{}
-	for i := range replicaSets {
-		rs := replicaSets[i]
+	activeFilter := func(rs *extensions.ReplicaSet) bool {
+		return rs != nil && *(rs.Spec.Replicas) > 0
+	}
+	return FilteredRSes(replicaSets, activeFilter)
+}
 
-		if rs != nil && *(rs.Spec.Replicas) > 0 {
-			active = append(active, replicaSets[i])
+// FilteredRSes returns replica sets that are filtered by filterFn (all returned ones should match filterFn).
+func FilteredRSes(RSes []*extensions.ReplicaSet, filterFn func(rs *extensions.ReplicaSet) bool) []*extensions.ReplicaSet {
+	var filtered []*extensions.ReplicaSet
+	for i := range RSes {
+		if filterFn(RSes[i]) {
+			filtered = append(filtered, RSes[i])
 		}
 	}
-	return active
+	return filtered
 }
 
 // PodKey returns a key unique to the given pod within a cluster.
