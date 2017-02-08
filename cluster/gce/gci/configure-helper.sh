@@ -721,8 +721,16 @@ function prepare-etcd-manifest {
   sed -i -e "s@{{ *hostname *}}@$host_name@g" "${temp_file}"
   sed -i -e "s@{{ *srv_kube_path *}}@/etc/srv/kubernetes@g" "${temp_file}"
   sed -i -e "s@{{ *etcd_cluster *}}@$etcd_cluster@g" "${temp_file}"
-  sed -i -e "s@{{ *storage_backend *}}@${STORAGE_BACKEND:-}@g" "${temp_file}"
-  if [[ "${STORAGE_BACKEND:-}" == "etcd3" ]]; then
+  # Get default storage backend from manifest file.
+  local -r default_storage_backend=$(cat "${temp_file}" | \
+    grep -o "{{ *pillar\.get('storage_backend', '\(.*\)') *}}" | \
+    sed -e "s@{{ *pillar\.get('storage_backend', '\(.*\)') *}}@\1@g")
+  if [[ -n "${STORAGE_BACKEND:-}" ]]; then
+    sed -i -e "s@{{ *pillar\.get('storage_backend', '\(.*\)') *}}@${STORAGE_BACKEND}@g" "${temp_file}"
+  else
+    sed -i -e "s@{{ *pillar\.get('storage_backend', '\(.*\)') *}}@\1@g" "${temp_file}"
+  fi
+  if [[ "${STORAGE_BACKEND:-${default_storage_backend}}" == "etcd3" ]]; then
     sed -i -e "s@{{ *quota_bytes *}}@--quota-backend-bytes=4294967296@g" "${temp_file}"
   else
     sed -i -e "s@{{ *quota_bytes *}}@@g" "${temp_file}"

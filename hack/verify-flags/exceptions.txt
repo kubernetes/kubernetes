@@ -16,17 +16,26 @@ cluster/gce/configure-vm.sh:  env-to-grains "runtime_config"
 cluster/gce/configure-vm.sh:  kubelet_api_servers: '${KUBELET_APISERVER}'
 cluster/gce/container-linux/configure-helper.sh:    authorization_mode+=",ABAC"
 cluster/gce/container-linux/configure-helper.sh:    authorization_mode+=",Webhook"
+cluster/gce/container-linux/configure-helper.sh:    grep -o "{{ *pillar\.get('storage_backend', '\(.*\)') *}}" | \
+cluster/gce/container-linux/configure-helper.sh:    sed -e "s@{{ *pillar\.get('storage_backend', '\(.*\)') *}}@\1@g")
+cluster/gce/container-linux/configure-helper.sh:    sed -i -e "s@{{ *pillar\.get('storage_backend', '\(.*\)') *}}@${STORAGE_BACKEND}@g" "${temp_file}"
+cluster/gce/container-linux/configure-helper.sh:    sed -i -e "s@{{ *pillar\.get('storage_backend', '\(.*\)') *}}@\1@g" "${temp_file}"
 cluster/gce/container-linux/configure-helper.sh:  local api_servers="--master=https://${KUBERNETES_MASTER_NAME}"
 cluster/gce/container-linux/configure-helper.sh:  local authorization_mode="RBAC"
-cluster/gce/container-linux/configure-helper.sh:  sed -i -e "s@{{ *storage_backend *}}@${STORAGE_BACKEND:-}@g" "${temp_file}"
 cluster/gce/container-linux/configure-helper.sh:  sed -i -e "s@{{pillar\['allow_privileged'\]}}@true@g" "${src_file}"
 cluster/gce/gci/configure-helper.sh:    authorization_mode+=",ABAC"
 cluster/gce/gci/configure-helper.sh:    authorization_mode+=",Webhook"
+cluster/gce/gci/configure-helper.sh:    grep -o "{{ *pillar\.get('storage_backend', '\(.*\)') *}}" | \
+cluster/gce/gci/configure-helper.sh:    sed -e "s@{{ *pillar\.get('storage_backend', '\(.*\)') *}}@\1@g")
+cluster/gce/gci/configure-helper.sh:    sed -i -e "s@{{ *pillar\.get('storage_backend', '\(.*\)') *}}@${STORAGE_BACKEND}@g" "${temp_file}"
+cluster/gce/gci/configure-helper.sh:    sed -i -e "s@{{ *pillar\.get('storage_backend', '\(.*\)') *}}@\1@g" "${temp_file}"
 cluster/gce/gci/configure-helper.sh:  local api_servers="--master=https://${KUBERNETES_MASTER_NAME}"
 cluster/gce/gci/configure-helper.sh:  local authorization_mode="RBAC"
-cluster/gce/gci/configure-helper.sh:  sed -i -e "s@{{ *storage_backend *}}@${STORAGE_BACKEND:-}@g" "${temp_file}"
 cluster/gce/gci/configure-helper.sh:  sed -i -e "s@{{pillar\['allow_privileged'\]}}@true@g" "${src_file}"
-cluster/gce/trusty/configure-helper.sh:  sed -i -e "s@{{ *storage_backend *}}@${STORAGE_BACKEND:-}@g" "${temp_file}"
+cluster/gce/trusty/configure-helper.sh:    grep -o "{{ *pillar\.get('storage_backend', '\(.*\)') *}}" | \
+cluster/gce/trusty/configure-helper.sh:    sed -e "s@{{ *pillar\.get('storage_backend', '\(.*\)') *}}@\1@g")
+cluster/gce/trusty/configure-helper.sh:    sed -i -e "s@{{ *pillar\.get('storage_backend', '\(.*\)') *}}@${STORAGE_BACKEND}@g" "${temp_file}"
+cluster/gce/trusty/configure-helper.sh:    sed -i -e "s@{{ *pillar\.get('storage_backend', '\(.*\)') *}}@\1@g" "${temp_file}"
 cluster/gce/trusty/configure-helper.sh:  sed -i -e "s@{{pillar\['allow_privileged'\]}}@true@g" "${src_file}"
 cluster/gce/util.sh:    local node_ip=$(gcloud compute instances describe --project "${PROJECT}" --zone "${ZONE}" \
 cluster/juju/layers/kubernetes-master/reactive/kubernetes_master.py:            context['pillar'] = {'num_nodes': get_node_count()}
@@ -50,9 +59,8 @@ cluster/photon-controller/util.sh:  node_name=${1}
 cluster/photon-controller/util.sh:  ssh_key=$(ssh-add -L | head -1)
 cluster/rackspace/util.sh:    local node_ip=$(nova show --minimal ${NODE_NAMES[$i]} \
 cluster/saltbase/salt/cluster-autoscaler/cluster-autoscaler.manifest:{% set params = pillar['autoscaler_mig_config'] + " " + cloud_config -%}
-cluster/saltbase/salt/etcd/etcd.manifest:        "value": "{{ storage_backend }}"
+cluster/saltbase/salt/etcd/etcd.manifest:        "value": "{{ pillar.get('storage_backend', 'etcd3') }}"
 cluster/saltbase/salt/etcd/etcd.manifest:{% if pillar.get('storage_backend', 'etcd3') == 'etcd3' -%}
-cluster/saltbase/salt/etcd/etcd.manifest:{% set storage_backend = pillar.get('storage_backend', 'etcd3') -%}
 cluster/saltbase/salt/kube-admission-controls/init.sls:{% if 'LimitRanger' in pillar.get('admission_control', '') %}
 cluster/saltbase/salt/kube-apiserver/kube-apiserver.manifest:{% set params = address + " " + storage_backend + " " + etcd_servers + " " + etcd_servers_overrides + " " + cloud_provider + " " + cloud_config + " " + runtime_config + " " + feature_gates + " " + admission_control + " " + max_requests_inflight + " " + target_ram_mb + " " + service_cluster_ip_range + " " + client_ca_file + basic_auth_file + " " + min_request_timeout + " " + enable_garbage_collector + " " + etcd_quorum_read -%}
 cluster/saltbase/salt/kube-controller-manager/kube-controller-manager.manifest:{% if pillar.get('enable_hostpath_provisioner', '').lower() == 'true' -%}
