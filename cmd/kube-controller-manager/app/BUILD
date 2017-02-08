@@ -31,7 +31,6 @@ go_library(
         "//pkg/apis/componentconfig:go_default_library",
         "//pkg/apis/extensions:go_default_library",
         "//pkg/client/clientset_generated/clientset:go_default_library",
-        "//pkg/client/informers/informers_generated:go_default_library",
         "//pkg/client/leaderelection:go_default_library",
         "//pkg/client/leaderelection/resourcelock:go_default_library",
         "//pkg/cloudprovider:go_default_library",
