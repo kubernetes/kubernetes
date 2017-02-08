@@ -129,9 +129,6 @@ func Jitter(duration time.Duration, maxFactor float64) time.Duration {
 // ErrWaitTimeout is returned when the condition exited without success.
 var ErrWaitTimeout = errors.New("timed out waiting for the condition")
 
-// ErrChannelClosed is returned when the watch channel is closed.
-var ErrChannelClosed = errors.New("watch channel closed")
-
 // ConditionFunc returns true if the condition is satisfied, or an error
 // if the loop should be aborted.
 type ConditionFunc func() (done bool, err error)
