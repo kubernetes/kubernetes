@@ -51,11 +51,6 @@ func PerformTLSBootstrap(cfg *clientcmdapi.Config) error {
 		return fmt.Errorf("failed to generate private key [%v]", err)
 	}
 
-	// Make sure there are no other nodes in the cluster with identical node name.
-	if err := checkForNodeNameDuplicates(c); err != nil {
-		return err
-	}
-
 	cert, err := csr.RequestNodeCertificate(c.Certificates().CertificateSigningRequests(), key, name)
 	if err != nil {
 		return fmt.Errorf("failed to request signed certificate from the API server [%v]", err)
