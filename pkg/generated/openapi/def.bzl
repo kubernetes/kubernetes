@@ -32,6 +32,8 @@ OPENAPI_VENDOR_TARGETS = [
     "k8s.io/apimachinery/pkg/util/intstr",
     "k8s.io/apimachinery/pkg/version",
     "k8s.io/apiserver/pkg/apis/example/v1",
+    "k8s.io/apiserver/pkg/server/openapi",
+    "k8s.io/client-go/pkg/api/v1",
 ]
 
 
