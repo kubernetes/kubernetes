@@ -50,8 +50,7 @@ var _ = framework.KubeDescribe("Federation secrets [Feature:Federation]", func()
 
 		BeforeEach(func() {
 			fedframework.SkipUnlessFederated(f.ClientSet)
-			clusters = map[string]*cluster{}
-			registerClusters(clusters, UserAgentName, "", f)
+			clusters, _ = getRegisteredClusters(UserAgentName, f)
 		})
 
 		AfterEach(func() {
@@ -59,8 +58,6 @@ var _ = framework.KubeDescribe("Federation secrets [Feature:Federation]", func()
 			// Delete all secrets.
 			nsName := f.FederationNamespace.Name
 			deleteAllSecretsOrFail(f.FederationClientset, nsName)
-			unregisterClusters(clusters, f)
-
 		})
 
 		It("should be created and deleted successfully", func() {

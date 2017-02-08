@@ -85,23 +85,26 @@ function init() {
       --image="${kube_registry}/hyperkube-amd64:${kube_version}"
 }
 
-# create_cluster_secrets creates the secrets containing the kubeconfigs
-# of the participating clusters in the host cluster. The kubeconfigs itself
-# are created while deploying clusters, i.e. when kube-up is run.
-function create_cluster_secrets() {
-  local -r kubeconfig_dir="$(dirname ${DEFAULT_KUBECONFIG})"
-  local -r base_dir="${kubeconfig_dir}/federation/kubernetes-apiserver"
+# join_cluster_to_federation joins the clusters in the local kubeconfig to federation. The clusters
+# and their kubeconfig entries in the local kubeconfig are created while deploying clusters, i.e. when kube-up is run.
+function join_cluster_to_federation() {
+  for cluster in $("${KUBE_ROOT}/cluster/kubectl.sh" config get-clusters |sed -n '1!p'); do
+    # Skip federation context
+    if [[ "${cluster}" == "${FEDERATION_NAME}" ]]; then
+      continue
+    fi
+    # Skip contexts not beginning with "federation"
+    if [[ "${cluster}" != federation* ]]; then
+      continue
+    fi
 
-  # Create secrets with all the kubernetes-apiserver's kubeconfigs.
-  for dir in $(ls "${base_dir}"); do
-    # We create a secret with the same name as the directory name (which is
-    # same as cluster name in kubeconfig).
-    # Massage the name so that it is valid (should not contain "_" and max 253
-    # chars)
-    name=$(echo "${dir}" | sed -e "s/_/-/g")  # Replace "_" by "-"
-    name=${name:0:252}
-    kube::log::status "Creating secret with name: ${name} in namespace ${FEDERATION_NAMESPACE}"
-    "${KUBE_ROOT}/cluster/kubectl.sh" create secret generic ${name} --from-file="${base_dir}/${dir}/kubeconfig" --namespace="${FEDERATION_NAMESPACE}"
+  kube::log::status "Joining cluster with name '${cluster}' to federation with name '${FEDERATION_NAME}'"
+
+  "${KUBE_ROOT}/federation/develop/kubefed.sh" join \
+      "${cluster}" \
+      --host-cluster-context="${HOST_CLUSTER_CONTEXT}" \
+      --context="${FEDERATION_NAME}" \
+      --secret-name="${cluster//_/-}"    # Replace "_" by "-"
   done
 }
 
@@ -109,11 +112,8 @@ USE_KUBEFED="${USE_KUBEFED:-}"
 
 if [[ "${USE_KUBEFED}" == "true" ]]; then
   init
-  # TODO(madhusudancs): Call to create_cluster_secrets and the function
-  # itself must be removed after implementing cluster join with kubefed
-  # here. This call is now required for the cluster joins in the
-  # BeforeEach blocks of each e2e test to work.
-  create_cluster_secrets
+
+  join_cluster_to_federation
 else
   export FEDERATION_IMAGE_TAG="$(get_version)"
   create-federation-api-objects

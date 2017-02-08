@@ -94,8 +94,7 @@ var _ = framework.KubeDescribe("Federated ingresses [Feature:Federation]", func(
 				federationName = DefaultFederationName
 			}
 			jig = newFederationTestJig(f.FederationClientset)
-			clusters = map[string]*cluster{}
-			primaryClusterName = registerClusters(clusters, UserAgentName, federationName, f)
+			clusters, primaryClusterName = getRegisteredClusters(UserAgentName, f)
 			ns = f.FederationNamespace.Name
 		})
 
@@ -103,7 +102,6 @@ var _ = framework.KubeDescribe("Federated ingresses [Feature:Federation]", func(
 			// Delete all ingresses.
 			nsName := f.FederationNamespace.Name
 			deleteAllIngressesOrFail(f.FederationClientset, nsName)
-			unregisterClusters(clusters, f)
 		})
 
 		It("should create and update matching ingresses in underlying clusters", func() {
