@@ -34,6 +34,7 @@ import (
 	certutil "k8s.io/client-go/util/cert"
 	clientcertificates "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/certificates/v1beta1"
 	"k8s.io/kubernetes/pkg/kubelet/util/csr"
+	"k8s.io/kubernetes/pkg/util"
 )
 
 const (
@@ -65,9 +66,9 @@ type Manager interface {
 type manager struct {
 	certSigningRequestClient clientcertificates.CertificateSigningRequestInterface
 	nodeName                 types.NodeName
-	certAccessLock           sync.Mutex
 	certDirectory            string
 	keyDirectory             string
+	certAccessLock           sync.RWMutex
 	cert                     *tls.Certificate
 	certRotationEnabled      bool
 }
@@ -84,22 +85,12 @@ func NewManager(
 	keyFile string,
 	certRotationEnabled bool) (Manager, error) {
 
-	var selectedCertFile, selectedKeyFile string
-	if fileExists(certFile) && fileExists(keyFile) {
-		selectedCertFile = certFile
-		selectedKeyFile = keyFile
-	} else if fileExists(filepath.Join(certDirectory, pairNamePrefix+certExtension)) && fileExists(filepath.Join(keyDirectory, pairNamePrefix+keyExtension)) {
-		selectedCertFile = filepath.Join(certDirectory, pairNamePrefix+certExtension)
-		selectedKeyFile = filepath.Join(keyDirectory, pairNamePrefix+keyExtension)
-	} else {
-		return nil, fmt.Errorf("no cert/key files read at (%q, %q) or in (%q, %q)",
-			certFile,
-			keyFile,
-			certDirectory,
-			keyDirectory)
+	selectedCertFile, selectedKeyFile, err := selectedCertKeyFiles(certFile, keyFile, certDirectory, keyDirectory)
+	if err != nil {
+		return nil, err
 	}
 
-	glog.Infof("Loading cert/key data from (%q, %q)", selectedCertFile, selectedKeyFile)
+	glog.V(2).Infof("Loading cert/key data from (%q, %q)", selectedCertFile, selectedKeyFile)
 	cert, err := loadX509KeyPair(selectedCertFile, selectedKeyFile)
 	if err != nil {
 		return nil, err
@@ -115,13 +106,45 @@ func NewManager(
 	}
 
 	if m.certRotationEnabled {
-		if err := m.cleanupPairs(); err == nil {
-			return &m, nil
-		} else {
+		if err := m.cleanupPairs(); err != nil {
 			return nil, err
 		}
 	}
 	return &m, nil
+}
+
+func selectedCertKeyFiles(certFile, keyFile, certDirectory, keyDirectory string) (string, string, error) {
+	certFileExists, err := util.FileExists(certFile)
+	if err != nil {
+		return "", "", err
+	}
+	keyFileExists, err := util.FileExists(keyFile)
+	if err != nil {
+		return "", "", err
+	}
+	if certFileExists && keyFileExists {
+		return certFile, keyFile, nil
+	}
+
+	c := filepath.Join(certDirectory, pairNamePrefix+certExtension)
+	k := filepath.Join(keyDirectory, pairNamePrefix+keyExtension)
+	certFileExists, err = util.FileExists(c)
+	if err != nil {
+		return "", "", err
+	}
+	keyFileExists, err = util.FileExists(k)
+	if err != nil {
+		return "", "", err
+	}
+	if certFileExists && keyFileExists {
+		return c, k, nil
+	}
+
+	return "", "", fmt.Errorf("no cert/key files read at (%q, %q) or in (%q, %q)",
+		certFile,
+		keyFile,
+		certDirectory,
+		keyDirectory)
 }
 
 // GetCertificate returns the certificate that should be used TLS connections.
@@ -137,15 +160,15 @@ func NewManager(
 //    }
 //
 func (m *manager) GetCertificate(clientHello *tls.ClientHelloInfo) (*tls.Certificate, error) {
-	m.certAccessLock.Lock()
-	defer m.certAccessLock.Unlock()
+	m.certAccessLock.RLock()
+	defer m.certAccessLock.RUnlock()
 	return m.cert, nil
 }
 
 // Start will start the background work of rotating the certificates.
 func (m *manager) Start() {
 	if !m.certRotationEnabled {
-		glog.Infof("Certificate rotation is not enabled.")
+		glog.V(2).Infof("Certificate rotation is not enabled.")
 		return
 	}
 
@@ -154,11 +177,11 @@ func (m *manager) Start() {
 	// client. This will happen on the master, where the kubelet is responsible
 	// for bootstrapping the pods of the master components.
 	if m.certSigningRequestClient == nil {
-		glog.Infof("Kubernetes client is nil, not starting certificate manager.")
+		glog.V(2).Infof("Kubernetes client is nil, not starting certificate manager.")
 		return
 	}
 
-	glog.Info("Starting to rotate expiring certificates.")
+	glog.V(2).Info("Starting to rotate expiring certificates.")
 	go wait.Forever(func() {
 		for range time.Tick(syncPeriod) {
 			err := m.rotateCerts()
@@ -179,7 +202,15 @@ func (m *manager) cleanupPairs() error {
 
 	keyPath := filepath.Join(m.keyDirectory, pairNamePrefix+keyExtension)
 	certPath := filepath.Join(m.certDirectory, pairNamePrefix+certExtension)
-	if fileExists(keyPath) && fileExists(certPath) {
+	keyPathExists, err := util.FileExists(keyPath)
+	if err != nil {
+		return fmt.Errorf("unable to check existence of key file %q: %v", keyPath, err)
+	}
+	certPathExists, err := util.FileExists(certPath)
+	if err != nil {
+		return fmt.Errorf("unable to check existence of cert file %q: %v", certPath, err)
+	}
+	if keyPathExists && certPathExists {
 		// Make sure the selected key/cert pair are symlinks. This facilitates
 		// key rotation.
 		if err := fixSymlink(keyPath); err != nil {
@@ -198,7 +229,7 @@ func (m *manager) cleanupPairs() error {
 func (m *manager) removeUnmatchedPairs() error {
 	keyfiles, err := ioutil.ReadDir(m.keyDirectory)
 	if err != nil {
-		return err
+		return fmt.Errorf("could not list the files in the key directory %q: %v", m.keyDirectory, err)
 	}
 	keys := map[string]bool{}
 	for _, keyfile := range keyfiles {
@@ -208,7 +239,7 @@ func (m *manager) removeUnmatchedPairs() error {
 	}
 	certfiles, err := ioutil.ReadDir(m.certDirectory)
 	if err != nil {
-		return err
+		return fmt.Errorf("could not list the files in the certificate directory %q: %v", m.certDirectory, err)
 	}
 	for _, certfile := range certfiles {
 		if filepath.Ext(certfile.Name()) == certExtension {
@@ -226,16 +257,11 @@ func (m *manager) removeUnmatchedPairs() error {
 		if !certFound {
 			keyPath := filepath.Join(m.keyDirectory, filename+keyExtension)
 			if err := os.Remove(keyPath); err != nil {
-				glog.Errorf("The certificate %q doesn't have a matching key but can't be deleted: %v", keyPath, err)
+				glog.Errorf("The key %q doesn't have a matching certificate but can't be deleted: %v", keyPath, err)
 			}
 		}
 	}
 	return nil
-}
-
-func fileExists(file string) bool {
-	_, err := os.Stat(file)
-	return err == nil || os.IsExist(err)
 }
 
 // withoutExt returns the given filename after removing the extension. The
@@ -254,14 +280,14 @@ func fixSymlink(filename string) error {
 		return nil
 	}
 
-	newFilename := withoutExt(filename) + ".orig" + filepath.Ext(filename)
+	origFilename := withoutExt(filename) + ".orig" + filepath.Ext(filename)
 
 	// Move the file to the backup location.
-	if err := os.Rename(filename, newFilename); err != nil {
-		return fmt.Errorf("unable to rename %q to %q: %v", filename, newFilename, err)
+	if err := os.Rename(filename, origFilename); err != nil {
+		return fmt.Errorf("unable to rename %q to %q: %v", filename, origFilename, err)
 	}
-	if err := os.Symlink(newFilename, filename); err != nil {
-		return fmt.Errorf("unable to create a symlink from %q to %q: %v", newFilename, filename, err)
+	if err := os.Symlink(origFilename, filename); err != nil {
+		return fmt.Errorf("unable to create a symlink from %q to %q: %v", origFilename, filename, err)
 	}
 	return nil
 }
@@ -273,6 +299,8 @@ func filename(qualifier, extension string) string {
 // shouldRotate looks at how close the current certificate is to expiring and
 // decides if it is time to rotate or not.
 func (m *manager) shouldRotate() bool {
+	m.certAccessLock.RLock()
+	defer m.certAccessLock.RUnlock()
 	notAfter := m.cert.Leaf.NotAfter
 	total := notAfter.Sub(m.cert.Leaf.NotBefore)
 	remaining := notAfter.Sub(time.Now())
@@ -294,7 +322,7 @@ func (m *manager) rotateCerts() error {
 	keyPath := filepath.Join(m.keyDirectory, keyFilename)
 	keyData, generatedKeyFile, err := certutil.LoadOrGenerateKeyFile(keyPath)
 	if err != nil {
-		return err
+		return fmt.Errorf("unable to load or generate a private key at %q: %f", keyPath, err)
 	}
 	if generatedKeyFile {
 		defer func() {
@@ -308,11 +336,11 @@ func (m *manager) rotateCerts() error {
 
 	// Call the Certificate Signing Request API to get a certificate for the
 	// new private key.
-	certPath := filepath.Join(m.certDirectory, certFilename)
 	certData, err := csr.RequestNodeCertificate(m.certSigningRequestClient, keyData, m.nodeName)
 	if err != nil {
-		return err
+		return fmt.Errorf("unable to get a new key signed for %q: %v", m.nodeName, err)
 	}
+	certPath := filepath.Join(m.certDirectory, certFilename)
 	if err := certutil.WriteCert(certPath, certData); err != nil {
 		return err
 	}
@@ -333,9 +361,13 @@ func (m *manager) rotateCerts() error {
 	}
 
 	designatedKeyPath := filepath.Join(m.keyDirectory, pairNamePrefix+keyExtension)
-	updateSymlink(keyPath, designatedKeyPath)
+	if err := updateSymlink(keyPath, designatedKeyPath); err != nil {
+		return err
+	}
 	designatedCertPath := filepath.Join(m.certDirectory, pairNamePrefix+certExtension)
-	updateSymlink(certPath, designatedCertPath)
+	if err := updateSymlink(certPath, designatedCertPath); err != nil {
+		return err
+	}
 
 	success = true
 	m.certAccessLock.Lock()
