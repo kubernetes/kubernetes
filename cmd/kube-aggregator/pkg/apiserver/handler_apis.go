@@ -30,7 +30,7 @@ import (
 
 	apiregistrationapi "k8s.io/kubernetes/cmd/kube-aggregator/pkg/apis/apiregistration"
 	apiregistrationv1alpha1api "k8s.io/kubernetes/cmd/kube-aggregator/pkg/apis/apiregistration/v1alpha1"
-	informers "k8s.io/kubernetes/cmd/kube-aggregator/pkg/client/informers/apiregistration/internalversion"
+	informers "k8s.io/kubernetes/cmd/kube-aggregator/pkg/client/informers/internalversion/apiregistration/internalversion"
 	listers "k8s.io/kubernetes/cmd/kube-aggregator/pkg/client/listers/apiregistration/internalversion"
 )
 

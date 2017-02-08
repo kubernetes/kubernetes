@@ -37,7 +37,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
-	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated"
+	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated/externalversions"
 	"k8s.io/kubernetes/pkg/controller"
 	replicationcontroller "k8s.io/kubernetes/pkg/controller/replication"
 	resourcequotacontroller "k8s.io/kubernetes/pkg/controller/resourcequota"
@@ -84,7 +84,7 @@ func TestQuota(t *testing.T) {
 	controllerCh := make(chan struct{})
 	defer close(controllerCh)
 
-	informers := informers.NewSharedInformerFactory(nil, clientset, controller.NoResyncPeriodFunc())
+	informers := informers.NewSharedInformerFactory(clientset, controller.NoResyncPeriodFunc())
 	rm := replicationcontroller.NewReplicationManager(
 		informers.Core().V1().Pods(),
 		informers.Core().V1().ReplicationControllers(),

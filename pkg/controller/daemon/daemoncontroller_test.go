@@ -32,7 +32,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/v1"
 	extensions "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset/fake"
-	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated"
+	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated/externalversions"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/securitycontext"
 )
@@ -157,7 +157,7 @@ type daemonSetsController struct {
 
 func newTestController(initialObjects ...runtime.Object) (*daemonSetsController, *controller.FakePodControl, *fake.Clientset) {
 	clientset := fake.NewSimpleClientset(initialObjects...)
-	informerFactory := informers.NewSharedInformerFactory(nil, clientset, controller.NoResyncPeriodFunc())
+	informerFactory := informers.NewSharedInformerFactory(clientset, controller.NoResyncPeriodFunc())
 
 	manager := NewDaemonSetsController(
 		informerFactory.Extensions().V1beta1().DaemonSets(),
