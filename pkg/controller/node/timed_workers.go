@@ -49,7 +49,7 @@ type TimedWorker struct {
 }
 
 // CreateWorker creates a TimedWorker that will execute `f` not earlier than `fireAt`.
-func CreateWorker(args *WorkArgs, createdAt time.Time, fireAt time.Time, f func(args *WorkArgs)) *TimedWorker {
+func CreateWorker(args *WorkArgs, createdAt time.Time, fireAt time.Time, f func(args *WorkArgs) error) *TimedWorker {
 	delay := fireAt.Sub(time.Now())
 	if delay <= 0 {
 		go f(args)
@@ -75,24 +75,29 @@ func (w *TimedWorker) Cancel() {
 type TimedWorkerQueue struct {
 	sync.Mutex
 	workers  map[string]*TimedWorker
-	workFunc func(args *WorkArgs)
+	workFunc func(args *WorkArgs) error
 }
 
 // CreateWorkerQueue creates a new TimedWorkerQueue for workers that will execute
 // given function `f`.
-func CreateWorkerQueue(f func(args *WorkArgs)) *TimedWorkerQueue {
+func CreateWorkerQueue(f func(args *WorkArgs) error) *TimedWorkerQueue {
 	return &TimedWorkerQueue{
 		workers:  make(map[string]*TimedWorker),
 		workFunc: f,
 	}
 }
 
-func (q *TimedWorkerQueue) getWrappedWorkerFunc(key string) func(args *WorkArgs) {
-	return func(args *WorkArgs) {
-		q.workFunc(args)
+func (q *TimedWorkerQueue) getWrappedWorkerFunc(key string) func(args *WorkArgs) error {
+	return func(args *WorkArgs) error {
+		err := q.workFunc(args)
 		q.Lock()
 		defer q.Unlock()
-		q.workers[key] = nil
+		if err == nil {
+			q.workers[key] = nil
+		} else {
+			delete(q.workers, key)
+		}
+		return err
 	}
 }
 

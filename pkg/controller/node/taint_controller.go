@@ -30,13 +30,15 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
 
+	"k8s.io/client-go/util/workqueue"
+
 	"github.com/golang/glog"
 )
 
 const (
-	nodeUpdateChannelSize = 10000
-	podUpdateChannelSize  = 50000
-	retries               = 4
+	nodeUpdateChannelSize = 10
+	podUpdateChannelSize  = 1
+	retries               = 5
 )
 
 func computeTaintDifference(left []v1.Taint, right []v1.Taint) []v1.Taint {
@@ -74,17 +76,18 @@ func computeTolerationDifference(left []v1.Toleration, right []v1.Toleration) []
 	return result
 }
 
+// Needed to make workqueue work
+type updateItemInterface interface{}
+
 type nodeUpdateItem struct {
 	oldNode   *v1.Node
 	newNode   *v1.Node
-	oldTaints []v1.Taint
 	newTaints []v1.Taint
 }
 
 type podUpdateItem struct {
 	oldPod         *v1.Pod
 	newPod         *v1.Pod
-	oldTolerations []v1.Toleration
 	newTolerations []v1.Toleration
 }
 
@@ -94,19 +97,30 @@ type NoExecuteTaintManager struct {
 	client             clientset.Interface
 	taintEvictionQueue *TimedWorkerQueue
 	// keeps a map from nodeName to all noExecute taints on that Node
-	taintedNodes     map[string][]v1.Taint
 	taintedNodesLock sync.Mutex
+	taintedNodes     map[string][]v1.Taint
 
-	nodeUpdateChannel chan nodeUpdateItem
-	podUpdateChannel  chan podUpdateItem
+	nodeUpdateChannel chan *nodeUpdateItem
+	podUpdateChannel  chan *podUpdateItem
+
+	nodeUpdateQueue workqueue.Interface
+	podUpdateQueue  workqueue.Interface
 }
 
-func deletePodHandler(c clientset.Interface) func(args *WorkArgs) {
-	return func(args *WorkArgs) {
+func deletePodHandler(c clientset.Interface) func(args *WorkArgs) error {
+	return func(args *WorkArgs) error {
 		ns := args.NamespacedName.Namespace
 		name := args.NamespacedName.Name
 		glog.V(0).Infof("NoExecuteTaintManager is deleting Pod: %v", args.NamespacedName.String())
-		c.Core().Pods(ns).Delete(name, &metav1.DeleteOptions{})
+		var err error
+		for i := 0; i < retries; i++ {
+			err = c.Core().Pods(ns).Delete(name, &metav1.DeleteOptions{})
+			if err == nil {
+				break
+			}
+			time.Sleep(10 * time.Millisecond)
+		}
+		return err
 	}
 }
 
@@ -118,28 +132,6 @@ func getNonExecuteTaints(taints []v1.Taint) []v1.Taint {
 		}
 	}
 	return result
-}
-
-// Returns true and list of Tolerations matching all Taints if all are tolerated, or false otherwise.
-func getMatchingTolerations(taints []v1.Taint, tolerations []v1.Toleration) (bool, []v1.Toleration) {
-	if len(tolerations) == 0 && len(taints) > 0 {
-		return false, []v1.Toleration{}
-	}
-	result := []v1.Toleration{}
-	for i := range taints {
-		tolerated := false
-		for j := range tolerations {
-			if tolerations[j].ToleratesTaint(&taints[i]) {
-				result = append(result, tolerations[j])
-				tolerated = true
-				break
-			}
-		}
-		if !tolerated {
-			return false, []v1.Toleration{}
-		}
-	}
-	return true, result
 }
 
 func getPodsAssignedToNode(c clientset.Interface, nodeName string) ([]v1.Pod, error) {
@@ -190,13 +182,48 @@ func NewNoExecuteTaintManager(c clientset.Interface) *NoExecuteTaintManager {
 		client:             c,
 		taintEvictionQueue: CreateWorkerQueue(deletePodHandler(c)),
 		taintedNodes:       make(map[string][]v1.Taint),
-		nodeUpdateChannel:  make(chan nodeUpdateItem, nodeUpdateChannelSize),
-		podUpdateChannel:   make(chan podUpdateItem, podUpdateChannelSize),
+		nodeUpdateChannel:  make(chan *nodeUpdateItem, nodeUpdateChannelSize),
+		podUpdateChannel:   make(chan *podUpdateItem, podUpdateChannelSize),
+
+		nodeUpdateQueue: workqueue.New(),
+		podUpdateQueue:  workqueue.New(),
 	}
 }
 
 // Run starts NoExecuteTaintManager which will run in loop until `stopCh` is closed.
 func (tc *NoExecuteTaintManager) Run(stopCh <-chan struct{}) {
+	// Functions that are responsible for taking work items out of the workqueues and putting them
+	// into channels.
+	go func(stopCh <-chan struct{}) {
+		for {
+			item, shutdown := tc.nodeUpdateQueue.Get()
+			if shutdown {
+				break
+			}
+			nodeUpdate := item.(*nodeUpdateItem)
+			select {
+			case <-stopCh:
+				break
+			case tc.nodeUpdateChannel <- nodeUpdate:
+			}
+		}
+	}(stopCh)
+
+	go func(stopCh <-chan struct{}) {
+		for {
+			item, shutdown := tc.podUpdateQueue.Get()
+			if shutdown {
+				break
+			}
+			podUpdate := item.(*podUpdateItem)
+			select {
+			case <-stopCh:
+				break
+			case tc.podUpdateChannel <- podUpdate:
+			}
+		}
+	}(stopCh)
+
 	// When processing events we want to prioritize Node updates over Pod updates,
 	// as NodeUpdates that interest NoExecuteTaintManager should be handled as soon as possible -
 	// we don't want user (or system) to wait until PodUpdate queue is drained before it can
@@ -247,18 +274,13 @@ func (tc *NoExecuteTaintManager) PodUpdated(oldPod *v1.Pod, newPod *v1.Pod) {
 	if oldPod != nil && newPod != nil && api.Semantic.DeepEqual(oldTolerations, newTolerations) && oldPod.Spec.NodeName == newPod.Spec.NodeName {
 		return
 	}
-	select {
-	case tc.podUpdateChannel <- podUpdateItem{
+	updateItem := &podUpdateItem{
 		oldPod:         oldPod,
 		newPod:         newPod,
-		oldTolerations: oldTolerations,
 		newTolerations: newTolerations,
-	}:
-	default:
-		// If our update queue is full it means that something's blocked, and we
-		// should try restarting controller.
-		panic(fmt.Errorf("NoExecuteTaintManager Pod update queue is full"))
 	}
+
+	tc.podUpdateQueue.Add(updateItemInterface(updateItem))
 }
 
 // NodeUpdated is used to notify NoExecuteTaintManager about Node changes.
@@ -287,18 +309,13 @@ func (tc *NoExecuteTaintManager) NodeUpdated(oldNode *v1.Node, newNode *v1.Node)
 	if oldNode != nil && newNode != nil && api.Semantic.DeepEqual(oldTaints, newTaints) {
 		return
 	}
-	select {
-	case tc.nodeUpdateChannel <- nodeUpdateItem{
+	updateItem := &nodeUpdateItem{
 		oldNode:   oldNode,
 		newNode:   newNode,
-		oldTaints: oldTaints,
 		newTaints: newTaints,
-	}:
-	default:
-		// If our update queue is full it means that something's blocked, and we
-		// should try restarting controller.
-		panic(fmt.Errorf("NoExecuteTaintManager Node update queue is full"))
 	}
+
+	tc.nodeUpdateQueue.Add(updateItemInterface(updateItem))
 }
 
 func (tc *NoExecuteTaintManager) processPodOnNode(
@@ -308,9 +325,10 @@ func (tc *NoExecuteTaintManager) processPodOnNode(
 	taints []v1.Taint,
 	now time.Time,
 ) {
-	allTolerated, usedTolerations := getMatchingTolerations(taints, tolerations)
+	allTolerated, usedTolerations := v1.GetMatchingTolerations(taints, tolerations)
 	if !allTolerated {
 		glog.V(2).Infof("Not all taints are tolerated after upgrade for Pod %v on %v", podNamespacedName.String(), nodeName)
+		// We're canceling scheduled work (if any), as we're going to delete the Pod right away.
 		tc.taintEvictionQueue.CancelWork(podNamespacedName.String())
 		tc.taintEvictionQueue.AddWork(NewWorkArgs(podNamespacedName.Name, podNamespacedName.Namespace), time.Now(), time.Now())
 		return
@@ -336,7 +354,7 @@ func (tc *NoExecuteTaintManager) processPodOnNode(
 	tc.taintEvictionQueue.AddWork(NewWorkArgs(podNamespacedName.Name, podNamespacedName.Namespace), startTime, triggerTime)
 }
 
-func (tc *NoExecuteTaintManager) handlePodUpdate(podUpdate podUpdateItem) {
+func (tc *NoExecuteTaintManager) handlePodUpdate(podUpdate *podUpdateItem) {
 	// Delete
 	if podUpdate.newPod == nil {
 		pod := podUpdate.oldPod
@@ -365,7 +383,7 @@ func (tc *NoExecuteTaintManager) handlePodUpdate(podUpdate podUpdateItem) {
 	tc.processPodOnNode(podNamespacedName, nodeName, podUpdate.newTolerations, taints, time.Now())
 }
 
-func (tc *NoExecuteTaintManager) handleNodeUpdate(nodeUpdate nodeUpdateItem) {
+func (tc *NoExecuteTaintManager) handleNodeUpdate(nodeUpdate *nodeUpdateItem) {
 	// Delete
 	if nodeUpdate.newNode == nil {
 		node := nodeUpdate.oldNode

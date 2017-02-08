@@ -27,9 +27,10 @@ func TestExecute(t *testing.T) {
 	testVal := int32(0)
 	wg := sync.WaitGroup{}
 	wg.Add(10)
-	queue := CreateWorkerQueue(func(args *WorkArgs) {
+	queue := CreateWorkerQueue(func(args *WorkArgs) error {
 		atomic.AddInt32(&testVal, 1)
 		wg.Done()
+		return nil
 	})
 	now := time.Now()
 	queue.AddWork(NewWorkArgs("1", "1"), now, now)
@@ -53,9 +54,10 @@ func TestExecuteDelayed(t *testing.T) {
 	testVal := int32(0)
 	wg := sync.WaitGroup{}
 	wg.Add(5)
-	queue := CreateWorkerQueue(func(args *WorkArgs) {
+	queue := CreateWorkerQueue(func(args *WorkArgs) error {
 		atomic.AddInt32(&testVal, 1)
 		wg.Done()
+		return nil
 	})
 	now := time.Now()
 	then := now.Add(time.Second)
@@ -80,9 +82,10 @@ func TestCancel(t *testing.T) {
 	testVal := int32(0)
 	wg := sync.WaitGroup{}
 	wg.Add(3)
-	queue := CreateWorkerQueue(func(args *WorkArgs) {
+	queue := CreateWorkerQueue(func(args *WorkArgs) error {
 		atomic.AddInt32(&testVal, 1)
 		wg.Done()
+		return nil
 	})
 	now := time.Now()
 	then := now.Add(time.Second)
@@ -109,9 +112,10 @@ func TestCancelAndReadd(t *testing.T) {
 	testVal := int32(0)
 	wg := sync.WaitGroup{}
 	wg.Add(4)
-	queue := CreateWorkerQueue(func(args *WorkArgs) {
+	queue := CreateWorkerQueue(func(args *WorkArgs) error {
 		atomic.AddInt32(&testVal, 1)
 		wg.Done()
+		return nil
 	})
 	now := time.Now()
 	then := now.Add(time.Second)
