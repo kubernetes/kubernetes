@@ -1230,13 +1230,24 @@ func waitForPodRunningInNamespaceSlow(c clientset.Interface, podName, namespace,
 	return waitTimeoutForPodRunningInNamespace(c, podName, namespace, resourceVersion, slowPodStartTimeout)
 }
 
-func waitTimeoutForPodRunningInNamespace(c clientset.Interface, podName, namespace, resourceVersion string, timeout time.Duration) error {
-	w, err := c.Core().Pods(namespace).Watch(metav1.SingleObject(metav1.ObjectMeta{Name: podName, ResourceVersion: resourceVersion}))
-	if err != nil {
-		return err
+func waitTimeoutForPodRunningInNamespace(c clientset.Interface, podName, namespace, resouceVersion string, timeout time.Duration) error {
+	return wait.PollImmediate(10*time.Millisecond, timeout, podRunning(c, podName, namespace))
+}
+
+func podRunning(c clientset.Interface, podName, namespace string) wait.ConditionFunc {
+	return func() (bool, error) {
+		pod, err := c.Core().Pods(namespace).Get(podName, metav1.GetOptions{})
+		if err != nil {
+			return false, err
+		}
+		switch pod.Status.Phase {
+		case v1.PodRunning:
+			return true, nil
+		case v1.PodFailed, v1.PodSucceeded:
+			return false, conditions.ErrPodCompleted
+		}
+		return false, nil
 	}
-	_, err = watch.Until(timeout, w, conditions.PodRunning)
-	return err
 }
 
 // Waits default amount of time (podNoLongerRunningTimeout) for the specified pod to stop running.
@@ -1246,33 +1257,63 @@ func WaitForPodNoLongerRunningInNamespace(c clientset.Interface, podName, namesp
 }
 
 func WaitTimeoutForPodNoLongerRunningInNamespace(c clientset.Interface, podName, namespace, resourceVersion string, timeout time.Duration) error {
-	w, err := c.Core().Pods(namespace).Watch(metav1.SingleObject(metav1.ObjectMeta{Name: podName, ResourceVersion: resourceVersion}))
-	if err != nil {
-		return err
+	return wait.PollImmediate(10*time.Millisecond, timeout, podCompleted(c, podName, namespace))
+}
+
+func podCompleted(c clientset.Interface, podName, namespace string) wait.ConditionFunc {
+	return func() (bool, error) {
+		pod, err := c.Core().Pods(namespace).Get(podName, metav1.GetOptions{})
+		if err != nil {
+			return false, err
+		}
+		switch pod.Status.Phase {
+		case v1.PodFailed, v1.PodSucceeded:
+			return true, nil
+		}
+		return false, nil
 	}
-	_, err = watch.Until(timeout, w, conditions.PodCompleted)
-	return err
 }
 
 func waitTimeoutForPodReadyInNamespace(c clientset.Interface, podName, namespace, resourceVersion string, timeout time.Duration) error {
-	w, err := c.Core().Pods(namespace).Watch(metav1.SingleObject(metav1.ObjectMeta{Name: podName, ResourceVersion: resourceVersion}))
-	if err != nil {
-		return err
+	return wait.PollImmediate(10*time.Millisecond, timeout, podRunningAndReady(c, podName, namespace))
+}
+
+func podRunningAndReady(c clientset.Interface, podName, namespace string) wait.ConditionFunc {
+	return func() (bool, error) {
+		pod, err := c.Core().Pods(namespace).Get(podName, metav1.GetOptions{})
+		if err != nil {
+			return false, err
+		}
+		switch pod.Status.Phase {
+		case v1.PodFailed, v1.PodSucceeded:
+			return false, conditions.ErrPodCompleted
+		case v1.PodRunning:
+			return v1.IsPodReady(pod), nil
+		}
+		return false, nil
 	}
-	_, err = watch.Until(timeout, w, conditions.PodRunningAndReady)
-	return err
 }
 
 // WaitForPodNotPending returns an error if it took too long for the pod to go out of pending state.
 // The resourceVersion is used when Watching object changes, it tells since when we care
 // about changes to the pod.
 func WaitForPodNotPending(c clientset.Interface, ns, podName, resourceVersion string) error {
-	w, err := c.Core().Pods(ns).Watch(metav1.SingleObject(metav1.ObjectMeta{Name: podName, ResourceVersion: resourceVersion}))
-	if err != nil {
-		return err
+	return wait.PollImmediate(10*time.Millisecond, PodStartTimeout, podNotPending(c, podName, ns))
+}
+
+func podNotPending(c clientset.Interface, podName, namespace string) wait.ConditionFunc {
+	return func() (bool, error) {
+		pod, err := c.Core().Pods(namespace).Get(podName, metav1.GetOptions{})
+		if err != nil {
+			return false, err
+		}
+		switch pod.Status.Phase {
+		case v1.PodPending:
+			return false, nil
+		default:
+			return true, nil
+		}
 	}
-	_, err = watch.Until(PodStartTimeout, w, conditions.PodNotPending)
-	return err
 }
 
 // waitForPodTerminatedInNamespace returns an error if it took too long for the pod
