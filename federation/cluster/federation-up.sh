@@ -52,10 +52,12 @@ function get_version() {
   if [[ -n "${KUBERNETES_RELEASE:-}" ]]; then
     echo "${KUBERNETES_RELEASE//+/_}"
     return
-  elif [[ ! -f "${versions_file}" ]]; then
+  fi
+
+  if [[ ! -f "${versions_file}" ]]; then
     echo "Couldn't determine the release version: neither the " \
-     "KUBERNETES_RELEASE environment variable is set, nor the " \
-     "versions file is provided"
+     "KUBERNETES_RELEASE environment variable is set, nor does " \
+     "the versions file exist at ${versions_file}"
     exit 1
   fi
 
