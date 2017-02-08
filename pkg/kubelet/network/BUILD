@@ -20,6 +20,7 @@ go_library(
         "//pkg/apis/componentconfig:go_default_library",
         "//pkg/client/clientset_generated/clientset:go_default_library",
         "//pkg/kubelet/container:go_default_library",
+        "//pkg/kubelet/network/hostport:go_default_library",
         "//pkg/util/exec:go_default_library",
         "//pkg/util/sysctl:go_default_library",
         "//vendor:github.com/golang/glog",
