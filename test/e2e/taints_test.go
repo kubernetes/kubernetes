@@ -47,7 +47,7 @@ func getTestTaint() v1.Taint {
 
 // Creates a defaut pod for this test, with argument saying if the Pod should have
 // toleration for Taits used in this test.
-func getPodForTaintsTest(hasToleration bool, tolerationSeconds int, podName, ns string) *v1.Pod {
+func createPodForTaintsTest(hasToleration bool, tolerationSeconds int, podName, ns string) *v1.Pod {
 	grace := int64(1)
 	if !hasToleration {
 		return &v1.Pod{
@@ -128,6 +128,8 @@ func getPodForTaintsTest(hasToleration bool, tolerationSeconds int, podName, ns 
 	}
 }
 
+// Creates and startes a controller (informer) that watches updates on a pod in given namespace with given name. It puts a new
+// struct into observedDeletion channel for every deletion it sees.
 func createTestController(cs clientset.Interface, observedDeletions chan struct{}, stopCh chan struct{}, podName, ns string) {
 	_, controller := cache.NewInformer(
 		&cache.ListWatch{
@@ -151,6 +153,11 @@ func createTestController(cs clientset.Interface, observedDeletions chan struct{
 	go controller.Run(stopCh)
 }
 
+// Tests the behavior of NoExecuteTaintManager. Following scenarios are included:
+// - eviction of non-tolerating pods from a tainted node,
+// - lack of eviction of tolerating pods from a tainted node,
+// - delayed eviction of short-tolerating pod from a tainted node,
+// - lack of eviction of short-tolerating pod after taint removal.
 var _ = framework.KubeDescribe("NoExecuteTaintManager [Serial]", func() {
 	var cs clientset.Interface
 	var nodeList *v1.NodeList
@@ -173,12 +180,12 @@ var _ = framework.KubeDescribe("NoExecuteTaintManager [Serial]", func() {
 	// 3. See if pod will get evicted
 	It("evicts pods from tainted nodes", func() {
 		podName := "taint-eviction-1"
-		pod := getPodForTaintsTest(false, 0, podName, ns)
+		pod := createPodForTaintsTest(false, 0, podName, ns)
 		observedDeletions := make(chan struct{}, 100)
 		stopCh := make(chan struct{})
 		createTestController(cs, observedDeletions, stopCh, podName, ns)
 
-		framework.Logf("Staring pod...")
+		By("Staring pod...")
 		nodeName, err := testutils.RunPodAndGetNodeName(cs, pod, 2*time.Minute)
 		framework.ExpectNoError(err)
 		framework.Logf("Pod is running on %v. Tainting Node", nodeName)
@@ -205,12 +212,12 @@ var _ = framework.KubeDescribe("NoExecuteTaintManager [Serial]", func() {
 	// 3. See if pod wont get evicted
 	It("doesn't evict pod with tolerations from tainted nodes", func() {
 		podName := "taint-eviction-2"
-		pod := getPodForTaintsTest(true, 0, podName, ns)
+		pod := createPodForTaintsTest(true, 0, podName, ns)
 		observedDeletions := make(chan struct{}, 100)
 		stopCh := make(chan struct{})
 		createTestController(cs, observedDeletions, stopCh, podName, ns)
 
-		framework.Logf("Staring pod...")
+		By("Staring pod...")
 		nodeName, err := testutils.RunPodAndGetNodeName(cs, pod, 2*time.Minute)
 		framework.ExpectNoError(err)
 		framework.Logf("Pod is running on %v. Tainting Node", nodeName)
@@ -238,12 +245,12 @@ var _ = framework.KubeDescribe("NoExecuteTaintManager [Serial]", func() {
 	// 4. See if pod will get evicted after toleration time runs out
 	It("eventually evict pod with finite tolerations from tainted nodes", func() {
 		podName := "taint-eviction-3"
-		pod := getPodForTaintsTest(true, 5, podName, ns)
+		pod := createPodForTaintsTest(true, 5, podName, ns)
 		observedDeletions := make(chan struct{}, 100)
 		stopCh := make(chan struct{})
 		createTestController(cs, observedDeletions, stopCh, podName, ns)
 
-		framework.Logf("Staring pod...")
+		By("Staring pod...")
 		nodeName, err := testutils.RunPodAndGetNodeName(cs, pod, 2*time.Minute)
 		framework.ExpectNoError(err)
 		framework.Logf("Pod is running on %v. Tainting Node", nodeName)
@@ -282,12 +289,12 @@ var _ = framework.KubeDescribe("NoExecuteTaintManager [Serial]", func() {
 	// 5. See if Pod won't be evicted.
 	It("removing taint cancels eviction", func() {
 		podName := "taint-eviction-4"
-		pod := getPodForTaintsTest(true, 5, podName, ns)
+		pod := createPodForTaintsTest(true, 5, podName, ns)
 		observedDeletions := make(chan struct{}, 100)
 		stopCh := make(chan struct{})
 		createTestController(cs, observedDeletions, stopCh, podName, ns)
 
-		framework.Logf("Staring pod...")
+		By("Staring pod...")
 		nodeName, err := testutils.RunPodAndGetNodeName(cs, pod, 2*time.Minute)
 		framework.ExpectNoError(err)
 		framework.Logf("Pod is running on %v. Tainting Node", nodeName)

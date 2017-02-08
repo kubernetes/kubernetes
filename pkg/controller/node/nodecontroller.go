@@ -249,13 +249,17 @@ func NewNodeController(
 		AddFunc: func(obj interface{}) {
 			nc.maybeDeleteTerminatingPod(obj)
 			pod := obj.(*v1.Pod)
-			nc.taintManager.PodUpdated(nil, pod)
+			if nc.runTaintManager {
+				nc.taintManager.PodUpdated(nil, pod)
+			}
 		},
 		UpdateFunc: func(prev, obj interface{}) {
 			nc.maybeDeleteTerminatingPod(obj)
 			prevPod := prev.(*v1.Pod)
 			newPod := obj.(*v1.Pod)
-			nc.taintManager.PodUpdated(prevPod, newPod)
+			if nc.runTaintManager {
+				nc.taintManager.PodUpdated(prevPod, newPod)
+			}
 		},
 		DeleteFunc: func(obj interface{}) {
 			pod, isPod := obj.(*v1.Pod)
@@ -272,7 +276,9 @@ func NewNodeController(
 					return
 				}
 			}
-			nc.taintManager.PodUpdated(pod, nil)
+			if nc.runTaintManager {
+				nc.taintManager.PodUpdated(pod, nil)
+			}
 		},
 	})
 	nc.podInformerSynced = podInformer.Informer().HasSynced
