@@ -454,6 +454,7 @@ items:
     - replicationcontrollers
     - secrets
     - serviceaccounts
+    - services
     verbs:
     - list
     - watch
