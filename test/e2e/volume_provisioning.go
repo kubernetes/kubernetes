@@ -34,9 +34,10 @@ import (
 const (
 	// Requested size of the volume
 	requestedSize = "1500Mi"
-	// Expected size of the volume is 2GiB, because all three supported cloud
-	// providers allocate volumes in 1GiB chunks.
+	// Expected size of the volume is 2GiB, for "openstack", "gce", "aws", "gke", as they allocate volumes in 1GiB chunks
 	expectedSize = "2Gi"
+	// vsphere provider does not allocate volumes in 1GiB chunks, so setting expected size equal to requestedSize
+	vsphereExpectedSize = "1500Mi"
 )
 
 func testDynamicProvisioning(client clientset.Interface, claim *v1.PersistentVolumeClaim) {
@@ -54,12 +55,15 @@ func testDynamicProvisioning(client clientset.Interface, claim *v1.PersistentVol
 
 	// Check sizes
 	expectedCapacity := resource.MustParse(expectedSize)
+	if framework.ProviderIs("vsphere") {
+		expectedCapacity = resource.MustParse(vsphereExpectedSize)
+	}
 	pvCapacity := pv.Spec.Capacity[v1.ResourceName(v1.ResourceStorage)]
-	Expect(pvCapacity.Value()).To(Equal(expectedCapacity.Value()))
+	Expect(pvCapacity.Value()).To(Equal(expectedCapacity.Value()), "pvCapacity is not equal to expectedCapacity")
 
 	requestedCapacity := resource.MustParse(requestedSize)
 	claimCapacity := claim.Spec.Resources.Requests[v1.ResourceName(v1.ResourceStorage)]
-	Expect(claimCapacity.Value()).To(Equal(requestedCapacity.Value()))
+	Expect(claimCapacity.Value()).To(Equal(requestedCapacity.Value()), "claimCapacity is not equal to requestedCapacity")
 
 	// Check PV properties
 	Expect(pv.Spec.PersistentVolumeReclaimPolicy).To(Equal(v1.PersistentVolumeReclaimDelete))
@@ -103,7 +107,7 @@ var _ = framework.KubeDescribe("Dynamic provisioning", func() {
 
 	framework.KubeDescribe("DynamicProvisioner", func() {
 		It("should create and delete persistent volumes [Slow] [Volume]", func() {
-			framework.SkipUnlessProviderIs("openstack", "gce", "aws", "gke")
+			framework.SkipUnlessProviderIs("openstack", "gce", "aws", "gke", "vsphere")
 
 			By("creating a StorageClass")
 			class := newStorageClass()
@@ -125,7 +129,7 @@ var _ = framework.KubeDescribe("Dynamic provisioning", func() {
 
 	framework.KubeDescribe("DynamicProvisioner Alpha", func() {
 		It("should create and delete alpha persistent volumes [Slow] [Volume]", func() {
-			framework.SkipUnlessProviderIs("openstack", "gce", "aws", "gke")
+			framework.SkipUnlessProviderIs("openstack", "gce", "aws", "gke", "vsphere")
 
 			By("creating a claim with an alpha dynamic provisioning annotation")
 			claim := newClaim(ns, true)
@@ -229,6 +233,8 @@ func newStorageClass() *storage.StorageClass {
 		pluginName = "kubernetes.io/aws-ebs"
 	case framework.ProviderIs("openstack"):
 		pluginName = "kubernetes.io/cinder"
+	case framework.ProviderIs("vsphere"):
+		pluginName = "kubernetes.io/vsphere-volume"
 	}
 
 	return &storage.StorageClass{
