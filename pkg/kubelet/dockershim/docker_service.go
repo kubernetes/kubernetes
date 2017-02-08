@@ -19,7 +19,10 @@ package dockershim
 import (
 	"fmt"
 	"net/http"
+	"time"
 
+	"github.com/blang/semver"
+	dockertypes "github.com/docker/engine-api/types"
 	"github.com/golang/glog"
 
 	"k8s.io/kubernetes/pkg/apis/componentconfig"
@@ -33,6 +36,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/network/cni"
 	"k8s.io/kubernetes/pkg/kubelet/network/kubenet"
 	"k8s.io/kubernetes/pkg/kubelet/server/streaming"
+	"k8s.io/kubernetes/pkg/kubelet/util/cache"
 )
 
 const (
@@ -60,6 +64,9 @@ const (
 	containerTypeLabelContainer = "container"
 	containerLogPathLabelKey    = "io.kubernetes.container.logpath"
 	sandboxIDLabelKey           = "io.kubernetes.sandbox.id"
+
+	// The expiration time of version cache.
+	versionCacheTTL = 60 * time.Second
 
 	// TODO: https://github.com/kubernetes/kubernetes/pull/31169 provides experimental
 	// defaulting of host user namespace that may be enabled when the docker daemon
@@ -153,6 +160,12 @@ func NewDockerService(client dockertools.DockerInterface, seccompProfileRoot str
 		glog.Infof("Setting cgroupDriver to %s", cgroupDriver)
 	}
 	ds.cgroupDriver = cgroupDriver
+	ds.versionCache = cache.NewObjectCache(
+		func() (interface{}, error) {
+			return ds.getDockerVersion()
+		},
+		versionCacheTTL,
+	)
 	return ds, nil
 }
 
@@ -180,25 +193,37 @@ type dockerService struct {
 	checkpointHandler CheckpointHandler
 	// legacyCleanup indicates whether legacy cleanup has finished or not.
 	legacyCleanup legacyCleanupFlag
+	// caches the version of the runtime.
+	// To be compatible with multiple docker versions, we need to perform
+	// version checking for some operations. Use this cache to avoid querying
+	// the docker daemon every time we need to do such checks.
+	versionCache *cache.ObjectCache
 }
 
 // Version returns the runtime name, runtime version and runtime API version
 func (ds *dockerService) Version(_ string) (*runtimeapi.VersionResponse, error) {
+	v, err := ds.getDockerVersion()
+	if err != nil {
+		return nil, err
+	}
+	return &runtimeapi.VersionResponse{
+		Version:           kubeAPIVersion,
+		RuntimeName:       dockerRuntimeName,
+		RuntimeVersion:    v.Version,
+		RuntimeApiVersion: v.APIVersion,
+	}, nil
+}
+
+// dockerVersion gets the version information from docker.
+func (ds *dockerService) getDockerVersion() (*dockertypes.Version, error) {
 	v, err := ds.client.Version()
 	if err != nil {
-		return nil, fmt.Errorf("docker: failed to get docker version: %v", err)
+		return nil, fmt.Errorf("failed to get docker version: %v", err)
 	}
-	runtimeAPIVersion := kubeAPIVersion
-	name := dockerRuntimeName
 	// Docker API version (e.g., 1.23) is not semver compatible. Add a ".0"
 	// suffix to remedy this.
-	apiVersion := fmt.Sprintf("%s.0", v.APIVersion)
-	return &runtimeapi.VersionResponse{
-		Version:           runtimeAPIVersion,
-		RuntimeName:       name,
-		RuntimeVersion:    v.Version,
-		RuntimeApiVersion: apiVersion,
-	}, nil
+	v.APIVersion = fmt.Sprintf("%s.0", v.APIVersion)
+	return v, nil
 }
 
 // UpdateRuntimeConfig updates the runtime config. Currently only handles podCIDR updates.
@@ -297,4 +322,32 @@ func (ds *dockerService) GenerateExpectedCgroupParent(cgroupParent string) (stri
 	}
 	glog.V(3).Infof("Setting cgroup parent to: %q", cgroupParent)
 	return cgroupParent, nil
+}
+
+// getDockerAPIVersion gets the semver-compatible docker api version.
+func (ds *dockerService) getDockerAPIVersion() (*semver.Version, error) {
+	var dv *dockertypes.Version
+	var err error
+	if ds.versionCache != nil {
+		dv, err = ds.getDockerVersionFromCache()
+	} else {
+		dv, err = ds.getDockerVersion()
+	}
+
+	apiVersion, err := semver.Parse(dv.APIVersion)
+	if err != nil {
+		return nil, err
+	}
+	return &apiVersion, nil
+}
+
+func (ds *dockerService) getDockerVersionFromCache() (*dockertypes.Version, error) {
+	// We only store on key in the cache.
+	const dummyKey = "version"
+	value, err := ds.versionCache.Get(dummyKey)
+	dv := value.(*dockertypes.Version)
+	if err != nil {
+		return nil, err
+	}
+	return dv, nil
 }

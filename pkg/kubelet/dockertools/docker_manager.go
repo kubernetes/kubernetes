@@ -110,7 +110,7 @@ const (
 	versionCacheTTL = 60 * time.Second
 
 	// Docker changed the API for specifying options in v1.11
-	SecurityOptSeparatorChangeVersion = "1.23" // Corresponds to docker 1.11.x
+	SecurityOptSeparatorChangeVersion = "1.23.0" // Corresponds to docker 1.11.x
 	SecurityOptSeparatorOld           = ':'
 	SecurityOptSeparatorNew           = '='
 )
