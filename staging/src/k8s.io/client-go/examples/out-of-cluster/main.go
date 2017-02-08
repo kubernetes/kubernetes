@@ -26,11 +26,8 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 )
 
-var (
-	kubeconfig = flag.String("kubeconfig", "./config", "absolute path to the kubeconfig file")
-)
-
 func main() {
+	kubeconfig := flag.String("kubeconfig", "./config", "absolute path to the kubeconfig file")
 	flag.Parse()
 	// uses the current context in kubeconfig
 	config, err := clientcmd.BuildConfigFromFlags("", *kubeconfig)
