@@ -1208,30 +1208,27 @@ func CheckInvariants(events []watch.Event, fns ...InvariantFunc) error {
 // Waits default amount of time (PodStartTimeout) for the specified pod to become running.
 // Returns an error if timeout occurs first, or pod goes in to failed state.
 func WaitForPodRunningInNamespace(c clientset.Interface, pod *v1.Pod) error {
-	// this short-cicuit is needed for cases when we pass a list of pods instead
-	// of newly created pod (e.g. VerifyPods) which means we are getting already
-	// running pod for which waiting does not make sense and will always fail
 	if pod.Status.Phase == v1.PodRunning {
 		return nil
 	}
-	return waitTimeoutForPodRunningInNamespace(c, pod.Name, pod.Namespace, pod.ResourceVersion, PodStartTimeout)
+	return waitTimeoutForPodRunningInNamespace(c, pod.Name, pod.Namespace, PodStartTimeout)
 }
 
 // Waits default amount of time (PodStartTimeout) for the specified pod to become running.
 // Returns an error if timeout occurs first, or pod goes in to failed state.
 func WaitForPodNameRunningInNamespace(c clientset.Interface, podName, namespace string) error {
-	return waitTimeoutForPodRunningInNamespace(c, podName, namespace, "", PodStartTimeout)
+	return waitTimeoutForPodRunningInNamespace(c, podName, namespace, PodStartTimeout)
 }
 
 // Waits an extended amount of time (slowPodStartTimeout) for the specified pod to become running.
 // The resourceVersion is used when Watching object changes, it tells since when we care
 // about changes to the pod. Returns an error if timeout occurs first, or pod goes in to failed state.
-func waitForPodRunningInNamespaceSlow(c clientset.Interface, podName, namespace, resourceVersion string) error {
-	return waitTimeoutForPodRunningInNamespace(c, podName, namespace, resourceVersion, slowPodStartTimeout)
+func waitForPodRunningInNamespaceSlow(c clientset.Interface, podName, namespace string) error {
+	return waitTimeoutForPodRunningInNamespace(c, podName, namespace, slowPodStartTimeout)
 }
 
-func waitTimeoutForPodRunningInNamespace(c clientset.Interface, podName, namespace, resouceVersion string, timeout time.Duration) error {
-	return wait.PollImmediate(10*time.Millisecond, timeout, podRunning(c, podName, namespace))
+func waitTimeoutForPodRunningInNamespace(c clientset.Interface, podName, namespace string, timeout time.Duration) error {
+	return wait.PollImmediate(Poll, timeout, podRunning(c, podName, namespace))
 }
 
 func podRunning(c clientset.Interface, podName, namespace string) wait.ConditionFunc {
@@ -1252,12 +1249,12 @@ func podRunning(c clientset.Interface, podName, namespace string) wait.Condition
 
 // Waits default amount of time (podNoLongerRunningTimeout) for the specified pod to stop running.
 // Returns an error if timeout occurs first.
-func WaitForPodNoLongerRunningInNamespace(c clientset.Interface, podName, namespace, resourceVersion string) error {
-	return WaitTimeoutForPodNoLongerRunningInNamespace(c, podName, namespace, resourceVersion, podNoLongerRunningTimeout)
+func WaitForPodNoLongerRunningInNamespace(c clientset.Interface, podName, namespace string) error {
+	return WaitTimeoutForPodNoLongerRunningInNamespace(c, podName, namespace, podNoLongerRunningTimeout)
 }
 
-func WaitTimeoutForPodNoLongerRunningInNamespace(c clientset.Interface, podName, namespace, resourceVersion string, timeout time.Duration) error {
-	return wait.PollImmediate(10*time.Millisecond, timeout, podCompleted(c, podName, namespace))
+func WaitTimeoutForPodNoLongerRunningInNamespace(c clientset.Interface, podName, namespace string, timeout time.Duration) error {
+	return wait.PollImmediate(Poll, timeout, podCompleted(c, podName, namespace))
 }
 
 func podCompleted(c clientset.Interface, podName, namespace string) wait.ConditionFunc {
@@ -1274,8 +1271,8 @@ func podCompleted(c clientset.Interface, podName, namespace string) wait.Conditi
 	}
 }
 
-func waitTimeoutForPodReadyInNamespace(c clientset.Interface, podName, namespace, resourceVersion string, timeout time.Duration) error {
-	return wait.PollImmediate(10*time.Millisecond, timeout, podRunningAndReady(c, podName, namespace))
+func waitTimeoutForPodReadyInNamespace(c clientset.Interface, podName, namespace string, timeout time.Duration) error {
+	return wait.PollImmediate(Poll, timeout, podRunningAndReady(c, podName, namespace))
 }
 
 func podRunningAndReady(c clientset.Interface, podName, namespace string) wait.ConditionFunc {
@@ -1297,8 +1294,8 @@ func podRunningAndReady(c clientset.Interface, podName, namespace string) wait.C
 // WaitForPodNotPending returns an error if it took too long for the pod to go out of pending state.
 // The resourceVersion is used when Watching object changes, it tells since when we care
 // about changes to the pod.
-func WaitForPodNotPending(c clientset.Interface, ns, podName, resourceVersion string) error {
-	return wait.PollImmediate(10*time.Millisecond, PodStartTimeout, podNotPending(c, podName, ns))
+func WaitForPodNotPending(c clientset.Interface, ns, podName string) error {
+	return wait.PollImmediate(Poll, PodStartTimeout, podNotPending(c, podName, ns))
 }
 
 func podNotPending(c clientset.Interface, podName, namespace string) wait.ConditionFunc {
