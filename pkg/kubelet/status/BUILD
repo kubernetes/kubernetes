@@ -51,6 +51,7 @@ go_test(
         "//pkg/kubelet/pod:go_default_library",
         "//pkg/kubelet/pod/testing:go_default_library",
         "//pkg/kubelet/secret:go_default_library",
+        "//pkg/kubelet/status/testing:go_default_library",
         "//pkg/kubelet/types:go_default_library",
         "//vendor:github.com/stretchr/testify/assert",
         "//vendor:k8s.io/apimachinery/pkg/api/errors",
@@ -70,6 +71,9 @@ filegroup(
 
 filegroup(
     name = "all-srcs",
-    srcs = [":package-srcs"],
+    srcs = [
+        ":package-srcs",
+        "//pkg/kubelet/status/testing:all-srcs",
+    ],
     tags = ["automanaged"],
 )
