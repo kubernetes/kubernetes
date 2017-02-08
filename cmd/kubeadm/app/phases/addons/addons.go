@@ -25,17 +25,16 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kuberuntime "k8s.io/apimachinery/pkg/runtime"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
+	"k8s.io/kubernetes/cmd/kubeadm/app/images"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
 	extensions "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
-	"k8s.io/kubernetes/pkg/registry/core/service/ipallocator"
 )
 
 // CreateEssentialAddons creates the kube-proxy and kube-dns addons
 func CreateEssentialAddons(cfg *kubeadmapi.MasterConfiguration, client *clientset.Clientset) error {
-
 	proxyConfigMapBytes, err := kubeadmutil.ParseTemplate(KubeProxyConfigMap, struct{ MasterEndpoint string }{
 		// Fetch this value from the kubeconfig file
 		MasterEndpoint: fmt.Sprintf("https://%s:%d", cfg.API.AdvertiseAddresses[0], cfg.API.Port),
@@ -44,11 +43,9 @@ func CreateEssentialAddons(cfg *kubeadmapi.MasterConfiguration, client *clientse
 		return fmt.Errorf("error when parsing kube-proxy configmap template: %v", err)
 	}
 
-	proxyDaemonSetBytes, err := kubeadmutil.ParseTemplate(KubeProxyDaemonSet, struct{ ImageRepository, Arch, Version string }{
-		ImageRepository: kubeadmapi.GlobalEnvParams.RepositoryPrefix,
-		Arch:            runtime.GOARCH,
-		// TODO: Fetch the version from the {API Server IP}/version
-		Version: cfg.KubernetesVersion,
+	proxyDaemonSetBytes, err := kubeadmutil.ParseTemplate(KubeProxyDaemonSet, struct{ Image, ClusterCIDR string }{
+		Image:       images.GetCoreImage("proxy", cfg, kubeadmapi.GlobalEnvParams.HyperkubeImage),
+		ClusterCIDR: getClusterCIDR(cfg.Networking.PodSubnet),
 	})
 	if err != nil {
 		return fmt.Errorf("error when parsing kube-proxy daemonset template: %v", err)
@@ -69,8 +66,7 @@ func CreateEssentialAddons(cfg *kubeadmapi.MasterConfiguration, client *clientse
 		return fmt.Errorf("error when parsing kube-dns deployment template: %v", err)
 	}
 
-	// Get the DNS IP
-	dnsip, err := getDNSIP(cfg.Networking.ServiceSubnet)
+	dnsip, err := getDNSIP(client)
 	if err != nil {
 		return err
 	}
@@ -139,17 +135,28 @@ func CreateKubeDNSAddon(deploymentBytes, serviceBytes []byte, client *clientset.
 	return nil
 }
 
-// TODO: Instead of looking at the subnet given to kubeadm, it should be possible to only use /28 or larger subnets and then
-// kubeadm should look at the kubernetes service (e.g. 10.96.0.1 or 10.0.0.1) and just append a "0" at the end.
-// This way, we don't need the information about the subnet in this phase => good
-func getDNSIP(subnet string) (net.IP, error) {
-	_, n, err := net.ParseCIDR(subnet)
+// getDNSIP fetches the kubernetes service's ClusterIP and appends a "0" to it in order to get the DNS IP
+func getDNSIP(client *clientset.Clientset) (net.IP, error) {
+	k8ssvc, err := client.CoreV1().Services(metav1.NamespaceDefault).Get("kubernetes", metav1.GetOptions{})
 	if err != nil {
-		return nil, fmt.Errorf("could not parse %q: %v", subnet, err)
+		return nil, fmt.Errorf("couldn't fetch information about the kubernetes service: %v", err)
 	}
-	ip, err := ipallocator.GetIndexedIP(n, 10)
-	if err != nil {
-		return nil, fmt.Errorf("unable to allocate IP address for kube-dns addon from the given CIDR %q: [%v]", subnet, err)
+
+	if len(k8ssvc.Spec.ClusterIP) == 0 {
+		return nil, fmt.Errorf("couldn't fetch a valid clusterIP from the kubernetes service")
 	}
-	return ip, nil
+
+	// Build an IP by taking the kubernetes service's clusterIP and appending a "0" and checking that it's valid
+	dnsIP := net.ParseIP(fmt.Sprintf("%s0", k8ssvc.Spec.ClusterIP))
+	if dnsIP == nil {
+		return nil, fmt.Errorf("could not parse dns ip %q: %v", dnsIP, err)
+	}
+	return dnsIP, nil
+}
+
+func getClusterCIDR(podsubnet string) string {
+	if len(podsubnet) == 0 {
+		return ""
+	}
+	return "--cluster-cidr" + podsubnet
 }
