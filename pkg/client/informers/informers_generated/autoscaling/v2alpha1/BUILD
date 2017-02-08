@@ -17,7 +17,6 @@ go_library(
     deps = [
         "//pkg/apis/autoscaling/v2alpha1:go_default_library",
         "//pkg/client/clientset_generated/clientset:go_default_library",
-        "//pkg/client/informers/informers_generated/internalinterfaces:go_default_library",
         "//pkg/client/listers/autoscaling/v2alpha1:go_default_library",
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
         "//vendor:k8s.io/apimachinery/pkg/runtime",
