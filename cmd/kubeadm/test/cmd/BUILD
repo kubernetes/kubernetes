@@ -17,7 +17,7 @@ go_library(
 go_test(
     name = "go_default_test",
     srcs = ["token_test.go"],
-    args = ["--kubeadm-path=../kubeadm"],
+    args = ["--kubeadm-path=../../kubeadm"],
     data = ["//cmd/kubeadm"],
     library = ":go_default_library",
     tags = [
