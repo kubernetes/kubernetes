@@ -40,16 +40,16 @@ set -o errexit
 set -o nounset
 
 if [ -z "${TARGET_STORAGE:-}" ]; then
-  echo "TARGET_STORAGE variable unset - skipping migration"
-  exit 0
+  echo "TARGET_STORAGE variable unset - unexpected failure"
+  exit 1
 fi
 if [ -z "${TARGET_VERSION:-}" ]; then
-  echo "TARGET_VERSION variable unset - skipping migration"
-  exit 0
+  echo "TARGET_VERSION variable unset - unexpected failure"
+  exit 1
 fi
 if [ -z "${DATA_DIRECTORY:-}" ]; then
-  echo "DATA_DIRECTORY variable unset - skipping migration"
-  exit 0
+  echo "DATA_DIRECTORY variable unset - unexpected failure"
+  exit 1
 fi
 
 if [ "${TARGET_STORAGE}" != "etcd2" -a "${TARGET_STORAGE}" != "etcd3" ]; then
