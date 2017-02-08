@@ -1098,16 +1098,6 @@ go_library(
 )
 
 go_library(
-    name = "github.com/clusterhq/flocker-go",
-    srcs = [
-        "github.com/clusterhq/flocker-go/client.go",
-        "github.com/clusterhq/flocker-go/doc.go",
-        "github.com/clusterhq/flocker-go/util.go",
-    ],
-    tags = ["automanaged"],
-)
-
-go_library(
     name = "github.com/codegangsta/negroni",
     srcs = [
         "github.com/codegangsta/negroni/doc.go",
@@ -17119,4 +17109,14 @@ go_library(
         "//vendor:k8s.io/apimachinery/pkg/runtime/serializer",
         "//vendor:k8s.io/kube-aggregator/pkg/apis/apiregistration/install",
     ],
+)
+
+go_library(
+    name = "github.com/ClusterHQ/flocker-go",
+    srcs = [
+        "github.com/ClusterHQ/flocker-go/client.go",
+        "github.com/ClusterHQ/flocker-go/doc.go",
+        "github.com/ClusterHQ/flocker-go/util.go",
+    ],
+    tags = ["automanaged"],
 )
