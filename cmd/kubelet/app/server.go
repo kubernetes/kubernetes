@@ -363,7 +363,7 @@ func run(s *options.KubeletServer, kubeDeps *kubelet.KubeletDeps) (err error) {
 	}
 
 	if kubeDeps == nil {
-		var kubeClient *clientset.Clientset
+		var kubeClient clientset.Interface
 		var eventClient v1core.EventsGetter
 		var externalKubeClient clientgoclientset.Interface
 		var cloud cloudprovider.Interface
