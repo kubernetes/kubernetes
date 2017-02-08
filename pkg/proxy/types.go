@@ -47,15 +47,3 @@ type ServicePortName struct {
 func (spn ServicePortName) String() string {
 	return fmt.Sprintf("%s:%s", spn.NamespacedName.String(), spn.Port)
 }
-
-// ServicePortPortalName carries a namespace + name + portname + portalip.  This is the unique
-// identfier for a load-balanced service.
-type ServicePortPortalName struct {
-	types.NamespacedName
-	Port         string
-	PortalIPName string
-}
-
-func (spn ServicePortPortalName) String() string {
-	return fmt.Sprintf("%s:%s:%s", spn.NamespacedName.String(), spn.Port, spn.PortalIPName)
-}
