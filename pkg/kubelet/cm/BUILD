@@ -22,9 +22,11 @@ go_library(
     ],
     tags = ["automanaged"],
     deps = [
+        "//pkg/api:go_default_library",
         "//pkg/api/v1:go_default_library",
         "//pkg/kubelet/cadvisor:go_default_library",
         "//pkg/kubelet/cm/util:go_default_library",
+        "//pkg/kubelet/lifecycle:go_default_library",
         "//pkg/kubelet/qos:go_default_library",
         "//pkg/util:go_default_library",
         "//pkg/util/mount:go_default_library",
@@ -50,12 +52,14 @@ go_test(
     name = "go_default_test",
     srcs = [
         "cgroup_manager_linux_test.go",
+        "cgroup_manager_test.go",
         "container_manager_linux_test.go",
         "helpers_linux_test.go",
     ],
     library = ":go_default_library",
     tags = ["automanaged"],
     deps = [
+        "//pkg/api:go_default_library",
         "//pkg/api/v1:go_default_library",
         "//pkg/util/mount:go_default_library",
         "//vendor:github.com/stretchr/testify/assert",

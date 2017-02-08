@@ -258,7 +258,7 @@ func (m *cgroupManagerImpl) Destroy(cgroupConfig *CgroupConfig) error {
 	return nil
 }
 
-type subsystem interface {
+type settableSubsystem interface {
 	// Name returns the name of the subsystem.
 	Name() string
 	// Set the cgroup represented by cgroup.
@@ -266,7 +266,7 @@ type subsystem interface {
 }
 
 // Cgroup subsystems we currently support
-var supportedSubsystems = []subsystem{
+var settableSubsystems = []settableSubsystem{
 	&cgroupfs.MemoryGroup{},
 	&cgroupfs.CpuGroup{},
 }
@@ -281,7 +281,7 @@ var supportedSubsystems = []subsystem{
 // but this is not possible with libcontainers Set() method
 // See https://github.com/opencontainers/runc/issues/932
 func setSupportedSubsytems(cgroupConfig *libcontainerconfigs.Cgroup) error {
-	for _, sys := range supportedSubsystems {
+	for _, sys := range settableSubsystems {
 		if _, ok := cgroupConfig.Paths[sys.Name()]; !ok {
 			return fmt.Errorf("Failed to find subsytem mount for subsytem: %v", sys.Name())
 		}
@@ -451,4 +451,47 @@ func (m *cgroupManagerImpl) ReduceCPULimits(cgroupName CgroupName) error {
 		ResourceParameters: resources,
 	}
 	return m.Update(containerConfig)
+}
+
+type gettableSubsystem interface {
+	// Name returns the name of the subsystem.
+	Name() string
+	// GetStats returns the statistics associated with the cgroup
+	GetStats(path string, stats *libcontainercgroups.Stats) error
+}
+
+// Cgroup subsystems on which we get statistics
+var gettableSubsystems = []gettableSubsystem{
+	&cgroupfs.MemoryGroup{},
+}
+
+func getSupportedSubsytems(cgroupPaths map[string]string) (*libcontainercgroups.Stats, error) {
+	stats := libcontainercgroups.NewStats()
+	for _, sys := range gettableSubsystems {
+		if _, ok := cgroupPaths[sys.Name()]; !ok {
+			return nil, fmt.Errorf("Failed to find subsytem mount for subsytem: %v", sys.Name())
+		}
+		if err := sys.GetStats(cgroupPaths[sys.Name()], stats); err != nil {
+			return nil, fmt.Errorf("Failed to set config for supported subsystems : %v", err)
+		}
+	}
+	return stats, nil
+}
+
+func toResourceStats(stats *libcontainercgroups.Stats) *ResourceStats {
+	return &ResourceStats{
+		MemoryStats: &MemoryStats{
+			Usage: int64(stats.MemoryStats.Usage.Usage),
+		},
+	}
+}
+
+// Get sets the ResourceParameters of the specified cgroup as read from the cgroup fs
+func (m *cgroupManagerImpl) Get(name CgroupName) (*ResourceStats, error) {
+	cgroupPaths := m.buildCgroupPaths(name)
+	stats, err := getSupportedSubsytems(cgroupPaths)
+	if err != nil {
+		return nil, fmt.Errorf("failed to set supported cgroup subsystems for cgroup %v: %v", name, err)
+	}
+	return toResourceStats(stats), nil
 }

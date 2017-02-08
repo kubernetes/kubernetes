@@ -231,6 +231,7 @@ type KubeletDeps struct {
 	Writer             kubeio.Writer
 	VolumePlugins      []volume.VolumePlugin
 	TLSOptions         *server.TLSOptions
+	PodAdmitHandlers   []lifecycle.PodAdmitHandler
 }
 
 // makePodSourceConfig creates a config.PodConfig from the given
@@ -469,6 +470,10 @@ func NewMainKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *Kub
 		iptablesMasqueradeBit:                   int(kubeCfg.IPTablesMasqueradeBit),
 		iptablesDropBit:                         int(kubeCfg.IPTablesDropBit),
 		experimentalHostUserNamespaceDefaulting: utilfeature.DefaultFeatureGate.Enabled(features.ExperimentalHostUserNamespaceDefaultingGate),
+	}
+
+	for _, admitHandler := range kubeDeps.PodAdmitHandlers {
+		klet.admitHandlers.AddPodAdmitHandler(admitHandler)
 	}
 
 	if klet.experimentalHostUserNamespaceDefaulting {
@@ -1171,7 +1176,7 @@ func (kl *Kubelet) initializeModules() error {
 		return fmt.Errorf("Kubelet failed to get node info: %v", err)
 	}
 
-	if err := kl.containerManager.Start(node); err != nil {
+	if err := kl.containerManager.Start(node, kl.GetPods); err != nil {
 		return fmt.Errorf("Failed to start ContainerManager %v", err)
 	}
 

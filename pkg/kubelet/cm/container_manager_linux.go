@@ -41,6 +41,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
 	cmutil "k8s.io/kubernetes/pkg/kubelet/cm/util"
+	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 	"k8s.io/kubernetes/pkg/kubelet/qos"
 	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/mount"
@@ -103,8 +104,9 @@ type containerManagerImpl struct {
 	qosContainers    QOSContainersInfo
 	periodicTasks    []func()
 	// holds all the mounted cgroup subsystems
-	subsystems *CgroupSubsystems
-	nodeInfo   *v1.Node
+	subsystems  *CgroupSubsystems
+	nodeInfo    *v1.Node
+	getPodsFunc func() []*v1.Pod
 }
 
 type features struct {
@@ -167,20 +169,22 @@ func validateSystemRequirements(mountUtil mount.Interface) (features, error) {
 // TODO(vmarmol): Add limits to the system containers.
 // Takes the absolute name of the specified containers.
 // Empty container name disables use of the specified container.
-func NewContainerManager(mountUtil mount.Interface, cadvisorInterface cadvisor.Interface, nodeConfig NodeConfig, failSwapOn bool) (ContainerManager, error) {
+// Returns a ContainerManager plus a PodAdmitHandler used for
+// hooking into the pod admission path to update cgroup attributes.
+func NewContainerManager(mountUtil mount.Interface, cadvisorInterface cadvisor.Interface, nodeConfig NodeConfig, failSwapOn bool) (ContainerManager, lifecycle.PodAdmitHandler, error) {
 	subsystems, err := GetCgroupSubsystems()
 	if err != nil {
-		return nil, fmt.Errorf("failed to get mounted cgroup subsystems: %v", err)
+		return nil, nil, fmt.Errorf("failed to get mounted cgroup subsystems: %v", err)
 	}
 
 	// Check whether swap is enabled. The Kubelet does not support running with swap enabled.
 	cmd := exec.Command("cat", "/proc/swaps")
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	if err := cmd.Start(); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	var buf []string
 	scanner := bufio.NewScanner(stdout)
@@ -188,7 +192,7 @@ func NewContainerManager(mountUtil mount.Interface, cadvisorInterface cadvisor.I
 		buf = append(buf, scanner.Text())
 	}
 	if err := cmd.Wait(); err != nil { // Clean up
-		return nil, err
+		return nil, nil, err
 	}
 
 	// TODO(#34726:1.8.0): Remove the opt-in for failing when swap is enabled.
@@ -198,7 +202,7 @@ func NewContainerManager(mountUtil mount.Interface, cadvisorInterface cadvisor.I
 	// If there is more than one line (table headers) in /proc/swaps, swap is enabled and we should error out.
 	if len(buf) > 1 {
 		if failSwapOn {
-			return nil, fmt.Errorf("Running with swap on is not supported, please disable swap! /proc/swaps contained: %v", buf)
+			return nil, nil, fmt.Errorf("Running with swap on is not supported, please disable swap! /proc/swaps contained: %v", buf)
 		}
 		glog.Warningf("Running with swap on is not supported, please disable swap! " +
 			"This will be a fatal error by default starting in K8s v1.6! " +
@@ -209,7 +213,7 @@ func NewContainerManager(mountUtil mount.Interface, cadvisorInterface cadvisor.I
 	if nodeConfig.CgroupsPerQOS {
 		// this does default to / when enabled, but this tests against regressions.
 		if nodeConfig.CgroupRoot == "" {
-			return nil, fmt.Errorf("invalid configuration: cgroups-per-qos was specified and cgroup-root was not specified. To enable the QoS cgroup hierarchy you need to specify a valid cgroup-root")
+			return nil, nil, fmt.Errorf("invalid configuration: cgroups-per-qos was specified and cgroup-root was not specified. To enable the QoS cgroup hierarchy you need to specify a valid cgroup-root")
 		}
 
 		// we need to check that the cgroup root actually exists for each subsystem
@@ -218,15 +222,16 @@ func NewContainerManager(mountUtil mount.Interface, cadvisorInterface cadvisor.I
 		// this is important because we do not want any name conversion to occur.
 		cgroupManager := NewCgroupManager(subsystems, "cgroupfs")
 		if !cgroupManager.Exists(CgroupName(nodeConfig.CgroupRoot)) {
-			return nil, fmt.Errorf("invalid configuration: cgroup-root doesn't exist: %v", err)
+			return nil, nil, fmt.Errorf("invalid configuration: cgroup-root doesn't exist: %v", err)
 		}
 	}
-	return &containerManagerImpl{
+	containerManager := &containerManagerImpl{
 		cadvisorInterface: cadvisorInterface,
 		mountUtil:         mountUtil,
 		NodeConfig:        nodeConfig,
 		subsystems:        subsystems,
-	}, nil
+	}
+	return containerManager, containerManager, nil
 }
 
 // NewPodContainerManager is a factory method returns a PodContainerManager object
@@ -268,11 +273,11 @@ const (
 	KernelTunableModify KernelTunableBehavior = "modify"
 )
 
-// InitQOS creates the top level qos cgroup containers
+// initQOS creates the top level qos cgroup containers
 // We create top level QoS containers for only Burstable and Best Effort
 // and not Guaranteed QoS class. All guaranteed pods are nested under the
-// RootContainer by default. InitQOS is called only once during kubelet bootstrapping.
-func InitQOS(cgroupDriver, rootContainer string, subsystems *CgroupSubsystems) (QOSContainersInfo, error) {
+// RootContainer by default. initQOS is called only once during kubelet bootstrapping.
+func initQOS(cgroupDriver, rootContainer string, subsystems *CgroupSubsystems) (QOSContainersInfo, error) {
 	cm := NewCgroupManager(subsystems, cgroupDriver)
 	// Top level for Qos containers are created only for Burstable
 	// and Best Effort classes
@@ -342,6 +347,140 @@ func setupKernelTunables(option KernelTunableBehavior) error {
 	return utilerrors.NewAggregate(errList)
 }
 
+func setQOSCgroupMemoryLimit(cgroupManager CgroupManager, qosClass v1.PodQOSClass, limit int64) error {
+	glog.V(2).Infof("[Container Manager] Setting %s QoS memory limit to %d bytes", qosClass, limit)
+	// Attempt to set specified limit
+	cgroupConfig := CgroupConfig{
+		Name: cgroupManager.CgroupName(string(qosClass)),
+		ResourceParameters: &ResourceConfig{
+			Memory: &limit,
+		},
+	}
+	err := cgroupManager.Update(&cgroupConfig)
+	if err == nil {
+		return nil
+	}
+
+	// Unreclaimable memory usage already exceeds the desired limit.
+	// Attempt to set the limit near the current usage to put pressure
+	// on the cgroup and prevent further growth.
+	glog.Warningf("[Container Manager] %s QoS memory usage is already above desired limit", qosClass)
+	stats, err := cgroupManager.Get(cgroupConfig.Name)
+	if err != nil {
+		return err
+	}
+	usageLimit := stats.MemoryStats.Usage + memoryUsageMargin
+	cgroupConfig.ResourceParameters.Memory = &usageLimit
+	glog.V(2).Infof("[Container Manager] Setting %s QoS memory limit to %d bytes", qosClass, usageLimit)
+	return cgroupManager.Update(&cgroupConfig)
+}
+
+// setQOSMemoryReserveLimit sums the memory limits of all pods in a QOS class,
+// calculate QOS class memory limits, and set those limits in the QOS cgroups
+func setQOSMemoryReserveLimit(cm *containerManagerImpl, reservePercent int64) error {
+	qosMemoryLimits := map[v1.PodQOSClass]int64{
+		v1.PodQOSGuaranteed: 0,
+		v1.PodQOSBurstable:  0,
+	}
+
+	// Sum the pod limits for pods in each QOS class
+	pods := cm.getPodsFunc()
+	for _, pod := range pods {
+		podMemoryLimit := int64(0)
+		qosClass := qos.GetPodQOS(pod)
+		if qosClass == v1.PodQOSBestEffort {
+			// limits are not set for Best Effort pods
+			continue
+		}
+		for _, container := range pod.Spec.Containers {
+			podMemoryLimit += container.Resources.Limits.Memory().Value()
+		}
+		qosMemoryLimits[qosClass] += podMemoryLimit
+	}
+
+	allocatable := cm.nodeInfo.Status.Allocatable.Memory().Value()
+	if allocatable == 0 {
+		return fmt.Errorf("memory capacity reported as 0, might be in standalone mode")
+	}
+
+	for qos, limits := range qosMemoryLimits {
+		glog.V(2).Infof("[Container Manager] %s pod limits total %d bytes (reserve %d%%)", qos, limits, reservePercent)
+	}
+
+	// Calculate QOS memory limits
+	burstableLimit := allocatable - (qosMemoryLimits[v1.PodQOSGuaranteed] * reservePercent / 100)
+	if burstableLimit < minimumLimit {
+		burstableLimit = minimumLimit
+	}
+	bestEffortLimit := burstableLimit - (qosMemoryLimits[v1.PodQOSBurstable] * reservePercent / 100)
+	if bestEffortLimit < minimumLimit {
+		bestEffortLimit = minimumLimit
+	}
+
+	// Update QOS class cgroups with calculated memory limits
+	subsystems, err := GetCgroupSubsystems()
+	if err != nil {
+		return err
+	}
+
+	cgroupManager := NewCgroupManager(subsystems, cm.CgroupDriver)
+	err = setQOSCgroupMemoryLimit(cgroupManager, v1.PodQOSBurstable, burstableLimit)
+	if err != nil {
+		return err
+	}
+	err = setQOSCgroupMemoryLimit(cgroupManager, v1.PodQOSBestEffort, bestEffortLimit)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+type qosReserveLimitHandler func(*containerManagerImpl, int64) error
+
+var resourceQOSReserveLimitHandlers = map[string]qosReserveLimitHandler{
+	"memory": setQOSMemoryReserveLimit,
+}
+
+// If usage is already above the limit, set the limit to the usage plus this margin
+// This increases the likelyhood that the limit can be set successfully and gives the
+// cgroup a little forgiveness so it doesn't OOM kill in response to a little growth.
+const memoryUsageMargin = 10 * 1024 * 1024 // 10MB
+
+// The minumum limit to which a QoS level cgroup can be set
+// TODO: this is just made up to prevent instant OOM of pods if the limit is calulcated
+// to be too low.
+const minimumLimit = 512 * 1024 * 1024 // 512MB
+
+func (cm *containerManagerImpl) setQOSReserveLimits() error {
+	for _, reserveLimit := range cm.NodeConfig.QOSReserveLimits {
+		handler, ok := resourceQOSReserveLimitHandlers[reserveLimit.resource]
+		if !ok {
+			// programming error if we hit this
+			return fmt.Errorf("no reserve limit handler for resource '%s'", reserveLimit.resource)
+		}
+		if err := handler(cm, reserveLimit.reservePercent); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// Admit always returns Admit: true but allows the ConatinerManager to hook into the admit path
+// in order to update the QoS reserve limits to account for the incoming pod.
+func (cm *containerManagerImpl) Admit(attrs *lifecycle.PodAdmitAttributes) lifecycle.PodAdmitResult {
+	glog.V(2).Infof("[Container Manager] Updating QoS reserve limits on pod admission")
+	if cm.CgroupsPerQOS {
+		if err := cm.setQOSReserveLimits(); err != nil {
+			glog.Warningf("[ContainerManager] Failed to update QoS reserve limits during pod admission: %v", err)
+			// don't block admission on error here
+		}
+	}
+	return lifecycle.PodAdmitResult{
+		Admit: true,
+	}
+}
+
 func (cm *containerManagerImpl) setupNode() error {
 	f, err := validateSystemRequirements(cm.mountUtil)
 	if err != nil {
@@ -360,7 +499,7 @@ func (cm *containerManagerImpl) setupNode() error {
 
 	// Setup top level qos containers only if CgroupsPerQOS flag is specified as true
 	if cm.NodeConfig.CgroupsPerQOS {
-		qosContainersInfo, err := InitQOS(cm.NodeConfig.CgroupDriver, cm.NodeConfig.CgroupRoot, cm.subsystems)
+		qosContainersInfo, err := initQOS(cm.NodeConfig.CgroupDriver, cm.NodeConfig.CgroupRoot, cm.subsystems)
 		if err != nil {
 			return fmt.Errorf("failed to initialise top level QOS containers: %v", err)
 		}
@@ -523,10 +662,11 @@ func (cm *containerManagerImpl) Status() Status {
 	return cm.status
 }
 
-func (cm *containerManagerImpl) Start(node *v1.Node) error {
+func (cm *containerManagerImpl) Start(node *v1.Node, getPods func() []*v1.Pod) error {
 	// cache the node Info including resource capacity and
 	// allocatable of the node
 	cm.nodeInfo = node
+	cm.getPodsFunc = getPods
 	// Setup the node
 	if err := cm.setupNode(); err != nil {
 		return err
@@ -551,6 +691,16 @@ func (cm *containerManagerImpl) Start(node *v1.Node) error {
 			}
 		}, time.Minute, wait.NeverStop)
 
+	}
+
+	if cm.CgroupsPerQOS && len(cm.QOSReserveLimits) != 0 {
+		// sync qos level limits every 10 seconds.
+		go wait.Until(func() {
+			err := cm.setQOSReserveLimits()
+			if err != nil {
+				glog.Warningf("[ContainerManager] Failed to set QoS reserve limits: %v", err)
+			}
+		}, 10*time.Second, wait.NeverStop)
 	}
 
 	if len(cm.periodicTasks) > 0 {

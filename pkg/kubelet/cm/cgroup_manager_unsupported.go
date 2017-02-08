@@ -54,6 +54,10 @@ func (m *unsupportedCgroupManager) Create(_ *CgroupConfig) error {
 	return fmt.Errorf("Cgroup Manager is not supported in this build")
 }
 
+func (m *unsupportedCgroupManager) Get(name CgroupName) (*ResourceStats, error) {
+	return nil, fmt.Errorf("Cgroup Manager is not supported in this build")
+}
+
 func (m *unsupportedCgroupManager) Pids(_ CgroupName) []int {
 	return nil
 }
@@ -63,6 +67,10 @@ func (m *unsupportedCgroupManager) CgroupName(name string) CgroupName {
 }
 
 func (m *unsupportedCgroupManager) ReduceCPULimits(cgroupName CgroupName) error {
+	return nil
+}
+
+func (m *cgroupManagerImpl) Get(cgroupConfig *CgroupConfig) error {
 	return nil
 }
 
