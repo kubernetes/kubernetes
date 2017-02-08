@@ -33,7 +33,7 @@ import (
 	apps "k8s.io/kubernetes/pkg/apis/apps/v1beta1"
 	extensions "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	policy "k8s.io/kubernetes/pkg/apis/policy/v1beta1"
-	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated"
+	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated/externalversions"
 	"k8s.io/kubernetes/pkg/controller"
 )
 
@@ -99,7 +99,7 @@ type disruptionController struct {
 func newFakeDisruptionController() (*disruptionController, *pdbStates) {
 	ps := &pdbStates{}
 
-	informerFactory := informers.NewSharedInformerFactory(nil, nil, controller.NoResyncPeriodFunc())
+	informerFactory := informers.NewSharedInformerFactory(nil, controller.NoResyncPeriodFunc())
 
 	dc := NewDisruptionController(
 		informerFactory.Core().V1().Pods(),
