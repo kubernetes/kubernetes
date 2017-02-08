@@ -549,6 +549,7 @@ items:
     - delete
     - get
     - list
+    - patch
     - update
   - apiGroups:
     - ""

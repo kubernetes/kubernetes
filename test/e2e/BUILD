@@ -133,6 +133,7 @@ go_library(
         "//pkg/controller/deployment/util:go_default_library",
         "//pkg/controller/endpoint:go_default_library",
         "//pkg/controller/job:go_default_library",
+        "//pkg/controller/node:go_default_library",
         "//pkg/controller/replicaset:go_default_library",
         "//pkg/controller/replication:go_default_library",
         "//pkg/kubectl:go_default_library",
