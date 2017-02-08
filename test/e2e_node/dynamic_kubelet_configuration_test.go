@@ -30,7 +30,7 @@ import (
 var _ = framework.KubeDescribe("DynamicKubeletConfiguration [Feature:DynamicKubeletConfig] [Serial] [Disruptive]", func() {
 	f := framework.NewDefaultFramework("dynamic-kubelet-configuration-test")
 
-	Context("When a configmap called `kubelet-<node-name>` is added to the `kube-system` namespace", func() {
+	Context("When a configmap called `kubelet-{node-name}` is added to the `kube-system` namespace", func() {
 		It("The Kubelet on that node should restart to take up the new config", func() {
 			// Get the current KubeletConfiguration (known to be valid) by
 			// querying the configz endpoint for the current node.
@@ -47,7 +47,7 @@ var _ = framework.KubeDescribe("DynamicKubeletConfiguration [Feature:DynamicKube
 			}
 			kubeCfg.FileCheckFrequency.Duration = newFileCheckFrequency
 
-			// Use the new config to create a new kube-<node-name> configmap in `kube-system` namespace.
+			// Use the new config to create a new kube-{node-name} configmap in `kube-system` namespace.
 			// Note: setKubeletConfiguration will return an error if the Kubelet does not present the
 			//       modified configuration via /configz when it comes back up.
 			err = setKubeletConfiguration(f, kubeCfg)
