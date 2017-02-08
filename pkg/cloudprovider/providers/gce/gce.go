@@ -140,7 +140,7 @@ type Disks interface {
 
 	// CreateDisk creates a new PD with given properties. Tags are serialized
 	// as JSON into Description field.
-	CreateDisk(name string, diskType string, zone string, sizeGb int64, tags map[string]string) error
+	CreateDisk(name string, diskType string, zone string, sizeGb int64, imageID string, tags map[string]string) error
 
 	// DeleteDisk deletes PD.
 	DeleteDisk(diskToDelete string) error
@@ -2443,7 +2443,7 @@ func (gce *GCECloud) encodeDiskTags(tags map[string]string) (string, error) {
 // CreateDisk creates a new Persistent Disk, with the specified name & size, in
 // the specified zone. It stores specified tags encoded in JSON in Description
 // field.
-func (gce *GCECloud) CreateDisk(name string, diskType string, zone string, sizeGb int64, tags map[string]string) error {
+func (gce *GCECloud) CreateDisk(name string, diskType string, zone string, sizeGb int64, imageID string, tags map[string]string) error {
 	// Do not allow creation of PDs in zones that are not managed. Such PDs
 	// then cannot be deleted by DeleteDisk.
 	isManaged := false
@@ -2473,10 +2473,11 @@ func (gce *GCECloud) CreateDisk(name string, diskType string, zone string, sizeG
 	diskTypeUri := fmt.Sprintf(diskTypeUriTemplate, gce.projectID, zone, diskType)
 
 	diskToCreate := &compute.Disk{
-		Name:        name,
-		SizeGb:      sizeGb,
-		Description: tagsStr,
-		Type:        diskTypeUri,
+		Name:          name,
+		SizeGb:        sizeGb,
+		Description:   tagsStr,
+		Type:          diskTypeUri,
+		SourceImageId: imageID,
 	}
 
 	createOp, err := gce.service.Disks.Insert(gce.projectID, zone, diskToCreate).Do()

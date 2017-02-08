@@ -87,12 +87,15 @@ func (gceutil *GCEDiskUtil) CreateVolume(c *gcePersistentDiskProvisioner) (strin
 	// the values to the cloud provider.
 	diskType := ""
 	zone := ""
+	imageID := ""
 	for k, v := range c.options.Parameters {
 		switch strings.ToLower(k) {
 		case "type":
 			diskType = v
 		case "zone":
 			zone = v
+		case "imageid":
+			imageID = v
 		default:
 			return "", 0, nil, fmt.Errorf("invalid option %q for volume plugin %s", k, c.plugin.GetPluginName())
 		}
@@ -114,7 +117,7 @@ func (gceutil *GCEDiskUtil) CreateVolume(c *gcePersistentDiskProvisioner) (strin
 		zone = volume.ChooseZoneForVolume(zones, c.options.PVC.Name)
 	}
 
-	err = cloud.CreateDisk(name, diskType, zone, int64(requestGB), *c.options.CloudTags)
+	err = cloud.CreateDisk(name, diskType, zone, int64(requestGB), imageID, *c.options.CloudTags)
 	if err != nil {
 		glog.V(2).Infof("Error creating GCE PD volume: %v", err)
 		return "", 0, nil, err
