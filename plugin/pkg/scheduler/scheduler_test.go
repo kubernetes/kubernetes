@@ -91,7 +91,7 @@ type mockScheduler struct {
 	err     error
 }
 
-func (es mockScheduler) Schedule(pod *v1.Pod, ml algorithm.NodeLister) (string, *schedulerapi.Annotations, error) {
+func (es mockScheduler) Schedule(pod *v1.Pod, ml algorithm.NodeLister) (string, schedulerapi.Annotations, error) {
 	return es.machine, nil, es.err
 }
 

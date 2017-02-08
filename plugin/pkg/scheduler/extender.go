@@ -97,12 +97,13 @@ func NewHTTPExtender(config *schedulerapi.ExtenderConfig, apiVersion string) (al
 // Filter based on extender implemented predicate functions. The filtered list is
 // expected to be a subset of the supplied list. failedNodesMap optionally contains
 // the list of failed nodes and failure reasons.
-func (h *HTTPExtender) Filter(pod *v1.Pod, nodes []*v1.Node, nodeNameToInfo map[string]*schedulercache.NodeInfo) ([]*v1.Node, schedulerapi.FailedNodesMap, *schedulerapi.Annotations, error) {
+func (h *HTTPExtender) Filter(pod *v1.Pod, nodes []*v1.Node, nodeNameToInfo map[string]*schedulercache.NodeInfo) ([]*v1.Node, schedulerapi.FailedNodesMap, schedulerapi.Annotations, error) {
 	var (
-		result     schedulerapi.ExtenderFilterResult
-		nodeItems  []v1.Node
-		nodeNames  *[]string
-		nodeResult []*v1.Node
+		result         schedulerapi.ExtenderFilterResult
+		nodeItems      []v1.Node
+		nodeNames      *[]string
+		nodeResult     []*v1.Node
+		podAnnotations schedulerapi.Annotations
 	)
 
 	if h.filterVerb == "" {
@@ -146,7 +147,14 @@ func (h *HTTPExtender) Filter(pod *v1.Pod, nodes []*v1.Node, nodeNameToInfo map[
 			nodeResult = append(nodeResult, &result.Nodes.Items[i])
 		}
 	}
-	return nodeResult, result.FailedNodes, result.PodAnnotations, nil
+
+	if result.PodAnnotations != nil {
+		podAnnotations = *result.PodAnnotations
+	} else {
+		podAnnotations = make(schedulerapi.Annotations)
+	}
+
+	return nodeResult, result.FailedNodes, podAnnotations, nil
 }
 
 // Prioritize based on extender implemented priority functions. Weight*priority is added

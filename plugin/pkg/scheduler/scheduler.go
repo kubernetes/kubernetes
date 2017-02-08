@@ -148,6 +148,7 @@ func (s *Scheduler) Run() {
 
 func (s *Scheduler) scheduleOne() {
 	var podAnnotations schedulerapi.Annotations
+
 	pod := s.config.NextPod()
 	if pod.DeletionTimestamp != nil {
 		s.config.Recorder.Eventf(pod, v1.EventTypeWarning, "FailedScheduling", "skip schedule deleting pod: %v/%v", pod.Namespace, pod.Name)
@@ -192,8 +193,8 @@ func (s *Scheduler) scheduleOne() {
 	go func() {
 		defer metrics.E2eSchedulingLatency.Observe(metrics.SinceInMicroseconds(start))
 
-		if annotations != nil {
-			podAnnotations = *annotations
+		if len(annotations) != 0 {
+			podAnnotations = annotations
 		}
 		b := &v1.Binding{
 			ObjectMeta: metav1.ObjectMeta{Namespace: pod.Namespace, Name: pod.Name, Annotations: podAnnotations},

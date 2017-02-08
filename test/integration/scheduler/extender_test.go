@@ -108,9 +108,8 @@ func (e *Extender) serveHTTP(t *testing.T, w http.ResponseWriter, req *http.Requ
 }
 
 func (e *Extender) filterUsingNodeCache(args *schedulerapi.ExtenderArgs) (*schedulerapi.ExtenderFilterResult, error) {
-	nodeSlice := make([]string, len(*args.NodeNames))
+	nodeSlice := make([]string, 0)
 	failedNodesMap := schedulerapi.FailedNodesMap{}
-
 	for _, nodeName := range *args.NodeNames {
 		fits := true
 		for _, predicate := range e.predicates {
@@ -120,7 +119,7 @@ func (e *Extender) filterUsingNodeCache(args *schedulerapi.ExtenderArgs) (*sched
 				return &schedulerapi.ExtenderFilterResult{
 					Nodes:          nil,
 					NodeNames:      nil,
-					PodAnnotations: &podAnnotations,
+					PodAnnotations: nil,
 					FailedNodes:    schedulerapi.FailedNodesMap{},
 					Error:          err.Error(),
 				}, err
@@ -140,7 +139,7 @@ func (e *Extender) filterUsingNodeCache(args *schedulerapi.ExtenderArgs) (*sched
 	return &schedulerapi.ExtenderFilterResult{
 		Nodes:          nil,
 		NodeNames:      &nodeSlice,
-		PodAnnotations: nil,
+		PodAnnotations: &podAnnotations,
 		FailedNodes:    failedNodesMap,
 	}, nil
 }
@@ -176,6 +175,7 @@ func (e *Extender) Filter(args *schedulerapi.ExtenderArgs) (*schedulerapi.Extend
 				failedNodesMap[node.Name] = fmt.Sprintf("extender failed: %s", e.name)
 			}
 		}
+
 		return &schedulerapi.ExtenderFilterResult{
 			Nodes:          &v1.NodeList{Items: filtered},
 			NodeNames:      nil,
@@ -188,13 +188,23 @@ func (e *Extender) Filter(args *schedulerapi.ExtenderArgs) (*schedulerapi.Extend
 func (e *Extender) Prioritize(args *schedulerapi.ExtenderArgs) (schedulerapi.HostPriorityList, error) {
 	result := schedulerapi.HostPriorityList{}
 	combinedScores := map[string]int{}
+	var nodes = &v1.NodeList{Items: []v1.Node{}}
+
+	if e.nodeCacheCapable {
+		for _, nodeName := range *args.NodeNames {
+			nodes.Items = append(nodes.Items, v1.Node{ObjectMeta: metav1.ObjectMeta{Name: nodeName}})
+		}
+	} else {
+		nodes = args.Nodes
+	}
+
 	for _, prioritizer := range e.prioritizers {
 		weight := prioritizer.weight
 		if weight == 0 {
 			continue
 		}
 		priorityFunc := prioritizer.function
-		prioritizedList, err := priorityFunc(&args.Pod, args.Nodes)
+		prioritizedList, err := priorityFunc(&args.Pod, nodes)
 		if err != nil {
 			return schedulerapi.HostPriorityList{}, err
 		}
@@ -306,7 +316,7 @@ func TestSchedulerExtender(t *testing.T) {
 				URLPrefix:        es3.URL,
 				FilterVerb:       filter,
 				PrioritizeVerb:   prioritize,
-				Weight:           5,
+				Weight:           10,
 				EnableHttps:      false,
 				NodeCacheCapable: true,
 			},
@@ -374,10 +384,11 @@ func DoTestPodScheduling(ns *v1.Namespace, t *testing.T, cs clientset.Interface)
 		t.Fatalf("Failed to schedule pod: %v", err)
 	}
 
-	if myPod, err := cs.Core().Pods(ns.Name).Get(myPod.Name, metav1.GetOptions{}); err != nil {
+	myPod, err = cs.Core().Pods(ns.Name).Get(myPod.Name, metav1.GetOptions{})
+	if err != nil {
 		t.Fatalf("Failed to get pod: %v", err)
 	} else if myPod.Spec.NodeName != "machine2" {
-		t.Fatalf("Failed to schedule using extender, expected machine3, got %v", myPod.Spec.NodeName)
+		t.Fatalf("Failed to schedule using extender, expected machine2, got %v", myPod.Spec.NodeName)
 	}
 	for k := range podAnnotations {
 		if myPod.Annotations[k] != podAnnotations[k] {

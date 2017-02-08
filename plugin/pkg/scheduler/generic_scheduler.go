@@ -86,7 +86,7 @@ type genericScheduler struct {
 // Schedule tries to schedule the given pod to one of node in the node list.
 // If it succeeds, it will return the name of the node.
 // If it fails, it will return a Fiterror error with reasons.
-func (g *genericScheduler) Schedule(pod *v1.Pod, nodeLister algorithm.NodeLister) (string, *schedulerapi.Annotations, error) {
+func (g *genericScheduler) Schedule(pod *v1.Pod, nodeLister algorithm.NodeLister) (string, schedulerapi.Annotations, error) {
 	trace := utiltrace.New(fmt.Sprintf("Scheduling %s/%s", pod.Namespace, pod.Name))
 	defer trace.LogIfLong(100 * time.Millisecond)
 
@@ -162,9 +162,9 @@ func findNodesThatFit(
 	predicateFuncs map[string]algorithm.FitPredicate,
 	extenders []algorithm.SchedulerExtender,
 	metadataProducer algorithm.MetadataProducer,
-) ([]*v1.Node, FailedPredicateMap, *schedulerapi.Annotations, error) {
+) ([]*v1.Node, FailedPredicateMap, schedulerapi.Annotations, error) {
 	var filtered []*v1.Node
-	var podAnnotations *schedulerapi.Annotations
+	var podAnnotations = make(schedulerapi.Annotations)
 	failedPredicateMap := FailedPredicateMap{}
 
 	if len(predicateFuncs) == 0 {
@@ -217,7 +217,10 @@ func findNodesThatFit(
 				failedPredicateMap[failedNodeName] = append(failedPredicateMap[failedNodeName], predicates.NewFailureReason(failedMsg))
 			}
 			filtered = filteredList
-			podAnnotations = annotations
+			// Merge the pod annotations map
+			for k, v := range annotations {
+				podAnnotations[k] = v
+			}
 			if len(filtered) == 0 {
 				break
 			}
