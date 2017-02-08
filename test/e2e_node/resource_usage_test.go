@@ -21,10 +21,8 @@ package e2e_node
 import (
 	"fmt"
 	"strings"
-	"sync"
 	"time"
 
-	"k8s.io/apimachinery/pkg/labels"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
@@ -147,20 +145,11 @@ func runResourceUsageTest(f *framework.Framework, rc *ResourceCollector, testArg
 		// sleep for an interval here to measure steady data
 		sleepAfterCreatePods = 10 * time.Second
 	)
-	framework.Logf("creating namespaces")
-	var namespaces []*v1.Namespace
-	for i := 0; i < testArg.podsNr; i++ {
-		ns, err := f.CreateNamespace(fmt.Sprintf("ns-%d", i), nil)
-		framework.ExpectNoError(err)
-		namespaces = append(namespaces, ns)
-	}
-	framework.Logf("namespaces created")
 	var secrets []*v1.Secret
 	for i := 0; i < testArg.podsNr; i++ {
 		secret := &v1.Secret{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      fmt.Sprintf("secret-%d", i),
-				Namespace: namespaces[i].Name,
 			},
 			Data: map[string][]byte{
 				"sfjdkjflds": []byte("sfksjdlf kjsd kfjsdlk fjlkds jflksd jflksjd lkfsj liferjlkjsadlkjfl kjd lijdsif jds l dskjf lkdsj flksdj flisdj fsld jdsk jflkdsj fks "),
@@ -176,18 +165,18 @@ func runResourceUsageTest(f *framework.Framework, rc *ResourceCollector, testArg
 			},
 			Type: v1.SecretTypeOpaque,
 		}
-		s, err := f.ClientSet.Core().Secrets(secret.Namespace).Create(secret)
+		s, err := f.ClientSet.Core().Secrets(f.Namespace.Name).Create(secret)
 		framework.ExpectNoError(err)
 		secrets = append(secrets, s)
 	}
-	pods := newTestPodsInNamespaces(testArg.podsNr, framework.GetPauseImageNameForHostArch(), "test_pod", namespaces, secrets)
+	pods := newTestPodsInNamespaces(testArg.podsNr, framework.GetPauseImageNameForHostArch(), "test_pod", secrets)
 	framework.Logf("pods created")
 //	pods := newTestPods(testArg.podsNr, true, framework.GetPauseImageNameForHostArch(), "test_pod")
 
 
 	rc.Start()
 	// Explicitly delete pods to prevent namespace controller cleanning up timeout
-	defer func() {
+/*	defer func() {
 		var wg sync.WaitGroup
 		for _, pod := range pods {
 			wg.Add(1)
@@ -200,12 +189,12 @@ func runResourceUsageTest(f *framework.Framework, rc *ResourceCollector, testArg
 			}(pod)
 		}
 		wg.Wait()
-	}()
-	//defer deletePodsSync(f, append(pods, getCadvisorPod()))
+	}()*/
+	defer deletePodsSync(f, append(pods, getCadvisorPod()))
 	defer rc.Stop()
 
 	By("Creating a batch of Pods")
-	var wg sync.WaitGroup
+/*	var wg sync.WaitGroup
 	for _, pod := range pods {
 		wg.Add(1)
 		go func(pod *v1.Pod) {
@@ -217,8 +206,8 @@ func runResourceUsageTest(f *framework.Framework, rc *ResourceCollector, testArg
 			framework.ExpectNoError(framework.WaitForPodNameRunningInNamespace(f.ClientSet, pod.Name, pod.Namespace))
 		}(pod)
 	}
-	wg.Wait()
-//	f.PodClient().CreateBatch(pods)
+	wg.Wait()*/
+	f.PodClient().CreateBatch(pods)
 
 	// wait for a while to let the node be steady
 	time.Sleep(sleepAfterCreatePods)
