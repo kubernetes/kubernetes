@@ -240,7 +240,7 @@ func runEdit(f cmdutil.Factory, out, errOut io.Writer, cmd *cobra.Command, args 
 					file: file,
 				}
 				containsError = true
-				fmt.Fprintln(out, results.addError(errors.NewInvalid(api.Kind(""), "", field.ErrorList{field.Invalid(nil, "The edited file failed validation", fmt.Sprintf("%v", err))}), infos[0]))
+				fmt.Fprintln(errOut, results.addError(errors.NewInvalid(api.Kind(""), "", field.ErrorList{field.Invalid(nil, "The edited file failed validation", fmt.Sprintf("%v", err))}), infos[0]))
 				continue
 			}
 
@@ -505,7 +505,7 @@ func visitToPatch(
 		results.version = defaultVersion
 		patched, err := resource.NewHelper(info.Client, info.Mapping).Patch(info.Namespace, info.Name, types.StrategicMergePatchType, patch)
 		if err != nil {
-			fmt.Fprintln(out, results.addError(err, info))
+			fmt.Fprintln(errOut, results.addError(err, info))
 			return nil
 		}
 		info.Refresh(patched, true)

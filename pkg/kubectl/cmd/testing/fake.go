@@ -216,6 +216,9 @@ type TestFactory struct {
 	Namespace          string
 	ClientConfig       *restclient.Config
 	Err                error
+
+	ClientForMappingFunc             func(mapping *meta.RESTMapping) (resource.RESTClient, error)
+	UnstructuredClientForMappingFunc func(mapping *meta.RESTMapping) (resource.RESTClient, error)
 }
 
 type FakeFactory struct {
@@ -294,7 +297,10 @@ func (f *FakeFactory) BareClientConfig() (*restclient.Config, error) {
 	return f.tf.ClientConfig, f.tf.Err
 }
 
-func (f *FakeFactory) ClientForMapping(*meta.RESTMapping) (resource.RESTClient, error) {
+func (f *FakeFactory) ClientForMapping(mapping *meta.RESTMapping) (resource.RESTClient, error) {
+	if f.tf.ClientForMappingFunc != nil {
+		return f.tf.ClientForMappingFunc(mapping)
+	}
 	return f.tf.Client, f.tf.Err
 }
 
@@ -311,7 +317,10 @@ func (f *FakeFactory) ClientConfigForVersion(requiredVersion *schema.GroupVersio
 	return nil, nil
 }
 
-func (f *FakeFactory) UnstructuredClientForMapping(*meta.RESTMapping) (resource.RESTClient, error) {
+func (f *FakeFactory) UnstructuredClientForMapping(mapping *meta.RESTMapping) (resource.RESTClient, error) {
+	if f.tf.UnstructuredClientForMappingFunc != nil {
+		return f.tf.UnstructuredClientForMappingFunc(mapping)
+	}
 	return f.tf.UnstructuredClient, f.tf.Err
 }
 
@@ -481,6 +490,9 @@ func (f *fakeMixedFactory) ClientForMapping(m *meta.RESTMapping) (resource.RESTC
 	if m.ObjectConvertor == api.Scheme {
 		return f.apiClient, f.tf.Err
 	}
+	if f.tf.ClientForMappingFunc != nil {
+		return f.tf.ClientForMappingFunc(m)
+	}
 	return f.tf.Client, f.tf.Err
 }
 
@@ -553,11 +565,17 @@ func (f *fakeAPIFactory) ClientConfig() (*restclient.Config, error) {
 	return f.tf.ClientConfig, f.tf.Err
 }
 
-func (f *fakeAPIFactory) ClientForMapping(*meta.RESTMapping) (resource.RESTClient, error) {
+func (f *fakeAPIFactory) ClientForMapping(m *meta.RESTMapping) (resource.RESTClient, error) {
+	if f.tf.ClientForMappingFunc != nil {
+		return f.tf.ClientForMappingFunc(m)
+	}
 	return f.tf.Client, f.tf.Err
 }
 
-func (f *fakeAPIFactory) UnstructuredClientForMapping(*meta.RESTMapping) (resource.RESTClient, error) {
+func (f *fakeAPIFactory) UnstructuredClientForMapping(m *meta.RESTMapping) (resource.RESTClient, error) {
+	if f.tf.UnstructuredClientForMappingFunc != nil {
+		return f.tf.UnstructuredClientForMappingFunc(m)
+	}
 	return f.tf.UnstructuredClient, f.tf.Err
 }
 
