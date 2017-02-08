@@ -75,6 +75,8 @@ func (util *VsphereDiskUtil) CreateVolume(v *vsphereVolumeProvisioner) (vmDiskPa
 		switch strings.ToLower(parameter) {
 		case "diskformat":
 			volumeOptions.DiskFormat = value
+		case "datastore":
+			volumeOptions.Datastore = value
 		default:
 			return "", 0, fmt.Errorf("invalid option %q for volume plugin %s", parameter, v.plugin.GetPluginName())
 		}

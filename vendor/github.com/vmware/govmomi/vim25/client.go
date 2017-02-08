@@ -17,12 +17,12 @@ limitations under the License.
 package vim25
 
 import (
+	"context"
 	"encoding/json"
 
 	"github.com/vmware/govmomi/vim25/methods"
 	"github.com/vmware/govmomi/vim25/soap"
 	"github.com/vmware/govmomi/vim25/types"
-	"golang.org/x/net/context"
 )
 
 // Client is a tiny wrapper around the vim25/soap Client that stores session

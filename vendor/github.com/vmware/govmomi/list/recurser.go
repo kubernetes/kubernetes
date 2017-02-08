@@ -17,11 +17,11 @@ limitations under the License.
 package list
 
 import (
+	"context"
 	"path"
 	"path/filepath"
 
 	"github.com/vmware/govmomi/property"
-	"golang.org/x/net/context"
 )
 
 type Recurser struct {
