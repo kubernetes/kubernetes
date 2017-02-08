@@ -57,6 +57,7 @@ go_library(
         "//pkg/cloudprovider/providers/gce:go_default_library",
         "//pkg/controller:go_default_library",
         "//pkg/controller/deployment/util:go_default_library",
+        "//pkg/controller/node:go_default_library",
         "//pkg/kubectl:go_default_library",
         "//pkg/kubelet/api/v1alpha1/stats:go_default_library",
         "//pkg/kubelet/metrics:go_default_library",
