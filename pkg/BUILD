@@ -37,7 +37,6 @@ filegroup(
         "//pkg/client/clientset_generated/clientset:all-srcs",
         "//pkg/client/clientset_generated/internalclientset:all-srcs",
         "//pkg/client/conditions:all-srcs",
-        "//pkg/client/informers/informers_generated/autoscaling/v2alpha1:all-srcs",
         "//pkg/client/informers/informers_generated/externalversions:all-srcs",
         "//pkg/client/informers/informers_generated/internalversion:all-srcs",
         "//pkg/client/leaderelection:all-srcs",

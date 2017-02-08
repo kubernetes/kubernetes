@@ -25,7 +25,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	extensions "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset/fake"
-	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated"
+	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated/externalversions"
 	"k8s.io/kubernetes/pkg/controller"
 )
 
@@ -68,7 +68,7 @@ func TestScaleDownOldReplicaSets(t *testing.T) {
 		}
 
 		kc := fake.NewSimpleClientset(expected...)
-		informers := informers.NewSharedInformerFactory(nil, kc, controller.NoResyncPeriodFunc())
+		informers := informers.NewSharedInformerFactory(kc, controller.NoResyncPeriodFunc())
 		c := NewDeploymentController(informers.Extensions().V1beta1().Deployments(), informers.Extensions().V1beta1().ReplicaSets(), informers.Core().V1().Pods(), kc)
 		c.eventRecorder = &record.FakeRecorder{}
 

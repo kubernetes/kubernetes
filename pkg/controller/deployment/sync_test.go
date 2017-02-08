@@ -26,7 +26,7 @@ import (
 	"k8s.io/client-go/tools/record"
 	extensions "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset/fake"
-	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated"
+	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated/externalversions"
 	"k8s.io/kubernetes/pkg/controller"
 	deploymentutil "k8s.io/kubernetes/pkg/controller/deployment/util"
 )
@@ -383,7 +383,7 @@ func TestDeploymentController_cleanupDeployment(t *testing.T) {
 		t.Logf("scenario %d", i)
 
 		fake := &fake.Clientset{}
-		informers := informers.NewSharedInformerFactory(nil, fake, controller.NoResyncPeriodFunc())
+		informers := informers.NewSharedInformerFactory(fake, controller.NoResyncPeriodFunc())
 		controller := NewDeploymentController(informers.Extensions().V1beta1().Deployments(), informers.Extensions().V1beta1().ReplicaSets(), informers.Core().V1().Pods(), fake)
 
 		controller.eventRecorder = &record.FakeRecorder{}
