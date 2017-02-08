@@ -12,6 +12,7 @@ go_library(
     name = "go_default_library",
     srcs = [
         "admission.go",
+        "config.go",
         "controller.go",
         "doc.go",
         "resource_access.go",
@@ -24,11 +25,19 @@ go_library(
         "//pkg/quota:go_default_library",
         "//pkg/quota/install:go_default_library",
         "//pkg/util/workqueue/prometheus:go_default_library",
+        "//plugin/pkg/admission/resourcequota/apis/resourcequota:go_default_library",
+        "//plugin/pkg/admission/resourcequota/apis/resourcequota/install:go_default_library",
+        "//plugin/pkg/admission/resourcequota/apis/resourcequota/v1alpha1:go_default_library",
+        "//plugin/pkg/admission/resourcequota/apis/resourcequota/validation:go_default_library",
         "//vendor:github.com/golang/glog",
         "//vendor:github.com/hashicorp/golang-lru",
         "//vendor:k8s.io/apimachinery/pkg/api/meta",
+        "//vendor:k8s.io/apimachinery/pkg/apimachinery/announced",
+        "//vendor:k8s.io/apimachinery/pkg/apimachinery/registered",
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
         "//vendor:k8s.io/apimachinery/pkg/runtime",
+        "//vendor:k8s.io/apimachinery/pkg/runtime/schema",
+        "//vendor:k8s.io/apimachinery/pkg/runtime/serializer",
         "//vendor:k8s.io/apimachinery/pkg/util/runtime",
         "//vendor:k8s.io/apimachinery/pkg/util/sets",
         "//vendor:k8s.io/apimachinery/pkg/util/wait",
@@ -51,6 +60,7 @@ go_test(
         "//pkg/quota:go_default_library",
         "//pkg/quota/generic:go_default_library",
         "//pkg/quota/install:go_default_library",
+        "//plugin/pkg/admission/resourcequota/apis/resourcequota:go_default_library",
         "//vendor:github.com/hashicorp/golang-lru",
         "//vendor:k8s.io/apimachinery/pkg/api/resource",
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
@@ -71,6 +81,9 @@ filegroup(
 
 filegroup(
     name = "all-srcs",
-    srcs = [":package-srcs"],
+    srcs = [
+        ":package-srcs",
+        "//plugin/pkg/admission/resourcequota/apis/resourcequota:all-srcs",
+    ],
     tags = ["automanaged"],
 )
