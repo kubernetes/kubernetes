@@ -44,7 +44,7 @@ import (
 
 func TestExtractFromNonExistentFile(t *testing.T) {
 	ch := make(chan interface{}, 1)
-	c := new("/some/fake/file", "localhost", time.Millisecond, ch)
+	c := new("/some/fake/file", "localhost", ch)
 	err := c.watch()
 	if err == nil {
 		t.Errorf("Expected error")
@@ -135,7 +135,7 @@ func TestExtractFromBadDataFile(t *testing.T) {
 	}
 
 	ch := make(chan interface{}, 1)
-	c := new(fileName, "localhost", time.Millisecond, ch)
+	c := new(fileName, "localhost", ch)
 	err = c.resetStoreFromPath()
 	if err == nil {
 		t.Fatalf("expected error, got nil")
@@ -151,7 +151,7 @@ func TestExtractFromEmptyDir(t *testing.T) {
 	defer os.RemoveAll(dirName)
 
 	ch := make(chan interface{}, 1)
-	c := new(dirName, "localhost", time.Millisecond, ch)
+	c := new(dirName, "localhost", ch)
 	err = c.resetStoreFromPath()
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
