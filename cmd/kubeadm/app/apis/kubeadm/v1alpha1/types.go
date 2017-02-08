@@ -30,11 +30,40 @@ type MasterConfiguration struct {
 	KubernetesVersion string     `json:"kubernetesVersion"`
 	CloudProvider     string     `json:"cloudProvider"`
 	AuthorizationMode string     `json:"authorizationMode"`
+
+	Phases Phases `json:"phases"`
+
+	// The directory where certificates are stored
+	CertificatesDir string `json:"certificatesDir"`
+}
+
+type PhaseMetadata struct {
+	Annotations map[string]string `json:"annotations"`
+}
+
+type Phases struct {
+	Certificates CertificatesPhase `json:"certificates"`
+}
+
+type CertificatesPhase struct {
+	Metadata PhaseMetadata `json:"metadata"`
+
+	// In the future, we may provide more options for generating certs
+	// For instance, we may want to provide integrations with something like Vault in the future for storing the certs
+	SelfSign *SelfSignCertificates `json:"selfSign"`
+}
+
+type SelfSignCertificates struct {
+	// This phase needs to know these values as well:
+	// ServiceSubnet, DNSDomain, CertificatesDir, AdvertiseAddresses
+
+	// All IP addresses and DNS names these certs should be signed for
+	// Defaults to the default networking interface's IP address and the hostname of the master node
+	AltNames []string `json:"altNames"`
 }
 
 type API struct {
 	AdvertiseAddresses []string `json:"advertiseAddresses"`
-	ExternalDNSNames   []string `json:"externalDNSNames"`
 	Port               int32    `json:"port"`
 }
 

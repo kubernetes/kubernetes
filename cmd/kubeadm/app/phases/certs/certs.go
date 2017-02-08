@@ -23,7 +23,9 @@ import (
 	"net"
 	"os"
 
+	netutil "k8s.io/apimachinery/pkg/util/net"
 	setutil "k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/util/validation"
 	certutil "k8s.io/client-go/util/cert"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
@@ -40,42 +42,21 @@ import (
 
 // CreatePKIAssets will create and write to disk all PKI assets necessary to establish the control plane.
 // It generates a self-signed CA certificate and a server certificate (signed by the CA)
-func CreatePKIAssets(cfg *kubeadmapi.MasterConfiguration, pkiDir string) error {
-	altNames := certutil.AltNames{}
-
-	// First, define all domains this cert should be signed for
-	internalAPIServerFQDN := []string{
-		"kubernetes",
-		"kubernetes.default",
-		"kubernetes.default.svc",
-		fmt.Sprintf("kubernetes.default.svc.%s", cfg.Networking.DNSDomain),
+func CreatePKIAssets(cfg *kubeadmapi.MasterConfiguration) error {
+	if cfg.Phases.Certificates.SelfSign != nil {
+		return fmt.Errorf("can't run this phase when the SelfSign phase object is nil")
 	}
+	pkiDir := cfg.CertificatesDir
+
 	hostname, err := os.Hostname()
 	if err != nil {
 		return fmt.Errorf("couldn't get the hostname: %v", err)
 	}
-	altNames.DNSNames = append(cfg.API.ExternalDNSNames, hostname)
-	altNames.DNSNames = append(altNames.DNSNames, internalAPIServerFQDN...)
-
-	// then, add all IP addresses we're bound to
-	for _, a := range cfg.API.AdvertiseAddresses {
-		if ip := net.ParseIP(a); ip != nil {
-			altNames.IPs = append(altNames.IPs, ip)
-		} else {
-			return fmt.Errorf("could not parse ip %q", a)
-		}
-	}
-	// and lastly, extract the internal IP address for the API server
-	_, n, err := net.ParseCIDR(cfg.Networking.ServiceSubnet)
+	_, svcSubnet, err := net.ParseCIDR(cfg.Networking.ServiceSubnet)
 	if err != nil {
 		return fmt.Errorf("error parsing CIDR %q: %v", cfg.Networking.ServiceSubnet, err)
 	}
-	internalAPIServerVirtualIP, err := ipallocator.GetIndexedIP(n, 1)
-	if err != nil {
-		return fmt.Errorf("unable to allocate IP address for the API server from the given CIDR (%q) [%v]", &cfg.Networking.ServiceSubnet, err)
-	}
-
-	altNames.IPs = append(altNames.IPs, internalAPIServerVirtualIP)
+	altNames := getAltNames(cfg.Phases.Certificates.SelfSign.AltNames, hostname, cfg.Networking.DNSDomain, svcSubnet)
 
 	var caCert *x509.Certificate
 	var caKey *rsa.PrivateKey
@@ -194,4 +175,39 @@ func checkAltNamesExist(IPs []net.IP, DNSNames []string, altNames certutil.AltNa
 		}
 	}
 	return true
+}
+
+func getAltNames(cfgAltNames []string, hostname, dnsdomain string, svcSubnet *net.IPNet) certutil.AltNames {
+	altNames := certutil.AltNames{
+		DNSNames: []string{
+			hostname,
+			"kubernetes",
+			"kubernetes.default",
+			"kubernetes.default.svc",
+			fmt.Sprintf("kubernetes.default.svc.%s", dnsdomain),
+		},
+	}
+
+	// Populate IPs/DNSNames from AltNames
+	for _, altname := range cfgAltNames {
+		if len(validation.IsDNS1123Subdomain(altname)) == 0 {
+			altNames.DNSNames = append(altNames.DNSNames, altname)
+		} else if ip := net.ParseIP(altname); ip != nil {
+			altNames.IPs = append(altNames.IPs, ip)
+		}
+	}
+
+	// Add the IP for the default route if a such IP exists
+	ip, err := netutil.ChooseHostInterface()
+	if err == nil {
+		altNames.IPs = append(altNames.IPs, ip)
+	}
+
+	// and lastly, extract the internal IP address for the API server
+	internalAPIServerVirtualIP, err := ipallocator.GetIndexedIP(svcSubnet, 1)
+	if err != nil {
+		fmt.Printf("[certs] WARNING: Unable to get first IP address from the given CIDR (%s): %v\n", svcSubnet.String(), err)
+	}
+	altNames.IPs = append(altNames.IPs, internalAPIServerVirtualIP)
+	return altNames
 }
