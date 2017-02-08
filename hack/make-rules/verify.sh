@@ -26,6 +26,7 @@ EXCLUDED_CHECKS=(
   "verify-linkcheck.sh"   # runs in separate Jenkins job once per day due to high network usage
   "verify-govet.sh"       # it has a separate make vet target
   "verify-test-owners.sh" # TODO(rmmh): figure out how to avoid endless conflicts
+  "verify-bazel-generated.sh" # Run in Bazel.
   )
 
 function is-excluded {

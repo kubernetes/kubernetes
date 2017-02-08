@@ -21,6 +21,16 @@ filegroup(
 )
 
 sh_test(
+    name = "verify-bazel-generated",
+    srcs = ["verify-bazel-generated.sh"],
+    data = [
+        "//:all-srcs",
+        "//pkg/generated/openapi:zz_generated.openapi",
+    ],
+    tags = ["manual"],
+)
+
+sh_test(
     name = "verify-boilerplate",
     srcs = ["verify-boilerplate.sh"],
     data = ["//:all-srcs"],
@@ -31,6 +41,7 @@ test_suite(
     name = "verify-all",
     tags = ["manual"],
     tests = [
+        "verify-bazel-generated",
         "verify-boilerplate",
     ],
 )
