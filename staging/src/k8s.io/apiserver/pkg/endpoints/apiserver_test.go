@@ -54,9 +54,9 @@ import (
 	"k8s.io/apiserver/pkg/apis/example"
 	examplefuzzer "k8s.io/apiserver/pkg/apis/example/fuzzer"
 	examplev1 "k8s.io/apiserver/pkg/apis/example/v1"
-	"k8s.io/apiserver/pkg/endpoints/request"
 	genericapifilters "k8s.io/apiserver/pkg/endpoints/filters"
 	"k8s.io/apiserver/pkg/endpoints/handlers/responsewriters"
+	"k8s.io/apiserver/pkg/endpoints/request"
 	genericapitesting "k8s.io/apiserver/pkg/endpoints/testing"
 	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/kubernetes/plugin/pkg/admission/admit"
@@ -457,19 +457,19 @@ func (storage *SimpleRESTStorage) checkContext(ctx request.Context) {
 	storage.actualNamespace, storage.namespacePresent = request.NamespaceFrom(ctx)
 }
 
-func (storage *SimpleRESTStorage) Delete(ctx request.Context, id string, options *metav1.DeleteOptions) (runtime.Object, error) {
+func (storage *SimpleRESTStorage) Delete(ctx request.Context, id string, options *metav1.DeleteOptions) (runtime.Object, bool, error) {
 	storage.checkContext(ctx)
 	storage.deleted = id
 	storage.deleteOptions = options
 	if err := storage.errors["delete"]; err != nil {
-		return nil, err
+		return nil, false, err
 	}
 	var obj runtime.Object = &metav1.Status{Status: metav1.StatusSuccess}
 	var err error
 	if storage.injectedFunction != nil {
 		obj, err = storage.injectedFunction(&genericapitesting.Simple{ObjectMeta: metav1.ObjectMeta{Name: id}})
 	}
-	return obj, err
+	return obj, true, err
 }
 
 func (storage *SimpleRESTStorage) New() runtime.Object {
@@ -605,7 +605,8 @@ type LegacyRESTStorage struct {
 }
 
 func (storage LegacyRESTStorage) Delete(ctx request.Context, id string) (runtime.Object, error) {
-	return storage.SimpleRESTStorage.Delete(ctx, id, nil)
+	obj, _, err := storage.SimpleRESTStorage.Delete(ctx, id, nil)
+	return obj, err
 }
 
 type MetadataRESTStorage struct {
