@@ -10,7 +10,10 @@ load(
 
 go_library(
     name = "go_default_library",
-    srcs = ["vsphere.go"],
+    srcs = [
+        "vsphere.go",
+        "vsphere_util.go",
+    ],
     tags = ["automanaged"],
     deps = [
         "//pkg/api/v1:go_default_library",
