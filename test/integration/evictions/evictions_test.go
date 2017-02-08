@@ -36,8 +36,8 @@ import (
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/apis/policy/v1beta1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
+	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated"
 	"k8s.io/kubernetes/pkg/controller/disruption"
-	"k8s.io/kubernetes/pkg/controller/informers"
 	"k8s.io/kubernetes/test/integration/framework"
 )
 
@@ -50,14 +50,14 @@ const (
 func TestConcurrentEvictionRequests(t *testing.T) {
 	podNameFormat := "test-pod-%d"
 
-	s, rm, podInformer, clientSet := rmSetup(t)
+	s, rm, informers, clientSet := rmSetup(t)
 	defer s.Close()
 
 	ns := framework.CreateTestingNamespace("concurrent-eviction-requests", s, t)
 	defer framework.DeleteTestingNamespace(ns, s, t)
 
 	stopCh := make(chan struct{})
-	go podInformer.Run(stopCh)
+	informers.Start(stopCh)
 	go rm.Run(stopCh)
 	defer close(stopCh)
 
@@ -87,7 +87,7 @@ func TestConcurrentEvictionRequests(t *testing.T) {
 		}
 	}
 
-	waitToObservePods(t, podInformer, numOfEvictions)
+	waitToObservePods(t, informers.Core().V1().Pods().Informer(), numOfEvictions)
 
 	pdb := newPDB()
 	if _, err := clientSet.Policy().PodDisruptionBudgets(ns.Name).Create(pdb); err != nil {
@@ -227,7 +227,7 @@ func newEviction(ns, evictionName string, deleteOption *metav1.DeleteOptions) *v
 	}
 }
 
-func rmSetup(t *testing.T) (*httptest.Server, *disruption.DisruptionController, cache.SharedIndexInformer, clientset.Interface) {
+func rmSetup(t *testing.T) (*httptest.Server, *disruption.DisruptionController, informers.SharedInformerFactory, clientset.Interface) {
 	masterConfig := framework.NewIntegrationTestMasterConfig()
 	_, s := framework.RunAMaster(masterConfig)
 
@@ -237,13 +237,18 @@ func rmSetup(t *testing.T) (*httptest.Server, *disruption.DisruptionController, 
 		t.Fatalf("Error in create clientset: %v", err)
 	}
 	resyncPeriod := 12 * time.Hour
-	informers := informers.NewSharedInformerFactory(clientset.NewForConfigOrDie(restclient.AddUserAgent(&config, "pdb-informers")), nil, resyncPeriod)
+	informers := informers.NewSharedInformerFactory(nil, clientset.NewForConfigOrDie(restclient.AddUserAgent(&config, "pdb-informers")), resyncPeriod)
 
 	rm := disruption.NewDisruptionController(
-		informers.Pods().Informer(),
+		informers.Core().V1().Pods(),
+		informers.Policy().V1beta1().PodDisruptionBudgets(),
+		informers.Core().V1().ReplicationControllers(),
+		informers.Extensions().V1beta1().ReplicaSets(),
+		informers.Extensions().V1beta1().Deployments(),
+		informers.Apps().V1beta1().StatefulSets(),
 		clientset.NewForConfigOrDie(restclient.AddUserAgent(&config, "disruption-controller")),
 	)
-	return s, rm, informers.Pods().Informer(), clientSet
+	return s, rm, informers, clientSet
 }
 
 // wait for the podInformer to observe the pods. Call this function before
