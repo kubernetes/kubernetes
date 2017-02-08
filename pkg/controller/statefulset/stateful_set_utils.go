@@ -248,9 +248,7 @@ func (ao ascendingOrdinal) Len() int {
 }
 
 func (ao ascendingOrdinal) Swap(i, j int) {
-	tmp := ao[i]
-	ao[i] = ao[j]
-	ao[j] = tmp
+	ao[i], ao[j] = ao[j], ao[i]
 }
 
 func (ao ascendingOrdinal) Less(i, j int) bool {
