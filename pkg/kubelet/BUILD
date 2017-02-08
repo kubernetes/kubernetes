@@ -182,6 +182,7 @@ go_test(
         "//pkg/kubelet/server/remotecommand:go_default_library",
         "//pkg/kubelet/server/stats:go_default_library",
         "//pkg/kubelet/status:go_default_library",
+        "//pkg/kubelet/status/testing:go_default_library",
         "//pkg/kubelet/types:go_default_library",
         "//pkg/kubelet/util/queue:go_default_library",
         "//pkg/kubelet/util/sliceutils:go_default_library",
