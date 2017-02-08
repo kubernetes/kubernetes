@@ -713,7 +713,7 @@ func testDynamicResources() []*discovery.APIGroupResources {
 			},
 			VersionedResources: map[string][]metav1.APIResource{
 				"v1": {
-					{Name: "testtprs", Namespaced: true, Kind: "TestTpr"},
+					{Name: "widgets", Namespaced: true, Kind: "Widget"},
 				},
 			},
 		},

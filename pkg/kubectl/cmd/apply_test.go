@@ -64,7 +64,7 @@ const (
 	filenameSVC   = "../../../test/fixtures/pkg/kubectl/cmd/apply/service.yaml"
 	filenameRCSVC = "../../../test/fixtures/pkg/kubectl/cmd/apply/rc-service.yaml"
 
-	filenameIdempotentTPREntry = "../../../test/fixtures/pkg/kubectl/cmd/apply/tpr-entry.yaml"
+	filenameWidget = "../../../test/fixtures/pkg/kubectl/cmd/apply/widget.yaml"
 )
 
 func readBytesFromFile(t *testing.T, filename string) []byte {
@@ -106,6 +106,15 @@ func readReplicationControllerFromFile(t *testing.T, filename string) *api.Repli
 	return &rc
 }
 
+func readUnstructuredFromFile(t *testing.T, filename string) *unstructured.Unstructured {
+	data := readBytesFromFile(t, filename)
+	unst := unstructured.Unstructured{}
+	if err := runtime.DecodeInto(testapi.Extensions.Codec(), data, &unst); err != nil {
+		t.Fatal(err)
+	}
+	return &unst
+}
+
 func readServiceFromFile(t *testing.T, filename string) *api.Service {
 	data := readBytesFromFile(t, filename)
 	svc := api.Service{}
@@ -116,16 +125,19 @@ func readServiceFromFile(t *testing.T, filename string) *api.Service {
 	return &svc
 }
 
-func annotateRuntimeObject(t *testing.T, originalObj, currentObj runtime.Object, kind string) (string, []byte) {
+func annotateRuntimeObject(t *testing.T, originalObj, currentObj runtime.Object,
+	codec runtime.Codec) (string, []byte) {
 	originalAccessor, err := meta.Accessor(originalObj)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	originalLabels := originalAccessor.GetLabels()
-	originalLabels["DELETE_ME"] = "DELETE_ME"
-	originalAccessor.SetLabels(originalLabels)
-	original, err := runtime.Encode(testapi.Default.Codec(), originalObj)
+	if originalLabels != nil {
+		originalLabels["DELETE_ME"] = "DELETE_ME"
+		originalAccessor.SetLabels(originalLabels)
+	}
+	original, err := runtime.Encode(codec, originalObj)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -141,7 +153,7 @@ func annotateRuntimeObject(t *testing.T, originalObj, currentObj runtime.Object,
 	}
 	currentAnnotations[annotations.LastAppliedConfigAnnotation] = string(original)
 	currentAccessor.SetAnnotations(currentAnnotations)
-	current, err := runtime.Encode(testapi.Default.Codec(), currentObj)
+	current, err := runtime.Encode(codec, currentObj)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -152,13 +164,19 @@ func annotateRuntimeObject(t *testing.T, originalObj, currentObj runtime.Object,
 func readAndAnnotateReplicationController(t *testing.T, filename string) (string, []byte) {
 	rc1 := readReplicationControllerFromFile(t, filename)
 	rc2 := readReplicationControllerFromFile(t, filename)
-	return annotateRuntimeObject(t, rc1, rc2, "ReplicationController")
+	return annotateRuntimeObject(t, rc1, rc2, testapi.Default.Codec())
 }
 
 func readAndAnnotateService(t *testing.T, filename string) (string, []byte) {
 	svc1 := readServiceFromFile(t, filename)
 	svc2 := readServiceFromFile(t, filename)
-	return annotateRuntimeObject(t, svc1, svc2, "Service")
+	return annotateRuntimeObject(t, svc1, svc2, testapi.Default.Codec())
+}
+
+func readAndAnnotateUnstructured(t *testing.T, filename string) (string, []byte) {
+	obj1 := readUnstructuredFromFile(t, filename)
+	obj2 := readUnstructuredFromFile(t, filename)
+	return annotateRuntimeObject(t, obj1, obj2, testapi.Extensions.Codec())
 }
 
 func validatePatchApplication(t *testing.T, req *http.Request) {
@@ -535,27 +553,12 @@ func TestApplyNULLPreservation(t *testing.T) {
 	}
 }
 
-func readTPREntryFromFile(t *testing.T, filename string) []byte {
-	raw := readBytesFromFile(t, filename)
-	obj := &unstructured.Unstructured{}
-	if err := runtime.DecodeInto(testapi.Extensions.Codec(), raw, obj); err != nil {
-		t.Fatal(err)
-	}
-
-	objJSON, err := runtime.Encode(testapi.Extensions.Codec(), obj)
-	if err != nil {
-		t.Fatal(err)
-	}
-	return objJSON
-}
-
-// TestApplyIdempotentTPREntry check repeated apply operations on TPR entries
+// TestApplyIdempotentTPREntry checks repeated apply operations on TPR entries
 // without any change.
 func TestApplyIdempotentTPREntry(t *testing.T) {
 	initTestErrorHandler(t)
-	name := "test-tpr-entry"
-	path := "/namespaces/test/testtprs/" + name
-	curr := readTPREntryFromFile(t, filenameIdempotentTPREntry)
+	name, curr := readAndAnnotateUnstructured(t, filenameWidget)
+	path := "/namespaces/test/widgets/" + name
 
 	verifiedPatch := false
 
@@ -573,6 +576,13 @@ func TestApplyIdempotentTPREntry(t *testing.T) {
 					Header:     defaultHeader(),
 					Body:       body}, nil
 			case p == path && m == "PATCH":
+				// In idempotent updates, kubectl sends an logically empty
+				// request body with the PATCH request.
+				// Should look like this
+				// Request Body: {"metadata":{"annotations":{}}}
+				// TODO: This unit tests adds the
+				// kubectl.kubernetes.io/last-applied-configuration annotation.
+
 				patch, err := ioutil.ReadAll(req.Body)
 				if err != nil {
 					t.Fatal(err)
@@ -607,15 +617,14 @@ func TestApplyIdempotentTPREntry(t *testing.T) {
 	errBuf := bytes.NewBuffer([]byte{})
 
 	cmd := NewCmdApply(f, buf, errBuf)
-	cmd.Flags().Set("filename", filenameIdempotentTPREntry)
+	cmd.Flags().Set("filename", filenameWidget)
 	cmd.Flags().Set("output", "name")
 	cmd.Run(cmd, []string{})
 
-	expected := "testtpr/" + name + "\n"
+	expected := "widget/" + name + "\n"
 	if buf.String() != expected {
 		t.Fatalf("unexpected output: %s\nexpected: %s", buf.String(), expected)
 	}
-
 	if !verifiedPatch {
 		t.Fatal("No server-side patch call detected")
 	}
