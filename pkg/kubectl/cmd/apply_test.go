@@ -59,9 +59,10 @@ func validateApplyArgs(cmd *cobra.Command, args []string) error {
 }
 
 const (
-	filenameRC    = "../../../test/fixtures/pkg/kubectl/cmd/apply/rc.yaml"
-	filenameSVC   = "../../../test/fixtures/pkg/kubectl/cmd/apply/service.yaml"
-	filenameRCSVC = "../../../test/fixtures/pkg/kubectl/cmd/apply/rc-service.yaml"
+	filenameRC            = "../../../test/fixtures/pkg/kubectl/cmd/apply/rc.yaml"
+	filenameRCLASTAPPLIED = "../../../test/fixtures/pkg/kubectl/cmd/apply/rc-lastapplied.yaml"
+	filenameSVC           = "../../../test/fixtures/pkg/kubectl/cmd/apply/service.yaml"
+	filenameRCSVC         = "../../../test/fixtures/pkg/kubectl/cmd/apply/rc-service.yaml"
 )
 
 func readBytesFromFile(t *testing.T, filename string) []byte {
@@ -191,6 +192,129 @@ func walkMapPath(t *testing.T, start map[string]interface{}, path []string) map[
 	}
 
 	return finish
+}
+
+func TestRunApplyViewLastApplied(t *testing.T) {
+	_, rcBytesWithConfig := readReplicationController(t, filenameRCLASTAPPLIED)
+	nameRC, rcBytes := readReplicationController(t, filenameRC)
+	pathRC := "/namespaces/test/replicationcontrollers/" + nameRC
+
+	tests := []struct {
+		name, nameRC, pathRC, filePath, outputFormat, expectedErr, expectedOut, selector string
+		args                                                                             []string
+		respBytes                                                                        []byte
+	}{
+		{
+			name:         "view with file",
+			filePath:     filenameRC,
+			outputFormat: "",
+			expectedErr:  "",
+			expectedOut:  "test: 1234\n",
+			selector:     "",
+			args:         []string{},
+			respBytes:    rcBytesWithConfig,
+		},
+		{
+			name:         "view with file json format",
+			filePath:     filenameRC,
+			outputFormat: "json",
+			expectedErr:  "",
+			expectedOut:  "{\n  \"test\": 1234\n}\n",
+			selector:     "",
+			args:         []string{},
+			respBytes:    rcBytesWithConfig,
+		},
+		{
+			name:         "view resource/name invalid format",
+			filePath:     "",
+			outputFormat: "wide",
+			expectedErr:  "error: Unexpected -o output mode: wide, the flag 'output' must be one of yaml|json\nSee 'view-last-applied -h' for help and examples.",
+			expectedOut:  "",
+			selector:     "",
+			args:         []string{"rc", "test-rc"},
+			respBytes:    rcBytesWithConfig,
+		},
+		{
+			name:         "view resource with label",
+			filePath:     "",
+			outputFormat: "",
+			expectedErr:  "",
+			expectedOut:  "test: 1234\n",
+			selector:     "name=test-rc",
+			args:         []string{"rc"},
+			respBytes:    rcBytesWithConfig,
+		},
+		{
+			name:         "view resource without annotations",
+			filePath:     "",
+			outputFormat: "",
+			expectedErr:  "error: no last-applied-configuration annotation found on resource: test-rc",
+			expectedOut:  "",
+			selector:     "",
+			args:         []string{"rc", "test-rc"},
+			respBytes:    rcBytes,
+		},
+		{
+			name:         "view resource no match",
+			filePath:     "",
+			outputFormat: "",
+			expectedErr:  "Error from server (NotFound): the server could not find the requested resource (get replicationcontrollers no-match)",
+			expectedOut:  "",
+			selector:     "",
+			args:         []string{"rc", "no-match"},
+			respBytes:    nil,
+		},
+	}
+	for _, test := range tests {
+		f, tf, codec, _ := cmdtesting.NewAPIFactory()
+		tf.Printer = &testPrinter{}
+		tf.UnstructuredClient = &fake.RESTClient{
+			APIRegistry:          api.Registry,
+			NegotiatedSerializer: unstructuredSerializer,
+			Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
+				switch p, m := req.URL.Path, req.Method; {
+				case p == pathRC && m == "GET":
+					bodyRC := ioutil.NopCloser(bytes.NewReader(test.respBytes))
+					return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: bodyRC}, nil
+				case p == "/namespaces/test/replicationcontrollers" && m == "GET":
+					bodyRC := ioutil.NopCloser(bytes.NewReader(test.respBytes))
+					return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: bodyRC}, nil
+				case p == "/namespaces/test/replicationcontrollers/no-match" && m == "GET":
+					return &http.Response{StatusCode: 404, Header: defaultHeader(), Body: objBody(codec, &api.Pod{})}, nil
+				case p == "/api/v1/namespaces/test" && m == "GET":
+					return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, &api.Namespace{})}, nil
+				default:
+					t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
+					return nil, nil
+				}
+			}),
+		}
+		tf.Namespace = "test"
+		tf.ClientConfig = defaultClientConfig()
+		buf, errBuf := bytes.NewBuffer([]byte{}), bytes.NewBuffer([]byte{})
+
+		cmdutil.BehaviorOnFatal(func(str string, code int) {
+			if str != test.expectedErr {
+				t.Errorf("%s: unexpected error: %s\nexpected: %s", test.name, str, test.expectedErr)
+			}
+		})
+
+		cmd := NewCmdApplyViewLastApplied(f, buf, errBuf)
+		if test.filePath != "" {
+			cmd.Flags().Set("filename", test.filePath)
+		}
+		if test.outputFormat != "" {
+			cmd.Flags().Set("output", test.outputFormat)
+		}
+		if test.selector != "" {
+			cmd.Flags().Set("selector", test.selector)
+		}
+
+		cmd.Run(cmd, test.args)
+		if buf.String() != test.expectedOut {
+			t.Fatalf("%s: unexpected output: %s\nexpected: %s", test.name, buf.String(), test.expectedOut)
+		}
+	}
 }
 
 func TestApplyObjectWithoutAnnotation(t *testing.T) {
