@@ -203,7 +203,7 @@ func Run(s *options.ServerRunOptions) error {
 		genericapiserver.NewDefaultResourceEncodingConfig(api.Registry), storageGroupsToEncodingVersion,
 		// FIXME: this GroupVersionResource override should be configurable
 		[]schema.GroupVersionResource{batch.Resource("cronjobs").WithVersion("v2alpha1")},
-		master.DefaultAPIResourceConfigSource(), s.GenericServerRunOptions.RuntimeConfig)
+		master.DefaultAPIResourceConfigSource(), s.APIEnablement.RuntimeConfig)
 	if err != nil {
 		return fmt.Errorf("error in initializing storage factory: %s", err)
 	}
