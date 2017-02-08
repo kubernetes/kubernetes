@@ -3456,18 +3456,23 @@ func WaitForObservedDeployment(c clientset.Interface, ns, deploymentName string,
 }
 
 func WaitForDeploymentWithCondition(c clientset.Interface, ns, deploymentName, reason string, condType extensions.DeploymentConditionType) error {
-	var conditions []extensions.DeploymentCondition
+	var deployment *extensions.Deployment
 	pollErr := wait.PollImmediate(time.Second, 5*time.Minute, func() (bool, error) {
-		deployment, err := c.Extensions().Deployments(ns).Get(deploymentName, metav1.GetOptions{})
+		d, err := c.Extensions().Deployments(ns).Get(deploymentName, metav1.GetOptions{})
 		if err != nil {
 			return false, err
 		}
-		conditions = deployment.Status.Conditions
+		deployment = d
 		cond := deploymentutil.GetDeploymentCondition(deployment.Status, condType)
 		return cond != nil && cond.Reason == reason, nil
 	})
 	if pollErr == wait.ErrWaitTimeout {
-		pollErr = fmt.Errorf("deployment %q never updated with the desired condition and reason: %v", deploymentName, conditions)
+		pollErr = fmt.Errorf("deployment %q never updated with the desired condition and reason: %v", deployment.Name, deployment.Status.Conditions)
+		_, allOldRSs, newRS, err := deploymentutil.GetAllReplicaSets(deployment, c)
+		if err == nil {
+			logReplicaSetsOfDeployment(deployment, allOldRSs, newRS)
+		}
+		logPodsOfDeployment(c, deployment)
 	}
 	return pollErr
 }
