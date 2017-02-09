@@ -382,17 +382,17 @@ var _ = framework.KubeDescribe("Network Partition [Disruptive] [Slow]", func() {
 				dumpDebugInfo(c, ns)
 			}
 			framework.Logf("Deleting all stateful set in ns %v", ns)
-			deleteAllStatefulSets(c, ns)
+			framework.DeleteAllStatefulSets(c, ns)
 		})
 
 		It("should come back up if node goes down [Slow] [Disruptive]", func() {
 			petMounts := []v1.VolumeMount{{Name: "datadir", MountPath: "/data/"}}
 			podMounts := []v1.VolumeMount{{Name: "home", MountPath: "/home"}}
-			ps := newStatefulSet(psName, ns, headlessSvcName, 3, petMounts, podMounts, labels)
+			ps := framework.NewStatefulSet(psName, ns, headlessSvcName, 3, petMounts, podMounts, labels)
 			_, err := c.Apps().StatefulSets(ns).Create(ps)
 			Expect(err).NotTo(HaveOccurred())
 
-			pst := statefulSetTester{c: c}
+			pst := framework.NewStatefulSetTester(c)
 
 			nn := framework.TestContext.CloudConfig.NumNodes
 			nodeNames, err := framework.CheckNodesReady(f.ClientSet, framework.NodeReadyInitialTimeout, nn)
@@ -400,18 +400,18 @@ var _ = framework.KubeDescribe("Network Partition [Disruptive] [Slow]", func() {
 			restartNodes(f, nodeNames)
 
 			By("waiting for pods to be running again")
-			pst.waitForRunningAndReady(*ps.Spec.Replicas, ps)
+			pst.WaitForRunningAndReady(*ps.Spec.Replicas, ps)
 		})
 
 		It("should not reschedule stateful pods if there is a network partition [Slow] [Disruptive]", func() {
-			ps := newStatefulSet(psName, ns, headlessSvcName, 3, []v1.VolumeMount{}, []v1.VolumeMount{}, labels)
+			ps := framework.NewStatefulSet(psName, ns, headlessSvcName, 3, []v1.VolumeMount{}, []v1.VolumeMount{}, labels)
 			_, err := c.Apps().StatefulSets(ns).Create(ps)
 			Expect(err).NotTo(HaveOccurred())
 
-			pst := statefulSetTester{c: c}
-			pst.waitForRunningAndReady(*ps.Spec.Replicas, ps)
+			pst := framework.NewStatefulSetTester(c)
+			pst.WaitForRunningAndReady(*ps.Spec.Replicas, ps)
 
-			pod := pst.getPodList(ps).Items[0]
+			pod := pst.GetPodList(ps).Items[0]
 			node, err := c.Core().Nodes().Get(pod.Spec.NodeName, metav1.GetOptions{})
 			framework.ExpectNoError(err)
 
@@ -430,7 +430,7 @@ var _ = framework.KubeDescribe("Network Partition [Disruptive] [Slow]", func() {
 			}
 
 			By("waiting for pods to be running again")
-			pst.waitForRunningAndReady(*ps.Spec.Replicas, ps)
+			pst.WaitForRunningAndReady(*ps.Spec.Replicas, ps)
 		})
 	})
 
