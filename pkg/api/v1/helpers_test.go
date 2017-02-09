@@ -17,12 +17,14 @@ limitations under the License.
 package v1
 
 import (
+	"fmt"
 	"reflect"
 	"testing"
 
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 )
 
 func TestAddToNodeAddresses(t *testing.T) {
@@ -641,6 +643,183 @@ func TestSysctlsFromPodAnnotation(t *testing.T) {
 			t.Errorf("[%v]did not expect error but got: %v", i, err)
 		} else if !reflect.DeepEqual(sysctls, test.expectValue) {
 			t.Errorf("[%v]expect value %v but got %v", i, test.expectValue, sysctls)
+		}
+	}
+}
+
+func TestGetAffinityFromPodAnnotations(t *testing.T) {
+	testCases := []struct {
+		pod       *Pod
+		expectErr bool
+	}{
+		{
+			pod:       &Pod{},
+			expectErr: false,
+		},
+		{
+			pod: &Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						AffinityAnnotationKey: `
+						{"nodeAffinity": { "requiredDuringSchedulingIgnoredDuringExecution": {
+							"nodeSelectorTerms": [{
+								"matchExpressions": [{
+									"key": "foo",
+									"operator": "In",
+									"values": ["value1", "value2"]
+								}]
+							}]
+						}}}`,
+					},
+				},
+			},
+			expectErr: false,
+		},
+		{
+			pod: &Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						AffinityAnnotationKey: `
+						{"nodeAffinity": { "requiredDuringSchedulingIgnoredDuringExecution": {
+							"nodeSelectorTerms": [{
+								"matchExpressions": [{
+									"key": "foo",
+						`,
+					},
+				},
+			},
+			expectErr: true,
+		},
+	}
+
+	for i, tc := range testCases {
+		_, err := GetAffinityFromPodAnnotations(tc.pod.Annotations)
+		if err == nil && tc.expectErr {
+			t.Errorf("[%v]expected error but got none.", i)
+		}
+		if err != nil && !tc.expectErr {
+			t.Errorf("[%v]did not expect error but got: %v", i, err)
+		}
+	}
+}
+
+func TestReconcileAffinity(t *testing.T) {
+	baseAffinity := &Affinity{
+		NodeAffinity: &NodeAffinity{
+			RequiredDuringSchedulingIgnoredDuringExecution: &NodeSelector{
+				NodeSelectorTerms: []NodeSelectorTerm{
+					{
+						MatchExpressions: []NodeSelectorRequirement{
+							{
+								Key:      "foo",
+								Operator: NodeSelectorOpIn,
+								Values:   []string{"bar", "value2"},
+							},
+						},
+					},
+				},
+			},
+		},
+		PodAffinity: &PodAffinity{
+			RequiredDuringSchedulingIgnoredDuringExecution: []PodAffinityTerm{
+				{
+					LabelSelector: &metav1.LabelSelector{
+						MatchExpressions: []metav1.LabelSelectorRequirement{
+							{
+								Key:      "security",
+								Operator: metav1.LabelSelectorOpDoesNotExist,
+								Values:   []string{"securityscan"},
+							},
+						},
+					},
+					TopologyKey: "topologyKey1",
+				},
+			},
+		},
+		PodAntiAffinity: &PodAntiAffinity{
+			RequiredDuringSchedulingIgnoredDuringExecution: []PodAffinityTerm{
+				{
+					LabelSelector: &metav1.LabelSelector{
+						MatchExpressions: []metav1.LabelSelectorRequirement{
+							{
+								Key:      "service",
+								Operator: metav1.LabelSelectorOpIn,
+								Values:   []string{"S1", "value2"},
+							},
+						},
+					},
+					TopologyKey: "topologyKey2",
+					Namespaces:  []string{"ns1"},
+				},
+			},
+		},
+	}
+
+	nodeAffinityAnnotation := map[string]string{
+		AffinityAnnotationKey: `
+		{"nodeAffinity": {"preferredDuringSchedulingIgnoredDuringExecution": [
+			{
+				"weight": 2,
+				"preference": {"matchExpressions": [
+					{
+						"key": "foo",
+						"operator": "In", "values": ["bar"]
+					}
+				]}
+			}
+		]}}`,
+	}
+
+	testCases := []struct {
+		pod                *Pod
+		expected           *Affinity
+		annotationsEnabled bool
+	}{
+		{
+			pod: &Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: nodeAffinityAnnotation,
+				},
+				Spec: PodSpec{
+					Affinity: baseAffinity,
+				},
+			},
+			expected:           baseAffinity,
+			annotationsEnabled: true,
+		},
+		{
+			pod: &Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: nodeAffinityAnnotation,
+				},
+			},
+			expected: &Affinity{
+				NodeAffinity: &NodeAffinity{
+					PreferredDuringSchedulingIgnoredDuringExecution: []PreferredSchedulingTerm{
+						{
+							Weight: 2,
+							Preference: NodeSelectorTerm{
+								MatchExpressions: []NodeSelectorRequirement{
+									{
+										Key:      "foo",
+										Operator: NodeSelectorOpIn,
+										Values:   []string{"bar"},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			annotationsEnabled: true,
+		},
+	}
+
+	for i, tc := range testCases {
+		utilfeature.DefaultFeatureGate.Set(fmt.Sprintf("AffinityInAnnotations=%t", tc.annotationsEnabled))
+		affinity := ReconcileAffinity(tc.pod)
+		if affinity != tc.expected {
+			t.Errorf("[%v]did not get expected affinity. got: %v instead of %v", i, affinity, tc.expected)
 		}
 	}
 }
