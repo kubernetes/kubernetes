@@ -148,7 +148,6 @@ func (s *Scheduler) Run() {
 
 func (s *Scheduler) scheduleOne() {
 	var podAnnotations schedulerapi.Annotations
-
 	pod := s.config.NextPod()
 	if pod.DeletionTimestamp != nil {
 		s.config.Recorder.Eventf(pod, v1.EventTypeWarning, "FailedScheduling", "skip schedule deleting pod: %v/%v", pod.Namespace, pod.Name)

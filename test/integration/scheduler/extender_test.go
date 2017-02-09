@@ -185,7 +185,7 @@ func (e *Extender) Filter(args *schedulerapi.ExtenderArgs) (*schedulerapi.Extend
 	}
 }
 
-func (e *Extender) Prioritize(args *schedulerapi.ExtenderArgs) (schedulerapi.HostPriorityList, error) {
+func (e *Extender) Prioritize(args *schedulerapi.ExtenderArgs) (*schedulerapi.HostPriorityList, error) {
 	result := schedulerapi.HostPriorityList{}
 	combinedScores := map[string]int{}
 	var nodes = &v1.NodeList{Items: []v1.Node{}}
@@ -206,7 +206,7 @@ func (e *Extender) Prioritize(args *schedulerapi.ExtenderArgs) (schedulerapi.Hos
 		priorityFunc := prioritizer.function
 		prioritizedList, err := priorityFunc(&args.Pod, nodes)
 		if err != nil {
-			return schedulerapi.HostPriorityList{}, err
+			return &schedulerapi.HostPriorityList{}, err
 		}
 		for _, hostEntry := range *prioritizedList {
 			combinedScores[hostEntry.Host] += hostEntry.Score * weight
@@ -215,7 +215,7 @@ func (e *Extender) Prioritize(args *schedulerapi.ExtenderArgs) (schedulerapi.Hos
 	for host, score := range combinedScores {
 		result = append(result, schedulerapi.HostPriority{Host: host, Score: score})
 	}
-	return result, nil
+	return &result, nil
 }
 
 func machine_1_2_3_Predicate(pod *v1.Pod, node *v1.Node) (bool, error) {

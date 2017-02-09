@@ -155,7 +155,8 @@ type Annotations map[string]string
 
 // ExtenderFilterResult represents the results of a filter call to an extender
 type ExtenderFilterResult struct {
-	// Filtered set of nodes where the pod can be scheduled
+	// Filtered set of nodes where the pod can be scheduled; to be populated
+	// only if extender is not capable of maintaining its own node cache
 	Nodes *apiv1.NodeList `json:"nodes,omitempty"`
 	// Filtered set of nodes where the pod can be scheduled; to be populated
 	// only if extender is capable of maintaining its own node cache

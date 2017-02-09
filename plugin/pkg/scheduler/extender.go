@@ -42,7 +42,6 @@ type HTTPExtender struct {
 	filterVerb       string
 	prioritizeVerb   string
 	weight           int
-	apiVersion       string
 	client           *http.Client
 	nodeCacheCapable bool
 }
@@ -70,7 +69,7 @@ func makeTransport(config *schedulerapi.ExtenderConfig) (http.RoundTripper, erro
 	return utilnet.SetTransportDefaults(&http.Transport{}), nil
 }
 
-func NewHTTPExtender(config *schedulerapi.ExtenderConfig, apiVersion string) (algorithm.SchedulerExtender, error) {
+func NewHTTPExtender(config *schedulerapi.ExtenderConfig) (algorithm.SchedulerExtender, error) {
 	if config.HTTPTimeout.Nanoseconds() == 0 {
 		config.HTTPTimeout = time.Duration(DefaultExtenderTimeout)
 	}
@@ -85,7 +84,6 @@ func NewHTTPExtender(config *schedulerapi.ExtenderConfig, apiVersion string) (al
 	}
 	return &HTTPExtender{
 		extenderURL:      config.URLPrefix,
-		apiVersion:       apiVersion,
 		filterVerb:       config.FilterVerb,
 		prioritizeVerb:   config.PrioritizeVerb,
 		weight:           config.Weight,
@@ -104,6 +102,7 @@ func (h *HTTPExtender) Filter(pod *v1.Pod, nodes []*v1.Node, nodeNameToInfo map[
 		nodeNames      *[]string
 		nodeResult     []*v1.Node
 		podAnnotations schedulerapi.Annotations
+		args           *schedulerapi.ExtenderArgs
 	)
 
 	if h.filterVerb == "" {
@@ -123,25 +122,33 @@ func (h *HTTPExtender) Filter(pod *v1.Pod, nodes []*v1.Node, nodeNameToInfo map[
 		}
 	}
 
-	args := schedulerapi.ExtenderArgs{
-		Pod:       *pod,
-		Nodes:     &v1.NodeList{Items: nodeItems},
-		NodeNames: nodeNames,
+	if h.nodeCacheCapable {
+		args = &schedulerapi.ExtenderArgs{
+			Pod:       *pod,
+			Nodes:     nil,
+			NodeNames: nodeNames,
+		}
+	} else {
+		args = &schedulerapi.ExtenderArgs{
+			Pod:       *pod,
+			Nodes:     &v1.NodeList{Items: nodeItems},
+			NodeNames: nil,
+		}
 	}
 
-	if err := h.send(h.filterVerb, &args, &result); err != nil {
+	if err := h.send(h.filterVerb, args, &result); err != nil {
 		return nil, nil, nil, err
 	}
 	if result.Error != "" {
 		return nil, nil, nil, fmt.Errorf(result.Error)
 	}
 
-	if h.nodeCacheCapable {
+	if h.nodeCacheCapable && (result.NodeNames != nil) {
 		nodeResult = make([]*v1.Node, 0, len(*result.NodeNames))
 		for i := range *result.NodeNames {
 			nodeResult = append(nodeResult, nodeNameToInfo[(*result.NodeNames)[i]].Node())
 		}
-	} else {
+	} else if result.Nodes != nil {
 		nodeResult = make([]*v1.Node, 0, len(result.Nodes.Items))
 		for i := range result.Nodes.Items {
 			nodeResult = append(nodeResult, &result.Nodes.Items[i])
@@ -165,6 +172,7 @@ func (h *HTTPExtender) Prioritize(pod *v1.Pod, nodes []*v1.Node) (*schedulerapi.
 		result    schedulerapi.HostPriorityList
 		nodeItems []v1.Node
 		nodeNames *[]string
+		args      *schedulerapi.ExtenderArgs
 	)
 
 	if h.prioritizeVerb == "" {
@@ -188,13 +196,21 @@ func (h *HTTPExtender) Prioritize(pod *v1.Pod, nodes []*v1.Node) (*schedulerapi.
 		}
 	}
 
-	args := schedulerapi.ExtenderArgs{
-		Pod:       *pod,
-		Nodes:     &v1.NodeList{Items: nodeItems},
-		NodeNames: nodeNames,
+	if h.nodeCacheCapable {
+		args = &schedulerapi.ExtenderArgs{
+			Pod:       *pod,
+			Nodes:     nil,
+			NodeNames: nodeNames,
+		}
+	} else {
+		args = &schedulerapi.ExtenderArgs{
+			Pod:       *pod,
+			Nodes:     &v1.NodeList{Items: nodeItems},
+			NodeNames: nil,
+		}
 	}
 
-	if err := h.send(h.prioritizeVerb, &args, &result); err != nil {
+	if err := h.send(h.prioritizeVerb, args, &result); err != nil {
 		return nil, 0, err
 	}
 	return &result, h.weight, nil

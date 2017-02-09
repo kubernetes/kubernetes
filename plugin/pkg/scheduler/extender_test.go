@@ -37,6 +37,10 @@ type priorityConfig struct {
 	weight   int
 }
 
+var podAnnotations = schedulerapi.Annotations{
+	"testann.io/pod-ann-test": "test-ann",
+}
+
 func errorPredicateExtender(pod *v1.Pod, node *v1.Node) (bool, error) {
 	return false, fmt.Errorf("Some error")
 }
@@ -104,9 +108,10 @@ func machine2Prioritizer(_ *v1.Pod, nodeNameToInfo map[string]*schedulercache.No
 }
 
 type FakeExtender struct {
-	predicates   []fitPredicate
-	prioritizers []priorityConfig
-	weight       int
+	predicates       []fitPredicate
+	prioritizers     []priorityConfig
+	weight           int
+	nodeCacheCapable bool
 }
 
 func (f *FakeExtender) Filter(pod *v1.Pod, nodes []*v1.Node, nodeNameToInfo map[string]*schedulercache.NodeInfo) ([]*v1.Node, schedulerapi.FailedNodesMap, schedulerapi.Annotations, error) {
@@ -129,6 +134,10 @@ func (f *FakeExtender) Filter(pod *v1.Pod, nodes []*v1.Node, nodeNameToInfo map[
 		} else {
 			failedNodesMap[node.Name] = "FakeExtender failed"
 		}
+	}
+
+	if f.nodeCacheCapable {
+		return filtered, failedNodesMap, podAnnotations, nil
 	}
 	return filtered, failedNodesMap, nil, nil
 }
@@ -167,6 +176,7 @@ func TestGenericSchedulerWithExtenders(t *testing.T) {
 		nodes                []string
 		expectedHost         string
 		expectsErr           bool
+		expectsAnnotations   bool
 	}{
 		{
 			predicates:   map[string]algorithm.FitPredicate{"true": truePredicate},
@@ -275,6 +285,22 @@ func TestGenericSchedulerWithExtenders(t *testing.T) {
 			expectedHost: "machine2", // machine2 has higher score
 			name:         "test 7",
 		},
+		{
+			predicates:   map[string]algorithm.FitPredicate{"true": truePredicate},
+			prioritizers: []algorithm.PriorityConfig{{Function: machine2Prioritizer, Weight: 20}},
+			extenders: []FakeExtender{
+				{
+					predicates:       []fitPredicate{truePredicateExtender},
+					prioritizers:     []priorityConfig{{machine1PrioritizerExtender, 10}},
+					weight:           1,
+					nodeCacheCapable: true,
+				},
+			},
+			nodes:              []string{"machine1", "machine2"},
+			expectedHost:       "machine2",
+			expectsAnnotations: true,
+			name:               "test 8",
+		},
 	}
 
 	for _, test := range tests {
@@ -289,7 +315,7 @@ func TestGenericSchedulerWithExtenders(t *testing.T) {
 		scheduler := NewGenericScheduler(
 			cache, test.predicates, algorithm.EmptyMetadataProducer, test.prioritizers, algorithm.EmptyMetadataProducer, extenders)
 		podIgnored := &v1.Pod{}
-		machine, _, err := scheduler.Schedule(podIgnored, algorithm.FakeNodeLister(makeNodeList(test.nodes)))
+		machine, podAnnotations, err := scheduler.Schedule(podIgnored, algorithm.FakeNodeLister(makeNodeList(test.nodes)))
 		if test.expectsErr {
 			if err == nil {
 				t.Errorf("Unexpected non-error for %s, machine %s", test.name, machine)
@@ -301,6 +327,9 @@ func TestGenericSchedulerWithExtenders(t *testing.T) {
 			}
 			if test.expectedHost != machine {
 				t.Errorf("Failed : %s, Expected: %s, Saw: %s", test.name, test.expectedHost, machine)
+			}
+			if test.expectsAnnotations && podAnnotations == nil {
+				t.Errorf("Failed : %s, Expected annotations : %v, Saw: nil", test.name, podAnnotations)
 			}
 		}
 	}

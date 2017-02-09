@@ -139,7 +139,8 @@ type ExtenderConfig struct {
 type ExtenderArgs struct {
 	// Pod being scheduled
 	Pod v1.Pod
-	// List of candidate nodes where the pod can be scheduled
+	// List of candidate nodes where the pod can be scheduled; to be populated
+	// only if extender is not capable of maintaining its own node cache
 	Nodes *v1.NodeList
 	// List of candidate node names where the pod can be scheduled; to be
 	// populated only if extender is capable of maintaining its own node cache
@@ -154,7 +155,8 @@ type Annotations map[string]string
 
 // ExtenderFilterResult represents the results of a filter call to an extender
 type ExtenderFilterResult struct {
-	// Filtered set of nodes where the pod can be scheduled
+	// Filtered set of nodes where the pod can be scheduled; to be populated
+	// only if extender is not capable of maintaining its own node cache
 	Nodes *v1.NodeList
 	// Filtered set of nodes where the pod can be scheduled; to be populated
 	// only if extender is capable of maintaining its own node cache
