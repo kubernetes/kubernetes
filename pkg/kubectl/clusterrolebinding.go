@@ -100,7 +100,6 @@ func (s ClusterRoleBindingGeneratorV1) ParamNames() []GeneratorParam {
 		{"user", false},
 		{"group", false},
 		{"serviceaccount", false},
-		{"force", false},
 	}
 }
 
