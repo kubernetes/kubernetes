@@ -168,7 +168,12 @@
   {% set etcd_quorum_read = "--etcd_quorum_read=" + pillar['etcd_quorum_read'] -%}
 {% endif -%}
 
-{% set params = address + " " + storage_backend + " " + etcd_servers + " " + etcd_servers_overrides + " " + cloud_provider + " " + cloud_config + " " + runtime_config + " " + feature_gates + " " + admission_control + " " + max_requests_inflight + " " + target_ram_mb + " " + service_cluster_ip_range + " " + client_ca_file + basic_auth_file + " " + min_request_timeout + " " + enable_garbage_collector + " " + etcd_quorum_read -%}
+{% set audit_log = "" -%}
+{% if pillar['enable_apiserver_basic_audit'] is defined and pillar['enable_apiserver_basic_audit'] in ['true']  -%}
+  {% set audit_log = "--audit-log-path=/var/log/kube-apiserver-audit.log --audit-log-maxage=0 --audit-log-maxbackup=0 --audit-log-maxsize=2000000000" -%}
+{% endif -%}
+
+{% set params = address + " " + storage_backend + " " + etcd_servers + " " + etcd_servers_overrides + " " + cloud_provider + " " + cloud_config + " " + runtime_config + " " + feature_gates + " " + admission_control + " " + max_requests_inflight + " " + target_ram_mb + " " + service_cluster_ip_range + " " + client_ca_file + basic_auth_file + " " + min_request_timeout + " " + enable_garbage_collector + " " + etcd_quorum_read + " " + audit_log -%}
 {% set params = params + " " + cert_file + " " + key_file + " --secure-port=" + secure_port + token_auth_file + " " + bind_address + " " + log_level + " " + advertise_address  + " " + proxy_ssh_options + authz_mode + abac_policy_file + webhook_authentication_config + webhook_authorization_config + image_review_config -%}
 
 # test_args has to be kept at the end, so they'll overwrite any prior configuration
@@ -233,6 +238,9 @@
         { "name": "logfile",
         "mountPath": "/var/log/kube-apiserver.log",
         "readOnly": false},
+        { "name": "auditlogfile",
+        "mountPath": "/var/log/kube-apiserver-audit.log",
+        "readOnly": false},
         { "name": "etcssl",
         "mountPath": "/etc/ssl",
         "readOnly": true},
@@ -265,6 +273,10 @@
   { "name": "logfile",
     "hostPath": {
         "path": "/var/log/kube-apiserver.log"}
+  },
+  { "name": "auditlogfile",
+    "hostPath": {
+        "path": "/var/log/kube-apiserver-audit.log"}
   },
   { "name": "etcssl",
     "hostPath": {
