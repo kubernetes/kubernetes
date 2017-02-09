@@ -84,6 +84,7 @@ filegroup(
     name = "all-srcs",
     srcs = [
         ":package-srcs",
+        "//pkg/controller/bootstrap:all-srcs",
         "//pkg/controller/certificates:all-srcs",
         "//pkg/controller/cloud:all-srcs",
         "//pkg/controller/cronjob:all-srcs",
