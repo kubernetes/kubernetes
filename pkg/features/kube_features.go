@@ -66,6 +66,9 @@ const (
 	// and also prevents them from being evicted from a node.
 	// Note: This feature is not supported for `BestEffort` pods.
 	ExperimentalCriticalPodAnnotation utilfeature.Feature = "ExperimentalCriticalPodAnnotation"
+
+	// Determines if affinity defined in annotations should bep rocessed
+	AffinityInAnnotations utilfeature.Feature = "AffinityInAnnotations"
 )
 
 func init() {

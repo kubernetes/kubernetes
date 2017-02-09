@@ -70,7 +70,7 @@ func createClient(s *options.SchedulerServer) (*clientset.Clientset, error) {
 
 // createScheduler encapsulates the entire creation of a runnable scheduler.
 func createScheduler(s *options.SchedulerServer, kubecli *clientset.Clientset, recorder record.EventRecorder) (*scheduler.Scheduler, error) {
-	configurator := factory.NewConfigFactory(kubecli, s.SchedulerName, s.HardPodAffinitySymmetricWeight, s.FailureDomains)
+	configurator := factory.NewConfigFactory(kubecli, s.SchedulerName, s.HardPodAffinitySymmetricWeight)
 
 	// Rebuild the configurator with a default Create(...) method.
 	configurator = &schedulerConfigurator{
