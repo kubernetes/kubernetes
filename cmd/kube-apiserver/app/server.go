@@ -315,15 +315,19 @@ func Run(s *options.ServerRunOptions) error {
 		sets.NewString("watch", "proxy"),
 		sets.NewString("attach", "exec", "proxy", "log", "portforward"),
 	)
+	genericConfig.RESTOptionsGetter = &kubeapiserver.RESTOptionsFactory{
+		StorageFactory:          storageFactory,
+		EnableWatchCache:        s.Etcd.EnableWatchCache,
+		EnableGarbageCollection: s.Etcd.EnableGarbageCollection,
+		DeleteCollectionWorkers: s.Etcd.DeleteCollectionWorkers,
+	}
 
 	config := &master.Config{
 		GenericConfig: genericConfig,
 
 		APIResourceConfigSource: storageFactory.APIResourceConfigSource,
 		StorageFactory:          storageFactory,
-		EnableWatchCache:        s.GenericServerRunOptions.EnableWatchCache,
 		EnableCoreControllers:   true,
-		DeleteCollectionWorkers: s.GenericServerRunOptions.DeleteCollectionWorkers,
 		EventTTL:                s.EventTTL,
 		KubeletClientConfig:     s.KubeletConfig,
 		EnableUISupport:         true,
@@ -342,7 +346,7 @@ func Run(s *options.ServerRunOptions) error {
 		MasterCount: s.MasterCount,
 	}
 
-	if s.GenericServerRunOptions.EnableWatchCache {
+	if s.Etcd.EnableWatchCache {
 		glog.V(2).Infof("Initializing cache sizes based on %dMB limit", s.GenericServerRunOptions.TargetRAMMB)
 		cachesize.InitializeWatchCacheSizes(s.GenericServerRunOptions.TargetRAMMB)
 		cachesize.SetWatchCacheSizes(s.GenericServerRunOptions.WatchCacheSizes)

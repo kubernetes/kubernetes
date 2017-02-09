@@ -388,9 +388,10 @@ func NewDefaultAPIGroupInfo(group string, registry *registered.APIRegistrationMa
 	return APIGroupInfo{
 		GroupMeta:                    *groupMeta,
 		VersionedResourcesStorageMap: map[string]map[string]rest.Storage{},
-		OptionsExternalVersion:       &registry.GroupOrDie("").GroupVersion,
-		Scheme:                       scheme,
-		ParameterCodec:               parameterCodec,
-		NegotiatedSerializer:         codecs,
+		// TODO unhardcode this.  It was hardcoded before, but we need to re-evaluate
+		OptionsExternalVersion: &schema.GroupVersion{Version: "v1"},
+		Scheme:                 scheme,
+		ParameterCodec:         parameterCodec,
+		NegotiatedSerializer:   codecs,
 	}
 }
