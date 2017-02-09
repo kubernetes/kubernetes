@@ -45,6 +45,15 @@ var (
 	alwaysReady           = func() bool { return true }
 )
 
+const (
+	noSchedule = `
+	[{
+		"key": "dedicated",
+		"value": "user1",
+		"effect": "NoSchedule"
+	}]`
+)
+
 func getKey(ds *extensions.DaemonSet, t *testing.T) string {
 	if key, err := controller.KeyFunc(ds); err != nil {
 		t.Errorf("Unexpected error getting key for ds %v: %v", ds.Name, err)
@@ -706,6 +715,63 @@ func TestDaemonKillFailedPods(t *testing.T) {
 		manager.dsStore.Add(ds)
 		syncAndValidateDaemonSets(t, manager, ds, podControl, test.expectedCreates, test.expectedDeletes)
 	}
+}
+
+// DaemonSet should not launch a pod on a tainted node when the pod doesn't tolerate that taint.
+func TestTaintedNodeDaemonDoesNotLaunchUntoleratePod(t *testing.T) {
+	manager, podControl, _ := newTestController()
+
+	node := newNode("tainted", nil)
+	setNodeTaint(node, noSchedule)
+	manager.nodeStore.Add(node)
+
+	ds := newDaemonSet("untolerate")
+	manager.dsStore.Add(ds)
+
+	syncAndValidateDaemonSets(t, manager, ds, podControl, 0, 0)
+}
+
+// DaemonSet should launch a pod on a tainted node when the pod can tolerate that taint.
+func TestTaintedNodeDaemonLaunchesToleratePod(t *testing.T) {
+	manager, podControl, _ := newTestController()
+
+	node := newNode("tainted", nil)
+	setNodeTaint(node, noSchedule)
+	manager.nodeStore.Add(node)
+
+	ds := newDaemonSet("tolerate")
+	setDaemonSetToleration(ds, noSchedule)
+	manager.dsStore.Add(ds)
+
+	syncAndValidateDaemonSets(t, manager, ds, podControl, 1, 0)
+}
+
+// DaemonSet should launch a pod on an untainted node when the pod has tolerations.
+func TestNodeDaemonLaunchesToleratePod(t *testing.T) {
+	manager, podControl, _ := newTestController()
+
+	node := newNode("untainted", nil)
+	manager.nodeStore.Add(node)
+
+	ds := newDaemonSet("tolerate")
+	setDaemonSetToleration(ds, noSchedule)
+	manager.dsStore.Add(ds)
+
+	syncAndValidateDaemonSets(t, manager, ds, podControl, 1, 0)
+}
+
+func setNodeTaint(node *v1.Node, taint string) {
+	if node.ObjectMeta.Annotations == nil {
+		node.ObjectMeta.Annotations = make(map[string]string)
+	}
+	node.ObjectMeta.Annotations[v1.TaintsAnnotationKey] = taint
+}
+
+func setDaemonSetToleration(ds *extensions.DaemonSet, toleration string) {
+	if ds.Spec.Template.ObjectMeta.Annotations == nil {
+		ds.Spec.Template.ObjectMeta.Annotations = make(map[string]string)
+	}
+	ds.Spec.Template.ObjectMeta.Annotations[v1.TolerationsAnnotationKey] = toleration
 }
 
 func TestNodeShouldRunDaemonPod(t *testing.T) {
