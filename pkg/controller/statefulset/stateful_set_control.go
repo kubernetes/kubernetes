@@ -115,13 +115,15 @@ func (ssc *defaultStatefulSetControl) UpdateStatefulSet(set *apps.StatefulSet, p
 		if !isCreated(replicas[i]) {
 			return ssc.podControl.CreateStatefulPod(set, replicas[i])
 		}
-		// if we have a Pod that has been created but is not running and ready we can not make progress
+		// If we have a Pod that has been created but is not running and ready we can not make progress.
+		// We must ensure that all for each Pod, when we create it, all of its predecessors, with respect to its
+		// ordinal, are Running and Ready.
 		if !isRunningAndReady(replicas[i]) {
 			glog.V(2).Infof("StatefulSet %s is waiting for Pod %s to be Running and Ready",
 				set.Name, replicas[i].Name)
 			return nil
 		}
-		// enforce the StatefulSet invariants
+		// Enforce the StatefulSet invariants,
 		if err := ssc.podControl.UpdateStatefulPod(set, replicas[i]); err != nil {
 			return err
 		}

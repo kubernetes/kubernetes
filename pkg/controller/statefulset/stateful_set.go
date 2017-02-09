@@ -17,6 +17,7 @@ limitations under the License.
 package statefulset
 
 import (
+	"fmt"
 	"reflect"
 	"sort"
 	"time"
@@ -40,7 +41,6 @@ import (
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/kubernetes/pkg/controller"
 
-	"fmt"
 	"github.com/golang/glog"
 )
 
@@ -60,11 +60,8 @@ type StatefulSetController struct {
 	control StatefulSetControlInterface
 	// podStore is a cache of watched pods.
 	podStore listers.StoreToPodLister
-
 	// podStoreSynced returns true if the pod store has synced at least once.
 	podStoreSynced cache.InformerSynced
-	// Watches changes to all pods.
-	podController cache.Controller
 	// A store of StatefulSets, populated by the psController.
 	setStore listers.StoreToStatefulSetLister
 	// Watches changes to all StatefulSets.
@@ -95,7 +92,6 @@ func NewStatefulSetController(podInformer cache.SharedIndexInformer, kubeClient 
 		DeleteFunc: ssc.deletePod,
 	})
 	ssc.podStore.Indexer = podInformer.GetIndexer()
-	ssc.podController = podInformer.GetController()
 
 	ssc.setStore.Store, ssc.setController = cache.NewInformer(
 		&cache.ListWatch{
@@ -122,13 +118,14 @@ func NewStatefulSetController(podInformer cache.SharedIndexInformer, kubeClient 
 		},
 	)
 	// TODO: Watch volumes
-	ssc.podStoreSynced = ssc.podController.HasSynced
+	ssc.podStoreSynced = podInformer.GetController().HasSynced
 	return ssc
 }
 
 // Run runs the statefulset controller.
 func (ssc *StatefulSetController) Run(workers int, stopCh <-chan struct{}) {
 	defer utilruntime.HandleCrash()
+	defer ssc.queue.ShutDown()
 	glog.Infof("Starting statefulset controller")
 	if !cache.WaitForCacheSync(stopCh, ssc.podStoreSynced) {
 		return
@@ -139,7 +136,7 @@ func (ssc *StatefulSetController) Run(workers int, stopCh <-chan struct{}) {
 	}
 	<-stopCh
 	glog.Infof("Shutting down statefulset controller")
-	ssc.queue.ShutDown()
+
 }
 
 // addPod adds the statefulset for the pod to the sync queue
