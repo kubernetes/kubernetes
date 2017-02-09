@@ -21,7 +21,6 @@ package network
 import (
 	"github.com/Azure/go-autorest/autorest"
 	"github.com/Azure/go-autorest/autorest/azure"
-	"github.com/Azure/go-autorest/autorest/validation"
 	"net/http"
 )
 
@@ -54,13 +53,6 @@ func NewRouteTablesClientWithBaseURI(baseURI string, subscriptionID string) Rout
 // name of the route table. parameters is parameters supplied to the create
 // or update route table operation.
 func (client RouteTablesClient) CreateOrUpdate(resourceGroupName string, routeTableName string, parameters RouteTable, cancel <-chan struct{}) (result autorest.Response, err error) {
-	if err := validation.Validate([]validation.Validation{
-		{TargetValue: parameters,
-			Constraints: []validation.Constraint{{Target: "parameters.RouteTablePropertiesFormat", Name: validation.Null, Rule: false,
-				Chain: []validation.Constraint{{Target: "parameters.RouteTablePropertiesFormat.Subnets", Name: validation.ReadOnly, Rule: true, Chain: nil}}}}}}); err != nil {
-		return result, validation.NewErrorWithValidationError(err, "network.RouteTablesClient", "CreateOrUpdate")
-	}
-
 	req, err := client.CreateOrUpdatePreparer(resourceGroupName, routeTableName, parameters, cancel)
 	if err != nil {
 		return result, autorest.NewErrorWithError(err, "network.RouteTablesClient", "CreateOrUpdate", nil, "Failure preparing request")

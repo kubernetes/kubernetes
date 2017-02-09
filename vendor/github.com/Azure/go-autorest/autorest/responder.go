@@ -128,6 +128,8 @@ func ByUnmarshallingJSON(v interface{}) RespondDecorator {
 			err := r.Respond(resp)
 			if err == nil {
 				b, errInner := ioutil.ReadAll(resp.Body)
+				// Some responses might include a BOM, remove for successful unmarshalling
+				b = bytes.TrimPrefix(b, []byte("\xef\xbb\xbf"))
 				if errInner != nil {
 					err = fmt.Errorf("Error occurred reading http.Response#Body - Error = '%v'", errInner)
 				} else if len(strings.Trim(string(b), " ")) > 0 {

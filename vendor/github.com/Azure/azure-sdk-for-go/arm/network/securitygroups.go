@@ -21,7 +21,6 @@ package network
 import (
 	"github.com/Azure/go-autorest/autorest"
 	"github.com/Azure/go-autorest/autorest/azure"
-	"github.com/Azure/go-autorest/autorest/validation"
 	"net/http"
 )
 
@@ -56,15 +55,6 @@ func NewSecurityGroupsClientWithBaseURI(baseURI string, subscriptionID string) S
 // parameters is parameters supplied to the create or update network security
 // group operation.
 func (client SecurityGroupsClient) CreateOrUpdate(resourceGroupName string, networkSecurityGroupName string, parameters SecurityGroup, cancel <-chan struct{}) (result autorest.Response, err error) {
-	if err := validation.Validate([]validation.Validation{
-		{TargetValue: parameters,
-			Constraints: []validation.Constraint{{Target: "parameters.SecurityGroupPropertiesFormat", Name: validation.Null, Rule: false,
-				Chain: []validation.Constraint{{Target: "parameters.SecurityGroupPropertiesFormat.NetworkInterfaces", Name: validation.ReadOnly, Rule: true, Chain: nil},
-					{Target: "parameters.SecurityGroupPropertiesFormat.Subnets", Name: validation.ReadOnly, Rule: true, Chain: nil},
-				}}}}}); err != nil {
-		return result, validation.NewErrorWithValidationError(err, "network.SecurityGroupsClient", "CreateOrUpdate")
-	}
-
 	req, err := client.CreateOrUpdatePreparer(resourceGroupName, networkSecurityGroupName, parameters, cancel)
 	if err != nil {
 		return result, autorest.NewErrorWithError(err, "network.SecurityGroupsClient", "CreateOrUpdate", nil, "Failure preparing request")

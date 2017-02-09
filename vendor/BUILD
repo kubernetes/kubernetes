@@ -48,7 +48,7 @@ go_library(
         "github.com/Azure/azure-sdk-for-go/arm/compute/availabilitysets.go",
         "github.com/Azure/azure-sdk-for-go/arm/compute/client.go",
         "github.com/Azure/azure-sdk-for-go/arm/compute/models.go",
-        "github.com/Azure/azure-sdk-for-go/arm/compute/usageoperations.go",
+        "github.com/Azure/azure-sdk-for-go/arm/compute/usage.go",
         "github.com/Azure/azure-sdk-for-go/arm/compute/version.go",
         "github.com/Azure/azure-sdk-for-go/arm/compute/virtualmachineextensionimages.go",
         "github.com/Azure/azure-sdk-for-go/arm/compute/virtualmachineextensions.go",
@@ -142,13 +142,19 @@ go_library(
 go_library(
     name = "github.com/Azure/azure-sdk-for-go/storage",
     srcs = [
+        "github.com/Azure/azure-sdk-for-go/storage/authorization.go",
         "github.com/Azure/azure-sdk-for-go/storage/blob.go",
         "github.com/Azure/azure-sdk-for-go/storage/client.go",
+        "github.com/Azure/azure-sdk-for-go/storage/directory.go",
         "github.com/Azure/azure-sdk-for-go/storage/file.go",
+        "github.com/Azure/azure-sdk-for-go/storage/fileserviceclient.go",
         "github.com/Azure/azure-sdk-for-go/storage/queue.go",
+        "github.com/Azure/azure-sdk-for-go/storage/share.go",
+        "github.com/Azure/azure-sdk-for-go/storage/storagepolicy.go",
         "github.com/Azure/azure-sdk-for-go/storage/table.go",
         "github.com/Azure/azure-sdk-for-go/storage/table_entities.go",
         "github.com/Azure/azure-sdk-for-go/storage/util.go",
+        "github.com/Azure/azure-sdk-for-go/storage/version.go",
     ],
     tags = ["automanaged"],
 )

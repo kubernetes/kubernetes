@@ -85,7 +85,7 @@ var (
 		PublishSettingsURL:           "https://manage.chinacloudapi.com/publishsettings/index",
 		ServiceManagementEndpoint:    "https://management.core.chinacloudapi.cn/",
 		ResourceManagerEndpoint:      "https://management.chinacloudapi.cn/",
-		ActiveDirectoryEndpoint:      "https://login.chinacloudapi.cn/?api-version=1.0",
+		ActiveDirectoryEndpoint:      "https://login.chinacloudapi.cn/",
 		GalleryEndpoint:              "https://gallery.chinacloudapi.cn/",
 		KeyVaultEndpoint:             "https://vault.azure.cn/",
 		GraphEndpoint:                "https://graph.chinacloudapi.cn/",

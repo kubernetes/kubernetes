@@ -59,9 +59,7 @@ func (client VirtualNetworkGatewaysClient) CreateOrUpdate(resourceGroupName stri
 	if err := validation.Validate([]validation.Validation{
 		{TargetValue: parameters,
 			Constraints: []validation.Constraint{{Target: "parameters.VirtualNetworkGatewayPropertiesFormat", Name: validation.Null, Rule: true,
-				Chain: []validation.Constraint{{Target: "parameters.VirtualNetworkGatewayPropertiesFormat.IPConfigurations", Name: validation.Null, Rule: true, Chain: nil},
-					{Target: "parameters.VirtualNetworkGatewayPropertiesFormat.ProvisioningState", Name: validation.ReadOnly, Rule: true, Chain: nil},
-				}}}}}); err != nil {
+				Chain: []validation.Constraint{{Target: "parameters.VirtualNetworkGatewayPropertiesFormat.IPConfigurations", Name: validation.Null, Rule: true, Chain: nil}}}}}}); err != nil {
 		return result, validation.NewErrorWithValidationError(err, "network.VirtualNetworkGatewaysClient", "CreateOrUpdate")
 	}
 

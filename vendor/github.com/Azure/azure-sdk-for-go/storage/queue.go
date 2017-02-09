@@ -19,6 +19,7 @@ const (
 // Service.
 type QueueServiceClient struct {
 	client Client
+	auth   authentication
 }
 
 func pathForQueue(queue string) string         { return fmt.Sprintf("/%s", queue) }
@@ -151,12 +152,13 @@ type QueueMetadataResponse struct {
 // See https://msdn.microsoft.com/en-us/library/azure/dd179348.aspx
 func (c QueueServiceClient) SetMetadata(name string, metadata map[string]string) error {
 	uri := c.client.getEndpoint(queueServiceName, pathForQueue(name), url.Values{"comp": []string{"metadata"}})
+	metadata = c.client.protectUserAgent(metadata)
 	headers := c.client.getStandardHeaders()
 	for k, v := range metadata {
 		headers[userDefinedMetadataHeaderPrefix+k] = v
 	}
 
-	resp, err := c.client.exec("PUT", uri, headers, nil)
+	resp, err := c.client.exec(http.MethodPut, uri, headers, nil, c.auth)
 	if err != nil {
 		return err
 	}
@@ -179,7 +181,7 @@ func (c QueueServiceClient) GetMetadata(name string) (QueueMetadataResponse, err
 	qm.UserDefinedMetadata = make(map[string]string)
 	uri := c.client.getEndpoint(queueServiceName, pathForQueue(name), url.Values{"comp": []string{"metadata"}})
 	headers := c.client.getStandardHeaders()
-	resp, err := c.client.exec("GET", uri, headers, nil)
+	resp, err := c.client.exec(http.MethodGet, uri, headers, nil, c.auth)
 	if err != nil {
 		return qm, err
 	}
@@ -212,7 +214,7 @@ func (c QueueServiceClient) GetMetadata(name string) (QueueMetadataResponse, err
 func (c QueueServiceClient) CreateQueue(name string) error {
 	uri := c.client.getEndpoint(queueServiceName, pathForQueue(name), url.Values{})
 	headers := c.client.getStandardHeaders()
-	resp, err := c.client.exec("PUT", uri, headers, nil)
+	resp, err := c.client.exec(http.MethodPut, uri, headers, nil, c.auth)
 	if err != nil {
 		return err
 	}
@@ -225,7 +227,7 @@ func (c QueueServiceClient) CreateQueue(name string) error {
 // See https://msdn.microsoft.com/en-us/library/azure/dd179436.aspx
 func (c QueueServiceClient) DeleteQueue(name string) error {
 	uri := c.client.getEndpoint(queueServiceName, pathForQueue(name), url.Values{})
-	resp, err := c.client.exec("DELETE", uri, c.client.getStandardHeaders(), nil)
+	resp, err := c.client.exec(http.MethodDelete, uri, c.client.getStandardHeaders(), nil, c.auth)
 	if err != nil {
 		return err
 	}
@@ -236,7 +238,7 @@ func (c QueueServiceClient) DeleteQueue(name string) error {
 // QueueExists returns true if a queue with given name exists.
 func (c QueueServiceClient) QueueExists(name string) (bool, error) {
 	uri := c.client.getEndpoint(queueServiceName, pathForQueue(name), url.Values{"comp": {"metadata"}})
-	resp, err := c.client.exec("GET", uri, c.client.getStandardHeaders(), nil)
+	resp, err := c.client.exec(http.MethodGet, uri, c.client.getStandardHeaders(), nil, c.auth)
 	if resp != nil && (resp.statusCode == http.StatusOK || resp.statusCode == http.StatusNotFound) {
 		return resp.statusCode == http.StatusOK, nil
 	}
@@ -256,7 +258,7 @@ func (c QueueServiceClient) PutMessage(queue string, message string, params PutM
 	}
 	headers := c.client.getStandardHeaders()
 	headers["Content-Length"] = strconv.Itoa(nn)
-	resp, err := c.client.exec("POST", uri, headers, body)
+	resp, err := c.client.exec(http.MethodPost, uri, headers, body, c.auth)
 	if err != nil {
 		return err
 	}
@@ -269,7 +271,7 @@ func (c QueueServiceClient) PutMessage(queue string, message string, params PutM
 // See https://msdn.microsoft.com/en-us/library/azure/dd179454.aspx
 func (c QueueServiceClient) ClearMessages(queue string) error {
 	uri := c.client.getEndpoint(queueServiceName, pathForQueueMessages(queue), url.Values{})
-	resp, err := c.client.exec("DELETE", uri, c.client.getStandardHeaders(), nil)
+	resp, err := c.client.exec(http.MethodDelete, uri, c.client.getStandardHeaders(), nil, c.auth)
 	if err != nil {
 		return err
 	}
@@ -284,7 +286,7 @@ func (c QueueServiceClient) ClearMessages(queue string) error {
 func (c QueueServiceClient) GetMessages(queue string, params GetMessagesParameters) (GetMessagesResponse, error) {
 	var r GetMessagesResponse
 	uri := c.client.getEndpoint(queueServiceName, pathForQueueMessages(queue), params.getParameters())
-	resp, err := c.client.exec("GET", uri, c.client.getStandardHeaders(), nil)
+	resp, err := c.client.exec(http.MethodGet, uri, c.client.getStandardHeaders(), nil, c.auth)
 	if err != nil {
 		return r, err
 	}
@@ -300,7 +302,7 @@ func (c QueueServiceClient) GetMessages(queue string, params GetMessagesParamete
 func (c QueueServiceClient) PeekMessages(queue string, params PeekMessagesParameters) (PeekMessagesResponse, error) {
 	var r PeekMessagesResponse
 	uri := c.client.getEndpoint(queueServiceName, pathForQueueMessages(queue), params.getParameters())
-	resp, err := c.client.exec("GET", uri, c.client.getStandardHeaders(), nil)
+	resp, err := c.client.exec(http.MethodGet, uri, c.client.getStandardHeaders(), nil, c.auth)
 	if err != nil {
 		return r, err
 	}
@@ -315,7 +317,7 @@ func (c QueueServiceClient) PeekMessages(queue string, params PeekMessagesParame
 func (c QueueServiceClient) DeleteMessage(queue, messageID, popReceipt string) error {
 	uri := c.client.getEndpoint(queueServiceName, pathForMessage(queue, messageID), url.Values{
 		"popreceipt": {popReceipt}})
-	resp, err := c.client.exec("DELETE", uri, c.client.getStandardHeaders(), nil)
+	resp, err := c.client.exec(http.MethodDelete, uri, c.client.getStandardHeaders(), nil, c.auth)
 	if err != nil {
 		return err
 	}
@@ -335,7 +337,7 @@ func (c QueueServiceClient) UpdateMessage(queue string, messageID string, messag
 	}
 	headers := c.client.getStandardHeaders()
 	headers["Content-Length"] = fmt.Sprintf("%d", nn)
-	resp, err := c.client.exec("PUT", uri, headers, body)
+	resp, err := c.client.exec(http.MethodPut, uri, headers, body, c.auth)
 	if err != nil {
 		return err
 	}
