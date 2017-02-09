@@ -330,7 +330,7 @@ var _ = framework.KubeDescribe("[Feature:Example]", func() {
 				}
 			})
 			// using out of statefulset e2e as deleting pvc is a pain
-			deleteAllStatefulSets(c, ns)
+			framework.DeleteAllStatefulSets(c, ns)
 		})
 	})
 
