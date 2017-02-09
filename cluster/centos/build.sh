@@ -89,6 +89,7 @@ function unpack-releases() {
     tar xzf ${RELEASES_DIR}/kubernetes-server-linux-amd64.tar.gz -C ${RELEASES_DIR}
     cp ${RELEASES_DIR}/kubernetes/server/bin/kube-apiserver \
        ${RELEASES_DIR}/kubernetes/server/bin/kube-controller-manager \
+       ${RELEASES_DIR}/kubernetes/server/bin/kube-aggregator \
        ${RELEASES_DIR}/kubernetes/server/bin/kube-scheduler ${BINARY_DIR}/master/bin
     cp ${RELEASES_DIR}/kubernetes/server/bin/kubelet \
        ${RELEASES_DIR}/kubernetes/server/bin/kube-proxy ${BINARY_DIR}/node/bin

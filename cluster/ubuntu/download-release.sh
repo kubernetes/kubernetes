@@ -86,6 +86,7 @@ grep -q "^${KUBE_VERSION}\$" binaries/.kubernetes 2>/dev/null || {
   cp kubernetes/client/bin/kubectl binaries/
   cp kubernetes/server/bin/kube-apiserver \
      kubernetes/server/bin/kube-controller-manager \
+     kubernetes/server/bin/kube-aggregator \
      kubernetes/server/bin/kube-scheduler binaries/master
   cp kubernetes/server/bin/kubelet \
      kubernetes/server/bin/kube-proxy binaries/minion
