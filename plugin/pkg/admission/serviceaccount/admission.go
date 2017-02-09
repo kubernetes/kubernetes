@@ -78,7 +78,6 @@ type serviceAccount struct {
 	serviceAccounts cache.Indexer
 	secrets         cache.Indexer
 
-	stopChan                 chan struct{}
 	serviceAccountsReflector *cache.Reflector
 	secretsReflector         *cache.Reflector
 }
@@ -133,10 +132,6 @@ func (a *serviceAccount) SetInternalClientSet(cl internalclientset.Interface) {
 		&api.Secret{},
 		0,
 	)
-
-	if cl != nil {
-		a.Run()
-	}
 }
 
 // Validate ensures an authorizer is set.
@@ -159,17 +154,10 @@ func (a *serviceAccount) Validate() error {
 	return nil
 }
 
-func (s *serviceAccount) Run() {
-	if s.stopChan == nil {
-		s.stopChan = make(chan struct{})
-		s.serviceAccountsReflector.RunUntil(s.stopChan)
-		s.secretsReflector.RunUntil(s.stopChan)
-	}
-}
-func (s *serviceAccount) Stop() {
-	if s.stopChan != nil {
-		close(s.stopChan)
-		s.stopChan = nil
+func (s *serviceAccount) Run(stopCh <-chan struct{}) {
+	if s.client != nil {
+		s.serviceAccountsReflector.RunUntil(stopCh)
+		s.secretsReflector.RunUntil(stopCh)
 	}
 }
 

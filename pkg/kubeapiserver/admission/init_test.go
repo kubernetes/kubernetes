@@ -51,7 +51,7 @@ var _ WantsAuthorizer = &WantAuthorizerAdmission{}
 // TestWantsAuthorizer ensures that the authorizer is injected when the WantsAuthorizer
 // interface is implemented.
 func TestWantsAuthorizer(t *testing.T) {
-	initializer := NewPluginInitializer(nil, nil, &TestAuthorizer{})
+	initializer := NewPluginInitializer(nil, nil, &TestAuthorizer{}, nil)
 	wantAuthorizerAdmission := &WantAuthorizerAdmission{}
 	initializer.Initialize(wantAuthorizerAdmission)
 	if wantAuthorizerAdmission.auth == nil {

@@ -35,15 +35,14 @@ func init() {
 			// NOTE: we do not provide informers to the registry because admission level decisions
 			// does not require us to open watches for all items tracked by quota.
 			registry := install.NewRegistry(nil, nil)
-			return NewResourceQuota(registry, 5, make(chan struct{}))
+			return NewResourceQuota(registry, 5)
 		})
 }
 
 // quotaAdmission implements an admission controller that can enforce quota constraints
 type quotaAdmission struct {
 	*admission.Handler
-
-	stopCh        <-chan struct{}
+	quotaAccessor *quotaAccessor
 	registry      quota.Registry
 	numEvaluators int
 	evaluator     Evaluator
@@ -59,10 +58,9 @@ type liveLookupEntry struct {
 // NewResourceQuota configures an admission controller that can enforce quota constraints
 // using the provided registry.  The registry must have the capability to handle group/kinds that
 // are persisted by the server this admission controller is intercepting
-func NewResourceQuota(registry quota.Registry, numEvaluators int, stopCh <-chan struct{}) (admission.Interface, error) {
+func NewResourceQuota(registry quota.Registry, numEvaluators int) (admission.Interface, error) {
 	return &quotaAdmission{
 		Handler:       admission.NewHandler(admission.Create, admission.Update),
-		stopCh:        stopCh,
 		registry:      registry,
 		numEvaluators: numEvaluators,
 	}, nil
@@ -75,9 +73,7 @@ func (a *quotaAdmission) SetInternalClientSet(client internalclientset.Interface
 		// TODO handle errors more cleanly
 		panic(err)
 	}
-	go quotaAccessor.Run(a.stopCh)
-
-	a.evaluator = NewQuotaEvaluator(quotaAccessor, a.registry, nil, a.numEvaluators, a.stopCh)
+	a.quotaAccessor = quotaAccessor
 }
 
 // Validate ensures an authorizer is set.
@@ -86,6 +82,11 @@ func (a *quotaAdmission) Validate() error {
 		return fmt.Errorf("missing evaluator")
 	}
 	return nil
+}
+
+func (q *quotaAdmission) Run(stopCh <-chan struct{}) {
+	go q.quotaAccessor.Run(stopCh)
+	q.evaluator = NewQuotaEvaluator(q.quotaAccessor, q.registry, nil, q.numEvaluators, stopCh)
 }
 
 // Admit makes admission decisions while enforcing quota
