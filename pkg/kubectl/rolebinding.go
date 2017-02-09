@@ -104,7 +104,6 @@ func (s RoleBindingGeneratorV1) ParamNames() []GeneratorParam {
 		{"user", false},
 		{"group", false},
 		{"serviceaccount", false},
-		{"force", false},
 	}
 }
 
