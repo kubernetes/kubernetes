@@ -137,10 +137,6 @@ func annotateRuntimeObject(t *testing.T, originalObj, currentObj runtime.Object,
 		originalLabels["DELETE_ME"] = "DELETE_ME"
 		originalAccessor.SetLabels(originalLabels)
 	}
-	original, err := runtime.Encode(codec, originalObj)
-	if err != nil {
-		t.Fatal(err)
-	}
 
 	currentAccessor, err := meta.Accessor(currentObj)
 	if err != nil {
@@ -151,7 +147,14 @@ func annotateRuntimeObject(t *testing.T, originalObj, currentObj runtime.Object,
 	if currentAnnotations == nil {
 		currentAnnotations = make(map[string]string)
 	}
-	currentAnnotations[annotations.LastAppliedConfigAnnotation] = string(original)
+
+	originalAccessor.SetAnnotations(map[string]string{})
+	originalWithEmptyAnno, err := runtime.Encode(codec, originalObj)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	currentAnnotations[annotations.LastAppliedConfigAnnotation] = string(originalWithEmptyAnno)
 	currentAccessor.SetAnnotations(currentAnnotations)
 	current, err := runtime.Encode(codec, currentObj)
 	if err != nil {
@@ -547,7 +550,6 @@ func TestApplyNULLPreservation(t *testing.T) {
 	if buf.String() != expected {
 		t.Fatalf("unexpected output: %s\nexpected: %s", buf.String(), expected)
 	}
-
 	if !verifiedPatch {
 		t.Fatal("No server-side patch call detected")
 	}
@@ -576,12 +578,10 @@ func TestApplyIdempotentTPREntry(t *testing.T) {
 					Header:     defaultHeader(),
 					Body:       body}, nil
 			case p == path && m == "PATCH":
-				// In idempotent updates, kubectl sends an logically empty
+				// In idempotent updates, kubectl sends a logically empty
 				// request body with the PATCH request.
-				// Should look like this
+				// Should look like this:
 				// Request Body: {"metadata":{"annotations":{}}}
-				// TODO: This unit tests adds the
-				// kubectl.kubernetes.io/last-applied-configuration annotation.
 
 				patch, err := ioutil.ReadAll(req.Body)
 				if err != nil {
@@ -592,10 +592,13 @@ func TestApplyIdempotentTPREntry(t *testing.T) {
 				if err := json.Unmarshal(patch, &patchMap); err != nil {
 					t.Fatal(err)
 				}
+				if len(patchMap) != 1 {
+					t.Fatalf("Unexpected Patch. Has more than 1 entry. path: %s", patch)
+				}
 
 				annotationsMap := walkMapPath(t, patchMap, []string{"metadata", "annotations"})
-				if _, ok := annotationsMap[annotations.LastAppliedConfigAnnotation]; !ok {
-					t.Fatalf("patch does not contain annotation:\n%s\n", patch)
+				if len(annotationsMap) != 0 {
+					t.Fatalf("Unexpected Patch. Found unexpected annotation: %s", patch)
 				}
 
 				verifiedPatch = true
