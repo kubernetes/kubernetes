@@ -35,7 +35,6 @@ import (
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/pod"
-	"k8s.io/kubernetes/pkg/kubelet/status"
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
 	"k8s.io/kubernetes/pkg/kubelet/volumemanager/cache"
 	"k8s.io/kubernetes/pkg/volume"
@@ -71,7 +70,6 @@ func NewDesiredStateOfWorldPopulator(
 	loopSleepDuration time.Duration,
 	getPodStatusRetryDuration time.Duration,
 	podManager pod.Manager,
-	podStatusProvider status.PodStatusProvider,
 	desiredStateOfWorld cache.DesiredStateOfWorld,
 	kubeContainerRuntime kubecontainer.Runtime,
 	keepTerminatedPodVolumes bool) DesiredStateOfWorldPopulator {
@@ -80,7 +78,6 @@ func NewDesiredStateOfWorldPopulator(
 		loopSleepDuration:         loopSleepDuration,
 		getPodStatusRetryDuration: getPodStatusRetryDuration,
 		podManager:                podManager,
-		podStatusProvider:         podStatusProvider,
 		desiredStateOfWorld:       desiredStateOfWorld,
 		pods: processedPods{
 			processedPods: make(map[volumetypes.UniquePodName]bool)},
@@ -94,7 +91,6 @@ type desiredStateOfWorldPopulator struct {
 	loopSleepDuration         time.Duration
 	getPodStatusRetryDuration time.Duration
 	podManager                pod.Manager
-	podStatusProvider         status.PodStatusProvider
 	desiredStateOfWorld       cache.DesiredStateOfWorld
 	pods                      processedPods
 	kubeContainerRuntime      kubecontainer.Runtime
@@ -138,30 +134,15 @@ func (dswp *desiredStateOfWorldPopulator) populatorLoopFunc() func() {
 	}
 }
 
-func (dswp *desiredStateOfWorldPopulator) isPodTerminated(pod *v1.Pod) bool {
-	podStatus, found := dswp.podStatusProvider.GetPodStatus(pod.UID)
-	if !found {
-		podStatus = pod.Status
-	}
-	return podStatus.Phase == v1.PodFailed || podStatus.Phase == v1.PodSucceeded || (pod.DeletionTimestamp != nil && notRunning(podStatus.ContainerStatuses))
-}
-
-// notRunning returns true if every status is terminated or waiting, or the status list
-// is empty.
-func notRunning(statuses []v1.ContainerStatus) bool {
-	for _, status := range statuses {
-		if status.State.Terminated == nil && status.State.Waiting == nil {
-			return false
-		}
-	}
-	return true
+func isPodTerminated(pod *v1.Pod) bool {
+	return pod.Status.Phase == v1.PodFailed || pod.Status.Phase == v1.PodSucceeded
 }
 
 // Iterate through all pods and add to desired state of world if they don't
 // exist but should
 func (dswp *desiredStateOfWorldPopulator) findAndAddNewPods() {
 	for _, pod := range dswp.podManager.GetPods() {
-		if dswp.isPodTerminated(pod) {
+		if isPodTerminated(pod) {
 			// Do not (re)add volumes for terminated pods
 			continue
 		}
@@ -179,7 +160,7 @@ func (dswp *desiredStateOfWorldPopulator) findAndRemoveDeletedPods() {
 		pod, podExists := dswp.podManager.GetPodByUID(volumeToMount.Pod.UID)
 		if podExists {
 			// Skip running pods
-			if !dswp.isPodTerminated(pod) {
+			if !isPodTerminated(pod) {
 				continue
 			}
 			if dswp.keepTerminatedPodVolumes {
