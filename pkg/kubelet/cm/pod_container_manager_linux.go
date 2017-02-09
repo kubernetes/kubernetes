@@ -45,6 +45,8 @@ type podContainerManagerImpl struct {
 	// cgroupManager is the cgroup Manager Object responsible for managing all
 	// pod cgroups.
 	cgroupManager CgroupManager
+	// eventDispatcher manages delegation to external lifecycle event handlers.
+	eventDispatcher EventDispatcher
 }
 
 // Make sure that podContainerManagerImpl implements the PodContainerManager interface
@@ -80,6 +82,9 @@ func (m *podContainerManagerImpl) EnsureExists(pod *v1.Pod) error {
 		if err := m.cgroupManager.Create(containerConfig); err != nil {
 			return fmt.Errorf("failed to create container for %v : %v", podContainerName, err)
 		}
+		// Dispatch events to subscribed event handlers, if any.
+		// TODO(CD): Ensure it's ok to do this before calling applyLimits
+		m.eventDispatcher.PreStartPod(string(podContainerName))
 	}
 	// Apply appropriate resource limits on the pod container
 	// Top level qos containers limits are not updated
@@ -164,6 +169,7 @@ func (m *podContainerManagerImpl) Destroy(podCgroup CgroupName) error {
 		Name:               podCgroup,
 		ResourceParameters: &ResourceConfig{},
 	}
+	// TODO(CD): Invoke pod post-stop lifecycle hook.
 	if err := m.cgroupManager.Destroy(containerConfig); err != nil {
 		return fmt.Errorf("failed to delete cgroup paths for %v : %v", podCgroup, err)
 	}
