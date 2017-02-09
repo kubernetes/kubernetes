@@ -699,13 +699,19 @@ func NewMainKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *Kub
 	if klet.kubeClient != nil && klet.kubeClient.Certificates() != nil {
 		certSigningRequestClient = klet.kubeClient.Certificates().CertificateSigningRequests()
 	}
-	klet.certificateManager, err = certificate.NewManager(
-		certSigningRequestClient,
-		nodeName,
+	certificateStore, err := certificate.NewFileStore(
+		"kubelet-server",
 		kubeCfg.CertDirectory,
 		kubeCfg.CertDirectory,
 		kubeCfg.TLSCertFile,
-		kubeCfg.TLSPrivateKeyFile,
+		kubeCfg.TLSPrivateKeyFile)
+	if err != nil {
+		return nil, fmt.Errorf("failed to initialize certificate store: %v", err)
+	}
+	klet.certificateManager, err = certificate.NewManager(
+		certSigningRequestClient,
+		nodeName,
+		certificateStore,
 		kubeCfg.CertRotation)
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize certificate manager: %v", err)
@@ -2100,7 +2106,6 @@ func (kl *Kubelet) ResyncInterval() time.Duration {
 // ListenAndServe runs the kubelet HTTP server.
 func (kl *Kubelet) ListenAndServe(address net.IP, port uint, tlsOptions *server.TLSOptions, auth server.AuthInterface, enableDebuggingHandlers bool) {
 	if tlsOptions != nil {
-		glog.Infof("Enabling rotating certificates.")
 		tlsOptions.Config.GetCertificate = kl.certificateManager.GetCertificate
 	}
 	server.ListenAndServeKubeletServer(kl, kl.resourceAnalyzer, address, port, tlsOptions, auth, enableDebuggingHandlers, kl.containerRuntime, kl.criHandler)

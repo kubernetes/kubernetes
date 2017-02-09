@@ -20,9 +20,6 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"fmt"
-	"io/ioutil"
-	"os"
-	"path/filepath"
 	"testing"
 	"time"
 
@@ -81,126 +78,14 @@ O1eRCsCGPAnUCviFgNeH15ug+6N54DTTR6ZV/TTV64FDOcsox9nrhYcmH9sYuITi
 -----END CERTIFICATE-----`
 )
 
-func TestFixSymlink(t *testing.T) {
-	dir, err := ioutil.TempDir("", "k8s-test-make-symlink")
-	if err != nil {
-		t.Fatalf("Unable to created the test directory %q: %v", dir, err)
-	}
-	defer func() {
-		if err := os.RemoveAll(dir); err != nil {
-			t.Errorf("Unable to clean up test directory %q: %v", dir, err)
-		}
-	}()
-	keyFile := filepath.Join(dir, "kubelet.key")
-	if err := ioutil.WriteFile(keyFile, nil, os.ModePerm); err != nil {
-		t.Fatalf("Unable to create the file %q: %v", keyFile, err)
-	}
-	fixSymlink(keyFile)
-
-	if _, err := os.Stat(keyFile); err != nil {
-		t.Errorf("Expected the file %q to be there: %v", keyFile, err)
-	}
-	if fi, err := os.Lstat(keyFile); err != nil {
-		t.Errorf("Expected the file %q to be there: %v", keyFile, err)
-	} else if fi.Mode()&os.ModeSymlink != os.ModeSymlink {
-		t.Errorf("Expected %q to be a symlink.", keyFile)
-	}
-	origKeyFile := filepath.Join(dir, "kubelet.orig.key")
-	if _, err := os.Stat(origKeyFile); err != nil {
-		t.Errorf("Expected the file %q to be there: %v", origKeyFile, err)
-	}
-}
-
-func TestCleanupPairs(t *testing.T) {
-	keyCertPairs := []struct {
-		name string
-		key  bool
-		cert bool
-	}{
-		{"kubelet-1", true, true},
-		{"kubelet-2", false, true},
-		{"kubelet-3", true, false},
-	}
-	dir, err := ioutil.TempDir("", "k8s-test-cleanup-pairs")
-	if err != nil {
-		t.Fatalf("Unable to created the test directory %q: %v", dir, err)
-	}
-	defer func() {
-		if err := os.RemoveAll(dir); err != nil {
-			t.Errorf("Unable to clean up test directory %q: %v", dir, err)
-		}
-	}()
-
-	for _, keyCertPair := range keyCertPairs {
-		if keyCertPair.key {
-			keyFile := filepath.Join(dir, keyCertPair.name+".key")
-			if err := ioutil.WriteFile(keyFile, nil, os.ModePerm); err != nil {
-				t.Fatalf("Unable to create the file %q: %v", keyFile, err)
-			}
-		}
-		if keyCertPair.cert {
-			certFile := filepath.Join(dir, keyCertPair.name+".crt")
-			if err := ioutil.WriteFile(certFile, nil, os.ModePerm); err != nil {
-				t.Fatalf("Unable to create the file %q: %v", certFile, err)
-			}
-		}
-	}
-
-	cm := manager{
-		certSigningRequestClient: nil,
-		nodeName:                 "node-name",
-		certDirectory:            dir,
-		keyDirectory:             dir,
-	}
-
-	if err := cm.cleanupPairs(); err != nil {
-		t.Fatalf("Failed to initialize the certificate manager: %v", err)
-	}
-
-	for _, keyCertPair := range keyCertPairs {
-		if keyCertPair.key && keyCertPair.cert {
-			keyFile := filepath.Join(dir, keyCertPair.name+".key")
-			if _, err := os.Stat(keyFile); err != nil {
-				t.Errorf("Expected the file %q to be there: %v", keyFile, err)
-			}
-			certFile := filepath.Join(dir, keyCertPair.name+".crt")
-			if _, err := os.Stat(certFile); err != nil {
-				t.Errorf("Expected the file %q to be there: %v", certFile, err)
-			}
-		} else {
-			keyFile := filepath.Join(dir, keyCertPair.name+".key")
-			if _, err := os.Stat(keyFile); !os.IsNotExist(err) {
-				t.Errorf("Expected the file %q to be deleted.", keyFile)
-			}
-			certFile := filepath.Join(dir, keyCertPair.name+".crt")
-			if _, err := os.Stat(certFile); !os.IsNotExist(err) {
-				t.Errorf("Expected the file %q to be deleted.", certFile)
-			}
-		}
-	}
-}
-
 func TestNewManagerNoRotation(t *testing.T) {
-	dir, err := ioutil.TempDir("", "k8s-test-new-manager")
+	cert, err := tls.X509KeyPair([]byte(certificateData), []byte(privateKeyData))
 	if err != nil {
-		t.Fatalf("Unable to created the test directory %q: %v", dir, err)
-	}
-	defer func() {
-		if err := os.RemoveAll(dir); err != nil {
-			t.Errorf("Unable to clean up test directory %q: %v", dir, err)
-		}
-	}()
-	keyFile := filepath.Join(dir, "kubelet.key")
-	if err := ioutil.WriteFile(keyFile, []byte(privateKeyData), 0600); err != nil {
-		t.Fatalf("Unable to create the file %q: %v", keyFile, err)
-	}
-	certFile := filepath.Join(dir, "kubelet.crt")
-	if err := ioutil.WriteFile(certFile, []byte(certificateData), 0600); err != nil {
-		t.Fatalf("Unable to create the file %q: %v", keyFile, err)
+		t.Fatalf("Unable to initialize a certificate: %v", err)
 	}
 
-	_, err = NewManager(nil, "node-name", dir, dir, certFile, keyFile, false)
-	if err != nil {
+	store := &fakeStore{cert: &cert}
+	if _, err := NewManager(nil, "node-name", store, false); err != nil {
 		t.Fatalf("Failed to initialize the certificate manager: %v", err)
 	}
 }
@@ -226,6 +111,7 @@ func TestShouldRotate(t *testing.T) {
 					NotBefore: test.notBefore,
 				},
 			},
+			shouldRotatePercent: 10,
 		}
 
 		if m.shouldRotate() != test.shouldRotate {
@@ -241,10 +127,6 @@ func TestShouldRotate(t *testing.T) {
 
 func TestRotateCertCreateCSRError(t *testing.T) {
 	now := time.Now()
-	dir, err := ioutil.TempDir("", "k8s-test-rotate-cert")
-	if err != nil {
-		t.Fatalf("Unable to created the test directory %q: %v", dir, err)
-	}
 	m := manager{
 		cert: &tls.Certificate{
 			Leaf: &x509.Certificate{
@@ -252,8 +134,6 @@ func TestRotateCertCreateCSRError(t *testing.T) {
 				NotBefore: now.Add(-2 * time.Hour),
 			},
 		},
-		keyDirectory:  dir,
-		certDirectory: dir,
 		certSigningRequestClient: fakeClient{
 			failureType: createError,
 		},
@@ -266,10 +146,6 @@ func TestRotateCertCreateCSRError(t *testing.T) {
 
 func TestRotateCertWaitingForResultError(t *testing.T) {
 	now := time.Now()
-	dir, err := ioutil.TempDir("", "k8s-test-rotate-cert")
-	if err != nil {
-		t.Fatalf("Unable to created the test directory %q: %v", dir, err)
-	}
 	m := manager{
 		cert: &tls.Certificate{
 			Leaf: &x509.Certificate{
@@ -277,8 +153,6 @@ func TestRotateCertWaitingForResultError(t *testing.T) {
 				NotBefore: now.Add(-2 * time.Hour),
 			},
 		},
-		keyDirectory:  dir,
-		certDirectory: dir,
 		certSigningRequestClient: fakeClient{
 			failureType: watchError,
 		},
@@ -356,4 +230,24 @@ func (w *fakeWatch) ResultChan() <-chan watch.Event {
 		Object: &csr,
 	}
 	return c
+}
+
+type fakeStore struct {
+	cert *tls.Certificate
+}
+
+func (s *fakeStore) Current() (*tls.Certificate, error) {
+	return s.cert, nil
+}
+
+// Accepts the PEM data for the cert/key pair and makes the new cert/key
+// pair the 'current' pair, that will be returned by future calls to
+// Current().
+func (s *fakeStore) Update(certPEM, keyPEM []byte) (*tls.Certificate, error) {
+	cert, err := tls.X509KeyPair(certPEM, keyPEM)
+	if err != nil {
+		return nil, err
+	}
+	s.cert = &cert
+	return s.cert, nil
 }

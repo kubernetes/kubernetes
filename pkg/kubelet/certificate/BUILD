@@ -10,7 +10,7 @@ load(
 
 go_library(
     name = "go_default_library",
-    srcs = ["certificate_manager.go"],
+    srcs = ["certificate_manager.go", "certificate_store.go"],
     tags = ["automanaged"],
     deps = [
         "//pkg/client/clientset_generated/clientset/typed/certificates/v1beta1:go_default_library",
@@ -25,7 +25,7 @@ go_library(
 
 go_test(
     name = "go_default_test",
-    srcs = ["certificate_manager_test.go"],
+    srcs = ["certificate_manager_test.go", "certificate_store_test.go"],
     library = ":go_default_library",
     tags = ["automanaged"],
     deps = [
