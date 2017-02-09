@@ -17,9 +17,9 @@ limitations under the License.
 package fake
 
 import (
+	restclient "k8s.io/client-go/rest"
+	core "k8s.io/client-go/testing"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/client/restclient"
-	"k8s.io/kubernetes/pkg/client/testing/core"
 )
 
 func (c *FakePods) Bind(binding *api.Binding) error {

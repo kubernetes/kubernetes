@@ -22,35 +22,31 @@ import (
 	"sync"
 	"time"
 
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/client-go/tools/clientcmd"
+	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
+	kubeconfigphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/kubeconfig"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
-	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/apis/certificates"
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
-	certclient "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/certificates/v1alpha1"
-	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
-	"k8s.io/kubernetes/pkg/types"
-	"k8s.io/kubernetes/pkg/util/wait"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 )
-
-// ConnectionDetails represents a master API endpoint connection
-type ConnectionDetails struct {
-	ClientSet  *clientset.Clientset
-	CertClient *certclient.CertificatesV1alpha1Client
-	Endpoint   string
-	CACert     []byte
-	NodeName   types.NodeName
-}
 
 // retryTimeout between the subsequent attempts to connect
 // to an API endpoint
 const retryTimeout = 5
 
+type apiClient struct {
+	clientSet    *clientset.Clientset
+	clientConfig *clientcmdapi.Config
+}
+
 // EstablishMasterConnection establishes a connection with exactly one of the provided API endpoints.
 // The function builds a client for every endpoint and concurrently keeps trying to connect to any one
 // of the provided endpoints. Blocks until at least one connection is established, then it stops the
-// connection attempts for other endpoints.
-func EstablishMasterConnection(c *kubeadmapi.TokenDiscovery, clusterInfo *kubeadmapi.ClusterInfo) (*ConnectionDetails, error) {
+// connection attempts for other endpoints and returns the valid client configuration, if any.
+func EstablishMasterConnection(c *kubeadmapi.TokenDiscovery, clusterInfo *kubeadmapi.ClusterInfo) (*clientcmdapi.Config, error) {
 	hostName, err := os.Hostname()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get node hostname [%v]", err)
@@ -62,10 +58,11 @@ func EstablishMasterConnection(c *kubeadmapi.TokenDiscovery, clusterInfo *kubead
 	caCert := []byte(clusterInfo.CertificateAuthorities[0])
 
 	stopChan := make(chan struct{})
-	result := make(chan *ConnectionDetails)
+	var clientConfig *clientcmdapi.Config
+	var once sync.Once
 	var wg sync.WaitGroup
 	for _, endpoint := range endpoints {
-		clientSet, err := createClients(caCert, endpoint, kubeadmutil.BearerToken(c), nodeName)
+		ac, err := createClients(caCert, endpoint, kubeadmutil.BearerToken(c), nodeName)
 		if err != nil {
 			fmt.Printf("[bootstrap] Warning: %s. Skipping endpoint %s\n", err, endpoint)
 			continue
@@ -75,47 +72,41 @@ func EstablishMasterConnection(c *kubeadmapi.TokenDiscovery, clusterInfo *kubead
 			defer wg.Done()
 			wait.Until(func() {
 				fmt.Printf("[bootstrap] Trying to connect to endpoint %s\n", apiEndpoint)
-				err := checkAPIEndpoint(clientSet, apiEndpoint)
+				err := checkAPIEndpoint(ac.clientSet, apiEndpoint)
 				if err != nil {
 					fmt.Printf("[bootstrap] Endpoint check failed [%v]\n", err)
 					return
 				}
 				fmt.Printf("[bootstrap] Successfully established connection with endpoint %q\n", apiEndpoint)
+
 				// connection established, stop all wait threads
-				close(stopChan)
-				result <- &ConnectionDetails{
-					ClientSet:  clientSet,
-					CertClient: clientSet.CertificatesV1alpha1Client,
-					Endpoint:   apiEndpoint,
-					CACert:     caCert,
-					NodeName:   nodeName,
-				}
+				once.Do(func() {
+					close(stopChan)
+					clientConfig = ac.clientConfig
+				})
 			}, retryTimeout*time.Second, stopChan)
 		}(endpoint)
 	}
+	wg.Wait()
 
-	go func() {
-		wg.Wait()
-		// all wait.Until() calls have finished now
-		close(result)
-	}()
-
-	establishedConnection, ok := <-result
-	if !ok {
+	if clientConfig == nil {
 		return nil, fmt.Errorf("failed to create bootstrap clients for any of the provided API endpoints")
 	}
-	return establishedConnection, nil
+
+	return clientConfig, nil
 }
 
 // creates a set of clients for this endpoint
-func createClients(caCert []byte, endpoint, token string, nodeName types.NodeName) (*clientset.Clientset, error) {
-	bareClientConfig := kubeadmutil.CreateBasicClientConfig("kubernetes", endpoint, caCert)
-	bootstrapClientConfig, err := clientcmd.NewDefaultClientConfig(
-		*kubeadmutil.MakeClientConfigWithToken(
-			bareClientConfig, "kubernetes", fmt.Sprintf("kubelet-%s", nodeName), token,
-		),
-		&clientcmd.ConfigOverrides{},
-	).ClientConfig()
+func createClients(caCert []byte, endpoint, token string, nodeName types.NodeName) (*apiClient, error) {
+	clientConfig := kubeconfigphase.MakeClientConfigWithToken(
+		endpoint,
+		"kubernetes",
+		fmt.Sprintf("kubelet-%s", nodeName),
+		caCert,
+		token,
+	)
+
+	bootstrapClientConfig, err := clientcmd.NewDefaultClientConfig(*clientConfig, &clientcmd.ConfigOverrides{}).ClientConfig()
 	if err != nil {
 		return nil, fmt.Errorf("failed to create API client configuration [%v]", err)
 	}
@@ -123,25 +114,12 @@ func createClients(caCert []byte, endpoint, token string, nodeName types.NodeNam
 	if err != nil {
 		return nil, fmt.Errorf("failed to create clients for the API endpoint %q: [%v]", endpoint, err)
 	}
-	return clientSet, nil
-}
 
-// CheckForNodeNameDuplicates checks whether there are other nodes in the cluster with identical node names.
-func CheckForNodeNameDuplicates(connection *ConnectionDetails) error {
-	hostName, err := os.Hostname()
-	if err != nil {
-		return fmt.Errorf("Failed to get node hostname [%v]", err)
+	ac := &apiClient{
+		clientSet:    clientSet,
+		clientConfig: clientConfig,
 	}
-	nodeList, err := connection.ClientSet.Nodes().List(v1.ListOptions{})
-	if err != nil {
-		return fmt.Errorf("Failed to list the nodes in the cluster: [%v]\n", err)
-	}
-	for _, node := range nodeList.Items {
-		if hostName == node.Name {
-			return fmt.Errorf("Node with name [%q] already exists.", node.Name)
-		}
-	}
-	return nil
+	return ac, nil
 }
 
 // checks the connection requirements for a specific API endpoint

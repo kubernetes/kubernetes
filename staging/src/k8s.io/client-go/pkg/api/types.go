@@ -17,13 +17,13 @@ limitations under the License.
 package api
 
 import (
-	"k8s.io/client-go/pkg/api/resource"
-	metav1 "k8s.io/client-go/pkg/apis/meta/v1"
-	"k8s.io/client-go/pkg/fields"
-	"k8s.io/client-go/pkg/labels"
-	"k8s.io/client-go/pkg/runtime"
-	"k8s.io/client-go/pkg/types"
-	"k8s.io/client-go/pkg/util/intstr"
+	"k8s.io/apimachinery/pkg/api/resource"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/fields"
+	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/intstr"
 )
 
 // Common string formats
@@ -57,6 +57,7 @@ import (
 
 // ObjectMeta is metadata that all persisted resources must have, which includes all objects
 // users must create.
+// DEPRECATED: Use k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta instead - this type will be removed soon.
 type ObjectMeta struct {
 	// Name is unique within a namespace.  Name is required when creating resources, although
 	// some resources may allow a client to request the generation of an appropriate name
@@ -370,7 +371,7 @@ type PersistentVolumeClaimVolumeSource struct {
 type PersistentVolume struct {
 	metav1.TypeMeta
 	// +optional
-	ObjectMeta
+	metav1.ObjectMeta
 
 	//Spec defines a persistent volume owned by the cluster
 	// +optional
@@ -441,7 +442,7 @@ type PersistentVolumeList struct {
 type PersistentVolumeClaim struct {
 	metav1.TypeMeta
 	// +optional
-	ObjectMeta
+	metav1.ObjectMeta
 
 	// Spec defines the volume requested by a pod author
 	// +optional
@@ -728,8 +729,8 @@ type SecretVolumeSource struct {
 	// key and content is the value. If specified, the listed keys will be
 	// projected into the specified paths, and unlisted keys will not be
 	// present. If a key is specified which is not present in the Secret,
-	// the volume setup will error. Paths must be relative and may not contain
-	// the '..' path or start with '..'.
+	// the volume setup will error unless it is marked optional. Paths must be
+	// relative and may not contain the '..' path or start with '..'.
 	// +optional
 	Items []KeyToPath
 	// Mode bits to use on created files by default. Must be a value between
@@ -739,6 +740,9 @@ type SecretVolumeSource struct {
 	// mode, like fsGroup, and the result can be other mode bits set.
 	// +optional
 	DefaultMode *int32
+	// Specify whether the Secret or it's key must be defined
+	// +optional
+	Optional *bool
 }
 
 // Represents an NFS mount that lasts the lifetime of a pod.
@@ -991,8 +995,8 @@ type ConfigMapVolumeSource struct {
 	// key and content is the value. If specified, the listed keys will be
 	// projected into the specified paths, and unlisted keys will not be
 	// present. If a key is specified which is not present in the ConfigMap,
-	// the volume setup will error. Paths must be relative and may not contain
-	// the '..' path or start with '..'.
+	// the volume setup will error unless it is marked optional. Paths must be
+	// relative and may not contain the '..' path or start with '..'.
 	// +optional
 	Items []KeyToPath
 	// Mode bits to use on created files by default. Must be a value between
@@ -1002,6 +1006,9 @@ type ConfigMapVolumeSource struct {
 	// mode, like fsGroup, and the result can be other mode bits set.
 	// +optional
 	DefaultMode *int32
+	// Specify whether the ConfigMap or it's keys must be defined
+	// +optional
+	Optional *bool
 }
 
 // Maps a string key to a path within a volume.
@@ -1123,6 +1130,9 @@ type ConfigMapKeySelector struct {
 	LocalObjectReference
 	// The key to select.
 	Key string
+	// Specify whether the ConfigMap or it's key must be defined
+	// +optional
+	Optional *bool
 }
 
 // SecretKeySelector selects a key of a Secret.
@@ -1131,6 +1141,48 @@ type SecretKeySelector struct {
 	LocalObjectReference
 	// The key of the secret to select from.  Must be a valid secret key.
 	Key string
+	// Specify whether the Secret or it's key must be defined
+	// +optional
+	Optional *bool
+}
+
+// EnvFromSource represents the source of a set of ConfigMaps
+type EnvFromSource struct {
+	// An optional identifier to prepend to each key in the ConfigMap. Must be a C_IDENTIFIER.
+	// +optional
+	Prefix string
+	// The ConfigMap to select from.
+	//+optional
+	ConfigMapRef *ConfigMapEnvSource
+	// The Secret to select from.
+	//+optional
+	SecretRef *SecretEnvSource
+}
+
+// ConfigMapEnvSource selects a ConfigMap to populate the environment
+// variables with.
+//
+// The contents of the target ConfigMap's Data field will represent the
+// key-value pairs as environment variables.
+type ConfigMapEnvSource struct {
+	// The ConfigMap to select from.
+	LocalObjectReference
+	// Specify whether the ConfigMap must be defined
+	// +optional
+	Optional *bool
+}
+
+// SecretEnvSource selects a Secret to populate the environment
+// variables with.
+//
+// The contents of the target Secret's Data field will represent the
+// key-value pairs as environment variables.
+type SecretEnvSource struct {
+	// The Secret to select from.
+	LocalObjectReference
+	// Specify whether the Secret must be defined
+	// +optional
+	Optional *bool
 }
 
 // HTTPHeader describes a custom header to be used in HTTP probes
@@ -1223,6 +1275,19 @@ const (
 	PullIfNotPresent PullPolicy = "IfNotPresent"
 )
 
+// TerminationMessagePolicy describes how termination messages are retrieved from a container.
+type TerminationMessagePolicy string
+
+const (
+	// TerminationMessageReadFile is the default behavior and will set the container status message to
+	// the contents of the container's terminationMessagePath when the container exits.
+	TerminationMessageReadFile TerminationMessagePolicy = "File"
+	// TerminationMessageFallbackToLogsOnError will read the most recent contents of the container logs
+	// for the container status message when the container exits with an error and the
+	// terminationMessagePath has no contents.
+	TerminationMessageFallbackToLogsOnError TerminationMessagePolicy = "FallbackToLogsOnError"
+)
+
 // Capability represent POSIX capabilities type
 type Capability string
 
@@ -1274,6 +1339,14 @@ type Container struct {
 	WorkingDir string
 	// +optional
 	Ports []ContainerPort
+	// List of sources to populate environment variables in the container.
+	// The keys defined within a source must be a C_IDENTIFIER. An invalid key
+	// will prevent the container from starting. When a key exists in multiple
+	// sources, the value associated with the last source will take precedence.
+	// Values defined by an Env with a duplicate key will take precedence.
+	// Cannot be updated.
+	// +optional
+	EnvFrom []EnvFromSource
 	// +optional
 	Env []EnvVar
 	// Compute resource requirements.
@@ -1290,6 +1363,8 @@ type Container struct {
 	// Required.
 	// +optional
 	TerminationMessagePath string
+	// +optional
+	TerminationMessagePolicy TerminationMessagePolicy
 	// Required: Policy for pulling images for this container
 	ImagePullPolicy PullPolicy
 	// Optional: SecurityContext defines the security options the container should be run with.
@@ -1708,8 +1783,12 @@ type Taint struct {
 	Value string
 	// Required. The effect of the taint on pods
 	// that do not tolerate the taint.
-	// Valid effects are NoSchedule and PreferNoSchedule.
+	// Valid effects are NoSchedule, PreferNoSchedule and NoExecute.
 	Effect TaintEffect
+	// TimeAdded represents the time at which the taint was added.
+	// It is only written for NoExecute taints.
+	// +optional
+	TimeAdded metav1.Time
 }
 
 type TaintEffect string
@@ -1725,26 +1804,23 @@ const (
 	// onto the node entirely. Enforced by the scheduler.
 	TaintEffectPreferNoSchedule TaintEffect = "PreferNoSchedule"
 	// NOT YET IMPLEMENTED. TODO: Uncomment field once it is implemented.
-	// Do not allow new pods to schedule onto the node unless they tolerate the taint,
-	// do not allow pods to start on Kubelet unless they tolerate the taint,
-	// but allow all already-running pods to continue running.
-	// Enforced by the scheduler and Kubelet.
+	// Like TaintEffectNoSchedule, but additionally do not allow pods submitted to
+	// Kubelet without going through the scheduler to start.
+	// Enforced by Kubelet and the scheduler.
 	// TaintEffectNoScheduleNoAdmit TaintEffect = "NoScheduleNoAdmit"
-	// NOT YET IMPLEMENTED. TODO: Uncomment field once it is implemented.
-	// Do not allow new pods to schedule onto the node unless they tolerate the taint,
-	// do not allow pods to start on Kubelet unless they tolerate the taint,
-	// and evict any already-running pods that do not tolerate the taint.
-	// Enforced by the scheduler and Kubelet.
-	// TaintEffectNoScheduleNoAdmitNoExecute = "NoScheduleNoAdmitNoExecute"
+	// Evict any already-running pods that do not tolerate the taint.
+	// Currently enforced by NodeController.
+	TaintEffectNoExecute TaintEffect = "NoExecute"
 )
 
 // The pod this Toleration is attached to tolerates any taint that matches
 // the triple <key,value,effect> using the matching operator <operator>.
 type Toleration struct {
-	// Required. Key is the taint key that the toleration applies to.
+	// Key is the taint key that the toleration applies to. Empty means match all taint keys.
+	// If the key is empty, operator must be Exists; this combination means to match all values and all keys.
 	// +optional
 	Key string
-	// operator represents a key's relationship to the value.
+	// Operator represents a key's relationship to the value.
 	// Valid operators are Exists and Equal. Defaults to Equal.
 	// Exists is equivalent to wildcard for value, so that a pod can
 	// tolerate all taints of a particular category.
@@ -1755,11 +1831,15 @@ type Toleration struct {
 	// +optional
 	Value string
 	// Effect indicates the taint effect to match. Empty means match all taint effects.
-	// When specified, allowed values are NoSchedule and PreferNoSchedule.
+	// When specified, allowed values are NoSchedule, PreferNoSchedule and NoExecute.
 	// +optional
 	Effect TaintEffect
-	// TODO: For forgiveness (#1574), we'd eventually add at least a grace period
-	// here, and possibly an occurrence threshold and period.
+	// TolerationSeconds represents the period of time the toleration (which must be
+	// of effect NoExecute, otherwise this field is ignored) tolerates the taint. By default,
+	// it is not set, which means tolerate the taint forever (do not evict). Zero and
+	// negative values will be treated as 0 (evict immediately) by the system.
+	// +optional
+	TolerationSeconds *int64
 }
 
 // A toleration operator is the set of operators that can be used in a toleration.
@@ -1827,6 +1907,10 @@ type PodSpec struct {
 	// If specified, the pod's scheduling constraints
 	// +optional
 	Affinity *Affinity
+	// If specified, the pod will be dispatched by specified scheduler.
+	// If not specified, the pod will be dispatched by default scheduler.
+	// +optional
+	SchedulerName string
 }
 
 // Sysctl defines a kernel parameter to be set
@@ -1933,7 +2017,7 @@ type PodStatus struct {
 	// +optional
 	StartTime *metav1.Time
 	// +optional
-	QOSClass PodQOSClass `json:"qosClass,omitempty"`
+	QOSClass PodQOSClass
 
 	// The list has one entry per init container in the manifest. The most recent successful
 	// init container will have ready = true, the most recently started container will have
@@ -1953,7 +2037,7 @@ type PodStatus struct {
 type PodStatusResult struct {
 	metav1.TypeMeta
 	// +optional
-	ObjectMeta
+	metav1.ObjectMeta
 	// Status represents the current information about a pod. This data may not be up
 	// to date.
 	// +optional
@@ -1966,7 +2050,7 @@ type PodStatusResult struct {
 type Pod struct {
 	metav1.TypeMeta
 	// +optional
-	ObjectMeta
+	metav1.ObjectMeta
 
 	// Spec defines the behavior of a pod.
 	// +optional
@@ -1982,7 +2066,7 @@ type Pod struct {
 type PodTemplateSpec struct {
 	// Metadata of the pods created from this template.
 	// +optional
-	ObjectMeta
+	metav1.ObjectMeta
 
 	// Spec defines the behavior of a pod.
 	// +optional
@@ -1995,7 +2079,7 @@ type PodTemplateSpec struct {
 type PodTemplate struct {
 	metav1.TypeMeta
 	// +optional
-	ObjectMeta
+	metav1.ObjectMeta
 
 	// Template defines the pods that will be created from this pod template
 	// +optional
@@ -2100,7 +2184,7 @@ type ReplicationControllerCondition struct {
 type ReplicationController struct {
 	metav1.TypeMeta
 	// +optional
-	ObjectMeta
+	metav1.ObjectMeta
 
 	// Spec defines the desired behavior of this replication controller.
 	// +optional
@@ -2305,7 +2389,7 @@ type ServicePort struct {
 type Service struct {
 	metav1.TypeMeta
 	// +optional
-	ObjectMeta
+	metav1.ObjectMeta
 
 	// Spec defines the behavior of a service.
 	// +optional
@@ -2325,7 +2409,7 @@ type Service struct {
 type ServiceAccount struct {
 	metav1.TypeMeta
 	// +optional
-	ObjectMeta
+	metav1.ObjectMeta
 
 	// Secrets is the list of secrets allowed to be used by pods running using this ServiceAccount
 	Secrets []ObjectReference
@@ -2363,7 +2447,7 @@ type ServiceAccountList struct {
 type Endpoints struct {
 	metav1.TypeMeta
 	// +optional
-	ObjectMeta
+	metav1.ObjectMeta
 
 	// The set of all endpoints is the union of all subsets.
 	Subsets []EndpointSubset
@@ -2685,7 +2769,7 @@ type ResourceList map[ResourceName]resource.Quantity
 type Node struct {
 	metav1.TypeMeta
 	// +optional
-	ObjectMeta
+	metav1.ObjectMeta
 
 	// Spec defines the behavior of a node.
 	// +optional
@@ -2745,7 +2829,7 @@ const (
 type Namespace struct {
 	metav1.TypeMeta
 	// +optional
-	ObjectMeta
+	metav1.ObjectMeta
 
 	// Spec defines the behavior of the Namespace.
 	// +optional
@@ -2770,7 +2854,7 @@ type Binding struct {
 	metav1.TypeMeta
 	// ObjectMeta describes the object that is being bound.
 	// +optional
-	ObjectMeta
+	metav1.ObjectMeta
 
 	// Target is the object to bind to.
 	Target ObjectReference
@@ -2784,6 +2868,7 @@ type Preconditions struct {
 }
 
 // DeleteOptions may be provided when deleting an API object
+// DEPRECATED: This type has been moved to meta/v1 and will be removed soon.
 type DeleteOptions struct {
 	metav1.TypeMeta
 
@@ -2806,6 +2891,7 @@ type DeleteOptions struct {
 
 // ListOptions is the query options to a standard REST list call, and has future support for
 // watch calls.
+// DEPRECATED: This type has been moved to meta/v1 and will be removed soon.
 type ListOptions struct {
 	metav1.TypeMeta
 
@@ -2907,6 +2993,15 @@ type PodExecOptions struct {
 	Command []string
 }
 
+// PodPortForwardOptions is the query options to a Pod's port forward call
+type PodPortForwardOptions struct {
+	metav1.TypeMeta
+
+	// The list of ports to forward
+	// +optional
+	Ports []int32
+}
+
 // PodProxyOptions is the query options to a Pod's proxy call
 type PodProxyOptions struct {
 	metav1.TypeMeta
@@ -2998,7 +3093,7 @@ const (
 type Event struct {
 	metav1.TypeMeta
 	// +optional
-	ObjectMeta
+	metav1.ObjectMeta
 
 	// Required. The object that this event is about.
 	// +optional
@@ -3101,7 +3196,7 @@ type LimitRangeSpec struct {
 type LimitRange struct {
 	metav1.TypeMeta
 	// +optional
-	ObjectMeta
+	metav1.ObjectMeta
 
 	// Spec defines the limits enforced
 	// +optional
@@ -3191,7 +3286,7 @@ type ResourceQuotaStatus struct {
 type ResourceQuota struct {
 	metav1.TypeMeta
 	// +optional
-	ObjectMeta
+	metav1.ObjectMeta
 
 	// Spec defines the desired quota
 	// +optional
@@ -3219,7 +3314,7 @@ type ResourceQuotaList struct {
 type Secret struct {
 	metav1.TypeMeta
 	// +optional
-	ObjectMeta
+	metav1.ObjectMeta
 
 	// Data contains the secret data.  Each key must be a valid DNS_SUBDOMAIN
 	// or leading dot followed by valid DNS_SUBDOMAIN.
@@ -3248,6 +3343,9 @@ const (
 	// - Secret.Annotations["kubernetes.io/service-account.uid"] - the UID of the ServiceAccount the token identifies
 	// - Secret.Data["token"] - a token that identifies the service account to the API
 	SecretTypeServiceAccountToken SecretType = "kubernetes.io/service-account-token"
+
+	// SecretTypeBootstrapToken is the key for tokens used by kubeadm to validate cluster info during discovery.
+	SecretTypeBootstrapToken = "bootstrap.kubernetes.io/token"
 
 	// ServiceAccountNameKey is the key of the required annotation for SecretTypeServiceAccountToken secrets
 	ServiceAccountNameKey = "kubernetes.io/service-account.name"
@@ -3331,7 +3429,7 @@ type SecretList struct {
 type ConfigMap struct {
 	metav1.TypeMeta
 	// +optional
-	ObjectMeta
+	metav1.ObjectMeta
 
 	// Data contains the configuration data.
 	// Each key must be a valid DNS_SUBDOMAIN with an optional leading dot.
@@ -3390,17 +3488,6 @@ const (
 	PortForwardRequestIDHeader = "requestID"
 )
 
-// Similarly to above, these are constants to support HTTP PATCH utilized by
-// both the client and server that didn't make sense for a whole package to be
-// dedicated to.
-type PatchType string
-
-const (
-	JSONPatchType           PatchType = "application/json-patch+json"
-	MergePatchType          PatchType = "application/merge-patch+json"
-	StrategicMergePatchType PatchType = "application/strategic-merge-patch+json"
-)
-
 // Type and constants for component health validation.
 type ComponentConditionType string
 
@@ -3425,7 +3512,7 @@ type ComponentCondition struct {
 type ComponentStatus struct {
 	metav1.TypeMeta
 	// +optional
-	ObjectMeta
+	metav1.ObjectMeta
 
 	// +optional
 	Conditions []ComponentCondition
@@ -3504,7 +3591,7 @@ type SELinuxOptions struct {
 type RangeAllocation struct {
 	metav1.TypeMeta
 	// +optional
-	ObjectMeta
+	metav1.ObjectMeta
 	// A string representing a unique label for a range of resources, such as a CIDR "10.0.0.0/8" or
 	// port range "10000-30000". Range is not strongly schema'd here. The Range is expected to define
 	// a start and end unless there is an implicit end.

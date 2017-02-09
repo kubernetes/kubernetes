@@ -21,9 +21,9 @@ limitations under the License.
 package app
 
 import (
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/kubernetes/pkg/controller/podautoscaler"
 	"k8s.io/kubernetes/pkg/controller/podautoscaler/metrics"
-	"k8s.io/kubernetes/pkg/runtime/schema"
 )
 
 func startHPAController(ctx ControllerContext) (bool, error) {
@@ -40,7 +40,7 @@ func startHPAController(ctx ControllerContext) (bool, error) {
 	)
 	replicaCalc := podautoscaler.NewReplicaCalculator(metricsClient, hpaClient.Core())
 	go podautoscaler.NewHorizontalController(
-		hpaClient.Core(),
+		ctx.ClientBuilder.ClientGoClientOrDie("horizontal-pod-autoscaler").Core(),
 		hpaClient.Extensions(),
 		hpaClient.Autoscaling(),
 		replicaCalc,

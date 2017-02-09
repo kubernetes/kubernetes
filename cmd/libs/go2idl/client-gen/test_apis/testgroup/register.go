@@ -17,9 +17,8 @@ limitations under the License.
 package testgroup
 
 import (
-	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
 var SchemeGroupVersion = schema.GroupVersion{Group: "testgroup.k8s.io", Version: runtime.APIVersionInternal}
@@ -36,9 +35,7 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 		&TestTypeList{},
 	)
 
-	scheme.AddKnownTypes(SchemeGroupVersion,
-		&api.ListOptions{},
-	)
+	scheme.AddKnownTypes(SchemeGroupVersion)
 	return nil
 }
 

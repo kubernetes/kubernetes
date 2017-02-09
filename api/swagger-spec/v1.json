@@ -403,7 +403,7 @@
     "description": "API at /api/v1",
     "operations": [
      {
-      "type": "versioned.Event",
+      "type": "v1.WatchEvent",
       "method": "GET",
       "summary": "watch individual changes to a list of ConfigMap",
       "nickname": "watchNamespacedConfigMapList",
@@ -469,7 +469,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "versioned.Event"
+        "responseModel": "v1.WatchEvent"
        }
       ],
       "produces": [
@@ -742,7 +742,7 @@
     "description": "API at /api/v1",
     "operations": [
      {
-      "type": "versioned.Event",
+      "type": "v1.WatchEvent",
       "method": "GET",
       "summary": "watch changes to an object of kind ConfigMap",
       "nickname": "watchNamespacedConfigMap",
@@ -816,7 +816,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "versioned.Event"
+        "responseModel": "v1.WatchEvent"
        }
       ],
       "produces": [
@@ -916,7 +916,7 @@
     "description": "API at /api/v1",
     "operations": [
      {
-      "type": "versioned.Event",
+      "type": "v1.WatchEvent",
       "method": "GET",
       "summary": "watch individual changes to a list of ConfigMap",
       "nickname": "watchConfigMapListForAllNamespaces",
@@ -974,7 +974,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "versioned.Event"
+        "responseModel": "v1.WatchEvent"
        }
       ],
       "produces": [
@@ -1208,7 +1208,7 @@
     "description": "API at /api/v1",
     "operations": [
      {
-      "type": "versioned.Event",
+      "type": "v1.WatchEvent",
       "method": "GET",
       "summary": "watch individual changes to a list of Endpoints",
       "nickname": "watchNamespacedEndpointsList",
@@ -1274,7 +1274,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "versioned.Event"
+        "responseModel": "v1.WatchEvent"
        }
       ],
       "produces": [
@@ -1547,7 +1547,7 @@
     "description": "API at /api/v1",
     "operations": [
      {
-      "type": "versioned.Event",
+      "type": "v1.WatchEvent",
       "method": "GET",
       "summary": "watch changes to an object of kind Endpoints",
       "nickname": "watchNamespacedEndpoints",
@@ -1621,7 +1621,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "versioned.Event"
+        "responseModel": "v1.WatchEvent"
        }
       ],
       "produces": [
@@ -1721,7 +1721,7 @@
     "description": "API at /api/v1",
     "operations": [
      {
-      "type": "versioned.Event",
+      "type": "v1.WatchEvent",
       "method": "GET",
       "summary": "watch individual changes to a list of Endpoints",
       "nickname": "watchEndpointsListForAllNamespaces",
@@ -1779,7 +1779,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "versioned.Event"
+        "responseModel": "v1.WatchEvent"
        }
       ],
       "produces": [
@@ -2013,7 +2013,7 @@
     "description": "API at /api/v1",
     "operations": [
      {
-      "type": "versioned.Event",
+      "type": "v1.WatchEvent",
       "method": "GET",
       "summary": "watch individual changes to a list of Event",
       "nickname": "watchNamespacedEventList",
@@ -2079,7 +2079,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "versioned.Event"
+        "responseModel": "v1.WatchEvent"
        }
       ],
       "produces": [
@@ -2352,7 +2352,7 @@
     "description": "API at /api/v1",
     "operations": [
      {
-      "type": "versioned.Event",
+      "type": "v1.WatchEvent",
       "method": "GET",
       "summary": "watch changes to an object of kind Event",
       "nickname": "watchNamespacedEvent",
@@ -2426,7 +2426,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "versioned.Event"
+        "responseModel": "v1.WatchEvent"
        }
       ],
       "produces": [
@@ -2526,7 +2526,7 @@
     "description": "API at /api/v1",
     "operations": [
      {
-      "type": "versioned.Event",
+      "type": "v1.WatchEvent",
       "method": "GET",
       "summary": "watch individual changes to a list of Event",
       "nickname": "watchEventListForAllNamespaces",
@@ -2584,7 +2584,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "versioned.Event"
+        "responseModel": "v1.WatchEvent"
        }
       ],
       "produces": [
@@ -2818,7 +2818,7 @@
     "description": "API at /api/v1",
     "operations": [
      {
-      "type": "versioned.Event",
+      "type": "v1.WatchEvent",
       "method": "GET",
       "summary": "watch individual changes to a list of LimitRange",
       "nickname": "watchNamespacedLimitRangeList",
@@ -2884,7 +2884,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "versioned.Event"
+        "responseModel": "v1.WatchEvent"
        }
       ],
       "produces": [
@@ -3157,7 +3157,7 @@
     "description": "API at /api/v1",
     "operations": [
      {
-      "type": "versioned.Event",
+      "type": "v1.WatchEvent",
       "method": "GET",
       "summary": "watch changes to an object of kind LimitRange",
       "nickname": "watchNamespacedLimitRange",
@@ -3231,7 +3231,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "versioned.Event"
+        "responseModel": "v1.WatchEvent"
        }
       ],
       "produces": [
@@ -3331,7 +3331,7 @@
     "description": "API at /api/v1",
     "operations": [
      {
-      "type": "versioned.Event",
+      "type": "v1.WatchEvent",
       "method": "GET",
       "summary": "watch individual changes to a list of LimitRange",
       "nickname": "watchLimitRangeListForAllNamespaces",
@@ -3389,7 +3389,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "versioned.Event"
+        "responseModel": "v1.WatchEvent"
        }
       ],
       "produces": [
@@ -3599,7 +3599,7 @@
     "description": "API at /api/v1",
     "operations": [
      {
-      "type": "versioned.Event",
+      "type": "v1.WatchEvent",
       "method": "GET",
       "summary": "watch individual changes to a list of Namespace",
       "nickname": "watchNamespaceList",
@@ -3657,7 +3657,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "versioned.Event"
+        "responseModel": "v1.WatchEvent"
        }
       ],
       "produces": [
@@ -3898,7 +3898,7 @@
     "description": "API at /api/v1",
     "operations": [
      {
-      "type": "versioned.Event",
+      "type": "v1.WatchEvent",
       "method": "GET",
       "summary": "watch changes to an object of kind Namespace",
       "nickname": "watchNamespace",
@@ -3964,7 +3964,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "versioned.Event"
+        "responseModel": "v1.WatchEvent"
        }
       ],
       "produces": [
@@ -4368,7 +4368,7 @@
     "description": "API at /api/v1",
     "operations": [
      {
-      "type": "versioned.Event",
+      "type": "v1.WatchEvent",
       "method": "GET",
       "summary": "watch individual changes to a list of Node",
       "nickname": "watchNodeList",
@@ -4426,7 +4426,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "versioned.Event"
+        "responseModel": "v1.WatchEvent"
        }
       ],
       "produces": [
@@ -4667,7 +4667,7 @@
     "description": "API at /api/v1",
     "operations": [
      {
-      "type": "versioned.Event",
+      "type": "v1.WatchEvent",
       "method": "GET",
       "summary": "watch changes to an object of kind Node",
       "nickname": "watchNode",
@@ -4733,7 +4733,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "versioned.Event"
+        "responseModel": "v1.WatchEvent"
        }
       ],
       "produces": [
@@ -5852,7 +5852,7 @@
     "description": "API at /api/v1",
     "operations": [
      {
-      "type": "versioned.Event",
+      "type": "v1.WatchEvent",
       "method": "GET",
       "summary": "watch individual changes to a list of PersistentVolumeClaim",
       "nickname": "watchNamespacedPersistentVolumeClaimList",
@@ -5918,7 +5918,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "versioned.Event"
+        "responseModel": "v1.WatchEvent"
        }
       ],
       "produces": [
@@ -6191,7 +6191,7 @@
     "description": "API at /api/v1",
     "operations": [
      {
-      "type": "versioned.Event",
+      "type": "v1.WatchEvent",
       "method": "GET",
       "summary": "watch changes to an object of kind PersistentVolumeClaim",
       "nickname": "watchNamespacedPersistentVolumeClaim",
@@ -6265,7 +6265,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "versioned.Event"
+        "responseModel": "v1.WatchEvent"
        }
       ],
       "produces": [
@@ -6365,7 +6365,7 @@
     "description": "API at /api/v1",
     "operations": [
      {
-      "type": "versioned.Event",
+      "type": "v1.WatchEvent",
       "method": "GET",
       "summary": "watch individual changes to a list of PersistentVolumeClaim",
       "nickname": "watchPersistentVolumeClaimListForAllNamespaces",
@@ -6423,7 +6423,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "versioned.Event"
+        "responseModel": "v1.WatchEvent"
        }
       ],
       "produces": [
@@ -6798,7 +6798,7 @@
     "description": "API at /api/v1",
     "operations": [
      {
-      "type": "versioned.Event",
+      "type": "v1.WatchEvent",
       "method": "GET",
       "summary": "watch individual changes to a list of PersistentVolume",
       "nickname": "watchPersistentVolumeList",
@@ -6856,7 +6856,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "versioned.Event"
+        "responseModel": "v1.WatchEvent"
        }
       ],
       "produces": [
@@ -7097,7 +7097,7 @@
     "description": "API at /api/v1",
     "operations": [
      {
-      "type": "versioned.Event",
+      "type": "v1.WatchEvent",
       "method": "GET",
       "summary": "watch changes to an object of kind PersistentVolume",
       "nickname": "watchPersistentVolume",
@@ -7163,7 +7163,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "versioned.Event"
+        "responseModel": "v1.WatchEvent"
        }
       ],
       "produces": [
@@ -7538,7 +7538,7 @@
     "description": "API at /api/v1",
     "operations": [
      {
-      "type": "versioned.Event",
+      "type": "v1.WatchEvent",
       "method": "GET",
       "summary": "watch individual changes to a list of Pod",
       "nickname": "watchNamespacedPodList",
@@ -7604,7 +7604,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "versioned.Event"
+        "responseModel": "v1.WatchEvent"
        }
       ],
       "produces": [
@@ -7877,7 +7877,7 @@
     "description": "API at /api/v1",
     "operations": [
      {
-      "type": "versioned.Event",
+      "type": "v1.WatchEvent",
       "method": "GET",
       "summary": "watch changes to an object of kind Pod",
       "nickname": "watchNamespacedPod",
@@ -7951,7 +7951,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "versioned.Event"
+        "responseModel": "v1.WatchEvent"
        }
       ],
       "produces": [
@@ -8471,7 +8471,7 @@
     "description": "API at /api/v1",
     "operations": [
      {
-      "type": "versioned.Event",
+      "type": "v1.WatchEvent",
       "method": "GET",
       "summary": "watch individual changes to a list of Pod",
       "nickname": "watchPodListForAllNamespaces",
@@ -8529,7 +8529,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "versioned.Event"
+        "responseModel": "v1.WatchEvent"
        }
       ],
       "produces": [
@@ -9096,6 +9096,14 @@
       "nickname": "connectGetNamespacedPodPortforward",
       "parameters": [
        {
+        "type": "integer",
+        "paramType": "query",
+        "name": "ports",
+        "description": "List of ports to forward Required when using WebSockets",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
         "type": "string",
         "paramType": "path",
         "name": "namespace",
@@ -9125,6 +9133,14 @@
       "summary": "connect POST requests to portforward of Pod",
       "nickname": "connectPostNamespacedPodPortforward",
       "parameters": [
+       {
+        "type": "integer",
+        "paramType": "query",
+        "name": "ports",
+        "description": "List of ports to forward Required when using WebSockets",
+        "required": false,
+        "allowMultiple": false
+       },
        {
         "type": "string",
         "paramType": "path",
@@ -10050,7 +10066,7 @@
     "description": "API at /api/v1",
     "operations": [
      {
-      "type": "versioned.Event",
+      "type": "v1.WatchEvent",
       "method": "GET",
       "summary": "watch individual changes to a list of PodTemplate",
       "nickname": "watchNamespacedPodTemplateList",
@@ -10116,7 +10132,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "versioned.Event"
+        "responseModel": "v1.WatchEvent"
        }
       ],
       "produces": [
@@ -10389,7 +10405,7 @@
     "description": "API at /api/v1",
     "operations": [
      {
-      "type": "versioned.Event",
+      "type": "v1.WatchEvent",
       "method": "GET",
       "summary": "watch changes to an object of kind PodTemplate",
       "nickname": "watchNamespacedPodTemplate",
@@ -10463,7 +10479,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "versioned.Event"
+        "responseModel": "v1.WatchEvent"
        }
       ],
       "produces": [
@@ -10563,7 +10579,7 @@
     "description": "API at /api/v1",
     "operations": [
      {
-      "type": "versioned.Event",
+      "type": "v1.WatchEvent",
       "method": "GET",
       "summary": "watch individual changes to a list of PodTemplate",
       "nickname": "watchPodTemplateListForAllNamespaces",
@@ -10621,7 +10637,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "versioned.Event"
+        "responseModel": "v1.WatchEvent"
        }
       ],
       "produces": [
@@ -10855,7 +10871,7 @@
     "description": "API at /api/v1",
     "operations": [
      {
-      "type": "versioned.Event",
+      "type": "v1.WatchEvent",
       "method": "GET",
       "summary": "watch individual changes to a list of ReplicationController",
       "nickname": "watchNamespacedReplicationControllerList",
@@ -10921,7 +10937,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "versioned.Event"
+        "responseModel": "v1.WatchEvent"
        }
       ],
       "produces": [
@@ -11194,7 +11210,7 @@
     "description": "API at /api/v1",
     "operations": [
      {
-      "type": "versioned.Event",
+      "type": "v1.WatchEvent",
       "method": "GET",
       "summary": "watch changes to an object of kind ReplicationController",
       "nickname": "watchNamespacedReplicationController",
@@ -11268,7 +11284,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "versioned.Event"
+        "responseModel": "v1.WatchEvent"
        }
       ],
       "produces": [
@@ -11368,7 +11384,7 @@
     "description": "API at /api/v1",
     "operations": [
      {
-      "type": "versioned.Event",
+      "type": "v1.WatchEvent",
       "method": "GET",
       "summary": "watch individual changes to a list of ReplicationController",
       "nickname": "watchReplicationControllerListForAllNamespaces",
@@ -11426,7 +11442,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "versioned.Event"
+        "responseModel": "v1.WatchEvent"
        }
       ],
       "produces": [
@@ -11990,7 +12006,7 @@
     "description": "API at /api/v1",
     "operations": [
      {
-      "type": "versioned.Event",
+      "type": "v1.WatchEvent",
       "method": "GET",
       "summary": "watch individual changes to a list of ResourceQuota",
       "nickname": "watchNamespacedResourceQuotaList",
@@ -12056,7 +12072,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "versioned.Event"
+        "responseModel": "v1.WatchEvent"
        }
       ],
       "produces": [
@@ -12329,7 +12345,7 @@
     "description": "API at /api/v1",
     "operations": [
      {
-      "type": "versioned.Event",
+      "type": "v1.WatchEvent",
       "method": "GET",
       "summary": "watch changes to an object of kind ResourceQuota",
       "nickname": "watchNamespacedResourceQuota",
@@ -12403,7 +12419,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "versioned.Event"
+        "responseModel": "v1.WatchEvent"
        }
       ],
       "produces": [
@@ -12503,7 +12519,7 @@
     "description": "API at /api/v1",
     "operations": [
      {
-      "type": "versioned.Event",
+      "type": "v1.WatchEvent",
       "method": "GET",
       "summary": "watch individual changes to a list of ResourceQuota",
       "nickname": "watchResourceQuotaListForAllNamespaces",
@@ -12561,7 +12577,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "versioned.Event"
+        "responseModel": "v1.WatchEvent"
        }
       ],
       "produces": [
@@ -12960,7 +12976,7 @@
     "description": "API at /api/v1",
     "operations": [
      {
-      "type": "versioned.Event",
+      "type": "v1.WatchEvent",
       "method": "GET",
       "summary": "watch individual changes to a list of Secret",
       "nickname": "watchNamespacedSecretList",
@@ -13026,7 +13042,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "versioned.Event"
+        "responseModel": "v1.WatchEvent"
        }
       ],
       "produces": [
@@ -13299,7 +13315,7 @@
     "description": "API at /api/v1",
     "operations": [
      {
-      "type": "versioned.Event",
+      "type": "v1.WatchEvent",
       "method": "GET",
       "summary": "watch changes to an object of kind Secret",
       "nickname": "watchNamespacedSecret",
@@ -13373,7 +13389,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "versioned.Event"
+        "responseModel": "v1.WatchEvent"
        }
       ],
       "produces": [
@@ -13473,7 +13489,7 @@
     "description": "API at /api/v1",
     "operations": [
      {
-      "type": "versioned.Event",
+      "type": "v1.WatchEvent",
       "method": "GET",
       "summary": "watch individual changes to a list of Secret",
       "nickname": "watchSecretListForAllNamespaces",
@@ -13531,7 +13547,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "versioned.Event"
+        "responseModel": "v1.WatchEvent"
        }
       ],
       "produces": [
@@ -13765,7 +13781,7 @@
     "description": "API at /api/v1",
     "operations": [
      {
-      "type": "versioned.Event",
+      "type": "v1.WatchEvent",
       "method": "GET",
       "summary": "watch individual changes to a list of ServiceAccount",
       "nickname": "watchNamespacedServiceAccountList",
@@ -13831,7 +13847,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "versioned.Event"
+        "responseModel": "v1.WatchEvent"
        }
       ],
       "produces": [
@@ -14104,7 +14120,7 @@
     "description": "API at /api/v1",
     "operations": [
      {
-      "type": "versioned.Event",
+      "type": "v1.WatchEvent",
       "method": "GET",
       "summary": "watch changes to an object of kind ServiceAccount",
       "nickname": "watchNamespacedServiceAccount",
@@ -14178,7 +14194,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "versioned.Event"
+        "responseModel": "v1.WatchEvent"
        }
       ],
       "produces": [
@@ -14278,7 +14294,7 @@
     "description": "API at /api/v1",
     "operations": [
      {
-      "type": "versioned.Event",
+      "type": "v1.WatchEvent",
       "method": "GET",
       "summary": "watch individual changes to a list of ServiceAccount",
       "nickname": "watchServiceAccountListForAllNamespaces",
@@ -14336,7 +14352,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "versioned.Event"
+        "responseModel": "v1.WatchEvent"
        }
       ],
       "produces": [
@@ -14491,7 +14507,7 @@
     "description": "API at /api/v1",
     "operations": [
      {
-      "type": "versioned.Event",
+      "type": "v1.WatchEvent",
       "method": "GET",
       "summary": "watch individual changes to a list of Service",
       "nickname": "watchNamespacedServiceList",
@@ -14557,7 +14573,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "versioned.Event"
+        "responseModel": "v1.WatchEvent"
        }
       ],
       "produces": [
@@ -14806,7 +14822,7 @@
     "description": "API at /api/v1",
     "operations": [
      {
-      "type": "versioned.Event",
+      "type": "v1.WatchEvent",
       "method": "GET",
       "summary": "watch changes to an object of kind Service",
       "nickname": "watchNamespacedService",
@@ -14880,7 +14896,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "versioned.Event"
+        "responseModel": "v1.WatchEvent"
        }
       ],
       "produces": [
@@ -15400,7 +15416,7 @@
     "description": "API at /api/v1",
     "operations": [
      {
-      "type": "versioned.Event",
+      "type": "v1.WatchEvent",
       "method": "GET",
       "summary": "watch individual changes to a list of Service",
       "nickname": "watchServiceListForAllNamespaces",
@@ -15458,7 +15474,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "versioned.Event"
+        "responseModel": "v1.WatchEvent"
        }
       ],
       "produces": [
@@ -16575,8 +16591,8 @@
      }
     }
    },
-   "versioned.Event": {
-    "id": "versioned.Event",
+   "v1.WatchEvent": {
+    "id": "v1.WatchEvent",
     "required": [
      "type",
      "object"
@@ -16597,7 +16613,7 @@
    },
    "v1.DeleteOptions": {
     "id": "v1.DeleteOptions",
-    "description": "DeleteOptions may be provided when deleting an API object",
+    "description": "DeleteOptions may be provided when deleting an API object.",
     "properties": {
      "kind": {
       "type": "string",
@@ -18197,6 +18213,13 @@
       },
       "description": "List of volumes that can be mounted by containers belonging to the pod. More info: http://kubernetes.io/docs/user-guide/volumes"
      },
+     "initContainers": {
+      "type": "array",
+      "items": {
+       "$ref": "v1.Container"
+      },
+      "description": "List of initialization containers belonging to the pod. Init containers are executed in order prior to containers being started. If any init container fails, the pod is considered to have failed and is handled according to its restartPolicy. The name for an init container or normal container must be unique among all containers. Init containers may not have Lifecycle actions, Readiness probes, or Liveness probes. The resourceRequirements of an init container are taken into account during scheduling by finding the highest request/limit for each resource type, and then using the max of of that value or the sum of the normal containers. Limits are applied to init containers in a similar fashion. Init containers cannot currently be added or removed. Cannot be updated. More info: http://kubernetes.io/docs/user-guide/containers"
+     },
      "containers": {
       "type": "array",
       "items": {
@@ -18272,6 +18295,10 @@
      "affinity": {
       "$ref": "v1.Affinity",
       "description": "If specified, the pod's scheduling constraints"
+     },
+     "schedulername": {
+      "type": "string",
+      "description": "If specified, the pod will be dispatched by specified scheduler. If not specified, the pod will be dispatched by default scheduler."
      }
     }
    },
@@ -18424,12 +18451,16 @@
       "items": {
        "$ref": "v1.KeyToPath"
       },
-      "description": "If unspecified, each key-value pair in the Data field of the referenced Secret will be projected into the volume as a file whose name is the key and content is the value. If specified, the listed keys will be projected into the specified paths, and unlisted keys will not be present. If a key is specified which is not present in the Secret, the volume setup will error. Paths must be relative and may not contain the '..' path or start with '..'."
+      "description": "If unspecified, each key-value pair in the Data field of the referenced Secret will be projected into the volume as a file whose name is the key and content is the value. If specified, the listed keys will be projected into the specified paths, and unlisted keys will not be present. If a key is specified which is not present in the Secret, the volume setup will error unless it is marked optional. Paths must be relative and may not contain the '..' path or start with '..'."
      },
      "defaultMode": {
       "type": "integer",
       "format": "int32",
       "description": "Optional: mode bits to use on created files by default. Must be a value between 0 and 0777. Defaults to 0644. Directories within the path are not affected by this setting. This might be in conflict with other options that affect the file mode, like fsGroup, and the result can be other mode bits set."
+     },
+     "optional": {
+      "type": "boolean",
+      "description": "Specify whether the Secret or it's keys must be defined"
      }
     }
    },
@@ -18568,12 +18599,16 @@
       "items": {
        "$ref": "v1.KeyToPath"
       },
-      "description": "If unspecified, each key-value pair in the Data field of the referenced ConfigMap will be projected into the volume as a file whose name is the key and content is the value. If specified, the listed keys will be projected into the specified paths, and unlisted keys will not be present. If a key is specified which is not present in the ConfigMap, the volume setup will error. Paths must be relative and may not contain the '..' path or start with '..'."
+      "description": "If unspecified, each key-value pair in the Data field of the referenced ConfigMap will be projected into the volume as a file whose name is the key and content is the value. If specified, the listed keys will be projected into the specified paths, and unlisted keys will not be present. If a key is specified which is not present in the ConfigMap, the volume setup will error unless it is marked optional. Paths must be relative and may not contain the '..' path or start with '..'."
      },
      "defaultMode": {
       "type": "integer",
       "format": "int32",
       "description": "Optional: mode bits to use on created files by default. Must be a value between 0 and 0777. Defaults to 0644. Directories within the path are not affected by this setting. This might be in conflict with other options that affect the file mode, like fsGroup, and the result can be other mode bits set."
+     },
+     "optional": {
+      "type": "boolean",
+      "description": "Specify whether the ConfigMap or it's keys must be defined"
      }
     }
    },
@@ -18617,6 +18652,13 @@
       },
       "description": "List of ports to expose from the container. Exposing a port here gives the system additional information about the network connections a container uses, but is primarily informational. Not specifying a port here DOES NOT prevent that port from being exposed. Any port which is listening on the default \"0.0.0.0\" address inside a container will be accessible from the network. Cannot be updated."
      },
+     "envFrom": {
+      "type": "array",
+      "items": {
+       "$ref": "v1.EnvFromSource"
+      },
+      "description": "List of sources to populate environment variables in the container. The keys defined within a source must be a C_IDENTIFIER. An invalid key will prevent the container from starting. When a key exists in multiple sources, the value associated with the last source will take precedence. Values defined by an Env with a duplicate key will take precedence. Cannot be updated."
+     },
      "env": {
       "type": "array",
       "items": {
@@ -18649,7 +18691,11 @@
      },
      "terminationMessagePath": {
       "type": "string",
-      "description": "Optional: Path at which the file to which the container's termination message will be written is mounted into the container's filesystem. Message written is intended to be brief final status, such as an assertion failure message. Defaults to /dev/termination-log. Cannot be updated."
+      "description": "Optional: Path at which the file to which the container's termination message will be written is mounted into the container's filesystem. Message written is intended to be brief final status, such as an assertion failure message. Will be truncated by the node if greater than 4096 bytes. The total message length across all containers will be limited to 12kb. Defaults to /dev/termination-log. Cannot be updated."
+     },
+     "terminationMessagePolicy": {
+      "type": "string",
+      "description": "Indicate how the termination message should be populated. File will use the contents of terminationMessagePath to populate the container status message on both success and failure. FallbackToLogsOnError will use the last chunk of container log output if the termination message file is empty and the container exited with an error. The log output is limited to 2048 bytes or 80 lines, whichever is smaller. Defaults to File. Cannot be updated."
      },
      "imagePullPolicy": {
       "type": "string",
@@ -18701,6 +18747,52 @@
      "hostIP": {
       "type": "string",
       "description": "What host IP to bind the external port to."
+     }
+    }
+   },
+   "v1.EnvFromSource": {
+    "id": "v1.EnvFromSource",
+    "description": "EnvFromSource represents the source of a set of ConfigMaps",
+    "properties": {
+     "prefix": {
+      "type": "string",
+      "description": "An optional identifer to prepend to each key in the ConfigMap. Must be a C_IDENTIFIER."
+     },
+     "configMapRef": {
+      "$ref": "v1.ConfigMapEnvSource",
+      "description": "The ConfigMap to select from"
+     },
+     "secretRef": {
+      "$ref": "v1.SecretEnvSource",
+      "description": "The Secret to select from"
+     }
+    }
+   },
+   "v1.ConfigMapEnvSource": {
+    "id": "v1.ConfigMapEnvSource",
+    "description": "ConfigMapEnvSource selects a ConfigMap to populate the environment variables with.\n\nThe contents of the target ConfigMap's Data field will represent the key-value pairs as environment variables.",
+    "properties": {
+     "name": {
+      "type": "string",
+      "description": "Name of the referent. More info: http://kubernetes.io/docs/user-guide/identifiers#names"
+     },
+     "optional": {
+      "type": "boolean",
+      "description": "Specify whether the ConfigMap must be defined"
+     }
+    }
+   },
+   "v1.SecretEnvSource": {
+    "id": "v1.SecretEnvSource",
+    "description": "SecretEnvSource selects a Secret to populate the environment variables with.\n\nThe contents of the target Secret's Data field will represent the key-value pairs as environment variables.",
+    "properties": {
+     "name": {
+      "type": "string",
+      "description": "Name of the referent. More info: http://kubernetes.io/docs/user-guide/identifiers#names"
+     },
+     "optional": {
+      "type": "boolean",
+      "description": "Specify whether the Secret must be defined"
      }
     }
    },
@@ -18761,6 +18853,10 @@
      "key": {
       "type": "string",
       "description": "The key to select."
+     },
+     "optional": {
+      "type": "boolean",
+      "description": "Specify whether the ConfigMap or it's key must be defined"
      }
     }
    },
@@ -18778,6 +18874,10 @@
      "key": {
       "type": "string",
       "description": "The key of the secret to select from.  Must be a valid secret key."
+     },
+     "optional": {
+      "type": "boolean",
+      "description": "Specify whether the Secret or it's key must be defined"
      }
     }
    },
@@ -19294,6 +19394,13 @@
      "startTime": {
       "type": "string",
       "description": "RFC 3339 date and time at which the object was acknowledged by the Kubelet. This is before the Kubelet pulled the container image(s) for the pod."
+     },
+     "initContainerStatuses": {
+      "type": "array",
+      "items": {
+       "$ref": "v1.ContainerStatus"
+      },
+      "description": "The list has one entry per init container in the manifest. The most recent successful init container will have ready = true, the most recently started container will have startTime set. More info: http://kubernetes.io/docs/user-guide/pod-states#container-statuses"
      },
      "containerStatuses": {
       "type": "array",
@@ -20203,6 +20310,13 @@
        "type": "string"
       },
       "description": "verbs is a list of supported kube verbs (this includes get, list, watch, create, update, patch, delete, deletecollection, and proxy)"
+     },
+     "shortNames": {
+      "type": "array",
+      "items": {
+       "type": "string"
+      },
+      "description": "shortNames is a list of suggested short names of the resource."
      }
     }
    }

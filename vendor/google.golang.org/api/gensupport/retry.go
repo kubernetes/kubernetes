@@ -55,23 +55,17 @@ func DefaultBackoffStrategy() BackoffStrategy {
 // shouldRetry returns true if the HTTP response / error indicates that the
 // request should be attempted again.
 func shouldRetry(status int, err error) bool {
-	// Retry for 5xx response codes.
-	if 500 <= status && status < 600 {
+	if 500 <= status && status <= 599 {
 		return true
 	}
-
-	// Retry on statusTooManyRequests{
 	if status == statusTooManyRequests {
 		return true
 	}
-
-	// Retry on unexpected EOFs and temporary network errors.
 	if err == io.ErrUnexpectedEOF {
 		return true
 	}
 	if err, ok := err.(net.Error); ok {
 		return err.Temporary()
 	}
-
 	return false
 }

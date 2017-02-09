@@ -17,24 +17,29 @@ limitations under the License.
 package cmd
 
 import (
-	"encoding/json"
 	"fmt"
 	"io"
 	"reflect"
 	"strings"
 
+	jsonpatch "github.com/evanphx/json-patch"
 	"github.com/golang/glog"
 	"github.com/spf13/cobra"
-	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/meta"
+
+	"k8s.io/apimachinery/pkg/api/meta"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
+	utilerrors "k8s.io/apimachinery/pkg/util/errors"
+	"k8s.io/apimachinery/pkg/util/json"
+	"k8s.io/apimachinery/pkg/util/validation"
+
 	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
-	"k8s.io/kubernetes/pkg/runtime"
-	utilerrors "k8s.io/kubernetes/pkg/util/errors"
-	"k8s.io/kubernetes/pkg/util/strategicpatch"
-	"k8s.io/kubernetes/pkg/util/validation"
+	"k8s.io/kubernetes/pkg/util/i18n"
 )
 
 // LabelOptions have the data required to perform the label operation
@@ -105,7 +110,7 @@ func NewCmdLabel(f cmdutil.Factory, out io.Writer) *cobra.Command {
 
 	cmd := &cobra.Command{
 		Use:     "label [--overwrite] (-f FILENAME | TYPE NAME) KEY_1=VAL_1 ... KEY_N=VAL_N [--resource-version=version]",
-		Short:   "Update the labels on a resource",
+		Short:   i18n.T("Update the labels on a resource"),
 		Long:    fmt.Sprintf(label_long, validation.LabelValueMaxLength),
 		Example: label_example,
 		Run: func(cmd *cobra.Command, args []string) {
@@ -174,8 +179,12 @@ func (o *LabelOptions) RunLabel(f cmdutil.Factory, cmd *cobra.Command) error {
 	}
 
 	changeCause := f.Command()
-	mapper, typer := f.Object()
-	b := resource.NewBuilder(mapper, typer, resource.ClientMapperFunc(f.ClientForMapping), f.Decoder(true)).
+
+	mapper, typer, err := f.UnstructuredObject()
+	if err != nil {
+		return err
+	}
+	b := resource.NewBuilder(mapper, typer, resource.ClientMapperFunc(f.UnstructuredClientForMapping), unstructured.UnstructuredJSONScheme).
 		ContinueOnError().
 		NamespaceParam(cmdNamespace).DefaultNamespace().
 		FilenameParam(enforceNamespace, &o.FilenameOptions).
@@ -187,7 +196,7 @@ func (o *LabelOptions) RunLabel(f cmdutil.Factory, cmd *cobra.Command) error {
 			Latest()
 	}
 	one := false
-	r := b.Do().IntoSingular(&one)
+	r := b.Do().IntoSingleItemImplied(&one)
 	if err := r.Err(); err != nil {
 		return err
 	}
@@ -212,10 +221,7 @@ func (o *LabelOptions) RunLabel(f cmdutil.Factory, cmd *cobra.Command) error {
 			}
 			outputObj = info.Object
 		} else {
-			obj, err := cmdutil.MaybeConvertObject(info.Object, info.Mapping.GroupVersionKind.GroupVersion(), info.Mapping)
-			if err != nil {
-				return err
-			}
+			obj := info.Object
 			name, namespace := info.Name, info.Namespace
 			oldData, err := json.Marshal(obj)
 			if err != nil {
@@ -246,21 +252,21 @@ func (o *LabelOptions) RunLabel(f cmdutil.Factory, cmd *cobra.Command) error {
 			if !reflect.DeepEqual(oldData, newData) {
 				dataChangeMsg = "labeled"
 			}
-			patchBytes, err := strategicpatch.CreateTwoWayMergePatch(oldData, newData, obj)
+			patchBytes, err := jsonpatch.CreateMergePatch(oldData, newData)
 			createdPatch := err == nil
 			if err != nil {
 				glog.V(2).Infof("couldn't compute patch: %v", err)
 			}
 
 			mapping := info.ResourceMapping()
-			client, err := f.ClientForMapping(mapping)
+			client, err := f.UnstructuredClientForMapping(mapping)
 			if err != nil {
 				return err
 			}
 			helper := resource.NewHelper(client, mapping)
 
 			if createdPatch {
-				outputObj, err = helper.Patch(namespace, name, api.StrategicMergePatchType, patchBytes)
+				outputObj, err = helper.Patch(namespace, name, types.MergePatchType, patchBytes)
 			} else {
 				outputObj, err = helper.Replace(namespace, name, false, obj)
 			}
@@ -276,7 +282,7 @@ func (o *LabelOptions) RunLabel(f cmdutil.Factory, cmd *cobra.Command) error {
 	})
 }
 
-func validateNoOverwrites(accessor meta.Object, labels map[string]string) error {
+func validateNoOverwrites(accessor metav1.Object, labels map[string]string) error {
 	allErrs := []error{}
 	for key := range labels {
 		if value, found := accessor.GetLabels()[key]; found {

@@ -29,7 +29,7 @@ ifeq ($(ARCH),amd64)
 	BASEIMAGE?=debian:jessie
 endif
 ifeq ($(ARCH),arm)
-	BASEIMAGE?=armel/debian:jessie
+	BASEIMAGE?=armhf/debian:jessie
 endif
 ifeq ($(ARCH),arm64)
 	BASEIMAGE?=aarch64/debian:jessie
@@ -48,7 +48,7 @@ build:
 	cp -r ./* ${TEMP_DIR}
 	cp ../../../_output/dockerized/bin/linux/${ARCH}/kube-discovery ${TEMP_DIR}
 	cd ${TEMP_DIR} && sed -i.back "s|BASEIMAGE|${BASEIMAGE}|g" Dockerfile
-	docker build -t ${REGISTRY}/kube-discovery-${ARCH}:${VERSION} ${TEMP_DIR}
+	docker build --pull -t ${REGISTRY}/kube-discovery-${ARCH}:${VERSION} ${TEMP_DIR}
 	rm -rf "${TEMP_DIR}"
 
 push: build

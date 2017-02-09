@@ -12,3 +12,19 @@ go_library(
     srcs = ["doc.go"],
     tags = ["automanaged"],
 )
+
+filegroup(
+    name = "package-srcs",
+    srcs = glob(["**"]),
+    tags = ["automanaged"],
+    visibility = ["//visibility:private"],
+)
+
+filegroup(
+    name = "all-srcs",
+    srcs = [
+        ":package-srcs",
+        "//plugin/pkg/auth/authorizer/rbac:all-srcs",
+    ],
+    tags = ["automanaged"],
+)

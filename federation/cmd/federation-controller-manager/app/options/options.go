@@ -24,11 +24,11 @@ import (
 
 	"github.com/spf13/pflag"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	utilflag "k8s.io/apiserver/pkg/util/flag"
 	"k8s.io/kubernetes/federation/pkg/dnsprovider"
 	"k8s.io/kubernetes/pkg/apis/componentconfig"
-	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/client/leaderelection"
-	"k8s.io/kubernetes/pkg/util/config"
 )
 
 type ControllerManagerConfiguration struct {
@@ -69,7 +69,7 @@ type ControllerManagerConfiguration struct {
 	// contentType is contentType of requests sent to apiserver.
 	ContentType string `json:"contentType"`
 	// ConfigurationMap determining which controllers should be enabled or disabled
-	Controllers config.ConfigurationMap `json:"controllers"`
+	Controllers utilflag.ConfigurationMap `json:"controllers"`
 }
 
 // CMServer is the main context object for the controller manager.
@@ -97,7 +97,7 @@ func NewCMServer() *CMServer {
 			APIServerQPS:              20.0,
 			APIServerBurst:            30,
 			LeaderElection:            leaderelection.DefaultLeaderElectionConfiguration(),
-			Controllers:               make(config.ConfigurationMap),
+			Controllers:               make(utilflag.ConfigurationMap),
 		},
 	}
 	return &s

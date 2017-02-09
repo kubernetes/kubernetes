@@ -24,10 +24,10 @@ import (
 	"sync"
 	"time"
 
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/util/flowcontrol"
 	"k8s.io/kubernetes/pkg/api/v1"
 	. "k8s.io/kubernetes/pkg/kubelet/container"
-	"k8s.io/kubernetes/pkg/types"
-	"k8s.io/kubernetes/pkg/util/flowcontrol"
 	"k8s.io/kubernetes/pkg/util/term"
 	"k8s.io/kubernetes/pkg/volume"
 )
@@ -73,7 +73,7 @@ type FakeDirectStreamingRuntime struct {
 		TTY         bool
 		// Port-forward args
 		Pod    *Pod
-		Port   uint16
+		Port   int32
 		Stream io.ReadWriteCloser
 	}
 }
@@ -348,25 +348,25 @@ func (f *FakeRuntime) GetContainerLogs(pod *v1.Pod, containerID ContainerID, log
 	return f.Err
 }
 
-func (f *FakeRuntime) PullImage(image ImageSpec, pullSecrets []v1.Secret) error {
+func (f *FakeRuntime) PullImage(image ImageSpec, pullSecrets []v1.Secret) (string, error) {
 	f.Lock()
 	defer f.Unlock()
 
 	f.CalledFunctions = append(f.CalledFunctions, "PullImage")
-	return f.Err
+	return image.Image, f.Err
 }
 
-func (f *FakeRuntime) IsImagePresent(image ImageSpec) (bool, error) {
+func (f *FakeRuntime) GetImageRef(image ImageSpec) (string, error) {
 	f.Lock()
 	defer f.Unlock()
 
-	f.CalledFunctions = append(f.CalledFunctions, "IsImagePresent")
+	f.CalledFunctions = append(f.CalledFunctions, "GetImageRef")
 	for _, i := range f.ImageList {
 		if i.ID == image.Image {
-			return true, nil
+			return i.ID, nil
 		}
 	}
-	return false, f.InspectErr
+	return "", f.InspectErr
 }
 
 func (f *FakeRuntime) ListImages() ([]Image, error) {
@@ -394,7 +394,7 @@ func (f *FakeRuntime) RemoveImage(image ImageSpec) error {
 	return f.Err
 }
 
-func (f *FakeDirectStreamingRuntime) PortForward(pod *Pod, port uint16, stream io.ReadWriteCloser) error {
+func (f *FakeDirectStreamingRuntime) PortForward(pod *Pod, port int32, stream io.ReadWriteCloser) error {
 	f.Lock()
 	defer f.Unlock()
 
@@ -471,7 +471,7 @@ func (f *FakeIndirectStreamingRuntime) GetAttach(id ContainerID, stdin, stdout, 
 	return &url.URL{Host: FakeHost}, f.Err
 }
 
-func (f *FakeIndirectStreamingRuntime) GetPortForward(podName, podNamespace string, podUID types.UID) (*url.URL, error) {
+func (f *FakeIndirectStreamingRuntime) GetPortForward(podName, podNamespace string, podUID types.UID, ports []int32) (*url.URL, error) {
 	f.Lock()
 	defer f.Unlock()
 

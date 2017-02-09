@@ -17,10 +17,12 @@ limitations under the License.
 package util
 
 import (
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/tools/clientcmd"
+	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
+	fedclient "k8s.io/kubernetes/federation/client/clientset_generated/federation_clientset"
 	"k8s.io/kubernetes/pkg/api"
 	client "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
-	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
-	clientcmdapi "k8s.io/kubernetes/pkg/client/unversioned/clientcmd/api"
 	kubectlcmd "k8s.io/kubernetes/pkg/kubectl/cmd"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 
@@ -39,13 +41,16 @@ const (
 
 // AdminConfig provides a filesystem based kubeconfig (via
 // `PathOptions()`) and a mechanism to talk to the federation
-// host cluster.
+// host cluster and the federation control plane api server.
 type AdminConfig interface {
 	// PathOptions provides filesystem based kubeconfig access.
 	PathOptions() *clientcmd.PathOptions
+	// FedClientSet provides a federation API compliant clientset
+	// to communicate with the federation control plane api server
+	FederationClientset(context, kubeconfigPath string) (*fedclient.Clientset, error)
 	// HostFactory provides a mechanism to communicate with the
 	// cluster where federation control plane is hosted.
-	HostFactory(host, kubeconfigPath string) cmdutil.Factory
+	HostFactory(hostcontext, kubeconfigPath string) cmdutil.Factory
 }
 
 // adminConfig implements the AdminConfig interface.
@@ -64,17 +69,30 @@ func (a *adminConfig) PathOptions() *clientcmd.PathOptions {
 	return a.pathOptions
 }
 
-func (a *adminConfig) HostFactory(host, kubeconfigPath string) cmdutil.Factory {
+func (a *adminConfig) FederationClientset(context, kubeconfigPath string) (*fedclient.Clientset, error) {
+	fedConfig := a.getClientConfig(context, kubeconfigPath)
+	fedClientConfig, err := fedConfig.ClientConfig()
+	if err != nil {
+		return nil, err
+	}
+
+	return fedclient.NewForConfigOrDie(fedClientConfig), nil
+}
+
+func (a *adminConfig) HostFactory(hostcontext, kubeconfigPath string) cmdutil.Factory {
+	hostClientConfig := a.getClientConfig(hostcontext, kubeconfigPath)
+	return cmdutil.NewFactory(hostClientConfig)
+}
+
+func (a *adminConfig) getClientConfig(context, kubeconfigPath string) clientcmd.ClientConfig {
 	loadingRules := *a.pathOptions.LoadingRules
 	loadingRules.Precedence = a.pathOptions.GetLoadingPrecedence()
 	loadingRules.ExplicitPath = kubeconfigPath
 	overrides := &clientcmd.ConfigOverrides{
-		CurrentContext: host,
+		CurrentContext: context,
 	}
 
-	hostClientConfig := clientcmd.NewNonInteractiveDeferredLoadingClientConfig(&loadingRules, overrides)
-
-	return cmdutil.NewFactory(hostClientConfig)
+	return clientcmd.NewNonInteractiveDeferredLoadingClientConfig(&loadingRules, overrides)
 }
 
 // SubcommandFlags holds the flags required by the subcommands of
@@ -118,7 +136,7 @@ func CreateKubeconfigSecret(clientset *client.Clientset, kubeconfig *clientcmdap
 	// Build the secret object with the minified and flattened
 	// kubeconfig content.
 	secret := &api.Secret{
-		ObjectMeta: api.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
 			Namespace: namespace,
 		},

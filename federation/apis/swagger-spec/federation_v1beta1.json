@@ -202,7 +202,7 @@
     "description": "API at /apis/federation/v1beta1",
     "operations": [
      {
-      "type": "versioned.Event",
+      "type": "v1.WatchEvent",
       "method": "GET",
       "summary": "watch individual changes to a list of Cluster",
       "nickname": "watchClusterList",
@@ -260,7 +260,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "versioned.Event"
+        "responseModel": "v1.WatchEvent"
        }
       ],
       "produces": [
@@ -501,7 +501,7 @@
     "description": "API at /apis/federation/v1beta1",
     "operations": [
      {
-      "type": "versioned.Event",
+      "type": "v1.WatchEvent",
       "method": "GET",
       "summary": "watch changes to an object of kind Cluster",
       "nickname": "watchCluster",
@@ -567,7 +567,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "versioned.Event"
+        "responseModel": "v1.WatchEvent"
        }
       ],
       "produces": [
@@ -885,7 +885,7 @@
    },
    "v1beta1.ClusterStatus": {
     "id": "v1beta1.ClusterStatus",
-    "description": "ClusterStatus is information about the current status of a cluster updated by cluster controller peridocally.",
+    "description": "ClusterStatus is information about the current status of a cluster updated by cluster controller periodically.",
     "properties": {
      "conditions": {
       "type": "array",
@@ -1028,8 +1028,8 @@
      }
     }
    },
-   "versioned.Event": {
-    "id": "versioned.Event",
+   "v1.WatchEvent": {
+    "id": "v1.WatchEvent",
     "required": [
      "type",
      "object"
@@ -1050,7 +1050,7 @@
    },
    "v1.DeleteOptions": {
     "id": "v1.DeleteOptions",
-    "description": "DeleteOptions may be provided when deleting an API object",
+    "description": "DeleteOptions may be provided when deleting an API object.",
     "properties": {
      "kind": {
       "type": "string",
@@ -1146,6 +1146,13 @@
        "type": "string"
       },
       "description": "verbs is a list of supported kube verbs (this includes get, list, watch, create, update, patch, delete, deletecollection, and proxy)"
+     },
+     "shortNames": {
+      "type": "array",
+      "items": {
+       "type": "string"
+      },
+      "description": "shortNames is a list of suggested short names of the resource."
      }
     }
    }

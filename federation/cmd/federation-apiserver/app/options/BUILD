@@ -15,8 +15,23 @@ go_library(
     ],
     tags = ["automanaged"],
     deps = [
-        "//pkg/genericapiserver/options:go_default_library",
+        "//pkg/api:go_default_library",
+        "//pkg/features:go_default_library",
         "//pkg/kubeapiserver/options:go_default_library",
         "//vendor:github.com/spf13/pflag",
+        "//vendor:k8s.io/apiserver/pkg/server/options",
     ],
+)
+
+filegroup(
+    name = "package-srcs",
+    srcs = glob(["**"]),
+    tags = ["automanaged"],
+    visibility = ["//visibility:private"],
+)
+
+filegroup(
+    name = "all-srcs",
+    srcs = [":package-srcs"],
+    tags = ["automanaged"],
 )

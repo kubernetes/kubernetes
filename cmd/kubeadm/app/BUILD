@@ -18,3 +18,31 @@ go_library(
         "//vendor:github.com/spf13/pflag",
     ],
 )
+
+filegroup(
+    name = "package-srcs",
+    srcs = glob(["**"]),
+    tags = ["automanaged"],
+    visibility = ["//visibility:private"],
+)
+
+filegroup(
+    name = "all-srcs",
+    srcs = [
+        ":package-srcs",
+        "//cmd/kubeadm/app/apis/kubeadm:all-srcs",
+        "//cmd/kubeadm/app/cmd:all-srcs",
+        "//cmd/kubeadm/app/constants:all-srcs",
+        "//cmd/kubeadm/app/discovery:all-srcs",
+        "//cmd/kubeadm/app/images:all-srcs",
+        "//cmd/kubeadm/app/master:all-srcs",
+        "//cmd/kubeadm/app/node:all-srcs",
+        "//cmd/kubeadm/app/phases/addons:all-srcs",
+        "//cmd/kubeadm/app/phases/apiconfig:all-srcs",
+        "//cmd/kubeadm/app/phases/certs:all-srcs",
+        "//cmd/kubeadm/app/phases/kubeconfig:all-srcs",
+        "//cmd/kubeadm/app/preflight:all-srcs",
+        "//cmd/kubeadm/app/util:all-srcs",
+    ],
+    tags = ["automanaged"],
+)

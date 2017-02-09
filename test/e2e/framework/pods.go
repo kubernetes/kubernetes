@@ -22,13 +22,13 @@ import (
 	"sync"
 	"time"
 
-	"k8s.io/kubernetes/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/api/v1"
-	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	v1core "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/core/v1"
-	"k8s.io/kubernetes/pkg/labels"
-	"k8s.io/kubernetes/pkg/util/sets"
-	"k8s.io/kubernetes/pkg/util/wait"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -46,6 +46,16 @@ func (f *Framework) PodClient() *PodClient {
 	return &PodClient{
 		f:            f,
 		PodInterface: f.ClientSet.Core().Pods(f.Namespace.Name),
+	}
+}
+
+// Convenience method for getting a pod client interface in an alternative namespace,
+// possibly applying test-suite specific transformations to the pod spec, e.g. for
+// node e2e pod scheduling.
+func (f *Framework) PodClientNS(namespace string) *PodClient {
+	return &PodClient{
+		f:            f,
+		PodInterface: f.ClientSet.Core().Pods(namespace),
 	}
 }
 
@@ -113,7 +123,7 @@ func (c *PodClient) Update(name string, updateFn func(pod *v1.Pod)) {
 
 // DeleteSync deletes the pod and wait for the pod to disappear for `timeout`. If the pod doesn't
 // disappear before the timeout, it will fail the test.
-func (c *PodClient) DeleteSync(name string, options *v1.DeleteOptions, timeout time.Duration) {
+func (c *PodClient) DeleteSync(name string, options *metav1.DeleteOptions, timeout time.Duration) {
 	err := c.Delete(name, options)
 	if err != nil && !errors.IsNotFound(err) {
 		Failf("Failed to delete pod %q: %v", name, err)

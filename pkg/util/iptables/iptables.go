@@ -25,9 +25,9 @@ import (
 
 	godbus "github.com/godbus/dbus"
 	"github.com/golang/glog"
+	"k8s.io/apimachinery/pkg/util/sets"
 	utildbus "k8s.io/kubernetes/pkg/util/dbus"
 	utilexec "k8s.io/kubernetes/pkg/util/exec"
-	"k8s.io/kubernetes/pkg/util/sets"
 	utilversion "k8s.io/kubernetes/pkg/util/version"
 )
 
@@ -54,7 +54,6 @@ type Interface interface {
 	DeleteRule(table Table, chain Chain, args ...string) error
 	// IsIpv6 returns true if this is managing ipv6 tables
 	IsIpv6() bool
-	// TODO: (BenTheElder) Unit-Test Save/SaveAll, Restore/RestoreAll
 	// Save calls `iptables-save` for table.
 	Save(table Table) ([]byte, error)
 	// SaveAll calls `iptables-save`.

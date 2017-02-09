@@ -20,78 +20,15 @@ set -o pipefail
 
 KUBE_ROOT=${KUBE_ROOT:-$(dirname "${BASH_SOURCE}")/..}
 source "${KUBE_ROOT}/cluster/kube-util.sh"
-
-# Get the absolute path of the directory component of a file, i.e. the
-# absolute path of the dirname of $1.
-get_absolute_dirname() {
-  echo "$(cd "$(dirname "$1")" && pwd)"
-}
-
-# Detect the OS name/arch so that we can find our binary
-case "$(uname -s)" in
-  Darwin)
-    host_os=darwin
-    ;;
-  Linux)
-    host_os=linux
-    ;;
-  *)
-    echo "Unsupported host OS.  Must be Linux or Mac OS X." >&2
-    exit 1
-    ;;
-esac
-
-case "$(uname -m)" in
-  x86_64*)
-    host_arch=amd64
-    ;;
-  i?86_64*)
-    host_arch=amd64
-    ;;
-  amd64*)
-    host_arch=amd64
-    ;;
-  arm*)
-    host_arch=arm
-    ;;
-  i?86*)
-    host_arch=386
-    ;;
-  s390x*)
-    host_arch=s390x
-    ;;
-  ppc64le*)
-    host_arch=ppc64le
-    ;;
-  *)
-    echo "Unsupported host arch. Must be x86_64, 386, arm, s390x or ppc64le." >&2
-    exit 1
-    ;;
-esac
+source "${KUBE_ROOT}/cluster/clientbin.sh"
 
 # If KUBEADM_PATH isn't set, gather up the list of likely places and use ls
 # to find the latest one.
 if [[ -z "${KUBEADM_PATH:-}" ]]; then
-  locations=(
-    "${KUBE_ROOT}/_output/bin/kubeadm"
-    "${KUBE_ROOT}/_output/dockerized/bin/${host_os}/${host_arch}/kubeadm"
-    "${KUBE_ROOT}/_output/local/bin/${host_os}/${host_arch}/kubeadm"
-    "${KUBE_ROOT}/platforms/${host_os}/${host_arch}/kubeadm"
-  )
-  kubeadm=$( (ls -t "${locations[@]}" 2>/dev/null || true) | head -1 )
+  kubeadm=$( get_bin "kubeadm" "cmd/kubeadm" )
 
   if [[ ! -x "$kubeadm" ]]; then
-    {
-      echo "It looks as if you don't have a compiled kubeadm binary"
-      echo
-      echo "If you are running from a clone of the git repo, please run"
-      echo "'./build/run.sh make cross'. Note that this requires having"
-      echo "Docker installed."
-      echo
-      echo "If you are running from a binary release tarball, something is wrong. "
-      echo "Look at http://kubernetes.io/ for information on how to contact the "
-      echo "development team for help."
-    } >&2
+    print_error "kubeadm"
     exit 1
   fi
 elif [[ ! -x "${KUBEADM_PATH}" ]]; then

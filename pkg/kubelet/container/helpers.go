@@ -20,19 +20,22 @@ import (
 	"bytes"
 	"fmt"
 	"hash/adler32"
+	"hash/fnv"
 	"strings"
 	"time"
 
 	"github.com/golang/glog"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
+	clientv1 "k8s.io/client-go/pkg/api/v1"
+	"k8s.io/client-go/tools/record"
 	"k8s.io/kubernetes/pkg/api/v1"
-	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
-	"k8s.io/kubernetes/pkg/client/record"
 	runtimeapi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
+	"k8s.io/kubernetes/pkg/kubelet/events"
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
 	"k8s.io/kubernetes/pkg/kubelet/util/ioutils"
-	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/types"
 	hashutil "k8s.io/kubernetes/pkg/util/hash"
 	"k8s.io/kubernetes/third_party/forked/golang/expansion"
 )
@@ -91,6 +94,15 @@ func ShouldContainerBeRestarted(container *v1.Container, pod *v1.Pod, podStatus 
 // HashContainer returns the hash of the container. It is used to compare
 // the running container with its desired spec.
 func HashContainer(container *v1.Container) uint64 {
+	hash := fnv.New32a()
+	hashutil.DeepHashObject(hash, *container)
+	return uint64(hash.Sum32())
+}
+
+// HashContainerLegacy returns the hash of the container. It is used to compare
+// the running container with its desired spec.
+// TODO: Delete this function after we deprecate dockertools.
+func HashContainerLegacy(container *v1.Container) uint64 {
 	hash := adler32.New()
 	hashutil.DeepHashObject(hash, *container)
 	return uint64(hash.Sum32())
@@ -136,13 +148,19 @@ type innerEventRecorder struct {
 	recorder record.EventRecorder
 }
 
-func (irecorder *innerEventRecorder) shouldRecordEvent(object runtime.Object) (*v1.ObjectReference, bool) {
+func (irecorder *innerEventRecorder) shouldRecordEvent(object runtime.Object) (*clientv1.ObjectReference, bool) {
 	if object == nil {
 		return nil, false
 	}
-	if ref, ok := object.(*v1.ObjectReference); ok {
+	if ref, ok := object.(*clientv1.ObjectReference); ok {
 		if !strings.HasPrefix(ref.FieldPath, ImplicitContainerPrefix) {
 			return ref, true
+		}
+	}
+	// just in case we miss a spot, be sure that we still log something
+	if ref, ok := object.(*v1.ObjectReference); ok {
+		if !strings.HasPrefix(ref.FieldPath, ImplicitContainerPrefix) {
+			return events.ToObjectReference(ref), true
 		}
 	}
 	return nil, false
@@ -197,14 +215,14 @@ func ConvertPodStatusToRunningPod(runtimeName string, podStatus *PodStatus) Pod 
 	// Populate sandboxes in kubecontainer.Pod
 	for _, sandbox := range podStatus.SandboxStatuses {
 		runningPod.Sandboxes = append(runningPod.Sandboxes, &Container{
-			ID:    ContainerID{Type: runtimeName, ID: *sandbox.Id},
-			State: SandboxToContainerState(*sandbox.State),
+			ID:    ContainerID{Type: runtimeName, ID: sandbox.Id},
+			State: SandboxToContainerState(sandbox.State),
 		})
 	}
 	return runningPod
 }
 
-// sandboxToContainerState converts runtimeApi.PodSandboxState to
+// SandboxToContainerState converts runtimeapi.PodSandboxState to
 // kubecontainer.ContainerState.
 // This is only needed because we need to return sandboxes as if they were
 // kubecontainer.Containers to avoid substantial changes to PLEG.
@@ -272,4 +290,19 @@ func HasPrivilegedContainer(pod *v1.Pod) bool {
 		}
 	}
 	return false
+}
+
+// MakeCapabilities creates string slices from Capability slices
+func MakeCapabilities(capAdd []v1.Capability, capDrop []v1.Capability) ([]string, []string) {
+	var (
+		addCaps  []string
+		dropCaps []string
+	)
+	for _, cap := range capAdd {
+		addCaps = append(addCaps, string(cap))
+	}
+	for _, cap := range capDrop {
+		dropCaps = append(dropCaps, string(cap))
+	}
+	return addCaps, dropCaps
 }

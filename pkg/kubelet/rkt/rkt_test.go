@@ -31,7 +31,11 @@ import (
 	rktapi "github.com/coreos/rkt/api/v1alpha"
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/assert"
-	"k8s.io/kubernetes/pkg/api/resource"
+	"k8s.io/apimachinery/pkg/api/resource"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	kubetypes "k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/errors"
+	utiltesting "k8s.io/client-go/util/testing"
 	"k8s.io/kubernetes/pkg/api/v1"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	containertesting "k8s.io/kubernetes/pkg/kubelet/container/testing"
@@ -41,10 +45,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/network/kubenet"
 	"k8s.io/kubernetes/pkg/kubelet/network/mock_network"
 	"k8s.io/kubernetes/pkg/kubelet/types"
-	kubetypes "k8s.io/kubernetes/pkg/types"
-	"k8s.io/kubernetes/pkg/util/errors"
 	utilexec "k8s.io/kubernetes/pkg/util/exec"
-	utiltesting "k8s.io/kubernetes/pkg/util/testing"
 )
 
 func mustMarshalPodManifest(man *appcschema.PodManifest) []byte {
@@ -844,7 +845,11 @@ func generateCapRetainIsolator(t *testing.T, caps ...string) appctypes.Isolator 
 	if err != nil {
 		t.Fatalf("Error generating cap retain isolator: %v", err)
 	}
-	return retain.AsIsolator()
+	isolator, err := retain.AsIsolator()
+	if err != nil {
+		t.Fatalf("Error generating cap retain isolator: %v", err)
+	}
+	return *isolator
 }
 
 func generateCapRevokeIsolator(t *testing.T, caps ...string) appctypes.Isolator {
@@ -852,7 +857,11 @@ func generateCapRevokeIsolator(t *testing.T, caps ...string) appctypes.Isolator 
 	if err != nil {
 		t.Fatalf("Error generating cap revoke isolator: %v", err)
 	}
-	return revoke.AsIsolator()
+	isolator, err := revoke.AsIsolator()
+	if err != nil {
+		t.Fatalf("Error generating cap revoke isolator: %v", err)
+	}
+	return *isolator
 }
 
 func generateCPUIsolator(t *testing.T, request, limit string) appctypes.Isolator {
@@ -1203,7 +1212,7 @@ func TestGenerateRunCommand(t *testing.T) {
 		{
 			kubenet.NewPlugin("/tmp"),
 			&v1.Pod{
-				ObjectMeta: v1.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Name: "pod-name-foo",
 				},
 				Spec: v1.PodSpec{
@@ -1222,7 +1231,7 @@ func TestGenerateRunCommand(t *testing.T) {
 		{
 			kubenet.NewPlugin("/tmp"),
 			&v1.Pod{
-				ObjectMeta: v1.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Name: "pod-name-foo",
 				},
 				Spec: v1.PodSpec{
@@ -1241,7 +1250,7 @@ func TestGenerateRunCommand(t *testing.T) {
 		{
 			kubenet.NewPlugin("/tmp"),
 			&v1.Pod{
-				ObjectMeta: v1.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Name: "pod-name-foo",
 				},
 				Spec: v1.PodSpec{
@@ -1262,7 +1271,7 @@ func TestGenerateRunCommand(t *testing.T) {
 		{
 			kubenet.NewPlugin("/tmp"),
 			&v1.Pod{
-				ObjectMeta: v1.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Name: "pod-name-foo",
 				},
 				Spec: v1.PodSpec{
@@ -1283,7 +1292,7 @@ func TestGenerateRunCommand(t *testing.T) {
 		{
 			kubenet.NewPlugin("/tmp"),
 			&v1.Pod{
-				ObjectMeta: v1.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Name: "pod-name-foo",
 				},
 				Spec: v1.PodSpec{
@@ -1304,7 +1313,7 @@ func TestGenerateRunCommand(t *testing.T) {
 		{
 			&network.NoopNetworkPlugin{},
 			&v1.Pod{
-				ObjectMeta: v1.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Name: "pod-name-foo",
 				},
 				Spec: v1.PodSpec{
@@ -1323,7 +1332,7 @@ func TestGenerateRunCommand(t *testing.T) {
 		{
 			kubenet.NewPlugin("/tmp"),
 			&v1.Pod{
-				ObjectMeta: v1.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Name: "pod-name-foo",
 				},
 				Spec: v1.PodSpec{
@@ -1345,7 +1354,7 @@ func TestGenerateRunCommand(t *testing.T) {
 		{
 			kubenet.NewPlugin("/tmp"),
 			&v1.Pod{
-				ObjectMeta: v1.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Name: "pod-name-foo",
 				},
 				Spec: v1.PodSpec{
@@ -1415,7 +1424,7 @@ func TestLifeCycleHooks(t *testing.T) {
 		{
 			// Case 0, container without any hooks.
 			&v1.Pod{
-				ObjectMeta: v1.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Name:      "pod-1",
 					Namespace: "ns-1",
 					UID:       "uid-1",
@@ -1438,7 +1447,7 @@ func TestLifeCycleHooks(t *testing.T) {
 		{
 			// Case 1, containers with post-start and pre-stop hooks.
 			&v1.Pod{
-				ObjectMeta: v1.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Name:      "pod-1",
 					Namespace: "ns-1",
 					UID:       "uid-1",
@@ -1513,7 +1522,7 @@ func TestLifeCycleHooks(t *testing.T) {
 		{
 			// Case 2, one container with invalid hooks.
 			&v1.Pod{
-				ObjectMeta: v1.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Name:      "pod-1",
 					Namespace: "ns-1",
 					UID:       "uid-1",
@@ -1632,10 +1641,10 @@ func TestGarbageCollect(t *testing.T) {
 				MaxContainers: 0,
 			},
 			[]*v1.Pod{
-				{ObjectMeta: v1.ObjectMeta{UID: "pod-uid-1"}},
-				{ObjectMeta: v1.ObjectMeta{UID: "pod-uid-2"}},
-				{ObjectMeta: v1.ObjectMeta{UID: "pod-uid-3"}},
-				{ObjectMeta: v1.ObjectMeta{UID: "pod-uid-4"}},
+				{ObjectMeta: metav1.ObjectMeta{UID: "pod-uid-1"}},
+				{ObjectMeta: metav1.ObjectMeta{UID: "pod-uid-2"}},
+				{ObjectMeta: metav1.ObjectMeta{UID: "pod-uid-3"}},
+				{ObjectMeta: metav1.ObjectMeta{UID: "pod-uid-4"}},
 			},
 			[]*rktapi.Pod{
 				{
@@ -1716,9 +1725,9 @@ func TestGarbageCollect(t *testing.T) {
 				MaxContainers: 1,
 			},
 			[]*v1.Pod{
-				{ObjectMeta: v1.ObjectMeta{UID: "pod-uid-0"}},
-				{ObjectMeta: v1.ObjectMeta{UID: "pod-uid-1"}},
-				{ObjectMeta: v1.ObjectMeta{UID: "pod-uid-2"}},
+				{ObjectMeta: metav1.ObjectMeta{UID: "pod-uid-0"}},
+				{ObjectMeta: metav1.ObjectMeta{UID: "pod-uid-1"}},
+				{ObjectMeta: metav1.ObjectMeta{UID: "pod-uid-2"}},
 			},
 			[]*rktapi.Pod{
 				{
@@ -1839,7 +1848,7 @@ func TestMakePodManifestAnnotations(t *testing.T) {
 	}{
 		{
 			in: &v1.Pod{
-				ObjectMeta: v1.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					UID:       "uid-1",
 					Name:      "name-1",
 					Namespace: "namespace-1",

@@ -22,18 +22,20 @@ import (
 	"sync"
 	"time"
 
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/resource"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/watch"
+	clientv1 "k8s.io/client-go/pkg/api/v1"
+	"k8s.io/client-go/util/clock"
 	"k8s.io/kubernetes/pkg/api"
-	apierrors "k8s.io/kubernetes/pkg/api/errors"
-	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/v1"
-	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset/fake"
 	v1core "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/core/v1"
-	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/util/clock"
 	utilnode "k8s.io/kubernetes/pkg/util/node"
-	"k8s.io/kubernetes/pkg/util/sets"
-	"k8s.io/kubernetes/pkg/watch"
 )
 
 // FakeNodeHandler is a fake implementation of NodesInterface and NodeInterface. It
@@ -129,7 +131,7 @@ func (m *FakeNodeHandler) Get(name string, opts metav1.GetOptions) (*v1.Node, er
 }
 
 // List returns a list of Nodes from the fake store.
-func (m *FakeNodeHandler) List(opts v1.ListOptions) (*v1.NodeList, error) {
+func (m *FakeNodeHandler) List(opts metav1.ListOptions) (*v1.NodeList, error) {
 	m.lock.Lock()
 	defer func() {
 		m.RequestCount++
@@ -159,7 +161,7 @@ func (m *FakeNodeHandler) List(opts v1.ListOptions) (*v1.NodeList, error) {
 }
 
 // Delete delets a Node from the fake store.
-func (m *FakeNodeHandler) Delete(id string, opt *v1.DeleteOptions) error {
+func (m *FakeNodeHandler) Delete(id string, opt *metav1.DeleteOptions) error {
 	m.lock.Lock()
 	defer func() {
 		m.RequestCount++
@@ -173,7 +175,7 @@ func (m *FakeNodeHandler) Delete(id string, opt *v1.DeleteOptions) error {
 }
 
 // DeleteCollection deletes a collection of Nodes from the fake store.
-func (m *FakeNodeHandler) DeleteCollection(opt *v1.DeleteOptions, listOpts v1.ListOptions) error {
+func (m *FakeNodeHandler) DeleteCollection(opt *metav1.DeleteOptions, listOpts metav1.ListOptions) error {
 	return nil
 }
 
@@ -214,19 +216,19 @@ func (m *FakeNodeHandler) PatchStatus(nodeName string, data []byte) (*v1.Node, e
 }
 
 // Watch watches Nodes in a fake store.
-func (m *FakeNodeHandler) Watch(opts v1.ListOptions) (watch.Interface, error) {
+func (m *FakeNodeHandler) Watch(opts metav1.ListOptions) (watch.Interface, error) {
 	return watch.NewFake(), nil
 }
 
 // Patch patches a Node in the fake store.
-func (m *FakeNodeHandler) Patch(name string, pt api.PatchType, data []byte, subresources ...string) (*v1.Node, error) {
+func (m *FakeNodeHandler) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (*v1.Node, error) {
 	return nil, nil
 }
 
 // FakeRecorder is used as a fake during testing.
 type FakeRecorder struct {
-	source v1.EventSource
-	Events []*v1.Event
+	source clientv1.EventSource
+	Events []*clientv1.Event
 	clock  clock.Clock
 }
 
@@ -245,7 +247,7 @@ func (f *FakeRecorder) PastEventf(obj runtime.Object, timestamp metav1.Time, eve
 }
 
 func (f *FakeRecorder) generateEvent(obj runtime.Object, timestamp metav1.Time, eventtype, reason, message string) {
-	ref, err := v1.GetReference(obj)
+	ref, err := v1.GetReference(api.Scheme, obj)
 	if err != nil {
 		return
 	}
@@ -257,19 +259,30 @@ func (f *FakeRecorder) generateEvent(obj runtime.Object, timestamp metav1.Time, 
 	}
 }
 
-func (f *FakeRecorder) makeEvent(ref *v1.ObjectReference, eventtype, reason, message string) *v1.Event {
+func (f *FakeRecorder) makeEvent(ref *v1.ObjectReference, eventtype, reason, message string) *clientv1.Event {
 	fmt.Println("make event")
 	t := metav1.Time{Time: f.clock.Now()}
 	namespace := ref.Namespace
 	if namespace == "" {
-		namespace = v1.NamespaceDefault
+		namespace = metav1.NamespaceDefault
 	}
-	return &v1.Event{
-		ObjectMeta: v1.ObjectMeta{
+
+	clientref := clientv1.ObjectReference{
+		Kind:            ref.Kind,
+		Namespace:       ref.Namespace,
+		Name:            ref.Name,
+		UID:             ref.UID,
+		APIVersion:      ref.APIVersion,
+		ResourceVersion: ref.ResourceVersion,
+		FieldPath:       ref.FieldPath,
+	}
+
+	return &clientv1.Event{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:      fmt.Sprintf("%v.%x", ref.Name, t.UnixNano()),
 			Namespace: namespace,
 		},
-		InvolvedObject: *ref,
+		InvolvedObject: clientref,
 		Reason:         reason,
 		Message:        message,
 		FirstTimestamp: t,
@@ -282,8 +295,8 @@ func (f *FakeRecorder) makeEvent(ref *v1.ObjectReference, eventtype, reason, mes
 // NewFakeRecorder returns a pointer to a newly constructed FakeRecorder.
 func NewFakeRecorder() *FakeRecorder {
 	return &FakeRecorder{
-		source: v1.EventSource{Component: "nodeControllerTest"},
-		Events: []*v1.Event{},
+		source: clientv1.EventSource{Component: "nodeControllerTest"},
+		Events: []*clientv1.Event{},
 		clock:  clock.NewFakeClock(time.Now()),
 	}
 }
@@ -291,7 +304,7 @@ func NewFakeRecorder() *FakeRecorder {
 // NewNode is a helper function for creating Nodes for testing.
 func NewNode(name string) *v1.Node {
 	return &v1.Node{
-		ObjectMeta: v1.ObjectMeta{Name: name},
+		ObjectMeta: metav1.ObjectMeta{Name: name},
 		Spec: v1.NodeSpec{
 			ExternalID: name,
 		},
@@ -307,7 +320,7 @@ func NewNode(name string) *v1.Node {
 // NewPod is a helper function for creating Pods for testing.
 func NewPod(name, host string) *v1.Pod {
 	pod := &v1.Pod{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Namespace: "default",
 			Name:      name,
 		},
@@ -338,7 +351,7 @@ func contains(node *v1.Node, nodes []*v1.Node) bool {
 
 // GetZones returns list of zones for all Nodes stored in FakeNodeHandler
 func GetZones(nodeHandler *FakeNodeHandler) []string {
-	nodes, _ := nodeHandler.List(v1.ListOptions{})
+	nodes, _ := nodeHandler.List(metav1.ListOptions{})
 	zones := sets.NewString()
 	for _, node := range nodes.Items {
 		zones.Insert(utilnode.GetZoneKey(&node))

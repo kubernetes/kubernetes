@@ -43,18 +43,18 @@ import (
 
 	compute "google.golang.org/api/compute/v1"
 	"google.golang.org/api/googleapi"
-	apierrs "k8s.io/kubernetes/pkg/api/errors"
+	apierrs "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/runtime"
+	utilnet "k8s.io/apimachinery/pkg/util/net"
+	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/util/wait"
+	utilyaml "k8s.io/apimachinery/pkg/util/yaml"
 	extensions "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
-	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	gcecloud "k8s.io/kubernetes/pkg/cloudprovider/providers/gce"
-	"k8s.io/kubernetes/pkg/labels"
-	"k8s.io/kubernetes/pkg/runtime"
 	utilexec "k8s.io/kubernetes/pkg/util/exec"
-	utilnet "k8s.io/kubernetes/pkg/util/net"
-	"k8s.io/kubernetes/pkg/util/sets"
-	"k8s.io/kubernetes/pkg/util/wait"
-	utilyaml "k8s.io/kubernetes/pkg/util/yaml"
 	"k8s.io/kubernetes/test/e2e/framework"
 	testutils "k8s.io/kubernetes/test/utils"
 
@@ -181,31 +181,11 @@ func createComformanceTests(jig *testJig, ns string) []conformanceTests {
 				})
 				By("Checking that " + pathToFail + " is not exposed by polling for failure")
 				route := fmt.Sprintf("http://%v%v", jig.address, pathToFail)
-				framework.ExpectNoError(pollURL(route, updateURLMapHost, lbCleanupTimeout, jig.pollInterval, &http.Client{Timeout: reqTimeout}, true))
+				framework.ExpectNoError(framework.PollURL(route, updateURLMapHost, framework.LoadBalancerCleanupTimeout, jig.pollInterval, &http.Client{Timeout: reqTimeout}, true))
 			},
 			fmt.Sprintf("Waiting for path updates to reflect in L7"),
 		},
 	}
-}
-
-// pollURL polls till the url responds with a healthy http code. If
-// expectUnreachable is true, it breaks on first non-healthy http code instead.
-func pollURL(route, host string, timeout time.Duration, interval time.Duration, httpClient *http.Client, expectUnreachable bool) error {
-	var lastBody string
-	pollErr := wait.PollImmediate(interval, timeout, func() (bool, error) {
-		var err error
-		lastBody, err = simpleGET(httpClient, route, host)
-		if err != nil {
-			framework.Logf("host %v path %v: %v unreachable", host, route, err)
-			return expectUnreachable, nil
-		}
-		return !expectUnreachable, nil
-	})
-	if pollErr != nil {
-		return fmt.Errorf("Failed to execute a successful GET within %v, Last response body for %v, host %v:\n%v\n\n%v\n",
-			timeout, route, host, lastBody, pollErr)
-	}
-	return nil
 }
 
 // generateRSACerts generates a basic self signed certificate using a key length
@@ -306,7 +286,7 @@ func createSecret(kubeClient clientset.Interface, ing *extensions.Ingress) (host
 	cert := c.Bytes()
 	key := k.Bytes()
 	secret := &v1.Secret{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name: tls.SecretName,
 		},
 		Data: map[string][]byte{
@@ -327,15 +307,8 @@ func createSecret(kubeClient clientset.Interface, ing *extensions.Ingress) (host
 	return host, cert, key, err
 }
 
-func describeIng(ns string) {
-	framework.Logf("\nOutput of kubectl describe ing:\n")
-	desc, _ := framework.RunKubectl(
-		"describe", "ing", fmt.Sprintf("--namespace=%v", ns))
-	framework.Logf(desc)
-}
-
 func cleanupGCE(gceController *GCEIngressController) {
-	pollErr := wait.Poll(5*time.Second, lbCleanupTimeout, func() (bool, error) {
+	pollErr := wait.Poll(5*time.Second, framework.LoadBalancerCleanupTimeout, func() (bool, error) {
 		if err := gceController.Cleanup(false); err != nil {
 			framework.Logf("Still waiting for glbc to cleanup:\n%v", err)
 			return false, nil
@@ -347,7 +320,7 @@ func cleanupGCE(gceController *GCEIngressController) {
 	// controller. Delete this IP only after the controller has had a chance
 	// to cleanup or it might interfere with the controller, causing it to
 	// throw out confusing events.
-	if ipErr := wait.Poll(5*time.Second, lbCleanupTimeout, func() (bool, error) {
+	if ipErr := wait.Poll(5*time.Second, framework.LoadBalancerCleanupTimeout, func() (bool, error) {
 		if err := gceController.deleteStaticIPs(); err != nil {
 			framework.Logf("Failed to delete static-ip: %v\n", err)
 			return false, nil
@@ -821,7 +794,7 @@ func (j *testJig) update(update func(ing *extensions.Ingress)) {
 		update(j.ing)
 		j.ing, err = j.client.Extensions().Ingresses(ns).Update(j.ing)
 		if err == nil {
-			describeIng(j.ing.Namespace)
+			framework.DescribeIng(j.ing.Namespace)
 			return
 		}
 		if !apierrs.IsConflict(err) && !apierrs.IsServerTimeout(err) {
@@ -864,9 +837,9 @@ func (j *testJig) deleteIngress() {
 // Ingress.
 func (j *testJig) waitForIngress(waitForNodePort bool) {
 	// Wait for the loadbalancer IP.
-	address, err := framework.WaitForIngressAddress(j.client, j.ing.Namespace, j.ing.Name, lbPollTimeout)
+	address, err := framework.WaitForIngressAddress(j.client, j.ing.Namespace, j.ing.Name, framework.LoadBalancerPollTimeout)
 	if err != nil {
-		framework.Failf("Ingress failed to acquire an IP address within %v", lbPollTimeout)
+		framework.Failf("Ingress failed to acquire an IP address within %v", framework.LoadBalancerPollTimeout)
 	}
 	j.address = address
 	framework.Logf("Found address %v for ingress %v", j.address, j.ing.Name)
@@ -889,7 +862,7 @@ func (j *testJig) waitForIngress(waitForNodePort bool) {
 			}
 			route := fmt.Sprintf("%v://%v%v", proto, address, p.Path)
 			framework.Logf("Testing route %v host %v with simple GET", route, rules.Host)
-			framework.ExpectNoError(pollURL(route, rules.Host, lbPollTimeout, j.pollInterval, timeoutClient, false))
+			framework.ExpectNoError(framework.PollURL(route, rules.Host, framework.LoadBalancerPollTimeout, j.pollInterval, timeoutClient, false))
 		}
 	}
 }
@@ -898,7 +871,7 @@ func (j *testJig) waitForIngress(waitForNodePort bool) {
 // given url returns a non-healthy http code even once.
 func (j *testJig) verifyURL(route, host string, iterations int, interval time.Duration, httpClient *http.Client) error {
 	for i := 0; i < iterations; i++ {
-		b, err := simpleGET(httpClient, route, host)
+		b, err := framework.SimpleGET(httpClient, route, host)
 		if err != nil {
 			framework.Logf(b)
 			return err
@@ -913,7 +886,7 @@ func (j *testJig) curlServiceNodePort(ns, name string, port int) {
 	// TODO: Curl all nodes?
 	u, err := framework.GetNodePortURL(j.client, ns, name, port)
 	framework.ExpectNoError(err)
-	framework.ExpectNoError(pollURL(u, "", 30*time.Second, j.pollInterval, &http.Client{Timeout: reqTimeout}, false))
+	framework.ExpectNoError(framework.PollURL(u, "", 30*time.Second, j.pollInterval, &http.Client{Timeout: reqTimeout}, false))
 }
 
 // getIngressNodePorts returns all related backend services' nodePorts.
@@ -921,7 +894,7 @@ func (j *testJig) curlServiceNodePort(ns, name string, port int) {
 // by default, so retrieve its nodePort as well.
 func (j *testJig) getIngressNodePorts() []string {
 	nodePorts := []string{}
-	defaultSvc, err := j.client.Core().Services(api.NamespaceSystem).Get(defaultBackendName, metav1.GetOptions{})
+	defaultSvc, err := j.client.Core().Services(metav1.NamespaceSystem).Get(defaultBackendName, metav1.GetOptions{})
 	Expect(err).NotTo(HaveOccurred())
 	nodePorts = append(nodePorts, strconv.Itoa(int(defaultSvc.Spec.Ports[0].NodePort)))
 
@@ -975,8 +948,8 @@ func ingFromManifest(fileName string) *extensions.Ingress {
 }
 
 func (cont *GCEIngressController) getL7AddonUID() (string, error) {
-	framework.Logf("Retrieving UID from config map: %v/%v", api.NamespaceSystem, uidConfigMap)
-	cm, err := cont.c.Core().ConfigMaps(api.NamespaceSystem).Get(uidConfigMap, metav1.GetOptions{})
+	framework.Logf("Retrieving UID from config map: %v/%v", metav1.NamespaceSystem, uidConfigMap)
+	cm, err := cont.c.Core().ConfigMaps(metav1.NamespaceSystem).Get(uidConfigMap, metav1.GetOptions{})
 	if err != nil {
 		return "", err
 	}
@@ -1011,7 +984,7 @@ type GCEIngressController struct {
 }
 
 func newTestJig(c clientset.Interface) *testJig {
-	return &testJig{client: c, rootCAs: map[string][]byte{}, pollInterval: lbPollInterval}
+	return &testJig{client: c, rootCAs: map[string][]byte{}, pollInterval: framework.LoadBalancerPollInterval}
 }
 
 // NginxIngressController manages implementation details of Ingress on Nginx.
@@ -1037,7 +1010,7 @@ func (cont *NginxIngressController) init() {
 	framework.Logf("waiting for pods with label %v", rc.Spec.Selector)
 	sel := labels.SelectorFromSet(labels.Set(rc.Spec.Selector))
 	framework.ExpectNoError(testutils.WaitForPodsWithLabelRunning(cont.c, cont.ns, sel))
-	pods, err := cont.c.Core().Pods(cont.ns).List(v1.ListOptions{LabelSelector: sel.String()})
+	pods, err := cont.c.Core().Pods(cont.ns).List(metav1.ListOptions{LabelSelector: sel.String()})
 	framework.ExpectNoError(err)
 	if len(pods.Items) == 0 {
 		framework.Failf("Failed to find nginx ingress controller pods with selector %v", sel)

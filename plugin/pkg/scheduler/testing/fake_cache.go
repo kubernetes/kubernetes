@@ -17,8 +17,8 @@ limitations under the License.
 package schedulercache
 
 import (
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/schedulercache"
 )
 
@@ -31,6 +31,8 @@ func (f *FakeCache) AssumePod(pod *v1.Pod) error {
 	f.AssumeFunc(pod)
 	return nil
 }
+
+func (f *FakeCache) FinishBinding(pod *v1.Pod) error { return nil }
 
 func (f *FakeCache) ForgetPod(pod *v1.Pod) error { return nil }
 

@@ -20,31 +20,33 @@ import (
 	"fmt"
 	"math/rand"
 	"strconv"
+	"strings"
 	"testing"
 	"time"
 
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
-	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset/fake"
-	"k8s.io/kubernetes/pkg/client/testing/core"
-	"k8s.io/kubernetes/pkg/runtime/schema"
-
 	"github.com/stretchr/testify/assert"
 
+	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	core "k8s.io/client-go/testing"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/v1"
-	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset/fake"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	kubepod "k8s.io/kubernetes/pkg/kubelet/pod"
 	podtest "k8s.io/kubernetes/pkg/kubelet/pod/testing"
+	kubesecret "k8s.io/kubernetes/pkg/kubelet/secret"
+	statustest "k8s.io/kubernetes/pkg/kubelet/status/testing"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
-	"k8s.io/kubernetes/pkg/runtime"
 )
 
 // Generate new instance of test pod with the same initial value.
 func getTestPod() *v1.Pod {
 	return &v1.Pod{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			UID:       "12345678",
 			Name:      "foo",
 			Namespace: "new",
@@ -71,9 +73,9 @@ func (m *manager) testSyncBatch() {
 }
 
 func newTestManager(kubeClient clientset.Interface) *manager {
-	podManager := kubepod.NewBasicPodManager(podtest.NewFakeMirrorClient())
+	podManager := kubepod.NewBasicPodManager(podtest.NewFakeMirrorClient(), kubesecret.NewFakeManager())
 	podManager.AddPod(getTestPod())
-	return NewManager(kubeClient, podManager).(*manager)
+	return NewManager(kubeClient, podManager, &statustest.FakePodDeletionSafetyProvider{}).(*manager)
 }
 
 func generateRandomMessage() string {
@@ -138,7 +140,7 @@ func TestNewStatus(t *testing.T) {
 func TestNewStatusPreservesPodStartTime(t *testing.T) {
 	syncer := newTestManager(&fake.Clientset{})
 	pod := &v1.Pod{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			UID:       "12345678",
 			Name:      "foo",
 			Namespace: "new",
@@ -171,7 +173,7 @@ func TestNewStatusSetsReadyTransitionTime(t *testing.T) {
 	syncer := newTestManager(&fake.Clientset{})
 	podStatus := getReadyPodStatus()
 	pod := &v1.Pod{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			UID:       "12345678",
 			Name:      "foo",
 			Namespace: "new",
@@ -218,7 +220,7 @@ func TestChangedStatusUpdatesLastTransitionTime(t *testing.T) {
 	syncer := newTestManager(&fake.Clientset{})
 	podStatus := getReadyPodStatus()
 	pod := &v1.Pod{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			UID:       "12345678",
 			Name:      "foo",
 			Namespace: "new",
@@ -257,7 +259,7 @@ func TestUnchangedStatusPreservesLastTransitionTime(t *testing.T) {
 	syncer := newTestManager(&fake.Clientset{})
 	podStatus := getReadyPodStatus()
 	pod := &v1.Pod{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			UID:       "12345678",
 			Name:      "foo",
 			Namespace: "new",
@@ -476,6 +478,40 @@ func TestStatusEquality(t *testing.T) {
 		if !isStatusEqual(&oldPodStatus, &podStatus) {
 			t.Fatalf("Order of container statuses should not affect normalized equality.")
 		}
+	}
+}
+
+func TestStatusNormalizationEnforcesMaxBytes(t *testing.T) {
+	pod := v1.Pod{
+		Spec: v1.PodSpec{},
+	}
+	containerStatus := []v1.ContainerStatus{}
+	for i := 0; i < 48; i++ {
+		s := v1.ContainerStatus{
+			Name: fmt.Sprintf("container%d", i),
+			LastTerminationState: v1.ContainerState{
+				Terminated: &v1.ContainerStateTerminated{
+					Message: strings.Repeat("abcdefgh", int(24+i%3)),
+				},
+			},
+		}
+		containerStatus = append(containerStatus, s)
+	}
+	podStatus := v1.PodStatus{
+		InitContainerStatuses: containerStatus[:24],
+		ContainerStatuses:     containerStatus[24:],
+	}
+	result := normalizeStatus(&pod, &podStatus)
+	count := 0
+	for _, s := range result.InitContainerStatuses {
+		l := len(s.LastTerminationState.Terminated.Message)
+		if l < 192 || l > 256 {
+			t.Errorf("container message had length %d", l)
+		}
+		count += l
+	}
+	if count > kubecontainer.MaxPodTerminationMessageLogLength {
+		t.Errorf("message length not truncated")
 	}
 }
 

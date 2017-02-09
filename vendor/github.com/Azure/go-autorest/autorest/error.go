@@ -28,6 +28,9 @@ type DetailedError struct {
 
 	// Message is the error message.
 	Message string
+
+	// Service Error is the response body of failed API in bytes
+	ServiceError []byte
 }
 
 // NewError creates a new Error conforming object from the passed packageType, method, and

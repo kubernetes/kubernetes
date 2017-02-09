@@ -25,25 +25,28 @@ import (
 
 	"github.com/golang/glog"
 	"github.com/spf13/cobra"
-	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/meta"
+	"k8s.io/apimachinery/pkg/api/meta"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
+	utilerrors "k8s.io/apimachinery/pkg/util/errors"
+	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/util/strategicpatch"
+	"k8s.io/apimachinery/pkg/util/validation"
+	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
-	"k8s.io/kubernetes/pkg/runtime"
-	utilerrors "k8s.io/kubernetes/pkg/util/errors"
-	"k8s.io/kubernetes/pkg/util/sets"
-	"k8s.io/kubernetes/pkg/util/strategicpatch"
+	"k8s.io/kubernetes/pkg/util/i18n"
 	utiltaints "k8s.io/kubernetes/pkg/util/taints"
-	"k8s.io/kubernetes/pkg/util/validation"
 )
 
 // TaintOptions have the data required to perform the taint operation
 type TaintOptions struct {
 	resources      []string
-	taintsToAdd    []api.Taint
-	taintsToRemove []api.Taint
+	taintsToAdd    []v1.Taint
+	taintsToRemove []v1.Taint
 	builder        *resource.Builder
 	selector       string
 	overwrite      bool
@@ -59,7 +62,7 @@ var (
 
 		* A taint consists of a key, value, and effect. As an argument here, it is expressed as key=value:effect.
 		* The key must begin with a letter or number, and may contain letters, numbers, hyphens, dots, and underscores, up to %[1]d characters.
-		* The value must begin with a letter or number, and may contain letters, numbers, hyphens, dots, and underscores, up to %[1]d characters.
+		* The value must begin with a letter or number, and may contain letters, numbers, hyphens, dots, and underscores, up to %[2]d characters.
 		* The effect must be NoSchedule or PreferNoSchedule.
 		* Currently taint can only apply to node.`)
 
@@ -83,7 +86,7 @@ func NewCmdTaint(f cmdutil.Factory, out io.Writer) *cobra.Command {
 
 	cmd := &cobra.Command{
 		Use:     "taint NODE NAME KEY_1=VAL_1:TAINT_EFFECT_1 ... KEY_N=VAL_N:TAINT_EFFECT_N",
-		Short:   "Update the taints on one or more nodes",
+		Short:   i18n.T("Update the taints on one or more nodes"),
 		Long:    fmt.Sprintf(taint_long, validation.DNS1123SubdomainMaxLength, validation.LabelValueMaxLength),
 		Example: taint_example,
 		Run: func(cmd *cobra.Command, args []string) {
@@ -110,34 +113,16 @@ func NewCmdTaint(f cmdutil.Factory, out io.Writer) *cobra.Command {
 	return cmd
 }
 
-func deleteTaint(taints []api.Taint, taintToDelete api.Taint) ([]api.Taint, error) {
-	newTaints := []api.Taint{}
-	found := false
-	for _, taint := range taints {
-		if taint.Key == taintToDelete.Key &&
-			(len(taintToDelete.Effect) == 0 || taint.Effect == taintToDelete.Effect) {
-			found = true
-			continue
-		}
-		newTaints = append(newTaints, taint)
-	}
-
-	if !found {
-		return nil, fmt.Errorf("taint key=\"%s\" and effect=\"%s\" not found.", taintToDelete.Key, taintToDelete.Effect)
-	}
-	return newTaints, nil
-}
-
 // reorganizeTaints returns the updated set of taints, taking into account old taints that were not updated,
 // old taints that were updated, old taints that were deleted, and new taints.
-func reorganizeTaints(accessor meta.Object, overwrite bool, taintsToAdd []api.Taint, taintsToRemove []api.Taint) ([]api.Taint, error) {
-	newTaints := append([]api.Taint{}, taintsToAdd...)
+func reorganizeTaints(accessor metav1.Object, overwrite bool, taintsToAdd []v1.Taint, taintsToRemove []v1.Taint) ([]v1.Taint, error) {
+	newTaints := append([]v1.Taint{}, taintsToAdd...)
 
-	var oldTaints []api.Taint
+	var oldTaints []v1.Taint
 	var err error
 	annotations := accessor.GetAnnotations()
 	if annotations != nil {
-		if oldTaints, err = api.GetTaintsFromNodeAnnotations(annotations); err != nil {
+		if oldTaints, err = v1.GetTaintsFromNodeAnnotations(annotations); err != nil {
 			return nil, err
 		}
 	}
@@ -158,17 +143,22 @@ func reorganizeTaints(accessor meta.Object, overwrite bool, taintsToAdd []api.Ta
 
 	allErrs := []error{}
 	for _, taintToRemove := range taintsToRemove {
-		newTaints, err = deleteTaint(newTaints, taintToRemove)
-		if err != nil {
-			allErrs = append(allErrs, err)
+		removed := false
+		if len(taintToRemove.Effect) > 0 {
+			newTaints, removed = v1.DeleteTaint(newTaints, &taintToRemove)
+		} else {
+			newTaints, removed = v1.DeleteTaintsByKey(newTaints, taintToRemove.Key)
+		}
+		if !removed {
+			allErrs = append(allErrs, fmt.Errorf("taint %q not found", taintToRemove.ToString()))
 		}
 	}
 	return newTaints, utilerrors.NewAggregate(allErrs)
 }
 
-func parseTaints(spec []string) ([]api.Taint, []api.Taint, error) {
-	var taints, taintsToRemove []api.Taint
-	uniqueTaints := map[api.TaintEffect]sets.String{}
+func parseTaints(spec []string) ([]v1.Taint, []v1.Taint, error) {
+	var taints, taintsToRemove []v1.Taint
+	uniqueTaints := map[v1.TaintEffect]sets.String{}
 
 	for _, taintSpec := range spec {
 		if strings.Index(taintSpec, "=") != -1 && strings.Index(taintSpec, ":") != -1 {
@@ -189,13 +179,13 @@ func parseTaints(spec []string) ([]api.Taint, []api.Taint, error) {
 			taints = append(taints, newTaint)
 		} else if strings.HasSuffix(taintSpec, "-") {
 			taintKey := taintSpec[:len(taintSpec)-1]
-			var effect api.TaintEffect
+			var effect v1.TaintEffect
 			if strings.Index(taintKey, ":") != -1 {
 				parts := strings.Split(taintKey, ":")
 				taintKey = parts[0]
-				effect = api.TaintEffect(parts[1])
+				effect = v1.TaintEffect(parts[1])
 			}
-			taintsToRemove = append(taintsToRemove, api.Taint{Key: taintKey, Effect: effect})
+			taintsToRemove = append(taintsToRemove, v1.Taint{Key: taintKey, Effect: effect})
 		} else {
 			return nil, nil, fmt.Errorf("unknown taint spec: %v", taintSpec)
 		}
@@ -341,7 +331,7 @@ func (o TaintOptions) RunTaint() error {
 
 		var outputObj runtime.Object
 		if createdPatch {
-			outputObj, err = helper.Patch(namespace, name, api.StrategicMergePatchType, patchBytes)
+			outputObj, err = helper.Patch(namespace, name, types.StrategicMergePatchType, patchBytes)
 		} else {
 			outputObj, err = helper.Replace(namespace, name, false, obj)
 		}
@@ -361,14 +351,14 @@ func (o TaintOptions) RunTaint() error {
 }
 
 // validateNoTaintOverwrites validates that when overwrite is false, to-be-updated taints don't exist in the node taint list (yet)
-func validateNoTaintOverwrites(accessor meta.Object, taints []api.Taint) error {
+func validateNoTaintOverwrites(accessor metav1.Object, taints []v1.Taint) error {
 	annotations := accessor.GetAnnotations()
 	if annotations == nil {
 		return nil
 	}
 
 	allErrs := []error{}
-	oldTaints, err := api.GetTaintsFromNodeAnnotations(annotations)
+	oldTaints, err := v1.GetTaintsFromNodeAnnotations(annotations)
 	if err != nil {
 		allErrs = append(allErrs, err)
 		return utilerrors.NewAggregate(allErrs)
@@ -410,7 +400,7 @@ func (o TaintOptions) updateTaints(obj runtime.Object) error {
 	if err != nil {
 		return err
 	}
-	annotations[api.TaintsAnnotationKey] = string(taintsData)
+	annotations[v1.TaintsAnnotationKey] = string(taintsData)
 	accessor.SetAnnotations(annotations)
 
 	return nil

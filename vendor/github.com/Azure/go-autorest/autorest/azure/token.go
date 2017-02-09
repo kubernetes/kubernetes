@@ -302,7 +302,7 @@ func (spt *ServicePrincipalToken) refreshInternal(resource string) error {
 
 	var newToken Token
 	err = autorest.Respond(resp,
-		autorest.WithErrorUnlessOK(),
+		autorest.WithErrorUnlessStatusCode(http.StatusOK),
 		autorest.ByUnmarshallingJSON(&newToken),
 		autorest.ByClosing())
 	if err != nil {

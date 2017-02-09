@@ -18,16 +18,16 @@ package e2e
 
 import (
 	"fmt"
-	"io/ioutil"
 	"net/http"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/wait"
+	utilyaml "k8s.io/apimachinery/pkg/util/yaml"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
-	"k8s.io/kubernetes/pkg/labels"
-	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/util/wait"
-	utilyaml "k8s.io/kubernetes/pkg/util/yaml"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/generated"
 
@@ -113,7 +113,7 @@ func (h *haproxyControllerTester) start(namespace string) (err error) {
 	// Find the pods of the rc we just created.
 	labelSelector := labels.SelectorFromSet(
 		labels.Set(map[string]string{"name": h.rcName}))
-	options := v1.ListOptions{LabelSelector: labelSelector.String()}
+	options := metav1.ListOptions{LabelSelector: labelSelector.String()}
 	pods, err := h.client.Core().Pods(h.rcNamespace).List(options)
 	if err != nil {
 		return err
@@ -197,7 +197,7 @@ func (s *ingManager) test(path string) error {
 	url := fmt.Sprintf("%v/hostName", path)
 	httpClient := &http.Client{}
 	return wait.Poll(pollInterval, framework.ServiceRespondingTimeout, func() (bool, error) {
-		body, err := simpleGET(httpClient, url, "")
+		body, err := framework.SimpleGET(httpClient, url, "")
 		if err != nil {
 			framework.Logf("%v\n%v\n%v", url, body, err)
 			return false, nil
@@ -238,30 +238,6 @@ var _ = framework.KubeDescribe("ServiceLoadBalancer [Feature:ServiceLoadBalancer
 		}
 	})
 })
-
-// simpleGET executes a get on the given url, returns error if non-200 returned.
-func simpleGET(c *http.Client, url, host string) (string, error) {
-	req, err := http.NewRequest("GET", url, nil)
-	if err != nil {
-		return "", err
-	}
-	req.Host = host
-	res, err := c.Do(req)
-	if err != nil {
-		return "", err
-	}
-	defer res.Body.Close()
-	rawBody, err := ioutil.ReadAll(res.Body)
-	if err != nil {
-		return "", err
-	}
-	body := string(rawBody)
-	if res.StatusCode != http.StatusOK {
-		err = fmt.Errorf(
-			"GET returned http error %v", res.StatusCode)
-	}
-	return body, err
-}
 
 // rcFromManifest reads a .json/yaml file and returns the rc in it.
 func rcFromManifest(fileName string) *v1.ReplicationController {

@@ -16,8 +16,8 @@ go_library(
     ],
     tags = ["automanaged"],
     deps = [
+        "//pkg/api:go_default_library",
         "//pkg/api/install:go_default_library",
-        "//pkg/apimachinery/registered:go_default_library",
         "//pkg/apis/apps/install:go_default_library",
         "//pkg/apis/authentication/install:go_default_library",
         "//pkg/apis/authorization/install:go_default_library",
@@ -40,10 +40,37 @@ go_library(
         "//pkg/client/clientset_generated/internalclientset/typed/policy/internalversion:go_default_library",
         "//pkg/client/clientset_generated/internalclientset/typed/rbac/internalversion:go_default_library",
         "//pkg/client/clientset_generated/internalclientset/typed/storage/internalversion:go_default_library",
-        "//pkg/client/restclient:go_default_library",
-        "//pkg/client/typed/discovery:go_default_library",
-        "//pkg/util/flowcontrol:go_default_library",
-        "//plugin/pkg/client/auth:go_default_library",
         "//vendor:github.com/golang/glog",
+        "//vendor:k8s.io/client-go/discovery",
+        "//vendor:k8s.io/client-go/plugin/pkg/client/auth",
+        "//vendor:k8s.io/client-go/rest",
+        "//vendor:k8s.io/client-go/util/flowcontrol",
     ],
+)
+
+filegroup(
+    name = "package-srcs",
+    srcs = glob(["**"]),
+    tags = ["automanaged"],
+    visibility = ["//visibility:private"],
+)
+
+filegroup(
+    name = "all-srcs",
+    srcs = [
+        ":package-srcs",
+        "//pkg/client/clientset_generated/internalclientset/fake:all-srcs",
+        "//pkg/client/clientset_generated/internalclientset/typed/apps/internalversion:all-srcs",
+        "//pkg/client/clientset_generated/internalclientset/typed/authentication/internalversion:all-srcs",
+        "//pkg/client/clientset_generated/internalclientset/typed/authorization/internalversion:all-srcs",
+        "//pkg/client/clientset_generated/internalclientset/typed/autoscaling/internalversion:all-srcs",
+        "//pkg/client/clientset_generated/internalclientset/typed/batch/internalversion:all-srcs",
+        "//pkg/client/clientset_generated/internalclientset/typed/certificates/internalversion:all-srcs",
+        "//pkg/client/clientset_generated/internalclientset/typed/core/internalversion:all-srcs",
+        "//pkg/client/clientset_generated/internalclientset/typed/extensions/internalversion:all-srcs",
+        "//pkg/client/clientset_generated/internalclientset/typed/policy/internalversion:all-srcs",
+        "//pkg/client/clientset_generated/internalclientset/typed/rbac/internalversion:all-srcs",
+        "//pkg/client/clientset_generated/internalclientset/typed/storage/internalversion:all-srcs",
+    ],
+    tags = ["automanaged"],
 )

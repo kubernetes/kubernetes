@@ -17,17 +17,17 @@ limitations under the License.
 package app
 
 import (
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	utilflag "k8s.io/apiserver/pkg/util/flag"
 	ingresscontroller "k8s.io/kubernetes/federation/pkg/federation-controller/ingress"
-	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
-	"k8s.io/kubernetes/pkg/runtime/schema"
-	"k8s.io/kubernetes/pkg/util/config"
 	"testing"
 )
 
 func TestControllerEnabled(t *testing.T) {
 
 	testCases := []struct {
-		controllersConfig config.ConfigurationMap
+		controllersConfig utilflag.ConfigurationMap
 		serverResources   []*metav1.APIResourceList
 		controller        string
 		requiredResources []schema.GroupVersionResource
@@ -36,7 +36,7 @@ func TestControllerEnabled(t *testing.T) {
 	}{
 		// no override, API server has Ingress enabled
 		{
-			controllersConfig: config.ConfigurationMap{},
+			controllersConfig: utilflag.ConfigurationMap{},
 			serverResources: []*metav1.APIResourceList{
 				{
 					GroupVersion: "extensions/v1beta1",
@@ -52,7 +52,7 @@ func TestControllerEnabled(t *testing.T) {
 		},
 		// no override, API server has Ingress disabled
 		{
-			controllersConfig: config.ConfigurationMap{},
+			controllersConfig: utilflag.ConfigurationMap{},
 			serverResources:   []*metav1.APIResourceList{},
 			controller:        ingresscontroller.ControllerName,
 			requiredResources: ingresscontroller.RequiredResources,
@@ -61,7 +61,7 @@ func TestControllerEnabled(t *testing.T) {
 		},
 		// API server has Ingress enabled, override config to disable Ingress controller
 		{
-			controllersConfig: config.ConfigurationMap{
+			controllersConfig: utilflag.ConfigurationMap{
 				ingresscontroller.ControllerName: "false",
 			},
 			serverResources: []*metav1.APIResourceList{

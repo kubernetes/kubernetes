@@ -19,10 +19,11 @@ package coredns
 import (
 	"encoding/json"
 	"fmt"
+	"hash/fnv"
+
 	etcdc "github.com/coreos/etcd/client"
 	dnsmsg "github.com/miekg/coredns/middleware/etcd/msg"
 	"golang.org/x/net/context"
-	"hash/fnv"
 	"k8s.io/kubernetes/federation/pkg/dnsprovider"
 )
 
@@ -34,6 +35,7 @@ type ChangeSetType string
 const (
 	ADDITION = ChangeSetType("ADDITION")
 	DELETION = ChangeSetType("DELETION")
+	UPSERT   = ChangeSetType("UPSERT")
 )
 
 type ChangeSet struct {
@@ -58,6 +60,15 @@ func (c *ResourceRecordChangeset) Remove(rrset dnsprovider.ResourceRecordSet) dn
 	return c
 }
 
+func (c *ResourceRecordChangeset) IsEmpty() bool {
+	return len(c.changeset) == 0
+}
+
+func (c *ResourceRecordChangeset) Upsert(rrset dnsprovider.ResourceRecordSet) dnsprovider.ResourceRecordChangeset {
+	c.changeset = append(c.changeset, ChangeSet{cstype: UPSERT, rrset: rrset})
+	return c
+}
+
 func (c *ResourceRecordChangeset) Apply() error {
 	ctx := context.Background()
 	etcdPathPrefix := c.zone.zones.intf.etcdPathPrefix
@@ -69,7 +80,11 @@ func (c *ResourceRecordChangeset) Apply() error {
 
 	for _, changeset := range c.changeset {
 		switch changeset.cstype {
-		case ADDITION:
+		case ADDITION, UPSERT:
+			checkNotExists := changeset.cstype == ADDITION
+
+			// TODO: I think the semantics of the other providers are different; they operate at the record level, not the individual rrdata level
+			// In other words: we should insert/replace all the records for the key
 			for _, rrdata := range changeset.rrset.Rrdatas() {
 				b, err := json.Marshal(&dnsmsg.Service{Host: rrdata, TTL: uint32(changeset.rrset.Ttl()), Group: changeset.rrset.Name()})
 				if err != nil {
@@ -79,9 +94,11 @@ func (c *ResourceRecordChangeset) Apply() error {
 				recordLabel := getHash(rrdata)
 				recordKey := buildDNSNameString(changeset.rrset.Name(), recordLabel)
 
-				response, err := c.zone.zones.intf.etcdKeysAPI.Get(ctx, dnsmsg.Path(recordKey, etcdPathPrefix), getOpts)
-				if err == nil && response != nil {
-					return fmt.Errorf("Key already exist, key: %v", recordKey)
+				if checkNotExists {
+					response, err := c.zone.zones.intf.etcdKeysAPI.Get(ctx, dnsmsg.Path(recordKey, etcdPathPrefix), getOpts)
+					if err == nil && response != nil {
+						return fmt.Errorf("Key already exist, key: %v", recordKey)
+					}
 				}
 
 				_, err = c.zone.zones.intf.etcdKeysAPI.Set(ctx, dnsmsg.Path(recordKey, etcdPathPrefix), recordValue, setOpts)
@@ -89,7 +106,10 @@ func (c *ResourceRecordChangeset) Apply() error {
 					return err
 				}
 			}
+
 		case DELETION:
+			// TODO: I think the semantics of the other providers are different; they operate at the record level, not the individual rrdata level
+			// In other words: we should delete all the records for the key, only if it matches exactly
 			for _, rrdata := range changeset.rrset.Rrdatas() {
 				recordLabel := getHash(rrdata)
 				recordKey := buildDNSNameString(changeset.rrset.Name(), recordLabel)

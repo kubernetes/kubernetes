@@ -3,6 +3,11 @@ package(default_visibility = ["//visibility:public"])
 load("@bazel_tools//tools/build_defs/pkg:pkg.bzl", "pkg_tar", "pkg_deb")
 load("@io_kubernetes_build//defs:deb.bzl", "k8s_deb", "deb_data")
 
+# We do not include kube-scheduler, kube-controller-manager,
+# kube-apiserver, and kube-proxy in this list even though we
+# produce debs for them. We recommend that they be run in docker
+# images. We use the debs that we produce here to build those
+# images.
 filegroup(
     name = "debs",
     srcs = [
@@ -13,11 +18,28 @@ filegroup(
     ],
 )
 
-deb_data(
-    name = "kubectl",
+[deb_data(
+    name = binary,
     data = [
         {
-            "files": ["//cmd/kubectl"],
+            "files": ["//cmd/" + binary],
+            "mode": "0755",
+            "dir": "/usr/bin",
+        },
+    ],
+) for binary in [
+    "kubectl",
+    "kube-apiserver",
+    "kube-controller-manager",
+    "kube-proxy",
+    "kube-aggregator",
+]]
+
+deb_data(
+    name = "kube-scheduler",
+    data = [
+        {
+            "files": ["//plugin/cmd/kube-scheduler"],
             "mode": "0755",
             "dir": "/usr/bin",
         },
@@ -70,6 +92,35 @@ The Kubernetes command line tool for interacting with the Kubernetes API.
 )
 
 k8s_deb(
+    name = "kube-apiserver",
+    description = "Kubernetes API Server",
+)
+
+k8s_deb(
+    name = "kube-controller-manager",
+    description = "Kubernetes Controller Manager",
+)
+
+k8s_deb(
+    name = "kube-scheduler",
+    description = "Kubernetes Scheduler",
+)
+
+k8s_deb(
+    name = "kube-proxy",
+    depends = [
+        "iptables (>= 1.4.21)",
+        "iproute2",
+    ],
+    description = "Kubernetes Service Proxy",
+)
+
+k8s_deb(
+    name = "kube-aggregator",
+    description = "Kubernetes Federated API Server",
+)
+
+k8s_deb(
     name = "kubelet",
     depends = [
         "iptables (>= 1.4.21)",
@@ -102,4 +153,17 @@ k8s_deb(
     description = """Kubernetes Packaging of CNI
 The Container Networking Interface tools for provisioning container networks.
 """,
+)
+
+filegroup(
+    name = "package-srcs",
+    srcs = glob(["**"]),
+    tags = ["automanaged"],
+    visibility = ["//visibility:private"],
+)
+
+filegroup(
+    name = "all-srcs",
+    srcs = [":package-srcs"],
+    tags = ["automanaged"],
 )

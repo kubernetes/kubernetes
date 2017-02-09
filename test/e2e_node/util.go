@@ -28,16 +28,17 @@ import (
 
 	"github.com/golang/glog"
 
+	k8serr "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/api"
-	k8serr "k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/apis/componentconfig"
 	v1alpha1 "k8s.io/kubernetes/pkg/apis/componentconfig/v1alpha1"
-	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/stats"
 	// utilconfig "k8s.io/kubernetes/pkg/util/config"
 	"k8s.io/kubernetes/test/e2e/framework"
 
+	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 )
 
@@ -85,6 +86,51 @@ func getCurrentKubeletConfig() (*componentconfig.KubeletConfiguration, error) {
 	return kubeCfg, nil
 }
 
+// Convenience method to set the evictionHard threshold during the current context.
+func tempSetEvictionHard(f *framework.Framework, evictionHard string) {
+	tempSetCurrentKubeletConfig(f, func(initialConfig *componentconfig.KubeletConfiguration) {
+		initialConfig.EvictionHard = evictionHard
+	})
+}
+
+// Must be called within a Context. Allows the function to modify the KubeletConfiguration during the BeforeEach of the context.
+// The change is reverted in the AfterEach of the context.
+func tempSetCurrentKubeletConfig(f *framework.Framework, updateFunction func(initialConfig *componentconfig.KubeletConfiguration)) {
+	var oldCfg *componentconfig.KubeletConfiguration
+	BeforeEach(func() {
+		configEnabled, err := isKubeletConfigEnabled(f)
+		framework.ExpectNoError(err)
+		if configEnabled {
+			oldCfg, err = getCurrentKubeletConfig()
+			framework.ExpectNoError(err)
+			clone, err := api.Scheme.DeepCopy(oldCfg)
+			framework.ExpectNoError(err)
+			newCfg := clone.(*componentconfig.KubeletConfiguration)
+			updateFunction(newCfg)
+			framework.ExpectNoError(setKubeletConfiguration(f, newCfg))
+		} else {
+			framework.Logf("The Dynamic Kubelet Configuration feature is not enabled.\n" +
+				"Pass --feature-gates=DynamicKubeletConfig=true to the Kubelet to enable this feature.\n" +
+				"For `make test-e2e-node`, you can set `TEST_ARGS='--feature-gates=DynamicKubeletConfig=true'`.")
+		}
+	})
+	AfterEach(func() {
+		if oldCfg != nil {
+			err := setKubeletConfiguration(f, oldCfg)
+			framework.ExpectNoError(err)
+		}
+	})
+}
+
+// Returns true if kubeletConfig is enabled, false otherwise or if we cannot determine if it is.
+func isKubeletConfigEnabled(f *framework.Framework) (bool, error) {
+	cfgz, err := getCurrentKubeletConfig()
+	if err != nil {
+		return false, fmt.Errorf("could not determine whether 'DynamicKubeletConfig' feature is enabled, err: %v", err)
+	}
+	return strings.Contains(cfgz.FeatureGates, "DynamicKubeletConfig=true"), nil
+}
+
 // Queries the API server for a Kubelet configuration for the node described by framework.TestContext.NodeName
 func getCurrentKubeletConfigMap(f *framework.Framework) (*v1.ConfigMap, error) {
 	return f.ClientSet.Core().ConfigMaps("kube-system").Get(fmt.Sprintf("kubelet-%s", framework.TestContext.NodeName), metav1.GetOptions{})
@@ -99,11 +145,11 @@ func setKubeletConfiguration(f *framework.Framework, kubeCfg *componentconfig.Ku
 	)
 
 	// Make sure Dynamic Kubelet Configuration feature is enabled on the Kubelet we are about to reconfigure
-	cfgz, err := getCurrentKubeletConfig()
+	configEnabled, err := isKubeletConfigEnabled(f)
 	if err != nil {
 		return fmt.Errorf("could not determine whether 'DynamicKubeletConfig' feature is enabled, err: %v", err)
 	}
-	if !strings.Contains(cfgz.FeatureGates, "DynamicKubeletConfig=true") {
+	if !configEnabled {
 		return fmt.Errorf("The Dynamic Kubelet Configuration feature is not enabled.\n" +
 			"Pass --feature-gates=DynamicKubeletConfig=true to the Kubelet to enable this feature.\n" +
 			"For `make test-e2e-node`, you can set `TEST_ARGS='--feature-gates=DynamicKubeletConfig=true'`.")
@@ -205,7 +251,7 @@ func makeKubeletConfigMap(nodeName string, kubeCfg *componentconfig.KubeletConfi
 	framework.ExpectNoError(err)
 
 	cmap := &v1.ConfigMap{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name: fmt.Sprintf("kubelet-%s", nodeName),
 		},
 		Data: map[string]string{

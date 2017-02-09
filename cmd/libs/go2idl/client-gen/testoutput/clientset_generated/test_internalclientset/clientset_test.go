@@ -19,8 +19,8 @@ package test_internalclientset
 import (
 	"testing"
 
-	restclient "k8s.io/kubernetes/pkg/client/restclient"
-	"k8s.io/kubernetes/pkg/util/flowcontrol"
+	restclient "k8s.io/client-go/rest"
+	"k8s.io/client-go/util/flowcontrol"
 )
 
 func ClientSetRateLimiterTest(t *testing.T) {

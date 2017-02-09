@@ -81,23 +81,17 @@ func (g *genClientForType) GenerateType(c *generator.Context, t *types.Type, w i
 		"type":                t,
 		"package":             pkg,
 		"Package":             namer.IC(pkg),
+		"namespaced":          namespaced,
 		"Group":               namer.IC(g.group),
 		"GroupVersion":        namer.IC(g.group) + namer.IC(g.version),
-		"watchInterface":      c.Universe.Type(types.Name{Package: "k8s.io/kubernetes/pkg/watch", Name: "Interface"}),
-		"RESTClientInterface": c.Universe.Type(types.Name{Package: "k8s.io/kubernetes/pkg/client/restclient", Name: "Interface"}),
+		"DeleteOptions":       c.Universe.Type(types.Name{Package: "k8s.io/apimachinery/pkg/apis/meta/v1", Name: "DeleteOptions"}),
+		"ListOptions":         c.Universe.Type(types.Name{Package: "k8s.io/apimachinery/pkg/apis/meta/v1", Name: "ListOptions"}),
+		"GetOptions":          c.Universe.Type(types.Name{Package: "k8s.io/apimachinery/pkg/apis/meta/v1", Name: "GetOptions"}),
+		"PatchType":           c.Universe.Type(types.Name{Package: "k8s.io/apimachinery/pkg/types", Name: "PatchType"}),
+		"watchInterface":      c.Universe.Type(types.Name{Package: "k8s.io/apimachinery/pkg/watch", Name: "Interface"}),
+		"RESTClientInterface": c.Universe.Type(types.Name{Package: "k8s.io/client-go/rest", Name: "Interface"}),
 		"apiParameterCodec":   c.Universe.Type(types.Name{Package: "k8s.io/kubernetes/pkg/api", Name: "ParameterCodec"}),
-		"PatchType":           c.Universe.Type(types.Name{Package: "k8s.io/kubernetes/pkg/api", Name: "PatchType"}),
-		"namespaced":          namespaced,
 	}
-
-	if g.version == "" {
-		m["DeleteOptions"] = c.Universe.Type(types.Name{Package: "k8s.io/kubernetes/pkg/api", Name: "DeleteOptions"})
-		m["ListOptions"] = c.Universe.Type(types.Name{Package: "k8s.io/kubernetes/pkg/api", Name: "ListOptions"})
-	} else {
-		m["DeleteOptions"] = c.Universe.Type(types.Name{Package: "k8s.io/kubernetes/pkg/api/v1", Name: "DeleteOptions"})
-		m["ListOptions"] = c.Universe.Type(types.Name{Package: "k8s.io/kubernetes/pkg/api/v1", Name: "ListOptions"})
-	}
-	m["GetOptions"] = c.Universe.Type(types.Name{Package: "k8s.io/kubernetes/pkg/apis/meta/v1", Name: "GetOptions"})
 
 	sw.Do(getterComment, m)
 	if namespaced {

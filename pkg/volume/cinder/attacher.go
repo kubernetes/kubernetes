@@ -24,7 +24,7 @@ import (
 	"time"
 
 	"github.com/golang/glog"
-	"k8s.io/kubernetes/pkg/types"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/util/exec"
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/volume"
@@ -83,17 +83,17 @@ func (attacher *cinderDiskAttacher) Attach(spec *volume.Spec, nodeName types.Nod
 	if err != nil {
 		// Log error and continue with attach
 		glog.Warningf(
-			"Error checking if volume (%q) is already attached to current node (%q). Will continue and try attach anyway. err=%v",
+			"Error checking if volume (%q) is already attached to current instance (%q). Will continue and try attach anyway. err=%v",
 			volumeID, instanceid, err)
 	}
 
 	if err == nil && attached {
-		// Volume is already attached to node.
-		glog.Infof("Attach operation is successful. volume %q is already attached to node %q.", volumeID, instanceid)
+		// Volume is already attached to instance.
+		glog.Infof("Attach operation is successful. volume %q is already attached to instance %q.", volumeID, instanceid)
 	} else {
 		_, err = attacher.cinderProvider.AttachDisk(instanceid, volumeID)
 		if err == nil {
-			glog.Infof("Attach operation successful: volume %q attached to node %q.", volumeID, instanceid)
+			glog.Infof("Attach operation successful: volume %q attached to instance %q.", volumeID, instanceid)
 		} else {
 			glog.Infof("Attach volume %q to instance %q failed with %v", volumeID, instanceid, err)
 			return "", err
@@ -177,7 +177,7 @@ func (attacher *cinderDiskAttacher) WaitForAttach(spec *volume.Spec, devicePath 
 				return devicePath, nil
 			} else {
 				// Log an error, and continue checking periodically
-				glog.Errorf("Error: could not find attached Cinder disk %q: %v", volumeID, err)
+				glog.Errorf("Error: could not find attached Cinder disk %q (path: %q): %v", volumeID, devicePath, err)
 			}
 		case <-timer.C:
 			return "", fmt.Errorf("Could not find attached Cinder disk %q. Timeout waiting for mount paths to be created.", volumeID)
@@ -277,7 +277,7 @@ func (detacher *cinderDiskDetacher) Detach(deviceMountPath string, nodeName type
 		glog.Errorf("Error detaching volume %q: %v", volumeID, err)
 		return err
 	}
-	glog.Infof("detatached volume %q from instance %q", volumeID, instanceid)
+	glog.Infof("detached volume %q from instance %q", volumeID, instanceid)
 	return nil
 }
 

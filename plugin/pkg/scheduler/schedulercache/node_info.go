@@ -21,9 +21,9 @@ import (
 
 	"github.com/golang/glog"
 
-	"k8s.io/kubernetes/pkg/api/resource"
+	"k8s.io/apimachinery/pkg/api/resource"
+	clientcache "k8s.io/client-go/tools/cache"
 	"k8s.io/kubernetes/pkg/api/v1"
-	clientcache "k8s.io/kubernetes/pkg/client/cache"
 	priorityutil "k8s.io/kubernetes/plugin/pkg/scheduler/algorithm/priorities/util"
 )
 
@@ -80,6 +80,14 @@ func (r *Resource) ResourceList() v1.ResourceList {
 		result[rName] = *resource.NewQuantity(rQuant, resource.DecimalSI)
 	}
 	return result
+}
+
+func (r *Resource) AddOpaque(name v1.ResourceName, quantity int64) {
+	// Lazily allocate opaque integer resource map.
+	if r.OpaqueIntResources == nil {
+		r.OpaqueIntResources = map[v1.ResourceName]int64{}
+	}
+	r.OpaqueIntResources[name] += quantity
 }
 
 // NewNodeInfo returns a ready to use empty NodeInfo object.
@@ -209,16 +217,12 @@ func (n *NodeInfo) String() string {
 }
 
 func hasPodAffinityConstraints(pod *v1.Pod) bool {
-	affinity, err := v1.GetAffinityFromPodAnnotations(pod.Annotations)
-	if err != nil || affinity == nil {
-		return false
-	}
-	return affinity.PodAffinity != nil || affinity.PodAntiAffinity != nil
+	affinity := pod.Spec.Affinity
+	return affinity != nil && (affinity.PodAffinity != nil || affinity.PodAntiAffinity != nil)
 }
 
 // addPod adds pod information to this NodeInfo.
 func (n *NodeInfo) addPod(pod *v1.Pod) {
-	// cpu, mem, nvidia_gpu, non0_cpu, non0_mem := calculateResource(pod)
 	res, non0_cpu, non0_mem := calculateResource(pod)
 	n.requestedResource.MilliCPU += res.MilliCPU
 	n.requestedResource.Memory += res.Memory
@@ -301,11 +305,7 @@ func calculateResource(pod *v1.Pod) (res Resource, non0_cpu int64, non0_mem int6
 				res.NvidiaGPU += rQuant.Value()
 			default:
 				if v1.IsOpaqueIntResourceName(rName) {
-					// Lazily allocate opaque resource map.
-					if res.OpaqueIntResources == nil {
-						res.OpaqueIntResources = map[v1.ResourceName]int64{}
-					}
-					res.OpaqueIntResources[rName] += rQuant.Value()
+					res.AddOpaque(rName, rQuant.Value())
 				}
 			}
 		}
@@ -333,11 +333,7 @@ func (n *NodeInfo) SetNode(node *v1.Node) error {
 			n.allowedPodNumber = int(rQuant.Value())
 		default:
 			if v1.IsOpaqueIntResourceName(rName) {
-				// Lazily allocate opaque resource map.
-				if n.allocatableResource.OpaqueIntResources == nil {
-					n.allocatableResource.OpaqueIntResources = map[v1.ResourceName]int64{}
-				}
-				n.allocatableResource.OpaqueIntResources[rName] = rQuant.Value()
+				n.allocatableResource.AddOpaque(rName, rQuant.Value())
 			}
 		}
 	}

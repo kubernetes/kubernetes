@@ -21,36 +21,25 @@ import (
 	"fmt"
 	"os"
 	"path"
-	"strconv"
 
+	"k8s.io/apimachinery/pkg/util/uuid"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
-	kubeadmapiext "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha1"
-	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
-	netutil "k8s.io/kubernetes/pkg/util/net"
-	"k8s.io/kubernetes/pkg/util/uuid"
 )
 
-func PrepareTokenDiscovery(d *kubeadmapi.TokenDiscovery) error {
-	if len(d.Addresses) == 0 {
-		ip, err := netutil.ChooseHostInterface()
-		if err != nil {
-			return err
-		}
-		d.Addresses = []string{ip.String() + ":" + strconv.Itoa(kubeadmapiext.DefaultDiscoveryBindPort)}
-	}
-	if err := kubeadmutil.GenerateTokenIfNeeded(d); err != nil {
-		return fmt.Errorf("failed to generate token(s) [%v]", err)
-	}
-	return nil
-}
+const (
+	// TODO: prefix with kubeadm prefix
+	KubeletBootstrapUser = "kubeadm-node-csr"
+
+	KubeletBootstrapGroup = "kubeadm:kubelet-bootstrap"
+)
 
 func CreateTokenAuthFile(bt string) error {
 	tokenAuthFilePath := path.Join(kubeadmapi.GlobalEnvParams.HostPKIPath, "tokens.csv")
 	if err := os.MkdirAll(kubeadmapi.GlobalEnvParams.HostPKIPath, 0700); err != nil {
 		return fmt.Errorf("failed to create directory %q [%v]", kubeadmapi.GlobalEnvParams.HostPKIPath, err)
 	}
-	serialized := []byte(fmt.Sprintf("%s,kubeadm-node-csr,%s,system:kubelet-bootstrap\n", bt, uuid.NewUUID()))
+	serialized := []byte(fmt.Sprintf("%s,%s,%s,%s\n", bt, KubeletBootstrapUser, uuid.NewUUID(), KubeletBootstrapGroup))
 	// DumpReaderToFile create a file with mode 0600
 	if err := cmdutil.DumpReaderToFile(bytes.NewReader(serialized), tokenAuthFilePath); err != nil {
 		return fmt.Errorf("failed to save token auth file (%q) [%v]", tokenAuthFilePath, err)

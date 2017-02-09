@@ -20,9 +20,8 @@
 {% endfor -%}
 {% set etcd_cluster = vars.etcd_cluster -%}
 {% set cluster_state = vars.cluster_state -%}
-{% set storage_backend = pillar.get('storage_backend', 'etcd2') -%}
 {% set quota_bytes = '' -%}
-{% if pillar.get('storage_backend', 'etcd2') == 'etcd3' -%}
+{% if pillar.get('storage_backend', 'etcd3') == 'etcd3' -%}
   {% set quota_bytes = '--quota-backend-bytes=4294967296' -%}
 {% endif -%}
 {% set srv_kube_path = "/srv/kubernetes" -%}
@@ -39,7 +38,7 @@
 "containers":[
     {
     "name": "etcd-container",
-    "image": "gcr.io/google_containers/etcd:{{ pillar.get('etcd_docker_tag', '2.2.1') }}",
+    "image": "gcr.io/google_containers/etcd:{{ pillar.get('etcd_docker_tag', '3.0.14-alpha.1') }}",
     "resources": {
       "requests": {
         "cpu": {{ cpulimit }}
@@ -52,10 +51,10 @@
             ],
     "env": [
       { "name": "TARGET_STORAGE",
-        "value": "{{ storage_backend }}"
+        "value": "{{ pillar.get('storage_backend', 'etcd3') }}"
       },
       { "name": "TARGET_VERSION",
-        "value": "{{ pillar.get('etcd_version', '2.2.1') }}"
+        "value": "{{ pillar.get('etcd_version', '3.0.14') }}"
       },
       { "name": "DATA_DIRECTORY",
         "value": "/var/etcd/data{{ suffix }}"

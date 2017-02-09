@@ -227,11 +227,13 @@ define TEST_E2E_NODE_HELP_INFO
 #  GUBERNATOR: For REMOTE=true only. Produce link to Gubernator to view logs.
 #	 Defaults to false.
 #  PARALLELISM: The number of gingko nodes to run.  Defaults to 8.
+#  RUNTIME: Container runtime to use (eg. docker, rkt, remote).
+#    Defaults to "docker".
 #
 # Example:
 #   make test-e2e-node FOCUS=Kubelet SKIP=container
 #   make test-e2e-node REMOTE=true DELETE_INSTANCES=true
-#   make test-e2e-node TEST_ARGS="--experimental-cgroups-per-qos=true"
+#   make test-e2e-node TEST_ARGS="--cgroups-per-qos=true"
 # Build and run tests.
 endef
 .PHONY: test-e2e-node
@@ -257,6 +259,7 @@ else
 test-cmd: generated_files
 	hack/make-rules/test-kubeadm-cmd.sh
 	hack/make-rules/test-cmd.sh
+	hack/make-rules/test-federation-cmd.sh
 endif
 
 define CLEAN_HELP_INFO
@@ -466,4 +469,50 @@ help:
 else
 help:
 	hack/make-rules/make-help.sh
+endif
+
+# Non-dockerized bazel rules.
+.PHONY: bazel-build bazel-test bazel-release
+
+ifeq ($(PRINT_HELP),y)
+define BAZEL_BUILD_HELP_INFO
+# Build with bazel
+#
+# Example:
+# make bazel-build
+endef
+bazel-build:
+	@echo "$$BAZEL_BUILD_HELP_INFO"
+else
+bazel-build:
+	bazel build //cmd/... //pkg/... //federation/... //plugin/... //third_party/... //examples/... //test/...
+endif
+
+
+ifeq ($(PRINT_HELP),y)
+bazel-test:
+define BAZEL_TEST_HELP_INFO
+# Test with bazel
+#
+# Example:
+# make bazel-test
+endef
+	@echo "$$BAZEL_TEST_HELP_INFO"
+else
+bazel-test:
+	bazel test  //cmd/... //pkg/... //federation/... //plugin/... //third_party/... //hack/... //hack:verify-all
+endif
+
+ifeq ($(PRINT_HELP),y)
+define BAZEL_BUILD_HELP_INFO
+# Build release tars with bazel
+#
+# Example:
+# make bazel-release
+endef
+bazel-release:
+	@echo "$$BAZEL_BUILD_HELP_INFO"
+else
+bazel-release:
+	bazel build //build/release-tars
 endif

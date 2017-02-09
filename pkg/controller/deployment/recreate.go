@@ -73,8 +73,6 @@ func (dc *DeploymentController) rolloutRecreate(deployment *extensions.Deploymen
 		return dc.syncRolloutStatus(allRSs, newRS, deployment)
 	}
 
-	dc.cleanupDeployment(oldRSs, deployment)
-
 	// Sync deployment status
 	return dc.syncRolloutStatus(allRSs, newRS, deployment)
 }

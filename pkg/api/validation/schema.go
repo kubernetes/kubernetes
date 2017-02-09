@@ -27,10 +27,10 @@ import (
 	"github.com/emicklei/go-restful/swagger"
 	ejson "github.com/exponent-io/jsonpath"
 	"github.com/golang/glog"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	utilerrors "k8s.io/apimachinery/pkg/util/errors"
+	"k8s.io/apimachinery/pkg/util/yaml"
 	apiutil "k8s.io/kubernetes/pkg/api/util"
-	"k8s.io/kubernetes/pkg/apis/meta/v1/unstructured"
-	utilerrors "k8s.io/kubernetes/pkg/util/errors"
-	"k8s.io/kubernetes/pkg/util/yaml"
 )
 
 type InvalidTypeError struct {
@@ -253,7 +253,7 @@ func (s *SwaggerSchema) ValidateObject(obj interface{}, fieldName, typeName stri
 	if !ok && s.delegate != nil {
 		fields, mapOk := obj.(map[string]interface{})
 		if !mapOk {
-			return append(allErrs, fmt.Errorf("field %s: expected object of type map[string]interface{}, but the actual type is %T", fieldName, obj))
+			return append(allErrs, fmt.Errorf("field %s for %s: expected object of type map[string]interface{}, but the actual type is %T", fieldName, typeName, obj))
 		}
 		if delegated, err := s.delegateIfDifferentApiVersion(&unstructured.Unstructured{Object: fields}); delegated {
 			if err != nil {
@@ -273,7 +273,7 @@ func (s *SwaggerSchema) ValidateObject(obj interface{}, fieldName, typeName stri
 	}
 	fields, ok := obj.(map[string]interface{})
 	if !ok {
-		return append(allErrs, fmt.Errorf("field %s: expected object of type map[string]interface{}, but the actual type is %T", fieldName, obj))
+		return append(allErrs, fmt.Errorf("field %s for %s: expected object of type map[string]interface{}, but the actual type is %T", fieldName, typeName, obj))
 	}
 	if len(fieldName) > 0 {
 		fieldName = fieldName + "."
@@ -281,7 +281,7 @@ func (s *SwaggerSchema) ValidateObject(obj interface{}, fieldName, typeName stri
 	// handle required fields
 	for _, requiredKey := range model.Required {
 		if _, ok := fields[requiredKey]; !ok {
-			allErrs = append(allErrs, fmt.Errorf("field %s: is required", requiredKey))
+			allErrs = append(allErrs, fmt.Errorf("field %s%s for %s is required", fieldName, requiredKey, typeName))
 		}
 	}
 	for key, value := range fields {
@@ -302,7 +302,7 @@ func (s *SwaggerSchema) ValidateObject(obj interface{}, fieldName, typeName stri
 			continue
 		}
 		if details.Type == nil && details.Ref == nil {
-			allErrs = append(allErrs, fmt.Errorf("could not find the type of %s from object: %v", key, details))
+			allErrs = append(allErrs, fmt.Errorf("could not find the type of %s%s from object %v", fieldName, key, details))
 		}
 		var fieldType string
 		if details.Type != nil {
@@ -311,7 +311,7 @@ func (s *SwaggerSchema) ValidateObject(obj interface{}, fieldName, typeName stri
 			fieldType = *details.Ref
 		}
 		if value == nil {
-			glog.V(2).Infof("Skipping nil field: %s", key)
+			glog.V(2).Infof("Skipping nil field: %s%s", fieldName, key)
 			continue
 		}
 		errs := s.validateField(value, fieldName+key, fieldType, &details)

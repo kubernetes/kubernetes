@@ -18,13 +18,13 @@ limitations under the License.
 package policybased
 
 import (
-	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/errors"
-	"k8s.io/kubernetes/pkg/api/rest"
+	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/runtime"
+	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
+	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/kubernetes/pkg/apis/rbac"
-	"k8s.io/kubernetes/pkg/apis/rbac/validation"
 	rbacregistry "k8s.io/kubernetes/pkg/registry/rbac"
-	"k8s.io/kubernetes/pkg/runtime"
+	rbacregistryvalidation "k8s.io/kubernetes/pkg/registry/rbac/validation"
 )
 
 var groupResource = rbac.Resource("roles")
@@ -32,63 +32,40 @@ var groupResource = rbac.Resource("roles")
 type Storage struct {
 	rest.StandardStorage
 
-	ruleResolver validation.AuthorizationRuleResolver
+	ruleResolver rbacregistryvalidation.AuthorizationRuleResolver
 }
 
-func NewStorage(s rest.StandardStorage, ruleResolver validation.AuthorizationRuleResolver) *Storage {
+func NewStorage(s rest.StandardStorage, ruleResolver rbacregistryvalidation.AuthorizationRuleResolver) *Storage {
 	return &Storage{s, ruleResolver}
 }
 
-func (s *Storage) Create(ctx api.Context, obj runtime.Object) (runtime.Object, error) {
+func (s *Storage) Create(ctx genericapirequest.Context, obj runtime.Object) (runtime.Object, error) {
 	if rbacregistry.EscalationAllowed(ctx) {
 		return s.StandardStorage.Create(ctx, obj)
 	}
 
 	role := obj.(*rbac.Role)
 	rules := role.Rules
-	if err := validation.ConfirmNoEscalation(ctx, s.ruleResolver, rules); err != nil {
+	if err := rbacregistryvalidation.ConfirmNoEscalation(ctx, s.ruleResolver, rules); err != nil {
 		return nil, errors.NewForbidden(groupResource, role.Name, err)
 	}
 	return s.StandardStorage.Create(ctx, obj)
 }
 
-func (s *Storage) Update(ctx api.Context, name string, obj rest.UpdatedObjectInfo) (runtime.Object, bool, error) {
+func (s *Storage) Update(ctx genericapirequest.Context, name string, obj rest.UpdatedObjectInfo) (runtime.Object, bool, error) {
 	if rbacregistry.EscalationAllowed(ctx) {
 		return s.StandardStorage.Update(ctx, name, obj)
 	}
 
-	nonEscalatingInfo := wrapUpdatedObjectInfo(obj, func(ctx api.Context, obj runtime.Object, oldObj runtime.Object) (runtime.Object, error) {
+	nonEscalatingInfo := rest.WrapUpdatedObjectInfo(obj, func(ctx genericapirequest.Context, obj runtime.Object, oldObj runtime.Object) (runtime.Object, error) {
 		role := obj.(*rbac.Role)
 
 		rules := role.Rules
-		if err := validation.ConfirmNoEscalation(ctx, s.ruleResolver, rules); err != nil {
+		if err := rbacregistryvalidation.ConfirmNoEscalation(ctx, s.ruleResolver, rules); err != nil {
 			return nil, errors.NewForbidden(groupResource, role.Name, err)
 		}
 		return obj, nil
 	})
 
 	return s.StandardStorage.Update(ctx, name, nonEscalatingInfo)
-}
-
-// TODO(ericchiang): This logic is copied from #26240. Replace with once that PR is merged into master.
-type wrappedUpdatedObjectInfo struct {
-	objInfo rest.UpdatedObjectInfo
-
-	transformFunc rest.TransformFunc
-}
-
-func wrapUpdatedObjectInfo(objInfo rest.UpdatedObjectInfo, transformFunc rest.TransformFunc) rest.UpdatedObjectInfo {
-	return &wrappedUpdatedObjectInfo{objInfo, transformFunc}
-}
-
-func (i *wrappedUpdatedObjectInfo) Preconditions() *api.Preconditions {
-	return i.objInfo.Preconditions()
-}
-
-func (i *wrappedUpdatedObjectInfo) UpdatedObject(ctx api.Context, oldObj runtime.Object) (runtime.Object, error) {
-	obj, err := i.objInfo.UpdatedObject(ctx, oldObj)
-	if err != nil {
-		return obj, err
-	}
-	return i.transformFunc(ctx, obj, oldObj)
 }

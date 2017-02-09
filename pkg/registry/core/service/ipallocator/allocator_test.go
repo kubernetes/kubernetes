@@ -20,8 +20,8 @@ import (
 	"net"
 	"testing"
 
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/util/sets"
 )
 
 func TestAllocate(t *testing.T) {
@@ -33,6 +33,9 @@ func TestAllocate(t *testing.T) {
 	t.Logf("base: %v", r.base.Bytes())
 	if f := r.Free(); f != 254 {
 		t.Errorf("unexpected free %d", f)
+	}
+	if f := r.Used(); f != 0 {
+		t.Errorf("unexpected used %d", f)
 	}
 	found := sets.NewString()
 	count := 0
@@ -61,6 +64,9 @@ func TestAllocate(t *testing.T) {
 	if f := r.Free(); f != 1 {
 		t.Errorf("unexpected free %d", f)
 	}
+	if f := r.Used(); f != 253 {
+		t.Errorf("unexpected free %d", f)
+	}
 	ip, err := r.AllocateNext()
 	if err != nil {
 		t.Fatal(err)
@@ -87,10 +93,16 @@ func TestAllocate(t *testing.T) {
 	if f := r.Free(); f != 1 {
 		t.Errorf("unexpected free %d", f)
 	}
+	if f := r.Used(); f != 253 {
+		t.Errorf("unexpected free %d", f)
+	}
 	if err := r.Allocate(released); err != nil {
 		t.Fatal(err)
 	}
 	if f := r.Free(); f != 0 {
+		t.Errorf("unexpected free %d", f)
+	}
+	if f := r.Used(); f != 254 {
 		t.Errorf("unexpected free %d", f)
 	}
 }
@@ -167,6 +179,43 @@ func TestRangeSize(t *testing.T) {
 	}
 }
 
+func TestForEach(t *testing.T) {
+	_, cidr, err := net.ParseCIDR("192.168.1.0/24")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	testCases := []sets.String{
+		sets.NewString(),
+		sets.NewString("192.168.1.1"),
+		sets.NewString("192.168.1.1", "192.168.1.254"),
+		sets.NewString("192.168.1.1", "192.168.1.128", "192.168.1.254"),
+	}
+
+	for i, tc := range testCases {
+		r := NewCIDRRange(cidr)
+		for ips := range tc {
+			ip := net.ParseIP(ips)
+			if err := r.Allocate(ip); err != nil {
+				t.Errorf("[%d] error allocating IP %v: %v", i, ip, err)
+			}
+			if !r.Has(ip) {
+				t.Errorf("[%d] expected IP %v allocated", i, ip)
+			}
+		}
+		calls := sets.NewString()
+		r.ForEach(func(ip net.IP) {
+			calls.Insert(ip.String())
+		})
+		if len(calls) != len(tc) {
+			t.Errorf("[%d] expected %d calls, got %d", i, len(tc), len(calls))
+		}
+		if !calls.Equal(tc) {
+			t.Errorf("[%d] expected calls to equal testcase: %v vs %v", i, calls.List(), tc.List())
+		}
+	}
+}
+
 func TestSnapshot(t *testing.T) {
 	_, cidr, err := net.ParseCIDR("192.168.1.0/24")
 	if err != nil {
@@ -217,5 +266,44 @@ func TestSnapshot(t *testing.T) {
 	}
 	if other.Free() != r.Free() {
 		t.Errorf("counts do not match: %d", other.Free())
+	}
+}
+
+func TestNewFromSnapshot(t *testing.T) {
+	_, cidr, err := net.ParseCIDR("192.168.0.0/24")
+	if err != nil {
+		t.Fatal(err)
+	}
+	r := NewCIDRRange(cidr)
+	allocated := []net.IP{}
+	for i := 0; i < 128; i++ {
+		ip, err := r.AllocateNext()
+		if err != nil {
+			t.Fatal(err)
+		}
+		allocated = append(allocated, ip)
+	}
+
+	snapshot := api.RangeAllocation{}
+	if err = r.Snapshot(&snapshot); err != nil {
+		t.Fatal(err)
+	}
+
+	r, err = NewFromSnapshot(&snapshot)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if x := r.Free(); x != 126 {
+		t.Fatalf("expected 126 free IPs, got %d", x)
+	}
+	if x := r.Used(); x != 128 {
+		t.Fatalf("expected 128 used IPs, got %d", x)
+	}
+
+	for _, ip := range allocated {
+		if !r.Has(ip) {
+			t.Fatalf("expected IP to be allocated, but it was not")
+		}
 	}
 }

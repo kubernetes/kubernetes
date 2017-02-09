@@ -55,7 +55,8 @@ func TestSync(t *testing.T) {
 			newVolumeArray("volume1-2", "1Gi", "", "", v1.VolumePending, v1.PersistentVolumeReclaimRetain),
 			newClaimArray("claim1-2", "uid1-2", "10Gi", "", v1.ClaimPending),
 			newClaimArray("claim1-2", "uid1-2", "10Gi", "", v1.ClaimPending),
-			noevents, noerrors, testSyncClaim,
+			[]string{"Normal FailedBinding"},
+			noerrors, testSyncClaim,
 		},
 		{
 			// syncClaim resets claim.Status to Pending when there is no
@@ -65,7 +66,8 @@ func TestSync(t *testing.T) {
 			newVolumeArray("volume1-3", "1Gi", "", "", v1.VolumePending, v1.PersistentVolumeReclaimRetain),
 			newClaimArray("claim1-3", "uid1-3", "10Gi", "", v1.ClaimBound),
 			newClaimArray("claim1-3", "uid1-3", "10Gi", "", v1.ClaimPending),
-			noevents, noerrors, testSyncClaim,
+			[]string{"Normal FailedBinding"},
+			noerrors, testSyncClaim,
 		},
 		{
 			// syncClaim binds claims to the smallest matching volume
@@ -122,7 +124,8 @@ func TestSync(t *testing.T) {
 			newVolumeArray("volume1-7", "10Gi", "uid1-777", "claim1-7", v1.VolumePending, v1.PersistentVolumeReclaimRetain),
 			newClaimArray("claim1-7", "uid1-7", "1Gi", "", v1.ClaimPending),
 			newClaimArray("claim1-7", "uid1-7", "1Gi", "", v1.ClaimPending),
-			noevents, noerrors, testSyncClaim,
+			[]string{"Normal FailedBinding"},
+			noerrors, testSyncClaim,
 		},
 		{
 			// syncClaim completes binding - simulates controller crash after
@@ -170,7 +173,8 @@ func TestSync(t *testing.T) {
 			newVolumeArray("volume1-1", "1Gi", "", "", v1.VolumePending, v1.PersistentVolumeReclaimRetain),
 			withLabelSelector(labels, newClaimArray("claim1-1", "uid1-1", "1Gi", "", v1.ClaimPending)),
 			withLabelSelector(labels, newClaimArray("claim1-1", "uid1-1", "1Gi", "", v1.ClaimPending)),
-			noevents, noerrors, testSyncClaim,
+			[]string{"Normal FailedBinding"},
+			noerrors, testSyncClaim,
 		},
 
 		// [Unit test set 2] User asked for a specific PV.

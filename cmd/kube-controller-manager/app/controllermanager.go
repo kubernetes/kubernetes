@@ -31,16 +31,24 @@ import (
 	"strconv"
 	"time"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/apiserver/pkg/server/healthz"
+	"k8s.io/client-go/discovery"
+	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
+	clientv1 "k8s.io/client-go/pkg/api/v1"
+	restclient "k8s.io/client-go/rest"
+	"k8s.io/client-go/tools/clientcmd"
+	"k8s.io/client-go/tools/record"
+	certutil "k8s.io/client-go/util/cert"
 	"k8s.io/kubernetes/cmd/kube-controller-manager/app/options"
-	"k8s.io/kubernetes/pkg/api/v1"
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
-	v1core "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/core/v1"
+	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
+	newinformers "k8s.io/kubernetes/pkg/client/informers/informers_generated"
 	"k8s.io/kubernetes/pkg/client/leaderelection"
 	"k8s.io/kubernetes/pkg/client/leaderelection/resourcelock"
-	"k8s.io/kubernetes/pkg/client/record"
-	"k8s.io/kubernetes/pkg/client/restclient"
-	"k8s.io/kubernetes/pkg/client/typed/discovery"
-	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/informers"
@@ -50,12 +58,8 @@ import (
 	serviceaccountcontroller "k8s.io/kubernetes/pkg/controller/serviceaccount"
 	"k8s.io/kubernetes/pkg/controller/volume/attachdetach"
 	persistentvolumecontroller "k8s.io/kubernetes/pkg/controller/volume/persistentvolume"
-	"k8s.io/kubernetes/pkg/healthz"
-	"k8s.io/kubernetes/pkg/runtime/schema"
 	"k8s.io/kubernetes/pkg/serviceaccount"
-	certutil "k8s.io/kubernetes/pkg/util/cert"
 	"k8s.io/kubernetes/pkg/util/configz"
-	"k8s.io/kubernetes/pkg/util/wait"
 
 	"github.com/golang/glog"
 	"github.com/prometheus/client_golang/prometheus"
@@ -71,7 +75,7 @@ const (
 // NewControllerManagerCommand creates a *cobra.Command object with default parameters
 func NewControllerManagerCommand() *cobra.Command {
 	s := options.NewCMServer()
-	s.AddFlags(pflag.CommandLine)
+	s.AddFlags(pflag.CommandLine, KnownControllers(), ControllersDisabledByDefault.List())
 	cmd := &cobra.Command{
 		Use: "kube-controller-manager",
 		Long: `The Kubernetes controller manager is a daemon that embeds
@@ -98,6 +102,10 @@ func ResyncPeriod(s *options.CMServer) func() time.Duration {
 
 // Run runs the CMServer.  This should never exit.
 func Run(s *options.CMServer) error {
+	if err := s.Validate(KnownControllers(), ControllersDisabledByDefault.List()); err != nil {
+		return err
+	}
+
 	if c, err := configz.New("componentconfig"); err == nil {
 		c.Set(s.KubeControllerManagerConfiguration)
 	} else {
@@ -138,8 +146,8 @@ func Run(s *options.CMServer) error {
 
 	eventBroadcaster := record.NewBroadcaster()
 	eventBroadcaster.StartLogging(glog.Infof)
-	eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: kubeClient.Core().Events("")})
-	recorder := eventBroadcaster.NewRecorder(v1.EventSource{Component: "controller-manager"})
+	eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: v1core.New(kubeClient.Core().RESTClient()).Events("")})
+	recorder := eventBroadcaster.NewRecorder(api.Scheme, clientv1.EventSource{Component: "controller-manager"})
 
 	run := func(stop <-chan struct{}) {
 		rootClientBuilder := controller.SimpleControllerClientBuilder{
@@ -173,7 +181,7 @@ func Run(s *options.CMServer) error {
 
 	// TODO: enable other lock types
 	rl := resourcelock.EndpointsLock{
-		EndpointsMeta: v1.ObjectMeta{
+		EndpointsMeta: metav1.ObjectMeta{
 			Namespace: "kube-system",
 			Name:      "kube-controller-manager",
 		},
@@ -203,8 +211,13 @@ type ControllerContext struct {
 	// ClientBuilder will provide a client for this controller to use
 	ClientBuilder controller.ControllerClientBuilder
 
-	// InformerFactory gives access to informers for the controller
+	// InformerFactory gives access to informers for the controller.
+	// TODO delete this instance once the conversion to generated informers is complete.
 	InformerFactory informers.SharedInformerFactory
+
+	// NewInformerFactory gives access to informers for the controller.
+	// TODO rename this to InformerFactory once the conversion to generated informers is complete.
+	NewInformerFactory newinformers.SharedInformerFactory
 
 	// Options provides access to init options for a given controller
 	Options options.CMServer
@@ -216,10 +229,45 @@ type ControllerContext struct {
 	Stop <-chan struct{}
 }
 
+func (c ControllerContext) IsControllerEnabled(name string) bool {
+	return IsControllerEnabled(name, ControllersDisabledByDefault, c.Options.Controllers...)
+}
+
+func IsControllerEnabled(name string, disabledByDefaultControllers sets.String, controllers ...string) bool {
+	hasStar := false
+	for _, controller := range controllers {
+		if controller == name {
+			return true
+		}
+		if controller == "-"+name {
+			return false
+		}
+		if controller == "*" {
+			hasStar = true
+		}
+	}
+	// if we get here, there was no explicit choice
+	if !hasStar {
+		// nothing on by default
+		return false
+	}
+	if disabledByDefaultControllers.Has(name) {
+		return false
+	}
+
+	return true
+}
+
 // InitFunc is used to launch a particular controller.  It may run additional "should I activate checks".
 // Any error returned will cause the controller process to `Fatal`
 // The bool indicates whether the controller was enabled.
 type InitFunc func(ctx ControllerContext) (bool, error)
+
+func KnownControllers() []string {
+	return sets.StringKeySet(newControllerInitializers()).List()
+}
+
+var ControllersDisabledByDefault = sets.NewString()
 
 func newControllerInitializers() map[string]InitFunc {
 	controllers := map[string]InitFunc{}
@@ -284,7 +332,10 @@ func getAvailableResources(clientBuilder controller.ControllerClientBuilder) (ma
 }
 
 func StartControllers(controllers map[string]InitFunc, s *options.CMServer, rootClientBuilder, clientBuilder controller.ControllerClientBuilder, stop <-chan struct{}) error {
-	sharedInformers := informers.NewSharedInformerFactory(rootClientBuilder.ClientOrDie("shared-informers"), nil, ResyncPeriod(s)())
+	versionedClient := rootClientBuilder.ClientOrDie("shared-informers")
+	// TODO replace sharedInformers with newSharedInformers
+	sharedInformers := informers.NewSharedInformerFactory(versionedClient, nil, ResyncPeriod(s)())
+	newSharedInformers := newinformers.NewSharedInformerFactory(nil, versionedClient, ResyncPeriod(s)())
 
 	// always start the SA token controller first using a full-power client, since it needs to mint tokens for the rest
 	if len(s.ServiceAccountKeyFile) > 0 {
@@ -324,12 +375,18 @@ func StartControllers(controllers map[string]InitFunc, s *options.CMServer, root
 	ctx := ControllerContext{
 		ClientBuilder:      clientBuilder,
 		InformerFactory:    sharedInformers,
+		NewInformerFactory: newSharedInformers,
 		Options:            *s,
 		AvailableResources: availableResources,
 		Stop:               stop,
 	}
 
 	for controllerName, initFn := range controllers {
+		if !ctx.IsControllerEnabled(controllerName) {
+			glog.Warningf("%q is disabled", controllerName)
+			continue
+		}
+
 		time.Sleep(wait.Jitter(s.ControllerStartInterval.Duration, ControllerStartJitter))
 
 		glog.V(1).Infof("Starting %q", controllerName)
@@ -340,6 +397,7 @@ func StartControllers(controllers map[string]InitFunc, s *options.CMServer, root
 		}
 		if !started {
 			glog.Warningf("Skipping %q", controllerName)
+			continue
 		}
 		glog.Infof("Started %q", controllerName)
 	}
@@ -358,11 +416,24 @@ func StartControllers(controllers map[string]InitFunc, s *options.CMServer, root
 		glog.Warningf("Unsuccessful parsing of service CIDR %v: %v", s.ServiceCIDR, err)
 	}
 	nodeController, err := nodecontroller.NewNodeController(
-		sharedInformers.Pods(), sharedInformers.Nodes(), sharedInformers.DaemonSets(),
-		cloud, clientBuilder.ClientOrDie("node-controller"),
-		s.PodEvictionTimeout.Duration, s.NodeEvictionRate, s.SecondaryNodeEvictionRate, s.LargeClusterSizeThreshold, s.UnhealthyZoneThreshold, s.NodeMonitorGracePeriod.Duration,
-		s.NodeStartupGracePeriod.Duration, s.NodeMonitorPeriod.Duration, clusterCIDR, serviceCIDR,
-		int(s.NodeCIDRMaskSize), s.AllocateNodeCIDRs)
+		newSharedInformers.Core().V1().Pods(),
+		newSharedInformers.Core().V1().Nodes(),
+		newSharedInformers.Extensions().V1beta1().DaemonSets(),
+		cloud,
+		clientBuilder.ClientOrDie("node-controller"),
+		s.PodEvictionTimeout.Duration,
+		s.NodeEvictionRate,
+		s.SecondaryNodeEvictionRate,
+		s.LargeClusterSizeThreshold,
+		s.UnhealthyZoneThreshold,
+		s.NodeMonitorGracePeriod.Duration,
+		s.NodeStartupGracePeriod.Duration,
+		s.NodeMonitorPeriod.Duration,
+		clusterCIDR,
+		serviceCIDR,
+		int(s.NodeCIDRMaskSize),
+		s.AllocateNodeCIDRs,
+	)
 	if err != nil {
 		return fmt.Errorf("failed to initialize nodecontroller: %v", err)
 	}
@@ -405,25 +476,34 @@ func StartControllers(controllers map[string]InitFunc, s *options.CMServer, root
 		EnableDynamicProvisioning: s.VolumeConfiguration.EnableDynamicProvisioning,
 	}
 	volumeController := persistentvolumecontroller.NewController(params)
-	volumeController.Run(stop)
+	go volumeController.Run(stop)
 	time.Sleep(wait.Jitter(s.ControllerStartInterval.Duration, ControllerStartJitter))
+
+	if s.ReconcilerSyncLoopPeriod.Duration < time.Second {
+		return fmt.Errorf("Duration time must be greater than one second as set via command line option reconcile-sync-loop-period.")
+	}
 
 	attachDetachController, attachDetachControllerErr :=
 		attachdetach.NewAttachDetachController(
 			clientBuilder.ClientOrDie("attachdetach-controller"),
-			sharedInformers.Pods().Informer(),
-			sharedInformers.Nodes().Informer(),
-			sharedInformers.PersistentVolumeClaims().Informer(),
-			sharedInformers.PersistentVolumes().Informer(),
+			newSharedInformers.Core().V1().Pods(),
+			newSharedInformers.Core().V1().Nodes(),
+			newSharedInformers.Core().V1().PersistentVolumeClaims(),
+			newSharedInformers.Core().V1().PersistentVolumes(),
 			cloud,
-			ProbeAttachableVolumePlugins(s.VolumeConfiguration))
+			ProbeAttachableVolumePlugins(s.VolumeConfiguration),
+			s.DisableAttachDetachReconcilerSync,
+			s.ReconcilerSyncLoopPeriod.Duration,
+		)
 	if attachDetachControllerErr != nil {
 		return fmt.Errorf("failed to start attach/detach controller: %v", attachDetachControllerErr)
 	}
 	go attachDetachController.Run(stop)
 	time.Sleep(wait.Jitter(s.ControllerStartInterval.Duration, ControllerStartJitter))
 
+	// TODO replace sharedInformers with newSharedInformers
 	sharedInformers.Start(stop)
+	newSharedInformers.Start(stop)
 
 	select {}
 }

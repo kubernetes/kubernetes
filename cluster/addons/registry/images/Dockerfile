@@ -13,7 +13,6 @@
 # limitations under the License.
 
 FROM nginx:1.11
-MAINTAINER Matthew Fisher <mfisher@deis.com>
 
 RUN apt-get update \
 	&& apt-get install -y \

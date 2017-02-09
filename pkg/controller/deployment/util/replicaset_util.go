@@ -21,13 +21,13 @@ import (
 
 	"github.com/golang/glog"
 
+	errorsutil "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
 	extensions "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
-	"k8s.io/kubernetes/pkg/client/cache"
 	unversionedextensions "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/extensions/v1beta1"
+	extensionslisters "k8s.io/kubernetes/pkg/client/listers/extensions/v1beta1"
 	"k8s.io/kubernetes/pkg/client/retry"
-	errorsutil "k8s.io/kubernetes/pkg/util/errors"
 	labelsutil "k8s.io/kubernetes/pkg/util/labels"
 )
 
@@ -37,7 +37,7 @@ type updateRSFunc func(rs *extensions.ReplicaSet) error
 
 // UpdateRSWithRetries updates a RS with given applyUpdate function. Note that RS not found error is ignored.
 // The returned bool value can be used to tell if the RS is actually updated.
-func UpdateRSWithRetries(rsClient unversionedextensions.ReplicaSetInterface, rsLister *cache.StoreToReplicaSetLister, namespace, name string, applyUpdate updateRSFunc) (*extensions.ReplicaSet, error) {
+func UpdateRSWithRetries(rsClient unversionedextensions.ReplicaSetInterface, rsLister extensionslisters.ReplicaSetLister, namespace, name string, applyUpdate updateRSFunc) (*extensions.ReplicaSet, error) {
 	var rs *extensions.ReplicaSet
 
 	retryErr := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
@@ -73,6 +73,16 @@ func GetReplicaSetHash(rs *extensions.ReplicaSet) string {
 	meta := rs.Spec.Template.ObjectMeta
 	meta.Labels = labelsutil.CloneAndRemoveLabel(meta.Labels, extensions.DefaultDeploymentUniqueLabelKey)
 	return fmt.Sprintf("%d", GetPodTemplateSpecHash(v1.PodTemplateSpec{
+		ObjectMeta: meta,
+		Spec:       rs.Spec.Template.Spec,
+	}))
+}
+
+// GetReplicaSetHashFnv returns the pod template hash of a ReplicaSet's pod template spec.
+func GetReplicaSetHashFnv(rs *extensions.ReplicaSet) string {
+	meta := rs.Spec.Template.ObjectMeta
+	meta.Labels = labelsutil.CloneAndRemoveLabel(meta.Labels, extensions.DefaultDeploymentUniqueLabelKey)
+	return fmt.Sprintf("%d", GetPodTemplateSpecHashFnv(v1.PodTemplateSpec{
 		ObjectMeta: meta,
 		Spec:       rs.Spec.Template.Spec,
 	}))

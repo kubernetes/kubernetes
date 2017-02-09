@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors.
+Copyright 2017 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,11 +17,12 @@ limitations under the License.
 package internalversion
 
 import (
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	types "k8s.io/apimachinery/pkg/types"
+	watch "k8s.io/apimachinery/pkg/watch"
+	rest "k8s.io/client-go/rest"
 	api "k8s.io/kubernetes/pkg/api"
 	apps "k8s.io/kubernetes/pkg/apis/apps"
-	v1 "k8s.io/kubernetes/pkg/apis/meta/v1"
-	restclient "k8s.io/kubernetes/pkg/client/restclient"
-	watch "k8s.io/kubernetes/pkg/watch"
 )
 
 // StatefulSetsGetter has a method to return a StatefulSetInterface.
@@ -35,18 +36,18 @@ type StatefulSetInterface interface {
 	Create(*apps.StatefulSet) (*apps.StatefulSet, error)
 	Update(*apps.StatefulSet) (*apps.StatefulSet, error)
 	UpdateStatus(*apps.StatefulSet) (*apps.StatefulSet, error)
-	Delete(name string, options *api.DeleteOptions) error
-	DeleteCollection(options *api.DeleteOptions, listOptions api.ListOptions) error
+	Delete(name string, options *v1.DeleteOptions) error
+	DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error
 	Get(name string, options v1.GetOptions) (*apps.StatefulSet, error)
-	List(opts api.ListOptions) (*apps.StatefulSetList, error)
-	Watch(opts api.ListOptions) (watch.Interface, error)
-	Patch(name string, pt api.PatchType, data []byte, subresources ...string) (result *apps.StatefulSet, err error)
+	List(opts v1.ListOptions) (*apps.StatefulSetList, error)
+	Watch(opts v1.ListOptions) (watch.Interface, error)
+	Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *apps.StatefulSet, err error)
 	StatefulSetExpansion
 }
 
 // statefulSets implements StatefulSetInterface
 type statefulSets struct {
-	client restclient.Interface
+	client rest.Interface
 	ns     string
 }
 
@@ -100,7 +101,7 @@ func (c *statefulSets) UpdateStatus(statefulSet *apps.StatefulSet) (result *apps
 }
 
 // Delete takes name of the statefulSet and deletes it. Returns an error if one occurs.
-func (c *statefulSets) Delete(name string, options *api.DeleteOptions) error {
+func (c *statefulSets) Delete(name string, options *v1.DeleteOptions) error {
 	return c.client.Delete().
 		Namespace(c.ns).
 		Resource("statefulsets").
@@ -111,7 +112,7 @@ func (c *statefulSets) Delete(name string, options *api.DeleteOptions) error {
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *statefulSets) DeleteCollection(options *api.DeleteOptions, listOptions api.ListOptions) error {
+func (c *statefulSets) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
 	return c.client.Delete().
 		Namespace(c.ns).
 		Resource("statefulsets").
@@ -135,7 +136,7 @@ func (c *statefulSets) Get(name string, options v1.GetOptions) (result *apps.Sta
 }
 
 // List takes label and field selectors, and returns the list of StatefulSets that match those selectors.
-func (c *statefulSets) List(opts api.ListOptions) (result *apps.StatefulSetList, err error) {
+func (c *statefulSets) List(opts v1.ListOptions) (result *apps.StatefulSetList, err error) {
 	result = &apps.StatefulSetList{}
 	err = c.client.Get().
 		Namespace(c.ns).
@@ -147,7 +148,7 @@ func (c *statefulSets) List(opts api.ListOptions) (result *apps.StatefulSetList,
 }
 
 // Watch returns a watch.Interface that watches the requested statefulSets.
-func (c *statefulSets) Watch(opts api.ListOptions) (watch.Interface, error) {
+func (c *statefulSets) Watch(opts v1.ListOptions) (watch.Interface, error) {
 	return c.client.Get().
 		Prefix("watch").
 		Namespace(c.ns).
@@ -157,7 +158,7 @@ func (c *statefulSets) Watch(opts api.ListOptions) (watch.Interface, error) {
 }
 
 // Patch applies the patch and returns the patched statefulSet.
-func (c *statefulSets) Patch(name string, pt api.PatchType, data []byte, subresources ...string) (result *apps.StatefulSet, err error) {
+func (c *statefulSets) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *apps.StatefulSet, err error) {
 	result = &apps.StatefulSet{}
 	err = c.client.Patch(pt).
 		Namespace(c.ns).

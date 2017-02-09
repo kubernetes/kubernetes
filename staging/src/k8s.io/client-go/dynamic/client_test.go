@@ -25,16 +25,15 @@ import (
 	"reflect"
 	"testing"
 
-	"k8s.io/client-go/pkg/api"
-	"k8s.io/client-go/pkg/api/v1"
-	metav1 "k8s.io/client-go/pkg/apis/meta/v1"
-	"k8s.io/client-go/pkg/apis/meta/v1/unstructured"
-	"k8s.io/client-go/pkg/runtime"
-	"k8s.io/client-go/pkg/runtime/schema"
-	"k8s.io/client-go/pkg/runtime/serializer/streaming"
-	"k8s.io/client-go/pkg/watch"
-	"k8s.io/client-go/pkg/watch/versioned"
-	"k8s.io/client-go/rest"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/runtime/serializer/streaming"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/watch"
+	restclient "k8s.io/client-go/rest"
+	restclientwatch "k8s.io/client-go/rest/watch"
 )
 
 func getJSON(version, kind, name string) []byte {
@@ -61,9 +60,9 @@ func getObject(version, kind, name string) *unstructured.Unstructured {
 
 func getClientServer(gv *schema.GroupVersion, h func(http.ResponseWriter, *http.Request)) (*Client, *httptest.Server, error) {
 	srv := httptest.NewServer(http.HandlerFunc(h))
-	cl, err := NewClient(&rest.Config{
+	cl, err := NewClient(&restclient.Config{
 		Host:          srv.URL,
-		ContentConfig: rest.ContentConfig{GroupVersion: gv},
+		ContentConfig: restclient.ContentConfig{GroupVersion: gv},
 	})
 	if err != nil {
 		srv.Close()
@@ -137,7 +136,7 @@ func TestList(t *testing.T) {
 		}
 		defer srv.Close()
 
-		got, err := cl.Resource(resource, tc.namespace).List(&v1.ListOptions{})
+		got, err := cl.Resource(resource, tc.namespace).List(&metav1.ListOptions{})
 		if err != nil {
 			t.Errorf("unexpected error when listing %q: %v", tc.name, err)
 			continue
@@ -294,7 +293,7 @@ func TestDeleteCollection(t *testing.T) {
 		}
 		defer srv.Close()
 
-		err = cl.Resource(resource, tc.namespace).DeleteCollection(nil, &v1.ListOptions{})
+		err = cl.Resource(resource, tc.namespace).DeleteCollection(nil, &metav1.ListOptions{})
 		if err != nil {
 			t.Errorf("unexpected error when deleting collection %q: %v", tc.name, err)
 			continue
@@ -459,7 +458,7 @@ func TestWatch(t *testing.T) {
 				t.Errorf("Watch(%q) got path %s. wanted %s", tc.name, r.URL.Path, tc.path)
 			}
 
-			enc := versioned.NewEncoder(streaming.NewEncoder(w, dynamicCodec{}), dynamicCodec{})
+			enc := restclientwatch.NewEncoder(streaming.NewEncoder(w, dynamicCodec{}), dynamicCodec{})
 			for _, e := range tc.events {
 				enc.Encode(&e)
 			}
@@ -470,7 +469,7 @@ func TestWatch(t *testing.T) {
 		}
 		defer srv.Close()
 
-		watcher, err := cl.Resource(resource, tc.namespace).Watch(&v1.ListOptions{})
+		watcher, err := cl.Resource(resource, tc.namespace).Watch(&metav1.ListOptions{})
 		if err != nil {
 			t.Errorf("unexpected error when watching %q: %v", tc.name, err)
 			continue
@@ -520,8 +519,8 @@ func TestPatch(t *testing.T) {
 			}
 
 			content := r.Header.Get("Content-Type")
-			if content != string(api.StrategicMergePatchType) {
-				t.Errorf("Patch(%q) got Content-Type %s. wanted %s", tc.name, content, api.StrategicMergePatchType)
+			if content != string(types.StrategicMergePatchType) {
+				t.Errorf("Patch(%q) got Content-Type %s. wanted %s", tc.name, content, types.StrategicMergePatchType)
 			}
 
 			data, err := ioutil.ReadAll(r.Body)
@@ -540,7 +539,7 @@ func TestPatch(t *testing.T) {
 		}
 		defer srv.Close()
 
-		got, err := cl.Resource(resource, tc.namespace).Patch(tc.name, api.StrategicMergePatchType, tc.patch)
+		got, err := cl.Resource(resource, tc.namespace).Patch(tc.name, types.StrategicMergePatchType, tc.patch)
 		if err != nil {
 			t.Errorf("unexpected error when patching %q: %v", tc.name, err)
 			continue

@@ -19,10 +19,13 @@ package dockershim
 import (
 	"fmt"
 	"net/http"
+	"time"
 
+	"github.com/blang/semver"
+	dockertypes "github.com/docker/engine-api/types"
 	"github.com/golang/glog"
-	"github.com/golang/protobuf/proto"
 
+	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/apis/componentconfig"
 	internalapi "k8s.io/kubernetes/pkg/kubelet/api"
 	runtimeapi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
@@ -32,8 +35,10 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/dockertools"
 	"k8s.io/kubernetes/pkg/kubelet/network"
 	"k8s.io/kubernetes/pkg/kubelet/network/cni"
+	"k8s.io/kubernetes/pkg/kubelet/network/hostport"
 	"k8s.io/kubernetes/pkg/kubelet/network/kubenet"
 	"k8s.io/kubernetes/pkg/kubelet/server/streaming"
+	"k8s.io/kubernetes/pkg/kubelet/util/cache"
 )
 
 const (
@@ -49,6 +54,9 @@ const (
 
 	defaultSeccompProfile = "unconfined"
 
+	// dockershimRootDir is the root directory for dockershim
+	dockershimRootDir = "/var/lib/dockershim"
+
 	// Internal docker labels used to identify whether a container is a sandbox
 	// or a regular container.
 	// TODO: This is not backward compatible with older containers. We will
@@ -58,6 +66,9 @@ const (
 	containerTypeLabelContainer = "container"
 	containerLogPathLabelKey    = "io.kubernetes.container.logpath"
 	sandboxIDLabelKey           = "io.kubernetes.sandbox.id"
+
+	// The expiration time of version cache.
+	versionCacheTTL = 60 * time.Second
 
 	// TODO: https://github.com/kubernetes/kubernetes/pull/31169 provides experimental
 	// defaulting of host user namespace that may be enabled when the docker daemon
@@ -98,11 +109,40 @@ type NetworkPluginSettings struct {
 	LegacyRuntimeHost network.LegacyHost
 }
 
+// namespaceGetter is a wrapper around the dockerService that implements
+// the network.NamespaceGetter interface.
+type namespaceGetter struct {
+	ds *dockerService
+}
+
+func (n *namespaceGetter) GetNetNS(containerID string) (string, error) {
+	return n.ds.GetNetNS(containerID)
+}
+
+// portMappingGetter is a wrapper around the dockerService that implements
+// the network.PortMappingGetter interface.
+type portMappingGetter struct {
+	ds *dockerService
+}
+
+func (p *portMappingGetter) GetPodPortMappings(containerID string) ([]*hostport.PortMapping, error) {
+	return p.ds.GetPodPortMappings(containerID)
+}
+
+// dockerNetworkHost implements network.Host by wrapping the legacy host passed in by the kubelet
+// and dockerServices which implementes the rest of the network host interfaces.
+// The legacy host methods are slated for deletion.
+type dockerNetworkHost struct {
+	network.LegacyHost
+	*namespaceGetter
+	*portMappingGetter
+}
+
 var internalLabelKeys []string = []string{containerTypeLabelKey, containerLogPathLabelKey, sandboxIDLabelKey}
 
 // NOTE: Anything passed to DockerService should be eventually handled in another way when we switch to running the shim as a different process.
 func NewDockerService(client dockertools.DockerInterface, seccompProfileRoot string, podSandboxImage string, streamingConfig *streaming.Config,
-	pluginSettings *NetworkPluginSettings, cgroupsName string, kubeCgroupDriver string) (DockerService, error) {
+	pluginSettings *NetworkPluginSettings, cgroupsName string, kubeCgroupDriver string, execHandler dockertools.ExecHandler) (DockerService, error) {
 	c := dockertools.NewInstrumentedDockerInterface(client)
 	ds := &dockerService{
 		seccompProfileRoot: seccompProfileRoot,
@@ -110,12 +150,11 @@ func NewDockerService(client dockertools.DockerInterface, seccompProfileRoot str
 		os:                 kubecontainer.RealOS{},
 		podSandboxImage:    podSandboxImage,
 		streamingRuntime: &streamingRuntime{
-			client: client,
-			// Only the native exec handling is supported for now.
-			// TODO(#35747) - Either deprecate nsenter exec handling, or add support for it here.
-			execHandler: &dockertools.NativeExecHandler{},
+			client:      client,
+			execHandler: execHandler,
 		},
-		containerManager: cm.NewContainerManager(cgroupsName, client),
+		containerManager:  cm.NewContainerManager(cgroupsName, client),
+		checkpointHandler: NewPersistentCheckpointHandler(),
 	}
 	if streamingConfig != nil {
 		var err error
@@ -130,6 +169,7 @@ func NewDockerService(client dockertools.DockerInterface, seccompProfileRoot str
 	netHost := &dockerNetworkHost{
 		pluginSettings.LegacyRuntimeHost,
 		&namespaceGetter{ds},
+		&portMappingGetter{ds},
 	}
 	plug, err := network.InitNetworkPlugin(cniPlugins, pluginSettings.PluginName, netHost, pluginSettings.HairpinMode, pluginSettings.NonMasqueradeCIDR, pluginSettings.MTU)
 	if err != nil {
@@ -152,7 +192,12 @@ func NewDockerService(client dockertools.DockerInterface, seccompProfileRoot str
 		glog.Infof("Setting cgroupDriver to %s", cgroupDriver)
 	}
 	ds.cgroupDriver = cgroupDriver
-
+	ds.versionCache = cache.NewObjectCache(
+		func() (interface{}, error) {
+			return ds.getDockerVersion()
+		},
+		versionCacheTTL,
+	)
 	return ds, nil
 }
 
@@ -176,26 +221,41 @@ type dockerService struct {
 	networkPlugin      network.NetworkPlugin
 	containerManager   cm.ContainerManager
 	// cgroup driver used by Docker runtime.
-	cgroupDriver string
+	cgroupDriver      string
+	checkpointHandler CheckpointHandler
+	// legacyCleanup indicates whether legacy cleanup has finished or not.
+	legacyCleanup legacyCleanupFlag
+	// caches the version of the runtime.
+	// To be compatible with multiple docker versions, we need to perform
+	// version checking for some operations. Use this cache to avoid querying
+	// the docker daemon every time we need to do such checks.
+	versionCache *cache.ObjectCache
 }
 
 // Version returns the runtime name, runtime version and runtime API version
 func (ds *dockerService) Version(_ string) (*runtimeapi.VersionResponse, error) {
+	v, err := ds.getDockerVersion()
+	if err != nil {
+		return nil, err
+	}
+	return &runtimeapi.VersionResponse{
+		Version:           kubeAPIVersion,
+		RuntimeName:       dockerRuntimeName,
+		RuntimeVersion:    v.Version,
+		RuntimeApiVersion: v.APIVersion,
+	}, nil
+}
+
+// dockerVersion gets the version information from docker.
+func (ds *dockerService) getDockerVersion() (*dockertypes.Version, error) {
 	v, err := ds.client.Version()
 	if err != nil {
-		return nil, fmt.Errorf("docker: failed to get docker version: %v", err)
+		return nil, fmt.Errorf("failed to get docker version: %v", err)
 	}
-	runtimeAPIVersion := kubeAPIVersion
-	name := dockerRuntimeName
 	// Docker API version (e.g., 1.23) is not semver compatible. Add a ".0"
 	// suffix to remedy this.
-	apiVersion := fmt.Sprintf("%s.0", v.APIVersion)
-	return &runtimeapi.VersionResponse{
-		Version:           &runtimeAPIVersion,
-		RuntimeName:       &name,
-		RuntimeVersion:    &v.Version,
-		RuntimeApiVersion: &apiVersion,
-	}, nil
+	v.APIVersion = fmt.Sprintf("%s.0", v.APIVersion)
+	return v, nil
 }
 
 // UpdateRuntimeConfig updates the runtime config. Currently only handles podCIDR updates.
@@ -204,18 +264,12 @@ func (ds *dockerService) UpdateRuntimeConfig(runtimeConfig *runtimeapi.RuntimeCo
 		return
 	}
 	glog.Infof("docker cri received runtime config %+v", runtimeConfig)
-	if ds.networkPlugin != nil && runtimeConfig.NetworkConfig.PodCidr != nil {
+	if ds.networkPlugin != nil && runtimeConfig.NetworkConfig.PodCidr != "" {
 		event := make(map[string]interface{})
-		event[network.NET_PLUGIN_EVENT_POD_CIDR_CHANGE_DETAIL_CIDR] = *runtimeConfig.NetworkConfig.PodCidr
+		event[network.NET_PLUGIN_EVENT_POD_CIDR_CHANGE_DETAIL_CIDR] = runtimeConfig.NetworkConfig.PodCidr
 		ds.networkPlugin.Event(network.NET_PLUGIN_EVENT_POD_CIDR_CHANGE, event)
 	}
 	return
-}
-
-// namespaceGetter is a wrapper around the dockerService that implements
-// the network.NamespaceGetter interface.
-type namespaceGetter struct {
-	*dockerService
 }
 
 // GetNetNS returns the network namespace of the given containerID. The ID
@@ -229,16 +283,30 @@ func (ds *dockerService) GetNetNS(podSandboxID string) (string, error) {
 	return getNetworkNamespace(r), nil
 }
 
-// dockerNetworkHost implements network.Host by wrapping the legacy host
-// passed in by the kubelet and adding NamespaceGetter methods. The legacy
-// host methods are slated for deletion.
-type dockerNetworkHost struct {
-	network.LegacyHost
-	*namespaceGetter
+// GetPodPortMappings returns the port mappings of the given podSandbox ID.
+func (ds *dockerService) GetPodPortMappings(podSandboxID string) ([]*hostport.PortMapping, error) {
+	// TODO: get portmappings from docker labels for backward compatibility
+	checkpoint, err := ds.checkpointHandler.GetCheckpoint(podSandboxID)
+	if err != nil {
+		return nil, err
+	}
+
+	portMappings := []*hostport.PortMapping{}
+	for _, pm := range checkpoint.Data.PortMappings {
+		proto := toAPIProtocol(*pm.Protocol)
+		portMappings = append(portMappings, &hostport.PortMapping{
+			HostPort:      *pm.HostPort,
+			ContainerPort: *pm.ContainerPort,
+			Protocol:      proto,
+		})
+	}
+	return portMappings, nil
 }
 
 // Start initializes and starts components in dockerService.
 func (ds *dockerService) Start() error {
+	// Initialize the legacy cleanup flag.
+	ds.LegacyCleanupInit()
 	return ds.containerManager.Start()
 }
 
@@ -246,23 +314,23 @@ func (ds *dockerService) Start() error {
 // TODO(random-liu): Set network condition accordingly here.
 func (ds *dockerService) Status() (*runtimeapi.RuntimeStatus, error) {
 	runtimeReady := &runtimeapi.RuntimeCondition{
-		Type:   proto.String(runtimeapi.RuntimeReady),
-		Status: proto.Bool(true),
+		Type:   runtimeapi.RuntimeReady,
+		Status: true,
 	}
 	networkReady := &runtimeapi.RuntimeCondition{
-		Type:   proto.String(runtimeapi.NetworkReady),
-		Status: proto.Bool(true),
+		Type:   runtimeapi.NetworkReady,
+		Status: true,
 	}
 	conditions := []*runtimeapi.RuntimeCondition{runtimeReady, networkReady}
 	if _, err := ds.client.Version(); err != nil {
-		runtimeReady.Status = proto.Bool(false)
-		runtimeReady.Reason = proto.String("DockerDaemonNotReady")
-		runtimeReady.Message = proto.String(fmt.Sprintf("docker: failed to get docker version: %v", err))
+		runtimeReady.Status = false
+		runtimeReady.Reason = "DockerDaemonNotReady"
+		runtimeReady.Message = fmt.Sprintf("docker: failed to get docker version: %v", err)
 	}
 	if err := ds.networkPlugin.Status(); err != nil {
-		networkReady.Status = proto.Bool(false)
-		networkReady.Reason = proto.String("NetworkPluginNotReady")
-		networkReady.Message = proto.String(fmt.Sprintf("docker: network plugin is not ready: %v", err))
+		networkReady.Status = false
+		networkReady.Reason = "NetworkPluginNotReady"
+		networkReady.Message = fmt.Sprintf("docker: network plugin is not ready: %v", err)
 	}
 	return &runtimeapi.RuntimeStatus{Conditions: conditions}, nil
 }
@@ -292,4 +360,43 @@ func (ds *dockerService) GenerateExpectedCgroupParent(cgroupParent string) (stri
 	}
 	glog.V(3).Infof("Setting cgroup parent to: %q", cgroupParent)
 	return cgroupParent, nil
+}
+
+// getDockerAPIVersion gets the semver-compatible docker api version.
+func (ds *dockerService) getDockerAPIVersion() (*semver.Version, error) {
+	var dv *dockertypes.Version
+	var err error
+	if ds.versionCache != nil {
+		dv, err = ds.getDockerVersionFromCache()
+	} else {
+		dv, err = ds.getDockerVersion()
+	}
+
+	apiVersion, err := semver.Parse(dv.APIVersion)
+	if err != nil {
+		return nil, err
+	}
+	return &apiVersion, nil
+}
+
+func (ds *dockerService) getDockerVersionFromCache() (*dockertypes.Version, error) {
+	// We only store on key in the cache.
+	const dummyKey = "version"
+	value, err := ds.versionCache.Get(dummyKey)
+	dv := value.(*dockertypes.Version)
+	if err != nil {
+		return nil, err
+	}
+	return dv, nil
+}
+
+func toAPIProtocol(protocol Protocol) v1.Protocol {
+	switch protocol {
+	case protocolTCP:
+		return v1.ProtocolTCP
+	case protocolUDP:
+		return v1.ProtocolUDP
+	}
+	glog.Warningf("Unknown protocol %q: defaulting to TCP", protocol)
+	return v1.ProtocolTCP
 }

@@ -22,11 +22,11 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/batch"
 	"k8s.io/kubernetes/pkg/apis/extensions"
-	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
-	"k8s.io/kubernetes/pkg/runtime"
 )
 
 func TestUpdateSelectorForObjectTypes(t *testing.T) {
@@ -282,6 +282,13 @@ func TestGetResourcesAndSelector(t *testing.T) {
 				MatchLabels:      map[string]string{},
 				MatchExpressions: []metav1.LabelSelectorRequirement{},
 			},
+		},
+		{
+			name:          "no resource and selector",
+			args:          args{args: []string{}},
+			wantResources: []string{},
+			wantErr:       false,
+			wantSelector:  nil,
 		},
 	}
 	for _, tt := range tests {

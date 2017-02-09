@@ -20,7 +20,8 @@ import (
 	"reflect"
 	"testing"
 
-	"k8s.io/kubernetes/pkg/api/resource"
+	"k8s.io/apimachinery/pkg/api/resource"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/api/v1"
 	schedulerapi "k8s.io/kubernetes/plugin/pkg/scheduler/api"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/schedulercache"
@@ -146,10 +147,10 @@ func TestLeastRequested(t *testing.T) {
 			expectedList: []schedulerapi.HostPriority{{Host: "machine1", Score: 10}, {Host: "machine2", Score: 10}},
 			test:         "no resources requested, pods scheduled",
 			pods: []*v1.Pod{
-				{Spec: machine1Spec, ObjectMeta: v1.ObjectMeta{Labels: labels2}},
-				{Spec: machine1Spec, ObjectMeta: v1.ObjectMeta{Labels: labels1}},
-				{Spec: machine2Spec, ObjectMeta: v1.ObjectMeta{Labels: labels1}},
-				{Spec: machine2Spec, ObjectMeta: v1.ObjectMeta{Labels: labels1}},
+				{Spec: machine1Spec, ObjectMeta: metav1.ObjectMeta{Labels: labels2}},
+				{Spec: machine1Spec, ObjectMeta: metav1.ObjectMeta{Labels: labels1}},
+				{Spec: machine2Spec, ObjectMeta: metav1.ObjectMeta{Labels: labels1}},
+				{Spec: machine2Spec, ObjectMeta: metav1.ObjectMeta{Labels: labels1}},
 			},
 		},
 		{
@@ -169,10 +170,10 @@ func TestLeastRequested(t *testing.T) {
 			expectedList: []schedulerapi.HostPriority{{Host: "machine1", Score: 7}, {Host: "machine2", Score: 5}},
 			test:         "no resources requested, pods scheduled with resources",
 			pods: []*v1.Pod{
-				{Spec: cpuOnly, ObjectMeta: v1.ObjectMeta{Labels: labels2}},
-				{Spec: cpuOnly, ObjectMeta: v1.ObjectMeta{Labels: labels1}},
-				{Spec: cpuOnly2, ObjectMeta: v1.ObjectMeta{Labels: labels1}},
-				{Spec: cpuAndMemory, ObjectMeta: v1.ObjectMeta{Labels: labels1}},
+				{Spec: cpuOnly, ObjectMeta: metav1.ObjectMeta{Labels: labels2}},
+				{Spec: cpuOnly, ObjectMeta: metav1.ObjectMeta{Labels: labels1}},
+				{Spec: cpuOnly2, ObjectMeta: metav1.ObjectMeta{Labels: labels1}},
+				{Spec: cpuAndMemory, ObjectMeta: metav1.ObjectMeta{Labels: labels1}},
 			},
 		},
 		{

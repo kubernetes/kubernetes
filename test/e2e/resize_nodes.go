@@ -23,12 +23,10 @@ import (
 	"strings"
 	"time"
 
-	"k8s.io/kubernetes/pkg/api"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/apimachinery/registered"
-	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
-	"k8s.io/kubernetes/pkg/util/intstr"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/test/e2e/framework"
 
 	"github.com/aws/aws-sdk-go/aws/session"
@@ -139,7 +137,7 @@ func WaitForGroupSize(group string, size int32) error {
 
 func svcByName(name string, port int) *v1.Service {
 	return &v1.Service{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
 		},
 		Spec: v1.ServiceSpec{
@@ -160,56 +158,10 @@ func newSVCByName(c clientset.Interface, ns, name string) error {
 	return err
 }
 
-func rcByNamePort(name string, replicas int32, image string, port int, protocol v1.Protocol,
-	labels map[string]string, gracePeriod *int64) *v1.ReplicationController {
-
-	return rcByNameContainer(name, replicas, image, labels, v1.Container{
-		Name:  name,
-		Image: image,
-		Ports: []v1.ContainerPort{{ContainerPort: int32(port), Protocol: protocol}},
-	}, gracePeriod)
-}
-
-func rcByNameContainer(name string, replicas int32, image string, labels map[string]string, c v1.Container,
-	gracePeriod *int64) *v1.ReplicationController {
-
-	zeroGracePeriod := int64(0)
-
-	// Add "name": name to the labels, overwriting if it exists.
-	labels["name"] = name
-	if gracePeriod == nil {
-		gracePeriod = &zeroGracePeriod
-	}
-	return &v1.ReplicationController{
-		TypeMeta: metav1.TypeMeta{
-			Kind:       "ReplicationController",
-			APIVersion: registered.GroupOrDie(v1.GroupName).GroupVersion.String(),
-		},
-		ObjectMeta: v1.ObjectMeta{
-			Name: name,
-		},
-		Spec: v1.ReplicationControllerSpec{
-			Replicas: func(i int32) *int32 { return &i }(replicas),
-			Selector: map[string]string{
-				"name": name,
-			},
-			Template: &v1.PodTemplateSpec{
-				ObjectMeta: v1.ObjectMeta{
-					Labels: labels,
-				},
-				Spec: v1.PodSpec{
-					Containers:                    []v1.Container{c},
-					TerminationGracePeriodSeconds: gracePeriod,
-				},
-			},
-		},
-	}
-}
-
 // newRCByName creates a replication controller with a selector by name of name.
 func newRCByName(c clientset.Interface, ns, name string, replicas int32, gracePeriod *int64) (*v1.ReplicationController, error) {
 	By(fmt.Sprintf("creating replication controller %s", name))
-	return c.Core().ReplicationControllers(ns).Create(rcByNamePort(
+	return c.Core().ReplicationControllers(ns).Create(framework.RcByNamePort(
 		name, replicas, serveHostnameImage, 9376, v1.ProtocolTCP, map[string]string{}, gracePeriod))
 }
 
@@ -285,10 +237,10 @@ var _ = framework.KubeDescribe("Nodes [Disruptive]", func() {
 			// Many e2e tests assume that the cluster is fully healthy before they start.  Wait until
 			// the cluster is restored to health.
 			By("waiting for system pods to successfully restart")
-			err := framework.WaitForPodsRunningReady(c, api.NamespaceSystem, systemPodsNo, framework.PodReadyBeforeTimeout, ignoreLabels, true)
+			err := framework.WaitForPodsRunningReady(c, metav1.NamespaceSystem, systemPodsNo, framework.PodReadyBeforeTimeout, ignoreLabels, true)
 			Expect(err).NotTo(HaveOccurred())
 			By("waiting for image prepulling pods to complete")
-			framework.WaitForPodsSuccess(c, api.NamespaceSystem, framework.ImagePullerLabels, imagePrePullingTimeout)
+			framework.WaitForPodsSuccess(c, metav1.NamespaceSystem, framework.ImagePullerLabels, imagePrePullingTimeout)
 		})
 
 		It("should be able to delete nodes", func() {

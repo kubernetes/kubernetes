@@ -20,13 +20,14 @@ import (
 	"reflect"
 	"testing"
 
+	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/intstr"
+	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
+	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/errors"
-	"k8s.io/kubernetes/pkg/api/rest"
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
-	"k8s.io/kubernetes/pkg/apimachinery/registered"
-	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/util/intstr"
 )
 
 func TestExportService(t *testing.T) {
@@ -38,7 +39,7 @@ func TestExportService(t *testing.T) {
 	}{
 		{
 			objIn: &api.Service{
-				ObjectMeta: api.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Name:      "foo",
 					Namespace: "bar",
 				},
@@ -51,7 +52,7 @@ func TestExportService(t *testing.T) {
 				},
 			},
 			objOut: &api.Service{
-				ObjectMeta: api.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Name:      "foo",
 					Namespace: "bar",
 				},
@@ -60,7 +61,7 @@ func TestExportService(t *testing.T) {
 		},
 		{
 			objIn: &api.Service{
-				ObjectMeta: api.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Name:      "foo",
 					Namespace: "bar",
 				},
@@ -76,7 +77,7 @@ func TestExportService(t *testing.T) {
 				},
 			},
 			objOut: &api.Service{
-				ObjectMeta: api.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Name:      "foo",
 					Namespace: "bar",
 				},
@@ -92,7 +93,7 @@ func TestExportService(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		err := Strategy.Export(api.NewContext(), test.objIn, test.exact)
+		err := Strategy.Export(genericapirequest.NewContext(), test.objIn, test.exact)
 		if err != nil {
 			if !test.expectErr {
 				t.Errorf("unexpected error: %v", err)
@@ -121,14 +122,14 @@ func TestCheckGeneratedNameError(t *testing.T) {
 	}
 
 	expect = errors.NewAlreadyExists(api.Resource("foos"), "bar")
-	if err := rest.CheckGeneratedNameError(Strategy, expect, &api.Pod{ObjectMeta: api.ObjectMeta{GenerateName: "foo"}}); err == nil || !errors.IsServerTimeout(err) {
+	if err := rest.CheckGeneratedNameError(Strategy, expect, &api.Pod{ObjectMeta: metav1.ObjectMeta{GenerateName: "foo"}}); err == nil || !errors.IsServerTimeout(err) {
 		t.Errorf("expected try again later error: %v", err)
 	}
 }
 
 func makeValidService() api.Service {
 	return api.Service{
-		ObjectMeta: api.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:            "valid",
 			Namespace:       "default",
 			Labels:          map[string]string{},
@@ -200,7 +201,7 @@ func TestBeforeUpdate(t *testing.T) {
 		oldSvc := makeValidService()
 		newSvc := makeValidService()
 		tc.tweakSvc(&oldSvc, &newSvc)
-		ctx := api.NewDefaultContext()
+		ctx := genericapirequest.NewDefaultContext()
 		err := rest.BeforeUpdate(Strategy, ctx, runtime.Object(&oldSvc), runtime.Object(&newSvc))
 		if tc.expectErr && err == nil {
 			t.Errorf("unexpected non-error for %q", tc.name)
@@ -213,7 +214,7 @@ func TestBeforeUpdate(t *testing.T) {
 
 func TestSelectableFieldLabelConversions(t *testing.T) {
 	apitesting.TestSelectableFieldLabelConversionsOfKind(t,
-		registered.GroupOrDie(api.GroupName).GroupVersion.String(),
+		api.Registry.GroupOrDie(api.GroupName).GroupVersion.String(),
 		"Service",
 		ServiceToSelectableFields(&api.Service{}),
 		nil,
@@ -221,7 +222,7 @@ func TestSelectableFieldLabelConversions(t *testing.T) {
 }
 
 func TestServiceStatusStrategy(t *testing.T) {
-	ctx := api.NewDefaultContext()
+	ctx := genericapirequest.NewDefaultContext()
 	if !StatusStrategy.NamespaceScoped() {
 		t.Errorf("Service must be namespace scoped")
 	}

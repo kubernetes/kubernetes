@@ -1,4 +1,4 @@
-apiVersion: certificates.k8s.io/v1alpha1
+apiVersion: certificates.k8s.io/v1beta1
 kind: CertificateSigningRequest
 metadata:
   name: foo

@@ -17,13 +17,18 @@ limitations under the License.
 package validation
 
 import (
+	"net"
+
+	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
-	"k8s.io/kubernetes/pkg/util/validation/field"
+	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
+	"k8s.io/kubernetes/pkg/registry/core/service/ipallocator"
 )
 
 func ValidateMasterConfiguration(c *kubeadm.MasterConfiguration) field.ErrorList {
 	allErrs := field.ErrorList{}
 	allErrs = append(allErrs, ValidateDiscovery(&c.Discovery, field.NewPath("discovery"))...)
+	allErrs = append(allErrs, ValidateDiscovery(&c.Discovery, field.NewPath("service subnet"))...)
 	return allErrs
 }
 
@@ -67,4 +72,16 @@ func ValidateHTTPSDiscovery(c *kubeadm.HTTPSDiscovery, fldPath *field.Path) fiel
 func ValidateTokenDiscovery(c *kubeadm.TokenDiscovery, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	return allErrs
+}
+
+func ValidateServiceSubnet(subnet string, fldPath *field.Path) field.ErrorList {
+	_, svcSubnet, err := net.ParseCIDR(subnet)
+	if err != nil {
+		return field.ErrorList{field.Invalid(fldPath, nil, "couldn't parse the service subnet")}
+	}
+	numAddresses := ipallocator.RangeSize(svcSubnet)
+	if numAddresses < kubeadmconstants.MinimumAddressesInServiceSubnet {
+		return field.ErrorList{field.Invalid(fldPath, nil, "service subnet is too small")}
+	}
+	return field.ErrorList{}
 }

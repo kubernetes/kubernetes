@@ -18,24 +18,23 @@ package app
 
 import (
 	"github.com/golang/glog"
+	"k8s.io/apiserver/pkg/registry/generic"
+	"k8s.io/apiserver/pkg/registry/rest"
+	genericapiserver "k8s.io/apiserver/pkg/server"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/rest"
-	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	_ "k8s.io/kubernetes/pkg/apis/extensions/install"
-	"k8s.io/kubernetes/pkg/genericapiserver"
-	daemonsetetcd "k8s.io/kubernetes/pkg/registry/extensions/daemonset/etcd"
-	deploymentetcd "k8s.io/kubernetes/pkg/registry/extensions/deployment/etcd"
-	ingressetcd "k8s.io/kubernetes/pkg/registry/extensions/ingress/etcd"
-	replicasetetcd "k8s.io/kubernetes/pkg/registry/extensions/replicaset/etcd"
-	"k8s.io/kubernetes/pkg/registry/generic"
+	daemonsetstore "k8s.io/kubernetes/pkg/registry/extensions/daemonset/storage"
+	deploymentstore "k8s.io/kubernetes/pkg/registry/extensions/deployment/storage"
+	ingressstore "k8s.io/kubernetes/pkg/registry/extensions/ingress/storage"
+	replicasetstore "k8s.io/kubernetes/pkg/registry/extensions/replicaset/storage"
 )
 
 func installExtensionsAPIs(g *genericapiserver.GenericAPIServer, optsGetter generic.RESTOptionsGetter) {
-	replicaSetStorage := replicasetetcd.NewStorage(optsGetter)
-	deploymentStorage := deploymentetcd.NewStorage(optsGetter)
-	ingressStorage, ingressStatusStorage := ingressetcd.NewREST(optsGetter)
-	daemonSetStorage, daemonSetStatusStorage := daemonsetetcd.NewREST(optsGetter)
+	replicaSetStorage := replicasetstore.NewStorage(optsGetter)
+	deploymentStorage := deploymentstore.NewStorage(optsGetter)
+	ingressStorage, ingressStatusStorage := ingressstore.NewREST(optsGetter)
+	daemonSetStorage, daemonSetStatusStorage := daemonsetstore.NewREST(optsGetter)
 
 	extensionsResources := map[string]rest.Storage{
 		"replicasets":          replicaSetStorage.ReplicaSet,
@@ -50,13 +49,13 @@ func installExtensionsAPIs(g *genericapiserver.GenericAPIServer, optsGetter gene
 		"deployments/scale":    deploymentStorage.Scale,
 		"deployments/rollback": deploymentStorage.Rollback,
 	}
-	extensionsGroupMeta := registered.GroupOrDie(extensions.GroupName)
+	extensionsGroupMeta := api.Registry.GroupOrDie(extensions.GroupName)
 	apiGroupInfo := genericapiserver.APIGroupInfo{
 		GroupMeta: *extensionsGroupMeta,
 		VersionedResourcesStorageMap: map[string]map[string]rest.Storage{
 			"v1beta1": extensionsResources,
 		},
-		OptionsExternalVersion: &registered.GroupOrDie(api.GroupName).GroupVersion,
+		OptionsExternalVersion: &api.Registry.GroupOrDie(api.GroupName).GroupVersion,
 		Scheme:                 api.Scheme,
 		ParameterCodec:         api.ParameterCodec,
 		NegotiatedSerializer:   api.Codecs,

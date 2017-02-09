@@ -25,21 +25,25 @@ import (
 	"reflect"
 
 	"github.com/golang/glog"
-	"k8s.io/kubernetes/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/fields"
+	pkgruntime "k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/apimachinery/pkg/watch"
+	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
+	clientv1 "k8s.io/client-go/pkg/api/v1"
+	"k8s.io/client-go/tools/cache"
+	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/util/workqueue"
+	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/client/cache"
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
-	unversionedcore "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/core/v1"
-	"k8s.io/kubernetes/pkg/client/record"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
+	"k8s.io/kubernetes/pkg/client/legacylisters"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/controller"
-	"k8s.io/kubernetes/pkg/fields"
-	pkgruntime "k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util/metrics"
-	"k8s.io/kubernetes/pkg/util/runtime"
-	"k8s.io/kubernetes/pkg/util/wait"
-	"k8s.io/kubernetes/pkg/util/workqueue"
-	"k8s.io/kubernetes/pkg/watch"
 )
 
 const (
@@ -85,12 +89,12 @@ type ServiceController struct {
 	zone             cloudprovider.Zone
 	cache            *serviceCache
 	// A store of services, populated by the serviceController
-	serviceStore cache.StoreToServiceLister
+	serviceStore listers.StoreToServiceLister
 	// Watches changes to all services
-	serviceController *cache.Controller
+	serviceController cache.Controller
 	eventBroadcaster  record.EventBroadcaster
 	eventRecorder     record.EventRecorder
-	nodeLister        cache.StoreToNodeLister
+	nodeLister        listers.StoreToNodeLister
 	// services that need to be synced
 	workingQueue workqueue.DelayingInterface
 }
@@ -99,8 +103,8 @@ type ServiceController struct {
 // (like load balancers) in sync with the registry.
 func New(cloud cloudprovider.Interface, kubeClient clientset.Interface, clusterName string) (*ServiceController, error) {
 	broadcaster := record.NewBroadcaster()
-	broadcaster.StartRecordingToSink(&unversionedcore.EventSinkImpl{Interface: kubeClient.Core().Events("")})
-	recorder := broadcaster.NewRecorder(v1.EventSource{Component: "service-controller"})
+	broadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: v1core.New(kubeClient.Core().RESTClient()).Events("")})
+	recorder := broadcaster.NewRecorder(api.Scheme, clientv1.EventSource{Component: "service-controller"})
 
 	if kubeClient != nil && kubeClient.Core().RESTClient().GetRateLimiter() != nil {
 		metrics.RegisterMetricAndTrackRateLimiterUsage("service_controller", kubeClient.Core().RESTClient().GetRateLimiter())
@@ -114,18 +118,18 @@ func New(cloud cloudprovider.Interface, kubeClient clientset.Interface, clusterN
 		cache:            &serviceCache{serviceMap: make(map[string]*cachedService)},
 		eventBroadcaster: broadcaster,
 		eventRecorder:    recorder,
-		nodeLister: cache.StoreToNodeLister{
+		nodeLister: listers.StoreToNodeLister{
 			Store: cache.NewStore(cache.MetaNamespaceKeyFunc),
 		},
 		workingQueue: workqueue.NewDelayingQueue(),
 	}
 	s.serviceStore.Indexer, s.serviceController = cache.NewIndexerInformer(
 		&cache.ListWatch{
-			ListFunc: func(options v1.ListOptions) (pkgruntime.Object, error) {
-				return s.kubeClient.Core().Services(v1.NamespaceAll).List(options)
+			ListFunc: func(options metav1.ListOptions) (pkgruntime.Object, error) {
+				return s.kubeClient.Core().Services(metav1.NamespaceAll).List(options)
 			},
-			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
-				return s.kubeClient.Core().Services(v1.NamespaceAll).Watch(options)
+			WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
+				return s.kubeClient.Core().Services(metav1.NamespaceAll).Watch(options)
 			},
 		},
 		&v1.Service{},
@@ -175,7 +179,7 @@ func (s *ServiceController) Run(workers int) {
 	for i := 0; i < workers; i++ {
 		go wait.Until(s.worker, time.Second, wait.NeverStop)
 	}
-	nodeLW := cache.NewListWatchFromClient(s.kubeClient.Core().RESTClient(), "nodes", v1.NamespaceAll, fields.Everything())
+	nodeLW := cache.NewListWatchFromClient(s.kubeClient.Core().RESTClient(), "nodes", metav1.NamespaceAll, fields.Everything())
 	cache.NewReflector(nodeLW, &v1.Node{}, s.nodeLister.Store, 0).Run()
 	go wait.Until(s.nodeSyncLoop, nodeSyncPeriod, wait.NeverStop)
 }
@@ -600,7 +604,7 @@ func includeNodeFromNodeList(node *v1.Node) bool {
 	return !node.Spec.Unschedulable
 }
 
-func getNodeConditionPredicate() cache.NodeConditionPredicate {
+func getNodeConditionPredicate() listers.NodeConditionPredicate {
 	return func(node *v1.Node) bool {
 		// We add the master to the node list, but its unschedulable.  So we use this to filter
 		// the master.

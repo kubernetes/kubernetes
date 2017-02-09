@@ -19,8 +19,9 @@ package volume
 import (
 	"testing"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/types"
 )
 
 func TestSpecSourceConverters(t *testing.T) {
@@ -38,7 +39,7 @@ func TestSpecSourceConverters(t *testing.T) {
 	}
 
 	pv := &v1.PersistentVolume{
-		ObjectMeta: v1.ObjectMeta{Name: "bar"},
+		ObjectMeta: metav1.ObjectMeta{Name: "bar"},
 		Spec: v1.PersistentVolumeSpec{
 			PersistentVolumeSource: v1.PersistentVolumeSource{AWSElasticBlockStore: &v1.AWSElasticBlockStoreVolumeSource{}},
 		},
@@ -102,5 +103,43 @@ func TestVolumePluginMgrFunc(t *testing.T) {
 	}
 	if plug.GetPluginName() != "testPlugin" {
 		t.Errorf("Wrong name: %s", plug.GetPluginName())
+	}
+}
+
+func Test_ValidatePodTemplate(t *testing.T) {
+	pod := &v1.Pod{
+		Spec: v1.PodSpec{
+			Volumes: []v1.Volume{
+				{
+					Name:         "vol",
+					VolumeSource: v1.VolumeSource{},
+				},
+			},
+		},
+	}
+	var want error
+	if got := ValidateRecyclerPodTemplate(pod); got != want {
+		t.Errorf("isPodTemplateValid(%v) returned (%v), want (%v)", pod.String(), got.Error(), want)
+	}
+
+	// Check that the default recycle pod template is valid
+	pod = NewPersistentVolumeRecyclerPodTemplate()
+	want = nil
+	if got := ValidateRecyclerPodTemplate(pod); got != want {
+		t.Errorf("isPodTemplateValid(%v) returned (%v), want (%v)", pod.String(), got.Error(), want)
+	}
+
+	pod = &v1.Pod{
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
+				{
+					Name: "pv-recycler",
+				},
+			},
+		},
+	}
+	// want = an error
+	if got := ValidateRecyclerPodTemplate(pod); got == nil {
+		t.Errorf("isPodTemplateValid(%v) returned (%v), want (%v)", pod.String(), got, "Error: pod specification does not contain any volume(s).")
 	}
 }

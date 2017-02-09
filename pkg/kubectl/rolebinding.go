@@ -21,8 +21,8 @@ import (
 
 	"strings"
 
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/kubernetes/pkg/apis/rbac"
-	"k8s.io/kubernetes/pkg/runtime"
 )
 
 // RoleBindingGeneratorV1 supports stable generation of a roleBinding.
@@ -79,7 +79,7 @@ func (s RoleBindingGeneratorV1) Generate(genericParams map[string]interface{}) (
 			return nil, fmt.Errorf("expected []string, found :%v", fromFileStrings)
 		}
 		delegate.ServiceAccounts = fromLiteralArray
-		delete(genericParams, "serviceaccounts")
+		delete(genericParams, "serviceaccount")
 	}
 	params := map[string]string{}
 	for key, value := range genericParams {
@@ -134,14 +134,14 @@ func (s RoleBindingGeneratorV1) StructuredGenerate() (runtime.Object, error) {
 	for _, user := range s.Users {
 		roleBinding.Subjects = append(roleBinding.Subjects, rbac.Subject{
 			Kind:       rbac.UserKind,
-			APIVersion: "rbac/v1alpha1",
+			APIVersion: "rbac.authorization.k8s.io/v1beta1",
 			Name:       user,
 		})
 	}
 	for _, group := range s.Groups {
 		roleBinding.Subjects = append(roleBinding.Subjects, rbac.Subject{
 			Kind:       rbac.GroupKind,
-			APIVersion: "rbac/v1alpha1",
+			APIVersion: "rbac.authorization.k8s.io/v1beta1",
 			Name:       group,
 		})
 	}

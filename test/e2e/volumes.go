@@ -46,10 +46,11 @@ import (
 	"strings"
 	"time"
 
-	apierrs "k8s.io/kubernetes/pkg/api/errors"
+	apierrs "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/api/v1"
-	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
+	vsphere "k8s.io/kubernetes/pkg/cloudprovider/providers/vsphere"
 	"k8s.io/kubernetes/test/e2e/framework"
 
 	"github.com/golang/glog"
@@ -82,6 +83,15 @@ type VolumeTest struct {
 	file            string
 	expectedContent string
 }
+
+// Current supported images for e2e volume testing to be assigned to VolumeTestConfig.serverImage
+const (
+	NfsServerImage       string = "gcr.io/google_containers/volume-nfs:0.8"
+	IscsiServerImage     string = "gcr.io/google_containers/volume-iscsi:0.1"
+	GlusterfsServerImage string = "gcr.io/google_containers/volume-gluster:0.2"
+	CephServerImage      string = "gcr.io/google_containers/volume-ceph:0.1"
+	RbdServerImage       string = "gcr.io/google_containers/volume-rbd:0.1"
+)
 
 // Starts a container specified by config.serverImage and exports all
 // config.serverPorts from it. The returned pod should be used to get the server
@@ -121,7 +131,8 @@ func startVolumeServer(client clientset.Interface, config VolumeTestConfig) *v1.
 		i++
 	}
 
-	By(fmt.Sprint("creating ", config.prefix, " server pod"))
+	serverPodName := fmt.Sprintf("%s-server", config.prefix)
+	By(fmt.Sprint("creating ", serverPodName, " pod"))
 	privileged := new(bool)
 	*privileged = true
 	serverPod := &v1.Pod{
@@ -129,17 +140,17 @@ func startVolumeServer(client clientset.Interface, config VolumeTestConfig) *v1.
 			Kind:       "Pod",
 			APIVersion: "v1",
 		},
-		ObjectMeta: v1.ObjectMeta{
-			Name: config.prefix + "-server",
+		ObjectMeta: metav1.ObjectMeta{
+			Name: serverPodName,
 			Labels: map[string]string{
-				"role": config.prefix + "-server",
+				"role": serverPodName,
 			},
 		},
 
 		Spec: v1.PodSpec{
 			Containers: []v1.Container{
 				{
-					Name:  config.prefix + "-server",
+					Name:  serverPodName,
 					Image: config.serverImage,
 					SecurityContext: &v1.SecurityContext{
 						Privileged: privileged,
@@ -152,17 +163,29 @@ func startVolumeServer(client clientset.Interface, config VolumeTestConfig) *v1.
 			Volumes: volumes,
 		},
 	}
-	serverPod, err := podClient.Create(serverPod)
-	framework.ExpectNoError(err, "Failed to create %s pod: %v", serverPod.Name, err)
 
+	var pod *v1.Pod
+	serverPod, err := podClient.Create(serverPod)
+	// ok if the server pod already exists. TODO: make this controllable by callers
+	if err != nil {
+		if apierrs.IsAlreadyExists(err) {
+			framework.Logf("Ignore \"already-exists\" error, re-get pod...")
+			By(fmt.Sprintf("re-getting the %q server pod", serverPodName))
+			serverPod, err = podClient.Get(serverPodName, metav1.GetOptions{})
+			framework.ExpectNoError(err, "Cannot re-get the server pod %q: %v", serverPodName, err)
+			pod = serverPod
+		} else {
+			framework.ExpectNoError(err, "Failed to create %q pod: %v", serverPodName, err)
+		}
+	}
 	framework.ExpectNoError(framework.WaitForPodRunningInNamespace(client, serverPod))
 
-	By("locating the server pod")
-	pod, err := podClient.Get(serverPod.Name, metav1.GetOptions{})
-	framework.ExpectNoError(err, "Cannot locate the server pod %v: %v", serverPod.Name, err)
+	if pod == nil {
+		By(fmt.Sprintf("locating the %q server pod", serverPodName))
+		pod, err = podClient.Get(serverPodName, metav1.GetOptions{})
+		framework.ExpectNoError(err, "Cannot locate the server pod %q: %v", serverPodName, err)
+	}
 
-	By("sleeping a bit to give the server time to start")
-	time.Sleep(20 * time.Second)
 	return pod
 }
 
@@ -211,7 +234,7 @@ func testVolumeClient(client clientset.Interface, config VolumeTestConfig, fsGro
 			Kind:       "Pod",
 			APIVersion: "v1",
 		},
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name: config.prefix + "-client",
 			Labels: map[string]string{
 				"role": config.prefix + "-client",
@@ -291,7 +314,7 @@ func injectHtml(client clientset.Interface, config VolumeTestConfig, volume v1.V
 			Kind:       "Pod",
 			APIVersion: "v1",
 		},
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name: config.prefix + "-injector",
 			Labels: map[string]string{
 				"role": config.prefix + "-injector",
@@ -380,11 +403,11 @@ var _ = framework.KubeDescribe("Volumes [Feature:Volumes]", func() {
 	////////////////////////////////////////////////////////////////////////
 
 	framework.KubeDescribe("NFS", func() {
-		It("should be mountable", func() {
+		It("should be mountable [Volume]", func() {
 			config := VolumeTestConfig{
 				namespace:   namespace.Name,
 				prefix:      "nfs",
-				serverImage: "gcr.io/google_containers/volume-nfs:0.8",
+				serverImage: NfsServerImage,
 				serverPorts: []int{2049},
 			}
 
@@ -420,11 +443,11 @@ var _ = framework.KubeDescribe("Volumes [Feature:Volumes]", func() {
 	////////////////////////////////////////////////////////////////////////
 
 	framework.KubeDescribe("GlusterFS", func() {
-		It("should be mountable", func() {
+		It("should be mountable [Volume]", func() {
 			config := VolumeTestConfig{
 				namespace:   namespace.Name,
 				prefix:      "gluster",
-				serverImage: "gcr.io/google_containers/volume-gluster:0.2",
+				serverImage: GlusterfsServerImage,
 				serverPorts: []int{24007, 24008, 49152},
 			}
 
@@ -443,7 +466,7 @@ var _ = framework.KubeDescribe("Volumes [Feature:Volumes]", func() {
 					Kind:       "Endpoints",
 					APIVersion: "v1",
 				},
-				ObjectMeta: v1.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Name: config.prefix + "-server",
 				},
 				Subsets: []v1.EndpointSubset{
@@ -505,11 +528,11 @@ var _ = framework.KubeDescribe("Volumes [Feature:Volumes]", func() {
 	// Run the test with "go run hack/e2e.go ... --ginkgo.focus=iSCSI"
 
 	framework.KubeDescribe("iSCSI", func() {
-		It("should be mountable", func() {
+		It("should be mountable [Volume]", func() {
 			config := VolumeTestConfig{
 				namespace:   namespace.Name,
 				prefix:      "iscsi",
-				serverImage: "gcr.io/google_containers/volume-iscsi:0.1",
+				serverImage: IscsiServerImage,
 				serverPorts: []int{3260},
 				serverVolumes: map[string]string{
 					// iSCSI container needs to insert modules from the host
@@ -552,11 +575,11 @@ var _ = framework.KubeDescribe("Volumes [Feature:Volumes]", func() {
 	////////////////////////////////////////////////////////////////////////
 
 	framework.KubeDescribe("Ceph RBD", func() {
-		It("should be mountable", func() {
+		It("should be mountable [Volume]", func() {
 			config := VolumeTestConfig{
 				namespace:   namespace.Name,
 				prefix:      "rbd",
-				serverImage: "gcr.io/google_containers/volume-rbd:0.1",
+				serverImage: RbdServerImage,
 				serverPorts: []int{6789},
 				serverVolumes: map[string]string{
 					// iSCSI container needs to insert modules from the host
@@ -580,7 +603,7 @@ var _ = framework.KubeDescribe("Volumes [Feature:Volumes]", func() {
 					Kind:       "Secret",
 					APIVersion: "v1",
 				},
-				ObjectMeta: v1.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Name: config.prefix + "-secret",
 				},
 				Data: map[string][]byte{
@@ -630,11 +653,11 @@ var _ = framework.KubeDescribe("Volumes [Feature:Volumes]", func() {
 	////////////////////////////////////////////////////////////////////////
 
 	framework.KubeDescribe("CephFS", func() {
-		It("should be mountable", func() {
+		It("should be mountable [Volume]", func() {
 			config := VolumeTestConfig{
 				namespace:   namespace.Name,
 				prefix:      "cephfs",
-				serverImage: "gcr.io/google_containers/volume-ceph:0.1",
+				serverImage: CephServerImage,
 				serverPorts: []int{6789},
 			}
 
@@ -655,7 +678,7 @@ var _ = framework.KubeDescribe("Volumes [Feature:Volumes]", func() {
 					Kind:       "Secret",
 					APIVersion: "v1",
 				},
-				ObjectMeta: v1.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Name: config.prefix + "-secret",
 				},
 				// Must use the ceph keyring at contrib/for-tests/volumes-ceph/ceph/init.sh
@@ -708,7 +731,7 @@ var _ = framework.KubeDescribe("Volumes [Feature:Volumes]", func() {
 	// (OS_USERNAME, OS_PASSWORD, OS_TENANT_NAME at least).
 
 	framework.KubeDescribe("Cinder", func() {
-		It("should be mountable", func() {
+		It("should be mountable [Volume]", func() {
 			framework.SkipUnlessProviderIs("openstack")
 			config := VolumeTestConfig{
 				namespace: namespace.Name,
@@ -784,7 +807,7 @@ var _ = framework.KubeDescribe("Volumes [Feature:Volumes]", func() {
 	////////////////////////////////////////////////////////////////////////
 
 	framework.KubeDescribe("PD", func() {
-		It("should be mountable", func() {
+		It("should be mountable [Volume]", func() {
 			framework.SkipUnlessProviderIs("gce", "gke")
 			config := VolumeTestConfig{
 				namespace: namespace.Name,
@@ -834,7 +857,7 @@ var _ = framework.KubeDescribe("Volumes [Feature:Volumes]", func() {
 	////////////////////////////////////////////////////////////////////////
 
 	framework.KubeDescribe("ConfigMap", func() {
-		It("should be mountable", func() {
+		It("should be mountable [Volume]", func() {
 			config := VolumeTestConfig{
 				namespace: namespace.Name,
 				prefix:    "configmap",
@@ -850,7 +873,7 @@ var _ = framework.KubeDescribe("Volumes [Feature:Volumes]", func() {
 					Kind:       "ConfigMap",
 					APIVersion: "v1",
 				},
-				ObjectMeta: v1.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Name: config.prefix + "-map",
 				},
 				Data: map[string]string{
@@ -904,6 +927,60 @@ var _ = framework.KubeDescribe("Volumes [Feature:Volumes]", func() {
 				},
 			}
 			testVolumeClient(cs, config, nil, tests)
+		})
+	})
+
+	////////////////////////////////////////////////////////////////////////
+	// vSphere
+	////////////////////////////////////////////////////////////////////////
+
+	framework.KubeDescribe("vsphere", func() {
+		It("should be mountable", func() {
+			framework.SkipUnlessProviderIs("vsphere")
+			var (
+				volumePath string
+			)
+			config := VolumeTestConfig{
+				namespace: namespace.Name,
+				prefix:    "vsphere",
+			}
+			By("creating a test vsphere volume")
+			vsp, err := vsphere.GetVSphere()
+			Expect(err).NotTo(HaveOccurred())
+
+			volumePath, err = createVSphereVolume(vsp, nil)
+			Expect(err).NotTo(HaveOccurred())
+
+			defer func() {
+				vsp.DeleteVolume(volumePath)
+			}()
+
+			defer func() {
+				if clean {
+					framework.Logf("Running volumeTestCleanup")
+					volumeTestCleanup(f, config)
+				}
+			}()
+
+			tests := []VolumeTest{
+				{
+					volume: v1.VolumeSource{
+						VsphereVolume: &v1.VsphereVirtualDiskVolumeSource{
+							VolumePath: volumePath,
+							FSType:     "ext4",
+						},
+					},
+					file: "index.html",
+					// Randomize index.html to make sure we don't see the
+					// content from previous test runs.
+					expectedContent: "Hello from vSphere from namespace " + namespace.Name,
+				},
+			}
+
+			injectHtml(cs, config, tests[0].volume, tests[0].expectedContent)
+
+			fsGroup := int64(1234)
+			testVolumeClient(cs, config, &fsGroup, tests)
 		})
 	})
 })

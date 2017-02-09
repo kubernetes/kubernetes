@@ -22,30 +22,110 @@ import (
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 )
 
-func TestTokenParseErrors(t *testing.T) {
-	invalidTokens := []string{
-		"1234567890123456789012",
-		"12345.1234567890123456",
-		".1234567890123456",
-		"123456.1234567890.123456",
+func TestTokenParse(t *testing.T) {
+	var tests = []struct {
+		token    string
+		expected bool
+	}{
+		{token: "1234567890123456789012", expected: false},   // invalid parcel size
+		{token: "12345:1234567890123456", expected: false},   // invalid parcel size
+		{token: ".1234567890123456", expected: false},        // invalid parcel size
+		{token: "123456:1234567890.123456", expected: false}, // invalid separation
+		{token: "abcdef.1234567890123456", expected: false},  // invalid separation
+		{token: "Abcdef:1234567890123456", expected: false},  // invalid token id
+		{token: "123456:AABBCCDDEEFFGGHH", expected: false},  // invalid token secret
+		{token: "abcdef:1234567890123456", expected: true},
+		{token: "123456:aabbccddeeffgghh", expected: true},
 	}
 
-	for _, token := range invalidTokens {
-		if _, _, err := ParseToken(token); err == nil {
-			t.Errorf("generateTokenIfNeeded did not return an error for this invalid token: [%s]", token)
+	for _, rt := range tests {
+		_, _, actual := ParseToken(rt.token)
+		if (actual == nil) != rt.expected {
+			t.Errorf(
+				"failed ParseToken for this token: [%s]\n\texpected: %t\n\t  actual: %t",
+				rt.token,
+				rt.expected,
+				(actual == nil),
+			)
+		}
+	}
+
+}
+
+func TestParseTokenID(t *testing.T) {
+	var tests = []struct {
+		tokenID  string
+		expected bool
+	}{
+		{tokenID: "", expected: false},
+		{tokenID: "1234567890123456789012", expected: false},
+		{tokenID: "12345", expected: false},
+		{tokenID: "Abcdef", expected: false},
+		{tokenID: "abcdef", expected: true},
+		{tokenID: "123456", expected: true},
+	}
+	for _, rt := range tests {
+		actual := ParseTokenID(rt.tokenID)
+		if (actual == nil) != rt.expected {
+			t.Errorf(
+				"failed ParseTokenID for this token ID: [%s]\n\texpected: %t\n\t  actual: %t",
+				rt.tokenID,
+				rt.expected,
+				(actual == nil),
+			)
+		}
+	}
+}
+
+func TestValidateToken(t *testing.T) {
+	var tests = []struct {
+		token    *kubeadmapi.TokenDiscovery
+		expected bool
+	}{
+		{token: &kubeadmapi.TokenDiscovery{ID: "", Secret: ""}, expected: false},
+		{token: &kubeadmapi.TokenDiscovery{ID: "1234567890123456789012", Secret: ""}, expected: false},
+		{token: &kubeadmapi.TokenDiscovery{ID: "", Secret: "1234567890123456789012"}, expected: false},
+		{token: &kubeadmapi.TokenDiscovery{ID: "12345", Secret: "1234567890123456"}, expected: false},
+		{token: &kubeadmapi.TokenDiscovery{ID: "Abcdef", Secret: "1234567890123456"}, expected: false},
+		{token: &kubeadmapi.TokenDiscovery{ID: "123456", Secret: "AABBCCDDEEFFGGHH"}, expected: false},
+		{token: &kubeadmapi.TokenDiscovery{ID: "abc*ef", Secret: "1234567890123456"}, expected: false},
+		{token: &kubeadmapi.TokenDiscovery{ID: "abcdef", Secret: "123456789*123456"}, expected: false},
+		{token: &kubeadmapi.TokenDiscovery{ID: "abcdef", Secret: "1234567890123456"}, expected: true},
+		{token: &kubeadmapi.TokenDiscovery{ID: "123456", Secret: "aabbccddeeffgghh"}, expected: true},
+		{token: &kubeadmapi.TokenDiscovery{ID: "abc456", Secret: "1234567890123456"}, expected: true},
+		{token: &kubeadmapi.TokenDiscovery{ID: "abcdef", Secret: "123456ddeeffgghh"}, expected: true},
+	}
+	for _, rt := range tests {
+		valid, actual := ValidateToken(rt.token)
+		if (actual == nil) != rt.expected {
+			t.Errorf(
+				"failed ValidateToken for this token ID: [%s]\n\texpected: %t\n\t  actual: %t",
+				rt.token,
+				rt.expected,
+				(actual == nil),
+			)
+		}
+		if (valid == true) != rt.expected {
+			t.Errorf(
+				"failed ValidateToken for this token ID: [%s]\n\texpected: %t\n\t  actual: %t",
+				rt.token,
+				rt.expected,
+				(actual == nil),
+			)
 		}
 	}
 }
 
 func TestGenerateToken(t *testing.T) {
-	var cfg kubeadmapi.TokenDiscovery
-
-	GenerateToken(&cfg)
-	if len(cfg.ID) != 6 {
-		t.Errorf("failed GenerateToken first part length:\n\texpected: 6\n\t  actual: %d", len(cfg.ID))
+	td := &kubeadmapi.TokenDiscovery{}
+	if err := GenerateToken(td); err != nil {
+		t.Fatalf("GenerateToken returned an unexpected error: %+v", err)
 	}
-	if len(cfg.Secret) != 16 {
-		t.Errorf("failed GenerateToken first part length:\n\texpected: 16\n\t  actual: %d", len(cfg.Secret))
+	if len(td.ID) != 6 {
+		t.Errorf("failed GenerateToken first part length:\n\texpected: 6\n\t  actual: %d", len(td.ID))
+	}
+	if len(td.Secret) != 16 {
+		t.Errorf("failed GenerateToken second part length:\n\texpected: 16\n\t  actual: %d", len(td.Secret))
 	}
 }
 
@@ -59,12 +139,12 @@ func TestRandBytes(t *testing.T) {
 	}
 
 	for _, rt := range randTest {
-		actual, err := RandBytes(rt)
+		actual, err := randBytes(rt)
 		if err != nil {
-			t.Errorf("failed RandBytes: %v", err)
+			t.Errorf("failed randBytes: %v", err)
 		}
 		if len(actual) != rt*2 {
-			t.Errorf("failed RandBytes:\n\texpected: %d\n\t  actual: %d\n", rt*2, len(actual))
+			t.Errorf("failed randBytes:\n\texpected: %d\n\t  actual: %d\n", rt*2, len(actual))
 		}
 	}
 }

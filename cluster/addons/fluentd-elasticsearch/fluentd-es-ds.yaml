@@ -1,23 +1,23 @@
 apiVersion: extensions/v1beta1
 kind: DaemonSet
 metadata:
-  name: fluentd-es-v1.20
+  name: fluentd-es-v1.22
   namespace: kube-system
   labels:
     k8s-app: fluentd-es
     kubernetes.io/cluster-service: "true"
-    version: v1.20
+    version: v1.22
 spec:
   template:
     metadata:
       labels:
         k8s-app: fluentd-es
         kubernetes.io/cluster-service: "true"
-        version: v1.20
+        version: v1.22
     spec:
       containers:
       - name: fluentd-es
-        image: gcr.io/google_containers/fluentd-elasticsearch:1.20
+        image: gcr.io/google_containers/fluentd-elasticsearch:1.22
         command:
           - '/bin/sh'
           - '-c'

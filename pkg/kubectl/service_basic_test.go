@@ -20,8 +20,9 @@ import (
 	"reflect"
 	"testing"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/util/intstr"
 )
 
 func TestServiceBasicGenerate(t *testing.T) {
@@ -39,7 +40,7 @@ func TestServiceBasicGenerate(t *testing.T) {
 			clusterip:   "",
 			serviceType: api.ServiceTypeClusterIP,
 			expected: &api.Service{
-				ObjectMeta: api.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Name:   "clusterip-ok",
 					Labels: map[string]string{"app": "clusterip-ok"},
 				},
@@ -76,7 +77,7 @@ func TestServiceBasicGenerate(t *testing.T) {
 			clusterip:   "None",
 			serviceType: api.ServiceTypeClusterIP,
 			expected: &api.Service{
-				ObjectMeta: api.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Name:   "clusterip-none-ok",
 					Labels: map[string]string{"app": "clusterip-none-ok"},
 				},
@@ -93,7 +94,7 @@ func TestServiceBasicGenerate(t *testing.T) {
 			clusterip:   "",
 			serviceType: api.ServiceTypeLoadBalancer,
 			expected: &api.Service{
-				ObjectMeta: api.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Name:   "loadbalancer-ok",
 					Labels: map[string]string{"app": "loadbalancer-ok"},
 				},

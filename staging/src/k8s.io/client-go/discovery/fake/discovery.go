@@ -21,11 +21,12 @@ import (
 
 	"github.com/emicklei/go-restful/swagger"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/version"
 	"k8s.io/client-go/pkg/api/v1"
-	metav1 "k8s.io/client-go/pkg/apis/meta/v1"
-	"k8s.io/client-go/pkg/runtime/schema"
-	"k8s.io/client-go/pkg/version"
-	"k8s.io/client-go/rest"
+	kubeversion "k8s.io/client-go/pkg/version"
+	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/testing"
 )
 
@@ -74,7 +75,7 @@ func (c *FakeDiscovery) ServerVersion() (*version.Info, error) {
 	action.Resource = schema.GroupVersionResource{Resource: "version"}
 
 	c.Invokes(action, nil)
-	versionInfo := version.Get()
+	versionInfo := kubeversion.Get()
 	return &versionInfo, nil
 }
 
@@ -91,6 +92,6 @@ func (c *FakeDiscovery) SwaggerSchema(version schema.GroupVersion) (*swagger.Api
 	return &swagger.ApiDeclaration{}, nil
 }
 
-func (c *FakeDiscovery) RESTClient() rest.Interface {
+func (c *FakeDiscovery) RESTClient() restclient.Interface {
 	return nil
 }

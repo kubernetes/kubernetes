@@ -19,13 +19,13 @@ package selfsubjectaccessreview
 import (
 	"fmt"
 
-	"k8s.io/kubernetes/pkg/api"
-	apierrors "k8s.io/kubernetes/pkg/api/errors"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apiserver/pkg/authorization/authorizer"
+	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	authorizationapi "k8s.io/kubernetes/pkg/apis/authorization"
 	authorizationvalidation "k8s.io/kubernetes/pkg/apis/authorization/validation"
-	"k8s.io/kubernetes/pkg/auth/authorizer"
 	authorizationutil "k8s.io/kubernetes/pkg/registry/authorization/util"
-	"k8s.io/kubernetes/pkg/runtime"
 )
 
 type REST struct {
@@ -40,7 +40,7 @@ func (r *REST) New() runtime.Object {
 	return &authorizationapi.SelfSubjectAccessReview{}
 }
 
-func (r *REST) Create(ctx api.Context, obj runtime.Object) (runtime.Object, error) {
+func (r *REST) Create(ctx genericapirequest.Context, obj runtime.Object) (runtime.Object, error) {
 	selfSAR, ok := obj.(*authorizationapi.SelfSubjectAccessReview)
 	if !ok {
 		return nil, apierrors.NewBadRequest(fmt.Sprintf("not a SelfSubjectAccessReview: %#v", obj))
@@ -48,7 +48,7 @@ func (r *REST) Create(ctx api.Context, obj runtime.Object) (runtime.Object, erro
 	if errs := authorizationvalidation.ValidateSelfSubjectAccessReview(selfSAR); len(errs) > 0 {
 		return nil, apierrors.NewInvalid(authorizationapi.Kind(selfSAR.Kind), "", errs)
 	}
-	userToCheck, exists := api.UserFrom(ctx)
+	userToCheck, exists := genericapirequest.UserFrom(ctx)
 	if !exists {
 		return nil, apierrors.NewBadRequest("no user present on request")
 	}

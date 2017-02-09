@@ -26,9 +26,10 @@ import (
 	"fmt"
 	"io/ioutil"
 
+	"k8s.io/apiserver/pkg/authentication/authenticator"
+	apiserverserviceaccount "k8s.io/apiserver/pkg/authentication/serviceaccount"
+	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/auth/authenticator"
-	"k8s.io/kubernetes/pkg/auth/user"
 
 	jwt "github.com/dgrijalva/jwt-go"
 	"github.com/golang/glog"
@@ -72,11 +73,25 @@ func ReadPrivateKey(file string) (interface{}, error) {
 
 // ReadPrivateKeyFromPEM is a helper function for reading a private key from a PEM-encoded file
 func ReadPrivateKeyFromPEM(data []byte) (interface{}, error) {
-	if key, err := jwt.ParseRSAPrivateKeyFromPEM(data); err == nil {
-		return key, nil
-	}
-	if key, err := jwt.ParseECPrivateKeyFromPEM(data); err == nil {
-		return key, nil
+	var block *pem.Block
+	for {
+		// read the next block
+		block, data = pem.Decode(data)
+		if block == nil {
+			break
+		}
+
+		// get PEM bytes for just this block
+		blockData := pem.EncodeToMemory(block)
+		if key, err := jwt.ParseRSAPrivateKeyFromPEM(blockData); err == nil {
+			return key, nil
+		}
+		if key, err := jwt.ParseECPrivateKeyFromPEM(blockData); err == nil {
+			return key, nil
+		}
+
+		// tolerate non-key PEM blocks for compatibility with things like "EC PARAMETERS" blocks
+		// originally, only the first PEM block was parsed and expected to be a key block
 	}
 	return nil, fmt.Errorf("data does not contain a valid RSA or ECDSA private key")
 }
@@ -176,7 +191,7 @@ func (j *jwtTokenGenerator) GenerateToken(serviceAccount v1.ServiceAccount, secr
 	claims[IssuerClaim] = Issuer
 
 	// Username
-	claims[SubjectClaim] = MakeUsername(serviceAccount.Namespace, serviceAccount.Name)
+	claims[SubjectClaim] = apiserverserviceaccount.MakeUsername(serviceAccount.Namespace, serviceAccount.Name)
 
 	// Persist enough structured info for the authenticator to be able to look up the service account and secret
 	claims[NamespaceClaim] = serviceAccount.Namespace
@@ -287,7 +302,7 @@ func (j *jwtTokenAuthenticator) AuthenticateToken(token string) (user.Info, bool
 			return nil, false, errors.New("serviceAccountUID claim is missing")
 		}
 
-		subjectNamespace, subjectName, err := SplitUsername(sub)
+		subjectNamespace, subjectName, err := apiserverserviceaccount.SplitUsername(sub)
 		if err != nil || subjectNamespace != namespace || subjectName != serviceAccountName {
 			return nil, false, errors.New("sub claim is invalid")
 		}

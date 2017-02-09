@@ -50,7 +50,7 @@ const (
 	// UserAgent is the header string used to identify this package.
 	UserAgent = "google-api-go-client/" + Version
 
-	// The default chunk size to use for resumable uplods if not specified by the user.
+	// The default chunk size to use for resumable uploads if not specified by the user.
 	DefaultUploadChunkSize = 8 * 1024 * 1024
 
 	// The minimum chunk size that can be used for resumable uploads.  All

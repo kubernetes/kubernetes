@@ -16,7 +16,20 @@ go_library(
     ],
     tags = ["automanaged"],
     deps = [
-        "//pkg/genericapiserver/mux:go_default_library",
         "//vendor:github.com/emicklei/go-restful",
+        "//vendor:k8s.io/apiserver/pkg/server/mux",
     ],
+)
+
+filegroup(
+    name = "package-srcs",
+    srcs = glob(["**"]),
+    tags = ["automanaged"],
+    visibility = ["//visibility:private"],
+)
+
+filegroup(
+    name = "all-srcs",
+    srcs = [":package-srcs"],
+    tags = ["automanaged"],
 )

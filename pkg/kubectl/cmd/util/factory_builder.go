@@ -23,10 +23,9 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/meta"
+	"k8s.io/apimachinery/pkg/api/meta"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
-	"k8s.io/kubernetes/pkg/runtime"
 )
 
 type ring2Factory struct {
@@ -44,7 +43,20 @@ func NewBuilderFactory(clientAccessFactory ClientAccessFactory, objectMappingFac
 }
 
 func (f *ring2Factory) PrintObject(cmd *cobra.Command, mapper meta.RESTMapper, obj runtime.Object, out io.Writer) error {
-	gvks, _, err := api.Scheme.ObjectKinds(obj)
+	// try to get a typed object
+	_, typer := f.objectMappingFactory.Object()
+	gvks, _, err := typer.ObjectKinds(obj)
+
+	// fall back to an unstructured object if we get something unregistered
+	if runtime.IsNotRegisteredError(err) {
+		_, typer, unstructuredErr := f.objectMappingFactory.UnstructuredObject()
+		if unstructuredErr != nil {
+			// if we can't get an unstructured typer, return the original error
+			return err
+		}
+		gvks, _, err = typer.ObjectKinds(obj)
+	}
+
 	if err != nil {
 		return err
 	}

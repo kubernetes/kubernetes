@@ -21,13 +21,13 @@ import (
 	"fmt"
 	"time"
 
-	"k8s.io/kubernetes/pkg/auth/authorizer"
+	"k8s.io/apiserver/pkg/authorization/authorizer"
+	"k8s.io/apiserver/pkg/authorization/authorizerfactory"
+	"k8s.io/apiserver/pkg/authorization/union"
+	"k8s.io/apiserver/plugin/pkg/authorizer/webhook"
 	"k8s.io/kubernetes/pkg/auth/authorizer/abac"
-	"k8s.io/kubernetes/pkg/auth/authorizer/union"
 	"k8s.io/kubernetes/pkg/controller/informers"
-	genericauthorizer "k8s.io/kubernetes/pkg/genericapiserver/authorizer"
 	"k8s.io/kubernetes/plugin/pkg/auth/authorizer/rbac"
-	"k8s.io/kubernetes/plugin/pkg/auth/authorizer/webhook"
 )
 
 const (
@@ -80,9 +80,9 @@ func (config AuthorizationConfig) New() (authorizer.Authorizer, error) {
 		// Keep cases in sync with constant list above.
 		switch authorizationMode {
 		case ModeAlwaysAllow:
-			authorizers = append(authorizers, genericauthorizer.NewAlwaysAllowAuthorizer())
+			authorizers = append(authorizers, authorizerfactory.NewAlwaysAllowAuthorizer())
 		case ModeAlwaysDeny:
-			authorizers = append(authorizers, genericauthorizer.NewAlwaysDenyAuthorizer())
+			authorizers = append(authorizers, authorizerfactory.NewAlwaysDenyAuthorizer())
 		case ModeABAC:
 			if config.PolicyFile == "" {
 				return nil, errors.New("ABAC's authorization policy file not passed")

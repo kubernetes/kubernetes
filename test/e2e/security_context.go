@@ -25,9 +25,9 @@ package e2e
 import (
 	"fmt"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/kubernetes/pkg/api/v1"
-	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
-	"k8s.io/kubernetes/pkg/util/uuid"
 	"k8s.io/kubernetes/test/e2e/framework"
 
 	. "github.com/onsi/ginkgo"
@@ -37,7 +37,7 @@ import (
 func scTestPod(hostIPC bool, hostPID bool) *v1.Pod {
 	podName := "security-context-" + string(uuid.NewUUID())
 	pod := &v1.Pod{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:        podName,
 			Labels:      map[string]string{"name": podName},
 			Annotations: map[string]string{},

@@ -28,21 +28,22 @@ import (
 	"github.com/jonboulle/clockwork"
 	"github.com/spf13/cobra"
 
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/fields"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/wait"
+	restclient "k8s.io/client-go/rest"
 	"k8s.io/kubernetes/pkg/api"
-	apierrors "k8s.io/kubernetes/pkg/api/errors"
-	"k8s.io/kubernetes/pkg/api/meta"
-	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/apis/policy"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
-	"k8s.io/kubernetes/pkg/client/restclient"
-	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
 	"k8s.io/kubernetes/pkg/kubelet/types"
-	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/util/wait"
+	"k8s.io/kubernetes/pkg/util/i18n"
 )
 
 type DrainOptions struct {
@@ -99,7 +100,7 @@ func NewCmdCordon(f cmdutil.Factory, out io.Writer) *cobra.Command {
 
 	cmd := &cobra.Command{
 		Use:     "cordon NODE",
-		Short:   "Mark node as unschedulable",
+		Short:   i18n.T("Mark node as unschedulable"),
 		Long:    cordon_long,
 		Example: cordon_example,
 		Run: func(cmd *cobra.Command, args []string) {
@@ -124,7 +125,7 @@ func NewCmdUncordon(f cmdutil.Factory, out io.Writer) *cobra.Command {
 
 	cmd := &cobra.Command{
 		Use:     "uncordon NODE",
-		Short:   "Mark node as schedulable",
+		Short:   i18n.T("Mark node as schedulable"),
 		Long:    uncordon_long,
 		Example: uncordon_example,
 		Run: func(cmd *cobra.Command, args []string) {
@@ -173,7 +174,7 @@ func NewCmdDrain(f cmdutil.Factory, out, errOut io.Writer) *cobra.Command {
 
 	cmd := &cobra.Command{
 		Use:     "drain NODE",
-		Short:   "Drain node in preparation for maintenance",
+		Short:   i18n.T("Drain node in preparation for maintenance"),
 		Long:    drain_long,
 		Example: drain_example,
 		Run: func(cmd *cobra.Command, args []string) {
@@ -381,8 +382,8 @@ func (ps podStatuses) Message() string {
 // getPodsForDeletion returns all the pods we're going to delete.  If there are
 // any pods preventing us from deleting, we return that list in an error.
 func (o *DrainOptions) getPodsForDeletion() (pods []api.Pod, err error) {
-	podList, err := o.client.Core().Pods(api.NamespaceAll).List(api.ListOptions{
-		FieldSelector: fields.SelectorFromSet(fields.Set{"spec.nodeName": o.nodeInfo.Name})})
+	podList, err := o.client.Core().Pods(metav1.NamespaceAll).List(metav1.ListOptions{
+		FieldSelector: fields.SelectorFromSet(fields.Set{"spec.nodeName": o.nodeInfo.Name}).String()})
 	if err != nil {
 		return pods, err
 	}
@@ -418,7 +419,7 @@ func (o *DrainOptions) getPodsForDeletion() (pods []api.Pod, err error) {
 }
 
 func (o *DrainOptions) deletePod(pod api.Pod) error {
-	deleteOptions := &api.DeleteOptions{}
+	deleteOptions := &metav1.DeleteOptions{}
 	if o.GracePeriodSeconds >= 0 {
 		gracePeriodSeconds := int64(o.GracePeriodSeconds)
 		deleteOptions.GracePeriodSeconds = &gracePeriodSeconds
@@ -427,7 +428,7 @@ func (o *DrainOptions) deletePod(pod api.Pod) error {
 }
 
 func (o *DrainOptions) evictPod(pod api.Pod, policyGroupVersion string) error {
-	deleteOptions := &api.DeleteOptions{}
+	deleteOptions := &metav1.DeleteOptions{}
 	if o.GracePeriodSeconds >= 0 {
 		gracePeriodSeconds := int64(o.GracePeriodSeconds)
 		deleteOptions.GracePeriodSeconds = &gracePeriodSeconds
@@ -437,7 +438,7 @@ func (o *DrainOptions) evictPod(pod api.Pod, policyGroupVersion string) error {
 			APIVersion: policyGroupVersion,
 			Kind:       EvictionKind,
 		},
-		ObjectMeta: api.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:      pod.Name,
 			Namespace: pod.Namespace,
 		},

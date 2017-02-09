@@ -27,16 +27,17 @@ import (
 
 	"github.com/spf13/cobra"
 
+	kubeerr "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/client-go/rest/fake"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/annotations"
-	kubeerr "k8s.io/kubernetes/pkg/api/errors"
-	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/api/testapi"
-	"k8s.io/kubernetes/pkg/client/restclient/fake"
+	"k8s.io/kubernetes/pkg/apis/extensions"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
-	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/runtime/schema"
 )
 
 func TestApplyExtraArgsFail(t *testing.T) {
@@ -197,10 +198,11 @@ func TestApplyObjectWithoutAnnotation(t *testing.T) {
 	nameRC, rcBytes := readReplicationController(t, filenameRC)
 	pathRC := "/namespaces/test/replicationcontrollers/" + nameRC
 
-	f, tf, _, ns := cmdtesting.NewAPIFactory()
+	f, tf, _, _ := cmdtesting.NewAPIFactory()
 	tf.Printer = &testPrinter{}
-	tf.Client = &fake.RESTClient{
-		NegotiatedSerializer: ns,
+	tf.UnstructuredClient = &fake.RESTClient{
+		APIRegistry:          api.Registry,
+		NegotiatedSerializer: unstructuredSerializer,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch p, m := req.URL.Path, req.Method; {
 			case p == pathRC && m == "GET":
@@ -241,10 +243,11 @@ func TestApplyObject(t *testing.T) {
 	nameRC, currentRC := readAndAnnotateReplicationController(t, filenameRC)
 	pathRC := "/namespaces/test/replicationcontrollers/" + nameRC
 
-	f, tf, _, ns := cmdtesting.NewAPIFactory()
+	f, tf, _, _ := cmdtesting.NewAPIFactory()
 	tf.Printer = &testPrinter{}
-	tf.Client = &fake.RESTClient{
-		NegotiatedSerializer: ns,
+	tf.UnstructuredClient = &fake.RESTClient{
+		APIRegistry:          api.Registry,
+		NegotiatedSerializer: unstructuredSerializer,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch p, m := req.URL.Path, req.Method; {
 			case p == pathRC && m == "GET":
@@ -284,10 +287,11 @@ func TestApplyRetry(t *testing.T) {
 	firstPatch := true
 	retry := false
 	getCount := 0
-	f, tf, _, ns := cmdtesting.NewAPIFactory()
+	f, tf, _, _ := cmdtesting.NewAPIFactory()
 	tf.Printer = &testPrinter{}
-	tf.Client = &fake.RESTClient{
-		NegotiatedSerializer: ns,
+	tf.UnstructuredClient = &fake.RESTClient{
+		APIRegistry:          api.Registry,
+		NegotiatedSerializer: unstructuredSerializer,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch p, m := req.URL.Path, req.Method; {
 			case p == pathRC && m == "GET":
@@ -337,10 +341,11 @@ func TestApplyNonExistObject(t *testing.T) {
 	pathRC := "/namespaces/test/replicationcontrollers"
 	pathNameRC := pathRC + "/" + nameRC
 
-	f, tf, _, ns := cmdtesting.NewAPIFactory()
+	f, tf, _, _ := cmdtesting.NewAPIFactory()
 	tf.Printer = &testPrinter{}
-	tf.Client = &fake.RESTClient{
-		NegotiatedSerializer: ns,
+	tf.UnstructuredClient = &fake.RESTClient{
+		APIRegistry:          api.Registry,
+		NegotiatedSerializer: unstructuredSerializer,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch p, m := req.URL.Path, req.Method; {
 			case p == "/api/v1/namespaces/test" && m == "GET":
@@ -387,10 +392,11 @@ func testApplyMultipleObjects(t *testing.T, asList bool) {
 	nameSVC, currentSVC := readAndAnnotateService(t, filenameSVC)
 	pathSVC := "/namespaces/test/services/" + nameSVC
 
-	f, tf, _, ns := cmdtesting.NewAPIFactory()
+	f, tf, _, _ := cmdtesting.NewAPIFactory()
 	tf.Printer = &testPrinter{}
-	tf.Client = &fake.RESTClient{
-		NegotiatedSerializer: ns,
+	tf.UnstructuredClient = &fake.RESTClient{
+		APIRegistry:          api.Registry,
+		NegotiatedSerializer: unstructuredSerializer,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch p, m := req.URL.Path, req.Method; {
 			case p == pathRC && m == "GET":
@@ -436,5 +442,92 @@ func testApplyMultipleObjects(t *testing.T, asList bool) {
 	expectTwo := expectSVC + expectRC
 	if buf.String() != expectOne && buf.String() != expectTwo {
 		t.Fatalf("unexpected output: %s\nexpected: %s OR %s", buf.String(), expectOne, expectTwo)
+	}
+}
+
+const (
+	filenameDeployObjServerside = "../../../test/fixtures/pkg/kubectl/cmd/apply/deploy-serverside.yaml"
+	filenameDeployObjClientside = "../../../test/fixtures/pkg/kubectl/cmd/apply/deploy-clientside.yaml"
+)
+
+func readDeploymentFromFile(t *testing.T, file string) []byte {
+	raw := readBytesFromFile(t, file)
+	obj := &extensions.Deployment{}
+	if err := runtime.DecodeInto(testapi.Extensions.Codec(), raw, obj); err != nil {
+		t.Fatal(err)
+	}
+	objJSON, err := runtime.Encode(testapi.Extensions.Codec(), obj)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return objJSON
+}
+
+func TestApplyNULLPreservation(t *testing.T) {
+	initTestErrorHandler(t)
+	deploymentName := "nginx-deployment"
+	deploymentPath := "/namespaces/test/deployments/" + deploymentName
+
+	verifiedPatch := false
+	deploymentBytes := readDeploymentFromFile(t, filenameDeployObjServerside)
+
+	f, tf, _, _ := cmdtesting.NewTestFactory()
+	tf.UnstructuredClient = &fake.RESTClient{
+		APIRegistry:          api.Registry,
+		NegotiatedSerializer: unstructuredSerializer,
+		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
+			switch p, m := req.URL.Path, req.Method; {
+			case p == deploymentPath && m == "GET":
+				body := ioutil.NopCloser(bytes.NewReader(deploymentBytes))
+				return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: body}, nil
+			case p == deploymentPath && m == "PATCH":
+				patch, err := ioutil.ReadAll(req.Body)
+				if err != nil {
+					t.Fatal(err)
+				}
+
+				patchMap := map[string]interface{}{}
+				if err := json.Unmarshal(patch, &patchMap); err != nil {
+					t.Fatal(err)
+				}
+				annotationMap := walkMapPath(t, patchMap, []string{"metadata", "annotations"})
+				if _, ok := annotationMap[annotations.LastAppliedConfigAnnotation]; !ok {
+					t.Fatalf("patch does not contain annotation:\n%s\n", patch)
+				}
+				strategy := walkMapPath(t, patchMap, []string{"spec", "strategy"})
+				if value, ok := strategy["rollingUpdate"]; !ok || value != nil {
+					t.Fatalf("patch did not retain null value in key: rollingUpdate:\n%s\n", patch)
+				}
+				verifiedPatch = true
+
+				// The real API server would had returned the patched object but Kubectl
+				// is ignoring the actual return object.
+				// TODO: Make this match actual server behavior by returning the patched object.
+				body := ioutil.NopCloser(bytes.NewReader(deploymentBytes))
+				return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: body}, nil
+			default:
+				t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
+				return nil, nil
+			}
+		}),
+	}
+	tf.Namespace = "test"
+	tf.ClientConfig = defaultClientConfig()
+	buf := bytes.NewBuffer([]byte{})
+	errBuf := bytes.NewBuffer([]byte{})
+
+	cmd := NewCmdApply(f, buf, errBuf)
+	cmd.Flags().Set("filename", filenameDeployObjClientside)
+	cmd.Flags().Set("output", "name")
+
+	cmd.Run(cmd, []string{})
+
+	expected := "deployment/" + deploymentName + "\n"
+	if buf.String() != expected {
+		t.Fatalf("unexpected output: %s\nexpected: %s", buf.String(), expected)
+	}
+
+	if !verifiedPatch {
+		t.Fatal("No server-side patch call detected")
 	}
 }

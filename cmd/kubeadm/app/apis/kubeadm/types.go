@@ -17,7 +17,7 @@ limitations under the License.
 package kubeadm
 
 import (
-	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 type EnvParams struct {
@@ -39,6 +39,7 @@ type MasterConfiguration struct {
 	Networking        Networking
 	KubernetesVersion string
 	CloudProvider     string
+	AuthorizationMode string
 }
 
 type API struct {

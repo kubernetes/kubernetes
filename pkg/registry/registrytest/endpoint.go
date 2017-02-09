@@ -20,10 +20,12 @@ import (
 	"fmt"
 	"sync"
 
+	"k8s.io/apimachinery/pkg/api/errors"
+	metainternalversion "k8s.io/apimachinery/pkg/apis/meta/internalversion"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/watch"
+	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/errors"
-	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
-	"k8s.io/kubernetes/pkg/watch"
 )
 
 // Registry is an interface for things that know how to store endpoints.
@@ -35,7 +37,7 @@ type EndpointRegistry struct {
 	lock sync.Mutex
 }
 
-func (e *EndpointRegistry) ListEndpoints(ctx api.Context, options *api.ListOptions) (*api.EndpointsList, error) {
+func (e *EndpointRegistry) ListEndpoints(ctx genericapirequest.Context, options *metainternalversion.ListOptions) (*api.EndpointsList, error) {
 	// TODO: support namespaces in this mock
 	e.lock.Lock()
 	defer e.lock.Unlock()
@@ -43,7 +45,7 @@ func (e *EndpointRegistry) ListEndpoints(ctx api.Context, options *api.ListOptio
 	return e.Endpoints, e.Err
 }
 
-func (e *EndpointRegistry) GetEndpoints(ctx api.Context, name string, options *metav1.GetOptions) (*api.Endpoints, error) {
+func (e *EndpointRegistry) GetEndpoints(ctx genericapirequest.Context, name string, options *metav1.GetOptions) (*api.Endpoints, error) {
 	// TODO: support namespaces in this mock
 	e.lock.Lock()
 	defer e.lock.Unlock()
@@ -60,11 +62,11 @@ func (e *EndpointRegistry) GetEndpoints(ctx api.Context, name string, options *m
 	return nil, errors.NewNotFound(api.Resource("endpoints"), name)
 }
 
-func (e *EndpointRegistry) WatchEndpoints(ctx api.Context, options *api.ListOptions) (watch.Interface, error) {
+func (e *EndpointRegistry) WatchEndpoints(ctx genericapirequest.Context, options *metainternalversion.ListOptions) (watch.Interface, error) {
 	return nil, fmt.Errorf("unimplemented!")
 }
 
-func (e *EndpointRegistry) UpdateEndpoints(ctx api.Context, endpoints *api.Endpoints) error {
+func (e *EndpointRegistry) UpdateEndpoints(ctx genericapirequest.Context, endpoints *api.Endpoints) error {
 	// TODO: support namespaces in this mock
 	e.lock.Lock()
 	defer e.lock.Unlock()
@@ -91,7 +93,7 @@ func (e *EndpointRegistry) UpdateEndpoints(ctx api.Context, endpoints *api.Endpo
 	return nil
 }
 
-func (e *EndpointRegistry) DeleteEndpoints(ctx api.Context, name string) error {
+func (e *EndpointRegistry) DeleteEndpoints(ctx genericapirequest.Context, name string) error {
 	// TODO: support namespaces in this mock
 	e.lock.Lock()
 	defer e.lock.Unlock()

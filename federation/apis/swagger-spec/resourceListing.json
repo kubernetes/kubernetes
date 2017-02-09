@@ -36,6 +36,26 @@
    {
     "path": "/apis/extensions",
     "description": "get information of a group"
+   },
+   {
+    "path": "/apis/batch/v1",
+    "description": "API at /apis/batch/v1"
+   },
+   {
+    "path": "/apis/batch/v2alpha1",
+    "description": "API at /apis/batch/v2alpha1"
+   },
+   {
+    "path": "/apis/batch",
+    "description": "get information of a group"
+   },
+   {
+    "path": "/apis/autoscaling/v1",
+    "description": "API at /apis/autoscaling/v1"
+   },
+   {
+    "path": "/apis/autoscaling",
+    "description": "get information of a group"
    }
   ],
   "apiVersion": "",

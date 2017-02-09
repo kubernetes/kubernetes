@@ -21,10 +21,11 @@ import (
 	"path/filepath"
 	"time"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
-	"k8s.io/kubernetes/pkg/labels"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/test/e2e/framework"
 
 	. "github.com/onsi/ginkgo"
@@ -98,7 +99,7 @@ var _ = framework.KubeDescribe("ClusterDns [Feature:Example]", func() {
 		// the application itself may have not been initialized. Just query the application.
 		for _, ns := range namespaces {
 			label := labels.SelectorFromSet(labels.Set(map[string]string{"name": backendRcName}))
-			options := v1.ListOptions{LabelSelector: label.String()}
+			options := metav1.ListOptions{LabelSelector: label.String()}
 			pods, err := c.Core().Pods(ns.Name).List(options)
 			Expect(err).NotTo(HaveOccurred())
 			err = framework.PodsResponding(c, ns.Name, backendPodName, false, pods)
@@ -118,7 +119,7 @@ var _ = framework.KubeDescribe("ClusterDns [Feature:Example]", func() {
 		// dns error or timeout.
 		// This code is probably unnecessary, but let's stay on the safe side.
 		label := labels.SelectorFromSet(labels.Set(map[string]string{"name": backendPodName}))
-		options := v1.ListOptions{LabelSelector: label.String()}
+		options := metav1.ListOptions{LabelSelector: label.String()}
 		pods, err := c.Core().Pods(namespaces[0].Name).List(options)
 
 		if err != nil || pods == nil || len(pods.Items) == 0 {

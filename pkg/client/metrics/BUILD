@@ -12,3 +12,19 @@ go_library(
     srcs = ["metrics.go"],
     tags = ["automanaged"],
 )
+
+filegroup(
+    name = "package-srcs",
+    srcs = glob(["**"]),
+    tags = ["automanaged"],
+    visibility = ["//visibility:private"],
+)
+
+filegroup(
+    name = "all-srcs",
+    srcs = [
+        ":package-srcs",
+        "//pkg/client/metrics/prometheus:all-srcs",
+    ],
+    tags = ["automanaged"],
+)

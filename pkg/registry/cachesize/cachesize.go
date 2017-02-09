@@ -23,6 +23,8 @@ import (
 	"strings"
 
 	"github.com/golang/glog"
+
+	"k8s.io/apiserver/pkg/registry/generic/registry"
 )
 
 type Resource string
@@ -60,9 +62,6 @@ const (
 	ServiceAccounts            Resource = "serviceaccounts"
 	Services                   Resource = "services"
 	StorageClasses             Resource = "storageclasses"
-
-	// Default value of watch cache size for a resource if not specified.
-	defaultWatchCacheSize = 100
 )
 
 // TODO: This shouldn't be a global variable.
@@ -112,11 +111,11 @@ func SetWatchCacheSizes(cacheSizes []string) {
 	}
 }
 
-func GetWatchCacheSizeByResource(resource Resource) int { // TODO this should use schema.GroupResource for lookups
-	if value, found := watchCacheSizes[resource]; found {
+func GetWatchCacheSizeByResource(resource string) int { // TODO this should use schema.GroupResource for lookups
+	if value, found := watchCacheSizes[Resource(resource)]; found {
 		return value
 	}
-	return defaultWatchCacheSize
+	return registry.DefaultWatchCacheSize
 }
 
 func maxInt(a, b int) int {

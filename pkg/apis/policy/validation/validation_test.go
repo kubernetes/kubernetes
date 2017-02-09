@@ -19,9 +19,9 @@ package validation
 import (
 	"testing"
 
+	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/kubernetes/pkg/apis/policy"
-	"k8s.io/kubernetes/pkg/util/intstr"
-	"k8s.io/kubernetes/pkg/util/validation/field"
 )
 
 func TestValidatePodDisruptionBudgetSpec(t *testing.T) {

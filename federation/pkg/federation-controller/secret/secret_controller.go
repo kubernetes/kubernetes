@@ -20,22 +20,24 @@ import (
 	"fmt"
 	"time"
 
+	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	pkgruntime "k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/watch"
+	clientv1 "k8s.io/client-go/pkg/api/v1"
+	"k8s.io/client-go/tools/cache"
+	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/util/flowcontrol"
 	federationapi "k8s.io/kubernetes/federation/apis/federation/v1beta1"
 	federationclientset "k8s.io/kubernetes/federation/client/clientset_generated/federation_clientset"
 	"k8s.io/kubernetes/federation/pkg/federation-controller/util"
 	"k8s.io/kubernetes/federation/pkg/federation-controller/util/deletionhelper"
 	"k8s.io/kubernetes/federation/pkg/federation-controller/util/eventsink"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/errors"
 	apiv1 "k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/client/cache"
 	kubeclientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
-	"k8s.io/kubernetes/pkg/client/record"
 	"k8s.io/kubernetes/pkg/controller"
-	pkgruntime "k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/types"
-	"k8s.io/kubernetes/pkg/util/flowcontrol"
-	"k8s.io/kubernetes/pkg/watch"
 
 	"github.com/golang/glog"
 )
@@ -61,7 +63,7 @@ type SecretController struct {
 	// Definitions of secrets that should be federated.
 	secretInformerStore cache.Store
 	// Informer controller for secrets that should be federated.
-	secretInformerController cache.ControllerInterface
+	secretInformerController cache.Controller
 
 	// Client to federated api server.
 	federatedApiClient federationclientset.Interface
@@ -84,7 +86,7 @@ type SecretController struct {
 func NewSecretController(client federationclientset.Interface) *SecretController {
 	broadcaster := record.NewBroadcaster()
 	broadcaster.StartRecordingToSink(eventsink.NewFederatedEventSink(client))
-	recorder := broadcaster.NewRecorder(apiv1.EventSource{Component: "federated-secrets-controller"})
+	recorder := broadcaster.NewRecorder(api.Scheme, clientv1.EventSource{Component: "federated-secrets-controller"})
 
 	secretcontroller := &SecretController{
 		federatedApiClient:    client,
@@ -103,11 +105,11 @@ func NewSecretController(client federationclientset.Interface) *SecretController
 	// Start informer in federated API servers on secrets that should be federated.
 	secretcontroller.secretInformerStore, secretcontroller.secretInformerController = cache.NewInformer(
 		&cache.ListWatch{
-			ListFunc: func(options apiv1.ListOptions) (pkgruntime.Object, error) {
-				return client.Core().Secrets(apiv1.NamespaceAll).List(options)
+			ListFunc: func(options metav1.ListOptions) (pkgruntime.Object, error) {
+				return client.Core().Secrets(metav1.NamespaceAll).List(options)
 			},
-			WatchFunc: func(options apiv1.ListOptions) (watch.Interface, error) {
-				return client.Core().Secrets(apiv1.NamespaceAll).Watch(options)
+			WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
+				return client.Core().Secrets(metav1.NamespaceAll).Watch(options)
 			},
 		},
 		&apiv1.Secret{},
@@ -117,14 +119,14 @@ func NewSecretController(client federationclientset.Interface) *SecretController
 	// Federated informer on secrets in members of federation.
 	secretcontroller.secretFederatedInformer = util.NewFederatedInformer(
 		client,
-		func(cluster *federationapi.Cluster, targetClient kubeclientset.Interface) (cache.Store, cache.ControllerInterface) {
+		func(cluster *federationapi.Cluster, targetClient kubeclientset.Interface) (cache.Store, cache.Controller) {
 			return cache.NewInformer(
 				&cache.ListWatch{
-					ListFunc: func(options apiv1.ListOptions) (pkgruntime.Object, error) {
-						return targetClient.Core().Secrets(apiv1.NamespaceAll).List(options)
+					ListFunc: func(options metav1.ListOptions) (pkgruntime.Object, error) {
+						return targetClient.Core().Secrets(metav1.NamespaceAll).List(options)
 					},
-					WatchFunc: func(options apiv1.ListOptions) (watch.Interface, error) {
-						return targetClient.Core().Secrets(apiv1.NamespaceAll).Watch(options)
+					WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
+						return targetClient.Core().Secrets(metav1.NamespaceAll).Watch(options)
 					},
 				},
 				&apiv1.Secret{},
@@ -160,7 +162,7 @@ func NewSecretController(client federationclientset.Interface) *SecretController
 		},
 		func(client kubeclientset.Interface, obj pkgruntime.Object) error {
 			secret := obj.(*apiv1.Secret)
-			err := client.Core().Secrets(secret.Namespace).Delete(secret.Name, &apiv1.DeleteOptions{})
+			err := client.Core().Secrets(secret.Namespace).Delete(secret.Name, &metav1.DeleteOptions{})
 			return err
 		})
 
@@ -218,14 +220,14 @@ func (secretcontroller *SecretController) removeFinalizerFunc(obj pkgruntime.Obj
 	return secret, nil
 }
 
-// Adds the given finalizer to the given objects ObjectMeta.
+// Adds the given finalizers to the given objects ObjectMeta.
 // Assumes that the given object is a secret.
-func (secretcontroller *SecretController) addFinalizerFunc(obj pkgruntime.Object, finalizer string) (pkgruntime.Object, error) {
+func (secretcontroller *SecretController) addFinalizerFunc(obj pkgruntime.Object, finalizers []string) (pkgruntime.Object, error) {
 	secret := obj.(*apiv1.Secret)
-	secret.ObjectMeta.Finalizers = append(secret.ObjectMeta.Finalizers, finalizer)
+	secret.ObjectMeta.Finalizers = append(secret.ObjectMeta.Finalizers, finalizers...)
 	secret, err := secretcontroller.federatedApiClient.Core().Secrets(secret.Namespace).Update(secret)
 	if err != nil {
-		return nil, fmt.Errorf("failed to add finalizer %s to secret %s: %v", finalizer, secret.Name, err)
+		return nil, fmt.Errorf("failed to add finalizers %v to secret %s: %v", finalizers, secret.Name, err)
 	}
 	return secret, nil
 }

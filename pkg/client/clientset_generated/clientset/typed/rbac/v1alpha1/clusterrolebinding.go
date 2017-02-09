@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors.
+Copyright 2017 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,12 +17,12 @@ limitations under the License.
 package v1alpha1
 
 import (
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	types "k8s.io/apimachinery/pkg/types"
+	watch "k8s.io/apimachinery/pkg/watch"
+	rest "k8s.io/client-go/rest"
 	api "k8s.io/kubernetes/pkg/api"
-	v1 "k8s.io/kubernetes/pkg/api/v1"
-	meta_v1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	v1alpha1 "k8s.io/kubernetes/pkg/apis/rbac/v1alpha1"
-	restclient "k8s.io/kubernetes/pkg/client/restclient"
-	watch "k8s.io/kubernetes/pkg/watch"
 )
 
 // ClusterRoleBindingsGetter has a method to return a ClusterRoleBindingInterface.
@@ -37,16 +37,16 @@ type ClusterRoleBindingInterface interface {
 	Update(*v1alpha1.ClusterRoleBinding) (*v1alpha1.ClusterRoleBinding, error)
 	Delete(name string, options *v1.DeleteOptions) error
 	DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error
-	Get(name string, options meta_v1.GetOptions) (*v1alpha1.ClusterRoleBinding, error)
+	Get(name string, options v1.GetOptions) (*v1alpha1.ClusterRoleBinding, error)
 	List(opts v1.ListOptions) (*v1alpha1.ClusterRoleBindingList, error)
 	Watch(opts v1.ListOptions) (watch.Interface, error)
-	Patch(name string, pt api.PatchType, data []byte, subresources ...string) (result *v1alpha1.ClusterRoleBinding, err error)
+	Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v1alpha1.ClusterRoleBinding, err error)
 	ClusterRoleBindingExpansion
 }
 
 // clusterRoleBindings implements ClusterRoleBindingInterface
 type clusterRoleBindings struct {
-	client restclient.Interface
+	client rest.Interface
 }
 
 // newClusterRoleBindings returns a ClusterRoleBindings
@@ -100,7 +100,7 @@ func (c *clusterRoleBindings) DeleteCollection(options *v1.DeleteOptions, listOp
 }
 
 // Get takes name of the clusterRoleBinding, and returns the corresponding clusterRoleBinding object, and an error if there is any.
-func (c *clusterRoleBindings) Get(name string, options meta_v1.GetOptions) (result *v1alpha1.ClusterRoleBinding, err error) {
+func (c *clusterRoleBindings) Get(name string, options v1.GetOptions) (result *v1alpha1.ClusterRoleBinding, err error) {
 	result = &v1alpha1.ClusterRoleBinding{}
 	err = c.client.Get().
 		Resource("clusterrolebindings").
@@ -132,7 +132,7 @@ func (c *clusterRoleBindings) Watch(opts v1.ListOptions) (watch.Interface, error
 }
 
 // Patch applies the patch and returns the patched clusterRoleBinding.
-func (c *clusterRoleBindings) Patch(name string, pt api.PatchType, data []byte, subresources ...string) (result *v1alpha1.ClusterRoleBinding, err error) {
+func (c *clusterRoleBindings) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v1alpha1.ClusterRoleBinding, err error) {
 	result = &v1alpha1.ClusterRoleBinding{}
 	err = c.client.Patch(pt).
 		Resource("clusterrolebindings").

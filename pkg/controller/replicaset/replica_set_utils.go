@@ -24,16 +24,16 @@ import (
 
 	"github.com/golang/glog"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
 	extensions "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
-	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	unversionedextensions "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/extensions/v1beta1"
-	"k8s.io/kubernetes/pkg/labels"
 )
 
 // updateReplicaSetStatus attempts to update the Status.Replicas of the given ReplicaSet, with a single GET/PUT retry.
-func updateReplicaSetStatus(c unversionedextensions.ReplicaSetInterface, rs extensions.ReplicaSet, newStatus extensions.ReplicaSetStatus) (updateErr error) {
+func updateReplicaSetStatus(c unversionedextensions.ReplicaSetInterface, rs *extensions.ReplicaSet, newStatus extensions.ReplicaSetStatus) (updateErr error) {
 	// This is the steady state. It happens when the ReplicaSet doesn't have any expectations, since
 	// we do a periodic relist every 30s. If the generations differ but the replicas are
 	// the same, a caller might've resized to the same replica count.
@@ -48,11 +48,11 @@ func updateReplicaSetStatus(c unversionedextensions.ReplicaSetInterface, rs exte
 
 	// deep copy to avoid mutation now.
 	// TODO this method need some work.  Retry on conflict probably, though I suspect this is stomping status to something it probably shouldn't
-	copyObj, err := api.Scheme.DeepCopy(&rs)
+	copyObj, err := api.Scheme.DeepCopy(rs)
 	if err != nil {
 		return err
 	}
-	rs = *copyObj.(*extensions.ReplicaSet)
+	rs = copyObj.(*extensions.ReplicaSet)
 
 	// Save the generation number we acted on, otherwise we might wrongfully indicate
 	// that we've seen a spec update when we retry.
@@ -61,7 +61,7 @@ func updateReplicaSetStatus(c unversionedextensions.ReplicaSetInterface, rs exte
 	newStatus.ObservedGeneration = rs.Generation
 
 	var getErr error
-	for i, rs := 0, &rs; ; i++ {
+	for i, rs := 0, rs; ; i++ {
 		glog.V(4).Infof(fmt.Sprintf("Updating replica count for ReplicaSet: %s/%s, ", rs.Namespace, rs.Name) +
 			fmt.Sprintf("replicas %d->%d (need %d), ", rs.Status.Replicas, newStatus.Replicas, *(rs.Spec.Replicas)) +
 			fmt.Sprintf("fullyLabeledReplicas %d->%d, ", rs.Status.FullyLabeledReplicas, newStatus.FullyLabeledReplicas) +
@@ -83,7 +83,7 @@ func updateReplicaSetStatus(c unversionedextensions.ReplicaSetInterface, rs exte
 	}
 }
 
-func calculateStatus(rs extensions.ReplicaSet, filteredPods []*v1.Pod, manageReplicasErr error) extensions.ReplicaSetStatus {
+func calculateStatus(rs *extensions.ReplicaSet, filteredPods []*v1.Pod, manageReplicasErr error) extensions.ReplicaSetStatus {
 	newStatus := rs.Status
 	// Count the number of pods that have labels matching the labels of the pod
 	// template of the replica set, the matching pods may have more

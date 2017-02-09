@@ -21,17 +21,17 @@ import (
 	"strings"
 
 	"github.com/golang/glog"
-	"k8s.io/kubernetes/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/kubernetes/pkg/api/v1"
 	extensions "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
-	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
-	"k8s.io/kubernetes/pkg/labels"
-	"k8s.io/kubernetes/pkg/runtime/schema"
 )
 
 type PodControllerRefManager struct {
 	podControl         PodControlInterface
-	controllerObject   v1.ObjectMeta
+	controllerObject   metav1.ObjectMeta
 	controllerSelector labels.Selector
 	controllerKind     schema.GroupVersionKind
 }
@@ -40,7 +40,7 @@ type PodControllerRefManager struct {
 // methods to manage the controllerRef of pods.
 func NewPodControllerRefManager(
 	podControl PodControlInterface,
-	controllerObject v1.ObjectMeta,
+	controllerObject metav1.ObjectMeta,
 	controllerSelector labels.Selector,
 	controllerKind schema.GroupVersionKind,
 ) *PodControllerRefManager {
@@ -66,7 +66,7 @@ func (m *PodControllerRefManager) Classify(pods []*v1.Pod) (
 				pod.Namespace, pod.Name, pod.Status.Phase, pod.DeletionTimestamp)
 			continue
 		}
-		controllerRef := GetControllerOf(pod.ObjectMeta)
+		controllerRef := GetControllerOf(&pod.ObjectMeta)
 		if controllerRef != nil {
 			if controllerRef.UID == m.controllerObject.UID {
 				// already controlled
@@ -93,11 +93,12 @@ func (m *PodControllerRefManager) Classify(pods []*v1.Pod) (
 
 // GetControllerOf returns the controllerRef if controllee has a controller,
 // otherwise returns nil.
-func GetControllerOf(controllee v1.ObjectMeta) *metav1.OwnerReference {
-	for _, owner := range controllee.OwnerReferences {
+func GetControllerOf(controllee *metav1.ObjectMeta) *metav1.OwnerReference {
+	for i := range controllee.OwnerReferences {
+		owner := &controllee.OwnerReferences[i]
 		// controlled by other controller
 		if owner.Controller != nil && *owner.Controller == true {
-			return &owner
+			return owner
 		}
 	}
 	return nil
@@ -108,7 +109,7 @@ func GetControllerOf(controllee v1.ObjectMeta) *metav1.OwnerReference {
 func (m *PodControllerRefManager) AdoptPod(pod *v1.Pod) error {
 	// we should not adopt any pods if the controller is about to be deleted
 	if m.controllerObject.DeletionTimestamp != nil {
-		return fmt.Errorf("cancel the adopt attempt for pod %s because the controlller is being deleted",
+		return fmt.Errorf("cancel the adopt attempt for pod %s because the controller is being deleted",
 			strings.Join([]string{pod.Namespace, pod.Name, string(pod.UID)}, "_"))
 	}
 	addControllerPatch := fmt.Sprintf(
@@ -152,7 +153,7 @@ func (m *PodControllerRefManager) ReleasePod(pod *v1.Pod) error {
 // for more details.
 type ReplicaSetControllerRefManager struct {
 	rsControl          RSControlInterface
-	controllerObject   v1.ObjectMeta
+	controllerObject   metav1.ObjectMeta
 	controllerSelector labels.Selector
 	controllerKind     schema.GroupVersionKind
 }
@@ -161,7 +162,7 @@ type ReplicaSetControllerRefManager struct {
 // methods to manage the controllerRef of ReplicaSets.
 func NewReplicaSetControllerRefManager(
 	rsControl RSControlInterface,
-	controllerObject v1.ObjectMeta,
+	controllerObject metav1.ObjectMeta,
 	controllerSelector labels.Selector,
 	controllerKind schema.GroupVersionKind,
 ) *ReplicaSetControllerRefManager {
@@ -183,7 +184,7 @@ func (m *ReplicaSetControllerRefManager) Classify(replicaSets []*extensions.Repl
 	controlledDoesNotMatch []*extensions.ReplicaSet) {
 	for i := range replicaSets {
 		replicaSet := replicaSets[i]
-		controllerRef := GetControllerOf(replicaSet.ObjectMeta)
+		controllerRef := GetControllerOf(&replicaSet.ObjectMeta)
 		if controllerRef != nil {
 			if controllerRef.UID != m.controllerObject.UID {
 				// ignoring the ReplicaSet controlled by other Deployment

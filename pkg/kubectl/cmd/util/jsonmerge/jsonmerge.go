@@ -23,8 +23,8 @@ import (
 	"github.com/evanphx/json-patch"
 	"github.com/golang/glog"
 
-	"k8s.io/kubernetes/pkg/util/strategicpatch"
-	"k8s.io/kubernetes/pkg/util/yaml"
+	"k8s.io/apimachinery/pkg/util/mergepatch"
+	"k8s.io/apimachinery/pkg/util/yaml"
 )
 
 // Delta represents a change between two JSON documents.
@@ -161,7 +161,7 @@ func (d *Delta) Apply(latest []byte) ([]byte, error) {
 	}
 
 	glog.V(6).Infof("Testing for conflict between:\n%s\n%s", string(d.edit), string(changes))
-	hasConflicts, err := strategicpatch.HasConflicts(diff1, diff2)
+	hasConflicts, err := mergepatch.HasConflicts(diff1, diff2)
 	if err != nil {
 		return nil, err
 	}

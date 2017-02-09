@@ -20,6 +20,7 @@ import (
 	"strings"
 	"testing"
 
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/kubernetes/pkg/api/testapi"
 )
 
@@ -44,6 +45,16 @@ func TestReplaceAliases(t *testing.T) {
 			arg:      "all,secrets",
 			expected: "pods,replicationcontrollers,services,statefulsets,horizontalpodautoscalers,jobs,deployments,replicasets,secrets",
 		},
+		{
+			name:     "sc-resolves-to-storageclasses",
+			arg:      "sc",
+			expected: "storageclasses",
+		},
+		{
+			name:     "storageclasses-no-replacement",
+			arg:      "storageclasses",
+			expected: "storageclasses",
+		},
 	}
 
 	mapper := NewShortcutExpander(testapi.Default.RESTMapper(), nil)
@@ -56,6 +67,33 @@ func TestReplaceAliases(t *testing.T) {
 		}
 		if strings.Join(resources, ",") != test.expected {
 			t.Errorf("%s: unexpected argument: expected %s, got %s", test.name, test.expected, resources)
+		}
+	}
+}
+func TestKindFor(t *testing.T) {
+	tests := []struct {
+		in       schema.GroupVersionResource
+		expected schema.GroupVersionKind
+	}{
+		{
+			in:       schema.GroupVersionResource{Group: "storage.k8s.io", Version: "", Resource: "sc"},
+			expected: schema.GroupVersionKind{Group: "storage.k8s.io", Version: "v1beta1", Kind: "StorageClass"},
+		},
+		{
+			in:       schema.GroupVersionResource{Group: "", Version: "", Resource: "sc"},
+			expected: schema.GroupVersionKind{Group: "storage.k8s.io", Version: "v1beta1", Kind: "StorageClass"},
+		},
+	}
+
+	mapper := NewShortcutExpander(testapi.Default.RESTMapper(), nil)
+
+	for i, test := range tests {
+		ret, err := mapper.KindFor(test.in)
+		if err != nil {
+			t.Errorf("%d: unexpected error returned %s", i, err.Error())
+		}
+		if ret != test.expected {
+			t.Errorf("%d: unexpected data returned %#v, expected %#v", i, ret, test.expected)
 		}
 	}
 }

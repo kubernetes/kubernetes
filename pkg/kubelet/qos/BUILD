@@ -8,35 +8,46 @@ load(
     "go_test",
 )
 
-go_library(
-    name = "go_default_library",
-    srcs = [
-        "doc.go",
-        "policy.go",
-        "qos.go",
-        "types.go",
-    ],
-    tags = ["automanaged"],
-    deps = [
-        "//pkg/api:go_default_library",
-        "//pkg/api/resource:go_default_library",
-        "//pkg/api/v1:go_default_library",
-        "//pkg/kubelet/types:go_default_library",
-        "//pkg/util/sets:go_default_library",
-    ],
-)
-
 go_test(
     name = "go_default_test",
     srcs = [
         "policy_test.go",
         "qos_test.go",
     ],
-    library = "go_default_library",
+    library = ":go_default_library",
     tags = ["automanaged"],
     deps = [
-        "//pkg/api/resource:go_default_library",
         "//pkg/api/v1:go_default_library",
-        "//pkg/kubelet/types:go_default_library",
+        "//vendor:k8s.io/apimachinery/pkg/api/resource",
+        "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
     ],
+)
+
+go_library(
+    name = "go_default_library",
+    srcs = [
+        "doc.go",
+        "policy.go",
+        "qos.go",
+    ],
+    tags = ["automanaged"],
+    deps = [
+        "//pkg/api:go_default_library",
+        "//pkg/api/v1:go_default_library",
+        "//vendor:k8s.io/apimachinery/pkg/api/resource",
+        "//vendor:k8s.io/apimachinery/pkg/util/sets",
+    ],
+)
+
+filegroup(
+    name = "package-srcs",
+    srcs = glob(["**"]),
+    tags = ["automanaged"],
+    visibility = ["//visibility:private"],
+)
+
+filegroup(
+    name = "all-srcs",
+    srcs = [":package-srcs"],
+    tags = ["automanaged"],
 )

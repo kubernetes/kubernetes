@@ -22,13 +22,12 @@ import (
 	"net/http"
 	"net/url"
 
-	"k8s.io/client-go/pkg/api"
-	"k8s.io/client-go/pkg/api/testapi"
-	"k8s.io/client-go/pkg/apimachinery/registered"
-	"k8s.io/client-go/pkg/runtime"
-	"k8s.io/client-go/pkg/runtime/schema"
-	"k8s.io/client-go/pkg/util/flowcontrol"
-	"k8s.io/client-go/rest"
+	"k8s.io/apimachinery/pkg/apimachinery/registered"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
+	restclient "k8s.io/client-go/rest"
+	"k8s.io/client-go/util/flowcontrol"
 )
 
 func CreateHTTPClient(roundTripper func(*http.Request) (*http.Response, error)) *http.Client {
@@ -48,71 +47,71 @@ type RESTClient struct {
 	Client               *http.Client
 	NegotiatedSerializer runtime.NegotiatedSerializer
 	GroupName            string
+	APIRegistry          *registered.APIRegistrationManager
+	VersionedAPIPath     string
 
 	Req  *http.Request
 	Resp *http.Response
 	Err  error
 }
 
-func (c *RESTClient) Get() *rest.Request {
+func (c *RESTClient) Get() *restclient.Request {
 	return c.request("GET")
 }
 
-func (c *RESTClient) Put() *rest.Request {
+func (c *RESTClient) Put() *restclient.Request {
 	return c.request("PUT")
 }
 
-func (c *RESTClient) Patch(_ api.PatchType) *rest.Request {
-	return c.request("PATCH")
+func (c *RESTClient) Patch(pt types.PatchType) *restclient.Request {
+	return c.request("PATCH").SetHeader("Content-Type", string(pt))
 }
 
-func (c *RESTClient) Post() *rest.Request {
+func (c *RESTClient) Post() *restclient.Request {
 	return c.request("POST")
 }
 
-func (c *RESTClient) Delete() *rest.Request {
+func (c *RESTClient) Delete() *restclient.Request {
 	return c.request("DELETE")
 }
 
-func (c *RESTClient) Verb(verb string) *rest.Request {
+func (c *RESTClient) Verb(verb string) *restclient.Request {
 	return c.request(verb)
 }
 
 func (c *RESTClient) APIVersion() schema.GroupVersion {
-	return *(testapi.Default.GroupVersion())
+	return c.APIRegistry.GroupOrDie("").GroupVersion
 }
 
 func (c *RESTClient) GetRateLimiter() flowcontrol.RateLimiter {
 	return nil
 }
 
-func (c *RESTClient) request(verb string) *rest.Request {
-	config := rest.ContentConfig{
-		ContentType:          runtime.ContentTypeJSON,
-		GroupVersion:         &registered.GroupOrDie(api.GroupName).GroupVersion,
+func (c *RESTClient) request(verb string) *restclient.Request {
+	config := restclient.ContentConfig{
+		ContentType: runtime.ContentTypeJSON,
+		// TODO this was hardcoded before, but it doesn't look right
+		GroupVersion:         &c.APIRegistry.GroupOrDie("").GroupVersion,
 		NegotiatedSerializer: c.NegotiatedSerializer,
 	}
 
-	groupName := api.GroupName
-	if c.GroupName != "" {
-		groupName = c.GroupName
-	}
 	ns := c.NegotiatedSerializer
 	info, _ := runtime.SerializerInfoForMediaType(ns.SupportedMediaTypes(), runtime.ContentTypeJSON)
 	internalVersion := schema.GroupVersion{
-		Group:   registered.GroupOrDie(groupName).GroupVersion.Group,
+		Group:   c.APIRegistry.GroupOrDie(c.GroupName).GroupVersion.Group,
 		Version: runtime.APIVersionInternal,
 	}
 	internalVersion.Version = runtime.APIVersionInternal
-	serializers := rest.Serializers{
-		Encoder: ns.EncoderForVersion(info.Serializer, registered.GroupOrDie(api.GroupName).GroupVersion),
+	serializers := restclient.Serializers{
+		// TODO this was hardcoded before, but it doesn't look right
+		Encoder: ns.EncoderForVersion(info.Serializer, c.APIRegistry.GroupOrDie("").GroupVersion),
 		Decoder: ns.DecoderToVersion(info.Serializer, internalVersion),
 	}
 	if info.StreamSerializer != nil {
 		serializers.StreamingSerializer = info.StreamSerializer.Serializer
 		serializers.Framer = info.StreamSerializer.Framer
 	}
-	return rest.NewRequest(c, verb, &url.URL{Host: "localhost"}, "", config, serializers, nil, nil)
+	return restclient.NewRequest(c, verb, &url.URL{Host: "localhost"}, c.VersionedAPIPath, config, serializers, nil, nil)
 }
 
 func (c *RESTClient) Do(req *http.Request) (*http.Response, error) {

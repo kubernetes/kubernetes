@@ -25,14 +25,14 @@ import (
 
 	"github.com/golang/glog"
 
-	"k8s.io/kubernetes/pkg/admission"
+	"k8s.io/apimachinery/pkg/api/meta"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/apiserver/pkg/admission"
+	"k8s.io/client-go/util/workqueue"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/quota"
-	utilruntime "k8s.io/kubernetes/pkg/util/runtime"
-	"k8s.io/kubernetes/pkg/util/sets"
-	"k8s.io/kubernetes/pkg/util/wait"
-	"k8s.io/kubernetes/pkg/util/workqueue"
 	_ "k8s.io/kubernetes/pkg/util/workqueue/prometheus" // for workqueue metric registration
 )
 
@@ -45,8 +45,8 @@ type Evaluator interface {
 
 type quotaEvaluator struct {
 	quotaAccessor QuotaAccessor
-	// lockAquisitionFunc acquires any required locks and returns a cleanup method to defer
-	lockAquisitionFunc func([]api.ResourceQuota) func()
+	// lockAcquisitionFunc acquires any required locks and returns a cleanup method to defer
+	lockAcquisitionFunc func([]api.ResourceQuota) func()
 
 	// registry that knows how to measure usage for objects
 	registry quota.Registry
@@ -99,10 +99,10 @@ func newAdmissionWaiter(a admission.Attributes) *admissionWaiter {
 // NewQuotaEvaluator configures an admission controller that can enforce quota constraints
 // using the provided registry.  The registry must have the capability to handle group/kinds that
 // are persisted by the server this admission controller is intercepting
-func NewQuotaEvaluator(quotaAccessor QuotaAccessor, registry quota.Registry, lockAquisitionFunc func([]api.ResourceQuota) func(), workers int, stopCh <-chan struct{}) Evaluator {
+func NewQuotaEvaluator(quotaAccessor QuotaAccessor, registry quota.Registry, lockAcquisitionFunc func([]api.ResourceQuota) func(), workers int, stopCh <-chan struct{}) Evaluator {
 	return &quotaEvaluator{
-		quotaAccessor:      quotaAccessor,
-		lockAquisitionFunc: lockAquisitionFunc,
+		quotaAccessor:       quotaAccessor,
+		lockAcquisitionFunc: lockAcquisitionFunc,
 
 		registry: registry,
 
@@ -173,8 +173,8 @@ func (e *quotaEvaluator) checkAttributes(ns string, admissionAttributes []*admis
 		return
 	}
 
-	if e.lockAquisitionFunc != nil {
-		releaseLocks := e.lockAquisitionFunc(quotas)
+	if e.lockAcquisitionFunc != nil {
+		releaseLocks := e.lockAcquisitionFunc(quotas)
 		defer releaseLocks()
 	}
 

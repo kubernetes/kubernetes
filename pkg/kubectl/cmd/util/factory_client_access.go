@@ -32,25 +32,23 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 
+	"k8s.io/apimachinery/pkg/api/meta"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	utilflag "k8s.io/apiserver/pkg/util/flag"
+	"k8s.io/client-go/discovery"
+	restclient "k8s.io/client-go/rest"
+	"k8s.io/client-go/tools/clientcmd"
+	"k8s.io/client-go/util/homedir"
 	fedclientset "k8s.io/kubernetes/federation/client/clientset_generated/federation_internalclientset"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/api/service"
-	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	"k8s.io/kubernetes/pkg/apis/apps"
 	"k8s.io/kubernetes/pkg/apis/batch"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
-	"k8s.io/kubernetes/pkg/client/restclient"
-	"k8s.io/kubernetes/pkg/client/typed/discovery"
-	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
 	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
-	"k8s.io/kubernetes/pkg/registry/extensions/thirdpartyresourcedata"
-	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/runtime/schema"
-	utilflag "k8s.io/kubernetes/pkg/util/flag"
-	"k8s.io/kubernetes/pkg/util/homedir"
 )
 
 type ring0Factory struct {
@@ -210,11 +208,11 @@ func (f *ring0Factory) Decoder(toInternal bool) runtime.Decoder {
 	} else {
 		decoder = api.Codecs.UniversalDeserializer()
 	}
-	return thirdpartyresourcedata.NewDecoder(decoder, "")
+	return decoder
 }
 
 func (f *ring0Factory) JSONEncoder() runtime.Encoder {
-	return api.Codecs.LegacyCodec(registered.EnabledVersions()...)
+	return api.Codecs.LegacyCodec(api.Registry.EnabledVersions()...)
 }
 
 func (f *ring0Factory) UpdatePodSpecForObject(obj runtime.Object, fn func(*api.PodSpec) error) (bool, error) {
@@ -433,32 +431,31 @@ func (f *ring0Factory) DefaultNamespace() (string, bool, error) {
 }
 
 const (
-	RunV1GeneratorName                          = "run/v1"
-	RunPodV1GeneratorName                       = "run-pod/v1"
-	ServiceV1GeneratorName                      = "service/v1"
-	ServiceV2GeneratorName                      = "service/v2"
-	ServiceNodePortGeneratorV1Name              = "service-nodeport/v1"
-	ServiceClusterIPGeneratorV1Name             = "service-clusterip/v1"
-	ServiceLoadBalancerGeneratorV1Name          = "service-loadbalancer/v1"
-	ServiceExternalNameGeneratorV1Name          = "service-externalname/v1"
-	ServiceAccountV1GeneratorName               = "serviceaccount/v1"
-	HorizontalPodAutoscalerV1Beta1GeneratorName = "horizontalpodautoscaler/v1beta1"
-	HorizontalPodAutoscalerV1GeneratorName      = "horizontalpodautoscaler/v1"
-	DeploymentV1Beta1GeneratorName              = "deployment/v1beta1"
-	DeploymentBasicV1Beta1GeneratorName         = "deployment-basic/v1beta1"
-	JobV1GeneratorName                          = "job/v1"
-	CronJobV2Alpha1GeneratorName                = "cronjob/v2alpha1"
-	ScheduledJobV2Alpha1GeneratorName           = "scheduledjob/v2alpha1"
-	NamespaceV1GeneratorName                    = "namespace/v1"
-	ResourceQuotaV1GeneratorName                = "resourcequotas/v1"
-	SecretV1GeneratorName                       = "secret/v1"
-	SecretForDockerRegistryV1GeneratorName      = "secret-for-docker-registry/v1"
-	SecretForTLSV1GeneratorName                 = "secret-for-tls/v1"
-	ConfigMapV1GeneratorName                    = "configmap/v1"
-	ClusterRoleBindingV1GeneratorName           = "clusterrolebinding.rbac.authorization.k8s.io/v1alpha1"
-	RoleBindingV1GeneratorName                  = "rolebinding.rbac.authorization.k8s.io/v1alpha1"
-	ClusterV1Beta1GeneratorName                 = "cluster/v1beta1"
-	PodDisruptionBudgetV1GeneratorName          = "poddisruptionbudget/v1beta1"
+	RunV1GeneratorName                     = "run/v1"
+	RunPodV1GeneratorName                  = "run-pod/v1"
+	ServiceV1GeneratorName                 = "service/v1"
+	ServiceV2GeneratorName                 = "service/v2"
+	ServiceNodePortGeneratorV1Name         = "service-nodeport/v1"
+	ServiceClusterIPGeneratorV1Name        = "service-clusterip/v1"
+	ServiceLoadBalancerGeneratorV1Name     = "service-loadbalancer/v1"
+	ServiceExternalNameGeneratorV1Name     = "service-externalname/v1"
+	ServiceAccountV1GeneratorName          = "serviceaccount/v1"
+	HorizontalPodAutoscalerV1GeneratorName = "horizontalpodautoscaler/v1"
+	DeploymentV1Beta1GeneratorName         = "deployment/v1beta1"
+	DeploymentBasicV1Beta1GeneratorName    = "deployment-basic/v1beta1"
+	JobV1GeneratorName                     = "job/v1"
+	CronJobV2Alpha1GeneratorName           = "cronjob/v2alpha1"
+	ScheduledJobV2Alpha1GeneratorName      = "scheduledjob/v2alpha1"
+	NamespaceV1GeneratorName               = "namespace/v1"
+	ResourceQuotaV1GeneratorName           = "resourcequotas/v1"
+	SecretV1GeneratorName                  = "secret/v1"
+	SecretForDockerRegistryV1GeneratorName = "secret-for-docker-registry/v1"
+	SecretForTLSV1GeneratorName            = "secret-for-tls/v1"
+	ConfigMapV1GeneratorName               = "configmap/v1"
+	ClusterRoleBindingV1GeneratorName      = "clusterrolebinding.rbac.authorization.k8s.io/v1alpha1"
+	RoleBindingV1GeneratorName             = "rolebinding.rbac.authorization.k8s.io/v1alpha1"
+	ClusterV1Beta1GeneratorName            = "cluster/v1beta1"
+	PodDisruptionBudgetV1GeneratorName     = "poddisruptionbudget/v1beta1"
 )
 
 // DefaultGenerators returns the set of default generators for use in Factory instances
@@ -497,8 +494,7 @@ func DefaultGenerators(cmdName string) map[string]kubectl.Generator {
 		}
 	case "autoscale":
 		generator = map[string]kubectl.Generator{
-			HorizontalPodAutoscalerV1Beta1GeneratorName: kubectl.HorizontalPodAutoscalerV1Beta1{},
-			HorizontalPodAutoscalerV1GeneratorName:      kubectl.HorizontalPodAutoscalerV1{},
+			HorizontalPodAutoscalerV1GeneratorName: kubectl.HorizontalPodAutoscalerV1{},
 		}
 	case "namespace":
 		generator = map[string]kubectl.Generator{

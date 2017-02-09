@@ -2,23 +2,23 @@
 	"kind": "ReplicationController",
 	"apiVersion": "v1",
 	"metadata": {
-		"name": "heapster-v1.2.0",
+		"name": "heapster-v1.3.0-beta.0",
 		"labels": {
 			"k8s-app": "heapster",
-			"version": "v1.2.0"
+			"version": "v1.3.0-beta.0"
 		}
 	},
 	"spec": {
 		"replicas": 1,
 		"selector": {
 			"k8s-app": "heapster",
-			"version": "v1.2.0"
+			"version": "v1.3.0-beta.0"
 		},
 		"template": {
 			"metadata": {
 				"labels": {
 					"k8s-app": "heapster",
-					"version": "v1.2.0"
+					"version": "v1.3.0-beta.0"
 				}
 			},
 			"spec": {
@@ -33,7 +33,7 @@
 				"containers": [
 				{
 					"name": "heapster",
-					"image": "gcr.io/google_containers/heapster:v1.2.0",
+					"image": "gcr.io/google_containers/heapster:v1.3.0-beta.0",
 					"resources": {
 						"requests": {
 							"cpu": "100m",
@@ -44,7 +44,7 @@
 						"/heapster"
 					],
 					"args": [
-						"--source=kubernetes:https://{{MASTER_IP}}:443?inClusterConfig=0&useServiceAccount=0&auth=/kubeconfig/kubeconfig"
+						"--source=kubernetes:https://{{MASTER_IP}}:443?inClusterConfig=0&useServiceAccount=0&auth=/kubeconfig/heapster.kubeconfig"
 					],
 					"volumeMounts": [
 						{
@@ -55,7 +55,7 @@
 				},
 				{
 					"name": "eventer",
-					"image": "gcr.io/google_containers/heapster:v1.2.0",
+					"image": "gcr.io/google_containers/heapster:v1.3.0-beta.0",
 					"resources": {
 						"requests": {
 							"cpu": "100m",
@@ -66,7 +66,7 @@
 						"/eventer"
 					],
 					"args": [
-						"--source=kubernetes:https://104.197.233.84:443?inClusterConfig=0&useServiceAccount=0&auth=/kubeconfig/kubeconfig"
+						"--source=kubernetes:https://{{MASTER_IP}}:443?inClusterConfig=0&useServiceAccount=0&auth=/kubeconfig/heapster.kubeconfig"
 					],
 					"volumeMounts": [
 						{

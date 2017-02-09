@@ -57,12 +57,11 @@ func (g *genGroup) Imports(c *generator.Context) (imports []string) {
 
 func (g *genGroup) GenerateType(c *generator.Context, t *types.Type, w io.Writer) error {
 	sw := generator.NewSnippetWriter(w, c, "$", "$")
-	const pkgRESTClient = "k8s.io/kubernetes/pkg/client/restclient"
-	const pkgRegistered = "k8s.io/kubernetes/pkg/apimachinery/registered"
+	const pkgRESTClient = "k8s.io/client-go/rest"
 	const pkgAPI = "k8s.io/kubernetes/pkg/api"
-	const pkgSerializer = "k8s.io/kubernetes/pkg/runtime/serializer"
+	const pkgSerializer = "k8s.io/apimachinery/pkg/runtime/serializer"
 	const pkgUnversioned = "k8s.io/kubernetes/pkg/api/unversioned"
-	const pkgSchema = "k8s.io/kubernetes/pkg/runtime/schema"
+	const pkgSchema = "k8s.io/apimachinery/pkg/runtime/schema"
 
 	apiPath := func(group string) string {
 		if len(g.apiPath) > 0 {
@@ -94,11 +93,9 @@ func (g *genGroup) GenerateType(c *generator.Context, t *types.Type, w io.Writer
 		"DefaultKubernetesUserAgent": c.Universe.Function(types.Name{Package: pkgRESTClient, Name: "DefaultKubernetesUserAgent"}),
 		"RESTClientInterface":        c.Universe.Type(types.Name{Package: pkgRESTClient, Name: "Interface"}),
 		"RESTClientFor":              c.Universe.Function(types.Name{Package: pkgRESTClient, Name: "RESTClientFor"}),
-		"Group":                      c.Universe.Variable(types.Name{Package: pkgRegistered, Name: "Group"}),
-		"GroupOrDie":                 c.Universe.Variable(types.Name{Package: pkgRegistered, Name: "GroupOrDie"}),
-		"IsEnabledVersion":           c.Universe.Variable(types.Name{Package: pkgRegistered, Name: "IsEnabledVersion"}),
 		"ParseGroupVersion":          c.Universe.Function(types.Name{Package: pkgSchema, Name: "ParseGroupVersion"}),
 		"apiPath":                    apiPath(g.group),
+		"apiRegistry":                c.Universe.Variable(types.Name{Package: pkgAPI, Name: "Registry"}),
 		"codecs":                     c.Universe.Variable(types.Name{Package: pkgAPI, Name: "Codecs"}),
 		"directCodecFactory":         c.Universe.Variable(types.Name{Package: pkgSerializer, Name: "DirectCodecFactory"}),
 		"Errorf":                     c.Universe.Variable(types.Name{Package: "fmt", Name: "Errorf"}),
@@ -140,7 +137,7 @@ type $.GroupVersion$Interface interface {
 `
 
 var groupClientTemplate = `
-// $.GroupVersion$Client is used to interact with features provided by the $.Group$ group.
+// $.GroupVersion$Client is used to interact with features provided by the $.groupName$ group.
 type $.GroupVersion$Client struct {
 	restClient $.RESTClientInterface|raw$
 }
@@ -205,7 +202,7 @@ func New(c $.RESTClientInterface|raw$) *$.GroupVersion$Client {
 var setInternalVersionClientDefaultsTemplate = `
 func setConfigDefaults(config *$.Config|raw$) error {
 	// if $.group$ group is not registered, return an error
-	g, err := $.Group|raw$("$.groupName$")
+	g, err := $.apiRegistry|raw$.Group("$.groupName$")
 	if err != nil {
 		return err
 	}
@@ -236,7 +233,7 @@ func setConfigDefaults(config *$.Config|raw$) error {
 		return err
 	}
 	// if $.groupName$/$.version$ is not enabled, return an error
-	if ! $.IsEnabledVersion|raw$(gv) {
+	if ! $.apiRegistry|raw$.IsEnabledVersion(gv) {
 		return $.Errorf|raw$("$.groupName$/$.version$ is not enabled")
 	}
 	config.APIPath = $.apiPath$

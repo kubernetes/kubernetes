@@ -19,13 +19,13 @@ package validation
 import (
 	"fmt"
 
+	"k8s.io/apimachinery/pkg/api/meta"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/validation"
+	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/meta"
 	apiutil "k8s.io/kubernetes/pkg/api/util"
-	"k8s.io/kubernetes/pkg/apimachinery/registered"
-	"k8s.io/kubernetes/pkg/runtime/schema"
-	"k8s.io/kubernetes/pkg/util/validation"
-	"k8s.io/kubernetes/pkg/util/validation/field"
 )
 
 // ValidateEvent makes sure that the event makes sense.
@@ -35,7 +35,7 @@ func ValidateEvent(event *api.Event) field.ErrorList {
 	// Make sure event.Namespace and the involvedObject.Namespace agree
 	if len(event.InvolvedObject.Namespace) == 0 {
 		// event.Namespace must also be empty (or "default", for compatibility with old clients)
-		if event.Namespace != api.NamespaceNone && event.Namespace != api.NamespaceDefault {
+		if event.Namespace != metav1.NamespaceNone && event.Namespace != metav1.NamespaceDefault {
 			allErrs = append(allErrs, field.Invalid(field.NewPath("involvedObject", "namespace"), event.InvolvedObject.Namespace, "does not match event.namespace"))
 		}
 	} else {
@@ -64,7 +64,7 @@ func ValidateEvent(event *api.Event) field.ErrorList {
 // Check whether the kind in groupVersion is scoped at the root of the api hierarchy
 func isNamespacedKind(kind, groupVersion string) (bool, error) {
 	group := apiutil.GetGroup(groupVersion)
-	g, err := registered.Group(group)
+	g, err := api.Registry.Group(group)
 	if err != nil {
 		return false, err
 	}

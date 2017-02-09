@@ -7,6 +7,7 @@ advertised-address
 algorithm-provider
 all-namespaces
 allocate-node-cidrs
+allow-missing-template-keys
 allow-privileged
 allowed-not-ready-nodes
 anonymous-auth
@@ -18,6 +19,8 @@ api-prefix
 api-rate
 api-server-port
 api-servers
+api-server-advertise-address
+api-server-service-type
 api-token
 api-version
 apiserver-count
@@ -62,6 +65,7 @@ cert-dir
 certificate-authority
 cgroup-driver
 cgroup-root
+cgroups-per-qos
 chaos-chance
 clean-start
 cleanup
@@ -116,7 +120,6 @@ controller-start-interval
 cors-allowed-origins
 cpu-cfs-quota
 cpu-percent
-create-external-load-balancer
 current-release-pr
 current-replicas
 daemonset-lookup-cache-size
@@ -158,7 +161,6 @@ duration-sec
 e2e-output-dir
 e2e-verify-service-account
 enable-controller-attach-detach
-enable-cri
 enable-custom-metrics
 enable-debugging-handlers
 enable-dynamic-provisioning
@@ -176,6 +178,7 @@ etcd-keyfile
 etcd-mutation-timeout
 etcd-prefix
 etcd-pv-capacity
+etcd-persistent-storage
 etcd-quorum-read
 etcd-server
 etcd-servers
@@ -196,7 +199,6 @@ executor-suicide-timeout
 exit-on-lock-contention
 experimental-allowed-unsafe-sysctls
 experimental-bootstrap-kubeconfig
-experimental-cgroups-per-qos
 experimental-keystone-url
 experimental-keystone-ca-file
 experimental-mounter-path
@@ -307,6 +309,7 @@ junit-file-number
 k8s-bin-dir
 k8s-build-output
 keep-gogoproto
+keep-terminated-pod-volumes
 km-path
 kops-admin-access
 kops-cluster
@@ -324,6 +327,7 @@ kube-master
 kube-master-url
 kube-reserved
 kubeadm-path
+kubeadm-cmd-skip
 kubecfg-file
 kubectl-path
 kubelet-address
@@ -541,6 +545,7 @@ seccomp-profile-root
 secondary-node-eviction-rate
 secret-name
 secure-port
+self-hosted
 serialize-image-pulls
 server-start-timeout
 service-account-key-file
@@ -573,6 +578,7 @@ sort-by
 source-file
 ssh-env
 ssh-keyfile
+ssh-key
 ssh-options
 ssh-user
 start-services
@@ -635,3 +641,5 @@ garbage-collector-enabled
 viper-config
 log-lines-total
 run-duration
+attach-detach-reconcile-sync-period
+disable-attach-detach-reconcile-sync

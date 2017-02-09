@@ -21,9 +21,9 @@ import (
 	"sort"
 	"testing"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/api/v1"
 	extensions "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
-	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm"
 	schedulerapi "k8s.io/kubernetes/plugin/pkg/scheduler/api"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/schedulercache"
@@ -70,25 +70,25 @@ func TestSelectorSpreadPriority(t *testing.T) {
 			test:         "nothing scheduled",
 		},
 		{
-			pod:          &v1.Pod{ObjectMeta: v1.ObjectMeta{Labels: labels1}},
+			pod:          &v1.Pod{ObjectMeta: metav1.ObjectMeta{Labels: labels1}},
 			pods:         []*v1.Pod{{Spec: zone1Spec}},
 			nodes:        []string{"machine1", "machine2"},
 			expectedList: []schedulerapi.HostPriority{{Host: "machine1", Score: 10}, {Host: "machine2", Score: 10}},
 			test:         "no services",
 		},
 		{
-			pod:          &v1.Pod{ObjectMeta: v1.ObjectMeta{Labels: labels1}},
-			pods:         []*v1.Pod{{Spec: zone1Spec, ObjectMeta: v1.ObjectMeta{Labels: labels2}}},
+			pod:          &v1.Pod{ObjectMeta: metav1.ObjectMeta{Labels: labels1}},
+			pods:         []*v1.Pod{{Spec: zone1Spec, ObjectMeta: metav1.ObjectMeta{Labels: labels2}}},
 			nodes:        []string{"machine1", "machine2"},
 			services:     []*v1.Service{{Spec: v1.ServiceSpec{Selector: map[string]string{"key": "value"}}}},
 			expectedList: []schedulerapi.HostPriority{{Host: "machine1", Score: 10}, {Host: "machine2", Score: 10}},
 			test:         "different services",
 		},
 		{
-			pod: &v1.Pod{ObjectMeta: v1.ObjectMeta{Labels: labels1}},
+			pod: &v1.Pod{ObjectMeta: metav1.ObjectMeta{Labels: labels1}},
 			pods: []*v1.Pod{
-				{Spec: zone1Spec, ObjectMeta: v1.ObjectMeta{Labels: labels2}},
-				{Spec: zone2Spec, ObjectMeta: v1.ObjectMeta{Labels: labels1}},
+				{Spec: zone1Spec, ObjectMeta: metav1.ObjectMeta{Labels: labels2}},
+				{Spec: zone2Spec, ObjectMeta: metav1.ObjectMeta{Labels: labels1}},
 			},
 			nodes:        []string{"machine1", "machine2"},
 			services:     []*v1.Service{{Spec: v1.ServiceSpec{Selector: labels1}}},
@@ -96,13 +96,13 @@ func TestSelectorSpreadPriority(t *testing.T) {
 			test:         "two pods, one service pod",
 		},
 		{
-			pod: &v1.Pod{ObjectMeta: v1.ObjectMeta{Labels: labels1}},
+			pod: &v1.Pod{ObjectMeta: metav1.ObjectMeta{Labels: labels1}},
 			pods: []*v1.Pod{
-				{Spec: zone1Spec, ObjectMeta: v1.ObjectMeta{Labels: labels2}},
-				{Spec: zone1Spec, ObjectMeta: v1.ObjectMeta{Labels: labels1, Namespace: v1.NamespaceDefault}},
-				{Spec: zone1Spec, ObjectMeta: v1.ObjectMeta{Labels: labels1, Namespace: "ns1"}},
-				{Spec: zone2Spec, ObjectMeta: v1.ObjectMeta{Labels: labels1}},
-				{Spec: zone2Spec, ObjectMeta: v1.ObjectMeta{Labels: labels2}},
+				{Spec: zone1Spec, ObjectMeta: metav1.ObjectMeta{Labels: labels2}},
+				{Spec: zone1Spec, ObjectMeta: metav1.ObjectMeta{Labels: labels1, Namespace: metav1.NamespaceDefault}},
+				{Spec: zone1Spec, ObjectMeta: metav1.ObjectMeta{Labels: labels1, Namespace: "ns1"}},
+				{Spec: zone2Spec, ObjectMeta: metav1.ObjectMeta{Labels: labels1}},
+				{Spec: zone2Spec, ObjectMeta: metav1.ObjectMeta{Labels: labels2}},
 			},
 			nodes:        []string{"machine1", "machine2"},
 			services:     []*v1.Service{{Spec: v1.ServiceSpec{Selector: labels1}}},
@@ -110,38 +110,38 @@ func TestSelectorSpreadPriority(t *testing.T) {
 			test:         "five pods, one service pod in no namespace",
 		},
 		{
-			pod: &v1.Pod{ObjectMeta: v1.ObjectMeta{Labels: labels1, Namespace: v1.NamespaceDefault}},
+			pod: &v1.Pod{ObjectMeta: metav1.ObjectMeta{Labels: labels1, Namespace: metav1.NamespaceDefault}},
 			pods: []*v1.Pod{
-				{Spec: zone1Spec, ObjectMeta: v1.ObjectMeta{Labels: labels1}},
-				{Spec: zone1Spec, ObjectMeta: v1.ObjectMeta{Labels: labels1, Namespace: "ns1"}},
-				{Spec: zone2Spec, ObjectMeta: v1.ObjectMeta{Labels: labels1, Namespace: v1.NamespaceDefault}},
-				{Spec: zone2Spec, ObjectMeta: v1.ObjectMeta{Labels: labels2}},
+				{Spec: zone1Spec, ObjectMeta: metav1.ObjectMeta{Labels: labels1}},
+				{Spec: zone1Spec, ObjectMeta: metav1.ObjectMeta{Labels: labels1, Namespace: "ns1"}},
+				{Spec: zone2Spec, ObjectMeta: metav1.ObjectMeta{Labels: labels1, Namespace: metav1.NamespaceDefault}},
+				{Spec: zone2Spec, ObjectMeta: metav1.ObjectMeta{Labels: labels2}},
 			},
 			nodes:        []string{"machine1", "machine2"},
-			services:     []*v1.Service{{Spec: v1.ServiceSpec{Selector: labels1}, ObjectMeta: v1.ObjectMeta{Namespace: v1.NamespaceDefault}}},
+			services:     []*v1.Service{{Spec: v1.ServiceSpec{Selector: labels1}, ObjectMeta: metav1.ObjectMeta{Namespace: metav1.NamespaceDefault}}},
 			expectedList: []schedulerapi.HostPriority{{Host: "machine1", Score: 10}, {Host: "machine2", Score: 0}},
 			test:         "four pods, one service pod in default namespace",
 		},
 		{
-			pod: &v1.Pod{ObjectMeta: v1.ObjectMeta{Labels: labels1, Namespace: "ns1"}},
+			pod: &v1.Pod{ObjectMeta: metav1.ObjectMeta{Labels: labels1, Namespace: "ns1"}},
 			pods: []*v1.Pod{
-				{Spec: zone1Spec, ObjectMeta: v1.ObjectMeta{Labels: labels1}},
-				{Spec: zone1Spec, ObjectMeta: v1.ObjectMeta{Labels: labels1, Namespace: v1.NamespaceDefault}},
-				{Spec: zone1Spec, ObjectMeta: v1.ObjectMeta{Labels: labels1, Namespace: "ns2"}},
-				{Spec: zone2Spec, ObjectMeta: v1.ObjectMeta{Labels: labels1, Namespace: "ns1"}},
-				{Spec: zone2Spec, ObjectMeta: v1.ObjectMeta{Labels: labels2}},
+				{Spec: zone1Spec, ObjectMeta: metav1.ObjectMeta{Labels: labels1}},
+				{Spec: zone1Spec, ObjectMeta: metav1.ObjectMeta{Labels: labels1, Namespace: metav1.NamespaceDefault}},
+				{Spec: zone1Spec, ObjectMeta: metav1.ObjectMeta{Labels: labels1, Namespace: "ns2"}},
+				{Spec: zone2Spec, ObjectMeta: metav1.ObjectMeta{Labels: labels1, Namespace: "ns1"}},
+				{Spec: zone2Spec, ObjectMeta: metav1.ObjectMeta{Labels: labels2}},
 			},
 			nodes:        []string{"machine1", "machine2"},
-			services:     []*v1.Service{{Spec: v1.ServiceSpec{Selector: labels1}, ObjectMeta: v1.ObjectMeta{Namespace: "ns1"}}},
+			services:     []*v1.Service{{Spec: v1.ServiceSpec{Selector: labels1}, ObjectMeta: metav1.ObjectMeta{Namespace: "ns1"}}},
 			expectedList: []schedulerapi.HostPriority{{Host: "machine1", Score: 10}, {Host: "machine2", Score: 0}},
 			test:         "five pods, one service pod in specific namespace",
 		},
 		{
-			pod: &v1.Pod{ObjectMeta: v1.ObjectMeta{Labels: labels1}},
+			pod: &v1.Pod{ObjectMeta: metav1.ObjectMeta{Labels: labels1}},
 			pods: []*v1.Pod{
-				{Spec: zone1Spec, ObjectMeta: v1.ObjectMeta{Labels: labels2}},
-				{Spec: zone1Spec, ObjectMeta: v1.ObjectMeta{Labels: labels1}},
-				{Spec: zone2Spec, ObjectMeta: v1.ObjectMeta{Labels: labels1}},
+				{Spec: zone1Spec, ObjectMeta: metav1.ObjectMeta{Labels: labels2}},
+				{Spec: zone1Spec, ObjectMeta: metav1.ObjectMeta{Labels: labels1}},
+				{Spec: zone2Spec, ObjectMeta: metav1.ObjectMeta{Labels: labels1}},
 			},
 			nodes:        []string{"machine1", "machine2"},
 			services:     []*v1.Service{{Spec: v1.ServiceSpec{Selector: labels1}}},
@@ -149,12 +149,12 @@ func TestSelectorSpreadPriority(t *testing.T) {
 			test:         "three pods, two service pods on different machines",
 		},
 		{
-			pod: &v1.Pod{ObjectMeta: v1.ObjectMeta{Labels: labels1}},
+			pod: &v1.Pod{ObjectMeta: metav1.ObjectMeta{Labels: labels1}},
 			pods: []*v1.Pod{
-				{Spec: zone1Spec, ObjectMeta: v1.ObjectMeta{Labels: labels2}},
-				{Spec: zone1Spec, ObjectMeta: v1.ObjectMeta{Labels: labels1}},
-				{Spec: zone2Spec, ObjectMeta: v1.ObjectMeta{Labels: labels1}},
-				{Spec: zone2Spec, ObjectMeta: v1.ObjectMeta{Labels: labels1}},
+				{Spec: zone1Spec, ObjectMeta: metav1.ObjectMeta{Labels: labels2}},
+				{Spec: zone1Spec, ObjectMeta: metav1.ObjectMeta{Labels: labels1}},
+				{Spec: zone2Spec, ObjectMeta: metav1.ObjectMeta{Labels: labels1}},
+				{Spec: zone2Spec, ObjectMeta: metav1.ObjectMeta{Labels: labels1}},
 			},
 			nodes:        []string{"machine1", "machine2"},
 			services:     []*v1.Service{{Spec: v1.ServiceSpec{Selector: labels1}}},
@@ -162,11 +162,11 @@ func TestSelectorSpreadPriority(t *testing.T) {
 			test:         "four pods, three service pods",
 		},
 		{
-			pod: &v1.Pod{ObjectMeta: v1.ObjectMeta{Labels: labels1}},
+			pod: &v1.Pod{ObjectMeta: metav1.ObjectMeta{Labels: labels1}},
 			pods: []*v1.Pod{
-				{Spec: zone1Spec, ObjectMeta: v1.ObjectMeta{Labels: labels2}},
-				{Spec: zone1Spec, ObjectMeta: v1.ObjectMeta{Labels: labels1}},
-				{Spec: zone2Spec, ObjectMeta: v1.ObjectMeta{Labels: labels1}},
+				{Spec: zone1Spec, ObjectMeta: metav1.ObjectMeta{Labels: labels2}},
+				{Spec: zone1Spec, ObjectMeta: metav1.ObjectMeta{Labels: labels1}},
+				{Spec: zone2Spec, ObjectMeta: metav1.ObjectMeta{Labels: labels1}},
 			},
 			nodes:        []string{"machine1", "machine2"},
 			services:     []*v1.Service{{Spec: v1.ServiceSpec{Selector: map[string]string{"baz": "blah"}}}},
@@ -174,11 +174,11 @@ func TestSelectorSpreadPriority(t *testing.T) {
 			test:         "service with partial pod label matches",
 		},
 		{
-			pod: &v1.Pod{ObjectMeta: v1.ObjectMeta{Labels: labels1, OwnerReferences: controllerRef("ReplicationController", "name", "abc123")}},
+			pod: &v1.Pod{ObjectMeta: metav1.ObjectMeta{Labels: labels1, OwnerReferences: controllerRef("ReplicationController", "name", "abc123")}},
 			pods: []*v1.Pod{
-				{Spec: zone1Spec, ObjectMeta: v1.ObjectMeta{Labels: labels2}},
-				{Spec: zone1Spec, ObjectMeta: v1.ObjectMeta{Labels: labels1, OwnerReferences: controllerRef("ReplicationController", "name", "abc123")}},
-				{Spec: zone2Spec, ObjectMeta: v1.ObjectMeta{Labels: labels1, OwnerReferences: controllerRef("ReplicationController", "name", "abc123")}},
+				{Spec: zone1Spec, ObjectMeta: metav1.ObjectMeta{Labels: labels2}},
+				{Spec: zone1Spec, ObjectMeta: metav1.ObjectMeta{Labels: labels1, OwnerReferences: controllerRef("ReplicationController", "name", "abc123")}},
+				{Spec: zone2Spec, ObjectMeta: metav1.ObjectMeta{Labels: labels1, OwnerReferences: controllerRef("ReplicationController", "name", "abc123")}},
 			},
 			nodes:    []string{"machine1", "machine2"},
 			rcs:      []*v1.ReplicationController{{Spec: v1.ReplicationControllerSpec{Selector: map[string]string{"foo": "bar"}}}},
@@ -189,11 +189,11 @@ func TestSelectorSpreadPriority(t *testing.T) {
 			test:         "service with partial pod label matches with service and replication controller",
 		},
 		{
-			pod: &v1.Pod{ObjectMeta: v1.ObjectMeta{Labels: labels1, OwnerReferences: controllerRef("ReplicaSet", "name", "abc123")}},
+			pod: &v1.Pod{ObjectMeta: metav1.ObjectMeta{Labels: labels1, OwnerReferences: controllerRef("ReplicaSet", "name", "abc123")}},
 			pods: []*v1.Pod{
-				{Spec: zone1Spec, ObjectMeta: v1.ObjectMeta{Labels: labels2}},
-				{Spec: zone1Spec, ObjectMeta: v1.ObjectMeta{Labels: labels1, OwnerReferences: controllerRef("ReplicaSet", "name", "abc123")}},
-				{Spec: zone2Spec, ObjectMeta: v1.ObjectMeta{Labels: labels1, OwnerReferences: controllerRef("ReplicaSet", "name", "abc123")}},
+				{Spec: zone1Spec, ObjectMeta: metav1.ObjectMeta{Labels: labels2}},
+				{Spec: zone1Spec, ObjectMeta: metav1.ObjectMeta{Labels: labels1, OwnerReferences: controllerRef("ReplicaSet", "name", "abc123")}},
+				{Spec: zone2Spec, ObjectMeta: metav1.ObjectMeta{Labels: labels1, OwnerReferences: controllerRef("ReplicaSet", "name", "abc123")}},
 			},
 			nodes:    []string{"machine1", "machine2"},
 			services: []*v1.Service{{Spec: v1.ServiceSpec{Selector: map[string]string{"baz": "blah"}}}},
@@ -203,11 +203,11 @@ func TestSelectorSpreadPriority(t *testing.T) {
 			test:         "service with partial pod label matches with service and replica set",
 		},
 		{
-			pod: &v1.Pod{ObjectMeta: v1.ObjectMeta{Labels: map[string]string{"foo": "bar", "bar": "foo"}, OwnerReferences: controllerRef("ReplicationController", "name", "abc123")}},
+			pod: &v1.Pod{ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{"foo": "bar", "bar": "foo"}, OwnerReferences: controllerRef("ReplicationController", "name", "abc123")}},
 			pods: []*v1.Pod{
-				{Spec: zone1Spec, ObjectMeta: v1.ObjectMeta{Labels: labels2}},
-				{Spec: zone1Spec, ObjectMeta: v1.ObjectMeta{Labels: labels1, OwnerReferences: controllerRef("ReplicationController", "name", "abc123")}},
-				{Spec: zone2Spec, ObjectMeta: v1.ObjectMeta{Labels: labels1, OwnerReferences: controllerRef("ReplicationController", "name", "abc123")}},
+				{Spec: zone1Spec, ObjectMeta: metav1.ObjectMeta{Labels: labels2}},
+				{Spec: zone1Spec, ObjectMeta: metav1.ObjectMeta{Labels: labels1, OwnerReferences: controllerRef("ReplicationController", "name", "abc123")}},
+				{Spec: zone2Spec, ObjectMeta: metav1.ObjectMeta{Labels: labels1, OwnerReferences: controllerRef("ReplicationController", "name", "abc123")}},
 			},
 			nodes:    []string{"machine1", "machine2"},
 			rcs:      []*v1.ReplicationController{{Spec: v1.ReplicationControllerSpec{Selector: map[string]string{"foo": "bar"}}}},
@@ -217,11 +217,11 @@ func TestSelectorSpreadPriority(t *testing.T) {
 			test:         "disjoined service and replication controller should be treated equally",
 		},
 		{
-			pod: &v1.Pod{ObjectMeta: v1.ObjectMeta{Labels: map[string]string{"foo": "bar", "bar": "foo"}, OwnerReferences: controllerRef("ReplicaSet", "name", "abc123")}},
+			pod: &v1.Pod{ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{"foo": "bar", "bar": "foo"}, OwnerReferences: controllerRef("ReplicaSet", "name", "abc123")}},
 			pods: []*v1.Pod{
-				{Spec: zone1Spec, ObjectMeta: v1.ObjectMeta{Labels: labels2}},
-				{Spec: zone1Spec, ObjectMeta: v1.ObjectMeta{Labels: labels1, OwnerReferences: controllerRef("ReplicaSet", "name", "abc123")}},
-				{Spec: zone2Spec, ObjectMeta: v1.ObjectMeta{Labels: labels1, OwnerReferences: controllerRef("ReplicaSet", "name", "abc123")}},
+				{Spec: zone1Spec, ObjectMeta: metav1.ObjectMeta{Labels: labels2}},
+				{Spec: zone1Spec, ObjectMeta: metav1.ObjectMeta{Labels: labels1, OwnerReferences: controllerRef("ReplicaSet", "name", "abc123")}},
+				{Spec: zone2Spec, ObjectMeta: metav1.ObjectMeta{Labels: labels1, OwnerReferences: controllerRef("ReplicaSet", "name", "abc123")}},
 			},
 			nodes:    []string{"machine1", "machine2"},
 			services: []*v1.Service{{Spec: v1.ServiceSpec{Selector: map[string]string{"bar": "foo"}}}},
@@ -231,11 +231,11 @@ func TestSelectorSpreadPriority(t *testing.T) {
 			test:         "disjoined service and replica set should be treated equally",
 		},
 		{
-			pod: &v1.Pod{ObjectMeta: v1.ObjectMeta{Labels: labels1, OwnerReferences: controllerRef("ReplicationController", "name", "abc123")}},
+			pod: &v1.Pod{ObjectMeta: metav1.ObjectMeta{Labels: labels1, OwnerReferences: controllerRef("ReplicationController", "name", "abc123")}},
 			pods: []*v1.Pod{
-				{Spec: zone1Spec, ObjectMeta: v1.ObjectMeta{Labels: labels2}},
-				{Spec: zone1Spec, ObjectMeta: v1.ObjectMeta{Labels: labels1, OwnerReferences: controllerRef("ReplicationController", "name", "abc123")}},
-				{Spec: zone2Spec, ObjectMeta: v1.ObjectMeta{Labels: labels1, OwnerReferences: controllerRef("ReplicationController", "name", "abc123")}},
+				{Spec: zone1Spec, ObjectMeta: metav1.ObjectMeta{Labels: labels2}},
+				{Spec: zone1Spec, ObjectMeta: metav1.ObjectMeta{Labels: labels1, OwnerReferences: controllerRef("ReplicationController", "name", "abc123")}},
+				{Spec: zone2Spec, ObjectMeta: metav1.ObjectMeta{Labels: labels1, OwnerReferences: controllerRef("ReplicationController", "name", "abc123")}},
 			},
 			nodes: []string{"machine1", "machine2"},
 			rcs:   []*v1.ReplicationController{{Spec: v1.ReplicationControllerSpec{Selector: map[string]string{"foo": "bar"}}}},
@@ -244,11 +244,11 @@ func TestSelectorSpreadPriority(t *testing.T) {
 			test:         "Replication controller with partial pod label matches",
 		},
 		{
-			pod: &v1.Pod{ObjectMeta: v1.ObjectMeta{Labels: labels1, OwnerReferences: controllerRef("ReplicaSet", "name", "abc123")}},
+			pod: &v1.Pod{ObjectMeta: metav1.ObjectMeta{Labels: labels1, OwnerReferences: controllerRef("ReplicaSet", "name", "abc123")}},
 			pods: []*v1.Pod{
-				{Spec: zone1Spec, ObjectMeta: v1.ObjectMeta{Labels: labels2}},
-				{Spec: zone1Spec, ObjectMeta: v1.ObjectMeta{Labels: labels1, OwnerReferences: controllerRef("ReplicaSet", "name", "abc123")}},
-				{Spec: zone2Spec, ObjectMeta: v1.ObjectMeta{Labels: labels1, OwnerReferences: controllerRef("ReplicaSet", "name", "abc123")}},
+				{Spec: zone1Spec, ObjectMeta: metav1.ObjectMeta{Labels: labels2}},
+				{Spec: zone1Spec, ObjectMeta: metav1.ObjectMeta{Labels: labels1, OwnerReferences: controllerRef("ReplicaSet", "name", "abc123")}},
+				{Spec: zone2Spec, ObjectMeta: metav1.ObjectMeta{Labels: labels1, OwnerReferences: controllerRef("ReplicaSet", "name", "abc123")}},
 			},
 			nodes: []string{"machine1", "machine2"},
 			rss:   []*extensions.ReplicaSet{{Spec: extensions.ReplicaSetSpec{Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"foo": "bar"}}}}},
@@ -257,11 +257,11 @@ func TestSelectorSpreadPriority(t *testing.T) {
 			test:         "Replica set with partial pod label matches",
 		},
 		{
-			pod: &v1.Pod{ObjectMeta: v1.ObjectMeta{Labels: labels1, OwnerReferences: controllerRef("ReplicationController", "name", "abc123")}},
+			pod: &v1.Pod{ObjectMeta: metav1.ObjectMeta{Labels: labels1, OwnerReferences: controllerRef("ReplicationController", "name", "abc123")}},
 			pods: []*v1.Pod{
-				{Spec: zone1Spec, ObjectMeta: v1.ObjectMeta{Labels: labels2, OwnerReferences: controllerRef("ReplicationController", "name", "abc123")}},
-				{Spec: zone1Spec, ObjectMeta: v1.ObjectMeta{Labels: labels1, OwnerReferences: controllerRef("ReplicationController", "name", "abc123")}},
-				{Spec: zone2Spec, ObjectMeta: v1.ObjectMeta{Labels: labels1, OwnerReferences: controllerRef("ReplicationController", "name", "abc123")}},
+				{Spec: zone1Spec, ObjectMeta: metav1.ObjectMeta{Labels: labels2, OwnerReferences: controllerRef("ReplicationController", "name", "abc123")}},
+				{Spec: zone1Spec, ObjectMeta: metav1.ObjectMeta{Labels: labels1, OwnerReferences: controllerRef("ReplicationController", "name", "abc123")}},
+				{Spec: zone2Spec, ObjectMeta: metav1.ObjectMeta{Labels: labels1, OwnerReferences: controllerRef("ReplicationController", "name", "abc123")}},
 			},
 			nodes:        []string{"machine1", "machine2"},
 			rcs:          []*v1.ReplicationController{{Spec: v1.ReplicationControllerSpec{Selector: map[string]string{"baz": "blah"}}}},
@@ -269,11 +269,11 @@ func TestSelectorSpreadPriority(t *testing.T) {
 			test:         "Another replication controller with partial pod label matches",
 		},
 		{
-			pod: &v1.Pod{ObjectMeta: v1.ObjectMeta{Labels: labels1, OwnerReferences: controllerRef("ReplicaSet", "name", "abc123")}},
+			pod: &v1.Pod{ObjectMeta: metav1.ObjectMeta{Labels: labels1, OwnerReferences: controllerRef("ReplicaSet", "name", "abc123")}},
 			pods: []*v1.Pod{
-				{Spec: zone1Spec, ObjectMeta: v1.ObjectMeta{Labels: labels2, OwnerReferences: controllerRef("ReplicaSet", "name", "abc123")}},
-				{Spec: zone1Spec, ObjectMeta: v1.ObjectMeta{Labels: labels1, OwnerReferences: controllerRef("ReplicaSet", "name", "abc123")}},
-				{Spec: zone2Spec, ObjectMeta: v1.ObjectMeta{Labels: labels1, OwnerReferences: controllerRef("ReplicaSet", "name", "abc123")}},
+				{Spec: zone1Spec, ObjectMeta: metav1.ObjectMeta{Labels: labels2, OwnerReferences: controllerRef("ReplicaSet", "name", "abc123")}},
+				{Spec: zone1Spec, ObjectMeta: metav1.ObjectMeta{Labels: labels1, OwnerReferences: controllerRef("ReplicaSet", "name", "abc123")}},
+				{Spec: zone2Spec, ObjectMeta: metav1.ObjectMeta{Labels: labels1, OwnerReferences: controllerRef("ReplicaSet", "name", "abc123")}},
 			},
 			nodes: []string{"machine1", "machine2"},
 			rss:   []*extensions.ReplicaSet{{Spec: extensions.ReplicaSetSpec{Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"baz": "blah"}}}}},
@@ -302,7 +302,7 @@ func TestSelectorSpreadPriority(t *testing.T) {
 
 func buildPod(nodeName string, labels map[string]string, ownerRefs []metav1.OwnerReference) *v1.Pod {
 	return &v1.Pod{
-		ObjectMeta: v1.ObjectMeta{Labels: labels, OwnerReferences: ownerRefs},
+		ObjectMeta: metav1.ObjectMeta{Labels: labels, OwnerReferences: ownerRefs},
 		Spec:       v1.PodSpec{NodeName: nodeName},
 	}
 }
@@ -559,7 +559,7 @@ func TestZoneSpreadPriority(t *testing.T) {
 			test: "nothing scheduled",
 		},
 		{
-			pod:   &v1.Pod{ObjectMeta: v1.ObjectMeta{Labels: labels1}},
+			pod:   &v1.Pod{ObjectMeta: metav1.ObjectMeta{Labels: labels1}},
 			pods:  []*v1.Pod{{Spec: zone1Spec}},
 			nodes: labeledNodes,
 			expectedList: []schedulerapi.HostPriority{{Host: "machine11", Score: 10}, {Host: "machine12", Score: 10},
@@ -568,8 +568,8 @@ func TestZoneSpreadPriority(t *testing.T) {
 			test: "no services",
 		},
 		{
-			pod:      &v1.Pod{ObjectMeta: v1.ObjectMeta{Labels: labels1}},
-			pods:     []*v1.Pod{{Spec: zone1Spec, ObjectMeta: v1.ObjectMeta{Labels: labels2}}},
+			pod:      &v1.Pod{ObjectMeta: metav1.ObjectMeta{Labels: labels1}},
+			pods:     []*v1.Pod{{Spec: zone1Spec, ObjectMeta: metav1.ObjectMeta{Labels: labels2}}},
 			nodes:    labeledNodes,
 			services: []*v1.Service{{Spec: v1.ServiceSpec{Selector: map[string]string{"key": "value"}}}},
 			expectedList: []schedulerapi.HostPriority{{Host: "machine11", Score: 10}, {Host: "machine12", Score: 10},
@@ -578,11 +578,11 @@ func TestZoneSpreadPriority(t *testing.T) {
 			test: "different services",
 		},
 		{
-			pod: &v1.Pod{ObjectMeta: v1.ObjectMeta{Labels: labels1}},
+			pod: &v1.Pod{ObjectMeta: metav1.ObjectMeta{Labels: labels1}},
 			pods: []*v1.Pod{
-				{Spec: zone0Spec, ObjectMeta: v1.ObjectMeta{Labels: labels2}},
-				{Spec: zone1Spec, ObjectMeta: v1.ObjectMeta{Labels: labels2}},
-				{Spec: zone2Spec, ObjectMeta: v1.ObjectMeta{Labels: labels1}},
+				{Spec: zone0Spec, ObjectMeta: metav1.ObjectMeta{Labels: labels2}},
+				{Spec: zone1Spec, ObjectMeta: metav1.ObjectMeta{Labels: labels2}},
+				{Spec: zone2Spec, ObjectMeta: metav1.ObjectMeta{Labels: labels1}},
 			},
 			nodes:    labeledNodes,
 			services: []*v1.Service{{Spec: v1.ServiceSpec{Selector: labels1}}},
@@ -592,11 +592,11 @@ func TestZoneSpreadPriority(t *testing.T) {
 			test: "three pods, one service pod",
 		},
 		{
-			pod: &v1.Pod{ObjectMeta: v1.ObjectMeta{Labels: labels1}},
+			pod: &v1.Pod{ObjectMeta: metav1.ObjectMeta{Labels: labels1}},
 			pods: []*v1.Pod{
-				{Spec: zone1Spec, ObjectMeta: v1.ObjectMeta{Labels: labels2}},
-				{Spec: zone1Spec, ObjectMeta: v1.ObjectMeta{Labels: labels1}},
-				{Spec: zone2Spec, ObjectMeta: v1.ObjectMeta{Labels: labels1}},
+				{Spec: zone1Spec, ObjectMeta: metav1.ObjectMeta{Labels: labels2}},
+				{Spec: zone1Spec, ObjectMeta: metav1.ObjectMeta{Labels: labels1}},
+				{Spec: zone2Spec, ObjectMeta: metav1.ObjectMeta{Labels: labels1}},
 			},
 			nodes:    labeledNodes,
 			services: []*v1.Service{{Spec: v1.ServiceSpec{Selector: labels1}}},
@@ -606,27 +606,27 @@ func TestZoneSpreadPriority(t *testing.T) {
 			test: "three pods, two service pods on different machines",
 		},
 		{
-			pod: &v1.Pod{ObjectMeta: v1.ObjectMeta{Labels: labels1, Namespace: v1.NamespaceDefault}},
+			pod: &v1.Pod{ObjectMeta: metav1.ObjectMeta{Labels: labels1, Namespace: metav1.NamespaceDefault}},
 			pods: []*v1.Pod{
-				{Spec: zone1Spec, ObjectMeta: v1.ObjectMeta{Labels: labels1}},
-				{Spec: zone1Spec, ObjectMeta: v1.ObjectMeta{Labels: labels1, Namespace: v1.NamespaceDefault}},
-				{Spec: zone2Spec, ObjectMeta: v1.ObjectMeta{Labels: labels1}},
-				{Spec: zone2Spec, ObjectMeta: v1.ObjectMeta{Labels: labels1, Namespace: "ns1"}},
+				{Spec: zone1Spec, ObjectMeta: metav1.ObjectMeta{Labels: labels1}},
+				{Spec: zone1Spec, ObjectMeta: metav1.ObjectMeta{Labels: labels1, Namespace: metav1.NamespaceDefault}},
+				{Spec: zone2Spec, ObjectMeta: metav1.ObjectMeta{Labels: labels1}},
+				{Spec: zone2Spec, ObjectMeta: metav1.ObjectMeta{Labels: labels1, Namespace: "ns1"}},
 			},
 			nodes:    labeledNodes,
-			services: []*v1.Service{{Spec: v1.ServiceSpec{Selector: labels1}, ObjectMeta: v1.ObjectMeta{Namespace: v1.NamespaceDefault}}},
+			services: []*v1.Service{{Spec: v1.ServiceSpec{Selector: labels1}, ObjectMeta: metav1.ObjectMeta{Namespace: metav1.NamespaceDefault}}},
 			expectedList: []schedulerapi.HostPriority{{Host: "machine11", Score: 0}, {Host: "machine12", Score: 0},
 				{Host: "machine21", Score: 10}, {Host: "machine22", Score: 10},
 				{Host: "machine01", Score: 0}, {Host: "machine02", Score: 0}},
 			test: "three service label match pods in different namespaces",
 		},
 		{
-			pod: &v1.Pod{ObjectMeta: v1.ObjectMeta{Labels: labels1}},
+			pod: &v1.Pod{ObjectMeta: metav1.ObjectMeta{Labels: labels1}},
 			pods: []*v1.Pod{
-				{Spec: zone1Spec, ObjectMeta: v1.ObjectMeta{Labels: labels2}},
-				{Spec: zone1Spec, ObjectMeta: v1.ObjectMeta{Labels: labels1}},
-				{Spec: zone2Spec, ObjectMeta: v1.ObjectMeta{Labels: labels1}},
-				{Spec: zone2Spec, ObjectMeta: v1.ObjectMeta{Labels: labels1}},
+				{Spec: zone1Spec, ObjectMeta: metav1.ObjectMeta{Labels: labels2}},
+				{Spec: zone1Spec, ObjectMeta: metav1.ObjectMeta{Labels: labels1}},
+				{Spec: zone2Spec, ObjectMeta: metav1.ObjectMeta{Labels: labels1}},
+				{Spec: zone2Spec, ObjectMeta: metav1.ObjectMeta{Labels: labels1}},
 			},
 			nodes:    labeledNodes,
 			services: []*v1.Service{{Spec: v1.ServiceSpec{Selector: labels1}}},
@@ -636,11 +636,11 @@ func TestZoneSpreadPriority(t *testing.T) {
 			test: "four pods, three service pods",
 		},
 		{
-			pod: &v1.Pod{ObjectMeta: v1.ObjectMeta{Labels: labels1}},
+			pod: &v1.Pod{ObjectMeta: metav1.ObjectMeta{Labels: labels1}},
 			pods: []*v1.Pod{
-				{Spec: zone1Spec, ObjectMeta: v1.ObjectMeta{Labels: labels2}},
-				{Spec: zone1Spec, ObjectMeta: v1.ObjectMeta{Labels: labels1}},
-				{Spec: zone2Spec, ObjectMeta: v1.ObjectMeta{Labels: labels1}},
+				{Spec: zone1Spec, ObjectMeta: metav1.ObjectMeta{Labels: labels2}},
+				{Spec: zone1Spec, ObjectMeta: metav1.ObjectMeta{Labels: labels1}},
+				{Spec: zone2Spec, ObjectMeta: metav1.ObjectMeta{Labels: labels1}},
 			},
 			nodes:    labeledNodes,
 			services: []*v1.Service{{Spec: v1.ServiceSpec{Selector: map[string]string{"baz": "blah"}}}},
@@ -650,12 +650,12 @@ func TestZoneSpreadPriority(t *testing.T) {
 			test: "service with partial pod label matches",
 		},
 		{
-			pod: &v1.Pod{ObjectMeta: v1.ObjectMeta{Labels: labels1}},
+			pod: &v1.Pod{ObjectMeta: metav1.ObjectMeta{Labels: labels1}},
 			pods: []*v1.Pod{
-				{Spec: zone0Spec, ObjectMeta: v1.ObjectMeta{Labels: labels1}},
-				{Spec: zone1Spec, ObjectMeta: v1.ObjectMeta{Labels: labels1}},
-				{Spec: zone2Spec, ObjectMeta: v1.ObjectMeta{Labels: labels1}},
-				{Spec: zone2Spec, ObjectMeta: v1.ObjectMeta{Labels: labels1}},
+				{Spec: zone0Spec, ObjectMeta: metav1.ObjectMeta{Labels: labels1}},
+				{Spec: zone1Spec, ObjectMeta: metav1.ObjectMeta{Labels: labels1}},
+				{Spec: zone2Spec, ObjectMeta: metav1.ObjectMeta{Labels: labels1}},
+				{Spec: zone2Spec, ObjectMeta: metav1.ObjectMeta{Labels: labels1}},
 			},
 			nodes:    labeledNodes,
 			services: []*v1.Service{{Spec: v1.ServiceSpec{Selector: labels1}}},
@@ -685,7 +685,7 @@ func TestZoneSpreadPriority(t *testing.T) {
 func makeLabeledNodeList(nodeMap map[string]map[string]string) []*v1.Node {
 	nodes := make([]*v1.Node, 0, len(nodeMap))
 	for nodeName, labels := range nodeMap {
-		nodes = append(nodes, &v1.Node{ObjectMeta: v1.ObjectMeta{Name: nodeName, Labels: labels}})
+		nodes = append(nodes, &v1.Node{ObjectMeta: metav1.ObjectMeta{Name: nodeName, Labels: labels}})
 	}
 	return nodes
 }
@@ -693,7 +693,7 @@ func makeLabeledNodeList(nodeMap map[string]map[string]string) []*v1.Node {
 func makeNodeList(nodeNames []string) []*v1.Node {
 	nodes := make([]*v1.Node, 0, len(nodeNames))
 	for _, nodeName := range nodeNames {
-		nodes = append(nodes, &v1.Node{ObjectMeta: v1.ObjectMeta{Name: nodeName}})
+		nodes = append(nodes, &v1.Node{ObjectMeta: metav1.ObjectMeta{Name: nodeName}})
 	}
 	return nodes
 }

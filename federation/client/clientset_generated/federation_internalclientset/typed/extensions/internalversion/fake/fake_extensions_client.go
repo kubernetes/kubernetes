@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors.
+Copyright 2017 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,13 +17,13 @@ limitations under the License.
 package fake
 
 import (
+	rest "k8s.io/client-go/rest"
+	testing "k8s.io/client-go/testing"
 	internalversion "k8s.io/kubernetes/federation/client/clientset_generated/federation_internalclientset/typed/extensions/internalversion"
-	restclient "k8s.io/kubernetes/pkg/client/restclient"
-	core "k8s.io/kubernetes/pkg/client/testing/core"
 )
 
 type FakeExtensions struct {
-	*core.Fake
+	*testing.Fake
 }
 
 func (c *FakeExtensions) DaemonSets(namespace string) internalversion.DaemonSetInterface {
@@ -44,7 +44,7 @@ func (c *FakeExtensions) ReplicaSets(namespace string) internalversion.ReplicaSe
 
 // RESTClient returns a RESTClient that is used to communicate
 // with API server by this client implementation.
-func (c *FakeExtensions) RESTClient() restclient.Interface {
-	var ret *restclient.RESTClient
+func (c *FakeExtensions) RESTClient() rest.Interface {
+	var ret *rest.RESTClient
 	return ret
 }

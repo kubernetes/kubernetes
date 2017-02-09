@@ -5,7 +5,6 @@ licenses(["notice"])
 load(
     "@io_bazel_rules_go//go:def.bzl",
     "go_library",
-    "go_test",
 )
 
 go_library(
@@ -13,50 +12,38 @@ go_library(
     srcs = [
         "doc.go",
         "namespace_controller.go",
-        "namespace_controller_utils.go",
     ],
     tags = ["automanaged"],
     deps = [
-        "//pkg/api/errors:go_default_library",
         "//pkg/api/v1:go_default_library",
-        "//pkg/apis/meta/v1:go_default_library",
-        "//pkg/apis/meta/v1/unstructured:go_default_library",
-        "//pkg/client/cache:go_default_library",
         "//pkg/client/clientset_generated/clientset:go_default_library",
-        "//pkg/client/typed/discovery:go_default_library",
-        "//pkg/client/typed/dynamic:go_default_library",
         "//pkg/controller:go_default_library",
-        "//pkg/runtime:go_default_library",
-        "//pkg/runtime/schema:go_default_library",
+        "//pkg/controller/namespace/deletion:go_default_library",
         "//pkg/util/metrics:go_default_library",
-        "//pkg/util/runtime:go_default_library",
-        "//pkg/util/sets:go_default_library",
-        "//pkg/util/wait:go_default_library",
-        "//pkg/util/workqueue:go_default_library",
-        "//pkg/watch:go_default_library",
         "//vendor:github.com/golang/glog",
+        "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
+        "//vendor:k8s.io/apimachinery/pkg/runtime",
+        "//vendor:k8s.io/apimachinery/pkg/util/runtime",
+        "//vendor:k8s.io/apimachinery/pkg/util/wait",
+        "//vendor:k8s.io/apimachinery/pkg/watch",
+        "//vendor:k8s.io/client-go/dynamic",
+        "//vendor:k8s.io/client-go/tools/cache",
+        "//vendor:k8s.io/client-go/util/workqueue",
     ],
 )
 
-go_test(
-    name = "go_default_test",
-    srcs = ["namespace_controller_test.go"],
-    library = "go_default_library",
+filegroup(
+    name = "package-srcs",
+    srcs = glob(["**"]),
     tags = ["automanaged"],
-    deps = [
-        "//pkg/api:go_default_library",
-        "//pkg/api/errors:go_default_library",
-        "//pkg/api/v1:go_default_library",
-        "//pkg/apimachinery/registered:go_default_library",
-        "//pkg/apis/meta/v1:go_default_library",
-        "//pkg/client/clientset_generated/clientset:go_default_library",
-        "//pkg/client/clientset_generated/clientset/fake:go_default_library",
-        "//pkg/client/restclient:go_default_library",
-        "//pkg/client/testing/core:go_default_library",
-        "//pkg/client/typed/discovery:go_default_library",
-        "//pkg/client/typed/dynamic:go_default_library",
-        "//pkg/runtime:go_default_library",
-        "//pkg/runtime/schema:go_default_library",
-        "//pkg/util/sets:go_default_library",
+    visibility = ["//visibility:private"],
+)
+
+filegroup(
+    name = "all-srcs",
+    srcs = [
+        ":package-srcs",
+        "//pkg/controller/namespace/deletion:all-srcs",
     ],
+    tags = ["automanaged"],
 )

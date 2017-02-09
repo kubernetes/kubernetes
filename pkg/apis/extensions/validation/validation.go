@@ -24,19 +24,19 @@ import (
 	"strconv"
 	"strings"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	unversionedvalidation "k8s.io/apimachinery/pkg/apis/meta/v1/validation"
+	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/util/validation"
+	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/kubernetes/pkg/api"
 	apivalidation "k8s.io/kubernetes/pkg/api/validation"
 	"k8s.io/kubernetes/pkg/apis/extensions"
-	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
-	unversionedvalidation "k8s.io/kubernetes/pkg/apis/meta/v1/validation"
-	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/security/apparmor"
 	"k8s.io/kubernetes/pkg/security/podsecuritypolicy/seccomp"
 	psputil "k8s.io/kubernetes/pkg/security/podsecuritypolicy/util"
-	"k8s.io/kubernetes/pkg/util/intstr"
-	"k8s.io/kubernetes/pkg/util/sets"
-	"k8s.io/kubernetes/pkg/util/validation"
-	"k8s.io/kubernetes/pkg/util/validation/field"
 )
 
 func ValidateThirdPartyResourceUpdate(update, old *extensions.ThirdPartyResource) field.ErrorList {
@@ -109,6 +109,7 @@ func validateDaemonSetStatus(status *extensions.DaemonSetStatus, fldPath *field.
 	allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(status.NumberMisscheduled), fldPath.Child("numberMisscheduled"))...)
 	allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(status.DesiredNumberScheduled), fldPath.Child("desiredNumberScheduled"))...)
 	allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(status.NumberReady), fldPath.Child("numberReady"))...)
+	allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(status.ObservedGeneration, fldPath.Child("observedGeneration"))...)
 	return allErrs
 }
 
@@ -281,8 +282,19 @@ func ValidateDeploymentStatus(status *extensions.DeploymentStatus, fldPath *fiel
 	allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(status.ObservedGeneration, fldPath.Child("observedGeneration"))...)
 	allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(status.Replicas), fldPath.Child("replicas"))...)
 	allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(status.UpdatedReplicas), fldPath.Child("updatedReplicas"))...)
+	allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(status.ReadyReplicas), fldPath.Child("readyReplicas"))...)
 	allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(status.AvailableReplicas), fldPath.Child("availableReplicas"))...)
 	allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(status.UnavailableReplicas), fldPath.Child("unavailableReplicas"))...)
+	msg := "cannot be greater than status.replicas"
+	if status.ReadyReplicas > status.Replicas {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("readyReplicas"), status.ReadyReplicas, msg))
+	}
+	if status.AvailableReplicas > status.Replicas {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("availableReplicas"), status.AvailableReplicas, msg))
+	}
+	if status.ReadyReplicas > status.AvailableReplicas {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("readyReplicas"), status.ReadyReplicas, "cannot be greater than availableReplicas"))
+	}
 	return allErrs
 }
 
@@ -499,12 +511,26 @@ func ValidateReplicaSetUpdate(rs, oldRs *extensions.ReplicaSet) field.ErrorList 
 // ValidateReplicaSetStatusUpdate tests if required fields in the ReplicaSet are set.
 func ValidateReplicaSetStatusUpdate(rs, oldRs *extensions.ReplicaSet) field.ErrorList {
 	allErrs := field.ErrorList{}
+	fldPath := field.NewPath("status")
 	allErrs = append(allErrs, apivalidation.ValidateObjectMetaUpdate(&rs.ObjectMeta, &oldRs.ObjectMeta, field.NewPath("metadata"))...)
-	allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(rs.Status.Replicas), field.NewPath("status", "replicas"))...)
-	allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(rs.Status.FullyLabeledReplicas), field.NewPath("status", "fullyLabeledReplicas"))...)
-	allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(rs.Status.ReadyReplicas), field.NewPath("status", "readyReplicas"))...)
-	allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(rs.Status.AvailableReplicas), field.NewPath("status", "availableReplicas"))...)
-	allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(rs.Status.ObservedGeneration), field.NewPath("status", "observedGeneration"))...)
+	allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(rs.Status.Replicas), fldPath.Child("replicas"))...)
+	allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(rs.Status.FullyLabeledReplicas), fldPath.Child("fullyLabeledReplicas"))...)
+	allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(rs.Status.ReadyReplicas), fldPath.Child("readyReplicas"))...)
+	allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(rs.Status.AvailableReplicas), fldPath.Child("availableReplicas"))...)
+	allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(rs.Status.ObservedGeneration), fldPath.Child("observedGeneration"))...)
+	msg := "cannot be greater than status.replicas"
+	if rs.Status.FullyLabeledReplicas > rs.Status.Replicas {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("fullyLabeledReplicas"), rs.Status.FullyLabeledReplicas, msg))
+	}
+	if rs.Status.ReadyReplicas > rs.Status.Replicas {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("readyReplicas"), rs.Status.ReadyReplicas, msg))
+	}
+	if rs.Status.AvailableReplicas > rs.Status.Replicas {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("availableReplicas"), rs.Status.AvailableReplicas, msg))
+	}
+	if rs.Status.ReadyReplicas > rs.Status.AvailableReplicas {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("readyReplicas"), rs.Status.ReadyReplicas, "cannot be greater than availableReplicas"))
+	}
 	return allErrs
 }
 
@@ -802,26 +828,42 @@ func ValidateNetworkPolicySpec(spec *extensions.NetworkPolicySpec, fldPath *fiel
 	allErrs = append(allErrs, unversionedvalidation.ValidateLabelSelector(&spec.PodSelector, fldPath.Child("podSelector"))...)
 
 	// Validate ingress rules.
-	for _, i := range spec.Ingress {
-		// TODO: Update From to be a pointer to slice as soon as auto-generation supports it.
-		for _, f := range i.From {
-			numFroms := 0
-			if f.PodSelector != nil {
-				numFroms++
-				allErrs = append(allErrs, unversionedvalidation.ValidateLabelSelector(f.PodSelector, fldPath.Child("podSelector"))...)
+	for i, ingress := range spec.Ingress {
+		ingressPath := fldPath.Child("ingress").Index(i)
+		for i, port := range ingress.Ports {
+			portPath := ingressPath.Child("ports").Index(i)
+			if port.Protocol != nil && *port.Protocol != api.ProtocolTCP && *port.Protocol != api.ProtocolUDP {
+				allErrs = append(allErrs, field.NotSupported(portPath.Child("protocol"), *port.Protocol, []string{string(api.ProtocolTCP), string(api.ProtocolUDP)}))
 			}
-			if f.NamespaceSelector != nil {
-				if numFroms > 0 {
-					allErrs = append(allErrs, field.Forbidden(fldPath, "may not specify more than 1 from type"))
+			if port.Port != nil {
+				if port.Port.Type == intstr.Int {
+					for _, msg := range validation.IsValidPortNum(int(port.Port.IntVal)) {
+						allErrs = append(allErrs, field.Invalid(portPath.Child("port"), port.Port.IntVal, msg))
+					}
 				} else {
-					numFroms++
-					allErrs = append(allErrs, unversionedvalidation.ValidateLabelSelector(f.NamespaceSelector, fldPath.Child("namespaces"))...)
+					for _, msg := range validation.IsValidPortName(port.Port.StrVal) {
+						allErrs = append(allErrs, field.Invalid(portPath.Child("port"), port.Port.StrVal, msg))
+					}
 				}
+			}
+		}
+		// TODO: Update From to be a pointer to slice as soon as auto-generation supports it.
+		for i, from := range ingress.From {
+			fromPath := ingressPath.Child("from").Index(i)
+			numFroms := 0
+			if from.PodSelector != nil {
+				numFroms++
+				allErrs = append(allErrs, unversionedvalidation.ValidateLabelSelector(from.PodSelector, fromPath.Child("podSelector"))...)
+			}
+			if from.NamespaceSelector != nil {
+				numFroms++
+				allErrs = append(allErrs, unversionedvalidation.ValidateLabelSelector(from.NamespaceSelector, fromPath.Child("namespaceSelector"))...)
 			}
 
 			if numFroms == 0 {
-				// At least one of PodSelector and NamespaceSelector must be defined.
-				allErrs = append(allErrs, field.Required(fldPath, "must specify a from type"))
+				allErrs = append(allErrs, field.Required(fromPath, "must specify a from type"))
+			} else if numFroms > 1 {
+				allErrs = append(allErrs, field.Forbidden(fromPath, "may not specify more than 1 from type"))
 			}
 		}
 	}

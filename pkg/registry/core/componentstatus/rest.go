@@ -18,14 +18,16 @@ package componentstatus
 
 import (
 	"fmt"
-
 	"sync"
 
+	metainternalversion "k8s.io/apimachinery/pkg/apis/meta/internalversion"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
+	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/kubernetes/pkg/api"
-	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/probe"
 	httpprober "k8s.io/kubernetes/pkg/probe/http"
-	"k8s.io/kubernetes/pkg/runtime"
 )
 
 type REST struct {
@@ -51,7 +53,7 @@ func (rs *REST) NewList() runtime.Object {
 
 // Returns the list of component status. Note that the label and field are both ignored.
 // Note that this call doesn't support labels or selectors.
-func (rs *REST) List(ctx api.Context, options *api.ListOptions) (runtime.Object, error) {
+func (rs *REST) List(ctx genericapirequest.Context, options *metainternalversion.ListOptions) (runtime.Object, error) {
 	servers := rs.GetServersToValidate()
 
 	wait := sync.WaitGroup{}
@@ -74,7 +76,7 @@ func (rs *REST) List(ctx api.Context, options *api.ListOptions) (runtime.Object,
 	return &api.ComponentStatusList{Items: reply}, nil
 }
 
-func (rs *REST) Get(ctx api.Context, name string, options *metav1.GetOptions) (runtime.Object, error) {
+func (rs *REST) Get(ctx genericapirequest.Context, name string, options *metav1.GetOptions) (runtime.Object, error) {
 	servers := rs.GetServersToValidate()
 
 	if server, ok := servers[name]; !ok {
@@ -115,4 +117,12 @@ func (rs *REST) getComponentStatus(name string, server Server) *api.ComponentSta
 	retVal.Name = name
 
 	return retVal
+}
+
+// Implement ShortNamesProvider
+var _ rest.ShortNamesProvider = &REST{}
+
+// ShortNames implements the ShortNamesProvider interface. Returns a list of short names for a resource.
+func (r *REST) ShortNames() []string {
+	return []string{"cs"}
 }

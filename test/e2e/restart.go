@@ -20,13 +20,12 @@ import (
 	"fmt"
 	"time"
 
-	"k8s.io/kubernetes/pkg/api"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/fields"
+	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/api/v1"
-	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
-	"k8s.io/kubernetes/pkg/fields"
 	kubepod "k8s.io/kubernetes/pkg/kubelet/pod"
-	"k8s.io/kubernetes/pkg/labels"
-	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/test/e2e/framework"
 	testutils "k8s.io/kubernetes/test/utils"
 
@@ -65,7 +64,7 @@ var _ = framework.KubeDescribe("Restart [Disruptive]", func() {
 		// check must be identical to that call.
 		framework.SkipUnlessProviderIs("gce", "gke")
 
-		ps = testutils.NewPodStore(f.ClientSet, api.NamespaceSystem, labels.Everything(), fields.Everything())
+		ps = testutils.NewPodStore(f.ClientSet, metav1.NamespaceSystem, labels.Everything(), fields.Everything())
 	})
 
 	AfterEach(func() {
@@ -90,7 +89,7 @@ var _ = framework.KubeDescribe("Restart [Disruptive]", func() {
 		for i, p := range pods {
 			podNamesBefore[i] = p.ObjectMeta.Name
 		}
-		ns := api.NamespaceSystem
+		ns := metav1.NamespaceSystem
 		if !framework.CheckPodsRunningReadyOrSucceeded(f.ClientSet, ns, podNamesBefore, framework.PodReadyBeforeTimeout) {
 			framework.Failf("At least one pod wasn't running and ready or succeeded at test start.")
 		}

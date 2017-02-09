@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors.
+Copyright 2017 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,10 +17,11 @@ limitations under the License.
 package v1
 
 import (
+	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	types "k8s.io/apimachinery/pkg/types"
+	watch "k8s.io/apimachinery/pkg/watch"
 	api "k8s.io/client-go/pkg/api"
 	v1 "k8s.io/client-go/pkg/api/v1"
-	meta_v1 "k8s.io/client-go/pkg/apis/meta/v1"
-	watch "k8s.io/client-go/pkg/watch"
 	rest "k8s.io/client-go/rest"
 )
 
@@ -34,12 +35,12 @@ type ComponentStatusesGetter interface {
 type ComponentStatusInterface interface {
 	Create(*v1.ComponentStatus) (*v1.ComponentStatus, error)
 	Update(*v1.ComponentStatus) (*v1.ComponentStatus, error)
-	Delete(name string, options *v1.DeleteOptions) error
-	DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error
+	Delete(name string, options *meta_v1.DeleteOptions) error
+	DeleteCollection(options *meta_v1.DeleteOptions, listOptions meta_v1.ListOptions) error
 	Get(name string, options meta_v1.GetOptions) (*v1.ComponentStatus, error)
-	List(opts v1.ListOptions) (*v1.ComponentStatusList, error)
-	Watch(opts v1.ListOptions) (watch.Interface, error)
-	Patch(name string, pt api.PatchType, data []byte, subresources ...string) (result *v1.ComponentStatus, err error)
+	List(opts meta_v1.ListOptions) (*v1.ComponentStatusList, error)
+	Watch(opts meta_v1.ListOptions) (watch.Interface, error)
+	Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v1.ComponentStatus, err error)
 	ComponentStatusExpansion
 }
 
@@ -79,7 +80,7 @@ func (c *componentStatuses) Update(componentStatus *v1.ComponentStatus) (result 
 }
 
 // Delete takes name of the componentStatus and deletes it. Returns an error if one occurs.
-func (c *componentStatuses) Delete(name string, options *v1.DeleteOptions) error {
+func (c *componentStatuses) Delete(name string, options *meta_v1.DeleteOptions) error {
 	return c.client.Delete().
 		Resource("componentstatuses").
 		Name(name).
@@ -89,7 +90,7 @@ func (c *componentStatuses) Delete(name string, options *v1.DeleteOptions) error
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *componentStatuses) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
+func (c *componentStatuses) DeleteCollection(options *meta_v1.DeleteOptions, listOptions meta_v1.ListOptions) error {
 	return c.client.Delete().
 		Resource("componentstatuses").
 		VersionedParams(&listOptions, api.ParameterCodec).
@@ -111,7 +112,7 @@ func (c *componentStatuses) Get(name string, options meta_v1.GetOptions) (result
 }
 
 // List takes label and field selectors, and returns the list of ComponentStatuses that match those selectors.
-func (c *componentStatuses) List(opts v1.ListOptions) (result *v1.ComponentStatusList, err error) {
+func (c *componentStatuses) List(opts meta_v1.ListOptions) (result *v1.ComponentStatusList, err error) {
 	result = &v1.ComponentStatusList{}
 	err = c.client.Get().
 		Resource("componentstatuses").
@@ -122,7 +123,7 @@ func (c *componentStatuses) List(opts v1.ListOptions) (result *v1.ComponentStatu
 }
 
 // Watch returns a watch.Interface that watches the requested componentStatuses.
-func (c *componentStatuses) Watch(opts v1.ListOptions) (watch.Interface, error) {
+func (c *componentStatuses) Watch(opts meta_v1.ListOptions) (watch.Interface, error) {
 	return c.client.Get().
 		Prefix("watch").
 		Resource("componentstatuses").
@@ -131,7 +132,7 @@ func (c *componentStatuses) Watch(opts v1.ListOptions) (watch.Interface, error) 
 }
 
 // Patch applies the patch and returns the patched componentStatus.
-func (c *componentStatuses) Patch(name string, pt api.PatchType, data []byte, subresources ...string) (result *v1.ComponentStatus, err error) {
+func (c *componentStatuses) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v1.ComponentStatus, err error) {
 	result = &v1.ComponentStatus{}
 	err = c.client.Patch(pt).
 		Resource("componentstatuses").

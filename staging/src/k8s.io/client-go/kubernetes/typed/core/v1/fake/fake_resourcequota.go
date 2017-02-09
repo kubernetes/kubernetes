@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors.
+Copyright 2017 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,12 +17,12 @@ limitations under the License.
 package fake
 
 import (
-	api "k8s.io/client-go/pkg/api"
+	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	labels "k8s.io/apimachinery/pkg/labels"
+	schema "k8s.io/apimachinery/pkg/runtime/schema"
+	types "k8s.io/apimachinery/pkg/types"
+	watch "k8s.io/apimachinery/pkg/watch"
 	v1 "k8s.io/client-go/pkg/api/v1"
-	meta_v1 "k8s.io/client-go/pkg/apis/meta/v1"
-	labels "k8s.io/client-go/pkg/labels"
-	schema "k8s.io/client-go/pkg/runtime/schema"
-	watch "k8s.io/client-go/pkg/watch"
 	testing "k8s.io/client-go/testing"
 )
 
@@ -64,14 +64,14 @@ func (c *FakeResourceQuotas) UpdateStatus(resourceQuota *v1.ResourceQuota) (*v1.
 	return obj.(*v1.ResourceQuota), err
 }
 
-func (c *FakeResourceQuotas) Delete(name string, options *v1.DeleteOptions) error {
+func (c *FakeResourceQuotas) Delete(name string, options *meta_v1.DeleteOptions) error {
 	_, err := c.Fake.
 		Invokes(testing.NewDeleteAction(resourcequotasResource, c.ns, name), &v1.ResourceQuota{})
 
 	return err
 }
 
-func (c *FakeResourceQuotas) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
+func (c *FakeResourceQuotas) DeleteCollection(options *meta_v1.DeleteOptions, listOptions meta_v1.ListOptions) error {
 	action := testing.NewDeleteCollectionAction(resourcequotasResource, c.ns, listOptions)
 
 	_, err := c.Fake.Invokes(action, &v1.ResourceQuotaList{})
@@ -88,7 +88,7 @@ func (c *FakeResourceQuotas) Get(name string, options meta_v1.GetOptions) (resul
 	return obj.(*v1.ResourceQuota), err
 }
 
-func (c *FakeResourceQuotas) List(opts v1.ListOptions) (result *v1.ResourceQuotaList, err error) {
+func (c *FakeResourceQuotas) List(opts meta_v1.ListOptions) (result *v1.ResourceQuotaList, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewListAction(resourcequotasResource, c.ns, opts), &v1.ResourceQuotaList{})
 
@@ -110,14 +110,14 @@ func (c *FakeResourceQuotas) List(opts v1.ListOptions) (result *v1.ResourceQuota
 }
 
 // Watch returns a watch.Interface that watches the requested resourceQuotas.
-func (c *FakeResourceQuotas) Watch(opts v1.ListOptions) (watch.Interface, error) {
+func (c *FakeResourceQuotas) Watch(opts meta_v1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
 		InvokesWatch(testing.NewWatchAction(resourcequotasResource, c.ns, opts))
 
 }
 
 // Patch applies the patch and returns the patched resourceQuota.
-func (c *FakeResourceQuotas) Patch(name string, pt api.PatchType, data []byte, subresources ...string) (result *v1.ResourceQuota, err error) {
+func (c *FakeResourceQuotas) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v1.ResourceQuota, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewPatchSubresourceAction(resourcequotasResource, c.ns, name, data, subresources...), &v1.ResourceQuota{})
 

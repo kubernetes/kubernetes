@@ -119,6 +119,7 @@ wait_for_etcd_and_apiserver_down() {
 MANIFEST_DIR="/etc/kubernetes/manifests"
 MANIFEST_BACKUP_DIR="/etc/kubernetes/manifests-backups"
 mkdir -p "${MANIFEST_BACKUP_DIR}"
+echo "Moving etcd(s) & apiserver manifest files to ${MANIFEST_BACKUP_DIR}"
 # If those files were already moved (e.g. during previous
 # try of backup) don't fail on it.
 mv "${MANIFEST_DIR}/kube-apiserver.manifest" "${MANIFEST_BACKUP_DIR}" || true
@@ -143,6 +144,7 @@ if [ "${ETCD_API}" == "etcd2" ]; then
   # directory. After that, we start etcd with --force-new-cluster option
   # that (according to the etcd documentation) is required to recover from
   # a backup.
+  echo "Copying data to ${BACKUP_DIR} and restoring there"
   mkdir -p "${BACKUP_DIR}/member/snap"
   mkdir -p "${BACKUP_DIR}/member/wal"
   # If the cluster is relatively new, there can be no .snap file.
@@ -150,6 +152,7 @@ if [ "${ETCD_API}" == "etcd2" ]; then
   mv *.wal "${BACKUP_DIR}/member/wal/"
 
   # TODO(jsz): This won't work with HA setups (e.g. do we need to set --name flag)?
+  echo "Starting etcd ${ETCD_VERSION} to restore data"
   image=$(docker run -d -v ${BACKUP_DIR}:/var/etcd/data \
     --net=host -p ${etcd_port}:${etcd_port} \
     "gcr.io/google_containers/etcd:${ETCD_VERSION}" /bin/sh -c \
@@ -158,6 +161,7 @@ if [ "${ETCD_API}" == "etcd2" ]; then
     echo "Docker container didn't started correctly"
     exit 1
   fi
+  echo "Container ${image} created, waiting for etcd to report as healthy"
 
   if ! wait_for_etcd_up "${etcd_port}"; then
     echo "Etcd didn't come back correctly"
@@ -165,10 +169,12 @@ if [ "${ETCD_API}" == "etcd2" ]; then
   fi
 
   # Kill that etcd instance.
+  echo "Etcd healthy - killing ${image} container"
   docker kill "${image}"
 elif [ "${ETCD_API}" == "etcd3" ]; then
   echo "Preparing etcd snapshot for restore"
   mkdir -p "${BACKUP_DIR}"
+  echo "Copying data to ${BACKUP_DIR} and restoring there"
   number_files=$(find . -maxdepth 1 -type f -name "*.db" | wc -l)
   if [ "${number_files}" -ne "1" ]; then
     echo "Incorrect number of *.db files - expected 1"
@@ -205,12 +211,15 @@ fi
 # Save the corrupted data (clean directory if it is already non-empty).
 rm -rf "${MNT_DISK}/var/etcd-corrupted"
 mkdir -p "${MNT_DISK}/var/etcd-corrupted"
+echo "Saving corrupted data to ${MNT_DISK}/var/etcd-corrupted"
 mv /var/etcd/data "${MNT_DISK}/var/etcd-corrupted"
 
 # Replace the corrupted data dir with the resotred data.
+echo "Copying restored data to /var/etcd/data"
 mv "${BACKUP_DIR}" /var/etcd/data
 
 if [ "${RESET_EVENT_ETCD:-}" == "true" ]; then
+  echo "Removing event-etcd corrupted data"
   EVENTS_CORRUPTED_DIR="${MNT_DISK}/var/etcd-events-corrupted"
   # Save the corrupted data (clean directory if it is already non-empty).
   rm -rf "${EVENTS_CORRUPTED_DIR}"

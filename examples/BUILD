@@ -47,12 +47,34 @@ go_test(
         "//pkg/apis/extensions/validation:go_default_library",
         "//pkg/capabilities:go_default_library",
         "//pkg/registry/batch/job:go_default_library",
-        "//pkg/runtime:go_default_library",
-        "//pkg/types:go_default_library",
-        "//pkg/util/validation/field:go_default_library",
-        "//pkg/util/yaml:go_default_library",
         "//plugin/pkg/scheduler/api:go_default_library",
         "//plugin/pkg/scheduler/api/latest:go_default_library",
         "//vendor:github.com/golang/glog",
+        "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
+        "//vendor:k8s.io/apimachinery/pkg/runtime",
+        "//vendor:k8s.io/apimachinery/pkg/types",
+        "//vendor:k8s.io/apimachinery/pkg/util/validation/field",
+        "//vendor:k8s.io/apimachinery/pkg/util/yaml",
     ],
+)
+
+filegroup(
+    name = "package-srcs",
+    srcs = glob(["**"]),
+    tags = ["automanaged"],
+    visibility = ["//visibility:private"],
+)
+
+filegroup(
+    name = "all-srcs",
+    srcs = [
+        ":package-srcs",
+        "//examples/apiserver:all-srcs",
+        "//examples/explorer:all-srcs",
+        "//examples/guestbook-go:all-srcs",
+        "//examples/https-nginx:all-srcs",
+        "//examples/k8petstore/web-server/src:all-srcs",
+        "//examples/sharing-clusters:all-srcs",
+    ],
+    tags = ["automanaged"],
 )

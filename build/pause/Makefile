@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-.PHONY: all push push-legacy container clean
+.PHONY: all push push-legacy container clean orphan
 
 REGISTRY ?= gcr.io/google_containers
 IMAGE = $(REGISTRY)/pause-$(ARCH)
@@ -25,7 +25,7 @@ ARCH ?= amd64
 
 ALL_ARCH = amd64 arm arm64 ppc64le s390x
 
-CFLAGS = -Os -Wall -static
+CFLAGS = -Os -Wall -Werror -static
 KUBE_CROSS_IMAGE ?= gcr.io/google_containers/kube-cross
 KUBE_CROSS_VERSION ?= $(shell cat ../build-image/cross/VERSION)
 
@@ -69,7 +69,7 @@ build: bin/$(BIN)-$(ARCH)
 
 bin/$(BIN)-$(ARCH): $(SRCS)
 	mkdir -p bin
-	docker run -u $$(id -u):$$(id -g) -v $$(pwd):/build \
+	docker run --rm -u $$(id -u):$$(id -g) -v $$(pwd):/build \
 		$(KUBE_CROSS_IMAGE):$(KUBE_CROSS_VERSION) \
 		/bin/bash -c "\
 			cd /build && \
@@ -78,7 +78,7 @@ bin/$(BIN)-$(ARCH): $(SRCS)
 
 container: .container-$(ARCH)
 .container-$(ARCH): bin/$(BIN)-$(ARCH)
-	docker build -t $(IMAGE):$(TAG) --build-arg ARCH=$(ARCH) .
+	docker build --pull -t $(IMAGE):$(TAG) --build-arg ARCH=$(ARCH) .
 ifeq ($(ARCH),amd64)
 	docker rmi $(LEGACY_AMD64_IMAGE):$(TAG) || true
 	docker tag $(IMAGE):$(TAG) $(LEGACY_AMD64_IMAGE):$(TAG)
@@ -96,6 +96,17 @@ ifeq ($(ARCH),amd64)
 	gcloud docker -- push $(LEGACY_AMD64_IMAGE):$(TAG)
 endif
 	touch $@
+
+# Useful for testing, not automatically included in container image
+orphan: bin/orphan-$(ARCH)
+bin/orphan-$(ARCH): orphan.c
+	mkdir -p bin
+	docker run -u $$(id -u):$$(id -g) -v $$(pwd):/build \
+		$(KUBE_CROSS_IMAGE):$(KUBE_CROSS_VERSION) \
+		/bin/bash -c "\
+			cd /build && \
+			$(TRIPLE)-gcc $(CFLAGS) -o $@ $^ && \
+			$(TRIPLE)-strip $@"
 
 clean:
 	rm -rf .container-* .push-* bin/

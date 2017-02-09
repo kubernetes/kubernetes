@@ -19,19 +19,18 @@ package apiserver
 import (
 	"fmt"
 
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	utilerrors "k8s.io/apimachinery/pkg/util/errors"
+	"k8s.io/apiserver/pkg/authorization/authorizerfactory"
+	"k8s.io/apiserver/pkg/registry/generic"
+	"k8s.io/apiserver/pkg/registry/rest"
+	genericapiserver "k8s.io/apiserver/pkg/server"
+	genericoptions "k8s.io/apiserver/pkg/server/options"
+	"k8s.io/apiserver/pkg/storage/storagebackend"
 	"k8s.io/kubernetes/cmd/libs/go2idl/client-gen/test_apis/testgroup/v1"
 	testgroupetcd "k8s.io/kubernetes/examples/apiserver/rest"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/rest"
-	"k8s.io/kubernetes/pkg/apimachinery/registered"
-	"k8s.io/kubernetes/pkg/genericapiserver"
-	"k8s.io/kubernetes/pkg/genericapiserver/authorizer"
-	genericoptions "k8s.io/kubernetes/pkg/genericapiserver/options"
 	kubeoptions "k8s.io/kubernetes/pkg/kubeapiserver/options"
-	"k8s.io/kubernetes/pkg/registry/generic"
-	"k8s.io/kubernetes/pkg/runtime/schema"
-	"k8s.io/kubernetes/pkg/storage/storagebackend"
-	utilerrors "k8s.io/kubernetes/pkg/util/errors"
 
 	// Install the testgroup API
 	_ "k8s.io/kubernetes/cmd/libs/go2idl/client-gen/test_apis/testgroup/install"
@@ -50,8 +49,9 @@ func newStorageFactory() genericapiserver.StorageFactory {
 	config := storagebackend.Config{
 		Prefix:     genericoptions.DefaultEtcdPathPrefix,
 		ServerList: []string{"http://127.0.0.1:2379"},
+		Copier:     api.Scheme,
 	}
-	storageFactory := genericapiserver.NewDefaultStorageFactory(config, "application/json", api.Codecs, genericapiserver.NewDefaultResourceEncodingConfig(), genericapiserver.NewResourceConfig())
+	storageFactory := genericapiserver.NewDefaultStorageFactory(config, "application/json", api.Codecs, genericapiserver.NewDefaultResourceEncodingConfig(api.Registry), genericapiserver.NewResourceConfig())
 
 	return storageFactory
 }
@@ -62,15 +62,17 @@ type ServerRunOptions struct {
 	SecureServing           *genericoptions.SecureServingOptions
 	InsecureServing         *genericoptions.ServingOptions
 	Authentication          *kubeoptions.BuiltInAuthenticationOptions
+	CloudProvider           *kubeoptions.CloudProviderOptions
 }
 
 func NewServerRunOptions() *ServerRunOptions {
 	s := ServerRunOptions{
 		GenericServerRunOptions: genericoptions.NewServerRunOptions(),
-		Etcd:            genericoptions.NewEtcdOptions(),
+		Etcd:            genericoptions.NewEtcdOptions(api.Scheme),
 		SecureServing:   genericoptions.NewSecureServingOptions(),
 		InsecureServing: genericoptions.NewInsecureServingOptions(),
 		Authentication:  kubeoptions.NewBuiltInAuthenticationOptions().WithAll(),
+		CloudProvider:   kubeoptions.NewCloudProviderOptions(),
 	}
 	s.InsecureServing.BindPort = InsecurePort
 	s.SecureServing.ServingOptions.BindPort = SecurePort
@@ -82,7 +84,7 @@ func (serverOptions *ServerRunOptions) Run(stopCh <-chan struct{}) error {
 	serverOptions.Etcd.StorageConfig.ServerList = []string{"http://127.0.0.1:2379"}
 
 	// set defaults
-	if err := serverOptions.GenericServerRunOptions.DefaultExternalHost(); err != nil {
+	if err := serverOptions.CloudProvider.DefaultExternalHost(serverOptions.GenericServerRunOptions); err != nil {
 		return err
 	}
 	if err := serverOptions.SecureServing.MaybeDefaultWithSelfSignedCerts(serverOptions.GenericServerRunOptions.AdvertiseAddress.String()); err != nil {
@@ -102,17 +104,22 @@ func (serverOptions *ServerRunOptions) Run(stopCh <-chan struct{}) error {
 
 	// create config from options
 	config := genericapiserver.NewConfig().
-		ApplyOptions(serverOptions.GenericServerRunOptions).
-		ApplyInsecureServingOptions(serverOptions.InsecureServing)
+		WithSerializer(api.Codecs)
 
-	if _, err := config.ApplySecureServingOptions(serverOptions.SecureServing); err != nil {
+	if err := serverOptions.GenericServerRunOptions.ApplyTo(config); err != nil {
+		return err
+	}
+	if err := serverOptions.InsecureServing.ApplyTo(config); err != nil {
+		return err
+	}
+	if err := serverOptions.SecureServing.ApplyTo(config); err != nil {
 		return fmt.Errorf("failed to configure https: %s", err)
 	}
-	if err := serverOptions.Authentication.Apply(config); err != nil {
+	if err := serverOptions.Authentication.ApplyTo(config); err != nil {
 		return fmt.Errorf("failed to configure authentication: %s", err)
 	}
 
-	config.Authorizer = authorizer.NewAlwaysAllowAuthorizer()
+	config.Authorizer = authorizerfactory.NewAlwaysAllowAuthorizer()
 	config.SwaggerConfig = genericapiserver.DefaultSwaggerConfig()
 
 	s, err := config.Complete().New()
@@ -122,7 +129,7 @@ func (serverOptions *ServerRunOptions) Run(stopCh <-chan struct{}) error {
 
 	groupVersion := v1.SchemeGroupVersion
 	groupName := groupVersion.Group
-	groupMeta, err := registered.Group(groupName)
+	groupMeta, err := api.Registry.Group(groupName)
 	if err != nil {
 		return fmt.Errorf("%v", err)
 	}

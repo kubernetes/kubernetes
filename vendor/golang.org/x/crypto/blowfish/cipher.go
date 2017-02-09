@@ -39,7 +39,7 @@ func NewCipher(key []byte) (*Cipher, error) {
 
 // NewSaltedCipher creates a returns a Cipher that folds a salt into its key
 // schedule. For most purposes, NewCipher, instead of NewSaltedCipher, is
-// sufficient and desirable. For bcrypt compatiblity, the key can be over 56
+// sufficient and desirable. For bcrypt compatibility, the key can be over 56
 // bytes.
 func NewSaltedCipher(key, salt []byte) (*Cipher, error) {
 	if len(salt) == 0 {

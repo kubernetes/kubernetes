@@ -33,16 +33,16 @@ import (
 	dockernat "github.com/docker/go-connections/nat"
 	cadvisorapi "github.com/google/cadvisor/info/v1"
 	"github.com/stretchr/testify/assert"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/tools/record"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/apis/componentconfig"
-	"k8s.io/kubernetes/pkg/client/record"
 	"k8s.io/kubernetes/pkg/credentialprovider"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
 	"k8s.io/kubernetes/pkg/kubelet/images"
 	"k8s.io/kubernetes/pkg/kubelet/network"
 	nettest "k8s.io/kubernetes/pkg/kubelet/network/testing"
-	"k8s.io/kubernetes/pkg/types"
 	hashutil "k8s.io/kubernetes/pkg/util/hash"
 )
 
@@ -705,12 +705,12 @@ func (f *imageTrackingDockerClient) InspectImageByRef(name string) (image *docke
 	return
 }
 
-func TestIsImagePresent(t *testing.T) {
+func TestGetImageRef(t *testing.T) {
 	cl := &imageTrackingDockerClient{NewFakeDockerClient(), ""}
 	puller := &dockerPuller{
 		client: cl,
 	}
-	_, _ = puller.IsImagePresent("abc:123")
+	_, _ = puller.GetImageRef("abc:123")
 	if cl.imageName != "abc:123" {
 		t.Errorf("expected inspection of image abc:123, instead inspected image %v", cl.imageName)
 	}

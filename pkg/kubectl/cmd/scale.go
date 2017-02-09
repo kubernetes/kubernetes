@@ -23,11 +23,11 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
+	"k8s.io/kubernetes/pkg/util/i18n"
 )
 
 var (
@@ -68,7 +68,7 @@ func NewCmdScale(f cmdutil.Factory, out io.Writer) *cobra.Command {
 		Use: "scale [--resource-version=version] [--current-replicas=count] --replicas=COUNT (-f FILENAME | TYPE NAME)",
 		// resize is deprecated
 		Aliases: []string{"resize"},
-		Short:   "Set a new size for a Deployment, ReplicaSet, Replication Controller, or Job",
+		Short:   i18n.T("Set a new size for a Deployment, ReplicaSet, Replication Controller, or Job"),
 		Long:    scale_long,
 		Example: scale_example,
 		Run: func(cmd *cobra.Command, args []string) {
@@ -164,7 +164,7 @@ func RunScale(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []strin
 			return err
 		}
 		if cmdutil.ShouldRecord(cmd, info) {
-			patchBytes, err := cmdutil.ChangeResourcePatch(info, f.Command())
+			patchBytes, patchType, err := cmdutil.ChangeResourcePatch(info, f.Command())
 			if err != nil {
 				return err
 			}
@@ -174,7 +174,7 @@ func RunScale(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []strin
 				return err
 			}
 			helper := resource.NewHelper(client, mapping)
-			_, err = helper.Patch(info.Namespace, info.Name, api.StrategicMergePatchType, patchBytes)
+			_, err = helper.Patch(info.Namespace, info.Name, patchType, patchBytes)
 			if err != nil {
 				return err
 			}

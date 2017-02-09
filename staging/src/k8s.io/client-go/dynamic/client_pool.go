@@ -19,9 +19,10 @@ package dynamic
 import (
 	"sync"
 
-	"k8s.io/client-go/pkg/api/meta"
-	"k8s.io/client-go/pkg/runtime/schema"
-	"k8s.io/client-go/rest"
+	"k8s.io/apimachinery/pkg/api/meta"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/client-go/pkg/api"
+	restclient "k8s.io/client-go/rest"
 )
 
 // ClientPool manages a pool of dynamic clients.
@@ -50,7 +51,7 @@ func LegacyAPIPathResolverFunc(kind schema.GroupVersionKind) string {
 // is asked to retrieve. This type is thread safe.
 type clientPoolImpl struct {
 	lock                sync.RWMutex
-	config              *rest.Config
+	config              *restclient.Config
 	clients             map[schema.GroupVersion]*Client
 	apiPathResolverFunc APIPathResolverFunc
 	mapper              meta.RESTMapper
@@ -59,7 +60,7 @@ type clientPoolImpl struct {
 // NewClientPool returns a ClientPool from the specified config. It reuses clients for the the same
 // group version. It is expected this type may be wrapped by specific logic that special cases certain
 // resources or groups.
-func NewClientPool(config *rest.Config, mapper meta.RESTMapper, apiPathResolverFunc APIPathResolverFunc) ClientPool {
+func NewClientPool(config *restclient.Config, mapper meta.RESTMapper, apiPathResolverFunc APIPathResolverFunc) ClientPool {
 	confCopy := *config
 
 	return &clientPoolImpl{
@@ -68,6 +69,13 @@ func NewClientPool(config *rest.Config, mapper meta.RESTMapper, apiPathResolverF
 		apiPathResolverFunc: apiPathResolverFunc,
 		mapper:              mapper,
 	}
+}
+
+// Instantiates a new dynamic client pool with the given config.
+func NewDynamicClientPool(cfg *restclient.Config) ClientPool {
+	// TODO: should use a dynamic RESTMapper built from the discovery results.
+	restMapper := api.Registry.RESTMapper()
+	return NewClientPool(cfg, restMapper, LegacyAPIPathResolverFunc)
 }
 
 // ClientForGroupVersionResource uses the provided RESTMapper to identify the appropriate resource. Resource may

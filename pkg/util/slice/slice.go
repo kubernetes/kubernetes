@@ -20,7 +20,7 @@ package slice
 import (
 	"sort"
 
-	utilrand "k8s.io/kubernetes/pkg/util/rand"
+	utilrand "k8s.io/apimachinery/pkg/util/rand"
 )
 
 // CopyStrings copies the contents of the specified string slice

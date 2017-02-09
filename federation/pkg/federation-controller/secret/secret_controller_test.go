@@ -22,6 +22,10 @@ import (
 	"testing"
 	"time"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/wait"
 	federationapi "k8s.io/kubernetes/federation/apis/federation/v1beta1"
 	fakefedclientset "k8s.io/kubernetes/federation/client/clientset_generated/federation_clientset/fake"
 	"k8s.io/kubernetes/federation/pkg/federation-controller/util"
@@ -30,9 +34,6 @@ import (
 	apiv1 "k8s.io/kubernetes/pkg/api/v1"
 	kubeclientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	fakekubeclientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/fake"
-	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/types"
-	"k8s.io/kubernetes/pkg/util/wait"
 
 	"github.com/golang/glog"
 	"github.com/stretchr/testify/assert"
@@ -82,7 +83,7 @@ func TestSecretController(t *testing.T) {
 	secretController.Run(stop)
 
 	secret1 := apiv1.Secret{
-		ObjectMeta: apiv1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:      "test-secret",
 			Namespace: "ns",
 			SelfLink:  "/api/v1/namespaces/ns/secrets/test-secret",
@@ -96,11 +97,10 @@ func TestSecretController(t *testing.T) {
 
 	// Test add federated secret.
 	secretWatch.Add(&secret1)
-	// There should be 2 updates to add both the finalizers.
+	// There should be an update to add both the finalizers.
 	updatedSecret := GetSecretFromChan(secretUpdateChan)
 	assert.True(t, secretController.hasFinalizerFunc(updatedSecret, deletionhelper.FinalizerDeleteFromUnderlyingClusters))
-	updatedSecret = GetSecretFromChan(secretUpdateChan)
-	assert.True(t, secretController.hasFinalizerFunc(updatedSecret, apiv1.FinalizerOrphan))
+	assert.True(t, secretController.hasFinalizerFunc(updatedSecret, metav1.FinalizerOrphan))
 	secret1 = *updatedSecret
 
 	// Verify that the secret is created in underlying cluster1.

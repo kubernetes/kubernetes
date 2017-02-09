@@ -17,17 +17,17 @@ limitations under the License.
 package serviceaccount
 
 import (
-	"k8s.io/kubernetes/pkg/api"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
+	"k8s.io/apiserver/pkg/registry/generic"
+	"k8s.io/apiserver/pkg/storage/storagebackend"
 	"k8s.io/kubernetes/pkg/api/v1"
-	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/pkg/registry/core/secret"
-	secretetcd "k8s.io/kubernetes/pkg/registry/core/secret/etcd"
+	secretstore "k8s.io/kubernetes/pkg/registry/core/secret/storage"
 	serviceaccountregistry "k8s.io/kubernetes/pkg/registry/core/serviceaccount"
-	serviceaccountetcd "k8s.io/kubernetes/pkg/registry/core/serviceaccount/etcd"
-	"k8s.io/kubernetes/pkg/registry/generic"
+	serviceaccountstore "k8s.io/kubernetes/pkg/registry/core/serviceaccount/storage"
 	"k8s.io/kubernetes/pkg/serviceaccount"
-	"k8s.io/kubernetes/pkg/storage/storagebackend"
 )
 
 // clientGetter implements ServiceAccountTokenGetter using a clientset.Interface
@@ -61,7 +61,7 @@ func NewGetterFromRegistries(serviceAccounts serviceaccountregistry.Registry, se
 	return &registryGetter{serviceAccounts, secrets}
 }
 func (r *registryGetter) GetServiceAccount(namespace, name string) (*v1.ServiceAccount, error) {
-	ctx := api.WithNamespace(api.NewContext(), namespace)
+	ctx := genericapirequest.WithNamespace(genericapirequest.NewContext(), namespace)
 	internalServiceAccount, err := r.serviceAccounts.GetServiceAccount(ctx, name, &metav1.GetOptions{})
 	if err != nil {
 		return nil, err
@@ -72,7 +72,7 @@ func (r *registryGetter) GetServiceAccount(namespace, name string) (*v1.ServiceA
 
 }
 func (r *registryGetter) GetSecret(namespace, name string) (*v1.Secret, error) {
-	ctx := api.WithNamespace(api.NewContext(), namespace)
+	ctx := genericapirequest.WithNamespace(genericapirequest.NewContext(), namespace)
 	internalSecret, err := r.secrets.GetSecret(ctx, name, &metav1.GetOptions{})
 	if err != nil {
 		return nil, err
@@ -89,7 +89,7 @@ func NewGetterFromStorageInterface(config *storagebackend.Config, saPrefix, secr
 	saOpts := generic.RESTOptions{StorageConfig: config, Decorator: generic.UndecoratedStorage, ResourcePrefix: saPrefix}
 	secretOpts := generic.RESTOptions{StorageConfig: config, Decorator: generic.UndecoratedStorage, ResourcePrefix: secretPrefix}
 	return NewGetterFromRegistries(
-		serviceaccountregistry.NewRegistry(serviceaccountetcd.NewREST(saOpts)),
-		secret.NewRegistry(secretetcd.NewREST(secretOpts)),
+		serviceaccountregistry.NewRegistry(serviceaccountstore.NewREST(saOpts)),
+		secret.NewRegistry(secretstore.NewREST(secretOpts)),
 	)
 }

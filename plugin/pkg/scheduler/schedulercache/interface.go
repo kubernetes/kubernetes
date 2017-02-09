@@ -17,8 +17,8 @@ limitations under the License.
 package schedulercache
 
 import (
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/labels"
 )
 
 // Cache collects pods' information and provides node-level aggregated information.
@@ -60,6 +60,9 @@ type Cache interface {
 	// The implementation also decides the policy to expire pod before being confirmed (receiving Add event).
 	// After expiration, its information would be subtracted.
 	AssumePod(pod *v1.Pod) error
+
+	// FinishBinding signals that cache for assumed pod can be expired
+	FinishBinding(pod *v1.Pod) error
 
 	// ForgetPod removes an assumed pod from cache.
 	ForgetPod(pod *v1.Pod) error

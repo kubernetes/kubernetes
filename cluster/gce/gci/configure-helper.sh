@@ -68,7 +68,7 @@ function safe-format-and-mount() {
   # Format only if the disk is not already formatted.
   if ! tune2fs -l "${device}" ; then
     echo "Formatting '${device}'"
-    mkfs.ext4 -F -E lazy_itable_init=0,lazy_journal_init=0,discard "${device}"
+    mkfs.ext4 -F "${device}"
   fi
 
   mkdir -p "${mountpoint}"
@@ -190,6 +190,20 @@ function mount-master-pd {
   chgrp -R etcd "${mount_point}/var/etcd"
 }
 
+# replace_prefixed_line ensures:
+# 1. the specified file exists
+# 2. existing lines with the specified ${prefix} are removed
+# 3. a new line with the specified ${prefix}${suffix} is appended
+function replace_prefixed_line {
+  local -r file="${1:-}"
+  local -r prefix="${2:-}"
+  local -r suffix="${3:-}"
+
+  touch "${file}"
+  awk "substr(\$0,0,length(\"${prefix}\")) != \"${prefix}\" { print }" "${file}" > "${file}.filtered"  && mv "${file}.filtered" "${file}"
+  echo "${prefix}${suffix}" >> "${file}"
+}
+
 # After the first boot and on upgrade, these files exist on the master-pd
 # and should never be touched again (except perhaps an additional service
 # account, see NB below.)
@@ -201,16 +215,29 @@ function create-master-auth {
     echo "${MASTER_CERT}" | base64 --decode > "${auth_dir}/server.cert"
     echo "${MASTER_KEY}" | base64 --decode > "${auth_dir}/server.key"
   fi
+  if [[ ! -z "${CA_KEY:-}" ]]; then
+    echo "${CA_KEY}" | base64 --decode > "${auth_dir}/ca.key"
+  fi
+  if [ ! -e "${auth_dir}/kubeapiserver.cert" ] && [[ ! -z "${KUBEAPISERVER_CERT:-}" ]] && [[ ! -z "${KUBEAPISERVER_KEY:-}" ]]; then
+    echo "${KUBEAPISERVER_CERT}" | base64 --decode > "${auth_dir}/kubeapiserver.cert"
+    echo "${KUBEAPISERVER_KEY}" | base64 --decode > "${auth_dir}/kubeapiserver.key"
+  fi
   local -r basic_auth_csv="${auth_dir}/basic_auth.csv"
-  if [[ ! -e "${basic_auth_csv}" && -n "${KUBE_PASSWORD:-}" && -n "${KUBE_USER:-}" ]]; then
-    echo "${KUBE_PASSWORD},${KUBE_USER},admin" > "${basic_auth_csv}"
+  if [[ -n "${KUBE_PASSWORD:-}" && -n "${KUBE_USER:-}" ]]; then
+    replace_prefixed_line "${basic_auth_csv}" "${KUBE_PASSWORD},${KUBE_USER}," "admin,system:masters"
   fi
   local -r known_tokens_csv="${auth_dir}/known_tokens.csv"
-  if [[ ! -e "${known_tokens_csv}" ]]; then
-    echo "${KUBE_BEARER_TOKEN},admin,admin" > "${known_tokens_csv}"
-    echo "${KUBE_CONTROLLER_MANAGER_TOKEN},system:kube-controller-manager,uid:system:kube-controller-manager" >> "${known_tokens_csv}"
-    echo "${KUBELET_TOKEN},system:node:node-name,uid:kubelet,system:nodes" >> "${known_tokens_csv}"
-    echo "${KUBE_PROXY_TOKEN},system:kube-proxy,uid:kube_proxy" >> "${known_tokens_csv}"
+  if [[ -n "${KUBE_BEARER_TOKEN:-}" ]]; then
+    replace_prefixed_line "${known_tokens_csv}" "${KUBE_BEARER_TOKEN},"             "admin,admin,system:masters"
+  fi
+  if [[ -n "${KUBE_CONTROLLER_MANAGER_TOKEN:-}" ]]; then
+    replace_prefixed_line "${known_tokens_csv}" "${KUBE_CONTROLLER_MANAGER_TOKEN}," "system:kube-controller-manager,uid:system:kube-controller-manager"
+  fi
+  if [[ -n "${KUBELET_TOKEN:-}" ]]; then
+    replace_prefixed_line "${known_tokens_csv}" "${KUBELET_TOKEN},"                 "system:node:node-name,uid:kubelet,system:nodes"
+  fi
+  if [[ -n "${KUBE_PROXY_TOKEN:-}" ]]; then
+    replace_prefixed_line "${known_tokens_csv}" "${KUBE_PROXY_TOKEN},"              "system:kube-proxy,uid:kube_proxy"
   fi
   local use_cloud_config="false"
   cat <<EOF >/etc/gce.conf
@@ -342,6 +369,12 @@ contexts:
   name: service-account-context
 current-context: service-account-context
 EOF
+}
+
+function create-kubelet-auth-ca {
+  if [[ -n "${KUBELET_AUTH_CA_CERT:-}" ]]; then
+    echo "${KUBELET_AUTH_CA_CERT}" | base64 --decode > "/var/lib/kubelet/kubelet_auth_ca.crt"
+  fi
 }
 
 # Uses KUBELET_CA_CERT (falling back to CA_CERT), KUBELET_CERT, and KUBELET_KEY
@@ -549,6 +582,9 @@ function start-kubelet {
        [[ "${HAIRPIN_MODE:-}" == "none" ]]; then
       flags+=" --hairpin-mode=${HAIRPIN_MODE}"
     fi
+    if [ -n "${KUBELET_AUTH_CA_CERT:-}" ]; then
+      flags+=" --anonymous-auth=false --client-ca-file=/var/lib/kubelet/kubelet_auth_ca.crt"
+    fi
   fi
   # Network plugin
   if [[ -n "${NETWORK_PROVIDER:-}" ]]; then
@@ -685,8 +721,16 @@ function prepare-etcd-manifest {
   sed -i -e "s@{{ *hostname *}}@$host_name@g" "${temp_file}"
   sed -i -e "s@{{ *srv_kube_path *}}@/etc/srv/kubernetes@g" "${temp_file}"
   sed -i -e "s@{{ *etcd_cluster *}}@$etcd_cluster@g" "${temp_file}"
-  sed -i -e "s@{{ *storage_backend *}}@${STORAGE_BACKEND:-}@g" "${temp_file}"
-  if [[ "${STORAGE_BACKEND:-}" == "etcd3" ]]; then
+  # Get default storage backend from manifest file.
+  local -r default_storage_backend=$(cat "${temp_file}" | \
+    grep -o "{{ *pillar\.get('storage_backend', '\(.*\)') *}}" | \
+    sed -e "s@{{ *pillar\.get('storage_backend', '\(.*\)') *}}@\1@g")
+  if [[ -n "${STORAGE_BACKEND:-}" ]]; then
+    sed -i -e "s@{{ *pillar\.get('storage_backend', '\(.*\)') *}}@${STORAGE_BACKEND}@g" "${temp_file}"
+  else
+    sed -i -e "s@{{ *pillar\.get('storage_backend', '\(.*\)') *}}@\1@g" "${temp_file}"
+  fi
+  if [[ "${STORAGE_BACKEND:-${default_storage_backend}}" == "etcd3" ]]; then
     sed -i -e "s@{{ *quota_bytes *}}@--quota-backend-bytes=4294967296@g" "${temp_file}"
   else
     sed -i -e "s@{{ *quota_bytes *}}@@g" "${temp_file}"
@@ -786,7 +830,6 @@ function start-kube-apiserver {
   local params="${API_SERVER_TEST_LOG_LEVEL:-"--v=2"} ${APISERVER_TEST_ARGS:-} ${CLOUD_CONFIG_OPT}"
   params+=" --address=127.0.0.1"
   params+=" --allow-privileged=true"
-  params+=" --authorization-policy-file=/etc/srv/kubernetes/abac-authz-policy.jsonl"
   params+=" --cloud-provider=gce"
   params+=" --client-ca-file=/etc/srv/kubernetes/ca.crt"
   params+=" --etcd-servers=http://127.0.0.1:2379"
@@ -794,6 +837,8 @@ function start-kube-apiserver {
   params+=" --secure-port=443"
   params+=" --tls-cert-file=/etc/srv/kubernetes/server.cert"
   params+=" --tls-private-key-file=/etc/srv/kubernetes/server.key"
+  params+=" --kubelet-client-certificate=/etc/srv/kubernetes/kubeapiserver.cert"
+  params+=" --kubelet-client-key=/etc/srv/kubernetes/kubeapiserver.key"
   params+=" --token-auth-file=/etc/srv/kubernetes/known_tokens.csv"
   if [[ -n "${KUBE_PASSWORD:-}" && -n "${KUBE_USER:-}" ]]; then
     params+=" --basic-auth-file=/etc/srv/kubernetes/basic_auth.csv"
@@ -864,26 +909,25 @@ function start-kube-apiserver {
     webhook_authn_config_volume="{\"name\": \"webhookauthnconfigmount\",\"hostPath\": {\"path\": \"/etc/gcp_authn.config\"}},"
   fi
 
-  params+=" --authorization-mode=RBAC,ABAC"
+
+  local authorization_mode="RBAC"
+  # Load existing ABAC policy files written by versions < 1.6 of this script
+  # TODO: only default to this legacy path when in upgrade mode
+  ABAC_AUTHZ_FILE="${ABAC_AUTHZ_FILE:-/etc/srv/kubernetes/abac-authz-policy.jsonl}"
+  if [[ -n "${ABAC_AUTHZ_FILE:-}" && -e "${ABAC_AUTHZ_FILE}" ]]; then
+    params+=" --authorization-policy-file=${ABAC_AUTHZ_FILE}"
+    authorization_mode+=",ABAC"
+  fi
   local webhook_config_mount=""
   local webhook_config_volume=""
   if [[ -n "${GCP_AUTHZ_URL:-}" ]]; then
-    params+=",Webhook --authorization-webhook-config-file=/etc/gcp_authz.config"
+    authorization_mode+=",Webhook"
+    params+=" --authorization-webhook-config-file=/etc/gcp_authz.config"
     webhook_config_mount="{\"name\": \"webhookconfigmount\",\"mountPath\": \"/etc/gcp_authz.config\", \"readOnly\": false},"
     webhook_config_volume="{\"name\": \"webhookconfigmount\",\"hostPath\": {\"path\": \"/etc/gcp_authz.config\"}},"
   fi
   local -r src_dir="${KUBE_HOME}/kube-manifests/kubernetes/gci-trusty"
-
-  if [[ -n "${KUBE_USER:-}" || ! -e /etc/srv/kubernetes/abac-authz-policy.jsonl ]]; then
-    local -r abac_policy_json="${src_dir}/abac-authz-policy.jsonl"
-    remove-salt-config-comments "${abac_policy_json}"
-    if [[ -n "${KUBE_USER:-}" ]]; then
-      sed -i -e "s/{{kube_user}}/${KUBE_USER}/g" "${abac_policy_json}"
-    else
-      sed -i -e "/{{kube_user}}/d" "${abac_policy_json}"
-    fi
-    cp "${abac_policy_json}" /etc/srv/kubernetes/
-  fi
+  params+=" --authorization-mode=${authorization_mode}"
 
   src_file="${src_dir}/kube-apiserver.manifest"
   remove-salt-config-comments "${src_file}"
@@ -940,6 +984,10 @@ function start-kube-controller-manager {
   fi
   if [[ -n "${CLUSTER_IP_RANGE:-}" ]]; then
     params+=" --cluster-cidr=${CLUSTER_IP_RANGE}"
+  fi
+  if [[ -n "${CA_KEY:-}" ]]; then
+    params+=" --cluster-signing-cert-file=/etc/srv/kubernetes/ca.crt"
+    params+=" --cluster-signing-key-file=/etc/srv/kubernetes/ca.key"
   fi
   if [[ -n "${SERVICE_CLUSTER_IP_RANGE:-}" ]]; then
     params+=" --service-cluster-ip-range=${SERVICE_CLUSTER_IP_RANGE}"
@@ -1278,6 +1326,10 @@ fi
 
 source "${KUBE_HOME}/kube-env"
 
+if [[ -e "${KUBE_HOME}/kube-master-certs" ]]; then
+  source "${KUBE_HOME}/kube-master-certs"
+fi
+
 if [[ -n "${KUBE_USER:-}" ]]; then
   if ! [[ "${KUBE_USER}" =~ ^[-._@a-zA-Z0-9]+$ ]]; then
     echo "Bad KUBE_USER format."
@@ -1301,6 +1353,7 @@ if [[ "${KUBERNETES_MASTER:-}" == "true" ]]; then
   create-master-etcd-auth
 else
   create-kubelet-kubeconfig
+  create-kubelet-auth-ca
   create-kubeproxy-kubeconfig
 fi
 

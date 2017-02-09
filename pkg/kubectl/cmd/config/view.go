@@ -23,13 +23,14 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
-	clientcmdapi "k8s.io/kubernetes/pkg/client/unversioned/clientcmd/api"
-	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd/api/latest"
+	"k8s.io/apiserver/pkg/util/flag"
+	"k8s.io/client-go/tools/clientcmd"
+	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
+	"k8s.io/client-go/tools/clientcmd/api/latest"
 	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
-	"k8s.io/kubernetes/pkg/util/flag"
+	"k8s.io/kubernetes/pkg/util/i18n"
 )
 
 type ViewOptions struct {
@@ -61,7 +62,7 @@ func NewCmdConfigView(out io.Writer, ConfigAccess clientcmd.ConfigAccess) *cobra
 
 	cmd := &cobra.Command{
 		Use:     "view",
-		Short:   "Display merged kubeconfig settings or a specified kubeconfig file",
+		Short:   i18n.T("Display merged kubeconfig settings or a specified kubeconfig file"),
 		Long:    view_long,
 		Example: view_example,
 		Run: func(cmd *cobra.Command, args []string) {

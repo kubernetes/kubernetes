@@ -23,14 +23,17 @@ import (
 	"testing"
 	"time"
 
-	"k8s.io/kubernetes/pkg/api/resource"
+	"k8s.io/apimachinery/pkg/api/resource"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/util/diff"
+	"k8s.io/apimachinery/pkg/util/wait"
+	clientv1 "k8s.io/client-go/pkg/api/v1"
+	clientcache "k8s.io/client-go/tools/cache"
+	"k8s.io/client-go/tools/record"
+	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/api/v1"
-	clientcache "k8s.io/kubernetes/pkg/client/cache"
-	"k8s.io/kubernetes/pkg/client/record"
-	"k8s.io/kubernetes/pkg/labels"
-	"k8s.io/kubernetes/pkg/util/diff"
-	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm/predicates"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/schedulercache"
@@ -51,9 +54,19 @@ func (fc fakePodConditionUpdater) Update(pod *v1.Pod, podCondition *v1.PodCondit
 
 func podWithID(id, desiredHost string) *v1.Pod {
 	return &v1.Pod{
-		ObjectMeta: v1.ObjectMeta{Name: id, SelfLink: testapi.Default.SelfLink("pods", id)},
+		ObjectMeta: metav1.ObjectMeta{Name: id, SelfLink: testapi.Default.SelfLink("pods", id)},
 		Spec: v1.PodSpec{
 			NodeName: desiredHost,
+		},
+	}
+}
+
+func deletingPod(id string) *v1.Pod {
+	deletionTimestamp := metav1.Now()
+	return &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{Name: id, SelfLink: testapi.Default.SelfLink("pods", id), DeletionTimestamp: &deletionTimestamp},
+		Spec: v1.PodSpec{
+			NodeName: "",
 		},
 	}
 }
@@ -88,7 +101,7 @@ func TestScheduler(t *testing.T) {
 	eventBroadcaster.StartLogging(t.Logf).Stop()
 	errS := errors.New("scheduler")
 	errB := errors.New("binder")
-	testNode := v1.Node{ObjectMeta: v1.ObjectMeta{Name: "machine1"}}
+	testNode := v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "machine1"}}
 
 	table := []struct {
 		injectBindError  error
@@ -103,7 +116,7 @@ func TestScheduler(t *testing.T) {
 		{
 			sendPod:          podWithID("foo", ""),
 			algo:             mockScheduler{testNode.Name, nil},
-			expectBind:       &v1.Binding{ObjectMeta: v1.ObjectMeta{Name: "foo"}, Target: v1.ObjectReference{Kind: "Node", Name: testNode.Name}},
+			expectBind:       &v1.Binding{ObjectMeta: metav1.ObjectMeta{Name: "foo"}, Target: v1.ObjectReference{Kind: "Node", Name: testNode.Name}},
 			expectAssumedPod: podWithID("foo", testNode.Name),
 			eventReason:      "Scheduled",
 		}, {
@@ -115,12 +128,16 @@ func TestScheduler(t *testing.T) {
 		}, {
 			sendPod:          podWithID("foo", ""),
 			algo:             mockScheduler{testNode.Name, nil},
-			expectBind:       &v1.Binding{ObjectMeta: v1.ObjectMeta{Name: "foo"}, Target: v1.ObjectReference{Kind: "Node", Name: testNode.Name}},
+			expectBind:       &v1.Binding{ObjectMeta: metav1.ObjectMeta{Name: "foo"}, Target: v1.ObjectReference{Kind: "Node", Name: testNode.Name}},
 			expectAssumedPod: podWithID("foo", testNode.Name),
 			injectBindError:  errB,
 			expectError:      errB,
 			expectErrorPod:   podWithID("foo", ""),
 			eventReason:      "FailedScheduling",
+		}, {
+			sendPod:     deletingPod("foo"),
+			algo:        mockScheduler{"", nil},
+			eventReason: "FailedScheduling",
 		},
 	}
 
@@ -151,11 +168,11 @@ func TestScheduler(t *testing.T) {
 			NextPod: func() *v1.Pod {
 				return item.sendPod
 			},
-			Recorder: eventBroadcaster.NewRecorder(v1.EventSource{Component: "scheduler"}),
+			Recorder: eventBroadcaster.NewRecorder(api.Scheme, clientv1.EventSource{Component: "scheduler"}),
 		}
 		s := New(c)
 		called := make(chan struct{})
-		events := eventBroadcaster.StartEventWatcher(func(e *v1.Event) {
+		events := eventBroadcaster.StartEventWatcher(func(e *clientv1.Event) {
 			if e, a := item.eventReason, e.Reason; e != a {
 				t.Errorf("%v: expected %v, got %v", i, e, a)
 			}
@@ -185,7 +202,7 @@ func TestSchedulerNoPhantomPodAfterExpire(t *testing.T) {
 	queuedPodStore := clientcache.NewFIFO(clientcache.MetaNamespaceKeyFunc)
 	scache := schedulercache.New(100*time.Millisecond, stop)
 	pod := podWithPort("pod.Name", "", 8080)
-	node := v1.Node{ObjectMeta: v1.ObjectMeta{Name: "machine1"}}
+	node := v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "machine1"}}
 	scache.AddNode(&node)
 	nodeLister := algorithm.FakeNodeLister([]*v1.Node{&node})
 	predicateMap := map[string]algorithm.FitPredicate{"PodFitsHostPorts": predicates.PodFitsHostPorts}
@@ -226,7 +243,7 @@ func TestSchedulerNoPhantomPodAfterExpire(t *testing.T) {
 	select {
 	case b := <-bindingChan:
 		expectBinding := &v1.Binding{
-			ObjectMeta: v1.ObjectMeta{Name: "bar"},
+			ObjectMeta: metav1.ObjectMeta{Name: "bar"},
 			Target:     v1.ObjectReference{Kind: "Node", Name: node.Name},
 		}
 		if !reflect.DeepEqual(expectBinding, b) {
@@ -243,7 +260,7 @@ func TestSchedulerNoPhantomPodAfterDelete(t *testing.T) {
 	queuedPodStore := clientcache.NewFIFO(clientcache.MetaNamespaceKeyFunc)
 	scache := schedulercache.New(10*time.Minute, stop)
 	firstPod := podWithPort("pod.Name", "", 8080)
-	node := v1.Node{ObjectMeta: v1.ObjectMeta{Name: "machine1"}}
+	node := v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "machine1"}}
 	scache.AddNode(&node)
 	nodeLister := algorithm.FakeNodeLister([]*v1.Node{&node})
 	predicateMap := map[string]algorithm.FitPredicate{"PodFitsHostPorts": predicates.PodFitsHostPorts}
@@ -286,7 +303,7 @@ func TestSchedulerNoPhantomPodAfterDelete(t *testing.T) {
 	select {
 	case b := <-bindingChan:
 		expectBinding := &v1.Binding{
-			ObjectMeta: v1.ObjectMeta{Name: "bar"},
+			ObjectMeta: metav1.ObjectMeta{Name: "bar"},
 			Target:     v1.ObjectReference{Kind: "Node", Name: node.Name},
 		}
 		if !reflect.DeepEqual(expectBinding, b) {
@@ -294,6 +311,65 @@ func TestSchedulerNoPhantomPodAfterDelete(t *testing.T) {
 		}
 	case <-time.After(wait.ForeverTestTimeout):
 		t.Fatalf("timeout after %v", wait.ForeverTestTimeout)
+	}
+}
+
+// Scheduler should preserve predicate constraint even if binding was longer
+// than cache ttl
+func TestSchedulerErrorWithLongBinding(t *testing.T) {
+	stop := make(chan struct{})
+	defer close(stop)
+
+	firstPod := podWithPort("foo", "", 8080)
+	conflictPod := podWithPort("bar", "", 8080)
+	pods := map[string]*v1.Pod{firstPod.Name: firstPod, conflictPod.Name: conflictPod}
+	for _, test := range []struct {
+		Expected        map[string]bool
+		CacheTTL        time.Duration
+		BindingDuration time.Duration
+	}{
+		{
+			Expected:        map[string]bool{firstPod.Name: true},
+			CacheTTL:        100 * time.Millisecond,
+			BindingDuration: 300 * time.Millisecond,
+		},
+		{
+			Expected:        map[string]bool{firstPod.Name: true},
+			CacheTTL:        10 * time.Second,
+			BindingDuration: 300 * time.Millisecond,
+		},
+	} {
+		queuedPodStore := clientcache.NewFIFO(clientcache.MetaNamespaceKeyFunc)
+		scache := schedulercache.New(test.CacheTTL, stop)
+
+		node := v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "machine1"}}
+		scache.AddNode(&node)
+
+		nodeLister := algorithm.FakeNodeLister([]*v1.Node{&node})
+		predicateMap := map[string]algorithm.FitPredicate{"PodFitsHostPorts": predicates.PodFitsHostPorts}
+
+		scheduler, bindingChan := setupTestSchedulerLongBindingWithRetry(
+			queuedPodStore, scache, nodeLister, predicateMap, stop, test.BindingDuration)
+		scheduler.Run()
+		queuedPodStore.Add(firstPod)
+		queuedPodStore.Add(conflictPod)
+
+		resultBindings := map[string]bool{}
+		waitChan := time.After(5 * time.Second)
+		for finished := false; !finished; {
+			select {
+			case b := <-bindingChan:
+				resultBindings[b.Name] = true
+				p := pods[b.Name]
+				p.Spec.NodeName = b.Target.Name
+				scache.AddPod(p)
+			case <-waitChan:
+				finished = true
+			}
+		}
+		if !reflect.DeepEqual(resultBindings, test.Expected) {
+			t.Errorf("Result binding are not equal to expected. %v != %v", resultBindings, test.Expected)
+		}
 	}
 }
 
@@ -315,7 +391,7 @@ func setupTestSchedulerWithOnePodOnNode(t *testing.T, queuedPodStore *clientcach
 	select {
 	case b := <-bindingChan:
 		expectBinding := &v1.Binding{
-			ObjectMeta: v1.ObjectMeta{Name: pod.Name},
+			ObjectMeta: metav1.ObjectMeta{Name: pod.Name},
 			Target:     v1.ObjectReference{Kind: "Node", Name: node.Name},
 		}
 		if !reflect.DeepEqual(expectBinding, b) {
@@ -348,7 +424,7 @@ func TestSchedulerFailedSchedulingReasons(t *testing.T) {
 	nodes := []*v1.Node{}
 	for i := 0; i < 100; i++ {
 		node := v1.Node{
-			ObjectMeta: v1.ObjectMeta{Name: fmt.Sprintf("machine%v", i)},
+			ObjectMeta: metav1.ObjectMeta{Name: fmt.Sprintf("machine%v", i)},
 			Status: v1.NodeStatus{
 				Capacity: v1.ResourceList{
 					v1.ResourceCPU:    *(resource.NewQuantity(cpu/2, resource.DecimalSI)),
@@ -428,4 +504,35 @@ func setupTestScheduler(queuedPodStore *clientcache.FIFO, scache schedulercache.
 		PodConditionUpdater: fakePodConditionUpdater{},
 	}
 	return New(cfg), bindingChan, errChan
+}
+
+func setupTestSchedulerLongBindingWithRetry(queuedPodStore *clientcache.FIFO, scache schedulercache.Cache, nodeLister algorithm.FakeNodeLister, predicateMap map[string]algorithm.FitPredicate, stop chan struct{}, bindingTime time.Duration) (*Scheduler, chan *v1.Binding) {
+	algo := NewGenericScheduler(
+		scache,
+		predicateMap,
+		algorithm.EmptyMetadataProducer,
+		[]algorithm.PriorityConfig{},
+		algorithm.EmptyMetadataProducer,
+		[]algorithm.SchedulerExtender{})
+	bindingChan := make(chan *v1.Binding, 2)
+	cfg := &Config{
+		SchedulerCache: scache,
+		NodeLister:     nodeLister,
+		Algorithm:      algo,
+		Binder: fakeBinder{func(b *v1.Binding) error {
+			time.Sleep(bindingTime)
+			bindingChan <- b
+			return nil
+		}},
+		NextPod: func() *v1.Pod {
+			return clientcache.Pop(queuedPodStore).(*v1.Pod)
+		},
+		Error: func(p *v1.Pod, err error) {
+			queuedPodStore.AddIfNotPresent(p)
+		},
+		Recorder:            &record.FakeRecorder{},
+		PodConditionUpdater: fakePodConditionUpdater{},
+		StopEverything:      stop,
+	}
+	return New(cfg), bindingChan
 }

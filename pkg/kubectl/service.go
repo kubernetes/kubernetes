@@ -21,9 +21,10 @@ import (
 	"strconv"
 	"strings"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/util/intstr"
 )
 
 // The only difference between ServiceGeneratorV1 and V2 is that the service port is named "default" in V1, while it is left unnamed in V2.
@@ -61,7 +62,6 @@ func paramNames() []GeneratorParam {
 		{"ports", false},
 		{"labels", false},
 		{"external-ip", false},
-		{"create-external-load-balancer", false},
 		{"load-balancer-ip", false},
 		{"type", false},
 		{"protocol", false},
@@ -177,7 +177,7 @@ func generate(genericParams map[string]interface{}) (runtime.Object, error) {
 	}
 
 	service := api.Service{
-		ObjectMeta: api.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:   name,
 			Labels: labels,
 		},
@@ -208,9 +208,6 @@ func generate(genericParams map[string]interface{}) (runtime.Object, error) {
 			port := service.Spec.Ports[i].Port
 			service.Spec.Ports[i].TargetPort = intstr.FromInt(int(port))
 		}
-	}
-	if params["create-external-load-balancer"] == "true" {
-		service.Spec.Type = api.ServiceTypeLoadBalancer
 	}
 	if len(params["external-ip"]) > 0 {
 		service.Spec.ExternalIPs = []string{params["external-ip"]}

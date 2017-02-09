@@ -21,19 +21,21 @@ import (
 
 	"github.com/golang/glog"
 
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/apimachinery/pkg/watch"
+	"k8s.io/client-go/tools/cache"
+	"k8s.io/client-go/util/workqueue"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/client/cache"
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/quota"
-	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/runtime/schema"
 	"k8s.io/kubernetes/pkg/util/metrics"
-	utilruntime "k8s.io/kubernetes/pkg/util/runtime"
-	"k8s.io/kubernetes/pkg/util/wait"
-	"k8s.io/kubernetes/pkg/util/workqueue"
-	"k8s.io/kubernetes/pkg/watch"
 )
 
 // ResourceQuotaControllerOptions holds options for creating a quota controller
@@ -46,7 +48,7 @@ type ResourceQuotaControllerOptions struct {
 	Registry quota.Registry
 	// Knows how to build controllers that notify replenishment events
 	ControllerFactory ReplenishmentControllerFactory
-	// Controls full resync of objects monitored for replenihsment.
+	// Controls full resync of objects monitored for replenishment.
 	ReplenishmentResyncPeriod controller.ResyncPeriodFunc
 	// List of GroupKind objects that should be monitored for replenishment at
 	// a faster frequency than the quota controller recalculation interval
@@ -60,10 +62,10 @@ type ResourceQuotaController struct {
 	// An index of resource quota objects by namespace
 	rqIndexer cache.Indexer
 	// Watches changes to all resource quota
-	rqController *cache.Controller
+	rqController cache.Controller
 	// ResourceQuota objects that need to be synchronized
 	queue workqueue.RateLimitingInterface
-	// missingUsageQueue holds objects that are missing the initial usage informatino
+	// missingUsageQueue holds objects that are missing the initial usage information
 	missingUsageQueue workqueue.RateLimitingInterface
 	// To allow injection of syncUsage for testing.
 	syncHandler func(key string) error
@@ -72,7 +74,7 @@ type ResourceQuotaController struct {
 	// knows how to calculate usage
 	registry quota.Registry
 	// controllers monitoring to notify for replenishment
-	replenishmentControllers []cache.ControllerInterface
+	replenishmentControllers []cache.Controller
 }
 
 func NewResourceQuotaController(options *ResourceQuotaControllerOptions) *ResourceQuotaController {
@@ -83,7 +85,7 @@ func NewResourceQuotaController(options *ResourceQuotaControllerOptions) *Resour
 		missingUsageQueue:        workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "resourcequota_priority"),
 		resyncPeriod:             options.ResyncPeriod,
 		registry:                 options.Registry,
-		replenishmentControllers: []cache.ControllerInterface{},
+		replenishmentControllers: []cache.Controller{},
 	}
 	if options.KubeClient != nil && options.KubeClient.Core().RESTClient().GetRateLimiter() != nil {
 		metrics.RegisterMetricAndTrackRateLimiterUsage("resource_quota_controller", options.KubeClient.Core().RESTClient().GetRateLimiter())
@@ -94,11 +96,11 @@ func NewResourceQuotaController(options *ResourceQuotaControllerOptions) *Resour
 	// build the controller that observes quota
 	rq.rqIndexer, rq.rqController = cache.NewIndexerInformer(
 		&cache.ListWatch{
-			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
-				return rq.kubeClient.Core().ResourceQuotas(v1.NamespaceAll).List(options)
+			ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
+				return rq.kubeClient.Core().ResourceQuotas(metav1.NamespaceAll).List(options)
 			},
-			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
-				return rq.kubeClient.Core().ResourceQuotas(v1.NamespaceAll).Watch(options)
+			WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
+				return rq.kubeClient.Core().ResourceQuotas(metav1.NamespaceAll).Watch(options)
 			},
 		},
 		&v1.ResourceQuota{},
@@ -173,7 +175,7 @@ func (rq *ResourceQuotaController) addQuota(obj interface{}) {
 	resourceQuota := obj.(*v1.ResourceQuota)
 
 	// if we declared an intent that is not yet captured in status (prioritize it)
-	if !api.Semantic.DeepEqual(resourceQuota.Spec.Hard, resourceQuota.Status.Hard) {
+	if !apiequality.Semantic.DeepEqual(resourceQuota.Spec.Hard, resourceQuota.Status.Hard) {
 		rq.missingUsageQueue.Add(key)
 		return
 	}
@@ -267,7 +269,7 @@ func (rq *ResourceQuotaController) syncResourceQuotaFromKey(key string) (err err
 // syncResourceQuota runs a complete sync of resource quota status across all known kinds
 func (rq *ResourceQuotaController) syncResourceQuota(v1ResourceQuota v1.ResourceQuota) (err error) {
 	// quota is dirty if any part of spec hard limits differs from the status hard limits
-	dirty := !api.Semantic.DeepEqual(v1ResourceQuota.Spec.Hard, v1ResourceQuota.Status.Hard)
+	dirty := !apiequality.Semantic.DeepEqual(v1ResourceQuota.Spec.Hard, v1ResourceQuota.Status.Hard)
 
 	resourceQuota := api.ResourceQuota{}
 	if err := v1.Convert_v1_ResourceQuota_To_api_ResourceQuota(&v1ResourceQuota, &resourceQuota, nil); err != nil {
@@ -300,7 +302,7 @@ func (rq *ResourceQuotaController) syncResourceQuota(v1ResourceQuota v1.Resource
 	// Create a usage object that is based on the quota resource version that will handle updates
 	// by default, we preserve the past usage observation, and set hard to the current spec
 	usage := api.ResourceQuota{
-		ObjectMeta: api.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:            resourceQuota.Name,
 			Namespace:       resourceQuota.Namespace,
 			ResourceVersion: resourceQuota.ResourceVersion,

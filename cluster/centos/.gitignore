@@ -1,4 +1,5 @@
 binaries
+ca-cert
 
 master/bin/etcd
 master/bin/etcdctl

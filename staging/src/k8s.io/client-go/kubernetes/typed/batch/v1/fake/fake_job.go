@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors.
+Copyright 2017 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,13 +17,12 @@ limitations under the License.
 package fake
 
 import (
-	api "k8s.io/client-go/pkg/api"
-	api_v1 "k8s.io/client-go/pkg/api/v1"
+	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	labels "k8s.io/apimachinery/pkg/labels"
+	schema "k8s.io/apimachinery/pkg/runtime/schema"
+	types "k8s.io/apimachinery/pkg/types"
+	watch "k8s.io/apimachinery/pkg/watch"
 	v1 "k8s.io/client-go/pkg/apis/batch/v1"
-	meta_v1 "k8s.io/client-go/pkg/apis/meta/v1"
-	labels "k8s.io/client-go/pkg/labels"
-	schema "k8s.io/client-go/pkg/runtime/schema"
-	watch "k8s.io/client-go/pkg/watch"
 	testing "k8s.io/client-go/testing"
 )
 
@@ -65,14 +64,14 @@ func (c *FakeJobs) UpdateStatus(job *v1.Job) (*v1.Job, error) {
 	return obj.(*v1.Job), err
 }
 
-func (c *FakeJobs) Delete(name string, options *api_v1.DeleteOptions) error {
+func (c *FakeJobs) Delete(name string, options *meta_v1.DeleteOptions) error {
 	_, err := c.Fake.
 		Invokes(testing.NewDeleteAction(jobsResource, c.ns, name), &v1.Job{})
 
 	return err
 }
 
-func (c *FakeJobs) DeleteCollection(options *api_v1.DeleteOptions, listOptions api_v1.ListOptions) error {
+func (c *FakeJobs) DeleteCollection(options *meta_v1.DeleteOptions, listOptions meta_v1.ListOptions) error {
 	action := testing.NewDeleteCollectionAction(jobsResource, c.ns, listOptions)
 
 	_, err := c.Fake.Invokes(action, &v1.JobList{})
@@ -89,7 +88,7 @@ func (c *FakeJobs) Get(name string, options meta_v1.GetOptions) (result *v1.Job,
 	return obj.(*v1.Job), err
 }
 
-func (c *FakeJobs) List(opts api_v1.ListOptions) (result *v1.JobList, err error) {
+func (c *FakeJobs) List(opts meta_v1.ListOptions) (result *v1.JobList, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewListAction(jobsResource, c.ns, opts), &v1.JobList{})
 
@@ -111,14 +110,14 @@ func (c *FakeJobs) List(opts api_v1.ListOptions) (result *v1.JobList, err error)
 }
 
 // Watch returns a watch.Interface that watches the requested jobs.
-func (c *FakeJobs) Watch(opts api_v1.ListOptions) (watch.Interface, error) {
+func (c *FakeJobs) Watch(opts meta_v1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
 		InvokesWatch(testing.NewWatchAction(jobsResource, c.ns, opts))
 
 }
 
 // Patch applies the patch and returns the patched job.
-func (c *FakeJobs) Patch(name string, pt api.PatchType, data []byte, subresources ...string) (result *v1.Job, err error) {
+func (c *FakeJobs) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v1.Job, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewPatchSubresourceAction(jobsResource, c.ns, name, data, subresources...), &v1.Job{})
 

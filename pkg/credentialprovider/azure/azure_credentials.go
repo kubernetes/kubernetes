@@ -17,7 +17,6 @@ limitations under the License.
 package azure
 
 import (
-	"fmt"
 	"io/ioutil"
 	"time"
 
@@ -133,10 +132,15 @@ func (a *acrProvider) Provide() credentialprovider.DockerConfig {
 		return cfg
 	}
 	for ix := range *res.Value {
-		// TODO: I don't think this will work for national clouds
-		cfg[fmt.Sprintf("%s.azurecr.io", *(*res.Value)[ix].Name)] = entry
+		loginServer := getLoginServer((*res.Value)[ix])
+		glog.V(4).Infof("Adding Azure Container Registry docker credential for %s", loginServer)
+		cfg[loginServer] = entry
 	}
 	return cfg
+}
+
+func getLoginServer(registry containerregistry.Registry) string {
+	return *(*registry.RegistryProperties).LoginServer
 }
 
 func (a *acrProvider) LazyProvide() *credentialprovider.DockerConfigEntry {

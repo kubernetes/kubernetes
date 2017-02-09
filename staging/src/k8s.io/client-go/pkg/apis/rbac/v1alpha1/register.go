@@ -17,11 +17,9 @@ limitations under the License.
 package v1alpha1
 
 import (
-	"k8s.io/client-go/pkg/api/v1"
-	metav1 "k8s.io/client-go/pkg/apis/meta/v1"
-	"k8s.io/client-go/pkg/runtime"
-	"k8s.io/client-go/pkg/runtime/schema"
-	"k8s.io/client-go/pkg/watch/versioned"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
 const GroupName = "rbac.authorization.k8s.io"
@@ -51,12 +49,7 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 		&ClusterRoleBinding{},
 		&ClusterRoleBindingList{},
 		&ClusterRoleList{},
-
-		&v1.ListOptions{},
-		&v1.DeleteOptions{},
-		&metav1.ExportOptions{},
-		&metav1.GetOptions{},
 	)
-	versioned.AddToGroupVersion(scheme, SchemeGroupVersion)
+	metav1.AddToGroupVersion(scheme, SchemeGroupVersion)
 	return nil
 }

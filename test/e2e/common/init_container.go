@@ -21,12 +21,13 @@ import (
 	"strconv"
 	"time"
 
-	"k8s.io/kubernetes/pkg/api/resource"
+	"k8s.io/apimachinery/pkg/api/resource"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/uuid"
+	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/kubernetes/pkg/api/v1"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/client/conditions"
-	"k8s.io/kubernetes/pkg/util/uuid"
-	"k8s.io/kubernetes/pkg/watch"
 	"k8s.io/kubernetes/test/e2e/framework"
 
 	. "github.com/onsi/ginkgo"
@@ -47,7 +48,7 @@ var _ = framework.KubeDescribe("InitContainer", func() {
 		name := "pod-init-" + string(uuid.NewUUID())
 		value := strconv.Itoa(time.Now().Nanosecond())
 		pod := &v1.Pod{
-			ObjectMeta: v1.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name: name,
 				Labels: map[string]string{
 					"name": "foo",
@@ -77,31 +78,42 @@ var _ = framework.KubeDescribe("InitContainer", func() {
 				},
 			},
 		}
-		if err := podutil.SetInitContainersAnnotations(pod); err != nil {
+		stable := true
+		for i := 0; i < 2; i++ {
+			if !stable {
+				framework.Logf("PodSpec: initContainers in metadata.annotation")
+				if err := podutil.SetInitContainersAnnotations(pod); err != nil {
+					Expect(err).To(BeNil())
+				}
+			} else {
+				framework.Logf("PodSpec: initContainers in spec.initContainers")
+			}
+			startedPod := podClient.Create(pod)
+			w, err := podClient.Watch(metav1.SingleObject(startedPod.ObjectMeta))
+			Expect(err).NotTo(HaveOccurred(), "error watching a pod")
+			wr := watch.NewRecorder(w)
+			event, err := watch.Until(framework.PodStartTimeout, wr, conditions.PodCompleted)
 			Expect(err).To(BeNil())
-		}
-		startedPod := podClient.Create(pod)
-		w, err := podClient.Watch(v1.SingleObject(startedPod.ObjectMeta))
-		Expect(err).NotTo(HaveOccurred(), "error watching a pod")
-		wr := watch.NewRecorder(w)
-		event, err := watch.Until(framework.PodStartTimeout, wr, conditions.PodCompleted)
-		Expect(err).To(BeNil())
-		framework.CheckInvariants(wr.Events(), framework.ContainerInitInvariant)
-		endPod := event.Object.(*v1.Pod)
-		if err := podutil.SetInitContainersAndStatuses(endPod); err != nil {
-			Expect(err).To(BeNil())
-		}
+			framework.CheckInvariants(wr.Events(), framework.ContainerInitInvariant)
+			endPod := event.Object.(*v1.Pod)
+			if err := podutil.SetInitContainersAndStatuses(endPod); err != nil {
+				Expect(err).To(BeNil())
+			}
 
-		Expect(endPod.Status.Phase).To(Equal(v1.PodSucceeded))
-		_, init := v1.GetPodCondition(&endPod.Status, v1.PodInitialized)
-		Expect(init).NotTo(BeNil())
-		Expect(init.Status).To(Equal(v1.ConditionTrue))
+			Expect(endPod.Status.Phase).To(Equal(v1.PodSucceeded))
+			_, init := v1.GetPodCondition(&endPod.Status, v1.PodInitialized)
+			Expect(init).NotTo(BeNil())
+			Expect(init.Status).To(Equal(v1.ConditionTrue))
 
-		Expect(len(endPod.Status.InitContainerStatuses)).To(Equal(2))
-		for _, status := range endPod.Status.InitContainerStatuses {
-			Expect(status.Ready).To(BeTrue())
-			Expect(status.State.Terminated).NotTo(BeNil())
-			Expect(status.State.Terminated.ExitCode).To(BeZero())
+			Expect(len(endPod.Status.InitContainerStatuses)).To(Equal(2))
+			for _, status := range endPod.Status.InitContainerStatuses {
+				Expect(status.Ready).To(BeTrue())
+				Expect(status.State.Terminated).NotTo(BeNil())
+				Expect(status.State.Terminated.ExitCode).To(BeZero())
+			}
+			stable = false
+			name := "pod-init-" + string(uuid.NewUUID())
+			pod.Name = name
 		}
 	})
 
@@ -112,7 +124,7 @@ var _ = framework.KubeDescribe("InitContainer", func() {
 		name := "pod-init-" + string(uuid.NewUUID())
 		value := strconv.Itoa(time.Now().Nanosecond())
 		pod := &v1.Pod{
-			ObjectMeta: v1.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name: name,
 				Labels: map[string]string{
 					"name": "foo",
@@ -146,31 +158,42 @@ var _ = framework.KubeDescribe("InitContainer", func() {
 				},
 			},
 		}
-		if err := podutil.SetInitContainersAnnotations(pod); err != nil {
+		stable := true
+		for i := 0; i < 2; i++ {
+			if !stable {
+				framework.Logf("PodSpec: initContainers in metadata.annotation")
+				if err := podutil.SetInitContainersAnnotations(pod); err != nil {
+					Expect(err).To(BeNil())
+				}
+			} else {
+				framework.Logf("PodSpec: initContainers in spec.initContainers")
+			}
+			startedPod := podClient.Create(pod)
+			w, err := podClient.Watch(metav1.SingleObject(startedPod.ObjectMeta))
+			Expect(err).NotTo(HaveOccurred(), "error watching a pod")
+			wr := watch.NewRecorder(w)
+			event, err := watch.Until(framework.PodStartTimeout, wr, conditions.PodRunning)
 			Expect(err).To(BeNil())
-		}
-		startedPod := podClient.Create(pod)
-		w, err := podClient.Watch(v1.SingleObject(startedPod.ObjectMeta))
-		Expect(err).NotTo(HaveOccurred(), "error watching a pod")
-		wr := watch.NewRecorder(w)
-		event, err := watch.Until(framework.PodStartTimeout, wr, conditions.PodRunning)
-		Expect(err).To(BeNil())
-		framework.CheckInvariants(wr.Events(), framework.ContainerInitInvariant)
-		endPod := event.Object.(*v1.Pod)
+			framework.CheckInvariants(wr.Events(), framework.ContainerInitInvariant)
+			endPod := event.Object.(*v1.Pod)
 
-		Expect(endPod.Status.Phase).To(Equal(v1.PodRunning))
-		_, init := v1.GetPodCondition(&endPod.Status, v1.PodInitialized)
-		Expect(init).NotTo(BeNil())
-		Expect(init.Status).To(Equal(v1.ConditionTrue))
-		if err := podutil.SetInitContainersAndStatuses(endPod); err != nil {
-			Expect(err).To(BeNil())
-		}
+			Expect(endPod.Status.Phase).To(Equal(v1.PodRunning))
+			_, init := v1.GetPodCondition(&endPod.Status, v1.PodInitialized)
+			Expect(init).NotTo(BeNil())
+			Expect(init.Status).To(Equal(v1.ConditionTrue))
+			if err := podutil.SetInitContainersAndStatuses(endPod); err != nil {
+				Expect(err).To(BeNil())
+			}
 
-		Expect(len(endPod.Status.InitContainerStatuses)).To(Equal(2))
-		for _, status := range endPod.Status.InitContainerStatuses {
-			Expect(status.Ready).To(BeTrue())
-			Expect(status.State.Terminated).NotTo(BeNil())
-			Expect(status.State.Terminated.ExitCode).To(BeZero())
+			Expect(len(endPod.Status.InitContainerStatuses)).To(Equal(2))
+			for _, status := range endPod.Status.InitContainerStatuses {
+				Expect(status.Ready).To(BeTrue())
+				Expect(status.State.Terminated).NotTo(BeNil())
+				Expect(status.State.Terminated.ExitCode).To(BeZero())
+			}
+			stable = false
+			name := "pod-init-" + string(uuid.NewUUID())
+			pod.Name = name
 		}
 	})
 
@@ -182,7 +205,7 @@ var _ = framework.KubeDescribe("InitContainer", func() {
 		value := strconv.Itoa(time.Now().Nanosecond())
 
 		pod := &v1.Pod{
-			ObjectMeta: v1.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name: name,
 				Labels: map[string]string{
 					"name": "foo",
@@ -216,84 +239,95 @@ var _ = framework.KubeDescribe("InitContainer", func() {
 				},
 			},
 		}
-		if err := podutil.SetInitContainersAnnotations(pod); err != nil {
-			Expect(err).To(BeNil())
-		}
-		startedPod := podClient.Create(pod)
-		w, err := podClient.Watch(v1.SingleObject(startedPod.ObjectMeta))
-		Expect(err).NotTo(HaveOccurred(), "error watching a pod")
+		stable := true
+		for i := 0; i < 2; i++ {
+			if !stable {
+				framework.Logf("PodSpec: initContainers in metadata.annotation")
+				if err := podutil.SetInitContainersAnnotations(pod); err != nil {
+					Expect(err).To(BeNil())
+				}
+			} else {
+				framework.Logf("PodSpec: initContainers in spec.initContainers")
+			}
+			startedPod := podClient.Create(pod)
+			w, err := podClient.Watch(metav1.SingleObject(startedPod.ObjectMeta))
+			Expect(err).NotTo(HaveOccurred(), "error watching a pod")
 
-		wr := watch.NewRecorder(w)
-		event, err := watch.Until(
-			framework.PodStartTimeout, wr,
-			// check for the first container to fail at least once
-			func(evt watch.Event) (bool, error) {
-				switch t := evt.Object.(type) {
-				case *v1.Pod:
-					if err := podutil.SetInitContainersAndStatuses(t); err != nil {
-						Expect(err).To(BeNil())
-					}
-					for _, status := range t.Status.ContainerStatuses {
+			wr := watch.NewRecorder(w)
+			event, err := watch.Until(
+				framework.PodStartTimeout, wr,
+				// check for the first container to fail at least once
+				func(evt watch.Event) (bool, error) {
+					switch t := evt.Object.(type) {
+					case *v1.Pod:
+						if err := podutil.SetInitContainersAndStatuses(t); err != nil {
+							Expect(err).To(BeNil())
+						}
+						for _, status := range t.Status.ContainerStatuses {
+							if status.State.Waiting == nil {
+								return false, fmt.Errorf("container %q should not be out of waiting: %#v", status.Name, status)
+							}
+							if status.State.Waiting.Reason != "PodInitializing" {
+								return false, fmt.Errorf("container %q should have reason PodInitializing: %#v", status.Name, status)
+							}
+						}
+						if len(t.Status.InitContainerStatuses) != 2 {
+							return false, nil
+						}
+						status := t.Status.InitContainerStatuses[1]
 						if status.State.Waiting == nil {
-							return false, fmt.Errorf("container %q should not be out of waiting: %#v", status.Name, status)
+							return false, fmt.Errorf("second init container should not be out of waiting: %#v", status)
 						}
 						if status.State.Waiting.Reason != "PodInitializing" {
-							return false, fmt.Errorf("container %q should have reason PodInitializing: %#v", status.Name, status)
+							return false, fmt.Errorf("second init container should have reason PodInitializing: %#v", status)
 						}
+						status = t.Status.InitContainerStatuses[0]
+						if status.State.Terminated != nil && status.State.Terminated.ExitCode == 0 {
+							return false, fmt.Errorf("first init container should have exitCode != 0: %#v", status)
+						}
+						// continue until we see an attempt to restart the pod
+						return status.LastTerminationState.Terminated != nil, nil
+					default:
+						return false, fmt.Errorf("unexpected object: %#v", t)
 					}
-					if len(t.Status.InitContainerStatuses) != 2 {
-						return false, nil
+				},
+				// verify we get two restarts
+				func(evt watch.Event) (bool, error) {
+					switch t := evt.Object.(type) {
+					case *v1.Pod:
+						if err := podutil.SetInitContainersAndStatuses(t); err != nil {
+							Expect(err).To(BeNil())
+						}
+						status := t.Status.InitContainerStatuses[0]
+						if status.RestartCount < 3 {
+							return false, nil
+						}
+						framework.Logf("init container has failed twice: %#v", t)
+						// TODO: more conditions
+						return true, nil
+					default:
+						return false, fmt.Errorf("unexpected object: %#v", t)
 					}
-					status := t.Status.InitContainerStatuses[1]
-					if status.State.Waiting == nil {
-						return false, fmt.Errorf("second init container should not be out of waiting: %#v", status)
-					}
-					if status.State.Waiting.Reason != "PodInitializing" {
-						return false, fmt.Errorf("second init container should have reason PodInitializing: %#v", status)
-					}
-					status = t.Status.InitContainerStatuses[0]
-					if status.State.Terminated != nil && status.State.Terminated.ExitCode == 0 {
-						return false, fmt.Errorf("first init container should have exitCode != 0: %#v", status)
-					}
-					// continue until we see an attempt to restart the pod
-					return status.LastTerminationState.Terminated != nil, nil
-				default:
-					return false, fmt.Errorf("unexpected object: %#v", t)
-				}
-			},
-			// verify we get two restarts
-			func(evt watch.Event) (bool, error) {
-				switch t := evt.Object.(type) {
-				case *v1.Pod:
-					if err := podutil.SetInitContainersAndStatuses(t); err != nil {
-						Expect(err).To(BeNil())
-					}
-					status := t.Status.InitContainerStatuses[0]
-					if status.RestartCount < 3 {
-						return false, nil
-					}
-					framework.Logf("init container has failed twice: %#v", t)
-					// TODO: more conditions
-					return true, nil
-				default:
-					return false, fmt.Errorf("unexpected object: %#v", t)
-				}
-			},
-		)
-		Expect(err).To(BeNil())
-		framework.CheckInvariants(wr.Events(), framework.ContainerInitInvariant)
-		endPod := event.Object.(*v1.Pod)
-		if err := podutil.SetInitContainersAndStatuses(endPod); err != nil {
+				},
+			)
 			Expect(err).To(BeNil())
-		}
+			framework.CheckInvariants(wr.Events(), framework.ContainerInitInvariant)
+			endPod := event.Object.(*v1.Pod)
+			if err := podutil.SetInitContainersAndStatuses(endPod); err != nil {
+				Expect(err).To(BeNil())
+			}
 
-		Expect(endPod.Status.Phase).To(Equal(v1.PodPending))
-		_, init := v1.GetPodCondition(&endPod.Status, v1.PodInitialized)
-		Expect(init).NotTo(BeNil())
-		Expect(init.Status).To(Equal(v1.ConditionFalse))
-		Expect(init.Reason).To(Equal("ContainersNotInitialized"))
-		Expect(init.Message).To(Equal("containers with incomplete status: [init1 init2]"))
-		Expect(len(endPod.Status.InitContainerStatuses)).To(Equal(2))
+			Expect(endPod.Status.Phase).To(Equal(v1.PodPending))
+			_, init := v1.GetPodCondition(&endPod.Status, v1.PodInitialized)
+			Expect(init).NotTo(BeNil())
+			Expect(init.Status).To(Equal(v1.ConditionFalse))
+			Expect(init.Reason).To(Equal("ContainersNotInitialized"))
+			Expect(init.Message).To(Equal("containers with incomplete status: [init1 init2]"))
+			Expect(len(endPod.Status.InitContainerStatuses)).To(Equal(2))
+			stable = false
+			name := "pod-init-" + string(uuid.NewUUID())
+			pod.Name = name
+		}
 	})
 
 	It("should not start app containers and fail the pod if init containers fail on a RestartNever pod", func() {
@@ -303,7 +337,7 @@ var _ = framework.KubeDescribe("InitContainer", func() {
 		name := "pod-init-" + string(uuid.NewUUID())
 		value := strconv.Itoa(time.Now().Nanosecond())
 		pod := &v1.Pod{
-			ObjectMeta: v1.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name: name,
 				Labels: map[string]string{
 					"name": "foo",
@@ -339,70 +373,81 @@ var _ = framework.KubeDescribe("InitContainer", func() {
 				},
 			},
 		}
-		if err := podutil.SetInitContainersAnnotations(pod); err != nil {
-			Expect(err).To(BeNil())
-		}
-		startedPod := podClient.Create(pod)
-
-		w, err := podClient.Watch(v1.SingleObject(startedPod.ObjectMeta))
-		Expect(err).NotTo(HaveOccurred(), "error watching a pod")
-
-		wr := watch.NewRecorder(w)
-		event, err := watch.Until(
-			framework.PodStartTimeout, wr,
-			// check for the second container to fail at least once
-			func(evt watch.Event) (bool, error) {
-				switch t := evt.Object.(type) {
-				case *v1.Pod:
-					if err := podutil.SetInitContainersAndStatuses(t); err != nil {
-						Expect(err).To(BeNil())
-					}
-					for _, status := range t.Status.ContainerStatuses {
-						if status.State.Waiting == nil {
-							return false, fmt.Errorf("container %q should not be out of waiting: %#v", status.Name, status)
-						}
-						if status.State.Waiting.Reason != "PodInitializing" {
-							return false, fmt.Errorf("container %q should have reason PodInitializing: %#v", status.Name, status)
-						}
-					}
-					if len(t.Status.InitContainerStatuses) != 2 {
-						return false, nil
-					}
-					status := t.Status.InitContainerStatuses[0]
-					if status.State.Terminated == nil {
-						if status.State.Waiting != nil && status.State.Waiting.Reason != "PodInitializing" {
-							return false, fmt.Errorf("second init container should have reason PodInitializing: %#v", status)
-						}
-						return false, nil
-					}
-					if status.State.Terminated != nil && status.State.Terminated.ExitCode != 0 {
-						return false, fmt.Errorf("first init container should have exitCode != 0: %#v", status)
-					}
-					status = t.Status.InitContainerStatuses[1]
-					if status.State.Terminated == nil {
-						return false, nil
-					}
-					if status.State.Terminated.ExitCode == 0 {
-						return false, fmt.Errorf("second init container should have failed: %#v", status)
-					}
-					return true, nil
-				default:
-					return false, fmt.Errorf("unexpected object: %#v", t)
+		stable := true
+		for i := 0; i < 2; i++ {
+			if !stable {
+				framework.Logf("PodSpec: initContainers in metadata.annotation")
+				if err := podutil.SetInitContainersAnnotations(pod); err != nil {
+					Expect(err).To(BeNil())
 				}
-			},
-			conditions.PodCompleted,
-		)
-		Expect(err).To(BeNil())
-		framework.CheckInvariants(wr.Events(), framework.ContainerInitInvariant)
-		endPod := event.Object.(*v1.Pod)
+			} else {
+				framework.Logf("PodSpec: initContainers in spec.initContainers")
+			}
+			startedPod := podClient.Create(pod)
 
-		Expect(endPod.Status.Phase).To(Equal(v1.PodFailed))
-		_, init := v1.GetPodCondition(&endPod.Status, v1.PodInitialized)
-		Expect(init).NotTo(BeNil())
-		Expect(init.Status).To(Equal(v1.ConditionFalse))
-		Expect(init.Reason).To(Equal("ContainersNotInitialized"))
-		Expect(init.Message).To(Equal("containers with incomplete status: [init2]"))
-		Expect(len(endPod.Status.InitContainerStatuses)).To(Equal(2))
-		Expect(endPod.Status.ContainerStatuses[0].State.Waiting).ToNot(BeNil())
+			w, err := podClient.Watch(metav1.SingleObject(startedPod.ObjectMeta))
+			Expect(err).NotTo(HaveOccurred(), "error watching a pod")
+
+			wr := watch.NewRecorder(w)
+			event, err := watch.Until(
+				framework.PodStartTimeout, wr,
+				// check for the second container to fail at least once
+				func(evt watch.Event) (bool, error) {
+					switch t := evt.Object.(type) {
+					case *v1.Pod:
+						if err := podutil.SetInitContainersAndStatuses(t); err != nil {
+							Expect(err).To(BeNil())
+						}
+						for _, status := range t.Status.ContainerStatuses {
+							if status.State.Waiting == nil {
+								return false, fmt.Errorf("container %q should not be out of waiting: %#v", status.Name, status)
+							}
+							if status.State.Waiting.Reason != "PodInitializing" {
+								return false, fmt.Errorf("container %q should have reason PodInitializing: %#v", status.Name, status)
+							}
+						}
+						if len(t.Status.InitContainerStatuses) != 2 {
+							return false, nil
+						}
+						status := t.Status.InitContainerStatuses[0]
+						if status.State.Terminated == nil {
+							if status.State.Waiting != nil && status.State.Waiting.Reason != "PodInitializing" {
+								return false, fmt.Errorf("second init container should have reason PodInitializing: %#v", status)
+							}
+							return false, nil
+						}
+						if status.State.Terminated != nil && status.State.Terminated.ExitCode != 0 {
+							return false, fmt.Errorf("first init container should have exitCode != 0: %#v", status)
+						}
+						status = t.Status.InitContainerStatuses[1]
+						if status.State.Terminated == nil {
+							return false, nil
+						}
+						if status.State.Terminated.ExitCode == 0 {
+							return false, fmt.Errorf("second init container should have failed: %#v", status)
+						}
+						return true, nil
+					default:
+						return false, fmt.Errorf("unexpected object: %#v", t)
+					}
+				},
+				conditions.PodCompleted,
+			)
+			Expect(err).To(BeNil())
+			framework.CheckInvariants(wr.Events(), framework.ContainerInitInvariant)
+			endPod := event.Object.(*v1.Pod)
+
+			Expect(endPod.Status.Phase).To(Equal(v1.PodFailed))
+			_, init := v1.GetPodCondition(&endPod.Status, v1.PodInitialized)
+			Expect(init).NotTo(BeNil())
+			Expect(init.Status).To(Equal(v1.ConditionFalse))
+			Expect(init.Reason).To(Equal("ContainersNotInitialized"))
+			Expect(init.Message).To(Equal("containers with incomplete status: [init2]"))
+			Expect(len(endPod.Status.InitContainerStatuses)).To(Equal(2))
+			Expect(endPod.Status.ContainerStatuses[0].State.Waiting).ToNot(BeNil())
+			stable = false
+			name := "pod-init-" + string(uuid.NewUUID())
+			pod.Name = name
+		}
 	})
 })

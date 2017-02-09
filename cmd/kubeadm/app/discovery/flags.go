@@ -72,11 +72,23 @@ func ParseURL(d *kubeadm.Discovery, s string) error {
 	}
 	switch u.Scheme {
 	case "https":
-		return https.Parse(u, d)
+		https.Parse(u, d)
+		return nil
 	case "file":
-		return file.Parse(u, d)
+		file.Parse(u, d)
+		return nil
 	case "token":
-		return token.Parse(u, d)
+		// Make sure a valid RFC 3986 URL has been passed and parsed.
+		// See https://github.com/kubernetes/kubeadm/issues/95#issuecomment-270431296 for more details.
+		if !strings.Contains(s, "@") {
+			s := s + "@"
+			u, err = url.Parse(s)
+			if err != nil {
+				return err
+			}
+		}
+		token.Parse(u, d)
+		return nil
 	default:
 		return fmt.Errorf("unknown discovery scheme")
 	}

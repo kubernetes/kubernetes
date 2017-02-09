@@ -18,6 +18,8 @@ package allocator
 
 import (
 	"testing"
+
+	"k8s.io/apimachinery/pkg/util/sets"
 )
 
 func TestAllocate(t *testing.T) {
@@ -79,6 +81,37 @@ func TestRelease(t *testing.T) {
 
 	if m.Has(offset) {
 		t.Errorf("expect offset %v not allocated", offset)
+	}
+}
+
+func TestForEach(t *testing.T) {
+	testCases := []sets.Int{
+		sets.NewInt(),
+		sets.NewInt(0),
+		sets.NewInt(0, 2, 5, 9),
+		sets.NewInt(0, 1, 2, 3, 4, 5, 6, 7, 8, 9),
+	}
+
+	for i, tc := range testCases {
+		m := NewAllocationMap(10, "test")
+		for offset := range tc {
+			if ok, _ := m.Allocate(offset); !ok {
+				t.Errorf("[%d] error allocate offset %v", i, offset)
+			}
+			if !m.Has(offset) {
+				t.Errorf("[%d] expect offset %v allocated", i, offset)
+			}
+		}
+		calls := sets.NewInt()
+		m.ForEach(func(i int) {
+			calls.Insert(i)
+		})
+		if len(calls) != len(tc) {
+			t.Errorf("[%d] expected %d calls, got %d", i, len(tc), len(calls))
+		}
+		if !calls.Equal(tc) {
+			t.Errorf("[%d] expected calls to equal testcase: %v vs %v", i, calls.List(), tc.List())
+		}
 	}
 }
 

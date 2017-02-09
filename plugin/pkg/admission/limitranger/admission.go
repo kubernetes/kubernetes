@@ -25,17 +25,18 @@ import (
 
 	lru "github.com/hashicorp/golang-lru"
 
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
+	"k8s.io/apimachinery/pkg/api/meta"
+	"k8s.io/apimachinery/pkg/api/resource"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/runtime"
+	utilerrors "k8s.io/apimachinery/pkg/util/errors"
+	"k8s.io/apiserver/pkg/admission"
+	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	coreinternallisters "k8s.io/kubernetes/pkg/client/listers/core/internalversion"
 	"k8s.io/kubernetes/pkg/controller/informers"
-
-	"k8s.io/kubernetes/pkg/admission"
-	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/meta"
-	"k8s.io/kubernetes/pkg/api/resource"
-	"k8s.io/kubernetes/pkg/labels"
-	"k8s.io/kubernetes/pkg/runtime"
-	utilerrors "k8s.io/kubernetes/pkg/util/errors"
+	kubeapiserveradmission "k8s.io/kubernetes/pkg/kubeapiserver/admission"
 )
 
 const (
@@ -43,15 +44,15 @@ const (
 )
 
 func init() {
-	admission.RegisterPlugin("LimitRanger", func(client clientset.Interface, config io.Reader) (admission.Interface, error) {
-		return NewLimitRanger(client, &DefaultLimitRangerActions{})
+	admission.RegisterPlugin("LimitRanger", func(config io.Reader) (admission.Interface, error) {
+		return NewLimitRanger(&DefaultLimitRangerActions{})
 	})
 }
 
 // limitRanger enforces usage limits on a per resource basis in the namespace
 type limitRanger struct {
 	*admission.Handler
-	client  clientset.Interface
+	client  internalclientset.Interface
 	actions LimitRangerActions
 	lister  coreinternallisters.LimitRangeLister
 
@@ -76,6 +77,9 @@ func (l *limitRanger) SetInformerFactory(f informers.SharedInformerFactory) {
 func (l *limitRanger) Validate() error {
 	if l.lister == nil {
 		return fmt.Errorf("missing limitRange lister")
+	}
+	if l.client == nil {
+		return fmt.Errorf("missing client")
 	}
 	return nil
 }
@@ -109,7 +113,7 @@ func (l *limitRanger) Admit(a admission.Attributes) (err error) {
 			// If there is already in-flight List() for a given namespace, we should wait until
 			// it is finished and cache is updated instead of doing the same, also to avoid
 			// throttling - see #22422 for details.
-			liveList, err := l.client.Core().LimitRanges(a.GetNamespace()).List(api.ListOptions{})
+			liveList, err := l.client.Core().LimitRanges(a.GetNamespace()).List(metav1.ListOptions{})
 			if err != nil {
 				return admission.NewForbidden(a, err)
 			}
@@ -145,7 +149,7 @@ func (l *limitRanger) Admit(a admission.Attributes) (err error) {
 }
 
 // NewLimitRanger returns an object that enforces limits based on the supplied limit function
-func NewLimitRanger(client clientset.Interface, actions LimitRangerActions) (admission.Interface, error) {
+func NewLimitRanger(actions LimitRangerActions) (admission.Interface, error) {
 	liveLookupCache, err := lru.New(10000)
 	if err != nil {
 		return nil, err
@@ -157,11 +161,16 @@ func NewLimitRanger(client clientset.Interface, actions LimitRangerActions) (adm
 
 	return &limitRanger{
 		Handler:         admission.NewHandler(admission.Create, admission.Update),
-		client:          client,
 		actions:         actions,
 		liveLookupCache: liveLookupCache,
 		liveTTL:         time.Duration(30 * time.Second),
 	}, nil
+}
+
+var _ = kubeapiserveradmission.WantsInternalClientSet(&limitRanger{})
+
+func (a *limitRanger) SetInternalClientSet(client internalclientset.Interface) {
+	a.client = client
 }
 
 // defaultContainerResourceRequirements returns the default requirements for a container

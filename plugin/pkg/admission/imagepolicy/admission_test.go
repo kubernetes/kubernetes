@@ -28,12 +28,11 @@ import (
 	"testing"
 	"time"
 
-	"k8s.io/kubernetes/pkg/admission"
+	"k8s.io/apiserver/pkg/admission"
+	"k8s.io/apiserver/pkg/authentication/user"
+	"k8s.io/client-go/tools/clientcmd/api/v1"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/imagepolicy/v1alpha1"
-	"k8s.io/kubernetes/pkg/auth/user"
-	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/fake"
-	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd/api/v1"
 
 	"fmt"
 	"io/ioutil"
@@ -244,7 +243,7 @@ current-context: default
 			}
 			defer configFile.Close()
 
-			_, err = NewImagePolicyWebhook(fake.NewSimpleClientset(), configFile)
+			_, err = NewImagePolicyWebhook(configFile)
 			return err
 		}()
 		if err != nil && !tt.wantErr {
@@ -404,7 +403,7 @@ func newImagePolicyWebhook(callbackURL string, clientCert, clientKey, ca []byte,
 		return nil, fmt.Errorf("failed to read test config: %v", err)
 	}
 	defer configFile.Close()
-	wh, err := NewImagePolicyWebhook(fake.NewSimpleClientset(), configFile)
+	wh, err := NewImagePolicyWebhook(configFile)
 	return wh.(*imagePolicyWebhook), err
 }
 

@@ -21,8 +21,8 @@ limitations under the License.
 package app
 
 import (
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/kubernetes/pkg/controller/disruption"
-	"k8s.io/kubernetes/pkg/runtime/schema"
 )
 
 func startDisruptionController(ctx ControllerContext) (bool, error) {

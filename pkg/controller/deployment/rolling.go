@@ -21,10 +21,10 @@ import (
 	"sort"
 
 	"github.com/golang/glog"
+	"k8s.io/client-go/util/integer"
 	extensions "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	"k8s.io/kubernetes/pkg/controller"
 	deploymentutil "k8s.io/kubernetes/pkg/controller/deployment/util"
-	"k8s.io/kubernetes/pkg/util/integer"
 )
 
 // rolloutRolling implements the logic for rolling a new replica set.
@@ -54,8 +54,6 @@ func (dc *DeploymentController) rolloutRolling(deployment *extensions.Deployment
 		// Update DeploymentStatus
 		return dc.syncRolloutStatus(allRSs, newRS, deployment)
 	}
-
-	dc.cleanupDeployment(oldRSs, deployment)
 
 	// Sync deployment status
 	return dc.syncRolloutStatus(allRSs, newRS, deployment)

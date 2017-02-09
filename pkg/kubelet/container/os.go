@@ -32,6 +32,7 @@ type OSInterface interface {
 	Remove(path string) error
 	RemoveAll(path string) error
 	Create(path string) (*os.File, error)
+	Chmod(path string, perm os.FileMode) error
 	Hostname() (name string, err error)
 	Chtimes(path string, atime time.Time, mtime time.Time) error
 	Pipe() (r *os.File, w *os.File, err error)
@@ -71,6 +72,12 @@ func (RealOS) RemoveAll(path string) error {
 // at path.
 func (RealOS) Create(path string) (*os.File, error) {
 	return os.Create(path)
+}
+
+// Chmod will change the permissions on the specified path or return
+// an error.
+func (RealOS) Chmod(path string, perm os.FileMode) error {
+	return os.Chmod(path, perm)
 }
 
 // Hostname will call os.Hostname to return the hostname.

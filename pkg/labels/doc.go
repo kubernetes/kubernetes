@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors.
+Copyright 2017 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,6 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package labels implements a simple label system, parsing and matching
-// selectors with sets of labels.
-package labels // import "k8s.io/kubernetes/pkg/labels"
+// Package labels only exists until heapster rebases
+// TODO genericapiserver remove this empty package.  Godep fails without this because heapster relies
+// on this package.  This will allow us to start splitting packages, but will force
+// heapster to update on their next kube rebase.
+package labels

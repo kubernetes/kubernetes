@@ -21,14 +21,14 @@ import (
 	"strconv"
 	"strings"
 
+	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/kubernetes/pkg/api/v1"
 	serviceapi "k8s.io/kubernetes/pkg/api/v1/service"
-	utilerrors "k8s.io/kubernetes/pkg/util/errors"
 
 	"github.com/Azure/azure-sdk-for-go/arm/network"
 	"github.com/Azure/go-autorest/autorest/to"
 	"github.com/golang/glog"
-	"k8s.io/kubernetes/pkg/types"
+	"k8s.io/apimachinery/pkg/types"
 )
 
 // GetLoadBalancer returns whether the specified load balancer exists, and
@@ -83,6 +83,10 @@ func (az *Cloud) EnsureLoadBalancer(clusterName string, service *v1.Service, nod
 	}
 	if sgNeedsUpdate {
 		glog.V(3).Infof("ensure(%s): sg(%s) - updating", serviceName, *sg.Name)
+		// azure-sdk-for-go introduced contraint validation which breaks the updating here if we don't set these
+		// to nil. This is a workaround until https://github.com/Azure/go-autorest/issues/112 is fixed
+		sg.SecurityGroupPropertiesFormat.NetworkInterfaces = nil
+		sg.SecurityGroupPropertiesFormat.Subnets = nil
 		_, err := az.SecurityGroupsClient.CreateOrUpdate(az.ResourceGroup, *sg.Name, sg, nil)
 		if err != nil {
 			return nil, err
@@ -200,6 +204,10 @@ func (az *Cloud) EnsureLoadBalancerDeleted(clusterName string, service *v1.Servi
 		}
 		if sgNeedsUpdate {
 			glog.V(3).Infof("delete(%s): sg(%s) - updating", serviceName, az.SecurityGroupName)
+			// azure-sdk-for-go introduced contraint validation which breaks the updating here if we don't set these
+			// to nil. This is a workaround until https://github.com/Azure/go-autorest/issues/112 is fixed
+			sg.SecurityGroupPropertiesFormat.NetworkInterfaces = nil
+			sg.SecurityGroupPropertiesFormat.Subnets = nil
 			_, err := az.SecurityGroupsClient.CreateOrUpdate(az.ResourceGroup, *reconciledSg.Name, reconciledSg, nil)
 			if err != nil {
 				return err

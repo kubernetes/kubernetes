@@ -19,12 +19,20 @@ limitations under the License.
 package install
 
 import (
-	"k8s.io/client-go/pkg/apimachinery/announced"
+	"k8s.io/apimachinery/pkg/apimachinery/announced"
+	"k8s.io/apimachinery/pkg/apimachinery/registered"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/pkg/api"
 	"k8s.io/client-go/pkg/apis/apps"
 	"k8s.io/client-go/pkg/apis/apps/v1beta1"
 )
 
 func init() {
+	Install(api.GroupFactoryRegistry, api.Registry, api.Scheme)
+}
+
+// Install registers the API group and adds types to a scheme
+func Install(groupFactoryRegistry announced.APIGroupFactoryRegistry, registry *registered.APIRegistrationManager, scheme *runtime.Scheme) {
 	if err := announced.NewGroupMetaFactory(
 		&announced.GroupMetaFactoryArgs{
 			GroupName:                  apps.GroupName,
@@ -35,7 +43,7 @@ func init() {
 		announced.VersionToSchemeFunc{
 			v1beta1.SchemeGroupVersion.Version: v1beta1.AddToScheme,
 		},
-	).Announce().RegisterAndEnable(); err != nil {
+	).Announce(groupFactoryRegistry).RegisterAndEnable(registry, scheme); err != nil {
 		panic(err)
 	}
 }

@@ -21,10 +21,10 @@ import (
 	"time"
 
 	"github.com/golang/glog"
+	"k8s.io/client-go/tools/cache"
 	"k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/client/cache"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset/fake"
-	fcache "k8s.io/kubernetes/pkg/client/testing/cache"
+	fcache "k8s.io/kubernetes/pkg/controller/volume/persistentvolume/testing"
 )
 
 // Test the real controller methods (add/update/delete claim/volume) with
@@ -176,7 +176,7 @@ func TestControllerSync(t *testing.T) {
 
 		// Start the controller
 		stopCh := make(chan struct{})
-		ctrl.Run(stopCh)
+		go ctrl.Run(stopCh)
 
 		// Wait for the controller to pass initial sync and fill its caches.
 		for !ctrl.volumeController.HasSynced() ||

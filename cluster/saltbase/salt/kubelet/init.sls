@@ -31,6 +31,15 @@
     - mode: 400
     - makedirs: true
 
+{% if pillar['kubelet_auth_ca_cert'] is defined %}
+/var/lib/kubelet/kubelet_auth_ca.crt:
+  file.managed:
+    - source: salt://kubelet/kubelet_auth_ca.crt
+    - user: root
+    - group: root
+    - mode: 400
+    - makedirs: true
+{% endif %}
 
 {% if pillar.get('is_systemd') %}
 
@@ -52,6 +61,7 @@ fix-service-kubelet:
       - file: {{ pillar.get('systemd_system_path') }}/kubelet.service
       - file: {{ environment_file }}
       - file: /var/lib/kubelet/kubeconfig
+      - file: /var/lib/kubelet/kubelet_auth_ca.crt
 
 {% else %}
 
@@ -79,6 +89,9 @@ kubelet:
 {% endif %}
       - file: {{ environment_file }}
       - file: /var/lib/kubelet/kubeconfig
+{% if pillar['kubelet_auth_ca_cert'] is defined  %}
+      - file: /var/lib/kubelet/kubelet_auth_ca.crt
+{% endif %}
 {% if pillar.get('is_systemd') %}
     - provider:
       - service: systemd

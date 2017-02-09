@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors.
+Copyright 2017 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,12 +17,12 @@ limitations under the License.
 package fake
 
 import (
-	api "k8s.io/client-go/pkg/api"
+	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	labels "k8s.io/apimachinery/pkg/labels"
+	schema "k8s.io/apimachinery/pkg/runtime/schema"
+	types "k8s.io/apimachinery/pkg/types"
+	watch "k8s.io/apimachinery/pkg/watch"
 	v1 "k8s.io/client-go/pkg/api/v1"
-	meta_v1 "k8s.io/client-go/pkg/apis/meta/v1"
-	labels "k8s.io/client-go/pkg/labels"
-	schema "k8s.io/client-go/pkg/runtime/schema"
-	watch "k8s.io/client-go/pkg/watch"
 	testing "k8s.io/client-go/testing"
 )
 
@@ -60,13 +60,13 @@ func (c *FakePersistentVolumes) UpdateStatus(persistentVolume *v1.PersistentVolu
 	return obj.(*v1.PersistentVolume), err
 }
 
-func (c *FakePersistentVolumes) Delete(name string, options *v1.DeleteOptions) error {
+func (c *FakePersistentVolumes) Delete(name string, options *meta_v1.DeleteOptions) error {
 	_, err := c.Fake.
 		Invokes(testing.NewRootDeleteAction(persistentvolumesResource, name), &v1.PersistentVolume{})
 	return err
 }
 
-func (c *FakePersistentVolumes) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
+func (c *FakePersistentVolumes) DeleteCollection(options *meta_v1.DeleteOptions, listOptions meta_v1.ListOptions) error {
 	action := testing.NewRootDeleteCollectionAction(persistentvolumesResource, listOptions)
 
 	_, err := c.Fake.Invokes(action, &v1.PersistentVolumeList{})
@@ -82,7 +82,7 @@ func (c *FakePersistentVolumes) Get(name string, options meta_v1.GetOptions) (re
 	return obj.(*v1.PersistentVolume), err
 }
 
-func (c *FakePersistentVolumes) List(opts v1.ListOptions) (result *v1.PersistentVolumeList, err error) {
+func (c *FakePersistentVolumes) List(opts meta_v1.ListOptions) (result *v1.PersistentVolumeList, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewRootListAction(persistentvolumesResource, opts), &v1.PersistentVolumeList{})
 	if obj == nil {
@@ -103,13 +103,13 @@ func (c *FakePersistentVolumes) List(opts v1.ListOptions) (result *v1.Persistent
 }
 
 // Watch returns a watch.Interface that watches the requested persistentVolumes.
-func (c *FakePersistentVolumes) Watch(opts v1.ListOptions) (watch.Interface, error) {
+func (c *FakePersistentVolumes) Watch(opts meta_v1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
 		InvokesWatch(testing.NewRootWatchAction(persistentvolumesResource, opts))
 }
 
 // Patch applies the patch and returns the patched persistentVolume.
-func (c *FakePersistentVolumes) Patch(name string, pt api.PatchType, data []byte, subresources ...string) (result *v1.PersistentVolume, err error) {
+func (c *FakePersistentVolumes) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v1.PersistentVolume, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewRootPatchSubresourceAction(persistentvolumesResource, name, data, subresources...), &v1.PersistentVolume{})
 	if obj == nil {

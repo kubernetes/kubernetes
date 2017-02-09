@@ -21,16 +21,17 @@ import (
 	"math/rand"
 	"testing"
 
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
+	apitesting "k8s.io/apimachinery/pkg/api/testing"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
-	apitesting "k8s.io/kubernetes/pkg/api/testing"
-	"k8s.io/kubernetes/pkg/apimachinery/registered"
-	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/util/diff"
+	kapitesting "k8s.io/kubernetes/pkg/api/testing"
 )
 
 func BenchmarkPodConversion(b *testing.B) {
-	apiObjectFuzzer := apitesting.FuzzerFor(nil, api.SchemeGroupVersion, rand.NewSource(benchmarkSeed))
+	apiObjectFuzzer := apitesting.FuzzerFor(kapitesting.FuzzerFuncs(b, api.Codecs), rand.NewSource(benchmarkSeed))
 	items := make([]api.Pod, 4)
 	for i := range items {
 		apiObjectFuzzer.Fuzz(&items[i])
@@ -45,7 +46,7 @@ func BenchmarkPodConversion(b *testing.B) {
 	scheme := api.Scheme
 	for i := 0; i < b.N; i++ {
 		pod := &items[i%width]
-		versionedObj, err := scheme.UnsafeConvertToVersion(pod, registered.GroupOrDie(api.GroupName).GroupVersion)
+		versionedObj, err := scheme.UnsafeConvertToVersion(pod, api.Registry.GroupOrDie(api.GroupName).GroupVersion)
 		if err != nil {
 			b.Fatalf("Conversion error: %v", err)
 		}
@@ -69,7 +70,7 @@ func BenchmarkNodeConversion(b *testing.B) {
 	var result *api.Node
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		versionedObj, err := scheme.UnsafeConvertToVersion(&node, registered.GroupOrDie(api.GroupName).GroupVersion)
+		versionedObj, err := scheme.UnsafeConvertToVersion(&node, api.Registry.GroupOrDie(api.GroupName).GroupVersion)
 		if err != nil {
 			b.Fatalf("Conversion error: %v", err)
 		}
@@ -80,7 +81,7 @@ func BenchmarkNodeConversion(b *testing.B) {
 		result = obj.(*api.Node)
 	}
 	b.StopTimer()
-	if !api.Semantic.DeepDerivative(node, *result) {
+	if !apiequality.Semantic.DeepDerivative(node, *result) {
 		b.Fatalf("Incorrect conversion: %s", diff.ObjectDiff(node, *result))
 	}
 }
@@ -99,7 +100,7 @@ func BenchmarkReplicationControllerConversion(b *testing.B) {
 	var result *api.ReplicationController
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		versionedObj, err := scheme.UnsafeConvertToVersion(&replicationController, registered.GroupOrDie(api.GroupName).GroupVersion)
+		versionedObj, err := scheme.UnsafeConvertToVersion(&replicationController, api.Registry.GroupOrDie(api.GroupName).GroupVersion)
 		if err != nil {
 			b.Fatalf("Conversion error: %v", err)
 		}
@@ -110,7 +111,7 @@ func BenchmarkReplicationControllerConversion(b *testing.B) {
 		result = obj.(*api.ReplicationController)
 	}
 	b.StopTimer()
-	if !api.Semantic.DeepDerivative(replicationController, *result) {
+	if !apiequality.Semantic.DeepDerivative(replicationController, *result) {
 		b.Fatalf("Incorrect conversion: expected %v, got %v", replicationController, *result)
 	}
 }

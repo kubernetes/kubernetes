@@ -24,14 +24,15 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/intstr"
+	core "k8s.io/client-go/testing"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
 	extensions "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
-	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset/fake"
-	"k8s.io/kubernetes/pkg/client/testing/core"
-	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/util/intstr"
 )
 
 func addListRSReactor(fakeClient *fake.Clientset, obj runtime.Object) *fake.Clientset {
@@ -102,7 +103,7 @@ func newPod(now time.Time, ready bool, beforeSec int) v1.Pod {
 // generatePodFromRS creates a pod, with the input ReplicaSet's selector and its template
 func generatePodFromRS(rs extensions.ReplicaSet) v1.Pod {
 	return v1.Pod{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Labels: rs.Labels,
 		},
 		Spec: rs.Spec.Template.Spec,
@@ -111,7 +112,7 @@ func generatePodFromRS(rs extensions.ReplicaSet) v1.Pod {
 
 func generatePod(labels map[string]string, image string) v1.Pod {
 	return v1.Pod{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Labels: labels,
 		},
 		Spec: v1.PodSpec{
@@ -129,7 +130,7 @@ func generatePod(labels map[string]string, image string) v1.Pod {
 
 func generateRSWithLabel(labels map[string]string, image string) extensions.ReplicaSet {
 	return extensions.ReplicaSet{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:   v1.SimpleNameGenerator.GenerateName("replicaset"),
 			Labels: labels,
 		},
@@ -137,7 +138,7 @@ func generateRSWithLabel(labels map[string]string, image string) extensions.Repl
 			Replicas: func(i int32) *int32 { return &i }(1),
 			Selector: &metav1.LabelSelector{MatchLabels: labels},
 			Template: v1.PodTemplateSpec{
-				ObjectMeta: v1.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Labels: labels,
 				},
 				Spec: v1.PodSpec{
@@ -159,7 +160,7 @@ func generateRSWithLabel(labels map[string]string, image string) extensions.Repl
 func generateRS(deployment extensions.Deployment) extensions.ReplicaSet {
 	template := GetNewReplicaSetTemplate(&deployment)
 	return extensions.ReplicaSet{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:   v1.SimpleNameGenerator.GenerateName("replicaset"),
 			Labels: template.Labels,
 		},
@@ -176,14 +177,15 @@ func generateDeployment(image string) extensions.Deployment {
 	podLabels := map[string]string{"name": image}
 	terminationSec := int64(30)
 	return extensions.Deployment{
-		ObjectMeta: v1.ObjectMeta{
-			Name: image,
+		ObjectMeta: metav1.ObjectMeta{
+			Name:        image,
+			Annotations: make(map[string]string),
 		},
 		Spec: extensions.DeploymentSpec{
 			Replicas: func(i int32) *int32 { return &i }(1),
 			Selector: &metav1.LabelSelector{MatchLabels: podLabels},
 			Template: v1.PodTemplateSpec{
-				ObjectMeta: v1.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Labels: podLabels,
 				},
 				Spec: v1.PodSpec{
@@ -255,7 +257,7 @@ func TestGetNewRC(t *testing.T) {
 		if err != nil {
 			t.Errorf("In test case %s, got unexpected error %v", test.test, err)
 		}
-		if !api.Semantic.DeepEqual(rs, test.expected) {
+		if !apiequality.Semantic.DeepEqual(rs, test.expected) {
 			t.Errorf("In test case %s, expected %#v, got %#v", test.test, test.expected, rs)
 		}
 	}
@@ -363,7 +365,7 @@ func TestGetOldRCs(t *testing.T) {
 
 func generatePodTemplateSpec(name, nodeName string, annotations, labels map[string]string) v1.PodTemplateSpec {
 	return v1.PodTemplateSpec{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:        name,
 			Annotations: annotations,
 			Labels:      labels,
@@ -446,11 +448,7 @@ func TestEqualIgnoreHash(t *testing.T) {
 				reverseString = " (reverse order)"
 			}
 			// Run
-			equal, err := equalIgnoreHash(*t1, *t2)
-			// Check
-			if err != nil {
-				t.Errorf("In test case %q%s, expected no error, returned %v", test.test, reverseString, err)
-			}
+			equal := EqualIgnoreHash(*t1, *t2)
 			if equal != test.expected {
 				t.Errorf("In test case %q%s, expected %v", test.test, reverseString, test.expected)
 			}
@@ -625,7 +623,6 @@ func TestGetReplicaCountForReplicaSets(t *testing.T) {
 }
 
 func TestResolveFenceposts(t *testing.T) {
-
 	tests := []struct {
 		maxSurge          string
 		maxUnavailable    string
@@ -896,14 +893,14 @@ func TestRemoveCondition(t *testing.T) {
 }
 
 func TestDeploymentComplete(t *testing.T) {
-	deployment := func(desired, current, updated, available, maxUnavailable int32) *extensions.Deployment {
+	deployment := func(desired, current, updated, available, maxUnavailable, maxSurge int32) *extensions.Deployment {
 		return &extensions.Deployment{
 			Spec: extensions.DeploymentSpec{
 				Replicas: &desired,
 				Strategy: extensions.DeploymentStrategy{
 					RollingUpdate: &extensions.RollingUpdateDeployment{
 						MaxUnavailable: func(i int) *intstr.IntOrString { x := intstr.FromInt(i); return &x }(int(maxUnavailable)),
-						MaxSurge:       func() *intstr.IntOrString { x := intstr.FromInt(0); return &x }(),
+						MaxSurge:       func(i int) *intstr.IntOrString { x := intstr.FromInt(i); return &x }(int(maxSurge)),
 					},
 					Type: extensions.RollingUpdateDeploymentStrategyType,
 				},
@@ -926,25 +923,33 @@ func TestDeploymentComplete(t *testing.T) {
 		{
 			name: "complete",
 
-			d:        deployment(5, 5, 5, 4, 1),
+			d:        deployment(5, 5, 5, 4, 1, 0),
 			expected: true,
 		},
 		{
 			name: "not complete",
 
-			d:        deployment(5, 5, 5, 3, 1),
+			d:        deployment(5, 5, 5, 3, 1, 0),
 			expected: false,
 		},
 		{
 			name: "complete #2",
 
-			d:        deployment(5, 5, 5, 5, 0),
+			d:        deployment(5, 5, 5, 5, 0, 0),
 			expected: true,
 		},
 		{
 			name: "not complete #2",
 
-			d:        deployment(5, 5, 4, 5, 0),
+			d:        deployment(5, 5, 4, 5, 0, 0),
+			expected: false,
+		},
+		{
+			name: "not complete #3",
+
+			// old replica set: spec.replicas=1, status.replicas=1, status.availableReplicas=1
+			// new replica set: spec.replicas=1, status.replicas=1, status.availableReplicas=0
+			d:        deployment(1, 2, 1, 1, 0, 1),
 			expected: false,
 		},
 	}
@@ -1104,6 +1109,114 @@ func TestDeploymentTimedOut(t *testing.T) {
 		nowFn = test.nowFn
 		if got, exp := DeploymentTimedOut(&test.d, &test.d.Status), test.expected; got != exp {
 			t.Errorf("expected timeout: %t, got: %t", exp, got)
+		}
+	}
+}
+
+func TestSelectorUpdatedBefore(t *testing.T) {
+	now := metav1.Now()
+	later := metav1.Time{Time: now.Add(time.Minute)}
+	selectorUpdated := metav1.Time{Time: later.Add(time.Minute)}
+	selectorUpdatedLater := metav1.Time{Time: selectorUpdated.Add(time.Minute)}
+
+	tests := []struct {
+		name string
+
+		d1                 extensions.Deployment
+		creationTimestamp1 *metav1.Time
+		selectorUpdated1   *metav1.Time
+
+		d2                 extensions.Deployment
+		creationTimestamp2 *metav1.Time
+		selectorUpdated2   *metav1.Time
+
+		expected bool
+	}{
+		{
+			name: "d1 created before d2",
+
+			d1:                 generateDeployment("foo"),
+			creationTimestamp1: &now,
+
+			d2:                 generateDeployment("bar"),
+			creationTimestamp2: &later,
+
+			expected: true,
+		},
+		{
+			name: "d1 created after d2",
+
+			d1:                 generateDeployment("foo"),
+			creationTimestamp1: &later,
+
+			d2:                 generateDeployment("bar"),
+			creationTimestamp2: &now,
+
+			expected: false,
+		},
+		{
+			// Think of the following scenario:
+			// d1 is created first, d2 is created after and its selector overlaps
+			// with d1. d2 is marked as overlapping correctly. If d1's selector is
+			// updated and continues to overlap with the selector of d2 then d1 is
+			// now marked overlapping and d2 is cleaned up. Proved by the following
+			// test case. Callers of SelectorUpdatedBefore should first check for
+			// the existence of the overlapping annotation in any of the two deployments
+			// prior to comparing their timestamps and as a matter of fact this is
+			// now handled in `(dc *DeploymentController) handleOverlap`.
+			name: "d1 created before d2 but updated its selector afterwards",
+
+			d1:                 generateDeployment("foo"),
+			creationTimestamp1: &now,
+			selectorUpdated1:   &selectorUpdated,
+
+			d2:                 generateDeployment("bar"),
+			creationTimestamp2: &later,
+
+			expected: false,
+		},
+		{
+			name: "d1 selector is older than d2",
+
+			d1:               generateDeployment("foo"),
+			selectorUpdated1: &selectorUpdated,
+
+			d2:               generateDeployment("bar"),
+			selectorUpdated2: &selectorUpdatedLater,
+
+			expected: true,
+		},
+		{
+			name: "d1 selector is younger than d2",
+
+			d1:               generateDeployment("foo"),
+			selectorUpdated1: &selectorUpdatedLater,
+
+			d2:               generateDeployment("bar"),
+			selectorUpdated2: &selectorUpdated,
+
+			expected: false,
+		},
+	}
+
+	for _, test := range tests {
+		t.Logf("running scenario %q", test.name)
+
+		if test.creationTimestamp1 != nil {
+			test.d1.CreationTimestamp = *test.creationTimestamp1
+		}
+		if test.creationTimestamp2 != nil {
+			test.d2.CreationTimestamp = *test.creationTimestamp2
+		}
+		if test.selectorUpdated1 != nil {
+			test.d1.Annotations[SelectorUpdateAnnotation] = test.selectorUpdated1.Format(time.RFC3339)
+		}
+		if test.selectorUpdated2 != nil {
+			test.d2.Annotations[SelectorUpdateAnnotation] = test.selectorUpdated2.Format(time.RFC3339)
+		}
+
+		if got := SelectorUpdatedBefore(&test.d1, &test.d2); got != test.expected {
+			t.Errorf("expected d1 selector to be updated before d2: %t, got: %t", test.expected, got)
 		}
 	}
 }

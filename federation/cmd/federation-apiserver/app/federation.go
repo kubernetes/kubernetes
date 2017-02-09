@@ -19,12 +19,11 @@ package app
 import (
 	"github.com/golang/glog"
 
+	"k8s.io/apiserver/pkg/registry/generic"
+	"k8s.io/apiserver/pkg/registry/rest"
+	genericapiserver "k8s.io/apiserver/pkg/server"
 	"k8s.io/kubernetes/federation/apis/federation"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/rest"
-	"k8s.io/kubernetes/pkg/apimachinery/registered"
-	"k8s.io/kubernetes/pkg/genericapiserver"
-	"k8s.io/kubernetes/pkg/registry/generic"
 
 	_ "k8s.io/kubernetes/federation/apis/federation/install"
 	clusteretcd "k8s.io/kubernetes/federation/registry/cluster/etcd"
@@ -36,13 +35,13 @@ func installFederationAPIs(g *genericapiserver.GenericAPIServer, optsGetter gene
 		"clusters":        clusterStorage,
 		"clusters/status": clusterStatusStorage,
 	}
-	federationGroupMeta := registered.GroupOrDie(federation.GroupName)
+	federationGroupMeta := api.Registry.GroupOrDie(federation.GroupName)
 	apiGroupInfo := genericapiserver.APIGroupInfo{
 		GroupMeta: *federationGroupMeta,
 		VersionedResourcesStorageMap: map[string]map[string]rest.Storage{
 			"v1beta1": federationResources,
 		},
-		OptionsExternalVersion: &registered.GroupOrDie(api.GroupName).GroupVersion,
+		OptionsExternalVersion: &api.Registry.GroupOrDie(api.GroupName).GroupVersion,
 		Scheme:                 api.Scheme,
 		ParameterCodec:         api.ParameterCodec,
 		NegotiatedSerializer:   api.Codecs,

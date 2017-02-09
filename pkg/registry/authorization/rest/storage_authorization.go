@@ -17,15 +17,17 @@ limitations under the License.
 package rest
 
 import (
-	"k8s.io/kubernetes/pkg/api/rest"
+	"k8s.io/apiserver/pkg/authorization/authorizer"
+	"k8s.io/apiserver/pkg/registry/generic"
+	"k8s.io/apiserver/pkg/registry/rest"
+	genericapiserver "k8s.io/apiserver/pkg/server"
+	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/authorization"
+	authorizationv1 "k8s.io/kubernetes/pkg/apis/authorization/v1"
 	authorizationv1beta1 "k8s.io/kubernetes/pkg/apis/authorization/v1beta1"
-	"k8s.io/kubernetes/pkg/auth/authorizer"
-	"k8s.io/kubernetes/pkg/genericapiserver"
 	"k8s.io/kubernetes/pkg/registry/authorization/localsubjectaccessreview"
 	"k8s.io/kubernetes/pkg/registry/authorization/selfsubjectaccessreview"
 	"k8s.io/kubernetes/pkg/registry/authorization/subjectaccessreview"
-	"k8s.io/kubernetes/pkg/registry/generic"
 )
 
 type RESTStorageProvider struct {
@@ -37,17 +39,39 @@ func (p RESTStorageProvider) NewRESTStorage(apiResourceConfigSource genericapise
 		return genericapiserver.APIGroupInfo{}, false
 	}
 
-	apiGroupInfo := genericapiserver.NewDefaultAPIGroupInfo(authorization.GroupName)
+	apiGroupInfo := genericapiserver.NewDefaultAPIGroupInfo(authorization.GroupName, api.Registry, api.Scheme, api.ParameterCodec, api.Codecs)
 
 	if apiResourceConfigSource.AnyResourcesForVersionEnabled(authorizationv1beta1.SchemeGroupVersion) {
 		apiGroupInfo.VersionedResourcesStorageMap[authorizationv1beta1.SchemeGroupVersion.Version] = p.v1beta1Storage(apiResourceConfigSource, restOptionsGetter)
 		apiGroupInfo.GroupMeta.GroupVersion = authorizationv1beta1.SchemeGroupVersion
 	}
 
+	if apiResourceConfigSource.AnyResourcesForVersionEnabled(authorizationv1.SchemeGroupVersion) {
+		apiGroupInfo.VersionedResourcesStorageMap[authorizationv1.SchemeGroupVersion.Version] = p.v1Storage(apiResourceConfigSource, restOptionsGetter)
+		apiGroupInfo.GroupMeta.GroupVersion = authorizationv1.SchemeGroupVersion
+	}
+
 	return apiGroupInfo, true
 }
 
 func (p RESTStorageProvider) v1beta1Storage(apiResourceConfigSource genericapiserver.APIResourceConfigSource, restOptionsGetter generic.RESTOptionsGetter) map[string]rest.Storage {
+	version := authorizationv1beta1.SchemeGroupVersion
+
+	storage := map[string]rest.Storage{}
+	if apiResourceConfigSource.ResourceEnabled(version.WithResource("subjectaccessreviews")) {
+		storage["subjectaccessreviews"] = subjectaccessreview.NewREST(p.Authorizer)
+	}
+	if apiResourceConfigSource.ResourceEnabled(version.WithResource("selfsubjectaccessreviews")) {
+		storage["selfsubjectaccessreviews"] = selfsubjectaccessreview.NewREST(p.Authorizer)
+	}
+	if apiResourceConfigSource.ResourceEnabled(version.WithResource("localsubjectaccessreviews")) {
+		storage["localsubjectaccessreviews"] = localsubjectaccessreview.NewREST(p.Authorizer)
+	}
+
+	return storage
+}
+
+func (p RESTStorageProvider) v1Storage(apiResourceConfigSource genericapiserver.APIResourceConfigSource, restOptionsGetter generic.RESTOptionsGetter) map[string]rest.Storage {
 	version := authorizationv1beta1.SchemeGroupVersion
 
 	storage := map[string]rest.Storage{}

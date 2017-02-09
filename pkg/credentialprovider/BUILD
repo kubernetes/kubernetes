@@ -20,9 +20,9 @@ go_library(
     tags = ["automanaged"],
     deps = [
         "//pkg/api/v1:go_default_library",
-        "//pkg/util/sets:go_default_library",
         "//vendor:github.com/docker/engine-api/types",
         "//vendor:github.com/golang/glog",
+        "//vendor:k8s.io/apimachinery/pkg/util/sets",
     ],
 )
 
@@ -33,7 +33,24 @@ go_test(
         "keyring_test.go",
         "provider_test.go",
     ],
-    library = "go_default_library",
+    library = ":go_default_library",
     tags = ["automanaged"],
-    deps = [],
+)
+
+filegroup(
+    name = "package-srcs",
+    srcs = glob(["**"]),
+    tags = ["automanaged"],
+    visibility = ["//visibility:private"],
+)
+
+filegroup(
+    name = "all-srcs",
+    srcs = [
+        ":package-srcs",
+        "//pkg/credentialprovider/aws:all-srcs",
+        "//pkg/credentialprovider/azure:all-srcs",
+        "//pkg/credentialprovider/gcp:all-srcs",
+    ],
+    tags = ["automanaged"],
 )

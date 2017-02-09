@@ -21,11 +21,12 @@ import (
 	"math"
 	"time"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/api/v1"
 	v1core "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/core/v1"
 	metricsclient "k8s.io/kubernetes/pkg/controller/podautoscaler/metrics"
-	"k8s.io/kubernetes/pkg/labels"
-	"k8s.io/kubernetes/pkg/util/sets"
 )
 
 type ReplicaCalculator struct {
@@ -48,7 +49,7 @@ func (c *ReplicaCalculator) GetResourceReplicas(currentReplicas int32, targetUti
 		return 0, 0, time.Time{}, fmt.Errorf("unable to get metrics for resource %s: %v", resource, err)
 	}
 
-	podList, err := c.podsGetter.Pods(namespace).List(v1.ListOptions{LabelSelector: selector.String()})
+	podList, err := c.podsGetter.Pods(namespace).List(metav1.ListOptions{LabelSelector: selector.String()})
 	if err != nil {
 		return 0, 0, time.Time{}, fmt.Errorf("unable to get pods while calculating replica count: %v", err)
 	}
@@ -156,7 +157,7 @@ func (c *ReplicaCalculator) GetMetricReplicas(currentReplicas int32, targetUtili
 		return 0, 0, time.Time{}, fmt.Errorf("unable to get metric  %s: %v", metricName, err)
 	}
 
-	podList, err := c.podsGetter.Pods(namespace).List(v1.ListOptions{LabelSelector: selector.String()})
+	podList, err := c.podsGetter.Pods(namespace).List(metav1.ListOptions{LabelSelector: selector.String()})
 	if err != nil {
 		return 0, 0, time.Time{}, fmt.Errorf("unable to get pods while calculating replica count: %v", err)
 	}

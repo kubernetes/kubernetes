@@ -19,12 +19,12 @@ package internalversion
 import (
 	"testing"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/client-go/tools/cache"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/batch"
-	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
-	"k8s.io/kubernetes/pkg/client/cache"
-	"k8s.io/kubernetes/pkg/labels"
-	"k8s.io/kubernetes/pkg/util/sets"
 )
 
 func TestJobLister(t *testing.T) {
@@ -40,7 +40,7 @@ func TestJobLister(t *testing.T) {
 		// Basic listing
 		{
 			inJobs: []*batch.Job{
-				{ObjectMeta: api.ObjectMeta{Name: "basic"}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "basic"}},
 			},
 			list: func() ([]*batch.Job, error) {
 				list, err := lister.List(labels.Everything())
@@ -52,9 +52,9 @@ func TestJobLister(t *testing.T) {
 		// Listing multiple jobs
 		{
 			inJobs: []*batch.Job{
-				{ObjectMeta: api.ObjectMeta{Name: "basic"}},
-				{ObjectMeta: api.ObjectMeta{Name: "complex"}},
-				{ObjectMeta: api.ObjectMeta{Name: "complex2"}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "basic"}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "complex"}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "complex2"}},
 			},
 			list: func() ([]*batch.Job, error) {
 				list, err := lister.List(labels.Everything())
@@ -67,7 +67,7 @@ func TestJobLister(t *testing.T) {
 		{
 			inJobs: []*batch.Job{
 				{
-					ObjectMeta: api.ObjectMeta{Name: "basic", Namespace: "ns"},
+					ObjectMeta: metav1.ObjectMeta{Name: "basic", Namespace: "ns"},
 					Spec: batch.JobSpec{
 						Selector: &metav1.LabelSelector{
 							MatchLabels: map[string]string{"foo": "baz"},
@@ -77,7 +77,7 @@ func TestJobLister(t *testing.T) {
 			},
 			list: func() ([]*batch.Job, error) {
 				pod := &api.Pod{
-					ObjectMeta: api.ObjectMeta{Name: "pod", Namespace: "ns"},
+					ObjectMeta: metav1.ObjectMeta{Name: "pod", Namespace: "ns"},
 				}
 				podJobs, err := lister.GetPodJobs(pod)
 				jobs := make([]*batch.Job, 0, len(podJobs))
@@ -94,12 +94,12 @@ func TestJobLister(t *testing.T) {
 		{
 			inJobs: []*batch.Job{
 				{
-					ObjectMeta: api.ObjectMeta{Name: "basic", Namespace: "ns"},
+					ObjectMeta: metav1.ObjectMeta{Name: "basic", Namespace: "ns"},
 				},
 			},
 			list: func() ([]*batch.Job, error) {
 				pod := &api.Pod{
-					ObjectMeta: api.ObjectMeta{
+					ObjectMeta: metav1.ObjectMeta{
 						Name:      "pod",
 						Namespace: "ns",
 						Labels:    map[string]string{"foo": "bar"},
@@ -120,7 +120,7 @@ func TestJobLister(t *testing.T) {
 		{
 			inJobs: []*batch.Job{
 				{
-					ObjectMeta: api.ObjectMeta{Name: "foo"},
+					ObjectMeta: metav1.ObjectMeta{Name: "foo"},
 					Spec: batch.JobSpec{
 						Selector: &metav1.LabelSelector{
 							MatchLabels: map[string]string{"foo": "bar"},
@@ -128,7 +128,7 @@ func TestJobLister(t *testing.T) {
 					},
 				},
 				{
-					ObjectMeta: api.ObjectMeta{Name: "bar", Namespace: "ns"},
+					ObjectMeta: metav1.ObjectMeta{Name: "bar", Namespace: "ns"},
 					Spec: batch.JobSpec{
 						Selector: &metav1.LabelSelector{
 							MatchLabels: map[string]string{"foo": "bar"},
@@ -138,7 +138,7 @@ func TestJobLister(t *testing.T) {
 			},
 			list: func() ([]*batch.Job, error) {
 				pod := &api.Pod{
-					ObjectMeta: api.ObjectMeta{
+					ObjectMeta: metav1.ObjectMeta{
 						Name:      "pod",
 						Labels:    map[string]string{"foo": "bar"},
 						Namespace: "ns",
@@ -158,7 +158,7 @@ func TestJobLister(t *testing.T) {
 		{
 			inJobs: []*batch.Job{
 				{
-					ObjectMeta: api.ObjectMeta{Name: "foo", Namespace: "foo"},
+					ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "foo"},
 					Spec: batch.JobSpec{
 						Selector: &metav1.LabelSelector{
 							MatchLabels: map[string]string{"foo": "bar"},
@@ -166,7 +166,7 @@ func TestJobLister(t *testing.T) {
 					},
 				},
 				{
-					ObjectMeta: api.ObjectMeta{Name: "bar", Namespace: "bar"},
+					ObjectMeta: metav1.ObjectMeta{Name: "bar", Namespace: "bar"},
 					Spec: batch.JobSpec{
 						Selector: &metav1.LabelSelector{
 							MatchLabels: map[string]string{"foo": "bar"},
@@ -176,7 +176,7 @@ func TestJobLister(t *testing.T) {
 			},
 			list: func() ([]*batch.Job, error) {
 				pod := &api.Pod{
-					ObjectMeta: api.ObjectMeta{
+					ObjectMeta: metav1.ObjectMeta{
 						Name:      "pod",
 						Labels:    map[string]string{"foo": "bar"},
 						Namespace: "baz",

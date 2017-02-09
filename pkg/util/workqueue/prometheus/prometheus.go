@@ -17,7 +17,7 @@ limitations under the License.
 package prometheus
 
 import (
-	"k8s.io/kubernetes/pkg/util/workqueue"
+	"k8s.io/client-go/util/workqueue"
 
 	"github.com/prometheus/client_golang/prometheus"
 )

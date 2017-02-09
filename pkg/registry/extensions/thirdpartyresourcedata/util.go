@@ -20,8 +20,8 @@ import (
 	"fmt"
 	"strings"
 
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/kubernetes/pkg/apis/extensions"
-	"k8s.io/kubernetes/pkg/runtime/schema"
 )
 
 func ExtractGroupVersionKind(list *extensions.ThirdPartyResourceList) ([]schema.GroupVersion, []schema.GroupVersionKind, error) {

@@ -19,12 +19,13 @@ package config
 import (
 	"testing"
 
-	"k8s.io/kubernetes/pkg/api"
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/watch"
+	"k8s.io/client-go/tools/cache"
 	"k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/client/cache"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
-	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/watch"
 )
 
 type fakePodLW struct {
@@ -32,11 +33,11 @@ type fakePodLW struct {
 	watchResp watch.Interface
 }
 
-func (lw fakePodLW) List(options v1.ListOptions) (runtime.Object, error) {
+func (lw fakePodLW) List(options metav1.ListOptions) (runtime.Object, error) {
 	return lw.listResp, nil
 }
 
-func (lw fakePodLW) Watch(options v1.ListOptions) (watch.Interface, error) {
+func (lw fakePodLW) Watch(options metav1.ListOptions) (watch.Interface, error) {
 	return lw.watchResp, nil
 }
 
@@ -44,13 +45,13 @@ var _ cache.ListerWatcher = fakePodLW{}
 
 func TestNewSourceApiserver_UpdatesAndMultiplePods(t *testing.T) {
 	pod1v1 := &v1.Pod{
-		ObjectMeta: v1.ObjectMeta{Name: "p"},
+		ObjectMeta: metav1.ObjectMeta{Name: "p"},
 		Spec:       v1.PodSpec{Containers: []v1.Container{{Image: "image/one"}}}}
 	pod1v2 := &v1.Pod{
-		ObjectMeta: v1.ObjectMeta{Name: "p"},
+		ObjectMeta: metav1.ObjectMeta{Name: "p"},
 		Spec:       v1.PodSpec{Containers: []v1.Container{{Image: "image/two"}}}}
 	pod2 := &v1.Pod{
-		ObjectMeta: v1.ObjectMeta{Name: "q"},
+		ObjectMeta: metav1.ObjectMeta{Name: "q"},
 		Spec:       v1.PodSpec{Containers: []v1.Container{{Image: "image/blah"}}}}
 
 	// Setup fake api client.
@@ -70,7 +71,7 @@ func TestNewSourceApiserver_UpdatesAndMultiplePods(t *testing.T) {
 	}
 	update := got.(kubetypes.PodUpdate)
 	expected := CreatePodUpdate(kubetypes.SET, kubetypes.ApiserverSource, pod1v1)
-	if !api.Semantic.DeepEqual(expected, update) {
+	if !apiequality.Semantic.DeepEqual(expected, update) {
 		t.Errorf("Expected %#v; Got %#v", expected, update)
 	}
 
@@ -85,7 +86,7 @@ func TestNewSourceApiserver_UpdatesAndMultiplePods(t *testing.T) {
 	expectedA := CreatePodUpdate(kubetypes.SET, kubetypes.ApiserverSource, pod1v1, pod2)
 	expectedB := CreatePodUpdate(kubetypes.SET, kubetypes.ApiserverSource, pod2, pod1v1)
 
-	if !api.Semantic.DeepEqual(expectedA, update) && !api.Semantic.DeepEqual(expectedB, update) {
+	if !apiequality.Semantic.DeepEqual(expectedA, update) && !apiequality.Semantic.DeepEqual(expectedB, update) {
 		t.Errorf("Expected %#v or %#v, Got %#v", expectedA, expectedB, update)
 	}
 
@@ -99,7 +100,7 @@ func TestNewSourceApiserver_UpdatesAndMultiplePods(t *testing.T) {
 	expectedA = CreatePodUpdate(kubetypes.SET, kubetypes.ApiserverSource, pod1v2, pod2)
 	expectedB = CreatePodUpdate(kubetypes.SET, kubetypes.ApiserverSource, pod2, pod1v2)
 
-	if !api.Semantic.DeepEqual(expectedA, update) && !api.Semantic.DeepEqual(expectedB, update) {
+	if !apiequality.Semantic.DeepEqual(expectedA, update) && !apiequality.Semantic.DeepEqual(expectedB, update) {
 		t.Errorf("Expected %#v or %#v, Got %#v", expectedA, expectedB, update)
 	}
 
@@ -111,7 +112,7 @@ func TestNewSourceApiserver_UpdatesAndMultiplePods(t *testing.T) {
 	}
 	update = got.(kubetypes.PodUpdate)
 	expected = CreatePodUpdate(kubetypes.SET, kubetypes.ApiserverSource, pod2)
-	if !api.Semantic.DeepEqual(expected, update) {
+	if !apiequality.Semantic.DeepEqual(expected, update) {
 		t.Errorf("Expected %#v, Got %#v", expected, update)
 	}
 
@@ -123,17 +124,17 @@ func TestNewSourceApiserver_UpdatesAndMultiplePods(t *testing.T) {
 	}
 	update = got.(kubetypes.PodUpdate)
 	expected = CreatePodUpdate(kubetypes.SET, kubetypes.ApiserverSource)
-	if !api.Semantic.DeepEqual(expected, update) {
+	if !apiequality.Semantic.DeepEqual(expected, update) {
 		t.Errorf("Expected %#v, Got %#v", expected, update)
 	}
 }
 
 func TestNewSourceApiserver_TwoNamespacesSameName(t *testing.T) {
 	pod1 := v1.Pod{
-		ObjectMeta: v1.ObjectMeta{Name: "p", Namespace: "one"},
+		ObjectMeta: metav1.ObjectMeta{Name: "p", Namespace: "one"},
 		Spec:       v1.PodSpec{Containers: []v1.Container{{Image: "image/one"}}}}
 	pod2 := v1.Pod{
-		ObjectMeta: v1.ObjectMeta{Name: "p", Namespace: "two"},
+		ObjectMeta: metav1.ObjectMeta{Name: "p", Namespace: "two"},
 		Spec:       v1.PodSpec{Containers: []v1.Container{{Image: "image/blah"}}}}
 
 	// Setup fake api client.
@@ -187,7 +188,7 @@ func TestNewSourceApiserverInitialEmptySendsEmptyPodUpdate(t *testing.T) {
 	}
 	update := got.(kubetypes.PodUpdate)
 	expected := CreatePodUpdate(kubetypes.SET, kubetypes.ApiserverSource)
-	if !api.Semantic.DeepEqual(expected, update) {
+	if !apiequality.Semantic.DeepEqual(expected, update) {
 		t.Errorf("Expected %#v; Got %#v", expected, update)
 	}
 }

@@ -42,10 +42,10 @@ import (
 	"github.com/vmware/govmomi/vim25/types"
 	"golang.org/x/net/context"
 
+	k8stypes "k8s.io/apimachinery/pkg/types"
+	k8runtime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/cloudprovider"
-	k8stypes "k8s.io/kubernetes/pkg/types"
-	k8runtime "k8s.io/kubernetes/pkg/util/runtime"
 )
 
 const (
@@ -1286,6 +1286,9 @@ func (vs *VSphere) DeleteVolume(vmDiskPath string) error {
 	// Create a virtual disk manager
 	virtualDiskManager := object.NewVirtualDiskManager(vs.client.Client)
 
+	if filepath.Ext(vmDiskPath) != ".vmdk" {
+		vmDiskPath += ".vmdk"
+	}
 	// Delete virtual disk
 	task, err := virtualDiskManager.DeleteVirtualDisk(ctx, vmDiskPath, dc)
 	if err != nil {

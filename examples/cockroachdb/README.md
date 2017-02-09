@@ -98,10 +98,10 @@ database and ensuring the other replicas have all data that was written.
 
 ## Scaling up or down
 
-Simply patch the Stateful Set by running
+Scale the Stateful Set by running
 
 ```shell
-kubectl patch statefulset cockroachdb -p '{"spec":{"replicas":4}}'
+kubectl scale statefulset cockroachdb --replicas=4
 ```
 
 Note that you may need to create a new persistent volume claim first. If you
@@ -116,7 +116,7 @@ Because all of the resources in this example have been tagged with the label `ap
 we can clean up everything that we created in one quick command using a selector on that label:
 
 ```shell
-kubectl delete statefulsets,pods,persistentvolumes,persistentvolumeclaims,services -l app=cockroachdb
+kubectl delete statefulsets,persistentvolumes,persistentvolumeclaims,services,poddisruptionbudget -l app=cockroachdb
 ```
 
 

@@ -21,8 +21,8 @@ import (
 	"strings"
 	"time"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/api/v1"
-	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	docker "k8s.io/kubernetes/pkg/kubelet/dockertools"
 	"k8s.io/kubernetes/test/e2e/framework"
 
@@ -231,7 +231,7 @@ func containerGCTest(f *framework.Framework, test testRun) {
 		AfterEach(func() {
 			for _, pod := range test.testPods {
 				By(fmt.Sprintf("Deleting Pod %v", pod.podName))
-				f.PodClient().DeleteSync(pod.podName, &v1.DeleteOptions{}, defaultRuntimeRequestTimeoutDuration)
+				f.PodClient().DeleteSync(pod.podName, &metav1.DeleteOptions{}, defaultRuntimeRequestTimeoutDuration)
 			}
 
 			By("Making sure all containers get cleaned up")
@@ -309,7 +309,7 @@ func getPods(specs []*testPodSpec) (pods []*v1.Pod) {
 			})
 		}
 		pods = append(pods, &v1.Pod{
-			ObjectMeta: v1.ObjectMeta{Name: spec.podName},
+			ObjectMeta: metav1.ObjectMeta{Name: spec.podName},
 			Spec: v1.PodSpec{
 				RestartPolicy: v1.RestartPolicyAlways,
 				Containers:    containers,

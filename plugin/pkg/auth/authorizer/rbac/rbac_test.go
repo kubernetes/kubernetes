@@ -21,11 +21,11 @@ import (
 	"strings"
 	"testing"
 
-	"k8s.io/kubernetes/pkg/api"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apiserver/pkg/authentication/user"
+	"k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/kubernetes/pkg/apis/rbac"
-	"k8s.io/kubernetes/pkg/apis/rbac/validation"
-	"k8s.io/kubernetes/pkg/auth/authorizer"
-	"k8s.io/kubernetes/pkg/auth/user"
+	rbacregistryvalidation "k8s.io/kubernetes/pkg/registry/rbac/validation"
 )
 
 func newRule(verbs, apiGroups, resources, nonResourceURLs string) rbac.PolicyRule {
@@ -38,11 +38,11 @@ func newRule(verbs, apiGroups, resources, nonResourceURLs string) rbac.PolicyRul
 }
 
 func newRole(name, namespace string, rules ...rbac.PolicyRule) *rbac.Role {
-	return &rbac.Role{ObjectMeta: api.ObjectMeta{Namespace: namespace, Name: name}, Rules: rules}
+	return &rbac.Role{ObjectMeta: metav1.ObjectMeta{Namespace: namespace, Name: name}, Rules: rules}
 }
 
 func newClusterRole(name string, rules ...rbac.PolicyRule) *rbac.ClusterRole {
-	return &rbac.ClusterRole{ObjectMeta: api.ObjectMeta{Name: name}, Rules: rules}
+	return &rbac.ClusterRole{ObjectMeta: metav1.ObjectMeta{Name: name}, Rules: rules}
 }
 
 const (
@@ -52,7 +52,7 @@ const (
 
 func newClusterRoleBinding(roleName string, subjects ...string) *rbac.ClusterRoleBinding {
 	r := &rbac.ClusterRoleBinding{
-		ObjectMeta: api.ObjectMeta{},
+		ObjectMeta: metav1.ObjectMeta{},
 		RoleRef: rbac.RoleRef{
 			APIGroup: rbac.GroupName,
 			Kind:     "ClusterRole", // ClusterRoleBindings can only refer to ClusterRole
@@ -69,7 +69,7 @@ func newClusterRoleBinding(roleName string, subjects ...string) *rbac.ClusterRol
 }
 
 func newRoleBinding(namespace, roleName string, bindType uint16, subjects ...string) *rbac.RoleBinding {
-	r := &rbac.RoleBinding{ObjectMeta: api.ObjectMeta{Namespace: namespace}}
+	r := &rbac.RoleBinding{ObjectMeta: metav1.ObjectMeta{Namespace: namespace}}
 
 	switch bindType {
 	case bindToRole:
@@ -219,7 +219,7 @@ func TestAuthorizer(t *testing.T) {
 		},
 	}
 	for i, tt := range tests {
-		ruleResolver, _ := validation.NewTestRuleResolver(tt.roles, tt.roleBindings, tt.clusterRoles, tt.clusterRoleBindings)
+		ruleResolver, _ := rbacregistryvalidation.NewTestRuleResolver(tt.roles, tt.roleBindings, tt.clusterRoles, tt.clusterRoleBindings)
 		a := RBACAuthorizer{ruleResolver}
 		for _, attr := range tt.shouldPass {
 			if authorized, _, _ := a.Authorize(attr); !authorized {

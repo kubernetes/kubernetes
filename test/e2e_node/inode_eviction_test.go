@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"time"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/test/e2e/framework"
 
@@ -45,7 +46,7 @@ var _ = framework.KubeDescribe("InodeEviction [Slow] [Serial] [Disruptive] [Flak
 		{
 			evictionPriority: 1, // This pod should be evicted before the normal memory usage pod
 			pod: v1.Pod{
-				ObjectMeta: v1.ObjectMeta{Name: "container-inode-hog-pod"},
+				ObjectMeta: metav1.ObjectMeta{Name: "container-inode-hog-pod"},
 				Spec: v1.PodSpec{
 					RestartPolicy: v1.RestartPolicyNever,
 					Containers: []v1.Container{
@@ -65,7 +66,7 @@ var _ = framework.KubeDescribe("InodeEviction [Slow] [Serial] [Disruptive] [Flak
 		{
 			evictionPriority: 1, // This pod should be evicted before the normal memory usage pod
 			pod: v1.Pod{
-				ObjectMeta: v1.ObjectMeta{Name: "volume-inode-hog-pod"},
+				ObjectMeta: metav1.ObjectMeta{Name: "volume-inode-hog-pod"},
 				Spec: v1.PodSpec{
 					RestartPolicy: v1.RestartPolicyNever,
 					Containers: []v1.Container{
@@ -91,7 +92,7 @@ var _ = framework.KubeDescribe("InodeEviction [Slow] [Serial] [Disruptive] [Flak
 		{
 			evictionPriority: 0, // This pod should never be evicted
 			pod: v1.Pod{
-				ObjectMeta: v1.ObjectMeta{Name: "normal-memory-usage-pod"},
+				ObjectMeta: metav1.ObjectMeta{Name: "normal-memory-usage-pod"},
 				Spec: v1.PodSpec{
 					RestartPolicy: v1.RestartPolicyNever,
 					Containers: []v1.Container{
@@ -109,10 +110,12 @@ var _ = framework.KubeDescribe("InodeEviction [Slow] [Serial] [Disruptive] [Flak
 			},
 		},
 	}
-	evictionTestTimeout := 60 * time.Minute
+	evictionTestTimeout := 30 * time.Minute
 	testCondition := "Disk Pressure due to Inodes"
+	// Set the EvictionHard threshold lower to decrease test time
+	evictionHardLimit := "nodefs.inodesFree<50%"
 
-	runEvictionTest(f, testCondition, podTestSpecs, evictionTestTimeout, hasInodePressure)
+	runEvictionTest(f, testCondition, podTestSpecs, evictionHardLimit, evictionTestTimeout, hasInodePressure)
 })
 
 // Struct used by runEvictionTest that specifies the pod, and when that pod should be evicted, relative to other pods
@@ -130,11 +133,12 @@ type podTestSpec struct {
 //		It ensures that lower evictionPriority pods are always evicted before higher evictionPriority pods (2 evicted before 1, etc.)
 //		It ensures that all lower evictionPriority pods are eventually evicted.
 // runEvictionTest then cleans up the testing environment by deleting provided nodes, and ensures that testCondition no longer exists
-func runEvictionTest(f *framework.Framework, testCondition string, podTestSpecs []podTestSpec,
+func runEvictionTest(f *framework.Framework, testCondition string, podTestSpecs []podTestSpec, evictionHard string,
 	evictionTestTimeout time.Duration, hasPressureCondition func(*framework.Framework, string) (bool, error)) {
 
 	Context(fmt.Sprintf("when we run containers that should cause %s", testCondition), func() {
 
+		tempSetEvictionHard(f, evictionHard)
 		BeforeEach(func() {
 			By("seting up pods to be used by tests")
 			for _, spec := range podTestSpecs {
@@ -157,7 +161,7 @@ func runEvictionTest(f *framework.Framework, testCondition string, podTestSpecs 
 
 			Eventually(func() error {
 				// Gather current information
-				updatedPodList, err := f.ClientSet.Core().Pods(f.Namespace.Name).List(v1.ListOptions{})
+				updatedPodList, err := f.ClientSet.Core().Pods(f.Namespace.Name).List(metav1.ListOptions{})
 				updatedPods := updatedPodList.Items
 				for _, p := range updatedPods {
 					framework.Logf("fetching pod %s; phase= %v", p.Name, p.Status.Phase)
@@ -247,7 +251,7 @@ func runEvictionTest(f *framework.Framework, testCondition string, podTestSpecs 
 			By("making sure we can start a new pod after the test")
 			podName := "test-admit-pod"
 			f.PodClient().CreateSync(&v1.Pod{
-				ObjectMeta: v1.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Name: podName,
 				},
 				Spec: v1.PodSpec{
@@ -266,7 +270,7 @@ func runEvictionTest(f *framework.Framework, testCondition string, podTestSpecs 
 			By("deleting pods")
 			for _, spec := range podTestSpecs {
 				By(fmt.Sprintf("deleting pod: %s", spec.pod.Name))
-				f.PodClient().DeleteSync(spec.pod.Name, &v1.DeleteOptions{}, podDisappearTimeout)
+				f.PodClient().DeleteSync(spec.pod.Name, &metav1.DeleteOptions{}, podDisappearTimeout)
 			}
 
 			if CurrentGinkgoTestDescription().Failed {
@@ -284,7 +288,7 @@ func runEvictionTest(f *framework.Framework, testCondition string, podTestSpecs 
 // Returns TRUE if the node has disk pressure due to inodes exists on the node, FALSE otherwise
 func hasInodePressure(f *framework.Framework, testCondition string) (bool, error) {
 
-	nodeList, err := f.ClientSet.Core().Nodes().List(v1.ListOptions{})
+	nodeList, err := f.ClientSet.Core().Nodes().List(metav1.ListOptions{})
 	framework.ExpectNoError(err, "getting node list")
 	if len(nodeList.Items) != 1 {
 		return false, fmt.Errorf("expected 1 node, but see %d. List: %v", len(nodeList.Items), nodeList.Items)

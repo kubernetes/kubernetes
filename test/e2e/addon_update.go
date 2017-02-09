@@ -25,9 +25,8 @@ import (
 	"time"
 
 	"golang.org/x/crypto/ssh"
-	"k8s.io/kubernetes/pkg/api/v1"
-	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/test/e2e/framework"
 
 	. "github.com/onsi/ginkgo"
@@ -206,7 +205,7 @@ spec:
 const (
 	addonTestPollInterval = 3 * time.Second
 	addonTestPollTimeout  = 5 * time.Minute
-	defaultNsName         = v1.NamespaceDefault
+	defaultNsName         = metav1.NamespaceDefault
 	addonNsName           = "kube-system"
 )
 

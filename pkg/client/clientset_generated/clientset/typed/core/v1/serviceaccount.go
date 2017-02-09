@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors.
+Copyright 2017 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,11 +17,12 @@ limitations under the License.
 package v1
 
 import (
+	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	types "k8s.io/apimachinery/pkg/types"
+	watch "k8s.io/apimachinery/pkg/watch"
+	rest "k8s.io/client-go/rest"
 	api "k8s.io/kubernetes/pkg/api"
 	v1 "k8s.io/kubernetes/pkg/api/v1"
-	meta_v1 "k8s.io/kubernetes/pkg/apis/meta/v1"
-	restclient "k8s.io/kubernetes/pkg/client/restclient"
-	watch "k8s.io/kubernetes/pkg/watch"
 )
 
 // ServiceAccountsGetter has a method to return a ServiceAccountInterface.
@@ -34,18 +35,18 @@ type ServiceAccountsGetter interface {
 type ServiceAccountInterface interface {
 	Create(*v1.ServiceAccount) (*v1.ServiceAccount, error)
 	Update(*v1.ServiceAccount) (*v1.ServiceAccount, error)
-	Delete(name string, options *v1.DeleteOptions) error
-	DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error
+	Delete(name string, options *meta_v1.DeleteOptions) error
+	DeleteCollection(options *meta_v1.DeleteOptions, listOptions meta_v1.ListOptions) error
 	Get(name string, options meta_v1.GetOptions) (*v1.ServiceAccount, error)
-	List(opts v1.ListOptions) (*v1.ServiceAccountList, error)
-	Watch(opts v1.ListOptions) (watch.Interface, error)
-	Patch(name string, pt api.PatchType, data []byte, subresources ...string) (result *v1.ServiceAccount, err error)
+	List(opts meta_v1.ListOptions) (*v1.ServiceAccountList, error)
+	Watch(opts meta_v1.ListOptions) (watch.Interface, error)
+	Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v1.ServiceAccount, err error)
 	ServiceAccountExpansion
 }
 
 // serviceAccounts implements ServiceAccountInterface
 type serviceAccounts struct {
-	client restclient.Interface
+	client rest.Interface
 	ns     string
 }
 
@@ -83,7 +84,7 @@ func (c *serviceAccounts) Update(serviceAccount *v1.ServiceAccount) (result *v1.
 }
 
 // Delete takes name of the serviceAccount and deletes it. Returns an error if one occurs.
-func (c *serviceAccounts) Delete(name string, options *v1.DeleteOptions) error {
+func (c *serviceAccounts) Delete(name string, options *meta_v1.DeleteOptions) error {
 	return c.client.Delete().
 		Namespace(c.ns).
 		Resource("serviceaccounts").
@@ -94,7 +95,7 @@ func (c *serviceAccounts) Delete(name string, options *v1.DeleteOptions) error {
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *serviceAccounts) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
+func (c *serviceAccounts) DeleteCollection(options *meta_v1.DeleteOptions, listOptions meta_v1.ListOptions) error {
 	return c.client.Delete().
 		Namespace(c.ns).
 		Resource("serviceaccounts").
@@ -118,7 +119,7 @@ func (c *serviceAccounts) Get(name string, options meta_v1.GetOptions) (result *
 }
 
 // List takes label and field selectors, and returns the list of ServiceAccounts that match those selectors.
-func (c *serviceAccounts) List(opts v1.ListOptions) (result *v1.ServiceAccountList, err error) {
+func (c *serviceAccounts) List(opts meta_v1.ListOptions) (result *v1.ServiceAccountList, err error) {
 	result = &v1.ServiceAccountList{}
 	err = c.client.Get().
 		Namespace(c.ns).
@@ -130,7 +131,7 @@ func (c *serviceAccounts) List(opts v1.ListOptions) (result *v1.ServiceAccountLi
 }
 
 // Watch returns a watch.Interface that watches the requested serviceAccounts.
-func (c *serviceAccounts) Watch(opts v1.ListOptions) (watch.Interface, error) {
+func (c *serviceAccounts) Watch(opts meta_v1.ListOptions) (watch.Interface, error) {
 	return c.client.Get().
 		Prefix("watch").
 		Namespace(c.ns).
@@ -140,7 +141,7 @@ func (c *serviceAccounts) Watch(opts v1.ListOptions) (watch.Interface, error) {
 }
 
 // Patch applies the patch and returns the patched serviceAccount.
-func (c *serviceAccounts) Patch(name string, pt api.PatchType, data []byte, subresources ...string) (result *v1.ServiceAccount, err error) {
+func (c *serviceAccounts) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v1.ServiceAccount, err error) {
 	result = &v1.ServiceAccount{}
 	err = c.client.Patch(pt).
 		Namespace(c.ns).

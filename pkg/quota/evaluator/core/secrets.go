@@ -17,12 +17,12 @@ limitations under the License.
 package core
 
 import (
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/v1"
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/pkg/quota"
 	"k8s.io/kubernetes/pkg/quota/generic"
-	"k8s.io/kubernetes/pkg/runtime"
 )
 
 // NewSecretEvaluator returns an evaluator that can evaluate secrets
@@ -31,7 +31,7 @@ func NewSecretEvaluator(kubeClient clientset.Interface) quota.Evaluator {
 		AllowCreateOnUpdate: false,
 		InternalGroupKind:   api.Kind("Secret"),
 		ResourceName:        api.ResourceSecrets,
-		ListFuncByNamespace: func(namespace string, options v1.ListOptions) ([]runtime.Object, error) {
+		ListFuncByNamespace: func(namespace string, options metav1.ListOptions) ([]runtime.Object, error) {
 			itemList, err := kubeClient.Core().Secrets(namespace).List(options)
 			if err != nil {
 				return nil, err

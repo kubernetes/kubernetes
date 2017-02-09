@@ -28,6 +28,7 @@ skip=${SKIP-"\[Flaky\]|\[Slow\]|\[Serial\]"}
 parallelism=${PARALLELISM:-8}
 artifacts=${ARTIFACTS:-"/tmp/_artifacts/`date +%y%m%dT%H%M%S`"}
 remote=${REMOTE:-"false"}
+runtime=${RUNTIME:-"docker"}
 run_until_failure=${RUN_UNTIL_FAILURE:-"false"}
 test_args=${TEST_ARGS:-""}
 
@@ -144,10 +145,16 @@ else
   # test_args.
   test_args='--kubelet-flags="--network-plugin= --network-plugin-dir=" '$test_args
 
+  # Runtime flags
+  test_args='--kubelet-flags="--container-runtime='$runtime'" '$test_args
+  if [[ $runtime == "remote" ]] ; then
+      test_args='--kubelet-flags="--experimental-cri=true" '$test_args
+  fi
+
   # Test using the host the script was run on
   # Provided for backwards compatibility
   go run test/e2e_node/runner/local/run_local.go --ginkgo-flags="$ginkgoflags" \
-    --test-flags="--alsologtostderr --v 4 --report-dir=${artifacts} --node-name $(hostname) \
+    --test-flags="--container-runtime=${runtime} --alsologtostderr --v 4 --report-dir=${artifacts} --node-name $(hostname) \
     $test_args" --build-dependencies=true 2>&1 | tee -i "${artifacts}/build-log.txt"
   exit $?
 fi

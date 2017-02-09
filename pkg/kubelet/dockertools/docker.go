@@ -31,13 +31,13 @@ import (
 	dockerapi "github.com/docker/engine-api/client"
 	dockertypes "github.com/docker/engine-api/types"
 	"github.com/golang/glog"
+	"k8s.io/apimachinery/pkg/types"
+	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/credentialprovider"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/images"
 	"k8s.io/kubernetes/pkg/kubelet/leaky"
-	"k8s.io/kubernetes/pkg/types"
-	utilerrors "k8s.io/kubernetes/pkg/util/errors"
 )
 
 const (
@@ -94,7 +94,7 @@ func SetContainerNamePrefix(prefix string) {
 // DockerPuller is an abstract interface for testability.  It abstracts image pull operations.
 type DockerPuller interface {
 	Pull(image string, secrets []v1.Secret) error
-	IsImagePresent(image string) (bool, error)
+	GetImageRef(image string) (string, error)
 }
 
 // dockerPuller is the default implementation of DockerPuller.
@@ -241,11 +241,11 @@ func (p dockerPuller) Pull(image string, secrets []v1.Secret) error {
 		err := p.client.PullImage(image, dockertypes.AuthConfig{}, opts)
 		if err == nil {
 			// Sometimes PullImage failed with no error returned.
-			exist, ierr := p.IsImagePresent(image)
+			imageRef, ierr := p.GetImageRef(image)
 			if ierr != nil {
 				glog.Warningf("Failed to inspect image %s: %v", image, ierr)
 			}
-			if !exist {
+			if imageRef == "" {
 				return fmt.Errorf("image pull failed for unknown error")
 			}
 			return nil
@@ -277,15 +277,23 @@ func (p dockerPuller) Pull(image string, secrets []v1.Secret) error {
 	return utilerrors.NewAggregate(pullErrs)
 }
 
-func (p dockerPuller) IsImagePresent(image string) (bool, error) {
-	_, err := p.client.InspectImageByRef(image)
+func (p dockerPuller) GetImageRef(image string) (string, error) {
+	resp, err := p.client.InspectImageByRef(image)
 	if err == nil {
-		return true, nil
+		if resp == nil {
+			return "", nil
+		}
+
+		imageRef := resp.ID
+		if len(resp.RepoDigests) > 0 {
+			imageRef = resp.RepoDigests[0]
+		}
+		return imageRef, nil
 	}
 	if _, ok := err.(imageNotFoundError); ok {
-		return false, nil
+		return "", nil
 	}
-	return false, err
+	return "", err
 }
 
 // Creates a name which can be reversed to identify both full pod name and container name.
@@ -294,7 +302,7 @@ func (p dockerPuller) IsImagePresent(image string) (bool, error) {
 // only occur when instances of the same container in the same pod have the same UID. The
 // chance is really slim.
 func BuildDockerName(dockerName KubeletContainerName, container *v1.Container) (string, string, string) {
-	containerName := dockerName.ContainerName + "." + strconv.FormatUint(kubecontainer.HashContainer(container), 16)
+	containerName := dockerName.ContainerName + "." + strconv.FormatUint(kubecontainer.HashContainerLegacy(container), 16)
 	stableName := fmt.Sprintf("%s_%s_%s_%s",
 		containerNamePrefix,
 		containerName,

@@ -25,11 +25,11 @@ import (
 
 	"github.com/golang/groupcache/lru"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	"k8s.io/client-go/pkg/api/v1"
-	metav1 "k8s.io/client-go/pkg/apis/meta/v1"
-	"k8s.io/client-go/pkg/util/clock"
-	"k8s.io/client-go/pkg/util/sets"
-	"k8s.io/client-go/pkg/util/strategicpatch"
+	"k8s.io/client-go/util/clock"
 )
 
 const (
@@ -172,7 +172,7 @@ func (e *EventAggregator) EventAggregate(newEvent *v1.Event) (*v1.Event, error) 
 
 	// create a new aggregate event
 	eventCopy := &v1.Event{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:      fmt.Sprintf("%v.%x", newEvent.InvolvedObject.Name, now.UnixNano()),
 			Namespace: newEvent.Namespace,
 		},
@@ -244,7 +244,7 @@ func (e *eventLogger) eventObserve(newEvent *v1.Event) (*v1.Event, []byte, error
 
 		newData, _ := json.Marshal(event)
 		oldData, _ := json.Marshal(eventCopy2)
-		patch, err = strategicpatch.CreateStrategicMergePatch(oldData, newData, event)
+		patch, err = strategicpatch.CreateTwoWayMergePatch(oldData, newData, event)
 	}
 
 	// record our new observation

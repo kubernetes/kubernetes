@@ -15,21 +15,34 @@ go_library(
     deps = [
         "//pkg/api/v1:go_default_library",
         "//pkg/cloudprovider:go_default_library",
-        "//pkg/types:go_default_library",
         "//vendor:github.com/golang/glog",
         "//vendor:github.com/vmware/photon-controller-go-sdk/photon",
         "//vendor:gopkg.in/gcfg.v1",
+        "//vendor:k8s.io/apimachinery/pkg/types",
     ],
 )
 
 go_test(
     name = "go_default_test",
     srcs = ["photon_test.go"],
-    library = "go_default_library",
+    library = ":go_default_library",
     tags = ["automanaged"],
     deps = [
         "//pkg/cloudprovider:go_default_library",
-        "//pkg/types:go_default_library",
-        "//pkg/util/rand:go_default_library",
+        "//vendor:k8s.io/apimachinery/pkg/types",
+        "//vendor:k8s.io/apimachinery/pkg/util/rand",
     ],
+)
+
+filegroup(
+    name = "package-srcs",
+    srcs = glob(["**"]),
+    tags = ["automanaged"],
+    visibility = ["//visibility:private"],
+)
+
+filegroup(
+    name = "all-srcs",
+    srcs = [":package-srcs"],
+    tags = ["automanaged"],
 )

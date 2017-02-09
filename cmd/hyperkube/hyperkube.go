@@ -25,8 +25,8 @@ import (
 	"os"
 	"path"
 
+	utilflag "k8s.io/apiserver/pkg/util/flag"
 	"k8s.io/kubernetes/pkg/util"
-	utilflag "k8s.io/kubernetes/pkg/util/flag"
 	"k8s.io/kubernetes/pkg/util/logs"
 	"k8s.io/kubernetes/pkg/version/verflag"
 
@@ -188,7 +188,7 @@ func (hk *HyperKube) Run(args []string) error {
 func (hk *HyperKube) RunToExit(args []string) {
 	err := hk.Run(args)
 	if err != nil {
-		fmt.Fprint(os.Stderr, err.Error())
+		fmt.Fprintf(os.Stderr, "Error: %v\n", err.Error())
 		os.Exit(1)
 	}
 	os.Exit(0)

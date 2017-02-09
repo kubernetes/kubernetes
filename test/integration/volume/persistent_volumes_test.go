@@ -27,20 +27,19 @@ import (
 	"testing"
 	"time"
 
+	"k8s.io/apimachinery/pkg/api/resource"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/watch"
+	restclient "k8s.io/client-go/rest"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/apimachinery/registered"
-	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	storage "k8s.io/kubernetes/pkg/apis/storage/v1beta1"
 	storageutil "k8s.io/kubernetes/pkg/apis/storage/v1beta1/util"
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
-	"k8s.io/kubernetes/pkg/client/restclient"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	fakecloud "k8s.io/kubernetes/pkg/cloudprovider/providers/fake"
 	persistentvolumecontroller "k8s.io/kubernetes/pkg/controller/volume/persistentvolume"
 	"k8s.io/kubernetes/pkg/volume"
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
-	"k8s.io/kubernetes/pkg/watch"
 	"k8s.io/kubernetes/test/integration/framework"
 
 	"github.com/golang/glog"
@@ -117,10 +116,10 @@ func TestPersistentVolumeRecycler(t *testing.T) {
 
 	// NOTE: This test cannot run in parallel, because it is creating and deleting
 	// non-namespaced objects (PersistenceVolumes).
-	defer testClient.Core().PersistentVolumes().DeleteCollection(nil, v1.ListOptions{})
+	defer testClient.Core().PersistentVolumes().DeleteCollection(nil, metav1.ListOptions{})
 
 	stopCh := make(chan struct{})
-	ctrl.Run(stopCh)
+	go ctrl.Run(stopCh)
 	defer close(stopCh)
 
 	// This PV will be claimed, released, and recycled.
@@ -171,10 +170,10 @@ func TestPersistentVolumeDeleter(t *testing.T) {
 
 	// NOTE: This test cannot run in parallel, because it is creating and deleting
 	// non-namespaced objects (PersistenceVolumes).
-	defer testClient.Core().PersistentVolumes().DeleteCollection(nil, v1.ListOptions{})
+	defer testClient.Core().PersistentVolumes().DeleteCollection(nil, metav1.ListOptions{})
 
 	stopCh := make(chan struct{})
-	ctrl.Run(stopCh)
+	go ctrl.Run(stopCh)
 	defer close(stopCh)
 
 	// This PV will be claimed, released, and deleted.
@@ -230,10 +229,10 @@ func TestPersistentVolumeBindRace(t *testing.T) {
 
 	// NOTE: This test cannot run in parallel, because it is creating and deleting
 	// non-namespaced objects (PersistenceVolumes).
-	defer testClient.Core().PersistentVolumes().DeleteCollection(nil, v1.ListOptions{})
+	defer testClient.Core().PersistentVolumes().DeleteCollection(nil, metav1.ListOptions{})
 
 	stopCh := make(chan struct{})
-	ctrl.Run(stopCh)
+	go ctrl.Run(stopCh)
 	defer close(stopCh)
 
 	pv := createPV("fake-pv-race", "/tmp/foo", "10G", []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce}, v1.PersistentVolumeReclaimRetain)
@@ -245,7 +244,7 @@ func TestPersistentVolumeBindRace(t *testing.T) {
 		counter += 1
 		clone, _ := api.Scheme.DeepCopy(pvc)
 		newPvc, _ := clone.(*v1.PersistentVolumeClaim)
-		newPvc.ObjectMeta = v1.ObjectMeta{Name: fmt.Sprintf("fake-pvc-race-%d", counter)}
+		newPvc.ObjectMeta = metav1.ObjectMeta{Name: fmt.Sprintf("fake-pvc-race-%d", counter)}
 		claim, err := testClient.PersistentVolumeClaims(ns.Name).Create(newPvc)
 		if err != nil {
 			t.Fatalf("Error creating newPvc: %v", err)
@@ -257,7 +256,7 @@ func TestPersistentVolumeBindRace(t *testing.T) {
 	// putting a bind manually on a pv should only match the claim it is bound to
 	rand.Seed(time.Now().Unix())
 	claim := claims[rand.Intn(maxClaims-1)]
-	claimRef, err := v1.GetReference(claim)
+	claimRef, err := v1.GetReference(api.Scheme, claim)
 	if err != nil {
 		t.Fatalf("Unexpected error getting claimRef: %v", err)
 	}
@@ -301,10 +300,10 @@ func TestPersistentVolumeClaimLabelSelector(t *testing.T) {
 
 	// NOTE: This test cannot run in parallel, because it is creating and deleting
 	// non-namespaced objects (PersistenceVolumes).
-	defer testClient.Core().PersistentVolumes().DeleteCollection(nil, v1.ListOptions{})
+	defer testClient.Core().PersistentVolumes().DeleteCollection(nil, metav1.ListOptions{})
 
 	stopCh := make(chan struct{})
-	controller.Run(stopCh)
+	go controller.Run(stopCh)
 	defer close(stopCh)
 
 	var (
@@ -381,10 +380,10 @@ func TestPersistentVolumeClaimLabelSelectorMatchExpressions(t *testing.T) {
 
 	// NOTE: This test cannot run in parallel, because it is creating and deleting
 	// non-namespaced objects (PersistenceVolumes).
-	defer testClient.Core().PersistentVolumes().DeleteCollection(nil, v1.ListOptions{})
+	defer testClient.Core().PersistentVolumes().DeleteCollection(nil, metav1.ListOptions{})
 
 	stopCh := make(chan struct{})
-	controller.Run(stopCh)
+	go controller.Run(stopCh)
 	defer close(stopCh)
 
 	var (
@@ -480,10 +479,10 @@ func TestPersistentVolumeMultiPVs(t *testing.T) {
 
 	// NOTE: This test cannot run in parallel, because it is creating and deleting
 	// non-namespaced objects (PersistenceVolumes).
-	defer testClient.Core().PersistentVolumes().DeleteCollection(nil, v1.ListOptions{})
+	defer testClient.Core().PersistentVolumes().DeleteCollection(nil, metav1.ListOptions{})
 
 	stopCh := make(chan struct{})
-	controller.Run(stopCh)
+	go controller.Run(stopCh)
 	defer close(stopCh)
 
 	maxPVs := getObjectCount()
@@ -569,10 +568,10 @@ func TestPersistentVolumeMultiPVsPVCs(t *testing.T) {
 
 	// NOTE: This test cannot run in parallel, because it is creating and deleting
 	// non-namespaced objects (PersistenceVolumes).
-	defer testClient.Core().PersistentVolumes().DeleteCollection(nil, v1.ListOptions{})
+	defer testClient.Core().PersistentVolumes().DeleteCollection(nil, metav1.ListOptions{})
 
 	controllerStopCh := make(chan struct{})
-	binder.Run(controllerStopCh)
+	go binder.Run(controllerStopCh)
 	defer close(controllerStopCh)
 
 	objCount := getObjectCount()
@@ -638,7 +637,7 @@ func TestPersistentVolumeMultiPVsPVCs(t *testing.T) {
 				// Modify PVC
 				i := rand.Intn(objCount)
 				name := "pvc-" + strconv.Itoa(i)
-				pvc, err := testClient.PersistentVolumeClaims(v1.NamespaceDefault).Get(name, metav1.GetOptions{})
+				pvc, err := testClient.PersistentVolumeClaims(metav1.NamespaceDefault).Get(name, metav1.GetOptions{})
 				if err != nil {
 					// Silently ignore error, the PVC may have be already
 					// deleted or not exists yet.
@@ -650,7 +649,7 @@ func TestPersistentVolumeMultiPVsPVCs(t *testing.T) {
 				} else {
 					pvc.Annotations["TestAnnotation"] = fmt.Sprint(rand.Int())
 				}
-				_, err = testClient.PersistentVolumeClaims(v1.NamespaceDefault).Update(pvc)
+				_, err = testClient.PersistentVolumeClaims(metav1.NamespaceDefault).Update(pvc)
 				if err != nil {
 					// Silently ignore error, the PVC may have been updated by
 					// the controller.
@@ -760,7 +759,7 @@ func TestPersistentVolumeControllerStartup(t *testing.T) {
 
 		pv := createPV(pvName, "/tmp/foo"+strconv.Itoa(i), "1G",
 			[]v1.PersistentVolumeAccessMode{v1.ReadWriteOnce}, v1.PersistentVolumeReclaimRetain)
-		claimRef, err := v1.GetReference(newPVC)
+		claimRef, err := v1.GetReference(api.Scheme, newPVC)
 		if err != nil {
 			glog.V(3).Infof("unexpected error getting claim reference: %v", err)
 			return
@@ -785,7 +784,7 @@ func TestPersistentVolumeControllerStartup(t *testing.T) {
 
 	// Start the controller when all PVs and PVCs are already saved in etcd
 	stopCh := make(chan struct{})
-	binder.Run(stopCh)
+	go binder.Run(stopCh)
 	defer close(stopCh)
 
 	// wait for at least two sync periods for changes. No volume should be
@@ -857,14 +856,14 @@ func TestPersistentVolumeProvisionMultiPVCs(t *testing.T) {
 
 	// NOTE: This test cannot run in parallel, because it is creating and deleting
 	// non-namespaced objects (PersistenceVolumes and StorageClasses).
-	defer testClient.Core().PersistentVolumes().DeleteCollection(nil, v1.ListOptions{})
-	defer testClient.Storage().StorageClasses().DeleteCollection(nil, v1.ListOptions{})
+	defer testClient.Core().PersistentVolumes().DeleteCollection(nil, metav1.ListOptions{})
+	defer testClient.Storage().StorageClasses().DeleteCollection(nil, metav1.ListOptions{})
 
 	storageClass := storage.StorageClass{
 		TypeMeta: metav1.TypeMeta{
 			Kind: "StorageClass",
 		},
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name: "gold",
 		},
 		Provisioner: provisionerPluginName,
@@ -872,7 +871,7 @@ func TestPersistentVolumeProvisionMultiPVCs(t *testing.T) {
 	testClient.Storage().StorageClasses().Create(&storageClass)
 
 	stopCh := make(chan struct{})
-	binder.Run(stopCh)
+	go binder.Run(stopCh)
 	defer close(stopCh)
 
 	objCount := getObjectCount()
@@ -902,7 +901,7 @@ func TestPersistentVolumeProvisionMultiPVCs(t *testing.T) {
 	glog.V(2).Infof("TestPersistentVolumeProvisionMultiPVCs: claims are bound")
 
 	// check that we have enough bound PVs
-	pvList, err := testClient.PersistentVolumes().List(v1.ListOptions{})
+	pvList, err := testClient.PersistentVolumes().List(metav1.ListOptions{})
 	if err != nil {
 		t.Fatalf("Failed to list volumes: %s", err)
 	}
@@ -925,7 +924,7 @@ func TestPersistentVolumeProvisionMultiPVCs(t *testing.T) {
 	// Wait for the PVs to get deleted by listing remaining volumes
 	// (delete events were unreliable)
 	for {
-		volumes, err := testClient.PersistentVolumes().List(v1.ListOptions{})
+		volumes, err := testClient.PersistentVolumes().List(metav1.ListOptions{})
 		if err != nil {
 			t.Fatalf("Failed to list volumes: %v", err)
 		}
@@ -954,10 +953,10 @@ func TestPersistentVolumeMultiPVsDiffAccessModes(t *testing.T) {
 
 	// NOTE: This test cannot run in parallel, because it is creating and deleting
 	// non-namespaced objects (PersistenceVolumes).
-	defer testClient.Core().PersistentVolumes().DeleteCollection(nil, v1.ListOptions{})
+	defer testClient.Core().PersistentVolumes().DeleteCollection(nil, metav1.ListOptions{})
 
 	stopCh := make(chan struct{})
-	controller.Run(stopCh)
+	go controller.Run(stopCh)
 	defer close(stopCh)
 
 	// This PV will be claimed, released, and deleted
@@ -1094,13 +1093,13 @@ func createClients(ns *v1.Namespace, t *testing.T, s *httptest.Server, syncPerio
 	// creates many objects and default values were too low.
 	binderClient := clientset.NewForConfigOrDie(&restclient.Config{
 		Host:          s.URL,
-		ContentConfig: restclient.ContentConfig{GroupVersion: &registered.GroupOrDie(v1.GroupName).GroupVersion},
+		ContentConfig: restclient.ContentConfig{GroupVersion: &api.Registry.GroupOrDie(v1.GroupName).GroupVersion},
 		QPS:           1000000,
 		Burst:         1000000,
 	})
 	testClient := clientset.NewForConfigOrDie(&restclient.Config{
 		Host:          s.URL,
-		ContentConfig: restclient.ContentConfig{GroupVersion: &registered.GroupOrDie(v1.GroupName).GroupVersion},
+		ContentConfig: restclient.ContentConfig{GroupVersion: &api.Registry.GroupOrDie(v1.GroupName).GroupVersion},
 		QPS:           1000000,
 		Burst:         1000000,
 	})
@@ -1129,11 +1128,11 @@ func createClients(ns *v1.Namespace, t *testing.T, s *httptest.Server, syncPerio
 			EnableDynamicProvisioning: true,
 		})
 
-	watchPV, err := testClient.PersistentVolumes().Watch(v1.ListOptions{})
+	watchPV, err := testClient.PersistentVolumes().Watch(metav1.ListOptions{})
 	if err != nil {
 		t.Fatalf("Failed to watch PersistentVolumes: %v", err)
 	}
-	watchPVC, err := testClient.PersistentVolumeClaims(ns.Name).Watch(v1.ListOptions{})
+	watchPVC, err := testClient.PersistentVolumeClaims(ns.Name).Watch(metav1.ListOptions{})
 	if err != nil {
 		t.Fatalf("Failed to watch PersistentVolumeClaims: %v", err)
 	}
@@ -1143,7 +1142,7 @@ func createClients(ns *v1.Namespace, t *testing.T, s *httptest.Server, syncPerio
 
 func createPV(name, path, cap string, mode []v1.PersistentVolumeAccessMode, reclaim v1.PersistentVolumeReclaimPolicy) *v1.PersistentVolume {
 	return &v1.PersistentVolume{
-		ObjectMeta: v1.ObjectMeta{Name: name},
+		ObjectMeta: metav1.ObjectMeta{Name: name},
 		Spec: v1.PersistentVolumeSpec{
 			PersistentVolumeSource:        v1.PersistentVolumeSource{HostPath: &v1.HostPathVolumeSource{Path: path}},
 			Capacity:                      v1.ResourceList{v1.ResourceName(v1.ResourceStorage): resource.MustParse(cap)},
@@ -1155,7 +1154,7 @@ func createPV(name, path, cap string, mode []v1.PersistentVolumeAccessMode, recl
 
 func createPVC(name, namespace, cap string, mode []v1.PersistentVolumeAccessMode) *v1.PersistentVolumeClaim {
 	return &v1.PersistentVolumeClaim{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
 			Namespace: namespace,
 		},

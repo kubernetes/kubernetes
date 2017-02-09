@@ -19,6 +19,7 @@ package podsecuritypolicy
 import (
 	"fmt"
 
+	"k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/security/podsecuritypolicy/apparmor"
@@ -28,7 +29,6 @@ import (
 	"k8s.io/kubernetes/pkg/security/podsecuritypolicy/selinux"
 	"k8s.io/kubernetes/pkg/security/podsecuritypolicy/sysctl"
 	"k8s.io/kubernetes/pkg/security/podsecuritypolicy/user"
-	"k8s.io/kubernetes/pkg/util/errors"
 )
 
 type simpleStrategyFactory struct{}

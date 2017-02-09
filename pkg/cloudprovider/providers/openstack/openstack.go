@@ -36,9 +36,9 @@ import (
 	"gopkg.in/gcfg.v1"
 
 	"github.com/golang/glog"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/cloudprovider"
-	"k8s.io/kubernetes/pkg/types"
 )
 
 const ProviderName = "openstack"
@@ -295,8 +295,6 @@ func getServerByName(client *gophercloud.ServiceClient, name types.NodeName) (*s
 
 	if len(serverList) == 0 {
 		return nil, ErrNotFound
-	} else if len(serverList) > 1 {
-		return nil, ErrMultipleResults
 	}
 
 	return &serverList[0], nil

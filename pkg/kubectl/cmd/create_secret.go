@@ -25,13 +25,14 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
+	"k8s.io/kubernetes/pkg/util/i18n"
 )
 
 // NewCmdCreateSecret groups subcommands to create various types of secrets
 func NewCmdCreateSecret(f cmdutil.Factory, cmdOut, errOut io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "secret",
-		Short: "Create a secret using specified subcommand",
+		Short: i18n.T("Create a secret using specified subcommand"),
 		Long:  "Create a secret using specified subcommand.",
 		Run:   cmdutil.DefaultSubCommandRun(errOut),
 	}
@@ -70,7 +71,7 @@ var (
 func NewCmdCreateSecretGeneric(f cmdutil.Factory, cmdOut io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "generic NAME [--type=string] [--from-file=[key=]source] [--from-literal=key1=value1] [--dry-run]",
-		Short:   "Create a secret from a local file, directory or literal value",
+		Short:   i18n.T("Create a secret from a local file, directory or literal value"),
 		Long:    secretLong,
 		Example: secretExample,
 		Run: func(cmd *cobra.Command, args []string) {
@@ -83,7 +84,7 @@ func NewCmdCreateSecretGeneric(f cmdutil.Factory, cmdOut io.Writer) *cobra.Comma
 	cmdutil.AddPrinterFlags(cmd)
 	cmdutil.AddGeneratorFlags(cmd, cmdutil.SecretV1GeneratorName)
 	cmd.Flags().StringSlice("from-file", []string{}, "Key files can be specified using their file path, in which case a default name will be given to them, or optionally with a name and file path, in which case the given name will be used.  Specifying a directory will iterate each named file in the directory that is a valid secret key.")
-	cmd.Flags().StringSlice("from-literal", []string{}, "Specify a key and literal value to insert in secret (i.e. mykey=somevalue)")
+	cmd.Flags().StringArray("from-literal", []string{}, "Specify a key and literal value to insert in secret (i.e. mykey=somevalue)")
 	cmd.Flags().String("type", "", "The type of secret to create")
 	return cmd
 }
@@ -101,7 +102,7 @@ func CreateSecretGeneric(f cmdutil.Factory, cmdOut io.Writer, cmd *cobra.Command
 			Name:           name,
 			Type:           cmdutil.GetFlagString(cmd, "type"),
 			FileSources:    cmdutil.GetFlagStringSlice(cmd, "from-file"),
-			LiteralSources: cmdutil.GetFlagStringSlice(cmd, "from-literal"),
+			LiteralSources: cmdutil.GetFlagStringArray(cmd, "from-literal"),
 		}
 	default:
 		return cmdutil.UsageError(cmd, fmt.Sprintf("Generator: %s not supported.", generatorName))
@@ -140,7 +141,7 @@ var (
 func NewCmdCreateSecretDockerRegistry(f cmdutil.Factory, cmdOut io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "docker-registry NAME --docker-username=user --docker-password=password --docker-email=email [--docker-server=string] [--from-literal=key1=value1] [--dry-run]",
-		Short:   "Create a secret for use with a Docker registry",
+		Short:   i18n.T("Create a secret for use with a Docker registry"),
 		Long:    secretForDockerRegistryLong,
 		Example: secretForDockerRegistryExample,
 		Run: func(cmd *cobra.Command, args []string) {
@@ -211,7 +212,7 @@ var (
 func NewCmdCreateSecretTLS(f cmdutil.Factory, cmdOut io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "tls NAME --cert=path/to/cert/file --key=path/to/key/file [--dry-run]",
-		Short:   "Create a TLS secret",
+		Short:   i18n.T("Create a TLS secret"),
 		Long:    secretForTLSLong,
 		Example: secretForTLSExample,
 		Run: func(cmd *cobra.Command, args []string) {

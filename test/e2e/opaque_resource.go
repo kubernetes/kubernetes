@@ -22,15 +22,16 @@ import (
 	"sync"
 	"time"
 
-	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/resource"
+	"k8s.io/apimachinery/pkg/api/resource"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/fields"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/apimachinery/pkg/watch"
+	"k8s.io/client-go/tools/cache"
 	"k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/client/cache"
-	"k8s.io/kubernetes/pkg/fields"
-	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util/system"
-	"k8s.io/kubernetes/pkg/util/wait"
-	"k8s.io/kubernetes/pkg/watch"
 	"k8s.io/kubernetes/test/e2e/framework"
 
 	. "github.com/onsi/ginkgo"
@@ -45,7 +46,7 @@ var _ = framework.KubeDescribe("Opaque resources [Feature:OpaqueResources]", fun
 	BeforeEach(func() {
 		if node == nil {
 			// Priming invocation; select the first non-master node.
-			nodes, err := f.ClientSet.Core().Nodes().List(v1.ListOptions{})
+			nodes, err := f.ClientSet.Core().Nodes().List(metav1.ListOptions{})
 			Expect(err).NotTo(HaveOccurred())
 			for _, n := range nodes.Items {
 				if !system.IsMasterNode(n.Name) {
@@ -139,7 +140,7 @@ var _ = framework.KubeDescribe("Opaque resources [Feature:OpaqueResources]", fun
 		image := framework.GetPauseImageName(f.ClientSet)
 		// This pod consumes 2 "foo" resources.
 		pod := &v1.Pod{
-			ObjectMeta: v1.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name: "mult-container-oir",
 			},
 			Spec: v1.PodSpec{
@@ -183,7 +184,7 @@ var _ = framework.KubeDescribe("Opaque resources [Feature:OpaqueResources]", fun
 		limits = v1.ResourceList{}
 		// This pod consumes 6 "foo" resources.
 		pod = &v1.Pod{
-			ObjectMeta: v1.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name: "mult-container-over-max-oir",
 			},
 			Spec: v1.PodSpec{
@@ -228,7 +229,7 @@ var _ = framework.KubeDescribe("Opaque resources [Feature:OpaqueResources]", fun
 func addOpaqueResource(f *framework.Framework, nodeName string, opaqueResName v1.ResourceName) {
 	action := func() error {
 		patch := []byte(fmt.Sprintf(`[{"op": "add", "path": "/status/capacity/%s", "value": "5"}]`, escapeForJSONPatch(opaqueResName)))
-		return f.ClientSet.Core().RESTClient().Patch(api.JSONPatchType).Resource("nodes").Name(nodeName).SubResource("status").Body(patch).Do().Error()
+		return f.ClientSet.Core().RESTClient().Patch(types.JSONPatchType).Resource("nodes").Name(nodeName).SubResource("status").Body(patch).Do().Error()
 	}
 	predicate := func(n *v1.Node) bool {
 		capacity, foundCap := n.Status.Capacity[opaqueResName]
@@ -245,7 +246,7 @@ func addOpaqueResource(f *framework.Framework, nodeName string, opaqueResName v1
 func removeOpaqueResource(f *framework.Framework, nodeName string, opaqueResName v1.ResourceName) {
 	action := func() error {
 		patch := []byte(fmt.Sprintf(`[{"op": "remove", "path": "/status/capacity/%s"}]`, escapeForJSONPatch(opaqueResName)))
-		f.ClientSet.Core().RESTClient().Patch(api.JSONPatchType).Resource("nodes").Name(nodeName).SubResource("status").Body(patch).Do()
+		f.ClientSet.Core().RESTClient().Patch(types.JSONPatchType).Resource("nodes").Name(nodeName).SubResource("status").Body(patch).Do()
 		return nil // Ignore error -- the opaque resource may not exist.
 	}
 	predicate := func(n *v1.Node) bool {
@@ -274,12 +275,12 @@ func observeNodeUpdateAfterAction(f *framework.Framework, nodeName string, nodeP
 
 	_, controller := cache.NewInformer(
 		&cache.ListWatch{
-			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
+			ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
 				options.FieldSelector = nodeSelector.String()
 				ls, err := f.ClientSet.Core().Nodes().List(options)
 				return ls, err
 			},
-			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
+			WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
 				options.FieldSelector = nodeSelector.String()
 				w, err := f.ClientSet.Core().Nodes().Watch(options)
 				// Signal parent goroutine that watching has begun.
@@ -330,11 +331,11 @@ func observeEventAfterAction(f *framework.Framework, eventPredicate func(*v1.Eve
 	// Create an informer to list/watch events from the test framework namespace.
 	_, controller := cache.NewInformer(
 		&cache.ListWatch{
-			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
+			ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
 				ls, err := f.ClientSet.Core().Events(f.Namespace.Name).List(options)
 				return ls, err
 			},
-			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
+			WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
 				w, err := f.ClientSet.Core().Events(f.Namespace.Name).Watch(options)
 				return w, err
 			},

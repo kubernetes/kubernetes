@@ -17,12 +17,12 @@ limitations under the License.
 package core
 
 import (
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/v1"
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/pkg/quota"
 	"k8s.io/kubernetes/pkg/quota/generic"
-	"k8s.io/kubernetes/pkg/runtime"
 )
 
 // NewReplicationControllerEvaluator returns an evaluator that can evaluate replication controllers
@@ -31,7 +31,7 @@ func NewReplicationControllerEvaluator(kubeClient clientset.Interface) quota.Eva
 		AllowCreateOnUpdate: false,
 		InternalGroupKind:   api.Kind("ReplicationController"),
 		ResourceName:        api.ResourceReplicationControllers,
-		ListFuncByNamespace: func(namespace string, options v1.ListOptions) ([]runtime.Object, error) {
+		ListFuncByNamespace: func(namespace string, options metav1.ListOptions) ([]runtime.Object, error) {
 			itemList, err := kubeClient.Core().ReplicationControllers(namespace).List(options)
 			if err != nil {
 				return nil, err

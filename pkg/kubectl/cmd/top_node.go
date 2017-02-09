@@ -22,13 +22,14 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/kubernetes/pkg/api"
-	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	coreclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/core/internalversion"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/metricsutil"
-	"k8s.io/kubernetes/pkg/labels"
+	"k8s.io/kubernetes/pkg/util/i18n"
 )
 
 // TopNodeOptions contains all the options for running the top-node cli command.
@@ -74,7 +75,7 @@ func NewCmdTopNode(f cmdutil.Factory, out io.Writer) *cobra.Command {
 
 	cmd := &cobra.Command{
 		Use:     "node [NAME | -l label]",
-		Short:   "Display Resource (CPU/Memory/Storage) usage of nodes",
+		Short:   i18n.T("Display Resource (CPU/Memory/Storage) usage of nodes"),
 		Long:    topNodeLong,
 		Example: topNodeExample,
 		Run: func(cmd *cobra.Command, args []string) {
@@ -88,7 +89,7 @@ func NewCmdTopNode(f cmdutil.Factory, out io.Writer) *cobra.Command {
 				cmdutil.CheckErr(err)
 			}
 		},
-		Aliases: []string{"nodes"},
+		Aliases: []string{"nodes", "no"},
 	}
 	cmd.Flags().StringVarP(&options.Selector, "selector", "l", "", "Selector (label query) to filter on, supports '=', '==', and '!='.")
 	options.HeapsterOptions.Bind(cmd.Flags())
@@ -151,8 +152,8 @@ func (o TopNodeOptions) RunTopNode() error {
 		}
 		nodes = append(nodes, *node)
 	} else {
-		nodeList, err := o.NodeClient.Nodes().List(api.ListOptions{
-			LabelSelector: selector,
+		nodeList, err := o.NodeClient.Nodes().List(metav1.ListOptions{
+			LabelSelector: selector.String(),
 		})
 		if err != nil {
 			return err

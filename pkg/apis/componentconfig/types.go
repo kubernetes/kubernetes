@@ -17,9 +17,12 @@ limitations under the License.
 package componentconfig
 
 import (
+	"fmt"
+	"sort"
+	"strings"
+
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/api"
-	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
-	utilconfig "k8s.io/kubernetes/pkg/util/config"
 )
 
 type KubeProxyConfiguration struct {
@@ -88,11 +91,10 @@ type KubeProxyConfiguration struct {
 }
 
 // Currently two modes of proxying are available: 'userspace' (older, stable) or 'iptables'
-// (newer, faster). If blank, look at the Node object on the Kubernetes API and respect the
-// 'net.experimental.kubernetes.io/proxy-mode' annotation if provided.  Otherwise use the
-// best-available proxy (currently iptables, but may change in future versions).  If the
-// iptables proxy is selected, regardless of how, but the system's kernel or iptables
-// versions are insufficient, this always falls back to the userspace proxy.
+// (newer, faster). If blank, use the best-available proxy (currently iptables, but may
+// change in future versions).  If the iptables proxy is selected, regardless of how, but
+// the system's kernel or iptables versions are insufficient, this always falls back to the
+// userspace proxy.
 type ProxyMode string
 
 const (
@@ -295,7 +297,7 @@ type KubeletConfiguration struct {
 	// And all Burstable and BestEffort pods are brought up under their
 	// specific top level QoS cgroup.
 	// +optional
-	ExperimentalCgroupsPerQOS bool
+	CgroupsPerQOS bool
 	// driver that the kubelet uses to manipulate cgroups on the host (cgroupfs or systemd)
 	// +optional
 	CgroupDriver string
@@ -308,7 +310,7 @@ type KubeletConfiguration struct {
 	// +optional
 	SystemCgroups string
 	// CgroupRoot is the root cgroup to use for pods.
-	// If ExperimentalCgroupsPerQOS is enabled, this is the root of the QoS cgroup hierarchy.
+	// If CgroupsPerQOS is enabled, this is the root of the QoS cgroup hierarchy.
 	// +optional
 	CgroupRoot string
 	// containerRuntime is the container runtime to use.
@@ -379,9 +381,6 @@ type KubeletConfiguration struct {
 	Containerized bool
 	// maxOpenFiles is Number of files that can be opened by Kubelet process.
 	MaxOpenFiles int64
-	// reconcileCIDR is Reconcile node CIDR with the CIDR specified by the
-	// API server. Won't have any effect if register-node is false.
-	ReconcileCIDR bool
 	// registerSchedulable tells the kubelet to register the node as
 	// schedulable. Won't have any effect if register-node is false.
 	// DEPRECATED: use registerWithTaints instead
@@ -447,12 +446,12 @@ type KubeletConfiguration struct {
 	// that describe resources reserved for non-kubernetes components.
 	// Currently only cpu and memory are supported. [default=none]
 	// See http://kubernetes.io/docs/user-guide/compute-resources for more detail.
-	SystemReserved utilconfig.ConfigurationMap
+	SystemReserved ConfigurationMap
 	// A set of ResourceName=ResourceQuantity (e.g. cpu=200m,memory=150G) pairs
 	// that describe resources reserved for kubernetes system components.
 	// Currently only cpu and memory are supported. [default=none]
 	// See http://kubernetes.io/docs/user-guide/compute-resources for more detail.
-	KubeReserved utilconfig.ConfigurationMap
+	KubeReserved ConfigurationMap
 	// Default behaviour for kernel tuning
 	ProtectKernelDefaults bool
 	// If true, Kubelet ensures a set of iptables rules are present on host.
@@ -483,6 +482,9 @@ type KubeletConfiguration struct {
 	// (binaries, etc.) to mount the volume are available on the underlying node. If the check is enabled
 	// and fails the mount operation fails.
 	ExperimentalCheckNodeCapabilitiesBeforeMount bool
+	// This flag, if set, instructs the kubelet to keep volumes from terminated pods mounted to the node.
+	// This can be useful for debugging volume related issues.
+	KeepTerminatedPodVolumes bool
 }
 
 type KubeletAuthorizationMode string
@@ -563,8 +565,7 @@ type KubeSchedulerConfiguration struct {
 	// kubeAPIBurst is the QPS burst to use while talking with kubernetes apiserver.
 	KubeAPIBurst int32
 	// schedulerName is name of the scheduler, used to select which pods
-	// will be processed by this scheduler, based on pod's annotation with
-	// key 'scheduler.alpha.kubernetes.io/name'.
+	// will be processed by this scheduler, based on pod's "spec.SchedulerName".
 	SchedulerName string
 	// RequiredDuringScheduling affinity is not symmetric, but there is an implicit PreferredDuringScheduling affinity rule
 	// corresponding to every RequiredDuringScheduling affinity rule.
@@ -603,6 +604,13 @@ type LeaderElectionConfiguration struct {
 
 type KubeControllerManagerConfiguration struct {
 	metav1.TypeMeta
+
+	// Controllers is the list of controllers to enable or disable
+	// '*' means "all enabled by default controllers"
+	// 'foo' means "enable 'foo'"
+	// '-foo' means "disable 'foo'"
+	// first item for a particular name wins
+	Controllers []string
 
 	// port is the port that the controller-manager's http service runs on.
 	Port int32
@@ -775,6 +783,13 @@ type KubeControllerManagerConfiguration struct {
 	// Zone is treated as unhealthy in nodeEvictionRate and secondaryNodeEvictionRate when at least
 	// unhealthyZoneThreshold (no less than 3) of Nodes in the zone are NotReady
 	UnhealthyZoneThreshold float32
+	// Reconciler runs a periodic loop to reconcile the desired state of the with
+	// the actual state of the world by triggering attach detach operations.
+	// This flag enables or disables reconcile.  Is false by default, and thus enabled.
+	DisableAttachDetachReconcilerSync bool
+	// ReconcilerSyncLoopPeriod is the amount of time the reconciler sync states loop
+	// wait between successive executions. Is set to 5 sec by default.
+	ReconcilerSyncLoopPeriod metav1.Duration
 }
 
 // VolumeConfiguration contains *all* enumerated flags meant to configure all volume
@@ -823,4 +838,34 @@ type PersistentVolumeRecyclerConfiguration struct {
 	// for a HostPath scrubber pod.  This is for development and testing only and will not work
 	// in a multi-node cluster.
 	IncrementTimeoutHostPath int32
+}
+
+type ConfigurationMap map[string]string
+
+func (m *ConfigurationMap) String() string {
+	pairs := []string{}
+	for k, v := range *m {
+		pairs = append(pairs, fmt.Sprintf("%s=%s", k, v))
+	}
+	sort.Strings(pairs)
+	return strings.Join(pairs, ",")
+}
+
+func (m *ConfigurationMap) Set(value string) error {
+	for _, s := range strings.Split(value, ",") {
+		if len(s) == 0 {
+			continue
+		}
+		arr := strings.SplitN(s, "=", 2)
+		if len(arr) == 2 {
+			(*m)[strings.TrimSpace(arr[0])] = strings.TrimSpace(arr[1])
+		} else {
+			(*m)[strings.TrimSpace(arr[0])] = ""
+		}
+	}
+	return nil
+}
+
+func (*ConfigurationMap) Type() string {
+	return "mapStringString"
 }

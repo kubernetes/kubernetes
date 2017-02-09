@@ -21,14 +21,14 @@ import (
 	"io"
 	"net/url"
 
+	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	federationapi "k8s.io/kubernetes/federation/apis/federation"
 	"k8s.io/kubernetes/federation/pkg/kubefed/util"
-	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
-	"k8s.io/kubernetes/pkg/runtime/schema"
 
 	"github.com/spf13/cobra"
 )
@@ -139,7 +139,7 @@ func deleteSecret(hostFactory cmdutil.Factory, name, namespace string) error {
 	if err != nil {
 		return err
 	}
-	return clientset.Core().Secrets(namespace).Delete(name, &api.DeleteOptions{})
+	return clientset.Core().Secrets(namespace).Delete(name, &metav1.DeleteOptions{})
 }
 
 // isNotFound checks if the given error is a NotFound status error.

@@ -36,6 +36,15 @@ source "${KUBE_ROOT}/cluster/aws/${KUBE_CONFIG_FILE-"config-default.sh"}"
 source "${KUBE_ROOT}/cluster/common.sh"
 source "${KUBE_ROOT}/cluster/lib/util.sh"
 
+if [[ -z "${KUBE_AWS_DEPRECATION_WARNED:-}" ]]; then
+  echo -e "${color_red}WARNING${color_norm}: The bash deployment for AWS is deprecated and will be removed in v1.7." >&2
+  echo "For a list of viable alternatives, see:" >&2
+  echo >&2
+  echo "  http://kubernetes.io/docs/getting-started-guides/aws/" >&2
+  echo >&2
+  export KUBE_AWS_DEPRECATION_WARNED=yes
+fi
+
 ALLOCATE_NODE_CIDRS=true
 
 NODE_INSTANCE_PREFIX="${INSTANCE_PREFIX}-minion"
@@ -567,18 +576,6 @@ function verify-prereqs {
   if [[ "$(which aws)" == "" ]]; then
     echo "Can't find aws in PATH, please fix and retry."
     exit 1
-  fi
-}
-
-
-# Create a temp dir that'll be deleted at the end of this bash session.
-#
-# Vars set:
-#   KUBE_TEMP
-function ensure-temp-dir {
-  if [[ -z ${KUBE_TEMP-} ]]; then
-    KUBE_TEMP=$(mktemp -d -t kubernetes.XXXXXX)
-    trap 'rm -rf "${KUBE_TEMP}"' EXIT
   fi
 }
 

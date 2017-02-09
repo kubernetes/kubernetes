@@ -24,11 +24,11 @@ import (
 	"strings"
 	"time"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/tools/record"
 	"k8s.io/kubernetes/federation/pkg/federation-controller/util"
 	"k8s.io/kubernetes/pkg/api"
-	api_v1 "k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/client/record"
-	"k8s.io/kubernetes/pkg/runtime"
 
 	"github.com/golang/glog"
 )
@@ -46,7 +46,7 @@ const (
 
 type HasFinalizerFunc func(runtime.Object, string) bool
 type RemoveFinalizerFunc func(runtime.Object, string) (runtime.Object, error)
-type AddFinalizerFunc func(runtime.Object, string) (runtime.Object, error)
+type AddFinalizerFunc func(runtime.Object, []string) (runtime.Object, error)
 type ObjNameFunc func(runtime.Object) string
 
 type DeletionHelper struct {
@@ -89,19 +89,16 @@ func NewDeletionHelper(
 // This method should be called before creating objects in underlying clusters.
 func (dh *DeletionHelper) EnsureFinalizers(obj runtime.Object) (
 	runtime.Object, error) {
+	finalizers := []string{}
 	if !dh.hasFinalizerFunc(obj, FinalizerDeleteFromUnderlyingClusters) {
-		glog.V(2).Infof("Adding finalizer %s to %s", FinalizerDeleteFromUnderlyingClusters, dh.objNameFunc(obj))
-		obj, err := dh.addFinalizerFunc(obj, FinalizerDeleteFromUnderlyingClusters)
-		if err != nil {
-			return obj, err
-		}
+		finalizers = append(finalizers, FinalizerDeleteFromUnderlyingClusters)
 	}
-	if !dh.hasFinalizerFunc(obj, api_v1.FinalizerOrphan) {
-		glog.V(2).Infof("Adding finalizer %s to %s", api_v1.FinalizerOrphan, dh.objNameFunc(obj))
-		obj, err := dh.addFinalizerFunc(obj, api_v1.FinalizerOrphan)
-		if err != nil {
-			return obj, err
-		}
+	if !dh.hasFinalizerFunc(obj, metav1.FinalizerOrphan) {
+		finalizers = append(finalizers, metav1.FinalizerOrphan)
+	}
+	if len(finalizers) != 0 {
+		glog.V(2).Infof("Adding finalizers %v to %s", finalizers, dh.objNameFunc(obj))
+		return dh.addFinalizerFunc(obj, finalizers)
 	}
 	return obj, nil
 }
@@ -120,17 +117,17 @@ func (dh *DeletionHelper) HandleObjectInUnderlyingClusters(obj runtime.Object) (
 		glog.V(2).Infof("obj does not have %s finalizer. Nothing to do", FinalizerDeleteFromUnderlyingClusters)
 		return obj, nil
 	}
-	hasOrphanFinalizer := dh.hasFinalizerFunc(obj, api_v1.FinalizerOrphan)
+	hasOrphanFinalizer := dh.hasFinalizerFunc(obj, metav1.FinalizerOrphan)
 	if hasOrphanFinalizer {
 		glog.V(2).Infof("Found finalizer orphan. Nothing to do, just remove the finalizer")
 		// If the obj has FinalizerOrphan finalizer, then we need to orphan the
 		// corresponding objects in underlying clusters.
 		// Just remove both the finalizers in that case.
-		obj, err := dh.removeFinalizerFunc(obj, api_v1.FinalizerOrphan)
+		obj, err := dh.removeFinalizerFunc(obj, FinalizerDeleteFromUnderlyingClusters)
 		if err != nil {
 			return obj, err
 		}
-		return dh.removeFinalizerFunc(obj, FinalizerDeleteFromUnderlyingClusters)
+		return dh.removeFinalizerFunc(obj, metav1.FinalizerOrphan)
 	}
 
 	glog.V(2).Infof("Deleting obj %s from underlying clusters", objName)

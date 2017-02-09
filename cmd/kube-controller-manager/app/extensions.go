@@ -21,10 +21,10 @@ limitations under the License.
 package app
 
 import (
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/kubernetes/pkg/controller/daemon"
 	"k8s.io/kubernetes/pkg/controller/deployment"
 	replicaset "k8s.io/kubernetes/pkg/controller/replicaset"
-	"k8s.io/kubernetes/pkg/runtime/schema"
 )
 
 func startDaemonSetController(ctx ControllerContext) (bool, error) {
@@ -32,9 +32,9 @@ func startDaemonSetController(ctx ControllerContext) (bool, error) {
 		return false, nil
 	}
 	go daemon.NewDaemonSetsController(
-		ctx.InformerFactory.DaemonSets(),
-		ctx.InformerFactory.Pods(),
-		ctx.InformerFactory.Nodes(),
+		ctx.NewInformerFactory.Extensions().V1beta1().DaemonSets(),
+		ctx.NewInformerFactory.Core().V1().Pods(),
+		ctx.NewInformerFactory.Core().V1().Nodes(),
 		ctx.ClientBuilder.ClientOrDie("daemon-set-controller"),
 		int(ctx.Options.LookupCacheSizeForDaemonSet),
 	).Run(int(ctx.Options.ConcurrentDaemonSetSyncs), ctx.Stop)
@@ -46,9 +46,9 @@ func startDeploymentController(ctx ControllerContext) (bool, error) {
 		return false, nil
 	}
 	go deployment.NewDeploymentController(
-		ctx.InformerFactory.Deployments(),
-		ctx.InformerFactory.ReplicaSets(),
-		ctx.InformerFactory.Pods(),
+		ctx.NewInformerFactory.Extensions().V1beta1().Deployments(),
+		ctx.NewInformerFactory.Extensions().V1beta1().ReplicaSets(),
+		ctx.NewInformerFactory.Core().V1().Pods(),
 		ctx.ClientBuilder.ClientOrDie("deployment-controller"),
 	).Run(int(ctx.Options.ConcurrentDeploymentSyncs), ctx.Stop)
 	return true, nil
@@ -59,8 +59,8 @@ func startReplicaSetController(ctx ControllerContext) (bool, error) {
 		return false, nil
 	}
 	go replicaset.NewReplicaSetController(
-		ctx.InformerFactory.ReplicaSets(),
-		ctx.InformerFactory.Pods(),
+		ctx.NewInformerFactory.Extensions().V1beta1().ReplicaSets(),
+		ctx.NewInformerFactory.Core().V1().Pods(),
 		ctx.ClientBuilder.ClientOrDie("replicaset-controller"),
 		replicaset.BurstReplicas,
 		int(ctx.Options.LookupCacheSizeForRS),

@@ -17,17 +17,14 @@ limitations under the License.
 package cronjob
 
 import (
-	//"fmt"
 	"strings"
 	"testing"
 	"time"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/api/v1"
 	batch "k8s.io/kubernetes/pkg/apis/batch/v2alpha1"
-	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
-	"k8s.io/kubernetes/pkg/types"
-	//"k8s.io/kubernetes/pkg/controller"
-	// "k8s.io/kubernetes/pkg/util/rand"
 )
 
 func TestGetJobFromTemplate(t *testing.T) {
@@ -38,7 +35,7 @@ func TestGetJobFromTemplate(t *testing.T) {
 	var no bool = false
 
 	sj := batch.CronJob{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:      "mycronjob",
 			Namespace: "snazzycats",
 			UID:       types.UID("1a2b3c"),
@@ -48,7 +45,7 @@ func TestGetJobFromTemplate(t *testing.T) {
 			Schedule:          "* * * * ?",
 			ConcurrencyPolicy: batch.AllowConcurrent,
 			JobTemplate: batch.JobTemplateSpec{
-				ObjectMeta: v1.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Labels:      map[string]string{"a": "b"},
 					Annotations: map[string]string{"x": "y"},
 				},
@@ -56,7 +53,7 @@ func TestGetJobFromTemplate(t *testing.T) {
 					ActiveDeadlineSeconds: &one,
 					ManualSelector:        &no,
 					Template: v1.PodTemplateSpec{
-						ObjectMeta: v1.ObjectMeta{
+						ObjectMeta: metav1.ObjectMeta{
 							Labels: map[string]string{
 								"foo": "bar",
 							},
@@ -102,16 +99,16 @@ func TestGetJobFromTemplate(t *testing.T) {
 
 func TestGetParentUIDFromJob(t *testing.T) {
 	j := &batch.Job{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:      "foobar",
-			Namespace: v1.NamespaceDefault,
+			Namespace: metav1.NamespaceDefault,
 		},
 		Spec: batch.JobSpec{
 			Selector: &metav1.LabelSelector{
 				MatchLabels: map[string]string{"foo": "bar"},
 			},
 			Template: v1.PodTemplateSpec{
-				ObjectMeta: v1.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{
 						"foo": "bar",
 					},
@@ -176,7 +173,7 @@ func TestGroupJobsByParent(t *testing.T) {
 	{
 		// Case 2: there is one controller with no job.
 		sjs := []batch.CronJob{
-			{ObjectMeta: v1.ObjectMeta{Name: "e", Namespace: "x", UID: uid1}},
+			{ObjectMeta: metav1.ObjectMeta{Name: "e", Namespace: "x", UID: uid1}},
 		}
 		js := []batch.Job{}
 		jobsBySj := groupJobsByParent(sjs, js)
@@ -188,10 +185,10 @@ func TestGroupJobsByParent(t *testing.T) {
 	{
 		// Case 3: there is one controller with one job it created.
 		sjs := []batch.CronJob{
-			{ObjectMeta: v1.ObjectMeta{Name: "e", Namespace: "x", UID: uid1}},
+			{ObjectMeta: metav1.ObjectMeta{Name: "e", Namespace: "x", UID: uid1}},
 		}
 		js := []batch.Job{
-			{ObjectMeta: v1.ObjectMeta{Name: "a", Namespace: "x", Annotations: createdBy1}},
+			{ObjectMeta: metav1.ObjectMeta{Name: "a", Namespace: "x", Annotations: createdBy1}},
 		}
 		jobsBySj := groupJobsByParent(sjs, js)
 
@@ -211,18 +208,18 @@ func TestGroupJobsByParent(t *testing.T) {
 		// Case 4: Two namespaces, one has two jobs from one controller, other has 3 jobs from two controllers.
 		// There are also two jobs with no created-by annotation.
 		js := []batch.Job{
-			{ObjectMeta: v1.ObjectMeta{Name: "a", Namespace: "x", Annotations: createdBy1}},
-			{ObjectMeta: v1.ObjectMeta{Name: "b", Namespace: "x", Annotations: createdBy2}},
-			{ObjectMeta: v1.ObjectMeta{Name: "c", Namespace: "x", Annotations: createdBy1}},
-			{ObjectMeta: v1.ObjectMeta{Name: "d", Namespace: "x", Annotations: noCreatedBy}},
-			{ObjectMeta: v1.ObjectMeta{Name: "a", Namespace: "y", Annotations: createdBy3}},
-			{ObjectMeta: v1.ObjectMeta{Name: "b", Namespace: "y", Annotations: createdBy3}},
-			{ObjectMeta: v1.ObjectMeta{Name: "d", Namespace: "y", Annotations: noCreatedBy}},
+			{ObjectMeta: metav1.ObjectMeta{Name: "a", Namespace: "x", Annotations: createdBy1}},
+			{ObjectMeta: metav1.ObjectMeta{Name: "b", Namespace: "x", Annotations: createdBy2}},
+			{ObjectMeta: metav1.ObjectMeta{Name: "c", Namespace: "x", Annotations: createdBy1}},
+			{ObjectMeta: metav1.ObjectMeta{Name: "d", Namespace: "x", Annotations: noCreatedBy}},
+			{ObjectMeta: metav1.ObjectMeta{Name: "a", Namespace: "y", Annotations: createdBy3}},
+			{ObjectMeta: metav1.ObjectMeta{Name: "b", Namespace: "y", Annotations: createdBy3}},
+			{ObjectMeta: metav1.ObjectMeta{Name: "d", Namespace: "y", Annotations: noCreatedBy}},
 		}
 		sjs := []batch.CronJob{
-			{ObjectMeta: v1.ObjectMeta{Name: "e", Namespace: "x", UID: uid1}},
-			{ObjectMeta: v1.ObjectMeta{Name: "f", Namespace: "x", UID: uid2}},
-			{ObjectMeta: v1.ObjectMeta{Name: "g", Namespace: "y", UID: uid3}},
+			{ObjectMeta: metav1.ObjectMeta{Name: "e", Namespace: "x", UID: uid1}},
+			{ObjectMeta: metav1.ObjectMeta{Name: "f", Namespace: "x", UID: uid2}},
+			{ObjectMeta: metav1.ObjectMeta{Name: "g", Namespace: "y", UID: uid3}},
 		}
 
 		jobsBySj := groupJobsByParent(sjs, js)
@@ -270,9 +267,9 @@ func TestGetRecentUnmetScheduleTimes(t *testing.T) {
 	}
 
 	sj := batch.CronJob{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:      "mycronjob",
-			Namespace: v1.NamespaceDefault,
+			Namespace: metav1.NamespaceDefault,
 			UID:       types.UID("1a2b3c"),
 		},
 		Spec: batch.CronJobSpec{
@@ -367,13 +364,26 @@ func TestGetRecentUnmetScheduleTimes(t *testing.T) {
 		}
 	}
 	{
-		// Case 6: now is way way ahead of last start time.
+		// Case 6: now is way way ahead of last start time, and there is no deadline.
 		sj.ObjectMeta.CreationTimestamp = metav1.Time{Time: T1.Add(-2 * time.Hour)}
 		sj.Status.LastScheduleTime = &metav1.Time{Time: T1.Add(-1 * time.Hour)}
 		now := T2.Add(10 * 24 * time.Hour)
 		_, err := getRecentUnmetScheduleTimes(sj, now)
 		if err == nil {
 			t.Errorf("unexpected lack of error")
+		}
+	}
+	{
+		// Case 7: now is way way ahead of last start time, but there is a short deadline.
+		sj.ObjectMeta.CreationTimestamp = metav1.Time{Time: T1.Add(-2 * time.Hour)}
+		sj.Status.LastScheduleTime = &metav1.Time{Time: T1.Add(-1 * time.Hour)}
+		now := T2.Add(10 * 24 * time.Hour)
+		// Deadline is short
+		deadline := int64(2 * 60 * 60)
+		sj.Spec.StartingDeadlineSeconds = &deadline
+		_, err := getRecentUnmetScheduleTimes(sj, now)
+		if err != nil {
+			t.Errorf("unexpected error")
 		}
 	}
 

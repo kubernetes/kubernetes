@@ -35,7 +35,7 @@ go_library(
 go_test(
     name = "go_default_test",
     srcs = ["coredns_test.go"],
-    library = "go_default_library",
+    library = ":go_default_library",
     tags = ["automanaged"],
     deps = [
         "//federation/pkg/dnsprovider:go_default_library",
@@ -43,4 +43,20 @@ go_test(
         "//federation/pkg/dnsprovider/rrstype:go_default_library",
         "//federation/pkg/dnsprovider/tests:go_default_library",
     ],
+)
+
+filegroup(
+    name = "package-srcs",
+    srcs = glob(["**"]),
+    tags = ["automanaged"],
+    visibility = ["//visibility:private"],
+)
+
+filegroup(
+    name = "all-srcs",
+    srcs = [
+        ":package-srcs",
+        "//federation/pkg/dnsprovider/providers/coredns/stubs:all-srcs",
+    ],
+    tags = ["automanaged"],
 )

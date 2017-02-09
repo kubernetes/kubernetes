@@ -12,13 +12,25 @@ go_library(
     srcs = ["csr.go"],
     tags = ["automanaged"],
     deps = [
-        "//pkg/api/v1:go_default_library",
-        "//pkg/apis/certificates/v1alpha1:go_default_library",
-        "//pkg/apis/meta/v1:go_default_library",
-        "//pkg/client/clientset_generated/clientset/typed/certificates/v1alpha1:go_default_library",
-        "//pkg/fields:go_default_library",
-        "//pkg/types:go_default_library",
-        "//pkg/util/cert:go_default_library",
-        "//pkg/watch:go_default_library",
+        "//pkg/apis/certificates/v1beta1:go_default_library",
+        "//pkg/client/clientset_generated/clientset/typed/certificates/v1beta1:go_default_library",
+        "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
+        "//vendor:k8s.io/apimachinery/pkg/fields",
+        "//vendor:k8s.io/apimachinery/pkg/types",
+        "//vendor:k8s.io/apimachinery/pkg/watch",
+        "//vendor:k8s.io/client-go/util/cert",
     ],
+)
+
+filegroup(
+    name = "package-srcs",
+    srcs = glob(["**"]),
+    tags = ["automanaged"],
+    visibility = ["//visibility:private"],
+)
+
+filegroup(
+    name = "all-srcs",
+    srcs = [":package-srcs"],
+    tags = ["automanaged"],
 )

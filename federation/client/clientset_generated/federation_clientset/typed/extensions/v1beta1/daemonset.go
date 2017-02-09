@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors.
+Copyright 2017 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,12 +17,12 @@ limitations under the License.
 package v1beta1
 
 import (
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	types "k8s.io/apimachinery/pkg/types"
+	watch "k8s.io/apimachinery/pkg/watch"
+	rest "k8s.io/client-go/rest"
 	api "k8s.io/kubernetes/pkg/api"
-	v1 "k8s.io/kubernetes/pkg/api/v1"
 	v1beta1 "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
-	meta_v1 "k8s.io/kubernetes/pkg/apis/meta/v1"
-	restclient "k8s.io/kubernetes/pkg/client/restclient"
-	watch "k8s.io/kubernetes/pkg/watch"
 )
 
 // DaemonSetsGetter has a method to return a DaemonSetInterface.
@@ -38,16 +38,16 @@ type DaemonSetInterface interface {
 	UpdateStatus(*v1beta1.DaemonSet) (*v1beta1.DaemonSet, error)
 	Delete(name string, options *v1.DeleteOptions) error
 	DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error
-	Get(name string, options meta_v1.GetOptions) (*v1beta1.DaemonSet, error)
+	Get(name string, options v1.GetOptions) (*v1beta1.DaemonSet, error)
 	List(opts v1.ListOptions) (*v1beta1.DaemonSetList, error)
 	Watch(opts v1.ListOptions) (watch.Interface, error)
-	Patch(name string, pt api.PatchType, data []byte, subresources ...string) (result *v1beta1.DaemonSet, err error)
+	Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v1beta1.DaemonSet, err error)
 	DaemonSetExpansion
 }
 
 // daemonSets implements DaemonSetInterface
 type daemonSets struct {
-	client restclient.Interface
+	client rest.Interface
 	ns     string
 }
 
@@ -123,7 +123,7 @@ func (c *daemonSets) DeleteCollection(options *v1.DeleteOptions, listOptions v1.
 }
 
 // Get takes name of the daemonSet, and returns the corresponding daemonSet object, and an error if there is any.
-func (c *daemonSets) Get(name string, options meta_v1.GetOptions) (result *v1beta1.DaemonSet, err error) {
+func (c *daemonSets) Get(name string, options v1.GetOptions) (result *v1beta1.DaemonSet, err error) {
 	result = &v1beta1.DaemonSet{}
 	err = c.client.Get().
 		Namespace(c.ns).
@@ -158,7 +158,7 @@ func (c *daemonSets) Watch(opts v1.ListOptions) (watch.Interface, error) {
 }
 
 // Patch applies the patch and returns the patched daemonSet.
-func (c *daemonSets) Patch(name string, pt api.PatchType, data []byte, subresources ...string) (result *v1beta1.DaemonSet, err error) {
+func (c *daemonSets) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v1beta1.DaemonSet, err error) {
 	result = &v1beta1.DaemonSet{}
 	err = c.client.Patch(pt).
 		Namespace(c.ns).

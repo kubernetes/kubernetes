@@ -20,9 +20,8 @@ import (
 	"strconv"
 	"testing"
 
-	"k8s.io/kubernetes/pkg/api/resource"
+	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/v1"
-	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 )
 
 const (
@@ -136,25 +135,6 @@ var (
 			},
 		},
 	}
-	criticalPodWithNoLimit = v1.Pod{
-		ObjectMeta: v1.ObjectMeta{
-			Annotations: map[string]string{
-				kubetypes.CriticalPodAnnotationKey: "",
-			},
-		},
-		Spec: v1.PodSpec{
-			Containers: []v1.Container{
-				{
-					Resources: v1.ResourceRequirements{
-						Requests: v1.ResourceList{
-							v1.ResourceName(v1.ResourceMemory): resource.MustParse(strconv.Itoa(standardMemoryAmount - 1)),
-							v1.ResourceName(v1.ResourceCPU):    resource.MustParse("5m"),
-						},
-					},
-				},
-			},
-		},
-	}
 )
 
 type oomTest struct {
@@ -207,12 +187,6 @@ func TestGetContainerOOMScoreAdjust(t *testing.T) {
 			memoryCapacity:  standardMemoryAmount,
 			lowOOMScoreAdj:  2,
 			highOOMScoreAdj: 2,
-		},
-		{
-			pod:             &criticalPodWithNoLimit,
-			memoryCapacity:  standardMemoryAmount,
-			lowOOMScoreAdj:  -998,
-			highOOMScoreAdj: -998,
 		},
 	}
 	for _, test := range oomTests {

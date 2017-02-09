@@ -18,6 +18,7 @@ package dockershim
 
 import (
 	"fmt"
+	"math/rand"
 	"strconv"
 	"strings"
 
@@ -57,25 +58,33 @@ const (
 
 func makeSandboxName(s *runtimeapi.PodSandboxConfig) string {
 	return strings.Join([]string{
-		kubePrefix,                                 // 0
-		sandboxContainerName,                       // 1
-		s.Metadata.GetName(),                       // 2
-		s.Metadata.GetNamespace(),                  // 3
-		s.Metadata.GetUid(),                        // 4
-		fmt.Sprintf("%d", s.Metadata.GetAttempt()), // 5
+		kubePrefix,                            // 0
+		sandboxContainerName,                  // 1
+		s.Metadata.Name,                       // 2
+		s.Metadata.Namespace,                  // 3
+		s.Metadata.Uid,                        // 4
+		fmt.Sprintf("%d", s.Metadata.Attempt), // 5
 	}, nameDelimiter)
 }
 
 func makeContainerName(s *runtimeapi.PodSandboxConfig, c *runtimeapi.ContainerConfig) string {
 	return strings.Join([]string{
-		kubePrefix,                                 // 0
-		c.Metadata.GetName(),                       // 1:
-		s.Metadata.GetName(),                       // 2: sandbox name
-		s.Metadata.GetNamespace(),                  // 3: sandbox namesapce
-		s.Metadata.GetUid(),                        // 4  sandbox uid
-		fmt.Sprintf("%d", c.Metadata.GetAttempt()), // 5
+		kubePrefix,                            // 0
+		c.Metadata.Name,                       // 1:
+		s.Metadata.Name,                       // 2: sandbox name
+		s.Metadata.Namespace,                  // 3: sandbox namesapce
+		s.Metadata.Uid,                        // 4  sandbox uid
+		fmt.Sprintf("%d", c.Metadata.Attempt), // 5
 	}, nameDelimiter)
+}
 
+// randomizeName randomizes the container name. This should only be used when we hit the
+// docker container name conflict bug.
+func randomizeName(name string) string {
+	return strings.Join([]string{
+		name,
+		fmt.Sprintf("%08x", rand.Uint32()),
+	}, nameDelimiter)
 }
 
 func parseUint32(s string) (uint32, error) {
@@ -92,7 +101,9 @@ func parseSandboxName(name string) (*runtimeapi.PodSandboxMetadata, error) {
 	name = strings.TrimPrefix(name, "/")
 
 	parts := strings.Split(name, nameDelimiter)
-	if len(parts) != 6 {
+	// Tolerate the random suffix.
+	// TODO(random-liu): Remove 7 field case when docker 1.11 is deprecated.
+	if len(parts) != 6 && len(parts) != 7 {
 		return nil, fmt.Errorf("failed to parse the sandbox name: %q", name)
 	}
 	if parts[0] != kubePrefix {
@@ -105,10 +116,10 @@ func parseSandboxName(name string) (*runtimeapi.PodSandboxMetadata, error) {
 	}
 
 	return &runtimeapi.PodSandboxMetadata{
-		Name:      &parts[2],
-		Namespace: &parts[3],
-		Uid:       &parts[4],
-		Attempt:   &attempt,
+		Name:      parts[2],
+		Namespace: parts[3],
+		Uid:       parts[4],
+		Attempt:   attempt,
 	}, nil
 }
 
@@ -118,7 +129,9 @@ func parseContainerName(name string) (*runtimeapi.ContainerMetadata, error) {
 	name = strings.TrimPrefix(name, "/")
 
 	parts := strings.Split(name, nameDelimiter)
-	if len(parts) != 6 {
+	// Tolerate the random suffix.
+	// TODO(random-liu): Remove 7 field case when docker 1.11 is deprecated.
+	if len(parts) != 6 && len(parts) != 7 {
 		return nil, fmt.Errorf("failed to parse the container name: %q", name)
 	}
 	if parts[0] != kubePrefix {
@@ -131,7 +144,7 @@ func parseContainerName(name string) (*runtimeapi.ContainerMetadata, error) {
 	}
 
 	return &runtimeapi.ContainerMetadata{
-		Name:    &parts[1],
-		Attempt: &attempt,
+		Name:    parts[1],
+		Attempt: attempt,
 	}, nil
 }

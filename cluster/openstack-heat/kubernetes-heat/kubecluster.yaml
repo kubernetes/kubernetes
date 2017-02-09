@@ -123,10 +123,14 @@ parameters:
     description: OpenStack Region Name
     default: false
 
-  os_tenant_id:
+  os_tenant_name:
     type: string
-    description: OpenStack Tenant ID
+    description: OpenStack Tenant Name
     default: false
+
+  os_user_domain_name:
+    type: string
+    description: OpenStack User Domain Name (Domain-level authorization scope for keystone v3)
 
   enable_proxy:
     type: string
@@ -313,7 +317,8 @@ resources:
             "$OS_USERNAME": {get_param: os_username}
             "$OS_PASSWORD": {get_param: os_password}
             "$OS_REGION_NAME": {get_param: os_region_name}
-            "$OS_TENANT_ID": {get_param: os_tenant_id}
+            "$OS_TENANT_NAME": {get_param: os_tenant_name}
+            "$OS_USER_DOMAIN_NAME": {get_param: os_user_domain_name}
             "$LBAAS_VERSION": {get_param: lbaas_version}
             "$SUBNET_ID": {get_resource: fixed_subnet}
             "$FLOATING_NETWORK_ID": {get_attr: [kube_master_floating, floating_network_id]}
@@ -422,7 +427,8 @@ resources:
           os_username: {get_param: os_username}
           os_password: {get_param: os_password}
           os_region_name: {get_param: os_region_name}
-          os_tenant_id: {get_param: os_tenant_id}
+          os_tenant_name: {get_param: os_tenant_name}
+          os_user_domain_name: {get_param: os_user_domain_name}
           enable_proxy: {get_param: enable_proxy }
           ftp_proxy: {get_param: ftp_proxy }
           http_proxy: {get_param: http_proxy }

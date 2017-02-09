@@ -17,12 +17,12 @@ limitations under the License.
 package v1alpha1
 
 import (
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/api/v1"
-	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 )
 
 type KubeProxyConfiguration struct {
-	metav1.TypeMeta
+	metav1.TypeMeta `json:",inline"`
 
 	// bindAddress is the IP address for the proxy server to serve on (set to 0.0.0.0
 	// for all interfaces)
@@ -87,11 +87,10 @@ type KubeProxyConfiguration struct {
 }
 
 // Currently two modes of proxying are available: 'userspace' (older, stable) or 'iptables'
-// (experimental). If blank, look at the Node object on the Kubernetes API and respect the
-// 'net.experimental.kubernetes.io/proxy-mode' annotation if provided.  Otherwise use the
-// best-available proxy (currently userspace, but may change in future versions).  If the
-// iptables proxy is selected, regardless of how, but the system's kernel or iptables
-// versions are insufficient, this always falls back to the userspace proxy.
+// (newer, faster). If blank, use the best-available proxy (currently iptables, but may
+// change in future versions).  If the iptables proxy is selected, regardless of how, but
+// the system's kernel or iptables versions are insufficient, this always falls back to the
+// userspace proxy.
 type ProxyMode string
 
 const (
@@ -100,7 +99,7 @@ const (
 )
 
 type KubeSchedulerConfiguration struct {
-	metav1.TypeMeta
+	metav1.TypeMeta `json:",inline"`
 
 	// port is the port that the scheduler's http service runs on.
 	Port int `json:"port"`
@@ -121,8 +120,7 @@ type KubeSchedulerConfiguration struct {
 	// kubeAPIBurst is the QPS burst to use while talking with kubernetes apiserver.
 	KubeAPIBurst int `json:"kubeAPIBurst"`
 	// schedulerName is name of the scheduler, used to select which pods
-	// will be processed by this scheduler, based on pod's annotation with
-	// key 'scheduler.alpha.kubernetes.io/name'.
+	// will be processed by this scheduler, based on pod's "spec.SchedulerName".
 	SchedulerName string `json:"schedulerName"`
 	// RequiredDuringScheduling affinity is not symmetric, but there is an implicit PreferredDuringScheduling affinity rule
 	// corresponding to every RequiredDuringScheduling affinity rule.
@@ -178,7 +176,7 @@ type LeaderElectionConfiguration struct {
 }
 
 type KubeletConfiguration struct {
-	metav1.TypeMeta
+	metav1.TypeMeta `json:",inline"`
 
 	// podManifestPath is the path to the directory containing pod manifests to
 	// run, or the path to a single manifest file
@@ -360,7 +358,7 @@ type KubeletConfiguration struct {
 	// And all Burstable and BestEffort pods are brought up under their
 	// specific top level QoS cgroup.
 	// +optional
-	ExperimentalCgroupsPerQOS *bool `json:"experimentalCgroupsPerQOS,omitempty"`
+	CgroupsPerQOS *bool `json:"cgroupsPerQOS,omitempty"`
 	// driver that the kubelet uses to manipulate cgroups on the host (cgroupfs or systemd)
 	// +optional
 	CgroupDriver string `json:"cgroupDriver,omitempty"`
@@ -428,9 +426,6 @@ type KubeletConfiguration struct {
 	Containerized *bool `json:"containerized"`
 	// maxOpenFiles is Number of files that can be opened by Kubelet process.
 	MaxOpenFiles int64 `json:"maxOpenFiles"`
-	// reconcileCIDR is Reconcile node CIDR with the CIDR specified by the
-	// API server. Won't have any effect if register-node is false.
-	ReconcileCIDR *bool `json:"reconcileCIDR"`
 	// registerSchedulable tells the kubelet to register the node as
 	// schedulable. Won't have any effect if register-node is false.
 	// DEPRECATED: use registerWithTaints instead
@@ -523,7 +518,10 @@ type KubeletConfiguration struct {
 	// This flag, if set, enables a check prior to mount operations to verify that the required components
 	// (binaries, etc.) to mount the volume are available on the underlying node. If the check is enabled
 	// and fails the mount operation fails.
-	ExperimentalCheckNodeCapabilitiesBeforeMount bool `json:"ExperimentalCheckNodeCapabilitiesBeforeMount,omitempty"`
+	ExperimentalCheckNodeCapabilitiesBeforeMount bool `json:"experimentalCheckNodeCapabilitiesBeforeMount,omitempty"`
+	// This flag, if set, instructs the kubelet to keep volumes from terminated pods mounted to the node.
+	// This can be useful for debugging volume related issues.
+	KeepTerminatedPodVolumes bool `json:"keepTerminatedPodVolumes,omitempty"`
 }
 
 type KubeletAuthorizationMode string

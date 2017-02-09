@@ -34,18 +34,21 @@ import (
 
 	"github.com/golang/glog"
 
-	"k8s.io/kubernetes/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
+	utilerrors "k8s.io/apimachinery/pkg/util/errors"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/apimachinery/pkg/util/wait"
+	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
+	clientv1 "k8s.io/client-go/pkg/api/v1"
+	"k8s.io/client-go/tools/record"
+	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
 	batch "k8s.io/kubernetes/pkg/apis/batch/v2alpha1"
-	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
-	v1core "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/core/v1"
-	"k8s.io/kubernetes/pkg/client/record"
-	"k8s.io/kubernetes/pkg/runtime"
-	utilerrors "k8s.io/kubernetes/pkg/util/errors"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/pkg/util/metrics"
-	utilruntime "k8s.io/kubernetes/pkg/util/runtime"
-	"k8s.io/kubernetes/pkg/util/wait"
 )
 
 // Utilities for dealing with Jobs and CronJobs and time.
@@ -62,7 +65,7 @@ func NewCronJobController(kubeClient clientset.Interface) *CronJobController {
 	eventBroadcaster := record.NewBroadcaster()
 	eventBroadcaster.StartLogging(glog.Infof)
 	// TODO: remove the wrapper when every clients have moved to use the clientset.
-	eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: kubeClient.Core().Events("")})
+	eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: v1core.New(kubeClient.Core().RESTClient()).Events("")})
 
 	if kubeClient != nil && kubeClient.Core().RESTClient().GetRateLimiter() != nil {
 		metrics.RegisterMetricAndTrackRateLimiterUsage("cronjob_controller", kubeClient.Core().RESTClient().GetRateLimiter())
@@ -73,7 +76,7 @@ func NewCronJobController(kubeClient clientset.Interface) *CronJobController {
 		jobControl: realJobControl{KubeClient: kubeClient},
 		sjControl:  &realSJControl{KubeClient: kubeClient},
 		podControl: &realPodControl{KubeClient: kubeClient},
-		recorder:   eventBroadcaster.NewRecorder(v1.EventSource{Component: "cronjob-controller"}),
+		recorder:   eventBroadcaster.NewRecorder(api.Scheme, clientv1.EventSource{Component: "cronjob-controller"}),
 	}
 
 	return jm
@@ -96,7 +99,7 @@ func (jm *CronJobController) Run(stopCh <-chan struct{}) {
 
 // SyncAll lists all the CronJobs and Jobs and reconciles them.
 func (jm *CronJobController) SyncAll() {
-	sjl, err := jm.kubeClient.BatchV2alpha1().CronJobs(v1.NamespaceAll).List(v1.ListOptions{})
+	sjl, err := jm.kubeClient.BatchV2alpha1().CronJobs(metav1.NamespaceAll).List(metav1.ListOptions{})
 	if err != nil {
 		glog.Errorf("Error listing cronjobs: %v", err)
 		return
@@ -104,7 +107,7 @@ func (jm *CronJobController) SyncAll() {
 	sjs := sjl.Items
 	glog.V(4).Infof("Found %d cronjobs", len(sjs))
 
-	jl, err := jm.kubeClient.BatchV2alpha1().Jobs(v1.NamespaceAll).List(v1.ListOptions{})
+	jl, err := jm.kubeClient.BatchV2alpha1().Jobs(metav1.NamespaceAll).List(metav1.ListOptions{})
 	if err != nil {
 		glog.Errorf("Error listing jobs")
 		return
@@ -127,8 +130,10 @@ func (jm *CronJobController) SyncAll() {
 func SyncOne(sj batch.CronJob, js []batch.Job, now time.Time, jc jobControlInterface, sjc sjControlInterface, pc podControlInterface, recorder record.EventRecorder) {
 	nameForLog := fmt.Sprintf("%s/%s", sj.Namespace, sj.Name)
 
+	childrenJobs := make(map[types.UID]bool)
 	for i := range js {
 		j := js[i]
+		childrenJobs[j.ObjectMeta.UID] = true
 		found := inActiveList(sj, j.ObjectMeta.UID)
 		if !found && !IsJobFinished(&j) {
 			recorder.Eventf(&sj, v1.EventTypeWarning, "UnexpectedJob", "Saw a job that the controller did not create or forgot: %v", j.Name)
@@ -148,6 +153,17 @@ func SyncOne(sj batch.CronJob, js []batch.Job, now time.Time, jc jobControlInter
 			recorder.Eventf(&sj, v1.EventTypeNormal, "SawCompletedJob", "Saw completed job: %v", j.Name)
 		}
 	}
+
+	// Remove any job reference from the active list if the corresponding job does not exist any more.
+	// Otherwise, the cronjob may be stuck in active mode forever even though there is no matching
+	// job running.
+	for _, j := range sj.Status.Active {
+		if found := childrenJobs[j.UID]; !found {
+			recorder.Eventf(&sj, v1.EventTypeNormal, "MissingJob", "Active job went missing: %v", j.Name)
+			deleteFromActiveList(&sj, j.UID)
+		}
+	}
+
 	updatedSJ, err := sjc.UpdateStatus(&sj)
 	if err != nil {
 		glog.Errorf("Unable to update status for %s (rv = %s): %v", nameForLog, sj.ResourceVersion, err)
@@ -160,6 +176,7 @@ func SyncOne(sj batch.CronJob, js []batch.Job, now time.Time, jc jobControlInter
 	}
 	times, err := getRecentUnmetScheduleTimes(sj, now)
 	if err != nil {
+		recorder.Eventf(&sj, v1.EventTypeWarning, "FailedNeedsStart", "Cannot determine if job needs to be started: %v", err)
 		glog.Errorf("Cannot determine if %s needs to be started: %v", nameForLog, err)
 	}
 	// TODO: handle multiple unmet start times, from oldest to newest, updating status as needed.
@@ -223,7 +240,7 @@ func SyncOne(sj batch.CronJob, js []batch.Job, now time.Time, jc jobControlInter
 			}
 			// remove all pods...
 			selector, _ := metav1.LabelSelectorAsSelector(job.Spec.Selector)
-			options := v1.ListOptions{LabelSelector: selector.String()}
+			options := metav1.ListOptions{LabelSelector: selector.String()}
 			podList, err := pc.ListPods(job.Namespace, options)
 			if err != nil {
 				recorder.Eventf(&sj, v1.EventTypeWarning, "FailedList", "List job-pods: %v", err)
@@ -293,5 +310,5 @@ func SyncOne(sj batch.CronJob, js []batch.Job, now time.Time, jc jobControlInter
 }
 
 func getRef(object runtime.Object) (*v1.ObjectReference, error) {
-	return v1.GetReference(object)
+	return v1.GetReference(api.Scheme, object)
 }

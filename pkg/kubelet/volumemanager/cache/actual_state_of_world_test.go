@@ -19,6 +19,7 @@ package cache
 import (
 	"testing"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/volume"
 	volumetesting "k8s.io/kubernetes/pkg/volume/testing"
@@ -36,7 +37,7 @@ func Test_MarkVolumeAsAttached_Positive_NewVolume(t *testing.T) {
 	volumePluginMgr, plugin := volumetesting.GetTestVolumePluginMgr(t)
 	asw := NewActualStateOfWorld("mynode" /* nodeName */, volumePluginMgr)
 	pod := &v1.Pod{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name: "pod1",
 			UID:  "pod1uid",
 		},
@@ -80,7 +81,7 @@ func Test_MarkVolumeAsAttached_SuppliedVolumeName_Positive_NewVolume(t *testing.
 	volumePluginMgr, _ := volumetesting.GetTestVolumePluginMgr(t)
 	asw := NewActualStateOfWorld("mynode" /* nodeName */, volumePluginMgr)
 	pod := &v1.Pod{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name: "pod1",
 			UID:  "pod1uid",
 		},
@@ -124,7 +125,7 @@ func Test_MarkVolumeAsAttached_Positive_ExistingVolume(t *testing.T) {
 	devicePath := "fake/device/path"
 	asw := NewActualStateOfWorld("mynode" /* nodeName */, volumePluginMgr)
 	pod := &v1.Pod{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name: "pod1",
 			UID:  "pod1uid",
 		},
@@ -172,7 +173,7 @@ func Test_AddPodToVolume_Positive_ExistingVolumeNewNode(t *testing.T) {
 	devicePath := "fake/device/path"
 
 	pod := &v1.Pod{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name: "pod1",
 			UID:  "pod1uid",
 		},
@@ -229,7 +230,7 @@ func Test_AddPodToVolume_Positive_ExistingVolumeExistingNode(t *testing.T) {
 	devicePath := "fake/device/path"
 
 	pod := &v1.Pod{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name: "pod1",
 			UID:  "pod1uid",
 		},
@@ -291,7 +292,7 @@ func Test_AddPodToVolume_Negative_VolumeDoesntExist(t *testing.T) {
 	asw := NewActualStateOfWorld("mynode" /* nodeName */, volumePluginMgr)
 
 	pod := &v1.Pod{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name: "pod1",
 			UID:  "pod1uid",
 		},
@@ -356,7 +357,7 @@ func Test_MarkDeviceAsMounted_Positive_NewVolume(t *testing.T) {
 	volumePluginMgr, plugin := volumetesting.GetTestVolumePluginMgr(t)
 	asw := NewActualStateOfWorld("mynode" /* nodeName */, volumePluginMgr)
 	pod := &v1.Pod{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name: "pod1",
 			UID:  "pod1uid",
 		},

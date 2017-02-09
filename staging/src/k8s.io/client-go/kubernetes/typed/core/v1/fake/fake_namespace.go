@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors.
+Copyright 2017 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,12 +17,12 @@ limitations under the License.
 package fake
 
 import (
-	api "k8s.io/client-go/pkg/api"
+	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	labels "k8s.io/apimachinery/pkg/labels"
+	schema "k8s.io/apimachinery/pkg/runtime/schema"
+	types "k8s.io/apimachinery/pkg/types"
+	watch "k8s.io/apimachinery/pkg/watch"
 	v1 "k8s.io/client-go/pkg/api/v1"
-	meta_v1 "k8s.io/client-go/pkg/apis/meta/v1"
-	labels "k8s.io/client-go/pkg/labels"
-	schema "k8s.io/client-go/pkg/runtime/schema"
-	watch "k8s.io/client-go/pkg/watch"
 	testing "k8s.io/client-go/testing"
 )
 
@@ -60,13 +60,13 @@ func (c *FakeNamespaces) UpdateStatus(namespace *v1.Namespace) (*v1.Namespace, e
 	return obj.(*v1.Namespace), err
 }
 
-func (c *FakeNamespaces) Delete(name string, options *v1.DeleteOptions) error {
+func (c *FakeNamespaces) Delete(name string, options *meta_v1.DeleteOptions) error {
 	_, err := c.Fake.
 		Invokes(testing.NewRootDeleteAction(namespacesResource, name), &v1.Namespace{})
 	return err
 }
 
-func (c *FakeNamespaces) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
+func (c *FakeNamespaces) DeleteCollection(options *meta_v1.DeleteOptions, listOptions meta_v1.ListOptions) error {
 	action := testing.NewRootDeleteCollectionAction(namespacesResource, listOptions)
 
 	_, err := c.Fake.Invokes(action, &v1.NamespaceList{})
@@ -82,7 +82,7 @@ func (c *FakeNamespaces) Get(name string, options meta_v1.GetOptions) (result *v
 	return obj.(*v1.Namespace), err
 }
 
-func (c *FakeNamespaces) List(opts v1.ListOptions) (result *v1.NamespaceList, err error) {
+func (c *FakeNamespaces) List(opts meta_v1.ListOptions) (result *v1.NamespaceList, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewRootListAction(namespacesResource, opts), &v1.NamespaceList{})
 	if obj == nil {
@@ -103,13 +103,13 @@ func (c *FakeNamespaces) List(opts v1.ListOptions) (result *v1.NamespaceList, er
 }
 
 // Watch returns a watch.Interface that watches the requested namespaces.
-func (c *FakeNamespaces) Watch(opts v1.ListOptions) (watch.Interface, error) {
+func (c *FakeNamespaces) Watch(opts meta_v1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
 		InvokesWatch(testing.NewRootWatchAction(namespacesResource, opts))
 }
 
 // Patch applies the patch and returns the patched namespace.
-func (c *FakeNamespaces) Patch(name string, pt api.PatchType, data []byte, subresources ...string) (result *v1.Namespace, err error) {
+func (c *FakeNamespaces) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v1.Namespace, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewRootPatchSubresourceAction(namespacesResource, name, data, subresources...), &v1.Namespace{})
 	if obj == nil {

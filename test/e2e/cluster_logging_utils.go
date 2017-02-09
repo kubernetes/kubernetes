@@ -21,10 +21,9 @@ import (
 	"fmt"
 	"time"
 
-	"k8s.io/kubernetes/pkg/api"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/kubernetes/pkg/api/v1"
-	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
-	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/test/e2e/framework"
 )
 
@@ -44,7 +43,7 @@ const (
 
 func createSynthLogger(f *framework.Framework, linesCount int) {
 	f.PodClient().Create(&v1.Pod{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:      synthLoggerPodName,
 			Namespace: f.Namespace.Name,
 		},
@@ -74,13 +73,13 @@ func reportLogsFromFluentdPod(f *framework.Framework) error {
 	}
 
 	label := labels.SelectorFromSet(labels.Set(map[string]string{"k8s-app": "fluentd-logging"}))
-	options := v1.ListOptions{LabelSelector: label.String()}
-	fluentdPods, err := f.ClientSet.Core().Pods(api.NamespaceSystem).List(options)
+	options := metav1.ListOptions{LabelSelector: label.String()}
+	fluentdPods, err := f.ClientSet.Core().Pods(metav1.NamespaceSystem).List(options)
 
 	for _, fluentdPod := range fluentdPods.Items {
 		if fluentdPod.Spec.NodeName == synthLoggerNodeName {
 			containerName := fluentdPod.Spec.Containers[0].Name
-			logs, err := framework.GetPodLogs(f.ClientSet, api.NamespaceSystem, fluentdPod.Name, containerName)
+			logs, err := framework.GetPodLogs(f.ClientSet, metav1.NamespaceSystem, fluentdPod.Name, containerName)
 			if err != nil {
 				return fmt.Errorf("Failed to get logs from fluentd pod %s due to %v", fluentdPod.Name, err)
 			}

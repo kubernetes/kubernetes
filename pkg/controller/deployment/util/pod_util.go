@@ -18,15 +18,16 @@ package util
 
 import (
 	"hash/adler32"
+	"hash/fnv"
 
 	"github.com/golang/glog"
 
+	errorsutil "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/client/cache"
 	v1core "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/core/v1"
+	corelisters "k8s.io/kubernetes/pkg/client/listers/core/v1"
 	"k8s.io/kubernetes/pkg/client/retry"
-	errorsutil "k8s.io/kubernetes/pkg/util/errors"
 	hashutil "k8s.io/kubernetes/pkg/util/hash"
 )
 
@@ -43,13 +44,19 @@ func GetInternalPodTemplateSpecHash(template api.PodTemplateSpec) uint32 {
 	return podTemplateSpecHasher.Sum32()
 }
 
+func GetPodTemplateSpecHashFnv(template v1.PodTemplateSpec) uint32 {
+	podTemplateSpecHasher := fnv.New32a()
+	hashutil.DeepHashObject(podTemplateSpecHasher, template)
+	return podTemplateSpecHasher.Sum32()
+}
+
 // TODO: use client library instead when it starts to support update retries
 //       see https://github.com/kubernetes/kubernetes/issues/21479
 type updatePodFunc func(pod *v1.Pod) error
 
 // UpdatePodWithRetries updates a pod with given applyUpdate function. Note that pod not found error is ignored.
 // The returned bool value can be used to tell if the pod is actually updated.
-func UpdatePodWithRetries(podClient v1core.PodInterface, podLister *cache.StoreToPodLister, namespace, name string, applyUpdate updatePodFunc) (*v1.Pod, error) {
+func UpdatePodWithRetries(podClient v1core.PodInterface, podLister corelisters.PodLister, namespace, name string, applyUpdate updatePodFunc) (*v1.Pod, error) {
 	var pod *v1.Pod
 
 	retryErr := retry.RetryOnConflict(retry.DefaultBackoff, func() error {

@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors.
+Copyright 2017 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,14 +17,13 @@ limitations under the License.
 package fake
 
 import (
-	api "k8s.io/kubernetes/pkg/api"
-	v1 "k8s.io/kubernetes/pkg/api/v1"
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	labels "k8s.io/apimachinery/pkg/labels"
+	schema "k8s.io/apimachinery/pkg/runtime/schema"
+	types "k8s.io/apimachinery/pkg/types"
+	watch "k8s.io/apimachinery/pkg/watch"
+	testing "k8s.io/client-go/testing"
 	v2alpha1 "k8s.io/kubernetes/pkg/apis/batch/v2alpha1"
-	meta_v1 "k8s.io/kubernetes/pkg/apis/meta/v1"
-	core "k8s.io/kubernetes/pkg/client/testing/core"
-	labels "k8s.io/kubernetes/pkg/labels"
-	schema "k8s.io/kubernetes/pkg/runtime/schema"
-	watch "k8s.io/kubernetes/pkg/watch"
 )
 
 // FakeCronJobs implements CronJobInterface
@@ -37,7 +36,7 @@ var cronjobsResource = schema.GroupVersionResource{Group: "batch", Version: "v2a
 
 func (c *FakeCronJobs) Create(cronJob *v2alpha1.CronJob) (result *v2alpha1.CronJob, err error) {
 	obj, err := c.Fake.
-		Invokes(core.NewCreateAction(cronjobsResource, c.ns, cronJob), &v2alpha1.CronJob{})
+		Invokes(testing.NewCreateAction(cronjobsResource, c.ns, cronJob), &v2alpha1.CronJob{})
 
 	if obj == nil {
 		return nil, err
@@ -47,7 +46,7 @@ func (c *FakeCronJobs) Create(cronJob *v2alpha1.CronJob) (result *v2alpha1.CronJ
 
 func (c *FakeCronJobs) Update(cronJob *v2alpha1.CronJob) (result *v2alpha1.CronJob, err error) {
 	obj, err := c.Fake.
-		Invokes(core.NewUpdateAction(cronjobsResource, c.ns, cronJob), &v2alpha1.CronJob{})
+		Invokes(testing.NewUpdateAction(cronjobsResource, c.ns, cronJob), &v2alpha1.CronJob{})
 
 	if obj == nil {
 		return nil, err
@@ -57,7 +56,7 @@ func (c *FakeCronJobs) Update(cronJob *v2alpha1.CronJob) (result *v2alpha1.CronJ
 
 func (c *FakeCronJobs) UpdateStatus(cronJob *v2alpha1.CronJob) (*v2alpha1.CronJob, error) {
 	obj, err := c.Fake.
-		Invokes(core.NewUpdateSubresourceAction(cronjobsResource, "status", c.ns, cronJob), &v2alpha1.CronJob{})
+		Invokes(testing.NewUpdateSubresourceAction(cronjobsResource, "status", c.ns, cronJob), &v2alpha1.CronJob{})
 
 	if obj == nil {
 		return nil, err
@@ -67,21 +66,21 @@ func (c *FakeCronJobs) UpdateStatus(cronJob *v2alpha1.CronJob) (*v2alpha1.CronJo
 
 func (c *FakeCronJobs) Delete(name string, options *v1.DeleteOptions) error {
 	_, err := c.Fake.
-		Invokes(core.NewDeleteAction(cronjobsResource, c.ns, name), &v2alpha1.CronJob{})
+		Invokes(testing.NewDeleteAction(cronjobsResource, c.ns, name), &v2alpha1.CronJob{})
 
 	return err
 }
 
 func (c *FakeCronJobs) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
-	action := core.NewDeleteCollectionAction(cronjobsResource, c.ns, listOptions)
+	action := testing.NewDeleteCollectionAction(cronjobsResource, c.ns, listOptions)
 
 	_, err := c.Fake.Invokes(action, &v2alpha1.CronJobList{})
 	return err
 }
 
-func (c *FakeCronJobs) Get(name string, options meta_v1.GetOptions) (result *v2alpha1.CronJob, err error) {
+func (c *FakeCronJobs) Get(name string, options v1.GetOptions) (result *v2alpha1.CronJob, err error) {
 	obj, err := c.Fake.
-		Invokes(core.NewGetAction(cronjobsResource, c.ns, name), &v2alpha1.CronJob{})
+		Invokes(testing.NewGetAction(cronjobsResource, c.ns, name), &v2alpha1.CronJob{})
 
 	if obj == nil {
 		return nil, err
@@ -91,13 +90,13 @@ func (c *FakeCronJobs) Get(name string, options meta_v1.GetOptions) (result *v2a
 
 func (c *FakeCronJobs) List(opts v1.ListOptions) (result *v2alpha1.CronJobList, err error) {
 	obj, err := c.Fake.
-		Invokes(core.NewListAction(cronjobsResource, c.ns, opts), &v2alpha1.CronJobList{})
+		Invokes(testing.NewListAction(cronjobsResource, c.ns, opts), &v2alpha1.CronJobList{})
 
 	if obj == nil {
 		return nil, err
 	}
 
-	label, _, _ := core.ExtractFromListOptions(opts)
+	label, _, _ := testing.ExtractFromListOptions(opts)
 	if label == nil {
 		label = labels.Everything()
 	}
@@ -113,14 +112,14 @@ func (c *FakeCronJobs) List(opts v1.ListOptions) (result *v2alpha1.CronJobList, 
 // Watch returns a watch.Interface that watches the requested cronJobs.
 func (c *FakeCronJobs) Watch(opts v1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
-		InvokesWatch(core.NewWatchAction(cronjobsResource, c.ns, opts))
+		InvokesWatch(testing.NewWatchAction(cronjobsResource, c.ns, opts))
 
 }
 
 // Patch applies the patch and returns the patched cronJob.
-func (c *FakeCronJobs) Patch(name string, pt api.PatchType, data []byte, subresources ...string) (result *v2alpha1.CronJob, err error) {
+func (c *FakeCronJobs) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v2alpha1.CronJob, err error) {
 	obj, err := c.Fake.
-		Invokes(core.NewPatchSubresourceAction(cronjobsResource, c.ns, name, data, subresources...), &v2alpha1.CronJob{})
+		Invokes(testing.NewPatchSubresourceAction(cronjobsResource, c.ns, name, data, subresources...), &v2alpha1.CronJob{})
 
 	if obj == nil {
 		return nil, err

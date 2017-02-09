@@ -13,6 +13,5 @@
 # limitations under the License.
 
 FROM scratch
-MAINTAINER Daniel Smith <dbsmith@google.com>
 ADD kubectl kubectl
 ENTRYPOINT ["/kubectl"]

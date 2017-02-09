@@ -43,10 +43,15 @@ readonly TMP_DIR="$(mktemp -d)"
 readonly FEDERATION_OUTPUT_ROOT="${LOCAL_OUTPUT_ROOT}/federation"
 readonly VERSIONS_FILE="${FEDERATION_OUTPUT_ROOT}/versions"
 
-detect-project
-readonly KUBE_PROJECT="${KUBE_PROJECT:-${PROJECT:-}}"
+if [[ "${KUBERNETES_PROVIDER}" == "gke" || "${KUBERNETES_PROVIDER}" == "gce" ]]; then
+  detect-project
+  readonly KUBE_PROJECT="${KUBE_PROJECT:-${PROJECT:-}}"
+  readonly KUBE_REGISTRY="${KUBE_REGISTRY:-gcr.io/${KUBE_PROJECT}}"
+else
+  readonly KUBE_PROJECT="${KUBE_PROJECT:-${PROJECT:-federation}}"
+  readonly KUBE_REGISTRY="${KUBE_REGISTRY:-localhost:5000/${KUBE_PROJECT}}"
+fi
 
-readonly KUBE_REGISTRY="${KUBE_REGISTRY:-gcr.io/${KUBE_PROJECT}}"
 # In dev environments this value must be recomputed after build. See
 # the build_image() function. So not making it readonly
 KUBE_VERSION="${KUBE_VERSION:-}"
@@ -79,6 +84,7 @@ function build_binaries() {
   kube::build::verify_prereqs
   kube::build::build_image
   kube::build::run_build_command make WHAT="cmd/kubectl cmd/hyperkube"
+  kube::build::copy_output
 }
 
 function build_image() {

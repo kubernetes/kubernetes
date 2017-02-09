@@ -9,10 +9,19 @@ load(
 
 go_library(
     name = "go_default_library",
-    srcs = ["uuid.go"],
+    srcs = ["doc.go"],
     tags = ["automanaged"],
-    deps = [
-        "//pkg/types:go_default_library",
-        "//vendor:github.com/pborman/uuid",
-    ],
+)
+
+filegroup(
+    name = "package-srcs",
+    srcs = glob(["**"]),
+    tags = ["automanaged"],
+    visibility = ["//visibility:private"],
+)
+
+filegroup(
+    name = "all-srcs",
+    srcs = [":package-srcs"],
+    tags = ["automanaged"],
 )

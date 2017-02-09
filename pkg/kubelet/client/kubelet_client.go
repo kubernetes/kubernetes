@@ -21,20 +21,20 @@ import (
 	"strconv"
 	"time"
 
-	"k8s.io/kubernetes/pkg/api"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
+	utilnet "k8s.io/apimachinery/pkg/util/net"
+	restclient "k8s.io/client-go/rest"
+	"k8s.io/client-go/transport"
 	"k8s.io/kubernetes/pkg/api/v1"
-	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
-	"k8s.io/kubernetes/pkg/client/restclient"
-	"k8s.io/kubernetes/pkg/client/transport"
-	"k8s.io/kubernetes/pkg/types"
-	utilnet "k8s.io/kubernetes/pkg/util/net"
 	nodeutil "k8s.io/kubernetes/pkg/util/node"
 )
 
 type KubeletClientConfig struct {
 	// Default port - used if no information about Kubelet port can be found in Node.NodeStatus.DaemonEndpoints.
-	Port        uint
-	EnableHttps bool
+	Port         uint
+	ReadOnlyPort uint
+	EnableHttps  bool
 
 	// PreferredAddressTypes - used to select an address from Node.NodeStatus.Addresses
 	PreferredAddressTypes []string
@@ -62,7 +62,7 @@ type ConnectionInfo struct {
 
 // ConnectionInfoGetter provides ConnectionInfo for the kubelet running on a named node
 type ConnectionInfoGetter interface {
-	GetConnectionInfo(ctx api.Context, nodeName types.NodeName) (*ConnectionInfo, error)
+	GetConnectionInfo(nodeName types.NodeName) (*ConnectionInfo, error)
 }
 
 func MakeTransport(config *KubeletClientConfig) (http.RoundTripper, error) {
@@ -153,7 +153,7 @@ func NewNodeConnectionInfoGetter(nodes NodeGetter, config KubeletClientConfig) (
 	}, nil
 }
 
-func (k *NodeConnectionInfoGetter) GetConnectionInfo(ctx api.Context, nodeName types.NodeName) (*ConnectionInfo, error) {
+func (k *NodeConnectionInfoGetter) GetConnectionInfo(nodeName types.NodeName) (*ConnectionInfo, error) {
 	node, err := k.nodes.Get(string(nodeName), metav1.GetOptions{})
 	if err != nil {
 		return nil, err

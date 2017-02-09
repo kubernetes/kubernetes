@@ -21,7 +21,7 @@ import (
 	"fmt"
 	"sync"
 
-	"k8s.io/client-go/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/util/sets"
 
 	"github.com/golang/glog"
 )
@@ -505,14 +505,12 @@ func (f *DeltaFIFO) Replace(list []interface{}, resourceVersion string) error {
 
 // Resync will send a sync event for each item
 func (f *DeltaFIFO) Resync() error {
-	var keys []string
-	func() {
-		f.lock.RLock()
-		defer f.lock.RUnlock()
-		keys = f.knownObjects.ListKeys()
-	}()
+	f.lock.Lock()
+	defer f.lock.Unlock()
+
+	keys := f.knownObjects.ListKeys()
 	for _, k := range keys {
-		if err := f.syncKey(k); err != nil {
+		if err := f.syncKeyLocked(k); err != nil {
 			return err
 		}
 	}
@@ -522,6 +520,11 @@ func (f *DeltaFIFO) Resync() error {
 func (f *DeltaFIFO) syncKey(key string) error {
 	f.lock.Lock()
 	defer f.lock.Unlock()
+
+	return f.syncKeyLocked(key)
+}
+
+func (f *DeltaFIFO) syncKeyLocked(key string) error {
 	obj, exists, err := f.knownObjects.GetByKey(key)
 	if err != nil {
 		glog.Errorf("Unexpected error %v during lookup of key %v, unable to queue object for sync", err, key)

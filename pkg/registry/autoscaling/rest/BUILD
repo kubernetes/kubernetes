@@ -12,11 +12,25 @@ go_library(
     srcs = ["storage_autoscaling.go"],
     tags = ["automanaged"],
     deps = [
-        "//pkg/api/rest:go_default_library",
+        "//pkg/api:go_default_library",
         "//pkg/apis/autoscaling:go_default_library",
         "//pkg/apis/autoscaling/v1:go_default_library",
-        "//pkg/genericapiserver:go_default_library",
-        "//pkg/registry/autoscaling/horizontalpodautoscaler/etcd:go_default_library",
-        "//pkg/registry/generic:go_default_library",
+        "//pkg/registry/autoscaling/horizontalpodautoscaler/storage:go_default_library",
+        "//vendor:k8s.io/apiserver/pkg/registry/generic",
+        "//vendor:k8s.io/apiserver/pkg/registry/rest",
+        "//vendor:k8s.io/apiserver/pkg/server",
     ],
+)
+
+filegroup(
+    name = "package-srcs",
+    srcs = glob(["**"]),
+    tags = ["automanaged"],
+    visibility = ["//visibility:private"],
+)
+
+filegroup(
+    name = "all-srcs",
+    srcs = [":package-srcs"],
+    tags = ["automanaged"],
 )

@@ -20,20 +20,23 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"path/filepath"
 
 	"github.com/renstrom/dedent"
 	"github.com/spf13/cobra"
 
+	"k8s.io/apimachinery/pkg/runtime"
+	certutil "k8s.io/client-go/util/cert"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmapiext "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha1"
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/validation"
+	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/discovery"
 	kubenode "k8s.io/kubernetes/cmd/kubeadm/app/node"
+	kubeconfigphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/kubeconfig"
 	"k8s.io/kubernetes/cmd/kubeadm/app/preflight"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	"k8s.io/kubernetes/pkg/api"
-	clientcmdapi "k8s.io/kubernetes/pkg/client/unversioned/clientcmd/api"
-	"k8s.io/kubernetes/pkg/runtime"
 )
 
 var (
@@ -88,7 +91,6 @@ type Join struct {
 }
 
 func NewJoin(cfgPath string, args []string, cfg *kubeadmapi.NodeConfiguration, skipPreFlight bool) (*Join, error) {
-
 	fmt.Println("[kubeadm] WARNING: kubeadm is in alpha, please do not use it for production clusters.")
 
 	if cfgPath != "" {
@@ -127,41 +129,27 @@ func (j *Join) Validate() error {
 	return validation.ValidateNodeConfiguration(j.cfg).ToAggregate()
 }
 
-// Run executes worked node provisioning and tries to join an existing cluster.
+// Run executes worker node provisioning and tries to join an existing cluster.
 func (j *Join) Run(out io.Writer) error {
-	clusterInfo, err := kubenode.RetrieveTrustedClusterInfo(j.cfg.Discovery.Token)
+	cfg, err := discovery.For(j.cfg.Discovery)
 	if err != nil {
 		return err
 	}
-
-	var cfg *clientcmdapi.Config
-	// TODO: delete this first block when we move Token to the discovery interface
-	if j.cfg.Discovery.Token != nil {
-		connectionDetails, err := kubenode.EstablishMasterConnection(j.cfg.Discovery.Token, clusterInfo)
-		if err != nil {
-			return err
-		}
-		err = kubenode.CheckForNodeNameDuplicates(connectionDetails)
-		if err != nil {
-			return err
-		}
-		cfg, err = kubenode.PerformTLSBootstrapDeprecated(connectionDetails)
-		if err != nil {
-			return err
-		}
-	} else {
-		cfg, err = discovery.For(j.cfg.Discovery)
-		if err != nil {
-			return err
-		}
-		if err := kubenode.PerformTLSBootstrap(cfg); err != nil {
-			return err
-		}
+	if err := kubenode.PerformTLSBootstrap(cfg); err != nil {
+		return err
 	}
 
-	err = kubeadmutil.WriteKubeconfigIfNotExists("kubelet", cfg)
-	if err != nil {
+	kubeconfigFile := filepath.Join(kubeadmapi.GlobalEnvParams.KubernetesDir, kubeconfigphase.KubeletKubeConfigFileName)
+	if err := kubeconfigphase.WriteKubeconfigToDisk(kubeconfigFile, cfg); err != nil {
 		return err
+	}
+
+	// Write the ca certificate to disk so kubelet can use it for authentication
+	cluster := cfg.Contexts[cfg.CurrentContext].Cluster
+	caCertFile := filepath.Join(kubeadmapi.GlobalEnvParams.HostPKIPath, kubeadmconstants.CACertName)
+	err = certutil.WriteCert(caCertFile, cfg.Clusters[cluster].CertificateAuthorityData)
+	if err != nil {
+		return fmt.Errorf("couldn't save the CA certificate to disk: %v", err)
 	}
 
 	fmt.Fprintf(out, joinDoneMsgf)

@@ -271,20 +271,19 @@ $(DEEPCOPY_FILES): $(DEEPCOPY_GEN)
 # file if the contents have actually changed.  We 'sinclude' this later.
 .PHONY: $(META_DIR)/$(DEEPCOPY_GEN).mk
 $(META_DIR)/$(DEEPCOPY_GEN).mk:
-	mkdir -p $(@D);                                        \
-	(echo -n "$(DEEPCOPY_GEN): ";                          \
-	 DIRECT=$$(go list -f '{{.Dir}} {{.Dir}}/*.go'         \
-	     ./cmd/libs/go2idl/deepcopy-gen);                  \
-	 INDIRECT=$$(go list                                   \
-	     -f '{{range .Deps}}{{.}}{{"\n"}}{{end}}'          \
-	     ./cmd/libs/go2idl/deepcopy-gen                    \
-	     | grep --color=never "^$(PRJ_SRC_PATH)"           \
-	     | sed 's|^$(PRJ_SRC_PATH)|./|'                    \
-	     | xargs go list -f '{{.Dir}} {{.Dir}}/*.go');     \
-	 echo $$DIRECT $$INDIRECT                              \
-	     | sed 's/ / \\=,/g'                               \
-	     | tr '=,' '\n\t';                                 \
-	) | sed "s|$$(pwd -P)/||" > $@.tmp;                    \
+	mkdir -p $(@D);                                                       \
+	(echo -n "$(DEEPCOPY_GEN): ";                                         \
+	 ./hack/run-in-gopath.sh go list                                      \
+	     -f '{{.ImportPath}}{{"\n"}}{{range .Deps}}{{.}}{{"\n"}}{{end}}'  \
+	     ./cmd/libs/go2idl/deepcopy-gen                                   \
+	     | grep --color=never "^$(PRJ_SRC_PATH)/"                         \
+	     | xargs ./hack/run-in-gopath.sh go list                          \
+	         -f '{{$$d := .Dir}}{{$$d}}{{"\n"}}{{range .GoFiles}}{{$$d}}/{{.}}{{"\n"}}{{end}}'  \
+	     | paste -sd' ' -                                                 \
+	     | sed 's/ / \\=,/g'                                              \
+	     | tr '=,' '\n\t'                                                 \
+	     | sed "s|$$(pwd -P)/||";                                         \
+	) > $@.tmp;                                                           \
 	cmp -s $@.tmp $@ || cat $@.tmp > $@ && rm -f $@.tmp
 
 # Include dependency info for the generator tool.  This will cause the rule of
@@ -422,20 +421,19 @@ $(DEFAULTER_FILES): $(DEFAULTER_GEN)
 # file if the contents have actually changed.  We 'sinclude' this later.
 .PHONY: $(META_DIR)/$(DEFAULTER_GEN).mk
 $(META_DIR)/$(DEFAULTER_GEN).mk:
-	mkdir -p $(@D);                                        \
-	(echo -n "$(DEFAULTER_GEN): ";                         \
-	 DIRECT=$$(go list -f '{{.Dir}} {{.Dir}}/*.go'         \
-	     ./cmd/libs/go2idl/defaulter-gen);                 \
-	 INDIRECT=$$(go list                                   \
-	     -f '{{range .Deps}}{{.}}{{"\n"}}{{end}}'          \
-	     ./cmd/libs/go2idl/defaulter-gen                   \
-	     | grep --color=never "^$(PRJ_SRC_PATH)"           \
-	     | sed 's|^$(PRJ_SRC_PATH)|./|'                    \
-	     | xargs go list -f '{{.Dir}} {{.Dir}}/*.go');     \
-	 echo $$DIRECT $$INDIRECT                              \
-	     | sed 's/ / \\=,/g'                               \
-	     | tr '=,' '\n\t';                                 \
-	) | sed "s|$$(pwd -P)/||" > $@.tmp;                    \
+	mkdir -p $(@D);                                                       \
+	(echo -n "$(DEFAULTER_GEN): ";                                        \
+	 ./hack/run-in-gopath.sh go list                                      \
+	     -f '{{.ImportPath}}{{"\n"}}{{range .Deps}}{{.}}{{"\n"}}{{end}}'  \
+	     ./cmd/libs/go2idl/defaulter-gen                                  \
+	     | grep --color=never "^$(PRJ_SRC_PATH)/"                         \
+	     | xargs ./hack/run-in-gopath.sh go list                          \
+	         -f '{{$$d := .Dir}}{{$$d}}{{"\n"}}{{range .GoFiles}}{{$$d}}/{{.}}{{"\n"}}{{end}}'  \
+	     | paste -sd' ' -                                                 \
+	     | sed 's/ / \\=,/g'                                              \
+	     | tr '=,' '\n\t'                                                 \
+	     | sed "s|$$(pwd -P)/||";                                         \
+	) > $@.tmp;                                                           \
 	cmp -s $@.tmp $@ || cat $@.tmp > $@ && rm -f $@.tmp
 
 # Include dependency info for the generator tool.  This will cause the rule of
@@ -529,20 +527,19 @@ $(OPENAPI_OUTFILE): $(OPENAPI_GEN) $(OPENAPI_GEN)
 # file if the contents have actually changed.  We 'sinclude' this later.
 .PHONY: $(META_DIR)/$(OPENAPI_GEN).mk
 $(META_DIR)/$(OPENAPI_GEN).mk:
-	mkdir -p $(@D);                                        \
-	(echo -n "$(OPENAPI_GEN): ";                           \
-	 DIRECT=$$(go list -f '{{.Dir}} {{.Dir}}/*.go'         \
-	     ./cmd/libs/go2idl/openapi-gen);                   \
-	 INDIRECT=$$(go list                                   \
-	     -f '{{range .Deps}}{{.}}{{"\n"}}{{end}}'          \
-	     ./cmd/libs/go2idl/openapi-gen                     \
-	     | grep --color=never "^$(PRJ_SRC_PATH)"           \
-	     | sed 's|^$(PRJ_SRC_PATH)|./|'                    \
-	     | xargs go list -f '{{.Dir}} {{.Dir}}/*.go');     \
-	 echo $$DIRECT $$INDIRECT                              \
-	     | sed 's/ / \\=,/g'                               \
-	     | tr '=,' '\n\t';                                 \
-	) | sed "s|$$(pwd -P)/||" > $@.tmp;                    \
+	mkdir -p $(@D);                                                       \
+	(echo -n "$(OPENAPI_GEN): ";                                          \
+	 ./hack/run-in-gopath.sh go list                                      \
+	     -f '{{.ImportPath}}{{"\n"}}{{range .Deps}}{{.}}{{"\n"}}{{end}}'  \
+	     ./cmd/libs/go2idl/openapi-gen                                    \
+	     | grep --color=never "^$(PRJ_SRC_PATH)/"                         \
+	     | xargs ./hack/run-in-gopath.sh go list                          \
+	         -f '{{$$d := .Dir}}{{$$d}}{{"\n"}}{{range .GoFiles}}{{$$d}}/{{.}}{{"\n"}}{{end}}'  \
+	     | paste -sd' ' -                                                 \
+	     | sed 's/ / \\=,/g'                                              \
+	     | tr '=,' '\n\t'                                                 \
+	     | sed "s|$$(pwd -P)/||";                                         \
+	) > $@.tmp;                                                           \
 	cmp -s $@.tmp $@ || cat $@.tmp > $@ && rm -f $@.tmp
 
 # Include dependency info for the generator tool.  This will cause the rule of
@@ -724,20 +721,19 @@ $(CONVERSION_FILES): $(CONVERSION_GEN)
 # file if the contents have actually changed.  We 'sinclude' this later.
 .PHONY: $(META_DIR)/$(CONVERSION_GEN).mk
 $(META_DIR)/$(CONVERSION_GEN).mk:
-	mkdir -p $(@D);                                        \
-	(echo -n "$(CONVERSION_GEN): ";                        \
-	 DIRECT=$$(go list -f '{{.Dir}} {{.Dir}}/*.go'         \
-	     ./cmd/libs/go2idl/conversion-gen);                \
-	 INDIRECT=$$(go list                                   \
-	     -f '{{range .Deps}}{{.}}{{"\n"}}{{end}}'          \
-	     ./cmd/libs/go2idl/conversion-gen                  \
-	     | grep --color=never "^$(PRJ_SRC_PATH)"           \
-	     | sed 's|^$(PRJ_SRC_PATH)|./|'                    \
-	     | xargs go list -f '{{.Dir}} {{.Dir}}/*.go');     \
-	 echo $$DIRECT $$INDIRECT                              \
-	     | sed 's/ / \\=,/g'                               \
-	     | tr '=,' '\n\t';                                 \
-	) | sed "s|$$(pwd -P)/||" > $@.tmp;                    \
+	mkdir -p $(@D);                                                       \
+	(echo -n "$(CONVERSION_GEN): ";                                       \
+	 ./hack/run-in-gopath.sh go list                                      \
+	     -f '{{.ImportPath}}{{"\n"}}{{range .Deps}}{{.}}{{"\n"}}{{end}}'  \
+	     ./cmd/libs/go2idl/conversion-gen                                 \
+	     | grep --color=never "^$(PRJ_SRC_PATH)/"                         \
+	     | xargs ./hack/run-in-gopath.sh go list                          \
+	         -f '{{$$d := .Dir}}{{$$d}}{{"\n"}}{{range .GoFiles}}{{$$d}}/{{.}}{{"\n"}}{{end}}'  \
+	     | paste -sd' ' -                                                 \
+	     | sed 's/ / \\=,/g'                                              \
+	     | tr '=,' '\n\t'                                                 \
+	     | sed "s|$$(pwd -P)/||";                                         \
+	) > $@.tmp;                                                           \
 	cmp -s $@.tmp $@ || cat $@.tmp > $@ && rm -f $@.tmp
 
 # Include dependency info for the generator tool.  This will cause the rule of

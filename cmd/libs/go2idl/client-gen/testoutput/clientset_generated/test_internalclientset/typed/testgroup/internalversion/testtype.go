@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors.
+Copyright 2017 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,11 +17,12 @@ limitations under the License.
 package internalversion
 
 import (
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	types "k8s.io/apimachinery/pkg/types"
+	watch "k8s.io/apimachinery/pkg/watch"
+	rest "k8s.io/client-go/rest"
 	testgroup "k8s.io/kubernetes/cmd/libs/go2idl/client-gen/test_apis/testgroup"
 	api "k8s.io/kubernetes/pkg/api"
-	v1 "k8s.io/kubernetes/pkg/apis/meta/v1"
-	restclient "k8s.io/kubernetes/pkg/client/restclient"
-	watch "k8s.io/kubernetes/pkg/watch"
 )
 
 // TestTypesGetter has a method to return a TestTypeInterface.
@@ -35,18 +36,18 @@ type TestTypeInterface interface {
 	Create(*testgroup.TestType) (*testgroup.TestType, error)
 	Update(*testgroup.TestType) (*testgroup.TestType, error)
 	UpdateStatus(*testgroup.TestType) (*testgroup.TestType, error)
-	Delete(name string, options *api.DeleteOptions) error
-	DeleteCollection(options *api.DeleteOptions, listOptions api.ListOptions) error
+	Delete(name string, options *v1.DeleteOptions) error
+	DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error
 	Get(name string, options v1.GetOptions) (*testgroup.TestType, error)
-	List(opts api.ListOptions) (*testgroup.TestTypeList, error)
-	Watch(opts api.ListOptions) (watch.Interface, error)
-	Patch(name string, pt api.PatchType, data []byte, subresources ...string) (result *testgroup.TestType, err error)
+	List(opts v1.ListOptions) (*testgroup.TestTypeList, error)
+	Watch(opts v1.ListOptions) (watch.Interface, error)
+	Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *testgroup.TestType, err error)
 	TestTypeExpansion
 }
 
 // testTypes implements TestTypeInterface
 type testTypes struct {
-	client restclient.Interface
+	client rest.Interface
 	ns     string
 }
 
@@ -100,7 +101,7 @@ func (c *testTypes) UpdateStatus(testType *testgroup.TestType) (result *testgrou
 }
 
 // Delete takes name of the testType and deletes it. Returns an error if one occurs.
-func (c *testTypes) Delete(name string, options *api.DeleteOptions) error {
+func (c *testTypes) Delete(name string, options *v1.DeleteOptions) error {
 	return c.client.Delete().
 		Namespace(c.ns).
 		Resource("testtypes").
@@ -111,7 +112,7 @@ func (c *testTypes) Delete(name string, options *api.DeleteOptions) error {
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *testTypes) DeleteCollection(options *api.DeleteOptions, listOptions api.ListOptions) error {
+func (c *testTypes) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
 	return c.client.Delete().
 		Namespace(c.ns).
 		Resource("testtypes").
@@ -135,7 +136,7 @@ func (c *testTypes) Get(name string, options v1.GetOptions) (result *testgroup.T
 }
 
 // List takes label and field selectors, and returns the list of TestTypes that match those selectors.
-func (c *testTypes) List(opts api.ListOptions) (result *testgroup.TestTypeList, err error) {
+func (c *testTypes) List(opts v1.ListOptions) (result *testgroup.TestTypeList, err error) {
 	result = &testgroup.TestTypeList{}
 	err = c.client.Get().
 		Namespace(c.ns).
@@ -147,7 +148,7 @@ func (c *testTypes) List(opts api.ListOptions) (result *testgroup.TestTypeList, 
 }
 
 // Watch returns a watch.Interface that watches the requested testTypes.
-func (c *testTypes) Watch(opts api.ListOptions) (watch.Interface, error) {
+func (c *testTypes) Watch(opts v1.ListOptions) (watch.Interface, error) {
 	return c.client.Get().
 		Prefix("watch").
 		Namespace(c.ns).
@@ -157,7 +158,7 @@ func (c *testTypes) Watch(opts api.ListOptions) (watch.Interface, error) {
 }
 
 // Patch applies the patch and returns the patched testType.
-func (c *testTypes) Patch(name string, pt api.PatchType, data []byte, subresources ...string) (result *testgroup.TestType, err error) {
+func (c *testTypes) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *testgroup.TestType, err error) {
 	result = &testgroup.TestType{}
 	err = c.client.Patch(pt).
 		Namespace(c.ns).

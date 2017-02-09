@@ -20,36 +20,33 @@ import (
 	"fmt"
 	"strings"
 
+	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/fields"
+	"k8s.io/apimachinery/pkg/types"
+	utilerrors "k8s.io/apimachinery/pkg/util/errors"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/client-go/tools/cache"
+	"k8s.io/client-go/tools/record"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/client/cache"
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
-	"k8s.io/kubernetes/pkg/client/record"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
+	extensionslisters "k8s.io/kubernetes/pkg/client/listers/extensions/v1beta1"
 	"k8s.io/kubernetes/pkg/cloudprovider"
-	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
-	"k8s.io/kubernetes/pkg/types"
-	utilerrors "k8s.io/kubernetes/pkg/util/errors"
 	"k8s.io/kubernetes/pkg/util/node"
-	utilruntime "k8s.io/kubernetes/pkg/util/runtime"
 	utilversion "k8s.io/kubernetes/pkg/util/version"
 
 	"github.com/golang/glog"
 )
 
-const (
-	// Number of Nodes that needs to be in the cluster for it to be treated as "large"
-	LargeClusterThreshold = 20
-)
-
 // deletePods will delete all pods from master running on given node, and return true
 // if any pods were deleted, or were found pending deletion.
-func deletePods(kubeClient clientset.Interface, recorder record.EventRecorder, nodeName, nodeUID string, daemonStore cache.StoreToDaemonSetLister) (bool, error) {
+func deletePods(kubeClient clientset.Interface, recorder record.EventRecorder, nodeName, nodeUID string, daemonStore extensionslisters.DaemonSetLister) (bool, error) {
 	remaining := false
 	selector := fields.OneTermEqualSelector(api.PodHostField, nodeName).String()
-	options := v1.ListOptions{FieldSelector: selector}
-	pods, err := kubeClient.Core().Pods(v1.NamespaceAll).List(options)
+	options := metav1.ListOptions{FieldSelector: selector}
+	pods, err := kubeClient.Core().Pods(metav1.NamespaceAll).List(options)
 	var updateErrList []error
 
 	if err != nil {
@@ -120,7 +117,7 @@ func setPodTerminationReason(kubeClient clientset.Interface, pod *v1.Pod, nodeNa
 func forcefullyDeletePod(c clientset.Interface, pod *v1.Pod) error {
 	var zero int64
 	glog.Infof("NodeController is force deleting Pod: %v:%v", pod.Namespace, pod.Name)
-	err := c.Core().Pods(pod.Namespace).Delete(pod.Name, &v1.DeleteOptions{GracePeriodSeconds: &zero})
+	err := c.Core().Pods(pod.Namespace).Delete(pod.Name, &metav1.DeleteOptions{GracePeriodSeconds: &zero})
 	if err == nil {
 		glog.V(4).Infof("forceful deletion of %s succeeded", pod.Name)
 	}
@@ -158,7 +155,11 @@ func (nc *NodeController) maybeDeleteTerminatingPod(obj interface{}) {
 		return
 	}
 
-	nodeObj, found, err := nc.nodeStore.Store.GetByKey(pod.Spec.NodeName)
+	node, err := nc.nodeLister.Get(pod.Spec.NodeName)
+	// if there is no such node, do nothing and let the podGC clean it up.
+	if errors.IsNotFound(err) {
+		return
+	}
 	if err != nil {
 		// this can only happen if the Store.KeyFunc has a problem creating
 		// a key for the pod. If it happens once, it will happen again so
@@ -167,20 +168,14 @@ func (nc *NodeController) maybeDeleteTerminatingPod(obj interface{}) {
 		return
 	}
 
-	// if there is no such node, do nothing and let the podGC clean it up.
-	if !found {
-		return
-	}
-
 	// delete terminating pods that have been scheduled on
 	// nodes that do not support graceful termination
 	// TODO(mikedanese): this can be removed when we no longer
 	// guarantee backwards compatibility of master API to kubelets with
 	// versions less than 1.1.0
-	node := nodeObj.(*v1.Node)
 	v, err := utilversion.ParseSemantic(node.Status.NodeInfo.KubeletVersion)
 	if err != nil {
-		glog.V(0).Infof("couldn't parse verions %q of node: %v", node.Status.NodeInfo.KubeletVersion, err)
+		glog.V(0).Infof("Couldn't parse version %q of node: %v", node.Status.NodeInfo.KubeletVersion, err)
 		utilruntime.HandleError(nc.forcefullyDeletePod(pod))
 		return
 	}
@@ -202,8 +197,8 @@ func markAllPodsNotReady(kubeClient clientset.Interface, node *v1.Node) error {
 	}
 	nodeName := node.Name
 	glog.V(2).Infof("Update ready status of pods on node [%v]", nodeName)
-	opts := v1.ListOptions{FieldSelector: fields.OneTermEqualSelector(api.PodHostField, nodeName).String()}
-	pods, err := kubeClient.Core().Pods(v1.NamespaceAll).List(opts)
+	opts := metav1.ListOptions{FieldSelector: fields.OneTermEqualSelector(api.PodHostField, nodeName).String()}
+	pods, err := kubeClient.Core().Pods(metav1.NamespaceAll).List(opts)
 	if err != nil {
 		return err
 	}

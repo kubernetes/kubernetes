@@ -20,9 +20,10 @@ import (
 	"reflect"
 	"testing"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/kubernetes/pkg/api/v1"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
-	"k8s.io/kubernetes/pkg/util/intstr"
 )
 
 func TestContainerLabels(t *testing.T) {
@@ -51,7 +52,7 @@ func TestContainerLabels(t *testing.T) {
 		Lifecycle:              lifecycle,
 	}
 	pod := &v1.Pod{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:      "test_pod",
 			Namespace: "test_pod_namespace",
 			UID:       "test_pod_uid",
@@ -119,7 +120,7 @@ func TestContainerAnnotations(t *testing.T) {
 		Lifecycle:              lifecycle,
 	}
 	pod := &v1.Pod{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:      "test_pod",
 			Namespace: "test_pod_namespace",
 			UID:       "test_pod_uid",
@@ -166,7 +167,7 @@ func TestContainerAnnotations(t *testing.T) {
 
 func TestPodLabels(t *testing.T) {
 	pod := &v1.Pod{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:      "test_pod",
 			Namespace: "test_pod_namespace",
 			UID:       "test_pod_uid",
@@ -193,7 +194,7 @@ func TestPodLabels(t *testing.T) {
 
 func TestPodAnnotations(t *testing.T) {
 	pod := &v1.Pod{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:        "test_pod",
 			Namespace:   "test_pod_namespace",
 			UID:         "test_pod_uid",

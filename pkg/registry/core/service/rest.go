@@ -25,21 +25,24 @@ import (
 	"strconv"
 
 	"github.com/golang/glog"
+	"k8s.io/apimachinery/pkg/api/errors"
+	metainternalversion "k8s.io/apimachinery/pkg/apis/meta/internalversion"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	utilnet "k8s.io/apimachinery/pkg/util/net"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/apimachinery/pkg/util/validation/field"
+	"k8s.io/apimachinery/pkg/watch"
+	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
+	"k8s.io/apiserver/pkg/registry/rest"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/errors"
-	"k8s.io/kubernetes/pkg/api/rest"
 	apiservice "k8s.io/kubernetes/pkg/api/service"
 	"k8s.io/kubernetes/pkg/api/validation"
-	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/registry/core/endpoint"
 	"k8s.io/kubernetes/pkg/registry/core/service/ipallocator"
 	"k8s.io/kubernetes/pkg/registry/core/service/portallocator"
-	"k8s.io/kubernetes/pkg/runtime"
-	featuregate "k8s.io/kubernetes/pkg/util/config"
-	utilnet "k8s.io/kubernetes/pkg/util/net"
-	utilruntime "k8s.io/kubernetes/pkg/util/runtime"
-	"k8s.io/kubernetes/pkg/util/validation/field"
-	"k8s.io/kubernetes/pkg/watch"
 )
 
 // ServiceRest includes storage for services and all sub resources
@@ -73,7 +76,7 @@ func NewStorage(registry Registry, endpoints endpoint.Registry, serviceIPs ipall
 	}
 }
 
-func (rs *REST) Create(ctx api.Context, obj runtime.Object) (runtime.Object, error) {
+func (rs *REST) Create(ctx genericapirequest.Context, obj runtime.Object) (runtime.Object, error) {
 	service := obj.(*api.Service)
 
 	if err := rest.BeforeCreate(Strategy, ctx, obj); err != nil {
@@ -205,7 +208,7 @@ func (rs *REST) Create(ctx api.Context, obj runtime.Object) (runtime.Object, err
 	return out, err
 }
 
-func (rs *REST) Delete(ctx api.Context, id string) (runtime.Object, error) {
+func (rs *REST) Delete(ctx genericapirequest.Context, id string) (runtime.Object, error) {
 	service, err := rs.registry.GetService(ctx, id, &metav1.GetOptions{})
 	if err != nil {
 		return nil, err
@@ -248,23 +251,23 @@ func (rs *REST) Delete(ctx api.Context, id string) (runtime.Object, error) {
 	return &metav1.Status{Status: metav1.StatusSuccess}, nil
 }
 
-func (rs *REST) Get(ctx api.Context, id string, options *metav1.GetOptions) (runtime.Object, error) {
+func (rs *REST) Get(ctx genericapirequest.Context, id string, options *metav1.GetOptions) (runtime.Object, error) {
 	return rs.registry.GetService(ctx, id, options)
 }
 
-func (rs *REST) List(ctx api.Context, options *api.ListOptions) (runtime.Object, error) {
+func (rs *REST) List(ctx genericapirequest.Context, options *metainternalversion.ListOptions) (runtime.Object, error) {
 	return rs.registry.ListServices(ctx, options)
 }
 
 // Watch returns Services events via a watch.Interface.
 // It implements rest.Watcher.
-func (rs *REST) Watch(ctx api.Context, options *api.ListOptions) (watch.Interface, error) {
+func (rs *REST) Watch(ctx genericapirequest.Context, options *metainternalversion.ListOptions) (watch.Interface, error) {
 	return rs.registry.WatchServices(ctx, options)
 }
 
 // Export returns Service stripped of cluster-specific information.
 // It implements rest.Exporter.
-func (rs *REST) Export(ctx api.Context, name string, opts metav1.ExportOptions) (runtime.Object, error) {
+func (rs *REST) Export(ctx genericapirequest.Context, name string, opts metav1.ExportOptions) (runtime.Object, error) {
 	return rs.registry.ExportService(ctx, name, opts)
 }
 
@@ -368,7 +371,7 @@ func (rs *REST) healthCheckNodePortUpdate(oldService, service *api.Service) (boo
 	return true, nil
 }
 
-func (rs *REST) Update(ctx api.Context, name string, objInfo rest.UpdatedObjectInfo) (runtime.Object, bool, error) {
+func (rs *REST) Update(ctx genericapirequest.Context, name string, objInfo rest.UpdatedObjectInfo) (runtime.Object, bool, error) {
 	oldService, err := rs.registry.GetService(ctx, name, &metav1.GetOptions{})
 	if err != nil {
 		return nil, false, err
@@ -380,7 +383,7 @@ func (rs *REST) Update(ctx api.Context, name string, objInfo rest.UpdatedObjectI
 	}
 
 	service := obj.(*api.Service)
-	if !api.ValidNamespace(ctx, &service.ObjectMeta) {
+	if !rest.ValidNamespace(ctx, &service.ObjectMeta) {
 		return nil, false, errors.NewConflict(api.Resource("services"), service.Namespace, fmt.Errorf("Service.Namespace does not match the provided context"))
 	}
 
@@ -467,7 +470,7 @@ func (rs *REST) Update(ctx api.Context, name string, objInfo rest.UpdatedObjectI
 var _ = rest.Redirector(&REST{})
 
 // ResourceLocation returns a URL to which one can send traffic for the specified service.
-func (rs *REST) ResourceLocation(ctx api.Context, id string) (*url.URL, http.RoundTripper, error) {
+func (rs *REST) ResourceLocation(ctx genericapirequest.Context, id string) (*url.URL, http.RoundTripper, error) {
 	// Allow ID as "svcname", "svcname:port", or "scheme:svcname:port".
 	svcScheme, svcName, portStr, valid := utilnet.SplitSchemeNamePort(id)
 	if !valid {
@@ -554,6 +557,8 @@ func shouldAssignNodePorts(service *api.Service) bool {
 		return true
 	case api.ServiceTypeClusterIP:
 		return false
+	case api.ServiceTypeExternalName:
+		return false
 	default:
 		glog.Errorf("Unknown service type: %v", service.Spec.Type)
 		return false
@@ -563,7 +568,7 @@ func shouldAssignNodePorts(service *api.Service) bool {
 func shouldCheckOrAssignHealthCheckNodePort(service *api.Service) bool {
 	if service.Spec.Type == api.ServiceTypeLoadBalancer {
 		// True if Service-type == LoadBalancer AND annotation AnnotationExternalTraffic present
-		return (featuregate.DefaultFeatureGate.ExternalTrafficLocalOnly() && apiservice.NeedsHealthCheck(service))
+		return (utilfeature.DefaultFeatureGate.Enabled(features.ExternalTrafficLocalOnly) && apiservice.NeedsHealthCheck(service))
 	}
 	glog.V(4).Infof("Service type: %v does not need health check node port", service.Spec.Type)
 	return false

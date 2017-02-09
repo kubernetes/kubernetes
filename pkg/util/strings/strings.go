@@ -17,7 +17,6 @@ limitations under the License.
 package strings
 
 import (
-	"fmt"
 	"path"
 	"strings"
 	"unicode"
@@ -46,22 +45,6 @@ func ShortenString(str string, n int) string {
 	} else {
 		return str[:n]
 	}
-}
-
-// GetArticleForNoun returns the article needed for the given noun.
-func GetArticleForNoun(noun string, padding string) string {
-	if noun[len(noun)-2:] != "ss" && noun[len(noun)-1:] == "s" {
-		// Plurals don't have an article.
-		// Don't catch words like class
-		return fmt.Sprintf("%v", padding)
-	}
-
-	article := "a"
-	if isVowel(rune(noun[0])) {
-		article = "an"
-	}
-
-	return fmt.Sprintf("%s%s%s", padding, article, padding)
 }
 
 // isVowel returns true if the rune is a vowel (case insensitive).

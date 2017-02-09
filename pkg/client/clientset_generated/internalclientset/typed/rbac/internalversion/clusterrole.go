@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors.
+Copyright 2017 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,11 +17,12 @@ limitations under the License.
 package internalversion
 
 import (
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	types "k8s.io/apimachinery/pkg/types"
+	watch "k8s.io/apimachinery/pkg/watch"
+	rest "k8s.io/client-go/rest"
 	api "k8s.io/kubernetes/pkg/api"
-	v1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	rbac "k8s.io/kubernetes/pkg/apis/rbac"
-	restclient "k8s.io/kubernetes/pkg/client/restclient"
-	watch "k8s.io/kubernetes/pkg/watch"
 )
 
 // ClusterRolesGetter has a method to return a ClusterRoleInterface.
@@ -34,18 +35,18 @@ type ClusterRolesGetter interface {
 type ClusterRoleInterface interface {
 	Create(*rbac.ClusterRole) (*rbac.ClusterRole, error)
 	Update(*rbac.ClusterRole) (*rbac.ClusterRole, error)
-	Delete(name string, options *api.DeleteOptions) error
-	DeleteCollection(options *api.DeleteOptions, listOptions api.ListOptions) error
+	Delete(name string, options *v1.DeleteOptions) error
+	DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error
 	Get(name string, options v1.GetOptions) (*rbac.ClusterRole, error)
-	List(opts api.ListOptions) (*rbac.ClusterRoleList, error)
-	Watch(opts api.ListOptions) (watch.Interface, error)
-	Patch(name string, pt api.PatchType, data []byte, subresources ...string) (result *rbac.ClusterRole, err error)
+	List(opts v1.ListOptions) (*rbac.ClusterRoleList, error)
+	Watch(opts v1.ListOptions) (watch.Interface, error)
+	Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *rbac.ClusterRole, err error)
 	ClusterRoleExpansion
 }
 
 // clusterRoles implements ClusterRoleInterface
 type clusterRoles struct {
-	client restclient.Interface
+	client rest.Interface
 }
 
 // newClusterRoles returns a ClusterRoles
@@ -79,7 +80,7 @@ func (c *clusterRoles) Update(clusterRole *rbac.ClusterRole) (result *rbac.Clust
 }
 
 // Delete takes name of the clusterRole and deletes it. Returns an error if one occurs.
-func (c *clusterRoles) Delete(name string, options *api.DeleteOptions) error {
+func (c *clusterRoles) Delete(name string, options *v1.DeleteOptions) error {
 	return c.client.Delete().
 		Resource("clusterroles").
 		Name(name).
@@ -89,7 +90,7 @@ func (c *clusterRoles) Delete(name string, options *api.DeleteOptions) error {
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *clusterRoles) DeleteCollection(options *api.DeleteOptions, listOptions api.ListOptions) error {
+func (c *clusterRoles) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
 	return c.client.Delete().
 		Resource("clusterroles").
 		VersionedParams(&listOptions, api.ParameterCodec).
@@ -111,7 +112,7 @@ func (c *clusterRoles) Get(name string, options v1.GetOptions) (result *rbac.Clu
 }
 
 // List takes label and field selectors, and returns the list of ClusterRoles that match those selectors.
-func (c *clusterRoles) List(opts api.ListOptions) (result *rbac.ClusterRoleList, err error) {
+func (c *clusterRoles) List(opts v1.ListOptions) (result *rbac.ClusterRoleList, err error) {
 	result = &rbac.ClusterRoleList{}
 	err = c.client.Get().
 		Resource("clusterroles").
@@ -122,7 +123,7 @@ func (c *clusterRoles) List(opts api.ListOptions) (result *rbac.ClusterRoleList,
 }
 
 // Watch returns a watch.Interface that watches the requested clusterRoles.
-func (c *clusterRoles) Watch(opts api.ListOptions) (watch.Interface, error) {
+func (c *clusterRoles) Watch(opts v1.ListOptions) (watch.Interface, error) {
 	return c.client.Get().
 		Prefix("watch").
 		Resource("clusterroles").
@@ -131,7 +132,7 @@ func (c *clusterRoles) Watch(opts api.ListOptions) (watch.Interface, error) {
 }
 
 // Patch applies the patch and returns the patched clusterRole.
-func (c *clusterRoles) Patch(name string, pt api.PatchType, data []byte, subresources ...string) (result *rbac.ClusterRole, err error) {
+func (c *clusterRoles) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *rbac.ClusterRole, err error) {
 	result = &rbac.ClusterRole{}
 	err = c.client.Patch(pt).
 		Resource("clusterroles").

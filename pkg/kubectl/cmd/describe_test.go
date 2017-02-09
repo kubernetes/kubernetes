@@ -22,17 +22,19 @@ import (
 	"net/http"
 	"testing"
 
-	"k8s.io/kubernetes/pkg/client/restclient/fake"
+	"k8s.io/client-go/rest/fake"
+	"k8s.io/kubernetes/pkg/api"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
 )
 
 // Verifies that schemas that are not in the master tree of Kubernetes can be retrieved via Get.
 func TestDescribeUnknownSchemaObject(t *testing.T) {
 	d := &testDescriber{Output: "test output"}
-	f, tf, codec, ns := cmdtesting.NewTestFactory()
+	f, tf, codec, _ := cmdtesting.NewTestFactory()
 	tf.Describer = d
-	tf.Client = &fake.RESTClient{
-		NegotiatedSerializer: ns,
+	tf.UnstructuredClient = &fake.RESTClient{
+		APIRegistry:          api.Registry,
+		NegotiatedSerializer: unstructuredSerializer,
 		Resp:                 &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, cmdtesting.NewInternalType("", "", "foo"))},
 	}
 	tf.Namespace = "non-default"
@@ -40,6 +42,31 @@ func TestDescribeUnknownSchemaObject(t *testing.T) {
 	buferr := bytes.NewBuffer([]byte{})
 	cmd := NewCmdDescribe(f, buf, buferr)
 	cmd.Run(cmd, []string{"type", "foo"})
+
+	if d.Name != "foo" || d.Namespace != "" {
+		t.Errorf("unexpected describer: %#v", d)
+	}
+
+	if buf.String() != fmt.Sprintf("%s", d.Output) {
+		t.Errorf("unexpected output: %s", buf.String())
+	}
+}
+
+// Verifies that schemas that are not in the master tree of Kubernetes can be retrieved via Get.
+func TestDescribeUnknownNamespacedSchemaObject(t *testing.T) {
+	d := &testDescriber{Output: "test output"}
+	f, tf, codec, _ := cmdtesting.NewTestFactory()
+	tf.Describer = d
+	tf.UnstructuredClient = &fake.RESTClient{
+		APIRegistry:          api.Registry,
+		NegotiatedSerializer: unstructuredSerializer,
+		Resp:                 &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, cmdtesting.NewInternalNamespacedType("", "", "foo", "non-default"))},
+	}
+	tf.Namespace = "non-default"
+	buf := bytes.NewBuffer([]byte{})
+	buferr := bytes.NewBuffer([]byte{})
+	cmd := NewCmdDescribe(f, buf, buferr)
+	cmd.Run(cmd, []string{"namespacedtype", "foo"})
 
 	if d.Name != "foo" || d.Namespace != "non-default" {
 		t.Errorf("unexpected describer: %#v", d)
@@ -52,11 +79,12 @@ func TestDescribeUnknownSchemaObject(t *testing.T) {
 
 func TestDescribeObject(t *testing.T) {
 	_, _, rc := testData()
-	f, tf, codec, ns := cmdtesting.NewAPIFactory()
+	f, tf, codec, _ := cmdtesting.NewAPIFactory()
 	d := &testDescriber{Output: "test output"}
 	tf.Describer = d
-	tf.Client = &fake.RESTClient{
-		NegotiatedSerializer: ns,
+	tf.UnstructuredClient = &fake.RESTClient{
+		APIRegistry:          api.Registry,
+		NegotiatedSerializer: unstructuredSerializer,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch p, m := req.URL.Path, req.Method; {
 			case p == "/namespaces/test/replicationcontrollers/redis-master" && m == "GET":
@@ -85,11 +113,12 @@ func TestDescribeObject(t *testing.T) {
 
 func TestDescribeListObjects(t *testing.T) {
 	pods, _, _ := testData()
-	f, tf, codec, ns := cmdtesting.NewAPIFactory()
+	f, tf, codec, _ := cmdtesting.NewAPIFactory()
 	d := &testDescriber{Output: "test output"}
 	tf.Describer = d
-	tf.Client = &fake.RESTClient{
-		NegotiatedSerializer: ns,
+	tf.UnstructuredClient = &fake.RESTClient{
+		APIRegistry:          api.Registry,
+		NegotiatedSerializer: unstructuredSerializer,
 		Resp:                 &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, pods)},
 	}
 
@@ -105,11 +134,12 @@ func TestDescribeListObjects(t *testing.T) {
 
 func TestDescribeObjectShowEvents(t *testing.T) {
 	pods, _, _ := testData()
-	f, tf, codec, ns := cmdtesting.NewAPIFactory()
+	f, tf, codec, _ := cmdtesting.NewAPIFactory()
 	d := &testDescriber{Output: "test output"}
 	tf.Describer = d
-	tf.Client = &fake.RESTClient{
-		NegotiatedSerializer: ns,
+	tf.UnstructuredClient = &fake.RESTClient{
+		APIRegistry:          api.Registry,
+		NegotiatedSerializer: unstructuredSerializer,
 		Resp:                 &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, pods)},
 	}
 
@@ -126,11 +156,12 @@ func TestDescribeObjectShowEvents(t *testing.T) {
 
 func TestDescribeObjectSkipEvents(t *testing.T) {
 	pods, _, _ := testData()
-	f, tf, codec, ns := cmdtesting.NewAPIFactory()
+	f, tf, codec, _ := cmdtesting.NewAPIFactory()
 	d := &testDescriber{Output: "test output"}
 	tf.Describer = d
-	tf.Client = &fake.RESTClient{
-		NegotiatedSerializer: ns,
+	tf.UnstructuredClient = &fake.RESTClient{
+		APIRegistry:          api.Registry,
+		NegotiatedSerializer: unstructuredSerializer,
 		Resp:                 &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, pods)},
 	}
 

@@ -19,20 +19,22 @@ package configmap
 import (
 	"time"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	pkgruntime "k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/watch"
+	clientv1 "k8s.io/client-go/pkg/api/v1"
+	"k8s.io/client-go/tools/cache"
+	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/util/flowcontrol"
 	federationapi "k8s.io/kubernetes/federation/apis/federation/v1beta1"
 	federationclientset "k8s.io/kubernetes/federation/client/clientset_generated/federation_clientset"
 	"k8s.io/kubernetes/federation/pkg/federation-controller/util"
 	"k8s.io/kubernetes/federation/pkg/federation-controller/util/eventsink"
 	"k8s.io/kubernetes/pkg/api"
 	apiv1 "k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/client/cache"
 	kubeclientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
-	"k8s.io/kubernetes/pkg/client/record"
 	"k8s.io/kubernetes/pkg/controller"
-	pkgruntime "k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/types"
-	"k8s.io/kubernetes/pkg/util/flowcontrol"
-	"k8s.io/kubernetes/pkg/watch"
 
 	"github.com/golang/glog"
 )
@@ -58,7 +60,7 @@ type ConfigMapController struct {
 	// Definitions of configmaps that should be federated.
 	configmapInformerStore cache.Store
 	// Informer controller for configmaps that should be federated.
-	configmapInformerController cache.ControllerInterface
+	configmapInformerController cache.Controller
 
 	// Client to federated api server.
 	federatedApiClient federationclientset.Interface
@@ -79,7 +81,7 @@ type ConfigMapController struct {
 func NewConfigMapController(client federationclientset.Interface) *ConfigMapController {
 	broadcaster := record.NewBroadcaster()
 	broadcaster.StartRecordingToSink(eventsink.NewFederatedEventSink(client))
-	recorder := broadcaster.NewRecorder(apiv1.EventSource{Component: "federated-configmaps-controller"})
+	recorder := broadcaster.NewRecorder(api.Scheme, clientv1.EventSource{Component: "federated-configmaps-controller"})
 
 	configmapcontroller := &ConfigMapController{
 		federatedApiClient:    client,
@@ -98,11 +100,11 @@ func NewConfigMapController(client federationclientset.Interface) *ConfigMapCont
 	// Start informer on federated API servers on configmaps that should be federated.
 	configmapcontroller.configmapInformerStore, configmapcontroller.configmapInformerController = cache.NewInformer(
 		&cache.ListWatch{
-			ListFunc: func(options apiv1.ListOptions) (pkgruntime.Object, error) {
-				return client.Core().ConfigMaps(apiv1.NamespaceAll).List(options)
+			ListFunc: func(options metav1.ListOptions) (pkgruntime.Object, error) {
+				return client.Core().ConfigMaps(metav1.NamespaceAll).List(options)
 			},
-			WatchFunc: func(options apiv1.ListOptions) (watch.Interface, error) {
-				return client.Core().ConfigMaps(apiv1.NamespaceAll).Watch(options)
+			WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
+				return client.Core().ConfigMaps(metav1.NamespaceAll).Watch(options)
 			},
 		},
 		&apiv1.ConfigMap{},
@@ -112,20 +114,20 @@ func NewConfigMapController(client federationclientset.Interface) *ConfigMapCont
 	// Federated informer on configmaps in members of federation.
 	configmapcontroller.configmapFederatedInformer = util.NewFederatedInformer(
 		client,
-		func(cluster *federationapi.Cluster, targetClient kubeclientset.Interface) (cache.Store, cache.ControllerInterface) {
+		func(cluster *federationapi.Cluster, targetClient kubeclientset.Interface) (cache.Store, cache.Controller) {
 			return cache.NewInformer(
 				&cache.ListWatch{
-					ListFunc: func(options apiv1.ListOptions) (pkgruntime.Object, error) {
-						return targetClient.Core().ConfigMaps(apiv1.NamespaceAll).List(options)
+					ListFunc: func(options metav1.ListOptions) (pkgruntime.Object, error) {
+						return targetClient.Core().ConfigMaps(metav1.NamespaceAll).List(options)
 					},
-					WatchFunc: func(options apiv1.ListOptions) (watch.Interface, error) {
-						return targetClient.Core().ConfigMaps(apiv1.NamespaceAll).Watch(options)
+					WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
+						return targetClient.Core().ConfigMaps(metav1.NamespaceAll).Watch(options)
 					},
 				},
 				&apiv1.ConfigMap{},
 				controller.NoResyncPeriodFunc(),
 				// Trigger reconciliation whenever something in federated cluster is changed. In most cases it
-				// would be just confirmation that some configmap opration succeeded.
+				// would be just confirmation that some configmap operation succeeded.
 				util.NewTriggerOnAllChanges(
 					func(obj pkgruntime.Object) {
 						configmapcontroller.deliverConfigMapObj(obj, configmapcontroller.configmapReviewDelay, false)
@@ -155,7 +157,7 @@ func NewConfigMapController(client federationclientset.Interface) *ConfigMapCont
 		},
 		func(client kubeclientset.Interface, obj pkgruntime.Object) error {
 			configmap := obj.(*apiv1.ConfigMap)
-			err := client.Core().ConfigMaps(configmap.Namespace).Delete(configmap.Name, &apiv1.DeleteOptions{})
+			err := client.Core().ConfigMaps(configmap.Namespace).Delete(configmap.Name, &metav1.DeleteOptions{})
 			return err
 		})
 	return configmapcontroller

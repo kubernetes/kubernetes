@@ -61,10 +61,14 @@ parameters:
     description: OpenStack Region Name
     default: false
 
-  os_tenant_id:
+  os_tenant_name:
     type: string
-    description: OpenStack Tenant ID
+    description: OpenStack Tenant Name
     default: false
+
+  os_user_domain_name:
+    type: string
+    description: OpenStack User Domain Name (Domain-level authorization scope for keystone v3)
 
   enable_proxy:
     type: string
@@ -216,7 +220,8 @@ resources:
             "$OS_USERNAME": {get_param: os_username}
             "$OS_PASSWORD": {get_param: os_password}
             "$OS_REGION_NAME": {get_param: os_region_name}
-            "$OS_TENANT_ID": {get_param: os_tenant_id}
+            "$OS_TENANT_NAME": {get_param: os_tenant_name}
+            "$OS_USER_DOMAIN_NAME": {get_param: os_user_domain_name}
             "$role": "kubernetes-pool"
             "$cluster_cidr": {get_param: cluster_cidr}
 
@@ -251,7 +256,11 @@ resources:
   server_name_post_fix:
     type: OS::Heat::RandomString
     properties:
+      character_classes: [{'class': 'lowercase', 'min': 1}]
       length: 8
+      character_classes:
+        - class: lowercase
+        - class: digits
 
   kube_minion:
     type: OS::Nova::Server

@@ -30,18 +30,20 @@ import (
 	"github.com/onsi/ginkgo/reporters"
 	"github.com/onsi/gomega"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	runtimeutils "k8s.io/apimachinery/pkg/util/runtime"
+	utilyaml "k8s.io/apimachinery/pkg/util/yaml"
 	federationapi "k8s.io/kubernetes/federation/apis/federation/v1beta1"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	gcecloud "k8s.io/kubernetes/pkg/cloudprovider/providers/gce"
-	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util/logs"
-	runtimeutils "k8s.io/kubernetes/pkg/util/runtime"
-	utilyaml "k8s.io/kubernetes/pkg/util/yaml"
 	commontest "k8s.io/kubernetes/test/e2e/common"
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/generated"
+	federationtest "k8s.io/kubernetes/test/e2e_federation"
 	testutils "k8s.io/kubernetes/test/utils"
 )
 
@@ -109,7 +111,7 @@ var _ = ginkgo.SynchronizedBeforeSuite(func() []byte {
 	// Delete any namespaces except default and kube-system. This ensures no
 	// lingering resources are left over from a previous test run.
 	if framework.TestContext.CleanStart {
-		deleted, err := framework.DeleteNamespaces(c, nil /* deleteFilter */, []string{api.NamespaceSystem, v1.NamespaceDefault, federationapi.FederationNamespaceSystem})
+		deleted, err := framework.DeleteNamespaces(c, nil /* deleteFilter */, []string{metav1.NamespaceSystem, metav1.NamespaceDefault, federationapi.FederationNamespaceSystem})
 		if err != nil {
 			framework.Failf("Error deleting orphaned namespaces: %v", err)
 		}
@@ -129,14 +131,14 @@ var _ = ginkgo.SynchronizedBeforeSuite(func() []byte {
 	// test pods from running, and tests that ensure all pods are running and
 	// ready will fail).
 	podStartupTimeout := framework.TestContext.SystemPodsStartupTimeout
-	if err := framework.WaitForPodsRunningReady(c, api.NamespaceSystem, int32(framework.TestContext.MinStartupPods), podStartupTimeout, framework.ImagePullerLabels, true); err != nil {
-		framework.DumpAllNamespaceInfo(c, api.NamespaceSystem)
-		framework.LogFailedContainers(c, api.NamespaceSystem, framework.Logf)
-		runKubernetesServiceTestContainer(c, v1.NamespaceDefault)
+	if err := framework.WaitForPodsRunningReady(c, metav1.NamespaceSystem, int32(framework.TestContext.MinStartupPods), podStartupTimeout, framework.ImagePullerLabels, true); err != nil {
+		framework.DumpAllNamespaceInfo(c, metav1.NamespaceSystem)
+		framework.LogFailedContainers(c, metav1.NamespaceSystem, framework.Logf)
+		runKubernetesServiceTestContainer(c, metav1.NamespaceDefault)
 		framework.Failf("Error waiting for all pods to be running and ready: %v", err)
 	}
 
-	if err := framework.WaitForPodsSuccess(c, api.NamespaceSystem, framework.ImagePullerLabels, imagePrePullingTimeout); err != nil {
+	if err := framework.WaitForPodsSuccess(c, metav1.NamespaceSystem, framework.ImagePullerLabels, imagePrePullingTimeout); err != nil {
 		// There is no guarantee that the image pulling will succeed in 3 minutes
 		// and we don't even run the image puller on all platforms (including GKE).
 		// We wait for it so we get an indication of failures in the logs, and to
@@ -147,11 +149,14 @@ var _ = ginkgo.SynchronizedBeforeSuite(func() []byte {
 	// Dump the output of the nethealth containers only once per run
 	if framework.TestContext.DumpLogsOnFailure {
 		framework.Logf("Dumping network health container logs from all nodes")
-		framework.LogContainersInPodsWithLabels(c, api.NamespaceSystem, framework.ImagePullerLabels, "nethealth", framework.Logf)
+		framework.LogContainersInPodsWithLabels(c, metav1.NamespaceSystem, framework.ImagePullerLabels, "nethealth", framework.Logf)
 	}
 
 	// Reference common test to make the import valid.
 	commontest.CurrentSuite = commontest.E2E
+
+	// Reference federation test to make the import valid.
+	federationtest.FederationSuite = commontest.FederationE2E
 
 	return nil
 

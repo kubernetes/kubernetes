@@ -19,7 +19,7 @@ PREFIX ?= gcr.io/google_containers
 all: push
 
 image:
-	docker build -t $(PREFIX)/dnsutils .
+	docker build --pull -t $(PREFIX)/dnsutils .
 
 push: image
 	gcloud docker -- push $(PREFIX)/dnsutils

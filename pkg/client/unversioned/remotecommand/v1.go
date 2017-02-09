@@ -23,8 +23,8 @@ import (
 	"net/http"
 
 	"github.com/golang/glog"
+	"k8s.io/apimachinery/pkg/util/httpstream"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/util/httpstream"
 )
 
 // streamProtocolV1 implements the first version of the streaming exec & attach

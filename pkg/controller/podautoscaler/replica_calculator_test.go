@@ -25,16 +25,15 @@ import (
 	"testing"
 	"time"
 
-	"k8s.io/kubernetes/pkg/api/resource"
+	"k8s.io/apimachinery/pkg/api/resource"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	restclient "k8s.io/client-go/rest"
+	core "k8s.io/client-go/testing"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/v1"
-	_ "k8s.io/kubernetes/pkg/apimachinery/registered"
-	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset/fake"
-	"k8s.io/kubernetes/pkg/client/restclient"
-	"k8s.io/kubernetes/pkg/client/testing/core"
 	"k8s.io/kubernetes/pkg/controller/podautoscaler/metrics"
-	"k8s.io/kubernetes/pkg/runtime"
 
 	heapster "k8s.io/heapster/metrics/api/v1/types"
 	metricsapi "k8s.io/heapster/metrics/apis/metrics/v1alpha1"
@@ -47,6 +46,8 @@ type resourceInfo struct {
 	name     v1.ResourceName
 	requests []resource.Quantity
 	levels   []int64
+	// only applies to pod names returned from "heapster"
+	podNames []string
 
 	targetUtilization   int32
 	expectedUtilization int32
@@ -99,7 +100,7 @@ func (tc *replicaCalcTestCase) prepareTestClient(t *testing.T) *fake.Clientset {
 						},
 					},
 				},
-				ObjectMeta: v1.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Name:      podName,
 					Namespace: testNamespace,
 					Labels: map[string]string{
@@ -134,9 +135,13 @@ func (tc *replicaCalcTestCase) prepareTestClient(t *testing.T) *fake.Clientset {
 		if tc.resource != nil {
 			metrics := metricsapi.PodMetricsList{}
 			for i, resValue := range tc.resource.levels {
+				podName := fmt.Sprintf("%s-%d", podNamePrefix, i)
+				if len(tc.resource.podNames) > i {
+					podName = tc.resource.podNames[i]
+				}
 				podMetric := metricsapi.PodMetrics{
 					ObjectMeta: v1.ObjectMeta{
-						Name:      fmt.Sprintf("%s-%d", podNamePrefix, i),
+						Name:      podName,
 						Namespace: testNamespace,
 					},
 					Timestamp: unversioned.Time{Time: tc.timestamp},
@@ -248,6 +253,22 @@ func (tc *replicaCalcTestCase) runTest(t *testing.T) {
 		assert.InDelta(t, tc.metric.expectedUtilization, 0.1, outUtilization, "utilization should be as expected")
 		assert.True(t, tc.timestamp.Equal(outTimestamp), "timestamp should be as expected")
 	}
+}
+
+func TestReplicaCalcDisjointResourcesMetrics(t *testing.T) {
+	tc := replicaCalcTestCase{
+		currentReplicas: 1,
+		expectedError:   fmt.Errorf("no metrics returned matched known pods"),
+		resource: &resourceInfo{
+			name:     v1.ResourceCPU,
+			requests: []resource.Quantity{resource.MustParse("1.0")},
+			levels:   []int64{100},
+			podNames: []string{"an-older-pod-name"},
+
+			targetUtilization: 100,
+		},
+	}
+	tc.runTest(t)
 }
 
 func TestReplicaCalcScaleUp(t *testing.T) {

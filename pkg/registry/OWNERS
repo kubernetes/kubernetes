@@ -1,4 +1,5 @@
 approvers:
+- deads2k
 - lavalamp
 - smarterclayton
 - wojtek-t
@@ -7,7 +8,6 @@ reviewers:
 - lavalamp
 - smarterclayton
 - wojtek-t
-- bgrant0607
 - deads2k
 - yujuhong
 - derekwaynecarr

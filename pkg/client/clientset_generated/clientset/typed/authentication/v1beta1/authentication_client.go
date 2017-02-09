@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors.
+Copyright 2017 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -18,21 +18,20 @@ package v1beta1
 
 import (
 	fmt "fmt"
+	schema "k8s.io/apimachinery/pkg/runtime/schema"
+	serializer "k8s.io/apimachinery/pkg/runtime/serializer"
+	rest "k8s.io/client-go/rest"
 	api "k8s.io/kubernetes/pkg/api"
-	registered "k8s.io/kubernetes/pkg/apimachinery/registered"
-	restclient "k8s.io/kubernetes/pkg/client/restclient"
-	schema "k8s.io/kubernetes/pkg/runtime/schema"
-	serializer "k8s.io/kubernetes/pkg/runtime/serializer"
 )
 
 type AuthenticationV1beta1Interface interface {
-	RESTClient() restclient.Interface
+	RESTClient() rest.Interface
 	TokenReviewsGetter
 }
 
-// AuthenticationV1beta1Client is used to interact with features provided by the k8s.io/kubernetes/pkg/apimachinery/registered.Group group.
+// AuthenticationV1beta1Client is used to interact with features provided by the authentication.k8s.io group.
 type AuthenticationV1beta1Client struct {
-	restClient restclient.Interface
+	restClient rest.Interface
 }
 
 func (c *AuthenticationV1beta1Client) TokenReviews() TokenReviewInterface {
@@ -40,12 +39,12 @@ func (c *AuthenticationV1beta1Client) TokenReviews() TokenReviewInterface {
 }
 
 // NewForConfig creates a new AuthenticationV1beta1Client for the given config.
-func NewForConfig(c *restclient.Config) (*AuthenticationV1beta1Client, error) {
+func NewForConfig(c *rest.Config) (*AuthenticationV1beta1Client, error) {
 	config := *c
 	if err := setConfigDefaults(&config); err != nil {
 		return nil, err
 	}
-	client, err := restclient.RESTClientFor(&config)
+	client, err := rest.RESTClientFor(&config)
 	if err != nil {
 		return nil, err
 	}
@@ -54,7 +53,7 @@ func NewForConfig(c *restclient.Config) (*AuthenticationV1beta1Client, error) {
 
 // NewForConfigOrDie creates a new AuthenticationV1beta1Client for the given config and
 // panics if there is an error in the config.
-func NewForConfigOrDie(c *restclient.Config) *AuthenticationV1beta1Client {
+func NewForConfigOrDie(c *rest.Config) *AuthenticationV1beta1Client {
 	client, err := NewForConfig(c)
 	if err != nil {
 		panic(err)
@@ -63,22 +62,22 @@ func NewForConfigOrDie(c *restclient.Config) *AuthenticationV1beta1Client {
 }
 
 // New creates a new AuthenticationV1beta1Client for the given RESTClient.
-func New(c restclient.Interface) *AuthenticationV1beta1Client {
+func New(c rest.Interface) *AuthenticationV1beta1Client {
 	return &AuthenticationV1beta1Client{c}
 }
 
-func setConfigDefaults(config *restclient.Config) error {
+func setConfigDefaults(config *rest.Config) error {
 	gv, err := schema.ParseGroupVersion("authentication.k8s.io/v1beta1")
 	if err != nil {
 		return err
 	}
 	// if authentication.k8s.io/v1beta1 is not enabled, return an error
-	if !registered.IsEnabledVersion(gv) {
+	if !api.Registry.IsEnabledVersion(gv) {
 		return fmt.Errorf("authentication.k8s.io/v1beta1 is not enabled")
 	}
 	config.APIPath = "/apis"
 	if config.UserAgent == "" {
-		config.UserAgent = restclient.DefaultKubernetesUserAgent()
+		config.UserAgent = rest.DefaultKubernetesUserAgent()
 	}
 	copyGroupVersion := gv
 	config.GroupVersion = &copyGroupVersion
@@ -90,7 +89,7 @@ func setConfigDefaults(config *restclient.Config) error {
 
 // RESTClient returns a RESTClient that is used to communicate
 // with API server by this client implementation.
-func (c *AuthenticationV1beta1Client) RESTClient() restclient.Interface {
+func (c *AuthenticationV1beta1Client) RESTClient() rest.Interface {
 	if c == nil {
 		return nil
 	}

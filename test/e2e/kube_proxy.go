@@ -24,6 +24,7 @@ import (
 	"strings"
 	"time"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/api/v1"
 
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -47,7 +48,7 @@ var _ = framework.KubeDescribe("Network", func() {
 
 	It("should set TCP CLOSE_WAIT timeout", func() {
 		nodes := framework.GetReadySchedulableNodesOrDie(fr.ClientSet)
-		ips := collectAddresses(nodes, v1.NodeInternalIP)
+		ips := framework.CollectAddresses(nodes, v1.NodeInternalIP)
 
 		if len(nodes.Items) < 2 {
 			framework.Skipf(
@@ -76,7 +77,7 @@ var _ = framework.KubeDescribe("Network", func() {
 		zero := int64(0)
 
 		clientPodSpec := &v1.Pod{
-			ObjectMeta: v1.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name:      "e2e-net-client",
 				Namespace: fr.Namespace.Name,
 				Labels:    map[string]string{"app": "e2e-net-client"},
@@ -98,7 +99,7 @@ var _ = framework.KubeDescribe("Network", func() {
 		}
 
 		serverPodSpec := &v1.Pod{
-			ObjectMeta: v1.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name:      "e2e-net-server",
 				Namespace: fr.Namespace.Name,
 				Labels:    map[string]string{"app": "e2e-net-server"},

@@ -23,12 +23,13 @@ import (
 	"path"
 	"testing"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
+	utiltesting "k8s.io/client-go/util/testing"
 	"k8s.io/kubernetes/pkg/api/v1"
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset/fake"
 	"k8s.io/kubernetes/pkg/fieldpath"
-	"k8s.io/kubernetes/pkg/types"
-	utiltesting "k8s.io/kubernetes/pkg/util/testing"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/empty_dir"
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
@@ -91,7 +92,7 @@ func TestLabels(t *testing.T) {
 		"key2": "value2"}
 
 	clientset := fake.NewSimpleClientset(&v1.Pod{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:      testName,
 			Namespace: testNamespace,
 			Labels:    labels,
@@ -117,7 +118,7 @@ func TestLabels(t *testing.T) {
 	if err != nil {
 		t.Errorf("Can't find the plugin by name")
 	}
-	pod := &v1.Pod{ObjectMeta: v1.ObjectMeta{UID: testPodUID, Labels: labels}}
+	pod := &v1.Pod{ObjectMeta: metav1.ObjectMeta{UID: testPodUID, Labels: labels}}
 	mounter, err := plugin.NewMounter(volume.NewSpecFromVolume(volumeSpec), pod, volume.VolumeOptions{})
 
 	if err != nil {
@@ -182,7 +183,7 @@ func TestAnnotations(t *testing.T) {
 	}
 
 	clientset := fake.NewSimpleClientset(&v1.Pod{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:        testName,
 			Namespace:   testNamespace,
 			Annotations: annotations,
@@ -197,7 +198,7 @@ func TestAnnotations(t *testing.T) {
 	if err != nil {
 		t.Errorf("Can't find the plugin by name")
 	}
-	pod := &v1.Pod{ObjectMeta: v1.ObjectMeta{UID: testPodUID, Annotations: annotations}}
+	pod := &v1.Pod{ObjectMeta: metav1.ObjectMeta{UID: testPodUID, Annotations: annotations}}
 	mounter, err := plugin.NewMounter(volume.NewSpecFromVolume(volumeSpec), pod, volume.VolumeOptions{})
 	if err != nil {
 		t.Errorf("Failed to make a new Mounter: %v", err)
@@ -247,7 +248,7 @@ func TestName(t *testing.T) {
 	}
 
 	clientset := fake.NewSimpleClientset(&v1.Pod{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:      testName,
 			Namespace: testNamespace,
 		},
@@ -261,7 +262,7 @@ func TestName(t *testing.T) {
 	if err != nil {
 		t.Errorf("Can't find the plugin by name")
 	}
-	pod := &v1.Pod{ObjectMeta: v1.ObjectMeta{UID: testPodUID, Name: testName}}
+	pod := &v1.Pod{ObjectMeta: metav1.ObjectMeta{UID: testPodUID, Name: testName}}
 	mounter, err := plugin.NewMounter(volume.NewSpecFromVolume(volumeSpec), pod, volume.VolumeOptions{})
 	if err != nil {
 		t.Errorf("Failed to make a new Mounter: %v", err)
@@ -312,7 +313,7 @@ func TestNamespace(t *testing.T) {
 	}
 
 	clientset := fake.NewSimpleClientset(&v1.Pod{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:      testName,
 			Namespace: testNamespace,
 		},
@@ -326,7 +327,7 @@ func TestNamespace(t *testing.T) {
 	if err != nil {
 		t.Errorf("Can't find the plugin by name")
 	}
-	pod := &v1.Pod{ObjectMeta: v1.ObjectMeta{UID: testPodUID, Namespace: testNamespace}}
+	pod := &v1.Pod{ObjectMeta: metav1.ObjectMeta{UID: testPodUID, Namespace: testNamespace}}
 	mounter, err := plugin.NewMounter(volume.NewSpecFromVolume(volumeSpec), pod, volume.VolumeOptions{})
 	if err != nil {
 		t.Errorf("Failed to make a new Mounter: %v", err)
@@ -368,7 +369,7 @@ func TestWriteTwiceNoUpdate(t *testing.T) {
 		"key2": "value2"}
 
 	clientset := fake.NewSimpleClientset(&v1.Pod{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:      testName,
 			Namespace: testNamespace,
 			Labels:    labels,
@@ -393,7 +394,7 @@ func TestWriteTwiceNoUpdate(t *testing.T) {
 	if err != nil {
 		t.Errorf("Can't find the plugin by name")
 	}
-	pod := &v1.Pod{ObjectMeta: v1.ObjectMeta{UID: testPodUID, Labels: labels}}
+	pod := &v1.Pod{ObjectMeta: metav1.ObjectMeta{UID: testPodUID, Labels: labels}}
 	mounter, err := plugin.NewMounter(volume.NewSpecFromVolume(volumeSpec), pod, volume.VolumeOptions{})
 
 	if err != nil {
@@ -456,7 +457,7 @@ func TestWriteTwiceWithUpdate(t *testing.T) {
 		"key2": "value2"}
 
 	clientset := fake.NewSimpleClientset(&v1.Pod{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:      testName,
 			Namespace: testNamespace,
 			Labels:    labels,
@@ -481,7 +482,7 @@ func TestWriteTwiceWithUpdate(t *testing.T) {
 	if err != nil {
 		t.Errorf("Can't find the plugin by name")
 	}
-	pod := &v1.Pod{ObjectMeta: v1.ObjectMeta{UID: testPodUID, Labels: labels}}
+	pod := &v1.Pod{ObjectMeta: metav1.ObjectMeta{UID: testPodUID, Labels: labels}}
 	mounter, err := plugin.NewMounter(volume.NewSpecFromVolume(volumeSpec), pod, volume.VolumeOptions{})
 
 	if err != nil {
@@ -563,7 +564,7 @@ func TestWriteWithUnixPath(t *testing.T) {
 		"a2": "value2"}
 
 	clientset := fake.NewSimpleClientset(&v1.Pod{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:      testName,
 			Namespace: testNamespace,
 			Labels:    labels,
@@ -591,7 +592,7 @@ func TestWriteWithUnixPath(t *testing.T) {
 	if err != nil {
 		t.Errorf("Can't find the plugin by name")
 	}
-	pod := &v1.Pod{ObjectMeta: v1.ObjectMeta{UID: testPodUID, Labels: labels, Annotations: annotations}}
+	pod := &v1.Pod{ObjectMeta: metav1.ObjectMeta{UID: testPodUID, Labels: labels, Annotations: annotations}}
 	mounter, err := plugin.NewMounter(volume.NewSpecFromVolume(volumeSpec), pod, volume.VolumeOptions{})
 
 	if err != nil {
@@ -641,7 +642,7 @@ func TestWriteWithUnixPathBadPath(t *testing.T) {
 	}
 
 	clientset := fake.NewSimpleClientset(&v1.Pod{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:      testName,
 			Namespace: testNamespace,
 			Labels:    labels,
@@ -675,7 +676,7 @@ func TestWriteWithUnixPathBadPath(t *testing.T) {
 		},
 	}
 
-	pod := &v1.Pod{ObjectMeta: v1.ObjectMeta{UID: testPodUID, Labels: labels}}
+	pod := &v1.Pod{ObjectMeta: metav1.ObjectMeta{UID: testPodUID, Labels: labels}}
 	mounter, err := plugin.NewMounter(volume.NewSpecFromVolume(volumeSpec), pod, volume.VolumeOptions{})
 	if err != nil {
 		t.Fatalf("Failed to make a new Mounter: %v", err)
@@ -722,7 +723,7 @@ func TestDefaultMode(t *testing.T) {
 	}
 
 	clientset := fake.NewSimpleClientset(&v1.Pod{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:      testName,
 			Namespace: testNamespace,
 		},
@@ -736,7 +737,7 @@ func TestDefaultMode(t *testing.T) {
 	if err != nil {
 		t.Errorf("Can't find the plugin by name")
 	}
-	pod := &v1.Pod{ObjectMeta: v1.ObjectMeta{UID: testPodUID, Name: testName}}
+	pod := &v1.Pod{ObjectMeta: metav1.ObjectMeta{UID: testPodUID, Name: testName}}
 	mounter, err := plugin.NewMounter(volume.NewSpecFromVolume(volumeSpec), pod, volume.VolumeOptions{})
 	if err != nil {
 		t.Errorf("Failed to make a new Mounter: %v", err)
@@ -792,7 +793,7 @@ func TestItemMode(t *testing.T) {
 	}
 
 	clientset := fake.NewSimpleClientset(&v1.Pod{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:      testName,
 			Namespace: testNamespace,
 		},
@@ -806,7 +807,7 @@ func TestItemMode(t *testing.T) {
 	if err != nil {
 		t.Errorf("Can't find the plugin by name")
 	}
-	pod := &v1.Pod{ObjectMeta: v1.ObjectMeta{UID: testPodUID, Name: testName}}
+	pod := &v1.Pod{ObjectMeta: metav1.ObjectMeta{UID: testPodUID, Name: testName}}
 	mounter, err := plugin.NewMounter(volume.NewSpecFromVolume(volumeSpec), pod, volume.VolumeOptions{})
 	if err != nil {
 		t.Errorf("Failed to make a new Mounter: %v", err)

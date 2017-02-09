@@ -24,24 +24,30 @@ import (
 	"reflect"
 
 	"github.com/golang/glog"
+	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/conversion"
+	pkgruntime "k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/apimachinery/pkg/watch"
+	clientv1 "k8s.io/client-go/pkg/api/v1"
+	cache "k8s.io/client-go/tools/cache"
+	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/util/workqueue"
 	v1beta1 "k8s.io/kubernetes/federation/apis/federation/v1beta1"
 	federationcache "k8s.io/kubernetes/federation/client/cache"
 	fedclientset "k8s.io/kubernetes/federation/client/clientset_generated/federation_clientset"
 	"k8s.io/kubernetes/federation/pkg/dnsprovider"
+	"k8s.io/kubernetes/federation/pkg/federation-controller/util"
+	fedutil "k8s.io/kubernetes/federation/pkg/federation-controller/util"
+	"k8s.io/kubernetes/federation/pkg/federation-controller/util/deletionhelper"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/errors"
 	v1 "k8s.io/kubernetes/pkg/api/v1"
-	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
-	cache "k8s.io/kubernetes/pkg/client/cache"
 	kubeclientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
-	"k8s.io/kubernetes/pkg/client/record"
+	"k8s.io/kubernetes/pkg/client/legacylisters"
 	"k8s.io/kubernetes/pkg/controller"
-	pkgruntime "k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/util/runtime"
-	"k8s.io/kubernetes/pkg/util/sets"
-	"k8s.io/kubernetes/pkg/util/wait"
-	"k8s.io/kubernetes/pkg/util/workqueue"
-	"k8s.io/kubernetes/pkg/watch"
 )
 
 const (
@@ -68,6 +74,10 @@ const (
 	KubeAPIBurst  = 30
 
 	maxNoOfClusters = 100
+
+	updateTimeout         = 30 * time.Second
+	allClustersKey        = "ALL_CLUSTERS"
+	clusterAvailableDelay = time.Second * 20
 )
 
 type cachedService struct {
@@ -111,13 +121,14 @@ type ServiceController struct {
 	serviceCache *serviceCache
 	clusterCache *clusterClientCache
 	// A store of services, populated by the serviceController
-	serviceStore cache.StoreToServiceLister
+	serviceStore listers.StoreToServiceLister
 	// Watches changes to all services
-	serviceController *cache.Controller
+	serviceController cache.Controller
+	federatedInformer fedutil.FederatedInformer
 	// A store of services, populated by the serviceController
 	clusterStore federationcache.StoreToClusterLister
 	// Watches changes to all services
-	clusterController *cache.Controller
+	clusterController cache.Controller
 	eventBroadcaster  record.EventBroadcaster
 	eventRecorder     record.EventRecorder
 	// services that need to be synced
@@ -133,6 +144,12 @@ type ServiceController struct {
 	serviceWorkerMap map[string]bool
 	// channel for worker to signal that it is going out of existence
 	serviceWorkerDoneChan chan string
+
+	// For triggering all services reconciliation. This is used when
+	// a new cluster becomes available.
+	clusterDeliverer *util.DelayingDeliverer
+
+	deletionHelper *deletionhelper.DeletionHelper
 }
 
 // New returns a new service controller to keep DNS provider service resources
@@ -143,7 +160,7 @@ func New(federationClient fedclientset.Interface, dns dnsprovider.Interface,
 	broadcaster := record.NewBroadcaster()
 	// federationClient event is not supported yet
 	// broadcaster.StartRecordingToSink(&unversioned_core.EventSinkImpl{Interface: kubeClient.Core().Events("")})
-	recorder := broadcaster.NewRecorder(v1.EventSource{Component: UserAgentName})
+	recorder := broadcaster.NewRecorder(api.Scheme, clientv1.EventSource{Component: UserAgentName})
 
 	s := &ServiceController{
 		dns:              dns,
@@ -162,13 +179,14 @@ func New(federationClient fedclientset.Interface, dns dnsprovider.Interface,
 		queue:            workqueue.New(),
 		knownClusterSet:  make(sets.String),
 	}
+	s.clusterDeliverer = util.NewDelayingDeliverer()
 	s.serviceStore.Indexer, s.serviceController = cache.NewIndexerInformer(
 		&cache.ListWatch{
-			ListFunc: func(options v1.ListOptions) (pkgruntime.Object, error) {
-				return s.federationClient.Core().Services(v1.NamespaceAll).List(options)
+			ListFunc: func(options metav1.ListOptions) (pkgruntime.Object, error) {
+				return s.federationClient.Core().Services(metav1.NamespaceAll).List(options)
 			},
-			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
-				return s.federationClient.Core().Services(v1.NamespaceAll).Watch(options)
+			WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
+				return s.federationClient.Core().Services(metav1.NamespaceAll).Watch(options)
 			},
 		},
 		&v1.Service{},
@@ -187,10 +205,10 @@ func New(federationClient fedclientset.Interface, dns dnsprovider.Interface,
 	)
 	s.clusterStore.Store, s.clusterController = cache.NewInformer(
 		&cache.ListWatch{
-			ListFunc: func(options v1.ListOptions) (pkgruntime.Object, error) {
+			ListFunc: func(options metav1.ListOptions) (pkgruntime.Object, error) {
 				return s.federationClient.Federation().Clusters().List(options)
 			},
-			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
+			WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
 				return s.federationClient.Federation().Clusters().Watch(options)
 			},
 		},
@@ -224,11 +242,119 @@ func New(federationClient fedclientset.Interface, dns dnsprovider.Interface,
 		},
 	)
 
+	clusterLifecycle := fedutil.ClusterLifecycleHandlerFuncs{
+		ClusterAvailable: func(cluster *v1beta1.Cluster) {
+			s.clusterDeliverer.DeliverAfter(allClustersKey, nil, clusterAvailableDelay)
+		},
+	}
+	fedInformerFactory := func(cluster *v1beta1.Cluster, targetClient kubeclientset.Interface) (cache.Store, cache.Controller) {
+		return cache.NewInformer(
+			&cache.ListWatch{
+				ListFunc: func(options metav1.ListOptions) (pkgruntime.Object, error) {
+					return targetClient.Core().Services(metav1.NamespaceAll).List(options)
+				},
+				WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
+					return targetClient.Core().Services(metav1.NamespaceAll).Watch(options)
+				},
+			},
+			&v1.Service{},
+			controller.NoResyncPeriodFunc(),
+			// Trigger reconciliation whenever something in federated cluster is changed. In most cases it
+			// would be just confirmation that some service operation succeeded.
+			util.NewTriggerOnAllChanges(
+				func(obj pkgruntime.Object) {
+					// TODO: Use this to enque services.
+				},
+			))
+	}
+
+	s.federatedInformer = fedutil.NewFederatedInformer(federationClient, fedInformerFactory, &clusterLifecycle)
+
+	federatedUpdater := fedutil.NewFederatedUpdater(s.federatedInformer,
+		func(client kubeclientset.Interface, obj pkgruntime.Object) error {
+			svc := obj.(*v1.Service)
+			_, err := client.Core().Services(svc.Namespace).Create(svc)
+			return err
+		},
+		func(client kubeclientset.Interface, obj pkgruntime.Object) error {
+			svc := obj.(*v1.Service)
+			_, err := client.Core().Services(svc.Namespace).Update(svc)
+			return err
+		},
+		func(client kubeclientset.Interface, obj pkgruntime.Object) error {
+			svc := obj.(*v1.Service)
+			err := client.Core().Services(svc.Namespace).Delete(svc.Name, &metav1.DeleteOptions{})
+			return err
+		})
+
+	s.deletionHelper = deletionhelper.NewDeletionHelper(
+		s.hasFinalizerFunc,
+		s.removeFinalizerFunc,
+		s.addFinalizerFunc,
+		// objNameFunc
+		func(obj pkgruntime.Object) string {
+			service := obj.(*v1.Service)
+			return service.Name
+		},
+		updateTimeout,
+		s.eventRecorder,
+		s.federatedInformer,
+		federatedUpdater,
+	)
+
 	s.endpointWorkerMap = make(map[string]bool)
 	s.serviceWorkerMap = make(map[string]bool)
 	s.endpointWorkerDoneChan = make(chan string, maxNoOfClusters)
 	s.serviceWorkerDoneChan = make(chan string, maxNoOfClusters)
 	return s
+}
+
+// Returns true if the given object has the given finalizer in its ObjectMeta.
+func (s *ServiceController) hasFinalizerFunc(obj pkgruntime.Object, finalizer string) bool {
+	service := obj.(*v1.Service)
+	for i := range service.ObjectMeta.Finalizers {
+		if string(service.ObjectMeta.Finalizers[i]) == finalizer {
+			return true
+		}
+	}
+	return false
+}
+
+// Removes the finalizer from the given objects ObjectMeta.
+// Assumes that the given object is a service.
+func (s *ServiceController) removeFinalizerFunc(obj pkgruntime.Object, finalizer string) (pkgruntime.Object, error) {
+	service := obj.(*v1.Service)
+	newFinalizers := []string{}
+	hasFinalizer := false
+	for i := range service.ObjectMeta.Finalizers {
+		if string(service.ObjectMeta.Finalizers[i]) != finalizer {
+			newFinalizers = append(newFinalizers, service.ObjectMeta.Finalizers[i])
+		} else {
+			hasFinalizer = true
+		}
+	}
+	if !hasFinalizer {
+		// Nothing to do.
+		return obj, nil
+	}
+	service.ObjectMeta.Finalizers = newFinalizers
+	service, err := s.federationClient.Core().Services(service.Namespace).Update(service)
+	if err != nil {
+		return nil, fmt.Errorf("failed to remove finalizer %s from service %s: %v", finalizer, service.Name, err)
+	}
+	return service, nil
+}
+
+// Adds the given finalizers to the given objects ObjectMeta.
+// Assumes that the given object is a service.
+func (s *ServiceController) addFinalizerFunc(obj pkgruntime.Object, finalizers []string) (pkgruntime.Object, error) {
+	service := obj.(*v1.Service)
+	service.ObjectMeta.Finalizers = append(service.ObjectMeta.Finalizers, finalizers...)
+	service, err := s.federationClient.Core().Services(service.Namespace).Update(service)
+	if err != nil {
+		return nil, fmt.Errorf("failed to add finalizers %v to service %s: %v", finalizers, service.Name, err)
+	}
+	return service, nil
 }
 
 // obj could be an *api.Service, or a DeletionFinalStateUnknown marker item.
@@ -257,6 +383,10 @@ func (s *ServiceController) Run(workers int, stopCh <-chan struct{}) error {
 		return err
 	}
 	defer runtime.HandleCrash()
+	s.federatedInformer.Start()
+	s.clusterDeliverer.StartWithHandler(func(_ *util.DelayingDelivererItem) {
+		// TODO: Use this new clusterDeliverer to reconcile services in new clusters.
+	})
 	go s.serviceController.Run(stopCh)
 	go s.clusterController.Run(stopCh)
 	for i := 0; i < workers; i++ {
@@ -268,6 +398,7 @@ func (s *ServiceController) Run(workers int, stopCh <-chan struct{}) error {
 	<-stopCh
 	glog.Infof("Shutting down Federation Service Controller")
 	s.queue.ShutDown()
+	s.federatedInformer.Stop()
 	return nil
 }
 
@@ -290,7 +421,7 @@ func (s *ServiceController) init() error {
 	}
 	zones, ok := s.dns.Zones()
 	if !ok {
-		return fmt.Errorf("the dns provider does not support zone enumeration, which is required for creating dns records.")
+		return fmt.Errorf("the dns provider does not support zone enumeration, which is required for creating dns records")
 	}
 	s.dnsZones = zones
 	matchingZones, err := getDnsZones(s.zoneName, s.zoneID, s.dnsZones)
@@ -361,20 +492,16 @@ func (s *ServiceController) processServiceForCluster(cachedService *cachedServic
 // should be retried.
 func (s *ServiceController) updateFederationService(key string, cachedService *cachedService) (error, bool) {
 	// Clone federation service, and create them in underlying k8s cluster
-	clone, err := api.Scheme.DeepCopy(cachedService.lastState)
-	if err != nil {
-		return err, !retryable
-	}
-	service, ok := clone.(*v1.Service)
-	if !ok {
-		return fmt.Errorf("Unexpected service cast error : %v\n", service), !retryable
+	desiredService := &v1.Service{
+		ObjectMeta: util.DeepCopyRelevantObjectMeta(cachedService.lastState.ObjectMeta),
+		Spec:       *(util.DeepCopyApiTypeOrPanic(&cachedService.lastState.Spec).(*v1.ServiceSpec)),
 	}
 
 	// handle available clusters one by one
 	var hasErr bool
 	for clusterName, cache := range s.clusterCache.clientMap {
 		go func(cache *clusterCache, clusterName string) {
-			err = s.processServiceForCluster(cachedService, clusterName, service, cache.clientset)
+			err := s.processServiceForCluster(cachedService, clusterName, desiredService, cache.clientset)
 			if err != nil {
 				hasErr = true
 			}
@@ -382,7 +509,7 @@ func (s *ServiceController) updateFederationService(key string, cachedService *c
 	}
 	if hasErr {
 		// detail error has been dumped inside the loop
-		return fmt.Errorf("Service %s/%s was not successfully updated to all clusters", service.Namespace, service.Name), retryable
+		return fmt.Errorf("Service %s/%s was not successfully updated to all clusters", desiredService.Namespace, desiredService.Name), retryable
 	}
 	return nil, !retryable
 }
@@ -812,17 +939,24 @@ func (s *ServiceController) syncService(key string) error {
 		glog.V(4).Infof("Finished syncing service %q (%v)", key, time.Now().Sub(startTime))
 	}()
 	// obj holds the latest service info from apiserver
-	obj, exists, err := s.serviceStore.Indexer.GetByKey(key)
+	objFromStore, exists, err := s.serviceStore.Indexer.GetByKey(key)
 	if err != nil {
 		glog.Errorf("Unable to retrieve service %v from store: %v", key, err)
 		s.queue.Add(key)
 		return err
 	}
-
 	if !exists {
 		// service absence in store means watcher caught the deletion, ensure LB info is cleaned
 		glog.Infof("Service has been deleted %v", key)
 		err, retryDelay = s.processServiceDeletion(key)
+	}
+	// Create a copy before modifying the obj to prevent race condition with
+	// other readers of obj from store.
+	obj, err := conversion.NewCloner().DeepCopy(objFromStore)
+	if err != nil {
+		glog.Errorf("Error in deep copying service %v retrieved from store: %v", key, err)
+		s.queue.Add(key)
+		return err
 	}
 
 	if exists {
@@ -857,6 +991,29 @@ func (s *ServiceController) processServiceUpdate(cachedService *cachedService, s
 	cachedService.rwlock.Lock()
 	defer cachedService.rwlock.Unlock()
 
+	if service.DeletionTimestamp != nil {
+		if err := s.delete(service); err != nil {
+			glog.Errorf("Failed to delete %s: %v", service, err)
+			s.eventRecorder.Eventf(service, api.EventTypeNormal, "DeleteFailed",
+				"Service delete failed: %v", err)
+			return err, cachedService.nextRetryDelay()
+		}
+		return nil, doNotRetry
+	}
+
+	glog.V(3).Infof("Ensuring delete object from underlying clusters finalizer for service: %s",
+		service.Name)
+	// Add the required finalizers before creating a service in underlying clusters.
+	updatedServiceObj, err := s.deletionHelper.EnsureFinalizers(service)
+	if err != nil {
+		glog.Errorf("Failed to ensure delete object from underlying clusters finalizer in service %s: %v",
+			service.Name, err)
+		return err, cachedService.nextRetryDelay()
+	}
+	service = updatedServiceObj.(*v1.Service)
+
+	glog.V(3).Infof("Syncing service %s in underlying clusters", service.Name)
+
 	// Update the cached service (used above for populating synthetic deletes)
 	// alway trust service, which is retrieve from serviceStore, which keeps the latest service info getting from apiserver
 	// if the same service is changed before this go routine finished, there will be another queue entry to handle that.
@@ -883,6 +1040,26 @@ func (s *ServiceController) processServiceUpdate(cachedService *cachedService, s
 	glog.V(4).Infof("Successfully proceeded services %s", key)
 	cachedService.resetRetryDelay()
 	return nil, doNotRetry
+}
+
+// delete deletes the given service or returns error if the deletion was not complete.
+func (s *ServiceController) delete(service *v1.Service) error {
+	glog.V(3).Infof("Handling deletion of service: %v", *service)
+	_, err := s.deletionHelper.HandleObjectInUnderlyingClusters(service)
+	if err != nil {
+		return err
+	}
+
+	err = s.federationClient.Core().Services(service.Namespace).Delete(service.Name, nil)
+	if err != nil {
+		// Its all good if the error is not found error. That means it is deleted already and we do not have to do anything.
+		// This is expected when we are processing an update as a result of service finalizer deletion.
+		// The process that deleted the last finalizer is also going to delete the service and we do not have to do anything.
+		if !errors.IsNotFound(err) {
+			return fmt.Errorf("failed to delete service: %v", err)
+		}
+	}
+	return nil
 }
 
 // processServiceDeletion returns an error if processing the service deletion failed, along with a time.Duration

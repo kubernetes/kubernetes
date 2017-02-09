@@ -19,20 +19,20 @@ package generic
 import (
 	"fmt"
 
-	"k8s.io/kubernetes/pkg/admission"
+	"k8s.io/apimachinery/pkg/api/resource"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/resource"
-	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/controller/informers"
-	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/quota"
-	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/runtime/schema"
 )
 
 // ListResourceUsingInformerFunc returns a listing function based on the shared informer factory for the specified resource.
 func ListResourceUsingInformerFunc(f informers.SharedInformerFactory, groupResource schema.GroupResource) ListFuncByNamespace {
-	return func(namespace string, options v1.ListOptions) ([]runtime.Object, error) {
+	return func(namespace string, options metav1.ListOptions) ([]runtime.Object, error) {
 		labelSelector, err := labels.Parse(options.LabelSelector)
 		if err != nil {
 			return nil, err
@@ -46,7 +46,7 @@ func ListResourceUsingInformerFunc(f informers.SharedInformerFactory, groupResou
 }
 
 // ListFuncByNamespace knows how to list resources in a namespace
-type ListFuncByNamespace func(namespace string, options v1.ListOptions) ([]runtime.Object, error)
+type ListFuncByNamespace func(namespace string, options metav1.ListOptions) ([]runtime.Object, error)
 
 // MatchesScopeFunc knows how to evaluate if an object matches a scope
 type MatchesScopeFunc func(scope api.ResourceQuotaScope, object runtime.Object) (bool, error)
@@ -91,7 +91,7 @@ func CalculateUsageStats(options quota.UsageStatsOptions,
 	for _, resourceName := range options.Resources {
 		result.Used[resourceName] = resource.Quantity{Format: resource.DecimalSI}
 	}
-	items, err := listFunc(options.Namespace, v1.ListOptions{
+	items, err := listFunc(options.Namespace, metav1.ListOptions{
 		LabelSelector: labels.Everything().String(),
 	})
 	if err != nil {

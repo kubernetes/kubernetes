@@ -25,6 +25,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
+	"k8s.io/kubernetes/pkg/util/i18n"
 )
 
 var (
@@ -44,7 +45,7 @@ func NewCmdCreateQuota(f cmdutil.Factory, cmdOut io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "quota NAME [--hard=key1=value1,key2=value2] [--scopes=Scope1,Scope2] [--dry-run=bool]",
 		Aliases: []string{"resourcequota"},
-		Short:   "Create a quota with the specified name.",
+		Short:   i18n.T("Create a quota with the specified name."),
 		Long:    quotaLong,
 		Example: quotaExample,
 		Run: func(cmd *cobra.Command, args []string) {

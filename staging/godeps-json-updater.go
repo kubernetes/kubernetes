@@ -43,12 +43,13 @@ type Godeps struct {
 	Deps         []Dependency
 }
 
-// rewrites the Godeps.ImportPath, removes the Deps whose ImportPath contains "k8s.io/kubernetes"
+// rewrites the Godeps.ImportPath, removes the Deps whose ImportPath contains "k8s.io/kubernetes" or "k8s.io/apimachinery".
+// entries for k8s.io/apimahinery will be written by the publishing robot before publishing to the repository.
 func main() {
 	flag.Parse()
 	var g Godeps
 	if len(*godepsFile) == 0 {
-		log.Fatalf("absolute ath to Godeps.json is required")
+		log.Fatalf("absolute path to Godeps.json is required")
 	}
 	if len(*clientRepoImportPath) == 0 {
 		log.Fatalf("import path to a version of client-go is required")
@@ -67,7 +68,13 @@ func main() {
 	// removes the Deps whose ImportPath contains "k8s.io/kubernetes"
 	i := 0
 	for _, dep := range g.Deps {
+		if strings.Contains(dep.ImportPath, "k8s.io/apimachinery") {
+			continue
+		}
 		if strings.Contains(dep.ImportPath, "k8s.io/kubernetes") {
+			continue
+		}
+		if strings.Contains(dep.ImportPath, "k8s.io/client-go") {
 			continue
 		}
 		g.Deps[i] = dep

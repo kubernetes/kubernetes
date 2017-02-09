@@ -24,7 +24,23 @@ go_test(
         "bitmap_test.go",
         "utils_test.go",
     ],
-    library = "go_default_library",
+    library = ":go_default_library",
     tags = ["automanaged"],
-    deps = [],
+    deps = ["//vendor:k8s.io/apimachinery/pkg/util/sets"],
+)
+
+filegroup(
+    name = "package-srcs",
+    srcs = glob(["**"]),
+    tags = ["automanaged"],
+    visibility = ["//visibility:private"],
+)
+
+filegroup(
+    name = "all-srcs",
+    srcs = [
+        ":package-srcs",
+        "//pkg/registry/core/service/allocator/storage:all-srcs",
+    ],
+    tags = ["automanaged"],
 )

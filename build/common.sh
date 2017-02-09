@@ -19,6 +19,9 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
+USER_ID=$(id -u)
+GROUP_ID=$(id -g)
+
 DOCKER_OPTS=${DOCKER_OPTS:-""}
 DOCKER=(docker ${DOCKER_OPTS})
 DOCKER_HOST=${DOCKER_HOST:-""}
@@ -29,15 +32,6 @@ readonly DOCKER_MACHINE_DRIVER=${DOCKER_MACHINE_DRIVER:-"virtualbox --virtualbox
 KUBE_ROOT=$(cd $(dirname "${BASH_SOURCE}")/.. && pwd -P)
 
 source "${KUBE_ROOT}/hack/lib/init.sh"
-
-# Set KUBE_BUILD_PPC64LE to y to build for ppc64le in addition to other
-# platforms.
-# TODO(IBM): remove KUBE_BUILD_PPC64LE and reenable ppc64le compilation by
-# default when
-# https://github.com/kubernetes/kubernetes/issues/30384 and
-# https://github.com/kubernetes/kubernetes/issues/25886 are fixed.
-# The majority of the logic is in hack/lib/golang.sh.
-readonly KUBE_BUILD_PPC64LE="${KUBE_BUILD_PPC64LE:-n}"
 
 # Constants
 readonly KUBE_BUILD_IMAGE_REPO=kube-build
@@ -91,46 +85,47 @@ readonly KUBE_CONTAINER_RSYNC_PORT=8730
 #
 # $1 - server architecture
 kube::build::get_docker_wrapped_binaries() {
+  debian_iptables_version=v6
   case $1 in
     "amd64")
         local targets=(
           kube-apiserver,busybox
           kube-controller-manager,busybox
           kube-scheduler,busybox
-          kubernetes-discovery,busybox
-          kube-proxy,gcr.io/google_containers/debian-iptables-amd64:v4
+          kube-aggregator,busybox
+          kube-proxy,gcr.io/google_containers/debian-iptables-amd64:${debian_iptables_version}
         );;
     "arm")
         local targets=(
           kube-apiserver,armel/busybox
           kube-controller-manager,armel/busybox
           kube-scheduler,armel/busybox
-          kubernetes-discovery,armel/busybox
-          kube-proxy,gcr.io/google_containers/debian-iptables-arm:v4
+          kube-aggregator,armel/busybox
+          kube-proxy,gcr.io/google_containers/debian-iptables-arm:${debian_iptables_version}
         );;
     "arm64")
         local targets=(
           kube-apiserver,aarch64/busybox
           kube-controller-manager,aarch64/busybox
           kube-scheduler,aarch64/busybox
-          kubernetes-discovery,aarch64/busybox
-          kube-proxy,gcr.io/google_containers/debian-iptables-arm64:v4
+          kube-aggregator,aarch64/busybox
+          kube-proxy,gcr.io/google_containers/debian-iptables-arm64:${debian_iptables_version}
         );;
     "ppc64le")
         local targets=(
           kube-apiserver,ppc64le/busybox
           kube-controller-manager,ppc64le/busybox
           kube-scheduler,ppc64le/busybox
-          kubernetes-discovery,ppc64le/busybox
-          kube-proxy,gcr.io/google_containers/debian-iptables-ppc64le:v4
+          kube-aggregator,ppc64le/busybox
+          kube-proxy,gcr.io/google_containers/debian-iptables-ppc64le:${debian_iptables_version}
         );;
     "s390x")
         local targets=(
           kube-apiserver,s390x/busybox
           kube-controller-manager,s390x/busybox
           kube-scheduler,s390x/busybox
-          kubernetes-discovery,s390x/busybox
-          kube-proxy,gcr.io/google_containers/debian-iptables-s390x:v4
+          kube-aggregator,s390x/busybox
+          kube-proxy,gcr.io/google_containers/debian-iptables-s390x:${debian_iptables_version}
         );;		
   esac
 
@@ -407,6 +402,8 @@ function kube::build::clean() {
 # Set up the context directory for the kube-build image and build it.
 function kube::build::build_image() {
   mkdir -p "${LOCAL_OUTPUT_BUILD_CONTEXT}"
+  # Make sure the context directory owned by the right user for syncing sources to container.
+  chown -R ${USER_ID}:${GROUP_ID} "${LOCAL_OUTPUT_BUILD_CONTEXT}"
 
   cp /etc/localtime "${LOCAL_OUTPUT_BUILD_CONTEXT}/"
 
@@ -494,7 +491,7 @@ function kube::build::ensure_data_container() {
       --name "${KUBE_DATA_CONTAINER_NAME}"
       --hostname "${HOSTNAME}"
       "${KUBE_BUILD_IMAGE}"
-      chown -R $(id -u).$(id -g)
+      chown -R ${USER_ID}:${GROUP_ID}
         "${REMOTE_ROOT}"
         /usr/local/go/pkg/
     )
@@ -553,7 +550,6 @@ function kube::build::run_build_command_ex() {
   docker_run_opts+=(
     --env "KUBE_FASTBUILD=${KUBE_FASTBUILD:-false}"
     --env "KUBE_BUILDER_OS=${OSTYPE:-notdetected}"
-    --env "KUBE_BUILD_PPC64LE=${KUBE_BUILD_PPC64LE}"  # TODO(IBM): remove
     --env "KUBE_VERBOSE=${KUBE_VERBOSE}"
   )
 

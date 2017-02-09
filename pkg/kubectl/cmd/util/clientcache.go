@@ -19,14 +19,15 @@ package util
 import (
 	"sync"
 
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/client-go/discovery"
+	restclient "k8s.io/client-go/rest"
+	"k8s.io/client-go/tools/clientcmd"
 	fedclientset "k8s.io/kubernetes/federation/client/clientset_generated/federation_internalclientset"
-	"k8s.io/kubernetes/pkg/apimachinery/registered"
+	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
-	"k8s.io/kubernetes/pkg/client/restclient"
-	"k8s.io/kubernetes/pkg/client/typed/discovery"
 	oldclient "k8s.io/kubernetes/pkg/client/unversioned"
-	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
-	"k8s.io/kubernetes/pkg/runtime/schema"
+	"k8s.io/kubernetes/pkg/version"
 )
 
 func NewClientCache(loader clientcmd.ClientConfig, discoveryClientFactory DiscoveryClientFactory) *ClientCache {
@@ -76,7 +77,7 @@ func (c *ClientCache) getDefaultConfig() (restclient.Config, discovery.Discovery
 		return restclient.Config{}, nil, err
 	}
 	if c.matchVersion {
-		if err := discovery.MatchesServerVersion(discoveryClient); err != nil {
+		if err := discovery.MatchesServerVersion(version.Get(), discoveryClient); err != nil {
 			return restclient.Config{}, nil, err
 		}
 	}
@@ -107,7 +108,7 @@ func (c *ClientCache) ClientConfigForVersion(requiredVersion *schema.GroupVersio
 		}
 	}
 
-	negotiatedVersion, err := discovery.NegotiateVersion(discoveryClient, requiredVersion, registered.EnabledVersions())
+	negotiatedVersion, err := discovery.NegotiateVersion(discoveryClient, requiredVersion, api.Registry.EnabledVersions())
 	if err != nil {
 		return nil, err
 	}

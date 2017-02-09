@@ -23,9 +23,17 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
-	clientcmdapi "k8s.io/kubernetes/pkg/client/unversioned/clientcmd/api"
+	"k8s.io/client-go/tools/clientcmd"
+	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
+	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
+	"k8s.io/kubernetes/pkg/util/i18n"
+)
+
+var (
+	use_context_example = templates.Examples(`
+		# Use the context for the minikube cluster
+		kubectl config use-context minikube`)
 )
 
 type useContextOptions struct {
@@ -37,9 +45,10 @@ func NewCmdConfigUseContext(out io.Writer, configAccess clientcmd.ConfigAccess) 
 	options := &useContextOptions{configAccess: configAccess}
 
 	cmd := &cobra.Command{
-		Use:   "use-context CONTEXT_NAME",
-		Short: "Sets the current-context in a kubeconfig file",
-		Long:  `Sets the current-context in a kubeconfig file`,
+		Use:     "use-context CONTEXT_NAME",
+		Short:   i18n.T("Sets the current-context in a kubeconfig file"),
+		Long:    `Sets the current-context in a kubeconfig file`,
+		Example: use_context_example,
 		Run: func(cmd *cobra.Command, args []string) {
 			if !options.complete(cmd) {
 				return

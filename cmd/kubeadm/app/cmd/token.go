@@ -27,12 +27,13 @@ import (
 	"github.com/renstrom/dedent"
 	"github.com/spf13/cobra"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/fields"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubemaster "k8s.io/kubernetes/cmd/kubeadm/app/master"
+	"k8s.io/kubernetes/cmd/kubeadm/app/phases/kubeconfig"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	"k8s.io/kubernetes/pkg/api"
-	v1 "k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/kubectl"
 )
 
@@ -108,7 +109,7 @@ func NewCmdTokenGenerate(out io.Writer) *cobra.Command {
 			the "init" and "join" commands.
 
 			You don't have to use this command in order to generate a token, you can do so
-			yourself as long as it's in the format "<6 characters>.<16 characters>". This
+			yourself as long as it's in the format "<6 characters>:<16 characters>". This
 			command is provided for convenience to generate tokens in that format.
 
 			You can also use "kubeadm init" without specifying a token, and it will
@@ -123,48 +124,40 @@ func NewCmdTokenGenerate(out io.Writer) *cobra.Command {
 
 // RunCreateToken generates a new bootstrap token and stores it as a secret on the server.
 func RunCreateToken(out io.Writer, cmd *cobra.Command, tokenDuration time.Duration, token string) error {
-	client, err := kubemaster.CreateClientFromFile(path.Join(kubeadmapi.GlobalEnvParams.KubernetesDir, "admin.conf"))
+	client, err := kubemaster.CreateClientFromFile(path.Join(kubeadmapi.GlobalEnvParams.KubernetesDir, kubeconfig.AdminKubeConfigFileName))
 	if err != nil {
 		return err
 	}
 
-	d := &kubeadmapi.TokenDiscovery{}
-	if token != "" {
-		parsedID, parsedSecret, err := kubeadmutil.ParseToken(token)
-		if err != nil {
-			return err
-		}
-		d.ID = parsedID
-		d.Secret = parsedSecret
-	}
-	err = kubeadmutil.GenerateTokenIfNeeded(d)
+	parsedID, parsedSecret, err := kubeadmutil.ParseToken(token)
 	if err != nil {
 		return err
 	}
+	td := &kubeadmapi.TokenDiscovery{ID: parsedID, Secret: parsedSecret}
 
-	err = kubeadmutil.UpdateOrCreateToken(client, d, tokenDuration)
+	err = kubeadmutil.UpdateOrCreateToken(client, td, tokenDuration)
 	if err != nil {
 		return err
 	}
-	fmt.Fprintln(out, kubeadmutil.BearerToken(d))
+	fmt.Fprintln(out, kubeadmutil.BearerToken(td))
 
 	return nil
 }
 
 func RunGenerateToken(out io.Writer) error {
-	d := &kubeadmapi.TokenDiscovery{}
-	err := kubeadmutil.GenerateToken(d)
+	td := &kubeadmapi.TokenDiscovery{}
+	err := kubeadmutil.GenerateToken(td)
 	if err != nil {
 		return err
 	}
 
-	fmt.Fprintln(out, kubeadmutil.BearerToken(d))
+	fmt.Fprintln(out, kubeadmutil.BearerToken(td))
 	return nil
 }
 
 // RunListTokens lists details on all existing bootstrap tokens on the server.
 func RunListTokens(out io.Writer, errW io.Writer, cmd *cobra.Command) error {
-	client, err := kubemaster.CreateClientFromFile(path.Join(kubeadmapi.GlobalEnvParams.KubernetesDir, "admin.conf"))
+	client, err := kubemaster.CreateClientFromFile(path.Join(kubeadmapi.GlobalEnvParams.KubernetesDir, kubeconfig.AdminKubeConfigFileName))
 	if err != nil {
 		return err
 	}
@@ -174,11 +167,11 @@ func RunListTokens(out io.Writer, errW io.Writer, cmd *cobra.Command) error {
 			api.SecretTypeField: string(api.SecretTypeBootstrapToken),
 		},
 	)
-	listOptions := v1.ListOptions{
+	listOptions := metav1.ListOptions{
 		FieldSelector: tokenSelector.String(),
 	}
 
-	results, err := client.Secrets(api.NamespaceSystem).List(listOptions)
+	results, err := client.Secrets(metav1.NamespaceSystem).List(listOptions)
 	if err != nil {
 		return fmt.Errorf("failed to list bootstrap tokens [%v]", err)
 	}
@@ -219,13 +212,17 @@ func RunListTokens(out io.Writer, errW io.Writer, cmd *cobra.Command) error {
 
 // RunDeleteToken removes a bootstrap token from the server.
 func RunDeleteToken(out io.Writer, cmd *cobra.Command, tokenId string) error {
-	client, err := kubemaster.CreateClientFromFile(path.Join(kubeadmapi.GlobalEnvParams.KubernetesDir, "admin.conf"))
+	if err := kubeadmutil.ParseTokenID(tokenId); err != nil {
+		return err
+	}
+
+	client, err := kubemaster.CreateClientFromFile(path.Join(kubeadmapi.GlobalEnvParams.KubernetesDir, kubeconfig.AdminKubeConfigFileName))
 	if err != nil {
 		return err
 	}
 
 	tokenSecretName := fmt.Sprintf("%s%s", kubeadmutil.BootstrapTokenSecretPrefix, tokenId)
-	if err := client.Secrets(api.NamespaceSystem).Delete(tokenSecretName, nil); err != nil {
+	if err := client.Secrets(metav1.NamespaceSystem).Delete(tokenSecretName, nil); err != nil {
 		return fmt.Errorf("failed to delete bootstrap token [%v]", err)
 	}
 	fmt.Fprintf(out, "[token] bootstrap token deleted: %s\n", tokenId)

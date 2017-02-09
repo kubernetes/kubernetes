@@ -18,7 +18,6 @@ package util
 
 import (
 	"bytes"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -32,22 +31,23 @@ import (
 	"github.com/golang/glog"
 	"github.com/spf13/cobra"
 
+	kerrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
+	utilerrors "k8s.io/apimachinery/pkg/util/errors"
+	"k8s.io/apimachinery/pkg/util/json"
+	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/util/strategicpatch"
+	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/kubernetes/pkg/api"
-	kerrors "k8s.io/kubernetes/pkg/api/errors"
-	"k8s.io/kubernetes/pkg/api/meta"
-	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	"k8s.io/kubernetes/pkg/apis/extensions"
-	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
-	"k8s.io/kubernetes/pkg/apis/meta/v1/unstructured"
-	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
 	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
-	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/runtime/schema"
-	utilerrors "k8s.io/kubernetes/pkg/util/errors"
 	utilexec "k8s.io/kubernetes/pkg/util/exec"
-	"k8s.io/kubernetes/pkg/util/sets"
-	"k8s.io/kubernetes/pkg/util/strategicpatch"
 )
 
 const (
@@ -301,10 +301,7 @@ func UsageError(cmd *cobra.Command, format string, args ...interface{}) error {
 }
 
 func IsFilenameEmpty(filenames []string) bool {
-	if len(filenames) == 0 {
-		return true
-	}
-	return false
+	return len(filenames) == 0
 }
 
 // Whether this cmd need watching objects.
@@ -349,7 +346,7 @@ func GetFlagStringArray(cmd *cobra.Command, flag string) []string {
 // GetWideFlag is used to determine if "-o wide" is used
 func GetWideFlag(cmd *cobra.Command) bool {
 	f := cmd.Flags().Lookup("output")
-	if f.Value.String() == "wide" {
+	if f != nil && f.Value != nil && f.Value.String() == "wide" {
 		return true
 	}
 	return false
@@ -452,10 +449,11 @@ func Merge(codec runtime.Codec, dst runtime.Object, fragment, kind string) (runt
 // (usually for temporary use).
 func DumpReaderToFile(reader io.Reader, filename string) error {
 	f, err := os.OpenFile(filename, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0600)
-	defer f.Close()
 	if err != nil {
 		return err
 	}
+	defer f.Close()
+
 	buffer := make([]byte, 1024)
 	for {
 		count, err := reader.Read(buffer)
@@ -521,27 +519,35 @@ func RecordChangeCause(obj runtime.Object, changeCause string) error {
 	return nil
 }
 
-// ChangeResourcePatch creates a strategic merge patch between the origin input resource info
+// ChangeResourcePatch creates a patch between the origin input resource info
 // and the annotated with change-cause input resource info.
-func ChangeResourcePatch(info *resource.Info, changeCause string) ([]byte, error) {
+func ChangeResourcePatch(info *resource.Info, changeCause string) ([]byte, types.PatchType, error) {
 	// Get a versioned object
 	obj, err := info.Mapping.ConvertToVersion(info.Object, info.Mapping.GroupVersionKind.GroupVersion())
 	if err != nil {
-		return nil, err
+		return nil, types.StrategicMergePatchType, err
 	}
 
 	oldData, err := json.Marshal(obj)
 	if err != nil {
-		return nil, err
+		return nil, types.StrategicMergePatchType, err
 	}
 	if err := RecordChangeCause(obj, changeCause); err != nil {
-		return nil, err
+		return nil, types.StrategicMergePatchType, err
 	}
 	newData, err := json.Marshal(obj)
 	if err != nil {
-		return nil, err
+		return nil, types.StrategicMergePatchType, err
 	}
-	return strategicpatch.CreateTwoWayMergePatch(oldData, newData, obj)
+
+	switch obj := obj.(type) {
+	case *unstructured.Unstructured:
+		patch, err := jsonpatch.CreateMergePatch(oldData, newData)
+		return patch, types.MergePatchType, err
+	default:
+		patch, err := strategicpatch.CreateTwoWayMergePatch(oldData, newData, obj)
+		return patch, types.StrategicMergePatchType, err
+	}
 }
 
 // containsChangeCause checks if input resource info contains change-cause annotation.
@@ -556,6 +562,11 @@ func ContainsChangeCause(info *resource.Info) bool {
 // ShouldRecord checks if we should record current change cause
 func ShouldRecord(cmd *cobra.Command, info *resource.Info) bool {
 	return GetRecordFlag(cmd) || (ContainsChangeCause(info) && !cmd.Flags().Changed("record"))
+}
+
+func AddInclude3rdPartyVarFlags(cmd *cobra.Command, include3rdParty *bool) {
+	cmd.Flags().BoolVar(include3rdParty, "include-extended-apis", true, "If true, include definitions of new APIs via calls to the API server. [default true]")
+	cmd.Flags().MarkDeprecated("include-extended-apis", "No longer required.")
 }
 
 func AddInclude3rdPartyFlags(cmd *cobra.Command) {
@@ -591,28 +602,30 @@ func ParsePairs(pairArgs []string, pairType string, supportRemove bool) (newPair
 		removePairs = []string{}
 	}
 	var invalidBuf bytes.Buffer
-
+	var invalidBufNonEmpty bool
 	for _, pairArg := range pairArgs {
-		if strings.Index(pairArg, "=") != -1 {
+		if strings.Contains(pairArg, "=") {
 			parts := strings.SplitN(pairArg, "=", 2)
 			if len(parts) != 2 {
-				if invalidBuf.Len() > 0 {
+				if invalidBufNonEmpty {
 					invalidBuf.WriteString(", ")
 				}
-				invalidBuf.WriteString(fmt.Sprintf(pairArg))
+				invalidBuf.WriteString(pairArg)
+				invalidBufNonEmpty = true
 			} else {
 				newPairs[parts[0]] = parts[1]
 			}
 		} else if supportRemove && strings.HasSuffix(pairArg, "-") {
 			removePairs = append(removePairs, pairArg[:len(pairArg)-1])
 		} else {
-			if invalidBuf.Len() > 0 {
+			if invalidBufNonEmpty {
 				invalidBuf.WriteString(", ")
 			}
-			invalidBuf.WriteString(fmt.Sprintf(pairArg))
+			invalidBuf.WriteString(pairArg)
+			invalidBufNonEmpty = true
 		}
 	}
-	if invalidBuf.Len() > 0 {
+	if invalidBufNonEmpty {
 		err = fmt.Errorf("invalid %s format: %s", pairType, invalidBuf.String())
 		return
 	}
@@ -694,7 +707,7 @@ func PrintFilterCount(hiddenObjNum int, resource string, options *kubectl.PrintO
 // and squashes the list's items into a single versioned runtime.Object.
 func ObjectListToVersionedObject(objects []runtime.Object, version schema.GroupVersion) (runtime.Object, error) {
 	objectList := &api.List{Items: objects}
-	converted, err := resource.TryConvert(api.Scheme, objectList, version, registered.GroupOrDie(api.GroupName).GroupVersion)
+	converted, err := resource.TryConvert(api.Scheme, objectList, version, api.Registry.GroupOrDie(api.GroupName).GroupVersion)
 	if err != nil {
 		return nil, err
 	}
@@ -728,4 +741,20 @@ func RequireNoArguments(c *cobra.Command, args []string) {
 	if len(args) > 0 {
 		CheckErr(UsageError(c, fmt.Sprintf(`unknown command %q`, strings.Join(args, " "))))
 	}
+}
+
+// OutputsRawFormat determines if a command's output format is machine parsable
+// or returns false if it is human readable (name, wide, etc.)
+func OutputsRawFormat(cmd *cobra.Command) bool {
+	output := GetFlagString(cmd, "output")
+	if output == "json" ||
+		output == "yaml" ||
+		output == "go-template" ||
+		output == "go-template-file" ||
+		output == "jsonpath" ||
+		output == "jsonpath-file" {
+		return true
+	}
+
+	return false
 }

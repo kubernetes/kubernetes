@@ -28,21 +28,21 @@ import (
 
 	cadvisorapi "github.com/google/cadvisor/info/v1"
 	cadvisorapiv2 "github.com/google/cadvisor/info/v2"
-	"k8s.io/kubernetes/pkg/api"
-	apierrors "k8s.io/kubernetes/pkg/api/errors"
-	"k8s.io/kubernetes/pkg/api/resource"
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/resource"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/diff"
+	"k8s.io/apimachinery/pkg/util/rand"
+	"k8s.io/apimachinery/pkg/util/strategicpatch"
+	"k8s.io/apimachinery/pkg/util/uuid"
+	"k8s.io/apimachinery/pkg/util/wait"
+	core "k8s.io/client-go/testing"
 	"k8s.io/kubernetes/pkg/api/v1"
-	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset/fake"
-	"k8s.io/kubernetes/pkg/client/testing/core"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/util/sliceutils"
-	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/util/diff"
-	"k8s.io/kubernetes/pkg/util/rand"
-	"k8s.io/kubernetes/pkg/util/strategicpatch"
-	"k8s.io/kubernetes/pkg/util/uuid"
-	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/version"
 	"k8s.io/kubernetes/pkg/volume/util/volumehelper"
 )
@@ -114,9 +114,10 @@ func TestUpdateNewNodeStatus(t *testing.T) {
 	inputImageList, expectedImageList := generateTestingImageList(maxImagesInNodeStatus + 1)
 	testKubelet := newTestKubeletWithImageList(
 		t, inputImageList, false /* controllerAttachDetachEnabled */)
+	defer testKubelet.Cleanup()
 	kubelet := testKubelet.kubelet
 	kubeClient := testKubelet.fakeKubeClient
-	existingNode := v1.Node{ObjectMeta: v1.ObjectMeta{Name: testKubeletHostname}}
+	existingNode := v1.Node{ObjectMeta: metav1.ObjectMeta{Name: testKubeletHostname}}
 	kubeClient.ReactionChain = fake.NewSimpleClientset(&v1.NodeList{Items: []v1.Node{existingNode}}).ReactionChain
 	machineInfo := &cadvisorapi.MachineInfo{
 		MachineID:      "123",
@@ -140,7 +141,7 @@ func TestUpdateNewNodeStatus(t *testing.T) {
 	}
 
 	expectedNode := &v1.Node{
-		ObjectMeta: v1.ObjectMeta{Name: testKubeletHostname},
+		ObjectMeta: metav1.ObjectMeta{Name: testKubeletHostname},
 		Spec:       v1.NodeSpec{},
 		Status: v1.NodeStatus{
 			Conditions: []v1.NodeCondition{
@@ -244,7 +245,7 @@ func TestUpdateNewNodeStatus(t *testing.T) {
 	if maxImagesInNodeStatus != len(updatedNode.Status.Images) {
 		t.Errorf("unexpected image list length in node status, expected: %v, got: %v", maxImagesInNodeStatus, len(updatedNode.Status.Images))
 	} else {
-		if !api.Semantic.DeepEqual(expectedNode, updatedNode) {
+		if !apiequality.Semantic.DeepEqual(expectedNode, updatedNode) {
 			t.Errorf("unexpected objects: %s", diff.ObjectDiff(expectedNode, updatedNode))
 		}
 	}
@@ -253,9 +254,10 @@ func TestUpdateNewNodeStatus(t *testing.T) {
 
 func TestUpdateNewNodeOutOfDiskStatusWithTransitionFrequency(t *testing.T) {
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+	defer testKubelet.Cleanup()
 	kubelet := testKubelet.kubelet
 	kubeClient := testKubelet.fakeKubeClient
-	existingNode := v1.Node{ObjectMeta: v1.ObjectMeta{Name: testKubeletHostname}}
+	existingNode := v1.Node{ObjectMeta: metav1.ObjectMeta{Name: testKubeletHostname}}
 	kubeClient.ReactionChain = fake.NewSimpleClientset(&v1.NodeList{Items: []v1.Node{existingNode}}).ReactionChain
 	machineInfo := &cadvisorapi.MachineInfo{
 		MachineID:      "123",
@@ -328,10 +330,11 @@ func TestUpdateNewNodeOutOfDiskStatusWithTransitionFrequency(t *testing.T) {
 
 func TestUpdateExistingNodeStatus(t *testing.T) {
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+	defer testKubelet.Cleanup()
 	kubelet := testKubelet.kubelet
 	kubeClient := testKubelet.fakeKubeClient
 	existingNode := v1.Node{
-		ObjectMeta: v1.ObjectMeta{Name: testKubeletHostname},
+		ObjectMeta: metav1.ObjectMeta{Name: testKubeletHostname},
 		Spec:       v1.NodeSpec{},
 		Status: v1.NodeStatus{
 			Conditions: []v1.NodeCondition{
@@ -403,7 +406,7 @@ func TestUpdateExistingNodeStatus(t *testing.T) {
 	}
 
 	expectedNode := &v1.Node{
-		ObjectMeta: v1.ObjectMeta{Name: testKubeletHostname},
+		ObjectMeta: metav1.ObjectMeta{Name: testKubeletHostname},
 		Spec:       v1.NodeSpec{},
 		Status: v1.NodeStatus{
 			Conditions: []v1.NodeCondition{
@@ -516,13 +519,14 @@ func TestUpdateExistingNodeStatus(t *testing.T) {
 		t.Errorf("unexpected node condition order. NodeReady should be last.")
 	}
 
-	if !api.Semantic.DeepEqual(expectedNode, updatedNode) {
+	if !apiequality.Semantic.DeepEqual(expectedNode, updatedNode) {
 		t.Errorf("unexpected objects: %s", diff.ObjectDiff(expectedNode, updatedNode))
 	}
 }
 
 func TestUpdateExistingNodeOutOfDiskStatusWithTransitionFrequency(t *testing.T) {
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+	defer testKubelet.Cleanup()
 	kubelet := testKubelet.kubelet
 	clock := testKubelet.fakeClock
 	// Do not set nano second, because apiserver function doesn't support nano second. (Only support
@@ -530,7 +534,7 @@ func TestUpdateExistingNodeOutOfDiskStatusWithTransitionFrequency(t *testing.T) 
 	clock.SetTime(time.Unix(123456, 0))
 	kubeClient := testKubelet.fakeKubeClient
 	existingNode := v1.Node{
-		ObjectMeta: v1.ObjectMeta{Name: testKubeletHostname},
+		ObjectMeta: metav1.ObjectMeta{Name: testKubeletHostname},
 		Spec:       v1.NodeSpec{},
 		Status: v1.NodeStatus{
 			Conditions: []v1.NodeCondition{
@@ -681,10 +685,11 @@ func TestUpdateExistingNodeOutOfDiskStatusWithTransitionFrequency(t *testing.T) 
 
 func TestUpdateNodeStatusWithRuntimeStateError(t *testing.T) {
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+	defer testKubelet.Cleanup()
 	kubelet := testKubelet.kubelet
 	clock := testKubelet.fakeClock
 	kubeClient := testKubelet.fakeKubeClient
-	existingNode := v1.Node{ObjectMeta: v1.ObjectMeta{Name: testKubeletHostname}}
+	existingNode := v1.Node{ObjectMeta: metav1.ObjectMeta{Name: testKubeletHostname}}
 	kubeClient.ReactionChain = fake.NewSimpleClientset(&v1.NodeList{Items: []v1.Node{existingNode}}).ReactionChain
 	mockCadvisor := testKubelet.fakeCadvisor
 	mockCadvisor.On("Start").Return(nil)
@@ -708,7 +713,7 @@ func TestUpdateNodeStatusWithRuntimeStateError(t *testing.T) {
 	}
 
 	expectedNode := &v1.Node{
-		ObjectMeta: v1.ObjectMeta{Name: testKubeletHostname},
+		ObjectMeta: metav1.ObjectMeta{Name: testKubeletHostname},
 		Spec:       v1.NodeSpec{},
 		Status: v1.NodeStatus{
 			Conditions: []v1.NodeCondition{
@@ -824,7 +829,7 @@ func TestUpdateNodeStatusWithRuntimeStateError(t *testing.T) {
 			LastHeartbeatTime:  metav1.Time{},
 			LastTransitionTime: metav1.Time{},
 		}
-		if !api.Semantic.DeepEqual(expectedNode, updatedNode) {
+		if !apiequality.Semantic.DeepEqual(expectedNode, updatedNode) {
 			t.Errorf("unexpected objects: %s", diff.ObjectDiff(expectedNode, updatedNode))
 		}
 	}
@@ -900,6 +905,7 @@ func TestUpdateNodeStatusWithRuntimeStateError(t *testing.T) {
 
 func TestUpdateNodeStatusError(t *testing.T) {
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+	defer testKubelet.Cleanup()
 	kubelet := testKubelet.kubelet
 	// No matching node for the kubelet
 	testKubelet.fakeKubeClient.ReactionChain = fake.NewSimpleClientset(&v1.NodeList{Items: []v1.Node{}}).ReactionChain
@@ -914,6 +920,7 @@ func TestUpdateNodeStatusError(t *testing.T) {
 
 func TestRegisterWithApiServer(t *testing.T) {
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+	defer testKubelet.Cleanup()
 	kubelet := testKubelet.kubelet
 	kubeClient := testKubelet.fakeKubeClient
 	kubeClient.AddReactor("create", "nodes", func(action core.Action) (bool, runtime.Object, error) {
@@ -925,7 +932,7 @@ func TestRegisterWithApiServer(t *testing.T) {
 	kubeClient.AddReactor("get", "nodes", func(action core.Action) (bool, runtime.Object, error) {
 		// Return an existing (matching) node on get.
 		return true, &v1.Node{
-			ObjectMeta: v1.ObjectMeta{Name: testKubeletHostname},
+			ObjectMeta: metav1.ObjectMeta{Name: testKubeletHostname},
 			Spec:       v1.NodeSpec{ExternalID: testKubeletHostname},
 		}, nil
 	})
@@ -981,7 +988,7 @@ func TestTryRegisterWithApiServer(t *testing.T) {
 
 	newNode := func(cmad bool, externalID string) *v1.Node {
 		node := &v1.Node{
-			ObjectMeta: v1.ObjectMeta{},
+			ObjectMeta: metav1.ObjectMeta{},
 			Spec: v1.NodeSpec{
 				ExternalID: externalID,
 			},
@@ -1094,6 +1101,7 @@ func TestTryRegisterWithApiServer(t *testing.T) {
 
 	for _, tc := range cases {
 		testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled is a don't-care for this test */)
+		defer testKubelet.Cleanup()
 		kubelet := testKubelet.kubelet
 		kubeClient := testKubelet.fakeKubeClient
 

@@ -12,11 +12,25 @@ go_library(
     srcs = ["storage_apps.go"],
     tags = ["automanaged"],
     deps = [
-        "//pkg/api/rest:go_default_library",
+        "//pkg/api:go_default_library",
         "//pkg/apis/apps:go_default_library",
         "//pkg/apis/apps/v1beta1:go_default_library",
-        "//pkg/genericapiserver:go_default_library",
-        "//pkg/registry/apps/petset/etcd:go_default_library",
-        "//pkg/registry/generic:go_default_library",
+        "//pkg/registry/apps/petset/storage:go_default_library",
+        "//vendor:k8s.io/apiserver/pkg/registry/generic",
+        "//vendor:k8s.io/apiserver/pkg/registry/rest",
+        "//vendor:k8s.io/apiserver/pkg/server",
     ],
+)
+
+filegroup(
+    name = "package-srcs",
+    srcs = glob(["**"]),
+    tags = ["automanaged"],
+    visibility = ["//visibility:private"],
+)
+
+filegroup(
+    name = "all-srcs",
+    srcs = [":package-srcs"],
+    tags = ["automanaged"],
 )

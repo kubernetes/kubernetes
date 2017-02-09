@@ -30,7 +30,7 @@ import (
 	"reflect"
 	"strings"
 
-	customreflect "k8s.io/kubernetes/third_party/forked/golang/reflect"
+	customreflect "k8s.io/apimachinery/third_party/forked/golang/reflect"
 )
 
 func rewriteFile(name string, header []byte, rewriteFn func(*token.FileSet, *ast.File) error) error {

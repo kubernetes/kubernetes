@@ -22,6 +22,7 @@ import (
 
 	"github.com/golang/glog"
 	. "github.com/onsi/ginkgo"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/test/e2e/framework"
 )
@@ -130,7 +131,7 @@ func (config *KubeletManagedHostConfig) getEtcHostsContent(podName, containerNam
 
 func (config *KubeletManagedHostConfig) createPodSpec(podName string) *v1.Pod {
 	pod := &v1.Pod{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name: podName,
 		},
 		Spec: v1.PodSpec{
@@ -186,7 +187,7 @@ func (config *KubeletManagedHostConfig) createPodSpec(podName string) *v1.Pod {
 
 func (config *KubeletManagedHostConfig) createPodSpecWithHostNetwork(podName string) *v1.Pod {
 	pod := &v1.Pod{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name: podName,
 		},
 		Spec: v1.PodSpec{

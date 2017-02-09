@@ -21,11 +21,11 @@ import (
 	"strings"
 	"time"
 
-	"k8s.io/kubernetes/pkg/api"
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/util/uuid"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/stats"
-	"k8s.io/kubernetes/pkg/util/sets"
-	"k8s.io/kubernetes/pkg/util/uuid"
 	"k8s.io/kubernetes/test/e2e/framework"
 	testutils "k8s.io/kubernetes/test/utils"
 
@@ -201,7 +201,7 @@ var _ = framework.KubeDescribe("Kubelet [Serial] [Slow]", func() {
 		// Wait until image prepull pod has completed so that they wouldn't
 		// affect the runtime cpu usage. Fail the test if prepulling cannot
 		// finish in time.
-		if err := framework.WaitForPodsSuccess(f.ClientSet, api.NamespaceSystem, framework.ImagePullerLabels, imagePrePullingLongTimeout); err != nil {
+		if err := framework.WaitForPodsSuccess(f.ClientSet, metav1.NamespaceSystem, framework.ImagePullerLabels, imagePrePullingLongTimeout); err != nil {
 			framework.Failf("Image puller didn't complete in %v, not running resource usage test since the metrics might be adultrated", imagePrePullingLongTimeout)
 		}
 		nodes := framework.GetReadySchedulableNodesOrDie(f.ClientSet)

@@ -18,13 +18,16 @@ package options
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
+	"github.com/golang/glog"
 	"github.com/spf13/pflag"
 
-	"k8s.io/kubernetes/pkg/genericapiserver"
-	genericoptions "k8s.io/kubernetes/pkg/genericapiserver/options"
+	genericapiserver "k8s.io/apiserver/pkg/server"
+	genericoptions "k8s.io/apiserver/pkg/server/options"
 	"k8s.io/kubernetes/pkg/kubeapiserver/authenticator"
+	"k8s.io/kubernetes/pkg/kubeapiserver/authorizer"
 )
 
 type BuiltInAuthenticationOptions struct {
@@ -294,8 +297,8 @@ func (s *BuiltInAuthenticationOptions) ToAuthenticationConfig() authenticator.Au
 	return ret
 }
 
-func (o *BuiltInAuthenticationOptions) Apply(c *genericapiserver.Config) error {
-	if o == nil || o.PasswordFile == nil {
+func (o *BuiltInAuthenticationOptions) ApplyTo(c *genericapiserver.Config) error {
+	if o == nil {
 		return nil
 	}
 
@@ -313,6 +316,30 @@ func (o *BuiltInAuthenticationOptions) Apply(c *genericapiserver.Config) error {
 		}
 	}
 
-	c.SupportsBasicAuth = len(o.PasswordFile.BasicAuthFile) > 0
+	c.SupportsBasicAuth = o.PasswordFile != nil && len(o.PasswordFile.BasicAuthFile) > 0
+
 	return nil
+}
+
+// ApplyAuthorization will conditionally modify the authentication options based on the authorization options
+func (o *BuiltInAuthenticationOptions) ApplyAuthorization(authorization *BuiltInAuthorizationOptions) {
+	if o == nil || authorization == nil || o.Anonymous == nil {
+		return
+	}
+
+	// authorization ModeAlwaysAllow cannot be combined with AnonymousAuth.
+	// in such a case the AnonymousAuth is stomped to false and you get a message
+	if o.Anonymous.Allow {
+		found := false
+		for _, mode := range strings.Split(authorization.Mode, ",") {
+			if mode == authorizer.ModeAlwaysAllow {
+				found = true
+				break
+			}
+		}
+		if found {
+			glog.Warningf("AnonymousAuth is not allowed with the AllowAll authorizer.  Resetting AnonymousAuth to false. You should use a different authorizer")
+			o.Anonymous.Allow = false
+		}
+	}
 }

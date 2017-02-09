@@ -25,6 +25,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
+	"k8s.io/kubernetes/pkg/util/i18n"
 )
 
 var (
@@ -39,8 +40,8 @@ var (
 // ClusterRoleBinding is a command to ease creating ClusterRoleBindings.
 func NewCmdCreateClusterRoleBinding(f cmdutil.Factory, cmdOut io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:     "clusterrolebinding NAME --clusterrole=NAME [--user=username] [--group=groupname] [--dry-run]",
-		Short:   "Create a ClusterRoleBinding for a particular ClusterRole",
+		Use:     "clusterrolebinding NAME --clusterrole=NAME [--user=username] [--group=groupname] [--serviceaccount=namespace:serviceaccountname] [--dry-run]",
+		Short:   i18n.T("Create a ClusterRoleBinding for a particular ClusterRole"),
 		Long:    clusterRoleBindingLong,
 		Example: clusterRoleBindingExample,
 		Run: func(cmd *cobra.Command, args []string) {

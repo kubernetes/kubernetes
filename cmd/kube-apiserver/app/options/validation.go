@@ -63,5 +63,8 @@ func (options *ServerRunOptions) Validate() []error {
 	if errs := options.InsecureServing.Validate("insecure-port"); len(errs) > 0 {
 		errors = append(errors, errs...)
 	}
+	if options.MasterCount <= 0 {
+		errors = append(errors, fmt.Errorf("--apiserver-count should be a positive number, but value '%d' provided", options.MasterCount))
+	}
 	return errors
 }

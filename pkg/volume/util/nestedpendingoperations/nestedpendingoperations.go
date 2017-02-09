@@ -29,9 +29,9 @@ import (
 	"sync"
 
 	"github.com/golang/glog"
+	k8sRuntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/util/goroutinemap/exponentialbackoff"
-	k8sRuntime "k8s.io/kubernetes/pkg/util/runtime"
 	"k8s.io/kubernetes/pkg/volume/util/types"
 )
 

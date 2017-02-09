@@ -45,9 +45,14 @@ spec:
         scheduler.alpha.kubernetes.io/critical-pod: ''
         scheduler.alpha.kubernetes.io/tolerations: '[{"key":"CriticalAddonsOnly", "operator":"Exists"}]'
     spec:
+      volumes:
+      - name: kube-dns-config
+        configMap:
+          name: kube-dns
+          optional: true    
       containers:
       - name: kubedns
-        image: gcr.io/google_containers/kubedns-amd64:1.9
+        image: gcr.io/google_containers/k8s-dns-kube-dns-amd64:1.12.1
         resources:
           # TODO: Set memory limits when we've profiled the container for large
           # clusters, then set request = limit to keep this container in
@@ -79,7 +84,7 @@ spec:
         args:
         - --domain=$DNS_DOMAIN.
         - --dns-port=10053
-        - --config-map=kube-dns
+        - --config-dir=/kube-dns-config
         - --v=2
         env:
         - name: PROMETHEUS_PORT
@@ -94,8 +99,11 @@ spec:
         - containerPort: 10055
           name: metrics
           protocol: TCP
+        volumeMounts:
+        - name: kube-dns-config
+          mountPath: /kube-dns-config
       - name: dnsmasq
-        image: gcr.io/google_containers/kube-dnsmasq-amd64:1.4
+        image: gcr.io/google_containers/k8s-dns-dnsmasq-amd64:1.12.1
         livenessProbe:
           httpGet:
             path: /healthcheck/dnsmasq
@@ -123,7 +131,7 @@ spec:
             cpu: 150m
             memory: 10Mi
       - name: sidecar
-        image: gcr.io/google_containers/k8s-dns-sidecar-amd64:1.10.0
+        image: gcr.io/google_containers/k8s-dns-sidecar-amd64:1.12.1
         livenessProbe:
           httpGet:
             path: /metrics

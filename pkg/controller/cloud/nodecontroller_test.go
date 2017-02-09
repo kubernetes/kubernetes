@@ -25,21 +25,23 @@ import (
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset/fake"
 
-	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
-	"k8s.io/kubernetes/pkg/client/record"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/wait"
+	clientv1 "k8s.io/client-go/pkg/api/v1"
+	"k8s.io/client-go/tools/record"
+	"k8s.io/kubernetes/pkg/api"
+	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	fakecloud "k8s.io/kubernetes/pkg/cloudprovider/providers/fake"
 	"k8s.io/kubernetes/pkg/controller"
-	"k8s.io/kubernetes/pkg/controller/informers"
 	"k8s.io/kubernetes/pkg/controller/node/testutil"
-	"k8s.io/kubernetes/pkg/util/wait"
 )
 
 // This test checks that the node is deleted when kubelet stops reporting
 // and cloud provider says node is gone
 func TestNodeDeleted(t *testing.T) {
 	pod0 := &v1.Pod{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Namespace: "default",
 			Name:      "pod0",
 		},
@@ -57,7 +59,7 @@ func TestNodeDeleted(t *testing.T) {
 	}
 
 	pod1 := &v1.Pod{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Namespace: "default",
 			Name:      "pod1",
 		},
@@ -77,7 +79,7 @@ func TestNodeDeleted(t *testing.T) {
 	fnh := &testutil.FakeNodeHandler{
 		Existing: []*v1.Node{
 			{
-				ObjectMeta: v1.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Name:              "node0",
 					CreationTimestamp: metav1.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
 				},
@@ -97,15 +99,15 @@ func TestNodeDeleted(t *testing.T) {
 		DeleteWaitChan: make(chan struct{}),
 	}
 
-	factory := informers.NewSharedInformerFactory(fnh, nil, controller.NoResyncPeriodFunc())
+	factory := informers.NewSharedInformerFactory(nil, fnh, controller.NoResyncPeriodFunc())
 
 	eventBroadcaster := record.NewBroadcaster()
 	cloudNodeController := &CloudNodeController{
 		kubeClient:        fnh,
-		nodeInformer:      factory.Nodes(),
+		nodeInformer:      factory.Core().V1().Nodes(),
 		cloud:             &fakecloud.FakeCloud{Err: cloudprovider.InstanceNotFound},
 		nodeMonitorPeriod: 5 * time.Second,
-		recorder:          eventBroadcaster.NewRecorder(v1.EventSource{Component: "controllermanager"}),
+		recorder:          eventBroadcaster.NewRecorder(api.Scheme, clientv1.EventSource{Component: "controllermanager"}),
 	}
 	eventBroadcaster.StartLogging(glog.Infof)
 

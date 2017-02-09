@@ -21,7 +21,6 @@ spec:
         - federation-apiserver
         - --bind-address=0.0.0.0
         - --etcd-servers=http://localhost:2379
-        - --service-cluster-ip-range={{.FEDERATION_SERVICE_CIDR}}
         - --secure-port=443
         {{if eq .IS_DNS_NAME "false"}}
         - --advertise-address={{.FEDERATION_API_HOST}}
@@ -33,6 +32,7 @@ spec:
         - --admission-control={{.FEDERATION_ADMISSION_CONTROL}}
         - --token-auth-file=/srv/kubernetes/known-tokens.csv
         - --anonymous-auth=false
+        - --storage-backend=etcd2
         ports:
         - containerPort: 443
           name: https
@@ -43,9 +43,9 @@ spec:
           mountPath: /srv/kubernetes/
           readOnly: true
       - name: etcd
-        image: quay.io/coreos/etcd:v2.3.3
+        image: gcr.io/google_containers/etcd:3.0.14-alpha.1
         command:
-          - /etcd
+          - /usr/local/bin/etcd
           - --data-dir
           - /var/etcd/data
         volumeMounts:

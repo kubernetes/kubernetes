@@ -20,25 +20,25 @@ import (
 	"fmt"
 	"testing"
 
+	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/fields"
+	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/runtime"
+	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
+	genericregistry "k8s.io/apiserver/pkg/registry/generic/registry"
+	"k8s.io/apiserver/pkg/registry/rest/resttest"
+	etcdstorage "k8s.io/apiserver/pkg/storage/etcd"
+	etcdtesting "k8s.io/apiserver/pkg/storage/etcd/testing"
+	"k8s.io/apiserver/pkg/storage/storagebackend"
+	storagetesting "k8s.io/apiserver/pkg/storage/testing"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/errors"
-	"k8s.io/kubernetes/pkg/api/meta"
-	"k8s.io/kubernetes/pkg/api/rest/resttest"
 	"k8s.io/kubernetes/pkg/api/testapi"
-	"k8s.io/kubernetes/pkg/apimachinery/registered"
-	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
-	"k8s.io/kubernetes/pkg/fields"
-	"k8s.io/kubernetes/pkg/labels"
-	genericregistry "k8s.io/kubernetes/pkg/registry/generic/registry"
-	"k8s.io/kubernetes/pkg/runtime"
-	etcdstorage "k8s.io/kubernetes/pkg/storage/etcd"
-	etcdtesting "k8s.io/kubernetes/pkg/storage/etcd/testing"
-	"k8s.io/kubernetes/pkg/storage/storagebackend"
-	storagetesting "k8s.io/kubernetes/pkg/storage/testing"
 )
 
 func NewEtcdStorage(t *testing.T, group string) (*storagebackend.Config, *etcdtesting.EtcdTestServer) {
-	server, config := etcdtesting.NewUnsecuredEtcd3TestClientServer(t)
+	server, config := etcdtesting.NewUnsecuredEtcd3TestClientServer(t, api.Scheme)
 	config.Codec = testapi.Groups[group].StorageCodec()
 	return config, server
 }
@@ -51,7 +51,7 @@ type UpdateFunc func(runtime.Object) runtime.Object
 
 func New(t *testing.T, storage *genericregistry.Store) *Tester {
 	return &Tester{
-		tester:  resttest.New(t, storage),
+		tester:  resttest.New(t, storage, api.Scheme),
 		storage: storage,
 	}
 }
@@ -163,7 +163,7 @@ func getCodec(obj runtime.Object) (runtime.Codec, error) {
 	// split the schemes for internal objects.
 	// TODO: caesarxuchao: we should add a map from kind to group in Scheme.
 	var codec runtime.Codec
-	if api.Scheme.Recognizes(registered.GroupOrDie(api.GroupName).GroupVersion.WithKind(fqKind.Kind)) {
+	if api.Scheme.Recognizes(api.Registry.GroupOrDie(api.GroupName).GroupVersion.WithKind(fqKind.Kind)) {
 		codec = testapi.Default.Codec()
 	} else if api.Scheme.Recognizes(testapi.Extensions.GroupVersion().WithKind(fqKind.Kind)) {
 		codec = testapi.Extensions.Codec()
@@ -175,7 +175,7 @@ func getCodec(obj runtime.Object) (runtime.Codec, error) {
 
 // Helper functions
 
-func (t *Tester) getObject(ctx api.Context, obj runtime.Object) (runtime.Object, error) {
+func (t *Tester) getObject(ctx genericapirequest.Context, obj runtime.Object) (runtime.Object, error) {
 	accessor, err := meta.Accessor(obj)
 	if err != nil {
 		return nil, err
@@ -188,7 +188,7 @@ func (t *Tester) getObject(ctx api.Context, obj runtime.Object) (runtime.Object,
 	return result, nil
 }
 
-func (t *Tester) createObject(ctx api.Context, obj runtime.Object) error {
+func (t *Tester) createObject(ctx genericapirequest.Context, obj runtime.Object) error {
 	accessor, err := meta.Accessor(obj)
 	if err != nil {
 		return err

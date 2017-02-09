@@ -20,12 +20,12 @@ import (
 	"fmt"
 	"time"
 
-	apierrors "k8s.io/kubernetes/pkg/api/errors"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/uuid"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/api/v1"
-	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
-	"k8s.io/kubernetes/pkg/util/uuid"
 	utilversion "k8s.io/kubernetes/pkg/util/version"
-	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/plugin/pkg/admission/serviceaccount"
 	"k8s.io/kubernetes/test/e2e/framework"
 
@@ -191,21 +191,21 @@ var _ = framework.KubeDescribe("ServiceAccounts", func() {
 		}))
 
 		pod := &v1.Pod{
-			ObjectMeta: v1.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				GenerateName: "pod-service-account-" + string(uuid.NewUUID()) + "-",
 			},
 			Spec: v1.PodSpec{
 				Containers: []v1.Container{
 					{
 						Name:  "token-test",
-						Image: "gcr.io/google_containers/mounttest:0.7",
+						Image: "gcr.io/google_containers/mounttest:0.8",
 						Args: []string{
 							fmt.Sprintf("--file_content=%s/%s", serviceaccount.DefaultAPITokenMountPath, v1.ServiceAccountTokenKey),
 						},
 					},
 					{
 						Name:  "root-ca-test",
-						Image: "gcr.io/google_containers/mounttest:0.7",
+						Image: "gcr.io/google_containers/mounttest:0.8",
 						Args: []string{
 							fmt.Sprintf("--file_content=%s/%s", serviceaccount.DefaultAPITokenMountPath, v1.ServiceAccountRootCAKey),
 						},
@@ -219,7 +219,7 @@ var _ = framework.KubeDescribe("ServiceAccounts", func() {
 		if supportsTokenNamespace {
 			pod.Spec.Containers = append(pod.Spec.Containers, v1.Container{
 				Name:  "namespace-test",
-				Image: "gcr.io/google_containers/mounttest:0.7",
+				Image: "gcr.io/google_containers/mounttest:0.8",
 				Args: []string{
 					fmt.Sprintf("--file_content=%s/%s", serviceaccount.DefaultAPITokenMountPath, v1.ServiceAccountNamespaceKey),
 				},

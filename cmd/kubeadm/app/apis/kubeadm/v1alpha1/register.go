@@ -17,10 +17,9 @@ limitations under the License.
 package v1alpha1
 
 import (
-	"k8s.io/kubernetes/pkg/api/v1"
-	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
-	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/runtime/schema"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
 // GroupName is the group name use in this package
@@ -49,10 +48,8 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 		&MasterConfiguration{},
 		&NodeConfiguration{},
 		&ClusterInfo{},
-		&v1.ListOptions{},
-		&v1.DeleteOptions{},
-		&metav1.ExportOptions{},
 	)
+	metav1.AddToGroupVersion(scheme, SchemeGroupVersion)
 	return nil
 }
 

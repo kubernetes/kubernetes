@@ -23,10 +23,11 @@ import (
 	"path"
 	"testing"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
+	utiltesting "k8s.io/client-go/util/testing"
 	"k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util/mount"
-	utiltesting "k8s.io/kubernetes/pkg/util/testing"
 	"k8s.io/kubernetes/pkg/volume"
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
 	"k8s.io/kubernetes/pkg/volume/util"
@@ -108,7 +109,7 @@ func doTestPlugin(t *testing.T, config pluginTestConfig) {
 
 		physicalMounter = mount.FakeMounter{}
 		mountDetector   = fakeMountDetector{}
-		pod             = &v1.Pod{ObjectMeta: v1.ObjectMeta{UID: types.UID("poduid")}}
+		pod             = &v1.Pod{ObjectMeta: metav1.ObjectMeta{UID: types.UID("poduid")}}
 	)
 
 	if config.idempotent {
@@ -214,7 +215,7 @@ func TestPluginBackCompat(t *testing.T) {
 	spec := &v1.Volume{
 		Name: "vol1",
 	}
-	pod := &v1.Pod{ObjectMeta: v1.ObjectMeta{UID: types.UID("poduid")}}
+	pod := &v1.Pod{ObjectMeta: metav1.ObjectMeta{UID: types.UID("poduid")}}
 	mounter, err := plug.NewMounter(volume.NewSpecFromVolume(spec), pod, volume.VolumeOptions{})
 	if err != nil {
 		t.Errorf("Failed to make a new Mounter: %v", err)
@@ -243,7 +244,7 @@ func TestMetrics(t *testing.T) {
 	spec := &v1.Volume{
 		Name: "vol1",
 	}
-	pod := &v1.Pod{ObjectMeta: v1.ObjectMeta{UID: types.UID("poduid")}}
+	pod := &v1.Pod{ObjectMeta: metav1.ObjectMeta{UID: types.UID("poduid")}}
 	mounter, err := plug.NewMounter(volume.NewSpecFromVolume(spec), pod, volume.VolumeOptions{})
 	if err != nil {
 		t.Errorf("Failed to make a new Mounter: %v", err)

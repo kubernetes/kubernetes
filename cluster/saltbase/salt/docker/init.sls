@@ -155,7 +155,7 @@ docker:
      - watch:
        - file: {{ environment_file }}
 
-{% elif grains.cloud is defined and grains.cloud in ['vsphere', 'photon-controller'] and grains.os == 'Debian' and grains.osrelease_info[0] >=8 %}
+{% elif grains.cloud is defined and grains.cloud in ['photon-controller'] and grains.os == 'Debian' and grains.osrelease_info[0] >=8 %}
 
 {% if pillar.get('is_systemd') %}
 

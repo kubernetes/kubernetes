@@ -131,6 +131,9 @@ func newMux(p packetConn) *mux {
 
 func (m *mux) sendMessage(msg interface{}) error {
 	p := Marshal(msg)
+	if debugMux {
+		log.Printf("send global(%d): %#v", m.chanList.offset, msg)
+	}
 	return m.conn.writePacket(p)
 }
 
@@ -173,18 +176,6 @@ func (m *mux) ackRequest(ok bool, data []byte) error {
 		return m.sendMessage(globalRequestSuccessMsg{Data: data})
 	}
 	return m.sendMessage(globalRequestFailureMsg{Data: data})
-}
-
-// TODO(hanwen): Disconnect is a transport layer message. We should
-// probably send and receive Disconnect somewhere in the transport
-// code.
-
-// Disconnect sends a disconnect message.
-func (m *mux) Disconnect(reason uint32, message string) error {
-	return m.sendMessage(disconnectMsg{
-		Reason:  reason,
-		Message: message,
-	})
 }
 
 func (m *mux) Close() error {
@@ -236,11 +227,6 @@ func (m *mux) onePacket() error {
 	}
 
 	switch packet[0] {
-	case msgNewKeys:
-		// Ignore notification of key change.
-		return nil
-	case msgDisconnect:
-		return m.handleDisconnect(packet)
 	case msgChannelOpen:
 		return m.handleChannelOpen(packet)
 	case msgGlobalRequest, msgRequestSuccess, msgRequestFailure:
@@ -258,18 +244,6 @@ func (m *mux) onePacket() error {
 	}
 
 	return ch.handlePacket(packet)
-}
-
-func (m *mux) handleDisconnect(packet []byte) error {
-	var d disconnectMsg
-	if err := Unmarshal(packet, &d); err != nil {
-		return err
-	}
-
-	if debugMux {
-		log.Printf("caught disconnect: %v", d)
-	}
-	return &d
 }
 
 func (m *mux) handleGlobalPacket(packet []byte) error {

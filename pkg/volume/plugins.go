@@ -23,14 +23,15 @@ import (
 	"sync"
 
 	"github.com/golang/glog"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
+	utilerrors "k8s.io/apimachinery/pkg/util/errors"
+	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/kubernetes/pkg/api/v1"
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/pkg/cloudprovider"
-	"k8s.io/kubernetes/pkg/types"
-	utilerrors "k8s.io/kubernetes/pkg/util/errors"
 	"k8s.io/kubernetes/pkg/util/io"
 	"k8s.io/kubernetes/pkg/util/mount"
-	"k8s.io/kubernetes/pkg/util/validation"
 )
 
 // VolumeOptions contains option information about a volume.
@@ -41,8 +42,10 @@ type VolumeOptions struct {
 
 	// Reclamation policy for a persistent volume
 	PersistentVolumeReclaimPolicy v1.PersistentVolumeReclaimPolicy
-	// PV.Name of the appropriate PersistentVolume. Used to generate cloud
-	// volume name.
+	// Suggested PV.Name of the PersistentVolume to provision.
+	// This is a generated name guaranteed to be unique in Kubernetes cluster.
+	// If you choose not to use it as volume name, ensure uniqueness by either
+	// combining it with your value or create unique values of your own.
 	PVName string
 	// PVC is reference to the claim that lead to provisioning of a new PV.
 	// Provisioners *must* create a PV that would be matched by this PVC,
@@ -212,8 +215,11 @@ type VolumeHost interface {
 	// Returns host IP or nil in the case of error.
 	GetHostIP() (net.IP, error)
 
-	// Returns node allocatable
+	// Returns node allocatable.
 	GetNodeAllocatable() (v1.ResourceList, error)
+
+	// Returns a function that returns a secret.
+	GetSecretFunc() func(namespace, name string) (*v1.Secret, error)
 }
 
 // VolumePluginMgr tracks registered plugins.
@@ -529,9 +535,9 @@ func (pm *VolumePluginMgr) FindAttachablePluginByName(name string) (AttachableVo
 func NewPersistentVolumeRecyclerPodTemplate() *v1.Pod {
 	timeout := int64(60)
 	pod := &v1.Pod{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			GenerateName: "pv-recycler-",
-			Namespace:    v1.NamespaceDefault,
+			Namespace:    metav1.NamespaceDefault,
 		},
 		Spec: v1.PodSpec{
 			ActiveDeadlineSeconds: &timeout,
@@ -562,4 +568,16 @@ func NewPersistentVolumeRecyclerPodTemplate() *v1.Pod {
 		},
 	}
 	return pod
+}
+
+// Check validity of recycle pod template
+// List of checks:
+// - at least one volume is defined in the recycle pod template
+// If successful, returns nil
+// if unsuccessful, returns an error.
+func ValidateRecyclerPodTemplate(pod *v1.Pod) error {
+	if len(pod.Spec.Volumes) < 1 {
+		return fmt.Errorf("does not contain any volume(s)")
+	}
+	return nil
 }

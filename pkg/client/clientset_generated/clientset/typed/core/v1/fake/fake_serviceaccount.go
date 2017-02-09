@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors.
+Copyright 2017 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,13 +17,13 @@ limitations under the License.
 package fake
 
 import (
-	api "k8s.io/kubernetes/pkg/api"
+	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	labels "k8s.io/apimachinery/pkg/labels"
+	schema "k8s.io/apimachinery/pkg/runtime/schema"
+	types "k8s.io/apimachinery/pkg/types"
+	watch "k8s.io/apimachinery/pkg/watch"
+	testing "k8s.io/client-go/testing"
 	v1 "k8s.io/kubernetes/pkg/api/v1"
-	meta_v1 "k8s.io/kubernetes/pkg/apis/meta/v1"
-	core "k8s.io/kubernetes/pkg/client/testing/core"
-	labels "k8s.io/kubernetes/pkg/labels"
-	schema "k8s.io/kubernetes/pkg/runtime/schema"
-	watch "k8s.io/kubernetes/pkg/watch"
 )
 
 // FakeServiceAccounts implements ServiceAccountInterface
@@ -36,7 +36,7 @@ var serviceaccountsResource = schema.GroupVersionResource{Group: "", Version: "v
 
 func (c *FakeServiceAccounts) Create(serviceAccount *v1.ServiceAccount) (result *v1.ServiceAccount, err error) {
 	obj, err := c.Fake.
-		Invokes(core.NewCreateAction(serviceaccountsResource, c.ns, serviceAccount), &v1.ServiceAccount{})
+		Invokes(testing.NewCreateAction(serviceaccountsResource, c.ns, serviceAccount), &v1.ServiceAccount{})
 
 	if obj == nil {
 		return nil, err
@@ -46,7 +46,7 @@ func (c *FakeServiceAccounts) Create(serviceAccount *v1.ServiceAccount) (result 
 
 func (c *FakeServiceAccounts) Update(serviceAccount *v1.ServiceAccount) (result *v1.ServiceAccount, err error) {
 	obj, err := c.Fake.
-		Invokes(core.NewUpdateAction(serviceaccountsResource, c.ns, serviceAccount), &v1.ServiceAccount{})
+		Invokes(testing.NewUpdateAction(serviceaccountsResource, c.ns, serviceAccount), &v1.ServiceAccount{})
 
 	if obj == nil {
 		return nil, err
@@ -54,15 +54,15 @@ func (c *FakeServiceAccounts) Update(serviceAccount *v1.ServiceAccount) (result 
 	return obj.(*v1.ServiceAccount), err
 }
 
-func (c *FakeServiceAccounts) Delete(name string, options *v1.DeleteOptions) error {
+func (c *FakeServiceAccounts) Delete(name string, options *meta_v1.DeleteOptions) error {
 	_, err := c.Fake.
-		Invokes(core.NewDeleteAction(serviceaccountsResource, c.ns, name), &v1.ServiceAccount{})
+		Invokes(testing.NewDeleteAction(serviceaccountsResource, c.ns, name), &v1.ServiceAccount{})
 
 	return err
 }
 
-func (c *FakeServiceAccounts) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
-	action := core.NewDeleteCollectionAction(serviceaccountsResource, c.ns, listOptions)
+func (c *FakeServiceAccounts) DeleteCollection(options *meta_v1.DeleteOptions, listOptions meta_v1.ListOptions) error {
+	action := testing.NewDeleteCollectionAction(serviceaccountsResource, c.ns, listOptions)
 
 	_, err := c.Fake.Invokes(action, &v1.ServiceAccountList{})
 	return err
@@ -70,7 +70,7 @@ func (c *FakeServiceAccounts) DeleteCollection(options *v1.DeleteOptions, listOp
 
 func (c *FakeServiceAccounts) Get(name string, options meta_v1.GetOptions) (result *v1.ServiceAccount, err error) {
 	obj, err := c.Fake.
-		Invokes(core.NewGetAction(serviceaccountsResource, c.ns, name), &v1.ServiceAccount{})
+		Invokes(testing.NewGetAction(serviceaccountsResource, c.ns, name), &v1.ServiceAccount{})
 
 	if obj == nil {
 		return nil, err
@@ -78,15 +78,15 @@ func (c *FakeServiceAccounts) Get(name string, options meta_v1.GetOptions) (resu
 	return obj.(*v1.ServiceAccount), err
 }
 
-func (c *FakeServiceAccounts) List(opts v1.ListOptions) (result *v1.ServiceAccountList, err error) {
+func (c *FakeServiceAccounts) List(opts meta_v1.ListOptions) (result *v1.ServiceAccountList, err error) {
 	obj, err := c.Fake.
-		Invokes(core.NewListAction(serviceaccountsResource, c.ns, opts), &v1.ServiceAccountList{})
+		Invokes(testing.NewListAction(serviceaccountsResource, c.ns, opts), &v1.ServiceAccountList{})
 
 	if obj == nil {
 		return nil, err
 	}
 
-	label, _, _ := core.ExtractFromListOptions(opts)
+	label, _, _ := testing.ExtractFromListOptions(opts)
 	if label == nil {
 		label = labels.Everything()
 	}
@@ -100,16 +100,16 @@ func (c *FakeServiceAccounts) List(opts v1.ListOptions) (result *v1.ServiceAccou
 }
 
 // Watch returns a watch.Interface that watches the requested serviceAccounts.
-func (c *FakeServiceAccounts) Watch(opts v1.ListOptions) (watch.Interface, error) {
+func (c *FakeServiceAccounts) Watch(opts meta_v1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
-		InvokesWatch(core.NewWatchAction(serviceaccountsResource, c.ns, opts))
+		InvokesWatch(testing.NewWatchAction(serviceaccountsResource, c.ns, opts))
 
 }
 
 // Patch applies the patch and returns the patched serviceAccount.
-func (c *FakeServiceAccounts) Patch(name string, pt api.PatchType, data []byte, subresources ...string) (result *v1.ServiceAccount, err error) {
+func (c *FakeServiceAccounts) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v1.ServiceAccount, err error) {
 	obj, err := c.Fake.
-		Invokes(core.NewPatchSubresourceAction(serviceaccountsResource, c.ns, name, data, subresources...), &v1.ServiceAccount{})
+		Invokes(testing.NewPatchSubresourceAction(serviceaccountsResource, c.ns, name, data, subresources...), &v1.ServiceAccount{})
 
 	if obj == nil {
 		return nil, err

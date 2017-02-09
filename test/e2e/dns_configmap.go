@@ -21,14 +21,13 @@ import (
 	"strings"
 	"time"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/fields"
+	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/api/v1"
-	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
-	fed "k8s.io/kubernetes/pkg/dns/federation"
-	"k8s.io/kubernetes/pkg/fields"
-	"k8s.io/kubernetes/pkg/labels"
-	"k8s.io/kubernetes/pkg/util/intstr"
-	"k8s.io/kubernetes/pkg/util/wait"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/test/e2e/framework"
 
 	. "github.com/onsi/ginkgo"
@@ -43,6 +42,7 @@ type dnsConfigMapTest struct {
 	labels []string
 
 	cm      *v1.ConfigMap
+	fedMap  map[string]string
 	isValid bool
 
 	dnsPod      *v1.Pod
@@ -69,7 +69,7 @@ var _ = framework.KubeDescribe("DNS config map", func() {
 func (t *dnsConfigMapTest) init() {
 	By("Finding a DNS pod")
 	label := labels.SelectorFromSet(labels.Set(map[string]string{"k8s-app": "kube-dns"}))
-	options := v1.ListOptions{LabelSelector: label.String()}
+	options := metav1.ListOptions{LabelSelector: label.String()}
 
 	pods, err := t.f.ClientSet.Core().Pods("kube-system").List(options)
 	Expect(err).NotTo(HaveOccurred())
@@ -90,23 +90,25 @@ func (t *dnsConfigMapTest) run() {
 
 	t.labels = []string{"abc", "ghi"}
 	valid1 := map[string]string{"federations": t.labels[0] + "=def"}
+	valid1m := map[string]string{t.labels[0]: "def"}
 	valid2 := map[string]string{"federations": t.labels[1] + "=xyz"}
+	valid2m := map[string]string{t.labels[1]: "xyz"}
 	invalid := map[string]string{"federations": "invalid.map=xyz"}
 
 	By("empty -> valid1")
-	t.setConfigMap(&v1.ConfigMap{Data: valid1}, true)
+	t.setConfigMap(&v1.ConfigMap{Data: valid1}, valid1m, true)
 	t.validate()
 
 	By("valid1 -> valid2")
-	t.setConfigMap(&v1.ConfigMap{Data: valid2}, true)
+	t.setConfigMap(&v1.ConfigMap{Data: valid2}, valid2m, true)
 	t.validate()
 
 	By("valid2 -> invalid")
-	t.setConfigMap(&v1.ConfigMap{Data: invalid}, false)
+	t.setConfigMap(&v1.ConfigMap{Data: invalid}, nil, false)
 	t.validate()
 
 	By("invalid -> valid1")
-	t.setConfigMap(&v1.ConfigMap{Data: valid1}, true)
+	t.setConfigMap(&v1.ConfigMap{Data: valid1}, valid1m, true)
 	t.validate()
 
 	By("valid1 -> deleted")
@@ -114,7 +116,7 @@ func (t *dnsConfigMapTest) run() {
 	t.validate()
 
 	By("deleted -> invalid")
-	t.setConfigMap(&v1.ConfigMap{Data: invalid}, false)
+	t.setConfigMap(&v1.ConfigMap{Data: invalid}, nil, false)
 	t.validate()
 }
 
@@ -123,11 +125,7 @@ func (t *dnsConfigMapTest) validate() {
 }
 
 func (t *dnsConfigMapTest) validateFederation() {
-	federations := make(map[string]string)
-	if t.cm != nil {
-		err := fed.ParseFederationsFlag(t.cm.Data["federations"], federations)
-		Expect(err).NotTo(HaveOccurred())
-	}
+	federations := t.fedMap
 
 	if len(federations) == 0 {
 		By(fmt.Sprintf("Validating federation labels %v do not exist", t.labels))
@@ -210,16 +208,17 @@ func (t *dnsConfigMapTest) runDig(dnsName string) []string {
 	}
 }
 
-func (t *dnsConfigMapTest) setConfigMap(cm *v1.ConfigMap, isValid bool) {
+func (t *dnsConfigMapTest) setConfigMap(cm *v1.ConfigMap, fedMap map[string]string, isValid bool) {
 	if isValid {
 		t.cm = cm
+		t.fedMap = fedMap
 	}
 	t.isValid = isValid
 
 	cm.ObjectMeta.Namespace = t.ns
 	cm.ObjectMeta.Name = t.name
 
-	options := v1.ListOptions{
+	options := metav1.ListOptions{
 		FieldSelector: fields.Set{
 			"metadata.namespace": t.ns,
 			"metadata.name":      t.name,
@@ -257,7 +256,7 @@ func (t *dnsConfigMapTest) createUtilPod() {
 		TypeMeta: metav1.TypeMeta{
 			Kind: "Pod",
 		},
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Namespace:    t.f.Namespace.Name,
 			Labels:       map[string]string{"app": "e2e-dns-configmap"},
 			GenerateName: "e2e-dns-configmap-",
@@ -286,7 +285,7 @@ func (t *dnsConfigMapTest) createUtilPod() {
 		TypeMeta: metav1.TypeMeta{
 			Kind: "Service",
 		},
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Namespace: t.f.Namespace.Name,
 			Name:      "e2e-dns-configmap",
 		},
@@ -309,7 +308,7 @@ func (t *dnsConfigMapTest) createUtilPod() {
 
 func (t *dnsConfigMapTest) deleteUtilPod() {
 	podClient := t.c.Core().Pods(t.f.Namespace.Name)
-	if err := podClient.Delete(t.utilPod.Name, v1.NewDeleteOptions(0)); err != nil {
+	if err := podClient.Delete(t.utilPod.Name, metav1.NewDeleteOptions(0)); err != nil {
 		framework.Logf("Delete of pod %v:%v failed: %v",
 			t.utilPod.Namespace, t.utilPod.Name, err)
 	}

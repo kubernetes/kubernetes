@@ -25,8 +25,8 @@ import (
 	"github.com/aws/aws-sdk-go/service/ec2"
 	"github.com/aws/aws-sdk-go/service/elb"
 	"github.com/golang/glog"
-	"k8s.io/kubernetes/pkg/types"
-	"k8s.io/kubernetes/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/sets"
 )
 
 const ProxyProtocolPolicyName = "k8s-proxyprotocol-enabled"
@@ -293,7 +293,7 @@ func (c *Cloud) ensureLoadBalancer(namespacedName types.NamespacedName, loadBala
 
 		// Update attributes if they're dirty
 		if !reflect.DeepEqual(loadBalancerAttributes, foundAttributes) {
-			glog.V(2).Info("Updating load-balancer attributes for %q", loadBalancerName)
+			glog.V(2).Infof("Updating load-balancer attributes for %q", loadBalancerName)
 
 			modifyAttributesRequest := &elb.ModifyLoadBalancerAttributesInput{}
 			modifyAttributesRequest.LoadBalancerName = aws.String(loadBalancerName)
@@ -351,7 +351,7 @@ func (c *Cloud) ensureLoadBalancerHealthCheck(loadBalancer *elb.LoadBalancerDesc
 		return nil
 	}
 
-	glog.V(2).Info("Updating load-balancer health-check for %q", name)
+	glog.V(2).Infof("Updating load-balancer health-check for %q", name)
 
 	healthCheck := &elb.HealthCheck{}
 	healthCheck.HealthyThreshold = &expectedHealthyThreshold

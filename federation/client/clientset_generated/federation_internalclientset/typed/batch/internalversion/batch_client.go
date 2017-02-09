@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors.
+Copyright 2017 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,19 +17,18 @@ limitations under the License.
 package internalversion
 
 import (
+	rest "k8s.io/client-go/rest"
 	api "k8s.io/kubernetes/pkg/api"
-	registered "k8s.io/kubernetes/pkg/apimachinery/registered"
-	restclient "k8s.io/kubernetes/pkg/client/restclient"
 )
 
 type BatchInterface interface {
-	RESTClient() restclient.Interface
+	RESTClient() rest.Interface
 	JobsGetter
 }
 
-// BatchClient is used to interact with features provided by the k8s.io/kubernetes/pkg/apimachinery/registered.Group group.
+// BatchClient is used to interact with features provided by the batch group.
 type BatchClient struct {
-	restClient restclient.Interface
+	restClient rest.Interface
 }
 
 func (c *BatchClient) Jobs(namespace string) JobInterface {
@@ -37,12 +36,12 @@ func (c *BatchClient) Jobs(namespace string) JobInterface {
 }
 
 // NewForConfig creates a new BatchClient for the given config.
-func NewForConfig(c *restclient.Config) (*BatchClient, error) {
+func NewForConfig(c *rest.Config) (*BatchClient, error) {
 	config := *c
 	if err := setConfigDefaults(&config); err != nil {
 		return nil, err
 	}
-	client, err := restclient.RESTClientFor(&config)
+	client, err := rest.RESTClientFor(&config)
 	if err != nil {
 		return nil, err
 	}
@@ -51,7 +50,7 @@ func NewForConfig(c *restclient.Config) (*BatchClient, error) {
 
 // NewForConfigOrDie creates a new BatchClient for the given config and
 // panics if there is an error in the config.
-func NewForConfigOrDie(c *restclient.Config) *BatchClient {
+func NewForConfigOrDie(c *rest.Config) *BatchClient {
 	client, err := NewForConfig(c)
 	if err != nil {
 		panic(err)
@@ -60,19 +59,19 @@ func NewForConfigOrDie(c *restclient.Config) *BatchClient {
 }
 
 // New creates a new BatchClient for the given RESTClient.
-func New(c restclient.Interface) *BatchClient {
+func New(c rest.Interface) *BatchClient {
 	return &BatchClient{c}
 }
 
-func setConfigDefaults(config *restclient.Config) error {
+func setConfigDefaults(config *rest.Config) error {
 	// if batch group is not registered, return an error
-	g, err := registered.Group("batch")
+	g, err := api.Registry.Group("batch")
 	if err != nil {
 		return err
 	}
 	config.APIPath = "/apis"
 	if config.UserAgent == "" {
-		config.UserAgent = restclient.DefaultKubernetesUserAgent()
+		config.UserAgent = rest.DefaultKubernetesUserAgent()
 	}
 	if config.GroupVersion == nil || config.GroupVersion.Group != g.GroupVersion.Group {
 		copyGroupVersion := g.GroupVersion
@@ -91,7 +90,7 @@ func setConfigDefaults(config *restclient.Config) error {
 
 // RESTClient returns a RESTClient that is used to communicate
 // with API server by this client implementation.
-func (c *BatchClient) RESTClient() restclient.Interface {
+func (c *BatchClient) RESTClient() rest.Interface {
 	if c == nil {
 		return nil
 	}

@@ -26,10 +26,19 @@ import (
 	"reflect"
 	"testing"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	utilnet "k8s.io/apimachinery/pkg/util/net"
+	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/version"
+	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
+	genericapiserver "k8s.io/apiserver/pkg/server"
+	etcdtesting "k8s.io/apiserver/pkg/storage/etcd/testing"
+	restclient "k8s.io/client-go/rest"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	apiv1 "k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	"k8s.io/kubernetes/pkg/apis/apps"
 	appsapiv1beta1 "k8s.io/kubernetes/pkg/apis/apps/v1beta1"
 	"k8s.io/kubernetes/pkg/apis/autoscaling"
@@ -40,40 +49,27 @@ import (
 	"k8s.io/kubernetes/pkg/apis/certificates"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	extensionsapiv1beta1 "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
-	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/apis/rbac"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset/fake"
-	"k8s.io/kubernetes/pkg/client/restclient"
-	openapigen "k8s.io/kubernetes/pkg/generated/openapi"
-	"k8s.io/kubernetes/pkg/genericapiserver"
 	kubeletclient "k8s.io/kubernetes/pkg/kubelet/client"
-	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/runtime/schema"
-	etcdtesting "k8s.io/kubernetes/pkg/storage/etcd/testing"
-	utilnet "k8s.io/kubernetes/pkg/util/net"
-	"k8s.io/kubernetes/pkg/util/sets"
-	"k8s.io/kubernetes/pkg/version"
+	kubeversion "k8s.io/kubernetes/pkg/version"
 
-	"github.com/go-openapi/loads"
-	"github.com/go-openapi/spec"
-	"github.com/go-openapi/strfmt"
-	"github.com/go-openapi/validate"
 	"github.com/stretchr/testify/assert"
 )
 
 // setUp is a convience function for setting up for (most) tests.
 func setUp(t *testing.T) (*Master, *etcdtesting.EtcdTestServer, Config, *assert.Assertions) {
-	server, storageConfig := etcdtesting.NewUnsecuredEtcd3TestClientServer(t)
+	server, storageConfig := etcdtesting.NewUnsecuredEtcd3TestClientServer(t, api.Scheme)
 
 	config := &Config{
-		GenericConfig:           genericapiserver.NewConfig(),
+		GenericConfig:           genericapiserver.NewConfig().WithSerializer(api.Codecs),
 		APIResourceConfigSource: DefaultAPIResourceConfigSource(),
 		APIServerServicePort:    443,
 		MasterCount:             1,
 	}
 
-	resourceEncoding := genericapiserver.NewDefaultResourceEncodingConfig()
-	resourceEncoding.SetVersionEncoding(api.GroupName, registered.GroupOrDie(api.GroupName).GroupVersion, schema.GroupVersion{Group: api.GroupName, Version: runtime.APIVersionInternal})
+	resourceEncoding := genericapiserver.NewDefaultResourceEncodingConfig(api.Registry)
+	resourceEncoding.SetVersionEncoding(api.GroupName, api.Registry.GroupOrDie(api.GroupName).GroupVersion, schema.GroupVersion{Group: api.GroupName, Version: runtime.APIVersionInternal})
 	resourceEncoding.SetVersionEncoding(autoscaling.GroupName, *testapi.Autoscaling.GroupVersion(), schema.GroupVersion{Group: autoscaling.GroupName, Version: runtime.APIVersionInternal})
 	resourceEncoding.SetVersionEncoding(batch.GroupName, *testapi.Batch.GroupVersion(), schema.GroupVersion{Group: batch.GroupName, Version: runtime.APIVersionInternal})
 	resourceEncoding.SetVersionEncoding(apps.GroupName, *testapi.Apps.GroupVersion(), schema.GroupVersion{Group: apps.GroupName, Version: runtime.APIVersionInternal})
@@ -82,13 +78,13 @@ func setUp(t *testing.T) (*Master, *etcdtesting.EtcdTestServer, Config, *assert.
 	resourceEncoding.SetVersionEncoding(certificates.GroupName, *testapi.Certificates.GroupVersion(), schema.GroupVersion{Group: certificates.GroupName, Version: runtime.APIVersionInternal})
 	storageFactory := genericapiserver.NewDefaultStorageFactory(*storageConfig, testapi.StorageMediaType(), api.Codecs, resourceEncoding, DefaultAPIResourceConfigSource())
 
-	kubeVersion := version.Get()
+	kubeVersion := kubeversion.Get()
 	config.GenericConfig.Version = &kubeVersion
 	config.StorageFactory = storageFactory
 	config.GenericConfig.LoopbackClientConfig = &restclient.Config{APIPath: "/api", ContentConfig: restclient.ContentConfig{NegotiatedSerializer: api.Codecs}}
 	config.GenericConfig.PublicAddress = net.ParseIP("192.168.10.4")
 	config.GenericConfig.LegacyAPIGroupPrefixes = sets.NewString("/api")
-	config.GenericConfig.RequestContextMapper = api.NewRequestContextMapper()
+	config.GenericConfig.RequestContextMapper = genericapirequest.NewRequestContextMapper()
 	config.GenericConfig.LoopbackClientConfig = &restclient.Config{APIPath: "/api", ContentConfig: restclient.ContentConfig{NegotiatedSerializer: api.Codecs}}
 	config.GenericConfig.EnableMetrics = true
 	config.EnableCoreControllers = false
@@ -161,8 +157,8 @@ func TestVersion(t *testing.T) {
 		t.Errorf("unexpected error: %v", err)
 	}
 
-	if !reflect.DeepEqual(version.Get(), info) {
-		t.Errorf("Expected %#v, Got %#v", version.Get(), info)
+	if !reflect.DeepEqual(kubeversion.Get(), info) {
+		t.Errorf("Expected %#v, Got %#v", kubeversion.Get(), info)
 	}
 }
 
@@ -192,14 +188,14 @@ func TestGetNodeAddresses(t *testing.T) {
 	addressProvider := nodeAddressProvider{fakeNodeClient}
 
 	// Fail case (no addresses associated with nodes)
-	nodes, _ := fakeNodeClient.List(apiv1.ListOptions{})
+	nodes, _ := fakeNodeClient.List(metav1.ListOptions{})
 	addrs, err := addressProvider.externalAddresses()
 
 	assert.Error(err, "addresses should have caused an error as there are no addresses.")
 	assert.Equal([]string(nil), addrs)
 
 	// Pass case with External type IP
-	nodes, _ = fakeNodeClient.List(apiv1.ListOptions{})
+	nodes, _ = fakeNodeClient.List(metav1.ListOptions{})
 	for index := range nodes.Items {
 		nodes.Items[index].Status.Addresses = []apiv1.NodeAddress{{Type: apiv1.NodeExternalIP, Address: "127.0.0.1"}}
 		fakeNodeClient.Update(&nodes.Items[index])
@@ -209,7 +205,7 @@ func TestGetNodeAddresses(t *testing.T) {
 	assert.Equal([]string{"127.0.0.1", "127.0.0.1"}, addrs)
 
 	// Pass case with LegacyHost type IP
-	nodes, _ = fakeNodeClient.List(apiv1.ListOptions{})
+	nodes, _ = fakeNodeClient.List(metav1.ListOptions{})
 	for index := range nodes.Items {
 		nodes.Items[index].Status.Addresses = []apiv1.NodeAddress{{Type: apiv1.NodeLegacyHostIP, Address: "127.0.0.2"}}
 		fakeNodeClient.Update(&nodes.Items[index])
@@ -306,62 +302,4 @@ func TestAPIVersionOfDiscoveryEndpoints(t *testing.T) {
 	assert.NoError(decodeResponse(resp, &resourceList))
 	assert.Equal(resourceList.APIVersion, "v1")
 
-}
-
-// TestValidOpenAPISpec verifies that the open api is added
-// at the proper endpoint and the spec is valid.
-func TestValidOpenAPISpec(t *testing.T) {
-	_, etcdserver, config, assert := setUp(t)
-	defer etcdserver.Terminate(t)
-
-	config.GenericConfig.EnableIndex = true
-	config.GenericConfig.OpenAPIConfig = genericapiserver.DefaultOpenAPIConfig(openapigen.OpenAPIDefinitions)
-	config.GenericConfig.OpenAPIConfig.Info = &spec.Info{
-		InfoProps: spec.InfoProps{
-			Title:   "Kubernetes",
-			Version: "unversioned",
-		},
-	}
-	config.GenericConfig.SwaggerConfig = genericapiserver.DefaultSwaggerConfig()
-
-	master, err := config.Complete().New()
-	if err != nil {
-		t.Fatalf("Error in bringing up the master: %v", err)
-	}
-
-	// make sure swagger.json is not registered before calling PrepareRun.
-	server := httptest.NewServer(master.GenericAPIServer.HandlerContainer.ServeMux)
-	defer server.Close()
-	resp, err := http.Get(server.URL + "/swagger.json")
-	if !assert.NoError(err) {
-		t.Errorf("unexpected error: %v", err)
-	}
-	assert.Equal(http.StatusNotFound, resp.StatusCode)
-
-	master.GenericAPIServer.PrepareRun()
-
-	resp, err = http.Get(server.URL + "/swagger.json")
-	if !assert.NoError(err) {
-		t.Errorf("unexpected error: %v", err)
-	}
-	assert.Equal(http.StatusOK, resp.StatusCode)
-
-	// as json schema
-	var sch spec.Schema
-	if assert.NoError(decodeResponse(resp, &sch)) {
-		validator := validate.NewSchemaValidator(spec.MustLoadSwagger20Schema(), nil, "", strfmt.Default)
-		res := validator.Validate(&sch)
-		assert.NoError(res.AsError())
-	}
-
-	// Validate OpenApi spec
-	doc, err := loads.Spec(server.URL + "/swagger.json")
-	if assert.NoError(err) {
-		validator := validate.NewSpecValidator(doc.Schema(), strfmt.Default)
-		res, warns := validator.Validate(doc)
-		assert.NoError(res.AsError())
-		if !warns.IsValid() {
-			t.Logf("Open API spec on root has some warnings : %v", warns)
-		}
-	}
 }

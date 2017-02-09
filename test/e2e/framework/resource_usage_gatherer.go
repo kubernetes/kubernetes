@@ -27,9 +27,9 @@ import (
 	"text/tabwriter"
 	"time"
 
-	"k8s.io/kubernetes/pkg/api/v1"
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
-	utilruntime "k8s.io/kubernetes/pkg/util/runtime"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/pkg/util/system"
 )
 
@@ -232,7 +232,7 @@ func NewResourceUsageGatherer(c clientset.Interface, options ResourceGathererOpt
 			finished:   false,
 		})
 	} else {
-		pods, err := c.Core().Pods("kube-system").List(v1.ListOptions{})
+		pods, err := c.Core().Pods("kube-system").List(metav1.ListOptions{})
 		if err != nil {
 			Logf("Error while listing Pods: %v", err)
 			return nil, err
@@ -244,7 +244,7 @@ func NewResourceUsageGatherer(c clientset.Interface, options ResourceGathererOpt
 				g.containerIDs = append(g.containerIDs, containerID)
 			}
 		}
-		nodeList, err := c.Core().Nodes().List(v1.ListOptions{})
+		nodeList, err := c.Core().Nodes().List(metav1.ListOptions{})
 		if err != nil {
 			Logf("Error while listing Nodes: %v", err)
 			return nil, err

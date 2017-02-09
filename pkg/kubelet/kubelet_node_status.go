@@ -27,17 +27,18 @@ import (
 	"time"
 
 	"github.com/golang/glog"
-	apierrors "k8s.io/kubernetes/pkg/api/errors"
-	"k8s.io/kubernetes/pkg/api/resource"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/resource"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/conversion"
+	"k8s.io/apimachinery/pkg/types"
+	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/kubernetes/pkg/api/v1"
-	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/cloudprovider"
-	"k8s.io/kubernetes/pkg/conversion"
 	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
 	"k8s.io/kubernetes/pkg/kubelet/events"
+	"k8s.io/kubernetes/pkg/kubelet/util"
 	"k8s.io/kubernetes/pkg/kubelet/util/sliceutils"
-	"k8s.io/kubernetes/pkg/types"
-	utilnet "k8s.io/kubernetes/pkg/util/net"
 	nodeutil "k8s.io/kubernetes/pkg/util/node"
 	"k8s.io/kubernetes/pkg/version"
 	"k8s.io/kubernetes/pkg/volume/util/volumehelper"
@@ -149,7 +150,7 @@ func (kl *Kubelet) tryRegisterWithApiServer(node *v1.Node) bool {
 	if err := kl.kubeClient.Core().Nodes().Delete(node.Name, nil); err != nil {
 		glog.Errorf("Unable to register node %q with API server: error deleting old node: %v", kl.nodeName, err)
 	} else {
-		glog.Info("Deleted old node object %q", kl.nodeName)
+		glog.Infof("Deleted old node object %q", kl.nodeName)
 	}
 
 	return false
@@ -189,7 +190,7 @@ func (kl *Kubelet) reconcileCMADAnnotationWithExistingNode(node, existingNode *v
 // labels, information from the cloud provider, and Kubelet configuration.
 func (kl *Kubelet) initialNode() (*v1.Node, error) {
 	node := &v1.Node{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name: string(kl.nodeName),
 			Labels: map[string]string{
 				metav1.LabelHostname:       kl.hostname,
@@ -204,7 +205,13 @@ func (kl *Kubelet) initialNode() (*v1.Node, error) {
 	}
 	if len(kl.kubeletConfiguration.RegisterWithTaints) > 0 {
 		annotations := make(map[string]string)
-		b, err := json.Marshal(kl.kubeletConfiguration.RegisterWithTaints)
+		taints := make([]v1.Taint, len(kl.kubeletConfiguration.RegisterWithTaints))
+		for i := range kl.kubeletConfiguration.RegisterWithTaints {
+			if err := v1.Convert_api_Taint_To_v1_Taint(&kl.kubeletConfiguration.RegisterWithTaints[i], &taints[i], nil); err != nil {
+				return nil, err
+			}
+		}
+		b, err := json.Marshal(taints)
 		if err != nil {
 			return nil, err
 		}
@@ -339,11 +346,11 @@ func (kl *Kubelet) tryUpdateNodeStatus(tryNumber int) error {
 	// from here are the majority of load on apiserver and etcd.
 	// To reduce the load on etcd, we are serving GET operations from
 	// apiserver cache (the data might be slightly delayed but it doesn't
-	// seem to cause more confilict - the delays are pretty small).
+	// seem to cause more conflict - the delays are pretty small).
 	// If it result in a conflict, all retries are served directly from etcd.
 	opts := metav1.GetOptions{}
 	if tryNumber == 0 {
-		opts.ResourceVersion = "0"
+		util.FromApiserverCache(&opts)
 	}
 	node, err := kl.kubeClient.Core().Nodes().Get(string(kl.nodeName), opts)
 	if err != nil {
@@ -368,7 +375,7 @@ func (kl *Kubelet) tryUpdateNodeStatus(tryNumber int) error {
 	if err != nil {
 		return err
 	}
-	// If update finishes sucessfully, mark the volumeInUse as reportedInUse to indicate
+	// If update finishes successfully, mark the volumeInUse as reportedInUse to indicate
 	// those volumes are already updated in the node's status
 	kl.volumeManager.MarkVolumesAsReportedInUse(updatedNode.Status.VolumesInUse)
 	return nil
@@ -376,11 +383,11 @@ func (kl *Kubelet) tryUpdateNodeStatus(tryNumber int) error {
 
 // recordNodeStatusEvent records an event of the given type with the given
 // message for the node.
-func (kl *Kubelet) recordNodeStatusEvent(eventtype, event string) {
+func (kl *Kubelet) recordNodeStatusEvent(eventType, event string) {
 	glog.V(2).Infof("Recording %s event message for node %s", event, kl.nodeName)
 	// TODO: This requires a transaction, either both node status is updated
 	// and event is recorded or neither should happen, see issue #6055.
-	kl.recorder.Eventf(kl.nodeRef, eventtype, event, "Node %s status is now: %s", kl.nodeName, event)
+	kl.recorder.Eventf(kl.nodeRef, eventType, event, "Node %s status is now: %s", kl.nodeName, event)
 }
 
 // Set IP and hostname addresses for the node.
@@ -765,7 +772,7 @@ func (kl *Kubelet) setNodeDiskPressureCondition(node *v1.Node) {
 	// Update the heartbeat time
 	condition.LastHeartbeatTime = currentTime
 
-	// Note: The conditions below take care of the case when a new NodeDiskressure condition is
+	// Note: The conditions below take care of the case when a new NodeDiskPressure condition is
 	// created and as well as the case when the condition already exists. When a new condition
 	// is created its status is set to v1.ConditionUnknown which matches either
 	// condition.Status != v1.ConditionTrue or
@@ -794,7 +801,7 @@ func (kl *Kubelet) setNodeDiskPressureCondition(node *v1.Node) {
 	}
 }
 
-// Set OODcondition for the node.
+// Set OODCondition for the node.
 func (kl *Kubelet) setNodeOODCondition(node *v1.Node) {
 	currentTime := metav1.NewTime(kl.clock.Now())
 	var nodeOODCondition *v1.NodeCondition
@@ -914,14 +921,6 @@ func (kl *Kubelet) defaultNodeStatusFuncs() []func(*v1.Node) error {
 		withoutError(kl.setNodeReadyCondition),
 		withoutError(kl.setNodeVolumesInUseStatus),
 		withoutError(kl.recordNodeSchedulableEvent),
-	}
-}
-
-// SetNodeStatus returns a functional Option that adds the given node status
-// update handler to the Kubelet
-func SetNodeStatus(f func(*v1.Node) error) Option {
-	return func(k *Kubelet) {
-		k.setNodeStatusFuncs = append(k.setNodeStatusFuncs, f)
 	}
 }
 

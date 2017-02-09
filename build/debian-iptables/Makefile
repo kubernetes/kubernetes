@@ -16,15 +16,16 @@
 
 REGISTRY?="gcr.io/google_containers"
 IMAGE=debian-iptables
-TAG=v4
+TAG=v6
 ARCH?=amd64
 TEMP_DIR:=$(shell mktemp -d)
+QEMUVERSION=v2.7.0
 
 ifeq ($(ARCH),amd64)
 	BASEIMAGE?=debian:jessie
 endif
 ifeq ($(ARCH),arm)
-	BASEIMAGE?=armel/debian:jessie
+	BASEIMAGE?=armhf/debian:jessie
 	QEMUARCH=arm
 endif
 ifeq ($(ARCH),arm64)
@@ -52,11 +53,11 @@ else
 	# When cross-building, only the placeholder "CROSS_BUILD_" should be removed
 	# Register /usr/bin/qemu-ARCH-static as the handler for ARM binaries in the kernel
 	docker run --rm --privileged multiarch/qemu-user-static:register --reset
-	curl -sSL https://github.com/multiarch/qemu-user-static/releases/download/v2.6.0/x86_64_qemu-$(QEMUARCH)-static.tar.gz | tar -xz -C $(TEMP_DIR)
+	curl -sSL https://github.com/multiarch/qemu-user-static/releases/download/$(QEMUVERSION)/x86_64_qemu-$(QEMUARCH)-static.tar.gz | tar -xz -C $(TEMP_DIR)
 	cd $(TEMP_DIR) && sed -i "s/CROSS_BUILD_//g" Dockerfile
 endif
 
-	docker build -t $(REGISTRY)/$(IMAGE)-$(ARCH):$(TAG) $(TEMP_DIR)
+	docker build --pull -t $(REGISTRY)/$(IMAGE)-$(ARCH):$(TAG) $(TEMP_DIR)
 
 push: build
 	gcloud docker -- push $(REGISTRY)/$(IMAGE)-$(ARCH):$(TAG)

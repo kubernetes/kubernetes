@@ -20,10 +20,11 @@ import (
 	"reflect"
 	"testing"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/kubernetes/pkg/api"
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
-	"k8s.io/kubernetes/pkg/apimachinery/registered"
-	"k8s.io/kubernetes/pkg/runtime"
 )
 
 func TestExportSecret(t *testing.T) {
@@ -35,7 +36,7 @@ func TestExportSecret(t *testing.T) {
 	}{
 		{
 			objIn: &api.Secret{
-				ObjectMeta: api.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Name:      "foo",
 					Namespace: "bar",
 				},
@@ -44,7 +45,7 @@ func TestExportSecret(t *testing.T) {
 				},
 			},
 			objOut: &api.Secret{
-				ObjectMeta: api.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Name:      "foo",
 					Namespace: "bar",
 				},
@@ -56,7 +57,7 @@ func TestExportSecret(t *testing.T) {
 		},
 		{
 			objIn: &api.Secret{
-				ObjectMeta: api.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Name:      "foo",
 					Namespace: "bar",
 				},
@@ -66,7 +67,7 @@ func TestExportSecret(t *testing.T) {
 		},
 		{
 			objIn: &api.Secret{
-				ObjectMeta: api.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Name:      "foo",
 					Namespace: "bar",
 					Annotations: map[string]string{
@@ -83,7 +84,7 @@ func TestExportSecret(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		err := Strategy.Export(api.NewContext(), test.objIn, test.exact)
+		err := Strategy.Export(genericapirequest.NewContext(), test.objIn, test.exact)
 		if err != nil {
 			if !test.expectErr {
 				t.Errorf("unexpected error: %v", err)
@@ -102,7 +103,7 @@ func TestExportSecret(t *testing.T) {
 
 func TestSelectableFieldLabelConversions(t *testing.T) {
 	apitesting.TestSelectableFieldLabelConversionsOfKind(t,
-		registered.GroupOrDie(api.GroupName).GroupVersion.String(),
+		api.Registry.GroupOrDie(api.GroupName).GroupVersion.String(),
 		"Secret",
 		SelectableFields(&api.Secret{}),
 		nil,

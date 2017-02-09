@@ -16,9 +16,8 @@ go_test(
         "preallocate_test.go",
         "purge_test.go",
     ],
-    library = "go_default_library",
+    library = ":go_default_library",
     tags = ["automanaged"],
-    deps = [],
 )
 
 go_library(
@@ -33,4 +32,17 @@ go_library(
     ],
     tags = ["automanaged"],
     deps = ["//vendor:github.com/coreos/pkg/capnslog"],
+)
+
+filegroup(
+    name = "package-srcs",
+    srcs = glob(["**"]),
+    tags = ["automanaged"],
+    visibility = ["//visibility:private"],
+)
+
+filegroup(
+    name = "all-srcs",
+    srcs = [":package-srcs"],
+    tags = ["automanaged"],
 )

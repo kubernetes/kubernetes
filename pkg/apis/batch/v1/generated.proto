@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors.
+Copyright 2017 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -21,12 +21,12 @@ syntax = 'proto2';
 
 package k8s.io.kubernetes.pkg.apis.batch.v1;
 
-import "k8s.io/kubernetes/pkg/api/resource/generated.proto";
+import "k8s.io/apimachinery/pkg/apis/meta/v1/generated.proto";
+import "k8s.io/apimachinery/pkg/runtime/generated.proto";
+import "k8s.io/apimachinery/pkg/runtime/schema/generated.proto";
+import "k8s.io/apimachinery/pkg/util/intstr/generated.proto";
+import "k8s.io/apiserver/pkg/apis/example/v1/generated.proto";
 import "k8s.io/kubernetes/pkg/api/v1/generated.proto";
-import "k8s.io/kubernetes/pkg/apis/meta/v1/generated.proto";
-import "k8s.io/kubernetes/pkg/runtime/generated.proto";
-import "k8s.io/kubernetes/pkg/runtime/schema/generated.proto";
-import "k8s.io/kubernetes/pkg/util/intstr/generated.proto";
 
 // Package-wide variables from generator "generated".
 option go_package = "v1";
@@ -36,7 +36,7 @@ message Job {
   // Standard object's metadata.
   // More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
   // +optional
-  optional k8s.io.kubernetes.pkg.api.v1.ObjectMeta metadata = 1;
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
   // Spec is a structure defining the expected behavior of a job.
   // More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status
@@ -59,11 +59,11 @@ message JobCondition {
 
   // Last time the condition was checked.
   // +optional
-  optional k8s.io.kubernetes.pkg.apis.meta.v1.Time lastProbeTime = 3;
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.Time lastProbeTime = 3;
 
   // Last time the condition transit from one status to another.
   // +optional
-  optional k8s.io.kubernetes.pkg.apis.meta.v1.Time lastTransitionTime = 4;
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.Time lastTransitionTime = 4;
 
   // (brief) reason for the condition's last transition.
   // +optional
@@ -79,7 +79,7 @@ message JobList {
   // Standard list metadata
   // More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
   // +optional
-  optional k8s.io.kubernetes.pkg.apis.meta.v1.ListMeta metadata = 1;
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
 
   // Items is the list of Job.
   repeated Job items = 2;
@@ -113,7 +113,7 @@ message JobSpec {
   // Normally, the system sets this field for you.
   // More info: http://kubernetes.io/docs/user-guide/labels#label-selectors
   // +optional
-  optional k8s.io.kubernetes.pkg.apis.meta.v1.LabelSelector selector = 4;
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.LabelSelector selector = 4;
 
   // ManualSelector controls generation of pod labels and pod selectors.
   // Leave `manualSelector` unset unless you are certain what you are doing.
@@ -145,13 +145,13 @@ message JobStatus {
   // It is not guaranteed to be set in happens-before order across separate operations.
   // It is represented in RFC3339 form and is in UTC.
   // +optional
-  optional k8s.io.kubernetes.pkg.apis.meta.v1.Time startTime = 2;
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.Time startTime = 2;
 
   // CompletionTime represents time when the job was completed. It is not guaranteed to
   // be set in happens-before order across separate operations.
   // It is represented in RFC3339 form and is in UTC.
   // +optional
-  optional k8s.io.kubernetes.pkg.apis.meta.v1.Time completionTime = 3;
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.Time completionTime = 3;
 
   // Active is the number of actively running pods.
   // +optional

@@ -22,17 +22,18 @@ import (
 	"testing"
 	"time"
 
+	"k8s.io/apimachinery/pkg/api/meta"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/wait"
 	fedv1 "k8s.io/kubernetes/federation/apis/federation/v1beta1"
 	fakefedclientset "k8s.io/kubernetes/federation/client/clientset_generated/federation_clientset/fake"
 	. "k8s.io/kubernetes/federation/pkg/federation-controller/util/test"
-	"k8s.io/kubernetes/pkg/api/meta"
 	apiv1 "k8s.io/kubernetes/pkg/api/v1"
 	extensionsv1 "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	kubeclientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	fakekubeclientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/fake"
-	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/types"
-	"k8s.io/kubernetes/pkg/util/wait"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -84,6 +85,9 @@ func TestDeploymentController(t *testing.T) {
 	cluster2 := NewCluster("cluster2", apiv1.ConditionTrue)
 
 	fakeClient := &fakefedclientset.Clientset{}
+	// Add an update reactor on fake client to return the desired updated object.
+	// This is a hack to workaround https://github.com/kubernetes/kubernetes/issues/40939.
+	AddFakeUpdateReactor("deployments", &fakeClient.Fake)
 	RegisterFakeList("clusters", &fakeClient.Fake, &fedv1.ClusterList{Items: []fedv1.Cluster{*cluster1}})
 	deploymentsWatch := RegisterFakeWatch("deployments", &fakeClient.Fake)
 	clusterWatch := RegisterFakeWatch("clusters", &fakeClient.Fake)
@@ -174,9 +178,9 @@ func GetDeploymentFromChan(c chan runtime.Object) *extensionsv1.Deployment {
 
 func newDeploymentWithReplicas(name string, replicas int32) *extensionsv1.Deployment {
 	return &extensionsv1.Deployment{
-		ObjectMeta: apiv1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
-			Namespace: apiv1.NamespaceDefault,
+			Namespace: metav1.NamespaceDefault,
 			SelfLink:  "/api/v1/namespaces/default/deployments/name",
 		},
 		Spec: extensionsv1.DeploymentSpec{

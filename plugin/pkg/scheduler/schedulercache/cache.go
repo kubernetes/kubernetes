@@ -22,9 +22,9 @@ import (
 	"time"
 
 	"github.com/golang/glog"
+	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/labels"
-	"k8s.io/kubernetes/pkg/util/wait"
 )
 
 var (
@@ -60,6 +60,8 @@ type podState struct {
 	pod *v1.Pod
 	// Used by assumedPod to determinate expiration.
 	deadline *time.Time
+	// Used to block cache from expiring assumedPod if binding still runs
+	bindingFinished bool
 }
 
 func newSchedulerCache(ttl, period time.Duration, stop <-chan struct{}) *schedulerCache {
@@ -105,11 +107,6 @@ func (cache *schedulerCache) List(selector labels.Selector) ([]*v1.Pod, error) {
 }
 
 func (cache *schedulerCache) AssumePod(pod *v1.Pod) error {
-	return cache.assumePod(pod, time.Now())
-}
-
-// assumePod exists for making test deterministic by taking time as input argument.
-func (cache *schedulerCache) assumePod(pod *v1.Pod, now time.Time) error {
 	key, err := getPodKey(pod)
 	if err != nil {
 		return err
@@ -122,13 +119,35 @@ func (cache *schedulerCache) assumePod(pod *v1.Pod, now time.Time) error {
 	}
 
 	cache.addPod(pod)
-	dl := now.Add(cache.ttl)
 	ps := &podState{
-		pod:      pod,
-		deadline: &dl,
+		pod: pod,
 	}
 	cache.podStates[key] = ps
 	cache.assumedPods[key] = true
+	return nil
+}
+
+func (cache *schedulerCache) FinishBinding(pod *v1.Pod) error {
+	return cache.finishBinding(pod, time.Now())
+}
+
+// finishBinding exists to make tests determinitistic by injecting now as an argument
+func (cache *schedulerCache) finishBinding(pod *v1.Pod, now time.Time) error {
+	key, err := getPodKey(pod)
+	if err != nil {
+		return err
+	}
+
+	cache.mu.Lock()
+	defer cache.mu.Unlock()
+
+	glog.V(5).Infof("Finished binding for pod %v. Can be expired.", key)
+	currState, ok := cache.podStates[key]
+	if ok && cache.assumedPods[key] {
+		dl := now.Add(cache.ttl)
+		currState.bindingFinished = true
+		currState.deadline = &dl
+	}
 	return nil
 }
 
@@ -342,6 +361,11 @@ func (cache *schedulerCache) cleanupAssumedPods(now time.Time) {
 		ps, ok := cache.podStates[key]
 		if !ok {
 			panic("Key found in assumed set but not in podStates. Potentially a logical error.")
+		}
+		if !ps.bindingFinished {
+			glog.Warningf("Couldn't expire cache for pod %v/%v. Binding is still in progress.",
+				ps.pod.Namespace, ps.pod.Name)
+			continue
 		}
 		if now.After(*ps.deadline) {
 			glog.Warningf("Pod %s/%s expired", ps.pod.Namespace, ps.pod.Name)

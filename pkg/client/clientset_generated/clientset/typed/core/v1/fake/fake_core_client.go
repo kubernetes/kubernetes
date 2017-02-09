@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors.
+Copyright 2017 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,13 +17,13 @@ limitations under the License.
 package fake
 
 import (
+	rest "k8s.io/client-go/rest"
+	testing "k8s.io/client-go/testing"
 	v1 "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/core/v1"
-	restclient "k8s.io/kubernetes/pkg/client/restclient"
-	core "k8s.io/kubernetes/pkg/client/testing/core"
 )
 
 type FakeCoreV1 struct {
-	*core.Fake
+	*testing.Fake
 }
 
 func (c *FakeCoreV1) ComponentStatuses() v1.ComponentStatusInterface {
@@ -92,7 +92,7 @@ func (c *FakeCoreV1) ServiceAccounts(namespace string) v1.ServiceAccountInterfac
 
 // RESTClient returns a RESTClient that is used to communicate
 // with API server by this client implementation.
-func (c *FakeCoreV1) RESTClient() restclient.Interface {
-	var ret *restclient.RESTClient
+func (c *FakeCoreV1) RESTClient() rest.Interface {
+	var ret *rest.RESTClient
 	return ret
 }

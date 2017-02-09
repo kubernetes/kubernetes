@@ -20,8 +20,8 @@ import (
 	"sync"
 	"time"
 
-	"k8s.io/kubernetes/pkg/types"
-	"k8s.io/kubernetes/pkg/util/clock"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/util/clock"
 )
 
 // WorkQueue allows queuing items with a timestamp. An item is

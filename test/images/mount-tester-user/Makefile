@@ -12,13 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-TAG = 0.4
+TAG = 0.5
 PREFIX = gcr.io/google_containers
 
 all: push
 
 image:
-	sudo docker build -t $(PREFIX)/mounttest-user:$(TAG) .
+	sudo docker build --pull -t $(PREFIX)/mounttest-user:$(TAG) .
 
 push: image
 	gcloud docker -- push $(PREFIX)/mounttest-user:$(TAG)

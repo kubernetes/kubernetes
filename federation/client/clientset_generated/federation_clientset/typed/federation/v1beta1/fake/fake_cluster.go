@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors.
+Copyright 2017 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,14 +17,13 @@ limitations under the License.
 package fake
 
 import (
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	labels "k8s.io/apimachinery/pkg/labels"
+	schema "k8s.io/apimachinery/pkg/runtime/schema"
+	types "k8s.io/apimachinery/pkg/types"
+	watch "k8s.io/apimachinery/pkg/watch"
+	testing "k8s.io/client-go/testing"
 	v1beta1 "k8s.io/kubernetes/federation/apis/federation/v1beta1"
-	api "k8s.io/kubernetes/pkg/api"
-	v1 "k8s.io/kubernetes/pkg/api/v1"
-	meta_v1 "k8s.io/kubernetes/pkg/apis/meta/v1"
-	core "k8s.io/kubernetes/pkg/client/testing/core"
-	labels "k8s.io/kubernetes/pkg/labels"
-	schema "k8s.io/kubernetes/pkg/runtime/schema"
-	watch "k8s.io/kubernetes/pkg/watch"
 )
 
 // FakeClusters implements ClusterInterface
@@ -36,7 +35,7 @@ var clustersResource = schema.GroupVersionResource{Group: "federation", Version:
 
 func (c *FakeClusters) Create(cluster *v1beta1.Cluster) (result *v1beta1.Cluster, err error) {
 	obj, err := c.Fake.
-		Invokes(core.NewRootCreateAction(clustersResource, cluster), &v1beta1.Cluster{})
+		Invokes(testing.NewRootCreateAction(clustersResource, cluster), &v1beta1.Cluster{})
 	if obj == nil {
 		return nil, err
 	}
@@ -45,7 +44,7 @@ func (c *FakeClusters) Create(cluster *v1beta1.Cluster) (result *v1beta1.Cluster
 
 func (c *FakeClusters) Update(cluster *v1beta1.Cluster) (result *v1beta1.Cluster, err error) {
 	obj, err := c.Fake.
-		Invokes(core.NewRootUpdateAction(clustersResource, cluster), &v1beta1.Cluster{})
+		Invokes(testing.NewRootUpdateAction(clustersResource, cluster), &v1beta1.Cluster{})
 	if obj == nil {
 		return nil, err
 	}
@@ -54,7 +53,7 @@ func (c *FakeClusters) Update(cluster *v1beta1.Cluster) (result *v1beta1.Cluster
 
 func (c *FakeClusters) UpdateStatus(cluster *v1beta1.Cluster) (*v1beta1.Cluster, error) {
 	obj, err := c.Fake.
-		Invokes(core.NewRootUpdateSubresourceAction(clustersResource, "status", cluster), &v1beta1.Cluster{})
+		Invokes(testing.NewRootUpdateSubresourceAction(clustersResource, "status", cluster), &v1beta1.Cluster{})
 	if obj == nil {
 		return nil, err
 	}
@@ -63,20 +62,20 @@ func (c *FakeClusters) UpdateStatus(cluster *v1beta1.Cluster) (*v1beta1.Cluster,
 
 func (c *FakeClusters) Delete(name string, options *v1.DeleteOptions) error {
 	_, err := c.Fake.
-		Invokes(core.NewRootDeleteAction(clustersResource, name), &v1beta1.Cluster{})
+		Invokes(testing.NewRootDeleteAction(clustersResource, name), &v1beta1.Cluster{})
 	return err
 }
 
 func (c *FakeClusters) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
-	action := core.NewRootDeleteCollectionAction(clustersResource, listOptions)
+	action := testing.NewRootDeleteCollectionAction(clustersResource, listOptions)
 
 	_, err := c.Fake.Invokes(action, &v1beta1.ClusterList{})
 	return err
 }
 
-func (c *FakeClusters) Get(name string, options meta_v1.GetOptions) (result *v1beta1.Cluster, err error) {
+func (c *FakeClusters) Get(name string, options v1.GetOptions) (result *v1beta1.Cluster, err error) {
 	obj, err := c.Fake.
-		Invokes(core.NewRootGetAction(clustersResource, name), &v1beta1.Cluster{})
+		Invokes(testing.NewRootGetAction(clustersResource, name), &v1beta1.Cluster{})
 	if obj == nil {
 		return nil, err
 	}
@@ -85,12 +84,12 @@ func (c *FakeClusters) Get(name string, options meta_v1.GetOptions) (result *v1b
 
 func (c *FakeClusters) List(opts v1.ListOptions) (result *v1beta1.ClusterList, err error) {
 	obj, err := c.Fake.
-		Invokes(core.NewRootListAction(clustersResource, opts), &v1beta1.ClusterList{})
+		Invokes(testing.NewRootListAction(clustersResource, opts), &v1beta1.ClusterList{})
 	if obj == nil {
 		return nil, err
 	}
 
-	label, _, _ := core.ExtractFromListOptions(opts)
+	label, _, _ := testing.ExtractFromListOptions(opts)
 	if label == nil {
 		label = labels.Everything()
 	}
@@ -106,13 +105,13 @@ func (c *FakeClusters) List(opts v1.ListOptions) (result *v1beta1.ClusterList, e
 // Watch returns a watch.Interface that watches the requested clusters.
 func (c *FakeClusters) Watch(opts v1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
-		InvokesWatch(core.NewRootWatchAction(clustersResource, opts))
+		InvokesWatch(testing.NewRootWatchAction(clustersResource, opts))
 }
 
 // Patch applies the patch and returns the patched cluster.
-func (c *FakeClusters) Patch(name string, pt api.PatchType, data []byte, subresources ...string) (result *v1beta1.Cluster, err error) {
+func (c *FakeClusters) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v1beta1.Cluster, err error) {
 	obj, err := c.Fake.
-		Invokes(core.NewRootPatchSubresourceAction(clustersResource, name, data, subresources...), &v1beta1.Cluster{})
+		Invokes(testing.NewRootPatchSubresourceAction(clustersResource, name, data, subresources...), &v1beta1.Cluster{})
 	if obj == nil {
 		return nil, err
 	}

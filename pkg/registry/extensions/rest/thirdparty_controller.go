@@ -20,12 +20,12 @@ import (
 	"fmt"
 	"strings"
 
-	"k8s.io/kubernetes/pkg/api"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	extensionsclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/extensions/internalversion"
 	"k8s.io/kubernetes/pkg/registry/extensions/thirdpartyresourcedata"
-	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/util/sets"
 )
 
 // ResourceInterface is the interface for the parts of the master that know how to add/remove
@@ -68,7 +68,7 @@ func (t *ThirdPartyController) SyncOneResource(rsrc *extensions.ThirdPartyResour
 
 // Synchronize all resources with RESTful resources on the master
 func (t *ThirdPartyController) SyncResources() error {
-	list, err := t.client.ThirdPartyResources().List(api.ListOptions{})
+	list, err := t.client.ThirdPartyResources().List(metav1.ListOptions{})
 	if err != nil {
 		return err
 	}

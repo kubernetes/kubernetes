@@ -13,7 +13,6 @@
 # limitations under the License.
 
 FROM BASEIMAGE
-MAINTAINER Tim Hockin <thockin@google.com>
 ADD serve_hostname /serve_hostname
 EXPOSE 9376
 ENTRYPOINT ["/serve_hostname"]

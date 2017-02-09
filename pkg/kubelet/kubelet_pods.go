@@ -29,29 +29,33 @@ import (
 	"runtime"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/golang/glog"
+	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/sets"
+	utilvalidation "k8s.io/apimachinery/pkg/util/validation"
+	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
 	utilpod "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/api/v1/validation"
-	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/fieldpath"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/envvars"
 	"k8s.io/kubernetes/pkg/kubelet/images"
+	"k8s.io/kubernetes/pkg/kubelet/qos"
+	"k8s.io/kubernetes/pkg/kubelet/server/portforward"
 	"k8s.io/kubernetes/pkg/kubelet/server/remotecommand"
 	"k8s.io/kubernetes/pkg/kubelet/status"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
-	"k8s.io/kubernetes/pkg/labels"
-	"k8s.io/kubernetes/pkg/types"
-	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/util/term"
-	utilvalidation "k8s.io/kubernetes/pkg/util/validation"
-	"k8s.io/kubernetes/pkg/util/validation/field"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util/volumehelper"
 	"k8s.io/kubernetes/third_party/forked/golang/expansion"
@@ -414,6 +418,77 @@ func (kl *Kubelet) makeEnvironmentVariables(pod *v1.Pod, container *v1.Container
 		return result, err
 	}
 
+	var (
+		configMaps = make(map[string]*v1.ConfigMap)
+		secrets    = make(map[string]*v1.Secret)
+		tmpEnv     = make(map[string]string)
+	)
+
+	// Env will override EnvFrom variables.
+	// Process EnvFrom first then allow Env to replace existing values.
+	for _, envFrom := range container.EnvFrom {
+		switch {
+		case envFrom.ConfigMapRef != nil:
+			cm := envFrom.ConfigMapRef
+			name := cm.Name
+			configMap, ok := configMaps[name]
+			if !ok {
+				if kl.kubeClient == nil {
+					return result, fmt.Errorf("Couldn't get configMap %v/%v, no kubeClient defined", pod.Namespace, name)
+				}
+				optional := cm.Optional != nil && *cm.Optional
+				configMap, err = kl.kubeClient.Core().ConfigMaps(pod.Namespace).Get(name, metav1.GetOptions{})
+				if err != nil {
+					if errors.IsNotFound(err) && optional {
+						// ignore error when marked optional
+						continue
+					}
+					return result, err
+				}
+				configMaps[name] = configMap
+			}
+
+			for k, v := range configMap.Data {
+				if len(envFrom.Prefix) > 0 {
+					k = envFrom.Prefix + k
+				}
+				if errMsgs := utilvalidation.IsCIdentifier(k); len(errMsgs) != 0 {
+					return result, fmt.Errorf("Invalid environment variable name, %v, from configmap %v/%v: %s", k, pod.Namespace, name, errMsgs[0])
+				}
+				tmpEnv[k] = v
+			}
+		case envFrom.SecretRef != nil:
+			s := envFrom.SecretRef
+			name := s.Name
+			secret, ok := secrets[name]
+			if !ok {
+				if kl.kubeClient == nil {
+					return result, fmt.Errorf("Couldn't get secret %v/%v, no kubeClient defined", pod.Namespace, name)
+				}
+				optional := s.Optional != nil && *s.Optional
+				secret, err = kl.secretManager.GetSecret(pod.Namespace, name)
+				if err != nil {
+					if errors.IsNotFound(err) && optional {
+						// ignore error when marked optional
+						continue
+					}
+					return result, err
+				}
+				secrets[name] = secret
+			}
+
+			for k, v := range secret.Data {
+				if len(envFrom.Prefix) > 0 {
+					k = envFrom.Prefix + k
+				}
+				if errMsgs := utilvalidation.IsCIdentifier(k); len(errMsgs) != 0 {
+					return result, fmt.Errorf("Invalid environment variable name, %v, from secret %v/%v: %s", k, pod.Namespace, name, errMsgs[0])
+				}
+				tmpEnv[k] = string(v)
+			}
+		}
+	}
+
 	// Determine the final values of variables:
 	//
 	// 1.  Determine the final value of each variable:
@@ -424,19 +499,9 @@ func (kl *Kubelet) makeEnvironmentVariables(pod *v1.Pod, container *v1.Container
 	// 2.  Create the container's environment in the order variables are declared
 	// 3.  Add remaining service environment vars
 	var (
-		tmpEnv      = make(map[string]string)
-		configMaps  = make(map[string]*v1.ConfigMap)
-		secrets     = make(map[string]*v1.Secret)
 		mappingFunc = expansion.MappingFuncFor(tmpEnv, serviceEnv)
 	)
 	for _, envVar := range container.Env {
-		// Accesses apiserver+Pods.
-		// So, the master may set service env vars, or kubelet may.  In case both are doing
-		// it, we delete the key from the kubelet-generated ones so we don't have duplicate
-		// env vars.
-		// TODO: remove this net line once all platforms use apiserver+Pods.
-		delete(serviceEnv, envVar.Name)
-
 		runtimeVal := envVar.Value
 		if runtimeVal != "" {
 			// Step 1a: expand variable references
@@ -459,8 +524,10 @@ func (kl *Kubelet) makeEnvironmentVariables(pod *v1.Pod, container *v1.Container
 					return result, err
 				}
 			case envVar.ValueFrom.ConfigMapKeyRef != nil:
-				name := envVar.ValueFrom.ConfigMapKeyRef.Name
-				key := envVar.ValueFrom.ConfigMapKeyRef.Key
+				cm := envVar.ValueFrom.ConfigMapKeyRef
+				name := cm.Name
+				key := cm.Key
+				optional := cm.Optional != nil && *cm.Optional
 				configMap, ok := configMaps[name]
 				if !ok {
 					if kl.kubeClient == nil {
@@ -468,43 +535,76 @@ func (kl *Kubelet) makeEnvironmentVariables(pod *v1.Pod, container *v1.Container
 					}
 					configMap, err = kl.kubeClient.Core().ConfigMaps(pod.Namespace).Get(name, metav1.GetOptions{})
 					if err != nil {
+						if errors.IsNotFound(err) && optional {
+							// ignore error when marked optional
+							continue
+						}
 						return result, err
 					}
 					configMaps[name] = configMap
 				}
 				runtimeVal, ok = configMap.Data[key]
 				if !ok {
+					if optional {
+						continue
+					}
 					return result, fmt.Errorf("Couldn't find key %v in ConfigMap %v/%v", key, pod.Namespace, name)
 				}
 			case envVar.ValueFrom.SecretKeyRef != nil:
-				name := envVar.ValueFrom.SecretKeyRef.Name
-				key := envVar.ValueFrom.SecretKeyRef.Key
+				s := envVar.ValueFrom.SecretKeyRef
+				name := s.Name
+				key := s.Key
+				optional := s.Optional != nil && *s.Optional
 				secret, ok := secrets[name]
 				if !ok {
 					if kl.kubeClient == nil {
 						return result, fmt.Errorf("Couldn't get secret %v/%v, no kubeClient defined", pod.Namespace, name)
 					}
-					secret, err = kl.kubeClient.Core().Secrets(pod.Namespace).Get(name, metav1.GetOptions{})
+					secret, err = kl.secretManager.GetSecret(pod.Namespace, name)
 					if err != nil {
+						if errors.IsNotFound(err) && optional {
+							// ignore error when marked optional
+							continue
+						}
 						return result, err
 					}
 					secrets[name] = secret
 				}
 				runtimeValBytes, ok := secret.Data[key]
 				if !ok {
+					if optional {
+						continue
+					}
 					return result, fmt.Errorf("Couldn't find key %v in Secret %v/%v", key, pod.Namespace, name)
 				}
 				runtimeVal = string(runtimeValBytes)
 			}
 		}
+		// Accesses apiserver+Pods.
+		// So, the master may set service env vars, or kubelet may.  In case both are doing
+		// it, we delete the key from the kubelet-generated ones so we don't have duplicate
+		// env vars.
+		// TODO: remove this next line once all platforms use apiserver+Pods.
+		delete(serviceEnv, envVar.Name)
 
 		tmpEnv[envVar.Name] = runtimeVal
-		result = append(result, kubecontainer.EnvVar{Name: envVar.Name, Value: tmpEnv[envVar.Name]})
+	}
+
+	// Append the env vars
+	for k, v := range tmpEnv {
+		result = append(result, kubecontainer.EnvVar{Name: k, Value: v})
 	}
 
 	// Append remaining service env vars.
 	for k, v := range serviceEnv {
-		result = append(result, kubecontainer.EnvVar{Name: k, Value: v})
+		// Accesses apiserver+Pods.
+		// So, the master may set service env vars, or kubelet may.  In case both are doing
+		// it, we skip the key from the kubelet-generated ones so we don't have duplicate
+		// env vars.
+		// TODO: remove this next line once all platforms use apiserver+Pods.
+		if _, present := tmpEnv[k]; !present {
+			result = append(result, kubecontainer.EnvVar{Name: k, Value: v})
+		}
 	}
 	return result, nil
 }
@@ -594,14 +694,11 @@ func (kl *Kubelet) makePodDataDirs(pod *v1.Pod) error {
 
 // getPullSecretsForPod inspects the Pod and retrieves the referenced pull
 // secrets.
-// TODO: duplicate secrets are being retrieved multiple times and there
-// is no cache.  Creating and using a secret manager interface will make this
-// easier to address.
 func (kl *Kubelet) getPullSecretsForPod(pod *v1.Pod) ([]v1.Secret, error) {
 	pullSecrets := []v1.Secret{}
 
 	for _, secretRef := range pod.Spec.ImagePullSecrets {
-		secret, err := kl.kubeClient.Core().Secrets(pod.Namespace).Get(secretRef.Name, metav1.GetOptions{})
+		secret, err := kl.secretManager.GetSecret(pod.Namespace, secretRef.Name)
 		if err != nil {
 			glog.Warningf("Unable to retrieve pull secret %s/%s for %s/%s due to %v.  The image pull may not succeed.", pod.Namespace, secretRef.Name, pod.Namespace, pod.Name, err)
 			continue
@@ -629,6 +726,37 @@ func (kl *Kubelet) podIsTerminated(pod *v1.Pod) bool {
 	}
 
 	return false
+}
+
+// Returns true if all required node-level resources that a pod was consuming have been reclaimed by the kubelet.
+// Reclaiming resources is a prerequisite to deleting a pod from the API server.
+func (kl *Kubelet) OkToDeletePod(pod *v1.Pod) bool {
+	if pod.DeletionTimestamp == nil {
+		// We shouldnt delete pods whose DeletionTimestamp is not set
+		return false
+	}
+	if !notRunning(pod.Status.ContainerStatuses) {
+		// We shouldnt delete pods that still have running containers
+		glog.V(3).Infof("Pod %q is terminated, but some containers are still running", format.Pod(pod))
+		return false
+	}
+	if kl.podVolumesExist(pod.UID) && !kl.kubeletConfiguration.KeepTerminatedPodVolumes {
+		// We shouldnt delete pods whose volumes have not been cleaned up if we are not keeping terminated pod volumes
+		glog.V(3).Infof("Pod %q is terminated, but some volumes have not been cleaned up", format.Pod(pod))
+		return false
+	}
+	return true
+}
+
+// notRunning returns true if every status is terminated or waiting, or the status list
+// is empty.
+func notRunning(statuses []v1.ContainerStatus) bool {
+	for _, status := range statuses {
+		if status.State.Terminated == nil && status.State.Waiting == nil {
+			return false
+		}
+	}
+	return true
 }
 
 // filterOutTerminatedPods returns the given pods which the status manager
@@ -757,8 +885,8 @@ func (kl *Kubelet) HandlePodCleanups() error {
 // another goroutine isn't already in action.
 func (kl *Kubelet) podKiller() {
 	killing := sets.NewString()
-	resultCh := make(chan types.UID)
-	defer close(resultCh)
+	// guard for the killing set
+	lock := sync.Mutex{}
 	for {
 		select {
 		case podPair, ok := <-kl.podKillingCh:
@@ -769,24 +897,25 @@ func (kl *Kubelet) podKiller() {
 			runningPod := podPair.RunningPod
 			apiPod := podPair.APIPod
 
-			if killing.Has(string(runningPod.ID)) {
-				// The pod is already being killed.
-				break
+			lock.Lock()
+			exists := killing.Has(string(runningPod.ID))
+			if !exists {
+				killing.Insert(string(runningPod.ID))
 			}
-			killing.Insert(string(runningPod.ID))
-			go func(apiPod *v1.Pod, runningPod *kubecontainer.Pod, ch chan types.UID) {
-				defer func() {
-					ch <- runningPod.ID
-				}()
-				glog.V(2).Infof("Killing unwanted pod %q", runningPod.Name)
-				err := kl.killPod(apiPod, runningPod, nil, nil)
-				if err != nil {
-					glog.Errorf("Failed killing the pod %q: %v", runningPod.Name, err)
-				}
-			}(apiPod, runningPod, resultCh)
+			lock.Unlock()
 
-		case podID := <-resultCh:
-			killing.Delete(string(podID))
+			if !exists {
+				go func(apiPod *v1.Pod, runningPod *kubecontainer.Pod) {
+					glog.V(2).Infof("Killing unwanted pod %q", runningPod.Name)
+					err := kl.killPod(apiPod, runningPod, nil, nil)
+					if err != nil {
+						glog.Errorf("Failed killing the pod %q: %v", runningPod.Name, err)
+					}
+					lock.Lock()
+					killing.Delete(string(runningPod.ID))
+					lock.Unlock()
+				}(apiPod, runningPod)
+			}
 		}
 	}
 }
@@ -1076,6 +1205,8 @@ func (kl *Kubelet) generateAPIPodStatus(pod *v1.Pod, podStatus *kubecontainer.Po
 func (kl *Kubelet) convertStatusToAPIStatus(pod *v1.Pod, podStatus *kubecontainer.PodStatus) *v1.PodStatus {
 	var apiPodStatus v1.PodStatus
 	apiPodStatus.PodIP = podStatus.IP
+	// set status for Pods created on versions of kube older than 1.6
+	apiPodStatus.QOSClass = qos.GetPodQOS(pod)
 
 	apiPodStatus.ContainerStatuses = kl.convertToAPIContainerStatuses(
 		pod, podStatus,
@@ -1295,7 +1426,7 @@ func (kl *Kubelet) AttachContainer(podFullName string, podUID types.UID, contain
 
 // PortForward connects to the pod's port and copies data between the port
 // and the stream.
-func (kl *Kubelet) PortForward(podFullName string, podUID types.UID, port uint16, stream io.ReadWriteCloser) error {
+func (kl *Kubelet) PortForward(podFullName string, podUID types.UID, port int32, stream io.ReadWriteCloser) error {
 	streamingRuntime, ok := kl.containerRuntime.(kubecontainer.DirectStreamingRuntime)
 	if !ok {
 		return fmt.Errorf("streaming methods not supported by runtime")
@@ -1368,7 +1499,7 @@ func (kl *Kubelet) GetAttach(podFullName string, podUID types.UID, containerName
 }
 
 // GetPortForward gets the URL the port-forward will be served from, or nil if the Kubelet will serve it.
-func (kl *Kubelet) GetPortForward(podName, podNamespace string, podUID types.UID) (*url.URL, error) {
+func (kl *Kubelet) GetPortForward(podName, podNamespace string, podUID types.UID, portForwardOpts portforward.V4Options) (*url.URL, error) {
 	switch streamingRuntime := kl.containerRuntime.(type) {
 	case kubecontainer.DirectStreamingRuntime:
 		// Kubelet will serve the attach directly.
@@ -1385,7 +1516,7 @@ func (kl *Kubelet) GetPortForward(podName, podNamespace string, podUID types.UID
 			return nil, fmt.Errorf("pod not found (%q)", podFullName)
 		}
 
-		return streamingRuntime.GetPortForward(podName, podNamespace, podUID)
+		return streamingRuntime.GetPortForward(podName, podNamespace, podUID, portForwardOpts.Ports)
 	default:
 		return nil, fmt.Errorf("container runtime does not support port-forward")
 	}

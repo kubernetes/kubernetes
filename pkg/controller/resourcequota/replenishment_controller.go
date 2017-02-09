@@ -21,19 +21,20 @@ import (
 
 	"github.com/golang/glog"
 
+	"k8s.io/apimachinery/pkg/api/meta"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/apimachinery/pkg/watch"
+	"k8s.io/client-go/tools/cache"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/client/cache"
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/informers"
 	"k8s.io/kubernetes/pkg/quota/evaluator/core"
-	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/runtime/schema"
 	"k8s.io/kubernetes/pkg/util/metrics"
-	utilruntime "k8s.io/kubernetes/pkg/util/runtime"
-	"k8s.io/kubernetes/pkg/watch"
 )
 
 // ReplenishmentFunc is a function that is invoked when controller sees a change
@@ -90,7 +91,7 @@ func ObjectReplenishmentDeleteFunc(options *ReplenishmentControllerOptions) func
 type ReplenishmentControllerFactory interface {
 	// NewController returns a controller configured with the specified options.
 	// This method is NOT thread-safe.
-	NewController(options *ReplenishmentControllerOptions) (cache.ControllerInterface, error)
+	NewController(options *ReplenishmentControllerOptions) (cache.Controller, error)
 }
 
 // replenishmentControllerFactory implements ReplenishmentControllerFactory
@@ -118,7 +119,8 @@ func NewReplenishmentControllerFactoryFromClient(kubeClient clientset.Interface)
 func controllerFor(
 	groupResource schema.GroupResource,
 	f informers.SharedInformerFactory,
-	handlerFuncs cache.ResourceEventHandlerFuncs) (cache.ControllerInterface, error) {
+	handlerFuncs cache.ResourceEventHandlerFuncs,
+) (cache.Controller, error) {
 	genericInformer, err := f.ForResource(groupResource)
 	if err != nil {
 		return nil, err
@@ -128,7 +130,7 @@ func controllerFor(
 	return informer.GetController(), nil
 }
 
-func (r *replenishmentControllerFactory) NewController(options *ReplenishmentControllerOptions) (result cache.ControllerInterface, err error) {
+func (r *replenishmentControllerFactory) NewController(options *ReplenishmentControllerOptions) (result cache.Controller, err error) {
 	if r.kubeClient != nil && r.kubeClient.Core().RESTClient().GetRateLimiter() != nil {
 		metrics.RegisterMetricAndTrackRateLimiterUsage("replenishment_controller", r.kubeClient.Core().RESTClient().GetRateLimiter())
 	}
@@ -147,11 +149,11 @@ func (r *replenishmentControllerFactory) NewController(options *ReplenishmentCon
 		// TODO move to informer when defined
 		_, result = cache.NewInformer(
 			&cache.ListWatch{
-				ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
-					return r.kubeClient.Core().Services(v1.NamespaceAll).List(options)
+				ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
+					return r.kubeClient.Core().Services(metav1.NamespaceAll).List(options)
 				},
-				WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
-					return r.kubeClient.Core().Services(v1.NamespaceAll).Watch(options)
+				WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
+					return r.kubeClient.Core().Services(metav1.NamespaceAll).Watch(options)
 				},
 			},
 			&v1.Service{},
@@ -165,11 +167,11 @@ func (r *replenishmentControllerFactory) NewController(options *ReplenishmentCon
 		// TODO move to informer when defined
 		_, result = cache.NewInformer(
 			&cache.ListWatch{
-				ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
-					return r.kubeClient.Core().ReplicationControllers(v1.NamespaceAll).List(options)
+				ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
+					return r.kubeClient.Core().ReplicationControllers(metav1.NamespaceAll).List(options)
 				},
-				WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
-					return r.kubeClient.Core().ReplicationControllers(v1.NamespaceAll).Watch(options)
+				WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
+					return r.kubeClient.Core().ReplicationControllers(metav1.NamespaceAll).Watch(options)
 				},
 			},
 			&v1.ReplicationController{},
@@ -188,11 +190,11 @@ func (r *replenishmentControllerFactory) NewController(options *ReplenishmentCon
 		// TODO (derekwaynecarr) remove me when we can require a sharedInformerFactory in all code paths...
 		_, result = cache.NewInformer(
 			&cache.ListWatch{
-				ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
-					return r.kubeClient.Core().PersistentVolumeClaims(v1.NamespaceAll).List(options)
+				ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
+					return r.kubeClient.Core().PersistentVolumeClaims(metav1.NamespaceAll).List(options)
 				},
-				WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
-					return r.kubeClient.Core().PersistentVolumeClaims(v1.NamespaceAll).Watch(options)
+				WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
+					return r.kubeClient.Core().PersistentVolumeClaims(metav1.NamespaceAll).Watch(options)
 				},
 			},
 			&v1.PersistentVolumeClaim{},
@@ -205,11 +207,11 @@ func (r *replenishmentControllerFactory) NewController(options *ReplenishmentCon
 		// TODO move to informer when defined
 		_, result = cache.NewInformer(
 			&cache.ListWatch{
-				ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
-					return r.kubeClient.Core().Secrets(v1.NamespaceAll).List(options)
+				ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
+					return r.kubeClient.Core().Secrets(metav1.NamespaceAll).List(options)
 				},
-				WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
-					return r.kubeClient.Core().Secrets(v1.NamespaceAll).Watch(options)
+				WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
+					return r.kubeClient.Core().Secrets(metav1.NamespaceAll).Watch(options)
 				},
 			},
 			&v1.Secret{},
@@ -222,11 +224,11 @@ func (r *replenishmentControllerFactory) NewController(options *ReplenishmentCon
 		// TODO move to informer when defined
 		_, result = cache.NewInformer(
 			&cache.ListWatch{
-				ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
-					return r.kubeClient.Core().ConfigMaps(v1.NamespaceAll).List(options)
+				ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
+					return r.kubeClient.Core().ConfigMaps(metav1.NamespaceAll).List(options)
 				},
-				WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
-					return r.kubeClient.Core().ConfigMaps(v1.NamespaceAll).Watch(options)
+				WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
+					return r.kubeClient.Core().ConfigMaps(metav1.NamespaceAll).Watch(options)
 				},
 			},
 			&v1.ConfigMap{},
@@ -276,7 +278,7 @@ func IsUnhandledGroupKindError(err error) bool {
 // returning the first success or failure it hits.  If there are no hits either way, it return an UnhandledGroupKind error
 type UnionReplenishmentControllerFactory []ReplenishmentControllerFactory
 
-func (f UnionReplenishmentControllerFactory) NewController(options *ReplenishmentControllerOptions) (cache.ControllerInterface, error) {
+func (f UnionReplenishmentControllerFactory) NewController(options *ReplenishmentControllerOptions) (cache.Controller, error) {
 	for _, factory := range f {
 		controller, err := factory.NewController(options)
 		if !IsUnhandledGroupKindError(err) {

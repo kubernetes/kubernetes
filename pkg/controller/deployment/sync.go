@@ -23,15 +23,15 @@ import (
 	"strconv"
 
 	"github.com/golang/glog"
+	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
+	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/v1"
 	extensions "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
-	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/controller"
 	deploymentutil "k8s.io/kubernetes/pkg/controller/deployment/util"
-	"k8s.io/kubernetes/pkg/labels"
-	utilerrors "k8s.io/kubernetes/pkg/util/errors"
 	labelsutil "k8s.io/kubernetes/pkg/util/labels"
 )
 
@@ -58,7 +58,6 @@ func (dc *DeploymentController) sync(deployment *extensions.Deployment) error {
 		// so we can abort this resync
 		return err
 	}
-	dc.cleanupDeployment(oldRSs, deployment)
 
 	allRSs := append(oldRSs, newRS)
 	return dc.syncDeploymentStatus(allRSs, newRS, deployment)
@@ -128,7 +127,7 @@ func (dc *DeploymentController) getAllReplicaSetsAndSyncRevision(deployment *ext
 // rsAndPodsWithHashKeySynced returns the RSes and pods the given deployment targets, with pod-template-hash information synced.
 func (dc *DeploymentController) rsAndPodsWithHashKeySynced(deployment *extensions.Deployment) ([]*extensions.ReplicaSet, *v1.PodList, error) {
 	rsList, err := deploymentutil.ListReplicaSets(deployment,
-		func(namespace string, options v1.ListOptions) ([]*extensions.ReplicaSet, error) {
+		func(namespace string, options metav1.ListOptions) ([]*extensions.ReplicaSet, error) {
 			parsed, err := labels.Parse(options.LabelSelector)
 			if err != nil {
 				return nil, err
@@ -192,7 +191,7 @@ func (dc *DeploymentController) addHashKeyToRSAndPods(rs *extensions.ReplicaSet)
 	if err != nil {
 		return nil, fmt.Errorf("error in converting selector to label selector for replica set %s: %s", updatedRS.Name, err)
 	}
-	options := v1.ListOptions{LabelSelector: selector.String()}
+	options := metav1.ListOptions{LabelSelector: selector.String()}
 	parsed, err := labels.Parse(options.LabelSelector)
 	if err != nil {
 		return nil, err
@@ -241,7 +240,7 @@ func (dc *DeploymentController) addHashKeyToRSAndPods(rs *extensions.ReplicaSet)
 
 func (dc *DeploymentController) listPods(deployment *extensions.Deployment) (*v1.PodList, error) {
 	return deploymentutil.ListPods(deployment,
-		func(namespace string, options v1.ListOptions) (*v1.PodList, error) {
+		func(namespace string, options metav1.ListOptions) (*v1.PodList, error) {
 			parsed, err := labels.Parse(options.LabelSelector)
 			if err != nil {
 				return nil, err
@@ -316,16 +315,17 @@ func (dc *DeploymentController) getNewReplicaSet(deployment *extensions.Deployme
 
 	// new ReplicaSet does not exist, create one.
 	namespace := deployment.Namespace
-	podTemplateSpecHash := deploymentutil.GetPodTemplateSpecHash(deployment.Spec.Template)
+	podTemplateSpecHash := fmt.Sprintf("%d", deploymentutil.GetPodTemplateSpecHash(deployment.Spec.Template))
 	newRSTemplate := deploymentutil.GetNewReplicaSetTemplate(deployment)
+	newRSTemplate.Labels = labelsutil.CloneAndAddLabel(deployment.Spec.Template.Labels, extensions.DefaultDeploymentUniqueLabelKey, podTemplateSpecHash)
 	// Add podTemplateHash label to selector.
 	newRSSelector := labelsutil.CloneSelectorAndAddLabel(deployment.Spec.Selector, extensions.DefaultDeploymentUniqueLabelKey, podTemplateSpecHash)
 
 	// Create new ReplicaSet
 	newRS := extensions.ReplicaSet{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			// Make the name deterministic, to ensure idempotence
-			Name:      deployment.Name + "-" + fmt.Sprintf("%d", podTemplateSpecHash),
+			Name:      deployment.Name + "-" + podTemplateSpecHash,
 			Namespace: namespace,
 		},
 		Spec: extensions.ReplicaSetSpec{
@@ -595,6 +595,7 @@ func calculateStatus(allRSs []*extensions.ReplicaSet, newRS *extensions.ReplicaS
 		ObservedGeneration:  deployment.Generation,
 		Replicas:            deploymentutil.GetActualReplicaCountForReplicaSets(allRSs),
 		UpdatedReplicas:     deploymentutil.GetActualReplicaCountForReplicaSets([]*extensions.ReplicaSet{newRS}),
+		ReadyReplicas:       deploymentutil.GetReadyReplicaCountForReplicaSets(allRSs),
 		AvailableReplicas:   availableReplicas,
 		UnavailableReplicas: unavailableReplicas,
 	}

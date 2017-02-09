@@ -36,14 +36,6 @@ func (APIVersion) SwaggerDoc() map[string]string {
 	return map_APIVersion
 }
 
-var map_CPUTargetUtilization = map[string]string{
-	"targetPercentage": "fraction of the requested CPU that should be utilized/used, e.g. 70 means that 70% of the requested CPU should be in use.",
-}
-
-func (CPUTargetUtilization) SwaggerDoc() map[string]string {
-	return map_CPUTargetUtilization
-}
-
 var map_CustomMetricCurrentStatus = map[string]string{
 	"name":  "Custom Metric name.",
 	"value": "Custom Metric value (average).",
@@ -100,6 +92,7 @@ var map_DaemonSetStatus = map[string]string{
 	"numberMisscheduled":     "NumberMisscheduled is the number of nodes that are running the daemon pod, but are not supposed to run the daemon pod. More info: http://releases.k8s.io/HEAD/docs/admin/daemons.md",
 	"desiredNumberScheduled": "DesiredNumberScheduled is the total number of nodes that should be running the daemon pod (including nodes correctly running the daemon pod). More info: http://releases.k8s.io/HEAD/docs/admin/daemons.md",
 	"numberReady":            "NumberReady is the number of nodes that should be running the daemon pod and have one or more of the daemon pod running and ready.",
+	"observedGeneration":     "ObservedGeneration is the most recent generation observed by the daemon set controller.",
 }
 
 func (DaemonSetStatus) SwaggerDoc() map[string]string {
@@ -174,6 +167,7 @@ var map_DeploymentStatus = map[string]string{
 	"observedGeneration":  "The generation observed by the deployment controller.",
 	"replicas":            "Total number of non-terminated pods targeted by this deployment (their labels match the selector).",
 	"updatedReplicas":     "Total number of non-terminated pods targeted by this deployment that have the desired template spec.",
+	"readyReplicas":       "Total number of ready pods targeted by this deployment.",
 	"availableReplicas":   "Total number of available pods (ready for at least minReadySeconds) targeted by this deployment.",
 	"unavailableReplicas": "Total number of unavailable pods targeted by this deployment.",
 	"conditions":          "Represents the latest available observations of a deployment's current state.",
@@ -220,52 +214,6 @@ var map_HTTPIngressRuleValue = map[string]string{
 
 func (HTTPIngressRuleValue) SwaggerDoc() map[string]string {
 	return map_HTTPIngressRuleValue
-}
-
-var map_HorizontalPodAutoscaler = map[string]string{
-	"":         "configuration of a horizontal pod autoscaler.",
-	"metadata": "Standard object metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata",
-	"spec":     "behaviour of autoscaler. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status.",
-	"status":   "current information about the autoscaler.",
-}
-
-func (HorizontalPodAutoscaler) SwaggerDoc() map[string]string {
-	return map_HorizontalPodAutoscaler
-}
-
-var map_HorizontalPodAutoscalerList = map[string]string{
-	"":         "list of horizontal pod autoscaler objects.",
-	"metadata": "Standard list metadata.",
-	"items":    "list of horizontal pod autoscaler objects.",
-}
-
-func (HorizontalPodAutoscalerList) SwaggerDoc() map[string]string {
-	return map_HorizontalPodAutoscalerList
-}
-
-var map_HorizontalPodAutoscalerSpec = map[string]string{
-	"":               "specification of a horizontal pod autoscaler.",
-	"scaleRef":       "reference to Scale subresource; horizontal pod autoscaler will learn the current resource consumption from its status, and will set the desired number of pods by modifying its spec.",
-	"minReplicas":    "lower limit for the number of pods that can be set by the autoscaler, default 1.",
-	"maxReplicas":    "upper limit for the number of pods that can be set by the autoscaler; cannot be smaller than MinReplicas.",
-	"cpuUtilization": "target average CPU utilization (represented as a percentage of requested CPU) over all the pods; if not specified it defaults to the target CPU utilization at 80% of the requested resources.",
-}
-
-func (HorizontalPodAutoscalerSpec) SwaggerDoc() map[string]string {
-	return map_HorizontalPodAutoscalerSpec
-}
-
-var map_HorizontalPodAutoscalerStatus = map[string]string{
-	"":                                "current status of a horizontal pod autoscaler",
-	"observedGeneration":              "most recent generation observed by this autoscaler.",
-	"lastScaleTime":                   "last time the HorizontalPodAutoscaler scaled the number of pods; used by the autoscaler to control how often the number of pods is changed.",
-	"currentReplicas":                 "current number of replicas of pods managed by this autoscaler.",
-	"desiredReplicas":                 "desired number of replicas of pods managed by this autoscaler.",
-	"currentCPUUtilizationPercentage": "current average CPU utilization over all pods, represented as a percentage of requested CPU, e.g. 70 means that an average pod is using now 70% of its requested CPU.",
-}
-
-func (HorizontalPodAutoscalerStatus) SwaggerDoc() map[string]string {
-	return map_HorizontalPodAutoscalerStatus
 }
 
 var map_HostPortRange = map[string]string{
@@ -599,18 +547,6 @@ var map_ScaleStatus = map[string]string{
 
 func (ScaleStatus) SwaggerDoc() map[string]string {
 	return map_ScaleStatus
-}
-
-var map_SubresourceReference = map[string]string{
-	"":            "SubresourceReference contains enough information to let you inspect or modify the referred subresource.",
-	"kind":        "Kind of the referent; More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds",
-	"name":        "Name of the referent; More info: http://kubernetes.io/docs/user-guide/identifiers#names",
-	"apiVersion":  "API version of the referent",
-	"subresource": "Subresource name of the referent",
-}
-
-func (SubresourceReference) SwaggerDoc() map[string]string {
-	return map_SubresourceReference
 }
 
 var map_SupplementalGroupsStrategyOptions = map[string]string{

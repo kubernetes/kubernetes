@@ -14,7 +14,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-source "${KUBE_ROOT}/cluster/kubemark/config-default.sh"
+source "${KUBE_ROOT}/test/kubemark/cloud-provider-config.sh"
+source "${KUBE_ROOT}/cluster/kubemark/${CLOUD_PROVIDER}/config-default.sh"
 source "${KUBE_ROOT}/cluster/kubemark/util.sh"
 source "${KUBE_ROOT}/cluster/lib/util.sh"
 
@@ -38,8 +39,6 @@ MASTER_NAME="${INSTANCE_PREFIX}-kubemark-master"
 MASTER_TAG="kubemark-master"
 EVENT_STORE_NAME="${INSTANCE_PREFIX}-event-store"
 
-RETRIES=3
-
 export KUBECTL="${KUBE_ROOT}/cluster/kubectl.sh"
 export KUBEMARK_DIRECTORY="${KUBE_ROOT}/test/kubemark"
 export RESOURCE_DIRECTORY="${KUBEMARK_DIRECTORY}/resources"
@@ -47,16 +46,29 @@ export RESOURCE_DIRECTORY="${KUBEMARK_DIRECTORY}/resources"
 # Runs gcloud compute command with the given parameters. Up to $RETRIES will be made
 # to execute the command.
 # arguments:
-# $@: all stuff that goes after 'gcloud compute '
+# $@: all stuff that goes after 'gcloud compute'
 function run-gcloud-compute-with-retries {
+  RETRIES="${RETRIES:-3}"
   for attempt in $(seq 1 ${RETRIES}); do
-    if ! gcloud compute $@; then
-      echo -e "${color_yellow}Attempt $(($attempt+1)) failed to $1 $2 $3. Retrying.${color_norm}" >& 2
+    local -r gcloud_result=$(gcloud compute "$@" 2>&1)
+    local -r ret_val="$?"
+    echo "${gcloud_result}"
+    if [[ "${ret_val}" -ne "0" ]]; then
+      if [[ $(echo "${gcloud_result}" | grep -c "already exists") -gt 0 ]]; then
+        if [[ "${attempt}" == 1 ]]; then
+          echo -e "${color_red}Failed to $1 $2 $3 as the resource hasn't been deleted from a previous run.${color_norm}" >& 2
+          exit 1
+        fi
+        echo -e "${color_yellow}Succeeded to $1 $2 $3 in the previous attempt, but status response wasn't received.${color_norm}"
+        return 0
+      fi
+      echo -e "${color_yellow}Attempt $attempt failed to $1 $2 $3. Retrying.${color_norm}" >& 2
       sleep $(($attempt * 5))
     else
+      echo -e "${color_green}Succeeded to gcloud compute $1 $2 $3.${color_norm}"
       return 0
     fi
   done
-  echo -e "${color_red} Failed to $1 $2 $3.${color_norm}" >& 2
+  echo -e "${color_red}Failed to $1 $2 $3.${color_norm}" >& 2
   exit 1
 }

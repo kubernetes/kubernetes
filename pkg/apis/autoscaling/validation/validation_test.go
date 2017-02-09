@@ -20,7 +20,7 @@ import (
 	"strings"
 	"testing"
 
-	"k8s.io/kubernetes/pkg/api"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/apis/autoscaling"
 	"k8s.io/kubernetes/pkg/controller/podautoscaler"
 )
@@ -28,27 +28,27 @@ import (
 func TestValidateScale(t *testing.T) {
 	successCases := []autoscaling.Scale{
 		{
-			ObjectMeta: api.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name:      "frontend",
-				Namespace: api.NamespaceDefault,
+				Namespace: metav1.NamespaceDefault,
 			},
 			Spec: autoscaling.ScaleSpec{
 				Replicas: 1,
 			},
 		},
 		{
-			ObjectMeta: api.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name:      "frontend",
-				Namespace: api.NamespaceDefault,
+				Namespace: metav1.NamespaceDefault,
 			},
 			Spec: autoscaling.ScaleSpec{
 				Replicas: 10,
 			},
 		},
 		{
-			ObjectMeta: api.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name:      "frontend",
-				Namespace: api.NamespaceDefault,
+				Namespace: metav1.NamespaceDefault,
 			},
 			Spec: autoscaling.ScaleSpec{
 				Replicas: 0,
@@ -68,9 +68,9 @@ func TestValidateScale(t *testing.T) {
 	}{
 		{
 			scale: autoscaling.Scale{
-				ObjectMeta: api.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Name:      "frontend",
-					Namespace: api.NamespaceDefault,
+					Namespace: metav1.NamespaceDefault,
 				},
 				Spec: autoscaling.ScaleSpec{
 					Replicas: -1,
@@ -92,9 +92,9 @@ func TestValidateScale(t *testing.T) {
 func TestValidateHorizontalPodAutoscaler(t *testing.T) {
 	successCases := []autoscaling.HorizontalPodAutoscaler{
 		{
-			ObjectMeta: api.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name:      "myautoscaler",
-				Namespace: api.NamespaceDefault,
+				Namespace: metav1.NamespaceDefault,
 			},
 			Spec: autoscaling.HorizontalPodAutoscalerSpec{
 				ScaleTargetRef: autoscaling.CrossVersionObjectReference{
@@ -107,9 +107,9 @@ func TestValidateHorizontalPodAutoscaler(t *testing.T) {
 			},
 		},
 		{
-			ObjectMeta: api.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name:      "myautoscaler",
-				Namespace: api.NamespaceDefault,
+				Namespace: metav1.NamespaceDefault,
 			},
 			Spec: autoscaling.HorizontalPodAutoscalerSpec{
 				ScaleTargetRef: autoscaling.CrossVersionObjectReference{
@@ -121,9 +121,9 @@ func TestValidateHorizontalPodAutoscaler(t *testing.T) {
 			},
 		},
 		{
-			ObjectMeta: api.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name:      "myautoscaler",
-				Namespace: api.NamespaceDefault,
+				Namespace: metav1.NamespaceDefault,
 				Annotations: map[string]string{
 					podautoscaler.HpaCustomMetricsTargetAnnotationName: "{\"items\":[{\"name\":\"qps\",\"value\":\"20\"}]}",
 				},
@@ -150,7 +150,7 @@ func TestValidateHorizontalPodAutoscaler(t *testing.T) {
 	}{
 		{
 			horizontalPodAutoscaler: autoscaling.HorizontalPodAutoscaler{
-				ObjectMeta: api.ObjectMeta{Name: "myautoscaler", Namespace: api.NamespaceDefault},
+				ObjectMeta: metav1.ObjectMeta{Name: "myautoscaler", Namespace: metav1.NamespaceDefault},
 				Spec: autoscaling.HorizontalPodAutoscalerSpec{
 					ScaleTargetRef:                 autoscaling.CrossVersionObjectReference{Name: "myrc"},
 					MinReplicas:                    newInt32(1),
@@ -162,7 +162,7 @@ func TestValidateHorizontalPodAutoscaler(t *testing.T) {
 		},
 		{
 			horizontalPodAutoscaler: autoscaling.HorizontalPodAutoscaler{
-				ObjectMeta: api.ObjectMeta{Name: "myautoscaler", Namespace: api.NamespaceDefault},
+				ObjectMeta: metav1.ObjectMeta{Name: "myautoscaler", Namespace: metav1.NamespaceDefault},
 				Spec: autoscaling.HorizontalPodAutoscalerSpec{
 					ScaleTargetRef:                 autoscaling.CrossVersionObjectReference{Kind: "..", Name: "myrc"},
 					MinReplicas:                    newInt32(1),
@@ -174,7 +174,7 @@ func TestValidateHorizontalPodAutoscaler(t *testing.T) {
 		},
 		{
 			horizontalPodAutoscaler: autoscaling.HorizontalPodAutoscaler{
-				ObjectMeta: api.ObjectMeta{Name: "myautoscaler", Namespace: api.NamespaceDefault},
+				ObjectMeta: metav1.ObjectMeta{Name: "myautoscaler", Namespace: metav1.NamespaceDefault},
 				Spec: autoscaling.HorizontalPodAutoscalerSpec{
 					ScaleTargetRef:                 autoscaling.CrossVersionObjectReference{Kind: "ReplicationController"},
 					MinReplicas:                    newInt32(1),
@@ -186,7 +186,7 @@ func TestValidateHorizontalPodAutoscaler(t *testing.T) {
 		},
 		{
 			horizontalPodAutoscaler: autoscaling.HorizontalPodAutoscaler{
-				ObjectMeta: api.ObjectMeta{Name: "myautoscaler", Namespace: api.NamespaceDefault},
+				ObjectMeta: metav1.ObjectMeta{Name: "myautoscaler", Namespace: metav1.NamespaceDefault},
 				Spec: autoscaling.HorizontalPodAutoscalerSpec{
 					ScaleTargetRef:                 autoscaling.CrossVersionObjectReference{Kind: "ReplicationController", Name: ".."},
 					MinReplicas:                    newInt32(1),
@@ -198,9 +198,9 @@ func TestValidateHorizontalPodAutoscaler(t *testing.T) {
 		},
 		{
 			horizontalPodAutoscaler: autoscaling.HorizontalPodAutoscaler{
-				ObjectMeta: api.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Name:      "myautoscaler",
-					Namespace: api.NamespaceDefault,
+					Namespace: metav1.NamespaceDefault,
 				},
 				Spec: autoscaling.HorizontalPodAutoscalerSpec{
 					ScaleTargetRef: autoscaling.CrossVersionObjectReference{},
@@ -212,9 +212,9 @@ func TestValidateHorizontalPodAutoscaler(t *testing.T) {
 		},
 		{
 			horizontalPodAutoscaler: autoscaling.HorizontalPodAutoscaler{
-				ObjectMeta: api.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Name:      "myautoscaler",
-					Namespace: api.NamespaceDefault,
+					Namespace: metav1.NamespaceDefault,
 				},
 				Spec: autoscaling.HorizontalPodAutoscalerSpec{
 					ScaleTargetRef: autoscaling.CrossVersionObjectReference{},
@@ -226,9 +226,9 @@ func TestValidateHorizontalPodAutoscaler(t *testing.T) {
 		},
 		{
 			horizontalPodAutoscaler: autoscaling.HorizontalPodAutoscaler{
-				ObjectMeta: api.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Name:      "myautoscaler",
-					Namespace: api.NamespaceDefault,
+					Namespace: metav1.NamespaceDefault,
 				},
 				Spec: autoscaling.HorizontalPodAutoscalerSpec{
 					ScaleTargetRef:                 autoscaling.CrossVersionObjectReference{},
@@ -241,9 +241,9 @@ func TestValidateHorizontalPodAutoscaler(t *testing.T) {
 		},
 		{
 			horizontalPodAutoscaler: autoscaling.HorizontalPodAutoscaler{
-				ObjectMeta: api.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Name:      "myautoscaler",
-					Namespace: api.NamespaceDefault,
+					Namespace: metav1.NamespaceDefault,
 					Annotations: map[string]string{
 						podautoscaler.HpaCustomMetricsTargetAnnotationName: "broken",
 					},
@@ -261,9 +261,9 @@ func TestValidateHorizontalPodAutoscaler(t *testing.T) {
 		},
 		{
 			horizontalPodAutoscaler: autoscaling.HorizontalPodAutoscaler{
-				ObjectMeta: api.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Name:      "myautoscaler",
-					Namespace: api.NamespaceDefault,
+					Namespace: metav1.NamespaceDefault,
 					Annotations: map[string]string{
 						podautoscaler.HpaCustomMetricsTargetAnnotationName: "{}",
 					},
@@ -281,9 +281,9 @@ func TestValidateHorizontalPodAutoscaler(t *testing.T) {
 		},
 		{
 			horizontalPodAutoscaler: autoscaling.HorizontalPodAutoscaler{
-				ObjectMeta: api.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Name:      "myautoscaler",
-					Namespace: api.NamespaceDefault,
+					Namespace: metav1.NamespaceDefault,
 					Annotations: map[string]string{
 						podautoscaler.HpaCustomMetricsTargetAnnotationName: "{\"items\":[{\"value\":\"20\"}]}",
 					},
@@ -301,9 +301,9 @@ func TestValidateHorizontalPodAutoscaler(t *testing.T) {
 		},
 		{
 			horizontalPodAutoscaler: autoscaling.HorizontalPodAutoscaler{
-				ObjectMeta: api.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Name:      "myautoscaler",
-					Namespace: api.NamespaceDefault,
+					Namespace: metav1.NamespaceDefault,
 					Annotations: map[string]string{
 						podautoscaler.HpaCustomMetricsTargetAnnotationName: "{\"items\":[{\"name\":\"qps\",\"value\":\"0\"}]}",
 					},

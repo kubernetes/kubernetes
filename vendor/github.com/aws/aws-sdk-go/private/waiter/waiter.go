@@ -51,17 +51,15 @@ func (w *Waiter) Wait() error {
 
 		err := req.Send()
 		for _, a := range w.Acceptors {
-			if err != nil && a.Matcher != "error" {
-				// Only matcher error is valid if there is a request error
-				continue
-			}
-
 			result := false
 			var vals []interface{}
 			switch a.Matcher {
 			case "pathAll", "path":
 				// Require all matches to be equal for result to match
 				vals, _ = awsutil.ValuesAtPath(req.Data, a.Argument)
+				if len(vals) == 0 {
+					break
+				}
 				result = true
 				for _, val := range vals {
 					if !awsutil.DeepEqual(val, a.Expected) {

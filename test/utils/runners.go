@@ -23,24 +23,26 @@ import (
 	"sync"
 	"time"
 
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
+	apierrs "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/resource"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/fields"
+	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/util/uuid"
+	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/client-go/util/workqueue"
 	"k8s.io/kubernetes/pkg/api"
-	apierrs "k8s.io/kubernetes/pkg/api/errors"
-	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/v1"
 	batchinternal "k8s.io/kubernetes/pkg/apis/batch"
 	batch "k8s.io/kubernetes/pkg/apis/batch/v1"
 	extensionsinternal "k8s.io/kubernetes/pkg/apis/extensions"
 	extensions "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
-	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
-	"k8s.io/kubernetes/pkg/fields"
-	"k8s.io/kubernetes/pkg/labels"
-	"k8s.io/kubernetes/pkg/runtime/schema"
-	"k8s.io/kubernetes/pkg/util/sets"
-	"k8s.io/kubernetes/pkg/util/uuid"
-	"k8s.io/kubernetes/pkg/util/wait"
-	"k8s.io/kubernetes/pkg/util/workqueue"
 
 	"github.com/golang/glog"
 )
@@ -227,7 +229,7 @@ func (config *DeploymentConfig) GetKind() schema.GroupKind {
 
 func (config *DeploymentConfig) create() error {
 	deployment := &extensions.Deployment{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name: config.Name,
 		},
 		Spec: extensions.DeploymentSpec{
@@ -238,7 +240,7 @@ func (config *DeploymentConfig) create() error {
 				},
 			},
 			Template: v1.PodTemplateSpec{
-				ObjectMeta: v1.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{"name": config.Name},
 				},
 				Spec: v1.PodSpec{
@@ -291,7 +293,7 @@ func (config *ReplicaSetConfig) GetKind() schema.GroupKind {
 
 func (config *ReplicaSetConfig) create() error {
 	rs := &extensions.ReplicaSet{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name: config.Name,
 		},
 		Spec: extensions.ReplicaSetSpec{
@@ -302,7 +304,7 @@ func (config *ReplicaSetConfig) create() error {
 				},
 			},
 			Template: v1.PodTemplateSpec{
-				ObjectMeta: v1.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{"name": config.Name},
 				},
 				Spec: v1.PodSpec{
@@ -355,14 +357,14 @@ func (config *JobConfig) GetKind() schema.GroupKind {
 
 func (config *JobConfig) create() error {
 	job := &batch.Job{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name: config.Name,
 		},
 		Spec: batch.JobSpec{
 			Parallelism: func(i int) *int32 { x := int32(i); return &x }(config.Replicas),
 			Completions: func(i int) *int32 { x := int32(i); return &x }(config.Replicas),
 			Template: v1.PodTemplateSpec{
-				ObjectMeta: v1.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{"name": config.Name},
 				},
 				Spec: v1.PodSpec{
@@ -447,7 +449,7 @@ func (config *RCConfig) create() error {
 		config.DNSPolicy = &dnsDefault
 	}
 	rc := &v1.ReplicationController{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name: config.Name,
 		},
 		Spec: v1.ReplicationControllerSpec{
@@ -456,7 +458,7 @@ func (config *RCConfig) create() error {
 				"name": config.Name,
 			},
 			Template: &v1.PodTemplateSpec{
-				ObjectMeta: v1.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{"name": config.Name},
 				},
 				Spec: v1.PodSpec{
@@ -688,8 +690,8 @@ func (config *RCConfig) start() error {
 
 	if oldRunning != config.Replicas {
 		// List only pods from a given replication controller.
-		options := v1.ListOptions{LabelSelector: label.String()}
-		if pods, err := config.Client.Core().Pods(v1.NamespaceAll).List(options); err == nil {
+		options := metav1.ListOptions{LabelSelector: label.String()}
+		if pods, err := config.Client.Core().Pods(metav1.NamespaceAll).List(options); err == nil {
 
 			for _, pod := range pods.Items {
 				config.RCConfigLog("Pod %s\t%s\t%s\t%s", pod.Name, pod.Spec.NodeName, pod.Status.Phase, pod.DeletionTimestamp)
@@ -826,7 +828,7 @@ func DoPrepareNode(client clientset.Interface, node *v1.Node, strategy PrepareNo
 		return nil
 	}
 	for attempt := 0; attempt < retries; attempt++ {
-		if _, err = client.Core().Nodes().Patch(node.Name, api.MergePatchType, []byte(patch)); err == nil {
+		if _, err = client.Core().Nodes().Patch(node.Name, types.MergePatchType, []byte(patch)); err == nil {
 			return nil
 		}
 		if !apierrs.IsConflict(err) {
@@ -844,7 +846,7 @@ func DoCleanupNode(client clientset.Interface, nodeName string, strategy Prepare
 			return fmt.Errorf("Skipping cleanup of Node: failed to get Node %v: %v", nodeName, err)
 		}
 		updatedNode := strategy.CleanupNode(node)
-		if api.Semantic.DeepEqual(node, updatedNode) {
+		if apiequality.Semantic.DeepEqual(node, updatedNode) {
 			return nil
 		}
 		if _, err = client.Core().Nodes().Update(updatedNode); err == nil {
@@ -953,14 +955,14 @@ func createPod(client clientset.Interface, namespace string, podCount int, podTe
 
 func createController(client clientset.Interface, controllerName, namespace string, podCount int, podTemplate *v1.Pod) error {
 	rc := &v1.ReplicationController{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name: controllerName,
 		},
 		Spec: v1.ReplicationControllerSpec{
 			Replicas: func(i int) *int32 { x := int32(i); return &x }(podCount),
 			Selector: map[string]string{"name": controllerName},
 			Template: &v1.PodTemplateSpec{
-				ObjectMeta: v1.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{"name": controllerName},
 				},
 				Spec: podTemplate.Spec,
@@ -985,7 +987,7 @@ func NewCustomCreatePodStrategy(podTemplate *v1.Pod) TestPodCreateStrategy {
 
 func NewSimpleCreatePodStrategy() TestPodCreateStrategy {
 	basePod := &v1.Pod{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			GenerateName: "simple-pod-",
 		},
 		Spec: MakePodSpec(),
@@ -996,7 +998,7 @@ func NewSimpleCreatePodStrategy() TestPodCreateStrategy {
 func NewSimpleWithControllerCreatePodStrategy(controllerName string) TestPodCreateStrategy {
 	return func(client clientset.Interface, namespace string, podCount int) error {
 		basePod := &v1.Pod{
-			ObjectMeta: v1.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				GenerateName: controllerName + "-pod-",
 				Labels:       map[string]string{"name": controllerName},
 			},
@@ -1020,7 +1022,7 @@ type SecretConfig struct {
 
 func (config *SecretConfig) Run() error {
 	secret := &v1.Secret{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name: config.Name,
 		},
 		StringData: map[string]string{},
@@ -1038,7 +1040,7 @@ func (config *SecretConfig) Run() error {
 }
 
 func (config *SecretConfig) Stop() error {
-	if err := config.Client.Core().Secrets(config.Namespace).Delete(config.Name, &v1.DeleteOptions{}); err != nil {
+	if err := config.Client.Core().Secrets(config.Namespace).Delete(config.Name, &metav1.DeleteOptions{}); err != nil {
 		return fmt.Errorf("Error deleting secret: %v", err)
 	}
 	config.LogFunc("Deleted secret %v/%v", config.Namespace, config.Name)
@@ -1087,12 +1089,12 @@ func (config *DaemonConfig) Run() error {
 		"name": config.Name + "-daemon",
 	}
 	daemon := &extensions.DaemonSet{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name: config.Name,
 		},
 		Spec: extensions.DaemonSetSpec{
 			Template: v1.PodTemplateSpec{
-				ObjectMeta: v1.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Labels: nameLabel,
 				},
 				Spec: v1.PodSpec{
@@ -1115,7 +1117,7 @@ func (config *DaemonConfig) Run() error {
 	var nodes *v1.NodeList
 	for i := 0; i < retries; i++ {
 		// Wait for all daemons to be running
-		nodes, err = config.Client.Core().Nodes().List(v1.ListOptions{ResourceVersion: "0"})
+		nodes, err = config.Client.Core().Nodes().List(metav1.ListOptions{ResourceVersion: "0"})
 		if err == nil {
 			break
 		} else if i+1 == retries {

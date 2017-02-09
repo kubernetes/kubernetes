@@ -1,4 +1,6 @@
-assignees:
-  - vishh
-  - timstclair
-  - Random-Liu 
+approvers:
+- Random-Liu
+- timstclair
+- vishh
+reviewers:
+- sig-node-reviewers

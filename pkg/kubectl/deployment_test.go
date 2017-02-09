@@ -20,9 +20,9 @@ import (
 	"reflect"
 	"testing"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/extensions"
-	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 )
 
 func TestDeploymentGenerate(t *testing.T) {
@@ -37,7 +37,7 @@ func TestDeploymentGenerate(t *testing.T) {
 				"image": []string{"abc/app:v4"},
 			},
 			expected: &extensions.Deployment{
-				ObjectMeta: api.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Name:   "foo",
 					Labels: map[string]string{"app": "foo"},
 				},
@@ -45,7 +45,7 @@ func TestDeploymentGenerate(t *testing.T) {
 					Replicas: 1,
 					Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"app": "foo"}},
 					Template: api.PodTemplateSpec{
-						ObjectMeta: api.ObjectMeta{
+						ObjectMeta: metav1.ObjectMeta{
 							Labels: map[string]string{"app": "foo"},
 						},
 						Spec: api.PodSpec{
@@ -62,7 +62,7 @@ func TestDeploymentGenerate(t *testing.T) {
 				"image": []string{"abc/app:v4", "zyx/ape"},
 			},
 			expected: &extensions.Deployment{
-				ObjectMeta: api.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Name:   "foo",
 					Labels: map[string]string{"app": "foo"},
 				},
@@ -70,7 +70,7 @@ func TestDeploymentGenerate(t *testing.T) {
 					Replicas: 1,
 					Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"app": "foo"}},
 					Template: api.PodTemplateSpec{
-						ObjectMeta: api.ObjectMeta{
+						ObjectMeta: metav1.ObjectMeta{
 							Labels: map[string]string{"app": "foo"},
 						},
 						Spec: api.PodSpec{

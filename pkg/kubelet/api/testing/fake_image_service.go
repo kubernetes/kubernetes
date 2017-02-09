@@ -57,8 +57,8 @@ func NewFakeImageService() *FakeImageService {
 
 func (r *FakeImageService) makeFakeImage(image string) *runtimeapi.Image {
 	return &runtimeapi.Image{
-		Id:       &image,
-		Size_:    &r.FakeImageSize,
+		Id:       image,
+		Size_:    r.FakeImageSize,
 		RepoTags: []string{image},
 	}
 }
@@ -72,7 +72,7 @@ func (r *FakeImageService) ListImages(filter *runtimeapi.ImageFilter) ([]*runtim
 	images := make([]*runtimeapi.Image, 0)
 	for _, img := range r.Images {
 		if filter != nil && filter.Image != nil {
-			if !sliceutils.StringInSlice(filter.Image.GetImage(), img.RepoTags) {
+			if !sliceutils.StringInSlice(filter.Image.Image, img.RepoTags) {
 				continue
 			}
 		}
@@ -88,10 +88,10 @@ func (r *FakeImageService) ImageStatus(image *runtimeapi.ImageSpec) (*runtimeapi
 
 	r.Called = append(r.Called, "ImageStatus")
 
-	return r.Images[image.GetImage()], nil
+	return r.Images[image.Image], nil
 }
 
-func (r *FakeImageService) PullImage(image *runtimeapi.ImageSpec, auth *runtimeapi.AuthConfig) error {
+func (r *FakeImageService) PullImage(image *runtimeapi.ImageSpec, auth *runtimeapi.AuthConfig) (string, error) {
 	r.Lock()
 	defer r.Unlock()
 
@@ -99,12 +99,12 @@ func (r *FakeImageService) PullImage(image *runtimeapi.ImageSpec, auth *runtimea
 
 	// ImageID should be randomized for real container runtime, but here just use
 	// image's name for easily making fake images.
-	imageID := image.GetImage()
+	imageID := image.Image
 	if _, ok := r.Images[imageID]; !ok {
-		r.Images[imageID] = r.makeFakeImage(image.GetImage())
+		r.Images[imageID] = r.makeFakeImage(image.Image)
 	}
 
-	return nil
+	return imageID, nil
 }
 
 func (r *FakeImageService) RemoveImage(image *runtimeapi.ImageSpec) error {
@@ -114,7 +114,7 @@ func (r *FakeImageService) RemoveImage(image *runtimeapi.ImageSpec) error {
 	r.Called = append(r.Called, "RemoveImage")
 
 	// Remove the image
-	delete(r.Images, image.GetImage())
+	delete(r.Images, image.Image)
 
 	return nil
 }

@@ -20,9 +20,10 @@ import (
 	"fmt"
 	"time"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/util/intstr"
-	"k8s.io/kubernetes/pkg/util/uuid"
 	"k8s.io/kubernetes/test/e2e/framework"
 
 	. "github.com/onsi/ginkgo"
@@ -34,7 +35,7 @@ var _ = framework.KubeDescribe("Container Lifecycle Hook", func() {
 	var podClient *framework.PodClient
 	const (
 		podCheckInterval     = 1 * time.Second
-		podWaitTimeout       = 2 * time.Minute
+		podWaitTimeout       = 3 * time.Minute
 		postStartWaitTimeout = 2 * time.Minute
 		preStopWaitTimeout   = 30 * time.Second
 	)
@@ -59,7 +60,7 @@ var _ = framework.KubeDescribe("Container Lifecycle Hook", func() {
 					podClient.WaitForSuccess(podCheckHook.Name, postStartWaitTimeout)
 				}
 				By("delete the pod with lifecycle hook")
-				podClient.DeleteSync(podWithHook.Name, v1.NewDeleteOptions(15), podWaitTimeout)
+				podClient.DeleteSync(podWithHook.Name, metav1.NewDeleteOptions(15), podWaitTimeout)
 				if podWithHook.Spec.Containers[0].Lifecycle.PreStop != nil {
 					By("create the hook check pod")
 					podClient.Create(podCheckHook)
@@ -109,7 +110,7 @@ var _ = framework.KubeDescribe("Container Lifecycle Hook", func() {
 		Context("when it is http hook", func() {
 			var targetIP string
 			podHandleHookRequest := &v1.Pod{
-				ObjectMeta: v1.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Name: "pod-handle-http-request",
 				},
 				Spec: v1.PodSpec{
@@ -143,7 +144,7 @@ var _ = framework.KubeDescribe("Container Lifecycle Hook", func() {
 					}, postStartWaitTimeout, podCheckInterval).Should(BeNil())
 				}
 				By("delete the pod with lifecycle hook")
-				podClient.DeleteSync(podWithHook.Name, v1.NewDeleteOptions(15), podWaitTimeout)
+				podClient.DeleteSync(podWithHook.Name, metav1.NewDeleteOptions(15), podWaitTimeout)
 				if podWithHook.Spec.Containers[0].Lifecycle.PreStop != nil {
 					By("check prestop hook")
 					Eventually(func() error {
@@ -154,7 +155,7 @@ var _ = framework.KubeDescribe("Container Lifecycle Hook", func() {
 			}
 			It("should execute poststart http hook properly [Conformance]", func() {
 				podWithHook := &v1.Pod{
-					ObjectMeta: v1.ObjectMeta{
+					ObjectMeta: metav1.ObjectMeta{
 						Name: "pod-with-poststart-http-hook",
 					},
 					Spec: v1.PodSpec{
@@ -179,7 +180,7 @@ var _ = framework.KubeDescribe("Container Lifecycle Hook", func() {
 			})
 			It("should execute prestop http hook properly [Conformance]", func() {
 				podWithHook := &v1.Pod{
-					ObjectMeta: v1.ObjectMeta{
+					ObjectMeta: metav1.ObjectMeta{
 						Name: "pod-with-prestop-http-hook",
 					},
 					Spec: v1.PodSpec{
@@ -208,7 +209,7 @@ var _ = framework.KubeDescribe("Container Lifecycle Hook", func() {
 
 func getExecHookTestPod(name string, cmd []string) *v1.Pod {
 	return &v1.Pod{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
 		},
 		Spec: v1.PodSpec{

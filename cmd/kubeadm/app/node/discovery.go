@@ -25,8 +25,8 @@ import (
 	"time"
 
 	jose "github.com/square/go-jose"
+	"k8s.io/apimachinery/pkg/util/wait"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
-	"k8s.io/kubernetes/pkg/util/wait"
 )
 
 // the amount of time to wait between each request to the discovery API
@@ -36,7 +36,7 @@ func RetrieveTrustedClusterInfo(d *kubeadmapi.TokenDiscovery) (*kubeadmapi.Clust
 	requestURL := fmt.Sprintf("http://%s/cluster-info/v1/?token-id=%s", d.Addresses[0], d.ID)
 	req, err := http.NewRequest("GET", requestURL, nil)
 	if err != nil {
-		return nil, fmt.Errorf("failed to consturct an HTTP request [%v]", err)
+		return nil, fmt.Errorf("failed to construct an HTTP request [%v]", err)
 	}
 
 	fmt.Printf("[discovery] Created cluster info discovery client, requesting info from %q\n", requestURL)

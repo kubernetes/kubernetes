@@ -16,17 +16,17 @@ limitations under the License.
 
 package v1alpha1
 
-import (
-	"k8s.io/kubernetes/pkg/runtime"
-)
+import "k8s.io/apimachinery/pkg/runtime"
 
 const (
-	DefaultServiceDNSDomain          = "cluster.local"
-	DefaultServicesSubnet            = "10.96.0.0/12"
-	DefaultKubernetesVersion         = "stable"
-	DefaultKubernetesFallbackVersion = "v1.5.0"
+	DefaultServiceDNSDomain  = "cluster.local"
+	DefaultServicesSubnet    = "10.96.0.0/12"
+	DefaultKubernetesVersion = "latest"
+	// This is only for clusters without internet, were the latest stable version can't be determined
+	DefaultKubernetesFallbackVersion = "v1.6.0-alpha.1"
 	DefaultAPIBindPort               = 6443
 	DefaultDiscoveryBindPort         = 9898
+	DefaultAuthorizationMode         = "RBAC"
 )
 
 func addDefaultingFuncs(scheme *runtime.Scheme) error {
@@ -55,5 +55,9 @@ func SetDefaults_MasterConfiguration(obj *MasterConfiguration) {
 
 	if obj.Discovery.Token == nil && obj.Discovery.File == nil && obj.Discovery.HTTPS == nil {
 		obj.Discovery.Token = &TokenDiscovery{}
+	}
+
+	if obj.AuthorizationMode == "" {
+		obj.AuthorizationMode = DefaultAuthorizationMode
 	}
 }

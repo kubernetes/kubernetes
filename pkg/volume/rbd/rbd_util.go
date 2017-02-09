@@ -84,6 +84,9 @@ func waitForPath(pool, image string, maxRetries int) (string, bool) {
 		if found {
 			return devicePath, true
 		}
+		if i == maxRetries-1 {
+			break
+		}
 		time.Sleep(time.Second)
 	}
 	return "", false
@@ -314,6 +317,7 @@ func (util *RBDUtil) DetachDisk(c rbdUnmounter, mntPath string) error {
 }
 
 func (util *RBDUtil) CreateImage(p *rbdVolumeProvisioner) (r *v1.RBDVolumeSource, size int, err error) {
+	var output []byte
 	capacity := p.options.PVC.Spec.Resources.Requests[v1.ResourceName(v1.ResourceStorage)]
 	volSizeBytes := capacity.Value()
 	// convert to MB that rbd defaults on
@@ -327,7 +331,6 @@ func (util *RBDUtil) CreateImage(p *rbdVolumeProvisioner) (r *v1.RBDVolumeSource
 	for i := start; i < start+l; i++ {
 		mon := p.Mon[i%l]
 		glog.V(4).Infof("rbd: create %s size %s using mon %s, pool %s id %s key %s", p.rbdMounter.Image, volSz, mon, p.rbdMounter.Pool, p.rbdMounter.adminId, p.rbdMounter.adminSecret)
-		var output []byte
 		output, err = p.rbdMounter.plugin.execCommand("rbd",
 			[]string{"create", p.rbdMounter.Image, "--size", volSz, "--pool", p.rbdMounter.Pool, "--id", p.rbdMounter.adminId, "-m", mon, "--key=" + p.rbdMounter.adminSecret, "--image-format", "1"})
 		if err == nil {
@@ -338,8 +341,7 @@ func (util *RBDUtil) CreateImage(p *rbdVolumeProvisioner) (r *v1.RBDVolumeSource
 	}
 
 	if err != nil {
-		glog.Errorf("rbd: Error creating rbd image: %v", err)
-		return nil, 0, err
+		return nil, 0, fmt.Errorf("failed to create rbd image: %v, command output: %s", err, string(output))
 	}
 
 	return &v1.RBDVolumeSource{
@@ -372,7 +374,7 @@ func (util *RBDUtil) DeleteImage(p *rbdVolumeDeleter) error {
 		if err == nil {
 			return nil
 		} else {
-			glog.Errorf("failed to delete rbd image, error %v output %v", err, string(output))
+			glog.Errorf("failed to delete rbd image: %v, command output: %s", err, string(output))
 		}
 	}
 	return err

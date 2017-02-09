@@ -21,12 +21,12 @@ import (
 	"sync"
 
 	"github.com/golang/groupcache/lru"
-	"k8s.io/kubernetes/pkg/api/meta"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	hashutil "k8s.io/kubernetes/pkg/util/hash"
 )
 
 type objectWithMeta interface {
-	meta.Object
+	metav1.Object
 }
 
 // keyFunc returns the key of an object, which is used to look up in the cache for it's matching object.

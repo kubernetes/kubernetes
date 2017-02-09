@@ -16,8 +16,7 @@
 
 KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
 
-# This command builds and runs a local kubernetes cluster. It's just like
-# local-up.sh, but this one launches the three separate binaries.
+# This command builds and runs a local kubernetes cluster.
 # You may need to run this as root to allow kubelet to open docker's socket,
 # and to write the test CA in /var/run/kubernetes.
 DOCKER_OPTS=${DOCKER_OPTS:-""}
@@ -35,7 +34,7 @@ NET_PLUGIN=${NET_PLUGIN:-""}
 NET_PLUGIN_DIR=${NET_PLUGIN_DIR:-""}
 SERVICE_CLUSTER_IP_RANGE=${SERVICE_CLUSTER_IP_RANGE:-10.0.0.0/24}
 # if enabled, must set CGROUP_ROOT
-EXPERIMENTAL_CGROUPS_PER_QOS=${EXPERIMENTAL_CGROUPS_PER_QOS:-false}
+CGROUPS_PER_QOS=${CGROUPS_PER_QOS:-false}
 # this is not defaulted to preserve backward compatibility.
 # if EXPERIMENTAL_CGROUPS_PER_QOS is enabled, recommend setting to /
 CGROUP_ROOT=${CGROUP_ROOT:-""}
@@ -78,7 +77,7 @@ if [ "${CLOUD_PROVIDER}" == "openstack" ]; then
         exit 1
     fi
     if [ ! -f "${CLOUD_CONFIG}" ]; then
-        echo "Cloud config ${CLOUD_CONFIG} doesn't exit"
+        echo "Cloud config ${CLOUD_CONFIG} doesn't exist"
         exit 1
     fi
 fi
@@ -139,7 +138,7 @@ do
 done
 
 if [ "x$GO_OUT" == "x" ]; then
-    make -C "${KUBE_ROOT}" WHAT="cmd/kubectl cmd/hyperkube cmd/kubernetes-discovery"
+    make -C "${KUBE_ROOT}" WHAT="cmd/kubectl cmd/hyperkube cmd/kube-aggregator"
 else
     echo "skipped the build."
 fi
@@ -189,6 +188,17 @@ ENABLE_CONTROLLER_ATTACH_DETACH=${ENABLE_CONTROLLER_ATTACH_DETACH:-"true"} # cur
 CERT_DIR=${CERT_DIR:-"/var/run/kubernetes"}
 ROOT_CA_FILE=$CERT_DIR/apiserver.crt
 EXPERIMENTAL_CRI=${EXPERIMENTAL_CRI:-"false"}
+
+# name of the cgroup driver, i.e. cgroupfs or systemd
+if [[ ${CONTAINER_RUNTIME} == "docker" ]]; then
+  # default cgroup driver to match what is reported by docker to simplify local development
+  if [[ -z ${CGROUP_DRIVER} ]]; then
+    # match driver with docker runtime reported value (they must match)
+    CGROUP_DRIVER=$(docker info | grep "Cgroup Driver:" | cut -f3- -d' ')
+    echo "Kubelet cgroup driver defaulted to use: ${CGROUP_DRIVER}"
+  fi
+fi
+
 
 
 # Ensure CERT_DIR is created for auto-generated crt/key and kubeconfig
@@ -319,6 +329,14 @@ cleanup()
   exit 0
 }
 
+function warning {
+  message=$1
+
+  echo $(tput bold)$(tput setaf 1)
+  echo "WARNING: ${message}"
+  echo $(tput sgr0)
+}
+
 function start_etcd {
     echo "Starting etcd"
     kube::etcd::start
@@ -418,26 +436,31 @@ function start_apiserver {
 
     # Wait for kube-apiserver to come up before launching the rest of the components.
     echo "Waiting for apiserver to come up"
-    kube::util::wait_for_url "https://${API_HOST}:${API_SECURE_PORT}/version" "apiserver: " 1 ${WAIT_FOR_URL_API_SERVER} || exit 1
+    # this uses the API port because if you don't have any authenticator, you can't seem to use the secure port at all.
+    # this matches what happened with the combination in 1.4.
+    # TODO change this conditionally based on whether API_PORT is on or off
+    kube::util::wait_for_url "http://${API_HOST_IP}:${API_PORT}/version" "apiserver: " 1 ${WAIT_FOR_URL_API_SERVER} \
+        || { echo "check apiserver logs: ${APISERVER_LOG}" ; exit 1 ; }
 
     # Create kubeconfigs for all components, using client certs
     kube::util::write_client_kubeconfig "${CONTROLPLANE_SUDO}" "${CERT_DIR}" "${ROOT_CA_FILE}" "${API_HOST}" "${API_SECURE_PORT}" admin
+    ${CONTROLPLANE_SUDO} chown "${USER}" "${CERT_DIR}/client-admin.key" # make readable for kubectl
     kube::util::write_client_kubeconfig "${CONTROLPLANE_SUDO}" "${CERT_DIR}" "${ROOT_CA_FILE}" "${API_HOST}" "${API_SECURE_PORT}" kubelet
     kube::util::write_client_kubeconfig "${CONTROLPLANE_SUDO}" "${CERT_DIR}" "${ROOT_CA_FILE}" "${API_HOST}" "${API_SECURE_PORT}" kube-proxy
     kube::util::write_client_kubeconfig "${CONTROLPLANE_SUDO}" "${CERT_DIR}" "${ROOT_CA_FILE}" "${API_HOST}" "${API_SECURE_PORT}" controller
     kube::util::write_client_kubeconfig "${CONTROLPLANE_SUDO}" "${CERT_DIR}" "${ROOT_CA_FILE}" "${API_HOST}" "${API_SECURE_PORT}" scheduler
 
-    if [[ -z "${AUTH_ARGS}"  ]]; then
-        if [[ "${ALLOW_ANY_TOKEN}" = true  ]]; then
+    if [[ -z "${AUTH_ARGS}" ]]; then
+        if [[ "${ALLOW_ANY_TOKEN}" = true ]]; then
             # use token authentication
-            if [[ -n "${KUBECONFIG_TOKEN}"  ]]; then
+            if [[ -n "${KUBECONFIG_TOKEN}" ]]; then
                 AUTH_ARGS="--token=${KUBECONFIG_TOKEN}"
             else
                 AUTH_ARGS="--token=system:admin/system:masters"
             fi
         else
-            # default to use basic authentication
-            AUTH_ARGS="--username=admin --password=admin"
+            # default to the admin client cert/key
+            AUTH_ARGS="--client-key=${CERT_DIR}/client-admin.key --client-certificate=${CERT_DIR}/client-admin.crt"
         fi
     fi
 }
@@ -531,9 +554,10 @@ function start_kubelet {
         --feature-gates="${FEATURE_GATES}" \
         --cpu-cfs-quota=${CPU_CFS_QUOTA} \
         --enable-controller-attach-detach="${ENABLE_CONTROLLER_ATTACH_DETACH}" \
-        --experimental-cgroups-per-qos=${EXPERIMENTAL_CGROUPS_PER_QOS} \
+        --cgroups-per-qos=${CGROUPS_PER_QOS} \
         --cgroup-driver=${CGROUP_DRIVER} \
         --cgroup-root=${CGROUP_ROOT} \
+        --keep-terminated-pod-volumes=true \
         ${auth_args} \
         ${dns_args} \
         ${net_plugin_dir_args} \
@@ -625,12 +649,19 @@ function start_kubedns {
         
         # TODO update to dns role once we have one.
         ${KUBECTL} --kubeconfig="${CERT_DIR}/admin.kubeconfig" create clusterrolebinding system:kube-dns --clusterrole=cluster-admin --serviceaccount=kube-system:default
-        # use kubectl to create kubedns rc and service
+        # use kubectl to create kubedns deployment and service
         ${KUBECTL} --kubeconfig="${CERT_DIR}/admin.kubeconfig" --namespace=kube-system create -f kubedns-deployment.yaml
         ${KUBECTL} --kubeconfig="${CERT_DIR}/admin.kubeconfig" --namespace=kube-system create -f kubedns-svc.yaml
-        echo "Kube-dns rc and service successfully deployed."
+        echo "Kube-dns deployment and service successfully deployed."
         rm  kubedns-deployment.yaml kubedns-svc.yaml
     fi
+}
+
+function create_psp_policy {
+    echo "Create podsecuritypolicy policies for RBAC."
+    ${KUBECTL} --kubeconfig="${CERT_DIR}/admin.kubeconfig" create -f ${KUBE_ROOT}/examples/podsecuritypolicy/rbac/policies.yaml
+    ${KUBECTL} --kubeconfig="${CERT_DIR}/admin.kubeconfig" create -f ${KUBE_ROOT}/examples/podsecuritypolicy/rbac/roles.yaml
+    ${KUBECTL} --kubeconfig="${CERT_DIR}/admin.kubeconfig" create -f ${KUBE_ROOT}/examples/podsecuritypolicy/rbac/bindings.yaml
 }
 
 function print_success {
@@ -657,7 +688,12 @@ fi
 if [[ "${START_MODE}" != "kubeletonly" ]]; then
   echo
   cat <<EOF
-To start using your cluster, open up another terminal/tab and run:
+To start using your cluster, you can open up another terminal/tab and run:
+
+  export KUBECONFIG=${CERT_DIR}/admin.kubeconfig
+  cluster/kubectl.sh
+
+Alternatively, you can write to the default kubeconfig:
 
   export KUBERNETES_PROVIDER=local
 
@@ -697,13 +733,13 @@ kube::util::test_cfssl_installed
 
 ### IF the user didn't supply an output/ for the build... Then we detect.
 if [ "$GO_OUT" == "" ]; then
-    detect_binary
+  detect_binary
 fi
 echo "Detected host and ready to start services.  Doing some housekeeping first..."
 echo "Using GO_OUT $GO_OUT"
 KUBELET_CIDFILE=/tmp/kubelet.cid
 if [[ "${ENABLE_DAEMON}" = false ]]; then
-trap cleanup EXIT
+  trap cleanup EXIT
 fi
 
 echo "Starting services now!"
@@ -717,11 +753,30 @@ if [[ "${START_MODE}" != "kubeletonly" ]]; then
 fi
 
 if [[ "${START_MODE}" != "nokubelet" ]]; then
-  start_kubelet
+  ## TODO remove this check if/when kubelet is supported on darwin
+  # Detect the OS name/arch and display appropriate error.
+    case "$(uname -s)" in
+      Darwin)
+        warning "kubelet is not currently supported in darwin, kubelet aborted."
+        KUBELET_LOG=""
+        ;;
+      Linux)
+        start_kubelet
+        ;;
+      *)
+        warning "Unsupported host OS.  Must be Linux or Mac OS X, kubelet aborted."
+        ;;
+    esac
+fi
+
+if [[ -n "${PSP_ADMISSION}" && "${ENABLE_RBAC}" = true ]]; then
+  create_psp_policy
 fi
 
 print_success
 
 if [[ "${ENABLE_DAEMON}" = false ]]; then
-   while true; do sleep 1; done
+  while true; do sleep 1; done
 fi
+
+

@@ -13,7 +13,6 @@
 # limitations under the License.
 
 FROM node:0.10
-MAINTAINER Christiaan Hees <christiaan@q42.nl>
 
 ONBUILD WORKDIR /appsrc
 ONBUILD COPY . /appsrc
