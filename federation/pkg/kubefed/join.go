@@ -31,6 +31,7 @@ import (
 
 	"github.com/golang/glog"
 	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
 )
 
 const (
@@ -57,17 +58,36 @@ var (
 		kubefed join foo --host-cluster-context=bar`)
 )
 
+type JoinFederationOptions struct {
+	util.SubcommandOptions
+
+	JoinFederation
+}
+
+type JoinFederation struct {
+	ClusterContext string
+	SecretName     string
+	DryRun         bool
+}
+
+func (o *JoinFederation) Bind(flags *pflag.FlagSet) {
+	flags.StringVar(&o.ClusterContext, "cluster-context", "", "Name of the cluster's context in the local kubeconfig. Defaults to cluster name if unspecified.")
+	flags.StringVar(&o.SecretName, "secret-name", "", "Name of the secret where the cluster's credentials will be stored in the host cluster. This name should be a valid RFC 1035 label. Defaults to cluster name if unspecified.")
+}
+
 // NewCmdJoin defines the `join` command that joins a cluster to a
 // federation.
 func NewCmdJoin(f cmdutil.Factory, cmdOut io.Writer, config util.AdminConfig) *cobra.Command {
+	options := &JoinFederationOptions{}
+
 	cmd := &cobra.Command{
 		Use:     "join CLUSTER_NAME --host-cluster-context=HOST_CONTEXT",
 		Short:   "Join a cluster to a federation",
 		Long:    join_long,
 		Example: join_example,
 		Run: func(cmd *cobra.Command, args []string) {
-			err := joinFederation(f, cmdOut, config, cmd, args)
-			cmdutil.CheckErr(err)
+			cmdutil.CheckErr(options.Complete(cmd, args))
+			cmdutil.CheckErr(options.Run(f, cmdOut, config, cmd))
 		},
 	}
 
@@ -75,45 +95,51 @@ func NewCmdJoin(f cmdutil.Factory, cmdOut io.Writer, config util.AdminConfig) *c
 	cmdutil.AddValidateFlags(cmd)
 	cmdutil.AddPrinterFlags(cmd)
 	cmdutil.AddGeneratorFlags(cmd, cmdutil.ClusterV1Beta1GeneratorName)
-	util.AddSubcommandFlags(cmd)
-	cmd.Flags().String("cluster-context", "", "Name of the cluster's context in the local kubeconfig. Defaults to cluster name if unspecified.")
-	cmd.Flags().String("secret-name", "", "Name of the secret where the cluster's credentials will be stored in the host cluster. This name should be a valid RFC 1035 label. Defaults to cluster name if unspecified.")
+
+	flags := cmd.Flags()
+	options.SubcommandOptions.Bind(flags)
+	options.JoinFederation.Bind(flags)
+
 	return cmd
 }
 
-// joinFederation is the implementation of the `join federation` command.
-func joinFederation(f cmdutil.Factory, cmdOut io.Writer, config util.AdminConfig, cmd *cobra.Command, args []string) error {
-	joinFlags, err := util.GetSubcommandFlags(cmd, args)
+// Complete ensures that options are valid and marshals them if necessary.
+func (o *JoinFederationOptions) Complete(cmd *cobra.Command, args []string) error {
+	err := o.SubcommandOptions.SetName(cmd, args)
 	if err != nil {
 		return err
 	}
-	clusterContext := cmdutil.GetFlagString(cmd, "cluster-context")
-	secretName := cmdutil.GetFlagString(cmd, "secret-name")
-	dryRun := cmdutil.GetDryRunFlag(cmd)
 
-	if clusterContext == "" {
-		clusterContext = joinFlags.Name
+	o.DryRun = cmdutil.GetDryRunFlag(cmd)
+
+	if o.ClusterContext == "" {
+		o.ClusterContext = o.Name
 	}
-	if secretName == "" {
-		secretName = joinFlags.Name
+	if o.SecretName == "" {
+		o.SecretName = o.Name
 	}
 
-	glog.V(2).Infof("Args and flags: name %s, host: %s, host-system-namespace: %s, kubeconfig: %s, cluster-context: %s, secret-name: %s, dry-run: %s", joinFlags.Name, joinFlags.Host, joinFlags.FederationSystemNamespace, joinFlags.Kubeconfig, clusterContext, secretName, dryRun)
+	glog.V(2).Infof("Args and flags: name %s, host: %s, host-system-namespace: %s, kubeconfig: %s, cluster-context: %s, secret-name: %s, dry-run: %s", o.Name, o.Host, o.FederationSystemNamespace, o.Kubeconfig, o.ClusterContext, o.SecretName, o.DryRun)
 
+	return nil
+}
+
+// Run is the implementation of the `join federation` command.
+func (o *JoinFederationOptions) Run(f cmdutil.Factory, cmdOut io.Writer, config util.AdminConfig, cmd *cobra.Command) error {
 	po := config.PathOptions()
-	po.LoadingRules.ExplicitPath = joinFlags.Kubeconfig
+	po.LoadingRules.ExplicitPath = o.Kubeconfig
 	clientConfig, err := po.GetStartingConfig()
 	if err != nil {
 		return err
 	}
-	generator, err := clusterGenerator(clientConfig, joinFlags.Name, clusterContext, secretName)
+	generator, err := clusterGenerator(clientConfig, o.Name, o.ClusterContext, o.SecretName)
 	if err != nil {
 		glog.V(2).Infof("Failed creating cluster generator: %v", err)
 		return err
 	}
 	glog.V(2).Infof("Created cluster generator: %#v", generator)
 
-	hostFactory := config.HostFactory(joinFlags.Host, joinFlags.Kubeconfig)
+	hostFactory := config.HostFactory(o.Host, o.Kubeconfig)
 
 	// We are not using the `kubectl create secret` machinery through
 	// `RunCreateSubcommand` as we do to the cluster resource below
@@ -130,7 +156,7 @@ func joinFederation(f cmdutil.Factory, cmdOut io.Writer, config util.AdminConfig
 	//    don't have to print the created secret in the default case.
 	// Having said that, secret generation machinery could be altered to
 	// suit our needs, but it is far less invasive and readable this way.
-	_, err = createSecret(hostFactory, clientConfig, joinFlags.FederationSystemNamespace, clusterContext, secretName, dryRun)
+	_, err = createSecret(hostFactory, clientConfig, o.FederationSystemNamespace, o.ClusterContext, o.SecretName, o.DryRun)
 	if err != nil {
 		glog.V(2).Infof("Failed creating the cluster credentials secret: %v", err)
 		return err
@@ -138,9 +164,9 @@ func joinFederation(f cmdutil.Factory, cmdOut io.Writer, config util.AdminConfig
 	glog.V(2).Infof("Cluster credentials secret created")
 
 	return kubectlcmd.RunCreateSubcommand(f, cmd, cmdOut, &kubectlcmd.CreateSubcommandOptions{
-		Name:                joinFlags.Name,
+		Name:                o.Name,
 		StructuredGenerator: generator,
-		DryRun:              dryRun,
+		DryRun:              o.DryRun,
 		OutputFormat:        cmdutil.GetFlagString(cmd, "output"),
 	})
 }

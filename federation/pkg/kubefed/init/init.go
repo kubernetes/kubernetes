@@ -34,6 +34,7 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -57,7 +58,7 @@ import (
 	"k8s.io/kubernetes/pkg/version"
 
 	"github.com/spf13/cobra"
-	"sort"
+	"github.com/spf13/pflag"
 )
 
 const (
@@ -119,34 +120,65 @@ var (
 	hyperkubeImageName = "gcr.io/google_containers/hyperkube-amd64"
 )
 
+type InitFederationOptions struct {
+	util.SubcommandOptions
+
+	InitFederation
+}
+
+type InitFederation struct {
+	DNSZoneName                      string
+	Image                            string
+	DNSProvider                      string
+	EtcdPVCapacity                   string
+	EtcdPersistentStorage            bool
+	DryRun                           bool
+	StorageBackend                   string
+	APIServerOverridesString         string
+	APIServerOverrides               map[string]string
+	ControllerManagerOverridesString string
+	ControllerManagerOverrides       map[string]string
+	APIServerServiceTypeString       string
+	APIServerServiceType             v1.ServiceType
+	APIServerAdvertiseAddress        string
+}
+
+func (o *InitFederation) Bind(flags *pflag.FlagSet) {
+	defaultImage := fmt.Sprintf("%s:%s", hyperkubeImageName, version.Get())
+
+	flags.StringVar(&o.DNSZoneName, "dns-zone-name", "", "DNS suffix for this federation. Federated Service DNS names are published with this suffix.")
+	flags.StringVar(&o.Image, "image", defaultImage, "Image to use for federation API server and controller manager binaries.")
+	flags.StringVar(&o.DNSProvider, "dns-provider", "google-clouddns", "Dns provider to be used for this deployment.")
+	flags.StringVar(&o.EtcdPVCapacity, "etcd-pv-capacity", "10Gi", "Size of persistent volume claim to be used for etcd.")
+	flags.BoolVar(&o.EtcdPersistentStorage, "etcd-persistent-storage", true, "Use persistent volume for etcd. Defaults to 'true'.")
+	flags.BoolVar(&o.DryRun, "dry-run", false, "dry run without sending commands to server.")
+	flags.StringVar(&o.StorageBackend, "storage-backend", "etcd2", "The storage backend for persistence. Options: 'etcd2' (default), 'etcd3'.")
+	flags.StringVar(&o.APIServerOverridesString, "apiserver-arg-overrides", "", "comma separated list of federation-apiserver arguments to override: Example \"--arg1=value1,--arg2=value2...\"")
+	flags.StringVar(&o.ControllerManagerOverridesString, "controllermanager-arg-overrides", "", "comma separated list of federation-controller-manager arguments to override: Example \"--arg1=value1,--arg2=value2...\"")
+	flags.StringVar(&o.APIServerServiceTypeString, apiserverServiceTypeFlag, string(v1.ServiceTypeLoadBalancer), "The type of service to create for federation API server. Options: 'LoadBalancer' (default), 'NodePort'.")
+	flags.StringVar(&o.APIServerAdvertiseAddress, apiserverAdvertiseAddressFlag, "", "Preferred address to advertise api server nodeport service. Valid only if '"+apiserverServiceTypeFlag+"=NodePort'.")
+}
+
 // NewCmdInit defines the `init` command that bootstraps a federation
 // control plane inside a set of host clusters.
 func NewCmdInit(cmdOut io.Writer, config util.AdminConfig) *cobra.Command {
+	options := &InitFederationOptions{}
+
 	cmd := &cobra.Command{
 		Use:     "init FEDERATION_NAME --host-cluster-context=HOST_CONTEXT",
 		Short:   "init initializes a federation control plane",
 		Long:    init_long,
 		Example: init_example,
 		Run: func(cmd *cobra.Command, args []string) {
-			err := initFederation(cmdOut, config, cmd, args)
-			cmdutil.CheckErr(err)
+			cmdutil.CheckErr(options.Complete(cmd, args))
+			cmdutil.CheckErr(options.Run(cmdOut, config))
 		},
 	}
 
-	defaultImage := fmt.Sprintf("%s:%s", hyperkubeImageName, version.Get())
+	flags := cmd.Flags()
+	options.SubcommandOptions.Bind(flags)
+	options.InitFederation.Bind(flags)
 
-	util.AddSubcommandFlags(cmd)
-	cmd.Flags().String("dns-zone-name", "", "DNS suffix for this federation. Federated Service DNS names are published with this suffix.")
-	cmd.Flags().String("image", defaultImage, "Image to use for federation API server and controller manager binaries.")
-	cmd.Flags().String("dns-provider", "google-clouddns", "Dns provider to be used for this deployment.")
-	cmd.Flags().String("etcd-pv-capacity", "10Gi", "Size of persistent volume claim to be used for etcd.")
-	cmd.Flags().Bool("etcd-persistent-storage", true, "Use persistent volume for etcd. Defaults to 'true'.")
-	cmd.Flags().Bool("dry-run", false, "dry run without sending commands to server.")
-	cmd.Flags().String("apiserver-arg-overrides", "", "comma separated list of federation-apiserver arguments to override: Example \"--arg1=value1,--arg2=value2...\"")
-	cmd.Flags().String("controllermanager-arg-overrides", "", "comma separated list of federation-controller-manager arguments to override: Example \"--arg1=value1,--arg2=value2...\"")
-	cmd.Flags().String("storage-backend", "etcd2", "The storage backend for persistence. Options: 'etcd2' (default), 'etcd3'.")
-	cmd.Flags().String(apiserverServiceTypeFlag, string(v1.ServiceTypeLoadBalancer), "The type of service to create for federation API server. Options: 'LoadBalancer' (default), 'NodePort'.")
-	cmd.Flags().String(apiserverAdvertiseAddressFlag, "", "Preferred address to advertise api server nodeport service. Valid only if '"+apiserverServiceTypeFlag+"=NodePort'.")
 	return cmd
 }
 
@@ -157,81 +189,79 @@ type entityKeyPairs struct {
 	admin             *triple.KeyPair
 }
 
-// initFederation initializes a federation control plane.
-// See the design doc in https://github.com/kubernetes/kubernetes/pull/34484
-// for details.
-func initFederation(cmdOut io.Writer, config util.AdminConfig, cmd *cobra.Command, args []string) error {
-	initFlags, err := util.GetSubcommandFlags(cmd, args)
+// Complete ensures that options are valid and marshals them if necessary.
+func (o *InitFederationOptions) Complete(cmd *cobra.Command, args []string) error {
+	err := o.SubcommandOptions.SetName(cmd, args)
 	if err != nil {
 		return err
 	}
-	dnsZoneName := cmdutil.GetFlagString(cmd, "dns-zone-name")
-	image := cmdutil.GetFlagString(cmd, "image")
-	dnsProvider := cmdutil.GetFlagString(cmd, "dns-provider")
-	etcdPVCapacity := cmdutil.GetFlagString(cmd, "etcd-pv-capacity")
-	etcdPersistence := cmdutil.GetFlagBool(cmd, "etcd-persistent-storage")
-	dryRun := cmdutil.GetDryRunFlag(cmd)
-	storageBackend := cmdutil.GetFlagString(cmd, "storage-backend")
-	apiserverServiceType := v1.ServiceType(cmdutil.GetFlagString(cmd, apiserverServiceTypeFlag))
-	apiserverAdvertiseAddress := cmdutil.GetFlagString(cmd, apiserverAdvertiseAddressFlag)
 
-	if apiserverServiceType != v1.ServiceTypeLoadBalancer && apiserverServiceType != v1.ServiceTypeNodePort {
-		return fmt.Errorf("invalid %s: %s, should be either %s or %s", apiserverServiceTypeFlag, apiserverServiceType, v1.ServiceTypeLoadBalancer, v1.ServiceTypeNodePort)
+	o.APIServerServiceType = v1.ServiceType(o.APIServerServiceTypeString)
+	if o.APIServerServiceType != v1.ServiceTypeLoadBalancer && o.APIServerServiceType != v1.ServiceTypeNodePort {
+		return fmt.Errorf("invalid %s: %s, should be either %s or %s", apiserverServiceTypeFlag, o.APIServerServiceType, v1.ServiceTypeLoadBalancer, v1.ServiceTypeNodePort)
 	}
-	if apiserverAdvertiseAddress != "" {
-		ip := net.ParseIP(apiserverAdvertiseAddress)
+	if o.APIServerAdvertiseAddress != "" {
+		ip := net.ParseIP(o.APIServerAdvertiseAddress)
 		if ip == nil {
-			return fmt.Errorf("invalid %s: %s, should be a valid ip address", apiserverAdvertiseAddressFlag, apiserverAdvertiseAddress)
+			return fmt.Errorf("invalid %s: %s, should be a valid ip address", apiserverAdvertiseAddressFlag, o.APIServerAdvertiseAddress)
 		}
-		if apiserverServiceType != v1.ServiceTypeNodePort {
+		if o.APIServerServiceType != v1.ServiceTypeNodePort {
 			return fmt.Errorf("%s should be passed only with '%s=NodePort'", apiserverAdvertiseAddressFlag, apiserverServiceTypeFlag)
 		}
 	}
-	apiserverArgOverrides, err := marshallOverrides(cmdutil.GetFlagString(cmd, "apiserver-arg-overrides"))
+
+	o.APIServerOverrides, err = marshallOverrides(o.APIServerOverridesString)
 	if err != nil {
 		return fmt.Errorf("Error marshalling --apiserver-arg-overrides: %v", err)
 	}
-	cmArgOverrides, err := marshallOverrides(cmdutil.GetFlagString(cmd, "controllermanager-arg-overrides"))
+	o.ControllerManagerOverrides, err = marshallOverrides(o.ControllerManagerOverridesString)
 	if err != nil {
 		return fmt.Errorf("Error marshalling --controllermanager-arg-overrides: %v", err)
 	}
 
-	hostFactory := config.HostFactory(initFlags.Host, initFlags.Kubeconfig)
+	return nil
+}
+
+// Run initializes a federation control plane.
+// See the design doc in https://github.com/kubernetes/kubernetes/pull/34484
+// for details.
+func (o *InitFederationOptions) Run(cmdOut io.Writer, config util.AdminConfig) error {
+	hostFactory := config.HostFactory(o.Host, o.Kubeconfig)
 	hostClientset, err := hostFactory.ClientSet()
 	if err != nil {
 		return err
 	}
 
-	serverName := fmt.Sprintf("%s-apiserver", initFlags.Name)
+	serverName := fmt.Sprintf("%s-apiserver", o.Name)
 	serverCredName := fmt.Sprintf("%s-credentials", serverName)
-	cmName := fmt.Sprintf("%s-controller-manager", initFlags.Name)
+	cmName := fmt.Sprintf("%s-controller-manager", o.Name)
 	cmKubeconfigName := fmt.Sprintf("%s-kubeconfig", cmName)
 
 	// 1. Create a namespace for federation system components
-	_, err = createNamespace(hostClientset, initFlags.FederationSystemNamespace, dryRun)
+	_, err = createNamespace(hostClientset, o.FederationSystemNamespace, o.DryRun)
 	if err != nil {
 		return err
 	}
 
 	// 2. Expose a network endpoint for the federation API server
-	svc, ips, hostnames, err := createService(hostClientset, initFlags.FederationSystemNamespace, serverName, apiserverAdvertiseAddress, apiserverServiceType, dryRun)
+	svc, ips, hostnames, err := createService(hostClientset, o.FederationSystemNamespace, serverName, o.APIServerAdvertiseAddress, o.APIServerServiceType, o.DryRun)
 	if err != nil {
 		return err
 	}
 
 	// 3. Generate TLS certificates and credentials
-	entKeyPairs, err := genCerts(initFlags.FederationSystemNamespace, initFlags.Name, svc.Name, HostClusterLocalDNSZoneName, ips, hostnames)
+	entKeyPairs, err := genCerts(o.FederationSystemNamespace, o.Name, svc.Name, HostClusterLocalDNSZoneName, ips, hostnames)
 	if err != nil {
 		return err
 	}
 
-	_, err = createAPIServerCredentialsSecret(hostClientset, initFlags.FederationSystemNamespace, serverCredName, entKeyPairs, dryRun)
+	_, err = createAPIServerCredentialsSecret(hostClientset, o.FederationSystemNamespace, serverCredName, entKeyPairs, o.DryRun)
 	if err != nil {
 		return err
 	}
 
 	// 4. Create a kubeconfig secret
-	_, err = createControllerManagerKubeconfigSecret(hostClientset, initFlags.FederationSystemNamespace, initFlags.Name, svc.Name, cmKubeconfigName, entKeyPairs, dryRun)
+	_, err = createControllerManagerKubeconfigSecret(hostClientset, o.FederationSystemNamespace, o.Name, svc.Name, cmKubeconfigName, entKeyPairs, o.DryRun)
 	if err != nil {
 		return err
 	}
@@ -240,8 +270,8 @@ func initFederation(cmdOut io.Writer, config util.AdminConfig, cmd *cobra.Comman
 	// API server's state. This is where federation API server's etcd
 	// stores its data.
 	var pvc *api.PersistentVolumeClaim
-	if etcdPersistence {
-		pvc, err = createPVC(hostClientset, initFlags.FederationSystemNamespace, svc.Name, etcdPVCapacity, dryRun)
+	if o.EtcdPersistentStorage {
+		pvc, err = createPVC(hostClientset, o.FederationSystemNamespace, svc.Name, o.EtcdPVCapacity, o.DryRun)
 		if err != nil {
 			return err
 		}
@@ -250,13 +280,13 @@ func initFederation(cmdOut io.Writer, config util.AdminConfig, cmd *cobra.Comman
 	// Since only one IP address can be specified as advertise address,
 	// we arbitrarily pick the first available IP address
 	// Pick user provided apiserverAdvertiseAddress over other available IP addresses.
-	advertiseAddress := apiserverAdvertiseAddress
+	advertiseAddress := o.APIServerAdvertiseAddress
 	if advertiseAddress == "" && len(ips) > 0 {
 		advertiseAddress = ips[0]
 	}
 
 	// 6. Create federation API server
-	_, err = createAPIServer(hostClientset, initFlags.FederationSystemNamespace, serverName, image, serverCredName, advertiseAddress, storageBackend, apiserverArgOverrides, pvc, dryRun)
+	_, err = createAPIServer(hostClientset, o.FederationSystemNamespace, serverName, o.Image, serverCredName, advertiseAddress, o.StorageBackend, o.APIServerOverrides, pvc, o.DryRun)
 	if err != nil {
 		return err
 	}
@@ -264,20 +294,20 @@ func initFederation(cmdOut io.Writer, config util.AdminConfig, cmd *cobra.Comman
 	// 7. Create federation controller manager
 	// 7a. Create a service account in the host cluster for federation
 	// controller manager.
-	sa, err := createControllerManagerSA(hostClientset, initFlags.FederationSystemNamespace, dryRun)
+	sa, err := createControllerManagerSA(hostClientset, o.FederationSystemNamespace, o.DryRun)
 	if err != nil {
 		return err
 	}
 
 	// 7b. Create RBAC role and role binding for federation controller
 	// manager service account.
-	_, _, err = createRoleBindings(hostClientset, initFlags.FederationSystemNamespace, sa.Name, dryRun)
+	_, _, err = createRoleBindings(hostClientset, o.FederationSystemNamespace, sa.Name, o.DryRun)
 	if err != nil {
 		return err
 	}
 
 	// 7c. Create federation controller manager deployment.
-	_, err = createControllerManager(hostClientset, initFlags.FederationSystemNamespace, initFlags.Name, svc.Name, cmName, image, cmKubeconfigName, dnsZoneName, dnsProvider, sa.Name, cmArgOverrides, dryRun)
+	_, err = createControllerManager(hostClientset, o.FederationSystemNamespace, o.Name, svc.Name, cmName, o.Image, cmKubeconfigName, o.DNSZoneName, o.DNSProvider, sa.Name, o.ControllerManagerOverrides, o.DryRun)
 	if err != nil {
 		return err
 	}
@@ -291,24 +321,24 @@ func initFederation(cmdOut io.Writer, config util.AdminConfig, cmd *cobra.Comman
 		endpoint = hostnames[0]
 	}
 	// If the service is nodeport, need to append the port to endpoint as it is non-standard port
-	if apiserverServiceType == v1.ServiceTypeNodePort {
+	if o.APIServerServiceType == v1.ServiceTypeNodePort {
 		endpoint = endpoint + ":" + strconv.Itoa(int(svc.Spec.Ports[0].NodePort))
 	}
 
 	// 8. Write the federation API server endpoint info, credentials
 	// and context to kubeconfig
-	err = updateKubeconfig(config, initFlags.Name, endpoint, entKeyPairs, dryRun)
+	err = updateKubeconfig(config, o.Name, endpoint, entKeyPairs, o.DryRun)
 	if err != nil {
 		return err
 	}
 
-	if !dryRun {
+	if !o.DryRun {
 		fedPods := []string{serverName, cmName}
-		err = waitForPods(hostClientset, fedPods, initFlags.FederationSystemNamespace)
+		err = waitForPods(hostClientset, fedPods, o.FederationSystemNamespace)
 		if err != nil {
 			return err
 		}
-		err = waitSrvHealthy(config, initFlags.Name, initFlags.Kubeconfig)
+		err = waitSrvHealthy(config, o.Name, o.Kubeconfig)
 		if err != nil {
 			return err
 		}
