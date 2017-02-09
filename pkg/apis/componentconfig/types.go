@@ -442,16 +442,6 @@ type KubeletConfiguration struct {
 	// manage attachment/detachment of volumes scheduled to this node, and
 	// disables kubelet from executing any attach/detach operations
 	EnableControllerAttachDetach bool
-	// A set of ResourceName=ResourceQuantity (e.g. cpu=200m,memory=150G) pairs
-	// that describe resources reserved for non-kubernetes components.
-	// Currently only cpu and memory are supported. [default=none]
-	// See http://kubernetes.io/docs/user-guide/compute-resources for more detail.
-	SystemReserved ConfigurationMap
-	// A set of ResourceName=ResourceQuantity (e.g. cpu=200m,memory=150G) pairs
-	// that describe resources reserved for kubernetes system components.
-	// Currently only cpu and memory are supported. [default=none]
-	// See http://kubernetes.io/docs/user-guide/compute-resources for more detail.
-	KubeReserved ConfigurationMap
 	// Default behaviour for kernel tuning
 	ProtectKernelDefaults bool
 	// If true, Kubelet ensures a set of iptables rules are present on host.
@@ -485,6 +475,32 @@ type KubeletConfiguration struct {
 	// This flag, if set, instructs the kubelet to keep volumes from terminated pods mounted to the node.
 	// This can be useful for debugging volume related issues.
 	KeepTerminatedPodVolumes bool
+
+	/* following flags are meant for Node Allocatable */
+
+	// A set of ResourceName=ResourceQuantity (e.g. cpu=200m,memory=150G) pairs
+	// that describe resources reserved for non-kubernetes components.
+	// Currently only cpu and memory are supported. [default=none]
+	// See http://kubernetes.io/docs/user-guide/compute-resources for more detail.
+	SystemReserved ConfigurationMap
+	// A set of ResourceName=ResourceQuantity (e.g. cpu=200m,memory=150G) pairs
+	// that describe resources reserved for kubernetes system components.
+	// Currently only cpu and memory are supported. [default=none]
+	// See http://kubernetes.io/docs/user-guide/compute-resources for more detail.
+	KubeReserved ConfigurationMap
+	// This flag helps kubelet identify absolute name of top level cgroup used to enforce `SystemReserved` compute resource reservation for OS system daemons.
+	// Refer to [Node Allocatable](https://github.com/kubernetes/community/blob/master/contributors/design-proposals/node-allocatable.md) doc for more information.
+	SystemReservedCgroup string
+	// This flag helps kubelet identify absolute name of top level cgroup used to enforce `KubeReserved` compute resource reservation for Kubernetes node system daemons.
+	// Refer to [Node Allocatable](https://github.com/kubernetes/community/blob/master/contributors/design-proposals/node-allocatable.md) doc for more information.
+	KubeReservedCgroup string
+	// This flag specifies the various Node Allocatable enforcements that Kubelet needs to perform.
+	// This flag accepts a list of options. Acceptible options are `pods`, `system-reserved` & `kube-reserved`.
+	// Refer to [Node Allocatable](https://github.com/kubernetes/community/blob/master/contributors/design-proposals/node-allocatable.md) doc for more information.
+	EnforceNodeAllocatable []string
+	// This flag, if set, will avoid including `EvictionHard` limits while computing Node Allocatable.
+	// Refer to [Node Allocatable](https://github.com/kubernetes/community/blob/master/contributors/design-proposals/node-allocatable.md) doc for more information.
+	ExperimentalNodeAllocatableIgnoreEvictionThreshold bool
 }
 
 type KubeletAuthorizationMode string

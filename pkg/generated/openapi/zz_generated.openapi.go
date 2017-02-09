@@ -11389,34 +11389,6 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 								Format:      "",
 							},
 						},
-						"systemReserved": {
-							SchemaProps: spec.SchemaProps{
-								Description: "A set of ResourceName=ResourceQuantity (e.g. cpu=200m,memory=150G) pairs that describe resources reserved for non-kubernetes components. Currently only cpu and memory are supported. [default=none] See http://kubernetes.io/docs/user-guide/compute-resources for more detail.",
-								Type:        []string{"object"},
-								AdditionalProperties: &spec.SchemaOrBool{
-									Schema: &spec.Schema{
-										SchemaProps: spec.SchemaProps{
-											Type:   []string{"string"},
-											Format: "",
-										},
-									},
-								},
-							},
-						},
-						"kubeReserved": {
-							SchemaProps: spec.SchemaProps{
-								Description: "A set of ResourceName=ResourceQuantity (e.g. cpu=200m,memory=150G) pairs that describe resources reserved for kubernetes system components. Currently only cpu and memory are supported. [default=none] See http://kubernetes.io/docs/user-guide/compute-resources for more detail.",
-								Type:        []string{"object"},
-								AdditionalProperties: &spec.SchemaOrBool{
-									Schema: &spec.Schema{
-										SchemaProps: spec.SchemaProps{
-											Type:   []string{"string"},
-											Format: "",
-										},
-									},
-								},
-							},
-						},
 						"protectKernelDefaults": {
 							SchemaProps: spec.SchemaProps{
 								Description: "Default behaviour for kernel tuning",
@@ -11494,8 +11466,71 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 								Format:      "",
 							},
 						},
+						"systemReserved": {
+							SchemaProps: spec.SchemaProps{
+								Description: "A set of ResourceName=ResourceQuantity (e.g. cpu=200m,memory=150G) pairs that describe resources reserved for non-kubernetes components. Currently only cpu and memory are supported. [default=none] See http://kubernetes.io/docs/user-guide/compute-resources for more detail.",
+								Type:        []string{"object"},
+								AdditionalProperties: &spec.SchemaOrBool{
+									Schema: &spec.Schema{
+										SchemaProps: spec.SchemaProps{
+											Type:   []string{"string"},
+											Format: "",
+										},
+									},
+								},
+							},
+						},
+						"kubeReserved": {
+							SchemaProps: spec.SchemaProps{
+								Description: "A set of ResourceName=ResourceQuantity (e.g. cpu=200m,memory=150G) pairs that describe resources reserved for kubernetes system components. Currently only cpu and memory are supported. [default=none] See http://kubernetes.io/docs/user-guide/compute-resources for more detail.",
+								Type:        []string{"object"},
+								AdditionalProperties: &spec.SchemaOrBool{
+									Schema: &spec.Schema{
+										SchemaProps: spec.SchemaProps{
+											Type:   []string{"string"},
+											Format: "",
+										},
+									},
+								},
+							},
+						},
+						"systemReservedCgroup": {
+							SchemaProps: spec.SchemaProps{
+								Description: "This flag helps kubelet identify absolute name of top level cgroup used to enforce `SystemReserved` compute resource reservation for OS system daemons. Refer to [Node Allocatable](https://github.com/kubernetes/community/blob/master/contributors/design-proposals/node-allocatable.md) doc for more information.",
+								Type:        []string{"string"},
+								Format:      "",
+							},
+						},
+						"kubeReservedCgroup": {
+							SchemaProps: spec.SchemaProps{
+								Description: "This flag helps kubelet identify absolute name of top level cgroup used to enforce `KubeReserved` compute resource reservation for Kubernetes node system daemons. Refer to [Node Allocatable](https://github.com/kubernetes/community/blob/master/contributors/design-proposals/node-allocatable.md) doc for more information.",
+								Type:        []string{"string"},
+								Format:      "",
+							},
+						},
+						"enforceNodeAllocatable": {
+							SchemaProps: spec.SchemaProps{
+								Description: "This flag specifies the various Node Allocatable enforcements that Kubelet needs to perform. This flag accepts a list of options. Acceptible options are `pods`, `system-reserved` & `kube-reserved`. Refer to [Node Allocatable](https://github.com/kubernetes/community/blob/master/contributors/design-proposals/node-allocatable.md) doc for more information.",
+								Type:        []string{"array"},
+								Items: &spec.SchemaOrArray{
+									Schema: &spec.Schema{
+										SchemaProps: spec.SchemaProps{
+											Type:   []string{"string"},
+											Format: "",
+										},
+									},
+								},
+							},
+						},
+						"experimentalNodeAllocatableIgnoreEvictionThreshold": {
+							SchemaProps: spec.SchemaProps{
+								Description: "This flag, if set, will avoid including `EvictionHard` limits while computing Node Allocatable. Refer to [Node Allocatable](https://github.com/kubernetes/community/blob/master/contributors/design-proposals/node-allocatable.md) doc for more information.",
+								Type:        []string{"boolean"},
+								Format:      "",
+							},
+						},
 					},
-					Required: []string{"podManifestPath", "syncFrequency", "fileCheckFrequency", "httpCheckFrequency", "manifestURL", "manifestURLHeader", "enableServer", "address", "port", "readOnlyPort", "tlsCertFile", "tlsPrivateKeyFile", "certDirectory", "authentication", "authorization", "hostnameOverride", "podInfraContainerImage", "dockerEndpoint", "rootDirectory", "seccompProfileRoot", "allowPrivileged", "hostNetworkSources", "hostPIDSources", "hostIPCSources", "registryPullQPS", "registryBurst", "eventRecordQPS", "eventBurst", "enableDebuggingHandlers", "minimumGCAge", "maxPerPodContainerCount", "maxContainerCount", "cAdvisorPort", "healthzPort", "healthzBindAddress", "oomScoreAdj", "registerNode", "clusterDomain", "masterServiceNamespace", "clusterDNS", "streamingConnectionIdleTimeout", "nodeStatusUpdateFrequency", "imageMinimumGCAge", "imageGCHighThresholdPercent", "imageGCLowThresholdPercent", "lowDiskSpaceThresholdMB", "volumeStatsAggPeriod", "networkPluginName", "networkPluginDir", "cniConfDir", "cniBinDir", "networkPluginMTU", "volumePluginDir", "cloudProvider", "cloudConfigFile", "kubeletCgroups", "runtimeCgroups", "systemCgroups", "cgroupRoot", "containerRuntime", "remoteRuntimeEndpoint", "remoteImageEndpoint", "runtimeRequestTimeout", "rktPath", "rktAPIEndpoint", "rktStage1Image", "lockFilePath", "exitOnLockContention", "hairpinMode", "babysitDaemons", "maxPods", "nvidiaGPUs", "dockerExecHandlerName", "podCIDR", "resolvConf", "cpuCFSQuota", "containerized", "maxOpenFiles", "registerSchedulable", "registerWithTaints", "contentType", "kubeAPIQPS", "kubeAPIBurst", "serializeImagePulls", "outOfDiskTransitionFrequency", "nodeIP", "nodeLabels", "nonMasqueradeCIDR", "enableCustomMetrics", "evictionHard", "evictionSoft", "evictionSoftGracePeriod", "evictionPressureTransitionPeriod", "evictionMaxPodGracePeriod", "evictionMinimumReclaim", "experimentalKernelMemcgNotification", "podsPerCore", "enableControllerAttachDetach", "systemReserved", "kubeReserved", "protectKernelDefaults", "makeIPTablesUtilChains", "iptablesMasqueradeBit", "iptablesDropBit"},
+					Required: []string{"podManifestPath", "syncFrequency", "fileCheckFrequency", "httpCheckFrequency", "manifestURL", "manifestURLHeader", "enableServer", "address", "port", "readOnlyPort", "tlsCertFile", "tlsPrivateKeyFile", "certDirectory", "authentication", "authorization", "hostnameOverride", "podInfraContainerImage", "dockerEndpoint", "rootDirectory", "seccompProfileRoot", "allowPrivileged", "hostNetworkSources", "hostPIDSources", "hostIPCSources", "registryPullQPS", "registryBurst", "eventRecordQPS", "eventBurst", "enableDebuggingHandlers", "minimumGCAge", "maxPerPodContainerCount", "maxContainerCount", "cAdvisorPort", "healthzPort", "healthzBindAddress", "oomScoreAdj", "registerNode", "clusterDomain", "masterServiceNamespace", "clusterDNS", "streamingConnectionIdleTimeout", "nodeStatusUpdateFrequency", "imageMinimumGCAge", "imageGCHighThresholdPercent", "imageGCLowThresholdPercent", "lowDiskSpaceThresholdMB", "volumeStatsAggPeriod", "networkPluginName", "networkPluginDir", "cniConfDir", "cniBinDir", "networkPluginMTU", "volumePluginDir", "cloudProvider", "cloudConfigFile", "kubeletCgroups", "runtimeCgroups", "systemCgroups", "cgroupRoot", "containerRuntime", "remoteRuntimeEndpoint", "remoteImageEndpoint", "runtimeRequestTimeout", "rktPath", "rktAPIEndpoint", "rktStage1Image", "lockFilePath", "exitOnLockContention", "hairpinMode", "babysitDaemons", "maxPods", "nvidiaGPUs", "dockerExecHandlerName", "podCIDR", "resolvConf", "cpuCFSQuota", "containerized", "maxOpenFiles", "registerSchedulable", "registerWithTaints", "contentType", "kubeAPIQPS", "kubeAPIBurst", "serializeImagePulls", "outOfDiskTransitionFrequency", "nodeIP", "nodeLabels", "nonMasqueradeCIDR", "enableCustomMetrics", "evictionHard", "evictionSoft", "evictionSoftGracePeriod", "evictionPressureTransitionPeriod", "evictionMaxPodGracePeriod", "evictionMinimumReclaim", "experimentalKernelMemcgNotification", "podsPerCore", "enableControllerAttachDetach", "protectKernelDefaults", "makeIPTablesUtilChains", "iptablesMasqueradeBit", "iptablesDropBit", "systemReserved", "kubeReserved"},
 				},
 			},
 			Dependencies: []string{
