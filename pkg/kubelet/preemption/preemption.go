@@ -116,7 +116,14 @@ func (c *CriticalPodAdmissionHandler) HandleAdmissionFailure(pod *v1.Pod, failur
 // based on requests.  For example, if the only insufficient resource is 200Mb of memory, this function could
 // evict a pod with request=250Mb.
 func (c *CriticalPodAdmissionHandler) evictPodsToFreeRequests(insufficientResources admissionRequirementList) error {
-	podsToPreempt, err := getPodsToPreempt(c.getPodsFunc(), insufficientResources)
+	pods := []*v1.Pod{}
+	for _, pod := range c.getPodsFunc() {
+		// only consider guaranteed or burstable pods that are not critical
+		if !kubetypes.IsCriticalPod(pod) && (qos.GetPodQOS(pod) == v1.PodQOSGuaranteed || qos.GetPodQOS(pod) == v1.PodQOSBurstable) {
+			pods = append(pods, pod)
+		}
+	}
+	podsToPreempt, err := getPodsToPreempt(pods, insufficientResources)
 	if err != nil {
 		return fmt.Errorf("Error finding a set of pods to preempt: %v", err)
 	}
@@ -163,6 +170,7 @@ func getPodsToPreempt(possiblePods []*v1.Pod, insufficientResources admissionReq
 
 }
 
+// Return the list of pods with the smaller cost,
 func minCostPodList(list1 []*v1.Pod, list2 []*v1.Pod) []*v1.Pod {
 	nGuaranteed1, nBurstable1, memory1, cpu1 := evaluatePodList(list1)
 	nGuaranteed2, nBurstable2, memory2, cpu2 := evaluatePodList(list2)
@@ -194,6 +202,9 @@ func minCostPodList(list1 []*v1.Pod, list2 []*v1.Pod) []*v1.Pod {
 	return list1
 }
 
+// given a list of pods, return the total:
+// number of guaranteeed pods, number of burstable pods,
+// memory requested, cpu requested
 func evaluatePodList(pods []*v1.Pod) (int, int, int64, int64) {
 	nGuaranteed := 0
 	nBurstable := 0
@@ -212,6 +223,7 @@ func evaluatePodList(pods []*v1.Pod) (int, int, int64, int64) {
 	return nGuaranteed, nBurstable, memory, cpu
 }
 
+// finds and returns the request for a specific resource.
 func getResourceRequest(requests *schedulercache.Resource, resource v1.ResourceName) int64 {
 	switch resource {
 	case v1.ResourcePods:
@@ -230,125 +242,3 @@ func getResourceRequest(requests *schedulercache.Resource, resource v1.ResourceN
 		return 0
 	}
 }
-
-// 	activePods := c.getPodsFunc()
-// 	burstablePods := filterPods(activePods, func(p *v1.Pod) bool {
-// 		// find all burstable, non-critical pods
-// 		return qos.GetPodQOS(p) == v1.PodQOSBurstable && !kubetypes.IsCriticalPod(pod)
-// 	})
-// 	guaranteedPods := filterPods(activePods, func(p *v1.Pod) bool {
-// 		// find all guaranteed, non-critical pods
-// 		return qos.GetPodQOS(p) == v1.PodQOSGuaranteed && !kubetypes.IsCriticalPod(pod)
-// 	})
-// 	burstablePods = sort(byResourceRequest(burstablePods))
-// 	guaranteedPods = sort(byResourceRequest(guaranteedPods))
-// 	// Our priority in preemption is to evict the fewest pods possible, while taking into account QOS ordering.
-// 	// For example, it is better to evict 3 burstable pods than 1 guaranteed, but it is better to evict 1 guarateed and 1 burstable
-// 	// than 1 guaranteed and 2 burstable pods.  We iterate through numbers in this order, looking for matches that evict those numbers of pods.
-// 	// Return as soon as we find a match, since we are iterating through better combinations first.
-// 	for nGuaranteed := 0; nGuaranteed < len(guaranteedPods); nGuaranteed++ {
-// 		for nBurstable := 0; nBurstable < len(burstablePods); nBurstable++ {
-// 			pods, found := getLowestCostMatch(insufficientResources, burstablePods, guaranteedPods, nBurstable, nGuaranteed)
-// 			if found {
-// 				return pods, nil
-// 			}
-// 		}
-// 	}
-// 	return nil, fmt.Errorf("No set of running pods found to reclaim requests: %v", insufficientResources)
-// }
-
-// func getLowestCostMatch(insufficientResources []predicates.InsufficientResourceError,
-// 	sortedBurstable []*v1.Pod, sortedGuaranteed []*v1.Pod, nBurstable int, nGuaranteed int) ([]*v1.Pod, bool) {
-// 	burstableIndicies := []int{}
-// 	for i := 0; i < nBurstable; i++ {
-// 		burstableIndicies = append(burstableIndicies, i)
-// 	}
-// 	guaranteedIndiciess := []int{}
-// 	for i := 0; i < nGuaranteed; i++ {
-// 		guaranteedIndiciess = append(guaranteedIndiciess, i)
-// 	}
-// 	for {
-// 		pods := []*v1.Pod{}
-// 		for _, i := range burstableIndicies {
-// 			pods = append(pods, sortedBurstable[i])
-// 		}
-// 		for _, i := range guaranteedIndiciess {
-// 			pods = append(pods, sortedGuaranteed[i])
-// 		}
-// 		if podsMeetResourceRequirements(pods, insufficientResources) {
-// 			return pods, true
-// 		}
-
-// 	}
-// }
-
-// func podsMeetResourceRequirements(pods []*v1.Pods, resourceRequirements []predicates.InsufficientResourceError) bool {
-// 	for _, resource := range resourceRequirements {
-// 		totalResourcesFreed := int64(0)
-// 		for _, pod := range pods {
-// 			totalResourcesFreed += getResourceRequest(pod, resource.ResourceName)
-// 		}
-// 		if totalResourcesFreed < resource.GetInsufficientAmount() {
-// 			return false
-// 		}
-// 	}
-// 	return true
-// }
-
-// func incrementIndicies(indicies []int, maxIndex int) bool {
-// 	for i := len(indicies) - 1; i >= 0; i-- {
-// 		if
-// 	}
-// }
-
-// // returns pods in the list of pods where filterFunc returns true.
-// func filterPods(pods []*v1.Pods, filterFunc func(p *v1.Pod) bool) []*v1.Pod {
-// 	filteredPods := []*v1.Pod{}
-// 	for _, pod := range pods {
-// 		if filterFunc(pod) {
-// 			filteredPods = append(filteredPods, pod)
-// 		}
-// 	}
-// 	return filteredPods
-// }
-
-// // byResourceRequest implements sort.Interface for []*v1.Pod, and sorts according to the requests on the given resource.
-// type byResourceRequest []*v1.Pod
-
-// func (a byResource) Len() int      { return len(a) }
-// func (a byResource) Swap(i, j int) { a[i], a[j] = a[j], a[i] }
-
-// // Less ranks based on memory requests.
-// func (a byResource) Less(i, j int) bool {
-// 	return getResourceRequestByResource(a[i], v1.ResourceMemory) < getResourceRequestByResource(a[j], v1.ResourceMemory)
-// }
-
-
-// // byPreemptionPriority implements sort.Interface for []predicates.InsufficientResourceError.
-// type byPreemptionPriority []predicates.InsufficientResourceError
-
-// func (a byPreemptionPriority) Len() int      { return len(a) }
-// func (a byPreemptionPriority) Swap(i, j int) { a[i], a[j] = a[j], a[i] }
-
-// // Less ranks based on the getPreemptionPriority function
-// func (a byPreemptionPriority) Less(i, j int) bool {
-// 	return getPreemptionPriority(a[i].ResourceName) < getPreemptionPriority(a[j].ResourceName)
-// }
-
-// // Lower return value indicates a higher priority
-// // This determines which resouce preemption prioritizes utilization for.
-// // For example, if ResourceMemory is chosen, then the preemption logic will find and evict the
-// // set of pods that free the insufficientResources and consume the least amount of memory, leaving memory requests
-// // as close to allocateable as possible, while successfully freeing insufficientResources.
-// func getPreemptionPriority(resource v1.ResourceName) int {
-// 	switch resource {
-// 	case v1.ResourcePods:
-// 		return 1
-// 	case v1.ResourceMemory:
-// 		return -2
-// 	case v1.ResourceCPU:
-// 		return -1
-// 	default:
-// 		return 0
-// 	}
-// }
