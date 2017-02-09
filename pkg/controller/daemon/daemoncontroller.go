@@ -801,7 +801,8 @@ func (dsc *DaemonSetsController) nodeShouldRunDaemonPod(node *v1.Node, ds *exten
 				predicates.ErrNodeLabelPresenceViolated,
 				// this one is probably intentional since it's a workaround for not having
 				// pod hard anti affinity.
-				predicates.ErrPodNotFitsHostPorts:
+				predicates.ErrPodNotFitsHostPorts,
+				predicates.ErrTaintsTolerationsNotMatch:
 				wantToRun, shouldSchedule, shouldContinueRunning = false, false, false
 			// unintentional
 			case
@@ -818,8 +819,7 @@ func (dsc *DaemonSetsController) nodeShouldRunDaemonPod(node *v1.Node, ds *exten
 			// unexpected
 			case
 				predicates.ErrPodAffinityNotMatch,
-				predicates.ErrServiceAffinityViolated,
-				predicates.ErrTaintsTolerationsNotMatch:
+				predicates.ErrServiceAffinityViolated:
 				return false, false, false, fmt.Errorf("unexpected reason: GeneralPredicates should not return reason %s", reason.GetReason())
 			default:
 				glog.V(4).Infof("unknown predicate failure reason: %s", reason.GetReason())
