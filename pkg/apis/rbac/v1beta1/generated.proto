@@ -183,9 +183,10 @@ message Subject {
   // If the Authorizer does not recognized the kind value, the Authorizer should report an error.
   optional string kind = 1;
 
-  // APIVersion holds the API group and version of the referenced object.
+  // APIGroup holds the API group of the referenced object. For non-object references such as "Group" and "User" this is
+  // expected to be this API group. For example, "rbac.authorization.k8s.io".
   // +optional
-  optional string apiVersion = 2;
+  optional string apiGroup = 2;
 
   // Name of the object being referenced.
   optional string name = 3;

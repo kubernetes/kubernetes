@@ -56,7 +56,7 @@ func NewSubjectAccessEvaluator(roles rbacregistryvalidation.RoleGetter, roleBind
 func (r *SubjectAccessEvaluator) AllowedSubjects(requestAttributes authorizer.Attributes) ([]rbac.Subject, error) {
 	subjects := []rbac.Subject{{Kind: rbac.GroupKind, Name: user.SystemPrivilegedGroup}}
 	if len(r.superUser) > 0 {
-		subjects = append(subjects, rbac.Subject{Kind: rbac.UserKind, APIVersion: "v1alpha1", Name: r.superUser})
+		subjects = append(subjects, rbac.Subject{Kind: rbac.UserKind, APIGroup: rbac.GroupName, Name: r.superUser})
 	}
 	errorlist := []error{}
 

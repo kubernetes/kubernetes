@@ -63,9 +63,9 @@ type Subject struct {
 	// Kind of object being referenced. Values defined by this API group are "User", "Group", and "ServiceAccount".
 	// If the Authorizer does not recognized the kind value, the Authorizer should report an error.
 	Kind string
-	// APIVersion holds the API group and version of the referenced object. For non-object references such as "Group" and "User" this is
-	// expected to be API version of this API group. For example, "rbac/v1alpha1".
-	APIVersion string
+	// APIGroup holds the API group of the referenced object. For non-object references such as "Group" and "User" this is
+	// expected to be this API group. For example, "rbac.authorization.k8s.io".
+	APIGroup string
 	// Name of the object being referenced.
 	Name string
 	// Namespace of the referenced object.  If the object kind is non-namespace, such as "User" or "Group", and this value is not empty

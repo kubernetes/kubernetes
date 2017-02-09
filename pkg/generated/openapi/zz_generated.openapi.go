@@ -14900,9 +14900,9 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 								Format:      "",
 							},
 						},
-						"apiVersion": {
+						"apiGroup": {
 							SchemaProps: spec.SchemaProps{
-								Description: "APIVersion holds the API group and version of the referenced object.",
+								Description: "APIGroup holds the API group of the referenced object. For non-object references such as \"Group\" and \"User\" this is expected to be this API group. For example, \"rbac.authorization.k8s.io\".",
 								Type:        []string{"string"},
 								Format:      "",
 							},

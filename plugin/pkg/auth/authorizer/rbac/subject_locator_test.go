@@ -105,7 +105,7 @@ func TestSubjectLocator(t *testing.T) {
 					&defaultAttributes{"", "", "get", "Pods", "", "ns1", ""},
 					[]rbac.Subject{
 						{Kind: rbac.GroupKind, Name: user.SystemPrivilegedGroup},
-						{Kind: rbac.UserKind, APIVersion: "v1alpha1", Name: "foo"},
+						{Kind: rbac.UserKind, APIGroup: "rbac.authorization.k8s.io", Name: "foo"},
 						{Kind: rbac.UserKind, Name: "super-admin"},
 						{Kind: rbac.GroupKind, Name: "super-admins"},
 						{Kind: rbac.UserKind, Name: "admin"},
@@ -117,7 +117,7 @@ func TestSubjectLocator(t *testing.T) {
 					&defaultAttributes{"", "", "create", "Pods", "", "ns1", ""},
 					[]rbac.Subject{
 						{Kind: rbac.GroupKind, Name: user.SystemPrivilegedGroup},
-						{Kind: rbac.UserKind, APIVersion: "v1alpha1", Name: "foo"},
+						{Kind: rbac.UserKind, APIGroup: "rbac.authorization.k8s.io", Name: "foo"},
 						{Kind: rbac.UserKind, Name: "super-admin"},
 						{Kind: rbac.GroupKind, Name: "super-admins"},
 					},
@@ -127,7 +127,7 @@ func TestSubjectLocator(t *testing.T) {
 					&defaultAttributes{"", "", "get", "Pods", "", "ns2", ""},
 					[]rbac.Subject{
 						{Kind: rbac.GroupKind, Name: user.SystemPrivilegedGroup},
-						{Kind: rbac.UserKind, APIVersion: "v1alpha1", Name: "foo"},
+						{Kind: rbac.UserKind, APIGroup: "rbac.authorization.k8s.io", Name: "foo"},
 						{Kind: rbac.UserKind, Name: "super-admin"},
 						{Kind: rbac.GroupKind, Name: "super-admins"},
 					},
