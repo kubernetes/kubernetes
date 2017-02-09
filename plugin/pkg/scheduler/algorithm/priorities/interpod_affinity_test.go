@@ -19,13 +19,11 @@ package priorities
 import (
 	"fmt"
 	"reflect"
-	"strings"
 	"testing"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm"
-	priorityutil "k8s.io/kubernetes/plugin/pkg/scheduler/algorithm/priorities/util"
 	schedulerapi "k8s.io/kubernetes/plugin/pkg/scheduler/api"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/schedulercache"
 )
@@ -517,7 +515,6 @@ func TestInterPodAffinityPriority(t *testing.T) {
 			nodeLister:            algorithm.FakeNodeLister(test.nodes),
 			podLister:             algorithm.FakePodLister(test.pods),
 			hardPodAffinityWeight: v1.DefaultHardPodAffinitySymmetricWeight,
-			failureDomains:        priorityutil.Topologies{DefaultKeys: strings.Split(v1.DefaultFailureDomains, ",")},
 		}
 		list, err := interPodAffinity.CalculateInterPodAffinityPriority(test.pod, nodeNameToInfo, test.nodes)
 		if err != nil {
@@ -606,93 +603,6 @@ func TestHardPodAffinitySymmetricWeight(t *testing.T) {
 			nodeLister:            algorithm.FakeNodeLister(test.nodes),
 			podLister:             algorithm.FakePodLister(test.pods),
 			hardPodAffinityWeight: test.hardPodAffinityWeight,
-		}
-		list, err := ipa.CalculateInterPodAffinityPriority(test.pod, nodeNameToInfo, test.nodes)
-		if err != nil {
-			t.Errorf("unexpected error: %v", err)
-		}
-		if !reflect.DeepEqual(test.expectedList, list) {
-			t.Errorf("%s: \nexpected \n\t%#v, \ngot \n\t%#v\n", test.test, test.expectedList, list)
-		}
-	}
-}
-
-func TestSoftPodAntiAffinityWithFailureDomains(t *testing.T) {
-	labelAzAZ1 := map[string]string{
-		"az": "az1",
-	}
-	LabelZoneFailureDomainAZ1 := map[string]string{
-		metav1.LabelZoneFailureDomain: "az1",
-	}
-	podLabel1 := map[string]string{
-		"security": "S1",
-	}
-	antiAffinity1 := &v1.Affinity{
-		PodAntiAffinity: &v1.PodAntiAffinity{
-			PreferredDuringSchedulingIgnoredDuringExecution: []v1.WeightedPodAffinityTerm{
-				{
-					Weight: 5,
-					PodAffinityTerm: v1.PodAffinityTerm{
-						LabelSelector: &metav1.LabelSelector{
-							MatchExpressions: []metav1.LabelSelectorRequirement{
-								{
-									Key:      "security",
-									Operator: metav1.LabelSelectorOpIn,
-									Values:   []string{"S1"},
-								},
-							},
-						},
-						TopologyKey: "",
-					},
-				},
-			},
-		},
-	}
-	tests := []struct {
-		pod            *v1.Pod
-		pods           []*v1.Pod
-		nodes          []*v1.Node
-		failureDomains priorityutil.Topologies
-		expectedList   schedulerapi.HostPriorityList
-		test           string
-	}{
-		{
-			pod: &v1.Pod{Spec: v1.PodSpec{NodeName: "", Affinity: antiAffinity1}, ObjectMeta: metav1.ObjectMeta{Labels: podLabel1}},
-			pods: []*v1.Pod{
-				{Spec: v1.PodSpec{NodeName: "machine1"}, ObjectMeta: metav1.ObjectMeta{Labels: podLabel1}},
-				{Spec: v1.PodSpec{NodeName: "machine2"}, ObjectMeta: metav1.ObjectMeta{Labels: podLabel1}},
-			},
-			nodes: []*v1.Node{
-				{ObjectMeta: metav1.ObjectMeta{Name: "machine1", Labels: LabelZoneFailureDomainAZ1}},
-				{ObjectMeta: metav1.ObjectMeta{Name: "machine2", Labels: labelAzAZ1}},
-			},
-			failureDomains: priorityutil.Topologies{DefaultKeys: strings.Split(v1.DefaultFailureDomains, ",")},
-			expectedList:   []schedulerapi.HostPriority{{Host: "machine1", Score: 0}, {Host: "machine2", Score: 10}},
-			test:           "Soft Pod Anti Affinity: when the topologyKey is emtpy, match among topologyKeys indicated by failure domains.",
-		},
-		{
-			pod: &v1.Pod{Spec: v1.PodSpec{NodeName: "", Affinity: antiAffinity1}, ObjectMeta: metav1.ObjectMeta{Labels: podLabel1}},
-			pods: []*v1.Pod{
-				{Spec: v1.PodSpec{NodeName: "machine1"}, ObjectMeta: metav1.ObjectMeta{Labels: podLabel1}},
-				{Spec: v1.PodSpec{NodeName: "machine2"}, ObjectMeta: metav1.ObjectMeta{Labels: podLabel1}},
-			},
-			nodes: []*v1.Node{
-				{ObjectMeta: metav1.ObjectMeta{Name: "machine1", Labels: LabelZoneFailureDomainAZ1}},
-				{ObjectMeta: metav1.ObjectMeta{Name: "machine2", Labels: labelAzAZ1}},
-			},
-			failureDomains: priorityutil.Topologies{},
-			expectedList:   []schedulerapi.HostPriority{{Host: "machine1", Score: 0}, {Host: "machine2", Score: 0}},
-			test:           "Soft Pod Anti Affinity: when the topologyKey is emtpy, and no failure domains indicated, regard as topologyKey not match.",
-		},
-	}
-	for _, test := range tests {
-		nodeNameToInfo := schedulercache.CreateNodeNameToInfoMap(test.pods, test.nodes)
-		ipa := InterPodAffinity{
-			info:                  FakeNodeListInfo(test.nodes),
-			nodeLister:            algorithm.FakeNodeLister(test.nodes),
-			podLister:             algorithm.FakePodLister(test.pods),
-			hardPodAffinityWeight: v1.DefaultHardPodAffinitySymmetricWeight,
-			failureDomains:        test.failureDomains,
 		}
 		list, err := ipa.CalculateInterPodAffinityPriority(test.pod, nodeNameToInfo, test.nodes)
 		if err != nil {
