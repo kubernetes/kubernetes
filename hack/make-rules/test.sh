@@ -43,7 +43,6 @@ kube::test::find_dirs() {
           -o -path './test/e2e/*' \
           -o -path './test/e2e_node/*' \
           -o -path './test/integration/*' \
-          -o -path './test/component/scheduler/perf/*' \
           -o -path './third_party/*' \
           -o -path './staging/*' \
           -o -path './vendor/*' \
