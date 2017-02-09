@@ -40,6 +40,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/server/healthz"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -469,6 +470,14 @@ func run(s *options.KubeletServer, kubeDeps *kubelet.KubeletDeps) (err error) {
 				CgroupDriver:          s.CgroupDriver,
 				ProtectKernelDefaults: s.ProtectKernelDefaults,
 				EnableCRI:             s.EnableCRI,
+				NodeAllocatableConfig: cm.NodeAllocatableConfig{
+					KubeReservedCgroupName:   s.KubeReservedCgroup,
+					SystemReservedCgroupName: s.SystemReservedCgroup,
+					EnforceNodeAllocatable:   sets.NewString(s.EnforceNodeAllocatable...),
+					KubeReserved:             kubeReserved,
+					SystemReserved:           systemReserved,
+					HardEvictionThresholds:   hardEvictionThresholds,
+				},
 			},
 			s.ExperimentalFailSwapOn)
 

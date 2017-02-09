@@ -16,7 +16,10 @@ limitations under the License.
 
 package cm
 
-import "k8s.io/kubernetes/pkg/api/v1"
+import (
+	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/kubernetes/pkg/api/v1"
+)
 
 // Manages the containers running on a machine.
 type ContainerManager interface {
@@ -56,6 +59,16 @@ type NodeConfig struct {
 	CgroupDriver          string
 	ProtectKernelDefaults bool
 	EnableCRI             bool
+	NodeAllocatableConfig
+}
+
+type NodeAllocatableConfig struct {
+	KubeReservedCgroupName   string
+	SystemReservedCgroupName string
+	EnforceNodeAllocatable   sets.String
+	KubeReserved             v1.ResourceList
+	SystemReserved           v1.ResourceList
+	HardEvictionThresholds   []evictionapi.Threshold
 }
 
 type Status struct {
