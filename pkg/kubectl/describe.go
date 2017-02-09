@@ -1748,6 +1748,12 @@ func describeService(service *api.Service, endpoints *api.Endpoints, events *api
 			w.Write(LEVEL_0, "Endpoints:\t%s\n", formatEndpoints(endpoints, sets.NewString(sp.Name)))
 		}
 		w.Write(LEVEL_0, "Session Affinity:\t%s\n", service.Spec.SessionAffinity)
+		if service.Spec.ExternalTraffic != "" {
+			w.Write(LEVEL_0, "ExternalTraffic:\t%s\n", service.Spec.ExternalTraffic)
+		}
+		if service.Spec.HealthCheckNodePort != 0 {
+			w.Write(LEVEL_0, "HealthCheckNodePort:\t%v\n", service.Spec.HealthCheckNodePort)
+		}
 		if events != nil {
 			DescribeEvents(events, w)
 		}

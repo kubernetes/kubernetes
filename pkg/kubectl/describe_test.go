@@ -116,6 +116,16 @@ func TestDescribeService(t *testing.T) {
 			Name:      "bar",
 			Namespace: "foo",
 		},
+		Spec: api.ServiceSpec{
+			Type: api.ServiceTypeLoadBalancer,
+			Ports: []api.ServicePort{{
+				Port:       6502,
+				Protocol:   api.ProtocolTCP,
+				TargetPort: intstr.FromInt(6502),
+			}},
+			ExternalTraffic:     api.ServiceExternalTrafficTypeOnlyLocal,
+			HealthCheckNodePort: int32(34567),
+		},
 	})
 	c := &describeClient{T: t, Namespace: "foo", Interface: fake}
 	d := ServiceDescriber{c}
@@ -123,7 +133,15 @@ func TestDescribeService(t *testing.T) {
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
-	if !strings.Contains(out, "Labels:") || !strings.Contains(out, "bar") {
+	if !strings.Contains(out, "Labels:") ||
+		!strings.Contains(out, "bar") ||
+		!strings.Contains(out, "Port:") ||
+		!strings.Contains(out, "6502") ||
+		!strings.Contains(out, string(api.ProtocolTCP)) ||
+		!strings.Contains(out, "ExternalTraffic:") ||
+		!strings.Contains(out, string(api.ServiceExternalTrafficTypeOnlyLocal)) ||
+		!strings.Contains(out, "HealthCheckNodePort:") ||
+		!strings.Contains(out, "34567") {
 		t.Errorf("unexpected out: %s", out)
 	}
 }
