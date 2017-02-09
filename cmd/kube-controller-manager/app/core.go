@@ -144,7 +144,7 @@ func startServiceAccountController(ctx ControllerContext) (bool, error) {
 
 func startTTLController(ctx ControllerContext) (bool, error) {
 	go ttlcontroller.NewTTLController(
-		ctx.InformerFactory.Nodes(),
+		ctx.NewInformerFactory.Core().V1().Nodes(),
 		ctx.ClientBuilder.ClientOrDie("ttl-controller"),
 	).Run(5, ctx.Stop)
 	return true, nil
