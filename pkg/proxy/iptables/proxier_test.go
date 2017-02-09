@@ -27,7 +27,6 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/service"
 	"k8s.io/kubernetes/pkg/proxy"
 	"k8s.io/kubernetes/pkg/util/exec"
 	utiliptables "k8s.io/kubernetes/pkg/util/iptables"
@@ -937,10 +936,6 @@ func TestBuildServiceMapAddRemove(t *testing.T) {
 			}
 		}),
 		makeTestService("somewhere", "only-local-load-balancer", func(svc *api.Service) {
-			svc.ObjectMeta.Annotations = map[string]string{
-				service.BetaAnnotationExternalTraffic:     service.AnnotationValueExternalTrafficLocal,
-				service.BetaAnnotationHealthCheckNodePort: "345",
-			}
 			svc.Spec.Type = api.ServiceTypeLoadBalancer
 			svc.Spec.ClusterIP = "172.16.55.12"
 			svc.Spec.LoadBalancerIP = "5.6.7.8"
@@ -951,6 +946,8 @@ func TestBuildServiceMapAddRemove(t *testing.T) {
 					{IP: "10.1.2.3"},
 				},
 			}
+			svc.Spec.ExternalTraffic = api.ServiceExternalTrafficTypeOnlyLocal
+			svc.Spec.HealthCheckNodePort = int32(345)
 		}),
 	}
 
@@ -998,10 +995,10 @@ func TestBuildServiceMapAddRemove(t *testing.T) {
 		t.Errorf("expected healthcheck add length 1, got %v", hcAdd)
 	}
 
-	// The only OnlyLocal annotation was removed above, so we expect a delete now.
-	// FIXME: Since the BetaAnnotationHealthCheckNodePort is the same for all
-	// ServicePorts, we'll get one delete per ServicePort, even though they all
-	// contain the same information
+	// The only OnlyLocal service was removed above, so we expect a delete now.
+	// FIXME: Since the HealthCheckNodePort is the same for all ServicePorts,
+	// we'll get one delete per ServicePort, even though they all contain the
+	// same information
 	if len(hcDel) != 2 {
 		t.Errorf("expected healthcheck del length 2, got %v", hcDel)
 	} else {
@@ -1092,10 +1089,6 @@ func TestBuildServiceMapServiceUpdate(t *testing.T) {
 
 	second := []api.Service{
 		makeTestService("somewhere", "some-service", func(svc *api.Service) {
-			svc.ObjectMeta.Annotations = map[string]string{
-				service.BetaAnnotationExternalTraffic:     service.AnnotationValueExternalTrafficLocal,
-				service.BetaAnnotationHealthCheckNodePort: "345",
-			}
 			svc.Spec.Type = api.ServiceTypeLoadBalancer
 			svc.Spec.ClusterIP = "172.16.55.4"
 			svc.Spec.LoadBalancerIP = "5.6.7.8"
@@ -1106,6 +1099,8 @@ func TestBuildServiceMapServiceUpdate(t *testing.T) {
 					{IP: "10.1.2.3"},
 				},
 			}
+			svc.Spec.ExternalTraffic = api.ServiceExternalTrafficTypeOnlyLocal
+			svc.Spec.HealthCheckNodePort = int32(345)
 		}),
 	}
 

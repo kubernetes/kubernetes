@@ -1422,7 +1422,7 @@ var _ = framework.KubeDescribe("ESIPP [Slow]", func() {
 		}
 	})
 
-	It("should handle updates to source ip annotation [Feature:ExternalTrafficLocalOnly]", func() {
+	It("should handle updates to ExternalTraffic field [Feature:ExternalTrafficLocalOnly]", func() {
 		namespace := f.Namespace.Name
 		serviceName := "external-local"
 		jig := framework.NewServiceTestJig(cs, serviceName)
@@ -1439,16 +1439,15 @@ var _ = framework.KubeDescribe("ESIPP [Slow]", func() {
 			Expect(cs.Core().Services(svc.Namespace).Delete(svc.Name, nil)).NotTo(HaveOccurred())
 		}()
 
-		// save the health check node port because it disappears when lift the annotation.
+		// save the health check node port because it disappears when ESIPP is turned off.
 		healthCheckNodePort := int(service.GetServiceHealthCheckNodePort(svc))
 
 		By("turning ESIPP off")
 		svc = jig.UpdateServiceOrFail(svc.Namespace, svc.Name, func(svc *v1.Service) {
-			svc.ObjectMeta.Annotations[service.BetaAnnotationExternalTraffic] =
-				service.AnnotationValueExternalTrafficGlobal
+			svc.Spec.ExternalTraffic = v1.ServiceExternalTrafficTypeGlobal
 		})
 		if service.GetServiceHealthCheckNodePort(svc) > 0 {
-			framework.Failf("Service HealthCheck NodePort annotation still present")
+			framework.Failf("Service HealthCheck NodePort still present")
 		}
 
 		endpointNodeMap := jig.GetEndpointNodes(svc)
@@ -1506,13 +1505,11 @@ var _ = framework.KubeDescribe("ESIPP [Slow]", func() {
 		// If the health check nodePort has NOT been freed, the new service
 		// creation will fail.
 
-		By("turning ESIPP annotation back on")
+		By("setting ExternalTraffic field back to OnlyLocal")
 		svc = jig.UpdateServiceOrFail(svc.Namespace, svc.Name, func(svc *v1.Service) {
-			svc.ObjectMeta.Annotations[service.BetaAnnotationExternalTraffic] =
-				service.AnnotationValueExternalTrafficLocal
+			svc.Spec.ExternalTraffic = v1.ServiceExternalTrafficTypeOnlyLocal
 			// Request the same healthCheckNodePort as before, to test the user-requested allocation path
-			svc.ObjectMeta.Annotations[service.BetaAnnotationHealthCheckNodePort] =
-				fmt.Sprintf("%d", healthCheckNodePort)
+			svc.Spec.HealthCheckNodePort = int32(healthCheckNodePort)
 		})
 		pollErr = wait.PollImmediate(framework.Poll, framework.KubeProxyLagTimeout, func() (bool, error) {
 			content := jig.GetHTTPContent(ingressIP, svcTCPPort, framework.KubeProxyLagTimeout, path)

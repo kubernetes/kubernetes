@@ -156,7 +156,9 @@ type endpointsInfo struct {
 
 // returns a new serviceInfo struct
 func newServiceInfo(serviceName proxy.ServicePortName, port *api.ServicePort, service *api.Service) *serviceInfo {
-	onlyNodeLocalEndpoints := apiservice.NeedsHealthCheck(service) && utilfeature.DefaultFeatureGate.Enabled(features.ExternalTrafficLocalOnly) && (service.Spec.Type == api.ServiceTypeLoadBalancer || service.Spec.Type == api.ServiceTypeNodePort)
+	onlyNodeLocalEndpoints := apiservice.RequestsOnlyLocalTraffic(service) &&
+		utilfeature.DefaultFeatureGate.Enabled(features.ExternalTrafficLocalOnly) &&
+		(service.Spec.Type == api.ServiceTypeLoadBalancer || service.Spec.Type == api.ServiceTypeNodePort)
 	info := &serviceInfo{
 		clusterIP: net.ParseIP(service.Spec.ClusterIP),
 		port:      int(port.Port),
@@ -176,8 +178,7 @@ func newServiceInfo(serviceName proxy.ServicePortName, port *api.ServicePort, se
 	if info.onlyNodeLocalEndpoints {
 		p := apiservice.GetServiceHealthCheckNodePort(service)
 		if p == 0 {
-			glog.Errorf("Service does not contain necessary annotation %v",
-				apiservice.BetaAnnotationHealthCheckNodePort)
+			glog.Errorf("Service HealthCheckNodePort field is not set")
 		} else {
 			info.healthCheckNodePort = int(p)
 		}
