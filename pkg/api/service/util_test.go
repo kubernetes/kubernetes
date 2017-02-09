@@ -21,6 +21,7 @@ import (
 
 	"strings"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/api"
 	netsets "k8s.io/kubernetes/pkg/util/net/sets"
 )
@@ -128,4 +129,204 @@ func TestAllowAll(t *testing.T) {
 	checkAllowAll(true, "0.0.0.0/0")
 	checkAllowAll(true, "192.168.0.0/0")
 	checkAllowAll(true, "192.168.0.1/32", "0.0.0.0/0")
+}
+
+func TestRequestsOnlyLocalTraffic(t *testing.T) {
+	checkRequestsOnlyLocalTraffic := func(requestsOnlyLocalTraffic bool, service *api.Service) {
+		res := RequestsOnlyLocalTraffic(service)
+		if res != requestsOnlyLocalTraffic {
+			t.Errorf("Expected requests OnlyLocal traffic = %v, got %v",
+				requestsOnlyLocalTraffic, res)
+		}
+	}
+
+	checkRequestsOnlyLocalTraffic(false, &api.Service{})
+	checkRequestsOnlyLocalTraffic(false, &api.Service{
+		Spec: api.ServiceSpec{
+			Type: api.ServiceTypeClusterIP,
+		},
+	})
+	checkRequestsOnlyLocalTraffic(false, &api.Service{
+		Spec: api.ServiceSpec{
+			Type: api.ServiceTypeNodePort,
+		},
+	})
+	checkRequestsOnlyLocalTraffic(false, &api.Service{
+		Spec: api.ServiceSpec{
+			Type:            api.ServiceTypeNodePort,
+			ExternalTraffic: api.ServiceExternalTrafficTypeGlobal,
+		},
+	})
+	checkRequestsOnlyLocalTraffic(true, &api.Service{
+		Spec: api.ServiceSpec{
+			Type:            api.ServiceTypeNodePort,
+			ExternalTraffic: api.ServiceExternalTrafficTypeOnlyLocal,
+		},
+	})
+	checkRequestsOnlyLocalTraffic(false, &api.Service{
+		Spec: api.ServiceSpec{
+			Type:            api.ServiceTypeLoadBalancer,
+			ExternalTraffic: api.ServiceExternalTrafficTypeGlobal,
+		},
+	})
+	checkRequestsOnlyLocalTraffic(true, &api.Service{
+		Spec: api.ServiceSpec{
+			Type:            api.ServiceTypeLoadBalancer,
+			ExternalTraffic: api.ServiceExternalTrafficTypeOnlyLocal,
+		},
+	})
+}
+
+func TestNeedsHealthCheck(t *testing.T) {
+	checkNeedsHealthCheck := func(needsHealthCheck bool, service *api.Service) {
+		res := NeedsHealthCheck(service)
+		if res != needsHealthCheck {
+			t.Errorf("Expected needs health check = %v, got %v",
+				needsHealthCheck, res)
+		}
+	}
+
+	checkNeedsHealthCheck(false, &api.Service{
+		Spec: api.ServiceSpec{
+			Type: api.ServiceTypeClusterIP,
+		},
+	})
+	checkNeedsHealthCheck(false, &api.Service{
+		Spec: api.ServiceSpec{
+			Type:            api.ServiceTypeNodePort,
+			ExternalTraffic: api.ServiceExternalTrafficTypeGlobal,
+		},
+	})
+	checkNeedsHealthCheck(false, &api.Service{
+		Spec: api.ServiceSpec{
+			Type:            api.ServiceTypeNodePort,
+			ExternalTraffic: api.ServiceExternalTrafficTypeOnlyLocal,
+		},
+	})
+	checkNeedsHealthCheck(false, &api.Service{
+		Spec: api.ServiceSpec{
+			Type:            api.ServiceTypeLoadBalancer,
+			ExternalTraffic: api.ServiceExternalTrafficTypeGlobal,
+		},
+	})
+	checkNeedsHealthCheck(true, &api.Service{
+		Spec: api.ServiceSpec{
+			Type:            api.ServiceTypeLoadBalancer,
+			ExternalTraffic: api.ServiceExternalTrafficTypeOnlyLocal,
+		},
+	})
+
+	checkNeedsHealthCheck(false, &api.Service{
+		Spec: api.ServiceSpec{
+			Type: api.ServiceTypeLoadBalancer,
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Annotations: map[string]string{
+				BetaAnnotationExternalTraffic: "invalid",
+			},
+		},
+	})
+	checkNeedsHealthCheck(false, &api.Service{
+		Spec: api.ServiceSpec{
+			Type: api.ServiceTypeLoadBalancer,
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Annotations: map[string]string{
+				BetaAnnotationExternalTraffic: string(api.ServiceExternalTrafficTypeGlobal),
+			},
+		},
+	})
+	checkNeedsHealthCheck(true, &api.Service{
+		Spec: api.ServiceSpec{
+			Type: api.ServiceTypeLoadBalancer,
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Annotations: map[string]string{
+				BetaAnnotationExternalTraffic: string(api.ServiceExternalTrafficTypeOnlyLocal),
+			},
+		},
+	})
+}
+
+func TestGetServiceHealthCheckNodePort(t *testing.T) {
+	checkGetServiceHealthCheckNodePort := func(healthCheckNodePort int32, service *api.Service) {
+		res := GetServiceHealthCheckNodePort(service)
+		if res != healthCheckNodePort {
+			t.Errorf("Expected health check node port = %v, got %v",
+				healthCheckNodePort, res)
+		}
+	}
+
+	checkGetServiceHealthCheckNodePort(0, &api.Service{
+		Spec: api.ServiceSpec{
+			Type: api.ServiceTypeClusterIP,
+		},
+	})
+	checkGetServiceHealthCheckNodePort(0, &api.Service{
+		Spec: api.ServiceSpec{
+			Type:            api.ServiceTypeNodePort,
+			ExternalTraffic: api.ServiceExternalTrafficTypeGlobal,
+		},
+	})
+	checkGetServiceHealthCheckNodePort(0, &api.Service{
+		Spec: api.ServiceSpec{
+			Type:                api.ServiceTypeNodePort,
+			ExternalTraffic:     api.ServiceExternalTrafficTypeOnlyLocal,
+			HealthCheckNodePort: int32(34567),
+		},
+	})
+	checkGetServiceHealthCheckNodePort(0, &api.Service{
+		Spec: api.ServiceSpec{
+			Type:            api.ServiceTypeLoadBalancer,
+			ExternalTraffic: api.ServiceExternalTrafficTypeGlobal,
+		},
+	})
+	checkGetServiceHealthCheckNodePort(0, &api.Service{
+		Spec: api.ServiceSpec{
+			Type:                api.ServiceTypeLoadBalancer,
+			ExternalTraffic:     api.ServiceExternalTrafficTypeGlobal,
+			HealthCheckNodePort: int32(34567),
+		},
+	})
+	checkGetServiceHealthCheckNodePort(34567, &api.Service{
+		Spec: api.ServiceSpec{
+			Type:                api.ServiceTypeLoadBalancer,
+			ExternalTraffic:     api.ServiceExternalTrafficTypeOnlyLocal,
+			HealthCheckNodePort: int32(34567),
+		},
+	})
+
+	checkGetServiceHealthCheckNodePort(0, &api.Service{
+		Spec: api.ServiceSpec{
+			Type: api.ServiceTypeLoadBalancer,
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Annotations: map[string]string{
+				BetaAnnotationExternalTraffic:     "invalid",
+				BetaAnnotationHealthCheckNodePort: "34567",
+			},
+		},
+	})
+	checkGetServiceHealthCheckNodePort(0, &api.Service{
+		Spec: api.ServiceSpec{
+			Type: api.ServiceTypeLoadBalancer,
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Annotations: map[string]string{
+				BetaAnnotationExternalTraffic:     string(api.ServiceExternalTrafficTypeGlobal),
+				BetaAnnotationHealthCheckNodePort: "34567",
+			},
+		},
+	})
+	checkGetServiceHealthCheckNodePort(34567, &api.Service{
+		Spec: api.ServiceSpec{
+			Type: api.ServiceTypeLoadBalancer,
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Annotations: map[string]string{
+				BetaAnnotationExternalTraffic:     string(api.ServiceExternalTrafficTypeOnlyLocal),
+				BetaAnnotationHealthCheckNodePort: "34567",
+			},
+		},
+	})
 }

@@ -161,33 +161,16 @@ func (rs *REST) Create(ctx genericapirequest.Context, obj runtime.Object) (runti
 		}
 	}
 
-	if shouldCheckOrAssignHealthCheckNodePort(service) {
-		var healthCheckNodePort int
-		var err error
-		if l, ok := service.Annotations[apiservice.BetaAnnotationHealthCheckNodePort]; ok {
-			healthCheckNodePort, err = strconv.Atoi(l)
-			if err != nil || healthCheckNodePort <= 0 {
-				return nil, errors.NewInternalError(fmt.Errorf("Failed to parse annotation %v: %v", apiservice.BetaAnnotationHealthCheckNodePort, err))
-			}
+	// Handle ExternalTraiffc related fields during service creation.
+	if utilfeature.DefaultFeatureGate.Enabled(features.ExternalTrafficLocalOnly) &&
+		apiservice.NeedsHealthCheck(service) {
+		if err := rs.allocateHealthCheckNodePort(service); err != nil {
+			return nil, errors.NewInternalError(err)
 		}
-		if healthCheckNodePort > 0 {
-			// If the request has a health check nodePort in mind, attempt to reserve it
-			err := nodePortOp.Allocate(int(healthCheckNodePort))
-			if err != nil {
-				return nil, errors.NewInternalError(fmt.Errorf("Failed to allocate requested HealthCheck nodePort %v: %v", healthCheckNodePort, err))
-			}
-		} else {
-			// If the request has no health check nodePort specified, allocate any
-			healthCheckNodePort, err = nodePortOp.AllocateNext()
-			if err != nil {
-				// TODO: what error should be returned here?  It's not a
-				// field-level validation failure (the field is valid), and it's
-				// not really an internal error.
-				return nil, errors.NewInternalError(fmt.Errorf("failed to allocate a nodePort: %v", err))
-			}
-			// Insert the newly allocated health check port as an annotation (plan of record for Alpha)
-			service.Annotations[apiservice.BetaAnnotationHealthCheckNodePort] = fmt.Sprintf("%d", healthCheckNodePort)
-		}
+	}
+	defaultExternalTrafficIfNeeded(service)
+	if errs := validation.ValidateServiceExternalTrafficFieldsBeforeAction(service); len(errs) > 0 {
+		return nil, errors.NewInvalid(api.Kind("Service"), service.Name, errs)
 	}
 
 	out, err := rs.registry.CreateService(ctx, service)
@@ -238,7 +221,8 @@ func (rs *REST) Delete(ctx genericapirequest.Context, id string) (runtime.Object
 		}
 	}
 
-	if shouldCheckOrAssignHealthCheckNodePort(service) {
+	if utilfeature.DefaultFeatureGate.Enabled(features.ExternalTrafficLocalOnly) &&
+		apiservice.NeedsHealthCheck(service) {
 		nodePort := apiservice.GetServiceHealthCheckNodePort(service)
 		if nodePort > 0 {
 			err := rs.serviceNodePorts.Release(int(nodePort))
@@ -279,92 +263,72 @@ func (*REST) NewList() runtime.Object {
 	return &api.ServiceList{}
 }
 
+// externalTrafficUpdate adjusts ExternalTraffic field during service update if needed.
+// It is good to have this update manipulation because we default ExternalTraffic field
+// to different values based on service types:
+// nodePort / loadBalancer: default to Global
+// others: default to empty
+func externalTrafficUpdate(oldService, service *api.Service) {
+	var oldNeedExternalTraffic, needExternalTraffic bool
+	if oldService.Spec.Type == api.ServiceTypeNodePort ||
+		oldService.Spec.Type == api.ServiceTypeLoadBalancer {
+		oldNeedExternalTraffic = true
+	}
+	if service.Spec.Type == api.ServiceTypeNodePort ||
+		service.Spec.Type == api.ServiceTypeLoadBalancer {
+		needExternalTraffic = true
+	}
+	if oldNeedExternalTraffic && !needExternalTraffic {
+		// Clear ExternalTraffic to prevent confusion from ineffective field.
+		service.Spec.ExternalTraffic = api.ServiceExternalTrafficType("")
+	}
+	// Default ExternalTraffic if needed for consistency.
+	defaultExternalTrafficIfNeeded(service)
+}
+
+// healthCheckNodePortUpdate handles HealthCheckNodePort allocation/release
+// and adjusts HealthCheckNodePort during service update if needed.
 func (rs *REST) healthCheckNodePortUpdate(oldService, service *api.Service) (bool, error) {
-	// Health Check Node Port handling during updates
-	//
-	// Case 1. Transition from globalTraffic to OnlyLocal for the ESIPP annotation
-	//
-	//   Allocate a health check node port or attempt to reserve the user-specified one, if provided.
-	//   Insert health check node port as an annotation into the service's annotations
-	//
-	// Case 2. Transition from OnlyLocal to Global for the ESIPP annotation
-	//
-	//   Free the existing healthCheckNodePort and clear the health check nodePort annotation
-	//
-	// Case 3. No change (Global ---stays--> Global) but prevent invalid annotation manipulations
-	//
-	//   Reject insertion of the "service.alpha.kubernetes.io/healthcheck-nodeport" annotation
-	//
-	// Case 4. No change (OnlyLocal ---stays--> OnlyLocal) but prevent invalid annotation manipulations
-	//
-	//   Reject deletion of the "service.alpha.kubernetes.io/healthcheck-nodeport" annotation
-	//   Reject changing the value of the healthCheckNodePort annotation
-	//
-	oldServiceHasHealthCheckNodePort := shouldCheckOrAssignHealthCheckNodePort(oldService)
+	oldServiceHasHealthCheckNodePort := apiservice.NeedsHealthCheck(oldService)
 	oldHealthCheckNodePort := apiservice.GetServiceHealthCheckNodePort(oldService)
 
-	assignHealthCheckNodePort := shouldCheckOrAssignHealthCheckNodePort(service)
+	assignHealthCheckNodePort := apiservice.NeedsHealthCheck(service)
 	requestedHealthCheckNodePort := apiservice.GetServiceHealthCheckNodePort(service)
 
 	switch {
+	// Case 1: Transition from LoadBalancer type service with ExternalTraffic=Global / non
+	// LoadBalancer type service to LoadBalancer type service with ExternalTraffic=OnlyLocal.
+	// Allocate a health check node port or attempt to reserve the user-specified one, if provided.
+	// Insert health check node port into the service's HealthCheckNodePort field if needed.
 	case !oldServiceHasHealthCheckNodePort && assignHealthCheckNodePort:
-		glog.Infof("Transition from Global LB service to OnlyLocal service")
-		if requestedHealthCheckNodePort > 0 {
-			// If the request has a health check nodePort in mind, attempt to reserve it
-			err := rs.serviceNodePorts.Allocate(int(requestedHealthCheckNodePort))
-			if err != nil {
-				errmsg := fmt.Sprintf("Failed to allocate requested HealthCheck nodePort %v:%v",
-					requestedHealthCheckNodePort, err)
-				el := field.ErrorList{field.Invalid(field.NewPath("metadata", "annotations"),
-					apiservice.BetaAnnotationHealthCheckNodePort, errmsg)}
-				return false, errors.NewInvalid(api.Kind("Service"), service.Name, el)
-			}
-			glog.Infof("Reserved user requested nodePort: %d", requestedHealthCheckNodePort)
-		} else {
-			// If the request has no health check nodePort specified, allocate any
-			healthCheckNodePort, err := rs.serviceNodePorts.AllocateNext()
-			if err != nil {
-				// TODO: what error should be returned here?  It's not a
-				// field-level validation failure (the field is valid), and it's
-				// not really an internal error.
-				return false, errors.NewInternalError(fmt.Errorf("failed to allocate a nodePort: %v", err))
-			}
-			// Insert the newly allocated health check port as an annotation (plan of record for Alpha)
-			service.Annotations[apiservice.BetaAnnotationHealthCheckNodePort] = fmt.Sprintf("%d", healthCheckNodePort)
-			glog.Infof("Reserved health check nodePort: %d", healthCheckNodePort)
+		glog.Infof("Transition to LoadBalancer type service with ExternalTraffic=OnlyLocal")
+		if err := rs.allocateHealthCheckNodePort(service); err != nil {
+			return false, errors.NewInternalError(err)
 		}
 
+	// Case 2: Transition from LoadBalancer type service with ExternalTraffic=OnlyLocal to non
+	// LoadBalancer type service or LoadBalancer type service with ExternalTraffic=Global.
+	// Free the existing healthCheckNodePort, clear the HealthCheckNodePort field and adjust
+	// the ExternalTraffic field.
 	case oldServiceHasHealthCheckNodePort && !assignHealthCheckNodePort:
-		glog.Infof("Transition from OnlyLocal LB service to Global service")
+		glog.Infof("Transition to non LoadBalancer type service or LoadBalancer type service with ExternalTraffic=Global")
 		err := rs.serviceNodePorts.Release(int(oldHealthCheckNodePort))
 		if err != nil {
-			glog.Warningf("Error releasing service health check %s node port %d: %v", service.Name, oldHealthCheckNodePort, err)
+			glog.Warningf("error releasing service health check %s node port %d: %v", service.Name, oldHealthCheckNodePort, err)
 			return false, errors.NewInternalError(fmt.Errorf("failed to free health check nodePort: %v", err))
-		} else {
-			delete(service.Annotations, apiservice.BetaAnnotationHealthCheckNodePort)
-			delete(service.Annotations, apiservice.AlphaAnnotationHealthCheckNodePort)
-			glog.Infof("Freed health check nodePort: %d", oldHealthCheckNodePort)
 		}
+		glog.Infof("Freed health check nodePort: %d", oldHealthCheckNodePort)
+		// Clear the HealthCheckNodePort field
+		service.Spec.HealthCheckNodePort = 0
 
-	case !oldServiceHasHealthCheckNodePort && !assignHealthCheckNodePort:
-		if _, ok := service.Annotations[apiservice.BetaAnnotationHealthCheckNodePort]; ok {
-			glog.Warningf("Attempt to insert health check node port annotation DENIED")
-			el := field.ErrorList{field.Invalid(field.NewPath("metadata", "annotations"),
-				apiservice.BetaAnnotationHealthCheckNodePort, "Cannot insert healthcheck nodePort annotation")}
-			return false, errors.NewInvalid(api.Kind("Service"), service.Name, el)
-		}
-
+	// Case 3: No change (LoadBalancer ExternalTraffic=OnlyLocal to LoadBalancer
+	// ExternalTraffic=OnlyLocal), should prevent invalid field manipulations.
+	// Reject changing the value of the HealthCheckNodePort field.
 	case oldServiceHasHealthCheckNodePort && assignHealthCheckNodePort:
-		if _, ok := service.Annotations[apiservice.BetaAnnotationHealthCheckNodePort]; !ok {
-			glog.Warningf("Attempt to delete health check node port annotation DENIED")
-			el := field.ErrorList{field.Invalid(field.NewPath("metadata", "annotations"),
-				apiservice.BetaAnnotationHealthCheckNodePort, "Cannot delete healthcheck nodePort annotation")}
-			return false, errors.NewInvalid(api.Kind("Service"), service.Name, el)
-		}
 		if oldHealthCheckNodePort != requestedHealthCheckNodePort {
-			glog.Warningf("Attempt to change value of health check node port annotation DENIED")
-			el := field.ErrorList{field.Invalid(field.NewPath("metadata", "annotations"),
-				apiservice.BetaAnnotationHealthCheckNodePort, "Cannot change healthcheck nodePort during update")}
+			glog.Warningf("Attempt to change value of health check node port DENIED")
+			el := field.ErrorList{field.Invalid(field.NewPath("spec", "healthCheckNodePort"), requestedHealthCheckNodePort,
+				"cannot change healthCheckNodePort on loadBalancer service with externalTraffic=OnlyLocal during update")}
 			return false, errors.NewInvalid(api.Kind("Service"), service.Name, el)
 		}
 	}
@@ -448,9 +412,16 @@ func (rs *REST) Update(ctx genericapirequest.Context, name string, objInfo rest.
 		service.Status.LoadBalancer = api.LoadBalancerStatus{}
 	}
 
-	success, err := rs.healthCheckNodePortUpdate(oldService, service)
-	if !success {
-		return nil, false, err
+	// Handle ExternalTraiffc related updates.
+	if utilfeature.DefaultFeatureGate.Enabled(features.ExternalTrafficLocalOnly) {
+		success, err := rs.healthCheckNodePortUpdate(oldService, service)
+		if !success {
+			return nil, false, err
+		}
+	}
+	externalTrafficUpdate(oldService, service)
+	if errs := validation.ValidateServiceExternalTrafficFieldsBeforeAction(service); len(errs) > 0 {
+		return nil, false, errors.NewInvalid(api.Kind("Service"), service.Name, errs)
 	}
 
 	out, err := rs.registry.UpdateService(ctx, service)
@@ -565,15 +536,6 @@ func shouldAssignNodePorts(service *api.Service) bool {
 	}
 }
 
-func shouldCheckOrAssignHealthCheckNodePort(service *api.Service) bool {
-	if service.Spec.Type == api.ServiceTypeLoadBalancer {
-		// True if Service-type == LoadBalancer AND annotation AnnotationExternalTraffic present
-		return (utilfeature.DefaultFeatureGate.Enabled(features.ExternalTrafficLocalOnly) && apiservice.NeedsHealthCheck(service))
-	}
-	glog.V(4).Infof("Service type: %v does not need health check node port", service.Spec.Type)
-	return false
-}
-
 // Loop through the service ports list, find one with the same port number and
 // NodePort specified, return this NodePort otherwise return 0.
 func findRequestedNodePort(port int, servicePorts []api.ServicePort) int {
@@ -584,4 +546,39 @@ func findRequestedNodePort(port int, servicePorts []api.ServicePort) int {
 		}
 	}
 	return 0
+}
+
+// defaultExternalTrafficIfNeeded defaults the ExternalTraffic field to Global
+// for nodePort / loadBalancer service for consistency.
+func defaultExternalTrafficIfNeeded(service *api.Service) {
+	if (service.Spec.Type == api.ServiceTypeNodePort ||
+		service.Spec.Type == api.ServiceTypeLoadBalancer) &&
+		service.Spec.ExternalTraffic == "" {
+		service.Spec.ExternalTraffic = api.ServiceExternalTrafficTypeGlobal
+	}
+}
+
+// allocateHealthCheckNodePort allocates health check node port to service.
+func (rs *REST) allocateHealthCheckNodePort(service *api.Service) error {
+	if service.Spec.HealthCheckNodePort != 0 {
+		// If the request has a health check nodePort in mind, attempt to reserve it.
+		err := rs.serviceNodePorts.Allocate(int(service.Spec.HealthCheckNodePort))
+		if err != nil {
+			return fmt.Errorf("failed to allocate requested HealthCheck nodePort %v: %v",
+				service.Spec.HealthCheckNodePort, err)
+		}
+		glog.Infof("Reserved user requested nodePort: %d", service.Spec.HealthCheckNodePort)
+	} else {
+		// If the request has no health check nodePort specified, allocate any.
+		healthCheckNodePort, err := rs.serviceNodePorts.AllocateNext()
+		if err != nil {
+			// TODO: what error should be returned here?  It's not a
+			// field-level validation failure (the field is valid), and it's
+			// not really an internal error.
+			return fmt.Errorf("failed to allocate a nodePort: %v", err)
+		}
+		service.Spec.HealthCheckNodePort = int32(healthCheckNodePort)
+		glog.Infof("Reserved allocated nodePort: %d", healthCheckNodePort)
+	}
+	return nil
 }

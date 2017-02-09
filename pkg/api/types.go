@@ -2254,6 +2254,16 @@ const (
 	ServiceTypeExternalName ServiceType = "ExternalName"
 )
 
+// Service External Traffic Type string
+type ServiceExternalTrafficType string
+
+const (
+	// ServiceExternalTrafficTypeOnlyLocal specifies local endpoints behavior.
+	ServiceExternalTrafficTypeOnlyLocal ServiceExternalTrafficType = "OnlyLocal"
+	// ServiceExternalTrafficTypeGlobal specifies global (legacy) behavior.
+	ServiceExternalTrafficTypeGlobal ServiceExternalTrafficType = "Global"
+)
+
 // ServiceStatus represents the current status of a service
 type ServiceStatus struct {
 	// LoadBalancer contains the current status of the load-balancer,
@@ -2353,6 +2363,20 @@ type ServiceSpec struct {
 	// cloud-provider does not support the feature."
 	// +optional
 	LoadBalancerSourceRanges []string
+
+	// externalTraffic denotes if this Service desires to route external traffic to
+	// local endpoints only. This preserves Source IP and avoids a second hop for
+	// LoadBalancer and Nodeport type services.
+	// +optional
+	ExternalTraffic ServiceExternalTrafficType
+
+	// healthCheckNodePort specifies the healthcheck nodePort for the service.
+	// If not specified, HealthCheckNodePort is created by the service api
+	// backend with the allocated nodePort. Will use user-specified nodePort value
+	// if specified by the client. Only effects when Type is set to LoadBalancer
+	// and ExternalTraffic is set to OnlyLocal.
+	// +optional
+	HealthCheckNodePort int32
 }
 
 type ServicePort struct {

@@ -2570,6 +2570,16 @@ const (
 	ServiceTypeExternalName ServiceType = "ExternalName"
 )
 
+// Service External Traffic Type string
+type ServiceExternalTrafficType string
+
+const (
+	// ServiceExternalTrafficTypeOnlyLocal specifies local endpoints behavior.
+	ServiceExternalTrafficTypeOnlyLocal ServiceExternalTrafficType = "OnlyLocal"
+	// ServiceExternalTrafficTypeGlobal specifies global (legacy) behavior.
+	ServiceExternalTrafficTypeGlobal ServiceExternalTrafficType = "Global"
+)
+
 // ServiceStatus represents the current status of a service.
 type ServiceStatus struct {
 	// LoadBalancer contains the current status of the load-balancer,
@@ -2691,6 +2701,20 @@ type ServiceSpec struct {
 	// Must be a valid DNS name and requires Type to be ExternalName.
 	// +optional
 	ExternalName string `json:"externalName,omitempty" protobuf:"bytes,10,opt,name=externalName"`
+
+	// externalTraffic denotes if this Service desires to route external traffic to
+	// local endpoints only. This preserves Source IP and avoids a second hop for
+	// LoadBalancer and Nodeport type services.
+	// +optional
+	ExternalTraffic ServiceExternalTrafficType `json:"externalTraffic,omitempty" protobuf:"bytes,11,opt,name=externalTraffic"`
+
+	// healthCheckNodePort specifies the healthcheck nodePort for the service.
+	// If not specified, HealthCheckNodePort is created by the service api
+	// backend with the allocated nodePort. Will use user-specified nodePort value
+	// if specified by the client. Only effects when Type is set to LoadBalancer
+	// and ExternalTraffic is set to OnlyLocal.
+	// +optional
+	HealthCheckNodePort int32 `json:"healthCheckNodePort,omitempty" protobuf:"bytes,12,opt,name=healthCheckNodePort"`
 }
 
 // ServicePort contains information on service's port.

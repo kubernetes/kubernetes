@@ -18,8 +18,10 @@ package service
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 
+	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
 	netsets "k8s.io/kubernetes/pkg/util/net/sets"
 )
@@ -65,4 +67,50 @@ func GetLoadBalancerSourceRanges(service *api.Service) (netsets.IPNet, error) {
 		}
 	}
 	return ipnets, nil
+}
+
+// RequestsOnlyLocalTraffic chekcs if service requests OnlyLocal traffic.
+func RequestsOnlyLocalTraffic(service *api.Service) bool {
+	// First check the beta annotation and then the first class field. This is so existing
+	// Services continue to work till the user decides to transition to the first class field.
+	// If they transition to the first class field, there's no way to go back to beta without
+	// rolling back the cluster.
+	if l, ok := service.Annotations[BetaAnnotationExternalTraffic]; ok {
+		if l == string(api.ServiceExternalTrafficTypeOnlyLocal) {
+			return true
+		} else if l == string(api.ServiceExternalTrafficTypeGlobal) {
+			return false
+		} else {
+			glog.Errorf("Invalid value for annotation %v: %v", BetaAnnotationExternalTraffic, l)
+		}
+	}
+	return service.Spec.ExternalTraffic == api.ServiceExternalTrafficTypeOnlyLocal
+}
+
+// NeedsHealthCheck Check if service needs health check.
+func NeedsHealthCheck(service *api.Service) bool {
+	if service.Spec.Type != api.ServiceTypeLoadBalancer {
+		return false
+	}
+	return RequestsOnlyLocalTraffic(service)
+}
+
+// GetServiceHealthCheckNodePort Return health check node port for service, if one exists
+func GetServiceHealthCheckNodePort(service *api.Service) int32 {
+	if !NeedsHealthCheck(service) {
+		return 0
+	}
+	// First check the beta annotation and then the first class field. This is so existing
+	// Services continue to work till the user decides to transition to the first class field.
+	// If they transition to the first class field, there's no way to go back to beta without
+	// rolling back the cluster.
+	if l, ok := service.Annotations[BetaAnnotationHealthCheckNodePort]; ok {
+		p, err := strconv.Atoi(l)
+		if err != nil {
+			glog.Errorf("Failed to parse annotation %v: %v", BetaAnnotationHealthCheckNodePort, err)
+		} else {
+			return int32(p)
+		}
+	}
+	return service.Spec.HealthCheckNodePort
 }
