@@ -35,21 +35,18 @@ type InterPodAffinity struct {
 	nodeLister            algorithm.NodeLister
 	podLister             algorithm.PodLister
 	hardPodAffinityWeight int
-	failureDomains        priorityutil.Topologies
 }
 
 func NewInterPodAffinityPriority(
 	info predicates.NodeInfo,
 	nodeLister algorithm.NodeLister,
 	podLister algorithm.PodLister,
-	hardPodAffinityWeight int,
-	failureDomains []string) algorithm.PriorityFunction {
+	hardPodAffinityWeight int) algorithm.PriorityFunction {
 	interPodAffinity := &InterPodAffinity{
 		info:                  info,
 		nodeLister:            nodeLister,
 		podLister:             podLister,
 		hardPodAffinityWeight: hardPodAffinityWeight,
-		failureDomains:        priorityutil.Topologies{DefaultKeys: failureDomains},
 	}
 	return interPodAffinity.CalculateInterPodAffinityPriority
 }
@@ -62,17 +59,14 @@ type podAffinityPriorityMap struct {
 	// counts store the mapping from node name to so-far computed score of
 	// the node.
 	counts map[string]float64
-	// failureDomains contain default failure domains keys
-	failureDomains priorityutil.Topologies
 	// The first error that we faced.
 	firstError error
 }
 
-func newPodAffinityPriorityMap(nodes []*v1.Node, failureDomains priorityutil.Topologies) *podAffinityPriorityMap {
+func newPodAffinityPriorityMap(nodes []*v1.Node) *podAffinityPriorityMap {
 	return &podAffinityPriorityMap{
 		nodes:          nodes,
 		counts:         make(map[string]float64, len(nodes)),
-		failureDomains: failureDomains,
 	}
 }
 
@@ -97,7 +91,7 @@ func (p *podAffinityPriorityMap) processTerm(term *v1.PodAffinityTerm, podDefini
 			p.Lock()
 			defer p.Unlock()
 			for _, node := range p.nodes {
-				if p.failureDomains.NodesHaveSameTopologyKey(node, fixedNode, term.TopologyKey) {
+				if priorityutil.NodesHaveSameTopologyKey(node, fixedNode, term.TopologyKey) {
 					p.counts[node.Name] += weight
 				}
 			}
@@ -132,7 +126,7 @@ func (ipa *InterPodAffinity) CalculateInterPodAffinityPriority(pod *v1.Pod, node
 	var minCount float64
 	// priorityMap stores the mapping from node name to so-far computed score of
 	// the node.
-	pm := newPodAffinityPriorityMap(nodes, ipa.failureDomains)
+	pm := newPodAffinityPriorityMap(nodes)
 
 	processPod := func(existingPod *v1.Pod) error {
 		existingPodNode, err := ipa.info.GetNodeInfo(existingPod.Spec.NodeName)

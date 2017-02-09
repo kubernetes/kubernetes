@@ -57,23 +57,3 @@ func NodesHaveSameTopologyKey(nodeA, nodeB *v1.Node, topologyKey string) bool {
 	}
 	return nodeA.Labels != nil && nodeB.Labels != nil && len(nodeA.Labels[topologyKey]) > 0 && nodeA.Labels[topologyKey] == nodeB.Labels[topologyKey]
 }
-
-type Topologies struct {
-	DefaultKeys []string
-}
-
-// NodesHaveSameTopologyKey checks if nodeA and nodeB have same label value with given topologyKey as label key.
-// If the topologyKey is empty, check if the two nodes have any of the default topologyKeys, and have same corresponding label value.
-func (tps *Topologies) NodesHaveSameTopologyKey(nodeA, nodeB *v1.Node, topologyKey string) bool {
-	if len(topologyKey) == 0 {
-		// assumes this is allowed only for PreferredDuringScheduling pod anti-affinity (ensured by api/validation)
-		for _, defaultKey := range tps.DefaultKeys {
-			if NodesHaveSameTopologyKey(nodeA, nodeB, defaultKey) {
-				return true
-			}
-		}
-		return false
-	} else {
-		return NodesHaveSameTopologyKey(nodeA, nodeB, topologyKey)
-	}
-}
