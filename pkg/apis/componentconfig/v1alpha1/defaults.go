@@ -48,7 +48,12 @@ const (
 	defaultIPTablesDropBit       = 15
 )
 
-var zeroDuration = metav1.Duration{}
+var (
+	zeroDuration = metav1.Duration{}
+	// Refer to [Node Allocatable](https://github.com/kubernetes/community/blob/master/contributors/design-proposals/node-allocatable.md) doc for more information.
+	// TODO: Set the default to "pods" once cgroups per qos is turned on by default.
+	defaultNodeAllocatableEnforcement = []string{}
+)
 
 func addDefaultingFuncs(scheme *kruntime.Scheme) error {
 	RegisterDefaults(scheme)
@@ -400,6 +405,9 @@ func SetDefaults_KubeletConfiguration(obj *KubeletConfiguration) {
 	}
 	if obj.CgroupDriver == "" {
 		obj.CgroupDriver = "cgroupfs"
+	}
+	if obj.EnforceNodeAllocatable == nil {
+		obj.EnforceNodeAllocatable = defaultNodeAllocatableEnforcement
 	}
 	if obj.EnableCRI == nil {
 		obj.EnableCRI = boolVar(true)
