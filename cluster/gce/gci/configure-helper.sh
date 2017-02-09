@@ -388,7 +388,7 @@ function create-master-kubelet-auth {
     REGISTER_MASTER_KUBELET="true"
     create-kubelet-kubeconfig
   fi
-  
+
 }
 
 function create-kubeproxy-kubeconfig {
@@ -556,7 +556,7 @@ function start-kubelet {
   flags+=" --cloud-provider=gce"
   flags+=" --cluster-dns=${DNS_SERVER_IP}"
   flags+=" --cluster-domain=${DNS_DOMAIN}"
-  flags+=" --config=/etc/kubernetes/manifests"
+  flags+=" --pod-manifest-path=/etc/kubernetes/manifests"
   flags+=" --experimental-mounter-path=${KUBE_HOME}/bin/mounter"
   flags+=" --experimental-check-node-capabilities-before-mount=true"
 
