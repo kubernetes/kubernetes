@@ -1,0 +1,23 @@
+apiVersion: rbac.authorization.k8s.io/v1beta1
+kind: ClusterRole
+metadata:
+  name: node-proxy
+  labels:
+    kubernetes.io/cluster-service: "true"
+rules:
+- apiGroups:
+  - ""
+  resources:
+  - nodes/proxy
+  verbs:
+  - create
+  - get
+- apiGroups:
+  - ""
+  resources:
+  - nodes/log
+  - nodes/stats
+  - nodes/metrics
+  - nodes/spec
+  verbs:
+  - get
