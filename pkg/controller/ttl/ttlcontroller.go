@@ -44,9 +44,9 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
+	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated/core/v1"
 	listers "k8s.io/kubernetes/pkg/client/listers/core/v1"
 	"k8s.io/kubernetes/pkg/controller"
-	"k8s.io/kubernetes/pkg/controller/informers"
 
 	"github.com/golang/glog"
 )
@@ -198,10 +198,6 @@ func (ttlc *TTLController) enqueueNode(node *v1.Node) {
 
 func (ttlc *TTLController) worker() {
 	for ttlc.processItem() {
-		if quit := ttlc.processItem(); quit {
-			glog.Infof("TTL controller worker shutting down")
-			return
-		}
 	}
 }
 
