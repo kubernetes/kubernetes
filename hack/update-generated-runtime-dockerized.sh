@@ -20,6 +20,7 @@ set -o pipefail
 
 KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
 KUBE_REMOTE_RUNTIME_ROOT="${KUBE_ROOT}/pkg/kubelet/api/v1alpha1/runtime"
+KUBE_REMOTE_LIFECYCLE_ROOT="${KUBE_ROOT}/pkg/kubelet/api/v1alpha1/lifecycle"
 source "${KUBE_ROOT}/hack/lib/init.sh"
 
 kube::golang::setup_env
@@ -41,6 +42,7 @@ fi
 
 function cleanup {
 	rm -f ${KUBE_REMOTE_RUNTIME_ROOT}/api.pb.go.bak
+	rm -f ${KUBE_REMOTE_LIFECYCLE_ROOT}/api.pb.go.bak
 }
 
 trap cleanup EXIT
@@ -53,10 +55,20 @@ PATH="${gogopath}:${PATH}" \
   --proto_path="${KUBE_ROOT}/vendor" \
   --gogo_out=plugins=grpc:${KUBE_REMOTE_RUNTIME_ROOT} ${KUBE_REMOTE_RUNTIME_ROOT}/api.proto
 
-# Update boilerplate for the generated file.
+PATH="${gogopath}:${PATH}" \
+  protoc \
+  --proto_path="${KUBE_REMOTE_LIFECYCLE_ROOT}" \
+  --proto_path="${KUBE_ROOT}/vendor" \
+  --gogo_out=plugins=grpc:${KUBE_REMOTE_LIFECYCLE_ROOT} ${KUBE_REMOTE_LIFECYCLE_ROOT}/api.proto
+
+# Update boilerplate for the generated files.
 echo "$(cat hack/boilerplate/boilerplate.go.txt ${KUBE_REMOTE_RUNTIME_ROOT}/api.pb.go)" > ${KUBE_REMOTE_RUNTIME_ROOT}/api.pb.go
 sed -i".bak" "s/Copyright YEAR/Copyright $(date '+%Y')/g" ${KUBE_REMOTE_RUNTIME_ROOT}/api.pb.go
+
+echo "$(cat hack/boilerplate/boilerplate.go.txt ${KUBE_REMOTE_LIFECYCLE_ROOT}/api.pb.go)" > ${KUBE_REMOTE_LIFECYCLE_ROOT}/api.pb.go
+sed -i".bak" "s/Copyright YEAR/Copyright $(date '+%Y')/g" ${KUBE_REMOTE_LIFECYCLE_ROOT}/api.pb.go
 
 # Run gofmt to clean up the generated code.
 kube::golang::verify_go_version
 gofmt -l -s -w ${KUBE_REMOTE_RUNTIME_ROOT}/api.pb.go
+gofmt -l -s -w ${KUBE_REMOTE_LIFECYCLE_ROOT}/api.pb.go
