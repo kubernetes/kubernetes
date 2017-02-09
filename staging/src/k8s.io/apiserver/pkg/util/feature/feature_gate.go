@@ -107,6 +107,8 @@ type FeatureGate interface {
 	// owner: @pweil-
 	// alpha: v1.5
 	ExperimentalHostUserNamespaceDefaulting() bool
+
+	AnninityInAnnotations() bool
 }
 
 // featureGate implements FeatureGate as well as pflag.Value for flag parsing.
