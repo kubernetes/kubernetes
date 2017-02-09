@@ -57,10 +57,20 @@ func TestGetDevicePrefixRefCount(t *testing.T) {
 
 func TestExtractDeviceAndPrefix(t *testing.T) {
 	devicePath := "127.0.0.1:3260-iqn.2014-12.com.example:test.tgt00"
+	mountPrefix := "/var/lib/kubelet/plugins/kubernetes.io/iscsi/default/" + devicePath
 	lun := "-lun-0"
-	device, prefix, err := extractDeviceAndPrefix("/var/lib/kubelet/plugins/kubernetes.io/iscsi/" + devicePath + lun)
-	if err != nil || device != (devicePath+lun) || prefix != devicePath {
-		t.Errorf("extractDeviceAndPrefix: expected %s and %s, got %v %s and %s", devicePath+lun, devicePath, err, device, prefix)
+	device, prefix, err := extractDeviceAndPrefix(mountPrefix + lun)
+	if err != nil || device != (devicePath+lun) || prefix != mountPrefix {
+		t.Errorf("extractDeviceAndPrefix: expected %s and %s, got %v %s and %s", devicePath+lun, mountPrefix, err, device, prefix)
+	}
+}
+
+func TestExtractIface(t *testing.T) {
+	ifaceName := "default"
+	devicePath := "127.0.0.1:3260-iqn.2014-12.com.example:test.tgt00-lun-0"
+	iface, err := extractIface("/var/lib/kubelet/plugins/kubernetes.io/iscsi/" + ifaceName + "/" + devicePath)
+	if err != nil || iface != ifaceName {
+		t.Errorf("extractIface: expected %s, got %v %s", ifaceName, err, iface)
 	}
 }
 
