@@ -23,6 +23,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/client-go/util/clock"
 )
 
 // Config contains all the settings for a Controller.
@@ -50,12 +51,22 @@ type Config struct {
 	// queue.
 	FullResyncPeriod time.Duration
 
+	// ShouldResync, if specified, is invoked when the controller's reflector determines the next
+	// periodic sync should occur. If this returns true, it means the reflector should proceed with
+	// the resync.
+	ShouldResync ShouldResyncFunc
+
 	// If true, when Process() returns an error, re-enqueue the object.
 	// TODO: add interface to let you inject a delay/backoff or drop
 	//       the object completely if desired. Pass the object in
 	//       question to this interface as a parameter.
 	RetryOnError bool
 }
+
+// ShouldResyncFunc is a type of function that indicates if a reflector should perform a
+// resync or not. It can be used by a shared informer to support multiple event handlers with custom
+// resync periods.
+type ShouldResyncFunc func() bool
 
 // ProcessFunc processes a single object.
 type ProcessFunc func(obj interface{}) error
@@ -65,6 +76,7 @@ type controller struct {
 	config         Config
 	reflector      *Reflector
 	reflectorMutex sync.RWMutex
+	clock          clock.Clock
 }
 
 type Controller interface {
@@ -77,6 +89,7 @@ type Controller interface {
 func New(c *Config) Controller {
 	ctlr := &controller{
 		config: *c,
+		clock:  &clock.RealClock{},
 	}
 	return ctlr
 }
@@ -92,6 +105,8 @@ func (c *controller) Run(stopCh <-chan struct{}) {
 		c.config.Queue,
 		c.config.FullResyncPeriod,
 	)
+	r.ShouldResync = c.config.ShouldResync
+	r.clock = c.clock
 
 	c.reflectorMutex.Lock()
 	c.reflector = r
