@@ -33,6 +33,10 @@ const (
 	// ClusterUpgrade indicates that both master and nodes are
 	// being upgraded.
 	ClusterUpgrade
+
+	// EtcdUpgrade indicates that only etcd is being upgraded (or migrated
+	// between storage versions).
+	EtcdUpgrade
 )
 
 // Test is an interface for upgrade tests.
