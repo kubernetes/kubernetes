@@ -67,22 +67,6 @@ type admissionRequirement struct {
 
 type admissionRequirementList []*admissionRequirement
 
-func (a admissionRequirementList) sub(pod *v1.Pod) admissionRequirementList {
-	requests := predicates.GetResourceRequest(pod)
-	newList := []*admissionRequirement{}
-	for _, req := range a {
-		value := getResourceRequest(requests, req.resourceName)
-		newQuantity := req.quantity - value
-		if newQuantity > 0 {
-			newList = append(newList, &admissionRequirement{
-				resourceName: req.resourceName,
-				quantity:     newQuantity,
-			})
-		}
-	}
-	return newList
-}
-
 // HandleAdmissionFailure gracefully handles admission rejection, and, in some cases,
 // to allow admission of the pod despite its previous failure.
 func (c *CriticalPodAdmissionHandler) HandleAdmissionFailure(pod *v1.Pod, failureReasons []algorithm.PredicateFailureReason) (bool, []algorithm.PredicateFailureReason, error) {
@@ -127,7 +111,7 @@ func (c *CriticalPodAdmissionHandler) evictPodsToFreeRequests(insufficientResour
 	if err != nil {
 		return fmt.Errorf("Error finding a set of pods to preempt: %v", err)
 	}
-	glog.Infof("preemption: attempting to evict pods %v, in order to free up resources: %v", podsToPreempt, insufficientResources)
+	glog.Infof("preemption: attempting to evict pods %v, in order to free up resources: %s", podsToPreempt, insufficientResources.toString())
 	for _, pod := range podsToPreempt {
 		status := v1.PodStatus{
 			Phase:   v1.PodFailed,
@@ -166,8 +150,7 @@ func getPodsToPreempt(possiblePods []*v1.Pod, insufficientResources admissionReq
 			return withoutNextPod, nil
 		}
 	}
-	return nil, fmt.Errorf("No set of running pods found to reclaim resources: %v", insufficientResources)
-
+	return nil, fmt.Errorf("No set of running pods found to reclaim resources: %s", insufficientResources.toString())
 }
 
 // Return the list of pods with the smaller cost,
@@ -205,11 +188,7 @@ func minCostPodList(list1 []*v1.Pod, list2 []*v1.Pod) []*v1.Pod {
 // given a list of pods, return the total:
 // number of guaranteeed pods, number of burstable pods,
 // memory requested, cpu requested
-func evaluatePodList(pods []*v1.Pod) (int, int, int64, int64) {
-	nGuaranteed := 0
-	nBurstable := 0
-	memory := int64(0)
-	cpu := int64(0)
+func evaluatePodList(pods []*v1.Pod) (nGuaranteed, nBurstable int, memory, cpu int64) {
 	for _, pod := range pods {
 		if qos.GetPodQOS(pod) == v1.PodQOSGuaranteed {
 			nGuaranteed += 1
@@ -241,4 +220,28 @@ func getResourceRequest(requests *schedulercache.Resource, resource v1.ResourceN
 		}
 		return 0
 	}
+}
+
+func (a admissionRequirementList) sub(pod *v1.Pod) admissionRequirementList {
+	requests := predicates.GetResourceRequest(pod)
+	newList := []*admissionRequirement{}
+	for _, req := range a {
+		value := getResourceRequest(requests, req.resourceName)
+		newQuantity := req.quantity - value
+		if newQuantity > 0 {
+			newList = append(newList, &admissionRequirement{
+				resourceName: req.resourceName,
+				quantity:     newQuantity,
+			})
+		}
+	}
+	return newList
+}
+
+func (a admissionRequirementList) toString() string {
+	s := "["
+	for _, req := range a {
+		s += fmt.Sprintf("(res: %v, q: %d), ", req.resourceName, req.quantity)
+	}
+	return s + "]"
 }
