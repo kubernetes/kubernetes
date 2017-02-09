@@ -177,6 +177,11 @@ func DeepCopy_componentconfig_KubeletConfiguration(in interface{}, out interface
 				(*out)[key] = val
 			}
 		}
+		if in.AllowedUnsafeSysctls != nil {
+			in, out := &in.AllowedUnsafeSysctls, &out.AllowedUnsafeSysctls
+			*out = make([]string, len(*in))
+			copy(*out, *in)
+		}
 		if in.SystemReserved != nil {
 			in, out := &in.SystemReserved, &out.SystemReserved
 			*out = make(ConfigurationMap)
@@ -191,8 +196,8 @@ func DeepCopy_componentconfig_KubeletConfiguration(in interface{}, out interface
 				(*out)[key] = val
 			}
 		}
-		if in.AllowedUnsafeSysctls != nil {
-			in, out := &in.AllowedUnsafeSysctls, &out.AllowedUnsafeSysctls
+		if in.EnforceNodeAllocatable != nil {
+			in, out := &in.EnforceNodeAllocatable, &out.EnforceNodeAllocatable
 			*out = make([]string, len(*in))
 			copy(*out, *in)
 		}
