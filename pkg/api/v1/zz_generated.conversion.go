@@ -4123,6 +4123,8 @@ func autoConvert_v1_ServiceSpec_To_api_ServiceSpec(in *ServiceSpec, out *api.Ser
 	out.LoadBalancerIP = in.LoadBalancerIP
 	out.LoadBalancerSourceRanges = *(*[]string)(unsafe.Pointer(&in.LoadBalancerSourceRanges))
 	out.ExternalName = in.ExternalName
+	out.ExternalTraffic = api.ServiceExternalTrafficType(in.ExternalTraffic)
+	out.HealthCheckNodePort = in.HealthCheckNodePort
 	return nil
 }
 
@@ -4136,6 +4138,8 @@ func autoConvert_api_ServiceSpec_To_v1_ServiceSpec(in *api.ServiceSpec, out *Ser
 	out.LoadBalancerIP = in.LoadBalancerIP
 	out.SessionAffinity = ServiceAffinity(in.SessionAffinity)
 	out.LoadBalancerSourceRanges = *(*[]string)(unsafe.Pointer(&in.LoadBalancerSourceRanges))
+	out.ExternalTraffic = ServiceExternalTrafficType(in.ExternalTraffic)
+	out.HealthCheckNodePort = in.HealthCheckNodePort
 	return nil
 }
 

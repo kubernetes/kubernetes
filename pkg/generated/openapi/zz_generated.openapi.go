@@ -8303,6 +8303,20 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 								Format:      "",
 							},
 						},
+						"externalTraffic": {
+							SchemaProps: spec.SchemaProps{
+								Description: "externalTraffic denotes if this Service desires to route external traffic to local endpoints only. This preserves Source IP and avoids a second hop for LoadBalancer and Nodeport type services.",
+								Type:        []string{"string"},
+								Format:      "",
+							},
+						},
+						"healthCheckNodePort": {
+							SchemaProps: spec.SchemaProps{
+								Description: "healthCheckNodePort specifies the healthcheck nodePort for the service. If not specified, HealthCheckNodePort is created by the service api backend with the allocated nodePort. Will use user-specified nodePort value if specified by the client. Only effects when Type is set to LoadBalancer and ExternalTraffic is set to OnlyLocal.",
+								Type:        []string{"integer"},
+								Format:      "int32",
+							},
+						},
 					},
 				},
 			},
