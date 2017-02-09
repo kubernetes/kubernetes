@@ -35,6 +35,7 @@ import (
 	"github.com/davecgh/go-spew/spew"
 	"github.com/golang/glog"
 
+	"hash/fnv"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -47,6 +48,7 @@ import (
 	"k8s.io/kubernetes/pkg/proxy"
 	"k8s.io/kubernetes/pkg/proxy/healthcheck"
 	utilexec "k8s.io/kubernetes/pkg/util/exec"
+	hashutil "k8s.io/kubernetes/pkg/util/hash"
 	utiliptables "k8s.io/kubernetes/pkg/util/iptables"
 	"k8s.io/kubernetes/pkg/util/slice"
 	utilsysctl "k8s.io/kubernetes/pkg/util/sysctl"
@@ -200,17 +202,18 @@ type Proxier struct {
 	throttle                    flowcontrol.RateLimiter
 
 	// These are effectively const and do not need the mutex to be held.
-	syncPeriod     time.Duration
-	minSyncPeriod  time.Duration
-	iptables       utiliptables.Interface
-	masqueradeAll  bool
-	masqueradeMark string
-	exec           utilexec.Interface
-	clusterCIDR    string
-	hostname       string
-	nodeIP         net.IP
-	portMapper     portOpener
-	recorder       record.EventRecorder
+	syncPeriod        time.Duration
+	minSyncPeriod     time.Duration
+	iptables          utiliptables.Interface
+	masqueradeAll     bool
+	masqueradeMark    string
+	exec              utilexec.Interface
+	clusterCIDR       string
+	hostname          string
+	nodeIP            net.IP
+	portMapper        portOpener
+	recorder          record.EventRecorder
+	endpointChecksums map[string]uint32
 }
 
 type localPort struct {
@@ -588,6 +591,11 @@ func (proxier *Proxier) OnEndpointsUpdate(allEndpoints []api.Endpoints) {
 	defer proxier.mu.Unlock()
 	proxier.haveReceivedEndpointsUpdate = true
 
+	if !proxier.needToUpdate(allEndpoints) {
+		glog.V(4).Infof("Skipping proxy iptables rule sync on endpoint update because nothing changed")
+		return
+	}
+
 	activeEndpoints := make(map[proxy.ServicePortName]bool) // use a map as a set
 	staleConnections := make(map[endpointServicePair]bool)
 	svcPortToInfoMap := make(map[proxy.ServicePortName][]hostPortInfo)
@@ -654,6 +662,36 @@ func (proxier *Proxier) OnEndpointsUpdate(allEndpoints []api.Endpoints) {
 	}
 	proxier.syncProxyRules()
 	proxier.deleteEndpointConnections(staleConnections)
+}
+
+// needToUpdate returns if the input endpoints is different from the last batch
+// This is calculated by comparing the checksum of EndpointSubsets.
+func (proxier *Proxier) needToUpdate(allEndpoints []api.Endpoints) bool {
+	checksumMap := make(map[string]uint32)
+	hash := fnv.New32a()
+
+	for _, ep := range allEndpoints {
+		hashutil.DeepHashObject(hash, ep.Subsets)
+		checksumMap[fmt.Sprintf("%s/%s", ep.Namespace, ep.Name)] = hash.Sum32()
+	}
+
+	needToUpdate := false
+	if len(checksumMap) == len(proxier.endpointChecksums) {
+		for ep, checksum := range checksumMap {
+			if checksum != proxier.endpointChecksums[ep] {
+				needToUpdate = true
+				break
+			}
+		}
+	} else {
+		needToUpdate = true
+	}
+
+	if needToUpdate {
+		proxier.endpointChecksums = checksumMap
+	}
+
+	return needToUpdate
 }
 
 // updateHealthCheckEntries - send the new set of local endpoints to the health checker
