@@ -709,7 +709,7 @@ func testDynamicResources() []*discovery.APIGroupResources {
 				},
 				PreferredVersion: metav1.GroupVersionForDiscovery{
 					GroupVersion: "unit-test.test.com/v1",
-					Version:      "v1beta1"},
+					Version:      "v1"},
 			},
 			VersionedResources: map[string][]metav1.APIResource{
 				"v1": {

@@ -588,6 +588,11 @@ func TestApplyIdempotentTPREntry(t *testing.T) {
 					t.Fatal(err)
 				}
 
+				contentType := req.Header.Get("Content-Type")
+				if contentType != "application/merge-patch+json" {
+					t.Fatalf("Unexpected Content-Type: %s in patch: %s.", contentType, patch)
+				}
+
 				patchMap := map[string]interface{}{}
 				if err := json.Unmarshal(patch, &patchMap); err != nil {
 					t.Fatal(err)
