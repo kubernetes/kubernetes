@@ -36,8 +36,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/admission"
-	"k8s.io/apiserver/pkg/registry/generic"
-	genericregistry "k8s.io/apiserver/pkg/registry/generic/registry"
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	"k8s.io/apiserver/pkg/server/filters"
 	"k8s.io/kubernetes/federation/cmd/federation-apiserver/app/options"
@@ -196,9 +194,15 @@ func Run(s *options.ServerRunOptions) error {
 		sets.NewString("watch", "proxy"),
 		sets.NewString("attach", "exec", "proxy", "log", "portforward"),
 	)
+	genericConfig.RESTOptionsGetter = &kubeapiserver.RESTOptionsFactory{
+		StorageFactory:          storageFactory,
+		EnableWatchCache:        s.Etcd.EnableWatchCache,
+		EnableGarbageCollection: s.Etcd.EnableGarbageCollection,
+		DeleteCollectionWorkers: s.Etcd.DeleteCollectionWorkers,
+	}
 
 	// TODO: Move this to generic api server (Need to move the command line flag).
-	if s.GenericServerRunOptions.EnableWatchCache {
+	if s.Etcd.EnableWatchCache {
 		cachesize.InitializeWatchCacheSizes(s.GenericServerRunOptions.TargetRAMMB)
 		cachesize.SetWatchCacheSizes(s.GenericServerRunOptions.WatchCacheSizes)
 	}
@@ -211,48 +215,15 @@ func Run(s *options.ServerRunOptions) error {
 	routes.UIRedirect{}.Install(m.HandlerContainer)
 	routes.Logs{}.Install(m.HandlerContainer)
 
-	// TODO: Refactor this code to share it with kube-apiserver rather than duplicating it here.
-	restOptionsFactory := &restOptionsFactory{
-		storageFactory:          storageFactory,
-		enableGarbageCollection: s.Features.EnableGarbageCollection,
-		deleteCollectionWorkers: s.GenericServerRunOptions.DeleteCollectionWorkers,
-	}
-	if s.GenericServerRunOptions.EnableWatchCache {
-		restOptionsFactory.storageDecorator = genericregistry.StorageWithCacher
-	} else {
-		restOptionsFactory.storageDecorator = generic.UndecoratedStorage
-	}
-
-	installFederationAPIs(m, restOptionsFactory)
-	installCoreAPIs(s, m, restOptionsFactory)
-	installExtensionsAPIs(m, restOptionsFactory)
-	installBatchAPIs(m, restOptionsFactory)
-	installAutoscalingAPIs(m, restOptionsFactory)
+	installFederationAPIs(m, genericConfig.RESTOptionsGetter)
+	installCoreAPIs(s, m, genericConfig.RESTOptionsGetter)
+	installExtensionsAPIs(m, genericConfig.RESTOptionsGetter)
+	installBatchAPIs(m, genericConfig.RESTOptionsGetter)
+	installAutoscalingAPIs(m, genericConfig.RESTOptionsGetter)
 
 	sharedInformers.Start(wait.NeverStop)
 	m.PrepareRun().Run(wait.NeverStop)
 	return nil
-}
-
-type restOptionsFactory struct {
-	storageFactory          genericapiserver.StorageFactory
-	storageDecorator        generic.StorageDecorator
-	deleteCollectionWorkers int
-	enableGarbageCollection bool
-}
-
-func (f *restOptionsFactory) GetRESTOptions(resource schema.GroupResource) (generic.RESTOptions, error) {
-	config, err := f.storageFactory.NewConfig(resource)
-	if err != nil {
-		return generic.RESTOptions{}, fmt.Errorf("Unable to find storage config for %v, due to %v", resource, err.Error())
-	}
-	return generic.RESTOptions{
-		StorageConfig:           config,
-		Decorator:               f.storageDecorator,
-		DeleteCollectionWorkers: f.deleteCollectionWorkers,
-		EnableGarbageCollection: f.enableGarbageCollection,
-		ResourcePrefix:          f.storageFactory.ResourcePrefix(resource),
-	}, nil
 }
 
 // PostProcessSpec adds removed definitions for backward compatibility

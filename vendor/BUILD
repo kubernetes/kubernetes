@@ -9098,6 +9098,7 @@ go_library(
         "//vendor:k8s.io/apiserver/pkg/endpoints/filters",
         "//vendor:k8s.io/apiserver/pkg/endpoints/openapi",
         "//vendor:k8s.io/apiserver/pkg/endpoints/request",
+        "//vendor:k8s.io/apiserver/pkg/registry/generic",
         "//vendor:k8s.io/apiserver/pkg/registry/rest",
         "//vendor:k8s.io/apiserver/pkg/server/filters",
         "//vendor:k8s.io/apiserver/pkg/server/healthz",
@@ -14106,11 +14107,14 @@ go_library(
         "//vendor:gopkg.in/natefinch/lumberjack.v2",
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
         "//vendor:k8s.io/apimachinery/pkg/runtime",
+        "//vendor:k8s.io/apimachinery/pkg/runtime/schema",
         "//vendor:k8s.io/apimachinery/pkg/util/net",
         "//vendor:k8s.io/apiserver/pkg/admission",
         "//vendor:k8s.io/apiserver/pkg/authentication/authenticatorfactory",
         "//vendor:k8s.io/apiserver/pkg/authorization/authorizerfactory",
         "//vendor:k8s.io/apiserver/pkg/features",
+        "//vendor:k8s.io/apiserver/pkg/registry/generic",
+        "//vendor:k8s.io/apiserver/pkg/registry/generic/registry",
         "//vendor:k8s.io/apiserver/pkg/server",
         "//vendor:k8s.io/apiserver/pkg/storage/storagebackend",
         "//vendor:k8s.io/apiserver/pkg/util/feature",
@@ -15275,5 +15279,127 @@ go_test(
         "//vendor:k8s.io/apiserver/pkg/server",
         "//vendor:k8s.io/apiserver/pkg/util/flag",
         "//vendor:k8s.io/client-go/util/cert",
+    ],
+)
+
+go_binary(
+    name = "k8s.io/sample-apiserver_bin",
+    library = ":k8s.io/sample-apiserver",
+    tags = ["automanaged"],
+)
+
+go_library(
+    name = "k8s.io/sample-apiserver",
+    srcs = ["k8s.io/sample-apiserver/main.go"],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:k8s.io/apimachinery/pkg/util/wait",
+        "//vendor:k8s.io/sample-apiserver/pkg/cmd/server",
+    ],
+)
+
+go_library(
+    name = "k8s.io/sample-apiserver/pkg/apis/wardle",
+    srcs = [
+        "k8s.io/sample-apiserver/pkg/apis/wardle/doc.go",
+        "k8s.io/sample-apiserver/pkg/apis/wardle/register.go",
+        "k8s.io/sample-apiserver/pkg/apis/wardle/types.go",
+        "k8s.io/sample-apiserver/pkg/apis/wardle/zz_generated.deepcopy.go",
+    ],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
+        "//vendor:k8s.io/apimachinery/pkg/conversion",
+        "//vendor:k8s.io/apimachinery/pkg/runtime",
+        "//vendor:k8s.io/apimachinery/pkg/runtime/schema",
+    ],
+)
+
+go_library(
+    name = "k8s.io/sample-apiserver/pkg/apis/wardle/install",
+    srcs = ["k8s.io/sample-apiserver/pkg/apis/wardle/install/install.go"],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:k8s.io/apimachinery/pkg/apimachinery/announced",
+        "//vendor:k8s.io/apimachinery/pkg/apimachinery/registered",
+        "//vendor:k8s.io/apimachinery/pkg/runtime",
+        "//vendor:k8s.io/apimachinery/pkg/util/sets",
+        "//vendor:k8s.io/sample-apiserver/pkg/apis/wardle",
+        "//vendor:k8s.io/sample-apiserver/pkg/apis/wardle/v1alpha1",
+    ],
+)
+
+go_library(
+    name = "k8s.io/sample-apiserver/pkg/apis/wardle/v1alpha1",
+    srcs = [
+        "k8s.io/sample-apiserver/pkg/apis/wardle/v1alpha1/doc.go",
+        "k8s.io/sample-apiserver/pkg/apis/wardle/v1alpha1/register.go",
+        "k8s.io/sample-apiserver/pkg/apis/wardle/v1alpha1/types.go",
+        "k8s.io/sample-apiserver/pkg/apis/wardle/v1alpha1/zz_generated.conversion.go",
+        "k8s.io/sample-apiserver/pkg/apis/wardle/v1alpha1/zz_generated.deepcopy.go",
+    ],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
+        "//vendor:k8s.io/apimachinery/pkg/conversion",
+        "//vendor:k8s.io/apimachinery/pkg/runtime",
+        "//vendor:k8s.io/apimachinery/pkg/runtime/schema",
+        "//vendor:k8s.io/sample-apiserver/pkg/apis/wardle",
+    ],
+)
+
+go_library(
+    name = "k8s.io/sample-apiserver/pkg/apiserver",
+    srcs = ["k8s.io/sample-apiserver/pkg/apiserver/apiserver.go"],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:k8s.io/apimachinery/pkg/apimachinery/announced",
+        "//vendor:k8s.io/apimachinery/pkg/apimachinery/registered",
+        "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
+        "//vendor:k8s.io/apimachinery/pkg/runtime",
+        "//vendor:k8s.io/apimachinery/pkg/runtime/schema",
+        "//vendor:k8s.io/apimachinery/pkg/runtime/serializer",
+        "//vendor:k8s.io/apimachinery/pkg/version",
+        "//vendor:k8s.io/apiserver/pkg/registry/rest",
+        "//vendor:k8s.io/apiserver/pkg/server",
+        "//vendor:k8s.io/sample-apiserver/pkg/apis/wardle",
+        "//vendor:k8s.io/sample-apiserver/pkg/apis/wardle/install",
+        "//vendor:k8s.io/sample-apiserver/pkg/apis/wardle/v1alpha1",
+        "//vendor:k8s.io/sample-apiserver/pkg/registry/wardle",
+    ],
+)
+
+go_library(
+    name = "k8s.io/sample-apiserver/pkg/cmd/server",
+    srcs = ["k8s.io/sample-apiserver/pkg/cmd/server/start.go"],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:github.com/pborman/uuid",
+        "//vendor:github.com/spf13/cobra",
+        "//vendor:k8s.io/apiserver/pkg/server",
+        "//vendor:k8s.io/apiserver/pkg/server/options",
+        "//vendor:k8s.io/sample-apiserver/pkg/apis/wardle/v1alpha1",
+        "//vendor:k8s.io/sample-apiserver/pkg/apiserver",
+    ],
+)
+
+go_library(
+    name = "k8s.io/sample-apiserver/pkg/registry/wardle",
+    srcs = [
+        "k8s.io/sample-apiserver/pkg/registry/wardle/etcd.go",
+        "k8s.io/sample-apiserver/pkg/registry/wardle/strategy.go",
+    ],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:k8s.io/apimachinery/pkg/fields",
+        "//vendor:k8s.io/apimachinery/pkg/labels",
+        "//vendor:k8s.io/apimachinery/pkg/runtime",
+        "//vendor:k8s.io/apimachinery/pkg/util/validation/field",
+        "//vendor:k8s.io/apiserver/pkg/endpoints/request",
+        "//vendor:k8s.io/apiserver/pkg/registry/generic",
+        "//vendor:k8s.io/apiserver/pkg/registry/generic/registry",
+        "//vendor:k8s.io/apiserver/pkg/storage",
+        "//vendor:k8s.io/apiserver/pkg/storage/names",
+        "//vendor:k8s.io/sample-apiserver/pkg/apis/wardle",
     ],
 )
