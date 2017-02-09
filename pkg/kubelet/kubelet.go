@@ -773,7 +773,8 @@ func NewMainKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *Kub
 	klet.AddPodSyncLoopHandler(activeDeadlineHandler)
 	klet.AddPodSyncHandler(activeDeadlineHandler)
 
-	klet.admitHandlers.AddPodAdmitHandler(lifecycle.NewPredicateAdmitHandler(klet.getNodeAnyWay, preemption.NewCriticalPodAdmissionHandler()))
+	criticalPodAdmissionHandler := preemption.NewCriticalPodAdmissionHandler(klet.getActivePods, killPodNow(klet.podWorkers, kubeDeps.Recorder), kubeDeps.Recorder)
+	klet.admitHandlers.AddPodAdmitHandler(lifecycle.NewPredicateAdmitHandler(klet.getNodeAnyWay, criticalPodAdmissionHandler))
 	// apply functional Option's
 	for _, opt := range kubeDeps.Options {
 		opt(klet)
