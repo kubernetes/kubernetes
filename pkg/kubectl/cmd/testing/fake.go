@@ -609,6 +609,19 @@ func (f *fakeAPIFactory) LogsForObject(object, options runtime.Object) (*restcli
 	}
 }
 
+func (f *fakeAPIFactory) AttachablePodForObject(object runtime.Object) (*api.Pod, error) {
+	switch t := object.(type) {
+	case *api.Pod:
+		return t, nil
+	default:
+		gvks, _, err := api.Scheme.ObjectKinds(object)
+		if err != nil {
+			return nil, err
+		}
+		return nil, fmt.Errorf("cannot attach to %v: not implemented", gvks[0])
+	}
+}
+
 func (f *fakeAPIFactory) Validator(validate bool, cacheDir string) (validation.Schema, error) {
 	return f.tf.Validator, f.tf.Err
 }
