@@ -163,6 +163,8 @@ go_library(
         "//vendor:golang.org/x/crypto/ssh",
         "//vendor:golang.org/x/net/context",
         "//vendor:golang.org/x/net/websocket",
+        "//vendor:golang.org/x/oauth2",
+        "//vendor:golang.org/x/oauth2/google",
         "//vendor:google.golang.org/api/googleapi",
         "//vendor:google.golang.org/api/monitoring/v3",
         "//vendor:k8s.io/apimachinery/pkg/api/errors",
