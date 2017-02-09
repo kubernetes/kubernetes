@@ -322,7 +322,9 @@ func (reaper *DaemonSetReaper) Stop(namespace, name string, timeout time.Duratio
 		return err
 	}
 
-	return reaper.client.DaemonSets(namespace).Delete(name, nil)
+	falseVar := false
+	deleteOptions := &metav1.DeleteOptions{OrphanDependents: &falseVar}
+	return reaper.client.DaemonSets(namespace).Delete(name, deleteOptions)
 }
 
 func (reaper *StatefulSetReaper) Stop(namespace, name string, timeout time.Duration, gracePeriod *metav1.DeleteOptions) error {
@@ -366,7 +368,9 @@ func (reaper *StatefulSetReaper) Stop(namespace, name string, timeout time.Durat
 
 	// TODO: Cleanup volumes? We don't want to accidentally delete volumes from
 	// stop, so just leave this up to the statefulset.
-	return statefulsets.Delete(name, nil)
+	falseVar := false
+	deleteOptions := &metav1.DeleteOptions{OrphanDependents: &falseVar}
+	return statefulsets.Delete(name, deleteOptions)
 }
 
 func (reaper *JobReaper) Stop(namespace, name string, timeout time.Duration, gracePeriod *metav1.DeleteOptions) error {
@@ -408,8 +412,10 @@ func (reaper *JobReaper) Stop(namespace, name string, timeout time.Duration, gra
 	if len(errList) > 0 {
 		return utilerrors.NewAggregate(errList)
 	}
-	// once we have all the pods removed we can safely remove the job itself
-	return jobs.Delete(name, nil)
+	// once we have all the pods removed we can safely remove the job itself.
+	falseVar := false
+	deleteOptions := &metav1.DeleteOptions{OrphanDependents: &falseVar}
+	return jobs.Delete(name, deleteOptions)
 }
 
 func (reaper *DeploymentReaper) Stop(namespace, name string, timeout time.Duration, gracePeriod *metav1.DeleteOptions) error {
@@ -509,5 +515,7 @@ func (reaper *ServiceReaper) Stop(namespace, name string, timeout time.Duration,
 	if err != nil {
 		return err
 	}
-	return services.Delete(name, nil)
+	falseVar := false
+	deleteOptions := &metav1.DeleteOptions{OrphanDependents: &falseVar}
+	return services.Delete(name, deleteOptions)
 }
