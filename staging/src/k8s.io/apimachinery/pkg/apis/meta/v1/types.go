@@ -73,7 +73,7 @@ type ListMeta struct {
 
 // These are internal finalizer values for Kubernetes-like APIs, must be qualified name unless defined here
 const (
-	FinalizerOrphan     string        = "orphan"
+	FinalizerOrphan string = "orphan"
 )
 
 // ObjectMeta is metadata that all persisted resources must have, which includes all objects
@@ -233,6 +233,8 @@ const (
 	NamespaceNone string = ""
 	// NamespaceSystem is the system namespace where we place system components.
 	NamespaceSystem string = "kube-system"
+	// NamespacePublic is the namespace where we place public info (ConfigMaps)
+	NamespacePublic string = "kube-public"
 )
 
 // OwnerReference contains enough information to let you identify an owning
