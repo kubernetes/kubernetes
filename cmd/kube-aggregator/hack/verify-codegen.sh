@@ -33,14 +33,14 @@ trap "cleanup" EXIT SIGINT
 
 cleanup
 
-mkdir -p "${_tmp}"
-cp -a -T "${DIFFROOT}" "${TMP_DIFFROOT}"
+mkdir -p "${TMP_DIFFROOT}"
+cp -a "${DIFFROOT}"/* "${TMP_DIFFROOT}"
 
 "${APIFEDERATOR_ROOT}/hack/update-codegen.sh"
 echo "diffing ${DIFFROOT} against freshly generated codegen"
 ret=0
 diff -Naupr "${DIFFROOT}" "${TMP_DIFFROOT}" || ret=$?
-cp -a -T "${TMP_DIFFROOT}" "${DIFFROOT}"
+cp -a "${TMP_DIFFROOT}"/* "${DIFFROOT}"
 if [[ $ret -eq 0 ]]
 then
   echo "${DIFFROOT} up to date."
