@@ -34,7 +34,6 @@ import (
 	clientgoclientset "k8s.io/client-go/kubernetes"
 
 	cadvisorapi "github.com/google/cadvisor/info/v1"
-	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
@@ -359,11 +358,6 @@ func NewMainKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *Kub
 		KernelMemcgNotification:  kubeCfg.ExperimentalKernelMemcgNotification,
 	}
 
-	reservation, err := ParseReservation(kubeCfg.KubeReserved, kubeCfg.SystemReserved)
-	if err != nil {
-		return nil, err
-	}
-
 	var dockerExecHandler dockertools.ExecHandler
 	switch kubeCfg.DockerExecHandlerName {
 	case "native":
@@ -465,7 +459,6 @@ func NewMainKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *Kub
 		nodeIP:            net.ParseIP(kubeCfg.NodeIP),
 		clock:             clock.RealClock{},
 		outOfDiskTransitionFrequency:            kubeCfg.OutOfDiskTransitionFrequency.Duration,
-		reservation:                             *reservation,
 		enableCustomMetrics:                     kubeCfg.EnableCustomMetrics,
 		babysitDaemons:                          kubeCfg.BabysitDaemons,
 		enableControllerAttachDetach:            kubeCfg.EnableControllerAttachDetach,
@@ -1033,10 +1026,6 @@ type Kubelet struct {
 	// not-out-of-disk. This prevents a pod that causes out-of-disk condition from repeatedly
 	// getting rescheduled onto the node.
 	outOfDiskTransitionFrequency time.Duration
-
-	// reservation specifies resources which are reserved for non-pod usage, including kubernetes and
-	// non-kubernetes system processes.
-	reservation kubetypes.Reservation
 
 	// support gathering custom metrics.
 	enableCustomMetrics bool
@@ -2117,47 +2106,6 @@ func (kl *Kubelet) cleanUpContainersInPod(podId types.UID, exitedContainerID str
 func isSyncPodWorthy(event *pleg.PodLifecycleEvent) bool {
 	// ContatnerRemoved doesn't affect pod state
 	return event.Type != pleg.ContainerRemoved
-}
-
-// parseResourceList parses the given configuration map into an API
-// ResourceList or returns an error.
-func parseResourceList(m componentconfig.ConfigurationMap) (v1.ResourceList, error) {
-	rl := make(v1.ResourceList)
-	for k, v := range m {
-		switch v1.ResourceName(k) {
-		// Only CPU and memory resources are supported.
-		case v1.ResourceCPU, v1.ResourceMemory:
-			q, err := resource.ParseQuantity(v)
-			if err != nil {
-				return nil, err
-			}
-			if q.Sign() == -1 {
-				return nil, fmt.Errorf("resource quantity for %q cannot be negative: %v", k, v)
-			}
-			rl[v1.ResourceName(k)] = q
-		default:
-			return nil, fmt.Errorf("cannot reserve %q resource", k)
-		}
-	}
-	return rl, nil
-}
-
-// ParseReservation parses the given kubelet- and system- reservations
-// configuration maps into an internal Reservation instance or returns an
-// error.
-func ParseReservation(kubeReserved, systemReserved componentconfig.ConfigurationMap) (*kubetypes.Reservation, error) {
-	reservation := new(kubetypes.Reservation)
-	if rl, err := parseResourceList(kubeReserved); err != nil {
-		return nil, err
-	} else {
-		reservation.Kubernetes = rl
-	}
-	if rl, err := parseResourceList(systemReserved); err != nil {
-		return nil, err
-	} else {
-		reservation.System = rl
-	}
-	return reservation, nil
 }
 
 // Gets the streaming server configuration to use with in-process CRI shims.
