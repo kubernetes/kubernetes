@@ -149,12 +149,12 @@ var _ = framework.KubeDescribe("Dynamic provisioning", func() {
 			Expect(err).NotTo(HaveOccurred())
 
 			By(fmt.Sprintf("Creating and deleting PersistentVolumeClaims for %d iterations", raceAttempts))
+			claim := newClaim(ns, false)
+			claim.Annotations[storageutil.StorageClassAnnotation] = class.Name
 			for i := 0; i < raceAttempts; i++ {
-				claim := newClaim(ns, false)
-				claim.Annotations[storageutil.StorageClassAnnotation] = class.Name
-				claim, err = c.Core().PersistentVolumeClaims(ns).Create(claim)
+				tmpClaim, err := c.Core().PersistentVolumeClaims(ns).Create(claim)
 				Expect(err).NotTo(HaveOccurred())
-				err = c.Core().PersistentVolumeClaims(ns).Delete(claim.Name, nil)
+				err = c.Core().PersistentVolumeClaims(ns).Delete(tmpClaim.Name, nil)
 				Expect(err).NotTo(HaveOccurred())
 			}
 
