@@ -24,8 +24,6 @@ import (
 	"strings"
 	"time"
 
-	inf "gopkg.in/inf.v0"
-
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
@@ -44,7 +42,6 @@ import (
 	"k8s.io/kubernetes/pkg/api/v1"
 	apps "k8s.io/kubernetes/pkg/apis/apps/v1beta1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
-	"k8s.io/kubernetes/pkg/controller/statefulset"
 	"k8s.io/kubernetes/test/e2e/framework"
 )
 
@@ -77,7 +74,7 @@ var _ = framework.KubeDescribe("StatefulSet", func() {
 		ns = f.Namespace.Name
 	})
 
-	framework.KubeDescribe("Basic StatefulSet functionality", func() {
+	framework.KubeDescribe("Basic StatefulSet functionality [StatefulSetBasic]", func() {
 		ssName := "ss"
 		labels := map[string]string{
 			"foo": "bar",
@@ -144,7 +141,7 @@ var _ = framework.KubeDescribe("StatefulSet", func() {
 			framework.ExpectNoError(sst.execInStatefulPods(ss, cmd))
 		})
 
-		It("should handle healthy stateful pod restarts during scale", func() {
+		It("should not deadlock when a pod's predecessor fails", func() {
 			By("Creating statefulset " + ssName + " in namespace " + ns)
 			*(ss.Spec.Replicas) = 2
 			setInitializedAnnotation(ss, "false")
@@ -169,8 +166,8 @@ var _ = framework.KubeDescribe("StatefulSet", func() {
 			By("Deleting healthy stateful pod at index 0.")
 			sst.deleteStatefulPodAtIndex(0, ss)
 
-			By("Confirming stateful pod at index 0 is not recreated.")
-			sst.confirmStatefulPodCount(1, ss, 10*time.Second)
+			By("Confirming stateful pod at index 0 is recreated.")
+			sst.waitForRunningAndReady(2, ss)
 
 			By("Deleting unhealthy stateful pod at index 1.")
 			sst.deleteStatefulPodAtIndex(1, ss)
@@ -937,10 +934,10 @@ func (s *statefulSetTester) setHealthy(ss *apps.StatefulSet) {
 			framework.Failf("Found multiple non-healthy stateful pods: %v and %v", pod.Name, markedHealthyPod)
 		}
 		p, err := framework.UpdatePodWithRetries(s.c, pod.Namespace, pod.Name, func(update *v1.Pod) {
-			update.Annotations[statefulset.StatefulSetInitAnnotation] = "true"
+			update.Annotations[apps.StatefulSetInitAnnotation] = "true"
 		})
 		framework.ExpectNoError(err)
-		framework.Logf("Set annotation %v to %v on pod %v", statefulset.StatefulSetInitAnnotation, p.Annotations[statefulset.StatefulSetInitAnnotation], pod.Name)
+		framework.Logf("Set annotation %v to %v on pod %v", apps.StatefulSetInitAnnotation, p.Annotations[apps.StatefulSetInitAnnotation], pod.Name)
 		markedHealthyPod = pod.Name
 	}
 }
@@ -1016,7 +1013,7 @@ func deleteAllStatefulSets(c clientset.Interface, ns string) {
 		return true, nil
 	})
 	if pvcPollErr != nil {
-		errList = append(errList, fmt.Sprintf("Timeout waiting for pvc deletion."))
+		errList = append(errList, "Timeout waiting for pvc deletion.")
 	}
 
 	pollErr := wait.PollImmediate(statefulsetPoll, statefulsetTimeout, func() (bool, error) {
@@ -1038,7 +1035,7 @@ func deleteAllStatefulSets(c clientset.Interface, ns string) {
 		return false, nil
 	})
 	if pollErr != nil {
-		errList = append(errList, fmt.Sprintf("Timeout waiting for pv provisioner to delete pvs, this might mean the test leaked pvs."))
+		errList = append(errList, "Timeout waiting for pv provisioner to delete pvs, this might mean the test leaked pvs.")
 	}
 	if len(errList) != 0 {
 		framework.ExpectNoError(fmt.Errorf("%v", strings.Join(errList, "\n")))
@@ -1063,7 +1060,7 @@ func pollReadWithTimeout(statefulPod statefulPodTester, statefulPodNumber int, k
 }
 
 func isInitialized(pod v1.Pod) bool {
-	initialized, ok := pod.Annotations[statefulset.StatefulSetInitAnnotation]
+	initialized, ok := pod.Annotations[apps.StatefulSetInitAnnotation]
 	if !ok {
 		return false
 	}
@@ -1072,10 +1069,6 @@ func isInitialized(pod v1.Pod) bool {
 		framework.Failf("Couldn't parse statefulset init annotations %v", initialized)
 	}
 	return inited
-}
-
-func dec(i int64, exponent int) *inf.Dec {
-	return inf.NewDec(i, inf.Scale(-exponent))
 }
 
 func newPVC(name string) v1.PersistentVolumeClaim {
