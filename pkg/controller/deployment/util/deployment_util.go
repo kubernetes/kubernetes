@@ -867,8 +867,13 @@ func DeploymentTimedOut(deployment *extensions.Deployment, newStatus *extensions
 	// progress or tried to create a replica set, or resumed a paused deployment and
 	// compare against progressDeadlineSeconds.
 	from := condition.LastUpdateTime
+	now := nowFn()
 	delta := time.Duration(*deployment.Spec.ProgressDeadlineSeconds) * time.Second
-	return from.Add(delta).Before(nowFn())
+	timedOut := from.Add(delta).Before(now)
+
+	// TODO: Switch to a much higher verbosity level
+	glog.V(2).Infof("Deployment %q timed out (%t) [last progress check: %v - now: %v]", deployment.Name, timedOut, from, now)
+	return timedOut
 }
 
 // NewRSNewReplicas calculates the number of replicas a deployment's new RS should have.
