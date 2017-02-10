@@ -99,6 +99,7 @@ func NewNodeControllerFromClient(
 		serviceCIDR,
 		nodeCIDRMaskSize,
 		allocateNodeCIDRs,
+		false,
 	)
 	if err != nil {
 		return nil, err
