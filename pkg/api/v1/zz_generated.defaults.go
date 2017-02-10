@@ -190,6 +190,26 @@ func SetObjectDefaults_Pod(in *Pod) {
 		if a.VolumeSource.AzureDisk != nil {
 			SetDefaults_AzureDiskVolumeSource(a.VolumeSource.AzureDisk)
 		}
+		if a.VolumeSource.Projected != nil {
+			for j := range a.VolumeSource.Projected.Sources {
+				b := &a.VolumeSource.Projected.Sources[j]
+				if b.Secret != nil {
+					SetDefaults_SecretVolumeSource(b.Secret)
+				}
+				if b.DownwardAPI != nil {
+					SetDefaults_DownwardAPIVolumeSource(b.DownwardAPI)
+					for k := range b.DownwardAPI.Items {
+						c := &b.DownwardAPI.Items[k]
+						if c.FieldRef != nil {
+							SetDefaults_ObjectFieldSelector(c.FieldRef)
+						}
+					}
+				}
+				if b.ConfigMap != nil {
+					SetDefaults_ConfigMapVolumeSource(b.ConfigMap)
+				}
+			}
+		}
 	}
 	for i := range in.Spec.InitContainers {
 		a := &in.Spec.InitContainers[i]
@@ -321,6 +341,26 @@ func SetObjectDefaults_PodTemplate(in *PodTemplate) {
 		if a.VolumeSource.AzureDisk != nil {
 			SetDefaults_AzureDiskVolumeSource(a.VolumeSource.AzureDisk)
 		}
+		if a.VolumeSource.Projected != nil {
+			for j := range a.VolumeSource.Projected.Sources {
+				b := &a.VolumeSource.Projected.Sources[j]
+				if b.Secret != nil {
+					SetDefaults_SecretVolumeSource(b.Secret)
+				}
+				if b.DownwardAPI != nil {
+					SetDefaults_DownwardAPIVolumeSource(b.DownwardAPI)
+					for k := range b.DownwardAPI.Items {
+						c := &b.DownwardAPI.Items[k]
+						if c.FieldRef != nil {
+							SetDefaults_ObjectFieldSelector(c.FieldRef)
+						}
+					}
+				}
+				if b.ConfigMap != nil {
+					SetDefaults_ConfigMapVolumeSource(b.ConfigMap)
+				}
+			}
+		}
 	}
 	for i := range in.Template.Spec.InitContainers {
 		a := &in.Template.Spec.InitContainers[i]
@@ -445,6 +485,26 @@ func SetObjectDefaults_ReplicationController(in *ReplicationController) {
 			}
 			if a.VolumeSource.AzureDisk != nil {
 				SetDefaults_AzureDiskVolumeSource(a.VolumeSource.AzureDisk)
+			}
+			if a.VolumeSource.Projected != nil {
+				for j := range a.VolumeSource.Projected.Sources {
+					b := &a.VolumeSource.Projected.Sources[j]
+					if b.Secret != nil {
+						SetDefaults_SecretVolumeSource(b.Secret)
+					}
+					if b.DownwardAPI != nil {
+						SetDefaults_DownwardAPIVolumeSource(b.DownwardAPI)
+						for k := range b.DownwardAPI.Items {
+							c := &b.DownwardAPI.Items[k]
+							if c.FieldRef != nil {
+								SetDefaults_ObjectFieldSelector(c.FieldRef)
+							}
+						}
+					}
+					if b.ConfigMap != nil {
+						SetDefaults_ConfigMapVolumeSource(b.ConfigMap)
+					}
+				}
 			}
 		}
 		for i := range in.Spec.Template.Spec.InitContainers {

@@ -2798,6 +2798,12 @@ message Probe {
   optional int32 failureThreshold = 6;
 }
 
+message Projections {
+  repeated VolumeProjection sources = 1;
+
+  optional int32 defaultMode = 2;
+}
+
 // Represents a Quobyte mount that lasts the lifetime of a pod.
 // Quobyte volumes do not support ownership management or SELinux relabeling.
 message QuobyteVolumeSource {
@@ -3184,6 +3190,10 @@ message SecretVolumeSource {
   // More info: http://kubernetes.io/docs/user-guide/volumes#secrets
   // +optional
   optional string secretName = 1;
+
+  // same as above, just matches configmap naming for consistency
+  // +optional
+  optional LocalObjectReference name = 5;
 
   // If unspecified, each key-value pair in the Data field of the referenced
   // Secret will be projected into the volume as a file whose name is the
@@ -3577,6 +3587,14 @@ message VolumeMount {
   optional string subPath = 4;
 }
 
+message VolumeProjection {
+  optional SecretVolumeSource secret = 1;
+
+  optional DownwardAPIVolumeSource downwardAPI = 2;
+
+  optional ConfigMapVolumeSource configMap = 3;
+}
+
 // Represents the source of a volume to mount.
 // Only one of its members may be specified.
 message VolumeSource {
@@ -3693,6 +3711,9 @@ message VolumeSource {
 
   // PhotonPersistentDisk represents a PhotonController persistent disk attached and mounted on kubelets host machine
   optional PhotonPersistentDiskVolumeSource photonPersistentDisk = 23;
+
+  // Items for all in one resources secrets, configmaps, and downward API
+  optional Projections projected = 24;
 }
 
 // Represents a vSphere volume resource.

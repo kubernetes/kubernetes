@@ -279,6 +279,8 @@ func RegisterConversions(scheme *runtime.Scheme) error {
 		Convert_api_PreferredSchedulingTerm_To_v1_PreferredSchedulingTerm,
 		Convert_v1_Probe_To_api_Probe,
 		Convert_api_Probe_To_v1_Probe,
+		Convert_v1_Projections_To_api_Projections,
+		Convert_api_Projections_To_v1_Projections,
 		Convert_v1_QuobyteVolumeSource_To_api_QuobyteVolumeSource,
 		Convert_api_QuobyteVolumeSource_To_v1_QuobyteVolumeSource,
 		Convert_v1_RBDVolumeSource_To_api_RBDVolumeSource,
@@ -351,6 +353,8 @@ func RegisterConversions(scheme *runtime.Scheme) error {
 		Convert_api_Volume_To_v1_Volume,
 		Convert_v1_VolumeMount_To_api_VolumeMount,
 		Convert_api_VolumeMount_To_v1_VolumeMount,
+		Convert_v1_VolumeProjection_To_api_VolumeProjection,
+		Convert_api_VolumeProjection_To_v1_VolumeProjection,
 		Convert_v1_VolumeSource_To_api_VolumeSource,
 		Convert_api_VolumeSource_To_v1_VolumeSource,
 		Convert_v1_VsphereVirtualDiskVolumeSource_To_api_VsphereVirtualDiskVolumeSource,
@@ -3377,6 +3381,26 @@ func Convert_api_Probe_To_v1_Probe(in *api.Probe, out *Probe, s conversion.Scope
 	return autoConvert_api_Probe_To_v1_Probe(in, out, s)
 }
 
+func autoConvert_v1_Projections_To_api_Projections(in *Projections, out *api.Projections, s conversion.Scope) error {
+	out.Sources = *(*[]api.VolumeProjection)(unsafe.Pointer(&in.Sources))
+	out.DefaultMode = (*int32)(unsafe.Pointer(in.DefaultMode))
+	return nil
+}
+
+func Convert_v1_Projections_To_api_Projections(in *Projections, out *api.Projections, s conversion.Scope) error {
+	return autoConvert_v1_Projections_To_api_Projections(in, out, s)
+}
+
+func autoConvert_api_Projections_To_v1_Projections(in *api.Projections, out *Projections, s conversion.Scope) error {
+	out.Sources = *(*[]VolumeProjection)(unsafe.Pointer(&in.Sources))
+	out.DefaultMode = (*int32)(unsafe.Pointer(in.DefaultMode))
+	return nil
+}
+
+func Convert_api_Projections_To_v1_Projections(in *api.Projections, out *Projections, s conversion.Scope) error {
+	return autoConvert_api_Projections_To_v1_Projections(in, out, s)
+}
+
 func autoConvert_v1_QuobyteVolumeSource_To_api_QuobyteVolumeSource(in *QuobyteVolumeSource, out *api.QuobyteVolumeSource, s conversion.Scope) error {
 	out.Registry = in.Registry
 	out.Volume = in.Volume
@@ -3884,6 +3908,9 @@ func Convert_api_SecretList_To_v1_SecretList(in *api.SecretList, out *SecretList
 
 func autoConvert_v1_SecretVolumeSource_To_api_SecretVolumeSource(in *SecretVolumeSource, out *api.SecretVolumeSource, s conversion.Scope) error {
 	out.SecretName = in.SecretName
+	if err := Convert_v1_LocalObjectReference_To_api_LocalObjectReference(&in.LocalObjectReference, &out.LocalObjectReference, s); err != nil {
+		return err
+	}
 	out.Items = *(*[]api.KeyToPath)(unsafe.Pointer(&in.Items))
 	out.DefaultMode = (*int32)(unsafe.Pointer(in.DefaultMode))
 	out.Optional = (*bool)(unsafe.Pointer(in.Optional))
@@ -3896,6 +3923,9 @@ func Convert_v1_SecretVolumeSource_To_api_SecretVolumeSource(in *SecretVolumeSou
 
 func autoConvert_api_SecretVolumeSource_To_v1_SecretVolumeSource(in *api.SecretVolumeSource, out *SecretVolumeSource, s conversion.Scope) error {
 	out.SecretName = in.SecretName
+	if err := Convert_api_LocalObjectReference_To_v1_LocalObjectReference(&in.LocalObjectReference, &out.LocalObjectReference, s); err != nil {
+		return err
+	}
 	out.Items = *(*[]KeyToPath)(unsafe.Pointer(&in.Items))
 	out.DefaultMode = (*int32)(unsafe.Pointer(in.DefaultMode))
 	out.Optional = (*bool)(unsafe.Pointer(in.Optional))
@@ -4297,6 +4327,28 @@ func Convert_api_VolumeMount_To_v1_VolumeMount(in *api.VolumeMount, out *VolumeM
 	return autoConvert_api_VolumeMount_To_v1_VolumeMount(in, out, s)
 }
 
+func autoConvert_v1_VolumeProjection_To_api_VolumeProjection(in *VolumeProjection, out *api.VolumeProjection, s conversion.Scope) error {
+	out.Secret = (*api.SecretVolumeSource)(unsafe.Pointer(in.Secret))
+	out.DownwardAPI = (*api.DownwardAPIVolumeSource)(unsafe.Pointer(in.DownwardAPI))
+	out.ConfigMap = (*api.ConfigMapVolumeSource)(unsafe.Pointer(in.ConfigMap))
+	return nil
+}
+
+func Convert_v1_VolumeProjection_To_api_VolumeProjection(in *VolumeProjection, out *api.VolumeProjection, s conversion.Scope) error {
+	return autoConvert_v1_VolumeProjection_To_api_VolumeProjection(in, out, s)
+}
+
+func autoConvert_api_VolumeProjection_To_v1_VolumeProjection(in *api.VolumeProjection, out *VolumeProjection, s conversion.Scope) error {
+	out.Secret = (*SecretVolumeSource)(unsafe.Pointer(in.Secret))
+	out.DownwardAPI = (*DownwardAPIVolumeSource)(unsafe.Pointer(in.DownwardAPI))
+	out.ConfigMap = (*ConfigMapVolumeSource)(unsafe.Pointer(in.ConfigMap))
+	return nil
+}
+
+func Convert_api_VolumeProjection_To_v1_VolumeProjection(in *api.VolumeProjection, out *VolumeProjection, s conversion.Scope) error {
+	return autoConvert_api_VolumeProjection_To_v1_VolumeProjection(in, out, s)
+}
+
 func autoConvert_v1_VolumeSource_To_api_VolumeSource(in *VolumeSource, out *api.VolumeSource, s conversion.Scope) error {
 	out.HostPath = (*api.HostPathVolumeSource)(unsafe.Pointer(in.HostPath))
 	out.EmptyDir = (*api.EmptyDirVolumeSource)(unsafe.Pointer(in.EmptyDir))
@@ -4321,6 +4373,7 @@ func autoConvert_v1_VolumeSource_To_api_VolumeSource(in *VolumeSource, out *api.
 	out.Quobyte = (*api.QuobyteVolumeSource)(unsafe.Pointer(in.Quobyte))
 	out.AzureDisk = (*api.AzureDiskVolumeSource)(unsafe.Pointer(in.AzureDisk))
 	out.PhotonPersistentDisk = (*api.PhotonPersistentDiskVolumeSource)(unsafe.Pointer(in.PhotonPersistentDisk))
+	out.Projected = (*api.Projections)(unsafe.Pointer(in.Projected))
 	return nil
 }
 
@@ -4352,6 +4405,7 @@ func autoConvert_api_VolumeSource_To_v1_VolumeSource(in *api.VolumeSource, out *
 	out.VsphereVolume = (*VsphereVirtualDiskVolumeSource)(unsafe.Pointer(in.VsphereVolume))
 	out.AzureDisk = (*AzureDiskVolumeSource)(unsafe.Pointer(in.AzureDisk))
 	out.PhotonPersistentDisk = (*PhotonPersistentDiskVolumeSource)(unsafe.Pointer(in.PhotonPersistentDisk))
+	out.Projected = (*Projections)(unsafe.Pointer(in.Projected))
 	return nil
 }
 

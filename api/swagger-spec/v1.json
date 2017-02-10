@@ -18404,6 +18404,10 @@
      "photonPersistentDisk": {
       "$ref": "v1.PhotonPersistentDiskVolumeSource",
       "description": "PhotonPersistentDisk represents a PhotonController persistent disk attached and mounted on kubelets host machine"
+     },
+     "projected": {
+      "$ref": "v1.Projections",
+      "description": "Items for all in one resources secrets, configmaps, and downward API"
      }
     }
    },
@@ -18445,6 +18449,10 @@
      "secretName": {
       "type": "string",
       "description": "Name of the secret in the pod's namespace to use. More info: http://kubernetes.io/docs/user-guide/volumes#secrets"
+     },
+     "name": {
+      "$ref": "v1.LocalObjectReference",
+      "description": "same as above, just matches configmap naming for consistency"
      },
      "items": {
       "type": "array",
@@ -18609,6 +18617,38 @@
      "optional": {
       "type": "boolean",
       "description": "Specify whether the ConfigMap or it's keys must be defined"
+     }
+    }
+   },
+   "v1.Projections": {
+    "id": "v1.Projections",
+    "required": [
+     "sources"
+    ],
+    "properties": {
+     "sources": {
+      "type": "array",
+      "items": {
+       "$ref": "v1.VolumeProjection"
+      }
+     },
+     "defaultMode": {
+      "type": "integer",
+      "format": "int32"
+     }
+    }
+   },
+   "v1.VolumeProjection": {
+    "id": "v1.VolumeProjection",
+    "properties": {
+     "secret": {
+      "$ref": "v1.SecretVolumeSource"
+     },
+     "downwardAPI": {
+      "$ref": "v1.DownwardAPIVolumeSource"
+     },
+     "configMap": {
+      "$ref": "v1.ConfigMapVolumeSource"
      }
     }
    },

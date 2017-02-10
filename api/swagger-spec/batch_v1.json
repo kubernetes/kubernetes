@@ -1474,6 +1474,10 @@
      "photonPersistentDisk": {
       "$ref": "v1.PhotonPersistentDiskVolumeSource",
       "description": "PhotonPersistentDisk represents a PhotonController persistent disk attached and mounted on kubelets host machine"
+     },
+     "projected": {
+      "$ref": "v1.Projections",
+      "description": "Items for all in one resources secrets, configmaps, and downward API"
      }
     }
    },
@@ -1581,6 +1585,10 @@
       "type": "string",
       "description": "Name of the secret in the pod's namespace to use. More info: http://kubernetes.io/docs/user-guide/volumes#secrets"
      },
+     "name": {
+      "$ref": "v1.LocalObjectReference",
+      "description": "same as above, just matches configmap naming for consistency"
+     },
      "items": {
       "type": "array",
       "items": {
@@ -1596,6 +1604,16 @@
      "optional": {
       "type": "boolean",
       "description": "Specify whether the Secret or it's keys must be defined"
+     }
+    }
+   },
+   "v1.LocalObjectReference": {
+    "id": "v1.LocalObjectReference",
+    "description": "LocalObjectReference contains enough information to let you locate the referenced object inside the same namespace.",
+    "properties": {
+     "name": {
+      "type": "string",
+      "description": "Name of the referent. More info: http://kubernetes.io/docs/user-guide/identifiers#names"
      }
     }
    },
@@ -1761,16 +1779,6 @@
      "readOnly": {
       "type": "boolean",
       "description": "ReadOnly here will force the ReadOnly setting in VolumeMounts. Defaults to false. More info: http://releases.k8s.io/HEAD/examples/volumes/rbd/README.md#how-to-use-it"
-     }
-    }
-   },
-   "v1.LocalObjectReference": {
-    "id": "v1.LocalObjectReference",
-    "description": "LocalObjectReference contains enough information to let you locate the referenced object inside the same namespace.",
-    "properties": {
-     "name": {
-      "type": "string",
-      "description": "Name of the referent. More info: http://kubernetes.io/docs/user-guide/identifiers#names"
      }
     }
    },
@@ -2129,6 +2137,38 @@
      "fsType": {
       "type": "string",
       "description": "Filesystem type to mount. Must be a filesystem type supported by the host operating system. Ex. \"ext4\", \"xfs\", \"ntfs\". Implicitly inferred to be \"ext4\" if unspecified."
+     }
+    }
+   },
+   "v1.Projections": {
+    "id": "v1.Projections",
+    "required": [
+     "sources"
+    ],
+    "properties": {
+     "sources": {
+      "type": "array",
+      "items": {
+       "$ref": "v1.VolumeProjection"
+      }
+     },
+     "defaultMode": {
+      "type": "integer",
+      "format": "int32"
+     }
+    }
+   },
+   "v1.VolumeProjection": {
+    "id": "v1.VolumeProjection",
+    "properties": {
+     "secret": {
+      "$ref": "v1.SecretVolumeSource"
+     },
+     "downwardAPI": {
+      "$ref": "v1.DownwardAPIVolumeSource"
+     },
+     "configMap": {
+      "$ref": "v1.ConfigMapVolumeSource"
      }
     }
    },
