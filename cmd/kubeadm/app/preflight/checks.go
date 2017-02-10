@@ -239,18 +239,19 @@ type HostnameCheck struct{}
 
 func (hc HostnameCheck) Check() (warnings, errors []error) {
 	errors = []error{}
+	warnings = []error{}
 	hostname := node.GetHostname("")
 	for _, msg := range validation.ValidateNodeName(hostname, false) {
 		errors = append(errors, fmt.Errorf("hostname \"%s\" %s", hostname, msg))
 	}
 	addr, err := net.LookupHost(hostname)
 	if addr == nil {
-		errors = append(errors, fmt.Errorf("hostname \"%s\" could not be reached", hostname))
+		warnings = append(warnings, fmt.Errorf("hostname \"%s\" could not be reached", hostname))
 	}
 	if err != nil {
-		errors = append(errors, fmt.Errorf("hostname \"%s\" %s", hostname, err))
+		warnings = append(warnings, fmt.Errorf("hostname \"%s\" %s", hostname, err))
 	}
-	return nil, errors
+	return warnings, errors
 }
 
 // HTTPProxyCheck checks if https connection to specific host is going
