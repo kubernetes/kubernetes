@@ -19,6 +19,7 @@ package cmd
 import (
 	"fmt"
 	"io"
+	"io/ioutil"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -37,11 +38,12 @@ import (
 // NewCmdReset returns the "kubeadm reset" command
 func NewCmdReset(out io.Writer) *cobra.Command {
 	var skipPreFlight, removeNode bool
+	var kubeConfig string
 	cmd := &cobra.Command{
 		Use:   "reset",
 		Short: "Run this to revert any changes made to this host by 'kubeadm init' or 'kubeadm join'.",
 		Run: func(cmd *cobra.Command, args []string) {
-			r, err := NewReset(skipPreFlight, removeNode)
+			r, err := NewReset(skipPreFlight, removeNode, kubeConfig)
 			kubeadmutil.CheckErr(err)
 			kubeadmutil.CheckErr(r.Run(out))
 		},
@@ -57,14 +59,20 @@ func NewCmdReset(out io.Writer) *cobra.Command {
 		"Remove this node from the pool of nodes in this cluster",
 	)
 
+	cmd.PersistentFlags().StringVar(
+		&kubeConfig, "kubeconfig", "",
+		"Path to the kubeconfig file to use for CLI requests",
+	)
+
 	return cmd
 }
 
 type Reset struct {
 	removeNode bool
+	kubeConfig string
 }
 
-func NewReset(skipPreFlight, removeNode bool) (*Reset, error) {
+func NewReset(skipPreFlight, removeNode bool, kubeConfig string) (*Reset, error) {
 	if !skipPreFlight {
 		fmt.Println("[preflight] Running pre-flight checks")
 
@@ -77,6 +85,7 @@ func NewReset(skipPreFlight, removeNode bool) (*Reset, error) {
 
 	return &Reset{
 		removeNode: removeNode,
+		kubeConfig: kubeConfig,
 	}, nil
 }
 
@@ -84,7 +93,7 @@ func NewReset(skipPreFlight, removeNode bool) (*Reset, error) {
 func (r *Reset) Run(out io.Writer) error {
 
 	// Try to drain and remove the node from the cluster
-	err := drainAndRemoveNode(r.removeNode)
+	err := drainAndRemoveNode(r.removeNode, r.kubeConfig)
 	if err != nil {
 		fmt.Printf("[reset] Failed to cleanup node: [%v]\n", err)
 	}
@@ -143,17 +152,25 @@ func (r *Reset) Run(out io.Writer) error {
 	return nil
 }
 
-func drainAndRemoveNode(removeNode bool) error {
+func drainAndRemoveNode(removeNode bool, kubeConfig string) error {
 	hostname, err := os.Hostname()
 	if err != nil {
 		return fmt.Errorf("failed to detect node hostname")
 	}
 	hostname = strings.ToLower(hostname)
 
-	// TODO: Use the "native" k8s client for this once we're confident the versioned is working
-	kubeConfigPath := filepath.Join(kubeadmapi.GlobalEnvParams.KubernetesDir, kubeconfig.KubeletKubeConfigFileName)
+	var kubeConfigOption string
+	if len(kubeConfig) == 0 {
+		// TODO: Use the "native" k8s client for this once we're confident the versioned is working
+		kubeConfigPath := filepath.Join(kubeadmapi.GlobalEnvParams.KubernetesDir, kubeconfig.AdminKubeConfigFileName)
+		if _, err = ioutil.ReadFile(kubeConfigPath); err == nil {
+			kubeConfigOption = "--kubeconfig=" + kubeConfigPath
+		}
+	} else {
+		kubeConfigOption = "--kubeconfig=" + kubeConfig
+	}
 
-	getNodesCmd := fmt.Sprintf("kubectl --kubeconfig %s get nodes | grep %s", kubeConfigPath, hostname)
+	getNodesCmd := fmt.Sprintf("kubectl %s get nodes | grep %s", kubeConfigOption, hostname)
 	output, err := exec.Command("sh", "-c", getNodesCmd).Output()
 	if err != nil {
 		// kubeadm shouldn't drain and/or remove the node when it doesn't exist anymore
@@ -165,14 +182,23 @@ func drainAndRemoveNode(removeNode bool) error {
 
 	fmt.Printf("[reset] Draining node: %q\n", hostname)
 
-	_, err = exec.Command("kubectl", "--kubeconfig", kubeConfigPath, "drain", hostname, "--delete-local-data", "--force", "--ignore-daemonsets").Output()
+	var drainArg = []string{"drain", hostname, "--delete-local-data", "--force", "--ignore-daemonsets"}
+	if len(kubeConfigOption) > 0 {
+		drainArg = append(drainArg, kubeConfigOption)
+	}
+	output, err = exec.Command("kubectl", drainArg...).Output()
 	if err != nil {
 		return fmt.Errorf("failed to drain node %q: %v", hostname, err)
 	}
 
 	if removeNode {
 		fmt.Printf("[reset] Removing node: %q\n", hostname)
-		_, err = exec.Command("kubectl", "--kubeconfig", kubeConfigPath, "delete", "node", hostname).Output()
+
+		var deleteArg = []string{"delete", "node", hostname}
+		if len(kubeConfigOption) > 0 {
+			deleteArg = append(deleteArg, kubeConfigOption)
+		}
+		output, err = exec.Command("kubectl", deleteArg...).Output()
 		if err != nil {
 			return fmt.Errorf("failed to remove node %q: %v", hostname, err)
 		}
