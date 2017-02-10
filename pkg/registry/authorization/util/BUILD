@@ -20,3 +20,15 @@ go_library(
         "//pkg/auth/user:go_default_library",
     ],
 )
+
+go_test(
+    name = "go_default_test",
+    srcs = ["helpers_test.go"],
+    library = ":go_default_library",
+    tags = ["automanaged"],
+    deps = [
+        "//pkg/apis/authorization:go_default_library",
+        "//pkg/auth/authorizer:go_default_library",
+        "//pkg/util/sets:go_default_library",
+    ],
+)
