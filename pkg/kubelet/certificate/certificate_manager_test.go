@@ -85,7 +85,7 @@ func TestNewManagerNoRotation(t *testing.T) {
 	}
 
 	store := &fakeStore{cert: &cert}
-	if _, err := NewManager(nil, "node-name", store, false); err != nil {
+	if _, err := NewManager(nil, "node-name", store, 0); err != nil {
 		t.Fatalf("Failed to initialize the certificate manager: %v", err)
 	}
 }

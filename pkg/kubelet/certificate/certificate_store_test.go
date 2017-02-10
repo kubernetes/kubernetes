@@ -390,7 +390,7 @@ func TestUpdateWithBadCertKeyData(t *testing.T) {
 		t.Fatalf("Got no error while updating certificate store with invalid data.")
 	}
 	if cert != nil {
-		t.Fatalf("Got %v certificate returned from the update, expected nil.")
+		t.Fatalf("Got %v certificate returned from the update, expected nil.", cert)
 	}
 }
 
