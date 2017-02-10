@@ -23,6 +23,7 @@ api-server-advertise-address
 api-server-service-type
 api-token
 api-version
+apiserver-arg-overrides
 apiserver-count
 apiserver-count
 audit-log-maxage
@@ -114,6 +115,7 @@ container-runtime
 container-runtime-endpoint
 contain-pod-resources
 contention-profiling
+controllermanager-arg-overrides
 controller-start-interval
 cors-allowed-origins
 cpu-cfs-quota

@@ -54,6 +54,7 @@ go_test(
         "//vendor:k8s.io/apimachinery/pkg/api/resource",
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
         "//vendor:k8s.io/apimachinery/pkg/util/diff",
+        "//vendor:k8s.io/apimachinery/pkg/util/sets",
         "//vendor:k8s.io/client-go/dynamic",
         "//vendor:k8s.io/client-go/rest/fake",
         "//vendor:k8s.io/client-go/tools/clientcmd",
