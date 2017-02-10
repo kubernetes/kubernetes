@@ -174,6 +174,8 @@ go_library(
         "//vendor:github.com/onsi/ginkgo/reporters",
         "//vendor:github.com/onsi/gomega",
         "//vendor:github.com/stretchr/testify/assert",
+        "//vendor:github.com/vmware/govmomi/find",
+        "//vendor:github.com/vmware/govmomi/vim25/types",
         "//vendor:golang.org/x/crypto/ssh",
         "//vendor:golang.org/x/net/websocket",
         "//vendor:google.golang.org/api/compute/v1",
