@@ -17,6 +17,7 @@ limitations under the License.
 package e2e
 
 import (
+	"fmt"
 	"time"
 
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -126,36 +127,54 @@ var _ = framework.KubeDescribe("Dynamic provisioning", func() {
 			testDynamicProvisioning(c, claim)
 		})
 
-		It("should test that deleting a claim before the volume is provisioned deletes the volume. [Slow][Volume]", func() {
+		It("should test that deleting a claim before the volume is provisioned deletes the volume. [Volume]", func() {
 			// This case tests for the regressions of a bug fixed by PR #21268
 			// REGRESSION: Deleting the PVC before the PV is provisioned can result in PV
 			// not being deleted
+
+			// Given the small race window, attempt to produce it iteratively
+			var raceAttempts int = 100
+
 			By("creating a StorageClass")
 			class := newStorageClass()
-			_, err := c.Storage().StorageClasses().Create(class)
+			class.Name = ns + "-sc" // pseudo-random Storage Class name
+			class, err := c.Storage().StorageClasses().Create(class)
 			defer c.Storage().StorageClasses().Delete(class.Name, nil)
 			Expect(err).NotTo(HaveOccurred())
 
-			By("creating the claim")
-			claim := newClaim(ns, false)
-			claim, err = c.Core().PersistentVolumeClaims(ns).Create(claim)
-			Expect(err).NotTo(HaveOccurred())
+			By(fmt.Sprintf("Creating and deleting PersistentVolumeClaims for %d iterations", raceAttempts))
+			for i := 0; i < raceAttempts; i++ {
+				claim := newClaim(ns, false)
+				claim.Annotations[storageutil.StorageClassAnnotation] = class.Name
+				claim, err = c.Core().PersistentVolumeClaims(ns).Create(claim)
+				Expect(err).NotTo(HaveOccurred())
+				err = c.Core().PersistentVolumeClaims(ns).Delete(claim.Name, nil)
+				Expect(err).NotTo(HaveOccurred())
+			}
 
-			// The provisioner uses a deterministic convention of "pvc-" + the claim UID for volume names.
-			// In order to reproduce the regression, the PVC cannot be allowed to bind which prevents
-			// getting the volume name directly.
-			pv := "pvc-" + string(claim.UID)
-			// In case of a regression, manually delete the volume
-			defer c.Core().PersistentVolumes().Delete(pv, nil)
-
-			By("deleting the claim")
-			err = c.Core().PersistentVolumeClaims(ns).Delete(claim.Name, nil)
-			Expect(err).NotTo(HaveOccurred())
-
-			By("waiting for the PV to delete")
-			// Regression: the PV is not released & deleted.
-			err = framework.WaitForPersistentVolumeDeleted(c, pv, 1*time.Second, 60*time.Second)
-			Expect(err).NotTo(HaveOccurred())
+			By(fmt.Sprintf("Checking for residual PVs associated with StorageClass %s", class.Name))
+			clusterPVs, err := c.Core().PersistentVolumes().List(metav1.ListOptions{})
+			regressedPVs := make([]v1.PersistentVolume, 0)
+			for _, pv := range clusterPVs.Items {
+				if storageutil.HasStorageClassAnnotation(pv.ObjectMeta) &&
+					pv.Annotations[storageutil.StorageClassAnnotation] == class.Name &&
+					pv.Status.Phase != v1.VolumeReleased {
+					// Any PVs associated with this storage class that are not Released
+					// indicate a regression
+					regressedPVs = append(regressedPVs, pv)
+				}
+			}
+			// Cleanup associated pv and disk
+			defer func() {
+				for _, pv := range regressedPVs {
+					deletePDWithRetry(pv.Spec.PersistentVolumeSource.GCEPersistentDisk.PDName)
+					deletePersistentVolume(c, pv.Name)
+				}
+			}()
+			// If a regression is detected, fail the test
+			if len(regressedPVs) > 0 {
+				framework.Failf("Found %d residual persistent volumes associated with StorageClass %s", len(regressedPVs), class.Name)
+			}
 		})
 	})
 
