@@ -55,7 +55,7 @@ func (hk *HyperKube) AddServer(s *Server) {
 // FindServer will find a specific server named name.
 func (hk *HyperKube) FindServer(name string) (*Server, error) {
 	for _, s := range hk.servers {
-		if s.Name() == name {
+		if s.Name() == name || s.AlternativeName == name {
 			return &s, nil
 		}
 	}
