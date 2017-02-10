@@ -27,7 +27,6 @@ import (
 	"github.com/spf13/cobra"
 
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
-	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/kubeconfig"
 	"k8s.io/kubernetes/cmd/kubeadm/app/preflight"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
@@ -224,7 +223,6 @@ func resetConfigDir(configPathDir, pkiPathDir string) {
 	filesToClean := []string{
 		filepath.Join(configPathDir, kubeconfig.AdminKubeConfigFileName),
 		filepath.Join(configPathDir, kubeconfig.KubeletKubeConfigFileName),
-		filepath.Join(configPathDir, kubeadmconstants.CACertName),
 	}
 	fmt.Printf("[reset] Deleting files: %v\n", filesToClean)
 	for _, path := range filesToClean {

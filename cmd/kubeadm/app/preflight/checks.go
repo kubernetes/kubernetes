@@ -361,7 +361,7 @@ func RunJoinNodeChecks(cfg *kubeadmapi.NodeConfiguration) error {
 		PortOpenCheck{port: 10250},
 		DirAvailableCheck{Path: filepath.Join(kubeadmapi.GlobalEnvParams.KubernetesDir, "manifests")},
 		DirAvailableCheck{Path: "/var/lib/kubelet"},
-		FileAvailableCheck{Path: filepath.Join(kubeadmapi.GlobalEnvParams.KubernetesDir, kubeadmconstants.CACertName)},
+		FileAvailableCheck{Path: filepath.Join(kubeadmapi.GlobalEnvParams.HostPKIPath, kubeadmconstants.CACertName)},
 		FileAvailableCheck{Path: filepath.Join(kubeadmapi.GlobalEnvParams.KubernetesDir, kubeconfig.KubeletKubeConfigFileName)},
 		FileContentCheck{Path: bridgenf, Content: []byte{'1'}},
 		InPathCheck{executable: "ip", mandatory: true},
