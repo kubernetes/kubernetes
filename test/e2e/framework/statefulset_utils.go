@@ -38,7 +38,6 @@ import (
 	"k8s.io/kubernetes/pkg/api/v1"
 	apps "k8s.io/kubernetes/pkg/apis/apps/v1beta1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
-	"k8s.io/kubernetes/pkg/controller/statefulset"
 )
 
 const (
@@ -349,10 +348,10 @@ func (s *StatefulSetTester) SetHealthy(ss *apps.StatefulSet) {
 			Failf("Found multiple non-healthy stateful pods: %v and %v", pod.Name, markedHealthyPod)
 		}
 		p, err := UpdatePodWithRetries(s.c, pod.Namespace, pod.Name, func(update *v1.Pod) {
-			update.Annotations[statefulset.StatefulSetInitAnnotation] = "true"
+			update.Annotations[apps.StatefulSetInitAnnotation] = "true"
 		})
 		ExpectNoError(err)
-		Logf("Set annotation %v to %v on pod %v", statefulset.StatefulSetInitAnnotation, p.Annotations[statefulset.StatefulSetInitAnnotation], pod.Name)
+		Logf("Set annotation %v to %v on pod %v", apps.StatefulSetInitAnnotation, p.Annotations[apps.StatefulSetInitAnnotation], pod.Name)
 		markedHealthyPod = pod.Name
 	}
 }
@@ -462,7 +461,7 @@ func DeleteAllStatefulSets(c clientset.Interface, ns string) {
 
 // IsStatefulSetPodInitialized returns true if pod's StatefulSetInitAnnotation exists and is set to true.
 func IsStatefulSetPodInitialized(pod v1.Pod) bool {
-	initialized, ok := pod.Annotations[statefulset.StatefulSetInitAnnotation]
+	initialized, ok := pod.Annotations[apps.StatefulSetInitAnnotation]
 	if !ok {
 		return false
 	}
