@@ -15,6 +15,7 @@ go_library(
         "dns.go",
         "doc.go",
         "endpoint_helper.go",
+        "ingress.go",
         "service_helper.go",
         "servicecontroller.go",
     ],
@@ -37,6 +38,7 @@ go_library(
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
         "//vendor:k8s.io/apimachinery/pkg/conversion",
         "//vendor:k8s.io/apimachinery/pkg/runtime",
+        "//vendor:k8s.io/apimachinery/pkg/types",
         "//vendor:k8s.io/apimachinery/pkg/util/runtime",
         "//vendor:k8s.io/apimachinery/pkg/util/sets",
         "//vendor:k8s.io/apimachinery/pkg/util/wait",
@@ -45,6 +47,7 @@ go_library(
         "//vendor:k8s.io/client-go/rest",
         "//vendor:k8s.io/client-go/tools/cache",
         "//vendor:k8s.io/client-go/tools/record",
+        "//vendor:k8s.io/client-go/util/flowcontrol",
         "//vendor:k8s.io/client-go/util/workqueue",
     ],
 )
