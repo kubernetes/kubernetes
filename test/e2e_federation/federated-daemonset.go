@@ -190,7 +190,9 @@ func createDaemonSetOrFail(clientset *fedclientset.Clientset, namespace string) 
 func deleteDaemonSetOrFail(clientset *fedclientset.Clientset, nsName string, daemonsetName string, orphanDependents *bool) {
 	By(fmt.Sprintf("Deleting daemonset %q in namespace %q", daemonsetName, nsName))
 	err := clientset.Extensions().DaemonSets(nsName).Delete(daemonsetName, &metav1.DeleteOptions{OrphanDependents: orphanDependents})
-	framework.ExpectNoError(err, "Error deleting daemonset %q in namespace %q", daemonsetName, nsName)
+	if err != nil && !errors.IsNotFound(err) {
+		framework.ExpectNoError(err, "Error deleting daemonset %q in namespace %q", daemonsetName, nsName)
+	}
 
 	// Wait for the daemonset to be deleted.
 	err = wait.Poll(5*time.Second, wait.ForeverTestTimeout, func() (bool, error) {
