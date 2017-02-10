@@ -1114,12 +1114,11 @@ func BenchmarkGetPodControllerSingleNS(b *testing.B) {
 	}
 }
 
-// setupManagerWithGCEnabled creates a RC manager with a fakePodControl and with garbageCollectorEnabled set to true
+// setupManagerWithGCEnabled creates a RC manager with a fakePodControl
 func setupManagerWithGCEnabled(objs ...runtime.Object) (manager *ReplicationManager, fakePodControl *controller.FakePodControl, podInformer coreinformers.PodInformer, rcInformer coreinformers.ReplicationControllerInformer) {
 	c := fakeclientset.NewSimpleClientset(objs...)
 	fakePodControl = &controller.FakePodControl{}
 	manager, podInformer, rcInformer = NewReplicationManagerFromClient(c, BurstReplicas, 0)
-	manager.garbageCollectorEnabled = true
 	manager.podControl = fakePodControl
 	return manager, fakePodControl, podInformer, rcInformer
 }

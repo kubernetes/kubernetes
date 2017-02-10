@@ -60,7 +60,6 @@ func testNewReplicaSetControllerFromClient(client clientset.Interface, stopCh ch
 		client,
 		burstReplicas,
 		lookupCacheSize,
-		false,
 	)
 
 	ret.podListerSynced = alwaysReady
@@ -532,7 +531,6 @@ func TestWatchControllers(t *testing.T) {
 		client,
 		BurstReplicas,
 		0,
-		false,
 	)
 	informers.Start(stopCh)
 
@@ -1135,12 +1133,10 @@ func TestDeletionTimestamp(t *testing.T) {
 }
 
 // setupManagerWithGCEnabled creates a RS manager with a fakePodControl
-// and with garbageCollectorEnabled set to true
 func setupManagerWithGCEnabled(stopCh chan struct{}, objs ...runtime.Object) (manager *ReplicaSetController, fakePodControl *controller.FakePodControl, informers informers.SharedInformerFactory) {
 	c := fakeclientset.NewSimpleClientset(objs...)
 	fakePodControl = &controller.FakePodControl{}
 	manager, informers = testNewReplicaSetControllerFromClient(c, stopCh, BurstReplicas, 0)
-	manager.garbageCollectorEnabled = true
 
 	manager.podControl = fakePodControl
 	return manager, fakePodControl, informers

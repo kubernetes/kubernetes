@@ -60,7 +60,6 @@ func startReplicationController(ctx ControllerContext) (bool, error) {
 		ctx.ClientBuilder.ClientOrDie("replication-controller"),
 		replicationcontroller.BurstReplicas,
 		int(ctx.Options.LookupCacheSizeForRC),
-		ctx.Options.EnableGarbageCollector,
 	).Run(int(ctx.Options.ConcurrentRCSyncs), ctx.Stop)
 	return true, nil
 }
