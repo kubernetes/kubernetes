@@ -212,6 +212,7 @@ go_test(
     srcs = [
         "e2e_test.go",
         "metrics_grabber_test.go",
+        "taints_test.go",
     ],
     library = ":go_default_library",
     tags = [
@@ -219,12 +220,19 @@ go_test(
         "integration",
     ],
     deps = [
+        "//pkg/api/v1:go_default_library",
         "//pkg/client/clientset_generated/clientset:go_default_library",
         "//pkg/metrics:go_default_library",
         "//test/e2e/framework:go_default_library",
+        "//test/utils:go_default_library",
         "//vendor:github.com/onsi/ginkgo",
         "//vendor:github.com/onsi/gomega",
+        "//vendor:github.com/stretchr/testify/assert",
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
+        "//vendor:k8s.io/apimachinery/pkg/fields",
+        "//vendor:k8s.io/apimachinery/pkg/runtime",
+        "//vendor:k8s.io/apimachinery/pkg/watch",
+        "//vendor:k8s.io/client-go/tools/cache",
     ],
 )
 

@@ -401,6 +401,28 @@ func DeleteTaint(taints []Taint, taintToDelete *Taint) ([]Taint, bool) {
 	return newTaints, deleted
 }
 
+// Returns true and list of Tolerations matching all Taints if all are tolerated, or false otherwise.
+func GetMatchingTolerations(taints []Taint, tolerations []Toleration) (bool, []Toleration) {
+	if len(tolerations) == 0 && len(taints) > 0 {
+		return false, []Toleration{}
+	}
+	result := []Toleration{}
+	for i := range taints {
+		tolerated := false
+		for j := range tolerations {
+			if tolerations[j].ToleratesTaint(&taints[i]) {
+				result = append(result, tolerations[j])
+				tolerated = true
+				break
+			}
+		}
+		if !tolerated {
+			return false, []Toleration{}
+		}
+	}
+	return true, result
+}
+
 // MatchTaint checks if the taint matches taintToMatch. Taints are unique by key:effect,
 // if the two taints have same key:effect, regard as they match.
 func (t *Taint) MatchTaint(taintToMatch Taint) bool {
