@@ -446,12 +446,14 @@ items:
   - apiGroups:
     - ""
     resources:
+    - configmaps
     - namespaces
     - nodes
     - persistentvolumeclaims
     - persistentvolumes
     - pods
     - replicationcontrollers
+    - resourcequotas
     - secrets
     - serviceaccounts
     - services

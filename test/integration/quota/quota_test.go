@@ -94,7 +94,6 @@ func TestQuota(t *testing.T) {
 		false,
 	)
 	rm.SetEventRecorder(&record.FakeRecorder{})
-	informers.Start(controllerCh)
 	go rm.Run(3, controllerCh)
 
 	resourceQuotaRegistry := quotainstall.NewRegistry(clientset, nil)
@@ -103,13 +102,15 @@ func TestQuota(t *testing.T) {
 	}
 	resourceQuotaControllerOptions := &resourcequotacontroller.ResourceQuotaControllerOptions{
 		KubeClient:                clientset,
+		ResourceQuotaInformer:     informers.Core().V1().ResourceQuotas(),
 		ResyncPeriod:              controller.NoResyncPeriodFunc,
 		Registry:                  resourceQuotaRegistry,
 		GroupKindsToReplenish:     groupKindsToReplenish,
 		ReplenishmentResyncPeriod: controller.NoResyncPeriodFunc,
-		ControllerFactory:         resourcequotacontroller.NewReplenishmentControllerFactoryFromClient(clientset),
+		ControllerFactory:         resourcequotacontroller.NewReplenishmentControllerFactory(informers),
 	}
 	go resourcequotacontroller.NewResourceQuotaController(resourceQuotaControllerOptions).Run(2, controllerCh)
+	informers.Start(controllerCh)
 
 	startTime := time.Now()
 	scale(t, ns2.Name, clientset)
