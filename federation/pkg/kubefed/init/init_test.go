@@ -718,10 +718,10 @@ func fakeInitHostFactory(apiserverServiceType v1.ServiceType, federationName, na
 		},
 		Subjects: []rbacv1beta1.Subject{
 			{
-				Kind:       "ServiceAccount",
-				APIVersion: "",
-				Name:       "federation-controller-manager",
-				Namespace:  "federation-system",
+				Kind:      "ServiceAccount",
+				APIGroup:  "",
+				Name:      "federation-controller-manager",
+				Namespace: "federation-system",
 			},
 		},
 		RoleRef: rbacv1beta1.RoleRef{
