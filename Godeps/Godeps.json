@@ -715,28 +715,28 @@
 		},
 		{
 			"ImportPath": "github.com/coreos/go-systemd/daemon",
-			"Comment": "v8-2-g4484981",
-			"Rev": "4484981625c1a6a2ecb40a390fcb6a9bcfee76e3"
+			"Comment": "v14",
+			"Rev": "48702e0da86bd25e76cfef347e2adeb434a0d0a6"
 		},
 		{
 			"ImportPath": "github.com/coreos/go-systemd/dbus",
-			"Comment": "v8-2-g4484981",
-			"Rev": "4484981625c1a6a2ecb40a390fcb6a9bcfee76e3"
+			"Comment": "v14",
+			"Rev": "48702e0da86bd25e76cfef347e2adeb434a0d0a6"
 		},
 		{
 			"ImportPath": "github.com/coreos/go-systemd/journal",
-			"Comment": "v8-2-g4484981",
-			"Rev": "4484981625c1a6a2ecb40a390fcb6a9bcfee76e3"
+			"Comment": "v14",
+			"Rev": "48702e0da86bd25e76cfef347e2adeb434a0d0a6"
 		},
 		{
 			"ImportPath": "github.com/coreos/go-systemd/unit",
-			"Comment": "v8-2-g4484981",
-			"Rev": "4484981625c1a6a2ecb40a390fcb6a9bcfee76e3"
+			"Comment": "v14",
+			"Rev": "48702e0da86bd25e76cfef347e2adeb434a0d0a6"
 		},
 		{
 			"ImportPath": "github.com/coreos/go-systemd/util",
-			"Comment": "v8-2-g4484981",
-			"Rev": "4484981625c1a6a2ecb40a390fcb6a9bcfee76e3"
+			"Comment": "v14",
+			"Rev": "48702e0da86bd25e76cfef347e2adeb434a0d0a6"
 		},
 		{
 			"ImportPath": "github.com/coreos/pkg/capnslog",
