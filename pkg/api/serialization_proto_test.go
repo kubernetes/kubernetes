@@ -30,28 +30,12 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer/protobuf"
 	"k8s.io/apimachinery/pkg/util/diff"
-	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/testapi"
 	kapitesting "k8s.io/kubernetes/pkg/api/testing"
 	"k8s.io/kubernetes/pkg/api/v1"
 	_ "k8s.io/kubernetes/pkg/apis/extensions"
 	_ "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 )
-
-var nonProtobaleAPIGroups = sets.NewString(
-	"kubeadm.k8s.io",
-)
-
-func init() {
-	codecsToTest = append(codecsToTest, func(version schema.GroupVersion, item runtime.Object) (runtime.Codec, bool, error) {
-		if nonProtobaleAPIGroups.Has(version.Group) {
-			return nil, false, nil
-		}
-		s := protobuf.NewSerializer(api.Scheme, api.Scheme, "application/arbitrary.content.type")
-		return api.Codecs.CodecForVersions(s, s, testapi.ExternalGroupVersions(), nil), true, nil
-	})
-}
 
 func TestUniversalDeserializer(t *testing.T) {
 	expected := &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "test"}}
