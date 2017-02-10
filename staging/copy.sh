@@ -109,6 +109,12 @@ mkcp "pkg/client/clientset_generated/${CLIENTSET}" "pkg/client/clientset_generat
 
 pushd "${CLIENT_REPO_TEMP}" > /dev/null
 echo "generating vendor/"
+# client-go depends on some apimachinery packages. Adding staging/ to the GOPATH
+# so that if client-go has new dependencies on apimachinery, `godep save` can
+# find the dependent packages in staging/, instead of failing. Note that all
+# k8s.io/apimachinery dependencies will be updated later by the robot to point
+# to the real k8s.io/apimachinery commit and vendor the real code.
+GOPATH="${GOPATH}:${MAIN_REPO}/staging"
 GO15VENDOREXPERIMENT=1 godep save ./...
 popd > /dev/null
 
@@ -186,6 +192,13 @@ find "${CLIENT_REPO_TEMP}" -type f \( \
 
 echo "remove cyclical godep"
 rm -rf "${CLIENT_REPO_TEMP}/_vendor/k8s.io/client-go"
+# If godep cannot find dependent packages in the primary GOPATH, it will search
+# in the secondary GOPATH staging/. If successful, godep will wrongly copy the
+# dependents relative to the primary GOPATH (looks like a godep bug), creating
+# the ${CLIENT_REPO_TEMP}/staging dir. These copies will not be recognized by
+# the Go compiler, so we just remove them. Note that the publishing robot will
+# correctly resolve these dependencies later.
+rm -rf "${CLIENT_REPO_TEMP}/staging"
 
 if [ "${FAIL_ON_CHANGES}" = true ]; then
     echo "running FAIL_ON_CHANGES"
