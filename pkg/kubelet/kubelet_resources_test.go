@@ -26,7 +26,6 @@ import (
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/v1"
-	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 )
 
 func TestPodResourceLimitsDefaulting(t *testing.T) {
@@ -42,17 +41,17 @@ func TestPodResourceLimitsDefaulting(t *testing.T) {
 	tk.fakeCadvisor.On("ImagesFsInfo").Return(cadvisorapiv2.FsInfo{}, nil)
 	tk.fakeCadvisor.On("RootFsInfo").Return(cadvisorapiv2.FsInfo{}, nil)
 
-	tk.kubelet.reservation = kubetypes.Reservation{
-		Kubernetes: v1.ResourceList{
-			v1.ResourceCPU:    resource.MustParse("3"),
-			v1.ResourceMemory: resource.MustParse("4Gi"),
-		},
-		System: v1.ResourceList{
-			v1.ResourceCPU:    resource.MustParse("1"),
-			v1.ResourceMemory: resource.MustParse("2Gi"),
-		},
-	}
-
+	/*	tk.kubelet.reservation = kubetypes.Reservation{
+			Kubernetes: v1.ResourceList{
+				v1.ResourceCPU:    resource.MustParse("3"),
+				v1.ResourceMemory: resource.MustParse("4Gi"),
+			},
+			System: v1.ResourceList{
+				v1.ResourceCPU:    resource.MustParse("1"),
+				v1.ResourceMemory: resource.MustParse("2Gi"),
+			},
+		}
+	*/
 	cases := []struct {
 		pod      *v1.Pod
 		expected *v1.Pod

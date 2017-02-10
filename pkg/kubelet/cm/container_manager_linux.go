@@ -103,8 +103,11 @@ type containerManagerImpl struct {
 	qosContainers    QOSContainersInfo
 	periodicTasks    []func()
 	// holds all the mounted cgroup subsystems
-	subsystems *CgroupSubsystems
-	nodeInfo   *v1.Node
+	subsystems    *CgroupSubsystems
+	nodeInfo      *v1.Node
+	cgroupManager CgroupManager
+	capacity      v1.ResourceList
+	cgroupRoot    string
 }
 
 type features struct {
@@ -204,7 +207,14 @@ func NewContainerManager(mountUtil mount.Interface, cadvisorInterface cadvisor.I
 			"This will be a fatal error by default starting in K8s v1.6! " +
 			"In the meantime, you can opt-in to making this a fatal error by enabling --experimental-fail-swap-on.")
 	}
+	var capacity = v1.ResourceList{}
+	if info, err := cadvisorInterface.MachineInfo(); err == nil {
+		capacity = cadvisor.CapacityFromMachineInfo(info)
+	} else {
+		return nil, err
+	}
 
+	cgroupManager := NewCgroupManager(subsystems, nodeConfig.CgroupDriver)
 	// Check if Cgroup-root actually exists on the node
 	if nodeConfig.CgroupsPerQOS {
 		// this does default to / when enabled, but this tests against regressions.
@@ -216,16 +226,23 @@ func NewContainerManager(mountUtil mount.Interface, cadvisorInterface cadvisor.I
 		// of note, we always use the cgroupfs driver when performing this check since
 		// the input is provided in that format.
 		// this is important because we do not want any name conversion to occur.
-		cgroupManager := NewCgroupManager(subsystems, "cgroupfs")
 		if !cgroupManager.Exists(CgroupName(nodeConfig.CgroupRoot)) {
 			return nil, fmt.Errorf("invalid configuration: cgroup-root doesn't exist: %v", err)
 		}
 	}
+	cgroupRoot := nodeConfig.CgroupRoot
+	if isNodeAllocatableEnforcedOnPods(nodeConfig.NodeAllocatableConfig) {
+		cgroupRoot = path.Join(cgroupRoot, defaultNodeAllocatableCgroupName)
+	}
+
 	return &containerManagerImpl{
 		cadvisorInterface: cadvisorInterface,
 		mountUtil:         mountUtil,
 		NodeConfig:        nodeConfig,
 		subsystems:        subsystems,
+		cgroupManager:     cgroupManager,
+		capacity:          capacity,
+		cgroupRoot:        cgroupRoot,
 	}, nil
 }
 
@@ -238,11 +255,11 @@ func (cm *containerManagerImpl) NewPodContainerManager() PodContainerManager {
 			qosContainersInfo: cm.qosContainers,
 			nodeInfo:          cm.nodeInfo,
 			subsystems:        cm.subsystems,
-			cgroupManager:     NewCgroupManager(cm.subsystems, cm.NodeConfig.CgroupDriver),
+			cgroupManager:     cm.cgroupManager,
 		}
 	}
 	return &podContainerManagerNoop{
-		cgroupRoot: CgroupName(cm.NodeConfig.CgroupRoot),
+		cgroupRoot: CgroupName(cm.cgroupRoot),
 	}
 }
 
@@ -296,9 +313,9 @@ func InitQOS(cgroupDriver, rootContainer string, subsystems *CgroupSubsystems) (
 	}
 	// Store the top level qos container names
 	qosContainersInfo := QOSContainersInfo{
-		Guaranteed: rootContainer,
-		Burstable:  path.Join(rootContainer, string(v1.PodQOSBurstable)),
-		BestEffort: path.Join(rootContainer, string(v1.PodQOSBestEffort)),
+		Guaranteed: path.Join(rootContainer, defaultNodeAllocatableCgroupName),
+		Burstable:  path.Join(rootContainer, defaultNodeAllocatableCgroupName, string(v1.PodQOSBurstable)),
+		BestEffort: path.Join(rootContainer, defaultNodeAllocatableCgroupName, string(v1.PodQOSBestEffort)),
 	}
 	return qosContainersInfo, nil
 }
@@ -358,9 +375,14 @@ func (cm *containerManagerImpl) setupNode() error {
 		return err
 	}
 
+	// Setup Node Allocatable
+	if err := createAndUpdateNodeAllocatableCgroups(cm.NodeConfig.NodeAllocatableConfig, cm.GetNodeAllocatable(), cm.cgroupManager); err != nil {
+		return err
+	}
+
 	// Setup top level qos containers only if CgroupsPerQOS flag is specified as true
 	if cm.NodeConfig.CgroupsPerQOS {
-		qosContainersInfo, err := InitQOS(cm.NodeConfig.CgroupDriver, cm.NodeConfig.CgroupRoot, cm.subsystems)
+		qosContainersInfo, err := InitQOS(cm.NodeConfig.CgroupDriver, cm.cgroupRoot, cm.subsystems)
 		if err != nil {
 			return fmt.Errorf("failed to initialise top level QOS containers: %v", err)
 		}
@@ -392,11 +414,7 @@ func (cm *containerManagerImpl) setupNode() error {
 			})
 		} else if cm.RuntimeCgroupsName != "" {
 			cont := newSystemCgroups(cm.RuntimeCgroupsName)
-			var capacity = v1.ResourceList{}
-			if info, err := cm.cadvisorInterface.MachineInfo(); err == nil {
-				capacity = cadvisor.CapacityFromMachineInfo(info)
-			}
-			memoryLimit := (int64(capacity.Memory().Value() * DockerMemoryLimitThresholdPercent / 100))
+			memoryLimit := (int64(cm.capacity.Memory().Value() * DockerMemoryLimitThresholdPercent / 100))
 			if memoryLimit < MinDockerMemoryLimit {
 				glog.Warningf("Memory limit %d for container %s is too small, reset it to %d", memoryLimit, cm.RuntimeCgroupsName, MinDockerMemoryLimit)
 				memoryLimit = MinDockerMemoryLimit

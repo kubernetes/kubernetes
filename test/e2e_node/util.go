@@ -95,8 +95,10 @@ func tempSetEvictionHard(f *framework.Framework, evictionHard string) {
 
 // Must be called within a Context. Allows the function to modify the KubeletConfiguration during the BeforeEach of the context.
 // The change is reverted in the AfterEach of the context.
-func tempSetCurrentKubeletConfig(f *framework.Framework, updateFunction func(initialConfig *componentconfig.KubeletConfiguration)) {
+// Returns true on success.
+func tempSetCurrentKubeletConfig(f *framework.Framework, updateFunction func(initialConfig *componentconfig.KubeletConfiguration)) bool {
 	var oldCfg *componentconfig.KubeletConfiguration
+	success := false
 	BeforeEach(func() {
 		configEnabled, err := isKubeletConfigEnabled(f)
 		framework.ExpectNoError(err)
@@ -108,6 +110,7 @@ func tempSetCurrentKubeletConfig(f *framework.Framework, updateFunction func(ini
 			newCfg := clone.(*componentconfig.KubeletConfiguration)
 			updateFunction(newCfg)
 			framework.ExpectNoError(setKubeletConfiguration(f, newCfg))
+			success = true
 		} else {
 			framework.Logf("The Dynamic Kubelet Configuration feature is not enabled.\n" +
 				"Pass --feature-gates=DynamicKubeletConfig=true to the Kubelet to enable this feature.\n" +
@@ -120,6 +123,7 @@ func tempSetCurrentKubeletConfig(f *framework.Framework, updateFunction func(ini
 			framework.ExpectNoError(err)
 		}
 	})
+	return success
 }
 
 // Returns true if kubeletConfig is enabled, false otherwise or if we cannot determine if it is.

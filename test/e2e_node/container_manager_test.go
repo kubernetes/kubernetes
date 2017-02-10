@@ -20,20 +20,25 @@ package e2e_node
 
 import (
 	"fmt"
+	"io/ioutil"
 	"os/exec"
 	"path"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
 
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/kubernetes/pkg/api/v1"
+	"k8s.io/kubernetes/pkg/apis/componentconfig"
+	"k8s.io/kubernetes/pkg/kubelet/cm"
 	"k8s.io/kubernetes/test/e2e/framework"
 
+	"github.com/golang/glog"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+	"github.com/pborman/uuid"
 )
 
 func getOOMScoreForPid(pid int) (int, error) {
@@ -70,9 +75,75 @@ func validateOOMScoreAdjSettingIsInRange(pid int, expectedMinOOMScoreAdj, expect
 	return nil
 }
 
+func getCapacity(f *framework.Framework) (v1.ResourceList, error) {
+	nodeList, err := f.ClientSet.Core().Nodes().List(metav1.ListOptions{})
+	if err != nil {
+		return nil, fmt.Errorf("failed to list nodes: %v", err)
+	}
+	if len(nodeList.Items) != 1 {
+		return nil, fmt.Errorf("unexpected number of nodes %d", len(nodeList.Items))
+	}
+	return nodeList.Items[0].Status.Capacity, nil
+
+}
+
+func expectFileValToEqual(filePath string, expectedValue int64) {
+	out, err := ioutil.ReadFile(filePath)
+	Expect(err).To(BeNil(), "failed to read file %q", filePath)
+	Expect(string(out)).To(Equal(strconv.FormatInt(expectedValue, 10)))
+}
+
 var _ = framework.KubeDescribe("Kubelet Container Manager [Serial]", func() {
 	f := framework.NewDefaultFramework("kubelet-container-manager")
 
+	Describe("Validate Node Allocatable", func() {
+		Context("once the node is setup", func() {
+			setKubeletConfig := tempSetCurrentKubeletConfig(f, func(initialConfig *componentconfig.KubeletConfiguration) {
+				initialConfig.EnforceNodeAllocatable = []string{"pods"}
+				initialConfig.SystemReserved = componentconfig.ConfigurationMap{
+					"cpu":    "100m",
+					"memory": "100Mi",
+				}
+				initialConfig.KubeReserved = componentconfig.ConfigurationMap{
+					"cpu":    "100m",
+					"memory": "100Mi",
+				}
+			})
+
+			It("Node Allocatable Pod Cgroup Is Found", func() {
+				if !setKubeletConfig {
+					Skip("This test cannot be run without Dynamic kubelet configuration enabled.")
+				}
+				currentConfig, err := getCurrentKubeletConfig()
+				Expect(err).To(BeNil())
+				glog.Errorf("current Config :%+v", currentConfig)
+				expectedNAPodCgroup := path.Join(currentConfig.CgroupRoot, "kubepods")
+				subsystems, err := cm.GetCgroupSubsystems()
+				Expect(err).To(BeNil())
+				cgroupManager := cm.NewCgroupManager(subsystems, currentConfig.CgroupDriver)
+				Expect(cgroupManager.Exists(cm.CgroupName(expectedNAPodCgroup))).To(BeTrue(), "Expected Node Allocatable Cgroup Does not exist")
+				// TODO: Update cgroupManager to expose a Status interface to get current Cgroup Settings.
+				capacity, err := getCapacity(f)
+				Expect(err).To(BeNil())
+				var allocatableCPU, allocatableMemory int64
+				// Total cpu reservation is 200m.
+				for k, v := range capacity {
+					if k == v1.ResourceCPU {
+						allocatableCPU = cm.MilliCPUToShares(v.MilliValue()) - cm.MilliCPUToShares(200)
+					}
+					if k == v1.ResourceMemory {
+						allocatableMemory = v.Value() - (200 * 2014 * 1024)
+					}
+				}
+				// Total Memory reservation is 200Mi.
+				// Expect CPU shares on node allocatable cgroup to equal allocatable.
+				expectFileValToEqual(filepath.Join(subsystems.MountPoints["cpu"], "kubepods", "cpu.shares"), allocatableCPU)
+				// Expect Memory limit on node allocatable cgroup to equal allocatable.
+				expectFileValToEqual(filepath.Join(subsystems.MountPoints["memory"], "kubepods", "cpu.shares"), allocatableMemory)
+			})
+			// TODO: Add test for enforcing System Reserved and Kube Reserved. Requires creation of dummy cgroups.
+		})
+	})
 	Describe("Validate OOM score adjustments", func() {
 		Context("once the node is setup", func() {
 			It("docker daemon's oom-score-adj should be -999", func() {
