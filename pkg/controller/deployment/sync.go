@@ -180,7 +180,9 @@ func (dc *DeploymentController) addHashKeyToRSAndPods(rs *extensions.ReplicaSet)
 	}
 	// Make sure rs pod template is updated so that it won't create pods without the new label (orphaned pods).
 	if updatedRS.Generation > updatedRS.Status.ObservedGeneration {
-		if err = deploymentutil.WaitForReplicaSetUpdated(dc.client, updatedRS.Generation, updatedRS.Namespace, updatedRS.Name); err != nil {
+		// TODO: Revisit if we really need to wait here as opposed to returning and
+		// potentially unblocking this worker (can wait up to 1min before timing out).
+		if err = deploymentutil.WaitForReplicaSetUpdated(dc.rsLister, updatedRS.Generation, updatedRS.Namespace, updatedRS.Name); err != nil {
 			return nil, fmt.Errorf("error waiting for replica set %s/%s to be observed by controller: %v", updatedRS.Namespace, updatedRS.Name, err)
 		}
 		glog.V(4).Infof("Observed the update of replica set %s/%s's pod template with hash %s.", rs.Namespace, rs.Name, hash)
@@ -213,7 +215,9 @@ func (dc *DeploymentController) addHashKeyToRSAndPods(rs *extensions.ReplicaSet)
 	// WaitForReplicaSetUpdated, the replicaset controller should have dropped
 	// FullyLabeledReplicas to 0 already, we only need to wait it to increase
 	// back to the number of replicas in the spec.
-	if err := deploymentutil.WaitForPodsHashPopulated(dc.client, updatedRS.Generation, updatedRS.Namespace, updatedRS.Name); err != nil {
+	// TODO: Revisit if we really need to wait here as opposed to returning and
+	// potentially unblocking this worker (can wait up to 1min before timing out).
+	if err := deploymentutil.WaitForPodsHashPopulated(dc.rsLister, updatedRS.Generation, updatedRS.Namespace, updatedRS.Name); err != nil {
 		return nil, fmt.Errorf("Replica set %s/%s: error waiting for replicaset controller to observe pods being labeled with template hash: %v", updatedRS.Namespace, updatedRS.Name, err)
 	}
 
