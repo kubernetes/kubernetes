@@ -24,6 +24,7 @@ import (
 
 	"github.com/google/gofuzz"
 
+	apitesting "k8s.io/apimachinery/pkg/api/testing"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -149,7 +150,7 @@ func TestDefaulting(t *testing.T) {
 		iter := 0
 		changedOnce := false
 		for {
-			if iter > *fuzzIters {
+			if iter > *apitesting.FuzzIters {
 				if !expectedChanged || changedOnce {
 					break
 				}
