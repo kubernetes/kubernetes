@@ -26,6 +26,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"sort"
 	"strconv"
 	"strings"
 	"testing"
@@ -36,6 +37,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/diff"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/rest/fake"
 	"k8s.io/client-go/tools/clientcmd"
@@ -76,35 +78,39 @@ func TestInitFederation(t *testing.T) {
 	defer kubefedtesting.RemoveFakeKubeconfigFiles(fakeKubeFiles)
 
 	testCases := []struct {
-		federation           string
-		kubeconfigGlobal     string
-		kubeconfigExplicit   string
-		dnsZoneName          string
-		lbIP                 string
-		apiserverServiceType v1.ServiceType
-		advertiseAddress     string
-		image                string
-		etcdPVCapacity       string
-		etcdPersistence      string
-		expectedErr          string
-		dnsProvider          string
-		storageBackend       string
-		dryRun               string
+		federation            string
+		kubeconfigGlobal      string
+		kubeconfigExplicit    string
+		dnsZoneName           string
+		lbIP                  string
+		apiserverServiceType  v1.ServiceType
+		advertiseAddress      string
+		image                 string
+		etcdPVCapacity        string
+		etcdPersistence       string
+		expectedErr           string
+		dnsProvider           string
+		storageBackend        string
+		dryRun                string
+		apiserverArgOverrides string
+		cmArgOverrides        string
 	}{
 		{
-			federation:           "union",
-			kubeconfigGlobal:     fakeKubeFiles[0],
-			kubeconfigExplicit:   "",
-			dnsZoneName:          "example.test.",
-			lbIP:                 lbIP,
-			apiserverServiceType: v1.ServiceTypeLoadBalancer,
-			image:                "example.test/foo:bar",
-			etcdPVCapacity:       "5Gi",
-			etcdPersistence:      "true",
-			expectedErr:          "",
-			dnsProvider:          "test-dns-provider",
-			storageBackend:       "etcd2",
-			dryRun:               "",
+			federation:            "union",
+			kubeconfigGlobal:      fakeKubeFiles[0],
+			kubeconfigExplicit:    "",
+			dnsZoneName:           "example.test.",
+			lbIP:                  lbIP,
+			apiserverServiceType:  v1.ServiceTypeLoadBalancer,
+			image:                 "example.test/foo:bar",
+			etcdPVCapacity:        "5Gi",
+			etcdPersistence:       "true",
+			expectedErr:           "",
+			dnsProvider:           "test-dns-provider",
+			storageBackend:        "etcd2",
+			dryRun:                "",
+			apiserverArgOverrides: "--client-ca-file=override,--log-dir=override",
+			cmArgOverrides:        "--dns-provider=override,--log-dir=override",
 		},
 		{
 			federation:           "union",
@@ -194,7 +200,7 @@ func TestInitFederation(t *testing.T) {
 		} else {
 			dnsProvider = "google-clouddns" //default value of dns-provider
 		}
-		hostFactory, err := fakeInitHostFactory(tc.apiserverServiceType, tc.federation, util.DefaultFederationSystemNamespace, tc.advertiseAddress, tc.lbIP, tc.dnsZoneName, tc.image, dnsProvider, tc.etcdPersistence, tc.etcdPVCapacity, tc.storageBackend)
+		hostFactory, err := fakeInitHostFactory(tc.apiserverServiceType, tc.federation, util.DefaultFederationSystemNamespace, tc.advertiseAddress, tc.lbIP, tc.dnsZoneName, tc.image, dnsProvider, tc.etcdPersistence, tc.etcdPVCapacity, tc.storageBackend, tc.apiserverArgOverrides, tc.cmArgOverrides)
 		if err != nil {
 			t.Fatalf("[%d] unexpected error: %v", i, err)
 		}
@@ -210,6 +216,9 @@ func TestInitFederation(t *testing.T) {
 		cmd.Flags().Set("host-cluster-context", "substrate")
 		cmd.Flags().Set("dns-zone-name", tc.dnsZoneName)
 		cmd.Flags().Set("image", tc.image)
+		cmd.Flags().Set("apiserver-arg-overrides", tc.apiserverArgOverrides)
+		cmd.Flags().Set("controllermanager-arg-overrides", tc.cmArgOverrides)
+
 		if tc.storageBackend != "" {
 			cmd.Flags().Set("storage-backend", tc.storageBackend)
 		}
@@ -256,6 +265,64 @@ func TestInitFederation(t *testing.T) {
 		}
 
 		testKubeconfigUpdate(t, tc.apiserverServiceType, tc.federation, tc.advertiseAddress, tc.lbIP, tc.kubeconfigGlobal, tc.kubeconfigExplicit)
+	}
+}
+
+func TestMarshallAndMergeOverrides(t *testing.T) {
+	testCases := []struct {
+		overrideParams string
+		expectedSet    sets.String
+		expectedErr    string
+	}{
+		{
+			overrideParams: "valid-format-param1=override1,valid-format-param2=override2",
+			expectedSet:    sets.NewString("arg2=val2", "arg1=val1", "valid-format-param1=override1", "valid-format-param2=override2"),
+			expectedErr:    "",
+		},
+		{
+			overrideParams: "valid-format-param1=override1,arg1=override1",
+			expectedSet:    sets.NewString("arg2=val2", "arg1=override1", "valid-format-param1=override1"),
+			expectedErr:    "",
+		},
+		{
+			overrideParams: "zero-value-arg=",
+			expectedSet:    sets.NewString("arg2=val2", "arg1=val1", "zero-value-arg="),
+			expectedErr:    "",
+		},
+		{
+			overrideParams: "wrong-format-arg",
+			expectedErr:    "wrong format for override arg: wrong-format-arg",
+		},
+		{
+			overrideParams: "wrong-format-arg=override=wrong-format-arg=override",
+			expectedErr:    "wrong format for override arg: wrong-format-arg=override=wrong-format-arg=override",
+		},
+		{
+			overrideParams: "=wrong-format-only-value",
+			expectedErr:    "wrong format for override arg: =wrong-format-only-value, arg name cannot be empty",
+		},
+	}
+
+	for i, tc := range testCases {
+		args, err := marshallOverrides(tc.overrideParams)
+		if tc.expectedErr == "" {
+			origArgs := map[string]string{
+				"arg1": "val1",
+				"arg2": "val2",
+			}
+			merged := argMapsToArgStrings(origArgs, args)
+
+			got := sets.NewString(merged...)
+			want := tc.expectedSet
+
+			if !got.Equal(want) {
+				t.Errorf("[%d] unexpected output: got: %v, want: %v", i, got, want)
+			}
+		} else {
+			if err.Error() != tc.expectedErr {
+				t.Errorf("[%d] unexpected error output: got: %s, want: %s", i, err.Error(), tc.expectedErr)
+			}
+		}
 	}
 }
 
@@ -498,7 +565,7 @@ func TestCertsHTTPS(t *testing.T) {
 	}
 }
 
-func fakeInitHostFactory(apiserverServiceType v1.ServiceType, federationName, namespaceName, advertiseAddress, lbIp, dnsZoneName, image, dnsProvider, etcdPersistence, etcdPVCapacity, storageProvider string) (cmdutil.Factory, error) {
+func fakeInitHostFactory(apiserverServiceType v1.ServiceType, federationName, namespaceName, advertiseAddress, lbIp, dnsZoneName, image, dnsProvider, etcdPersistence, etcdPVCapacity, storageProvider, apiserverOverrideArg, cmOverrideArg string) (cmdutil.Factory, error) {
 	svcName := federationName + "-apiserver"
 	svcUrlPrefix := "/api/v1/namespaces/federation-system/services"
 	credSecretName := svcName + "-credentials"
@@ -684,6 +751,40 @@ func fakeInitHostFactory(apiserverServiceType v1.ServiceType, federationName, na
 	nodeList := v1.NodeList{}
 	nodeList.Items = append(nodeList.Items, node)
 
+	address := lbIp
+	if apiserverServiceType == v1.ServiceTypeNodePort {
+		if advertiseAddress != "" {
+			address = advertiseAddress
+		} else {
+			address = nodeIP
+		}
+	}
+
+	apiserverCommand := []string{
+		"/hyperkube",
+		"federation-apiserver",
+	}
+	apiserverArgs := []string{
+		"--bind-address=0.0.0.0",
+		"--etcd-servers=http://localhost:2379",
+		"--secure-port=443",
+		"--tls-cert-file=/etc/federation/apiserver/server.crt",
+		"--tls-private-key-file=/etc/federation/apiserver/server.key",
+		"--admission-control=NamespaceLifecycle",
+		fmt.Sprintf("--storage-backend=%s", storageProvider),
+		fmt.Sprintf("--advertise-address=%s", address),
+	}
+
+	if apiserverOverrideArg != "" {
+		apiserverArgs = append(apiserverArgs, "--client-ca-file=override")
+		apiserverArgs = append(apiserverArgs, "--log-dir=override")
+
+	} else {
+		apiserverArgs = append(apiserverArgs, "--client-ca-file=/etc/federation/apiserver/ca.crt")
+	}
+	sort.Strings(apiserverArgs)
+	apiserverCommand = append(apiserverCommand, apiserverArgs...)
+
 	apiserver := v1beta1.Deployment{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "Deployment",
@@ -705,20 +806,9 @@ func fakeInitHostFactory(apiserverServiceType v1.ServiceType, federationName, na
 				Spec: v1.PodSpec{
 					Containers: []v1.Container{
 						{
-							Name:  "apiserver",
-							Image: image,
-							Command: []string{
-								"/hyperkube",
-								"federation-apiserver",
-								"--bind-address=0.0.0.0",
-								"--etcd-servers=http://localhost:2379",
-								"--secure-port=443",
-								"--client-ca-file=/etc/federation/apiserver/ca.crt",
-								"--tls-cert-file=/etc/federation/apiserver/server.crt",
-								"--tls-private-key-file=/etc/federation/apiserver/server.key",
-								"--admission-control=NamespaceLifecycle",
-								fmt.Sprintf("--storage-backend=%s", storageProvider),
-							},
+							Name:    "apiserver",
+							Image:   image,
+							Command: apiserverCommand,
 							Ports: []v1.ContainerPort{
 								{
 									Name:          "https",
@@ -784,15 +874,28 @@ func fakeInitHostFactory(apiserverServiceType v1.ServiceType, federationName, na
 		}
 	}
 
-	address := lbIp
-	if apiserverServiceType == v1.ServiceTypeNodePort {
-		if advertiseAddress != "" {
-			address = advertiseAddress
-		} else {
-			address = nodeIP
-		}
+	cmCommand := []string{
+		"/hyperkube",
+		"federation-controller-manager",
 	}
-	apiserver.Spec.Template.Spec.Containers[0].Command = append(apiserver.Spec.Template.Spec.Containers[0].Command, fmt.Sprintf("--advertise-address=%s", address))
+
+	cmArgs := []string{
+		"--kubeconfig=/etc/federation/controller-manager/kubeconfig",
+		"--dns-provider-config=",
+		fmt.Sprintf("--federation-name=%s", federationName),
+		fmt.Sprintf("--zone-name=%s", dnsZoneName),
+		fmt.Sprintf("--master=https://%s", svcName),
+	}
+
+	if cmOverrideArg != "" {
+		cmArgs = append(cmArgs, "--dns-provider=override")
+		cmArgs = append(cmArgs, "--log-dir=override")
+	} else {
+		cmArgs = append(cmArgs, fmt.Sprintf("--dns-provider=%s", dnsProvider))
+	}
+
+	sort.Strings(cmArgs)
+	cmCommand = append(cmCommand, cmArgs...)
 
 	cmName := federationName + "-controller-manager"
 	cm := v1beta1.Deployment{
@@ -816,18 +919,9 @@ func fakeInitHostFactory(apiserverServiceType v1.ServiceType, federationName, na
 				Spec: v1.PodSpec{
 					Containers: []v1.Container{
 						{
-							Name:  "controller-manager",
-							Image: image,
-							Command: []string{
-								"/hyperkube",
-								"federation-controller-manager",
-								"--master=https://" + svcName,
-								"--kubeconfig=/etc/federation/controller-manager/kubeconfig",
-								fmt.Sprintf("--dns-provider=%s", dnsProvider),
-								"--dns-provider-config=",
-								fmt.Sprintf("--federation-name=%s", federationName),
-								fmt.Sprintf("--zone-name=%s", dnsZoneName),
-							},
+							Name:    "controller-manager",
+							Image:   image,
+							Command: cmCommand,
 							VolumeMounts: []v1.VolumeMount{
 								{
 									Name:      cmKubeconfigSecretName,
