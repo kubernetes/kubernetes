@@ -27,6 +27,7 @@ go_library(
         "//pkg/client/listers/extensions/v1beta1:go_default_library",
         "//pkg/controller:go_default_library",
         "//pkg/util/metrics:go_default_library",
+        "//plugin/pkg/scheduler/algorithm:go_default_library",
         "//plugin/pkg/scheduler/algorithm/predicates:go_default_library",
         "//plugin/pkg/scheduler/schedulercache:go_default_library",
         "//vendor:github.com/golang/glog",
