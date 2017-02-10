@@ -3,15 +3,18 @@ load("@io_kubernetes_build//defs:go.bzl", "go_genrule")
 
 OPENAPI_TARGETS = [
     "cmd/libs/go2idl/client-gen/test_apis/testgroup/v1",
+    "cmd/libs/go2idl/openapi-gen/generators",
     "federation/apis/federation/v1beta1",
     "pkg/api/v1",
     "pkg/apis/abac/v0",
     "pkg/apis/abac/v1beta1",
     "pkg/apis/apps/v1beta1",
+    "pkg/apis/authentication/v1",
     "pkg/apis/authentication/v1beta1",
     "pkg/apis/authorization/v1",
     "pkg/apis/authorization/v1beta1",
     "pkg/apis/autoscaling/v1",
+    "pkg/apis/autoscaling/v2alpha1",
     "pkg/apis/batch/v1",
     "pkg/apis/batch/v2alpha1",
     "pkg/apis/certificates/v1beta1",
