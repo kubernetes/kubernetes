@@ -19,6 +19,9 @@ package constants
 import "time"
 
 const (
+	AuthorizationPolicyFile        = "abac_policy.json"
+	AuthorizationWebhookConfigFile = "webhook_authz.conf"
+
 	CACertAndKeyBaseName = "ca"
 	CACertName           = "ca.crt"
 	CAKeyName            = "ca.key"
