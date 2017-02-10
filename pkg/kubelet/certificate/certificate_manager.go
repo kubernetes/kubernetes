@@ -33,11 +33,6 @@ import (
 
 const (
 	syncPeriod = 1 * time.Hour
-	// defaultShouldRotatePercent is the time remaining threshold for when the
-	// certificate should be rotated. It is calculated by using the difference
-	// of the certificate end date and the certificate start date and checking
-	// what percentage of that interval is left.
-	defaultShouldRotatePercent = 10
 )
 
 // Manager maintains and updates the certificates in use by this kubelet. In
@@ -71,8 +66,7 @@ type manager struct {
 	certStore                Store
 	certAccessLock           sync.RWMutex
 	cert                     *tls.Certificate
-	certRotationEnabled      bool
-	shouldRotatePercent      int
+	shouldRotatePercent      int32
 }
 
 // NewManager returns a new certificate manager. A certificate manager is
@@ -82,20 +76,23 @@ func NewManager(
 	certSigningRequestClient clientcertificates.CertificateSigningRequestInterface,
 	nodeName types.NodeName,
 	certificateStore Store,
-	certRotationEnabled bool) (Manager, error) {
+	certRotationPercent int32) (Manager, error) {
 
 	cert, err := certificateStore.Current()
 	if err != nil {
 		return nil, err
 	}
 
+	if certRotationPercent > 100 {
+		certRotationPercent = 100
+	}
+
 	m := manager{
 		certSigningRequestClient: certSigningRequestClient,
 		nodeName:                 nodeName,
 		certStore:                certificateStore,
-		certRotationEnabled:      certRotationEnabled,
 		cert:                     cert,
-		shouldRotatePercent:      defaultShouldRotatePercent,
+		shouldRotatePercent:      certRotationPercent,
 	}
 
 	return &m, nil
@@ -121,22 +118,21 @@ func (m *manager) GetCertificate(clientHello *tls.ClientHelloInfo) (*tls.Certifi
 
 // Start will start the background work of rotating the certificates.
 func (m *manager) Start() {
-	if !m.certRotationEnabled {
+	if m.shouldRotatePercent < 1 {
 		glog.V(2).Infof("Certificate rotation is not enabled.")
 		return
 	}
-	glog.V(2).Infof("Enabling rotating certificates.")
 
 	// Certificate rotation depends on access to the API server certificate
 	// signing API, so don't start the certificate manager if we don't have a
 	// client. This will happen on the master, where the kubelet is responsible
 	// for bootstrapping the pods of the master components.
 	if m.certSigningRequestClient == nil {
-		glog.V(2).Infof("Kubernetes client is nil, not starting certificate manager.")
+		glog.V(2).Infof("Certificate rotation is not enabled, no connection to the apiserver.")
 		return
 	}
 
-	glog.V(2).Info("Starting to rotate expiring certificates.")
+	glog.V(2).Infof("Certificate rotation is enabled.")
 	go wait.Forever(func() {
 		for range time.Tick(syncPeriod) {
 			err := m.rotateCerts()
@@ -155,7 +151,7 @@ func (m *manager) shouldRotate() bool {
 	notAfter := m.cert.Leaf.NotAfter
 	total := notAfter.Sub(m.cert.Leaf.NotBefore)
 	remaining := notAfter.Sub(time.Now())
-	return int(remaining*100/total) < m.shouldRotatePercent
+	return int32(remaining*100/total) < m.shouldRotatePercent
 }
 
 func (m *manager) rotateCerts() error {

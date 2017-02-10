@@ -219,7 +219,7 @@ type KubeletConfiguration struct {
 	CertDirectory string `json:"certDirectory"`
 	// CertRotation is the flag to turn on automatic rotation of the kubelet's
 	// certificate for communicating with the API server.
-	CertRotation *bool `json:"certRotation,omitempty"`
+	CertRotation *int32 `json:"certRotation,omitempty"`
 	// authentication specifies how requests to the Kubelet's server are authenticated
 	Authentication KubeletAuthentication `json:"authentication"`
 	// authorization specifies how requests to the Kubelet's server are authorized
