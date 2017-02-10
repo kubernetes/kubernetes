@@ -118,6 +118,7 @@ func (ec *EquivalenceCache) PredicateWithECache(pod *v1.Pod, nodeName, predicate
 					return false, hostPredicate.FailReasons, false
 				}
 			}
+			glog.V(5).Infof("Calculated predicate: %v for pod: %s on node: %s based on equivalence cache", predicateKey, pod.GetName, nodeName)
 		}
 	}
 	return false, []algorithm.PredicateFailureReason{}, true
