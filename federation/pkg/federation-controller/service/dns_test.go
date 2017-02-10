@@ -32,6 +32,8 @@ import (
 )
 
 func TestServiceController_ensureDnsRecords(t *testing.T) {
+	clusterName := "testcluster"
+
 	tests := []struct {
 		name          string
 		service       v1.Service
@@ -44,6 +46,10 @@ func TestServiceController_ensureDnsRecords(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "servicename",
 					Namespace: "servicenamespace",
+					Annotations: map[string]string{
+						FederatedServiceIngressAnnotation: NewFederatedServiceIngress().
+							AddEndpoints("fooregion", "foozone", clusterName, []string{"198.51.100.1"}).
+							String()},
 				},
 			},
 			serviceStatus: buildServiceStatus([][]string{{"198.51.100.1", ""}}),
@@ -78,6 +84,10 @@ func TestServiceController_ensureDnsRecords(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "servicename",
 					Namespace: "servicenamespace",
+					Annotations: map[string]string{
+						FederatedServiceIngressAnnotation: NewFederatedServiceIngress().
+							AddEndpoints("fooregion", "foozone", clusterName, []string{}).
+							String()},
 				},
 			},
 			expected: []string{
@@ -106,8 +116,6 @@ func TestServiceController_ensureDnsRecords(t *testing.T) {
 			knownClusterSet: make(sets.String),
 		}
 
-		clusterName := "testcluster"
-
 		serviceController.clusterCache.clientMap[clusterName] = &clusterCache{
 			cluster: &v1beta1.Cluster{
 				Status: v1beta1.ClusterStatus{
@@ -127,7 +135,7 @@ func TestServiceController_ensureDnsRecords(t *testing.T) {
 			cachedService.serviceStatusMap[clusterName] = test.serviceStatus
 		}
 
-		err := serviceController.ensureDnsRecords(clusterName, cachedService)
+		err := serviceController.ensureDnsRecords(clusterName, &test.service)
 		if err != nil {
 			t.Errorf("Test failed for %s, unexpected error %v", test.name, err)
 		}

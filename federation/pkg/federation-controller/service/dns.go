@@ -26,6 +26,7 @@ import (
 
 	"k8s.io/kubernetes/federation/pkg/dnsprovider"
 	"k8s.io/kubernetes/federation/pkg/dnsprovider/rrstype"
+	"k8s.io/kubernetes/pkg/api/v1"
 )
 
 const (
@@ -34,24 +35,29 @@ const (
 )
 
 // getHealthyEndpoints returns the hostnames and/or IP addresses of healthy endpoints for the service, at a zone, region and global level (or an error)
-func (s *ServiceController) getHealthyEndpoints(clusterName string, cachedService *cachedService) (zoneEndpoints, regionEndpoints, globalEndpoints []string, err error) {
+func (s *ServiceController) getHealthyEndpoints(clusterName string, service *v1.Service) (zoneEndpoints, regionEndpoints, globalEndpoints []string, err error) {
 	var (
 		zoneNames  []string
 		regionName string
 	)
-	if zoneNames, regionName, err = s.getClusterZoneNames(clusterName); err != nil {
+	if zoneNames, regionName, err = s.getClusterZoneNames(clusterName, service); err != nil {
 		return nil, nil, nil, err
 	}
-	for lbClusterName, lbStatus := range cachedService.serviceStatusMap {
-		lbZoneNames, lbRegionName, err := s.getClusterZoneNames(lbClusterName)
-		if err != nil {
-			return nil, nil, nil, err
-		}
-		for _, ingress := range lbStatus.Ingress {
-			readyEndpoints, ok := cachedService.endpointMap[lbClusterName]
-			if !ok || readyEndpoints == 0 {
-				continue
-			}
+
+	// If federated service is deleted, return empty endpoints, so that DNS records are removed
+	if service.DeletionTimestamp != nil {
+		return zoneEndpoints, regionEndpoints, globalEndpoints, nil
+	}
+
+	serviceIngress, err := ParseFederatedServiceIngress(service)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+
+	for _, lbClusterIngress := range serviceIngress.Items {
+		lbRegionName := lbClusterIngress.Region
+		lbZoneNames := lbClusterIngress.Zones
+		for _, ingress := range lbClusterIngress.Items {
 			var address string
 			// We should get either an IP address or a hostname - use whichever one we get
 			if ingress.IP != "" {
@@ -61,7 +67,7 @@ func (s *ServiceController) getHealthyEndpoints(clusterName string, cachedServic
 			}
 			if len(address) <= 0 {
 				return nil, nil, nil, fmt.Errorf("Service %s/%s in cluster %s has neither LoadBalancerStatus.ingress.ip nor LoadBalancerStatus.ingress.hostname. Cannot use it as endpoint for federated service.",
-					cachedService.lastState.Name, cachedService.lastState.Namespace, clusterName)
+					service.Name, service.Namespace, clusterName)
 			}
 			for _, lbZoneName := range lbZoneNames {
 				for _, zoneName := range zoneNames {
@@ -80,15 +86,17 @@ func (s *ServiceController) getHealthyEndpoints(clusterName string, cachedServic
 }
 
 // getClusterZoneNames returns the name of the zones (and the region) where the specified cluster exists (e.g. zones "us-east1-c" on GCE, or "us-east-1b" on AWS)
-func (s *ServiceController) getClusterZoneNames(clusterName string) (zones []string, region string, err error) {
-	client, ok := s.clusterCache.clientMap[clusterName]
-	if !ok {
-		return nil, "", fmt.Errorf("Cluster cache does not contain entry for cluster %s", clusterName)
+func (s *ServiceController) getClusterZoneNames(clusterName string, service *v1.Service) (zones []string, region string, err error) {
+	serviceIngress, err := ParseFederatedServiceIngress(service)
+	if err != nil {
+		return nil, "", err
 	}
-	if client.cluster == nil {
-		return nil, "", fmt.Errorf("Cluster cache entry for cluster %s is nil", clusterName)
+	for _, ingress := range serviceIngress.Items {
+		if ingress.Cluster == clusterName {
+			return ingress.Zones, ingress.Region, nil
+		}
 	}
-	return client.cluster.Status.Zones, client.cluster.Status.Region, nil
+	return nil, "", fmt.Errorf("Unexpected error, Could not find cluster zone names for cluster %s", clusterName)
 }
 
 // getServiceDnsSuffix returns the DNS suffix to use when creating federated-service DNS records
@@ -284,7 +292,7 @@ given the current state of that service in that cluster.  This should be called 
 (or vice verse).  Only shards of the service which have both a loadbalancer ingress IP address or hostname AND at least one healthy backend endpoint
 are included in DNS records for that service (at all of zone, region and global levels). All other addresses are removed.  Also, if no shards exist
 in the zone or region of the cluster, a CNAME reference to the next higher level is ensured to exist. */
-func (s *ServiceController) ensureDnsRecords(clusterName string, cachedService *cachedService) error {
+func (s *ServiceController) ensureDnsRecords(clusterName string, service *v1.Service) error {
 	// Quinton: Pseudocode....
 	// See https://github.com/kubernetes/kubernetes/pull/25107#issuecomment-218026648
 	// For each service we need the following DNS names:
@@ -303,17 +311,17 @@ func (s *ServiceController) ensureDnsRecords(clusterName string, cachedService *
 	// So this time around we only need to patch that (add new records, remove deleted records, and update changed records.
 	//
 	if s == nil {
-		return fmt.Errorf("nil ServiceController passed to ServiceController.ensureDnsRecords(clusterName: %s, cachedService: %v)", clusterName, cachedService)
+		return fmt.Errorf("nil ServiceController passed to ServiceController.ensureDnsRecords(clusterName: %s, service: %v)", clusterName, service)
 	}
 	if s.dns == nil {
 		return nil
 	}
-	if cachedService == nil {
-		return fmt.Errorf("nil cachedService passed to ServiceController.ensureDnsRecords(clusterName: %s, cachedService: %v)", clusterName, cachedService)
+	if service == nil {
+		return fmt.Errorf("nil service passed to ServiceController.ensureDnsRecords(clusterName: %s, service: %v)", clusterName, service)
 	}
-	serviceName := cachedService.lastState.Name
-	namespaceName := cachedService.lastState.Namespace
-	zoneNames, regionName, err := s.getClusterZoneNames(clusterName)
+	serviceName := service.Name
+	namespaceName := service.Namespace
+	zoneNames, regionName, err := s.getClusterZoneNames(clusterName, service)
 	if err != nil {
 		return err
 	}
@@ -324,7 +332,7 @@ func (s *ServiceController) ensureDnsRecords(clusterName string, cachedService *
 	if err != nil {
 		return err
 	}
-	zoneEndpoints, regionEndpoints, globalEndpoints, err := s.getHealthyEndpoints(clusterName, cachedService)
+	zoneEndpoints, regionEndpoints, globalEndpoints, err := s.getHealthyEndpoints(clusterName, service)
 	if err != nil {
 		return err
 	}
