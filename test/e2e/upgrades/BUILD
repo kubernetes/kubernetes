@@ -10,6 +10,7 @@ load(
 go_library(
     name = "go_default_library",
     srcs = [
+        "deployments.go",
         "secrets.go",
         "services.go",
         "upgrade.go",
@@ -17,6 +18,8 @@ go_library(
     tags = ["automanaged"],
     deps = [
         "//pkg/api/v1:go_default_library",
+        "//pkg/apis/extensions/v1beta1:go_default_library",
+        "//pkg/controller/deployment/util:go_default_library",
         "//test/e2e/framework:go_default_library",
         "//vendor:github.com/onsi/ginkgo",
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
