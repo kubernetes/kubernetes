@@ -241,7 +241,9 @@ func createReplicaSetOrFail(clientset *fedclientset.Clientset, namespace string)
 func deleteReplicaSetOrFail(clientset *fedclientset.Clientset, nsName string, replicaSetName string, orphanDependents *bool) {
 	By(fmt.Sprintf("Deleting replica set %q in namespace %q", replicaSetName, nsName))
 	err := clientset.Extensions().ReplicaSets(nsName).Delete(replicaSetName, &metav1.DeleteOptions{OrphanDependents: orphanDependents})
-	framework.ExpectNoError(err, "Error deleting replica set %q in namespace %q", replicaSetName, nsName)
+	if err != nil && !errors.IsNotFound(err) {
+		framework.ExpectNoError(err, "Error deleting replica set %q in namespace %q", replicaSetName, nsName)
+	}
 
 	// Wait for the replicaSet to be deleted.
 	err = wait.Poll(5*time.Second, wait.ForeverTestTimeout, func() (bool, error) {
