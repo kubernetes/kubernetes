@@ -204,10 +204,12 @@ func deleteNamespace(orphanDependents *bool, namespace string, getter func(name 
 func waitForNamespaceDeletion(namespace string, getter func(name string, options metav1.GetOptions) (*v1.Namespace, error)) {
 	err := wait.Poll(5*time.Second, 2*time.Minute, func() (bool, error) {
 		_, err := getter(namespace, metav1.GetOptions{})
-		if err != nil && !errors.IsNotFound(err) {
+		if errors.IsNotFound(err) {
+			return true, nil
+		} else if err != nil {
 			return false, err
 		}
-		return true, nil
+		return false, nil
 	})
 	if err != nil {
 		framework.Failf("Namespaces not deleted: %v", err)
