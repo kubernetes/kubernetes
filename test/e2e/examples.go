@@ -460,7 +460,7 @@ var _ = framework.KubeDescribe("[Feature:Example]", func() {
 			By("creating secret and pod")
 			framework.RunKubectlOrDie("create", "-f", filepath.Join(framework.TestContext.OutputDir, secretYaml), nsFlag)
 			framework.RunKubectlOrDie("create", "-f", filepath.Join(framework.TestContext.OutputDir, podYaml), nsFlag)
-			err := framework.WaitForPodNoLongerRunningInNamespace(c, podName, ns, "")
+			err := framework.WaitForPodNoLongerRunningInNamespace(c, podName, ns)
 			Expect(err).NotTo(HaveOccurred())
 
 			By("checking if secret was read correctly")
@@ -482,7 +482,7 @@ var _ = framework.KubeDescribe("[Feature:Example]", func() {
 
 			By("creating the pod")
 			framework.RunKubectlOrDie("create", "-f", filepath.Join(framework.TestContext.OutputDir, podYaml), nsFlag)
-			err := framework.WaitForPodNoLongerRunningInNamespace(c, podName, ns, "")
+			err := framework.WaitForPodNoLongerRunningInNamespace(c, podName, ns)
 			Expect(err).NotTo(HaveOccurred())
 
 			By("checking if name and namespace were passed correctly")
