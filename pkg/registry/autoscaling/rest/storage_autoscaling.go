@@ -23,6 +23,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/autoscaling"
 	autoscalingapiv1 "k8s.io/kubernetes/pkg/apis/autoscaling/v1"
+	autoscalingapiv2alpha1 "k8s.io/kubernetes/pkg/apis/autoscaling/v2alpha1"
 	horizontalpodautoscalerstore "k8s.io/kubernetes/pkg/registry/autoscaling/horizontalpodautoscaler/storage"
 )
 
@@ -35,12 +36,28 @@ func (p RESTStorageProvider) NewRESTStorage(apiResourceConfigSource genericapise
 		apiGroupInfo.VersionedResourcesStorageMap[autoscalingapiv1.SchemeGroupVersion.Version] = p.v1Storage(apiResourceConfigSource, restOptionsGetter)
 		apiGroupInfo.GroupMeta.GroupVersion = autoscalingapiv1.SchemeGroupVersion
 	}
+	if apiResourceConfigSource.AnyResourcesForVersionEnabled(autoscalingapiv2alpha1.SchemeGroupVersion) {
+		apiGroupInfo.VersionedResourcesStorageMap[autoscalingapiv2alpha1.SchemeGroupVersion.Version] = p.v2alpha1Storage(apiResourceConfigSource, restOptionsGetter)
+		apiGroupInfo.GroupMeta.GroupVersion = autoscalingapiv2alpha1.SchemeGroupVersion
+	}
 
 	return apiGroupInfo, true
 }
 
 func (p RESTStorageProvider) v1Storage(apiResourceConfigSource genericapiserver.APIResourceConfigSource, restOptionsGetter generic.RESTOptionsGetter) map[string]rest.Storage {
 	version := autoscalingapiv1.SchemeGroupVersion
+
+	storage := map[string]rest.Storage{}
+	if apiResourceConfigSource.ResourceEnabled(version.WithResource("horizontalpodautoscalers")) {
+		hpaStorage, hpaStatusStorage := horizontalpodautoscalerstore.NewREST(restOptionsGetter)
+		storage["horizontalpodautoscalers"] = hpaStorage
+		storage["horizontalpodautoscalers/status"] = hpaStatusStorage
+	}
+	return storage
+}
+
+func (p RESTStorageProvider) v2alpha1Storage(apiResourceConfigSource genericapiserver.APIResourceConfigSource, restOptionsGetter generic.RESTOptionsGetter) map[string]rest.Storage {
+	version := autoscalingapiv2alpha1.SchemeGroupVersion
 
 	storage := map[string]rest.Storage{}
 	if apiResourceConfigSource.ResourceEnabled(version.WithResource("horizontalpodautoscalers")) {

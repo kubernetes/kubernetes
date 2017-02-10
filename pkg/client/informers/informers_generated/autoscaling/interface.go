@@ -21,6 +21,7 @@ package autoscaling
 import (
 	internalversion "k8s.io/kubernetes/pkg/client/informers/informers_generated/autoscaling/internalversion"
 	v1 "k8s.io/kubernetes/pkg/client/informers/informers_generated/autoscaling/v1"
+	v2alpha1 "k8s.io/kubernetes/pkg/client/informers/informers_generated/autoscaling/v2alpha1"
 	internalinterfaces "k8s.io/kubernetes/pkg/client/informers/informers_generated/internalinterfaces"
 )
 
@@ -30,6 +31,8 @@ type Interface interface {
 	InternalVersion() internalversion.Interface
 	// V1 provides access to shared informers for resources in V1.
 	V1() v1.Interface
+	// V2alpha1 provides access to shared informers for resources in V2alpha1.
+	V2alpha1() v2alpha1.Interface
 }
 
 type group struct {
@@ -49,4 +52,9 @@ func (g *group) InternalVersion() internalversion.Interface {
 // V1 returns a new v1.Interface.
 func (g *group) V1() v1.Interface {
 	return v1.New(g.SharedInformerFactory)
+}
+
+// V2alpha1 returns a new v2alpha1.Interface.
+func (g *group) V2alpha1() v2alpha1.Interface {
+	return v2alpha1.New(g.SharedInformerFactory)
 }

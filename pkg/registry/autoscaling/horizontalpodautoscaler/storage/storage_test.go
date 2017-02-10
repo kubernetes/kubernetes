@@ -20,6 +20,7 @@ import (
 	"testing"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/autoscaling"
 	// Ensure that autoscaling/v1 package is initialized.
 	"k8s.io/apimachinery/pkg/fields"
@@ -55,8 +56,16 @@ func validNewHorizontalPodAutoscaler(name string) *autoscaling.HorizontalPodAuto
 				Kind: "ReplicationController",
 				Name: "myrc",
 			},
-			MaxReplicas:                    5,
-			TargetCPUUtilizationPercentage: &cpu,
+			MaxReplicas: 5,
+			Metrics: []autoscaling.MetricSpec{
+				{
+					Type: autoscaling.ResourceMetricSourceType,
+					Resource: &autoscaling.ResourceMetricSource{
+						Name: api.ResourceCPU,
+						TargetAverageUtilization: &cpu,
+					},
+				},
+			},
 		},
 	}
 }
