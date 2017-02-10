@@ -55,6 +55,10 @@ func (cm *unsupportedContainerManager) Status() Status {
 	return Status{}
 }
 
+func (cm *unsupportedContainerManager) GetNodeAllocatable() v1.ResourceList {
+	return nil
+}
+
 func (cm *unsupportedContainerManager) NewPodContainerManager() PodContainerManager {
 	return &unsupportedPodContainerManager{}
 }
