@@ -26,20 +26,20 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/uuid"
-	clientv1 "k8s.io/client-go/pkg/api/v1"
 	"k8s.io/client-go/tools/cache"
-	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
 	apps "k8s.io/kubernetes/pkg/apis/apps/v1beta1"
 	extensions "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	policy "k8s.io/kubernetes/pkg/apis/policy/v1beta1"
-	"k8s.io/kubernetes/pkg/client/legacylisters"
+	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated"
 	"k8s.io/kubernetes/pkg/controller"
 )
 
 type pdbStates map[string]policy.PodDisruptionBudget
+
+var alwaysReady = func() bool { return true }
 
 func (ps *pdbStates) Set(pdb *policy.PodDisruptionBudget) error {
 	key, err := controller.KeyFunc(pdb)
@@ -85,23 +85,48 @@ func (ps *pdbStates) VerifyDisruptionAllowed(t *testing.T, key string, disruptio
 	}
 }
 
-func newFakeDisruptionController() (*DisruptionController, *pdbStates) {
+type disruptionController struct {
+	*DisruptionController
+
+	podStore cache.Store
+	pdbStore cache.Store
+	rcStore  cache.Store
+	rsStore  cache.Store
+	dStore   cache.Store
+	ssStore  cache.Store
+}
+
+func newFakeDisruptionController() (*disruptionController, *pdbStates) {
 	ps := &pdbStates{}
 
-	dc := &DisruptionController{
-		pdbLister:   listers.StoreToPodDisruptionBudgetLister{Store: cache.NewStore(controller.KeyFunc)},
-		podLister:   listers.StoreToPodLister{Indexer: cache.NewIndexer(controller.KeyFunc, cache.Indexers{})},
-		rcLister:    listers.StoreToReplicationControllerLister{Indexer: cache.NewIndexer(controller.KeyFunc, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})},
-		rsLister:    listers.StoreToReplicaSetLister{Indexer: cache.NewIndexer(controller.KeyFunc, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})},
-		dLister:     listers.StoreToDeploymentLister{Indexer: cache.NewIndexer(controller.KeyFunc, cache.Indexers{})},
-		ssLister:    listers.StoreToStatefulSetLister{Store: cache.NewStore(controller.KeyFunc)},
-		getUpdater:  func() updater { return ps.Set },
-		broadcaster: record.NewBroadcaster(),
-	}
+	informerFactory := informers.NewSharedInformerFactory(nil, nil, controller.NoResyncPeriodFunc())
 
-	dc.recorder = dc.broadcaster.NewRecorder(api.Scheme, clientv1.EventSource{Component: "disruption_test"})
+	dc := NewDisruptionController(
+		informerFactory.Core().V1().Pods(),
+		informerFactory.Policy().V1beta1().PodDisruptionBudgets(),
+		informerFactory.Core().V1().ReplicationControllers(),
+		informerFactory.Extensions().V1beta1().ReplicaSets(),
+		informerFactory.Extensions().V1beta1().Deployments(),
+		informerFactory.Apps().V1beta1().StatefulSets(),
+		nil,
+	)
+	dc.getUpdater = func() updater { return ps.Set }
+	dc.podListerSynced = alwaysReady
+	dc.pdbListerSynced = alwaysReady
+	dc.rcListerSynced = alwaysReady
+	dc.rsListerSynced = alwaysReady
+	dc.dListerSynced = alwaysReady
+	dc.ssListerSynced = alwaysReady
 
-	return dc, ps
+	return &disruptionController{
+		dc,
+		informerFactory.Core().V1().Pods().Informer().GetStore(),
+		informerFactory.Policy().V1beta1().PodDisruptionBudgets().Informer().GetStore(),
+		informerFactory.Core().V1().ReplicationControllers().Informer().GetStore(),
+		informerFactory.Extensions().V1beta1().ReplicaSets().Informer().GetStore(),
+		informerFactory.Extensions().V1beta1().Deployments().Informer().GetStore(),
+		informerFactory.Apps().V1beta1().StatefulSets().Informer().GetStore(),
+	}, ps
 }
 
 func fooBar() map[string]string {
@@ -283,11 +308,11 @@ func TestNoSelector(t *testing.T) {
 	pdb.Spec.Selector = &metav1.LabelSelector{}
 	pod, _ := newPod(t, "yo-yo-yo")
 
-	add(t, dc.pdbLister.Store, pdb)
+	add(t, dc.pdbStore, pdb)
 	dc.sync(pdbName)
 	ps.VerifyPdbStatus(t, pdbName, 0, 0, 3, 0, map[string]metav1.Time{})
 
-	add(t, dc.podLister.Indexer, pod)
+	add(t, dc.podStore, pod)
 	dc.sync(pdbName)
 	ps.VerifyPdbStatus(t, pdbName, 0, 0, 3, 0, map[string]metav1.Time{})
 }
@@ -298,7 +323,7 @@ func TestUnavailable(t *testing.T) {
 	dc, ps := newFakeDisruptionController()
 
 	pdb, pdbName := newPodDisruptionBudget(t, intstr.FromInt(3))
-	add(t, dc.pdbLister.Store, pdb)
+	add(t, dc.pdbStore, pdb)
 	dc.sync(pdbName)
 
 	// Add three pods, verifying that the counts go up at each step.
@@ -307,14 +332,14 @@ func TestUnavailable(t *testing.T) {
 		ps.VerifyPdbStatus(t, pdbName, 0, i, 3, i, map[string]metav1.Time{})
 		pod, _ := newPod(t, fmt.Sprintf("yo-yo-yo %d", i))
 		pods = append(pods, pod)
-		add(t, dc.podLister.Indexer, pod)
+		add(t, dc.podStore, pod)
 		dc.sync(pdbName)
 	}
 	ps.VerifyPdbStatus(t, pdbName, 1, 4, 3, 4, map[string]metav1.Time{})
 
 	// Now set one pod as unavailable
 	pods[0].Status.Conditions = []v1.PodCondition{}
-	update(t, dc.podLister.Indexer, pods[0])
+	update(t, dc.podStore, pods[0])
 	dc.sync(pdbName)
 
 	// Verify expected update
@@ -327,13 +352,13 @@ func TestNakedPod(t *testing.T) {
 	dc, ps := newFakeDisruptionController()
 
 	pdb, pdbName := newPodDisruptionBudget(t, intstr.FromString("28%"))
-	add(t, dc.pdbLister.Store, pdb)
+	add(t, dc.pdbStore, pdb)
 	dc.sync(pdbName)
 	// This verifies that when a PDB has 0 pods, disruptions are not allowed.
 	ps.VerifyDisruptionAllowed(t, pdbName, 0)
 
 	pod, _ := newPod(t, "naked")
-	add(t, dc.podLister.Indexer, pod)
+	add(t, dc.podStore, pod)
 	dc.sync(pdbName)
 
 	ps.VerifyDisruptionAllowed(t, pdbName, 0)
@@ -344,13 +369,13 @@ func TestReplicaSet(t *testing.T) {
 	dc, ps := newFakeDisruptionController()
 
 	pdb, pdbName := newPodDisruptionBudget(t, intstr.FromString("20%"))
-	add(t, dc.pdbLister.Store, pdb)
+	add(t, dc.pdbStore, pdb)
 
 	rs, _ := newReplicaSet(t, 10)
-	add(t, dc.rsLister.Indexer, rs)
+	add(t, dc.rsStore, rs)
 
 	pod, _ := newPod(t, "pod")
-	add(t, dc.podLister.Indexer, pod)
+	add(t, dc.podStore, pod)
 	dc.sync(pdbName)
 	ps.VerifyPdbStatus(t, pdbName, 0, 1, 2, 10, map[string]metav1.Time{})
 }
@@ -363,11 +388,11 @@ func TestMultipleControllers(t *testing.T) {
 	dc, ps := newFakeDisruptionController()
 
 	pdb, pdbName := newPodDisruptionBudget(t, intstr.FromString("1%"))
-	add(t, dc.pdbLister.Store, pdb)
+	add(t, dc.pdbStore, pdb)
 
 	for i := 0; i < podCount; i++ {
 		pod, _ := newPod(t, fmt.Sprintf("pod %d", i))
-		add(t, dc.podLister.Indexer, pod)
+		add(t, dc.podStore, pod)
 	}
 	dc.sync(pdbName)
 
@@ -376,7 +401,7 @@ func TestMultipleControllers(t *testing.T) {
 
 	rc, _ := newReplicationController(t, 1)
 	rc.Name = "rc 1"
-	add(t, dc.rcLister.Indexer, rc)
+	add(t, dc.rcStore, rc)
 	dc.sync(pdbName)
 
 	// One RC and 200%>1% healthy => disruption allowed
@@ -384,7 +409,7 @@ func TestMultipleControllers(t *testing.T) {
 
 	rc, _ = newReplicationController(t, 1)
 	rc.Name = "rc 2"
-	add(t, dc.rcLister.Indexer, rc)
+	add(t, dc.rcStore, rc)
 	dc.sync(pdbName)
 
 	// 100%>1% healthy BUT two RCs => no disruption allowed
@@ -405,10 +430,10 @@ func TestReplicationController(t *testing.T) {
 
 	// 34% should round up to 2
 	pdb, pdbName := newPodDisruptionBudget(t, intstr.FromString("34%"))
-	add(t, dc.pdbLister.Store, pdb)
+	add(t, dc.pdbStore, pdb)
 	rc, _ := newReplicationController(t, 3)
 	rc.Spec.Selector = labels
-	add(t, dc.rcLister.Indexer, rc)
+	add(t, dc.rcStore, rc)
 	dc.sync(pdbName)
 
 	// It starts out at 0 expected because, with no pods, the PDB doesn't know
@@ -421,7 +446,7 @@ func TestReplicationController(t *testing.T) {
 		pod, _ := newPod(t, fmt.Sprintf("foobar %d", i))
 		pods = append(pods, pod)
 		pod.Labels = labels
-		add(t, dc.podLister.Indexer, pod)
+		add(t, dc.podStore, pod)
 		dc.sync(pdbName)
 		if i < 2 {
 			ps.VerifyPdbStatus(t, pdbName, 0, i+1, 2, 3, map[string]metav1.Time{})
@@ -431,7 +456,7 @@ func TestReplicationController(t *testing.T) {
 	}
 
 	rogue, _ := newPod(t, "rogue")
-	add(t, dc.podLister.Indexer, rogue)
+	add(t, dc.podStore, rogue)
 	dc.sync(pdbName)
 	ps.VerifyDisruptionAllowed(t, pdbName, 0)
 }
@@ -446,9 +471,9 @@ func TestStatefulSetController(t *testing.T) {
 
 	// 34% should round up to 2
 	pdb, pdbName := newPodDisruptionBudget(t, intstr.FromString("34%"))
-	add(t, dc.pdbLister.Store, pdb)
+	add(t, dc.pdbStore, pdb)
 	ss, _ := newStatefulSet(t, 3)
-	add(t, dc.ssLister.Store, ss)
+	add(t, dc.ssStore, ss)
 	dc.sync(pdbName)
 
 	// It starts out at 0 expected because, with no pods, the PDB doesn't know
@@ -461,7 +486,7 @@ func TestStatefulSetController(t *testing.T) {
 		pod, _ := newPod(t, fmt.Sprintf("foobar %d", i))
 		pods = append(pods, pod)
 		pod.Labels = labels
-		add(t, dc.podLister.Indexer, pod)
+		add(t, dc.podStore, pod)
 		dc.sync(pdbName)
 		if i < 2 {
 			ps.VerifyPdbStatus(t, pdbName, 0, i+1, 2, 3, map[string]metav1.Time{})
@@ -494,10 +519,10 @@ func TestTwoControllers(t *testing.T) {
 	const minimumTwo int32 = 7        // integer minimum with two controllers
 
 	pdb, pdbName := newPodDisruptionBudget(t, intstr.FromString("28%"))
-	add(t, dc.pdbLister.Store, pdb)
+	add(t, dc.pdbStore, pdb)
 	rc, _ := newReplicationController(t, collectionSize)
 	rc.Spec.Selector = rcLabels
-	add(t, dc.rcLister.Indexer, rc)
+	add(t, dc.rcStore, rc)
 	dc.sync(pdbName)
 
 	ps.VerifyPdbStatus(t, pdbName, 0, 0, 0, 0, map[string]metav1.Time{})
@@ -512,7 +537,7 @@ func TestTwoControllers(t *testing.T) {
 		if i <= unavailablePods {
 			pod.Status.Conditions = []v1.PodCondition{}
 		}
-		add(t, dc.podLister.Indexer, pod)
+		add(t, dc.podStore, pod)
 		dc.sync(pdbName)
 		if i <= unavailablePods {
 			ps.VerifyPdbStatus(t, pdbName, 0, 0, minimumOne, collectionSize, map[string]metav1.Time{})
@@ -525,14 +550,14 @@ func TestTwoControllers(t *testing.T) {
 
 	d, _ := newDeployment(t, collectionSize)
 	d.Spec.Selector = newSel(dLabels)
-	add(t, dc.dLister.Indexer, d)
+	add(t, dc.dStore, d)
 	dc.sync(pdbName)
 	ps.VerifyPdbStatus(t, pdbName, 1, minimumOne+1, minimumOne, collectionSize, map[string]metav1.Time{})
 
 	rs, _ := newReplicaSet(t, collectionSize)
 	rs.Spec.Selector = newSel(dLabels)
 	rs.Labels = dLabels
-	add(t, dc.rsLister.Indexer, rs)
+	add(t, dc.rsStore, rs)
 	dc.sync(pdbName)
 	ps.VerifyPdbStatus(t, pdbName, 1, minimumOne+1, minimumOne, collectionSize, map[string]metav1.Time{})
 
@@ -545,7 +570,7 @@ func TestTwoControllers(t *testing.T) {
 		if i <= unavailablePods {
 			pod.Status.Conditions = []v1.PodCondition{}
 		}
-		add(t, dc.podLister.Indexer, pod)
+		add(t, dc.podStore, pod)
 		dc.sync(pdbName)
 		if i <= unavailablePods {
 			ps.VerifyPdbStatus(t, pdbName, 0, minimumOne+1, minimumTwo, 2*collectionSize, map[string]metav1.Time{})
@@ -562,17 +587,17 @@ func TestTwoControllers(t *testing.T) {
 	// verify that a disruption is permitted again.
 	ps.VerifyPdbStatus(t, pdbName, 2, 2+minimumTwo, minimumTwo, 2*collectionSize, map[string]metav1.Time{})
 	pods[collectionSize-1].Status.Conditions = []v1.PodCondition{}
-	update(t, dc.podLister.Indexer, pods[collectionSize-1])
+	update(t, dc.podStore, pods[collectionSize-1])
 	dc.sync(pdbName)
 	ps.VerifyPdbStatus(t, pdbName, 1, 1+minimumTwo, minimumTwo, 2*collectionSize, map[string]metav1.Time{})
 
 	pods[collectionSize-2].Status.Conditions = []v1.PodCondition{}
-	update(t, dc.podLister.Indexer, pods[collectionSize-2])
+	update(t, dc.podStore, pods[collectionSize-2])
 	dc.sync(pdbName)
 	ps.VerifyPdbStatus(t, pdbName, 0, minimumTwo, minimumTwo, 2*collectionSize, map[string]metav1.Time{})
 
 	pods[collectionSize-1].Status.Conditions = []v1.PodCondition{{Type: v1.PodReady, Status: v1.ConditionTrue}}
-	update(t, dc.podLister.Indexer, pods[collectionSize-1])
+	update(t, dc.podStore, pods[collectionSize-1])
 	dc.sync(pdbName)
 	ps.VerifyPdbStatus(t, pdbName, 1, 1+minimumTwo, minimumTwo, 2*collectionSize, map[string]metav1.Time{})
 }
@@ -581,7 +606,7 @@ func TestTwoControllers(t *testing.T) {
 func TestPDBNotExist(t *testing.T) {
 	dc, _ := newFakeDisruptionController()
 	pdb, _ := newPodDisruptionBudget(t, intstr.FromString("67%"))
-	add(t, dc.pdbLister.Store, pdb)
+	add(t, dc.pdbStore, pdb)
 	if err := dc.sync("notExist"); err != nil {
 		t.Errorf("Unexpected error: %v, expect nil", err)
 	}
@@ -598,16 +623,16 @@ func TestUpdateDisruptedPods(t *testing.T) {
 		"p3":       {Time: currentTime},                       // Should remain, pod untouched.
 		"notthere": {Time: currentTime},                       // Should be removed, pod deleted.
 	}
-	add(t, dc.pdbLister.Store, pdb)
+	add(t, dc.pdbStore, pdb)
 
 	pod1, _ := newPod(t, "p1")
 	pod1.DeletionTimestamp = &metav1.Time{Time: time.Now()}
 	pod2, _ := newPod(t, "p2")
 	pod3, _ := newPod(t, "p3")
 
-	add(t, dc.podLister.Indexer, pod1)
-	add(t, dc.podLister.Indexer, pod2)
-	add(t, dc.podLister.Indexer, pod3)
+	add(t, dc.podStore, pod1)
+	add(t, dc.podStore, pod2)
+	add(t, dc.podStore, pod3)
 
 	dc.sync(pdbName)
 

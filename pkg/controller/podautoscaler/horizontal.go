@@ -25,9 +25,7 @@ import (
 	"github.com/golang/glog"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
-	"k8s.io/apimachinery/pkg/watch"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	clientv1 "k8s.io/client-go/pkg/api/v1"
 	"k8s.io/client-go/tools/cache"
@@ -38,6 +36,8 @@ import (
 	extensionsv1beta1 "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	unversionedautoscaling "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/autoscaling/v1"
 	unversionedextensions "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/extensions/v1beta1"
+	autoscalinginformers "k8s.io/kubernetes/pkg/client/informers/informers_generated/autoscaling/v1"
+	autoscalinglisters "k8s.io/kubernetes/pkg/client/listers/autoscaling/v1"
 )
 
 const (
@@ -65,27 +65,36 @@ type HorizontalController struct {
 	replicaCalc   *ReplicaCalculator
 	eventRecorder record.EventRecorder
 
-	// A store of HPA objects, populated by the controller.
-	store cache.Store
-	// Watches changes to all HPA objects.
-	controller cache.Controller
+	// hpaLister is able to list/get HPAs from the shared cache from the informer passed in to
+	// NewHorizontalController.
+	hpaLister       autoscalinglisters.HorizontalPodAutoscalerLister
+	hpaListerSynced cache.InformerSynced
 }
 
 var downscaleForbiddenWindow = 5 * time.Minute
 var upscaleForbiddenWindow = 3 * time.Minute
 
-func newInformer(controller *HorizontalController, resyncPeriod time.Duration) (cache.Store, cache.Controller) {
-	return cache.NewInformer(
-		&cache.ListWatch{
-			ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
-				return controller.hpaNamespacer.HorizontalPodAutoscalers(metav1.NamespaceAll).List(options)
-			},
-			WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
-				return controller.hpaNamespacer.HorizontalPodAutoscalers(metav1.NamespaceAll).Watch(options)
-			},
-		},
-		&autoscaling.HorizontalPodAutoscaler{},
-		resyncPeriod,
+func NewHorizontalController(
+	evtNamespacer v1core.EventsGetter,
+	scaleNamespacer unversionedextensions.ScalesGetter,
+	hpaNamespacer unversionedautoscaling.HorizontalPodAutoscalersGetter,
+	replicaCalc *ReplicaCalculator,
+	hpaInformer autoscalinginformers.HorizontalPodAutoscalerInformer,
+	resyncPeriod time.Duration,
+) *HorizontalController {
+	broadcaster := record.NewBroadcaster()
+	// TODO: remove the wrapper when every clients have moved to use the clientset.
+	broadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: evtNamespacer.Events("")})
+	recorder := broadcaster.NewRecorder(api.Scheme, clientv1.EventSource{Component: "horizontal-pod-autoscaler"})
+
+	controller := &HorizontalController{
+		replicaCalc:     replicaCalc,
+		eventRecorder:   recorder,
+		scaleNamespacer: scaleNamespacer,
+		hpaNamespacer:   hpaNamespacer,
+	}
+
+	hpaInformer.Informer().AddEventHandlerWithResyncPeriod(
 		cache.ResourceEventHandlerFuncs{
 			AddFunc: func(obj interface{}) {
 				hpa := obj.(*autoscaling.HorizontalPodAutoscaler)
@@ -108,31 +117,24 @@ func newInformer(controller *HorizontalController, resyncPeriod time.Duration) (
 			},
 			// We are not interested in deletions.
 		},
+		resyncPeriod,
 	)
-}
-
-func NewHorizontalController(evtNamespacer v1core.EventsGetter, scaleNamespacer unversionedextensions.ScalesGetter, hpaNamespacer unversionedautoscaling.HorizontalPodAutoscalersGetter, replicaCalc *ReplicaCalculator, resyncPeriod time.Duration) *HorizontalController {
-	broadcaster := record.NewBroadcaster()
-	broadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: evtNamespacer.Events("")})
-	recorder := broadcaster.NewRecorder(api.Scheme, clientv1.EventSource{Component: "horizontal-pod-autoscaler"})
-
-	controller := &HorizontalController{
-		replicaCalc:     replicaCalc,
-		eventRecorder:   recorder,
-		scaleNamespacer: scaleNamespacer,
-		hpaNamespacer:   hpaNamespacer,
-	}
-	store, frameworkController := newInformer(controller, resyncPeriod)
-	controller.store = store
-	controller.controller = frameworkController
+	controller.hpaLister = hpaInformer.Lister()
+	controller.hpaListerSynced = hpaInformer.Informer().HasSynced
 
 	return controller
 }
 
 func (a *HorizontalController) Run(stopCh <-chan struct{}) {
 	defer utilruntime.HandleCrash()
+
 	glog.Infof("Starting HPA Controller")
-	go a.controller.Run(stopCh)
+
+	if !cache.WaitForCacheSync(stopCh, a.hpaListerSynced) {
+		utilruntime.HandleError(fmt.Errorf("timed out waiting for caches to sync"))
+		return
+	}
+
 	<-stopCh
 	glog.Infof("Shutting down HPA Controller")
 }
@@ -412,11 +414,18 @@ func shouldScale(hpa *autoscaling.HorizontalPodAutoscaler, currentReplicas, desi
 func (a *HorizontalController) updateCurrentReplicasInStatus(hpa *autoscaling.HorizontalPodAutoscaler, currentReplicas int32) {
 	err := a.updateStatus(hpa, currentReplicas, hpa.Status.DesiredReplicas, hpa.Status.CurrentCPUUtilizationPercentage, hpa.Annotations[HpaCustomMetricsStatusAnnotationName], false)
 	if err != nil {
-		glog.Errorf("%v", err)
+		utilruntime.HandleError(err)
 	}
 }
 
 func (a *HorizontalController) updateStatus(hpa *autoscaling.HorizontalPodAutoscaler, currentReplicas, desiredReplicas int32, cpuCurrentUtilization *int32, cmStatus string, rescale bool) error {
+	// Make a copy so we don't mutate the object in the shared cache
+	copy, err := api.Scheme.DeepCopy(hpa)
+	if err != nil {
+		return nil
+	}
+	hpa = copy.(*autoscaling.HorizontalPodAutoscaler)
+
 	hpa.Status = autoscaling.HorizontalPodAutoscalerStatus{
 		CurrentReplicas:                 currentReplicas,
 		DesiredReplicas:                 desiredReplicas,
@@ -432,7 +441,7 @@ func (a *HorizontalController) updateStatus(hpa *autoscaling.HorizontalPodAutosc
 		hpa.Status.LastScaleTime = &now
 	}
 
-	_, err := a.hpaNamespacer.HorizontalPodAutoscalers(hpa.Namespace).UpdateStatus(hpa)
+	_, err = a.hpaNamespacer.HorizontalPodAutoscalers(hpa.Namespace).UpdateStatus(hpa)
 	if err != nil {
 		a.eventRecorder.Event(hpa, v1.EventTypeWarning, "FailedUpdateStatus", err.Error())
 		return fmt.Errorf("failed to update status for %s: %v", hpa.Name, err)
