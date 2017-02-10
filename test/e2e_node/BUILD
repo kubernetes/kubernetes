@@ -50,7 +50,6 @@ go_test(
     name = "go_default_test",
     srcs = [
         "apparmor_test.go",
-        "cgroup_manager_test.go",
         "container_manager_test.go",
         "density_test.go",
         "disk_eviction_test.go",
@@ -64,6 +63,8 @@ go_test(
         "log_path_test.go",
         "memory_eviction_test.go",
         "mirror_pod_test.go",
+        "node_container_manager_test.go",
+        "pods_container_manager_test.go",
         "resource_usage_test.go",
         "restart_test.go",
         "runtime_conformance_test.go",
@@ -77,6 +78,7 @@ go_test(
     ],
     deps = [
         "//pkg/api/v1:go_default_library",
+        "//pkg/apis/componentconfig:go_default_library",
         "//pkg/client/clientset_generated/clientset:go_default_library",
         "//pkg/kubelet:go_default_library",
         "//pkg/kubelet/api/v1alpha1/stats:go_default_library",
@@ -113,6 +115,7 @@ go_test(
         "//vendor:k8s.io/apimachinery/pkg/util/intstr",
         "//vendor:k8s.io/apimachinery/pkg/util/uuid",
         "//vendor:k8s.io/apimachinery/pkg/watch",
+        "//vendor:k8s.io/client-go/pkg/api",
         "//vendor:k8s.io/client-go/tools/cache",
     ],
 )

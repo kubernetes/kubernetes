@@ -25,6 +25,8 @@ import (
 type ResourceConfig struct {
 	// Memory limit (in bytes).
 	Memory *int64
+	// Hierarchical Memory Accounting.
+	HierarchicalMemoryAccounting bool
 	// CPU shares (relative weight vs. other containers).
 	CpuShares *int64
 	// CPU hardcap limit (in usecs). Allowed cpu time in a given period.

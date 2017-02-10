@@ -41,6 +41,7 @@ import (
 	core "k8s.io/client-go/testing"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset/fake"
+	"k8s.io/kubernetes/pkg/kubelet/cm"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/util/sliceutils"
 	"k8s.io/kubernetes/pkg/version"
@@ -109,6 +110,15 @@ func applyNodeStatusPatch(originalNode *v1.Node, patch []byte) (*v1.Node, error)
 	return updatedNode, nil
 }
 
+type localCM struct {
+	cm.ContainerManager
+	allocatable v1.ResourceList
+}
+
+func (lcm *localCM) GetNodeAllocatableReservation() v1.ResourceList {
+	return lcm.allocatable
+}
+
 func TestUpdateNewNodeStatus(t *testing.T) {
 	// generate one more than maxImagesInNodeStatus in inputImageList
 	inputImageList, expectedImageList := generateTestingImageList(maxImagesInNodeStatus + 1)
@@ -116,6 +126,13 @@ func TestUpdateNewNodeStatus(t *testing.T) {
 		t, inputImageList, false /* controllerAttachDetachEnabled */)
 	defer testKubelet.Cleanup()
 	kubelet := testKubelet.kubelet
+	kubelet.containerManager = &localCM{
+		ContainerManager: cm.NewStubContainerManager(),
+		allocatable: v1.ResourceList{
+			v1.ResourceCPU:    *resource.NewMilliQuantity(200, resource.DecimalSI),
+			v1.ResourceMemory: *resource.NewQuantity(100E6, resource.BinarySI),
+		},
+	}
 	kubeClient := testKubelet.fakeKubeClient
 	existingNode := v1.Node{ObjectMeta: metav1.ObjectMeta{Name: testKubeletHostname}}
 	kubeClient.ReactionChain = fake.NewSimpleClientset(&v1.NodeList{Items: []v1.Node{existingNode}}).ReactionChain
@@ -332,6 +349,14 @@ func TestUpdateExistingNodeStatus(t *testing.T) {
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
 	defer testKubelet.Cleanup()
 	kubelet := testKubelet.kubelet
+	kubelet.containerManager = &localCM{
+		ContainerManager: cm.NewStubContainerManager(),
+		allocatable: v1.ResourceList{
+			v1.ResourceCPU:    *resource.NewMilliQuantity(200, resource.DecimalSI),
+			v1.ResourceMemory: *resource.NewQuantity(100E6, resource.BinarySI),
+		},
+	}
+
 	kubeClient := testKubelet.fakeKubeClient
 	existingNode := v1.Node{
 		ObjectMeta: metav1.ObjectMeta{Name: testKubeletHostname},
@@ -377,9 +402,10 @@ func TestUpdateExistingNodeStatus(t *testing.T) {
 				v1.ResourcePods:   *resource.NewQuantity(0, resource.DecimalSI),
 			},
 			Allocatable: v1.ResourceList{
-				v1.ResourceCPU:    *resource.NewMilliQuantity(2800, resource.DecimalSI),
-				v1.ResourceMemory: *resource.NewQuantity(19900E6, resource.BinarySI),
-				v1.ResourcePods:   *resource.NewQuantity(0, resource.DecimalSI),
+				v1.ResourceCPU:       *resource.NewMilliQuantity(2800, resource.DecimalSI),
+				v1.ResourceMemory:    *resource.NewQuantity(19900E6, resource.BinarySI),
+				v1.ResourcePods:      *resource.NewQuantity(0, resource.DecimalSI),
+				v1.ResourceNvidiaGPU: *resource.NewQuantity(0, resource.DecimalSI),
 			},
 		},
 	}
@@ -687,6 +713,14 @@ func TestUpdateNodeStatusWithRuntimeStateError(t *testing.T) {
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
 	defer testKubelet.Cleanup()
 	kubelet := testKubelet.kubelet
+	kubelet.containerManager = &localCM{
+		ContainerManager: cm.NewStubContainerManager(),
+		allocatable: v1.ResourceList{
+			v1.ResourceCPU:    *resource.NewMilliQuantity(200, resource.DecimalSI),
+			v1.ResourceMemory: *resource.NewQuantity(100E6, resource.BinarySI),
+		},
+	}
+
 	clock := testKubelet.fakeClock
 	kubeClient := testKubelet.fakeKubeClient
 	existingNode := v1.Node{ObjectMeta: metav1.ObjectMeta{Name: testKubeletHostname}}
