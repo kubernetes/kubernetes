@@ -1789,7 +1789,6 @@ func (kl *Kubelet) syncLoopIteration(configCh <-chan kubetypes.PodUpdate, handle
 		// takes place only after kubelet calls the update handler to process
 		// the update to ensure the internal pod cache is up-to-date.
 		kl.sourcesReady.AddSource(u.Source)
-
 	case e := <-plegCh:
 		if isSyncPodWorthy(e) {
 			// PLEG event for a pod; sync it.
