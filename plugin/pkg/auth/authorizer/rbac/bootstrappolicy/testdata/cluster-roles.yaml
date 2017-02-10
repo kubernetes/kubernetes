@@ -444,14 +444,16 @@ items:
     verbs:
     - update
   - apiGroups:
-    - '*'
+    - ""
     resources:
+    - configmaps
     - namespaces
     - nodes
     - persistentvolumeclaims
     - persistentvolumes
     - pods
     - replicationcontrollers
+    - resourcequotas
     - secrets
     - serviceaccounts
     - services
@@ -493,6 +495,13 @@ items:
     - autoscaling
     resources:
     - horizontalpodautoscalers
+    verbs:
+    - list
+    - watch
+  - apiGroups:
+    - certificates.k8s.io
+    resources:
+    - certificatesigningrequests
     verbs:
     - list
     - watch

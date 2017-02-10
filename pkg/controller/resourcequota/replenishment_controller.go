@@ -22,19 +22,15 @@ import (
 	"github.com/golang/glog"
 
 	"k8s.io/apimachinery/pkg/api/meta"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
-	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
+	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated/externalversions"
 	"k8s.io/kubernetes/pkg/controller"
-	"k8s.io/kubernetes/pkg/controller/informers"
 	"k8s.io/kubernetes/pkg/quota/evaluator/core"
-	"k8s.io/kubernetes/pkg/util/metrics"
 )
 
 // ReplenishmentFunc is a function that is invoked when controller sees a change
@@ -45,6 +41,8 @@ type ReplenishmentFunc func(groupKind schema.GroupKind, namespace string, object
 // how to configure a controller that can inform the quota system it should
 // replenish quota
 type ReplenishmentControllerOptions struct {
+	// The shared informer factory
+	SharedInformerFactory informers.SharedInformerFactory
 	// The kind monitored for replenishment
 	GroupKind schema.GroupKind
 	// The period that should be used to re-sync the monitored resource
@@ -87,160 +85,85 @@ func ObjectReplenishmentDeleteFunc(options *ReplenishmentControllerOptions) func
 	}
 }
 
-// ReplenishmentControllerFactory knows how to build replenishment controllers
-type ReplenishmentControllerFactory interface {
-	// NewController returns a controller configured with the specified options.
-	// This method is NOT thread-safe.
-	NewController(options *ReplenishmentControllerOptions) (cache.Controller, error)
-}
-
-// replenishmentControllerFactory implements ReplenishmentControllerFactory
-type replenishmentControllerFactory struct {
-	kubeClient            clientset.Interface
-	sharedInformerFactory informers.SharedInformerFactory
-}
-
-// NewReplenishmentControllerFactory returns a factory that knows how to build controllers
-// to replenish resources when updated or deleted
-func NewReplenishmentControllerFactory(f informers.SharedInformerFactory, kubeClient clientset.Interface) ReplenishmentControllerFactory {
-	return &replenishmentControllerFactory{
-		kubeClient:            kubeClient,
-		sharedInformerFactory: f,
-	}
-}
-
-// NewReplenishmentControllerFactoryFromClient returns a factory that knows how to build controllers to replenish resources
-// when updated or deleted using the specified client.
-func NewReplenishmentControllerFactoryFromClient(kubeClient clientset.Interface) ReplenishmentControllerFactory {
-	return NewReplenishmentControllerFactory(nil, kubeClient)
-}
-
-// controllerFor returns a replenishment controller for the specified group resource.
-func controllerFor(
-	groupResource schema.GroupResource,
-	f informers.SharedInformerFactory,
-	handlerFuncs cache.ResourceEventHandlerFuncs,
-) (cache.Controller, error) {
-	genericInformer, err := f.ForResource(groupResource)
-	if err != nil {
-		return nil, err
-	}
-	informer := genericInformer.Informer()
-	informer.AddEventHandler(handlerFuncs)
-	return informer.GetController(), nil
-}
-
-func (r *replenishmentControllerFactory) NewController(options *ReplenishmentControllerOptions) (result cache.Controller, err error) {
-	if r.kubeClient != nil && r.kubeClient.Core().RESTClient().GetRateLimiter() != nil {
-		metrics.RegisterMetricAndTrackRateLimiterUsage("replenishment_controller", r.kubeClient.Core().RESTClient().GetRateLimiter())
-	}
+func handleResource(options *ReplenishmentControllerOptions) (cache.InformerSynced, error) {
+	var (
+		informer informers.GenericInformer
+		err      error
+	)
 
 	switch options.GroupKind {
 	case api.Kind("Pod"):
-		if r.sharedInformerFactory != nil {
-			result, err = controllerFor(api.Resource("pods"), r.sharedInformerFactory, cache.ResourceEventHandlerFuncs{
+		informer, err = options.SharedInformerFactory.ForResource(v1.SchemeGroupVersion.WithResource("pods"))
+		if err != nil {
+			return nil, err
+		}
+		informer.Informer().AddEventHandlerWithResyncPeriod(
+			cache.ResourceEventHandlerFuncs{
 				UpdateFunc: PodReplenishmentUpdateFunc(options),
 				DeleteFunc: ObjectReplenishmentDeleteFunc(options),
-			})
-			break
-		}
-		result = informers.NewPodInformer(r.kubeClient, options.ResyncPeriod())
-	case api.Kind("Service"):
-		// TODO move to informer when defined
-		_, result = cache.NewInformer(
-			&cache.ListWatch{
-				ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
-					return r.kubeClient.Core().Services(metav1.NamespaceAll).List(options)
-				},
-				WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
-					return r.kubeClient.Core().Services(metav1.NamespaceAll).Watch(options)
-				},
 			},
-			&v1.Service{},
 			options.ResyncPeriod(),
+		)
+	case api.Kind("Service"):
+		informer, err = options.SharedInformerFactory.ForResource(v1.SchemeGroupVersion.WithResource("services"))
+		if err != nil {
+			return nil, err
+		}
+		informer.Informer().AddEventHandlerWithResyncPeriod(
 			cache.ResourceEventHandlerFuncs{
 				UpdateFunc: ServiceReplenishmentUpdateFunc(options),
 				DeleteFunc: ObjectReplenishmentDeleteFunc(options),
 			},
+			options.ResyncPeriod(),
 		)
 	case api.Kind("ReplicationController"):
-		// TODO move to informer when defined
-		_, result = cache.NewInformer(
-			&cache.ListWatch{
-				ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
-					return r.kubeClient.Core().ReplicationControllers(metav1.NamespaceAll).List(options)
-				},
-				WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
-					return r.kubeClient.Core().ReplicationControllers(metav1.NamespaceAll).Watch(options)
-				},
-			},
-			&v1.ReplicationController{},
-			options.ResyncPeriod(),
+		informer, err = options.SharedInformerFactory.ForResource(v1.SchemeGroupVersion.WithResource("replicationcontrollers"))
+		if err != nil {
+			return nil, err
+		}
+		informer.Informer().AddEventHandlerWithResyncPeriod(
 			cache.ResourceEventHandlerFuncs{
 				DeleteFunc: ObjectReplenishmentDeleteFunc(options),
 			},
+			options.ResyncPeriod(),
 		)
 	case api.Kind("PersistentVolumeClaim"):
-		if r.sharedInformerFactory != nil {
-			result, err = controllerFor(api.Resource("persistentvolumeclaims"), r.sharedInformerFactory, cache.ResourceEventHandlerFuncs{
-				DeleteFunc: ObjectReplenishmentDeleteFunc(options),
-			})
-			break
+		informer, err = options.SharedInformerFactory.ForResource(v1.SchemeGroupVersion.WithResource("persistentvolumeclaims"))
+		if err != nil {
+			return nil, err
 		}
-		// TODO (derekwaynecarr) remove me when we can require a sharedInformerFactory in all code paths...
-		_, result = cache.NewInformer(
-			&cache.ListWatch{
-				ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
-					return r.kubeClient.Core().PersistentVolumeClaims(metav1.NamespaceAll).List(options)
-				},
-				WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
-					return r.kubeClient.Core().PersistentVolumeClaims(metav1.NamespaceAll).Watch(options)
-				},
-			},
-			&v1.PersistentVolumeClaim{},
-			options.ResyncPeriod(),
+		informer.Informer().AddEventHandlerWithResyncPeriod(
 			cache.ResourceEventHandlerFuncs{
 				DeleteFunc: ObjectReplenishmentDeleteFunc(options),
 			},
+			options.ResyncPeriod(),
 		)
 	case api.Kind("Secret"):
-		// TODO move to informer when defined
-		_, result = cache.NewInformer(
-			&cache.ListWatch{
-				ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
-					return r.kubeClient.Core().Secrets(metav1.NamespaceAll).List(options)
-				},
-				WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
-					return r.kubeClient.Core().Secrets(metav1.NamespaceAll).Watch(options)
-				},
-			},
-			&v1.Secret{},
-			options.ResyncPeriod(),
+		informer, err = options.SharedInformerFactory.ForResource(v1.SchemeGroupVersion.WithResource("secrets"))
+		if err != nil {
+			return nil, err
+		}
+		informer.Informer().AddEventHandlerWithResyncPeriod(
 			cache.ResourceEventHandlerFuncs{
 				DeleteFunc: ObjectReplenishmentDeleteFunc(options),
 			},
+			options.ResyncPeriod(),
 		)
 	case api.Kind("ConfigMap"):
-		// TODO move to informer when defined
-		_, result = cache.NewInformer(
-			&cache.ListWatch{
-				ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
-					return r.kubeClient.Core().ConfigMaps(metav1.NamespaceAll).List(options)
-				},
-				WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
-					return r.kubeClient.Core().ConfigMaps(metav1.NamespaceAll).Watch(options)
-				},
-			},
-			&v1.ConfigMap{},
-			options.ResyncPeriod(),
+		informer, err = options.SharedInformerFactory.ForResource(v1.SchemeGroupVersion.WithResource("configmaps"))
+		if err != nil {
+			return nil, err
+		}
+		informer.Informer().AddEventHandlerWithResyncPeriod(
 			cache.ResourceEventHandlerFuncs{
 				DeleteFunc: ObjectReplenishmentDeleteFunc(options),
 			},
+			options.ResyncPeriod(),
 		)
 	default:
 		return nil, NewUnhandledGroupKindError(options.GroupKind)
 	}
-	return result, err
+	return informer.Informer().HasSynced, nil
 }
 
 // ServiceReplenishmentUpdateFunc will replenish if the service was quota tracked has changed service type
@@ -272,19 +195,4 @@ func IsUnhandledGroupKindError(err error) bool {
 	}
 	_, ok := err.(unhandledKindErr)
 	return ok
-}
-
-// UnionReplenishmentControllerFactory iterates through its constituent factories ignoring, UnhandledGroupKindErrors
-// returning the first success or failure it hits.  If there are no hits either way, it return an UnhandledGroupKind error
-type UnionReplenishmentControllerFactory []ReplenishmentControllerFactory
-
-func (f UnionReplenishmentControllerFactory) NewController(options *ReplenishmentControllerOptions) (cache.Controller, error) {
-	for _, factory := range f {
-		controller, err := factory.NewController(options)
-		if !IsUnhandledGroupKindError(err) {
-			return controller, err
-		}
-	}
-
-	return nil, NewUnhandledGroupKindError(options.GroupKind)
 }

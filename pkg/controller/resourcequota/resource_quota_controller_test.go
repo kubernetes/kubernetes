@@ -28,6 +28,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset/fake"
+	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated/externalversions"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/quota/generic"
 	"k8s.io/kubernetes/pkg/quota/install"
@@ -106,21 +107,22 @@ func TestSyncResourceQuota(t *testing.T) {
 	}
 
 	kubeClient := fake.NewSimpleClientset(&podList, &resourceQuota)
+	informerFactory := informers.NewSharedInformerFactory(kubeClient, controller.NoResyncPeriodFunc())
 	resourceQuotaControllerOptions := &ResourceQuotaControllerOptions{
-		KubeClient:   kubeClient,
-		ResyncPeriod: controller.NoResyncPeriodFunc,
-		Registry:     install.NewRegistry(kubeClient, nil),
+		KubeClient:            kubeClient,
+		SharedInformerFactory: informerFactory,
+		ResyncPeriod:          controller.NoResyncPeriodFunc,
+		Registry:              install.NewRegistry(kubeClient, nil),
 		GroupKindsToReplenish: []schema.GroupKind{
 			api.Kind("Pod"),
 			api.Kind("Service"),
 			api.Kind("ReplicationController"),
 			api.Kind("PersistentVolumeClaim"),
 		},
-		ControllerFactory:         NewReplenishmentControllerFactoryFromClient(kubeClient),
 		ReplenishmentResyncPeriod: controller.NoResyncPeriodFunc,
 	}
 	quotaController := NewResourceQuotaController(resourceQuotaControllerOptions)
-	err := quotaController.syncResourceQuota(resourceQuota)
+	err := quotaController.syncResourceQuota(&resourceQuota)
 	if err != nil {
 		t.Fatalf("Unexpected error %v", err)
 	}
@@ -191,21 +193,22 @@ func TestSyncResourceQuotaSpecChange(t *testing.T) {
 	}
 
 	kubeClient := fake.NewSimpleClientset(&resourceQuota)
+	informerFactory := informers.NewSharedInformerFactory(kubeClient, controller.NoResyncPeriodFunc())
 	resourceQuotaControllerOptions := &ResourceQuotaControllerOptions{
-		KubeClient:   kubeClient,
-		ResyncPeriod: controller.NoResyncPeriodFunc,
-		Registry:     install.NewRegistry(kubeClient, nil),
+		KubeClient:            kubeClient,
+		SharedInformerFactory: informerFactory,
+		ResyncPeriod:          controller.NoResyncPeriodFunc,
+		Registry:              install.NewRegistry(kubeClient, nil),
 		GroupKindsToReplenish: []schema.GroupKind{
 			api.Kind("Pod"),
 			api.Kind("Service"),
 			api.Kind("ReplicationController"),
 			api.Kind("PersistentVolumeClaim"),
 		},
-		ControllerFactory:         NewReplenishmentControllerFactoryFromClient(kubeClient),
 		ReplenishmentResyncPeriod: controller.NoResyncPeriodFunc,
 	}
 	quotaController := NewResourceQuotaController(resourceQuotaControllerOptions)
-	err := quotaController.syncResourceQuota(resourceQuota)
+	err := quotaController.syncResourceQuota(&resourceQuota)
 	if err != nil {
 		t.Fatalf("Unexpected error %v", err)
 	}
@@ -279,21 +282,22 @@ func TestSyncResourceQuotaSpecHardChange(t *testing.T) {
 	}
 
 	kubeClient := fake.NewSimpleClientset(&resourceQuota)
+	informerFactory := informers.NewSharedInformerFactory(kubeClient, controller.NoResyncPeriodFunc())
 	resourceQuotaControllerOptions := &ResourceQuotaControllerOptions{
-		KubeClient:   kubeClient,
-		ResyncPeriod: controller.NoResyncPeriodFunc,
-		Registry:     install.NewRegistry(kubeClient, nil),
+		KubeClient:            kubeClient,
+		SharedInformerFactory: informerFactory,
+		ResyncPeriod:          controller.NoResyncPeriodFunc,
+		Registry:              install.NewRegistry(kubeClient, nil),
 		GroupKindsToReplenish: []schema.GroupKind{
 			api.Kind("Pod"),
 			api.Kind("Service"),
 			api.Kind("ReplicationController"),
 			api.Kind("PersistentVolumeClaim"),
 		},
-		ControllerFactory:         NewReplenishmentControllerFactoryFromClient(kubeClient),
 		ReplenishmentResyncPeriod: controller.NoResyncPeriodFunc,
 	}
 	quotaController := NewResourceQuotaController(resourceQuotaControllerOptions)
-	err := quotaController.syncResourceQuota(resourceQuota)
+	err := quotaController.syncResourceQuota(&resourceQuota)
 	if err != nil {
 		t.Fatalf("Unexpected error %v", err)
 	}
@@ -367,21 +371,22 @@ func TestSyncResourceQuotaNoChange(t *testing.T) {
 	}
 
 	kubeClient := fake.NewSimpleClientset(&v1.PodList{}, &resourceQuota)
+	informerFactory := informers.NewSharedInformerFactory(kubeClient, controller.NoResyncPeriodFunc())
 	resourceQuotaControllerOptions := &ResourceQuotaControllerOptions{
-		KubeClient:   kubeClient,
-		ResyncPeriod: controller.NoResyncPeriodFunc,
-		Registry:     install.NewRegistry(kubeClient, nil),
+		KubeClient:            kubeClient,
+		SharedInformerFactory: informerFactory,
+		ResyncPeriod:          controller.NoResyncPeriodFunc,
+		Registry:              install.NewRegistry(kubeClient, nil),
 		GroupKindsToReplenish: []schema.GroupKind{
 			api.Kind("Pod"),
 			api.Kind("Service"),
 			api.Kind("ReplicationController"),
 			api.Kind("PersistentVolumeClaim"),
 		},
-		ControllerFactory:         NewReplenishmentControllerFactoryFromClient(kubeClient),
 		ReplenishmentResyncPeriod: controller.NoResyncPeriodFunc,
 	}
 	quotaController := NewResourceQuotaController(resourceQuotaControllerOptions)
-	err := quotaController.syncResourceQuota(resourceQuota)
+	err := quotaController.syncResourceQuota(&resourceQuota)
 	if err != nil {
 		t.Fatalf("Unexpected error %v", err)
 	}
@@ -399,16 +404,17 @@ func TestSyncResourceQuotaNoChange(t *testing.T) {
 
 func TestAddQuota(t *testing.T) {
 	kubeClient := fake.NewSimpleClientset()
+	informerFactory := informers.NewSharedInformerFactory(kubeClient, controller.NoResyncPeriodFunc())
 	resourceQuotaControllerOptions := &ResourceQuotaControllerOptions{
-		KubeClient:   kubeClient,
-		ResyncPeriod: controller.NoResyncPeriodFunc,
-		Registry:     install.NewRegistry(kubeClient, nil),
+		KubeClient:            kubeClient,
+		SharedInformerFactory: informerFactory,
+		ResyncPeriod:          controller.NoResyncPeriodFunc,
+		Registry:              install.NewRegistry(kubeClient, nil),
 		GroupKindsToReplenish: []schema.GroupKind{
 			api.Kind("Pod"),
 			api.Kind("ReplicationController"),
 			api.Kind("PersistentVolumeClaim"),
 		},
-		ControllerFactory:         NewReplenishmentControllerFactoryFromClient(kubeClient),
 		ReplenishmentResyncPeriod: controller.NoResyncPeriodFunc,
 	}
 	quotaController := NewResourceQuotaController(resourceQuotaControllerOptions)

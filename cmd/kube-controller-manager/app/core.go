@@ -76,7 +76,7 @@ func startPodGCController(ctx ControllerContext) (bool, error) {
 
 func startResourceQuotaController(ctx ControllerContext) (bool, error) {
 	resourceQuotaControllerClient := ctx.ClientBuilder.ClientOrDie("resourcequota-controller")
-	resourceQuotaRegistry := quotainstall.NewRegistry(resourceQuotaControllerClient, ctx.InformerFactory)
+	resourceQuotaRegistry := quotainstall.NewRegistry(resourceQuotaControllerClient, ctx.NewInformerFactory)
 	groupKindsToReplenish := []schema.GroupKind{
 		api.Kind("Pod"),
 		api.Kind("Service"),
@@ -87,9 +87,9 @@ func startResourceQuotaController(ctx ControllerContext) (bool, error) {
 	}
 	resourceQuotaControllerOptions := &resourcequotacontroller.ResourceQuotaControllerOptions{
 		KubeClient:                resourceQuotaControllerClient,
+		SharedInformerFactory:     ctx.NewInformerFactory,
 		ResyncPeriod:              controller.StaticResyncPeriodFunc(ctx.Options.ResourceQuotaSyncPeriod.Duration),
 		Registry:                  resourceQuotaRegistry,
-		ControllerFactory:         resourcequotacontroller.NewReplenishmentControllerFactory(ctx.InformerFactory, resourceQuotaControllerClient),
 		ReplenishmentResyncPeriod: ResyncPeriod(&ctx.Options),
 		GroupKindsToReplenish:     groupKindsToReplenish,
 	}
