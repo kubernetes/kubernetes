@@ -6560,7 +6560,6 @@ go_library(
         "//vendor:github.com/vmware/govmomi/vim25",
         "//vendor:github.com/vmware/govmomi/vim25/soap",
         "//vendor:github.com/vmware/govmomi/vim25/types",
-        "//vendor:golang.org/x/net/context",
     ],
 )
 
@@ -6578,7 +6577,6 @@ go_library(
         "//vendor:github.com/vmware/govmomi/vim25",
         "//vendor:github.com/vmware/govmomi/vim25/mo",
         "//vendor:github.com/vmware/govmomi/vim25/types",
-        "//vendor:golang.org/x/net/context",
     ],
 )
 
@@ -6595,7 +6593,6 @@ go_library(
         "//vendor:github.com/vmware/govmomi/vim25/mo",
         "//vendor:github.com/vmware/govmomi/vim25/soap",
         "//vendor:github.com/vmware/govmomi/vim25/types",
-        "//vendor:golang.org/x/net/context",
     ],
 )
 
@@ -6610,6 +6607,9 @@ go_library(
         "github.com/vmware/govmomi/object/customization_spec_manager.go",
         "github.com/vmware/govmomi/object/datacenter.go",
         "github.com/vmware/govmomi/object/datastore.go",
+        "github.com/vmware/govmomi/object/datastore_file.go",
+        "github.com/vmware/govmomi/object/datastore_path.go",
+        "github.com/vmware/govmomi/object/diagnostic_log.go",
         "github.com/vmware/govmomi/object/diagnostic_manager.go",
         "github.com/vmware/govmomi/object/distributed_virtual_portgroup.go",
         "github.com/vmware/govmomi/object/distributed_virtual_switch.go",
@@ -6618,9 +6618,12 @@ go_library(
         "github.com/vmware/govmomi/object/folder.go",
         "github.com/vmware/govmomi/object/history_collector.go",
         "github.com/vmware/govmomi/object/host_account_manager.go",
+        "github.com/vmware/govmomi/object/host_certificate_info.go",
+        "github.com/vmware/govmomi/object/host_certificate_manager.go",
         "github.com/vmware/govmomi/object/host_config_manager.go",
         "github.com/vmware/govmomi/object/host_datastore_browser.go",
         "github.com/vmware/govmomi/object/host_datastore_system.go",
+        "github.com/vmware/govmomi/object/host_date_time_system.go",
         "github.com/vmware/govmomi/object/host_firewall_system.go",
         "github.com/vmware/govmomi/object/host_network_system.go",
         "github.com/vmware/govmomi/object/host_service_system.go",
@@ -6658,7 +6661,6 @@ go_library(
         "//vendor:github.com/vmware/govmomi/vim25/progress",
         "//vendor:github.com/vmware/govmomi/vim25/soap",
         "//vendor:github.com/vmware/govmomi/vim25/types",
-        "//vendor:golang.org/x/net/context",
     ],
 )
 
@@ -6675,7 +6677,6 @@ go_library(
         "//vendor:github.com/vmware/govmomi/vim25/mo",
         "//vendor:github.com/vmware/govmomi/vim25/soap",
         "//vendor:github.com/vmware/govmomi/vim25/types",
-        "//vendor:golang.org/x/net/context",
     ],
 )
 
@@ -6693,7 +6694,6 @@ go_library(
         "//vendor:github.com/vmware/govmomi/vim25/mo",
         "//vendor:github.com/vmware/govmomi/vim25/soap",
         "//vendor:github.com/vmware/govmomi/vim25/types",
-        "//vendor:golang.org/x/net/context",
     ],
 )
 
@@ -6708,7 +6708,6 @@ go_library(
         "//vendor:github.com/vmware/govmomi/property",
         "//vendor:github.com/vmware/govmomi/vim25/progress",
         "//vendor:github.com/vmware/govmomi/vim25/types",
-        "//vendor:golang.org/x/net/context",
     ],
 )
 
@@ -6724,7 +6723,6 @@ go_library(
         "//vendor:github.com/vmware/govmomi/vim25/methods",
         "//vendor:github.com/vmware/govmomi/vim25/soap",
         "//vendor:github.com/vmware/govmomi/vim25/types",
-        "//vendor:golang.org/x/net/context",
     ],
 )
 
@@ -6745,7 +6743,6 @@ go_library(
     deps = [
         "//vendor:github.com/vmware/govmomi/vim25/soap",
         "//vendor:github.com/vmware/govmomi/vim25/types",
-        "//vendor:golang.org/x/net/context",
     ],
 )
 
@@ -6766,7 +6763,6 @@ go_library(
         "//vendor:github.com/vmware/govmomi/vim25/methods",
         "//vendor:github.com/vmware/govmomi/vim25/soap",
         "//vendor:github.com/vmware/govmomi/vim25/types",
-        "//vendor:golang.org/x/net/context",
     ],
 )
 
@@ -6799,7 +6795,6 @@ go_library(
         "//vendor:github.com/vmware/govmomi/vim25/progress",
         "//vendor:github.com/vmware/govmomi/vim25/types",
         "//vendor:github.com/vmware/govmomi/vim25/xml",
-        "//vendor:golang.org/x/net/context",
     ],
 )
 
