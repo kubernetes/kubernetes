@@ -93,6 +93,9 @@ controller, and serviceaccounts controller.`,
 	return cmd
 }
 
+// ResyncPeriod returns a function which generates a duration each time it is
+// invoked; this is so that multiple controllers don't get into lock-step and all
+// hammer the apiserver with list requests simultaneously.
 func ResyncPeriod(s *options.CMServer) func() time.Duration {
 	return func() time.Duration {
 		factor := rand.Float64() + 1
