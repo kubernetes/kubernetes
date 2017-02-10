@@ -23,6 +23,7 @@ import (
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/authentication"
+	authenticationv1 "k8s.io/kubernetes/pkg/apis/authentication/v1"
 	authenticationv1beta1 "k8s.io/kubernetes/pkg/apis/authentication/v1beta1"
 	"k8s.io/kubernetes/pkg/registry/authentication/tokenreview"
 )
@@ -43,6 +44,10 @@ func (p RESTStorageProvider) NewRESTStorage(apiResourceConfigSource genericapise
 		apiGroupInfo.VersionedResourcesStorageMap[authenticationv1beta1.SchemeGroupVersion.Version] = p.v1beta1Storage(apiResourceConfigSource, restOptionsGetter)
 		apiGroupInfo.GroupMeta.GroupVersion = authenticationv1beta1.SchemeGroupVersion
 	}
+	if apiResourceConfigSource.AnyResourcesForVersionEnabled(authenticationv1.SchemeGroupVersion) {
+		apiGroupInfo.VersionedResourcesStorageMap[authenticationv1.SchemeGroupVersion.Version] = p.v1Storage(apiResourceConfigSource, restOptionsGetter)
+		apiGroupInfo.GroupMeta.GroupVersion = authenticationv1.SchemeGroupVersion
+	}
 
 	return apiGroupInfo, true
 }
@@ -52,6 +57,20 @@ func (p RESTStorageProvider) v1beta1Storage(apiResourceConfigSource genericapise
 
 	storage := map[string]rest.Storage{}
 	if apiResourceConfigSource.AnyResourcesForVersionEnabled(authenticationv1beta1.SchemeGroupVersion) {
+		if apiResourceConfigSource.ResourceEnabled(version.WithResource("tokenreviews")) {
+			tokenReviewStorage := tokenreview.NewREST(p.Authenticator)
+			storage["tokenreviews"] = tokenReviewStorage
+		}
+	}
+
+	return storage
+}
+
+func (p RESTStorageProvider) v1Storage(apiResourceConfigSource genericapiserver.APIResourceConfigSource, restOptionsGetter generic.RESTOptionsGetter) map[string]rest.Storage {
+	version := authenticationv1.SchemeGroupVersion
+
+	storage := map[string]rest.Storage{}
+	if apiResourceConfigSource.AnyResourcesForVersionEnabled(authenticationv1.SchemeGroupVersion) {
 		if apiResourceConfigSource.ResourceEnabled(version.WithResource("tokenreviews")) {
 			tokenReviewStorage := tokenreview.NewREST(p.Authenticator)
 			storage["tokenreviews"] = tokenReviewStorage

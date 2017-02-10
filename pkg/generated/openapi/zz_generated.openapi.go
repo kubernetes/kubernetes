@@ -9056,6 +9056,97 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 			},
 			Dependencies: []string{},
 		},
+		"k8s.io/kubernetes/pkg/apis/authentication/v1.TokenReview": {
+			Schema: spec.Schema{
+				SchemaProps: spec.SchemaProps{
+					Description: "TokenReview attempts to authenticate a token to a known user. Note: TokenReview requests may be cached by the webhook token authenticator plugin in the kube-apiserver.",
+					Properties: map[string]spec.Schema{
+						"kind": {
+							SchemaProps: spec.SchemaProps{
+								Description: "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds",
+								Type:        []string{"string"},
+								Format:      "",
+							},
+						},
+						"apiVersion": {
+							SchemaProps: spec.SchemaProps{
+								Description: "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources",
+								Type:        []string{"string"},
+								Format:      "",
+							},
+						},
+						"metadata": {
+							SchemaProps: spec.SchemaProps{
+								Ref: ref("k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta"),
+							},
+						},
+						"spec": {
+							SchemaProps: spec.SchemaProps{
+								Description: "Spec holds information about the request being evaluated",
+								Ref:         ref("k8s.io/kubernetes/pkg/apis/authentication/v1.TokenReviewSpec"),
+							},
+						},
+						"status": {
+							SchemaProps: spec.SchemaProps{
+								Description: "Status is filled in by the server and indicates whether the request can be authenticated.",
+								Ref:         ref("k8s.io/kubernetes/pkg/apis/authentication/v1.TokenReviewStatus"),
+							},
+						},
+					},
+					Required: []string{"spec"},
+				},
+			},
+			Dependencies: []string{
+				"k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta", "k8s.io/kubernetes/pkg/apis/authentication/v1.TokenReviewSpec", "k8s.io/kubernetes/pkg/apis/authentication/v1.TokenReviewStatus"},
+		},
+		"k8s.io/kubernetes/pkg/apis/authentication/v1.TokenReviewSpec": {
+			Schema: spec.Schema{
+				SchemaProps: spec.SchemaProps{
+					Description: "TokenReviewSpec is a description of the token authentication request.",
+					Properties: map[string]spec.Schema{
+						"token": {
+							SchemaProps: spec.SchemaProps{
+								Description: "Token is the opaque bearer token.",
+								Type:        []string{"string"},
+								Format:      "",
+							},
+						},
+					},
+				},
+			},
+			Dependencies: []string{},
+		},
+		"k8s.io/kubernetes/pkg/apis/authentication/v1.TokenReviewStatus": {
+			Schema: spec.Schema{
+				SchemaProps: spec.SchemaProps{
+					Description: "TokenReviewStatus is the result of the token authentication request.",
+					Properties: map[string]spec.Schema{
+						"authenticated": {
+							SchemaProps: spec.SchemaProps{
+								Description: "Authenticated indicates that the token was associated with a known user.",
+								Type:        []string{"boolean"},
+								Format:      "",
+							},
+						},
+						"user": {
+							SchemaProps: spec.SchemaProps{
+								Description: "User is the UserInfo associated with the provided token.",
+								Ref:         ref("k8s.io/kubernetes/pkg/apis/authentication/v1.UserInfo"),
+							},
+						},
+						"error": {
+							SchemaProps: spec.SchemaProps{
+								Description: "Error indicates that the token couldn't be checked",
+								Type:        []string{"string"},
+								Format:      "",
+							},
+						},
+					},
+				},
+			},
+			Dependencies: []string{
+				"k8s.io/kubernetes/pkg/apis/authentication/v1.UserInfo"},
+		},
 		"k8s.io/kubernetes/pkg/api/v1.Toleration": {
 			Schema: spec.Schema{
 				SchemaProps: spec.SchemaProps{
@@ -9118,6 +9209,65 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 								Description: "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources",
 								Type:        []string{"string"},
 								Format:      "",
+							},
+						},
+					},
+				},
+			},
+			Dependencies: []string{},
+		},
+		"k8s.io/kubernetes/pkg/apis/authentication/v1.UserInfo": {
+			Schema: spec.Schema{
+				SchemaProps: spec.SchemaProps{
+					Description: "UserInfo holds the information about the user needed to implement the user.Info interface.",
+					Properties: map[string]spec.Schema{
+						"username": {
+							SchemaProps: spec.SchemaProps{
+								Description: "The name that uniquely identifies this user among all active users.",
+								Type:        []string{"string"},
+								Format:      "",
+							},
+						},
+						"uid": {
+							SchemaProps: spec.SchemaProps{
+								Description: "A unique value that identifies this user across time. If this user is deleted and another user by the same name is added, they will have different UIDs.",
+								Type:        []string{"string"},
+								Format:      "",
+							},
+						},
+						"groups": {
+							SchemaProps: spec.SchemaProps{
+								Description: "The names of groups this user is a part of.",
+								Type:        []string{"array"},
+								Items: &spec.SchemaOrArray{
+									Schema: &spec.Schema{
+										SchemaProps: spec.SchemaProps{
+											Type:   []string{"string"},
+											Format: "",
+										},
+									},
+								},
+							},
+						},
+						"extra": {
+							SchemaProps: spec.SchemaProps{
+								Description: "Any additional information provided by the authenticator.",
+								Type:        []string{"object"},
+								AdditionalProperties: &spec.SchemaOrBool{
+									Schema: &spec.Schema{
+										SchemaProps: spec.SchemaProps{
+											Type: []string{"array"},
+											Items: &spec.SchemaOrArray{
+												Schema: &spec.Schema{
+													SchemaProps: spec.SchemaProps{
+														Type:   []string{"string"},
+														Format: "",
+													},
+												},
+											},
+										},
+									},
+								},
 							},
 						},
 					},
