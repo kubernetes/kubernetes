@@ -31,13 +31,13 @@ func GetVSphere() (*VSphere, error) {
 	if err != nil {
 		return nil, err
 	}
-	vs := VSphere{
+	vs := &VSphere{
 		client:          client,
 		cfg:             cfg,
 		localInstanceID: "",
 	}
-	runtime.SetFinalizer(&vs, logout)
-	return &vs, nil
+	runtime.SetFinalizer(vs, logout)
+	return vs, nil
 }
 
 func getVSphereConfig() *VSphereConfig {

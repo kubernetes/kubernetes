@@ -43,16 +43,16 @@ import (
 	2. Create PVC which uses the StorageClass created in step 1.
 	3. Wait for PV to be provisioned.
 	4. Wait for PVC's status to become Bound
-	5. Create POD using PVC on specific node.
+	5. Create pod using PVC on specific node.
 	6. Wait for Disk to be attached to the node.
 	7. Get node VM's devices and find PV's Volume Disk.
 	8. Get Backing Info of the Volume Disk and obtain EagerlyScrub and ThinProvisioned
 	9. Based on the value of EagerlyScrub and ThinProvisioned, verify diskformat is correct.
-	10. Delete POD and Wait for Volume Disk to be detached from the Node.
+	10. Delete pod and Wait for Volume Disk to be detached from the Node.
 	11. Delete PVC, PV and Storage Class
 */
 
-var _ = framework.KubeDescribe("Volume Disk Format", func() {
+var _ = framework.KubeDescribe("Volume Disk Format [Feature:Volume] [vsphere]", func() {
 	f := framework.NewDefaultFramework("volume-disk-format")
 	var (
 		client            clientset.Interface
@@ -109,17 +109,21 @@ func invokeTest(client clientset.Interface, namespace string, nodeName string, n
 	By("Creating Storage Class With DiskFormat")
 	storageClassSpec := getVSphereStorageClassSpec("thinsc", scParameters)
 	storageclass, err := client.StorageV1beta1().StorageClasses().Create(storageClassSpec)
+	Expect(err).NotTo(HaveOccurred())
+
 	defer client.StorageV1beta1().StorageClasses().Delete(storageclass.Name, nil)
 	Expect(err).NotTo(HaveOccurred())
 
 	By("Creating PVC using the Storage Class")
 	pvclaimSpec := getVSphereClaimSpecWithStorageClassAnnotation(namespace, storageclass)
 	pvclaim, err := client.CoreV1().PersistentVolumeClaims(namespace).Create(pvclaimSpec)
+	Expect(err).NotTo(HaveOccurred())
+
 	defer func() {
 		client.CoreV1().PersistentVolumeClaims(namespace).Delete(pvclaimSpec.Name, nil)
 	}()
 
-	By("Waiting for calim to be in bould phase")
+	By("Waiting for claim to be in bound phase")
 	err = framework.WaitForPersistentVolumeClaimPhase(v1.ClaimBound, client, pvclaim.Namespace, pvclaim.Name, framework.Poll, framework.ClaimProvisionTimeout)
 	Expect(err).NotTo(HaveOccurred())
 
@@ -135,10 +139,11 @@ func invokeTest(client clientset.Interface, namespace string, nodeName string, n
 		PV is required to be attached to the Node. so that using govmomi API we can grab Disk's Backing Info
 		to check EagerlyScrub and ThinProvisioned property
 	*/
-	By("Creating POD to attach PV to the node")
-	// Create POD to attach Volume to Node
+	By("Creating pod to attach PV to the node")
+	// Create pod to attach Volume to Node
 	podSpec := getVSpherePodSpecWithClaim(pvclaim.Name, nodeKeyValueLabel, "while true ; do sleep 2 ; done")
 	pod, err := client.CoreV1().Pods(namespace).Create(podSpec)
+	Expect(err).NotTo(HaveOccurred())
 
 	vsp, err := vsphere.GetVSphere()
 	Expect(err).NotTo(HaveOccurred())
@@ -162,10 +167,15 @@ func verifyDiskFormat(nodeName string, pvVolumePath string, diskFormat string) b
 
 	govMoMiClient, err := vsphere.GetgovmomiClient(nil)
 	Expect(err).NotTo(HaveOccurred())
+
 	f := find.NewFinder(govMoMiClient.Client, true)
 	ctx, _ := context.WithCancel(context.Background())
 	vm, err := f.VirtualMachine(ctx, os.Getenv("VSPHERE_WORKING_DIR")+nodeName)
+	Expect(err).NotTo(HaveOccurred())
+
 	vmDevices, err := vm.Device(ctx)
+	Expect(err).NotTo(HaveOccurred())
+
 	disks := vmDevices.SelectByType((*types.VirtualDisk)(nil))
 
 	for _, disk := range disks {

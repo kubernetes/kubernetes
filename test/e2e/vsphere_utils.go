@@ -177,7 +177,7 @@ func writeContentToVSpherePV(client clientset.Interface, pvc *v1.PersistentVolum
 // function to verify content is matching on the volume backed for given PVC
 func verifyContentOfVSpherePV(client clientset.Interface, pvc *v1.PersistentVolumeClaim, expectedContent string) {
 	runInPodWithVolume(client, pvc.Namespace, pvc.Name, "grep '"+expectedContent+"' /mnt/test/data")
-	framework.Logf("Sucessfully verified content of the volume")
+	framework.Logf("Successfully verified content of the volume")
 }
 
 func getVSphereStorageClassSpec(name string, scParameters map[string]string) *storage.StorageClass {
@@ -202,7 +202,7 @@ func getVSphereClaimSpecWithStorageClassAnnotation(ns string, storageclass *stor
 	scAnnotation := make(map[string]string)
 	scAnnotation["volume.beta.kubernetes.io/storage-class"] = storageclass.Name
 
-	claim := v1.PersistentVolumeClaim{
+	claim := &v1.PersistentVolumeClaim{
 		ObjectMeta: metav1.ObjectMeta{
 			GenerateName: "pvc-",
 			Namespace:    ns,
@@ -219,7 +219,7 @@ func getVSphereClaimSpecWithStorageClassAnnotation(ns string, storageclass *stor
 			},
 		},
 	}
-	return &claim
+	return claim
 }
 
 func getVSpherePodSpecWithClaim(claimName string, nodeSelectorKV map[string]string, command string) *v1.Pod {

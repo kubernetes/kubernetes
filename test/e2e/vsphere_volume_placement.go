@@ -28,7 +28,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 )
 
-var _ = framework.KubeDescribe("Volume Placement [Feature:Volume]", func() {
+var _ = framework.KubeDescribe("Volume Placement [Feature:Volume] [vsphere]", func() {
 	f := framework.NewDefaultFramework("volume-placement")
 	var (
 		c                  clientset.Interface
