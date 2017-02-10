@@ -23,6 +23,8 @@ import (
 	"net"
 	"strings"
 
+	"time"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -494,7 +496,7 @@ func (f *fakePortOpener) OpenLocalPort(lp *localPort) (closeable, error) {
 func NewFakeProxier(ipt utiliptables.Interface) *Proxier {
 	// TODO: Call NewProxier after refactoring out the goroutine
 	// invocation into a Run() method.
-	return &Proxier{
+	p := &Proxier{
 		exec:                        &exec.FakeExec{},
 		serviceMap:                  make(map[proxy.ServicePortName]*serviceInfo),
 		iptables:                    ipt,
@@ -506,6 +508,8 @@ func NewFakeProxier(ipt utiliptables.Interface) *Proxier {
 		portsMap:                    make(map[localPort]closeable),
 		portMapper:                  &fakePortOpener{[]*localPort{}},
 	}
+	p.syncRunner = NewPeriodicRunner(p.Sync, 0, time.Minute, 1)
+	return p
 }
 
 func hasJump(rules []iptablestest.Rule, destChain, destIP, destPort string) bool {

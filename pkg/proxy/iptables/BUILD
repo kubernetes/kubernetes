@@ -10,7 +10,10 @@ load(
 
 go_library(
     name = "go_default_library",
-    srcs = ["proxier.go"],
+    srcs = [
+        "periodic_runner.go",
+        "proxier.go",
+    ],
     tags = ["automanaged"],
     deps = [
         "//pkg/api:go_default_library",
@@ -27,6 +30,7 @@ go_library(
         "//vendor:github.com/golang/glog",
         "//vendor:k8s.io/apimachinery/pkg/types",
         "//vendor:k8s.io/apimachinery/pkg/util/sets",
+        "//vendor:k8s.io/apimachinery/pkg/util/wait",
         "//vendor:k8s.io/apiserver/pkg/util/feature",
         "//vendor:k8s.io/client-go/pkg/api/v1",
         "//vendor:k8s.io/client-go/tools/record",
