@@ -83,9 +83,19 @@ type Conn struct {
 	}
 }
 
-// New establishes a connection to the system bus and authenticates.
+// New establishes a connection to any available bus and authenticates.
 // Callers should call Close() when done with the connection.
 func New() (*Conn, error) {
+	conn, err := NewSystemConnection()
+	if err != nil && os.Geteuid() == 0 {
+		return NewSystemdConnection()
+	}
+	return conn, err
+}
+
+// NewSystemConnection establishes a connection to the system bus and authenticates.
+// Callers should call Close() when done with the connection
+func NewSystemConnection() (*Conn, error) {
 	return NewConnection(func() (*dbus.Conn, error) {
 		return dbusAuthHelloConnection(dbus.SystemBusPrivate)
 	})
