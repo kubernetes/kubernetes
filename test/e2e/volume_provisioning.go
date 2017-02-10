@@ -21,7 +21,10 @@ import (
 
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apiserver/pkg/authentication/serviceaccount"
 	"k8s.io/kubernetes/pkg/api/v1"
+	rbacv1beta1 "k8s.io/kubernetes/pkg/apis/rbac/v1beta1"
 	storage "k8s.io/kubernetes/pkg/apis/storage/v1beta1"
 	storageutil "k8s.io/kubernetes/pkg/apis/storage/v1beta1/util"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
@@ -34,13 +37,11 @@ import (
 const (
 	// Requested size of the volume
 	requestedSize = "1500Mi"
-	// Expected size of the volume is 2GiB, for "openstack", "gce", "aws", "gke", as they allocate volumes in 1GiB chunks
-	expectedSize = "2Gi"
-	// vsphere provider does not allocate volumes in 1GiB chunks, so setting expected size equal to requestedSize
-	vsphereExpectedSize = "1500Mi"
+	// Plugin name of the external provisioner
+	externalPluginName = "example.com/nfs"
 )
 
-func testDynamicProvisioning(client clientset.Interface, claim *v1.PersistentVolumeClaim) {
+func testDynamicProvisioning(client clientset.Interface, claim *v1.PersistentVolumeClaim, expectedSize string) {
 	err := framework.WaitForPersistentVolumeClaimPhase(v1.ClaimBound, client, claim.Namespace, claim.Name, framework.Poll, framework.ClaimProvisionTimeout)
 	Expect(err).NotTo(HaveOccurred())
 
@@ -55,9 +56,6 @@ func testDynamicProvisioning(client clientset.Interface, claim *v1.PersistentVol
 
 	// Check sizes
 	expectedCapacity := resource.MustParse(expectedSize)
-	if framework.ProviderIs("vsphere") {
-		expectedCapacity = resource.MustParse(vsphereExpectedSize)
-	}
 	pvCapacity := pv.Spec.Capacity[v1.ResourceName(v1.ResourceStorage)]
 	Expect(pvCapacity.Value()).To(Equal(expectedCapacity.Value()), "pvCapacity is not equal to expectedCapacity")
 
@@ -110,20 +108,28 @@ var _ = framework.KubeDescribe("Dynamic provisioning", func() {
 			framework.SkipUnlessProviderIs("openstack", "gce", "aws", "gke", "vsphere")
 
 			By("creating a StorageClass")
-			class := newStorageClass()
+			class := newStorageClass("", "internal")
 			_, err := c.Storage().StorageClasses().Create(class)
 			defer c.Storage().StorageClasses().Delete(class.Name, nil)
 			Expect(err).NotTo(HaveOccurred())
 
 			By("creating a claim with a dynamic provisioning annotation")
-			claim := newClaim(ns, false)
+			claim := newClaim(ns, "internal", false)
 			defer func() {
 				c.Core().PersistentVolumeClaims(ns).Delete(claim.Name, nil)
 			}()
 			claim, err = c.Core().PersistentVolumeClaims(ns).Create(claim)
 			Expect(err).NotTo(HaveOccurred())
 
-			testDynamicProvisioning(c, claim)
+			if framework.ProviderIs("vsphere") {
+				// vsphere provider does not allocate volumes in 1GiB chunks, so setting expected size
+				// equal to requestedSize
+				testDynamicProvisioning(c, claim, requestedSize)
+			} else {
+				// Expected size of the volume is 2GiB, because the other three supported cloud
+				// providers allocate volumes in 1GiB chunks.
+				testDynamicProvisioning(c, claim, "2Gi")
+			}
 		})
 	})
 
@@ -132,19 +138,59 @@ var _ = framework.KubeDescribe("Dynamic provisioning", func() {
 			framework.SkipUnlessProviderIs("openstack", "gce", "aws", "gke", "vsphere")
 
 			By("creating a claim with an alpha dynamic provisioning annotation")
-			claim := newClaim(ns, true)
+			claim := newClaim(ns, "", true)
 			defer func() {
 				c.Core().PersistentVolumeClaims(ns).Delete(claim.Name, nil)
 			}()
 			claim, err := c.Core().PersistentVolumeClaims(ns).Create(claim)
 			Expect(err).NotTo(HaveOccurred())
 
-			testDynamicProvisioning(c, claim)
+			if framework.ProviderIs("vsphere") {
+				testDynamicProvisioning(c, claim, requestedSize)
+			} else {
+				testDynamicProvisioning(c, claim, "2Gi")
+			}
+		})
+	})
+
+	framework.KubeDescribe("DynamicProvisioner External", func() {
+		It("should let an external dynamic provisioner create and delete persistent volumes [Slow]", func() {
+			// external dynamic provisioner pods need additional permissions provided by the
+			// persistent-volume-provisioner role
+			framework.BindClusterRole(c.Rbac(), "system:persistent-volume-provisioner", ns,
+				rbacv1beta1.Subject{Kind: rbacv1beta1.ServiceAccountKind, Namespace: ns, Name: "default"})
+
+			err := framework.WaitForAuthorizationUpdate(c.AuthorizationV1beta1(),
+				serviceaccount.MakeUsername(ns, "default"),
+				"", "get", schema.GroupResource{Group: "storage.k8s.io", Resource: "storageclasses"}, true)
+			framework.ExpectNoError(err, "Failed to update authorization: %v", err)
+
+			By("creating an external dynamic provisioner pod")
+			pod := startExternalProvisioner(c, ns)
+			defer c.Core().Pods(ns).Delete(pod.Name, nil)
+
+			By("creating a StorageClass")
+			class := newStorageClass(externalPluginName, "external")
+			_, err = c.Storage().StorageClasses().Create(class)
+			defer c.Storage().StorageClasses().Delete(class.Name, nil)
+			Expect(err).NotTo(HaveOccurred())
+
+			By("creating a claim with a dynamic provisioning annotation")
+			claim := newClaim(ns, "external", false)
+			defer func() {
+				c.Core().PersistentVolumeClaims(ns).Delete(claim.Name, nil)
+			}()
+			claim, err = c.Core().PersistentVolumeClaims(ns).Create(claim)
+			Expect(err).NotTo(HaveOccurred())
+
+			// Expected size of the externally provisioned volume depends on the external
+			// provisioner: for nfs-provisioner used here, it's equal to requested
+			testDynamicProvisioning(c, claim, requestedSize)
 		})
 	})
 })
 
-func newClaim(ns string, alpha bool) *v1.PersistentVolumeClaim {
+func newClaim(ns, suffix string, alpha bool) *v1.PersistentVolumeClaim {
 	claim := v1.PersistentVolumeClaim{
 		ObjectMeta: metav1.ObjectMeta{
 			GenerateName: "pvc-",
@@ -168,7 +214,7 @@ func newClaim(ns string, alpha bool) *v1.PersistentVolumeClaim {
 		}
 	} else {
 		claim.Annotations = map[string]string{
-			storageutil.StorageClassAnnotation: "fast",
+			storageutil.StorageClassAnnotation: "myclass-" + suffix,
 		}
 
 	}
@@ -223,18 +269,18 @@ func runInPodWithVolume(c clientset.Interface, ns, claimName, command string) {
 	framework.ExpectNoError(framework.WaitForPodSuccessInNamespaceSlow(c, pod.Name, pod.Namespace))
 }
 
-func newStorageClass() *storage.StorageClass {
-	var pluginName string
-
-	switch {
-	case framework.ProviderIs("gke"), framework.ProviderIs("gce"):
-		pluginName = "kubernetes.io/gce-pd"
-	case framework.ProviderIs("aws"):
-		pluginName = "kubernetes.io/aws-ebs"
-	case framework.ProviderIs("openstack"):
-		pluginName = "kubernetes.io/cinder"
-	case framework.ProviderIs("vsphere"):
-		pluginName = "kubernetes.io/vsphere-volume"
+func newStorageClass(pluginName, suffix string) *storage.StorageClass {
+	if pluginName == "" {
+		switch {
+		case framework.ProviderIs("gke"), framework.ProviderIs("gce"):
+			pluginName = "kubernetes.io/gce-pd"
+		case framework.ProviderIs("aws"):
+			pluginName = "kubernetes.io/aws-ebs"
+		case framework.ProviderIs("openstack"):
+			pluginName = "kubernetes.io/cinder"
+		case framework.ProviderIs("vsphere"):
+			pluginName = "kubernetes.io/vsphere-volume"
+		}
 	}
 
 	return &storage.StorageClass{
@@ -242,8 +288,81 @@ func newStorageClass() *storage.StorageClass {
 			Kind: "StorageClass",
 		},
 		ObjectMeta: metav1.ObjectMeta{
-			Name: "fast",
+			Name: "myclass-" + suffix,
 		},
 		Provisioner: pluginName,
 	}
+}
+
+func startExternalProvisioner(c clientset.Interface, ns string) *v1.Pod {
+	podClient := c.Core().Pods(ns)
+
+	provisionerPod := &v1.Pod{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "Pod",
+			APIVersion: "v1",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			GenerateName: "external-provisioner-",
+		},
+
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
+				{
+					Name:  "nfs-provisioner",
+					Image: "quay.io/kubernetes_incubator/nfs-provisioner:v1.0.3",
+					SecurityContext: &v1.SecurityContext{
+						Capabilities: &v1.Capabilities{
+							Add: []v1.Capability{"DAC_READ_SEARCH"},
+						},
+					},
+					Args: []string{
+						"-provisioner=" + externalPluginName,
+						"-grace-period=0",
+					},
+					Ports: []v1.ContainerPort{
+						{Name: "nfs", ContainerPort: 2049},
+						{Name: "mountd", ContainerPort: 20048},
+						{Name: "rpcbind", ContainerPort: 111},
+						{Name: "rpcbind-udp", ContainerPort: 111, Protocol: v1.ProtocolUDP},
+					},
+					Env: []v1.EnvVar{
+						{
+							Name: "POD_IP",
+							ValueFrom: &v1.EnvVarSource{
+								FieldRef: &v1.ObjectFieldSelector{
+									FieldPath: "status.podIP",
+								},
+							},
+						},
+					},
+					ImagePullPolicy: v1.PullIfNotPresent,
+					VolumeMounts: []v1.VolumeMount{
+						{
+							Name:      "export-volume",
+							MountPath: "/export",
+						},
+					},
+				},
+			},
+			Volumes: []v1.Volume{
+				{
+					Name: "export-volume",
+					VolumeSource: v1.VolumeSource{
+						EmptyDir: &v1.EmptyDirVolumeSource{},
+					},
+				},
+			},
+		},
+	}
+	provisionerPod, err := podClient.Create(provisionerPod)
+	framework.ExpectNoError(err, "Failed to create %s pod: %v", provisionerPod.Name, err)
+
+	framework.ExpectNoError(framework.WaitForPodRunningInNamespace(c, provisionerPod))
+
+	By("locating the provisioner pod")
+	pod, err := podClient.Get(provisionerPod.Name, metav1.GetOptions{})
+	framework.ExpectNoError(err, "Cannot locate the provisioner pod %v: %v", provisionerPod.Name, err)
+
+	return pod
 }
