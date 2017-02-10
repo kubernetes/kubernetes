@@ -61,37 +61,23 @@ func (t *StatefulSetUpgradeTest) Setup(f *framework.Framework) {
 
 	By("Saturating stateful set " + t.set.Name)
 	t.tester.Saturate(t.set)
-
-	By("Verifying statefulset mounted data directory is usable")
-	framework.ExpectNoError(t.tester.CheckMount(t.set, "/data"))
-
-	By("Verifying statefulset provides a stable hostname for each pod")
-	framework.ExpectNoError(t.tester.CheckHostname(t.set))
-
-	By("Verifying statefulset set proper service name")
-	framework.ExpectNoError(t.tester.CheckServiceName(t.set, headlessSvcName))
-
-	cmd := "echo $(hostname) > /data/hostname; sync;"
-	By("Running " + cmd + " in all stateful pods")
-	framework.ExpectNoError(t.tester.ExecInStatefulPods(t.set, cmd))
-
-	By("Restarting statefulset " + t.set.Name)
-	t.tester.Restart(t.set)
-	t.tester.Saturate(t.set)
-
-	By("Verifying statefulset mounted data directory is usable")
-	framework.ExpectNoError(t.tester.CheckMount(t.set, "/data"))
-
-	cmd = "if [ \"$(cat /data/hostname)\" = \"$(hostname)\" ]; then exit 0; else exit 1; fi"
-	By("Running " + cmd + " in all stateful pods")
-	framework.ExpectNoError(t.tester.ExecInStatefulPods(t.set, cmd))
-
+	t.verify()
+	t.restart()
+	t.verify()
 }
 
 // Waits for the upgrade to complete and verifies the StatefulSet basic functionality
 func (t *StatefulSetUpgradeTest) Test(f *framework.Framework, done <-chan struct{}, upgrade UpgradeType) {
 	<-done
+	t.verify()
+}
 
+// Deletes all StatefulSets
+func (t *StatefulSetUpgradeTest) Teardown(f *framework.Framework) {
+	framework.DeleteAllStatefulSets(f.ClientSet, t.set.Name)
+}
+
+func (t *StatefulSetUpgradeTest) verify() {
 	By("Verifying statefulset mounted data directory is usable")
 	framework.ExpectNoError(t.tester.CheckMount(t.set, "/data"))
 
@@ -104,20 +90,10 @@ func (t *StatefulSetUpgradeTest) Test(f *framework.Framework, done <-chan struct
 	cmd := "echo $(hostname) > /data/hostname; sync;"
 	By("Running " + cmd + " in all stateful pods")
 	framework.ExpectNoError(t.tester.ExecInStatefulPods(t.set, cmd))
+}
 
+func (t *StatefulSetUpgradeTest) restart() {
 	By("Restarting statefulset " + t.set.Name)
 	t.tester.Restart(t.set)
 	t.tester.Saturate(t.set)
-
-	By("Verifying statefulset mounted data directory is usable")
-	framework.ExpectNoError(t.tester.CheckMount(t.set, "/data"))
-
-	cmd = "if [ \"$(cat /data/hostname)\" = \"$(hostname)\" ]; then exit 0; else exit 1; fi"
-	By("Running " + cmd + " in all stateful pods")
-	framework.ExpectNoError(t.tester.ExecInStatefulPods(t.set, cmd))
-}
-
-// Deletes all StatefulSets
-func (t *StatefulSetUpgradeTest) Teardown(f *framework.Framework) {
-	framework.DeleteAllStatefulSets(f.ClientSet, t.set.Name)
 }
