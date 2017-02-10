@@ -23,6 +23,7 @@ import (
 	"net/http"
 	"os/exec"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/golang/glog"
@@ -40,6 +41,48 @@ func init() {
 	}
 }
 
+// gcpAuthProvider is an auth provider plugin that uses GCP credentials to provide
+// tokens for kubectl to authenticate itself to the apiserver. A sample json config
+// is provided below with all recognized options described.
+//
+// {
+//   'auth-provider': {
+//     # Required
+//     "name": "gcp",
+//
+//     'config': {
+//       # Caching options
+//
+//       # Raw string data representing cached access token.
+//       "access-token": "ya29.CjWdA4GiBPTt",
+//       # RFC3339Nano expiration timestamp for cached access token.
+//       "expiry": "2016-10-31 22:31:9.123",
+//
+//       # Command execution options
+//       # These options direct the plugin to execute a specified command and parse
+//       # token and expiry time from the output of the command.
+//
+//       # Command to execute for access token. String is split on whitespace
+//       # with first field treated as the executable, remaining fields as args.
+//       # Command output will be parsed as JSON.
+//       "cmd-path": "/usr/bin/gcloud config config-helper --output=json",
+//
+//       # JSONPath to the string field that represents the access token in
+//       # command output. If omitted, defaults to "{.access_token}".
+//       "token-key": "{.credential.access_token}",
+//
+//       # JSONPath to the string field that represents expiration timestamp
+//       # of the access token in the command output. If omitted, defaults to
+//       # "{.token_expiry}"
+//       "expiry-key": ""{.credential.token_expiry}",
+//
+//       # golang reference time in the format that the expiration timestamp uses.
+//       # If omitted, defaults to time.RFC3339Nano
+//       "time-fmt": "2006-01-02 15:04:05.999999999"
+//     }
+//   }
+// }
+//
 type gcpAuthProvider struct {
 	tokenSource oauth2.TokenSource
 	persister   rest.AuthProviderConfigPersister
@@ -74,6 +117,7 @@ func (g *gcpAuthProvider) WrapTransport(rt http.RoundTripper) http.RoundTripper 
 func (g *gcpAuthProvider) Login() error { return nil }
 
 type cachedTokenSource struct {
+	lk          sync.Mutex
 	source      oauth2.TokenSource
 	accessToken string
 	expiry      time.Time
@@ -99,11 +143,7 @@ func newCachedTokenSource(accessToken, expiry string, persister rest.AuthProvide
 }
 
 func (t *cachedTokenSource) Token() (*oauth2.Token, error) {
-	tok := &oauth2.Token{
-		AccessToken: t.accessToken,
-		TokenType:   "Bearer",
-		Expiry:      t.expiry,
-	}
+	tok := t.cachedToken()
 	if tok.Valid() && !tok.Expiry.IsZero() {
 		return tok, nil
 	}
@@ -111,14 +151,37 @@ func (t *cachedTokenSource) Token() (*oauth2.Token, error) {
 	if err != nil {
 		return nil, err
 	}
+	cache := t.update(tok)
 	if t.persister != nil {
-		t.cache["access-token"] = tok.AccessToken
-		t.cache["expiry"] = tok.Expiry.Format(time.RFC3339Nano)
-		if err := t.persister.Persist(t.cache); err != nil {
+		if err := t.persister.Persist(cache); err != nil {
 			glog.V(4).Infof("Failed to persist token: %v", err)
 		}
 	}
 	return tok, nil
+}
+
+func (t *cachedTokenSource) cachedToken() *oauth2.Token {
+	t.lk.Lock()
+	defer t.lk.Unlock()
+	return &oauth2.Token{
+		AccessToken: t.accessToken,
+		TokenType:   "Bearer",
+		Expiry:      t.expiry,
+	}
+}
+
+func (t *cachedTokenSource) update(tok *oauth2.Token) map[string]string {
+	t.lk.Lock()
+	defer t.lk.Unlock()
+	t.accessToken = tok.AccessToken
+	t.expiry = tok.Expiry
+	ret := map[string]string{}
+	for k, v := range t.cache {
+		ret[k] = v
+	}
+	ret["access-token"] = t.accessToken
+	ret["expiry"] = t.expiry.Format(time.RFC3339Nano)
+	return ret
 }
 
 type commandTokenSource struct {
