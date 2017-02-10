@@ -149,7 +149,7 @@ func runServer(server *http.Server, network string, stopCh <-chan struct{}) (int
 				for {
 					time.Sleep(15 * time.Second)
 
-					ln, err = net.Listen("tcp", server.Addr)
+					ln, err = net.Listen(network, server.Addr)
 					if err == nil {
 						return
 					}
