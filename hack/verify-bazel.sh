@@ -22,7 +22,7 @@ source "${KUBE_ROOT}/hack/lib/init.sh"
 
 git config http.https://gopkg.in.followRedirects true
 
-go get -u gopkg.in/mikedanese/gazel.v13/gazel
+go get -u gopkg.in/mikedanese/gazel.v14/gazel
 if ! "${GOPATH}/bin/gazel" -validate -print-diff -root="$(kube::realpath ${KUBE_ROOT})" ; then
   echo
   echo "Run ./hack/update-bazel.sh"
