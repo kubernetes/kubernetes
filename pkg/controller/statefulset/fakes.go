@@ -20,8 +20,6 @@ import (
 	"fmt"
 	"time"
 
-	inf "gopkg.in/inf.v0"
-
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -31,10 +29,6 @@ import (
 	apipod "k8s.io/kubernetes/pkg/api/v1/pod"
 	apps "k8s.io/kubernetes/pkg/apis/apps/v1beta1"
 )
-
-func dec(i int64, exponent int) *inf.Dec {
-	return inf.NewDec(i, inf.Scale(-exponent))
-}
 
 func newPVC(name string) v1.PersistentVolumeClaim {
 	return v1.PersistentVolumeClaim{
@@ -101,13 +95,6 @@ func newStatefulSetWithVolumes(replicas int, name string, petMounts []v1.VolumeM
 			ServiceName:          "governingsvc",
 		},
 	}
-}
-
-func runningPod(ns, name string) *v1.Pod {
-	p := &v1.Pod{Status: v1.PodStatus{Phase: v1.PodRunning}}
-	p.Namespace = ns
-	p.Name = name
-	return p
 }
 
 func newPodList(ps *apps.StatefulSet, num int) []*v1.Pod {
