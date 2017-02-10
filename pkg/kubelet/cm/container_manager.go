@@ -18,7 +18,9 @@ package cm
 
 import (
 	"k8s.io/apimachinery/pkg/util/sets"
+	// TODO: Migrate kubelet to either use its own internal objects or client library.
 	"k8s.io/kubernetes/pkg/api/v1"
+	evictionapi "k8s.io/kubernetes/pkg/kubelet/eviction/api"
 )
 
 // Manages the containers running on a machine.
@@ -47,6 +49,9 @@ type ContainerManager interface {
 
 	// GetQOSContainersInfo returns the names of top level QoS containers
 	GetQOSContainersInfo() QOSContainersInfo
+
+	// GetNodeAllocatable returns the amount of compute resources that can be consumed by pods.
+	GetNodeAllocatable() v1.ResourceList
 }
 
 type NodeConfig struct {
