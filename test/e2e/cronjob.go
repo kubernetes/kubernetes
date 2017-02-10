@@ -82,7 +82,8 @@ var _ = framework.KubeDescribe("CronJob", func() {
 	It("should not schedule jobs when suspended [Slow]", func() {
 		By("Creating a suspended cronjob")
 		cronJob := newTestCronJob("suspended", "*/1 * * * ?", batch.AllowConcurrent, true)
-		cronJob.Spec.Suspend = newBool(true)
+		t := true
+		cronJob.Spec.Suspend = &t
 		cronJob, err := createCronJob(f.ClientSet, f.Namespace.Name, cronJob)
 		Expect(err).NotTo(HaveOccurred())
 
@@ -209,7 +210,7 @@ var _ = framework.KubeDescribe("CronJob", func() {
 		Expect(err).NotTo(HaveOccurred())
 
 		By("Ensuring job was deleted")
-		_, err = getJob(f.ClientSet, f.Namespace.Name, job.Name)
+		_, err = framework.GetJob(f.ClientSet, f.Namespace.Name, job.Name)
 		Expect(err).To(HaveOccurred())
 		Expect(errors.IsNotFound(err)).To(BeTrue())
 

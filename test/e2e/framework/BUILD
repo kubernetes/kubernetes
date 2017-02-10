@@ -18,6 +18,7 @@ go_library(
         "framework.go",
         "get-kubemark-resource-usage.go",
         "google_compute.go",
+        "jobs_util.go",
         "kubelet_stats.go",
         "log_size_monitoring.go",
         "metrics_util.go",

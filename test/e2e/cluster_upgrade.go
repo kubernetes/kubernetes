@@ -33,6 +33,7 @@ var upgradeTests = []upgrades.Test{
 	&upgrades.ServiceUpgradeTest{},
 	&upgrades.SecretUpgradeTest{},
 	&upgrades.DeploymentUpgradeTest{},
+	&upgrades.JobUpgradeTest{},
 }
 
 var _ = framework.KubeDescribe("Upgrade [Feature:Upgrade]", func() {
