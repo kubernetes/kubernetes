@@ -440,6 +440,52 @@ func newTestPods(numPods int, volume bool, imageName, podType string) []*v1.Pod 
 	return pods
 }
 
+// newTestPodsWithSecrets creates a list of pods (specification) for test.
+func newTestPodsInNamespaces(numPods int, imageName, podType string, secrets []*v1.Secret) []*v1.Pod {
+	var pods []*v1.Pod
+	for i := 0; i < numPods; i++ {
+		podName := "test-" + string(uuid.NewUUID())
+		labels := map[string]string{
+			"type": podType,
+			"name": podName,
+		}
+		pods = append(pods,
+			&v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      podName,
+					Labels:    labels,
+				},
+				Spec: v1.PodSpec{
+					// Restart policy is always (default).
+					Containers: []v1.Container{
+						{
+							Image: imageName,
+							Name:  podName,
+							VolumeMounts: []v1.VolumeMount{
+								{
+									Name:      "foo",
+									MountPath: "/etc/foo",
+									ReadOnly:  true,
+								},
+							},
+						},
+					},
+					Volumes: []v1.Volume{
+						{
+							Name: "foo",
+							VolumeSource: v1.VolumeSource{
+								Secret: &v1.SecretVolumeSource{
+									SecretName: secrets[i].Name,
+								},
+							},
+						},
+					},
+				},
+			})
+	}
+	return pods
+}
+
 // Time series of resource usage
 type ResourceSeries struct {
 	Timestamp            []int64           `json:"ts"`

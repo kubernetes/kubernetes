@@ -23,6 +23,8 @@ import (
 	"strings"
 	"time"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/stats"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -134,6 +136,7 @@ func (rt *resourceTest) getTestName() string {
 
 // runResourceUsageTest runs the resource usage test
 func runResourceUsageTest(f *framework.Framework, rc *ResourceCollector, testArg resourceTest) {
+	framework.Logf("resourceUsageTest")
 	const (
 		// The monitoring time for one test
 		monitoringTime = 10 * time.Minute
@@ -142,14 +145,68 @@ func runResourceUsageTest(f *framework.Framework, rc *ResourceCollector, testArg
 		// sleep for an interval here to measure steady data
 		sleepAfterCreatePods = 10 * time.Second
 	)
-	pods := newTestPods(testArg.podsNr, true, framework.GetPauseImageNameForHostArch(), "test_pod")
+	var secrets []*v1.Secret
+	for i := 0; i < testArg.podsNr; i++ {
+		secret := &v1.Secret{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      fmt.Sprintf("secret-%d", i),
+			},
+			Data: map[string][]byte{
+				"sfjdkjflds": []byte("sfksjdlf kjsd kfjsdlk fjlkds jflksd jflksjd lkfsj liferjlkjsadlkjfl kjd lijdsif jds l dskjf lkdsj flksdj flisdj fsld jdsk jflkdsj fks "),
+				"adndbsnfbf": []byte("sfksjdlf kjsd kfjsdlk fjlkds jflksd jflksjd lkfsj liferjlkjsadlkjfl kjd lijdsif jds l dskjf lkdsj flksdj flisdj fsld jdsk jflkdsj fks "),
+				"ewoiroeiwr": []byte("sfksjdlf kjsd kfjsdlk fjlkds jflksd jflksjd lkfsj liferjlkjsadlkjfl kjd lijdsif jds l dskjf lkdsj flksdj flisdj fsld jdsk jflkdsj fks "),
+				"lkslkfdsfk": []byte("sfksjdlf kjsd kfjsdlk fjlkds jflksd jflksjd lkfsj liferjlkjsadlkjfl kjd lijdsif jds l dskjf lkdsj flksdj flisdj fsld jdsk jflkdsj fks "),
+				"poewproerd": []byte("sfksjdlf kjsd kfjsdlk fjlkds jflksd jflksjd lkfsj liferjlkjsadlkjfl kjd lijdsif jds l dskjf lkdsj flksdj flisdj fsld jdsk jflkdsj fks "),
+				"yryeutyrue": []byte("sfksjdlf kjsd kfjsdlk fjlkds jflksd jflksjd lkfsj liferjlkjsadlkjfl kjd lijdsif jds l dskjf lkdsj flksdj flisdj fsld jdsk jflkdsj fks "),
+				"qweioieiei": []byte("sfksjdlf kjsd kfjsdlk fjlkds jflksd jflksjd lkfsj liferjlkjsadlkjfl kjd lijdsif jds l dskjf lkdsj flksdj flisdj fsld jdsk jflkdsj fks "),
+				"rtrueiutuq": []byte("sfksjdlf kjsd kfjsdlk fjlkds jflksd jflksjd lkfsj liferjlkjsadlkjfl kjd lijdsif jds l dskjf lkdsj flksdj flisdj fsld jdsk jflkdsj fks "),
+				"mgfkjdgkfd": []byte("sfksjdlf kjsd kfjsdlk fjlkds jflksd jflksjd lkfsj liferjlkjsadlkjfl kjd lijdsif jds l dskjf lkdsj flksdj flisdj fsld jdsk jflkdsj fks "),
+				"gjflkdkslk": []byte("sfksjdlf kjsd kfjsdlk fjlkds jflksd jflksjd lkfsj liferjlkjsadlkjfl kjd lijdsif jds l dskjf lkdsj flksdj flisdj fsld jdsk jflkdsj fks "),
+			},
+			Type: v1.SecretTypeOpaque,
+		}
+		s, err := f.ClientSet.Core().Secrets(f.Namespace.Name).Create(secret)
+		framework.ExpectNoError(err)
+		secrets = append(secrets, s)
+	}
+	pods := newTestPodsInNamespaces(testArg.podsNr, framework.GetPauseImageNameForHostArch(), "test_pod", secrets)
+	framework.Logf("pods created")
+//	pods := newTestPods(testArg.podsNr, true, framework.GetPauseImageNameForHostArch(), "test_pod")
+
 
 	rc.Start()
 	// Explicitly delete pods to prevent namespace controller cleanning up timeout
+/*	defer func() {
+		var wg sync.WaitGroup
+		for _, pod := range pods {
+			wg.Add(1)
+			go func(pod *v1.Pod) {
+				defer wg.Done()
+				err := f.ClientSet.Core().Pods(pod.Namespace).Delete(pod.Name, metav1.NewDeleteOptions(30))
+				framework.ExpectNoError(err)
+				framework.ExpectNoError(framework.WaitForPodToDisappear(f.ClientSet, pod.Namespace, pod.Name, labels.Everything(),
+					30*time.Second, 10*time.Minute))
+			}(pod)
+		}
+		wg.Wait()
+	}()*/
 	defer deletePodsSync(f, append(pods, getCadvisorPod()))
 	defer rc.Stop()
 
 	By("Creating a batch of Pods")
+/*	var wg sync.WaitGroup
+	for _, pod := range pods {
+		wg.Add(1)
+		go func(pod *v1.Pod) {
+			defer wg.Done()
+			defer GinkgoRecover()
+			f.PodClient().MungeSpec(pod)
+			_, err := f.ClientSet.Core().Pods(pod.Namespace).Create(pod)
+			framework.ExpectNoError(err)
+			framework.ExpectNoError(framework.WaitForPodNameRunningInNamespace(f.ClientSet, pod.Name, pod.Namespace))
+		}(pod)
+	}
+	wg.Wait()*/
 	f.PodClient().CreateBatch(pods)
 
 	// wait for a while to let the node be steady
