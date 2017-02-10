@@ -22,7 +22,6 @@ go_library(
         "//pkg/kubelet/util/format:go_default_library",
         "//plugin/pkg/scheduler/algorithm:go_default_library",
         "//plugin/pkg/scheduler/algorithm/predicates:go_default_library",
-        "//plugin/pkg/scheduler/schedulercache:go_default_library",
         "//vendor:github.com/golang/glog",
         "//vendor:k8s.io/apiserver/pkg/util/feature",
         "//vendor:k8s.io/client-go/tools/record",
