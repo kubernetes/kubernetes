@@ -20,20 +20,24 @@ package e2e_node
 
 import (
 	"fmt"
+	"io/ioutil"
 	"os/exec"
 	"path"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
 
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/kubernetes/pkg/api/v1"
+	"k8s.io/kubernetes/pkg/apis/componentconfig"
+	"k8s.io/kubernetes/pkg/kubelet/cm"
 	"k8s.io/kubernetes/test/e2e/framework"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+	"github.com/pborman/uuid"
 )
 
 func getOOMScoreForPid(pid int) (int, error) {
@@ -70,8 +74,82 @@ func validateOOMScoreAdjSettingIsInRange(pid int, expectedMinOOMScoreAdj, expect
 	return nil
 }
 
-var _ = framework.KubeDescribe("Kubelet Container Manager [Serial]", func() {
-	f := framework.NewDefaultFramework("kubelet-container-manager")
+func expectFileValToEqual(filePath string, expectedValue, delta int64) {
+	out, err := ioutil.ReadFile(filePath)
+	Expect(err).To(BeNil(), "failed to read file %q", filePath)
+	actual, err := strconv.ParseInt(strings.TrimSpace(string(out)), 10, 64)
+	Expect(err).To(BeNil(), "failed to parse output %v", err)
+	// Ensure that values are within a delta range to work arounding rounding errors.
+	Expect((actual < (expectedValue-delta)) || (actual > (expectedValue+delta))).To(BeFalse(), "Expected value at %q to be between %d and %d. Got %d", filePath, (expectedValue - delta), (expectedValue + delta), actual)
+}
+
+var _ = framework.KubeDescribe("Kubelet Container Manager Node Allocatable Enforcement [Serial]", func() {
+	f := framework.NewDefaultFramework("kubelet-container-manager-na")
+
+	Describe("Validate Node Allocatable", func() {
+		Context("once the node is setup", func() {
+			tempSetCurrentKubeletConfig(f, func(initialConfig *componentconfig.KubeletConfiguration) {
+				initialConfig.EnforceNodeAllocatable = []string{"pods"}
+				initialConfig.SystemReserved = componentconfig.ConfigurationMap{
+					"cpu":    "100m",
+					"memory": "100Mi",
+				}
+				initialConfig.KubeReserved = componentconfig.ConfigurationMap{
+					"cpu":    "100m",
+					"memory": "100Mi",
+				}
+				initialConfig.EvictionHard = "memory.available<100Mi"
+				// Necessary for allocatable enforcement.
+				initialConfig.CgroupsPerQOS = true
+			})
+
+			It("Node Allocatable Pod Cgroup Is Found", func() {
+				currentConfig, err := getCurrentKubeletConfig()
+				Expect(err).To(BeNil())
+				if !currentConfig.CgroupsPerQOS || len(currentConfig.EnforceNodeAllocatable) == 0 {
+					Skip("Required configuration not found. Skipping test")
+				}
+				expectedNAPodCgroup := path.Join(currentConfig.CgroupRoot, "kubepods")
+				subsystems, err := cm.GetCgroupSubsystems()
+				Expect(err).To(BeNil())
+				cgroupManager := cm.NewCgroupManager(subsystems, currentConfig.CgroupDriver)
+				Expect(cgroupManager.Exists(cm.CgroupName(expectedNAPodCgroup))).To(BeTrue(), "Expected Node Allocatable Cgroup Does not exist")
+				// TODO: Update cgroupManager to expose a Status interface to get current Cgroup Settings.
+				capacity := getLocalNode(f).Status.Capacity
+				Expect(err).To(BeNil())
+				var allocatableCPU, allocatableMemory *resource.Quantity
+				// Total cpu reservation is 200m.
+				for k, v := range capacity {
+					if k == v1.ResourceCPU {
+						allocatableCPU = v.Copy()
+						allocatableCPU.Sub(resource.MustParse("200m"))
+					}
+					if k == v1.ResourceMemory {
+						allocatableMemory = v.Copy()
+						allocatableMemory.Sub(resource.MustParse("200Mi"))
+					}
+				}
+				// Total Memory reservation is 200Mi excluding eviction thresholds.
+				// Expect CPU shares on node allocatable cgroup to equal allocatable.
+				expectFileValToEqual(filepath.Join(subsystems.MountPoints["cpu"], "kubepods", "cpu.shares"), cm.MilliCPUToShares(allocatableCPU.MilliValue()), 10)
+				// Expect Memory limit on node allocatable cgroup to equal allocatable.
+				expectFileValToEqual(filepath.Join(subsystems.MountPoints["memory"], "kubepods", "memory.limit_in_bytes"), allocatableMemory.Value(), 0)
+				// Check that Allocatable reported to scheduler includes eviction thresholds.
+				schedulerAllocatable := getLocalNode(f).Status.Allocatable
+				// CPU based evictions are not supported.
+				Expect(allocatableCPU.Cmp(schedulerAllocatable["cpu"])).To(Equal(0), "Unexpected cpu allocatable value exposed by the node. Expected: %v, got: %v, capacity: %v", allocatableCPU, schedulerAllocatable["cpu"], capacity["cpu"])
+				// Memory allocatable should take into account eviction thresholds.
+				allocatableMemory.Sub(resource.MustParse("100Mi"))
+				Expect(allocatableMemory.Cmp(schedulerAllocatable["memory"])).To(Equal(0), "Unexpected cpu allocatable value exposed by the node. Expected: %v, got: %v, capacity: %v", allocatableCPU, schedulerAllocatable["cpu"], capacity["memory"])
+
+			})
+			// TODO: Add test for enforcing System Reserved and Kube Reserved. Requires creation of dummy cgroups.
+		})
+	})
+})
+
+var _ = framework.KubeDescribe("Kubelet Container Manager OOM score Enforcement [Serial]", func() {
+	f := framework.NewDefaultFramework("kubelet-container-manager-oom")
 
 	Describe("Validate OOM score adjustments", func() {
 		Context("once the node is setup", func() {

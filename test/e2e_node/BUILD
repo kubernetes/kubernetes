@@ -77,6 +77,7 @@ go_test(
     ],
     deps = [
         "//pkg/api/v1:go_default_library",
+        "//pkg/apis/componentconfig:go_default_library",
         "//pkg/client/clientset_generated/clientset:go_default_library",
         "//pkg/kubelet:go_default_library",
         "//pkg/kubelet/api/v1alpha1/stats:go_default_library",
@@ -102,6 +103,7 @@ go_test(
         "//vendor:github.com/onsi/gomega",
         "//vendor:github.com/onsi/gomega/gstruct",
         "//vendor:github.com/onsi/gomega/types",
+        "//vendor:github.com/pborman/uuid",
         "//vendor:github.com/spf13/pflag",
         "//vendor:k8s.io/apimachinery/pkg/api/errors",
         "//vendor:k8s.io/apimachinery/pkg/api/resource",
