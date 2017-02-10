@@ -18,11 +18,12 @@ package master
 
 import (
 	"bytes"
-	"encoding/json"
 	"fmt"
 	"os"
 	"path"
 	"strings"
+
+	"github.com/ghodss/yaml"
 
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -129,10 +130,10 @@ func WriteStaticPodManifests(cfg *kubeadmapi.MasterConfiguration) error {
 		return fmt.Errorf("failed to create directory %q [%v]", manifestsPath, err)
 	}
 	for name, spec := range staticPodSpecs {
-		filename := path.Join(manifestsPath, name+".json")
-		serialized, err := json.MarshalIndent(spec, "", "  ")
+		filename := path.Join(manifestsPath, name+".yaml")
+		serialized, err := yaml.Marshal(spec)
 		if err != nil {
-			return fmt.Errorf("failed to marshal manifest for %q to JSON [%v]", name, err)
+			return fmt.Errorf("failed to marshal manifest for %q to YAML [%v]", name, err)
 		}
 		if err := cmdutil.DumpReaderToFile(bytes.NewReader(serialized), filename); err != nil {
 			return fmt.Errorf("failed to create static pod manifest file for %q (%q) [%v]", name, filename, err)
