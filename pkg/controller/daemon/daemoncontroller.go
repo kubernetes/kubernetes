@@ -780,14 +780,14 @@ func (dsc *DaemonSetsController) nodeShouldRunDaemonPod(node *v1.Node, ds *exten
 
 	nodeInfo := schedulercache.NewNodeInfo(pods...)
 	nodeInfo.SetNode(node)
-	_, reasons, err := deamonSetPredicates(newPod, nodeInfo)
+	_, reasons, err := daemonSetPredicates(newPod, nodeInfo)
 	if err != nil {
-		glog.Warningf("deamonSetPredicates failed on ds '%s/%s' due to unexpected error: %v", ds.ObjectMeta.Namespace, ds.ObjectMeta.Name, err)
+		glog.Warningf("daemonSetPredicates failed on ds '%s/%s' due to unexpected error: %v", ds.ObjectMeta.Namespace, ds.ObjectMeta.Name, err)
 		return false, false, false, err
 	}
 
 	for _, r := range reasons {
-		glog.V(4).Infof("deamonSetPredicates failed on ds '%s/%s' for reason: %v", ds.ObjectMeta.Namespace, ds.ObjectMeta.Name, r.GetReason())
+		glog.V(4).Infof("daemonSetPredicates failed on ds '%s/%s' for reason: %v", ds.ObjectMeta.Namespace, ds.ObjectMeta.Name, r.GetReason())
 		switch reason := r.(type) {
 		case *predicates.InsufficientResourceError:
 			dsc.eventRecorder.Eventf(ds, v1.EventTypeNormal, FailedPlacementReason, "failed to place pod on %q: %s", node.ObjectMeta.Name, reason.Error())
@@ -823,7 +823,8 @@ func (dsc *DaemonSetsController) nodeShouldRunDaemonPod(node *v1.Node, ds *exten
 			case
 				predicates.ErrPodAffinityNotMatch,
 				predicates.ErrServiceAffinityViolated:
-				return false, false, false, fmt.Errorf("unexpected reason: deamonSetPredicates should not return reason %s", reason.GetReason())
+				glog.Warningf("unexpected predicate failure reason: %s", reason.GetReason())
+				return false, false, false, fmt.Errorf("unexpected reason: daemonSetPredicates should not return reason %s", reason.GetReason())
 			default:
 				glog.V(4).Infof("unknown predicate failure reason: %s", reason.GetReason())
 				wantToRun, shouldSchedule, shouldContinueRunning = false, false, false
@@ -837,9 +838,9 @@ func (dsc *DaemonSetsController) nodeShouldRunDaemonPod(node *v1.Node, ds *exten
 	return
 }
 
-// deamonSetPredicates checks if a DaemonSet's pod can be scheduled on a node using GeneralPredicates
+// daemonSetPredicates checks if a DaemonSet's pod can be scheduled on a node using GeneralPredicates
 // and PodToleratesNodeTaints predicate
-func deamonSetPredicates(pod *v1.Pod, nodeInfo *schedulercache.NodeInfo) (bool, []algorithm.PredicateFailureReason, error) {
+func daemonSetPredicates(pod *v1.Pod, nodeInfo *schedulercache.NodeInfo) (bool, []algorithm.PredicateFailureReason, error) {
 	var predicateFails []algorithm.PredicateFailureReason
 
 	fit, reasons, err := predicates.GeneralPredicates(pod, nil, nodeInfo)
