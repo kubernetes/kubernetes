@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: \n"
 "Report-Msgid-Bugs-To: EMAIL\n"
-"POT-Creation-Date: 2017-02-01 23:02-0800\n"
+"POT-Creation-Date: 2017-02-21 21:49-0800\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -17,8 +17,106 @@ msgstr ""
 "Content-Type: text/plain; charset=CHARSET\n"
 "Content-Transfer-Encoding: 8bit\n"
 
-#: pkg/kubectl/cmd/apply.go:102
+#: pkg/kubectl/cmd/apply.go:104
 msgid "Apply a configuration to a resource by filename or stdin"
+msgstr ""
+
+#: pkg/kubectl/cmd/certificates.go:72
+msgid "Approve a certificate signing request"
+msgstr ""
+
+#: pkg/kubectl/cmd/attach.go:70
+msgid "Attach to a running container"
+msgstr ""
+
+#: pkg/kubectl/cmd/autoscale.go:56
+msgid "Auto-scale a Deployment, ReplicaSet, or ReplicationController"
+msgstr ""
+
+#: pkg/kubectl/cmd/convert.go:68
+msgid "Convert config files between different API versions"
+msgstr ""
+
+#: pkg/kubectl/cmd/cp.go:65
+msgid "Copy files and directories to and from containers."
+msgstr ""
+
+#: pkg/kubectl/cmd/create_clusterrolebinding.go:44
+msgid "Create a ClusterRoleBinding for a particular ClusterRole"
+msgstr ""
+
+#: pkg/kubectl/cmd/create_service.go:182
+msgid "Create a LoadBalancer service."
+msgstr ""
+
+#: pkg/kubectl/cmd/create_service.go:125
+msgid "Create a NodePort service."
+msgstr ""
+
+#: pkg/kubectl/cmd/create_rolebinding.go:44
+msgid "Create a RoleBinding for a particular Role or ClusterRole"
+msgstr ""
+
+#: pkg/kubectl/cmd/create_secret.go:215
+msgid "Create a TLS secret"
+msgstr ""
+
+#: pkg/kubectl/cmd/create_service.go:69
+msgid "Create a clusterIP service."
+msgstr ""
+
+#: pkg/kubectl/cmd/create_configmap.go:60
+msgid "Create a configmap from a local file, directory or literal value"
+msgstr ""
+
+#: pkg/kubectl/cmd/create_deployment.go:45
+msgid "Create a deployment with the specified name."
+msgstr ""
+
+#: pkg/kubectl/cmd/create_namespace.go:45
+msgid "Create a namespace with the specified name"
+msgstr ""
+
+#: pkg/kubectl/cmd/create_pdb.go:50
+msgid "Create a pod disruption budget with the specified name."
+msgstr ""
+
+#: pkg/kubectl/cmd/create_quota.go:48
+msgid "Create a quota with the specified name."
+msgstr ""
+
+#: pkg/kubectl/cmd/create.go:63
+msgid "Create a resource by filename or stdin"
+msgstr ""
+
+#: pkg/kubectl/cmd/create_secret.go:144
+msgid "Create a secret for use with a Docker registry"
+msgstr ""
+
+#: pkg/kubectl/cmd/create_secret.go:74
+msgid "Create a secret from a local file, directory or literal value"
+msgstr ""
+
+#: pkg/kubectl/cmd/create_secret.go:35
+msgid "Create a secret using specified subcommand"
+msgstr ""
+
+#: pkg/kubectl/cmd/create_serviceaccount.go:45
+msgid "Create a service account with the specified name"
+msgstr ""
+
+#: pkg/kubectl/cmd/create_service.go:37
+msgid "Create a service using specified subcommand."
+msgstr ""
+
+#: pkg/kubectl/cmd/create_service.go:241
+msgid "Create an ExternalName service."
+msgstr ""
+
+#: pkg/kubectl/cmd/delete.go:131
+msgid ""
+"Delete resources by filenames, stdin, resources and names, or by resources "
+"and label selector"
 msgstr ""
 
 #: pkg/kubectl/cmd/config/delete_cluster.go:39
@@ -29,8 +127,32 @@ msgstr ""
 msgid "Delete the specified context from the kubeconfig"
 msgstr ""
 
+#: pkg/kubectl/cmd/certificates.go:122
+msgid "Deny a certificate signing request"
+msgstr ""
+
+#: pkg/kubectl/cmd/stop.go:59
+msgid "Deprecated: Gracefully shut down a resource by name or filename"
+msgstr ""
+
 #: pkg/kubectl/cmd/config/get_contexts.go:63
 msgid "Describe one or many contexts"
+msgstr ""
+
+#: pkg/kubectl/cmd/top_node.go:78
+msgid "Display Resource (CPU/Memory/Storage) usage of nodes"
+msgstr ""
+
+#: pkg/kubectl/cmd/top_pod.go:80
+msgid "Display Resource (CPU/Memory/Storage) usage of pods"
+msgstr ""
+
+#: pkg/kubectl/cmd/top.go:44
+msgid "Display Resource (CPU/Memory/Storage) usage."
+msgstr ""
+
+#: pkg/kubectl/cmd/clusterinfo.go:51
+msgid "Display cluster info"
 msgstr ""
 
 #: pkg/kubectl/cmd/config/get_clusters.go:41
@@ -41,12 +163,105 @@ msgstr ""
 msgid "Display merged kubeconfig settings or a specified kubeconfig file"
 msgstr ""
 
+#: pkg/kubectl/cmd/get.go:107
+msgid "Display one or many resources"
+msgstr ""
+
 #: pkg/kubectl/cmd/config/current_context.go:49
 msgid "Displays the current-context"
 msgstr ""
 
+#: pkg/kubectl/cmd/explain.go:51
+msgid "Documentation of resources"
+msgstr ""
+
+#: pkg/kubectl/cmd/drain.go:177
+msgid "Drain node in preparation for maintenance"
+msgstr ""
+
+#: pkg/kubectl/cmd/clusterinfo_dump.go:39
+msgid "Dump lots of relevant info for debugging and diagnosis"
+msgstr ""
+
+#: pkg/kubectl/cmd/edit.go:106
+msgid "Edit a resource on the server"
+msgstr ""
+
+#: pkg/kubectl/cmd/exec.go:69
+msgid "Execute a command in a container"
+msgstr ""
+
+#: pkg/kubectl/cmd/portforward.go:76
+msgid "Forward one or more local ports to a pod"
+msgstr ""
+
+#: pkg/kubectl/cmd/help.go:37
+msgid "Help about any command"
+msgstr ""
+
+#: pkg/kubectl/cmd/rollout/rollout.go:47
+msgid "Manage a deployment rollout"
+msgstr ""
+
+#: pkg/kubectl/cmd/drain.go:128
+msgid "Mark node as schedulable"
+msgstr ""
+
+#: pkg/kubectl/cmd/drain.go:103
+msgid "Mark node as unschedulable"
+msgstr ""
+
+#: pkg/kubectl/cmd/rollout/rollout_pause.go:74
+msgid "Mark the provided resource as paused"
+msgstr ""
+
+#: pkg/kubectl/cmd/certificates.go:36
+msgid "Modify certificate resources."
+msgstr ""
+
 #: pkg/kubectl/cmd/config/config.go:40
 msgid "Modify kubeconfig files"
+msgstr ""
+
+#: pkg/kubectl/cmd/completion.go:98
+msgid "Output shell completion code for the specified shell (bash or zsh)"
+msgstr ""
+
+#: pkg/kubectl/cmd/rollingupdate.go:85
+msgid "Perform a rolling update of the given ReplicationController"
+msgstr ""
+
+#: pkg/kubectl/cmd/version.go:40
+msgid "Print the client and server version information"
+msgstr ""
+
+#: pkg/kubectl/cmd/options.go:38
+msgid "Print the list of flags inherited by all commands"
+msgstr ""
+
+#: pkg/kubectl/cmd/logs.go:87
+msgid "Print the logs for a container in a pod"
+msgstr ""
+
+#: pkg/kubectl/cmd/replace.go:71
+msgid "Replace a resource by filename or stdin"
+msgstr ""
+
+#: pkg/kubectl/cmd/rollout/rollout_resume.go:72
+msgid "Resume a paused resource"
+msgstr ""
+
+#: pkg/kubectl/cmd/run.go:95
+msgid "Run a particular image on the cluster"
+msgstr ""
+
+#: pkg/kubectl/cmd/proxy.go:69
+msgid "Run a proxy to the Kubernetes API server"
+msgstr ""
+
+#: pkg/kubectl/cmd/scale.go:71
+msgid ""
+"Set a new size for a Deployment, ReplicaSet, Replication Controller, or Job"
 msgstr ""
 
 #: pkg/kubectl/cmd/set/set.go:38
@@ -77,8 +292,30 @@ msgstr ""
 msgid "Sets the current-context in a kubeconfig file"
 msgstr ""
 
+#: pkg/kubectl/cmd/describe.go:82
+msgid "Show details of a specific resource or group of resources"
+msgstr ""
+
+#: pkg/kubectl/cmd/rollout/rollout_status.go:58
+msgid "Show the status of the rollout"
+msgstr ""
+
+#: pkg/kubectl/cmd/expose.go:88
+msgid ""
+"Take a replication controller, service, deployment or pod and expose it as a "
+"new Kubernetes Service"
+msgstr ""
+
+#: pkg/kubectl/cmd/rollout/rollout_undo.go:72
+msgid "Undo a previous rollout"
+msgstr ""
+
 #: pkg/kubectl/cmd/config/unset.go:48
 msgid "Unsets an individual value in a kubeconfig file"
+msgstr ""
+
+#: pkg/kubectl/cmd/patch.go:95
+msgid "Update field(s) of a resource using strategic merge patch"
 msgstr ""
 
 #: pkg/kubectl/cmd/set/set_image.go:95
@@ -91,4 +328,20 @@ msgstr ""
 
 #: pkg/kubectl/cmd/annotate.go:115
 msgid "Update the annotations on a resource"
+msgstr ""
+
+#: pkg/kubectl/cmd/label.go:113
+msgid "Update the labels on a resource"
+msgstr ""
+
+#: pkg/kubectl/cmd/taint.go:89
+msgid "Update the taints on one or more nodes"
+msgstr ""
+
+#: pkg/kubectl/cmd/rollout/rollout_history.go:52
+msgid "View rollout history"
+msgstr ""
+
+#: pkg/kubectl/cmd/cmd.go:217
+msgid "kubectl controls the Kubernetes cluster manager"
 msgstr ""
