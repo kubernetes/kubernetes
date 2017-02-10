@@ -15582,6 +15582,89 @@
      }
     }
    },
+   "/apis/authentication.k8s.io/v1/": {
+    "get": {
+     "description": "get available resources",
+     "consumes": [
+      "application/json",
+      "application/yaml",
+      "application/vnd.kubernetes.protobuf"
+     ],
+     "produces": [
+      "application/json",
+      "application/yaml",
+      "application/vnd.kubernetes.protobuf"
+     ],
+     "schemes": [
+      "https"
+     ],
+     "tags": [
+      "authentication_v1"
+     ],
+     "operationId": "getAuthenticationV1APIResources",
+     "responses": {
+      "200": {
+       "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.APIResourceList"
+       }
+      },
+      "401": {
+       "description": "Unauthorized"
+      }
+     }
+    }
+   },
+   "/apis/authentication.k8s.io/v1/tokenreviews": {
+    "post": {
+     "description": "create a TokenReview",
+     "consumes": [
+      "*/*"
+     ],
+     "produces": [
+      "application/json",
+      "application/yaml",
+      "application/vnd.kubernetes.protobuf"
+     ],
+     "schemes": [
+      "https"
+     ],
+     "tags": [
+      "authentication_v1"
+     ],
+     "operationId": "createAuthenticationV1TokenReview",
+     "parameters": [
+      {
+       "name": "body",
+       "in": "body",
+       "required": true,
+       "schema": {
+        "$ref": "#/definitions/io.k8s.kubernetes.pkg.apis.authentication.v1.TokenReview"
+       }
+      }
+     ],
+     "responses": {
+      "200": {
+       "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.kubernetes.pkg.apis.authentication.v1.TokenReview"
+       }
+      },
+      "401": {
+       "description": "Unauthorized"
+      }
+     }
+    },
+    "parameters": [
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "If 'true', then the output is pretty printed.",
+      "name": "pretty",
+      "in": "query"
+     }
+    ]
+   },
    "/apis/authentication.k8s.io/v1beta1/": {
     "get": {
      "description": "get available resources",
@@ -39161,6 +39244,96 @@
       "description": "Replicas is the number of actual replicas.",
       "type": "integer",
       "format": "int32"
+     }
+    }
+   },
+   "io.k8s.kubernetes.pkg.apis.authentication.v1.TokenReview": {
+    "description": "TokenReview attempts to authenticate a token to a known user. Note: TokenReview requests may be cached by the webhook token authenticator plugin in the kube-apiserver.",
+    "required": [
+     "spec"
+    ],
+    "properties": {
+     "apiVersion": {
+      "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources",
+      "type": "string"
+     },
+     "kind": {
+      "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds",
+      "type": "string"
+     },
+     "metadata": {
+      "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta"
+     },
+     "spec": {
+      "description": "Spec holds information about the request being evaluated",
+      "$ref": "#/definitions/io.k8s.kubernetes.pkg.apis.authentication.v1.TokenReviewSpec"
+     },
+     "status": {
+      "description": "Status is filled in by the server and indicates whether the request can be authenticated.",
+      "$ref": "#/definitions/io.k8s.kubernetes.pkg.apis.authentication.v1.TokenReviewStatus"
+     }
+    },
+    "x-kubernetes-group-version-kind": [
+     {
+      "Group": "authentication.k8s.io",
+      "Version": "v1",
+      "Kind": "TokenReview"
+     }
+    ]
+   },
+   "io.k8s.kubernetes.pkg.apis.authentication.v1.TokenReviewSpec": {
+    "description": "TokenReviewSpec is a description of the token authentication request.",
+    "properties": {
+     "token": {
+      "description": "Token is the opaque bearer token.",
+      "type": "string"
+     }
+    }
+   },
+   "io.k8s.kubernetes.pkg.apis.authentication.v1.TokenReviewStatus": {
+    "description": "TokenReviewStatus is the result of the token authentication request.",
+    "properties": {
+     "authenticated": {
+      "description": "Authenticated indicates that the token was associated with a known user.",
+      "type": "boolean"
+     },
+     "error": {
+      "description": "Error indicates that the token couldn't be checked",
+      "type": "string"
+     },
+     "user": {
+      "description": "User is the UserInfo associated with the provided token.",
+      "$ref": "#/definitions/io.k8s.kubernetes.pkg.apis.authentication.v1.UserInfo"
+     }
+    }
+   },
+   "io.k8s.kubernetes.pkg.apis.authentication.v1.UserInfo": {
+    "description": "UserInfo holds the information about the user needed to implement the user.Info interface.",
+    "properties": {
+     "extra": {
+      "description": "Any additional information provided by the authenticator.",
+      "type": "object",
+      "additionalProperties": {
+       "type": "array",
+       "items": {
+        "type": "string"
+       }
+      }
+     },
+     "groups": {
+      "description": "The names of groups this user is a part of.",
+      "type": "array",
+      "items": {
+       "type": "string"
+      }
+     },
+     "uid": {
+      "description": "A unique value that identifies this user across time. If this user is deleted and another user by the same name is added, they will have different UIDs.",
+      "type": "string"
+     },
+     "username": {
+      "description": "The name that uniquely identifies this user among all active users.",
+      "type": "string"
      }
     }
    },

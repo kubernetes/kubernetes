@@ -26,6 +26,8 @@ import (
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	v1beta1apps "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/apps/v1beta1"
 	fakev1beta1apps "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/apps/v1beta1/fake"
+	v1authentication "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/authentication/v1"
+	fakev1authentication "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/authentication/v1/fake"
 	v1beta1authentication "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/authentication/v1beta1"
 	fakev1beta1authentication "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/authentication/v1beta1/fake"
 	v1authorization "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/authorization/v1"
@@ -109,13 +111,18 @@ func (c *Clientset) Apps() v1beta1apps.AppsV1beta1Interface {
 	return &fakev1beta1apps.FakeAppsV1beta1{Fake: &c.Fake}
 }
 
-// AuthenticationV1beta1 retrieves the AuthenticationV1beta1Client
-func (c *Clientset) AuthenticationV1beta1() v1beta1authentication.AuthenticationV1beta1Interface {
-	return &fakev1beta1authentication.FakeAuthenticationV1beta1{Fake: &c.Fake}
+// AuthenticationV1 retrieves the AuthenticationV1Client
+func (c *Clientset) AuthenticationV1() v1authentication.AuthenticationV1Interface {
+	return &fakev1authentication.FakeAuthenticationV1{Fake: &c.Fake}
 }
 
-// Authentication retrieves the AuthenticationV1beta1Client
-func (c *Clientset) Authentication() v1beta1authentication.AuthenticationV1beta1Interface {
+// Authentication retrieves the AuthenticationV1Client
+func (c *Clientset) Authentication() v1authentication.AuthenticationV1Interface {
+	return &fakev1authentication.FakeAuthenticationV1{Fake: &c.Fake}
+}
+
+// AuthenticationV1beta1 retrieves the AuthenticationV1beta1Client
+func (c *Clientset) AuthenticationV1beta1() v1beta1authentication.AuthenticationV1beta1Interface {
 	return &fakev1beta1authentication.FakeAuthenticationV1beta1{Fake: &c.Fake}
 }
 
