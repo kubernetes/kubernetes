@@ -40,6 +40,7 @@ import (
 	replicationcontroller "k8s.io/kubernetes/pkg/controller/replication"
 	resourcequotacontroller "k8s.io/kubernetes/pkg/controller/resourcequota"
 	serviceaccountcontroller "k8s.io/kubernetes/pkg/controller/serviceaccount"
+	ttlcontroller "k8s.io/kubernetes/pkg/controller/ttl"
 	quotainstall "k8s.io/kubernetes/pkg/quota/install"
 )
 
@@ -138,6 +139,14 @@ func startServiceAccountController(ctx ControllerContext) (bool, error) {
 		ctx.ClientBuilder.ClientOrDie("service-account-controller"),
 		serviceaccountcontroller.DefaultServiceAccountsControllerOptions(),
 	).Run(1, ctx.Stop)
+	return true, nil
+}
+
+func startTTLController(ctx ControllerContext) (bool, error) {
+	go ttlcontroller.NewTTLController(
+		ctx.NewInformerFactory.Core().V1().Nodes(),
+		ctx.ClientBuilder.ClientOrDie("ttl-controller"),
+	).Run(5, ctx.Stop)
 	return true, nil
 }
 

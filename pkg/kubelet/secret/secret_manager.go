@@ -18,6 +18,7 @@ package secret
 
 import (
 	"fmt"
+	"strconv"
 	"sync"
 	"time"
 
@@ -30,6 +31,10 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/util/clock"
+)
+
+const (
+	defaultTTL = time.Minute
 )
 
 type Manager interface {
@@ -67,6 +72,8 @@ func (s *simpleSecretManager) RegisterPod(pod *v1.Pod) {
 func (s *simpleSecretManager) UnregisterPod(pod *v1.Pod) {
 }
 
+type GetObjectTTLFunc func() (time.Duration, bool)
+
 type objectKey struct {
 	namespace string
 	name      string
@@ -93,15 +100,18 @@ type secretStore struct {
 
 	lock  sync.Mutex
 	items map[objectKey]*secretStoreItem
-	ttl   time.Duration
+
+	defaultTTL time.Duration
+	getTTL     GetObjectTTLFunc
 }
 
-func newSecretStore(kubeClient clientset.Interface, clock clock.Clock, ttl time.Duration) *secretStore {
+func newSecretStore(kubeClient clientset.Interface, clock clock.Clock, getTTL GetObjectTTLFunc, ttl time.Duration) *secretStore {
 	return &secretStore{
 		kubeClient: kubeClient,
 		clock:      clock,
 		items:      make(map[objectKey]*secretStoreItem),
-		ttl:        ttl,
+		defaultTTL: ttl,
+		getTTL:     getTTL,
 	}
 }
 
@@ -149,6 +159,31 @@ func (s *secretStore) Delete(namespace, name string) {
 	}
 }
 
+func GetObjectTTLFromNodeFunc(getNode func() (*v1.Node, error)) GetObjectTTLFunc {
+	return func() (time.Duration, bool) {
+		node, err := getNode()
+		if err != nil {
+			return time.Duration(0), false
+		}
+		if node != nil && node.Annotations != nil {
+			if value, ok := node.Annotations[v1.ObjectTTLAnnotationKey]; ok {
+				if intValue, err := strconv.Atoi(value); err == nil {
+					return time.Duration(intValue) * time.Second, true
+				}
+			}
+		}
+		return time.Duration(0), false
+	}
+}
+
+func (s *secretStore) isSecretFresh(data *secretData) bool {
+	secretTTL := s.defaultTTL
+	if ttl, ok := s.getTTL(); ok {
+		secretTTL = ttl
+	}
+	return s.clock.Now().Before(data.lastUpdateTime.Add(secretTTL))
+}
+
 func (s *secretStore) Get(namespace, name string) (*v1.Secret, error) {
 	key := objectKey{namespace: namespace, name: name}
 
@@ -172,7 +207,7 @@ func (s *secretStore) Get(namespace, name string) (*v1.Secret, error) {
 	// needed and return data.
 	data.Lock()
 	defer data.Unlock()
-	if data.err != nil || !s.clock.Now().Before(data.lastUpdateTime.Add(s.ttl)) {
+	if data.err != nil || !s.isSecretFresh(data) {
 		opts := metav1.GetOptions{}
 		if data.secret != nil && data.err == nil {
 			// This is just a periodic refresh of a secret we successfully fetched previously.
@@ -212,9 +247,9 @@ type cachingSecretManager struct {
 	registeredPods map[objectKey]*v1.Pod
 }
 
-func NewCachingSecretManager(kubeClient clientset.Interface) (Manager, error) {
+func NewCachingSecretManager(kubeClient clientset.Interface, getTTL GetObjectTTLFunc) (Manager, error) {
 	csm := &cachingSecretManager{
-		secretStore:    newSecretStore(kubeClient, clock.RealClock{}, time.Minute),
+		secretStore:    newSecretStore(kubeClient, clock.RealClock{}, getTTL, defaultTTL),
 		registeredPods: make(map[objectKey]*v1.Pod),
 	}
 	return csm, nil
