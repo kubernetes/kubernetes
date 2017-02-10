@@ -163,7 +163,7 @@ func TestControllerSync(t *testing.T) {
 		client := &fake.Clientset{}
 		volumeSource := fcache.NewFakePVControllerSource()
 		claimSource := fcache.NewFakePVCControllerSource()
-		ctrl := newTestController(client, volumeSource, claimSource, nil, true)
+		ctrl, volumeCtrl, claimCtrl, _ := newTestController(client, volumeSource, claimSource, nil, true)
 		reactor := newVolumeReactor(client, ctrl, volumeSource, claimSource, test.errors)
 		for _, claim := range test.initialClaims {
 			claimSource.Add(claim)
@@ -176,11 +176,13 @@ func TestControllerSync(t *testing.T) {
 
 		// Start the controller
 		stopCh := make(chan struct{})
+		go volumeCtrl.Run(stopCh)
+		go claimCtrl.Run(stopCh)
 		go ctrl.Run(stopCh)
 
 		// Wait for the controller to pass initial sync and fill its caches.
-		for !ctrl.volumeController.HasSynced() ||
-			!ctrl.claimController.HasSynced() ||
+		for !ctrl.volumeListerSynced() ||
+			!ctrl.claimListerSynced() ||
 			len(ctrl.claims.ListKeys()) < len(test.initialClaims) ||
 			len(ctrl.volumes.store.ListKeys()) < len(test.initialVolumes) {
 

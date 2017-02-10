@@ -45,6 +45,9 @@ import (
 	storageutil "k8s.io/kubernetes/pkg/apis/storage/v1beta1/util"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset/fake"
+	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated"
+	corelisters "k8s.io/kubernetes/pkg/client/listers/core/v1"
+	"k8s.io/kubernetes/pkg/controller"
 	fcache "k8s.io/kubernetes/pkg/controller/volume/persistentvolume/testing"
 	vol "k8s.io/kubernetes/pkg/volume"
 )
@@ -584,8 +587,9 @@ func newVolumeReactor(client *fake.Clientset, ctrl *PersistentVolumeController, 
 	client.AddReactor("*", "*", reactor.React)
 	return reactor
 }
+func alwaysReady() bool { return true }
 
-func newTestController(kubeClient clientset.Interface, volumeSource, claimSource, classSource cache.ListerWatcher, enableDynamicProvisioning bool) *PersistentVolumeController {
+func newTestController(kubeClient clientset.Interface, volumeSource, claimSource, classSource cache.ListerWatcher, enableDynamicProvisioning bool) (*PersistentVolumeController, cache.Controller, cache.Controller, *cache.Reflector) {
 	if volumeSource == nil {
 		volumeSource = fcache.NewFakePVControllerSource()
 	}
@@ -595,22 +599,62 @@ func newTestController(kubeClient clientset.Interface, volumeSource, claimSource
 	if classSource == nil {
 		classSource = fcache.NewFakeControllerSource()
 	}
-
+	// Pass in shared informers as usual but do not start them. Instead,
+	// use our own informers that use the same volumeSource + claimSource
+	// as the reactor.
+	informerFactory := informers.NewSharedInformerFactory(nil, nil, controller.NoResyncPeriodFunc())
 	params := ControllerParameters{
 		KubeClient:                kubeClient,
 		SyncPeriod:                5 * time.Second,
 		VolumePlugins:             []vol.VolumePlugin{},
-		VolumeSource:              volumeSource,
-		ClaimSource:               claimSource,
-		ClassSource:               classSource,
+		VolumeInformer:            informerFactory.Core().V1().PersistentVolumes(),
+		ClaimInformer:             informerFactory.Core().V1().PersistentVolumeClaims(),
+		ClassInformer:             informerFactory.Storage().V1beta1().StorageClasses(),
 		EventRecorder:             record.NewFakeRecorder(1000),
 		EnableDynamicProvisioning: enableDynamicProvisioning,
 	}
 	ctrl := NewController(params)
-
 	// Speed up the test
 	ctrl.createProvisionedPVInterval = 5 * time.Millisecond
-	return ctrl
+
+	volumeInformer, volumeController := cache.NewIndexerInformer(
+		volumeSource,
+		&v1.PersistentVolume{},
+		params.SyncPeriod,
+		cache.ResourceEventHandlerFuncs{
+			AddFunc:    func(obj interface{}) { ctrl.enqueueWork(ctrl.volumeQueue, obj) },
+			UpdateFunc: func(oldObj, newObj interface{}) { ctrl.enqueueWork(ctrl.volumeQueue, newObj) },
+			DeleteFunc: func(obj interface{}) { ctrl.enqueueWork(ctrl.volumeQueue, obj) },
+		},
+		cache.Indexers{"accessmodes": accessModesIndexFunc},
+	)
+	ctrl.volumeLister = corelisters.NewPersistentVolumeLister(volumeInformer)
+	ctrl.volumeListerSynced = volumeController.HasSynced
+
+	claimInformer, claimController := cache.NewIndexerInformer(
+		claimSource,
+		&v1.PersistentVolumeClaim{},
+		params.SyncPeriod,
+		cache.ResourceEventHandlerFuncs{
+			AddFunc:    func(obj interface{}) { ctrl.enqueueWork(ctrl.claimQueue, obj) },
+			UpdateFunc: func(oldObj, newObj interface{}) { ctrl.enqueueWork(ctrl.claimQueue, newObj) },
+			DeleteFunc: func(obj interface{}) { ctrl.enqueueWork(ctrl.claimQueue, obj) },
+		},
+		cache.Indexers{},
+	)
+	ctrl.claimLister = corelisters.NewPersistentVolumeClaimLister(claimInformer)
+	ctrl.claimListerSynced = claimController.HasSynced
+
+	ctrl.classes = cache.NewStore(cache.DeletionHandlingMetaNamespaceKeyFunc)
+	classReflector := cache.NewReflector(
+		classSource,
+		&storage.StorageClass{},
+		ctrl.classes,
+		params.SyncPeriod,
+	)
+	ctrl.classListerSynced = alwaysReady
+
+	return ctrl, volumeController, claimController, classReflector
 }
 
 // newVolume returns a new volume with given attributes
@@ -924,7 +968,7 @@ func runSyncTests(t *testing.T, tests []controllerTest, storageClasses []*storag
 
 		// Initialize the controller
 		client := &fake.Clientset{}
-		ctrl := newTestController(client, nil, nil, nil, true)
+		ctrl, _, _, _ := newTestController(client, nil, nil, nil, true)
 		reactor := newVolumeReactor(client, ctrl, nil, nil, test.errors)
 		for _, claim := range test.initialClaims {
 			ctrl.claims.Add(claim)
@@ -980,7 +1024,7 @@ func runMultisyncTests(t *testing.T, tests []controllerTest, storageClasses []*s
 
 		// Initialize the controller
 		client := &fake.Clientset{}
-		ctrl := newTestController(client, nil, nil, nil, true)
+		ctrl, _, _, _ := newTestController(client, nil, nil, nil, true)
 
 		// Convert classes to []interface{}  and forcefully inject them into
 		// controller.
