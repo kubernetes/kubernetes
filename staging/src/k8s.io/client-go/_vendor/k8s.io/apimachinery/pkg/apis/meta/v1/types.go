@@ -228,6 +228,8 @@ const (
 	NamespaceNone string = ""
 	// NamespaceSystem is the system namespace where we place system components.
 	NamespaceSystem string = "kube-system"
+	// NamespacePublic is the namespace where we place public info (ConfigMaps)
+	NamespacePublic string = "kube-public"
 )
 
 // OwnerReference contains enough information to let you identify an owning

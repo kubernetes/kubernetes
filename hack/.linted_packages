@@ -87,6 +87,7 @@ pkg/apis/rbac/install
 pkg/apis/rbac/v1alpha1
 pkg/apis/storage/install
 pkg/apis/storage/validation
+pkg/bootstrap/api
 pkg/client/conditions
 pkg/client/informers/informers_generated/apps
 pkg/client/informers/informers_generated/apps/internalversion
