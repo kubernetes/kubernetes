@@ -46,7 +46,8 @@ import (
 
 func startEndpointController(ctx ControllerContext) (bool, error) {
 	go endpointcontroller.NewEndpointController(
-		ctx.InformerFactory.Pods().Informer(),
+		ctx.NewInformerFactory.Core().V1().Pods(),
+		ctx.NewInformerFactory.Core().V1().Services(),
 		ctx.ClientBuilder.ClientOrDie("endpoint-controller"),
 	).Run(int(ctx.Options.ConcurrentEndpointSyncs), ctx.Stop)
 	return true, nil
