@@ -14,6 +14,7 @@ cluster/gce/configure-vm.sh:  cloud_config: ${CLOUD_CONFIG}
 cluster/gce/configure-vm.sh:  env-to-grains "feature_gates"
 cluster/gce/configure-vm.sh:  env-to-grains "runtime_config"
 cluster/gce/configure-vm.sh:  kubelet_api_servers: '${KUBELET_APISERVER}'
+cluster/gce/configure-vm.sh:  local -r client_ca_file="/srv/salt-overlay/salt/kubelet/ca.crt"
 cluster/gce/container-linux/configure-helper.sh:    authorization_mode+=",ABAC"
 cluster/gce/container-linux/configure-helper.sh:    authorization_mode+=",Webhook"
 cluster/gce/container-linux/configure-helper.sh:    grep -o "{{ *pillar\.get('storage_backend', '\(.*\)') *}}" | \
