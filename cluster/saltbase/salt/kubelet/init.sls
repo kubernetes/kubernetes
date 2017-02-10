@@ -61,7 +61,9 @@ fix-service-kubelet:
       - file: {{ pillar.get('systemd_system_path') }}/kubelet.service
       - file: {{ environment_file }}
       - file: /var/lib/kubelet/kubeconfig
+{% if pillar['kubelet_auth_ca_cert'] is defined  %}
       - file: /var/lib/kubelet/kubelet_auth_ca.crt
+{% endif %}
 
 {% else %}
 
