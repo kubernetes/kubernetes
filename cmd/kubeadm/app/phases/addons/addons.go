@@ -158,5 +158,5 @@ func getClusterCIDR(podsubnet string) string {
 	if len(podsubnet) == 0 {
 		return ""
 	}
-	return "--cluster-cidr" + podsubnet
+	return "- --cluster-cidr=" + podsubnet
 }
