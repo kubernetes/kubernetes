@@ -70,6 +70,8 @@ const (
 	// The expiration time of version cache.
 	versionCacheTTL = 60 * time.Second
 
+	defaultCgroupDriver = "cgroupfs"
+
 	// TODO: https://github.com/kubernetes/kubernetes/pull/31169 provides experimental
 	// defaulting of host user namespace that may be enabled when the docker daemon
 	// is using remapped UIDs.
@@ -179,18 +181,21 @@ func NewDockerService(client dockertools.DockerInterface, seccompProfileRoot str
 	glog.Infof("Docker cri networking managed by %v", plug.Name())
 
 	// NOTE: cgroup driver is only detectable in docker 1.11+
-	var cgroupDriver string
+	cgroupDriver := defaultCgroupDriver
 	dockerInfo, err := ds.client.Info()
 	if err != nil {
-		glog.Errorf("failed to execute Info() call to the Docker client: %v", err)
-		glog.Warningf("Using fallback default of cgroupfs as cgroup driver")
+		glog.Errorf("Failed to execute Info() call to the Docker client: %v", err)
+		glog.Warningf("Falling back to use the default driver: %q", cgroupDriver)
+	} else if len(dockerInfo.CgroupDriver) == 0 {
+		glog.Warningf("No cgroup driver is set in Docker")
+		glog.Warningf("Falling back to use the default driver: %q", cgroupDriver)
 	} else {
 		cgroupDriver = dockerInfo.CgroupDriver
-		if len(kubeCgroupDriver) != 0 && kubeCgroupDriver != cgroupDriver {
-			return nil, fmt.Errorf("misconfiguration: kubelet cgroup driver: %q is different from docker cgroup driver: %q", kubeCgroupDriver, cgroupDriver)
-		}
-		glog.Infof("Setting cgroupDriver to %s", cgroupDriver)
 	}
+	if len(kubeCgroupDriver) != 0 && kubeCgroupDriver != cgroupDriver {
+		return nil, fmt.Errorf("misconfiguration: kubelet cgroup driver: %q is different from docker cgroup driver: %q", kubeCgroupDriver, cgroupDriver)
+	}
+	glog.Infof("Setting cgroupDriver to %s", cgroupDriver)
 	ds.cgroupDriver = cgroupDriver
 	ds.versionCache = cache.NewObjectCache(
 		func() (interface{}, error) {
