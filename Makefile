@@ -490,13 +490,13 @@ endif
 
 
 ifeq ($(PRINT_HELP),y)
-bazel-test:
 define BAZEL_TEST_HELP_INFO
 # Test with bazel
 #
 # Example:
 # make bazel-test
 endef
+bazel-test:
 	@echo "$$BAZEL_TEST_HELP_INFO"
 else
 bazel-test:
