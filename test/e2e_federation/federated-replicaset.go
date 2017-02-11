@@ -413,17 +413,7 @@ func deleteReplicaSetOrFail(clientset *fedclientset.Clientset, nsName string, re
 		framework.ExpectNoError(err, "Error deleting replica set %q in namespace %q", replicaSetName, nsName)
 	}
 
-	// Wait for the replicaSet to be deleted.
-	err = wait.Poll(5*time.Second, wait.ForeverTestTimeout, func() (bool, error) {
-		_, err := clientset.Extensions().ReplicaSets(nsName).Get(replicaSetName, metav1.GetOptions{})
-		if err != nil && errors.IsNotFound(err) {
-			return true, nil
-		}
-		return false, err
-	})
-	if err != nil {
-		framework.Failf("Error in deleting replica set %s: %v", replicaSetName, err)
-	}
+	waitForReplicaSetToBeDeletedOrFail(clientset, nsName, replicaSetName)
 }
 
 func updateReplicaSetOrFail(clientset *fedclientset.Clientset, replicaset *v1beta1.ReplicaSet) *v1beta1.ReplicaSet {
