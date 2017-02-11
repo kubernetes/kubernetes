@@ -19,12 +19,12 @@ package storage
 import (
 	"strings"
 
+	"github.com/golang/glog"
+
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/storage/storagebackend"
-
-	"github.com/golang/glog"
 )
 
 // StorageFactory is the interface to locate the storage for a given GroupResource
@@ -43,11 +43,11 @@ type StorageFactory interface {
 	Backends() []string
 }
 
-// DefaultStorageFactory takes a GroupResource and returns back its storage interface.  This result includes:
+// ConfigurableStorageFactory takes a GroupResource and returns back its storage interface.  This result includes:
 // 1. Merged etcd config, including: auth, server locations, prefixes
 // 2. Resource encodings for storage: group,version,kind to store as
 // 3. Cohabitating default: some resources like hpa are exposed through multiple APIs.  They must agree on 1 and 2
-type DefaultStorageFactory struct {
+type ConfigurableStorageFactory struct {
 	// StorageConfig describes how to create a storage backend in general.
 	// Its authentication information will be used for every storage.Interface returned.
 	StorageConfig storagebackend.Config
@@ -122,7 +122,7 @@ func (o groupResourceOverrides) Apply(config *storagebackend.Config, options *St
 	}
 }
 
-var _ StorageFactory = &DefaultStorageFactory{}
+var _ StorageFactory = &ConfigurableStorageFactory{}
 
 const AllResources = "*"
 
@@ -138,11 +138,11 @@ var specialDefaultResourcePrefixes = map[schema.GroupResource]string{
 	schema.GroupResource{Group: "extensions", Resource: "podsecuritypolicies"}: "podsecuritypolicy",
 }
 
-func NewDefaultStorageFactory(config storagebackend.Config, defaultMediaType string, defaultSerializer runtime.StorageSerializer, resourceEncodingConfig ResourceEncodingConfig, resourceConfig APIResourceConfigSource) *DefaultStorageFactory {
+func NewConfigurableStorageFactory(config storagebackend.Config, defaultMediaType string, defaultSerializer runtime.StorageSerializer, resourceEncodingConfig ResourceEncodingConfig, resourceConfig APIResourceConfigSource) *ConfigurableStorageFactory {
 	if len(defaultMediaType) == 0 {
 		defaultMediaType = runtime.ContentTypeJSON
 	}
-	return &DefaultStorageFactory{
+	return &ConfigurableStorageFactory{
 		StorageConfig:           config,
 		Overrides:               map[schema.GroupResource]groupResourceOverrides{},
 		DefaultMediaType:        defaultMediaType,
@@ -155,26 +155,26 @@ func NewDefaultStorageFactory(config storagebackend.Config, defaultMediaType str
 	}
 }
 
-func (s *DefaultStorageFactory) SetEtcdLocation(groupResource schema.GroupResource, location []string) {
+func (s *ConfigurableStorageFactory) SetEtcdLocation(groupResource schema.GroupResource, location []string) {
 	overrides := s.Overrides[groupResource]
 	overrides.etcdLocation = location
 	s.Overrides[groupResource] = overrides
 }
 
-func (s *DefaultStorageFactory) SetEtcdPrefix(groupResource schema.GroupResource, prefix string) {
+func (s *ConfigurableStorageFactory) SetEtcdPrefix(groupResource schema.GroupResource, prefix string) {
 	overrides := s.Overrides[groupResource]
 	overrides.etcdPrefix = prefix
 	s.Overrides[groupResource] = overrides
 }
 
 // SetResourceEtcdPrefix sets the prefix for a resource, but not the base-dir.  You'll end up in `etcdPrefix/resourceEtcdPrefix`.
-func (s *DefaultStorageFactory) SetResourceEtcdPrefix(groupResource schema.GroupResource, prefix string) {
+func (s *ConfigurableStorageFactory) SetResourceEtcdPrefix(groupResource schema.GroupResource, prefix string) {
 	overrides := s.Overrides[groupResource]
 	overrides.etcdResourcePrefix = prefix
 	s.Overrides[groupResource] = overrides
 }
 
-func (s *DefaultStorageFactory) SetSerializer(groupResource schema.GroupResource, mediaType string, serializer runtime.StorageSerializer) {
+func (s *ConfigurableStorageFactory) SetSerializer(groupResource schema.GroupResource, mediaType string, serializer runtime.StorageSerializer) {
 	overrides := s.Overrides[groupResource]
 	overrides.mediaType = mediaType
 	overrides.serializer = serializer
@@ -182,7 +182,7 @@ func (s *DefaultStorageFactory) SetSerializer(groupResource schema.GroupResource
 }
 
 // AddCohabitatingResources links resources together the order of the slice matters!  its the priority order of lookup for finding a storage location
-func (s *DefaultStorageFactory) AddCohabitatingResources(groupResources ...schema.GroupResource) {
+func (s *ConfigurableStorageFactory) AddCohabitatingResources(groupResources ...schema.GroupResource) {
 	for _, groupResource := range groupResources {
 		overrides := s.Overrides[groupResource]
 		overrides.cohabitatingResources = groupResources
@@ -190,7 +190,7 @@ func (s *DefaultStorageFactory) AddCohabitatingResources(groupResources ...schem
 	}
 }
 
-func (s *DefaultStorageFactory) AddSerializationChains(encoderDecoratorFn func(runtime.Encoder) runtime.Encoder, decoderDecoratorFn func([]runtime.Decoder) []runtime.Decoder, groupResources ...schema.GroupResource) {
+func (s *ConfigurableStorageFactory) AddSerializationChains(encoderDecoratorFn func(runtime.Encoder) runtime.Encoder, decoderDecoratorFn func([]runtime.Decoder) []runtime.Decoder, groupResources ...schema.GroupResource) {
 	for _, groupResource := range groupResources {
 		overrides := s.Overrides[groupResource]
 		overrides.encoderDecoratorFn = encoderDecoratorFn
@@ -203,7 +203,7 @@ func getAllResourcesAlias(resource schema.GroupResource) schema.GroupResource {
 	return schema.GroupResource{Group: resource.Group, Resource: AllResources}
 }
 
-func (s *DefaultStorageFactory) getStorageGroupResource(groupResource schema.GroupResource) schema.GroupResource {
+func (s *ConfigurableStorageFactory) getStorageGroupResource(groupResource schema.GroupResource) schema.GroupResource {
 	for _, potentialStorageResource := range s.Overrides[groupResource].cohabitatingResources {
 		if s.APIResourceConfigSource.AnyVersionOfResourceEnabled(potentialStorageResource) {
 			return potentialStorageResource
@@ -215,7 +215,7 @@ func (s *DefaultStorageFactory) getStorageGroupResource(groupResource schema.Gro
 
 // New finds the storage destination for the given group and resource. It will
 // return an error if the group has no storage destination configured.
-func (s *DefaultStorageFactory) NewConfig(groupResource schema.GroupResource) (*storagebackend.Config, error) {
+func (s *ConfigurableStorageFactory) NewConfig(groupResource schema.GroupResource) (*storagebackend.Config, error) {
 	chosenStorageResource := s.getStorageGroupResource(groupResource)
 
 	// operate on copy
@@ -254,7 +254,7 @@ func (s *DefaultStorageFactory) NewConfig(groupResource schema.GroupResource) (*
 
 // Get all backends for all registered storage destinations.
 // Used for getting all instances for health validations.
-func (s *DefaultStorageFactory) Backends() []string {
+func (s *ConfigurableStorageFactory) Backends() []string {
 	backends := sets.NewString(s.StorageConfig.ServerList...)
 
 	for _, overrides := range s.Overrides {
@@ -263,7 +263,7 @@ func (s *DefaultStorageFactory) Backends() []string {
 	return backends.List()
 }
 
-func (s *DefaultStorageFactory) ResourcePrefix(groupResource schema.GroupResource) string {
+func (s *ConfigurableStorageFactory) ResourcePrefix(groupResource schema.GroupResource) string {
 	chosenStorageResource := s.getStorageGroupResource(groupResource)
 	groupOverride := s.Overrides[getAllResourcesAlias(chosenStorageResource)]
 	exactResourceOverride := s.Overrides[chosenStorageResource]

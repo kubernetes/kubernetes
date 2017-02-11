@@ -365,17 +365,11 @@ func NewMasterConfig() *master.Config {
 	genericConfig.Authorizer = authorizerfactory.NewAlwaysAllowAuthorizer()
 	genericConfig.AdmissionControl = admit.NewAlwaysAdmit()
 	genericConfig.EnableMetrics = true
-	genericConfig.RESTOptionsGetter = &kubeapiserver.RESTOptionsFactory{
-		StorageFactory:          storageFactory,
-		EnableWatchCache:        true,
-		EnableGarbageCollection: true,
-		DeleteCollectionWorkers: 1,
-	}
+	genericConfig.StorageFactory = storageFactory
 
 	return &master.Config{
 		GenericConfig:           genericConfig,
 		APIResourceConfigSource: master.DefaultAPIResourceConfigSource(),
-		StorageFactory:          storageFactory,
 		EnableCoreControllers:   true,
 		KubeletClientConfig:     kubeletclient.KubeletClientConfig{Port: 10250},
 		APIServerServicePort:    443,
