@@ -22,7 +22,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apiserver/pkg/registry/generic"
 	genericregistry "k8s.io/apiserver/pkg/registry/generic/registry"
-	genericapiserver "k8s.io/apiserver/pkg/server"
+	serverstorage "k8s.io/apiserver/pkg/server/storage"
 )
 
 // RESTOptionsFactory is a RESTOptionsGetter for kube apiservers since they do complicated stuff
@@ -30,7 +30,7 @@ type RESTOptionsFactory struct {
 	DeleteCollectionWorkers int
 	EnableGarbageCollection bool
 	EnableWatchCache        bool
-	StorageFactory          genericapiserver.StorageFactory
+	StorageFactory          serverstorage.StorageFactory
 }
 
 func (f *RESTOptionsFactory) GetRESTOptions(resource schema.GroupResource) (generic.RESTOptions, error) {
