@@ -21,6 +21,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apiserver/pkg/server"
+	"k8s.io/apiserver/pkg/storage/storagebackend"
 )
 
 // RecommendedOptions contains the recommended options for running an API server
@@ -36,7 +37,7 @@ type RecommendedOptions struct {
 
 func NewRecommendedOptions(prefix string, copier runtime.ObjectCopier, codec runtime.Codec) *RecommendedOptions {
 	return &RecommendedOptions{
-		Etcd:           NewEtcdOptions(prefix, copier, codec),
+		Etcd:           NewEtcdOptions(storagebackend.NewDefaultConfig(prefix, copier, codec)),
 		SecureServing:  NewSecureServingOptions(),
 		Authentication: NewDelegatingAuthenticationOptions(),
 		Authorization:  NewDelegatingAuthorizationOptions(),

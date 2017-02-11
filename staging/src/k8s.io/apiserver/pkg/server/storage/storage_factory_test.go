@@ -92,7 +92,7 @@ func (n *fakeNegotiater) DecoderToVersion(serializer runtime.Decoder, gv runtime
 	return n.serializer
 }
 
-func TestDefaultStorageFactory(t *testing.T) {
+func TestConfigurableStorageFactory(t *testing.T) {
 	ns := &fakeNegotiater{types: []string{"test/test"}}
 	f := NewDefaultStorageFactory(storagebackend.Config{}, "test/test", ns, NewDefaultResourceEncodingConfig(registry), NewResourceConfig())
 	f.AddCohabitatingResources(example.Resource("test"), schema.GroupResource{Resource: "test2", Group: "2"})
