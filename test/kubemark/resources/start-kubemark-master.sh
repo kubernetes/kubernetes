@@ -160,6 +160,30 @@ current-context: service-account-context
 EOF
 }
 
+function create-kubescheduler-kubeconfig {
+  echo "Creating kube-scheduler kubeconfig file"
+  mkdir -p /etc/srv/kubernetes/kube-scheduler
+  cat <<EOF >/etc/srv/kubernetes/kube-scheduler/kubeconfig
+apiVersion: v1
+kind: Config
+users:
+- name: kube-scheduler
+  user:
+    token: ${KUBE_SCHEDULER_TOKEN}
+clusters:
+- name: local
+  cluster:
+    insecure-skip-tls-verify: true
+    server: https://localhost:443
+contexts:
+- context:
+    cluster: local
+    user: kube-scheduler
+  name: kube-scheduler
+current-context: kube-scheduler
+EOF
+}
+
 function assemble-docker-flags {
 	echo "Assemble docker command line flags"
 	local docker_opts="-p /var/run/docker.pid --iptables=false --ip-masq=false"
@@ -346,7 +370,7 @@ function compute-kube-controller-manager-params {
 # Computes command line arguments to be passed to scheduler.
 function compute-kube-scheduler-params {
 	local params="${SCHEDULER_TEST_ARGS:-}"
-	params+=" --master=127.0.0.1:8080"
+	params+=" --kubeconfig=/etc/srv/kubernetes/kube-scheduler/kubeconfig"
 	echo "${params}"
 }
 
@@ -405,10 +429,15 @@ setup-kubelet-dir
 delete-default-etcd-configs
 compute-etcd-variables
 
-# Setup authentication token and kubeconfig for controller-manager.
+# Setup authentication token and kubeconfig for kube-controller-manager.
 KUBE_CONTROLLER_MANAGER_TOKEN=$(dd if=/dev/urandom bs=128 count=1 2>/dev/null | base64 | tr -d "=+/" | dd bs=32 count=1 2>/dev/null)
 echo "${KUBE_CONTROLLER_MANAGER_TOKEN},system:kube-controller-manager,uid:system:kube-controller-manager" >> /etc/srv/kubernetes/known_tokens.csv
 create-kubecontrollermanager-kubeconfig
+
+# Setup authentication token and kubeconfig for kube-scheduler.
+KUBE_SCHEDULER_TOKEN=$(dd if=/dev/urandom bs=128 count=1 2>/dev/null | base64 | tr -d "=+/" | dd bs=32 count=1 2>/dev/null)
+echo "${KUBE_SCHEDULER_TOKEN},system:kube-scheduler,uid:system:kube-scheduler" >> /etc/srv/kubernetes/known_tokens.csv
+create-kubescheduler-kubeconfig
 
 # Mount master PD for etcd and create symbolic links to it.
 {
