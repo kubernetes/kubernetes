@@ -19,12 +19,12 @@ package storage
 import (
 	"strings"
 
+	"github.com/golang/glog"
+
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/storage/storagebackend"
-
-	"github.com/golang/glog"
 )
 
 // StorageFactory is the interface to locate the storage for a given GroupResource
