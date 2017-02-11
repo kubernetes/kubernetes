@@ -10,6 +10,7 @@ load(
 go_library(
     name = "go_default_library",
     srcs = [
+        "configmaps.go",
         "deployments.go",
         "secrets.go",
         "services.go",
