@@ -58,12 +58,16 @@ func newController(csrs ...runtime.Object) (*testController, error) {
 		return nil, err
 	}
 
+	signer, err := NewCFSSLSigner(certFile, keyFile)
+	if err != nil {
+		return nil, err
+	}
+
 	approver := &fakeAutoApprover{make(chan *certificates.CertificateSigningRequest, 1)}
 	controller, err := NewCertificateController(
 		client,
 		informerFactory.Certificates().V1beta1().CertificateSigningRequests(),
-		certFile,
-		keyFile,
+		signer,
 		approver,
 	)
 	if err != nil {
