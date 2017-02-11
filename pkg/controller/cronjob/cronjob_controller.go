@@ -30,6 +30,7 @@ Just periodically list jobs and SJs, and then reconcile them.
 
 import (
 	"fmt"
+	"sort"
 	"time"
 
 	"github.com/golang/glog"
@@ -119,7 +120,65 @@ func (jm *CronJobController) SyncAll() {
 	glog.V(4).Infof("Found %d groups", len(jobsBySj))
 
 	for _, sj := range sjs {
-		SyncOne(sj, jobsBySj[sj.UID], time.Now(), jm.jobControl, jm.sjControl, jm.podControl, jm.recorder)
+		sj := SyncOne(sj, jobsBySj[sj.UID], time.Now(), jm.jobControl, jm.sjControl, jm.podControl, jm.recorder)
+		CleanupFinishedJobs(sj, jobsBySj[sj.UID], jm.jobControl, jm.sjControl, jm.podControl, jm.recorder)
+	}
+}
+
+// CleanupFinishedJobs cleanups finished jobs created by a CronJob
+func CleanupFinishedJobs(sj batch.CronJob, js []batch.Job, jc jobControlInterface, sjc sjControlInterface, pc podControlInterface, recorder record.EventRecorder) {
+	// If neither limits are active, there is no need to do anything.
+	if sj.Spec.FailedJobsHistoryLimit == nil && sj.Spec.SuccessfulJobsHistoryLimit == nil {
+		return
+	}
+
+	failedJobs := []batch.Job{}
+	succesfulJobs := []batch.Job{}
+
+	for _, job := range js {
+		isFinished, finishedStatus := GetFinishedStatus(&job)
+		if isFinished && finishedStatus == batch.JobComplete {
+			succesfulJobs = append(succesfulJobs, job)
+		} else if isFinished && finishedStatus == batch.JobFailed {
+			failedJobs = append(failedJobs, job)
+		}
+	}
+
+	RemoveOldestJobs(&sj,
+		succesfulJobs,
+		jc,
+		pc,
+		*sj.Spec.SuccessfulJobsHistoryLimit,
+		recorder)
+
+	RemoveOldestJobs(&sj,
+		failedJobs,
+		jc,
+		pc,
+		*sj.Spec.FailedJobsHistoryLimit,
+		recorder)
+
+	// Update the CronJob, in case jobs were removed from the list.
+	if _, err := sjc.UpdateStatus(&sj); err != nil {
+		nameForLog := fmt.Sprintf("%s/%s", sj.Namespace, sj.Name)
+		glog.Infof("Unable to update status for %s (rv = %s): %v", nameForLog, sj.ResourceVersion, err)
+	}
+}
+
+// RemoveJobs removes the oldest jobs from a list of jobs
+func RemoveOldestJobs(sj *batch.CronJob, js []batch.Job, jc jobControlInterface, pc podControlInterface, maxJobs int32, recorder record.EventRecorder) {
+	numToDelete := len(js) - int(maxJobs)
+	if numToDelete <= 0 {
+		return
+	}
+
+	nameForLog := fmt.Sprintf("%s/%s", sj.Namespace, sj.Name)
+	glog.V(4).Infof("Cleaning up %d/%d jobs from %s", numToDelete, len(js), nameForLog, numToDelete)
+
+	sort.Sort(byJobStartTime(js))
+	for i := 0; i < numToDelete; i++ {
+		glog.V(4).Infof("Removing job %s from %s", js[i].Name, nameForLog)
+		_ = DeleteJob(sj, &js[i], jc, pc, recorder, "history limit reached")
 	}
 }
 
@@ -127,7 +186,7 @@ func (jm *CronJobController) SyncAll() {
 // All known jobs created by "sj" should be included in "js".
 // The current time is passed in to facilitate testing.
 // It has no receiver, to facilitate testing.
-func SyncOne(sj batch.CronJob, js []batch.Job, now time.Time, jc jobControlInterface, sjc sjControlInterface, pc podControlInterface, recorder record.EventRecorder) {
+func SyncOne(sj batch.CronJob, js []batch.Job, now time.Time, jc jobControlInterface, sjc sjControlInterface, pc podControlInterface, recorder record.EventRecorder) batch.CronJob {
 	nameForLog := fmt.Sprintf("%s/%s", sj.Namespace, sj.Name)
 
 	childrenJobs := make(map[types.UID]bool)
@@ -172,7 +231,7 @@ func SyncOne(sj batch.CronJob, js []batch.Job, now time.Time, jc jobControlInter
 
 	if sj.Spec.Suspend != nil && *sj.Spec.Suspend {
 		glog.V(4).Infof("Not starting job for %s because it is suspended", nameForLog)
-		return
+		return sj
 	}
 	times, err := getRecentUnmetScheduleTimes(sj, now)
 	if err != nil {
@@ -182,7 +241,7 @@ func SyncOne(sj batch.CronJob, js []batch.Job, now time.Time, jc jobControlInter
 	// TODO: handle multiple unmet start times, from oldest to newest, updating status as needed.
 	if len(times) == 0 {
 		glog.V(4).Infof("No unmet start times for %s", nameForLog)
-		return
+		return sj
 	}
 	if len(times) > 1 {
 		glog.V(4).Infof("Multiple unmet start times for %s so only starting last one", nameForLog)
@@ -203,7 +262,7 @@ func SyncOne(sj batch.CronJob, js []batch.Job, now time.Time, jc jobControlInter
 		// Status.LastScheduleTime, Status.LastMissedTime), and then so we won't generate
 		// and event the next time we process it, and also so the user looking at the status
 		// can see easily that there was a missed execution.
-		return
+		return sj
 	}
 	if sj.Spec.ConcurrencyPolicy == batch.ForbidConcurrent && len(sj.Status.Active) > 0 {
 		// Regardless which source of information we use for the set of active jobs,
@@ -216,70 +275,34 @@ func SyncOne(sj batch.CronJob, js []batch.Job, now time.Time, jc jobControlInter
 		// With replace, we could use a name that is deterministic per execution time.
 		// But that would mean that you could not inspect prior successes or failures of Forbid jobs.
 		glog.V(4).Infof("Not starting job for %s because of prior execution still running and concurrency policy is Forbid", nameForLog)
-		return
+		return sj
 	}
 	if sj.Spec.ConcurrencyPolicy == batch.ReplaceConcurrent {
 		for _, j := range sj.Status.Active {
 			// TODO: this should be replaced with server side job deletion
 			// currently this mimics JobReaper from pkg/kubectl/stop.go
 			glog.V(4).Infof("Deleting job %s of %s that was still running at next scheduled start time", j.Name, nameForLog)
+
 			job, err := jc.GetJob(j.Namespace, j.Name)
 			if err != nil {
 				recorder.Eventf(&sj, v1.EventTypeWarning, "FailedGet", "Get job: %v", err)
-				return
+				return sj
 			}
-			// scale job down to 0
-			if *job.Spec.Parallelism != 0 {
-				zero := int32(0)
-				job.Spec.Parallelism = &zero
-				job, err = jc.UpdateJob(job.Namespace, job)
-				if err != nil {
-					recorder.Eventf(&sj, v1.EventTypeWarning, "FailedUpdate", "Update job: %v", err)
-					return
-				}
+			if !DeleteJob(&sj, job, jc, pc, recorder, "") {
+				return sj
 			}
-			// remove all pods...
-			selector, _ := metav1.LabelSelectorAsSelector(job.Spec.Selector)
-			options := metav1.ListOptions{LabelSelector: selector.String()}
-			podList, err := pc.ListPods(job.Namespace, options)
-			if err != nil {
-				recorder.Eventf(&sj, v1.EventTypeWarning, "FailedList", "List job-pods: %v", err)
-			}
-			errList := []error{}
-			for _, pod := range podList.Items {
-				glog.V(2).Infof("CronJob controller is deleting Pod %v/%v", pod.Namespace, pod.Name)
-				if err := pc.DeletePod(pod.Namespace, pod.Name); err != nil {
-					// ignores the error when the pod isn't found
-					if !errors.IsNotFound(err) {
-						errList = append(errList, err)
-					}
-				}
-			}
-			if len(errList) != 0 {
-				recorder.Eventf(&sj, v1.EventTypeWarning, "FailedDelete", "Deleted job-pods: %v", utilerrors.NewAggregate(errList))
-				return
-			}
-			// ... the job itself...
-			if err := jc.DeleteJob(job.Namespace, job.Name); err != nil {
-				recorder.Eventf(&sj, v1.EventTypeWarning, "FailedDelete", "Deleted job: %v", err)
-				glog.Errorf("Error deleting job %s from %s: %v", job.Name, nameForLog, err)
-				return
-			}
-			// ... and its reference from active list
-			deleteFromActiveList(&sj, job.ObjectMeta.UID)
-			recorder.Eventf(&sj, v1.EventTypeNormal, "SuccessfulDelete", "Deleted job %v", j.Name)
 		}
 	}
 
 	jobReq, err := getJobFromTemplate(&sj, scheduledTime)
 	if err != nil {
 		glog.Errorf("Unable to make Job from template in %s: %v", nameForLog, err)
-		return
+		return sj
 	}
 	jobResp, err := jc.CreateJob(sj.Namespace, jobReq)
 	if err != nil {
 		recorder.Eventf(&sj, v1.EventTypeWarning, "FailedCreate", "Error creating job: %v", err)
-		return
+		return sj
 	}
 	glog.V(4).Infof("Created Job %s for %s", jobResp.Name, nameForLog)
 	recorder.Eventf(&sj, v1.EventTypeNormal, "SuccessfulCreate", "Created job %v", jobResp.Name)
@@ -306,7 +329,59 @@ func SyncOne(sj batch.CronJob, js []batch.Job, now time.Time, jc jobControlInter
 		glog.Infof("Unable to update status for %s (rv = %s): %v", nameForLog, sj.ResourceVersion, err)
 	}
 
-	return
+	return sj
+}
+
+// DeleteJob reaps a job, deleting the job, the pobs and the reference in the active list
+func DeleteJob(sj *batch.CronJob, job *batch.Job, jc jobControlInterface, pc podControlInterface, recorder record.EventRecorder, reason string) bool {
+	// TODO: this should be replaced with server side job deletion
+	// currencontinuetly this mimics JobReaper from pkg/kubectl/stop.go
+	nameForLog := fmt.Sprintf("%s/%s", sj.Namespace, sj.Name)
+	var err error
+
+	// scale job down to 0
+	if *job.Spec.Parallelism != 0 {
+		zero := int32(0)
+		job.Spec.Parallelism = &zero
+		job, err = jc.UpdateJob(job.Namespace, job)
+		if err != nil {
+			recorder.Eventf(sj, v1.EventTypeWarning, "FailedUpdate", "Update job: %v", err)
+			return false
+		}
+	}
+	// remove all pods...
+	selector, _ := metav1.LabelSelectorAsSelector(job.Spec.Selector)
+	options := metav1.ListOptions{LabelSelector: selector.String()}
+	podList, err := pc.ListPods(job.Namespace, options)
+	if err != nil {
+		recorder.Eventf(sj, v1.EventTypeWarning, "FailedList", "List job-pods: %v", err)
+	}
+	errList := []error{}
+	for _, pod := range podList.Items {
+		glog.V(2).Infof("CronJob controller is deleting Pod %v/%v", pod.Namespace, pod.Name)
+		if err := pc.DeletePod(pod.Namespace, pod.Name); err != nil {
+			// ignores the error when the pod isn't found
+			if !errors.IsNotFound(err) {
+				errList = append(errList, err)
+			}
+		}
+	}
+	if len(errList) != 0 {
+		recorder.Eventf(sj, v1.EventTypeWarning, "FailedDelete", "Deleted job-pods: %v", utilerrors.NewAggregate(errList))
+		return false
+	}
+	// ... the job itself...
+	if err := jc.DeleteJob(job.Namespace, job.Name); err != nil {
+		recorder.Eventf(sj, v1.EventTypeWarning, "FailedDelete", "Deleted job: %v", err)
+		glog.Errorf("Error deleting job %s from %s: %v", job.Name, nameForLog, err)
+		return false
+	}
+	// ... and its reference from active list
+	deleteFromActiveList(sj, job.ObjectMeta.UID)
+	glog.Errorf("Deleting from active list! siz now: %d", len(sj.Status.Active))
+	recorder.Eventf(sj, v1.EventTypeNormal, "SuccessfulDelete", "Deleted job %v", job.Name)
+
+	return true
 }
 
 func getRef(object runtime.Object) (*v1.ObjectReference, error) {

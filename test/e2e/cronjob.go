@@ -52,6 +52,10 @@ var (
 var _ = framework.KubeDescribe("CronJob", func() {
 	f := framework.NewDefaultGroupVersionFramework("cronjob", BatchV2Alpha1GroupVersion)
 
+	sleepCommand := []string{"sleep", "300"}
+	shortSleepCommand := []string{"sleep", "120"}
+	failureSleepCommand := []string{"timeout", "-t", "30", "sleep", "120"}
+
 	BeforeEach(func() {
 		framework.SkipIfMissingResource(f.ClientPool, CronJobGroupVersionResource, f.Namespace.Name)
 	})
@@ -59,7 +63,8 @@ var _ = framework.KubeDescribe("CronJob", func() {
 	// multiple jobs running at once
 	It("should schedule multiple jobs concurrently", func() {
 		By("Creating a cronjob")
-		cronJob := newTestCronJob("concurrent", "*/1 * * * ?", batch.AllowConcurrent, true)
+		cronJob := newTestCronJob("concurrent", "*/1 * * * ?", batch.AllowConcurrent,
+			sleepCommand, nil, nil, nil)
 		cronJob, err := createCronJob(f.ClientSet, f.Namespace.Name, cronJob)
 		Expect(err).NotTo(HaveOccurred())
 
@@ -70,7 +75,7 @@ var _ = framework.KubeDescribe("CronJob", func() {
 		By("Ensuring at least two running jobs exists by listing jobs explicitly")
 		jobs, err := f.ClientSet.Batch().Jobs(f.Namespace.Name).List(metav1.ListOptions{})
 		Expect(err).NotTo(HaveOccurred())
-		activeJobs := filterActiveJobs(jobs)
+		activeJobs, _ := filterActiveJobs(jobs)
 		Expect(len(activeJobs) >= 2).To(BeTrue())
 
 		By("Removing cronjob")
@@ -81,7 +86,8 @@ var _ = framework.KubeDescribe("CronJob", func() {
 	// suspended should not schedule jobs
 	It("should not schedule jobs when suspended [Slow]", func() {
 		By("Creating a suspended cronjob")
-		cronJob := newTestCronJob("suspended", "*/1 * * * ?", batch.AllowConcurrent, true)
+		cronJob := newTestCronJob("suspended", "*/1 * * * ?", batch.AllowConcurrent,
+			sleepCommand, nil, nil, nil)
 		cronJob.Spec.Suspend = newBool(true)
 		cronJob, err := createCronJob(f.ClientSet, f.Namespace.Name, cronJob)
 		Expect(err).NotTo(HaveOccurred())
@@ -103,7 +109,8 @@ var _ = framework.KubeDescribe("CronJob", func() {
 	// only single active job is allowed for ForbidConcurrent
 	It("should not schedule new jobs when ForbidConcurrent [Slow]", func() {
 		By("Creating a ForbidConcurrent cronjob")
-		cronJob := newTestCronJob("forbid", "*/1 * * * ?", batch.ForbidConcurrent, true)
+		cronJob := newTestCronJob("forbid", "*/1 * * * ?", batch.ForbidConcurrent,
+			sleepCommand, nil, nil, nil)
 		cronJob, err := createCronJob(f.ClientSet, f.Namespace.Name, cronJob)
 		Expect(err).NotTo(HaveOccurred())
 
@@ -119,7 +126,7 @@ var _ = framework.KubeDescribe("CronJob", func() {
 		By("Ensuring exaclty one running job exists by listing jobs explicitly")
 		jobs, err := f.ClientSet.Batch().Jobs(f.Namespace.Name).List(metav1.ListOptions{})
 		Expect(err).NotTo(HaveOccurred())
-		activeJobs := filterActiveJobs(jobs)
+		activeJobs, _ := filterActiveJobs(jobs)
 		Expect(activeJobs).To(HaveLen(1))
 
 		By("Ensuring no more jobs are scheduled")
@@ -134,7 +141,8 @@ var _ = framework.KubeDescribe("CronJob", func() {
 	// only single active job is allowed for ReplaceConcurrent
 	It("should replace jobs when ReplaceConcurrent", func() {
 		By("Creating a ReplaceConcurrent cronjob")
-		cronJob := newTestCronJob("replace", "*/1 * * * ?", batch.ReplaceConcurrent, true)
+		cronJob := newTestCronJob("replace", "*/1 * * * ?", batch.ReplaceConcurrent,
+			sleepCommand, nil, nil, nil)
 		cronJob, err := createCronJob(f.ClientSet, f.Namespace.Name, cronJob)
 		Expect(err).NotTo(HaveOccurred())
 
@@ -150,7 +158,7 @@ var _ = framework.KubeDescribe("CronJob", func() {
 		By("Ensuring exaclty one running job exists by listing jobs explicitly")
 		jobs, err := f.ClientSet.Batch().Jobs(f.Namespace.Name).List(metav1.ListOptions{})
 		Expect(err).NotTo(HaveOccurred())
-		activeJobs := filterActiveJobs(jobs)
+		activeJobs, _ := filterActiveJobs(jobs)
 		Expect(activeJobs).To(HaveLen(1))
 
 		By("Ensuring the job is replaced with a new one")
@@ -165,7 +173,8 @@ var _ = framework.KubeDescribe("CronJob", func() {
 	// shouldn't give us unexpected warnings
 	It("should not emit unexpected warnings", func() {
 		By("Creating a cronjob")
-		cronJob := newTestCronJob("concurrent", "*/1 * * * ?", batch.AllowConcurrent, false)
+		cronJob := newTestCronJob("concurrent", "*/1 * * * ?", batch.AllowConcurrent,
+			nil, nil, nil, nil)
 		cronJob, err := createCronJob(f.ClientSet, f.Namespace.Name, cronJob)
 		Expect(err).NotTo(HaveOccurred())
 
@@ -187,7 +196,8 @@ var _ = framework.KubeDescribe("CronJob", func() {
 	// deleted jobs should be removed from the active list
 	It("should remove from active list jobs that have been deleted", func() {
 		By("Creating a ForbidConcurrent cronjob")
-		cronJob := newTestCronJob("forbid", "*/1 * * * ?", batch.ForbidConcurrent, true)
+		cronJob := newTestCronJob("forbid", "*/1 * * * ?", batch.ForbidConcurrent,
+			nil, nil, nil, nil)
 		cronJob, err := createCronJob(f.ClientSet, f.Namespace.Name, cronJob)
 		Expect(err).NotTo(HaveOccurred())
 
@@ -225,10 +235,227 @@ var _ = framework.KubeDescribe("CronJob", func() {
 		err = deleteCronJob(f.ClientSet, f.Namespace.Name, cronJob.Name)
 		Expect(err).NotTo(HaveOccurred())
 	})
+
+	// cleanup of successful finished jobs, with default limits
+	It("should delete successful finished jobs according to default history limits [Slow]", func() {
+		By("Creating a AllowConcurrent cronjob with custom history limits")
+		cronJob := newTestCronJob("concurrent-limit", "*/1 * * * ?", batch.AllowConcurrent,
+			shortSleepCommand, nil, nil, nil)
+		cronJob, err := createCronJob(f.ClientSet, f.Namespace.Name, cronJob)
+		Expect(err).NotTo(HaveOccurred())
+
+		By("Ensuring a job is running")
+		err = waitForActiveJobs(f.ClientSet, f.Namespace.Name, cronJob.Name, 1)
+		Expect(err).NotTo(HaveOccurred())
+
+		By("Ensuring a job exists by listing jobs explicitly")
+		jobs, err := f.ClientSet.Batch().Jobs(f.Namespace.Name).List(metav1.ListOptions{})
+		Expect(err).NotTo(HaveOccurred())
+		activeJobs, _ := filterActiveJobs(jobs)
+		Expect(len(activeJobs) >= 1).To(BeTrue())
+
+		By("Ensuring this job is not active anymore")
+		err = waitForJobsNotActiveAnymore(f.ClientSet, f.Namespace.Name, cronJob.Name, activeJobs)
+		Expect(err).NotTo(HaveOccurred())
+
+		By("Ensuring this job does not exist anymore")
+		err = waitForJobsNotExist(f.ClientSet, f, activeJobs)
+		Expect(err).NotTo(HaveOccurred())
+
+		// There can be 4 jobs at the time we check if the controller
+		// has not cleaned up a recently finished job yet.
+		By("Ensuring there are 3 or 4 finished jobs by listing jobs explicitly")
+		jobs, err = f.ClientSet.Batch().Jobs(f.Namespace.Name).List(metav1.ListOptions{})
+		Expect(err).NotTo(HaveOccurred())
+		_, finishedJobs := filterActiveJobs(jobs)
+		Expect(len(finishedJobs) >= 3).To(BeTrue())
+		Expect(len(finishedJobs) <= 4).To(BeTrue())
+
+		By("Removing cronjob")
+		err = deleteCronJob(f.ClientSet, f.Namespace.Name, cronJob.Name)
+		Expect(err).NotTo(HaveOccurred())
+	})
+
+	// cleanup of failed finished jobs, with default limits
+	It("should delete failed finished jobs according to default history limits [Slow]", func() {
+		activeDeadlineSeconds := int64(15)
+		By("Creating a AllowConcurrent cronjob with custom history limits")
+		cronJob := newTestCronJob("concurrent-limit", "*/1 * * * ?", batch.AllowConcurrent,
+			failureSleepCommand, nil, nil, &activeDeadlineSeconds)
+		cronJob, err := createCronJob(f.ClientSet, f.Namespace.Name, cronJob)
+		Expect(err).NotTo(HaveOccurred())
+
+		By("Ensuring a job is running at a time")
+		err = waitForActiveJobs(f.ClientSet, f.Namespace.Name, cronJob.Name, 1)
+		Expect(err).NotTo(HaveOccurred())
+
+		By("Ensuring a job exists by listing jobs explicitly")
+		jobs, err := f.ClientSet.Batch().Jobs(f.Namespace.Name).List(metav1.ListOptions{})
+		Expect(err).NotTo(HaveOccurred())
+		activeJobs, _ := filterActiveJobs(jobs)
+		Expect(len(activeJobs) >= 1).To(BeTrue())
+
+		By("Ensuring this job is not active anymore")
+		err = waitForJobsNotActiveAnymore(f.ClientSet, f.Namespace.Name, cronJob.Name, activeJobs)
+		Expect(err).NotTo(HaveOccurred())
+
+		By("Ensuring this job does not exist anymore")
+		err = waitForJobsNotExist(f.ClientSet, f, activeJobs)
+		Expect(err).NotTo(HaveOccurred())
+
+		// There can be 2 jobs at the time we check if the controller
+		// has not cleaned up a recently finished job yet.
+		By("Ensuring there are 1 or 2 finished jobs by listing jobs explicitly")
+		jobs, err = f.ClientSet.Batch().Jobs(f.Namespace.Name).List(metav1.ListOptions{})
+		Expect(err).NotTo(HaveOccurred())
+		_, finishedJobs := filterActiveJobs(jobs)
+		Expect(len(finishedJobs) >= 1).To(BeTrue())
+		Expect(len(finishedJobs) <= 2).To(BeTrue())
+
+		By("Removing cronjob")
+		err = deleteCronJob(f.ClientSet, f.Namespace.Name, cronJob.Name)
+		Expect(err).NotTo(HaveOccurred())
+	})
+
+	// cleanup of successful finished jobs, with custom limits
+	It("should delete successful finished jobs according to custom history limits", func() {
+		By("Creating a AllowConcurrent cronjob with custom history limits")
+		successLimit := int32(0)
+		failureLimit := int32(0)
+		cronJob := newTestCronJob("concurrent-limit", "*/1 * * * ?", batch.AllowConcurrent,
+			shortSleepCommand, &successLimit, &failureLimit, nil)
+		cronJob, err := createCronJob(f.ClientSet, f.Namespace.Name, cronJob)
+		Expect(err).NotTo(HaveOccurred())
+
+		By("Ensuring a job is running")
+		err = waitForActiveJobs(f.ClientSet, f.Namespace.Name, cronJob.Name, 1)
+		Expect(err).NotTo(HaveOccurred())
+
+		By("Ensuring a job exists by listing jobs explicitly")
+		jobs, err := f.ClientSet.Batch().Jobs(f.Namespace.Name).List(metav1.ListOptions{})
+		Expect(err).NotTo(HaveOccurred())
+		activeJobs, _ := filterActiveJobs(jobs)
+		Expect(len(activeJobs) >= 1).To(BeTrue())
+
+		By("Ensuring this job is not active anymore")
+		err = waitForJobsNotActiveAnymore(f.ClientSet, f.Namespace.Name, cronJob.Name, activeJobs)
+		Expect(err).NotTo(HaveOccurred())
+
+		By("Ensuring this job does not exist anymore")
+		err = waitForJobsNotExist(f.ClientSet, f, activeJobs)
+		Expect(err).NotTo(HaveOccurred())
+
+		By("Removing cronjob")
+		err = deleteCronJob(f.ClientSet, f.Namespace.Name, cronJob.Name)
+		Expect(err).NotTo(HaveOccurred())
+	})
+
+	// do not cleanup successful finished jobs when limits are high
+	It("should delete successful finished jobs when limits are high", func() {
+		By("Creating a AllowConcurrent cronjob with custom history limits")
+		successLimit := int32(1000)
+		failureLimit := int32(0)
+		cronJob := newTestCronJob("concurrent-limit", "*/1 * * * ?", batch.AllowConcurrent,
+			shortSleepCommand, &successLimit, &failureLimit, nil)
+		cronJob, err := createCronJob(f.ClientSet, f.Namespace.Name, cronJob)
+		Expect(err).NotTo(HaveOccurred())
+
+		By("Ensuring a job is running")
+		err = waitForActiveJobs(f.ClientSet, f.Namespace.Name, cronJob.Name, 1)
+		Expect(err).NotTo(HaveOccurred())
+
+		By("Ensuring a job exists by listing jobs explicitly")
+		jobs, err := f.ClientSet.Batch().Jobs(f.Namespace.Name).List(metav1.ListOptions{})
+		Expect(err).NotTo(HaveOccurred())
+		activeJobs, _ := filterActiveJobs(jobs)
+		Expect(len(activeJobs) >= 1).To(BeTrue())
+
+		By("Ensuring this job is not active anymore")
+		err = waitForJobsNotActiveAnymore(f.ClientSet, f.Namespace.Name, cronJob.Name, activeJobs)
+		Expect(err).NotTo(HaveOccurred())
+
+		By("Ensuring this jobs is not deleted")
+		err = waitForJobsNotExist(f.ClientSet, f, activeJobs)
+		Expect(err).To(HaveOccurred())
+
+		By("Removing cronjob")
+		err = deleteCronJob(f.ClientSet, f.Namespace.Name, cronJob.Name)
+		Expect(err).NotTo(HaveOccurred())
+	})
+
+	// cleanup of finished failed jobs, with custom limits
+	It("should delete failed finished jobs according to custom history limits", func() {
+		By("Creating a AllowConcurrent cronjob with custom history limits")
+		successLimit := int32(0)
+		failureLimit := int32(0)
+		activeDeadlineSeconds := int64(15)
+		cronJob := newTestCronJob("concurrent-limit", "*/1 * * * ?", batch.AllowConcurrent,
+			failureSleepCommand, &successLimit, &failureLimit, &activeDeadlineSeconds)
+		cronJob, err := createCronJob(f.ClientSet, f.Namespace.Name, cronJob)
+		Expect(err).NotTo(HaveOccurred())
+
+		By("Ensuring a job is running")
+		err = waitForActiveJobs(f.ClientSet, f.Namespace.Name, cronJob.Name, 1)
+		Expect(err).NotTo(HaveOccurred())
+
+		By("Ensuring a job exists by listing jobs explicitly")
+		jobs, err := f.ClientSet.Batch().Jobs(f.Namespace.Name).List(metav1.ListOptions{})
+		Expect(err).NotTo(HaveOccurred())
+		activeJobs, _ := filterActiveJobs(jobs)
+		Expect(len(activeJobs) >= 1).To(BeTrue())
+
+		By("Ensuring this job is not active anymore")
+		err = waitForJobsNotActiveAnymore(f.ClientSet, f.Namespace.Name, cronJob.Name, activeJobs)
+		Expect(err).NotTo(HaveOccurred())
+
+		By("Ensuring this job does not exist anymore")
+		err = waitForJobsNotExist(f.ClientSet, f, activeJobs)
+		Expect(err).NotTo(HaveOccurred())
+
+		By("Removing cronjob")
+		err = deleteCronJob(f.ClientSet, f.Namespace.Name, cronJob.Name)
+		Expect(err).NotTo(HaveOccurred())
+	})
+
+	// do not cleanup failed finished jobs when limits are high
+	It("should not delete failed finished jobs when limits are high", func() {
+		By("Creating a AllowConcurrent cronjob with custom history limits")
+		successLimit := int32(0)
+		failureLimit := int32(1000)
+		activeDeadlineSeconds := int64(15)
+		cronJob := newTestCronJob("concurrent-limit", "*/1 * * * ?", batch.AllowConcurrent,
+			failureSleepCommand, &successLimit, &failureLimit, &activeDeadlineSeconds)
+		cronJob, err := createCronJob(f.ClientSet, f.Namespace.Name, cronJob)
+		Expect(err).NotTo(HaveOccurred())
+
+		By("Ensuring a job is running")
+		err = waitForActiveJobs(f.ClientSet, f.Namespace.Name, cronJob.Name, 1)
+		Expect(err).NotTo(HaveOccurred())
+
+		By("Ensuring a job exists by listing jobs explicitly")
+		jobs, err := f.ClientSet.Batch().Jobs(f.Namespace.Name).List(metav1.ListOptions{})
+		Expect(err).NotTo(HaveOccurred())
+		activeJobs, _ := filterActiveJobs(jobs)
+		Expect(len(activeJobs) >= 1).To(BeTrue())
+
+		By("Ensuring this job is not active anymore")
+		err = waitForJobsNotActiveAnymore(f.ClientSet, f.Namespace.Name, cronJob.Name, activeJobs)
+		Expect(err).NotTo(HaveOccurred())
+
+		By("Ensuring this job is not deleted")
+		err = waitForJobsNotExist(f.ClientSet, f, activeJobs)
+		Expect(err).To(HaveOccurred())
+
+		By("Removing cronjob")
+		err = deleteCronJob(f.ClientSet, f.Namespace.Name, cronJob.Name)
+		Expect(err).NotTo(HaveOccurred())
+	})
 })
 
 // newTestCronJob returns a cronjob which does one of several testing behaviors.
-func newTestCronJob(name, schedule string, concurrencyPolicy batch.ConcurrencyPolicy, sleep bool) *batch.CronJob {
+func newTestCronJob(name, schedule string, concurrencyPolicy batch.ConcurrencyPolicy, command []string,
+	successfulJobsHistoryLimit *int32, failedJobsHistoryLimit *int32,
+	activeDeadlineSeconds *int64) *batch.CronJob {
 	parallelism := int32(1)
 	completions := int32(1)
 	sj := &batch.CronJob{
@@ -271,8 +498,17 @@ func newTestCronJob(name, schedule string, concurrencyPolicy batch.ConcurrencyPo
 			},
 		},
 	}
-	if sleep {
-		sj.Spec.JobTemplate.Spec.Template.Spec.Containers[0].Command = []string{"sleep", "300"}
+	if successfulJobsHistoryLimit != nil {
+		sj.Spec.SuccessfulJobsHistoryLimit = successfulJobsHistoryLimit
+	}
+	if failedJobsHistoryLimit != nil {
+		sj.Spec.FailedJobsHistoryLimit = failedJobsHistoryLimit
+	}
+	if activeDeadlineSeconds != nil {
+		sj.Spec.JobTemplate.Spec.ActiveDeadlineSeconds = activeDeadlineSeconds
+	}
+	if command != nil {
+		sj.Spec.JobTemplate.Spec.Template.Spec.Containers[0].Command = command
 	}
 	return sj
 }
@@ -316,6 +552,49 @@ func waitForNoJobs(c clientset.Interface, ns, jobName string, failIfNonEmpty boo
 		} else {
 			return len(curr.Status.Active) != 0, nil
 		}
+	})
+}
+
+// Wait for a list of jobs to not be active anymore.
+func waitForJobsNotActiveAnymore(c clientset.Interface, ns, cronJobName string, jobs []*batchv1.Job) error {
+	jobNamesMap := make(map[string]bool)
+	for _, job := range jobs {
+		jobNamesMap[job.Namespace+"@"+job.Name] = true
+	}
+
+	return wait.Poll(framework.Poll, cronJobTimeout, func() (bool, error) {
+		curr, err := c.BatchV2alpha1().CronJobs(ns).Get(cronJobName, metav1.GetOptions{})
+		if err != nil {
+			return false, err
+		}
+		for _, jobRef := range curr.Status.Active {
+			if found := jobNamesMap[jobRef.Namespace+"@"+jobRef.Name]; found {
+				return false, nil
+			}
+		}
+		return true, nil
+	})
+}
+
+// Wait for a list of jobs to not exist by listing jobs explicitly.
+func waitForJobsNotExist(c clientset.Interface, f *framework.Framework, jobs []*batchv1.Job) error {
+	jobNamesMap := make(map[string]bool)
+	for _, job := range jobs {
+		jobNamesMap[job.Namespace+"@"+job.Name] = true
+	}
+
+	return wait.Poll(framework.Poll, cronJobTimeout, func() (bool, error) {
+		jobs, err := f.ClientSet.Batch().Jobs(f.Namespace.Name).List(metav1.ListOptions{})
+		if err != nil {
+			return false, err
+		}
+		_, finishedJobs := filterActiveJobs(jobs)
+		for _, job := range finishedJobs {
+			if found := jobNamesMap[job.Namespace+"@"+job.Name]; found {
+				return false, nil
+			}
+		}
+		return true, nil
 	})
 }
 
@@ -383,11 +662,13 @@ func checkNoEventWithReason(c clientset.Interface, ns, cronJobName string, reaso
 	return nil
 }
 
-func filterActiveJobs(jobs *batchv1.JobList) (active []*batchv1.Job) {
+func filterActiveJobs(jobs *batchv1.JobList) (active []*batchv1.Job, finished []*batchv1.Job) {
 	for i := range jobs.Items {
 		j := jobs.Items[i]
 		if !job.IsJobFinished(&j) {
 			active = append(active, &j)
+		} else {
+			finished = append(finished, &j)
 		}
 	}
 	return
