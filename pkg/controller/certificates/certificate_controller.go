@@ -63,21 +63,16 @@ type CertificateController struct {
 	queue workqueue.RateLimitingInterface
 }
 
-func NewCertificateController(kubeClient clientset.Interface, csrInformer certificatesinformers.CertificateSigningRequestInformer, caCertFile, caKeyFile string, approver AutoApprover) (*CertificateController, error) {
+func NewCertificateController(kubeClient clientset.Interface, csrInformer certificatesinformers.CertificateSigningRequestInformer, signer Signer, approver AutoApprover) (*CertificateController, error) {
 	// Send events to the apiserver
 	eventBroadcaster := record.NewBroadcaster()
 	eventBroadcaster.StartLogging(glog.Infof)
 	eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: v1core.New(kubeClient.Core().RESTClient()).Events("")})
 
-	s, err := NewCFSSLSigner(caCertFile, caKeyFile)
-	if err != nil {
-		return nil, err
-	}
-
 	cc := &CertificateController{
 		kubeClient: kubeClient,
 		queue:      workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "certificate"),
-		signer:     s,
+		signer:     signer,
 		approver:   approver,
 	}
 
