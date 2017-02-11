@@ -66,7 +66,8 @@ type AuthenticatorConfig struct {
 	RequestHeaderConfig *authenticatorfactory.RequestHeaderConfig
 
 	// TODO, this is the only non-serializable part of the entire config.  Factor it out into a clientconfig
-	ServiceAccountTokenGetter serviceaccount.ServiceAccountTokenGetter
+	ServiceAccountTokenGetter   serviceaccount.ServiceAccountTokenGetter
+	BootstrapTokenAuthenticator authenticator.Token
 }
 
 // New returns an authenticator.Request or an error that supports the standard
@@ -127,6 +128,9 @@ func (config AuthenticatorConfig) New() (authenticator.Request, *spec.SecurityDe
 		}
 		authenticators = append(authenticators, tokenAuth)
 		hasTokenAuth = true
+	}
+	if config.BootstrapTokenAuthenticator != nil {
+		authenticators = append(authenticators, bearertoken.New(config.BootstrapTokenAuthenticator))
 	}
 	if len(config.ServiceAccountKeyFiles) > 0 {
 		serviceAccountAuth, err := newServiceAccountAuthenticator(config.ServiceAccountKeyFiles, config.ServiceAccountLookup, config.ServiceAccountTokenGetter)
