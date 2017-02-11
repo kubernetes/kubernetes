@@ -40,7 +40,7 @@ import (
 
 var FuzzIters = flag.Int("fuzz-iters", 20, "How many fuzzing iterations to do.")
 
-// nonRoundTrippableTypes are kinds that are effectively reserved across all GroupVersions
+// globalNonRoundTrippableTypes are kinds that are effectively reserved across all GroupVersions
 // They don't roundtrip
 var globalNonRoundTrippableTypes = sets.NewString(
 	"ExportOptions",
@@ -56,7 +56,7 @@ var globalNonRoundTrippableTypes = sets.NewString(
 	"DeleteOptions",
 )
 
-// RoundTripTypes applies the round-trip test to all round-trippable Kinds
+// RoundTripTypesWithoutProtobuf applies the round-trip test to all round-trippable Kinds
 // in the scheme.  It will skip all the GroupVersionKinds in the skip list.
 func RoundTripTypesWithoutProtobuf(t *testing.T, scheme *runtime.Scheme, codecFactory runtimeserializer.CodecFactory, fuzzer *fuzz.Fuzzer, nonRoundTrippableTypes map[schema.GroupVersionKind]bool) {
 	roundTripTypes(t, scheme, codecFactory, fuzzer, nonRoundTrippableTypes, true)
@@ -214,7 +214,7 @@ func roundTrip(t *testing.T, scheme *runtime.Scheme, codec runtime.Codec, object
 	// ensure that the object produced from decoding the encoded data is equal
 	// to the original object
 	if !apiequality.Semantic.DeepEqual(original, obj2) {
-		t.Errorf("\n1: %v: diff: %v\nCodec: %#v\nSource:\n\n%#v\n\nEncoded:\n\n%s\n\nFinal:\n\n%#v", name, diff.ObjectReflectDiff(object, obj2), codec, printer.Sprintf("%#v", object), dataAsString(data), printer.Sprintf("%#v", obj2))
+		t.Errorf("1: %v: diff: %v\nCodec: %#v\nSource:\n\n%#v\n\nEncoded:\n\n%s\n\nFinal:\n\n%#v", name, diff.ObjectReflectDiff(object, obj2), codec, printer.Sprintf("%#v", object), dataAsString(data), printer.Sprintf("%#v", obj2))
 		return
 	}
 
