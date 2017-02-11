@@ -29,7 +29,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 )
 
-// NewStorageFactory builds the ConfigurableStorageFactory.
+// NewStorageFactory builds the DefaultStorageFactory.
 // Merges defaultResourceConfig with the user specified overrides and merges
 // defaultAPIResourceConfig with the corresponding user specified overrides as well.
 func NewStorageFactory(storageConfig storagebackend.Config, defaultMediaType string, serializer runtime.StorageSerializer,
