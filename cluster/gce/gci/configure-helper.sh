@@ -233,6 +233,9 @@ function create-master-auth {
   if [[ -n "${KUBE_CONTROLLER_MANAGER_TOKEN:-}" ]]; then
     replace_prefixed_line "${known_tokens_csv}" "${KUBE_CONTROLLER_MANAGER_TOKEN}," "system:kube-controller-manager,uid:system:kube-controller-manager"
   fi
+  if [[ -n "${KUBE_SCHEDULER_TOKEN:-}" ]]; then
+    replace_prefixed_line "${known_tokens_csv}" "${KUBE_SCHEDULER_TOKEN},"          "system:kube-scheduler,uid:system:kube-scheduler"
+  fi
   if [[ -n "${KUBELET_TOKEN:-}" ]]; then
     replace_prefixed_line "${known_tokens_csv}" "${KUBELET_TOKEN},"                 "system:node:node-name,uid:kubelet,system:nodes"
   fi
@@ -428,6 +431,30 @@ contexts:
     user: kube-controller-manager
   name: service-account-context
 current-context: service-account-context
+EOF
+}
+
+function create-kubescheduler-kubeconfig {
+  echo "Creating kube-scheduler kubeconfig file"
+  mkdir -p /etc/srv/kubernetes/kube-scheduler
+  cat <<EOF >/etc/srv/kubernetes/kube-scheduler/kubeconfig
+apiVersion: v1
+kind: Config
+users:
+- name: kube-scheduler
+  user:
+    token: ${KUBE_SCHEDULER_TOKEN}
+clusters:
+- name: local
+  cluster:
+    insecure-skip-tls-verify: true
+    server: https://localhost:443
+contexts:
+- context:
+    cluster: local
+    user: kube-scheduler
+  name: kube-scheduler
+current-context: kube-scheduler
 EOF
 }
 
@@ -1021,10 +1048,12 @@ function start-kube-controller-manager {
 #   DOCKER_REGISTRY
 function start-kube-scheduler {
   echo "Start kubernetes scheduler"
+  create-kubescheduler-kubeconfig
   prepare-log-file /var/log/kube-scheduler.log
 
   # Calculate variables and set them in the manifest.
   params="${SCHEDULER_TEST_LOG_LEVEL:-"--v=2"} ${SCHEDULER_TEST_ARGS:-}"
+  params+=" --kubeconfig=/etc/srv/kubernetes/kube-scheduler/kubeconfig"
   if [[ -n "${FEATURE_GATES:-}" ]]; then
     params+=" --feature-gates=${FEATURE_GATES}"
   fi
@@ -1037,6 +1066,7 @@ function start-kube-scheduler {
   local -r src_file="${KUBE_HOME}/kube-manifests/kubernetes/gci-trusty/kube-scheduler.manifest"
   remove-salt-config-comments "${src_file}"
 
+  sed -i -e "s@{{srv_kube_path}}@/etc/srv/kubernetes@g" "${src_file}"
   sed -i -e "s@{{params}}@${params}@g" "${src_file}"
   sed -i -e "s@{{pillar\['kube_docker_registry'\]}}@${DOCKER_REGISTRY}@g" "${src_file}"
   sed -i -e "s@{{pillar\['kube-scheduler_docker_tag'\]}}@${kube_scheduler_docker_tag}@g" "${src_file}"
@@ -1335,8 +1365,9 @@ if [[ -n "${KUBE_USER:-}" ]]; then
   fi
 fi
 
-# generate the controller manager token here since its only used on the master.
+# generate the controller manager and scheduler tokens here since they are only used on the master.
 KUBE_CONTROLLER_MANAGER_TOKEN=$(dd if=/dev/urandom bs=128 count=1 2>/dev/null | base64 | tr -d "=+/" | dd bs=32 count=1 2>/dev/null)
+KUBE_SCHEDULER_TOKEN=$(dd if=/dev/urandom bs=128 count=1 2>/dev/null | base64 | tr -d "=+/" | dd bs=32 count=1 2>/dev/null)
 
 setup-os-params
 config-ip-firewall
