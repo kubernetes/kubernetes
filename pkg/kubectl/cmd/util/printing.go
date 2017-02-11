@@ -95,10 +95,32 @@ func ValidateOutputArgs(cmd *cobra.Command) error {
 	return nil
 }
 
+func ValidateOutputArgsForEdit(cmd *cobra.Command) error {
+	outputMode := GetFlagString(cmd, "output")
+	if outputMode != "" {
+		if outputMode != "json" || outputMode != "yaml" {
+			return UsageError(cmd, "Unexpected -o output mode: %v. We only support yaml|json.", outputMode)
+		}
+	}
+	return nil
+}
+
 // OutputVersion returns the preferred output version for generic content (JSON, YAML, or templates)
 // defaultVersion is never mutated.  Nil simply allows clean passing in common usage from client.Config
 func OutputVersion(cmd *cobra.Command, defaultVersion *schema.GroupVersion) (schema.GroupVersion, error) {
 	outputVersionString := GetFlagString(cmd, "output-version")
+	if len(outputVersionString) == 0 {
+		if defaultVersion == nil {
+			return schema.GroupVersion{}, nil
+		}
+
+		return *defaultVersion, nil
+	}
+
+	return schema.ParseGroupVersion(outputVersionString)
+}
+
+func OutputVersionAlias(outputVersionString string, defaultVersion *schema.GroupVersion) (schema.GroupVersion, error) {
 	if len(outputVersionString) == 0 {
 		if defaultVersion == nil {
 			return schema.GroupVersion{}, nil
