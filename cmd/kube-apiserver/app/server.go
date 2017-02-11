@@ -44,11 +44,13 @@ import (
 	"k8s.io/apiserver/pkg/admission"
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	"k8s.io/apiserver/pkg/server/filters"
+	"k8s.io/apiserver/plugin/pkg/authenticator/token/bootstrap"
 	"k8s.io/kubernetes/cmd/kube-apiserver/app/options"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/batch"
 	"k8s.io/kubernetes/pkg/capabilities"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
+	"k8s.io/kubernetes/pkg/client/informers/informers_generated/internalversion"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/controller/informers"
 	serviceaccountcontroller "k8s.io/kubernetes/pkg/controller/serviceaccount"
@@ -241,22 +243,6 @@ func Run(s *options.ServerRunOptions) error {
 		}
 	}
 
-	authenticatorConfig := s.Authentication.ToAuthenticationConfig()
-	if s.Authentication.ServiceAccounts.Lookup {
-		// If we need to look up service accounts and tokens,
-		// go directly to etcd to avoid recursive auth insanity
-		storageConfig, err := storageFactory.NewConfig(api.Resource("serviceaccounts"))
-		if err != nil {
-			return fmt.Errorf("unable to get serviceaccounts storage: %v", err)
-		}
-		authenticatorConfig.ServiceAccountTokenGetter = serviceaccountcontroller.NewGetterFromStorageInterface(storageConfig, storageFactory.ResourcePrefix(api.Resource("serviceaccounts")), storageFactory.ResourcePrefix(api.Resource("secrets")))
-	}
-
-	apiAuthenticator, securityDefinitions, err := authenticatorConfig.New()
-	if err != nil {
-		return fmt.Errorf("invalid Authentication Config: %v", err)
-	}
-
 	client, err := internalclientset.NewForConfig(genericConfig.LoopbackClientConfig)
 	if err != nil {
 		kubeAPIVersions := os.Getenv("KUBE_API_VERSIONS")
@@ -269,7 +255,31 @@ func Run(s *options.ServerRunOptions) error {
 		// TODO: get rid of KUBE_API_VERSIONS or define sane behaviour if set
 		glog.Errorf("Failed to create clientset with KUBE_API_VERSIONS=%q. KUBE_API_VERSIONS is only for testing. Things will break.", kubeAPIVersions)
 	}
+
+	// NOTE(ericchang): Internal informers should switch to using
+	// 'pkg/client/informers/informers_generated', the second informer
+	// created here.
 	sharedInformers := informers.NewSharedInformerFactory(nil, client, 10*time.Minute)
+	internalSharedInformers := internalversion.NewSharedInformerFactory(client, 10*time.Minute)
+
+	authenticatorConfig := s.Authentication.ToAuthenticationConfig()
+	if s.Authentication.ServiceAccounts.Lookup {
+		// If we need to look up service accounts and tokens,
+		// go directly to etcd to avoid recursive auth insanity
+		storageConfig, err := storageFactory.NewConfig(api.Resource("serviceaccounts"))
+		if err != nil {
+			return fmt.Errorf("unable to get serviceaccounts storage: %v", err)
+		}
+		authenticatorConfig.ServiceAccountTokenGetter = serviceaccountcontroller.NewGetterFromStorageInterface(storageConfig, storageFactory.ResourcePrefix(api.Resource("serviceaccounts")), storageFactory.ResourcePrefix(api.Resource("secrets")))
+	}
+	authenticatorConfig.BootstrapTokenAuthenticator = bootstrap.NewTokenAuthenticator(
+		internalSharedInformers.Core().InternalVersion().Secrets(),
+	)
+
+	apiAuthenticator, securityDefinitions, err := authenticatorConfig.New()
+	if err != nil {
+		return fmt.Errorf("invalid Authentication Config: %v", err)
+	}
 
 	authorizationConfig := s.Authorization.ToAuthorizationConfig(sharedInformers)
 	apiAuthorizer, err := authorizationConfig.New()
@@ -351,6 +361,7 @@ func Run(s *options.ServerRunOptions) error {
 	}
 
 	sharedInformers.Start(wait.NeverStop)
+	internalSharedInformers.Start(wait.NeverStop)
 	m.GenericAPIServer.PrepareRun().Run(wait.NeverStop)
 	return nil
 }
