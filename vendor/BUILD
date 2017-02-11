@@ -16897,3 +16897,28 @@ go_test(
     tags = ["automanaged"],
     deps = ["//vendor:k8s.io/apimachinery/pkg/api/testing"],
 )
+
+go_test(
+    name = "k8s.io/apiserver/plugin/pkg/authenticator/token/bootstrap_test",
+    srcs = ["k8s.io/apiserver/plugin/pkg/authenticator/token/bootstrap/bootstrap_test.go"],
+    library = ":k8s.io/apiserver/plugin/pkg/authenticator/token/bootstrap",
+    tags = ["automanaged"],
+    deps = [
+        "//pkg/api:go_default_library",
+        "//vendor:k8s.io/apimachinery/pkg/labels",
+        "//vendor:k8s.io/apiserver/pkg/authentication/user",
+    ],
+)
+
+go_library(
+    name = "k8s.io/apiserver/plugin/pkg/authenticator/token/bootstrap",
+    srcs = ["k8s.io/apiserver/plugin/pkg/authenticator/token/bootstrap/bootstrap.go"],
+    tags = ["automanaged"],
+    deps = [
+        "//pkg/api:go_default_library",
+        "//pkg/client/listers/core/internalversion:go_default_library",
+        "//vendor:github.com/golang/glog",
+        "//vendor:k8s.io/apimachinery/pkg/labels",
+        "//vendor:k8s.io/apiserver/pkg/authentication/user",
+    ],
+)
