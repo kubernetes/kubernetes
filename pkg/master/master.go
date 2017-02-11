@@ -29,6 +29,7 @@ import (
 	"k8s.io/apiserver/pkg/registry/generic"
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	"k8s.io/apiserver/pkg/server/healthz"
+	serverstorage "k8s.io/apiserver/pkg/server/storage"
 	"k8s.io/kubernetes/cmd/kube-apiserver/app/options"
 	"k8s.io/kubernetes/pkg/api"
 	apiv1 "k8s.io/kubernetes/pkg/api/v1"
@@ -79,8 +80,8 @@ const (
 type Config struct {
 	GenericConfig *genericapiserver.Config
 
-	APIResourceConfigSource  genericapiserver.APIResourceConfigSource
-	StorageFactory           genericapiserver.StorageFactory
+	APIResourceConfigSource  serverstorage.APIResourceConfigSource
+	StorageFactory           serverstorage.StorageFactory
 	EnableCoreControllers    bool
 	EndpointReconcilerConfig EndpointReconcilerConfig
 	EventTTL                 time.Duration
@@ -284,11 +285,11 @@ func (m *Master) installTunneler(nodeTunneler tunneler.Tunneler, nodeClient core
 // RESTStorageProvider is a factory type for REST storage.
 type RESTStorageProvider interface {
 	GroupName() string
-	NewRESTStorage(apiResourceConfigSource genericapiserver.APIResourceConfigSource, restOptionsGetter generic.RESTOptionsGetter) (genericapiserver.APIGroupInfo, bool)
+	NewRESTStorage(apiResourceConfigSource serverstorage.APIResourceConfigSource, restOptionsGetter generic.RESTOptionsGetter) (genericapiserver.APIGroupInfo, bool)
 }
 
 // InstallAPIs will install the APIs for the restStorageProviders if they are enabled.
-func (m *Master) InstallAPIs(apiResourceConfigSource genericapiserver.APIResourceConfigSource, restOptionsGetter generic.RESTOptionsGetter, restStorageProviders ...RESTStorageProvider) {
+func (m *Master) InstallAPIs(apiResourceConfigSource serverstorage.APIResourceConfigSource, restOptionsGetter generic.RESTOptionsGetter, restStorageProviders ...RESTStorageProvider) {
 	apiGroupsInfo := []genericapiserver.APIGroupInfo{}
 
 	for _, restStorageBuilder := range restStorageProviders {
@@ -349,8 +350,8 @@ func (n nodeAddressProvider) externalAddresses() ([]string, error) {
 	return addrs, nil
 }
 
-func DefaultAPIResourceConfigSource() *genericapiserver.ResourceConfig {
-	ret := genericapiserver.NewResourceConfig()
+func DefaultAPIResourceConfigSource() *serverstorage.ResourceConfig {
+	ret := serverstorage.NewResourceConfig()
 	ret.EnableVersions(
 		apiv1.SchemeGroupVersion,
 		extensionsapiv1beta1.SchemeGroupVersion,
