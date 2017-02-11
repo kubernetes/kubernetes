@@ -500,7 +500,7 @@ endef
 	@echo "$$BAZEL_TEST_HELP_INFO"
 else
 bazel-test:
-	bazel test  //cmd/... //pkg/... //federation/... //plugin/... //third_party/... //hack/... //hack:verify-all
+	bazel test --flaky_test_attempts=3 //cmd/... //pkg/... //federation/... //plugin/... //third_party/... //hack/... //hack:verify-all
 endif
 
 ifeq ($(PRINT_HELP),y)
