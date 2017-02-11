@@ -26,6 +26,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/go-openapi/spec"
+	"github.com/pborman/uuid"
+
 	"github.com/golang/glog"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -40,6 +43,7 @@ import (
 	"k8s.io/apiserver/pkg/authorization/authorizerfactory"
 	authorizerunion "k8s.io/apiserver/pkg/authorization/union"
 	genericapiserver "k8s.io/apiserver/pkg/server"
+	"k8s.io/apiserver/pkg/server/options"
 	serverstorage "k8s.io/apiserver/pkg/server/storage"
 	"k8s.io/apiserver/pkg/storage/storagebackend"
 	restclient "k8s.io/client-go/rest"
@@ -68,9 +72,6 @@ import (
 	"k8s.io/kubernetes/pkg/util/env"
 	"k8s.io/kubernetes/pkg/version"
 	"k8s.io/kubernetes/plugin/pkg/admission/admit"
-
-	"github.com/go-openapi/spec"
-	"github.com/pborman/uuid"
 )
 
 const (
@@ -309,19 +310,16 @@ func GetEtcdURLFromEnv() string {
 
 // Returns a basic master config.
 func NewMasterConfig() *master.Config {
-	storageConfig := storagebackend.Config{
-		ServerList: []string{GetEtcdURLFromEnv()},
-		// This causes the integration tests to exercise the etcd
-		// prefix code, so please don't change without ensuring
-		// sufficient coverage in other ways.
-		Prefix: uuid.New(),
-		Copier: api.Scheme,
-	}
+	// This causes the integration tests to exercise the etcd
+	// prefix code, so please don't change without ensuring
+	// sufficient coverage in other ways.
+	etcdOptions := options.NewEtcdOptions(storagebackend.NewDefaultConfig(uuid.New(), api.Scheme, nil))
+	etcdOptions.StorageConfig.ServerList = []string{GetEtcdURLFromEnv()}
 
 	info, _ := runtime.SerializerInfoForMediaType(api.Codecs.SupportedMediaTypes(), runtime.ContentTypeJSON)
 	ns := NewSingleContentTypeSerializer(api.Scheme, info)
 
-	storageFactory := serverstorage.NewConfigurableStorageFactory(storageConfig, runtime.ContentTypeJSON, ns, serverstorage.NewDefaultResourceEncodingConfig(api.Registry), master.DefaultAPIResourceConfigSource())
+	storageFactory := serverstorage.NewDefaultStorageFactory(etcdOptions.StorageConfig, runtime.ContentTypeJSON, ns, serverstorage.NewDefaultResourceEncodingConfig(api.Registry), master.DefaultAPIResourceConfigSource())
 	storageFactory.SetSerializer(
 		schema.GroupResource{Group: v1.GroupName, Resource: serverstorage.AllResources},
 		"",
@@ -365,11 +363,10 @@ func NewMasterConfig() *master.Config {
 	genericConfig.Authorizer = authorizerfactory.NewAlwaysAllowAuthorizer()
 	genericConfig.AdmissionControl = admit.NewAlwaysAdmit()
 	genericConfig.EnableMetrics = true
-	genericConfig.RESTOptionsGetter = &kubeapiserver.RESTOptionsFactory{
-		StorageFactory:          storageFactory,
-		EnableWatchCache:        true,
-		EnableGarbageCollection: true,
-		DeleteCollectionWorkers: 1,
+
+	err := etcdOptions.ApplyWithStorageFactoryTo(storageFactory, genericConfig)
+	if err != nil {
+		panic(err)
 	}
 
 	return &master.Config{
