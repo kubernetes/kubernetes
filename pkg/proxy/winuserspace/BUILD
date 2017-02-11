@@ -22,6 +22,7 @@ go_library(
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/proxy:go_default_library",
+        "//pkg/util/ipconfig:go_default_library",
         "//pkg/util/netsh:go_default_library",
         "//pkg/util/slice:go_default_library",
         "//vendor:github.com/golang/glog",

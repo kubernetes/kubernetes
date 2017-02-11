@@ -49,6 +49,7 @@ type serviceInfo struct {
 	socket        proxySocket
 	timeout       time.Duration
 	activeClients *clientCache
+	dnsClients    *dnsClientCache
 	//nodePort      int
 	//loadBalancerStatus  api.LoadBalancerStatus
 	sessionAffinityType api.ServiceAffinity
@@ -376,6 +377,7 @@ func (proxier *Proxier) OnServiceUpdate(services []api.Service) {
 					socket:              sock,
 					timeout:             proxier.udpIdleTimeout,
 					activeClients:       newClientCache(),
+					dnsClients:          newDnsClientCache(),
 					sessionAffinityType: service.Spec.SessionAffinity, // default
 					stickyMaxAgeMinutes: 180,                          // TODO: parameterize this in the API.
 				}
