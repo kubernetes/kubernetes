@@ -38,6 +38,10 @@ type StorageFactory interface {
 	// centralized control over the shape of etcd directories
 	ResourcePrefix(groupResource schema.GroupResource) string
 
+	// PrimaryRepresentation returns the primary representation of a GroupResource. For
+	// resources which are co-habitated PrimaryRepresentation will return the same value.
+	PrimaryRepresentation(groupResource schema.GroupResource) schema.GroupResource
+
 	// Backends gets all backends for all registered storage destinations.
 	// Used for getting all instances for health validations.
 	Backends() []string
@@ -197,6 +201,11 @@ func (s *DefaultStorageFactory) AddSerializationChains(encoderDecoratorFn func(r
 		overrides.decoderDecoratorFn = decoderDecoratorFn
 		s.Overrides[groupResource] = overrides
 	}
+}
+
+func (s *DefaultStorageFactory) PrimaryRepresentation(groupResource schema.GroupResource) schema.GroupResource {
+	// return the first enabled groupResource
+	return s.getStorageGroupResource(groupResource)
 }
 
 func getAllResourcesAlias(resource schema.GroupResource) schema.GroupResource {

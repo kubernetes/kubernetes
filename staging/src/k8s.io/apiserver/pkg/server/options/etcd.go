@@ -21,7 +21,6 @@ import (
 
 	"github.com/spf13/pflag"
 
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apiserver/pkg/registry/generic"
 	genericregistry "k8s.io/apiserver/pkg/registry/generic/registry"
@@ -114,6 +113,7 @@ func (s *EtcdOptions) ApplyTo(c *server.Config) error {
 			Decorator:               generic.UndecoratedStorage,
 			EnableGarbageCollection: s.EnableGarbageCollection,
 			DeleteCollectionWorkers: s.DeleteCollectionWorkers,
+			PrimaryRepresentation:   resource, // no support for co-habitation
 		}
 		if s.EnableWatchCache {
 			ret.Decorator = genericregistry.StorageWithCacher
@@ -136,6 +136,7 @@ func (s *EtcdOptions) ApplyWithStorageFactoryTo(factory serverstorage.StorageFac
 			DeleteCollectionWorkers: s.DeleteCollectionWorkers,
 			EnableGarbageCollection: s.EnableGarbageCollection,
 			ResourcePrefix:          factory.ResourcePrefix(resource),
+			PrimaryRepresentation:   factory.PrimaryRepresentation(resource),
 		}
 		if s.EnableWatchCache {
 			ret.Decorator = genericregistry.StorageWithCacher
