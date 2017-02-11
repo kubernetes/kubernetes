@@ -526,3 +526,19 @@ func deleteBackendPodsOrFail(clusters map[string]*cluster, namespace string) {
 		}
 	}
 }
+
+// waitForReplicatSetToBeDeletedOrFail waits for the named ReplicaSet in namespace to be deleted.
+// If the deletion fails, the enclosing test fails.
+func waitForReplicaSetToBeDeletedOrFail(clientset *fedclientset.Clientset, namespace string, replicaSet string) {
+	err := wait.Poll(5*time.Second, wait.ForeverTestTimeout, func() (bool, error) {
+		_, err := clientset.Extensions().ReplicaSets(namespace).Get(replicaSet, metav1.GetOptions{})
+		if err != nil && errors.IsNotFound(err) {
+			return true, nil
+		}
+		return false, err
+	})
+
+	if err != nil {
+		framework.Failf("Error in deleting replica set %s: %v", replicaSet, err)
+	}
+}
