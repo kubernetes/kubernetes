@@ -32,6 +32,7 @@ import (
 	"k8s.io/apiserver/pkg/registry/generic"
 	"k8s.io/apiserver/pkg/registry/rest"
 	genericapiserver "k8s.io/apiserver/pkg/server"
+	serverstorage "k8s.io/apiserver/pkg/server/storage"
 	etcdutil "k8s.io/apiserver/pkg/storage/etcd/util"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/kubernetes/pkg/api"
@@ -66,7 +67,7 @@ import (
 // LegacyRESTStorageProvider provides information needed to build RESTStorage for core, but
 // does NOT implement the "normal" RESTStorageProvider (yet!)
 type LegacyRESTStorageProvider struct {
-	StorageFactory genericapiserver.StorageFactory
+	StorageFactory serverstorage.StorageFactory
 	// Used for custom proxy dialing, and proxy TLS options
 	ProxyTransport      http.RoundTripper
 	KubeletClientConfig kubeletclient.KubeletClientConfig
@@ -238,7 +239,7 @@ func (p LegacyRESTStorageProvider) GroupName() string {
 }
 
 type componentStatusStorage struct {
-	storageFactory genericapiserver.StorageFactory
+	storageFactory serverstorage.StorageFactory
 }
 
 func (s componentStatusStorage) serversToValidate() map[string]componentstatus.Server {
