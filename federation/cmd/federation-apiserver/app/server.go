@@ -146,6 +146,9 @@ func Run(s *options.ServerRunOptions) error {
 		servers := strings.Split(tokens[1], ";")
 		storageFactory.SetEtcdLocation(groupResource, servers)
 	}
+	if err := s.Etcd.ApplyWithStorageFactoryTo(storageFactory, genericConfig); err != nil {
+		return err
+	}
 
 	apiAuthenticator, securityDefinitions, err := s.Authentication.ToAuthenticationConfig().New()
 	if err != nil {
@@ -188,12 +191,6 @@ func Run(s *options.ServerRunOptions) error {
 		sets.NewString("watch", "proxy"),
 		sets.NewString("attach", "exec", "proxy", "log", "portforward"),
 	)
-	genericConfig.RESTOptionsGetter = &kubeapiserver.RESTOptionsFactory{
-		StorageFactory:          storageFactory,
-		EnableWatchCache:        s.Etcd.EnableWatchCache,
-		EnableGarbageCollection: s.Etcd.EnableGarbageCollection,
-		DeleteCollectionWorkers: s.Etcd.DeleteCollectionWorkers,
-	}
 
 	// TODO: Move this to generic api server (Need to move the command line flag).
 	if s.Etcd.EnableWatchCache {

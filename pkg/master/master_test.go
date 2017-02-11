@@ -34,6 +34,7 @@ import (
 	"k8s.io/apimachinery/pkg/version"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	genericapiserver "k8s.io/apiserver/pkg/server"
+	"k8s.io/apiserver/pkg/server/options"
 	serverstorage "k8s.io/apiserver/pkg/server/storage"
 	etcdtesting "k8s.io/apiserver/pkg/storage/etcd/testing"
 	restclient "k8s.io/client-go/rest"
@@ -52,7 +53,6 @@ import (
 	extensionsapiv1beta1 "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	"k8s.io/kubernetes/pkg/apis/rbac"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset/fake"
-	"k8s.io/kubernetes/pkg/kubeapiserver"
 	kubeletclient "k8s.io/kubernetes/pkg/kubelet/client"
 	kubeversion "k8s.io/kubernetes/pkg/version"
 
@@ -80,6 +80,11 @@ func setUp(t *testing.T) (*Master, *etcdtesting.EtcdTestServer, Config, *assert.
 	resourceEncoding.SetVersionEncoding(certificates.GroupName, *testapi.Certificates.GroupVersion(), schema.GroupVersion{Group: certificates.GroupName, Version: runtime.APIVersionInternal})
 	storageFactory := serverstorage.NewDefaultStorageFactory(*storageConfig, testapi.StorageMediaType(), api.Codecs, resourceEncoding, DefaultAPIResourceConfigSource())
 
+	err := options.NewEtcdOptions(storageConfig).ApplyWithStorageFactoryTo(storageFactory, config.GenericConfig)
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	kubeVersion := kubeversion.Get()
 	config.GenericConfig.Version = &kubeVersion
 	config.StorageFactory = storageFactory
@@ -89,12 +94,6 @@ func setUp(t *testing.T) (*Master, *etcdtesting.EtcdTestServer, Config, *assert.
 	config.GenericConfig.RequestContextMapper = genericapirequest.NewRequestContextMapper()
 	config.GenericConfig.LoopbackClientConfig = &restclient.Config{APIPath: "/api", ContentConfig: restclient.ContentConfig{NegotiatedSerializer: api.Codecs}}
 	config.GenericConfig.EnableMetrics = true
-	config.GenericConfig.RESTOptionsGetter = &kubeapiserver.RESTOptionsFactory{
-		StorageFactory:          storageFactory,
-		EnableWatchCache:        true,
-		EnableGarbageCollection: true,
-		DeleteCollectionWorkers: 1,
-	}
 	config.EnableCoreControllers = false
 	config.KubeletClientConfig = kubeletclient.KubeletClientConfig{Port: 10250}
 	config.ProxyTransport = utilnet.SetTransportDefaults(&http.Transport{

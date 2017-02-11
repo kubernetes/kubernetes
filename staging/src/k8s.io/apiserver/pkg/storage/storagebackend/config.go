@@ -43,6 +43,17 @@ type Config struct {
 	// We will drop the cache once using protobuf.
 	DeserializationCacheSize int
 
-	Codec runtime.Codec
+	Codec  runtime.Codec
 	Copier runtime.ObjectCopier
+}
+
+func NewDefaultConfig(prefix string, copier runtime.ObjectCopier, codec runtime.Codec) *Config {
+	return &Config{
+		Prefix: prefix,
+		// Default cache size to 0 - if unset, its size will be set based on target
+		// memory usage.
+		DeserializationCacheSize: 0,
+		Copier: copier,
+		Codec:  codec,
+	}
 }
