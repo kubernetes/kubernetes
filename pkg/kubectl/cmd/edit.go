@@ -198,17 +198,10 @@ func runEdit(f cmdutil.Factory, out, errOut io.Writer, cmd *cobra.Command, args 
 			if err != nil {
 				return preservedFile(err, results.file, errOut)
 			}
-			if editMode == NormalEditMode || containsError {
-				if bytes.Equal(stripComments(editedDiff), stripComments(edited)) {
-					// Ugly hack right here. We will hit this either (1) when we try to
-					// save the same changes we tried to save in the previous iteration
-					// which means our changes are invalid or (2) when we exit the second
-					// time. The second case is more usual so we can probably live with it.
-					// TODO: A less hacky fix would be welcome :)
-					return preservedFile(fmt.Errorf("%s", "Edit cancelled, no valid changes were saved."), file, errOut)
-				}
+			// If we're retrying the loop because of an error, and no change was made in the file, short-circuit
+			if containsError && bytes.Equal(stripComments(editedDiff), stripComments(edited)) {
+				return preservedFile(fmt.Errorf("%s", "Edit cancelled, no valid changes were saved."), file, errOut)
 			}
-
 			// cleanup any file from the previous pass
 			if len(results.file) > 0 {
 				os.Remove(results.file)
