@@ -10,7 +10,7 @@ load(
 
 go_library(
     name = "go_default_library",
-    srcs = ["gc_admission.go"],
+    srcs = ["admission.go"],
     tags = ["automanaged"],
     deps = [
         "//vendor:k8s.io/apimachinery/pkg/api/equality",
@@ -23,7 +23,7 @@ go_library(
 
 go_test(
     name = "go_default_test",
-    srcs = ["gc_admission_test.go"],
+    srcs = ["admission_test.go"],
     library = ":go_default_library",
     tags = ["automanaged"],
     deps = [
