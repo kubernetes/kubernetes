@@ -216,6 +216,7 @@ type TestFactory struct {
 	Namespace          string
 	ClientConfig       *restclient.Config
 	Err                error
+	Command            string
 
 	ClientForMappingFunc             func(mapping *meta.RESTMapping) (resource.RESTClient, error)
 	UnstructuredClientForMappingFunc func(mapping *meta.RESTMapping) (resource.RESTClient, error)
@@ -431,7 +432,7 @@ func (f *FakeFactory) PrintObjectSpecificMessage(obj runtime.Object, out io.Writ
 }
 
 func (f *FakeFactory) Command() string {
-	return ""
+	return f.tf.Command
 }
 
 func (f *FakeFactory) BindFlags(flags *pflag.FlagSet) {
@@ -628,6 +629,10 @@ func (f *fakeAPIFactory) Validator(validate bool, cacheDir string) (validation.S
 
 func (f *fakeAPIFactory) DefaultNamespace() (string, bool, error) {
 	return f.tf.Namespace, false, f.tf.Err
+}
+
+func (f *fakeAPIFactory) Command() string {
+	return f.tf.Command
 }
 
 func (f *fakeAPIFactory) Generators(cmdName string) map[string]kubectl.Generator {
