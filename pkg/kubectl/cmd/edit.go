@@ -147,17 +147,12 @@ func runEdit(f cmdutil.Factory, out, errOut io.Writer, cmd *cobra.Command, args 
 		return err
 	}
 
-	normalEditInfos, err := r.Infos()
-	if err != nil {
-		return err
-	}
-
 	var (
 		windowsLineEndings = cmdutil.GetFlagBool(cmd, "windows-line-endings")
 		edit               = editor.NewDefaultEditor(f.EditorEnvs())
 	)
 
-	editFn := func(info *resource.Info, err error) error {
+	editFn := func(infos []*resource.Info) error {
 		var (
 			results  = editResults{}
 			original = []byte{}
@@ -166,16 +161,7 @@ func runEdit(f cmdutil.Factory, out, errOut io.Writer, cmd *cobra.Command, args 
 		)
 
 		containsError := false
-		var infos []*resource.Info
 		for {
-			switch editMode {
-			case NormalEditMode:
-				infos = normalEditInfos
-			case EditBeforeCreateMode:
-				infos = []*resource.Info{info}
-			default:
-				err = fmt.Errorf("Not supported edit mode %q", editMode)
-			}
 			originalObj, err := resource.AsVersionedObject(infos, false, defaultVersion, encoder)
 			if err != nil {
 				return err
@@ -337,10 +323,16 @@ func runEdit(f cmdutil.Factory, out, errOut io.Writer, cmd *cobra.Command, args 
 	switch editMode {
 	// If doing normal edit we cannot use Visit because we need to edit a list for convenience. Ref: #20519
 	case NormalEditMode:
-		return editFn(nil, nil)
+		infos, err := r.Infos()
+		if err != nil {
+			return err
+		}
+		return editFn(infos)
 	// If doing an edit before created, we don't want a list and instead want the normal behavior as kubectl create.
 	case EditBeforeCreateMode:
-		return r.Visit(editFn)
+		return r.Visit(func(info *resource.Info, err error) error {
+			return editFn([]*resource.Info{info})
+		})
 	default:
 		return fmt.Errorf("Not supported edit mode %q", editMode)
 	}
