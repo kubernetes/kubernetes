@@ -131,7 +131,7 @@ func runEdit(f cmdutil.Factory, out, errOut io.Writer, cmd *cobra.Command, args 
 		return err
 	}
 
-	mapper, resourceMapper, r, cmdNamespace, err := getMapperAndResult(f, args, options, editMode)
+	mapper, originalResult, updatedResultsGetter, cmdNamespace, err := getMapperAndResult(f, args, options, editMode)
 	if err != nil {
 		return err
 	}
@@ -147,17 +147,12 @@ func runEdit(f cmdutil.Factory, out, errOut io.Writer, cmd *cobra.Command, args 
 		return err
 	}
 
-	normalEditInfos, err := r.Infos()
-	if err != nil {
-		return err
-	}
-
 	var (
 		windowsLineEndings = cmdutil.GetFlagBool(cmd, "windows-line-endings")
 		edit               = editor.NewDefaultEditor(f.EditorEnvs())
 	)
 
-	editFn := func(info *resource.Info, err error) error {
+	editFn := func(infos []*resource.Info) error {
 		var (
 			results  = editResults{}
 			original = []byte{}
@@ -166,16 +161,7 @@ func runEdit(f cmdutil.Factory, out, errOut io.Writer, cmd *cobra.Command, args 
 		)
 
 		containsError := false
-		var infos []*resource.Info
 		for {
-			switch editMode {
-			case NormalEditMode:
-				infos = normalEditInfos
-			case EditBeforeCreateMode:
-				infos = []*resource.Info{info}
-			default:
-				err = fmt.Errorf("Not supported edit mode %q", editMode)
-			}
 			originalObj, err := resource.AsVersionedObject(infos, false, defaultVersion, encoder)
 			if err != nil {
 				return err
@@ -212,17 +198,10 @@ func runEdit(f cmdutil.Factory, out, errOut io.Writer, cmd *cobra.Command, args 
 			if err != nil {
 				return preservedFile(err, results.file, errOut)
 			}
-			if editMode == NormalEditMode || containsError {
-				if bytes.Equal(stripComments(editedDiff), stripComments(edited)) {
-					// Ugly hack right here. We will hit this either (1) when we try to
-					// save the same changes we tried to save in the previous iteration
-					// which means our changes are invalid or (2) when we exit the second
-					// time. The second case is more usual so we can probably live with it.
-					// TODO: A less hacky fix would be welcome :)
-					return preservedFile(fmt.Errorf("%s", "Edit cancelled, no valid changes were saved."), file, errOut)
-				}
+			// If we're retrying the loop because of an error, and no change was made in the file, short-circuit
+			if containsError && bytes.Equal(stripComments(editedDiff), stripComments(edited)) {
+				return preservedFile(fmt.Errorf("%s", "Edit cancelled, no valid changes were saved."), file, errOut)
 			}
-
 			// cleanup any file from the previous pass
 			if len(results.file) > 0 {
 				os.Remove(results.file)
@@ -266,38 +245,37 @@ func runEdit(f cmdutil.Factory, out, errOut io.Writer, cmd *cobra.Command, args 
 			}
 
 			// parse the edited file
-			updates, err := resourceMapper.InfoForData(edited, "edited-file")
-			if err != nil {
+			var updatedVisitor resource.Visitor
+			if updatedInfos, err := updatedResultsGetter(edited).Infos(); err != nil {
 				// syntax error
 				containsError = true
 				results.header.reasons = append(results.header.reasons, editReason{head: fmt.Sprintf("The edited file had a syntax error: %v", err)})
 				continue
+			} else {
+				updatedVisitor = resource.InfoListVisitor(updatedInfos)
 			}
 			// not a syntax error as it turns out...
 			containsError = false
 
-			namespaceVisitor := resource.NewFlattenListVisitor(updates, resourceMapper)
+			namespaceVisitor := updatedVisitor
 			// need to make sure the original namespace wasn't changed while editing
 			if err = namespaceVisitor.Visit(resource.RequireNamespace(cmdNamespace)); err != nil {
 				return preservedFile(err, file, errOut)
 			}
 
 			// iterate through all items to apply annotations
-			mutatedObjects, err := visitAnnotation(cmd, f, updates, resourceMapper, encoder)
-			if err != nil {
+			annotationVisitor := updatedVisitor
+			if _, err := visitAnnotation(cmd, f, annotationVisitor, encoder); err != nil {
 				return preservedFile(err, file, errOut)
-			}
-
-			// if we mutated a list in the visitor, persist the changes on the overall object
-			if meta.IsListType(updates.Object) {
-				meta.SetList(updates.Object, mutatedObjects)
 			}
 
 			switch editMode {
 			case NormalEditMode:
-				err = visitToPatch(originalObj, updates, mapper, resourceMapper, encoder, out, errOut, defaultVersion, &results, file)
+				patchVisitor := updatedVisitor
+				err = visitToPatch(originalObj, patchVisitor, mapper, encoder, out, errOut, defaultVersion, &results, file)
 			case EditBeforeCreateMode:
-				err = visitToCreate(updates, mapper, resourceMapper, out, errOut, defaultVersion, &results, file)
+				createVisitor := updatedVisitor
+				err = visitToCreate(createVisitor, mapper, out, errOut, defaultVersion, &results, file)
 			default:
 				err = fmt.Errorf("Not supported edit mode %q", editMode)
 			}
@@ -337,10 +315,16 @@ func runEdit(f cmdutil.Factory, out, errOut io.Writer, cmd *cobra.Command, args 
 	switch editMode {
 	// If doing normal edit we cannot use Visit because we need to edit a list for convenience. Ref: #20519
 	case NormalEditMode:
-		return editFn(nil, nil)
+		infos, err := originalResult.Infos()
+		if err != nil {
+			return err
+		}
+		return editFn(infos)
 	// If doing an edit before created, we don't want a list and instead want the normal behavior as kubectl create.
 	case EditBeforeCreateMode:
-		return r.Visit(editFn)
+		return originalResult.Visit(func(info *resource.Info, err error) error {
+			return editFn([]*resource.Info{info})
+		})
 	default:
 		return fmt.Errorf("Not supported edit mode %q", editMode)
 	}
@@ -366,7 +350,9 @@ func getPrinter(cmd *cobra.Command) (*editPrinterOptions, error) {
 	}
 }
 
-func getMapperAndResult(f cmdutil.Factory, args []string, options *resource.FilenameOptions, editMode EditMode) (meta.RESTMapper, *resource.Mapper, *resource.Result, string, error) {
+type resultGetter func([]byte) *resource.Result
+
+func getMapperAndResult(f cmdutil.Factory, args []string, options *resource.FilenameOptions, editMode EditMode) (meta.RESTMapper, *resource.Result, resultGetter, string, error) {
 	cmdNamespace, enforceNamespace, err := f.DefaultNamespace()
 	if err != nil {
 		return nil, nil, nil, "", err
@@ -384,18 +370,8 @@ func getMapperAndResult(f cmdutil.Factory, args []string, options *resource.File
 	if err != nil {
 		return nil, nil, nil, "", err
 	}
-	resourceMapper := &resource.Mapper{
-		ObjectTyper:  typer,
-		RESTMapper:   mapper,
-		ClientMapper: resource.ClientMapperFunc(f.ClientForMapping),
 
-		// NB: we use `f.Decoder(false)` to get a plain deserializer for
-		// the resourceMapper, since it's used to read in edits and
-		// we don't want to convert into the internal version when
-		// reading in edits (this would cause us to potentially try to
-		// compare two different GroupVersions).
-		Decoder: f.Decoder(false),
-	}
+	// resource builder to read objects from the original file or arg invocation
 	var b *resource.Builder
 	switch editMode {
 	case NormalEditMode:
@@ -407,31 +383,42 @@ func getMapperAndResult(f cmdutil.Factory, args []string, options *resource.File
 	default:
 		return nil, nil, nil, "", fmt.Errorf("Not supported edit mode %q", editMode)
 	}
-	r := b.NamespaceParam(cmdNamespace).DefaultNamespace().
+
+	originalResult := b.NamespaceParam(cmdNamespace).DefaultNamespace().
 		FilenameParam(enforceNamespace, options).
 		ContinueOnError().
 		Flatten().
 		Do()
-	err = r.Err()
+	err = originalResult.Err()
 	if err != nil {
 		return nil, nil, nil, "", err
 	}
-	return mapper, resourceMapper, r, cmdNamespace, err
+
+	updatedResultGetter := func(data []byte) *resource.Result {
+		// resource builder to read objects from the original file or arg invocation
+		var b *resource.Builder
+		switch editMode {
+		case NormalEditMode:
+			b = resource.NewBuilder(mapper, typer, resource.ClientMapperFunc(f.ClientForMapping), f.Decoder(true))
+		case EditBeforeCreateMode:
+			b = resource.NewBuilder(mapper, typer, resource.ClientMapperFunc(f.UnstructuredClientForMapping), unstructured.UnstructuredJSONScheme)
+		}
+		return b.Stream(bytes.NewReader(data), "edited-file").ContinueOnError().Flatten().Do()
+	}
+
+	return mapper, originalResult, updatedResultGetter, cmdNamespace, err
 }
 
 func visitToPatch(
 	originalObj runtime.Object,
-	updates *resource.Info,
+	patchVisitor resource.Visitor,
 	mapper meta.RESTMapper,
-	resourceMapper *resource.Mapper,
 	encoder runtime.Encoder,
 	out, errOut io.Writer,
 	defaultVersion schema.GroupVersion,
 	results *editResults,
 	file string,
 ) error {
-
-	patchVisitor := resource.NewFlattenListVisitor(updates, resourceMapper)
 	err := patchVisitor.Visit(func(info *resource.Info, incomingErr error) error {
 		currOriginalObj := originalObj
 
@@ -515,8 +502,7 @@ func visitToPatch(
 	return err
 }
 
-func visitToCreate(updates *resource.Info, mapper meta.RESTMapper, resourceMapper *resource.Mapper, out, errOut io.Writer, defaultVersion schema.GroupVersion, results *editResults, file string) error {
-	createVisitor := resource.NewFlattenListVisitor(updates, resourceMapper)
+func visitToCreate(createVisitor resource.Visitor, mapper meta.RESTMapper, out, errOut io.Writer, defaultVersion schema.GroupVersion, results *editResults, file string) error {
 	err := createVisitor.Visit(func(info *resource.Info, incomingErr error) error {
 		results.version = defaultVersion
 		if err := createAndRefresh(info); err != nil {
@@ -528,9 +514,8 @@ func visitToCreate(updates *resource.Info, mapper meta.RESTMapper, resourceMappe
 	return err
 }
 
-func visitAnnotation(cmd *cobra.Command, f cmdutil.Factory, updates *resource.Info, resourceMapper *resource.Mapper, encoder runtime.Encoder) ([]runtime.Object, error) {
+func visitAnnotation(cmd *cobra.Command, f cmdutil.Factory, annotationVisitor resource.Visitor, encoder runtime.Encoder) ([]runtime.Object, error) {
 	mutatedObjects := []runtime.Object{}
-	annotationVisitor := resource.NewFlattenListVisitor(updates, resourceMapper)
 	// iterate through all items to apply annotations
 	err := annotationVisitor.Visit(func(info *resource.Info, incomingErr error) error {
 		// put configuration annotation in "updates"

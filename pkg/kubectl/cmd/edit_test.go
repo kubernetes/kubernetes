@@ -221,6 +221,20 @@ func TestEdit(t *testing.T) {
 				Client:               fake.CreateHTTPClient(reqResp),
 			}, nil
 		}
+		tf.UnstructuredClientForMappingFunc = func(mapping *meta.RESTMapping) (resource.RESTClient, error) {
+			versionedAPIPath := ""
+			if mapping.GroupVersionKind.Group == "" {
+				versionedAPIPath = "/api/" + mapping.GroupVersionKind.Version
+			} else {
+				versionedAPIPath = "/apis/" + mapping.GroupVersionKind.Group + "/" + mapping.GroupVersionKind.Version
+			}
+			return &fake.RESTClient{
+				APIRegistry:          api.Registry,
+				VersionedAPIPath:     versionedAPIPath,
+				NegotiatedSerializer: unstructuredSerializer,
+				Client:               fake.CreateHTTPClient(reqResp),
+			}, nil
+		}
 
 		if len(testcase.Namespace) > 0 {
 			tf.Namespace = testcase.Namespace
