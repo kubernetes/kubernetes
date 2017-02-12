@@ -1,0 +1,51 @@
+# Please edit the object below. Lines beginning with a '#' will be ignored,
+# and an empty file will abort the edit. If an error occurs while saving this file will be
+# reopened with the relevant failures.
+#
+apiVersion: v1
+items:
+- apiVersion: v1
+  data:
+    baz: qux
+    foo: changed-value
+    new-data: new-value
+    new-data2: new-value
+    new-data3: newivalue
+  kind: ConfigMap
+  metadata:
+    annotations:
+      kubernetes.io/change-cause: original creating command a
+    creationTimestamp: 2017-02-03T06:12:07Z
+    name: cm1
+    namespace: edit-test
+    resourceVersion: "1414"
+    selfLink: /api/v1/namespaces/edit-test/configmaps/cm1
+    uid: b09bffab-e9d7-11e6-8c3b-acbc32c1ca87
+- apiVersion: v1
+  kind: Service
+  metadata:
+    annotations:
+      kubernetes.io/change-cause: original creating command b
+    creationTimestamp: 2017-02-03T06:11:32Z
+    labels:
+      app: svc1
+      new-label: foo
+      new-label2: foo2
+    name: svc1
+    namespace: edit-test
+    resourceVersion: "1064"
+    selfLink: /api/v1/namespaces/edit-test/services/svc1
+    uid: 9bec82be-e9d7-11e6-8c3b-acbc32c1ca87
+  spec:
+    clusterIP: 10.0.0.248
+    ports:
+    - name: "80"
+      port: 82
+      protocol: TCP
+      targetPort: 81
+    sessionAffinity: None
+    type: ClusterIP
+  status:
+    loadBalancer: {}
+kind: List
+metadata: {}

@@ -226,6 +226,7 @@ func TestEdit(t *testing.T) {
 			tf.Namespace = testcase.Namespace
 		}
 		tf.ClientConfig = defaultClientConfig()
+		tf.Command = "edit test cmd invocation"
 		buf := bytes.NewBuffer([]byte{})
 		errBuf := bytes.NewBuffer([]byte{})
 
