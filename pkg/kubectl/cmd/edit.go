@@ -262,7 +262,8 @@ func runEdit(f cmdutil.Factory, out, errOut io.Writer, cmd *cobra.Command, args 
 			}
 
 			// iterate through all items to apply annotations
-			mutatedObjects, err := visitAnnotation(cmd, f, updates, resourceMapper, encoder)
+			annotationVisitor := resource.NewFlattenListVisitor(updates, resourceMapper)
+			mutatedObjects, err := visitAnnotation(cmd, f, annotationVisitor, encoder)
 			if err != nil {
 				return preservedFile(err, file, errOut)
 			}
@@ -274,9 +275,11 @@ func runEdit(f cmdutil.Factory, out, errOut io.Writer, cmd *cobra.Command, args 
 
 			switch editMode {
 			case NormalEditMode:
-				err = visitToPatch(originalObj, updates, mapper, resourceMapper, encoder, out, errOut, defaultVersion, &results, file)
+				patchVisitor := resource.NewFlattenListVisitor(updates, resourceMapper)
+				err = visitToPatch(originalObj, patchVisitor, mapper, encoder, out, errOut, defaultVersion, &results, file)
 			case EditBeforeCreateMode:
-				err = visitToCreate(updates, mapper, resourceMapper, out, errOut, defaultVersion, &results, file)
+				createVisitor := resource.NewFlattenListVisitor(updates, resourceMapper)
+				err = visitToCreate(createVisitor, mapper, out, errOut, defaultVersion, &results, file)
 			default:
 				err = fmt.Errorf("Not supported edit mode %q", editMode)
 			}
@@ -406,17 +409,14 @@ func getMapperAndResult(f cmdutil.Factory, args []string, options *resource.File
 
 func visitToPatch(
 	originalObj runtime.Object,
-	updates *resource.Info,
+	patchVisitor resource.Visitor,
 	mapper meta.RESTMapper,
-	resourceMapper *resource.Mapper,
 	encoder runtime.Encoder,
 	out, errOut io.Writer,
 	defaultVersion schema.GroupVersion,
 	results *editResults,
 	file string,
 ) error {
-
-	patchVisitor := resource.NewFlattenListVisitor(updates, resourceMapper)
 	err := patchVisitor.Visit(func(info *resource.Info, incomingErr error) error {
 		currOriginalObj := originalObj
 
@@ -500,8 +500,7 @@ func visitToPatch(
 	return err
 }
 
-func visitToCreate(updates *resource.Info, mapper meta.RESTMapper, resourceMapper *resource.Mapper, out, errOut io.Writer, defaultVersion schema.GroupVersion, results *editResults, file string) error {
-	createVisitor := resource.NewFlattenListVisitor(updates, resourceMapper)
+func visitToCreate(createVisitor resource.Visitor, mapper meta.RESTMapper, out, errOut io.Writer, defaultVersion schema.GroupVersion, results *editResults, file string) error {
 	err := createVisitor.Visit(func(info *resource.Info, incomingErr error) error {
 		results.version = defaultVersion
 		if err := createAndRefresh(info); err != nil {
@@ -513,9 +512,8 @@ func visitToCreate(updates *resource.Info, mapper meta.RESTMapper, resourceMappe
 	return err
 }
 
-func visitAnnotation(cmd *cobra.Command, f cmdutil.Factory, updates *resource.Info, resourceMapper *resource.Mapper, encoder runtime.Encoder) ([]runtime.Object, error) {
+func visitAnnotation(cmd *cobra.Command, f cmdutil.Factory, annotationVisitor resource.Visitor, encoder runtime.Encoder) ([]runtime.Object, error) {
 	mutatedObjects := []runtime.Object{}
-	annotationVisitor := resource.NewFlattenListVisitor(updates, resourceMapper)
 	// iterate through all items to apply annotations
 	err := annotationVisitor.Visit(func(info *resource.Info, incomingErr error) error {
 		// put configuration annotation in "updates"
