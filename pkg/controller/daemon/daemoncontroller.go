@@ -52,9 +52,6 @@ import (
 )
 
 const (
-	// Daemon sets will periodically check that their daemon pods are running as expected.
-	FullDaemonSetResyncPeriod = 30 * time.Second // TODO: Figure out if this time seems reasonable.
-
 	// The value of 250 is chosen b/c values that are too high can cause registry DoS issues
 	BurstReplicas = 250
 
@@ -188,12 +185,12 @@ func (dsc *DaemonSetsController) deleteDaemonset(obj interface{}) {
 	if !ok {
 		tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
 		if !ok {
-			glog.Errorf("Couldn't get object from tombstone %#v", obj)
+			utilruntime.HandleError(fmt.Errorf("Couldn't get object from tombstone %#v", obj))
 			return
 		}
 		ds, ok = tombstone.Obj.(*extensions.DaemonSet)
 		if !ok {
-			glog.Errorf("Tombstone contained object that is not a DaemonSet %#v", obj)
+			utilruntime.HandleError(fmt.Errorf("Tombstone contained object that is not a DaemonSet %#v", obj))
 			return
 		}
 	}
@@ -249,7 +246,7 @@ func (dsc *DaemonSetsController) processNextWorkItem() bool {
 func (dsc *DaemonSetsController) enqueueDaemonSet(ds *extensions.DaemonSet) {
 	key, err := controller.KeyFunc(ds)
 	if err != nil {
-		glog.Errorf("Couldn't get key for object %#v: %v", ds, err)
+		utilruntime.HandleError(fmt.Errorf("Couldn't get key for object %#v: %v", ds, err))
 		return
 	}
 
@@ -263,7 +260,7 @@ func (dsc *DaemonSetsController) getPodDaemonSet(pod *v1.Pod) *extensions.Daemon
 		ds, ok := obj.(*extensions.DaemonSet)
 		if !ok {
 			// This should not happen
-			glog.Errorf("lookup cache does not retuen a ReplicationController object")
+			utilruntime.HandleError(fmt.Errorf("lookup cache does not return a DaemonSet object"))
 			return nil
 		}
 		if dsc.isCacheValid(pod, ds) {
@@ -279,7 +276,7 @@ func (dsc *DaemonSetsController) getPodDaemonSet(pod *v1.Pod) *extensions.Daemon
 		// More than two items in this list indicates user error. If two daemon
 		// sets overlap, sort by creation timestamp, subsort by name, then pick
 		// the first.
-		glog.Errorf("user error! more than one daemon is selecting pods with labels: %+v", pod.Labels)
+		utilruntime.HandleError(fmt.Errorf("user error! more than one daemon is selecting pods with labels: %+v", pod.Labels))
 		sort.Sort(byCreationTimestamp(sets))
 	}
 
@@ -324,7 +321,7 @@ func (dsc *DaemonSetsController) addPod(obj interface{}) {
 	if ds := dsc.getPodDaemonSet(pod); ds != nil {
 		dsKey, err := controller.KeyFunc(ds)
 		if err != nil {
-			glog.Errorf("Couldn't get key for object %#v: %v", ds, err)
+			utilruntime.HandleError(fmt.Errorf("Couldn't get key for object %#v: %v", ds, err))
 			return
 		}
 		dsc.expectations.CreationObserved(dsKey)
@@ -369,12 +366,12 @@ func (dsc *DaemonSetsController) deletePod(obj interface{}) {
 	if !ok {
 		tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
 		if !ok {
-			glog.Errorf("Couldn't get object from tombstone %#v", obj)
+			utilruntime.HandleError(fmt.Errorf("Couldn't get object from tombstone %#v", obj))
 			return
 		}
 		pod, ok = tombstone.Obj.(*v1.Pod)
 		if !ok {
-			glog.Errorf("Tombstone contained object that is not a pod %#v", obj)
+			utilruntime.HandleError(fmt.Errorf("Tombstone contained object that is not a pod %#v", obj))
 			return
 		}
 	}
@@ -382,7 +379,7 @@ func (dsc *DaemonSetsController) deletePod(obj interface{}) {
 	if ds := dsc.getPodDaemonSet(pod); ds != nil {
 		dsKey, err := controller.KeyFunc(ds)
 		if err != nil {
-			glog.Errorf("Couldn't get key for object %#v: %v", ds, err)
+			utilruntime.HandleError(fmt.Errorf("Couldn't get key for object %#v: %v", ds, err))
 			return
 		}
 		dsc.expectations.DeletionObserved(dsKey)
