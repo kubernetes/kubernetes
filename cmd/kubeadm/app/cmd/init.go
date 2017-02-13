@@ -101,6 +101,10 @@ func NewCmdInit(out io.Writer) *cobra.Command {
 		&cfg.Networking.DNSDomain, "service-dns-domain", cfg.Networking.DNSDomain,
 		`Use alternative domain for services, e.g. "myorg.internal"`,
 	)
+	cmd.PersistentFlags().StringVar(
+		&cfg.API.PortRange, "service-node-port-range", cfg.API.PortRange,
+		`A port range to reserve for services with NodePort visibility. Example: '30000-32767'. Inclusive at both ends of the range. (default 30000-32767)"`,
+	)
 	cmd.PersistentFlags().Var(
 		flags.NewCloudProviderFlag(&cfg.CloudProvider), "cloud-provider",
 		`Enable cloud provider features (external load-balancers, storage, etc). Note that you have to configure all kubelets manually`,
