@@ -802,6 +802,11 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 		apiResource.Verbs = append(apiResource.Verbs, kubeVerb)
 	}
 	sort.Strings(apiResource.Verbs)
+	gr := a.group.GroupVersion.WithResource(resource).GroupResource()
+	if storage, ok := storage.(rest.PrimaryRepresentationProvider); ok {
+		gr = storage.PrimaryRepresentation()
+	}
+	apiResource.PrimaryRepresentation = gr.String()
 	apiResource.ShortNames = shortNames
 
 	return &apiResource, nil

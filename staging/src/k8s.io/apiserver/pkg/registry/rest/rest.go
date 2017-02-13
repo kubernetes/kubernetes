@@ -70,6 +70,12 @@ type ShortNamesProvider interface {
 	ShortNames() []string
 }
 
+// PrimaryRepresentationProvider is an interface for RESTful storage services. Delivers the primary representation for a resource,
+// e.g. pointing to a unique GroupResource for co-habitated resources.
+type PrimaryRepresentationProvider interface {
+	PrimaryRepresentation() schema.GroupResource
+}
+
 // Lister is an object that can retrieve resources that match the provided field and label criteria.
 type Lister interface {
 	// NewList returns an empty object that can be used with the List call.

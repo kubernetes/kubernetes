@@ -86,6 +86,10 @@ type Store struct {
 	// QualifiedResource is the pluralized name of the resource.
 	QualifiedResource schema.GroupResource
 
+	// PrimaryRepresentationResource is the primary representation of a GroupResource. For
+	// resources which are co-habitated PrimaryRepresentationResource will return the same value.
+	PrimaryRepresentationResource schema.GroupResource
+
 	// KeyRootFunc returns the root etcd key for this resource; should not
 	// include trailing "/".  This is used for operations that work on the
 	// entire collection (listing and watching).
@@ -172,6 +176,7 @@ type Store struct {
 // Note: the rest.StandardStorage interface aggregates the common REST verbs
 var _ rest.StandardStorage = &Store{}
 var _ rest.Exporter = &Store{}
+var _ rest.PrimaryRepresentationProvider = &Store{}
 
 const OptimisticLockErrorMsg = "the object has been modified; please apply your changes to the latest version and try again"
 
@@ -1036,6 +1041,13 @@ func (e *Store) CompleteWithOptions(options *generic.StoreOptions) error {
 	if e.QualifiedResource.Empty() {
 		return fmt.Errorf("store %#v must have a non-empty qualified resource", e)
 	}
+	if e.PrimaryRepresentationResource.Empty() {
+		restOptions, err := options.RESTOptions.GetRESTOptions(e.QualifiedResource)
+		if err != nil {
+			return fmt.Errorf("store for %s failed to get RESTOptions: %v", e.QualifiedResource.String(), err)
+		}
+		e.PrimaryRepresentationResource = restOptions.PrimaryRepresentation
+	}
 	if e.NewFunc == nil {
 		return fmt.Errorf("store for %s must have NewFunc set", e.QualifiedResource.String())
 	}
@@ -1141,4 +1153,8 @@ func (e *Store) CompleteWithOptions(options *generic.StoreOptions) error {
 	}
 
 	return nil
+}
+
+func (s *Store) PrimaryRepresentation() schema.GroupResource {
+	return s.PrimaryRepresentationResource
 }

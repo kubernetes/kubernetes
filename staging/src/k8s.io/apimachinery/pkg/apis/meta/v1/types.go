@@ -657,6 +657,10 @@ type APIResource struct {
 	Verbs Verbs `json:"verbs" protobuf:"bytes,4,opt,name=verbs"`
 	// shortNames is a list of suggested short names of the resource.
 	ShortNames []string `json:"shortNames,omitempty" protobuf:"bytes,5,rep,name=shortNames"`
+	// primaryRepresentation is the API group and resource name in the form "group/resource"
+	// of the primary resource which shares the storage with this resource. For all resources
+	// which share the storage there is exactly one primary resource.
+	PrimaryRepresentation string `json:"primaryRepresentation" protobuf:"bytes,6,opt,name=primaryRepresentation"`
 }
 
 // Verbs masks the value so protobuf can generate

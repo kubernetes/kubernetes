@@ -30,6 +30,7 @@ type RESTOptions struct {
 	EnableGarbageCollection bool
 	DeleteCollectionWorkers int
 	ResourcePrefix          string
+	PrimaryRepresentation   schema.GroupResource
 }
 
 // Implement RESTOptionsGetter so that RESTOptions can directly be used when available (i.e. tests)

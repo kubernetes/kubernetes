@@ -47,6 +47,10 @@ func (f fakeStorageFactory) ResourcePrefix(groupResource schema.GroupResource) s
 	return ""
 }
 
+func (f fakeStorageFactory) PrimaryRepresentation(groupResource schema.GroupResource) schema.GroupResource {
+	return groupResource
+}
+
 func (f fakeStorageFactory) Backends() []string {
 	return []string{"etcd-0"}
 }
