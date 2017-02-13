@@ -25,6 +25,96 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 )
 
+func TestNewDiscoveryValue(t *testing.T) {
+	tests := []struct {
+		d      *discoveryValue
+		expect string
+	}{
+		{
+			d: &discoveryValue{
+				v: &kubeadm.Discovery{}},
+			expect: "unknown",
+		},
+		{
+			d: &discoveryValue{
+				v: &kubeadm.Discovery{
+					HTTPS: &kubeadm.HTTPSDiscovery{URL: "notnil"},
+				},
+			},
+			expect: "notnil",
+		},
+		{
+			d: &discoveryValue{
+				v: &kubeadm.Discovery{
+					File: &kubeadm.FileDiscovery{Path: "notnil"},
+				},
+			},
+			expect: "file://notnil",
+		},
+		{
+			d: &discoveryValue{
+				v: &kubeadm.Discovery{
+					Token: &kubeadm.TokenDiscovery{
+						ID:        "foo",
+						Secret:    "bar",
+						Addresses: []string{"foobar"},
+					},
+				},
+			}, expect: "token://foo:bar@foobar",
+		},
+	}
+	for _, rt := range tests {
+		actual := rt.d.String()
+		if actual != rt.expect {
+			t.Errorf(
+				"failed discoveryValue string:\n\texpected: %s\n\t  actual: %s",
+				rt.expect,
+				actual,
+			)
+		}
+	}
+}
+
+func TestType(t *testing.T) {
+	tests := []struct {
+		d      *discoveryValue
+		expect string
+	}{
+		{d: &discoveryValue{}, expect: "discovery"},
+	}
+	for _, rt := range tests {
+		actual := rt.d.Type()
+		if actual != rt.expect {
+			t.Errorf(
+				"failed discoveryValue type:\n\texpected: %s\n\t  actual: %s",
+				rt.expect,
+				actual,
+			)
+		}
+	}
+}
+
+func TestSet(t *testing.T) {
+	tests := []struct {
+		d      *discoveryValue
+		s      string
+		expect bool
+	}{
+		{d: &discoveryValue{v: &kubeadm.Discovery{}}, s: "", expect: false},
+		{d: &discoveryValue{v: &kubeadm.Discovery{}}, s: "https://example.com", expect: true},
+	}
+	for _, rt := range tests {
+		actual := rt.d.Set(rt.s)
+		if (actual == nil) != rt.expect {
+			t.Errorf(
+				"failed discoveryValue set:\n\texpected: %t\n\t  actual: %t",
+				rt.expect,
+				(actual == nil),
+			)
+		}
+	}
+}
+
 func TestParseURL(t *testing.T) {
 	cases := []struct {
 		url       string
