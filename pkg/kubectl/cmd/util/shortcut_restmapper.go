@@ -22,6 +22,7 @@ import (
 
 	"github.com/golang/glog"
 	"k8s.io/apimachinery/pkg/api/meta"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/discovery"
 	"k8s.io/kubernetes/pkg/kubectl"
@@ -38,23 +39,35 @@ type shortcutExpander struct {
 
 var _ meta.RESTMapper = &shortcutExpander{}
 
+type NamespacedResources struct{}
+
+func (ns NamespacedResources) Match(groupVersion string, r *metav1.APIResource) bool {
+	return r.Namespaced
+}
+
 func NewShortcutExpander(delegate meta.RESTMapper, client discovery.DiscoveryInterface) (shortcutExpander, error) {
 	if client == nil {
 		return shortcutExpander{}, errors.New("Please provide discovery client to shortcut expander")
 	}
-	return shortcutExpander{All: UserResources, RESTMapper: delegate, discoveryClient: client}, nil
+	return ShortcutExpander{All: UserResources, RESTMapper: delegate, discoveryClient: client}, nil
 }
 
-func (e shortcutExpander) getAll() []schema.GroupResource {
+func (e ShortcutExpander) getAll() ([]schema.GroupResource, []schema.GroupResource) {
+	availableServerResources := []schema.GroupResource{}
+
+	if e.discoveryClient == nil {
+		return e.All, availableServerResources
+	}
+
 	// Check if we have access to server resources
 	apiResources, err := e.discoveryClient.ServerResources()
 	if err != nil {
-		return e.All
+		return e.All, availableServerResources
 	}
 
 	availableResources, err := discovery.GroupVersionResources(apiResources)
 	if err != nil {
-		return e.All
+		return e.All, availableServerResources
 	}
 
 	availableAll := []schema.GroupResource{}
@@ -68,7 +81,22 @@ func (e shortcutExpander) getAll() []schema.GroupResource {
 		}
 	}
 
-	return availableAll
+	filteredServerList := discovery.FilteredBy(NamespacedResources{}, apiResources)
+	filteredServerResources, err := discovery.GroupVersionResources(filteredServerList)
+
+	// populate all "discovered" resources from the server
+	for availableResource := range filteredServerResources {
+		r := availableResource.GroupResource()
+
+		rSplit := strings.Split(r.Resource, "/")
+		if len(rSplit) > 1 {
+			continue
+		}
+
+		availableServerResources = append(availableServerResources, availableResource.GroupResource())
+	}
+
+	return availableAll, availableServerResources
 }
 
 func (e shortcutExpander) KindFor(resource schema.GroupVersionResource) (schema.GroupVersionKind, error) {
@@ -118,9 +146,18 @@ var UserResources = []schema.GroupResource{
 func (e shortcutExpander) AliasesForResource(resource string) ([]string, bool) {
 	if strings.ToLower(resource) == "all" {
 		var resources []schema.GroupResource
-		if resources = e.getAll(); len(resources) == 0 {
+		var serverResources []schema.GroupResource
+		if resources, serverResources = e.getAll(); len(resources) == 0 {
+			resources = serverResources
+		}
+
+		// used as a last resort, if none of the UserResources are defined in
+		// the server, and the server returned zero available resources, fallback
+		// to our client-defined list of UserResources
+		if len(resources) == 0 {
 			resources = UserResources
 		}
+
 		aliases := []string{}
 		for _, r := range resources {
 			aliases = append(aliases, r.Resource)
