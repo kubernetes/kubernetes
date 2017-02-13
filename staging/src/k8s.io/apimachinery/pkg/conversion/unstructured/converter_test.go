@@ -43,13 +43,13 @@ type B struct {
 
 type C struct {
 	A []A            `json:"ca"`
-	B B              `json:",inline"`
+	B                `json:",inline"`
 	C string         `json:"cc"`
 	D *int64         `json:"cd"`
 	E map[string]int `json:"ce"`
 	F []bool         `json:"cf"`
-	G []int          `json"cg"`
-	H float32        `json:ch"`
+	G []int          `json:"cg"`
+	H float32        `json:"ch"`
 	I []interface{}  `json:"ci"`
 }
 
