@@ -17,9 +17,11 @@ limitations under the License.
 package util
 
 import (
+	"errors"
 	"strings"
 
 	"k8s.io/apimachinery/pkg/api/meta"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/discovery"
 	"k8s.io/kubernetes/pkg/kubectl"
@@ -41,12 +43,8 @@ func NewShortcutExpander(delegate meta.RESTMapper, client discovery.DiscoveryInt
 }
 
 func (e ShortcutExpander) getAll() []schema.GroupResource {
-	if e.discoveryClient == nil {
-		return e.All
-	}
-
 	// Check if we have access to server resources
-	apiResources, err := e.discoveryClient.ServerResources()
+	apiResources, err := e.getServerResources()
 	if err != nil {
 		return e.All
 	}
@@ -68,6 +66,14 @@ func (e ShortcutExpander) getAll() []schema.GroupResource {
 	}
 
 	return availableAll
+}
+
+func (e ShortcutExpander) getServerResources() ([]*metav1.APIResourceList, error) {
+	if e.discoveryClient == nil {
+		return nil, errors.New("Unable to get server resources no discovery client")
+	}
+
+	return e.discoveryClient.ServerResources()
 }
 
 func (e ShortcutExpander) KindFor(resource schema.GroupVersionResource) (schema.GroupVersionKind, error) {
@@ -130,18 +136,30 @@ func (e ShortcutExpander) AliasesForResource(resource string) ([]string, bool) {
 	return []string{expanded}, (expanded != resource)
 }
 
-// getShortcutMappings returns a hardcoded set of tuples.
-// First the list of potential resources will be taken from the instance variable
-// which holds the anticipated result of the discovery API.
-// Next we will fall back to the hardcoded list of resources.
-// Note that the list is ordered by group priority.
-// TODO: Wire this to discovery API.
+// getShortcutMappings returns a set of tuples which holds short names for resources.
+// First the list of potential resources will be taken from the API server.
+// Next we will append the hardcoded list of resources - to be backward compatible with old servers.
+// NOTE that the list is ordered by group priority.
 func (e ShortcutExpander) getShortcutMappings() ([]kubectl.ResourceShortcuts, error) {
-	res := []kubectl.ResourceShortcuts{
-		{
-			ShortForm: schema.GroupResource{Group: "storage.k8s.io", Resource: "sc"},
-			LongForm:  schema.GroupResource{Group: "storage.k8s.io", Resource: "storageclasses"},
-		},
+	res := make([]kubectl.ResourceShortcuts, 0)
+	// get server resources
+	apiResList, err := e.getServerResources()
+	if err == nil {
+		for _, apiResources := range apiResList {
+			for _, apiRes := range apiResources.APIResources {
+				for _, shortName := range apiRes.ShortNames {
+					gv, err := schema.ParseGroupVersion(apiResources.GroupVersion)
+					if err != nil {
+						continue
+					}
+					rs := kubectl.ResourceShortcuts{
+						ShortForm: schema.GroupResource{Group: gv.Group, Resource: shortName},
+						LongForm:  schema.GroupResource{Group: gv.Group, Resource: apiRes.Name},
+					}
+					res = append(res, rs)
+				}
+			}
+		}
 	}
 
 	// append hardcoded short forms at the end of the list
