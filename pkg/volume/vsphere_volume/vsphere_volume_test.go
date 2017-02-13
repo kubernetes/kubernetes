@@ -63,8 +63,8 @@ func getFakeDeviceName(host volume.VolumeHost, volPath string) string {
 	return path.Join(host.GetPluginDir(vsphereVolumePluginName), "device", volPath)
 }
 
-func (fake *fakePDManager) CreateVolume(v *vsphereVolumeProvisioner) (vmDiskPath string, volumeSizeKB int, err error) {
-	return "[local] test-volume-name.vmdk", 100, nil
+func (fake *fakePDManager) CreateVolume(v *vsphereVolumeProvisioner) (vmDiskPath string, volumeSizeKB int, fstype string, err error) {
+	return "[local] test-volume-name.vmdk", 100, "ext4", nil
 }
 
 func (fake *fakePDManager) DeleteVolume(vd *vsphereVolumeDeleter) error {
