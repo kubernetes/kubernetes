@@ -742,44 +742,14 @@ function create-etcd-certs {
   local ca_cert=${2:-}
   local ca_key=${3:-}
 
-  download-cfssl
+  GEN_ETCD_CA_CERT="${ca_cert}" GEN_ETCD_CA_KEY="${ca_key}" \
+    generate-etcd-cert "${KUBE_TEMP}/cfssl" "${host}" "peer" "peer"
 
   pushd "${KUBE_TEMP}/cfssl"
-
-  cat >ca-config.json <<EOF
-{
-    "signing": {
-        "default": {
-            "expiry": "168h"
-        },
-        "profiles": {
-            "client-server": {
-                "expiry": "43800h",
-                "usages": [
-                    "signing",
-                    "key encipherment"
-                ]
-            }
-        }
-    }
-}
-EOF
-  if [[ ! -z "${ca_key}" && ! -z "${ca_cert}" ]]; then
-    echo "${ca_key}" | base64 --decode > ca-key.pem
-    echo "${ca_cert}" | base64 --decode | gunzip > ca.pem
-  else
-    ./cfssl print-defaults csr > ca-csr.json
-    ./cfssl gencert -initca ca-csr.json | ./cfssljson -bare ca -
-  fi
-
-  echo '{"CN":"'"${host}"'","hosts":[""],"key":{"algo":"ecdsa","size":256}}' \
-      | ./cfssl gencert -ca=ca.pem -ca-key=ca-key.pem -config=ca-config.json -profile=client-server -hostname="${host}" - \
-      | ./cfssljson -bare etcd
-
   ETCD_CA_KEY_BASE64=$(cat "ca-key.pem" | base64 | tr -d '\r\n')
   ETCD_CA_CERT_BASE64=$(cat "ca.pem" | gzip | base64 | tr -d '\r\n')
-  ETCD_PEER_KEY_BASE64=$(cat "etcd-key.pem" | base64 | tr -d '\r\n')
-  ETCD_PEER_CERT_BASE64=$(cat "etcd.pem" | gzip | base64 | tr -d '\r\n')
+  ETCD_PEER_KEY_BASE64=$(cat "peer-key.pem" | base64 | tr -d '\r\n')
+  ETCD_PEER_CERT_BASE64=$(cat "peer.pem" | gzip | base64 | tr -d '\r\n')
   popd
 }
 
