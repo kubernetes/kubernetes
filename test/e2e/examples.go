@@ -544,12 +544,12 @@ var _ = framework.KubeDescribe("[Feature:Example]", func() {
 				return filepath.Join(framework.TestContext.RepoRoot, "examples/storage/hazelcast", file)
 			}
 			serviceYaml := mkpath("hazelcast-service.yaml")
-			controllerYaml := mkpath("hazelcast-controller.yaml")
+			deploymentYaml := mkpath("hazelcast-deployment.yaml")
 			nsFlag := fmt.Sprintf("--namespace=%v", ns)
 
 			By("starting hazelcast")
 			framework.RunKubectlOrDie("create", "-f", serviceYaml, nsFlag)
-			framework.RunKubectlOrDie("create", "-f", controllerYaml, nsFlag)
+			framework.RunKubectlOrDie("create", "-f", deploymentYaml, nsFlag)
 			label := labels.SelectorFromSet(labels.Set(map[string]string{"name": "hazelcast"}))
 			err := testutils.WaitForPodsWithLabelRunning(c, ns, label)
 			Expect(err).NotTo(HaveOccurred())
