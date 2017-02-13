@@ -21,6 +21,7 @@ limitations under the License.
 package autoscaling
 
 import (
+	resource "k8s.io/apimachinery/pkg/api/resource"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	conversion "k8s.io/apimachinery/pkg/conversion"
 	runtime "k8s.io/apimachinery/pkg/runtime"
@@ -40,6 +41,14 @@ func RegisterDeepCopies(scheme *runtime.Scheme) error {
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_autoscaling_HorizontalPodAutoscalerList, InType: reflect.TypeOf(&HorizontalPodAutoscalerList{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_autoscaling_HorizontalPodAutoscalerSpec, InType: reflect.TypeOf(&HorizontalPodAutoscalerSpec{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_autoscaling_HorizontalPodAutoscalerStatus, InType: reflect.TypeOf(&HorizontalPodAutoscalerStatus{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_autoscaling_MetricSpec, InType: reflect.TypeOf(&MetricSpec{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_autoscaling_MetricStatus, InType: reflect.TypeOf(&MetricStatus{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_autoscaling_ObjectMetricSource, InType: reflect.TypeOf(&ObjectMetricSource{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_autoscaling_ObjectMetricStatus, InType: reflect.TypeOf(&ObjectMetricStatus{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_autoscaling_PodsMetricSource, InType: reflect.TypeOf(&PodsMetricSource{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_autoscaling_PodsMetricStatus, InType: reflect.TypeOf(&PodsMetricStatus{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_autoscaling_ResourceMetricSource, InType: reflect.TypeOf(&ResourceMetricSource{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_autoscaling_ResourceMetricStatus, InType: reflect.TypeOf(&ResourceMetricStatus{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_autoscaling_Scale, InType: reflect.TypeOf(&Scale{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_autoscaling_ScaleSpec, InType: reflect.TypeOf(&ScaleSpec{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_autoscaling_ScaleStatus, InType: reflect.TypeOf(&ScaleStatus{})},
@@ -103,10 +112,14 @@ func DeepCopy_autoscaling_HorizontalPodAutoscalerSpec(in interface{}, out interf
 			*out = new(int32)
 			**out = **in
 		}
-		if in.TargetCPUUtilizationPercentage != nil {
-			in, out := &in.TargetCPUUtilizationPercentage, &out.TargetCPUUtilizationPercentage
-			*out = new(int32)
-			**out = **in
+		if in.Metrics != nil {
+			in, out := &in.Metrics, &out.Metrics
+			*out = make([]MetricSpec, len(*in))
+			for i := range *in {
+				if err := DeepCopy_autoscaling_MetricSpec(&(*in)[i], &(*out)[i], c); err != nil {
+					return err
+				}
+			}
 		}
 		return nil
 	}
@@ -127,11 +140,149 @@ func DeepCopy_autoscaling_HorizontalPodAutoscalerStatus(in interface{}, out inte
 			*out = new(v1.Time)
 			**out = (*in).DeepCopy()
 		}
-		if in.CurrentCPUUtilizationPercentage != nil {
-			in, out := &in.CurrentCPUUtilizationPercentage, &out.CurrentCPUUtilizationPercentage
+		if in.CurrentMetrics != nil {
+			in, out := &in.CurrentMetrics, &out.CurrentMetrics
+			*out = make([]MetricStatus, len(*in))
+			for i := range *in {
+				if err := DeepCopy_autoscaling_MetricStatus(&(*in)[i], &(*out)[i], c); err != nil {
+					return err
+				}
+			}
+		}
+		return nil
+	}
+}
+
+func DeepCopy_autoscaling_MetricSpec(in interface{}, out interface{}, c *conversion.Cloner) error {
+	{
+		in := in.(*MetricSpec)
+		out := out.(*MetricSpec)
+		*out = *in
+		if in.Object != nil {
+			in, out := &in.Object, &out.Object
+			*out = new(ObjectMetricSource)
+			if err := DeepCopy_autoscaling_ObjectMetricSource(*in, *out, c); err != nil {
+				return err
+			}
+		}
+		if in.Pods != nil {
+			in, out := &in.Pods, &out.Pods
+			*out = new(PodsMetricSource)
+			if err := DeepCopy_autoscaling_PodsMetricSource(*in, *out, c); err != nil {
+				return err
+			}
+		}
+		if in.Resource != nil {
+			in, out := &in.Resource, &out.Resource
+			*out = new(ResourceMetricSource)
+			if err := DeepCopy_autoscaling_ResourceMetricSource(*in, *out, c); err != nil {
+				return err
+			}
+		}
+		return nil
+	}
+}
+
+func DeepCopy_autoscaling_MetricStatus(in interface{}, out interface{}, c *conversion.Cloner) error {
+	{
+		in := in.(*MetricStatus)
+		out := out.(*MetricStatus)
+		*out = *in
+		if in.Object != nil {
+			in, out := &in.Object, &out.Object
+			*out = new(ObjectMetricStatus)
+			if err := DeepCopy_autoscaling_ObjectMetricStatus(*in, *out, c); err != nil {
+				return err
+			}
+		}
+		if in.Pods != nil {
+			in, out := &in.Pods, &out.Pods
+			*out = new(PodsMetricStatus)
+			if err := DeepCopy_autoscaling_PodsMetricStatus(*in, *out, c); err != nil {
+				return err
+			}
+		}
+		if in.Resource != nil {
+			in, out := &in.Resource, &out.Resource
+			*out = new(ResourceMetricStatus)
+			if err := DeepCopy_autoscaling_ResourceMetricStatus(*in, *out, c); err != nil {
+				return err
+			}
+		}
+		return nil
+	}
+}
+
+func DeepCopy_autoscaling_ObjectMetricSource(in interface{}, out interface{}, c *conversion.Cloner) error {
+	{
+		in := in.(*ObjectMetricSource)
+		out := out.(*ObjectMetricSource)
+		*out = *in
+		out.TargetValue = in.TargetValue.DeepCopy()
+		return nil
+	}
+}
+
+func DeepCopy_autoscaling_ObjectMetricStatus(in interface{}, out interface{}, c *conversion.Cloner) error {
+	{
+		in := in.(*ObjectMetricStatus)
+		out := out.(*ObjectMetricStatus)
+		*out = *in
+		out.CurrentValue = in.CurrentValue.DeepCopy()
+		return nil
+	}
+}
+
+func DeepCopy_autoscaling_PodsMetricSource(in interface{}, out interface{}, c *conversion.Cloner) error {
+	{
+		in := in.(*PodsMetricSource)
+		out := out.(*PodsMetricSource)
+		*out = *in
+		out.TargetAverageValue = in.TargetAverageValue.DeepCopy()
+		return nil
+	}
+}
+
+func DeepCopy_autoscaling_PodsMetricStatus(in interface{}, out interface{}, c *conversion.Cloner) error {
+	{
+		in := in.(*PodsMetricStatus)
+		out := out.(*PodsMetricStatus)
+		*out = *in
+		out.CurrentAverageValue = in.CurrentAverageValue.DeepCopy()
+		return nil
+	}
+}
+
+func DeepCopy_autoscaling_ResourceMetricSource(in interface{}, out interface{}, c *conversion.Cloner) error {
+	{
+		in := in.(*ResourceMetricSource)
+		out := out.(*ResourceMetricSource)
+		*out = *in
+		if in.TargetAverageUtilization != nil {
+			in, out := &in.TargetAverageUtilization, &out.TargetAverageUtilization
 			*out = new(int32)
 			**out = **in
 		}
+		if in.TargetAverageValue != nil {
+			in, out := &in.TargetAverageValue, &out.TargetAverageValue
+			*out = new(resource.Quantity)
+			**out = (*in).DeepCopy()
+		}
+		return nil
+	}
+}
+
+func DeepCopy_autoscaling_ResourceMetricStatus(in interface{}, out interface{}, c *conversion.Cloner) error {
+	{
+		in := in.(*ResourceMetricStatus)
+		out := out.(*ResourceMetricStatus)
+		*out = *in
+		if in.CurrentAverageUtilization != nil {
+			in, out := &in.CurrentAverageUtilization, &out.CurrentAverageUtilization
+			*out = new(int32)
+			**out = **in
+		}
+		out.CurrentAverageValue = in.CurrentAverageValue.DeepCopy()
 		return nil
 	}
 }

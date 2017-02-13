@@ -28,7 +28,6 @@ func addDefaultingFuncs(scheme *runtime.Scheme) error {
 	return scheme.AddDefaultingFuncs(
 		SetDefaults_DaemonSet,
 		SetDefaults_Deployment,
-		SetDefaults_HorizontalPodAutoscaler,
 		SetDefaults_ReplicaSet,
 		SetDefaults_NetworkPolicy,
 	)
@@ -87,16 +86,6 @@ func SetDefaults_Deployment(obj *Deployment) {
 			maxSurge := intstr.FromInt(1)
 			strategy.RollingUpdate.MaxSurge = &maxSurge
 		}
-	}
-}
-
-func SetDefaults_HorizontalPodAutoscaler(obj *HorizontalPodAutoscaler) {
-	if obj.Spec.MinReplicas == nil {
-		minReplicas := int32(1)
-		obj.Spec.MinReplicas = &minReplicas
-	}
-	if obj.Spec.CPUUtilization == nil {
-		obj.Spec.CPUUtilization = &CPUTargetUtilization{TargetPercentage: 80}
 	}
 }
 
