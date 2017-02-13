@@ -285,14 +285,6 @@ func componentPod(container api.Container, volumes ...api.Volume) api.Pod {
 	}
 }
 
-func getComponentBaseCommand(component string) []string {
-	if kubeadmapi.GlobalEnvParams.HyperkubeImage != "" {
-		return []string{"/hyperkube", component}
-	}
-
-	return []string{"kube-" + component}
-}
-
 func getCertFilePath(certName string) string {
 	return path.Join(kubeadmapi.GlobalEnvParams.HostPKIPath, certName)
 }
@@ -305,7 +297,8 @@ func getAPIServerCommand(cfg *kubeadmapi.MasterConfiguration, selfHosted bool) [
 		command = []string{"/usr/bin/flock", "--exclusive", "--timeout=30", "/var/lock/api-server.lock"}
 	}
 
-	command = append(getComponentBaseCommand(apiServer),
+	command = append(
+		"/usr/local/bin/kube-apiserver",
 		"--insecure-bind-address=127.0.0.1",
 		"--admission-control=NamespaceLifecycle,LimitRanger,ServiceAccount,PersistentVolumeLabel,DefaultStorageClass,ResourceQuota",
 		"--service-cluster-ip-range="+cfg.Networking.ServiceSubnet,
@@ -315,7 +308,7 @@ func getAPIServerCommand(cfg *kubeadmapi.MasterConfiguration, selfHosted bool) [
 		"--tls-private-key-file="+getCertFilePath(kubeadmconstants.APIServerKeyName),
 		"--kubelet-client-certificate="+getCertFilePath(kubeadmconstants.APIServerKubeletClientCertName),
 		"--kubelet-client-key="+getCertFilePath(kubeadmconstants.APIServerKubeletClientKeyName),
-		"--token-auth-file="+kubeadmapi.GlobalEnvParams.HostPKIPath+"/tokens.csv",
+		"--token-auth-file="+kubeadmapi.GlobalEnvParams.KubernetesDir+"/tokens.csv",
 		fmt.Sprintf("--secure-port=%d", cfg.API.Port),
 		"--allow-privileged",
 		"--storage-backend=etcd3",
@@ -378,7 +371,8 @@ func getControllerManagerCommand(cfg *kubeadmapi.MasterConfiguration, selfHosted
 		command = []string{"/usr/bin/flock", "--exclusive", "--timeout=30", "/var/lock/controller-manager.lock"}
 	}
 
-	command = append(getComponentBaseCommand(controllerManager),
+	command = append(
+		"/usr/local/bin/kube-controller-manager",
 		"--address=127.0.0.1",
 		"--leader-elect",
 		"--master=127.0.0.1:8080",
@@ -416,7 +410,8 @@ func getSchedulerCommand(cfg *kubeadmapi.MasterConfiguration, selfHosted bool) [
 		command = []string{"/usr/bin/flock", "--exclusive", "--timeout=30", "/var/lock/api-server.lock"}
 	}
 
-	command = append(getComponentBaseCommand(scheduler),
+	command = append(
+		"/usr/local/bin/kube-scheduler",
 		"--address=127.0.0.1",
 		"--leader-elect",
 		"--master=127.0.0.1:8080",

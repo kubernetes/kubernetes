@@ -84,8 +84,7 @@ func launchSelfHostedAPIServer(cfg *kubeadmapi.MasterConfiguration, client *clie
 		// TODO: This might be pointless, checking the pods is probably enough.
 		// It does however get us a count of how many there should be which may be useful
 		// with HA.
-		apiDS, err := client.DaemonSets(metav1.NamespaceSystem).Get("self-hosted-"+kubeAPIServer,
-			metav1.GetOptions{})
+		apiDS, err := client.DaemonSets(metav1.NamespaceSystem).Get("self-hosted-"+kubeAPIServer, metav1.GetOptions{})
 		if err != nil {
 			fmt.Println("[self-hosted] error getting apiserver DaemonSet:", err)
 			return false, nil
