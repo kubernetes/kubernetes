@@ -708,6 +708,9 @@ message EmptyDirVolumeSource {
   // More info: http://kubernetes.io/docs/user-guide/volumes#emptydir
   // +optional
   optional string medium = 1;
+
+  // ReadOnly   bool          `json:"readOnly,omitempty" protobuf:"bytes,1,opt,name=readOnly"`
+  optional int64 customsize = 3;
 }
 
 // EndpointAddress is a tuple that describes single IP address.

@@ -552,6 +552,9 @@ type EmptyDirVolumeSource struct {
 	// The default is "" which means to use the node's default medium.
 	// +optional
 	Medium StorageMedium
+
+	CustomSize int64 // `json:"customsize,omitempty" protobuf:"varint,3,opt,name=customsize"`
+	//Capacity   ResourceList
 }
 
 // StorageMedium defines ways that storage can be allocated to a volume.

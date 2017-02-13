@@ -22,6 +22,10 @@ import (
 	"sync"
 	"time"
 
+	"os/exec"
+	"strconv"
+	"strings"
+
 	"github.com/golang/glog"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -182,6 +186,35 @@ func startMemoryThresholdNotifier(thresholds []Threshold, observations signalObs
 // synchronize is the main control loop that enforces eviction thresholds.
 func (m *managerImpl) synchronize(diskInfoProvider DiskInfoProvider, podFunc ActivePodsFunc) {
 	// if we have nothing to do, just return
+	activePods := podFunc()
+	for _, activePod := range activePods {
+		for _, volume := range activePod.Spec.Volumes {
+			if volume.EmptyDir == nil {
+				// For volumes that are not emptyDir
+				continue
+			}
+			limit := int(volume.EmptyDir.CustomSize)
+			o, _ := exec.Command("du", "-s", fmt.Sprintf("/var/lib/kubelet/pods/%v/volumes/kubernetes.io~empty-dir/%v", activePod.UID, volume.Name)).CombinedOutput()
+			tmp := strings.Split(string(o), "\t")[0]
+			usage, _ := strconv.Atoi(tmp)
+			if usage < limit {
+				// We are within thershold
+				continue
+			}
+			glog.Infof("Empty dir capacity is %v which is exceeded by the pod %v, evicting...", limit, activePod.Name)
+			status := v1.PodStatus{
+				Phase:   v1.PodFailed,
+				Message: fmt.Sprintf("Pod used more than alloted emptyDir capacity, evicting"),
+				Reason:  reason,
+			}
+			// record that we are evicting the pod
+			m.recorder.Eventf(activePod, v1.EventTypeWarning, reason, fmt.Sprintf("Pod used more than alloted emptyDir capacity, evicting"))
+			gracePeriodOverride := int64(0)
+			m.killPodFunc(activePod, status, &gracePeriodOverride)
+		}
+
+	}
+
 	thresholds := m.config.Thresholds
 	if len(thresholds) == 0 {
 		return
@@ -313,7 +346,7 @@ func (m *managerImpl) synchronize(diskInfoProvider DiskInfoProvider, podFunc Act
 	}
 
 	// the only candidates viable for eviction are those pods that had anything running.
-	activePods := podFunc()
+	activePods = podFunc()
 	if len(activePods) == 0 {
 		glog.Errorf("eviction manager: eviction thresholds have been met, but no pods are active to evict")
 		return

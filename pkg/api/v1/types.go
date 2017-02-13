@@ -634,6 +634,9 @@ type EmptyDirVolumeSource struct {
 	// More info: http://kubernetes.io/docs/user-guide/volumes#emptydir
 	// +optional
 	Medium StorageMedium `json:"medium,omitempty" protobuf:"bytes,1,opt,name=medium,casttype=StorageMedium"`
+
+	CustomSize int64 `json:"customsize,omitempty" protobuf:"varint,3,opt,name=customsize"`
+	//Capacity   ResourceList  `json:"capacity,omitempty" protobuf:"bytes,1,rep,name=capacity,casttype=ResourceList,castkey=ResourceName"`
 }
 
 // Represents a Glusterfs mount that lasts the lifetime of a pod.
