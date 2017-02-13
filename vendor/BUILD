@@ -15322,6 +15322,7 @@ go_library(
     tags = ["automanaged"],
     deps = [
         "//vendor:k8s.io/apimachinery/pkg/util/wait",
+        "//vendor:k8s.io/apiserver/pkg/util/logs",
         "//vendor:k8s.io/sample-apiserver/pkg/cmd/server",
     ],
 )
@@ -15673,5 +15674,16 @@ go_library(
         "//vendor:k8s.io/client-go/pkg/api",
         "//vendor:k8s.io/client-go/pkg/api/v1",
         "//vendor:k8s.io/client-go/pkg/apis/autoscaling",
+    ],
+)
+
+go_library(
+    name = "k8s.io/apiserver/pkg/util/logs",
+    srcs = ["k8s.io/apiserver/pkg/util/logs/logs.go"],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:github.com/golang/glog",
+        "//vendor:github.com/spf13/pflag",
+        "//vendor:k8s.io/apimachinery/pkg/util/wait",
     ],
 )
