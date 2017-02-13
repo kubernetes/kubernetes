@@ -17,7 +17,9 @@ limitations under the License.
 package util
 
 import (
+	"bytes"
 	"testing"
+	"time"
 
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 )
@@ -145,6 +147,81 @@ func TestRandBytes(t *testing.T) {
 		}
 		if len(actual) != rt*2 {
 			t.Errorf("failed randBytes:\n\texpected: %d\n\t  actual: %d\n", rt*2, len(actual))
+		}
+	}
+}
+
+func TestDiscoveryPort(t *testing.T) {
+	var tests = []struct {
+		token    *kubeadmapi.TokenDiscovery
+		expected int32
+	}{
+		{token: &kubeadmapi.TokenDiscovery{}, expected: 9898}, // should use default
+		{token: &kubeadmapi.TokenDiscovery{Addresses: []string{"foobar:1234"}}, expected: 1234},
+		{token: &kubeadmapi.TokenDiscovery{Addresses: []string{"doesnothaveport"}}, expected: 9898}, // should use default
+		{token: &kubeadmapi.TokenDiscovery{Addresses: []string{"foorbar:abcd"}}, expected: 9898},    // since abcd isn't an int, should use default
+	}
+	for _, rt := range tests {
+		actual := DiscoveryPort(rt.token)
+		if actual != rt.expected {
+			t.Errorf(
+				"failed DiscoveryPort:\n\texpected: %d\n\t  actual: %d",
+				rt.expected,
+				actual,
+			)
+		}
+	}
+}
+
+func TestBearerToken(t *testing.T) {
+	var tests = []struct {
+		token    *kubeadmapi.TokenDiscovery
+		expected string
+	}{
+		{token: &kubeadmapi.TokenDiscovery{ID: "foo", Secret: "bar"}, expected: "foo:bar"}, // should use default
+	}
+	for _, rt := range tests {
+		actual := BearerToken(rt.token)
+		if actual != rt.expected {
+			t.Errorf(
+				"failed BearerToken:\n\texpected: %s\n\t  actual: %s",
+				rt.expected,
+				actual,
+			)
+		}
+	}
+}
+
+func TestEncodeTokenSecretData(t *testing.T) {
+	var tests = []struct {
+		token *kubeadmapi.TokenDiscovery
+		t     time.Duration
+	}{
+		{token: &kubeadmapi.TokenDiscovery{ID: "foo", Secret: "bar"}},                 // should use default
+		{token: &kubeadmapi.TokenDiscovery{ID: "foo", Secret: "bar"}, t: time.Second}, // should use default
+	}
+	for _, rt := range tests {
+		actual := encodeTokenSecretData(rt.token, rt.t)
+		if !bytes.Equal(actual["token-id"], []byte(rt.token.ID)) {
+			t.Errorf(
+				"failed EncodeTokenSecretData:\n\texpected: %s\n\t  actual: %s",
+				rt.token.ID,
+				actual["token-id"],
+			)
+		}
+		if !bytes.Equal(actual["token-secret"], []byte(rt.token.Secret)) {
+			t.Errorf(
+				"failed EncodeTokenSecretData:\n\texpected: %s\n\t  actual: %s",
+				rt.token.Secret,
+				actual["token-secret"],
+			)
+		}
+		if rt.t > 0 {
+			if actual["expiration"] == nil {
+				t.Errorf(
+					"failed EncodeTokenSecretData, duration was not added to time",
+				)
+			}
 		}
 	}
 }
