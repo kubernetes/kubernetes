@@ -32,7 +32,7 @@ import (
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
-	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated"
+	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated/externalversions"
 	"k8s.io/kubernetes/pkg/controller/replication"
 	"k8s.io/kubernetes/test/integration/framework"
 )
@@ -134,7 +134,7 @@ func rmSetup(t *testing.T, stopCh chan struct{}, enableGarbageCollector bool) (*
 	}
 	resyncPeriod := 12 * time.Hour
 
-	informers := informers.NewSharedInformerFactory(nil, clientSet, resyncPeriod)
+	informers := informers.NewSharedInformerFactory(clientSet, resyncPeriod)
 	rm := replication.NewReplicationManager(informers.Core().V1().Pods(), informers.Core().V1().ReplicationControllers(), clientSet, replication.BurstReplicas, 4096, enableGarbageCollector)
 	informers.Start(stopCh)
 

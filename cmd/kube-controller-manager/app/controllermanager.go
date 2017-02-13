@@ -46,7 +46,7 @@ import (
 	"k8s.io/kubernetes/cmd/kube-controller-manager/app/options"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
-	newinformers "k8s.io/kubernetes/pkg/client/informers/informers_generated"
+	newinformers "k8s.io/kubernetes/pkg/client/informers/informers_generated/externalversions"
 	"k8s.io/kubernetes/pkg/client/leaderelection"
 	"k8s.io/kubernetes/pkg/client/leaderelection/resourcelock"
 	"k8s.io/kubernetes/pkg/cloudprovider"
@@ -344,7 +344,7 @@ func StartControllers(controllers map[string]InitFunc, s *options.CMServer, root
 	versionedClient := rootClientBuilder.ClientOrDie("shared-informers")
 	// TODO replace sharedInformers with newSharedInformers
 	sharedInformers := informers.NewSharedInformerFactory(versionedClient, nil, ResyncPeriod(s)())
-	newSharedInformers := newinformers.NewSharedInformerFactory(nil, versionedClient, ResyncPeriod(s)())
+	newSharedInformers := newinformers.NewSharedInformerFactory(versionedClient, ResyncPeriod(s)())
 
 	// always start the SA token controller first using a full-power client, since it needs to mint tokens for the rest
 	if len(s.ServiceAccountKeyFile) > 0 {

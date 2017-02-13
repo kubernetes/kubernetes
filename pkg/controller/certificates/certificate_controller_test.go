@@ -34,7 +34,7 @@ import (
 	"k8s.io/client-go/util/cert/triple"
 	certificates "k8s.io/kubernetes/pkg/apis/certificates/v1beta1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset/fake"
-	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated"
+	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated/externalversions"
 	"k8s.io/kubernetes/pkg/controller"
 )
 
@@ -51,7 +51,7 @@ func alwaysReady() bool { return true }
 
 func newController(csrs ...runtime.Object) (*testController, error) {
 	client := fake.NewSimpleClientset(csrs...)
-	informerFactory := informers.NewSharedInformerFactory(nil, client, controller.NoResyncPeriodFunc())
+	informerFactory := informers.NewSharedInformerFactory(client, controller.NoResyncPeriodFunc())
 
 	certFile, keyFile, err := createTestCertFiles()
 	if err != nil {
