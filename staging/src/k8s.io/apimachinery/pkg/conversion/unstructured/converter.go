@@ -20,13 +20,17 @@ import (
 	"bytes"
 	encodingjson "encoding/json"
 	"fmt"
+//	"os"
 	"reflect"
+//	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/json"
+
+	"github.com/golang/glog"
 )
 
 type structField struct {
@@ -37,6 +41,7 @@ type structField struct {
 type fieldInfo struct {
 	name      string
 	nameValue reflect.Value
+	omitempty bool
 }
 
 type fieldsCacheMap map[structField]*fieldInfo
@@ -64,14 +69,41 @@ var (
 // ConverterImpl knows how to convert betweek runtime.Object and
 // Unstructured in both ways.
 type ConverterImpl struct {
+	// If true, we will be additionally running conversion via json
+	// to ensure that the result is true.
+	// This is supposed to be set only in tests.
+	mismatchDetection bool
 }
 
 func newConverter() *ConverterImpl {
-	return &ConverterImpl{}
+//	mismatchDetection, _ := strconv.ParseBool(os.Getenv("KUBE_PATCH_CONVERSION_DETECTOR"))
+	mismatchDetection := true
+	return &ConverterImpl{
+		mismatchDetection: mismatchDetection,
+	}
 }
 
 func (c *ConverterImpl) FromUnstructured(u map[string]interface{}, obj runtime.Object) error {
-	return fromUnstructured(reflect.ValueOf(u), reflect.ValueOf(obj).Elem())
+	err := fromUnstructured(reflect.ValueOf(u), reflect.ValueOf(obj).Elem())
+	if c.mismatchDetection {
+		newObj := reflect.New(reflect.TypeOf(obj).Elem()).Interface().(runtime.Object)
+		newErr := fromUnstructuredViaJSON(u, newObj)
+		if (err != nil) != (newErr != nil) {
+			glog.Fatalf("FromUnstructured unexpected error: %v, expected: %v", err, newErr)
+		}
+		if err == nil && !reflect.DeepEqual(obj, newObj) {
+			glog.Fatalf("FromUnstructured incorrect conversion: %#v, expected: %#v", obj, newObj)
+		}
+	}
+	return err
+}
+
+func fromUnstructuredViaJSON(u map[string]interface{}, obj runtime.Object) error {
+	data, err := json.Marshal(u)
+	if err != nil {
+		return err
+	}
+	return json.Unmarshal(data, obj)
 }
 
 func fromUnstructured(sv, dv reflect.Value) error {
@@ -159,7 +191,13 @@ func fieldInfoFromField(structType reflect.Type, field int) *fieldInfo {
 			info.name = strings.ToLower(typeField.Name[:1]) + typeField.Name[1:]
 		}
 	} else {
-		info.name = strings.Split(jsonTag, ",")[0]
+		items := strings.Split(jsonTag, ",")
+		info.name = items[0]
+		for i := range items {
+			if items[i] == "omitempty" {
+				info.omitempty = true
+			}
+		}
 	}
 	info.nameValue = reflect.ValueOf(info.name)
 
@@ -307,7 +345,26 @@ func interfaceFromUnstructured(sv, dv reflect.Value) error {
 }
 
 func (c *ConverterImpl) ToUnstructured(obj runtime.Object, u *map[string]interface{}) error {
-	return toUnstructured(reflect.ValueOf(obj).Elem(), reflect.ValueOf(u).Elem())
+	err := toUnstructured(reflect.ValueOf(obj).Elem(), reflect.ValueOf(u).Elem())
+	if c.mismatchDetection {
+		newUnstr := &map[string]interface{}{}
+		newErr := toUnstructuredViaJSON(obj, newUnstr)
+		if (err != nil) != (newErr != nil) {
+			glog.Fatalf("ToUnstructured unexpected error: %v, expected: %v", err, newErr)
+		}
+		if err == nil && !reflect.DeepEqual(*u, *newUnstr) {
+			glog.Fatalf("ToUnstructured incorrect conversion: %#v, expected: %#v", u, newUnstr)
+		}
+	}
+	return err
+}
+
+func toUnstructuredViaJSON(obj runtime.Object, u *map[string]interface{}) error {
+	data, err := json.Marshal(obj)
+	if err != nil {
+		return err
+	}
+	return json.Unmarshal(data, u)
 }
 
 func toUnstructured(sv, dv reflect.Value) error {
@@ -467,6 +524,25 @@ func pointerToUnstructured(sv, dv reflect.Value) error {
 	return toUnstructured(sv.Elem(), dv)
 }
 
+func isZero(v reflect.Value) bool {
+	switch v.Kind() {
+	case reflect.Array, reflect.String:
+		return v.Len() == 0
+	case reflect.Bool:
+		return !v.Bool()
+	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+		return v.Int() == 0
+	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
+		return v.Uint() == 0
+	case reflect.Float32, reflect.Float64:
+		return v.Float() == 0
+	case reflect.Map, reflect.Slice, reflect.Ptr, reflect.Interface:
+		// TODO: It seems that 0-len maps are ignored in it.
+		return v.IsNil()
+	}
+	return false
+}
+
 func structToUnstructured(sv, dv reflect.Value) error {
 	st, dt := sv.Type(), dv.Type()
 	if dt.Kind() == reflect.Interface && dv.NumMethod() == 0 {
@@ -483,15 +559,19 @@ func structToUnstructured(sv, dv reflect.Value) error {
 		fieldInfo := fieldInfoFromField(st, i)
 		fv := sv.Field(i)
 
+		if !fv.IsValid() {
+			// No fource field, skip.
+			continue
+		}
+		if fieldInfo.omitempty && isZero(fv) {
+			// omitempty fields should be ignored.
+			continue
+		}
 		if len(fieldInfo.name) == 0 {
 			// This field is inlined.
 			if err := toUnstructured(fv, dv); err != nil {
 				return err
 			}
-			continue
-		}
-		if !fv.IsValid() {
-			// No fource field, skip.
 			continue
 		}
 		switch fv.Type().Kind() {
