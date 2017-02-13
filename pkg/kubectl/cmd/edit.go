@@ -46,6 +46,7 @@ import (
 	"k8s.io/kubernetes/pkg/util/crlf"
 	"k8s.io/kubernetes/pkg/util/i18n"
 
+	jsonpatch "github.com/evanphx/json-patch"
 	"github.com/golang/glog"
 	"github.com/spf13/cobra"
 )
@@ -136,16 +137,7 @@ func runEdit(f cmdutil.Factory, out, errOut io.Writer, cmd *cobra.Command, args 
 		return err
 	}
 
-	clientConfig, err := f.ClientConfig()
-	if err != nil {
-		return err
-	}
-
 	encoder := f.JSONEncoder()
-	defaultVersion, err := cmdutil.OutputVersion(cmd, clientConfig.GroupVersion)
-	if err != nil {
-		return err
-	}
 
 	var (
 		windowsLineEndings = cmdutil.GetFlagBool(cmd, "windows-line-endings")
@@ -162,12 +154,23 @@ func runEdit(f cmdutil.Factory, out, errOut io.Writer, cmd *cobra.Command, args 
 
 		containsError := false
 		for {
-			originalObj, err := resource.AsVersionedObject(infos, false, defaultVersion, encoder)
-			if err != nil {
-				return err
+			var originalObj runtime.Object
+			switch len(infos) {
+			case 1:
+				originalObj = infos[0].Object
+			default:
+				l := &unstructured.UnstructuredList{
+					Object: map[string]interface{}{
+						"kind":       "List",
+						"apiVersion": "v1",
+						"metadata":   map[string]interface{}{},
+					},
+				}
+				for _, info := range infos {
+					l.Items = append(l.Items, info.Object.(*unstructured.Unstructured))
+				}
+				originalObj = l
 			}
-
-			objToEdit := originalObj
 
 			// generate the file to edit
 			buf := &bytes.Buffer{}
@@ -181,7 +184,7 @@ func runEdit(f cmdutil.Factory, out, errOut io.Writer, cmd *cobra.Command, args 
 			}
 
 			if !containsError {
-				if err := o.printer.PrintObj(objToEdit, w); err != nil {
+				if err := o.printer.PrintObj(originalObj, w); err != nil {
 					return preservedFile(err, results.file, errOut)
 				}
 				original = buf.Bytes()
@@ -272,10 +275,10 @@ func runEdit(f cmdutil.Factory, out, errOut io.Writer, cmd *cobra.Command, args 
 			switch editMode {
 			case NormalEditMode:
 				patchVisitor := updatedVisitor
-				err = visitToPatch(originalObj, patchVisitor, mapper, encoder, out, errOut, defaultVersion, &results, file)
+				err = visitToPatch(infos, patchVisitor, mapper, encoder, out, errOut, &results, file)
 			case EditBeforeCreateMode:
 				createVisitor := updatedVisitor
-				err = visitToCreate(createVisitor, mapper, out, errOut, defaultVersion, &results, file)
+				err = visitToCreate(createVisitor, mapper, out, errOut, &results, file)
 			default:
 				err = fmt.Errorf("Not supported edit mode %q", editMode)
 			}
@@ -353,35 +356,23 @@ func getPrinter(cmd *cobra.Command) (*editPrinterOptions, error) {
 type resultGetter func([]byte) *resource.Result
 
 func getMapperAndResult(f cmdutil.Factory, args []string, options *resource.FilenameOptions, editMode EditMode) (meta.RESTMapper, *resource.Result, resultGetter, string, error) {
+	if editMode != NormalEditMode && editMode != EditBeforeCreateMode {
+		return nil, nil, nil, "", fmt.Errorf("Not supported edit mode %q", editMode)
+	}
+
 	cmdNamespace, enforceNamespace, err := f.DefaultNamespace()
 	if err != nil {
 		return nil, nil, nil, "", err
 	}
-	var mapper meta.RESTMapper
-	var typer runtime.ObjectTyper
-	switch editMode {
-	case NormalEditMode:
-		mapper, typer = f.Object()
-	case EditBeforeCreateMode:
-		mapper, typer, err = f.UnstructuredObject()
-	default:
-		return nil, nil, nil, "", fmt.Errorf("Not supported edit mode %q", editMode)
-	}
+	mapper, typer, err := f.UnstructuredObject()
 	if err != nil {
 		return nil, nil, nil, "", err
 	}
 
-	// resource builder to read objects from the original file or arg invocation
-	var b *resource.Builder
-	switch editMode {
-	case NormalEditMode:
-		b = resource.NewBuilder(mapper, typer, resource.ClientMapperFunc(f.ClientForMapping), f.Decoder(true)).
-			ResourceTypeOrNameArgs(true, args...).
-			Latest()
-	case EditBeforeCreateMode:
-		b = resource.NewBuilder(mapper, typer, resource.ClientMapperFunc(f.UnstructuredClientForMapping), unstructured.UnstructuredJSONScheme)
-	default:
-		return nil, nil, nil, "", fmt.Errorf("Not supported edit mode %q", editMode)
+	b := resource.NewBuilder(mapper, typer, resource.ClientMapperFunc(f.UnstructuredClientForMapping), unstructured.UnstructuredJSONScheme)
+	if editMode == NormalEditMode {
+		// if in normal mode, also read from args, and fetch latest from the server
+		b = b.ResourceTypeOrNameArgs(true, args...).Latest()
 	}
 
 	originalResult := b.NamespaceParam(cmdNamespace).DefaultNamespace().
@@ -395,64 +386,48 @@ func getMapperAndResult(f cmdutil.Factory, args []string, options *resource.File
 	}
 
 	updatedResultGetter := func(data []byte) *resource.Result {
-		// resource builder to read objects from the original file or arg invocation
-		var b *resource.Builder
-		switch editMode {
-		case NormalEditMode:
-			b = resource.NewBuilder(mapper, typer, resource.ClientMapperFunc(f.ClientForMapping), f.Decoder(true))
-		case EditBeforeCreateMode:
-			b = resource.NewBuilder(mapper, typer, resource.ClientMapperFunc(f.UnstructuredClientForMapping), unstructured.UnstructuredJSONScheme)
-		}
-		return b.Stream(bytes.NewReader(data), "edited-file").ContinueOnError().Flatten().Do()
+		// resource builder to read objects from edited data
+		return resource.NewBuilder(mapper, typer, resource.ClientMapperFunc(f.UnstructuredClientForMapping), unstructured.UnstructuredJSONScheme).
+			Stream(bytes.NewReader(data), "edited-file").
+			ContinueOnError().
+			Flatten().
+			Do()
 	}
 
 	return mapper, originalResult, updatedResultGetter, cmdNamespace, err
 }
 
 func visitToPatch(
-	originalObj runtime.Object,
+	originalInfos []*resource.Info,
 	patchVisitor resource.Visitor,
 	mapper meta.RESTMapper,
 	encoder runtime.Encoder,
 	out, errOut io.Writer,
-	defaultVersion schema.GroupVersion,
 	results *editResults,
 	file string,
 ) error {
 	err := patchVisitor.Visit(func(info *resource.Info, incomingErr error) error {
-		currOriginalObj := originalObj
-
-		// if we're editing a list, then navigate the list to find the item that we're currently trying to edit
-		if meta.IsListType(originalObj) {
-			currOriginalObj = nil
-			editObjUID, err := meta.NewAccessor().UID(info.Object)
-			if err != nil {
-				return err
-			}
-
-			listItems, err := meta.ExtractList(originalObj)
-			if err != nil {
-				return err
-			}
-
-			// iterate through the list to find the item with the matching UID
-			for i := range listItems {
-				originalObjUID, err := meta.NewAccessor().UID(listItems[i])
-				if err != nil {
-					return err
-				}
-				if editObjUID == originalObjUID {
-					currOriginalObj = listItems[i]
-					break
-				}
-			}
-			if currOriginalObj == nil {
-				return fmt.Errorf("no original object found for %#v", info.Object)
-			}
-
+		editObjUID, err := meta.NewAccessor().UID(info.Object)
+		if err != nil {
+			return err
 		}
 
-		originalSerialization, err := runtime.Encode(encoder, currOriginalObj)
+		var originalInfo *resource.Info
+		for _, i := range originalInfos {
+			originalObjUID, err := meta.NewAccessor().UID(i.Object)
+			if err != nil {
+				return err
+			}
+			if editObjUID == originalObjUID {
+				originalInfo = i
+				break
+			}
+		}
+		if originalInfo == nil {
+			return fmt.Errorf("no original object found for %#v", info.Object)
+		}
+
+		originalSerialization, err := runtime.Encode(encoder, originalInfo.Object)
 		if err != nil {
 			return err
 		}
@@ -478,19 +453,47 @@ func visitToPatch(
 			return nil
 		}
 
-		preconditions := []mergepatch.PreconditionFunc{mergepatch.RequireKeyUnchanged("apiVersion"),
-			mergepatch.RequireKeyUnchanged("kind"), mergepatch.RequireMetadataKeyUnchanged("name")}
-		patch, err := strategicpatch.CreateTwoWayMergePatch(originalJS, editedJS, currOriginalObj, preconditions...)
-		if err != nil {
-			glog.V(4).Infof("Unable to calculate diff, no merge is possible: %v", err)
-			if mergepatch.IsPreconditionFailed(err) {
-				return fmt.Errorf("%s", "At least one of apiVersion, kind and name was changed")
-			}
-			return err
+		preconditions := []mergepatch.PreconditionFunc{
+			mergepatch.RequireKeyUnchanged("apiVersion"),
+			mergepatch.RequireKeyUnchanged("kind"),
+			mergepatch.RequireMetadataKeyUnchanged("name"),
 		}
 
-		results.version = defaultVersion
-		patched, err := resource.NewHelper(info.Client, info.Mapping).Patch(info.Namespace, info.Name, types.StrategicMergePatchType, patch)
+		// Create the versioned struct from the type defined in the mapping
+		// (which is the API version we'll be submitting the patch to)
+		versionedObject, err := api.Scheme.New(info.Mapping.GroupVersionKind)
+		var patchType types.PatchType
+		var patch []byte
+		switch {
+		case runtime.IsNotRegisteredError(err):
+			// fall back to generic JSON merge patch
+			patchType = types.MergePatchType
+			patch, err = jsonpatch.CreateMergePatch(originalJS, editedJS)
+			if err != nil {
+				glog.V(4).Infof("Unable to calculate diff, no merge is possible: %v", err)
+				return err
+			}
+			for _, precondition := range preconditions {
+				if !precondition(patch) {
+					glog.V(4).Infof("Unable to calculate diff, no merge is possible: %v", err)
+					return fmt.Errorf("%s", "At least one of apiVersion, kind and name was changed")
+				}
+			}
+		case err != nil:
+			return err
+		case err == nil:
+			patchType = types.StrategicMergePatchType
+			patch, err = strategicpatch.CreateTwoWayMergePatch(originalJS, editedJS, versionedObject, preconditions...)
+			if err != nil {
+				glog.V(4).Infof("Unable to calculate diff, no merge is possible: %v", err)
+				if mergepatch.IsPreconditionFailed(err) {
+					return fmt.Errorf("%s", "At least one of apiVersion, kind and name was changed")
+				}
+				return err
+			}
+		}
+
+		patched, err := resource.NewHelper(info.Client, info.Mapping).Patch(info.Namespace, info.Name, patchType, patch)
 		if err != nil {
 			fmt.Fprintln(errOut, results.addError(err, info))
 			return nil
@@ -502,9 +505,8 @@ func visitToPatch(
 	return err
 }
 
-func visitToCreate(createVisitor resource.Visitor, mapper meta.RESTMapper, out, errOut io.Writer, defaultVersion schema.GroupVersion, results *editResults, file string) error {
+func visitToCreate(createVisitor resource.Visitor, mapper meta.RESTMapper, out, errOut io.Writer, results *editResults, file string) error {
 	err := createVisitor.Visit(func(info *resource.Info, incomingErr error) error {
-		results.version = defaultVersion
 		if err := createAndRefresh(info); err != nil {
 			return err
 		}
