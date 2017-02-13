@@ -2700,7 +2700,7 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 						},
 						"scheme": {
 							SchemaProps: spec.SchemaProps{
-								Description: "Scheme to use for connecting to the host. Defaults to HTTP.",
+								Description: "Scheme to use for connecting to the host. Defaults to HTTP.  For HTTPS, be aware that the probe will by design not attempt certificate path validation.",
 								Type:        []string{"string"},
 								Format:      "",
 							},

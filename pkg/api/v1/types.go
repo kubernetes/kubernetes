@@ -1308,7 +1308,7 @@ type HTTPGetAction struct {
 	// +optional
 	Host string `json:"host,omitempty" protobuf:"bytes,3,opt,name=host"`
 	// Scheme to use for connecting to the host.
-	// Defaults to HTTP.
+	// Defaults to HTTP.  For HTTPS, be aware that the probe will by design not attempt certificate path validation.
 	// +optional
 	Scheme URIScheme `json:"scheme,omitempty" protobuf:"bytes,4,opt,name=scheme,casttype=URIScheme"`
 	// Custom headers to set in the request. HTTP allows repeated headers.
