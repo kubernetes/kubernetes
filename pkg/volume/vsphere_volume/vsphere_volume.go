@@ -152,7 +152,7 @@ func (plugin *vsphereVolumePlugin) ConstructVolumeSpec(volumeName, mountPath str
 // Abstract interface to disk operations.
 type vdManager interface {
 	// Creates a volume
-	CreateVolume(provisioner *vsphereVolumeProvisioner) (vmDiskPath string, volumeSizeGB int, err error)
+	CreateVolume(provisioner *vsphereVolumeProvisioner) (vmDiskPath string, volumeSizeGB int, fstype string, err error)
 	// Deletes a volume
 	DeleteVolume(deleter *vsphereVolumeDeleter) error
 }
@@ -343,9 +343,13 @@ func (plugin *vsphereVolumePlugin) newProvisionerInternal(options volume.VolumeO
 }
 
 func (v *vsphereVolumeProvisioner) Provision() (*v1.PersistentVolume, error) {
-	vmDiskPath, sizeKB, err := v.manager.CreateVolume(v)
+	vmDiskPath, sizeKB, fstype, err := v.manager.CreateVolume(v)
 	if err != nil {
 		return nil, err
+	}
+
+	if fstype == "" {
+		fstype = "ext4"
 	}
 
 	pv := &v1.PersistentVolume{
@@ -365,7 +369,7 @@ func (v *vsphereVolumeProvisioner) Provision() (*v1.PersistentVolume, error) {
 			PersistentVolumeSource: v1.PersistentVolumeSource{
 				VsphereVolume: &v1.VsphereVirtualDiskVolumeSource{
 					VolumePath: vmDiskPath,
-					FSType:     "ext4",
+					FSType:     fstype,
 				},
 			},
 		},
