@@ -40,20 +40,22 @@ func NewShortcutExpander(delegate meta.RESTMapper, client discovery.DiscoveryInt
 	return ShortcutExpander{All: UserResources, RESTMapper: delegate, discoveryClient: client}
 }
 
-func (e ShortcutExpander) getAll() []schema.GroupResource {
+func (e ShortcutExpander) getAll() ([]schema.GroupResource, []schema.GroupResource) {
+	availableServerResources := []schema.GroupResource{}
+
 	if e.discoveryClient == nil {
-		return e.All
+		return e.All, availableServerResources
 	}
 
 	// Check if we have access to server resources
 	apiResources, err := e.discoveryClient.ServerResources()
 	if err != nil {
-		return e.All
+		return e.All, availableServerResources
 	}
 
 	availableResources, err := discovery.GroupVersionResources(apiResources)
 	if err != nil {
-		return e.All
+		return e.All, availableServerResources
 	}
 
 	availableAll := []schema.GroupResource{}
@@ -67,7 +69,19 @@ func (e ShortcutExpander) getAll() []schema.GroupResource {
 		}
 	}
 
-	return availableAll
+	// populate all "discovered" resources from the server
+	for availableResource := range availableResources {
+		r := availableResource.GroupResource()
+
+		rSplit := strings.Split(r.Resource, "/")
+		if len(rSplit) > 1 {
+			continue
+		}
+
+		availableServerResources = append(availableServerResources, availableResource.GroupResource())
+	}
+
+	return availableAll, availableServerResources
 }
 
 func (e ShortcutExpander) KindFor(resource schema.GroupVersionResource) (schema.GroupVersionKind, error) {
@@ -117,9 +131,18 @@ var UserResources = []schema.GroupResource{
 func (e ShortcutExpander) AliasesForResource(resource string) ([]string, bool) {
 	if strings.ToLower(resource) == "all" {
 		var resources []schema.GroupResource
-		if resources = e.getAll(); len(resources) == 0 {
+		var serverResources []schema.GroupResource
+		if resources, serverResources = e.getAll(); len(resources) == 0 {
+			resources = serverResources
+		}
+
+		// used as a last resort, if none of the UserResources are defined in
+		// the server, and the server returned zero available resources, fallback
+		// to our client-defined list of UserResources
+		if len(resources) == 0 {
 			resources = UserResources
 		}
+
 		aliases := []string{}
 		for _, r := range resources {
 			aliases = append(aliases, r.Resource)
