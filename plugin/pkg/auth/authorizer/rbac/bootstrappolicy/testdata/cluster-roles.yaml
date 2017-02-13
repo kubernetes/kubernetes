@@ -444,7 +444,7 @@ items:
     verbs:
     - update
   - apiGroups:
-    - '*'
+    - ""
     resources:
     - namespaces
     - nodes
@@ -493,6 +493,13 @@ items:
     - autoscaling
     resources:
     - horizontalpodautoscalers
+    verbs:
+    - list
+    - watch
+  - apiGroups:
+    - certificates.k8s.io
+    resources:
+    - certificatesigningrequests
     verbs:
     - list
     - watch
