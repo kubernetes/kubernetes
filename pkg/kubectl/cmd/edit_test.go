@@ -205,22 +205,8 @@ func TestEdit(t *testing.T) {
 			t.Fatalf("%s: %v", name, err)
 		}
 
-		f, tf, _, ns := cmdtesting.NewAPIFactory()
+		f, tf, _, _ := cmdtesting.NewAPIFactory()
 		tf.Printer = &testPrinter{}
-		tf.ClientForMappingFunc = func(mapping *meta.RESTMapping) (resource.RESTClient, error) {
-			versionedAPIPath := ""
-			if mapping.GroupVersionKind.Group == "" {
-				versionedAPIPath = "/api/" + mapping.GroupVersionKind.Version
-			} else {
-				versionedAPIPath = "/apis/" + mapping.GroupVersionKind.Group + "/" + mapping.GroupVersionKind.Version
-			}
-			return &fake.RESTClient{
-				APIRegistry:          api.Registry,
-				VersionedAPIPath:     versionedAPIPath,
-				NegotiatedSerializer: ns, //unstructuredSerializer,
-				Client:               fake.CreateHTTPClient(reqResp),
-			}, nil
-		}
 		tf.UnstructuredClientForMappingFunc = func(mapping *meta.RESTMapping) (resource.RESTClient, error) {
 			versionedAPIPath := ""
 			if mapping.GroupVersionKind.Group == "" {

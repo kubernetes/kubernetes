@@ -719,5 +719,38 @@ func testDynamicResources() []*discovery.APIGroupResources {
 				},
 			},
 		},
+		{
+			Group: metav1.APIGroup{
+				Name: "storage.k8s.io",
+				Versions: []metav1.GroupVersionForDiscovery{
+					{Version: "v1beta1"},
+					{Version: "v0"},
+				},
+				PreferredVersion: metav1.GroupVersionForDiscovery{Version: "v1beta1"},
+			},
+			VersionedResources: map[string][]metav1.APIResource{
+				"v1beta1": {
+					{Name: "storageclasses", Namespaced: false, Kind: "StorageClass"},
+				},
+				// bogus version of a known group/version/resource to make sure kubectl falls back to generic object mode
+				"v0": {
+					{Name: "storageclasses", Namespaced: false, Kind: "StorageClass"},
+				},
+			},
+		},
+		{
+			Group: metav1.APIGroup{
+				Name: "company.com",
+				Versions: []metav1.GroupVersionForDiscovery{
+					{Version: "v1"},
+				},
+				PreferredVersion: metav1.GroupVersionForDiscovery{Version: "v1"},
+			},
+			VersionedResources: map[string][]metav1.APIResource{
+				"v1": {
+					{Name: "bars", Namespaced: true, Kind: "Bar"},
+				},
+			},
+		},
 	}
 }
