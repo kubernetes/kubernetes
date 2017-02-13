@@ -367,6 +367,8 @@ func NewCluster(name string, readyStatus apiv1.ConditionStatus) *federationapi.C
 			Conditions: []federationapi.ClusterCondition{
 				{Type: federationapi.ClusterReady, Status: readyStatus},
 			},
+			Zones:  []string{"foozone"},
+			Region: "fooregion",
 		},
 	}
 }
