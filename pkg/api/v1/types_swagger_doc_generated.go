@@ -209,6 +209,15 @@ func (ConfigMapList) SwaggerDoc() map[string]string {
 	return map_ConfigMapList
 }
 
+var map_ConfigMapProjection = map[string]string{
+	"items":    "If unspecified, each key-value pair in the Data field of the referenced ConfigMap will be projected into the volume as a file whose name is the key and content is the value. If specified, the listed keys will be projected into the specified paths, and unlisted keys will not be present. If a key is specified which is not present in the ConfigMap, the volume setup will error unless it is marked optional. Paths must be relative and may not contain the '..' path or start with '..'.",
+	"optional": "Specify whether the ConfigMap or it's keys must be defined",
+}
+
+func (ConfigMapProjection) SwaggerDoc() map[string]string {
+	return map_ConfigMapProjection
+}
+
 var map_ConfigMapVolumeSource = map[string]string{
 	"":            "Adapts a ConfigMap into a volume.\n\nThe contents of the target ConfigMap's Data field will be presented in a volume as files using the keys in the Data field as the file names, unless the items element is populated with specific mappings of keys to paths. ConfigMap volumes support ownership management and SELinux relabeling.",
 	"items":       "If unspecified, each key-value pair in the Data field of the referenced ConfigMap will be projected into the volume as a file whose name is the key and content is the value. If specified, the listed keys will be projected into the specified paths, and unlisted keys will not be present. If a key is specified which is not present in the ConfigMap, the volume setup will error unless it is marked optional. Paths must be relative and may not contain the '..' path or start with '..'.",
@@ -350,6 +359,14 @@ var map_DeleteOptions = map[string]string{
 
 func (DeleteOptions) SwaggerDoc() map[string]string {
 	return map_DeleteOptions
+}
+
+var map_DownwardAPIProjection = map[string]string{
+	"items": "Items is a list of DownwardAPIVolume file",
+}
+
+func (DownwardAPIProjection) SwaggerDoc() map[string]string {
+	return map_DownwardAPIProjection
 }
 
 var map_DownwardAPIVolumeFile = map[string]string{
@@ -1633,6 +1650,15 @@ func (SecretList) SwaggerDoc() map[string]string {
 	return map_SecretList
 }
 
+var map_SecretProjection = map[string]string{
+	"items":    "If unspecified, each key-value pair in the Data field of the referenced Secret will be projected into the volume as a file whose name is the key and content is the value. If specified, the listed keys will be projected into the specified paths, and unlisted keys will not be present. If a key is specified which is not present in the Secret, the volume setup will error unless it is marked optional. Paths must be relative and may not contain the '..' path or start with '..'.",
+	"optional": "Specify whether the Secret or its key must be defined",
+}
+
+func (SecretProjection) SwaggerDoc() map[string]string {
+	return map_SecretProjection
+}
+
 var map_SecretVolumeSource = map[string]string{
 	"":            "Adapts a Secret into a volume.\n\nThe contents of the target Secret's Data field will be presented in a volume as files using the keys in the Data field as the file names. Secret volumes support ownership management and SELinux relabeling.",
 	"secretName":  "Name of the secret in the pod's namespace to use. More info: http://kubernetes.io/docs/user-guide/volumes#secrets",
@@ -1839,6 +1865,7 @@ var map_VolumeSource = map[string]string{
 	"quobyte":              "Quobyte represents a Quobyte mount on the host that shares a pod's lifetime",
 	"azureDisk":            "AzureDisk represents an Azure Data Disk mount on the host and bind mount to the pod.",
 	"photonPersistentDisk": "PhotonPersistentDisk represents a PhotonController persistent disk attached and mounted on kubelets host machine",
+	"projected":            "Items for all in one resources secrets, configmaps, and downward API",
 }
 
 func (VolumeSource) SwaggerDoc() map[string]string {

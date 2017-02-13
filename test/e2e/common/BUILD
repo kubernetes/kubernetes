@@ -23,6 +23,7 @@ go_library(
         "networking.go",
         "pods.go",
         "privileged.go",
+        "projected.go",
         "secrets.go",
         "sysctl.go",
         "util.go",
