@@ -27,11 +27,15 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/kubernetes/federation/apis/federation/v1beta1"
+	fakefedclientset "k8s.io/kubernetes/federation/client/clientset_generated/federation_clientset/fake"
 	"k8s.io/kubernetes/federation/pkg/dnsprovider/providers/google/clouddns" // Only for unit testing purposes.
+	. "k8s.io/kubernetes/federation/pkg/federation-controller/util/test"
 	"k8s.io/kubernetes/pkg/api/v1"
 )
 
 func TestServiceController_ensureDnsRecords(t *testing.T) {
+	clusterName := "testcluster"
+
 	tests := []struct {
 		name          string
 		service       v1.Service
@@ -44,6 +48,10 @@ func TestServiceController_ensureDnsRecords(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "servicename",
 					Namespace: "servicenamespace",
+					Annotations: map[string]string{
+						FederatedServiceIngressAnnotation: NewFederatedServiceIngress().
+							AddEndpoints(clusterName, []string{"198.51.100.1"}).
+							String()},
 				},
 			},
 			serviceStatus: buildServiceStatus([][]string{{"198.51.100.1", ""}}),
@@ -92,7 +100,10 @@ func TestServiceController_ensureDnsRecords(t *testing.T) {
 		if !ok {
 			t.Error("Unable to fetch zones")
 		}
+		fakeClient := &fakefedclientset.Clientset{}
+		RegisterFakeClusterGet(&fakeClient.Fake, &v1beta1.ClusterList{Items: []v1beta1.Cluster{*NewCluster(clusterName, v1.ConditionTrue)}})
 		serviceController := ServiceController{
+			federationClient: fakeClient,
 			dns:              fakedns,
 			dnsZones:         fakednsZones,
 			serviceDnsSuffix: "federation.example.com",
@@ -105,8 +116,6 @@ func TestServiceController_ensureDnsRecords(t *testing.T) {
 			},
 			knownClusterSet: make(sets.String),
 		}
-
-		clusterName := "testcluster"
 
 		serviceController.clusterCache.clientMap[clusterName] = &clusterCache{
 			cluster: &v1beta1.Cluster{
@@ -127,7 +136,7 @@ func TestServiceController_ensureDnsRecords(t *testing.T) {
 			cachedService.serviceStatusMap[clusterName] = test.serviceStatus
 		}
 
-		err := serviceController.ensureDnsRecords(clusterName, cachedService)
+		err := serviceController.ensureDnsRecords(clusterName, &test.service)
 		if err != nil {
 			t.Errorf("Test failed for %s, unexpected error %v", test.name, err)
 		}
