@@ -112,6 +112,51 @@ func (attacher *awsElasticBlockStoreAttacher) VolumesAreAttached(specs []*volume
 	return volumesAttachedCheck, nil
 }
 
+func (attacher *awsElasticBlockStoreAttacher) BulkVerifyVolumes(volumesByNode map[types.NodeName][]*volume.Spec) (map[types.NodeName]map[*volume.Spec]bool, error) {
+	volumesAttachedCheck := make(map[types.NodeName]map[*volume.Spec]bool)
+	diskNamesByNode := make(map[types.NodeName][]aws.KubernetesVolumeID)
+	volumeSpecMap := make(map[aws.KubernetesVolumeID]*volume.Spec)
+
+	for nodeName, volumeSpecs := range volumesByNode {
+		for _, volumeSpec := range volumeSpecs {
+			volumeSource, _, err := getVolumeSource(volumeSpec)
+
+			if err != nil {
+				glog.Errorf("Error getting volume (%q) source : %v", volumeSpec.Name(), err)
+				continue
+			}
+
+			name := aws.KubernetesVolumeID(volumeSource.VolumeID)
+			diskNamesByNode[nodeName] = append(diskNamesByNode[nodeName], name)
+
+			nodeDisk, nodeDiskExists := volumesAttachedCheck[nodeName]
+
+			if !nodeDiskExists {
+				nodeDisk = make(map[*volume.Spec]bool)
+			}
+			nodeDisk[volumeSpec] = true
+			volumeSpecMap[name] = volumeSpec
+		}
+	}
+	attachedResult, err := attacher.awsVolumes.CheckClusterDisks(diskNamesByNode)
+
+	if err != nil {
+		glog.Errorf("Error checking if volumes are attached to nodes err = %v", err)
+		return volumesAttachedCheck, err
+	}
+
+	for nodeName, nodeDisks := range attachedResult {
+		for diskName, attached := range nodeDisks {
+			if !attached {
+				spec := volumeSpecMap[diskName]
+				setNodeDisk(volumesAttachedCheck, spec, nodeName, false)
+			}
+		}
+	}
+
+	return volumesAttachedCheck, nil
+}
+
 func (attacher *awsElasticBlockStoreAttacher) WaitForAttach(spec *volume.Spec, devicePath string, timeout time.Duration) (string, error) {
 	volumeSource, _, err := getVolumeSource(spec)
 	if err != nil {
@@ -247,4 +292,19 @@ func (detacher *awsElasticBlockStoreDetacher) Detach(deviceMountPath string, nod
 
 func (detacher *awsElasticBlockStoreDetacher) UnmountDevice(deviceMountPath string) error {
 	return volumeutil.UnmountPath(deviceMountPath, detacher.mounter)
+}
+
+func setNodeDisk(
+	nodeDiskMap map[types.NodeName]map[*volume.Spec]bool,
+	volumeSpec *volume.Spec,
+	nodeName types.NodeName,
+	check bool) {
+
+	volumeMap, volumeMapExists := nodeDiskMap[nodeName]
+
+	if !volumeMapExists {
+		volumeMap = make(map[*volume.Spec]bool)
+	}
+	volumeMap[volumeSpec] = check
+	nodeDiskMap[nodeName] = volumeMap
 }

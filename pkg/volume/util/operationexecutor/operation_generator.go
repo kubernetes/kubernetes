@@ -88,6 +88,13 @@ type OperationGenerator interface {
 
 	// Generates the function needed to check if the attach_detach controller has attached the volume plugin
 	GenerateVerifyControllerAttachedVolumeFunc(volumeToMount VolumeToMount, nodeName types.NodeName, actualStateOfWorld ActualStateOfWorldAttacherUpdater) (func() error, error)
+
+	// GetVolumePluginMgr returns volume plugin manager
+	GetVolumePluginMgr() *volume.VolumePluginMgr
+
+	GenerateBulkVolumeVerifyFunc(
+		map[string]map[types.NodeName][]*volume.Spec,
+		map[*volume.Spec]v1.UniqueVolumeName, ActualStateOfWorldAttacherUpdater) (func() error, error)
 }
 
 func (og *operationGenerator) GenerateVolumesAreAttachedFunc(
@@ -167,6 +174,66 @@ func (og *operationGenerator) GenerateVolumesAreAttachedFunc(
 	}, nil
 }
 
+func (og *operationGenerator) GenerateBulkVolumeVerifyFunc(
+	nodeVolumeMaps map[string]map[types.NodeName][]*volume.Spec,
+	volumeSpecMap map[*volume.Spec]v1.UniqueVolumeName,
+	actualStateOfWorld ActualStateOfWorldAttacherUpdater) (func() error, error) {
+
+	return func() error {
+		for pluginName, pluginNodeVolumes := range nodeVolumeMaps {
+			attachableVolumePlugin, err :=
+				og.volumePluginMgr.FindAttachablePluginByName(pluginName)
+			if err != nil || attachableVolumePlugin == nil {
+				glog.Errorf(
+					"BulkVerifyVolume.FindAttachablePluginBySpec failed for plugin %q with: %v",
+					pluginName,
+					err)
+				continue
+			}
+
+			volumeAttacher, newAttacherErr := attachableVolumePlugin.NewAttacher()
+
+			if newAttacherErr != nil {
+				glog.Errorf(
+					"BulkVerifyVolumes failed for getting plugin %q with: %v",
+					attachableVolumePlugin,
+					newAttacherErr)
+				continue
+			}
+			bulkVolumeVerifier, ok := volumeAttacher.(volume.BulkVolumeVerifier)
+
+			if !ok {
+				glog.Errorf("BulkVerifyVolume failed to type assert attacher %q", bulkVolumeVerifier)
+				continue
+			}
+
+			attached, bulkAttachErr := bulkVolumeVerifier.BulkVerifyVolumes(pluginNodeVolumes)
+			if bulkAttachErr != nil {
+				glog.Errorf("Error checking volumes are attached with %v", bulkAttachErr)
+				continue
+			}
+
+			for nodeName, volumeSpecs := range pluginNodeVolumes {
+				for _, volumeSpec := range volumeSpecs {
+					nodeVolumeSpecs, nodeChecked := attached[nodeName]
+
+					if !nodeChecked {
+						actualStateOfWorld.MarkVolumeAsDetached(volumeSpecMap[volumeSpec], nodeName)
+					}
+
+					check := nodeVolumeSpecs[volumeSpec]
+
+					if !check {
+						actualStateOfWorld.MarkVolumeAsDetached(volumeSpecMap[volumeSpec], nodeName)
+					}
+				}
+			}
+
+		}
+		return nil
+	}, nil
+}
+
 func (og *operationGenerator) GenerateAttachVolumeFunc(
 	volumeToAttach VolumeToAttach,
 	actualStateOfWorld ActualStateOfWorldAttacherUpdater) (func() error, error) {
@@ -231,6 +298,10 @@ func (og *operationGenerator) GenerateAttachVolumeFunc(
 
 		return nil
 	}, nil
+}
+
+func (og *operationGenerator) GetVolumePluginMgr() *volume.VolumePluginMgr {
+	return og.volumePluginMgr
 }
 
 func (og *operationGenerator) GenerateDetachVolumeFunc(
