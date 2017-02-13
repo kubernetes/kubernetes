@@ -81,7 +81,8 @@ func TestAPIsDelegation(t *testing.T) {
 			continue
 		}
 		if resp.StatusCode != http.StatusOK {
-			httputil.DumpResponse(resp, true)
+			bytes, _ := httputil.DumpResponse(resp, true)
+			t.Log(string(bytes))
 			t.Errorf("%s: %v", path, err)
 			continue
 		}

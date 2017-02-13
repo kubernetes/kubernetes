@@ -27,7 +27,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
-	"k8s.io/kubernetes/pkg/controller"
 
 	"k8s.io/kubernetes/cmd/kube-aggregator/pkg/apis/apiregistration"
 	informers "k8s.io/kubernetes/cmd/kube-aggregator/pkg/client/informers/internalversion/apiregistration/internalversion"
@@ -122,7 +121,7 @@ func (c *APIServiceRegistrationController) processNextWorkItem() bool {
 }
 
 func (c *APIServiceRegistrationController) enqueue(obj *apiregistration.APIService) {
-	key, err := controller.KeyFunc(obj)
+	key, err := cache.DeletionHandlingMetaNamespaceKeyFunc(obj)
 	if err != nil {
 		glog.Errorf("Couldn't get key for object %#v: %v", obj, err)
 		return
