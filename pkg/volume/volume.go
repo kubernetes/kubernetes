@@ -187,6 +187,13 @@ type Attacher interface {
 	MountDevice(spec *Spec, devicePath string, deviceMountPath string) error
 }
 
+type BulkVolumeVerifier interface {
+	// BulkVerifyVolumes checks whether the list of volumes still attached to the
+	// the clusters in the node. It returns a map which maps from the volume spec to the checking result.
+	// If an error is occured during checking, the error will be returned
+	BulkVerifyVolumes(volumesByNode map[types.NodeName][]*Spec) (map[types.NodeName]map[*Spec]bool, error)
+}
+
 // Detacher can detach a volume from a node.
 type Detacher interface {
 	// Detach the given device from the node with the given Name.
