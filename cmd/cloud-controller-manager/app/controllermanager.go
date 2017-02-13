@@ -229,8 +229,8 @@ func StartControllers(s *options.CloudControllerManagerServer, kubeconfig *restc
 		if routes, ok := cloud.Routes(); !ok {
 			glog.Warning("configure-cloud-routes is set, but cloud provider does not support routes. Will not configure cloud provider routes.")
 		} else {
-			routeController := routecontroller.New(routes, client("route-controller"), s.ClusterName, clusterCIDR)
-			routeController.Run(s.RouteReconciliationPeriod.Duration)
+			routeController := routecontroller.New(routes, client("route-controller"), newSharedInformers.Core().V1().Nodes(), s.ClusterName, clusterCIDR)
+			routeController.Run(stop, s.RouteReconciliationPeriod.Duration)
 			time.Sleep(wait.Jitter(s.ControllerStartInterval.Duration, ControllerStartJitter))
 		}
 	} else {
