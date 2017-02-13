@@ -344,6 +344,14 @@ items:
     - selfsubjectaccessreviews
     verbs:
     - create
+- apiVersion: rbac.authorization.k8s.io/v1beta1
+  kind: ClusterRole
+  metadata:
+    creationTimestamp: null
+    labels:
+      kubernetes.io/bootstrapping: rbac-defaults
+    name: system:cluster-facilities
+  rules:
   - apiGroups:
     - storage.k8s.io
     resources:

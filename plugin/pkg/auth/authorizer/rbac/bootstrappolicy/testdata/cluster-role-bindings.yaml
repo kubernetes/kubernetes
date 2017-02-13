@@ -36,6 +36,22 @@ items:
     creationTimestamp: null
     labels:
       kubernetes.io/bootstrapping: rbac-defaults
+    name: system:cluster-facilities
+  roleRef:
+    apiGroup: rbac.authorization.k8s.io
+    kind: ClusterRole
+    name: system:cluster-facilities
+  subjects:
+  - kind: Group
+    name: system:authenticated
+  - kind: Group
+    name: system:unauthenticated
+- apiVersion: rbac.authorization.k8s.io/v1beta1
+  kind: ClusterRoleBinding
+  metadata:
+    creationTimestamp: null
+    labels:
+      kubernetes.io/bootstrapping: rbac-defaults
     name: system:discovery
   roleRef:
     apiGroup: rbac.authorization.k8s.io
