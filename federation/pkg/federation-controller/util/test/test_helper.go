@@ -177,6 +177,14 @@ func RegisterFakeList(resource string, client *core.Fake, obj runtime.Object) {
 	})
 }
 
+// RegisterFakeGet registers a get response for the specified resource inside the given fake client.
+// The passed value will be returned with every get call.
+func RegisterFakeGet(resource string, client *core.Fake, obj runtime.Object) {
+	client.AddReactor("get", resource, func(action core.Action) (bool, runtime.Object, error) {
+		return true, obj, nil
+	})
+}
+
 // RegisterFakeCopyOnCreate registers a reactor in the given fake client that passes
 // all created objects to the given watcher and also copies them to a channel for
 // in-test inspection.
@@ -309,6 +317,8 @@ func NewCluster(name string, readyStatus apiv1.ConditionStatus) *federationapi.C
 			Conditions: []federationapi.ClusterCondition{
 				{Type: federationapi.ClusterReady, Status: readyStatus},
 			},
+			Zones:  []string{"foozone"},
+			Region: "fooregion",
 		},
 	}
 }

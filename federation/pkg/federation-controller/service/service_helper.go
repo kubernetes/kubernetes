@@ -85,6 +85,7 @@ func (cc *clusterClientCache) syncService(key, clusterName string, clusterCache 
 		// if serviceCache does not exists, that means the service is not created by federation, we should skip it
 		return nil
 	}
+	var service *v1.Service
 	serviceInterface, exists, err := clusterCache.serviceStore.Indexer.GetByKey(key)
 	if err != nil {
 		glog.Errorf("Did not successfully get %v from store: %v, will retry later", key, err)
@@ -93,7 +94,7 @@ func (cc *clusterClientCache) syncService(key, clusterName string, clusterCache 
 	}
 	var needUpdate, isDeletion bool
 	if exists {
-		service, ok := serviceInterface.(*v1.Service)
+		service, ok = serviceInterface.(*v1.Service)
 		if ok {
 			glog.V(4).Infof("Found service for federation service %s/%s from cluster %s", service.Namespace, service.Name, clusterName)
 			needUpdate = cc.processServiceUpdate(cachedService, service, clusterName)
@@ -114,7 +115,7 @@ func (cc *clusterClientCache) syncService(key, clusterName string, clusterCache 
 
 	if needUpdate {
 		for i := 0; i < clientRetryCount; i++ {
-			err := sc.ensureDnsRecords(clusterName, cachedService)
+			err := sc.ensureDnsRecords(clusterName, service)
 			if err == nil {
 				break
 			}
