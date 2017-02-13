@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package kubeapiserver
+package storage
 
 import (
 	"fmt"
@@ -22,7 +22,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apiserver/pkg/registry/generic"
 	genericregistry "k8s.io/apiserver/pkg/registry/generic/registry"
-	genericapiserver "k8s.io/apiserver/pkg/server"
 )
 
 // RESTOptionsFactory is a RESTOptionsGetter for kube apiservers since they do complicated stuff
@@ -30,13 +29,13 @@ type RESTOptionsFactory struct {
 	DeleteCollectionWorkers int
 	EnableGarbageCollection bool
 	EnableWatchCache        bool
-	StorageFactory          genericapiserver.StorageFactory
+	StorageFactory          StorageFactory
 }
 
 func (f *RESTOptionsFactory) GetRESTOptions(resource schema.GroupResource) (generic.RESTOptions, error) {
 	storageConfig, err := f.StorageFactory.NewConfig(resource)
 	if err != nil {
-		return generic.RESTOptions{}, fmt.Errorf("Unable to find storage destination for %v, due to %v", resource, err.Error())
+		return generic.RESTOptions{}, fmt.Errorf("unable to find storage destination for %v, due to %v", resource, err.Error())
 	}
 
 	ret := generic.RESTOptions{

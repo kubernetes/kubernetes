@@ -14,20 +14,17 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package server
+package storage
 
 import (
-	"fmt"
-	"mime"
 	"strings"
+
+	"github.com/golang/glog"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/runtime/serializer/recognizer"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/storage/storagebackend"
-
-	"github.com/golang/glog"
 )
 
 // StorageFactory is the interface to locate the storage for a given GroupResource
@@ -46,11 +43,11 @@ type StorageFactory interface {
 	Backends() []string
 }
 
-// DefaultStorageFactory takes a GroupResource and returns back its storage interface.  This result includes:
+// ConfigurableStorageFactory takes a GroupResource and returns back its storage interface.  This result includes:
 // 1. Merged etcd config, including: auth, server locations, prefixes
 // 2. Resource encodings for storage: group,version,kind to store as
 // 3. Cohabitating default: some resources like hpa are exposed through multiple APIs.  They must agree on 1 and 2
-type DefaultStorageFactory struct {
+type ConfigurableStorageFactory struct {
 	// StorageConfig describes how to create a storage backend in general.
 	// Its authentication information will be used for every storage.Interface returned.
 	StorageConfig storagebackend.Config
@@ -75,18 +72,6 @@ type DefaultStorageFactory struct {
 
 	// newStorageCodecFn exists to be overwritten for unit testing.
 	newStorageCodecFn func(opts StorageCodecConfig) (codec runtime.Codec, err error)
-}
-
-// StorageCodecConfig are the arguments passed to newStorageCodecFn
-type StorageCodecConfig struct {
-	StorageMediaType  string
-	StorageSerializer runtime.StorageSerializer
-	StorageVersion    schema.GroupVersion
-	MemoryVersion     schema.GroupVersion
-	Config            storagebackend.Config
-
-	EncoderDecoratorFn func(runtime.Encoder) runtime.Encoder
-	DecoderDecoratorFn func([]runtime.Decoder) []runtime.Decoder
 }
 
 type groupResourceOverrides struct {
@@ -137,7 +122,7 @@ func (o groupResourceOverrides) Apply(config *storagebackend.Config, options *St
 	}
 }
 
-var _ StorageFactory = &DefaultStorageFactory{}
+var _ StorageFactory = &ConfigurableStorageFactory{}
 
 const AllResources = "*"
 
@@ -153,11 +138,11 @@ var specialDefaultResourcePrefixes = map[schema.GroupResource]string{
 	schema.GroupResource{Group: "extensions", Resource: "podsecuritypolicies"}: "podsecuritypolicy",
 }
 
-func NewDefaultStorageFactory(config storagebackend.Config, defaultMediaType string, defaultSerializer runtime.StorageSerializer, resourceEncodingConfig ResourceEncodingConfig, resourceConfig APIResourceConfigSource) *DefaultStorageFactory {
+func NewConfigurableStorageFactory(config storagebackend.Config, defaultMediaType string, defaultSerializer runtime.StorageSerializer, resourceEncodingConfig ResourceEncodingConfig, resourceConfig APIResourceConfigSource) *ConfigurableStorageFactory {
 	if len(defaultMediaType) == 0 {
 		defaultMediaType = runtime.ContentTypeJSON
 	}
-	return &DefaultStorageFactory{
+	return &ConfigurableStorageFactory{
 		StorageConfig:           config,
 		Overrides:               map[schema.GroupResource]groupResourceOverrides{},
 		DefaultMediaType:        defaultMediaType,
@@ -170,26 +155,26 @@ func NewDefaultStorageFactory(config storagebackend.Config, defaultMediaType str
 	}
 }
 
-func (s *DefaultStorageFactory) SetEtcdLocation(groupResource schema.GroupResource, location []string) {
+func (s *ConfigurableStorageFactory) SetEtcdLocation(groupResource schema.GroupResource, location []string) {
 	overrides := s.Overrides[groupResource]
 	overrides.etcdLocation = location
 	s.Overrides[groupResource] = overrides
 }
 
-func (s *DefaultStorageFactory) SetEtcdPrefix(groupResource schema.GroupResource, prefix string) {
+func (s *ConfigurableStorageFactory) SetEtcdPrefix(groupResource schema.GroupResource, prefix string) {
 	overrides := s.Overrides[groupResource]
 	overrides.etcdPrefix = prefix
 	s.Overrides[groupResource] = overrides
 }
 
 // SetResourceEtcdPrefix sets the prefix for a resource, but not the base-dir.  You'll end up in `etcdPrefix/resourceEtcdPrefix`.
-func (s *DefaultStorageFactory) SetResourceEtcdPrefix(groupResource schema.GroupResource, prefix string) {
+func (s *ConfigurableStorageFactory) SetResourceEtcdPrefix(groupResource schema.GroupResource, prefix string) {
 	overrides := s.Overrides[groupResource]
 	overrides.etcdResourcePrefix = prefix
 	s.Overrides[groupResource] = overrides
 }
 
-func (s *DefaultStorageFactory) SetSerializer(groupResource schema.GroupResource, mediaType string, serializer runtime.StorageSerializer) {
+func (s *ConfigurableStorageFactory) SetSerializer(groupResource schema.GroupResource, mediaType string, serializer runtime.StorageSerializer) {
 	overrides := s.Overrides[groupResource]
 	overrides.mediaType = mediaType
 	overrides.serializer = serializer
@@ -197,7 +182,7 @@ func (s *DefaultStorageFactory) SetSerializer(groupResource schema.GroupResource
 }
 
 // AddCohabitatingResources links resources together the order of the slice matters!  its the priority order of lookup for finding a storage location
-func (s *DefaultStorageFactory) AddCohabitatingResources(groupResources ...schema.GroupResource) {
+func (s *ConfigurableStorageFactory) AddCohabitatingResources(groupResources ...schema.GroupResource) {
 	for _, groupResource := range groupResources {
 		overrides := s.Overrides[groupResource]
 		overrides.cohabitatingResources = groupResources
@@ -205,7 +190,7 @@ func (s *DefaultStorageFactory) AddCohabitatingResources(groupResources ...schem
 	}
 }
 
-func (s *DefaultStorageFactory) AddSerializationChains(encoderDecoratorFn func(runtime.Encoder) runtime.Encoder, decoderDecoratorFn func([]runtime.Decoder) []runtime.Decoder, groupResources ...schema.GroupResource) {
+func (s *ConfigurableStorageFactory) AddSerializationChains(encoderDecoratorFn func(runtime.Encoder) runtime.Encoder, decoderDecoratorFn func([]runtime.Decoder) []runtime.Decoder, groupResources ...schema.GroupResource) {
 	for _, groupResource := range groupResources {
 		overrides := s.Overrides[groupResource]
 		overrides.encoderDecoratorFn = encoderDecoratorFn
@@ -218,7 +203,7 @@ func getAllResourcesAlias(resource schema.GroupResource) schema.GroupResource {
 	return schema.GroupResource{Group: resource.Group, Resource: AllResources}
 }
 
-func (s *DefaultStorageFactory) getStorageGroupResource(groupResource schema.GroupResource) schema.GroupResource {
+func (s *ConfigurableStorageFactory) getStorageGroupResource(groupResource schema.GroupResource) schema.GroupResource {
 	for _, potentialStorageResource := range s.Overrides[groupResource].cohabitatingResources {
 		if s.APIResourceConfigSource.AnyVersionOfResourceEnabled(potentialStorageResource) {
 			return potentialStorageResource
@@ -230,7 +215,7 @@ func (s *DefaultStorageFactory) getStorageGroupResource(groupResource schema.Gro
 
 // New finds the storage destination for the given group and resource. It will
 // return an error if the group has no storage destination configured.
-func (s *DefaultStorageFactory) NewConfig(groupResource schema.GroupResource) (*storagebackend.Config, error) {
+func (s *ConfigurableStorageFactory) NewConfig(groupResource schema.GroupResource) (*storagebackend.Config, error) {
 	chosenStorageResource := s.getStorageGroupResource(groupResource)
 
 	// operate on copy
@@ -269,7 +254,7 @@ func (s *DefaultStorageFactory) NewConfig(groupResource schema.GroupResource) (*
 
 // Get all backends for all registered storage destinations.
 // Used for getting all instances for health validations.
-func (s *DefaultStorageFactory) Backends() []string {
+func (s *ConfigurableStorageFactory) Backends() []string {
 	backends := sets.NewString(s.StorageConfig.ServerList...)
 
 	for _, overrides := range s.Overrides {
@@ -278,60 +263,7 @@ func (s *DefaultStorageFactory) Backends() []string {
 	return backends.List()
 }
 
-// NewStorageCodec assembles a storage codec for the provided storage media type, the provided serializer, and the requested
-// storage and memory versions.
-func NewStorageCodec(opts StorageCodecConfig) (runtime.Codec, error) {
-	mediaType, _, err := mime.ParseMediaType(opts.StorageMediaType)
-	if err != nil {
-		return nil, fmt.Errorf("%q is not a valid mime-type", opts.StorageMediaType)
-	}
-	serializer, ok := runtime.SerializerInfoForMediaType(opts.StorageSerializer.SupportedMediaTypes(), mediaType)
-	if !ok {
-		return nil, fmt.Errorf("unable to find serializer for %q", opts.StorageMediaType)
-	}
-
-	s := serializer.Serializer
-
-	// etcd2 only supports string data - we must wrap any result before returning
-	// TODO: storagebackend should return a boolean indicating whether it supports binary data
-	if !serializer.EncodesAsText && (opts.Config.Type == storagebackend.StorageTypeUnset || opts.Config.Type == storagebackend.StorageTypeETCD2) {
-		glog.V(4).Infof("Wrapping the underlying binary storage serializer with a base64 encoding for etcd2")
-		s = runtime.NewBase64Serializer(s)
-	}
-
-	// Give callers the opportunity to wrap encoders and decoders.  For decoders, each returned decoder will
-	// be passed to the recognizer so that multiple decoders are available.
-	var encoder runtime.Encoder = s
-	if opts.EncoderDecoratorFn != nil {
-		encoder = opts.EncoderDecoratorFn(encoder)
-	}
-	decoders := []runtime.Decoder{s, opts.StorageSerializer.UniversalDeserializer()}
-	if opts.DecoderDecoratorFn != nil {
-		decoders = opts.DecoderDecoratorFn(decoders)
-	}
-
-	// Ensure the storage receives the correct version.
-	encoder = opts.StorageSerializer.EncoderForVersion(
-		encoder,
-		runtime.NewMultiGroupVersioner(
-			opts.StorageVersion,
-			schema.GroupKind{Group: opts.StorageVersion.Group},
-			schema.GroupKind{Group: opts.MemoryVersion.Group},
-		),
-	)
-	decoder := opts.StorageSerializer.DecoderToVersion(
-		recognizer.NewDecoder(decoders...),
-		runtime.NewMultiGroupVersioner(
-			opts.MemoryVersion,
-			schema.GroupKind{Group: opts.MemoryVersion.Group},
-			schema.GroupKind{Group: opts.StorageVersion.Group},
-		),
-	)
-
-	return runtime.NewCodec(encoder, decoder), nil
-}
-
-func (s *DefaultStorageFactory) ResourcePrefix(groupResource schema.GroupResource) string {
+func (s *ConfigurableStorageFactory) ResourcePrefix(groupResource schema.GroupResource) string {
 	chosenStorageResource := s.getStorageGroupResource(groupResource)
 	groupOverride := s.Overrides[getAllResourcesAlias(chosenStorageResource)]
 	exactResourceOverride := s.Overrides[chosenStorageResource]

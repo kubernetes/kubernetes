@@ -55,6 +55,7 @@ import (
 	"k8s.io/apiserver/pkg/server/healthz"
 	"k8s.io/apiserver/pkg/server/mux"
 	"k8s.io/apiserver/pkg/server/routes"
+	"k8s.io/apiserver/pkg/storage/storagebackend"
 	restclient "k8s.io/client-go/rest"
 	certutil "k8s.io/client-go/util/cert"
 
@@ -131,7 +132,9 @@ type Config struct {
 	OpenAPIConfig *openapicommon.Config
 	// SwaggerConfig will be used in generating Swagger spec. This is nil by default. Use DefaultSwaggerConfig for "working" defaults.
 	SwaggerConfig *swagger.Config
-	// RESTOptionsGetter is used to construct "normal" RESTStorage types
+
+	// RESTOptionsGetter is used to construct "normal" RESTStorage types. If not set, a default
+	// RESTOptionsGetter is created with the given StorageFactory.
 	RESTOptionsGetter genericregistry.RESTOptionsGetter
 
 	// If specified, requests will be allocated a random timeout between this value, and twice this value.
@@ -187,6 +190,19 @@ type SecureServingInfo struct {
 
 	// ClientCA is the certificate bundle for all the signers that you'll recognize for incoming client certificates
 	ClientCA *x509.CertPool
+}
+
+type EtcdConfig struct {
+	StorageConfig storagebackend.Config
+
+	EtcdServersOverrides []string
+
+	// To enable protobuf as storage format, it is enough
+	// to set it to "application/vnd.kubernetes.protobuf".
+	DefaultStorageMediaType string
+	DeleteCollectionWorkers int
+	EnableGarbageCollection bool
+	EnableWatchCache        bool
 }
 
 // NewConfig returns a Config struct with the default values
@@ -369,7 +385,10 @@ func (c *Config) SkipComplete() completedConfig {
 //   any unhandled paths to "Handler".
 func (c completedConfig) New() (*GenericAPIServer, error) {
 	if c.Serializer == nil {
-		return nil, fmt.Errorf("Genericapiserver.New() called with config.Serializer == nil")
+		return nil, fmt.Errorf("genericapiserver config.New() called with config.Serializer == nil")
+	}
+	if c.RESTOptionsGetter == nil {
+		return nil, fmt.Errorf("genericapiserver config.New() called with config.RESTOptionsGetter == nil")
 	}
 
 	s := &GenericAPIServer{
