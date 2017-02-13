@@ -57,6 +57,7 @@ import (
 	kubeletvolume "k8s.io/kubernetes/pkg/kubelet/volumemanager"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util/clock"
+	utilconfig "k8s.io/kubernetes/pkg/util/config"
 	"k8s.io/kubernetes/pkg/util/flowcontrol"
 	"k8s.io/kubernetes/pkg/util/mount"
 	utilruntime "k8s.io/kubernetes/pkg/util/runtime"
@@ -465,6 +466,7 @@ func TestHandlePortConflicts(t *testing.T) {
 
 // Tests that we sort pods based on criticality.
 func TestCriticalPrioritySorting(t *testing.T) {
+	utilconfig.DefaultFeatureGate.Set("ExperimentalCriticalPodAnnotation=True")
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
 	kl := testKubelet.kubelet
 	nodes := []api.Node{

@@ -50,6 +50,9 @@ const (
 	// (MKNOD, SYS_MODULE, SYS_TIME). This should only be enabled if user namespace remapping is enabled
 	// in the docker daemon.
 	experimentalHostUserNamespaceDefaultingGate = "ExperimentalHostUserNamespaceDefaulting"
+	// Ensures guaranteed scheduling of pods marked with a special pod annotation `scheduler.alpha.kubernetes.io/critical-pod`
+	// and also prevents them from being evicted from a node.
+	experimentalCriticalPodAnnotation = "ExperimentalCriticalPodAnnotation"
 )
 
 var (
@@ -63,6 +66,7 @@ var (
 		dynamicVolumeProvisioning:                   {true, alpha},
 		streamingProxyRedirects:                     {false, alpha},
 		experimentalHostUserNamespaceDefaultingGate: {false, alpha},
+		experimentalCriticalPodAnnotation:           {false, alpha},
 	}
 
 	// Special handling for a few gates.
@@ -127,6 +131,10 @@ type FeatureGate interface {
 	// owner: @pweil-
 	// alpha: v1.5
 	ExperimentalHostUserNamespaceDefaulting() bool
+
+	// owner: @vishh
+	// alpha: v1.4
+	ExperimentalCriticalPodAnnotation() bool
 }
 
 // featureGate implements FeatureGate as well as pflag.Value for flag parsing.
@@ -224,6 +232,11 @@ func (f *featureGate) StreamingProxyRedirects() bool {
 // ExperimentalHostUserNamespaceDefaulting returns value for experimentalHostUserNamespaceDefaulting
 func (f *featureGate) ExperimentalHostUserNamespaceDefaulting() bool {
 	return f.lookup(experimentalHostUserNamespaceDefaultingGate)
+}
+
+// ExperimentalCriticalPodAnnotation returns true if experimentalCriticalPodAnnotation feature is enabled.
+func (f *featureGate) ExperimentalCriticalPodAnnotation() bool {
+	return f.lookup(experimentalCriticalPodAnnotation)
 }
 
 func (f *featureGate) lookup(key string) bool {
