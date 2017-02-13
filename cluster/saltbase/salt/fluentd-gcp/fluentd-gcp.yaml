@@ -6,6 +6,11 @@ metadata:
   namespace: kube-system
   labels:
     k8s-app: fluentd-logging
+  # This annotation ensures that fluentd does not get evicted if the node
+  # supports critical pod annotation based priority scheme.
+  # Note that this does not guarantee admission on the nodes (#40573).
+  annotations:
+    scheduler.alpha.kubernetes.io/critical-pod: ''
 spec:
   dnsPolicy: Default
   containers:
