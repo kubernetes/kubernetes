@@ -281,7 +281,7 @@ func runEdit(f cmdutil.Factory, out, errOut io.Writer, cmd *cobra.Command, args 
 			case EditBeforeCreateMode:
 				err = visitToCreate(updatedVisitor, mapper, out, errOut, &results, file)
 			default:
-				err = fmt.Errorf("Not supported edit mode %q", editMode)
+				err = fmt.Errorf("Unsupported edit mode %q", editMode)
 			}
 			if err != nil {
 				return preservedFile(err, results.file, errOut)
@@ -330,7 +330,7 @@ func runEdit(f cmdutil.Factory, out, errOut io.Writer, cmd *cobra.Command, args 
 			return editFn([]*resource.Info{info})
 		})
 	default:
-		return fmt.Errorf("Not supported edit mode %q", editMode)
+		return fmt.Errorf("Unsupported edit mode %q", editMode)
 	}
 }
 
@@ -358,7 +358,7 @@ type resultGetter func([]byte) *resource.Result
 
 func getMapperAndResult(f cmdutil.Factory, args []string, options *resource.FilenameOptions, editMode EditMode) (meta.RESTMapper, *resource.Result, resultGetter, string, error) {
 	if editMode != NormalEditMode && editMode != EditBeforeCreateMode {
-		return nil, nil, nil, "", fmt.Errorf("Not supported edit mode %q", editMode)
+		return nil, nil, nil, "", fmt.Errorf("Unsupported edit mode %q", editMode)
 	}
 
 	cmdNamespace, enforceNamespace, err := f.DefaultNamespace()
@@ -482,7 +482,7 @@ func visitToPatch(
 			}
 		case err != nil:
 			return err
-		case err == nil:
+		default:
 			patchType = types.StrategicMergePatchType
 			patch, err = strategicpatch.CreateTwoWayMergePatch(originalJS, editedJS, versionedObject, preconditions...)
 			if err != nil {
