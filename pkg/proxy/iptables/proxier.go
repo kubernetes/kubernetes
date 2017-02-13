@@ -632,7 +632,17 @@ func (proxier *Proxier) OnEndpointsUpdate(allEndpoints []api.Endpoints) {
 				staleConnections[endpointServicePair{endpoint: ep.ip, servicePortName: svcPort}] = true
 			}
 		}
+	}
 
+	// Update service health check
+	allSvcPorts := make(map[proxy.ServicePortName]bool)
+	for svcPort := range proxier.endpointsMap {
+		allSvcPorts[svcPort] = true
+	}
+	for svcPort := range newEndpointsMap {
+		allSvcPorts[svcPort] = true
+	}
+	for svcPort := range allSvcPorts {
 		proxier.updateHealthCheckEntries(svcPort.NamespacedName, svcPortToInfoMap[svcPort])
 	}
 
