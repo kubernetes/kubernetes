@@ -546,7 +546,7 @@ func (dc *DeploymentController) cleanupDeployment(oldRSs []*extensions.ReplicaSe
 	cleanablefilter := func(rs *extensions.ReplicaSet) bool {
 		return rs != nil && rs.ObjectMeta.DeletionTimestamp == nil && rs.Status.Replicas == 0 && *(rs.Spec.Replicas) == 0 && rs.Generation <= rs.Status.ObservedGeneration
 	}
-	cleanableRSes := controller.FilteredRSes(oldRSs, cleanablefilter)
+	cleanableRSes := controller.FilterReplicaSets(oldRSs, cleanablefilter)
 
 	diff := int32(len(cleanableRSes)) - *deployment.Spec.RevisionHistoryLimit
 	if diff <= 0 {

@@ -757,11 +757,13 @@ func FilterActiveReplicaSets(replicaSets []*extensions.ReplicaSet) []*extensions
 	activeFilter := func(rs *extensions.ReplicaSet) bool {
 		return rs != nil && *(rs.Spec.Replicas) > 0
 	}
-	return FilteredRSes(replicaSets, activeFilter)
+	return FilterReplicaSets(replicaSets, activeFilter)
 }
 
-// FilteredRSes returns replica sets that are filtered by filterFn (all returned ones should match filterFn).
-func FilteredRSes(RSes []*extensions.ReplicaSet, filterFn func(rs *extensions.ReplicaSet) bool) []*extensions.ReplicaSet {
+type filterRS func(rs *extensions.ReplicaSet) bool
+
+// FilterReplicaSets returns replica sets that are filtered by filterFn (all returned ones should match filterFn).
+func FilterReplicaSets(RSes []*extensions.ReplicaSet, filterFn filterRS) []*extensions.ReplicaSet {
 	var filtered []*extensions.ReplicaSet
 	for i := range RSes {
 		if filterFn(RSes[i]) {
