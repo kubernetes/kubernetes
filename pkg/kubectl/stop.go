@@ -328,13 +328,13 @@ func (reaper *DaemonSetReaper) Stop(namespace, name string, timeout time.Duratio
 func (reaper *StatefulSetReaper) Stop(namespace, name string, timeout time.Duration, gracePeriod *metav1.DeleteOptions) error {
 	statefulsets := reaper.client.StatefulSets(namespace)
 	scaler := &StatefulSetScaler{reaper.client}
-	ps, err := statefulsets.Get(name, metav1.GetOptions{})
+	ss, err := statefulsets.Get(name, metav1.GetOptions{})
 	if err != nil {
 		return err
 	}
 	if timeout == 0 {
-		numPets := ps.Spec.Replicas
-		timeout = Timeout + time.Duration(10*numPets)*time.Second
+		numReplicas := ss.Spec.Replicas
+		timeout = Timeout + time.Duration(10*numReplicas)*time.Second
 	}
 	retry := NewRetryParams(reaper.pollInterval, reaper.timeout)
 	waitForStatefulSet := NewRetryParams(reaper.pollInterval, reaper.timeout)
@@ -342,10 +342,10 @@ func (reaper *StatefulSetReaper) Stop(namespace, name string, timeout time.Durat
 		return err
 	}
 
-	// TODO: This shouldn't be needed, see corresponding TODO in StatefulSetHasDesiredPets.
+	// TODO: This shouldn't be needed, see corresponding TODO in StatefulSetHasDesiredReplicas.
 	// StatefulSet should track generation number.
 	pods := reaper.podClient.Pods(namespace)
-	selector, _ := metav1.LabelSelectorAsSelector(ps.Spec.Selector)
+	selector, _ := metav1.LabelSelectorAsSelector(ss.Spec.Selector)
 	options := metav1.ListOptions{LabelSelector: selector.String()}
 	podList, err := pods.List(options)
 	if err != nil {
