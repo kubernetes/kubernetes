@@ -403,6 +403,9 @@ func DeleteTaint(taints []Taint, taintToDelete *Taint) ([]Taint, bool) {
 
 // Returns true and list of Tolerations matching all Taints if all are tolerated, or false otherwise.
 func GetMatchingTolerations(taints []Taint, tolerations []Toleration) (bool, []Toleration) {
+	if len(taints) == 0 {
+		return true, []Toleration{}
+	}
 	if len(tolerations) == 0 && len(taints) > 0 {
 		return false, []Toleration{}
 	}

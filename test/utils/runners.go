@@ -71,7 +71,6 @@ func WaitUntilPodIsScheduled(c clientset.Interface, name, namespace string, time
 }
 
 func RunPodAndGetNodeName(c clientset.Interface, pod *v1.Pod, timeout time.Duration) (string, error) {
-	retries := 5
 	name := pod.Name
 	namespace := pod.Namespace
 	var err error
