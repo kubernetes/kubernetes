@@ -78,6 +78,10 @@ func (plugin *fcPlugin) RequiresRemount() bool {
 	return false
 }
 
+func (plugin *fcPlugin) SupportsBulkVolumeVerification() bool {
+	return false
+}
+
 func (plugin *fcPlugin) GetAccessModes() []v1.PersistentVolumeAccessMode {
 	return []v1.PersistentVolumeAccessMode{
 		v1.ReadWriteOnce,

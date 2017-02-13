@@ -88,6 +88,10 @@ func (plugin *nfsPlugin) RequiresRemount() bool {
 	return false
 }
 
+func (plugin *nfsPlugin) SupportsBulkVolumeVerification() bool {
+	return false
+}
+
 func (plugin *nfsPlugin) GetAccessModes() []v1.PersistentVolumeAccessMode {
 	return []v1.PersistentVolumeAccessMode{
 		v1.ReadWriteOnce,

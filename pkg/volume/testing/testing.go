@@ -203,6 +203,10 @@ func (plugin *FakeVolumePlugin) RequiresRemount() bool {
 	return false
 }
 
+func (plugin *FakeVolumePlugin) SupportsBulkVolumeVerification() bool {
+	return false
+}
+
 func (plugin *FakeVolumePlugin) NewMounter(spec *Spec, pod *v1.Pod, opts VolumeOptions) (Mounter, error) {
 	plugin.Lock()
 	defer plugin.Unlock()

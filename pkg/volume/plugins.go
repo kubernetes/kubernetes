@@ -107,6 +107,11 @@ type VolumePlugin interface {
 	// information from input. This function is used by volume manager to reconstruct
 	// volume spec by reading the volume directories from disk
 	ConstructVolumeSpec(volumeName, mountPath string) (*Spec, error)
+
+	// SupportsBulkVolumeVerification checks if volume plugin type is capable
+	// of enabling bulk polling of all nodes. This can speed up verification of
+	// attached volumes by quite a bit, but underlying pluging must support it.
+	SupportsBulkVolumeVerification() bool
 }
 
 // PersistentVolumePlugin is an extended interface of VolumePlugin and is used

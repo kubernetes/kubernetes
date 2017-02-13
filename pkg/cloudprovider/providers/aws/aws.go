@@ -330,8 +330,7 @@ type Volumes interface {
 	// Check if the volume is already attached to the node with the specified NodeName
 	DiskIsAttached(diskName KubernetesVolumeID, nodeName types.NodeName) (bool, error)
 
-	// Check if a list of volumes are attached to the node with the specified NodeName
-	DisksAreAttached(diskNames []KubernetesVolumeID, nodeName types.NodeName) (map[KubernetesVolumeID]bool, error)
+	CheckClusterDisks(map[types.NodeName][]KubernetesVolumeID) (map[types.NodeName]map[KubernetesVolumeID]bool, error)
 }
 
 // InstanceGroups is an interface for managing cloud-managed instance groups / autoscaling instance groups
@@ -1066,6 +1065,21 @@ func (c *Cloud) getInstancesByRegex(regex string) ([]types.NodeName, error) {
 	return matchingInstances, nil
 }
 
+// getAllRunningInstances returns all running instances that are part of this cluster
+func (c *Cloud) getAllRunningInstances() ([]*ec2.Instance, error) {
+	filters := []*ec2.Filter{newEc2Filter("instance-state-name", "running")}
+	filters = c.addFilters(filters)
+	request := &ec2.DescribeInstancesInput{
+		Filters: filters,
+	}
+
+	instances, err := c.ec2.DescribeInstances(request)
+	if err != nil {
+		return nil, err
+	}
+	return instances, nil
+}
+
 // getAllZones retrieves  a list of all the zones in which nodes are running
 // It currently involves querying all instances
 func (c *Cloud) getAllZones() (sets.String, error) {
@@ -1777,36 +1791,55 @@ func (c *Cloud) DiskIsAttached(diskName KubernetesVolumeID, nodeName types.NodeN
 	return false, nil
 }
 
-func (c *Cloud) DisksAreAttached(diskNames []KubernetesVolumeID, nodeName types.NodeName) (map[KubernetesVolumeID]bool, error) {
-	idToDiskName := make(map[awsVolumeID]KubernetesVolumeID)
-	attached := make(map[KubernetesVolumeID]bool)
-	for _, diskName := range diskNames {
-		volumeID, err := diskName.mapToAWSVolumeID()
-		if err != nil {
-			return nil, fmt.Errorf("error mapping volume spec %q to aws id: %v", diskName, err)
-		}
-		idToDiskName[volumeID] = diskName
-		attached[diskName] = false
+func (c *Cloud) CheckClusterDisks(nodeDisks map[types.NodeName][]KubernetesVolumeID) (map[types.NodeName]map[KubernetesVolumeID]bool, error) {
+	attached := make(map[types.NodeName]map[KubernetesVolumeID]bool)
+
+	if len(nodeDisks) == 0 {
+		return attached, nil
 	}
-	_, instance, err := c.getFullInstance(nodeName)
+
+	awsInstances, err := c.getAllRunningInstances()
 	if err != nil {
-		if err == cloudprovider.InstanceNotFound {
+		return nil, err
+	}
+
+	awsInstanceMap := make(map[types.NodeName]*ec2.Instance)
+	for _, awsInstance := range awsInstances {
+		awsInstanceMap[mapInstanceToNodeName(awsInstance)] = awsInstance
+	}
+
+	// Note that we check that the volume is attached to the correct node, not that it is attached to _a_ node
+	for nodeName, diskNames := range nodeDisks {
+		for _, diskName := range diskNames {
+			setNodeDisk(attached, diskName, nodeName, false)
+		}
+
+		awsInstance := awsInstanceMap[nodeName]
+		if awsInstance == nil {
 			// If instance no longer exists, safe to assume volume is not attached.
 			glog.Warningf(
 				"Node %q does not exist. DisksAreAttached will assume disks %v are not attached to it.",
 				nodeName,
 				diskNames)
-			return attached, nil
+			continue
 		}
 
-		return attached, err
-	}
-	for _, blockDevice := range instance.BlockDeviceMappings {
-		volumeID := awsVolumeID(aws.StringValue(blockDevice.Ebs.VolumeId))
-		diskName, found := idToDiskName[volumeID]
-		if found {
-			// Disk is still attached to node
-			attached[diskName] = true
+		idToDiskName := make(map[awsVolumeID]KubernetesVolumeID)
+		for _, diskName := range diskNames {
+			volumeID, err := diskName.mapToAWSVolumeID()
+			if err != nil {
+				return nil, fmt.Errorf("error mapping volume spec %q to aws id: %v", diskName, err)
+			}
+			idToDiskName[volumeID] = diskName
+		}
+
+		for _, blockDevice := range awsInstance.BlockDeviceMappings {
+			volumeID := awsVolumeID(aws.StringValue(blockDevice.Ebs.VolumeId))
+			diskName, found := idToDiskName[volumeID]
+			if found {
+				// Disk is still attached to node
+				setNodeDisk(attached, diskName, nodeName, true)
+			}
 		}
 	}
 
@@ -3313,4 +3346,19 @@ func (c *Cloud) addFilters(filters []*ec2.Filter) []*ec2.Filter {
 // Returns the cluster name or an empty string
 func (c *Cloud) getClusterName() string {
 	return c.filterTags[TagNameKubernetesCluster]
+}
+
+func setNodeDisk(
+	nodeDiskMap map[types.NodeName]map[KubernetesVolumeID]bool,
+	volumeID KubernetesVolumeID,
+	nodeName types.NodeName,
+	check bool) {
+
+	volumeMap, volumeMapExists := nodeDiskMap[nodeName]
+
+	if !volumeMapExists {
+		volumeMap = make(map[KubernetesVolumeID]bool)
+	}
+	volumeMap[volumeID] = check
+	nodeDiskMap[nodeName] = volumeMap
 }

@@ -24,6 +24,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/golang/glog"
+
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/util/mount"
@@ -65,6 +67,8 @@ type OperationExecutor interface {
 	// In theory (but very unlikely in practise), race condition among these operations might mark volume as detached
 	// even if it is attached. But reconciler can correct this in a short period of time.
 	VerifyVolumesAreAttached(AttachedVolumes []AttachedVolume, nodeName types.NodeName, actualStateOfWorld ActualStateOfWorldAttacherUpdater) error
+
+	BulkVerifyVolumes(volumesToVerify map[types.NodeName][]AttachedVolume, actualStateOfWorld ActualStateOfWorldAttacherUpdater)
 
 	// DetachVolume detaches the volume from the node specified in
 	// volumeToDetach, and updates the actual state of the world to reflect
@@ -386,6 +390,82 @@ func (oe *operationExecutor) DetachVolume(
 
 	return oe.pendingOperations.Run(
 		volumeToDetach.VolumeName, "" /* podName */, detachFunc)
+}
+func (oe *operationExecutor) BulkVerifyVolumes(
+	attachedVolumes map[types.NodeName][]AttachedVolume,
+	actualStateOfWorld ActualStateOfWorldAttacherUpdater) {
+
+	// A map of plugin names and nodes on which they exist with volumes they manage
+	bulkVerifyPluginsByNode := make(map[string]map[types.NodeName][]*volume.Spec)
+	volumeSpecMapByPlugin := make(map[string]map[*volume.Spec]v1.UniqueVolumeName)
+
+	for node, nodeAttachedVolumes := range attachedVolumes {
+		for _, volumeAttached := range nodeAttachedVolumes {
+			volumePlugin, err :=
+				oe.operationGenerator.GetVolumePluginMgr().FindPluginBySpec(volumeAttached.VolumeSpec)
+
+			if err != nil || volumePlugin == nil {
+				glog.Errorf(
+					"VolumesAreAttached.FindPluginBySpec failed for volume %q (spec.Name: %q) on node %q with error: %v",
+					volumeAttached.VolumeName,
+					volumeAttached.VolumeSpec.Name(),
+					volumeAttached.NodeName,
+					err)
+				continue
+			}
+
+			pluginName := volumePlugin.GetPluginName()
+
+			if volumePlugin.SupportsBulkVolumeVerification() {
+				pluginNodes, pluginNodesExist := bulkVerifyPluginsByNode[pluginName]
+
+				if !pluginNodesExist {
+					pluginNodes = make(map[types.NodeName][]*volume.Spec)
+				}
+
+				volumeSpecList, nodeExists := pluginNodes[node]
+				if !nodeExists {
+					volumeSpecList = []*volume.Spec{}
+				}
+				volumeSpecList = append(volumeSpecList, volumeAttached.VolumeSpec)
+				pluginNodes[node] = volumeSpecList
+
+				bulkVerifyPluginsByNode[pluginName] = pluginNodes
+				volumeSpecMap, mapExists := volumeSpecMapByPlugin[pluginName]
+
+				if !mapExists {
+					volumeSpecMap = make(map[*volume.Spec]v1.UniqueVolumeName)
+				}
+				volumeSpecMap[volumeAttached.VolumeSpec] = volumeAttached.VolumeName
+				volumeSpecMapByPlugin[pluginName] = volumeSpecMap
+				continue
+			}
+
+			// If node doesn't support Bulk volume polling it is best to poll individually
+			nodeError := oe.VerifyVolumesAreAttached(nodeAttachedVolumes, node, actualStateOfWorld)
+			if nodeError != nil {
+				glog.Errorf("BulkVerifyVolumes.VerifyVolumesAreAttached verifying volumes on node %q with %v", node, nodeError)
+			}
+			break
+		}
+	}
+
+	for pluginName, pluginNodeVolumes := range bulkVerifyPluginsByNode {
+		bulkVerifyVolumeFunc, err := oe.operationGenerator.GenerateBulkVolumeVerifyFunc(
+			pluginNodeVolumes,
+			pluginName,
+			volumeSpecMapByPlugin[pluginName],
+			actualStateOfWorld)
+		if err != nil {
+			glog.Errorf("BulkVerifyVolumes.GenerateBulkVolumeVerifyFunc  error bulk verifying volumes for plugin %q with  %v", pluginName, err)
+		}
+		// Ugly hack to ensure - we don't do parallel bulk polling of same volume plugin
+		uniquePluginName := v1.UniqueVolumeName(pluginName)
+		err = oe.pendingOperations.Run(uniquePluginName, "" /* Pod Name */, bulkVerifyVolumeFunc)
+		if err != nil {
+			glog.Errorf("BulkVerifyVolumes.Run Error bulk volume verification for plugin %q  with %v", pluginName, err)
+		}
+	}
 }
 
 func (oe *operationExecutor) VerifyVolumesAreAttached(

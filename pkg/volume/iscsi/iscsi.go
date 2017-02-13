@@ -82,6 +82,10 @@ func (plugin *iscsiPlugin) RequiresRemount() bool {
 	return false
 }
 
+func (plugin *iscsiPlugin) SupportsBulkVolumeVerification() bool {
+	return false
+}
+
 func (plugin *iscsiPlugin) GetAccessModes() []v1.PersistentVolumeAccessMode {
 	return []v1.PersistentVolumeAccessMode{
 		v1.ReadWriteOnce,
