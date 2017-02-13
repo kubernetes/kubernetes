@@ -122,14 +122,14 @@ func doRoundTrip(t *testing.T, item runtime.Object) {
 	}
 
 	newUnstr := make(map[string]interface{})
-	err = NewConverter().ToUnstructured(item, &newUnstr)
+	err = Converter.ToUnstructured(item, &newUnstr)
 	if err != nil {
 		t.Errorf("ToUnstructured failed: %v", err)
 		return
 	}
 
 	newObj := reflect.New(reflect.TypeOf(item).Elem()).Interface().(runtime.Object)
-	err = NewConverter().FromUnstructured(newUnstr, newObj)
+	err = Converter.FromUnstructured(newUnstr, newObj)
 	if err != nil {
 		t.Errorf("FromUnstructured failed: %v", err)
 		return
@@ -239,7 +239,7 @@ func doUnrecognized(t *testing.T, jsonData string, item runtime.Object, expected
 		return
 	}
 	newObj := reflect.New(reflect.TypeOf(item).Elem()).Interface().(runtime.Object)
-	err = NewConverter().FromUnstructured(unstr, newObj)
+	err = Converter.FromUnstructured(unstr, newObj)
 	if (err != nil) != (expectedErr != nil) {
 		t.Errorf("Unexpected error in FromUnstructured: %v, expected: %v", err, expectedErr)
 	}
