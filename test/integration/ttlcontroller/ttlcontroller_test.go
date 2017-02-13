@@ -32,7 +32,7 @@ import (
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
-	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated"
+	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated/externalversions"
 	listers "k8s.io/kubernetes/pkg/client/listers/core/v1"
 	"k8s.io/kubernetes/pkg/controller/ttl"
 	"k8s.io/kubernetes/test/integration/framework"
@@ -46,7 +46,7 @@ func createClientAndInformers(t *testing.T, server *httptest.Server) (*clientset
 	}
 	testClient := clientset.NewForConfigOrDie(&config)
 
-	informers := informers.NewSharedInformerFactory(nil, testClient, time.Second)
+	informers := informers.NewSharedInformerFactory(testClient, time.Second)
 	return testClient, informers
 }
 

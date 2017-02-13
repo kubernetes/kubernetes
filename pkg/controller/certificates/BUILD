@@ -21,7 +21,7 @@ go_library(
     deps = [
         "//pkg/apis/certificates/v1beta1:go_default_library",
         "//pkg/client/clientset_generated/clientset:go_default_library",
-        "//pkg/client/informers/informers_generated/certificates/v1beta1:go_default_library",
+        "//pkg/client/informers/informers_generated/externalversions/certificates/v1beta1:go_default_library",
         "//pkg/client/listers/certificates/v1beta1:go_default_library",
         "//pkg/controller:go_default_library",
         "//vendor:github.com/cloudflare/cfssl/config",
@@ -70,7 +70,7 @@ go_test(
     deps = [
         "//pkg/apis/certificates/v1beta1:go_default_library",
         "//pkg/client/clientset_generated/clientset/fake:go_default_library",
-        "//pkg/client/informers/informers_generated:go_default_library",
+        "//pkg/client/informers/informers_generated/externalversions:go_default_library",
         "//pkg/controller:go_default_library",
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
         "//vendor:k8s.io/apimachinery/pkg/runtime",
