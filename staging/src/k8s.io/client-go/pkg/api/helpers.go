@@ -244,7 +244,7 @@ func IsServiceIPRequested(service *Service) bool {
 
 var standardFinalizers = sets.NewString(
 	string(FinalizerKubernetes),
-	FinalizerOrphan,
+	metav1.FinalizerOrphan,
 )
 
 // HasAnnotation returns a bool if passed in annotation exists
@@ -466,6 +466,11 @@ const (
 	// is at-your-own-risk. Pods that attempt to set an unsafe sysctl that is not enabled for a kubelet
 	// will fail to launch.
 	UnsafeSysctlsPodAnnotationKey string = "security.alpha.kubernetes.io/unsafe-sysctls"
+
+	// ObjectTTLAnnotations represents a suggestion for kubelet for how long it can cache
+	// an object (e.g. secret, config map) before fetching it again from apiserver.
+	// This annotation can be attached to node.
+	ObjectTTLAnnotationKey string = "node.alpha.kubernetes.io/ttl"
 )
 
 // TolerationToleratesTaint checks if the toleration tolerates the taint.
