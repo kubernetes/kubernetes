@@ -75,7 +75,8 @@ func (f *ring1Factory) Object() (meta.RESTMapper, runtime.ObjectTyper) {
 	}
 
 	// wrap with shortcuts
-	mapper = NewShortcutExpander(mapper, discoveryClient)
+	mapper, err = NewShortcutExpander(mapper, discoveryClient)
+	CheckErr(err)
 
 	// wrap with output preferences
 	cfg, err := f.clientAccessFactory.ClientConfigForVersion(nil)
@@ -104,7 +105,8 @@ func (f *ring1Factory) UnstructuredObject() (meta.RESTMapper, runtime.ObjectType
 
 	mapper := discovery.NewDeferredDiscoveryRESTMapper(discoveryClient, meta.InterfacesForUnstructured)
 	typer := discovery.NewUnstructuredObjectTyper(groupResources)
-	return NewShortcutExpander(mapper, discoveryClient), typer, nil
+	expander, err := NewShortcutExpander(mapper, discoveryClient)
+	return expander, typer, err
 }
 
 func (f *ring1Factory) ClientForMapping(mapping *meta.RESTMapping) (resource.RESTClient, error) {
