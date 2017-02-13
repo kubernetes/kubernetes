@@ -29,6 +29,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
+	"k8s.io/kubernetes/test/e2e/common"
 	"k8s.io/kubernetes/test/e2e/framework"
 )
 
@@ -54,7 +55,7 @@ var _ = framework.KubeDescribe("PersistentVolumes [Volume][Disruptive][Flaky]", 
 		c                         clientset.Interface
 		ns                        string
 		nfsServerPod              *v1.Pod
-		nfsPVconfig               persistentVolumeConfig
+		nfsPVconfig               common.PersistentVolumeConfig
 		nfsServerIP, clientNodeIP string
 		clientNode                *v1.Node
 	)
@@ -72,9 +73,9 @@ var _ = framework.KubeDescribe("PersistentVolumes [Volume][Disruptive][Flaky]", 
 		framework.Logf("[BeforeEach] Configuring PersistentVolume")
 		nfsServerIP = nfsServerPod.Status.PodIP
 		Expect(nfsServerIP).NotTo(BeEmpty())
-		nfsPVconfig = persistentVolumeConfig{
-			namePrefix: "nfs-",
-			pvSource: v1.PersistentVolumeSource{
+		nfsPVconfig = common.PersistentVolumeConfig{
+			NamePrefix: "nfs-",
+			PVSource: v1.PersistentVolumeSource{
 				NFS: &v1.NFSVolumeSource{
 					Server:   nfsServerIP,
 					Path:     "/exports",
@@ -98,7 +99,7 @@ var _ = framework.KubeDescribe("PersistentVolumes [Volume][Disruptive][Flaky]", 
 	})
 
 	AfterEach(func() {
-		deletePodWithWait(f, c, nfsServerPod)
+		common.DeletePodWithWait(f, c, nfsServerPod)
 	})
 
 	Context("when kubelet restarts", func() {
@@ -175,7 +176,7 @@ func testVolumeUnmountsFromDeletedPod(c clientset.Interface, f *framework.Framew
 
 	By("Restarting the kubelet.")
 	kubeletCommand(kStop, c, clientPod)
-	deletePodWithWait(f, c, clientPod)
+	common.DeletePodWithWait(f, c, clientPod)
 	kubeletCommand(kStart, c, clientPod)
 
 	By("Expecting the volume mount not to be found.")
@@ -187,9 +188,9 @@ func testVolumeUnmountsFromDeletedPod(c clientset.Interface, f *framework.Framew
 }
 
 // initTestCase initializes spec resources (pv, pvc, and pod) and returns pointers to be consumed by the test
-func initTestCase(f *framework.Framework, c clientset.Interface, pvConfig persistentVolumeConfig, ns, nodeName string) (*v1.Pod, *v1.PersistentVolume, *v1.PersistentVolumeClaim) {
-	pv, pvc := createPVPVC(c, pvConfig, ns, false)
-	pod := makePod(ns, pvc.Name)
+func initTestCase(f *framework.Framework, c clientset.Interface, pvConfig common.PersistentVolumeConfig, ns, nodeName string) (*v1.Pod, *v1.PersistentVolume, *v1.PersistentVolumeClaim) {
+	pv, pvc := common.CreatePVPVC(c, pvConfig, ns, false)
+	pod := common.MakePod(ns, pvc.Name)
 	pod.Spec.NodeName = nodeName
 	framework.Logf("Creating nfs client Pod %s on node %s", pod.Name, nodeName)
 	pod, err := c.Core().Pods(ns).Create(pod)
@@ -208,9 +209,9 @@ func initTestCase(f *framework.Framework, c clientset.Interface, pvConfig persis
 
 // tearDownTestCase destroy resources created by initTestCase.
 func tearDownTestCase(c clientset.Interface, f *framework.Framework, ns string, pod *v1.Pod, pvc *v1.PersistentVolumeClaim, pv *v1.PersistentVolume) {
-	deletePodWithWait(f, c, pod)
-	deletePersistentVolumeClaim(c, pvc.Name, ns)
-	deletePersistentVolume(c, pv.Name)
+	common.DeletePodWithWait(f, c, pod)
+	common.DeletePersistentVolumeClaim(c, pvc.Name, ns)
+	common.DeletePersistentVolume(c, pv.Name)
 }
 
 // kubeletCommand performs `start`, `restart`, or `stop` on the kubelet running on the node of the target pod.

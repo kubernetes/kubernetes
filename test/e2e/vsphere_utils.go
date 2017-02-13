@@ -21,6 +21,7 @@ import (
 	"time"
 
 	"fmt"
+
 	. "github.com/onsi/gomega"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -30,6 +31,7 @@ import (
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	vsphere "k8s.io/kubernetes/pkg/cloudprovider/providers/vsphere"
 	"k8s.io/kubernetes/pkg/volume/util/volumehelper"
+	"k8s.io/kubernetes/test/e2e/common"
 	"k8s.io/kubernetes/test/e2e/framework"
 )
 
@@ -83,24 +85,24 @@ func waitForVSphereDiskToDetach(vsp *vsphere.VSphere, volumePath string, nodeNam
 // function to create vsphere volume spec with given VMDK volume path, Reclaim Policy and labels
 func getVSpherePersistentVolumeSpec(volumePath string, persistentVolumeReclaimPolicy v1.PersistentVolumeReclaimPolicy, labels map[string]string) *v1.PersistentVolume {
 	var (
-		pvConfig persistentVolumeConfig
+		pvConfig common.PersistentVolumeConfig
 		pv       *v1.PersistentVolume
 		claimRef *v1.ObjectReference
 	)
-	pvConfig = persistentVolumeConfig{
-		namePrefix: "vspherepv-",
-		pvSource: v1.PersistentVolumeSource{
+	pvConfig = common.PersistentVolumeConfig{
+		NamePrefix: "vspherepv-",
+		PVSource: v1.PersistentVolumeSource{
 			VsphereVolume: &v1.VsphereVirtualDiskVolumeSource{
 				VolumePath: volumePath,
 				FSType:     "ext4",
 			},
 		},
-		prebind: nil,
+		Prebind: nil,
 	}
 
 	pv = &v1.PersistentVolume{
 		ObjectMeta: metav1.ObjectMeta{
-			GenerateName: pvConfig.namePrefix,
+			GenerateName: pvConfig.NamePrefix,
 			Annotations: map[string]string{
 				volumehelper.VolumeGidAnnotationKey: "777",
 			},
@@ -110,7 +112,7 @@ func getVSpherePersistentVolumeSpec(volumePath string, persistentVolumeReclaimPo
 			Capacity: v1.ResourceList{
 				v1.ResourceName(v1.ResourceStorage): resource.MustParse("2Gi"),
 			},
-			PersistentVolumeSource: pvConfig.pvSource,
+			PersistentVolumeSource: pvConfig.PVSource,
 			AccessModes: []v1.PersistentVolumeAccessMode{
 				v1.ReadWriteOnce,
 			},

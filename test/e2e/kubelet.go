@@ -29,6 +29,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
+	"k8s.io/kubernetes/test/e2e/common"
 	"k8s.io/kubernetes/test/e2e/framework"
 	testutils "k8s.io/kubernetes/test/utils"
 
@@ -415,8 +416,8 @@ var _ = framework.KubeDescribe("kubelet", func() {
 			})
 
 			AfterEach(func() {
-				deletePodWithWait(f, c, pod)
-				deletePodWithWait(f, c, nfsServerPod)
+				common.DeletePodWithWait(f, c, pod)
+				common.DeletePodWithWait(f, c, nfsServerPod)
 			})
 
 			// execute It blocks from above table of tests
@@ -427,11 +428,11 @@ var _ = framework.KubeDescribe("kubelet", func() {
 					pod = createPodUsingNfs(f, c, ns, nfsIP, t.podCmd)
 
 					By("Delete the NFS server pod")
-					deletePodWithWait(f, c, nfsServerPod)
+					common.DeletePodWithWait(f, c, nfsServerPod)
 					nfsServerPod = nil
 
 					By("Delete the pod mounted to the NFS volume")
-					deletePodWithWait(f, c, pod)
+					common.DeletePodWithWait(f, c, pod)
 					// pod object is now stale, but is intentionally not nil
 
 					By("Check if host running deleted pod has been cleaned up -- expect not")
