@@ -19,6 +19,7 @@ package federation
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/v1"
 )
 
 // ServerAddressByClientCIDR helps the client to determine the server address that they should use, depending on the clientCIDR that they match.
@@ -152,4 +153,19 @@ type ClusterReplicaSetPreferences struct {
 
 	// A number expressing the preference to put an additional replica to this LocalReplicaSet. 0 by default.
 	Weight int64
+}
+
+// Annotation for a federated service to keep record of service loadbalancer ingresses in federated cluster
+type FederatedServiceIngress struct {
+	// List of loadbalancer ingress of a service in all federated clusters
+	// +optional
+	Items []ClusterServiceIngress `json:"items,omitempty"`
+}
+
+// Loadbalancer ingresses of a service within a federated cluster
+type ClusterServiceIngress struct {
+	// Cluster is the name of the federated cluster
+	Cluster string `json:"cluster"`
+	// List of loadbalancer ingresses of a federated service within a federated cluster
+	Items []v1.LoadBalancerIngress `json:"items"`
 }
