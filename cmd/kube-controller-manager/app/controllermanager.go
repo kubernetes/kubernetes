@@ -464,8 +464,8 @@ func StartControllers(controllers map[string]InitFunc, s *options.CMServer, root
 		} else if routes, ok := cloud.Routes(); !ok {
 			glog.Warning("configure-cloud-routes is set, but cloud provider does not support routes. Will not configure cloud provider routes.")
 		} else {
-			routeController := routecontroller.New(routes, clientBuilder.ClientOrDie("route-controller"), s.ClusterName, clusterCIDR)
-			routeController.Run(s.RouteReconciliationPeriod.Duration)
+			routeController := routecontroller.New(routes, clientBuilder.ClientOrDie("route-controller"), newSharedInformers.Core().V1().Nodes(), s.ClusterName, clusterCIDR)
+			go routeController.Run(stop, s.RouteReconciliationPeriod.Duration)
 			time.Sleep(wait.Jitter(s.ControllerStartInterval.Duration, ControllerStartJitter))
 		}
 	} else {
