@@ -742,7 +742,7 @@ function create-etcd-certs {
   local ca_cert=${2:-}
   local ca_key=${3:-}
 
-  download-cfssl
+  download-cfssl "${KUBE_TEMP}/cfssl"
 
   pushd "${KUBE_TEMP}/cfssl"
 

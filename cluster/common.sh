@@ -900,14 +900,14 @@ function sha1sum-file() {
   fi
 }
 
-# Downloads cfssl into ${KUBE_TEMP}/cfssl directory
+# Downloads cfssl into $1 directory
 #
 # Assumed vars:
-#   KUBE_TEMP: temporary directory
+#   $1 (cfssl directory)
 #
 function download-cfssl {
-  mkdir -p "${KUBE_TEMP}/cfssl"
-  pushd "${KUBE_TEMP}/cfssl"
+  mkdir -p "$1"
+  pushd "$1"
 
   kernel=$(uname -s)
   case "${kernel}" in
@@ -1022,7 +1022,7 @@ function generate-certs {
     ./easyrsa --subject-alt-name="${SANS}" build-server-full "${MASTER_NAME}" nopass
     ./easyrsa build-client-full kube-apiserver nopass
 
-    download-cfssl
+    download-cfssl "${KUBE_TEMP}/cfssl"
 
     # make the config for the signer
     echo '{"signing":{"default":{"expiry":"43800h","usages":["signing","key encipherment","client auth"]}}}' > "ca-config.json"
