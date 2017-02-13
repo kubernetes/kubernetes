@@ -20,7 +20,7 @@ go_library(
         "//cmd/kube-aggregator/pkg/client/listers/apiregistration/v1alpha1:go_default_library",
         "//cmd/kube-aggregator/pkg/cmd/server:go_default_library",
         "//pkg/kubectl/cmd/util:go_default_library",
-        "//pkg/util/logs:go_default_library",
+        "//vendor:k8s.io/apiserver/pkg/util/logs",
     ],
 )
 
