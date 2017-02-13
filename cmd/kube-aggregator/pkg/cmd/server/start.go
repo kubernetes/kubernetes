@@ -32,7 +32,6 @@ import (
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/kubernetes/cmd/kube-aggregator/pkg/apiserver"
 	"k8s.io/kubernetes/pkg/api"
-	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 
 	"k8s.io/kubernetes/cmd/kube-aggregator/pkg/apis/apiregistration/v1alpha1"
 )
@@ -64,10 +63,17 @@ func NewCommandStartAggregator(out, err io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Short: "Launch a API aggregator and proxy server",
 		Long:  "Launch a API aggregator and proxy server",
-		Run: func(c *cobra.Command, args []string) {
-			cmdutil.CheckErr(o.Complete())
-			cmdutil.CheckErr(o.Validate(args))
-			cmdutil.CheckErr(o.RunAggregator())
+		RunE: func(c *cobra.Command, args []string) error {
+			if err := o.Complete(); err != nil {
+				return err
+			}
+			if err := o.Validate(args); err != nil {
+				return err
+			}
+			if err := o.RunAggregator(); err != nil {
+				return err
+			}
+			return nil
 		},
 	}
 
