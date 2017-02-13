@@ -39,6 +39,8 @@ import (
 	informers "k8s.io/kubernetes/cmd/kube-aggregator/pkg/client/informers/internalversion"
 	listers "k8s.io/kubernetes/cmd/kube-aggregator/pkg/client/listers/apiregistration/internalversion"
 	apiservicestorage "k8s.io/kubernetes/cmd/kube-aggregator/pkg/registry/apiservice/etcd"
+
+	_ "k8s.io/kubernetes/pkg/api/install"
 )
 
 // legacyAPIServiceName is the fixed name of the only non-groupified API version
