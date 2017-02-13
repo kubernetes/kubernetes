@@ -1,10 +1,12 @@
-# Cloud Native Deployment of Minio using Kubernetes
+  # Cloud Native Deployment of Minio using Kubernetes
 
-## Table of Contents
+  ## Table of Contents
 
+  - [Introduction](#introduction)
   - [Prerequisites](#prerequisites)
-  - [Minio Docker](#minio-docker)
   - [Get Started](#get-started)
+
+  ## Introduction
 
   Minio is an AWS S3 compatible, object storage server built for cloud applications and devops.
 
@@ -12,7 +14,7 @@
   Minio understands that it is running within a cluster manager, and uses this cluster management infrastructure for allocation of compute and storage
   resources.
 
-  This example uses some of the core components of Kubernetes:
+  The pods use the [official Minio Docker image](https://hub.docker.com/r/minio/minio/~/dockerfile/) from Docker Hub. This example uses some of the core components of Kubernetes:
 
   - [_Pods_](https://kubernetes.io/docs/user-guide/pods/)
   - [_Services_](https://kubernetes.io/docs/user-guide/services/)
@@ -26,10 +28,6 @@
   command line tool somewhere in your path.  Please see the
   [getting started guides](../../../docs/getting-started-guides/)
   for installation instructions for your platform.
-
-  ## Minio Docker
-
-  The pods use the [official Minio Docker image](https://hub.docker.com/r/minio/minio/~/dockerfile/) from Docker Hub.
 
   ## Get Started
 
