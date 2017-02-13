@@ -108,7 +108,7 @@ func (cc *clusterClientCache) syncService(key, clusterName string, clusterCache 
 
 	if needUpdate {
 		for i := 0; i < clientRetryCount; i++ {
-			err := sc.ensureDnsRecords(clusterName, cachedService)
+			err := sc.ensureDnsRecords(clusterName, service)
 			if err == nil {
 				break
 			}

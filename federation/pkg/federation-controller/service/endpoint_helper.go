@@ -122,7 +122,7 @@ func (cc *clusterClientCache) processEndpointDeletion(cachedService *cachedServi
 		glog.V(4).Infof("Cached endpoint was found for %s/%s, cluster %s, removing", cachedService.lastState.Namespace, cachedService.lastState.Name, clusterName)
 		delete(cachedService.endpointMap, clusterName)
 		for i := 0; i < clientRetryCount; i++ {
-			err := serviceController.ensureDnsRecords(clusterName, cachedService)
+			err := serviceController.ensureDnsRecords(clusterName, cachedService.lastState)
 			if err == nil {
 				return nil
 			}
@@ -154,7 +154,7 @@ func (cc *clusterClientCache) processEndpointUpdate(cachedService *cachedService
 			glog.V(4).Infof("Reachable endpoint was found for %s/%s, cluster %s, building endpointMap", endpoint.Namespace, endpoint.Name, clusterName)
 			cachedService.endpointMap[clusterName] = 1
 			for i := 0; i < clientRetryCount; i++ {
-				err := serviceController.ensureDnsRecords(clusterName, cachedService)
+				err := serviceController.ensureDnsRecords(clusterName, cachedService.lastState)
 				if err == nil {
 					return nil
 				}
@@ -175,7 +175,7 @@ func (cc *clusterClientCache) processEndpointUpdate(cachedService *cachedService
 			glog.V(4).Infof("Reachable endpoint was lost for %s/%s, cluster %s, deleting endpointMap", endpoint.Namespace, endpoint.Name, clusterName)
 			delete(cachedService.endpointMap, clusterName)
 			for i := 0; i < clientRetryCount; i++ {
-				err := serviceController.ensureDnsRecords(clusterName, cachedService)
+				err := serviceController.ensureDnsRecords(clusterName, cachedService.lastState)
 				if err == nil {
 					return nil
 				}
