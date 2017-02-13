@@ -76,8 +76,8 @@ cd "${CLIENT_REPO}"
 # save copies code from client-go into the temp folder to make sure we don't lose it by accident
 # TODO this is temporary until everything in certain directories is authoritative
 function save() {
-    mkdir -p "${CLIENT_REPO_TEMP}/$1"
-    cp -r "${CLIENT_REPO}/$1/"* "${CLIENT_REPO_TEMP}/$1"
+    mkdir -p "$(dirname "${CLIENT_REPO_TEMP}/$1")"
+    cp -r "${CLIENT_REPO}/$1"* "${CLIENT_REPO_TEMP}/"
 }
 
 # save everything for which the staging directory is the source of truth
@@ -90,8 +90,8 @@ save "transport"
 save "third_party"
 save "plugin"
 save "util"
-
-
+save "examples"
+save "OWNERS"
 
 # mkcp copies file from the main repo to the client repo, it creates the directory if it doesn't exist in the client repo.
 function mkcp() {
