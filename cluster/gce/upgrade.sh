@@ -123,7 +123,7 @@ function backfile-kubeletauth-certs() {
   echo "${CA_KEY_BASE64}" | base64 -d > "${KUBE_TEMP}/pki/ca.key"
   echo "${CA_CERT_BASE64}" | base64 -d > "${KUBE_TEMP}/pki/ca.crt"
   (cd "${KUBE_TEMP}/pki"
-    download-cfssl
+    download-cfssl "${KUBE_TEMP}/cfssl"
     cat <<EOF > ca-config.json
 {
   "signing": {

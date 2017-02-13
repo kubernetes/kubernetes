@@ -71,7 +71,7 @@ function concat-etcd-servers() {
     if [ -n "$etcd_servers" ]; then
       prefix="${etcd_servers},"
     fi
-    etcd_servers="${prefix}http://${master_ip}:2379"
+    etcd_servers="${prefix}https://${master_ip}:2379"
   done
 
   echo "$etcd_servers"
@@ -89,7 +89,7 @@ function concat-etcd-initial-cluster() {
     if [ -n "$etcd_initial_cluster" ]; then
       etcd_initial_cluster+=","
     fi
-    etcd_initial_cluster+="infra${num_infra}=http://${master_ip}:2380"
+    etcd_initial_cluster+="infra${num_infra}=https://${master_ip}:2380"
     let ++num_infra
   done
 
@@ -97,7 +97,10 @@ function concat-etcd-initial-cluster() {
 }
 export ETCD_INITIAL_CLUSTER="$(concat-etcd-initial-cluster)"
 
-export CERT_DIR="${CERT_DIR:-$(cd "${root}/ca-cert" && pwd)}"
+CERT_DIR="${CERT_DIR:-${root}/ca-cert}"
+mkdir -p "${CERT_DIR}"
+# CERT_DIR path must be absolute.
+export CERT_DIR="$(cd "${CERT_DIR}"; pwd)"
 
 # define the IP range used for service cluster IPs.
 # according to rfc 1918 ref: https://tools.ietf.org/html/rfc1918 choose a private ip range here.
@@ -117,7 +120,7 @@ export FLANNEL_NET=${FLANNEL_NET:-"172.16.0.0/16"}
 
 # Admission Controllers to invoke prior to persisting objects in cluster
 # If we included ResourceQuota, we should keep it at the end of the list to prevent incrementing quota usage prematurely.
-export ADMISSION_CONTROL=NamespaceLifecycle,LimitRanger,ServiceAccount,DefaultTolerationSeconds,ResourceQuota
+export ADMISSION_CONTROL=${ADMISSION_CONTROL:-"NamespaceLifecycle,LimitRanger,ServiceAccount,DefaultTolerationSeconds,ResourceQuota"}
 
 # Extra options to set on the Docker command line.
 # This is useful for setting --insecure-registry for local registries.
