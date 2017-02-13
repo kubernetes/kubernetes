@@ -749,7 +749,8 @@ func TestDiscoveryReplaceAliases(t *testing.T) {
 		},
 	}
 
-	mapper := NewShortcutExpander(testapi.Default.RESTMapper(), nil)
+	ds := &fakeDiscoveryClient{}
+	mapper := NewShortcutExpander(testapi.Default.RESTMapper(), ds)
 	b := resource.NewBuilder(mapper, api.Scheme, fakeClient(), testapi.Default.Codec())
 
 	for _, test := range tests {

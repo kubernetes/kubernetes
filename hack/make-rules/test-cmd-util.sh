@@ -3225,6 +3225,7 @@ runTests() {
 }
 __EOF__
     kube::test::get_object_assert storageclass "{{range.items}}{{$id_field}}:{{end}}" 'storage-class-name:'
+    kube::test::get_object_assert sc "{{range.items}}{{$id_field}}:{{end}}" 'storage-class-name:'
     kubectl delete storageclass storage-class-name "${kube_flags[@]}"
     # Post-condition: no storage classes
     kube::test::get_object_assert storageclass "{{range.items}}{{$id_field}}:{{end}}" ''

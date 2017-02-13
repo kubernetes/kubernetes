@@ -205,6 +205,10 @@ func (d *fakeCachedDiscoveryClient) Fresh() bool {
 func (d *fakeCachedDiscoveryClient) Invalidate() {
 }
 
+func (d *fakeCachedDiscoveryClient) ServerResources() ([]*metav1.APIResourceList, error) {
+	return []*metav1.APIResourceList{}, nil
+}
+
 type TestFactory struct {
 	Mapper             meta.RESTMapper
 	Typer              runtime.ObjectTyper
@@ -270,7 +274,8 @@ func (f *FakeFactory) UnstructuredObject() (meta.RESTMapper, runtime.ObjectTyper
 	mapper := discovery.NewRESTMapper(groupResources, meta.InterfacesForUnstructured)
 	typer := discovery.NewUnstructuredObjectTyper(groupResources)
 
-	return cmdutil.NewShortcutExpander(mapper, nil), typer, nil
+	fakeDs := &fakeCachedDiscoveryClient{}
+	return cmdutil.NewShortcutExpander(mapper, fakeDs), typer, nil
 }
 
 func (f *FakeFactory) Decoder(bool) runtime.Decoder {
@@ -518,8 +523,8 @@ func (f *fakeAPIFactory) UnstructuredObject() (meta.RESTMapper, runtime.ObjectTy
 	groupResources := testDynamicResources()
 	mapper := discovery.NewRESTMapper(groupResources, meta.InterfacesForUnstructured)
 	typer := discovery.NewUnstructuredObjectTyper(groupResources)
-
-	return cmdutil.NewShortcutExpander(mapper, nil), typer, nil
+	fakeDs := &fakeCachedDiscoveryClient{}
+	return cmdutil.NewShortcutExpander(mapper, fakeDs), typer, nil
 }
 
 func (f *fakeAPIFactory) Decoder(bool) runtime.Decoder {
