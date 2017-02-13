@@ -62,9 +62,12 @@ var (
 		accepts filenames as well as command line arguments, although the files you point to must
 		be previously saved versions of resources.
 
-		The files to edit will be output in the default API version, or a version specified
-		by --output-version. The default format is YAML - if you would like to edit in JSON
-		pass -o json. The flag --windows-line-endings can be used to force Windows line endings,
+		Editing is done with the API version used to fetch the resource.
+		To edit using a specific API version, fully-qualify the resource, version, and group.
+		
+		The default format is YAML. To edit in JSON, specify "-o json".
+		
+		The flag --windows-line-endings can be used to force Windows line endings,
 		otherwise the default for your operating system will be used.
 
 		In the event an error occurs while updating, a temporary file will be created on disk
@@ -80,8 +83,8 @@ var (
 		# Use an alternative editor
 		KUBE_EDITOR="nano" kubectl edit svc/docker-registry
 
-		# Edit the service 'docker-registry' in JSON using the v1 API format:
-		kubectl edit svc/docker-registry --output-version=v1 -o json`)
+		# Edit the job 'myjob' in JSON using the v1 API format:
+		kubectl edit job.v1.batch/myjob -o json`)
 )
 
 func NewCmdEdit(f cmdutil.Factory, out, errOut io.Writer) *cobra.Command {
@@ -114,7 +117,10 @@ func NewCmdEdit(f cmdutil.Factory, out, errOut io.Writer) *cobra.Command {
 	cmdutil.AddFilenameOptionFlags(cmd, options, usage)
 	cmdutil.AddValidateFlags(cmd)
 	cmd.Flags().StringP("output", "o", "yaml", "Output format. One of: yaml|json.")
-	cmd.Flags().String("output-version", "", "Output the formatted object with the given group version (for ex: 'extensions/v1beta1').")
+	cmd.Flags().String("output-version", "", "DEPRECATED: To edit using a specific API version, fully-qualify the resource, version, and group (for example: 'jobs.v1.batch/myjob').")
+	cmd.Flags().MarkDeprecated("output-version", "editing is now done using the resource exactly as fetched from the API. To edit using a specific API version, fully-qualify the resource, version, and group (for example: 'jobs.v1.batch/myjob').")
+	cmd.Flags().MarkHidden("output-version")
+
 	cmd.Flags().Bool("windows-line-endings", gruntime.GOOS == "windows", "Use Windows line-endings (default Unix line-endings)")
 	cmdutil.AddApplyAnnotationFlags(cmd)
 	cmdutil.AddRecordFlag(cmd)
