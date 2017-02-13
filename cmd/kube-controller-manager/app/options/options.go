@@ -103,7 +103,7 @@ func NewCMServer() *CMServer {
 			ConcurrentGCSyncs:        20,
 			ClusterSigningCertFile:   "/etc/kubernetes/ca/ca.pem",
 			ClusterSigningKeyFile:    "/etc/kubernetes/ca/ca.key",
-			ReconcilerSyncLoopPeriod: metav1.Duration{Duration: 5 * time.Second},
+			ReconcilerSyncLoopPeriod: metav1.Duration{Duration: 60 * time.Second},
 			EnableTaintManager:       true,
 		},
 	}
