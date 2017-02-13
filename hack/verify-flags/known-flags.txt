@@ -145,7 +145,6 @@ dns-bind-address
 dns-port
 dns-provider
 dns-provider-config
-dns-zone-name
 docker-email
 docker-endpoint
 docker-exec-handler
@@ -586,7 +585,6 @@ start-services
 static-pods-config
 stats-port
 stop-services
-storage-backend
 storage-media-type
 storage-version
 storage-versions

@@ -78,39 +78,37 @@ func TestInitFederation(t *testing.T) {
 	defer kubefedtesting.RemoveFakeKubeconfigFiles(fakeKubeFiles)
 
 	testCases := []struct {
-		federation            string
-		kubeconfigGlobal      string
-		kubeconfigExplicit    string
-		dnsZoneName           string
-		lbIP                  string
-		apiserverServiceType  v1.ServiceType
-		advertiseAddress      string
-		image                 string
-		etcdPVCapacity        string
-		etcdPersistence       string
-		expectedErr           string
-		dnsProvider           string
-		storageBackend        string
-		dryRun                string
-		apiserverArgOverrides string
-		cmArgOverrides        string
+		federation           string
+		kubeconfigGlobal     string
+		kubeconfigExplicit   string
+		dnsZoneName          string
+		lbIP                 string
+		apiserverServiceType v1.ServiceType
+		advertiseAddress     string
+		image                string
+		etcdPVCapacity       string
+		etcdPersistence      string
+		expectedErr          string
+		dnsProvider          string
+		storageBackend       string
+		dryRun               string
 	}{
+		// TODO: The data in the below tests needs to be re-organised
+		// and the overall tests in this section might need re-work.
 		{
-			federation:            "union",
-			kubeconfigGlobal:      fakeKubeFiles[0],
-			kubeconfigExplicit:    "",
-			dnsZoneName:           "example.test.",
-			lbIP:                  lbIP,
-			apiserverServiceType:  v1.ServiceTypeLoadBalancer,
-			image:                 "example.test/foo:bar",
-			etcdPVCapacity:        "5Gi",
-			etcdPersistence:       "true",
-			expectedErr:           "",
-			dnsProvider:           "test-dns-provider",
-			storageBackend:        "etcd2",
-			dryRun:                "",
-			apiserverArgOverrides: "--client-ca-file=override,--log-dir=override",
-			cmArgOverrides:        "--dns-provider=override,--log-dir=override",
+			federation:           "union",
+			kubeconfigGlobal:     fakeKubeFiles[0],
+			kubeconfigExplicit:   "",
+			dnsZoneName:          "example.test.",
+			lbIP:                 lbIP,
+			apiserverServiceType: v1.ServiceTypeLoadBalancer,
+			image:                "example.test/foo:bar",
+			etcdPVCapacity:       "5Gi",
+			etcdPersistence:      "true",
+			expectedErr:          "",
+			dnsProvider:          "test-dns-provider",
+			storageBackend:       "etcd2",
+			dryRun:               "",
 		},
 		{
 			federation:           "union",
@@ -200,7 +198,7 @@ func TestInitFederation(t *testing.T) {
 		} else {
 			dnsProvider = "google-clouddns" //default value of dns-provider
 		}
-		hostFactory, err := fakeInitHostFactory(tc.apiserverServiceType, tc.federation, util.DefaultFederationSystemNamespace, tc.advertiseAddress, tc.lbIP, tc.dnsZoneName, tc.image, dnsProvider, tc.etcdPersistence, tc.etcdPVCapacity, tc.storageBackend, tc.apiserverArgOverrides, tc.cmArgOverrides)
+		hostFactory, err := fakeInitHostFactory(tc.apiserverServiceType, tc.federation, util.DefaultFederationSystemNamespace, tc.advertiseAddress, tc.lbIP, tc.dnsZoneName, tc.image, dnsProvider, tc.etcdPersistence, tc.etcdPVCapacity, tc.storageBackend)
 		if err != nil {
 			t.Fatalf("[%d] unexpected error: %v", i, err)
 		}
@@ -214,16 +212,15 @@ func TestInitFederation(t *testing.T) {
 
 		cmd.Flags().Set("kubeconfig", tc.kubeconfigExplicit)
 		cmd.Flags().Set("host-cluster-context", "substrate")
-		cmd.Flags().Set("dns-zone-name", tc.dnsZoneName)
 		cmd.Flags().Set("image", tc.image)
-		cmd.Flags().Set("apiserver-arg-overrides", tc.apiserverArgOverrides)
-		cmd.Flags().Set("controllermanager-arg-overrides", tc.cmArgOverrides)
 
+		apiserverOverrides := ""
+		cmOverrides := fmt.Sprintf("--zone-name=%s", tc.dnsZoneName)
 		if tc.storageBackend != "" {
-			cmd.Flags().Set("storage-backend", tc.storageBackend)
+			apiserverOverrides = fmt.Sprintf("--storage-backend=%s", tc.storageBackend)
 		}
 		if tc.dnsProvider != "" {
-			cmd.Flags().Set("dns-provider", tc.dnsProvider)
+			cmOverrides = fmt.Sprintf("%s,--dns-provider=%s", cmOverrides, tc.dnsProvider)
 		}
 		if tc.etcdPVCapacity != "" {
 			cmd.Flags().Set("etcd-pv-capacity", tc.etcdPVCapacity)
@@ -238,6 +235,8 @@ func TestInitFederation(t *testing.T) {
 		if tc.dryRun == "valid-run" {
 			cmd.Flags().Set("dry-run", "true")
 		}
+		cmd.Flags().Set("apiserver-arg-overrides", apiserverOverrides)
+		cmd.Flags().Set("controllermanager-arg-overrides", cmOverrides)
 
 		cmd.Run(cmd, []string{tc.federation})
 
@@ -565,7 +564,7 @@ func TestCertsHTTPS(t *testing.T) {
 	}
 }
 
-func fakeInitHostFactory(apiserverServiceType v1.ServiceType, federationName, namespaceName, advertiseAddress, lbIp, dnsZoneName, image, dnsProvider, etcdPersistence, etcdPVCapacity, storageProvider, apiserverOverrideArg, cmOverrideArg string) (cmdutil.Factory, error) {
+func fakeInitHostFactory(apiserverServiceType v1.ServiceType, federationName, namespaceName, advertiseAddress, lbIp, dnsZoneName, image, dnsProvider, etcdPersistence, etcdPVCapacity, storageProvider string) (cmdutil.Factory, error) {
 	svcName := federationName + "-apiserver"
 	svcUrlPrefix := "/api/v1/namespaces/federation-system/services"
 	credSecretName := svcName + "-credentials"
@@ -773,15 +772,9 @@ func fakeInitHostFactory(apiserverServiceType v1.ServiceType, federationName, na
 		"--admission-control=NamespaceLifecycle",
 		fmt.Sprintf("--storage-backend=%s", storageProvider),
 		fmt.Sprintf("--advertise-address=%s", address),
+		"--client-ca-file=/etc/federation/apiserver/ca.crt",
 	}
 
-	if apiserverOverrideArg != "" {
-		apiserverArgs = append(apiserverArgs, "--client-ca-file=override")
-		apiserverArgs = append(apiserverArgs, "--log-dir=override")
-
-	} else {
-		apiserverArgs = append(apiserverArgs, "--client-ca-file=/etc/federation/apiserver/ca.crt")
-	}
 	sort.Strings(apiserverArgs)
 	apiserverCommand = append(apiserverCommand, apiserverArgs...)
 
@@ -885,13 +878,7 @@ func fakeInitHostFactory(apiserverServiceType v1.ServiceType, federationName, na
 		fmt.Sprintf("--federation-name=%s", federationName),
 		fmt.Sprintf("--zone-name=%s", dnsZoneName),
 		fmt.Sprintf("--master=https://%s", svcName),
-	}
-
-	if cmOverrideArg != "" {
-		cmArgs = append(cmArgs, "--dns-provider=override")
-		cmArgs = append(cmArgs, "--log-dir=override")
-	} else {
-		cmArgs = append(cmArgs, fmt.Sprintf("--dns-provider=%s", dnsProvider))
+		fmt.Sprintf("--dns-provider=%s", dnsProvider),
 	}
 
 	sort.Strings(cmArgs)

@@ -127,13 +127,10 @@ type InitFederationOptions struct {
 }
 
 type InitFederation struct {
-	DNSZoneName                      string
 	Image                            string
-	DNSProvider                      string
 	EtcdPVCapacity                   string
 	EtcdPersistentStorage            bool
 	DryRun                           bool
-	StorageBackend                   string
 	APIServerOverridesString         string
 	APIServerOverrides               map[string]string
 	ControllerManagerOverridesString string
@@ -146,13 +143,10 @@ type InitFederation struct {
 func (o *InitFederation) Bind(flags *pflag.FlagSet) {
 	defaultImage := fmt.Sprintf("%s:%s", hyperkubeImageName, version.Get())
 
-	flags.StringVar(&o.DNSZoneName, "dns-zone-name", "", "DNS suffix for this federation. Federated Service DNS names are published with this suffix.")
 	flags.StringVar(&o.Image, "image", defaultImage, "Image to use for federation API server and controller manager binaries.")
-	flags.StringVar(&o.DNSProvider, "dns-provider", "google-clouddns", "Dns provider to be used for this deployment.")
 	flags.StringVar(&o.EtcdPVCapacity, "etcd-pv-capacity", "10Gi", "Size of persistent volume claim to be used for etcd.")
 	flags.BoolVar(&o.EtcdPersistentStorage, "etcd-persistent-storage", true, "Use persistent volume for etcd. Defaults to 'true'.")
 	flags.BoolVar(&o.DryRun, "dry-run", false, "dry run without sending commands to server.")
-	flags.StringVar(&o.StorageBackend, "storage-backend", "etcd2", "The storage backend for persistence. Options: 'etcd2' (default), 'etcd3'.")
 	flags.StringVar(&o.APIServerOverridesString, "apiserver-arg-overrides", "", "comma separated list of federation-apiserver arguments to override: Example \"--arg1=value1,--arg2=value2...\"")
 	flags.StringVar(&o.ControllerManagerOverridesString, "controllermanager-arg-overrides", "", "comma separated list of federation-controller-manager arguments to override: Example \"--arg1=value1,--arg2=value2...\"")
 	flags.StringVar(&o.APIServerServiceTypeString, apiserverServiceTypeFlag, string(v1.ServiceTypeLoadBalancer), "The type of service to create for federation API server. Options: 'LoadBalancer' (default), 'NodePort'.")
@@ -286,7 +280,7 @@ func (o *InitFederationOptions) Run(cmdOut io.Writer, config util.AdminConfig) e
 	}
 
 	// 6. Create federation API server
-	_, err = createAPIServer(hostClientset, o.FederationSystemNamespace, serverName, o.Image, serverCredName, advertiseAddress, o.StorageBackend, o.APIServerOverrides, pvc, o.DryRun)
+	_, err = createAPIServer(hostClientset, o.FederationSystemNamespace, serverName, o.Image, serverCredName, advertiseAddress, o.APIServerOverrides, pvc, o.DryRun)
 	if err != nil {
 		return err
 	}
@@ -307,7 +301,7 @@ func (o *InitFederationOptions) Run(cmdOut io.Writer, config util.AdminConfig) e
 	}
 
 	// 7c. Create federation controller manager deployment.
-	_, err = createControllerManager(hostClientset, o.FederationSystemNamespace, o.Name, svc.Name, cmName, o.Image, cmKubeconfigName, o.DNSZoneName, o.DNSProvider, sa.Name, o.ControllerManagerOverrides, o.DryRun)
+	_, err = createControllerManager(hostClientset, o.FederationSystemNamespace, o.Name, svc.Name, cmName, o.Image, cmKubeconfigName, sa.Name, o.ControllerManagerOverrides, o.DryRun)
 	if err != nil {
 		return err
 	}
@@ -559,7 +553,7 @@ func createPVC(clientset *client.Clientset, namespace, svcName, etcdPVCapacity s
 	return clientset.Core().PersistentVolumeClaims(namespace).Create(pvc)
 }
 
-func createAPIServer(clientset *client.Clientset, namespace, name, image, credentialsName, advertiseAddress, storageBackend string, argOverrides map[string]string, pvc *api.PersistentVolumeClaim, dryRun bool) (*extensions.Deployment, error) {
+func createAPIServer(clientset *client.Clientset, namespace, name, image, credentialsName, advertiseAddress string, argOverrides map[string]string, pvc *api.PersistentVolumeClaim, dryRun bool) (*extensions.Deployment, error) {
 	command := []string{
 		"/hyperkube",
 		"federation-apiserver",
@@ -574,7 +568,6 @@ func createAPIServer(clientset *client.Clientset, namespace, name, image, creden
 		"--admission-control":    "NamespaceLifecycle",
 	}
 
-	argsMap["--storage-backend"] = storageBackend
 	if advertiseAddress != "" {
 		argsMap["--advertise-address"] = advertiseAddress
 	}
@@ -722,20 +715,19 @@ func createRoleBindings(clientset *client.Clientset, namespace, saName string, d
 	return newRole, newRolebinding, err
 }
 
-func createControllerManager(clientset *client.Clientset, namespace, name, svcName, cmName, image, kubeconfigName, dnsZoneName, dnsProvider, saName string, argOverrides map[string]string, dryRun bool) (*extensions.Deployment, error) {
+func createControllerManager(clientset *client.Clientset, namespace, name, svcName, cmName, image, kubeconfigName, saName string, argOverrides map[string]string, dryRun bool) (*extensions.Deployment, error) {
 	command := []string{
 		"/hyperkube",
 		"federation-controller-manager",
 	}
 	argsMap := map[string]string{
 		"--kubeconfig":          "/etc/federation/controller-manager/kubeconfig",
+		"--dns-provider":        "google-clouddns",
 		"--dns-provider-config": "",
 	}
 
 	argsMap["--master"] = fmt.Sprintf("https://%s", svcName)
-	argsMap["--dns-provider"] = dnsProvider
 	argsMap["--federation-name"] = name
-	argsMap["--zone-name"] = dnsZoneName
 
 	args := argMapsToArgStrings(argsMap, argOverrides)
 	command = append(command, args...)
