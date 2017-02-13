@@ -25,8 +25,8 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apiserver/pkg/endpoints/handlers/responsewriters"
+	v1listers "k8s.io/client-go/listers/core/v1"
 	"k8s.io/kubernetes/pkg/api"
-	v1listers "k8s.io/kubernetes/pkg/client/listers/core/v1"
 
 	apiregistrationapi "k8s.io/kubernetes/cmd/kube-aggregator/pkg/apis/apiregistration"
 	apiregistrationv1alpha1api "k8s.io/kubernetes/cmd/kube-aggregator/pkg/apis/apiregistration/v1alpha1"
