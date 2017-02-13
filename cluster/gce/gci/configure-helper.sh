@@ -631,6 +631,9 @@ function prepare-etcd-manifest {
   local etcd_protocol="http"
   local etcd_creds=""
 
+  if [[ -n "${INITIAL_ETCD_CLUSTER_STATE:-}" ]]; then
+    cluster_state="${INITIAL_ETCD_CLUSTER_STATE}"
+  fi
   if [[ -n "${ETCD_CA_KEY:-}" && -n "${ETCD_CA_CERT:-}" && -n "${ETCD_PEER_KEY:-}" && -n "${ETCD_PEER_CERT:-}" ]]; then
     etcd_creds=" --peer-trusted-ca-file /etc/srv/kubernetes/etcd-ca.crt --peer-cert-file /etc/srv/kubernetes/etcd-peer.crt --peer-key-file /etc/srv/kubernetes/etcd-peer.key -peer-client-cert-auth "
     etcd_protocol="https"
@@ -640,7 +643,6 @@ function prepare-etcd-manifest {
     etcd_host="etcd-${host}=${etcd_protocol}://${host}:$3"
     if [[ -n "${etcd_cluster}" ]]; then
       etcd_cluster+=","
-      cluster_state="existing"
     fi
     etcd_cluster+="${etcd_host}"
   done

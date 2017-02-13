@@ -764,6 +764,11 @@ EOF
 INITIAL_ETCD_CLUSTER: $(yaml-quote ${INITIAL_ETCD_CLUSTER})
 EOF
     fi
+    if [ -n "${INITIAL_ETCD_CLUSTER_STATE:-}" ]; then
+      cat >>$file <<EOF
+INITIAL_ETCD_CLUSTER_STATE: $(yaml-quote ${INITIAL_ETCD_CLUSTER_STATE})
+EOF
+    fi
     if [ -n "${ETCD_QUORUM_READ:-}" ]; then
       cat >>$file <<EOF
 ETCD_QUORUM_READ: $(yaml-quote ${ETCD_QUORUM_READ})
