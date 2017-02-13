@@ -544,6 +544,14 @@ items:
   - apiGroups:
     - ""
     resources:
+    - nodes
+    verbs:
+    - delete
+    - patch
+    - update
+  - apiGroups:
+    - ""
+    resources:
     - events
     verbs:
     - create
