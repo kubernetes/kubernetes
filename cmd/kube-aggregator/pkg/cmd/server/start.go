@@ -21,7 +21,6 @@ import (
 	"io"
 	"io/ioutil"
 
-	"github.com/pborman/uuid"
 	"github.com/spf13/cobra"
 
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -104,12 +103,6 @@ func (o AggregatorOptions) RunAggregator() error {
 		sets.NewString("watch", "proxy"),
 		sets.NewString("attach", "exec", "proxy", "log", "portforward"),
 	)
-
-	var err error
-	privilegedLoopbackToken := uuid.NewRandom().String()
-	if serverConfig.LoopbackClientConfig, err = serverConfig.SecureServingInfo.NewSelfClientConfig(privilegedLoopbackToken); err != nil {
-		return err
-	}
 
 	kubeconfig, err := restclient.InClusterConfig()
 	if err != nil {
