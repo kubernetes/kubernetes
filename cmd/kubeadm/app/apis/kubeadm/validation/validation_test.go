@@ -70,3 +70,101 @@ func TestValidateServiceSubnet(t *testing.T) {
 		}
 	}
 }
+
+func TestValidateMasterConfiguration(t *testing.T) {
+	var tests = []struct {
+		s        *kubeadm.MasterConfiguration
+		expected bool
+	}{
+		{&kubeadm.MasterConfiguration{}, false},
+		{&kubeadm.MasterConfiguration{
+			Discovery: kubeadm.Discovery{
+				HTTPS: &kubeadm.HTTPSDiscovery{URL: "foo"},
+				File:  &kubeadm.FileDiscovery{Path: "foo"},
+				Token: &kubeadm.TokenDiscovery{
+					ID:        "abcdef",
+					Secret:    "1234567890123456",
+					Addresses: []string{"foobar"},
+				},
+			},
+		}, false},
+		{&kubeadm.MasterConfiguration{
+			Discovery: kubeadm.Discovery{
+				HTTPS: &kubeadm.HTTPSDiscovery{URL: "foo"},
+			},
+		}, true},
+		{&kubeadm.MasterConfiguration{
+			Discovery: kubeadm.Discovery{
+				File: &kubeadm.FileDiscovery{Path: "foo"},
+			},
+		}, true},
+		{&kubeadm.MasterConfiguration{
+			Discovery: kubeadm.Discovery{
+				Token: &kubeadm.TokenDiscovery{
+					ID:        "abcdef",
+					Secret:    "1234567890123456",
+					Addresses: []string{"foobar"},
+				},
+			},
+		}, true},
+	}
+	for _, rt := range tests {
+		actual := ValidateMasterConfiguration(rt.s)
+		if (len(actual) == 0) != rt.expected {
+			t.Errorf(
+				"failed ValidateMasterConfiguration:\n\texpected: %t\n\t  actual: %t",
+				rt.expected,
+				(len(actual) == 0),
+			)
+		}
+	}
+}
+
+func TestValidateNodeConfiguration(t *testing.T) {
+	var tests = []struct {
+		s        *kubeadm.NodeConfiguration
+		expected bool
+	}{
+		{&kubeadm.NodeConfiguration{}, false},
+		{&kubeadm.NodeConfiguration{
+			Discovery: kubeadm.Discovery{
+				HTTPS: &kubeadm.HTTPSDiscovery{URL: "foo"},
+				File:  &kubeadm.FileDiscovery{Path: "foo"},
+				Token: &kubeadm.TokenDiscovery{
+					ID:        "abcdef",
+					Secret:    "1234567890123456",
+					Addresses: []string{"foobar"},
+				},
+			},
+		}, false},
+		{&kubeadm.NodeConfiguration{
+			Discovery: kubeadm.Discovery{
+				HTTPS: &kubeadm.HTTPSDiscovery{URL: "foo"},
+			},
+		}, true},
+		{&kubeadm.NodeConfiguration{
+			Discovery: kubeadm.Discovery{
+				File: &kubeadm.FileDiscovery{Path: "foo"},
+			},
+		}, true},
+		{&kubeadm.NodeConfiguration{
+			Discovery: kubeadm.Discovery{
+				Token: &kubeadm.TokenDiscovery{
+					ID:        "abcdef",
+					Secret:    "1234567890123456",
+					Addresses: []string{"foobar"},
+				},
+			},
+		}, true},
+	}
+	for _, rt := range tests {
+		actual := ValidateNodeConfiguration(rt.s)
+		if (len(actual) == 0) != rt.expected {
+			t.Errorf(
+				"failed ValidateNodeConfiguration:\n\texpected: %t\n\t  actual: %t",
+				rt.expected,
+				(len(actual) == 0),
+			)
+		}
+	}
+}
