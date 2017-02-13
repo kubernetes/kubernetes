@@ -205,7 +205,7 @@ func SetDefaults_KubeletConfiguration(obj *KubeletConfiguration) {
 		obj.CertDirectory = "/var/run/kubernetes"
 	}
 	if obj.CgroupsPerQOS == nil {
-		obj.CgroupsPerQOS = boolVar(false)
+		obj.CgroupsPerQOS = boolVar(true)
 	}
 	if obj.ContainerRuntime == "" {
 		obj.ContainerRuntime = "docker"
