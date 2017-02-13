@@ -116,6 +116,10 @@ func (p *flockerPlugin) SupportsMountOption() bool {
 	return false
 }
 
+func (plugin *flockerPlugin) SupportsBulkVolumeVerification() bool {
+	return false
+}
+
 func (plugin *flockerPlugin) GetAccessModes() []v1.PersistentVolumeAccessMode {
 	return []v1.PersistentVolumeAccessMode{
 		v1.ReadWriteOnce,

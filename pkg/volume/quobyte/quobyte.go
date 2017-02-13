@@ -122,6 +122,10 @@ func (plugin *quobytePlugin) SupportsMountOption() bool {
 	return true
 }
 
+func (plugin *quobytePlugin) SupportsBulkVolumeVerification() bool {
+	return false
+}
+
 func (plugin *quobytePlugin) GetAccessModes() []v1.PersistentVolumeAccessMode {
 	return []v1.PersistentVolumeAccessMode{
 		v1.ReadWriteOnce,
