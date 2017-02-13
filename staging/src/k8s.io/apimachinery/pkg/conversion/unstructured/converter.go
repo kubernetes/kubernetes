@@ -57,18 +57,20 @@ var (
 	unmarshalerType        = reflect.TypeOf(new(encodingjson.Unmarshaler)).Elem()
 	mapStringInterfaceType = reflect.TypeOf(map[string]interface{}{})
 	fieldCache             = newFieldsCache()
+	Converter              = newConverter()
+
 )
 
-// Converter knows how to convert betweek runtime.Object and
+// ConverterImpl knows how to convert betweek runtime.Object and
 // Unstructured in both ways.
-type Converter struct {
+type ConverterImpl struct {
 }
 
-func NewConverter() *Converter {
-	return &Converter{}
+func newConverter() *ConverterImpl {
+	return &ConverterImpl{}
 }
 
-func (c *Converter) FromUnstructured(u map[string]interface{}, obj runtime.Object) error {
+func (c *ConverterImpl) FromUnstructured(u map[string]interface{}, obj runtime.Object) error {
 	return fromUnstructured(reflect.ValueOf(u), reflect.ValueOf(obj).Elem())
 }
 
@@ -304,7 +306,7 @@ func interfaceFromUnstructured(sv, dv reflect.Value) error {
 	return nil
 }
 
-func (c *Converter) ToUnstructured(obj runtime.Object, u *map[string]interface{}) error {
+func (c *ConverterImpl) ToUnstructured(obj runtime.Object, u *map[string]interface{}) error {
 	return toUnstructured(reflect.ValueOf(obj).Elem(), reflect.ValueOf(u).Elem())
 }
 
