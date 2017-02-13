@@ -98,6 +98,8 @@ function mkcp() {
     mkdir -p "${CLIENT_REPO_TEMP}/$2" && cp -r "${MAIN_REPO}/$1" "${CLIENT_REPO_TEMP}/$2"
 }
 
+mkcp "/pkg/client/unversioned/remotecommand" "/pkg/client/unversioned"
+
 # assemble all the other parts of the staging directory
 echo "copying client packages"
 # need to copy version.  We aren't authoritative here
@@ -125,6 +127,7 @@ rm -rf "${CLIENT_REPO_TEMP}"/vendor/k8s.io/kubernetes
 # client-go will share the vendor of the main repo for now. When client-go
 # becomes a standalone repo, it will have its own vendor
 mv "${CLIENT_REPO_TEMP}"/vendor "${CLIENT_REPO_TEMP}"/_vendor
+rm -r "${CLIENT_REPO_TEMP}"/_vendor/github.com/docker/docker/project/
 
 echo "rewriting Godeps.json"
 go run "${DIR}/godeps-json-updater.go" --godeps-file="${CLIENT_REPO_TEMP}/Godeps/Godeps.json" --client-go-import-path="${CLIENT_REPO_FROM_SRC}"
@@ -171,6 +174,7 @@ function mvfolder {
     done
 }
 
+mvfolder "pkg/client/unversioned/remotecommand" "tools/remotecommand"
 mvfolder "pkg/client/clientset_generated/${CLIENTSET}" kubernetes
 mvfolder "pkg/client/informers/informers_generated/externalversions" informers
 mvfolder "pkg/client/listers" listers
