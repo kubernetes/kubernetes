@@ -32,7 +32,6 @@ import (
 
 	"github.com/go-openapi/spec"
 	"github.com/golang/glog"
-	"github.com/pborman/uuid"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 
@@ -258,12 +257,7 @@ func Run(s *options.ServerRunOptions) error {
 		return fmt.Errorf("invalid Authentication Config: %v", err)
 	}
 
-	privilegedLoopbackToken := uuid.NewRandom().String()
-	selfClientConfig, err := genericapiserver.NewSelfClientConfig(genericConfig.SecureServingInfo, genericConfig.InsecureServingInfo, privilegedLoopbackToken)
-	if err != nil {
-		return fmt.Errorf("failed to create clientset: %v", err)
-	}
-	client, err := internalclientset.NewForConfig(selfClientConfig)
+	client, err := internalclientset.NewForConfig(genericConfig.LoopbackClientConfig)
 	if err != nil {
 		kubeAPIVersions := os.Getenv("KUBE_API_VERSIONS")
 		if len(kubeAPIVersions) == 0 {
@@ -301,7 +295,6 @@ func Run(s *options.ServerRunOptions) error {
 	kubeVersion := version.Get()
 
 	genericConfig.Version = &kubeVersion
-	genericConfig.LoopbackClientConfig = selfClientConfig
 	genericConfig.Authenticator = apiAuthenticator
 	genericConfig.Authorizer = apiAuthorizer
 	genericConfig.AdmissionControl = admissionController

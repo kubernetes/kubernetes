@@ -14128,6 +14128,7 @@ go_library(
     tags = ["automanaged"],
     deps = [
         "//vendor:github.com/golang/glog",
+        "//vendor:github.com/pborman/uuid",
         "//vendor:github.com/spf13/pflag",
         "//vendor:gopkg.in/natefinch/lumberjack.v2",
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
@@ -14836,6 +14837,7 @@ go_test(
         "//vendor:k8s.io/apiserver/pkg/storage/etcd/testing",
         "//vendor:k8s.io/apiserver/pkg/storage/storagebackend",
         "//vendor:k8s.io/client-go/pkg/api",
+        "//vendor:k8s.io/client-go/rest",
     ],
 )
 
@@ -15303,6 +15305,7 @@ go_test(
         "//vendor:k8s.io/apiserver/pkg/endpoints/request",
         "//vendor:k8s.io/apiserver/pkg/server",
         "//vendor:k8s.io/apiserver/pkg/util/flag",
+        "//vendor:k8s.io/client-go/rest",
         "//vendor:k8s.io/client-go/util/cert",
     ],
 )
@@ -15399,7 +15402,6 @@ go_library(
     srcs = ["k8s.io/sample-apiserver/pkg/cmd/server/start.go"],
     tags = ["automanaged"],
     deps = [
-        "//vendor:github.com/pborman/uuid",
         "//vendor:github.com/spf13/cobra",
         "//vendor:k8s.io/apiserver/pkg/server",
         "//vendor:k8s.io/apiserver/pkg/server/options",
