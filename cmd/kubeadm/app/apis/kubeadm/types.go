@@ -40,20 +40,13 @@ type MasterConfiguration struct {
 	KubernetesVersion string
 	CloudProvider     string
 	AuthorizationMode string
-	// SelfHosted enables an alpha deployment type where the apiserver, scheduler, and
-	// controller manager are managed by Kubernetes itself. This option is likely to
-	// become the default in the future.
-	SelfHosted bool
-
-	APIServerExtraArgs         map[string]string
-	ControllerManagerExtraArgs map[string]string
-	SchedulerExtraArgs         map[string]string
 }
 
 type API struct {
-	AdvertiseAddress string
-	ExternalDNSNames []string
-	BindPort         int32
+	AdvertiseAddresses []string
+	ExternalDNSNames   []string
+	Port               int32
+	PortRange          string
 }
 
 type Discovery struct {
@@ -92,13 +85,7 @@ type Etcd struct {
 type NodeConfiguration struct {
 	metav1.TypeMeta
 
-	CACertPath     string
-	DiscoveryFile  string
-	DiscoveryToken string
-	// Currently we only pay attention to one api server but hope to support >1 in the future
-	DiscoveryTokenAPIServers []string
-	TLSBootstrapToken        string
-	Token                    string
+	Discovery Discovery
 }
 
 // ClusterInfo TODO add description
