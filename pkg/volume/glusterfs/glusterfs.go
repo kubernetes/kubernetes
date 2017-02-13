@@ -116,6 +116,10 @@ func (plugin *glusterfsPlugin) RequiresRemount() bool {
 	return false
 }
 
+func (plugin *glusterfsPlugin) SupportsBulkVolumeVerification() bool {
+	return false
+}
+
 func (plugin *glusterfsPlugin) GetAccessModes() []v1.PersistentVolumeAccessMode {
 	return []v1.PersistentVolumeAccessMode{
 		v1.ReadWriteOnce,

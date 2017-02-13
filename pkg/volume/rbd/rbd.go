@@ -86,6 +86,10 @@ func (plugin *rbdPlugin) RequiresRemount() bool {
 	return false
 }
 
+func (plugin *rbdPlugin) SupportsBulkVolumeVerification() bool {
+	return false
+}
+
 func (plugin *rbdPlugin) GetAccessModes() []v1.PersistentVolumeAccessMode {
 	return []v1.PersistentVolumeAccessMode{
 		v1.ReadWriteOnce,
