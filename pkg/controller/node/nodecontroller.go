@@ -198,7 +198,7 @@ func NewNodeController(
 		glog.V(0).Infof("Sending events to api server.")
 		eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: v1core.New(kubeClient.Core().RESTClient()).Events("")})
 	} else {
-		glog.V(0).Infof("No api server defined - no events will be sent to API server.")
+		glog.Fatalf("kubeClient is nil when starting NodeController")
 	}
 
 	if kubeClient != nil && kubeClient.Core().RESTClient().GetRateLimiter() != nil {
