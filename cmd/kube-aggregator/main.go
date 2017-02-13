@@ -21,9 +21,8 @@ import (
 	"os"
 	"runtime"
 
+	"k8s.io/apiserver/pkg/util/logs"
 	"k8s.io/kubernetes/cmd/kube-aggregator/pkg/cmd/server"
-	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
-	"k8s.io/kubernetes/pkg/util/logs"
 
 	// force compilation of packages we'll later rely upon
 	_ "k8s.io/kubernetes/cmd/kube-aggregator/pkg/apis/apiregistration/install"
@@ -44,6 +43,6 @@ func main() {
 	cmd := server.NewCommandStartAggregator(os.Stdout, os.Stderr)
 	cmd.Flags().AddGoFlagSet(flag.CommandLine)
 	if err := cmd.Execute(); err != nil {
-		cmdutil.CheckErr(err)
+		panic(err)
 	}
 }

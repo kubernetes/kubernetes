@@ -16,7 +16,6 @@ go_library(
         "//cmd/kube-aggregator/pkg/apiserver:go_default_library",
         "//pkg/api:go_default_library",
         "//pkg/client/clientset_generated/clientset:go_default_library",
-        "//pkg/kubectl/cmd/util:go_default_library",
         "//vendor:github.com/pborman/uuid",
         "//vendor:github.com/spf13/cobra",
         "//vendor:k8s.io/apimachinery/pkg/util/sets",
