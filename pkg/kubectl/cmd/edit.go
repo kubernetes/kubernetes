@@ -248,37 +248,32 @@ func runEdit(f cmdutil.Factory, out, errOut io.Writer, cmd *cobra.Command, args 
 			}
 
 			// parse the edited file
-			var updatedVisitor resource.Visitor
-			if updatedInfos, err := updatedResultsGetter(edited).Infos(); err != nil {
+			updatedInfos, err := updatedResultsGetter(edited).Infos()
+			if err != nil {
 				// syntax error
 				containsError = true
 				results.header.reasons = append(results.header.reasons, editReason{head: fmt.Sprintf("The edited file had a syntax error: %v", err)})
 				continue
-			} else {
-				updatedVisitor = resource.InfoListVisitor(updatedInfos)
 			}
 			// not a syntax error as it turns out...
 			containsError = false
+			updatedVisitor := resource.InfoListVisitor(updatedInfos)
 
-			namespaceVisitor := updatedVisitor
 			// need to make sure the original namespace wasn't changed while editing
-			if err = namespaceVisitor.Visit(resource.RequireNamespace(cmdNamespace)); err != nil {
+			if err = updatedVisitor.Visit(resource.RequireNamespace(cmdNamespace)); err != nil {
 				return preservedFile(err, file, errOut)
 			}
 
 			// iterate through all items to apply annotations
-			annotationVisitor := updatedVisitor
-			if _, err := visitAnnotation(cmd, f, annotationVisitor, encoder); err != nil {
+			if _, err := visitAnnotation(cmd, f, updatedVisitor, encoder); err != nil {
 				return preservedFile(err, file, errOut)
 			}
 
 			switch editMode {
 			case NormalEditMode:
-				patchVisitor := updatedVisitor
-				err = visitToPatch(infos, patchVisitor, mapper, encoder, out, errOut, &results, file)
+				err = visitToPatch(infos, updatedVisitor, mapper, encoder, out, errOut, &results, file)
 			case EditBeforeCreateMode:
-				createVisitor := updatedVisitor
-				err = visitToCreate(createVisitor, mapper, out, errOut, &results, file)
+				err = visitToCreate(updatedVisitor, mapper, out, errOut, &results, file)
 			default:
 				err = fmt.Errorf("Not supported edit mode %q", editMode)
 			}
