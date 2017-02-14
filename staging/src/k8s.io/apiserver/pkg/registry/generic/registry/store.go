@@ -94,7 +94,7 @@ type Store struct {
 	KeyRootFunc func(ctx genericapirequest.Context) string
 
 	// KeyFunc returns the key for a specific object in the collection.
-	// KeyFund is dalled for Create/Update/Get/Delete. Note that 'namespace'
+	// KeyFunc is called for Create/Update/Get/Delete. Note that 'namespace'
 	// can be gotten from ctx.
 	//
 	// KeyFunc and KeyRootFunc must be supplied together or not at all.

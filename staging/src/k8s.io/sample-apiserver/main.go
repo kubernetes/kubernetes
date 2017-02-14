@@ -22,14 +22,13 @@ import (
 	"runtime"
 
 	"k8s.io/apimachinery/pkg/util/wait"
-	// "k8s.io/kubernetes/pkg/util/logs"
+	"k8s.io/apiserver/pkg/util/logs"
 	"k8s.io/sample-apiserver/pkg/cmd/server"
 )
 
 func main() {
-	// TODO move package and restore
-	// logs.InitLogs()
-	// defer logs.FlushLogs()
+	logs.InitLogs()
+	defer logs.FlushLogs()
 
 	if len(os.Getenv("GOMAXPROCS")) == 0 {
 		runtime.GOMAXPROCS(runtime.NumCPU())

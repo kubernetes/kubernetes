@@ -27,19 +27,20 @@ import (
 	"k8s.io/apiserver/pkg/registry/rest"
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	genericfilters "k8s.io/apiserver/pkg/server/filters"
-	"k8s.io/kubernetes/pkg/api"
-	kubeclientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
-	kubeinformers "k8s.io/kubernetes/pkg/client/informers/informers_generated"
-	v1listers "k8s.io/kubernetes/pkg/client/listers/core/v1"
-	"k8s.io/kubernetes/pkg/version"
+	kubeinformers "k8s.io/client-go/informers"
+	kubeclientset "k8s.io/client-go/kubernetes"
+	v1listers "k8s.io/client-go/listers/core/v1"
+	"k8s.io/client-go/pkg/api"
+	"k8s.io/client-go/pkg/version"
 
 	"k8s.io/kubernetes/cmd/kube-aggregator/pkg/apis/apiregistration"
 	"k8s.io/kubernetes/cmd/kube-aggregator/pkg/apis/apiregistration/v1alpha1"
-	aggregatorclient "k8s.io/kubernetes/cmd/kube-aggregator/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/cmd/kube-aggregator/pkg/client/clientset_generated/internalclientset"
-	"k8s.io/kubernetes/cmd/kube-aggregator/pkg/client/informers"
+	informers "k8s.io/kubernetes/cmd/kube-aggregator/pkg/client/informers/internalversion"
 	listers "k8s.io/kubernetes/cmd/kube-aggregator/pkg/client/listers/apiregistration/internalversion"
 	apiservicestorage "k8s.io/kubernetes/cmd/kube-aggregator/pkg/registry/apiservice/etcd"
+
+	_ "k8s.io/client-go/pkg/api/install"
 )
 
 // legacyAPIServiceName is the fixed name of the only non-groupified API version
@@ -105,10 +106,9 @@ func (c *Config) SkipComplete() completedConfig {
 func (c completedConfig) New() (*APIAggregator, error) {
 	informerFactory := informers.NewSharedInformerFactory(
 		internalclientset.NewForConfigOrDie(c.Config.GenericConfig.LoopbackClientConfig),
-		aggregatorclient.NewForConfigOrDie(c.Config.GenericConfig.LoopbackClientConfig),
 		5*time.Minute, // this is effectively used as a refresh interval right now.  Might want to do something nicer later on.
 	)
-	kubeInformers := kubeinformers.NewSharedInformerFactory(nil, c.CoreAPIServerClient, 5*time.Minute)
+	kubeInformers := kubeinformers.NewSharedInformerFactory(c.CoreAPIServerClient, 5*time.Minute)
 
 	proxyMux := http.NewServeMux()
 

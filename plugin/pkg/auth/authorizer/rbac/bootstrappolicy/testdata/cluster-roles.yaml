@@ -444,7 +444,7 @@ items:
     verbs:
     - update
   - apiGroups:
-    - '*'
+    - ""
     resources:
     - namespaces
     - nodes
@@ -472,6 +472,34 @@ items:
     resources:
     - cronjobs
     - jobs
+    verbs:
+    - list
+    - watch
+  - apiGroups:
+    - apps
+    resources:
+    - statefulsets
+    verbs:
+    - list
+    - watch
+  - apiGroups:
+    - policy
+    resources:
+    - poddisruptionbudgets
+    verbs:
+    - list
+    - watch
+  - apiGroups:
+    - autoscaling
+    resources:
+    - horizontalpodautoscalers
+    verbs:
+    - list
+    - watch
+  - apiGroups:
+    - certificates.k8s.io
+    resources:
+    - certificatesigningrequests
     verbs:
     - list
     - watch
@@ -518,6 +546,14 @@ items:
     resources:
     - nodes/status
     verbs:
+    - patch
+    - update
+  - apiGroups:
+    - ""
+    resources:
+    - nodes
+    verbs:
+    - delete
     - patch
     - update
   - apiGroups:

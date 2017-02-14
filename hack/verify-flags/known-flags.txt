@@ -519,7 +519,9 @@ requestheader-username-headers
 require-kubeconfig
 required-contexts
 resolv-conf
+resource
 resource-container
+resource-name
 resource-quota-sync-period
 resource-version
 results-dir
@@ -623,6 +625,7 @@ use-service-account-credentials
 use-kubernetes-cluster-service
 use-kubernetes-version
 user-whitelist
+verb
 verify-only
 versioned-clientset-package
 viper-config

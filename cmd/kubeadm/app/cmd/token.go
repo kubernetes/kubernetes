@@ -29,11 +29,12 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
+	"k8s.io/client-go/pkg/api"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubemaster "k8s.io/kubernetes/cmd/kubeadm/app/master"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/kubeconfig"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
-	"k8s.io/kubernetes/pkg/api"
+	bootstrapapi "k8s.io/kubernetes/pkg/bootstrap/api"
 	"k8s.io/kubernetes/pkg/kubectl"
 )
 
@@ -91,6 +92,9 @@ func NewCmdToken(out io.Writer, errW io.Writer) *cobra.Command {
 		Use:   "delete",
 		Short: "Delete bootstrap tokens on the server.",
 		Run: func(tokenCmd *cobra.Command, args []string) {
+			if len(args) < 1 {
+				kubeadmutil.CheckErr(fmt.Errorf("missing subcommand; 'token delete' is missing token of form [\"^([a-z0-9]{6})$\"]"))
+			}
 			err := RunDeleteToken(out, tokenCmd, args[0])
 			kubeadmutil.CheckErr(err)
 		},
@@ -164,7 +168,7 @@ func RunListTokens(out io.Writer, errW io.Writer, cmd *cobra.Command) error {
 
 	tokenSelector := fields.SelectorFromSet(
 		map[string]string{
-			api.SecretTypeField: string(api.SecretTypeBootstrapToken),
+			api.SecretTypeField: string(bootstrapapi.SecretTypeBootstrapToken),
 		},
 	)
 	listOptions := metav1.ListOptions{

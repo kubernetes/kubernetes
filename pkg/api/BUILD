@@ -11,7 +11,6 @@ load(
 go_library(
     name = "go_default_library",
     srcs = [
-        "conversion.go",
         "defaults.go",
         "doc.go",
         "field_constants.go",
@@ -25,7 +24,6 @@ go_library(
     ],
     tags = ["automanaged"],
     deps = [
-        "//pkg/util/labels:go_default_library",
         "//vendor:github.com/davecgh/go-spew/spew",
         "//vendor:k8s.io/apimachinery/pkg/api/meta",
         "//vendor:k8s.io/apimachinery/pkg/api/resource",

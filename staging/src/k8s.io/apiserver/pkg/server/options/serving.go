@@ -26,6 +26,7 @@ import (
 	"strconv"
 
 	"github.com/golang/glog"
+	"github.com/pborman/uuid"
 	"github.com/spf13/pflag"
 
 	utilnet "k8s.io/apimachinery/pkg/util/net"
@@ -139,6 +140,30 @@ func (s *SecureServingOptions) ApplyTo(c *server.Config) error {
 	if s.ServingOptions.BindPort <= 0 {
 		return nil
 	}
+	if err := s.applyServingInfoTo(c); err != nil {
+		return err
+	}
+
+	loopbackClientConfig, err := c.SecureServingInfo.NewSelfClientConfig(uuid.NewRandom().String())
+	switch {
+	// if we failed and there's no fallback loopback client config, we need to fail
+	case err != nil && c.LoopbackClientConfig == nil:
+		return err
+
+	// if we failed, but we already have a fallback loopback client config (usually insecure), allow it
+	case err != nil && c.LoopbackClientConfig != nil:
+
+	default:
+		c.LoopbackClientConfig = loopbackClientConfig
+	}
+
+	return nil
+}
+
+func (s *SecureServingOptions) applyServingInfoTo(c *server.Config) error {
+	if s.ServingOptions.BindPort <= 0 {
+		return nil
+	}
 
 	secureServingInfo := &server.SecureServingInfo{
 		ServingInfo: server.ServingInfo{
@@ -248,6 +273,12 @@ func (s *ServingOptions) ApplyTo(c *server.Config) error {
 
 	c.InsecureServingInfo = &server.ServingInfo{
 		BindAddress: net.JoinHostPort(s.BindAddress.String(), strconv.Itoa(s.BindPort)),
+	}
+
+	var err error
+	privilegedLoopbackToken := uuid.NewRandom().String()
+	if c.LoopbackClientConfig, err = c.InsecureServingInfo.NewSelfClientConfig(privilegedLoopbackToken); err != nil {
+		return err
 	}
 
 	return nil

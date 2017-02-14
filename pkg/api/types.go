@@ -189,6 +189,8 @@ const (
 	NamespaceNone string = ""
 	// NamespaceSystem is the system namespace where we place system components.
 	NamespaceSystem string = "kube-system"
+	// NamespacePublic is the namespace where we place public info (ConfigMaps)
+	NamespacePublic string = "kube-public"
 	// TerminationMessagePathDefault means the default path to capture the application termination message running in a container
 	TerminationMessagePathDefault string = "/dev/termination-log"
 )
@@ -623,6 +625,10 @@ type ISCSIVolumeSource struct {
 	// the ReadOnly setting in VolumeMounts.
 	// +optional
 	ReadOnly bool
+	// Required: list of iSCSI target portal ips for high availability.
+	// the portal is either an IP or ip_addr:port if port is other than default (typically TCP ports 860 and 3260)
+	// +optional
+	Portals []string
 }
 
 // Represents a Fibre Channel volume.
@@ -3343,9 +3349,6 @@ const (
 	// - Secret.Annotations["kubernetes.io/service-account.uid"] - the UID of the ServiceAccount the token identifies
 	// - Secret.Data["token"] - a token that identifies the service account to the API
 	SecretTypeServiceAccountToken SecretType = "kubernetes.io/service-account-token"
-
-	// SecretTypeBootstrapToken is the key for tokens used by kubeadm to validate cluster info during discovery.
-	SecretTypeBootstrapToken = "bootstrap.kubernetes.io/token"
 
 	// ServiceAccountNameKey is the key of the required annotation for SecretTypeServiceAccountToken secrets
 	ServiceAccountNameKey = "kubernetes.io/service-account.name"

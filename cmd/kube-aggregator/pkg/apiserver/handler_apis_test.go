@@ -27,10 +27,10 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/diff"
+	v1listers "k8s.io/client-go/listers/core/v1"
+	"k8s.io/client-go/pkg/api"
+	corev1 "k8s.io/client-go/pkg/api/v1"
 	"k8s.io/client-go/tools/cache"
-	"k8s.io/kubernetes/pkg/api"
-	corev1 "k8s.io/kubernetes/pkg/api/v1"
-	v1listers "k8s.io/kubernetes/pkg/client/listers/core/v1"
 
 	"k8s.io/kubernetes/cmd/kube-aggregator/pkg/apis/apiregistration"
 	listers "k8s.io/kubernetes/cmd/kube-aggregator/pkg/client/listers/apiregistration/internalversion"
@@ -81,7 +81,8 @@ func TestAPIsDelegation(t *testing.T) {
 			continue
 		}
 		if resp.StatusCode != http.StatusOK {
-			httputil.DumpResponse(resp, true)
+			bytes, _ := httputil.DumpResponse(resp, true)
+			t.Log(string(bytes))
 			t.Errorf("%s: %v", path, err)
 			continue
 		}

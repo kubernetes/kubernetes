@@ -32,11 +32,17 @@ func startCSRController(ctx ControllerContext) (bool, error) {
 		return false, nil
 	}
 	c := ctx.ClientBuilder.ClientOrDie("certificate-controller")
+
+	signer, err := certcontroller.NewCFSSLSigner(ctx.Options.ClusterSigningCertFile, ctx.Options.ClusterSigningKeyFile)
+	if err != nil {
+		glog.Errorf("Failed to start certificate controller: %v", err)
+		return false, nil
+	}
+
 	certController, err := certcontroller.NewCertificateController(
 		c,
 		ctx.NewInformerFactory.Certificates().V1beta1().CertificateSigningRequests(),
-		ctx.Options.ClusterSigningCertFile,
-		ctx.Options.ClusterSigningKeyFile,
+		signer,
 		certcontroller.NewGroupApprover(ctx.Options.ApproveAllKubeletCSRsForGroup),
 	)
 	if err != nil {

@@ -590,6 +590,23 @@ func rbacFuncs(t apitesting.TestingCommon) []interface{} {
 				r.APIGroup = rbac.GroupName
 			}
 		},
+		func(r *rbac.Subject, c fuzz.Continue) {
+			switch c.Int31n(3) {
+			case 0:
+				r.Kind = rbac.ServiceAccountKind
+				r.APIGroup = ""
+				c.FuzzNoCustom(&r.Name)
+				c.FuzzNoCustom(&r.Namespace)
+			case 1:
+				r.Kind = rbac.UserKind
+				r.APIGroup = rbac.GroupName
+				c.FuzzNoCustom(&r.Name)
+			case 2:
+				r.Kind = rbac.GroupKind
+				r.APIGroup = rbac.GroupName
+				c.FuzzNoCustom(&r.Name)
+			}
+		},
 	}
 }
 

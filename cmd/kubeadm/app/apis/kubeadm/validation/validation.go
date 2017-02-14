@@ -71,6 +71,12 @@ func ValidateHTTPSDiscovery(c *kubeadm.HTTPSDiscovery, fldPath *field.Path) fiel
 
 func ValidateTokenDiscovery(c *kubeadm.TokenDiscovery, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
+	if len(c.ID) == 0 || len(c.Secret) == 0 {
+		allErrs = append(allErrs, field.Invalid(fldPath, nil, "token must be specific as <ID>:<Secret>"))
+	}
+	if len(c.Addresses) == 0 {
+		allErrs = append(allErrs, field.Invalid(fldPath, nil, "at least one address is required"))
+	}
 	return allErrs
 }
 

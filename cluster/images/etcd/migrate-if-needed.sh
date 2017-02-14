@@ -52,6 +52,8 @@ if [ -z "${DATA_DIRECTORY:-}" ]; then
   exit 1
 fi
 
+echo "$(date +'%Y-%m-%d %H:%M:%S') Detecting if migration is needed"
+
 if [ "${TARGET_STORAGE}" != "etcd2" -a "${TARGET_STORAGE}" != "etcd3" ]; then
   echo "Not supported version of storage: ${TARGET_STORAGE}"
   exit 1
@@ -152,7 +154,7 @@ ROLLBACK="${ROLLBACK:-/usr/local/bin/rollback}"
 # If we are upgrading from 2.2.1 and this is the first try for upgrade,
 # do the backup to allow restoring from it in case of failed upgrade.
 BACKUP_DIR="${DATA_DIRECTORY}/migration-backup"
-if [ "${CURRENT_VERSION}" = "2.2.1" -a ! -d "${BACKUP_DIR}" ]; then
+if [ "${CURRENT_VERSION}" = "2.2.1" -a ! "${CURRENT_VERSION}" != "${TARGET_VERSION}" -a -d "${BACKUP_DIR}" ]; then
   echo "Backup etcd before starting migration"
   mkdir ${BACKUP_DIR}
   ETCDCTL_CMD="/usr/local/bin/etcdctl-2.2.1"
@@ -187,7 +189,7 @@ for step in ${SUPPORTED_VERSIONS}; do
     CURRENT_VERSION=${step}
     echo "${CURRENT_VERSION}/${CURRENT_STORAGE}" > "${DATA_DIRECTORY}/${VERSION_FILE}"
   fi
-  if [ "$(echo ${CURRENT_VERSION} | cut -c1-2)" = "3." -a "${CURRENT_STORAGE}" = "etcd2" -a "${TARGET_STORAGE}" = "etcd3" ]; then
+  if [ "$(echo ${CURRENT_VERSION} | cut -c1-2)" = "3." -a "${CURRENT_VERSION}" = "${step}" -a "${CURRENT_STORAGE}" = "etcd2" -a "${TARGET_STORAGE}" = "etcd3" ]; then
     # If it is the first 3.x release in the list and we are migrating
     # also from 'etcd2' to 'etcd3', do the migration now.
     echo "Performing etcd2 -> etcd3 migration"
@@ -241,3 +243,5 @@ if [ "${CURRENT_STORAGE}" = "etcd3" -a "${TARGET_STORAGE}" = "etcd2" ]; then
   CURRENT_VERSION="2.3.7"
   echo "${CURRENT_VERSION}/${CURRENT_STORAGE}" > "${DATA_DIRECTORY}/${VERSION_FILE}"
 fi
+
+echo "$(date +'%Y-%m-%d %H:%M:%S') Migration finished"

@@ -371,6 +371,9 @@ func (c completedConfig) New() (*GenericAPIServer, error) {
 	if c.Serializer == nil {
 		return nil, fmt.Errorf("Genericapiserver.New() called with config.Serializer == nil")
 	}
+	if c.LoopbackClientConfig == nil {
+		return nil, fmt.Errorf("Genericapiserver.New() called with config.LoopbackClientConfig == nil")
+	}
 
 	s := &GenericAPIServer{
 		discoveryAddresses:     c.DiscoveryAddresses,
