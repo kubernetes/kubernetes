@@ -24,10 +24,10 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	errorutils "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/client-go/tools/record"
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
 	apps "k8s.io/kubernetes/pkg/apis/apps/v1beta1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
+	"k8s.io/kubernetes/pkg/client/retry"
 )
 
 // StatefulPodControlInterface defines the interface that StatefulSetController uses to create, update, and delete Pods,
@@ -80,54 +80,50 @@ func (spc *realStatefulPodControl) CreateStatefulPod(set *apps.StatefulSet, pod 
 }
 
 func (spc *realStatefulPodControl) UpdateStatefulPod(set *apps.StatefulSet, pod *v1.Pod) error {
-	// we make a copy of the Pod on the stack and mutate the copy
-	// we copy back to pod to notify the caller of successful mutation
-	obj, err := api.Scheme.Copy(pod)
-	if err != nil {
-		return fmt.Errorf("unable to copy pod: %v", err)
-	}
-	podCopy := obj.(*v1.Pod)
-	for attempt := 0; attempt < maxUpdateRetries; attempt++ {
+	attemptedUpdate := false
+
+	err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
 		// assume the Pod is consistent
 		consistent := true
-		// if the Pod does not conform to it's identity, update the identity and dirty the Pod
-		if !identityMatches(set, podCopy) {
-			updateIdentity(set, podCopy)
+		// if the Pod does not conform to its identity, update the identity and dirty the Pod
+		if !identityMatches(set, pod) {
+			updateIdentity(set, pod)
 			consistent = false
 		}
 		// if the Pod does not conform to the StatefulSet's storage requirements, update the Pod's PVC's,
 		// dirty the Pod, and create any missing PVCs
-		if !storageMatches(set, podCopy) {
-			updateStorage(set, podCopy)
+		if !storageMatches(set, pod) {
+			updateStorage(set, pod)
 			consistent = false
-			if err := spc.createPersistentVolumeClaims(set, podCopy); err != nil {
+			if err := spc.createPersistentVolumeClaims(set, pod); err != nil {
 				spc.recordPodEvent("update", set, pod, err)
 				return err
 			}
 		}
 		// if the Pod is not dirty do nothing
 		if consistent {
-			*pod = *podCopy
 			return nil
 		}
+
+		attemptedUpdate = true
 		// commit the update, retrying on conflicts
-		_, err = spc.client.Core().Pods(set.Namespace).Update(podCopy)
-		if !apierrors.IsConflict(err) {
-			if err == nil {
-				*pod = *podCopy
-			}
-			spc.recordPodEvent("update", set, pod, err)
-			return err
+		_, err := spc.client.Core().Pods(set.Namespace).Update(pod)
+		if err == nil {
+			return nil
 		}
-		conflicting, err := spc.client.Core().Pods(set.Namespace).Get(podCopy.Name, metav1.GetOptions{})
-		if err != nil {
-			spc.recordPodEvent("update", set, podCopy, err)
-			return err
+		updateErr := err
+
+		conflicting, err := spc.client.Core().Pods(set.Namespace).Get(pod.Name, metav1.GetOptions{})
+		if err == nil {
+			pod = conflicting
 		}
-		*podCopy = *conflicting
+
+		return updateErr
+	})
+	if attemptedUpdate {
+		spc.recordPodEvent("update", set, pod, err)
 	}
-	spc.recordPodEvent("update", set, pod, updateConflictError)
-	return updateConflictError
+	return err
 }
 
 func (spc *realStatefulPodControl) DeleteStatefulPod(set *apps.StatefulSet, pod *v1.Pod) error {
@@ -137,31 +133,21 @@ func (spc *realStatefulPodControl) DeleteStatefulPod(set *apps.StatefulSet, pod 
 }
 
 func (spc *realStatefulPodControl) UpdateStatefulSetReplicas(set *apps.StatefulSet, replicas int32) error {
-	if set.Status.Replicas == replicas {
-		return nil
-	}
-	obj, err := api.Scheme.Copy(set)
-	if err != nil {
-		return fmt.Errorf("unable to copy set: %v", err)
-	}
-	setCopy := obj.(*apps.StatefulSet)
-	setCopy.Status.Replicas = replicas
-	for attempt := 0; attempt < maxUpdateRetries; attempt++ {
-		_, err := spc.client.Apps().StatefulSets(setCopy.Namespace).UpdateStatus(setCopy)
-		if !apierrors.IsConflict(err) {
-			if err == nil {
-				*set = *setCopy
-			}
-			return err
+	return retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+		set.Status.Replicas = replicas
+		_, err := spc.client.Apps().StatefulSets(set.Namespace).UpdateStatus(set)
+		if err == nil {
+			return nil
 		}
-		conflicting, err := spc.client.Apps().StatefulSets(setCopy.Namespace).Get(setCopy.Name, metav1.GetOptions{})
-		if err != nil {
-			return err
+
+		updateErr := err
+
+		if updated, err := spc.client.Apps().StatefulSets(set.Namespace).Get(set.Name, metav1.GetOptions{}); err == nil {
+			set = updated
 		}
-		conflicting.Status.Replicas = setCopy.Status.Replicas
-		*setCopy = *conflicting
-	}
-	return updateConflictError
+
+		return updateErr
+	})
 }
 
 // recordPodEvent records an event for verb applied to a Pod in a StatefulSet. If err is nil the generated event will

@@ -210,10 +210,12 @@ func TestStatefulPodControlUpdatesIdentity(t *testing.T) {
 	recorder := record.NewFakeRecorder(10)
 	set := newStatefulSet(3)
 	pod := newStatefulSetPod(set, 0)
-	fakeClient := &fake.Clientset{}
+	fakeClient := fake.NewSimpleClientset(set, pod)
 	control := NewRealStatefulPodControl(fakeClient, recorder)
-	fakeClient.AddReactor("update", "pods", func(action core.Action) (bool, runtime.Object, error) {
+	var updated *v1.Pod
+	fakeClient.PrependReactor("update", "pods", func(action core.Action) (bool, runtime.Object, error) {
 		update := action.(core.UpdateAction)
+		updated = update.GetObject().(*v1.Pod)
 		return true, update.GetObject(), nil
 	})
 	pod.Name = "goo-0"
@@ -227,7 +229,7 @@ func TestStatefulPodControlUpdatesIdentity(t *testing.T) {
 	} else if !strings.Contains(events[0], v1.EventTypeNormal) {
 		t.Errorf("Expected normal event found %s", events[0])
 	}
-	if !identityMatches(set, pod) {
+	if !identityMatches(set, updated) {
 		t.Error("Name update failed identity does not match")
 	}
 }
@@ -239,12 +241,13 @@ func TestStatefulPodControlUpdateIdentityFailure(t *testing.T) {
 	fakeClient := &fake.Clientset{}
 	control := NewRealStatefulPodControl(fakeClient, recorder)
 	fakeClient.AddReactor("update", "pods", func(action core.Action) (bool, runtime.Object, error) {
+		pod.Name = "goo-0"
 		return true, nil, apierrors.NewInternalError(errors.New("API server down"))
 	})
 	pod.Name = "goo-0"
 	control = NewRealStatefulPodControl(fakeClient, recorder)
 	if err := control.UpdateStatefulPod(set, pod); err == nil {
-		t.Error("Falied update does not generate an error")
+		t.Error("Failed update does not generate an error")
 	}
 	events := collectEvents(recorder.Events)
 	if eventCount := len(events); eventCount != 1 {
@@ -282,6 +285,12 @@ func TestStatefulPodControlUpdatesPodStorage(t *testing.T) {
 		update := action.(core.UpdateAction)
 		return true, update.GetObject(), nil
 	})
+	var updated *v1.Pod
+	fakeClient.PrependReactor("update", "pods", func(action core.Action) (bool, runtime.Object, error) {
+		update := action.(core.UpdateAction)
+		updated = update.GetObject().(*v1.Pod)
+		return true, update.GetObject(), nil
+	})
 	control = NewRealStatefulPodControl(fakeClient, recorder)
 	if err := control.UpdateStatefulPod(set, pod); err != nil {
 		t.Errorf("Successful update returned an error: %s", err)
@@ -295,7 +304,7 @@ func TestStatefulPodControlUpdatesPodStorage(t *testing.T) {
 			t.Errorf("Expected normal event found %s", events[i])
 		}
 	}
-	if !storageMatches(set, pod) {
+	if !storageMatches(set, updated) {
 		t.Error("Name update failed identity does not match")
 	}
 }
@@ -337,9 +346,6 @@ func TestStatefulPodControlUpdatePodStorageFailure(t *testing.T) {
 			t.Errorf("Expected normal event found %s", events[i])
 		}
 	}
-	if storageMatches(set, pod) {
-		t.Error("Storag matches on failed update")
-	}
 }
 
 func TestStatefulPodControlUpdatePodConflictSuccess(t *testing.T) {
@@ -348,11 +354,11 @@ func TestStatefulPodControlUpdatePodConflictSuccess(t *testing.T) {
 	pod := newStatefulSetPod(set, 0)
 	fakeClient := &fake.Clientset{}
 	control := NewRealStatefulPodControl(fakeClient, recorder)
-	attempts := 0
+	conflict := false
 	fakeClient.AddReactor("update", "pods", func(action core.Action) (bool, runtime.Object, error) {
 		update := action.(core.UpdateAction)
-		if attempts < maxUpdateRetries/2 {
-			attempts++
+		if !conflict {
+			conflict = true
 			return true, update.GetObject(), apierrors.NewConflict(action.GetResource().GroupResource(), pod.Name, errors.New("conflict"))
 		} else {
 			return true, update.GetObject(), nil
@@ -391,13 +397,13 @@ func TestStatefulPodControlUpdatePodConflictFailure(t *testing.T) {
 
 	})
 	fakeClient.AddReactor("get", "pods", func(action core.Action) (bool, runtime.Object, error) {
-		return true, nil, apierrors.NewInternalError(errors.New("API server down"))
-
+		pod.Name = "goo-0"
+		return true, pod, nil
 	})
 	pod.Name = "goo-0"
 	control = NewRealStatefulPodControl(fakeClient, recorder)
 	if err := control.UpdateStatefulPod(set, pod); err == nil {
-		t.Error("Falied update did not reaturn an error")
+		t.Error("Failed update did not return an error")
 	}
 	events := collectEvents(recorder.Events)
 	if eventCount := len(events); eventCount != 1 {
@@ -429,7 +435,7 @@ func TestStatefulPodControlUpdatePodConflictMaxRetries(t *testing.T) {
 	pod.Name = "goo-0"
 	control = NewRealStatefulPodControl(fakeClient, recorder)
 	if err := control.UpdateStatefulPod(set, pod); err == nil {
-		t.Error("Falied update did not reaturn an error")
+		t.Error("Failed update did not return an error")
 	}
 	events := collectEvents(recorder.Events)
 	if eventCount := len(events); eventCount != 1 {
@@ -506,7 +512,6 @@ func TestStatefulPodControlUpdatesSetStatus(t *testing.T) {
 func TestStatefulPodControlUpdateReplicasFailure(t *testing.T) {
 	recorder := record.NewFakeRecorder(10)
 	set := newStatefulSet(3)
-	replicas := set.Status.Replicas
 	fakeClient := &fake.Clientset{}
 	control := NewRealStatefulPodControl(fakeClient, recorder)
 	fakeClient.AddReactor("update", "statefulsets", func(action core.Action) (bool, runtime.Object, error) {
@@ -514,9 +519,6 @@ func TestStatefulPodControlUpdateReplicasFailure(t *testing.T) {
 	})
 	if err := control.UpdateStatefulSetReplicas(set, 2); err == nil {
 		t.Error("Failed update did not return error")
-	}
-	if set.Status.Replicas != replicas {
-		t.Errorf("UpdateStatefulSetStatus mutated the sets replicas %d", replicas)
 	}
 	events := collectEvents(recorder.Events)
 	if eventCount := len(events); eventCount != 0 {
@@ -527,14 +529,13 @@ func TestStatefulPodControlUpdateReplicasFailure(t *testing.T) {
 func TestStatefulPodControlUpdateReplicasConflict(t *testing.T) {
 	recorder := record.NewFakeRecorder(10)
 	set := newStatefulSet(3)
-	attempts := 0
+	conflict := false
 	fakeClient := &fake.Clientset{}
 	control := NewRealStatefulPodControl(fakeClient, recorder)
 	fakeClient.AddReactor("update", "statefulsets", func(action core.Action) (bool, runtime.Object, error) {
-
 		update := action.(core.UpdateAction)
-		if attempts < maxUpdateRetries/2 {
-			attempts++
+		if !conflict {
+			conflict = true
 			return true, update.GetObject(), apierrors.NewConflict(action.GetResource().GroupResource(), set.Name, errors.New("Object already exists"))
 		} else {
 			return true, update.GetObject(), nil
@@ -558,7 +559,6 @@ func TestStatefulPodControlUpdateReplicasConflict(t *testing.T) {
 func TestStatefulPodControlUpdateReplicasConflictFailure(t *testing.T) {
 	recorder := record.NewFakeRecorder(10)
 	set := newStatefulSet(3)
-	replicas := set.Status.Replicas
 	fakeClient := &fake.Clientset{}
 	control := NewRealStatefulPodControl(fakeClient, recorder)
 	fakeClient.AddReactor("update", "statefulsets", func(action core.Action) (bool, runtime.Object, error) {
@@ -571,9 +571,6 @@ func TestStatefulPodControlUpdateReplicasConflictFailure(t *testing.T) {
 	if err := control.UpdateStatefulSetReplicas(set, 2); err == nil {
 		t.Error("UpdateStatefulSetStatus failed to return an error on get failure")
 	}
-	if set.Status.Replicas != replicas {
-		t.Errorf("UpdateStatefulSetStatus mutated the sets replicas %d", set.Status.Replicas)
-	}
 	events := collectEvents(recorder.Events)
 	if eventCount := len(events); eventCount != 0 {
 		t.Errorf("Expected 0 events for successful status update %d", eventCount)
@@ -583,7 +580,6 @@ func TestStatefulPodControlUpdateReplicasConflictFailure(t *testing.T) {
 func TestStatefulPodControlUpdateReplicasConflictMaxRetries(t *testing.T) {
 	recorder := record.NewFakeRecorder(10)
 	set := newStatefulSet(3)
-	replicas := set.Status.Replicas
 	fakeClient := &fake.Clientset{}
 	control := NewRealStatefulPodControl(fakeClient, recorder)
 	fakeClient.AddReactor("update", "statefulsets", func(action core.Action) (bool, runtime.Object, error) {
@@ -594,9 +590,6 @@ func TestStatefulPodControlUpdateReplicasConflictMaxRetries(t *testing.T) {
 	})
 	if err := control.UpdateStatefulSetReplicas(set, 2); err == nil {
 		t.Error("UpdateStatefulSetStatus failure did not return an error ")
-	}
-	if set.Status.Replicas != replicas {
-		t.Errorf("UpdateStatefulSetStatus mutated the sets replicas %d", set.Status.Replicas)
 	}
 	events := collectEvents(recorder.Events)
 	if eventCount := len(events); eventCount != 0 {
