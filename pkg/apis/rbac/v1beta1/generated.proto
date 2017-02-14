@@ -183,11 +183,9 @@ message Subject {
   // If the Authorizer does not recognized the kind value, the Authorizer should report an error.
   optional string kind = 1;
 
-  // APIGroup holds the API group of the referenced subject.
-  // Defaults to "" for ServiceAccount subjects.
-  // Defaults to "rbac.authorization.k8s.io" for User and Group subjects.
+  // APIVersion holds the API group and version of the referenced object.
   // +optional
-  optional string apiGroup = 2;
+  optional string apiVersion = 2;
 
   // Name of the object being referenced.
   optional string name = 3;
