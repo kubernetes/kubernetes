@@ -26,7 +26,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/kubernetes/federation/client/clientset_generated/federation_clientset/typed/core/v1"
 	"k8s.io/kubernetes/pkg/api/v1"
-	api_v1 "k8s.io/kubernetes/pkg/api/v1"
+	"k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	"k8s.io/kubernetes/test/e2e/framework"
 	fedframework "k8s.io/kubernetes/test/e2e_federation/framework"
 
@@ -34,8 +34,9 @@ import (
 )
 
 const (
-	namespacePrefix = "e2e-namespace-test-"
-	eventNamePrefix = "e2e-namespace-test-event-"
+	eventNamePrefix      = "e2e-namespace-test-event-"
+	namespacePrefix      = "e2e-namespace-test-"
+	replicaSetNamePrefix = "e2e-namespace-test-rs-"
 )
 
 // Create/delete ingress api objects
@@ -97,18 +98,67 @@ var _ = framework.KubeDescribe("Federation namespace [Feature:Federation]", func
 			By(fmt.Sprintf("Verified that namespaces were not deleted from underlying clusters"))
 		})
 
+		// See https://github.com/kubernetes/kubernetes/issues/38225
+		It("deletes replicasets in the namespace when the namespace is deleted", func() {
+			fedframework.SkipUnlessFederated(f.ClientSet)
+
+			nsName := createNamespace(f.FederationClientset.Core().Namespaces())
+			rsName := v1.SimpleNameGenerator.GenerateName(replicaSetNamePrefix)
+			replicaCount := int32(2)
+			rs := &v1beta1.ReplicaSet{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      rsName,
+					Namespace: nsName,
+				},
+				Spec: v1beta1.ReplicaSetSpec{
+					Replicas: &replicaCount,
+					Selector: &metav1.LabelSelector{
+						MatchLabels: map[string]string{"name": "myrs"},
+					},
+					Template: v1.PodTemplateSpec{
+						ObjectMeta: metav1.ObjectMeta{
+							Labels: map[string]string{"name": "myrs"},
+						},
+						Spec: v1.PodSpec{
+							Containers: []v1.Container{
+								{
+									Name:  "nginx",
+									Image: "nginx",
+								},
+							},
+						},
+					},
+				},
+			}
+
+			By(fmt.Sprintf("Creating replicaset %s in namespace %s", rsName, nsName))
+			_, err := f.FederationClientset.Extensions().ReplicaSets(nsName).Create(rs)
+			if err != nil {
+				framework.Failf("Failed to create replicaset %v in namespace %s, err: %s", rs, nsName, err)
+			}
+
+			By(fmt.Sprintf("Deleting namespace %s", nsName))
+			deleteNamespace(nil, nsName,
+				f.FederationClientset.Core().Namespaces().Get,
+				f.FederationClientset.Core().Namespaces().Delete)
+
+			By(fmt.Sprintf("Verify that replicaset %s was deleted as well", rsName))
+
+			waitForReplicaSetToBeDeletedOrFail(f.FederationClientset, nsName, rsName)
+		})
+
 		It("all resources in the namespace should be deleted when namespace is deleted", func() {
 			fedframework.SkipUnlessFederated(f.ClientSet)
 
 			nsName = createNamespace(f.FederationClientset.Core().Namespaces())
 
 			// Create resources in the namespace.
-			event := api_v1.Event{
+			event := v1.Event{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      v1.SimpleNameGenerator.GenerateName(eventNamePrefix),
 					Namespace: nsName,
 				},
-				InvolvedObject: api_v1.ObjectReference{
+				InvolvedObject: v1.ObjectReference{
 					Kind:      "Pod",
 					Namespace: nsName,
 					Name:      "sample-pod",
@@ -178,7 +228,7 @@ func verifyNsCascadingDeletion(nsClient clientset.NamespaceInterface, clusters m
 }
 
 func createNamespace(nsClient clientset.NamespaceInterface) string {
-	ns := api_v1.Namespace{
+	ns := v1.Namespace{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: v1.SimpleNameGenerator.GenerateName(namespacePrefix),
 		},
