@@ -88,7 +88,7 @@ func (a *claimDefaulterPlugin) SetInternalClientSet(client internalclientset.Int
 	}
 }
 
-// Validate ensures an authorizer is set.
+// Validate ensures clientset and store are set.
 func (a *claimDefaulterPlugin) Validate() error {
 	if a.client == nil {
 		return fmt.Errorf("missing client")
