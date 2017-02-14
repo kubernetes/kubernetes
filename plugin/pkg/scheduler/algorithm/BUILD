@@ -29,10 +29,16 @@ go_library(
 
 go_test(
     name = "go_default_test",
-    srcs = ["scheduler_interface_test.go"],
+    srcs = [
+        "scheduler_interface_test.go",
+        "types_test.go"
+    ],
     library = ":go_default_library",
     tags = ["automanaged"],
-    deps = ["//pkg/api/v1:go_default_library"],
+    deps = [
+        "//pkg/api/v1:go_default_library",
+        "//vendor:k8s.io/kubernetes/plugin/pkg/scheduler/schedulercache",
+    ],
 )
 
 filegroup(
