@@ -101,4 +101,4 @@ ${informergen} \
 # You may add additional calls of code generators like set-gen above.
 
 # call generation on sub-project for now
-cmd/kube-aggregator/hack/update-codegen.sh
+vendor/k8s.io/kube-aggregator/hack/update-codegen.sh
