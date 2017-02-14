@@ -65,7 +65,7 @@ DOCKERIZED_BINARIES = {
     },
     "kube-aggregator": {
         "base": ":busybox-libc",
-        "target": "//cmd/kube-aggregator:kube-aggregator",
+        "target": "//vendor/k8s.io/kube-aggregator:kube-aggregator",
     },
     "kube-proxy": {
         "base": ":busybox-net",
