@@ -130,7 +130,10 @@ func updateNodeLabels(c clientset.Interface, nodeNames sets.String, toAdd, toRem
 	}
 }
 
-// Wraps startVolumeServer to create and run a nfs-server pod. Returns server pod and its ip address.
+// Calls startVolumeServer to create and run a nfs-server pod. Returns server pod and its
+// ip address.
+// Note: startVolumeServer() waits for the nfs-server pod to be Running and sleeps some
+//   so that the nfs server can start up.
 func createNfsServerPod(c clientset.Interface, config VolumeTestConfig) (*v1.Pod, string) {
 
 	pod := startVolumeServer(c, config)
@@ -140,26 +143,6 @@ func createNfsServerPod(c clientset.Interface, config VolumeTestConfig) (*v1.Pod
 	framework.Logf("NFS server IP address: %v", ip)
 
 	return pod, ip
-}
-
-// Restart the passed-in nfs-server by issuing a `/usr/sbin/rpc.nfsd 1` command in the
-// pod's (only) container. This command changes the number of nfs server threads from
-// (presumably) zero back to 1, and therefore allows nfs to open connections again.
-func restartNfsServer(serverPod *v1.Pod) {
-
-	const startcmd = "/usr/sbin/rpc.nfsd 1"
-	ns := fmt.Sprintf("--namespace=%v", serverPod.Namespace)
-	framework.RunKubectlOrDie("exec", ns, serverPod.Name, "--", "/bin/sh", "-c", startcmd)
-}
-
-// Stop the passed-in nfs-server by issuing a `/usr/sbin/rpc.nfsd 0` command in the
-// pod's (only) container. This command changes the number of nfs server threads to 0,
-// thus closing all open nfs connections.
-func stopNfsServer(serverPod *v1.Pod) {
-
-	const stopcmd = "/usr/sbin/rpc.nfsd 0"
-	ns := fmt.Sprintf("--namespace=%v", serverPod.Namespace)
-	framework.RunKubectlOrDie("exec", ns, serverPod.Name, "--", "/bin/sh", "-c", stopcmd)
 }
 
 // Creates a pod that mounts an nfs volume that is served by the nfs-server pod. The container
@@ -235,48 +218,42 @@ func checkPodCleanup(c clientset.Interface, pod *v1.Pod, expectClean bool) {
 
 	timeout := 5 * time.Minute
 	poll := 20 * time.Second
-	podDir := filepath.Join("/var/lib/kubelet/pods", string(pod.UID))
+	podUID := string(pod.UID)
+	podDir := filepath.Join("/var/lib/kubelet/pods", podUID)
 	mountDir := filepath.Join(podDir, "volumes", "kubernetes.io~nfs")
 	// use ip rather than hostname in GCE
 	nodeIP, err := framework.GetHostExternalAddress(c, pod)
 	Expect(err).NotTo(HaveOccurred())
 
-	condMsg := "deleted"
-	if !expectClean {
-		condMsg = "present"
+	condMsg := map[bool]string{
+		true:  "deleted",
+		false: "present",
 	}
 
-	// table of host tests to perform (order may matter so not using a map)
-	type testT struct {
-		feature string // feature to test
-		cmd     string // remote command to execute on node
-	}
-	tests := []testT{
-		{
-			feature: "pod UID directory",
-			cmd:     fmt.Sprintf("sudo ls %v", podDir),
-		},
-		{
-			feature: "pod nfs mount",
-			cmd:     fmt.Sprintf("sudo mount | grep %v", mountDir),
-		},
+	// table of host tests to perform
+	tests := map[string]string{ //["what-to-test"] "remote-command"
+		"pod UID directory": fmt.Sprintf("sudo ls %v", podDir),
+		"pod nfs mount":     fmt.Sprintf("sudo mount | grep %v", mountDir),
 	}
 
-	for _, test := range tests {
-		framework.Logf("Wait up to %v for host's (%v) %q to be %v", timeout, nodeIP, test.feature, condMsg)
+	for test, cmd := range tests {
+		framework.Logf("Wait up to %v for host's (%v) %q to be %v", timeout, nodeIP, test, condMsg[expectClean])
 		err = wait.Poll(poll, timeout, func() (bool, error) {
-			result, _ := nodeExec(nodeIP, test.cmd)
+			result, _ := nodeExec(nodeIP, cmd)
 			framework.LogSSHResult(result)
-			ok := (result.Code == 0 && len(result.Stdout) > 0 && len(result.Stderr) == 0)
-			if expectClean && ok { // keep trying
+			sawFiles := result.Code == 0
+			if expectClean && sawFiles { // keep trying
 				return false, nil
 			}
-			if !expectClean && !ok { // stop wait loop
-				return true, fmt.Errorf("%v is gone but expected to exist", test.feature)
+			if !expectClean && !sawFiles { // stop wait loop
+				return true, fmt.Errorf("%v is gone but expected to exist", test)
 			}
 			return true, nil // done, host is as expected
 		})
-		Expect(err).NotTo(HaveOccurred(), fmt.Sprintf("Host (%v) cleanup error: %v. Expected %q to be %v", nodeIP, err, test.feature, condMsg))
+		if err != nil {
+			framework.Logf("Host (%v) cleanup error: %v. Expected %q to be %v", nodeIP, err, test, condMsg[expectClean])
+			Expect(err).NotTo(HaveOccurred())
+		}
 	}
 
 	if expectClean {
@@ -398,20 +375,14 @@ var _ = framework.KubeDescribe("kubelet", func() {
 		}
 	})
 
-	// Test host cleanup when disrupting the volume server.
-	framework.KubeDescribe("host cleanup with volume mounts [HostCleanup][Slow]", func() {
-
+	// Delete nfs server pod after another pods accesses the mounted nfs volume.
+	framework.KubeDescribe("host cleanup with volume mounts [HostCleanup][Flaky]", func() {
 		type hostCleanupTest struct {
 			itDescr string
 			podCmd  string
 		}
 
-		// Disrupt the nfs server pod after a client pod accesses the nfs volume.
-		// Note: the nfs-server is stopped NOT deleted. This is done to preserve its ip addr.
-		//       If the nfs-server pod is deleted the client pod's mount can not be unmounted.
-		//       If the nfs-server pod is deleted and re-created, due to having a different ip
-		//       addr, the client pod's mount still cannot be unmounted.
-		Context("Host cleanup after disrupting NFS volume [NFS]", func() {
+		Context("Host cleanup after pod using NFS mount is deleted [Volume][NFS]", func() {
 			// issue #31272
 			var (
 				nfsServerPod *v1.Pod
@@ -424,11 +395,11 @@ var _ = framework.KubeDescribe("kubelet", func() {
 			testTbl := []hostCleanupTest{
 				{
 					itDescr: "after deleting the nfs-server, the host should be cleaned-up when deleting sleeping pod which mounts an NFS vol",
-					podCmd:  "sleep 6000", // keep pod running
+					podCmd:  "sleep 6000",
 				},
 				{
 					itDescr: "after deleting the nfs-server, the host should be cleaned-up when deleting a pod accessing the NFS vol",
-					podCmd:  "while true; do echo FeFieFoFum >>/mnt/SUCCESS; sleep 1; cat /mnt/SUCCESS; done",
+					podCmd:  "while true; do echo FeFieFoFum >>/mnt/SUCCESS; cat /mnt/SUCCESS; done",
 				},
 			}
 
@@ -449,24 +420,28 @@ var _ = framework.KubeDescribe("kubelet", func() {
 			})
 
 			// execute It blocks from above table of tests
-			for _, t := range testTbl {
-				It(t.itDescr, func() {
+			for _, test := range testTbl {
+				t := test // local copy for closure
+				It(fmt.Sprintf("%v [Serial]", t.itDescr), func() {
+					// create a pod which uses the nfs server's volume
 					pod = createPodUsingNfs(f, c, ns, nfsIP, t.podCmd)
 
-					By("Stop the NFS server")
-					stopNfsServer(nfsServerPod)
+					By("Delete the NFS server pod")
+					deletePodWithWait(f, c, nfsServerPod)
+					nfsServerPod = nil
 
 					By("Delete the pod mounted to the NFS volume")
 					deletePodWithWait(f, c, pod)
 					// pod object is now stale, but is intentionally not nil
 
-					By("Check if pod's host has been cleaned up -- expect not")
+					By("Check if host running deleted pod has been cleaned up -- expect not")
+					// expect the pod's host *not* to be cleaned up
 					checkPodCleanup(c, pod, false)
 
-					By("Restart the nfs server")
-					restartNfsServer(nfsServerPod)
-
+					By("Recreate the nfs server pod")
+					nfsServerPod, nfsIP = createNfsServerPod(c, NFSconfig)
 					By("Verify host running the deleted pod is now cleaned up")
+					// expect the pod's host to be cleaned up
 					checkPodCleanup(c, pod, true)
 				})
 			}
