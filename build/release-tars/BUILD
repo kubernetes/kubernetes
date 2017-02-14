@@ -69,7 +69,6 @@ NODE_TARGETS = [
 # since we include them in the actual build rule.
 SERVER_TARGETS = [
     "//cmd/hyperkube",
-    "//vendor/k8s.io/kube-aggregator",
     "//cmd/kube-apiserver",
     "//cmd/kube-controller-manager",
     "//cmd/kube-discovery",
