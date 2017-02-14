@@ -92,7 +92,7 @@ func NewCmdToken(out io.Writer, errW io.Writer) *cobra.Command {
 		Use:   "delete",
 		Short: "Delete bootstrap tokens on the server.",
 		Run: func(tokenCmd *cobra.Command, args []string) {
-			err := RunDeleteToken(out, tokenCmd, args[0])
+			err := RunDeleteToken(out, tokenCmd, args)
 			kubeadmutil.CheckErr(err)
 		},
 	}
@@ -212,7 +212,12 @@ func RunListTokens(out io.Writer, errW io.Writer, cmd *cobra.Command) error {
 }
 
 // RunDeleteToken removes a bootstrap token from the server.
-func RunDeleteToken(out io.Writer, cmd *cobra.Command, tokenId string) error {
+func RunDeleteToken(out io.Writer, cmd *cobra.Command, args []string) error {
+	if len(args) == 0 {
+		return fmt.Errorf("token ID needs to be provided")
+	}
+
+	tokenId := args[0]
 	if err := kubeadmutil.ParseTokenID(tokenId); err != nil {
 		return err
 	}
