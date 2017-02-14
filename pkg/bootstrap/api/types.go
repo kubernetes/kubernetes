@@ -45,4 +45,13 @@ const (
 	// sign configs as part of the bootstrap process. Value must be "true". Any
 	// other value is assumed to be false. Optional.
 	BootstrapTokenUsageSigningKey = "usage-bootstrap-signing"
+
+	// ConfigMapClusterInfo defines the name for the ConfigMap where the information how to connect and trust the cluster exist
+	ConfigMapClusterInfo = "cluster-info"
+
+	// KubeConfigKey defines at which key in the Data object of the ConfigMap the KubeConfig object is stored
+	KubeConfigKey = "kubeconfig"
+
+	// JWSSignatureKeyPrefix defines what key prefix the JWS-signed tokens have
+	JWSSignatureKeyPrefix = "jws-kubeconfig-"
 )
