@@ -263,12 +263,13 @@ func (s *ServiceController) processServiceUpdate(cachedService *cachedService, s
 // Returns whatever error occurred along with a boolean indicator of whether it
 // should be retried.
 func (s *ServiceController) createLoadBalancerIfNeeded(key string, service *v1.Service) (error, bool) {
-
 	// Note: It is safe to just call EnsureLoadBalancer.  But, on some clouds that requires a delete & create,
 	// which may involve service interruption.  Also, we would like user-friendly events.
 
 	// Save the state so we can avoid a write if it doesn't change
 	previousState := v1.LoadBalancerStatusDeepCopy(&service.Status.LoadBalancer)
+	var newState *v1.LoadBalancerStatus
+	var err error
 
 	if !wantsLoadBalancer(service) {
 		needDelete := true
@@ -289,7 +290,7 @@ func (s *ServiceController) createLoadBalancerIfNeeded(key string, service *v1.S
 			s.eventRecorder.Event(service, v1.EventTypeNormal, "DeletedLoadBalancer", "Deleted load balancer")
 		}
 
-		service.Status.LoadBalancer = v1.LoadBalancerStatus{}
+		newState = &v1.LoadBalancerStatus{}
 	} else {
 		glog.V(2).Infof("Ensuring LB for service %s", key)
 
@@ -297,7 +298,7 @@ func (s *ServiceController) createLoadBalancerIfNeeded(key string, service *v1.S
 
 		// The load balancer doesn't exist yet, so create it.
 		s.eventRecorder.Event(service, v1.EventTypeNormal, "CreatingLoadBalancer", "Creating load balancer")
-		err := s.createLoadBalancer(service)
+		newState, err = s.createLoadBalancer(service)
 		if err != nil {
 			return fmt.Errorf("Failed to create load balancer for service %s: %v", key, err), retryable
 		}
@@ -306,7 +307,17 @@ func (s *ServiceController) createLoadBalancerIfNeeded(key string, service *v1.S
 
 	// Write the state if changed
 	// TODO: Be careful here ... what if there were other changes to the service?
-	if !v1.LoadBalancerStatusEqual(previousState, &service.Status.LoadBalancer) {
+	if !v1.LoadBalancerStatusEqual(previousState, newState) {
+		// Make a copy so we don't mutate the shared informer cache
+		copy, err := api.Scheme.DeepCopy(service)
+		if err != nil {
+			return err, retryable
+		}
+		service = copy.(*v1.Service)
+
+		// Update the status on the copy
+		service.Status.LoadBalancer = *newState
+
 		if err := s.persistUpdate(service); err != nil {
 			return fmt.Errorf("Failed to persist updated status to apiserver, even after retries. Giving up: %v", err), notRetryable
 		}
@@ -319,14 +330,6 @@ func (s *ServiceController) createLoadBalancerIfNeeded(key string, service *v1.S
 
 func (s *ServiceController) persistUpdate(service *v1.Service) error {
 	var err error
-
-	// Make a copy so we don't mutate the shared informer cache
-	copy, err := api.Scheme.DeepCopy(service)
-	if err != nil {
-		return err
-	}
-	service = copy.(*v1.Service)
-
 	for i := 0; i < clientRetryCount; i++ {
 		_, err = s.kubeClient.Core().Services(service.Namespace).UpdateStatus(service)
 		if err == nil {
@@ -353,10 +356,10 @@ func (s *ServiceController) persistUpdate(service *v1.Service) error {
 	return err
 }
 
-func (s *ServiceController) createLoadBalancer(service *v1.Service) error {
+func (s *ServiceController) createLoadBalancer(service *v1.Service) (*v1.LoadBalancerStatus, error) {
 	nodes, err := s.nodeLister.List(labels.Everything())
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	lbNodes := []*v1.Node{}
@@ -369,14 +372,7 @@ func (s *ServiceController) createLoadBalancer(service *v1.Service) error {
 	// - Only one protocol supported per service
 	// - Not all cloud providers support all protocols and the next step is expected to return
 	//   an error for unsupported protocols
-	status, err := s.balancer.EnsureLoadBalancer(s.clusterName, service, lbNodes)
-	if err != nil {
-		return err
-	} else {
-		service.Status.LoadBalancer = *status
-	}
-
-	return nil
+	return s.balancer.EnsureLoadBalancer(s.clusterName, service, lbNodes)
 }
 
 // ListKeys implements the interface required by DeltaFIFO to list the keys we
@@ -757,15 +753,16 @@ func (s *ServiceController) syncService(key string) error {
 
 	// service holds the latest service info from apiserver
 	service, err := s.serviceLister.Services(namespace).Get(name)
-	if errors.IsNotFound(err) {
+	switch {
+	case errors.IsNotFound(err):
 		// service absence in store means watcher caught the deletion, ensure LB info is cleaned
 		glog.Infof("Service has been deleted %v", key)
 		err, retryDelay = s.processServiceDeletion(key)
-	} else if err != nil {
+	case err != nil:
 		glog.Infof("Unable to retrieve service %v from store: %v", key, err)
 		s.workingQueue.Add(key)
 		return err
-	} else {
+	default:
 		cachedService = s.cache.getOrCreate(key)
 		err, retryDelay = s.processServiceUpdate(cachedService, service, key)
 	}
