@@ -5,10 +5,10 @@
 - [Introduction](#introduction)
 - [Prerequisites](#prerequisites)
 - [Quickstart](#quickstart)
-- [Step 1: Create Persistent Volume Claim](#step1-create-persistent-volume-claim)
-- [Step 2: Create Deployment](#step2-create-deployment)
-- [Step 3: Create LoadBalancer Service](#step3-create-loadbalancer-service)
-- [Step 4: Resource cleanup](#step4-resource-cleanup)
+- [Step 1: Create Persistent Volume Claim](#step-1-create-persistent-volume-claim)
+- [Step 2: Create Deployment](#step-2-create-deployment)
+- [Step 3: Create LoadBalancer Service](#step-3-create-loadbalancer-service)
+- [Step 4: Resource cleanup](#step-4-resource-cleanup)
 
 ## Introduction
 Minio is an AWS S3 compatible, object storage server built for cloud applications and devops. Minio is _cloud native_, meaning Minio understands that it is running within a cluster manager, and uses the cluster management infrastructure for allocation of compute and storage resources.
