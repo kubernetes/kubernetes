@@ -25,7 +25,7 @@ import (
 	"k8s.io/client-go/tools/cache"
 	apiregistration "k8s.io/kubernetes/cmd/kube-aggregator/pkg/apis/apiregistration"
 
-	_ "k8s.io/kubernetes/pkg/api/install"
+	_ "k8s.io/client-go/pkg/api/install"
 )
 
 // APIServiceLister helps list APIServices.
