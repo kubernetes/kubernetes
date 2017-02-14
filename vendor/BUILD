@@ -14808,6 +14808,7 @@ go_test(
     srcs = [
         "k8s.io/apiserver/pkg/server/genericapiserver_test.go",
         "k8s.io/apiserver/pkg/server/resource_config_test.go",
+        "k8s.io/apiserver/pkg/server/serve_test.go",
         "k8s.io/apiserver/pkg/server/storage_factory_test.go",
     ],
     library = ":k8s.io/apiserver/pkg/server",
