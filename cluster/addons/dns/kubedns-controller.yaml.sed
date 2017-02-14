@@ -49,7 +49,7 @@ spec:
       - name: kube-dns-config
         configMap:
           name: kube-dns
-          optional: true    
+          optional: true
       containers:
       - name: kubedns
         image: gcr.io/google_containers/k8s-dns-kube-dns-amd64:1.12.1
@@ -115,8 +115,9 @@ spec:
           failureThreshold: 5
         args:
         - --cache-size=1000
-        - --no-resolv
-        - --server=127.0.0.1#10053
+        - --server=/$DNS_DOMAIN/127.0.0.1#10053
+        - --server=/in-addr.arpa/127.0.0.1#10053
+        - --server=/ip6.arpa/127.0.0.1#10053
         - --log-facility=-
         ports:
         - containerPort: 53
