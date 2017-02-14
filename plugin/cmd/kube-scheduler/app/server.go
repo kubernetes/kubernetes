@@ -119,6 +119,7 @@ func Run(s *options.SchedulerServer) error {
 	config.Recorder = eventBroadcaster.NewRecorder(api.EventSource{Component: s.SchedulerName})
 	eventBroadcaster.StartLogging(glog.Infof)
 	eventBroadcaster.StartRecordingToSink(kubeClient.Events(""))
+	config.HostPortRange = s.HostPortRange
 
 	sched := scheduler.New(config)
 

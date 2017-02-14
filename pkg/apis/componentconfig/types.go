@@ -472,6 +472,7 @@ type KubeSchedulerConfiguration struct {
 	FailureDomains string `json:"failureDomains"`
 	// leaderElection defines the configuration of leader election client.
 	LeaderElection LeaderElectionConfiguration `json:"leaderElection"`
+	HostPortRange  utilnet.PortRange           `json:hostPortRange`
 }
 
 // LeaderElectionConfiguration defines the configuration of leader election

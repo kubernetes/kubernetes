@@ -334,6 +334,7 @@ func (f *ConfigFactory) CreateFromKeys(predicateKeys, priorityKeys sets.String, 
 		Algorithm:           algo,
 		Binder:              &binder{f.Client},
 		PodConditionUpdater: &podConditionUpdater{f.Client},
+		PodUpdater:          &podUpdater{f.Client},
 		NextPod: func() *api.Pod {
 			return f.getNextPod()
 		},
@@ -587,6 +588,20 @@ func (b *binder) Bind(binding *api.Binding) error {
 
 type podConditionUpdater struct {
 	*client.Client
+}
+
+type podUpdater struct {
+	*client.Client
+}
+
+func (p *podUpdater) Update(pod *api.Pod) error {
+	glog.V(2).Infof("Updating pod %s/%s", pod.Namespace, pod.Name)
+	_, autoport := pod.ObjectMeta.Annotations[utilpod.PodAutoPortAnnotation]
+	if !autoport {
+		return nil
+	}
+	_, err := p.Pods(pod.Namespace).Update(pod)
+	return err
 }
 
 func (p *podConditionUpdater) Update(pod *api.Pod, condition *api.PodCondition) error {

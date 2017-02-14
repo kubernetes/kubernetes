@@ -74,6 +74,7 @@ func (s *SchedulerServer) AddFlags(fs *pflag.FlagSet) {
 		"RequiredDuringScheduling affinity is not symmetric, but there is an implicit PreferredDuringScheduling affinity rule corresponding "+
 			"to every RequiredDuringScheduling affinity rule. --hard-pod-affinity-symmetric-weight represents the weight of implicit PreferredDuringScheduling affinity rule.")
 	fs.StringVar(&s.FailureDomains, "failure-domains", api.DefaultFailureDomains, "Indicate the \"all topologies\" set for an empty topologyKey when it's used for PreferredDuringScheduling pod anti-affinity.")
+	fs.Var(&s.HostPortRange, "host-port-range", "A port range to reserve for dynamic host port.  Example: '30000-32767'.  Inclusive at both ends of the range.")
 	leaderelection.BindFlags(&s.LeaderElection, fs)
 	config.DefaultFeatureGate.AddFlag(fs)
 }

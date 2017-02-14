@@ -35,6 +35,8 @@ const (
 	// If there is a headless service named "my-web-service" in the same namespace as the pod, then,
 	// <hostname>.my-web-service.<namespace>.svc.<cluster domain>" would be resolved by the cluster DNS Server.
 	PodSubdomainAnnotation = "pod.beta.kubernetes.io/subdomain"
+
+	PodAutoPortAnnotation = "pod.tce.kubernetes.io/autoport"
 )
 
 // FindPort locates the container port for the given pod and portName.  If the
