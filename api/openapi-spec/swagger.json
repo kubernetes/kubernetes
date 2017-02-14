@@ -37886,6 +37886,10 @@
       "description": "If specified, the pod's scheduling constraints",
       "$ref": "#/definitions/io.k8s.kubernetes.pkg.api.v1.Affinity"
      },
+     "automountServiceAccountToken": {
+      "description": "AutomountServiceAccountToken indicates whether a service account token should be automatically mounted.",
+      "type": "boolean"
+     },
      "containers": {
       "description": "List of containers belonging to the pod. Containers cannot currently be added or removed. There must be at least one container in a Pod. Cannot be updated. More info: http://kubernetes.io/docs/user-guide/containers",
       "type": "array",
@@ -38766,6 +38770,10 @@
      "apiVersion": {
       "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources",
       "type": "string"
+     },
+     "automountServiceAccountToken": {
+      "description": "AutomountServiceAccountToken indicates whether pods running as this service account should have an API token automatically mounted. Can be overridden at the pod level.",
+      "type": "boolean"
      },
      "imagePullSecrets": {
       "description": "ImagePullSecrets is a list of references to secrets in the same namespace to use for pulling any images in pods that reference this ServiceAccount. ImagePullSecrets are distinct from Secrets because Secrets can be mounted in the pod, but ImagePullSecrets are only accessed by the kubelet. More info: http://kubernetes.io/docs/user-guide/secrets#manually-specifying-an-imagepullsecret",

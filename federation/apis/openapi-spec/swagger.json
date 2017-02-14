@@ -12490,6 +12490,10 @@
       "description": "If specified, the pod's scheduling constraints",
       "$ref": "#/definitions/io.k8s.kubernetes.pkg.api.v1.Affinity"
      },
+     "automountServiceAccountToken": {
+      "description": "AutomountServiceAccountToken indicates whether a service account token should be automatically mounted.",
+      "type": "boolean"
+     },
      "containers": {
       "description": "List of containers belonging to the pod. Containers cannot currently be added or removed. There must be at least one container in a Pod. Cannot be updated. More info: http://kubernetes.io/docs/user-guide/containers",
       "type": "array",
