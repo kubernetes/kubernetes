@@ -28,10 +28,10 @@ import (
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	"k8s.io/apiserver/pkg/server/filters"
 	genericoptions "k8s.io/apiserver/pkg/server/options"
+	kubeclientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/kubernetes/cmd/kube-aggregator/pkg/apiserver"
 	"k8s.io/kubernetes/pkg/api"
-	kubeclientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 
 	"k8s.io/kubernetes/cmd/kube-aggregator/pkg/apis/apiregistration/v1alpha1"
