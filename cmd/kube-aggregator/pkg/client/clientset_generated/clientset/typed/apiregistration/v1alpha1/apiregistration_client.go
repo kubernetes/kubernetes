@@ -20,8 +20,8 @@ import (
 	fmt "fmt"
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	serializer "k8s.io/apimachinery/pkg/runtime/serializer"
+	api "k8s.io/client-go/pkg/api"
 	rest "k8s.io/client-go/rest"
-	api "k8s.io/kubernetes/pkg/api"
 )
 
 type ApiregistrationV1alpha1Interface interface {
