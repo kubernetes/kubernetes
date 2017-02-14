@@ -92,7 +92,7 @@ var _ = framework.KubeDescribe("Federated Services [Feature:Federation]", func()
 			clusters, primaryClusterName = getRegisteredClusters(UserAgentName, f)
 		})
 
-		Describe("service creation", func() {
+		Describe("Federated Service", func() {
 			var (
 				service *v1.Service
 				nsName  string
@@ -100,7 +100,7 @@ var _ = framework.KubeDescribe("Federated Services [Feature:Federation]", func()
 
 			BeforeEach(func() {
 				fedframework.SkipUnlessFederated(f.ClientSet)
-				// Placeholder
+				nsName = f.FederationNamespace.Name
 			})
 
 			AfterEach(func() {
@@ -116,8 +116,6 @@ var _ = framework.KubeDescribe("Federated Services [Feature:Federation]", func()
 
 			It("should create matching services in underlying clusters", func() {
 				fedframework.SkipUnlessFederated(f.ClientSet)
-
-				nsName = f.FederationNamespace.Name
 				service = createServiceOrFail(f.FederationClientset, nsName, FederatedServiceName)
 				defer func() { // Cleanup
 					By(fmt.Sprintf("Deleting service %q in namespace %q", service.Name, nsName))
@@ -129,7 +127,6 @@ var _ = framework.KubeDescribe("Federated Services [Feature:Federation]", func()
 
 			It("should be deleted from underlying clusters when OrphanDependents is false", func() {
 				fedframework.SkipUnlessFederated(f.ClientSet)
-				nsName := f.FederationNamespace.Name
 				orphanDependents := false
 				verifyCascadingDeletionForService(f.FederationClientset, clusters, &orphanDependents, nsName)
 				By(fmt.Sprintf("Verified that services were deleted from underlying clusters"))
@@ -137,7 +134,6 @@ var _ = framework.KubeDescribe("Federated Services [Feature:Federation]", func()
 
 			It("should not be deleted from underlying clusters when OrphanDependents is true", func() {
 				fedframework.SkipUnlessFederated(f.ClientSet)
-				nsName := f.FederationNamespace.Name
 				orphanDependents := true
 				verifyCascadingDeletionForService(f.FederationClientset, clusters, &orphanDependents, nsName)
 				By(fmt.Sprintf("Verified that services were not deleted from underlying clusters"))
@@ -145,7 +141,6 @@ var _ = framework.KubeDescribe("Federated Services [Feature:Federation]", func()
 
 			It("should not be deleted from underlying clusters when OrphanDependents is nil", func() {
 				fedframework.SkipUnlessFederated(f.ClientSet)
-				nsName := f.FederationNamespace.Name
 				verifyCascadingDeletionForService(f.FederationClientset, clusters, nil, nsName)
 				By(fmt.Sprintf("Verified that services were not deleted from underlying clusters"))
 			})
