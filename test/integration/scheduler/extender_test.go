@@ -50,6 +50,7 @@ import (
 const (
 	filter     = "filter"
 	prioritize = "prioritize"
+	bind       = "bind"
 )
 
 type fitPredicate func(pod *v1.Pod, node *v1.Node) (bool, error)
@@ -61,45 +62,63 @@ type priorityConfig struct {
 }
 
 type Extender struct {
-	name         string
-	predicates   []fitPredicate
-	prioritizers []priorityConfig
+	name          string
+	predicates    []fitPredicate
+	prioritizers  []priorityConfig
+	filteredNodes []v1.Node
 }
 
 func (e *Extender) serveHTTP(t *testing.T, w http.ResponseWriter, req *http.Request) {
-	var args schedulerapi.ExtenderArgs
+	if strings.Contains(req.URL.Path, filter) || strings.Contains(req.URL.Path, prioritize) {
+		var args schedulerapi.ExtenderArgs
 
-	decoder := json.NewDecoder(req.Body)
-	defer req.Body.Close()
+		decoder := json.NewDecoder(req.Body)
+		defer req.Body.Close()
 
-	if err := decoder.Decode(&args); err != nil {
-		http.Error(w, "Decode error", http.StatusBadRequest)
-		return
-	}
-
-	encoder := json.NewEncoder(w)
-
-	if strings.Contains(req.URL.Path, filter) {
-		resp := &schedulerapi.ExtenderFilterResult{}
-		nodes, failedNodes, err := e.Filter(&args.Pod, &args.Nodes)
-		if err != nil {
-			resp.Error = err.Error()
-		} else {
-			resp.Nodes = *nodes
-			resp.FailedNodes = failedNodes
+		if err := decoder.Decode(&args); err != nil {
+			http.Error(w, "Decode error", http.StatusBadRequest)
+			return
 		}
 
-		if err := encoder.Encode(resp); err != nil {
-			t.Fatalf("Failed to encode %+v", resp)
-		}
-	} else if strings.Contains(req.URL.Path, prioritize) {
-		// Prioritize errors are ignored. Default k8s priorities or another extender's
-		// priorities may be applied.
-		priorities, _ := e.Prioritize(&args.Pod, &args.Nodes)
+		encoder := json.NewEncoder(w)
 
-		if err := encoder.Encode(priorities); err != nil {
-			t.Fatalf("Failed to encode %+v", priorities)
+		if strings.Contains(req.URL.Path, filter) {
+			resp := &schedulerapi.ExtenderFilterResult{}
+			nodes, failedNodes, err := e.Filter(&args.Pod, &args.Nodes)
+			if err != nil {
+				resp.Error = err.Error()
+			} else {
+				resp.Nodes = *nodes
+				resp.FailedNodes = failedNodes
+			}
+
+			if err := encoder.Encode(resp); err != nil {
+				t.Fatalf("Failed to encode %+v", resp)
+			}
+		} else if strings.Contains(req.URL.Path, prioritize) {
+			// Prioritize errors are ignored. Default k8s priorities or another extender's
+			// priorities may be applied.
+			priorities, _ := e.Prioritize(&args.Pod, &args.Nodes)
+
+			if err := encoder.Encode(priorities); err != nil {
+				t.Fatalf("Failed to encode %+v", priorities)
+			}
 		}
+	} else if strings.Contains(req.URL.Path, bind) {
+		var args schedulerapi.Binding
+
+		decoder := json.NewDecoder(req.Body)
+		defer req.Body.Close()
+
+		if err := decoder.Decode(&args); err != nil {
+			http.Error(w, "Decode error", http.StatusBadRequest)
+			return
+		}
+
+		if err := e.Bind(&args.Pod, args.Node); err != nil {
+			http.Error(w, fmt.Sprintf("Bind failed with error: %v", err), http.StatusInternalServerError)
+		}
+		w.WriteHeader(http.StatusOK)
 	} else {
 		http.Error(w, "Unknown method", http.StatusNotFound)
 	}
@@ -126,6 +145,7 @@ func (e *Extender) Filter(pod *v1.Pod, nodes *v1.NodeList) (*v1.NodeList, schedu
 			failedNodesMap[node.Name] = fmt.Sprintf("extender failed: %s", e.name)
 		}
 	}
+	e.filteredNodes = filtered
 	return &v1.NodeList{Items: filtered}, failedNodesMap, nil
 }
 
@@ -150,6 +170,19 @@ func (e *Extender) Prioritize(pod *v1.Pod, nodes *v1.NodeList) (*schedulerapi.Ho
 		result = append(result, schedulerapi.HostPriority{Host: host, Score: score})
 	}
 	return &result, nil
+}
+
+func (e *Extender) Bind(pod *v1.Pod, host string) error {
+	if len(e.filteredNodes) != 0 {
+		for _, node := range e.filteredNodes {
+			if node.Name == host {
+				return nil
+			}
+		}
+		return fmt.Errorf("Node %v not in filtered nodes %v", host, e.filteredNodes)
+		e.filteredNodes = nil
+	}
+	return nil
 }
 
 func machine_1_2_3_Predicate(pod *v1.Pod, node *v1.Node) (bool, error) {
@@ -232,6 +265,7 @@ func TestSchedulerExtender(t *testing.T) {
 				URLPrefix:      es2.URL,
 				FilterVerb:     filter,
 				PrioritizeVerb: prioritize,
+				BindVerb:       bind,
 				Weight:         4,
 				EnableHttps:    false,
 			},
