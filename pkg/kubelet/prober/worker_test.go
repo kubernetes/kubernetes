@@ -118,7 +118,7 @@ func TestDoProbe(t *testing.T) {
 			}
 
 			// Clean up.
-			m.statusManager = status.NewManager(&fake.Clientset{}, kubepod.NewBasicPodManager(nil, nil), &statustest.FakePodDeletionSafetyProvider{})
+			m.statusManager = status.NewManager(&fake.Clientset{}, kubepod.NewBasicPodManager(nil, nil, nil), &statustest.FakePodDeletionSafetyProvider{})
 			resultsManager(m, probeType).Remove(testContainerID)
 		}
 	}

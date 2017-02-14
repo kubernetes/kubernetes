@@ -618,3 +618,9 @@ func (adc *attachDetachController) GetSecretFunc() func(namespace, name string) 
 		return nil, fmt.Errorf("GetSecret unsupported in attachDetachController")
 	}
 }
+
+func (adc *attachDetachController) GetConfigMapFunc() func(namespace, name string) (*v1.ConfigMap, error) {
+	return func(_, _ string) (*v1.ConfigMap, error) {
+		return nil, fmt.Errorf("GetConfigMap unsupported in attachDetachController")
+	}
+}

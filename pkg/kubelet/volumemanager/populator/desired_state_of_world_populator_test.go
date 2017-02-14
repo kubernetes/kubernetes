@@ -41,7 +41,7 @@ func TestFindAndAddNewPods_FindAndRemoveDeletedPods(t *testing.T) {
 
 	fakeSecretManager := secret.NewFakeManager()
 	fakePodManager := kubepod.NewBasicPodManager(
-		podtest.NewFakeMirrorClient(), fakeSecretManager)
+		podtest.NewFakeMirrorClient(), fakeSecretManager, nil)
 
 	fakesDSW := cache.NewDesiredStateOfWorld(fakeVolumePluginMgr)
 	fakeRuntime := &containertest.FakeRuntime{}

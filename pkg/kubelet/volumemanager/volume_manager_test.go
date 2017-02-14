@@ -31,6 +31,7 @@ import (
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset/fake"
 	"k8s.io/kubernetes/pkg/kubelet/config"
+	"k8s.io/kubernetes/pkg/kubelet/configmap"
 	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
 	"k8s.io/kubernetes/pkg/kubelet/pod"
 	kubepod "k8s.io/kubernetes/pkg/kubelet/pod"
@@ -55,10 +56,11 @@ func TestGetMountedVolumesForPodAndGetVolumesInUse(t *testing.T) {
 		t.Fatalf("can't make a temp dir: %v", err)
 	}
 	defer os.RemoveAll(tmpDir)
-	podManager := kubepod.NewBasicPodManager(podtest.NewFakeMirrorClient(), secret.NewFakeManager())
 
 	node, pod, pv, claim := createObjects()
 	kubeClient := fake.NewSimpleClientset(node, pod, pv, claim)
+	cmm := configmap.NewSimpleConfigMapManager(kubeClient)
+	podManager := kubepod.NewBasicPodManager(podtest.NewFakeMirrorClient(), secret.NewFakeManager(), cmm)
 
 	manager, err := newTestVolumeManager(tmpDir, podManager, kubeClient)
 	if err != nil {
@@ -100,7 +102,6 @@ func TestGetExtraSupplementalGroupsForPod(t *testing.T) {
 		t.Fatalf("can't make a temp dir: %v", err)
 	}
 	defer os.RemoveAll(tmpDir)
-	podManager := kubepod.NewBasicPodManager(podtest.NewFakeMirrorClient(), secret.NewFakeManager())
 
 	node, pod, _, claim := createObjects()
 
@@ -148,6 +149,8 @@ func TestGetExtraSupplementalGroupsForPod(t *testing.T) {
 			},
 		}
 		kubeClient := fake.NewSimpleClientset(node, pod, pv, claim)
+		cmm := configmap.NewSimpleConfigMapManager(kubeClient)
+		podManager := kubepod.NewBasicPodManager(podtest.NewFakeMirrorClient(), secret.NewFakeManager(), cmm)
 
 		manager, err := newTestVolumeManager(tmpDir, podManager, kubeClient)
 		if err != nil {
