@@ -6383,6 +6383,13 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 								Format:      "",
 							},
 						},
+						"automountServiceAccountToken": {
+							SchemaProps: spec.SchemaProps{
+								Description: "AutomountServiceAccountToken indicates whether a service account token should be automatically mounted.",
+								Type:        []string{"boolean"},
+								Format:      "",
+							},
+						},
 						"nodeName": {
 							SchemaProps: spec.SchemaProps{
 								Description: "NodeName is a request to schedule this pod onto a specific node. If it is non-empty, the scheduler simply schedules this pod onto that node, assuming that it fits resource requirements.",
@@ -8283,6 +8290,13 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 										},
 									},
 								},
+							},
+						},
+						"automountServiceAccountToken": {
+							SchemaProps: spec.SchemaProps{
+								Description: "AutomountServiceAccountToken indicates whether pods running as this service account should have an API token automatically mounted. Can be overridden at the pod level.",
+								Type:        []string{"boolean"},
+								Format:      "",
 							},
 						},
 					},
