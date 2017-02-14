@@ -17,7 +17,6 @@ limitations under the License.
 package field
 
 import (
-	"encoding/json"
 	"fmt"
 	"strings"
 
@@ -49,14 +48,10 @@ func (v *Error) ErrorBody() string {
 	case ErrorTypeRequired, ErrorTypeForbidden, ErrorTypeTooLong, ErrorTypeInternal:
 		s = fmt.Sprintf("%s", v.Type)
 	default:
-		var bad string
-		badBytes, err := json.Marshal(v.BadValue)
-		if err != nil {
-			bad = err.Error()
-		} else {
-			bad = string(badBytes)
-		}
-		s = fmt.Sprintf("%s: %s", v.Type, bad)
+		// TODO: internal types have panic guards against json.Marshalling to prevent
+		// accidental use of internal types in external serialized form.  For now, use
+		// %#v, although it would be better to show a more expressive output in the future
+		s = fmt.Sprintf("%s: %#v", v.Type, v.BadValue)
 	}
 	if len(v.Detail) != 0 {
 		s += fmt.Sprintf(": %s", v.Detail)
