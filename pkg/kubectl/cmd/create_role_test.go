@@ -24,7 +24,6 @@ import (
 
 	"k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/kubernetes/pkg/apis/rbac"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
 )
@@ -72,6 +71,40 @@ func TestCreateRole(t *testing.T) {
 						Verbs:         []string{"get", "watch", "list"},
 						Resources:     []string{"pods"},
 						APIGroups:     []string{""},
+						ResourceNames: []string{},
+					},
+				},
+			},
+		},
+		"test-subresources": {
+			verbs:     "get,watch,list",
+			resources: "replicasets/scale",
+			expectedRole: &rbac.Role{
+				ObjectMeta: v1.ObjectMeta{
+					Name: roleName,
+				},
+				Rules: []rbac.PolicyRule{
+					{
+						Verbs:         []string{"get", "watch", "list"},
+						Resources:     []string{"replicasets/scales"},
+						APIGroups:     []string{"extensions"},
+						ResourceNames: []string{},
+					},
+				},
+			},
+		},
+		"test-subresources-with-apigroup": {
+			verbs:     "get,watch,list",
+			resources: "replicasets.extensions/scale",
+			expectedRole: &rbac.Role{
+				ObjectMeta: v1.ObjectMeta{
+					Name: roleName,
+				},
+				Rules: []rbac.PolicyRule{
+					{
+						Verbs:         []string{"get", "watch", "list"},
+						Resources:     []string{"replicasets/scales"},
+						APIGroups:     []string{"extensions"},
 						ResourceNames: []string{},
 					},
 				},
@@ -145,11 +178,35 @@ func TestValidate(t *testing.T) {
 			},
 			expectErr: true,
 		},
+		"test-missing-resource-existing-apigroup": {
+			roleOptions: &CreateRoleOptions{
+				Name:  "my-role",
+				Verbs: []string{"get"},
+				Resources: []ResourceOptions{
+					{
+						Group: "extensions",
+					},
+				},
+			},
+			expectErr: true,
+		},
+		"test-missing-resource-existing-subresource": {
+			roleOptions: &CreateRoleOptions{
+				Name:  "my-role",
+				Verbs: []string{"get"},
+				Resources: []ResourceOptions{
+					{
+						SubResource: "scales",
+					},
+				},
+			},
+			expectErr: true,
+		},
 		"test-invalid-verb": {
 			roleOptions: &CreateRoleOptions{
 				Name:  "my-role",
 				Verbs: []string{"invalid-verb"},
-				Resources: []schema.GroupVersionResource{
+				Resources: []ResourceOptions{
 					{
 						Resource: "pods",
 					},
@@ -161,7 +218,7 @@ func TestValidate(t *testing.T) {
 			roleOptions: &CreateRoleOptions{
 				Name:  "my-role",
 				Verbs: []string{"post"},
-				Resources: []schema.GroupVersionResource{
+				Resources: []ResourceOptions{
 					{
 						Resource: "pods",
 					},
@@ -173,9 +230,22 @@ func TestValidate(t *testing.T) {
 			roleOptions: &CreateRoleOptions{
 				Name:  "my-role",
 				Verbs: []string{"get"},
-				Resources: []schema.GroupVersionResource{
+				Resources: []ResourceOptions{
 					{
 						Resource: "invalid-resource",
+					},
+				},
+			},
+			expectErr: true,
+		},
+		"test-invalid-subresource": {
+			roleOptions: &CreateRoleOptions{
+				Name:  "my-role",
+				Verbs: []string{"get"},
+				Resources: []ResourceOptions{
+					{
+						Resource:    "replicasets",
+						SubResource: "invalid-resource",
 					},
 				},
 			},
@@ -185,7 +255,7 @@ func TestValidate(t *testing.T) {
 			roleOptions: &CreateRoleOptions{
 				Name:  "my-role",
 				Verbs: []string{"get"},
-				Resources: []schema.GroupVersionResource{
+				Resources: []ResourceOptions{
 					{
 						Resource: "pods",
 					},
@@ -202,9 +272,10 @@ func TestValidate(t *testing.T) {
 			roleOptions: &CreateRoleOptions{
 				Name:  "my-role",
 				Verbs: []string{"get", "list"},
-				Resources: []schema.GroupVersionResource{
+				Resources: []ResourceOptions{
 					{
-						Resource: "pods",
+						Resource:    "replicasets",
+						SubResource: "scales",
 					},
 				},
 				ResourceNames: []string{"foo"},
@@ -264,7 +335,7 @@ func TestComplete(t *testing.T) {
 					"watch",
 					"list",
 				},
-				Resources: []schema.GroupVersionResource{
+				Resources: []ResourceOptions{
 					{
 						Resource: "pods",
 						Group:    "",
@@ -292,7 +363,7 @@ func TestComplete(t *testing.T) {
 			expected: &CreateRoleOptions{
 				Name:  roleName,
 				Verbs: []string{"*"},
-				Resources: []schema.GroupVersionResource{
+				Resources: []ResourceOptions{
 					{
 						Resource: "pods",
 						Group:    "",
@@ -316,7 +387,7 @@ func TestComplete(t *testing.T) {
 			expected: &CreateRoleOptions{
 				Name:  roleName,
 				Verbs: []string{"*"},
-				Resources: []schema.GroupVersionResource{
+				Resources: []ResourceOptions{
 					{
 						Resource: "pods",
 						Group:    "",
@@ -340,7 +411,7 @@ func TestComplete(t *testing.T) {
 			expected: &CreateRoleOptions{
 				Name:  roleName,
 				Verbs: []string{"*"},
-				Resources: []schema.GroupVersionResource{
+				Resources: []ResourceOptions{
 					{
 						Resource: "pods",
 						Group:    "",
