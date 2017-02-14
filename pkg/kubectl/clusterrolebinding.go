@@ -31,6 +31,8 @@ type ClusterRoleBindingGeneratorV1 struct {
 	Name string
 	// ClusterRole for the clusterRoleBinding (required)
 	ClusterRole string
+	// APIVersion for the subjects
+	APIVersion string
 	// Users to derive the clusterRoleBinding from (optional)
 	Users []string
 	// Groups to derive the clusterRoleBinding from (optional)
@@ -89,6 +91,7 @@ func (s ClusterRoleBindingGeneratorV1) Generate(genericParams map[string]interfa
 	}
 	delegate.Name = params["name"]
 	delegate.ClusterRole = params["clusterrole"]
+	delegate.APIVersion = params["apiversion"]
 	return delegate.StructuredGenerate()
 }
 
@@ -97,6 +100,7 @@ func (s ClusterRoleBindingGeneratorV1) ParamNames() []GeneratorParam {
 	return []GeneratorParam{
 		{"name", true},
 		{"clusterrole", false},
+		{"apiversion", false},
 		{"user", false},
 		{"group", false},
 		{"serviceaccount", false},
@@ -118,14 +122,14 @@ func (s ClusterRoleBindingGeneratorV1) StructuredGenerate() (runtime.Object, err
 	for _, user := range s.Users {
 		clusterRoleBinding.Subjects = append(clusterRoleBinding.Subjects, rbac.Subject{
 			Kind:       rbac.UserKind,
-			APIVersion: "rbac.authorization.k8s.io/v1beta1",
+			APIVersion: s.APIVersion,
 			Name:       user,
 		})
 	}
 	for _, group := range s.Groups {
 		clusterRoleBinding.Subjects = append(clusterRoleBinding.Subjects, rbac.Subject{
 			Kind:       rbac.GroupKind,
-			APIVersion: "rbac.authorization.k8s.io/v1beta1",
+			APIVersion: s.APIVersion,
 			Name:       group,
 		})
 	}
