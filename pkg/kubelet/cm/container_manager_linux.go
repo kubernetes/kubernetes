@@ -214,6 +214,7 @@ func NewContainerManager(mountUtil mount.Interface, cadvisorInterface cadvisor.I
 		return nil, err
 	}
 
+	cgroupRoot := nodeConfig.CgroupRoot
 	cgroupManager := NewCgroupManager(subsystems, nodeConfig.CgroupDriver)
 	// Check if Cgroup-root actually exists on the node
 	if nodeConfig.CgroupsPerQOS {
@@ -229,9 +230,6 @@ func NewContainerManager(mountUtil mount.Interface, cadvisorInterface cadvisor.I
 		if !cgroupManager.Exists(CgroupName(nodeConfig.CgroupRoot)) {
 			return nil, fmt.Errorf("invalid configuration: cgroup-root doesn't exist: %v", err)
 		}
-	}
-	cgroupRoot := nodeConfig.CgroupRoot
-	if isNodeAllocatableEnforcedOnPods(nodeConfig.NodeAllocatableConfig) {
 		cgroupRoot = path.Join(cgroupRoot, defaultNodeAllocatableCgroupName)
 	}
 
@@ -375,11 +373,6 @@ func (cm *containerManagerImpl) setupNode() error {
 		return err
 	}
 
-	// Setup Node Allocatable
-	if err := createAndUpdateNodeAllocatableCgroups(cm.NodeConfig.NodeAllocatableConfig, cm.GetNodeAllocatable(), cm.cgroupManager); err != nil {
-		return err
-	}
-
 	// Setup top level qos containers only if CgroupsPerQOS flag is specified as true
 	if cm.NodeConfig.CgroupsPerQOS {
 		qosContainersInfo, err := InitQOS(cm.NodeConfig.CgroupDriver, cm.cgroupRoot, cm.subsystems)
@@ -387,6 +380,11 @@ func (cm *containerManagerImpl) setupNode() error {
 			return fmt.Errorf("failed to initialise top level QOS containers: %v", err)
 		}
 		cm.qosContainers = qosContainersInfo
+	}
+
+	// Enforce Node Allocatable (if required)
+	if err := enforceNodeAllocatableCgroups(cm.NodeConfig.NodeAllocatableConfig, cm.GetNodeAllocatable(), cm.cgroupManager); err != nil {
+		return err
 	}
 
 	systemContainers := []*systemContainer{}
