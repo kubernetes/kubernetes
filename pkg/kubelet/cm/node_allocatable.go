@@ -33,12 +33,19 @@ const (
 	kubeReservedEnforcementKey       = "kube-reserved"
 )
 
-func isNodeAllocatableEnforcedOnPods(nc NodeAllocatableConfig) bool {
-	return nc.EnforceNodeAllocatable.Has(nodeAllocatableEnforcementKey)
+func createNodeAllocatableCgroups(nc NodeAllocatableConfig, nodeAllocatable v1.ResourceList, cgroupManager CgroupManager) error {
+	cgroupConfig := &CgroupConfig{
+		Name: CgroupName(defaultNodeAllocatableCgroupName),
+	}
+	if err := cgroupManager.Create(cgroupConfig); err != nil {
+		glog.Errorf("Failed to create %q cgroup and apply limits")
+		return err
+	}
+	return nil
 }
 
-// Creates and updates Node Allocatable Cgroup.
-func createAndUpdateNodeAllocatableCgroups(nc NodeAllocatableConfig, nodeAllocatable v1.ResourceList, cgroupManager CgroupManager) error {
+// Enforce Node Allocatable Cgroup settings.
+func enforceNodeAllocatableCgroups(nc NodeAllocatableConfig, nodeAllocatable v1.ResourceList, cgroupManager CgroupManager) error {
 	glog.V(4).Infof("Attempting to enforce Node Allocatable with config: %+v", nc)
 	glog.V(4).Infof("Node Allocatable resources: %+v", nodeAllocatable)
 	// Create top level cgroups for all pods if necessary.
@@ -47,8 +54,8 @@ func createAndUpdateNodeAllocatableCgroups(nc NodeAllocatableConfig, nodeAllocat
 			Name:               CgroupName(defaultNodeAllocatableCgroupName),
 			ResourceParameters: getCgroupConfig(nodeAllocatable),
 		}
-		glog.V(4).Infof("Creating Node Allocatable cgroup with %d cpu shares and %d bytes of memory", cgroupConfig.ResourceParameters.CpuShares, cgroupConfig.ResourceParameters.Memory)
-		if err := cgroupManager.Create(cgroupConfig); err != nil {
+		glog.V(4).Infof("Updating Node Allocatable cgroup with %d cpu shares and %d bytes of memory", cgroupConfig.ResourceParameters.CpuShares, cgroupConfig.ResourceParameters.Memory)
+		if err := cgroupManager.Update(cgroupConfig); err != nil {
 			glog.Errorf("Failed to create %q cgroup and apply limits")
 			return err
 		}
@@ -112,7 +119,7 @@ func (cm *containerManagerImpl) GetNodeAllocatable() v1.ResourceList {
 			value.Sub(cm.NodeConfig.SystemReserved[k])
 		}
 		if cm.NodeConfig.KubeReserved != nil {
-			value.Sub(cm.NodeConfig.SystemReserved[k])
+			value.Sub(cm.NodeConfig.KubeReserved[k])
 		}
 		if value.Sign() < 0 {
 			// Negative Allocatable resources don't make sense.

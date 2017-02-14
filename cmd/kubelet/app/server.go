@@ -307,6 +307,17 @@ func initConfigz(kc *componentconfig.KubeletConfiguration) (*configz.Config, err
 	return cz, err
 }
 
+// validateConfig validates configuration of Kubelet and returns an error is the input configuration is invalid.
+func validateConfig(s *options.KubeletServer) {
+	if !s.CgroupsPerQOS && len(s.EnforceNodeAllocatable) > 0 {
+		return fmt.Errorf("Node Allocatable enforcement is not supported unless Cgroups Per QOS feature is turned on")
+	}
+	if s.SystemCgroups != "" && s.CgroupRoot == "" {
+		return fmt.Errorf("invalid configuration: system container was specified and cgroup root was not specified")
+	}
+
+}
+
 func run(s *options.KubeletServer, kubeDeps *kubelet.KubeletDeps) (err error) {
 	// TODO: this should be replaced by a --standalone flag
 	standaloneMode := (len(s.APIServerList) == 0 && !s.RequireKubeConfig)
@@ -362,6 +373,11 @@ func run(s *options.KubeletServer, kubeDeps *kubelet.KubeletDeps) (err error) {
 				glog.Errorf("failed to init dynamic Kubelet configuration sync: %v", err)
 			}
 		}
+	}
+
+	// Validate configuration.
+	if err := validateConfig(); err != nil {
+		return err
 	}
 
 	if kubeDeps == nil {
@@ -451,9 +467,6 @@ func run(s *options.KubeletServer, kubeDeps *kubelet.KubeletDeps) (err error) {
 	}
 
 	if kubeDeps.ContainerManager == nil {
-		if s.SystemCgroups != "" && s.CgroupRoot == "" {
-			return fmt.Errorf("invalid configuration: system container was specified and cgroup root was not specified")
-		}
 		kubeReserved, err := parseResourceList(s.KubeReserved)
 		if err != nil {
 			return err
