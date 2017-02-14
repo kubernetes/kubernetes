@@ -120,7 +120,7 @@ func DiscoveryPort(d *kubeadmapi.TokenDiscovery) int32 {
 	if len(split) == 1 {
 		return kubeadmapiext.DefaultDiscoveryBindPort
 	}
-	if i, err := strconv.Atoi(split[1]); err != nil {
+	if i, err := strconv.Atoi(split[1]); err == nil {
 		return int32(i)
 	}
 	return kubeadmapiext.DefaultDiscoveryBindPort
