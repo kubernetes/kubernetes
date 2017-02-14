@@ -409,7 +409,9 @@ func autoConvert_v1alpha1_KubeletConfiguration_To_componentconfig_KubeletConfigu
 	}
 	out.AllowedUnsafeSysctls = *(*[]string)(unsafe.Pointer(&in.AllowedUnsafeSysctls))
 	out.FeatureGates = in.FeatureGates
-	out.EnableCRI = in.EnableCRI
+	if err := api.Convert_Pointer_bool_To_bool(&in.EnableCRI, &out.EnableCRI, s); err != nil {
+		return err
+	}
 	out.ExperimentalFailSwapOn = in.ExperimentalFailSwapOn
 	out.ExperimentalCheckNodeCapabilitiesBeforeMount = in.ExperimentalCheckNodeCapabilitiesBeforeMount
 	out.KeepTerminatedPodVolumes = in.KeepTerminatedPodVolumes
@@ -581,7 +583,9 @@ func autoConvert_componentconfig_KubeletConfiguration_To_v1alpha1_KubeletConfigu
 	}
 	out.AllowedUnsafeSysctls = *(*[]string)(unsafe.Pointer(&in.AllowedUnsafeSysctls))
 	out.FeatureGates = in.FeatureGates
-	out.EnableCRI = in.EnableCRI
+	if err := api.Convert_bool_To_Pointer_bool(&in.EnableCRI, &out.EnableCRI, s); err != nil {
+		return err
+	}
 	out.ExperimentalFailSwapOn = in.ExperimentalFailSwapOn
 	out.ExperimentalCheckNodeCapabilitiesBeforeMount = in.ExperimentalCheckNodeCapabilitiesBeforeMount
 	out.KeepTerminatedPodVolumes = in.KeepTerminatedPodVolumes
