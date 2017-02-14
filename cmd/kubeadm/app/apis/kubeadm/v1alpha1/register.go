@@ -29,7 +29,7 @@ const GroupName = "kubeadm.k8s.io"
 var SchemeGroupVersion = schema.GroupVersion{Group: GroupName, Version: "v1alpha1"}
 
 var (
-	SchemeBuilder = runtime.NewSchemeBuilder(addKnownTypes, addDefaultingFuncs)
+	SchemeBuilder = runtime.NewSchemeBuilder(addKnownTypes, addDefaultingFuncs, addConversionFuncs)
 	AddToScheme   = SchemeBuilder.AddToScheme
 )
 

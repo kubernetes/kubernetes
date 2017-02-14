@@ -34,7 +34,6 @@ const (
 )
 
 func TestRoundTripTypes(t *testing.T) {
-
 	groupFactoryRegistry := make(announced.APIGroupFactoryRegistry)
 	registry := registered.NewOrDie("")
 	scheme := runtime.NewScheme()
