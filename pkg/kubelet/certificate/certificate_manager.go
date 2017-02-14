@@ -17,6 +17,8 @@ limitations under the License.
 package certificate
 
 import (
+	"crypto/ecdsa"
+	"crypto/elliptic"
 	cryptorand "crypto/rand"
 	"crypto/rsa"
 	"crypto/tls"
@@ -29,7 +31,6 @@ import (
 	"github.com/golang/glog"
 
 	"k8s.io/apimachinery/pkg/util/wait"
-	certutil "k8s.io/client-go/util/cert"
 	certificates "k8s.io/kubernetes/pkg/apis/certificates/v1beta1"
 	clientcertificates "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/certificates/v1beta1"
 	"k8s.io/kubernetes/pkg/kubelet/util/csr"
@@ -191,14 +192,20 @@ func (m *manager) rotateCerts() error {
 
 func (m *manager) generateCSR() (csrPEM []byte, keyPEM []byte, err error) {
 	// Generate a new private key.
-	keyPEM, err = certutil.MakeEllipticPrivateKeyPEM()
+	privateKey, err := ecdsa.GenerateKey(elliptic.P256(), cryptorand.Reader)
 	if err != nil {
 		return nil, nil, fmt.Errorf("unable to generate a new private key: %v", err)
 	}
-
-	csrPEM, err = makeCSR(keyPEM, m.template)
+	der, err := x509.MarshalECPrivateKey(privateKey)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, fmt.Errorf("unable to marshal the new key to DER: %v", err)
+	}
+
+	keyPEM = pem.EncodeToMemory(&pem.Block{Type: "EC PRIVATE KEY", Bytes: der})
+
+	csrPEM, err = makeCSR(privateKey, m.template)
+	if err != nil {
+		return nil, nil, fmt.Errorf("unable to create a csr from the private key: %v", err)
 	}
 	return csrPEM, keyPEM, nil
 }
