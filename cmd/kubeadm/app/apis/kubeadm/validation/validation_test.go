@@ -23,6 +23,29 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 )
 
+func TestValidateTokenDiscovery(t *testing.T) {
+	var tests = []struct {
+		c        *kubeadm.TokenDiscovery
+		f        *field.Path
+		expected bool
+	}{
+		{&kubeadm.TokenDiscovery{ID: "772ef5", Secret: "6b6baab1d4a0a171", Addresses: []string{"192.168.122.100:9898"}}, nil, true},
+		{&kubeadm.TokenDiscovery{ID: "", Secret: "6b6baab1d4a0a171", Addresses: []string{"192.168.122.100:9898"}}, nil, false},
+		{&kubeadm.TokenDiscovery{ID: "772ef5", Secret: "", Addresses: []string{"192.168.122.100:9898"}}, nil, false},
+		{&kubeadm.TokenDiscovery{ID: "772ef5", Secret: "6b6baab1d4a0a171", Addresses: []string{}}, nil, false},
+	}
+	for _, rt := range tests {
+		err := ValidateTokenDiscovery(rt.c, rt.f).ToAggregate()
+		if (err == nil) != rt.expected {
+			t.Errorf(
+				"failed ValidateTokenDiscovery:\n\texpected: %t\n\t  actual: %t",
+				rt.expected,
+				(err == nil),
+			)
+		}
+	}
+}
+
 func TestValidateServiceSubnet(t *testing.T) {
 	var tests = []struct {
 		s        string
