@@ -43,9 +43,16 @@ type EtcdOptions struct {
 	EnableWatchCache        bool
 }
 
-func NewEtcdOptions(backendConfig *storagebackend.Config) *EtcdOptions {
+func NewEtcdOptions(prefix string, copier runtime.ObjectCopier, codec runtime.Codec) *EtcdOptions {
 	return &EtcdOptions{
-		StorageConfig: *backendConfig,
+		StorageConfig: storagebackend.Config{
+			Prefix: prefix,
+			// Default cache size to 0 - if unset, its size will be set based on target
+			// memory usage.
+			DeserializationCacheSize: 0,
+			Copier: copier,
+			Codec:  codec,
+		},
 		DefaultStorageMediaType: "application/json",
 		DeleteCollectionWorkers: 1,
 		EnableGarbageCollection: true,
