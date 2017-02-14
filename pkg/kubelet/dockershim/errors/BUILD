@@ -9,9 +9,8 @@ load(
 
 go_library(
     name = "go_default_library",
-    srcs = ["util.go"],
+    srcs = ["errors.go"],
     tags = ["automanaged"],
-    deps = ["//pkg/kubelet/dockershim/errors:go_default_library"],
 )
 
 filegroup(
