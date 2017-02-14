@@ -33,6 +33,7 @@ import (
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/util/goroutinemap"
+	"k8s.io/kubernetes/pkg/util/goroutinemap/exponentialbackoff"
 	vol "k8s.io/kubernetes/pkg/volume"
 
 	"github.com/golang/glog"
@@ -1427,9 +1428,12 @@ func (ctrl *PersistentVolumeController) scheduleOperation(operationName string, 
 
 	err := ctrl.runningOperations.Run(operationName, operation)
 	if err != nil {
-		if goroutinemap.IsAlreadyExists(err) {
+		switch {
+		case goroutinemap.IsAlreadyExists(err):
 			glog.V(4).Infof("operation %q is already running, skipping", operationName)
-		} else {
+		case exponentialbackoff.IsExponentialBackoff(err):
+			glog.V(4).Infof("operation %q postponed due to exponential backoff", operationName)
+		default:
 			glog.Errorf("error scheduling operation %q: %v", operationName, err)
 		}
 	}
