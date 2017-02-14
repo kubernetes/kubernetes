@@ -17,6 +17,7 @@ limitations under the License.
 package kubelet
 
 import (
+	"crypto/x509"
 	"fmt"
 	"net"
 	"net/http"
@@ -52,6 +53,7 @@ import (
 	"k8s.io/client-go/util/integer"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
+	certificates "k8s.io/kubernetes/pkg/apis/certificates/v1beta1"
 	"k8s.io/kubernetes/pkg/apis/componentconfig"
 	componentconfigv1alpha1 "k8s.io/kubernetes/pkg/apis/componentconfig/v1alpha1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
@@ -710,7 +712,12 @@ func NewMainKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *Kub
 	}
 	klet.certificateManager, err = certificate.NewManager(
 		certSigningRequestClient,
-		nodeName,
+		&x509.CertificateRequest{},
+		[]certificates.KeyUsage{
+			certificates.UsageDigitalSignature,
+			certificates.UsageKeyEncipherment,
+			certificates.UsageClientAuth,
+		},
 		certificateStore,
 		kubeCfg.CertRotation)
 	if err != nil {

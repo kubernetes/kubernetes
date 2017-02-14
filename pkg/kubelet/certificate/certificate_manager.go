@@ -17,16 +17,20 @@ limitations under the License.
 package certificate
 
 import (
+	cryptorand "crypto/rand"
+	"crypto/rsa"
 	"crypto/tls"
+	"crypto/x509"
+	"encoding/pem"
 	"fmt"
 	"sync"
 	"time"
 
 	"github.com/golang/glog"
 
-	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
 	certutil "k8s.io/client-go/util/cert"
+	certificates "k8s.io/kubernetes/pkg/apis/certificates/v1beta1"
 	clientcertificates "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/certificates/v1beta1"
 	"k8s.io/kubernetes/pkg/kubelet/util/csr"
 )
@@ -62,7 +66,8 @@ type Store interface {
 
 type manager struct {
 	certSigningRequestClient clientcertificates.CertificateSigningRequestInterface
-	nodeName                 types.NodeName
+	template                 *x509.CertificateRequest
+	usages                   []certificates.KeyUsage
 	certStore                Store
 	certAccessLock           sync.RWMutex
 	cert                     *tls.Certificate
@@ -74,7 +79,8 @@ type manager struct {
 // Kubelet and handling updates due to rotation.
 func NewManager(
 	certSigningRequestClient clientcertificates.CertificateSigningRequestInterface,
-	nodeName types.NodeName,
+	template *x509.CertificateRequest,
+	usages []certificates.KeyUsage,
 	certificateStore Store,
 	certRotationPercent int32) (Manager, error) {
 
@@ -89,7 +95,8 @@ func NewManager(
 
 	m := manager{
 		certSigningRequestClient: certSigningRequestClient,
-		nodeName:                 nodeName,
+		template:                 template,
+		usages:                   usages,
 		certStore:                certificateStore,
 		cert:                     cert,
 		shouldRotatePercent:      certRotationPercent,
@@ -159,20 +166,19 @@ func (m *manager) rotateCerts() error {
 		return nil
 	}
 
-	// Generate a new private key.
-	keyData, err := certutil.MakeEllipticPrivateKeyPEM()
+	csrPEM, keyPEM, err := m.generateCSR()
 	if err != nil {
-		return fmt.Errorf("unable to generate a new private key: %v", err)
+		return err
 	}
 
 	// Call the Certificate Signing Request API to get a certificate for the
 	// new private key.
-	certData, err := csr.RequestNodeCertificate(m.certSigningRequestClient, keyData, m.nodeName)
+	crtPEM, err := csr.RequestCertificate(m.certSigningRequestClient, csrPEM, m.usages)
 	if err != nil {
-		return fmt.Errorf("unable to get a new key signed for %q: %v", m.nodeName, err)
+		return fmt.Errorf("unable to get a new key signed for %v: %v", m.template, err)
 	}
 
-	cert, err := m.certStore.Update(certData, keyData)
+	cert, err := m.certStore.Update(crtPEM, keyPEM)
 	if err != nil {
 		return fmt.Errorf("unable to store the new cert/key pair: %v", err)
 	}
@@ -181,4 +187,51 @@ func (m *manager) rotateCerts() error {
 	defer m.certAccessLock.Unlock()
 	m.cert = cert
 	return nil
+}
+
+func (m *manager) generateCSR() (csrPEM []byte, keyPEM []byte, err error) {
+	// Generate a new private key.
+	keyPEM, err = certutil.MakeEllipticPrivateKeyPEM()
+	if err != nil {
+		return nil, nil, fmt.Errorf("unable to generate a new private key: %v", err)
+	}
+
+	csrPEM, err = makeCSR(keyPEM, m.template)
+	if err != nil {
+		return nil, nil, err
+	}
+	return csrPEM, keyPEM, nil
+}
+
+// MakeCSR generates a PEM-encoded CSR using the supplied private key, subject, and SANs.
+// All key types that are implemented via crypto.Signer are supported (This includes *rsa.PrivateKey and *ecdsa.PrivateKey.)
+func makeCSR(privateKey interface{}, template *x509.CertificateRequest) ([]byte, error) {
+	// Customize the signature for RSA keys, depending on the key size
+	var sigType x509.SignatureAlgorithm
+	if privateKey, ok := privateKey.(*rsa.PrivateKey); ok {
+		keySize := privateKey.N.BitLen()
+		switch {
+		case keySize >= 4096:
+			sigType = x509.SHA512WithRSA
+		case keySize >= 3072:
+			sigType = x509.SHA384WithRSA
+		default:
+			sigType = x509.SHA256WithRSA
+		}
+	}
+
+	t := *template
+	t.SignatureAlgorithm = sigType
+
+	csrDER, err := x509.CreateCertificateRequest(cryptorand.Reader, &t, privateKey)
+	if err != nil {
+		return nil, err
+	}
+
+	csrPemBlock := &pem.Block{
+		Type:  "CERTIFICATE REQUEST",
+		Bytes: csrDER,
+	}
+
+	return pem.EncodeToMemory(csrPemBlock), nil
 }

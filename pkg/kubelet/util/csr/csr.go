@@ -103,3 +103,12 @@ func RequestNodeCertificate(client certificatesclient.CertificateSigningRequestI
 
 	return nil, fmt.Errorf("watch channel closed")
 }
+
+// RequestCertificate will create a certificate signing request and send it to API server,
+// then it will watch the object's status, once approved by API server, it will return the API
+// server's issued certificate (pem-encoded). If there is any errors, or the watch timeouts,
+// it will return an error. This is intended for use on nodes (kubelet and kubeadm).
+func RequestCertificate(client certificatesclient.CertificateSigningRequestInterface, csrData []byte, usages []certificates.KeyUsage) (certData []byte, err error) {
+	// TODO DELETEME, just for testing. The real function is in another PR waiting to merge.
+	return []byte{}, nil
+}

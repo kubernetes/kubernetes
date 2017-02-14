@@ -85,7 +85,7 @@ func TestNewManagerNoRotation(t *testing.T) {
 	}
 
 	store := &fakeStore{cert: &cert}
-	if _, err := NewManager(nil, "node-name", store, 0); err != nil {
+	if _, err := NewManager(nil, &x509.CertificateRequest{}, []certificates.KeyUsage{}, store, 0); err != nil {
 		t.Fatalf("Failed to initialize the certificate manager: %v", err)
 	}
 }
@@ -111,6 +111,8 @@ func TestShouldRotate(t *testing.T) {
 					NotBefore: test.notBefore,
 				},
 			},
+			template:            &x509.CertificateRequest{},
+			usages:              []certificates.KeyUsage{},
 			shouldRotatePercent: 10,
 		}
 
@@ -134,6 +136,8 @@ func TestRotateCertCreateCSRError(t *testing.T) {
 				NotBefore: now.Add(-2 * time.Hour),
 			},
 		},
+		template: &x509.CertificateRequest{},
+		usages:   []certificates.KeyUsage{},
 		certSigningRequestClient: fakeClient{
 			failureType: createError,
 		},
@@ -153,6 +157,8 @@ func TestRotateCertWaitingForResultError(t *testing.T) {
 				NotBefore: now.Add(-2 * time.Hour),
 			},
 		},
+		template: &x509.CertificateRequest{},
+		usages:   []certificates.KeyUsage{},
 		certSigningRequestClient: fakeClient{
 			failureType: watchError,
 		},
