@@ -27,6 +27,7 @@ import (
 	"k8s.io/client-go/pkg/api"
 	"k8s.io/client-go/pkg/api/v1"
 	core "k8s.io/client-go/testing"
+	bootstrapapi "k8s.io/kubernetes/pkg/bootstrap/api"
 )
 
 func init() {
@@ -43,15 +44,15 @@ func newConfigMap(tokenID, signature string) *v1.ConfigMap {
 	ret := &v1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace:       metav1.NamespacePublic,
-			Name:            configMapClusterInfo,
+			Name:            bootstrapapi.ConfigMapClusterInfo,
 			ResourceVersion: "1",
 		},
 		Data: map[string]string{
-			kubeConfigKey: "payload",
+			bootstrapapi.KubeConfigKey: "payload",
 		},
 	}
 	if len(tokenID) > 0 {
-		ret.Data[signaturePrefix+tokenID] = signature
+		ret.Data[bootstrapapi.JWSSignatureKeyPrefix+tokenID] = signature
 	}
 	return ret
 }

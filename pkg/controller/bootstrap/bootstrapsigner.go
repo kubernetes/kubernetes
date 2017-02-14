@@ -38,12 +38,6 @@ import (
 	"k8s.io/kubernetes/pkg/util/metrics"
 )
 
-const (
-	configMapClusterInfo = "cluster-info"
-	kubeConfigKey        = "kubeconfig"
-	signaturePrefix      = "jws-kubeconfig-"
-)
-
 // BootstrapSignerOptions contains options for the BootstrapSigner
 type BootstrapSignerOptions struct {
 
@@ -70,7 +64,7 @@ type BootstrapSignerOptions struct {
 func DefaultBootstrapSignerOptions() BootstrapSignerOptions {
 	return BootstrapSignerOptions{
 		ConfigMapNamespace:   api.NamespacePublic,
-		ConfigMapName:        configMapClusterInfo,
+		ConfigMapName:        bootstrapapi.ConfigMapClusterInfo,
 		TokenSecretNamespace: api.NamespaceSystem,
 	}
 }
@@ -191,17 +185,17 @@ func (e *BootstrapSigner) signConfigMap() {
 	}
 
 	// First capture the config we are signing
-	content, ok := newCM.Data[kubeConfigKey]
+	content, ok := newCM.Data[bootstrapapi.KubeConfigKey]
 	if !ok {
-		glog.V(3).Infof("No %s key in %s/%s ConfigMap", kubeConfigKey, origCM.Namespace, origCM.Name)
+		glog.V(3).Infof("No %s key in %s/%s ConfigMap", bootstrapapi.KubeConfigKey, origCM.Namespace, origCM.Name)
 		return
 	}
 
 	// Next remove and save all existing signatures
 	sigs := map[string]string{}
 	for key, value := range newCM.Data {
-		if strings.HasPrefix(key, signaturePrefix) {
-			tokenID := strings.TrimPrefix(key, signaturePrefix)
+		if strings.HasPrefix(key, bootstrapapi.JWSSignatureKeyPrefix) {
+			tokenID := strings.TrimPrefix(key, bootstrapapi.JWSSignatureKeyPrefix)
 			sigs[tokenID] = value
 			delete(newCM.Data, key)
 		}
@@ -222,7 +216,7 @@ func (e *BootstrapSigner) signConfigMap() {
 		}
 		delete(sigs, tokenID)
 
-		newCM.Data[signaturePrefix+tokenID] = sig
+		newCM.Data[bootstrapapi.JWSSignatureKeyPrefix+tokenID] = sig
 	}
 
 	// If we have signatures left over we know that some signatures were

@@ -51,3 +51,17 @@ func TestComputeDetachedSig(t *testing.T) {
 		t.Errorf("Wrong signature. Got: %v", sig)
 	}
 }
+
+func TestDetachedTokenIsValid(t *testing.T) {
+	// Valid detached JWS token and valid inputs should succeed
+	sig := "eyJhbGciOiJIUzI1NiIsImtpZCI6Impvc2h1YSJ9..VShe2taLd-YTrmWuRkcL_8QTNDHYxQIEBsAYYiIj1_8"
+	if !DetachedTokenIsValid(sig, content, id, secret) {
+		t.Errorf("Content %q and token \"%s:%s\" should equal signature: %q", content, id, secret, sig)
+	}
+
+	// Invalid detached JWS token and valid inputs should fail
+	sig2 := sig + "foo"
+	if DetachedTokenIsValid(sig2, content, id, secret) {
+		t.Errorf("Content %q and token \"%s:%s\" should not equal signature: %q", content, id, secret, sig)
+	}
+}
