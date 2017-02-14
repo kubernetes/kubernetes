@@ -26,6 +26,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/api/v1"
 	storage "k8s.io/kubernetes/pkg/apis/storage/v1beta1"
@@ -223,6 +224,7 @@ func getVSphereClaimSpecWithStorageClassAnnotation(ns string, storageclass *stor
 	return claim
 }
 
+// func to get pod spec with given volume claim, node selector labels and command
 func getVSpherePodSpecWithClaim(claimName string, nodeSelectorKV map[string]string, command string) *v1.Pod {
 	pod := &v1.Pod{
 		TypeMeta: metav1.TypeMeta{
@@ -265,4 +267,68 @@ func getVSpherePodSpecWithClaim(claimName string, nodeSelectorKV map[string]stri
 		pod.Spec.NodeSelector = nodeSelectorKV
 	}
 	return pod
+}
+
+// func to get pod spec with given volume paths, node selector lables and container commands
+func getVSpherePodSpecWithVolumePaths(volumePaths []string, keyValuelabel map[string]string, commands []string) *v1.Pod {
+	var volumeMounts []v1.VolumeMount
+	var volumes []v1.Volume
+
+	for index, volumePath := range volumePaths {
+		name := fmt.Sprintf("volume%v", index+1)
+		volumeMounts = append(volumeMounts, v1.VolumeMount{Name: name, MountPath: "/mnt/" + name})
+		vsphereVolume := new(v1.VsphereVirtualDiskVolumeSource)
+		vsphereVolume.VolumePath = volumePath
+		vsphereVolume.FSType = "ext4"
+		volumes = append(volumes, v1.Volume{Name: name})
+		volumes[index].VolumeSource.VsphereVolume = vsphereVolume
+	}
+
+	if commands == nil || len(commands) == 0 {
+		commands = []string{
+			"/bin/sh",
+			"-c",
+			"while true; do sleep 2; done",
+		}
+	}
+	pod := &v1.Pod{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "Pod",
+			APIVersion: "v1",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			GenerateName: "vsphere-e2e-",
+		},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
+				{
+					Name:         "vsphere-e2e-container-" + string(uuid.NewUUID()),
+					Image:        "gcr.io/google_containers/busybox:1.24",
+					Command:      commands,
+					VolumeMounts: volumeMounts,
+				},
+			},
+			RestartPolicy: v1.RestartPolicyNever,
+			Volumes:       volumes,
+		},
+	}
+
+	if keyValuelabel != nil {
+		pod.Spec.NodeSelector = keyValuelabel
+	}
+	return pod
+}
+
+func verifyFilesExistOnVSphereVolume(namespace string, podName string, filePaths []string) {
+	for _, filePath := range filePaths {
+		_, err := framework.RunKubectl("exec", fmt.Sprintf("--namespace=%s", namespace), podName, "--", "/bin/ls", filePath)
+		Expect(err).NotTo(HaveOccurred(), fmt.Sprintf("failed to verify file: %q on the pod: %q", filePath, podName))
+	}
+}
+
+func createEmptyFilesOnVSphereVolume(namespace string, podName string, filePaths []string) {
+	for _, filePath := range filePaths {
+		err := framework.CreateEmptyFileOnPod(namespace, podName, filePath)
+		Expect(err).NotTo(HaveOccurred())
+	}
 }
