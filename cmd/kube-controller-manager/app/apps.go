@@ -29,11 +29,10 @@ func startStatefulSetController(ctx ControllerContext) (bool, error) {
 	if !ctx.AvailableResources[schema.GroupVersionResource{Group: "apps", Version: "v1beta1", Resource: "statefulsets"}] {
 		return false, nil
 	}
-	resyncPeriod := ResyncPeriod(&ctx.Options)()
 	go statefulset.NewStatefulSetController(
-		ctx.InformerFactory.Pods().Informer(),
+		ctx.NewInformerFactory.Core().V1().Pods(),
+		ctx.NewInformerFactory.Apps().V1beta1().StatefulSets(),
 		ctx.ClientBuilder.ClientOrDie("statefulset-controller"),
-		resyncPeriod,
 	).Run(1, ctx.Stop)
 	return true, nil
 }

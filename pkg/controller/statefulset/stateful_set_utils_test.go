@@ -251,10 +251,10 @@ func TestAscendingOrdinal(t *testing.T) {
 }
 
 func TestOverlappingStatefulSets(t *testing.T) {
-	sets := make([]apps.StatefulSet, 10)
+	sets := make([]*apps.StatefulSet, 10)
 	perm := rand.Perm(10)
 	for i, v := range perm {
-		sets[i] = *newStatefulSet(10)
+		sets[i] = newStatefulSet(10)
 		sets[i].CreationTimestamp = metav1.NewTime(sets[i].CreationTimestamp.Add(time.Duration(v) * time.Second))
 	}
 	sort.Sort(overlappingStatefulSets(sets))
@@ -262,7 +262,7 @@ func TestOverlappingStatefulSets(t *testing.T) {
 		t.Error("ascendingOrdinal fails to sort Pods")
 	}
 	for i, v := range perm {
-		sets[i] = *newStatefulSet(10)
+		sets[i] = newStatefulSet(10)
 		sets[i].Name = strconv.FormatInt(int64(v), 10)
 	}
 	sort.Sort(overlappingStatefulSets(sets))
