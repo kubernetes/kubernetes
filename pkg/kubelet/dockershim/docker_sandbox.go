@@ -115,8 +115,10 @@ func (ds *dockerService) RunPodSandbox(config *runtimeapi.PodSandboxConfig) (str
 // after us?
 func (ds *dockerService) StopPodSandbox(podSandboxID string) error {
 	var namespace, name string
+	var checkpointErr, statusErr error
 	needNetworkTearDown := false
 
+	// Try to retrieve sandbox information from docker daemon or sandbox checkpoint
 	status, statusErr := ds.PodSandboxStatus(podSandboxID)
 	if statusErr == nil {
 		nsOpts := status.GetLinux().GetNamespaces().GetOptions()
@@ -125,36 +127,53 @@ func (ds *dockerService) StopPodSandbox(podSandboxID string) error {
 		namespace = m.Namespace
 		name = m.Name
 	} else {
-		checkpoint, err := ds.checkpointHandler.GetCheckpoint(podSandboxID)
-		if err != nil {
-			glog.Errorf("Failed to get checkpoint for sandbox %q: %v", podSandboxID, err)
-			return fmt.Errorf("failed to get sandbox status: %v", statusErr)
+		var checkpoint *PodSandboxCheckpoint
+		checkpoint, checkpointErr = ds.checkpointHandler.GetCheckpoint(podSandboxID)
+
+		// Proceed if both sandbox container and checkpoint could not be found. This means that following
+		// actions will only have sandbox ID and not have pod namespace and name information.
+		// Return error if encounter any unexpected error.
+		if checkpointErr != nil {
+			if dockertools.IsContainerNotFoundError(statusErr) && checkpointErr == errors.CheckpointNotFoundError {
+				glog.Warningf("Both sandbox container and checkpoint for id %q could not be found. "+
+					"Proceed without further sandbox information.", podSandboxID)
+			} else {
+				return utilerrors.NewAggregate([]error{
+					fmt.Errorf("failed to get checkpoint for sandbox %q: %v", podSandboxID, checkpointErr),
+					fmt.Errorf("failed to get sandbox status: %v", statusErr)})
+			}
+		} else {
+			namespace = checkpoint.Namespace
+			name = checkpoint.Name
 		}
-		namespace = checkpoint.Namespace
-		name = checkpoint.Name
+
 		// Always trigger network plugin to tear down
 		needNetworkTearDown = true
 	}
 
+	// WARNING: The following operations made the following assumption:
+	// 1. kubelet will retry on any error returned by StopPodSandbox.
+	// 2. tearing down network and stopping sandbox container can succeed in any sequence.
+	// This depends on the implementation detail of network plugin and proper error handling.
+	// For kubenet, if tearing down network failed and sandbox container is stopped, kubelet
+	// will retry. On retry, kubenet will not be able to retrieve network namespace of the sandbox
+	// since it is stopped. With empty network namespcae, CNI bridge plugin will conduct best
+	// effort clean up and will not return error.
+	errList := []error{}
 	if needNetworkTearDown {
 		cID := kubecontainer.BuildContainerID(runtimeName, podSandboxID)
 		if err := ds.networkPlugin.TearDownPod(namespace, name, cID); err != nil {
-			// TODO: Figure out a way to retry this error. We can't
-			// right now because the plugin throws errors when it doesn't find
-			// eth0, which might not exist for various reasons (setup failed,
-			// conf changed etc). In theory, it should teardown everything else
-			// so there's no need to retry.
-			glog.Errorf("Failed to teardown sandbox %q for pod %s/%s: %v", podSandboxID, namespace, name, err)
+			errList = append(errList, fmt.Errorf("failed to teardown sandbox %q for pod %s/%s: %v", podSandboxID, namespace, name, err))
 		}
 	}
 	if err := ds.client.StopContainer(podSandboxID, defaultSandboxGracePeriod); err != nil {
 		glog.Errorf("Failed to stop sandbox %q: %v", podSandboxID, err)
 		// Do not return error if the container does not exist
 		if !dockertools.IsContainerNotFoundError(err) {
-			return err
+			errList = append(errList, err)
 		}
 	}
-	return nil
+	return utilerrors.NewAggregate(errList)
 	// TODO: Stop all running containers in the sandbox.
 }
 
