@@ -23,7 +23,6 @@ filegroup(
         "//cmd/genutils:all-srcs",
         "//cmd/genyaml:all-srcs",
         "//cmd/hyperkube:all-srcs",
-        "//cmd/kube-aggregator:all-srcs",
         "//cmd/kube-apiserver:all-srcs",
         "//cmd/kube-controller-manager:all-srcs",
         "//cmd/kube-discovery:all-srcs",
