@@ -86,17 +86,17 @@ type LoadBalancerOpts struct {
 	Provider             string     `gcfg:"provider"`
 
 	// Optional settings that allow a cluster admin to allow his users to set specific LB parameters through Service Annotations
-	EnableAnnotationLBVersion            bool `gcfg:"disable-annotation-lb-version"`
-	EnableAnnotationSubnetId             bool `gcfg:"disable-annotation-subnet-id"`
-	EnableAnnotationFloatingNetworkId    bool `gcfg:"disable-annotation-floating-network-id"`
-	EnableAnnotationLBMethod             bool `gcfg:"disable-annotation-lb-method"`
-	EnableAnnotationCreateMonitor        bool `gcfg:"disable-annotation-create-monitor"`
-	EnableAnnotationMonitorDelay         bool `gcfg:"disable-annotation-monitor-delay"`
-	EnableAnnotationMonitorTimeout       bool `gcfg:"disable-annotation-monitor-timeout"`
-	EnableAnnotationMonitorMaxRetries    bool `gcfg:"disable-annotation-monitor-max-retries"`
-	EnableAnnotationManageSecurityGroups bool `gcfg:"disable-annotation-manage-security-groups"`
-	EnableAnnotationNodeSecurityGroupID  bool `gcfg:"disable-annotation-node-security-group"`
-	EnableAnnotationProvider             bool `gcfg:"disable-annotation-provider"`
+	EnableAnnotationLBVersion            bool `gcfg:"enable-annotation-lb-version"`
+	EnableAnnotationSubnetId             bool `gcfg:"enable-annotation-subnet-id"`
+	EnableAnnotationFloatingNetworkId    bool `gcfg:"enable-annotation-floating-network-id"`
+	EnableAnnotationLBMethod             bool `gcfg:"enable-annotation-lb-method"`
+	EnableAnnotationCreateMonitor        bool `gcfg:"enable-annotation-create-monitor"`
+	EnableAnnotationMonitorDelay         bool `gcfg:"enable-annotation-monitor-delay"`
+	EnableAnnotationMonitorTimeout       bool `gcfg:"enable-annotation-monitor-timeout"`
+	EnableAnnotationMonitorMaxRetries    bool `gcfg:"enable-annotation-monitor-max-retries"`
+	EnableAnnotationManageSecurityGroups bool `gcfg:"enable-annotation-manage-security-groups"`
+	EnableAnnotationNodeSecurityGroupID  bool `gcfg:"enable-annotation-node-security-group"`
+	EnableAnnotationProvider             bool `gcfg:"enable-annotation-provider"`
 }
 
 type BlockStorageOpts struct {
