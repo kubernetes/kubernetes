@@ -22,6 +22,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/authentication/serviceaccount"
 	"k8s.io/kubernetes/pkg/api/v1"
 	rbacv1beta1 "k8s.io/kubernetes/pkg/apis/rbac/v1beta1"
@@ -130,6 +131,58 @@ var _ = framework.KubeDescribe("Dynamic provisioning", func() {
 				// providers allocate volumes in 1GiB chunks.
 				testDynamicProvisioning(c, claim, "2Gi")
 			}
+		})
+
+		// NOTE: Slow!  The test will wait up to 5 minutes (framework.ClaimProvisionTimeout) when there is
+		// no regression.
+		It("should not provision a volume in an unmanaged GCE zone. [Slow]", func() {
+			framework.SkipUnlessProviderIs("gce", "gke")
+			var suffix string = "unmananged"
+
+			By("Discovering an unmanaged zone")
+			allZones := sets.NewString()     // all zones in the project
+			managedZones := sets.NewString() // subset of allZones
+
+			gceCloud, err := getGCECloud()
+			Expect(err).NotTo(HaveOccurred())
+
+			// Get all k8s managed zones
+			managedZones, err = gceCloud.GetAllZones()
+			Expect(err).NotTo(HaveOccurred())
+
+			// Get a list of all zones in the project
+			zones, err := gceCloud.GetComputeService().Zones.List(framework.TestContext.CloudConfig.ProjectID).Do()
+			for _, z := range zones.Items {
+				allZones.Insert(z.Name)
+			}
+
+			// Get the subset of zones not managed by k8s
+			var unmanagedZone string
+			var popped bool
+			unmanagedZones := allZones.Difference(managedZones)
+			// And select one of them at random.
+			if unmanagedZone, popped = unmanagedZones.PopAny(); !popped {
+				framework.Skipf("No unmanaged zones found.")
+			}
+
+			By("Creating a StorageClass for the unmanaged zone")
+			sc := newStorageClass("kubernetes.io/gce-pd", suffix)
+			// Set an unmanaged zone.
+			sc.Parameters = map[string]string{"zone": unmanagedZone}
+			sc, err = c.Storage().StorageClasses().Create(sc)
+			defer Expect(c.Storage().StorageClasses().Delete(sc.Name, nil)).To(Succeed())
+			Expect(err).NotTo(HaveOccurred())
+
+			By("Creating a claim and expecting it to timeout")
+			pvc := newClaim(ns, suffix, false)
+			pvc, err = c.Core().PersistentVolumeClaims(ns).Create(pvc)
+			defer Expect(c.Core().PersistentVolumeClaims(ns).Delete(pvc.Name, nil)).To(Succeed())
+			Expect(err).NotTo(HaveOccurred())
+
+			// The claim should timeout phase:Pending
+			err = framework.WaitForPersistentVolumeClaimPhase(v1.ClaimBound, c, ns, pvc.Name, 2*time.Second, framework.ClaimProvisionTimeout)
+			Expect(err).To(HaveOccurred())
+			framework.Logf(err.Error())
 		})
 	})
 
