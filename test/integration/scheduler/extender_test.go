@@ -49,8 +49,10 @@ import (
 )
 
 const (
-	filter     = "filter"
-	prioritize = "prioritize"
+	filter      = "filter"
+	prioritize  = "prioritize"
+	bind        = "bind"
+	failPodName = "extender-fail-pod"
 )
 
 type fitPredicate func(pod *v1.Pod, node *v1.Node) (bool, error)
@@ -69,36 +71,54 @@ type Extender struct {
 }
 
 func (e *Extender) serveHTTP(t *testing.T, w http.ResponseWriter, req *http.Request) {
-	var args schedulerapi.ExtenderArgs
-
 	decoder := json.NewDecoder(req.Body)
 	defer req.Body.Close()
 
-	if err := decoder.Decode(&args); err != nil {
-		http.Error(w, "Decode error", http.StatusBadRequest)
-		return
-	}
+	if strings.Contains(req.URL.Path, filter) || strings.Contains(req.URL.Path, prioritize) {
+		var args schedulerapi.ExtenderArgs
 
-	encoder := json.NewEncoder(w)
-
-	if strings.Contains(req.URL.Path, filter) {
-		resp := &schedulerapi.ExtenderFilterResult{}
-		resp, err := e.Filter(&args)
-		if err != nil {
-			resp.Error = err.Error()
+		if err := decoder.Decode(&args); err != nil {
+			http.Error(w, "Decode error", http.StatusBadRequest)
+			return
 		}
 
-		if err := encoder.Encode(resp); err != nil {
-			t.Fatalf("Failed to encode %+v", resp)
-		}
-	} else if strings.Contains(req.URL.Path, prioritize) {
-		// Prioritize errors are ignored. Default k8s priorities or another extender's
-		// priorities may be applied.
-		priorities, _ := e.Prioritize(&args)
+		encoder := json.NewEncoder(w)
 
-		if err := encoder.Encode(priorities); err != nil {
-			t.Fatalf("Failed to encode %+v", priorities)
+		if strings.Contains(req.URL.Path, filter) {
+			resp := &schedulerapi.ExtenderFilterResult{}
+			resp, err := e.Filter(&args)
+			if err != nil {
+				resp.Error = err.Error()
+			}
+
+			if err := encoder.Encode(resp); err != nil {
+				t.Fatalf("Failed to encode %+v", resp)
+			}
+		} else if strings.Contains(req.URL.Path, prioritize) {
+			// Prioritize errors are ignored. Default k8s priorities or another extender's
+			// priorities may be applied.
+			priorities, _ := e.Prioritize(&args)
+
+			if err := encoder.Encode(priorities); err != nil {
+				t.Fatalf("Failed to encode %+v", priorities)
+			}
 		}
+	} else if strings.Contains(req.URL.Path, bind) {
+		var args schedulerapi.Binding
+
+		decoder := json.NewDecoder(req.Body)
+		defer req.Body.Close()
+
+		if err := decoder.Decode(&args); err != nil {
+			http.Error(w, "Decode error", http.StatusBadRequest)
+			return
+		}
+
+		if err := e.Bind(&args.Pod, args.Node); err != nil {
+			http.Error(w, fmt.Sprintf("Bind failed with error: %v", err), http.StatusInternalServerError)
+			return
+		}
+		w.WriteHeader(http.StatusOK)
 	} else {
 		http.Error(w, "Unknown method", http.StatusNotFound)
 	}
@@ -211,6 +231,14 @@ func (e *Extender) Prioritize(args *schedulerapi.ExtenderArgs) (*schedulerapi.Ho
 	return &result, nil
 }
 
+func (e *Extender) Bind(pod *v1.Pod, host string) error {
+	if pod.Name == failPodName {
+		return fmt.Errorf("Induced bind failure for %v", failPodName)
+	}
+
+	return nil
+}
+
 func machine_1_2_3_Predicate(pod *v1.Pod, node *v1.Node) (bool, error) {
 	if node.Name == "machine1" || node.Name == "machine2" || node.Name == "machine3" {
 		return true, nil
@@ -302,6 +330,7 @@ func TestSchedulerExtender(t *testing.T) {
 				URLPrefix:      es2.URL,
 				FilterVerb:     filter,
 				PrioritizeVerb: prioritize,
+				BindVerb:       bind,
 				Weight:         4,
 				EnableHttps:    false,
 			},
@@ -397,4 +426,22 @@ func DoTestPodScheduling(ns *v1.Namespace, t *testing.T, cs clientset.Interface)
 		t.Fatalf("Failed to schedule using extender, expected machine2, got %v", myPod.Spec.NodeName)
 	}
 	t.Logf("Scheduled pod using extenders")
+
+	pod.Name = failPodName
+	failPod, err := cs.Core().Pods(ns.Name).Create(pod)
+	if err != nil {
+		t.Fatalf("Failed to create pod: %v", err)
+	}
+
+	err = wait.Poll(time.Second, time.Second*2, podNotScheduled(cs, failPod.Namespace, failPod.Name))
+	if err != nil {
+		t.Fatalf("Scheduled pod when not expected to: %v", err)
+	}
+
+	if failPod, err := cs.Core().Pods(ns.Name).Get(failPod.Name, metav1.GetOptions{}); err != nil {
+		t.Fatalf("Failed to get pod: %v", err)
+	} else if failPod.Spec.NodeName != "" {
+		t.Fatalf("Pod scheduled to %v when not expected to", failPod.Spec.NodeName)
+	}
+	t.Logf("Tested pod scheduling failure using extenders")
 }

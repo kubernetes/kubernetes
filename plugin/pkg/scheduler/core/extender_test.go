@@ -109,6 +109,7 @@ type FakeExtender struct {
 	prioritizers     []priorityConfig
 	weight           int
 	nodeCacheCapable bool
+	filteredNodes    []*v1.Node
 }
 
 func (f *FakeExtender) Filter(pod *v1.Pod, nodes []*v1.Node, nodeNameToInfo map[string]*schedulercache.NodeInfo) ([]*v1.Node, schedulerapi.FailedNodesMap, error) {
@@ -133,6 +134,7 @@ func (f *FakeExtender) Filter(pod *v1.Pod, nodes []*v1.Node, nodeNameToInfo map[
 		}
 	}
 
+	f.filteredNodes = filtered
 	if f.nodeCacheCapable {
 		return filtered, failedNodesMap, nil
 	}
@@ -160,6 +162,19 @@ func (f *FakeExtender) Prioritize(pod *v1.Pod, nodes []*v1.Node) (*schedulerapi.
 		result = append(result, schedulerapi.HostPriority{Host: host, Score: score})
 	}
 	return &result, f.weight, nil
+}
+
+func (f *FakeExtender) Bind(pod *v1.Pod, host string) error {
+	if len(f.filteredNodes) != 0 {
+		for _, node := range f.filteredNodes {
+			if node.Name == host {
+				return nil
+			}
+		}
+		return fmt.Errorf("Node %v not in filtered nodes %v", host, f.filteredNodes)
+		f.filteredNodes = nil
+	}
+	return nil
 }
 
 func TestGenericSchedulerWithExtenders(t *testing.T) {

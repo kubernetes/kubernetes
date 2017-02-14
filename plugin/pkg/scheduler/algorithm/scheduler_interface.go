@@ -35,6 +35,11 @@ type SchedulerExtender interface {
 	// are used to compute the weighted score for an extender. The weighted scores are added to
 	// the scores computed  by Kubernetes scheduler. The total scores are used to do the host selection.
 	Prioritize(pod *v1.Pod, nodes []*v1.Node) (hostPriorities *schedulerapi.HostPriorityList, weight int, err error)
+
+	// Bind informs the extender about the scheduling decision, before the decision is
+	// conveyed to the apiserver. The binding information contains the pod and the
+	// selected node.
+	Bind(pod *v1.Pod, node string) error
 }
 
 // ScheduleAlgorithm is an interface implemented by things that know how to schedule pods

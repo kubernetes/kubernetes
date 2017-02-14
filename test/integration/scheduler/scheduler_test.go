@@ -106,6 +106,23 @@ func podScheduled(c clientset.Interface, podNamespace, podName string) wait.Cond
 	}
 }
 
+func podNotScheduled(c clientset.Interface, podNamespace, podName string) wait.ConditionFunc {
+	return func() (bool, error) {
+		pod, err := c.Core().Pods(podNamespace).Get(podName, metav1.GetOptions{})
+		if errors.IsNotFound(err) {
+			return false, nil
+		}
+		if err != nil {
+			// This could be a connection error so we want to retry.
+			return false, nil
+		}
+		if pod.Spec.NodeName != "" {
+			return false, nil
+		}
+		return true, nil
+	}
+}
+
 // Wait till the passFunc confirms that the object it expects to see is in the store.
 // Used to observe reflected events.
 func waitForReflection(t *testing.T, nodeLister corelisters.NodeLister, key string, passFunc func(n interface{}) bool) error {

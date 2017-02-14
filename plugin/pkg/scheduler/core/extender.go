@@ -41,6 +41,7 @@ type HTTPExtender struct {
 	extenderURL      string
 	filterVerb       string
 	prioritizeVerb   string
+	bindVerb         string
 	weight           int
 	client           *http.Client
 	nodeCacheCapable bool
@@ -86,6 +87,7 @@ func NewHTTPExtender(config *schedulerapi.ExtenderConfig) (algorithm.SchedulerEx
 		extenderURL:      config.URLPrefix,
 		filterVerb:       config.FilterVerb,
 		prioritizeVerb:   config.PrioritizeVerb,
+		bindVerb:         config.BindVerb,
 		weight:           config.Weight,
 		client:           client,
 		nodeCacheCapable: config.NodeCacheCapable,
@@ -193,6 +195,19 @@ func (h *HTTPExtender) Prioritize(pod *v1.Pod, nodes []*v1.Node) (*schedulerapi.
 	return &result, h.weight, nil
 }
 
+// Bind informs the extender about the scheduling decision, before the decision is
+// conveyed to the apiserver.
+func (h *HTTPExtender) Bind(pod *v1.Pod, node string) error {
+	if h.bindVerb == "" {
+		return nil
+	}
+	binding := &schedulerapi.Binding{
+		Pod:  *pod,
+		Node: node,
+	}
+	return h.send(h.bindVerb, &binding, nil)
+}
+
 // Helper function to send messages to the extender
 func (h *HTTPExtender) send(action string, args interface{}, result interface{}) error {
 	out, err := json.Marshal(args)
@@ -214,14 +229,20 @@ func (h *HTTPExtender) send(action string, args interface{}, result interface{})
 		return err
 	}
 
-	defer resp.Body.Close()
-	body, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		return err
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("Failed %v with extender at URL %v, code %v", action, h.extenderURL, resp.StatusCode)
 	}
 
-	if err := json.Unmarshal(body, result); err != nil {
-		return err
+	if result != nil {
+		defer resp.Body.Close()
+		body, err := ioutil.ReadAll(resp.Body)
+		if err != nil {
+			return err
+		}
+
+		if err := json.Unmarshal(body, result); err != nil {
+			return err
+		}
 	}
 	return nil
 }

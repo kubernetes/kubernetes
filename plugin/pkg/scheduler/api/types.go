@@ -118,6 +118,8 @@ type ExtenderConfig struct {
 	FilterVerb string
 	// Verb for the prioritize call, empty if not supported. This verb is appended to the URLPrefix when issuing the prioritize call to extender.
 	PrioritizeVerb string
+	// Verb for the bind call, empty if not supported. This verb is appended to the URLPrefix when issuing the bind call to extender.
+	BindVerb string
 	// The numeric multiplier for the node scores that the prioritize call generates.
 	// The weight should be a positive integer
 	Weight int
@@ -162,6 +164,14 @@ type ExtenderFilterResult struct {
 	FailedNodes FailedNodesMap
 	// Error message indicating failure
 	Error string
+}
+
+// Binding represents the binding of a pod to a node.
+type Binding struct {
+	// Pod being bound
+	Pod v1.Pod
+	// Node selected by the scheduler
+	Node string
 }
 
 // HostPriority represents the priority of scheduling to a particular host, higher priority is better.

@@ -20,6 +20,7 @@
         "apiVersion": "v1beta1",
         "filterVerb": "filter",
         "prioritizeVerb": "prioritize",
+        "bindVerb": "bind",
         "weight": 5,
         "enableHttps": false,
         "nodeCacheCapable": false

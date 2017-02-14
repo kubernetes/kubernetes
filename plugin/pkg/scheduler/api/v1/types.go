@@ -118,6 +118,8 @@ type ExtenderConfig struct {
 	FilterVerb string `json:"filterVerb,omitempty"`
 	// Verb for the prioritize call, empty if not supported. This verb is appended to the URLPrefix when issuing the prioritize call to extender.
 	PrioritizeVerb string `json:"prioritizeVerb,omitempty"`
+	// Verb for the bind call, empty if not supported. This verb is appended to the URLPrefix when issuing the bind call to extender.
+	BindVerb string `json:"bindVerb,omitempty"`
 	// The numeric multiplier for the node scores that the prioritize call generates.
 	// The weight should be a positive integer
 	Weight int `json:"weight,omitempty"`
@@ -162,6 +164,14 @@ type ExtenderFilterResult struct {
 	FailedNodes FailedNodesMap `json:"failedNodes,omitempty"`
 	// Error message indicating failure
 	Error string `json:"error,omitempty"`
+}
+
+// Binding represents the binding of a pod to a node.
+type Binding struct {
+	// Pod being bound
+	Pod apiv1.Pod `json:"pod"`
+	// Node selected by the scheduler
+	Node string `json:"node"`
 }
 
 // HostPriority represents the priority of scheduling to a particular host, higher priority is better.
