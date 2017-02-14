@@ -15,7 +15,6 @@ go_library(
         "//cmd/kube-aggregator/pkg/apis/apiregistration/v1alpha1:go_default_library",
         "//cmd/kube-aggregator/pkg/apiserver:go_default_library",
         "//pkg/api:go_default_library",
-        "//pkg/client/clientset_generated/clientset:go_default_library",
         "//pkg/kubectl/cmd/util:go_default_library",
         "//vendor:github.com/spf13/cobra",
         "//vendor:k8s.io/apimachinery/pkg/util/sets",
@@ -23,6 +22,7 @@ go_library(
         "//vendor:k8s.io/apiserver/pkg/server",
         "//vendor:k8s.io/apiserver/pkg/server/filters",
         "//vendor:k8s.io/apiserver/pkg/server/options",
+        "//vendor:k8s.io/client-go/kubernetes",
         "//vendor:k8s.io/client-go/rest",
     ],
 )
