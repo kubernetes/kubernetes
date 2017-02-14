@@ -583,6 +583,29 @@ func TestStaticPod(t *testing.T) {
 	})
 }
 
+func TestTerminatePod(t *testing.T) {
+	syncer := newTestManager(&fake.Clientset{})
+	testPod := getTestPod()
+	oldStatus := getRandomPodStatus()
+	oldStatus.Phase = v1.PodFailed
+	syncer.SetPodStatus(testPod, oldStatus)
+	syncer.TerminatePod(testPod)
+	status := expectPodStatus(t, syncer, testPod)
+	for i := range status.ContainerStatuses {
+		if status.ContainerStatuses[i].State.Terminated == nil {
+			t.Errorf("expected containers to be terminated")
+		}
+	}
+	for i := range status.InitContainerStatuses {
+		if status.InitContainerStatuses[i].State.Terminated == nil {
+			t.Errorf("expected init containers to be terminated")
+		}
+	}
+	if status.Phase != v1.PodFailed {
+		t.Errorf("expected terminated pod to be in a failed state, since it was previously set to failed")
+	}
+}
+
 func TestSetContainerReadiness(t *testing.T) {
 	cID1 := kubecontainer.ContainerID{Type: "test", ID: "1"}
 	cID2 := kubecontainer.ContainerID{Type: "test", ID: "2"}
