@@ -70,6 +70,7 @@ filegroup(
         "//pkg/client/listers/rbac/v1alpha1:all-srcs",
         "//pkg/client/listers/rbac/v1beta1:all-srcs",
         "//pkg/client/listers/storage/internalversion:all-srcs",
+        "//pkg/client/listers/storage/v1:all-srcs",
         "//pkg/client/listers/storage/v1beta1:all-srcs",
         "//pkg/client/metrics:all-srcs",
         "//pkg/client/retry:all-srcs",
