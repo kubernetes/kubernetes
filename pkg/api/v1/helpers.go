@@ -296,6 +296,45 @@ func GetPodTolerations(pod *Pod) ([]Toleration, error) {
 	return GetTolerationsFromPodAnnotations(pod.Annotations)
 }
 
+// Tries to add a toleration to annotations list. Returns true if something was updated
+// false otherwise.
+func AddOrUpdateTolerationInPod(pod *Pod, toleration *Toleration) (bool, error) {
+	podTolerations, err := GetPodTolerations(pod)
+	if err != nil {
+		return false, err
+	}
+
+	var newTolerations []*Toleration
+	updated := false
+	for i := range podTolerations {
+		if toleration.MatchToleration(&podTolerations[i]) {
+			if api.Semantic.DeepEqual(toleration, podTolerations[i]) {
+				return false, nil
+			}
+			newTolerations = append(newTolerations, toleration)
+			updated = true
+			continue
+		}
+
+		newTolerations = append(newTolerations, &podTolerations[i])
+	}
+
+	if !updated {
+		newTolerations = append(newTolerations, toleration)
+	}
+
+	tolerationsData, err := json.Marshal(newTolerations)
+	if err != nil {
+		return false, err
+	}
+
+	if pod.Annotations == nil {
+		pod.Annotations = make(map[string]string)
+	}
+	pod.Annotations[TolerationsAnnotationKey] = string(tolerationsData)
+	return true, nil
+}
+
 // GetTaintsFromNodeAnnotations gets the json serialized taints data from Pod.Annotations
 // and converts it to the []Taint type in api.
 func GetTaintsFromNodeAnnotations(annotations map[string]string) ([]Taint, error) {
@@ -311,6 +350,16 @@ func GetTaintsFromNodeAnnotations(annotations map[string]string) ([]Taint, error
 
 func GetNodeTaints(node *Node) ([]Taint, error) {
 	return GetTaintsFromNodeAnnotations(node.Annotations)
+}
+
+// MatchToleration checks if the toleration matches tolerationToMatch. Tolerations are unique by <key,effect,operator,value>,
+// if the two tolerations have same <key,effect,operator,value> combination, regard as they match.
+// TODO: uniqueness check for tolerations in api validations.
+func (t *Toleration) MatchToleration(tolerationToMatch *Toleration) bool {
+	return t.Key == tolerationToMatch.Key &&
+		t.Effect == tolerationToMatch.Effect &&
+		t.Operator == tolerationToMatch.Operator &&
+		t.Value == tolerationToMatch.Value
 }
 
 // ToleratesTaint checks if the toleration tolerates the taint.
