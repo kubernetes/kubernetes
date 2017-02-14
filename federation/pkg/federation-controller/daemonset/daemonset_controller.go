@@ -187,7 +187,6 @@ func NewDaemonSetController(client federationclientset.Interface) *DaemonSetCont
 
 	daemonsetcontroller.deletionHelper = deletionhelper.NewDeletionHelper(
 		daemonsetcontroller.hasFinalizerFunc,
-		daemonsetcontroller.removeFinalizerFunc,
 		daemonsetcontroller.addFinalizerFunc,
 		// objNameFunc
 		func(obj pkgruntime.Object) string {
@@ -212,31 +211,6 @@ func (daemonsetcontroller *DaemonSetController) hasFinalizerFunc(obj pkgruntime.
 		}
 	}
 	return false
-}
-
-// Removes the finalizer from the given objects ObjectMeta.
-// Assumes that the given object is a daemonset.
-func (daemonsetcontroller *DaemonSetController) removeFinalizerFunc(obj pkgruntime.Object, finalizer string) (pkgruntime.Object, error) {
-	daemonset := obj.(*extensionsv1.DaemonSet)
-	newFinalizers := []string{}
-	hasFinalizer := false
-	for i := range daemonset.ObjectMeta.Finalizers {
-		if string(daemonset.ObjectMeta.Finalizers[i]) != finalizer {
-			newFinalizers = append(newFinalizers, daemonset.ObjectMeta.Finalizers[i])
-		} else {
-			hasFinalizer = true
-		}
-	}
-	if !hasFinalizer {
-		// Nothing to do.
-		return obj, nil
-	}
-	daemonset.ObjectMeta.Finalizers = newFinalizers
-	daemonset, err := daemonsetcontroller.federatedApiClient.Extensions().DaemonSets(daemonset.Namespace).Update(daemonset)
-	if err != nil {
-		return nil, fmt.Errorf("failed to remove finalizer %s from daemonset %s: %v", finalizer, daemonset.Name, err)
-	}
-	return daemonset, nil
 }
 
 // Adds the given finalizers to the given objects ObjectMeta.
@@ -454,7 +428,7 @@ func (daemonsetcontroller *DaemonSetController) reconcileDaemonSet(namespace str
 // delete deletes the given daemonset or returns error if the deletion was not complete.
 func (daemonsetcontroller *DaemonSetController) delete(daemonset *extensionsv1.DaemonSet) error {
 	glog.V(3).Infof("Handling deletion of daemonset: %v", *daemonset)
-	_, err := daemonsetcontroller.deletionHelper.HandleObjectInUnderlyingClusters(daemonset)
+	err := daemonsetcontroller.deletionHelper.HandleObjectInUnderlyingClusters(daemonset)
 	if err != nil {
 		return err
 	}

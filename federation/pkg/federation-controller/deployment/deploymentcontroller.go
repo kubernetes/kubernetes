@@ -204,7 +204,6 @@ func NewDeploymentController(federationClient fedclientset.Interface) *Deploymen
 
 	fdc.deletionHelper = deletionhelper.NewDeletionHelper(
 		fdc.hasFinalizerFunc,
-		fdc.removeFinalizerFunc,
 		fdc.addFinalizerFunc,
 		// objNameFunc
 		func(obj runtime.Object) string {
@@ -229,31 +228,6 @@ func (fdc *DeploymentController) hasFinalizerFunc(obj runtime.Object, finalizer 
 		}
 	}
 	return false
-}
-
-// Removes the finalizer from the given objects ObjectMeta.
-// Assumes that the given object is a deployment.
-func (fdc *DeploymentController) removeFinalizerFunc(obj runtime.Object, finalizer string) (runtime.Object, error) {
-	deployment := obj.(*extensionsv1.Deployment)
-	newFinalizers := []string{}
-	hasFinalizer := false
-	for i := range deployment.ObjectMeta.Finalizers {
-		if string(deployment.ObjectMeta.Finalizers[i]) != finalizer {
-			newFinalizers = append(newFinalizers, deployment.ObjectMeta.Finalizers[i])
-		} else {
-			hasFinalizer = true
-		}
-	}
-	if !hasFinalizer {
-		// Nothing to do.
-		return obj, nil
-	}
-	deployment.ObjectMeta.Finalizers = newFinalizers
-	deployment, err := fdc.fedClient.Extensions().Deployments(deployment.Namespace).Update(deployment)
-	if err != nil {
-		return nil, fmt.Errorf("failed to remove finalizer %s from deployment %s: %v", finalizer, deployment.Name, err)
-	}
-	return deployment, nil
 }
 
 // Adds the given finalizers to the given objects ObjectMeta.
@@ -636,7 +610,7 @@ func (fdc *DeploymentController) reconcileDeploymentsOnClusterChange() {
 // delete deletes the given deployment or returns error if the deletion was not complete.
 func (fdc *DeploymentController) delete(deployment *extensionsv1.Deployment) error {
 	glog.V(3).Infof("Handling deletion of deployment: %v", *deployment)
-	_, err := fdc.deletionHelper.HandleObjectInUnderlyingClusters(deployment)
+	err := fdc.deletionHelper.HandleObjectInUnderlyingClusters(deployment)
 	if err != nil {
 		return err
 	}
