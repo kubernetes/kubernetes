@@ -20,6 +20,7 @@ import (
 	"strings"
 
 	"k8s.io/apimachinery/pkg/api/meta"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/discovery"
 	"k8s.io/kubernetes/pkg/kubectl"
@@ -35,6 +36,12 @@ type ShortcutExpander struct {
 }
 
 var _ meta.RESTMapper = &ShortcutExpander{}
+
+type NamespacedResources struct{}
+
+func (ns NamespacedResources) Match(groupVersion string, r *metav1.APIResource) bool {
+	return r.Namespaced
+}
 
 func NewShortcutExpander(delegate meta.RESTMapper, client discovery.DiscoveryInterface) ShortcutExpander {
 	return ShortcutExpander{All: UserResources, RESTMapper: delegate, discoveryClient: client}
@@ -69,8 +76,11 @@ func (e ShortcutExpander) getAll() ([]schema.GroupResource, []schema.GroupResour
 		}
 	}
 
+	filteredServerList := discovery.FilteredBy(NamespacedResources{}, apiResources)
+	filteredServerResources, err := discovery.GroupVersionResources(filteredServerList)
+
 	// populate all "discovered" resources from the server
-	for availableResource := range availableResources {
+	for availableResource := range filteredServerResources {
 		r := availableResource.GroupResource()
 
 		rSplit := strings.Split(r.Resource, "/")
