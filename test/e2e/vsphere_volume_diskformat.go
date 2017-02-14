@@ -88,19 +88,19 @@ var _ = framework.KubeDescribe("Volume Disk Format [Volumes]", func() {
 
 	It("verify disk format type - eagerzeroedthick is honored for dynamically provisioned pv using storageclass", func() {
 		By("Invoking Test for diskformat: eagerzeroedthick")
-		invokeTest(client, namespace, nodeName, nodeKeyValueLabel, "eagerzeroedthick")
+		invokeTest(f, client, namespace, nodeName, nodeKeyValueLabel, "eagerzeroedthick")
 	})
 	It("verify disk format type - zeroedthick is honored for dynamically provisioned pv using storageclass", func() {
 		By("Invoking Test for diskformat: zeroedthick")
-		invokeTest(client, namespace, nodeName, nodeKeyValueLabel, "zeroedthick")
+		invokeTest(f, client, namespace, nodeName, nodeKeyValueLabel, "zeroedthick")
 	})
 	It("verify disk format type - thin is honored for dynamically provisioned pv using storageclass", func() {
 		By("Invoking Test for diskformat: thin")
-		invokeTest(client, namespace, nodeName, nodeKeyValueLabel, "thin")
+		invokeTest(f, client, namespace, nodeName, nodeKeyValueLabel, "thin")
 	})
 })
 
-func invokeTest(client clientset.Interface, namespace string, nodeName string, nodeKeyValueLabel map[string]string, diskFormat string) {
+func invokeTest(f *framework.Framework, client clientset.Interface, namespace string, nodeName string, nodeKeyValueLabel map[string]string, diskFormat string) {
 
 	framework.Logf("Invoking Test for DiskFomat: %s", diskFormat)
 	scParameters := make(map[string]string)
@@ -152,8 +152,11 @@ func invokeTest(client clientset.Interface, namespace string, nodeName string, n
 	Expect(framework.WaitForPodNameRunningInNamespace(client, pod.Name, namespace)).To(Succeed())
 	Expect(verifyDiskFormat(nodeName, pv.Spec.VsphereVolume.VolumePath, diskFormat)).To(BeTrue(), "DiskFormat Verification Failed")
 
+	var volumePaths []string
+	volumePaths = append(volumePaths, pv.Spec.VsphereVolume.VolumePath)
+
 	By("Delete pod and wait for volume to be detached from node")
-	deletePodAndWaitForVolumeToDetach(client, namespace, vsp, nodeName, pod, pv.Spec.VsphereVolume.VolumePath)
+	deletePodAndWaitForVolumeToDetach(f, client, pod, vsp, nodeName, volumePaths)
 
 }
 
