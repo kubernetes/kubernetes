@@ -18,6 +18,7 @@ go_test(
     name = "go_default_test",
     srcs = [
         "init_test.go",
+        "join_test.go",
         "token_test.go",
     ],
     args = ["--kubeadm-path=../../kubeadm"],
