@@ -78,7 +78,7 @@ type Configurator interface {
 	Create() (*Config, error)
 	CreateFromProvider(providerName string) (*Config, error)
 	CreateFromConfig(policy schedulerapi.Policy) (*Config, error)
-	CreateFromKeys(predicateKeys, priorityKeys sets.String, extenders []algorithm.SchedulerExtender) (*Config, error)
+	CreateFromKeys(predicateKeys, priorityKeys sets.String, extender algorithm.SchedulerExtender, binder Binder) (*Config, error)
 }
 
 // TODO over time we should make this struct a hidden implementation detail of the scheduler.
@@ -191,7 +191,7 @@ func (s *Scheduler) scheduleOne() {
 		defer metrics.E2eSchedulingLatency.Observe(metrics.SinceInMicroseconds(start))
 
 		b := &v1.Binding{
-			ObjectMeta: metav1.ObjectMeta{Namespace: pod.Namespace, Name: pod.Name},
+			ObjectMeta: metav1.ObjectMeta{Namespace: pod.Namespace, Name: pod.Name, UID: pod.UID},
 			Target: v1.ObjectReference{
 				Kind: "Node",
 				Name: dest,

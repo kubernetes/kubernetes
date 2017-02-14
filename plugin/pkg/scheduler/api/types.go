@@ -20,6 +20,7 @@ import (
 	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/kubernetes/pkg/api/v1"
 )
@@ -30,8 +31,8 @@ type Policy struct {
 	Predicates []PredicatePolicy
 	// Holds the information to configure the priority functions
 	Priorities []PriorityPolicy
-	// Holds the information to communicate with the extender(s)
-	ExtenderConfigs []ExtenderConfig
+	// Holds the information to communicate with the extender
+	ExtenderConfig *ExtenderConfig
 }
 
 type PredicatePolicy struct {
@@ -118,6 +119,9 @@ type ExtenderConfig struct {
 	FilterVerb string
 	// Verb for the prioritize call, empty if not supported. This verb is appended to the URLPrefix when issuing the prioritize call to extender.
 	PrioritizeVerb string
+	// Verb for the bind call, empty if not supported. This verb is appended to the URLPrefix when issuing the bind call to extender.
+	// If this method is implemented by the extender, it is the extender's responsibility to bind the pod to apiserver.
+	BindVerb string
 	// The numeric multiplier for the node scores that the prioritize call generates.
 	// The weight should be a positive integer
 	Weight int
@@ -126,7 +130,7 @@ type ExtenderConfig struct {
 	// TLSConfig specifies the transport layer security config
 	TLSConfig *restclient.TLSClientConfig
 	// HTTPTimeout specifies the timeout duration for a call to the extender. Filter timeout fails the scheduling of the pod. Prioritize
-	// timeout is ignored, k8s/other extenders priorities are used to select the node.
+	// timeout is ignored, k8s priorities are used to select the node.
 	HTTPTimeout time.Duration
 	// NodeCacheCapable specifies that the extender is capable of caching node information,
 	// so the scheduler should only send minimal information about the eligible nodes
@@ -160,6 +164,24 @@ type ExtenderFilterResult struct {
 	NodeNames *[]string
 	// Filtered out nodes where the pod can't be scheduled and the failure messages
 	FailedNodes FailedNodesMap
+	// Error message indicating failure
+	Error string
+}
+
+// Binding represents the binding of a pod to a node.
+type Binding struct {
+	// PodName is the name of the pod being bound
+	PodName string
+	// PodNamespace is the namespace of the pod being bound
+	PodNamespace string
+	// PodUID is the UID of the pod being bound
+	PodUID types.UID
+	// Node selected by the scheduler
+	Node string
+}
+
+// BindingResult represents the result of binding of a pod to a node.
+type BindingResult struct {
 	// Error message indicating failure
 	Error string
 }

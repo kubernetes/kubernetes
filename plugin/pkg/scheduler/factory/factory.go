@@ -303,7 +303,7 @@ func (f *ConfigFactory) CreateFromProvider(providerName string) (*scheduler.Conf
 		return nil, err
 	}
 
-	return f.CreateFromKeys(provider.FitPredicateKeys, provider.PriorityFunctionKeys, []algorithm.SchedulerExtender{})
+	return f.CreateFromKeys(provider.FitPredicateKeys, provider.PriorityFunctionKeys, nil, nil)
 }
 
 // Creates a scheduler from the configuration file
@@ -327,22 +327,26 @@ func (f *ConfigFactory) CreateFromConfig(policy schedulerapi.Policy) (*scheduler
 		priorityKeys.Insert(RegisterCustomPriorityFunction(priority))
 	}
 
-	extenders := make([]algorithm.SchedulerExtender, 0)
-	if len(policy.ExtenderConfigs) != 0 {
-		for ii := range policy.ExtenderConfigs {
-			glog.V(2).Infof("Creating extender with config %+v", policy.ExtenderConfigs[ii])
-			if extender, err := core.NewHTTPExtender(&policy.ExtenderConfigs[ii]); err != nil {
-				return nil, err
-			} else {
-				extenders = append(extenders, extender)
-			}
+	var (
+		extender algorithm.SchedulerExtender
+		binder   scheduler.Binder
+		err      error
+	)
+	if policy.ExtenderConfig != nil {
+		glog.V(2).Infof("Creating extender with config %+v", policy.ExtenderConfig)
+		if extender, err = core.NewHTTPExtender(policy.ExtenderConfig); err != nil {
+			return nil, err
+		}
+		// Check if bind is offloaded to the extender.
+		if policy.ExtenderConfig.BindVerb != "" {
+			binder = extender
 		}
 	}
-	return f.CreateFromKeys(predicateKeys, priorityKeys, extenders)
+	return f.CreateFromKeys(predicateKeys, priorityKeys, extender, binder)
 }
 
 // Creates a scheduler from a set of registered fit predicate keys and priority keys.
-func (f *ConfigFactory) CreateFromKeys(predicateKeys, priorityKeys sets.String, extenders []algorithm.SchedulerExtender) (*scheduler.Config, error) {
+func (f *ConfigFactory) CreateFromKeys(predicateKeys, priorityKeys sets.String, extender algorithm.SchedulerExtender, extBinder scheduler.Binder) (*scheduler.Config, error) {
 	glog.V(2).Infof("Creating scheduler with fit predicates '%v' and priority functions '%v", predicateKeys, priorityKeys)
 
 	if f.GetHardPodAffinitySymmetricWeight() < 0 || f.GetHardPodAffinitySymmetricWeight() > 100 {
@@ -370,14 +374,17 @@ func (f *ConfigFactory) CreateFromKeys(predicateKeys, priorityKeys sets.String, 
 	}
 
 	f.Run()
-	algo := core.NewGenericScheduler(f.schedulerCache, predicateFuncs, predicateMetaProducer, priorityConfigs, priorityMetaProducer, extenders)
+	algo := core.NewGenericScheduler(f.schedulerCache, predicateFuncs, predicateMetaProducer, priorityConfigs, priorityMetaProducer, extender)
 	podBackoff := util.CreateDefaultPodBackoff()
+	if extBinder == nil {
+		extBinder = &binder{f.client}
+	}
 	return &scheduler.Config{
 		SchedulerCache: f.schedulerCache,
 		// The scheduler only needs to consider schedulable nodes.
 		NodeLister:          &nodePredicateLister{f.nodeLister},
 		Algorithm:           algo,
-		Binder:              &binder{f.client},
+		Binder:              extBinder,
 		PodConditionUpdater: &podConditionUpdater{f.client},
 		NextPod: func() *v1.Pod {
 			return f.getNextPod()

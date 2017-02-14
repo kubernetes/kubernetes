@@ -73,7 +73,7 @@ type genericScheduler struct {
 	priorityMetaProducer  algorithm.MetadataProducer
 	predicateMetaProducer algorithm.MetadataProducer
 	prioritizers          []algorithm.PriorityConfig
-	extenders             []algorithm.SchedulerExtender
+	extender              algorithm.SchedulerExtender
 	pods                  algorithm.PodLister
 	lastNodeIndexLock     sync.Mutex
 	lastNodeIndex         uint64
@@ -107,7 +107,7 @@ func (g *genericScheduler) Schedule(pod *v1.Pod, nodeLister algorithm.NodeLister
 	// TODO(harryz) Check if equivalenceCache is enabled and call scheduleWithEquivalenceClass here
 
 	trace.Step("Computing predicates")
-	filteredNodes, failedPredicateMap, err := findNodesThatFit(pod, g.cachedNodeInfoMap, nodes, g.predicates, g.extenders, g.predicateMetaProducer)
+	filteredNodes, failedPredicateMap, err := findNodesThatFit(pod, g.cachedNodeInfoMap, nodes, g.predicates, g.extender, g.predicateMetaProducer)
 	if err != nil {
 		return "", err
 	}
@@ -121,7 +121,7 @@ func (g *genericScheduler) Schedule(pod *v1.Pod, nodeLister algorithm.NodeLister
 
 	trace.Step("Prioritizing")
 	metaPrioritiesInterface := g.priorityMetaProducer(pod, g.cachedNodeInfoMap)
-	priorityList, err := PrioritizeNodes(pod, g.cachedNodeInfoMap, metaPrioritiesInterface, g.prioritizers, filteredNodes, g.extenders)
+	priorityList, err := PrioritizeNodes(pod, g.cachedNodeInfoMap, metaPrioritiesInterface, g.prioritizers, filteredNodes, g.extender)
 	if err != nil {
 		return "", err
 	}
@@ -156,7 +156,7 @@ func findNodesThatFit(
 	nodeNameToInfo map[string]*schedulercache.NodeInfo,
 	nodes []*v1.Node,
 	predicateFuncs map[string]algorithm.FitPredicate,
-	extenders []algorithm.SchedulerExtender,
+	extender algorithm.SchedulerExtender,
 	metadataProducer algorithm.MetadataProducer,
 ) ([]*v1.Node, FailedPredicateMap, error) {
 	var filtered []*v1.Node
@@ -198,24 +198,19 @@ func findNodesThatFit(
 		}
 	}
 
-	if len(filtered) > 0 && len(extenders) != 0 {
-		for _, extender := range extenders {
-			filteredList, failedMap, err := extender.Filter(pod, filtered, nodeNameToInfo)
-			if err != nil {
-				return []*v1.Node{}, FailedPredicateMap{}, err
-			}
-
-			for failedNodeName, failedMsg := range failedMap {
-				if _, found := failedPredicateMap[failedNodeName]; !found {
-					failedPredicateMap[failedNodeName] = []algorithm.PredicateFailureReason{}
-				}
-				failedPredicateMap[failedNodeName] = append(failedPredicateMap[failedNodeName], predicates.NewFailureReason(failedMsg))
-			}
-			filtered = filteredList
-			if len(filtered) == 0 {
-				break
-			}
+	if len(filtered) > 0 && extender != nil {
+		filteredList, failedMap, err := extender.Filter(pod, filtered, nodeNameToInfo)
+		if err != nil {
+			return []*v1.Node{}, FailedPredicateMap{}, err
 		}
+
+		for failedNodeName, failedMsg := range failedMap {
+			if _, found := failedPredicateMap[failedNodeName]; !found {
+				failedPredicateMap[failedNodeName] = []algorithm.PredicateFailureReason{}
+			}
+			failedPredicateMap[failedNodeName] = append(failedPredicateMap[failedNodeName], predicates.NewFailureReason(failedMsg))
+		}
+		filtered = filteredList
 	}
 	return filtered, failedPredicateMap, nil
 }
@@ -248,11 +243,11 @@ func PrioritizeNodes(
 	meta interface{},
 	priorityConfigs []algorithm.PriorityConfig,
 	nodes []*v1.Node,
-	extenders []algorithm.SchedulerExtender,
+	extender algorithm.SchedulerExtender,
 ) (schedulerapi.HostPriorityList, error) {
 	// If no priority configs are provided, then the EqualPriority function is applied
 	// This is required to generate the priority list in the required format
-	if len(priorityConfigs) == 0 && len(extenders) == 0 {
+	if len(priorityConfigs) == 0 && extender == nil {
 		result := make(schedulerapi.HostPriorityList, 0, len(nodes))
 		for i := range nodes {
 			hostPriority, err := EqualPriorityMap(pod, meta, nodeNameToInfo[nodes[i].Name])
@@ -338,29 +333,18 @@ func PrioritizeNodes(
 		}
 	}
 
-	if len(extenders) != 0 && nodes != nil {
+	if extender != nil && nodes != nil {
 		combinedScores := make(map[string]int, len(nodeNameToInfo))
-		for _, extender := range extenders {
-			wg.Add(1)
-			go func(ext algorithm.SchedulerExtender) {
-				defer wg.Done()
-				prioritizedList, weight, err := ext.Prioritize(pod, nodes)
-				if err != nil {
-					// Prioritization errors from extender can be ignored, let k8s/other extenders determine the priorities
-					return
-				}
-				mu.Lock()
-				for i := range *prioritizedList {
-					host, score := (*prioritizedList)[i].Host, (*prioritizedList)[i].Score
-					combinedScores[host] += score * weight
-				}
-				mu.Unlock()
-			}(extender)
-		}
-		// wait for all go routines to finish
-		wg.Wait()
-		for i := range result {
-			result[i].Score += combinedScores[result[i].Host]
+		prioritizedList, weight, err := extender.Prioritize(pod, nodes)
+		if err == nil {
+			// Prioritization errors from extender can be ignored, let k8s scheduler determine the priorities
+			for i := range *prioritizedList {
+				host, score := (*prioritizedList)[i].Host, (*prioritizedList)[i].Score
+				combinedScores[host] += score * weight
+			}
+			for i := range result {
+				result[i].Score += combinedScores[result[i].Host]
+			}
 		}
 	}
 
@@ -390,14 +374,14 @@ func NewGenericScheduler(
 	predicateMetaProducer algorithm.MetadataProducer,
 	prioritizers []algorithm.PriorityConfig,
 	priorityMetaProducer algorithm.MetadataProducer,
-	extenders []algorithm.SchedulerExtender) algorithm.ScheduleAlgorithm {
+	extender algorithm.SchedulerExtender) algorithm.ScheduleAlgorithm {
 	return &genericScheduler{
 		cache:                 cache,
 		predicates:            predicates,
 		predicateMetaProducer: predicateMetaProducer,
 		prioritizers:          prioritizers,
 		priorityMetaProducer:  priorityMetaProducer,
-		extenders:             extenders,
+		extender:              extender,
 		cachedNodeInfoMap:     make(map[string]*schedulercache.NodeInfo),
 	}
 }
