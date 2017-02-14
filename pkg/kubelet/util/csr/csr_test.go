@@ -63,7 +63,7 @@ func TestRequestNodeCertificate(t *testing.T) {
 
 	certData, err := RequestNodeCertificate(&fakeClient{}, privateKeyData, "fake-node-name")
 	if err != nil {
-		t.Errorf("Got %v, wanted no error.")
+		t.Errorf("Got %v, wanted no error.", err)
 	}
 	if certData == nil {
 		t.Errorf("Got nothing, expected a CSR.")
