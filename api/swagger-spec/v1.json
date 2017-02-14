@@ -4845,6 +4845,36 @@
      },
      {
       "type": "string",
+      "method": "PATCH",
+      "summary": "proxy PATCH requests to Node",
+      "nickname": "proxyPATCHNodeWithPath",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the Node",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "path",
+        "description": "path to the resource",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "produces": [
+       "*/*"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     },
+     {
+      "type": "string",
       "method": "DELETE",
       "summary": "proxy DELETE requests to Node",
       "nickname": "proxyDELETENodeWithPath",
@@ -4988,6 +5018,28 @@
       "method": "POST",
       "summary": "proxy POST requests to Node",
       "nickname": "proxyPOSTNode",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the Node",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "produces": [
+       "*/*"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     },
+     {
+      "type": "string",
+      "method": "PATCH",
+      "summary": "proxy PATCH requests to Node",
+      "nickname": "proxyPATCHNode",
       "parameters": [
        {
         "type": "string",
@@ -8087,6 +8139,44 @@
      },
      {
       "type": "string",
+      "method": "PATCH",
+      "summary": "proxy PATCH requests to Pod",
+      "nickname": "proxyPATCHNamespacedPodWithPath",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "namespace",
+        "description": "object name and auth scope, such as for teams and projects",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the Pod",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "path",
+        "description": "path to the resource",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "produces": [
+       "*/*"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     },
+     {
+      "type": "string",
       "method": "DELETE",
       "summary": "proxy DELETE requests to Pod",
       "nickname": "proxyDELETENamespacedPodWithPath",
@@ -8270,6 +8360,36 @@
       "method": "POST",
       "summary": "proxy POST requests to Pod",
       "nickname": "proxyPOSTNamespacedPod",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "namespace",
+        "description": "object name and auth scope, such as for teams and projects",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the Pod",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "produces": [
+       "*/*"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     },
+     {
+      "type": "string",
+      "method": "PATCH",
+      "summary": "proxy PATCH requests to Pod",
+      "nickname": "proxyPATCHNamespacedPod",
       "parameters": [
        {
         "type": "string",
@@ -15032,6 +15152,44 @@
      },
      {
       "type": "string",
+      "method": "PATCH",
+      "summary": "proxy PATCH requests to Service",
+      "nickname": "proxyPATCHNamespacedServiceWithPath",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "namespace",
+        "description": "object name and auth scope, such as for teams and projects",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the Service",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "path",
+        "description": "path to the resource",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "produces": [
+       "*/*"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     },
+     {
+      "type": "string",
       "method": "DELETE",
       "summary": "proxy DELETE requests to Service",
       "nickname": "proxyDELETENamespacedServiceWithPath",
@@ -15215,6 +15373,36 @@
       "method": "POST",
       "summary": "proxy POST requests to Service",
       "nickname": "proxyPOSTNamespacedService",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "namespace",
+        "description": "object name and auth scope, such as for teams and projects",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the Service",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "produces": [
+       "*/*"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     },
+     {
+      "type": "string",
+      "method": "PATCH",
+      "summary": "proxy PATCH requests to Service",
+      "nickname": "proxyPATCHNamespacedService",
       "parameters": [
        {
         "type": "string",
