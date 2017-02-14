@@ -67,6 +67,12 @@ kube::test::find_dirs() {
     # run tests for apimachinery
     find ./staging/src/k8s.io/apimachinery -name '*_test.go' \
       -name '*_test.go' -print0 | xargs -0n1 dirname | sed 's|^\./staging/src/|./vendor/|' | LC_ALL=C sort -u
+
+    find ./staging/src/k8s.io/kube-aggregator -name '*_test.go' \
+      -name '*_test.go' -print0 | xargs -0n1 dirname | sed 's|^\./staging/src/|./vendor/|' | LC_ALL=C sort -u
+
+    find ./staging/src/k8s.io/sample-apiserver -name '*_test.go' \
+      -name '*_test.go' -print0 | xargs -0n1 dirname | sed 's|^\./staging/src/|./vendor/|' | LC_ALL=C sort -u
   )
 }
 
