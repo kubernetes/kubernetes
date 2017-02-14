@@ -9,10 +9,7 @@ load(
 
 go_library(
     name = "go_default_library",
-    srcs = [
-        "conversion.go",
-        "register.go",
-    ],
+    srcs = ["register.go"],
     tags = ["automanaged"],
     deps = [
         "//pkg/api:go_default_library",
