@@ -51,16 +51,11 @@ func CreateEssentialAddons(cfg *kubeadmapi.MasterConfiguration, client *clientse
 		return fmt.Errorf("error when parsing kube-proxy daemonset template: %v", err)
 	}
 
-	dnsDeploymentBytes, err := kubeadmutil.ParseTemplate(KubeDNSDeployment, struct {
-		ImageRepository, Arch, Version, DNSDomain string
-		Replicas                                  int
-	}{
+	dnsDeploymentBytes, err := kubeadmutil.ParseTemplate(KubeDNSDeployment, struct{ ImageRepository, Arch, Version, DNSDomain string }{
 		ImageRepository: kubeadmapi.GlobalEnvParams.RepositoryPrefix,
 		Arch:            runtime.GOARCH,
-		// TODO: Support larger amount of replicas?
-		Replicas:  1,
-		Version:   KubeDNSVersion,
-		DNSDomain: cfg.Networking.DNSDomain,
+		Version:         KubeDNSVersion,
+		DNSDomain:       cfg.Networking.DNSDomain,
 	})
 	if err != nil {
 		return fmt.Errorf("error when parsing kube-dns deployment template: %v", err)
