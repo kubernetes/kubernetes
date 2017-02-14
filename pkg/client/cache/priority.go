@@ -165,15 +165,15 @@ func (pq *PriorityQueue) Pop() interface{} {
 	n := len(old)
 	pk := old[n-1]
 	item := pq.items[pk.key]
-	glog.V(2).Info("priority pop")
-	glog.V(2).Infof("current queue %#v", pq.items)
+	glog.V(1).Info("priority pop")
+	glog.V(1).Infof("current queue %#v", pq.items)
 
 	//delete from map and array
 	delete(pq.items, pk.key)
 	pq.queue = old[0 : n-1]
 
 	priority, _ := MetaPriorityFunc(item)
-	glog.V(2).Infof("priority: '%v'", priority)
+	glog.V(1).Infof("priority: '%v'", priority)
 	return item
 }
 
@@ -371,7 +371,7 @@ func (p *Priority) Pop(process PopProcessFunc) (interface{}, error) {
 
 		err := process(item)
 		//TODO: this never returns anything but nil currently...
-		glog.V(2).Infof("requeue?: '%#v'", err)
+		glog.V(1).Infof("requeue?: '%#v'", err)
 		if e, ok := err.(ErrRequeue); ok {
 			key, _ := p.keyFunc(item) //TODO: add error handling
 			p.addIfNotPresent(key, item)
@@ -448,7 +448,7 @@ func MetaPriorityFunc(obj interface{}) (int, error) {
 		return -1, fmt.Errorf("object does not have annotations")
 	}
 	if p, ok := annotations[annotationKey]; ok {
-		glog.V(2).Infof("priority annotation: '%v'", p)
+		glog.V(1).Infof("priority annotation: '%v'", p)
 		priority, err := strconv.Atoi(p)
 		if err != nil {
 			return -1, fmt.Errorf("priority is not an integer: %q", p)
