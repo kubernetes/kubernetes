@@ -133,6 +133,12 @@ func (f *fakeVolumeHost) GetSecretFunc() func(namespace, name string) (*v1.Secre
 	}
 }
 
+func (f *fakeVolumeHost) GetConfigMapFunc() func(namespace, name string) (*v1.ConfigMap, error) {
+	return func(namespace, name string) (*v1.ConfigMap, error) {
+		return f.kubeClient.Core().ConfigMaps(namespace).Get(name, metav1.GetOptions{})
+	}
+}
+
 func ProbeVolumePlugins(config VolumeConfig) []VolumePlugin {
 	if _, ok := config.OtherAttributes["fake-property"]; ok {
 		return []VolumePlugin{

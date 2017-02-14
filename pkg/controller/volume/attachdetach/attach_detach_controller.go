@@ -564,3 +564,9 @@ func (adc *attachDetachController) addNodeToDswp(node *v1.Node, nodeName types.N
 		adc.desiredStateOfWorld.AddNode(nodeName, keepTerminatedPodVolumes)
 	}
 }
+
+func (adc *attachDetachController) GetConfigMapFunc() func(namespace, name string) (*v1.ConfigMap, error) {
+	return func(_, _ string) (*v1.ConfigMap, error) {
+		return nil, fmt.Errorf("GetConfigMap unsupported in attachDetachController")
+	}
+}

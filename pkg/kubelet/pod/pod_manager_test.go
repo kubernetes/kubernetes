@@ -32,7 +32,7 @@ import (
 func newTestManager() (*basicManager, *podtest.FakeMirrorClient) {
 	fakeMirrorClient := podtest.NewFakeMirrorClient()
 	secretManager := secret.NewFakeManager()
-	manager := NewBasicPodManager(fakeMirrorClient, secretManager).(*basicManager)
+	manager := NewBasicPodManager(fakeMirrorClient, secretManager, nil).(*basicManager)
 	return manager, fakeMirrorClient
 }
 
