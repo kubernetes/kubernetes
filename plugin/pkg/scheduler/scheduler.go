@@ -134,7 +134,9 @@ func (s *Scheduler) AssignPort(pod *api.Pod, dest string) error {
 	if !autoport {
 		return nil
 	}
-	nodeNameToInfo, err := s.config.SchedulerCache.GetNodeNameToInfoMap()
+
+	nodeNameToInfo := make(map[string]*schedulercache.NodeInfo)
+	err := s.config.SchedulerCache.UpdateNodeNameToInfoMap(nodeNameToInfo)
 	if err != nil {
 		return err
 	}
