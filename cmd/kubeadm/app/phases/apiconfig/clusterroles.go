@@ -37,9 +37,14 @@ const (
 	// NodeBootstrapperClusterRoleName sets the name for the TLS Node Bootstrapper ClusterRole
 	NodeBootstrapperClusterRoleName = "system:node-bootstrapper"
 
+	BootstrapSignerClusterRoleName = "system:bootstrap-signer-clusterinfo"
+
+	AnonymousUser = "system:anonymous"
+
 	// Constants
 	clusterRoleKind    = "ClusterRole"
 	serviceAccountKind = "ServiceAccount"
+	userKind           = "User"
 	rbacAPIGroup       = "rbac.authorization.k8s.io"
 )
 
@@ -87,17 +92,27 @@ func CreateServiceAccounts(clientset *clientset.Clientset) error {
 
 // CreateClusterRoles creates the ClusterRoles that aren't bootstrapped by the apiserver
 func CreateClusterRoles(clientset *clientset.Clientset) error {
-	// TODO: Remove this ClusterRole when it's automatically bootstrapped in the apiserver
-	clusterRole := rbac.ClusterRole{
-		ObjectMeta: metav1.ObjectMeta{Name: KubeDNSClusterRoleName},
-		Rules: []rbac.PolicyRule{
-			rbac.NewRule("list", "watch").Groups("").Resources("endpoints", "services").RuleOrDie(),
-			// TODO: remove watch rule when https://github.com/kubernetes/kubernetes/pull/38816 gets merged
-			rbac.NewRule("get", "list", "watch").Groups("").Resources("configmaps").RuleOrDie(),
+	// TODO: Remove these ClusterRole when they are automatically bootstrapped in the apiserver
+	clusterRoles := []rbac.ClusterRole{
+		rbac.ClusterRole{
+			ObjectMeta: metav1.ObjectMeta{Name: KubeDNSClusterRoleName},
+			Rules: []rbac.PolicyRule{
+				rbac.NewRule("list", "watch").Groups("").Resources("endpoints", "services").RuleOrDie(),
+				// TODO: remove watch rule when https://github.com/kubernetes/kubernetes/pull/38816 gets merged
+				rbac.NewRule("get", "list", "watch").Groups("").Resources("configmaps").RuleOrDie(),
+			},
+		},
+		rbac.ClusterRole{
+			ObjectMeta: metav1.ObjectMeta{Name: BootstrapSignerClusterRoleName},
+			Rules: []rbac.PolicyRule{
+				rbac.NewRule("get").Groups("").Resources("configmaps").RuleOrDie(),
+			},
 		},
 	}
-	if _, err := clientset.Rbac().ClusterRoles().Create(&clusterRole); err != nil {
-		return err
+	for _, clusterRole := range clusterRoles {
+		if _, err := clientset.Rbac().ClusterRoles().Create(&clusterRole); err != nil {
+			return err
+		}
 	}
 	return nil
 }
@@ -137,7 +152,7 @@ func CreateClusterRoleBindings(clientset *clientset.Clientset) error {
 					Namespace: metav1.NamespaceSystem,
 				},
 			},
-		},
+			},
 		{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "kubeadm:node-proxier",
@@ -152,6 +167,22 @@ func CreateClusterRoleBindings(clientset *clientset.Clientset) error {
 					Kind:      serviceAccountKind,
 					Name:      kubeadmconstants.KubeProxyServiceAccountName,
 					Namespace: metav1.NamespaceSystem,
+				},
+			},
+		},
+		{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "kubeadm:bootstrap-signer-clusterinfo",
+			},
+			RoleRef: rbac.RoleRef{
+				APIGroup: rbacAPIGroup,
+				Kind:     clusterRoleKind,
+				Name:     BootstrapSignerClusterRoleName,
+			},
+			Subjects: []rbac.Subject{
+				{
+					Kind:      userKind,
+					Name:      AnonymousUser,
 				},
 			},
 		},

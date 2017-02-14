@@ -43,15 +43,15 @@ func newConfigMap(tokenID, signature string) *v1.ConfigMap {
 	ret := &v1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace:       metav1.NamespacePublic,
-			Name:            configMapClusterInfo,
+			Name:            ConfigMapClusterInfo,
 			ResourceVersion: "1",
 		},
 		Data: map[string]string{
-			kubeConfigKey: "payload",
+			KubeConfigKey: "payload",
 		},
 	}
 	if len(tokenID) > 0 {
-		ret.Data[signaturePrefix+tokenID] = signature
+		ret.Data[SignaturePrefix+tokenID] = signature
 	}
 	return ret
 }

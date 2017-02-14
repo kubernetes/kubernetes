@@ -21,15 +21,13 @@ import (
 	"encoding/hex"
 	"fmt"
 	"regexp"
-	"strconv"
 	"strings"
 	"time"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
-	kubeadmapiext "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha1"
-	v1 "k8s.io/kubernetes/pkg/api/v1"
+	"k8s.io/kubernetes/pkg/api/v1"
 	bootstrapapi "k8s.io/kubernetes/pkg/bootstrap/api"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 )
@@ -38,7 +36,6 @@ const (
 	TokenIDBytes               = 3
 	TokenSecretBytes           = 8
 	BootstrapTokenSecretPrefix = "bootstrap-token-"
-	DefaultTokenDuration       = time.Duration(8) * time.Hour
 	tokenCreateRetries         = 5
 )
 
@@ -84,7 +81,6 @@ func ParseTokenID(s string) error {
 		return fmt.Errorf("token ID [%q] was not of form [%q]", s, tokenIDRegexpString)
 	}
 	return nil
-
 }
 
 // ParseToken tries and parse a valid token from a string.
@@ -95,7 +91,6 @@ func ParseToken(s string) (string, string, error) {
 		return "", "", fmt.Errorf("token [%q] was not of form [%q]", s, tokenRegexpString)
 	}
 	return split[1], split[2], nil
-
 }
 
 // BearerToken returns a string representation of the passed token.
@@ -110,20 +105,6 @@ func ValidateToken(d *kubeadmapi.TokenDiscovery) (bool, error) {
 		return false, err
 	}
 	return true, nil
-}
-
-func DiscoveryPort(d *kubeadmapi.TokenDiscovery) int32 {
-	if len(d.Addresses) == 0 {
-		return kubeadmapiext.DefaultDiscoveryBindPort
-	}
-	split := strings.Split(d.Addresses[0], ":")
-	if len(split) == 1 {
-		return kubeadmapiext.DefaultDiscoveryBindPort
-	}
-	if i, err := strconv.Atoi(split[1]); err != nil {
-		return int32(i)
-	}
-	return kubeadmapiext.DefaultDiscoveryBindPort
 }
 
 // UpdateOrCreateToken attempts to update a token with the given ID, or create if it does

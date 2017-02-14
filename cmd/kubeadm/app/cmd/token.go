@@ -31,8 +31,8 @@ import (
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/client-go/pkg/api"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
-	kubemaster "k8s.io/kubernetes/cmd/kubeadm/app/master"
-	"k8s.io/kubernetes/cmd/kubeadm/app/phases/kubeconfig"
+	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
+	kubeconfigutil "k8s.io/kubernetes/cmd/kubeadm/app/util/kubeconfig"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	bootstrapapi "k8s.io/kubernetes/pkg/bootstrap/api"
 	"k8s.io/kubernetes/pkg/kubectl"
@@ -69,7 +69,7 @@ func NewCmdToken(out io.Writer, errW io.Writer) *cobra.Command {
 		},
 	}
 	createCmd.PersistentFlags().DurationVar(&tokenDuration,
-		"ttl", kubeadmutil.DefaultTokenDuration, "The duration before the token is automatically deleted.")
+		"ttl", kubeadmconstants.DefaultTokenDuration, "The duration before the token is automatically deleted.")
 	createCmd.PersistentFlags().StringVar(
 		&token, "token", "",
 		"Shared secret used to secure cluster bootstrap. If none is provided, one will be generated for you.",
@@ -125,7 +125,7 @@ func NewCmdTokenGenerate(out io.Writer) *cobra.Command {
 
 // RunCreateToken generates a new bootstrap token and stores it as a secret on the server.
 func RunCreateToken(out io.Writer, cmd *cobra.Command, tokenDuration time.Duration, token string) error {
-	client, err := kubemaster.CreateClientFromFile(path.Join(kubeadmapi.GlobalEnvParams.KubernetesDir, kubeconfig.AdminKubeConfigFileName))
+	client, err := kubeconfigutil.CreateClientFromFile(path.Join(kubeadmapi.GlobalEnvParams.KubernetesDir, kubeadmconstants.AdminKubeConfigFileName))
 	if err != nil {
 		return err
 	}
@@ -158,7 +158,7 @@ func RunGenerateToken(out io.Writer) error {
 
 // RunListTokens lists details on all existing bootstrap tokens on the server.
 func RunListTokens(out io.Writer, errW io.Writer, cmd *cobra.Command) error {
-	client, err := kubemaster.CreateClientFromFile(path.Join(kubeadmapi.GlobalEnvParams.KubernetesDir, kubeconfig.AdminKubeConfigFileName))
+	client, err := kubeconfigutil.CreateClientFromFile(path.Join(kubeadmapi.GlobalEnvParams.KubernetesDir, kubeadmconstants.AdminKubeConfigFileName))
 	if err != nil {
 		return err
 	}
@@ -217,7 +217,7 @@ func RunDeleteToken(out io.Writer, cmd *cobra.Command, tokenId string) error {
 		return err
 	}
 
-	client, err := kubemaster.CreateClientFromFile(path.Join(kubeadmapi.GlobalEnvParams.KubernetesDir, kubeconfig.AdminKubeConfigFileName))
+	client, err := kubeconfigutil.CreateClientFromFile(path.Join(kubeadmapi.GlobalEnvParams.KubernetesDir, kubeadmconstants.AdminKubeConfigFileName))
 	if err != nil {
 		return err
 	}

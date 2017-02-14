@@ -37,6 +37,7 @@ import (
 	apiconfigphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/apiconfig"
 	certphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/certs"
 	kubeconfigphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/kubeconfig"
+	tokenphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/token"
 	"k8s.io/kubernetes/cmd/kubeadm/app/preflight"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	"k8s.io/kubernetes/pkg/api"
@@ -216,7 +217,8 @@ func (i *Init) Run(out io.Writer) error {
 		return err
 	}
 
-	client, err := kubemaster.CreateClientAndWaitForAPI(path.Join(kubeadmapi.GlobalEnvParams.KubernetesDir, kubeconfigphase.AdminKubeConfigFileName))
+	adminKubeConfigPath := path.Join(kubeadmapi.GlobalEnvParams.KubernetesDir, kubeadmconstants.AdminKubeConfigFileName)
+	client, err := kubemaster.CreateClientAndWaitForAPI(adminKubeConfigPath)
 	if err != nil {
 		return err
 	}
@@ -251,10 +253,10 @@ func (i *Init) Run(out io.Writer) error {
 
 	if i.cfg.Discovery.Token != nil {
 		fmt.Printf("[token-discovery] Using token: %s\n", kubeadmutil.BearerToken(i.cfg.Discovery.Token))
-		if err := kubemaster.CreateDiscoveryDeploymentAndSecret(i.cfg, client); err != nil {
+		if err := kubeadmutil.UpdateOrCreateToken(client, i.cfg.Discovery.Token, kubeadmconstants.DefaultTokenDuration); err != nil {
 			return err
 		}
-		if err := kubeadmutil.UpdateOrCreateToken(client, i.cfg.Discovery.Token, kubeadmutil.DefaultTokenDuration); err != nil {
+		if err := tokenphase.CreateBootstrapConfigMap(adminKubeConfigPath); err != nil {
 			return err
 		}
 	}

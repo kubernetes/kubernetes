@@ -18,6 +18,7 @@ package cmd
 
 import (
 	"fmt"
+	"os"
 	"io"
 	"io/ioutil"
 	"path/filepath"
@@ -33,7 +34,7 @@ import (
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/discovery"
 	kubenode "k8s.io/kubernetes/cmd/kubeadm/app/node"
-	kubeconfigphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/kubeconfig"
+	kubeconfigutil "k8s.io/kubernetes/cmd/kubeadm/app/util/kubeconfig"
 	"k8s.io/kubernetes/cmd/kubeadm/app/preflight"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	"k8s.io/kubernetes/pkg/api"
@@ -135,12 +136,19 @@ func (j *Join) Run(out io.Writer) error {
 	if err != nil {
 		return err
 	}
-	if err := kubenode.PerformTLSBootstrap(cfg); err != nil {
+	hostname, err := os.Hostname()
+	if err != nil {
+		return err
+	}
+	if err := kubenode.ValidateAPIServer(cfg); err != nil {
+		return err
+	}
+	if err := kubenode.PerformTLSBootstrap(cfg, hostname); err != nil {
 		return err
 	}
 
-	kubeconfigFile := filepath.Join(kubeadmapi.GlobalEnvParams.KubernetesDir, kubeconfigphase.KubeletKubeConfigFileName)
-	if err := kubeconfigphase.WriteKubeconfigToDisk(kubeconfigFile, cfg); err != nil {
+	kubeconfigFile := filepath.Join(kubeadmapi.GlobalEnvParams.KubernetesDir, kubeadmconstants.KubeletKubeConfigFileName)
+	if err := kubeconfigutil.WriteKubeconfigToDisk(kubeconfigFile, cfg); err != nil {
 		return err
 	}
 

@@ -298,6 +298,7 @@ func getAPIServerCommand(cfg *kubeadmapi.MasterConfiguration, selfHosted bool) [
 	}
 
 	command = append(
+		command,
 		"/usr/local/bin/kube-apiserver",
 		"--insecure-bind-address=127.0.0.1",
 		"--admission-control=NamespaceLifecycle,LimitRanger,ServiceAccount,PersistentVolumeLabel,DefaultStorageClass,ResourceQuota",
@@ -372,6 +373,7 @@ func getControllerManagerCommand(cfg *kubeadmapi.MasterConfiguration, selfHosted
 	}
 
 	command = append(
+		command,
 		"/usr/local/bin/kube-controller-manager",
 		"--address=127.0.0.1",
 		"--leader-elect",
@@ -382,6 +384,7 @@ func getControllerManagerCommand(cfg *kubeadmapi.MasterConfiguration, selfHosted
 		"--cluster-signing-cert-file="+getCertFilePath(kubeadmconstants.CACertName),
 		"--cluster-signing-key-file="+getCertFilePath(kubeadmconstants.CAKeyName),
 		"--insecure-experimental-approve-all-kubelet-csrs-for-group="+KubeletBootstrapGroup,
+		"--controllers=*,bootstrapsigner,tokencleaner",
 	)
 
 	if cfg.CloudProvider != "" {
@@ -410,14 +413,13 @@ func getSchedulerCommand(cfg *kubeadmapi.MasterConfiguration, selfHosted bool) [
 		command = []string{"/usr/bin/flock", "--exclusive", "--timeout=30", "/var/lock/api-server.lock"}
 	}
 
-	command = append(
+	return append(
+		command,
 		"/usr/local/bin/kube-scheduler",
 		"--address=127.0.0.1",
 		"--leader-elect",
 		"--master=127.0.0.1:8080",
 	)
-
-	return command
 }
 
 func getProxyEnvVars() []api.EnvVar {

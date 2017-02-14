@@ -27,7 +27,7 @@ import (
 	"github.com/spf13/cobra"
 
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
-	"k8s.io/kubernetes/cmd/kubeadm/app/phases/kubeconfig"
+	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/preflight"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	"k8s.io/kubernetes/pkg/util/initsystem"
@@ -150,9 +150,9 @@ func drainAndRemoveNode(removeNode bool) error {
 	hostname = strings.ToLower(hostname)
 
 	// TODO: Use the "native" k8s client for this once we're confident the versioned is working
-	kubeConfigPath := filepath.Join(kubeadmapi.GlobalEnvParams.KubernetesDir, kubeconfig.KubeletKubeConfigFileName)
+	kubeConfigPath := filepath.Join(kubeadmapi.GlobalEnvParams.KubernetesDir, kubeadmconstants.KubeletKubeConfigFileName)
 
-	getNodesCmd := fmt.Sprintf("kubectl --kubeconfig %s get nodes | grep %s", kubeConfigPath, hostname)
+	getNodesCmd := fmt.Sprintf("kubectl --kubeadmconstants %s get nodes | grep %s", kubeConfigPath, hostname)
 	output, err := exec.Command("sh", "-c", getNodesCmd).Output()
 	if err != nil {
 		// kubeadm shouldn't drain and/or remove the node when it doesn't exist anymore
@@ -164,14 +164,14 @@ func drainAndRemoveNode(removeNode bool) error {
 
 	fmt.Printf("[reset] Draining node: %q\n", hostname)
 
-	_, err = exec.Command("kubectl", "--kubeconfig", kubeConfigPath, "drain", hostname, "--delete-local-data", "--force", "--ignore-daemonsets").Output()
+	_, err = exec.Command("kubectl", "--kubeadmconstants", kubeConfigPath, "drain", hostname, "--delete-local-data", "--force", "--ignore-daemonsets").Output()
 	if err != nil {
 		return fmt.Errorf("failed to drain node %q: %v", hostname, err)
 	}
 
 	if removeNode {
 		fmt.Printf("[reset] Removing node: %q\n", hostname)
-		_, err = exec.Command("kubectl", "--kubeconfig", kubeConfigPath, "delete", "node", hostname).Output()
+		_, err = exec.Command("kubectl", "--kubeadmconstants", kubeConfigPath, "delete", "node", hostname).Output()
 		if err != nil {
 			return fmt.Errorf("failed to remove node %q: %v", hostname, err)
 		}
@@ -221,8 +221,8 @@ func resetConfigDir(configPathDir, pkiPathDir string) {
 	}
 
 	filesToClean := []string{
-		filepath.Join(configPathDir, kubeconfig.AdminKubeConfigFileName),
-		filepath.Join(configPathDir, kubeconfig.KubeletKubeConfigFileName),
+		filepath.Join(configPathDir, kubeadmconstants.AdminKubeConfigFileName),
+		filepath.Join(configPathDir, kubeadmconstants.KubeletKubeConfigFileName),
 	}
 	fmt.Printf("[reset] Deleting files: %v\n", filesToClean)
 	for _, path := range filesToClean {
