@@ -8026,6 +8026,7 @@ go_test(
 go_library(
     name = "k8s.io/apimachinery/pkg/apis/meta/v1",
     srcs = [
+        "k8s.io/apimachinery/pkg/apis/meta/v1/conversion.go",
         "k8s.io/apimachinery/pkg/apis/meta/v1/doc.go",
         "k8s.io/apimachinery/pkg/apis/meta/v1/duration.go",
         "k8s.io/apimachinery/pkg/apis/meta/v1/generated.pb.go",
@@ -8049,6 +8050,7 @@ go_library(
         "//vendor:github.com/gogo/protobuf/proto",
         "//vendor:github.com/gogo/protobuf/sortkeys",
         "//vendor:github.com/google/gofuzz",
+        "//vendor:k8s.io/apimachinery/pkg/api/resource",
         "//vendor:k8s.io/apimachinery/pkg/conversion",
         "//vendor:k8s.io/apimachinery/pkg/fields",
         "//vendor:k8s.io/apimachinery/pkg/labels",
@@ -8057,6 +8059,7 @@ go_library(
         "//vendor:k8s.io/apimachinery/pkg/runtime/schema",
         "//vendor:k8s.io/apimachinery/pkg/selection",
         "//vendor:k8s.io/apimachinery/pkg/types",
+        "//vendor:k8s.io/apimachinery/pkg/util/intstr",
         "//vendor:k8s.io/apimachinery/pkg/watch",
     ],
 )
