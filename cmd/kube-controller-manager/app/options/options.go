@@ -95,7 +95,7 @@ func NewCMServer() *CMServer {
 			ConcurrentGCSyncs:        20,
 			ClusterSigningCertFile:   "/etc/kubernetes/ca/ca.pem",
 			ClusterSigningKeyFile:    "/etc/kubernetes/ca/ca.key",
-			ReconcilerSyncLoopPeriod: unversioned.Duration{Duration: 5 * time.Second},
+			ReconcilerSyncLoopPeriod: unversioned.Duration{Duration: 60 * time.Second},
 		},
 	}
 	s.LeaderElection.LeaderElect = true
