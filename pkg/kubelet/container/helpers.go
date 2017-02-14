@@ -72,8 +72,8 @@ func ShouldContainerBeRestarted(container *v1.Container, pod *v1.Pod, podStatus 
 	if status.State == ContainerStateRunning {
 		return false
 	}
-	// Always restart container in unknown state now
-	if status.State == ContainerStateUnknown {
+	// Always restart container in the unknown, or in the created state.
+	if status.State == ContainerStateUnknown || status.State == ContainerStateCreated {
 		return true
 	}
 	// Check RestartPolicy for dead container
