@@ -17,8 +17,8 @@ limitations under the License.
 package internalversion
 
 import (
+	api "k8s.io/client-go/pkg/api"
 	rest "k8s.io/client-go/rest"
-	api "k8s.io/kubernetes/pkg/api"
 )
 
 type ApiregistrationInterface interface {

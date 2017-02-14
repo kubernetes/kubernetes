@@ -14,7 +14,6 @@ go_library(
     deps = [
         "//cmd/kube-aggregator/pkg/apis/apiregistration/v1alpha1:go_default_library",
         "//cmd/kube-aggregator/pkg/apiserver:go_default_library",
-        "//pkg/api:go_default_library",
         "//vendor:github.com/spf13/cobra",
         "//vendor:k8s.io/apimachinery/pkg/util/sets",
         "//vendor:k8s.io/apimachinery/pkg/util/wait",
@@ -22,6 +21,7 @@ go_library(
         "//vendor:k8s.io/apiserver/pkg/server/filters",
         "//vendor:k8s.io/apiserver/pkg/server/options",
         "//vendor:k8s.io/client-go/kubernetes",
+        "//vendor:k8s.io/client-go/pkg/api",
         "//vendor:k8s.io/client-go/rest",
     ],
 )

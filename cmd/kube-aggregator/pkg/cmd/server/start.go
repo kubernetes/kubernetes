@@ -29,9 +29,9 @@ import (
 	"k8s.io/apiserver/pkg/server/filters"
 	genericoptions "k8s.io/apiserver/pkg/server/options"
 	kubeclientset "k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/pkg/api"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/kubernetes/cmd/kube-aggregator/pkg/apiserver"
-	"k8s.io/kubernetes/pkg/api"
 
 	"k8s.io/kubernetes/cmd/kube-aggregator/pkg/apis/apiregistration/v1alpha1"
 )
