@@ -35,6 +35,7 @@ func init() {
 // to allow building arbitrary schemes.
 func RegisterDeepCopies(scheme *runtime.Scheme) error {
 	return scheme.AddGeneratedDeepCopyFuncs(
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_componentconfig_ExperimentalKubeletConfiguration, InType: reflect.TypeOf(&ExperimentalKubeletConfiguration{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_componentconfig_IPVar, InType: reflect.TypeOf(&IPVar{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_componentconfig_KubeControllerManagerConfiguration, InType: reflect.TypeOf(&KubeControllerManagerConfiguration{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_componentconfig_KubeProxyConfiguration, InType: reflect.TypeOf(&KubeProxyConfiguration{})},
@@ -51,6 +52,20 @@ func RegisterDeepCopies(scheme *runtime.Scheme) error {
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_componentconfig_PortRangeVar, InType: reflect.TypeOf(&PortRangeVar{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_componentconfig_VolumeConfiguration, InType: reflect.TypeOf(&VolumeConfiguration{})},
 	)
+}
+
+func DeepCopy_componentconfig_ExperimentalKubeletConfiguration(in interface{}, out interface{}, c *conversion.Cloner) error {
+	{
+		in := in.(*ExperimentalKubeletConfiguration)
+		out := out.(*ExperimentalKubeletConfiguration)
+		*out = *in
+		if in.AllowedUnsafeSysctls != nil {
+			in, out := &in.AllowedUnsafeSysctls, &out.AllowedUnsafeSysctls
+			*out = make([]string, len(*in))
+			copy(*out, *in)
+		}
+		return nil
+	}
 }
 
 func DeepCopy_componentconfig_IPVar(in interface{}, out interface{}, c *conversion.Cloner) error {
@@ -185,11 +200,6 @@ func DeepCopy_componentconfig_KubeletConfiguration(in interface{}, out interface
 			for key, val := range *in {
 				(*out)[key] = val
 			}
-		}
-		if in.AllowedUnsafeSysctls != nil {
-			in, out := &in.AllowedUnsafeSysctls, &out.AllowedUnsafeSysctls
-			*out = make([]string, len(*in))
-			copy(*out, *in)
 		}
 		return nil
 	}

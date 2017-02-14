@@ -44,6 +44,8 @@ const (
 type KubeletServer struct {
 	componentconfig.KubeletConfiguration
 
+	Experimental componentconfig.ExperimentalKubeletConfiguration
+
 	KubeConfig          flag.StringFlag
 	BootstrapKubeconfig string
 
@@ -71,6 +73,7 @@ func NewKubeletServer() *KubeletServer {
 	config := componentconfig.KubeletConfiguration{}
 	api.Scheme.Convert(versioned, &config, nil)
 	return &KubeletServer{
+		Experimental:         *componentconfig.DefaultExperimentalKubeletConfiguration(),
 		KubeConfig:           flag.NewStringFlag("/var/lib/kubelet/kubeconfig"),
 		RequireKubeConfig:    false, // in 1.5, default to true
 		KubeletConfiguration: config,
@@ -79,8 +82,24 @@ func NewKubeletServer() *KubeletServer {
 
 // AddFlags adds flags for a specific KubeletServer to the specified FlagSet
 func (s *KubeletServer) AddFlags(fs *pflag.FlagSet) {
+
+	// Experimental Fields
 	// TODO(#34726:1.8.0): Remove the opt-in for failing when swap is enabled.
-	fs.BoolVar(&s.ExperimentalFailSwapOn, "experimental-fail-swap-on", s.ExperimentalFailSwapOn, "Makes the Kubelet fail to start if swap is enabled on the node. This is a temporary opton to maintain legacy behavior, failing due to swap enabled will happen by default in v1.6.")
+	fs.BoolVar(&s.Experimental.FailSwapOn, "experimental-fail-swap-on", s.Experimental.FailSwapOn, "Makes the Kubelet fail to start if swap is enabled on the node. This is a temporary opton to maintain legacy behavior, failing due to swap enabled will happen by default in v1.6.")
+	fs.StringVar(&s.Experimental.MounterPath, "experimental-mounter-path", s.Experimental.MounterPath, "[Experimental] Path of mounter binary. Leave empty to use the default mount.")
+	fs.Int32Var(&s.Experimental.NvidiaGPUs, "experimental-nvidia-gpus", s.Experimental.NvidiaGPUs, "Number of NVIDIA GPU devices on this node. Only 0 (default) and 1 are currently supported.")
+	fs.StringSliceVar(&s.Experimental.AllowedUnsafeSysctls, "experimental-allowed-unsafe-sysctls", s.Experimental.AllowedUnsafeSysctls, "Comma-separated whitelist of unsafe sysctls or unsafe sysctl patterns (ending in *). Use these at your own risk.")
+	fs.BoolVar(&s.Experimental.Containerized, "containerized", s.Experimental.Containerized, "Experimental support for running kubelet in a container.  Intended for testing. [default=false]")
+	fs.BoolVar(&s.Experimental.KernelMemcgNotification, "experimental-kernel-memcg-notification", s.Experimental.KernelMemcgNotification, "If enabled, the kubelet will integrate with the kernel memcg notification to determine if memory eviction thresholds are crossed rather than polling.")
+	fs.BoolVar(&s.Experimental.CheckNodeCapabilitiesBeforeMount, "experimental-check-node-capabilities-before-mount", s.Experimental.CheckNodeCapabilitiesBeforeMount, "[Experimental] if set true, the kubelet will check the underlying node for required componenets (binaries, etc.) before performing the mount")
+	// CRI flags (experimental)
+	fs.BoolVar(&s.Experimental.EnableCRI, "experimental-cri", s.Experimental.EnableCRI, "[Experimental] Enable the Container Runtime Interface (CRI) integration. If --container-runtime is set to \"remote\", Kubelet will communicate with the runtime/image CRI server listening on the endpoint specified by --remote-runtime-endpoint/--remote-image-endpoint. If --container-runtime is set to \"docker\", Kubelet will launch a in-process CRI server on behalf of docker, and communicate over a default endpoint.")
+	fs.StringVar(&s.Experimental.RemoteRuntimeEndpoint, "container-runtime-endpoint", s.Experimental.RemoteRuntimeEndpoint, "[Experimental] The unix socket endpoint of remote runtime service. The endpoint is used only when CRI integration is enabled (--experimental-cri)")
+	fs.StringVar(&s.Experimental.RemoteImageEndpoint, "image-service-endpoint", s.Experimental.RemoteImageEndpoint, "[Experimental] The unix socket endpoint of remote image service. If not specified, it will be the same with container-runtime-endpoint by default. The endpoint is used only when CRI integration is enabled (--experimental-cri)")
+
+	// Feature Gates
+	fs.StringVar(&s.FeatureGates, "feature-gates", s.FeatureGates, "A set of key=value pairs that describe feature gates for alpha/experimental features. "+
+		"Options are:\n"+strings.Join(utilfeature.DefaultFeatureGate.KnownFeatures(), "\n"))
 
 	fs.Var(&s.KubeConfig, "kubeconfig", "Path to a kubeconfig file, specifying how to connect to the API server. --api-servers will be used for the location unless --require-kubeconfig is set.")
 	fs.BoolVar(&s.RequireKubeConfig, "require-kubeconfig", s.RequireKubeConfig, "If true the Kubelet will exit if there are configuration errors, and will ignore the value of --api-servers in favor of the server defined in the kubeconfig file.")
@@ -180,8 +199,6 @@ func (s *KubeletServer) AddFlags(fs *pflag.FlagSet) {
 	fs.StringVar(&s.VolumePluginDir, "volume-plugin-dir", s.VolumePluginDir, "<Warning: Alpha feature> The full path of the directory in which to search for additional third party volume plugins")
 	fs.StringVar(&s.CloudProvider, "cloud-provider", s.CloudProvider, "The provider for cloud services. By default, kubelet will attempt to auto-detect the cloud provider. Specify empty string for running with no cloud provider. [default=auto-detect]")
 	fs.StringVar(&s.CloudConfigFile, "cloud-config", s.CloudConfigFile, "The path to the cloud provider configuration file.  Empty string for no configuration file.")
-	fs.StringVar(&s.FeatureGates, "feature-gates", s.FeatureGates, "A set of key=value pairs that describe feature gates for alpha/experimental features. "+
-		"Options are:\n"+strings.Join(utilfeature.DefaultFeatureGate.KnownFeatures(), "\n"))
 
 	fs.StringVar(&s.KubeletCgroups, "kubelet-cgroups", s.KubeletCgroups, "Optional absolute name of cgroups to create and run the Kubelet in.")
 	fs.StringVar(&s.SystemCgroups, "system-cgroups", s.SystemCgroups, "Optional absolute name of cgroups in which to place all non-kernel processes that are not already inside a cgroup under `/`. Empty for no container. Rolling back the flag requires a reboot. (Default: \"\").")
@@ -195,7 +212,6 @@ func (s *KubeletServer) AddFlags(fs *pflag.FlagSet) {
 	fs.StringVar(&s.LockFilePath, "lock-file", s.LockFilePath, "<Warning: Alpha feature> The path to file for kubelet to use as a lock file.")
 	fs.BoolVar(&s.ExitOnLockContention, "exit-on-lock-contention", s.ExitOnLockContention, "Whether kubelet should exit upon lock-file contention.")
 	fs.StringVar(&s.RktPath, "rkt-path", s.RktPath, "Path of rkt binary. Leave empty to use the first rkt in $PATH.  Only used if --container-runtime='rkt'.")
-	fs.StringVar(&s.ExperimentalMounterPath, "experimental-mounter-path", s.ExperimentalMounterPath, "[Experimental] Path of mounter binary. Leave empty to use the default mount.")
 	fs.StringVar(&s.RktAPIEndpoint, "rkt-api-endpoint", s.RktAPIEndpoint, "The endpoint of the rkt API service to communicate with. Only used if --container-runtime='rkt'.")
 	fs.StringVar(&s.RktStage1Image, "rkt-stage1-image", s.RktStage1Image, "image to use as stage1. Local paths and http/https URLs are supported. If empty, the 'stage1.aci' in the same directory as '--rkt-path' will be used.")
 	fs.MarkDeprecated("rkt-stage1-image", "Will be removed in a future version. The default stage1 image will be specified by the rkt configurations, see https://github.com/coreos/rkt/blob/master/Documentation/configuration.md for more details.")
@@ -203,7 +219,6 @@ func (s *KubeletServer) AddFlags(fs *pflag.FlagSet) {
 	fs.BoolVar(&s.BabysitDaemons, "babysit-daemons", s.BabysitDaemons, "If true, the node has babysitter process monitoring docker and kubelet.")
 	fs.MarkDeprecated("babysit-daemons", "Will be removed in a future version.")
 	fs.Int32Var(&s.MaxPods, "max-pods", s.MaxPods, "Number of Pods that can run on this Kubelet.")
-	fs.Int32Var(&s.NvidiaGPUs, "experimental-nvidia-gpus", s.NvidiaGPUs, "Number of NVIDIA GPU devices on this node. Only 0 (default) and 1 are currently supported.")
 	// TODO(#40229): Remove the docker-exec-handler flag.
 	fs.StringVar(&s.DockerExecHandlerName, "docker-exec-handler", s.DockerExecHandlerName, "Handler to use when executing a command in a container. Valid values are 'native' and 'nsenter'. Defaults to 'native'.")
 	fs.MarkDeprecated("docker-exec-handler", "this flag will be removed and only the 'native' handler will be supported in the future.")
@@ -215,12 +230,10 @@ func (s *KubeletServer) AddFlags(fs *pflag.FlagSet) {
 	fs.BoolVar(&s.MakeIPTablesUtilChains, "make-iptables-util-chains", s.MakeIPTablesUtilChains, "If true, kubelet will ensure iptables utility rules are present on host.")
 	fs.Int32Var(&s.IPTablesMasqueradeBit, "iptables-masquerade-bit", s.IPTablesMasqueradeBit, "The bit of the fwmark space to mark packets for SNAT. Must be within the range [0, 31]. Please match this parameter with corresponding parameter in kube-proxy.")
 	fs.Int32Var(&s.IPTablesDropBit, "iptables-drop-bit", s.IPTablesDropBit, "The bit of the fwmark space to mark packets for dropping. Must be within the range [0, 31].")
-	fs.StringSliceVar(&s.AllowedUnsafeSysctls, "experimental-allowed-unsafe-sysctls", s.AllowedUnsafeSysctls, "Comma-separated whitelist of unsafe sysctls or unsafe sysctl patterns (ending in *). Use these at your own risk.")
 
 	// Flags intended for testing, not recommended used in production environments.
 	fs.BoolVar(&s.ReallyCrashForTesting, "really-crash-for-testing", s.ReallyCrashForTesting, "If true, when panics occur crash. Intended for testing.")
 	fs.Float64Var(&s.ChaosChance, "chaos-chance", s.ChaosChance, "If > 0.0, introduce random client errors and latency. Intended for testing. [default=0.0]")
-	fs.BoolVar(&s.Containerized, "containerized", s.Containerized, "Experimental support for running kubelet in a container.  Intended for testing. [default=false]")
 	fs.Int64Var(&s.MaxOpenFiles, "max-open-files", s.MaxOpenFiles, "Number of files that can be opened by Kubelet process. [default=1000000]")
 	fs.Var(&s.SystemReserved, "system-reserved", "A set of ResourceName=ResourceQuantity (e.g. cpu=200m,memory=150G) pairs that describe resources reserved for non-kubernetes components. Currently only cpu and memory are supported. See http://kubernetes.io/docs/user-guide/compute-resources for more detail. [default=none]")
 	fs.Var(&s.KubeReserved, "kube-reserved", "A set of ResourceName=ResourceQuantity (e.g. cpu=200m,memory=150G) pairs that describe resources reserved for kubernetes system components. Currently only cpu and memory are supported. See http://kubernetes.io/docs/user-guide/compute-resources for more detail. [default=none]")
@@ -241,15 +254,8 @@ func (s *KubeletServer) AddFlags(fs *pflag.FlagSet) {
 	fs.DurationVar(&s.EvictionPressureTransitionPeriod.Duration, "eviction-pressure-transition-period", s.EvictionPressureTransitionPeriod.Duration, "Duration for which the kubelet has to wait before transitioning out of an eviction pressure condition.")
 	fs.Int32Var(&s.EvictionMaxPodGracePeriod, "eviction-max-pod-grace-period", s.EvictionMaxPodGracePeriod, "Maximum allowed grace period (in seconds) to use when terminating pods in response to a soft eviction threshold being met.  If negative, defer to pod specified value.")
 	fs.StringVar(&s.EvictionMinimumReclaim, "eviction-minimum-reclaim", s.EvictionMinimumReclaim, "A set of minimum reclaims (e.g. imagefs.available=2Gi) that describes the minimum amount of resource the kubelet will reclaim when performing a pod eviction if that resource is under pressure.")
-	fs.BoolVar(&s.ExperimentalKernelMemcgNotification, "experimental-kernel-memcg-notification", s.ExperimentalKernelMemcgNotification, "If enabled, the kubelet will integrate with the kernel memcg notification to determine if memory eviction thresholds are crossed rather than polling.")
 	fs.Int32Var(&s.PodsPerCore, "pods-per-core", s.PodsPerCore, "Number of Pods per core that can run on this Kubelet. The total number of Pods on this Kubelet cannot exceed max-pods, so max-pods will be used if this calculation results in a larger number of Pods allowed on the Kubelet. A value of 0 disables this limit.")
 	fs.BoolVar(&s.ProtectKernelDefaults, "protect-kernel-defaults", s.ProtectKernelDefaults, "Default kubelet behaviour for kernel tuning. If set, kubelet errors if any of kernel tunables is different than kubelet defaults.")
 	fs.BoolVar(&s.KeepTerminatedPodVolumes, "keep-terminated-pod-volumes", s.KeepTerminatedPodVolumes, "Keep terminated pod volumes mounted to the node after the pod terminates.  Can be useful for debugging volume related issues.")
 
-	// CRI flags.
-	fs.BoolVar(&s.EnableCRI, "experimental-cri", s.EnableCRI, "[Experimental] Enable the Container Runtime Interface (CRI) integration. If --container-runtime is set to \"remote\", Kubelet will communicate with the runtime/image CRI server listening on the endpoint specified by --remote-runtime-endpoint/--remote-image-endpoint. If --container-runtime is set to \"docker\", Kubelet will launch a in-process CRI server on behalf of docker, and communicate over a default endpoint.")
-	fs.StringVar(&s.RemoteRuntimeEndpoint, "container-runtime-endpoint", s.RemoteRuntimeEndpoint, "[Experimental] The unix socket endpoint of remote runtime service. The endpoint is used only when CRI integration is enabled (--experimental-cri)")
-	fs.StringVar(&s.RemoteImageEndpoint, "image-service-endpoint", s.RemoteImageEndpoint, "[Experimental] The unix socket endpoint of remote image service. If not specified, it will be the same with container-runtime-endpoint by default. The endpoint is used only when CRI integration is enabled (--experimental-cri)")
-
-	fs.BoolVar(&s.ExperimentalCheckNodeCapabilitiesBeforeMount, "experimental-check-node-capabilities-before-mount", s.ExperimentalCheckNodeCapabilitiesBeforeMount, "[Experimental] if set true, the kubelet will check the underlying node for required componenets (binaries, etc.) before performing the mount")
 }

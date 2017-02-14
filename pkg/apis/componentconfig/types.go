@@ -17,6 +17,7 @@ limitations under the License.
 package componentconfig
 
 import (
+	"encoding/json"
 	"fmt"
 	"sort"
 	"strings"
@@ -120,10 +121,74 @@ const (
 	HairpinNone = "none"
 )
 
+type ExperimentalKubeletConfiguration struct {
+	// mounterPath is the path of mounter binary. Leave empty to use the default mount path
+	MounterPath string `json:"mounterPath"`
+	// If enabled, the kubelet will integrate with the kernel memcg notification to determine if memory eviction thresholds are crossed rather than polling.
+	// +optional
+	KernelMemcgNotification bool `json:"kernelMemcgNotification"`
+	// TODO(#34726:1.8.0): Remove the opt-in for failing when swap is enabled.
+	// Tells the Kubelet to fail to start if swap is enabled on the node.
+	FailSwapOn bool `json:"failSwapOn"`
+	// This flag, if set, enables a check prior to mount operations to verify that the required components
+	// (binaries, etc.) to mount the volume are available on the underlying node. If the check is enabled
+	// and fails the mount operation fails.
+	CheckNodeCapabilitiesBeforeMount bool `json:"checkNodeCapabilitiesBeforeMount"`
+	// nvidiaGPUs is the number of NVIDIA GPU devices on this node.
+	NvidiaGPUs int32 `json:"nvidiaGPUs"`
+	// Whitelist of unsafe sysctls or sysctl patterns (ending in *). Use these at your own risk.
+	// Resource isolation might be lacking and pod might influence each other on the same node.
+	// +optional
+	AllowedUnsafeSysctls []string `json:"allowedUnsafeSysctls"`
+	// containerized should be set to true if kubelet is running in a container.
+	Containerized bool `json:"containerized"`
+	// Enable Container Runtime Interface (CRI) integration.
+	// +optional
+	EnableCRI bool `json:"enableCRI"`
+	// remoteRuntimeEndpoint is the endpoint of remote runtime service
+	RemoteRuntimeEndpoint string `json:"remoteRuntimeEndpoint"`
+	// remoteImageEndpoint is the endpoint of remote image service
+	RemoteImageEndpoint string `json:"remoteImageEndpoint"`
+}
+
+// Provide default values for experimental fields here
+func DefaultExperimentalKubeletConfiguration() *ExperimentalKubeletConfiguration {
+	return &ExperimentalKubeletConfiguration{}
+}
+
+// Layers the values from the string on top of the defaults and returns that object
+// An empty string results in the default values being returned
+func ExperimentalKubeletConfigurationFromString(s string) (*ExperimentalKubeletConfiguration, error) {
+	// todo, introduces json dep.
+	ekc := DefaultExperimentalKubeletConfiguration()
+	if len(s) == 0 {
+		return ekc, nil
+	}
+	err := json.Unmarshal([]byte(s), ekc)
+	if err != nil {
+		return nil, err
+	}
+	return ekc, nil
+}
+
+// Serialize the ExperimentalKubeletConfiguration to a JSON string
+func ExperimentalKubeletConfigurationToString(ekc *ExperimentalKubeletConfiguration) (string, error) {
+	bytes, err := json.Marshal(ekc)
+	if err != nil {
+		return "", err
+	}
+	return string(bytes), nil
+}
+
 // TODO: curate the ordering and structure of this config object
 type KubeletConfiguration struct {
 	metav1.TypeMeta
 
+	// experimental is a JSON blob that sets experimental Kubelet parameters
+	Experimental string
+	// featureGates is a string of comma-separated key=value pairs that describe feature
+	// gates for alpha/experimental features.
+	FeatureGates string
 	// podManifestPath is the path to the directory containing pod manifests to
 	// run, or the path to a single manifest file
 	PodManifestPath string
@@ -315,10 +380,6 @@ type KubeletConfiguration struct {
 	CgroupRoot string
 	// containerRuntime is the container runtime to use.
 	ContainerRuntime string
-	// remoteRuntimeEndpoint is the endpoint of remote runtime service
-	RemoteRuntimeEndpoint string
-	// remoteImageEndpoint is the endpoint of remote image service
-	RemoteImageEndpoint string
 	// runtimeRequestTimeout is the timeout for all runtime requests except long running
 	// requests - pull, logs, exec and attach.
 	// +optional
@@ -331,8 +392,7 @@ type KubeletConfiguration struct {
 	// $PATH.
 	// +optional
 	RktPath string
-	// experimentalMounterPath is the path of mounter binary. Leave empty to use the default mount path
-	ExperimentalMounterPath string
+
 	// rktApiEndpoint is the endpoint of the rkt API service to communicate with.
 	// +optional
 	RktAPIEndpoint string
@@ -362,8 +422,6 @@ type KubeletConfiguration struct {
 	BabysitDaemons bool
 	// maxPods is the number of pods that can run on this Kubelet.
 	MaxPods int32
-	// nvidiaGPUs is the number of NVIDIA GPU devices on this node.
-	NvidiaGPUs int32
 	// dockerExecHandlerName is the handler to use when executing a command
 	// in a container. Valid values are 'native' and 'nsenter'. Defaults to
 	// 'native'.
@@ -377,8 +435,6 @@ type KubeletConfiguration struct {
 	// cpuCFSQuota is Enable CPU CFS quota enforcement for containers that
 	// specify CPU limits
 	CPUCFSQuota bool
-	// containerized should be set to true if kubelet is running in a container.
-	Containerized bool
 	// maxOpenFiles is Number of files that can be opened by Kubelet process.
 	MaxOpenFiles int64
 	// registerSchedulable tells the kubelet to register the node as
@@ -433,9 +489,7 @@ type KubeletConfiguration struct {
 	// Comma-delimited list of minimum reclaims (e.g. imagefs.available=2Gi) that describes the minimum amount of resource the kubelet will reclaim when performing a pod eviction if that resource is under pressure.
 	// +optional
 	EvictionMinimumReclaim string
-	// If enabled, the kubelet will integrate with the kernel memcg notification to determine if memory eviction thresholds are crossed rather than polling.
-	// +optional
-	ExperimentalKernelMemcgNotification bool
+
 	// Maximum number of pods per core. Cannot exceed MaxPods
 	PodsPerCore int32
 	// enableControllerAttachDetach enables the Attach/Detach controller to
@@ -466,22 +520,6 @@ type KubeletConfiguration struct {
 	// iptablesDropBit is the bit of the iptables fwmark space to use for dropping packets. Kubelet will ensure iptables mark and drop rules.
 	// Values must be within the range [0, 31]. Must be different from IPTablesMasqueradeBit
 	IPTablesDropBit int32
-	// Whitelist of unsafe sysctls or sysctl patterns (ending in *).
-	// +optional
-	AllowedUnsafeSysctls []string
-	// featureGates is a string of comma-separated key=value pairs that describe feature
-	// gates for alpha/experimental features.
-	FeatureGates string
-	// Enable Container Runtime Interface (CRI) integration.
-	// +optional
-	EnableCRI bool
-	// TODO(#34726:1.8.0): Remove the opt-in for failing when swap is enabled.
-	// Tells the Kubelet to fail to start if swap is enabled on the node.
-	ExperimentalFailSwapOn bool
-	// This flag, if set, enables a check prior to mount operations to verify that the required components
-	// (binaries, etc.) to mount the volume are available on the underlying node. If the check is enabled
-	// and fails the mount operation fails.
-	ExperimentalCheckNodeCapabilitiesBeforeMount bool
 	// This flag, if set, instructs the kubelet to keep volumes from terminated pods mounted to the node.
 	// This can be useful for debugging volume related issues.
 	KeepTerminatedPodVolumes bool

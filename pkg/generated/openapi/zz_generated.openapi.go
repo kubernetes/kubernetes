@@ -10420,6 +10420,20 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 								Format:      "",
 							},
 						},
+						"experimental": {
+							SchemaProps: spec.SchemaProps{
+								Description: "experimental is a JSON blob that sets experimental Kubelet parameters",
+								Type:        []string{"string"},
+								Format:      "",
+							},
+						},
+						"featureGates": {
+							SchemaProps: spec.SchemaProps{
+								Description: "featureGates is a string of comma-separated key=value pairs that describe feature gates for alpha/experimental features.",
+								Type:        []string{"string"},
+								Format:      "",
+							},
+						},
 						"podManifestPath": {
 							SchemaProps: spec.SchemaProps{
 								Description: "podManifestPath is the path to the directory containing pod manifests to run, or the path to a single manifest file",
@@ -10865,20 +10879,6 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 								Format:      "",
 							},
 						},
-						"remoteRuntimeEndpoint": {
-							SchemaProps: spec.SchemaProps{
-								Description: "remoteRuntimeEndpoint is the endpoint of remote runtime service",
-								Type:        []string{"string"},
-								Format:      "",
-							},
-						},
-						"remoteImageEndpoint": {
-							SchemaProps: spec.SchemaProps{
-								Description: "remoteImageEndpoint is the endpoint of remote image service",
-								Type:        []string{"string"},
-								Format:      "",
-							},
-						},
 						"runtimeRequestTimeout": {
 							SchemaProps: spec.SchemaProps{
 								Description: "runtimeRequestTimeout is the timeout for all runtime requests except long running requests - pull, logs, exec and attach.",
@@ -10894,13 +10894,6 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 						"rktPath": {
 							SchemaProps: spec.SchemaProps{
 								Description: "rktPath is the  path of rkt binary. Leave empty to use the first rkt in $PATH.",
-								Type:        []string{"string"},
-								Format:      "",
-							},
-						},
-						"experimentalMounterPath": {
-							SchemaProps: spec.SchemaProps{
-								Description: "experimentalMounterPath is the path to mounter binary. If not set, kubelet will attempt to use mount binary that is available via $PATH,",
 								Type:        []string{"string"},
 								Format:      "",
 							},
@@ -10954,13 +10947,6 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 								Format:      "int32",
 							},
 						},
-						"nvidiaGPUs": {
-							SchemaProps: spec.SchemaProps{
-								Description: "nvidiaGPUs is the number of NVIDIA GPU devices on this node.",
-								Type:        []string{"integer"},
-								Format:      "int32",
-							},
-						},
 						"dockerExecHandlerName": {
 							SchemaProps: spec.SchemaProps{
 								Description: "dockerExecHandlerName is the handler to use when executing a command in a container. Valid values are 'native' and 'nsenter'. Defaults to 'native'.",
@@ -10985,13 +10971,6 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 						"cpuCFSQuota": {
 							SchemaProps: spec.SchemaProps{
 								Description: "cpuCFSQuota is Enable CPU CFS quota enforcement for containers that specify CPU limits",
-								Type:        []string{"boolean"},
-								Format:      "",
-							},
-						},
-						"containerized": {
-							SchemaProps: spec.SchemaProps{
-								Description: "containerized should be set to true if kubelet is running in a container.",
 								Type:        []string{"boolean"},
 								Format:      "",
 							},
@@ -11133,13 +11112,6 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 								Format:      "",
 							},
 						},
-						"experimentalKernelMemcgNotification": {
-							SchemaProps: spec.SchemaProps{
-								Description: "If enabled, the kubelet will integrate with the kernel memcg notification to determine if memory eviction thresholds are crossed rather than polling.",
-								Type:        []string{"boolean"},
-								Format:      "",
-							},
-						},
 						"podsPerCore": {
 							SchemaProps: spec.SchemaProps{
 								Description: "Maximum number of pods per core. Cannot exceed MaxPods",
@@ -11210,48 +11182,6 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 								Format:      "int32",
 							},
 						},
-						"allowedUnsafeSysctls": {
-							SchemaProps: spec.SchemaProps{
-								Description: "Whitelist of unsafe sysctls or sysctl patterns (ending in *). Use these at your own risk. Resource isolation might be lacking and pod might influence each other on the same node.",
-								Type:        []string{"array"},
-								Items: &spec.SchemaOrArray{
-									Schema: &spec.Schema{
-										SchemaProps: spec.SchemaProps{
-											Type:   []string{"string"},
-											Format: "",
-										},
-									},
-								},
-							},
-						},
-						"featureGates": {
-							SchemaProps: spec.SchemaProps{
-								Description: "featureGates is a string of comma-separated key=value pairs that describe feature gates for alpha/experimental features.",
-								Type:        []string{"string"},
-								Format:      "",
-							},
-						},
-						"enableCRI": {
-							SchemaProps: spec.SchemaProps{
-								Description: "Enable Container Runtime Interface (CRI) integration.",
-								Type:        []string{"boolean"},
-								Format:      "",
-							},
-						},
-						"experimentalFailSwapOn": {
-							SchemaProps: spec.SchemaProps{
-								Description: "Tells the Kubelet to fail to start if swap is enabled on the node.",
-								Type:        []string{"boolean"},
-								Format:      "",
-							},
-						},
-						"experimentalCheckNodeCapabilitiesBeforeMount": {
-							SchemaProps: spec.SchemaProps{
-								Description: "This flag, if set, enables a check prior to mount operations to verify that the required components (binaries, etc.) to mount the volume are available on the underlying node. If the check is enabled and fails the mount operation fails.",
-								Type:        []string{"boolean"},
-								Format:      "",
-							},
-						},
 						"keepTerminatedPodVolumes": {
 							SchemaProps: spec.SchemaProps{
 								Description: "This flag, if set, instructs the kubelet to keep volumes from terminated pods mounted to the node. This can be useful for debugging volume related issues.",
@@ -11260,7 +11190,7 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 							},
 						},
 					},
-					Required: []string{"podManifestPath", "syncFrequency", "fileCheckFrequency", "httpCheckFrequency", "manifestURL", "manifestURLHeader", "enableServer", "address", "port", "readOnlyPort", "tlsCertFile", "tlsPrivateKeyFile", "certDirectory", "authentication", "authorization", "hostnameOverride", "podInfraContainerImage", "dockerEndpoint", "rootDirectory", "seccompProfileRoot", "allowPrivileged", "hostNetworkSources", "hostPIDSources", "hostIPCSources", "registryPullQPS", "registryBurst", "eventRecordQPS", "eventBurst", "enableDebuggingHandlers", "minimumGCAge", "maxPerPodContainerCount", "maxContainerCount", "cAdvisorPort", "healthzPort", "healthzBindAddress", "oomScoreAdj", "registerNode", "clusterDomain", "masterServiceNamespace", "clusterDNS", "streamingConnectionIdleTimeout", "nodeStatusUpdateFrequency", "imageMinimumGCAge", "imageGCHighThresholdPercent", "imageGCLowThresholdPercent", "lowDiskSpaceThresholdMB", "volumeStatsAggPeriod", "networkPluginName", "networkPluginDir", "cniConfDir", "cniBinDir", "networkPluginMTU", "volumePluginDir", "cloudProvider", "cloudConfigFile", "kubeletCgroups", "runtimeCgroups", "systemCgroups", "cgroupRoot", "containerRuntime", "remoteRuntimeEndpoint", "remoteImageEndpoint", "runtimeRequestTimeout", "rktPath", "rktAPIEndpoint", "rktStage1Image", "lockFilePath", "exitOnLockContention", "hairpinMode", "babysitDaemons", "maxPods", "nvidiaGPUs", "dockerExecHandlerName", "podCIDR", "resolvConf", "cpuCFSQuota", "containerized", "maxOpenFiles", "registerSchedulable", "registerWithTaints", "contentType", "kubeAPIQPS", "kubeAPIBurst", "serializeImagePulls", "outOfDiskTransitionFrequency", "nodeIP", "nodeLabels", "nonMasqueradeCIDR", "enableCustomMetrics", "evictionHard", "evictionSoft", "evictionSoftGracePeriod", "evictionPressureTransitionPeriod", "evictionMaxPodGracePeriod", "evictionMinimumReclaim", "experimentalKernelMemcgNotification", "podsPerCore", "enableControllerAttachDetach", "systemReserved", "kubeReserved", "protectKernelDefaults", "makeIPTablesUtilChains", "iptablesMasqueradeBit", "iptablesDropBit"},
+					Required: []string{"experimental", "podManifestPath", "syncFrequency", "fileCheckFrequency", "httpCheckFrequency", "manifestURL", "manifestURLHeader", "enableServer", "address", "port", "readOnlyPort", "tlsCertFile", "tlsPrivateKeyFile", "certDirectory", "authentication", "authorization", "hostnameOverride", "podInfraContainerImage", "dockerEndpoint", "rootDirectory", "seccompProfileRoot", "allowPrivileged", "hostNetworkSources", "hostPIDSources", "hostIPCSources", "registryPullQPS", "registryBurst", "eventRecordQPS", "eventBurst", "enableDebuggingHandlers", "minimumGCAge", "maxPerPodContainerCount", "maxContainerCount", "cAdvisorPort", "healthzPort", "healthzBindAddress", "oomScoreAdj", "registerNode", "clusterDomain", "masterServiceNamespace", "clusterDNS", "streamingConnectionIdleTimeout", "nodeStatusUpdateFrequency", "imageMinimumGCAge", "imageGCHighThresholdPercent", "imageGCLowThresholdPercent", "lowDiskSpaceThresholdMB", "volumeStatsAggPeriod", "networkPluginName", "networkPluginDir", "cniConfDir", "cniBinDir", "networkPluginMTU", "volumePluginDir", "cloudProvider", "cloudConfigFile", "kubeletCgroups", "runtimeCgroups", "systemCgroups", "cgroupRoot", "containerRuntime", "runtimeRequestTimeout", "rktPath", "rktAPIEndpoint", "rktStage1Image", "lockFilePath", "exitOnLockContention", "hairpinMode", "babysitDaemons", "maxPods", "dockerExecHandlerName", "podCIDR", "resolvConf", "cpuCFSQuota", "maxOpenFiles", "registerSchedulable", "registerWithTaints", "contentType", "kubeAPIQPS", "kubeAPIBurst", "serializeImagePulls", "outOfDiskTransitionFrequency", "nodeIP", "nodeLabels", "nonMasqueradeCIDR", "enableCustomMetrics", "evictionHard", "evictionSoft", "evictionSoftGracePeriod", "evictionPressureTransitionPeriod", "evictionMaxPodGracePeriod", "evictionMinimumReclaim", "podsPerCore", "enableControllerAttachDetach", "systemReserved", "kubeReserved", "protectKernelDefaults", "makeIPTablesUtilChains", "iptablesMasqueradeBit", "iptablesDropBit"},
 				},
 			},
 			Dependencies: []string{
