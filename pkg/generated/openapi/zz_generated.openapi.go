@@ -11697,7 +11697,7 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 						},
 						"apiVersion": {
 							SchemaProps: spec.SchemaProps{
-								Description: "APIVersion holds the API group and version of the referenced object.",
+								Description: "APIVersion holds the API group and version of the referenced subject. Defaults to \"v1\" for ServiceAccount subjects. Defaults to \"rbac.authorization.k8s.io/v1alpha1\" for User and Group subjects.",
 								Type:        []string{"string"},
 								Format:      "",
 							},
@@ -15314,9 +15314,9 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 								Format:      "",
 							},
 						},
-						"apiVersion": {
+						"apiGroup": {
 							SchemaProps: spec.SchemaProps{
-								Description: "APIVersion holds the API group and version of the referenced object.",
+								Description: "APIGroup holds the API group of the referenced subject. Defaults to \"\" for ServiceAccount subjects. Defaults to \"rbac.authorization.k8s.io\" for User and Group subjects.",
 								Type:        []string{"string"},
 								Format:      "",
 							},
