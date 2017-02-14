@@ -31,6 +31,7 @@ import (
 	storage "k8s.io/kubernetes/pkg/apis/storage/v1beta1"
 	storageutil "k8s.io/kubernetes/pkg/apis/storage/v1beta1/util"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
+	corelisters "k8s.io/kubernetes/pkg/client/listers/core/v1"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/util/goroutinemap"
 	vol "k8s.io/kubernetes/pkg/volume"
@@ -146,14 +147,12 @@ const createProvisionedPVInterval = 10 * time.Second
 // cache.Controllers that watch PersistentVolume and PersistentVolumeClaim
 // changes.
 type PersistentVolumeController struct {
-	volumeController          cache.Controller
-	volumeInformer            cache.Indexer
-	volumeSource              cache.ListerWatcher
-	claimController           cache.Controller
-	claimInformer             cache.Store
-	claimSource               cache.ListerWatcher
-	classReflector            *cache.Reflector
-	classSource               cache.ListerWatcher
+	volumeLister       corelisters.PersistentVolumeLister
+	volumeListerSynced cache.InformerSynced
+	claimLister        corelisters.PersistentVolumeClaimLister
+	claimListerSynced  cache.InformerSynced
+	classListerSynced  cache.InformerSynced
+
 	kubeClient                clientset.Interface
 	eventRecorder             record.EventRecorder
 	cloud                     cloudprovider.Interface
