@@ -83,7 +83,7 @@ func WriteStaticPodManifests(cfg *kubeadmapi.MasterConfiguration) error {
 		kubeControllerManager: componentPod(api.Container{
 			Name:          kubeControllerManager,
 			Image:         images.GetCoreImage(images.KubeControllerManagerImage, cfg, kubeadmapi.GlobalEnvParams.HyperkubeImage),
-			Command:       getControllerManagerCommand(cfg, false),
+			Command:       getControllerManagerCommand(cfg),
 			VolumeMounts:  volumeMounts,
 			LivenessProbe: componentProbe(10252, "/healthz"),
 			Resources:     componentResources("200m"),
@@ -92,7 +92,7 @@ func WriteStaticPodManifests(cfg *kubeadmapi.MasterConfiguration) error {
 		kubeScheduler: componentPod(api.Container{
 			Name:          kubeScheduler,
 			Image:         images.GetCoreImage(images.KubeSchedulerImage, cfg, kubeadmapi.GlobalEnvParams.HyperkubeImage),
-			Command:       getSchedulerCommand(cfg, false),
+			Command:       getSchedulerCommand(cfg),
 			LivenessProbe: componentProbe(10251, "/healthz"),
 			Resources:     componentResources("100m"),
 			Env:           getProxyEnvVars(),
@@ -285,42 +285,28 @@ func componentPod(container api.Container, volumes ...api.Volume) api.Pod {
 	}
 }
 
-func getComponentBaseCommand(component string) []string {
-	if kubeadmapi.GlobalEnvParams.HyperkubeImage != "" {
-		return []string{"/hyperkube", component}
-	}
-
-	return []string{"kube-" + component}
-}
-
 func getCertFilePath(certName string) string {
 	return path.Join(kubeadmapi.GlobalEnvParams.HostPKIPath, certName)
 }
 
 func getAPIServerCommand(cfg *kubeadmapi.MasterConfiguration, selfHosted bool) []string {
-	var command []string
-
-	// self-hosted apiserver needs to wait on a lock
-	if selfHosted {
-		command = []string{"/usr/bin/flock", "--exclusive", "--timeout=30", "/var/lock/api-server.lock"}
-	}
-
-	command = append(getComponentBaseCommand(apiServer),
+	command := []string{
+		"/usr/local/bin/kube-apiserver",
 		"--insecure-bind-address=127.0.0.1",
 		"--admission-control=NamespaceLifecycle,LimitRanger,ServiceAccount,PersistentVolumeLabel,DefaultStorageClass,ResourceQuota",
-		"--service-cluster-ip-range="+cfg.Networking.ServiceSubnet,
-		"--service-account-key-file="+getCertFilePath(kubeadmconstants.ServiceAccountPublicKeyName),
-		"--client-ca-file="+getCertFilePath(kubeadmconstants.CACertName),
-		"--tls-cert-file="+getCertFilePath(kubeadmconstants.APIServerCertName),
-		"--tls-private-key-file="+getCertFilePath(kubeadmconstants.APIServerKeyName),
-		"--kubelet-client-certificate="+getCertFilePath(kubeadmconstants.APIServerKubeletClientCertName),
-		"--kubelet-client-key="+getCertFilePath(kubeadmconstants.APIServerKubeletClientKeyName),
-		"--token-auth-file="+kubeadmapi.GlobalEnvParams.HostPKIPath+"/tokens.csv",
+		"--service-cluster-ip-range=" + cfg.Networking.ServiceSubnet,
+		"--service-account-key-file=" + getCertFilePath(kubeadmconstants.ServiceAccountPublicKeyName),
+		"--client-ca-file=" + getCertFilePath(kubeadmconstants.CACertName),
+		"--tls-cert-file=" + getCertFilePath(kubeadmconstants.APIServerCertName),
+		"--tls-private-key-file=" + getCertFilePath(kubeadmconstants.APIServerKeyName),
+		"--kubelet-client-certificate=" + getCertFilePath(kubeadmconstants.APIServerKubeletClientCertName),
+		"--kubelet-client-key=" + getCertFilePath(kubeadmconstants.APIServerKubeletClientKeyName),
+		"--token-auth-file=" + kubeadmapi.GlobalEnvParams.KubernetesDir + "/tokens.csv",
 		fmt.Sprintf("--secure-port=%d", cfg.API.Port),
 		"--allow-privileged",
 		"--storage-backend=etcd3",
 		"--kubelet-preferred-address-types=InternalIP,ExternalIP,Hostname",
-	)
+	}
 
 	if cfg.AuthorizationMode != "" {
 		command = append(command, "--authorization-mode="+cfg.AuthorizationMode)
@@ -370,25 +356,19 @@ func getAPIServerCommand(cfg *kubeadmapi.MasterConfiguration, selfHosted bool) [
 	return command
 }
 
-func getControllerManagerCommand(cfg *kubeadmapi.MasterConfiguration, selfHosted bool) []string {
-	var command []string
-
-	// self-hosted controller-manager needs to wait on a lock
-	if selfHosted {
-		command = []string{"/usr/bin/flock", "--exclusive", "--timeout=30", "/var/lock/controller-manager.lock"}
-	}
-
-	command = append(getComponentBaseCommand(controllerManager),
+func getControllerManagerCommand(cfg *kubeadmapi.MasterConfiguration) []string {
+	command := []string{
+		"/usr/local/bin/kube-controller-manager",
 		"--address=127.0.0.1",
 		"--leader-elect",
 		"--master=127.0.0.1:8080",
-		"--cluster-name="+DefaultClusterName,
-		"--root-ca-file="+getCertFilePath(kubeadmconstants.CACertName),
-		"--service-account-private-key-file="+getCertFilePath(kubeadmconstants.ServiceAccountPrivateKeyName),
-		"--cluster-signing-cert-file="+getCertFilePath(kubeadmconstants.CACertName),
-		"--cluster-signing-key-file="+getCertFilePath(kubeadmconstants.CAKeyName),
-		"--insecure-experimental-approve-all-kubelet-csrs-for-group="+KubeletBootstrapGroup,
-	)
+		"--cluster-name=" + DefaultClusterName,
+		"--root-ca-file=" + getCertFilePath(kubeadmconstants.CACertName),
+		"--service-account-private-key-file=" + getCertFilePath(kubeadmconstants.ServiceAccountPrivateKeyName),
+		"--cluster-signing-cert-file=" + getCertFilePath(kubeadmconstants.CACertName),
+		"--cluster-signing-key-file=" + getCertFilePath(kubeadmconstants.CAKeyName),
+		"--insecure-experimental-approve-all-kubelet-csrs-for-group=" + KubeletBootstrapGroup,
+	}
 
 	if cfg.CloudProvider != "" {
 		command = append(command, "--cloud-provider="+cfg.CloudProvider)
@@ -408,21 +388,13 @@ func getControllerManagerCommand(cfg *kubeadmapi.MasterConfiguration, selfHosted
 	return command
 }
 
-func getSchedulerCommand(cfg *kubeadmapi.MasterConfiguration, selfHosted bool) []string {
-	var command []string
-
-	// self-hosted apiserver needs to wait on a lock
-	if selfHosted {
-		command = []string{"/usr/bin/flock", "--exclusive", "--timeout=30", "/var/lock/api-server.lock"}
-	}
-
-	command = append(getComponentBaseCommand(scheduler),
+func getSchedulerCommand(cfg *kubeadmapi.MasterConfiguration) []string {
+	return []string{
+		"/usr/local/bin/kube-scheduler",
 		"--address=127.0.0.1",
 		"--leader-elect",
 		"--master=127.0.0.1:8080",
-	)
-
-	return command
+	}
 }
 
 func getProxyEnvVars() []api.EnvVar {

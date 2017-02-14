@@ -35,9 +35,9 @@ const (
 )
 
 func CreateTokenAuthFile(bt string) error {
-	tokenAuthFilePath := path.Join(kubeadmapi.GlobalEnvParams.HostPKIPath, "tokens.csv")
-	if err := os.MkdirAll(kubeadmapi.GlobalEnvParams.HostPKIPath, 0700); err != nil {
-		return fmt.Errorf("failed to create directory %q [%v]", kubeadmapi.GlobalEnvParams.HostPKIPath, err)
+	tokenAuthFilePath := path.Join(kubeadmapi.GlobalEnvParams.KubernetesDir, "tokens.csv")
+	if err := os.MkdirAll(kubeadmapi.GlobalEnvParams.KubernetesDir, 0700); err != nil {
+		return fmt.Errorf("failed to create directory %q [%v]", kubeadmapi.GlobalEnvParams.KubernetesDir, err)
 	}
 	serialized := []byte(fmt.Sprintf("%s,%s,%s,%s\n", bt, KubeletBootstrapUser, uuid.NewUUID(), KubeletBootstrapGroup))
 	// DumpReaderToFile create a file with mode 0600
