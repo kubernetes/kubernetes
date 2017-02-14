@@ -22,6 +22,7 @@ package app
 
 import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/client-go/scale"
 	"k8s.io/kubernetes/pkg/controller/podautoscaler"
 	"k8s.io/kubernetes/pkg/controller/podautoscaler/metrics"
 )
@@ -31,6 +32,7 @@ func startHPAController(ctx ControllerContext) (bool, error) {
 		return false, nil
 	}
 	hpaClient := ctx.ClientBuilder.ClientOrDie("horizontal-pod-autoscaler")
+
 	metricsClient := metrics.NewHeapsterMetricsClient(
 		hpaClient,
 		metrics.DefaultHeapsterNamespace,
@@ -39,9 +41,13 @@ func startHPAController(ctx ControllerContext) (bool, error) {
 		metrics.DefaultHeapsterPort,
 	)
 	replicaCalc := podautoscaler.NewReplicaCalculator(metricsClient, hpaClient.Core())
+
+	scaleConfig := ctx.ClientBuilder.ConfigOrDie("horizontal-pod-autoscaler")
+	scaleClient := scale.NewScaleClient(scaleConfig)
+
 	go podautoscaler.NewHorizontalController(
 		ctx.ClientBuilder.ClientGoClientOrDie("horizontal-pod-autoscaler").Core(),
-		hpaClient.Extensions(),
+		scaleClient,
 		hpaClient.Autoscaling(),
 		replicaCalc,
 		ctx.NewInformerFactory.Autoscaling().V1().HorizontalPodAutoscalers(),

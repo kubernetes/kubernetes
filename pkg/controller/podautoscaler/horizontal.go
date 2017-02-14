@@ -30,15 +30,15 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	clientv1 "k8s.io/client-go/pkg/api/v1"
+	scaleapi "k8s.io/client-go/pkg/apis/autoscaling/v1"
+	scaleclient "k8s.io/client-go/scale"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
 	autoscalingv1 "k8s.io/kubernetes/pkg/apis/autoscaling/v1"
 	autoscalingv2 "k8s.io/kubernetes/pkg/apis/autoscaling/v2alpha1"
-	extensions "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	autoscalingclient "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/autoscaling/v1"
-	extensionsclient "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/extensions/v1beta1"
 	autoscalinginformers "k8s.io/kubernetes/pkg/client/informers/informers_generated/externalversions/autoscaling/v1"
 	autoscalinglisters "k8s.io/kubernetes/pkg/client/listers/autoscaling/v1"
 )
@@ -75,7 +75,7 @@ func UnsafeConvertToVersionVia(obj runtime.Object, externalVersion schema.GroupV
 }
 
 type HorizontalController struct {
-	scaleNamespacer extensionsclient.ScalesGetter
+	scaleNamespacer scaleclient.ScalesGetter
 	hpaNamespacer   autoscalingclient.HorizontalPodAutoscalersGetter
 
 	replicaCalc   *ReplicaCalculator
@@ -92,7 +92,7 @@ var upscaleForbiddenWindow = 3 * time.Minute
 
 func NewHorizontalController(
 	evtNamespacer v1core.EventsGetter,
-	scaleNamespacer extensionsclient.ScalesGetter,
+	scaleNamespacer scaleclient.ScalesGetter,
 	hpaNamespacer autoscalingclient.HorizontalPodAutoscalersGetter,
 	replicaCalc *ReplicaCalculator,
 	hpaInformer autoscalinginformers.HorizontalPodAutoscalerInformer,
@@ -153,7 +153,7 @@ func (a *HorizontalController) Run(stopCh <-chan struct{}) {
 // Computes the desired number of replicas for the metric specifications listed in the HPA, returning the maximum
 // of the computed replica counts, a description of the associated metric, and the statuses of all metrics
 // computed.
-func (a *HorizontalController) computeReplicasForMetrics(hpa *autoscalingv2.HorizontalPodAutoscaler, scale *extensions.Scale,
+func (a *HorizontalController) computeReplicasForMetrics(hpa *autoscalingv2.HorizontalPodAutoscaler, scale *scaleapi.Scale,
 	metricSpecs []autoscalingv2.MetricSpec) (replicas int32, metric string, statuses []autoscalingv2.MetricStatus, timestamp time.Time, err error) {
 
 	currentReplicas := scale.Status.Replicas
@@ -161,20 +161,13 @@ func (a *HorizontalController) computeReplicasForMetrics(hpa *autoscalingv2.Hori
 	statuses = make([]autoscalingv2.MetricStatus, len(metricSpecs))
 
 	for i, metricSpec := range metricSpecs {
-		if scale.Status.Selector == nil {
+		if scale.Status.Selector == "" {
 			errMsg := "selector is required"
 			a.eventRecorder.Event(hpa, v1.EventTypeWarning, "SelectorRequired", errMsg)
 			return 0, "", nil, time.Time{}, fmt.Errorf(errMsg)
 		}
 
-		var selector labels.Selector
-		var err error
-		if len(scale.Status.Selector) > 0 {
-			selector = labels.SelectorFromSet(labels.Set(scale.Status.Selector))
-			err = nil
-		} else {
-			selector, err = labels.Parse(scale.Status.TargetSelector)
-		}
+		selector, err := labels.Parse(scale.Status.Selector)
 		if err != nil {
 			errMsg := fmt.Sprintf("couldn't convert selector into a corresponding internal selector object: %v", err)
 			a.eventRecorder.Event(hpa, v1.EventTypeWarning, "InvalidSelector", errMsg)
@@ -286,7 +279,8 @@ func (a *HorizontalController) reconcileAutoscaler(hpav1 *autoscalingv1.Horizont
 
 	reference := fmt.Sprintf("%s/%s/%s", hpa.Spec.ScaleTargetRef.Kind, hpa.Namespace, hpa.Spec.ScaleTargetRef.Name)
 
-	scale, err := a.scaleNamespacer.Scales(hpa.Namespace).Get(hpa.Spec.ScaleTargetRef.Kind, hpa.Spec.ScaleTargetRef.Name)
+	targetGVK := schema.FromAPIVersionAndKind(hpa.Spec.ScaleTargetRef.APIVersion, hpa.Spec.ScaleTargetRef.Kind)
+	scale, err := a.scaleNamespacer.Scales(hpa.Namespace).Get(targetGVK.GroupKind(), hpa.Spec.ScaleTargetRef.Name)
 	if err != nil {
 		a.eventRecorder.Event(hpa, v1.EventTypeWarning, "FailedGetScale", err.Error())
 		return fmt.Errorf("failed to query scale subresource for %s: %v", reference, err)
@@ -364,7 +358,7 @@ func (a *HorizontalController) reconcileAutoscaler(hpav1 *autoscalingv1.Horizont
 
 	if rescale {
 		scale.Spec.Replicas = desiredReplicas
-		_, err = a.scaleNamespacer.Scales(hpa.Namespace).Update(hpa.Spec.ScaleTargetRef.Kind, scale)
+		_, err = a.scaleNamespacer.Scales(hpa.Namespace).Update(targetGVK.GroupKind(), scale)
 		if err != nil {
 			a.eventRecorder.Eventf(hpa, v1.EventTypeWarning, "FailedRescale", "New size: %d; reason: %s; error: %v", desiredReplicas, rescaleReason, err.Error())
 			return fmt.Errorf("failed to rescale %s: %v", reference, err)
