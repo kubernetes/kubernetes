@@ -39,7 +39,13 @@ var (
 		kubectl create role pod-reader --verb=get --verb=list --verb=watch --resource=pods
 
 		# Create a Role named "pod-reader" with ResourceName specified
-		kubectl create role pod-reader --verb=get --verg=list --verb=watch --resource=pods --resource-name=readablepod`)
+		kubectl create role pod-reader --verb=get --verb=list --verb=watch --resource=pods --resource-name=readablepod
+
+		# Create a Role named "foo" with API Group specified
+		kubectl create role foo --verb=get,list,watch --resource=rs.extensions
+
+		# Create a Role named "foo" with SubResource specified
+		kubectl create role foo --verb=get,list,watch --resource=po,pods/status`)
 
 	// Valid resource verb list for validation.
 	validResourceVerbs = []string{"*", "get", "delete", "list", "create", "update", "patch", "watch", "proxy", "redirect", "deletecollection"}
@@ -48,10 +54,15 @@ var (
 	validNonResourceVerbs = []string{"get", "post", "put", "delete"}
 )
 
+type ResourceOptions struct {
+	Resource    schema.GroupVersionResource
+	SubResource schema.GroupVersionResource
+}
+
 type CreateRoleOptions struct {
 	Name          string
 	Verbs         []string
-	Resources     []schema.GroupVersionResource
+	Resources     []ResourceOptions
 	ResourceNames []string
 }
 
@@ -59,7 +70,7 @@ type CreateRoleOptions struct {
 func NewCmdCreateRole(f cmdutil.Factory, cmdOut io.Writer) *cobra.Command {
 	c := &CreateRoleOptions{}
 	cmd := &cobra.Command{
-		Use:     "role NAME --verb=verb --resource=resource.group [--resource-name=resourcename] [--dry-run]",
+		Use:     "role NAME --verb=verb --resource=resource.group/subresource [--resource-name=resourcename] [--dry-run]",
 		Short:   roleLong,
 		Long:    roleLong,
 		Example: roleExample,
@@ -105,13 +116,23 @@ func (c *CreateRoleOptions) Complete(cmd *cobra.Command, args []string) error {
 	// e.g. --resource=pods,deployments.extensions
 	resources := cmdutil.GetFlagStringSlice(cmd, "resource")
 	for _, r := range resources {
-		sections := strings.Split(r, ".")
+		sections := strings.SplitN(r, ".", 2)
 
+		resource := &ResourceOptions{}
 		if len(sections) == 1 {
-			c.Resources = append(c.Resources, schema.GroupVersionResource{Resource: r})
+			parts := strings.SplitN(sections[0], "/", 2)
+			if len(parts) == 2 {
+				resource.SubResource = schema.GroupVersionResource{Resource: parts[1]}
+			}
+			resource.Resource = schema.GroupVersionResource{Resource: parts[0]}
 		} else {
-			c.Resources = append(c.Resources, schema.GroupVersionResource{Resource: sections[0], Group: strings.Join(sections[1:], ".")})
+			parts := strings.SplitN(sections[1], "/", 2)
+			if len(parts) == 2 {
+				resource.SubResource = schema.GroupVersionResource{Resource: parts[1]}
+			}
+			resource.Resource = schema.GroupVersionResource{Resource: sections[0], Group: parts[0]}
 		}
+		c.Resources = append(c.Resources, *resource)
 	}
 
 	// Remove duplicate resource names.
@@ -150,9 +171,13 @@ func (c *CreateRoleOptions) Validate(f cmdutil.Factory) error {
 	}
 
 	for _, r := range c.Resources {
-		_, err := mapper.ResourceFor(r)
-		if err != nil {
+		if _, err := mapper.ResourceFor(r.Resource); err != nil {
 			return err
+		}
+		if len(r.SubResource.Resource) > 0 {
+			if _, err := mapper.ResourceFor(r.SubResource); err != nil {
+				return err
+			}
 		}
 	}
 
@@ -178,9 +203,16 @@ func (c *CreateRoleOptions) RunCreateRole(f cmdutil.Factory, cmdOut io.Writer, c
 	// 2. Prevents pointing to non-existent resources.
 	// 3. Transfers resource short name to long name. E.g. rs.extensions is transferred to replicasets.extensions
 	for _, r := range c.Resources {
-		resource, err := mapper.ResourceFor(r)
+		resource, err := mapper.ResourceFor(r.Resource)
 		if err != nil {
 			return err
+		}
+		if len(r.SubResource.Resource) > 0 {
+			subresource, err := mapper.ResourceFor(r.SubResource)
+			if err != nil {
+				return err
+			}
+			resource.Resource = resource.Resource + "/" + subresource.Resource
 		}
 		if !arrayContains(groupResourceMapping[resource.Group], resource.Resource) {
 			groupResourceMapping[resource.Group] = append(groupResourceMapping[resource.Group], resource.Resource)

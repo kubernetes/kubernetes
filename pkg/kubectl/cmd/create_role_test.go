@@ -77,6 +77,40 @@ func TestCreateRole(t *testing.T) {
 				},
 			},
 		},
+		"test-subresources": {
+			verbs:     "get,watch,list",
+			resources: "replicasets/scale",
+			expectedRole: &rbac.Role{
+				ObjectMeta: v1.ObjectMeta{
+					Name: roleName,
+				},
+				Rules: []rbac.PolicyRule{
+					{
+						Verbs:         []string{"get", "watch", "list"},
+						Resources:     []string{"replicasets/scales"},
+						APIGroups:     []string{"extensions"},
+						ResourceNames: []string{},
+					},
+				},
+			},
+		},
+		"test-subresources-with-apigroup": {
+			verbs:     "get,watch,list",
+			resources: "replicasets.extensions/scale",
+			expectedRole: &rbac.Role{
+				ObjectMeta: v1.ObjectMeta{
+					Name: roleName,
+				},
+				Rules: []rbac.PolicyRule{
+					{
+						Verbs:         []string{"get", "watch", "list"},
+						Resources:     []string{"replicasets/scales"},
+						APIGroups:     []string{"extensions"},
+						ResourceNames: []string{},
+					},
+				},
+			},
+		},
 		"test-valid-case-with-multiple-apigroups": {
 			verbs:     "get,watch,list",
 			resources: "pods,deployments.extensions",
@@ -149,9 +183,11 @@ func TestValidate(t *testing.T) {
 			roleOptions: &CreateRoleOptions{
 				Name:  "my-role",
 				Verbs: []string{"invalid-verb"},
-				Resources: []schema.GroupVersionResource{
+				Resources: []ResourceOptions{
 					{
-						Resource: "pods",
+						Resource: schema.GroupVersionResource{
+							Resource: "pods",
+						},
 					},
 				},
 			},
@@ -161,9 +197,28 @@ func TestValidate(t *testing.T) {
 			roleOptions: &CreateRoleOptions{
 				Name:  "my-role",
 				Verbs: []string{"get"},
-				Resources: []schema.GroupVersionResource{
+				Resources: []ResourceOptions{
 					{
-						Resource: "invalid-resource",
+						Resource: schema.GroupVersionResource{
+							Resource: "invalid-resource",
+						},
+					},
+				},
+			},
+			expectErr: true,
+		},
+		"test-invalid-subresource": {
+			roleOptions: &CreateRoleOptions{
+				Name:  "my-role",
+				Verbs: []string{"get"},
+				Resources: []ResourceOptions{
+					{
+						Resource: schema.GroupVersionResource{
+							Resource: "replicasets",
+						},
+						SubResource: schema.GroupVersionResource{
+							Resource: "invalid-resource",
+						},
 					},
 				},
 			},
@@ -173,13 +228,17 @@ func TestValidate(t *testing.T) {
 			roleOptions: &CreateRoleOptions{
 				Name:  "my-role",
 				Verbs: []string{"get"},
-				Resources: []schema.GroupVersionResource{
+				Resources: []ResourceOptions{
 					{
-						Resource: "pods",
+						Resource: schema.GroupVersionResource{
+							Resource: "pods",
+						},
 					},
 					{
-						Resource: "deployments",
-						Group:    "extensions",
+						Resource: schema.GroupVersionResource{
+							Resource: "deployments",
+							Group:    "extensions",
+						},
 					},
 				},
 				ResourceNames: []string{"foo"},
@@ -190,9 +249,14 @@ func TestValidate(t *testing.T) {
 			roleOptions: &CreateRoleOptions{
 				Name:  "my-role",
 				Verbs: []string{"get", "list"},
-				Resources: []schema.GroupVersionResource{
+				Resources: []ResourceOptions{
 					{
-						Resource: "pods",
+						Resource: schema.GroupVersionResource{
+							Resource: "replicasets",
+						},
+						SubResource: schema.GroupVersionResource{
+							Resource: "scales",
+						},
 					},
 				},
 				ResourceNames: []string{"foo"},
@@ -252,14 +316,18 @@ func TestComplete(t *testing.T) {
 					"watch",
 					"list",
 				},
-				Resources: []schema.GroupVersionResource{
+				Resources: []ResourceOptions{
 					{
-						Resource: "pods",
-						Group:    "",
+						Resource: schema.GroupVersionResource{
+							Resource: "pods",
+							Group:    "",
+						},
 					},
 					{
-						Resource: "deployments",
-						Group:    "extensions",
+						Resource: schema.GroupVersionResource{
+							Resource: "deployments",
+							Group:    "extensions",
+						},
 					},
 				},
 				ResourceNames: []string{},
@@ -280,14 +348,18 @@ func TestComplete(t *testing.T) {
 			expected: &CreateRoleOptions{
 				Name:  roleName,
 				Verbs: []string{"*"},
-				Resources: []schema.GroupVersionResource{
+				Resources: []ResourceOptions{
 					{
-						Resource: "pods",
-						Group:    "",
+						Resource: schema.GroupVersionResource{
+							Resource: "pods",
+							Group:    "",
+						},
 					},
 					{
-						Resource: "deployments",
-						Group:    "extensions",
+						Resource: schema.GroupVersionResource{
+							Resource: "deployments",
+							Group:    "extensions",
+						},
 					},
 				},
 				ResourceNames: []string{},
@@ -304,14 +376,18 @@ func TestComplete(t *testing.T) {
 			expected: &CreateRoleOptions{
 				Name:  roleName,
 				Verbs: []string{"*"},
-				Resources: []schema.GroupVersionResource{
+				Resources: []ResourceOptions{
 					{
-						Resource: "pods",
-						Group:    "",
+						Resource: schema.GroupVersionResource{
+							Resource: "pods",
+							Group:    "",
+						},
 					},
 					{
-						Resource: "deployments",
-						Group:    "extensions",
+						Resource: schema.GroupVersionResource{
+							Resource: "deployments",
+							Group:    "extensions",
+						},
 					},
 				},
 				ResourceNames: []string{"foo"},
@@ -328,14 +404,18 @@ func TestComplete(t *testing.T) {
 			expected: &CreateRoleOptions{
 				Name:  roleName,
 				Verbs: []string{"*"},
-				Resources: []schema.GroupVersionResource{
+				Resources: []ResourceOptions{
 					{
-						Resource: "pods",
-						Group:    "",
+						Resource: schema.GroupVersionResource{
+							Resource: "pods",
+							Group:    "",
+						},
 					},
 					{
-						Resource: "deployments",
-						Group:    "extensions",
+						Resource: schema.GroupVersionResource{
+							Resource: "deployments",
+							Group:    "extensions",
+						},
 					},
 				},
 				ResourceNames: []string{"foo"},
