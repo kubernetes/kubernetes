@@ -19,6 +19,7 @@ package componentconfig
 import (
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	utilconfig "k8s.io/kubernetes/pkg/util/config"
+	utilnet "k8s.io/kubernetes/pkg/util/net"
 )
 
 type KubeProxyConfiguration struct {
