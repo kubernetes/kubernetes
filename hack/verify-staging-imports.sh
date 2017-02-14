@@ -51,9 +51,10 @@ function print_forbidden_imports () {
 
 RC=0
 print_forbidden_imports apimachinery k8s.io/ || RC=1
-print_forbidden_imports apiserver k8s.io/kubernetes || RC=1
-print_forbidden_imports client-go k8s.io/kubernetes k8s.io/apiserver || RC=1
-print_forbidden_imports sample-apiserver k8s.io/kubernetes || RC=1
+print_forbidden_imports apiserver k8s.io/kubernetes k8s.io/sample-apiserver k8s.io/kube-aggregator || RC=1
+print_forbidden_imports client-go k8s.io/kubernetes k8s.io/apiserver k8s.io/sample-apiserver k8s.io/kube-aggregator || RC=1
+print_forbidden_imports kube-aggregator k8s.io/kubernetes k8s.io/sample-apiserver || RC=1
+print_forbidden_imports sample-apiserver k8s.io/kubernetes k8s.io/kube-aggregator || RC=1
 if [ ${RC} != 0 ]; then
     exit ${RC}
 fi
