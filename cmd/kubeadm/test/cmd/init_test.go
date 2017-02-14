@@ -52,3 +52,88 @@ func TestCmdInitToken(t *testing.T) {
 		kubeadmReset()
 	}
 }
+
+func TestCmdInitKubernetesVersion(t *testing.T) {
+	if *kubeadmCmdSkip {
+		t.Log("kubeadm cmd tests being skipped")
+		t.Skip()
+	}
+
+	var initTest = []struct {
+		args     string
+		expected bool
+	}{
+		{"--use-kubernetes-version=foobar", false},
+	}
+
+	for _, rt := range initTest {
+		_, _, actual := RunCmd(*kubeadmPath, "init", rt.args, "--skip-preflight-checks")
+		if (actual == nil) != rt.expected {
+			t.Errorf(
+				"failed CmdInitKubernetesVersion running 'kubeadm init %s' with an error: %v\n\texpected: %t\n\t  actual: %t",
+				rt.args,
+				actual,
+				rt.expected,
+				(actual == nil),
+			)
+		}
+		kubeadmReset()
+	}
+}
+
+func TestCmdInitConfig(t *testing.T) {
+	if *kubeadmCmdSkip {
+		t.Log("kubeadm cmd tests being skipped")
+		t.Skip()
+	}
+
+	var initTest = []struct {
+		args     string
+		expected bool
+	}{
+		{"--config=foobar", false},
+		{"--config=/does/not/exist/foo/bar", false},
+	}
+
+	for _, rt := range initTest {
+		_, _, actual := RunCmd(*kubeadmPath, "init", rt.args, "--skip-preflight-checks")
+		if (actual == nil) != rt.expected {
+			t.Errorf(
+				"failed CmdInitConfig running 'kubeadm init %s' with an error: %v\n\texpected: %t\n\t  actual: %t",
+				rt.args,
+				actual,
+				rt.expected,
+				(actual == nil),
+			)
+		}
+		kubeadmReset()
+	}
+}
+
+func TestCmdInitAPIPort(t *testing.T) {
+	if *kubeadmCmdSkip {
+		t.Log("kubeadm cmd tests being skipped")
+		t.Skip()
+	}
+
+	var initTest = []struct {
+		args     string
+		expected bool
+	}{
+		{"--api-port=foobar", false},
+	}
+
+	for _, rt := range initTest {
+		_, _, actual := RunCmd(*kubeadmPath, "init", rt.args, "--skip-preflight-checks")
+		if (actual == nil) != rt.expected {
+			t.Errorf(
+				"failed CmdInitAPIPort running 'kubeadm init %s' with an error: %v\n\texpected: %t\n\t  actual: %t",
+				rt.args,
+				actual,
+				rt.expected,
+				(actual == nil),
+			)
+		}
+		kubeadmReset()
+	}
+}
