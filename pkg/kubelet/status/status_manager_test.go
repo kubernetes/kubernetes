@@ -583,6 +583,34 @@ func TestStaticPod(t *testing.T) {
 	})
 }
 
+func TestTerminatePod(t *testing.T) {
+	syncer := newTestManager(&fake.Clientset{})
+	testPod := getTestPod()
+	// update the pod's status to Failed.  TerminatePod should preserve this status update.
+	firstStatus := getRandomPodStatus()
+	firstStatus.Phase = v1.PodFailed
+	syncer.SetPodStatus(testPod, firstStatus)
+
+	// set the testPod to a pod with Phase running, to simulate a stale pod
+	testPod.Status = getRandomPodStatus()
+	testPod.Status.Phase = v1.PodRunning
+
+	syncer.TerminatePod(testPod)
+
+	// we expect the container statuses to have changed to terminated
+	newStatus := expectPodStatus(t, syncer, testPod)
+	for i := range newStatus.ContainerStatuses {
+		assert.False(t, newStatus.ContainerStatuses[i].State.Terminated == nil, "expected containers to be terminated")
+	}
+	for i := range newStatus.InitContainerStatuses {
+		assert.False(t, newStatus.InitContainerStatuses[i].State.Terminated == nil, "expected init containers to be terminated")
+	}
+
+	// we expect the previous status update to be preserved.
+	assert.Equal(t, newStatus.Phase, firstStatus.Phase)
+	assert.Equal(t, newStatus.Message, firstStatus.Message)
+}
+
 func TestSetContainerReadiness(t *testing.T) {
 	cID1 := kubecontainer.ContainerID{Type: "test", ID: "1"}
 	cID2 := kubecontainer.ContainerID{Type: "test", ID: "2"}

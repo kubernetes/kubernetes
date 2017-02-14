@@ -135,6 +135,8 @@ func (m *manager) Start() {
 	go wait.Forever(func() {
 		select {
 		case syncRequest := <-m.podStatusChannel:
+			glog.V(5).Infof("Status Manager: syncing pod: %q, with status: (%d, %v) from podStatusChannel",
+				syncRequest.podUID, syncRequest.status.version, syncRequest.status.status)
 			m.syncPod(syncRequest.podUID, syncRequest.status)
 		case <-syncTicker:
 			m.syncBatch()
@@ -260,7 +262,7 @@ func (m *manager) TerminatePod(pod *v1.Pod) {
 			Terminated: &v1.ContainerStateTerminated{},
 		}
 	}
-	m.updateStatusInternal(pod, pod.Status, true)
+	m.updateStatusInternal(pod, status, true)
 }
 
 // updateStatusInternal updates the internal status cache, and queues an update to the api server if
@@ -326,6 +328,8 @@ func (m *manager) updateStatusInternal(pod *v1.Pod, status v1.PodStatus, forceUp
 
 	select {
 	case m.podStatusChannel <- podStatusSyncRequest{pod.UID, newStatus}:
+		glog.V(5).Infof("Status Manager: adding pod: %q, with status: (%q, %v) to podStatusChannel",
+			pod.UID, newStatus.version, newStatus.status)
 		return true
 	default:
 		// Let the periodic syncBatch handle the update if the channel is full.
@@ -395,6 +399,7 @@ func (m *manager) syncBatch() {
 	}()
 
 	for _, update := range updatedStatuses {
+		glog.V(5).Infof("Status Manager: syncPod in syncbatch. pod UID: %q", update.podUID)
 		m.syncPod(update.podUID, update.status)
 	}
 }
