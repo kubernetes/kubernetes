@@ -13,7 +13,7 @@ go_library(
     tags = ["automanaged"],
     deps = [
         "//cmd/kube-aggregator/pkg/apis/apiregistration:go_default_library",
-        "//pkg/api/validation:go_default_library",
+        "//vendor:k8s.io/apimachinery/pkg/api/validation",
         "//vendor:k8s.io/apimachinery/pkg/api/validation/path",
         "//vendor:k8s.io/apimachinery/pkg/util/validation",
         "//vendor:k8s.io/apimachinery/pkg/util/validation/field",
