@@ -118,3 +118,111 @@ func TestIsPodAvailable(t *testing.T) {
 		}
 	}
 }
+
+func TestUpdatePodCondition(t *testing.T) {
+	tests := []struct {
+		podStatus    *PodStatus
+		podCondition *PodCondition
+		expected     bool
+	}{
+		{
+			podStatus: &PodStatus{
+				Conditions: []PodCondition{
+					{
+						Type:   PodInitialized,
+						Status: ConditionFalse,
+					},
+				},
+			},
+			podCondition: &PodCondition{
+				Status: ConditionTrue,
+				Type:   PodReady,
+			},
+			expected: true,
+		},
+		{
+			podStatus: &PodStatus{
+				Conditions: []PodCondition{
+					{
+						Type:   PodReady,
+						Status: ConditionFalse,
+					},
+				},
+			},
+			podCondition: &PodCondition{
+				Status: ConditionTrue,
+				Type:   PodReady,
+			},
+			expected: true,
+		},
+		{
+			podStatus: &PodStatus{
+				Conditions: []PodCondition{
+					{
+						Type:   PodReady,
+						Status: ConditionTrue,
+					},
+				},
+			},
+			podCondition: &PodCondition{
+				Status: ConditionTrue,
+				Type:   PodReady,
+			},
+			expected: false,
+		},
+	}
+
+	for i, test := range tests {
+		changedOrAadd := UpdatePodCondition(test.podStatus, test.podCondition)
+		if changedOrAadd != test.expected {
+			t.Errorf("[tc #%d] expected result: %t, got: %t", i, test.expected, changedOrAadd)
+		}
+	}
+}
+
+func TestIsNodeReady(t *testing.T) {
+	tests := []struct {
+		node     *Node
+		expected bool
+	}{
+		{
+			node: &Node{
+				Status: NodeStatus{
+					Conditions: []NodeCondition{
+						{Type: NodeReady, Status: ConditionTrue},
+					},
+				},
+			},
+			expected: true,
+		},
+		{
+			node: &Node{
+				Status: NodeStatus{
+					Conditions: []NodeCondition{
+						{Type: NodeReady, Status: ConditionFalse},
+					},
+				},
+			},
+			expected: false,
+		},
+		{
+			node: &Node{
+				Status: NodeStatus{
+					Conditions: []NodeCondition{
+						{Type: NodeOutOfDisk, Status: ConditionTrue},
+						{Type: NodeMemoryPressure, Status: ConditionTrue},
+					},
+				},
+			},
+			expected: false,
+		},
+	}
+
+	for i, test := range tests {
+		ready := IsNodeReady(test.node)
+		if ready != test.expected {
+			t.Errorf("[tc #%d] expected result: %t, got: %t", i, test.expected, ready)
+		}
+	}
+
+}
