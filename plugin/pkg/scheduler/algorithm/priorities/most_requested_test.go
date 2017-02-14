@@ -83,6 +83,27 @@ func TestMostRequested(t *testing.T) {
 			},
 		},
 	}
+	bigCpuAndMemory := v1.PodSpec{
+		NodeName: "machine1",
+		Containers: []v1.Container{
+			{
+				Resources: v1.ResourceRequirements{
+					Requests: v1.ResourceList{
+						"cpu":    resource.MustParse("2000m"),
+						"memory": resource.MustParse("4000"),
+					},
+				},
+			},
+			{
+				Resources: v1.ResourceRequirements{
+					Requests: v1.ResourceList{
+						"cpu":    resource.MustParse("3000m"),
+						"memory": resource.MustParse("5000"),
+					},
+				},
+			},
+		},
+	}
 	tests := []struct {
 		pod          *v1.Pod
 		pods         []*v1.Pod
@@ -167,6 +188,23 @@ func TestMostRequested(t *testing.T) {
 				{Spec: cpuOnly},
 				{Spec: cpuAndMemory},
 			},
+		},
+		{
+			/*
+				Node1 scores on 0-10 scale
+				CPU Score: 5000 > 4000 return 0
+				Memory Score: (9000 * 10) / 10000 = 9
+				Node1 Score: (0 + 9) / 2 = 4
+
+				Node2 scores on 0-10 scale
+				CPU Score: (5000 * 10) / 10000 = 5
+				Memory Score: 9000 > 8000 return 0
+				Node2 Score: (5 + 0) / 2 = 2
+			*/
+			pod:          &v1.Pod{Spec: bigCpuAndMemory},
+			nodes:        []*v1.Node{makeNode("machine1", 4000, 10000), makeNode("machine2", 10000, 8000)},
+			expectedList: []schedulerapi.HostPriority{{Host: "machine1", Score: 4}, {Host: "machine2", Score: 2}},
+			test:         "resources requested with more than the node, pods scheduled with resources",
 		},
 	}
 
