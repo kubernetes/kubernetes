@@ -2320,12 +2320,12 @@ func ValidatePodUpdate(newPod, oldPod *api.Pod) field.ErrorList {
 	mungedPod.Spec.InitContainers = newInitContainers
 	// munge spec.activeDeadlineSeconds
 	mungedPod.Spec.ActiveDeadlineSeconds = nil
-	_, autoport := oldPod.ObjectMeta.Annotations[utilpod.PodAutoPortAnnotation]
-	if !autoport && oldPod.Spec.ActiveDeadlineSeconds != nil {
+	if oldPod.Spec.ActiveDeadlineSeconds != nil {
 		activeDeadlineSeconds := *oldPod.Spec.ActiveDeadlineSeconds
 		mungedPod.Spec.ActiveDeadlineSeconds = &activeDeadlineSeconds
 	}
-	if !api.Semantic.DeepEqual(mungedPod.Spec, oldPod.Spec) {
+	_, autoport := oldPod.ObjectMeta.Annotations[utilpod.PodAutoPortAnnotation]
+	if !autoport && !api.Semantic.DeepEqual(mungedPod.Spec, oldPod.Spec) {
 		//TODO: Pinpoint the specific field that causes the invalid error after we have strategic merge diff
 		allErrs = append(allErrs, field.Forbidden(specPath, "pod updates may not change fields other than `containers[*].image` or `spec.activeDeadlineSeconds`"))
 	}
