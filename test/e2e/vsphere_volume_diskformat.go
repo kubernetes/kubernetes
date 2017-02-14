@@ -152,8 +152,11 @@ func invokeTest(client clientset.Interface, namespace string, nodeName string, n
 	Expect(framework.WaitForPodNameRunningInNamespace(client, pod.Name, namespace)).To(Succeed())
 	Expect(verifyDiskFormat(nodeName, pv.Spec.VsphereVolume.VolumePath, diskFormat)).To(BeTrue(), "DiskFormat Verification Failed")
 
+	var volumePaths []string
+	volumePaths = append(volumePaths, pv.Spec.VsphereVolume.VolumePath)
+
 	By("Delete pod and wait for volume to be detached from node")
-	deletePodAndWaitForVolumeToDetach(client, namespace, vsp, nodeName, pod, pv.Spec.VsphereVolume.VolumePath)
+	deletePodAndWaitForVolumeToDetach(client, namespace, vsp, nodeName, pod, volumePaths)
 
 }
 

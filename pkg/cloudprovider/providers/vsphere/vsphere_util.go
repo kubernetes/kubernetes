@@ -26,7 +26,7 @@ import (
 
 // Reads vSphere configuration from system environment and construct vSphere object
 func GetVSphere() (*VSphere, error) {
-	cfg := getVSphereConfig()
+	cfg := GetVSphereConfig()
 	client, err := GetgovmomiClient(cfg)
 	if err != nil {
 		return nil, err
@@ -40,7 +40,7 @@ func GetVSphere() (*VSphere, error) {
 	return vs, nil
 }
 
-func getVSphereConfig() *VSphereConfig {
+func GetVSphereConfig() *VSphereConfig {
 	var cfg VSphereConfig
 	cfg.Global.VCenterIP = os.Getenv("VSPHERE_VCENTER")
 	cfg.Global.VCenterPort = os.Getenv("VSPHERE_VCENTER_PORT")
@@ -56,9 +56,23 @@ func getVSphereConfig() *VSphereConfig {
 	return &cfg
 }
 
+func GetVSphereWithCustomConfig(cfg *VSphereConfig) (*VSphere, error) {
+	client, err := GetgovmomiClient(cfg)
+	if err != nil {
+		return nil, err
+	}
+	vs := &VSphere{
+		client:          client,
+		cfg:             cfg,
+		localInstanceID: "",
+	}
+	runtime.SetFinalizer(vs, logout)
+	return vs, nil
+}
+
 func GetgovmomiClient(cfg *VSphereConfig) (*govmomi.Client, error) {
 	if cfg == nil {
-		cfg = getVSphereConfig()
+		cfg = GetVSphereConfig()
 	}
 	client, err := newClient(context.TODO(), cfg)
 	return client, err
