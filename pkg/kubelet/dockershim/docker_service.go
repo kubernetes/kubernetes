@@ -32,6 +32,7 @@ import (
 	kubecm "k8s.io/kubernetes/pkg/kubelet/cm"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/dockershim/cm"
+	"k8s.io/kubernetes/pkg/kubelet/dockershim/errors"
 	"k8s.io/kubernetes/pkg/kubelet/dockertools"
 	"k8s.io/kubernetes/pkg/kubelet/network"
 	"k8s.io/kubernetes/pkg/kubelet/network/cni"
@@ -292,8 +293,14 @@ func (ds *dockerService) GetNetNS(podSandboxID string) (string, error) {
 func (ds *dockerService) GetPodPortMappings(podSandboxID string) ([]*hostport.PortMapping, error) {
 	// TODO: get portmappings from docker labels for backward compatibility
 	checkpoint, err := ds.checkpointHandler.GetCheckpoint(podSandboxID)
+	// Return empty portMappings if checkpoint is not found
 	if err != nil {
-		return nil, err
+		if err == errors.CheckpointNotFoundError {
+			glog.Warningf("Failed to retrieve checkpoint for sandbox %q: %v", err)
+			return nil, nil
+		} else {
+			return nil, err
+		}
 	}
 
 	portMappings := []*hostport.PortMapping{}

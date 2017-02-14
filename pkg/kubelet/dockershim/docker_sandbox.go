@@ -27,6 +27,7 @@ import (
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	runtimeapi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
+	"k8s.io/kubernetes/pkg/kubelet/dockershim/errors"
 	"k8s.io/kubernetes/pkg/kubelet/dockertools"
 	"k8s.io/kubernetes/pkg/kubelet/qos"
 	"k8s.io/kubernetes/pkg/kubelet/types"
@@ -355,7 +356,7 @@ func (ds *dockerService) ListPodSandbox(filter *runtimeapi.PodSandboxFilter) ([]
 			if err != nil {
 				glog.Errorf("Failed to retrieve checkpoint for sandbox %q: %v", id, err)
 
-				if err == CorruptCheckpointError {
+				if err == errors.CorruptCheckpointError {
 					glog.V(2).Info("Removing corrupted checkpoint %q: %+v", id, *checkpoint)
 					ds.checkpointHandler.RemoveCheckpoint(id)
 				}
