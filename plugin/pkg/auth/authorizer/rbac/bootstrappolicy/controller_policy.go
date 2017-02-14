@@ -140,9 +140,10 @@ func init() {
 			rbac.NewRule("get", "update").Groups(extensionsGroup).Resources("replicationcontrollers/scale").RuleOrDie(),
 			rbac.NewRule("get", "update").Groups(extensionsGroup).Resources("deployments/scale", "replicasets/scale").RuleOrDie(),
 			rbac.NewRule("list").Groups(legacyGroup).Resources("pods").RuleOrDie(),
-			// TODO: fix MetricsClient to no longer require root proxy access
-			// TODO: restrict this to the appropriate namespace
+			// TODO: Remove the root /proxy permission in 1.7; MetricsClient no longer requires root proxy access as of 1.6 (fixed in https://github.com/kubernetes/kubernetes/pull/39636)
 			rbac.NewRule("proxy").Groups(legacyGroup).Resources("services").Names("https:heapster:", "http:heapster:").RuleOrDie(),
+			// TODO: restrict this to the appropriate namespace
+			rbac.NewRule("get").Groups(legacyGroup).Resources("services/proxy").Names("https:heapster:", "http:heapster:").RuleOrDie(),
 			eventsRule(),
 		},
 	})

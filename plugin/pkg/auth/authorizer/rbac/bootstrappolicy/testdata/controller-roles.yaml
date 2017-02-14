@@ -421,6 +421,15 @@ items:
     - proxy
   - apiGroups:
     - ""
+    resourceNames:
+    - 'http:heapster:'
+    - 'https:heapster:'
+    resources:
+    - services/proxy
+    verbs:
+    - get
+  - apiGroups:
+    - ""
     resources:
     - events
     verbs:
