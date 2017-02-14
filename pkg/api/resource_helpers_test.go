@@ -17,6 +17,7 @@ limitations under the License.
 package api
 
 import (
+	"reflect"
 	"testing"
 	"time"
 
@@ -117,4 +118,165 @@ func TestIsPodAvailable(t *testing.T) {
 			t.Errorf("[tc #%d] expected available pod: %t, got: %t", i, test.expected, isAvailable)
 		}
 	}
+}
+
+func TestUpdatePodCondition(t *testing.T) {
+	now := metav1.Now()
+	tests := []struct {
+		podStatus      *PodStatus
+		podCondition   *PodCondition
+		expected       *PodStatus
+		expectedResult bool
+		test           string
+	}{
+		{
+			podStatus: &PodStatus{
+				Conditions: []PodCondition{
+					{
+						Type:   PodInitialized,
+						Status: ConditionFalse,
+					},
+				},
+			},
+			podCondition: &PodCondition{
+				Type:          PodReady,
+				Status:        ConditionTrue,
+				LastProbeTime: now,
+			},
+			expected: &PodStatus{
+				Conditions: []PodCondition{
+					{
+						Type:   PodInitialized,
+						Status: ConditionFalse,
+					},
+					{
+						Type:          PodReady,
+						Status:        ConditionTrue,
+						LastProbeTime: now,
+					},
+				},
+			},
+			expectedResult: true,
+			test:           "pod condition has been added",
+		},
+		{
+			podStatus: &PodStatus{
+				Conditions: []PodCondition{
+					{
+						Type:   PodReady,
+						Status: ConditionFalse,
+					},
+				},
+			},
+			podCondition: &PodCondition{
+				Type:          PodReady,
+				Status:        ConditionTrue,
+				LastProbeTime: now,
+			},
+			expected: &PodStatus{
+				Conditions: []PodCondition{
+					{
+						Type:          PodReady,
+						Status:        ConditionTrue,
+						LastProbeTime: now,
+					},
+				},
+			},
+			expectedResult: true,
+			test:           "pod condition has changed",
+		},
+		{
+			podStatus: &PodStatus{
+				Conditions: []PodCondition{
+					{
+						Type:   PodReady,
+						Status: ConditionTrue,
+					},
+				},
+			},
+			podCondition: &PodCondition{
+				Status: ConditionTrue,
+				Type:   PodReady,
+			},
+			expected: &PodStatus{
+				Conditions: []PodCondition{
+					{
+						Type:   PodReady,
+						Status: ConditionTrue,
+					},
+				},
+			},
+			expectedResult: false,
+			test:           "pod condition has not changed or not been added",
+		},
+	}
+
+	for _, test := range tests {
+		addOrChange := UpdatePodCondition(test.podStatus, test.podCondition)
+		if addOrChange == false {
+			if addOrChange != test.expectedResult {
+				t.Errorf("%s: expected result: %t, got: %t", test.test, test.expected, test.podStatus)
+			}
+		} else {
+			for i := range test.podStatus.Conditions {
+				if test.podStatus.Conditions[i].Type == test.podCondition.Type {
+					if test.podStatus.Conditions[i].LastTransitionTime.Equal(test.expected.Conditions[i].LastTransitionTime) {
+						t.Errorf("%s: expected result: %t, got: %t", test.test, test.expected, test.podStatus)
+					}
+				}
+				test.podStatus.Conditions[i].LastTransitionTime = metav1.Time{}
+				test.expected.Conditions[i].LastTransitionTime = metav1.Time{}
+			}
+			if !reflect.DeepEqual(test.podStatus, test.expected) {
+				t.Errorf("%s: expected result: %t, got: %t", test.test, test.expected, test.podStatus)
+			}
+		}
+	}
+}
+
+func TestIsNodeReady(t *testing.T) {
+	tests := []struct {
+		node     *Node
+		expected bool
+	}{
+		{
+			node: &Node{
+				Status: NodeStatus{
+					Conditions: []NodeCondition{
+						{Type: NodeReady, Status: ConditionTrue},
+					},
+				},
+			},
+			expected: true,
+		},
+		{
+			node: &Node{
+				Status: NodeStatus{
+					Conditions: []NodeCondition{
+						{Type: NodeReady, Status: ConditionFalse},
+					},
+				},
+			},
+			expected: false,
+		},
+		{
+			node: &Node{
+				Status: NodeStatus{
+					Conditions: []NodeCondition{
+						{Type: NodeOutOfDisk, Status: ConditionTrue},
+						{Type: NodeMemoryPressure, Status: ConditionTrue},
+					},
+				},
+			},
+			expected: false,
+		},
+	}
+
+	for i, test := range tests {
+		ready := IsNodeReady(test.node)
+		if ready != test.expected {
+			t.Errorf("[tc #%d] expected result: %t, got: %t", i, test.expected, ready)
+		}
+	}
+
 }
