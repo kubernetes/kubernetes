@@ -77,6 +77,23 @@ func TestCreateRole(t *testing.T) {
 				},
 			},
 		},
+		"test-subresources": {
+			verbs:     "get,watch,list",
+			resources: "pods/status",
+			expectedRole: &rbac.Role{
+				ObjectMeta: v1.ObjectMeta{
+					Name: roleName,
+				},
+				Rules: []rbac.PolicyRule{
+					{
+						Verbs:         []string{"get", "watch", "list"},
+						Resources:     []string{"pods/status"},
+						APIGroups:     []string{""},
+						ResourceNames: []string{},
+					},
+				},
+			},
+		},
 		"test-valid-case-with-multiple-apigroups": {
 			verbs:     "get,watch,list",
 			resources: "pods,deployments.extensions",

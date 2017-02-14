@@ -150,6 +150,8 @@ func (c *CreateRoleOptions) Validate(f cmdutil.Factory) error {
 	}
 
 	for _, r := range c.Resources {
+		parts := strings.SplitN(r.Resource, "/", 2)
+		r.Resource = parts[0]
 		_, err := mapper.ResourceFor(r)
 		if err != nil {
 			return err
@@ -178,9 +180,14 @@ func (c *CreateRoleOptions) RunCreateRole(f cmdutil.Factory, cmdOut io.Writer, c
 	// 2. Prevents pointing to non-existent resources.
 	// 3. Transfers resource short name to long name. E.g. rs.extensions is transferred to replicasets.extensions
 	for _, r := range c.Resources {
+		parts := strings.SplitN(r.Resource, "/", 2)
+		r.Resource = parts[0]
 		resource, err := mapper.ResourceFor(r)
 		if err != nil {
 			return err
+		}
+		if len(name) == 2 {
+			resource.Resource = resource.Resource + "/" + parts[1]
 		}
 		if !arrayContains(groupResourceMapping[resource.Group], resource.Resource) {
 			groupResourceMapping[resource.Group] = append(groupResourceMapping[resource.Group], resource.Resource)
