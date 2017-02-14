@@ -23,6 +23,8 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/authentication/serviceaccount"
 	"k8s.io/kubernetes/pkg/api/v1"
 	rbacv1beta1 "k8s.io/kubernetes/pkg/apis/rbac/v1beta1"
@@ -187,48 +189,52 @@ var _ = framework.KubeDescribe("Dynamic provisioning", func() {
 
 		It("should test that deleting a claim before the volume is provisioned deletes the volume. [Volume]", func() {
 			// This case tests for the regressions of a bug fixed by PR #21268
-			// REGRESSION: Deleting the PVC before the PV is provisioned can result in PV
+			// REGRESSION: Deleting the PVC before the PV is provisioned can result in the PV
 			// not being deleted.
-			// NOTE:  Checks for regression by iteratively calling .PersistentVolumes.List() and waiting
-			// 10 seconds for 30 iterations (total 2.5 minutes). Will run full time if none are detected.
+			// NOTE:  Polls until no PVs are detected, times out at 5 minutes.
 
-			var raceAttempts int = 10
-			var suffix string = ns[len(ns)-5:]
+			const RaceAttempts int = 100
+			var suffix string = ns[len(ns)-5:] // match trailing random string of generated namespace
+			var regressedPVs []v1.PersistentVolume
+			var regressCount int
 
 			By("Creating a StorageClass")
 			class := newStorageClass("kubernetes.io/gce-pd", suffix)
 			class, err := c.Storage().StorageClasses().Create(class)
-			framework.Logf("Created sc %s", class.Name)
 			Expect(err).NotTo(HaveOccurred())
 			defer c.Storage().StorageClasses().Delete(class.Name, nil)
+			framework.Logf("Created sc %s", class.Name)
 
-			// To increase chance of regression, try `raceAttempt` iterations
-			By(fmt.Sprintf("Creating and deleting PersistentVolumeClaims for %d iterations", raceAttempts))
+			// To increase chance of detection, attempt multiple iterations
+			By(fmt.Sprintf("Creating and deleting PersistentVolumeClaims %d times", RaceAttempts))
 			claim := newClaim(ns, suffix, false)
-			for i := 0; i < raceAttempts; i++ {
+			for i := 0; i < RaceAttempts; i++ {
 				tmpClaim, err := c.Core().PersistentVolumeClaims(ns).Create(claim)
 				Expect(err).NotTo(HaveOccurred())
-				time.Sleep(5 * time.Second)
 				err = c.Core().PersistentVolumeClaims(ns).Delete(tmpClaim.Name, nil)
 				Expect(err).NotTo(HaveOccurred())
 			}
 
-			regressedPVs := make([]v1.PersistentVolume, 0)
-			By(fmt.Sprintf("Checking for residual PVs associated with StorageClass %s", class.Name))
-			// Every 10 seconds, check for PVs that have not been Released.  These indicate a regression
-			for i := 0; i < 30 && len(regressedPVs) == 0; i++ {
-				time.Sleep(10 * time.Second)
-				clusterPVs, err := c.Core().PersistentVolumes().List(metav1.ListOptions{})
+			By(fmt.Sprintf("Checking for residual PersistentVolumes associated with StorageClass %s", class.Name))
+			// Every 10 seconds, check for PVs that have not been deleted.
+			err = wait.Poll(10*time.Second, 300*time.Second, func() (bool, error) {
+				regressedPVs = []v1.PersistentVolume{} // Start with a clean slice each iteration
+				regressCount = 0
+
+				allPVs, err := c.Core().PersistentVolumes().List(metav1.ListOptions{})
 				Expect(err).NotTo(HaveOccurred())
-				for _, pv := range clusterPVs.Items {
-					if pv.Annotations[storageutil.StorageClassAnnotation] == class.Name &&
-						pv.Status.Phase != v1.VolumeReleased {
-						// Any PVs associated with this storage class that are not Released
-						// indicate a regression
+				for _, pv := range allPVs.Items {
+					if pv.Annotations[storageutil.StorageClassAnnotation] == class.Name {
 						regressedPVs = append(regressedPVs, pv)
+						regressCount++
 					}
 				}
-			}
+				if regressCount > 0 {
+					return false, nil // Reiterate until no PVs are found
+				} else {
+					return true, nil // No remaining PVs found
+				}
+			})
 			// Cleanup associated pv and disk
 			defer func() {
 				for _, pv := range regressedPVs {
@@ -236,13 +242,13 @@ var _ = framework.KubeDescribe("Dynamic provisioning", func() {
 					deletePersistentVolume(c, pv.Name)
 				}
 			}()
-			// If a regression is detected, fail the test
-			if regressionCount := len(regressedPVs); regressionCount > 0 {
-				framework.Logf("Found %d residual persistent volumes associated with StorageClass %s:", regressionCount, class.Name)
+			// wait timeout err does not return a descriptive message.  Dress it up before failing.
+			if err != nil || regressCount > 0 {
+				framework.Logf("Remaining PersistentVolumes:")
 				for i, pv := range regressedPVs {
-					framework.Logf("%s%d) %s: Phase=%s", "\t", i+1, pv.Name, pv.Status.Phase)
+					framework.Logf("%s%d) %s", "\t", i+1, pv.Name)
 				}
-				framework.Failf("Detected %d instances of regression.", regressionCount)
+				framework.Failf("%s: Expected 0 PersistentVolumes remaining. Found %d", err, regressCount)
 			}
 		})
 	})
