@@ -35,7 +35,7 @@ import (
 	"k8s.io/client-go/tools/record"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated/externalversions"
 	"k8s.io/kubernetes/pkg/controller"
@@ -44,6 +44,7 @@ import (
 	kubeadmission "k8s.io/kubernetes/pkg/kubeapiserver/admission"
 	quotainstall "k8s.io/kubernetes/pkg/quota/install"
 	"k8s.io/kubernetes/plugin/pkg/admission/resourcequota"
+	resourcequotaapi "k8s.io/kubernetes/plugin/pkg/admission/resourcequota/apis/resourcequota"
 	"k8s.io/kubernetes/test/integration/framework"
 )
 
@@ -65,7 +66,8 @@ func TestQuota(t *testing.T) {
 	admissionCh := make(chan struct{})
 	clientset := clientset.NewForConfigOrDie(&restclient.Config{QPS: -1, Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &api.Registry.GroupOrDie(v1.GroupName).GroupVersion}})
 	internalClientset := internalclientset.NewForConfigOrDie(&restclient.Config{QPS: -1, Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &api.Registry.GroupOrDie(v1.GroupName).GroupVersion}})
-	admission, err := resourcequota.NewResourceQuota(quotainstall.NewRegistry(nil, nil), 5, admissionCh)
+	config := &resourcequotaapi.Configuration{}
+	admission, err := resourcequota.NewResourceQuota(quotainstall.NewRegistry(nil, nil), config, 5, admissionCh)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
