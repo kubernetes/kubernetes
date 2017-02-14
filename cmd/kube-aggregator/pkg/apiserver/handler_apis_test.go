@@ -28,9 +28,9 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/diff"
 	v1listers "k8s.io/client-go/listers/core/v1"
+	"k8s.io/client-go/pkg/api"
 	corev1 "k8s.io/client-go/pkg/api/v1"
 	"k8s.io/client-go/tools/cache"
-	"k8s.io/kubernetes/pkg/api"
 
 	"k8s.io/kubernetes/cmd/kube-aggregator/pkg/apis/apiregistration"
 	listers "k8s.io/kubernetes/cmd/kube-aggregator/pkg/client/listers/apiregistration/internalversion"

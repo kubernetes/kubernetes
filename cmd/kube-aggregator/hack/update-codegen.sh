@@ -22,6 +22,15 @@ KUBE_ROOT=$(dirname "${BASH_SOURCE}")/../../..
 APIFEDERATOR_ROOT=$(dirname "${BASH_SOURCE}")/..
 source "${KUBE_ROOT}/hack/lib/init.sh"
 
+if LANG=C sed --help 2>&1 | grep -q GNU; then
+  SED="sed"
+elif which gsed &>/dev/null; then
+  SED="gsed"
+else
+  echo "Failed to find GNU sed as sed or gsed. If you are on Mac: brew install gnu-sed." >&2
+  exit 1
+fi
+
 # Register function to be called on EXIT to remove generated binary.
 function cleanup {
   rm -f "${CLIENTGEN:-}"
@@ -67,3 +76,13 @@ ${informergen} \
   --listers-package k8s.io/kubernetes/cmd/kube-aggregator/pkg/client/listers \
   --output-package k8s.io/kubernetes/cmd/kube-aggregator/pkg/client/informers
   "$@"
+
+
+# this is a temporary hack until we manage to update codegen to accept a scheme instead of hardcoding it
+echo "rewriting imports"
+grep -R -H  "\"k8s.io/kubernetes/pkg" "${KUBE_ROOT}/cmd/kube-aggregator/pkg/client" | cut -d: -f1 | sort | uniq | \
+    grep "\.go" | \
+    xargs ${SED} -i "s|\"k8s.io/kubernetes/pkg|\"k8s.io/client-go/pkg|g"
+
+echo "running gofmt"
+find "${KUBE_ROOT}/cmd/kube-aggregator/pkg/client" -type f -name "*.go" -print0 | xargs -0 gofmt -w

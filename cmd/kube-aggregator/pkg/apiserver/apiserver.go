@@ -30,8 +30,8 @@ import (
 	kubeinformers "k8s.io/client-go/informers"
 	kubeclientset "k8s.io/client-go/kubernetes"
 	v1listers "k8s.io/client-go/listers/core/v1"
-	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/version"
+	"k8s.io/client-go/pkg/api"
+	"k8s.io/client-go/pkg/version"
 
 	"k8s.io/kubernetes/cmd/kube-aggregator/pkg/apis/apiregistration"
 	"k8s.io/kubernetes/cmd/kube-aggregator/pkg/apis/apiregistration/v1alpha1"
@@ -40,7 +40,7 @@ import (
 	listers "k8s.io/kubernetes/cmd/kube-aggregator/pkg/client/listers/apiregistration/internalversion"
 	apiservicestorage "k8s.io/kubernetes/cmd/kube-aggregator/pkg/registry/apiservice/etcd"
 
-	_ "k8s.io/kubernetes/pkg/api/install"
+	_ "k8s.io/client-go/pkg/api/install"
 )
 
 // legacyAPIServiceName is the fixed name of the only non-groupified API version
