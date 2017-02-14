@@ -411,6 +411,9 @@ func SetDefaults_KubeletConfiguration(obj *KubeletConfiguration) {
 			}
 		}
 	}
+	if obj.EnableCRI == nil {
+		obj.EnableCRI = boolVar(true)
+	}
 }
 
 func boolVar(b bool) *bool {
