@@ -115,47 +115,54 @@ func (s *EtcdOptions) AddFlags(fs *pflag.FlagSet) {
 }
 
 func (s *EtcdOptions) ApplyTo(c *server.Config) error {
-	c.RESTOptionsGetter = RESTOptionsFactoryFunc(func(resource schema.GroupResource) (generic.RESTOptions, error) {
-		ret := generic.RESTOptions{
-			StorageConfig:           &s.StorageConfig,
-			Decorator:               generic.UndecoratedStorage,
-			EnableGarbageCollection: s.EnableGarbageCollection,
-			DeleteCollectionWorkers: s.DeleteCollectionWorkers,
-			ResourcePrefix:          s.StorageConfig.Prefix + "/" + resource.Group + "/" + resource.Resource,
-		}
-		if s.EnableWatchCache {
-			ret.Decorator = genericregistry.StorageWithCacher
-		}
-		return ret, nil
-	})
+	c.RESTOptionsGetter = &simpleRestOptionsFactory{EtcdOptions: *s}
 	return nil
 }
 
 func (s *EtcdOptions) ApplyWithStorageFactoryTo(factory serverstorage.StorageFactory, c *server.Config) error {
-	c.RESTOptionsGetter = RESTOptionsFactoryFunc(func(resource schema.GroupResource) (generic.RESTOptions, error) {
-		storageConfig, err := factory.NewConfig(resource)
-		if err != nil {
-			return generic.RESTOptions{}, fmt.Errorf("unable to find storage destination for %v, due to %v", resource, err.Error())
-		}
-
-		ret := generic.RESTOptions{
-			StorageConfig:           storageConfig,
-			Decorator:               generic.UndecoratedStorage,
-			DeleteCollectionWorkers: s.DeleteCollectionWorkers,
-			EnableGarbageCollection: s.EnableGarbageCollection,
-			ResourcePrefix:          factory.ResourcePrefix(resource),
-		}
-		if s.EnableWatchCache {
-			ret.Decorator = genericregistry.StorageWithCacher
-		}
-
-		return ret, nil
-	})
+	c.RESTOptionsGetter = &storageFactoryRestOptionsFactory{EtcdOptions: *s, StorageFactory: factory}
 	return nil
 }
 
-type RESTOptionsFactoryFunc func(resource schema.GroupResource) (generic.RESTOptions, error)
+type simpleRestOptionsFactory struct {
+	EtcdOptions
+}
 
-func (f RESTOptionsFactoryFunc) GetRESTOptions(resource schema.GroupResource) (generic.RESTOptions, error) {
-	return f(resource)
+func (f *simpleRestOptionsFactory) GetRESTOptions(resource schema.GroupResource) (generic.RESTOptions, error) {
+	ret := generic.RESTOptions{
+		StorageConfig:           &f.StorageConfig,
+		Decorator:               generic.UndecoratedStorage,
+		EnableGarbageCollection: f.EnableGarbageCollection,
+		DeleteCollectionWorkers: f.DeleteCollectionWorkers,
+		ResourcePrefix:          f.StorageConfig.Prefix + "/" + resource.Group + "/" + resource.Resource,
+	}
+	if f.EnableWatchCache {
+		ret.Decorator = genericregistry.StorageWithCacher
+	}
+	return ret, nil
+}
+
+type storageFactoryRestOptionsFactory struct {
+	EtcdOptions
+	StorageFactory serverstorage.StorageFactory
+}
+
+func (f *storageFactoryRestOptionsFactory) GetRESTOptions(resource schema.GroupResource) (generic.RESTOptions, error) {
+	storageConfig, err := f.StorageFactory.NewConfig(resource)
+	if err != nil {
+		return generic.RESTOptions{}, fmt.Errorf("unable to find storage destination for %v, due to %v", resource, err.Error())
+	}
+
+	ret := generic.RESTOptions{
+		StorageConfig:           storageConfig,
+		Decorator:               generic.UndecoratedStorage,
+		DeleteCollectionWorkers: f.DeleteCollectionWorkers,
+		EnableGarbageCollection: f.EnableGarbageCollection,
+		ResourcePrefix:          f.StorageFactory.ResourcePrefix(resource),
+	}
+	if f.EnableWatchCache {
+		ret.Decorator = genericregistry.StorageWithCacher
+	}
+
+	return ret, nil
 }
