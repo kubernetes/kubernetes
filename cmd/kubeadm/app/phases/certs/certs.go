@@ -165,6 +165,33 @@ func CreatePKIAssets(cfg *kubeadmapi.MasterConfiguration, pkiDir string) error {
 		fmt.Println("[certificates] Generated API server kubelet client certificate and key.")
 	}
 
+	// If the key exists, we should try to load it
+	if pkiutil.CertOrKeyExist(pkiDir, kubeadmconstants.ServiceAccountPrivateKeyName) {
+		// Try to load sa.key from the PKI directory
+		_, err := pkiutil.TryLoadKeyFromDisk(pkiDir, kubeadmconstants.ServiceAccountPrivateKeyName)
+		if err != nil {
+			return fmt.Errorf("certificate and/or key existed but they could not be loaded properly [%v]", err)
+		}
+
+		fmt.Println("[certificates] Using the existing service account token signing key.")
+	} else {
+		// The key does NOT exist, let's generate it now
+		saTokenSigningKey, err := certutil.NewPrivateKey()
+		if err != nil {
+			return fmt.Errorf("failure while creating service account token signing key [%v]", err)
+		}
+
+		if err = pkiutil.WriteKey(pkiDir, kubeadmconstants.ServiceAccountKeyBaseName, saTokenSigningKey); err != nil {
+			return fmt.Errorf("failure while saving service account token signing key [%v]", err)
+		}
+		fmt.Println("[certificates] Generated service account token signing key.")
+
+		if err = pkiutil.WritePublicKey(pkiDir, kubeadmconstants.ServiceAccountKeyBaseName, &saTokenSigningKey.PublicKey); err != nil {
+			return fmt.Errorf("failure while saving service account token signing public key [%v]", err)
+		}
+		fmt.Println("[certificates] Generated service account token signing public key.")
+	}
+
 	fmt.Printf("[certificates] Valid certificates and keys now exist in %q\n", pkiDir)
 
 	return nil
