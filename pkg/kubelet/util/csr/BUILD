@@ -44,6 +44,8 @@ go_test(
     deps = [
         "//pkg/apis/certificates/v1beta1:go_default_library",
         "//pkg/client/clientset_generated/clientset/typed/certificates/v1beta1:go_default_library",
+        "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
+        "//vendor:k8s.io/apimachinery/pkg/watch",
         "//vendor:k8s.io/client-go/util/cert",
     ],
 )

@@ -19,7 +19,6 @@ package csr
 import (
 	"fmt"
 	"testing"
-	"time"
 
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	watch "k8s.io/apimachinery/pkg/watch"
@@ -97,7 +96,6 @@ func (c *fakeClient) Create(*certificates.CertificateSigningRequest) (*certifica
 
 func (c *fakeClient) Watch(opts v1.ListOptions) (watch.Interface, error) {
 	c.watch = watch.NewFakeWithChanSize(1, false)
-	time.Sleep(1 * time.Second)
 	c.watch.Add(c.generateCSR())
 	c.watch.Stop()
 	return c.watch, nil
