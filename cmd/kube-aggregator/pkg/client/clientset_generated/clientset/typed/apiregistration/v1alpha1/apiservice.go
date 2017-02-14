@@ -20,9 +20,9 @@ import (
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
+	api "k8s.io/client-go/pkg/api"
 	rest "k8s.io/client-go/rest"
 	v1alpha1 "k8s.io/kubernetes/cmd/kube-aggregator/pkg/apis/apiregistration/v1alpha1"
-	api "k8s.io/kubernetes/pkg/api"
 )
 
 // APIServicesGetter has a method to return a APIServiceInterface.
