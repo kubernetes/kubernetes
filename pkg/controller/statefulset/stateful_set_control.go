@@ -17,8 +17,10 @@ limitations under the License.
 package statefulset
 
 import (
+	"fmt"
 	"sort"
 
+	"k8s.io/client-go/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
 	apps "k8s.io/kubernetes/pkg/apis/apps/v1beta1"
 
@@ -97,8 +99,16 @@ func (ssc *defaultStatefulSetControl) UpdateStatefulSet(set *apps.StatefulSet, p
 	sort.Sort(ascendingOrdinal(condemned))
 
 	// if the current number of replicas has changed update the statefulSets replicas
-	if err := ssc.podControl.UpdateStatefulSetReplicas(set, int32(ready)); err != nil {
-		return err
+	if set.Status.Replicas != int32(ready) {
+		obj, err := api.Scheme.Copy(set)
+		if err != nil {
+			return fmt.Errorf("unable to copy set: %v", err)
+		}
+		set = obj.(*apps.StatefulSet)
+
+		if err := ssc.podControl.UpdateStatefulSetReplicas(set, int32(ready)); err != nil {
+			return err
+		}
 	}
 
 	// Examine each replica with respect to its ordinal
