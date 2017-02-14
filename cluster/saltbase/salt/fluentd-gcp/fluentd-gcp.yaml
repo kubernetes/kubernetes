@@ -11,7 +11,7 @@ spec:
   dnsPolicy: Default
   containers:
   - name: fluentd-cloud-logging
-    image: gcr.io/google_containers/fluentd-gcp:1.28.1
+    image: gcr.io/google_containers/fluentd-gcp:1.28.2
     resources:
       limits:
         memory: 200Mi

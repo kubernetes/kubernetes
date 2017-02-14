@@ -20,7 +20,7 @@
 # scope and that the Logging API has been enabled for the project
 # in the Google Developer Console.
 
-FROM gcr.io/google_containers/ubuntu-slim:0.4
+FROM gcr.io/google_containers/ubuntu-slim:0.6
 
 MAINTAINER Mik Vyatskov "vmik@google.com"
 
@@ -36,7 +36,7 @@ RUN apt-get -qq update && \
     sed -i -e "s/USER=td-agent/USER=root/" -e "s/GROUP=td-agent/GROUP=root/" /etc/init.d/td-agent && \
     td-agent-gem install --no-document fluent-plugin-record-reformer -v 0.8.2 && \
     td-agent-gem install --no-document fluent-plugin-systemd -v 0.0.5 && \
-    td-agent-gem install --no-document fluent-plugin-google-cloud -v 0.5.2 && \
+    td-agent-gem install --no-document fluent-plugin-google-cloud -v 0.5.6 && \
     # Remove build tools
     apt-get remove -y -qq gcc make && \
     apt-get autoremove -y -qq && \
