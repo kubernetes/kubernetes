@@ -45,7 +45,7 @@ The redis-sentinel Relication Controller will "adopt" the existing master/sentin
 
 Unlike our original redis-master pod, these pods exist independently, and they use the ```redis-sentinel-service``` that we defined above to discover and join the cluster.
 
-After the replicas join the cluster, the redis cluster will has 1 master + 3 slaves + 3 sentinels.
+After the replicas join the cluster, the redis cluster will have 1 master + 3 slaves + 3 sentinels.
 
 ### How client use the redis cluster
 
@@ -59,22 +59,22 @@ master=$(redis-cli -h ${REDIS_SENTINEL_SERVICE_HOST} -p ${REDIS_SENTINEL_SERVICE
 
 As a reliable redis cluster, it can automatically recover when any of the pod is down. Now let's take a close look at how this works.
 
-If one of the redis server pod is down
+If one of the redis server pod is down:
 
-  1. The redis replication controller notices that its desired state is 3 replicas, but there are currently only 2 replicas, and so it creates a new redis server to bring the replica count back up to 3
-  2. The new created redis server pod can use the ```redis-sentinel-service``` to get master information and join the cluster as slave.
+  1. The redis replication controller notices that it's desired state is 3 replicas, but there are currently only 2 replicas, and so it creates a new redis server to bring the replica count back up to 3
+  2. The newly created redis server pod can use the ```redis-sentinel-service``` to get master information and join the cluster as slave.
 
-If one of the sentinel pod is down
+If one of the sentinel pod is down:
 
-  1. The redis-sentinel replication controller notices that its desired state is 3 replicas, but there are currently only 2 replicas, and so it creates a new redis sentinel to bring the replica count back up to 3
-  2. The new created sentinel pod can use the ```redis-sentinel-service``` to get master information and join the cluster as sentinel.
+  1. The redis-sentinel replication controller notices that it's desired state is 3 replicas, but there are currently only 2 replicas, and so it creates a new redis sentinel to bring the replica count back up to 3
+  2. The newly created sentinel pod can use the ```redis-sentinel-service``` to get master information and join the cluster as sentinel.
   
-If the master/sentinel pod is down
+If the master/sentinel pod is down:
   
-  1. The redis-sentinel replication controller notices that its desired state is 3 replicas, but there are currently only 2 replicas, and so it creates a new sentinel to bring the replica count back up to 3
-  2. The new created sentinel pod can use the ```redis-sentinel-service``` to get master information. But since the master is also down, it cannot connect to the master. In this case, the new sentinel will enter a loop to repeatedly get the master information and try to connect... 
-  3. The existing redis sentinels themselves, realize that the master has disappeared from the cluster, and begin the election procedure for selecting a new master.  They perform this election and selection, and chose one of the existing redis server replicas to be the new master.
-  4. Once the new master is selected, the new created sentinel pod can get its information and join the cluster as sentinel.
+  1. The redis-sentinel replication controller notices that it's desired state is 3 replicas, but there are currently only 2 replicas, and so it creates a new sentinel to bring the replica count back up to 3
+  2. The newly created sentinel pod can use the ```redis-sentinel-service``` to get master information. But since the master is also down, it cannot connect to the master. In this case, the new sentinel will enter a loop to repeatedly get the master information and try to connect... 
+  3. The existing redis sentinels themselves, realize that the master has disappeared from the cluster, and begin the election procedure for selecting a new master.  They perform this election and selection, and choose one of the existing redis server replicas to be the new master.
+  4. Once the newly master is selected, the new created sentinel pod can get it's information and joins the cluster as sentinel.
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
