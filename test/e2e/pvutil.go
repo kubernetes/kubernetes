@@ -408,13 +408,10 @@ func deletePodWithWait(f *framework.Framework, c clientset.Interface, pod *v1.Po
 		Expect(err).NotTo(HaveOccurred())
 	}
 
-	// wait for pod to terminate. Expect apierr NotFound
+	// wait for pod to terminate
 	err = f.WaitForPodTerminated(pod.Name, "")
-	Expect(err).To(HaveOccurred())
-	if !apierrs.IsNotFound(err) {
-		framework.Logf("Error! Expected IsNotFound error deleting pod %q, instead got: %v", pod.Name, err)
-		Expect(apierrs.IsNotFound(err)).To(BeTrue())
-	}
+	Expect(apierrs.IsNotFound(err)).To(BeTrue(), fmt.Sprintf("Expected IsNotFound error deleting pod %q, instead got: %v", pod.Name, err))
+
 	framework.Logf("Ignore \"not found\" error above. Pod %v successfully deleted", pod.Name)
 }
 
