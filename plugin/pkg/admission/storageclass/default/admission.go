@@ -67,7 +67,7 @@ func (a *claimDefaulterPlugin) SetInformerFactory(f informers.SharedInformerFact
 	a.SetReadyFunc(informer.Informer().HasSynced)
 }
 
-// Validate ensures an authorizer is set.
+// Validate ensures lister is set.
 func (a *claimDefaulterPlugin) Validate() error {
 	if a.lister == nil {
 		return fmt.Errorf("missing lister")
