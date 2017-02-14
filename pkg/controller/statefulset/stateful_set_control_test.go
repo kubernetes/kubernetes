@@ -31,12 +31,20 @@ import (
 
 	"k8s.io/kubernetes/pkg/api/v1"
 	apps "k8s.io/kubernetes/pkg/apis/apps/v1beta1"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset/fake"
+	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated/externalversions"
+	appsinformers "k8s.io/kubernetes/pkg/client/informers/informers_generated/externalversions/apps/v1beta1"
+	coreinformers "k8s.io/kubernetes/pkg/client/informers/informers_generated/externalversions/core/v1"
 	listers "k8s.io/kubernetes/pkg/client/legacylisters"
+	appslisters "k8s.io/kubernetes/pkg/client/listers/apps/v1beta1"
+	corelisters "k8s.io/kubernetes/pkg/client/listers/core/v1"
 	"k8s.io/kubernetes/pkg/controller"
 )
 
 func TestDefaultStatefulSetControlCreatesPods(t *testing.T) {
-	spc := newFakeStatefulPodControl()
+	client := fake.NewSimpleClientset()
+	informerFactory := informers.NewSharedInformerFactory(client, controller.NoResyncPeriodFunc())
+	spc := newFakeStatefulPodControl(informerFactory.Core().V1().Pods(), informerFactory.Apps().V1beta1().StatefulSets())
 	ssc := NewDefaultStatefulSetControl(spc)
 	set := newStatefulSet(3)
 	if err := scaleUpStatefulSetControl(set, ssc, spc); err != nil {
@@ -48,7 +56,9 @@ func TestDefaultStatefulSetControlCreatesPods(t *testing.T) {
 }
 
 func TestStatefulSetControlScaleUp(t *testing.T) {
-	spc := newFakeStatefulPodControl()
+	client := fake.NewSimpleClientset()
+	informerFactory := informers.NewSharedInformerFactory(client, controller.NoResyncPeriodFunc())
+	spc := newFakeStatefulPodControl(informerFactory.Core().V1().Pods(), informerFactory.Apps().V1beta1().StatefulSets())
 	ssc := NewDefaultStatefulSetControl(spc)
 	set := newStatefulSet(3)
 	if err := scaleUpStatefulSetControl(set, ssc, spc); err != nil {
@@ -64,7 +74,9 @@ func TestStatefulSetControlScaleUp(t *testing.T) {
 }
 
 func TestStatefulSetControlScaleDown(t *testing.T) {
-	spc := newFakeStatefulPodControl()
+	client := fake.NewSimpleClientset()
+	informerFactory := informers.NewSharedInformerFactory(client, controller.NoResyncPeriodFunc())
+	spc := newFakeStatefulPodControl(informerFactory.Core().V1().Pods(), informerFactory.Apps().V1beta1().StatefulSets())
 	ssc := NewDefaultStatefulSetControl(spc)
 	set := newStatefulSet(3)
 	if err := scaleUpStatefulSetControl(set, ssc, spc); err != nil {
@@ -80,7 +92,9 @@ func TestStatefulSetControlScaleDown(t *testing.T) {
 }
 
 func TestStatefulSetControlReplacesPods(t *testing.T) {
-	spc := newFakeStatefulPodControl()
+	client := fake.NewSimpleClientset()
+	informerFactory := informers.NewSharedInformerFactory(client, controller.NoResyncPeriodFunc())
+	spc := newFakeStatefulPodControl(informerFactory.Core().V1().Pods(), informerFactory.Apps().V1beta1().StatefulSets())
 	ssc := NewDefaultStatefulSetControl(spc)
 	set := newStatefulSet(5)
 	if err := scaleUpStatefulSetControl(set, ssc, spc); err != nil {
@@ -132,7 +146,9 @@ func TestStatefulSetControlReplacesPods(t *testing.T) {
 }
 
 func TestDefaultStatefulSetControlRecreatesFailedPod(t *testing.T) {
-	spc := newFakeStatefulPodControl()
+	client := fake.NewSimpleClientset()
+	informerFactory := informers.NewSharedInformerFactory(client, controller.NoResyncPeriodFunc())
+	spc := newFakeStatefulPodControl(informerFactory.Core().V1().Pods(), informerFactory.Apps().V1beta1().StatefulSets())
 	ssc := NewDefaultStatefulSetControl(spc)
 	set := newStatefulSet(3)
 	selector, err := metav1.LabelSelectorAsSelector(set.Spec.Selector)
@@ -171,7 +187,9 @@ func TestDefaultStatefulSetControlRecreatesFailedPod(t *testing.T) {
 }
 
 func TestDefaultStatefulSetControlInitAnnotation(t *testing.T) {
-	spc := newFakeStatefulPodControl()
+	client := fake.NewSimpleClientset()
+	informerFactory := informers.NewSharedInformerFactory(client, controller.NoResyncPeriodFunc())
+	spc := newFakeStatefulPodControl(informerFactory.Core().V1().Pods(), informerFactory.Apps().V1beta1().StatefulSets())
 	ssc := NewDefaultStatefulSetControl(spc)
 	set := newStatefulSet(3)
 	selector, err := metav1.LabelSelectorAsSelector(set.Spec.Selector)
@@ -219,7 +237,9 @@ func TestDefaultStatefulSetControlInitAnnotation(t *testing.T) {
 }
 
 func TestDefaultStatefulSetControlCreatePodFailure(t *testing.T) {
-	spc := newFakeStatefulPodControl()
+	client := fake.NewSimpleClientset()
+	informerFactory := informers.NewSharedInformerFactory(client, controller.NoResyncPeriodFunc())
+	spc := newFakeStatefulPodControl(informerFactory.Core().V1().Pods(), informerFactory.Apps().V1beta1().StatefulSets())
 	ssc := NewDefaultStatefulSetControl(spc)
 	set := newStatefulSet(3)
 	spc.SetCreateStatefulPodError(apierrors.NewInternalError(errors.New("API server failed")), 2)
@@ -235,7 +255,9 @@ func TestDefaultStatefulSetControlCreatePodFailure(t *testing.T) {
 }
 
 func TestDefaultStatefulSetControlUpdatePodFailure(t *testing.T) {
-	spc := newFakeStatefulPodControl()
+	client := fake.NewSimpleClientset()
+	informerFactory := informers.NewSharedInformerFactory(client, controller.NoResyncPeriodFunc())
+	spc := newFakeStatefulPodControl(informerFactory.Core().V1().Pods(), informerFactory.Apps().V1beta1().StatefulSets())
 	ssc := NewDefaultStatefulSetControl(spc)
 	set := newStatefulSet(3)
 	spc.SetUpdateStatefulPodError(apierrors.NewInternalError(errors.New("API server failed")), 2)
@@ -251,7 +273,9 @@ func TestDefaultStatefulSetControlUpdatePodFailure(t *testing.T) {
 }
 
 func TestDefaultStatefulSetControlUpdateSetStatusFailure(t *testing.T) {
-	spc := newFakeStatefulPodControl()
+	client := fake.NewSimpleClientset()
+	informerFactory := informers.NewSharedInformerFactory(client, controller.NoResyncPeriodFunc())
+	spc := newFakeStatefulPodControl(informerFactory.Core().V1().Pods(), informerFactory.Apps().V1beta1().StatefulSets())
 	ssc := NewDefaultStatefulSetControl(spc)
 	set := newStatefulSet(3)
 	spc.SetUpdateStatefulSetStatusError(apierrors.NewInternalError(errors.New("API server failed")), 2)
@@ -267,7 +291,9 @@ func TestDefaultStatefulSetControlUpdateSetStatusFailure(t *testing.T) {
 }
 
 func TestDefaultStatefulSetControlPodRecreateDeleteError(t *testing.T) {
-	spc := newFakeStatefulPodControl()
+	client := fake.NewSimpleClientset()
+	informerFactory := informers.NewSharedInformerFactory(client, controller.NoResyncPeriodFunc())
+	spc := newFakeStatefulPodControl(informerFactory.Core().V1().Pods(), informerFactory.Apps().V1beta1().StatefulSets())
 	ssc := NewDefaultStatefulSetControl(spc)
 	set := newStatefulSet(3)
 	selector, err := metav1.LabelSelectorAsSelector(set.Spec.Selector)
@@ -313,7 +339,9 @@ func TestDefaultStatefulSetControlPodRecreateDeleteError(t *testing.T) {
 }
 
 func TestStatefulSetControlScaleDownDeleteError(t *testing.T) {
-	spc := newFakeStatefulPodControl()
+	client := fake.NewSimpleClientset()
+	informerFactory := informers.NewSharedInformerFactory(client, controller.NoResyncPeriodFunc())
+	spc := newFakeStatefulPodControl(informerFactory.Core().V1().Pods(), informerFactory.Apps().V1beta1().StatefulSets())
 	ssc := NewDefaultStatefulSetControl(spc)
 	set := newStatefulSet(3)
 	if err := scaleUpStatefulSetControl(set, ssc, spc); err != nil {
@@ -352,9 +380,9 @@ func (rt *requestTracker) reset() {
 }
 
 type fakeStatefulPodControl struct {
-	podsLister          listers.StoreToPodLister
+	podsLister          corelisters.PodLister
 	claimsLister        listers.StoreToPersistentVolumeClaimLister
-	setsLister          listers.StoreToStatefulSetLister
+	setsLister          appslisters.StatefulSetLister
 	podsIndexer         cache.Indexer
 	claimsIndexer       cache.Indexer
 	setsIndexer         cache.Indexer
@@ -364,20 +392,16 @@ type fakeStatefulPodControl struct {
 	updateStatusTracker requestTracker
 }
 
-func newFakeStatefulPodControl() *fakeStatefulPodControl {
-	podsIndexer := cache.NewIndexer(controller.KeyFunc,
-		cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
+func newFakeStatefulPodControl(podInformer coreinformers.PodInformer, setInformer appsinformers.StatefulSetInformer) *fakeStatefulPodControl {
 	claimsIndexer := cache.NewIndexer(controller.KeyFunc,
 		cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
-	setsIndexer := cache.NewIndexer(controller.KeyFunc,
-		cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
 	return &fakeStatefulPodControl{
-		listers.StoreToPodLister{Indexer: podsIndexer},
+		podInformer.Lister(),
 		listers.StoreToPersistentVolumeClaimLister{Indexer: claimsIndexer},
-		listers.StoreToStatefulSetLister{Store: setsIndexer},
-		podsIndexer,
+		setInformer.Lister(),
+		podInformer.Informer().GetIndexer(),
 		claimsIndexer,
-		setsIndexer,
+		setInformer.Informer().GetIndexer(),
 		requestTracker{0, nil, 0},
 		requestTracker{0, nil, 0},
 		requestTracker{0, nil, 0},
