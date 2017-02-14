@@ -610,20 +610,6 @@ func rbacFuncs(t apitesting.TestingCommon) []interface{} {
 	}
 }
 
-func kubeAdmFuncs(t apitesting.TestingCommon) []interface{} {
-	return []interface{}{
-		func(obj *kubeadm.MasterConfiguration, c fuzz.Continue) {
-			c.FuzzNoCustom(obj)
-			obj.KubernetesVersion = "v10"
-			obj.API.Port = 20
-			obj.Networking.ServiceSubnet = "foo"
-			obj.Networking.DNSDomain = "foo"
-			obj.AuthorizationMode = "foo"
-			obj.Discovery.Token = &kubeadm.TokenDiscovery{}
-		},
-	}
-}
-
 func policyFuncs(t apitesting.TestingCommon) []interface{} {
 	return []interface{}{
 		func(s *policy.PodDisruptionBudgetStatus, c fuzz.Continue) {
@@ -651,7 +637,7 @@ func FuzzerFuncs(t apitesting.TestingCommon, codecs runtimeserializer.CodecFacto
 		batchFuncs(t),
 		autoscalingFuncs(t),
 		rbacFuncs(t),
-		kubeAdmFuncs(t),
+		kubeadm.KubeadmFuzzerFuncs(t),
 		policyFuncs(t),
 		certificateFuncs(t),
 	)
