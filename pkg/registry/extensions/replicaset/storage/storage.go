@@ -29,8 +29,9 @@ import (
 	genericregistry "k8s.io/apiserver/pkg/registry/generic/registry"
 	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/apis/autoscaling"
+	autoscalingvalidation "k8s.io/kubernetes/pkg/apis/autoscaling/validation"
 	"k8s.io/kubernetes/pkg/apis/extensions"
-	extvalidation "k8s.io/kubernetes/pkg/apis/extensions/validation"
 	"k8s.io/kubernetes/pkg/registry/cachesize"
 	"k8s.io/kubernetes/pkg/registry/extensions/replicaset"
 )
@@ -121,7 +122,7 @@ var _ = rest.Patcher(&ScaleREST{})
 
 // New creates a new Scale object
 func (r *ScaleREST) New() runtime.Object {
-	return &extensions.Scale{}
+	return &autoscaling.Scale{}
 }
 
 func (r *ScaleREST) Get(ctx genericapirequest.Context, name string, options *metav1.GetOptions) (runtime.Object, error) {
@@ -154,12 +155,12 @@ func (r *ScaleREST) Update(ctx genericapirequest.Context, name string, objInfo r
 	if obj == nil {
 		return nil, false, errors.NewBadRequest(fmt.Sprintf("nil update passed to Scale"))
 	}
-	scale, ok := obj.(*extensions.Scale)
+	scale, ok := obj.(*autoscaling.Scale)
 	if !ok {
 		return nil, false, errors.NewBadRequest(fmt.Sprintf("wrong object passed to Scale update: %v", obj))
 	}
 
-	if errs := extvalidation.ValidateScale(scale); len(errs) > 0 {
+	if errs := autoscalingvalidation.ValidateScale(scale); len(errs) > 0 {
 		return nil, false, errors.NewInvalid(extensions.Kind("Scale"), scale.Name, errs)
 	}
 
@@ -177,8 +178,13 @@ func (r *ScaleREST) Update(ctx genericapirequest.Context, name string, objInfo r
 }
 
 // scaleFromReplicaSet returns a scale subresource for a replica set.
-func scaleFromReplicaSet(rs *extensions.ReplicaSet) (*extensions.Scale, error) {
-	return &extensions.Scale{
+func scaleFromReplicaSet(rs *extensions.ReplicaSet) (*autoscaling.Scale, error) {
+	selector, err := metav1.LabelSelectorAsSelector(rs.Spec.Selector)
+	if err != nil {
+		return nil, fmt.Errorf("invalid label selector: %v", err)
+	}
+
+	return &autoscaling.Scale{
 		// TODO: Create a variant of ObjectMeta type that only contains the fields below.
 		ObjectMeta: metav1.ObjectMeta{
 			Name:              rs.Name,
@@ -187,12 +193,12 @@ func scaleFromReplicaSet(rs *extensions.ReplicaSet) (*extensions.Scale, error) {
 			ResourceVersion:   rs.ResourceVersion,
 			CreationTimestamp: rs.CreationTimestamp,
 		},
-		Spec: extensions.ScaleSpec{
+		Spec: autoscaling.ScaleSpec{
 			Replicas: rs.Spec.Replicas,
 		},
-		Status: extensions.ScaleStatus{
+		Status: autoscaling.ScaleStatus{
 			Replicas: rs.Status.Replicas,
-			Selector: rs.Spec.Selector,
+			Selector: selector.String(),
 		},
 	}, nil
 }
