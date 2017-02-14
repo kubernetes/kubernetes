@@ -178,9 +178,6 @@ func (ds *dockerService) getIPFromPlugin(sandbox *dockertypes.ContainerJSON) (st
 		return "", err
 	}
 	msg := fmt.Sprintf("Couldn't find network status for %s/%s through plugin", metadata.Namespace, metadata.Name)
-	if sharesHostNetwork(sandbox) {
-		return "", fmt.Errorf("%v: not responsible for host-network sandboxes", msg)
-	}
 	cID := kubecontainer.BuildContainerID(runtimeName, sandbox.ID)
 	networkStatus, err := ds.networkPlugin.GetPodNetworkStatus(metadata.Namespace, metadata.Name, cID)
 	if err != nil {
@@ -200,6 +197,11 @@ func (ds *dockerService) getIPFromPlugin(sandbox *dockertypes.ContainerJSON) (st
 // in the sandbox itself. We look for an ipv4 address before ipv6.
 func (ds *dockerService) getIP(sandbox *dockertypes.ContainerJSON) (string, error) {
 	if sandbox.NetworkSettings == nil {
+		return "", nil
+	}
+	if sharesHostNetwork(sandbox) {
+		// For sandboxes using host network, the shim is not responsible for
+		// reporting the IP.
 		return "", nil
 	}
 	if IP, err := ds.getIPFromPlugin(sandbox); err != nil {
