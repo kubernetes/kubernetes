@@ -43,7 +43,7 @@ func TestRequestNodeCertificateErrorCreatingCSR(t *testing.T) {
 	}
 	privateKeyData, err := certutil.MakeEllipticPrivateKeyPEM()
 	if err != nil {
-		t.Fatalf("unable to generate a new private key: %v", err)
+		t.Fatalf("Unable to generate a new private key: %v", err)
 	}
 
 	certData, err := RequestNodeCertificate(client, privateKeyData, "fake-node-name")
@@ -58,7 +58,7 @@ func TestRequestNodeCertificateErrorCreatingCSR(t *testing.T) {
 func TestRequestNodeCertificate(t *testing.T) {
 	privateKeyData, err := certutil.MakeEllipticPrivateKeyPEM()
 	if err != nil {
-		t.Fatalf("unable to generate a new private key: %v", err)
+		t.Fatalf("Unable to generate a new private key: %v", err)
 	}
 
 	certData, err := RequestNodeCertificate(&fakeClient{}, privateKeyData, "fake-node-name")
