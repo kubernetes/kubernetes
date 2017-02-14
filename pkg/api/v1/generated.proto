@@ -2569,6 +2569,10 @@ message PodSpec {
   // +optional
   optional string serviceAccount = 9;
 
+  // AutomountServiceAccountToken indicates whether a service account token should be automatically mounted.
+  // +optional
+  optional bool automountServiceAccountToken = 21;
+
   // NodeName is a request to schedule this pod onto a specific node. If it is non-empty,
   // the scheduler simply schedules this pod onto that node, assuming that it fits resource
   // requirements.
@@ -3307,6 +3311,11 @@ message ServiceAccount {
   // More info: http://kubernetes.io/docs/user-guide/secrets#manually-specifying-an-imagepullsecret
   // +optional
   repeated LocalObjectReference imagePullSecrets = 3;
+
+  // AutomountServiceAccountToken indicates whether pods running as this service account should have an API token automatically mounted.
+  // Can be overridden at the pod level.
+  // +optional
+  optional bool automountServiceAccountToken = 4;
 }
 
 // ServiceAccountList is a list of ServiceAccount objects
