@@ -6,8 +6,8 @@
 - [Prerequisites](#prerequisites)
 - [Quickstart](#quickstart)
 - [Step 1: Create Persistent Volume Claim](#step-1-create-persistent-volume-claim)
-- [Step 2: Create Deployment](#step-2-create-deployment)
-- [Step 3: Create LoadBalancer Service](#step-3-create-loadbalancer-service)
+- [Step 2: Create Deployment](#step-2-create-minio-deployment)
+- [Step 3: Create LoadBalancer Service](#step-3-create-minio-service)
 - [Step 4: Resource cleanup](#step-4-resource-cleanup)
 
 ## Introduction
