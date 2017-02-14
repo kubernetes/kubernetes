@@ -78,7 +78,9 @@ type Server struct {
 }
 
 type TLSOptions struct {
-	Config *tls.Config
+	Config   *tls.Config
+	CertFile string
+	KeyFile  string
 }
 
 // containerInterface defines the restful.Container functions used on the root container
@@ -129,9 +131,7 @@ func ListenAndServeKubeletServer(
 	}
 	if tlsOptions != nil {
 		s.TLSConfig = tlsOptions.Config
-		// Passing empty strings as the cert and key files indicates to call
-		// GetCertificate in the TLSConfig.
-		glog.Fatal(s.ListenAndServeTLS("", ""))
+		glog.Fatal(s.ListenAndServeTLS(tlsOptions.CertFile, tlsOptions.KeyFile))
 	} else {
 		glog.Fatal(s.ListenAndServe())
 	}
