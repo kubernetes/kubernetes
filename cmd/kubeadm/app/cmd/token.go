@@ -92,6 +92,9 @@ func NewCmdToken(out io.Writer, errW io.Writer) *cobra.Command {
 		Use:   "delete",
 		Short: "Delete bootstrap tokens on the server.",
 		Run: func(tokenCmd *cobra.Command, args []string) {
+			if len(args) < 1 {
+				kubeadmutil.CheckErr(fmt.Errorf("missing subcommand; 'token delete' is missing token of form [\"^([a-z0-9]{6})$\"]"))
+			}
 			err := RunDeleteToken(out, tokenCmd, args[0])
 			kubeadmutil.CheckErr(err)
 		},
