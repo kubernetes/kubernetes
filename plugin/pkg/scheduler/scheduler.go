@@ -123,7 +123,7 @@ func (s *Scheduler) scheduleOne() {
 	assumed.Spec.NodeName = dest
 	if err := s.config.SchedulerCache.AssumePod(&assumed); err != nil {
 		glog.Errorf("scheduler cache AssumePod failed: %v", err)
-		glog.V(3).Errorf("scheduler cache AssumePod failed: %v", err)
+		glog.V(3).Infof("scheduler cache AssumePod failed: %v", err)
 		// TODO: This means that a given pod is already in cache (which means it
 		// is either assumed or already added). This is most probably result of a
 		// BUG in retrying logic. As a temporary workaround (which doesn't fully
