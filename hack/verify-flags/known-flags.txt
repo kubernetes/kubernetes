@@ -148,6 +148,7 @@ dns-port
 dns-provider
 dns-provider-config
 dns-zone-name
+docker-disable-shared-pid
 docker-email
 docker-endpoint
 docker-exec-handler

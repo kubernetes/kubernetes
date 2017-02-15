@@ -485,6 +485,9 @@ type KubeletConfiguration struct {
 	// This flag, if set, instructs the kubelet to keep volumes from terminated pods mounted to the node.
 	// This can be useful for debugging volume related issues.
 	KeepTerminatedPodVolumes bool
+	// This flag, if set, disables use of a shared PID namespace for pods running in the docker CRI runtime.
+	// TODO: remove once this escape hatch is no longer required.
+	DockerDisableSharedPID bool
 }
 
 type KubeletAuthorizationMode string
