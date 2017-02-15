@@ -35,9 +35,9 @@ for installation instructions for your platform.
 Run the below commands to get started quickly
 
 ```sh
-kubectl create -f examples/storage/minio/minio-distributed-headless-service.yaml
-kubectl create -f examples/storage/minio/minio-distributed-statefulset.yaml
-kubectl create -f examples/storage/minio/minio-distributed-service.yaml
+kubectl create -f https://github.com/kubernetes/kubernetes/blob/master/examples/storage/minio-distributed/minio-distributed-headless-service.yaml?raw=true
+kubectl create -f https://github.com/kubernetes/kubernetes/blob/master/examples/storage/minio-distributed/minio-distributed-statefulset.yaml?raw=true
+kubectl create -f https://github.com/kubernetes/kubernetes/blob/master/examples/storage/minio-distributed/minio-distributed-service.yaml?raw=true
 ```
 
 ## Step 1: Create Minio Headless Service
