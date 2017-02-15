@@ -15,7 +15,7 @@
 # limitations under the License.
 
 
-KUBE_ROOT=$(dirname "${BASH_SOURCE}")/../../..
+KUBE_ROOT=$(dirname "${BASH_SOURCE}")/../../../../..
 source "${KUBE_ROOT}/hack/lib/util.sh"
 
 # Register function to be called on EXIT to remove generated binary.
@@ -24,5 +24,7 @@ function cleanup {
 }
 trap cleanup EXIT
 
-cp -v ${KUBE_ROOT}/_output/local/bin/linux/amd64/kube-aggregator "${KUBE_ROOT}/vendor/k8s.io/kube-aggregator/artifacts/simple-image/kube-aggregator"
-docker build -t kube-aggregator:latest ${KUBE_ROOT}/vendor/k8s.io/kube-aggregator/artifacts/simple-image
+pushd "${KUBE_ROOT}/vendor/k8s.io/kube-aggregator"
+cp -v ../../../../_output/local/bin/linux/amd64/kube-aggregator ./artifacts/simple-image/kube-aggregator
+docker build -t kube-aggregator:latest ./artifacts/simple-image
+popd
