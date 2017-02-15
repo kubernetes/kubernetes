@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package e2e
+package common
 
 import (
 	"context"
@@ -25,6 +25,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/kubernetes/pkg/api/v1"
+	autoscalingv1 "k8s.io/kubernetes/pkg/apis/autoscaling/v1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -53,6 +54,13 @@ const (
 	customMetricName                = "QPS"
 )
 
+const (
+	KindRC         = "replicationController"
+	KindDeployment = "deployment"
+	KindReplicaSet = "replicaset"
+	subresource    = "scale"
+)
+
 /*
 ResourceConsumer is a tool for testing. It helps create specified usage of CPU or memory (Warning: memory not supported)
 typical use case:
@@ -79,6 +87,10 @@ type ResourceConsumer struct {
 	requestSizeCustomMetric  int
 }
 
+func GetResourceConsumerImage() string {
+	return resourceConsumerImage
+}
+
 func NewDynamicResourceConsumer(name, kind string, replicas, initCPUTotal, initMemoryTotal, initCustomMetric int, cpuLimit, memLimit int64, f *framework.Framework) *ResourceConsumer {
 	return newResourceConsumer(name, kind, replicas, initCPUTotal, initMemoryTotal, initCustomMetric, dynamicConsumptionTimeInSeconds,
 		dynamicRequestSizeInMillicores, dynamicRequestSizeInMegabytes, dynamicRequestSizeCustomMetric, cpuLimit, memLimit, f)
@@ -86,7 +98,7 @@ func NewDynamicResourceConsumer(name, kind string, replicas, initCPUTotal, initM
 
 // TODO this still defaults to replication controller
 func NewStaticResourceConsumer(name string, replicas, initCPUTotal, initMemoryTotal, initCustomMetric int, cpuLimit, memLimit int64, f *framework.Framework) *ResourceConsumer {
-	return newResourceConsumer(name, kindRC, replicas, initCPUTotal, initMemoryTotal, initCustomMetric, staticConsumptionTimeInSeconds,
+	return newResourceConsumer(name, KindRC, replicas, initCPUTotal, initMemoryTotal, initCustomMetric, staticConsumptionTimeInSeconds,
 		initCPUTotal/replicas, initMemoryTotal/replicas, initCustomMetric/replicas, cpuLimit, memLimit, f)
 }
 
@@ -160,6 +172,7 @@ func (rc *ResourceConsumer) makeConsumeCPURequests() {
 			rc.sendConsumeCPURequest(millicores)
 			sleepTime = rc.sleepTime
 		case <-rc.stopCPU:
+			framework.Logf("RC %s: stopping CPU consumer", rc.name)
 			return
 		}
 	}
@@ -178,6 +191,7 @@ func (rc *ResourceConsumer) makeConsumeMemRequests() {
 			rc.sendConsumeMemRequest(megabytes)
 			sleepTime = rc.sleepTime
 		case <-rc.stopMem:
+			framework.Logf("RC %s: stopping mem consumer", rc.name)
 			return
 		}
 	}
@@ -196,6 +210,7 @@ func (rc *ResourceConsumer) makeConsumeCustomMetric() {
 			rc.sendConsumeCustomMetric(delta)
 			sleepTime = rc.sleepTime
 		case <-rc.stopCustomMetric:
+			framework.Logf("RC %s: stopping metric consumer", rc.name)
 			return
 		}
 	}
@@ -263,21 +278,21 @@ func (rc *ResourceConsumer) sendConsumeCustomMetric(delta int) {
 
 func (rc *ResourceConsumer) GetReplicas() int {
 	switch rc.kind {
-	case kindRC:
+	case KindRC:
 		replicationController, err := rc.framework.ClientSet.Core().ReplicationControllers(rc.framework.Namespace.Name).Get(rc.name, metav1.GetOptions{})
 		framework.ExpectNoError(err)
 		if replicationController == nil {
 			framework.Failf(rcIsNil)
 		}
 		return int(replicationController.Status.Replicas)
-	case kindDeployment:
+	case KindDeployment:
 		deployment, err := rc.framework.ClientSet.Extensions().Deployments(rc.framework.Namespace.Name).Get(rc.name, metav1.GetOptions{})
 		framework.ExpectNoError(err)
 		if deployment == nil {
 			framework.Failf(deploymentIsNil)
 		}
 		return int(deployment.Status.Replicas)
-	case kindReplicaSet:
+	case KindReplicaSet:
 		rs, err := rc.framework.ClientSet.Extensions().ReplicaSets(rc.framework.Namespace.Name).Get(rc.name, metav1.GetOptions{})
 		framework.ExpectNoError(err)
 		if rs == nil {
@@ -312,6 +327,22 @@ func (rc *ResourceConsumer) EnsureDesiredReplicas(desiredReplicas int, timeout t
 		framework.Logf("Number of replicas is as expected")
 	}
 	framework.Logf("Number of replicas was stable over %v", timeout)
+}
+
+// Pause stops background goroutines responsible for consuming resources.
+func (rc *ResourceConsumer) Pause() {
+	By(fmt.Sprintf("HPA pausing RC %s", rc.name))
+	rc.stopCPU <- 0
+	rc.stopMem <- 0
+	rc.stopCustomMetric <- 0
+}
+
+// Pause starts background goroutines responsible for consuming resources.
+func (rc *ResourceConsumer) Resume() {
+	By(fmt.Sprintf("HPA resuming RC %s", rc.name))
+	go rc.makeConsumeCPURequests()
+	go rc.makeConsumeMemRequests()
+	go rc.makeConsumeCustomMetric()
 }
 
 func (rc *ResourceConsumer) CleanUp() {
@@ -361,16 +392,16 @@ func runServiceAndWorkloadForResourceConsumer(c clientset.Interface, internalCli
 	}
 
 	switch kind {
-	case kindRC:
+	case KindRC:
 		framework.ExpectNoError(framework.RunRC(rcConfig))
 		break
-	case kindDeployment:
+	case KindDeployment:
 		dpConfig := testutils.DeploymentConfig{
 			RCConfig: rcConfig,
 		}
 		framework.ExpectNoError(framework.RunDeployment(dpConfig))
 		break
-	case kindReplicaSet:
+	case KindReplicaSet:
 		rsConfig := testutils.ReplicaSetConfig{
 			RCConfig: rcConfig,
 		}
@@ -416,4 +447,24 @@ func runServiceAndWorkloadForResourceConsumer(c clientset.Interface, internalCli
 	// Wait for endpoints to propagate for the controller service.
 	framework.ExpectNoError(framework.WaitForServiceEndpointsNum(
 		c, ns, controllerName, 1, startServiceInterval, startServiceTimeout))
+}
+
+func CreateCPUHorizontalPodAutoscaler(rc *ResourceConsumer, cpu, minReplicas, maxRepl int32) {
+	hpa := &autoscalingv1.HorizontalPodAutoscaler{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      rc.name,
+			Namespace: rc.framework.Namespace.Name,
+		},
+		Spec: autoscalingv1.HorizontalPodAutoscalerSpec{
+			ScaleTargetRef: autoscalingv1.CrossVersionObjectReference{
+				Kind: rc.kind,
+				Name: rc.name,
+			},
+			MinReplicas:                    &minReplicas,
+			MaxReplicas:                    maxRepl,
+			TargetCPUUtilizationPercentage: &cpu,
+		},
+	}
+	_, errHPA := rc.framework.ClientSet.Autoscaling().HorizontalPodAutoscalers(rc.framework.Namespace.Name).Create(hpa)
+	framework.ExpectNoError(errHPA)
 }
