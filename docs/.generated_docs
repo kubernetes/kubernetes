@@ -38,6 +38,7 @@ docs/man/man1/kubectl-config.1
 docs/man/man1/kubectl-convert.1
 docs/man/man1/kubectl-cordon.1
 docs/man/man1/kubectl-cp.1
+docs/man/man1/kubectl-create-clusterrole.1
 docs/man/man1/kubectl-create-clusterrolebinding.1
 docs/man/man1/kubectl-create-configmap.1
 docs/man/man1/kubectl-create-deployment.1
@@ -124,6 +125,7 @@ docs/user-guide/kubectl/kubectl_convert.md
 docs/user-guide/kubectl/kubectl_cordon.md
 docs/user-guide/kubectl/kubectl_cp.md
 docs/user-guide/kubectl/kubectl_create.md
+docs/user-guide/kubectl/kubectl_create_clusterrole.md
 docs/user-guide/kubectl/kubectl_create_clusterrolebinding.md
 docs/user-guide/kubectl/kubectl_create_configmap.md
 docs/user-guide/kubectl/kubectl_create_deployment.md
