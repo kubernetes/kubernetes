@@ -637,6 +637,10 @@ function start-kubelet {
   local -r kubelet_env_file="/etc/default/kubelet"
   echo "KUBELET_OPTS=\"${flags}\"" > "${kubelet_env_file}"
 
+  if [[ -n "${ENABLE_CACHE_MUTATION_DETECTOR:-}" ]]; then
+    echo "KUBE_CACHE_MUTATION_DETECTOR=${ENABLE_CACHE_MUTATION_DETECTOR}" >> "${kubelet_env_file}"
+  fi
+
   # Write the systemd service file for kubelet.
   cat <<EOF >/etc/systemd/system/kubelet.service
 [Unit]
@@ -699,6 +703,7 @@ function start-kube-proxy {
   if [[ -n "${CLUSTER_IP_RANGE:-}" ]]; then
     sed -i -e "s@{{cluster_cidr}}@--cluster-cidr=${CLUSTER_IP_RANGE}@g" ${src_file}
   fi
+  sed -i -e "s@{{pillar\['enable_cache_mutation_detector'\]}}@${ENABLE_CACHE_MUTATION_DETECTOR:-false}@g" "${src_file}"
   cp "${src_file}" /etc/kubernetes/manifests
 }
 
@@ -992,6 +997,7 @@ function start-kube-apiserver {
   sed -i -e "s@{{admission_controller_config_volume}}@${admission_controller_config_volume}@g" "${src_file}"
   sed -i -e "s@{{image_policy_webhook_config_mount}}@${image_policy_webhook_config_mount}@g" "${src_file}"
   sed -i -e "s@{{image_policy_webhook_config_volume}}@${image_policy_webhook_config_volume}@g" "${src_file}"
+  sed -i -e "s@{{pillar\['enable_cache_mutation_detector'\]}}@${ENABLE_CACHE_MUTATION_DETECTOR:-false}@g" "${src_file}"
   cp "${src_file}" /etc/kubernetes/manifests
 }
 
@@ -1055,6 +1061,7 @@ function start-kube-controller-manager {
   sed -i -e "s@{{cloud_config_volume}}@${CLOUD_CONFIG_VOLUME}@g" "${src_file}"
   sed -i -e "s@{{additional_cloud_config_mount}}@@g" "${src_file}"
   sed -i -e "s@{{additional_cloud_config_volume}}@@g" "${src_file}"
+  sed -i -e "s@{{pillar\['enable_cache_mutation_detector'\]}}@${ENABLE_CACHE_MUTATION_DETECTOR:-false}@g" "${src_file}"
   cp "${src_file}" /etc/kubernetes/manifests
 }
 
@@ -1088,6 +1095,7 @@ function start-kube-scheduler {
   sed -i -e "s@{{params}}@${params}@g" "${src_file}"
   sed -i -e "s@{{pillar\['kube_docker_registry'\]}}@${DOCKER_REGISTRY}@g" "${src_file}"
   sed -i -e "s@{{pillar\['kube-scheduler_docker_tag'\]}}@${kube_scheduler_docker_tag}@g" "${src_file}"
+  sed -i -e "s@{{pillar\['enable_cache_mutation_detector'\]}}@${ENABLE_CACHE_MUTATION_DETECTOR:-false}@g" "${src_file}"
   cp "${src_file}" /etc/kubernetes/manifests
 }
 
