@@ -139,6 +139,35 @@ var _ = framework.KubeDescribe("Loadbalancing: L7", func() {
 			// framework.ExpectNoError(jig.verifyURL(fmt.Sprintf("https://%v/", ip), "", 30, 1*time.Second, httpClient))
 		})
 
+		It("should create ingress with pre-shared TLS certification", func() {
+			// cert deleted when the rest of lb resources are deleted in cleanupGCE
+			certName := jig.createTLSCertificate(gceController, ns)
+			By(fmt.Sprintf("created TLS cert %v: %v through the GCE cloud provider", ns, certName))
+
+			jig.createIngress(filepath.Join(ingressManifestPath, "pre-shared-cert"), ns, map[string]string{
+				"kubernetes.io/ingress.pre-shared-cert": certName,
+				"kubernetes.io/ingress.allow-http":      "false",
+			})
+
+			By("waiting for Ingress to come up with cert: " + certName)
+			httpClient := buildInsecureClient(reqTimeout)
+			framework.ExpectNoError(framework.PollURL(fmt.Sprintf("https://%v/", jig.address), "", framework.LoadBalancerPollTimeout, jig.pollInterval, httpClient, false))
+
+			By("should reject HTTP traffic")
+			framework.ExpectNoError(framework.PollURL(fmt.Sprintf("http://%v/", jig.address), "", framework.LoadBalancerPollTimeout, jig.pollInterval, httpClient, true))
+
+			By("should have correct firewall rule for ingress")
+			fw := gceController.getFirewallRule()
+			expFw := jig.constructFirewallForIngress(gceController)
+			// Passed the last argument as `true` to verify the backend ports is a subset
+			// of the allowed ports in firewall rule, given there may be other existing
+			// ingress resources and backends we are not aware of.
+			Expect(framework.VerifyFirewallRule(fw, expFw, gceController.cloud.Network, true)).NotTo(HaveOccurred())
+
+			By("should continue serving on provided TLS cert for 30 seconds")
+			ExpectNoError(jig.verifyURL(fmt.Sprintf("https://%v/", jig.address), "", 30, 1*time.Second, httpClient))
+		})
+
 		// TODO: Implement a multizone e2e that verifies traffic reaches each
 		// zone based on pod labels.
 	})
