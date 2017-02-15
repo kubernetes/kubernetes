@@ -21,6 +21,7 @@ spec:
       annotations:
         scheduler.alpha.kubernetes.io/critical-pod: ''
     spec:
+      dnsPolicy: Default
       containers:
       - name: fluentd-gcp
         image: gcr.io/google_containers/fluentd-gcp:1.38
