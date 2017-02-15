@@ -28,6 +28,14 @@ else
   exit 1
 fi
 
+dir=$(mktemp -d "${TMPDIR:-/tmp/}$(basename 0).XXXXXXXXXXXX")
+# Register function to be called on EXIT to remove generated binary.
+function cleanup {
+  rm -rf "${dir}"
+}
+trap cleanup EXIT
+
+
 scriptDir=$(dirname "${BASH_SOURCE}")
 
 # this uses discovery from a kube-like API server to register ALL the API versions that server provides
@@ -42,8 +50,7 @@ SERVICE_NAME=${3}
 AGG_KUBECONFIG=${4}
 
 
-dir=$(mktemp -d "${TMPDIR:-/tmp/}$(basename 0).XXXXXXXXXXXX")
-
+caBundle=$(base64 /var/run/kubernetes/server-ca.crt | awk 'BEGIN{ORS="";} {print}')
 
 # if we have a /api endpoint, then we need to register that
 if kubectl --kubeconfig=${FROM_KUBECONFIG} get --raw / | grep -q /api/v1; then
@@ -57,9 +64,10 @@ if kubectl --kubeconfig=${FROM_KUBECONFIG} get --raw / | grep -q /api/v1; then
 	${SED} -i "s/API_VERSION/${version}/" ${resourceFileName}
 	${SED} -i "s/SERVICE_NAMESPACE/${SERVICE_NAMESPACE}/" ${resourceFileName}
 	${SED} -i "s/SERVICE_NAME/${SERVICE_NAME}/" ${resourceFileName}
+	${SED} -i "s/CA_BUNDLE/${caBundle}/" ${resourceFileName}
 	echo "registering ${resourceName} using ${resourceFileName}"
 
-	kubectl --kubeconfig=${AGG_KUBECONFIG} create --v=8 -f ${resourceFileName}
+	kubectl --kubeconfig=${AGG_KUBECONFIG} create -f ${resourceFileName}
 fi
 
 groupVersions=( $(kubectl --kubeconfig=${FROM_KUBECONFIG} get --raw / | grep /apis/ | sed 's/",.*//' | sed 's|.*"/apis/||' | grep '/') )
@@ -75,6 +83,7 @@ for groupVersion in "${groupVersions[@]}"; do
 	${SED} -i "s/API_VERSION/${version}/" ${resourceFileName}
 	${SED} -i "s/SERVICE_NAMESPACE/${SERVICE_NAMESPACE}/" ${resourceFileName}
 	${SED} -i "s/SERVICE_NAME/${SERVICE_NAME}/" ${resourceFileName}
+	${SED} -i "s/CA_BUNDLE/${caBundle}/" ${resourceFileName}
 	echo "registering ${resourceName} using ${resourceFileName}"
 
 	kubectl --kubeconfig=${AGG_KUBECONFIG} create -f ${resourceFileName}
