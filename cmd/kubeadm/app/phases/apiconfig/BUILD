@@ -16,7 +16,6 @@ go_library(
     tags = ["automanaged"],
     deps = [
         "//cmd/kubeadm/app/constants:go_default_library",
-        "//cmd/kubeadm/app/master:go_default_library",
         "//pkg/api/v1:go_default_library",
         "//pkg/apis/rbac/v1beta1:go_default_library",
         "//pkg/client/clientset_generated/clientset:go_default_library",
