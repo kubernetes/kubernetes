@@ -1,12 +1,12 @@
 # privilegedPSP gives the privilegedPSP role
 # to the group privileged.
-apiVersion: rbac.authorization.k8s.io/v1alpha1
+apiVersion: rbac.authorization.k8s.io/v1beta1
 kind: ClusterRoleBinding
 metadata:
     name: privileged-psp-users
 subjects:
 - kind: Group
-  apiVersion: rbac.authorization.k8s.io/v1alpha1
+  apiGroup: rbac.authorization.k8s.io
   name: privileged-psp-users
 roleRef:
    apiGroup: rbac.authorization.k8s.io
@@ -15,16 +15,16 @@ roleRef:
 ---
 # restrictedPSP grants the restrictedPSP role to
 # the groups restricted and privileged.
-apiVersion: rbac.authorization.k8s.io/v1alpha1
+apiVersion: rbac.authorization.k8s.io/v1beta1
 kind: ClusterRoleBinding
 metadata:
     name: restricted-psp-users
 subjects:
 - kind: Group
-  apiVersion: rbac.authorization.k8s.io/v1alpha1
+  apiGroup: rbac.authorization.k8s.io
   name: restricted-psp-users
 - kind: Group
-  apiVersion: rbac.authorization.k8s.io/v1alpha1
+  apiGroup: rbac.authorization.k8s.io
   name: privileged-psp-users
 roleRef:
    apiGroup: rbac.authorization.k8s.io
@@ -32,16 +32,16 @@ roleRef:
    name: restricted-psp-user
 ---
 # edit grants edit role to system:authenticated.
-apiVersion: rbac.authorization.k8s.io/v1alpha1
+apiVersion: rbac.authorization.k8s.io/v1beta1
 kind: ClusterRoleBinding
 metadata:
     name: edit
 subjects:
 - kind: Group
-  apiVersion: rbac.authorization.k8s.io/v1alpha1
+  apiGroup: rbac.authorization.k8s.io
   name: privileged-psp-users
 - kind: Group
-  apiVersion: rbac.authorization.k8s.io/v1alpha1
+  apiGroup: rbac.authorization.k8s.io
   name: restricted-psp-users
 roleRef:
    apiGroup: rbac.authorization.k8s.io
