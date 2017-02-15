@@ -19,8 +19,6 @@ package v1
 import (
 	fmt "fmt"
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
-	serializer "k8s.io/apimachinery/pkg/runtime/serializer"
-	api "k8s.io/client-go/pkg/api"
 	rest "k8s.io/client-go/rest"
 	"k8s.io/apimachinery/pkg/runtime"
 )

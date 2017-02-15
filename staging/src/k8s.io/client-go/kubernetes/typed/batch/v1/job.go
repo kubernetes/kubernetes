@@ -20,7 +20,6 @@ import (
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
-	api "k8s.io/client-go/pkg/api"
 	v1 "k8s.io/client-go/pkg/apis/batch/v1"
 	rest "k8s.io/client-go/rest"
 	"k8s.io/apimachinery/pkg/runtime"
