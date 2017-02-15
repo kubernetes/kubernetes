@@ -23,6 +23,7 @@ import (
 	"net"
 	"strings"
 
+	"github.com/stretchr/testify/assert"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -1170,6 +1171,117 @@ func TestBuildServiceMapServiceUpdate(t *testing.T) {
 		// Services only added, so nothing stale yet
 		t.Errorf("expected stale UDP services length 0, got %d", len(staleUDPServices))
 	}
+}
+
+func TestNeedToUpdate(t *testing.T) {
+	testCases := []struct {
+		last         []api.Endpoints
+		current      []api.Endpoints
+		needToUpdate bool
+	}{
+		// no endpoints
+		{
+			[]api.Endpoints{},
+			[]api.Endpoints{},
+			false,
+		},
+		// no endpoints -> empty endpoint
+		{
+			[]api.Endpoints{},
+			[]api.Endpoints{
+				NewFakeEndpoints("ns1", "ep1", []api.EndpointSubset{
+					{Addresses: []api.EndpointAddress{}, Ports: []api.EndpointPort{}},
+				}),
+			},
+			true,
+		},
+		// empty endpoint -> no endpoints
+		{
+			[]api.Endpoints{
+				NewFakeEndpoints("ns1", "ep1", []api.EndpointSubset{
+					{Addresses: []api.EndpointAddress{}, Ports: []api.EndpointPort{}}}),
+			},
+			[]api.Endpoints{},
+			true,
+		},
+		// empty endpoint -> empty endpoint
+		{
+			[]api.Endpoints{
+				NewFakeEndpoints("ns1", "ep1", []api.EndpointSubset{
+					{Addresses: []api.EndpointAddress{}, Ports: []api.EndpointPort{}}}),
+			},
+			[]api.Endpoints{
+				NewFakeEndpoints("ns1", "ep1", []api.EndpointSubset{
+					{Addresses: []api.EndpointAddress{}, Ports: []api.EndpointPort{}}}),
+			},
+			false,
+		},
+		// empty endpoint -> one endpoint
+		{
+			[]api.Endpoints{
+				NewFakeEndpoints("ns1", "ep1", []api.EndpointSubset{
+					{Addresses: []api.EndpointAddress{}, Ports: []api.EndpointPort{}}}),
+			},
+			[]api.Endpoints{
+				NewFakeEndpoints("ns1", "ep1", []api.EndpointSubset{
+					{Addresses: []api.EndpointAddress{{IP: "1.2.3.4"}}, Ports: []api.EndpointPort{}}}),
+			},
+			true,
+		},
+		// ready endpoint -> not ready endpoint
+		{
+			[]api.Endpoints{
+				NewFakeEndpoints("ns1", "ep1", []api.EndpointSubset{
+					{Addresses: []api.EndpointAddress{{IP: "1.2.3.4"}}, Ports: []api.EndpointPort{}}}),
+			},
+			[]api.Endpoints{
+				NewFakeEndpoints("ns1", "ep1", []api.EndpointSubset{
+					{NotReadyAddresses: []api.EndpointAddress{{IP: "1.2.3.4"}}, Ports: []api.EndpointPort{}}}),
+			},
+			true,
+		},
+		// different endpoints
+		{
+			[]api.Endpoints{
+				NewFakeEndpoints("ns1", "ep1", []api.EndpointSubset{
+					{Addresses: []api.EndpointAddress{{IP: "1.2.3.4"}}, Ports: []api.EndpointPort{}}}),
+			},
+			[]api.Endpoints{
+				NewFakeEndpoints("ns1", "ep2", []api.EndpointSubset{
+					{Addresses: []api.EndpointAddress{{IP: "1.2.3.4"}}, Ports: []api.EndpointPort{}}}),
+			},
+			true,
+		},
+		// more endpoints
+		{
+			[]api.Endpoints{
+				NewFakeEndpoints("ns1", "ep1", []api.EndpointSubset{
+					{Addresses: []api.EndpointAddress{{IP: "1.2.3.4"}}, Ports: []api.EndpointPort{}}}),
+			},
+			[]api.Endpoints{
+				NewFakeEndpoints("ns1", "ep1", []api.EndpointSubset{
+					{Addresses: []api.EndpointAddress{{IP: "1.2.3.4"}}, Ports: []api.EndpointPort{}}}),
+				NewFakeEndpoints("ns1", "ep2", []api.EndpointSubset{
+					{Addresses: []api.EndpointAddress{{IP: "1.2.3.5"}}, Ports: []api.EndpointPort{}}}),
+			},
+			true,
+		},
+	}
+	ipt := iptablestest.NewFake()
+	fp := NewFakeProxier(ipt)
+
+	for _, tc := range testCases {
+		fp.needToUpdate(tc.last)
+		assert.Equal(t, tc.needToUpdate, fp.needToUpdate(tc.current))
+	}
+}
+
+func NewFakeEndpoints(namespace string, name string, subsets []api.EndpointSubset) api.Endpoints {
+	ep := api.Endpoints{}
+	ep.Namespace = namespace
+	ep.Name = name
+	ep.Subsets = subsets
+	return ep
 }
 
 // TODO(thockin): add *more* tests for syncProxyRules() or break it down further and test the pieces.
