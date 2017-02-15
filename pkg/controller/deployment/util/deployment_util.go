@@ -841,10 +841,10 @@ func DeploymentTimedOut(deployment *extensions.Deployment, newStatus *extensions
 	// Look at the difference in seconds between now and the last time we reported any
 	// progress or tried to create a replica set, or resumed a paused deployment and
 	// compare against progressDeadlineSeconds.
-	from := condition.LastUpdateTime
-	now := nowFn()
+	from := condition.LastUpdateTime.Truncate(time.Second)
+	now := nowFn().Round(time.Second)
 	delta := time.Duration(*deployment.Spec.ProgressDeadlineSeconds) * time.Second
-	timedOut := from.Add(delta).Before(now)
+	timedOut := from.Add(delta).Before(now) || from.Add(delta).Equal(now)
 
 	// TODO: Switch to a much higher verbosity level
 	glog.V(2).Infof("Deployment %q timed out (%t) [last progress check: %v - now: %v]", deployment.Name, timedOut, from, now)
