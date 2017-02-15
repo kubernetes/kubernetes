@@ -465,11 +465,9 @@ func NewMainKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *Kub
 		experimentalHostUserNamespaceDefaulting: utilfeature.DefaultFeatureGate.Enabled(features.ExperimentalHostUserNamespaceDefaultingGate),
 	}
 
-	secretManager, err := secret.NewCachingSecretManager(
+	secretManager := secret.NewCachingSecretManager(
 		kubeDeps.KubeClient, secret.GetObjectTTLFromNodeFunc(klet.GetNode))
-	if err != nil {
-		return nil, fmt.Errorf("failed to initialize secret manager: %v", err)
-	}
+
 	klet.secretManager = secretManager
 
 	if klet.experimentalHostUserNamespaceDefaulting {
