@@ -11,6 +11,7 @@ go_library(
     name = "go_default_library",
     srcs = [
         "configmaps.go",
+        "daemonsets.go",
         "deployments.go",
         "horizontal_pod_autoscalers.go",
         "persistent_volumes.go",
@@ -25,6 +26,7 @@ go_library(
         "//pkg/api/v1:go_default_library",
         "//pkg/apis/apps/v1beta1:go_default_library",
         "//pkg/apis/extensions/v1beta1:go_default_library",
+        "//pkg/controller:go_default_library",
         "//pkg/controller/deployment/util:go_default_library",
         "//pkg/kubelet/sysctl:go_default_library",
         "//test/e2e/common:go_default_library",
@@ -33,6 +35,7 @@ go_library(
         "//vendor:github.com/onsi/gomega",
         "//vendor:k8s.io/apimachinery/pkg/api/errors",
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
+        "//vendor:k8s.io/apimachinery/pkg/labels",
         "//vendor:k8s.io/apimachinery/pkg/util/uuid",
         "//vendor:k8s.io/apimachinery/pkg/util/wait",
     ],
