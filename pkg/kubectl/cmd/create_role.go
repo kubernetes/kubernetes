@@ -23,6 +23,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/apis/rbac"
@@ -165,38 +166,12 @@ func (c *CreateRoleOptions) RunCreateRole(f cmdutil.Factory, cmdOut io.Writer, c
 	mapper, _ := f.Object()
 	dryRun, outputFormat := cmdutil.GetDryRunFlag(cmd), cmdutil.GetFlagString(cmd, "output")
 
-	// groupResourceMapping is a apigroup-resource map. The key of this map is api group, while the value
-	// is a string array of resources under this api group.
-	// E.g.  groupResourceMapping = {"extensions": ["replicasets", "deployments"], "batch":["jobs"]}
-	groupResourceMapping := map[string][]string{}
-
-	// This loop does the following work:
-	// 1. Constructs groupResourceMapping based on input resources.
-	// 2. Prevents pointing to non-existent resources.
-	// 3. Transfers resource short name to long name. E.g. rs.extensions is transferred to replicasets.extensions
-	for _, r := range c.Resources {
-		resource, err := mapper.ResourceFor(r)
-		if err != nil {
-			return err
-		}
-		if !arrayContains(groupResourceMapping[resource.Group], resource.Resource) {
-			groupResourceMapping[resource.Group] = append(groupResourceMapping[resource.Group], resource.Resource)
-		}
-	}
-
 	role := &rbac.Role{}
-
-	// Create separate rule for each of the api group.
-	rules := []rbac.PolicyRule{}
-	for _, g := range sets.StringKeySet(groupResourceMapping).List() {
-		rule := rbac.PolicyRule{}
-		rule.Verbs = c.Verbs
-		rule.Resources = groupResourceMapping[g]
-		rule.APIGroups = []string{g}
-		rule.ResourceNames = c.ResourceNames
-		rules = append(rules, rule)
-	}
 	role.Name = c.Name
+	rules, err := generateResourcePolicyRules(mapper, c.Verbs, c.Resources, c.ResourceNames)
+	if err != nil {
+		return err
+	}
 	role.Rules = rules
 
 	// Create role.
@@ -231,4 +206,38 @@ func arrayContains(s []string, e string) bool {
 		}
 	}
 	return false
+}
+
+func generateResourcePolicyRules(mapper meta.RESTMapper, verbs []string, resources []schema.GroupVersionResource, resourceNames []string) ([]rbac.PolicyRule, error) {
+	// groupResourceMapping is a apigroup-resource map. The key of this map is api group, while the value
+	// is a string array of resources under this api group.
+	// E.g.  groupResourceMapping = {"extensions": ["replicasets", "deployments"], "batch":["jobs"]}
+	groupResourceMapping := map[string][]string{}
+
+	// This loop does the following work:
+	// 1. Constructs groupResourceMapping based on input resources.
+	// 2. Prevents pointing to non-existent resources.
+	// 3. Transfers resource short name to long name. E.g. rs.extensions is transferred to replicasets.extensions
+	for _, r := range resources {
+		resource, err := mapper.ResourceFor(r)
+		if err != nil {
+			return []rbac.PolicyRule{}, err
+		}
+		if !arrayContains(groupResourceMapping[resource.Group], resource.Resource) {
+			groupResourceMapping[resource.Group] = append(groupResourceMapping[resource.Group], resource.Resource)
+		}
+	}
+
+	// Create separate rule for each of the api group.
+	rules := []rbac.PolicyRule{}
+	for _, g := range sets.StringKeySet(groupResourceMapping).List() {
+		rule := rbac.PolicyRule{}
+		rule.Verbs = verbs
+		rule.Resources = groupResourceMapping[g]
+		rule.APIGroups = []string{g}
+		rule.ResourceNames = resourceNames
+		rules = append(rules, rule)
+	}
+
+	return rules, nil
 }
