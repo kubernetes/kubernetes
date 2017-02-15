@@ -22,56 +22,37 @@ func TestDeviceAllocator(t *testing.T) {
 	tests := []struct {
 		name            string
 		existingDevices ExistingDevices
-		length          int
-		firstDevice     mountDevice
-		lastAllocated   mountDevice
+		lastIndex       int
 		expectedOutput  mountDevice
 	}{
 		{
 			"empty device list",
 			ExistingDevices{},
-			2,
-			"aa",
-			"aa",
-			"ab",
+			0,
+			"bb",
 		},
 		{
 			"empty device list with wrap",
 			ExistingDevices{},
-			2,
-			"ba",
-			"zz",
+			51,
 			"ba", // next to 'zz' is the first one, 'ba'
 		},
 		{
 			"device list",
-			ExistingDevices{"aa": "used", "ab": "used", "ac": "used"},
-			2,
-			"aa",
-			"aa",
-			"ad", // all up to "ac" are used
+			ExistingDevices{"ba": "used", "bb": "used", "bc": "used"},
+			0,
+			"bd",
 		},
 		{
 			"device list with wrap",
-			ExistingDevices{"zy": "used", "zz": "used", "ba": "used"},
-			2,
-			"ba",
-			"zx",
-			"bb", // "zy", "zz" and "ba" are used
-		},
-		{
-			"three characters with wrap",
-			ExistingDevices{"zzy": "used", "zzz": "used", "baa": "used"},
-			3,
-			"baa",
-			"zzx",
-			"bab",
+			ExistingDevices{"cy": "used", "cz": "used", "ba": "used"},
+			49,
+			"bb", // "cy", "cz" and "ba" are used
 		},
 	}
 
 	for _, test := range tests {
-		allocator := NewDeviceAllocator(test.length, test.firstDevice).(*deviceAllocator)
-		allocator.lastAssignedDevice = test.lastAllocated
+		allocator := NewDeviceAllocator(test.lastIndex).(*deviceAllocator)
 
 		got, err := allocator.GetNext(test.existingDevices)
 		if err != nil {
@@ -84,12 +65,12 @@ func TestDeviceAllocator(t *testing.T) {
 }
 
 func TestDeviceAllocatorError(t *testing.T) {
-	allocator := NewDeviceAllocator(2, "ba").(*deviceAllocator)
+	allocator := NewDeviceAllocator(0).(*deviceAllocator)
 	existingDevices := ExistingDevices{}
 
 	// make all devices used
 	var first, second byte
-	for first = 'b'; first <= 'z'; first++ {
+	for first = 'b'; first <= 'c'; first++ {
 		for second = 'a'; second <= 'z'; second++ {
 			device := [2]byte{first, second}
 			existingDevices[mountDevice(device[:])] = "used"
