@@ -475,6 +475,7 @@ num_nodes: $(echo "${NUM_NODES:-}" | sed -e "s/'/''/g")
 e2e_storage_test_environment: '$(echo "$E2E_STORAGE_TEST_ENVIRONMENT" | sed -e "s/'/''/g")'
 kube_uid: '$(echo "${KUBE_UID}" | sed -e "s/'/''/g")'
 initial_etcd_cluster: '$(echo "${INITIAL_ETCD_CLUSTER:-}" | sed -e "s/'/''/g")'
+initial_etcd_cluster_state: '$(echo "${INITIAL_ETCD_CLUSTER_STATE:-}" | sed -e "s/'/''/g")'
 
 hostname: $(hostname -s)
 enable_default_storage_class: '$(echo "$ENABLE_DEFAULT_STORAGE_CLASS" | sed -e "s/'/''/g")'
