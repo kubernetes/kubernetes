@@ -22,6 +22,7 @@ spec:
         scheduler.alpha.kubernetes.io/critical-pod: ''
         scheduler.alpha.kubernetes.io/tolerations: '[{"key": "node.alpha.kubernetes.io/ismaster", "effect": "NoSchedule"}]'
     spec:
+      dnsPolicy: Default
       containers:
       - name: fluentd-gcp
         image: gcr.io/google_containers/fluentd-gcp:1.38
