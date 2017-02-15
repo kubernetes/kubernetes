@@ -47,14 +47,20 @@ kube::test::find_integration_test_dirs() {
   )
 }
 
+CLEANUP_REQUIRED=
 cleanup() {
+  if [[ -z "${CLEANUP_REQUIRED}" ]]; then
+    return
+  fi
   kube::log::status "Cleaning up etcd"
   kube::etcd::cleanup
+  CLEANUP_REQUIRED=
   kube::log::status "Integration test cleanup complete"
 }
 
 runTests() {
   kube::log::status "Starting etcd instance"
+  CLEANUP_REQUIRED=1
   kube::etcd::start
   kube::log::status "Running integration test cases"
 
