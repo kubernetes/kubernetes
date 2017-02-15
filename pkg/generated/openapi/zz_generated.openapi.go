@@ -3203,6 +3203,13 @@ var OpenAPIDefinitions *openapi.OpenAPIDefinitions = &openapi.OpenAPIDefinitions
 							Format:      "int32",
 						},
 					},
+					"failureThreshold": {
+						SchemaProps: spec.SchemaProps{
+							Description: "FailureThreshold specifies the desire to have a job finish after a set number of failures occur. Setting this value means that the failure of any pod will contribute to the threshold and and signal all pods to finish once the threshold is met. More info: http://kubernetes.io/docs/user-guide/jobs",
+							Type:        []string{"integer"},
+							Format:      "int32",
+						},
+					},
 					"activeDeadlineSeconds": {
 						SchemaProps: spec.SchemaProps{
 							Description: "Optional duration in seconds relative to the startTime that the job may be active before the system tries to terminate it; value must be positive integer",
@@ -15681,6 +15688,13 @@ var OpenAPIDefinitions *openapi.OpenAPIDefinitions = &openapi.OpenAPIDefinitions
 					"completions": {
 						SchemaProps: spec.SchemaProps{
 							Description: "Completions specifies the desired number of successfully finished pods the job should be run with.  Setting to nil means that the success of any pod signals the success of all pods, and allows parallelism to have any positive value.  Setting to 1 means that parallelism is limited to 1 and the success of that pod signals the success of the job. More info: http://kubernetes.io/docs/user-guide/jobs",
+							Type:        []string{"integer"},
+							Format:      "int32",
+						},
+					},
+					"failureThreshold": {
+						SchemaProps: spec.SchemaProps{
+							Description: "FailureThreshold specifies the desire to have a job finish after a set number of failures occur. Setting this value means that the failure of any pod will contribute to the threshold and and signal all pods to finish once the threshold is met. More info: http://kubernetes.io/docs/user-guide/jobs",
 							Type:        []string{"integer"},
 							Format:      "int32",
 						},

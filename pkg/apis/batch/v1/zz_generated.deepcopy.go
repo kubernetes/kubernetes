@@ -108,6 +108,11 @@ func DeepCopy_v1_JobSpec(in interface{}, out interface{}, c *conversion.Cloner) 
 			*out = new(int32)
 			**out = **in
 		}
+		if in.FailureThreshold != nil {
+			in, out := &in.FailureThreshold, &out.FailureThreshold
+			*out = new(int32)
+			**out = **in
+		}
 		if in.ActiveDeadlineSeconds != nil {
 			in, out := &in.ActiveDeadlineSeconds, &out.ActiveDeadlineSeconds
 			*out = new(int64)

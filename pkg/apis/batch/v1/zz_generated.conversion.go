@@ -152,6 +152,7 @@ func Convert_batch_JobList_To_v1_JobList(in *batch.JobList, out *JobList, s conv
 func autoConvert_v1_JobSpec_To_batch_JobSpec(in *JobSpec, out *batch.JobSpec, s conversion.Scope) error {
 	out.Parallelism = (*int32)(unsafe.Pointer(in.Parallelism))
 	out.Completions = (*int32)(unsafe.Pointer(in.Completions))
+	// WARNING: in.FailureThreshold requires manual conversion: does not exist in peer-type
 	out.ActiveDeadlineSeconds = (*int64)(unsafe.Pointer(in.ActiveDeadlineSeconds))
 	out.Selector = (*meta_v1.LabelSelector)(unsafe.Pointer(in.Selector))
 	out.ManualSelector = (*bool)(unsafe.Pointer(in.ManualSelector))
