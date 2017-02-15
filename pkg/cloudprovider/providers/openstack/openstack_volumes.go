@@ -316,6 +316,8 @@ func (os *OpenStack) GetDevicePath(diskId string) string {
 	candidateDeviceNodes := []string{
 		// KVM
 		fmt.Sprintf("virtio-%s", diskId[:20]),
+		// KVM virtio-scsi
+		fmt.Sprintf("scsi-0QEMU_QEMU_HARDDISK_%s", diskId[:20]),
 		// ESXi
 		fmt.Sprintf("wwn-0x%s", strings.Replace(diskId, "-", "", -1)),
 	}
