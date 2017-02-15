@@ -242,22 +242,22 @@ func copyAndReplace(set sets.String, replaceWhat, replaceWith string) sets.Strin
 
 // GetEquivalencePod returns a EquivalencePod which contains a group of pod attributes which can be reused.
 func GetEquivalencePod(pod *v1.Pod) interface{} {
-	equivalencePod := EquivalencePod{}
 	// For now we only consider pods:
 	// 1. OwnerReferences is Controller
-	// 2. OwnerReferences kind is in valid controller kinds
-	// 3. with same OwnerReferences
+	// 2. with same OwnerReferences
 	// to be equivalent
 	if len(pod.OwnerReferences) != 0 {
 		for _, ref := range pod.OwnerReferences {
 			if *ref.Controller {
-				equivalencePod.ControllerRef = ref
+				equivalencePod := EquivalencePod{
+					ControllerRef: ref,
+				}
 				// a pod can only belongs to one controller
-				break
+				return &equivalencePod
 			}
 		}
 	}
-	return &equivalencePod
+	return nil
 }
 
 // EquivalencePod is a group of pod attributes which can be reused as equivalence to schedule other pods.
