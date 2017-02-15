@@ -79,7 +79,8 @@ func (p *azureDiskProvisioner) Provision() (*v1.PersistentVolume, error) {
 		}
 	}
 
-	var storageAccountType, fsType, cachingMode string
+	var storageAccountType, fsType string
+	var cachingMode v1.AzureDataDiskCachingMode
 	var kind v1.AzureDataDiskKind
 	var err error
 
@@ -102,7 +103,7 @@ func (p *azureDiskProvisioner) Provision() (*v1.PersistentVolume, error) {
 		case "kind":
 			kind = v1.AzureDataDiskKind(strings.ToLower(v))
 		case "cachingmode":
-			cachingMode = strings.ToLower(v)
+			cachingMode = v1.AzureDataDiskCachingMode(strings.ToLower(v))
 		case "fstype":
 			fsType = strings.ToLower(v)
 		default:
@@ -158,7 +159,7 @@ func (p *azureDiskProvisioner) Provision() (*v1.PersistentVolume, error) {
 			},
 			PersistentVolumeSource: v1.PersistentVolumeSource{
 				AzureDisk: &v1.AzureDiskVolumeSource{
-					CachingMode: cachingMode,
+					CachingMode: &cachingMode,
 					DiskName:    name,
 					DataDiskURI: diskUri,
 					Kind:        &kind,

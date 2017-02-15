@@ -172,12 +172,12 @@ func normalizeStorageAccountType(storageAccountType string) (string, error) {
 	return storageAccountType, nil
 }
 
-func normalizeCachingMode(cachingMode string) (string, error) {
+func normalizeCachingMode(cachingMode v1.AzureDataDiskCachingMode) (v1.AzureDataDiskCachingMode, error) {
 	if cachingMode == "" {
-		return default_caching_mode, nil
+		return v1.AzureDataDiskCachingMode(default_caching_mode), nil
 	}
 
-	if !supportedCachingModes.Has(cachingMode) {
+	if !supportedCachingModes.Has(string(cachingMode)) {
 		return "", fmt.Errorf("azureDisk - %s is not supported cachingmode. Supported values are %s", cachingMode, supportedCachingModes.List())
 	}
 	return cachingMode, nil
