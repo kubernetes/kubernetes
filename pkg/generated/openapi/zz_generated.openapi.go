@@ -10710,9 +10710,16 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 						},
 						"clusterDNS": {
 							SchemaProps: spec.SchemaProps{
-								Description: "clusterDNS is the IP address for a cluster DNS server.  If set, kubelet will configure all containers to use this for DNS resolution in addition to the host's DNS servers",
-								Type:        []string{"string"},
-								Format:      "",
+								Description: "clusterDNS is a list of IP address for the cluster DNS server.  If set, kubelet will configure all containers to use this for DNS resolution instead of the host's DNS servers",
+								Type:        []string{"array"},
+								Items: &spec.SchemaOrArray{
+									Schema: &spec.Schema{
+										SchemaProps: spec.SchemaProps{
+											Type:   []string{"string"},
+											Format: "",
+										},
+									},
+								},
 							},
 						},
 						"streamingConnectionIdleTimeout": {
