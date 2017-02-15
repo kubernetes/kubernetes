@@ -20,7 +20,6 @@ go_library(
         "//pkg/proxy/healthcheck:go_default_library",
         "//pkg/util/exec:go_default_library",
         "//pkg/util/iptables:go_default_library",
-        "//pkg/util/slice:go_default_library",
         "//pkg/util/sysctl:go_default_library",
         "//pkg/util/version:go_default_library",
         "//vendor:github.com/davecgh/go-spew/spew",
