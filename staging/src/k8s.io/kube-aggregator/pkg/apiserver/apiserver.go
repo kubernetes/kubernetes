@@ -21,6 +21,7 @@ import (
 	"os"
 	"time"
 
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	genericapifilters "k8s.io/apiserver/pkg/endpoints/filters"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
@@ -69,6 +70,8 @@ type APIAggregator struct {
 
 	// proxyHandlers are the proxy handlers that are currently registered, keyed by apiservice.name
 	proxyHandlers map[string]*proxyHandler
+	// handledGroups are the groups that already have routes
+	handledGroups sets.String
 
 	// lister is used to add group handling for /apis/<group> aggregator lookups based on
 	// controller state
@@ -131,6 +134,7 @@ func (c completedConfig) New() (*APIAggregator, error) {
 		proxyClientCert:  c.ProxyClientCert,
 		proxyClientKey:   c.ProxyClientKey,
 		proxyHandlers:    map[string]*proxyHandler{},
+		handledGroups:    sets.String{},
 		lister:           informerFactory.Apiregistration().InternalVersion().APIServices().Lister(),
 		serviceLister:    kubeInformers.Core().V1().Services().Lister(),
 		endpointsLister:  kubeInformers.Core().V1().Endpoints().Lister(),
@@ -233,6 +237,11 @@ func (s *APIAggregator) AddAPIService(apiService *apiregistration.APIService) {
 		return
 	}
 
+	// if we've already registered the path with the handler, we don't want to do it again.
+	if s.handledGroups.Has(apiService.Spec.Group) {
+		return
+	}
+
 	// it's time to register the group aggregation endpoint
 	groupPath := "/apis/" + apiService.Spec.Group
 	groupDiscoveryHandler := &apiGroupHandler{
@@ -244,7 +253,7 @@ func (s *APIAggregator) AddAPIService(apiService *apiregistration.APIService) {
 	// aggregation is protected
 	s.GenericAPIServer.HandlerContainer.UnlistedRoutes.Handle(groupPath, groupDiscoveryHandler)
 	s.GenericAPIServer.HandlerContainer.UnlistedRoutes.Handle(groupPath+"/", groupDiscoveryHandler)
-
+	s.handledGroups.Insert(apiService.Spec.Group)
 }
 
 // RemoveAPIService removes the APIService from being handled.  Later on it will disable the proxy endpoint.
