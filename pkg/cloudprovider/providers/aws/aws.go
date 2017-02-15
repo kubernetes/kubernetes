@@ -1225,7 +1225,7 @@ func (c *Cloud) getMountDevice(
 	if deviceAllocator == nil {
 		// we want device names with two significant characters, starting with
 		// /dev/xvdba (leaving xvda - xvdz and xvdaa-xvdaz to the system)
-		deviceAllocator = NewDeviceAllocator(2, "ba")
+		deviceAllocator = NewDeviceAllocator(0)
 		c.deviceAllocators[i.nodeName] = deviceAllocator
 	}
 	chosen, err := deviceAllocator.GetNext(deviceMappings)
