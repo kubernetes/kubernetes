@@ -9,6 +9,7 @@ reviewers:
   - smarterclayton
   - spxtr
   - sttts
+  - soltysh
 approvers:
   - deads2k
   - fejta
@@ -23,3 +24,4 @@ approvers:
   - janetkuo
   - kargakis
   - gmarek
+  - soltysh
