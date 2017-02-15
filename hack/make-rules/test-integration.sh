@@ -93,6 +93,7 @@ trap cleanup EXIT
 # If a test case is specified, just run once with v1 API version and exit
 if [[ -n "${KUBE_TEST_ARGS}" ]]; then
   runTests v1
+  exit 0
 fi
 
 # Pass arguments that begin with "-" and move them to goflags.
