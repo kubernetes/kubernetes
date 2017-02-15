@@ -174,10 +174,7 @@ func newTestKubeletWithImageList(
 	kubelet.cadvisor = mockCadvisor
 
 	fakeMirrorClient := podtest.NewFakeMirrorClient()
-	secretManager, err := secret.NewSimpleSecretManager(kubelet.kubeClient)
-	if err != nil {
-		t.Fatalf("can't create a secret manager: %v", err)
-	}
+	secretManager := secret.NewSimpleSecretManager(kubelet.kubeClient)
 	kubelet.secretManager = secretManager
 	kubelet.podManager = kubepod.NewBasicPodManager(fakeMirrorClient, kubelet.secretManager)
 	kubelet.statusManager = status.NewManager(fakeKubeClient, kubelet.podManager)
