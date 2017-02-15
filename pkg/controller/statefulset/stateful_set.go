@@ -45,8 +45,6 @@ import (
 )
 
 const (
-	// Time to sleep before polling to see if the pod cache has synced.
-	PodStoreSyncedPollPeriod = 100 * time.Millisecond
 	// period to relist statefulsets and verify pets
 	statefulSetResyncPeriod = 30 * time.Second
 )
@@ -55,18 +53,18 @@ const (
 type StatefulSetController struct {
 	// client interface
 	kubeClient clientset.Interface
-	// newSyncer returns an interface capable of syncing a single pet.
+	// control returns an interface capable of syncing a stateful set.
 	// Abstracted out for testing.
 	control StatefulSetControlInterface
 	// podStore is a cache of watched pods.
 	podStore listers.StoreToPodLister
 	// podStoreSynced returns true if the pod store has synced at least once.
 	podStoreSynced cache.InformerSynced
-	// A store of StatefulSets, populated by the psController.
+	// A store of StatefulSets, populated by setController.
 	setStore listers.StoreToStatefulSetLister
 	// Watches changes to all StatefulSets.
 	setController cache.Controller
-	// Controllers that need to be synced.
+	// StatefulSets that need to be synced.
 	queue workqueue.RateLimitingInterface
 }
 
@@ -128,6 +126,7 @@ func (ssc *StatefulSetController) Run(workers int, stopCh <-chan struct{}) {
 	defer ssc.queue.ShutDown()
 	glog.Infof("Starting statefulset controller")
 	if !cache.WaitForCacheSync(stopCh, ssc.podStoreSynced) {
+		utilruntime.HandleError(fmt.Errorf("timed out waiting for caches to sync"))
 		return
 	}
 	go ssc.setController.Run(stopCh)
@@ -267,7 +266,6 @@ func (ssc *StatefulSetController) processNextWorkItem() bool {
 // worker runs a worker goroutine that invokes processNextWorkItem until the the controller's queue is closed
 func (ssc *StatefulSetController) worker() {
 	for ssc.processNextWorkItem() {
-
 	}
 }
 
