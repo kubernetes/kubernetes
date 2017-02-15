@@ -13,7 +13,6 @@ go_library(
     srcs = [
         "addon_update.go",
         "apparmor.go",
-        "autoscaling_utils.go",
         "cadvisor.go",
         "cluster_logging_es.go",
         "cluster_logging_gcl.go",
@@ -111,7 +110,6 @@ go_library(
         "//pkg/api/v1/pod:go_default_library",
         "//pkg/api/v1/service:go_default_library",
         "//pkg/apis/apps/v1beta1:go_default_library",
-        "//pkg/apis/autoscaling/v1:go_default_library",
         "//pkg/apis/batch:go_default_library",
         "//pkg/apis/batch/v1:go_default_library",
         "//pkg/apis/batch/v2alpha1:go_default_library",
