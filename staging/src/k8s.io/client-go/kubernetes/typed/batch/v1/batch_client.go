@@ -22,6 +22,7 @@ import (
 	serializer "k8s.io/apimachinery/pkg/runtime/serializer"
 	api "k8s.io/client-go/pkg/api"
 	rest "k8s.io/client-go/rest"
+	"k8s.io/apimachinery/pkg/runtime"
 )
 
 type BatchV1Interface interface {
@@ -32,10 +33,11 @@ type BatchV1Interface interface {
 // BatchV1Client is used to interact with features provided by the batch group.
 type BatchV1Client struct {
 	restClient rest.Interface
+	parameterCodec runtime.ParameterCodec
 }
 
 func (c *BatchV1Client) Jobs(namespace string) JobInterface {
-	return newJobs(c, namespace)
+	return newJobs(c, namespace, c.parameterCodec)
 }
 
 // NewForConfig creates a new BatchV1Client for the given config.
@@ -48,7 +50,7 @@ func NewForConfig(c *rest.Config) (*BatchV1Client, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &BatchV1Client{client}, nil
+	return &BatchV1Client{client, c.ParameterCodec}, nil
 }
 
 // NewForConfigOrDie creates a new BatchV1Client for the given config and
@@ -61,9 +63,9 @@ func NewForConfigOrDie(c *rest.Config) *BatchV1Client {
 	return client
 }
 
-// New creates a new BatchV1Client for the given RESTClient.
-func New(c rest.Interface) *BatchV1Client {
-	return &BatchV1Client{c}
+// New creates a new BatchV1Client for the given RESTClient. Only used and meant for testing.
+func New(c rest.Interface, parameterCodec runtime.ParameterCodec) *BatchV1Client {
+	return &BatchV1Client{c, parameterCodec}
 }
 
 func setConfigDefaults(config *rest.Config) error {
@@ -81,8 +83,6 @@ func setConfigDefaults(config *rest.Config) error {
 	}
 	copyGroupVersion := gv
 	config.GroupVersion = &copyGroupVersion
-
-	config.NegotiatedSerializer = serializer.DirectCodecFactory{CodecFactory: api.Codecs}
 
 	return nil
 }

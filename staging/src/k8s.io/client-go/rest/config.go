@@ -166,6 +166,8 @@ type ContentConfig struct {
 	// NegotiatedSerializer is used for obtaining encoders and decoders for multiple
 	// supported media types.
 	NegotiatedSerializer runtime.NegotiatedSerializer
+
+	ParameterCodec runtime.ParameterCodec
 }
 
 // RESTClientFor returns a RESTClient that satisfies the requested attributes on a client Config

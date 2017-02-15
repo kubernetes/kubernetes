@@ -18,6 +18,7 @@ package kubernetes
 
 import (
 	"github.com/golang/glog"
+	"k8s.io/apimachinery/pkg/runtime/serializer"
 	discovery "k8s.io/client-go/discovery"
 	v1beta1apps "k8s.io/client-go/kubernetes/typed/apps/v1beta1"
 	v1authentication "k8s.io/client-go/kubernetes/typed/authentication/v1"
@@ -350,6 +351,13 @@ func NewForConfig(c *rest.Config) (*Clientset, error) {
 	if configShallowCopy.RateLimiter == nil && configShallowCopy.QPS > 0 {
 		configShallowCopy.RateLimiter = flowcontrol.NewTokenBucketRateLimiter(configShallowCopy.QPS, configShallowCopy.Burst)
 	}
+	if configShallowCopy.ParameterCodec == nil {
+		configShallowCopy.ParameterCodec = parameterCodec
+	}
+	if configShallowCopy.NegotiatedSerializer == nil {
+		configShallowCopy.NegotiatedSerializer = serializer.DirectCodecFactory{CodecFactory: codecs}
+	}
+
 	var cs Clientset
 	var err error
 	cs.CoreV1Client, err = v1core.NewForConfig(&configShallowCopy)
@@ -461,7 +469,7 @@ func New(c rest.Interface) *Clientset {
 	cs.AuthorizationV1beta1Client = v1beta1authorization.New(c)
 	cs.AutoscalingV1Client = v1autoscaling.New(c)
 	cs.AutoscalingV2alpha1Client = v2alpha1autoscaling.New(c)
-	cs.BatchV1Client = v1batch.New(c)
+	cs.BatchV1Client = v1batch.New(c, parameterCodec)
 	cs.BatchV2alpha1Client = v2alpha1batch.New(c)
 	cs.CertificatesV1beta1Client = v1beta1certificates.New(c)
 	cs.ExtensionsV1beta1Client = v1beta1extensions.New(c)
