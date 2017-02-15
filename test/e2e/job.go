@@ -210,6 +210,31 @@ var _ = framework.KubeDescribe("Job", func() {
 		}
 		Expect(err).NotTo(HaveOccurred())
 	})
+
+	It("should fail a job if pod fails more than failure threshold", func() {
+		By("Creating a job")
+		job := newTestJob("fail", "foo", api.RestartPolicyNever, parallelism, completions)
+		failureThreshold := int32(2)
+		job.Spec.FailureThreshold = &failureThreshold
+		job, err := createJob(f.ClientSet, f.Namespace.Name, job)
+		Expect(err).NotTo(HaveOccurred())
+
+		By("Ensuring job was failed")
+		err = waitForJobFail(f.ClientSet, f.Namespace.Name, job.Name, 20*time.Second)
+		if err == wait.ErrWaitTimeout {
+			job, err = getJob(f.ClientSet, f.Namespace.Name, job.Name)
+			Expect(err).NotTo(HaveOccurred())
+			// the job stabilized and won't be synced until modification or full
+			// resync happens, we don't want to wait for the latter so we force
+			// sync modifying it
+			_, err = framework.UpdateJobWithRetries(f.ClientSet, f.Namespace.Name, job.Name, func(update *batch.Job) {
+				update.Spec.Parallelism = &completions
+			})
+			Expect(err).NotTo(HaveOccurred())
+			err = waitForJobFail(f.ClientSet, f.Namespace.Name, job.Name, jobTimeout)
+		}
+		Expect(err).NotTo(HaveOccurred())
+	})
 })
 
 // newTestJob returns a job which does one of several testing behaviors.
@@ -219,8 +244,8 @@ func newTestJob(behavior, name string, rPol v1.RestartPolicy, parallelism, compl
 			Name: name,
 		},
 		Spec: batch.JobSpec{
-			Parallelism:    &parallelism,
-			Completions:    &completions,
+			Parallelism:      &parallelism,
+			Completions:      &completions,
 			ManualSelector: newBool(false),
 			Template: v1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{

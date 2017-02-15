@@ -74,6 +74,13 @@ type JobSpec struct {
 	// +optional
 	Completions *int32 `json:"completions,omitempty" protobuf:"varint,2,opt,name=completions"`
 
+	// FailureThreshold specifies the desire to have a job finish after a set number of failures occur.
+	// Setting this value means that the failure of any pod will contribute to the threshold and and signal all pods
+	// to finish once the threshold is met.
+	// More info: http://kubernetes.io/docs/user-guide/jobs
+	// +optional
+	FailureThreshold *int32 `json:"failureThreshold,omitempty" protobuf:"varint,2,opt,name=failureThreshold"`
+
 	// Optional duration in seconds relative to the startTime that the job may be active
 	// before the system tries to terminate it; value must be positive integer
 	// +optional

@@ -57,6 +57,7 @@ func addConversionFuncs(scheme *runtime.Scheme) error {
 func Convert_batch_JobSpec_To_v2alpha1_JobSpec(in *batch.JobSpec, out *JobSpec, s conversion.Scope) error {
 	out.Parallelism = in.Parallelism
 	out.Completions = in.Completions
+	out.FailureThreshold = in.FailureThreshold
 	out.ActiveDeadlineSeconds = in.ActiveDeadlineSeconds
 	out.Selector = in.Selector
 	if in.ManualSelector != nil {

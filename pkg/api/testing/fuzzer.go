@@ -521,8 +521,10 @@ func batchFuncs(t apitesting.TestingCommon) []interface{} {
 		func(j *batch.JobSpec, c fuzz.Continue) {
 			c.FuzzNoCustom(j) // fuzz self without calling this function again
 			completions := int32(c.Rand.Int31())
+			failureThresholds := int32(c.Rand.Int31())
 			parallelism := int32(c.Rand.Int31())
 			j.Completions = &completions
+			j.FailureThreshold = &failureThresholds
 			j.Parallelism = &parallelism
 			if c.Rand.Int31()%2 == 0 {
 				j.ManualSelector = newBool(true)

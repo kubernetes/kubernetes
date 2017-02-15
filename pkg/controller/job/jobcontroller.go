@@ -325,7 +325,30 @@ func (jm *JobController) syncJob(key string) error {
 	if IsJobFinished(&job) {
 		return nil
 	}
-	if pastActiveDeadline(&job) {
+	if pastFailureThreshold(&job, failed) {
+		// TODO: below code should be replaced with pod termination resulting in
+		// pod failures, rather than killing pods. Unfortunately none such solution
+		// exists ATM. There's an open discussion in the topic in
+		// https://github.com/kubernetes/kubernetes/issues/14602 which might give
+		// some sort of solution to above problem.
+		// kill remaining active pods
+		wait := sync.WaitGroup{}
+		wait.Add(int(active))
+		for i := int32(0); i < active; i++ {
+			go func(ix int32) {
+				defer wait.Done()
+				if err := jm.podControl.DeletePod(job.Namespace, activePods[ix].Name, &job); err != nil {
+					defer utilruntime.HandleError(err)
+				}
+			}(i)
+		}
+		wait.Wait()
+		// update status values accordingly
+		failed += active
+		active = 0
+		job.Status.Conditions = append(job.Status.Conditions, newCondition(batch.JobFailed, "FailureThresholdExceeded", "Job exceeded the failure threshold"))
+		jm.recorder.Event(&job, v1.EventTypeNormal, "FailureThresholdExceeded", "Job exceeded the failure threshold")
+	} else if pastActiveDeadline(&job) {
 		// TODO: below code should be replaced with pod termination resulting in
 		// pod failures, rather than killing pods. Unfortunately none such solution
 		// exists ATM. There's an open discussion in the topic in
@@ -409,6 +432,14 @@ func pastActiveDeadline(job *batch.Job) bool {
 	duration := now.Time.Sub(start)
 	allowedDuration := time.Duration(*job.Spec.ActiveDeadlineSeconds) * time.Second
 	return duration >= allowedDuration
+}
+
+// pastFailureThreshold checks if job has FailureThreshold field set and if it is exceeded.
+func pastFailureThreshold(job *batch.Job, failed int32) bool {
+	if job.Spec.FailureThreshold == nil {
+		return false
+	}
+	return failed >= *job.Spec.FailureThreshold
 }
 
 func newCondition(conditionType batch.JobConditionType, reason, message string) batch.JobCondition {
