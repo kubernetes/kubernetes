@@ -483,6 +483,7 @@ items:
     resources:
     - daemonsets
     - deployments
+    - podsecuritypolicies
     - replicasets
     verbs:
     - list
@@ -520,6 +521,13 @@ items:
     - certificates.k8s.io
     resources:
     - certificatesigningrequests
+    verbs:
+    - list
+    - watch
+  - apiGroups:
+    - storage.k8s.io
+    resources:
+    - storageclasses
     verbs:
     - list
     - watch
