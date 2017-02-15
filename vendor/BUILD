@@ -13856,6 +13856,7 @@ go_library(
         "k8s.io/apimachinery/pkg/api/testing/codec.go",
         "k8s.io/apimachinery/pkg/api/testing/fuzzer.go",
         "k8s.io/apimachinery/pkg/api/testing/roundtrip.go",
+        "k8s.io/apimachinery/pkg/api/testing/valuefuzz.go",
     ],
     tags = ["automanaged"],
     deps = [
@@ -16846,4 +16847,11 @@ go_library(
         "//vendor:k8s.io/kube-aggregator/pkg/apis/apiregistration",
         "//vendor:k8s.io/kube-aggregator/pkg/registry/apiservice",
     ],
+)
+
+go_test(
+    name = "k8s.io/apimachinery/pkg/api/testing_test",
+    srcs = ["k8s.io/apimachinery/pkg/api/testing/valuefuzz_test.go"],
+    library = ":k8s.io/apimachinery/pkg/api/testing",
+    tags = ["automanaged"],
 )
