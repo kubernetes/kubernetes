@@ -1,0 +1,12 @@
+apiVersion: extensions/v1beta1
+kind: Ingress
+metadata:
+  name: pre-shared-cert
+  # This annotation is added by the test upon creating a TLS cert.
+  # annotations:
+  #  kubernetes.io/ingress.pre-shared-cert: "certname"
+spec:
+  backend:
+    serviceName: echoheaders-https
+    servicePort: 80
+
