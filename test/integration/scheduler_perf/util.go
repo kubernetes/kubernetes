@@ -36,6 +36,8 @@ import (
 	"k8s.io/kubernetes/test/integration/framework"
 )
 
+const enableEquivalenceCache = true
+
 // mustSetupScheduler starts the following components:
 // - k8s api server (a.k.a. master)
 // - scheduler
@@ -74,6 +76,7 @@ func mustSetupScheduler() (schedulerConfigurator scheduler.Configurator, destroy
 		informerFactory.Apps().V1beta1().StatefulSets(),
 		informerFactory.Core().V1().Services(),
 		v1.DefaultHardPodAffinitySymmetricWeight,
+		enableEquivalenceCache,
 	)
 
 	eventBroadcaster := record.NewBroadcaster()
