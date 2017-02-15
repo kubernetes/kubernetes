@@ -307,7 +307,6 @@ func runRemoteCommandTest(t *testing.T, commandType string) {
 			Stdout:             stdoutW,
 			Stderr:             stderrW,
 			Tty:                false,
-			TerminalSizeQueue:  nil,
 		}
 		require.NoError(t, exec.Stream(opts))
 	}()
