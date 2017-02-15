@@ -37,12 +37,14 @@ import (
 )
 
 const (
-	syncPeriod = 1 * time.Hour
+	syncPeriod               = 1 * time.Hour
+	ecPrivateKeyHeader       = "EC PRIVATE KEY"
+	certificateRequestHeader = "CERTIFICATE REQUEST"
 )
 
-// Manager maintains and updates the certificates in use by this kubelet. In
-// the background it communicates with the API server to get new certificates
-// for certificates about to expire.
+// Manager maintains and updates the certificates in use by this certificate
+// manager. In the background it communicates with the API server to get new
+// certificates for certificates about to expire.
 type Manager interface {
 	// Start the API server status sync loop.
 	Start()
@@ -58,10 +60,11 @@ type Manager interface {
 // Depending on the concrete implementation, the backing store for this
 // behavior may vary.
 type Store interface {
+	// Current returns the currently selected certificate.
 	Current() (*tls.Certificate, error)
-	// Accepts the PEM data for the cert/key pair and makes the new cert/key
-	// pair the 'current' pair, that will be returned by future calls to
-	// Current().
+	// Update accepts the PEM data for the cert/key pair and makes the new
+	// cert/key pair the 'current' pair, that will be returned by future calls
+	// to Current().
 	Update(cert, key []byte) (*tls.Certificate, error)
 }
 
@@ -72,7 +75,7 @@ type manager struct {
 	certStore                Store
 	certAccessLock           sync.RWMutex
 	cert                     *tls.Certificate
-	shouldRotatePercent      int32
+	shouldRotatePercent      uint
 }
 
 // NewManager returns a new certificate manager. A certificate manager is
@@ -83,7 +86,7 @@ func NewManager(
 	template *x509.CertificateRequest,
 	usages []certificates.KeyUsage,
 	certificateStore Store,
-	certRotationPercent int32) (Manager, error) {
+	certRotationPercent uint) (Manager, error) {
 
 	cert, err := certificateStore.Current()
 	if err != nil {
@@ -106,11 +109,11 @@ func NewManager(
 	return &m, nil
 }
 
-// GetCertificate returns the certificate that should be used TLS connections.
-// The value returned by this function will change over time as the certificate
-// is rotated. If a reference to this method is passed directly into the TLS
-// options for a connection, certificate rotation will be handled correctly by
-// the underlying go libraries.
+// GetCertificate returns the certificate that should be used with TLS
+// connections.  The value returned by this function will change over time as
+// the certificate is rotated. If a reference to this method is passed directly
+// into the TLS options for a connection, certificate rotation will be handled
+// correctly by the underlying go libraries.
 //
 //    tlsOptions := &server.TLSOptions{
 //        ...
@@ -159,7 +162,7 @@ func (m *manager) shouldRotate() bool {
 	notAfter := m.cert.Leaf.NotAfter
 	total := notAfter.Sub(m.cert.Leaf.NotBefore)
 	remaining := notAfter.Sub(time.Now())
-	return int32(remaining*100/total) < m.shouldRotatePercent
+	return remaining < 0 || uint(remaining*100/total) < m.shouldRotatePercent
 }
 
 func (m *manager) rotateCerts() error {
@@ -201,7 +204,7 @@ func (m *manager) generateCSR() (csrPEM []byte, keyPEM []byte, err error) {
 		return nil, nil, fmt.Errorf("unable to marshal the new key to DER: %v", err)
 	}
 
-	keyPEM = pem.EncodeToMemory(&pem.Block{Type: "EC PRIVATE KEY", Bytes: der})
+	keyPEM = pem.EncodeToMemory(&pem.Block{Type: ecPrivateKeyHeader, Bytes: der})
 
 	csrPEM, err = makeCSR(privateKey, m.template)
 	if err != nil {
@@ -236,7 +239,7 @@ func makeCSR(privateKey interface{}, template *x509.CertificateRequest) ([]byte,
 	}
 
 	csrPemBlock := &pem.Block{
-		Type:  "CERTIFICATE REQUEST",
+		Type:  certificateRequestHeader,
 		Bytes: csrDER,
 	}
 
