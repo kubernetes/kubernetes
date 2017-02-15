@@ -261,7 +261,7 @@ var _ = framework.KubeDescribe("Cluster size autoscaling [Slow]", func() {
 			framework.AddOrUpdateLabelOnNode(c, node, labelKey, labelValue)
 		}
 
-		CreateNodeSelectorPods(f, "node-selector", minSize+1, map[string]string{labelKey: labelValue}, false)
+		scheduling.CreateNodeSelectorPods(f, "node-selector", minSize+1, map[string]string{labelKey: labelValue}, false)
 
 		By("Waiting for new node to appear and annotating it")
 		framework.WaitForGroupSize(minMig, int32(minSize+1))
@@ -658,26 +658,6 @@ func doPut(url, content string) (string, error) {
 	}
 	strBody := string(body)
 	return strBody, nil
-}
-
-func CreateNodeSelectorPods(f *framework.Framework, id string, replicas int, nodeSelector map[string]string, expectRunning bool) {
-	By(fmt.Sprintf("Running RC which reserves host port and defines node selector"))
-
-	config := &testutils.RCConfig{
-		Client:         f.ClientSet,
-		InternalClient: f.InternalClientset,
-		Name:           id,
-		Namespace:      f.Namespace.Name,
-		Timeout:        defaultTimeout,
-		Image:          framework.GetPauseImageName(f.ClientSet),
-		Replicas:       replicas,
-		HostPorts:      map[string]int{"port1": 4321},
-		NodeSelector:   nodeSelector,
-	}
-	err := framework.RunRC(*config)
-	if expectRunning {
-		framework.ExpectNoError(err)
-	}
 }
 
 func ReserveMemory(f *framework.Framework, id string, replicas, megabytes int, expectRunning bool, timeout time.Duration) {
