@@ -928,7 +928,7 @@ func deleteNS(c clientset.Interface, clientPool dynamic.ClientPool, namespace st
 	}
 
 	// wait for namespace to delete or timeout.
-	err := wait.PollImmediate(5*time.Second, timeout, func() (bool, error) {
+	err := wait.PollImmediate(Poll, timeout, func() (bool, error) {
 		if _, err := c.Core().Namespaces().Get(namespace, metav1.GetOptions{}); err != nil {
 			if apierrs.IsNotFound(err) {
 				return true, nil
@@ -3758,6 +3758,12 @@ func NewHostExecPodSpec(ns, name string) *v1.Pod {
 // inside of a shell.
 func RunHostCmd(ns, name, cmd string) (string, error) {
 	return RunKubectl("exec", fmt.Sprintf("--namespace=%v", ns), name, "--", "/bin/sh", "-c", cmd)
+}
+
+// RunHostCmdOnContainer runs the given cmd in the context of the given pod/container
+// using `kubectl exec` inside of a shell.
+func RunHostCmdOnContainer(ns, podName, containerName, cmd string) (string, error) {
+	return RunKubectl("exec", fmt.Sprintf("--namespace=%v", ns), podName, fmt.Sprintf("--container=%v", containerName), "--", "/bin/sh", "-c", cmd)
 }
 
 // RunHostCmdOrDie calls RunHostCmd and dies on error.
