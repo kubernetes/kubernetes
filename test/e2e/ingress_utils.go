@@ -271,10 +271,8 @@ func buildInsecureClient(timeout time.Duration) *http.Client {
 	return &http.Client{Timeout: timeout, Transport: utilnet.SetTransportDefaults(t)}
 }
 
-// createSecret creates a secret containing TLS certificates for the given Ingress.
-// If a secret with the same name already exists in the namespace of the
-// Ingress, it's updated.
-func createSecret(kubeClient clientset.Interface, ing *extensions.Ingress) (host string, rootCA, privKey []byte, err error) {
+// createCertificate creates TLS certificates for the given Ingress.
+func createCertificate(ing *extensions.Ingress) (host string, rootCA, privKey []byte, err error) {
 	var k, c bytes.Buffer
 	tls := ing.Spec.TLS[0]
 	host = strings.Join(tls.Hosts, ",")
@@ -285,6 +283,20 @@ func createSecret(kubeClient clientset.Interface, ing *extensions.Ingress) (host
 	}
 	cert := c.Bytes()
 	key := k.Bytes()
+
+	return host, cert, key, err
+}
+
+// createSecret creates a secret containing TLS certificates for the given Ingress.
+// If a secret with the same name already exists in the namespace of the
+// Ingress, it's updated.
+func createSecret(kubeClient clientset.Interface, ing *extensions.Ingress) (host string, rootCA, privKey []byte, err error) {
+	host, cert, key, err := createCertificate(ing)
+	if err != nil {
+		return
+	}
+
+	tls := ing.Spec.TLS[0]
 	secret := &v1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: tls.SecretName,
@@ -331,6 +343,24 @@ func cleanupGCE(gceController *GCEIngressController) {
 		// of quota anyway.
 		By(fmt.Sprintf("WARNING: possibly leaked static IP: %v\n", ipErr))
 	}
+
+	// TODO:
+	// TLS cert allocated on behalf of the test, never deleted by the
+	// controller. Delete this cert only after the controller has had a chance
+	// to cleanup or it might interfere with the controller, causing it to
+	// throw out confusing events.
+	if certErr := wait.Poll(5*time.Second, framework.LoadBalancerCleanupTimeout, func() (bool, error) {
+		if err := gceController.deleteTLSCertificate(); err != nil {
+			framework.Logf("Failed to delete TLS cert: %v\n", err)
+			return false, nil
+		}
+		return true, nil
+	}); certErr != nil {
+		// If this is a persistent error, the suite will fail when we run out
+		// of quota anyway.
+		By(fmt.Sprintf("WARNING: possibly leaked TLS cert: %v\n", certErr))
+	}
+	// TODO:
 
 	// Always try to cleanup even if pollErr == nil, because the cleanup
 	// routine also purges old leaked resources based on creation timestamp.
@@ -661,6 +691,50 @@ func (cont *GCEIngressController) init() {
 	}
 }
 
+// createTLSCertificate generates a random TLS cert with the given name. Returns
+// a string representing the name of the certificate. Caller is expected to
+// manage cleanup of the cert by invoking deleteTLSCertificate.
+func (j *testJig) createTLSCertificate(cont *GCEIngressController, name string) string {
+	host, cert, key, err := createCertificate(j.ing)
+	if err != nil {
+		framework.Failf("Failed to generate TLS cert %v: %v", name, err)
+	}
+
+	gceCloud := cont.cloud.Provider.(*gcecloud.GCECloud)
+	c, err = gceCloud.CreateSslCertificate(&compute.SslCertificate{
+		Name:        name,
+		Certificate: cert,
+		PrivateKey:  key,
+	})
+	if err != nil {
+		framework.Failf("Failed to create TLS cert %v: %v", name, err)
+	}
+	cont.certName = c.Name
+	framework.Logf("Created TLS cert %v: %v", cont.certName, c.SelfLink)
+	return c.Name
+}
+
+// deleteTLSCertificate deletes all TLS certs allocated through calls to
+// createTLSCertificate.
+func (cont *GCEIngressController) deleteTLSCertificate() error {
+	if cont.certName != "" {
+		if err := gcloudDelete("ssl-certificates", cont.certName, cont.cloud.ProjectID); err == nil {
+			cont.certName = ""
+		} else {
+			return err
+		}
+	} else {
+		e2eCerts := []compute.SslCertificate{}
+		gcloudList("addresses", "e2e-.*", cont.cloud.ProjectID, &e2eCerts)
+		certs := []string{}
+		for _, cert := range e2eCerts {
+			certs = append(certs, cert.Name)
+		}
+		framework.Logf("None of the remaining %d TLS certs were created by this e2e: %v", len(certs), strings.Join(certs, ", "))
+	}
+	return nil
+}
+
 // createStaticIP allocates a random static ip with the given name. Returns a string
 // representation of the ip. Caller is expected to manage cleanup of the ip by
 // invoking deleteStaticIPs.
@@ -977,6 +1051,7 @@ type GCEIngressController struct {
 	rcPath       string
 	UID          string
 	staticIPName string
+	certName     string
 	rc           *v1.ReplicationController
 	svc          *v1.Service
 	c            clientset.Interface
