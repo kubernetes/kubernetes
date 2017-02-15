@@ -24,11 +24,11 @@ import (
 	"time"
 
 	dockertypes "github.com/docker/engine-api/types"
+	"k8s.io/kubernetes/pkg/client/unversioned/remotecommand"
 	runtimeapi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
 	"k8s.io/kubernetes/pkg/kubelet/dockertools"
 	"k8s.io/kubernetes/pkg/kubelet/server/streaming"
 	"k8s.io/kubernetes/pkg/kubelet/util/ioutils"
-	"k8s.io/kubernetes/pkg/util/term"
 )
 
 type streamingRuntime struct {
@@ -38,12 +38,12 @@ type streamingRuntime struct {
 
 var _ streaming.Runtime = &streamingRuntime{}
 
-func (r *streamingRuntime) Exec(containerID string, cmd []string, in io.Reader, out, err io.WriteCloser, tty bool, resize <-chan term.Size) error {
+func (r *streamingRuntime) Exec(containerID string, cmd []string, in io.Reader, out, err io.WriteCloser, tty bool, resize <-chan remotecommand.TerminalSize) error {
 	return r.exec(containerID, cmd, in, out, err, tty, resize, 0)
 }
 
 // Internal version of Exec adds a timeout.
-func (r *streamingRuntime) exec(containerID string, cmd []string, in io.Reader, out, errw io.WriteCloser, tty bool, resize <-chan term.Size, timeout time.Duration) error {
+func (r *streamingRuntime) exec(containerID string, cmd []string, in io.Reader, out, errw io.WriteCloser, tty bool, resize <-chan remotecommand.TerminalSize, timeout time.Duration) error {
 	container, err := checkContainerStatus(r.client, containerID)
 	if err != nil {
 		return err
@@ -51,7 +51,7 @@ func (r *streamingRuntime) exec(containerID string, cmd []string, in io.Reader, 
 	return r.execHandler.ExecInContainer(r.client, container, cmd, in, out, errw, tty, resize, timeout)
 }
 
-func (r *streamingRuntime) Attach(containerID string, in io.Reader, out, errw io.WriteCloser, tty bool, resize <-chan term.Size) error {
+func (r *streamingRuntime) Attach(containerID string, in io.Reader, out, errw io.WriteCloser, tty bool, resize <-chan remotecommand.TerminalSize) error {
 	_, err := checkContainerStatus(r.client, containerID)
 	if err != nil {
 		return err

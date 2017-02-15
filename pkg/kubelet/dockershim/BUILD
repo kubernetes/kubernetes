@@ -29,6 +29,7 @@ go_library(
     deps = [
         "//pkg/api/v1:go_default_library",
         "//pkg/apis/componentconfig:go_default_library",
+        "//pkg/client/unversioned/remotecommand:go_default_library",
         "//pkg/kubelet/api:go_default_library",
         "//pkg/kubelet/api/v1alpha1/runtime:go_default_library",
         "//pkg/kubelet/cm:go_default_library",
@@ -48,7 +49,6 @@ go_library(
         "//pkg/kubelet/util/cache:go_default_library",
         "//pkg/kubelet/util/ioutils:go_default_library",
         "//pkg/util/hash:go_default_library",
-        "//pkg/util/term:go_default_library",
         "//vendor:github.com/blang/semver",
         "//vendor:github.com/docker/engine-api/types",
         "//vendor:github.com/docker/engine-api/types/container",
