@@ -19,7 +19,7 @@ go_library(
     deps = [
         "//cmd/kubeadm/app/apis/kubeadm:go_default_library",
         "//cmd/kubeadm/app/phases/kubeconfig:go_default_library",
-        "//cmd/kubeadm/app/util:go_default_library",
+        "//cmd/kubeadm/app/util/token:go_default_library",
         "//pkg/apis/certificates:go_default_library",
         "//pkg/client/clientset_generated/clientset:go_default_library",
         "//pkg/kubelet/util/csr:go_default_library",

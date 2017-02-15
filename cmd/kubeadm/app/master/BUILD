@@ -16,7 +16,6 @@ go_library(
         "manifests.go",
         "selfhosted.go",
         "templates.go",
-        "tokens.go",
     ],
     tags = ["automanaged"],
     deps = [
@@ -35,7 +34,6 @@ go_library(
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
         "//vendor:k8s.io/apimachinery/pkg/runtime",
         "//vendor:k8s.io/apimachinery/pkg/util/intstr",
-        "//vendor:k8s.io/apimachinery/pkg/util/uuid",
         "//vendor:k8s.io/apimachinery/pkg/util/wait",
         "//vendor:k8s.io/client-go/tools/clientcmd",
         "//vendor:k8s.io/client-go/util/cert",
