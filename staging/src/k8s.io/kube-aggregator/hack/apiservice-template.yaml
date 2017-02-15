@@ -8,5 +8,5 @@ spec:
   service:
     namespace: SERVICE_NAMESPACE
     name: SERVICE_NAME
-  insecureSkipTLSVerify: true
+  caBundle: CA_BUNDLE
   priority: 100
