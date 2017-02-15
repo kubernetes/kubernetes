@@ -16330,3 +16330,21 @@ go_library(
         "//vendor:k8s.io/client-go/tools/cache",
     ],
 )
+
+go_library(
+    name = "k8s.io/client-go/scale",
+    srcs = [
+        "k8s.io/client-go/scale/client.go",
+        "k8s.io/client-go/scale/doc.go",
+        "k8s.io/client-go/scale/interfaces.go",
+    ],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:k8s.io/apimachinery/pkg/api/meta",
+        "//vendor:k8s.io/apimachinery/pkg/runtime/schema",
+        "//vendor:k8s.io/client-go/dynamic",
+        "//vendor:k8s.io/client-go/pkg/api",
+        "//vendor:k8s.io/client-go/pkg/apis/autoscaling/v1",
+        "//vendor:k8s.io/client-go/rest",
+    ],
+)

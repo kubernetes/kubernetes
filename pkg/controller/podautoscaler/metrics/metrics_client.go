@@ -29,28 +29,29 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/kubernetes/pkg/api/v1"
+	autoscaling "k8s.io/kubernetes/pkg/apis/autoscaling/v2alpha1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	v1core "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/core/v1"
 )
 
-// PodResourceInfo contains pod resourcemetric values as a map from pod names to
-// metric values
-type PodResourceInfo map[string]int64
-
-// PodMetricsInfo contains pod resourcemetric values as a map from pod names to
-// metric values
-type PodMetricsInfo map[string]float64
+// PodMetricsInfo contains pod metric values as a map from pod names to
+// metric values (the metric values are expected to be the metric as a milli-value)
+type PodMetricsInfo map[string]int64
 
 // MetricsClient knows how to query a remote interface to retrieve container-level
 // resource metrics as well as pod-level arbitrary metrics
 type MetricsClient interface {
 	// GetResourceMetric gets the given resource metric (and an associated oldest timestamp)
 	// for all pods matching the specified selector in the given namespace
-	GetResourceMetric(resource v1.ResourceName, namespace string, selector labels.Selector) (PodResourceInfo, time.Time, error)
+	GetResourceMetric(resource v1.ResourceName, namespace string, selector labels.Selector) (PodMetricsInfo, time.Time, error)
 
 	// GetRawMetric gets the given metric (and an associated oldest timestamp)
 	// for all pods matching the specified selector in the given namespace
 	GetRawMetric(metricName string, namespace string, selector labels.Selector) (PodMetricsInfo, time.Time, error)
+
+	// GetObjectMetric gets the given metric (and an associated timestamp) for the given
+	// object in the given namespace
+	GetObjectMetric(metricName string, namespace string, objectRef *autoscaling.CrossVersionObjectReference) (int64, time.Time, error)
 }
 
 const (
@@ -80,7 +81,7 @@ func NewHeapsterMetricsClient(client clientset.Interface, namespace, scheme, ser
 	}
 }
 
-func (h *HeapsterMetricsClient) GetResourceMetric(resource v1.ResourceName, namespace string, selector labels.Selector) (PodResourceInfo, time.Time, error) {
+func (h *HeapsterMetricsClient) GetResourceMetric(resource v1.ResourceName, namespace string, selector labels.Selector) (PodMetricsInfo, time.Time, error) {
 	metricPath := fmt.Sprintf("/apis/metrics/v1alpha1/namespaces/%s/pods", namespace)
 	params := map[string]string{"labelSelector": selector.String()}
 
@@ -88,7 +89,7 @@ func (h *HeapsterMetricsClient) GetResourceMetric(resource v1.ResourceName, name
 		ProxyGet(h.heapsterScheme, h.heapsterService, h.heapsterPort, metricPath, params).
 		DoRaw()
 	if err != nil {
-		return nil, time.Time{}, fmt.Errorf("failed to get heapster service: %v", err)
+		return nil, time.Time{}, fmt.Errorf("failed to get pod resource metrics: %v", err)
 	}
 
 	glog.V(4).Infof("Heapster metrics result: %s", string(resultRaw))
@@ -103,7 +104,7 @@ func (h *HeapsterMetricsClient) GetResourceMetric(resource v1.ResourceName, name
 		return nil, time.Time{}, fmt.Errorf("no metrics returned from heapster")
 	}
 
-	res := make(PodResourceInfo, len(metrics.Items))
+	res := make(PodMetricsInfo, len(metrics.Items))
 
 	for _, m := range metrics.Items {
 		podSum := int64(0)
@@ -155,7 +156,7 @@ func (h *HeapsterMetricsClient) GetRawMetric(metricName string, namespace string
 		ProxyGet(h.heapsterScheme, h.heapsterService, h.heapsterPort, metricPath, map[string]string{"start": startTime.Format(time.RFC3339)}).
 		DoRaw()
 	if err != nil {
-		return nil, time.Time{}, fmt.Errorf("failed to get heapster service: %v", err)
+		return nil, time.Time{}, fmt.Errorf("failed to get pod metrics: %v", err)
 	}
 
 	var metrics heapster.MetricResultList
@@ -192,7 +193,11 @@ func (h *HeapsterMetricsClient) GetRawMetric(metricName string, namespace string
 	return res, *timestamp, nil
 }
 
-func collapseTimeSamples(metrics heapster.MetricResult, duration time.Duration) (float64, time.Time, bool) {
+func (h *HeapsterMetricsClient) GetObjectMetric(metricName string, namespace string, objectRef *autoscaling.CrossVersionObjectReference) (int64, time.Time, error) {
+	return 0, time.Time{}, fmt.Errorf("object metrics are not yet supported")
+}
+
+func collapseTimeSamples(metrics heapster.MetricResult, duration time.Duration) (int64, time.Time, bool) {
 	floatSum := float64(0)
 	intSum := int64(0)
 	intSumCount := 0
@@ -217,9 +222,9 @@ func collapseTimeSamples(metrics heapster.MetricResult, duration time.Duration) 
 		}
 
 		if newest.FloatValue != nil {
-			return floatSum / float64(floatSumCount), newest.Timestamp, true
+			return int64(floatSum / float64(floatSumCount) * 1000), newest.Timestamp, true
 		} else {
-			return float64(intSum / int64(intSumCount)), newest.Timestamp, true
+			return (intSum * 1000) / int64(intSumCount), newest.Timestamp, true
 		}
 	}
 

@@ -22,6 +22,7 @@ import (
 
 	"github.com/golang/glog"
 
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/registry/generic"
@@ -31,7 +32,6 @@ import (
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	extensionsapiv1beta1 "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	extensionsclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/extensions/internalversion"
-	expcontrollerstore "k8s.io/kubernetes/pkg/registry/extensions/controller/storage"
 	daemonstore "k8s.io/kubernetes/pkg/registry/extensions/daemonset/storage"
 	deploymentstore "k8s.io/kubernetes/pkg/registry/extensions/deployment/storage"
 	ingressstore "k8s.io/kubernetes/pkg/registry/extensions/ingress/storage"
@@ -47,10 +47,17 @@ type RESTStorageProvider struct {
 
 func (p RESTStorageProvider) NewRESTStorage(apiResourceConfigSource genericapiserver.APIResourceConfigSource, restOptionsGetter generic.RESTOptionsGetter) (genericapiserver.APIGroupInfo, bool) {
 	apiGroupInfo := genericapiserver.NewDefaultAPIGroupInfo(extensions.GroupName, api.Registry, api.Scheme, api.ParameterCodec, api.Codecs)
+	apiGroupInfo.SubresourceGroupVersionKind = make(map[string]schema.GroupVersionKind)
 
 	if apiResourceConfigSource.AnyResourcesForVersionEnabled(extensionsapiv1beta1.SchemeGroupVersion) {
 		apiGroupInfo.VersionedResourcesStorageMap[extensionsapiv1beta1.SchemeGroupVersion.Version] = p.v1beta1Storage(apiResourceConfigSource, restOptionsGetter)
 		apiGroupInfo.GroupMeta.GroupVersion = extensionsapiv1beta1.SchemeGroupVersion
+	}
+
+	// use autoscaling.Scale if possible
+	if autoscalingGroupVersion := (schema.GroupVersion{Group: "autoscaling", Version: "v1"}); api.Registry.IsEnabledVersion(autoscalingGroupVersion) {
+		apiGroupInfo.SubresourceGroupVersionKind["deployments/scale"] = autoscalingGroupVersion.WithKind("Scale")
+		apiGroupInfo.SubresourceGroupVersionKind["replicasets/scale"] = autoscalingGroupVersion.WithKind("Scale")
 	}
 
 	return apiGroupInfo, true
@@ -60,12 +67,6 @@ func (p RESTStorageProvider) v1beta1Storage(apiResourceConfigSource genericapise
 	version := extensionsapiv1beta1.SchemeGroupVersion
 
 	storage := map[string]rest.Storage{}
-
-	// This is a dummy replication controller for scale subresource purposes.
-	// TODO: figure out how to enable this only if needed as a part of scale subresource GA.
-	controllerStorage := expcontrollerstore.NewStorage(restOptionsGetter)
-	storage["replicationcontrollers"] = controllerStorage.ReplicationController
-	storage["replicationcontrollers/scale"] = controllerStorage.Scale
 
 	if apiResourceConfigSource.ResourceEnabled(version.WithResource("thirdpartyresources")) {
 		thirdPartyResourceStorage := thirdpartyresourcestore.NewREST(restOptionsGetter)
