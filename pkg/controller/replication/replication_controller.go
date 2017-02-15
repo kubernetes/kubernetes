@@ -63,9 +63,7 @@ func getRCKind() schema.GroupVersionKind {
 
 // ReplicationManager is responsible for synchronizing ReplicationController objects stored
 // in the system with actual running pods.
-// TODO: this really should be called ReplicationController. The only reason why it's a Manager
-// is to distinguish this type from API object "ReplicationController". We should fix this.
-type ReplicationManager struct {
+type ReplicationController struct {
 	kubeClient clientset.Interface
 	podControl controller.PodControlInterface
 
@@ -96,8 +94,8 @@ type ReplicationManager struct {
 	garbageCollectorEnabled bool
 }
 
-// NewReplicationManager configures a replication manager with the specified event recorder
-func NewReplicationManager(podInformer coreinformers.PodInformer, rcInformer coreinformers.ReplicationControllerInformer, kubeClient clientset.Interface, burstReplicas int, lookupCacheSize int, garbageCollectorEnabled bool) *ReplicationManager {
+// NewReplicationController configures a replication manager with the specified event recorder
+func NewReplicationController(podInformer coreinformers.PodInformer, rcInformer coreinformers.ReplicationControllerInformer, kubeClient clientset.Interface, burstReplicas int, lookupCacheSize int, garbageCollectorEnabled bool) *ReplicationController {
 	if kubeClient != nil && kubeClient.Core().RESTClient().GetRateLimiter() != nil {
 		metrics.RegisterMetricAndTrackRateLimiterUsage("replication_controller", kubeClient.Core().RESTClient().GetRateLimiter())
 	}
@@ -106,7 +104,7 @@ func NewReplicationManager(podInformer coreinformers.PodInformer, rcInformer cor
 	eventBroadcaster.StartLogging(glog.Infof)
 	eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: v1core.New(kubeClient.Core().RESTClient()).Events("")})
 
-	rm := &ReplicationManager{
+	rm := &ReplicationController{
 		kubeClient: kubeClient,
 		podControl: controller.RealPodControl{
 			KubeClient: kubeClient,
@@ -147,14 +145,14 @@ func NewReplicationManager(podInformer coreinformers.PodInformer, rcInformer cor
 
 // SetEventRecorder replaces the event recorder used by the replication manager
 // with the given recorder. Only used for testing.
-func (rm *ReplicationManager) SetEventRecorder(recorder record.EventRecorder) {
+func (rm *ReplicationController) SetEventRecorder(recorder record.EventRecorder) {
 	// TODO: Hack. We can't cleanly shutdown the event recorder, so benchmarks
 	// need to pass in a fake.
 	rm.podControl = controller.RealPodControl{KubeClient: rm.kubeClient, Recorder: recorder}
 }
 
 // Run begins watching and syncing.
-func (rm *ReplicationManager) Run(workers int, stopCh <-chan struct{}) {
+func (rm *ReplicationController) Run(workers int, stopCh <-chan struct{}) {
 	defer utilruntime.HandleCrash()
 	defer rm.queue.ShutDown()
 
@@ -176,7 +174,7 @@ func (rm *ReplicationManager) Run(workers int, stopCh <-chan struct{}) {
 // getPodController returns the controller managing the given pod.
 // TODO: Surface that we are ignoring multiple controllers for a single pod.
 // TODO: use ownerReference.Controller to determine if the rc controls the pod.
-func (rm *ReplicationManager) getPodController(pod *v1.Pod) *v1.ReplicationController {
+func (rm *ReplicationController) getPodController(pod *v1.Pod) *v1.ReplicationController {
 	// look up in the cache, if cached and the cache is valid, just return cached value
 	if obj, cached := rm.lookupCache.GetMatchingObject(pod); cached {
 		controller, ok := obj.(*v1.ReplicationController)
@@ -216,7 +214,7 @@ func (rm *ReplicationManager) getPodController(pod *v1.Pod) *v1.ReplicationContr
 }
 
 // isCacheValid check if the cache is valid
-func (rm *ReplicationManager) isCacheValid(pod *v1.Pod, cachedRC *v1.ReplicationController) bool {
+func (rm *ReplicationController) isCacheValid(pod *v1.Pod, cachedRC *v1.ReplicationController) bool {
 	_, err := rm.rcLister.ReplicationControllers(cachedRC.Namespace).Get(cachedRC.Name)
 	// rc has been deleted or updated, cache is invalid
 	if err != nil || !isControllerMatch(pod, cachedRC) {
@@ -241,7 +239,7 @@ func isControllerMatch(pod *v1.Pod, rc *v1.ReplicationController) bool {
 }
 
 // callback when RC is updated
-func (rm *ReplicationManager) updateRC(old, cur interface{}) {
+func (rm *ReplicationController) updateRC(old, cur interface{}) {
 	oldRC := old.(*v1.ReplicationController)
 	curRC := cur.(*v1.ReplicationController)
 
@@ -282,7 +280,7 @@ func (rm *ReplicationManager) updateRC(old, cur interface{}) {
 }
 
 // When a pod is created, enqueue the controller that manages it and update it's expectations.
-func (rm *ReplicationManager) addPod(obj interface{}) {
+func (rm *ReplicationController) addPod(obj interface{}) {
 	pod := obj.(*v1.Pod)
 
 	rc := rm.getPodController(pod)
@@ -308,7 +306,7 @@ func (rm *ReplicationManager) addPod(obj interface{}) {
 // When a pod is updated, figure out what controller/s manage it and wake them
 // up. If the labels of the pod have changed we need to awaken both the old
 // and new controller. old and cur must be *v1.Pod types.
-func (rm *ReplicationManager) updatePod(old, cur interface{}) {
+func (rm *ReplicationController) updatePod(old, cur interface{}) {
 	curPod := cur.(*v1.Pod)
 	oldPod := old.(*v1.Pod)
 	if curPod.ResourceVersion == oldPod.ResourceVersion {
@@ -361,7 +359,7 @@ func (rm *ReplicationManager) updatePod(old, cur interface{}) {
 
 // When a pod is deleted, enqueue the controller that manages the pod and update its expectations.
 // obj could be an *v1.Pod, or a DeletionFinalStateUnknown marker item.
-func (rm *ReplicationManager) deletePod(obj interface{}) {
+func (rm *ReplicationController) deletePod(obj interface{}) {
 	pod, ok := obj.(*v1.Pod)
 
 	// When a delete is dropped, the relist will notice a pod in the store not
@@ -393,7 +391,7 @@ func (rm *ReplicationManager) deletePod(obj interface{}) {
 }
 
 // obj could be an *v1.ReplicationController, or a DeletionFinalStateUnknown marker item.
-func (rm *ReplicationManager) enqueueController(obj interface{}) {
+func (rm *ReplicationController) enqueueController(obj interface{}) {
 	key, err := controller.KeyFunc(obj)
 	if err != nil {
 		glog.Errorf("Couldn't get key for object %+v: %v", obj, err)
@@ -410,7 +408,7 @@ func (rm *ReplicationManager) enqueueController(obj interface{}) {
 }
 
 // obj could be an *v1.ReplicationController, or a DeletionFinalStateUnknown marker item.
-func (rm *ReplicationManager) enqueueControllerAfter(obj interface{}, after time.Duration) {
+func (rm *ReplicationController) enqueueControllerAfter(obj interface{}, after time.Duration) {
 	key, err := controller.KeyFunc(obj)
 	if err != nil {
 		glog.Errorf("Couldn't get key for object %+v: %v", obj, err)
@@ -428,7 +426,7 @@ func (rm *ReplicationManager) enqueueControllerAfter(obj interface{}, after time
 
 // worker runs a worker thread that just dequeues items, processes them, and marks them done.
 // It enforces that the syncHandler is never invoked concurrently with the same key.
-func (rm *ReplicationManager) worker() {
+func (rm *ReplicationController) worker() {
 	workFunc := func() bool {
 		key, quit := rm.queue.Get()
 		if quit {
@@ -456,7 +454,7 @@ func (rm *ReplicationManager) worker() {
 
 // manageReplicas checks and updates replicas for the given replication controller.
 // Does NOT modify <filteredPods>.
-func (rm *ReplicationManager) manageReplicas(filteredPods []*v1.Pod, rc *v1.ReplicationController) error {
+func (rm *ReplicationController) manageReplicas(filteredPods []*v1.Pod, rc *v1.ReplicationController) error {
 	diff := len(filteredPods) - int(*(rc.Spec.Replicas))
 	rcKey, err := controller.KeyFunc(rc)
 	if err != nil {
@@ -580,7 +578,7 @@ func (rm *ReplicationManager) manageReplicas(filteredPods []*v1.Pod, rc *v1.Repl
 // syncReplicationController will sync the rc with the given key if it has had its expectations fulfilled, meaning
 // it did not expect to see any more of its pods created or deleted. This function is not meant to be invoked
 // concurrently with the same key.
-func (rm *ReplicationManager) syncReplicationController(key string) error {
+func (rm *ReplicationController) syncReplicationController(key string) error {
 	trace := utiltrace.New("syncReplicationController: " + key)
 	defer trace.LogIfLong(250 * time.Millisecond)
 
