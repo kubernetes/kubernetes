@@ -156,6 +156,11 @@ func DeepCopy_componentconfig_KubeletConfiguration(in interface{}, out interface
 			*out = make([]string, len(*in))
 			copy(*out, *in)
 		}
+		if in.ClusterDNS != nil {
+			in, out := &in.ClusterDNS, &out.ClusterDNS
+			*out = make([]string, len(*in))
+			copy(*out, *in)
+		}
 		if in.RegisterWithTaints != nil {
 			in, out := &in.RegisterWithTaints, &out.RegisterWithTaints
 			*out = make([]api.Taint, len(*in))
