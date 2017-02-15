@@ -21,11 +21,11 @@ import (
 
 	"github.com/spf13/pflag"
 
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apiserver/pkg/registry/generic"
-	"k8s.io/apiserver/pkg/registry/generic/registry"
+	genericregistry "k8s.io/apiserver/pkg/registry/generic/registry"
 	"k8s.io/apiserver/pkg/server"
+	serverstorage "k8s.io/apiserver/pkg/server/storage"
 	"k8s.io/apiserver/pkg/storage/storagebackend"
 )
 
@@ -42,16 +42,9 @@ type EtcdOptions struct {
 	EnableWatchCache        bool
 }
 
-func NewEtcdOptions(prefix string, copier runtime.ObjectCopier, codec runtime.Codec) *EtcdOptions {
+func NewEtcdOptions(backendConfig *storagebackend.Config) *EtcdOptions {
 	return &EtcdOptions{
-		StorageConfig: storagebackend.Config{
-			Prefix: prefix,
-			// Default cache size to 0 - if unset, its size will be set based on target
-			// memory usage.
-			DeserializationCacheSize: 0,
-			Copier: copier,
-			Codec:  codec,
-		},
+		StorageConfig: *backendConfig,
 		DefaultStorageMediaType: "application/json",
 		DeleteCollectionWorkers: 1,
 		EnableGarbageCollection: true,
@@ -114,28 +107,53 @@ func (s *EtcdOptions) AddFlags(fs *pflag.FlagSet) {
 }
 
 func (s *EtcdOptions) ApplyTo(c *server.Config) error {
-	c.RESTOptionsGetter = &restOptionsFactory{options: s}
-
+	c.RESTOptionsGetter = &simpleRestOptionsFactory{Options: *s}
 	return nil
 }
 
-// restOptionsFactory is a default implementation of a RESTOptionsGetter
-// This will work well for most aggregated API servers.  The legacy kube server needs more customization
-type restOptionsFactory struct {
-	options *EtcdOptions
+func (s *EtcdOptions) ApplyWithStorageFactoryTo(factory serverstorage.StorageFactory, c *server.Config) error {
+	c.RESTOptionsGetter = &storageFactoryRestOptionsFactory{Options: *s, StorageFactory: factory}
+	return nil
 }
 
-func (f *restOptionsFactory) GetRESTOptions(resource schema.GroupResource) (generic.RESTOptions, error) {
+type simpleRestOptionsFactory struct {
+	Options EtcdOptions
+}
+
+func (f *simpleRestOptionsFactory) GetRESTOptions(resource schema.GroupResource) (generic.RESTOptions, error) {
 	ret := generic.RESTOptions{
-		StorageConfig:           &f.options.StorageConfig,
-		Decorator:               registry.StorageWithCacher,
-		DeleteCollectionWorkers: f.options.DeleteCollectionWorkers,
-		EnableGarbageCollection: f.options.EnableGarbageCollection,
-		ResourcePrefix:          f.options.StorageConfig.Prefix + "/" + resource.Group + "/" + resource.Resource,
+		StorageConfig:           &f.Options.StorageConfig,
+		Decorator:               generic.UndecoratedStorage,
+		EnableGarbageCollection: f.Options.EnableGarbageCollection,
+		DeleteCollectionWorkers: f.Options.DeleteCollectionWorkers,
+		ResourcePrefix:          f.Options.StorageConfig.Prefix + "/" + resource.Group + "/" + resource.Resource,
+	}
+	if f.Options.EnableWatchCache {
+		ret.Decorator = genericregistry.StorageWithCacher
+	}
+	return ret, nil
+}
+
+type storageFactoryRestOptionsFactory struct {
+	Options EtcdOptions
+	StorageFactory serverstorage.StorageFactory
+}
+
+func (f *storageFactoryRestOptionsFactory) GetRESTOptions(resource schema.GroupResource) (generic.RESTOptions, error) {
+	storageConfig, err := f.StorageFactory.NewConfig(resource)
+	if err != nil {
+		return generic.RESTOptions{}, fmt.Errorf("unable to find storage destination for %v, due to %v", resource, err.Error())
 	}
 
-	if !f.options.EnableWatchCache {
-		ret.Decorator = generic.UndecoratedStorage
+	ret := generic.RESTOptions{
+		StorageConfig:           storageConfig,
+		Decorator:               generic.UndecoratedStorage,
+		DeleteCollectionWorkers: f.Options.DeleteCollectionWorkers,
+		EnableGarbageCollection: f.Options.EnableGarbageCollection,
+		ResourcePrefix:          f.StorageFactory.ResourcePrefix(resource),
+	}
+	if f.Options.EnableWatchCache {
+		ret.Decorator = genericregistry.StorageWithCacher
 	}
 
 	return ret, nil

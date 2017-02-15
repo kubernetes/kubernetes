@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package server
+package storage
 
 import (
 	"os"
@@ -23,20 +23,36 @@ import (
 
 	"k8s.io/apimachinery/pkg/apimachinery/announced"
 	"k8s.io/apimachinery/pkg/apimachinery/registered"
-	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apiserver/pkg/apis/example"
 	exampleinstall "k8s.io/apiserver/pkg/apis/example/install"
-	examplev1 "k8s.io/apiserver/pkg/apis/example/v1"
 	"k8s.io/apiserver/pkg/storage/storagebackend"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/serializer"
+	"k8s.io/apiserver/pkg/apis/example"
+	examplev1 "k8s.io/apiserver/pkg/apis/example/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/runtime"
 )
 
 var (
+	v1GroupVersion = schema.GroupVersion{Group: "", Version: "v1"}
+
 	registry = registered.NewOrDie(os.Getenv("KUBE_API_VERSIONS"))
 	announce = make(announced.APIGroupFactoryRegistry)
+	scheme         = runtime.NewScheme()
+	codecs         = serializer.NewCodecFactory(scheme)
+	parameterCodec = runtime.NewParameterCodec(scheme)
 )
 
 func init() {
+	metav1.AddToGroupVersion(scheme, metav1.SchemeGroupVersion)
+	scheme.AddUnversionedTypes(v1GroupVersion,
+		&metav1.Status{},
+		&metav1.APIVersions{},
+		&metav1.APIGroupList{},
+		&metav1.APIGroup{},
+		&metav1.APIResourceList{},
+	)
+
 	exampleinstall.Install(announce, registry, scheme)
 }
 
@@ -76,7 +92,7 @@ func (n *fakeNegotiater) DecoderToVersion(serializer runtime.Decoder, gv runtime
 	return n.serializer
 }
 
-func TestDefaultStorageFactory(t *testing.T) {
+func TestConfigurableStorageFactory(t *testing.T) {
 	ns := &fakeNegotiater{types: []string{"test/test"}}
 	f := NewDefaultStorageFactory(storagebackend.Config{}, "test/test", ns, NewDefaultResourceEncodingConfig(registry), NewResourceConfig())
 	f.AddCohabitatingResources(example.Resource("test"), schema.GroupResource{Resource: "test2", Group: "2"})
