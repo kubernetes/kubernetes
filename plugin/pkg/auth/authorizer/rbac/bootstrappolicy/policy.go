@@ -296,15 +296,17 @@ func ClusterRoles() []rbac.ClusterRole {
 				rbac.NewRule("update").Groups(legacyGroup).Resources("endpoints", "serviceaccounts").RuleOrDie(),
 
 				rbac.NewRule("list", "watch").Groups(legacyGroup).Resources(
+					"configmaps",
 					"namespaces",
 					"nodes",
 					"persistentvolumeclaims",
 					"persistentvolumes",
 					"pods",
+					"replicationcontrollers",
+					"resourcequotas",
 					"secrets",
 					"services",
 					"serviceaccounts",
-					"replicationcontrollers",
 				).RuleOrDie(),
 				rbac.NewRule("list", "watch").Groups(extensionsGroup).Resources("daemonsets", "deployments", "replicasets").RuleOrDie(),
 				rbac.NewRule("list", "watch").Groups(batchGroup).Resources("jobs", "cronjobs").RuleOrDie(),
