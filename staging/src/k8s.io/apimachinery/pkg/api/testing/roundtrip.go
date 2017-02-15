@@ -272,6 +272,15 @@ func roundTrip(t *testing.T, scheme *runtime.Scheme, codec runtime.Codec, object
 		t.Errorf("3: %v: diff: %v\nCodec: %#v", name, diff.ObjectReflectDiff(object, obj3), codec)
 		return
 	}
+
+	// do structure-preserving fuzzing of the deep-copied object. If it shares anything with the original,
+	// the deep-copy was actually only a shallow copy. Then original and obj3 will be different after fuzzing.
+	// NOTE: we use the encoding+decoding here as an alternative, guaranteed deep-copy to compare against.
+	ValueFuzz(object)
+	if !apiequality.Semantic.DeepEqual(original, obj3) {
+		t.Errorf("0: %v: fuzzing a copy altered the original, diff: %v", name, diff.ObjectReflectDiff(original, object))
+		return
+	}
 }
 
 // dataAsString returns the given byte array as a string; handles detecting
