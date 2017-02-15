@@ -489,6 +489,7 @@ items:
     resources:
     - daemonsets
     - deployments
+    - podsecuritypolicies
     - replicasets
     verbs:
     - list

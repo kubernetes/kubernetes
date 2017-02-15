@@ -39,6 +39,7 @@ import (
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated/externalversions"
+	internalinformers "k8s.io/kubernetes/pkg/client/informers/informers_generated/internalversion"
 	"k8s.io/kubernetes/pkg/controller"
 	replicationcontroller "k8s.io/kubernetes/pkg/controller/replication"
 	resourcequotacontroller "k8s.io/kubernetes/pkg/controller/resourcequota"
@@ -73,6 +74,8 @@ func TestQuota(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	admission.(kubeadmission.WantsInternalClientSet).SetInternalClientSet(internalClientset)
+	internalInformers := internalinformers.NewSharedInformerFactory(internalClientset, controller.NoResyncPeriodFunc())
+	admission.(kubeadmission.WantsInformerFactory).SetInformerFactory(internalInformers)
 	defer close(admissionCh)
 
 	masterConfig := framework.NewIntegrationTestMasterConfig()
@@ -113,6 +116,7 @@ func TestQuota(t *testing.T) {
 		ControllerFactory:         resourcequotacontroller.NewReplenishmentControllerFactory(informers),
 	}
 	go resourcequotacontroller.NewResourceQuotaController(resourceQuotaControllerOptions).Run(2, controllerCh)
+	internalInformers.Start(controllerCh)
 	informers.Start(controllerCh)
 
 	startTime := time.Now()
@@ -257,6 +261,8 @@ func TestQuotaLimitedResourceDenial(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	admission.(kubeadmission.WantsInternalClientSet).SetInternalClientSet(internalClientset)
+	internalInformers := internalinformers.NewSharedInformerFactory(internalClientset, controller.NoResyncPeriodFunc())
+	admission.(kubeadmission.WantsInformerFactory).SetInformerFactory(internalInformers)
 	defer close(admissionCh)
 
 	masterConfig := framework.NewIntegrationTestMasterConfig()
@@ -295,6 +301,7 @@ func TestQuotaLimitedResourceDenial(t *testing.T) {
 		ControllerFactory:         resourcequotacontroller.NewReplenishmentControllerFactory(informers),
 	}
 	go resourcequotacontroller.NewResourceQuotaController(resourceQuotaControllerOptions).Run(2, controllerCh)
+	internalInformers.Start(controllerCh)
 	informers.Start(controllerCh)
 
 	// try to create a pod
