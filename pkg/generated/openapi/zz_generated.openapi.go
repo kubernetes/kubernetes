@@ -13360,6 +13360,13 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 								Format:      "",
 							},
 						},
+						"dockerDisableSharedPID": {
+							SchemaProps: spec.SchemaProps{
+								Description: "This flag, if set, disables use of a shared PID namespace for pods run by the docker CRI runtime.",
+								Type:        []string{"boolean"},
+								Format:      "",
+							},
+						},
 						"systemReserved": {
 							SchemaProps: spec.SchemaProps{
 								Description: "A set of ResourceName=ResourceQuantity (e.g. cpu=200m,memory=150G) pairs that describe resources reserved for non-kubernetes components. Currently only cpu and memory are supported. [default=none] See http://kubernetes.io/docs/user-guide/compute-resources for more detail.",
