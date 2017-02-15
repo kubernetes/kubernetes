@@ -22,6 +22,8 @@ import (
 
 	"github.com/golang/glog"
 
+	"bytes"
+
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/kubernetes/pkg/apis/rbac"
@@ -51,11 +53,26 @@ func (r *RBACAuthorizer) Authorize(requestAttributes authorizer.Attributes) (boo
 	if glog.V(2) {
 		var operation string
 		if requestAttributes.IsResourceRequest() {
-			operation = fmt.Sprintf(
-				"%q on \"%v.%v/%v\"",
-				requestAttributes.GetVerb(),
-				requestAttributes.GetResource(), requestAttributes.GetAPIGroup(), requestAttributes.GetSubresource(),
-			)
+			b := &bytes.Buffer{}
+			b.WriteString(`"`)
+			b.WriteString(requestAttributes.GetVerb())
+			b.WriteString(`" resource "`)
+			b.WriteString(requestAttributes.GetResource())
+			if len(requestAttributes.GetAPIGroup()) > 0 {
+				b.WriteString(`.`)
+				b.WriteString(requestAttributes.GetAPIGroup())
+			}
+			if len(requestAttributes.GetSubresource()) > 0 {
+				b.WriteString(`/`)
+				b.WriteString(requestAttributes.GetSubresource())
+			}
+			b.WriteString(`"`)
+			if len(requestAttributes.GetName()) > 0 {
+				b.WriteString(` named "`)
+				b.WriteString(requestAttributes.GetName())
+				b.WriteString(`"`)
+			}
+			operation = b.String()
 		} else {
 			operation = fmt.Sprintf("%q nonResourceURL %q", requestAttributes.GetVerb(), requestAttributes.GetPath())
 		}

@@ -315,6 +315,28 @@ func ClusterRoles() []rbac.ClusterRole {
 			},
 		},
 		{
+			// a role to use for the kube-scheduler
+			ObjectMeta: metav1.ObjectMeta{Name: "system:kube-scheduler"},
+			Rules: []rbac.PolicyRule{
+				eventsRule(),
+
+				// this is for leaderlease access
+				// TODO: scope this to the kube-system namespace
+				rbac.NewRule("create").Groups(legacyGroup).Resources("endpoints").RuleOrDie(),
+				rbac.NewRule("get", "update", "patch", "delete").Groups(legacyGroup).Resources("endpoints").Names("kube-scheduler").RuleOrDie(),
+
+				// fundamental resources
+				rbac.NewRule(Read...).Groups(legacyGroup).Resources("nodes", "pods").RuleOrDie(),
+				rbac.NewRule("create").Groups(legacyGroup).Resources("pods/binding", "bindings").RuleOrDie(),
+				rbac.NewRule("update").Groups(legacyGroup).Resources("pods/status").RuleOrDie(),
+				// things that select pods
+				rbac.NewRule(Read...).Groups(legacyGroup).Resources("services", "replicationcontrollers").RuleOrDie(),
+				rbac.NewRule(Read...).Groups(extensionsGroup).Resources("replicasets").RuleOrDie(),
+				// things that pods use
+				rbac.NewRule(Read...).Groups(legacyGroup).Resources("persistentvolumeclaims", "persistentvolumes").RuleOrDie(),
+			},
+		},
+		{
 			// a role for an external/out-of-tree persistent volume provisioner
 			ObjectMeta: metav1.ObjectMeta{Name: "system:persistent-volume-provisioner"},
 			Rules: []rbac.PolicyRule{
@@ -343,6 +365,7 @@ func ClusterRoleBindings() []rbac.ClusterRoleBinding {
 		rbac.NewClusterBinding("system:node").Groups(user.NodesGroup).BindingOrDie(),
 		rbac.NewClusterBinding("system:node-proxier").Users(user.KubeProxy).BindingOrDie(),
 		rbac.NewClusterBinding("system:kube-controller-manager").Users(user.KubeControllerManager).BindingOrDie(),
+		rbac.NewClusterBinding("system:kube-scheduler").Users(user.KubeScheduler).BindingOrDie(),
 	}
 	addClusterRoleBindingLabel(rolebindings)
 	return rolebindings
