@@ -21,12 +21,15 @@ import (
 	"fmt"
 	"time"
 
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/apiserver/pkg/authorization/authorizerfactory"
 	"k8s.io/apiserver/pkg/authorization/union"
 	"k8s.io/apiserver/plugin/pkg/authorizer/webhook"
+	rbacapi "k8s.io/kubernetes/pkg/apis/rbac"
 	"k8s.io/kubernetes/pkg/auth/authorizer/abac"
-	"k8s.io/kubernetes/pkg/controller/informers"
+	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated/internalversion"
+	rbaclisters "k8s.io/kubernetes/pkg/client/listers/rbac/internalversion"
 	"k8s.io/kubernetes/pkg/kubeapiserver/authorizer/modes"
 	"k8s.io/kubernetes/plugin/pkg/auth/authorizer/rbac"
 )
@@ -54,6 +57,38 @@ type AuthorizationConfig struct {
 	RBACSuperUser string
 
 	InformerFactory informers.SharedInformerFactory
+}
+
+type roleGetter struct {
+	lister rbaclisters.RoleLister
+}
+
+func (g *roleGetter) GetRole(namespace, name string) (*rbacapi.Role, error) {
+	return g.lister.Roles(namespace).Get(name)
+}
+
+type roleBindingLister struct {
+	lister rbaclisters.RoleBindingLister
+}
+
+func (l *roleBindingLister) ListRoleBindings(namespace string) ([]*rbacapi.RoleBinding, error) {
+	return l.lister.RoleBindings(namespace).List(labels.Everything())
+}
+
+type clusterRoleGetter struct {
+	lister rbaclisters.ClusterRoleLister
+}
+
+func (g *clusterRoleGetter) GetClusterRole(name string) (*rbacapi.ClusterRole, error) {
+	return g.lister.Get(name)
+}
+
+type clusterRoleBindingLister struct {
+	lister rbaclisters.ClusterRoleBindingLister
+}
+
+func (l *clusterRoleBindingLister) ListClusterRoleBindings() ([]*rbacapi.ClusterRoleBinding, error) {
+	return l.lister.List(labels.Everything())
 }
 
 // New returns the right sort of union of multiple authorizer.Authorizer objects
@@ -98,10 +133,10 @@ func (config AuthorizationConfig) New() (authorizer.Authorizer, error) {
 			authorizers = append(authorizers, webhookAuthorizer)
 		case modes.ModeRBAC:
 			rbacAuthorizer := rbac.New(
-				config.InformerFactory.Roles().Lister(),
-				config.InformerFactory.RoleBindings().Lister(),
-				config.InformerFactory.ClusterRoles().Lister(),
-				config.InformerFactory.ClusterRoleBindings().Lister(),
+				&roleGetter{config.InformerFactory.Rbac().InternalVersion().Roles().Lister()},
+				&roleBindingLister{config.InformerFactory.Rbac().InternalVersion().RoleBindings().Lister()},
+				&clusterRoleGetter{config.InformerFactory.Rbac().InternalVersion().ClusterRoles().Lister()},
+				&clusterRoleBindingLister{config.InformerFactory.Rbac().InternalVersion().ClusterRoleBindings().Lister()},
 			)
 			authorizers = append(authorizers, rbacAuthorizer)
 		default:

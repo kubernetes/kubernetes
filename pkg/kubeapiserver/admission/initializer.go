@@ -20,7 +20,7 @@ import (
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
-	"k8s.io/kubernetes/pkg/controller/informers"
+	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated/internalversion"
 )
 
 // TODO add a `WantsToRun` which takes a stopCh.  Might make it generic.

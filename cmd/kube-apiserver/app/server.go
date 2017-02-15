@@ -51,9 +51,8 @@ import (
 	"k8s.io/kubernetes/pkg/apis/batch"
 	"k8s.io/kubernetes/pkg/capabilities"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
-	"k8s.io/kubernetes/pkg/client/informers/informers_generated/internalversion"
+	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated/internalversion"
 	"k8s.io/kubernetes/pkg/cloudprovider"
-	"k8s.io/kubernetes/pkg/controller/informers"
 	serviceaccountcontroller "k8s.io/kubernetes/pkg/controller/serviceaccount"
 	generatedopenapi "k8s.io/kubernetes/pkg/generated/openapi"
 	"k8s.io/kubernetes/pkg/kubeapiserver"
@@ -270,17 +269,14 @@ func Run(s *options.ServerRunOptions) error {
 		glog.Errorf("Failed to create clientset with KUBE_API_VERSIONS=%q. KUBE_API_VERSIONS is only for testing. Things will break.", kubeAPIVersions)
 	}
 
-	// TODO: Internal informers should switch to using 'pkg/client/informers/informers_generated',
-	// the second informer created here. Refactor clients which take the former to accept the latter.
-	sharedInformers := informers.NewSharedInformerFactory(nil, client, 10*time.Minute)
-	internalSharedInformers := internalversion.NewSharedInformerFactory(client, 10*time.Minute)
+	sharedInformers := informers.NewSharedInformerFactory(client, 10*time.Minute)
 
 	if client == nil {
 		// TODO: Remove check once client can never be nil.
 		glog.Errorf("Failed to setup bootstrap token authenticator because the loopback clientset was not setup properly.")
 	} else {
 		authenticatorConfig.BootstrapTokenAuthenticator = bootstrap.NewTokenAuthenticator(
-			internalSharedInformers.Core().InternalVersion().Secrets().Lister().Secrets(v1.NamespaceSystem),
+			sharedInformers.Core().InternalVersion().Secrets().Lister().Secrets(v1.NamespaceSystem),
 		)
 	}
 
@@ -367,7 +363,6 @@ func Run(s *options.ServerRunOptions) error {
 	}
 
 	sharedInformers.Start(wait.NeverStop)
-	internalSharedInformers.Start(wait.NeverStop)
 	m.GenericAPIServer.PrepareRun().Run(wait.NeverStop)
 	return nil
 }
