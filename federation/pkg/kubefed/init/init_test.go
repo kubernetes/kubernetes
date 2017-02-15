@@ -114,8 +114,8 @@ func TestInitFederation(t *testing.T) {
 		},
 		{
 			federation:           "union",
-			kubeconfigGlobal:     fakeKubeFiles[0],
-			kubeconfigExplicit:   "",
+			kubeconfigGlobal:     fakeKubeFiles[1],
+			kubeconfigExplicit:   fakeKubeFiles[2],
 			dnsZoneName:          "example.test.",
 			lbIP:                 lbIP,
 			apiserverServiceType: v1.ServiceTypeLoadBalancer,
