@@ -172,47 +172,6 @@ func TestGetChainLinesMultipleTables(t *testing.T) {
 	checkAllLines(t, utiliptables.TableNAT, []byte(iptables_save), expected)
 }
 
-func TestGetRemovedEndpoints(t *testing.T) {
-	testCases := []struct {
-		currentEndpoints []string
-		newEndpoints     []string
-		removedEndpoints []string
-	}{
-		{
-			currentEndpoints: []string{"10.0.2.1:80", "10.0.2.2:80"},
-			newEndpoints:     []string{"10.0.2.1:80", "10.0.2.2:80"},
-			removedEndpoints: []string{},
-		},
-		{
-			currentEndpoints: []string{"10.0.2.1:80", "10.0.2.2:80", "10.0.2.3:80"},
-			newEndpoints:     []string{"10.0.2.1:80", "10.0.2.2:80"},
-			removedEndpoints: []string{"10.0.2.3:80"},
-		},
-		{
-			currentEndpoints: []string{},
-			newEndpoints:     []string{"10.0.2.1:80", "10.0.2.2:80"},
-			removedEndpoints: []string{},
-		},
-		{
-			currentEndpoints: []string{"10.0.2.1:80", "10.0.2.2:80"},
-			newEndpoints:     []string{},
-			removedEndpoints: []string{"10.0.2.1:80", "10.0.2.2:80"},
-		},
-		{
-			currentEndpoints: []string{"10.0.2.1:80", "10.0.2.2:80", "10.0.2.2:443"},
-			newEndpoints:     []string{"10.0.2.1:80", "10.0.2.2:80"},
-			removedEndpoints: []string{"10.0.2.2:443"},
-		},
-	}
-
-	for i := range testCases {
-		res := getRemovedEndpoints(testCases[i].currentEndpoints, testCases[i].newEndpoints)
-		if !slicesEquiv(res, testCases[i].removedEndpoints) {
-			t.Errorf("Expected: %v, but getRemovedEndpoints returned: %v", testCases[i].removedEndpoints, res)
-		}
-	}
-}
-
 func TestExecConntrackTool(t *testing.T) {
 	fcmd := exec.FakeCmd{
 		CombinedOutputScript: []exec.FakeCombinedOutputAction{
@@ -1268,16 +1227,14 @@ func TestBuildServiceMapServiceUpdate(t *testing.T) {
 // This is a coarse test, but it offers some modicum of confidence as the code is evolved.
 func Test_accumulateEndpointsMap(t *testing.T) {
 	testCases := []struct {
-		newEndpoints  api.Endpoints
-		oldEndpoints  map[proxy.ServicePortName][]*endpointsInfo
-		expectedNew   map[proxy.ServicePortName][]*endpointsInfo
-		expectedStale []endpointServicePair
+		newEndpoints api.Endpoints
+		oldEndpoints map[proxy.ServicePortName][]*endpointsInfo
+		expectedNew  map[proxy.ServicePortName][]*endpointsInfo
 	}{{
 		// Case[0]: nothing
-		newEndpoints:  makeTestEndpoints("ns1", "ep1", func(ept *api.Endpoints) {}),
-		oldEndpoints:  map[proxy.ServicePortName][]*endpointsInfo{},
-		expectedNew:   map[proxy.ServicePortName][]*endpointsInfo{},
-		expectedStale: []endpointServicePair{},
+		newEndpoints: makeTestEndpoints("ns1", "ep1", func(ept *api.Endpoints) {}),
+		oldEndpoints: map[proxy.ServicePortName][]*endpointsInfo{},
+		expectedNew:  map[proxy.ServicePortName][]*endpointsInfo{},
 	}, {
 		// Case[1]: no changes, unnamed port
 		newEndpoints: makeTestEndpoints("ns1", "ep1", func(ept *api.Endpoints) {
@@ -1303,7 +1260,6 @@ func Test_accumulateEndpointsMap(t *testing.T) {
 				{"1.1.1.1:11", false},
 			},
 		},
-		expectedStale: []endpointServicePair{},
 	}, {
 		// Case[2]: no changes, named port
 		newEndpoints: makeTestEndpoints("ns1", "ep1", func(ept *api.Endpoints) {
@@ -1329,7 +1285,6 @@ func Test_accumulateEndpointsMap(t *testing.T) {
 				{"1.1.1.1:11", false},
 			},
 		},
-		expectedStale: []endpointServicePair{},
 	}, {
 		// Case[3]: new port
 		newEndpoints: makeTestEndpoints("ns1", "ep1", func(ept *api.Endpoints) {
@@ -1352,7 +1307,6 @@ func Test_accumulateEndpointsMap(t *testing.T) {
 				{"1.1.1.1:11", false},
 			},
 		},
-		expectedStale: []endpointServicePair{},
 	}, {
 		// Case[4]: remove port
 		newEndpoints: makeTestEndpoints("ns1", "ep1", func(ept *api.Endpoints) {}),
@@ -1361,8 +1315,7 @@ func Test_accumulateEndpointsMap(t *testing.T) {
 				{"1.1.1.1:11", false},
 			},
 		},
-		expectedNew:   map[proxy.ServicePortName][]*endpointsInfo{},
-		expectedStale: []endpointServicePair{ /* can't detect this one */ },
+		expectedNew: map[proxy.ServicePortName][]*endpointsInfo{},
 	}, {
 		// Case[5]: new IP and port
 		newEndpoints: makeTestEndpoints("ns1", "ep1", func(ept *api.Endpoints) {
@@ -1398,7 +1351,6 @@ func Test_accumulateEndpointsMap(t *testing.T) {
 				{"2.2.2.2:22", false},
 			},
 		},
-		expectedStale: []endpointServicePair{},
 	}, {
 		// Case[6]: remove IP and port
 		newEndpoints: makeTestEndpoints("ns1", "ep1", func(ept *api.Endpoints) {
@@ -1429,10 +1381,6 @@ func Test_accumulateEndpointsMap(t *testing.T) {
 				{"1.1.1.1:11", false},
 			},
 		},
-		expectedStale: []endpointServicePair{{
-			endpoint:        "2.2.2.2:11",
-			servicePortName: makeServicePortName("ns1", "ep1", "p1"),
-		}},
 	}, {
 		// Case[7]: rename port
 		newEndpoints: makeTestEndpoints("ns1", "ep1", func(ept *api.Endpoints) {
@@ -1458,7 +1406,6 @@ func Test_accumulateEndpointsMap(t *testing.T) {
 				{"1.1.1.1:11", false},
 			},
 		},
-		expectedStale: []endpointServicePair{ /* can't detect this one */ },
 	}, {
 		// Case[8]: renumber port
 		newEndpoints: makeTestEndpoints("ns1", "ep1", func(ept *api.Endpoints) {
@@ -1484,19 +1431,13 @@ func Test_accumulateEndpointsMap(t *testing.T) {
 				{"1.1.1.1:22", false},
 			},
 		},
-		expectedStale: []endpointServicePair{{
-			endpoint:        "1.1.1.1:11",
-			servicePortName: makeServicePortName("ns1", "ep1", "p1"),
-		}},
 	}}
 
 	for tci, tc := range testCases {
 		// outputs
 		newEndpoints := map[proxy.ServicePortName][]*endpointsInfo{}
 		svcPortToInfoMap := map[proxy.ServicePortName][]hostPortInfo{}
-		staleConnections := map[endpointServicePair]bool{}
-		accumulateEndpointsMap(&tc.newEndpoints, "host", tc.oldEndpoints,
-			&newEndpoints, &svcPortToInfoMap, &staleConnections)
+		accumulateEndpointsMap(&tc.newEndpoints, "host", tc.oldEndpoints, &newEndpoints, &svcPortToInfoMap)
 
 		if len(newEndpoints) != len(tc.expectedNew) {
 			t.Errorf("[%d] expected %d new, got %d: %v", tci, len(tc.expectedNew), len(newEndpoints), spew.Sdump(newEndpoints))
@@ -1510,14 +1451,6 @@ func Test_accumulateEndpointsMap(t *testing.T) {
 						t.Errorf("[%d] expected new[%v][%d] to be %v, got %v", tci, x, i, tc.expectedNew[x][i], *(newEndpoints[x][i]))
 					}
 				}
-			}
-		}
-		if len(staleConnections) != len(tc.expectedStale) {
-			t.Errorf("[%d] expected %d stale, got %d: %v", tci, len(tc.expectedStale), len(staleConnections), staleConnections)
-		}
-		for _, x := range tc.expectedStale {
-			if staleConnections[x] != true {
-				t.Errorf("[%d] expected stale[%v], but didn't find it: %v", tci, x, staleConnections)
 			}
 		}
 	}
