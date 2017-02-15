@@ -16,7 +16,11 @@ limitations under the License.
 
 package remotecommand
 
-import "time"
+import (
+	"time"
+
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+)
 
 const (
 	DefaultStreamCreationTimeout = 30 * time.Second
@@ -41,6 +45,9 @@ const (
 	// attachment/execution. It is the 4th version of the subprotocol and
 	// adds support for exit codes.
 	StreamProtocolV4Name = "v4.channel.k8s.io"
+
+	NonZeroExitCodeReason = metav1.StatusReason("NonZeroExitCode")
+	ExitCodeCauseType     = metav1.CauseType("ExitCode")
 )
 
 var SupportedStreamingProtocols = []string{StreamProtocolV4Name, StreamProtocolV3Name, StreamProtocolV2Name, StreamProtocolV1Name}

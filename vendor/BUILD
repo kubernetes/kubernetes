@@ -16429,3 +16429,10 @@ go_test(
         "//vendor:k8s.io/client-go/kubernetes/fake",
     ],
 )
+
+go_library(
+    name = "k8s.io/apimachinery/pkg/util/remotecommand",
+    srcs = ["k8s.io/apimachinery/pkg/util/remotecommand/constants.go"],
+    tags = ["automanaged"],
+    deps = ["//vendor:k8s.io/apimachinery/pkg/apis/meta/v1"],
+)
