@@ -87,7 +87,7 @@ func addTaintsToNode(node *v1.Node, key, value string, indices []int) *v1.Node {
 }
 
 type timestampedPod struct {
-	name      string
+	names     []string
 	timestamp time.Duration
 }
 
@@ -503,7 +503,7 @@ func TestUpdateNode(t *testing.T) {
 			additionalSleep: 1500 * time.Millisecond,
 		},
 		{
-			description: "Pod with multiple tolerations are victed when first one runs out",
+			description: "Pod with multiple tolerations are evicted when first one runs out",
 			pods: []v1.Pod{
 				{
 					ObjectMeta: metav1.ObjectMeta{
@@ -592,8 +592,8 @@ func TestUpdateNodeWithMultiplePods(t *testing.T) {
 			oldNode: testutil.NewNode("node1"),
 			newNode: addTaintsToNode(testutil.NewNode("node1"), "testTaint1", "taint1", []int{1}),
 			expectedDeleteTimes: durationSlice{
-				{"pod1", 0},
-				{"pod2", time.Second},
+				{[]string{"pod1"}, 0},
+				{[]string{"pod2"}, time.Second},
 			},
 		},
 		{
@@ -606,8 +606,7 @@ func TestUpdateNodeWithMultiplePods(t *testing.T) {
 			oldNode: testutil.NewNode("node1"),
 			newNode: addTaintsToNode(testutil.NewNode("node1"), "testTaint1", "taint1", []int{1, 2}),
 			expectedDeleteTimes: durationSlice{
-				{"pod1", 0},
-				{"pod2", 0},
+				{[]string{"pod1", "pod2", "pod3"}, 0},
 			},
 		},
 	}
@@ -636,20 +635,46 @@ func TestUpdateNodeWithMultiplePods(t *testing.T) {
 				sleptAlready = item.expectedDeleteTimes[i].timestamp + increment
 			}
 
-			podDeleted := false
+			for delay, podName := range item.expectedDeleteTimes[i].names {
+				deleted := false
+				for _, action := range fakeClientset.Actions() {
+					deleteAction, ok := action.(clienttesting.DeleteActionImpl)
+					if !ok {
+						glog.Infof("Found not-delete action with verb %v. Ignoring.", action.GetVerb())
+						continue
+					}
+					if deleteAction.GetResource().Resource != "pods" {
+						continue
+					}
+					if podName == deleteAction.GetName() {
+						deleted = true
+					}
+				}
+				if !deleted {
+					t.Errorf("Failed to deleted pod %v after %v", podName, delay)
+				}
+			}
 			for _, action := range fakeClientset.Actions() {
 				deleteAction, ok := action.(clienttesting.DeleteActionImpl)
 				if !ok {
 					glog.Infof("Found not-delete action with verb %v. Ignoring.", action.GetVerb())
 					continue
 				}
-				if deleteAction.GetResource().Resource == "pods" && deleteAction.GetName() == item.expectedDeleteTimes[i].name {
-					podDeleted = true
+				if deleteAction.GetResource().Resource != "pods" {
+					continue
+				}
+				deletedPodName := deleteAction.GetName()
+				expected := false
+				for _, podName := range item.expectedDeleteTimes[i].names {
+					if podName == deletedPodName {
+						expected = true
+					}
+				}
+				if !expected {
+					t.Errorf("Pod %v was deleted even though it shouldn't have", deletedPodName)
 				}
 			}
-			if !podDeleted {
-				t.Errorf("%v: Unexepected test result. Expected delete %v which didn't happen", item.description, item.expectedDeleteTimes[i].name)
-			}
+			fakeClientset.ClearActions()
 		}
 
 		close(stopCh)
