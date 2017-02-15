@@ -1,4 +1,4 @@
-## Reliable, Scalable Redis on Kubernetes
+## Reliable, Multi-Node Redis on Kubernetes
 
 The following document describes the deployment of a reliable, multi-node Redis on Kubernetes.  It deploys a master with replicated slaves, as well as replicated redis sentinels which are use for health checking and failover.
 
@@ -6,37 +6,23 @@ The following document describes the deployment of a reliable, multi-node Redis 
 
 This example assumes that you have a Kubernetes cluster installed and running, and that you have installed the ```kubectl``` command line tool somewhere in your path.  Please see the [getting started](../../../docs/getting-started-guides/) for installation instructions for your platform.
 
-### A note for the impatient
-
-This is a somewhat long tutorial.  If you want to jump straight to the "do it now" commands, please see the [tl; dr](#tl-dr) at the end.
-
-### Turning up an initial master/sentinel pod.
+### Turning up an initial master/sentinel pod and sentinel service.
 
 A [_Pod_](../../../docs/user-guide/pods.md) is one or more containers that _must_ be scheduled onto the same host.  All containers in a pod share a network namespace, and may optionally share mounted volumes.
 
 We will use the shared network namespace to bootstrap our Redis cluster.  In particular, the very first sentinel needs to know how to find the master (subsequent sentinels just ask the first sentinel).  Because all containers in a Pod share a network namespace, the sentinel can simply look at ```$(hostname -i):6379```.
 
-Here is the config for the initial master and sentinel pod: [redis-master.yaml](redis-master.yaml)
-
-
-Create this master as follows:
-
-```sh
-kubectl create -f examples/storage/redis/redis-master.yaml
-```
-
-### Turning up a sentinel service
-
 In Kubernetes a [_Service_](../../../docs/user-guide/services.md) describes a set of Pods that perform the same task.  For example, the set of nodes in a Cassandra cluster, or even the single node we created above.  An important use for a Service is to create a load balancer which distributes traffic across members of the set.  But a _Service_ can also be used as a standing query which makes a dynamically changing set of Pods (or the single Pod we've already created) available via the Kubernetes API.
 
 In Redis, we will use a Kubernetes Service to provide a discoverable endpoints for the Redis sentinels in the cluster.  From the sentinels Redis clients can find the master, and then the slaves and other relevant info for the cluster.  This enables new members to join the cluster when failures occur.
 
-Here is the definition of the sentinel service: [redis-sentinel-service.yaml](redis-sentinel-service.yaml)
+Here is the config for the initial master/entinel pod and sentinel service: [redis-bootstrap.yaml](redis-bootstrap.yaml)
 
-Create this service:
+
+Create them as follows:
 
 ```sh
-kubectl create -f examples/storage/redis/redis-sentinel-service.yaml
+kubectl create -f examples/storage/redis/redis-bootstrap.yaml
 ```
 
 ### Turning up replicated redis servers
@@ -45,87 +31,50 @@ So far, what we have done is pretty manual, and not very fault-tolerant.  If the
 
 In Kubernetes a [_Replication Controller_](../../../docs/user-guide/replication-controller.md) is responsible for replicating sets of identical pods.  Like a _Service_ it has a selector query which identifies the members of it's set.  Unlike a _Service_ it also has a desired number of replicas, and it will create or delete _Pods_ to ensure that the number of _Pods_ matches up with it's desired state.
 
-Replication Controllers will "adopt" existing pods that match their selector query, so let's create a Replication Controller with a single replica to adopt our existing Redis server. Here is the replication controller config: [redis-controller.yaml](redis-controller.yaml)
+Let's create two Replication Controllers with 3 replica each for sentinel and redis servers.
 
-The bulk of this controller config is actually identical to the redis-master pod definition above.  It forms the template or "cookie cutter" that defines what it means to be a member of this set.
+The bulk of the controller configs are actually identical to the redis-master pod definition above.  It forms the template or "cookie cutter" that defines what it means to be a member of this set.
 
-Create this controller:
-
-```sh
-kubectl create -f examples/storage/redis/redis-controller.yaml
-```
-
-We'll do the same thing for the sentinel.  Here is the controller config: [redis-sentinel-controller.yaml](redis-sentinel-controller.yaml)
-
-We create it as follows:
+Create the controllers:
 
 ```sh
-kubectl create -f examples/storage/redis/redis-sentinel-controller.yaml
+kubectl create -f examples/storage/redis/redis-rc.yaml
 ```
 
-### Scale our replicated pods
-
-Initially creating those pods didn't actually do anything, since we only asked for one sentinel and one redis server, and they already existed, nothing changed.  Now we will add more replicas:
-
-```sh
-kubectl scale rc redis --replicas=3
-```
-
-```sh
-kubectl scale rc redis-sentinel --replicas=3
-```
-
-This will create two additional replicas of the redis server and two additional replicas of the redis sentinel.
+The redis-sentinel Relication Controller will "adopt" the existing master/sentinel pod and create 2 more sentinel replicas. The redis Replication Controller will create 3 replicas of redis server.
 
 Unlike our original redis-master pod, these pods exist independently, and they use the ```redis-sentinel-service``` that we defined above to discover and join the cluster.
 
-### Delete our manual pod
+After the replicas join the cluster, the redis cluster will have 1 master + 3 slaves + 3 sentinels.
 
-The final step in the cluster turn up is to delete the original redis-master pod that we created manually.  While it was useful for bootstrapping discovery in the cluster, we really don't want the lifespan of our sentinel to be tied to the lifespan of one of our redis servers, and now that we have a successful, replicated redis sentinel service up and running, the binding is unnecessary.
+### How client use the redis cluster
 
-Delete the master as follows:
+To access the redis cluster, the client can get the redis master IP address (the port number is 6379) by below command:
 
 ```sh
-kubectl delete pods redis-master
+master=$(redis-cli -h ${REDIS_SENTINEL_SERVICE_HOST} -p ${REDIS_SENTINEL_SERVICE_PORT} --csv SENTINEL get-master-addr-by-name mymaster | tr ',' ' ' | cut -d' ' -f1)
 ```
 
-Now let's take a close look at what happens after this pod is deleted.  There are three things that happen:
+### How fault-tolerant works
 
-  1. The redis replication controller notices that its desired state is 3 replicas, but there are currently only 2 replicas, and so it creates a new redis server to bring the replica count back up to 3
-  2. The redis-sentinel replication controller likewise notices the missing sentinel, and also creates a new sentinel.
-  3. The redis sentinels themselves, realize that the master has disappeared from the cluster, and begin the election procedure for selecting a new master.  They perform this election and selection, and chose one of the existing redis server replicas to be the new master.
+As a reliable redis cluster, it can automatically recover when any of the pod is down. Now let's take a close look at how this works.
 
-### Conclusion
+If one of the redis server pod is down:
 
-At this point we now have a reliable, scalable Redis installation.  By scaling the replication controller for redis servers, we can increase or decrease the number of read-slaves in our cluster.  Likewise, if failures occur, the redis-sentinels will perform master election and select a new master.
+  1. The redis replication controller notices that it's desired state is 3 replicas, but there are currently only 2 replicas, and so it creates a new redis server to bring the replica count back up to 3
+  2. The newly created redis server pod can use the ```redis-sentinel-service``` to get master information and join the cluster as slave.
 
-**NOTE:** since redis 3.2 some security measures (bind to 127.0.0.1 and `--protected-mode`) are enabled by default. Please read about this in http://antirez.com/news/96
+If one of the sentinel pod is down:
 
-
-### tl; dr
-
-For those of you who are impatient, here is the summary of commands we ran in this tutorial:
-
-```
-# Create a bootstrap master
-kubectl create -f examples/storage/redis/redis-master.yaml
-
-# Create a service to track the sentinels
-kubectl create -f examples/storage/redis/redis-sentinel-service.yaml
-
-# Create a replication controller for redis servers
-kubectl create -f examples/storage/redis/redis-controller.yaml
-
-# Create a replication controller for redis sentinels
-kubectl create -f examples/storage/redis/redis-sentinel-controller.yaml
-
-# Scale both replication controllers
-kubectl scale rc redis --replicas=3
-kubectl scale rc redis-sentinel --replicas=3
-
-# Delete the original master pod
-kubectl delete pods redis-master
-```
+  1. The redis-sentinel replication controller notices that it's desired state is 3 replicas, but there are currently only 2 replicas, and so it creates a new redis sentinel to bring the replica count back up to 3
+  2. The newly created sentinel pod can use the ```redis-sentinel-service``` to get master information and join the cluster as sentinel.
+  
+If the master/sentinel pod is down:
+  
+  1. The redis-sentinel replication controller notices that it's desired state is 3 replicas, but there are currently only 2 replicas, and so it creates a new sentinel to bring the replica count back up to 3
+  2. The newly created sentinel pod can use the ```redis-sentinel-service``` to get master information. But since the master is also down, it cannot connect to the master. In this case, the new sentinel will enter a loop to repeatedly get the master information and try to connect... 
+  3. The existing redis sentinels themselves, realize that the master has disappeared from the cluster, and begin the election procedure for selecting a new master.  They perform this election and selection, and choose one of the existing redis server replicas to be the new master.
+  4. Once the newly master is selected, the new created sentinel pod can get it's information and joins the cluster as sentinel.
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
