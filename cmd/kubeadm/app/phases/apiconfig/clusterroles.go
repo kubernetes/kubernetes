@@ -21,7 +21,6 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
-	"k8s.io/kubernetes/cmd/kubeadm/app/master"
 	"k8s.io/kubernetes/pkg/api/v1"
 	rbac "k8s.io/kubernetes/pkg/apis/rbac/v1beta1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
@@ -117,7 +116,7 @@ func CreateClusterRoleBindings(clientset *clientset.Clientset) error {
 			Subjects: []rbac.Subject{
 				{
 					Kind: "Group",
-					Name: master.KubeletBootstrapGroup,
+					Name: kubeadmconstants.CSVTokenBootstrapGroup,
 				},
 			},
 		},
