@@ -14,11 +14,12 @@ spec:
         k8s-app: fluentd-es
         kubernetes.io/cluster-service: "true"
         version: v1.22
-  # This annotation ensures that fluentd does not get evicted if the node
-  # supports critical pod annotation based priority scheme.
-  # Note that this does not guarantee admission on the nodes (#40573).
+      # This annotation ensures that fluentd does not get evicted if the node
+      # supports critical pod annotation based priority scheme.
+      # Note that this does not guarantee admission on the nodes (#40573).
       annotations:
         scheduler.alpha.kubernetes.io/critical-pod: ''
+        scheduler.alpha.kubernetes.io/tolerations: '[{"key": "node.alpha.kubernetes.io/ismaster", "effect": "NoSchedule"}]'
     spec:
       containers:
       - name: fluentd-es
