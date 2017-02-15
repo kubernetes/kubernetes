@@ -1,0 +1,33 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: kube-service-injection
+  namespace: kube-system
+spec:
+  hostNetwork: true
+  containers:
+  - name: kube-service-injection
+    image: kube-service-injection
+    imagePullPolicy: Never
+    args:
+    - "--secure-port=9443"
+    - "--authentication-kubeconfig=/all-certs/admin.kubeconfig"
+    - "--authorization-kubeconfig=/all-certs/admin.kubeconfig"
+    - "--tls-ca-file=/all-certs/apiserver.crt"
+    - "--client-ca-file=/all-certs/client-ca.crt"
+    - "--requestheader-username-headers=X-Remote-User"
+    - "--requestheader-group-headers=X-Remote-Group"
+    - "--requestheader-extra-headers-prefix=X-Remote-Extra-"
+    - "--requestheader-client-ca-file=/all-certs/request-header-ca.crt"
+    - "--etcd-servers=http://127.0.0.1:2379"
+    ports:
+    - containerPort: 9443
+      hostPort: 9443
+    volumeMounts:
+    - name: all-certs
+      mountPath: /all-certs
+      readOnly: true
+  volumes:
+  - name: all-certs
+    hostPath:
+      path: /var/run/kubernetes/
