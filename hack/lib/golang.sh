@@ -32,6 +32,7 @@ kube::golang::server_targets() {
     cmd/kubeadm
     cmd/hyperkube
     cmd/kube-discovery
+    cmd/certificates-controller
     vendor/k8s.io/kube-aggregator
     plugin/cmd/kube-scheduler
   )

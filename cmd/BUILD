@@ -13,6 +13,7 @@ filegroup(
     name = "all-srcs",
     srcs = [
         ":package-srcs",
+        "//cmd/certificates-controller:all-srcs",
         "//cmd/clicheck:all-srcs",
         "//cmd/cloud-controller-manager:all-srcs",
         "//cmd/gendocs:all-srcs",
