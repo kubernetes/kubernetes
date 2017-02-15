@@ -30,9 +30,11 @@ import (
 	kadmission "k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
-	"k8s.io/client-go/tools/cache"
 	kapi "k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/extensions"
+	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated/internalversion"
+	extensionslisters "k8s.io/kubernetes/pkg/client/listers/extensions/internalversion"
+	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/security/apparmor"
 	kpsp "k8s.io/kubernetes/pkg/security/podsecuritypolicy"
 	"k8s.io/kubernetes/pkg/security/podsecuritypolicy/seccomp"
@@ -43,13 +45,13 @@ const defaultContainerName = "test-c"
 
 // NewTestAdmission provides an admission plugin with test implementations of internal structs.  It uses
 // an authorizer that always returns true.
-func NewTestAdmission(store cache.Store) kadmission.Interface {
+func NewTestAdmission(lister extensionslisters.PodSecurityPolicyLister) kadmission.Interface {
 	return &podSecurityPolicyPlugin{
 		Handler:         kadmission.NewHandler(kadmission.Create),
-		store:           store,
 		strategyFactory: kpsp.NewSimpleStrategyFactory(),
 		pspMatcher:      getMatchingPolicies,
 		authz:           &TestAuthorizer{},
+		lister:          lister,
 	}
 }
 
@@ -1337,13 +1339,14 @@ func TestAdmitSysctls(t *testing.T) {
 }
 
 func testPSPAdmit(testCaseName string, psps []*extensions.PodSecurityPolicy, pod *kapi.Pod, shouldPass bool, expectedPSP string, t *testing.T) {
-	store := cache.NewStore(cache.MetaNamespaceKeyFunc)
+	informerFactory := informers.NewSharedInformerFactory(nil, controller.NoResyncPeriodFunc())
+	store := informerFactory.Extensions().InternalVersion().PodSecurityPolicies().Informer().GetStore()
 
 	for _, psp := range psps {
 		store.Add(psp)
 	}
 
-	plugin := NewTestAdmission(store)
+	plugin := NewTestAdmission(informerFactory.Extensions().InternalVersion().PodSecurityPolicies().Lister())
 
 	attrs := kadmission.NewAttributesRecord(pod, nil, kapi.Kind("Pod").WithVersion("version"), "namespace", "", kapi.Resource("pods").WithVersion("version"), "", kadmission.Create, &user.DefaultInfo{})
 	err := plugin.Admit(attrs)
@@ -1505,11 +1508,8 @@ func TestCreateProvidersFromConstraints(t *testing.T) {
 	}
 
 	for k, v := range testCases {
-		store := cache.NewStore(cache.MetaNamespaceKeyFunc)
-
 		admit := &podSecurityPolicyPlugin{
 			Handler:         kadmission.NewHandler(kadmission.Create, kadmission.Update),
-			store:           store,
 			strategyFactory: kpsp.NewSimpleStrategyFactory(),
 		}
 
@@ -1628,13 +1628,15 @@ func TestGetMatchingPolicies(t *testing.T) {
 		},
 	}
 	for k, v := range tests {
-		store := cache.NewStore(cache.MetaNamespaceKeyFunc)
+		informerFactory := informers.NewSharedInformerFactory(nil, controller.NoResyncPeriodFunc())
+		pspInformer := informerFactory.Extensions().InternalVersion().PodSecurityPolicies()
+		store := pspInformer.Informer().GetStore()
 		for _, psp := range v.inPolicies {
 			store.Add(psp)
 		}
 
 		authz := &TestAuthorizer{disallowed: v.disallowedPolicies}
-		allowedPolicies, err := getMatchingPolicies(store, v.user, v.sa, authz)
+		allowedPolicies, err := getMatchingPolicies(pspInformer.Lister(), v.user, v.sa, authz)
 		if err != nil {
 			t.Errorf("%s got unexpected error %#v", k, err)
 			continue

@@ -33,6 +33,8 @@ import (
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/fake"
+	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated/internalversion"
+	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/quota"
 	"k8s.io/kubernetes/pkg/quota/generic"
 	"k8s.io/kubernetes/pkg/quota/install"
@@ -123,14 +125,14 @@ func TestPrettyPrint(t *testing.T) {
 
 // TestAdmissionIgnoresDelete verifies that the admission controller ignores delete operations
 func TestAdmissionIgnoresDelete(t *testing.T) {
-	kubeClient := fake.NewSimpleClientset()
-	indexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{"namespace": cache.MetaNamespaceIndexFunc})
 	stopCh := make(chan struct{})
 	defer close(stopCh)
 
-	quotaAccessor, _ := newQuotaAccessor(kubeClient)
-	quotaAccessor.indexer = indexer
-	go quotaAccessor.Run(stopCh)
+	kubeClient := fake.NewSimpleClientset()
+	informerFactory := informers.NewSharedInformerFactory(kubeClient, controller.NoResyncPeriodFunc())
+	quotaAccessor, _ := newQuotaAccessor()
+	quotaAccessor.client = kubeClient
+	quotaAccessor.lister = informerFactory.Core().InternalVersion().ResourceQuotas().Lister()
 	config := &resourcequotaapi.Configuration{}
 	evaluator := NewQuotaEvaluator(quotaAccessor, install.NewRegistry(nil, nil), nil, config, 5, stopCh)
 
@@ -158,14 +160,14 @@ func TestAdmissionIgnoresSubresources(t *testing.T) {
 	}
 	resourceQuota.Status.Hard[api.ResourceMemory] = resource.MustParse("2Gi")
 	resourceQuota.Status.Used[api.ResourceMemory] = resource.MustParse("1Gi")
-	kubeClient := fake.NewSimpleClientset(resourceQuota)
-	indexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{"namespace": cache.MetaNamespaceIndexFunc})
 	stopCh := make(chan struct{})
 	defer close(stopCh)
 
-	quotaAccessor, _ := newQuotaAccessor(kubeClient)
-	quotaAccessor.indexer = indexer
-	go quotaAccessor.Run(stopCh)
+	kubeClient := fake.NewSimpleClientset()
+	informerFactory := informers.NewSharedInformerFactory(kubeClient, controller.NoResyncPeriodFunc())
+	quotaAccessor, _ := newQuotaAccessor()
+	quotaAccessor.client = kubeClient
+	quotaAccessor.lister = informerFactory.Core().InternalVersion().ResourceQuotas().Lister()
 	config := &resourcequotaapi.Configuration{}
 	evaluator := NewQuotaEvaluator(quotaAccessor, install.NewRegistry(nil, nil), nil, config, 5, stopCh)
 
@@ -173,7 +175,7 @@ func TestAdmissionIgnoresSubresources(t *testing.T) {
 		Handler:   admission.NewHandler(admission.Create, admission.Update),
 		evaluator: evaluator,
 	}
-	indexer.Add(resourceQuota)
+	informerFactory.Core().InternalVersion().ResourceQuotas().Informer().GetIndexer().Add(resourceQuota)
 	newPod := validPod("123", 1, getResourceRequirements(getResourceList("100m", "2Gi"), getResourceList("", "")))
 	err := handler.Admit(admission.NewAttributesRecord(newPod, nil, api.Kind("Pod").WithVersion("version"), newPod.Namespace, newPod.Name, api.Resource("pods").WithVersion("version"), "", admission.Create, nil))
 	if err == nil {
@@ -202,14 +204,14 @@ func TestAdmitBelowQuotaLimit(t *testing.T) {
 			},
 		},
 	}
-	kubeClient := fake.NewSimpleClientset(resourceQuota)
-	indexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{"namespace": cache.MetaNamespaceIndexFunc})
 	stopCh := make(chan struct{})
 	defer close(stopCh)
 
-	quotaAccessor, _ := newQuotaAccessor(kubeClient)
-	quotaAccessor.indexer = indexer
-	go quotaAccessor.Run(stopCh)
+	kubeClient := fake.NewSimpleClientset(resourceQuota)
+	informerFactory := informers.NewSharedInformerFactory(kubeClient, controller.NoResyncPeriodFunc())
+	quotaAccessor, _ := newQuotaAccessor()
+	quotaAccessor.client = kubeClient
+	quotaAccessor.lister = informerFactory.Core().InternalVersion().ResourceQuotas().Lister()
 	config := &resourcequotaapi.Configuration{}
 	evaluator := NewQuotaEvaluator(quotaAccessor, install.NewRegistry(nil, nil), nil, config, 5, stopCh)
 
@@ -217,7 +219,7 @@ func TestAdmitBelowQuotaLimit(t *testing.T) {
 		Handler:   admission.NewHandler(admission.Create, admission.Update),
 		evaluator: evaluator,
 	}
-	indexer.Add(resourceQuota)
+	informerFactory.Core().InternalVersion().ResourceQuotas().Informer().GetIndexer().Add(resourceQuota)
 	newPod := validPod("allowed-pod", 1, getResourceRequirements(getResourceList("100m", "2Gi"), getResourceList("", "")))
 	err := handler.Admit(admission.NewAttributesRecord(newPod, nil, api.Kind("Pod").WithVersion("version"), newPod.Namespace, newPod.Name, api.Resource("pods").WithVersion("version"), "", admission.Create, nil))
 	if err != nil {
@@ -285,14 +287,14 @@ func TestAdmitHandlesOldObjects(t *testing.T) {
 	}
 
 	// start up quota system
-	kubeClient := fake.NewSimpleClientset(resourceQuota)
-	indexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{"namespace": cache.MetaNamespaceIndexFunc})
 	stopCh := make(chan struct{})
 	defer close(stopCh)
 
-	quotaAccessor, _ := newQuotaAccessor(kubeClient)
-	quotaAccessor.indexer = indexer
-	go quotaAccessor.Run(stopCh)
+	kubeClient := fake.NewSimpleClientset(resourceQuota)
+	informerFactory := informers.NewSharedInformerFactory(kubeClient, controller.NoResyncPeriodFunc())
+	quotaAccessor, _ := newQuotaAccessor()
+	quotaAccessor.client = kubeClient
+	quotaAccessor.lister = informerFactory.Core().InternalVersion().ResourceQuotas().Lister()
 	config := &resourcequotaapi.Configuration{}
 	evaluator := NewQuotaEvaluator(quotaAccessor, install.NewRegistry(nil, nil), nil, config, 5, stopCh)
 
@@ -300,7 +302,7 @@ func TestAdmitHandlesOldObjects(t *testing.T) {
 		Handler:   admission.NewHandler(admission.Create, admission.Update),
 		evaluator: evaluator,
 	}
-	indexer.Add(resourceQuota)
+	informerFactory.Core().InternalVersion().ResourceQuotas().Informer().GetIndexer().Add(resourceQuota)
 
 	// old service was a load balancer, but updated version is a node port.
 	existingService := &api.Service{
@@ -382,14 +384,14 @@ func TestAdmitHandlesCreatingUpdates(t *testing.T) {
 	}
 
 	// start up quota system
-	kubeClient := fake.NewSimpleClientset(resourceQuota)
-	indexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{"namespace": cache.MetaNamespaceIndexFunc})
 	stopCh := make(chan struct{})
 	defer close(stopCh)
 
-	quotaAccessor, _ := newQuotaAccessor(kubeClient)
-	quotaAccessor.indexer = indexer
-	go quotaAccessor.Run(stopCh)
+	kubeClient := fake.NewSimpleClientset(resourceQuota)
+	informerFactory := informers.NewSharedInformerFactory(kubeClient, controller.NoResyncPeriodFunc())
+	quotaAccessor, _ := newQuotaAccessor()
+	quotaAccessor.client = kubeClient
+	quotaAccessor.lister = informerFactory.Core().InternalVersion().ResourceQuotas().Lister()
 	config := &resourcequotaapi.Configuration{}
 	evaluator := NewQuotaEvaluator(quotaAccessor, install.NewRegistry(nil, nil), nil, config, 5, stopCh)
 
@@ -397,7 +399,7 @@ func TestAdmitHandlesCreatingUpdates(t *testing.T) {
 		Handler:   admission.NewHandler(admission.Create, admission.Update),
 		evaluator: evaluator,
 	}
-	indexer.Add(resourceQuota)
+	informerFactory.Core().InternalVersion().ResourceQuotas().Informer().GetIndexer().Add(resourceQuota)
 
 	// old service didn't exist, so this update is actually a create
 	oldService := &api.Service{
@@ -476,14 +478,14 @@ func TestAdmitExceedQuotaLimit(t *testing.T) {
 			},
 		},
 	}
-	kubeClient := fake.NewSimpleClientset(resourceQuota)
-	indexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{"namespace": cache.MetaNamespaceIndexFunc})
 	stopCh := make(chan struct{})
 	defer close(stopCh)
 
-	quotaAccessor, _ := newQuotaAccessor(kubeClient)
-	quotaAccessor.indexer = indexer
-	go quotaAccessor.Run(stopCh)
+	kubeClient := fake.NewSimpleClientset(resourceQuota)
+	informerFactory := informers.NewSharedInformerFactory(kubeClient, controller.NoResyncPeriodFunc())
+	quotaAccessor, _ := newQuotaAccessor()
+	quotaAccessor.client = kubeClient
+	quotaAccessor.lister = informerFactory.Core().InternalVersion().ResourceQuotas().Lister()
 	config := &resourcequotaapi.Configuration{}
 	evaluator := NewQuotaEvaluator(quotaAccessor, install.NewRegistry(nil, nil), nil, config, 5, stopCh)
 
@@ -491,7 +493,7 @@ func TestAdmitExceedQuotaLimit(t *testing.T) {
 		Handler:   admission.NewHandler(admission.Create, admission.Update),
 		evaluator: evaluator,
 	}
-	indexer.Add(resourceQuota)
+	informerFactory.Core().InternalVersion().ResourceQuotas().Informer().GetIndexer().Add(resourceQuota)
 	newPod := validPod("not-allowed-pod", 1, getResourceRequirements(getResourceList("3", "2Gi"), getResourceList("", "")))
 	err := handler.Admit(admission.NewAttributesRecord(newPod, nil, api.Kind("Pod").WithVersion("version"), newPod.Namespace, newPod.Name, api.Resource("pods").WithVersion("version"), "", admission.Create, nil))
 	if err == nil {
@@ -520,23 +522,22 @@ func TestAdmitEnforceQuotaConstraints(t *testing.T) {
 			},
 		},
 	}
-	kubeClient := fake.NewSimpleClientset(resourceQuota)
-	indexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{"namespace": cache.MetaNamespaceIndexFunc})
 	stopCh := make(chan struct{})
 	defer close(stopCh)
 
-	quotaAccessor, _ := newQuotaAccessor(kubeClient)
-	quotaAccessor.indexer = indexer
-	go quotaAccessor.Run(stopCh)
+	kubeClient := fake.NewSimpleClientset(resourceQuota)
+	informerFactory := informers.NewSharedInformerFactory(kubeClient, controller.NoResyncPeriodFunc())
+	quotaAccessor, _ := newQuotaAccessor()
+	quotaAccessor.client = kubeClient
+	quotaAccessor.lister = informerFactory.Core().InternalVersion().ResourceQuotas().Lister()
 	config := &resourcequotaapi.Configuration{}
-
 	evaluator := NewQuotaEvaluator(quotaAccessor, install.NewRegistry(nil, nil), nil, config, 5, stopCh)
 
 	handler := &quotaAdmission{
 		Handler:   admission.NewHandler(admission.Create, admission.Update),
 		evaluator: evaluator,
 	}
-	indexer.Add(resourceQuota)
+	informerFactory.Core().InternalVersion().ResourceQuotas().Informer().GetIndexer().Add(resourceQuota)
 	// verify all values are specified as required on the quota
 	newPod := validPod("not-allowed-pod", 1, getResourceRequirements(getResourceList("100m", "2Gi"), getResourceList("200m", "")))
 	err := handler.Admit(admission.NewAttributesRecord(newPod, nil, api.Kind("Pod").WithVersion("version"), newPod.Namespace, newPod.Name, api.Resource("pods").WithVersion("version"), "", admission.Create, nil))
@@ -570,8 +571,6 @@ func TestAdmitPodInNamespaceWithoutQuota(t *testing.T) {
 			},
 		},
 	}
-	kubeClient := fake.NewSimpleClientset(resourceQuota)
-	indexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{"namespace": cache.MetaNamespaceIndexFunc})
 	liveLookupCache, err := lru.New(100)
 	if err != nil {
 		t.Fatal(err)
@@ -579,10 +578,12 @@ func TestAdmitPodInNamespaceWithoutQuota(t *testing.T) {
 	stopCh := make(chan struct{})
 	defer close(stopCh)
 
-	quotaAccessor, _ := newQuotaAccessor(kubeClient)
-	quotaAccessor.indexer = indexer
+	kubeClient := fake.NewSimpleClientset(resourceQuota)
+	informerFactory := informers.NewSharedInformerFactory(kubeClient, controller.NoResyncPeriodFunc())
+	quotaAccessor, _ := newQuotaAccessor()
+	quotaAccessor.client = kubeClient
+	quotaAccessor.lister = informerFactory.Core().InternalVersion().ResourceQuotas().Lister()
 	quotaAccessor.liveLookupCache = liveLookupCache
-	go quotaAccessor.Run(stopCh)
 	config := &resourcequotaapi.Configuration{}
 	evaluator := NewQuotaEvaluator(quotaAccessor, install.NewRegistry(nil, nil), nil, config, 5, stopCh)
 
@@ -591,7 +592,7 @@ func TestAdmitPodInNamespaceWithoutQuota(t *testing.T) {
 		evaluator: evaluator,
 	}
 	// Add to the index
-	indexer.Add(resourceQuota)
+	informerFactory.Core().InternalVersion().ResourceQuotas().Informer().GetIndexer().Add(resourceQuota)
 	newPod := validPod("not-allowed-pod", 1, getResourceRequirements(getResourceList("100m", "2Gi"), getResourceList("200m", "")))
 	// Add to the lru cache so we do not do a live client lookup
 	liveLookupCache.Add(newPod.Namespace, liveLookupEntry{expiry: time.Now().Add(time.Duration(30 * time.Second)), items: []*api.ResourceQuota{}})
@@ -641,14 +642,14 @@ func TestAdmitBelowTerminatingQuotaLimit(t *testing.T) {
 			},
 		},
 	}
-	kubeClient := fake.NewSimpleClientset(resourceQuotaTerminating, resourceQuotaNonTerminating)
-	indexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{"namespace": cache.MetaNamespaceIndexFunc})
 	stopCh := make(chan struct{})
 	defer close(stopCh)
 
-	quotaAccessor, _ := newQuotaAccessor(kubeClient)
-	quotaAccessor.indexer = indexer
-	go quotaAccessor.Run(stopCh)
+	kubeClient := fake.NewSimpleClientset(resourceQuotaTerminating, resourceQuotaNonTerminating)
+	informerFactory := informers.NewSharedInformerFactory(kubeClient, controller.NoResyncPeriodFunc())
+	quotaAccessor, _ := newQuotaAccessor()
+	quotaAccessor.client = kubeClient
+	quotaAccessor.lister = informerFactory.Core().InternalVersion().ResourceQuotas().Lister()
 	config := &resourcequotaapi.Configuration{}
 	evaluator := NewQuotaEvaluator(quotaAccessor, install.NewRegistry(nil, nil), nil, config, 5, stopCh)
 
@@ -656,8 +657,8 @@ func TestAdmitBelowTerminatingQuotaLimit(t *testing.T) {
 		Handler:   admission.NewHandler(admission.Create, admission.Update),
 		evaluator: evaluator,
 	}
-	indexer.Add(resourceQuotaNonTerminating)
-	indexer.Add(resourceQuotaTerminating)
+	informerFactory.Core().InternalVersion().ResourceQuotas().Informer().GetIndexer().Add(resourceQuotaNonTerminating)
+	informerFactory.Core().InternalVersion().ResourceQuotas().Informer().GetIndexer().Add(resourceQuotaTerminating)
 
 	// create a pod that has an active deadline
 	newPod := validPod("allowed-pod", 1, getResourceRequirements(getResourceList("100m", "2Gi"), getResourceList("", "")))
@@ -746,14 +747,14 @@ func TestAdmitBelowBestEffortQuotaLimit(t *testing.T) {
 			},
 		},
 	}
-	kubeClient := fake.NewSimpleClientset(resourceQuotaBestEffort, resourceQuotaNotBestEffort)
-	indexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{"namespace": cache.MetaNamespaceIndexFunc})
 	stopCh := make(chan struct{})
 	defer close(stopCh)
 
-	quotaAccessor, _ := newQuotaAccessor(kubeClient)
-	quotaAccessor.indexer = indexer
-	go quotaAccessor.Run(stopCh)
+	kubeClient := fake.NewSimpleClientset(resourceQuotaBestEffort, resourceQuotaNotBestEffort)
+	informerFactory := informers.NewSharedInformerFactory(kubeClient, controller.NoResyncPeriodFunc())
+	quotaAccessor, _ := newQuotaAccessor()
+	quotaAccessor.client = kubeClient
+	quotaAccessor.lister = informerFactory.Core().InternalVersion().ResourceQuotas().Lister()
 	config := &resourcequotaapi.Configuration{}
 	evaluator := NewQuotaEvaluator(quotaAccessor, install.NewRegistry(nil, nil), nil, config, 5, stopCh)
 
@@ -761,8 +762,8 @@ func TestAdmitBelowBestEffortQuotaLimit(t *testing.T) {
 		Handler:   admission.NewHandler(admission.Create, admission.Update),
 		evaluator: evaluator,
 	}
-	indexer.Add(resourceQuotaBestEffort)
-	indexer.Add(resourceQuotaNotBestEffort)
+	informerFactory.Core().InternalVersion().ResourceQuotas().Informer().GetIndexer().Add(resourceQuotaBestEffort)
+	informerFactory.Core().InternalVersion().ResourceQuotas().Informer().GetIndexer().Add(resourceQuotaNotBestEffort)
 
 	// create a pod that is best effort because it does not make a request for anything
 	newPod := validPod("allowed-pod", 1, getResourceRequirements(getResourceList("", ""), getResourceList("", "")))
@@ -838,14 +839,14 @@ func TestAdmitBestEffortQuotaLimitIgnoresBurstable(t *testing.T) {
 			},
 		},
 	}
-	kubeClient := fake.NewSimpleClientset(resourceQuota)
-	indexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{"namespace": cache.MetaNamespaceIndexFunc})
 	stopCh := make(chan struct{})
 	defer close(stopCh)
 
-	quotaAccessor, _ := newQuotaAccessor(kubeClient)
-	quotaAccessor.indexer = indexer
-	go quotaAccessor.Run(stopCh)
+	kubeClient := fake.NewSimpleClientset(resourceQuota)
+	informerFactory := informers.NewSharedInformerFactory(kubeClient, controller.NoResyncPeriodFunc())
+	quotaAccessor, _ := newQuotaAccessor()
+	quotaAccessor.client = kubeClient
+	quotaAccessor.lister = informerFactory.Core().InternalVersion().ResourceQuotas().Lister()
 	config := &resourcequotaapi.Configuration{}
 	evaluator := NewQuotaEvaluator(quotaAccessor, install.NewRegistry(nil, nil), nil, config, 5, stopCh)
 
@@ -853,7 +854,7 @@ func TestAdmitBestEffortQuotaLimitIgnoresBurstable(t *testing.T) {
 		Handler:   admission.NewHandler(admission.Create, admission.Update),
 		evaluator: evaluator,
 	}
-	indexer.Add(resourceQuota)
+	informerFactory.Core().InternalVersion().ResourceQuotas().Informer().GetIndexer().Add(resourceQuota)
 	newPod := validPod("allowed-pod", 1, getResourceRequirements(getResourceList("100m", "1Gi"), getResourceList("", "")))
 	err := handler.Admit(admission.NewAttributesRecord(newPod, nil, api.Kind("Pod").WithVersion("version"), newPod.Namespace, newPod.Name, api.Resource("pods").WithVersion("version"), "", admission.Create, nil))
 	if err != nil {
@@ -922,8 +923,6 @@ func TestAdmissionSetsMissingNamespace(t *testing.T) {
 			},
 		},
 	}
-	kubeClient := fake.NewSimpleClientset(resourceQuota)
-	indexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{"namespace": cache.MetaNamespaceIndexFunc})
 
 	// create a dummy evaluator so we can trigger quota
 	podEvaluator := &generic.ObjectCountEvaluator{
@@ -939,9 +938,11 @@ func TestAdmissionSetsMissingNamespace(t *testing.T) {
 	stopCh := make(chan struct{})
 	defer close(stopCh)
 
-	quotaAccessor, _ := newQuotaAccessor(kubeClient)
-	quotaAccessor.indexer = indexer
-	go quotaAccessor.Run(stopCh)
+	kubeClient := fake.NewSimpleClientset(resourceQuota)
+	informerFactory := informers.NewSharedInformerFactory(kubeClient, controller.NoResyncPeriodFunc())
+	quotaAccessor, _ := newQuotaAccessor()
+	quotaAccessor.client = kubeClient
+	quotaAccessor.lister = informerFactory.Core().InternalVersion().ResourceQuotas().Lister()
 	config := &resourcequotaapi.Configuration{}
 	evaluator := NewQuotaEvaluator(quotaAccessor, install.NewRegistry(nil, nil), nil, config, 5, stopCh)
 	evaluator.(*quotaEvaluator).registry = registry
@@ -950,7 +951,7 @@ func TestAdmissionSetsMissingNamespace(t *testing.T) {
 		Handler:   admission.NewHandler(admission.Create, admission.Update),
 		evaluator: evaluator,
 	}
-	indexer.Add(resourceQuota)
+	informerFactory.Core().InternalVersion().ResourceQuotas().Informer().GetIndexer().Add(resourceQuota)
 	newPod := validPod("pod-without-namespace", 1, getResourceRequirements(getResourceList("1", "2Gi"), getResourceList("", "")))
 
 	// unset the namespace
@@ -980,14 +981,14 @@ func TestAdmitRejectsNegativeUsage(t *testing.T) {
 			},
 		},
 	}
-	kubeClient := fake.NewSimpleClientset(resourceQuota)
-	indexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{"namespace": cache.MetaNamespaceIndexFunc})
 	stopCh := make(chan struct{})
 	defer close(stopCh)
 
-	quotaAccessor, _ := newQuotaAccessor(kubeClient)
-	quotaAccessor.indexer = indexer
-	go quotaAccessor.Run(stopCh)
+	kubeClient := fake.NewSimpleClientset(resourceQuota)
+	informerFactory := informers.NewSharedInformerFactory(kubeClient, controller.NoResyncPeriodFunc())
+	quotaAccessor, _ := newQuotaAccessor()
+	quotaAccessor.client = kubeClient
+	quotaAccessor.lister = informerFactory.Core().InternalVersion().ResourceQuotas().Lister()
 	config := &resourcequotaapi.Configuration{}
 	evaluator := NewQuotaEvaluator(quotaAccessor, install.NewRegistry(nil, nil), nil, config, 5, stopCh)
 
@@ -995,7 +996,7 @@ func TestAdmitRejectsNegativeUsage(t *testing.T) {
 		Handler:   admission.NewHandler(admission.Create, admission.Update),
 		evaluator: evaluator,
 	}
-	indexer.Add(resourceQuota)
+	informerFactory.Core().InternalVersion().ResourceQuotas().Informer().GetIndexer().Add(resourceQuota)
 	// verify quota rejects negative pvc storage requests
 	newPvc := validPersistentVolumeClaim("not-allowed-pvc", getResourceRequirements(api.ResourceList{api.ResourceStorage: resource.MustParse("-1Gi")}, api.ResourceList{}))
 	err := handler.Admit(admission.NewAttributesRecord(newPvc, nil, api.Kind("PersistentVolumeClaim").WithVersion("version"), newPvc.Namespace, newPvc.Name, api.Resource("persistentvolumeclaims").WithVersion("version"), "", admission.Create, nil))
@@ -1026,14 +1027,14 @@ func TestAdmitWhenUnrelatedResourceExceedsQuota(t *testing.T) {
 			},
 		},
 	}
-	kubeClient := fake.NewSimpleClientset(resourceQuota)
-	indexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{"namespace": cache.MetaNamespaceIndexFunc})
 	stopCh := make(chan struct{})
 	defer close(stopCh)
 
-	quotaAccessor, _ := newQuotaAccessor(kubeClient)
-	quotaAccessor.indexer = indexer
-	go quotaAccessor.Run(stopCh)
+	kubeClient := fake.NewSimpleClientset(resourceQuota)
+	informerFactory := informers.NewSharedInformerFactory(kubeClient, controller.NoResyncPeriodFunc())
+	quotaAccessor, _ := newQuotaAccessor()
+	quotaAccessor.client = kubeClient
+	quotaAccessor.lister = informerFactory.Core().InternalVersion().ResourceQuotas().Lister()
 	config := &resourcequotaapi.Configuration{}
 	evaluator := NewQuotaEvaluator(quotaAccessor, install.NewRegistry(nil, nil), nil, config, 5, stopCh)
 
@@ -1041,7 +1042,7 @@ func TestAdmitWhenUnrelatedResourceExceedsQuota(t *testing.T) {
 		Handler:   admission.NewHandler(admission.Create, admission.Update),
 		evaluator: evaluator,
 	}
-	indexer.Add(resourceQuota)
+	informerFactory.Core().InternalVersion().ResourceQuotas().Informer().GetIndexer().Add(resourceQuota)
 
 	// create a pod that should pass existing quota
 	newPod := validPod("allowed-pod", 1, getResourceRequirements(getResourceList("", ""), getResourceList("", "")))
@@ -1054,13 +1055,13 @@ func TestAdmitWhenUnrelatedResourceExceedsQuota(t *testing.T) {
 // TestAdmitLimitedResourceNoQuota verifies if a limited resource is configured with no quota, it cannot be consumed.
 func TestAdmitLimitedResourceNoQuota(t *testing.T) {
 	kubeClient := fake.NewSimpleClientset()
-	indexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{"namespace": cache.MetaNamespaceIndexFunc})
 	stopCh := make(chan struct{})
 	defer close(stopCh)
 
-	quotaAccessor, _ := newQuotaAccessor(kubeClient)
-	quotaAccessor.indexer = indexer
-	go quotaAccessor.Run(stopCh)
+	informerFactory := informers.NewSharedInformerFactory(kubeClient, controller.NoResyncPeriodFunc())
+	quotaAccessor, _ := newQuotaAccessor()
+	quotaAccessor.client = kubeClient
+	quotaAccessor.lister = informerFactory.Core().InternalVersion().ResourceQuotas().Lister()
 
 	// disable consumption of cpu unless there is a covering quota.
 	config := &resourcequotaapi.Configuration{
@@ -1087,13 +1088,13 @@ func TestAdmitLimitedResourceNoQuota(t *testing.T) {
 // TestAdmitLimitedResourceNoQuotaIgnoresNonMatchingResources shows it ignores non matching resources in config.
 func TestAdmitLimitedResourceNoQuotaIgnoresNonMatchingResources(t *testing.T) {
 	kubeClient := fake.NewSimpleClientset()
-	indexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{"namespace": cache.MetaNamespaceIndexFunc})
 	stopCh := make(chan struct{})
 	defer close(stopCh)
 
-	quotaAccessor, _ := newQuotaAccessor(kubeClient)
-	quotaAccessor.indexer = indexer
-	go quotaAccessor.Run(stopCh)
+	informerFactory := informers.NewSharedInformerFactory(kubeClient, controller.NoResyncPeriodFunc())
+	quotaAccessor, _ := newQuotaAccessor()
+	quotaAccessor.client = kubeClient
+	quotaAccessor.lister = informerFactory.Core().InternalVersion().ResourceQuotas().Lister()
 
 	// disable consumption of cpu unless there is a covering quota.
 	config := &resourcequotaapi.Configuration{
@@ -1135,9 +1136,10 @@ func TestAdmitLimitedResourceWithQuota(t *testing.T) {
 	stopCh := make(chan struct{})
 	defer close(stopCh)
 
-	quotaAccessor, _ := newQuotaAccessor(kubeClient)
-	quotaAccessor.indexer = indexer
-	go quotaAccessor.Run(stopCh)
+	informerFactory := informers.NewSharedInformerFactory(kubeClient, controller.NoResyncPeriodFunc())
+	quotaAccessor, _ := newQuotaAccessor()
+	quotaAccessor.client = kubeClient
+	quotaAccessor.lister = informerFactory.Core().InternalVersion().ResourceQuotas().Lister()
 
 	// disable consumption of cpu unless there is a covering quota.
 	// disable consumption of cpu unless there is a covering quota.
@@ -1192,9 +1194,10 @@ func TestAdmitLimitedResourceWithMultipleQuota(t *testing.T) {
 	stopCh := make(chan struct{})
 	defer close(stopCh)
 
-	quotaAccessor, _ := newQuotaAccessor(kubeClient)
-	quotaAccessor.indexer = indexer
-	go quotaAccessor.Run(stopCh)
+	informerFactory := informers.NewSharedInformerFactory(kubeClient, controller.NoResyncPeriodFunc())
+	quotaAccessor, _ := newQuotaAccessor()
+	quotaAccessor.client = kubeClient
+	quotaAccessor.lister = informerFactory.Core().InternalVersion().ResourceQuotas().Lister()
 
 	// disable consumption of cpu unless there is a covering quota.
 	// disable consumption of cpu unless there is a covering quota.
@@ -1239,9 +1242,10 @@ func TestAdmitLimitedResourceWithQuotaThatDoesNotCover(t *testing.T) {
 	stopCh := make(chan struct{})
 	defer close(stopCh)
 
-	quotaAccessor, _ := newQuotaAccessor(kubeClient)
-	quotaAccessor.indexer = indexer
-	go quotaAccessor.Run(stopCh)
+	informerFactory := informers.NewSharedInformerFactory(kubeClient, controller.NoResyncPeriodFunc())
+	quotaAccessor, _ := newQuotaAccessor()
+	quotaAccessor.client = kubeClient
+	quotaAccessor.lister = informerFactory.Core().InternalVersion().ResourceQuotas().Lister()
 
 	// disable consumption of cpu unless there is a covering quota.
 	// disable consumption of cpu unless there is a covering quota.

@@ -26,6 +26,8 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/storage"
 	storageutil "k8s.io/kubernetes/pkg/apis/storage/util"
+	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated/internalversion"
+	"k8s.io/kubernetes/pkg/controller"
 )
 
 func TestAdmission(t *testing.T) {
@@ -193,9 +195,10 @@ func TestAdmission(t *testing.T) {
 		claim := clone.(*api.PersistentVolumeClaim)
 
 		ctrl := newPlugin()
-		ctrl.SetInternalClientSet(nil)
+		informerFactory := informers.NewSharedInformerFactory(nil, controller.NoResyncPeriodFunc())
+		ctrl.SetInformerFactory(informerFactory)
 		for _, c := range test.classes {
-			ctrl.store.Add(c)
+			informerFactory.Storage().InternalVersion().StorageClasses().Informer().GetStore().Add(c)
 		}
 		attrs := admission.NewAttributesRecord(
 			claim, // new object
