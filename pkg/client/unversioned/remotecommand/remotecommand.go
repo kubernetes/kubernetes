@@ -28,8 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/httpstream/spdy"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/transport"
-	"k8s.io/kubernetes/pkg/kubelet/server/remotecommand"
-	"k8s.io/kubernetes/pkg/util/term"
+	"k8s.io/kubernetes/pkg/util/remotecommand"
 )
 
 // StreamOptions holds information pertaining to the current streaming session: supported stream
@@ -41,7 +40,7 @@ type StreamOptions struct {
 	Stdout             io.Writer
 	Stderr             io.Writer
 	Tty                bool
-	TerminalSizeQueue  term.TerminalSizeQueue
+	ResizeFunc         func(io.Writer)
 }
 
 // Executor is an interface for transporting shell-style streams.

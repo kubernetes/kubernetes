@@ -36,7 +36,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/httpstream"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/testapi"
+	remoteclient "k8s.io/kubernetes/pkg/client/unversioned/remotecommand"
 	"k8s.io/kubernetes/pkg/kubelet/server/remotecommand"
 	"k8s.io/kubernetes/pkg/util/term"
 )
@@ -221,7 +221,7 @@ func TestStream(t *testing.T) {
 			url, _ := url.ParseRequestURI(server.URL)
 			config := restclient.ContentConfig{
 				GroupVersion:         &schema.GroupVersion{Group: "x"},
-				NegotiatedSerializer: testapi.Default.NegotiatedSerializer(),
+				NegotiatedSerializer: api.Codecs,
 			}
 			c, err := restclient.NewRESTClient(url, "", config, -1, -1, nil, nil)
 			if err != nil {
@@ -254,12 +254,12 @@ func TestStream(t *testing.T) {
 			conf := &restclient.Config{
 				Host: server.URL,
 			}
-			e, err := NewExecutor(conf, "POST", req.URL())
+			e, err := remoteclient.NewExecutor(conf, "POST", req.URL())
 			if err != nil {
 				t.Errorf("%s: unexpected error: %v", name, err)
 				continue
 			}
-			err = e.Stream(StreamOptions{
+			err = e.Stream(remoteclient.StreamOptions{
 				SupportedProtocols: testCase.ClientProtocols,
 				Stdin:              streamIn,
 				Stdout:             streamOut,
@@ -351,7 +351,7 @@ func TestDial(t *testing.T) {
 		called = true
 		return rt
 	}
-	exec, err := NewStreamExecutor(upgrader, testFn, "POST", &url.URL{Host: "something.com", Scheme: "https"})
+	exec, err := remoteclient.NewStreamExecutor(upgrader, testFn, "POST", &url.URL{Host: "something.com", Scheme: "https"})
 	if err != nil {
 		t.Fatal(err)
 	}
