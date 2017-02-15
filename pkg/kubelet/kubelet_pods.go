@@ -43,6 +43,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/api/v1/validation"
+	"k8s.io/kubernetes/pkg/client/unversioned/remotecommand"
 	"k8s.io/kubernetes/pkg/fieldpath"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
@@ -50,11 +51,10 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/images"
 	"k8s.io/kubernetes/pkg/kubelet/qos"
 	"k8s.io/kubernetes/pkg/kubelet/server/portforward"
-	"k8s.io/kubernetes/pkg/kubelet/server/remotecommand"
+	remotecommandserver "k8s.io/kubernetes/pkg/kubelet/server/remotecommand"
 	"k8s.io/kubernetes/pkg/kubelet/status"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
-	"k8s.io/kubernetes/pkg/util/term"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util/volumehelper"
 	"k8s.io/kubernetes/third_party/forked/golang/expansion"
@@ -1399,7 +1399,7 @@ func (kl *Kubelet) RunInContainer(podFullName string, podUID types.UID, containe
 
 // ExecInContainer executes a command in a container, connecting the supplied
 // stdin/stdout/stderr to the command's IO streams.
-func (kl *Kubelet) ExecInContainer(podFullName string, podUID types.UID, containerName string, cmd []string, stdin io.Reader, stdout, stderr io.WriteCloser, tty bool, resize <-chan term.Size, timeout time.Duration) error {
+func (kl *Kubelet) ExecInContainer(podFullName string, podUID types.UID, containerName string, cmd []string, stdin io.Reader, stdout, stderr io.WriteCloser, tty bool, resize <-chan remotecommand.TerminalSize, timeout time.Duration) error {
 	streamingRuntime, ok := kl.containerRuntime.(kubecontainer.DirectStreamingRuntime)
 	if !ok {
 		return fmt.Errorf("streaming methods not supported by runtime")
@@ -1417,7 +1417,7 @@ func (kl *Kubelet) ExecInContainer(podFullName string, podUID types.UID, contain
 
 // AttachContainer uses the container runtime to attach the given streams to
 // the given container.
-func (kl *Kubelet) AttachContainer(podFullName string, podUID types.UID, containerName string, stdin io.Reader, stdout, stderr io.WriteCloser, tty bool, resize <-chan term.Size) error {
+func (kl *Kubelet) AttachContainer(podFullName string, podUID types.UID, containerName string, stdin io.Reader, stdout, stderr io.WriteCloser, tty bool, resize <-chan remotecommand.TerminalSize) error {
 	streamingRuntime, ok := kl.containerRuntime.(kubecontainer.DirectStreamingRuntime)
 	if !ok {
 		return fmt.Errorf("streaming methods not supported by runtime")
@@ -1454,7 +1454,7 @@ func (kl *Kubelet) PortForward(podFullName string, podUID types.UID, port int32,
 }
 
 // GetExec gets the URL the exec will be served from, or nil if the Kubelet will serve it.
-func (kl *Kubelet) GetExec(podFullName string, podUID types.UID, containerName string, cmd []string, streamOpts remotecommand.Options) (*url.URL, error) {
+func (kl *Kubelet) GetExec(podFullName string, podUID types.UID, containerName string, cmd []string, streamOpts remotecommandserver.Options) (*url.URL, error) {
 	switch streamingRuntime := kl.containerRuntime.(type) {
 	case kubecontainer.DirectStreamingRuntime:
 		// Kubelet will serve the exec directly.
@@ -1474,7 +1474,7 @@ func (kl *Kubelet) GetExec(podFullName string, podUID types.UID, containerName s
 }
 
 // GetAttach gets the URL the attach will be served from, or nil if the Kubelet will serve it.
-func (kl *Kubelet) GetAttach(podFullName string, podUID types.UID, containerName string, streamOpts remotecommand.Options) (*url.URL, error) {
+func (kl *Kubelet) GetAttach(podFullName string, podUID types.UID, containerName string, streamOpts remotecommandserver.Options) (*url.URL, error) {
 	switch streamingRuntime := kl.containerRuntime.(type) {
 	case kubecontainer.DirectStreamingRuntime:
 		// Kubelet will serve the attach directly.
