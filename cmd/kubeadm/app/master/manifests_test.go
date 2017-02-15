@@ -328,35 +328,6 @@ func TestComponentPod(t *testing.T) {
 	}
 }
 
-func TestGetComponentBaseCommand(t *testing.T) {
-	var tests = []struct {
-		c        string
-		expected []string
-	}{
-		{
-			c:        "foo",
-			expected: []string{"kube-foo", "--v=2"},
-		},
-		{
-			c:        "bar",
-			expected: []string{"kube-bar", "--v=2"},
-		},
-	}
-
-	for _, rt := range tests {
-		actual := getComponentBaseCommand(rt.c)
-		for i := range actual {
-			if actual[i] != rt.expected[i] {
-				t.Errorf(
-					"failed getComponentBaseCommand:\n\texpected: %s\n\t  actual: %s",
-					rt.expected[i],
-					actual[i],
-				)
-			}
-		}
-	}
-}
-
 func TestGetAPIServerCommand(t *testing.T) {
 	var tests = []struct {
 		cfg      *kubeadmapi.MasterConfiguration
@@ -368,7 +339,7 @@ func TestGetAPIServerCommand(t *testing.T) {
 				Networking: kubeadm.Networking{ServiceSubnet: "bar"},
 			},
 			expected: []string{
-				"kube-apiserver",
+				"/usr/local/bin/kube-apiserver",
 				"--insecure-bind-address=127.0.0.1",
 				"--admission-control=NamespaceLifecycle,LimitRanger,ServiceAccount,PersistentVolumeLabel,DefaultStorageClass,ResourceQuota",
 				"--service-cluster-ip-range=bar",
@@ -392,7 +363,7 @@ func TestGetAPIServerCommand(t *testing.T) {
 				Networking: kubeadm.Networking{ServiceSubnet: "bar"},
 			},
 			expected: []string{
-				"kube-apiserver",
+				"/usr/local/bin/kube-apiserver",
 				"--insecure-bind-address=127.0.0.1",
 				"--admission-control=NamespaceLifecycle,LimitRanger,ServiceAccount,PersistentVolumeLabel,DefaultStorageClass,ResourceQuota",
 				"--service-cluster-ip-range=bar",
@@ -418,7 +389,7 @@ func TestGetAPIServerCommand(t *testing.T) {
 				Etcd:       kubeadm.Etcd{CertFile: "fiz", KeyFile: "faz"},
 			},
 			expected: []string{
-				"kube-apiserver",
+				"/usr/local/bin/kube-apiserver",
 				"--insecure-bind-address=127.0.0.1",
 				"--admission-control=NamespaceLifecycle,LimitRanger,ServiceAccount,PersistentVolumeLabel,DefaultStorageClass,ResourceQuota",
 				"--service-cluster-ip-range=bar",
@@ -462,7 +433,7 @@ func TestGetControllerManagerCommand(t *testing.T) {
 		{
 			cfg: &kubeadmapi.MasterConfiguration{},
 			expected: []string{
-				"kube-controller-manager",
+				"/usr/local/bin/kube-controller-manager",
 				"--address=127.0.0.1",
 				"--leader-elect",
 				"--master=127.0.0.1:8080",
@@ -477,7 +448,7 @@ func TestGetControllerManagerCommand(t *testing.T) {
 		{
 			cfg: &kubeadmapi.MasterConfiguration{CloudProvider: "foo"},
 			expected: []string{
-				"kube-controller-manager",
+				"/usr/local/bin/kube-controller-manager",
 				"--address=127.0.0.1",
 				"--leader-elect",
 				"--master=127.0.0.1:8080",
@@ -493,7 +464,7 @@ func TestGetControllerManagerCommand(t *testing.T) {
 		{
 			cfg: &kubeadmapi.MasterConfiguration{Networking: kubeadm.Networking{PodSubnet: "bar"}},
 			expected: []string{
-				"kube-controller-manager",
+				"/usr/local/bin/kube-controller-manager",
 				"--address=127.0.0.1",
 				"--leader-elect",
 				"--master=127.0.0.1:8080",
@@ -510,7 +481,7 @@ func TestGetControllerManagerCommand(t *testing.T) {
 	}
 
 	for _, rt := range tests {
-		actual := getControllerManagerCommand(rt.cfg, false)
+		actual := getControllerManagerCommand(rt.cfg)
 		for i := range actual {
 			if actual[i] != rt.expected[i] {
 				t.Errorf(
@@ -531,7 +502,7 @@ func TestGetSchedulerCommand(t *testing.T) {
 		{
 			cfg: &kubeadmapi.MasterConfiguration{},
 			expected: []string{
-				"kube-scheduler",
+				"/usr/local/bin/kube-scheduler",
 				"--address=127.0.0.1",
 				"--leader-elect",
 				"--master=127.0.0.1:8080",
@@ -540,7 +511,7 @@ func TestGetSchedulerCommand(t *testing.T) {
 	}
 
 	for _, rt := range tests {
-		actual := getSchedulerCommand(rt.cfg, false)
+		actual := getSchedulerCommand(rt.cfg)
 		for i := range actual {
 			if actual[i] != rt.expected[i] {
 				t.Errorf(
