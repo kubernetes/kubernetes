@@ -2574,6 +2574,15 @@ func AddOrUpdateLabelOnNode(c clientset.Interface, nodeName string, labelKey, la
 	ExpectNoError(testutils.AddLabelsToNode(c, nodeName, map[string]string{labelKey: labelValue}))
 }
 
+func AddOrUpdateLabelOnNodeAndReturnOldValue(c clientset.Interface, nodeName string, labelKey, labelValue string) string {
+	var oldValue string
+	node, err := c.Core().Nodes().Get(nodeName, metav1.GetOptions{})
+	ExpectNoError(err)
+	oldValue = node.Labels[labelKey]
+	ExpectNoError(testutils.AddLabelsToNode(c, nodeName, map[string]string{labelKey: labelValue}))
+	return oldValue
+}
+
 func ExpectNodeHasLabel(c clientset.Interface, nodeName string, labelKey string, labelValue string) {
 	By("verifying the node has the label " + labelKey + " " + labelValue)
 	node, err := c.Core().Nodes().Get(nodeName, metav1.GetOptions{})
