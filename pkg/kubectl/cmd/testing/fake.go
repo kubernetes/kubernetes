@@ -216,6 +216,7 @@ type TestFactory struct {
 	Namespace          string
 	ClientConfig       *restclient.Config
 	Err                error
+	Command            string
 
 	ClientForMappingFunc             func(mapping *meta.RESTMapping) (resource.RESTClient, error)
 	UnstructuredClientForMappingFunc func(mapping *meta.RESTMapping) (resource.RESTClient, error)
@@ -431,7 +432,7 @@ func (f *FakeFactory) PrintObjectSpecificMessage(obj runtime.Object, out io.Writ
 }
 
 func (f *FakeFactory) Command() string {
-	return ""
+	return f.tf.Command
 }
 
 func (f *FakeFactory) BindFlags(flags *pflag.FlagSet) {
@@ -630,6 +631,10 @@ func (f *fakeAPIFactory) DefaultNamespace() (string, bool, error) {
 	return f.tf.Namespace, false, f.tf.Err
 }
 
+func (f *fakeAPIFactory) Command() string {
+	return f.tf.Command
+}
+
 func (f *fakeAPIFactory) Generators(cmdName string) map[string]kubectl.Generator {
 	return cmdutil.DefaultGenerators(cmdName)
 }
@@ -711,6 +716,39 @@ func testDynamicResources() []*discovery.APIGroupResources {
 			VersionedResources: map[string][]metav1.APIResource{
 				"v1beta1": {
 					{Name: "deployments", Namespaced: true, Kind: "Deployment"},
+				},
+			},
+		},
+		{
+			Group: metav1.APIGroup{
+				Name: "storage.k8s.io",
+				Versions: []metav1.GroupVersionForDiscovery{
+					{Version: "v1beta1"},
+					{Version: "v0"},
+				},
+				PreferredVersion: metav1.GroupVersionForDiscovery{Version: "v1beta1"},
+			},
+			VersionedResources: map[string][]metav1.APIResource{
+				"v1beta1": {
+					{Name: "storageclasses", Namespaced: false, Kind: "StorageClass"},
+				},
+				// bogus version of a known group/version/resource to make sure kubectl falls back to generic object mode
+				"v0": {
+					{Name: "storageclasses", Namespaced: false, Kind: "StorageClass"},
+				},
+			},
+		},
+		{
+			Group: metav1.APIGroup{
+				Name: "company.com",
+				Versions: []metav1.GroupVersionForDiscovery{
+					{Version: "v1"},
+				},
+				PreferredVersion: metav1.GroupVersionForDiscovery{Version: "v1"},
+			},
+			VersionedResources: map[string][]metav1.APIResource{
+				"v1": {
+					{Name: "bars", Namespaced: true, Kind: "Bar"},
 				},
 			},
 		},
