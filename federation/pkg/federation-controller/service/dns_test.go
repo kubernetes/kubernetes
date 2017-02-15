@@ -17,12 +17,12 @@ limitations under the License.
 package service
 
 import (
-	"sync"
-	"testing"
-
 	"fmt"
 	"reflect"
 	"sort"
+	"sync"
+	"testing"
+	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -34,7 +34,10 @@ import (
 )
 
 func TestServiceController_ensureDnsRecords(t *testing.T) {
-	clusterName := "testcluster"
+	cluster1Name := "c1"
+	cluster2Name := "c2"
+	cluster1 := NewClusterWithRegionZone(cluster1Name, v1.ConditionTrue, "fooregion", "foozone")
+	cluster2 := NewClusterWithRegionZone(cluster2Name, v1.ConditionTrue, "barregion", "barzone")
 
 	tests := []struct {
 		name          string
@@ -43,14 +46,14 @@ func TestServiceController_ensureDnsRecords(t *testing.T) {
 		serviceStatus v1.LoadBalancerStatus
 	}{
 		{
-			name: "withip",
+			name: "ServiceWithSingleLBIngress",
 			service: v1.Service{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "servicename",
 					Namespace: "servicenamespace",
 					Annotations: map[string]string{
 						FederatedServiceIngressAnnotation: NewFederatedServiceIngress().
-							AddEndpoints(clusterName, []string{"198.51.100.1"}).
+							AddEndpoints(cluster1Name, []string{"198.51.100.1"}).
 							String()},
 				},
 			},
@@ -59,6 +62,8 @@ func TestServiceController_ensureDnsRecords(t *testing.T) {
 				"example.com:servicename.servicenamespace.myfederation.svc.federation.example.com:A:180:[198.51.100.1]",
 				"example.com:servicename.servicenamespace.myfederation.svc.fooregion.federation.example.com:A:180:[198.51.100.1]",
 				"example.com:servicename.servicenamespace.myfederation.svc.foozone.fooregion.federation.example.com:A:180:[198.51.100.1]",
+				"example.com:servicename.servicenamespace.myfederation.svc.barregion.federation.example.com:CNAME:180:[servicename.servicenamespace.myfederation.svc.federation.example.com]",
+				"example.com:servicename.servicenamespace.myfederation.svc.barzone.barregion.federation.example.com:CNAME:180:[servicename.servicenamespace.myfederation.svc.barregion.federation.example.com]",
 			},
 		},
 		/*
@@ -81,7 +86,7 @@ func TestServiceController_ensureDnsRecords(t *testing.T) {
 			},
 		*/
 		{
-			name: "noendpoints",
+			name: "ServiceWithNoLBIngress",
 			service: v1.Service{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "servicename",
@@ -91,6 +96,94 @@ func TestServiceController_ensureDnsRecords(t *testing.T) {
 			expected: []string{
 				"example.com:servicename.servicenamespace.myfederation.svc.fooregion.federation.example.com:CNAME:180:[servicename.servicenamespace.myfederation.svc.federation.example.com]",
 				"example.com:servicename.servicenamespace.myfederation.svc.foozone.fooregion.federation.example.com:CNAME:180:[servicename.servicenamespace.myfederation.svc.fooregion.federation.example.com]",
+				"example.com:servicename.servicenamespace.myfederation.svc.barregion.federation.example.com:CNAME:180:[servicename.servicenamespace.myfederation.svc.federation.example.com]",
+				"example.com:servicename.servicenamespace.myfederation.svc.barzone.barregion.federation.example.com:CNAME:180:[servicename.servicenamespace.myfederation.svc.barregion.federation.example.com]",
+			},
+		},
+		{
+			name: "ServiceWithMultipleLBIngress",
+			service: v1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "servicename",
+					Namespace: "servicenamespace",
+					Annotations: map[string]string{
+						FederatedServiceIngressAnnotation: NewFederatedServiceIngress().
+							AddEndpoints(cluster1Name, []string{"198.51.100.1"}).
+							AddEndpoints(cluster2Name, []string{"198.51.200.1"}).
+							String()},
+				},
+			},
+			expected: []string{
+				"example.com:servicename.servicenamespace.myfederation.svc.federation.example.com:A:180:[198.51.100.1 198.51.200.1]",
+				"example.com:servicename.servicenamespace.myfederation.svc.fooregion.federation.example.com:A:180:[198.51.100.1]",
+				"example.com:servicename.servicenamespace.myfederation.svc.foozone.fooregion.federation.example.com:A:180:[198.51.100.1]",
+				"example.com:servicename.servicenamespace.myfederation.svc.barregion.federation.example.com:A:180:[198.51.200.1]",
+				"example.com:servicename.servicenamespace.myfederation.svc.barzone.barregion.federation.example.com:A:180:[198.51.200.1]",
+			},
+		},
+		{
+			name: "ServiceWithLBIngressAndServiceDeleted",
+			service: v1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "servicename",
+					Namespace:         "servicenamespace",
+					DeletionTimestamp: &metav1.Time{Time: time.Now()},
+					Annotations: map[string]string{
+						FederatedServiceIngressAnnotation: NewFederatedServiceIngress().
+							AddEndpoints(cluster1Name, []string{"198.51.100.1"}).
+							String()},
+				},
+			},
+			expected: []string{
+				// TODO: Ideally we should expect that there are no DNS records when federated service is deleted. Need to remove these leaks in future
+				"example.com:servicename.servicenamespace.myfederation.svc.fooregion.federation.example.com:CNAME:180:[servicename.servicenamespace.myfederation.svc.federation.example.com]",
+				"example.com:servicename.servicenamespace.myfederation.svc.foozone.fooregion.federation.example.com:CNAME:180:[servicename.servicenamespace.myfederation.svc.fooregion.federation.example.com]",
+				"example.com:servicename.servicenamespace.myfederation.svc.barregion.federation.example.com:CNAME:180:[servicename.servicenamespace.myfederation.svc.federation.example.com]",
+				"example.com:servicename.servicenamespace.myfederation.svc.barzone.barregion.federation.example.com:CNAME:180:[servicename.servicenamespace.myfederation.svc.barregion.federation.example.com]",
+			},
+		},
+		{
+			name: "ServiceWithMultipleLBIngressAndOneLBIngressGettingRemoved",
+			service: v1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "servicename",
+					Namespace: "servicenamespace",
+					Annotations: map[string]string{
+						FederatedServiceIngressAnnotation: NewFederatedServiceIngress().
+							AddEndpoints(cluster1Name, []string{"198.51.100.1"}).
+							AddEndpoints(cluster2Name, []string{"198.51.200.1"}).
+							RemoveEndpoint(cluster2Name, "198.51.200.1").
+							String()},
+				},
+			},
+			expected: []string{
+				"example.com:servicename.servicenamespace.myfederation.svc.federation.example.com:A:180:[198.51.100.1]",
+				"example.com:servicename.servicenamespace.myfederation.svc.fooregion.federation.example.com:A:180:[198.51.100.1]",
+				"example.com:servicename.servicenamespace.myfederation.svc.foozone.fooregion.federation.example.com:A:180:[198.51.100.1]",
+				"example.com:servicename.servicenamespace.myfederation.svc.barregion.federation.example.com:CNAME:180:[servicename.servicenamespace.myfederation.svc.federation.example.com]",
+				"example.com:servicename.servicenamespace.myfederation.svc.barzone.barregion.federation.example.com:CNAME:180:[servicename.servicenamespace.myfederation.svc.barregion.federation.example.com]",
+			},
+		},
+		{
+			name: "ServiceWithMultipleLBIngressAndAllLBIngressGettingRemoved",
+			service: v1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "servicename",
+					Namespace: "servicenamespace",
+					Annotations: map[string]string{
+						FederatedServiceIngressAnnotation: NewFederatedServiceIngress().
+							AddEndpoints(cluster1Name, []string{"198.51.100.1"}).
+							AddEndpoints(cluster2Name, []string{"198.51.200.1"}).
+							RemoveEndpoint(cluster1Name, "198.51.100.1").
+							RemoveEndpoint(cluster2Name, "198.51.200.1").
+							String()},
+				},
+			},
+			expected: []string{
+				"example.com:servicename.servicenamespace.myfederation.svc.fooregion.federation.example.com:CNAME:180:[servicename.servicenamespace.myfederation.svc.federation.example.com]",
+				"example.com:servicename.servicenamespace.myfederation.svc.foozone.fooregion.federation.example.com:CNAME:180:[servicename.servicenamespace.myfederation.svc.fooregion.federation.example.com]",
+				"example.com:servicename.servicenamespace.myfederation.svc.barregion.federation.example.com:CNAME:180:[servicename.servicenamespace.myfederation.svc.federation.example.com]",
+				"example.com:servicename.servicenamespace.myfederation.svc.barzone.barregion.federation.example.com:CNAME:180:[servicename.servicenamespace.myfederation.svc.barregion.federation.example.com]",
 			},
 		},
 	}
@@ -101,7 +194,7 @@ func TestServiceController_ensureDnsRecords(t *testing.T) {
 			t.Error("Unable to fetch zones")
 		}
 		fakeClient := &fakefedclientset.Clientset{}
-		RegisterFakeClusterGet(&fakeClient.Fake, &v1beta1.ClusterList{Items: []v1beta1.Cluster{*NewCluster(clusterName, v1.ConditionTrue)}})
+		RegisterFakeClusterGet(&fakeClient.Fake, &v1beta1.ClusterList{Items: []v1beta1.Cluster{*cluster1, *cluster2}})
 		serviceController := ServiceController{
 			federationClient: fakeClient,
 			dns:              fakedns,
@@ -117,7 +210,7 @@ func TestServiceController_ensureDnsRecords(t *testing.T) {
 			knownClusterSet: make(sets.String),
 		}
 
-		serviceController.clusterCache.clientMap[clusterName] = &clusterCache{
+		serviceController.clusterCache.clientMap[cluster1Name] = &clusterCache{
 			cluster: &v1beta1.Cluster{
 				Status: v1beta1.ClusterStatus{
 					Zones:  []string{"foozone"},
@@ -131,12 +224,16 @@ func TestServiceController_ensureDnsRecords(t *testing.T) {
 			endpointMap:      make(map[string]int),
 			serviceStatusMap: make(map[string]v1.LoadBalancerStatus),
 		}
-		cachedService.endpointMap[clusterName] = 1
+		cachedService.endpointMap[cluster1Name] = 1
 		if !reflect.DeepEqual(&test.serviceStatus, &v1.LoadBalancerStatus{}) {
-			cachedService.serviceStatusMap[clusterName] = test.serviceStatus
+			cachedService.serviceStatusMap[cluster1Name] = test.serviceStatus
 		}
 
-		err := serviceController.ensureDnsRecords(clusterName, &test.service)
+		err := serviceController.ensureDnsRecords(cluster1Name, &test.service)
+		if err != nil {
+			t.Errorf("Test failed for %s, unexpected error %v", test.name, err)
+		}
+		err = serviceController.ensureDnsRecords(cluster2Name, &test.service)
 		if err != nil {
 			t.Errorf("Test failed for %s, unexpected error %v", test.name, err)
 		}
@@ -147,7 +244,7 @@ func TestServiceController_ensureDnsRecords(t *testing.T) {
 		}
 
 		// Dump every record to a testable-by-string-comparison form
-		var records []string
+		records := []string{}
 		for _, z := range zones {
 			zoneName := z.Name()
 
