@@ -31,15 +31,14 @@ import (
 	"github.com/golang/glog"
 
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/client-go/util/cert"
 	certificates "k8s.io/kubernetes/pkg/apis/certificates/v1beta1"
 	clientcertificates "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/certificates/v1beta1"
 	"k8s.io/kubernetes/pkg/kubelet/util/csr"
 )
 
 const (
-	syncPeriod               = 1 * time.Hour
-	ecPrivateKeyHeader       = "EC PRIVATE KEY"
-	certificateRequestHeader = "CERTIFICATE REQUEST"
+	syncPeriod = 1 * time.Hour
 )
 
 // Manager maintains and updates the certificates in use by this certificate
@@ -179,7 +178,7 @@ func (m *manager) rotateCerts() error {
 	// new private key.
 	crtPEM, err := csr.RequestCertificate(m.certSigningRequestClient, csrPEM, m.usages)
 	if err != nil {
-		return fmt.Errorf("unable to get a new key signed for %v: %v", m.template, err)
+		return fmt.Errorf("unable to get a new key signed: %v", err)
 	}
 
 	cert, err := m.certStore.Update(crtPEM, keyPEM)
@@ -204,7 +203,7 @@ func (m *manager) generateCSR() (csrPEM []byte, keyPEM []byte, err error) {
 		return nil, nil, fmt.Errorf("unable to marshal the new key to DER: %v", err)
 	}
 
-	keyPEM = pem.EncodeToMemory(&pem.Block{Type: ecPrivateKeyHeader, Bytes: der})
+	keyPEM = pem.EncodeToMemory(&pem.Block{Type: cert.ECPrivateKeyBlockType, Bytes: der})
 
 	csrPEM, err = makeCSR(privateKey, m.template)
 	if err != nil {
@@ -239,7 +238,7 @@ func makeCSR(privateKey interface{}, template *x509.CertificateRequest) ([]byte,
 	}
 
 	csrPemBlock := &pem.Block{
-		Type:  certificateRequestHeader,
+		Type:  cert.CertificateRequestBlockType,
 		Bytes: csrDER,
 	}
 

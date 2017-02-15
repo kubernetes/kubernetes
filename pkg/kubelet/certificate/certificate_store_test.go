@@ -21,6 +21,8 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+
+	"k8s.io/client-go/util/cert"
 )
 
 func TestUpdateSymlinkExistingFileError(t *testing.T) {
@@ -256,11 +258,11 @@ func TestLoadCertKeyBlocks(t *testing.T) {
 	if err != nil {
 		t.Errorf("Got %v, but expected no error.", pairFile)
 	}
-	if certBlock.Type != "CERTIFICATE" {
-		t.Errorf("Got %q loaded from the pair file, expected a 'CERTIFICATE'.", certBlock.Type)
+	if certBlock.Type != cert.CertificateBlockType {
+		t.Errorf("Got %q loaded from the pair file, expected a %q.", certBlock.Type, cert.CertificateBlockType)
 	}
-	if keyBlock.Type != "RSA PRIVATE KEY" {
-		t.Errorf("Got %q loaded from the pair file, expected a 'RSA PRIVATE KEY'.", keyBlock.Type)
+	if keyBlock.Type != cert.RSAPrivateKeyBlockType {
+		t.Errorf("Got %q loaded from the pair file, expected a %q.", keyBlock.Type, cert.RSAPrivateKeyBlockType)
 	}
 }
 

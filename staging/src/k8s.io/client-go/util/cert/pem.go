@@ -24,6 +24,17 @@ import (
 	"fmt"
 )
 
+const (
+	// ECPrivateKeyBlockType is a possible value for pem.Block.Type.
+	ECPrivateKeyBlockType = "EC PRIVATE KEY"
+	// RSAPrivateKeyBlockType is a possible value for pem.Block.Type.
+	RSAPrivateKeyBlockType = "RSA PRIVATE KEY"
+	// CertificateBlockType is a possible value for pem.Block.Type.
+	CertificateBlockType = "CERTIFICATE"
+	// CertificateRequestBlockType is a possible value for pem.Block.Type.
+	CertificateRequestBlockType = "CERTIFICATE REQUEST"
+)
+
 // EncodePublicKeyPEM returns PEM-endcode public data
 func EncodePublicKeyPEM(key *rsa.PublicKey) ([]byte, error) {
 	der, err := x509.MarshalPKIXPublicKey(key)
@@ -49,7 +60,7 @@ func EncodePrivateKeyPEM(key *rsa.PrivateKey) []byte {
 // EncodeCertPEM returns PEM-endcoded certificate data
 func EncodeCertPEM(cert *x509.Certificate) []byte {
 	block := pem.Block{
-		Type:  "CERTIFICATE",
+		Type:  CertificateBlockType,
 		Bytes: cert.Raw,
 	}
 	return pem.EncodeToMemory(&block)
@@ -67,9 +78,9 @@ func ParsePrivateKeyPEM(keyData []byte) (interface{}, error) {
 		}
 
 		switch privateKeyPemBlock.Type {
-		case "EC PRIVATE KEY":
+		case ECPrivateKeyBlockType:
 			return x509.ParseECPrivateKey(privateKeyPemBlock.Bytes)
-		case "RSA PRIVATE KEY":
+		case RSAPrivateKeyBlockType:
 			return x509.ParsePKCS1PrivateKey(privateKeyPemBlock.Bytes)
 		}
 	}
