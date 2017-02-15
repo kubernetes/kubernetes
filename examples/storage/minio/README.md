@@ -34,9 +34,9 @@ for installation instructions for your platform.
 Run the below commands to get started quickly
 
 ```sh
-kubectl create -f examples/storage/minio/minio-standalone-pvc.yaml
-kubectl create -f examples/storage/minio/minio-standalone-deployment.yaml
-kubectl create -f examples/storage/minio/minio-standalone-service.yaml
+kubectl create -f https://github.com/kubernetes/kubernetes/blob/master/examples/storage/minio/minio-standalone-pvc.yaml?raw=true
+kubectl create -f https://github.com/kubernetes/kubernetes/blob/master/examples/storage/minio/minio-standalone-deployment.yaml?raw=true
+kubectl create -f https://github.com/kubernetes/kubernetes/blob/master/examples/storage/minio/minio-standalone-service.yaml?raw=true
 ```
 
 ## Step 1: Create Persistent Volume Claim
