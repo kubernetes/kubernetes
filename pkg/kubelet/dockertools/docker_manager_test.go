@@ -639,13 +639,9 @@ func TestSyncPodCreateNetAndContainer(t *testing.T) {
 	if !found {
 		t.Errorf("Custom pod infra container not found: %v", fakeDocker.RunningContainerList)
 	}
-
-	if len(fakeDocker.Created) != 2 ||
-		!matchString(t, "/k8s_POD\\.[a-f0-9]+_foo_new_", fakeDocker.Created[0]) ||
-		!matchString(t, "/k8s_bar\\.[a-f0-9]+_foo_new_", fakeDocker.Created[1]) {
-		t.Errorf("unexpected containers created %v", fakeDocker.Created)
-	}
 	fakeDocker.Unlock()
+
+	assert.NoError(t, fakeDocker.AssertCreatedByNameWithOrder([]string{"POD", "bar"}))
 }
 
 func TestSyncPodCreatesNetAndContainerPullsImage(t *testing.T) {
@@ -670,17 +666,12 @@ func TestSyncPodCreatesNetAndContainerPullsImage(t *testing.T) {
 	})
 
 	fakeDocker.Lock()
-
 	if !reflect.DeepEqual(puller.ImagesPulled, []string{"foo/infra_image:v1", "foo/something:v0"}) {
 		t.Errorf("unexpected pulled containers: %v", puller.ImagesPulled)
 	}
-
-	if len(fakeDocker.Created) != 2 ||
-		!matchString(t, "/k8s_POD\\.[a-f0-9]+_foo_new_", fakeDocker.Created[0]) ||
-		!matchString(t, "/k8s_bar\\.[a-f0-9]+_foo_new_", fakeDocker.Created[1]) {
-		t.Errorf("unexpected containers created %v", fakeDocker.Created)
-	}
 	fakeDocker.Unlock()
+
+	assert.NoError(t, fakeDocker.AssertCreatedByNameWithOrder([]string{"POD", "bar"}))
 }
 
 func TestSyncPodWithPodInfraCreatesContainer(t *testing.T) {
@@ -703,12 +694,7 @@ func TestSyncPodWithPodInfraCreatesContainer(t *testing.T) {
 		"create", "start", "inspect_container",
 	})
 
-	fakeDocker.Lock()
-	if len(fakeDocker.Created) != 1 ||
-		!matchString(t, "/k8s_bar\\.[a-f0-9]+_foo_new_", fakeDocker.Created[0]) {
-		t.Errorf("unexpected containers created %v", fakeDocker.Created)
-	}
-	fakeDocker.Unlock()
+	assert.NoError(t, fakeDocker.AssertCreatedByName([]string{"bar"}))
 }
 
 func TestSyncPodDeletesWithNoPodInfraContainer(t *testing.T) {
@@ -734,16 +720,7 @@ func TestSyncPodDeletesWithNoPodInfraContainer(t *testing.T) {
 		"create", "start", "inspect_container",
 	})
 
-	// A map iteration is used to delete containers, so must not depend on
-	// order here.
-	expectedToStop := map[string]bool{
-		"1234": true,
-	}
-	fakeDocker.Lock()
-	if len(fakeDocker.Stopped) != 1 || !expectedToStop[fakeDocker.Stopped[0]] {
-		t.Errorf("Wrong containers were stopped: %v", fakeDocker.Stopped)
-	}
-	fakeDocker.Unlock()
+	assert.NoError(t, fakeDocker.AssertStopped([]string{"1234"}))
 }
 
 func TestSyncPodDeletesDuplicate(t *testing.T) {
@@ -942,7 +919,7 @@ func TestSyncPodWithRestartPolicy(t *testing.T) {
 		// 'stop' is because the pod infra container is killed when no container is running.
 		verifyCalls(t, fakeDocker, tt.calls)
 
-		if err := fakeDocker.AssertCreated(tt.created); err != nil {
+		if err := fakeDocker.AssertCreatedByName(tt.created); err != nil {
 			t.Errorf("case [%d]: %v", i, err)
 		}
 		if err := fakeDocker.AssertStopped(tt.stopped); err != nil {
@@ -1180,12 +1157,8 @@ func TestSyncPodWithPodInfraCreatesContainerCallsHandler(t *testing.T) {
 		"create", "start", "inspect_container",
 	})
 
-	fakeDocker.Lock()
-	if len(fakeDocker.Created) != 1 ||
-		!matchString(t, "/k8s_bar\\.[a-f0-9]+_foo_new_", fakeDocker.Created[0]) {
-		t.Errorf("unexpected containers created %v", fakeDocker.Created)
-	}
-	fakeDocker.Unlock()
+	assert.NoError(t, fakeDocker.AssertCreatedByName([]string{"bar"}))
+
 	if fakeHTTPClient.url != "http://foo:8080/bar" {
 		t.Errorf("unexpected handler: %q", fakeHTTPClient.url)
 	}
@@ -1225,16 +1198,7 @@ func TestSyncPodEventHandlerFails(t *testing.T) {
 		"stop",
 	})
 
-	if len(fakeDocker.Stopped) != 1 {
-		t.Fatalf("Wrong containers were stopped: %v", fakeDocker.Stopped)
-	}
-	dockerName, _, err := ParseDockerName(fakeDocker.Stopped[0])
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
-	if dockerName.ContainerName != "bar" {
-		t.Errorf("Wrong stopped container, expected: bar, get: %q", dockerName.ContainerName)
-	}
+	assert.NoError(t, fakeDocker.AssertStoppedByName([]string{"bar"}))
 }
 
 type fakeReadWriteCloser struct{}
@@ -1289,13 +1253,8 @@ func TestSyncPodWithTerminationLog(t *testing.T) {
 
 	defer os.Remove(testPodContainerDir)
 
-	fakeDocker.Lock()
-	if len(fakeDocker.Created) != 2 ||
-		!matchString(t, "/k8s_POD\\.[a-f0-9]+_foo_new_", fakeDocker.Created[0]) ||
-		!matchString(t, "/k8s_bar\\.[a-f0-9]+_foo_new_", fakeDocker.Created[1]) {
-		t.Errorf("unexpected containers created %v", fakeDocker.Created)
-	}
-	fakeDocker.Unlock()
+	assert.NoError(t, fakeDocker.AssertCreatedByNameWithOrder([]string{"POD", "bar"}))
+
 	newContainer, err := fakeDocker.InspectContainer(fakeDocker.Created[1])
 	if err != nil {
 		t.Fatalf("unexpected error %v", err)
@@ -1327,13 +1286,7 @@ func TestSyncPodWithHostNetwork(t *testing.T) {
 		"create", "start", "inspect_container",
 	})
 
-	fakeDocker.Lock()
-	if len(fakeDocker.Created) != 2 ||
-		!matchString(t, "/k8s_POD\\.[a-f0-9]+_foo_new_", fakeDocker.Created[0]) ||
-		!matchString(t, "/k8s_bar\\.[a-f0-9]+_foo_new_", fakeDocker.Created[1]) {
-		t.Errorf("unexpected containers created %v", fakeDocker.Created)
-	}
-	fakeDocker.Unlock()
+	assert.NoError(t, fakeDocker.AssertCreatedByNameWithOrder([]string{"POD", "bar"}))
 
 	newContainer, err := fakeDocker.InspectContainer(fakeDocker.Created[1])
 	if err != nil {
