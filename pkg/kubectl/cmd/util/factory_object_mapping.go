@@ -72,11 +72,12 @@ func (f *ring1Factory) Object() (meta.RESTMapper, runtime.ObjectTyper) {
 				api.Registry.RESTMapper(), // hardcoded fall back
 			},
 		}
-	}
 
-	// wrap with shortcuts
-	mapper, err = NewShortcutExpander(mapper, discoveryClient)
-	CheckErr(err)
+		// wrap with shortcuts, they require a discoveryClient
+		mapper, err = NewShortcutExpander(mapper, discoveryClient)
+		// you only have an error on missing discoveryClient, so this shouldn't fail.  Check anyway.
+		CheckErr(err)
+	}
 
 	// wrap with output preferences
 	cfg, err := f.clientAccessFactory.ClientConfigForVersion(nil)
