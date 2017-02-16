@@ -67,4 +67,18 @@ const (
 	// Minimum amount of nodes the Service subnet should allow.
 	// We need at least ten, because the DNS service is always at the tenth cluster clusterIP
 	MinimumAddressesInServiceSubnet = 10
+
+	// DefaultTokenDuration specifies the default amount of time that a bootstrap token will be valid
+	DefaultTokenDuration = time.Duration(8) * time.Hour
+	// BootstrapTokenSecretPrefix the the prefix that will be used for the Secrets that are created as type bootstrap.kubernetes.io/token
+	BootstrapTokenSecretPrefix = "bootstrap-token-"
+
+	// CSVTokenBootstrapUser is currently the user the bootstrap token in the .csv file
+	// TODO: This should change to something more official and supported
+	// TODO: Prefix with kubeadm prefix
+	CSVTokenBootstrapUser = "kubeadm-node-csr"
+	// CSVTokenBootstrapGroup specifies the group the tokens in the .csv file will belong to
+	CSVTokenBootstrapGroup = "kubeadm:kubelet-bootstrap"
+	// The file name of the tokens file that can be used for bootstrapping
+	CSVTokenFileName = "tokens.csv"
 )

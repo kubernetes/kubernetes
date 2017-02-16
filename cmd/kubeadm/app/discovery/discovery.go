@@ -25,7 +25,7 @@ import (
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubenode "k8s.io/kubernetes/cmd/kubeadm/app/node"
-	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
+	tokenutil "k8s.io/kubernetes/cmd/kubeadm/app/util/token"
 )
 
 // For identifies and executes the desired discovery mechanism.
@@ -65,7 +65,7 @@ func runHTTPSDiscovery(hd *kubeadmapi.HTTPSDiscovery) (*clientcmdapi.Config, err
 
 // runTokenDiscovery executes token-based discovery.
 func runTokenDiscovery(td *kubeadmapi.TokenDiscovery) (*clientcmdapi.Config, error) {
-	if valid, err := kubeadmutil.ValidateToken(td); valid == false {
+	if valid, err := tokenutil.ValidateToken(td); valid == false {
 		return nil, err
 	}
 

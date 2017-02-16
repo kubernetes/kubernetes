@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors.
+Copyright 2017 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package master
+package token
 
 import (
 	"bytes"
@@ -24,22 +24,17 @@ import (
 
 	"k8s.io/apimachinery/pkg/util/uuid"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
+	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 )
 
-const (
-	// TODO: prefix with kubeadm prefix
-	KubeletBootstrapUser = "kubeadm-node-csr"
-
-	KubeletBootstrapGroup = "kubeadm:kubelet-bootstrap"
-)
-
+// CreateTokenAuthFile creates the CSV file that can be used for allowing users with tokens access to the API Server
 func CreateTokenAuthFile(bt string) error {
-	tokenAuthFilePath := path.Join(kubeadmapi.GlobalEnvParams.HostPKIPath, "tokens.csv")
+	tokenAuthFilePath := path.Join(kubeadmapi.GlobalEnvParams.HostPKIPath, kubeadmconstants.CSVTokenFileName)
 	if err := os.MkdirAll(kubeadmapi.GlobalEnvParams.HostPKIPath, 0700); err != nil {
 		return fmt.Errorf("failed to create directory %q [%v]", kubeadmapi.GlobalEnvParams.HostPKIPath, err)
 	}
-	serialized := []byte(fmt.Sprintf("%s,%s,%s,%s\n", bt, KubeletBootstrapUser, uuid.NewUUID(), KubeletBootstrapGroup))
+	serialized := []byte(fmt.Sprintf("%s,%s,%s,%s\n", bt, kubeadmconstants.CSVTokenBootstrapUser, uuid.NewUUID(), kubeadmconstants.CSVTokenBootstrapGroup))
 	// DumpReaderToFile create a file with mode 0600
 	if err := cmdutil.DumpReaderToFile(bytes.NewReader(serialized), tokenAuthFilePath); err != nil {
 		return fmt.Errorf("failed to save token auth file (%q) [%v]", tokenAuthFilePath, err)
