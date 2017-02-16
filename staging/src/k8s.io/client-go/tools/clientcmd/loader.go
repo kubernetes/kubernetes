@@ -48,7 +48,6 @@ const (
 )
 
 var RecommendedHomeFile = path.Join(homedir.HomeDir(), RecommendedHomeDir, RecommendedFileName)
-var RecommendedSchemaFile = path.Join(homedir.HomeDir(), RecommendedHomeDir, RecommendedSchemaName)
 
 // currentMigrationRules returns a map that holds the history of recommended home directories used in previous versions.
 // Any future changes to RecommendedHomeFile and related are expected to add a migration rule here, in order to make
@@ -526,27 +525,6 @@ func RelativizeAuthInfoLocalPaths(authInfo *clientcmdapi.AuthInfo) error {
 	}
 
 	return nil
-}
-
-func RelativizeConfigPaths(config *clientcmdapi.Config, base string) error {
-	return RelativizePathWithNoBacksteps(GetConfigFileReferences(config), base)
-}
-
-func ResolveConfigPaths(config *clientcmdapi.Config, base string) error {
-	return ResolvePaths(GetConfigFileReferences(config), base)
-}
-
-func GetConfigFileReferences(config *clientcmdapi.Config) []*string {
-	refs := []*string{}
-
-	for _, cluster := range config.Clusters {
-		refs = append(refs, GetClusterFileReferences(cluster)...)
-	}
-	for _, authInfo := range config.AuthInfos {
-		refs = append(refs, GetAuthInfoFileReferences(authInfo)...)
-	}
-
-	return refs
 }
 
 func GetClusterFileReferences(cluster *clientcmdapi.Cluster) []*string {
