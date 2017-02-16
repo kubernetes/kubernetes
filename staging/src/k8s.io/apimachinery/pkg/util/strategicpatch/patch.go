@@ -23,8 +23,8 @@ import (
 	"strings"
 
 	"k8s.io/apimachinery/pkg/util/json"
-	forkedjson "k8s.io/apimachinery/third_party/forked/golang/json"
 	"k8s.io/apimachinery/pkg/util/mergepatch"
+	forkedjson "k8s.io/apimachinery/third_party/forked/golang/json"
 )
 
 // An alternate implementation of JSON Merge Patch
