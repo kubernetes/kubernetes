@@ -274,8 +274,13 @@ func buildInsecureClient(timeout time.Duration) *http.Client {
 // createCertificate creates TLS certificates for the given Ingress.
 func createCertificate(ing *extensions.Ingress) (host string, rootCA, privKey []byte, err error) {
 	var k, c bytes.Buffer
-	tls := ing.Spec.TLS[0]
-	host = strings.Join(tls.Hosts, ",")
+	host = "example.com"
+
+	if len(ing.Spec.TLS) > 0 {
+		tls := ing.Spec.TLS[0]
+		host = strings.Join(tls.Hosts, ",")
+	}
+
 	framework.Logf("Generating RSA cert for host %v", host)
 
 	if err = generateRSACerts(host, true, &k, &c); err != nil {
