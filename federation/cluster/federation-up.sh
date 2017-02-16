@@ -29,13 +29,15 @@ KUBE_ROOT=$(dirname "${BASH_SOURCE}")/../..
 # For `kube::log::status` function since it already sources
 # "${KUBE_ROOT}/cluster/lib/logging.sh" and DEFAULT_KUBECONFIG
 source "${KUBE_ROOT}/cluster/common.sh"
-# For $FEDERATION_PUSH_REPO_BASE and $FEDERATION_NAMESPACE.
+# For $FEDERATION_KUBE_CONTEXT, $HOST_CLUSTER_CONTEXT,
+# $KUBEDNS_CONFIGMAP_NAME, $KUBEDNS_CONFIGMAP_NAMESPACE and
+# $KUBEDNS_FEDERATION_FLAG.
 source "${KUBE_ROOT}/federation/cluster/common.sh"
 
 FEDERATION_NAME="${FEDERATION_NAME:-e2e-federation}"
-FEDERATION_KUBE_CONTEXT="${FEDERATION_KUBE_CONTEXT:-e2e-federation}"
+
 DNS_ZONE_NAME="${FEDERATION_DNS_ZONE_NAME:-}"
-HOST_CLUSTER_CONTEXT="${FEDERATION_HOST_CLUSTER_CONTEXT:-${1}}"
+FEDERATIONS_DOMAIN_MAP="${FEDERATIONS_DOMAIN_MAP:-}"
 
 # get_version returns the version in KUBERNETES_RELEASE or defaults to the
 # value in the federation `versions` file.
