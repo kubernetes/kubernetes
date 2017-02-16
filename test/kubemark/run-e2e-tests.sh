@@ -38,6 +38,10 @@ else
 	ARGS=$@
 fi
 
-go run ./hack/e2e.go -v --check_version_skew=false --test --test_args="--e2e-verify-service-account=false --dump-logs-on-failure=false ${ARGS}"
-# Just make local test easier...
-# ${KUBE_ROOT}/hack/ginkgo-e2e.sh "--e2e-verify-service-account=false" "--dump-logs-on-failure=false" $ARGS
+if [[ -f /.dockerenv ]]; then
+	# Running inside a dockerized runner.
+	go run ./hack/e2e.go -v --check_version_skew=false --test --test_args="--e2e-verify-service-account=false --dump-logs-on-failure=false ${ARGS}"
+else
+	# Running locally.
+	${KUBE_ROOT}/hack/ginkgo-e2e.sh "--e2e-verify-service-account=false" "--dump-logs-on-failure=false" $ARGS
+fi
