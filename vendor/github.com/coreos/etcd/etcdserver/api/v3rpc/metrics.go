@@ -17,31 +17,6 @@ package v3rpc
 import "github.com/prometheus/client_golang/prometheus"
 
 var (
-	receivedCounter = prometheus.NewCounterVec(
-		prometheus.CounterOpts{
-			Namespace: "etcd",
-			Subsystem: "grpc",
-			Name:      "requests_total",
-			Help:      "Counter of received requests.",
-		}, []string{"grpc_service", "grpc_method"})
-
-	failedCounter = prometheus.NewCounterVec(
-		prometheus.CounterOpts{
-			Namespace: "etcd",
-			Subsystem: "grpc",
-			Name:      "requests_failed_total",
-			Help:      "Counter of failed requests.",
-		}, []string{"grpc_service", "grpc_method", "grpc_code"})
-
-	handlingDuration = prometheus.NewHistogramVec(
-		prometheus.HistogramOpts{
-			Namespace: "etcd",
-			Subsystem: "grpc",
-			Name:      "unary_requests_duration_seconds",
-			Help:      "Bucketed histogram of processing time (s) of handled unary (non-stream) requests.",
-			Buckets:   prometheus.ExponentialBuckets(0.0005, 2, 13),
-		}, []string{"grpc_service", "grpc_method"})
-
 	sentBytes = prometheus.NewCounter(prometheus.CounterOpts{
 		Namespace: "etcd",
 		Subsystem: "network",
@@ -58,10 +33,6 @@ var (
 )
 
 func init() {
-	prometheus.MustRegister(receivedCounter)
-	prometheus.MustRegister(failedCounter)
-	prometheus.MustRegister(handlingDuration)
-
 	prometheus.MustRegister(sentBytes)
 	prometheus.MustRegister(receivedBytes)
 }

@@ -41,16 +41,18 @@ const (
 	crcType
 	snapshotType
 
-	// the expected size of each wal segment file.
-	// the actual size might be bigger than it.
-	segmentSizeBytes = 64 * 1000 * 1000 // 64MB
-
 	// warnSyncDuration is the amount of time allotted to an fsync before
 	// logging a warning
 	warnSyncDuration = time.Second
 )
 
 var (
+	// SegmentSizeBytes is the preallocated size of each wal segment file.
+	// The actual size might be larger than this. In general, the default
+	// value should be used, but this is defined as an exported variable
+	// so that tests can set a different segment size.
+	SegmentSizeBytes int64 = 64 * 1000 * 1000 // 64MB
+
 	plog = capnslog.NewPackageLogger("github.com/coreos/etcd", "wal")
 
 	ErrMetadataConflict = errors.New("wal: conflicting metadata found")
@@ -113,7 +115,7 @@ func Create(dirpath string, metadata []byte) (*WAL, error) {
 	if _, err = f.Seek(0, os.SEEK_END); err != nil {
 		return nil, err
 	}
-	if err = fileutil.Preallocate(f.File, segmentSizeBytes, true); err != nil {
+	if err = fileutil.Preallocate(f.File, SegmentSizeBytes, true); err != nil {
 		return nil, err
 	}
 
@@ -234,7 +236,7 @@ func openAtIndex(dirpath string, snap walpb.Snapshot, write bool) (*WAL, error) 
 			closer()
 			return nil, err
 		}
-		w.fp = newFilePipeline(w.dir, segmentSizeBytes)
+		w.fp = newFilePipeline(w.dir, SegmentSizeBytes)
 	}
 
 	return w, nil
@@ -516,6 +518,7 @@ func (w *WAL) Close() error {
 			plog.Errorf("failed to unlock during closing wal: %s", err)
 		}
 	}
+
 	return w.dirFile.Close()
 }
 
@@ -565,22 +568,22 @@ func (w *WAL) Save(st raftpb.HardState, ents []raftpb.Entry) error {
 	if err != nil {
 		return err
 	}
-	if curOff < segmentSizeBytes {
+	if curOff < SegmentSizeBytes {
 		if mustSync {
 			return w.sync()
 		}
 		return nil
 	}
 
-	// TODO: add a test for this code path when refactoring the tests
 	return w.cut()
 }
 
 func (w *WAL) SaveSnapshot(e walpb.Snapshot) error {
+	b := pbutil.MustMarshal(&e)
+
 	w.mu.Lock()
 	defer w.mu.Unlock()
 
-	b := pbutil.MustMarshal(&e)
 	rec := &walpb.Record{Type: snapshotType, Data: b}
 	if err := w.encoder.encode(rec); err != nil {
 		return err

@@ -48,6 +48,10 @@ enum MessageType {
 	MsgCheckQuorum     = 12;
 	MsgTransferLeader  = 13;
 	MsgTimeoutNow      = 14;
+	MsgReadIndex       = 15;
+	MsgReadIndexResp   = 16;
+	MsgPreVote         = 17;
+	MsgPreVoteResp     = 18;
 }
 
 message Message {
@@ -62,6 +66,7 @@ message Message {
 	optional Snapshot    snapshot    = 9  [(gogoproto.nullable) = false];
 	optional bool        reject      = 10 [(gogoproto.nullable) = false];
 	optional uint64      rejectHint  = 11 [(gogoproto.nullable) = false];
+	optional bytes       context     = 12;
 }
 
 message HardState {

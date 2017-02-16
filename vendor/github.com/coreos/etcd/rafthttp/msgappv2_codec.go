@@ -82,7 +82,7 @@ func newMsgAppV2Encoder(w io.Writer, fs *stats.FollowerStats) *msgAppV2Encoder {
 	}
 }
 
-func (enc *msgAppV2Encoder) encode(m raftpb.Message) error {
+func (enc *msgAppV2Encoder) encode(m *raftpb.Message) error {
 	start := time.Now()
 	switch {
 	case isLinkHeartbeatMessage(m):
@@ -135,7 +135,7 @@ func (enc *msgAppV2Encoder) encode(m raftpb.Message) error {
 			return err
 		}
 		// write message
-		if _, err := enc.w.Write(pbutil.MustMarshal(&m)); err != nil {
+		if _, err := enc.w.Write(pbutil.MustMarshal(m)); err != nil {
 			return err
 		}
 

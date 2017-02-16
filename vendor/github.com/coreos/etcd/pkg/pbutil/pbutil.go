@@ -18,7 +18,7 @@ package pbutil
 import "github.com/coreos/pkg/capnslog"
 
 var (
-	plog = capnslog.NewPackageLogger("github.com/coreos/etcd/pkg", "flags")
+	plog = capnslog.NewPackageLogger("github.com/coreos/etcd", "pkg/pbutil")
 )
 
 type Marshaler interface {

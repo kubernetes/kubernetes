@@ -25,7 +25,7 @@ to it with the Save method:
 	...
 	err := w.Save(s, ents)
 
-After saving an raft snapshot to disk, SaveSnapshot method should be called to
+After saving a raft snapshot to disk, SaveSnapshot method should be called to
 record it. So WAL can match with the saved snapshot when restarting.
 
 	err := w.SaveSnapshot(walpb.Snapshot{Index: 10, Term: 2})

@@ -40,7 +40,7 @@ var (
 	// This only works for linux.
 	InitialMmapSize = int64(10 * 1024 * 1024 * 1024)
 
-	plog = capnslog.NewPackageLogger("github.com/coreos/etcd/mvcc", "backend")
+	plog = capnslog.NewPackageLogger("github.com/coreos/etcd", "mvcc/backend")
 )
 
 const (

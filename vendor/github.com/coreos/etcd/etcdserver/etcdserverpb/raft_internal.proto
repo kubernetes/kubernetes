@@ -14,6 +14,8 @@ message RequestHeader {
   uint64 ID = 1;
   // username is a username that is associated with an auth token of gRPC connection
   string username = 2;
+  // auth_revision is a revision number of auth.authStore. It is not related to mvcc
+  uint64 auth_revision = 3;
 }
 
 // An InternalRaftRequest is the union of all requests which can be

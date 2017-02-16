@@ -25,13 +25,7 @@ import (
 // isConnectedToQuorumSince checks whether the local member is connected to the
 // quorum of the cluster since the given time.
 func isConnectedToQuorumSince(transport rafthttp.Transporter, since time.Time, self types.ID, members []*membership.Member) bool {
-	var connectedNum int
-	for _, m := range members {
-		if m.ID == self || isConnectedSince(transport, since, m.ID) {
-			connectedNum++
-		}
-	}
-	return connectedNum >= (len(members)+1)/2
+	return numConnectedSince(transport, since, self, members) >= (len(members)/2)+1
 }
 
 // isConnectedSince checks whether the local member is connected to the
@@ -39,4 +33,65 @@ func isConnectedToQuorumSince(transport rafthttp.Transporter, since time.Time, s
 func isConnectedSince(transport rafthttp.Transporter, since time.Time, remote types.ID) bool {
 	t := transport.ActiveSince(remote)
 	return !t.IsZero() && t.Before(since)
+}
+
+// isConnectedFullySince checks whether the local member is connected to all
+// members in the cluster since the given time.
+func isConnectedFullySince(transport rafthttp.Transporter, since time.Time, self types.ID, members []*membership.Member) bool {
+	return numConnectedSince(transport, since, self, members) == len(members)
+}
+
+// numConnectedSince counts how many members are connected to the local member
+// since the given time.
+func numConnectedSince(transport rafthttp.Transporter, since time.Time, self types.ID, members []*membership.Member) int {
+	connectedNum := 0
+	for _, m := range members {
+		if m.ID == self || isConnectedSince(transport, since, m.ID) {
+			connectedNum++
+		}
+	}
+	return connectedNum
+}
+
+// longestConnected chooses the member with longest active-since-time.
+// It returns false, if nothing is active.
+func longestConnected(tp rafthttp.Transporter, membs []types.ID) (types.ID, bool) {
+	var longest types.ID
+	var oldest time.Time
+	for _, id := range membs {
+		tm := tp.ActiveSince(id)
+		if tm.IsZero() { // inactive
+			continue
+		}
+
+		if oldest.IsZero() { // first longest candidate
+			oldest = tm
+			longest = id
+		}
+
+		if tm.Before(oldest) {
+			oldest = tm
+			longest = id
+		}
+	}
+	if uint64(longest) == 0 {
+		return longest, false
+	}
+	return longest, true
+}
+
+type notifier struct {
+	c   chan struct{}
+	err error
+}
+
+func newNotifier() *notifier {
+	return &notifier{
+		c: make(chan struct{}, 0),
+	}
+}
+
+func (nc *notifier) notify(err error) {
+	nc.err = err
+	close(nc.c)
 }

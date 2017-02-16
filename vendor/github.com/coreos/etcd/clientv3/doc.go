@@ -44,7 +44,7 @@
 // etcd client returns 2 types of errors:
 //
 //	1. context error: canceled or deadline exceeded.
-//	2. gRPC error: see https://github.com/coreos/etcd/blob/master/etcdserver/api/v3rpc/error.go.
+//	2. gRPC error: see https://github.com/coreos/etcd/blob/master/etcdserver/api/v3rpc/rpctypes/error.go
 //
 // Here is the example code to handle client errors:
 //

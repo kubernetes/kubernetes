@@ -59,3 +59,11 @@ func (g *remote) send(m raftpb.Message) {
 func (g *remote) stop() {
 	g.pipeline.stop()
 }
+
+func (g *remote) Pause() {
+	g.stop()
+}
+
+func (g *remote) Resume() {
+	g.pipeline.start()
+}
