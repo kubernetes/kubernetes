@@ -140,16 +140,19 @@ var _ = framework.KubeDescribe("Loadbalancing: L7", func() {
 		})
 
 		It("should create ingress with pre-shared TLS certification", func() {
-			// cert deleted when the rest of lb resources are deleted in cleanupGCE
+			jig.createIngress(filepath.Join(ingressManifestPath, "pre-shared-cert"), ns, map[string]string{
+				"kubernetes.io/ingress.allow-http": "false",
+			})
+
+			// Cert deleted when the rest of lb resources are deleted in cleanupGCE.
 			certName := jig.createTLSCertificate(gceController, ns)
 			By(fmt.Sprintf("created TLS cert %v: %v through the GCE cloud provider", ns, certName))
 
-			jig.createIngress(filepath.Join(ingressManifestPath, "pre-shared-cert"), ns, map[string]string{
-				"kubernetes.io/ingress.pre-shared-cert": certName,
-				"kubernetes.io/ingress.allow-http":      "false",
-			})
+			jig.addPreSharedCert(certName)
 
 			By("waiting for Ingress to come up with cert: " + certName)
+			jig.waitForIngress(true)
+
 			httpClient := buildInsecureClient(reqTimeout)
 			framework.ExpectNoError(framework.PollURL(fmt.Sprintf("https://%v/", jig.address), "", framework.LoadBalancerPollTimeout, jig.pollInterval, httpClient, false))
 
@@ -165,7 +168,7 @@ var _ = framework.KubeDescribe("Loadbalancing: L7", func() {
 			Expect(framework.VerifyFirewallRule(fw, expFw, gceController.cloud.Network, true)).NotTo(HaveOccurred())
 
 			By("should continue serving on provided TLS cert for 30 seconds")
-			ExpectNoError(jig.verifyURL(fmt.Sprintf("https://%v/", jig.address), "", 30, 1*time.Second, httpClient))
+			framework.ExpectNoError(jig.verifyURL(fmt.Sprintf("https://%v/", jig.address), "", 30, 1*time.Second, httpClient))
 		})
 
 		// TODO: Implement a multizone e2e that verifies traffic reaches each
