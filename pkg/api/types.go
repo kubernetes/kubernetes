@@ -1887,6 +1887,9 @@ type PodSpec struct {
 	// ServiceAccountName is the name of the ServiceAccount to use to run this pod
 	// The pod will be allowed to use secrets referenced by the ServiceAccount
 	ServiceAccountName string
+	// AutomountServiceAccountToken indicates whether a service account token should be automatically mounted.
+	// +optional
+	AutomountServiceAccountToken *bool
 
 	// NodeName is a request to schedule this pod onto a specific node.  If it is non-empty,
 	// the scheduler simply schedules this pod onto that node, assuming that it fits resource
@@ -2425,6 +2428,11 @@ type ServiceAccount struct {
 	// can be mounted in the pod, but ImagePullSecrets are only accessed by the kubelet.
 	// +optional
 	ImagePullSecrets []LocalObjectReference
+
+	// AutomountServiceAccountToken indicates whether pods running as this service account should have an API token automatically mounted.
+	// Can be overridden at the pod level.
+	// +optional
+	AutomountServiceAccountToken *bool
 }
 
 // ServiceAccountList is a list of ServiceAccount objects
