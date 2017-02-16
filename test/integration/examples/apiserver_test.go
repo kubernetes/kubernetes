@@ -57,6 +57,10 @@ func TestRunServer(t *testing.T) {
 	defer os.Remove(kubeconfigFile.Name())
 	clientcmd.WriteToFile(*adminKubeConfig, kubeconfigFile.Name())
 
+	// Avoid default cert-dir of /var/run/kubernetes to allow this to run on darwin
+	certDir, _ := ioutil.TempDir("", "test-integration-apiserver")
+	defer os.Remove(certDir)
+
 	stopCh := make(chan struct{})
 	defer close(stopCh)
 	cmd := server.NewCommandStartWardleServer(os.Stdout, os.Stderr, stopCh)
@@ -66,6 +70,7 @@ func TestRunServer(t *testing.T) {
 		"--authentication-kubeconfig", kubeconfigFile.Name(),
 		"--authorization-kubeconfig", kubeconfigFile.Name(),
 		"--etcd-servers", framework.GetEtcdURLFromEnv(),
+		"--cert-dir", certDir,
 	})
 	go cmd.Execute()
 
