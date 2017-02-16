@@ -49,6 +49,7 @@ type AuthenticatorConfig struct {
 	Anonymous                   bool
 	AnyToken                    bool
 	BasicAuthFile               string
+	BootstrapToken              bool
 	ClientCAFile                string
 	TokenAuthFile               string
 	OIDCIssuerURL               string
@@ -66,7 +67,8 @@ type AuthenticatorConfig struct {
 	RequestHeaderConfig *authenticatorfactory.RequestHeaderConfig
 
 	// TODO, this is the only non-serializable part of the entire config.  Factor it out into a clientconfig
-	ServiceAccountTokenGetter serviceaccount.ServiceAccountTokenGetter
+	ServiceAccountTokenGetter   serviceaccount.ServiceAccountTokenGetter
+	BootstrapTokenAuthenticator authenticator.Token
 }
 
 // New returns an authenticator.Request or an error that supports the standard
@@ -135,6 +137,13 @@ func (config AuthenticatorConfig) New() (authenticator.Request, *spec.SecurityDe
 		}
 		authenticators = append(authenticators, serviceAccountAuth)
 		hasTokenAuth = true
+	}
+	if config.BootstrapToken {
+		if config.BootstrapTokenAuthenticator != nil {
+			// TODO: This can sometimes be nil because of
+			authenticators = append(authenticators, bearertoken.New(config.BootstrapTokenAuthenticator))
+			hasTokenAuth = true
+		}
 	}
 	// NOTE(ericchiang): Keep the OpenID Connect after Service Accounts.
 	//
