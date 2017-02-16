@@ -128,6 +128,9 @@ func NewCmdApply(f cmdutil.Factory, out, errOut io.Writer) *cobra.Command {
 	cmdutil.AddPrinterFlags(cmd)
 	cmdutil.AddRecordFlag(cmd)
 	cmdutil.AddInclude3rdPartyFlags(cmd)
+
+	cmd.AddCommand(NewCmdApplySetLastApplied(f, out, errOut))
+
 	return cmd
 }
 
