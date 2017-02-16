@@ -60,17 +60,6 @@ var initFlag int64 = 0
 var accountsLock = &sync.Mutex{}
 
 func newBlobDiskController(common *controllerCommon) (BlobDiskController, error) {
-
-	uniqueString := common.resourceGroup + common.location + common.subscriptionId
-	hash := makeCRC32(uniqueString)
-	//used to generate a unqie container name used by this cluster PVC
-	defaultContainerName = hash
-
-	storageAccountNamePrefix = fmt.Sprintf(storageAccountNameTemplate, hash)
-	// Used to filter relevant accounts (accounts used by shared PVC)
-	storageAccountNameMatch = storageAccountNamePrefix
-	// Used as a template to create new names for relevant accounts
-	storageAccountNamePrefix = storageAccountNamePrefix + "%s"
 	c := blobDiskController{common: common}
 	err := c.init()
 
@@ -398,6 +387,8 @@ func (c *blobDiskController) init() error {
 		return nil
 	}
 
+	c.setUniqueStrings()
+
 	// get accounts
 	accounts, err := c.getAllStorageAccounts()
 	if err != nil {
@@ -443,6 +434,21 @@ func (c *blobDiskController) init() error {
 	return nil
 }
 
+//Sets unique strings to be used as accountnames && || blob containers names
+func (c *blobDiskController) setUniqueStrings() {
+
+	uniqueString := c.common.resourceGroup + c.common.location + c.common.subscriptionId
+	hash := makeCRC32(uniqueString)
+	//used to generate a unqie container name used by this cluster PVC
+	defaultContainerName = hash
+
+	storageAccountNamePrefix = fmt.Sprintf(storageAccountNameTemplate, hash)
+	// Used to filter relevant accounts (accounts used by shared PVC)
+	storageAccountNameMatch = storageAccountNamePrefix
+	// Used as a template to create new names for relevant accounts
+	storageAccountNamePrefix = storageAccountNamePrefix + "%s"
+
+}
 func (c *blobDiskController) getStorageAccountKey(SAName string) (string, error) {
 
 	if account, exists := c.accounts[SAName]; exists && account.key != "" {
@@ -559,7 +565,7 @@ func (c *blobDiskController) ensureDefaultContainer(storageAccountName string) e
 
 			// check if we passed the max sleep
 			if counter >= 20 {
-				return fmt.Errorf("azureDisk - timeout waiting to aquire lock to validate account readiness:%s", storageAccountName)
+				return fmt.Errorf("azureDisk - timeout waiting to aquire lock to validate account:%s readiness", storageAccountName)
 			}
 		}
 
