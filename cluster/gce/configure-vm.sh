@@ -475,6 +475,7 @@ num_nodes: $(echo "${NUM_NODES:-}" | sed -e "s/'/''/g")
 e2e_storage_test_environment: '$(echo "$E2E_STORAGE_TEST_ENVIRONMENT" | sed -e "s/'/''/g")'
 kube_uid: '$(echo "${KUBE_UID}" | sed -e "s/'/''/g")'
 initial_etcd_cluster: '$(echo "${INITIAL_ETCD_CLUSTER:-}" | sed -e "s/'/''/g")'
+ca_cert_path: '$(echo "${CA_CERT_PATH:-}" | sed -e "s/'/''/g")'
 
 hostname: $(hostname -s)
 enable_default_storage_class: '$(echo "$ENABLE_DEFAULT_STORAGE_CLASS" | sed -e "s/'/''/g")'
@@ -662,11 +663,10 @@ function convert-bytes-gce-kube() {
 # and should never be touched again (except perhaps an additional service
 # account, see NB below.)
 function create-salt-master-auth() {
-  if [[ ! -e /srv/kubernetes/ca.crt ]]; then
-    if  [[ ! -z "${CA_CERT:-}" ]] && [[ ! -z "${MASTER_CERT:-}" ]] && [[ ! -z "${MASTER_KEY:-}" ]]; then
+  if [[ ! -e /srv/kubernetes/server.crt ]]; then
+    if [[ ! -z "${MASTER_CERT:-}" ]] && [[ ! -z "${MASTER_KEY:-}" ]]; then
       mkdir -p /srv/kubernetes
       (umask 077;
-        echo "${CA_CERT}" | base64 --decode > /srv/kubernetes/ca.crt;
         echo "${MASTER_CERT}" | base64 --decode > /srv/kubernetes/server.cert;
         echo "${MASTER_KEY}" | base64 --decode > /srv/kubernetes/server.key;
         # Kubecfg cert/key are optional and included for backwards compatibility.
@@ -714,18 +714,12 @@ function create-salt-master-kubelet-auth() {
 
 # This should happen both on cluster initialization and node upgrades.
 #
-#  - Uses KUBELET_CA_CERT (falling back to CA_CERT), KUBELET_CERT, and
-#    KUBELET_KEY to generate a kubeconfig file for the kubelet to securely
+#  - Uses CA_CERT, KUBELET_CERT, and KUBELET_KEY to generate a kubeconfig file for the kubelet to securely
 #    connect to the apiserver.
 
 function create-salt-kubelet-auth() {
   local -r kubelet_kubeconfig_file="/srv/salt-overlay/salt/kubelet/kubeconfig"
   if [ ! -e "${kubelet_kubeconfig_file}" ]; then
-    # If there isn't a CA certificate set specifically for the kubelet, use
-    # the cluster CA certificate.
-    if [[ -z "${KUBELET_CA_CERT:-}" ]]; then
-      KUBELET_CA_CERT="${CA_CERT}"
-    fi
     mkdir -p /srv/salt-overlay/salt/kubelet
     (umask 077;
       cat > "${kubelet_kubeconfig_file}" <<EOF
@@ -740,7 +734,7 @@ clusters:
 - name: local
   cluster:
     server: https://kubernetes-master
-    certificate-authority-data: ${KUBELET_CA_CERT}
+    certificate-authority: ${CA_CERT_PATH}
 contexts:
 - context:
     cluster: local
@@ -750,9 +744,6 @@ current-context: service-account-context
 EOF
 )
   fi
-  local -r client_ca_file="/srv/salt-overlay/salt/kubelet/ca.crt"
-  (umask 077;
-    echo "${KUBELET_CA_CERT}" | base64 --decode > "${client_ca_file}")
 }
 
 # This should happen both on cluster initialization and node upgrades.
@@ -774,7 +765,7 @@ users:
 clusters:
 - name: local
   cluster:
-    certificate-authority-data: ${CA_CERT}
+    certificate-authority: ${CA_CERT_PATH}
 contexts:
 - context:
     cluster: local
@@ -1107,6 +1098,17 @@ function create-salt-master-etcd-auth {
   fi
 }
 
+function write-ca-crt {
+  local ca_cert_dir="${1}"
+  if [[ -z "${CA_CERT:-}" ]]; then
+    echo "No CA_CERT available" 1>&2
+    exit 1
+  fi
+  CA_CERT_PATH="${ca_cert_dir}/ca.crt"
+  mkdir -p "${ca_cert_dir}"
+  (umask 077; echo "${CA_CERT}" | base64 --decode > "${CA_CERT_PATH}");
+}
+
 # This script is re-used on AWS.  Some of the above functions will be replaced.
 # The AWS kube-up script looks for this marker:
 #+AWS_OVERRIDES_HERE
@@ -1123,8 +1125,9 @@ if [[ -z "${is_push}" ]]; then
   set-kube-env
   auto-upgrade
   ensure-local-disks
+  write-ca-crt "/srv/kubernetes"
   [[ "${KUBERNETES_MASTER}" == "true" ]] && mount-master-pd
-  create-salt-pillar
+    create-salt-pillar
   if [[ "${KUBERNETES_MASTER}" == "true" ]]; then
     set-kube-master-certs
     create-salt-master-auth

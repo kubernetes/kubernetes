@@ -75,6 +75,9 @@ spec:
     - mountPath: /var/lib/kube-proxy/kubeconfig
       name: kubeconfig
       readOnly: false
+    - mountPath: {{ca_cert_path}}
+      name: kubeca
+      readOnly: false
   volumes:
   - hostPath:
       path: /usr/share/ca-certificates
@@ -85,6 +88,9 @@ spec:
   - hostPath:
       path: /var/lib/kube-proxy/kubeconfig
     name: kubeconfig
+  - hostPath:
+      path:  {{ca_cert_path}}
+    name: kubeca
   - hostPath:
       path: /var/log
     name: varlog
