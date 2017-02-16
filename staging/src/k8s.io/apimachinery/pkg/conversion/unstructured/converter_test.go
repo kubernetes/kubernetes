@@ -29,28 +29,28 @@ import (
 
 // Definte a number of test types.
 type A struct {
-	A int `json:"aa,omitempty"`
+	A int    `json:"aa,omitempty"`
 	B string `json:"ab,omitempty"`
-	C bool `json:"ac,omitempty"`
+	C bool   `json:"ac,omitempty"`
 }
 
 type B struct {
-	A A `json:"ba"`
-	B string `json:"bb"`
+	A A                 `json:"ba"`
+	B string            `json:"bb"`
 	C map[string]string `json:"bc"`
-	D []string `json:"bd"`
+	D []string          `json:"bd"`
 }
 
 type C struct {
-	A []A `json:"ca"`
-	B B `json:",inline"`
-	C string `json:"cc"`
-	D *int64 `json:"cd"`
+	A []A            `json:"ca"`
+	B B              `json:",inline"`
+	C string         `json:"cc"`
+	D *int64         `json:"cd"`
 	E map[string]int `json:"ce"`
-	F []bool `json:"cf"`
-	G []int `json"cg"`
-	H float32 `json:ch"`
-	I []interface{} `json:"ci"`
+	F []bool         `json:"cf"`
+	G []int          `json"cg"`
+	H float32        `json:ch"`
+	I []interface{}  `json:"ci"`
 }
 
 type D struct {
@@ -62,15 +62,15 @@ type E struct {
 }
 
 type F struct {
-	A string `json:"fa"`
+	A string            `json:"fa"`
 	B map[string]string `json:"fb"`
-	C []A `json:"fc"`
-	D int `json:"fd"`
-	E float32 `json:"fe"`
-	F []string `json:"ff"`
-	G []int `json:"fg"`
-	H []bool `json:"fh"`
-	I []float32 `json:"fi"`
+	C []A               `json:"fc"`
+	D int               `json:"fd"`
+	E float32           `json:"fe"`
+	F []string          `json:"ff"`
+	G []int             `json:"fg"`
+	H []bool            `json:"fh"`
+	I []float32         `json:"fi"`
 }
 
 // Implement runtime.Object to make types usable for tests.
@@ -142,7 +142,7 @@ func doRoundTrip(t *testing.T, item runtime.Object) {
 
 func TestRoundTrip(t *testing.T) {
 	intVal := int64(42)
-	testCases := []struct{
+	testCases := []struct {
 		obj runtime.Object
 	}{
 		{
@@ -250,10 +250,10 @@ func doUnrecognized(t *testing.T, jsonData string, item runtime.Object, expected
 }
 
 func TestUnrecognized(t *testing.T) {
-	testCases := []struct{
+	testCases := []struct {
 		data string
 		obj  runtime.Object
-		err error
+		err  error
 	}{
 		{
 			data: "{\"da\":[3.0,\"3.0\",null]}",
@@ -265,15 +265,15 @@ func TestUnrecognized(t *testing.T) {
 		},
 		{
 			data: "{\"ea\":[null,null,null]}",
-			obj: &E{},
+			obj:  &E{},
 		},
 		{
 			data: "{\"ea\":[[],[null]]}",
-			obj: &E{},
+			obj:  &E{},
 		},
 		{
 			data: "{\"ea\":{\"a\":[],\"b\":null}}",
-			obj: &E{},
+			obj:  &E{},
 		},
 		{
 			data: "{\"fa\":\"fa\",\"fb\":{\"a\":\"a\"}}",
