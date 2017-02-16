@@ -17,7 +17,6 @@ limitations under the License.
 package tolerationseconds
 
 import (
-	"encoding/json"
 	"flag"
 	"fmt"
 	"io"
@@ -91,34 +90,35 @@ func (p *plugin) Admit(attributes admission.Attributes) (err error) {
 		}
 	}
 
+	// no change is required, return immediately
+	if toleratesNodeNotReady && toleratesNodeUnreachable {
+		return nil
+	}
+
 	if !toleratesNodeNotReady {
-		tolerations = append(tolerations, v1.Toleration{
+		_, err := v1.AddOrUpdateTolerationInPod(pod, &v1.Toleration{
 			Key:               metav1.TaintNodeNotReady,
 			Operator:          v1.TolerationOpExists,
 			Effect:            v1.TaintEffectNoExecute,
 			TolerationSeconds: defaultNotReadyTolerationSeconds,
 		})
+		if err != nil {
+			return admission.NewForbidden(attributes,
+				fmt.Errorf("failed to add default tolerations for taints `notReady:NoExecute` and `unreachable:NoExecute`, err: %v", err))
+		}
 	}
 
 	if !toleratesNodeUnreachable {
-		tolerations = append(tolerations, v1.Toleration{
+		_, err := v1.AddOrUpdateTolerationInPod(pod, &v1.Toleration{
 			Key:               metav1.TaintNodeUnreachable,
 			Operator:          v1.TolerationOpExists,
 			Effect:            v1.TaintEffectNoExecute,
 			TolerationSeconds: defaultUnreachableTolerationSeconds,
 		})
+		if err != nil {
+			return admission.NewForbidden(attributes,
+				fmt.Errorf("failed to add default tolerations for taints `notReady:NoExecute` and `unreachable:NoExecute`, err: %v", err))
+		}
 	}
-
-	if len(pod.Annotations) == 0 {
-		pod.Annotations = map[string]string{}
-	}
-
-	tolerationsData, err := json.Marshal(tolerations)
-	if err != nil {
-		return admission.NewForbidden(attributes,
-			fmt.Errorf("failed to add default tolerations for taints `notReady:NoExecute` and `unreachable:NoExecute`, err: %v", err))
-	}
-
-	pod.Annotations[v1.TolerationsAnnotationKey] = string(tolerationsData)
 	return nil
 }
