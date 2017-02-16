@@ -14,6 +14,7 @@ go_library(
         "annotate.go",
         "apiversions.go",
         "apply.go",
+        "apply_set_last_applied.go",
         "attach.go",
         "autoscale.go",
         "certificates.go",
