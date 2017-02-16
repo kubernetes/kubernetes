@@ -568,7 +568,7 @@ function start_kubelet {
 
       pod_infra_container_image=""
       if [[ -n "${POD_INFRA_CONTAINER_IMAGE}" ]]; then
-        pod_infra_container_image="--pod_infra_container_image=${POD_INFRA_CONTAINER_IMAGE}"
+        pod_infra_container_image="--pod-infra-container-image=${POD_INFRA_CONTAINER_IMAGE}"
       fi
 
       sudo -E "${GO_OUT}/hyperkube" kubelet ${priv_arg}\
