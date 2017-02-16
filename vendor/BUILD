@@ -17083,3 +17083,14 @@ filegroup(
     srcs = [":package-srcs"],
     tags = ["automanaged"],
 )
+
+go_test(
+    name = "k8s.io/client-go/examples/third-party-resources_test",
+    srcs = ["k8s.io/client-go/examples/third-party-resources/types_test.go"],
+    library = ":k8s.io/client-go/examples/third-party-resources",
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
+        "//vendor:k8s.io/apimachinery/pkg/runtime",
+    ],
+)
