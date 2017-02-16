@@ -35,7 +35,6 @@ import (
 	v1alpha1rbac "k8s.io/client-go/kubernetes/typed/rbac/v1alpha1"
 	v1beta1rbac "k8s.io/client-go/kubernetes/typed/rbac/v1beta1"
 	v1beta1storage "k8s.io/client-go/kubernetes/typed/storage/v1beta1"
-	_ "k8s.io/client-go/plugin/pkg/client/auth"
 	rest "k8s.io/client-go/rest"
 	"k8s.io/client-go/util/flowcontrol"
 )
