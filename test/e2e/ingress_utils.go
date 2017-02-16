@@ -682,7 +682,7 @@ func (cont *GCEIngressController) createStaticIP(name string) string {
 	return ip.Address
 }
 
-// deleteStaticIPs delets all static-ips allocated through calls to
+// deleteStaticIPs deletes all static-ips allocated through calls to
 // createStaticIP.
 func (cont *GCEIngressController) deleteStaticIPs() error {
 	if cont.staticIPName != "" {
