@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors.
+Copyright 2017 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,16 +14,24 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package v1alpha1
+package kubeadm
 
 import (
-	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/client-go/pkg/api"
+	"github.com/google/gofuzz"
+
+	apitesting "k8s.io/apimachinery/pkg/api/testing"
 )
 
-func addConversionFuncs(scheme *runtime.Scheme) error {
-	// Add non-generated conversion functions
-	return scheme.AddConversionFuncs(
-		api.Convert_v1_TypeMeta_To_v1_TypeMeta,
-	)
+func KubeadmFuzzerFuncs(t apitesting.TestingCommon) []interface{} {
+	return []interface{}{
+		func(obj *MasterConfiguration, c fuzz.Continue) {
+			c.FuzzNoCustom(obj)
+			obj.KubernetesVersion = "v10"
+			obj.API.Port = 20
+			obj.Networking.ServiceSubnet = "foo"
+			obj.Networking.DNSDomain = "foo"
+			obj.AuthorizationMode = "foo"
+			obj.Discovery.Token = &TokenDiscovery{}
+		},
+	}
 }

@@ -5,7 +5,6 @@ licenses(["notice"])
 load(
     "@io_bazel_rules_go//go:def.bzl",
     "go_library",
-    "go_test",
 )
 
 go_library(
@@ -13,11 +12,14 @@ go_library(
     srcs = [
         "doc.go",
         "env.go",
+        "fuzzer.go",
         "register.go",
         "types.go",
     ],
     tags = ["automanaged"],
     deps = [
+        "//vendor:github.com/google/gofuzz",
+        "//vendor:k8s.io/apimachinery/pkg/api/testing",
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
         "//vendor:k8s.io/apimachinery/pkg/runtime",
         "//vendor:k8s.io/apimachinery/pkg/runtime/schema",
@@ -40,19 +42,4 @@ filegroup(
         "//cmd/kubeadm/app/apis/kubeadm/validation:all-srcs",
     ],
     tags = ["automanaged"],
-)
-
-go_test(
-    name = "go_default_xtest",
-    srcs = ["serialization_test.go"],
-    tags = ["automanaged"],
-    deps = [
-        "//cmd/kubeadm/app/apis/kubeadm/install:go_default_library",
-        "//pkg/api/testing:go_default_library",
-        "//vendor:k8s.io/apimachinery/pkg/api/testing",
-        "//vendor:k8s.io/apimachinery/pkg/apimachinery/announced",
-        "//vendor:k8s.io/apimachinery/pkg/apimachinery/registered",
-        "//vendor:k8s.io/apimachinery/pkg/runtime",
-        "//vendor:k8s.io/apimachinery/pkg/runtime/serializer",
-    ],
 )
