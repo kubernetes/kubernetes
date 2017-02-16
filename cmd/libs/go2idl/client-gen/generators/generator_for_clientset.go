@@ -32,7 +32,7 @@ import (
 type genClientset struct {
 	generator.DefaultGen
 	groups             []clientgentypes.GroupVersions
-	typedClientPath    string
+	clientsetBasePath  string
 	outputPackage      string
 	imports            namer.ImportTracker
 	clientsetGenerated bool
@@ -57,14 +57,16 @@ func (g *genClientset) Imports(c *generator.Context) (imports []string) {
 	imports = append(imports, g.imports.ImportLines()...)
 	for _, group := range g.groups {
 		for _, version := range group.Versions {
-			typedClientPath := filepath.Join(g.typedClientPath, group.Group.NonEmpty(), version.NonEmpty())
-			imports = append(imports, strings.ToLower(fmt.Sprintf("%s%s \"%s\"", version.NonEmpty(), group.Group.NonEmpty(), typedClientPath)))
+			typedClientPath := filepath.Join(g.clientsetBasePath, "typed", group.Group.NonEmpty(), version.NonEmpty())
+			imports = append(imports, strings.ToLower(fmt.Sprintf("client%s%s \"%s\"", group.Group.NonEmpty(), version.NonEmpty(), typedClientPath)))
 		}
 	}
 	imports = append(imports, "github.com/golang/glog")
+	imports = append(imports, "k8s.io/apimachinery/pkg/runtime/serializer")
 	imports = append(imports, "k8s.io/client-go/util/flowcontrol")
 	// import solely to initialize client auth plugins.
 	imports = append(imports, "_ \"k8s.io/client-go/plugin/pkg/client/auth\"")
+	imports = append(imports, filepath.Join(g.clientsetBasePath, "scheme"))
 	return
 }
 
@@ -162,6 +164,12 @@ func NewForConfig(c *$.Config|raw$) (*Clientset, error) {
 	configShallowCopy := *c
 	if configShallowCopy.RateLimiter == nil && configShallowCopy.QPS > 0 {
 		configShallowCopy.RateLimiter = flowcontrol.NewTokenBucketRateLimiter(configShallowCopy.QPS, configShallowCopy.Burst)
+	}
+	if configShallowCopy.ParameterCodec == nil {
+		configShallowCopy.ParameterCodec = scheme.ParameterCodec
+	}
+	if configShallowCopy.NegotiatedSerializer == nil {
+		configShallowCopy.NegotiatedSerializer = serializer.DirectCodecFactory{CodecFactory: scheme.Codecs}
 	}
 	var cs Clientset
 	var err error

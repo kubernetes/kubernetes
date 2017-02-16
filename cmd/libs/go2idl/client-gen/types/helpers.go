@@ -94,7 +94,8 @@ func ToGroupVersionPackages(groups []GroupVersions) []GroupVersionPackage {
 				Group:            Group(namer.IC(group.Group.NonEmpty())),
 				Version:          Version(namer.IC(version.String())),
 				GroupVersion:     namer.IC(group.Group.NonEmpty()) + namer.IC(version.String()),
-				PackageName:      strings.ToLower(version.NonEmpty() + group.Group.NonEmpty()),
+				PackageName:      "client" + strings.ToLower(group.Group.NonEmpty()+version.NonEmpty()),
+				InputPackageName: strings.ToLower(group.Group.NonEmpty() + version.NonEmpty()),
 				IsDefaultVersion: version == defaultVersion && version != "",
 			})
 		}

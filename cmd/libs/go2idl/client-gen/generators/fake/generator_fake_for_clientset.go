@@ -32,7 +32,7 @@ import (
 type genClientset struct {
 	generator.DefaultGen
 	groups             []clientgentypes.GroupVersions
-	typedClientPath    string
+	clientsetBasePath  string
 	outputPackage      string
 	imports            namer.ImportTracker
 	clientsetGenerated bool
@@ -59,10 +59,10 @@ func (g *genClientset) Imports(c *generator.Context) (imports []string) {
 	imports = append(imports, g.imports.ImportLines()...)
 	for _, group := range g.groups {
 		for _, version := range group.Versions {
-			typedClientPath := filepath.Join(g.typedClientPath, group.Group.NonEmpty(), version.NonEmpty())
-			imports = append(imports, strings.ToLower(fmt.Sprintf("%s%s \"%s\"", version.NonEmpty(), group.Group.NonEmpty(), typedClientPath)))
+			typedClientPath := filepath.Join(g.clientsetBasePath, "typed", group.Group.NonEmpty(), version.NonEmpty())
+			imports = append(imports, strings.ToLower(fmt.Sprintf("%s%s \"%s\"", group.Group.NonEmpty(), version.NonEmpty(), typedClientPath)))
 			fakeTypedClientPath := filepath.Join(typedClientPath, "fake")
-			imports = append(imports, strings.ToLower(fmt.Sprintf("fake%s%s \"%s\"", version.NonEmpty(), group.Group.NonEmpty(), fakeTypedClientPath)))
+			imports = append(imports, strings.ToLower(fmt.Sprintf("fake%s%s \"%s\"", group.Group.NonEmpty(), version.NonEmpty(), fakeTypedClientPath)))
 		}
 	}
 	// the package that has the clientset Interface
@@ -84,12 +84,22 @@ func (g *genClientset) GenerateType(c *generator.Context, t *types.Type, w io.Wr
 	// TODO: We actually don't need any type information to generate the clientset,
 	// perhaps we can adapt the go2ild framework to this kind of usage.
 	sw := generator.NewSnippetWriter(w, c, "$", "$")
+	const pkgRuntime = "k8s.io/apimachinery/pkg/runtime"
+	const pkgSerizalizer = "k8s.io/apimachinery/pkg/runtime/serializer"
 
+	allGroups := clientgentypes.ToGroupVersionPackages(g.groups)
+
+	m := map[string]interface{}{
+		"allGroups":                 allGroups,
+		"runtimeNewScheme":          c.Universe.Function(types.Name{Package: pkgRuntime, Name: "NewScheme"}),
+		"serializerNewCodecFactory": c.Universe.Function(types.Name{Package: pkgSerizalizer, Name: "NewCodecFactory"}),
+		"runtimeNewParameterCodec":  c.Universe.Function(types.Name{Package: pkgRuntime, Name: "NewParameterCodec"}),
+	}
+
+	sw.Do(globalsTemplate, m)
 	sw.Do(common, nil)
 
 	sw.Do(checkImpl, nil)
-
-	allGroups := clientgentypes.ToGroupVersionPackages(g.groups)
 
 	for _, g := range allGroups {
 		sw.Do(clientsetInterfaceImplTemplate, g)
@@ -101,6 +111,17 @@ func (g *genClientset) GenerateType(c *generator.Context, t *types.Type, w io.Wr
 
 	return sw.Error()
 }
+
+var globalsTemplate = `
+var Scheme = $.runtimeNewScheme|raw$()
+var codecs = $.serializerNewCodecFactory|raw$(scheme)
+var parameterCodec = $.runtimeNewParameterCodec|raw$(scheme)
+
+func init() {
+	$range .allGroups$ $.InputPackageName$.AddToScheme(Scheme)
+	$end$
+}
+`
 
 // This part of code is version-independent, unchanging.
 var common = `

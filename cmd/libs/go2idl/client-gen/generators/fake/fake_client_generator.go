@@ -28,7 +28,8 @@ import (
 	clientgentypes "k8s.io/kubernetes/cmd/libs/go2idl/client-gen/types"
 )
 
-func PackageForGroup(gv clientgentypes.GroupVersion, typeList []*types.Type, packageBasePath string, srcTreePath string, inputPath string, boilerplate []byte, generatedBy string) generator.Package {
+func PackageForGroup(gv clientgentypes.GroupVersion, typeList []*types.Type, clientsetBasePath string, srcTreePath string, inputPath string, boilerplate []byte, generatedBy string) generator.Package {
+	packageBasePath := filepath.Join(clientsetBasePath, "typed")
 	outputPackagePath := strings.ToLower(filepath.Join(packageBasePath, gv.Group.NonEmpty(), gv.Version.NonEmpty(), "fake"))
 	// TODO: should make this a function, called by here and in client-generator.go
 	realClientPath := filepath.Join(packageBasePath, gv.Group.NonEmpty(), gv.Version.NonEmpty())
@@ -90,12 +91,12 @@ func extractBoolTagOrDie(key string, lines []string) bool {
 	return val
 }
 
-func PackageForClientset(customArgs clientgenargs.Args, typedClientBasePath string, boilerplate []byte, generatedBy string) generator.Package {
+func PackageForClientset(customArgs clientgenargs.Args, clientsetBasePath string, boilerplate []byte, generatedBy string) generator.Package {
 	return &generator.DefaultPackage{
 		// TODO: we'll generate fake clientset for different release in the future.
 		// Package name and path are hard coded for now.
 		PackageName: "fake",
-		PackagePath: filepath.Join(customArgs.ClientsetOutputPath, customArgs.ClientsetName, "fake"),
+		PackagePath: filepath.Join(clientsetBasePath, "fake"),
 		HeaderText:  boilerplate,
 		PackageDocumentation: []byte(
 			generatedBy +
@@ -112,11 +113,11 @@ func PackageForClientset(customArgs clientgenargs.Args, typedClientBasePath stri
 					DefaultGen: generator.DefaultGen{
 						OptionalName: "clientset_generated",
 					},
-					groups:          customArgs.Groups,
-					typedClientPath: typedClientBasePath,
-					outputPackage:   "fake",
-					imports:         generator.NewImportTracker(),
-					clientsetPath:   filepath.Join(customArgs.ClientsetOutputPath, customArgs.ClientsetName),
+					groups:            customArgs.Groups,
+					clientsetBasePath: clientsetBasePath,
+					outputPackage:     "fake",
+					imports:           generator.NewImportTracker(),
+					clientsetPath:     filepath.Join(customArgs.ClientsetOutputPath, customArgs.ClientsetName),
 				},
 			}
 			return generators
