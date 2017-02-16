@@ -117,9 +117,6 @@ func NewCmdEdit(f cmdutil.Factory, out, errOut io.Writer) *cobra.Command {
 	cmdutil.AddFilenameOptionFlags(cmd, options, usage)
 	cmdutil.AddValidateFlags(cmd)
 	cmd.Flags().StringP("output", "o", "yaml", "Output format. One of: yaml|json.")
-	cmd.Flags().String("output-version", "", "DEPRECATED: To edit using a specific API version, fully-qualify the resource, version, and group (for example: 'jobs.v1.batch/myjob').")
-	cmd.Flags().MarkDeprecated("output-version", "editing is now done using the resource exactly as fetched from the API. To edit using a specific API version, fully-qualify the resource, version, and group (for example: 'jobs.v1.batch/myjob').")
-	cmd.Flags().MarkHidden("output-version")
 
 	cmd.Flags().Bool("windows-line-endings", gruntime.GOOS == "windows", "Use Windows line-endings (default Unix line-endings)")
 	cmdutil.AddApplyAnnotationFlags(cmd)
