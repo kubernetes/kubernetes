@@ -192,6 +192,71 @@ func CreatePKIAssets(cfg *kubeadmapi.MasterConfiguration, pkiDir string) error {
 		fmt.Println("[certificates] Generated service account token signing public key.")
 	}
 
+	// front proxy CA and client certs are used to secure a front proxy authenticator which is used to assert identity
+	// without the client cert, you cannot make use of the front proxy and the kube-aggregator uses this connection
+	// so we generate and enable it unconditionally
+	// This is a separte CA, so that front proxy identities cannot hit the API and normal client certs cannot be used
+	// as front proxies.
+	var frontProxyCACert *x509.Certificate
+	var frontProxyCAKey *rsa.PrivateKey
+	// If at least one of them exists, we should try to load them
+	// In the case that only one exists, there will most likely be an error anyway
+	if pkiutil.CertOrKeyExist(pkiDir, kubeadmconstants.FrontProxyCACertAndKeyBaseName) {
+		// Try to load front-proxy-ca.crt and front-proxy-ca.key from the PKI directory
+		frontProxyCACert, frontProxyCAKey, err = pkiutil.TryLoadCertAndKeyFromDisk(pkiDir, kubeadmconstants.FrontProxyCACertAndKeyBaseName)
+		if err != nil || frontProxyCACert == nil || frontProxyCAKey == nil {
+			return fmt.Errorf("certificate and/or key existed but they could not be loaded properly")
+		}
+
+		// The certificate and key could be loaded, but the certificate is not a CA
+		if !frontProxyCACert.IsCA {
+			return fmt.Errorf("certificate and key could be loaded but the certificate is not a CA")
+		}
+
+		fmt.Println("[certificates] Using the existing front-proxy CA certificate and key.")
+	} else {
+		// The certificate and the key did NOT exist, let's generate them now
+		frontProxyCACert, frontProxyCAKey, err = pkiutil.NewCertificateAuthority()
+		if err != nil {
+			return fmt.Errorf("failure while generating front-proxy CA certificate and key [%v]", err)
+		}
+
+		if err = pkiutil.WriteCertAndKey(pkiDir, kubeadmconstants.FrontProxyCACertAndKeyBaseName, frontProxyCACert, frontProxyCAKey); err != nil {
+			return fmt.Errorf("failure while saving front-proxy CA certificate and key [%v]", err)
+		}
+		fmt.Println("[certificates] Generated front-proxy CA certificate and key.")
+	}
+
+	// At this point we have a front proxy CA signing key.  We can use that create the front proxy client cert if
+	// it doesn't already exist.
+	// If at least one of them exists, we should try to load them
+	// In the case that only one exists, there will most likely be an error anyway
+	if pkiutil.CertOrKeyExist(pkiDir, kubeadmconstants.FrontProxyClientCertAndKeyBaseName) {
+		// Try to load apiserver-kubelet-client.crt and apiserver-kubelet-client.key from the PKI directory
+		apiCert, apiKey, err := pkiutil.TryLoadCertAndKeyFromDisk(pkiDir, kubeadmconstants.FrontProxyClientCertAndKeyBaseName)
+		if err != nil || apiCert == nil || apiKey == nil {
+			return fmt.Errorf("certificate and/or key existed but they could not be loaded properly")
+		}
+
+		fmt.Println("[certificates] Using the existing front-proxy client certificate and key.")
+	} else {
+		// The certificate and the key did NOT exist, let's generate them now
+		// TODO: Add a test case to verify that this cert has the x509.ExtKeyUsageClientAuth flag
+		config := certutil.Config{
+			CommonName: "front-proxy-client",
+			Usages:     []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth},
+		}
+		apiClientCert, apiClientKey, err := pkiutil.NewCertAndKey(frontProxyCACert, frontProxyCAKey, config)
+		if err != nil {
+			return fmt.Errorf("failure while creating front-proxy client key and certificate [%v]", err)
+		}
+
+		if err = pkiutil.WriteCertAndKey(pkiDir, kubeadmconstants.FrontProxyClientCertAndKeyBaseName, apiClientCert, apiClientKey); err != nil {
+			return fmt.Errorf("failure while saving front-proxy client certificate and key [%v]", err)
+		}
+		fmt.Println("[certificates] Generated front-proxy client certificate and key.")
+	}
+
 	fmt.Printf("[certificates] Valid certificates and keys now exist in %q\n", pkiDir)
 
 	return nil

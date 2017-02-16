@@ -38,6 +38,14 @@ const (
 	ServiceAccountPublicKeyName  = "sa.pub"
 	ServiceAccountPrivateKeyName = "sa.key"
 
+	FrontProxyCACertAndKeyBaseName = "front-proxy-ca"
+	FrontProxyCACertName           = "front-proxy-ca.crt"
+	FrontProxyCAKeyName            = "front-proxy-ca.key"
+
+	FrontProxyClientCertAndKeyBaseName = "front-proxy-client"
+	FrontProxyClientCertName           = "front-proxy-client.crt"
+	FrontProxyClientKeyName            = "front-proxy-client.key"
+
 	// TODO: These constants should actually come from pkg/kubeapiserver/authorizer, but we can't vendor that package in now
 	// because of all the other sub-packages that would get vendored. To fix this, a pkg/kubeapiserver/authorizer/modes package
 	// or similar should exist that only has these constants; then we can vendor it.
