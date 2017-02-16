@@ -39,6 +39,11 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+const (
+	namespaces string = "namespaces"
+	clusters   string = "clusters"
+)
+
 func TestNamespaceController(t *testing.T) {
 	cluster1 := NewCluster("cluster1", apiv1.ConditionTrue)
 	cluster2 := NewCluster("cluster2", apiv1.ConditionTrue)
@@ -53,24 +58,24 @@ func TestNamespaceController(t *testing.T) {
 	}
 
 	fakeClient := &fakefedclientset.Clientset{}
-	RegisterFakeList("clusters", &fakeClient.Fake, &federationapi.ClusterList{Items: []federationapi.Cluster{*cluster1}})
-	RegisterFakeList("namespaces", &fakeClient.Fake, &apiv1.NamespaceList{Items: []apiv1.Namespace{}})
-	namespaceWatch := RegisterFakeWatch("namespaces", &fakeClient.Fake)
-	namespaceCreateChan := RegisterFakeCopyOnCreate("namespaces", &fakeClient.Fake, namespaceWatch)
-	clusterWatch := RegisterFakeWatch("clusters", &fakeClient.Fake)
+	RegisterFakeList(clusters, &fakeClient.Fake, &federationapi.ClusterList{Items: []federationapi.Cluster{*cluster1}})
+	RegisterFakeList(namespaces, &fakeClient.Fake, &apiv1.NamespaceList{Items: []apiv1.Namespace{}})
+	namespaceWatch := RegisterFakeWatch(namespaces, &fakeClient.Fake)
+	namespaceCreateChan := RegisterFakeCopyOnCreate(namespaces, &fakeClient.Fake, namespaceWatch)
+	clusterWatch := RegisterFakeWatch(clusters, &fakeClient.Fake)
 
 	cluster1Client := &fakekubeclientset.Clientset{}
-	cluster1Watch := RegisterFakeWatch("namespaces", &cluster1Client.Fake)
-	RegisterFakeList("namespaces", &cluster1Client.Fake, &apiv1.NamespaceList{Items: []apiv1.Namespace{}})
-	cluster1CreateChan := RegisterFakeCopyOnCreate("namespaces", &cluster1Client.Fake, cluster1Watch)
-	cluster1UpdateChan := RegisterFakeCopyOnUpdate("namespaces", &cluster1Client.Fake, cluster1Watch)
+	cluster1Watch := RegisterFakeWatch(namespaces, &cluster1Client.Fake)
+	RegisterFakeList(namespaces, &cluster1Client.Fake, &apiv1.NamespaceList{Items: []apiv1.Namespace{}})
+	cluster1CreateChan := RegisterFakeCopyOnCreate(namespaces, &cluster1Client.Fake, cluster1Watch)
+	cluster1UpdateChan := RegisterFakeCopyOnUpdate(namespaces, &cluster1Client.Fake, cluster1Watch)
 
 	cluster2Client := &fakekubeclientset.Clientset{}
-	cluster2Watch := RegisterFakeWatch("namespaces", &cluster2Client.Fake)
-	RegisterFakeList("namespaces", &cluster2Client.Fake, &apiv1.NamespaceList{Items: []apiv1.Namespace{}})
-	cluster2CreateChan := RegisterFakeCopyOnCreate("namespaces", &cluster2Client.Fake, cluster2Watch)
+	cluster2Watch := RegisterFakeWatch(namespaces, &cluster2Client.Fake)
+	RegisterFakeList(namespaces, &cluster2Client.Fake, &apiv1.NamespaceList{Items: []apiv1.Namespace{}})
+	cluster2CreateChan := RegisterFakeCopyOnCreate(namespaces, &cluster2Client.Fake, cluster2Watch)
 
-	nsDeleteChan := RegisterDelete(&fakeClient.Fake, "namespaces")
+	nsDeleteChan := RegisterDelete(&fakeClient.Fake, namespaces)
 	namespaceController := NewNamespaceController(fakeClient, dynamic.NewDynamicClientPool(&restclient.Config{}))
 	informerClientFactory := func(cluster *federationapi.Cluster) (kubeclientset.Interface, error) {
 		switch cluster.Name {
@@ -175,7 +180,9 @@ func GetStringFromChan(c chan string) string {
 }
 
 func GetNamespaceFromChan(c chan runtime.Object) *apiv1.Namespace {
-	namespace := GetObjectFromChan(c).(*apiv1.Namespace)
-	return namespace
-
+	if namespace := GetObjectFromChan(c); namespace == nil {
+		return nil
+	} else {
+		return namespace.(*apiv1.Namespace)
+	}
 }
