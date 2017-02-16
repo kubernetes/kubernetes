@@ -24,6 +24,7 @@ filegroup(
     name = "all-srcs",
     srcs = [
         ":package-srcs",
+        "//plugin/pkg/auth/authenticator/token/bootstrap:all-srcs",
         "//plugin/pkg/auth/authorizer:all-srcs",
     ],
     tags = ["automanaged"],
