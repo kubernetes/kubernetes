@@ -47,7 +47,7 @@ import (
 )
 
 type DrainOptions struct {
-	client             *internalclientset.Clientset
+	client             internalclientset.Interface
 	restClient         *restclient.RESTClient
 	factory            cmdutil.Factory
 	Force              bool
@@ -583,7 +583,7 @@ func (o *DrainOptions) waitForDelete(pods []api.Pod, interval, timeout time.Dura
 
 // SupportEviction uses Discovery API to find out if the server support eviction subresource
 // If support, it will return its groupVersion; Otherwise, it will return ""
-func SupportEviction(clientset *internalclientset.Clientset) (string, error) {
+func SupportEviction(clientset internalclientset.Interface) (string, error) {
 	discoveryClient := clientset.Discovery()
 	groupList, err := discoveryClient.ServerGroups()
 	if err != nil {

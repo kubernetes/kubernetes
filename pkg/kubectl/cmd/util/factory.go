@@ -86,7 +86,7 @@ type ClientAccessFactory interface {
 	DiscoveryClientFactory
 
 	// ClientSet gives you back an internal, generated clientset
-	ClientSet() (*internalclientset.Clientset, error)
+	ClientSet() (internalclientset.Interface, error)
 	// Returns a RESTClient for accessing Kubernetes resources or an error.
 	RESTClient() (*restclient.RESTClient, error)
 	// Returns a client.Config for accessing the Kubernetes server.
@@ -101,7 +101,7 @@ type ClientAccessFactory interface {
 	// TODO remove this should be rolled into restclient with the right version
 	FederationClientForVersion(version *schema.GroupVersion) (*restclient.RESTClient, error)
 	// TODO remove.  This should be rolled into `ClientSet`
-	ClientSetForVersion(requiredVersion *schema.GroupVersion) (*internalclientset.Clientset, error)
+	ClientSetForVersion(requiredVersion *schema.GroupVersion) (internalclientset.Interface, error)
 	// TODO remove.  This should be rolled into `ClientConfig`
 	ClientConfigForVersion(requiredVersion *schema.GroupVersion) (*restclient.Config, error)
 
