@@ -705,7 +705,7 @@ func TestSoftPodAntiAffinityWithFailureDomains(t *testing.T) {
 	}
 }
 
-// TODO remove for 1.7
+// TODO: remove for 1.7
 func TestInterPodAffinityAnnotationsPriority(t *testing.T) {
 	utilfeature.DefaultFeatureGate.Set("AffinityInAnnotations=true")
 	labelRgChina := map[string]string{

@@ -179,6 +179,7 @@ func TestNodeAffinityPriority(t *testing.T) {
 	}
 }
 
+// TODO: Remove in 1.7
 func TestNodeAffinityAnnotationsPriority(t *testing.T) {
 	utilfeature.DefaultFeatureGate.Set("AffinityInAnnotations=true")
 	label1 := map[string]string{"foo": "bar"}
