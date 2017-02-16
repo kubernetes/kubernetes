@@ -139,7 +139,7 @@ var _ = framework.KubeDescribe("Loadbalancing: L7", func() {
 			// framework.ExpectNoError(jig.verifyURL(fmt.Sprintf("https://%v/", ip), "", 30, 1*time.Second, httpClient))
 		})
 
-		It("should create ingress with pre-shared TLS certification", func() {
+		It("should create ingress with pre-shared TLS certificate", func() {
 			jig.createIngress(filepath.Join(ingressManifestPath, "pre-shared-cert"), ns, map[string]string{
 				"kubernetes.io/ingress.allow-http": "false",
 			})
