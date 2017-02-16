@@ -19,6 +19,7 @@ package node
 import (
 	"encoding/json"
 	"fmt"
+	"sort"
 	"testing"
 	"time"
 
@@ -27,8 +28,93 @@ import (
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset/fake"
 	"k8s.io/kubernetes/pkg/controller/node/testutil"
 
+	"github.com/golang/glog"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	clienttesting "k8s.io/client-go/testing"
 )
+
+func createNoExecuteTaint(index int) v1.Taint {
+	return v1.Taint{
+		Key:       "testTaint" + fmt.Sprintf("%v", index),
+		Value:     "test" + fmt.Sprintf("%v", index),
+		Effect:    v1.TaintEffectNoExecute,
+		TimeAdded: metav1.Now(),
+	}
+}
+
+func addToleration(pod *v1.Pod, index int, duration int64) *v1.Pod {
+	if pod.Annotations == nil {
+		pod.Annotations = map[string]string{}
+	}
+	if duration < 0 {
+		pod.Annotations["scheduler.alpha.kubernetes.io/tolerations"] = `
+  [
+    {
+      "key": "testTaint` + fmt.Sprintf("%v", index) + `",
+      "value": "test` + fmt.Sprintf("%v", index) + `",
+      "effect": "` + string(v1.TaintEffectNoExecute) + `"
+    }
+  ]`
+	} else {
+		pod.Annotations["scheduler.alpha.kubernetes.io/tolerations"] = `
+  [
+    {
+      "key": "testTaint` + fmt.Sprintf("%v", index) + `",
+      "value": "test` + fmt.Sprintf("%v", index) + `",
+      "effect": "` + string(v1.TaintEffectNoExecute) + `",
+      "tolerationSeconds": ` + fmt.Sprintf("%v", duration) + `
+    }
+  ]`
+	}
+	return pod
+}
+
+func addTaintsToNode(node *v1.Node, key, value string, indices []int) *v1.Node {
+	taints := []v1.Taint{}
+	for _, index := range indices {
+		taints = append(taints, createNoExecuteTaint(index))
+	}
+	taintsData, err := json.Marshal(taints)
+	if err != nil {
+		panic(err)
+	}
+
+	if node.Annotations == nil {
+		node.Annotations = make(map[string]string)
+	}
+	node.Annotations[v1.TaintsAnnotationKey] = string(taintsData)
+	return node
+}
+
+type timestampedPod struct {
+	names     []string
+	timestamp time.Duration
+}
+
+type durationSlice []timestampedPod
+
+func (a durationSlice) Len() int           { return len(a) }
+func (a durationSlice) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
+func (a durationSlice) Less(i, j int) bool { return a[i].timestamp < a[j].timestamp }
+
+func TestFilterNoExecuteTaints(t *testing.T) {
+	taints := []v1.Taint{
+		{
+			Key:    "one",
+			Value:  "one",
+			Effect: v1.TaintEffectNoExecute,
+		},
+		{
+			Key:    "two",
+			Value:  "two",
+			Effect: v1.TaintEffectNoSchedule,
+		},
+	}
+	taints = getNoExecuteTaints(taints)
+	if len(taints) != 1 || taints[0].Key != "one" {
+		t.Errorf("Filtering doesn't work. Got %v", taints)
+	}
+}
 
 func TestComputeTaintDifference(t *testing.T) {
 	testCases := []struct {
@@ -123,42 +209,6 @@ func TestComputeTaintDifference(t *testing.T) {
 	}
 }
 
-func createNoExecuteTaint(index int) v1.Taint {
-	return v1.Taint{
-		Key:       "testTaint" + fmt.Sprintf("%v", index),
-		Value:     "test" + fmt.Sprintf("%v", index),
-		Effect:    v1.TaintEffectNoExecute,
-		TimeAdded: metav1.Now(),
-	}
-}
-
-func addToleration(pod *v1.Pod, index int, duration int64) *v1.Pod {
-	if pod.Annotations == nil {
-		pod.Annotations = map[string]string{}
-	}
-	if duration < 0 {
-		pod.Annotations["scheduler.alpha.kubernetes.io/tolerations"] = `
-  [
-    {
-      "key": "testTaint` + fmt.Sprintf("%v", index) + `",
-      "value": "test` + fmt.Sprintf("%v", index) + `",
-      "effect": "` + string(v1.TaintEffectNoExecute) + `"
-    }
-  ]`
-	} else {
-		pod.Annotations["scheduler.alpha.kubernetes.io/tolerations"] = `
-  [
-    {
-      "key": "testTaint` + fmt.Sprintf("%v", index) + `",
-      "value": "test` + fmt.Sprintf("%v", index) + `",
-      "effect": "` + string(v1.TaintEffectNoExecute) + `",
-      "tolerationSeconds": ` + fmt.Sprintf("%v", duration) + `
-    }
-  ]`
-	}
-	return pod
-}
-
 func TestCreatePod(t *testing.T) {
 	testCases := []struct {
 		description  string
@@ -216,6 +266,7 @@ func TestCreatePod(t *testing.T) {
 		stopCh := make(chan struct{})
 		fakeClientset := fake.NewSimpleClientset()
 		controller := NewNoExecuteTaintManager(fakeClientset)
+		controller.recorder = testutil.NewFakeRecorder()
 		go controller.Run(stopCh)
 		controller.taintedNodes = item.taintedNodes
 		controller.PodUpdated(nil, item.pod)
@@ -239,6 +290,7 @@ func TestDeletePod(t *testing.T) {
 	stopCh := make(chan struct{})
 	fakeClientset := fake.NewSimpleClientset()
 	controller := NewNoExecuteTaintManager(fakeClientset)
+	controller.recorder = testutil.NewFakeRecorder()
 	go controller.Run(stopCh)
 	controller.taintedNodes = map[string][]v1.Taint{
 		"node1": {createNoExecuteTaint(1)},
@@ -301,6 +353,7 @@ func TestUpdatePod(t *testing.T) {
 		stopCh := make(chan struct{})
 		fakeClientset := fake.NewSimpleClientset()
 		controller := NewNoExecuteTaintManager(fakeClientset)
+		controller.recorder = testutil.NewFakeRecorder()
 		go controller.Run(stopCh)
 		controller.taintedNodes = item.taintedNodes
 
@@ -325,23 +378,6 @@ func TestUpdatePod(t *testing.T) {
 		}
 		close(stopCh)
 	}
-}
-
-func addTaintsToNode(node *v1.Node, key, value string, indices []int) *v1.Node {
-	taints := []v1.Taint{}
-	for _, index := range indices {
-		taints = append(taints, createNoExecuteTaint(index))
-	}
-	taintsData, err := json.Marshal(taints)
-	if err != nil {
-		panic(err)
-	}
-
-	if node.Annotations == nil {
-		node.Annotations = make(map[string]string)
-	}
-	node.Annotations[v1.TaintsAnnotationKey] = string(taintsData)
-	return node
 }
 
 func TestCreateNode(t *testing.T) {
@@ -381,6 +417,7 @@ func TestCreateNode(t *testing.T) {
 		stopCh := make(chan struct{})
 		fakeClientset := fake.NewSimpleClientset(&v1.PodList{Items: item.pods})
 		controller := NewNoExecuteTaintManager(fakeClientset)
+		controller.recorder = testutil.NewFakeRecorder()
 		go controller.Run(stopCh)
 		controller.NodeUpdated(nil, item.node)
 		// wait a bit
@@ -403,6 +440,7 @@ func TestDeleteNode(t *testing.T) {
 	stopCh := make(chan struct{})
 	fakeClientset := fake.NewSimpleClientset()
 	controller := NewNoExecuteTaintManager(fakeClientset)
+	controller.recorder = testutil.NewFakeRecorder()
 	controller.taintedNodes = map[string][]v1.Taint{
 		"node1": {createNoExecuteTaint(1)},
 	}
@@ -464,12 +502,57 @@ func TestUpdateNode(t *testing.T) {
 			expectDelete:    false,
 			additionalSleep: 1500 * time.Millisecond,
 		},
+		{
+			description: "Pod with multiple tolerations are evicted when first one runs out",
+			pods: []v1.Pod{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Namespace: "default",
+						Name:      "pod1",
+						Annotations: map[string]string{
+							"scheduler.alpha.kubernetes.io/tolerations": `
+  [
+    {
+      "key": "testTaint1",
+      "value": "test1",
+      "effect": "` + string(v1.TaintEffectNoExecute) + `",
+      "tolerationSeconds": ` + fmt.Sprintf("%v", 1) + `
+    },
+    {
+      "key": "testTaint2",
+      "value": "test2",
+      "effect": "` + string(v1.TaintEffectNoExecute) + `",
+      "tolerationSeconds": ` + fmt.Sprintf("%v", 100) + `
+    }
+  ]
+  `,
+						},
+					},
+					Spec: v1.PodSpec{
+						NodeName: "node1",
+					},
+					Status: v1.PodStatus{
+						Conditions: []v1.PodCondition{
+							{
+								Type:   v1.PodReady,
+								Status: v1.ConditionTrue,
+							},
+						},
+					},
+				},
+			},
+			oldNode:         testutil.NewNode("node1"),
+			newNode:         addTaintsToNode(testutil.NewNode("node1"), "testTaint1", "taint1", []int{1, 2}),
+			expectDelete:    true,
+			additionalSleep: 1500 * time.Millisecond,
+		},
 	}
 
 	for _, item := range testCases {
 		stopCh := make(chan struct{})
 		fakeClientset := fake.NewSimpleClientset(&v1.PodList{Items: item.pods})
 		controller := NewNoExecuteTaintManager(fakeClientset)
+		controller.recorder = testutil.NewFakeRecorder()
 		go controller.Run(stopCh)
 		controller.NodeUpdated(item.oldNode, item.newNode)
 		// wait a bit
@@ -487,6 +570,113 @@ func TestUpdateNode(t *testing.T) {
 		if podDeleted != item.expectDelete {
 			t.Errorf("%v: Unexepected test result. Expected delete %v, got %v", item.description, item.expectDelete, podDeleted)
 		}
+		close(stopCh)
+	}
+}
+
+func TestUpdateNodeWithMultiplePods(t *testing.T) {
+	testCases := []struct {
+		description         string
+		pods                []v1.Pod
+		oldNode             *v1.Node
+		newNode             *v1.Node
+		expectedDeleteTimes durationSlice
+	}{
+		{
+			description: "Pods with different toleration times are evicted appropriately",
+			pods: []v1.Pod{
+				*testutil.NewPod("pod1", "node1"),
+				*addToleration(testutil.NewPod("pod2", "node1"), 1, 1),
+				*addToleration(testutil.NewPod("pod3", "node1"), 1, -1),
+			},
+			oldNode: testutil.NewNode("node1"),
+			newNode: addTaintsToNode(testutil.NewNode("node1"), "testTaint1", "taint1", []int{1}),
+			expectedDeleteTimes: durationSlice{
+				{[]string{"pod1"}, 0},
+				{[]string{"pod2"}, time.Second},
+			},
+		},
+		{
+			description: "Evict all pods not maching all taints instantly",
+			pods: []v1.Pod{
+				*testutil.NewPod("pod1", "node1"),
+				*addToleration(testutil.NewPod("pod2", "node1"), 1, 1),
+				*addToleration(testutil.NewPod("pod3", "node1"), 1, -1),
+			},
+			oldNode: testutil.NewNode("node1"),
+			newNode: addTaintsToNode(testutil.NewNode("node1"), "testTaint1", "taint1", []int{1, 2}),
+			expectedDeleteTimes: durationSlice{
+				{[]string{"pod1", "pod2", "pod3"}, 0},
+			},
+		},
+	}
+
+	for _, item := range testCases {
+		stopCh := make(chan struct{})
+		fakeClientset := fake.NewSimpleClientset(&v1.PodList{Items: item.pods})
+		sort.Sort(item.expectedDeleteTimes)
+		controller := NewNoExecuteTaintManager(fakeClientset)
+		controller.recorder = testutil.NewFakeRecorder()
+		go controller.Run(stopCh)
+		controller.NodeUpdated(item.oldNode, item.newNode)
+
+		sleptAlready := time.Duration(0)
+		for i := range item.expectedDeleteTimes {
+			var increment time.Duration
+			if i == 0 || item.expectedDeleteTimes[i-1].timestamp != item.expectedDeleteTimes[i].timestamp {
+				if i == len(item.expectedDeleteTimes)-1 || item.expectedDeleteTimes[i+1].timestamp == item.expectedDeleteTimes[i].timestamp {
+					increment = 200 * time.Millisecond
+				} else {
+					increment = ((item.expectedDeleteTimes[i+1].timestamp - item.expectedDeleteTimes[i].timestamp) / time.Duration(2))
+				}
+				sleepTime := item.expectedDeleteTimes[i].timestamp - sleptAlready + increment
+				glog.Infof("Sleeping for %v", sleepTime)
+				time.Sleep(sleepTime)
+				sleptAlready = item.expectedDeleteTimes[i].timestamp + increment
+			}
+
+			for delay, podName := range item.expectedDeleteTimes[i].names {
+				deleted := false
+				for _, action := range fakeClientset.Actions() {
+					deleteAction, ok := action.(clienttesting.DeleteActionImpl)
+					if !ok {
+						glog.Infof("Found not-delete action with verb %v. Ignoring.", action.GetVerb())
+						continue
+					}
+					if deleteAction.GetResource().Resource != "pods" {
+						continue
+					}
+					if podName == deleteAction.GetName() {
+						deleted = true
+					}
+				}
+				if !deleted {
+					t.Errorf("Failed to deleted pod %v after %v", podName, delay)
+				}
+			}
+			for _, action := range fakeClientset.Actions() {
+				deleteAction, ok := action.(clienttesting.DeleteActionImpl)
+				if !ok {
+					glog.Infof("Found not-delete action with verb %v. Ignoring.", action.GetVerb())
+					continue
+				}
+				if deleteAction.GetResource().Resource != "pods" {
+					continue
+				}
+				deletedPodName := deleteAction.GetName()
+				expected := false
+				for _, podName := range item.expectedDeleteTimes[i].names {
+					if podName == deletedPodName {
+						expected = true
+					}
+				}
+				if !expected {
+					t.Errorf("Pod %v was deleted even though it shouldn't have", deletedPodName)
+				}
+			}
+			fakeClientset.ClearActions()
+		}
+
 		close(stopCh)
 	}
 }

@@ -25,7 +25,7 @@ import (
 	"github.com/golang/glog"
 )
 
-// WorkArgs keeps arguments that will be passed to tha function executed by the worker.
+// WorkArgs keeps arguments that will be passed to the function executed by the worker.
 type WorkArgs struct {
 	NamespacedName types.NamespacedName
 }
@@ -50,7 +50,7 @@ type TimedWorker struct {
 
 // CreateWorker creates a TimedWorker that will execute `f` not earlier than `fireAt`.
 func CreateWorker(args *WorkArgs, createdAt time.Time, fireAt time.Time, f func(args *WorkArgs) error) *TimedWorker {
-	delay := fireAt.Sub(time.Now())
+	delay := fireAt.Sub(createdAt)
 	if delay <= 0 {
 		go f(args)
 		return nil
@@ -71,9 +71,10 @@ func (w *TimedWorker) Cancel() {
 	}
 }
 
-// TimedWorkerQueue keeps a set of TimedWorkers that still wait for execution.
+// TimedWorkerQueue keeps a set of TimedWorkers that are still wait for execution.
 type TimedWorkerQueue struct {
 	sync.Mutex
+	// map of workers keyed by string returned by 'KeyFromWorkArgs' from the given worker.
 	workers  map[string]*TimedWorker
 	workFunc func(args *WorkArgs) error
 }
@@ -93,6 +94,8 @@ func (q *TimedWorkerQueue) getWrappedWorkerFunc(key string) func(args *WorkArgs)
 		q.Lock()
 		defer q.Unlock()
 		if err == nil {
+			// To avoid duplicated calls we keep the key in the queue, to prevent
+			// subsequent additions.
 			q.workers[key] = nil
 		} else {
 			delete(q.workers, key)
@@ -104,6 +107,7 @@ func (q *TimedWorkerQueue) getWrappedWorkerFunc(key string) func(args *WorkArgs)
 // AddWork adds a work to the WorkerQueue which will be executed not earlier than `fireAt`.
 func (q *TimedWorkerQueue) AddWork(args *WorkArgs, createdAt time.Time, fireAt time.Time) {
 	key := args.KeyFromWorkArgs()
+	glog.V(4).Infof("Adding TimedWorkerQueue item %v at %v to be fired at %v", key, createdAt, fireAt)
 
 	q.Lock()
 	defer q.Unlock()
@@ -112,21 +116,24 @@ func (q *TimedWorkerQueue) AddWork(args *WorkArgs, createdAt time.Time, fireAt t
 		return
 	}
 	worker := CreateWorker(args, createdAt, fireAt, q.getWrappedWorkerFunc(key))
-	if worker == nil {
-		return
-	}
 	q.workers[key] = worker
 }
 
-// CancelWork removes scheduled function execution from the queue.
-func (q *TimedWorkerQueue) CancelWork(key string) {
+// CancelWork removes scheduled function execution from the queue. Returns true if work was cancelled.
+func (q *TimedWorkerQueue) CancelWork(key string) bool {
+	glog.V(4).Infof("Cancelling TimedWorkerQueue item %v at %v", key, time.Now())
 	q.Lock()
 	defer q.Unlock()
 	worker, found := q.workers[key]
+	result := false
 	if found {
-		worker.Cancel()
+		if worker != nil {
+			result = true
+			worker.Cancel()
+		}
 		delete(q.workers, key)
 	}
+	return result
 }
 
 // GetWorkerUnsafe returns a TimedWorker corresponding to the given key.
