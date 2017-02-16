@@ -43,8 +43,10 @@ spec:
         k8s-app: kube-dns
       annotations:
         scheduler.alpha.kubernetes.io/critical-pod: ''
-        scheduler.alpha.kubernetes.io/tolerations: '[{"key":"CriticalAddonsOnly", "operator":"Exists"}]'
     spec:
+      toleration:
+      - key: "CriticalAddonsOnly"
+        operator: "Exists"
       volumes:
       - name: kube-dns-config
         configMap:
