@@ -24,7 +24,7 @@ import (
 )
 
 var (
-	options_example = templates.Examples(i18n.T(`
+	optionsExample = templates.Examples(i18n.T(`
 		# Print flags inherited by all commands
 		kubectl options`))
 )
@@ -35,7 +35,7 @@ func NewCmdOptions() *cobra.Command {
 		Use:     "options",
 		Short:   i18n.T("Print the list of flags inherited by all commands"),
 		Long:    "Print the list of flags inherited by all commands",
-		Example: options_example,
+		Example: optionsExample,
 		Run: func(cmd *cobra.Command, args []string) {
 			cmd.Usage()
 		},

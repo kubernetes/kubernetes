@@ -62,7 +62,7 @@ type TaintOptions struct {
 }
 
 var (
-	taint_long = templates.LongDesc(i18n.T(`
+	taintLong = templates.LongDesc(i18n.T(`
 		Update the taints on one or more nodes.
 
 		* A taint consists of a key, value, and effect. As an argument here, it is expressed as key=value:effect.
@@ -71,7 +71,7 @@ var (
 		* The effect must be NoSchedule, PreferNoSchedule or NoExecute.
 		* Currently taint can only apply to node.`))
 
-	taint_example = templates.Examples(i18n.T(`
+	taintExample = templates.Examples(i18n.T(`
 		# Update node 'foo' with a taint with key 'dedicated' and value 'special-user' and effect 'NoSchedule'.
 		# If a taint with that key and effect already exists, its value is replaced as specified.
 		kubectl taint nodes foo dedicated=special-user:NoSchedule
@@ -92,8 +92,8 @@ func NewCmdTaint(f cmdutil.Factory, out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "taint NODE NAME KEY_1=VAL_1:TAINT_EFFECT_1 ... KEY_N=VAL_N:TAINT_EFFECT_N",
 		Short:   i18n.T("Update the taints on one or more nodes"),
-		Long:    fmt.Sprintf(taint_long, validation.DNS1123SubdomainMaxLength, validation.LabelValueMaxLength),
-		Example: taint_example,
+		Long:    fmt.Sprintf(taintLong, validation.DNS1123SubdomainMaxLength, validation.LabelValueMaxLength),
+		Example: taintExample,
 		Run: func(cmd *cobra.Command, args []string) {
 			if err := options.Complete(f, out, cmd, args); err != nil {
 				cmdutil.CheckErr(err)
