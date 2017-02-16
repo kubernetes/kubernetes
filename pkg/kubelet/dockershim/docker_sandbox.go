@@ -103,7 +103,7 @@ func (ds *dockerService) RunPodSandbox(config *runtimeapi.PodSandboxConfig) (str
 	// on the host as well, to satisfy parts of the pod spec that aren't
 	// recognized by the CNI standard yet.
 	cID := kubecontainer.BuildContainerID(runtimeName, createResp.ID)
-	err = ds.network.SetUpPod(config.GetMetadata().Namespace, config.GetMetadata().Name, cID)
+	err = ds.network.SetUpPod(config.GetMetadata().Namespace, config.GetMetadata().Name, cID, config.Annotations)
 	// TODO: Do we need to teardown on failure or can we rely on a StopPodSandbox call with the given ID?
 	return createResp.ID, err
 }
