@@ -46,7 +46,6 @@ go_library(
         "//pkg/client/clientset_generated/clientset/typed/storage/v1beta1:go_default_library",
         "//vendor:github.com/golang/glog",
         "//vendor:k8s.io/client-go/discovery",
-        "//vendor:k8s.io/client-go/plugin/pkg/client/auth",
         "//vendor:k8s.io/client-go/rest",
         "//vendor:k8s.io/client-go/util/flowcontrol",
     ],
