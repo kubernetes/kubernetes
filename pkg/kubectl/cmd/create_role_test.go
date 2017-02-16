@@ -157,6 +157,18 @@ func TestValidate(t *testing.T) {
 			},
 			expectErr: true,
 		},
+		"test-nonresource-verb": {
+			roleOptions: &CreateRoleOptions{
+				Name:  "my-role",
+				Verbs: []string{"post"},
+				Resources: []schema.GroupVersionResource{
+					{
+						Resource: "pods",
+					},
+				},
+			},
+			expectErr: true,
+		},
 		"test-invalid-resource": {
 			roleOptions: &CreateRoleOptions{
 				Name:  "my-role",
