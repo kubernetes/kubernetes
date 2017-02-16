@@ -61,4 +61,5 @@ type GroupVersionPackage struct {
 	IsDefaultVersion bool
 	GroupVersion     string
 	PackageName      string
+	InputPackageName string
 }

@@ -32,6 +32,7 @@ import (
 type genClientset struct {
 	generator.DefaultGen
 	groups             []clientgentypes.GroupVersions
+	inputPaths         map[clientgentypes.GroupVersion]string
 	typedClientPath    string
 	outputPackage      string
 	imports            namer.ImportTracker
@@ -58,10 +59,13 @@ func (g *genClientset) Imports(c *generator.Context) (imports []string) {
 	for _, group := range g.groups {
 		for _, version := range group.Versions {
 			typedClientPath := filepath.Join(g.typedClientPath, group.Group.NonEmpty(), version.NonEmpty())
-			imports = append(imports, strings.ToLower(fmt.Sprintf("%s%s \"%s\"", version.NonEmpty(), group.Group.NonEmpty(), typedClientPath)))
+			imports = append(imports, strings.ToLower(fmt.Sprintf("client%s%s \"%s\"", group.Group.NonEmpty(), version.NonEmpty(), typedClientPath)))
+			inputPath := g.inputPaths[clientgentypes.GroupVersion{Group: group.Group, Version: version}]
+			imports = append(imports, strings.ToLower(fmt.Sprintf("%s%s \"%s\"", group.Group.NonEmpty(), version.NonEmpty(), inputPath)))
 		}
 	}
 	imports = append(imports, "github.com/golang/glog")
+	imports = append(imports, "k8s.io/apimachinery/pkg/runtime/serializer")
 	imports = append(imports, "k8s.io/client-go/util/flowcontrol")
 	// import solely to initialize client auth plugins.
 	imports = append(imports, "_ \"k8s.io/client-go/plugin/pkg/client/auth\"")
@@ -72,6 +76,8 @@ func (g *genClientset) GenerateType(c *generator.Context, t *types.Type, w io.Wr
 	// TODO: We actually don't need any type information to generate the clientset,
 	// perhaps we can adapt the go2ild framework to this kind of usage.
 	sw := generator.NewSnippetWriter(w, c, "$", "$")
+	const pkgRuntime = "k8s.io/apimachinery/pkg/runtime"
+	const pkgSerizalizer = "k8s.io/apimachinery/pkg/runtime/serializer"
 	const pkgDiscovery = "k8s.io/client-go/discovery"
 	const pkgRESTClient = "k8s.io/client-go/rest"
 
@@ -87,7 +93,11 @@ func (g *genClientset) GenerateType(c *generator.Context, t *types.Type, w io.Wr
 		"NewDiscoveryClientForConfig":      c.Universe.Function(types.Name{Package: pkgDiscovery, Name: "NewDiscoveryClientForConfig"}),
 		"NewDiscoveryClientForConfigOrDie": c.Universe.Function(types.Name{Package: pkgDiscovery, Name: "NewDiscoveryClientForConfigOrDie"}),
 		"NewDiscoveryClient":               c.Universe.Function(types.Name{Package: pkgDiscovery, Name: "NewDiscoveryClient"}),
+		"runtimeNewScheme": c.Universe.Function(types.Name{Package: pkgRuntime, Name: "NewScheme"}),
+		"serializerNewCodecFactory": c.Universe.Function(types.Name{Package: pkgSerizalizer, Name: "NewCodecFactory"}),
+		"runtimeNewParameterCodec": c.Universe.Function(types.Name{Package: pkgRuntime, Name: "NewParameterCodec"}),
 	}
+	sw.Do(globalsTemplate, m)
 	sw.Do(clientsetInterface, m)
 	sw.Do(clientsetTemplate, m)
 	for _, g := range allGroups {
@@ -104,6 +114,17 @@ func (g *genClientset) GenerateType(c *generator.Context, t *types.Type, w io.Wr
 
 	return sw.Error()
 }
+
+var globalsTemplate = `
+var Scheme = $.runtimeNewScheme|raw$()
+var codecs = $.serializerNewCodecFactory|raw$(Scheme)
+var parameterCodec = $.runtimeNewParameterCodec|raw$(Scheme)
+
+func init() {
+	$range .allGroups$ $.InputPackageName$.AddToScheme(Scheme)
+	$end$
+}
+`
 
 var clientsetInterface = `
 type Interface interface {
@@ -163,6 +184,12 @@ func NewForConfig(c *$.Config|raw$) (*Clientset, error) {
 	if configShallowCopy.RateLimiter == nil && configShallowCopy.QPS > 0 {
 		configShallowCopy.RateLimiter = flowcontrol.NewTokenBucketRateLimiter(configShallowCopy.QPS, configShallowCopy.Burst)
 	}
+	if configShallowCopy.ParameterCodec == nil {
+		configShallowCopy.ParameterCodec = parameterCodec
+	}
+	if configShallowCopy.NegotiatedSerializer == nil {
+		configShallowCopy.NegotiatedSerializer = serializer.DirectCodecFactory{CodecFactory: codecs}
+	}
 	var cs Clientset
 	var err error
 $range .allGroups$    cs.$.GroupVersion$Client, err =$.PackageName$.NewForConfig(&configShallowCopy)
@@ -193,9 +220,9 @@ $end$
 
 var newClientsetForRESTClientTemplate = `
 // New creates a new Clientset for the given RESTClient.
-func New(c $.RESTClientInterface|raw$) *Clientset {
+func New(c $.RESTClientInterface|raw$, parameterCodec runtime.ParameterCodec) *Clientset {
 	var cs Clientset
-$range .allGroups$    cs.$.GroupVersion$Client =$.PackageName$.New(c)
+$range .allGroups$    cs.$.GroupVersion$Client =$.PackageName$.New(c, parameterCodec)
 $end$
 	cs.DiscoveryClient = $.NewDiscoveryClient|raw$(c)
 	return &cs

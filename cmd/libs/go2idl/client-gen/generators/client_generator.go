@@ -144,6 +144,7 @@ func packageForClientset(customArgs clientgenargs.Args, typedClientBasePath stri
 						OptionalName: "clientset",
 					},
 					groups:          customArgs.Groups,
+					inputPaths:      customArgs.GroupVersionToInputPath,
 					typedClientPath: typedClientBasePath,
 					outputPackage:   customArgs.ClientsetName,
 					imports:         generator.NewImportTracker(),
