@@ -280,11 +280,8 @@ func TestExampleObjectSchemas(t *testing.T) {
 			"phabricator-service":    &api.Service{},
 		},
 		"../examples/storage/redis": {
-			"redis-controller":          &api.ReplicationController{},
-			"redis-master":              &api.Pod{},
-			"redis-proxy":               &api.Pod{},
-			"redis-sentinel-controller": &api.ReplicationController{},
-			"redis-sentinel-service":    &api.Service{},
+			"redis-bootstrap": &api.Pod{},
+			"redis-rc":        &api.ReplicationController{},
 		},
 		"../examples/storage/rethinkdb": {
 			"admin-pod":      &api.Pod{},
