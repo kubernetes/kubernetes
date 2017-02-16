@@ -26,7 +26,7 @@ import (
 func TestExecute(t *testing.T) {
 	testVal := int32(0)
 	wg := sync.WaitGroup{}
-	wg.Add(10)
+	wg.Add(5)
 	queue := CreateWorkerQueue(func(args *WorkArgs) error {
 		atomic.AddInt32(&testVal, 1)
 		wg.Done()
@@ -38,6 +38,7 @@ func TestExecute(t *testing.T) {
 	queue.AddWork(NewWorkArgs("3", "3"), now, now)
 	queue.AddWork(NewWorkArgs("4", "4"), now, now)
 	queue.AddWork(NewWorkArgs("5", "5"), now, now)
+	// Adding the same thing second time should be no-op
 	queue.AddWork(NewWorkArgs("1", "1"), now, now)
 	queue.AddWork(NewWorkArgs("2", "2"), now, now)
 	queue.AddWork(NewWorkArgs("3", "3"), now, now)
@@ -45,8 +46,8 @@ func TestExecute(t *testing.T) {
 	queue.AddWork(NewWorkArgs("5", "5"), now, now)
 	wg.Wait()
 	lastVal := atomic.LoadInt32(&testVal)
-	if lastVal != 10 {
-		t.Errorf("Espected testVal = 10, got %v", lastVal)
+	if lastVal != 5 {
+		t.Errorf("Espected testVal = 5, got %v", lastVal)
 	}
 }
 
@@ -88,7 +89,7 @@ func TestCancel(t *testing.T) {
 		return nil
 	})
 	now := time.Now()
-	then := now.Add(time.Second)
+	then := now.Add(100 * time.Millisecond)
 	queue.AddWork(NewWorkArgs("1", "1"), now, then)
 	queue.AddWork(NewWorkArgs("2", "2"), now, then)
 	queue.AddWork(NewWorkArgs("3", "3"), now, then)
@@ -118,7 +119,7 @@ func TestCancelAndReadd(t *testing.T) {
 		return nil
 	})
 	now := time.Now()
-	then := now.Add(time.Second)
+	then := now.Add(100 * time.Millisecond)
 	queue.AddWork(NewWorkArgs("1", "1"), now, then)
 	queue.AddWork(NewWorkArgs("2", "2"), now, then)
 	queue.AddWork(NewWorkArgs("3", "3"), now, then)
