@@ -24,11 +24,11 @@ import (
 
 	"github.com/google/gofuzz"
 
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	runtimeserializer "k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/api/resource"
 )
 
 func GenericFuzzerFuncs(t TestingCommon, codecs runtimeserializer.CodecFactory) []interface{} {
@@ -158,4 +158,17 @@ func MergeFuzzerFuncs(t TestingCommon, funcLists ...[]interface{}) []interface{}
 		result = append(result, f)
 	}
 	return result
+}
+
+func DefaultFuzzers(t TestingCommon, codecFactory runtimeserializer.CodecFactory, fuzzerFuncs []interface{}) *fuzz.Fuzzer {
+	seed := rand.Int63()
+
+	return FuzzerFor(
+		MergeFuzzerFuncs(t,
+			GenericFuzzerFuncs(t, codecFactory),
+			fuzzerFuncs,
+		),
+		rand.NewSource(seed),
+	)
+
 }

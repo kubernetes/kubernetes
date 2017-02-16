@@ -13861,6 +13861,8 @@ go_library(
         "//vendor:k8s.io/apimachinery/pkg/api/equality",
         "//vendor:k8s.io/apimachinery/pkg/api/meta",
         "//vendor:k8s.io/apimachinery/pkg/api/resource",
+        "//vendor:k8s.io/apimachinery/pkg/apimachinery/announced",
+        "//vendor:k8s.io/apimachinery/pkg/apimachinery/registered",
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
         "//vendor:k8s.io/apimachinery/pkg/runtime",
         "//vendor:k8s.io/apimachinery/pkg/runtime/schema",
@@ -16878,4 +16880,20 @@ go_library(
         "//vendor:k8s.io/apimachinery/pkg/util/sets",
         "//vendor:k8s.io/apiserver/pkg/storage/storagebackend",
     ],
+)
+
+go_test(
+    name = "k8s.io/sample-apiserver/pkg/apis/wardle/install_test",
+    srcs = ["k8s.io/sample-apiserver/pkg/apis/wardle/install/install_test.go"],
+    library = ":k8s.io/sample-apiserver/pkg/apis/wardle/install",
+    tags = ["automanaged"],
+    deps = ["//vendor:k8s.io/apimachinery/pkg/api/testing"],
+)
+
+go_test(
+    name = "k8s.io/sample-apiserver/pkg/apiserver_test",
+    srcs = ["k8s.io/sample-apiserver/pkg/apiserver/scheme_test.go"],
+    library = ":k8s.io/sample-apiserver/pkg/apiserver",
+    tags = ["automanaged"],
+    deps = ["//vendor:k8s.io/apimachinery/pkg/api/testing"],
 )
