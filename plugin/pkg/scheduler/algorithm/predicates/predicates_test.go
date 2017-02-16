@@ -3581,7 +3581,7 @@ func TestVolumeZonePredicate(t *testing.T) {
 	}
 }
 
-// TODO remove for 1.7
+// TODO: remove when alpha support for affinity is removed
 func TestPodAnnotationFitsSelector(t *testing.T) {
 	utilfeature.DefaultFeatureGate.Set("AffinityInAnnotations=true")
 	tests := []struct {
@@ -4000,7 +4000,7 @@ func TestPodAnnotationFitsSelector(t *testing.T) {
 	}
 }
 
-// TODO remove for 1.7
+// TODO: remove when alpha support for affinity is removed
 func TestInterPodAffinityAnnotations(t *testing.T) {
 	utilfeature.DefaultFeatureGate.Set("AffinityInAnnotations=true")
 	podLabel := map[string]string{"service": "securityscan"}
@@ -4555,7 +4555,7 @@ func TestInterPodAffinityAnnotations(t *testing.T) {
 	}
 }
 
-// TODO remove for 1.7
+// TODO: remove when alpha support for affinity is removed
 func TestInterPodAffinityAnnotationsWithMultipleNodes(t *testing.T) {
 	utilfeature.DefaultFeatureGate.Set("AffinityInAnnotations=true")
 	podLabelA := map[string]string{

@@ -67,7 +67,11 @@ const (
 	// Note: This feature is not supported for `BestEffort` pods.
 	ExperimentalCriticalPodAnnotation utilfeature.Feature = "ExperimentalCriticalPodAnnotation"
 
-	// Determines if affinity defined in annotations should bep rocessed
+	// owner: @davidopp
+	// alpha: v1.6
+	//
+	// Determines if affinity defined in annotations should be processed
+	// TODO: remove when alpha support for affinity is removed
 	AffinityInAnnotations utilfeature.Feature = "AffinityInAnnotations"
 )
 
