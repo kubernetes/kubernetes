@@ -87,9 +87,9 @@ function init() {
       --image="${kube_registry}/hyperkube-amd64:${kube_version}"
 }
 
-# join_cluster_to_federation joins the clusters in the local kubeconfig to federation. The clusters
+# join_clusters joins the clusters in the local kubeconfig to federation. The clusters
 # and their kubeconfig entries in the local kubeconfig are created while deploying clusters, i.e. when kube-up is run.
-function join_cluster_to_federation() {
+function join_clusters() {
   for cluster in $("${KUBE_ROOT}/cluster/kubectl.sh" config get-clusters |sed -n '1!p'); do
     # Skip federation context
     if [[ "${cluster}" == "${FEDERATION_NAME}" ]]; then
@@ -114,8 +114,7 @@ USE_KUBEFED="${USE_KUBEFED:-}"
 
 if [[ "${USE_KUBEFED}" == "true" ]]; then
   init
-
-  join_cluster_to_federation
+  join_clusters
 else
   export FEDERATION_IMAGE_TAG="$(get_version)"
   create-federation-api-objects
