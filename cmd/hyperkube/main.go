@@ -43,5 +43,8 @@ func main() {
 	hk.AddServer(NewFederationAPIServer())
 	hk.AddServer(NewFederationCMServer())
 
+	// kube-aggregator
+	hk.AddServer(NewKubeAggregator())
+
 	hk.RunToExit(os.Args)
 }
