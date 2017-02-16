@@ -11,6 +11,7 @@ load(
 go_test(
     name = "go_default_test",
     srcs = [
+        "equivalence_cache_test.go",
         "extender_test.go",
         "generic_scheduler_test.go",
     ],
@@ -53,6 +54,7 @@ go_library(
         "//vendor:github.com/golang/groupcache/lru",
         "//vendor:k8s.io/apimachinery/pkg/util/errors",
         "//vendor:k8s.io/apimachinery/pkg/util/net",
+        "//vendor:k8s.io/apimachinery/pkg/util/sets",
         "//vendor:k8s.io/apiserver/pkg/util/trace",
         "//vendor:k8s.io/client-go/rest",
         "//vendor:k8s.io/client-go/util/workqueue",
