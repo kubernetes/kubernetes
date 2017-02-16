@@ -60,7 +60,7 @@ HOST_CLUSTER_CONTEXT="${FEDERATION_HOST_CLUSTER_CONTEXT:-${1}}"
 
 # kube-dns configuration.
 KUBEDNS_CONFIGMAP_NAME="kube-dns"
-KUBEDNS_CONFIGMAP_NAMESPACE = "kube-system"
+KUBEDNS_CONFIGMAP_NAMESPACE="kube-system"
 KUBEDNS_FEDERATION_FLAG="federations"
 
 host_kubectl="${KUBE_ROOT}/cluster/kubectl.sh --namespace=${FEDERATION_NAMESPACE}"
