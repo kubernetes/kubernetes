@@ -15,6 +15,7 @@ go_library(
         "apiversions.go",
         "apply.go",
         "apply_view_last_applied.go",
+        "apply_set_last_applied.go",
         "attach.go",
         "autoscale.go",
         "certificates.go",
