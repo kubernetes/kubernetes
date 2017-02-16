@@ -82,6 +82,7 @@ filegroup(
         "//pkg/util/parsers:all-srcs",
         "//pkg/util/procfs:all-srcs",
         "//pkg/util/rand:all-srcs",
+        "//pkg/util/remotecommand:all-srcs",
         "//pkg/util/removeall:all-srcs",
         "//pkg/util/resourcecontainer:all-srcs",
         "//pkg/util/rlimit:all-srcs",

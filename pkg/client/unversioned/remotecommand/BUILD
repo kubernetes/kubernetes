@@ -22,9 +22,8 @@ go_library(
     tags = ["automanaged"],
     deps = [
         "//pkg/api:go_default_library",
-        "//pkg/kubelet/server/remotecommand:go_default_library",
         "//pkg/util/exec:go_default_library",
-        "//pkg/util/term:go_default_library",
+        "//pkg/util/remotecommand:go_default_library",
         "//vendor:github.com/golang/glog",
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
         "//vendor:k8s.io/apimachinery/pkg/util/httpstream",
@@ -38,7 +37,6 @@ go_library(
 go_test(
     name = "go_default_test",
     srcs = [
-        "remotecommand_test.go",
         "v2_test.go",
         "v4_test.go",
     ],
@@ -46,15 +44,8 @@ go_test(
     tags = ["automanaged"],
     deps = [
         "//pkg/api:go_default_library",
-        "//pkg/api/testapi:go_default_library",
-        "//pkg/kubelet/server/remotecommand:go_default_library",
-        "//pkg/util/term:go_default_library",
-        "//vendor:github.com/stretchr/testify/require",
-        "//vendor:k8s.io/apimachinery/pkg/runtime/schema",
-        "//vendor:k8s.io/apimachinery/pkg/types",
         "//vendor:k8s.io/apimachinery/pkg/util/httpstream",
         "//vendor:k8s.io/apimachinery/pkg/util/wait",
-        "//vendor:k8s.io/client-go/rest",
     ],
 )
 
@@ -67,6 +58,9 @@ filegroup(
 
 filegroup(
     name = "all-srcs",
-    srcs = [":package-srcs"],
+    srcs = [
+        ":package-srcs",
+        "//pkg/client/unversioned/remotecommand/resize:all-srcs",
+    ],
     tags = ["automanaged"],
 )
