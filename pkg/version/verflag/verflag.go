@@ -94,9 +94,8 @@ var (
 func PrintAndExitIfRequested() {
 	if *versionFlag == VersionRaw {
 		fmt.Printf("%#v\n", version.Get())
-		os.Exit(0)
 	} else if *versionFlag == VersionTrue {
 		fmt.Printf("Kubernetes %s\n", version.Get())
-		os.Exit(0)
 	}
+	os.Exit(0)
 }
