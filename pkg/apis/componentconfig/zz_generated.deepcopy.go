@@ -191,6 +191,13 @@ func DeepCopy_componentconfig_KubeletConfiguration(in interface{}, out interface
 				(*out)[key] = val
 			}
 		}
+		if in.QOSReserveRequests != nil {
+			in, out := &in.QOSReserveRequests, &out.QOSReserveRequests
+			*out = make(ConfigurationMap)
+			for key, val := range *in {
+				(*out)[key] = val
+			}
+		}
 		if in.AllowedUnsafeSysctls != nil {
 			in, out := &in.AllowedUnsafeSysctls, &out.AllowedUnsafeSysctls
 			*out = make([]string, len(*in))

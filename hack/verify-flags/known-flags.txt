@@ -212,6 +212,7 @@ experimental-prefix
 experimental-cri
 experimental-check-node-capabilities-before-mount
 experimental-kernel-memcg-notification
+experimental-qos-reserve-requests
 external-etcd-cafile
 external-etcd-certfile
 external-etcd-endpoints
