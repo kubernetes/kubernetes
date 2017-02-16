@@ -130,7 +130,7 @@ func createComformanceTests(jig *testJig, ns string) []conformanceTests {
 			fmt.Sprintf("waiting for HTTPS updates to reflect in ingress"),
 		},
 		{
-			fmt.Sprintf("should update SSL certificated with modified hostname %v", updatedTLSHost),
+			fmt.Sprintf("should update SSL certificate with modified hostname %v", updatedTLSHost),
 			func() {
 				jig.update(func(ing *extensions.Ingress) {
 					newRules := []extensions.IngressRule{}
