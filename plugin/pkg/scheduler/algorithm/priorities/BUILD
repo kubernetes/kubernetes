@@ -67,6 +67,7 @@ go_test(
         "//plugin/pkg/scheduler/schedulercache:go_default_library",
         "//vendor:k8s.io/apimachinery/pkg/api/resource",
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
+        "//vendor:k8s.io/apiserver/pkg/util/feature",
     ],
 )
 

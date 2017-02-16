@@ -27,9 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/features"
 )
 
 // IsOpaqueIntResourceName returns true if the resource name has the opaque
@@ -281,7 +279,8 @@ const (
 	ObjectTTLAnnotationKey string = "node.alpha.kubernetes.io/ttl"
 
 	// AffinityAnnotationKey represents the key of affinity data (json serialized)
-	// in the Annotations of a Pod.  TODO remove in 1.7
+	// in the Annotations of a Pod.
+	// TODO: remove when alpha support for affinity is removed
 	AffinityAnnotationKey string = "scheduler.alpha.kubernetes.io/affinity"
 )
 
@@ -606,7 +605,7 @@ func RemoveTaint(node *Node, taint *Taint) (*Node, bool, error) {
 
 // GetAffinityFromPodAnnotations gets the json serialized affinity data from Pod.Annotations
 // and converts it to the Affinity type in api.
-// TODO remove for 1.7
+// TODO: remove when alpha support for affinity is removed
 func GetAffinityFromPodAnnotations(annotations map[string]string) (*Affinity, error) {
 	if len(annotations) > 0 && annotations[AffinityAnnotationKey] != "" {
 		var affinity Affinity
@@ -617,27 +616,4 @@ func GetAffinityFromPodAnnotations(annotations map[string]string) (*Affinity, er
 		return &affinity, nil
 	}
 	return nil, nil
-}
-
-// Reconcile api and annotation affinity definitions.
-// TODO remove for 1.7
-func ReconcileAffinity(pod *Pod) *Affinity {
-	affinity := pod.Spec.Affinity
-	if utilfeature.DefaultFeatureGate.Enabled(features.AffinityInAnnotations) {
-		annotationsAffinity, _ := GetAffinityFromPodAnnotations(pod.Annotations)
-		if affinity == nil && annotationsAffinity != nil {
-			affinity = annotationsAffinity
-		} else if annotationsAffinity != nil {
-			if affinity != nil && affinity.NodeAffinity == nil && annotationsAffinity.NodeAffinity != nil {
-				affinity.NodeAffinity = annotationsAffinity.NodeAffinity
-			}
-			if affinity != nil && affinity.PodAffinity == nil && annotationsAffinity.PodAffinity != nil {
-				affinity.PodAffinity = annotationsAffinity.PodAffinity
-			}
-			if affinity != nil && affinity.PodAntiAffinity == nil && annotationsAffinity.PodAntiAffinity != nil {
-				affinity.PodAntiAffinity = annotationsAffinity.PodAntiAffinity
-			}
-		}
-	}
-	return affinity
 }

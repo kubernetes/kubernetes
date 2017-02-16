@@ -108,7 +108,10 @@ type FeatureGate interface {
 	// alpha: v1.5
 	ExperimentalHostUserNamespaceDefaulting() bool
 
-	AnninityInAnnotations() bool
+	// owner: @davidopp
+	// alpha: v1.6
+	// TODO: remove when alpha support for affinity is removed
+	AffinityInAnnotations() bool
 }
 
 // featureGate implements FeatureGate as well as pflag.Value for flag parsing.
