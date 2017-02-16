@@ -254,6 +254,8 @@ spec:
   volumeClaimTemplates:
   - metadata:
       name: cassandra-data
+      annotations:
+        volume.alpha.kubernetes.io/storage-class: anything
     spec:
       accessModes: [ "ReadWriteOnce" ]
       resources:
