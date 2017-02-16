@@ -84,21 +84,15 @@ func launchSelfHostedAPIServer(cfg *kubeadmapi.MasterConfiguration, client *clie
 		// TODO: This might be pointless, checking the pods is probably enough.
 		// It does however get us a count of how many there should be which may be useful
 		// with HA.
-		apiDS, err := client.DaemonSets(metav1.NamespaceSystem).Get("self-hosted-"+kubeAPIServer,
-			metav1.GetOptions{})
+		apiDS, err := client.DaemonSets(metav1.NamespaceSystem).Get("self-hosted-"+kubeAPIServer, metav1.GetOptions{})
 		if err != nil {
 			fmt.Println("[self-hosted] error getting apiserver DaemonSet:", err)
 			return false, nil
 		}
-		fmt.Printf("[self-hosted] %s DaemonSet current=%d, desired=%d\n",
-			kubeAPIServer,
-			apiDS.Status.CurrentNumberScheduled,
-			apiDS.Status.DesiredNumberScheduled)
 
 		if apiDS.Status.CurrentNumberScheduled != apiDS.Status.DesiredNumberScheduled {
 			return false, nil
 		}
-
 		return true, nil
 	})
 
@@ -185,7 +179,7 @@ func waitForPodsWithLabel(client *clientset.Clientset, appLabel string, mustBeRu
 
 // Sources from bootkube templates.go
 func getAPIServerDS(cfg *kubeadmapi.MasterConfiguration, volumes []v1.Volume, volumeMounts []v1.VolumeMount) ext.DaemonSet {
-	ds := ext.DaemonSet{
+	return ext.DaemonSet{
 		TypeMeta: metav1.TypeMeta{
 			APIVersion: "extensions/v1beta1",
 			Kind:       "DaemonSet",
@@ -215,7 +209,7 @@ func getAPIServerDS(cfg *kubeadmapi.MasterConfiguration, volumes []v1.Volume, vo
 						{
 							Name:          "self-hosted-" + kubeAPIServer,
 							Image:         images.GetCoreImage(images.KubeAPIServerImage, cfg, kubeadmapi.GlobalEnvParams.HyperkubeImage),
-							Command:       getAPIServerCommand(cfg, true),
+							Command:       prependSelfHostedFlock(kubeAPIServer, getAPIServerCommand(cfg, true)),
 							Env:           getSelfHostedAPIServerEnv(),
 							VolumeMounts:  volumeMounts,
 							LivenessProbe: componentProbe(8080, "/healthz"),
@@ -226,11 +220,10 @@ func getAPIServerDS(cfg *kubeadmapi.MasterConfiguration, volumes []v1.Volume, vo
 			},
 		},
 	}
-	return ds
 }
 
 func getControllerManagerDeployment(cfg *kubeadmapi.MasterConfiguration, volumes []v1.Volume, volumeMounts []v1.VolumeMount) ext.Deployment {
-	d := ext.Deployment{
+	return ext.Deployment{
 		TypeMeta: metav1.TypeMeta{
 			APIVersion: "extensions/v1beta1",
 			Kind:       "Deployment",
@@ -268,7 +261,7 @@ func getControllerManagerDeployment(cfg *kubeadmapi.MasterConfiguration, volumes
 						{
 							Name:          "self-hosted-" + kubeControllerManager,
 							Image:         images.GetCoreImage(images.KubeControllerManagerImage, cfg, kubeadmapi.GlobalEnvParams.HyperkubeImage),
-							Command:       getControllerManagerCommand(cfg, true),
+							Command:       prependSelfHostedFlock(kubeControllerManager, getControllerManagerCommand(cfg)),
 							VolumeMounts:  volumeMounts,
 							LivenessProbe: componentProbe(10252, "/healthz"),
 							Resources:     componentResources("200m"),
@@ -280,11 +273,10 @@ func getControllerManagerDeployment(cfg *kubeadmapi.MasterConfiguration, volumes
 			},
 		},
 	}
-	return d
 }
 
 func getSchedulerDeployment(cfg *kubeadmapi.MasterConfiguration) ext.Deployment {
-	d := ext.Deployment{
+	return ext.Deployment{
 		TypeMeta: metav1.TypeMeta{
 			APIVersion: "extensions/v1beta1",
 			Kind:       "Deployment",
@@ -321,7 +313,7 @@ func getSchedulerDeployment(cfg *kubeadmapi.MasterConfiguration) ext.Deployment 
 						{
 							Name:          "self-hosted-" + kubeScheduler,
 							Image:         images.GetCoreImage(images.KubeSchedulerImage, cfg, kubeadmapi.GlobalEnvParams.HyperkubeImage),
-							Command:       getSchedulerCommand(cfg, true),
+							Command:       prependSelfHostedFlock(kubeScheduler, getSchedulerCommand(cfg)),
 							LivenessProbe: componentProbe(10251, "/healthz"),
 							Resources:     componentResources("100m"),
 							Env:           getProxyEnvVars(),
@@ -331,7 +323,13 @@ func getSchedulerDeployment(cfg *kubeadmapi.MasterConfiguration) ext.Deployment 
 			},
 		},
 	}
-	return d
+}
+
+func prependSelfHostedFlock(name string, args []string) []string {
+	// TODO: flock has to be inside the container, and a shell must exist with this approach
+	// Since the flock binary is present at /bin/flock in a busybox image and /usr/bin/flock in a debian image, we can't hardcode the path
+	command := []string{"flock", "--exclusive", "--timeout=30", fmt.Sprintf("/var/lock/%s.lock", name)}
+	return append(command, args...)
 }
 
 func buildStaticManifestFilepath(name string) string {
