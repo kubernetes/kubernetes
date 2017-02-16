@@ -1609,6 +1609,7 @@ go_library(
     deps = [
         "//vendor:github.com/coreos/etcd/etcdserver/etcdserverpb",
         "//vendor:github.com/coreos/etcd/lease",
+        "//vendor:golang.org/x/net/context",
     ],
 )
 
