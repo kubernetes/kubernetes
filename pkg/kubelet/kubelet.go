@@ -1182,7 +1182,7 @@ func (kl *Kubelet) initializeModules() error {
 		return fmt.Errorf("Kubelet failed to get node info: %v", err)
 	}
 
-	if err := kl.containerManager.Start(node); err != nil {
+	if err := kl.containerManager.Start(node, kl.GetPods); err != nil {
 		return fmt.Errorf("Failed to start ContainerManager %v", err)
 	}
 
@@ -1446,6 +1446,9 @@ func (kl *Kubelet) syncPod(o syncPodOptions) error {
 	// Create Cgroups for the pod and apply resource parameters
 	// to them if cgroup-per-qos flag is enabled.
 	pcm := kl.containerManager.NewPodContainerManager()
+	if err := kl.containerManager.UpdateQOSReserves(); err != nil {
+		glog.V(2).Infof("Failed to update QoS resource reserves while syncing pod: %v", err)
+	}
 	// If pod has already been terminated then we need not create
 	// or update the pod's cgroup
 	if !kl.podIsTerminated(pod) {

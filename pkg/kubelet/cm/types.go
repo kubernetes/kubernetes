@@ -17,8 +17,13 @@ limitations under the License.
 package cm
 
 import (
+	"fmt"
+	"strconv"
+	"strings"
+
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/api/v1"
+	"k8s.io/kubernetes/pkg/apis/componentconfig"
 )
 
 // ResourceConfig holds information about all the supported cgroup resource parameters.
@@ -47,6 +52,17 @@ type CgroupConfig struct {
 	ResourceParameters *ResourceConfig
 }
 
+type MemoryStats struct {
+	// Memory usage (in bytes).
+	Usage int64
+}
+
+// ResourceConfig holds information about all the supported cgroup resource parameters.
+type ResourceStats struct {
+	// Memory statistics.
+	MemoryStats *MemoryStats
+}
+
 // CgroupManager allows for cgroup management.
 // Supports Cgroup Creation ,Deletion and Updates.
 type CgroupManager interface {
@@ -72,6 +88,8 @@ type CgroupManager interface {
 	Pids(name CgroupName) []int
 	// ReduceCPULimits reduces the CPU CFS values to the minimum amount of shares.
 	ReduceCPULimits(cgroupName CgroupName) error
+	// GetResourceStats returns statistics of the specified cgroup as read from the cgroup fs.
+	GetResourceStats(name CgroupName) (*ResourceStats, error)
 }
 
 // QOSContainersInfo stores the names of containers per qos
@@ -104,4 +122,37 @@ type PodContainerManager interface {
 
 	// GetAllPodsFromCgroups enumerates the set of pod uids to their associated cgroup based on state of cgroupfs system.
 	GetAllPodsFromCgroups() (map[types.UID]CgroupName, error)
+}
+
+func parsePercentage(v string) (int64, error) {
+	if !strings.HasSuffix(v, "%") {
+		return 0, fmt.Errorf("percentage expected, got '%s'", v)
+	}
+	percentage, err := strconv.ParseInt(strings.TrimRight(v, "%"), 10, 0)
+	if err != nil {
+		return 0, fmt.Errorf("invalid number in percentage '%s'", v)
+	}
+	if percentage < 0 || percentage > 100 {
+		return 0, fmt.Errorf("percentage must be between 0 and 100")
+	}
+	return percentage, nil
+}
+
+// ParseReservation
+func ParseQOSReserveRequests(m componentconfig.ConfigurationMap) (*map[v1.ResourceName]int64, error) {
+	reservations := make(map[v1.ResourceName]int64)
+	for k, v := range m {
+		switch v1.ResourceName(k) {
+		// Only memory resources are supported.
+		case v1.ResourceMemory:
+			q, err := parsePercentage(v)
+			if err != nil {
+				return nil, err
+			}
+			reservations[v1.ResourceName(k)] = q
+		default:
+			return nil, fmt.Errorf("cannot reserve %q resource", k)
+		}
+	}
+	return &reservations, nil
 }
