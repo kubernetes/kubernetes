@@ -257,6 +257,12 @@ stale log entries:
 	If candidate receives majority of votes of denials, it reverts back to
 	follower.
 
+	'MsgPreVote' and 'MsgPreVoteResp' are used in an optional two-phase election
+	protocol. When Config.PreVote is true, a pre-election is carried out first
+	(using the same rules as a regular election), and no node increases its term
+	number unless the pre-election indicates that the campaigining node would win.
+	This minimizes disruption when a partitioned node rejoins the cluster.
+
 	'MsgSnap' requests to install a snapshot message. When a node has just
 	become a leader or the leader receives 'MsgProp' message, it calls
 	'bcastAppend' method, which then calls 'sendAppend' method to each

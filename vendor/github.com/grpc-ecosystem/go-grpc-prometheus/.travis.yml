@@ -1,0 +1,13 @@
+language: go
+go:
+  - 1.6
+  - 1.7
+
+install:
+  - go get github.com/prometheus/client_golang/prometheus
+  - go get google.golang.org/grpc
+  - go get golang.org/x/net/context
+  - go get github.com/stretchr/testify
+
+script:
+ - go test -race -v ./...

@@ -15,13 +15,15 @@
 package clientv3
 
 import (
+	"io/ioutil"
 	"log"
-	"os"
 	"sync"
 
 	"google.golang.org/grpc/grpclog"
 )
 
+// Logger is the logger used by client library.
+// It implements grpclog.Logger interface.
 type Logger grpclog.Logger
 
 var (
@@ -34,20 +36,36 @@ type settableLogger struct {
 }
 
 func init() {
-	// use go's standard logger by default like grpc
+	// disable client side logs by default
 	logger.mu.Lock()
-	logger.l = log.New(os.Stderr, "", log.LstdFlags)
+	logger.l = log.New(ioutil.Discard, "", 0)
+
+	// logger has to override the grpclog at initialization so that
+	// any changes to the grpclog go through logger with locking
+	// instead of through SetLogger
+	//
+	// now updates only happen through settableLogger.set
 	grpclog.SetLogger(&logger)
 	logger.mu.Unlock()
 }
 
-func (s *settableLogger) Set(l Logger) {
+// SetLogger sets client-side Logger. By default, logs are disabled.
+func SetLogger(l Logger) {
+	logger.set(l)
+}
+
+// GetLogger returns the current logger.
+func GetLogger() Logger {
+	return logger.get()
+}
+
+func (s *settableLogger) set(l Logger) {
 	s.mu.Lock()
 	logger.l = l
 	s.mu.Unlock()
 }
 
-func (s *settableLogger) Get() Logger {
+func (s *settableLogger) get() Logger {
 	s.mu.RLock()
 	l := logger.l
 	s.mu.RUnlock()
@@ -56,9 +74,9 @@ func (s *settableLogger) Get() Logger {
 
 // implement the grpclog.Logger interface
 
-func (s *settableLogger) Fatal(args ...interface{})                 { s.Get().Fatal(args...) }
-func (s *settableLogger) Fatalf(format string, args ...interface{}) { s.Get().Fatalf(format, args...) }
-func (s *settableLogger) Fatalln(args ...interface{})               { s.Get().Fatalln(args...) }
-func (s *settableLogger) Print(args ...interface{})                 { s.Get().Print(args...) }
-func (s *settableLogger) Printf(format string, args ...interface{}) { s.Get().Printf(format, args...) }
-func (s *settableLogger) Println(args ...interface{})               { s.Get().Println(args...) }
+func (s *settableLogger) Fatal(args ...interface{})                 { s.get().Fatal(args...) }
+func (s *settableLogger) Fatalf(format string, args ...interface{}) { s.get().Fatalf(format, args...) }
+func (s *settableLogger) Fatalln(args ...interface{})               { s.get().Fatalln(args...) }
+func (s *settableLogger) Print(args ...interface{})                 { s.get().Print(args...) }
+func (s *settableLogger) Printf(format string, args ...interface{}) { s.get().Printf(format, args...) }
+func (s *settableLogger) Println(args ...interface{})               { s.get().Println(args...) }

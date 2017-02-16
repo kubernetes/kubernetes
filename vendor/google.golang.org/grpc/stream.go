@@ -97,7 +97,14 @@ type ClientStream interface {
 
 // NewClientStream creates a new Stream for the client side. This is called
 // by generated code.
-func NewClientStream(ctx context.Context, desc *StreamDesc, cc *ClientConn, method string, opts ...CallOption) (_ ClientStream, err error) {
+func NewClientStream(ctx context.Context, desc *StreamDesc, cc *ClientConn, method string, opts ...CallOption) (ClientStream, error) {
+	if cc.dopts.streamInt != nil {
+		return cc.dopts.streamInt(ctx, desc, cc, method, newClientStream, opts...)
+	}
+	return newClientStream(ctx, desc, cc, method, opts...)
+}
+
+func newClientStream(ctx context.Context, desc *StreamDesc, cc *ClientConn, method string, opts ...CallOption) (_ ClientStream, err error) {
 	var (
 		t   transport.ClientTransport
 		s   *transport.Stream
@@ -296,7 +303,7 @@ func (cs *clientStream) SendMsg(m interface{}) (err error) {
 		}
 	}()
 	if err != nil {
-		return transport.StreamErrorf(codes.Internal, "grpc: %v", err)
+		return Errorf(codes.Internal, "grpc: %v", err)
 	}
 	return cs.t.Write(cs.s, out, &transport.Options{Last: false})
 }
@@ -403,12 +410,19 @@ func (cs *clientStream) finish(err error) {
 
 // ServerStream defines the interface a server stream has to satisfy.
 type ServerStream interface {
-	// SendHeader sends the header metadata. It should not be called
-	// after SendProto. It fails if called multiple times or if
-	// called after SendProto.
+	// SetHeader sets the header metadata. It may be called multiple times.
+	// When call multiple times, all the provided metadata will be merged.
+	// All the metadata will be sent out when one of the following happens:
+	//  - ServerStream.SendHeader() is called;
+	//  - The first response is sent out;
+	//  - An RPC status is sent out (error or success).
+	SetHeader(metadata.MD) error
+	// SendHeader sends the header metadata.
+	// The provided md and headers set by SetHeader() will be sent.
+	// It fails if called multiple times.
 	SendHeader(metadata.MD) error
-	// SetTrailer sets the trailer metadata which will be sent with the
-	// RPC status.
+	// SetTrailer sets the trailer metadata which will be sent with the RPC status.
+	// When called more than once, all the provided metadata will be merged.
 	SetTrailer(metadata.MD)
 	Stream
 }
@@ -432,6 +446,13 @@ type serverStream struct {
 
 func (ss *serverStream) Context() context.Context {
 	return ss.s.Context()
+}
+
+func (ss *serverStream) SetHeader(md metadata.MD) error {
+	if md.Len() == 0 {
+		return nil
+	}
+	return ss.s.SetHeader(md)
 }
 
 func (ss *serverStream) SendHeader(md metadata.MD) error {
@@ -468,10 +489,13 @@ func (ss *serverStream) SendMsg(m interface{}) (err error) {
 		}
 	}()
 	if err != nil {
-		err = transport.StreamErrorf(codes.Internal, "grpc: %v", err)
+		err = Errorf(codes.Internal, "grpc: %v", err)
 		return err
 	}
-	return ss.t.Write(ss.s, out, &transport.Options{Last: false})
+	if err := ss.t.Write(ss.s, out, &transport.Options{Last: false}); err != nil {
+		return toRPCErr(err)
+	}
+	return nil
 }
 
 func (ss *serverStream) RecvMsg(m interface{}) (err error) {
@@ -489,5 +513,14 @@ func (ss *serverStream) RecvMsg(m interface{}) (err error) {
 			ss.mu.Unlock()
 		}
 	}()
-	return recv(ss.p, ss.codec, ss.s, ss.dc, m, ss.maxMsgSize)
+	if err := recv(ss.p, ss.codec, ss.s, ss.dc, m, ss.maxMsgSize); err != nil {
+		if err == io.EOF {
+			return err
+		}
+		if err == io.ErrUnexpectedEOF {
+			err = Errorf(codes.Internal, io.ErrUnexpectedEOF.Error())
+		}
+		return toRPCErr(err)
+	}
+	return nil
 }

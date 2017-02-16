@@ -37,6 +37,22 @@ import (
 	"golang.org/x/net/context"
 )
 
+// UnaryInvoker is called by UnaryClientInterceptor to complete RPCs.
+type UnaryInvoker func(ctx context.Context, method string, req, reply interface{}, cc *ClientConn, opts ...CallOption) error
+
+// UnaryClientInterceptor intercepts the execution of a unary RPC on the client. inovker is the handler to complete the RPC
+// and it is the responsibility of the interceptor to call it.
+// This is the EXPERIMENTAL API.
+type UnaryClientInterceptor func(ctx context.Context, method string, req, reply interface{}, cc *ClientConn, invoker UnaryInvoker, opts ...CallOption) error
+
+// Streamer is called by StreamClientInterceptor to create a ClientStream.
+type Streamer func(ctx context.Context, desc *StreamDesc, cc *ClientConn, method string, opts ...CallOption) (ClientStream, error)
+
+// StreamClientInterceptor intercepts the creation of ClientStream. It may return a custom ClientStream to intercept all I/O
+// operations. streamer is the handlder to create a ClientStream and it is the responsibility of the interceptor to call it.
+// This is the EXPERIMENTAL API.
+type StreamClientInterceptor func(ctx context.Context, desc *StreamDesc, cc *ClientConn, method string, streamer Streamer, opts ...CallOption) (ClientStream, error)
+
 // UnaryServerInfo consists of various information about a unary RPC on
 // server side. All per-rpc information may be mutated by the interceptor.
 type UnaryServerInfo struct {
