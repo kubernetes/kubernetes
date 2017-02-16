@@ -17,8 +17,14 @@ limitations under the License.
 package v1beta1
 
 import (
+	"fmt"
+	"reflect"
+	"strings"
+
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/kubernetes/pkg/api/v1"
 )
@@ -30,7 +36,64 @@ func addDefaultingFuncs(scheme *runtime.Scheme) error {
 		SetDefaults_Deployment,
 		SetDefaults_ReplicaSet,
 		SetDefaults_NetworkPolicy,
+		SetDefaults_ThirdPartyResource,
 	)
+}
+
+func convertToCamelCase(input string) string {
+	result := ""
+	toUpper := true
+	for ix := range input {
+		char := input[ix]
+		if toUpper {
+			result = result + string([]byte{(char - 32)})
+			toUpper = false
+		} else if char == '-' {
+			toUpper = true
+		} else {
+			result = result + string([]byte{char})
+		}
+	}
+	return result
+}
+
+// ExtractAPIGroupAndKind turns the object name in the form "foo-bar.acme.com" into a kind FooBar and group acme.com.
+// It is *only* used to populate the kind and group in v1beta1 for backwards compatibility.
+func ExtractAPIGroupAndKind(name string) (kind string, group string, err error) {
+	parts := strings.Split(name, ".")
+	if len(parts) < 3 {
+		return "", "", fmt.Errorf("unexpectedly short resource name: %s, expected at least <resource>.<domain>.<tld>", name)
+	}
+	return convertToCamelCase(parts[0]), strings.Join(parts[1:], "."), nil
+}
+
+func SetDefaults_ThirdPartyResource(obj *ThirdPartyResource) {
+	// Default a completely empty spec
+	if reflect.DeepEqual(obj.Spec, ThirdPartyResourceSpec{}) {
+		gvk := schema.GroupVersionKind{}
+		if len(obj.Versions) > 0 {
+			gvk.Version = obj.Versions[0].Name
+		}
+		gvk.Kind, gvk.Group, _ = ExtractAPIGroupAndKind(obj.Name)
+		plural, singular := meta.KindToResource(gvk)
+
+		obj.Spec.Group = gvk.Group
+		obj.Spec.Kind = gvk.Kind
+		obj.Spec.Version = gvk.Version
+		obj.Spec.Resource = plural.Resource
+		obj.Spec.ResourceSingular = singular.Resource
+		t := true
+		obj.Spec.Namespaced = &t
+		obj.Spec.Description = obj.Description
+	}
+
+	if len(obj.Status.Conditions) == 0 {
+		obj.Status.Conditions = []ThirdPartyResourceCondition{{
+			Type:           ThirdPartyResourceActive,
+			Status:         ThirdPartyResourceConditionStatusUnknown,
+			LastUpdateTime: obj.CreationTimestamp,
+		}}
+	}
 }
 
 func SetDefaults_DaemonSet(obj *DaemonSet) {

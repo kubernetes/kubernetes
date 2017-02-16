@@ -70,6 +70,11 @@ func (t *Tester) Namer(namer func(int) string) *Tester {
 	return t
 }
 
+func (t *Tester) NameUpdater(updater func(runtime.Object, string)) *Tester {
+	t.tester = t.tester.NameUpdater(updater)
+	return t
+}
+
 func (t *Tester) AllowCreateOnUpdate() *Tester {
 	t.tester = t.tester.AllowCreateOnUpdate()
 	return t

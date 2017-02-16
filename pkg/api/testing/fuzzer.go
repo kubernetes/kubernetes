@@ -464,6 +464,16 @@ func coreFuncs(t apitesting.TestingCommon) []interface{} {
 
 func extensionFuncs(t apitesting.TestingCommon) []interface{} {
 	return []interface{}{
+		func(j *extensions.ThirdPartyResource, c fuzz.Continue) {
+			c.FuzzNoCustom(j) // fuzz self without calling this function again
+			if len(j.Status.Conditions) == 0 {
+				j.Status.Conditions = []extensions.ThirdPartyResourceCondition{{
+					Type:           extensions.ThirdPartyResourceActive,
+					Status:         extensions.ThirdPartyResourceConditionStatusUnknown,
+					LastUpdateTime: j.CreationTimestamp,
+				}}
+			}
+		},
 		func(j *extensions.DeploymentStrategy, c fuzz.Continue) {
 			c.FuzzNoCustom(j) // fuzz self without calling this function again
 			// Ensure that strategyType is one of valid values.

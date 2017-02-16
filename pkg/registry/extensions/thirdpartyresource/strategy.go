@@ -19,6 +19,7 @@ package thirdpartyresource
 import (
 	"fmt"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -53,6 +54,14 @@ func (strategy) GenerateName(base string) string {
 }
 
 func (strategy) PrepareForCreate(ctx genericapirequest.Context, obj runtime.Object) {
+	// Initialize to unknown status
+	obj.(*extensions.ThirdPartyResource).Status = extensions.ThirdPartyResourceStatus{
+		Conditions: []extensions.ThirdPartyResourceCondition{{
+			Type:           extensions.ThirdPartyResourceActive,
+			Status:         extensions.ThirdPartyResourceConditionStatusUnknown,
+			LastUpdateTime: metav1.Now(),
+		}},
+	}
 }
 
 func (strategy) Validate(ctx genericapirequest.Context, obj runtime.Object) field.ErrorList {
@@ -68,6 +77,7 @@ func (strategy) AllowCreateOnUpdate() bool {
 }
 
 func (strategy) PrepareForUpdate(ctx genericapirequest.Context, obj, old runtime.Object) {
+	obj.(*extensions.ThirdPartyResource).Status = old.(*extensions.ThirdPartyResource).Status
 }
 
 func (strategy) ValidateUpdate(ctx genericapirequest.Context, obj, old runtime.Object) field.ErrorList {

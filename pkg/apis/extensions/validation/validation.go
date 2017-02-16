@@ -34,6 +34,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	apivalidation "k8s.io/kubernetes/pkg/api/validation"
 	"k8s.io/kubernetes/pkg/apis/extensions"
+	"k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	"k8s.io/kubernetes/pkg/security/apparmor"
 	"k8s.io/kubernetes/pkg/security/podsecuritypolicy/seccomp"
 	psputil "k8s.io/kubernetes/pkg/security/podsecuritypolicy/util"
@@ -43,6 +44,12 @@ func ValidateThirdPartyResourceUpdate(update, old *extensions.ThirdPartyResource
 	allErrs := field.ErrorList{}
 	allErrs = append(allErrs, apivalidation.ValidateObjectMetaUpdate(&update.ObjectMeta, &old.ObjectMeta, field.NewPath("metadata"))...)
 	allErrs = append(allErrs, ValidateThirdPartyResource(update)...)
+	allErrs = append(allErrs, apivalidation.ValidateImmutableField(update.Spec.Group, old.Spec.Group, field.NewPath("spec", "group"))...)
+	allErrs = append(allErrs, apivalidation.ValidateImmutableField(update.Spec.Version, old.Spec.Version, field.NewPath("spec", "version"))...)
+	allErrs = append(allErrs, apivalidation.ValidateImmutableField(update.Spec.Kind, old.Spec.Kind, field.NewPath("spec", "kind"))...)
+	allErrs = append(allErrs, apivalidation.ValidateImmutableField(update.Spec.Resource, old.Spec.Resource, field.NewPath("spec", "resource"))...)
+	allErrs = append(allErrs, apivalidation.ValidateImmutableField(update.Spec.ResourceSingular, old.Spec.ResourceSingular, field.NewPath("spec", "resourceSingular"))...)
+	allErrs = append(allErrs, apivalidation.ValidateImmutableField(update.Spec.Namespaced, old.Spec.Namespaced, field.NewPath("spec", "namespaced"))...)
 	return allErrs
 }
 
@@ -67,24 +74,67 @@ func ValidateThirdPartyResource(obj *extensions.ThirdPartyResource) field.ErrorL
 	allErrs := field.ErrorList{}
 	allErrs = append(allErrs, apivalidation.ValidateObjectMeta(&obj.ObjectMeta, false, ValidateThirdPartyResourceName, field.NewPath("metadata"))...)
 
-	versions := sets.String{}
-	if len(obj.Versions) == 0 {
-		allErrs = append(allErrs, field.Required(field.NewPath("versions"), "must specify at least one version"))
-	}
-	for ix := range obj.Versions {
-		version := &obj.Versions[ix]
-		if len(version.Name) == 0 {
-			allErrs = append(allErrs, field.Invalid(field.NewPath("versions").Index(ix).Child("name"), version, "must not be empty"))
-		} else {
-			for _, msg := range validation.IsDNS1123Label(version.Name) {
-				allErrs = append(allErrs, field.Invalid(field.NewPath("versions").Index(ix).Child("name"), version, msg))
-			}
+	if len(obj.Spec.Group) == 0 {
+		allErrs = append(allErrs, field.Required(field.NewPath("spec", "group"), ""))
+	} else if len(strings.Split(obj.Spec.Group, ".")) < 2 {
+		allErrs = append(allErrs, field.Invalid(field.NewPath("spec", "group"), obj.Spec.Group, "must have at least two segments: <domain>.<tld>"))
+	} else {
+		for _, msg := range validation.IsDNS1123Subdomain(obj.Spec.Group) {
+			allErrs = append(allErrs, field.Invalid(field.NewPath("spec", "group"), obj.Spec.Group, msg))
 		}
-		if versions.Has(version.Name) {
-			allErrs = append(allErrs, field.Duplicate(field.NewPath("versions").Index(ix).Child("name"), version))
-		}
-		versions.Insert(version.Name)
 	}
+
+	if len(obj.Spec.Version) == 0 {
+		allErrs = append(allErrs, field.Required(field.NewPath("spec", "version"), ""))
+	} else {
+		for _, msg := range validation.IsDNS1123Label(obj.Spec.Version) {
+			allErrs = append(allErrs, field.Invalid(field.NewPath("spec", "version"), obj.Spec.Version, msg))
+		}
+	}
+
+	if len(obj.Spec.Kind) == 0 {
+		allErrs = append(allErrs, field.Required(field.NewPath("spec", "kind"), ""))
+	} else {
+		// TODO: enforce well-formed names: alpha-numeric only, leading alpha, max length
+	}
+
+	if len(obj.Spec.Resource) == 0 {
+		allErrs = append(allErrs, field.Required(field.NewPath("spec", "resource"), ""))
+	} else {
+		for _, msg := range validation.IsDNS1123Label(obj.Spec.Resource) {
+			allErrs = append(allErrs, field.Invalid(field.NewPath("spec", "resource"), obj.Spec.Resource, msg))
+		}
+	}
+
+	if len(obj.Name) > 0 && len(obj.Spec.Resource) > 0 && len(obj.Spec.Group) > 0 {
+		// TODO: disable once v1 is available and v1beta1 is dropped
+		matchesDerivedGroupKind := false
+		if kind, group, err := v1beta1.ExtractAPIGroupAndKind(obj.Name); err == nil {
+			matchesDerivedGroupKind = (group == obj.Spec.Group) && (kind == obj.Spec.Kind)
+		}
+
+		// This is the preferred form
+		matchesGroupResource := (obj.Name == (obj.Spec.Resource + "." + obj.Spec.Group))
+
+		if !matchesDerivedGroupKind && !matchesGroupResource {
+			allErrs = append(allErrs, field.Invalid(field.NewPath("metadata", "name"), obj.Name, "should match '<spec.resource>.<spec.group>'"))
+		}
+	}
+
+	if len(obj.Spec.ResourceSingular) == 0 {
+		allErrs = append(allErrs, field.Required(field.NewPath("spec", "resourceSingular"), ""))
+	} else {
+		for _, msg := range validation.IsDNS1123Label(obj.Spec.ResourceSingular) {
+			allErrs = append(allErrs, field.Invalid(field.NewPath("spec", "resourceSingular"), obj.Spec.ResourceSingular, msg))
+		}
+	}
+
+	if obj.Spec.Namespaced == nil {
+		allErrs = append(allErrs, field.Required(field.NewPath("spec", "namespaced"), ""))
+	} else if *obj.Spec.Namespaced != true {
+		allErrs = append(allErrs, field.NotSupported(field.NewPath("spec", "namespaced"), *obj.Spec.Namespaced, []string{"true"}))
+	}
+
 	return allErrs
 }
 

@@ -46,16 +46,19 @@ type Tester struct {
 	generatesName       bool
 	returnDeletedObject bool
 	namer               func(int) string
+	nameUpdater         func(runtime.Object, string)
 	scheme              *runtime.Scheme
 }
 
 func New(t *testing.T, storage rest.Storage, scheme *runtime.Scheme) *Tester {
-	return &Tester{
+	tester := &Tester{
 		T:       t,
 		storage: storage,
 		namer:   defaultNamer,
 		scheme:  scheme,
 	}
+	tester.nameUpdater = tester.setObjectMeta
+	return tester
 }
 
 func defaultNamer(i int) string {
@@ -66,6 +69,13 @@ func defaultNamer(i int) string {
 // By default "foo%d" is used
 func (t *Tester) Namer(namer func(int) string) *Tester {
 	t.namer = namer
+	return t
+}
+
+// NameUpdater allows providing a custom name updater, in case other parts of the object need to agree with the name.
+// By default, Tester#setObjectMeta is used
+func (t *Tester) NameUpdater(updater func(runtime.Object, string)) *Tester {
+	t.nameUpdater = updater
 	return t
 }
 
@@ -244,7 +254,7 @@ func (t *Tester) testCreateAlreadyExisting(obj runtime.Object, createFn CreateFu
 	ctx := t.TestContext()
 
 	foo := copyOrDie(obj, t.scheme)
-	t.setObjectMeta(foo, t.namer(1))
+	t.nameUpdater(foo, t.namer(1))
 	if err := createFn(ctx, foo); err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -260,7 +270,7 @@ func (t *Tester) testCreateEquals(obj runtime.Object, getFn GetFunc) {
 	ctx := t.TestContext()
 
 	foo := copyOrDie(obj, t.scheme)
-	t.setObjectMeta(foo, t.namer(2))
+	t.nameUpdater(foo, t.namer(2))
 
 	created, err := t.storage.(rest.Creater).Create(ctx, foo)
 	if err != nil {
@@ -317,8 +327,8 @@ func (t *Tester) testCreateGeneratesName(valid runtime.Object) {
 }
 
 func (t *Tester) testCreateHasMetadata(valid runtime.Object) {
+	t.nameUpdater(valid, t.namer(1))
 	objectMeta := t.getObjectMetaOrFail(valid)
-	objectMeta.Name = t.namer(1)
 	objectMeta.Namespace = t.TestNamespace()
 
 	obj, err := t.storage.(rest.Creater).Create(t.TestContext(), valid)
@@ -437,8 +447,8 @@ func (t *Tester) testCreateResetsUserData(valid runtime.Object) {
 }
 
 func (t *Tester) testCreateIgnoreClusterName(valid runtime.Object) {
+	t.nameUpdater(valid, t.namer(3))
 	objectMeta := t.getObjectMetaOrFail(valid)
-	objectMeta.Name = t.namer(3)
 	objectMeta.ClusterName = "clustername-to-ignore"
 
 	obj, err := t.storage.(rest.Creater).Create(t.TestContext(), copyOrDie(valid, t.scheme))
@@ -459,7 +469,7 @@ func (t *Tester) testUpdateEquals(obj runtime.Object, createFn CreateFunc, getFn
 	ctx := t.TestContext()
 
 	foo := copyOrDie(obj, t.scheme)
-	t.setObjectMeta(foo, t.namer(2))
+	t.nameUpdater(foo, t.namer(2))
 	if err := createFn(ctx, foo); err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -495,7 +505,7 @@ func (t *Tester) testUpdateFailsOnVersionTooOld(obj runtime.Object, createFn Cre
 	ctx := t.TestContext()
 
 	foo := copyOrDie(obj, t.scheme)
-	t.setObjectMeta(foo, t.namer(3))
+	t.nameUpdater(foo, t.namer(3))
 
 	if err := createFn(ctx, foo); err != nil {
 		t.Errorf("unexpected error: %v", err)
@@ -522,7 +532,7 @@ func (t *Tester) testUpdateInvokesValidation(obj runtime.Object, createFn Create
 	ctx := t.TestContext()
 
 	foo := copyOrDie(obj, t.scheme)
-	t.setObjectMeta(foo, t.namer(4))
+	t.nameUpdater(foo, t.namer(4))
 	if err := createFn(ctx, foo); err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -543,7 +553,7 @@ func (t *Tester) testUpdateInvokesValidation(obj runtime.Object, createFn Create
 func (t *Tester) testUpdateWithWrongUID(obj runtime.Object, createFn CreateFunc, getFn GetFunc) {
 	ctx := t.TestContext()
 	foo := copyOrDie(obj, t.scheme)
-	t.setObjectMeta(foo, t.namer(5))
+	t.nameUpdater(foo, t.namer(5))
 	objectMeta := t.getObjectMetaOrFail(foo)
 	objectMeta.UID = types.UID("UID0000")
 	if err := createFn(ctx, foo); err != nil {
@@ -563,7 +573,7 @@ func (t *Tester) testUpdateWithWrongUID(obj runtime.Object, createFn CreateFunc,
 func (t *Tester) testUpdateRetrievesOldObject(obj runtime.Object, createFn CreateFunc, getFn GetFunc) {
 	ctx := t.TestContext()
 	foo := copyOrDie(obj, t.scheme)
-	t.setObjectMeta(foo, t.namer(6))
+	t.nameUpdater(foo, t.namer(6))
 	objectMeta := t.getObjectMetaOrFail(foo)
 	objectMeta.Annotations = map[string]string{"A": "1"}
 	if err := createFn(ctx, foo); err != nil {
@@ -618,7 +628,7 @@ func (t *Tester) testUpdatePropagatesUpdatedObjectError(obj runtime.Object, crea
 	ctx := t.TestContext()
 	foo := copyOrDie(obj, t.scheme)
 	name := t.namer(7)
-	t.setObjectMeta(foo, name)
+	t.nameUpdater(foo, name)
 	if err := createFn(ctx, foo); err != nil {
 		t.Errorf("unexpected error: %v", err)
 		return
@@ -641,7 +651,9 @@ func (t *Tester) testUpdateIgnoreGenerationUpdates(obj runtime.Object, createFn 
 
 	foo := copyOrDie(obj, t.scheme)
 	name := t.namer(8)
-	t.setObjectMeta(foo, name)
+	t.nameUpdater(foo, name)
+	meta := t.getObjectMetaOrFail(foo)
+	meta.Generation = 1
 
 	if err := createFn(ctx, foo); err != nil {
 		t.Errorf("unexpected error: %v", err)
@@ -671,7 +683,7 @@ func (t *Tester) testUpdateIgnoreGenerationUpdates(obj runtime.Object, createFn 
 }
 
 func (t *Tester) testUpdateOnNotFound(obj runtime.Object) {
-	t.setObjectMeta(obj, t.namer(0))
+	t.nameUpdater(obj, t.namer(0))
 	_, created, err := t.storage.(rest.Updater).Update(t.TestContext(), t.namer(0), rest.DefaultUpdatedObjectInfo(obj, t.scheme))
 	if t.createOnUpdate {
 		if err != nil {
@@ -693,7 +705,7 @@ func (t *Tester) testUpdateRejectsMismatchedNamespace(obj runtime.Object, create
 	ctx := t.TestContext()
 
 	foo := copyOrDie(obj, t.scheme)
-	t.setObjectMeta(foo, t.namer(1))
+	t.nameUpdater(foo, t.namer(1))
 	if err := createFn(ctx, foo); err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -703,8 +715,8 @@ func (t *Tester) testUpdateRejectsMismatchedNamespace(obj runtime.Object, create
 		t.Errorf("unexpected error: %v", err)
 	}
 
+	t.nameUpdater(storedFoo, t.namer(1))
 	objectMeta := t.getObjectMetaOrFail(storedFoo)
-	objectMeta.Name = t.namer(1)
 	objectMeta.Namespace = "not-default"
 
 	obj, updated, err := t.storage.(rest.Updater).Update(t.TestContext(), "foo1", rest.DefaultUpdatedObjectInfo(storedFoo, t.scheme))
@@ -723,7 +735,7 @@ func (t *Tester) testUpdateIgnoreClusterName(obj runtime.Object, createFn Create
 
 	foo := copyOrDie(obj, t.scheme)
 	name := t.namer(9)
-	t.setObjectMeta(foo, name)
+	t.nameUpdater(foo, name)
 
 	if err := createFn(ctx, foo); err != nil {
 		t.Errorf("unexpected error: %v", err)
@@ -760,7 +772,7 @@ func (t *Tester) testDeleteNoGraceful(obj runtime.Object, createFn CreateFunc, g
 	ctx := t.TestContext()
 
 	foo := copyOrDie(obj, t.scheme)
-	t.setObjectMeta(foo, t.namer(1))
+	t.nameUpdater(foo, t.namer(1))
 	if err := createFn(ctx, foo); err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -799,7 +811,7 @@ func (t *Tester) testDeleteWithUID(obj runtime.Object, createFn CreateFunc, getF
 	ctx := t.TestContext()
 
 	foo := copyOrDie(obj, t.scheme)
-	t.setObjectMeta(foo, t.namer(1))
+	t.nameUpdater(foo, t.namer(1))
 	objectMeta := t.getObjectMetaOrFail(foo)
 	objectMeta.UID = types.UID("UID0000")
 	if err := createFn(ctx, foo); err != nil {
@@ -836,7 +848,7 @@ func (t *Tester) testDeleteGracefulHasDefault(obj runtime.Object, createFn Creat
 	ctx := t.TestContext()
 
 	foo := copyOrDie(obj, t.scheme)
-	t.setObjectMeta(foo, t.namer(1))
+	t.nameUpdater(foo, t.namer(1))
 	if err := createFn(ctx, foo); err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -867,7 +879,7 @@ func (t *Tester) testDeleteGracefulWithValue(obj runtime.Object, createFn Create
 	ctx := t.TestContext()
 
 	foo := copyOrDie(obj, t.scheme)
-	t.setObjectMeta(foo, t.namer(2))
+	t.nameUpdater(foo, t.namer(2))
 	if err := createFn(ctx, foo); err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -898,7 +910,7 @@ func (t *Tester) testDeleteGracefulExtend(obj runtime.Object, createFn CreateFun
 	ctx := t.TestContext()
 
 	foo := copyOrDie(obj, t.scheme)
-	t.setObjectMeta(foo, t.namer(3))
+	t.nameUpdater(foo, t.namer(3))
 	if err := createFn(ctx, foo); err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -934,7 +946,7 @@ func (t *Tester) testDeleteGracefulImmediate(obj runtime.Object, createFn Create
 	ctx := t.TestContext()
 
 	foo := copyOrDie(obj, t.scheme)
-	t.setObjectMeta(foo, "foo4")
+	t.nameUpdater(foo, "foo4")
 	if err := createFn(ctx, foo); err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -971,7 +983,7 @@ func (t *Tester) testDeleteGracefulUsesZeroOnNil(obj runtime.Object, createFn Cr
 	ctx := t.TestContext()
 
 	foo := copyOrDie(obj, t.scheme)
-	t.setObjectMeta(foo, t.namer(5))
+	t.nameUpdater(foo, t.namer(5))
 	if err := createFn(ctx, foo); err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -990,7 +1002,7 @@ func (t *Tester) testDeleteGracefulShorten(obj runtime.Object, createFn CreateFu
 	ctx := t.TestContext()
 
 	foo := copyOrDie(obj, t.scheme)
-	t.setObjectMeta(foo, t.namer(6))
+	t.nameUpdater(foo, t.namer(6))
 	if err := createFn(ctx, foo); err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -1035,8 +1047,8 @@ func (t *Tester) testGetDifferentNamespace(obj runtime.Object) {
 		t.Fatalf("the test does not work in in cluster-scope")
 	}
 
+	t.nameUpdater(obj, t.namer(5))
 	objMeta := t.getObjectMetaOrFail(obj)
-	objMeta.Name = t.namer(5)
 
 	ctx1 := genericapirequest.WithNamespace(genericapirequest.NewContext(), "bar3")
 	objMeta.Namespace = genericapirequest.NamespaceValue(ctx1)
@@ -1079,7 +1091,7 @@ func (t *Tester) testGetDifferentNamespace(obj runtime.Object) {
 
 func (t *Tester) testGetFound(obj runtime.Object) {
 	ctx := t.TestContext()
-	t.setObjectMeta(obj, t.namer(1))
+	t.nameUpdater(obj, t.namer(1))
 
 	existing, err := t.storage.(rest.Creater).Create(ctx, obj)
 	if err != nil {
@@ -1101,8 +1113,8 @@ func (t *Tester) testGetFound(obj runtime.Object) {
 func (t *Tester) testGetMimatchedNamespace(obj runtime.Object) {
 	ctx1 := genericapirequest.WithNamespace(genericapirequest.NewContext(), "bar1")
 	ctx2 := genericapirequest.WithNamespace(genericapirequest.NewContext(), "bar2")
+	t.nameUpdater(obj, t.namer(4))
 	objMeta := t.getObjectMetaOrFail(obj)
-	objMeta.Name = t.namer(4)
 	objMeta.Namespace = genericapirequest.NamespaceValue(ctx1)
 	_, err := t.storage.(rest.Creater).Create(ctx1, obj)
 	if err != nil {
@@ -1122,7 +1134,7 @@ func (t *Tester) testGetMimatchedNamespace(obj runtime.Object) {
 
 func (t *Tester) testGetNotFound(obj runtime.Object) {
 	ctx := t.TestContext()
-	t.setObjectMeta(obj, t.namer(2))
+	t.nameUpdater(obj, t.namer(2))
 	_, err := t.storage.(rest.Creater).Create(ctx, obj)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
@@ -1159,9 +1171,9 @@ func (t *Tester) testListFound(obj runtime.Object, assignFn AssignFunc) {
 	ctx := t.TestContext()
 
 	foo1 := copyOrDie(obj, t.scheme)
-	t.setObjectMeta(foo1, t.namer(1))
+	t.nameUpdater(foo1, t.namer(1))
 	foo2 := copyOrDie(obj, t.scheme)
-	t.setObjectMeta(foo2, t.namer(2))
+	t.nameUpdater(foo2, t.namer(2))
 
 	existing := assignFn([]runtime.Object{foo1, foo2})
 
@@ -1186,10 +1198,10 @@ func (t *Tester) testListMatchLabels(obj runtime.Object, assignFn AssignFunc) {
 	testLabels := map[string]string{"key": "value"}
 
 	foo3 := copyOrDie(obj, t.scheme)
-	t.setObjectMeta(foo3, "foo3")
+	t.nameUpdater(foo3, t.namer(3))
 	foo4 := copyOrDie(obj, t.scheme)
+	t.nameUpdater(foo4, t.namer(4))
 	foo4Meta := t.getObjectMetaOrFail(foo4)
-	foo4Meta.Name = "foo4"
 	foo4Meta.Namespace = genericapirequest.NamespaceValue(ctx)
 	foo4Meta.Labels = testLabels
 
