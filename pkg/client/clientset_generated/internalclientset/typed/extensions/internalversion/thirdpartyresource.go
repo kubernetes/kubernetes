@@ -35,6 +35,7 @@ type ThirdPartyResourcesGetter interface {
 type ThirdPartyResourceInterface interface {
 	Create(*extensions.ThirdPartyResource) (*extensions.ThirdPartyResource, error)
 	Update(*extensions.ThirdPartyResource) (*extensions.ThirdPartyResource, error)
+	UpdateStatus(*extensions.ThirdPartyResource) (*extensions.ThirdPartyResource, error)
 	Delete(name string, options *v1.DeleteOptions) error
 	DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error
 	Get(name string, options v1.GetOptions) (*extensions.ThirdPartyResource, error)
@@ -73,6 +74,21 @@ func (c *thirdPartyResources) Update(thirdPartyResource *extensions.ThirdPartyRe
 	err = c.client.Put().
 		Resource("thirdpartyresources").
 		Name(thirdPartyResource.Name).
+		Body(thirdPartyResource).
+		Do().
+		Into(result)
+	return
+}
+
+// UpdateStatus was generated because the type contains a Status member.
+// Add a +genclientstatus=false comment above the type to avoid generating UpdateStatus().
+
+func (c *thirdPartyResources) UpdateStatus(thirdPartyResource *extensions.ThirdPartyResource) (result *extensions.ThirdPartyResource, err error) {
+	result = &extensions.ThirdPartyResource{}
+	err = c.client.Put().
+		Resource("thirdpartyresources").
+		Name(thirdPartyResource.Name).
+		SubResource("status").
 		Body(thirdPartyResource).
 		Do().
 		Into(result)

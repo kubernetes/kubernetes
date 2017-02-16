@@ -15560,14 +15560,14 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 						},
 						"description": {
 							SchemaProps: spec.SchemaProps{
-								Description: "Description is the description of this object.",
+								Description: "Description is the description of this object. Deprecated: Use spec.description instead.",
 								Type:        []string{"string"},
 								Format:      "",
 							},
 						},
 						"versions": {
 							SchemaProps: spec.SchemaProps{
-								Description: "Versions are versions for this third party object",
+								Description: "Versions are versions for this third party object. Deprecated: Use spec.version instead.",
 								Type:        []string{"array"},
 								Items: &spec.SchemaOrArray{
 									Schema: &spec.Schema{
@@ -15578,11 +15578,68 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 								},
 							},
 						},
+						"spec": {
+							SchemaProps: spec.SchemaProps{
+								Description: "Spec describes the resource",
+								Ref:         ref("k8s.io/kubernetes/pkg/apis/extensions/v1beta1.ThirdPartyResourceSpec"),
+							},
+						},
+						"status": {
+							SchemaProps: spec.SchemaProps{
+								Description: "Status describes the current state of the resource",
+								Ref:         ref("k8s.io/kubernetes/pkg/apis/extensions/v1beta1.ThirdPartyResourceStatus"),
+							},
+						},
 					},
 				},
 			},
 			Dependencies: []string{
-				"k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta", "k8s.io/kubernetes/pkg/apis/extensions/v1beta1.APIVersion"},
+				"k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta", "k8s.io/kubernetes/pkg/apis/extensions/v1beta1.APIVersion", "k8s.io/kubernetes/pkg/apis/extensions/v1beta1.ThirdPartyResourceSpec", "k8s.io/kubernetes/pkg/apis/extensions/v1beta1.ThirdPartyResourceStatus"},
+		},
+		"k8s.io/kubernetes/pkg/apis/extensions/v1beta1.ThirdPartyResourceCondition": {
+			Schema: spec.Schema{
+				SchemaProps: spec.SchemaProps{
+					Properties: map[string]spec.Schema{
+						"type": {
+							SchemaProps: spec.SchemaProps{
+								Description: "request approval state, currently Approved or Denied.",
+								Type:        []string{"string"},
+								Format:      "",
+							},
+						},
+						"status": {
+							SchemaProps: spec.SchemaProps{
+								Description: "Status of the condition",
+								Type:        []string{"string"},
+								Format:      "",
+							},
+						},
+						"reason": {
+							SchemaProps: spec.SchemaProps{
+								Description: "brief reason for the state",
+								Type:        []string{"string"},
+								Format:      "",
+							},
+						},
+						"message": {
+							SchemaProps: spec.SchemaProps{
+								Description: "human readable message with details about the state",
+								Type:        []string{"string"},
+								Format:      "",
+							},
+						},
+						"lastUpdateTime": {
+							SchemaProps: spec.SchemaProps{
+								Description: "timestamp for the last update to this condition",
+								Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.Time"),
+							},
+						},
+					},
+					Required: []string{"type", "status"},
+				},
+			},
+			Dependencies: []string{
+				"k8s.io/apimachinery/pkg/apis/meta/v1.Time"},
 		},
 		"k8s.io/kubernetes/pkg/apis/extensions/v1beta1.ThirdPartyResourceData": {
 			Schema: spec.Schema{
@@ -15711,6 +15768,93 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 			},
 			Dependencies: []string{
 				"k8s.io/apimachinery/pkg/apis/meta/v1.ListMeta", "k8s.io/kubernetes/pkg/apis/extensions/v1beta1.ThirdPartyResource"},
+		},
+		"k8s.io/kubernetes/pkg/apis/extensions/v1beta1.ThirdPartyResourceSpec": {
+			Schema: spec.Schema{
+				SchemaProps: spec.SchemaProps{
+					Properties: map[string]spec.Schema{
+						"group": {
+							SchemaProps: spec.SchemaProps{
+								Type:   []string{"string"},
+								Format: "",
+							},
+						},
+						"version": {
+							SchemaProps: spec.SchemaProps{
+								Type:   []string{"string"},
+								Format: "",
+							},
+						},
+						"kind": {
+							SchemaProps: spec.SchemaProps{
+								Type:   []string{"string"},
+								Format: "",
+							},
+						},
+						"resource": {
+							SchemaProps: spec.SchemaProps{
+								Type:   []string{"string"},
+								Format: "",
+							},
+						},
+						"resourceSingular": {
+							SchemaProps: spec.SchemaProps{
+								Type:   []string{"string"},
+								Format: "",
+							},
+						},
+						"namespaced": {
+							SchemaProps: spec.SchemaProps{
+								Type:   []string{"boolean"},
+								Format: "",
+							},
+						},
+						"shortNames": {
+							SchemaProps: spec.SchemaProps{
+								Type: []string{"array"},
+								Items: &spec.SchemaOrArray{
+									Schema: &spec.Schema{
+										SchemaProps: spec.SchemaProps{
+											Type:   []string{"string"},
+											Format: "",
+										},
+									},
+								},
+							},
+						},
+						"description": {
+							SchemaProps: spec.SchemaProps{
+								Type:   []string{"string"},
+								Format: "",
+							},
+						},
+					},
+				},
+			},
+			Dependencies: []string{},
+		},
+		"k8s.io/kubernetes/pkg/apis/extensions/v1beta1.ThirdPartyResourceStatus": {
+			Schema: spec.Schema{
+				SchemaProps: spec.SchemaProps{
+					Properties: map[string]spec.Schema{
+						"conditions": {
+							SchemaProps: spec.SchemaProps{
+								Description: "Conditions applied to the resource",
+								Type:        []string{"array"},
+								Items: &spec.SchemaOrArray{
+									Schema: &spec.Schema{
+										SchemaProps: spec.SchemaProps{
+											Ref: ref("k8s.io/kubernetes/pkg/apis/extensions/v1beta1.ThirdPartyResourceCondition"),
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			Dependencies: []string{
+				"k8s.io/kubernetes/pkg/apis/extensions/v1beta1.ThirdPartyResourceCondition"},
 		},
 		"k8s.io/kubernetes/pkg/apis/authentication/v1beta1.TokenReview": {
 			Schema: spec.Schema{

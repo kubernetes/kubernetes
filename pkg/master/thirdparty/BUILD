@@ -18,7 +18,6 @@ go_library(
         "//pkg/registry/extensions/thirdpartyresourcedata:go_default_library",
         "//pkg/registry/extensions/thirdpartyresourcedata/storage:go_default_library",
         "//vendor:github.com/golang/glog",
-        "//vendor:k8s.io/apimachinery/pkg/api/meta",
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
         "//vendor:k8s.io/apimachinery/pkg/runtime",
         "//vendor:k8s.io/apimachinery/pkg/runtime/schema",

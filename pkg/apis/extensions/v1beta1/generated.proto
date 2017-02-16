@@ -896,12 +896,40 @@ message ThirdPartyResource {
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
   // Description is the description of this object.
+  // Deprecated: Use spec.description instead.
+  // +k8s:conversion-gen=false
   // +optional
   optional string description = 2;
 
-  // Versions are versions for this third party object
+  // Versions are versions for this third party object.
+  // Deprecated: Use spec.version instead.
+  // +k8s:conversion-gen=false
   // +optional
   repeated APIVersion versions = 3;
+
+  optional ThirdPartyResourceSpec spec = 4;
+
+  optional ThirdPartyResourceStatus status = 5;
+}
+
+message ThirdPartyResourceCondition {
+  // request approval state, currently Approved or Denied.
+  optional string type = 1;
+
+  // Status of the condition
+  optional string status = 2;
+
+  // brief reason for the state
+  // +optional
+  optional string reason = 3;
+
+  // human readable message with details about the state
+  // +optional
+  optional string message = 4;
+
+  // timestamp for the last update to this condition
+  // +optional
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.Time lastUpdateTime = 5;
 }
 
 // An internal object, used for versioned storage in etcd.  Not exposed to the end user.
@@ -934,5 +962,29 @@ message ThirdPartyResourceList {
 
   // Items is the list of ThirdPartyResources.
   repeated ThirdPartyResource items = 2;
+}
+
+message ThirdPartyResourceSpec {
+  optional string group = 1;
+
+  optional string version = 2;
+
+  optional string kind = 3;
+
+  optional string resource = 4;
+
+  optional string resourceSingular = 5;
+
+  optional bool namespaced = 6;
+
+  repeated string shortNames = 7;
+
+  optional string description = 8;
+}
+
+message ThirdPartyResourceStatus {
+  // Conditions applied to the resource
+  // +optional
+  repeated ThirdPartyResourceCondition conditions = 1;
 }
 

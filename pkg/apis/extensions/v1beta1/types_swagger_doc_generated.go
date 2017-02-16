@@ -562,12 +562,26 @@ func (SupplementalGroupsStrategyOptions) SwaggerDoc() map[string]string {
 var map_ThirdPartyResource = map[string]string{
 	"":            "A ThirdPartyResource is a generic representation of a resource, it is used by add-ons and plugins to add new resource types to the API.  It consists of one or more Versions of the api.",
 	"metadata":    "Standard object metadata",
-	"description": "Description is the description of this object.",
-	"versions":    "Versions are versions for this third party object",
+	"description": "Description is the description of this object. Deprecated: Use spec.description instead.",
+	"versions":    "Versions are versions for this third party object. Deprecated: Use spec.version instead.",
+	"spec":        "Spec describes the resource",
+	"status":      "Status describes the current state of the resource",
 }
 
 func (ThirdPartyResource) SwaggerDoc() map[string]string {
 	return map_ThirdPartyResource
+}
+
+var map_ThirdPartyResourceCondition = map[string]string{
+	"type":           "request approval state, currently Approved or Denied.",
+	"status":         "Status of the condition",
+	"reason":         "brief reason for the state",
+	"message":        "human readable message with details about the state",
+	"lastUpdateTime": "timestamp for the last update to this condition",
+}
+
+func (ThirdPartyResourceCondition) SwaggerDoc() map[string]string {
+	return map_ThirdPartyResourceCondition
 }
 
 var map_ThirdPartyResourceData = map[string]string{
@@ -598,6 +612,14 @@ var map_ThirdPartyResourceList = map[string]string{
 
 func (ThirdPartyResourceList) SwaggerDoc() map[string]string {
 	return map_ThirdPartyResourceList
+}
+
+var map_ThirdPartyResourceStatus = map[string]string{
+	"conditions": "Conditions applied to the resource",
+}
+
+func (ThirdPartyResourceStatus) SwaggerDoc() map[string]string {
+	return map_ThirdPartyResourceStatus
 }
 
 // AUTO-GENERATED FUNCTIONS END HERE

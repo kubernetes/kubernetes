@@ -145,12 +145,18 @@ func RegisterConversions(scheme *runtime.Scheme) error {
 		Convert_extensions_SupplementalGroupsStrategyOptions_To_v1beta1_SupplementalGroupsStrategyOptions,
 		Convert_v1beta1_ThirdPartyResource_To_extensions_ThirdPartyResource,
 		Convert_extensions_ThirdPartyResource_To_v1beta1_ThirdPartyResource,
+		Convert_v1beta1_ThirdPartyResourceCondition_To_extensions_ThirdPartyResourceCondition,
+		Convert_extensions_ThirdPartyResourceCondition_To_v1beta1_ThirdPartyResourceCondition,
 		Convert_v1beta1_ThirdPartyResourceData_To_extensions_ThirdPartyResourceData,
 		Convert_extensions_ThirdPartyResourceData_To_v1beta1_ThirdPartyResourceData,
 		Convert_v1beta1_ThirdPartyResourceDataList_To_extensions_ThirdPartyResourceDataList,
 		Convert_extensions_ThirdPartyResourceDataList_To_v1beta1_ThirdPartyResourceDataList,
 		Convert_v1beta1_ThirdPartyResourceList_To_extensions_ThirdPartyResourceList,
 		Convert_extensions_ThirdPartyResourceList_To_v1beta1_ThirdPartyResourceList,
+		Convert_v1beta1_ThirdPartyResourceSpec_To_extensions_ThirdPartyResourceSpec,
+		Convert_extensions_ThirdPartyResourceSpec_To_v1beta1_ThirdPartyResourceSpec,
+		Convert_v1beta1_ThirdPartyResourceStatus_To_extensions_ThirdPartyResourceStatus,
+		Convert_extensions_ThirdPartyResourceStatus_To_v1beta1_ThirdPartyResourceStatus,
 	)
 }
 
@@ -1453,8 +1459,14 @@ func Convert_extensions_SupplementalGroupsStrategyOptions_To_v1beta1_Supplementa
 
 func autoConvert_v1beta1_ThirdPartyResource_To_extensions_ThirdPartyResource(in *ThirdPartyResource, out *extensions.ThirdPartyResource, s conversion.Scope) error {
 	out.ObjectMeta = in.ObjectMeta
-	out.Description = in.Description
-	out.Versions = *(*[]extensions.APIVersion)(unsafe.Pointer(&in.Versions))
+	// INFO: in.Description opted out of conversion generation
+	// INFO: in.Versions opted out of conversion generation
+	if err := Convert_v1beta1_ThirdPartyResourceSpec_To_extensions_ThirdPartyResourceSpec(&in.Spec, &out.Spec, s); err != nil {
+		return err
+	}
+	if err := Convert_v1beta1_ThirdPartyResourceStatus_To_extensions_ThirdPartyResourceStatus(&in.Status, &out.Status, s); err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -1464,13 +1476,39 @@ func Convert_v1beta1_ThirdPartyResource_To_extensions_ThirdPartyResource(in *Thi
 
 func autoConvert_extensions_ThirdPartyResource_To_v1beta1_ThirdPartyResource(in *extensions.ThirdPartyResource, out *ThirdPartyResource, s conversion.Scope) error {
 	out.ObjectMeta = in.ObjectMeta
-	out.Description = in.Description
-	out.Versions = *(*[]APIVersion)(unsafe.Pointer(&in.Versions))
+	if err := Convert_extensions_ThirdPartyResourceSpec_To_v1beta1_ThirdPartyResourceSpec(&in.Spec, &out.Spec, s); err != nil {
+		return err
+	}
+	if err := Convert_extensions_ThirdPartyResourceStatus_To_v1beta1_ThirdPartyResourceStatus(&in.Status, &out.Status, s); err != nil {
+		return err
+	}
 	return nil
 }
 
-func Convert_extensions_ThirdPartyResource_To_v1beta1_ThirdPartyResource(in *extensions.ThirdPartyResource, out *ThirdPartyResource, s conversion.Scope) error {
-	return autoConvert_extensions_ThirdPartyResource_To_v1beta1_ThirdPartyResource(in, out, s)
+func autoConvert_v1beta1_ThirdPartyResourceCondition_To_extensions_ThirdPartyResourceCondition(in *ThirdPartyResourceCondition, out *extensions.ThirdPartyResourceCondition, s conversion.Scope) error {
+	out.Type = extensions.ThirdPartyResourceConditionType(in.Type)
+	out.Status = extensions.ThirdPartyResourceConditionStatus(in.Status)
+	out.Reason = in.Reason
+	out.Message = in.Message
+	out.LastUpdateTime = in.LastUpdateTime
+	return nil
+}
+
+func Convert_v1beta1_ThirdPartyResourceCondition_To_extensions_ThirdPartyResourceCondition(in *ThirdPartyResourceCondition, out *extensions.ThirdPartyResourceCondition, s conversion.Scope) error {
+	return autoConvert_v1beta1_ThirdPartyResourceCondition_To_extensions_ThirdPartyResourceCondition(in, out, s)
+}
+
+func autoConvert_extensions_ThirdPartyResourceCondition_To_v1beta1_ThirdPartyResourceCondition(in *extensions.ThirdPartyResourceCondition, out *ThirdPartyResourceCondition, s conversion.Scope) error {
+	out.Type = ThirdPartyResourceConditionType(in.Type)
+	out.Status = ThirdPartyResourceConditionStatus(in.Status)
+	out.Reason = in.Reason
+	out.Message = in.Message
+	out.LastUpdateTime = in.LastUpdateTime
+	return nil
+}
+
+func Convert_extensions_ThirdPartyResourceCondition_To_v1beta1_ThirdPartyResourceCondition(in *extensions.ThirdPartyResourceCondition, out *ThirdPartyResourceCondition, s conversion.Scope) error {
+	return autoConvert_extensions_ThirdPartyResourceCondition_To_v1beta1_ThirdPartyResourceCondition(in, out, s)
 }
 
 func autoConvert_v1beta1_ThirdPartyResourceData_To_extensions_ThirdPartyResourceData(in *ThirdPartyResourceData, out *extensions.ThirdPartyResourceData, s conversion.Scope) error {
@@ -1515,7 +1553,17 @@ func Convert_extensions_ThirdPartyResourceDataList_To_v1beta1_ThirdPartyResource
 
 func autoConvert_v1beta1_ThirdPartyResourceList_To_extensions_ThirdPartyResourceList(in *ThirdPartyResourceList, out *extensions.ThirdPartyResourceList, s conversion.Scope) error {
 	out.ListMeta = in.ListMeta
-	out.Items = *(*[]extensions.ThirdPartyResource)(unsafe.Pointer(&in.Items))
+	if in.Items != nil {
+		in, out := &in.Items, &out.Items
+		*out = make([]extensions.ThirdPartyResource, len(*in))
+		for i := range *in {
+			if err := Convert_v1beta1_ThirdPartyResource_To_extensions_ThirdPartyResource(&(*in)[i], &(*out)[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Items = nil
+	}
 	return nil
 }
 
@@ -1525,10 +1573,70 @@ func Convert_v1beta1_ThirdPartyResourceList_To_extensions_ThirdPartyResourceList
 
 func autoConvert_extensions_ThirdPartyResourceList_To_v1beta1_ThirdPartyResourceList(in *extensions.ThirdPartyResourceList, out *ThirdPartyResourceList, s conversion.Scope) error {
 	out.ListMeta = in.ListMeta
-	out.Items = *(*[]ThirdPartyResource)(unsafe.Pointer(&in.Items))
+	if in.Items != nil {
+		in, out := &in.Items, &out.Items
+		*out = make([]ThirdPartyResource, len(*in))
+		for i := range *in {
+			if err := Convert_extensions_ThirdPartyResource_To_v1beta1_ThirdPartyResource(&(*in)[i], &(*out)[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Items = nil
+	}
 	return nil
 }
 
 func Convert_extensions_ThirdPartyResourceList_To_v1beta1_ThirdPartyResourceList(in *extensions.ThirdPartyResourceList, out *ThirdPartyResourceList, s conversion.Scope) error {
 	return autoConvert_extensions_ThirdPartyResourceList_To_v1beta1_ThirdPartyResourceList(in, out, s)
+}
+
+func autoConvert_v1beta1_ThirdPartyResourceSpec_To_extensions_ThirdPartyResourceSpec(in *ThirdPartyResourceSpec, out *extensions.ThirdPartyResourceSpec, s conversion.Scope) error {
+	out.Group = in.Group
+	out.Version = in.Version
+	out.Kind = in.Kind
+	out.Resource = in.Resource
+	out.ResourceSingular = in.ResourceSingular
+	out.Namespaced = (*bool)(unsafe.Pointer(in.Namespaced))
+	out.ShortNames = *(*[]string)(unsafe.Pointer(&in.ShortNames))
+	out.Description = in.Description
+	return nil
+}
+
+func Convert_v1beta1_ThirdPartyResourceSpec_To_extensions_ThirdPartyResourceSpec(in *ThirdPartyResourceSpec, out *extensions.ThirdPartyResourceSpec, s conversion.Scope) error {
+	return autoConvert_v1beta1_ThirdPartyResourceSpec_To_extensions_ThirdPartyResourceSpec(in, out, s)
+}
+
+func autoConvert_extensions_ThirdPartyResourceSpec_To_v1beta1_ThirdPartyResourceSpec(in *extensions.ThirdPartyResourceSpec, out *ThirdPartyResourceSpec, s conversion.Scope) error {
+	out.Group = in.Group
+	out.Version = in.Version
+	out.Kind = in.Kind
+	out.Resource = in.Resource
+	out.ResourceSingular = in.ResourceSingular
+	out.Namespaced = (*bool)(unsafe.Pointer(in.Namespaced))
+	out.ShortNames = *(*[]string)(unsafe.Pointer(&in.ShortNames))
+	out.Description = in.Description
+	return nil
+}
+
+func Convert_extensions_ThirdPartyResourceSpec_To_v1beta1_ThirdPartyResourceSpec(in *extensions.ThirdPartyResourceSpec, out *ThirdPartyResourceSpec, s conversion.Scope) error {
+	return autoConvert_extensions_ThirdPartyResourceSpec_To_v1beta1_ThirdPartyResourceSpec(in, out, s)
+}
+
+func autoConvert_v1beta1_ThirdPartyResourceStatus_To_extensions_ThirdPartyResourceStatus(in *ThirdPartyResourceStatus, out *extensions.ThirdPartyResourceStatus, s conversion.Scope) error {
+	out.Conditions = *(*[]extensions.ThirdPartyResourceCondition)(unsafe.Pointer(&in.Conditions))
+	return nil
+}
+
+func Convert_v1beta1_ThirdPartyResourceStatus_To_extensions_ThirdPartyResourceStatus(in *ThirdPartyResourceStatus, out *extensions.ThirdPartyResourceStatus, s conversion.Scope) error {
+	return autoConvert_v1beta1_ThirdPartyResourceStatus_To_extensions_ThirdPartyResourceStatus(in, out, s)
+}
+
+func autoConvert_extensions_ThirdPartyResourceStatus_To_v1beta1_ThirdPartyResourceStatus(in *extensions.ThirdPartyResourceStatus, out *ThirdPartyResourceStatus, s conversion.Scope) error {
+	out.Conditions = *(*[]ThirdPartyResourceCondition)(unsafe.Pointer(&in.Conditions))
+	return nil
+}
+
+func Convert_extensions_ThirdPartyResourceStatus_To_v1beta1_ThirdPartyResourceStatus(in *extensions.ThirdPartyResourceStatus, out *ThirdPartyResourceStatus, s conversion.Scope) error {
+	return autoConvert_extensions_ThirdPartyResourceStatus_To_v1beta1_ThirdPartyResourceStatus(in, out, s)
 }

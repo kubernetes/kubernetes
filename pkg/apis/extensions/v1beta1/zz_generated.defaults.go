@@ -37,6 +37,8 @@ func RegisterDefaults(scheme *runtime.Scheme) error {
 	scheme.AddTypeDefaultingFunc(&NetworkPolicyList{}, func(obj interface{}) { SetObjectDefaults_NetworkPolicyList(obj.(*NetworkPolicyList)) })
 	scheme.AddTypeDefaultingFunc(&ReplicaSet{}, func(obj interface{}) { SetObjectDefaults_ReplicaSet(obj.(*ReplicaSet)) })
 	scheme.AddTypeDefaultingFunc(&ReplicaSetList{}, func(obj interface{}) { SetObjectDefaults_ReplicaSetList(obj.(*ReplicaSetList)) })
+	scheme.AddTypeDefaultingFunc(&ThirdPartyResource{}, func(obj interface{}) { SetObjectDefaults_ThirdPartyResource(obj.(*ThirdPartyResource)) })
+	scheme.AddTypeDefaultingFunc(&ThirdPartyResourceList{}, func(obj interface{}) { SetObjectDefaults_ThirdPartyResourceList(obj.(*ThirdPartyResourceList)) })
 	return nil
 }
 
@@ -420,5 +422,16 @@ func SetObjectDefaults_ReplicaSetList(in *ReplicaSetList) {
 	for i := range in.Items {
 		a := &in.Items[i]
 		SetObjectDefaults_ReplicaSet(a)
+	}
+}
+
+func SetObjectDefaults_ThirdPartyResource(in *ThirdPartyResource) {
+	SetDefaults_ThirdPartyResource(in)
+}
+
+func SetObjectDefaults_ThirdPartyResourceList(in *ThirdPartyResourceList) {
+	for i := range in.Items {
+		a := &in.Items[i]
+		SetObjectDefaults_ThirdPartyResource(a)
 	}
 }

@@ -90,9 +90,12 @@ func RegisterDeepCopies(scheme *runtime.Scheme) error {
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1beta1_ScaleStatus, InType: reflect.TypeOf(&ScaleStatus{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1beta1_SupplementalGroupsStrategyOptions, InType: reflect.TypeOf(&SupplementalGroupsStrategyOptions{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1beta1_ThirdPartyResource, InType: reflect.TypeOf(&ThirdPartyResource{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1beta1_ThirdPartyResourceCondition, InType: reflect.TypeOf(&ThirdPartyResourceCondition{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1beta1_ThirdPartyResourceData, InType: reflect.TypeOf(&ThirdPartyResourceData{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1beta1_ThirdPartyResourceDataList, InType: reflect.TypeOf(&ThirdPartyResourceDataList{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1beta1_ThirdPartyResourceList, InType: reflect.TypeOf(&ThirdPartyResourceList{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1beta1_ThirdPartyResourceSpec, InType: reflect.TypeOf(&ThirdPartyResourceSpec{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1beta1_ThirdPartyResourceStatus, InType: reflect.TypeOf(&ThirdPartyResourceStatus{})},
 	)
 }
 
@@ -992,6 +995,22 @@ func DeepCopy_v1beta1_ThirdPartyResource(in interface{}, out interface{}, c *con
 			*out = make([]APIVersion, len(*in))
 			copy(*out, *in)
 		}
+		if err := DeepCopy_v1beta1_ThirdPartyResourceSpec(&in.Spec, &out.Spec, c); err != nil {
+			return err
+		}
+		if err := DeepCopy_v1beta1_ThirdPartyResourceStatus(&in.Status, &out.Status, c); err != nil {
+			return err
+		}
+		return nil
+	}
+}
+
+func DeepCopy_v1beta1_ThirdPartyResourceCondition(in interface{}, out interface{}, c *conversion.Cloner) error {
+	{
+		in := in.(*ThirdPartyResourceCondition)
+		out := out.(*ThirdPartyResourceCondition)
+		*out = *in
+		out.LastUpdateTime = in.LastUpdateTime.DeepCopy()
 		return nil
 	}
 }
@@ -1043,6 +1062,43 @@ func DeepCopy_v1beta1_ThirdPartyResourceList(in interface{}, out interface{}, c 
 			*out = make([]ThirdPartyResource, len(*in))
 			for i := range *in {
 				if err := DeepCopy_v1beta1_ThirdPartyResource(&(*in)[i], &(*out)[i], c); err != nil {
+					return err
+				}
+			}
+		}
+		return nil
+	}
+}
+
+func DeepCopy_v1beta1_ThirdPartyResourceSpec(in interface{}, out interface{}, c *conversion.Cloner) error {
+	{
+		in := in.(*ThirdPartyResourceSpec)
+		out := out.(*ThirdPartyResourceSpec)
+		*out = *in
+		if in.Namespaced != nil {
+			in, out := &in.Namespaced, &out.Namespaced
+			*out = new(bool)
+			**out = **in
+		}
+		if in.ShortNames != nil {
+			in, out := &in.ShortNames, &out.ShortNames
+			*out = make([]string, len(*in))
+			copy(*out, *in)
+		}
+		return nil
+	}
+}
+
+func DeepCopy_v1beta1_ThirdPartyResourceStatus(in interface{}, out interface{}, c *conversion.Cloner) error {
+	{
+		in := in.(*ThirdPartyResourceStatus)
+		out := out.(*ThirdPartyResourceStatus)
+		*out = *in
+		if in.Conditions != nil {
+			in, out := &in.Conditions, &out.Conditions
+			*out = make([]ThirdPartyResourceCondition, len(*in))
+			for i := range *in {
+				if err := DeepCopy_v1beta1_ThirdPartyResourceCondition(&(*in)[i], &(*out)[i], c); err != nil {
 					return err
 				}
 			}

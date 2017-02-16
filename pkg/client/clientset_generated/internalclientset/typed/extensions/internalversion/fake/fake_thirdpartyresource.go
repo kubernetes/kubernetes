@@ -51,6 +51,15 @@ func (c *FakeThirdPartyResources) Update(thirdPartyResource *extensions.ThirdPar
 	return obj.(*extensions.ThirdPartyResource), err
 }
 
+func (c *FakeThirdPartyResources) UpdateStatus(thirdPartyResource *extensions.ThirdPartyResource) (*extensions.ThirdPartyResource, error) {
+	obj, err := c.Fake.
+		Invokes(testing.NewRootUpdateSubresourceAction(thirdpartyresourcesResource, "status", thirdPartyResource), &extensions.ThirdPartyResource{})
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*extensions.ThirdPartyResource), err
+}
+
 func (c *FakeThirdPartyResources) Delete(name string, options *v1.DeleteOptions) error {
 	_, err := c.Fake.
 		Invokes(testing.NewRootDeleteAction(thirdpartyresourcesResource, name), &extensions.ThirdPartyResource{})
