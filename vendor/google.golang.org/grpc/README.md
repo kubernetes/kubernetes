@@ -28,5 +28,5 @@ See [API documentation](https://godoc.org/google.golang.org/grpc) for package an
 
 Status
 ------
-Beta release
+GA
 
