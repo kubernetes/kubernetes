@@ -19,7 +19,6 @@ package framework
 import (
 	"bytes"
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -63,11 +62,13 @@ import (
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
+
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/dynamic"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
+
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
 	apps "k8s.io/kubernetes/pkg/apis/apps/v1beta1"
@@ -163,9 +164,6 @@ const (
 	// How long a pod is allowed to become "running" and "ready" after a node
 	// restart before test is considered failed.
 	RestartPodReadyAgainTimeout = 5 * time.Minute
-
-	// Number of times we want to retry Updates in case of conflict
-	UpdateRetries = 5
 
 	// Number of objects that gc can delete in a second.
 	// GC issues 2 requestes for single delete.
@@ -2491,6 +2489,15 @@ func ExpectNodeHasLabel(c clientset.Interface, nodeName string, labelKey string,
 	Expect(node.Labels[labelKey]).To(Equal(labelValue))
 }
 
+func RemoveTaintOffNode(c clientset.Interface, nodeName string, taint v1.Taint) {
+	ExpectNoError(controller.RemoveTaintOffNode(c, nodeName, &taint))
+	VerifyThatTaintIsGone(c, nodeName, &taint)
+}
+
+func AddOrUpdateTaintOnNode(c clientset.Interface, nodeName string, taint v1.Taint) {
+	ExpectNoError(controller.AddOrUpdateTaintOnNode(c, nodeName, &taint))
+}
+
 // RemoveLabelOffNode is for cleaning up labels temporarily added to node,
 // won't fail if target label doesn't exist or has been removed.
 func RemoveLabelOffNode(c clientset.Interface, nodeName string, labelKey string) {
@@ -2501,61 +2508,17 @@ func RemoveLabelOffNode(c clientset.Interface, nodeName string, labelKey string)
 	ExpectNoError(testutils.VerifyLabelsRemoved(c, nodeName, []string{labelKey}))
 }
 
-func AddOrUpdateTaintOnNode(c clientset.Interface, nodeName string, taint v1.Taint) {
-	for attempt := 0; attempt < UpdateRetries; attempt++ {
-		node, err := c.Core().Nodes().Get(nodeName, metav1.GetOptions{})
-		ExpectNoError(err)
-
-		nodeTaints, err := v1.GetTaintsFromNodeAnnotations(node.Annotations)
-		ExpectNoError(err)
-
-		var newTaints []v1.Taint
-		updated := false
-		for _, existingTaint := range nodeTaints {
-			if taint.MatchTaint(existingTaint) {
-				newTaints = append(newTaints, taint)
-				updated = true
-				continue
-			}
-
-			newTaints = append(newTaints, existingTaint)
-		}
-
-		if !updated {
-			newTaints = append(newTaints, taint)
-		}
-
-		taintsData, err := json.Marshal(newTaints)
-		ExpectNoError(err)
-
-		if node.Annotations == nil {
-			node.Annotations = make(map[string]string)
-		}
-		node.Annotations[v1.TaintsAnnotationKey] = string(taintsData)
-		_, err = c.Core().Nodes().Update(node)
-		if err != nil {
-			if !apierrs.IsConflict(err) {
-				ExpectNoError(err)
-			} else {
-				Logf("Conflict when trying to add/update taint %v to %v", taint, nodeName)
-			}
-		} else {
-			break
-		}
-		time.Sleep(100 * time.Millisecond)
+func VerifyThatTaintIsGone(c clientset.Interface, nodeName string, taint *v1.Taint) {
+	By("verifying the node doesn't have the taint " + taint.ToString())
+	nodeUpdated, err := c.Core().Nodes().Get(nodeName, metav1.GetOptions{})
+	taintsGot, err := v1.GetTaintsFromNodeAnnotations(nodeUpdated.Annotations)
+	ExpectNoError(err)
+	if v1.TaintExists(taintsGot, taint) {
+		Failf("Failed removing taint " + taint.ToString() + " of the node " + nodeName)
 	}
 }
 
-func taintExists(taints []v1.Taint, taintToFind v1.Taint) bool {
-	for _, taint := range taints {
-		if taint.MatchTaint(taintToFind) {
-			return true
-		}
-	}
-	return false
-}
-
-func ExpectNodeHasTaint(c clientset.Interface, nodeName string, taint v1.Taint) {
+func ExpectNodeHasTaint(c clientset.Interface, nodeName string, taint *v1.Taint) {
 	By("verifying the node has the taint " + taint.ToString())
 	node, err := c.Core().Nodes().Get(nodeName, metav1.GetOptions{})
 	ExpectNoError(err)
@@ -2563,58 +2526,8 @@ func ExpectNodeHasTaint(c clientset.Interface, nodeName string, taint v1.Taint) 
 	nodeTaints, err := v1.GetTaintsFromNodeAnnotations(node.Annotations)
 	ExpectNoError(err)
 
-	if len(nodeTaints) == 0 || !taintExists(nodeTaints, taint) {
+	if len(nodeTaints) == 0 || !v1.TaintExists(nodeTaints, taint) {
 		Failf("Failed to find taint %s on node %s", taint.ToString(), nodeName)
-	}
-}
-
-// RemoveTaintOffNode is for cleaning up taints temporarily added to node,
-// won't fail if target taint doesn't exist or has been removed.
-func RemoveTaintOffNode(c clientset.Interface, nodeName string, taint v1.Taint) {
-	By("removing the taint " + taint.ToString() + " off the node " + nodeName)
-	for attempt := 0; attempt < UpdateRetries; attempt++ {
-		node, err := c.Core().Nodes().Get(nodeName, metav1.GetOptions{})
-		ExpectNoError(err)
-
-		nodeTaints, err := v1.GetTaintsFromNodeAnnotations(node.Annotations)
-		ExpectNoError(err)
-		if len(nodeTaints) == 0 {
-			return
-		}
-
-		if !taintExists(nodeTaints, taint) {
-			return
-		}
-
-		newTaints, _ := v1.DeleteTaint(nodeTaints, &taint)
-		if len(newTaints) == 0 {
-			delete(node.Annotations, v1.TaintsAnnotationKey)
-		} else {
-			taintsData, err := json.Marshal(newTaints)
-			ExpectNoError(err)
-			node.Annotations[v1.TaintsAnnotationKey] = string(taintsData)
-		}
-
-		_, err = c.Core().Nodes().Update(node)
-		if err != nil {
-			if !apierrs.IsConflict(err) {
-				ExpectNoError(err)
-			} else {
-				Logf("Conflict when trying to add/update taint %s to node %v", taint.ToString(), nodeName)
-			}
-		} else {
-			break
-		}
-		time.Sleep(100 * time.Millisecond)
-	}
-
-	nodeUpdated, err := c.Core().Nodes().Get(nodeName, metav1.GetOptions{})
-	ExpectNoError(err)
-	By("verifying the node doesn't have the taint " + taint.ToString())
-	taintsGot, err := v1.GetTaintsFromNodeAnnotations(nodeUpdated.Annotations)
-	ExpectNoError(err)
-	if taintExists(taintsGot, taint) {
-		Failf("Failed removing taint " + taint.ToString() + " of the node " + nodeName)
 	}
 }
 
