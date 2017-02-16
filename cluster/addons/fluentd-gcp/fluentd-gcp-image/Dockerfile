@@ -22,7 +22,6 @@
 
 FROM gcr.io/google_containers/ubuntu-slim:0.6
 
-
 # Disable prompts from apt
 ENV DEBIAN_FRONTEND noninteractive
 
@@ -37,6 +36,7 @@ RUN apt-get -qq update && \
     td-agent-gem install --no-document fluent-plugin-systemd -v 0.0.5 && \
     td-agent-gem install --no-document fluent-plugin-google-cloud -v 0.5.6 && \
     td-agent-gem install --no-document fluent-plugin-detect-exceptions -v 0.0.4 && \
+    td-agent-gem install --no-document fluent-plugin-prometheus -v 0.2.1 && \
     # Remove build tools
     apt-get remove -y -qq gcc make && \
     apt-get autoremove -y -qq && \
@@ -55,6 +55,8 @@ COPY fluent.conf /etc/td-agent/td-agent.conf
 
 # Copy the entrypoint for the container
 COPY run.sh /run.sh
+
+EXPOSE 80
 
 # Start Fluentd to pick up our config that watches Docker container logs.
 CMD /run.sh $FLUENTD_ARGS
