@@ -18,11 +18,13 @@ package daemon
 
 import (
 	"fmt"
+	"sync"
 	"testing"
 
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apiserver/pkg/storage/names"
 	core "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/cache"
@@ -166,6 +168,63 @@ func addFailedPods(podStore cache.Store, nodeName string, label map[string]strin
 	}
 }
 
+type fakePodControl struct {
+	sync.Mutex
+	*controller.FakePodControl
+	podStore cache.Store
+	podIDMap map[string]*v1.Pod
+}
+
+func newFakePodControl() *fakePodControl {
+	podIDMap := make(map[string]*v1.Pod)
+	return &fakePodControl{
+		FakePodControl: &controller.FakePodControl{},
+		podIDMap:       podIDMap}
+}
+
+func (f *fakePodControl) CreatePodsOnNode(nodeName, namespace string, template *v1.PodTemplateSpec, object runtime.Object) error {
+	f.Lock()
+	defer f.Unlock()
+	if err := f.FakePodControl.CreatePodsOnNode(nodeName, namespace, template, object); err != nil {
+		return fmt.Errorf("failed to create pod on node %q", nodeName)
+	}
+
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Labels:       template.Labels,
+			Namespace:    namespace,
+			GenerateName: fmt.Sprintf("%s-", nodeName),
+		},
+	}
+
+	if err := api.Scheme.Convert(&template.Spec, &pod.Spec, nil); err != nil {
+		return fmt.Errorf("unable to convert pod template: %v", err)
+	}
+	if len(nodeName) != 0 {
+		pod.Spec.NodeName = nodeName
+	}
+	pod.Name = names.SimpleNameGenerator.GenerateName(fmt.Sprintf("%s-", nodeName))
+
+	f.podStore.Update(pod)
+	f.podIDMap[pod.Name] = pod
+	return nil
+}
+
+func (f *fakePodControl) DeletePod(namespace string, podID string, object runtime.Object) error {
+	f.Lock()
+	defer f.Unlock()
+	if err := f.FakePodControl.DeletePod(namespace, podID, object); err != nil {
+		return fmt.Errorf("failed to delete pod %q", podID)
+	}
+	pod, ok := f.podIDMap[podID]
+	if !ok {
+		return fmt.Errorf("pod %q does not exist", podID)
+	}
+	f.podStore.Delete(pod)
+	delete(f.podIDMap, podID)
+	return nil
+}
+
 type daemonSetsController struct {
 	*DaemonSetsController
 
@@ -174,7 +233,7 @@ type daemonSetsController struct {
 	nodeStore cache.Store
 }
 
-func newTestController(initialObjects ...runtime.Object) (*daemonSetsController, *controller.FakePodControl, *fake.Clientset) {
+func newTestController(initialObjects ...runtime.Object) (*daemonSetsController, *fakePodControl, *fake.Clientset) {
 	clientset := fake.NewSimpleClientset(initialObjects...)
 	informerFactory := informers.NewSharedInformerFactory(clientset, controller.NoResyncPeriodFunc())
 
@@ -190,8 +249,9 @@ func newTestController(initialObjects ...runtime.Object) (*daemonSetsController,
 	manager.podStoreSynced = alwaysReady
 	manager.nodeStoreSynced = alwaysReady
 	manager.dsStoreSynced = alwaysReady
-	podControl := &controller.FakePodControl{}
+	podControl := newFakePodControl()
 	manager.podControl = podControl
+	podControl.podStore = informerFactory.Core().V1().Pods().Informer().GetStore()
 
 	return &daemonSetsController{
 		manager,
@@ -201,7 +261,7 @@ func newTestController(initialObjects ...runtime.Object) (*daemonSetsController,
 	}, podControl, clientset
 }
 
-func validateSyncDaemonSets(t *testing.T, fakePodControl *controller.FakePodControl, expectedCreates, expectedDeletes int) {
+func validateSyncDaemonSets(t *testing.T, fakePodControl *fakePodControl, expectedCreates, expectedDeletes int) {
 	if len(fakePodControl.Templates) != expectedCreates {
 		t.Errorf("Unexpected number of creates.  Expected %d, saw %d\n", expectedCreates, len(fakePodControl.Templates))
 	}
@@ -210,13 +270,25 @@ func validateSyncDaemonSets(t *testing.T, fakePodControl *controller.FakePodCont
 	}
 }
 
-func syncAndValidateDaemonSets(t *testing.T, manager *daemonSetsController, ds *extensions.DaemonSet, podControl *controller.FakePodControl, expectedCreates, expectedDeletes int) {
+func syncAndValidateDaemonSets(t *testing.T, manager *daemonSetsController, ds *extensions.DaemonSet, podControl *fakePodControl, expectedCreates, expectedDeletes int) {
 	key, err := controller.KeyFunc(ds)
 	if err != nil {
 		t.Errorf("Could not get key for daemon.")
 	}
 	manager.syncHandler(key)
 	validateSyncDaemonSets(t, podControl, expectedCreates, expectedDeletes)
+}
+
+// clearExpectations copies the FakePodControl to PodStore and clears the create and delete expectations.
+func clearExpectations(t *testing.T, manager *daemonSetsController, ds *extensions.DaemonSet, fakePodControl *fakePodControl) {
+	fakePodControl.Clear()
+
+	key, err := controller.KeyFunc(ds)
+	if err != nil {
+		t.Errorf("Could not get key for daemon.")
+		return
+	}
+	manager.expectations.DeleteExpectations(key)
 }
 
 func TestDeleteFinalStateUnknown(t *testing.T) {
@@ -228,6 +300,15 @@ func TestDeleteFinalStateUnknown(t *testing.T) {
 	enqueuedKey, _ := manager.queue.Get()
 	if enqueuedKey.(string) != "default/foo" {
 		t.Errorf("expected delete of DeletedFinalStateUnknown to enqueue the daemonset but found: %#v", enqueuedKey)
+	}
+}
+
+func markPodsReady(store cache.Store) {
+	// mark pods as ready
+	for _, obj := range store.List() {
+		pod := obj.(*v1.Pod)
+		condition := v1.PodCondition{Type: v1.PodReady, Status: v1.ConditionTrue}
+		v1.UpdatePodCondition(&pod.Status, &condition)
 	}
 }
 
@@ -926,4 +1007,115 @@ func TestNodeShouldRunDaemonPod(t *testing.T) {
 			t.Errorf("[%v] expected err: %v, got: %v", i, c.err, err)
 		}
 	}
+}
+
+func TestDaemonSetUpdatesPods(t *testing.T) {
+	manager, podControl, _ := newTestController()
+	maxUnavailable := 2
+	addNodes(manager.nodeStore, 0, 5, nil)
+	ds := newDaemonSet("foo")
+	manager.dsStore.Add(ds)
+	syncAndValidateDaemonSets(t, manager, ds, podControl, 5, 0)
+	markPodsReady(podControl.podStore)
+
+	ds.Spec.Template.Spec.Containers[0].Image = "foo2/bar2"
+	ds.Spec.UpdateStrategy.Type = extensions.RollingUpdateDaemonSetStrategyType
+	intStr := intstr.FromInt(maxUnavailable)
+	ds.Spec.UpdateStrategy.RollingUpdate = &extensions.RollingUpdateDaemonSet{MaxUnavailable: &intStr}
+	ds.TemplateGeneration++
+	manager.dsStore.Update(ds)
+
+	clearExpectations(t, manager, ds, podControl)
+	syncAndValidateDaemonSets(t, manager, ds, podControl, 0, maxUnavailable)
+	clearExpectations(t, manager, ds, podControl)
+	syncAndValidateDaemonSets(t, manager, ds, podControl, maxUnavailable, 0)
+	markPodsReady(podControl.podStore)
+
+	clearExpectations(t, manager, ds, podControl)
+	syncAndValidateDaemonSets(t, manager, ds, podControl, 0, maxUnavailable)
+	clearExpectations(t, manager, ds, podControl)
+	syncAndValidateDaemonSets(t, manager, ds, podControl, maxUnavailable, 0)
+	markPodsReady(podControl.podStore)
+
+	clearExpectations(t, manager, ds, podControl)
+	syncAndValidateDaemonSets(t, manager, ds, podControl, 0, 1)
+	clearExpectations(t, manager, ds, podControl)
+	syncAndValidateDaemonSets(t, manager, ds, podControl, 1, 0)
+	markPodsReady(podControl.podStore)
+
+	clearExpectations(t, manager, ds, podControl)
+	syncAndValidateDaemonSets(t, manager, ds, podControl, 0, 0)
+	clearExpectations(t, manager, ds, podControl)
+}
+
+func TestDaemonSetUpdatesWhenNewPosIsNotReady(t *testing.T) {
+	manager, podControl, _ := newTestController()
+	maxUnavailable := 3
+	addNodes(manager.nodeStore, 0, 5, nil)
+	ds := newDaemonSet("foo")
+	manager.dsStore.Add(ds)
+	syncAndValidateDaemonSets(t, manager, ds, podControl, 5, 0)
+	markPodsReady(podControl.podStore)
+
+	ds.Spec.Template.Spec.Containers[0].Image = "foo2/bar2"
+	ds.Spec.UpdateStrategy.Type = extensions.RollingUpdateDaemonSetStrategyType
+	intStr := intstr.FromInt(maxUnavailable)
+	ds.Spec.UpdateStrategy.RollingUpdate = &extensions.RollingUpdateDaemonSet{MaxUnavailable: &intStr}
+	ds.TemplateGeneration++
+	manager.dsStore.Update(ds)
+
+	// new pods are not ready numUnavailable == maxUnavailable
+	clearExpectations(t, manager, ds, podControl)
+	syncAndValidateDaemonSets(t, manager, ds, podControl, 0, maxUnavailable)
+	clearExpectations(t, manager, ds, podControl)
+	syncAndValidateDaemonSets(t, manager, ds, podControl, maxUnavailable, 0)
+
+	clearExpectations(t, manager, ds, podControl)
+	syncAndValidateDaemonSets(t, manager, ds, podControl, 0, 0)
+	clearExpectations(t, manager, ds, podControl)
+}
+
+func TestDaemonSetUpdatesAllOldPodsNotReady(t *testing.T) {
+	manager, podControl, _ := newTestController()
+	maxUnavailable := 3
+	addNodes(manager.nodeStore, 0, 5, nil)
+	ds := newDaemonSet("foo")
+	manager.dsStore.Add(ds)
+	syncAndValidateDaemonSets(t, manager, ds, podControl, 5, 0)
+
+	ds.Spec.Template.Spec.Containers[0].Image = "foo2/bar2"
+	ds.Spec.UpdateStrategy.Type = extensions.RollingUpdateDaemonSetStrategyType
+	intStr := intstr.FromInt(maxUnavailable)
+	ds.Spec.UpdateStrategy.RollingUpdate = &extensions.RollingUpdateDaemonSet{MaxUnavailable: &intStr}
+	ds.TemplateGeneration++
+	manager.dsStore.Update(ds)
+
+	// all old pods are unavailable so should be removed
+	clearExpectations(t, manager, ds, podControl)
+	syncAndValidateDaemonSets(t, manager, ds, podControl, 0, 5)
+	clearExpectations(t, manager, ds, podControl)
+	syncAndValidateDaemonSets(t, manager, ds, podControl, 5, 0)
+
+	clearExpectations(t, manager, ds, podControl)
+	syncAndValidateDaemonSets(t, manager, ds, podControl, 0, 0)
+	clearExpectations(t, manager, ds, podControl)
+}
+
+func TestDaemonSetUpdatesNoTemplateChanged(t *testing.T) {
+	manager, podControl, _ := newTestController()
+	maxUnavailable := 3
+	addNodes(manager.nodeStore, 0, 5, nil)
+	ds := newDaemonSet("foo")
+	manager.dsStore.Add(ds)
+	syncAndValidateDaemonSets(t, manager, ds, podControl, 5, 0)
+
+	ds.Spec.UpdateStrategy.Type = extensions.RollingUpdateDaemonSetStrategyType
+	intStr := intstr.FromInt(maxUnavailable)
+	ds.Spec.UpdateStrategy.RollingUpdate = &extensions.RollingUpdateDaemonSet{MaxUnavailable: &intStr}
+	manager.dsStore.Update(ds)
+
+	// template is not changed no pod should be removed
+	clearExpectations(t, manager, ds, podControl)
+	syncAndValidateDaemonSets(t, manager, ds, podControl, 0, 0)
+	clearExpectations(t, manager, ds, podControl)
 }
