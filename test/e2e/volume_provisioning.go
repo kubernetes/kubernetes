@@ -190,12 +190,26 @@ var _ = framework.KubeDescribe("Dynamic provisioning", func() {
 		It("should create and delete alpha persistent volumes [Slow] [Volume]", func() {
 			framework.SkipUnlessProviderIs("openstack", "gce", "aws", "gke", "vsphere")
 
+			// Check there is a default storage class
+			classes, err := c.Storage().StorageClasses().List(metav1.ListOptions{})
+			Expect(err).NotTo(HaveOccurred())
+			found := false
+			for _, class := range classes.Items {
+				if storageutil.IsDefaultAnnotation(class.ObjectMeta) {
+					found = true
+					break
+				}
+			}
+			if !found {
+				Skip("No default class found")
+			}
+
 			By("creating a claim with an alpha dynamic provisioning annotation")
 			claim := newClaim(ns, "", true)
 			defer func() {
 				c.Core().PersistentVolumeClaims(ns).Delete(claim.Name, nil)
 			}()
-			claim, err := c.Core().PersistentVolumeClaims(ns).Create(claim)
+			claim, err = c.Core().PersistentVolumeClaims(ns).Create(claim)
 			Expect(err).NotTo(HaveOccurred())
 
 			if framework.ProviderIs("vsphere") {
@@ -263,7 +277,7 @@ func newClaim(ns, suffix string, alpha bool) *v1.PersistentVolumeClaim {
 
 	if alpha {
 		claim.Annotations = map[string]string{
-			storageutil.AlphaStorageClassAnnotation: "",
+			"volume.alpha.kubernetes.io/storage-class": "anything",
 		}
 	} else {
 		claim.Annotations = map[string]string{
