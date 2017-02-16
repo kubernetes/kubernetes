@@ -472,9 +472,14 @@ func StartControllers(controllers map[string]InitFunc, s *options.CMServer, root
 		glog.Infof("Will not configure cloud provider routes for allocate-node-cidrs: %v, configure-cloud-routes: %v.", s.AllocateNodeCIDRs, s.ConfigureCloudRoutes)
 	}
 
+	alphaProvisioner, err := NewAlphaVolumeProvisioner(cloud, s.VolumeConfiguration)
+	if err != nil {
+		return fmt.Errorf("an backward-compatible provisioner could not be created: %v, but one was expected. Provisioning will not work. This functionality is considered an early Alpha version.", err)
+	}
 	params := persistentvolumecontroller.ControllerParameters{
 		KubeClient:                clientBuilder.ClientOrDie("persistent-volume-binder"),
 		SyncPeriod:                s.PVClaimBinderSyncPeriod.Duration,
+		AlphaProvisioner:          alphaProvisioner,
 		VolumePlugins:             ProbeControllerVolumePlugins(cloud, s.VolumeConfiguration),
 		Cloud:                     cloud,
 		ClusterName:               s.ClusterName,

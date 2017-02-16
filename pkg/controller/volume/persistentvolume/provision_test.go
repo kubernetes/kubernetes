@@ -95,6 +95,10 @@ var provision2Success = provisionCall{
 	expectedParameters: class2Parameters,
 }
 
+var provisionAlphaSuccess = provisionCall{
+	ret: nil,
+}
+
 // Test single call to syncVolume, expecting provisioning to happen.
 // 1. Fill in the controller with initial data
 // 2. Call the syncVolume *once*.
@@ -354,6 +358,36 @@ func TestProvisionSync(t *testing.T) {
 		},
 	}
 	runSyncTests(t, tests, storageClasses)
+}
+
+func TestAlphaProvisionSync(t *testing.T) {
+	tests := []controllerTest{
+		{
+			// Provision a volume with alpha annotation
+			"14-1 - successful alpha provisioning",
+			novolumes,
+			newVolumeArray("pvc-uid14-1", "1Gi", "uid14-1", "claim14-1", v1.VolumeBound, v1.PersistentVolumeReclaimDelete, annBoundByController, annDynamicallyProvisioned),
+			newClaimArray("claim14-1", "uid14-1", "1Gi", "", v1.ClaimPending, storageutil.AlphaStorageClassAnnotation),
+			// Binding will be completed in the next syncClaim
+			newClaimArray("claim14-1", "uid14-1", "1Gi", "", v1.ClaimPending, storageutil.AlphaStorageClassAnnotation, annStorageProvisioner),
+			noevents, noerrors, wrapTestWithProvisionCalls([]provisionCall{provisionAlphaSuccess}, testSyncClaim),
+		},
+		{
+			// Provision success - there is already a volume available, still
+			// we provision a new one when requested.
+			"14-2 - no alpha provisioning when there is a volume available",
+			newVolumeArray("volume14-2", "1Gi", "", "", v1.VolumePending, v1.PersistentVolumeReclaimRetain),
+			[]*v1.PersistentVolume{
+				newVolume("volume14-2", "1Gi", "", "", v1.VolumePending, v1.PersistentVolumeReclaimRetain),
+				newVolume("pvc-uid14-2", "1Gi", "uid14-2", "claim14-2", v1.VolumeBound, v1.PersistentVolumeReclaimDelete, annBoundByController, annDynamicallyProvisioned),
+			},
+			newClaimArray("claim14-2", "uid14-2", "1Gi", "", v1.ClaimPending, storageutil.AlphaStorageClassAnnotation),
+			// Binding will be completed in the next syncClaim
+			newClaimArray("claim14-2", "uid14-2", "1Gi", "", v1.ClaimPending, storageutil.AlphaStorageClassAnnotation, annStorageProvisioner),
+			noevents, noerrors, wrapTestWithProvisionCalls([]provisionCall{provisionAlphaSuccess}, testSyncClaim),
+		},
+	}
+	runSyncTests(t, tests, []*storage.StorageClass{})
 }
 
 // Test multiple calls to syncClaim/syncVolume and periodic sync of all

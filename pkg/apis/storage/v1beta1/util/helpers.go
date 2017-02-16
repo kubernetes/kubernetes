@@ -27,6 +27,10 @@ import (
 const IsDefaultStorageClassAnnotation = "storageclass.beta.kubernetes.io/is-default-class"
 const BetaIsDefaultStorageClassAnnotation = "storageclass.beta.kubernetes.io/is-default-class"
 
+// AlphaStorageClassAnnotation represents the previous alpha storage class
+// annotation.  it's no longer used and held here for posterity.
+const AlphaStorageClassAnnotation = "volume.alpha.kubernetes.io/storage-class"
+
 // BetaStorageClassAnnotation represents the beta/previous StorageClass annotation.
 // It's currently still used and will be held for backwards compatibility
 const BetaStorageClassAnnotation = "volume.beta.kubernetes.io/storage-class"
@@ -71,7 +75,7 @@ func GetClaimStorageClass(claim *v1.PersistentVolumeClaim) string {
 
 // GetStorageClassAnnotation returns the StorageClass value
 // if the annotation is set, empty string if not
-// TODO: remove Beta when no longer used or needed
+// TODO: remove Alpha and Beta when no longer used or needed
 func GetStorageClassAnnotation(obj metav1.ObjectMeta) string {
 	if class, ok := obj.Annotations[StorageClassAnnotation]; ok {
 		return class
@@ -79,12 +83,16 @@ func GetStorageClassAnnotation(obj metav1.ObjectMeta) string {
 	if class, ok := obj.Annotations[BetaStorageClassAnnotation]; ok {
 		return class
 	}
+	if class, ok := obj.Annotations[AlphaStorageClassAnnotation]; ok {
+		return class
+	}
+
 	return ""
 }
 
 // HasStorageClassAnnotation returns a boolean
 // if the annotation is set
-// TODO: remove Beta when no longer used or needed
+// TODO: remove Alpha and Beta when no longer used or needed
 func HasStorageClassAnnotation(obj metav1.ObjectMeta) bool {
 	if _, found := obj.Annotations[StorageClassAnnotation]; found {
 		return found
@@ -92,7 +100,12 @@ func HasStorageClassAnnotation(obj metav1.ObjectMeta) bool {
 	if _, found := obj.Annotations[BetaStorageClassAnnotation]; found {
 		return found
 	}
+	if _, found := obj.Annotations[AlphaStorageClassAnnotation]; found {
+		return found
+	}
+
 	return false
+
 }
 
 // IsDefaultAnnotationText returns a pretty Yes/No String if
