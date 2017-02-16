@@ -46,9 +46,13 @@ func checkSecret(t *testing.T, store *secretStore, ns, name string, shouldExist 
 	}
 }
 
+func noObjectTTL() (time.Duration, bool) {
+	return time.Duration(0), false
+}
+
 func TestSecretStore(t *testing.T) {
 	fakeClient := &fake.Clientset{}
-	store := newSecretStore(fakeClient, clock.RealClock{}, 0)
+	store := newSecretStore(fakeClient, clock.RealClock{}, noObjectTTL, 0)
 	store.Add("ns1", "name1")
 	store.Add("ns2", "name2")
 	store.Add("ns1", "name1")
@@ -82,7 +86,7 @@ func TestSecretStore(t *testing.T) {
 
 func TestSecretStoreDeletingSecret(t *testing.T) {
 	fakeClient := &fake.Clientset{}
-	store := newSecretStore(fakeClient, clock.RealClock{}, 0)
+	store := newSecretStore(fakeClient, clock.RealClock{}, noObjectTTL, 0)
 	store.Add("ns", "name")
 
 	result := &v1.Secret{ObjectMeta: metav1.ObjectMeta{Namespace: "ns", Name: "name", ResourceVersion: "10"}}
@@ -112,7 +116,7 @@ func TestSecretStoreDeletingSecret(t *testing.T) {
 func TestSecretStoreGetAlwaysRefresh(t *testing.T) {
 	fakeClient := &fake.Clientset{}
 	fakeClock := clock.NewFakeClock(time.Now())
-	store := newSecretStore(fakeClient, fakeClock, 0)
+	store := newSecretStore(fakeClient, fakeClock, noObjectTTL, 0)
 
 	for i := 0; i < 10; i++ {
 		store.Add(fmt.Sprintf("ns-%d", i), fmt.Sprintf("name-%d", i))
@@ -139,7 +143,7 @@ func TestSecretStoreGetAlwaysRefresh(t *testing.T) {
 func TestSecretStoreGetNeverRefresh(t *testing.T) {
 	fakeClient := &fake.Clientset{}
 	fakeClock := clock.NewFakeClock(time.Now())
-	store := newSecretStore(fakeClient, fakeClock, time.Minute)
+	store := newSecretStore(fakeClient, fakeClock, noObjectTTL, time.Minute)
 
 	for i := 0; i < 10; i++ {
 		store.Add(fmt.Sprintf("ns-%d", i), fmt.Sprintf("name-%d", i))
@@ -158,6 +162,131 @@ func TestSecretStoreGetNeverRefresh(t *testing.T) {
 	actions := fakeClient.Actions()
 	// Only first Get, should forward the Get request.
 	assert.Equal(t, 10, len(actions), "unexpected actions: %#v", actions)
+}
+
+func TestCustomTTL(t *testing.T) {
+	ttl := time.Duration(0)
+	ttlExists := false
+	customTTL := func() (time.Duration, bool) {
+		return ttl, ttlExists
+	}
+
+	fakeClient := &fake.Clientset{}
+	fakeClock := clock.NewFakeClock(time.Time{})
+	store := newSecretStore(fakeClient, fakeClock, customTTL, time.Minute)
+
+	store.Add("ns", "name")
+	store.Get("ns", "name")
+	fakeClient.ClearActions()
+
+	// Set 0-ttl and see if that works.
+	ttl = time.Duration(0)
+	ttlExists = true
+	store.Get("ns", "name")
+	actions := fakeClient.Actions()
+	assert.Equal(t, 1, len(actions), "unexpected actions: %#v", actions)
+	fakeClient.ClearActions()
+
+	// Set 5-minute ttl and see if this works.
+	ttl = time.Duration(5) * time.Minute
+	store.Get("ns", "name")
+	actions = fakeClient.Actions()
+	assert.Equal(t, 0, len(actions), "unexpected actions: %#v", actions)
+	// Still no effect after 4 minutes.
+	fakeClock.Step(4 * time.Minute)
+	store.Get("ns", "name")
+	actions = fakeClient.Actions()
+	assert.Equal(t, 0, len(actions), "unexpected actions: %#v", actions)
+	// Now it should have an effect.
+	fakeClock.Step(time.Minute)
+	store.Get("ns", "name")
+	actions = fakeClient.Actions()
+	assert.Equal(t, 1, len(actions), "unexpected actions: %#v", actions)
+	fakeClient.ClearActions()
+
+	// Now remove the custom ttl and see if that works.
+	ttlExists = false
+	fakeClock.Step(55 * time.Second)
+	store.Get("ns", "name")
+	actions = fakeClient.Actions()
+	assert.Equal(t, 0, len(actions), "unexpected actions: %#v", actions)
+	// Pass the minute and it should be triggered now.
+	fakeClock.Step(5 * time.Second)
+	store.Get("ns", "name")
+	actions = fakeClient.Actions()
+	assert.Equal(t, 1, len(actions), "unexpected actions: %#v", actions)
+}
+
+func TestParseNodeAnnotation(t *testing.T) {
+	testCases := []struct {
+		node   *v1.Node
+		err    error
+		exists bool
+		ttl    time.Duration
+	}{
+		{
+			node:   nil,
+			err:    fmt.Errorf("error"),
+			exists: false,
+		},
+		{
+			node: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "node",
+				},
+			},
+			exists: false,
+		},
+		{
+			node: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:        "node",
+					Annotations: map[string]string{},
+				},
+			},
+			exists: false,
+		},
+		{
+			node: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:        "node",
+					Annotations: map[string]string{v1.ObjectTTLAnnotationKey: "bad"},
+				},
+			},
+			exists: false,
+		},
+		{
+			node: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:        "node",
+					Annotations: map[string]string{v1.ObjectTTLAnnotationKey: "0"},
+				},
+			},
+			exists: true,
+			ttl:    time.Duration(0),
+		},
+		{
+			node: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:        "node",
+					Annotations: map[string]string{v1.ObjectTTLAnnotationKey: "60"},
+				},
+			},
+			exists: true,
+			ttl:    time.Minute,
+		},
+	}
+	for i, testCase := range testCases {
+		getNode := func() (*v1.Node, error) { return testCase.node, testCase.err }
+		ttl, exists := GetObjectTTLFromNodeFunc(getNode)()
+		if exists != testCase.exists {
+			t.Errorf("%d: incorrect parsing: %t", i, exists)
+			continue
+		}
+		if exists && ttl != testCase.ttl {
+			t.Errorf("%d: incorrect ttl: %v", i, ttl)
+		}
+	}
 }
 
 type envSecrets struct {
@@ -215,7 +344,7 @@ func podWithSecrets(ns, name string, toAttach secretsToAttach) *v1.Pod {
 func TestCacheInvalidation(t *testing.T) {
 	fakeClient := &fake.Clientset{}
 	fakeClock := clock.NewFakeClock(time.Now())
-	store := newSecretStore(fakeClient, fakeClock, time.Minute)
+	store := newSecretStore(fakeClient, fakeClock, noObjectTTL, time.Minute)
 	manager := &cachingSecretManager{
 		secretStore:    store,
 		registeredPods: make(map[objectKey]*v1.Pod),
@@ -273,7 +402,7 @@ func TestCacheInvalidation(t *testing.T) {
 func TestCacheRefcounts(t *testing.T) {
 	fakeClient := &fake.Clientset{}
 	fakeClock := clock.NewFakeClock(time.Now())
-	store := newSecretStore(fakeClient, fakeClock, time.Minute)
+	store := newSecretStore(fakeClient, fakeClock, noObjectTTL, time.Minute)
 	manager := &cachingSecretManager{
 		secretStore:    store,
 		registeredPods: make(map[objectKey]*v1.Pod),
@@ -349,7 +478,7 @@ func TestCacheRefcounts(t *testing.T) {
 
 func TestCachingSecretManager(t *testing.T) {
 	fakeClient := &fake.Clientset{}
-	secretStore := newSecretStore(fakeClient, clock.RealClock{}, 0)
+	secretStore := newSecretStore(fakeClient, clock.RealClock{}, noObjectTTL, 0)
 	manager := &cachingSecretManager{
 		secretStore:    secretStore,
 		registeredPods: make(map[objectKey]*v1.Pod),

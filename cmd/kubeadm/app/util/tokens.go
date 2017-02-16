@@ -27,11 +27,11 @@ import (
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	clientset "k8s.io/client-go/kubernetes"
+	v1 "k8s.io/client-go/pkg/api/v1"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmapiext "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha1"
-	"k8s.io/kubernetes/pkg/api"
-	v1 "k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
+	bootstrapapi "k8s.io/kubernetes/pkg/bootstrap/api"
 )
 
 const (
@@ -120,7 +120,7 @@ func DiscoveryPort(d *kubeadmapi.TokenDiscovery) int32 {
 	if len(split) == 1 {
 		return kubeadmapiext.DefaultDiscoveryBindPort
 	}
-	if i, err := strconv.Atoi(split[1]); err != nil {
+	if i, err := strconv.Atoi(split[1]); err == nil {
 		return int32(i)
 	}
 	return kubeadmapiext.DefaultDiscoveryBindPort
@@ -154,7 +154,9 @@ func UpdateOrCreateToken(client *clientset.Clientset, d *kubeadmapi.TokenDiscove
 				ObjectMeta: metav1.ObjectMeta{
 					Name: secretName,
 				},
-				Type: api.SecretTypeBootstrapToken,
+				// TODO(jbeda): convert kubeadm to client-go
+				// https://github.com/kubernetes/kubeadm/issues/52
+				Type: v1.SecretType(bootstrapapi.SecretTypeBootstrapToken),
 				Data: encodeTokenSecretData(d, tokenDuration),
 			}
 			if _, err := client.Secrets(metav1.NamespaceSystem).Create(secret); err == nil {

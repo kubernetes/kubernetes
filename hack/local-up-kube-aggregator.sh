@@ -66,7 +66,7 @@ function start_kube-aggregator {
 	# make sure the resources we're about to create don't exist
 	kubectl_core -n kube-public delete secret auth-proxy-client serving-etcd serving-kube-aggregator kube-aggregator-etcd > /dev/null 2>&1 || true
 	kubectl_core -n kube-public delete configmap etcd-ca kube-aggregator-ca client-ca request-header-ca > /dev/null 2>&1 || true
-	kubectl_core -n kube-public delete -f "${KUBE_ROOT}/cmd/kube-aggregator/artifacts/local-cluster-up" > /dev/null 2>&1 || true
+	kubectl_core -n kube-public delete -f "${KUBE_ROOT}/vendor/k8s.io/kube-aggregator/artifacts/local-cluster-up" > /dev/null 2>&1 || true
 
 	sudo_kubectl_core -n kube-public create secret tls auth-proxy-client --cert="${CERT_DIR}/client-auth-proxy.crt" --key="${CERT_DIR}/client-auth-proxy.key"
 	sudo_kubectl_core -n kube-public create secret tls serving-etcd --cert="${CERT_DIR}/serving-etcd.crt" --key="${CERT_DIR}/serving-etcd.key"
@@ -77,9 +77,9 @@ function start_kube-aggregator {
 	kubectl_core -n kube-public create configmap client-ca --from-file="ca.crt=${CERT_DIR}/client-ca.crt" || true
 	kubectl_core -n kube-public create configmap request-header-ca --from-file="ca.crt=${CERT_DIR}/request-header-ca.crt" || true
 
-	${KUBE_ROOT}/cmd/kube-aggregator/hack/build-image.sh
+	${KUBE_ROOT}/vendor/k8s.io/kube-aggregator/hack/build-image.sh
 
-	kubectl_core -n kube-public create -f "${KUBE_ROOT}/cmd/kube-aggregator/artifacts/local-cluster-up"
+	kubectl_core -n kube-public create -f "${KUBE_ROOT}/vendor/k8s.io/kube-aggregator/artifacts/local-cluster-up"
 
 	${sudo} cp "${CERT_DIR}/admin.kubeconfig" "${CERT_DIR}/admin-kube-aggregator.kubeconfig"
 	${sudo} chown ${USER} "${CERT_DIR}/admin-kube-aggregator.kubeconfig"
@@ -94,7 +94,7 @@ function start_kube-aggregator {
 	sleep 1
 
 	# create the "normal" api services for the core API server
-	${kubectl} --kubeconfig="${CERT_DIR}/admin-kube-aggregator.kubeconfig" create -f "${KUBE_ROOT}/cmd/kube-aggregator/artifacts/core-apiservices"
+	${kubectl} --kubeconfig="${CERT_DIR}/admin-kube-aggregator.kubeconfig" create -f "${KUBE_ROOT}/vendor/k8s.io/kube-aggregator/artifacts/core-apiservices"
 }
 
 kube::util::test_openssl_installed

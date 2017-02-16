@@ -533,7 +533,7 @@ var (
 
 	// TODO: consider having 'KIND' for third party resource data
 	thirdPartyResourceDataColumns    = []string{"NAME", "LABELS", "DATA"}
-	horizontalPodAutoscalerColumns   = []string{"NAME", "REFERENCE", "TARGET", "CURRENT", "MINPODS", "MAXPODS", "REPLICAS", "AGE"}
+	horizontalPodAutoscalerColumns   = []string{"NAME", "REFERENCE", "TARGETS", "MINPODS", "MAXPODS", "REPLICAS", "AGE"}
 	withNamespacePrefixColumns       = []string{"NAMESPACE"} // TODO(erictune): print cluster name too.
 	deploymentColumns                = []string{"NAME", "DESIRED", "CURRENT", "UP-TO-DATE", "AVAILABLE", "AGE"}
 	deploymentWideColumns            = []string{"CONTAINER(S)", "IMAGE(S)", "SELECTOR"}
@@ -2145,6 +2145,66 @@ func printDeploymentList(list *extensions.DeploymentList, w io.Writer, options P
 	return nil
 }
 
+func formatHPAMetrics(specs []autoscaling.MetricSpec, statuses []autoscaling.MetricStatus) string {
+	if len(specs) == 0 {
+		return "<none>"
+	}
+	list := []string{}
+	max := 2
+	more := false
+	count := 0
+	for i, spec := range specs {
+		switch spec.Type {
+		case autoscaling.PodsMetricSourceType:
+			current := "<unknown>"
+			if len(statuses) > i && statuses[i].Pods != nil {
+				current = statuses[i].Pods.CurrentAverageValue.String()
+			}
+			list = append(list, fmt.Sprintf("%s / %s", current, spec.Pods.TargetAverageValue.String()))
+		case autoscaling.ObjectMetricSourceType:
+			current := "<unknown>"
+			if len(statuses) > i && statuses[i].Object != nil {
+				current = statuses[i].Object.CurrentValue.String()
+			}
+			list = append(list, fmt.Sprintf("%s / %s", current, spec.Object.TargetValue.String()))
+		case autoscaling.ResourceMetricSourceType:
+			if spec.Resource.TargetAverageValue != nil {
+				current := "<unknown>"
+				if len(statuses) > i && statuses[i].Resource != nil {
+					current = statuses[i].Resource.CurrentAverageValue.String()
+				}
+				list = append(list, fmt.Sprintf("%s / %s", current, spec.Resource.TargetAverageValue.String()))
+			} else {
+				current := "<unknown>"
+				if len(statuses) > i && statuses[i].Resource != nil && statuses[i].Resource.CurrentAverageUtilization != nil {
+					current = fmt.Sprintf("%d%%", *statuses[i].Resource.CurrentAverageUtilization)
+				}
+
+				target := "<auto>"
+				if spec.Resource.TargetAverageUtilization != nil {
+					target = fmt.Sprintf("%d%%", *spec.Resource.TargetAverageUtilization)
+				}
+				list = append(list, fmt.Sprintf("%s / %s", current, target))
+			}
+		default:
+			list = append(list, "<unknown type>")
+		}
+
+		count++
+	}
+
+	if count > max {
+		list = list[:max]
+		more = true
+	}
+
+	ret := strings.Join(list, ", ")
+	if more {
+		return fmt.Sprintf("%s + %d more...", ret, count-max)
+	}
+	return ret
+}
+
 func printHorizontalPodAutoscaler(hpa *autoscaling.HorizontalPodAutoscaler, w io.Writer, options PrintOptions) error {
 	namespace := hpa.Namespace
 	name := formatResourceName(options.Kind, hpa.Name, options.WithKind)
@@ -2152,15 +2212,8 @@ func printHorizontalPodAutoscaler(hpa *autoscaling.HorizontalPodAutoscaler, w io
 	reference := fmt.Sprintf("%s/%s",
 		hpa.Spec.ScaleTargetRef.Kind,
 		hpa.Spec.ScaleTargetRef.Name)
-	target := "<unset>"
-	if hpa.Spec.TargetCPUUtilizationPercentage != nil {
-		target = fmt.Sprintf("%d%%", *hpa.Spec.TargetCPUUtilizationPercentage)
-	}
-	current := "<waiting>"
-	if hpa.Status.CurrentCPUUtilizationPercentage != nil {
-		current = fmt.Sprintf("%d%%", *hpa.Status.CurrentCPUUtilizationPercentage)
-	}
 	minPods := "<unset>"
+	metrics := formatHPAMetrics(hpa.Spec.Metrics, hpa.Status.CurrentMetrics)
 	if hpa.Spec.MinReplicas != nil {
 		minPods = fmt.Sprintf("%d", *hpa.Spec.MinReplicas)
 	}
@@ -2173,11 +2226,10 @@ func printHorizontalPodAutoscaler(hpa *autoscaling.HorizontalPodAutoscaler, w io
 		}
 	}
 
-	if _, err := fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\t%d\t%d\t%s",
+	if _, err := fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%d\t%d\t%s",
 		name,
 		reference,
-		target,
-		current,
+		metrics,
 		minPods,
 		maxPods,
 		currentReplicas,

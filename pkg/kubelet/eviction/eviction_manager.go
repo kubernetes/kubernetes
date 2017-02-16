@@ -187,6 +187,8 @@ func (m *managerImpl) synchronize(diskInfoProvider DiskInfoProvider, podFunc Act
 		return
 	}
 
+	glog.V(3).Infof("eviction manager: synchronize housekeeping")
+
 	// build the ranking functions (if not yet known)
 	// TODO: have a function in cadvisor that lets us know if global housekeeping has completed
 	if len(m.resourceToRankFunc) == 0 || len(m.resourceToNodeReclaimFuncs) == 0 {
@@ -205,6 +207,7 @@ func (m *managerImpl) synchronize(diskInfoProvider DiskInfoProvider, podFunc Act
 		glog.Errorf("eviction manager: unexpected err: %v", err)
 		return
 	}
+	debugLogObservations("observations", observations)
 
 	// attempt to create a threshold notifier to improve eviction response time
 	if m.config.KernelMemcgNotification && !m.notifiersInitialized {
@@ -231,15 +234,18 @@ func (m *managerImpl) synchronize(diskInfoProvider DiskInfoProvider, podFunc Act
 
 	// determine the set of thresholds met independent of grace period
 	thresholds = thresholdsMet(thresholds, observations, false)
+	debugLogThresholdsWithObservation("thresholds - ignoring grace period", thresholds, observations)
 
 	// determine the set of thresholds previously met that have not yet satisfied the associated min-reclaim
 	if len(m.thresholdsMet) > 0 {
 		thresholdsNotYetResolved := thresholdsMet(m.thresholdsMet, observations, true)
 		thresholds = mergeThresholds(thresholds, thresholdsNotYetResolved)
 	}
+	debugLogThresholdsWithObservation("thresholds - reclaim not satisfied", thresholds, observations)
 
 	// determine the set of thresholds whose stats have been updated since the last sync
 	thresholds = thresholdsUpdatedStats(thresholds, observations, m.lastObservations)
+	debugLogThresholdsWithObservation("thresholds - updated stats", thresholds, observations)
 
 	// track when a threshold was first observed
 	now := m.clock.Now()
@@ -247,15 +253,22 @@ func (m *managerImpl) synchronize(diskInfoProvider DiskInfoProvider, podFunc Act
 
 	// the set of node conditions that are triggered by currently observed thresholds
 	nodeConditions := nodeConditions(thresholds)
+	if len(nodeConditions) > 0 {
+		glog.V(3).Infof("eviction manager: node conditions - observed: %v", nodeConditions)
+	}
 
 	// track when a node condition was last observed
 	nodeConditionsLastObservedAt := nodeConditionsLastObservedAt(nodeConditions, m.nodeConditionsLastObservedAt, now)
 
 	// node conditions report true if it has been observed within the transition period window
 	nodeConditions = nodeConditionsObservedSince(nodeConditionsLastObservedAt, m.config.PressureTransitionPeriod, now)
+	if len(nodeConditions) > 0 {
+		glog.V(3).Infof("eviction manager: node conditions - transition period not met: %v", nodeConditions)
+	}
 
 	// determine the set of thresholds we need to drive eviction behavior (i.e. all grace periods are met)
 	thresholds = thresholdsMetGracePeriod(thresholdsFirstObservedAt, now)
+	debugLogThresholdsWithObservation("thresholds - grace periods satisified", thresholds, observations)
 
 	// update internal state
 	m.Lock()

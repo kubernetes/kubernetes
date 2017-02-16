@@ -95,7 +95,7 @@ func TestSchedule100Node3KNodeAffinityPods(t *testing.T) {
 								{
 									Key:      nodeAffinityKey,
 									Operator: v1.NodeSelectorOpIn,
-									Values:   []string{string(i)},
+									Values:   []string{fmt.Sprintf("%v", i)},
 								},
 							},
 						},

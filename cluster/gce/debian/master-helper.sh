@@ -53,6 +53,10 @@ function replicate-master-instance() {
   kube_env="$(echo "${kube_env}" | grep -v "INITIAL_ETCD_CLUSTER")"
   kube_env="$(echo -e "${kube_env}\nINITIAL_ETCD_CLUSTER: '${existing_master_replicas},${REPLICA_NAME}'")"
 
+  # Substitute INITIAL_ETCD_CLUSTER_STATE
+  kube_env="$(echo "${kube_env}" | grep -v "INITIAL_ETCD_CLUSTER_STATE")"
+  kube_env="$(echo -e "${kube_env}\nINITIAL_ETCD_CLUSTER_STATE: 'existing'")"
+
   ETCD_CA_KEY="$(echo "${kube_env}" | grep "ETCD_CA_KEY" |  sed "s/^.*: '//" | sed "s/'$//")"
   ETCD_CA_CERT="$(echo "${kube_env}" | grep "ETCD_CA_CERT" |  sed "s/^.*: '//" | sed "s/'$//")"
 

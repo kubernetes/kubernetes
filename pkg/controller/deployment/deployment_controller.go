@@ -44,8 +44,8 @@ import (
 	"k8s.io/kubernetes/pkg/api/v1"
 	extensions "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
-	coreinformers "k8s.io/kubernetes/pkg/client/informers/informers_generated/core/v1"
-	extensionsinformers "k8s.io/kubernetes/pkg/client/informers/informers_generated/extensions/v1beta1"
+	coreinformers "k8s.io/kubernetes/pkg/client/informers/informers_generated/externalversions/core/v1"
+	extensionsinformers "k8s.io/kubernetes/pkg/client/informers/informers_generated/externalversions/extensions/v1beta1"
 	corelisters "k8s.io/kubernetes/pkg/client/listers/core/v1"
 	extensionslisters "k8s.io/kubernetes/pkg/client/listers/extensions/v1beta1"
 	"k8s.io/kubernetes/pkg/controller"
@@ -54,15 +54,8 @@ import (
 )
 
 const (
-	// FullDeploymentResyncPeriod means we'll attempt to recompute the required replicas
-	// of all deployments.
-	// This recomputation happens based on contents in the local caches.
-	FullDeploymentResyncPeriod = 30 * time.Second
-	// We must avoid creating new replica set / counting pods until the replica set / pods store has synced.
-	// If it hasn't synced, to avoid a hot loop, we'll wait this long between checks.
-	StoreSyncedPollPeriod = 100 * time.Millisecond
-	// MaxRetries is the number of times a deployment will be retried before it is dropped out of the queue.
-	MaxRetries = 5
+	// maxRetries is the number of times a deployment will be retried before it is dropped out of the queue.
+	maxRetries = 5
 )
 
 func getDeploymentKind() schema.GroupVersionKind {
@@ -72,6 +65,7 @@ func getDeploymentKind() schema.GroupVersionKind {
 // DeploymentController is responsible for synchronizing Deployment objects stored
 // in the system with actual running replica sets and pods.
 type DeploymentController struct {
+	// rsControl is used for adopting/releasing replica sets.
 	rsControl     controller.RSControlInterface
 	client        clientset.Interface
 	eventRecorder record.EventRecorder
@@ -310,12 +304,12 @@ func (dc *DeploymentController) deleteReplicaSet(obj interface{}) {
 	if !ok {
 		tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
 		if !ok {
-			utilruntime.HandleError(fmt.Errorf("Couldn't get object from tombstone %#v, could take up to %v before a deployment recreates/updates replicasets", obj, FullDeploymentResyncPeriod))
+			utilruntime.HandleError(fmt.Errorf("Couldn't get object from tombstone %#v", obj))
 			return
 		}
 		rs, ok = tombstone.Obj.(*extensions.ReplicaSet)
 		if !ok {
-			utilruntime.HandleError(fmt.Errorf("Tombstone contained object that is not a ReplicaSet %#v, could take up to %v before a deployment recreates/updates replicasets", obj, FullDeploymentResyncPeriod))
+			utilruntime.HandleError(fmt.Errorf("Tombstone contained object that is not a ReplicaSet %#v", obj))
 			return
 		}
 	}
@@ -336,12 +330,12 @@ func (dc *DeploymentController) deletePod(obj interface{}) {
 	if !ok {
 		tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
 		if !ok {
-			utilruntime.HandleError(fmt.Errorf("Couldn't get object from tombstone %#v, could take up to %v before a deployment recreates/updates pod", obj, FullDeploymentResyncPeriod))
+			utilruntime.HandleError(fmt.Errorf("Couldn't get object from tombstone %#v", obj))
 			return
 		}
 		pod, ok = tombstone.Obj.(*v1.Pod)
 		if !ok {
-			utilruntime.HandleError(fmt.Errorf("Tombstone contained object that is not a pod %#v, could take up to %v before a deployment recreates/updates pods", obj, FullDeploymentResyncPeriod))
+			utilruntime.HandleError(fmt.Errorf("Tombstone contained object that is not a pod %#v", obj))
 			return
 		}
 	}
@@ -438,7 +432,7 @@ func (dc *DeploymentController) handleErr(err error, key interface{}) {
 		return
 	}
 
-	if dc.queue.NumRequeues(key) < MaxRetries {
+	if dc.queue.NumRequeues(key) < maxRetries {
 		glog.V(2).Infof("Error syncing deployment %v: %v", key, err)
 		dc.queue.AddRateLimited(key)
 		return

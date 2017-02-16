@@ -3017,6 +3017,20 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 								Format:      "",
 							},
 						},
+						"portals": {
+							SchemaProps: spec.SchemaProps{
+								Description: "iSCSI target portal List. The portal is either an IP or ip_addr:port if the port is other than default (typically TCP ports 860 and 3260).",
+								Type:        []string{"array"},
+								Items: &spec.SchemaOrArray{
+									Schema: &spec.Schema{
+										SchemaProps: spec.SchemaProps{
+											Type:   []string{"string"},
+											Format: "",
+										},
+									},
+								},
+							},
+						},
 					},
 					Required: []string{"targetPortal", "iqn", "lun"},
 				},
@@ -3853,6 +3867,80 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 			},
 			Dependencies: []string{
 				"k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta", "k8s.io/kubernetes/pkg/apis/authorization/v1.SubjectAccessReviewSpec", "k8s.io/kubernetes/pkg/apis/authorization/v1.SubjectAccessReviewStatus"},
+		},
+		"k8s.io/kubernetes/pkg/apis/autoscaling/v1.MetricSpec": {
+			Schema: spec.Schema{
+				SchemaProps: spec.SchemaProps{
+					Description: "MetricSpec specifies how to scale based on a single metric (only `type` and one other matching field should be set at once).",
+					Properties: map[string]spec.Schema{
+						"type": {
+							SchemaProps: spec.SchemaProps{
+								Description: "type is the type of metric source.  It should match one of the fields below.",
+								Type:        []string{"string"},
+								Format:      "",
+							},
+						},
+						"object": {
+							SchemaProps: spec.SchemaProps{
+								Description: "object refers to a metric describing a single kubernetes object (for example, hits-per-second on an Ingress object).",
+								Ref:         ref("k8s.io/kubernetes/pkg/apis/autoscaling/v1.ObjectMetricSource"),
+							},
+						},
+						"pods": {
+							SchemaProps: spec.SchemaProps{
+								Description: "pods refers to a metric describing each pod in the current scale target (for example, transactions-processed-per-second).  The values will be averaged together before being compared to the target value.",
+								Ref:         ref("k8s.io/kubernetes/pkg/apis/autoscaling/v1.PodsMetricSource"),
+							},
+						},
+						"resource": {
+							SchemaProps: spec.SchemaProps{
+								Description: "resource refers to a resource metric (such as those specified in requests and limits) known to Kubernetes describing each pod in the current scale target (e.g. CPU or memory). Such metrics are built in to Kubernetes, and have special scaling options on top of those available to normal per-pod metrics using the \"pods\" source.",
+								Ref:         ref("k8s.io/kubernetes/pkg/apis/autoscaling/v1.ResourceMetricSource"),
+							},
+						},
+					},
+					Required: []string{"type"},
+				},
+			},
+			Dependencies: []string{
+				"k8s.io/kubernetes/pkg/apis/autoscaling/v1.ObjectMetricSource", "k8s.io/kubernetes/pkg/apis/autoscaling/v1.PodsMetricSource", "k8s.io/kubernetes/pkg/apis/autoscaling/v1.ResourceMetricSource"},
+		},
+		"k8s.io/kubernetes/pkg/apis/autoscaling/v1.MetricStatus": {
+			Schema: spec.Schema{
+				SchemaProps: spec.SchemaProps{
+					Description: "MetricStatus describes the last-read state of a single metric.",
+					Properties: map[string]spec.Schema{
+						"type": {
+							SchemaProps: spec.SchemaProps{
+								Description: "type is the type of metric source.  It will match one of the fields below.",
+								Type:        []string{"string"},
+								Format:      "",
+							},
+						},
+						"object": {
+							SchemaProps: spec.SchemaProps{
+								Description: "object refers to a metric describing a single kubernetes object (for example, hits-per-second on an Ingress object).",
+								Ref:         ref("k8s.io/kubernetes/pkg/apis/autoscaling/v1.ObjectMetricStatus"),
+							},
+						},
+						"pods": {
+							SchemaProps: spec.SchemaProps{
+								Description: "pods refers to a metric describing each pod in the current scale target (for example, transactions-processed-per-second).  The values will be averaged together before being compared to the target value.",
+								Ref:         ref("k8s.io/kubernetes/pkg/apis/autoscaling/v1.PodsMetricStatus"),
+							},
+						},
+						"resource": {
+							SchemaProps: spec.SchemaProps{
+								Description: "resource refers to a resource metric (such as those specified in requests and limits) known to Kubernetes describing each pod in the current scale target (e.g. CPU or memory). Such metrics are built in to Kubernetes, and have special scaling options on top of those available to normal per-pod metrics using the \"pods\" source.",
+								Ref:         ref("k8s.io/kubernetes/pkg/apis/autoscaling/v1.ResourceMetricStatus"),
+							},
+						},
+					},
+					Required: []string{"type"},
+				},
+			},
+			Dependencies: []string{
+				"k8s.io/kubernetes/pkg/apis/autoscaling/v1.ObjectMetricStatus", "k8s.io/kubernetes/pkg/apis/autoscaling/v1.PodsMetricStatus", "k8s.io/kubernetes/pkg/apis/autoscaling/v1.ResourceMetricStatus"},
 		},
 		"k8s.io/kubernetes/pkg/api/v1.NFSVolumeSource": {
 			Schema: spec.Schema{
@@ -4802,6 +4890,68 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 			},
 			Dependencies: []string{
 				"k8s.io/apimachinery/pkg/apis/meta/v1.OwnerReference", "k8s.io/apimachinery/pkg/apis/meta/v1.Time"},
+		},
+		"k8s.io/kubernetes/pkg/apis/autoscaling/v1.ObjectMetricSource": {
+			Schema: spec.Schema{
+				SchemaProps: spec.SchemaProps{
+					Description: "ObjectMetricSource indicates how to scale on a metric describing a kubernetes object (for example, hits-per-second on an Ingress object).",
+					Properties: map[string]spec.Schema{
+						"target": {
+							SchemaProps: spec.SchemaProps{
+								Description: "target is the described Kubernetes object.",
+								Ref:         ref("k8s.io/kubernetes/pkg/apis/autoscaling/v1.CrossVersionObjectReference"),
+							},
+						},
+						"metricName": {
+							SchemaProps: spec.SchemaProps{
+								Description: "metricName is the name of the metric in question.",
+								Type:        []string{"string"},
+								Format:      "",
+							},
+						},
+						"targetValue": {
+							SchemaProps: spec.SchemaProps{
+								Description: "targetValue is the target value of the metric (as a quantity).",
+								Ref:         ref("k8s.io/apimachinery/pkg/api/resource.Quantity"),
+							},
+						},
+					},
+					Required: []string{"target", "metricName", "targetValue"},
+				},
+			},
+			Dependencies: []string{
+				"k8s.io/apimachinery/pkg/api/resource.Quantity", "k8s.io/kubernetes/pkg/apis/autoscaling/v1.CrossVersionObjectReference"},
+		},
+		"k8s.io/kubernetes/pkg/apis/autoscaling/v1.ObjectMetricStatus": {
+			Schema: spec.Schema{
+				SchemaProps: spec.SchemaProps{
+					Description: "ObjectMetricStatus indicates the current value of a metric describing a kubernetes object (for example, hits-per-second on an Ingress object).",
+					Properties: map[string]spec.Schema{
+						"target": {
+							SchemaProps: spec.SchemaProps{
+								Description: "target is the described Kubernetes object.",
+								Ref:         ref("k8s.io/kubernetes/pkg/apis/autoscaling/v1.CrossVersionObjectReference"),
+							},
+						},
+						"metricName": {
+							SchemaProps: spec.SchemaProps{
+								Description: "metricName is the name of the metric in question.",
+								Type:        []string{"string"},
+								Format:      "",
+							},
+						},
+						"currentValue": {
+							SchemaProps: spec.SchemaProps{
+								Description: "currentValue is the current value of the metric (as a quantity).",
+								Ref:         ref("k8s.io/apimachinery/pkg/api/resource.Quantity"),
+							},
+						},
+					},
+					Required: []string{"target", "metricName", "currentValue"},
+				},
+			},
+			Dependencies: []string{
+				"k8s.io/apimachinery/pkg/api/resource.Quantity", "k8s.io/kubernetes/pkg/apis/autoscaling/v1.CrossVersionObjectReference"},
 		},
 		"k8s.io/kubernetes/pkg/api/v1.ObjectReference": {
 			Schema: spec.Schema{
@@ -6233,6 +6383,13 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 								Format:      "",
 							},
 						},
+						"automountServiceAccountToken": {
+							SchemaProps: spec.SchemaProps{
+								Description: "AutomountServiceAccountToken indicates whether a service account token should be automatically mounted.",
+								Type:        []string{"boolean"},
+								Format:      "",
+							},
+						},
 						"nodeName": {
 							SchemaProps: spec.SchemaProps{
 								Description: "NodeName is a request to schedule this pod onto a specific node. If it is non-empty, the scheduler simply schedules this pod onto that node, assuming that it fits resource requirements.",
@@ -6553,6 +6710,56 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 			},
 			Dependencies: []string{
 				"k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta", "k8s.io/kubernetes/pkg/api/v1.PodSpec"},
+		},
+		"k8s.io/kubernetes/pkg/apis/autoscaling/v1.PodsMetricSource": {
+			Schema: spec.Schema{
+				SchemaProps: spec.SchemaProps{
+					Description: "PodsMetricSource indicates how to scale on a metric describing each pod in the current scale target (for example, transactions-processed-per-second). The values will be averaged together before being compared to the target value.",
+					Properties: map[string]spec.Schema{
+						"metricName": {
+							SchemaProps: spec.SchemaProps{
+								Description: "metricName is the name of the metric in question",
+								Type:        []string{"string"},
+								Format:      "",
+							},
+						},
+						"targetAverageValue": {
+							SchemaProps: spec.SchemaProps{
+								Description: "targetAverageValue is the target value of the average of the metric across all relevant pods (as a quantity)",
+								Ref:         ref("k8s.io/apimachinery/pkg/api/resource.Quantity"),
+							},
+						},
+					},
+					Required: []string{"metricName", "targetAverageValue"},
+				},
+			},
+			Dependencies: []string{
+				"k8s.io/apimachinery/pkg/api/resource.Quantity"},
+		},
+		"k8s.io/kubernetes/pkg/apis/autoscaling/v1.PodsMetricStatus": {
+			Schema: spec.Schema{
+				SchemaProps: spec.SchemaProps{
+					Description: "PodsMetricStatus indicates the current value of a metric describing each pod in the current scale target (for example, transactions-processed-per-second).",
+					Properties: map[string]spec.Schema{
+						"metricName": {
+							SchemaProps: spec.SchemaProps{
+								Description: "metricName is the name of the metric in question",
+								Type:        []string{"string"},
+								Format:      "",
+							},
+						},
+						"currentAverageValue": {
+							SchemaProps: spec.SchemaProps{
+								Description: "currentAverageValue is the current value of the average of the metric across all relevant pods (as a quantity)",
+								Ref:         ref("k8s.io/apimachinery/pkg/api/resource.Quantity"),
+							},
+						},
+					},
+					Required: []string{"metricName", "currentAverageValue"},
+				},
+			},
+			Dependencies: []string{
+				"k8s.io/apimachinery/pkg/api/resource.Quantity"},
 		},
 		"k8s.io/apimachinery/pkg/apis/meta/v1.Preconditions": {
 			Schema: spec.Schema{
@@ -7189,6 +7396,70 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 						},
 					},
 					Required: []string{"resource"},
+				},
+			},
+			Dependencies: []string{
+				"k8s.io/apimachinery/pkg/api/resource.Quantity"},
+		},
+		"k8s.io/kubernetes/pkg/apis/autoscaling/v1.ResourceMetricSource": {
+			Schema: spec.Schema{
+				SchemaProps: spec.SchemaProps{
+					Description: "ResourceMetricSource indicates how to scale on a resource metric known to Kubernetes, as specified in requests and limits, describing each pod in the current scale target (e.g. CPU or memory).  The values will be averaged together before being compared to the target.  Such metrics are built in to Kubernetes, and have special scaling options on top of those available to normal per-pod metrics using the \"pods\" source.  Only one \"target\" type should be set.",
+					Properties: map[string]spec.Schema{
+						"name": {
+							SchemaProps: spec.SchemaProps{
+								Description: "name is the name of the resource in question.",
+								Type:        []string{"string"},
+								Format:      "",
+							},
+						},
+						"targetAverageUtilization": {
+							SchemaProps: spec.SchemaProps{
+								Description: "targetAverageUtilization is the target value of the average of the resource metric across all relevant pods, represented as a percentage of the requested value of the resource for the pods.",
+								Type:        []string{"integer"},
+								Format:      "int32",
+							},
+						},
+						"targetAverageValue": {
+							SchemaProps: spec.SchemaProps{
+								Description: "targetAverageValue is the the target value of the average of the resource metric across all relevant pods, as a raw value (instead of as a percentage of the request), similar to the \"pods\" metric source type.",
+								Ref:         ref("k8s.io/apimachinery/pkg/api/resource.Quantity"),
+							},
+						},
+					},
+					Required: []string{"name"},
+				},
+			},
+			Dependencies: []string{
+				"k8s.io/apimachinery/pkg/api/resource.Quantity"},
+		},
+		"k8s.io/kubernetes/pkg/apis/autoscaling/v1.ResourceMetricStatus": {
+			Schema: spec.Schema{
+				SchemaProps: spec.SchemaProps{
+					Description: "ResourceMetricStatus indicates the current value of a resource metric known to Kubernetes, as specified in requests and limits, describing each pod in the current scale target (e.g. CPU or memory).  Such metrics are built in to Kubernetes, and have special scaling options on top of those available to normal per-pod metrics using the \"pods\" source.",
+					Properties: map[string]spec.Schema{
+						"name": {
+							SchemaProps: spec.SchemaProps{
+								Description: "name is the name of the resource in question.",
+								Type:        []string{"string"},
+								Format:      "",
+							},
+						},
+						"currentAverageUtilization": {
+							SchemaProps: spec.SchemaProps{
+								Description: "currentAverageUtilization is the current value of the average of the resource metric across all relevant pods, represented as a percentage of the requested value of the resource for the pods.  It will only be present if `targetAverageValue` was set in the corresponding metric specification.",
+								Type:        []string{"integer"},
+								Format:      "int32",
+							},
+						},
+						"currentAverageValue": {
+							SchemaProps: spec.SchemaProps{
+								Description: "currentAverageValue is the the current value of the average of the resource metric across all relevant pods, as a raw value (instead of as a percentage of the request), similar to the \"pods\" metric source type. It will always be set, regardless of the corresponding metric specification.",
+								Ref:         ref("k8s.io/apimachinery/pkg/api/resource.Quantity"),
+							},
+						},
+					},
+					Required: []string{"name", "currentAverageValue"},
 				},
 			},
 			Dependencies: []string{
@@ -8021,6 +8292,13 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 								},
 							},
 						},
+						"automountServiceAccountToken": {
+							SchemaProps: spec.SchemaProps{
+								Description: "AutomountServiceAccountToken indicates whether pods running as this service account should have an API token automatically mounted. Can be overridden at the pod level.",
+								Type:        []string{"boolean"},
+								Format:      "",
+							},
+						},
 					},
 				},
 			},
@@ -8806,6 +9084,97 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 			},
 			Dependencies: []string{},
 		},
+		"k8s.io/kubernetes/pkg/apis/authentication/v1.TokenReview": {
+			Schema: spec.Schema{
+				SchemaProps: spec.SchemaProps{
+					Description: "TokenReview attempts to authenticate a token to a known user. Note: TokenReview requests may be cached by the webhook token authenticator plugin in the kube-apiserver.",
+					Properties: map[string]spec.Schema{
+						"kind": {
+							SchemaProps: spec.SchemaProps{
+								Description: "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds",
+								Type:        []string{"string"},
+								Format:      "",
+							},
+						},
+						"apiVersion": {
+							SchemaProps: spec.SchemaProps{
+								Description: "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources",
+								Type:        []string{"string"},
+								Format:      "",
+							},
+						},
+						"metadata": {
+							SchemaProps: spec.SchemaProps{
+								Ref: ref("k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta"),
+							},
+						},
+						"spec": {
+							SchemaProps: spec.SchemaProps{
+								Description: "Spec holds information about the request being evaluated",
+								Ref:         ref("k8s.io/kubernetes/pkg/apis/authentication/v1.TokenReviewSpec"),
+							},
+						},
+						"status": {
+							SchemaProps: spec.SchemaProps{
+								Description: "Status is filled in by the server and indicates whether the request can be authenticated.",
+								Ref:         ref("k8s.io/kubernetes/pkg/apis/authentication/v1.TokenReviewStatus"),
+							},
+						},
+					},
+					Required: []string{"spec"},
+				},
+			},
+			Dependencies: []string{
+				"k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta", "k8s.io/kubernetes/pkg/apis/authentication/v1.TokenReviewSpec", "k8s.io/kubernetes/pkg/apis/authentication/v1.TokenReviewStatus"},
+		},
+		"k8s.io/kubernetes/pkg/apis/authentication/v1.TokenReviewSpec": {
+			Schema: spec.Schema{
+				SchemaProps: spec.SchemaProps{
+					Description: "TokenReviewSpec is a description of the token authentication request.",
+					Properties: map[string]spec.Schema{
+						"token": {
+							SchemaProps: spec.SchemaProps{
+								Description: "Token is the opaque bearer token.",
+								Type:        []string{"string"},
+								Format:      "",
+							},
+						},
+					},
+				},
+			},
+			Dependencies: []string{},
+		},
+		"k8s.io/kubernetes/pkg/apis/authentication/v1.TokenReviewStatus": {
+			Schema: spec.Schema{
+				SchemaProps: spec.SchemaProps{
+					Description: "TokenReviewStatus is the result of the token authentication request.",
+					Properties: map[string]spec.Schema{
+						"authenticated": {
+							SchemaProps: spec.SchemaProps{
+								Description: "Authenticated indicates that the token was associated with a known user.",
+								Type:        []string{"boolean"},
+								Format:      "",
+							},
+						},
+						"user": {
+							SchemaProps: spec.SchemaProps{
+								Description: "User is the UserInfo associated with the provided token.",
+								Ref:         ref("k8s.io/kubernetes/pkg/apis/authentication/v1.UserInfo"),
+							},
+						},
+						"error": {
+							SchemaProps: spec.SchemaProps{
+								Description: "Error indicates that the token couldn't be checked",
+								Type:        []string{"string"},
+								Format:      "",
+							},
+						},
+					},
+				},
+			},
+			Dependencies: []string{
+				"k8s.io/kubernetes/pkg/apis/authentication/v1.UserInfo"},
+		},
 		"k8s.io/kubernetes/pkg/api/v1.Toleration": {
 			Schema: spec.Schema{
 				SchemaProps: spec.SchemaProps{
@@ -8868,6 +9237,65 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 								Description: "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources",
 								Type:        []string{"string"},
 								Format:      "",
+							},
+						},
+					},
+				},
+			},
+			Dependencies: []string{},
+		},
+		"k8s.io/kubernetes/pkg/apis/authentication/v1.UserInfo": {
+			Schema: spec.Schema{
+				SchemaProps: spec.SchemaProps{
+					Description: "UserInfo holds the information about the user needed to implement the user.Info interface.",
+					Properties: map[string]spec.Schema{
+						"username": {
+							SchemaProps: spec.SchemaProps{
+								Description: "The name that uniquely identifies this user among all active users.",
+								Type:        []string{"string"},
+								Format:      "",
+							},
+						},
+						"uid": {
+							SchemaProps: spec.SchemaProps{
+								Description: "A unique value that identifies this user across time. If this user is deleted and another user by the same name is added, they will have different UIDs.",
+								Type:        []string{"string"},
+								Format:      "",
+							},
+						},
+						"groups": {
+							SchemaProps: spec.SchemaProps{
+								Description: "The names of groups this user is a part of.",
+								Type:        []string{"array"},
+								Items: &spec.SchemaOrArray{
+									Schema: &spec.Schema{
+										SchemaProps: spec.SchemaProps{
+											Type:   []string{"string"},
+											Format: "",
+										},
+									},
+								},
+							},
+						},
+						"extra": {
+							SchemaProps: spec.SchemaProps{
+								Description: "Any additional information provided by the authenticator.",
+								Type:        []string{"object"},
+								AdditionalProperties: &spec.SchemaOrBool{
+									Schema: &spec.Schema{
+										SchemaProps: spec.SchemaProps{
+											Type: []string{"array"},
+											Items: &spec.SchemaOrArray{
+												Schema: &spec.Schema{
+													SchemaProps: spec.SchemaProps{
+														Type:   []string{"string"},
+														Format: "",
+													},
+												},
+											},
+										},
+									},
+								},
 							},
 						},
 					},
@@ -10296,9 +10724,16 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 						},
 						"clusterDNS": {
 							SchemaProps: spec.SchemaProps{
-								Description: "clusterDNS is the IP address for a cluster DNS server.  If set, kubelet will configure all containers to use this for DNS resolution in addition to the host's DNS servers",
-								Type:        []string{"string"},
-								Format:      "",
+								Description: "clusterDNS is a list of IP address for the cluster DNS server.  If set, kubelet will configure all containers to use this for DNS resolution instead of the host's DNS servers",
+								Type:        []string{"array"},
+								Items: &spec.SchemaOrArray{
+									Schema: &spec.Schema{
+										SchemaProps: spec.SchemaProps{
+											Type:   []string{"string"},
+											Format: "",
+										},
+									},
+								},
 							},
 						},
 						"streamingConnectionIdleTimeout": {
@@ -11283,7 +11718,7 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 						},
 						"apiVersion": {
 							SchemaProps: spec.SchemaProps{
-								Description: "APIVersion holds the API group and version of the referenced object.",
+								Description: "APIVersion holds the API group and version of the referenced subject. Defaults to \"v1\" for ServiceAccount subjects. Defaults to \"rbac.authorization.k8s.io/v1alpha1\" for User and Group subjects.",
 								Type:        []string{"string"},
 								Format:      "",
 							},
@@ -14900,9 +15335,9 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 								Format:      "",
 							},
 						},
-						"apiVersion": {
+						"apiGroup": {
 							SchemaProps: spec.SchemaProps{
-								Description: "APIVersion holds the API group and version of the referenced object.",
+								Description: "APIGroup holds the API group of the referenced subject. Defaults to \"\" for ServiceAccount subjects. Defaults to \"rbac.authorization.k8s.io\" for User and Group subjects.",
 								Type:        []string{"string"},
 								Format:      "",
 							},
@@ -15591,6 +16026,223 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 			Dependencies: []string{
 				"k8s.io/apimachinery/pkg/apis/meta/v1.Time", "k8s.io/kubernetes/pkg/api/v1.ObjectReference"},
 		},
+		"k8s.io/kubernetes/pkg/apis/autoscaling/v2alpha1.CrossVersionObjectReference": {
+			Schema: spec.Schema{
+				SchemaProps: spec.SchemaProps{
+					Description: "CrossVersionObjectReference contains enough information to let you identify the referred resource.",
+					Properties: map[string]spec.Schema{
+						"kind": {
+							SchemaProps: spec.SchemaProps{
+								Description: "Kind of the referent; More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds\"",
+								Type:        []string{"string"},
+								Format:      "",
+							},
+						},
+						"name": {
+							SchemaProps: spec.SchemaProps{
+								Description: "Name of the referent; More info: http://kubernetes.io/docs/user-guide/identifiers#names",
+								Type:        []string{"string"},
+								Format:      "",
+							},
+						},
+						"apiVersion": {
+							SchemaProps: spec.SchemaProps{
+								Description: "API version of the referent",
+								Type:        []string{"string"},
+								Format:      "",
+							},
+						},
+					},
+					Required: []string{"kind", "name"},
+				},
+			},
+			Dependencies: []string{},
+		},
+		"k8s.io/kubernetes/pkg/apis/autoscaling/v2alpha1.HorizontalPodAutoscaler": {
+			Schema: spec.Schema{
+				SchemaProps: spec.SchemaProps{
+					Description: "HorizontalPodAutoscaler is the configuration for a horizontal pod autoscaler, which automatically manages the replica count of any resource implementing the scale subresource based on the metrics specified.",
+					Properties: map[string]spec.Schema{
+						"kind": {
+							SchemaProps: spec.SchemaProps{
+								Description: "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds",
+								Type:        []string{"string"},
+								Format:      "",
+							},
+						},
+						"apiVersion": {
+							SchemaProps: spec.SchemaProps{
+								Description: "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources",
+								Type:        []string{"string"},
+								Format:      "",
+							},
+						},
+						"metadata": {
+							SchemaProps: spec.SchemaProps{
+								Description: "metadata is the standard object metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata",
+								Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta"),
+							},
+						},
+						"spec": {
+							SchemaProps: spec.SchemaProps{
+								Description: "spec is the specification for the behaviour of the autoscaler. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status.",
+								Ref:         ref("k8s.io/kubernetes/pkg/apis/autoscaling/v2alpha1.HorizontalPodAutoscalerSpec"),
+							},
+						},
+						"status": {
+							SchemaProps: spec.SchemaProps{
+								Description: "status is the current information about the autoscaler.",
+								Ref:         ref("k8s.io/kubernetes/pkg/apis/autoscaling/v2alpha1.HorizontalPodAutoscalerStatus"),
+							},
+						},
+					},
+				},
+			},
+			Dependencies: []string{
+				"k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta", "k8s.io/kubernetes/pkg/apis/autoscaling/v2alpha1.HorizontalPodAutoscalerSpec", "k8s.io/kubernetes/pkg/apis/autoscaling/v2alpha1.HorizontalPodAutoscalerStatus"},
+		},
+		"k8s.io/kubernetes/pkg/apis/autoscaling/v2alpha1.HorizontalPodAutoscalerList": {
+			Schema: spec.Schema{
+				SchemaProps: spec.SchemaProps{
+					Description: "HorizontalPodAutoscaler is a list of horizontal pod autoscaler objects.",
+					Properties: map[string]spec.Schema{
+						"kind": {
+							SchemaProps: spec.SchemaProps{
+								Description: "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds",
+								Type:        []string{"string"},
+								Format:      "",
+							},
+						},
+						"apiVersion": {
+							SchemaProps: spec.SchemaProps{
+								Description: "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources",
+								Type:        []string{"string"},
+								Format:      "",
+							},
+						},
+						"metadata": {
+							SchemaProps: spec.SchemaProps{
+								Description: "metadata is the standard list metadata.",
+								Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.ListMeta"),
+							},
+						},
+						"items": {
+							SchemaProps: spec.SchemaProps{
+								Description: "items is the list of horizontal pod autoscaler objects.",
+								Type:        []string{"array"},
+								Items: &spec.SchemaOrArray{
+									Schema: &spec.Schema{
+										SchemaProps: spec.SchemaProps{
+											Ref: ref("k8s.io/kubernetes/pkg/apis/autoscaling/v2alpha1.HorizontalPodAutoscaler"),
+										},
+									},
+								},
+							},
+						},
+					},
+					Required: []string{"items"},
+				},
+			},
+			Dependencies: []string{
+				"k8s.io/apimachinery/pkg/apis/meta/v1.ListMeta", "k8s.io/kubernetes/pkg/apis/autoscaling/v2alpha1.HorizontalPodAutoscaler"},
+		},
+		"k8s.io/kubernetes/pkg/apis/autoscaling/v2alpha1.HorizontalPodAutoscalerSpec": {
+			Schema: spec.Schema{
+				SchemaProps: spec.SchemaProps{
+					Description: "HorizontalPodAutoscalerSpec describes the desired functionality of the HorizontalPodAutoscaler.",
+					Properties: map[string]spec.Schema{
+						"scaleTargetRef": {
+							SchemaProps: spec.SchemaProps{
+								Description: "scaleTargetRef points to the target resource to scale, and is used to the pods for which metrics should be collected, as well as to actually change the replica count.",
+								Ref:         ref("k8s.io/kubernetes/pkg/apis/autoscaling/v2alpha1.CrossVersionObjectReference"),
+							},
+						},
+						"minReplicas": {
+							SchemaProps: spec.SchemaProps{
+								Description: "minReplicas is the lower limit for the number of replicas to which the autoscaler can scale down. It defaults to 1 pod.",
+								Type:        []string{"integer"},
+								Format:      "int32",
+							},
+						},
+						"maxReplicas": {
+							SchemaProps: spec.SchemaProps{
+								Description: "maxReplicas is the upper limit for the number of replicas to which the autoscaler can scale up. It cannot be less that minReplicas.",
+								Type:        []string{"integer"},
+								Format:      "int32",
+							},
+						},
+						"metrics": {
+							SchemaProps: spec.SchemaProps{
+								Description: "metrics contains the specifications for which to use to calculate the desired replica count (the maximum replica count across all metrics will be used).  The desired replica count is calculated multiplying the ratio between the target value and the current value by the current number of pods.  Ergo, metrics used must decrease as the pod count is increased, and vice-versa.  See the individual metric source types for more information about how each type of metric must respond.",
+								Type:        []string{"array"},
+								Items: &spec.SchemaOrArray{
+									Schema: &spec.Schema{
+										SchemaProps: spec.SchemaProps{
+											Ref: ref("k8s.io/kubernetes/pkg/apis/autoscaling/v2alpha1.MetricSpec"),
+										},
+									},
+								},
+							},
+						},
+					},
+					Required: []string{"scaleTargetRef", "maxReplicas"},
+				},
+			},
+			Dependencies: []string{
+				"k8s.io/kubernetes/pkg/apis/autoscaling/v2alpha1.CrossVersionObjectReference", "k8s.io/kubernetes/pkg/apis/autoscaling/v2alpha1.MetricSpec"},
+		},
+		"k8s.io/kubernetes/pkg/apis/autoscaling/v2alpha1.HorizontalPodAutoscalerStatus": {
+			Schema: spec.Schema{
+				SchemaProps: spec.SchemaProps{
+					Description: "HorizontalPodAutoscalerStatus describes the current status of a horizontal pod autoscaler.",
+					Properties: map[string]spec.Schema{
+						"observedGeneration": {
+							SchemaProps: spec.SchemaProps{
+								Description: "observedGeneration is the most recent generation observed by this autoscaler.",
+								Type:        []string{"integer"},
+								Format:      "int64",
+							},
+						},
+						"lastScaleTime": {
+							SchemaProps: spec.SchemaProps{
+								Description: "lastScaleTime is the last time the HorizontalPodAutoscaler scaled the number of pods, used by the autoscaler to control how often the number of pods is changed.",
+								Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.Time"),
+							},
+						},
+						"currentReplicas": {
+							SchemaProps: spec.SchemaProps{
+								Description: "currentReplicas is current number of replicas of pods managed by this autoscaler, as last seen by the autoscaler.",
+								Type:        []string{"integer"},
+								Format:      "int32",
+							},
+						},
+						"desiredReplicas": {
+							SchemaProps: spec.SchemaProps{
+								Description: "desiredReplicas is the desired number of replicas of pods managed by this autoscaler, as last calculated by the autoscaler.",
+								Type:        []string{"integer"},
+								Format:      "int32",
+							},
+						},
+						"currentMetrics": {
+							SchemaProps: spec.SchemaProps{
+								Description: "currentMetrics is the last read state of the metrics used by this autoscaler.",
+								Type:        []string{"array"},
+								Items: &spec.SchemaOrArray{
+									Schema: &spec.Schema{
+										SchemaProps: spec.SchemaProps{
+											Ref: ref("k8s.io/kubernetes/pkg/apis/autoscaling/v2alpha1.MetricStatus"),
+										},
+									},
+								},
+							},
+						},
+					},
+					Required: []string{"currentReplicas", "desiredReplicas", "currentMetrics"},
+				},
+			},
+			Dependencies: []string{
+				"k8s.io/apimachinery/pkg/apis/meta/v1.Time", "k8s.io/kubernetes/pkg/apis/autoscaling/v2alpha1.MetricStatus"},
+		},
 		"k8s.io/kubernetes/pkg/apis/batch/v2alpha1.Job": {
 			Schema: spec.Schema{
 				SchemaProps: spec.SchemaProps{
@@ -15899,6 +16551,256 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 			},
 			Dependencies: []string{
 				"k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta", "k8s.io/kubernetes/pkg/apis/batch/v2alpha1.JobSpec"},
+		},
+		"k8s.io/kubernetes/pkg/apis/autoscaling/v2alpha1.MetricSpec": {
+			Schema: spec.Schema{
+				SchemaProps: spec.SchemaProps{
+					Description: "MetricSpec specifies how to scale based on a single metric (only `type` and one other matching field should be set at once).",
+					Properties: map[string]spec.Schema{
+						"type": {
+							SchemaProps: spec.SchemaProps{
+								Description: "type is the type of metric source.  It should match one of the fields below.",
+								Type:        []string{"string"},
+								Format:      "",
+							},
+						},
+						"object": {
+							SchemaProps: spec.SchemaProps{
+								Description: "object refers to a metric describing a single kubernetes object (for example, hits-per-second on an Ingress object).",
+								Ref:         ref("k8s.io/kubernetes/pkg/apis/autoscaling/v2alpha1.ObjectMetricSource"),
+							},
+						},
+						"pods": {
+							SchemaProps: spec.SchemaProps{
+								Description: "pods refers to a metric describing each pod in the current scale target (for example, transactions-processed-per-second).  The values will be averaged together before being compared to the target value.",
+								Ref:         ref("k8s.io/kubernetes/pkg/apis/autoscaling/v2alpha1.PodsMetricSource"),
+							},
+						},
+						"resource": {
+							SchemaProps: spec.SchemaProps{
+								Description: "resource refers to a resource metric (such as those specified in requests and limits) known to Kubernetes describing each pod in the current scale target (e.g. CPU or memory). Such metrics are built in to Kubernetes, and have special scaling options on top of those available to normal per-pod metrics using the \"pods\" source.",
+								Ref:         ref("k8s.io/kubernetes/pkg/apis/autoscaling/v2alpha1.ResourceMetricSource"),
+							},
+						},
+					},
+					Required: []string{"type"},
+				},
+			},
+			Dependencies: []string{
+				"k8s.io/kubernetes/pkg/apis/autoscaling/v2alpha1.ObjectMetricSource", "k8s.io/kubernetes/pkg/apis/autoscaling/v2alpha1.PodsMetricSource", "k8s.io/kubernetes/pkg/apis/autoscaling/v2alpha1.ResourceMetricSource"},
+		},
+		"k8s.io/kubernetes/pkg/apis/autoscaling/v2alpha1.MetricStatus": {
+			Schema: spec.Schema{
+				SchemaProps: spec.SchemaProps{
+					Description: "MetricStatus describes the last-read state of a single metric.",
+					Properties: map[string]spec.Schema{
+						"type": {
+							SchemaProps: spec.SchemaProps{
+								Description: "type is the type of metric source.  It will match one of the fields below.",
+								Type:        []string{"string"},
+								Format:      "",
+							},
+						},
+						"object": {
+							SchemaProps: spec.SchemaProps{
+								Description: "object refers to a metric describing a single kubernetes object (for example, hits-per-second on an Ingress object).",
+								Ref:         ref("k8s.io/kubernetes/pkg/apis/autoscaling/v2alpha1.ObjectMetricStatus"),
+							},
+						},
+						"pods": {
+							SchemaProps: spec.SchemaProps{
+								Description: "pods refers to a metric describing each pod in the current scale target (for example, transactions-processed-per-second).  The values will be averaged together before being compared to the target value.",
+								Ref:         ref("k8s.io/kubernetes/pkg/apis/autoscaling/v2alpha1.PodsMetricStatus"),
+							},
+						},
+						"resource": {
+							SchemaProps: spec.SchemaProps{
+								Description: "resource refers to a resource metric (such as those specified in requests and limits) known to Kubernetes describing each pod in the current scale target (e.g. CPU or memory). Such metrics are built in to Kubernetes, and have special scaling options on top of those available to normal per-pod metrics using the \"pods\" source.",
+								Ref:         ref("k8s.io/kubernetes/pkg/apis/autoscaling/v2alpha1.ResourceMetricStatus"),
+							},
+						},
+					},
+					Required: []string{"type"},
+				},
+			},
+			Dependencies: []string{
+				"k8s.io/kubernetes/pkg/apis/autoscaling/v2alpha1.ObjectMetricStatus", "k8s.io/kubernetes/pkg/apis/autoscaling/v2alpha1.PodsMetricStatus", "k8s.io/kubernetes/pkg/apis/autoscaling/v2alpha1.ResourceMetricStatus"},
+		},
+		"k8s.io/kubernetes/pkg/apis/autoscaling/v2alpha1.ObjectMetricSource": {
+			Schema: spec.Schema{
+				SchemaProps: spec.SchemaProps{
+					Description: "ObjectMetricSource indicates how to scale on a metric describing a kubernetes object (for example, hits-per-second on an Ingress object).",
+					Properties: map[string]spec.Schema{
+						"target": {
+							SchemaProps: spec.SchemaProps{
+								Description: "target is the described Kubernetes object.",
+								Ref:         ref("k8s.io/kubernetes/pkg/apis/autoscaling/v2alpha1.CrossVersionObjectReference"),
+							},
+						},
+						"metricName": {
+							SchemaProps: spec.SchemaProps{
+								Description: "metricName is the name of the metric in question.",
+								Type:        []string{"string"},
+								Format:      "",
+							},
+						},
+						"targetValue": {
+							SchemaProps: spec.SchemaProps{
+								Description: "targetValue is the target value of the metric (as a quantity).",
+								Ref:         ref("k8s.io/apimachinery/pkg/api/resource.Quantity"),
+							},
+						},
+					},
+					Required: []string{"target", "metricName", "targetValue"},
+				},
+			},
+			Dependencies: []string{
+				"k8s.io/apimachinery/pkg/api/resource.Quantity", "k8s.io/kubernetes/pkg/apis/autoscaling/v2alpha1.CrossVersionObjectReference"},
+		},
+		"k8s.io/kubernetes/pkg/apis/autoscaling/v2alpha1.ObjectMetricStatus": {
+			Schema: spec.Schema{
+				SchemaProps: spec.SchemaProps{
+					Description: "ObjectMetricStatus indicates the current value of a metric describing a kubernetes object (for example, hits-per-second on an Ingress object).",
+					Properties: map[string]spec.Schema{
+						"target": {
+							SchemaProps: spec.SchemaProps{
+								Description: "target is the described Kubernetes object.",
+								Ref:         ref("k8s.io/kubernetes/pkg/apis/autoscaling/v2alpha1.CrossVersionObjectReference"),
+							},
+						},
+						"metricName": {
+							SchemaProps: spec.SchemaProps{
+								Description: "metricName is the name of the metric in question.",
+								Type:        []string{"string"},
+								Format:      "",
+							},
+						},
+						"currentValue": {
+							SchemaProps: spec.SchemaProps{
+								Description: "currentValue is the current value of the metric (as a quantity).",
+								Ref:         ref("k8s.io/apimachinery/pkg/api/resource.Quantity"),
+							},
+						},
+					},
+					Required: []string{"target", "metricName", "currentValue"},
+				},
+			},
+			Dependencies: []string{
+				"k8s.io/apimachinery/pkg/api/resource.Quantity", "k8s.io/kubernetes/pkg/apis/autoscaling/v2alpha1.CrossVersionObjectReference"},
+		},
+		"k8s.io/kubernetes/pkg/apis/autoscaling/v2alpha1.PodsMetricSource": {
+			Schema: spec.Schema{
+				SchemaProps: spec.SchemaProps{
+					Description: "PodsMetricSource indicates how to scale on a metric describing each pod in the current scale target (for example, transactions-processed-per-second). The values will be averaged together before being compared to the target value.",
+					Properties: map[string]spec.Schema{
+						"metricName": {
+							SchemaProps: spec.SchemaProps{
+								Description: "metricName is the name of the metric in question",
+								Type:        []string{"string"},
+								Format:      "",
+							},
+						},
+						"targetAverageValue": {
+							SchemaProps: spec.SchemaProps{
+								Description: "targetAverageValue is the target value of the average of the metric across all relevant pods (as a quantity)",
+								Ref:         ref("k8s.io/apimachinery/pkg/api/resource.Quantity"),
+							},
+						},
+					},
+					Required: []string{"metricName", "targetAverageValue"},
+				},
+			},
+			Dependencies: []string{
+				"k8s.io/apimachinery/pkg/api/resource.Quantity"},
+		},
+		"k8s.io/kubernetes/pkg/apis/autoscaling/v2alpha1.PodsMetricStatus": {
+			Schema: spec.Schema{
+				SchemaProps: spec.SchemaProps{
+					Description: "PodsMetricStatus indicates the current value of a metric describing each pod in the current scale target (for example, transactions-processed-per-second).",
+					Properties: map[string]spec.Schema{
+						"metricName": {
+							SchemaProps: spec.SchemaProps{
+								Description: "metricName is the name of the metric in question",
+								Type:        []string{"string"},
+								Format:      "",
+							},
+						},
+						"currentAverageValue": {
+							SchemaProps: spec.SchemaProps{
+								Description: "currentAverageValue is the current value of the average of the metric across all relevant pods (as a quantity)",
+								Ref:         ref("k8s.io/apimachinery/pkg/api/resource.Quantity"),
+							},
+						},
+					},
+					Required: []string{"metricName", "currentAverageValue"},
+				},
+			},
+			Dependencies: []string{
+				"k8s.io/apimachinery/pkg/api/resource.Quantity"},
+		},
+		"k8s.io/kubernetes/pkg/apis/autoscaling/v2alpha1.ResourceMetricSource": {
+			Schema: spec.Schema{
+				SchemaProps: spec.SchemaProps{
+					Description: "ResourceMetricSource indicates how to scale on a resource metric known to Kubernetes, as specified in requests and limits, describing each pod in the current scale target (e.g. CPU or memory).  The values will be averaged together before being compared to the target.  Such metrics are built in to Kubernetes, and have special scaling options on top of those available to normal per-pod metrics using the \"pods\" source.  Only one \"target\" type should be set.",
+					Properties: map[string]spec.Schema{
+						"name": {
+							SchemaProps: spec.SchemaProps{
+								Description: "name is the name of the resource in question.",
+								Type:        []string{"string"},
+								Format:      "",
+							},
+						},
+						"targetAverageUtilization": {
+							SchemaProps: spec.SchemaProps{
+								Description: "targetAverageUtilization is the target value of the average of the resource metric across all relevant pods, represented as a percentage of the requested value of the resource for the pods.",
+								Type:        []string{"integer"},
+								Format:      "int32",
+							},
+						},
+						"targetAverageValue": {
+							SchemaProps: spec.SchemaProps{
+								Description: "targetAverageValue is the the target value of the average of the resource metric across all relevant pods, as a raw value (instead of as a percentage of the request), similar to the \"pods\" metric source type.",
+								Ref:         ref("k8s.io/apimachinery/pkg/api/resource.Quantity"),
+							},
+						},
+					},
+					Required: []string{"name"},
+				},
+			},
+			Dependencies: []string{
+				"k8s.io/apimachinery/pkg/api/resource.Quantity"},
+		},
+		"k8s.io/kubernetes/pkg/apis/autoscaling/v2alpha1.ResourceMetricStatus": {
+			Schema: spec.Schema{
+				SchemaProps: spec.SchemaProps{
+					Description: "ResourceMetricStatus indicates the current value of a resource metric known to Kubernetes, as specified in requests and limits, describing each pod in the current scale target (e.g. CPU or memory).  Such metrics are built in to Kubernetes, and have special scaling options on top of those available to normal per-pod metrics using the \"pods\" source.",
+					Properties: map[string]spec.Schema{
+						"name": {
+							SchemaProps: spec.SchemaProps{
+								Description: "name is the name of the resource in question.",
+								Type:        []string{"string"},
+								Format:      "",
+							},
+						},
+						"currentAverageUtilization": {
+							SchemaProps: spec.SchemaProps{
+								Description: "currentAverageUtilization is the current value of the average of the resource metric across all relevant pods, represented as a percentage of the requested value of the resource for the pods.  It will only be present if `targetAverageValue` was set in the corresponding metric specification.",
+								Type:        []string{"integer"},
+								Format:      "int32",
+							},
+						},
+						"currentAverageValue": {
+							SchemaProps: spec.SchemaProps{
+								Description: "currentAverageValue is the the current value of the average of the resource metric across all relevant pods, as a raw value (instead of as a percentage of the request), similar to the \"pods\" metric source type. It will always be set, regardless of the corresponding metric specification.",
+								Ref:         ref("k8s.io/apimachinery/pkg/api/resource.Quantity"),
+							},
+						},
+					},
+					Required: []string{"name", "currentAverageValue"},
+				},
+			},
+			Dependencies: []string{
+				"k8s.io/apimachinery/pkg/api/resource.Quantity"},
 		},
 		"k8s.io/apimachinery/pkg/version.Info": {
 			Schema: spec.Schema{

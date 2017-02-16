@@ -292,10 +292,10 @@ type KubeletConfiguration struct {
 	// masterServiceNamespace is The namespace from which the kubernetes
 	// master services should be injected into pods.
 	MasterServiceNamespace string `json:"masterServiceNamespace"`
-	// clusterDNS is the IP address for a cluster DNS server.  If set, kubelet
-	// will configure all containers to use this for DNS resolution in
-	// addition to the host's DNS servers
-	ClusterDNS string `json:"clusterDNS"`
+	// clusterDNS is a list of IP address for the cluster DNS server.  If set,
+	// kubelet will configure all containers to use this for DNS resolution
+	// instead of the host's DNS servers
+	ClusterDNS []string `json:"clusterDNS"`
 	// streamingConnectionIdleTimeout is the maximum time a streaming connection
 	// can be idle before the connection is automatically closed.
 	StreamingConnectionIdleTimeout metav1.Duration `json:"streamingConnectionIdleTimeout"`
@@ -511,7 +511,7 @@ type KubeletConfiguration struct {
 	FeatureGates string `json:"featureGates,omitempty"`
 	// Enable Container Runtime Interface (CRI) integration.
 	// +optional
-	EnableCRI bool `json:"enableCRI,omitempty"`
+	EnableCRI *bool `json:"enableCRI,omitempty"`
 	// TODO(#34726:1.8.0): Remove the opt-in for failing when swap is enabled.
 	// Tells the Kubelet to fail to start if swap is enabled on the node.
 	ExperimentalFailSwapOn bool `json:"experimentalFailSwapOn,omitempty"`

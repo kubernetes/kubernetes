@@ -46,10 +46,11 @@ import (
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
+	"k8s.io/apiserver/pkg/registry/rest"
 	etcdtesting "k8s.io/apiserver/pkg/storage/etcd/testing"
 	"k8s.io/client-go/pkg/api"
+	restclient "k8s.io/client-go/rest"
 	openapigen "k8s.io/kubernetes/pkg/generated/openapi"
-	"k8s.io/apiserver/pkg/registry/rest"
 )
 
 const (
@@ -85,6 +86,7 @@ func setUp(t *testing.T) (*etcdtesting.EtcdTestServer, Config, *assert.Assertion
 	config.PublicAddress = net.ParseIP("192.168.10.4")
 	config.RequestContextMapper = genericapirequest.NewRequestContextMapper()
 	config.LegacyAPIGroupPrefixes = sets.NewString("/api")
+	config.LoopbackClientConfig = &restclient.Config{}
 
 	config.OpenAPIConfig = DefaultOpenAPIConfig(openapigen.GetOpenAPIDefinitions, api.Scheme)
 	config.OpenAPIConfig.Info = &spec.Info{

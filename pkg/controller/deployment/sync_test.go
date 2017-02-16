@@ -26,7 +26,7 @@ import (
 	"k8s.io/client-go/tools/record"
 	extensions "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset/fake"
-	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated"
+	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated/externalversions"
 	"k8s.io/kubernetes/pkg/controller"
 	deploymentutil "k8s.io/kubernetes/pkg/controller/deployment/util"
 )
@@ -323,6 +323,9 @@ func TestScale(t *testing.T) {
 
 func TestDeploymentController_cleanupDeployment(t *testing.T) {
 	selector := map[string]string{"foo": "bar"}
+	alreadyDeleted := newRSWithStatus("foo-1", 0, 0, selector)
+	now := metav1.Now()
+	alreadyDeleted.DeletionTimestamp = &now
 
 	tests := []struct {
 		oldRSs               []*extensions.ReplicaSet
@@ -366,12 +369,21 @@ func TestDeploymentController_cleanupDeployment(t *testing.T) {
 			revisionHistoryLimit: 0,
 			expectedDeletions:    0,
 		},
+		{
+			oldRSs: []*extensions.ReplicaSet{
+				alreadyDeleted,
+			},
+			revisionHistoryLimit: 0,
+			expectedDeletions:    0,
+		},
 	}
 
 	for i := range tests {
 		test := tests[i]
+		t.Logf("scenario %d", i)
+
 		fake := &fake.Clientset{}
-		informers := informers.NewSharedInformerFactory(nil, fake, controller.NoResyncPeriodFunc())
+		informers := informers.NewSharedInformerFactory(fake, controller.NoResyncPeriodFunc())
 		controller := NewDeploymentController(informers.Extensions().V1beta1().Deployments(), informers.Extensions().V1beta1().ReplicaSets(), informers.Core().V1().Pods(), fake)
 
 		controller.eventRecorder = &record.FakeRecorder{}

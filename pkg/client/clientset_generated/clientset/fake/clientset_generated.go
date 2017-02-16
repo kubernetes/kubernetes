@@ -26,6 +26,8 @@ import (
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	v1beta1apps "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/apps/v1beta1"
 	fakev1beta1apps "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/apps/v1beta1/fake"
+	v1authentication "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/authentication/v1"
+	fakev1authentication "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/authentication/v1/fake"
 	v1beta1authentication "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/authentication/v1beta1"
 	fakev1beta1authentication "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/authentication/v1beta1/fake"
 	v1authorization "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/authorization/v1"
@@ -34,6 +36,8 @@ import (
 	fakev1beta1authorization "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/authorization/v1beta1/fake"
 	v1autoscaling "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/autoscaling/v1"
 	fakev1autoscaling "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/autoscaling/v1/fake"
+	v2alpha1autoscaling "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/autoscaling/v2alpha1"
+	fakev2alpha1autoscaling "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/autoscaling/v2alpha1/fake"
 	v1batch "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/batch/v1"
 	fakev1batch "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/batch/v1/fake"
 	v2alpha1batch "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/batch/v2alpha1"
@@ -107,13 +111,18 @@ func (c *Clientset) Apps() v1beta1apps.AppsV1beta1Interface {
 	return &fakev1beta1apps.FakeAppsV1beta1{Fake: &c.Fake}
 }
 
-// AuthenticationV1beta1 retrieves the AuthenticationV1beta1Client
-func (c *Clientset) AuthenticationV1beta1() v1beta1authentication.AuthenticationV1beta1Interface {
-	return &fakev1beta1authentication.FakeAuthenticationV1beta1{Fake: &c.Fake}
+// AuthenticationV1 retrieves the AuthenticationV1Client
+func (c *Clientset) AuthenticationV1() v1authentication.AuthenticationV1Interface {
+	return &fakev1authentication.FakeAuthenticationV1{Fake: &c.Fake}
 }
 
-// Authentication retrieves the AuthenticationV1beta1Client
-func (c *Clientset) Authentication() v1beta1authentication.AuthenticationV1beta1Interface {
+// Authentication retrieves the AuthenticationV1Client
+func (c *Clientset) Authentication() v1authentication.AuthenticationV1Interface {
+	return &fakev1authentication.FakeAuthenticationV1{Fake: &c.Fake}
+}
+
+// AuthenticationV1beta1 retrieves the AuthenticationV1beta1Client
+func (c *Clientset) AuthenticationV1beta1() v1beta1authentication.AuthenticationV1beta1Interface {
 	return &fakev1beta1authentication.FakeAuthenticationV1beta1{Fake: &c.Fake}
 }
 
@@ -140,6 +149,11 @@ func (c *Clientset) AutoscalingV1() v1autoscaling.AutoscalingV1Interface {
 // Autoscaling retrieves the AutoscalingV1Client
 func (c *Clientset) Autoscaling() v1autoscaling.AutoscalingV1Interface {
 	return &fakev1autoscaling.FakeAutoscalingV1{Fake: &c.Fake}
+}
+
+// AutoscalingV2alpha1 retrieves the AutoscalingV2alpha1Client
+func (c *Clientset) AutoscalingV2alpha1() v2alpha1autoscaling.AutoscalingV2alpha1Interface {
+	return &fakev2alpha1autoscaling.FakeAutoscalingV2alpha1{Fake: &c.Fake}
 }
 
 // BatchV1 retrieves the BatchV1Client

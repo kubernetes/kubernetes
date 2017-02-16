@@ -147,16 +147,6 @@ spec:
           name: grpc
         - containerPort: 8080
           name: http
-        livenessProbe:
-          httpGet:
-            path: /_admin/v1/health
-            port: http
-          initialDelaySeconds: 30
-        readinessProbe:
-          httpGet:
-            path: /_admin/v1/health
-            port: http
-          initialDelaySeconds: 10
         volumeMounts:
         - name: datadir
           mountPath: /cockroach/cockroach-data
@@ -193,8 +183,6 @@ spec:
   volumeClaimTemplates:
   - metadata:
       name: datadir
-      annotations:
-        volume.alpha.kubernetes.io/storage-class: anything
     spec:
       accessModes:
         - "ReadWriteOnce"

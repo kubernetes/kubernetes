@@ -31,6 +31,10 @@ const (
 	APIServerKubeletClientCertName           = "apiserver-kubelet-client.crt"
 	APIServerKubeletClientKeyName            = "apiserver-kubelet-client.key"
 
+	ServiceAccountKeyBaseName    = "sa"
+	ServiceAccountPublicKeyName  = "sa.pub"
+	ServiceAccountPrivateKeyName = "sa.key"
+
 	// TODO: These constants should actually come from pkg/kubeapiserver/authorizer, but we can't vendor that package in now
 	// because of all the other sub-packages that would get vendored. To fix this, a pkg/kubeapiserver/authorizer/modes package
 	// or similar should exist that only has these constants; then we can vendor it.
@@ -40,7 +44,7 @@ const (
 	AuthzModeWebhook     = "Webhook"
 
 	// Important: a "v"-prefix shouldn't exist here; semver doesn't allow that
-	MinimumControlPlaneVersion = "1.6.0-alpha.1"
+	MinimumControlPlaneVersion = "1.6.0-alpha.2"
 
 	// Constants for what we name our ServiceAccounts with limited access to the cluster in case of RBAC
 	KubeDNSServiceAccountName   = "kube-dns"

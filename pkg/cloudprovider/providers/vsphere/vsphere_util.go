@@ -18,6 +18,7 @@ package vsphere
 
 import (
 	"context"
+	"github.com/vmware/govmomi"
 	"os"
 	"runtime"
 	"strings"
@@ -25,8 +26,22 @@ import (
 
 // Reads vSphere configuration from system environment and construct vSphere object
 func GetVSphere() (*VSphere, error) {
+	cfg := getVSphereConfig()
+	client, err := GetgovmomiClient(cfg)
+	if err != nil {
+		return nil, err
+	}
+	vs := &VSphere{
+		client:          client,
+		cfg:             cfg,
+		localInstanceID: "",
+	}
+	runtime.SetFinalizer(vs, logout)
+	return vs, nil
+}
+
+func getVSphereConfig() *VSphereConfig {
 	var cfg VSphereConfig
-	var err error
 	cfg.Global.VCenterIP = os.Getenv("VSPHERE_VCENTER")
 	cfg.Global.VCenterPort = os.Getenv("VSPHERE_VCENTER_PORT")
 	cfg.Global.User = os.Getenv("VSPHERE_USER")
@@ -38,15 +53,13 @@ func GetVSphere() (*VSphere, error) {
 	if strings.ToLower(os.Getenv("VSPHERE_INSECURE")) == "true" {
 		cfg.Global.InsecureFlag = true
 	}
-	c, err := newClient(context.TODO(), &cfg)
-	if err != nil {
-		return nil, err
+	return &cfg
+}
+
+func GetgovmomiClient(cfg *VSphereConfig) (*govmomi.Client, error) {
+	if cfg == nil {
+		cfg = getVSphereConfig()
 	}
-	vs := VSphere{
-		client:          c,
-		cfg:             &cfg,
-		localInstanceID: "",
-	}
-	runtime.SetFinalizer(&vs, logout)
-	return &vs, nil
+	client, err := newClient(context.TODO(), cfg)
+	return client, err
 }
