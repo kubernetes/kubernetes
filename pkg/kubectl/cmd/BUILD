@@ -76,6 +76,7 @@ go_library(
         "//pkg/client/clientset_generated/internalclientset/typed/core/internalversion:go_default_library",
         "//pkg/client/unversioned:go_default_library",
         "//pkg/client/unversioned/remotecommand:go_default_library",
+        "//pkg/client/unversioned/remotecommand/resize:go_default_library",
         "//pkg/kubectl:go_default_library",
         "//pkg/kubectl/cmd/config:go_default_library",
         "//pkg/kubectl/cmd/rollout:go_default_library",
