@@ -1,3 +1,5 @@
+#!/bin/sh
+
 # Copyright 2016 The Kubernetes Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -12,13 +14,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-.PHONY:	build push
+# For systems without journald
+mkdir -p /var/log/journal
 
-TAG = v4.6.1-1
-PREFIX = gcr.io/google_containers
+if [ -e /host/lib/libsystemd* ]
+then
+  rm /lib/x86_64-linux-gnu/libsystemd*
+  cp /host/lib/libsystemd* /lib/x86_64-linux-gnu/
+fi
 
-build:
-	docker build --pull -t $(PREFIX)/kibana:$(TAG) .
+LD_PRELOAD=/opt/td-agent/embedded/lib/libjemalloc.so
+RUBY_GC_HEAP_OLDOBJECT_LIMIT_FACTOR=0.9
 
-push:
-	gcloud docker -- push $(PREFIX)/kibana:$(TAG)
+/usr/sbin/td-agent $@

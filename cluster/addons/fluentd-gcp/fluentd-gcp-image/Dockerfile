@@ -20,7 +20,7 @@
 # scope and that the Logging API has been enabled for the project
 # in the Google Developer Console.
 
-FROM gcr.io/google_containers/ubuntu-slim:0.4
+FROM gcr.io/google_containers/ubuntu-slim:0.6
 
 MAINTAINER Mik Vyatskov "vmik@google.com"
 
@@ -50,11 +50,11 @@ RUN apt-get -qq update && \
         /opt/td-agent/embedded/share/postgresql \
         /etc/td-agent/td-agent.conf
 
-# Copy the Fluentd configuration files for logging Docker container logs.
-# Either configuration file can be used by specifying `-c <file>` as a command
-# line argument.
-COPY google-fluentd.conf /etc/td-agent/td-agent.conf
-COPY google-fluentd-journal.conf /etc/td-agent/td-agent-journal.conf
+# Copy the Fluentd configuration file for logging Docker container logs.
+COPY fluent.conf /etc/td-agent/td-agent.conf
+
+# Copy the entrypoint for the container
+COPY run.sh /run.sh
 
 # Start Fluentd to pick up our config that watches Docker container logs.
-CMD /usr/sbin/td-agent $FLUENTD_ARGS
+CMD /run.sh $FLUENTD_ARGS

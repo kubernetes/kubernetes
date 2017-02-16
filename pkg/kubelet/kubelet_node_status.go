@@ -176,9 +176,10 @@ func (kl *Kubelet) initialNode() (*api.Node, error) {
 		ObjectMeta: api.ObjectMeta{
 			Name: string(kl.nodeName),
 			Labels: map[string]string{
-				unversioned.LabelHostname: kl.hostname,
-				unversioned.LabelOS:       goRuntime.GOOS,
-				unversioned.LabelArch:     goRuntime.GOARCH,
+				unversioned.LabelHostname:       kl.hostname,
+				unversioned.LabelOS:             goRuntime.GOOS,
+				unversioned.LabelArch:           goRuntime.GOARCH,
+				unversioned.LabelFluentdDsReady: "true",
 			},
 		},
 		Spec: api.NodeSpec{
