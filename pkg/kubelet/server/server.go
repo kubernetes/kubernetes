@@ -583,6 +583,7 @@ func (s *Server) getSpec(request *restful.Request, response *restful.Response) {
 func (s *Server) getComponentConfigs(request *restful.Request, response *restful.Response) {
 	response.WriteEntity(s.host.GetComponentConfigs())
 }
+
 type execRequestParams struct {
 	podNamespace  string
 	podName       string
