@@ -157,26 +157,6 @@ var _ = framework.KubeDescribe("Federated Services [Feature:Federation]", func()
 				fedframework.SkipUnlessFederated(f.ClientSet)
 
 				nsName := f.FederationNamespace.Name
-				// Create kube-dns configmap for kube-dns to accept federation queries.
-				federationsDomainMap := os.Getenv("FEDERATIONS_DOMAIN_MAP")
-				if federationsDomainMap == "" {
-					framework.Failf("missing required env var FEDERATIONS_DOMAIN_MAP")
-				}
-				kubeDNSConfigMap := v1.ConfigMap{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      KubeDNSConfigMapName,
-						Namespace: KubeDNSConfigMapNamespace,
-					},
-					Data: map[string]string{
-						"federations": federationsDomainMap,
-					},
-				}
-				// Create this configmap in all clusters.
-				for clusterName, cluster := range clusters {
-					By(fmt.Sprintf("Creating kube dns config map in cluster: %s", clusterName))
-					_, err := cluster.Clientset.Core().ConfigMaps(KubeDNSConfigMapNamespace).Create(&kubeDNSConfigMap)
-					framework.ExpectNoError(err, fmt.Sprintf("Error in creating config map in cluster %s", clusterName))
-				}
 
 				createBackendPodsOrFail(clusters, nsName, FederatedServicePodName)
 
@@ -231,13 +211,6 @@ var _ = framework.KubeDescribe("Federated Services [Feature:Federation]", func()
 					serviceShard = nil
 				} else {
 					By("No service shards to delete. `serviceShard` is nil")
-				}
-
-				// Delete the kube-dns config map from all clusters.
-				for clusterName, cluster := range clusters {
-					By(fmt.Sprintf("Deleting kube dns config map from cluster: %s", clusterName))
-					err := cluster.Clientset.Core().ConfigMaps(KubeDNSConfigMapNamespace).Delete(KubeDNSConfigMapName, nil)
-					framework.ExpectNoError(err, fmt.Sprintf("Error in deleting config map from cluster %s", clusterName))
 				}
 			})
 
