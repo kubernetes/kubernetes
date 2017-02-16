@@ -136,8 +136,8 @@ func startNamespaceController(ctx ControllerContext) (bool, error) {
 
 func startServiceAccountController(ctx ControllerContext) (bool, error) {
 	go serviceaccountcontroller.NewServiceAccountsController(
-		ctx.InformerFactory.ServiceAccounts(),
-		ctx.InformerFactory.Namespaces(),
+		ctx.NewInformerFactory.Core().V1().ServiceAccounts(),
+		ctx.NewInformerFactory.Core().V1().Namespaces(),
 		ctx.ClientBuilder.ClientOrDie("service-account-controller"),
 		serviceaccountcontroller.DefaultServiceAccountsControllerOptions(),
 	).Run(1, ctx.Stop)
