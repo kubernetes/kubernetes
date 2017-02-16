@@ -186,6 +186,19 @@ func (fac FileAvailableCheck) Check() (warnings, errors []error) {
 	return nil, errors
 }
 
+// FileExistingCheck checks that the given file does not already exist.
+type FileExistingCheck struct {
+	Path string
+}
+
+func (fac FileExistingCheck) Check() (warnings, errors []error) {
+	errors = []error{}
+	if _, err := os.Stat(fac.Path); err != nil {
+		errors = append(errors, fmt.Errorf("%s doesn't exist", fac.Path))
+	}
+	return nil, errors
+}
+
 // FileContentCheck checks that the given file contains the string Content.
 type FileContentCheck struct {
 	Path    string
@@ -347,6 +360,16 @@ func RunInitMasterChecks(cfg *kubeadmapi.MasterConfiguration) error {
 			PortOpenCheck{port: 2379},
 			DirAvailableCheck{Path: "/var/lib/etcd"},
 		)
+	}
+
+	// Check the config for authorization mode
+	switch cfg.AuthorizationMode {
+	case kubeadmconstants.AuthzModeABAC:
+		authorizationPolicyPath := filepath.Join(kubeadmapi.GlobalEnvParams.KubernetesDir, kubeadmconstants.AuthorizationPolicyFile)
+		checks = append(checks, FileExistingCheck{Path: authorizationPolicyPath})
+	case kubeadmconstants.AuthzModeWebhook:
+		authorizationWebhookConfigPath := filepath.Join(kubeadmapi.GlobalEnvParams.KubernetesDir, kubeadmconstants.AuthorizationWebhookConfigFile)
+		checks = append(checks, FileExistingCheck{Path: authorizationWebhookConfigPath})
 	}
 
 	return RunChecks(checks, os.Stderr)
