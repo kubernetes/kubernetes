@@ -136,7 +136,7 @@ func (o *SubcommandOptions) SetName(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-func CreateKubeconfigSecret(clientset *client.Clientset, kubeconfig *clientcmdapi.Config, namespace, name string, dryRun bool) (*api.Secret, error) {
+func CreateKubeconfigSecret(clientset client.Interface, kubeconfig *clientcmdapi.Config, namespace, name string, dryRun bool) (*api.Secret, error) {
 	configBytes, err := clientcmd.Write(*kubeconfig)
 	if err != nil {
 		return nil, err
