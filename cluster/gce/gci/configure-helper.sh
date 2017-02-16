@@ -210,8 +210,7 @@ function replace_prefixed_line {
 function create-master-auth {
   echo "Creating master auth files"
   local -r auth_dir="/etc/srv/kubernetes"
-  if [[ ! -e "${auth_dir}/ca.crt" && ! -z "${CA_CERT:-}" && ! -z "${MASTER_CERT:-}" && ! -z "${MASTER_KEY:-}" ]]; then
-    echo "${CA_CERT}" | base64 --decode > "${auth_dir}/ca.crt"
+  if [[ ! -z "${MASTER_CERT:-}" && ! -z "${MASTER_KEY:-}" ]]; then
     echo "${MASTER_CERT}" | base64 --decode > "${auth_dir}/server.cert"
     echo "${MASTER_KEY}" | base64 --decode > "${auth_dir}/server.key"
   fi
@@ -347,9 +346,6 @@ EOF
 
 function create-kubelet-kubeconfig {
   echo "Creating kubelet kubeconfig file"
-  if [[ -z "${KUBELET_CA_CERT:-}" ]]; then
-    KUBELET_CA_CERT="${CA_CERT}"
-  fi
   cat <<EOF >/var/lib/kubelet/kubeconfig
 apiVersion: v1
 kind: Config
@@ -361,7 +357,7 @@ users:
 clusters:
 - name: local
   cluster:
-    certificate-authority-data: ${KUBELET_CA_CERT}
+    certificate-authority: ${CA_CERT_PATH}
 contexts:
 - context:
     cluster: local
@@ -369,10 +365,9 @@ contexts:
   name: service-account-context
 current-context: service-account-context
 EOF
-  echo "${KUBELET_CA_CERT}" | base64 -d > /var/lib/kubelet/ca.crt
 }
 
-# Uses KUBELET_CA_CERT (falling back to CA_CERT), KUBELET_CERT, and KUBELET_KEY
+# Uses CA_CERT, KUBELET_CERT, and KUBELET_KEY
 # to generate a kubeconfig file for the kubelet to securely connect to the apiserver.
 # Set REGISTER_MASTER_KUBELET to true if kubelet on the master node
 # should register to the apiserver.
@@ -397,7 +392,7 @@ users:
 clusters:
 - name: local
   cluster:
-    certificate-authority-data: ${CA_CERT}
+    certificate-authority: ${CA_CERT_PATH}
 contexts:
 - context:
     cluster: local
@@ -576,7 +571,7 @@ function start-kubelet {
        [[ "${HAIRPIN_MODE:-}" == "none" ]]; then
       flags+=" --hairpin-mode=${HAIRPIN_MODE}"
     fi
-    flags+=" --anonymous-auth=false --authorization-mode=Webhook --client-ca-file=/var/lib/kubelet/ca.crt"
+    flags+=" --anonymous-auth=false --authorization-mode=Webhook --client-ca-file=${CA_CERT_PATH}"
   fi
   # Network plugin
   if [[ -n "${NETWORK_PROVIDER:-}" ]]; then
@@ -823,7 +818,7 @@ function start-kube-apiserver {
   params+=" --address=127.0.0.1"
   params+=" --allow-privileged=true"
   params+=" --cloud-provider=gce"
-  params+=" --client-ca-file=/etc/srv/kubernetes/ca.crt"
+  params+=" --client-ca-file=${CA_CERT_PATH}"
   params+=" --etcd-servers=http://127.0.0.1:2379"
   params+=" --etcd-servers-overrides=/events#http://127.0.0.1:4002"
   params+=" --secure-port=443"
@@ -968,7 +963,7 @@ function start-kube-controller-manager {
   params+=" --use-service-account-credentials"
   params+=" --cloud-provider=gce"
   params+=" --kubeconfig=/etc/srv/kubernetes/kube-controller-manager/kubeconfig"
-  params+=" --root-ca-file=/etc/srv/kubernetes/ca.crt"
+  params+=" --root-ca-file=${CA_CERT_PATH}"
   params+=" --service-account-private-key-file=/etc/srv/kubernetes/server.key"
   if [[ -n "${ENABLE_GARBAGE_COLLECTOR:-}" ]]; then
     params+=" --enable-garbage-collector=${ENABLE_GARBAGE_COLLECTOR}"
@@ -980,7 +975,7 @@ function start-kube-controller-manager {
     params+=" --cluster-cidr=${CLUSTER_IP_RANGE}"
   fi
   if [[ -n "${CA_KEY:-}" ]]; then
-    params+=" --cluster-signing-cert-file=/etc/srv/kubernetes/ca.crt"
+    params+=" --cluster-signing-cert-file=${CA_CERT_PATH}"
     params+=" --cluster-signing-key-file=/etc/srv/kubernetes/ca.key"
   fi
   if [[ -n "${SERVICE_CLUSTER_IP_RANGE:-}" ]]; then
@@ -1313,6 +1308,17 @@ function pre-warm-mounter {
     ${KUBE_HOME}/bin/mounter &> /dev/null
 }
 
+function write-ca-crt {
+  local ca_cert_dir="${1}"
+  if [[ -z "${CA_CERT:-}" ]]; then
+    echo "No CA_CERT available" 1>&2
+    exit 1
+  fi
+  CA_CERT_PATH="${ca_cert_dir}/ca.crt"
+  mkdir -p "${ca_cert_dir}"
+  (umask 077; echo "${CA_CERT}" | base64 --decode > "${CA_CERT_PATH}");
+}
+
 ########### Main Function ###########
 echo "Start to configure instance for kubernetes"
 
@@ -1344,6 +1350,7 @@ create-dirs
 setup-kubelet-dir
 ensure-local-ssds
 setup-logrotate
+write-ca-crt "/etc/srv/kubernetes"
 if [[ "${KUBERNETES_MASTER:-}" == "true" ]]; then
   mount-master-pd
   create-master-auth
@@ -1353,6 +1360,7 @@ else
   create-kubelet-kubeconfig
   create-kubeproxy-kubeconfig
 fi
+
 
 override-kubectl
 # Run the containerized mounter once to pre-cache the container image.
