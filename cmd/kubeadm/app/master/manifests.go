@@ -40,17 +40,15 @@ const (
 	DefaultClusterName     = "kubernetes"
 	DefaultCloudConfigPath = "/etc/kubernetes/cloud-config"
 
-	etcd                           = "etcd"
-	apiServer                      = "apiserver"
-	controllerManager              = "controller-manager"
-	scheduler                      = "scheduler"
-	proxy                          = "proxy"
-	kubeAPIServer                  = "kube-apiserver"
-	kubeControllerManager          = "kube-controller-manager"
-	kubeScheduler                  = "kube-scheduler"
-	kubeProxy                      = "kube-proxy"
-	authorizationPolicyFile        = "abac_policy.json"
-	authorizationWebhookConfigFile = "webhook_authz.conf"
+	etcd                  = "etcd"
+	apiServer             = "apiserver"
+	controllerManager     = "controller-manager"
+	scheduler             = "scheduler"
+	proxy                 = "proxy"
+	kubeAPIServer         = "kube-apiserver"
+	kubeControllerManager = "kube-controller-manager"
+	kubeScheduler         = "kube-scheduler"
+	kubeProxy             = "kube-proxy"
 )
 
 // WriteStaticPodManifests builds manifest objects based on user provided configuration and then dumps it to disk
@@ -326,9 +324,9 @@ func getAPIServerCommand(cfg *kubeadmapi.MasterConfiguration, selfHosted bool) [
 		command = append(command, "--authorization-mode="+cfg.AuthorizationMode)
 		switch cfg.AuthorizationMode {
 		case kubeadmconstants.AuthzModeABAC:
-			command = append(command, "--authorization-policy-file="+path.Join(kubeadmapi.GlobalEnvParams.KubernetesDir, authorizationPolicyFile))
+			command = append(command, "--authorization-policy-file="+path.Join(kubeadmapi.GlobalEnvParams.KubernetesDir, kubeadmconstants.AuthorizationPolicyFile))
 		case kubeadmconstants.AuthzModeWebhook:
-			command = append(command, "--authorization-webhook-config-file="+path.Join(kubeadmapi.GlobalEnvParams.KubernetesDir, authorizationWebhookConfigFile))
+			command = append(command, "--authorization-webhook-config-file="+path.Join(kubeadmapi.GlobalEnvParams.KubernetesDir, kubeadmconstants.AuthorizationWebhookConfigFile))
 		}
 	}
 
