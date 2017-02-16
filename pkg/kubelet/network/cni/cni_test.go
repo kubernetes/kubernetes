@@ -215,7 +215,7 @@ func TestCNIPlugin(t *testing.T) {
 	}
 
 	// Set up the pod
-	err = plug.SetUpPod("podNamespace", "podName", containerID)
+	err = plug.SetUpPod("podNamespace", "podName", containerID, map[string]string{})
 	if err != nil {
 		t.Errorf("Expected nil: %v", err)
 	}

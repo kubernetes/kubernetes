@@ -69,7 +69,7 @@ type NetworkPlugin interface {
 	// the pod has been created but before the other containers of the
 	// pod are launched.
 	// TODO: rename podInfraContainerID to sandboxID
-	SetUpPod(namespace string, name string, podInfraContainerID kubecontainer.ContainerID) error
+	SetUpPod(namespace string, name string, podInfraContainerID kubecontainer.ContainerID, annotations map[string]string) error
 
 	// TearDownPod is the method called before a pod's infra container will be deleted
 	// TODO: rename podInfraContainerID to sandboxID
@@ -234,7 +234,7 @@ func (plugin *NoopNetworkPlugin) Capabilities() utilsets.Int {
 	return utilsets.NewInt()
 }
 
-func (plugin *NoopNetworkPlugin) SetUpPod(namespace string, name string, id kubecontainer.ContainerID) error {
+func (plugin *NoopNetworkPlugin) SetUpPod(namespace string, name string, id kubecontainer.ContainerID, annotations map[string]string) error {
 	return nil
 }
 
