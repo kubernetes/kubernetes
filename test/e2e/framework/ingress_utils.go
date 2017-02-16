@@ -728,16 +728,16 @@ func (cont *GCEIngressController) Init() {
 // a string representing the name of the certificate. Caller is expected to
 // manage cleanup of the cert by invoking deleteTLSCertificate.
 func (j *IngressTestJig) createTLSCertificate(cont *GCEIngressController, name string) string {
-	host, cert, key, err := createCertificate(j.Ingress)
+	_, cert, key, err := createCertificate(j.Ingress)
 	if err != nil {
 		Failf("Failed to generate TLS cert %v: %v", name, err)
 	}
 
 	gceCloud := cont.Cloud.Provider.(*gcecloud.GCECloud)
-	c, err = gceCloud.CreateSslCertificate(&compute.SslCertificate{
+	c, err := gceCloud.CreateSslCertificate(&compute.SslCertificate{
 		Name:        name,
-		Certificate: cert,
-		PrivateKey:  key,
+		Certificate: string(cert),
+		PrivateKey:  string(key),
 	})
 	if err != nil {
 		Failf("Failed to create TLS cert %v: %v", name, err)
