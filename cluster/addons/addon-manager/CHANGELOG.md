@@ -1,3 +1,6 @@
+### Version 6.4-alpha.2 (Wed February 16 2017 Zihong Zheng <zihongz@google.com>)
+ - Update kubectl to v1.6.0-alpha.2 to use HPA in autoscaling/v1 instead of extensions/v1beta1.
+
 ### Version 6.4-alpha.1 (Wed February 1 2017 Zihong Zheng <zihongz@google.com>)
  - Update kubectl to v1.6.0-alpha.1 for supporting optional ConfigMap.
 
