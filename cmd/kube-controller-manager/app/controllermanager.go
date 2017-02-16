@@ -483,6 +483,9 @@ func StartControllers(controllers map[string]InitFunc, s *options.CMServer, root
 		VolumePlugins:             ProbeControllerVolumePlugins(cloud, s.VolumeConfiguration),
 		Cloud:                     cloud,
 		ClusterName:               s.ClusterName,
+		VolumeInformer:            newSharedInformers.Core().V1().PersistentVolumes(),
+		ClaimInformer:             newSharedInformers.Core().V1().PersistentVolumeClaims(),
+		ClassInformer:             newSharedInformers.Storage().V1beta1().StorageClasses(),
 		EnableDynamicProvisioning: s.VolumeConfiguration.EnableDynamicProvisioning,
 	}
 	volumeController := persistentvolumecontroller.NewController(params)
