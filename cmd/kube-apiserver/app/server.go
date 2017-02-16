@@ -35,6 +35,7 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 
+	"k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/openapi"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
@@ -50,6 +51,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/batch"
 	"k8s.io/kubernetes/pkg/capabilities"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
+	"k8s.io/kubernetes/pkg/client/informers/informers_generated/internalversion"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/controller/informers"
 	serviceaccountcontroller "k8s.io/kubernetes/pkg/controller/serviceaccount"
@@ -61,6 +63,7 @@ import (
 	"k8s.io/kubernetes/pkg/master/tunneler"
 	"k8s.io/kubernetes/pkg/registry/cachesize"
 	"k8s.io/kubernetes/pkg/version"
+	"k8s.io/kubernetes/plugin/pkg/auth/authenticator/token/bootstrap"
 )
 
 // NewAPIServerCommand creates a *cobra.Command object with default parameters
@@ -253,11 +256,6 @@ func Run(s *options.ServerRunOptions) error {
 		authenticatorConfig.ServiceAccountTokenGetter = serviceaccountcontroller.NewGetterFromStorageInterface(storageConfig, storageFactory.ResourcePrefix(api.Resource("serviceaccounts")), storageFactory.ResourcePrefix(api.Resource("secrets")))
 	}
 
-	apiAuthenticator, securityDefinitions, err := authenticatorConfig.New()
-	if err != nil {
-		return fmt.Errorf("invalid Authentication Config: %v", err)
-	}
-
 	client, err := internalclientset.NewForConfig(genericConfig.LoopbackClientConfig)
 	if err != nil {
 		kubeAPIVersions := os.Getenv("KUBE_API_VERSIONS")
@@ -267,10 +265,29 @@ func Run(s *options.ServerRunOptions) error {
 
 		// KUBE_API_VERSIONS is used in test-update-storage-objects.sh, disabling a number of API
 		// groups. This leads to a nil client above and undefined behaviour further down.
+		//
 		// TODO: get rid of KUBE_API_VERSIONS or define sane behaviour if set
 		glog.Errorf("Failed to create clientset with KUBE_API_VERSIONS=%q. KUBE_API_VERSIONS is only for testing. Things will break.", kubeAPIVersions)
 	}
+
+	// TODO: Internal informers should switch to using 'pkg/client/informers/informers_generated',
+	// the second informer created here. Refactor clients which take the former to accept the latter.
 	sharedInformers := informers.NewSharedInformerFactory(nil, client, 10*time.Minute)
+	internalSharedInformers := internalversion.NewSharedInformerFactory(client, 10*time.Minute)
+
+	if client == nil {
+		// TODO: Remove check once client can never be nil.
+		glog.Errorf("Failed to setup bootstrap token authenticator because the loopback clientset was not setup properly.")
+	} else {
+		authenticatorConfig.BootstrapTokenAuthenticator = bootstrap.NewTokenAuthenticator(
+			internalSharedInformers.Core().InternalVersion().Secrets().Lister().Secrets(v1.NamespaceSystem),
+		)
+	}
+
+	apiAuthenticator, securityDefinitions, err := authenticatorConfig.New()
+	if err != nil {
+		return fmt.Errorf("invalid authentication config: %v", err)
+	}
 
 	authorizationConfig := s.Authorization.ToAuthorizationConfig(sharedInformers)
 	apiAuthorizer, err := authorizationConfig.New()
@@ -350,6 +367,7 @@ func Run(s *options.ServerRunOptions) error {
 	}
 
 	sharedInformers.Start(wait.NeverStop)
+	internalSharedInformers.Start(wait.NeverStop)
 	m.GenericAPIServer.PrepareRun().Run(wait.NeverStop)
 	return nil
 }
