@@ -17,7 +17,12 @@ limitations under the License.
 package cm
 
 import (
+	"fmt"
+	"strconv"
+	"strings"
+
 	"k8s.io/kubernetes/pkg/api/v1"
+	"k8s.io/kubernetes/pkg/apis/componentconfig"
 )
 
 type ActivePodsFunc func() []*v1.Pod
@@ -64,9 +69,48 @@ type NodeConfig struct {
 	CgroupDriver          string
 	ProtectKernelDefaults bool
 	EnableCRI             bool
+	QOSReserveRequests    map[v1.ResourceName]int64
 }
 
 type Status struct {
 	// Any soft requirements that were unsatisfied.
 	SoftRequirements error
+}
+
+// containerManager for the kubelet is currently an injected dependency.
+// We need to parse the --qos-reserve-requests option in
+// cmd/kubelet/app/server.go and there isn't really a good place to put
+// the code.  If/When the kubelet dependency injection gets worked out,
+// maybe there will be a better place for it.
+func parsePercentage(v string) (int64, error) {
+	if !strings.HasSuffix(v, "%") {
+		return 0, fmt.Errorf("percentage expected, got '%s'", v)
+	}
+	percentage, err := strconv.ParseInt(strings.TrimRight(v, "%"), 10, 0)
+	if err != nil {
+		return 0, fmt.Errorf("invalid number in percentage '%s'", v)
+	}
+	if percentage < 0 || percentage > 100 {
+		return 0, fmt.Errorf("percentage must be between 0 and 100")
+	}
+	return percentage, nil
+}
+
+// ParseQOSReserveRequests parses the --qos-reserve-requests option
+func ParseQOSReserveRequests(m componentconfig.ConfigurationMap) (*map[v1.ResourceName]int64, error) {
+	reservations := make(map[v1.ResourceName]int64)
+	for k, v := range m {
+		switch v1.ResourceName(k) {
+		// Only memory resources are supported.
+		case v1.ResourceMemory:
+			q, err := parsePercentage(v)
+			if err != nil {
+				return nil, err
+			}
+			reservations[v1.ResourceName(k)] = q
+		default:
+			return nil, fmt.Errorf("cannot reserve %q resource", k)
+		}
+	}
+	return &reservations, nil
 }

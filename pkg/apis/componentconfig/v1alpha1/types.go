@@ -488,6 +488,10 @@ type KubeletConfiguration struct {
 	// Currently only cpu and memory are supported. [default=none]
 	// See http://kubernetes.io/docs/user-guide/compute-resources for more detail.
 	KubeReserved map[string]string `json:"kubeReserved"`
+	// A set of ResourceName=Percentage (e.g. memory=50%) pairs that describe
+	// how pod resource requests are reserved at the QoS level.
+	// Currently only memory is supported. [default=none]"
+	QOSReserveRequests map[string]string `json:"qosReserveRequests"`
 	// Default behaviour for kernel tuning
 	ProtectKernelDefaults bool `json:"protectKernelDefaults"`
 	// If true, Kubelet ensures a set of iptables rules are present on host.

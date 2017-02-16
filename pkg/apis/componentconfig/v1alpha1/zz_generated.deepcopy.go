@@ -280,6 +280,13 @@ func DeepCopy_v1alpha1_KubeletConfiguration(in interface{}, out interface{}, c *
 				(*out)[key] = val
 			}
 		}
+		if in.QOSReserveRequests != nil {
+			in, out := &in.QOSReserveRequests, &out.QOSReserveRequests
+			*out = make(map[string]string)
+			for key, val := range *in {
+				(*out)[key] = val
+			}
+		}
 		if in.MakeIPTablesUtilChains != nil {
 			in, out := &in.MakeIPTablesUtilChains, &out.MakeIPTablesUtilChains
 			*out = new(bool)

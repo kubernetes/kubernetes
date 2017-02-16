@@ -456,6 +456,10 @@ func run(s *options.KubeletServer, kubeDeps *kubelet.KubeletDeps) (err error) {
 			glog.Infof("--cgroups-per-qos enabled, but --cgroup-root was not specified.  defaulting to /")
 			s.CgroupRoot = "/"
 		}
+		qosReserveRequests, err := cm.ParseQOSReserveRequests(s.QOSReserveRequests)
+		if err != nil {
+			return err
+		}
 		kubeDeps.ContainerManager, err = cm.NewContainerManager(
 			kubeDeps.Mounter,
 			kubeDeps.CAdvisorInterface,
@@ -469,6 +473,7 @@ func run(s *options.KubeletServer, kubeDeps *kubelet.KubeletDeps) (err error) {
 				CgroupDriver:          s.CgroupDriver,
 				ProtectKernelDefaults: s.ProtectKernelDefaults,
 				EnableCRI:             s.EnableCRI,
+				QOSReserveRequests:    *qosReserveRequests,
 			},
 			s.ExperimentalFailSwapOn)
 

@@ -226,6 +226,7 @@ func (s *KubeletServer) AddFlags(fs *pflag.FlagSet) {
 	fs.Int64Var(&s.MaxOpenFiles, "max-open-files", s.MaxOpenFiles, "Number of files that can be opened by Kubelet process. [default=1000000]")
 	fs.Var(&s.SystemReserved, "system-reserved", "A set of ResourceName=ResourceQuantity (e.g. cpu=200m,memory=150G) pairs that describe resources reserved for non-kubernetes components. Currently only cpu and memory are supported. See http://kubernetes.io/docs/user-guide/compute-resources for more detail. [default=none]")
 	fs.Var(&s.KubeReserved, "kube-reserved", "A set of ResourceName=ResourceQuantity (e.g. cpu=200m,memory=150G) pairs that describe resources reserved for kubernetes system components. Currently only cpu and memory are supported. See http://kubernetes.io/docs/user-guide/compute-resources for more detail. [default=none]")
+	fs.Var(&s.QOSReserveRequests, "experimental-qos-reserve-requests", "A set of ResourceName=Percentage (e.g. memory=50%) pairs that describe how pod resource requests are reserved at the QoS level. Currently only memory is supported. [default=none]")
 	fs.BoolVar(&s.RegisterSchedulable, "register-schedulable", s.RegisterSchedulable, "Register the node as schedulable. Won't have any effect if register-node is false. [default=true]")
 	fs.MarkDeprecated("register-schedulable", "will be removed in a future version")
 	fs.Var(utiltaints.NewTaintsVar(&s.RegisterWithTaints), "register-with-taints", "Register the node with the given list of taints (comma seperated \"<key>=<value>:<effect>\"). No-op if register-node is false.")
