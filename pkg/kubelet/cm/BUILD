@@ -18,11 +18,13 @@ go_library(
         "helpers_linux.go",
         "pod_container_manager_linux.go",
         "pod_container_manager_stub.go",
+        "qos_container_manager_linux.go",
         "types.go",
     ],
     tags = ["automanaged"],
     deps = [
         "//pkg/api/v1:go_default_library",
+        "//pkg/apis/componentconfig:go_default_library",
         "//pkg/kubelet/cadvisor:go_default_library",
         "//pkg/kubelet/cm/util:go_default_library",
         "//pkg/kubelet/qos:go_default_library",
