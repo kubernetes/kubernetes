@@ -73,9 +73,13 @@ type FakeDockerClient struct {
 	ImageHistoryMap map[string][]dockertypes.ImageHistory
 }
 
-// We don't check docker version now, just set the docker version of fake docker client to 1.8.1.
-// Notice that if someday we also have minimum docker version requirement, this should also be updated.
-const fakeDockerVersion = "1.8.1"
+const (
+	// We don't check docker version now, just set the docker version of fake docker client to 1.8.1.
+	// Notice that if someday we also have minimum docker version requirement, this should also be updated.
+	fakeDockerVersion = "1.8.1"
+
+	fakeImageSize = 1024
+)
 
 func NewFakeDockerClient() *FakeDockerClient {
 	return &FakeDockerClient{
@@ -373,30 +377,57 @@ func (f *FakeDockerClient) ListContainers(options dockertypes.ContainerListOptio
 		// TODO(random-liu): Is a fully sorted array needed?
 		containerList = append(containerList, f.ExitedContainerList...)
 	}
-	// TODO: Support other filters.
+	// Filter containers with id, only support 1 id.
+	idFilters := options.Filter.Get("id")
+	if len(idFilters) != 0 {
+		var filtered []dockertypes.Container
+		for _, container := range containerList {
+			for _, idFilter := range idFilters {
+				if container.ID == idFilter {
+					filtered = append(filtered, container)
+					break
+				}
+			}
+		}
+		containerList = filtered
+	}
+	// Filter containers with status, only support 1 status.
+	statusFilters := options.Filter.Get("status")
+	if len(statusFilters) == 1 {
+		var filtered []dockertypes.Container
+		for _, container := range containerList {
+			for _, statusFilter := range statusFilters {
+				if container.Status == statusFilter {
+					filtered = append(filtered, container)
+					break
+				}
+			}
+		}
+		containerList = filtered
+	}
 	// Filter containers with label filter.
 	labelFilters := options.Filter.Get("label")
-	if len(labelFilters) == 0 {
-		return containerList, err
-	}
-	var filtered []dockertypes.Container
-	for _, container := range containerList {
-		match := true
-		for _, labelFilter := range labelFilters {
-			kv := strings.Split(labelFilter, "=")
-			if len(kv) != 2 {
-				return nil, fmt.Errorf("invalid label filter %q", labelFilter)
+	if len(labelFilters) != 0 {
+		var filtered []dockertypes.Container
+		for _, container := range containerList {
+			match := true
+			for _, labelFilter := range labelFilters {
+				kv := strings.Split(labelFilter, "=")
+				if len(kv) != 2 {
+					return nil, fmt.Errorf("invalid label filter %q", labelFilter)
+				}
+				if container.Labels[kv[0]] != kv[1] {
+					match = false
+					break
+				}
 			}
-			if container.Labels[kv[0]] != kv[1] {
-				match = false
-				break
+			if match {
+				filtered = append(filtered, container)
 			}
 		}
-		if match {
-			filtered = append(filtered, container)
-		}
+		containerList = filtered
 	}
-	return filtered, err
+	return containerList, err
 }
 
 // InspectContainer is a test-spy implementation of DockerInterface.InspectContainer.
@@ -587,6 +618,10 @@ func (f *FakeDockerClient) PullImage(image string, auth dockertypes.AuthConfig, 
 		f.Image = &dockertypes.ImageInspect{
 			ID:       image,
 			RepoTags: []string{image},
+			// Image size is required to be non-zero for CRI integration.
+			VirtualSize: fakeImageSize,
+			Size:        fakeImageSize,
+			Config:      &dockercontainer.Config{},
 		}
 		f.appendPulled(fmt.Sprintf("%s using %s", image, string(authJson)))
 	}
