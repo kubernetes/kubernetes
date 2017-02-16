@@ -20,8 +20,35 @@ set -o pipefail
 
 KUBE_ROOT=$(readlink -m $(dirname "${BASH_SOURCE}")/../../)
 
-. ${KUBE_ROOT}/federation/cluster/common.sh
+# For $FEDERATION_KUBE_CONTEXT, $HOST_CLUSTER_CONTEXT,
+# $KUBEDNS_CONFIGMAP_NAME and $KUBEDNS_CONFIGMAP_NAMESPACE.
+source "${KUBE_ROOT}/federation/cluster/common.sh"
+
+# join_cluster_to_federation joins the clusters in the local kubeconfig to federation. The clusters
+# and their kubeconfig entries in the local kubeconfig are created while deploying clusters, i.e. when kube-up is run.
+function unjoin_clusters() {
+  "${host_kubectl}" config use-context "${FEDERATION_KUBE_CONTEXT}"
+
+  local -r clusters=$("${host_kubectl}" -o jsonpath --template '{.items[*].metadata.name}')
+  for cluster in ${clusters}; do
+    kube::log::status "Unjoining cluster \"${cluster}\" from federation \"${FEDERATION_NAME}\""
+
+    "${KUBE_ROOT}/federation/develop/kubefed.sh" unjoin \
+        "${cluster}" \
+        --host-cluster-context="${HOST_CLUSTER_CONTEXT}"
+
+    # Create kube-dns configmap in each cluster for kube-dns to accept
+    # federation queries.
+    # TODO: This shouldn't be required after
+    # https://github.com/kubernetes/kubernetes/pull/39338.
+    # Remove this after the PR is merged.
+    "${host_kubectl}" delete configmap \
+        --namespace="${KUBEDNS_CONFIGMAP_NAMESPACE}" \
+        "${KUBEDNS_CONFIGMAP_NAME}"
+  done
+}
 
 cleanup-federation-api-objects
 
-$host_kubectl delete ns/${FEDERATION_NAMESPACE}
+"${host_kubectl}" delete namespace "${FEDERATION_NAMESPACE}"
+
