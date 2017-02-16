@@ -905,6 +905,14 @@ func (j *testJig) getRootCA(secretName string) (rootCA []byte) {
 	return
 }
 
+func (j *testJig) addPreSharedCert(certName string) {
+	j.ing.Annotations["kubernetes.io/ingress.pre-shared-cert"] = certName
+	framework.Logf("Updating ingress %v to use TLS cert %v for TLS termination", j.ing.Name, certName)
+	j.update(func(ing *extensions.Ingress) {
+		ing.Annotations["kubernetes.io/ingress.pre-shared-cert"] = certName
+	})
+}
+
 func (j *testJig) deleteIngress() {
 	framework.ExpectNoError(j.client.Extensions().Ingresses(j.ing.Namespace).Delete(j.ing.Name, nil))
 }
