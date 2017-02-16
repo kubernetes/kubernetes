@@ -25,6 +25,7 @@ import (
 	kubeadmapiext "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha1"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
+	tokenutil "k8s.io/kubernetes/cmd/kubeadm/app/util/token"
 
 	"github.com/blang/semver"
 )
@@ -75,13 +76,13 @@ func setInitDynamicDefaults(cfg *kubeadmapi.MasterConfiguration) error {
 	// Validate token if any, otherwise generate
 	if cfg.Discovery.Token != nil {
 		if cfg.Discovery.Token.ID != "" && cfg.Discovery.Token.Secret != "" {
-			fmt.Printf("[init] A token has been provided, validating [%s]\n", kubeadmutil.BearerToken(cfg.Discovery.Token))
-			if valid, err := kubeadmutil.ValidateToken(cfg.Discovery.Token); valid == false {
+			fmt.Printf("[init] A token has been provided, validating [%s]\n", tokenutil.BearerToken(cfg.Discovery.Token))
+			if valid, err := tokenutil.ValidateToken(cfg.Discovery.Token); valid == false {
 				return err
 			}
 		} else {
 			fmt.Println("[init] A token has not been provided, generating one")
-			if err := kubeadmutil.GenerateToken(cfg.Discovery.Token); err != nil {
+			if err := tokenutil.GenerateToken(cfg.Discovery.Token); err != nil {
 				return err
 			}
 		}
