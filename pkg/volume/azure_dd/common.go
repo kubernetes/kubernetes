@@ -40,9 +40,7 @@ import (
 
 const (
 	default_fstype               = "ext4"
-	default_disk_kind            = "shared"
 	default_storage_account_type = "standard_lrs"
-	default_caching_mode         = "readwrite"
 )
 
 type dataDisk struct {
@@ -152,7 +150,7 @@ func normalizeFsType(fsType string) string {
 
 func normalizeKind(kind v1.AzureDataDiskKind) (v1.AzureDataDiskKind, error) {
 	if kind == "" {
-		return v1.AzureDataDiskKind(default_disk_kind), nil
+		return v1.AzureSharedBlobDisk, nil
 	}
 
 	if !supportedDiskKinds.Has(string(kind)) {
@@ -174,7 +172,7 @@ func normalizeStorageAccountType(storageAccountType string) (string, error) {
 
 func normalizeCachingMode(cachingMode v1.AzureDataDiskCachingMode) (v1.AzureDataDiskCachingMode, error) {
 	if cachingMode == "" {
-		return v1.AzureDataDiskCachingMode(default_caching_mode), nil
+		return v1.AzureDataDiskCachingReadWrite, nil
 	}
 
 	if !supportedCachingModes.Has(string(cachingMode)) {
