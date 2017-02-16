@@ -19,18 +19,20 @@ package dockertools
 import (
 	"encoding/json"
 	"fmt"
+	"hash/fnv"
 	"math/rand"
 	"os"
 	"reflect"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
 
 	dockertypes "github.com/docker/engine-api/types"
 	dockercontainer "github.com/docker/engine-api/types/container"
-	"k8s.io/client-go/util/clock"
 
+	"k8s.io/client-go/util/clock"
 	"k8s.io/kubernetes/pkg/api/v1"
 )
 
@@ -273,17 +275,39 @@ func (f *FakeDockerClient) AssertCallDetails(calls ...calledDetail) (err error) 
 	return
 }
 
-func (f *FakeDockerClient) AssertCreated(created []string) error {
+// idsToNames converts container ids into names. The caller must hold the lock.
+func (f *FakeDockerClient) idsToNames(ids []string) ([]string, error) {
+	names := []string{}
+	for _, id := range ids {
+		dockerName, _, err := ParseDockerName(f.ContainerMap[id].Name)
+		if err != nil {
+			return nil, fmt.Errorf("unexpected error: %v", err)
+		}
+		names = append(names, dockerName.ContainerName)
+	}
+	return names, nil
+}
+
+func (f *FakeDockerClient) AssertCreatedByNameWithOrder(created []string) error {
+	f.Lock()
+	defer f.Unlock()
+	actualCreated, err := f.idsToNames(f.Created)
+	if err != nil {
+		return err
+	}
+	if !reflect.DeepEqual(created, actualCreated) {
+		return fmt.Errorf("expected %#v, got %#v", created, actualCreated)
+	}
+	return nil
+}
+
+func (f *FakeDockerClient) AssertCreatedByName(created []string) error {
 	f.Lock()
 	defer f.Unlock()
 
-	actualCreated := []string{}
-	for _, c := range f.Created {
-		dockerName, _, err := ParseDockerName(c)
-		if err != nil {
-			return fmt.Errorf("unexpected error: %v", err)
-		}
-		actualCreated = append(actualCreated, dockerName.ContainerName)
+	actualCreated, err := f.idsToNames(f.Created)
+	if err != nil {
+		return err
 	}
 	sort.StringSlice(created).Sort()
 	sort.StringSlice(actualCreated).Sort()
@@ -293,13 +317,18 @@ func (f *FakeDockerClient) AssertCreated(created []string) error {
 	return nil
 }
 
-func (f *FakeDockerClient) AssertStarted(started []string) error {
+func (f *FakeDockerClient) AssertStoppedByName(stopped []string) error {
 	f.Lock()
 	defer f.Unlock()
-	sort.StringSlice(started).Sort()
-	sort.StringSlice(f.Started).Sort()
-	if !reflect.DeepEqual(started, f.Started) {
-		return fmt.Errorf("expected %#v, got %#v", started, f.Started)
+
+	actualStopped, err := f.idsToNames(f.Stopped)
+	if err != nil {
+		return err
+	}
+	sort.StringSlice(stopped).Sort()
+	sort.StringSlice(actualStopped).Sort()
+	if !reflect.DeepEqual(stopped, actualStopped) {
+		return fmt.Errorf("expected %#v, got %#v", stopped, actualStopped)
 	}
 	return nil
 }
@@ -307,21 +336,12 @@ func (f *FakeDockerClient) AssertStarted(started []string) error {
 func (f *FakeDockerClient) AssertStopped(stopped []string) error {
 	f.Lock()
 	defer f.Unlock()
+	// Copy stopped to avoid modifying it.
+	actualStopped := append([]string{}, f.Stopped...)
 	sort.StringSlice(stopped).Sort()
-	sort.StringSlice(f.Stopped).Sort()
-	if !reflect.DeepEqual(stopped, f.Stopped) {
-		return fmt.Errorf("expected %#v, got %#v", stopped, f.Stopped)
-	}
-	return nil
-}
-
-func (f *FakeDockerClient) AssertRemoved(removed []string) error {
-	f.Lock()
-	defer f.Unlock()
-	sort.StringSlice(removed).Sort()
-	sort.StringSlice(f.Removed).Sort()
-	if !reflect.DeepEqual(removed, f.Removed) {
-		return fmt.Errorf("expected %#v, got %#v", removed, f.Removed)
+	sort.StringSlice(actualStopped).Sort()
+	if !reflect.DeepEqual(stopped, actualStopped) {
+		return fmt.Errorf("expected %#v, got %#v", stopped, actualStopped)
 	}
 	return nil
 }
@@ -430,6 +450,13 @@ func (f *FakeDockerClient) normalSleep(mean, stdDev, cutOffMillis int) {
 	time.Sleep(delay)
 }
 
+// GetFakeContainerID generates a fake container id from container name with a hash.
+func GetFakeContainerID(name string) string {
+	hash := fnv.New64a()
+	hash.Write([]byte(name))
+	return strconv.FormatUint(hash.Sum64(), 16)
+}
+
 // CreateContainer is a test-spy implementation of DockerInterface.CreateContainer.
 // It adds an entry "create" to the internal method call record.
 func (f *FakeDockerClient) CreateContainer(c dockertypes.ContainerCreateConfig) (*dockertypes.ContainerCreateResponse, error) {
@@ -442,13 +469,13 @@ func (f *FakeDockerClient) CreateContainer(c dockertypes.ContainerCreateConfig) 
 	// This is not a very good fake. We'll just add this container's name to the list.
 	// Docker likes to add a '/', so copy that behavior.
 	name := "/" + c.Name
-	id := name
-	f.appendContainerTrace("Created", name)
+	id := GetFakeContainerID(name)
+	f.appendContainerTrace("Created", id)
 	// The newest container should be in front, because we assume so in GetPodStatus()
 	f.RunningContainerList = append([]dockertypes.Container{
-		{ID: name, Names: []string{name}, Image: c.Config.Image, Labels: c.Config.Labels},
+		{ID: id, Names: []string{name}, Image: c.Config.Image, Labels: c.Config.Labels},
 	}, f.RunningContainerList...)
-	f.ContainerMap[name] = convertFakeContainer(&FakeContainer{
+	f.ContainerMap[id] = convertFakeContainer(&FakeContainer{
 		ID: id, Name: name, Config: c.Config, HostConfig: c.HostConfig, CreatedAt: f.Clock.Now()})
 	f.normalSleep(100, 25, 25)
 	return &dockertypes.ContainerCreateResponse{ID: id}, nil
