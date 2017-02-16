@@ -222,10 +222,10 @@ done
 
 # Do the rollback of needed.
 # NOTE: Rollback is only supported from "3.0.x" version in 'etcd3' mode to
-# "2.3.7" version in 'etcd2' mode.
+# "2.2.1" version in 'etcd2' mode.
 if [ "${CURRENT_STORAGE}" = "etcd3" -a "${TARGET_STORAGE}" = "etcd2" ]; then
-  if [ "$(echo ${CURRENT_VERSION} | cut -c1-4)" != "3.0." -o "${TARGET_VERSION}" != "2.3.7" ]; then
-    echo "etcd3 -> etcd2 downgrade is supported only between 3.0.x and 2.3.7"
+  if [ "$(echo ${CURRENT_VERSION} | cut -c1-4)" != "3.0." -o "${TARGET_VERSION}" != "2.2.1" ]; then
+    echo "etcd3 -> etcd2 downgrade is supported only between 3.0.x and 2.2.1"
     return 0
   fi
   echo "Backup and remove all existing v2 data"
@@ -240,7 +240,7 @@ if [ "${CURRENT_STORAGE}" = "etcd3" -a "${TARGET_STORAGE}" = "etcd2" ]; then
     exit 1
   fi
   CURRENT_STORAGE="etcd2"
-  CURRENT_VERSION="2.3.7"
+  CURRENT_VERSION="2.2.1"
   echo "${CURRENT_VERSION}/${CURRENT_STORAGE}" > "${DATA_DIRECTORY}/${VERSION_FILE}"
 fi
 
