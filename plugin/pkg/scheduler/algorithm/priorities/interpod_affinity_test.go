@@ -615,7 +615,7 @@ func TestHardPodAffinitySymmetricWeight(t *testing.T) {
 	}
 }
 
-// TODO remove for 1.7
+// TODO: remove when alpha support for affinity is removed
 func TestInterPodAffinityAnnotationsPriority(t *testing.T) {
 	utilfeature.DefaultFeatureGate.Set("AffinityInAnnotations=true")
 	labelRgChina := map[string]string{
@@ -1089,7 +1089,7 @@ func TestInterPodAffinityAnnotationsPriority(t *testing.T) {
 	}
 }
 
-// TODO remove for 1.7
+// TODO: remove when alpha support for affinity is removed
 func TestHardPodAffinityAnnotationsSymmetricWeight(t *testing.T) {
 	utilfeature.DefaultFeatureGate.Set("AffinityInAnnotations=true")
 	podLabelServiceS1 := map[string]string{
