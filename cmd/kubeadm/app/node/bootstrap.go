@@ -30,7 +30,7 @@ import (
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeconfigphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/kubeconfig"
-	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
+	tokenutil "k8s.io/kubernetes/cmd/kubeadm/app/util/token"
 )
 
 // retryTimeout between the subsequent attempts to connect
@@ -62,7 +62,7 @@ func EstablishMasterConnection(c *kubeadmapi.TokenDiscovery, clusterInfo *kubead
 	var once sync.Once
 	var wg sync.WaitGroup
 	for _, endpoint := range endpoints {
-		ac, err := createClients(caCert, endpoint, kubeadmutil.BearerToken(c), nodeName)
+		ac, err := createClients(caCert, endpoint, tokenutil.BearerToken(c), nodeName)
 		if err != nil {
 			fmt.Printf("[bootstrap] Warning: %s. Skipping endpoint %s\n", err, endpoint)
 			continue
