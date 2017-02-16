@@ -60,7 +60,7 @@ func setInitDynamicDefaults(cfg *kubeadmapi.MasterConfiguration) error {
 		return fmt.Errorf("couldn't parse kubernetes version %q: %v", cfg.KubernetesVersion, err)
 	}
 	if k8sVersion.LT(minK8sVersion) {
-		return fmt.Errorf("this version of kubeadm only supports deploying clusters with the control plane version >= v1.6.0-alpha.1. Current version: %s", cfg.KubernetesVersion)
+		return fmt.Errorf("this version of kubeadm only supports deploying clusters with the control plane version >= v%s. Current version: %s", kubeadmconstants.MinimumControlPlaneVersion, cfg.KubernetesVersion)
 	}
 
 	fmt.Printf("[init] Using Kubernetes version: %s\n", cfg.KubernetesVersion)
