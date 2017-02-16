@@ -19,7 +19,6 @@ package internalclientset
 import (
 	"github.com/golang/glog"
 	discovery "k8s.io/client-go/discovery"
-	_ "k8s.io/client-go/plugin/pkg/client/auth"
 	rest "k8s.io/client-go/rest"
 	"k8s.io/client-go/util/flowcontrol"
 	internalversionapps "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/apps/internalversion"
