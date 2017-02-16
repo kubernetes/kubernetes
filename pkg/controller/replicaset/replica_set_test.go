@@ -1224,14 +1224,20 @@ func TestPatchPodFails(t *testing.T) {
 	informers.Core().V1().Pods().Informer().GetIndexer().Add(newPod("pod1", rs, v1.PodRunning, nil))
 	informers.Core().V1().Pods().Informer().GetIndexer().Add(newPod("pod2", rs, v1.PodRunning, nil))
 	// let both patches fail. The rs controller will assume it fails to take
-	// control of the pods and create new ones.
+	// control of the pods and requeue to try again.
 	fakePodControl.Err = fmt.Errorf("Fake Error")
-	err := manager.syncReplicaSet(getKey(rs, t))
-	if err == nil || err.Error() != "Fake Error" {
+	rsKey := getKey(rs, t)
+	err := manager.syncReplicaSet(rsKey)
+	if err == nil || !strings.Contains(err.Error(), "Fake Error") {
 		t.Errorf("expected Fake Error, got %+v", err)
 	}
-	// 2 patches to take control of pod1 and pod2 (both fail), 2 creates.
-	validateSyncReplicaSet(t, fakePodControl, 2, 0, 2)
+	// 2 patches to take control of pod1 and pod2 (both fail).
+	validateSyncReplicaSet(t, fakePodControl, 0, 0, 2)
+	// RS should requeue itself.
+	queueRS, _ := manager.queue.Get()
+	if queueRS != rsKey {
+		t.Fatalf("Expected to find key %v in queue, found %v", rsKey, queueRS)
+	}
 }
 
 func TestPatchExtraPodsThenDelete(t *testing.T) {
