@@ -22,6 +22,7 @@ import (
 	"io/ioutil"
 
 	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
 
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -32,9 +33,8 @@ import (
 	"k8s.io/client-go/pkg/api"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
-	"k8s.io/kube-aggregator/pkg/apiserver"
-
 	"k8s.io/kube-aggregator/pkg/apis/apiregistration/v1alpha1"
+	"k8s.io/kube-aggregator/pkg/apiserver"
 )
 
 const defaultEtcdPathPrefix = "/registry/kube-aggregator.kubernetes.io/"
@@ -55,15 +55,9 @@ type AggregatorOptions struct {
 	StdErr io.Writer
 }
 
-// NewCommandStartMaster provides a CLI handler for 'start master' command
+// NewCommandStartAggregator provides a CLI handler for 'start master' command
 func NewCommandStartAggregator(out, err io.Writer) *cobra.Command {
-	o := &AggregatorOptions{
-		RecommendedOptions: genericoptions.NewRecommendedOptions(defaultEtcdPathPrefix, api.Scheme, api.Codecs.LegacyCodec(v1alpha1.SchemeGroupVersion)),
-
-		StdOut: out,
-		StdErr: err,
-	}
-	o.RecommendedOptions.SecureServing.ServingOptions.BindPort = 443
+	o := NewDefaultOptions(out, err)
 
 	cmd := &cobra.Command{
 		Short: "Launch a API aggregator and proxy server",
@@ -82,14 +76,30 @@ func NewCommandStartAggregator(out, err io.Writer) *cobra.Command {
 		},
 	}
 
-	flags := cmd.Flags()
-	o.RecommendedOptions.AddFlags(flags)
-	flags.StringVar(&o.ProxyClientCertFile, "proxy-client-cert-file", o.ProxyClientCertFile, "client certificate used identify the proxy to the API server")
-	flags.StringVar(&o.ProxyClientKeyFile, "proxy-client-key-file", o.ProxyClientKeyFile, "client certificate key used identify the proxy to the API server")
-	flags.StringVar(&o.CoreAPIKubeconfig, "core-kubeconfig", o.CoreAPIKubeconfig, ""+
+	o.AddFlags(cmd.Flags())
+	return cmd
+}
+
+// AddFlags is necessary because hyperkube doesn't work using cobra, so we have to have different registration and execution paths
+func (o *AggregatorOptions) AddFlags(fs *pflag.FlagSet) {
+	o.RecommendedOptions.AddFlags(fs)
+	fs.StringVar(&o.ProxyClientCertFile, "proxy-client-cert-file", o.ProxyClientCertFile, "client certificate used identify the proxy to the API server")
+	fs.StringVar(&o.ProxyClientKeyFile, "proxy-client-key-file", o.ProxyClientKeyFile, "client certificate key used identify the proxy to the API server")
+	fs.StringVar(&o.CoreAPIKubeconfig, "core-kubeconfig", o.CoreAPIKubeconfig, ""+
 		"kubeconfig file pointing at the 'core' kubernetes server with enough rights to get,list,watch "+
 		" services,endpoints.  If not set, the in-cluster config is used")
-	return cmd
+}
+
+// NewDefaultOptions builds a "normal" set of options.  You wouldn't normally expose this, but hyperkube isn't cobra compatible
+func NewDefaultOptions(out, err io.Writer) *AggregatorOptions {
+	o := &AggregatorOptions{
+		RecommendedOptions: genericoptions.NewRecommendedOptions(defaultEtcdPathPrefix, api.Scheme, api.Codecs.LegacyCodec(v1alpha1.SchemeGroupVersion)),
+
+		StdOut: out,
+		StdErr: err,
+	}
+	o.RecommendedOptions.SecureServing.ServingOptions.BindPort = 443
+	return o
 }
 
 func (o AggregatorOptions) Validate(args []string) error {
