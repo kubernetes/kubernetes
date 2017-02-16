@@ -867,7 +867,7 @@ func validateAzureDisk(azure *api.AzureDiskVolumeSource, fldPath *field.Path) fi
 	}
 
 	if azure.Kind != nil && !supportedDiskKinds.Has(string(*azure.Kind)) {
-		allErrs = append(allErrs, field.NotSupported(fldPath.Child("kind"), *azure.CachingMode, supportedCachingModes.List()))
+		allErrs = append(allErrs, field.NotSupported(fldPath.Child("kind"), *azure.Kind, supportedDiskKinds.List()))
 	}
 
 	// validate that DiskUri is the correct format
