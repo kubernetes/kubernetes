@@ -430,6 +430,15 @@ filename | sha256 hash
 [kubernetes-server-linux-arm64.tar.gz](https://dl.k8s.io/v1.5.3/kubernetes-server-linux-arm64.tar.gz) | `bfd66c57d1071bdd213d4c6d124d491959ae3509994e5a23cc2720a8ad18526d`
 [kubernetes-server-linux-arm.tar.gz](https://dl.k8s.io/v1.5.3/kubernetes-server-linux-arm.tar.gz) | `12b335637b7a4aa019cee600b0161d51e6317a87bec0500e1f9d85990f6352d5`
 
+### Node Binaries
+
+filename | sha256 hash
+-------- | -----------
+[kubernetes-node-linux-amd64.tar.gz](https://dl.k8s.io/v1.5.3/kubernetes-node-linux-amd64.tar.gz) | `3f54e2d101b6351513ce9425a23f9a196e965326c3a7f78a98ef1dad452e5830`
+[kubernetes-node-linux-arm.tar.gz](https://dl.k8s.io/v1.5.3/kubernetes-node-linux-arm.tar.gz) | `6508b64755dc0ff90f23921d2b8bb6c0c321c38edeaf24fd4c22282880a87a11`
+[kubernetes-node-linux-arm64.tar.gz](https://dl.k8s.io/v1.5.3/kubernetes-node-linux-arm64.tar.gz) | `578ef8a6958fb4bf2e0438cdef7707d12456186a1b8c4b18aa66f47b9221a713`
+[kubernetes-node-windows-amd64.tar.gz](https://dl.k8s.io/v1.5.3/kubernetes-node-windows-amd64.tar.gz) | `aa166b275b3d0f80cbf23fbee7f42358b6176f37fd9ef66837f38910d4626079`
+
 ## Changelog since v1.5.2
 
 ### Other notable changes
