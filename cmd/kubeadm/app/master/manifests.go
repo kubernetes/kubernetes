@@ -318,6 +318,13 @@ func getAPIServerCommand(cfg *kubeadmapi.MasterConfiguration, selfHosted bool) [
 		"--allow-privileged",
 		"--storage-backend=etcd3",
 		"--kubelet-preferred-address-types=InternalIP,ExternalIP,Hostname",
+		// add options to configure the front proxy.  Without the generated client cert, this will never be useable
+		// so add it unconditionally with recommended values
+		"--requestheader-username-headers=X-Remote-User",
+		"--requestheader-group-headers=X-Remote-Group",
+		"--requestheader-extra-headers-prefix=X-Remote-Extra-",
+		"--requestheader-client-ca-file="+getCertFilePath(kubeadmconstants.FrontProxyCACertName),
+		"--requestheader-allowed-names=front-proxy-client",
 	)
 
 	if cfg.AuthorizationMode != "" {
