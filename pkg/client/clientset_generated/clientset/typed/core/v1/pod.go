@@ -18,10 +18,10 @@ package v1
 
 import (
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	runtime "k8s.io/apimachinery/pkg/runtime"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	rest "k8s.io/client-go/rest"
-	api "k8s.io/kubernetes/pkg/api"
 	v1 "k8s.io/kubernetes/pkg/api/v1"
 )
 
@@ -47,15 +47,17 @@ type PodInterface interface {
 
 // pods implements PodInterface
 type pods struct {
-	client rest.Interface
-	ns     string
+	client         rest.Interface
+	ns             string
+	parameterCodec runtime.ParameterCodec
 }
 
 // newPods returns a Pods
-func newPods(c *CoreV1Client, namespace string) *pods {
+func newPods(c *CoreV1Client, namespace string, parameterCodec runtime.ParameterCodec) *pods {
 	return &pods{
-		client: c.RESTClient(),
-		ns:     namespace,
+		client:         c.RESTClient(),
+		ns:             namespace,
+		parameterCodec: parameterCodec,
 	}
 }
 
@@ -116,7 +118,7 @@ func (c *pods) DeleteCollection(options *meta_v1.DeleteOptions, listOptions meta
 	return c.client.Delete().
 		Namespace(c.ns).
 		Resource("pods").
-		VersionedParams(&listOptions, api.ParameterCodec).
+		VersionedParams(&listOptions, c.parameterCodec).
 		Body(options).
 		Do().
 		Error()
@@ -129,7 +131,7 @@ func (c *pods) Get(name string, options meta_v1.GetOptions) (result *v1.Pod, err
 		Namespace(c.ns).
 		Resource("pods").
 		Name(name).
-		VersionedParams(&options, api.ParameterCodec).
+		VersionedParams(&options, c.parameterCodec).
 		Do().
 		Into(result)
 	return
@@ -141,7 +143,7 @@ func (c *pods) List(opts meta_v1.ListOptions) (result *v1.PodList, err error) {
 	err = c.client.Get().
 		Namespace(c.ns).
 		Resource("pods").
-		VersionedParams(&opts, api.ParameterCodec).
+		VersionedParams(&opts, c.parameterCodec).
 		Do().
 		Into(result)
 	return
@@ -153,7 +155,7 @@ func (c *pods) Watch(opts meta_v1.ListOptions) (watch.Interface, error) {
 		Prefix("watch").
 		Namespace(c.ns).
 		Resource("pods").
-		VersionedParams(&opts, api.ParameterCodec).
+		VersionedParams(&opts, c.parameterCodec).
 		Watch()
 }
 

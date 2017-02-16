@@ -18,10 +18,10 @@ package v1beta1
 
 import (
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	runtime "k8s.io/apimachinery/pkg/runtime"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	rest "k8s.io/client-go/rest"
-	api "k8s.io/kubernetes/pkg/api"
 	v1beta1 "k8s.io/kubernetes/pkg/apis/apps/v1beta1"
 )
 
@@ -47,15 +47,17 @@ type StatefulSetInterface interface {
 
 // statefulSets implements StatefulSetInterface
 type statefulSets struct {
-	client rest.Interface
-	ns     string
+	client         rest.Interface
+	ns             string
+	parameterCodec runtime.ParameterCodec
 }
 
 // newStatefulSets returns a StatefulSets
-func newStatefulSets(c *AppsV1beta1Client, namespace string) *statefulSets {
+func newStatefulSets(c *AppsV1beta1Client, namespace string, parameterCodec runtime.ParameterCodec) *statefulSets {
 	return &statefulSets{
-		client: c.RESTClient(),
-		ns:     namespace,
+		client:         c.RESTClient(),
+		ns:             namespace,
+		parameterCodec: parameterCodec,
 	}
 }
 
@@ -116,7 +118,7 @@ func (c *statefulSets) DeleteCollection(options *v1.DeleteOptions, listOptions v
 	return c.client.Delete().
 		Namespace(c.ns).
 		Resource("statefulsets").
-		VersionedParams(&listOptions, api.ParameterCodec).
+		VersionedParams(&listOptions, c.parameterCodec).
 		Body(options).
 		Do().
 		Error()
@@ -129,7 +131,7 @@ func (c *statefulSets) Get(name string, options v1.GetOptions) (result *v1beta1.
 		Namespace(c.ns).
 		Resource("statefulsets").
 		Name(name).
-		VersionedParams(&options, api.ParameterCodec).
+		VersionedParams(&options, c.parameterCodec).
 		Do().
 		Into(result)
 	return
@@ -141,7 +143,7 @@ func (c *statefulSets) List(opts v1.ListOptions) (result *v1beta1.StatefulSetLis
 	err = c.client.Get().
 		Namespace(c.ns).
 		Resource("statefulsets").
-		VersionedParams(&opts, api.ParameterCodec).
+		VersionedParams(&opts, c.parameterCodec).
 		Do().
 		Into(result)
 	return
@@ -153,7 +155,7 @@ func (c *statefulSets) Watch(opts v1.ListOptions) (watch.Interface, error) {
 		Prefix("watch").
 		Namespace(c.ns).
 		Resource("statefulsets").
-		VersionedParams(&opts, api.ParameterCodec).
+		VersionedParams(&opts, c.parameterCodec).
 		Watch()
 }
 

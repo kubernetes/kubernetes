@@ -17,8 +17,10 @@ limitations under the License.
 package internalversion
 
 import (
-	api "k8s.io/client-go/pkg/api"
+	runtime "k8s.io/apimachinery/pkg/runtime"
+	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	rest "k8s.io/client-go/rest"
+	"k8s.io/kube-aggregator/pkg/client/clientset_generated/internalclientset/scheme"
 )
 
 type ApiregistrationInterface interface {
@@ -28,11 +30,12 @@ type ApiregistrationInterface interface {
 
 // ApiregistrationClient is used to interact with features provided by the apiregistration.k8s.io group.
 type ApiregistrationClient struct {
-	restClient rest.Interface
+	restClient     rest.Interface
+	parameterCodec runtime.ParameterCodec
 }
 
 func (c *ApiregistrationClient) APIServices() APIServiceInterface {
-	return newAPIServices(c)
+	return newAPIServices(c, c.parameterCodec)
 }
 
 // NewForConfig creates a new ApiregistrationClient for the given config.
@@ -45,7 +48,7 @@ func NewForConfig(c *rest.Config) (*ApiregistrationClient, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &ApiregistrationClient{client}, nil
+	return &ApiregistrationClient{client, c.ParameterCodec}, nil
 }
 
 // NewForConfigOrDie creates a new ApiregistrationClient for the given config and
@@ -60,24 +63,18 @@ func NewForConfigOrDie(c *rest.Config) *ApiregistrationClient {
 
 // New creates a new ApiregistrationClient for the given RESTClient.
 func New(c rest.Interface) *ApiregistrationClient {
-	return &ApiregistrationClient{c}
+	return &ApiregistrationClient{c, scheme.ParameterCodec}
 }
 
 func setConfigDefaults(config *rest.Config) error {
-	// if apiregistration group is not registered, return an error
-	g, err := api.Registry.Group("apiregistration.k8s.io")
-	if err != nil {
-		return err
-	}
+	gv := schema.GroupVersion{Group: "apiregistration.k8s.io", Version: runtime.APIVersionInternal}
 	config.APIPath = "/apis"
 	if config.UserAgent == "" {
 		config.UserAgent = rest.DefaultKubernetesUserAgent()
 	}
-	if config.GroupVersion == nil || config.GroupVersion.Group != g.GroupVersion.Group {
-		copyGroupVersion := g.GroupVersion
-		config.GroupVersion = &copyGroupVersion
+	if config.GroupVersion == nil || config.GroupVersion.Group != "apiregistration.k8s.io" {
+		config.GroupVersion = &gv
 	}
-	config.NegotiatedSerializer = api.Codecs
 
 	if config.QPS == 0 {
 		config.QPS = 5

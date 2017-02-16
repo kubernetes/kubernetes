@@ -18,10 +18,10 @@ package v1
 
 import (
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	runtime "k8s.io/apimachinery/pkg/runtime"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	rest "k8s.io/client-go/rest"
-	api "k8s.io/kubernetes/pkg/api"
 	v1 "k8s.io/kubernetes/pkg/api/v1"
 )
 
@@ -47,15 +47,17 @@ type ReplicationControllerInterface interface {
 
 // replicationControllers implements ReplicationControllerInterface
 type replicationControllers struct {
-	client rest.Interface
-	ns     string
+	client         rest.Interface
+	ns             string
+	parameterCodec runtime.ParameterCodec
 }
 
 // newReplicationControllers returns a ReplicationControllers
-func newReplicationControllers(c *CoreV1Client, namespace string) *replicationControllers {
+func newReplicationControllers(c *CoreV1Client, namespace string, parameterCodec runtime.ParameterCodec) *replicationControllers {
 	return &replicationControllers{
-		client: c.RESTClient(),
-		ns:     namespace,
+		client:         c.RESTClient(),
+		ns:             namespace,
+		parameterCodec: parameterCodec,
 	}
 }
 
@@ -116,7 +118,7 @@ func (c *replicationControllers) DeleteCollection(options *meta_v1.DeleteOptions
 	return c.client.Delete().
 		Namespace(c.ns).
 		Resource("replicationcontrollers").
-		VersionedParams(&listOptions, api.ParameterCodec).
+		VersionedParams(&listOptions, c.parameterCodec).
 		Body(options).
 		Do().
 		Error()
@@ -129,7 +131,7 @@ func (c *replicationControllers) Get(name string, options meta_v1.GetOptions) (r
 		Namespace(c.ns).
 		Resource("replicationcontrollers").
 		Name(name).
-		VersionedParams(&options, api.ParameterCodec).
+		VersionedParams(&options, c.parameterCodec).
 		Do().
 		Into(result)
 	return
@@ -141,7 +143,7 @@ func (c *replicationControllers) List(opts meta_v1.ListOptions) (result *v1.Repl
 	err = c.client.Get().
 		Namespace(c.ns).
 		Resource("replicationcontrollers").
-		VersionedParams(&opts, api.ParameterCodec).
+		VersionedParams(&opts, c.parameterCodec).
 		Do().
 		Into(result)
 	return
@@ -153,7 +155,7 @@ func (c *replicationControllers) Watch(opts meta_v1.ListOptions) (watch.Interfac
 		Prefix("watch").
 		Namespace(c.ns).
 		Resource("replicationcontrollers").
-		VersionedParams(&opts, api.ParameterCodec).
+		VersionedParams(&opts, c.parameterCodec).
 		Watch()
 }
 

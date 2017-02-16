@@ -18,6 +18,7 @@ package internalversion
 
 import (
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	runtime "k8s.io/apimachinery/pkg/runtime"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	rest "k8s.io/client-go/rest"
@@ -45,15 +46,17 @@ type SecretInterface interface {
 
 // secrets implements SecretInterface
 type secrets struct {
-	client rest.Interface
-	ns     string
+	client         rest.Interface
+	ns             string
+	parameterCodec runtime.ParameterCodec
 }
 
 // newSecrets returns a Secrets
-func newSecrets(c *CoreClient, namespace string) *secrets {
+func newSecrets(c *CoreClient, namespace string, parameterCodec runtime.ParameterCodec) *secrets {
 	return &secrets{
-		client: c.RESTClient(),
-		ns:     namespace,
+		client:         c.RESTClient(),
+		ns:             namespace,
+		parameterCodec: parameterCodec,
 	}
 }
 
@@ -98,7 +101,7 @@ func (c *secrets) DeleteCollection(options *v1.DeleteOptions, listOptions v1.Lis
 	return c.client.Delete().
 		Namespace(c.ns).
 		Resource("secrets").
-		VersionedParams(&listOptions, api.ParameterCodec).
+		VersionedParams(&listOptions, c.parameterCodec).
 		Body(options).
 		Do().
 		Error()
@@ -111,7 +114,7 @@ func (c *secrets) Get(name string, options v1.GetOptions) (result *api.Secret, e
 		Namespace(c.ns).
 		Resource("secrets").
 		Name(name).
-		VersionedParams(&options, api.ParameterCodec).
+		VersionedParams(&options, c.parameterCodec).
 		Do().
 		Into(result)
 	return
@@ -123,7 +126,7 @@ func (c *secrets) List(opts v1.ListOptions) (result *api.SecretList, err error) 
 	err = c.client.Get().
 		Namespace(c.ns).
 		Resource("secrets").
-		VersionedParams(&opts, api.ParameterCodec).
+		VersionedParams(&opts, c.parameterCodec).
 		Do().
 		Into(result)
 	return
@@ -135,7 +138,7 @@ func (c *secrets) Watch(opts v1.ListOptions) (watch.Interface, error) {
 		Prefix("watch").
 		Namespace(c.ns).
 		Resource("secrets").
-		VersionedParams(&opts, api.ParameterCodec).
+		VersionedParams(&opts, c.parameterCodec).
 		Watch()
 }
 

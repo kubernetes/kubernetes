@@ -18,10 +18,10 @@ package v1beta1
 
 import (
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	runtime "k8s.io/apimachinery/pkg/runtime"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	rest "k8s.io/client-go/rest"
-	api "k8s.io/kubernetes/pkg/api"
 	v1beta1 "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 )
 
@@ -47,15 +47,17 @@ type IngressInterface interface {
 
 // ingresses implements IngressInterface
 type ingresses struct {
-	client rest.Interface
-	ns     string
+	client         rest.Interface
+	ns             string
+	parameterCodec runtime.ParameterCodec
 }
 
 // newIngresses returns a Ingresses
-func newIngresses(c *ExtensionsV1beta1Client, namespace string) *ingresses {
+func newIngresses(c *ExtensionsV1beta1Client, namespace string, parameterCodec runtime.ParameterCodec) *ingresses {
 	return &ingresses{
-		client: c.RESTClient(),
-		ns:     namespace,
+		client:         c.RESTClient(),
+		ns:             namespace,
+		parameterCodec: parameterCodec,
 	}
 }
 
@@ -116,7 +118,7 @@ func (c *ingresses) DeleteCollection(options *v1.DeleteOptions, listOptions v1.L
 	return c.client.Delete().
 		Namespace(c.ns).
 		Resource("ingresses").
-		VersionedParams(&listOptions, api.ParameterCodec).
+		VersionedParams(&listOptions, c.parameterCodec).
 		Body(options).
 		Do().
 		Error()
@@ -129,7 +131,7 @@ func (c *ingresses) Get(name string, options v1.GetOptions) (result *v1beta1.Ing
 		Namespace(c.ns).
 		Resource("ingresses").
 		Name(name).
-		VersionedParams(&options, api.ParameterCodec).
+		VersionedParams(&options, c.parameterCodec).
 		Do().
 		Into(result)
 	return
@@ -141,7 +143,7 @@ func (c *ingresses) List(opts v1.ListOptions) (result *v1beta1.IngressList, err 
 	err = c.client.Get().
 		Namespace(c.ns).
 		Resource("ingresses").
-		VersionedParams(&opts, api.ParameterCodec).
+		VersionedParams(&opts, c.parameterCodec).
 		Do().
 		Into(result)
 	return
@@ -153,7 +155,7 @@ func (c *ingresses) Watch(opts v1.ListOptions) (watch.Interface, error) {
 		Prefix("watch").
 		Namespace(c.ns).
 		Resource("ingresses").
-		VersionedParams(&opts, api.ParameterCodec).
+		VersionedParams(&opts, c.parameterCodec).
 		Watch()
 }
 

@@ -17,11 +17,10 @@ limitations under the License.
 package v1beta1
 
 import (
-	fmt "fmt"
+	runtime "k8s.io/apimachinery/pkg/runtime"
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
-	serializer "k8s.io/apimachinery/pkg/runtime/serializer"
 	rest "k8s.io/client-go/rest"
-	api "k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset/scheme"
 )
 
 type ExtensionsV1beta1Interface interface {
@@ -37,35 +36,36 @@ type ExtensionsV1beta1Interface interface {
 
 // ExtensionsV1beta1Client is used to interact with features provided by the extensions group.
 type ExtensionsV1beta1Client struct {
-	restClient rest.Interface
+	restClient     rest.Interface
+	parameterCodec runtime.ParameterCodec
 }
 
 func (c *ExtensionsV1beta1Client) DaemonSets(namespace string) DaemonSetInterface {
-	return newDaemonSets(c, namespace)
+	return newDaemonSets(c, namespace, c.parameterCodec)
 }
 
 func (c *ExtensionsV1beta1Client) Deployments(namespace string) DeploymentInterface {
-	return newDeployments(c, namespace)
+	return newDeployments(c, namespace, c.parameterCodec)
 }
 
 func (c *ExtensionsV1beta1Client) Ingresses(namespace string) IngressInterface {
-	return newIngresses(c, namespace)
+	return newIngresses(c, namespace, c.parameterCodec)
 }
 
 func (c *ExtensionsV1beta1Client) PodSecurityPolicies() PodSecurityPolicyInterface {
-	return newPodSecurityPolicies(c)
+	return newPodSecurityPolicies(c, c.parameterCodec)
 }
 
 func (c *ExtensionsV1beta1Client) ReplicaSets(namespace string) ReplicaSetInterface {
-	return newReplicaSets(c, namespace)
+	return newReplicaSets(c, namespace, c.parameterCodec)
 }
 
 func (c *ExtensionsV1beta1Client) Scales(namespace string) ScaleInterface {
-	return newScales(c, namespace)
+	return newScales(c, namespace, c.parameterCodec)
 }
 
 func (c *ExtensionsV1beta1Client) ThirdPartyResources() ThirdPartyResourceInterface {
-	return newThirdPartyResources(c)
+	return newThirdPartyResources(c, c.parameterCodec)
 }
 
 // NewForConfig creates a new ExtensionsV1beta1Client for the given config.
@@ -78,7 +78,7 @@ func NewForConfig(c *rest.Config) (*ExtensionsV1beta1Client, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &ExtensionsV1beta1Client{client}, nil
+	return &ExtensionsV1beta1Client{client, c.ParameterCodec}, nil
 }
 
 // NewForConfigOrDie creates a new ExtensionsV1beta1Client for the given config and
@@ -93,26 +93,22 @@ func NewForConfigOrDie(c *rest.Config) *ExtensionsV1beta1Client {
 
 // New creates a new ExtensionsV1beta1Client for the given RESTClient.
 func New(c rest.Interface) *ExtensionsV1beta1Client {
-	return &ExtensionsV1beta1Client{c}
+	return &ExtensionsV1beta1Client{c, scheme.ParameterCodec}
 }
 
 func setConfigDefaults(config *rest.Config) error {
-	gv, err := schema.ParseGroupVersion("extensions/v1beta1")
-	if err != nil {
-		return err
+	gv := schema.GroupVersion{Group: "extensions", Version: "v1beta1"}
+	if config.NegotiatedSerializer == nil {
+		return fmt.Errorf("expected non-nil NegotiatedSerializer for %v client", gv)
 	}
-	// if extensions/v1beta1 is not enabled, return an error
-	if !api.Registry.IsEnabledVersion(gv) {
-		return fmt.Errorf("extensions/v1beta1 is not enabled")
+	if config.ParameterCodec == nil {
+		return fmt.Errorf("expected non-nil ParameterCodec for %v client", gv)
 	}
 	config.APIPath = "/apis"
 	if config.UserAgent == "" {
 		config.UserAgent = rest.DefaultKubernetesUserAgent()
 	}
-	copyGroupVersion := gv
-	config.GroupVersion = &copyGroupVersion
-
-	config.NegotiatedSerializer = serializer.DirectCodecFactory{CodecFactory: api.Codecs}
+	config.GroupVersion = &gv
 
 	return nil
 }

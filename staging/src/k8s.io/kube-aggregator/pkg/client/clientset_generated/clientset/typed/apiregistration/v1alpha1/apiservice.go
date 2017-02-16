@@ -18,9 +18,9 @@ package v1alpha1
 
 import (
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	runtime "k8s.io/apimachinery/pkg/runtime"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
-	api "k8s.io/client-go/pkg/api"
 	rest "k8s.io/client-go/rest"
 	v1alpha1 "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1alpha1"
 )
@@ -47,13 +47,15 @@ type APIServiceInterface interface {
 
 // aPIServices implements APIServiceInterface
 type aPIServices struct {
-	client rest.Interface
+	client         rest.Interface
+	parameterCodec runtime.ParameterCodec
 }
 
 // newAPIServices returns a APIServices
-func newAPIServices(c *ApiregistrationV1alpha1Client) *aPIServices {
+func newAPIServices(c *ApiregistrationV1alpha1Client, parameterCodec runtime.ParameterCodec) *aPIServices {
 	return &aPIServices{
-		client: c.RESTClient(),
+		client:         c.RESTClient(),
+		parameterCodec: parameterCodec,
 	}
 }
 
@@ -109,7 +111,7 @@ func (c *aPIServices) Delete(name string, options *v1.DeleteOptions) error {
 func (c *aPIServices) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
 	return c.client.Delete().
 		Resource("apiservices").
-		VersionedParams(&listOptions, api.ParameterCodec).
+		VersionedParams(&listOptions, c.parameterCodec).
 		Body(options).
 		Do().
 		Error()
@@ -121,7 +123,7 @@ func (c *aPIServices) Get(name string, options v1.GetOptions) (result *v1alpha1.
 	err = c.client.Get().
 		Resource("apiservices").
 		Name(name).
-		VersionedParams(&options, api.ParameterCodec).
+		VersionedParams(&options, c.parameterCodec).
 		Do().
 		Into(result)
 	return
@@ -132,7 +134,7 @@ func (c *aPIServices) List(opts v1.ListOptions) (result *v1alpha1.APIServiceList
 	result = &v1alpha1.APIServiceList{}
 	err = c.client.Get().
 		Resource("apiservices").
-		VersionedParams(&opts, api.ParameterCodec).
+		VersionedParams(&opts, c.parameterCodec).
 		Do().
 		Into(result)
 	return
@@ -143,7 +145,7 @@ func (c *aPIServices) Watch(opts v1.ListOptions) (watch.Interface, error) {
 	return c.client.Get().
 		Prefix("watch").
 		Resource("apiservices").
-		VersionedParams(&opts, api.ParameterCodec).
+		VersionedParams(&opts, c.parameterCodec).
 		Watch()
 }
 

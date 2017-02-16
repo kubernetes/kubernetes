@@ -18,6 +18,7 @@ package internalversion
 
 import (
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	runtime "k8s.io/apimachinery/pkg/runtime"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	rest "k8s.io/client-go/rest"
@@ -46,13 +47,15 @@ type NodeInterface interface {
 
 // nodes implements NodeInterface
 type nodes struct {
-	client rest.Interface
+	client         rest.Interface
+	parameterCodec runtime.ParameterCodec
 }
 
 // newNodes returns a Nodes
-func newNodes(c *CoreClient) *nodes {
+func newNodes(c *CoreClient, parameterCodec runtime.ParameterCodec) *nodes {
 	return &nodes{
-		client: c.RESTClient(),
+		client:         c.RESTClient(),
+		parameterCodec: parameterCodec,
 	}
 }
 
@@ -108,7 +111,7 @@ func (c *nodes) Delete(name string, options *v1.DeleteOptions) error {
 func (c *nodes) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
 	return c.client.Delete().
 		Resource("nodes").
-		VersionedParams(&listOptions, api.ParameterCodec).
+		VersionedParams(&listOptions, c.parameterCodec).
 		Body(options).
 		Do().
 		Error()
@@ -120,7 +123,7 @@ func (c *nodes) Get(name string, options v1.GetOptions) (result *api.Node, err e
 	err = c.client.Get().
 		Resource("nodes").
 		Name(name).
-		VersionedParams(&options, api.ParameterCodec).
+		VersionedParams(&options, c.parameterCodec).
 		Do().
 		Into(result)
 	return
@@ -131,7 +134,7 @@ func (c *nodes) List(opts v1.ListOptions) (result *api.NodeList, err error) {
 	result = &api.NodeList{}
 	err = c.client.Get().
 		Resource("nodes").
-		VersionedParams(&opts, api.ParameterCodec).
+		VersionedParams(&opts, c.parameterCodec).
 		Do().
 		Into(result)
 	return
@@ -142,7 +145,7 @@ func (c *nodes) Watch(opts v1.ListOptions) (watch.Interface, error) {
 	return c.client.Get().
 		Prefix("watch").
 		Resource("nodes").
-		VersionedParams(&opts, api.ParameterCodec).
+		VersionedParams(&opts, c.parameterCodec).
 		Watch()
 }
 

@@ -17,6 +17,7 @@ limitations under the License.
 package internalversion
 
 import (
+	runtime "k8s.io/apimachinery/pkg/runtime"
 	rest "k8s.io/client-go/rest"
 )
 
@@ -33,14 +34,16 @@ type ScaleInterface interface {
 
 // scales implements ScaleInterface
 type scales struct {
-	client rest.Interface
-	ns     string
+	client         rest.Interface
+	ns             string
+	parameterCodec runtime.ParameterCodec
 }
 
 // newScales returns a Scales
-func newScales(c *ExtensionsClient, namespace string) *scales {
+func newScales(c *ExtensionsClient, namespace string, parameterCodec runtime.ParameterCodec) *scales {
 	return &scales{
-		client: c.RESTClient(),
-		ns:     namespace,
+		client:         c.RESTClient(),
+		ns:             namespace,
+		parameterCodec: parameterCodec,
 	}
 }

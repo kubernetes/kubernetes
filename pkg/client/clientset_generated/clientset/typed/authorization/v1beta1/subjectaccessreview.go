@@ -17,6 +17,7 @@ limitations under the License.
 package v1beta1
 
 import (
+	runtime "k8s.io/apimachinery/pkg/runtime"
 	rest "k8s.io/client-go/rest"
 )
 
@@ -33,12 +34,14 @@ type SubjectAccessReviewInterface interface {
 
 // subjectAccessReviews implements SubjectAccessReviewInterface
 type subjectAccessReviews struct {
-	client rest.Interface
+	client         rest.Interface
+	parameterCodec runtime.ParameterCodec
 }
 
 // newSubjectAccessReviews returns a SubjectAccessReviews
-func newSubjectAccessReviews(c *AuthorizationV1beta1Client) *subjectAccessReviews {
+func newSubjectAccessReviews(c *AuthorizationV1beta1Client, parameterCodec runtime.ParameterCodec) *subjectAccessReviews {
 	return &subjectAccessReviews{
-		client: c.RESTClient(),
+		client:         c.RESTClient(),
+		parameterCodec: parameterCodec,
 	}
 }

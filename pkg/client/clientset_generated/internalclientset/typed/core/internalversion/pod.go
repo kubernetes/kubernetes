@@ -18,6 +18,7 @@ package internalversion
 
 import (
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	runtime "k8s.io/apimachinery/pkg/runtime"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	rest "k8s.io/client-go/rest"
@@ -46,15 +47,17 @@ type PodInterface interface {
 
 // pods implements PodInterface
 type pods struct {
-	client rest.Interface
-	ns     string
+	client         rest.Interface
+	ns             string
+	parameterCodec runtime.ParameterCodec
 }
 
 // newPods returns a Pods
-func newPods(c *CoreClient, namespace string) *pods {
+func newPods(c *CoreClient, namespace string, parameterCodec runtime.ParameterCodec) *pods {
 	return &pods{
-		client: c.RESTClient(),
-		ns:     namespace,
+		client:         c.RESTClient(),
+		ns:             namespace,
+		parameterCodec: parameterCodec,
 	}
 }
 
@@ -115,7 +118,7 @@ func (c *pods) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOp
 	return c.client.Delete().
 		Namespace(c.ns).
 		Resource("pods").
-		VersionedParams(&listOptions, api.ParameterCodec).
+		VersionedParams(&listOptions, c.parameterCodec).
 		Body(options).
 		Do().
 		Error()
@@ -128,7 +131,7 @@ func (c *pods) Get(name string, options v1.GetOptions) (result *api.Pod, err err
 		Namespace(c.ns).
 		Resource("pods").
 		Name(name).
-		VersionedParams(&options, api.ParameterCodec).
+		VersionedParams(&options, c.parameterCodec).
 		Do().
 		Into(result)
 	return
@@ -140,7 +143,7 @@ func (c *pods) List(opts v1.ListOptions) (result *api.PodList, err error) {
 	err = c.client.Get().
 		Namespace(c.ns).
 		Resource("pods").
-		VersionedParams(&opts, api.ParameterCodec).
+		VersionedParams(&opts, c.parameterCodec).
 		Do().
 		Into(result)
 	return
@@ -152,7 +155,7 @@ func (c *pods) Watch(opts v1.ListOptions) (watch.Interface, error) {
 		Prefix("watch").
 		Namespace(c.ns).
 		Resource("pods").
-		VersionedParams(&opts, api.ParameterCodec).
+		VersionedParams(&opts, c.parameterCodec).
 		Watch()
 }
 

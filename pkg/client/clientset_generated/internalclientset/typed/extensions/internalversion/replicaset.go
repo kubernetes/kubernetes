@@ -18,10 +18,10 @@ package internalversion
 
 import (
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	runtime "k8s.io/apimachinery/pkg/runtime"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	rest "k8s.io/client-go/rest"
-	api "k8s.io/kubernetes/pkg/api"
 	extensions "k8s.io/kubernetes/pkg/apis/extensions"
 )
 
@@ -47,15 +47,17 @@ type ReplicaSetInterface interface {
 
 // replicaSets implements ReplicaSetInterface
 type replicaSets struct {
-	client rest.Interface
-	ns     string
+	client         rest.Interface
+	ns             string
+	parameterCodec runtime.ParameterCodec
 }
 
 // newReplicaSets returns a ReplicaSets
-func newReplicaSets(c *ExtensionsClient, namespace string) *replicaSets {
+func newReplicaSets(c *ExtensionsClient, namespace string, parameterCodec runtime.ParameterCodec) *replicaSets {
 	return &replicaSets{
-		client: c.RESTClient(),
-		ns:     namespace,
+		client:         c.RESTClient(),
+		ns:             namespace,
+		parameterCodec: parameterCodec,
 	}
 }
 
@@ -116,7 +118,7 @@ func (c *replicaSets) DeleteCollection(options *v1.DeleteOptions, listOptions v1
 	return c.client.Delete().
 		Namespace(c.ns).
 		Resource("replicasets").
-		VersionedParams(&listOptions, api.ParameterCodec).
+		VersionedParams(&listOptions, c.parameterCodec).
 		Body(options).
 		Do().
 		Error()
@@ -129,7 +131,7 @@ func (c *replicaSets) Get(name string, options v1.GetOptions) (result *extension
 		Namespace(c.ns).
 		Resource("replicasets").
 		Name(name).
-		VersionedParams(&options, api.ParameterCodec).
+		VersionedParams(&options, c.parameterCodec).
 		Do().
 		Into(result)
 	return
@@ -141,7 +143,7 @@ func (c *replicaSets) List(opts v1.ListOptions) (result *extensions.ReplicaSetLi
 	err = c.client.Get().
 		Namespace(c.ns).
 		Resource("replicasets").
-		VersionedParams(&opts, api.ParameterCodec).
+		VersionedParams(&opts, c.parameterCodec).
 		Do().
 		Into(result)
 	return
@@ -153,7 +155,7 @@ func (c *replicaSets) Watch(opts v1.ListOptions) (watch.Interface, error) {
 		Prefix("watch").
 		Namespace(c.ns).
 		Resource("replicasets").
-		VersionedParams(&opts, api.ParameterCodec).
+		VersionedParams(&opts, c.parameterCodec).
 		Watch()
 }
 

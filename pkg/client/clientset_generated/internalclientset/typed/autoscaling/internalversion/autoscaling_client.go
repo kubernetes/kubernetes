@@ -17,8 +17,10 @@ limitations under the License.
 package internalversion
 
 import (
+	runtime "k8s.io/apimachinery/pkg/runtime"
+	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	rest "k8s.io/client-go/rest"
-	api "k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/scheme"
 )
 
 type AutoscalingInterface interface {
@@ -28,11 +30,12 @@ type AutoscalingInterface interface {
 
 // AutoscalingClient is used to interact with features provided by the autoscaling group.
 type AutoscalingClient struct {
-	restClient rest.Interface
+	restClient     rest.Interface
+	parameterCodec runtime.ParameterCodec
 }
 
 func (c *AutoscalingClient) HorizontalPodAutoscalers(namespace string) HorizontalPodAutoscalerInterface {
-	return newHorizontalPodAutoscalers(c, namespace)
+	return newHorizontalPodAutoscalers(c, namespace, c.parameterCodec)
 }
 
 // NewForConfig creates a new AutoscalingClient for the given config.
@@ -45,7 +48,7 @@ func NewForConfig(c *rest.Config) (*AutoscalingClient, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &AutoscalingClient{client}, nil
+	return &AutoscalingClient{client, c.ParameterCodec}, nil
 }
 
 // NewForConfigOrDie creates a new AutoscalingClient for the given config and
@@ -60,24 +63,18 @@ func NewForConfigOrDie(c *rest.Config) *AutoscalingClient {
 
 // New creates a new AutoscalingClient for the given RESTClient.
 func New(c rest.Interface) *AutoscalingClient {
-	return &AutoscalingClient{c}
+	return &AutoscalingClient{c, scheme.ParameterCodec}
 }
 
 func setConfigDefaults(config *rest.Config) error {
-	// if autoscaling group is not registered, return an error
-	g, err := api.Registry.Group("autoscaling")
-	if err != nil {
-		return err
-	}
+	gv := schema.GroupVersion{Group: "autoscaling", Version: runtime.APIVersionInternal}
 	config.APIPath = "/apis"
 	if config.UserAgent == "" {
 		config.UserAgent = rest.DefaultKubernetesUserAgent()
 	}
-	if config.GroupVersion == nil || config.GroupVersion.Group != g.GroupVersion.Group {
-		copyGroupVersion := g.GroupVersion
-		config.GroupVersion = &copyGroupVersion
+	if config.GroupVersion == nil || config.GroupVersion.Group != "autoscaling" {
+		config.GroupVersion = &gv
 	}
-	config.NegotiatedSerializer = api.Codecs
 
 	if config.QPS == 0 {
 		config.QPS = 5

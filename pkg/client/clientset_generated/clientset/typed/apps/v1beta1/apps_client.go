@@ -17,11 +17,10 @@ limitations under the License.
 package v1beta1
 
 import (
-	fmt "fmt"
+	runtime "k8s.io/apimachinery/pkg/runtime"
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
-	serializer "k8s.io/apimachinery/pkg/runtime/serializer"
 	rest "k8s.io/client-go/rest"
-	api "k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset/scheme"
 )
 
 type AppsV1beta1Interface interface {
@@ -31,11 +30,12 @@ type AppsV1beta1Interface interface {
 
 // AppsV1beta1Client is used to interact with features provided by the apps group.
 type AppsV1beta1Client struct {
-	restClient rest.Interface
+	restClient     rest.Interface
+	parameterCodec runtime.ParameterCodec
 }
 
 func (c *AppsV1beta1Client) StatefulSets(namespace string) StatefulSetInterface {
-	return newStatefulSets(c, namespace)
+	return newStatefulSets(c, namespace, c.parameterCodec)
 }
 
 // NewForConfig creates a new AppsV1beta1Client for the given config.
@@ -48,7 +48,7 @@ func NewForConfig(c *rest.Config) (*AppsV1beta1Client, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &AppsV1beta1Client{client}, nil
+	return &AppsV1beta1Client{client, c.ParameterCodec}, nil
 }
 
 // NewForConfigOrDie creates a new AppsV1beta1Client for the given config and
@@ -63,26 +63,22 @@ func NewForConfigOrDie(c *rest.Config) *AppsV1beta1Client {
 
 // New creates a new AppsV1beta1Client for the given RESTClient.
 func New(c rest.Interface) *AppsV1beta1Client {
-	return &AppsV1beta1Client{c}
+	return &AppsV1beta1Client{c, scheme.ParameterCodec}
 }
 
 func setConfigDefaults(config *rest.Config) error {
-	gv, err := schema.ParseGroupVersion("apps/v1beta1")
-	if err != nil {
-		return err
+	gv := schema.GroupVersion{Group: "apps", Version: "v1beta1"}
+	if config.NegotiatedSerializer == nil {
+		return fmt.Errorf("expected non-nil NegotiatedSerializer for %v client", gv)
 	}
-	// if apps/v1beta1 is not enabled, return an error
-	if !api.Registry.IsEnabledVersion(gv) {
-		return fmt.Errorf("apps/v1beta1 is not enabled")
+	if config.ParameterCodec == nil {
+		return fmt.Errorf("expected non-nil ParameterCodec for %v client", gv)
 	}
 	config.APIPath = "/apis"
 	if config.UserAgent == "" {
 		config.UserAgent = rest.DefaultKubernetesUserAgent()
 	}
-	copyGroupVersion := gv
-	config.GroupVersion = &copyGroupVersion
-
-	config.NegotiatedSerializer = serializer.DirectCodecFactory{CodecFactory: api.Codecs}
+	config.GroupVersion = &gv
 
 	return nil
 }

@@ -17,11 +17,10 @@ limitations under the License.
 package v2alpha1
 
 import (
-	fmt "fmt"
+	runtime "k8s.io/apimachinery/pkg/runtime"
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
-	serializer "k8s.io/apimachinery/pkg/runtime/serializer"
 	rest "k8s.io/client-go/rest"
-	api "k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset/scheme"
 )
 
 type BatchV2alpha1Interface interface {
@@ -32,15 +31,16 @@ type BatchV2alpha1Interface interface {
 
 // BatchV2alpha1Client is used to interact with features provided by the batch group.
 type BatchV2alpha1Client struct {
-	restClient rest.Interface
+	restClient     rest.Interface
+	parameterCodec runtime.ParameterCodec
 }
 
 func (c *BatchV2alpha1Client) CronJobs(namespace string) CronJobInterface {
-	return newCronJobs(c, namespace)
+	return newCronJobs(c, namespace, c.parameterCodec)
 }
 
 func (c *BatchV2alpha1Client) Jobs(namespace string) JobInterface {
-	return newJobs(c, namespace)
+	return newJobs(c, namespace, c.parameterCodec)
 }
 
 // NewForConfig creates a new BatchV2alpha1Client for the given config.
@@ -53,7 +53,7 @@ func NewForConfig(c *rest.Config) (*BatchV2alpha1Client, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &BatchV2alpha1Client{client}, nil
+	return &BatchV2alpha1Client{client, c.ParameterCodec}, nil
 }
 
 // NewForConfigOrDie creates a new BatchV2alpha1Client for the given config and
@@ -68,26 +68,22 @@ func NewForConfigOrDie(c *rest.Config) *BatchV2alpha1Client {
 
 // New creates a new BatchV2alpha1Client for the given RESTClient.
 func New(c rest.Interface) *BatchV2alpha1Client {
-	return &BatchV2alpha1Client{c}
+	return &BatchV2alpha1Client{c, scheme.ParameterCodec}
 }
 
 func setConfigDefaults(config *rest.Config) error {
-	gv, err := schema.ParseGroupVersion("batch/v2alpha1")
-	if err != nil {
-		return err
+	gv := schema.GroupVersion{Group: "batch", Version: "v2alpha1"}
+	if config.NegotiatedSerializer == nil {
+		return fmt.Errorf("expected non-nil NegotiatedSerializer for %v client", gv)
 	}
-	// if batch/v2alpha1 is not enabled, return an error
-	if !api.Registry.IsEnabledVersion(gv) {
-		return fmt.Errorf("batch/v2alpha1 is not enabled")
+	if config.ParameterCodec == nil {
+		return fmt.Errorf("expected non-nil ParameterCodec for %v client", gv)
 	}
 	config.APIPath = "/apis"
 	if config.UserAgent == "" {
 		config.UserAgent = rest.DefaultKubernetesUserAgent()
 	}
-	copyGroupVersion := gv
-	config.GroupVersion = &copyGroupVersion
-
-	config.NegotiatedSerializer = serializer.DirectCodecFactory{CodecFactory: api.Codecs}
+	config.GroupVersion = &gv
 
 	return nil
 }

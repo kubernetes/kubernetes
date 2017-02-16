@@ -17,6 +17,7 @@ limitations under the License.
 package internalversion
 
 import (
+	runtime "k8s.io/apimachinery/pkg/runtime"
 	rest "k8s.io/client-go/rest"
 )
 
@@ -33,14 +34,16 @@ type LocalSubjectAccessReviewInterface interface {
 
 // localSubjectAccessReviews implements LocalSubjectAccessReviewInterface
 type localSubjectAccessReviews struct {
-	client rest.Interface
-	ns     string
+	client         rest.Interface
+	ns             string
+	parameterCodec runtime.ParameterCodec
 }
 
 // newLocalSubjectAccessReviews returns a LocalSubjectAccessReviews
-func newLocalSubjectAccessReviews(c *AuthorizationClient, namespace string) *localSubjectAccessReviews {
+func newLocalSubjectAccessReviews(c *AuthorizationClient, namespace string, parameterCodec runtime.ParameterCodec) *localSubjectAccessReviews {
 	return &localSubjectAccessReviews{
-		client: c.RESTClient(),
-		ns:     namespace,
+		client:         c.RESTClient(),
+		ns:             namespace,
+		parameterCodec: parameterCodec,
 	}
 }

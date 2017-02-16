@@ -18,10 +18,10 @@ package internalversion
 
 import (
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	runtime "k8s.io/apimachinery/pkg/runtime"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	rest "k8s.io/client-go/rest"
-	api "k8s.io/kubernetes/pkg/api"
 	rbac "k8s.io/kubernetes/pkg/apis/rbac"
 )
 
@@ -46,13 +46,15 @@ type ClusterRoleInterface interface {
 
 // clusterRoles implements ClusterRoleInterface
 type clusterRoles struct {
-	client rest.Interface
+	client         rest.Interface
+	parameterCodec runtime.ParameterCodec
 }
 
 // newClusterRoles returns a ClusterRoles
-func newClusterRoles(c *RbacClient) *clusterRoles {
+func newClusterRoles(c *RbacClient, parameterCodec runtime.ParameterCodec) *clusterRoles {
 	return &clusterRoles{
-		client: c.RESTClient(),
+		client:         c.RESTClient(),
+		parameterCodec: parameterCodec,
 	}
 }
 
@@ -93,7 +95,7 @@ func (c *clusterRoles) Delete(name string, options *v1.DeleteOptions) error {
 func (c *clusterRoles) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
 	return c.client.Delete().
 		Resource("clusterroles").
-		VersionedParams(&listOptions, api.ParameterCodec).
+		VersionedParams(&listOptions, c.parameterCodec).
 		Body(options).
 		Do().
 		Error()
@@ -105,7 +107,7 @@ func (c *clusterRoles) Get(name string, options v1.GetOptions) (result *rbac.Clu
 	err = c.client.Get().
 		Resource("clusterroles").
 		Name(name).
-		VersionedParams(&options, api.ParameterCodec).
+		VersionedParams(&options, c.parameterCodec).
 		Do().
 		Into(result)
 	return
@@ -116,7 +118,7 @@ func (c *clusterRoles) List(opts v1.ListOptions) (result *rbac.ClusterRoleList, 
 	result = &rbac.ClusterRoleList{}
 	err = c.client.Get().
 		Resource("clusterroles").
-		VersionedParams(&opts, api.ParameterCodec).
+		VersionedParams(&opts, c.parameterCodec).
 		Do().
 		Into(result)
 	return
@@ -127,7 +129,7 @@ func (c *clusterRoles) Watch(opts v1.ListOptions) (watch.Interface, error) {
 	return c.client.Get().
 		Prefix("watch").
 		Resource("clusterroles").
-		VersionedParams(&opts, api.ParameterCodec).
+		VersionedParams(&opts, c.parameterCodec).
 		Watch()
 }
 

@@ -18,27 +18,29 @@ package test_internalclientset
 
 import (
 	"github.com/golang/glog"
+	"k8s.io/apimachinery/pkg/runtime/serializer"
 	discovery "k8s.io/client-go/discovery"
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
 	rest "k8s.io/client-go/rest"
 	"k8s.io/client-go/util/flowcontrol"
-	internalversiontestgroup "k8s.io/kubernetes/cmd/libs/go2idl/client-gen/testoutput/clientset_generated/test_internalclientset/typed/testgroup/internalversion"
+	"k8s.io/kubernetes/cmd/libs/go2idl/client-gen/testoutput/clientset_generated/test_internalclientset/scheme"
+	clienttestgroupinternalversion "k8s.io/kubernetes/cmd/libs/go2idl/client-gen/testoutput/clientset_generated/test_internalclientset/typed/testgroup/internalversion"
 )
 
 type Interface interface {
 	Discovery() discovery.DiscoveryInterface
-	Testgroup() internalversiontestgroup.TestgroupInterface
+	Testgroup() clienttestgroupinternalversion.TestgroupInterface
 }
 
 // Clientset contains the clients for groups. Each group has exactly one
 // version included in a Clientset.
 type Clientset struct {
 	*discovery.DiscoveryClient
-	*internalversiontestgroup.TestgroupClient
+	*clienttestgroupinternalversion.TestgroupClient
 }
 
 // Testgroup retrieves the TestgroupClient
-func (c *Clientset) Testgroup() internalversiontestgroup.TestgroupInterface {
+func (c *Clientset) Testgroup() clienttestgroupinternalversion.TestgroupInterface {
 	if c == nil {
 		return nil
 	}
@@ -59,9 +61,15 @@ func NewForConfig(c *rest.Config) (*Clientset, error) {
 	if configShallowCopy.RateLimiter == nil && configShallowCopy.QPS > 0 {
 		configShallowCopy.RateLimiter = flowcontrol.NewTokenBucketRateLimiter(configShallowCopy.QPS, configShallowCopy.Burst)
 	}
+	if configShallowCopy.ParameterCodec == nil {
+		configShallowCopy.ParameterCodec = scheme.ParameterCodec
+	}
+	if configShallowCopy.NegotiatedSerializer == nil {
+		configShallowCopy.NegotiatedSerializer = serializer.DirectCodecFactory{CodecFactory: scheme.Codecs}
+	}
 	var cs Clientset
 	var err error
-	cs.TestgroupClient, err = internalversiontestgroup.NewForConfig(&configShallowCopy)
+	cs.TestgroupClient, err = clienttestgroupinternalversion.NewForConfig(&configShallowCopy)
 	if err != nil {
 		return nil, err
 	}
@@ -78,7 +86,7 @@ func NewForConfig(c *rest.Config) (*Clientset, error) {
 // panics if there is an error in the config.
 func NewForConfigOrDie(c *rest.Config) *Clientset {
 	var cs Clientset
-	cs.TestgroupClient = internalversiontestgroup.NewForConfigOrDie(c)
+	cs.TestgroupClient = clienttestgroupinternalversion.NewForConfigOrDie(c)
 
 	cs.DiscoveryClient = discovery.NewDiscoveryClientForConfigOrDie(c)
 	return &cs
@@ -87,7 +95,7 @@ func NewForConfigOrDie(c *rest.Config) *Clientset {
 // New creates a new Clientset for the given RESTClient.
 func New(c rest.Interface) *Clientset {
 	var cs Clientset
-	cs.TestgroupClient = internalversiontestgroup.New(c)
+	cs.TestgroupClient = clienttestgroupinternalversion.New(c)
 
 	cs.DiscoveryClient = discovery.NewDiscoveryClient(c)
 	return &cs

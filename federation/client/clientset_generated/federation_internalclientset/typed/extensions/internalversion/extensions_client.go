@@ -17,8 +17,10 @@ limitations under the License.
 package internalversion
 
 import (
+	runtime "k8s.io/apimachinery/pkg/runtime"
+	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	rest "k8s.io/client-go/rest"
-	api "k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/federation/client/clientset_generated/federation_internalclientset/scheme"
 )
 
 type ExtensionsInterface interface {
@@ -31,23 +33,24 @@ type ExtensionsInterface interface {
 
 // ExtensionsClient is used to interact with features provided by the extensions group.
 type ExtensionsClient struct {
-	restClient rest.Interface
+	restClient     rest.Interface
+	parameterCodec runtime.ParameterCodec
 }
 
 func (c *ExtensionsClient) DaemonSets(namespace string) DaemonSetInterface {
-	return newDaemonSets(c, namespace)
+	return newDaemonSets(c, namespace, c.parameterCodec)
 }
 
 func (c *ExtensionsClient) Deployments(namespace string) DeploymentInterface {
-	return newDeployments(c, namespace)
+	return newDeployments(c, namespace, c.parameterCodec)
 }
 
 func (c *ExtensionsClient) Ingresses(namespace string) IngressInterface {
-	return newIngresses(c, namespace)
+	return newIngresses(c, namespace, c.parameterCodec)
 }
 
 func (c *ExtensionsClient) ReplicaSets(namespace string) ReplicaSetInterface {
-	return newReplicaSets(c, namespace)
+	return newReplicaSets(c, namespace, c.parameterCodec)
 }
 
 // NewForConfig creates a new ExtensionsClient for the given config.
@@ -60,7 +63,7 @@ func NewForConfig(c *rest.Config) (*ExtensionsClient, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &ExtensionsClient{client}, nil
+	return &ExtensionsClient{client, c.ParameterCodec}, nil
 }
 
 // NewForConfigOrDie creates a new ExtensionsClient for the given config and
@@ -75,24 +78,18 @@ func NewForConfigOrDie(c *rest.Config) *ExtensionsClient {
 
 // New creates a new ExtensionsClient for the given RESTClient.
 func New(c rest.Interface) *ExtensionsClient {
-	return &ExtensionsClient{c}
+	return &ExtensionsClient{c, scheme.ParameterCodec}
 }
 
 func setConfigDefaults(config *rest.Config) error {
-	// if extensions group is not registered, return an error
-	g, err := api.Registry.Group("extensions")
-	if err != nil {
-		return err
-	}
+	gv := schema.GroupVersion{Group: "extensions", Version: runtime.APIVersionInternal}
 	config.APIPath = "/apis"
 	if config.UserAgent == "" {
 		config.UserAgent = rest.DefaultKubernetesUserAgent()
 	}
-	if config.GroupVersion == nil || config.GroupVersion.Group != g.GroupVersion.Group {
-		copyGroupVersion := g.GroupVersion
-		config.GroupVersion = &copyGroupVersion
+	if config.GroupVersion == nil || config.GroupVersion.Group != "extensions" {
+		config.GroupVersion = &gv
 	}
-	config.NegotiatedSerializer = api.Codecs
 
 	if config.QPS == 0 {
 		config.QPS = 5

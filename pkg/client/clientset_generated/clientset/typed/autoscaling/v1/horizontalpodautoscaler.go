@@ -18,10 +18,10 @@ package v1
 
 import (
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	runtime "k8s.io/apimachinery/pkg/runtime"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	rest "k8s.io/client-go/rest"
-	api "k8s.io/kubernetes/pkg/api"
 	v1 "k8s.io/kubernetes/pkg/apis/autoscaling/v1"
 )
 
@@ -47,15 +47,17 @@ type HorizontalPodAutoscalerInterface interface {
 
 // horizontalPodAutoscalers implements HorizontalPodAutoscalerInterface
 type horizontalPodAutoscalers struct {
-	client rest.Interface
-	ns     string
+	client         rest.Interface
+	ns             string
+	parameterCodec runtime.ParameterCodec
 }
 
 // newHorizontalPodAutoscalers returns a HorizontalPodAutoscalers
-func newHorizontalPodAutoscalers(c *AutoscalingV1Client, namespace string) *horizontalPodAutoscalers {
+func newHorizontalPodAutoscalers(c *AutoscalingV1Client, namespace string, parameterCodec runtime.ParameterCodec) *horizontalPodAutoscalers {
 	return &horizontalPodAutoscalers{
-		client: c.RESTClient(),
-		ns:     namespace,
+		client:         c.RESTClient(),
+		ns:             namespace,
+		parameterCodec: parameterCodec,
 	}
 }
 
@@ -116,7 +118,7 @@ func (c *horizontalPodAutoscalers) DeleteCollection(options *meta_v1.DeleteOptio
 	return c.client.Delete().
 		Namespace(c.ns).
 		Resource("horizontalpodautoscalers").
-		VersionedParams(&listOptions, api.ParameterCodec).
+		VersionedParams(&listOptions, c.parameterCodec).
 		Body(options).
 		Do().
 		Error()
@@ -129,7 +131,7 @@ func (c *horizontalPodAutoscalers) Get(name string, options meta_v1.GetOptions) 
 		Namespace(c.ns).
 		Resource("horizontalpodautoscalers").
 		Name(name).
-		VersionedParams(&options, api.ParameterCodec).
+		VersionedParams(&options, c.parameterCodec).
 		Do().
 		Into(result)
 	return
@@ -141,7 +143,7 @@ func (c *horizontalPodAutoscalers) List(opts meta_v1.ListOptions) (result *v1.Ho
 	err = c.client.Get().
 		Namespace(c.ns).
 		Resource("horizontalpodautoscalers").
-		VersionedParams(&opts, api.ParameterCodec).
+		VersionedParams(&opts, c.parameterCodec).
 		Do().
 		Into(result)
 	return
@@ -153,7 +155,7 @@ func (c *horizontalPodAutoscalers) Watch(opts meta_v1.ListOptions) (watch.Interf
 		Prefix("watch").
 		Namespace(c.ns).
 		Resource("horizontalpodautoscalers").
-		VersionedParams(&opts, api.ParameterCodec).
+		VersionedParams(&opts, c.parameterCodec).
 		Watch()
 }
 

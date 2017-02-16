@@ -17,8 +17,10 @@ limitations under the License.
 package internalversion
 
 import (
+	runtime "k8s.io/apimachinery/pkg/runtime"
+	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	rest "k8s.io/client-go/rest"
-	api "k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/scheme"
 )
 
 type BatchInterface interface {
@@ -29,15 +31,16 @@ type BatchInterface interface {
 
 // BatchClient is used to interact with features provided by the batch group.
 type BatchClient struct {
-	restClient rest.Interface
+	restClient     rest.Interface
+	parameterCodec runtime.ParameterCodec
 }
 
 func (c *BatchClient) CronJobs(namespace string) CronJobInterface {
-	return newCronJobs(c, namespace)
+	return newCronJobs(c, namespace, c.parameterCodec)
 }
 
 func (c *BatchClient) Jobs(namespace string) JobInterface {
-	return newJobs(c, namespace)
+	return newJobs(c, namespace, c.parameterCodec)
 }
 
 // NewForConfig creates a new BatchClient for the given config.
@@ -50,7 +53,7 @@ func NewForConfig(c *rest.Config) (*BatchClient, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &BatchClient{client}, nil
+	return &BatchClient{client, c.ParameterCodec}, nil
 }
 
 // NewForConfigOrDie creates a new BatchClient for the given config and
@@ -65,24 +68,18 @@ func NewForConfigOrDie(c *rest.Config) *BatchClient {
 
 // New creates a new BatchClient for the given RESTClient.
 func New(c rest.Interface) *BatchClient {
-	return &BatchClient{c}
+	return &BatchClient{c, scheme.ParameterCodec}
 }
 
 func setConfigDefaults(config *rest.Config) error {
-	// if batch group is not registered, return an error
-	g, err := api.Registry.Group("batch")
-	if err != nil {
-		return err
-	}
+	gv := schema.GroupVersion{Group: "batch", Version: runtime.APIVersionInternal}
 	config.APIPath = "/apis"
 	if config.UserAgent == "" {
 		config.UserAgent = rest.DefaultKubernetesUserAgent()
 	}
-	if config.GroupVersion == nil || config.GroupVersion.Group != g.GroupVersion.Group {
-		copyGroupVersion := g.GroupVersion
-		config.GroupVersion = &copyGroupVersion
+	if config.GroupVersion == nil || config.GroupVersion.Group != "batch" {
+		config.GroupVersion = &gv
 	}
-	config.NegotiatedSerializer = api.Codecs
 
 	if config.QPS == 0 {
 		config.QPS = 5

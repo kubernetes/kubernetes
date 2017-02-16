@@ -18,10 +18,10 @@ package v1
 
 import (
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	runtime "k8s.io/apimachinery/pkg/runtime"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	rest "k8s.io/client-go/rest"
-	api "k8s.io/kubernetes/pkg/api"
 	v1 "k8s.io/kubernetes/pkg/api/v1"
 )
 
@@ -47,13 +47,15 @@ type PersistentVolumeInterface interface {
 
 // persistentVolumes implements PersistentVolumeInterface
 type persistentVolumes struct {
-	client rest.Interface
+	client         rest.Interface
+	parameterCodec runtime.ParameterCodec
 }
 
 // newPersistentVolumes returns a PersistentVolumes
-func newPersistentVolumes(c *CoreV1Client) *persistentVolumes {
+func newPersistentVolumes(c *CoreV1Client, parameterCodec runtime.ParameterCodec) *persistentVolumes {
 	return &persistentVolumes{
-		client: c.RESTClient(),
+		client:         c.RESTClient(),
+		parameterCodec: parameterCodec,
 	}
 }
 
@@ -109,7 +111,7 @@ func (c *persistentVolumes) Delete(name string, options *meta_v1.DeleteOptions) 
 func (c *persistentVolumes) DeleteCollection(options *meta_v1.DeleteOptions, listOptions meta_v1.ListOptions) error {
 	return c.client.Delete().
 		Resource("persistentvolumes").
-		VersionedParams(&listOptions, api.ParameterCodec).
+		VersionedParams(&listOptions, c.parameterCodec).
 		Body(options).
 		Do().
 		Error()
@@ -121,7 +123,7 @@ func (c *persistentVolumes) Get(name string, options meta_v1.GetOptions) (result
 	err = c.client.Get().
 		Resource("persistentvolumes").
 		Name(name).
-		VersionedParams(&options, api.ParameterCodec).
+		VersionedParams(&options, c.parameterCodec).
 		Do().
 		Into(result)
 	return
@@ -132,7 +134,7 @@ func (c *persistentVolumes) List(opts meta_v1.ListOptions) (result *v1.Persisten
 	result = &v1.PersistentVolumeList{}
 	err = c.client.Get().
 		Resource("persistentvolumes").
-		VersionedParams(&opts, api.ParameterCodec).
+		VersionedParams(&opts, c.parameterCodec).
 		Do().
 		Into(result)
 	return
@@ -143,7 +145,7 @@ func (c *persistentVolumes) Watch(opts meta_v1.ListOptions) (watch.Interface, er
 	return c.client.Get().
 		Prefix("watch").
 		Resource("persistentvolumes").
-		VersionedParams(&opts, api.ParameterCodec).
+		VersionedParams(&opts, c.parameterCodec).
 		Watch()
 }
 

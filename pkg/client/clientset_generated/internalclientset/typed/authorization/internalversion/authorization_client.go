@@ -17,8 +17,10 @@ limitations under the License.
 package internalversion
 
 import (
+	runtime "k8s.io/apimachinery/pkg/runtime"
+	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	rest "k8s.io/client-go/rest"
-	api "k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/scheme"
 )
 
 type AuthorizationInterface interface {
@@ -30,19 +32,20 @@ type AuthorizationInterface interface {
 
 // AuthorizationClient is used to interact with features provided by the authorization.k8s.io group.
 type AuthorizationClient struct {
-	restClient rest.Interface
+	restClient     rest.Interface
+	parameterCodec runtime.ParameterCodec
 }
 
 func (c *AuthorizationClient) LocalSubjectAccessReviews(namespace string) LocalSubjectAccessReviewInterface {
-	return newLocalSubjectAccessReviews(c, namespace)
+	return newLocalSubjectAccessReviews(c, namespace, c.parameterCodec)
 }
 
 func (c *AuthorizationClient) SelfSubjectAccessReviews() SelfSubjectAccessReviewInterface {
-	return newSelfSubjectAccessReviews(c)
+	return newSelfSubjectAccessReviews(c, c.parameterCodec)
 }
 
 func (c *AuthorizationClient) SubjectAccessReviews() SubjectAccessReviewInterface {
-	return newSubjectAccessReviews(c)
+	return newSubjectAccessReviews(c, c.parameterCodec)
 }
 
 // NewForConfig creates a new AuthorizationClient for the given config.
@@ -55,7 +58,7 @@ func NewForConfig(c *rest.Config) (*AuthorizationClient, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &AuthorizationClient{client}, nil
+	return &AuthorizationClient{client, c.ParameterCodec}, nil
 }
 
 // NewForConfigOrDie creates a new AuthorizationClient for the given config and
@@ -70,24 +73,18 @@ func NewForConfigOrDie(c *rest.Config) *AuthorizationClient {
 
 // New creates a new AuthorizationClient for the given RESTClient.
 func New(c rest.Interface) *AuthorizationClient {
-	return &AuthorizationClient{c}
+	return &AuthorizationClient{c, scheme.ParameterCodec}
 }
 
 func setConfigDefaults(config *rest.Config) error {
-	// if authorization group is not registered, return an error
-	g, err := api.Registry.Group("authorization.k8s.io")
-	if err != nil {
-		return err
-	}
+	gv := schema.GroupVersion{Group: "authorization.k8s.io", Version: runtime.APIVersionInternal}
 	config.APIPath = "/apis"
 	if config.UserAgent == "" {
 		config.UserAgent = rest.DefaultKubernetesUserAgent()
 	}
-	if config.GroupVersion == nil || config.GroupVersion.Group != g.GroupVersion.Group {
-		copyGroupVersion := g.GroupVersion
-		config.GroupVersion = &copyGroupVersion
+	if config.GroupVersion == nil || config.GroupVersion.Group != "authorization.k8s.io" {
+		config.GroupVersion = &gv
 	}
-	config.NegotiatedSerializer = api.Codecs
 
 	if config.QPS == 0 {
 		config.QPS = 5

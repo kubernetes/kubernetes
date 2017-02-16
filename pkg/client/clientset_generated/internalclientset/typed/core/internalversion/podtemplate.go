@@ -18,6 +18,7 @@ package internalversion
 
 import (
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	runtime "k8s.io/apimachinery/pkg/runtime"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	rest "k8s.io/client-go/rest"
@@ -45,15 +46,17 @@ type PodTemplateInterface interface {
 
 // podTemplates implements PodTemplateInterface
 type podTemplates struct {
-	client rest.Interface
-	ns     string
+	client         rest.Interface
+	ns             string
+	parameterCodec runtime.ParameterCodec
 }
 
 // newPodTemplates returns a PodTemplates
-func newPodTemplates(c *CoreClient, namespace string) *podTemplates {
+func newPodTemplates(c *CoreClient, namespace string, parameterCodec runtime.ParameterCodec) *podTemplates {
 	return &podTemplates{
-		client: c.RESTClient(),
-		ns:     namespace,
+		client:         c.RESTClient(),
+		ns:             namespace,
+		parameterCodec: parameterCodec,
 	}
 }
 
@@ -98,7 +101,7 @@ func (c *podTemplates) DeleteCollection(options *v1.DeleteOptions, listOptions v
 	return c.client.Delete().
 		Namespace(c.ns).
 		Resource("podtemplates").
-		VersionedParams(&listOptions, api.ParameterCodec).
+		VersionedParams(&listOptions, c.parameterCodec).
 		Body(options).
 		Do().
 		Error()
@@ -111,7 +114,7 @@ func (c *podTemplates) Get(name string, options v1.GetOptions) (result *api.PodT
 		Namespace(c.ns).
 		Resource("podtemplates").
 		Name(name).
-		VersionedParams(&options, api.ParameterCodec).
+		VersionedParams(&options, c.parameterCodec).
 		Do().
 		Into(result)
 	return
@@ -123,7 +126,7 @@ func (c *podTemplates) List(opts v1.ListOptions) (result *api.PodTemplateList, e
 	err = c.client.Get().
 		Namespace(c.ns).
 		Resource("podtemplates").
-		VersionedParams(&opts, api.ParameterCodec).
+		VersionedParams(&opts, c.parameterCodec).
 		Do().
 		Into(result)
 	return
@@ -135,7 +138,7 @@ func (c *podTemplates) Watch(opts v1.ListOptions) (watch.Interface, error) {
 		Prefix("watch").
 		Namespace(c.ns).
 		Resource("podtemplates").
-		VersionedParams(&opts, api.ParameterCodec).
+		VersionedParams(&opts, c.parameterCodec).
 		Watch()
 }
 

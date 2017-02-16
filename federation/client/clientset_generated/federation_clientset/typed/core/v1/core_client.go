@@ -17,11 +17,10 @@ limitations under the License.
 package v1
 
 import (
-	fmt "fmt"
+	runtime "k8s.io/apimachinery/pkg/runtime"
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
-	serializer "k8s.io/apimachinery/pkg/runtime/serializer"
 	rest "k8s.io/client-go/rest"
-	api "k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/federation/client/clientset_generated/federation_clientset/scheme"
 )
 
 type CoreV1Interface interface {
@@ -35,27 +34,28 @@ type CoreV1Interface interface {
 
 // CoreV1Client is used to interact with features provided by the  group.
 type CoreV1Client struct {
-	restClient rest.Interface
+	restClient     rest.Interface
+	parameterCodec runtime.ParameterCodec
 }
 
 func (c *CoreV1Client) ConfigMaps(namespace string) ConfigMapInterface {
-	return newConfigMaps(c, namespace)
+	return newConfigMaps(c, namespace, c.parameterCodec)
 }
 
 func (c *CoreV1Client) Events(namespace string) EventInterface {
-	return newEvents(c, namespace)
+	return newEvents(c, namespace, c.parameterCodec)
 }
 
 func (c *CoreV1Client) Namespaces() NamespaceInterface {
-	return newNamespaces(c)
+	return newNamespaces(c, c.parameterCodec)
 }
 
 func (c *CoreV1Client) Secrets(namespace string) SecretInterface {
-	return newSecrets(c, namespace)
+	return newSecrets(c, namespace, c.parameterCodec)
 }
 
 func (c *CoreV1Client) Services(namespace string) ServiceInterface {
-	return newServices(c, namespace)
+	return newServices(c, namespace, c.parameterCodec)
 }
 
 // NewForConfig creates a new CoreV1Client for the given config.
@@ -68,7 +68,7 @@ func NewForConfig(c *rest.Config) (*CoreV1Client, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &CoreV1Client{client}, nil
+	return &CoreV1Client{client, c.ParameterCodec}, nil
 }
 
 // NewForConfigOrDie creates a new CoreV1Client for the given config and
@@ -83,26 +83,22 @@ func NewForConfigOrDie(c *rest.Config) *CoreV1Client {
 
 // New creates a new CoreV1Client for the given RESTClient.
 func New(c rest.Interface) *CoreV1Client {
-	return &CoreV1Client{c}
+	return &CoreV1Client{c, scheme.ParameterCodec}
 }
 
 func setConfigDefaults(config *rest.Config) error {
-	gv, err := schema.ParseGroupVersion("/v1")
-	if err != nil {
-		return err
+	gv := schema.GroupVersion{Group: "", Version: "v1"}
+	if config.NegotiatedSerializer == nil {
+		return fmt.Errorf("expected non-nil NegotiatedSerializer for %v client", gv)
 	}
-	// if /v1 is not enabled, return an error
-	if !api.Registry.IsEnabledVersion(gv) {
-		return fmt.Errorf("/v1 is not enabled")
+	if config.ParameterCodec == nil {
+		return fmt.Errorf("expected non-nil ParameterCodec for %v client", gv)
 	}
 	config.APIPath = "/api"
 	if config.UserAgent == "" {
 		config.UserAgent = rest.DefaultKubernetesUserAgent()
 	}
-	copyGroupVersion := gv
-	config.GroupVersion = &copyGroupVersion
-
-	config.NegotiatedSerializer = serializer.DirectCodecFactory{CodecFactory: api.Codecs}
+	config.GroupVersion = &gv
 
 	return nil
 }

@@ -17,8 +17,10 @@ limitations under the License.
 package internalversion
 
 import (
+	runtime "k8s.io/apimachinery/pkg/runtime"
+	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	rest "k8s.io/client-go/rest"
-	api "k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/scheme"
 )
 
 type RbacInterface interface {
@@ -31,23 +33,24 @@ type RbacInterface interface {
 
 // RbacClient is used to interact with features provided by the rbac.authorization.k8s.io group.
 type RbacClient struct {
-	restClient rest.Interface
+	restClient     rest.Interface
+	parameterCodec runtime.ParameterCodec
 }
 
 func (c *RbacClient) ClusterRoles() ClusterRoleInterface {
-	return newClusterRoles(c)
+	return newClusterRoles(c, c.parameterCodec)
 }
 
 func (c *RbacClient) ClusterRoleBindings() ClusterRoleBindingInterface {
-	return newClusterRoleBindings(c)
+	return newClusterRoleBindings(c, c.parameterCodec)
 }
 
 func (c *RbacClient) Roles(namespace string) RoleInterface {
-	return newRoles(c, namespace)
+	return newRoles(c, namespace, c.parameterCodec)
 }
 
 func (c *RbacClient) RoleBindings(namespace string) RoleBindingInterface {
-	return newRoleBindings(c, namespace)
+	return newRoleBindings(c, namespace, c.parameterCodec)
 }
 
 // NewForConfig creates a new RbacClient for the given config.
@@ -60,7 +63,7 @@ func NewForConfig(c *rest.Config) (*RbacClient, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &RbacClient{client}, nil
+	return &RbacClient{client, c.ParameterCodec}, nil
 }
 
 // NewForConfigOrDie creates a new RbacClient for the given config and
@@ -75,24 +78,18 @@ func NewForConfigOrDie(c *rest.Config) *RbacClient {
 
 // New creates a new RbacClient for the given RESTClient.
 func New(c rest.Interface) *RbacClient {
-	return &RbacClient{c}
+	return &RbacClient{c, scheme.ParameterCodec}
 }
 
 func setConfigDefaults(config *rest.Config) error {
-	// if rbac group is not registered, return an error
-	g, err := api.Registry.Group("rbac.authorization.k8s.io")
-	if err != nil {
-		return err
-	}
+	gv := schema.GroupVersion{Group: "rbac.authorization.k8s.io", Version: runtime.APIVersionInternal}
 	config.APIPath = "/apis"
 	if config.UserAgent == "" {
 		config.UserAgent = rest.DefaultKubernetesUserAgent()
 	}
-	if config.GroupVersion == nil || config.GroupVersion.Group != g.GroupVersion.Group {
-		copyGroupVersion := g.GroupVersion
-		config.GroupVersion = &copyGroupVersion
+	if config.GroupVersion == nil || config.GroupVersion.Group != "rbac.authorization.k8s.io" {
+		config.GroupVersion = &gv
 	}
-	config.NegotiatedSerializer = api.Codecs
 
 	if config.QPS == 0 {
 		config.QPS = 5

@@ -17,11 +17,10 @@ limitations under the License.
 package v1alpha1
 
 import (
-	fmt "fmt"
+	runtime "k8s.io/apimachinery/pkg/runtime"
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
-	serializer "k8s.io/apimachinery/pkg/runtime/serializer"
-	api "k8s.io/client-go/pkg/api"
 	rest "k8s.io/client-go/rest"
+	"k8s.io/kube-aggregator/pkg/client/clientset_generated/clientset/scheme"
 )
 
 type ApiregistrationV1alpha1Interface interface {
@@ -31,11 +30,12 @@ type ApiregistrationV1alpha1Interface interface {
 
 // ApiregistrationV1alpha1Client is used to interact with features provided by the apiregistration.k8s.io group.
 type ApiregistrationV1alpha1Client struct {
-	restClient rest.Interface
+	restClient     rest.Interface
+	parameterCodec runtime.ParameterCodec
 }
 
 func (c *ApiregistrationV1alpha1Client) APIServices() APIServiceInterface {
-	return newAPIServices(c)
+	return newAPIServices(c, c.parameterCodec)
 }
 
 // NewForConfig creates a new ApiregistrationV1alpha1Client for the given config.
@@ -48,7 +48,7 @@ func NewForConfig(c *rest.Config) (*ApiregistrationV1alpha1Client, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &ApiregistrationV1alpha1Client{client}, nil
+	return &ApiregistrationV1alpha1Client{client, c.ParameterCodec}, nil
 }
 
 // NewForConfigOrDie creates a new ApiregistrationV1alpha1Client for the given config and
@@ -63,26 +63,22 @@ func NewForConfigOrDie(c *rest.Config) *ApiregistrationV1alpha1Client {
 
 // New creates a new ApiregistrationV1alpha1Client for the given RESTClient.
 func New(c rest.Interface) *ApiregistrationV1alpha1Client {
-	return &ApiregistrationV1alpha1Client{c}
+	return &ApiregistrationV1alpha1Client{c, scheme.ParameterCodec}
 }
 
 func setConfigDefaults(config *rest.Config) error {
-	gv, err := schema.ParseGroupVersion("apiregistration.k8s.io/v1alpha1")
-	if err != nil {
-		return err
+	gv := schema.GroupVersion{Group: "apiregistration.k8s.io", Version: "v1alpha1"}
+	if config.NegotiatedSerializer == nil {
+		return fmt.Errorf("expected non-nil NegotiatedSerializer for %v client", gv)
 	}
-	// if apiregistration.k8s.io/v1alpha1 is not enabled, return an error
-	if !api.Registry.IsEnabledVersion(gv) {
-		return fmt.Errorf("apiregistration.k8s.io/v1alpha1 is not enabled")
+	if config.ParameterCodec == nil {
+		return fmt.Errorf("expected non-nil ParameterCodec for %v client", gv)
 	}
 	config.APIPath = "/apis"
 	if config.UserAgent == "" {
 		config.UserAgent = rest.DefaultKubernetesUserAgent()
 	}
-	copyGroupVersion := gv
-	config.GroupVersion = &copyGroupVersion
-
-	config.NegotiatedSerializer = serializer.DirectCodecFactory{CodecFactory: api.Codecs}
+	config.GroupVersion = &gv
 
 	return nil
 }

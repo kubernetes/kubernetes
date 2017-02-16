@@ -17,8 +17,10 @@ limitations under the License.
 package internalversion
 
 import (
+	runtime "k8s.io/apimachinery/pkg/runtime"
+	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	rest "k8s.io/client-go/rest"
-	api "k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/cmd/libs/go2idl/client-gen/testoutput/clientset_generated/test_internalclientset/scheme"
 )
 
 type TestgroupInterface interface {
@@ -28,11 +30,12 @@ type TestgroupInterface interface {
 
 // TestgroupClient is used to interact with features provided by the testgroup.k8s.io group.
 type TestgroupClient struct {
-	restClient rest.Interface
+	restClient     rest.Interface
+	parameterCodec runtime.ParameterCodec
 }
 
 func (c *TestgroupClient) TestTypes(namespace string) TestTypeInterface {
-	return newTestTypes(c, namespace)
+	return newTestTypes(c, namespace, c.parameterCodec)
 }
 
 // NewForConfig creates a new TestgroupClient for the given config.
@@ -45,7 +48,7 @@ func NewForConfig(c *rest.Config) (*TestgroupClient, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &TestgroupClient{client}, nil
+	return &TestgroupClient{client, c.ParameterCodec}, nil
 }
 
 // NewForConfigOrDie creates a new TestgroupClient for the given config and
@@ -60,24 +63,18 @@ func NewForConfigOrDie(c *rest.Config) *TestgroupClient {
 
 // New creates a new TestgroupClient for the given RESTClient.
 func New(c rest.Interface) *TestgroupClient {
-	return &TestgroupClient{c}
+	return &TestgroupClient{c, scheme.ParameterCodec}
 }
 
 func setConfigDefaults(config *rest.Config) error {
-	// if testgroup group is not registered, return an error
-	g, err := api.Registry.Group("testgroup.k8s.io")
-	if err != nil {
-		return err
-	}
+	gv := schema.GroupVersion{Group: "testgroup.k8s.io", Version: runtime.APIVersionInternal}
 	config.APIPath = "/apis"
 	if config.UserAgent == "" {
 		config.UserAgent = rest.DefaultKubernetesUserAgent()
 	}
-	if config.GroupVersion == nil || config.GroupVersion.Group != g.GroupVersion.Group {
-		copyGroupVersion := g.GroupVersion
-		config.GroupVersion = &copyGroupVersion
+	if config.GroupVersion == nil || config.GroupVersion.Group != "testgroup.k8s.io" {
+		config.GroupVersion = &gv
 	}
-	config.NegotiatedSerializer = api.Codecs
 
 	if config.QPS == 0 {
 		config.QPS = 5

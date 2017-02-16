@@ -18,6 +18,7 @@ package internalversion
 
 import (
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	runtime "k8s.io/apimachinery/pkg/runtime"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	rest "k8s.io/client-go/rest"
@@ -45,13 +46,15 @@ type ComponentStatusInterface interface {
 
 // componentStatuses implements ComponentStatusInterface
 type componentStatuses struct {
-	client rest.Interface
+	client         rest.Interface
+	parameterCodec runtime.ParameterCodec
 }
 
 // newComponentStatuses returns a ComponentStatuses
-func newComponentStatuses(c *CoreClient) *componentStatuses {
+func newComponentStatuses(c *CoreClient, parameterCodec runtime.ParameterCodec) *componentStatuses {
 	return &componentStatuses{
-		client: c.RESTClient(),
+		client:         c.RESTClient(),
+		parameterCodec: parameterCodec,
 	}
 }
 
@@ -92,7 +95,7 @@ func (c *componentStatuses) Delete(name string, options *v1.DeleteOptions) error
 func (c *componentStatuses) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
 	return c.client.Delete().
 		Resource("componentstatuses").
-		VersionedParams(&listOptions, api.ParameterCodec).
+		VersionedParams(&listOptions, c.parameterCodec).
 		Body(options).
 		Do().
 		Error()
@@ -104,7 +107,7 @@ func (c *componentStatuses) Get(name string, options v1.GetOptions) (result *api
 	err = c.client.Get().
 		Resource("componentstatuses").
 		Name(name).
-		VersionedParams(&options, api.ParameterCodec).
+		VersionedParams(&options, c.parameterCodec).
 		Do().
 		Into(result)
 	return
@@ -115,7 +118,7 @@ func (c *componentStatuses) List(opts v1.ListOptions) (result *api.ComponentStat
 	result = &api.ComponentStatusList{}
 	err = c.client.Get().
 		Resource("componentstatuses").
-		VersionedParams(&opts, api.ParameterCodec).
+		VersionedParams(&opts, c.parameterCodec).
 		Do().
 		Into(result)
 	return
@@ -126,7 +129,7 @@ func (c *componentStatuses) Watch(opts v1.ListOptions) (watch.Interface, error) 
 	return c.client.Get().
 		Prefix("watch").
 		Resource("componentstatuses").
-		VersionedParams(&opts, api.ParameterCodec).
+		VersionedParams(&opts, c.parameterCodec).
 		Watch()
 }
 

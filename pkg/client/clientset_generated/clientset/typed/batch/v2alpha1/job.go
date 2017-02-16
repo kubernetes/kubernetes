@@ -18,10 +18,10 @@ package v2alpha1
 
 import (
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	runtime "k8s.io/apimachinery/pkg/runtime"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	rest "k8s.io/client-go/rest"
-	api "k8s.io/kubernetes/pkg/api"
 	v2alpha1 "k8s.io/kubernetes/pkg/apis/batch/v2alpha1"
 )
 
@@ -47,15 +47,17 @@ type JobInterface interface {
 
 // jobs implements JobInterface
 type jobs struct {
-	client rest.Interface
-	ns     string
+	client         rest.Interface
+	ns             string
+	parameterCodec runtime.ParameterCodec
 }
 
 // newJobs returns a Jobs
-func newJobs(c *BatchV2alpha1Client, namespace string) *jobs {
+func newJobs(c *BatchV2alpha1Client, namespace string, parameterCodec runtime.ParameterCodec) *jobs {
 	return &jobs{
-		client: c.RESTClient(),
-		ns:     namespace,
+		client:         c.RESTClient(),
+		ns:             namespace,
+		parameterCodec: parameterCodec,
 	}
 }
 
@@ -116,7 +118,7 @@ func (c *jobs) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOp
 	return c.client.Delete().
 		Namespace(c.ns).
 		Resource("jobs").
-		VersionedParams(&listOptions, api.ParameterCodec).
+		VersionedParams(&listOptions, c.parameterCodec).
 		Body(options).
 		Do().
 		Error()
@@ -129,7 +131,7 @@ func (c *jobs) Get(name string, options v1.GetOptions) (result *v2alpha1.Job, er
 		Namespace(c.ns).
 		Resource("jobs").
 		Name(name).
-		VersionedParams(&options, api.ParameterCodec).
+		VersionedParams(&options, c.parameterCodec).
 		Do().
 		Into(result)
 	return
@@ -141,7 +143,7 @@ func (c *jobs) List(opts v1.ListOptions) (result *v2alpha1.JobList, err error) {
 	err = c.client.Get().
 		Namespace(c.ns).
 		Resource("jobs").
-		VersionedParams(&opts, api.ParameterCodec).
+		VersionedParams(&opts, c.parameterCodec).
 		Do().
 		Into(result)
 	return
@@ -153,7 +155,7 @@ func (c *jobs) Watch(opts v1.ListOptions) (watch.Interface, error) {
 		Prefix("watch").
 		Namespace(c.ns).
 		Resource("jobs").
-		VersionedParams(&opts, api.ParameterCodec).
+		VersionedParams(&opts, c.parameterCodec).
 		Watch()
 }
 

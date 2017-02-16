@@ -18,15 +18,26 @@ package fake
 
 import (
 	"k8s.io/apimachinery/pkg/runtime"
+	runtime "k8s.io/apimachinery/pkg/runtime"
+	serializer "k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/discovery"
 	fakediscovery "k8s.io/client-go/discovery/fake"
 	"k8s.io/client-go/pkg/api"
 	"k8s.io/client-go/testing"
 	clientset "k8s.io/kube-aggregator/pkg/client/clientset_generated/internalclientset"
-	internalversionapiregistration "k8s.io/kube-aggregator/pkg/client/clientset_generated/internalclientset/typed/apiregistration/internalversion"
-	fakeinternalversionapiregistration "k8s.io/kube-aggregator/pkg/client/clientset_generated/internalclientset/typed/apiregistration/internalversion/fake"
+	apiregistrationinternalversion "k8s.io/kube-aggregator/pkg/client/clientset_generated/internalclientset/typed/apiregistration/internalversion"
+	fakeapiregistrationinternalversion "k8s.io/kube-aggregator/pkg/client/clientset_generated/internalclientset/typed/apiregistration/internalversion/fake"
 )
+
+var Scheme = runtime.NewScheme()
+var codecs = serializer.NewCodecFactory(scheme)
+var parameterCodec = runtime.NewParameterCodec(scheme)
+
+func init() {
+	apiregistrationinternalversion.AddToScheme(Scheme)
+
+}
 
 // NewSimpleClientset returns a clientset that will respond with the provided objects.
 // It's backed by a very simple object tracker that processes creates, updates and deletions as-is,
@@ -62,6 +73,6 @@ func (c *Clientset) Discovery() discovery.DiscoveryInterface {
 var _ clientset.Interface = &Clientset{}
 
 // Apiregistration retrieves the ApiregistrationClient
-func (c *Clientset) Apiregistration() internalversionapiregistration.ApiregistrationInterface {
-	return &fakeinternalversionapiregistration.FakeApiregistration{Fake: &c.Fake}
+func (c *Clientset) Apiregistration() clientapiregistrationinternalversion.ApiregistrationInterface {
+	return &fakeclientapiregistrationinternalversion.FakeApiregistration{Fake: &c.Fake}
 }

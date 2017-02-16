@@ -18,10 +18,10 @@ package v1
 
 import (
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	runtime "k8s.io/apimachinery/pkg/runtime"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	rest "k8s.io/client-go/rest"
-	api "k8s.io/kubernetes/pkg/api"
 	v1 "k8s.io/kubernetes/pkg/api/v1"
 )
 
@@ -46,15 +46,17 @@ type ConfigMapInterface interface {
 
 // configMaps implements ConfigMapInterface
 type configMaps struct {
-	client rest.Interface
-	ns     string
+	client         rest.Interface
+	ns             string
+	parameterCodec runtime.ParameterCodec
 }
 
 // newConfigMaps returns a ConfigMaps
-func newConfigMaps(c *CoreV1Client, namespace string) *configMaps {
+func newConfigMaps(c *CoreV1Client, namespace string, parameterCodec runtime.ParameterCodec) *configMaps {
 	return &configMaps{
-		client: c.RESTClient(),
-		ns:     namespace,
+		client:         c.RESTClient(),
+		ns:             namespace,
+		parameterCodec: parameterCodec,
 	}
 }
 
@@ -99,7 +101,7 @@ func (c *configMaps) DeleteCollection(options *meta_v1.DeleteOptions, listOption
 	return c.client.Delete().
 		Namespace(c.ns).
 		Resource("configmaps").
-		VersionedParams(&listOptions, api.ParameterCodec).
+		VersionedParams(&listOptions, c.parameterCodec).
 		Body(options).
 		Do().
 		Error()
@@ -112,7 +114,7 @@ func (c *configMaps) Get(name string, options meta_v1.GetOptions) (result *v1.Co
 		Namespace(c.ns).
 		Resource("configmaps").
 		Name(name).
-		VersionedParams(&options, api.ParameterCodec).
+		VersionedParams(&options, c.parameterCodec).
 		Do().
 		Into(result)
 	return
@@ -124,7 +126,7 @@ func (c *configMaps) List(opts meta_v1.ListOptions) (result *v1.ConfigMapList, e
 	err = c.client.Get().
 		Namespace(c.ns).
 		Resource("configmaps").
-		VersionedParams(&opts, api.ParameterCodec).
+		VersionedParams(&opts, c.parameterCodec).
 		Do().
 		Into(result)
 	return
@@ -136,7 +138,7 @@ func (c *configMaps) Watch(opts meta_v1.ListOptions) (watch.Interface, error) {
 		Prefix("watch").
 		Namespace(c.ns).
 		Resource("configmaps").
-		VersionedParams(&opts, api.ParameterCodec).
+		VersionedParams(&opts, c.parameterCodec).
 		Watch()
 }
 

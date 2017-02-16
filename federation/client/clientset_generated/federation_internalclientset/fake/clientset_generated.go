@@ -18,23 +18,38 @@ package fake
 
 import (
 	"k8s.io/apimachinery/pkg/runtime"
+	runtime "k8s.io/apimachinery/pkg/runtime"
+	serializer "k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/discovery"
 	fakediscovery "k8s.io/client-go/discovery/fake"
 	"k8s.io/client-go/testing"
 	clientset "k8s.io/kubernetes/federation/client/clientset_generated/federation_internalclientset"
-	internalversionautoscaling "k8s.io/kubernetes/federation/client/clientset_generated/federation_internalclientset/typed/autoscaling/internalversion"
-	fakeinternalversionautoscaling "k8s.io/kubernetes/federation/client/clientset_generated/federation_internalclientset/typed/autoscaling/internalversion/fake"
-	internalversionbatch "k8s.io/kubernetes/federation/client/clientset_generated/federation_internalclientset/typed/batch/internalversion"
-	fakeinternalversionbatch "k8s.io/kubernetes/federation/client/clientset_generated/federation_internalclientset/typed/batch/internalversion/fake"
-	internalversioncore "k8s.io/kubernetes/federation/client/clientset_generated/federation_internalclientset/typed/core/internalversion"
-	fakeinternalversioncore "k8s.io/kubernetes/federation/client/clientset_generated/federation_internalclientset/typed/core/internalversion/fake"
-	internalversionextensions "k8s.io/kubernetes/federation/client/clientset_generated/federation_internalclientset/typed/extensions/internalversion"
-	fakeinternalversionextensions "k8s.io/kubernetes/federation/client/clientset_generated/federation_internalclientset/typed/extensions/internalversion/fake"
-	internalversionfederation "k8s.io/kubernetes/federation/client/clientset_generated/federation_internalclientset/typed/federation/internalversion"
-	fakeinternalversionfederation "k8s.io/kubernetes/federation/client/clientset_generated/federation_internalclientset/typed/federation/internalversion/fake"
+	autoscalinginternalversion "k8s.io/kubernetes/federation/client/clientset_generated/federation_internalclientset/typed/autoscaling/internalversion"
+	fakeautoscalinginternalversion "k8s.io/kubernetes/federation/client/clientset_generated/federation_internalclientset/typed/autoscaling/internalversion/fake"
+	batchinternalversion "k8s.io/kubernetes/federation/client/clientset_generated/federation_internalclientset/typed/batch/internalversion"
+	fakebatchinternalversion "k8s.io/kubernetes/federation/client/clientset_generated/federation_internalclientset/typed/batch/internalversion/fake"
+	coreinternalversion "k8s.io/kubernetes/federation/client/clientset_generated/federation_internalclientset/typed/core/internalversion"
+	fakecoreinternalversion "k8s.io/kubernetes/federation/client/clientset_generated/federation_internalclientset/typed/core/internalversion/fake"
+	extensionsinternalversion "k8s.io/kubernetes/federation/client/clientset_generated/federation_internalclientset/typed/extensions/internalversion"
+	fakeextensionsinternalversion "k8s.io/kubernetes/federation/client/clientset_generated/federation_internalclientset/typed/extensions/internalversion/fake"
+	federationinternalversion "k8s.io/kubernetes/federation/client/clientset_generated/federation_internalclientset/typed/federation/internalversion"
+	fakefederationinternalversion "k8s.io/kubernetes/federation/client/clientset_generated/federation_internalclientset/typed/federation/internalversion/fake"
 	"k8s.io/kubernetes/pkg/api"
 )
+
+var Scheme = runtime.NewScheme()
+var codecs = serializer.NewCodecFactory(scheme)
+var parameterCodec = runtime.NewParameterCodec(scheme)
+
+func init() {
+	coreinternalversion.AddToScheme(Scheme)
+	autoscalinginternalversion.AddToScheme(Scheme)
+	batchinternalversion.AddToScheme(Scheme)
+	extensionsinternalversion.AddToScheme(Scheme)
+	federationinternalversion.AddToScheme(Scheme)
+
+}
 
 // NewSimpleClientset returns a clientset that will respond with the provided objects.
 // It's backed by a very simple object tracker that processes creates, updates and deletions as-is,
@@ -70,26 +85,26 @@ func (c *Clientset) Discovery() discovery.DiscoveryInterface {
 var _ clientset.Interface = &Clientset{}
 
 // Core retrieves the CoreClient
-func (c *Clientset) Core() internalversioncore.CoreInterface {
-	return &fakeinternalversioncore.FakeCore{Fake: &c.Fake}
+func (c *Clientset) Core() clientcoreinternalversion.CoreInterface {
+	return &fakeclientcoreinternalversion.FakeCore{Fake: &c.Fake}
 }
 
 // Autoscaling retrieves the AutoscalingClient
-func (c *Clientset) Autoscaling() internalversionautoscaling.AutoscalingInterface {
-	return &fakeinternalversionautoscaling.FakeAutoscaling{Fake: &c.Fake}
+func (c *Clientset) Autoscaling() clientautoscalinginternalversion.AutoscalingInterface {
+	return &fakeclientautoscalinginternalversion.FakeAutoscaling{Fake: &c.Fake}
 }
 
 // Batch retrieves the BatchClient
-func (c *Clientset) Batch() internalversionbatch.BatchInterface {
-	return &fakeinternalversionbatch.FakeBatch{Fake: &c.Fake}
+func (c *Clientset) Batch() clientbatchinternalversion.BatchInterface {
+	return &fakeclientbatchinternalversion.FakeBatch{Fake: &c.Fake}
 }
 
 // Extensions retrieves the ExtensionsClient
-func (c *Clientset) Extensions() internalversionextensions.ExtensionsInterface {
-	return &fakeinternalversionextensions.FakeExtensions{Fake: &c.Fake}
+func (c *Clientset) Extensions() clientextensionsinternalversion.ExtensionsInterface {
+	return &fakeclientextensionsinternalversion.FakeExtensions{Fake: &c.Fake}
 }
 
 // Federation retrieves the FederationClient
-func (c *Clientset) Federation() internalversionfederation.FederationInterface {
-	return &fakeinternalversionfederation.FakeFederation{Fake: &c.Fake}
+func (c *Clientset) Federation() clientfederationinternalversion.FederationInterface {
+	return &fakeclientfederationinternalversion.FakeFederation{Fake: &c.Fake}
 }

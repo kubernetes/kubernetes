@@ -18,15 +18,26 @@ package fake
 
 import (
 	"k8s.io/apimachinery/pkg/runtime"
+	runtime "k8s.io/apimachinery/pkg/runtime"
+	serializer "k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/discovery"
 	fakediscovery "k8s.io/client-go/discovery/fake"
 	"k8s.io/client-go/testing"
 	clientset "k8s.io/kubernetes/cmd/libs/go2idl/client-gen/testoutput/clientset_generated/test_internalclientset"
-	internalversiontestgroup "k8s.io/kubernetes/cmd/libs/go2idl/client-gen/testoutput/clientset_generated/test_internalclientset/typed/testgroup/internalversion"
-	fakeinternalversiontestgroup "k8s.io/kubernetes/cmd/libs/go2idl/client-gen/testoutput/clientset_generated/test_internalclientset/typed/testgroup/internalversion/fake"
+	testgroupinternalversion "k8s.io/kubernetes/cmd/libs/go2idl/client-gen/testoutput/clientset_generated/test_internalclientset/typed/testgroup/internalversion"
+	faketestgroupinternalversion "k8s.io/kubernetes/cmd/libs/go2idl/client-gen/testoutput/clientset_generated/test_internalclientset/typed/testgroup/internalversion/fake"
 	"k8s.io/kubernetes/pkg/api"
 )
+
+var Scheme = runtime.NewScheme()
+var codecs = serializer.NewCodecFactory(scheme)
+var parameterCodec = runtime.NewParameterCodec(scheme)
+
+func init() {
+	testgroupinternalversion.AddToScheme(Scheme)
+
+}
 
 // NewSimpleClientset returns a clientset that will respond with the provided objects.
 // It's backed by a very simple object tracker that processes creates, updates and deletions as-is,
@@ -62,6 +73,6 @@ func (c *Clientset) Discovery() discovery.DiscoveryInterface {
 var _ clientset.Interface = &Clientset{}
 
 // Testgroup retrieves the TestgroupClient
-func (c *Clientset) Testgroup() internalversiontestgroup.TestgroupInterface {
-	return &fakeinternalversiontestgroup.FakeTestgroup{Fake: &c.Fake}
+func (c *Clientset) Testgroup() clienttestgroupinternalversion.TestgroupInterface {
+	return &fakeclienttestgroupinternalversion.FakeTestgroup{Fake: &c.Fake}
 }

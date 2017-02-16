@@ -18,43 +18,45 @@ package federation_internalclientset
 
 import (
 	"github.com/golang/glog"
+	"k8s.io/apimachinery/pkg/runtime/serializer"
 	discovery "k8s.io/client-go/discovery"
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
 	rest "k8s.io/client-go/rest"
 	"k8s.io/client-go/util/flowcontrol"
-	internalversionautoscaling "k8s.io/kubernetes/federation/client/clientset_generated/federation_internalclientset/typed/autoscaling/internalversion"
-	internalversionbatch "k8s.io/kubernetes/federation/client/clientset_generated/federation_internalclientset/typed/batch/internalversion"
-	internalversioncore "k8s.io/kubernetes/federation/client/clientset_generated/federation_internalclientset/typed/core/internalversion"
-	internalversionextensions "k8s.io/kubernetes/federation/client/clientset_generated/federation_internalclientset/typed/extensions/internalversion"
-	internalversionfederation "k8s.io/kubernetes/federation/client/clientset_generated/federation_internalclientset/typed/federation/internalversion"
+	"k8s.io/kubernetes/federation/client/clientset_generated/federation_internalclientset/scheme"
+	clientautoscalinginternalversion "k8s.io/kubernetes/federation/client/clientset_generated/federation_internalclientset/typed/autoscaling/internalversion"
+	clientbatchinternalversion "k8s.io/kubernetes/federation/client/clientset_generated/federation_internalclientset/typed/batch/internalversion"
+	clientcoreinternalversion "k8s.io/kubernetes/federation/client/clientset_generated/federation_internalclientset/typed/core/internalversion"
+	clientextensionsinternalversion "k8s.io/kubernetes/federation/client/clientset_generated/federation_internalclientset/typed/extensions/internalversion"
+	clientfederationinternalversion "k8s.io/kubernetes/federation/client/clientset_generated/federation_internalclientset/typed/federation/internalversion"
 )
 
 type Interface interface {
 	Discovery() discovery.DiscoveryInterface
-	Core() internalversioncore.CoreInterface
+	Core() clientcoreinternalversion.CoreInterface
 
-	Autoscaling() internalversionautoscaling.AutoscalingInterface
+	Autoscaling() clientautoscalinginternalversion.AutoscalingInterface
 
-	Batch() internalversionbatch.BatchInterface
+	Batch() clientbatchinternalversion.BatchInterface
 
-	Extensions() internalversionextensions.ExtensionsInterface
+	Extensions() clientextensionsinternalversion.ExtensionsInterface
 
-	Federation() internalversionfederation.FederationInterface
+	Federation() clientfederationinternalversion.FederationInterface
 }
 
 // Clientset contains the clients for groups. Each group has exactly one
 // version included in a Clientset.
 type Clientset struct {
 	*discovery.DiscoveryClient
-	*internalversioncore.CoreClient
-	*internalversionautoscaling.AutoscalingClient
-	*internalversionbatch.BatchClient
-	*internalversionextensions.ExtensionsClient
-	*internalversionfederation.FederationClient
+	*clientcoreinternalversion.CoreClient
+	*clientautoscalinginternalversion.AutoscalingClient
+	*clientbatchinternalversion.BatchClient
+	*clientextensionsinternalversion.ExtensionsClient
+	*clientfederationinternalversion.FederationClient
 }
 
 // Core retrieves the CoreClient
-func (c *Clientset) Core() internalversioncore.CoreInterface {
+func (c *Clientset) Core() clientcoreinternalversion.CoreInterface {
 	if c == nil {
 		return nil
 	}
@@ -62,7 +64,7 @@ func (c *Clientset) Core() internalversioncore.CoreInterface {
 }
 
 // Autoscaling retrieves the AutoscalingClient
-func (c *Clientset) Autoscaling() internalversionautoscaling.AutoscalingInterface {
+func (c *Clientset) Autoscaling() clientautoscalinginternalversion.AutoscalingInterface {
 	if c == nil {
 		return nil
 	}
@@ -70,7 +72,7 @@ func (c *Clientset) Autoscaling() internalversionautoscaling.AutoscalingInterfac
 }
 
 // Batch retrieves the BatchClient
-func (c *Clientset) Batch() internalversionbatch.BatchInterface {
+func (c *Clientset) Batch() clientbatchinternalversion.BatchInterface {
 	if c == nil {
 		return nil
 	}
@@ -78,7 +80,7 @@ func (c *Clientset) Batch() internalversionbatch.BatchInterface {
 }
 
 // Extensions retrieves the ExtensionsClient
-func (c *Clientset) Extensions() internalversionextensions.ExtensionsInterface {
+func (c *Clientset) Extensions() clientextensionsinternalversion.ExtensionsInterface {
 	if c == nil {
 		return nil
 	}
@@ -86,7 +88,7 @@ func (c *Clientset) Extensions() internalversionextensions.ExtensionsInterface {
 }
 
 // Federation retrieves the FederationClient
-func (c *Clientset) Federation() internalversionfederation.FederationInterface {
+func (c *Clientset) Federation() clientfederationinternalversion.FederationInterface {
 	if c == nil {
 		return nil
 	}
@@ -107,25 +109,31 @@ func NewForConfig(c *rest.Config) (*Clientset, error) {
 	if configShallowCopy.RateLimiter == nil && configShallowCopy.QPS > 0 {
 		configShallowCopy.RateLimiter = flowcontrol.NewTokenBucketRateLimiter(configShallowCopy.QPS, configShallowCopy.Burst)
 	}
+	if configShallowCopy.ParameterCodec == nil {
+		configShallowCopy.ParameterCodec = scheme.ParameterCodec
+	}
+	if configShallowCopy.NegotiatedSerializer == nil {
+		configShallowCopy.NegotiatedSerializer = serializer.DirectCodecFactory{CodecFactory: scheme.Codecs}
+	}
 	var cs Clientset
 	var err error
-	cs.CoreClient, err = internalversioncore.NewForConfig(&configShallowCopy)
+	cs.CoreClient, err = clientcoreinternalversion.NewForConfig(&configShallowCopy)
 	if err != nil {
 		return nil, err
 	}
-	cs.AutoscalingClient, err = internalversionautoscaling.NewForConfig(&configShallowCopy)
+	cs.AutoscalingClient, err = clientautoscalinginternalversion.NewForConfig(&configShallowCopy)
 	if err != nil {
 		return nil, err
 	}
-	cs.BatchClient, err = internalversionbatch.NewForConfig(&configShallowCopy)
+	cs.BatchClient, err = clientbatchinternalversion.NewForConfig(&configShallowCopy)
 	if err != nil {
 		return nil, err
 	}
-	cs.ExtensionsClient, err = internalversionextensions.NewForConfig(&configShallowCopy)
+	cs.ExtensionsClient, err = clientextensionsinternalversion.NewForConfig(&configShallowCopy)
 	if err != nil {
 		return nil, err
 	}
-	cs.FederationClient, err = internalversionfederation.NewForConfig(&configShallowCopy)
+	cs.FederationClient, err = clientfederationinternalversion.NewForConfig(&configShallowCopy)
 	if err != nil {
 		return nil, err
 	}
@@ -142,11 +150,11 @@ func NewForConfig(c *rest.Config) (*Clientset, error) {
 // panics if there is an error in the config.
 func NewForConfigOrDie(c *rest.Config) *Clientset {
 	var cs Clientset
-	cs.CoreClient = internalversioncore.NewForConfigOrDie(c)
-	cs.AutoscalingClient = internalversionautoscaling.NewForConfigOrDie(c)
-	cs.BatchClient = internalversionbatch.NewForConfigOrDie(c)
-	cs.ExtensionsClient = internalversionextensions.NewForConfigOrDie(c)
-	cs.FederationClient = internalversionfederation.NewForConfigOrDie(c)
+	cs.CoreClient = clientcoreinternalversion.NewForConfigOrDie(c)
+	cs.AutoscalingClient = clientautoscalinginternalversion.NewForConfigOrDie(c)
+	cs.BatchClient = clientbatchinternalversion.NewForConfigOrDie(c)
+	cs.ExtensionsClient = clientextensionsinternalversion.NewForConfigOrDie(c)
+	cs.FederationClient = clientfederationinternalversion.NewForConfigOrDie(c)
 
 	cs.DiscoveryClient = discovery.NewDiscoveryClientForConfigOrDie(c)
 	return &cs
@@ -155,11 +163,11 @@ func NewForConfigOrDie(c *rest.Config) *Clientset {
 // New creates a new Clientset for the given RESTClient.
 func New(c rest.Interface) *Clientset {
 	var cs Clientset
-	cs.CoreClient = internalversioncore.New(c)
-	cs.AutoscalingClient = internalversionautoscaling.New(c)
-	cs.BatchClient = internalversionbatch.New(c)
-	cs.ExtensionsClient = internalversionextensions.New(c)
-	cs.FederationClient = internalversionfederation.New(c)
+	cs.CoreClient = clientcoreinternalversion.New(c)
+	cs.AutoscalingClient = clientautoscalinginternalversion.New(c)
+	cs.BatchClient = clientbatchinternalversion.New(c)
+	cs.ExtensionsClient = clientextensionsinternalversion.New(c)
+	cs.FederationClient = clientfederationinternalversion.New(c)
 
 	cs.DiscoveryClient = discovery.NewDiscoveryClient(c)
 	return &cs

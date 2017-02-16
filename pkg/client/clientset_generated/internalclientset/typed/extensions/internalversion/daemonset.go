@@ -18,10 +18,10 @@ package internalversion
 
 import (
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	runtime "k8s.io/apimachinery/pkg/runtime"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	rest "k8s.io/client-go/rest"
-	api "k8s.io/kubernetes/pkg/api"
 	extensions "k8s.io/kubernetes/pkg/apis/extensions"
 )
 
@@ -47,15 +47,17 @@ type DaemonSetInterface interface {
 
 // daemonSets implements DaemonSetInterface
 type daemonSets struct {
-	client rest.Interface
-	ns     string
+	client         rest.Interface
+	ns             string
+	parameterCodec runtime.ParameterCodec
 }
 
 // newDaemonSets returns a DaemonSets
-func newDaemonSets(c *ExtensionsClient, namespace string) *daemonSets {
+func newDaemonSets(c *ExtensionsClient, namespace string, parameterCodec runtime.ParameterCodec) *daemonSets {
 	return &daemonSets{
-		client: c.RESTClient(),
-		ns:     namespace,
+		client:         c.RESTClient(),
+		ns:             namespace,
+		parameterCodec: parameterCodec,
 	}
 }
 
@@ -116,7 +118,7 @@ func (c *daemonSets) DeleteCollection(options *v1.DeleteOptions, listOptions v1.
 	return c.client.Delete().
 		Namespace(c.ns).
 		Resource("daemonsets").
-		VersionedParams(&listOptions, api.ParameterCodec).
+		VersionedParams(&listOptions, c.parameterCodec).
 		Body(options).
 		Do().
 		Error()
@@ -129,7 +131,7 @@ func (c *daemonSets) Get(name string, options v1.GetOptions) (result *extensions
 		Namespace(c.ns).
 		Resource("daemonsets").
 		Name(name).
-		VersionedParams(&options, api.ParameterCodec).
+		VersionedParams(&options, c.parameterCodec).
 		Do().
 		Into(result)
 	return
@@ -141,7 +143,7 @@ func (c *daemonSets) List(opts v1.ListOptions) (result *extensions.DaemonSetList
 	err = c.client.Get().
 		Namespace(c.ns).
 		Resource("daemonsets").
-		VersionedParams(&opts, api.ParameterCodec).
+		VersionedParams(&opts, c.parameterCodec).
 		Do().
 		Into(result)
 	return
@@ -153,7 +155,7 @@ func (c *daemonSets) Watch(opts v1.ListOptions) (watch.Interface, error) {
 		Prefix("watch").
 		Namespace(c.ns).
 		Resource("daemonsets").
-		VersionedParams(&opts, api.ParameterCodec).
+		VersionedParams(&opts, c.parameterCodec).
 		Watch()
 }
 

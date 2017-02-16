@@ -17,8 +17,10 @@ limitations under the License.
 package internalversion
 
 import (
+	runtime "k8s.io/apimachinery/pkg/runtime"
+	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	rest "k8s.io/client-go/rest"
-	api "k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/federation/client/clientset_generated/federation_internalclientset/scheme"
 )
 
 type FederationInterface interface {
@@ -28,11 +30,12 @@ type FederationInterface interface {
 
 // FederationClient is used to interact with features provided by the federation group.
 type FederationClient struct {
-	restClient rest.Interface
+	restClient     rest.Interface
+	parameterCodec runtime.ParameterCodec
 }
 
 func (c *FederationClient) Clusters() ClusterInterface {
-	return newClusters(c)
+	return newClusters(c, c.parameterCodec)
 }
 
 // NewForConfig creates a new FederationClient for the given config.
@@ -45,7 +48,7 @@ func NewForConfig(c *rest.Config) (*FederationClient, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &FederationClient{client}, nil
+	return &FederationClient{client, c.ParameterCodec}, nil
 }
 
 // NewForConfigOrDie creates a new FederationClient for the given config and
@@ -60,24 +63,18 @@ func NewForConfigOrDie(c *rest.Config) *FederationClient {
 
 // New creates a new FederationClient for the given RESTClient.
 func New(c rest.Interface) *FederationClient {
-	return &FederationClient{c}
+	return &FederationClient{c, scheme.ParameterCodec}
 }
 
 func setConfigDefaults(config *rest.Config) error {
-	// if federation group is not registered, return an error
-	g, err := api.Registry.Group("federation")
-	if err != nil {
-		return err
-	}
+	gv := schema.GroupVersion{Group: "federation", Version: runtime.APIVersionInternal}
 	config.APIPath = "/apis"
 	if config.UserAgent == "" {
 		config.UserAgent = rest.DefaultKubernetesUserAgent()
 	}
-	if config.GroupVersion == nil || config.GroupVersion.Group != g.GroupVersion.Group {
-		copyGroupVersion := g.GroupVersion
-		config.GroupVersion = &copyGroupVersion
+	if config.GroupVersion == nil || config.GroupVersion.Group != "federation" {
+		config.GroupVersion = &gv
 	}
-	config.NegotiatedSerializer = api.Codecs
 
 	if config.QPS == 0 {
 		config.QPS = 5

@@ -18,10 +18,10 @@ package internalversion
 
 import (
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	runtime "k8s.io/apimachinery/pkg/runtime"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	rest "k8s.io/client-go/rest"
-	api "k8s.io/kubernetes/pkg/api"
 	rbac "k8s.io/kubernetes/pkg/apis/rbac"
 )
 
@@ -46,15 +46,17 @@ type RoleInterface interface {
 
 // roles implements RoleInterface
 type roles struct {
-	client rest.Interface
-	ns     string
+	client         rest.Interface
+	ns             string
+	parameterCodec runtime.ParameterCodec
 }
 
 // newRoles returns a Roles
-func newRoles(c *RbacClient, namespace string) *roles {
+func newRoles(c *RbacClient, namespace string, parameterCodec runtime.ParameterCodec) *roles {
 	return &roles{
-		client: c.RESTClient(),
-		ns:     namespace,
+		client:         c.RESTClient(),
+		ns:             namespace,
+		parameterCodec: parameterCodec,
 	}
 }
 
@@ -99,7 +101,7 @@ func (c *roles) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListO
 	return c.client.Delete().
 		Namespace(c.ns).
 		Resource("roles").
-		VersionedParams(&listOptions, api.ParameterCodec).
+		VersionedParams(&listOptions, c.parameterCodec).
 		Body(options).
 		Do().
 		Error()
@@ -112,7 +114,7 @@ func (c *roles) Get(name string, options v1.GetOptions) (result *rbac.Role, err 
 		Namespace(c.ns).
 		Resource("roles").
 		Name(name).
-		VersionedParams(&options, api.ParameterCodec).
+		VersionedParams(&options, c.parameterCodec).
 		Do().
 		Into(result)
 	return
@@ -124,7 +126,7 @@ func (c *roles) List(opts v1.ListOptions) (result *rbac.RoleList, err error) {
 	err = c.client.Get().
 		Namespace(c.ns).
 		Resource("roles").
-		VersionedParams(&opts, api.ParameterCodec).
+		VersionedParams(&opts, c.parameterCodec).
 		Do().
 		Into(result)
 	return
@@ -136,7 +138,7 @@ func (c *roles) Watch(opts v1.ListOptions) (watch.Interface, error) {
 		Prefix("watch").
 		Namespace(c.ns).
 		Resource("roles").
-		VersionedParams(&opts, api.ParameterCodec).
+		VersionedParams(&opts, c.parameterCodec).
 		Watch()
 }
 

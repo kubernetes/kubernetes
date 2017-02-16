@@ -17,8 +17,10 @@ limitations under the License.
 package internalversion
 
 import (
+	runtime "k8s.io/apimachinery/pkg/runtime"
+	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	rest "k8s.io/client-go/rest"
-	api "k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/scheme"
 )
 
 type CoreInterface interface {
@@ -43,71 +45,72 @@ type CoreInterface interface {
 
 // CoreClient is used to interact with features provided by the  group.
 type CoreClient struct {
-	restClient rest.Interface
+	restClient     rest.Interface
+	parameterCodec runtime.ParameterCodec
 }
 
 func (c *CoreClient) ComponentStatuses() ComponentStatusInterface {
-	return newComponentStatuses(c)
+	return newComponentStatuses(c, c.parameterCodec)
 }
 
 func (c *CoreClient) ConfigMaps(namespace string) ConfigMapInterface {
-	return newConfigMaps(c, namespace)
+	return newConfigMaps(c, namespace, c.parameterCodec)
 }
 
 func (c *CoreClient) Endpoints(namespace string) EndpointsInterface {
-	return newEndpoints(c, namespace)
+	return newEndpoints(c, namespace, c.parameterCodec)
 }
 
 func (c *CoreClient) Events(namespace string) EventInterface {
-	return newEvents(c, namespace)
+	return newEvents(c, namespace, c.parameterCodec)
 }
 
 func (c *CoreClient) LimitRanges(namespace string) LimitRangeInterface {
-	return newLimitRanges(c, namespace)
+	return newLimitRanges(c, namespace, c.parameterCodec)
 }
 
 func (c *CoreClient) Namespaces() NamespaceInterface {
-	return newNamespaces(c)
+	return newNamespaces(c, c.parameterCodec)
 }
 
 func (c *CoreClient) Nodes() NodeInterface {
-	return newNodes(c)
+	return newNodes(c, c.parameterCodec)
 }
 
 func (c *CoreClient) PersistentVolumes() PersistentVolumeInterface {
-	return newPersistentVolumes(c)
+	return newPersistentVolumes(c, c.parameterCodec)
 }
 
 func (c *CoreClient) PersistentVolumeClaims(namespace string) PersistentVolumeClaimInterface {
-	return newPersistentVolumeClaims(c, namespace)
+	return newPersistentVolumeClaims(c, namespace, c.parameterCodec)
 }
 
 func (c *CoreClient) Pods(namespace string) PodInterface {
-	return newPods(c, namespace)
+	return newPods(c, namespace, c.parameterCodec)
 }
 
 func (c *CoreClient) PodTemplates(namespace string) PodTemplateInterface {
-	return newPodTemplates(c, namespace)
+	return newPodTemplates(c, namespace, c.parameterCodec)
 }
 
 func (c *CoreClient) ReplicationControllers(namespace string) ReplicationControllerInterface {
-	return newReplicationControllers(c, namespace)
+	return newReplicationControllers(c, namespace, c.parameterCodec)
 }
 
 func (c *CoreClient) ResourceQuotas(namespace string) ResourceQuotaInterface {
-	return newResourceQuotas(c, namespace)
+	return newResourceQuotas(c, namespace, c.parameterCodec)
 }
 
 func (c *CoreClient) Secrets(namespace string) SecretInterface {
-	return newSecrets(c, namespace)
+	return newSecrets(c, namespace, c.parameterCodec)
 }
 
 func (c *CoreClient) Services(namespace string) ServiceInterface {
-	return newServices(c, namespace)
+	return newServices(c, namespace, c.parameterCodec)
 }
 
 func (c *CoreClient) ServiceAccounts(namespace string) ServiceAccountInterface {
-	return newServiceAccounts(c, namespace)
+	return newServiceAccounts(c, namespace, c.parameterCodec)
 }
 
 // NewForConfig creates a new CoreClient for the given config.
@@ -120,7 +123,7 @@ func NewForConfig(c *rest.Config) (*CoreClient, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &CoreClient{client}, nil
+	return &CoreClient{client, c.ParameterCodec}, nil
 }
 
 // NewForConfigOrDie creates a new CoreClient for the given config and
@@ -135,24 +138,18 @@ func NewForConfigOrDie(c *rest.Config) *CoreClient {
 
 // New creates a new CoreClient for the given RESTClient.
 func New(c rest.Interface) *CoreClient {
-	return &CoreClient{c}
+	return &CoreClient{c, scheme.ParameterCodec}
 }
 
 func setConfigDefaults(config *rest.Config) error {
-	// if core group is not registered, return an error
-	g, err := api.Registry.Group("")
-	if err != nil {
-		return err
-	}
+	gv := schema.GroupVersion{Group: "", Version: runtime.APIVersionInternal}
 	config.APIPath = "/api"
 	if config.UserAgent == "" {
 		config.UserAgent = rest.DefaultKubernetesUserAgent()
 	}
-	if config.GroupVersion == nil || config.GroupVersion.Group != g.GroupVersion.Group {
-		copyGroupVersion := g.GroupVersion
-		config.GroupVersion = &copyGroupVersion
+	if config.GroupVersion == nil || config.GroupVersion.Group != "" {
+		config.GroupVersion = &gv
 	}
-	config.NegotiatedSerializer = api.Codecs
 
 	if config.QPS == 0 {
 		config.QPS = 5

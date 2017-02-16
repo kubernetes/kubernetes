@@ -18,15 +18,26 @@ package fake
 
 import (
 	"k8s.io/apimachinery/pkg/runtime"
+	runtime "k8s.io/apimachinery/pkg/runtime"
+	serializer "k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/discovery"
 	fakediscovery "k8s.io/client-go/discovery/fake"
 	"k8s.io/client-go/pkg/api"
 	"k8s.io/client-go/testing"
 	clientset "k8s.io/kube-aggregator/pkg/client/clientset_generated/clientset"
-	v1alpha1apiregistration "k8s.io/kube-aggregator/pkg/client/clientset_generated/clientset/typed/apiregistration/v1alpha1"
-	fakev1alpha1apiregistration "k8s.io/kube-aggregator/pkg/client/clientset_generated/clientset/typed/apiregistration/v1alpha1/fake"
+	apiregistrationv1alpha1 "k8s.io/kube-aggregator/pkg/client/clientset_generated/clientset/typed/apiregistration/v1alpha1"
+	fakeapiregistrationv1alpha1 "k8s.io/kube-aggregator/pkg/client/clientset_generated/clientset/typed/apiregistration/v1alpha1/fake"
 )
+
+var Scheme = runtime.NewScheme()
+var codecs = serializer.NewCodecFactory(scheme)
+var parameterCodec = runtime.NewParameterCodec(scheme)
+
+func init() {
+	apiregistrationv1alpha1.AddToScheme(Scheme)
+
+}
 
 // NewSimpleClientset returns a clientset that will respond with the provided objects.
 // It's backed by a very simple object tracker that processes creates, updates and deletions as-is,
@@ -62,11 +73,11 @@ func (c *Clientset) Discovery() discovery.DiscoveryInterface {
 var _ clientset.Interface = &Clientset{}
 
 // ApiregistrationV1alpha1 retrieves the ApiregistrationV1alpha1Client
-func (c *Clientset) ApiregistrationV1alpha1() v1alpha1apiregistration.ApiregistrationV1alpha1Interface {
-	return &fakev1alpha1apiregistration.FakeApiregistrationV1alpha1{Fake: &c.Fake}
+func (c *Clientset) ApiregistrationV1alpha1() clientapiregistrationv1alpha1.ApiregistrationV1alpha1Interface {
+	return &fakeclientapiregistrationv1alpha1.FakeApiregistrationV1alpha1{Fake: &c.Fake}
 }
 
 // Apiregistration retrieves the ApiregistrationV1alpha1Client
-func (c *Clientset) Apiregistration() v1alpha1apiregistration.ApiregistrationV1alpha1Interface {
-	return &fakev1alpha1apiregistration.FakeApiregistrationV1alpha1{Fake: &c.Fake}
+func (c *Clientset) Apiregistration() clientapiregistrationv1alpha1.ApiregistrationV1alpha1Interface {
+	return &fakeclientapiregistrationv1alpha1.FakeApiregistrationV1alpha1{Fake: &c.Fake}
 }

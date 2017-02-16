@@ -17,6 +17,7 @@ limitations under the License.
 package v1
 
 import (
+	runtime "k8s.io/apimachinery/pkg/runtime"
 	rest "k8s.io/client-go/rest"
 )
 
@@ -33,12 +34,14 @@ type TokenReviewInterface interface {
 
 // tokenReviews implements TokenReviewInterface
 type tokenReviews struct {
-	client rest.Interface
+	client         rest.Interface
+	parameterCodec runtime.ParameterCodec
 }
 
 // newTokenReviews returns a TokenReviews
-func newTokenReviews(c *AuthenticationV1Client) *tokenReviews {
+func newTokenReviews(c *AuthenticationV1Client, parameterCodec runtime.ParameterCodec) *tokenReviews {
 	return &tokenReviews{
-		client: c.RESTClient(),
+		client:         c.RESTClient(),
+		parameterCodec: parameterCodec,
 	}
 }

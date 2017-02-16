@@ -18,10 +18,10 @@ package v1
 
 import (
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	runtime "k8s.io/apimachinery/pkg/runtime"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	rest "k8s.io/client-go/rest"
-	api "k8s.io/kubernetes/pkg/api"
 	v1 "k8s.io/kubernetes/pkg/api/v1"
 )
 
@@ -46,15 +46,17 @@ type LimitRangeInterface interface {
 
 // limitRanges implements LimitRangeInterface
 type limitRanges struct {
-	client rest.Interface
-	ns     string
+	client         rest.Interface
+	ns             string
+	parameterCodec runtime.ParameterCodec
 }
 
 // newLimitRanges returns a LimitRanges
-func newLimitRanges(c *CoreV1Client, namespace string) *limitRanges {
+func newLimitRanges(c *CoreV1Client, namespace string, parameterCodec runtime.ParameterCodec) *limitRanges {
 	return &limitRanges{
-		client: c.RESTClient(),
-		ns:     namespace,
+		client:         c.RESTClient(),
+		ns:             namespace,
+		parameterCodec: parameterCodec,
 	}
 }
 
@@ -99,7 +101,7 @@ func (c *limitRanges) DeleteCollection(options *meta_v1.DeleteOptions, listOptio
 	return c.client.Delete().
 		Namespace(c.ns).
 		Resource("limitranges").
-		VersionedParams(&listOptions, api.ParameterCodec).
+		VersionedParams(&listOptions, c.parameterCodec).
 		Body(options).
 		Do().
 		Error()
@@ -112,7 +114,7 @@ func (c *limitRanges) Get(name string, options meta_v1.GetOptions) (result *v1.L
 		Namespace(c.ns).
 		Resource("limitranges").
 		Name(name).
-		VersionedParams(&options, api.ParameterCodec).
+		VersionedParams(&options, c.parameterCodec).
 		Do().
 		Into(result)
 	return
@@ -124,7 +126,7 @@ func (c *limitRanges) List(opts meta_v1.ListOptions) (result *v1.LimitRangeList,
 	err = c.client.Get().
 		Namespace(c.ns).
 		Resource("limitranges").
-		VersionedParams(&opts, api.ParameterCodec).
+		VersionedParams(&opts, c.parameterCodec).
 		Do().
 		Into(result)
 	return
@@ -136,7 +138,7 @@ func (c *limitRanges) Watch(opts meta_v1.ListOptions) (watch.Interface, error) {
 		Prefix("watch").
 		Namespace(c.ns).
 		Resource("limitranges").
-		VersionedParams(&opts, api.ParameterCodec).
+		VersionedParams(&opts, c.parameterCodec).
 		Watch()
 }
 

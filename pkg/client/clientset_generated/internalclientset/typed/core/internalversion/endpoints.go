@@ -18,6 +18,7 @@ package internalversion
 
 import (
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	runtime "k8s.io/apimachinery/pkg/runtime"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	rest "k8s.io/client-go/rest"
@@ -45,15 +46,17 @@ type EndpointsInterface interface {
 
 // endpoints implements EndpointsInterface
 type endpoints struct {
-	client rest.Interface
-	ns     string
+	client         rest.Interface
+	ns             string
+	parameterCodec runtime.ParameterCodec
 }
 
 // newEndpoints returns a Endpoints
-func newEndpoints(c *CoreClient, namespace string) *endpoints {
+func newEndpoints(c *CoreClient, namespace string, parameterCodec runtime.ParameterCodec) *endpoints {
 	return &endpoints{
-		client: c.RESTClient(),
-		ns:     namespace,
+		client:         c.RESTClient(),
+		ns:             namespace,
+		parameterCodec: parameterCodec,
 	}
 }
 
@@ -98,7 +101,7 @@ func (c *endpoints) DeleteCollection(options *v1.DeleteOptions, listOptions v1.L
 	return c.client.Delete().
 		Namespace(c.ns).
 		Resource("endpoints").
-		VersionedParams(&listOptions, api.ParameterCodec).
+		VersionedParams(&listOptions, c.parameterCodec).
 		Body(options).
 		Do().
 		Error()
@@ -111,7 +114,7 @@ func (c *endpoints) Get(name string, options v1.GetOptions) (result *api.Endpoin
 		Namespace(c.ns).
 		Resource("endpoints").
 		Name(name).
-		VersionedParams(&options, api.ParameterCodec).
+		VersionedParams(&options, c.parameterCodec).
 		Do().
 		Into(result)
 	return
@@ -123,7 +126,7 @@ func (c *endpoints) List(opts v1.ListOptions) (result *api.EndpointsList, err er
 	err = c.client.Get().
 		Namespace(c.ns).
 		Resource("endpoints").
-		VersionedParams(&opts, api.ParameterCodec).
+		VersionedParams(&opts, c.parameterCodec).
 		Do().
 		Into(result)
 	return
@@ -135,7 +138,7 @@ func (c *endpoints) Watch(opts v1.ListOptions) (watch.Interface, error) {
 		Prefix("watch").
 		Namespace(c.ns).
 		Resource("endpoints").
-		VersionedParams(&opts, api.ParameterCodec).
+		VersionedParams(&opts, c.parameterCodec).
 		Watch()
 }
 

@@ -18,6 +18,7 @@ package internalversion
 
 import (
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	runtime "k8s.io/apimachinery/pkg/runtime"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	rest "k8s.io/client-go/rest"
@@ -46,13 +47,15 @@ type PersistentVolumeInterface interface {
 
 // persistentVolumes implements PersistentVolumeInterface
 type persistentVolumes struct {
-	client rest.Interface
+	client         rest.Interface
+	parameterCodec runtime.ParameterCodec
 }
 
 // newPersistentVolumes returns a PersistentVolumes
-func newPersistentVolumes(c *CoreClient) *persistentVolumes {
+func newPersistentVolumes(c *CoreClient, parameterCodec runtime.ParameterCodec) *persistentVolumes {
 	return &persistentVolumes{
-		client: c.RESTClient(),
+		client:         c.RESTClient(),
+		parameterCodec: parameterCodec,
 	}
 }
 
@@ -108,7 +111,7 @@ func (c *persistentVolumes) Delete(name string, options *v1.DeleteOptions) error
 func (c *persistentVolumes) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
 	return c.client.Delete().
 		Resource("persistentvolumes").
-		VersionedParams(&listOptions, api.ParameterCodec).
+		VersionedParams(&listOptions, c.parameterCodec).
 		Body(options).
 		Do().
 		Error()
@@ -120,7 +123,7 @@ func (c *persistentVolumes) Get(name string, options v1.GetOptions) (result *api
 	err = c.client.Get().
 		Resource("persistentvolumes").
 		Name(name).
-		VersionedParams(&options, api.ParameterCodec).
+		VersionedParams(&options, c.parameterCodec).
 		Do().
 		Into(result)
 	return
@@ -131,7 +134,7 @@ func (c *persistentVolumes) List(opts v1.ListOptions) (result *api.PersistentVol
 	result = &api.PersistentVolumeList{}
 	err = c.client.Get().
 		Resource("persistentvolumes").
-		VersionedParams(&opts, api.ParameterCodec).
+		VersionedParams(&opts, c.parameterCodec).
 		Do().
 		Into(result)
 	return
@@ -142,7 +145,7 @@ func (c *persistentVolumes) Watch(opts v1.ListOptions) (watch.Interface, error) 
 	return c.client.Get().
 		Prefix("watch").
 		Resource("persistentvolumes").
-		VersionedParams(&opts, api.ParameterCodec).
+		VersionedParams(&opts, c.parameterCodec).
 		Watch()
 }
 

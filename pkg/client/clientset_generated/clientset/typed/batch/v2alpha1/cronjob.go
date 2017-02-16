@@ -18,10 +18,10 @@ package v2alpha1
 
 import (
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	runtime "k8s.io/apimachinery/pkg/runtime"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	rest "k8s.io/client-go/rest"
-	api "k8s.io/kubernetes/pkg/api"
 	v2alpha1 "k8s.io/kubernetes/pkg/apis/batch/v2alpha1"
 )
 
@@ -47,15 +47,17 @@ type CronJobInterface interface {
 
 // cronJobs implements CronJobInterface
 type cronJobs struct {
-	client rest.Interface
-	ns     string
+	client         rest.Interface
+	ns             string
+	parameterCodec runtime.ParameterCodec
 }
 
 // newCronJobs returns a CronJobs
-func newCronJobs(c *BatchV2alpha1Client, namespace string) *cronJobs {
+func newCronJobs(c *BatchV2alpha1Client, namespace string, parameterCodec runtime.ParameterCodec) *cronJobs {
 	return &cronJobs{
-		client: c.RESTClient(),
-		ns:     namespace,
+		client:         c.RESTClient(),
+		ns:             namespace,
+		parameterCodec: parameterCodec,
 	}
 }
 
@@ -116,7 +118,7 @@ func (c *cronJobs) DeleteCollection(options *v1.DeleteOptions, listOptions v1.Li
 	return c.client.Delete().
 		Namespace(c.ns).
 		Resource("cronjobs").
-		VersionedParams(&listOptions, api.ParameterCodec).
+		VersionedParams(&listOptions, c.parameterCodec).
 		Body(options).
 		Do().
 		Error()
@@ -129,7 +131,7 @@ func (c *cronJobs) Get(name string, options v1.GetOptions) (result *v2alpha1.Cro
 		Namespace(c.ns).
 		Resource("cronjobs").
 		Name(name).
-		VersionedParams(&options, api.ParameterCodec).
+		VersionedParams(&options, c.parameterCodec).
 		Do().
 		Into(result)
 	return
@@ -141,7 +143,7 @@ func (c *cronJobs) List(opts v1.ListOptions) (result *v2alpha1.CronJobList, err 
 	err = c.client.Get().
 		Namespace(c.ns).
 		Resource("cronjobs").
-		VersionedParams(&opts, api.ParameterCodec).
+		VersionedParams(&opts, c.parameterCodec).
 		Do().
 		Into(result)
 	return
@@ -153,7 +155,7 @@ func (c *cronJobs) Watch(opts v1.ListOptions) (watch.Interface, error) {
 		Prefix("watch").
 		Namespace(c.ns).
 		Resource("cronjobs").
-		VersionedParams(&opts, api.ParameterCodec).
+		VersionedParams(&opts, c.parameterCodec).
 		Watch()
 }
 

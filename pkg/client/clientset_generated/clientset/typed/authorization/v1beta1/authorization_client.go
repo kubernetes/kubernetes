@@ -17,11 +17,10 @@ limitations under the License.
 package v1beta1
 
 import (
-	fmt "fmt"
+	runtime "k8s.io/apimachinery/pkg/runtime"
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
-	serializer "k8s.io/apimachinery/pkg/runtime/serializer"
 	rest "k8s.io/client-go/rest"
-	api "k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset/scheme"
 )
 
 type AuthorizationV1beta1Interface interface {
@@ -33,19 +32,20 @@ type AuthorizationV1beta1Interface interface {
 
 // AuthorizationV1beta1Client is used to interact with features provided by the authorization.k8s.io group.
 type AuthorizationV1beta1Client struct {
-	restClient rest.Interface
+	restClient     rest.Interface
+	parameterCodec runtime.ParameterCodec
 }
 
 func (c *AuthorizationV1beta1Client) LocalSubjectAccessReviews(namespace string) LocalSubjectAccessReviewInterface {
-	return newLocalSubjectAccessReviews(c, namespace)
+	return newLocalSubjectAccessReviews(c, namespace, c.parameterCodec)
 }
 
 func (c *AuthorizationV1beta1Client) SelfSubjectAccessReviews() SelfSubjectAccessReviewInterface {
-	return newSelfSubjectAccessReviews(c)
+	return newSelfSubjectAccessReviews(c, c.parameterCodec)
 }
 
 func (c *AuthorizationV1beta1Client) SubjectAccessReviews() SubjectAccessReviewInterface {
-	return newSubjectAccessReviews(c)
+	return newSubjectAccessReviews(c, c.parameterCodec)
 }
 
 // NewForConfig creates a new AuthorizationV1beta1Client for the given config.
@@ -58,7 +58,7 @@ func NewForConfig(c *rest.Config) (*AuthorizationV1beta1Client, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &AuthorizationV1beta1Client{client}, nil
+	return &AuthorizationV1beta1Client{client, c.ParameterCodec}, nil
 }
 
 // NewForConfigOrDie creates a new AuthorizationV1beta1Client for the given config and
@@ -73,26 +73,22 @@ func NewForConfigOrDie(c *rest.Config) *AuthorizationV1beta1Client {
 
 // New creates a new AuthorizationV1beta1Client for the given RESTClient.
 func New(c rest.Interface) *AuthorizationV1beta1Client {
-	return &AuthorizationV1beta1Client{c}
+	return &AuthorizationV1beta1Client{c, scheme.ParameterCodec}
 }
 
 func setConfigDefaults(config *rest.Config) error {
-	gv, err := schema.ParseGroupVersion("authorization.k8s.io/v1beta1")
-	if err != nil {
-		return err
+	gv := schema.GroupVersion{Group: "authorization.k8s.io", Version: "v1beta1"}
+	if config.NegotiatedSerializer == nil {
+		return fmt.Errorf("expected non-nil NegotiatedSerializer for %v client", gv)
 	}
-	// if authorization.k8s.io/v1beta1 is not enabled, return an error
-	if !api.Registry.IsEnabledVersion(gv) {
-		return fmt.Errorf("authorization.k8s.io/v1beta1 is not enabled")
+	if config.ParameterCodec == nil {
+		return fmt.Errorf("expected non-nil ParameterCodec for %v client", gv)
 	}
 	config.APIPath = "/apis"
 	if config.UserAgent == "" {
 		config.UserAgent = rest.DefaultKubernetesUserAgent()
 	}
-	copyGroupVersion := gv
-	config.GroupVersion = &copyGroupVersion
-
-	config.NegotiatedSerializer = serializer.DirectCodecFactory{CodecFactory: api.Codecs}
+	config.GroupVersion = &gv
 
 	return nil
 }

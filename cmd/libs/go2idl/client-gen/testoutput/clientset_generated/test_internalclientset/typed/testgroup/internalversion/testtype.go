@@ -18,11 +18,11 @@ package internalversion
 
 import (
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	runtime "k8s.io/apimachinery/pkg/runtime"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	rest "k8s.io/client-go/rest"
 	testgroup "k8s.io/kubernetes/cmd/libs/go2idl/client-gen/test_apis/testgroup"
-	api "k8s.io/kubernetes/pkg/api"
 )
 
 // TestTypesGetter has a method to return a TestTypeInterface.
@@ -47,15 +47,17 @@ type TestTypeInterface interface {
 
 // testTypes implements TestTypeInterface
 type testTypes struct {
-	client rest.Interface
-	ns     string
+	client         rest.Interface
+	ns             string
+	parameterCodec runtime.ParameterCodec
 }
 
 // newTestTypes returns a TestTypes
-func newTestTypes(c *TestgroupClient, namespace string) *testTypes {
+func newTestTypes(c *TestgroupClient, namespace string, parameterCodec runtime.ParameterCodec) *testTypes {
 	return &testTypes{
-		client: c.RESTClient(),
-		ns:     namespace,
+		client:         c.RESTClient(),
+		ns:             namespace,
+		parameterCodec: parameterCodec,
 	}
 }
 
@@ -116,7 +118,7 @@ func (c *testTypes) DeleteCollection(options *v1.DeleteOptions, listOptions v1.L
 	return c.client.Delete().
 		Namespace(c.ns).
 		Resource("testtypes").
-		VersionedParams(&listOptions, api.ParameterCodec).
+		VersionedParams(&listOptions, c.parameterCodec).
 		Body(options).
 		Do().
 		Error()
@@ -129,7 +131,7 @@ func (c *testTypes) Get(name string, options v1.GetOptions) (result *testgroup.T
 		Namespace(c.ns).
 		Resource("testtypes").
 		Name(name).
-		VersionedParams(&options, api.ParameterCodec).
+		VersionedParams(&options, c.parameterCodec).
 		Do().
 		Into(result)
 	return
@@ -141,7 +143,7 @@ func (c *testTypes) List(opts v1.ListOptions) (result *testgroup.TestTypeList, e
 	err = c.client.Get().
 		Namespace(c.ns).
 		Resource("testtypes").
-		VersionedParams(&opts, api.ParameterCodec).
+		VersionedParams(&opts, c.parameterCodec).
 		Do().
 		Into(result)
 	return
@@ -153,7 +155,7 @@ func (c *testTypes) Watch(opts v1.ListOptions) (watch.Interface, error) {
 		Prefix("watch").
 		Namespace(c.ns).
 		Resource("testtypes").
-		VersionedParams(&opts, api.ParameterCodec).
+		VersionedParams(&opts, c.parameterCodec).
 		Watch()
 }
 

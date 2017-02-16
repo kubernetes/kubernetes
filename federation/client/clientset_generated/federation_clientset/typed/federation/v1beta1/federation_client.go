@@ -17,11 +17,10 @@ limitations under the License.
 package v1beta1
 
 import (
-	fmt "fmt"
+	runtime "k8s.io/apimachinery/pkg/runtime"
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
-	serializer "k8s.io/apimachinery/pkg/runtime/serializer"
 	rest "k8s.io/client-go/rest"
-	api "k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/federation/client/clientset_generated/federation_clientset/scheme"
 )
 
 type FederationV1beta1Interface interface {
@@ -31,11 +30,12 @@ type FederationV1beta1Interface interface {
 
 // FederationV1beta1Client is used to interact with features provided by the federation group.
 type FederationV1beta1Client struct {
-	restClient rest.Interface
+	restClient     rest.Interface
+	parameterCodec runtime.ParameterCodec
 }
 
 func (c *FederationV1beta1Client) Clusters() ClusterInterface {
-	return newClusters(c)
+	return newClusters(c, c.parameterCodec)
 }
 
 // NewForConfig creates a new FederationV1beta1Client for the given config.
@@ -48,7 +48,7 @@ func NewForConfig(c *rest.Config) (*FederationV1beta1Client, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &FederationV1beta1Client{client}, nil
+	return &FederationV1beta1Client{client, c.ParameterCodec}, nil
 }
 
 // NewForConfigOrDie creates a new FederationV1beta1Client for the given config and
@@ -63,26 +63,22 @@ func NewForConfigOrDie(c *rest.Config) *FederationV1beta1Client {
 
 // New creates a new FederationV1beta1Client for the given RESTClient.
 func New(c rest.Interface) *FederationV1beta1Client {
-	return &FederationV1beta1Client{c}
+	return &FederationV1beta1Client{c, scheme.ParameterCodec}
 }
 
 func setConfigDefaults(config *rest.Config) error {
-	gv, err := schema.ParseGroupVersion("federation/v1beta1")
-	if err != nil {
-		return err
+	gv := schema.GroupVersion{Group: "federation", Version: "v1beta1"}
+	if config.NegotiatedSerializer == nil {
+		return fmt.Errorf("expected non-nil NegotiatedSerializer for %v client", gv)
 	}
-	// if federation/v1beta1 is not enabled, return an error
-	if !api.Registry.IsEnabledVersion(gv) {
-		return fmt.Errorf("federation/v1beta1 is not enabled")
+	if config.ParameterCodec == nil {
+		return fmt.Errorf("expected non-nil ParameterCodec for %v client", gv)
 	}
 	config.APIPath = "/apis"
 	if config.UserAgent == "" {
 		config.UserAgent = rest.DefaultKubernetesUserAgent()
 	}
-	copyGroupVersion := gv
-	config.GroupVersion = &copyGroupVersion
-
-	config.NegotiatedSerializer = serializer.DirectCodecFactory{CodecFactory: api.Codecs}
+	config.GroupVersion = &gv
 
 	return nil
 }

@@ -18,10 +18,10 @@ package v1
 
 import (
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	runtime "k8s.io/apimachinery/pkg/runtime"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	rest "k8s.io/client-go/rest"
-	api "k8s.io/kubernetes/pkg/api"
 	v1 "k8s.io/kubernetes/pkg/api/v1"
 )
 
@@ -47,13 +47,15 @@ type NamespaceInterface interface {
 
 // namespaces implements NamespaceInterface
 type namespaces struct {
-	client rest.Interface
+	client         rest.Interface
+	parameterCodec runtime.ParameterCodec
 }
 
 // newNamespaces returns a Namespaces
-func newNamespaces(c *CoreV1Client) *namespaces {
+func newNamespaces(c *CoreV1Client, parameterCodec runtime.ParameterCodec) *namespaces {
 	return &namespaces{
-		client: c.RESTClient(),
+		client:         c.RESTClient(),
+		parameterCodec: parameterCodec,
 	}
 }
 
@@ -109,7 +111,7 @@ func (c *namespaces) Delete(name string, options *meta_v1.DeleteOptions) error {
 func (c *namespaces) DeleteCollection(options *meta_v1.DeleteOptions, listOptions meta_v1.ListOptions) error {
 	return c.client.Delete().
 		Resource("namespaces").
-		VersionedParams(&listOptions, api.ParameterCodec).
+		VersionedParams(&listOptions, c.parameterCodec).
 		Body(options).
 		Do().
 		Error()
@@ -121,7 +123,7 @@ func (c *namespaces) Get(name string, options meta_v1.GetOptions) (result *v1.Na
 	err = c.client.Get().
 		Resource("namespaces").
 		Name(name).
-		VersionedParams(&options, api.ParameterCodec).
+		VersionedParams(&options, c.parameterCodec).
 		Do().
 		Into(result)
 	return
@@ -132,7 +134,7 @@ func (c *namespaces) List(opts meta_v1.ListOptions) (result *v1.NamespaceList, e
 	result = &v1.NamespaceList{}
 	err = c.client.Get().
 		Resource("namespaces").
-		VersionedParams(&opts, api.ParameterCodec).
+		VersionedParams(&opts, c.parameterCodec).
 		Do().
 		Into(result)
 	return
@@ -143,7 +145,7 @@ func (c *namespaces) Watch(opts meta_v1.ListOptions) (watch.Interface, error) {
 	return c.client.Get().
 		Prefix("watch").
 		Resource("namespaces").
-		VersionedParams(&opts, api.ParameterCodec).
+		VersionedParams(&opts, c.parameterCodec).
 		Watch()
 }
 

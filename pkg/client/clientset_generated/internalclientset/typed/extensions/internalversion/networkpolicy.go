@@ -18,10 +18,10 @@ package internalversion
 
 import (
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	runtime "k8s.io/apimachinery/pkg/runtime"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	rest "k8s.io/client-go/rest"
-	api "k8s.io/kubernetes/pkg/api"
 	extensions "k8s.io/kubernetes/pkg/apis/extensions"
 )
 
@@ -46,15 +46,17 @@ type NetworkPolicyInterface interface {
 
 // networkPolicies implements NetworkPolicyInterface
 type networkPolicies struct {
-	client rest.Interface
-	ns     string
+	client         rest.Interface
+	ns             string
+	parameterCodec runtime.ParameterCodec
 }
 
 // newNetworkPolicies returns a NetworkPolicies
-func newNetworkPolicies(c *ExtensionsClient, namespace string) *networkPolicies {
+func newNetworkPolicies(c *ExtensionsClient, namespace string, parameterCodec runtime.ParameterCodec) *networkPolicies {
 	return &networkPolicies{
-		client: c.RESTClient(),
-		ns:     namespace,
+		client:         c.RESTClient(),
+		ns:             namespace,
+		parameterCodec: parameterCodec,
 	}
 }
 
@@ -99,7 +101,7 @@ func (c *networkPolicies) DeleteCollection(options *v1.DeleteOptions, listOption
 	return c.client.Delete().
 		Namespace(c.ns).
 		Resource("networkpolicies").
-		VersionedParams(&listOptions, api.ParameterCodec).
+		VersionedParams(&listOptions, c.parameterCodec).
 		Body(options).
 		Do().
 		Error()
@@ -112,7 +114,7 @@ func (c *networkPolicies) Get(name string, options v1.GetOptions) (result *exten
 		Namespace(c.ns).
 		Resource("networkpolicies").
 		Name(name).
-		VersionedParams(&options, api.ParameterCodec).
+		VersionedParams(&options, c.parameterCodec).
 		Do().
 		Into(result)
 	return
@@ -124,7 +126,7 @@ func (c *networkPolicies) List(opts v1.ListOptions) (result *extensions.NetworkP
 	err = c.client.Get().
 		Namespace(c.ns).
 		Resource("networkpolicies").
-		VersionedParams(&opts, api.ParameterCodec).
+		VersionedParams(&opts, c.parameterCodec).
 		Do().
 		Into(result)
 	return
@@ -136,7 +138,7 @@ func (c *networkPolicies) Watch(opts v1.ListOptions) (watch.Interface, error) {
 		Prefix("watch").
 		Namespace(c.ns).
 		Resource("networkpolicies").
-		VersionedParams(&opts, api.ParameterCodec).
+		VersionedParams(&opts, c.parameterCodec).
 		Watch()
 }
 

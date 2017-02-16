@@ -18,23 +18,38 @@ package fake
 
 import (
 	"k8s.io/apimachinery/pkg/runtime"
+	runtime "k8s.io/apimachinery/pkg/runtime"
+	serializer "k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/discovery"
 	fakediscovery "k8s.io/client-go/discovery/fake"
 	"k8s.io/client-go/testing"
 	clientset "k8s.io/kubernetes/federation/client/clientset_generated/federation_clientset"
-	v1autoscaling "k8s.io/kubernetes/federation/client/clientset_generated/federation_clientset/typed/autoscaling/v1"
-	fakev1autoscaling "k8s.io/kubernetes/federation/client/clientset_generated/federation_clientset/typed/autoscaling/v1/fake"
-	v1batch "k8s.io/kubernetes/federation/client/clientset_generated/federation_clientset/typed/batch/v1"
-	fakev1batch "k8s.io/kubernetes/federation/client/clientset_generated/federation_clientset/typed/batch/v1/fake"
-	v1core "k8s.io/kubernetes/federation/client/clientset_generated/federation_clientset/typed/core/v1"
-	fakev1core "k8s.io/kubernetes/federation/client/clientset_generated/federation_clientset/typed/core/v1/fake"
-	v1beta1extensions "k8s.io/kubernetes/federation/client/clientset_generated/federation_clientset/typed/extensions/v1beta1"
-	fakev1beta1extensions "k8s.io/kubernetes/federation/client/clientset_generated/federation_clientset/typed/extensions/v1beta1/fake"
-	v1beta1federation "k8s.io/kubernetes/federation/client/clientset_generated/federation_clientset/typed/federation/v1beta1"
-	fakev1beta1federation "k8s.io/kubernetes/federation/client/clientset_generated/federation_clientset/typed/federation/v1beta1/fake"
+	autoscalingv1 "k8s.io/kubernetes/federation/client/clientset_generated/federation_clientset/typed/autoscaling/v1"
+	fakeautoscalingv1 "k8s.io/kubernetes/federation/client/clientset_generated/federation_clientset/typed/autoscaling/v1/fake"
+	batchv1 "k8s.io/kubernetes/federation/client/clientset_generated/federation_clientset/typed/batch/v1"
+	fakebatchv1 "k8s.io/kubernetes/federation/client/clientset_generated/federation_clientset/typed/batch/v1/fake"
+	corev1 "k8s.io/kubernetes/federation/client/clientset_generated/federation_clientset/typed/core/v1"
+	fakecorev1 "k8s.io/kubernetes/federation/client/clientset_generated/federation_clientset/typed/core/v1/fake"
+	extensionsv1beta1 "k8s.io/kubernetes/federation/client/clientset_generated/federation_clientset/typed/extensions/v1beta1"
+	fakeextensionsv1beta1 "k8s.io/kubernetes/federation/client/clientset_generated/federation_clientset/typed/extensions/v1beta1/fake"
+	federationv1beta1 "k8s.io/kubernetes/federation/client/clientset_generated/federation_clientset/typed/federation/v1beta1"
+	fakefederationv1beta1 "k8s.io/kubernetes/federation/client/clientset_generated/federation_clientset/typed/federation/v1beta1/fake"
 	"k8s.io/kubernetes/pkg/api"
 )
+
+var Scheme = runtime.NewScheme()
+var codecs = serializer.NewCodecFactory(scheme)
+var parameterCodec = runtime.NewParameterCodec(scheme)
+
+func init() {
+	corev1.AddToScheme(Scheme)
+	autoscalingv1.AddToScheme(Scheme)
+	batchv1.AddToScheme(Scheme)
+	extensionsv1beta1.AddToScheme(Scheme)
+	federationv1beta1.AddToScheme(Scheme)
+
+}
 
 // NewSimpleClientset returns a clientset that will respond with the provided objects.
 // It's backed by a very simple object tracker that processes creates, updates and deletions as-is,
@@ -70,51 +85,51 @@ func (c *Clientset) Discovery() discovery.DiscoveryInterface {
 var _ clientset.Interface = &Clientset{}
 
 // CoreV1 retrieves the CoreV1Client
-func (c *Clientset) CoreV1() v1core.CoreV1Interface {
-	return &fakev1core.FakeCoreV1{Fake: &c.Fake}
+func (c *Clientset) CoreV1() clientcorev1.CoreV1Interface {
+	return &fakeclientcorev1.FakeCoreV1{Fake: &c.Fake}
 }
 
 // Core retrieves the CoreV1Client
-func (c *Clientset) Core() v1core.CoreV1Interface {
-	return &fakev1core.FakeCoreV1{Fake: &c.Fake}
+func (c *Clientset) Core() clientcorev1.CoreV1Interface {
+	return &fakeclientcorev1.FakeCoreV1{Fake: &c.Fake}
 }
 
 // AutoscalingV1 retrieves the AutoscalingV1Client
-func (c *Clientset) AutoscalingV1() v1autoscaling.AutoscalingV1Interface {
-	return &fakev1autoscaling.FakeAutoscalingV1{Fake: &c.Fake}
+func (c *Clientset) AutoscalingV1() clientautoscalingv1.AutoscalingV1Interface {
+	return &fakeclientautoscalingv1.FakeAutoscalingV1{Fake: &c.Fake}
 }
 
 // Autoscaling retrieves the AutoscalingV1Client
-func (c *Clientset) Autoscaling() v1autoscaling.AutoscalingV1Interface {
-	return &fakev1autoscaling.FakeAutoscalingV1{Fake: &c.Fake}
+func (c *Clientset) Autoscaling() clientautoscalingv1.AutoscalingV1Interface {
+	return &fakeclientautoscalingv1.FakeAutoscalingV1{Fake: &c.Fake}
 }
 
 // BatchV1 retrieves the BatchV1Client
-func (c *Clientset) BatchV1() v1batch.BatchV1Interface {
-	return &fakev1batch.FakeBatchV1{Fake: &c.Fake}
+func (c *Clientset) BatchV1() clientbatchv1.BatchV1Interface {
+	return &fakeclientbatchv1.FakeBatchV1{Fake: &c.Fake}
 }
 
 // Batch retrieves the BatchV1Client
-func (c *Clientset) Batch() v1batch.BatchV1Interface {
-	return &fakev1batch.FakeBatchV1{Fake: &c.Fake}
+func (c *Clientset) Batch() clientbatchv1.BatchV1Interface {
+	return &fakeclientbatchv1.FakeBatchV1{Fake: &c.Fake}
 }
 
 // ExtensionsV1beta1 retrieves the ExtensionsV1beta1Client
-func (c *Clientset) ExtensionsV1beta1() v1beta1extensions.ExtensionsV1beta1Interface {
-	return &fakev1beta1extensions.FakeExtensionsV1beta1{Fake: &c.Fake}
+func (c *Clientset) ExtensionsV1beta1() clientextensionsv1beta1.ExtensionsV1beta1Interface {
+	return &fakeclientextensionsv1beta1.FakeExtensionsV1beta1{Fake: &c.Fake}
 }
 
 // Extensions retrieves the ExtensionsV1beta1Client
-func (c *Clientset) Extensions() v1beta1extensions.ExtensionsV1beta1Interface {
-	return &fakev1beta1extensions.FakeExtensionsV1beta1{Fake: &c.Fake}
+func (c *Clientset) Extensions() clientextensionsv1beta1.ExtensionsV1beta1Interface {
+	return &fakeclientextensionsv1beta1.FakeExtensionsV1beta1{Fake: &c.Fake}
 }
 
 // FederationV1beta1 retrieves the FederationV1beta1Client
-func (c *Clientset) FederationV1beta1() v1beta1federation.FederationV1beta1Interface {
-	return &fakev1beta1federation.FakeFederationV1beta1{Fake: &c.Fake}
+func (c *Clientset) FederationV1beta1() clientfederationv1beta1.FederationV1beta1Interface {
+	return &fakeclientfederationv1beta1.FakeFederationV1beta1{Fake: &c.Fake}
 }
 
 // Federation retrieves the FederationV1beta1Client
-func (c *Clientset) Federation() v1beta1federation.FederationV1beta1Interface {
-	return &fakev1beta1federation.FakeFederationV1beta1{Fake: &c.Fake}
+func (c *Clientset) Federation() clientfederationv1beta1.FederationV1beta1Interface {
+	return &fakeclientfederationv1beta1.FakeFederationV1beta1{Fake: &c.Fake}
 }

@@ -17,6 +17,7 @@ limitations under the License.
 package v1beta1
 
 import (
+	runtime "k8s.io/apimachinery/pkg/runtime"
 	rest "k8s.io/client-go/rest"
 )
 
@@ -33,14 +34,16 @@ type EvictionInterface interface {
 
 // evictions implements EvictionInterface
 type evictions struct {
-	client rest.Interface
-	ns     string
+	client         rest.Interface
+	ns             string
+	parameterCodec runtime.ParameterCodec
 }
 
 // newEvictions returns a Evictions
-func newEvictions(c *PolicyV1beta1Client, namespace string) *evictions {
+func newEvictions(c *PolicyV1beta1Client, namespace string, parameterCodec runtime.ParameterCodec) *evictions {
 	return &evictions{
-		client: c.RESTClient(),
-		ns:     namespace,
+		client:         c.RESTClient(),
+		ns:             namespace,
+		parameterCodec: parameterCodec,
 	}
 }

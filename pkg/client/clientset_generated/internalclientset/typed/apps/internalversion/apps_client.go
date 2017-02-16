@@ -17,8 +17,10 @@ limitations under the License.
 package internalversion
 
 import (
+	runtime "k8s.io/apimachinery/pkg/runtime"
+	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	rest "k8s.io/client-go/rest"
-	api "k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/scheme"
 )
 
 type AppsInterface interface {
@@ -28,11 +30,12 @@ type AppsInterface interface {
 
 // AppsClient is used to interact with features provided by the apps group.
 type AppsClient struct {
-	restClient rest.Interface
+	restClient     rest.Interface
+	parameterCodec runtime.ParameterCodec
 }
 
 func (c *AppsClient) StatefulSets(namespace string) StatefulSetInterface {
-	return newStatefulSets(c, namespace)
+	return newStatefulSets(c, namespace, c.parameterCodec)
 }
 
 // NewForConfig creates a new AppsClient for the given config.
@@ -45,7 +48,7 @@ func NewForConfig(c *rest.Config) (*AppsClient, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &AppsClient{client}, nil
+	return &AppsClient{client, c.ParameterCodec}, nil
 }
 
 // NewForConfigOrDie creates a new AppsClient for the given config and
@@ -60,24 +63,18 @@ func NewForConfigOrDie(c *rest.Config) *AppsClient {
 
 // New creates a new AppsClient for the given RESTClient.
 func New(c rest.Interface) *AppsClient {
-	return &AppsClient{c}
+	return &AppsClient{c, scheme.ParameterCodec}
 }
 
 func setConfigDefaults(config *rest.Config) error {
-	// if apps group is not registered, return an error
-	g, err := api.Registry.Group("apps")
-	if err != nil {
-		return err
-	}
+	gv := schema.GroupVersion{Group: "apps", Version: runtime.APIVersionInternal}
 	config.APIPath = "/apis"
 	if config.UserAgent == "" {
 		config.UserAgent = rest.DefaultKubernetesUserAgent()
 	}
-	if config.GroupVersion == nil || config.GroupVersion.Group != g.GroupVersion.Group {
-		copyGroupVersion := g.GroupVersion
-		config.GroupVersion = &copyGroupVersion
+	if config.GroupVersion == nil || config.GroupVersion.Group != "apps" {
+		config.GroupVersion = &gv
 	}
-	config.NegotiatedSerializer = api.Codecs
 
 	if config.QPS == 0 {
 		config.QPS = 5

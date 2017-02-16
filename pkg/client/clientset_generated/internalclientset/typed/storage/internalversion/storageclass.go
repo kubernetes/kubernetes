@@ -18,10 +18,10 @@ package internalversion
 
 import (
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	runtime "k8s.io/apimachinery/pkg/runtime"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	rest "k8s.io/client-go/rest"
-	api "k8s.io/kubernetes/pkg/api"
 	storage "k8s.io/kubernetes/pkg/apis/storage"
 )
 
@@ -46,13 +46,15 @@ type StorageClassInterface interface {
 
 // storageClasses implements StorageClassInterface
 type storageClasses struct {
-	client rest.Interface
+	client         rest.Interface
+	parameterCodec runtime.ParameterCodec
 }
 
 // newStorageClasses returns a StorageClasses
-func newStorageClasses(c *StorageClient) *storageClasses {
+func newStorageClasses(c *StorageClient, parameterCodec runtime.ParameterCodec) *storageClasses {
 	return &storageClasses{
-		client: c.RESTClient(),
+		client:         c.RESTClient(),
+		parameterCodec: parameterCodec,
 	}
 }
 
@@ -93,7 +95,7 @@ func (c *storageClasses) Delete(name string, options *v1.DeleteOptions) error {
 func (c *storageClasses) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
 	return c.client.Delete().
 		Resource("storageclasses").
-		VersionedParams(&listOptions, api.ParameterCodec).
+		VersionedParams(&listOptions, c.parameterCodec).
 		Body(options).
 		Do().
 		Error()
@@ -105,7 +107,7 @@ func (c *storageClasses) Get(name string, options v1.GetOptions) (result *storag
 	err = c.client.Get().
 		Resource("storageclasses").
 		Name(name).
-		VersionedParams(&options, api.ParameterCodec).
+		VersionedParams(&options, c.parameterCodec).
 		Do().
 		Into(result)
 	return
@@ -116,7 +118,7 @@ func (c *storageClasses) List(opts v1.ListOptions) (result *storage.StorageClass
 	result = &storage.StorageClassList{}
 	err = c.client.Get().
 		Resource("storageclasses").
-		VersionedParams(&opts, api.ParameterCodec).
+		VersionedParams(&opts, c.parameterCodec).
 		Do().
 		Into(result)
 	return
@@ -127,7 +129,7 @@ func (c *storageClasses) Watch(opts v1.ListOptions) (watch.Interface, error) {
 	return c.client.Get().
 		Prefix("watch").
 		Resource("storageclasses").
-		VersionedParams(&opts, api.ParameterCodec).
+		VersionedParams(&opts, c.parameterCodec).
 		Watch()
 }
 

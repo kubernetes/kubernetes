@@ -18,10 +18,10 @@ package internalversion
 
 import (
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	runtime "k8s.io/apimachinery/pkg/runtime"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	rest "k8s.io/client-go/rest"
-	api "k8s.io/kubernetes/pkg/api"
 	extensions "k8s.io/kubernetes/pkg/apis/extensions"
 )
 
@@ -46,13 +46,15 @@ type ThirdPartyResourceInterface interface {
 
 // thirdPartyResources implements ThirdPartyResourceInterface
 type thirdPartyResources struct {
-	client rest.Interface
+	client         rest.Interface
+	parameterCodec runtime.ParameterCodec
 }
 
 // newThirdPartyResources returns a ThirdPartyResources
-func newThirdPartyResources(c *ExtensionsClient) *thirdPartyResources {
+func newThirdPartyResources(c *ExtensionsClient, parameterCodec runtime.ParameterCodec) *thirdPartyResources {
 	return &thirdPartyResources{
-		client: c.RESTClient(),
+		client:         c.RESTClient(),
+		parameterCodec: parameterCodec,
 	}
 }
 
@@ -93,7 +95,7 @@ func (c *thirdPartyResources) Delete(name string, options *v1.DeleteOptions) err
 func (c *thirdPartyResources) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
 	return c.client.Delete().
 		Resource("thirdpartyresources").
-		VersionedParams(&listOptions, api.ParameterCodec).
+		VersionedParams(&listOptions, c.parameterCodec).
 		Body(options).
 		Do().
 		Error()
@@ -105,7 +107,7 @@ func (c *thirdPartyResources) Get(name string, options v1.GetOptions) (result *e
 	err = c.client.Get().
 		Resource("thirdpartyresources").
 		Name(name).
-		VersionedParams(&options, api.ParameterCodec).
+		VersionedParams(&options, c.parameterCodec).
 		Do().
 		Into(result)
 	return
@@ -116,7 +118,7 @@ func (c *thirdPartyResources) List(opts v1.ListOptions) (result *extensions.Thir
 	result = &extensions.ThirdPartyResourceList{}
 	err = c.client.Get().
 		Resource("thirdpartyresources").
-		VersionedParams(&opts, api.ParameterCodec).
+		VersionedParams(&opts, c.parameterCodec).
 		Do().
 		Into(result)
 	return
@@ -127,7 +129,7 @@ func (c *thirdPartyResources) Watch(opts v1.ListOptions) (watch.Interface, error
 	return c.client.Get().
 		Prefix("watch").
 		Resource("thirdpartyresources").
-		VersionedParams(&opts, api.ParameterCodec).
+		VersionedParams(&opts, c.parameterCodec).
 		Watch()
 }
 

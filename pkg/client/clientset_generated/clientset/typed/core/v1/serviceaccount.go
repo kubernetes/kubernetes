@@ -18,10 +18,10 @@ package v1
 
 import (
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	runtime "k8s.io/apimachinery/pkg/runtime"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	rest "k8s.io/client-go/rest"
-	api "k8s.io/kubernetes/pkg/api"
 	v1 "k8s.io/kubernetes/pkg/api/v1"
 )
 
@@ -46,15 +46,17 @@ type ServiceAccountInterface interface {
 
 // serviceAccounts implements ServiceAccountInterface
 type serviceAccounts struct {
-	client rest.Interface
-	ns     string
+	client         rest.Interface
+	ns             string
+	parameterCodec runtime.ParameterCodec
 }
 
 // newServiceAccounts returns a ServiceAccounts
-func newServiceAccounts(c *CoreV1Client, namespace string) *serviceAccounts {
+func newServiceAccounts(c *CoreV1Client, namespace string, parameterCodec runtime.ParameterCodec) *serviceAccounts {
 	return &serviceAccounts{
-		client: c.RESTClient(),
-		ns:     namespace,
+		client:         c.RESTClient(),
+		ns:             namespace,
+		parameterCodec: parameterCodec,
 	}
 }
 
@@ -99,7 +101,7 @@ func (c *serviceAccounts) DeleteCollection(options *meta_v1.DeleteOptions, listO
 	return c.client.Delete().
 		Namespace(c.ns).
 		Resource("serviceaccounts").
-		VersionedParams(&listOptions, api.ParameterCodec).
+		VersionedParams(&listOptions, c.parameterCodec).
 		Body(options).
 		Do().
 		Error()
@@ -112,7 +114,7 @@ func (c *serviceAccounts) Get(name string, options meta_v1.GetOptions) (result *
 		Namespace(c.ns).
 		Resource("serviceaccounts").
 		Name(name).
-		VersionedParams(&options, api.ParameterCodec).
+		VersionedParams(&options, c.parameterCodec).
 		Do().
 		Into(result)
 	return
@@ -124,7 +126,7 @@ func (c *serviceAccounts) List(opts meta_v1.ListOptions) (result *v1.ServiceAcco
 	err = c.client.Get().
 		Namespace(c.ns).
 		Resource("serviceaccounts").
-		VersionedParams(&opts, api.ParameterCodec).
+		VersionedParams(&opts, c.parameterCodec).
 		Do().
 		Into(result)
 	return
@@ -136,7 +138,7 @@ func (c *serviceAccounts) Watch(opts meta_v1.ListOptions) (watch.Interface, erro
 		Prefix("watch").
 		Namespace(c.ns).
 		Resource("serviceaccounts").
-		VersionedParams(&opts, api.ParameterCodec).
+		VersionedParams(&opts, c.parameterCodec).
 		Watch()
 }
 

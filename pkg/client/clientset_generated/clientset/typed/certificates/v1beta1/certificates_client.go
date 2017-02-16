@@ -17,11 +17,10 @@ limitations under the License.
 package v1beta1
 
 import (
-	fmt "fmt"
+	runtime "k8s.io/apimachinery/pkg/runtime"
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
-	serializer "k8s.io/apimachinery/pkg/runtime/serializer"
 	rest "k8s.io/client-go/rest"
-	api "k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset/scheme"
 )
 
 type CertificatesV1beta1Interface interface {
@@ -31,11 +30,12 @@ type CertificatesV1beta1Interface interface {
 
 // CertificatesV1beta1Client is used to interact with features provided by the certificates.k8s.io group.
 type CertificatesV1beta1Client struct {
-	restClient rest.Interface
+	restClient     rest.Interface
+	parameterCodec runtime.ParameterCodec
 }
 
 func (c *CertificatesV1beta1Client) CertificateSigningRequests() CertificateSigningRequestInterface {
-	return newCertificateSigningRequests(c)
+	return newCertificateSigningRequests(c, c.parameterCodec)
 }
 
 // NewForConfig creates a new CertificatesV1beta1Client for the given config.
@@ -48,7 +48,7 @@ func NewForConfig(c *rest.Config) (*CertificatesV1beta1Client, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &CertificatesV1beta1Client{client}, nil
+	return &CertificatesV1beta1Client{client, c.ParameterCodec}, nil
 }
 
 // NewForConfigOrDie creates a new CertificatesV1beta1Client for the given config and
@@ -63,26 +63,22 @@ func NewForConfigOrDie(c *rest.Config) *CertificatesV1beta1Client {
 
 // New creates a new CertificatesV1beta1Client for the given RESTClient.
 func New(c rest.Interface) *CertificatesV1beta1Client {
-	return &CertificatesV1beta1Client{c}
+	return &CertificatesV1beta1Client{c, scheme.ParameterCodec}
 }
 
 func setConfigDefaults(config *rest.Config) error {
-	gv, err := schema.ParseGroupVersion("certificates.k8s.io/v1beta1")
-	if err != nil {
-		return err
+	gv := schema.GroupVersion{Group: "certificates.k8s.io", Version: "v1beta1"}
+	if config.NegotiatedSerializer == nil {
+		return fmt.Errorf("expected non-nil NegotiatedSerializer for %v client", gv)
 	}
-	// if certificates.k8s.io/v1beta1 is not enabled, return an error
-	if !api.Registry.IsEnabledVersion(gv) {
-		return fmt.Errorf("certificates.k8s.io/v1beta1 is not enabled")
+	if config.ParameterCodec == nil {
+		return fmt.Errorf("expected non-nil ParameterCodec for %v client", gv)
 	}
 	config.APIPath = "/apis"
 	if config.UserAgent == "" {
 		config.UserAgent = rest.DefaultKubernetesUserAgent()
 	}
-	copyGroupVersion := gv
-	config.GroupVersion = &copyGroupVersion
-
-	config.NegotiatedSerializer = serializer.DirectCodecFactory{CodecFactory: api.Codecs}
+	config.GroupVersion = &gv
 
 	return nil
 }
