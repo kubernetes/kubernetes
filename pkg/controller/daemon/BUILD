@@ -13,6 +13,7 @@ go_library(
     srcs = [
         "daemoncontroller.go",
         "doc.go",
+        "update.go",
     ],
     tags = ["automanaged"],
     deps = [
@@ -26,6 +27,8 @@ go_library(
         "//pkg/client/listers/core/v1:go_default_library",
         "//pkg/client/listers/extensions/v1beta1:go_default_library",
         "//pkg/controller:go_default_library",
+        "//pkg/controller/daemon/util:go_default_library",
+        "//pkg/controller/deployment/util:go_default_library",
         "//pkg/util/metrics:go_default_library",
         "//plugin/pkg/scheduler/algorithm:go_default_library",
         "//plugin/pkg/scheduler/algorithm/predicates:go_default_library",
@@ -35,6 +38,7 @@ go_library(
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
         "//vendor:k8s.io/apimachinery/pkg/labels",
         "//vendor:k8s.io/apimachinery/pkg/util/errors",
+        "//vendor:k8s.io/apimachinery/pkg/util/intstr",
         "//vendor:k8s.io/apimachinery/pkg/util/runtime",
         "//vendor:k8s.io/apimachinery/pkg/util/wait",
         "//vendor:k8s.io/client-go/kubernetes/typed/core/v1",
@@ -47,7 +51,10 @@ go_library(
 
 go_test(
     name = "go_default_test",
-    srcs = ["daemoncontroller_test.go"],
+    srcs = [
+        "daemoncontroller_test.go",
+        "update_test.go",
+    ],
     library = ":go_default_library",
     tags = ["automanaged"],
     deps = [
@@ -78,6 +85,9 @@ filegroup(
 
 filegroup(
     name = "all-srcs",
-    srcs = [":package-srcs"],
+    srcs = [
+        ":package-srcs",
+        "//pkg/controller/daemon/util:all-srcs",
+    ],
     tags = ["automanaged"],
 )
