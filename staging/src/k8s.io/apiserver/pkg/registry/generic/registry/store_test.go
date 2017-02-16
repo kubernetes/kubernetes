@@ -42,14 +42,14 @@ import (
 	"k8s.io/apiserver/pkg/apis/example"
 	examplev1 "k8s.io/apiserver/pkg/apis/example/v1"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
+	"k8s.io/apiserver/pkg/registry/generic"
+	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/apiserver/pkg/storage"
 	etcdstorage "k8s.io/apiserver/pkg/storage/etcd"
 	etcdtesting "k8s.io/apiserver/pkg/storage/etcd/testing"
 	"k8s.io/apiserver/pkg/storage/names"
 	"k8s.io/apiserver/pkg/storage/storagebackend/factory"
 	storagetesting "k8s.io/apiserver/pkg/storage/testing"
-	"k8s.io/apiserver/pkg/registry/generic"
-	"k8s.io/apiserver/pkg/registry/rest"
 )
 
 var scheme = runtime.NewScheme()

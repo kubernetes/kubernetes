@@ -44,7 +44,7 @@ type EtcdOptions struct {
 
 func NewEtcdOptions(backendConfig *storagebackend.Config) *EtcdOptions {
 	return &EtcdOptions{
-		StorageConfig: *backendConfig,
+		StorageConfig:           *backendConfig,
 		DefaultStorageMediaType: "application/json",
 		DeleteCollectionWorkers: 1,
 		EnableGarbageCollection: true,
@@ -135,7 +135,7 @@ func (f *simpleRestOptionsFactory) GetRESTOptions(resource schema.GroupResource)
 }
 
 type storageFactoryRestOptionsFactory struct {
-	Options EtcdOptions
+	Options        EtcdOptions
 	StorageFactory serverstorage.StorageFactory
 }
 

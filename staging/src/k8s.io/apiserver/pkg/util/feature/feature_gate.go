@@ -67,7 +67,7 @@ const (
 	// Values for PreRelease.
 	Alpha = prerelease("ALPHA")
 	Beta  = prerelease("BETA")
-	GA = prerelease("")
+	GA    = prerelease("")
 )
 
 // FeatureGate parses and stores flag gates for known features from
