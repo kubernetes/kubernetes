@@ -16906,3 +16906,15 @@ go_test(
     library = ":k8s.io/apimachinery/pkg/api/testing",
     tags = ["automanaged"],
 )
+
+go_library(
+    name = "google.golang.org/api/logging/v2beta1",
+    srcs = ["google.golang.org/api/logging/v2beta1/logging-gen.go"],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:golang.org/x/net/context",
+        "//vendor:golang.org/x/net/context/ctxhttp",
+        "//vendor:google.golang.org/api/gensupport",
+        "//vendor:google.golang.org/api/googleapi",
+    ],
+)
