@@ -314,6 +314,7 @@ func ClusterRoles() []rbac.ClusterRole {
 				rbac.NewRule("list", "watch").Groups(policyGroup).Resources("poddisruptionbudgets").RuleOrDie(),
 				rbac.NewRule("list", "watch").Groups(autoscalingGroup).Resources("horizontalpodautoscalers").RuleOrDie(),
 				rbac.NewRule("list", "watch").Groups(certificatesGroup).Resources("certificatesigningrequests").RuleOrDie(),
+				rbac.NewRule("list", "watch").Groups(storageGroup).Resources("storageclasses").RuleOrDie(),
 			},
 		},
 		{

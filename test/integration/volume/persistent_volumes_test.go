@@ -36,6 +36,7 @@ import (
 	storage "k8s.io/kubernetes/pkg/apis/storage/v1beta1"
 	storageutil "k8s.io/kubernetes/pkg/apis/storage/v1beta1/util"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
+	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated/externalversions"
 	fakecloud "k8s.io/kubernetes/pkg/cloudprovider/providers/fake"
 	persistentvolumecontroller "k8s.io/kubernetes/pkg/controller/volume/persistentvolume"
 	"k8s.io/kubernetes/pkg/volume"
@@ -110,7 +111,7 @@ func TestPersistentVolumeRecycler(t *testing.T) {
 	ns := framework.CreateTestingNamespace("pv-recycler", s, t)
 	defer framework.DeleteTestingNamespace(ns, s, t)
 
-	testClient, ctrl, watchPV, watchPVC := createClients(ns, t, s, defaultSyncPeriod)
+	testClient, ctrl, informers, watchPV, watchPVC := createClients(ns, t, s, defaultSyncPeriod)
 	defer watchPV.Stop()
 	defer watchPVC.Stop()
 
@@ -119,6 +120,7 @@ func TestPersistentVolumeRecycler(t *testing.T) {
 	defer testClient.Core().PersistentVolumes().DeleteCollection(nil, metav1.ListOptions{})
 
 	stopCh := make(chan struct{})
+	informers.Start(stopCh)
 	go ctrl.Run(stopCh)
 	defer close(stopCh)
 
@@ -164,7 +166,7 @@ func TestPersistentVolumeDeleter(t *testing.T) {
 	ns := framework.CreateTestingNamespace("pv-deleter", s, t)
 	defer framework.DeleteTestingNamespace(ns, s, t)
 
-	testClient, ctrl, watchPV, watchPVC := createClients(ns, t, s, defaultSyncPeriod)
+	testClient, ctrl, informers, watchPV, watchPVC := createClients(ns, t, s, defaultSyncPeriod)
 	defer watchPV.Stop()
 	defer watchPVC.Stop()
 
@@ -173,6 +175,7 @@ func TestPersistentVolumeDeleter(t *testing.T) {
 	defer testClient.Core().PersistentVolumes().DeleteCollection(nil, metav1.ListOptions{})
 
 	stopCh := make(chan struct{})
+	informers.Start(stopCh)
 	go ctrl.Run(stopCh)
 	defer close(stopCh)
 
@@ -223,7 +226,7 @@ func TestPersistentVolumeBindRace(t *testing.T) {
 	ns := framework.CreateTestingNamespace("pv-bind-race", s, t)
 	defer framework.DeleteTestingNamespace(ns, s, t)
 
-	testClient, ctrl, watchPV, watchPVC := createClients(ns, t, s, defaultSyncPeriod)
+	testClient, ctrl, informers, watchPV, watchPVC := createClients(ns, t, s, defaultSyncPeriod)
 	defer watchPV.Stop()
 	defer watchPVC.Stop()
 
@@ -232,6 +235,7 @@ func TestPersistentVolumeBindRace(t *testing.T) {
 	defer testClient.Core().PersistentVolumes().DeleteCollection(nil, metav1.ListOptions{})
 
 	stopCh := make(chan struct{})
+	informers.Start(stopCh)
 	go ctrl.Run(stopCh)
 	defer close(stopCh)
 
@@ -294,7 +298,7 @@ func TestPersistentVolumeClaimLabelSelector(t *testing.T) {
 	ns := framework.CreateTestingNamespace("pvc-label-selector", s, t)
 	defer framework.DeleteTestingNamespace(ns, s, t)
 
-	testClient, controller, watchPV, watchPVC := createClients(ns, t, s, defaultSyncPeriod)
+	testClient, controller, informers, watchPV, watchPVC := createClients(ns, t, s, defaultSyncPeriod)
 	defer watchPV.Stop()
 	defer watchPVC.Stop()
 
@@ -303,6 +307,7 @@ func TestPersistentVolumeClaimLabelSelector(t *testing.T) {
 	defer testClient.Core().PersistentVolumes().DeleteCollection(nil, metav1.ListOptions{})
 
 	stopCh := make(chan struct{})
+	informers.Start(stopCh)
 	go controller.Run(stopCh)
 	defer close(stopCh)
 
@@ -374,7 +379,7 @@ func TestPersistentVolumeClaimLabelSelectorMatchExpressions(t *testing.T) {
 	ns := framework.CreateTestingNamespace("pvc-match-expressions", s, t)
 	defer framework.DeleteTestingNamespace(ns, s, t)
 
-	testClient, controller, watchPV, watchPVC := createClients(ns, t, s, defaultSyncPeriod)
+	testClient, controller, informers, watchPV, watchPVC := createClients(ns, t, s, defaultSyncPeriod)
 	defer watchPV.Stop()
 	defer watchPVC.Stop()
 
@@ -383,6 +388,7 @@ func TestPersistentVolumeClaimLabelSelectorMatchExpressions(t *testing.T) {
 	defer testClient.Core().PersistentVolumes().DeleteCollection(nil, metav1.ListOptions{})
 
 	stopCh := make(chan struct{})
+	informers.Start(stopCh)
 	go controller.Run(stopCh)
 	defer close(stopCh)
 
@@ -473,7 +479,7 @@ func TestPersistentVolumeMultiPVs(t *testing.T) {
 	ns := framework.CreateTestingNamespace("multi-pvs", s, t)
 	defer framework.DeleteTestingNamespace(ns, s, t)
 
-	testClient, controller, watchPV, watchPVC := createClients(ns, t, s, defaultSyncPeriod)
+	testClient, controller, informers, watchPV, watchPVC := createClients(ns, t, s, defaultSyncPeriod)
 	defer watchPV.Stop()
 	defer watchPVC.Stop()
 
@@ -482,6 +488,7 @@ func TestPersistentVolumeMultiPVs(t *testing.T) {
 	defer testClient.Core().PersistentVolumes().DeleteCollection(nil, metav1.ListOptions{})
 
 	stopCh := make(chan struct{})
+	informers.Start(stopCh)
 	go controller.Run(stopCh)
 	defer close(stopCh)
 
@@ -562,7 +569,7 @@ func TestPersistentVolumeMultiPVsPVCs(t *testing.T) {
 	ns := framework.CreateTestingNamespace("multi-pvs-pvcs", s, t)
 	defer framework.DeleteTestingNamespace(ns, s, t)
 
-	testClient, binder, watchPV, watchPVC := createClients(ns, t, s, defaultSyncPeriod)
+	testClient, binder, informers, watchPV, watchPVC := createClients(ns, t, s, defaultSyncPeriod)
 	defer watchPV.Stop()
 	defer watchPVC.Stop()
 
@@ -571,6 +578,7 @@ func TestPersistentVolumeMultiPVsPVCs(t *testing.T) {
 	defer testClient.Core().PersistentVolumes().DeleteCollection(nil, metav1.ListOptions{})
 
 	controllerStopCh := make(chan struct{})
+	informers.Start(controllerStopCh)
 	go binder.Run(controllerStopCh)
 	defer close(controllerStopCh)
 
@@ -727,7 +735,7 @@ func TestPersistentVolumeControllerStartup(t *testing.T) {
 	const shortSyncPeriod = 2 * time.Second
 	syncPeriod := getSyncPeriod(shortSyncPeriod)
 
-	testClient, binder, watchPV, watchPVC := createClients(ns, t, s, shortSyncPeriod)
+	testClient, binder, informers, watchPV, watchPVC := createClients(ns, t, s, shortSyncPeriod)
 	defer watchPV.Stop()
 	defer watchPVC.Stop()
 
@@ -784,6 +792,7 @@ func TestPersistentVolumeControllerStartup(t *testing.T) {
 
 	// Start the controller when all PVs and PVCs are already saved in etcd
 	stopCh := make(chan struct{})
+	informers.Start(stopCh)
 	go binder.Run(stopCh)
 	defer close(stopCh)
 
@@ -850,7 +859,7 @@ func TestPersistentVolumeProvisionMultiPVCs(t *testing.T) {
 	ns := framework.CreateTestingNamespace("provision-multi-pvs", s, t)
 	defer framework.DeleteTestingNamespace(ns, s, t)
 
-	testClient, binder, watchPV, watchPVC := createClients(ns, t, s, defaultSyncPeriod)
+	testClient, binder, informers, watchPV, watchPVC := createClients(ns, t, s, defaultSyncPeriod)
 	defer watchPV.Stop()
 	defer watchPVC.Stop()
 
@@ -871,6 +880,7 @@ func TestPersistentVolumeProvisionMultiPVCs(t *testing.T) {
 	testClient.Storage().StorageClasses().Create(&storageClass)
 
 	stopCh := make(chan struct{})
+	informers.Start(stopCh)
 	go binder.Run(stopCh)
 	defer close(stopCh)
 
@@ -947,7 +957,7 @@ func TestPersistentVolumeMultiPVsDiffAccessModes(t *testing.T) {
 	ns := framework.CreateTestingNamespace("multi-pvs-diff-access", s, t)
 	defer framework.DeleteTestingNamespace(ns, s, t)
 
-	testClient, controller, watchPV, watchPVC := createClients(ns, t, s, defaultSyncPeriod)
+	testClient, controller, informers, watchPV, watchPVC := createClients(ns, t, s, defaultSyncPeriod)
 	defer watchPV.Stop()
 	defer watchPVC.Stop()
 
@@ -956,6 +966,7 @@ func TestPersistentVolumeMultiPVsDiffAccessModes(t *testing.T) {
 	defer testClient.Core().PersistentVolumes().DeleteCollection(nil, metav1.ListOptions{})
 
 	stopCh := make(chan struct{})
+	informers.Start(stopCh)
 	go controller.Run(stopCh)
 	defer close(stopCh)
 
@@ -1088,7 +1099,7 @@ func waitForAnyPersistentVolumeClaimPhase(w watch.Interface, phase v1.Persistent
 	}
 }
 
-func createClients(ns *v1.Namespace, t *testing.T, s *httptest.Server, syncPeriod time.Duration) (*clientset.Clientset, *persistentvolumecontroller.PersistentVolumeController, watch.Interface, watch.Interface) {
+func createClients(ns *v1.Namespace, t *testing.T, s *httptest.Server, syncPeriod time.Duration) (*clientset.Clientset, *persistentvolumecontroller.PersistentVolumeController, informers.SharedInformerFactory, watch.Interface, watch.Interface) {
 	// Use higher QPS and Burst, there is a test for race conditions which
 	// creates many objects and default values were too low.
 	binderClient := clientset.NewForConfigOrDie(&restclient.Config{
@@ -1119,12 +1130,16 @@ func createClients(ns *v1.Namespace, t *testing.T, s *httptest.Server, syncPerio
 	}
 	plugins := []volume.VolumePlugin{plugin}
 	cloud := &fakecloud.FakeCloud{}
+	informers := informers.NewSharedInformerFactory(testClient, getSyncPeriod(syncPeriod))
 	ctrl := persistentvolumecontroller.NewController(
 		persistentvolumecontroller.ControllerParameters{
-			KubeClient:    binderClient,
-			SyncPeriod:    getSyncPeriod(syncPeriod),
-			VolumePlugins: plugins,
-			Cloud:         cloud,
+			KubeClient:                binderClient,
+			SyncPeriod:                getSyncPeriod(syncPeriod),
+			VolumePlugins:             plugins,
+			Cloud:                     cloud,
+			VolumeInformer:            informers.Core().V1().PersistentVolumes(),
+			ClaimInformer:             informers.Core().V1().PersistentVolumeClaims(),
+			ClassInformer:             informers.Storage().V1beta1().StorageClasses(),
 			EnableDynamicProvisioning: true,
 		})
 
@@ -1137,7 +1152,7 @@ func createClients(ns *v1.Namespace, t *testing.T, s *httptest.Server, syncPerio
 		t.Fatalf("Failed to watch PersistentVolumeClaims: %v", err)
 	}
 
-	return testClient, ctrl, watchPV, watchPVC
+	return testClient, ctrl, informers, watchPV, watchPVC
 }
 
 func createPV(name, path, cap string, mode []v1.PersistentVolumeAccessMode, reclaim v1.PersistentVolumeReclaimPolicy) *v1.PersistentVolume {
