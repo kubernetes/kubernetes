@@ -23,6 +23,7 @@ source "${KUBE_ROOT}/hack/lib/init.sh"
 git config http.https://gopkg.in.followRedirects true
 
 # Remove generated files prior to running gazel.
+# TODO(spxtr): Remove this line once Bazel is the only way to build.
 rm -f "${KUBE_ROOT}/pkg/generated/openapi/zz_generated.openapi.go"
 
 go get -u gopkg.in/mikedanese/gazel.v14/gazel
