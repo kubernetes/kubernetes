@@ -145,6 +145,27 @@ func NewTestServer(s Service, cert, key, caCert []byte) (*httptest.Server, error
 	return server, nil
 }
 
+func authenticateToken(w *WebhookTokenAuthenticator, token string) (user.Info, bool, error) {
+	return authenticateTokenWithExtra(w, token, make(map[string][]string))
+}
+
+func authenticateTokenWithExtra(w *WebhookTokenAuthenticator, token string, extra map[string][]string) (user.Info, bool, error) {
+	req, err := http.NewRequest("GET", "/doSomething", nil)
+
+	if err != nil {
+		return nil, false, nil
+	}
+
+	req.Header.Add("Authorization", "Bearer "+token)
+	for headerKey, headerValues := range extra {
+		for _, headerValue := range headerValues {
+			req.Header.Add(headerKey, headerValue)
+		}
+	}
+
+	return w.AuthenticateRequest(req)
+}
+
 // A service that can be set to say yes or no to authentication requests.
 type mockService struct {
 	allow      bool
@@ -193,7 +214,7 @@ func newTokenAuthenticator(serverURL string, clientCert, clientKey, ca []byte, c
 		return nil, err
 	}
 
-	return newWithBackoff(c, cacheTime, 0)
+	return newWithBackoff(c, cacheTime, 0, []string{"x-extra-auth-param"})
 }
 
 func TestTLSConfig(t *testing.T) {
@@ -257,7 +278,7 @@ func TestTLSConfig(t *testing.T) {
 
 			// Allow all and see if we get an error.
 			service.Allow()
-			_, authenticated, err := wh.AuthenticateToken("t0k3n")
+			_, authenticated, err := authenticateToken(wh, "t0k3n")
 			if tt.wantErr {
 				if err == nil {
 					t.Errorf("expected error making authorization request: %v", err)
@@ -270,9 +291,9 @@ func TestTLSConfig(t *testing.T) {
 			}
 
 			service.Deny()
-			_, authenticated, err = wh.AuthenticateToken("t0k3n")
+			_, authenticated, err = authenticateToken(wh, "t0k3n")
 			if err != nil {
-				t.Errorf("%s: unexpectedly failed AuthenticateToken", tt.test)
+				t.Errorf("%s: unexpectedly failed authenticateToken", tt.test)
 			}
 			if authenticated {
 				t.Errorf("%s: incorrectly authenticated token", tt.test)
@@ -374,7 +395,7 @@ func TestWebhookTokenAuthenticator(t *testing.T) {
 	token := "my-s3cr3t-t0ken"
 	for i, tt := range tests {
 		serv.response = tt.serverResponse
-		user, authenticated, err := wh.AuthenticateToken(token)
+		user, authenticated, err := authenticateToken(wh, token)
 		if err != nil {
 			t.Errorf("case %d: authentication failed: %v", i, err)
 			continue
@@ -545,7 +566,7 @@ func TestWebhookCacheAndRetry(t *testing.T) {
 			serv.statusCode = testcase.code
 			serv.called = 0
 
-			_, ok, err := wh.AuthenticateToken(testcase.token)
+			_, ok, err := authenticateToken(wh, testcase.token)
 			hasError := err != nil
 			if hasError != testcase.expectError {
 				t.Log(testcase.description)

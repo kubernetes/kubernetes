@@ -46,22 +46,23 @@ import (
 )
 
 type AuthenticatorConfig struct {
-	Anonymous                   bool
-	AnyToken                    bool
-	BasicAuthFile               string
-	ClientCAFile                string
-	TokenAuthFile               string
-	OIDCIssuerURL               string
-	OIDCClientID                string
-	OIDCCAFile                  string
-	OIDCUsernameClaim           string
-	OIDCGroupsClaim             string
-	ServiceAccountKeyFiles      []string
-	ServiceAccountLookup        bool
-	KeystoneURL                 string
-	KeystoneCAFile              string
-	WebhookTokenAuthnConfigFile string
-	WebhookTokenAuthnCacheTTL   time.Duration
+	Anonymous                     bool
+	AnyToken                      bool
+	BasicAuthFile                 string
+	ClientCAFile                  string
+	TokenAuthFile                 string
+	OIDCIssuerURL                 string
+	OIDCClientID                  string
+	OIDCCAFile                    string
+	OIDCUsernameClaim             string
+	OIDCGroupsClaim               string
+	ServiceAccountKeyFiles        []string
+	ServiceAccountLookup          bool
+	KeystoneURL                   string
+	KeystoneCAFile                string
+	WebhookTokenAuthnConfigFile   string
+	WebhookTokenAuthnCacheTTL     time.Duration
+	WebhookTokenAuthnExtraHeaders []string
 
 	RequestHeaderConfig *authenticatorfactory.RequestHeaderConfig
 
@@ -151,7 +152,7 @@ func (config AuthenticatorConfig) New() (authenticator.Request, *spec.SecurityDe
 		hasTokenAuth = true
 	}
 	if len(config.WebhookTokenAuthnConfigFile) > 0 {
-		webhookTokenAuth, err := newWebhookTokenAuthenticator(config.WebhookTokenAuthnConfigFile, config.WebhookTokenAuthnCacheTTL)
+		webhookTokenAuth, err := newWebhookTokenAuthenticator(config.WebhookTokenAuthnConfigFile, config.WebhookTokenAuthnCacheTTL, config.WebhookTokenAuthnExtraHeaders)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -288,11 +289,6 @@ func newAuthenticatorFromKeystoneURL(keystoneURL string, keystoneCAFile string) 
 	return basicauth.New(keystoneAuthenticator), nil
 }
 
-func newWebhookTokenAuthenticator(webhookConfigFile string, ttl time.Duration) (authenticator.Request, error) {
-	webhookTokenAuthenticator, err := webhook.New(webhookConfigFile, ttl)
-	if err != nil {
-		return nil, err
-	}
-
-	return bearertoken.New(webhookTokenAuthenticator), nil
+func newWebhookTokenAuthenticator(webhookConfigFile string, ttl time.Duration, extraHeaders []string) (authenticator.Request, error) {
+	return webhook.New(webhookConfigFile, ttl, extraHeaders)
 }
