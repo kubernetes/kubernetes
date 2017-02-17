@@ -598,6 +598,9 @@ start_kube_apiserver() {
   if [[ -n "${STORAGE_BACKEND:-}" ]]; then
     params="${params} --storage-backend=${STORAGE_BACKEND}"
   fi
+  if [[ -n "${STORAGE_MEDIA_TYPE:-}" ]]; then
+    params="${params} --storage-media-type=${STORAGE_MEDIA_TYPE}"
+  fi
   if [ -n "${NUM_NODES:-}" ]; then
     # If the cluster is large, increase max-requests-inflight limit in apiserver.
     if [[ "${NUM_NODES}" -ge 1000 ]]; then
