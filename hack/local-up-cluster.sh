@@ -566,9 +566,9 @@ function start_kubelet {
         image_service_endpoint_args="--image-service-endpoint=${IMAGE_SERVICE_ENDPOINT}"
       fi
 
-      pod_infra_container_image=""
+      pod_infra_container_image_args=""
       if [[ -n "${POD_INFRA_CONTAINER_IMAGE}" ]]; then
-        pod_infra_container_image="--pod-infra-container-image=${POD_INFRA_CONTAINER_IMAGE}"
+        pod_infra_container_image_args="--pod-infra-container-image=${POD_INFRA_CONTAINER_IMAGE}"
       fi
 
       sudo -E "${GO_OUT}/hyperkube" kubelet ${priv_arg}\
@@ -600,7 +600,7 @@ function start_kubelet {
         ${net_plugin_args} \
         ${container_runtime_endpoint_args} \
         ${image_service_endpoint_args} \
-        ${pod_infra_container_image} \
+        ${pod_infra_container_image_args} \
         --port="$KUBELET_PORT" >"${KUBELET_LOG}" 2>&1 &
       KUBELET_PID=$!
       # Quick check that kubelet is running.
