@@ -135,9 +135,10 @@ func Run(s *options.CloudControllerManagerServer, cloud cloudprovider.Interface)
 		var clientBuilder controller.ControllerClientBuilder
 		if len(s.ServiceAccountKeyFile) > 0 && s.UseServiceAccountCredentials {
 			clientBuilder = controller.SAControllerClientBuilder{
-				ClientConfig: restclient.AnonymousClientConfig(kubeconfig),
-				CoreClient:   kubeClient.Core(),
-				Namespace:    "kube-system",
+				ClientConfig:         restclient.AnonymousClientConfig(kubeconfig),
+				CoreClient:           kubeClient.Core(),
+				AuthenticationClient: kubeClient.Authentication(),
+				Namespace:            "kube-system",
 			}
 		} else {
 			clientBuilder = rootClientBuilder
