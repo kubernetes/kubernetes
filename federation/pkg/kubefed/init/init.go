@@ -66,6 +66,10 @@ const (
 	ControllerManagerCN         = "federation-controller-manager"
 	AdminCN                     = "admin"
 	HostClusterLocalDNSZoneName = "cluster.local."
+	APIServerNameSuffix         = "apiserver"
+	CMNameSuffix                = "controller-manager"
+	CredentialSuffix            = "credentials"
+	KubeconfigNameSuffix        = "kubeconfig"
 
 	// User name used by federation controller manager to make
 	// calls to federation API server.
@@ -225,16 +229,16 @@ func (i *initFederation) Complete(cmd *cobra.Command, args []string) error {
 // See the design doc in https://github.com/kubernetes/kubernetes/pull/34484
 // for details.
 func (i *initFederation) Run(cmdOut io.Writer, config util.AdminConfig) error {
-	hostFactory := config.HostFactory(i.commonOptions.Host, i.commonOptions.Kubeconfig)
+	hostFactory := config.ClusterFactory(i.commonOptions.Host, i.commonOptions.Kubeconfig)
 	hostClientset, err := hostFactory.ClientSet()
 	if err != nil {
 		return err
 	}
 
-	serverName := fmt.Sprintf("%s-apiserver", i.commonOptions.Name)
-	serverCredName := fmt.Sprintf("%s-credentials", serverName)
-	cmName := fmt.Sprintf("%s-controller-manager", i.commonOptions.Name)
-	cmKubeconfigName := fmt.Sprintf("%s-kubeconfig", cmName)
+	serverName := fmt.Sprintf("%s-%s", i.commonOptions.Name, APIServerNameSuffix)
+	serverCredName := fmt.Sprintf("%s-%s", serverName, CredentialSuffix)
+	cmName := fmt.Sprintf("%s-%s", i.commonOptions.Name, CMNameSuffix)
+	cmKubeconfigName := fmt.Sprintf("%s-%s", cmName, KubeconfigNameSuffix)
 
 	// 1. Create a namespace for federation system components
 	_, err = createNamespace(hostClientset, i.commonOptions.FederationSystemNamespace, i.options.dryRun)
@@ -745,6 +749,16 @@ func createControllerManager(clientset *client.Clientset, namespace, name, svcNa
 			Name:      cmName,
 			Namespace: namespace,
 			Labels:    componentLabel,
+			// We additionally update the details (in annotations) about the
+			// kube-dns config map which needs to be created in the clusters
+			// registering to this federation (at kubefed join).
+			// We wont otherwise have this information available at kubefed join.
+			Annotations: map[string]string{
+				// TODO: the name/domain name pair should ideally be checked for naming convention
+				// as done in kube-dns federation flags check.
+				// https://github.com/kubernetes/dns/blob/master/pkg/dns/federation/federation.go
+				util.FedDomainMapKey: fmt.Sprintf("%s=%s", name, dnsZoneName),
+			},
 		},
 		Spec: extensions.DeploymentSpec{
 			Replicas: 1,
