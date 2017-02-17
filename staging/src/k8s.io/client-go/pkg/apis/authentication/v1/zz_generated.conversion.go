@@ -78,6 +78,7 @@ func Convert_authentication_TokenReview_To_v1_TokenReview(in *authentication.Tok
 
 func autoConvert_v1_TokenReviewSpec_To_authentication_TokenReviewSpec(in *TokenReviewSpec, out *authentication.TokenReviewSpec, s conversion.Scope) error {
 	out.Token = in.Token
+	out.Extra = *(*map[string]authentication.ExtraValue)(unsafe.Pointer(&in.Extra))
 	return nil
 }
 
@@ -87,6 +88,7 @@ func Convert_v1_TokenReviewSpec_To_authentication_TokenReviewSpec(in *TokenRevie
 
 func autoConvert_authentication_TokenReviewSpec_To_v1_TokenReviewSpec(in *authentication.TokenReviewSpec, out *TokenReviewSpec, s conversion.Scope) error {
 	out.Token = in.Token
+	out.Extra = *(*map[string]ExtraValue)(unsafe.Pointer(&in.Extra))
 	return nil
 }
 
