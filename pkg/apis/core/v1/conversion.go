@@ -28,6 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/extensions"
+	"k8s.io/kubernetes/pkg/fieldpath"
 )
 
 // This is a "fast-path" that avoids reflection for common types. It focuses on the objects that are
@@ -156,7 +157,8 @@ func addConversionFuncs(scheme *runtime.Scheme) error {
 	// Add field conversion funcs.
 	err = scheme.AddFieldLabelConversionFunc("v1", "Pod",
 		func(label, value string) (string, string, error) {
-			switch label {
+			path, _ := fieldpath.SplitMaybeSubscriptedPath(label)
+			switch path {
 			case "metadata.annotations",
 				"metadata.labels",
 				"metadata.name",
@@ -170,7 +172,7 @@ func addConversionFuncs(scheme *runtime.Scheme) error {
 				"status.hostIP",
 				"status.podIP":
 				return label, value, nil
-				// This is for backwards compatibility with old v1 clients which send spec.host
+			// This is for backwards compatibility with old v1 clients which send spec.host
 			case "spec.host":
 				return "spec.nodeName", value, nil
 			default:

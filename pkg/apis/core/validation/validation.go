@@ -50,6 +50,7 @@ import (
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	"k8s.io/kubernetes/pkg/capabilities"
 	"k8s.io/kubernetes/pkg/features"
+	"k8s.io/kubernetes/pkg/fieldpath"
 	"k8s.io/kubernetes/pkg/security/apparmor"
 )
 
@@ -960,11 +961,13 @@ func validateFlockerVolumeSource(flocker *core.FlockerVolumeSource, fldPath *fie
 	return allErrs
 }
 
-var validDownwardAPIFieldPathExpressions = sets.NewString(
+var validVolumeDownwardAPIFieldPathExpressions = sets.NewString(
 	"metadata.name",
 	"metadata.namespace",
 	"metadata.labels",
+	"metadata.labels[]", // represents "metadata.labels" with an arbitary subscript
 	"metadata.annotations",
+	"metadata.annotations[]", // represents "metadata.annotations" with an arbitary subscript
 	"metadata.uid")
 
 func validateDownwardAPIVolumeFile(file *core.DownwardAPIVolumeFile, fldPath *field.Path) field.ErrorList {
@@ -975,7 +978,7 @@ func validateDownwardAPIVolumeFile(file *core.DownwardAPIVolumeFile, fldPath *fi
 	}
 	allErrs = append(allErrs, validateLocalNonReservedPath(file.Path, fldPath.Child("path"))...)
 	if file.FieldRef != nil {
-		allErrs = append(allErrs, validateObjectFieldSelector(file.FieldRef, &validDownwardAPIFieldPathExpressions, fldPath.Child("fieldRef"))...)
+		allErrs = append(allErrs, validateObjectFieldSelector(file.FieldRef, &validVolumeDownwardAPIFieldPathExpressions, fldPath.Child("fieldRef"))...)
 		if file.ResourceFieldRef != nil {
 			allErrs = append(allErrs, field.Invalid(fldPath, "resource", "fieldRef and resourceFieldRef can not be specified simultaneously"))
 		}
@@ -1898,7 +1901,16 @@ func ValidateEnv(vars []core.EnvVar, fldPath *field.Path) field.ErrorList {
 	return allErrs
 }
 
-var validFieldPathExpressionsEnv = sets.NewString("metadata.name", "metadata.namespace", "metadata.uid", "spec.nodeName", "spec.serviceAccountName", "status.hostIP", "status.podIP")
+var validEnvDownwardAPIFieldPathExpressions = sets.NewString(
+	"metadata.annotations[]", // represents "metadata.annotations" with an arbitary subscript
+	"metadata.labels[]",      // represents "metadata.labels" with an arbitary subscript
+	"metadata.name",
+	"metadata.namespace",
+	"metadata.uid",
+	"spec.nodeName",
+	"spec.serviceAccountName",
+	"status.hostIP",
+	"status.podIP")
 var validContainerResourceFieldPathExpressions = sets.NewString("limits.cpu", "limits.memory", "limits.ephemeral-storage", "requests.cpu", "requests.memory", "requests.ephemeral-storage")
 
 func validateEnvVarValueFrom(ev core.EnvVar, fldPath *field.Path) field.ErrorList {
@@ -1912,7 +1924,7 @@ func validateEnvVarValueFrom(ev core.EnvVar, fldPath *field.Path) field.ErrorLis
 
 	if ev.ValueFrom.FieldRef != nil {
 		numSources++
-		allErrs = append(allErrs, validateObjectFieldSelector(ev.ValueFrom.FieldRef, &validFieldPathExpressionsEnv, fldPath.Child("fieldRef"))...)
+		allErrs = append(allErrs, validateObjectFieldSelector(ev.ValueFrom.FieldRef, &validEnvDownwardAPIFieldPathExpressions, fldPath.Child("fieldRef"))...)
 	}
 	if ev.ValueFrom.ResourceFieldRef != nil {
 		numSources++
@@ -1945,14 +1957,32 @@ func validateObjectFieldSelector(fs *core.ObjectFieldSelector, expressions *sets
 
 	if len(fs.APIVersion) == 0 {
 		allErrs = append(allErrs, field.Required(fldPath.Child("apiVersion"), ""))
-	} else if len(fs.FieldPath) == 0 {
+		return allErrs
+	}
+	if len(fs.FieldPath) == 0 {
 		allErrs = append(allErrs, field.Required(fldPath.Child("fieldPath"), ""))
-	} else {
-		internalFieldPath, _, err := legacyscheme.Scheme.ConvertFieldLabel(fs.APIVersion, "Pod", fs.FieldPath, "")
-		if err != nil {
-			allErrs = append(allErrs, field.Invalid(fldPath.Child("fieldPath"), fs.FieldPath, fmt.Sprintf("error converting fieldPath: %v", err)))
-		} else if !expressions.Has(internalFieldPath) {
-			allErrs = append(allErrs, field.NotSupported(fldPath.Child("fieldPath"), internalFieldPath, expressions.List()))
+		return allErrs
+	}
+
+	internalFieldPath, _, err := legacyscheme.Scheme.ConvertFieldLabel(fs.APIVersion, "Pod", fs.FieldPath, "")
+	if err != nil {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("fieldPath"), fs.FieldPath, fmt.Sprintf("error converting fieldPath: %v", err)))
+		return allErrs
+	}
+
+	path, subscript := fieldpath.SplitMaybeSubscriptedPath(internalFieldPath)
+	if len(subscript) > 0 {
+		// This is to indicate that the internalFieldPath has a subscript, so
+		// that we can compare the path against the allowed path set easily.
+		path += "[]"
+	}
+	if !expressions.Has(path) {
+		allErrs = append(allErrs, field.NotSupported(fldPath.Child("fieldPath"), path, expressions.List()))
+		return allErrs
+	}
+	if len(subscript) > 0 {
+		for _, msg := range validation.IsQualifiedName(subscript) {
+			allErrs = append(allErrs, field.Invalid(fldPath, subscript, msg))
 		}
 	}
 

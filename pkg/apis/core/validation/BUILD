@@ -22,6 +22,7 @@ go_library(
         "//pkg/apis/core/v1/helper:go_default_library",
         "//pkg/capabilities:go_default_library",
         "//pkg/features:go_default_library",
+        "//pkg/fieldpath:go_default_library",
         "//pkg/security/apparmor:go_default_library",
         "//vendor/github.com/golang/glog:go_default_library",
         "//vendor/k8s.io/api/core/v1:go_default_library",

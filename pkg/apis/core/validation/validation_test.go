@@ -2629,10 +2629,24 @@ func TestValidateVolumes(t *testing.T) {
 								},
 							},
 							{
+								Path: "labels with subscript",
+								FieldRef: &core.ObjectFieldSelector{
+									APIVersion: "v1",
+									FieldPath:  "metadata.labels['key']",
+								},
+							},
+							{
 								Path: "annotations",
 								FieldRef: &core.ObjectFieldSelector{
 									APIVersion: "v1",
 									FieldPath:  "metadata.annotations",
+								},
+							},
+							{
+								Path: "annotations with subscript",
+								FieldRef: &core.ObjectFieldSelector{
+									APIVersion: "v1",
+									FieldPath:  "metadata.annotations['key']",
 								},
 							},
 							{
@@ -3829,6 +3843,24 @@ func TestValidateEnv(t *testing.T) {
 			ValueFrom: &core.EnvVarSource{
 				FieldRef: &core.ObjectFieldSelector{
 					APIVersion: legacyscheme.Registry.GroupOrDie(core.GroupName).GroupVersion.String(),
+					FieldPath:  "metadata.annotations['key']",
+				},
+			},
+		},
+		{
+			Name: "abc",
+			ValueFrom: &core.EnvVarSource{
+				FieldRef: &core.ObjectFieldSelector{
+					APIVersion: legacyscheme.Registry.GroupOrDie(core.GroupName).GroupVersion.String(),
+					FieldPath:  "metadata.labels['key']",
+				},
+			},
+		},
+		{
+			Name: "abc",
+			ValueFrom: &core.EnvVarSource{
+				FieldRef: &core.ObjectFieldSelector{
+					APIVersion: legacyscheme.Registry.GroupOrDie(core.GroupName).GroupVersion.String(),
 					FieldPath:  "metadata.name",
 				},
 			},
@@ -4095,7 +4127,20 @@ func TestValidateEnv(t *testing.T) {
 			expectedError: `[0].valueFrom.fieldRef.fieldPath: Invalid value: "metadata.whoops": error converting fieldPath`,
 		},
 		{
-			name: "invalid fieldPath labels",
+			name: "metadata.name with subscript",
+			envs: []core.EnvVar{{
+				Name: "labels",
+				ValueFrom: &core.EnvVarSource{
+					FieldRef: &core.ObjectFieldSelector{
+						FieldPath:  "metadata.name['key']",
+						APIVersion: "v1",
+					},
+				},
+			}},
+			expectedError: `[0].valueFrom.fieldRef.fieldPath: Unsupported value: "metadata.name[]": supported values: "metadata.annotations[]", "metadata.labels[]", "metadata.name", "metadata.namespace", "metadata.uid", "spec.nodeName", "spec.serviceAccountName", "status.hostIP", "status.podIP"`,
+		},
+		{
+			name: "metadata.labels without subscript",
 			envs: []core.EnvVar{{
 				Name: "labels",
 				ValueFrom: &core.EnvVarSource{
@@ -4105,10 +4150,10 @@ func TestValidateEnv(t *testing.T) {
 					},
 				},
 			}},
-			expectedError: `[0].valueFrom.fieldRef.fieldPath: Unsupported value: "metadata.labels": supported values: "metadata.name", "metadata.namespace", "metadata.uid", "spec.nodeName", "spec.serviceAccountName", "status.hostIP", "status.podIP"`,
+			expectedError: `[0].valueFrom.fieldRef.fieldPath: Unsupported value: "metadata.labels": supported values: "metadata.annotations[]", "metadata.labels[]", "metadata.name", "metadata.namespace", "metadata.uid", "spec.nodeName", "spec.serviceAccountName", "status.hostIP", "status.podIP"`,
 		},
 		{
-			name: "invalid fieldPath annotations",
+			name: "metadata.annotations without subscript",
 			envs: []core.EnvVar{{
 				Name: "abc",
 				ValueFrom: &core.EnvVarSource{
@@ -4118,7 +4163,7 @@ func TestValidateEnv(t *testing.T) {
 					},
 				},
 			}},
-			expectedError: `[0].valueFrom.fieldRef.fieldPath: Unsupported value: "metadata.annotations": supported values: "metadata.name", "metadata.namespace", "metadata.uid", "spec.nodeName", "spec.serviceAccountName", "status.hostIP", "status.podIP"`,
+			expectedError: `[0].valueFrom.fieldRef.fieldPath: Unsupported value: "metadata.annotations": supported values: "metadata.annotations[]", "metadata.labels[]", "metadata.name", "metadata.namespace", "metadata.uid", "spec.nodeName", "spec.serviceAccountName", "status.hostIP", "status.podIP"`,
 		},
 		{
 			name: "unsupported fieldPath",
@@ -4131,7 +4176,7 @@ func TestValidateEnv(t *testing.T) {
 					},
 				},
 			}},
-			expectedError: `valueFrom.fieldRef.fieldPath: Unsupported value: "status.phase": supported values: "metadata.name", "metadata.namespace", "metadata.uid", "spec.nodeName", "spec.serviceAccountName", "status.hostIP", "status.podIP"`,
+			expectedError: `valueFrom.fieldRef.fieldPath: Unsupported value: "status.phase": supported values: "metadata.annotations[]", "metadata.labels[]", "metadata.name", "metadata.namespace", "metadata.uid", "spec.nodeName", "spec.serviceAccountName", "status.hostIP", "status.podIP"`,
 		},
 	}
 	for _, tc := range errorCases {

@@ -16,6 +16,7 @@ go_library(
         "//pkg/apis/core:go_default_library",
         "//pkg/apis/extensions:go_default_library",
         "//pkg/features:go_default_library",
+        "//pkg/fieldpath:go_default_library",
         "//pkg/util/parsers:go_default_library",
         "//pkg/util/pointer:go_default_library",
         "//vendor/k8s.io/api/core/v1:go_default_library",
