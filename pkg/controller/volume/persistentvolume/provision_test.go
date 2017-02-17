@@ -23,7 +23,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/api/v1"
 	storage "k8s.io/kubernetes/pkg/apis/storage/v1"
-	storageutil "k8s.io/kubernetes/pkg/apis/storage/v1/util"
 )
 
 var class1Parameters = map[string]string{
@@ -367,9 +366,9 @@ func TestAlphaProvisionSync(t *testing.T) {
 			"14-1 - successful alpha provisioning",
 			novolumes,
 			newVolumeArray("pvc-uid14-1", "1Gi", "uid14-1", "claim14-1", v1.VolumeBound, v1.PersistentVolumeReclaimDelete, classEmpty, annBoundByController, annDynamicallyProvisioned),
-			newClaimArray("claim14-1", "uid14-1", "1Gi", "", v1.ClaimPending, nil, storageutil.AlphaStorageClassAnnotation),
+			newClaimArray("claim14-1", "uid14-1", "1Gi", "", v1.ClaimPending, nil, v1.AlphaStorageClassAnnotation),
 			// Binding will be completed in the next syncClaim
-			newClaimArray("claim14-1", "uid14-1", "1Gi", "", v1.ClaimPending, nil, storageutil.AlphaStorageClassAnnotation, annStorageProvisioner),
+			newClaimArray("claim14-1", "uid14-1", "1Gi", "", v1.ClaimPending, nil, v1.AlphaStorageClassAnnotation, annStorageProvisioner),
 			noevents, noerrors, wrapTestWithProvisionCalls([]provisionCall{provisionAlphaSuccess}, testSyncClaim),
 		},
 		{
@@ -381,9 +380,9 @@ func TestAlphaProvisionSync(t *testing.T) {
 				newVolume("volume14-2", "1Gi", "", "", v1.VolumePending, v1.PersistentVolumeReclaimRetain, classEmpty),
 				newVolume("pvc-uid14-2", "1Gi", "uid14-2", "claim14-2", v1.VolumeBound, v1.PersistentVolumeReclaimDelete, classEmpty, annBoundByController, annDynamicallyProvisioned),
 			},
-			newClaimArray("claim14-2", "uid14-2", "1Gi", "", v1.ClaimPending, nil, storageutil.AlphaStorageClassAnnotation),
+			newClaimArray("claim14-2", "uid14-2", "1Gi", "", v1.ClaimPending, nil, v1.AlphaStorageClassAnnotation),
 			// Binding will be completed in the next syncClaim
-			newClaimArray("claim14-2", "uid14-2", "1Gi", "", v1.ClaimPending, nil, storageutil.AlphaStorageClassAnnotation, annStorageProvisioner),
+			newClaimArray("claim14-2", "uid14-2", "1Gi", "", v1.ClaimPending, nil, v1.AlphaStorageClassAnnotation, annStorageProvisioner),
 			noevents, noerrors, wrapTestWithProvisionCalls([]provisionCall{provisionAlphaSuccess}, testSyncClaim),
 		},
 	}

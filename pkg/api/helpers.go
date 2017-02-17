@@ -565,3 +565,16 @@ func PodAnnotationsFromSysctls(sysctls []Sysctl) string {
 	}
 	return strings.Join(kvs, ",")
 }
+
+// GetClaimStorageClass returns StorageClassName. Request for `nil` class is
+// interpreted as request for class "", i.e. for a classless PV. This is useful
+// when DefaultStorageClass admission plugin is disabled or there is no default
+// storage class configured - caller does not need to check for
+// storageClassName == nil.
+func GetClaimStorageClass(claim *PersistentVolumeClaim) string {
+	if claim.Spec.StorageClassName != nil {
+		return *claim.Spec.StorageClassName
+	}
+
+	return ""
+}

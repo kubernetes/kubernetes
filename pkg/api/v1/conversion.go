@@ -27,7 +27,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/extensions"
-	storageutil "k8s.io/kubernetes/pkg/apis/storage/util"
 )
 
 // This is a "fast-path" that avoids reflection for common types. It focuses on the objects that are
@@ -739,7 +738,7 @@ func Convert_v1_PersistentVolume_To_api_PersistentVolume(in *PersistentVolume, o
 	// For backward compatibility, copy any beta class annotations into
 	// StorageClassName field.
 	// TODO: introduced in 1.6, remove in a couple of releases (kubernetes 1.8?)
-	if class, found := in.Annotations[storageutil.BetaStorageClassAnnotation]; found {
+	if class, found := in.Annotations[BetaStorageClassAnnotation]; found {
 		if in.Spec.StorageClassName == "" {
 			in.Spec.StorageClassName = class
 		}
@@ -771,7 +770,7 @@ func Convert_v1_PersistentVolumeClaim_To_api_PersistentVolumeClaim(in *Persisten
 	// For backward compatibility, copy any beta class annotations into
 	// StorageClassName field.
 	// TODO: introduced in 1.6, remove in a couple of releases (kubernetes 1.8?)
-	if class, found := in.Annotations[storageutil.BetaStorageClassAnnotation]; found {
+	if class, found := in.Annotations[BetaStorageClassAnnotation]; found {
 		if out.Spec.StorageClassName == nil {
 			out.Spec.StorageClassName = &class
 		}

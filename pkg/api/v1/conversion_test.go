@@ -29,7 +29,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
-	storageutil "k8s.io/kubernetes/pkg/apis/storage/util"
 )
 
 func TestPodLogOptions(t *testing.T) {
@@ -242,12 +241,12 @@ func TestPersistentVolumeV1ToApiConversion(t *testing.T) {
 		{ // Annotation is copied to class
 			input: pvTestSpec{
 				annotations: map[string]string{
-					storageutil.BetaStorageClassAnnotation: "foo",
+					BetaStorageClassAnnotation: "foo",
 				},
 			},
 			expected: pvTestSpec{
 				annotations: map[string]string{
-					storageutil.BetaStorageClassAnnotation: "foo",
+					BetaStorageClassAnnotation: "foo",
 				},
 				storageClassName: "foo",
 			},
@@ -255,13 +254,13 @@ func TestPersistentVolumeV1ToApiConversion(t *testing.T) {
 		{ // Annotation does not overwrite existing class
 			input: pvTestSpec{
 				annotations: map[string]string{
-					storageutil.BetaStorageClassAnnotation: "foo",
+					BetaStorageClassAnnotation: "foo",
 				},
 				storageClassName: "bar",
 			},
 			expected: pvTestSpec{
 				annotations: map[string]string{
-					storageutil.BetaStorageClassAnnotation: "foo",
+					BetaStorageClassAnnotation: "foo",
 				},
 				storageClassName: "bar",
 			},
@@ -338,12 +337,12 @@ func TestPersistentVolumeClaimV1ToApiConversion(t *testing.T) {
 		{ // Annotation is copied to class
 			input: claimTestSpec{
 				annotations: map[string]string{
-					storageutil.BetaStorageClassAnnotation: "foo",
+					BetaStorageClassAnnotation: "foo",
 				},
 			},
 			expected: claimTestSpec{
 				annotations: map[string]string{
-					storageutil.BetaStorageClassAnnotation: "foo",
+					BetaStorageClassAnnotation: "foo",
 				},
 				storageClassName: &fooClass,
 			},
@@ -351,13 +350,13 @@ func TestPersistentVolumeClaimV1ToApiConversion(t *testing.T) {
 		{ // Annotation does not overwrite existing class
 			input: claimTestSpec{
 				annotations: map[string]string{
-					storageutil.BetaStorageClassAnnotation: "foo",
+					BetaStorageClassAnnotation: "foo",
 				},
 				storageClassName: &barClass,
 			},
 			expected: claimTestSpec{
 				annotations: map[string]string{
-					storageutil.BetaStorageClassAnnotation: "foo",
+					BetaStorageClassAnnotation: "foo",
 				},
 				storageClassName: &barClass,
 			},
@@ -365,13 +364,13 @@ func TestPersistentVolumeClaimV1ToApiConversion(t *testing.T) {
 		{ // Annotation does not overwrite existing empty class
 			input: claimTestSpec{
 				annotations: map[string]string{
-					storageutil.BetaStorageClassAnnotation: "foo",
+					BetaStorageClassAnnotation: "foo",
 				},
 				storageClassName: &emptyClass,
 			},
 			expected: claimTestSpec{
 				annotations: map[string]string{
-					storageutil.BetaStorageClassAnnotation: "foo",
+					BetaStorageClassAnnotation: "foo",
 				},
 				storageClassName: &emptyClass,
 			},

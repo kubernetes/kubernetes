@@ -28,7 +28,6 @@ import (
 	"k8s.io/kubernetes/pkg/api/v1"
 	rbacv1beta1 "k8s.io/kubernetes/pkg/apis/rbac/v1beta1"
 	storage "k8s.io/kubernetes/pkg/apis/storage/v1"
-	storageutil "k8s.io/kubernetes/pkg/apis/storage/v1beta1/util"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/test/e2e/framework"
 
@@ -151,7 +150,7 @@ var _ = framework.KubeDescribe("Dynamic provisioning", func() {
 			By("creating a claim with a dynamic provisioning annotation")
 			claim := newClaim(ns)
 			claim.Annotations = map[string]string{
-				storageutil.BetaStorageClassAnnotation: "fast",
+				v1.BetaStorageClassAnnotation: "fast",
 			}
 
 			defer func() {
@@ -225,7 +224,7 @@ var _ = framework.KubeDescribe("Dynamic provisioning", func() {
 
 			By("creating a claim with an alpha dynamic provisioning annotation")
 			claim := newClaim(ns)
-			claim.Annotations = map[string]string{storageutil.AlphaStorageClassAnnotation: ""}
+			claim.Annotations = map[string]string{v1.AlphaStorageClassAnnotation: ""}
 
 			defer func() {
 				c.Core().PersistentVolumeClaims(ns).Delete(claim.Name, nil)

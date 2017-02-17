@@ -906,7 +906,7 @@ func (d *PersistentVolumeClaimDescriber) Describe(namespace, name string, descri
 
 		w.Write(LEVEL_0, "Name:\t%s\n", pvc.Name)
 		w.Write(LEVEL_0, "Namespace:\t%s\n", pvc.Namespace)
-		w.Write(LEVEL_0, "StorageClass:\t%s\n", storageutil.GetClaimStorageClass(pvc))
+		w.Write(LEVEL_0, "StorageClass:\t%s\n", api.GetClaimStorageClass(pvc))
 		w.Write(LEVEL_0, "Status:\t%v\n", pvc.Status.Phase)
 		w.Write(LEVEL_0, "Volume:\t%s\n", pvc.Spec.VolumeName)
 		printLabelsMultiline(w, "Labels", pvc.Labels)
