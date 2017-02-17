@@ -41,10 +41,23 @@ function print_forbidden_imports () {
     )
     if [ -n "${FORBIDDEN}" ]; then
         echo "${PACKAGE} has a forbidden dependency:"
-		echo
-		echo "${FORBIDDEN}" | sed 's/^/  /'
-		echo
-		return 1
+        echo
+        echo "${FORBIDDEN}" | sed 's/^/  /'
+        echo
+        return 1
+    fi
+    local FORBIDDEN=$(
+        go list -f $'{{with $package := .ImportPath}}{{range $.TestImports}}{{$package}} imports {{.}}\n{{end}}{{end}}' ./vendor/k8s.io/${PACKAGE}/... |
+        sed 's|^k8s.io/kubernetes/vendor/||;s| k8s.io/kubernetes/vendor/| |' |
+        grep -v " k8s.io/${PACKAGE}" |
+        grep -e "imports \(${RE}\)"
+    )
+    if [ -n "${FORBIDDEN}" ]; then
+        echo "${PACKAGE} has a forbidden dependency:"
+        echo
+        echo "${FORBIDDEN}" | sed 's/^/  /'
+        echo
+        return 1
     fi
     return 0
 }

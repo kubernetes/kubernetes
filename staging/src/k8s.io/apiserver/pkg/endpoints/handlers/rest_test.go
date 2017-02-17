@@ -36,9 +36,11 @@ import (
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	"k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/rest"
-	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/testapi"
-	"k8s.io/kubernetes/pkg/api/v1"
+	"k8s.io/client-go/pkg/api"
+	"k8s.io/client-go/pkg/api/v1"
+
+	// need to register pods
+	_ "k8s.io/client-go/pkg/api/install"
 )
 
 type testPatchType struct {
@@ -182,7 +184,7 @@ func (tc *patchTestCase) Run(t *testing.T) {
 	namespace := tc.startingPod.Namespace
 	name := tc.startingPod.Name
 
-	codec := testapi.Default.Codec()
+	codec := api.Codecs.LegacyCodec(schema.GroupVersion{Version: "v1"})
 	admit := tc.admit
 	if admit == nil {
 		admit = func(updatedObject runtime.Object, currentObject runtime.Object) error {
