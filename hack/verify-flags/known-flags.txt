@@ -87,6 +87,8 @@ cluster-ip
 cluster-monitor-period
 cluster-name
 cluster-signing-cert-file
+cluster-signing-gke-kubeconfig
+cluster-signing-gke-retry-backoff
 cluster-signing-key-file
 cluster-tag
 cni-bin-dir

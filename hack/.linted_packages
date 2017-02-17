@@ -8,6 +8,7 @@ cmd/genkubedocs
 cmd/genman
 cmd/genswaggertypedocs
 cmd/genyaml
+cmd/gke-certificates-controller
 cmd/kube-apiserver
 cmd/kube-apiserver/app
 cmd/kube-apiserver/app/options
