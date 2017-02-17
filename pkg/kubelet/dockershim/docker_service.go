@@ -147,6 +147,10 @@ var internalLabelKeys []string = []string{containerTypeLabelKey, containerLogPat
 func NewDockerService(client dockertools.DockerInterface, seccompProfileRoot string, podSandboxImage string, streamingConfig *streaming.Config,
 	pluginSettings *NetworkPluginSettings, cgroupsName string, kubeCgroupDriver string, execHandler dockertools.ExecHandler) (DockerService, error) {
 	c := dockertools.NewInstrumentedDockerInterface(client)
+	checkpointHandler, err := NewPersistentCheckpointHandler()
+	if err != nil {
+		return nil, err
+	}
 	ds := &dockerService{
 		seccompProfileRoot: seccompProfileRoot,
 		client:             c,
@@ -157,7 +161,7 @@ func NewDockerService(client dockertools.DockerInterface, seccompProfileRoot str
 			execHandler: execHandler,
 		},
 		containerManager:  cm.NewContainerManager(cgroupsName, client),
-		checkpointHandler: NewPersistentCheckpointHandler(),
+		checkpointHandler: checkpointHandler,
 	}
 	if streamingConfig != nil {
 		var err error
