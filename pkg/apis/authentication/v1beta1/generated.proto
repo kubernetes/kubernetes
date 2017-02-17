@@ -60,6 +60,10 @@ message TokenReviewSpec {
   // Token is the opaque bearer token.
   // +optional
   optional string token = 1;
+
+  // Any additional information provided to the authenticator.
+  // +optional
+  map<string, ExtraValue> extra = 2;
 }
 
 // TokenReviewStatus is the result of the token authentication request.

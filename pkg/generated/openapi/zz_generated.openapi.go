@@ -9139,6 +9139,27 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 								Format:      "",
 							},
 						},
+						"extra": {
+							SchemaProps: spec.SchemaProps{
+								Description: "Any additional information provided to the authenticator.",
+								Type:        []string{"object"},
+								AdditionalProperties: &spec.SchemaOrBool{
+									Schema: &spec.Schema{
+										SchemaProps: spec.SchemaProps{
+											Type: []string{"array"},
+											Items: &spec.SchemaOrArray{
+												Schema: &spec.Schema{
+													SchemaProps: spec.SchemaProps{
+														Type:   []string{"string"},
+														Format: "",
+													},
+												},
+											},
+										},
+									},
+								},
+							},
+						},
 					},
 				},
 			},
@@ -15765,6 +15786,27 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 								Description: "Token is the opaque bearer token.",
 								Type:        []string{"string"},
 								Format:      "",
+							},
+						},
+						"extra": {
+							SchemaProps: spec.SchemaProps{
+								Description: "Any additional information provided to the authenticator.",
+								Type:        []string{"object"},
+								AdditionalProperties: &spec.SchemaOrBool{
+									Schema: &spec.Schema{
+										SchemaProps: spec.SchemaProps{
+											Type: []string{"array"},
+											Items: &spec.SchemaOrArray{
+												Schema: &spec.Schema{
+													SchemaProps: spec.SchemaProps{
+														Type:   []string{"string"},
+														Format: "",
+													},
+												},
+											},
+										},
+									},
+								},
 							},
 						},
 					},
