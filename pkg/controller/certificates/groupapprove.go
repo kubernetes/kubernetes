@@ -72,7 +72,7 @@ func (cc *groupApprover) AutoApprove(csr *certificates.CertificateSigningRequest
 	if len(x509cr.DNSNames)+len(x509cr.EmailAddresses)+len(x509cr.IPAddresses) != 0 {
 		return csr, nil
 	}
-	if !hasExactUsages(csr, kubeletClientUsages) {
+	if !hasExactUsages(csr, kubeletClientUsages) && !hasExactUsages(csr, kubeletServerUsages) {
 		return csr, nil
 	}
 
@@ -84,6 +84,10 @@ func (cc *groupApprover) AutoApprove(csr *certificates.CertificateSigningRequest
 	return csr, nil
 }
 
+var kubeletServerUsages = []certificates.KeyUsage{
+	certificates.UsageKeyEncipherment,
+	certificates.UsageServerAuth,
+}
 var kubeletClientUsages = []certificates.KeyUsage{
 	certificates.UsageKeyEncipherment,
 	certificates.UsageDigitalSignature,

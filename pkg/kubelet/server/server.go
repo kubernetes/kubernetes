@@ -134,6 +134,8 @@ func ListenAndServeKubeletServer(
 	}
 	if tlsOptions != nil {
 		s.TLSConfig = tlsOptions.Config
+		// Passing empty strings as the cert and key files indicates to call
+		// GetCertificate in the TLSConfig.
 		glog.Fatal(s.ListenAndServeTLS(tlsOptions.CertFile, tlsOptions.KeyFile))
 	} else {
 		glog.Fatal(s.ListenAndServe())
