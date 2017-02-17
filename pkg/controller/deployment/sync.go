@@ -541,18 +541,25 @@ func (dc *DeploymentController) cleanupDeployment(oldRSs []*extensions.ReplicaSe
 	if deployment.Spec.RevisionHistoryLimit == nil {
 		return nil
 	}
-	diff := int32(len(oldRSs)) - *deployment.Spec.RevisionHistoryLimit
+
+	// Avoid deleting replica set with deletion timestamp set
+	aliveFilter := func(rs *extensions.ReplicaSet) bool {
+		return rs != nil && rs.ObjectMeta.DeletionTimestamp == nil
+	}
+	cleanableRSes := controller.FilterReplicaSets(oldRSs, aliveFilter)
+
+	diff := int32(len(cleanableRSes)) - *deployment.Spec.RevisionHistoryLimit
 	if diff <= 0 {
 		return nil
 	}
 
-	sort.Sort(controller.ReplicaSetsByCreationTimestamp(oldRSs))
+	sort.Sort(controller.ReplicaSetsByCreationTimestamp(cleanableRSes))
 	glog.V(2).Infof("Looking to cleanup old replica sets for deployment %q", deployment.Name)
 
 	var errList []error
 	// TODO: This should be parallelized.
 	for i := int32(0); i < diff; i++ {
-		rs := oldRSs[i]
+		rs := cleanableRSes[i]
 		// Avoid delete replica set with non-zero replica counts
 		if rs.Status.Replicas != 0 || *(rs.Spec.Replicas) != 0 || rs.Generation > rs.Status.ObservedGeneration || rs.DeletionTimestamp != nil {
 			continue
