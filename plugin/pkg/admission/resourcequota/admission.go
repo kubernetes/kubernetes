@@ -64,8 +64,7 @@ type liveLookupEntry struct {
 func NewResourceQuota(registry quota.Registry, numEvaluators int, stopCh <-chan struct{}) (admission.Interface, error) {
 	quotaAccessor, err := newQuotaAccessor()
 	if err != nil {
-		// TODO handle errors more cleanly
-		panic(err)
+		return nil, err
 	}
 
 	return &quotaAdmission{
