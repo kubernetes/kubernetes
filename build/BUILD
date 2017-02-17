@@ -67,6 +67,10 @@ DOCKERIZED_BINARIES = {
         "base": ":busybox-net",
         "target": "//cmd/kube-proxy:kube-proxy",
     },
+    "gke-certificates-controller": {
+        "base": ":busybox-libc",
+        "target": "//cmd/gke-certificates-controller:gke-certificates-controller",
+    },
 }
 
 [genrule(
