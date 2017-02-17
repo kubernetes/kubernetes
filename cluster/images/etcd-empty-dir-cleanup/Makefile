@@ -14,9 +14,9 @@
 
 .PHONY:	build push
 
-ETCD_VERSION = 2.2.1
+ETCD_VERSION = 3.0.14
 IMAGE = gcr.io/google_containers/etcd-empty-dir-cleanup
-TAG = 0.0.1
+TAG = 3.0.14
 
 clean:
 	rm -rf etcdctl etcd-v$(ETCD_VERSION)-linux-amd64 etcd-v$(ETCD_VERSION)-linux-amd64.tar.gz
