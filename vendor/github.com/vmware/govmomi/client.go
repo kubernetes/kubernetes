@@ -57,6 +57,7 @@ are kept outside the object package.
 package govmomi
 
 import (
+	"context"
 	"crypto/tls"
 	"net/url"
 
@@ -65,7 +66,6 @@ import (
 	"github.com/vmware/govmomi/vim25"
 	"github.com/vmware/govmomi/vim25/soap"
 	"github.com/vmware/govmomi/vim25/types"
-	"golang.org/x/net/context"
 )
 
 type Client struct {
