@@ -383,7 +383,9 @@ func (cm *containerManagerImpl) setupNode() error {
 	}
 
 	// Enforce Node Allocatable (if required)
-	if err := enforceNodeAllocatableCgroups(cm.NodeConfig.NodeAllocatableConfig, cm.GetNodeAllocatable(), cm.cgroupManager); err != nil {
+	if err := enforceNodeAllocatableCgroups(cm.NodeConfig.NodeAllocatableConfig,
+		cm.getNodeAllocatableInternal(false), // ignore eviction thresholds.
+		cm.cgroupManager); err != nil {
 		return err
 	}
 
@@ -825,4 +827,8 @@ func getDockerVersion(cadvisor cadvisor.Interface) *utilversion.Version {
 		return utilversion.MustParseSemantic("0.0.0")
 	}
 	return dockerVersion
+}
+
+func (m *containerManagerImpl) GetCapacity() v1.ResourceList {
+	return m.capacity
 }

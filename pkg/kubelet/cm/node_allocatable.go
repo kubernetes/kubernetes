@@ -24,6 +24,7 @@ import (
 	"github.com/golang/glog"
 
 	"k8s.io/kubernetes/pkg/api/v1"
+	evictionapi "k8s.io/kubernetes/pkg/kubelet/eviction/api"
 )
 
 const (
@@ -110,8 +111,11 @@ func getCgroupConfig(rl v1.ResourceList) *ResourceConfig {
 	return &rc
 }
 
-// GetNodeAllocatable returns amount of compute resource available for pods.
-func (cm *containerManagerImpl) GetNodeAllocatable() v1.ResourceList {
+func (cm *containerManagerImpl) getNodeAllocatableInternal(includeHardEviction bool) v1.ResourceList {
+	var evictionReservation v1.ResourceList
+	if includeHardEviction {
+		evictionReservation = hardEvictionReservation(cm.HardEvictionThresholds, cm.capacity)
+	}
 	result := make(v1.ResourceList)
 	for k, v := range cm.capacity {
 		value := *(v.Copy())
@@ -121,6 +125,9 @@ func (cm *containerManagerImpl) GetNodeAllocatable() v1.ResourceList {
 		if cm.NodeConfig.KubeReserved != nil {
 			value.Sub(cm.NodeConfig.KubeReserved[k])
 		}
+		if evictionReservation != nil {
+			value.Sub(evictionReservation[k])
+		}
 		if value.Sign() < 0 {
 			// Negative Allocatable resources don't make sense.
 			value.Set(0)
@@ -128,4 +135,30 @@ func (cm *containerManagerImpl) GetNodeAllocatable() v1.ResourceList {
 		result[k] = value
 	}
 	return result
+
+}
+
+// GetNodeAllocatable returns amount of compute resource available for pods.
+func (cm *containerManagerImpl) GetNodeAllocatable() v1.ResourceList {
+	return cm.getNodeAllocatableInternal(true)
+}
+
+// hardEvictionReservation returns a resourcelist that includes reservation of resources based on hard eviction thresholds.
+func hardEvictionReservation(thresholds []evictionapi.Threshold, capacity v1.ResourceList) v1.ResourceList {
+	if len(thresholds) == 0 {
+		return nil
+	}
+	ret := v1.ResourceList{}
+	for _, threshold := range thresholds {
+		if threshold.Operator != evictionapi.OpLessThan {
+			continue
+		}
+		switch threshold.Signal {
+		case evictionapi.SignalMemoryAvailable:
+			memoryCapacity := capacity[v1.ResourceMemory]
+			value := evictionapi.GetThresholdQuantity(threshold.Value, &memoryCapacity)
+			ret[v1.ResourceMemory] = *value
+		}
+	}
+	return ret
 }
