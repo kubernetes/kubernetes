@@ -450,11 +450,17 @@ func StartControllers(controllers map[string]InitFunc, s *options.CMServer, root
 	nodeController.Run()
 	time.Sleep(wait.Jitter(s.ControllerStartInterval.Duration, ControllerStartJitter))
 
-	serviceController, err := servicecontroller.New(cloud, clientBuilder.ClientOrDie("service-controller"), s.ClusterName)
+	serviceController, err := servicecontroller.New(
+		cloud,
+		clientBuilder.ClientOrDie("service-controller"),
+		newSharedInformers.Core().V1().Services(),
+		newSharedInformers.Core().V1().Nodes(),
+		s.ClusterName,
+	)
 	if err != nil {
 		glog.Errorf("Failed to start service controller: %v", err)
 	} else {
-		serviceController.Run(int(s.ConcurrentServiceSyncs))
+		go serviceController.Run(stop, int(s.ConcurrentServiceSyncs))
 	}
 	time.Sleep(wait.Jitter(s.ControllerStartInterval.Duration, ControllerStartJitter))
 
