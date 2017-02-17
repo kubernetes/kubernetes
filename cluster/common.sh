@@ -608,6 +608,7 @@ function build-kube-env {
   build-runtime-config
   gen-uid
 
+  env > ${KUBE_TEMP}/env
   rm -f ${file}
   cat >$file <<EOF
 ENV_TIMESTAMP: $(yaml-quote $(date -u +%Y-%m-%dT%T%z))
