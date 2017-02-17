@@ -253,6 +253,10 @@ var _ = framework.KubeDescribe("StatefulSet", func() {
 			By("Verifying the 2nd pod is removed only when it becomes running and ready")
 			sst.restoreProbe(ss, testProbe)
 			_, err = watch.Until(statefulsetTimeout, watcher, func(event watch.Event) (bool, error) {
+				if event.Type == watch.Error {
+					framework.Logf("Keep waiting, received error from watch event: %v", apierrs.FromObject(event.Object))
+					return false, nil
+				}
 				pod := event.Object.(*v1.Pod)
 				if event.Type == watch.Deleted && pod.Name == expectedPodName {
 					return false, fmt.Errorf("Pod %v was deleted before enter running", pod.Name)
@@ -393,9 +397,12 @@ var _ = framework.KubeDescribe("StatefulSet", func() {
 			framework.ExpectNoError(err)
 			// we need to get UID from pod in any state and wait until stateful set controller will remove pod atleast once
 			_, err = watch.Until(statefulPodTimeout, w, func(event watch.Event) (bool, error) {
+				if event.Type == watch.Error {
+					framework.Logf("Keep waiting, received error from watch event: %v", apierrs.FromObject(event.Object))
+					return false, nil
+				}
 				pod := event.Object.(*v1.Pod)
-				switch event.Type {
-				case watch.Deleted:
+				if event.Type == watch.Deleted {
 					framework.Logf("Observed delete event for stateful pod %v in namespace %v", pod.Name, pod.Namespace)
 					if initialStatefulPodUID == "" {
 						return false, nil
