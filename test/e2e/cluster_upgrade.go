@@ -32,6 +32,7 @@ import (
 var upgradeTests = []upgrades.Test{
 	&upgrades.ServiceUpgradeTest{},
 	&upgrades.SecretUpgradeTest{},
+	&upgrades.StatefulSetUpgradeTest{},
 	&upgrades.DeploymentUpgradeTest{},
 	&upgrades.ConfigMapUpgradeTest{},
 	&upgrades.HPAUpgradeTest{},
