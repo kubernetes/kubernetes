@@ -23,21 +23,21 @@ import (
 
 	"k8s.io/apimachinery/pkg/apimachinery/announced"
 	"k8s.io/apimachinery/pkg/apimachinery/registered"
-	exampleinstall "k8s.io/apiserver/pkg/apis/example/install"
-	"k8s.io/apiserver/pkg/storage/storagebackend"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apiserver/pkg/apis/example"
+	exampleinstall "k8s.io/apiserver/pkg/apis/example/install"
 	examplev1 "k8s.io/apiserver/pkg/apis/example/v1"
-	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apiserver/pkg/storage/storagebackend"
 )
 
 var (
 	v1GroupVersion = schema.GroupVersion{Group: "", Version: "v1"}
 
-	registry = registered.NewOrDie(os.Getenv("KUBE_API_VERSIONS"))
-	announce = make(announced.APIGroupFactoryRegistry)
+	registry       = registered.NewOrDie(os.Getenv("KUBE_API_VERSIONS"))
+	announce       = make(announced.APIGroupFactoryRegistry)
 	scheme         = runtime.NewScheme()
 	codecs         = serializer.NewCodecFactory(scheme)
 	parameterCodec = runtime.NewParameterCodec(scheme)
