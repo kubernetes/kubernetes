@@ -26,7 +26,7 @@ import (
 	"testing"
 
 	"k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/client-go/pkg/api"
 )
 
 func TestGenericHttpResponseChecker(t *testing.T) {

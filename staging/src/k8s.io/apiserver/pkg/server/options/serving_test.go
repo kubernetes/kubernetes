@@ -36,9 +36,9 @@ import (
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	. "k8s.io/apiserver/pkg/server"
 	utilflag "k8s.io/apiserver/pkg/util/flag"
+	"k8s.io/client-go/discovery"
 	restclient "k8s.io/client-go/rest"
 	utilcert "k8s.io/client-go/util/cert"
-	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 )
 
 func setUp(t *testing.T) Config {
@@ -569,7 +569,7 @@ NextTest:
 			t.Errorf("%q - failed creating loopback client config: %v", title, err)
 			continue NextTest
 		}
-		client, err := clientset.NewForConfig(cfg)
+		client, err := discovery.NewDiscoveryClientForConfig(cfg)
 		if err != nil {
 			t.Errorf("%q - failed to create loopback client: %v", title, err)
 			continue NextTest
