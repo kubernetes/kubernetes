@@ -51,6 +51,9 @@ const (
 	// maxNamesPerImageInNodeStatus is max number of names per image stored in
 	// the node status.
 	maxNamesPerImageInNodeStatus = 5
+
+	// mb is used to easily convert an int to an mb
+	mb = 1024 * 1024
 )
 
 // registerWithApiServer registers the node with the cluster master. It is safe
