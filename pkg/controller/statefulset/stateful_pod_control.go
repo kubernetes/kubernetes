@@ -41,7 +41,7 @@ type StatefulPodControlInterface interface {
 	CreateStatefulPod(set *apps.StatefulSet, pod *v1.Pod) error
 	// UpdateStatefulPod Updates a Pod in a StatefulSet. If the Pod already has the correct identity and stable
 	// storage this method is a no-op. If the Pod must be mutated to conform to the Set, it is mutated and updated.
-	// pod is an in-out parameter, and any updates made to the pod are reflected as mutations to this parameter. If
+	// pod is an in parameter, and any updates made to the pod are not reflected as mutations to this parameter. If
 	// the create is successful, the returned error is nil.
 	UpdateStatefulPod(set *apps.StatefulSet, pod *v1.Pod) error
 	// DeleteStatefulPod deletes a Pod in a StatefulSet. The pods PVCs are not deleted. If the delete is successful,
@@ -81,13 +81,19 @@ func (spc *realStatefulPodControl) CreateStatefulPod(set *apps.StatefulSet, pod 
 }
 
 func (spc *realStatefulPodControl) UpdateStatefulPod(set *apps.StatefulSet, pod *v1.Pod) error {
+	if identityMatches(set, pod) && storageMatches(set, pod) {
+		return nil
+	}
+
 	// we make a copy of the Pod on the stack and mutate the copy
 	obj, err := api.Scheme.Copy(pod)
 	if err != nil {
 		return fmt.Errorf("unable to copy pod: %v", err)
 	}
 	podCopy := obj.(*v1.Pod)
+
 	attemptedUpdate := false
+
 	err = retry.RetryOnConflict(retry.DefaultBackoff, func() error {
 		// assume the Pod is consistent
 		consistent := true
