@@ -26,6 +26,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/util"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 )
 
@@ -181,6 +182,14 @@ func addConversionFuncs(scheme *runtime.Scheme) error {
 	// Add field conversion funcs.
 	err = scheme.AddFieldLabelConversionFunc("v1", "Pod",
 		func(label, value string) (string, string, error) {
+			annotationFieldPathParser, err := util.NewAnnotationFieldPathParser()
+			if err != nil {
+				return "", "", err
+			}
+			if annotationFieldPathParser.Validate(label) {
+				return label, value, nil
+			}
+
 			switch label {
 			case "metadata.annotations",
 				"metadata.labels",

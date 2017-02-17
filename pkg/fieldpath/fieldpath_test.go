@@ -88,6 +88,16 @@ func TestExtractFieldPathAsString(t *testing.T) {
 			},
 			expectedValue: "builder=\"john-doe\"",
 		},
+		{
+			name:      "ok - annotation",
+			fieldPath: "metadata.annotations['spec.pod.beta.kubernetes.io/statefulset-index']",
+			obj: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{"spec.pod.beta.kubernetes.io/statefulset-index": "1"},
+				},
+			},
+			expectedValue: "1",
+		},
 
 		{
 			name:      "invalid expression",
@@ -95,6 +105,16 @@ func TestExtractFieldPathAsString(t *testing.T) {
 			obj: &v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Namespace: "object-namespace",
+				},
+			},
+			expectedMessageFragment: "unsupported fieldPath",
+		},
+		{
+			name:      "invalid annotation",
+			fieldPath: "metadata.annotations['unescaped]forbidden[characters'inside[]key']",
+			obj: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{"foo": "bar"},
 				},
 			},
 			expectedMessageFragment: "unsupported fieldPath",

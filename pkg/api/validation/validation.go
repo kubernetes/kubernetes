@@ -44,6 +44,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/helper"
 	apiservice "k8s.io/kubernetes/pkg/api/service"
+	apiutil "k8s.io/kubernetes/pkg/api/util"
 	"k8s.io/kubernetes/pkg/api/v1"
 	v1helper "k8s.io/kubernetes/pkg/api/v1/helper"
 	"k8s.io/kubernetes/pkg/capabilities"
@@ -1458,6 +1459,12 @@ func validateEnvVarValueFrom(ev api.EnvVar, fldPath *field.Path) field.ErrorList
 func validateObjectFieldSelector(fs *api.ObjectFieldSelector, expressions *sets.String, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 
+	annotationFieldPathParser, err := apiutil.NewAnnotationFieldPathParser()
+	if err != nil {
+		allErrs = append(allErrs, field.Invalid(fldPath, fs.FieldPath, err.Error()))
+		return allErrs
+	}
+
 	if len(fs.APIVersion) == 0 {
 		allErrs = append(allErrs, field.Required(fldPath.Child("apiVersion"), ""))
 	} else if len(fs.FieldPath) == 0 {
@@ -1466,7 +1473,7 @@ func validateObjectFieldSelector(fs *api.ObjectFieldSelector, expressions *sets.
 		internalFieldPath, _, err := api.Scheme.ConvertFieldLabel(fs.APIVersion, "Pod", fs.FieldPath, "")
 		if err != nil {
 			allErrs = append(allErrs, field.Invalid(fldPath.Child("fieldPath"), fs.FieldPath, fmt.Sprintf("error converting fieldPath: %v", err)))
-		} else if !expressions.Has(internalFieldPath) {
+		} else if !expressions.Has(internalFieldPath) && !annotationFieldPathParser.Validate(internalFieldPath) {
 			allErrs = append(allErrs, field.NotSupported(fldPath.Child("fieldPath"), internalFieldPath, expressions.List()))
 		}
 	}
