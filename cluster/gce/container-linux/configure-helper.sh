@@ -807,6 +807,9 @@ function start-kube-apiserver {
   if [[ -n "${STORAGE_BACKEND:-}" ]]; then
     params+=" --storage-backend=${STORAGE_BACKEND}"
   fi
+  if [[ -n "${STORAGE_MEDIA_TYPE:-}" ]]; then
+    params+=" --storage-media-type=${STORAGE_MEDIA_TYPE}"
+  fi
   if [[ -n "${ENABLE_GARBAGE_COLLECTOR:-}" ]]; then
     params+=" --enable-garbage-collector=${ENABLE_GARBAGE_COLLECTOR}"
   fi

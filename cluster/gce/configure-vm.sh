@@ -485,6 +485,11 @@ EOF
 storage_backend: '$(echo "$STORAGE_BACKEND" | sed -e "s/'/''/g")'
 EOF
     fi
+    if [ -n "${STORAGE_MEDIA_TYPE:-}" ]; then
+      cat <<EOF >>/srv/salt-overlay/pillar/cluster-params.sls
+storage_media_type: '$(echo "$STORAGE_MEDIA_TYPE" | sed -e "s/'/''/g")'
+EOF
+    fi
     if [ -n "${ADMISSION_CONTROL:-}" ] && [ ${ADMISSION_CONTROL} == *"ImagePolicyWebhook"* ]; then
       cat <<EOF >>/srv/salt-overlay/pillar/cluster-params.sls
 admission-control-config-file: /etc/admission_controller.config
