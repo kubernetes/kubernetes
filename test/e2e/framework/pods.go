@@ -72,14 +72,19 @@ func (c *PodClient) Create(pod *v1.Pod) *v1.Pod {
 	return p
 }
 
-// CreateSync creates a new pod according to the framework specifications, and wait for it to start.
-func (c *PodClient) CreateSync(pod *v1.Pod) *v1.Pod {
+// CreateSync creates a new pod according to the framework specifications in the given namespace, and waits for it to start.
+func (c *PodClient) CreateSyncInNamespace(pod *v1.Pod, namespace string) *v1.Pod {
 	p := c.Create(pod)
-	ExpectNoError(c.f.WaitForPodRunning(p.Name))
+	ExpectNoError(WaitForPodNameRunningInNamespace(c.f.ClientSet, p.Name, namespace))
 	// Get the newest pod after it becomes running, some status may change after pod created, such as pod ip.
 	p, err := c.Get(p.Name, metav1.GetOptions{})
 	ExpectNoError(err)
 	return p
+}
+
+// CreateSync creates a new pod according to the framework specifications, and wait for it to start.
+func (c *PodClient) CreateSync(pod *v1.Pod) *v1.Pod {
+	return c.CreateSyncInNamespace(pod, c.f.Namespace.Name)
 }
 
 // CreateBatch create a batch of pods. All pods are created before waiting.
@@ -124,11 +129,17 @@ func (c *PodClient) Update(name string, updateFn func(pod *v1.Pod)) {
 // DeleteSync deletes the pod and wait for the pod to disappear for `timeout`. If the pod doesn't
 // disappear before the timeout, it will fail the test.
 func (c *PodClient) DeleteSync(name string, options *metav1.DeleteOptions, timeout time.Duration) {
+	c.DeleteSyncInNamespace(name, c.f.Namespace.Name, options, timeout)
+}
+
+// DeleteSyncInNamespace deletes the pod from the namespace and wait for the pod to disappear for `timeout`. If the pod doesn't
+// disappear before the timeout, it will fail the test.
+func (c *PodClient) DeleteSyncInNamespace(name string, namespace string, options *metav1.DeleteOptions, timeout time.Duration) {
 	err := c.Delete(name, options)
 	if err != nil && !errors.IsNotFound(err) {
 		Failf("Failed to delete pod %q: %v", name, err)
 	}
-	Expect(WaitForPodToDisappear(c.f.ClientSet, c.f.Namespace.Name, name, labels.Everything(),
+	Expect(WaitForPodToDisappear(c.f.ClientSet, namespace, name, labels.Everything(),
 		2*time.Second, timeout)).To(Succeed(), "wait for pod %q to disappear", name)
 }
 
