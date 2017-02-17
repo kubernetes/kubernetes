@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors.
+Copyright 2017 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -82,7 +82,7 @@ type configClientWithToken struct {
 	token string
 }
 
-func TestMakeClientConfigWithCerts(t *testing.T) {
+func TestCreateWithCerts(t *testing.T) {
 	var createBasicTest = []struct {
 		cc          configClient
 		ccWithCerts configClientWithCerts
@@ -92,7 +92,7 @@ func TestMakeClientConfigWithCerts(t *testing.T) {
 		{configClient{clusterName: "kubernetes"}, configClientWithCerts{}, ""},
 	}
 	for _, rt := range createBasicTest {
-		cwc := MakeClientConfigWithCerts(
+		cwc := CreateWithCerts(
 			rt.cc.serverURL,
 			rt.cc.clusterName,
 			rt.cc.userName,
@@ -102,7 +102,7 @@ func TestMakeClientConfigWithCerts(t *testing.T) {
 		)
 		if cwc.Kind != rt.expected {
 			t.Errorf(
-				"failed MakeClientConfigWithCerts:\n\texpected: %s\n\t  actual: %s",
+				"failed CreateWithCerts:\n\texpected: %s\n\t  actual: %s",
 				rt.expected,
 				cwc.Kind,
 			)
@@ -110,7 +110,7 @@ func TestMakeClientConfigWithCerts(t *testing.T) {
 	}
 }
 
-func TestMakeClientConfigWithToken(t *testing.T) {
+func TestCreateWithToken(t *testing.T) {
 	var createBasicTest = []struct {
 		cc          configClient
 		ccWithToken configClientWithToken
@@ -120,7 +120,7 @@ func TestMakeClientConfigWithToken(t *testing.T) {
 		{configClient{clusterName: "kubernetes"}, configClientWithToken{}, ""},
 	}
 	for _, rt := range createBasicTest {
-		cwc := MakeClientConfigWithToken(
+		cwc := CreateWithToken(
 			rt.cc.serverURL,
 			rt.cc.clusterName,
 			rt.cc.userName,
@@ -129,7 +129,7 @@ func TestMakeClientConfigWithToken(t *testing.T) {
 		)
 		if cwc.Kind != rt.expected {
 			t.Errorf(
-				"failed MakeClientConfigWithCerts:\n\texpected: %s\n\t  actual: %s",
+				"failed CreateWithToken:\n\texpected: %s\n\t  actual: %s",
 				rt.expected,
 				cwc.Kind,
 			)
@@ -161,7 +161,7 @@ func TestWriteKubeconfigToDisk(t *testing.T) {
 		{"test2", configClient{clusterName: "kubernetes", userName: "user2", serverURL: "localhost:8080"}, configClientWithToken{token: "cba"}, nil, []byte(configOut2)},
 	}
 	for _, rt := range writeConfig {
-		c := MakeClientConfigWithToken(
+		c := CreateWithToken(
 			rt.cc.serverURL,
 			rt.cc.clusterName,
 			rt.cc.userName,
@@ -169,10 +169,10 @@ func TestWriteKubeconfigToDisk(t *testing.T) {
 			rt.ccWithToken.token,
 		)
 		configPath := filepath.Join(kubeadmapi.GlobalEnvParams.KubernetesDir, fmt.Sprintf("%s.conf", rt.name))
-		err := WriteKubeconfigToDisk(configPath, c)
+		err := WriteToDisk(configPath, c)
 		if err != rt.expected {
 			t.Errorf(
-				"failed WriteKubeconfigToDisk with an error:\n\texpected: %s\n\t  actual: %s",
+				"failed WriteToDisk with an error:\n\texpected: %s\n\t  actual: %s",
 				rt.expected,
 				err,
 			)
@@ -180,7 +180,7 @@ func TestWriteKubeconfigToDisk(t *testing.T) {
 		newFile, _ := ioutil.ReadFile(configPath)
 		if !bytes.Equal(newFile, rt.file) {
 			t.Errorf(
-				"failed WriteKubeconfigToDisk config write:\n\texpected: %s\n\t  actual: %s",
+				"failed WriteToDisk config write:\n\texpected: %s\n\t  actual: %s",
 				rt.file,
 				newFile,
 			)

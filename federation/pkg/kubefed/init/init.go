@@ -46,7 +46,7 @@ import (
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	certutil "k8s.io/client-go/util/cert"
 	triple "k8s.io/client-go/util/cert/triple"
-	kubeadmkubeconfigphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/kubeconfig"
+	kubeconfigutil "k8s.io/kubernetes/cmd/kubeadm/app/util/kubeconfig"
 	"k8s.io/kubernetes/federation/pkg/kubefed/util"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
@@ -513,7 +513,7 @@ func createAPIServerCredentialsSecret(clientset *client.Clientset, namespace, cr
 }
 
 func createControllerManagerKubeconfigSecret(clientset *client.Clientset, namespace, name, svcName, kubeconfigName string, entKeyPairs *entityKeyPairs, dryRun bool) (*api.Secret, error) {
-	config := kubeadmkubeconfigphase.MakeClientConfigWithCerts(
+	config := kubeconfigutil.CreateWithCerts(
 		fmt.Sprintf("https://%s", svcName),
 		name,
 		ControllerManagerUser,

@@ -46,6 +46,9 @@ const (
 	FrontProxyClientCertName           = "front-proxy-client.crt"
 	FrontProxyClientKeyName            = "front-proxy-client.key"
 
+	AdminKubeConfigFileName   = "admin.conf"
+	KubeletKubeConfigFileName = "kubelet.conf"
+
 	// TODO: These constants should actually come from pkg/kubeapiserver/authorizer, but we can't vendor that package in now
 	// because of all the other sub-packages that would get vendored. To fix this, a pkg/kubeapiserver/authorizer/modes package
 	// or similar should exist that only has these constants; then we can vendor it.
