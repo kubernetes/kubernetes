@@ -8,6 +8,32 @@ load(
     "go_test",
 )
 
+go_test(
+    name = "go_default_test",
+    srcs = [
+        "e2e_test.go",
+        "metrics_grabber_test.go",
+        "taints_test.go",
+    ],
+    library = ":go_default_library",
+    tags = ["automanaged"],
+    deps = [
+        "//pkg/api/v1:go_default_library",
+        "//pkg/client/clientset_generated/clientset:go_default_library",
+        "//pkg/metrics:go_default_library",
+        "//test/e2e/framework:go_default_library",
+        "//test/utils:go_default_library",
+        "//vendor:github.com/onsi/ginkgo",
+        "//vendor:github.com/onsi/gomega",
+        "//vendor:github.com/stretchr/testify/assert",
+        "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
+        "//vendor:k8s.io/apimachinery/pkg/fields",
+        "//vendor:k8s.io/apimachinery/pkg/runtime",
+        "//vendor:k8s.io/apimachinery/pkg/watch",
+        "//vendor:k8s.io/client-go/tools/cache",
+    ],
+)
+
 go_library(
     name = "go_default_library",
     srcs = [
@@ -118,9 +144,7 @@ go_library(
         "//pkg/apis/extensions:go_default_library",
         "//pkg/apis/extensions/v1beta1:go_default_library",
         "//pkg/apis/rbac/v1beta1:go_default_library",
-        "//pkg/apis/storage/util:go_default_library",
         "//pkg/apis/storage/v1:go_default_library",
-        "//pkg/apis/storage/v1/util:go_default_library",
         "//pkg/client/clientset_generated/clientset:go_default_library",
         "//pkg/client/clientset_generated/clientset/typed/core/v1:go_default_library",
         "//pkg/client/clientset_generated/clientset/typed/extensions/v1beta1:go_default_library",
@@ -211,44 +235,6 @@ go_library(
         "//vendor:k8s.io/client-go/util/flowcontrol",
         "//vendor:k8s.io/client-go/util/workqueue",
     ],
-)
-
-go_test(
-    name = "go_default_test",
-    srcs = [
-        "e2e_test.go",
-        "metrics_grabber_test.go",
-        "taints_test.go",
-    ],
-    library = ":go_default_library",
-    tags = [
-        "automanaged",
-        "integration",
-    ],
-    deps = [
-        "//pkg/api/v1:go_default_library",
-        "//pkg/client/clientset_generated/clientset:go_default_library",
-        "//pkg/metrics:go_default_library",
-        "//test/e2e/framework:go_default_library",
-        "//test/utils:go_default_library",
-        "//vendor:github.com/onsi/ginkgo",
-        "//vendor:github.com/onsi/gomega",
-        "//vendor:github.com/stretchr/testify/assert",
-        "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
-        "//vendor:k8s.io/apimachinery/pkg/fields",
-        "//vendor:k8s.io/apimachinery/pkg/runtime",
-        "//vendor:k8s.io/apimachinery/pkg/watch",
-        "//vendor:k8s.io/client-go/tools/cache",
-    ],
-)
-
-genrule(
-    name = "gen_e2e.test",
-    testonly = 1,
-    srcs = [":go_default_test"],
-    outs = ["e2e.test"],
-    cmd = "srcs=($(SRCS)); cp $$(dirname $${srcs[0]})/go_default_test $@;",
-    output_to_bindir = 1,
 )
 
 filegroup(
