@@ -277,7 +277,7 @@ type ClusterAutoscaler struct {
 
 	// Specification of ClusterAutoscaler. Currently empty. Protobuf index placeholder.
 	// +optional
-	Spec ClusterAutoscalerSpec `json:"spec,omitempty" protobuf:"bytes,2,opt,name=spec"`
+	// Spec ClusterAutoscalerSpec `json:"spec,omitempty" protobuf:"bytes,2,opt,name=spec"`
 
 	// Current information about ClusterAutoscaler.
 	// +optional
@@ -285,8 +285,8 @@ type ClusterAutoscaler struct {
 }
 
 // Specification of ClusterAutoscaler. Empty for for now.
-type ClusterAutoscalerSpec struct {
-}
+// type ClusterAutoscalerSpec struct {
+// }
 
 // Type of ClusterAutoscalerCondition
 type ClusterAutoscalerConditionType string
