@@ -205,7 +205,7 @@ func TestInitFederation(t *testing.T) {
 			t.Fatalf("[%d] unexpected error: %v", i, err)
 		}
 
-		adminConfig, err := kubefedtesting.NewFakeAdminConfig(hostFactory, tc.kubeconfigGlobal)
+		adminConfig, err := kubefedtesting.NewFakeAdminConfig(hostFactory, nil, "", tc.kubeconfigGlobal)
 		if err != nil {
 			t.Fatalf("[%d] unexpected error: %v", i, err)
 		}
@@ -907,6 +907,9 @@ func fakeInitHostFactory(apiserverServiceType v1.ServiceType, federationName, na
 			Name:      cmName,
 			Namespace: namespaceName,
 			Labels:    componentLabel,
+			Annotations: map[string]string{
+				util.FedDomainMapKey: fmt.Sprintf("%s=%s", federationName, dnsZoneName),
+			},
 		},
 		Spec: v1beta1.DeploymentSpec{
 			Replicas: &replicas,

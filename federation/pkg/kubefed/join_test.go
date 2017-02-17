@@ -21,9 +21,11 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	"strings"
 	"testing"
 
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
+	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/client-go/dynamic"
@@ -36,6 +38,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/api/v1"
+	"k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 )
@@ -130,7 +133,16 @@ func TestJoinFederation(t *testing.T) {
 			t.Fatalf("[%d] unexpected error: %v", i, err)
 		}
 
-		adminConfig, err := kubefedtesting.NewFakeAdminConfig(hostFactory, tc.kubeconfigGlobal)
+		targetClusterFactory, err := fakeJoinTargetClusterFactory(tc.cluster, tc.clusterCtx)
+		if err != nil {
+			t.Fatalf("[%d] unexpected error: %v", i, err)
+		}
+
+		targetClusterContext := tc.clusterCtx
+		if targetClusterContext == "" {
+			targetClusterContext = tc.cluster
+		}
+		adminConfig, err := kubefedtesting.NewFakeAdminConfig(hostFactory, targetClusterFactory, targetClusterContext, tc.kubeconfigGlobal)
 		if err != nil {
 			t.Fatalf("[%d] unexpected error: %v", i, err)
 		}
@@ -234,6 +246,7 @@ func fakeJoinHostFactory(clusterName, clusterCtx, secretName, server, token stri
 	if err != nil {
 		return nil, err
 	}
+
 	secretObject := v1.Secret{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "Secret",
@@ -245,6 +258,21 @@ func fakeJoinHostFactory(clusterName, clusterCtx, secretName, server, token stri
 		},
 		Data: map[string][]byte{
 			"kubeconfig": configBytes,
+		},
+	}
+
+	cmName := "controller-manager"
+	cmObject := v1beta1.Deployment{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "Deployment",
+			APIVersion: testapi.Extensions.GroupVersion().String(),
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      cmName,
+			Namespace: util.DefaultFederationSystemNamespace,
+			Annotations: map[string]string{
+				util.FedDomainMapKey: fmt.Sprintf("%s=%s", clusterCtx, "test-dns-zone"),
+			},
 		},
 	}
 
@@ -270,6 +298,57 @@ func fakeJoinHostFactory(clusterName, clusterCtx, secretName, server, token stri
 					return nil, fmt.Errorf("Unexpected secret object\n\tDiff: %s", diff.ObjectGoPrintDiff(got, secretObject))
 				}
 				return &http.Response{StatusCode: http.StatusCreated, Header: kubefedtesting.DefaultHeader(), Body: kubefedtesting.ObjBody(codec, &secretObject)}, nil
+			case p == "/apis/extensions/v1beta1/namespaces/federation-system/deployments" && m == http.MethodGet:
+				got := strings.TrimPrefix(p, "/apis/extensions/v1beta1/namespaces/federation-system/deployments")
+				if got != cmName {
+					return nil, errors.NewNotFound(api.Resource("deployments"), got)
+				}
+				return &http.Response{StatusCode: http.StatusOK, Header: kubefedtesting.DefaultHeader(), Body: kubefedtesting.ObjBody(codec, &cmObject)}, nil
+			default:
+				return nil, fmt.Errorf("unexpected request: %#v\n%#v", req.URL, req)
+			}
+		}),
+	}
+	return f, nil
+}
+
+func fakeJoinTargetClusterFactory(clusterName, clusterCtx string) (cmdutil.Factory, error) {
+	if clusterCtx == "" {
+		clusterCtx = clusterName
+	}
+
+	configmapObject := v1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      util.KubeDnsConfigmapName,
+			Namespace: metav1.NamespaceSystem,
+		},
+		Data: map[string]string{
+			util.FedDomainMapKey: fmt.Sprintf("%s=%s", clusterCtx, "test-dns-zone"),
+		},
+	}
+
+	f, tf, codec, _ := cmdtesting.NewAPIFactory()
+	ns := dynamic.ContentConfig().NegotiatedSerializer
+	tf.ClientConfig = kubefedtesting.DefaultClientConfig()
+	tf.Client = &fake.RESTClient{
+		APIRegistry:          api.Registry,
+		NegotiatedSerializer: ns,
+		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
+			switch p, m := req.URL.Path, req.Method; {
+			case p == "/api/v1/namespaces/kube-system/configmaps/" && m == http.MethodPost:
+				body, err := ioutil.ReadAll(req.Body)
+				if err != nil {
+					return nil, err
+				}
+				var got v1.ConfigMap
+				_, _, err = codec.Decode(body, nil, &got)
+				if err != nil {
+					return nil, err
+				}
+				if !apiequality.Semantic.DeepEqual(got, configmapObject) {
+					return nil, fmt.Errorf("Unexpected configmap object\n\tDiff: %s", diff.ObjectGoPrintDiff(got, configmapObject))
+				}
+				return &http.Response{StatusCode: http.StatusCreated, Header: kubefedtesting.DefaultHeader(), Body: kubefedtesting.ObjBody(codec, &configmapObject)}, nil
 			default:
 				return nil, fmt.Errorf("unexpected request: %#v\n%#v", req.URL, req)
 			}
