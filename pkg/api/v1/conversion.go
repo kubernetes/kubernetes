@@ -27,6 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/extensions"
+	storageutil "k8s.io/kubernetes/pkg/apis/storage/util"
 )
 
 // This is a "fast-path" that avoids reflection for common types. It focuses on the objects that are
@@ -731,6 +732,61 @@ func Convert_v1_ResourceList_To_api_ResourceList(in *ResourceList, out *api.Reso
 
 		(*out)[api.ResourceName(key)] = val
 	}
+	return nil
+}
+
+func Convert_v1_PersistentVolume_To_api_PersistentVolume(in *PersistentVolume, out *api.PersistentVolume, s conversion.Scope) error {
+	// For backward compatibility, copy any beta class annotations into
+	// StorageClassName field.
+	// TODO: introduced in 1.6, remove in a couple of releases (kubernetes 1.8?)
+	if class, found := in.Annotations[storageutil.BetaStorageClassAnnotation]; found {
+		if in.Spec.StorageClassName == "" {
+			in.Spec.StorageClassName = class
+		}
+	}
+
+	if err := autoConvert_v1_PersistentVolume_To_api_PersistentVolume(in, out, s); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func Convert_api_PersistentVolume_To_v1_PersistentVolume(in *api.PersistentVolume, out *PersistentVolume, s conversion.Scope) error {
+	if err := autoConvert_api_PersistentVolume_To_v1_PersistentVolume(in, out, s); err != nil {
+		return err
+	}
+	// Explicitly do not convert pv.Spec.StorageClassName into beta annotation,
+	// it would break serialization unit test.
+	// TODO: introduced in 1.6, remove this comment in a couple of releases
+	// (kubernetes 1.8?)
+	return nil
+}
+
+func Convert_v1_PersistentVolumeClaim_To_api_PersistentVolumeClaim(in *PersistentVolumeClaim, out *api.PersistentVolumeClaim, s conversion.Scope) error {
+	if err := autoConvert_v1_PersistentVolumeClaim_To_api_PersistentVolumeClaim(in, out, s); err != nil {
+		return err
+	}
+
+	// For backward compatibility, copy any beta class annotations into
+	// StorageClassName field.
+	// TODO: introduced in 1.6, remove in a couple of releases (kubernetes 1.8?)
+	if class, found := in.Annotations[storageutil.BetaStorageClassAnnotation]; found {
+		if out.Spec.StorageClassName == nil {
+			out.Spec.StorageClassName = &class
+		}
+	}
+	return nil
+}
+
+func Convert_api_PersistentVolumeClaim_To_v1_PersistentVolumeClaim(in *api.PersistentVolumeClaim, out *PersistentVolumeClaim, s conversion.Scope) error {
+	if err := autoConvert_api_PersistentVolumeClaim_To_v1_PersistentVolumeClaim(in, out, s); err != nil {
+		return err
+	}
+	// Explicitly do not convert pv.Spec.StorageClassName into beta annotation,
+	// it would break serialization unit test.
+	// TODO: introduced in 1.6, remove this comment in a couple of releases
+	// (kubernetes 1.8?)
 	return nil
 }
 

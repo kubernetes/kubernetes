@@ -2451,10 +2451,6 @@ func autoConvert_v1_PersistentVolume_To_api_PersistentVolume(in *PersistentVolum
 	return nil
 }
 
-func Convert_v1_PersistentVolume_To_api_PersistentVolume(in *PersistentVolume, out *api.PersistentVolume, s conversion.Scope) error {
-	return autoConvert_v1_PersistentVolume_To_api_PersistentVolume(in, out, s)
-}
-
 func autoConvert_api_PersistentVolume_To_v1_PersistentVolume(in *api.PersistentVolume, out *PersistentVolume, s conversion.Scope) error {
 	out.ObjectMeta = in.ObjectMeta
 	if err := Convert_api_PersistentVolumeSpec_To_v1_PersistentVolumeSpec(&in.Spec, &out.Spec, s); err != nil {
@@ -2464,10 +2460,6 @@ func autoConvert_api_PersistentVolume_To_v1_PersistentVolume(in *api.PersistentV
 		return err
 	}
 	return nil
-}
-
-func Convert_api_PersistentVolume_To_v1_PersistentVolume(in *api.PersistentVolume, out *PersistentVolume, s conversion.Scope) error {
-	return autoConvert_api_PersistentVolume_To_v1_PersistentVolume(in, out, s)
 }
 
 func autoConvert_v1_PersistentVolumeClaim_To_api_PersistentVolumeClaim(in *PersistentVolumeClaim, out *api.PersistentVolumeClaim, s conversion.Scope) error {
@@ -2481,10 +2473,6 @@ func autoConvert_v1_PersistentVolumeClaim_To_api_PersistentVolumeClaim(in *Persi
 	return nil
 }
 
-func Convert_v1_PersistentVolumeClaim_To_api_PersistentVolumeClaim(in *PersistentVolumeClaim, out *api.PersistentVolumeClaim, s conversion.Scope) error {
-	return autoConvert_v1_PersistentVolumeClaim_To_api_PersistentVolumeClaim(in, out, s)
-}
-
 func autoConvert_api_PersistentVolumeClaim_To_v1_PersistentVolumeClaim(in *api.PersistentVolumeClaim, out *PersistentVolumeClaim, s conversion.Scope) error {
 	out.ObjectMeta = in.ObjectMeta
 	if err := Convert_api_PersistentVolumeClaimSpec_To_v1_PersistentVolumeClaimSpec(&in.Spec, &out.Spec, s); err != nil {
@@ -2496,13 +2484,19 @@ func autoConvert_api_PersistentVolumeClaim_To_v1_PersistentVolumeClaim(in *api.P
 	return nil
 }
 
-func Convert_api_PersistentVolumeClaim_To_v1_PersistentVolumeClaim(in *api.PersistentVolumeClaim, out *PersistentVolumeClaim, s conversion.Scope) error {
-	return autoConvert_api_PersistentVolumeClaim_To_v1_PersistentVolumeClaim(in, out, s)
-}
-
 func autoConvert_v1_PersistentVolumeClaimList_To_api_PersistentVolumeClaimList(in *PersistentVolumeClaimList, out *api.PersistentVolumeClaimList, s conversion.Scope) error {
 	out.ListMeta = in.ListMeta
-	out.Items = *(*[]api.PersistentVolumeClaim)(unsafe.Pointer(&in.Items))
+	if in.Items != nil {
+		in, out := &in.Items, &out.Items
+		*out = make([]api.PersistentVolumeClaim, len(*in))
+		for i := range *in {
+			if err := Convert_v1_PersistentVolumeClaim_To_api_PersistentVolumeClaim(&(*in)[i], &(*out)[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Items = nil
+	}
 	return nil
 }
 
@@ -2512,7 +2506,17 @@ func Convert_v1_PersistentVolumeClaimList_To_api_PersistentVolumeClaimList(in *P
 
 func autoConvert_api_PersistentVolumeClaimList_To_v1_PersistentVolumeClaimList(in *api.PersistentVolumeClaimList, out *PersistentVolumeClaimList, s conversion.Scope) error {
 	out.ListMeta = in.ListMeta
-	out.Items = *(*[]PersistentVolumeClaim)(unsafe.Pointer(&in.Items))
+	if in.Items != nil {
+		in, out := &in.Items, &out.Items
+		*out = make([]PersistentVolumeClaim, len(*in))
+		for i := range *in {
+			if err := Convert_api_PersistentVolumeClaim_To_v1_PersistentVolumeClaim(&(*in)[i], &(*out)[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Items = nil
+	}
 	return nil
 }
 

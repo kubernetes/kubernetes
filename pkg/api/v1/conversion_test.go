@@ -29,6 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
+	storageutil "k8s.io/kubernetes/pkg/apis/storage/util"
 )
 
 func TestPodLogOptions(t *testing.T) {
@@ -213,6 +214,202 @@ func TestResourceListConversion(t *testing.T) {
 		}
 		if !apiequality.Semantic.DeepEqual(test.expected, output) {
 			t.Errorf("unexpected conversion for case %d: Expected %+v; Got %+v", i, test.expected, output)
+		}
+	}
+}
+
+type pvTestSpec struct {
+	annotations      map[string]string
+	storageClassName string
+}
+
+func TestPersistentVolumeV1ToApiConversion(t *testing.T) {
+	tests := []struct {
+		input, expected pvTestSpec
+	}{
+		{ // No changes
+			input:    pvTestSpec{},
+			expected: pvTestSpec{},
+		},
+		{ // No changes
+			input: pvTestSpec{
+				storageClassName: "foo",
+			},
+			expected: pvTestSpec{
+				storageClassName: "foo",
+			},
+		},
+		{ // Annotation is copied to class
+			input: pvTestSpec{
+				annotations: map[string]string{
+					storageutil.BetaStorageClassAnnotation: "foo",
+				},
+			},
+			expected: pvTestSpec{
+				annotations: map[string]string{
+					storageutil.BetaStorageClassAnnotation: "foo",
+				},
+				storageClassName: "foo",
+			},
+		},
+		{ // Annotation does not overwrite existing class
+			input: pvTestSpec{
+				annotations: map[string]string{
+					storageutil.BetaStorageClassAnnotation: "foo",
+				},
+				storageClassName: "bar",
+			},
+			expected: pvTestSpec{
+				annotations: map[string]string{
+					storageutil.BetaStorageClassAnnotation: "foo",
+				},
+				storageClassName: "bar",
+			},
+		},
+	}
+
+	for i, test := range tests {
+		input := v1.PersistentVolume{
+			ObjectMeta: metav1.ObjectMeta{
+				Annotations: test.input.annotations,
+			},
+			Spec: v1.PersistentVolumeSpec{
+				StorageClassName:              test.input.storageClassName,
+				PersistentVolumeReclaimPolicy: v1.PersistentVolumeReclaimRetain,
+			},
+			Status: v1.PersistentVolumeStatus{
+				Phase: v1.VolumePending,
+			},
+		}
+		expected := api.PersistentVolume{
+			ObjectMeta: metav1.ObjectMeta{
+				Annotations: test.expected.annotations,
+			},
+			Spec: api.PersistentVolumeSpec{
+				StorageClassName:              test.expected.storageClassName,
+				PersistentVolumeReclaimPolicy: api.PersistentVolumeReclaimRetain,
+			},
+			Status: api.PersistentVolumeStatus{
+				Phase: api.VolumePending,
+			},
+		}
+
+		output := api.PersistentVolume{}
+
+		err := api.Scheme.Convert(&input, &output, nil)
+		if err != nil {
+			t.Fatalf("unexpected error for case %d: %v", i, err)
+		}
+		if !apiequality.Semantic.DeepEqual(expected, output) {
+			t.Errorf("unexpected conversion for case %d: Expected %+v; Got %+v", i, expected, output)
+		}
+	}
+}
+
+type claimTestSpec struct {
+	annotations      map[string]string
+	storageClassName *string
+}
+
+func TestPersistentVolumeClaimV1ToApiConversion(t *testing.T) {
+	fooClass := "foo"
+	barClass := "bar"
+	emptyClass := ""
+
+	tests := []struct {
+		input, expected claimTestSpec
+	}{
+		{ // No changes
+			input:    claimTestSpec{},
+			expected: claimTestSpec{},
+		},
+		{ // No changes
+			input:    claimTestSpec{storageClassName: &emptyClass},
+			expected: claimTestSpec{storageClassName: &emptyClass},
+		},
+		{ // No changes
+			input: claimTestSpec{
+				storageClassName: &fooClass,
+			},
+			expected: claimTestSpec{
+				storageClassName: &fooClass,
+			},
+		},
+		{ // Annotation is copied to class
+			input: claimTestSpec{
+				annotations: map[string]string{
+					storageutil.BetaStorageClassAnnotation: "foo",
+				},
+			},
+			expected: claimTestSpec{
+				annotations: map[string]string{
+					storageutil.BetaStorageClassAnnotation: "foo",
+				},
+				storageClassName: &fooClass,
+			},
+		},
+		{ // Annotation does not overwrite existing class
+			input: claimTestSpec{
+				annotations: map[string]string{
+					storageutil.BetaStorageClassAnnotation: "foo",
+				},
+				storageClassName: &barClass,
+			},
+			expected: claimTestSpec{
+				annotations: map[string]string{
+					storageutil.BetaStorageClassAnnotation: "foo",
+				},
+				storageClassName: &barClass,
+			},
+		},
+		{ // Annotation does not overwrite existing empty class
+			input: claimTestSpec{
+				annotations: map[string]string{
+					storageutil.BetaStorageClassAnnotation: "foo",
+				},
+				storageClassName: &emptyClass,
+			},
+			expected: claimTestSpec{
+				annotations: map[string]string{
+					storageutil.BetaStorageClassAnnotation: "foo",
+				},
+				storageClassName: &emptyClass,
+			},
+		},
+	}
+
+	for i, test := range tests {
+		input := v1.PersistentVolumeClaim{
+			ObjectMeta: metav1.ObjectMeta{
+				Annotations: test.input.annotations,
+			},
+			Spec: v1.PersistentVolumeClaimSpec{
+				StorageClassName: test.input.storageClassName,
+			},
+			Status: v1.PersistentVolumeClaimStatus{
+				Phase: v1.ClaimPending,
+			},
+		}
+		expected := api.PersistentVolumeClaim{
+			ObjectMeta: metav1.ObjectMeta{
+				Annotations: test.expected.annotations,
+			},
+			Spec: api.PersistentVolumeClaimSpec{
+				StorageClassName: test.expected.storageClassName,
+			},
+			Status: api.PersistentVolumeClaimStatus{
+				Phase: api.ClaimPending,
+			},
+		}
+
+		output := api.PersistentVolumeClaim{}
+
+		err := api.Scheme.Convert(&input, &output, nil)
+		if err != nil {
+			t.Fatalf("unexpected error for case %d: %v", i, err)
+		}
+		if !apiequality.Semantic.DeepEqual(expected, output) {
+			t.Errorf("unexpected conversion for case %d: Expected %+v; Got %+v", i, expected, output)
 		}
 	}
 }
