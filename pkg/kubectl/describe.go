@@ -42,6 +42,8 @@ import (
 	"k8s.io/kubernetes/federation/apis/federation"
 	fedclientset "k8s.io/kubernetes/federation/client/clientset_generated/federation_internalclientset"
 	"k8s.io/kubernetes/pkg/api"
+
+	"k8s.io/kubernetes/pkg/api/annotations"
 	"k8s.io/kubernetes/pkg/api/events"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/apis/apps"
@@ -1545,7 +1547,8 @@ func describeSecret(secret *api.Secret) (string, error) {
 		w.Write(LEVEL_0, "Name:\t%s\n", secret.Name)
 		w.Write(LEVEL_0, "Namespace:\t%s\n", secret.Namespace)
 		printLabelsMultiline(w, "Labels", secret.Labels)
-		printLabelsMultiline(w, "Annotations", secret.Annotations)
+		skipAnnotations := sets.NewString(annotations.LastAppliedConfigAnnotation)
+		printLabelsMultilineWithFilter(w, "Annotations", secret.Annotations, skipAnnotations)
 
 		w.Write(LEVEL_0, "\nType:\t%s\n", secret.Type)
 
@@ -2806,13 +2809,18 @@ func (fn typeFunc) Describe(exact interface{}, extra ...interface{}) (string, er
 	return s, err
 }
 
+// printLabelsMultilineWithFilter prints filtered multiple labels with a proper alignment.
+func printLabelsMultilineWithFilter(w *PrefixWriter, title string, labels map[string]string, skip sets.String) {
+	printLabelsMultilineWithIndent(w, "", title, "\t", labels, skip)
+}
+
 // printLabelsMultiline prints multiple labels with a proper alignment.
 func printLabelsMultiline(w *PrefixWriter, title string, labels map[string]string) {
-	printLabelsMultilineWithIndent(w, "", title, "\t", labels)
+	printLabelsMultilineWithIndent(w, "", title, "\t", labels, sets.NewString())
 }
 
 // printLabelsMultiline prints multiple labels with a user-defined alignment.
-func printLabelsMultilineWithIndent(w *PrefixWriter, initialIndent, title, innerIndent string, labels map[string]string) {
+func printLabelsMultilineWithIndent(w *PrefixWriter, initialIndent, title, innerIndent string, labels map[string]string, skip sets.String) {
 
 	w.Write(LEVEL_0, "%s%s:%s", initialIndent, title, innerIndent)
 
@@ -2824,7 +2832,14 @@ func printLabelsMultilineWithIndent(w *PrefixWriter, initialIndent, title, inner
 	// to print labels in the sorted order
 	keys := make([]string, 0, len(labels))
 	for key := range labels {
+		if skip.Has(key) {
+			continue
+		}
 		keys = append(keys, key)
+	}
+	if len(keys) == 0 {
+		w.WriteLine("<none>")
+		return
 	}
 	sort.Strings(keys)
 
