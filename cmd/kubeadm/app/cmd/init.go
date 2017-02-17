@@ -243,7 +243,7 @@ func (i *Init) Run(out io.Writer) error {
 		if err := kubemaster.CreateDiscoveryDeploymentAndSecret(i.cfg, client); err != nil {
 			return err
 		}
-		if err := tokenphase.UpdateOrCreateToken(client, i.cfg.Discovery.Token, kubeadmconstants.DefaultTokenDuration); err != nil {
+		if err := tokenphase.UpdateOrCreateToken(client, i.cfg.Discovery.Token, kubeadmconstants.DefaultTokenDuration, kubeadmconstants.DefaultTokenUsages); err != nil {
 			return err
 		}
 	}

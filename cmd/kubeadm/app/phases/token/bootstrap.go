@@ -36,18 +36,18 @@ const (
 
 // UpdateOrCreateToken attempts to update a token with the given ID, or create if it does
 // not already exist.
-func UpdateOrCreateToken(client *clientset.Clientset, d *kubeadmapi.TokenDiscovery, tokenDuration time.Duration) error {
+func UpdateOrCreateToken(client *clientset.Clientset, d *kubeadmapi.TokenDiscovery, tokenDuration time.Duration, usages []string) error {
 	// Let's make sure the token is valid
 	if valid, err := tokenutil.ValidateToken(d); !valid {
 		return err
 	}
-	secretName := fmt.Sprintf("%s%s", kubeadmconstants.BootstrapTokenSecretPrefix, d.ID)
+	secretName := kubeadmconstants.BootstrapTokenSecretPrefix + d.ID
 	var lastErr error
 	for i := 0; i < tokenCreateRetries; i++ {
 		secret, err := client.Secrets(metav1.NamespaceSystem).Get(secretName, metav1.GetOptions{})
 		if err == nil {
 			// Secret with this ID already exists, update it:
-			secret.Data = encodeTokenSecretData(d, tokenDuration)
+			secret.Data = encodeTokenSecretData(d, tokenDuration, usages)
 			if _, err := client.Secrets(metav1.NamespaceSystem).Update(secret); err == nil {
 				return nil
 			} else {
@@ -63,14 +63,13 @@ func UpdateOrCreateToken(client *clientset.Clientset, d *kubeadmapi.TokenDiscove
 					Name: secretName,
 				},
 				Type: v1.SecretType(bootstrapapi.SecretTypeBootstrapToken),
-				Data: encodeTokenSecretData(d, tokenDuration),
+				Data: encodeTokenSecretData(d, tokenDuration, usages),
 			}
 			if _, err := client.Secrets(metav1.NamespaceSystem).Create(secret); err == nil {
 				return nil
 			} else {
 				lastErr = err
 			}
-
 			continue
 		}
 
@@ -83,17 +82,20 @@ func UpdateOrCreateToken(client *clientset.Clientset, d *kubeadmapi.TokenDiscove
 }
 
 // encodeTokenSecretData takes the token discovery object and an optional duration and returns the .Data for the Secret
-func encodeTokenSecretData(d *kubeadmapi.TokenDiscovery, duration time.Duration) map[string][]byte {
+func encodeTokenSecretData(d *kubeadmapi.TokenDiscovery, duration time.Duration, usages []string) map[string][]byte {
 	data := map[string][]byte{
-		bootstrapapi.BootstrapTokenIDKey:           []byte(d.ID),
-		bootstrapapi.BootstrapTokenSecretKey:       []byte(d.Secret),
-		bootstrapapi.BootstrapTokenUsageSigningKey: []byte("true"),
+		bootstrapapi.BootstrapTokenIDKey:     []byte(d.ID),
+		bootstrapapi.BootstrapTokenSecretKey: []byte(d.Secret),
 	}
 
 	if duration > 0 {
 		// Get the current time, add the specified duration, and format it accordingly
 		durationString := time.Now().Add(duration).Format(time.RFC3339)
 		data[bootstrapapi.BootstrapTokenExpirationKey] = []byte(durationString)
+	}
+	for _, usage := range usages {
+		// TODO: Validate the usage string here before
+		data[bootstrapapi.BootstrapTokenUsagePrefix+usage] = []byte("true")
 	}
 	return data
 }

@@ -69,7 +69,8 @@ const (
 	MinimumAddressesInServiceSubnet = 10
 
 	// DefaultTokenDuration specifies the default amount of time that a bootstrap token will be valid
-	DefaultTokenDuration = time.Duration(8) * time.Hour
+	// Default behaviour is "never expire" == 0
+	DefaultTokenDuration = 0
 	// BootstrapTokenSecretPrefix the the prefix that will be used for the Secrets that are created as type bootstrap.kubernetes.io/token
 	BootstrapTokenSecretPrefix = "bootstrap-token-"
 
@@ -81,4 +82,9 @@ const (
 	CSVTokenBootstrapGroup = "kubeadm:kubelet-bootstrap"
 	// The file name of the tokens file that can be used for bootstrapping
 	CSVTokenFileName = "tokens.csv"
+)
+
+var (
+	// DefaultTokenUsages specifies the default functions a token will get
+	DefaultTokenUsages = []string{"signing", "authentication"}
 )
