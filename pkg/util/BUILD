@@ -11,6 +11,7 @@ filegroup(
     name = "all-srcs",
     srcs = [
         ":package-srcs",
+        "//pkg/util/annotations:all-srcs",
         "//pkg/util/async:all-srcs",
         "//pkg/util/bandwidth:all-srcs",
         "//pkg/util/config:all-srcs",
