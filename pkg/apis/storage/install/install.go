@@ -25,6 +25,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/storage"
+	"k8s.io/kubernetes/pkg/apis/storage/v1"
 	"k8s.io/kubernetes/pkg/apis/storage/v1beta1"
 )
 
@@ -37,12 +38,13 @@ func Install(groupFactoryRegistry announced.APIGroupFactoryRegistry, registry *r
 	if err := announced.NewGroupMetaFactory(
 		&announced.GroupMetaFactoryArgs{
 			GroupName:                  storage.GroupName,
-			VersionPreferenceOrder:     []string{v1beta1.SchemeGroupVersion.Version},
+			VersionPreferenceOrder:     []string{v1.SchemeGroupVersion.Version, v1beta1.SchemeGroupVersion.Version},
 			ImportPrefix:               "k8s.io/kubernetes/pkg/apis/storage",
 			RootScopedKinds:            sets.NewString("StorageClass"),
 			AddInternalObjectsToScheme: storage.AddToScheme,
 		},
 		announced.VersionToSchemeFunc{
+			v1.SchemeGroupVersion.Version:      v1.AddToScheme,
 			v1beta1.SchemeGroupVersion.Version: v1beta1.AddToScheme,
 		},
 	).Announce(groupFactoryRegistry).RegisterAndEnable(registry, scheme); err != nil {
