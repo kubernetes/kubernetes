@@ -93,7 +93,7 @@ spec:
           name: kube-proxy
 `
 
-	KubeDNSVersion = "1.12.1"
+	KubeDNSVersion = "1.13.0"
 
 	KubeDNSDeployment = `
 
