@@ -631,34 +631,9 @@ func (kl *Kubelet) killPod(pod *v1.Pod, runningPod *kubecontainer.Pod, status *k
 		return fmt.Errorf("one of the two arguments must be non-nil: runningPod, status")
 	}
 
-	// cache the pod cgroup Name for reducing the cpu resource limits of the pod cgroup once the pod is killed
-	pcm := kl.containerManager.NewPodContainerManager()
-	var podCgroup cm.CgroupName
-	reduceCpuLimits := true
-	if pod != nil {
-		podCgroup, _ = pcm.GetPodContainerName(pod)
-	} else {
-		// If the pod is nil then cgroup limit must have already
-		// been decreased earlier
-		reduceCpuLimits = false
-	}
-
 	// Call the container runtime KillPod method which stops all running containers of the pod
 	if err := kl.containerRuntime.KillPod(pod, p, gracePeriodOverride); err != nil {
 		return err
-	}
-	// At this point the pod might not completely free up cpu and memory resources.
-	// In such a case deleting the pod's cgroup might cause the pod's charges to be transferred
-	// to the parent cgroup. There might be various kinds of pod charges at this point.
-	// For example, any volume used by the pod that was backed by memory will have its
-	// pages charged to the pod cgroup until those volumes are removed by the kubelet.
-	// Hence we only reduce the cpu resource limits of the pod's cgroup
-	// and defer the responsibilty of destroying the pod's cgroup to the
-	// cleanup method and the housekeeping loop.
-	if reduceCpuLimits {
-		if err := pcm.ReduceCPULimits(podCgroup); err != nil {
-			glog.Warningf("Failed to reduce the CPU values to the minimum amount of shares: %v", err)
-		}
 	}
 	if err := kl.containerManager.UpdateQOSCgroups(); err != nil {
 		glog.V(2).Infof("Failed to update QoS cgroups while killing pod: %v", err)
@@ -717,8 +692,9 @@ func (kl *Kubelet) podIsTerminated(pod *v1.Pod) bool {
 	return false
 }
 
-// Returns true if all required node-level resources that a pod was consuming have been reclaimed by the kubelet.
-// Reclaiming resources is a prerequisite to deleting a pod from the API server.
+// OkToDeletePod returns true if all required node-level resources that a pod was consuming have
+// been reclaimed by the kubelet.  Reclaiming resources is a prerequisite to deleting a pod from the
+// API server.
 func (kl *Kubelet) OkToDeletePod(pod *v1.Pod) bool {
 	if pod.DeletionTimestamp == nil {
 		// We shouldnt delete pods whose DeletionTimestamp is not set
@@ -733,6 +709,13 @@ func (kl *Kubelet) OkToDeletePod(pod *v1.Pod) bool {
 		// We shouldnt delete pods whose volumes have not been cleaned up if we are not keeping terminated pod volumes
 		glog.V(3).Infof("Pod %q is terminated, but some volumes have not been cleaned up", format.Pod(pod))
 		return false
+	}
+	if kl.kubeletConfiguration.CgroupsPerQOS {
+		pcm := kl.containerManager.NewPodContainerManager()
+		if pcm.Exists(pod) {
+			glog.V(3).Infof("Pod %q is terminated, but pod cgroup sandbox has not been cleaned up", format.Pod(pod))
+			return false
+		}
 	}
 	return true
 }
@@ -861,9 +844,9 @@ func (kl *Kubelet) HandlePodCleanups() error {
 		glog.Errorf("Failed cleaning up bandwidth limits: %v", err)
 	}
 
-	// Remove any cgroups in the hierarchy for pods that should no longer exist
+	// Remove any cgroups in the hierarchy for pods that are no longer running.
 	if kl.cgroupsPerQOS {
-		kl.cleanupOrphanedPodCgroups(cgroupPods, allPods, runningPods)
+		kl.cleanupOrphanedPodCgroups(cgroupPods, runningPods)
 	}
 
 	kl.backOff.GC()
@@ -1518,31 +1501,34 @@ func (kl *Kubelet) GetPortForward(podName, podNamespace string, podUID types.UID
 	}
 }
 
-// cleanupOrphanedPodCgroups removes the Cgroups of pods that should not be
-// running and whose volumes have been cleaned up.
-func (kl *Kubelet) cleanupOrphanedPodCgroups(
-	cgroupPods map[types.UID]cm.CgroupName,
-	pods []*v1.Pod, runningPods []*kubecontainer.Pod) {
-	// Add all running and existing terminated pods to a set allPods
-	allPods := sets.NewString()
-	for _, pod := range pods {
-		allPods.Insert(string(pod.UID))
-	}
+// cleanupOrphanedPodCgroups removes cgroups that should no longer exist.
+// it reconciles the cached state of cgroupPods with the specified list of runningPods
+func (kl *Kubelet) cleanupOrphanedPodCgroups(cgroupPods map[types.UID]cm.CgroupName, runningPods []*kubecontainer.Pod) {
+	// Add all running pods to the set that we want to preserve
+	podSet := sets.NewString()
 	for _, pod := range runningPods {
-		allPods.Insert(string(pod.ID))
+		podSet.Insert(string(pod.ID))
 	}
 
 	pcm := kl.containerManager.NewPodContainerManager()
 
 	// Iterate over all the found pods to verify if they should be running
 	for uid, val := range cgroupPods {
-		if allPods.Has(string(uid)) {
+		// if the pod is in the running set, its not a candidate for cleanup
+		if podSet.Has(string(uid)) {
 			continue
 		}
 
-		// If volumes have not been unmounted/detached, do not delete the cgroup in case so the charge does not go to the parent.
-		if podVolumesExist := kl.podVolumesExist(uid); podVolumesExist {
-			glog.V(3).Infof("Orphaned pod %q found, but volumes are not cleaned up, Skipping cgroups deletion.", uid)
+		// If volumes have not been unmounted/detached, do not delete the cgroup
+		// so any memory backed volumes don't have their charges propagated to the
+		// parent croup.  If the volumes still exist, reduce the cpu shares for any
+		// process in the cgroup to the minimum value while we wait.  if the kubelet
+		// is configured to keep terminated volumes, we will delete the cgroup and not block.
+		if podVolumesExist := kl.podVolumesExist(uid); podVolumesExist && !kl.kubeletConfiguration.KeepTerminatedPodVolumes {
+			glog.V(3).Infof("Orphaned pod %q found, but volumes not yet removed.  Reducing cpu to minimum", uid)
+			if err := pcm.ReduceCPULimits(val); err != nil {
+				glog.Warningf("Failed to reduce cpu time for pod %q pending volume cleanup due to %v", uid, err)
+			}
 			continue
 		}
 		glog.V(3).Infof("Orphaned pod %q found, removing pod cgroups", uid)
