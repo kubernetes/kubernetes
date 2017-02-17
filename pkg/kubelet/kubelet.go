@@ -17,6 +17,9 @@ limitations under the License.
 package kubelet
 
 import (
+	"crypto/tls"
+	"crypto/x509"
+	"crypto/x509/pkix"
 	"fmt"
 	"net"
 	"net/http"
@@ -51,14 +54,17 @@ import (
 	"k8s.io/client-go/util/integer"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
+	certificates "k8s.io/kubernetes/pkg/apis/certificates/v1beta1"
 	"k8s.io/kubernetes/pkg/apis/componentconfig"
 	componentconfigv1alpha1 "k8s.io/kubernetes/pkg/apis/componentconfig/v1alpha1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
+	clientcertificates "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/certificates/v1beta1"
 	corelisters "k8s.io/kubernetes/pkg/client/listers/core/v1"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/features"
 	internalapi "k8s.io/kubernetes/pkg/kubelet/api"
 	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
+	"k8s.io/kubernetes/pkg/kubelet/certificate"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	"k8s.io/kubernetes/pkg/kubelet/config"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
@@ -669,6 +675,13 @@ func NewMainKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *Kub
 
 	klet.statusManager = status.NewManager(klet.kubeClient, klet.podManager, klet)
 
+	if utilfeature.DefaultFeatureGate.Enabled(features.RotateKubeletServerCertificate) {
+		klet.serverCertificateManager, err = initializeCertificateManager(klet.kubeClient, kubeCfg, klet.nodeName)
+		if err != nil {
+			return nil, fmt.Errorf("failed to initialize certificate manager: %v", err)
+		}
+	}
+
 	klet.probeManager = prober.NewManager(
 		klet.statusManager,
 		klet.livenessManager,
@@ -893,6 +906,9 @@ type Kubelet struct {
 	// Cached MachineInfo returned by cadvisor.
 	machineInfo *cadvisorapi.MachineInfo
 
+	// Handles certificate rotations.
+	serverCertificateManager certificate.Manager
+
 	// Syncs pods statuses with apiserver; also used as a cache of statuses.
 	statusManager status.Manager
 
@@ -1079,6 +1095,36 @@ type Kubelet struct {
 	dockerLegacyService dockershim.DockerLegacyService
 }
 
+func initializeCertificateManager(kubeClient clientset.Interface, kubeCfg *componentconfig.KubeletConfiguration, nodeName types.NodeName) (certificate.Manager, error) {
+	var certSigningRequestClient clientcertificates.CertificateSigningRequestInterface
+	if kubeClient != nil && kubeClient.Certificates() != nil {
+		certSigningRequestClient = kubeClient.Certificates().CertificateSigningRequests()
+	}
+	certificateStore, err := certificate.NewFileStore(
+		"kubelet-server",
+		kubeCfg.CertDirectory,
+		kubeCfg.CertDirectory,
+		kubeCfg.TLSCertFile,
+		kubeCfg.TLSPrivateKeyFile)
+	if err != nil {
+		return nil, fmt.Errorf("failed to initialize certificate store: %v", err)
+	}
+	return certificate.NewManager(&certificate.Config{
+		CertificateSigningRequestClient: certSigningRequestClient,
+		Template: &x509.CertificateRequest{
+			Subject: pkix.Name{
+				CommonName:   string(nodeName),
+				Organization: []string{"system:nodes"},
+			},
+		},
+		Usages: []certificates.KeyUsage{
+			certificates.UsageKeyEncipherment,
+			certificates.UsageServerAuth,
+		},
+		CertificateStore: certificateStore,
+	})
+}
+
 // setupDataDirs creates:
 // 1.  the root directory
 // 2.  the pods directory
@@ -1160,7 +1206,12 @@ func (kl *Kubelet) initializeModules() error {
 	// Step 4: Start the image manager.
 	kl.imageManager.Start()
 
-	// Step 5: Start container manager.
+	// Step 5: Start the certificate manager.
+	if utilfeature.DefaultFeatureGate.Enabled(features.RotateKubeletServerCertificate) {
+		kl.serverCertificateManager.Start()
+	}
+
+	// Step 6: Start container manager.
 	node, err := kl.getNodeAnyWay()
 	if err != nil {
 		return fmt.Errorf("Kubelet failed to get node info: %v", err)
@@ -1170,15 +1221,15 @@ func (kl *Kubelet) initializeModules() error {
 		return fmt.Errorf("Failed to start ContainerManager %v", err)
 	}
 
-	// Step 6: Start out of memory watcher.
+	// Step 7: Start out of memory watcher.
 	if err := kl.oomWatcher.Start(kl.nodeRef); err != nil {
 		return fmt.Errorf("Failed to start OOM watcher %v", err)
 	}
 
-	// Step 7: Initialize GPUs
+	// Step 8: Initialize GPUs
 	kl.gpuManager.Start()
 
-	// Step 8: Start resource analyzer
+	// Step 9: Start resource analyzer
 	kl.resourceAnalyzer.Start()
 
 	return nil
@@ -2080,6 +2131,11 @@ func (kl *Kubelet) ResyncInterval() time.Duration {
 
 // ListenAndServe runs the kubelet HTTP server.
 func (kl *Kubelet) ListenAndServe(address net.IP, port uint, tlsOptions *server.TLSOptions, auth server.AuthInterface, enableDebuggingHandlers, enableContentionProfiling bool) {
+	if utilfeature.DefaultFeatureGate.Enabled(features.RotateKubeletServerCertificate) && tlsOptions != nil {
+		tlsOptions.Config.GetCertificate = func(*tls.ClientHelloInfo) (*tls.Certificate, error) {
+			return kl.serverCertificateManager.Current(), nil
+		}
+	}
 	server.ListenAndServeKubeletServer(kl, kl.resourceAnalyzer, address, port, tlsOptions, auth, enableDebuggingHandlers, enableContentionProfiling, kl.containerRuntime, kl.criHandler)
 }
 
