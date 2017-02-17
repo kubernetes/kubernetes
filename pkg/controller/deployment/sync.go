@@ -26,6 +26,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	selectors "k8s.io/apimachinery/pkg/selectors"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
@@ -187,7 +188,7 @@ func (dc *DeploymentController) addHashKeyToRSAndPods(rs *extensions.ReplicaSet)
 	}
 
 	// 2. Update all pods managed by the rs to have the new hash label, so they will be correctly adopted.
-	selector, err := metav1.LabelSelectorAsSelector(updatedRS.Spec.Selector)
+	selector, err := selectors.LabelSelectorAsSelector(updatedRS.Spec.Selector)
 	if err != nil {
 		return nil, fmt.Errorf("error in converting selector to label selector for replica set %s: %s", updatedRS.Name, err)
 	}

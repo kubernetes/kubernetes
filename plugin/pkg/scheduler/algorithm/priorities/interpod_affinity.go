@@ -21,7 +21,7 @@ import (
 	"sync"
 
 	"github.com/golang/glog"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	selectors "k8s.io/apimachinery/pkg/selectors"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm"
@@ -84,7 +84,7 @@ func (p *podAffinityPriorityMap) setError(err error) {
 
 func (p *podAffinityPriorityMap) processTerm(term *v1.PodAffinityTerm, podDefiningAffinityTerm, podToCheck *v1.Pod, fixedNode *v1.Node, weight float64) {
 	namespaces := priorityutil.GetNamespacesFromPodAffinityTerm(podDefiningAffinityTerm, term)
-	selector, err := metav1.LabelSelectorAsSelector(term.LabelSelector)
+	selector, err := selectors.LabelSelectorAsSelector(term.LabelSelector)
 	if err != nil {
 		p.setError(err)
 		return

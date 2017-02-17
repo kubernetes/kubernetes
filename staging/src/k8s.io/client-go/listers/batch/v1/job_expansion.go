@@ -19,8 +19,8 @@ package v1
 import (
 	"fmt"
 
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/selectors"
 	"k8s.io/client-go/pkg/api/v1"
 	batch "k8s.io/client-go/pkg/apis/batch/v1"
 )
@@ -47,7 +47,7 @@ func (l *jobLister) GetPodJobs(pod *v1.Pod) (jobs []batch.Job, err error) {
 		return
 	}
 	for _, job := range list {
-		selector, _ := metav1.LabelSelectorAsSelector(job.Spec.Selector)
+		selector, _ := selectors.LabelSelectorAsSelector(job.Spec.Selector)
 		if !selector.Matches(labels.Set(pod.Labels)) {
 			continue
 		}

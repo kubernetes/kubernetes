@@ -532,7 +532,8 @@ kube::golang::build_binaries_for_platform() {
     kube::log::progress "    "
     for binary in "${statics[@]:+${statics[@]}}"; do
       local outfile=$(kube::golang::output_filename_for_binary "${binary}" "${platform}")
-      CGO_ENABLED=0 "${GO}" build -o "${outfile}" \
+      V=2 kube::log::info "${GO} build -o ${outfile} ${goflags[@]:+${goflags[@]}} -gcflags ${gogcflags} -ldflags ${goldflags} ${binary}"
+      CGO_ENABLED=0 "[1] ${GO}" build -o "${outfile}" \
         "${goflags[@]:+${goflags[@]}}" \
         -gcflags "${gogcflags}" \
         -ldflags "${goldflags}" \
@@ -541,6 +542,7 @@ kube::golang::build_binaries_for_platform() {
     done
     for binary in "${nonstatics[@]:+${nonstatics[@]}}"; do
       local outfile=$(kube::golang::output_filename_for_binary "${binary}" "${platform}")
+      V=2 kube::log::info "[2] ${GO} build -o ${outfile} ${goflags[@]:+${goflags[@]}} -gcflags ${gogcflags} -ldflags ${goldflags} ${binary}"
       "${GO}" build -o "${outfile}" \
         "${goflags[@]:+${goflags[@]}}" \
         -gcflags "${gogcflags}" \
@@ -552,12 +554,15 @@ kube::golang::build_binaries_for_platform() {
   else
     # Use go install.
     if [[ "${#nonstatics[@]}" != 0 ]]; then
+      V=2 kube::log::info "[3] ${GO} install ${goflags[@]:+${goflags[@]}} -gcflags ${gogcflags} -ldflags ${goldflags} ${nonstatics[@]:+${nonstatics[@]}}"
       "${GO}" install "${goflags[@]:+${goflags[@]}}" \
         -gcflags "${gogcflags}" \
         -ldflags "${goldflags}" \
         "${nonstatics[@]:+${nonstatics[@]}}"
+      V=2 kube::log::info "Install completed"
     fi
     if [[ "${#statics[@]}" != 0 ]]; then
+      V=2 kube::log::info "[4] ${GO} install -installsuffix cgo ${goflags[@]:+${goflags[@]}} -gcflags ${gogcflags} -ldflags ${goldflags} ${statics[@]:+${statics[@]}}"
       CGO_ENABLED=0 "${GO}" install -installsuffix cgo "${goflags[@]:+${goflags[@]}}" \
         -gcflags "${gogcflags}" \
         -ldflags "${goldflags}" \
@@ -591,6 +596,7 @@ kube::golang::build_binaries_for_platform() {
     # doing a staleness check on k8s.io/kubernetes/test/e2e package always
     # returns true (always stale). And that's why we need to install the
     # test package.
+    V=2 kube::log::info "${GO} install ${goflags[@]:+${goflags[@]}} -gcflags ${gogcflags} -ldflags ${goldflags} ${testpkg}"
     "${GO}" install "${goflags[@]:+${goflags[@]}}" \
         -gcflags "${gogcflags}" \
         -ldflags "${goldflags}" \

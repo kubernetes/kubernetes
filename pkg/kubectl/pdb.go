@@ -21,6 +21,7 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	selectors "k8s.io/apimachinery/pkg/selectors"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/kubernetes/pkg/apis/policy"
 )
@@ -70,7 +71,7 @@ func (s *PodDisruptionBudgetV1Generator) StructuredGenerate() (runtime.Object, e
 		return nil, err
 	}
 
-	selector, err := metav1.ParseToLabelSelector(s.Selector)
+	selector, err := selectors.ParseToLabelSelector(s.Selector)
 	if err != nil {
 		return nil, err
 	}

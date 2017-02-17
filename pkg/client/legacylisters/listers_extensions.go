@@ -20,8 +20,8 @@ import (
 	"fmt"
 
 	"k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/selectors"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/kubernetes/pkg/api/v1"
 	extensionsinternal "k8s.io/kubernetes/pkg/apis/extensions"
@@ -91,7 +91,7 @@ func (s *StoreToDeploymentLister) GetDeploymentsForReplicaSet(rs *extensions.Rep
 		return
 	}
 	for _, d := range dList {
-		selector, err := metav1.LabelSelectorAsSelector(d.Spec.Selector)
+		selector, err := selectors.LabelSelectorAsSelector(d.Spec.Selector)
 		if err != nil {
 			return nil, fmt.Errorf("invalid label selector: %v", err)
 		}
@@ -124,7 +124,7 @@ func (s *StoreToDeploymentLister) GetDeploymentsForPod(pod *v1.Pod) (deployments
 		return
 	}
 	for _, d := range dList {
-		selector, err := metav1.LabelSelectorAsSelector(d.Spec.Selector)
+		selector, err := selectors.LabelSelectorAsSelector(d.Spec.Selector)
 		if err != nil {
 			return nil, fmt.Errorf("invalid label selector: %v", err)
 		}
@@ -194,7 +194,7 @@ func (s *StoreToReplicaSetLister) GetPodReplicaSets(pod *v1.Pod) (rss []*extensi
 		if rs.Namespace != pod.Namespace {
 			continue
 		}
-		selector, err := metav1.LabelSelectorAsSelector(rs.Spec.Selector)
+		selector, err := selectors.LabelSelectorAsSelector(rs.Spec.Selector)
 		if err != nil {
 			return nil, fmt.Errorf("invalid selector: %v", err)
 		}

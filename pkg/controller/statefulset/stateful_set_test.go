@@ -21,7 +21,7 @@ import (
 	"testing"
 	"time"
 
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/selectors"
 
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
@@ -98,7 +98,7 @@ func TestStatefulSetControllerRespectsTermination(t *testing.T) {
 		t.Error(err)
 	}
 	ssc.syncStatefulSet(set, pods)
-	selector, err := metav1.LabelSelectorAsSelector(set.Spec.Selector)
+	selector, err := selectors.LabelSelectorAsSelector(set.Spec.Selector)
 	if err != nil {
 		t.Error(err)
 	}
@@ -149,7 +149,7 @@ func TestStatefulSetControllerBlocksScaling(t *testing.T) {
 	}
 	ssc.enqueueStatefulSet(set)
 	fakeWorker(ssc)
-	selector, err := metav1.LabelSelectorAsSelector(set.Spec.Selector)
+	selector, err := selectors.LabelSelectorAsSelector(set.Spec.Selector)
 	if err != nil {
 		t.Error(err)
 	}
@@ -374,7 +374,7 @@ func scaleUpStatefulSetController(set *apps.StatefulSet, ssc *StatefulSetControl
 	spc.setsIndexer.Add(set)
 	ssc.enqueueStatefulSet(set)
 	fakeWorker(ssc)
-	selector, err := metav1.LabelSelectorAsSelector(set.Spec.Selector)
+	selector, err := selectors.LabelSelectorAsSelector(set.Spec.Selector)
 	if err != nil {
 		return err
 	}
@@ -418,7 +418,7 @@ func scaleUpStatefulSetController(set *apps.StatefulSet, ssc *StatefulSetControl
 }
 
 func scaleDownStatefulSetController(set *apps.StatefulSet, ssc *StatefulSetController, spc *fakeStatefulPodControl) error {
-	selector, err := metav1.LabelSelectorAsSelector(set.Spec.Selector)
+	selector, err := selectors.LabelSelectorAsSelector(set.Spec.Selector)
 	if err != nil {
 		return err
 	}

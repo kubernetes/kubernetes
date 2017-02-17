@@ -20,8 +20,8 @@ import (
 	"fmt"
 
 	"github.com/golang/glog"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/selectors"
 	"k8s.io/client-go/pkg/api/v1"
 	policy "k8s.io/client-go/pkg/apis/policy/v1beta1"
 )
@@ -52,7 +52,7 @@ func (s *podDisruptionBudgetLister) GetPodPodDisruptionBudgets(pod *v1.Pod) ([]*
 	var pdbList []*policy.PodDisruptionBudget
 	for i := range list {
 		pdb := list[i]
-		selector, err = metav1.LabelSelectorAsSelector(pdb.Spec.Selector)
+		selector, err = selectors.LabelSelectorAsSelector(pdb.Spec.Selector)
 		if err != nil {
 			glog.Warningf("invalid selector: %v", err)
 			// TODO(mml): add an event to the PDB

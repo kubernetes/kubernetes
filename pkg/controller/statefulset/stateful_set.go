@@ -23,6 +23,7 @@ import (
 	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	selectors "k8s.io/apimachinery/pkg/selectors"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	clientv1 "k8s.io/client-go/pkg/api/v1"
 	"k8s.io/client-go/tools/cache"
@@ -200,7 +201,7 @@ func (ssc *StatefulSetController) deletePod(obj interface{}) {
 
 // getPodsForStatefulSets returns the pods that match the selectors of the given statefulset.
 func (ssc *StatefulSetController) getPodsForStatefulSet(set *apps.StatefulSet) ([]*v1.Pod, error) {
-	sel, err := metav1.LabelSelectorAsSelector(set.Spec.Selector)
+	sel, err := selectors.LabelSelectorAsSelector(set.Spec.Selector)
 	if err != nil {
 		return []*v1.Pod{}, err
 	}

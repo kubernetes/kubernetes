@@ -22,6 +22,8 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/golang/glog"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -209,6 +211,20 @@ func NewBadRequest(reason string) *StatusError {
 		Reason:  metav1.StatusReasonBadRequest,
 		Message: reason,
 	}}
+}
+
+// ErrorToBadRequest should safely convert any error to a BadRequest (400) StatusError, so that a 500 is not returned.
+func ErrorToBadRequest(err error) *StatusError {
+	switch err.(type) {
+	case *StatusError:
+		statusError := err.(*StatusError)
+		if statusError.ErrStatus.Code != http.StatusBadRequest {
+			glog.V(1).Infof("Error - attempt to convert StatusError %d to a 400", statusError.ErrStatus.Code)
+		}
+		return statusError
+	default:
+		return NewBadRequest(err.Error())
+	}
 }
 
 // NewServiceUnavailable creates an error that indicates that the requested service is unavailable.

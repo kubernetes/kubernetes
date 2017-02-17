@@ -553,14 +553,17 @@ func (g *genConversion) GenerateType(c *generator.Context, t *types.Type, w io.W
 	glog.V(5).Infof("generating for type %v", t)
 	peerType := getPeerTypeFor(c, t, g.peerPackages)
 	sw := generator.NewSnippetWriter(w, c, "$", "$")
-	g.generateConversion(t, peerType, sw)
-	g.generateConversion(peerType, t, sw)
+	g.generateConversion(t, peerType, sw, c)
+	g.generateConversion(peerType, t, sw, c)
 	return sw.Error()
 }
 
-func (g *genConversion) generateConversion(inType, outType *types.Type, sw *generator.SnippetWriter) {
+func (g *genConversion) generateConversion(inType, outType *types.Type, sw *generator.SnippetWriter, c *generator.Context) {
 	args := argsFromType(inType, outType).
 		With("Scope", types.Ref(conversionPackagePath, "Scope"))
+
+	buffer := &bytes.Buffer{}
+	dsw := generator.NewSnippetWriter(buffer, c, "$", "$")
 
 	sw.Do("func auto"+nameTmpl+"(in *$.inType|raw$, out *$.outType|raw$, s $.Scope|raw$) error {\n", args)
 	g.generateFor(inType, outType, sw)
@@ -569,6 +572,8 @@ func (g *genConversion) generateConversion(inType, outType *types.Type, sw *gene
 
 	if _, found := g.preexists(inType, outType); found {
 		// There is a public manual Conversion method: use it.
+		dsw.Do(nameTmpl, args)
+		glog.Errorf("WRF: Using pre-existing %s.", buffer.String())
 	} else if skipped := g.skippedFields[inType]; len(skipped) != 0 {
 		// The inType had some fields we could not generate.
 		glog.Errorf("Warning: could not find nor generate a final Conversion function for %v -> %v", inType, outType)
@@ -578,6 +583,8 @@ func (g *genConversion) generateConversion(inType, outType *types.Type, sw *gene
 		}
 	} else {
 		// Emit a public conversion function.
+		dsw.Do(nameTmpl, args)
+		glog.Errorf("WRF: Generating %s.", buffer.String())
 		sw.Do("func "+nameTmpl+"(in *$.inType|raw$, out *$.outType|raw$, s $.Scope|raw$) error {\n", args)
 		sw.Do("return auto"+nameTmpl+"(in, out, s)\n", args)
 		sw.Do("}\n\n", nil)
