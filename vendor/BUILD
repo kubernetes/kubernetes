@@ -9746,9 +9746,6 @@ go_test(
     library = ":k8s.io/apiserver/pkg/endpoints",
     tags = ["automanaged"],
     deps = [
-        "//pkg/api:go_default_library",
-        "//plugin/pkg/admission/admit:go_default_library",
-        "//plugin/pkg/admission/deny:go_default_library",
         "//vendor:github.com/emicklei/go-restful",
         "//vendor:golang.org/x/net/websocket",
         "//vendor:k8s.io/apimachinery/pkg/api/equality",
@@ -9778,6 +9775,7 @@ go_test(
         "//vendor:k8s.io/apiserver/pkg/endpoints/request",
         "//vendor:k8s.io/apiserver/pkg/endpoints/testing",
         "//vendor:k8s.io/apiserver/pkg/registry/rest",
+        "//vendor:k8s.io/client-go/pkg/api",
     ],
 )
 
@@ -9823,7 +9821,6 @@ go_test(
     library = ":k8s.io/apiserver/pkg/endpoints/filters",
     tags = ["automanaged"],
     deps = [
-        "//pkg/apis/batch:go_default_library",
         "//vendor:k8s.io/apimachinery/pkg/util/sets",
         "//vendor:k8s.io/apiserver/pkg/authentication/authenticator",
         "//vendor:k8s.io/apiserver/pkg/authentication/user",
@@ -9831,6 +9828,7 @@ go_test(
         "//vendor:k8s.io/apiserver/pkg/endpoints/handlers/responsewriters",
         "//vendor:k8s.io/apiserver/pkg/endpoints/request",
         "//vendor:k8s.io/client-go/pkg/apis/authentication",
+        "//vendor:k8s.io/client-go/pkg/apis/batch",
     ],
 )
 
@@ -9868,9 +9866,6 @@ go_test(
     library = ":k8s.io/apiserver/pkg/endpoints/handlers",
     tags = ["automanaged"],
     deps = [
-        "//pkg/api:go_default_library",
-        "//pkg/api/testapi:go_default_library",
-        "//pkg/api/v1:go_default_library",
         "//vendor:github.com/emicklei/go-restful",
         "//vendor:github.com/evanphx/json-patch",
         "//vendor:k8s.io/apimachinery/pkg/api/equality",
@@ -9883,6 +9878,9 @@ go_test(
         "//vendor:k8s.io/apimachinery/pkg/util/strategicpatch",
         "//vendor:k8s.io/apiserver/pkg/endpoints/request",
         "//vendor:k8s.io/apiserver/pkg/registry/rest",
+        "//vendor:k8s.io/client-go/pkg/api",
+        "//vendor:k8s.io/client-go/pkg/api/install",
+        "//vendor:k8s.io/client-go/pkg/api/v1",
     ],
 )
 
@@ -10199,7 +10197,6 @@ go_test(
     library = ":k8s.io/apiserver/pkg/registry/generic/rest",
     tags = ["automanaged"],
     deps = [
-        "//pkg/api:go_default_library",
         "//vendor:github.com/stretchr/testify/assert",
         "//vendor:github.com/stretchr/testify/require",
         "//vendor:golang.org/x/net/websocket",
@@ -10210,6 +10207,7 @@ go_test(
         "//vendor:k8s.io/apiserver/pkg/features",
         "//vendor:k8s.io/apiserver/pkg/util/feature",
         "//vendor:k8s.io/apiserver/pkg/util/proxy",
+        "//vendor:k8s.io/client-go/pkg/api",
     ],
 )
 
@@ -10306,12 +10304,11 @@ go_test(
     library = ":k8s.io/apiserver/pkg/server",
     tags = ["automanaged"],
     deps = [
-        "//pkg/generated/openapi:go_default_library",
-        "//vendor:github.com/go-openapi/spec",
         "//vendor:github.com/stretchr/testify/assert",
         "//vendor:k8s.io/apimachinery/pkg/api/meta",
         "//vendor:k8s.io/apimachinery/pkg/apimachinery",
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
+        "//vendor:k8s.io/apimachinery/pkg/openapi",
         "//vendor:k8s.io/apimachinery/pkg/runtime",
         "//vendor:k8s.io/apimachinery/pkg/runtime/schema",
         "//vendor:k8s.io/apimachinery/pkg/runtime/serializer",
@@ -10325,7 +10322,6 @@ go_test(
         "//vendor:k8s.io/apiserver/pkg/endpoints/request",
         "//vendor:k8s.io/apiserver/pkg/registry/rest",
         "//vendor:k8s.io/apiserver/pkg/storage/etcd/testing",
-        "//vendor:k8s.io/client-go/pkg/api",
         "//vendor:k8s.io/client-go/rest",
     ],
 )
@@ -10523,7 +10519,6 @@ go_test(
     library = ":k8s.io/apiserver/pkg/server/options",
     tags = ["automanaged"],
     deps = [
-        "//pkg/client/clientset_generated/clientset:go_default_library",
         "//vendor:github.com/stretchr/testify/assert",
         "//vendor:k8s.io/apimachinery/pkg/runtime",
         "//vendor:k8s.io/apimachinery/pkg/runtime/serializer",
@@ -10531,6 +10526,7 @@ go_test(
         "//vendor:k8s.io/apiserver/pkg/endpoints/request",
         "//vendor:k8s.io/apiserver/pkg/server",
         "//vendor:k8s.io/apiserver/pkg/util/flag",
+        "//vendor:k8s.io/client-go/discovery",
         "//vendor:k8s.io/client-go/rest",
         "//vendor:k8s.io/client-go/util/cert",
     ],
