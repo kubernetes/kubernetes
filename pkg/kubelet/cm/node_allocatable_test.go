@@ -4,15 +4,19 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/v1"
+	evictionapi "k8s.io/kubernetes/pkg/kubelet/eviction/api"
 )
 
 func TestGetNodeAllocatable(t *testing.T) {
+	memoryEvictionThreshold := resource.MustParse("100Mi")
 	testCases := []struct {
 		kubeReserved   v1.ResourceList
 		systemReserved v1.ResourceList
 		capacity       v1.ResourceList
 		expected       v1.ResourceList
+		hardThreshold  evictionapi.ThresholdValue
 	}{
 		{
 			kubeReserved:   getResourceList("100m", "100Mi"),
@@ -20,6 +24,25 @@ func TestGetNodeAllocatable(t *testing.T) {
 			capacity:       getResourceList("10", "10Gi"),
 			expected:       getResourceList("9850m", "10090Mi"),
 		},
+		{
+			kubeReserved:   getResourceList("100m", "100Mi"),
+			systemReserved: getResourceList("50m", "50Mi"),
+			hardThreshold: evictionapi.ThresholdValue{
+				Quantity: &memoryEvictionThreshold,
+			},
+			capacity: getResourceList("10", "10Gi"),
+			expected: getResourceList("9850m", "10475274240"),
+		},
+		{
+			kubeReserved:   getResourceList("100m", "100Mi"),
+			systemReserved: getResourceList("50m", "50Mi"),
+			hardThreshold: evictionapi.ThresholdValue{
+				Percentage: 0.05,
+			},
+			capacity: getResourceList("10", "10Gi"),
+			expected: getResourceList("9850m", "10043260920"),
+		},
+
 		{
 			kubeReserved:   v1.ResourceList{},
 			systemReserved: v1.ResourceList{},
@@ -51,6 +74,13 @@ func TestGetNodeAllocatable(t *testing.T) {
 			NodeAllocatableConfig: NodeAllocatableConfig{
 				KubeReserved:   tc.kubeReserved,
 				SystemReserved: tc.systemReserved,
+				HardEvictionThresholds: []evictionapi.Threshold{
+					{
+						Signal:   evictionapi.SignalMemoryAvailable,
+						Operator: evictionapi.OpLessThan,
+						Value:    tc.hardThreshold,
+					},
+				},
 			},
 		}
 		cm := &containerManagerImpl{

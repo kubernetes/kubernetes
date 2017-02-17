@@ -26,10 +26,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
-	"time"
 
-	"k8s.io/apimachinery/pkg/api/resource"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/apis/componentconfig"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
@@ -38,7 +35,6 @@ import (
 	"github.com/golang/glog"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
-	"github.com/pborman/uuid"
 )
 
 func getOOMScoreForPid(pid int) (int, error) {
@@ -75,18 +71,6 @@ func validateOOMScoreAdjSettingIsInRange(pid int, expectedMinOOMScoreAdj, expect
 	return nil
 }
 
-func getCapacity(f *framework.Framework) (v1.ResourceList, error) {
-	nodeList, err := f.ClientSet.Core().Nodes().List(metav1.ListOptions{})
-	if err != nil {
-		return nil, fmt.Errorf("failed to list nodes: %v", err)
-	}
-	if len(nodeList.Items) != 1 {
-		return nil, fmt.Errorf("unexpected number of nodes %d", len(nodeList.Items))
-	}
-	return nodeList.Items[0].Status.Capacity, nil
-
-}
-
 func expectFileValToEqual(filePath string, expectedValue int64) {
 	out, err := ioutil.ReadFile(filePath)
 	Expect(err).To(BeNil(), "failed to read file %q", filePath)
@@ -108,6 +92,9 @@ var _ = framework.KubeDescribe("Kubelet Container Manager [Serial]", func() {
 					"cpu":    "100m",
 					"memory": "100Mi",
 				}
+				initialConfig.EvictionHard = "memory<100Mi"
+				// Necessary for allocatable enforcement.
+				initialConfig.CgroupsPerQOS = true
 			})
 
 			It("Node Allocatable Pod Cgroup Is Found", func() {
@@ -123,7 +110,7 @@ var _ = framework.KubeDescribe("Kubelet Container Manager [Serial]", func() {
 				cgroupManager := cm.NewCgroupManager(subsystems, currentConfig.CgroupDriver)
 				Expect(cgroupManager.Exists(cm.CgroupName(expectedNAPodCgroup))).To(BeTrue(), "Expected Node Allocatable Cgroup Does not exist")
 				// TODO: Update cgroupManager to expose a Status interface to get current Cgroup Settings.
-				capacity, err := getCapacity(f)
+				capacity := getLocalNode(f).Status.Capacity
 				Expect(err).To(BeNil())
 				var allocatableCPU, allocatableMemory int64
 				// Total cpu reservation is 200m.
@@ -132,175 +119,182 @@ var _ = framework.KubeDescribe("Kubelet Container Manager [Serial]", func() {
 						allocatableCPU = cm.MilliCPUToShares(v.MilliValue()) - cm.MilliCPUToShares(200)
 					}
 					if k == v1.ResourceMemory {
-						allocatableMemory = v.Value() - (200 * 2014 * 1024)
+						allocatableMemory = v.Value() - (200 * 1024 * 1024)
 					}
 				}
-				// Total Memory reservation is 200Mi.
+				// Total Memory reservation is 200Mi excluding eviction thresholds.
 				// Expect CPU shares on node allocatable cgroup to equal allocatable.
 				expectFileValToEqual(filepath.Join(subsystems.MountPoints["cpu"], "kubepods", "cpu.shares"), allocatableCPU)
 				// Expect Memory limit on node allocatable cgroup to equal allocatable.
 				expectFileValToEqual(filepath.Join(subsystems.MountPoints["memory"], "kubepods", "cpu.shares"), allocatableMemory)
+				// Check that Allocatable reported to scheduler includes eviction thresholds.
+				schedulerAllocatable := getLocalNode(f).Status.Allocatable
+				// CPU based evictions are not supported.
+				Expect(schedulerAllocatable["cpu"]).To(Equal(allocatableCPU), "Unexpected cpu allocatable value exposed by the node. Expected: %d, got: %d", allocatableCPU, schedulerAllocatable["cpu"])
+				// Memory allocatable should take into account eviction thresholds.
+				Expect(schedulerAllocatable["memory"]).To(Equal(allocatableCPU-(100*1024*1024)), "Unexpected cpu allocatable value exposed by the node. Expected: %d, got: %d", allocatableCPU, schedulerAllocatable["cpu"])
+
 			})
 			// TODO: Add test for enforcing System Reserved and Kube Reserved. Requires creation of dummy cgroups.
 		})
 	})
-	Describe("Validate OOM score adjustments", func() {
-		Context("once the node is setup", func() {
-			It("docker daemon's oom-score-adj should be -999", func() {
-				dockerPids, err := getPidsForProcess(dockerProcessName, dockerPidFile)
-				Expect(err).To(BeNil(), "failed to get list of docker daemon pids")
-				for _, pid := range dockerPids {
-					Eventually(func() error {
-						return validateOOMScoreAdjSetting(pid, -999)
-					}, 5*time.Minute, 30*time.Second).Should(BeNil())
-				}
-			})
-			It("Kubelet's oom-score-adj should be -999", func() {
-				kubeletPids, err := getPidsForProcess(kubeletProcessName, "")
-				Expect(err).To(BeNil(), "failed to get list of kubelet pids")
-				Expect(len(kubeletPids)).To(Equal(1), "expected only one kubelet process; found %d", len(kubeletPids))
-				Eventually(func() error {
-					return validateOOMScoreAdjSetting(kubeletPids[0], -999)
-				}, 5*time.Minute, 30*time.Second).Should(BeNil())
-			})
-			Context("", func() {
-				It("pod infra containers oom-score-adj should be -998 and best effort container's should be 1000", func() {
-					var err error
-					podClient := f.PodClient()
-					podName := "besteffort" + string(uuid.NewUUID())
-					podClient.Create(&v1.Pod{
-						ObjectMeta: metav1.ObjectMeta{
-							Name: podName,
-						},
-						Spec: v1.PodSpec{
-							Containers: []v1.Container{
-								{
-									Image: "gcr.io/google_containers/serve_hostname:v1.4",
-									Name:  podName,
-								},
-							},
-						},
-					})
-					var pausePids []int
-					By("checking infra container's oom-score-adj")
-					Eventually(func() error {
-						pausePids, err = getPidsForProcess("pause", "")
-						if err != nil {
-							return fmt.Errorf("failed to get list of pause pids: %v", err)
-						}
-						for _, pid := range pausePids {
-							if err := validateOOMScoreAdjSetting(pid, -998); err != nil {
-								return err
-							}
-						}
-						return nil
-					}, 2*time.Minute, time.Second*4).Should(BeNil())
-					var shPids []int
-					By("checking besteffort container's oom-score-adj")
-					Eventually(func() error {
-						shPids, err = getPidsForProcess("serve_hostname", "")
-						if err != nil {
-							return fmt.Errorf("failed to get list of serve hostname process pids: %v", err)
-						}
-						if len(shPids) != 1 {
-							return fmt.Errorf("expected only one serve_hostname process; found %d", len(shPids))
-						}
-						return validateOOMScoreAdjSetting(shPids[0], 1000)
-					}, 2*time.Minute, time.Second*4).Should(BeNil())
-				})
-				// Log the running containers here to help debugging. Use `docker ps`
-				// directly for now because the test is already docker specific.
-				AfterEach(func() {
-					if CurrentGinkgoTestDescription().Failed {
-						By("Dump all running docker containers")
-						output, err := exec.Command("docker", "ps").CombinedOutput()
-						Expect(err).NotTo(HaveOccurred())
-						framework.Logf("Running docker containers:\n%s", string(output))
-					}
-				})
-			})
-			It("guaranteed container's oom-score-adj should be -998", func() {
-				podClient := f.PodClient()
-				podName := "guaranteed" + string(uuid.NewUUID())
-				podClient.Create(&v1.Pod{
-					ObjectMeta: metav1.ObjectMeta{
-						Name: podName,
-					},
-					Spec: v1.PodSpec{
-						Containers: []v1.Container{
-							{
-								Image: "gcr.io/google_containers/nginx-slim:0.7",
-								Name:  podName,
-								Resources: v1.ResourceRequirements{
-									Limits: v1.ResourceList{
-										"cpu":    resource.MustParse("100m"),
-										"memory": resource.MustParse("50Mi"),
-									},
-								},
-							},
-						},
-					},
-				})
-				var (
-					ngPids []int
-					err    error
-				)
-				Eventually(func() error {
-					ngPids, err = getPidsForProcess("nginx", "")
-					if err != nil {
-						return fmt.Errorf("failed to get list of nginx process pids: %v", err)
-					}
-					for _, pid := range ngPids {
-						if err := validateOOMScoreAdjSetting(pid, -998); err != nil {
-							return err
-						}
-					}
+	// Describe("Validate OOM score adjustments", func() {
+	// 	Context("once the node is setup", func() {
+	// 		It("docker daemon's oom-score-adj should be -999", func() {
+	// 			dockerPids, err := getPidsForProcess(dockerProcessName, dockerPidFile)
+	// 			Expect(err).To(BeNil(), "failed to get list of docker daemon pids")
+	// 			for _, pid := range dockerPids {
+	// 				Eventually(func() error {
+	// 					return validateOOMScoreAdjSetting(pid, -999)
+	// 				}, 5*time.Minute, 30*time.Second).Should(BeNil())
+	// 			}
+	// 		})
+	// 		It("Kubelet's oom-score-adj should be -999", func() {
+	// 			kubeletPids, err := getPidsForProcess(kubeletProcessName, "")
+	// 			Expect(err).To(BeNil(), "failed to get list of kubelet pids")
+	// 			Expect(len(kubeletPids)).To(Equal(1), "expected only one kubelet process; found %d", len(kubeletPids))
+	// 			Eventually(func() error {
+	// 				return validateOOMScoreAdjSetting(kubeletPids[0], -999)
+	// 			}, 5*time.Minute, 30*time.Second).Should(BeNil())
+	// 		})
+	// 		Context("", func() {
+	// 			It("pod infra containers oom-score-adj should be -998 and best effort container's should be 1000", func() {
+	// 				var err error
+	// 				podClient := f.PodClient()
+	// 				podName := "besteffort" + string(uuid.NewUUID())
+	// 				podClient.Create(&v1.Pod{
+	// 					ObjectMeta: metav1.ObjectMeta{
+	// 						Name: podName,
+	// 					},
+	// 					Spec: v1.PodSpec{
+	// 						Containers: []v1.Container{
+	// 							{
+	// 								Image: "gcr.io/google_containers/serve_hostname:v1.4",
+	// 								Name:  podName,
+	// 							},
+	// 						},
+	// 					},
+	// 				})
+	// 				var pausePids []int
+	// 				By("checking infra container's oom-score-adj")
+	// 				Eventually(func() error {
+	// 					pausePids, err = getPidsForProcess("pause", "")
+	// 					if err != nil {
+	// 						return fmt.Errorf("failed to get list of pause pids: %v", err)
+	// 					}
+	// 					for _, pid := range pausePids {
+	// 						if err := validateOOMScoreAdjSetting(pid, -998); err != nil {
+	// 							return err
+	// 						}
+	// 					}
+	// 					return nil
+	// 				}, 2*time.Minute, time.Second*4).Should(BeNil())
+	// 				var shPids []int
+	// 				By("checking besteffort container's oom-score-adj")
+	// 				Eventually(func() error {
+	// 					shPids, err = getPidsForProcess("serve_hostname", "")
+	// 					if err != nil {
+	// 						return fmt.Errorf("failed to get list of serve hostname process pids: %v", err)
+	// 					}
+	// 					if len(shPids) != 1 {
+	// 						return fmt.Errorf("expected only one serve_hostname process; found %d", len(shPids))
+	// 					}
+	// 					return validateOOMScoreAdjSetting(shPids[0], 1000)
+	// 				}, 2*time.Minute, time.Second*4).Should(BeNil())
+	// 			})
+	// 			// Log the running containers here to help debugging. Use `docker ps`
+	// 			// directly for now because the test is already docker specific.
+	// 			AfterEach(func() {
+	// 				if CurrentGinkgoTestDescription().Failed {
+	// 					By("Dump all running docker containers")
+	// 					output, err := exec.Command("docker", "ps").CombinedOutput()
+	// 					Expect(err).NotTo(HaveOccurred())
+	// 					framework.Logf("Running docker containers:\n%s", string(output))
+	// 				}
+	// 			})
+	// 		})
+	// 		It("guaranteed container's oom-score-adj should be -998", func() {
+	// 			podClient := f.PodClient()
+	// 			podName := "guaranteed" + string(uuid.NewUUID())
+	// 			podClient.Create(&v1.Pod{
+	// 				ObjectMeta: metav1.ObjectMeta{
+	// 					Name: podName,
+	// 				},
+	// 				Spec: v1.PodSpec{
+	// 					Containers: []v1.Container{
+	// 						{
+	// 							Image: "gcr.io/google_containers/nginx-slim:0.7",
+	// 							Name:  podName,
+	// 							Resources: v1.ResourceRequirements{
+	// 								Limits: v1.ResourceList{
+	// 									"cpu":    resource.MustParse("100m"),
+	// 									"memory": resource.MustParse("50Mi"),
+	// 								},
+	// 							},
+	// 						},
+	// 					},
+	// 				},
+	// 			})
+	// 			var (
+	// 				ngPids []int
+	// 				err    error
+	// 			)
+	// 			Eventually(func() error {
+	// 				ngPids, err = getPidsForProcess("nginx", "")
+	// 				if err != nil {
+	// 					return fmt.Errorf("failed to get list of nginx process pids: %v", err)
+	// 				}
+	// 				for _, pid := range ngPids {
+	// 					if err := validateOOMScoreAdjSetting(pid, -998); err != nil {
+	// 						return err
+	// 					}
+	// 				}
 
-					return nil
-				}, 2*time.Minute, time.Second*4).Should(BeNil())
+	// 				return nil
+	// 			}, 2*time.Minute, time.Second*4).Should(BeNil())
 
-			})
-			It("burstable container's oom-score-adj should be between [2, 1000)", func() {
-				podClient := f.PodClient()
-				podName := "burstable" + string(uuid.NewUUID())
-				podClient.Create(&v1.Pod{
-					ObjectMeta: metav1.ObjectMeta{
-						Name: podName,
-					},
-					Spec: v1.PodSpec{
-						Containers: []v1.Container{
-							{
-								Image: "gcr.io/google_containers/test-webserver:e2e",
-								Name:  podName,
-								Resources: v1.ResourceRequirements{
-									Requests: v1.ResourceList{
-										"cpu":    resource.MustParse("100m"),
-										"memory": resource.MustParse("50Mi"),
-									},
-								},
-							},
-						},
-					},
-				})
-				var (
-					wsPids []int
-					err    error
-				)
-				Eventually(func() error {
-					wsPids, err = getPidsForProcess("test-webserver", "")
-					if err != nil {
-						return fmt.Errorf("failed to get list of test-webserver process pids: %v", err)
-					}
-					for _, pid := range wsPids {
-						if err := validateOOMScoreAdjSettingIsInRange(pid, 2, 1000); err != nil {
-							return err
-						}
-					}
-					return nil
-				}, 2*time.Minute, time.Second*4).Should(BeNil())
+	// 		})
+	// 		It("burstable container's oom-score-adj should be between [2, 1000)", func() {
+	// 			podClient := f.PodClient()
+	// 			podName := "burstable" + string(uuid.NewUUID())
+	// 			podClient.Create(&v1.Pod{
+	// 				ObjectMeta: metav1.ObjectMeta{
+	// 					Name: podName,
+	// 				},
+	// 				Spec: v1.PodSpec{
+	// 					Containers: []v1.Container{
+	// 						{
+	// 							Image: "gcr.io/google_containers/test-webserver:e2e",
+	// 							Name:  podName,
+	// 							Resources: v1.ResourceRequirements{
+	// 								Requests: v1.ResourceList{
+	// 									"cpu":    resource.MustParse("100m"),
+	// 									"memory": resource.MustParse("50Mi"),
+	// 								},
+	// 							},
+	// 						},
+	// 					},
+	// 				},
+	// 			})
+	// 			var (
+	// 				wsPids []int
+	// 				err    error
+	// 			)
+	// 			Eventually(func() error {
+	// 				wsPids, err = getPidsForProcess("test-webserver", "")
+	// 				if err != nil {
+	// 					return fmt.Errorf("failed to get list of test-webserver process pids: %v", err)
+	// 				}
+	// 				for _, pid := range wsPids {
+	// 					if err := validateOOMScoreAdjSettingIsInRange(pid, 2, 1000); err != nil {
+	// 						return err
+	// 					}
+	// 				}
+	// 				return nil
+	// 			}, 2*time.Minute, time.Second*4).Should(BeNil())
 
-				// TODO: Test the oom-score-adj logic for burstable more accurately.
-			})
-		})
-	})
+	// 			// TODO: Test the oom-score-adj logic for burstable more accurately.
+	// 		})
+	// 	})
+	// })
 })

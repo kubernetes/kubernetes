@@ -71,6 +71,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/config"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/dockertools"
+	"k8s.io/kubernetes/pkg/kubelet/eviction"
 	"k8s.io/kubernetes/pkg/kubelet/server"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/util/configz"
@@ -308,14 +309,14 @@ func initConfigz(kc *componentconfig.KubeletConfiguration) (*configz.Config, err
 }
 
 // validateConfig validates configuration of Kubelet and returns an error is the input configuration is invalid.
-func validateConfig(s *options.KubeletServer) {
+func validateConfig(s *options.KubeletServer) error {
 	if !s.CgroupsPerQOS && len(s.EnforceNodeAllocatable) > 0 {
 		return fmt.Errorf("Node Allocatable enforcement is not supported unless Cgroups Per QOS feature is turned on")
 	}
 	if s.SystemCgroups != "" && s.CgroupRoot == "" {
 		return fmt.Errorf("invalid configuration: system container was specified and cgroup root was not specified")
 	}
-
+	return nil
 }
 
 func run(s *options.KubeletServer, kubeDeps *kubelet.KubeletDeps) (err error) {
@@ -376,7 +377,7 @@ func run(s *options.KubeletServer, kubeDeps *kubelet.KubeletDeps) (err error) {
 	}
 
 	// Validate configuration.
-	if err := validateConfig(); err != nil {
+	if err := validateConfig(s); err != nil {
 		return err
 	}
 
@@ -475,6 +476,10 @@ func run(s *options.KubeletServer, kubeDeps *kubelet.KubeletDeps) (err error) {
 		if err != nil {
 			return err
 		}
+		hardEvictionThresholds, err := eviction.ParseThresholdConfig(s.EvictionHard, "", "", "")
+		if err != nil {
+			return err
+		}
 		kubeDeps.ContainerManager, err = cm.NewContainerManager(
 			kubeDeps.Mounter,
 			kubeDeps.CAdvisorInterface,
@@ -494,6 +499,7 @@ func run(s *options.KubeletServer, kubeDeps *kubelet.KubeletDeps) (err error) {
 					EnforceNodeAllocatable:   sets.NewString(s.EnforceNodeAllocatable...),
 					KubeReserved:             kubeReserved,
 					SystemReserved:           systemReserved,
+					HardEvictionThresholds:   hardEvictionThresholds,
 				},
 			},
 			s.ExperimentalFailSwapOn)

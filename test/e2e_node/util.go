@@ -296,3 +296,9 @@ func logNodeEvents(f *framework.Framework) {
 	err := framework.ListNamespaceEvents(f.ClientSet, "")
 	framework.ExpectNoError(err)
 }
+
+func getLocalNode(f *framework.Framework) *v1.Node {
+	nodeList := framework.GetReadySchedulableNodesOrDie(f.ClientSet)
+	Expect(len(nodeList.Items)).To(Equal(1), "Unexpected number of node objects for node e2e. Expects only one node.")
+	return &nodeList.Items[0]
+}
