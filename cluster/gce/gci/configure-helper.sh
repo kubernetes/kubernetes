@@ -190,17 +190,79 @@ function mount-master-pd {
   chgrp -R etcd "${mount_point}/var/etcd"
 }
 
+function create-node-pki {
+  echo "Creating node pki files"
+
+  local -r pki_dir="/etc/srv/kubernetes/pki"
+  mkdir -p "${pki_dir}"
+
+  if [[ -z "${CA_CERT_BUNDLE:-}" ]]; then
+    CA_CERT_BUNDLE="${CA_CERT}"
+    CA_CERT_BUNDLE_PATH="${pki_dir}/ca-certificates.crt"
+    echo "${CA_CERT_BUNDLE}" | base64 --decode > "${CA_CERT_BUNDLE_PATH}"
+  fi
+
+  if [[ ! -z "${KUBELET_CERT:-}" && ! -z "${KUBELET_KEY:-}" ]]; then
+    KUBELET_CERT_PATH="${pki_dir}/kubelet.crt"
+    echo "${KUBELET_CERT}" | base64 --decode > "${KUBELET_CERT_PATH}"
+
+    KUBELET_KEY_PATH="${pki_dir}/kubelet.key"
+    echo "${KUBELET_KEY}" | base64 --decode > "${KUBELET_KEY_PATH}"
+  fi
+}
+
+function create-master-pki {
+  echo "Creating master pki files"
+
+  local -r pki_dir="/etc/srv/kubernetes/pki"
+  mkdir -p "${pki_dir}"
+
+  CA_CERT_PATH="${pki_dir}/ca.crt"
+  echo "${CA_CERT}" | base64 --decode > "${CA_CERT_PATH}"
+
+  # this is not true on GKE
+  if [[ ! -z "${CA_KEY:-}" ]]; then
+    CA_KEY_PATH="${pki_dir}/ca.key"
+    echo "${CA_KEY}" | base64 --decode > "${CA_KEY_PATH}"
+  fi
+
+  if [[ -z "${APISERVER_SERVER_CERT:-}" || -z "${APISERVER_SERVER_KEY:-}" ]]; then
+    APISERVER_SERVER_CERT="${MASTER_CERT}"
+    APISERVER_SERVER_CERT_PATH="${pki_dir}/apiserver.crt"
+    echo "${APISERVER_SERVER_CERT}" | base64 --decode > "${APISERVER_SERVER_CERT_PATH}"
+
+    APISERVER_SERVER_KEY="${MASTER_KEY}"
+    APISERVER_SERVER_KEY_PATH="${pki_dir}/apiserver.key"
+    echo "${APISERVER_SERVER_KEY}" | base64 --decode > "${APISERVER_SERVER_KEY_PATH}"
+  fi
+
+  if [[ -z "${APISERVER_CLIENT_CERT:-}" || -z "${APISERVER_CLIENT_KEY:-}" ]]; then
+    APISERVER_CLIENT_CERT="${KUBEAPISERVER_CERT}"
+    APISERVER_CLIENT_CERT_PATH="${pki_dir}/apiserver-client.crt"
+    echo "${APISERVER_CLIENT_CERT}" | base64 --decode > "${APISERVER_CLIENT_CERT_PATH}"
+
+    APISERVER_CLIENT_KEY="${KUBEAPISERVER_KEY}"
+    APISERVER_CLIENT_KEY_PATH="${pki_dir}/apiserver-client.key"
+    echo "${APISERVER_CLIENT_KEY}" | base64 --decode > "${APISERVER_CLIENT_KEY_PATH}"
+  fi
+
+  if [[ -z "${SERVICEACCOUNT_CERT:-}" || -z "${SERVICEACCOUNT_KEY:-}" ]]; then
+    SERVICEACCOUNT_CERT="${MASTER_CERT}"
+    SERVICEACCOUNT_CERT_PATH="${pki_dir}/serviceaccount.crt"
+    echo "${SERVICEACCOUNT_CERT}" | base64 --decode > "${SERVICEACCOUNT_CERT_PATH}"
+
+    SERVICEACCOUNT_KEY="${MASTER_KEY}"
+    SERVICEACCOUNT_KEY_PATH="${pki_dir}/serviceaccount.key"
+    echo "${SERVICEACCOUNT_KEY}" | base64 --decode > "${SERVICEACCOUNT_KEY_PATH}"
+  fi
+}
+
 # After the first boot and on upgrade, these files exist on the master-pd
 # and should never be touched again (except perhaps an additional service
 # account, see NB below.)
 function create-master-auth {
   echo "Creating master auth files"
   local -r auth_dir="/etc/srv/kubernetes"
-  if [[ ! -e "${auth_dir}/ca.crt" && ! -z "${CA_CERT:-}" && ! -z "${MASTER_CERT:-}" && ! -z "${MASTER_KEY:-}" ]]; then
-    echo "${CA_CERT}" | base64 --decode > "${auth_dir}/ca.crt"
-    echo "${MASTER_CERT}" | base64 --decode > "${auth_dir}/server.cert"
-    echo "${MASTER_KEY}" | base64 --decode > "${auth_dir}/server.key"
-  fi
   local -r basic_auth_csv="${auth_dir}/basic_auth.csv"
   if [[ ! -e "${basic_auth_csv}" ]]; then
     echo "${KUBE_PASSWORD},${KUBE_USER},admin" > "${basic_auth_csv}"
@@ -319,21 +381,18 @@ EOF
 
 function create-kubelet-kubeconfig {
   echo "Creating kubelet kubeconfig file"
-  if [[ -z "${KUBELET_CA_CERT:-}" ]]; then
-    KUBELET_CA_CERT="${CA_CERT}"
-  fi
   cat <<EOF >/var/lib/kubelet/kubeconfig
 apiVersion: v1
 kind: Config
 users:
 - name: kubelet
   user:
-    client-certificate-data: ${KUBELET_CERT}
-    client-key-data: ${KUBELET_KEY}
+    client-certificate: ${KUBELET_CERT_PATH}
+    client-key: ${KUBELET_KEY_PATH}
 clusters:
 - name: local
   cluster:
-    certificate-authority-data: ${KUBELET_CA_CERT}
+    certificate-authority: ${CA_CERT_BUNDLE_PATH}
 contexts:
 - context:
     cluster: local
@@ -365,7 +424,7 @@ users:
 clusters:
 - name: local
   cluster:
-    certificate-authority-data: ${CA_CERT}
+    certificate-authority-data: ${CA_CERT_BUNDLE}
 contexts:
 - context:
     cluster: local
@@ -762,12 +821,12 @@ function start-kube-apiserver {
   params+=" --authorization-policy-file=/etc/srv/kubernetes/abac-authz-policy.jsonl"
   params+=" --basic-auth-file=/etc/srv/kubernetes/basic_auth.csv"
   params+=" --cloud-provider=gce"
-  params+=" --client-ca-file=/etc/srv/kubernetes/ca.crt"
+  params+=" --client-ca-file=${CA_CERT_BUNDLE_PATH}"
   params+=" --etcd-servers=http://127.0.0.1:2379"
   params+=" --etcd-servers-overrides=/events#http://127.0.0.1:4002"
   params+=" --secure-port=443"
-  params+=" --tls-cert-file=/etc/srv/kubernetes/server.cert"
-  params+=" --tls-private-key-file=/etc/srv/kubernetes/server.key"
+  params+=" --tls-cert-file=${APISERVER_SERVER_CERT_PATH}"
+  params+=" --tls-private-key-file=${APISERVER_SERVER_KEY_PATH}"
   params+=" --token-auth-file=/etc/srv/kubernetes/known_tokens.csv"
   if [[ -n "${STORAGE_BACKEND:-}" ]]; then
     params+=" --storage-backend=${STORAGE_BACKEND}"
@@ -910,8 +969,8 @@ function start-kube-controller-manager {
   local params="${CONTROLLER_MANAGER_TEST_LOG_LEVEL:-"--v=2"} ${CONTROLLER_MANAGER_TEST_ARGS:-} ${CLOUD_CONFIG_OPT}"
   params+=" --cloud-provider=gce"
   params+=" --master=127.0.0.1:8080"
-  params+=" --root-ca-file=/etc/srv/kubernetes/ca.crt"
-  params+=" --service-account-private-key-file=/etc/srv/kubernetes/server.key"
+  params+=" --root-ca-file=${CA_CERT_BUNDLE_PATH}"
+  params+=" --service-account-private-key-file=${SERVICEACCOUNT_KEY_PATH}"
   if [[ -n "${ENABLE_GARBAGE_COLLECTOR:-}" ]]; then
     params+=" --enable-garbage-collector=${ENABLE_GARBAGE_COLLECTOR}"
   fi
@@ -1262,10 +1321,13 @@ ensure-local-ssds
 setup-logrotate
 if [[ "${KUBERNETES_MASTER:-}" == "true" ]]; then
   mount-master-pd
+  create-node-pki
+  create-master-pki
   create-master-auth
   create-master-kubelet-auth
   create-master-etcd-auth
 else
+  create-node-pki
   create-kubelet-kubeconfig
   create-kubeproxy-kubeconfig
 fi
