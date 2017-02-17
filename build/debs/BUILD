@@ -33,6 +33,7 @@ filegroup(
     "kube-controller-manager",
     "kube-proxy",
     "kube-aggregator",
+    "gke-certificates-controller",
 ]]
 
 deb_data(
@@ -89,6 +90,11 @@ k8s_deb(
     description = """Kubernetes Command Line Tool
 The Kubernetes command line tool for interacting with the Kubernetes API.
 """,
+)
+
+k8s_deb(
+    name = "gke-certificates-controller",
+    description = "GKE Certificates Controller",
 )
 
 k8s_deb(
