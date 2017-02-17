@@ -9,18 +9,18 @@ load(
 
 go_library(
     name = "go_default_library",
-    srcs = ["storage_storage.go"],
+    srcs = [
+        "expansion_generated.go",
+        "storageclass.go",
+    ],
     tags = ["automanaged"],
     deps = [
-        "//pkg/api:go_default_library",
         "//pkg/apis/storage:go_default_library",
         "//pkg/apis/storage/v1:go_default_library",
-        "//pkg/apis/storage/v1beta1:go_default_library",
-        "//pkg/registry/storage/storageclass/storage:go_default_library",
-        "//vendor:k8s.io/apiserver/pkg/registry/generic",
-        "//vendor:k8s.io/apiserver/pkg/registry/rest",
-        "//vendor:k8s.io/apiserver/pkg/server",
-        "//vendor:k8s.io/apiserver/pkg/server/storage",
+        "//vendor:k8s.io/apimachinery/pkg/api/errors",
+        "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
+        "//vendor:k8s.io/apimachinery/pkg/labels",
+        "//vendor:k8s.io/client-go/tools/cache",
     ],
 )
 
