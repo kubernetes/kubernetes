@@ -26,7 +26,8 @@ import (
 	. "github.com/onsi/ginkgo"
 )
 
-var _ = framework.KubeDescribe("Cluster level logging using GCL", func() {
+// TODO(crassirostris): Remove Flaky once test is stable
+var _ = framework.KubeDescribe("Cluster level logging using GCL [Flaky]", func() {
 	f := framework.NewDefaultFramework("gcl-logging")
 
 	BeforeEach(func() {
