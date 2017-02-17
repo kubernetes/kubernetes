@@ -116,7 +116,10 @@ var _ = framework.KubeDescribe("Dynamic provisioning", func() {
 			Expect(err).NotTo(HaveOccurred())
 
 			By("creating a claim with a dynamic provisioning annotation")
-			claim := newClaim(ns, "internal", false)
+			claim := newClaim(ns)
+			classFast := "fast"
+			claim.Spec.StorageClassName = &classFast
+
 			defer func() {
 				c.Core().PersistentVolumeClaims(ns).Delete(claim.Name, nil)
 			}()
@@ -132,6 +135,32 @@ var _ = framework.KubeDescribe("Dynamic provisioning", func() {
 				// providers allocate volumes in 1GiB chunks.
 				testDynamicProvisioning(c, claim, "2Gi")
 			}
+		})
+	})
+
+	framework.KubeDescribe("DynamicProvisioner Beta", func() {
+		It("should create and delete persistent volumes [Slow] [Volume]", func() {
+			framework.SkipUnlessProviderIs("openstack", "gce", "aws", "gke")
+
+			By("creating a StorageClass")
+			class := newStorageClass("", "beta")
+			_, err := c.Storage().StorageClasses().Create(class)
+			defer c.Storage().StorageClasses().Delete(class.Name, nil)
+			Expect(err).NotTo(HaveOccurred())
+
+			By("creating a claim with a dynamic provisioning annotation")
+			claim := newClaim(ns)
+			claim.Annotations = map[string]string{
+				storageutil.BetaStorageClassAnnotation: "fast",
+			}
+
+			defer func() {
+				c.Core().PersistentVolumeClaims(ns).Delete(claim.Name, nil)
+			}()
+			claim, err = c.Core().PersistentVolumeClaims(ns).Create(claim)
+			Expect(err).NotTo(HaveOccurred())
+
+			testDynamicProvisioning(c, claim, "2Gi")
 		})
 
 		// NOTE: Slow!  The test will wait up to 5 minutes (framework.ClaimProvisionTimeout) when there is
@@ -167,7 +196,7 @@ var _ = framework.KubeDescribe("Dynamic provisioning", func() {
 			}
 
 			By("Creating a StorageClass for the unmanaged zone")
-			sc := newStorageClass("kubernetes.io/gce-pd", suffix)
+			sc := newStorageClass("", suffix)
 			// Set an unmanaged zone.
 			sc.Parameters = map[string]string{"zone": unmanagedZone}
 			sc, err = c.Storage().StorageClasses().Create(sc)
@@ -175,7 +204,10 @@ var _ = framework.KubeDescribe("Dynamic provisioning", func() {
 			Expect(err).NotTo(HaveOccurred())
 
 			By("Creating a claim and expecting it to timeout")
-			pvc := newClaim(ns, suffix, false)
+			pvc := newClaim(ns)
+			className := sc.Name
+			pvc.Spec.StorageClassName = &className
+
 			pvc, err = c.Core().PersistentVolumeClaims(ns).Create(pvc)
 			defer Expect(c.Core().PersistentVolumeClaims(ns).Delete(pvc.Name, nil)).To(Succeed())
 			Expect(err).NotTo(HaveOccurred())
@@ -192,7 +224,9 @@ var _ = framework.KubeDescribe("Dynamic provisioning", func() {
 			framework.SkipUnlessProviderIs("openstack", "gce", "aws", "gke", "vsphere")
 
 			By("creating a claim with an alpha dynamic provisioning annotation")
-			claim := newClaim(ns, "", true)
+			claim := newClaim(ns)
+			claim.Annotations = map[string]string{storageutil.AlphaStorageClassAnnotation: ""}
+
 			defer func() {
 				c.Core().PersistentVolumeClaims(ns).Delete(claim.Name, nil)
 			}()
@@ -230,7 +264,9 @@ var _ = framework.KubeDescribe("Dynamic provisioning", func() {
 			Expect(err).NotTo(HaveOccurred())
 
 			By("creating a claim with a dynamic provisioning annotation")
-			claim := newClaim(ns, "external", false)
+			claim := newClaim(ns)
+			className := class.Name
+			claim.Spec.StorageClassName = &className
 			defer func() {
 				c.Core().PersistentVolumeClaims(ns).Delete(claim.Name, nil)
 			}()
@@ -244,7 +280,7 @@ var _ = framework.KubeDescribe("Dynamic provisioning", func() {
 	})
 })
 
-func newClaim(ns, suffix string, alpha bool) *v1.PersistentVolumeClaim {
+func newClaim(ns string) *v1.PersistentVolumeClaim {
 	claim := v1.PersistentVolumeClaim{
 		ObjectMeta: metav1.ObjectMeta{
 			GenerateName: "pvc-",
@@ -260,17 +296,6 @@ func newClaim(ns, suffix string, alpha bool) *v1.PersistentVolumeClaim {
 				},
 			},
 		},
-	}
-
-	if alpha {
-		claim.Annotations = map[string]string{
-			storageutil.AlphaStorageClassAnnotation: "",
-		}
-	} else {
-		claim.Annotations = map[string]string{
-			storageutil.StorageClassAnnotation: "myclass-" + suffix,
-		}
-
 	}
 
 	return &claim
