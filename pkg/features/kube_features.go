@@ -89,6 +89,14 @@ const (
 	// to take advantage of NoExecute Taints and Tolerations.
 	TaintBasedEvictions utilfeature.Feature = "TaintBasedEvictions"
 
+	// owner: @jcbsmpsn
+	// alpha: v1.7
+	//
+	// Gets a server certificate for the kubelet from the Certificate Signing
+	// Request API instead of generating one self signed and auto rotates the
+	// certificate as expiration approaches.
+	RotateKubeletServerCertificate utilfeature.Feature = "RotateKubeletServerCertificate"
+
 	// owner: @msau
 	// alpha: v1.7
 	//
@@ -113,6 +121,7 @@ var defaultKubernetesFeatureGates = map[utilfeature.Feature]utilfeature.FeatureS
 	AffinityInAnnotations:                       {Default: false, PreRelease: utilfeature.Alpha},
 	Accelerators:                                {Default: false, PreRelease: utilfeature.Alpha},
 	TaintBasedEvictions:                         {Default: false, PreRelease: utilfeature.Alpha},
+	RotateKubeletServerCertificate:              {Default: false, PreRelease: utilfeature.Alpha},
 	PersistentLocalVolumes:                      {Default: false, PreRelease: utilfeature.Alpha},
 
 	// inherited features from generic apiserver, relisted here to get a conflict if it is changed
