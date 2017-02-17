@@ -356,6 +356,94 @@ func TestGetCurrentCertificateOrBootstrap(t *testing.T) {
 	}
 }
 
+func TestInitializeCertificateSigningRequestClient(t *testing.T) {
+	var nilCertificate = &certificateData{}
+	testCases := []struct {
+		description             string
+		storeCert               *certificateData
+		bootstrapCert           *certificateData
+		apiCert                 *certificateData
+		expectedCertBeforeStart *certificateData
+		expectedCertAfterStart  *certificateData
+	}{
+		{
+			description:             "No current certificate, no bootstrap certificate",
+			storeCert:               nilCertificate,
+			bootstrapCert:           nilCertificate,
+			apiCert:                 apiServerCertData,
+			expectedCertBeforeStart: nilCertificate,
+			expectedCertAfterStart:  apiServerCertData,
+		},
+		{
+			description:             "No current certificate, bootstrap certificate",
+			storeCert:               nilCertificate,
+			bootstrapCert:           bootstrapCertData,
+			apiCert:                 apiServerCertData,
+			expectedCertBeforeStart: bootstrapCertData,
+			expectedCertAfterStart:  apiServerCertData,
+		},
+		{
+			description:             "Current certificate, no bootstrap certificate",
+			storeCert:               storeCertData,
+			bootstrapCert:           nilCertificate,
+			apiCert:                 apiServerCertData,
+			expectedCertBeforeStart: storeCertData,
+			expectedCertAfterStart:  storeCertData,
+		},
+		{
+			description:             "Current certificate, bootstrap certificate",
+			storeCert:               storeCertData,
+			bootstrapCert:           bootstrapCertData,
+			apiCert:                 apiServerCertData,
+			expectedCertBeforeStart: storeCertData,
+			expectedCertAfterStart:  storeCertData,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.description, func(t *testing.T) {
+			certificateStore := &fakeStore{
+				cert: tc.storeCert.certificate,
+			}
+
+			certificateManager, err := NewManager(&Config{
+				Template: &x509.CertificateRequest{
+					Subject: pkix.Name{
+						Organization: []string{"system:nodes"},
+						CommonName:   "system:node:fake-node-name",
+					},
+				},
+				Usages: []certificates.KeyUsage{
+					certificates.UsageDigitalSignature,
+					certificates.UsageKeyEncipherment,
+					certificates.UsageClientAuth,
+				},
+				CertificateStore:        certificateStore,
+				BootstrapCertificatePEM: tc.bootstrapCert.certificatePEM,
+				BootstrapKeyPEM:         tc.bootstrapCert.keyPEM,
+			})
+			if err != nil {
+				t.Errorf("Got %v, wanted no error.", err)
+			}
+
+			certificate := certificateManager.Current()
+			if !certificatesEqual(certificate, tc.expectedCertBeforeStart.certificate) {
+				t.Errorf("Got %v, wanted %v", certificateString(certificate), certificateString(tc.expectedCertBeforeStart.certificate))
+			}
+			certificateManager.CertificateSigningRequestClient(&fakeClient{
+				certificatePEM: tc.apiCert.certificatePEM,
+			})
+
+			certificateManager.Start()
+
+			certificate = certificateManager.Current()
+			if !certificatesEqual(certificate, tc.expectedCertAfterStart.certificate) {
+				t.Errorf("Got %v, wanted %v", certificateString(certificate), certificateString(tc.expectedCertAfterStart.certificate))
+			}
+		})
+	}
+}
+
 func TestInitializeOtherRESTClients(t *testing.T) {
 	var nilCertificate = &certificateData{}
 	testCases := []struct {
