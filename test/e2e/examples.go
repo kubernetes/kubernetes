@@ -264,20 +264,19 @@ var _ = framework.KubeDescribe("[Feature:Example]", func() {
 	framework.KubeDescribe("CassandraStatefulSet", func() {
 		It("should create statefulset", func() {
 			mkpath := func(file string) string {
-				return filepath.Join(framework.TestContext.RepoRoot, "examples/storage/cassandra", file)
+				return filepath.Join("examples/storage/cassandra", file)
 			}
 			serviceYaml := mkpath("cassandra-service.yaml")
 			nsFlag := fmt.Sprintf("--namespace=%v", ns)
 
 			// have to change dns prefix because of the dynamic namespace
-			input, err := ioutil.ReadFile(mkpath("cassandra-statefulset.yaml"))
-			Expect(err).NotTo(HaveOccurred())
+			input := generated.ReadOrDie(mkpath("cassandra-statefulset.yaml"))
 
 			output := strings.Replace(string(input), "cassandra-0.cassandra.default.svc.cluster.local", "cassandra-0.cassandra."+ns+".svc.cluster.local", -1)
 
 			statefulsetYaml := "/tmp/cassandra-statefulset.yaml"
 
-			err = ioutil.WriteFile(statefulsetYaml, []byte(output), 0644)
+			err := ioutil.WriteFile(statefulsetYaml, []byte(output), 0644)
 			Expect(err).NotTo(HaveOccurred())
 
 			By("Starting the cassandra service")
