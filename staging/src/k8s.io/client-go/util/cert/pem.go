@@ -22,6 +22,7 @@ import (
 	"encoding/pem"
 	"errors"
 	"fmt"
+	"io/ioutil"
 )
 
 // EncodePublicKeyPEM returns PEM-endcode public data
@@ -53,6 +54,33 @@ func EncodeCertPEM(cert *x509.Certificate) []byte {
 		Bytes: cert.Raw,
 	}
 	return pem.EncodeToMemory(&block)
+}
+
+// ReadPrivateKeyFromFile is a helper function for reading a private key from a PEM-encoded file
+func ReadPrivateKeyFromFile(file string) (interface{}, error) {
+	data, err := ioutil.ReadFile(file)
+	if err != nil {
+		return nil, err
+	}
+	key, err := ParsePrivateKeyPEM(data)
+	if err != nil {
+		return nil, fmt.Errorf("error reading private key file %s: %v", file, err)
+	}
+	return key, nil
+}
+
+// ReadPublicKeysFromFile is a helper function for reading x509.Certificates from a PEM-encoded file.
+// Reads public keys from both public and private key files.
+func ReadPublicKeysFromFile(file string) ([]interface{}, error) {
+	data, err := ioutil.ReadFile(file)
+	if err != nil {
+		return nil, err
+	}
+	keys, err := ParsePublicKeysPEM(data)
+	if err != nil {
+		return nil, fmt.Errorf("error reading public key file %s: %v", file, err)
+	}
+	return keys, nil
 }
 
 // ParsePrivateKeyPEM returns a private key parsed from a PEM block in the supplied data.
@@ -91,6 +119,37 @@ func ParsePrivateKeyPEM(keyData []byte) (interface{}, error) {
 	return nil, fmt.Errorf("data does not contain a valid RSA or ECDSA private key")
 }
 
+// ParsePublicKeysPEM is a helper function for reading an array of rsa.PublicKey or ecdsa.PublicKey from a PEM-encoded byte array.
+// Reads public keys from both public and private key files.
+func ParsePublicKeysPEM(keyData []byte) ([]interface{}, error) {
+	ok := false
+	var keys []interface{}
+	for len(keyData) > 0 {
+		var block *pem.Block
+		block, keyData = pem.Decode(keyData)
+		if block == nil {
+			break
+		}
+		// Only use PEM "PUBLIC KEY" blocks without extra headers
+		if block.Type != "PUBLIC KEY" || len(block.Headers) != 0 {
+			continue
+		}
+
+		key, err := x509.ParsePKIXPublicKey(block.Bytes)
+		if err != nil {
+			return keys, err
+		}
+
+		keys = append(keys, key)
+		ok = true
+	}
+
+	if !ok {
+		return keys, errors.New("data does not contain a valid RSA or ECDSA public keys")
+	}
+	return keys, nil
+}
+
 // ParseCertsPEM returns the x509.Certificates contained in the given PEM-encoded byte array
 // Returns an error if a certificate could not be parsed, or if the data does not contain any certificates
 func ParseCertsPEM(pemCerts []byte) ([]*x509.Certificate, error) {
@@ -117,7 +176,7 @@ func ParseCertsPEM(pemCerts []byte) ([]*x509.Certificate, error) {
 	}
 
 	if !ok {
-		return certs, errors.New("could not read any certificates")
+		return certs, errors.New("data does not contain a valid RSA or ECDSA certificates")
 	}
 	return certs, nil
 }
