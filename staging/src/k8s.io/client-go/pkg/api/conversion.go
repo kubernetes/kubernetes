@@ -27,6 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/selectors"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	utillabels "k8s.io/client-go/pkg/util/labels"
 )
@@ -245,7 +246,7 @@ func Convert_map_to_unversioned_LabelSelector(in *map[string]string, out *metav1
 
 func Convert_unversioned_LabelSelector_to_map(in *metav1.LabelSelector, out *map[string]string, s conversion.Scope) error {
 	var err error
-	*out, err = metav1.LabelSelectorAsMap(in)
+	*out, err = selectors.LabelSelectorAsMap(in)
 	return err
 }
 

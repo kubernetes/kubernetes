@@ -23,8 +23,6 @@ import (
 
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/conversion"
-	"k8s.io/apimachinery/pkg/fields"
-	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/intstr"
 )
@@ -43,12 +41,6 @@ func AddConversionFuncs(scheme *runtime.Scheme) error {
 
 		Convert_resource_Quantity_To_resource_Quantity,
 
-		Convert_string_To_labels_Selector,
-		Convert_labels_Selector_To_string,
-
-		Convert_string_To_fields_Selector,
-		Convert_fields_Selector_To_string,
-
 		Convert_Pointer_bool_To_bool,
 		Convert_bool_To_Pointer_bool,
 
@@ -63,9 +55,6 @@ func AddConversionFuncs(scheme *runtime.Scheme) error {
 
 		Convert_Pointer_float64_To_float64,
 		Convert_float64_To_Pointer_float64,
-
-		Convert_map_to_unversioned_LabelSelector,
-		Convert_unversioned_LabelSelector_to_map,
 
 		Convert_Slice_string_To_Slice_int32,
 	)
@@ -190,61 +179,10 @@ func Convert_Slice_string_To_unversioned_Time(input *[]string, out *Time, s conv
 	return out.UnmarshalQueryParameter(str)
 }
 
-func Convert_string_To_labels_Selector(in *string, out *labels.Selector, s conversion.Scope) error {
-	selector, err := labels.Parse(*in)
-	if err != nil {
-		return err
-	}
-	*out = selector
-	return nil
-}
-
-func Convert_string_To_fields_Selector(in *string, out *fields.Selector, s conversion.Scope) error {
-	selector, err := fields.ParseSelector(*in)
-	if err != nil {
-		return err
-	}
-	*out = selector
-	return nil
-}
-
-func Convert_labels_Selector_To_string(in *labels.Selector, out *string, s conversion.Scope) error {
-	if *in == nil {
-		return nil
-	}
-	*out = (*in).String()
-	return nil
-}
-
-func Convert_fields_Selector_To_string(in *fields.Selector, out *string, s conversion.Scope) error {
-	if *in == nil {
-		return nil
-	}
-	*out = (*in).String()
-	return nil
-}
-
 // +k8s:conversion-fn=copy-only
 func Convert_resource_Quantity_To_resource_Quantity(in *resource.Quantity, out *resource.Quantity, s conversion.Scope) error {
 	*out = *in
 	return nil
-}
-
-func Convert_map_to_unversioned_LabelSelector(in *map[string]string, out *LabelSelector, s conversion.Scope) error {
-	if in == nil {
-		return nil
-	}
-	out = new(LabelSelector)
-	for labelKey, labelValue := range *in {
-		AddLabelToSelector(out, labelKey, labelValue)
-	}
-	return nil
-}
-
-func Convert_unversioned_LabelSelector_to_map(in *LabelSelector, out *map[string]string, s conversion.Scope) error {
-	var err error
-	*out, err = LabelSelectorAsMap(in)
-	return err
 }
 
 // Convert_Slice_string_To_Slice_int32 converts multiple query parameters or

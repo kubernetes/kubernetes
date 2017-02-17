@@ -22,6 +22,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/conversion"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/selectors"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	v1 "k8s.io/client-go/pkg/api/v1"
 	"k8s.io/client-go/pkg/apis/extensions"
@@ -76,7 +77,7 @@ func Convert_extensions_ScaleStatus_To_v1beta1_ScaleStatus(in *extensions.ScaleS
 			out.Selector = in.Selector.MatchLabels
 		}
 
-		selector, err := metav1.LabelSelectorAsSelector(in.Selector)
+		selector, err := selectors.LabelSelectorAsSelector(in.Selector)
 		if err != nil {
 			return fmt.Errorf("invalid label selector: %v", err)
 		}
@@ -93,7 +94,7 @@ func Convert_v1beta1_ScaleStatus_To_extensions_ScaleStatus(in *ScaleStatus, out 
 	// new field can be expected to know about the old field (though that's not quite true, due
 	// to kubectl apply). However, these fields are readonly, so any non-nil value should work.
 	if in.TargetSelector != "" {
-		labelSelector, err := metav1.ParseToLabelSelector(in.TargetSelector)
+		labelSelector, err := selectors.ParseToLabelSelector(in.TargetSelector)
 		if err != nil {
 			out.Selector = nil
 			return fmt.Errorf("failed to parse target selector: %v", err)

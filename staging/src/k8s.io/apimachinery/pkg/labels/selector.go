@@ -24,6 +24,7 @@ import (
 	"strings"
 
 	"github.com/golang/glog"
+	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/selection"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation"
@@ -117,32 +118,32 @@ func NewRequirement(key string, op selection.Operator, vals []string) (*Requirem
 	switch op {
 	case selection.In, selection.NotIn:
 		if len(vals) == 0 {
-			return nil, fmt.Errorf("for 'in', 'notin' operators, values set can't be empty")
+			return nil, errors.ErrorToBadRequest(fmt.Errorf("for 'in', 'notin' operators, values set can't be empty"))
 		}
 	case selection.Equals, selection.DoubleEquals, selection.NotEquals:
 		if len(vals) != 1 {
-			return nil, fmt.Errorf("exact-match compatibility requires one single value")
+			return nil, errors.ErrorToBadRequest(fmt.Errorf("exact-match compatibility requires one single value"))
 		}
 	case selection.Exists, selection.DoesNotExist:
 		if len(vals) != 0 {
-			return nil, fmt.Errorf("values set must be empty for exists and does not exist")
+			return nil, errors.ErrorToBadRequest(fmt.Errorf("values set must be empty for exists and does not exist"))
 		}
 	case selection.GreaterThan, selection.LessThan:
 		if len(vals) != 1 {
-			return nil, fmt.Errorf("for 'Gt', 'Lt' operators, exactly one value is required")
+			return nil, errors.ErrorToBadRequest(fmt.Errorf("for 'Gt', 'Lt' operators, exactly one value is required"))
 		}
 		for i := range vals {
 			if _, err := strconv.ParseInt(vals[i], 10, 64); err != nil {
-				return nil, fmt.Errorf("for 'Gt', 'Lt' operators, the value must be an integer")
+				return nil, errors.ErrorToBadRequest(fmt.Errorf("for 'Gt', 'Lt' operators, the value must be an integer"))
 			}
 		}
 	default:
-		return nil, fmt.Errorf("operator '%v' is not recognized", op)
+		return nil, errors.ErrorToBadRequest(fmt.Errorf("operator '%v' is not recognized", op))
 	}
 
 	for i := range vals {
 		if err := validateLabelValue(vals[i]); err != nil {
-			return nil, err
+			return nil, errors.ErrorToBadRequest(err)
 		}
 	}
 	sort.Strings(vals)
@@ -756,10 +757,10 @@ func (p *Parser) parseExactValue() (sets.String, error) {
 //
 func Parse(selector string) (Selector, error) {
 	parsedSelector, err := parse(selector)
-	if err == nil {
-		return parsedSelector, nil
+	if err != nil {
+		return nil, errors.ErrorToBadRequest(err)
 	}
-	return nil, err
+	return parsedSelector, nil
 }
 
 // parse parses the string representation of the selector and returns the internalSelector struct.
@@ -832,5 +833,9 @@ func SelectorFromValidatedSet(ls Set) Selector {
 // See the documentation for Parse() function for more details.
 // TODO: Consider exporting the internalSelector type instead.
 func ParseToRequirements(selector string) ([]Requirement, error) {
-	return parse(selector)
+	req, err := parse(selector)
+	if err != nil {
+		return nil, errors.ErrorToBadRequest(err)
+	}
+	return req, nil
 }

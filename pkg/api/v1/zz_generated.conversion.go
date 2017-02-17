@@ -1863,10 +1863,10 @@ func Convert_api_List_To_v1_List(in *api.List, out *List, s conversion.Scope) er
 }
 
 func autoConvert_v1_ListOptions_To_api_ListOptions(in *ListOptions, out *api.ListOptions, s conversion.Scope) error {
-	if err := meta_v1.Convert_string_To_labels_Selector(&in.LabelSelector, &out.LabelSelector, s); err != nil {
+	if err := Convert_string_To_labels_Selector(&in.LabelSelector, &out.LabelSelector, s); err != nil {
 		return err
 	}
-	if err := meta_v1.Convert_string_To_fields_Selector(&in.FieldSelector, &out.FieldSelector, s); err != nil {
+	if err := Convert_string_To_fields_Selector(&in.FieldSelector, &out.FieldSelector, s); err != nil {
 		return err
 	}
 	out.Watch = in.Watch
@@ -1880,10 +1880,10 @@ func Convert_v1_ListOptions_To_api_ListOptions(in *ListOptions, out *api.ListOpt
 }
 
 func autoConvert_api_ListOptions_To_v1_ListOptions(in *api.ListOptions, out *ListOptions, s conversion.Scope) error {
-	if err := meta_v1.Convert_labels_Selector_To_string(&in.LabelSelector, &out.LabelSelector, s); err != nil {
+	if err := Convert_labels_Selector_To_string(&in.LabelSelector, &out.LabelSelector, s); err != nil {
 		return err
 	}
-	if err := meta_v1.Convert_fields_Selector_To_string(&in.FieldSelector, &out.FieldSelector, s); err != nil {
+	if err := Convert_fields_Selector_To_string(&in.FieldSelector, &out.FieldSelector, s); err != nil {
 		return err
 	}
 	out.Watch = in.Watch

@@ -32,6 +32,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	selectors "k8s.io/apimachinery/pkg/selectors"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -453,7 +454,7 @@ func (dc *DeploymentController) claimReplicaSets(deployment *extensions.Deployme
 		return err
 	}
 
-	deploymentSelector, err := metav1.LabelSelectorAsSelector(deployment.Spec.Selector)
+	deploymentSelector, err := selectors.LabelSelectorAsSelector(deployment.Spec.Selector)
 	if err != nil {
 		return fmt.Errorf("deployment %s/%s has invalid label selector: %v", deployment.Namespace, deployment.Name, err)
 	}

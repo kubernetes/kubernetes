@@ -27,6 +27,7 @@ import (
 	"github.com/golang/glog"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	selectors "k8s.io/apimachinery/pkg/selectors"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/kubernetes/pkg/api/v1"
@@ -931,7 +932,7 @@ func (c *PodAffinityChecker) anyPodMatchesPodAffinityTerm(pod *v1.Pod, allPods [
 	}
 	matchingPodExists := false
 	namespaces := priorityutil.GetNamespacesFromPodAffinityTerm(pod, term)
-	selector, err := metav1.LabelSelectorAsSelector(term.LabelSelector)
+	selector, err := selectors.LabelSelectorAsSelector(term.LabelSelector)
 	if err != nil {
 		return false, false, err
 	}
@@ -1014,7 +1015,7 @@ func getMatchingAntiAffinityTerms(pod *v1.Pod, nodeInfoMap map[string]*scheduler
 			}
 			for _, term := range getPodAntiAffinityTerms(affinity.PodAntiAffinity) {
 				namespaces := priorityutil.GetNamespacesFromPodAffinityTerm(pod, &term)
-				selector, err := metav1.LabelSelectorAsSelector(term.LabelSelector)
+				selector, err := selectors.LabelSelectorAsSelector(term.LabelSelector)
 				if err != nil {
 					catchError(err)
 					return
@@ -1044,7 +1045,7 @@ func (c *PodAffinityChecker) getMatchingAntiAffinityTerms(pod *v1.Pod, allPods [
 			}
 			for _, term := range getPodAntiAffinityTerms(affinity.PodAntiAffinity) {
 				namespaces := priorityutil.GetNamespacesFromPodAffinityTerm(existingPod, &term)
-				selector, err := metav1.LabelSelectorAsSelector(term.LabelSelector)
+				selector, err := selectors.LabelSelectorAsSelector(term.LabelSelector)
 				if err != nil {
 					return nil, err
 				}
@@ -1120,7 +1121,7 @@ func (c *PodAffinityChecker) satisfiesPodsAffinityAntiAffinity(pod *v1.Pod, node
 				return false
 			}
 			namespaces := priorityutil.GetNamespacesFromPodAffinityTerm(pod, &term)
-			selector, err := metav1.LabelSelectorAsSelector(term.LabelSelector)
+			selector, err := selectors.LabelSelectorAsSelector(term.LabelSelector)
 			if err != nil {
 				glog.V(10).Infof("Cannot parse selector on term %v for pod %v. Details %v",
 					term, podName(pod), err)

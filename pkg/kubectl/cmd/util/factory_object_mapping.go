@@ -30,10 +30,10 @@ import (
 	"github.com/spf13/cobra"
 
 	"k8s.io/apimachinery/pkg/api/meta"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	selectors "k8s.io/apimachinery/pkg/selectors"
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/dynamic"
 	restclient "k8s.io/client-go/rest"
@@ -241,7 +241,7 @@ func (f *ring1Factory) LogsForObject(object, options runtime.Object) (*restclien
 		if !ok {
 			return nil, errors.New("provided options object is not a PodLogOptions")
 		}
-		selector, err := metav1.LabelSelectorAsSelector(t.Spec.Selector)
+		selector, err := selectors.LabelSelectorAsSelector(t.Spec.Selector)
 		if err != nil {
 			return nil, fmt.Errorf("invalid label selector: %v", err)
 		}
@@ -331,19 +331,19 @@ func (f *ring1Factory) AttachablePodForObject(object runtime.Object) (*api.Pod, 
 		selector = labels.SelectorFromSet(t.Spec.Selector)
 	case *apps.StatefulSet:
 		namespace = t.Namespace
-		selector, err = metav1.LabelSelectorAsSelector(t.Spec.Selector)
+		selector, err = selectors.LabelSelectorAsSelector(t.Spec.Selector)
 		if err != nil {
 			return nil, fmt.Errorf("invalid label selector: %v", err)
 		}
 	case *extensions.Deployment:
 		namespace = t.Namespace
-		selector, err = metav1.LabelSelectorAsSelector(t.Spec.Selector)
+		selector, err = selectors.LabelSelectorAsSelector(t.Spec.Selector)
 		if err != nil {
 			return nil, fmt.Errorf("invalid label selector: %v", err)
 		}
 	case *batch.Job:
 		namespace = t.Namespace
-		selector, err = metav1.LabelSelectorAsSelector(t.Spec.Selector)
+		selector, err = selectors.LabelSelectorAsSelector(t.Spec.Selector)
 		if err != nil {
 			return nil, fmt.Errorf("invalid label selector: %v", err)
 		}

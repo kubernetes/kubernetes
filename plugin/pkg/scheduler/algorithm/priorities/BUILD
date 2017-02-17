@@ -37,6 +37,7 @@ go_library(
         "//vendor:k8s.io/apimachinery/pkg/api/resource",
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
         "//vendor:k8s.io/apimachinery/pkg/labels",
+        "//vendor:k8s.io/apimachinery/pkg/selectors",
         "//vendor:k8s.io/client-go/util/workqueue",
     ],
 )

@@ -19,8 +19,8 @@ package v1beta1
 import (
 	"fmt"
 
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/selectors"
 	extensions "k8s.io/client-go/pkg/apis/extensions/v1beta1"
 )
 
@@ -48,7 +48,7 @@ func (s *deploymentLister) GetDeploymentsForReplicaSet(rs *extensions.ReplicaSet
 
 	var deployments []*extensions.Deployment
 	for _, d := range dList {
-		selector, err := metav1.LabelSelectorAsSelector(d.Spec.Selector)
+		selector, err := selectors.LabelSelectorAsSelector(d.Spec.Selector)
 		if err != nil {
 			return nil, fmt.Errorf("invalid label selector: %v", err)
 		}

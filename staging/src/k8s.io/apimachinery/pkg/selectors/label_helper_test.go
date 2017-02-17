@@ -14,21 +14,22 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package v1
+package selectors
 
 import (
 	"reflect"
 	"strings"
 	"testing"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 )
 
 func TestLabelSelectorAsSelector(t *testing.T) {
 	matchLabels := map[string]string{"foo": "bar"}
-	matchExpressions := []LabelSelectorRequirement{{
+	matchExpressions := []metav1.LabelSelectorRequirement{{
 		Key:      "baz",
-		Operator: LabelSelectorOpIn,
+		Operator: metav1.LabelSelectorOpIn,
 		Values:   []string{"qux", "norf"},
 	}}
 	mustParse := func(s string) labels.Selector {
@@ -39,29 +40,29 @@ func TestLabelSelectorAsSelector(t *testing.T) {
 		return out
 	}
 	tc := []struct {
-		in        *LabelSelector
+		in        *metav1.LabelSelector
 		out       labels.Selector
 		expectErr bool
 	}{
 		{in: nil, out: labels.Nothing()},
-		{in: &LabelSelector{}, out: labels.Everything()},
+		{in: &metav1.LabelSelector{}, out: labels.Everything()},
 		{
-			in:  &LabelSelector{MatchLabels: matchLabels},
+			in:  &metav1.LabelSelector{MatchLabels: matchLabels},
 			out: mustParse("foo=bar"),
 		},
 		{
-			in:  &LabelSelector{MatchExpressions: matchExpressions},
+			in:  &metav1.LabelSelector{MatchExpressions: matchExpressions},
 			out: mustParse("baz in (norf,qux)"),
 		},
 		{
-			in:  &LabelSelector{MatchLabels: matchLabels, MatchExpressions: matchExpressions},
+			in:  &metav1.LabelSelector{MatchLabels: matchLabels, MatchExpressions: matchExpressions},
 			out: mustParse("baz in (norf,qux),foo=bar"),
 		},
 		{
-			in: &LabelSelector{
-				MatchExpressions: []LabelSelectorRequirement{{
+			in: &metav1.LabelSelector{
+				MatchExpressions: []metav1.LabelSelectorRequirement{{
 					Key:      "baz",
-					Operator: LabelSelectorOpExists,
+					Operator: metav1.LabelSelectorOpExists,
 					Values:   []string{"qux", "norf"},
 				}},
 			},
@@ -85,8 +86,8 @@ func TestLabelSelectorAsSelector(t *testing.T) {
 
 func TestLabelSelectorAsMap(t *testing.T) {
 	matchLabels := map[string]string{"foo": "bar"}
-	matchExpressions := func(operator LabelSelectorOperator, values []string) []LabelSelectorRequirement {
-		return []LabelSelectorRequirement{{
+	matchExpressions := func(operator metav1.LabelSelectorOperator, values []string) []metav1.LabelSelectorRequirement {
+		return []metav1.LabelSelectorRequirement{{
 			Key:      "baz",
 			Operator: operator,
 			Values:   values,
@@ -94,40 +95,40 @@ func TestLabelSelectorAsMap(t *testing.T) {
 	}
 
 	tests := []struct {
-		in        *LabelSelector
+		in        *metav1.LabelSelector
 		out       map[string]string
 		errString string
 	}{
 		{in: nil, out: nil},
 		{
-			in:  &LabelSelector{MatchLabels: matchLabels},
+			in:  &metav1.LabelSelector{MatchLabels: matchLabels},
 			out: map[string]string{"foo": "bar"},
 		},
 		{
-			in:  &LabelSelector{MatchLabels: matchLabels, MatchExpressions: matchExpressions(LabelSelectorOpIn, []string{"norf"})},
+			in:  &metav1.LabelSelector{MatchLabels: matchLabels, MatchExpressions: matchExpressions(metav1.LabelSelectorOpIn, []string{"norf"})},
 			out: map[string]string{"foo": "bar", "baz": "norf"},
 		},
 		{
-			in:  &LabelSelector{MatchExpressions: matchExpressions(LabelSelectorOpIn, []string{"norf"})},
+			in:  &metav1.LabelSelector{MatchExpressions: matchExpressions(metav1.LabelSelectorOpIn, []string{"norf"})},
 			out: map[string]string{"baz": "norf"},
 		},
 		{
-			in:        &LabelSelector{MatchLabels: matchLabels, MatchExpressions: matchExpressions(LabelSelectorOpIn, []string{"norf", "qux"})},
+			in:        &metav1.LabelSelector{MatchLabels: matchLabels, MatchExpressions: matchExpressions(metav1.LabelSelectorOpIn, []string{"norf", "qux"})},
 			out:       map[string]string{"foo": "bar"},
 			errString: "without a single value cannot be converted",
 		},
 		{
-			in:        &LabelSelector{MatchExpressions: matchExpressions(LabelSelectorOpNotIn, []string{"norf", "qux"})},
+			in:        &metav1.LabelSelector{MatchExpressions: matchExpressions(metav1.LabelSelectorOpNotIn, []string{"norf", "qux"})},
 			out:       map[string]string{},
 			errString: "cannot be converted",
 		},
 		{
-			in:        &LabelSelector{MatchLabels: matchLabels, MatchExpressions: matchExpressions(LabelSelectorOpExists, []string{})},
+			in:        &metav1.LabelSelector{MatchLabels: matchLabels, MatchExpressions: matchExpressions(metav1.LabelSelectorOpExists, []string{})},
 			out:       map[string]string{"foo": "bar"},
 			errString: "cannot be converted",
 		},
 		{
-			in:        &LabelSelector{MatchExpressions: matchExpressions(LabelSelectorOpDoesNotExist, []string{})},
+			in:        &metav1.LabelSelector{MatchExpressions: matchExpressions(metav1.LabelSelectorOpDoesNotExist, []string{})},
 			out:       map[string]string{},
 			errString: "cannot be converted",
 		},

@@ -57,6 +57,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	selectors "k8s.io/apimachinery/pkg/selectors"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/uuid"
@@ -720,7 +721,7 @@ func WaitForNamespacesDeleted(c clientset.Interface, namespaces []string, timeou
 }
 
 func waitForServiceAccountInNamespace(c clientset.Interface, ns, serviceAccountName string, timeout time.Duration) error {
-	w, err := c.Core().ServiceAccounts(ns).Watch(metav1.SingleObject(metav1.ObjectMeta{Name: serviceAccountName}))
+	w, err := c.Core().ServiceAccounts(ns).Watch(selectors.SingleObject(metav1.ObjectMeta{Name: serviceAccountName}))
 	if err != nil {
 		return err
 	}
@@ -2715,13 +2716,13 @@ func getSelectorFromRuntimeObject(obj runtime.Object) (labels.Selector, error) {
 	case *v1.ReplicationController:
 		return labels.SelectorFromSet(typed.Spec.Selector), nil
 	case *extensions.ReplicaSet:
-		return metav1.LabelSelectorAsSelector(typed.Spec.Selector)
+		return selectors.LabelSelectorAsSelector(typed.Spec.Selector)
 	case *extensions.Deployment:
-		return metav1.LabelSelectorAsSelector(typed.Spec.Selector)
+		return selectors.LabelSelectorAsSelector(typed.Spec.Selector)
 	case *extensions.DaemonSet:
-		return metav1.LabelSelectorAsSelector(typed.Spec.Selector)
+		return selectors.LabelSelectorAsSelector(typed.Spec.Selector)
 	case *batch.Job:
-		return metav1.LabelSelectorAsSelector(typed.Spec.Selector)
+		return selectors.LabelSelectorAsSelector(typed.Spec.Selector)
 	default:
 		return nil, fmt.Errorf("Unsupported kind when getting selector: %v", obj)
 	}
@@ -2973,7 +2974,7 @@ func DeleteReplicaSet(clientset clientset.Interface, internalClientset internalc
 // ReplicaSet selector (because the pods have completed termination).
 func waitForReplicaSetPodsGone(c clientset.Interface, rs *extensions.ReplicaSet) error {
 	return wait.PollImmediate(Poll, 2*time.Minute, func() (bool, error) {
-		selector, err := metav1.LabelSelectorAsSelector(rs.Spec.Selector)
+		selector, err := selectors.LabelSelectorAsSelector(rs.Spec.Selector)
 		ExpectNoError(err)
 		options := metav1.ListOptions{LabelSelector: selector.String()}
 		if pods, err := c.Core().Pods(rs.Namespace).List(options); err == nil && len(pods.Items) == 0 {
@@ -2989,7 +2990,7 @@ func WaitForReadyReplicaSet(c clientset.Interface, ns, name string) error {
 	if err != nil {
 		return err
 	}
-	selector, err := metav1.LabelSelectorAsSelector(rs.Spec.Selector)
+	selector, err := selectors.LabelSelectorAsSelector(rs.Spec.Selector)
 	if err != nil {
 		return err
 	}
@@ -3249,7 +3250,7 @@ func WatchRecreateDeployment(c clientset.Interface, d *extensions.Deployment) er
 		return fmt.Errorf("deployment %q does not use a Recreate strategy: %s", d.Name, d.Spec.Strategy.Type)
 	}
 
-	w, err := c.Extensions().Deployments(d.Namespace).Watch(metav1.SingleObject(metav1.ObjectMeta{Name: d.Name, ResourceVersion: d.ResourceVersion}))
+	w, err := c.Extensions().Deployments(d.Namespace).Watch(selectors.SingleObject(metav1.ObjectMeta{Name: d.Name, ResourceVersion: d.ResourceVersion}))
 	if err != nil {
 		return err
 	}

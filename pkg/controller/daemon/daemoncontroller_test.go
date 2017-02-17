@@ -23,6 +23,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	selectors "k8s.io/apimachinery/pkg/selectors"
 	"k8s.io/apiserver/pkg/storage/names"
 	core "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/cache"
@@ -650,7 +651,7 @@ func TestNumberReadyStatus(t *testing.T) {
 		t.Errorf("Wrong daemon %s status: %v", updated.Name, updated.Status)
 	}
 
-	selector, _ := metav1.LabelSelectorAsSelector(daemon.Spec.Selector)
+	selector, _ := selectors.LabelSelectorAsSelector(daemon.Spec.Selector)
 	daemonPods, _ := manager.podLister.Pods(daemon.Namespace).List(selector)
 	for _, pod := range daemonPods {
 		condition := v1.PodCondition{Type: v1.PodReady, Status: v1.ConditionTrue}

@@ -29,6 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	selectors "k8s.io/apimachinery/pkg/selectors"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/security/apparmor"
@@ -147,7 +148,7 @@ func runAppArmorTest(f *framework.Framework, shouldRun bool, profile string) v1.
 			f.ClientSet, pod.Name, f.Namespace.Name, framework.PodStartTimeout))
 	} else {
 		// Pod should remain in the pending state. Wait for the Reason to be set to "AppArmor".
-		w, err := f.PodClient().Watch(metav1.SingleObject(metav1.ObjectMeta{Name: pod.Name}))
+		w, err := f.PodClient().Watch(selectors.SingleObject(metav1.ObjectMeta{Name: pod.Name}))
 		framework.ExpectNoError(err)
 		_, err = watch.Until(framework.PodStartTimeout, w, func(e watch.Event) (bool, error) {
 			switch e.Type {

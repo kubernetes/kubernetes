@@ -24,9 +24,9 @@ import (
 	"strconv"
 	"strings"
 
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	unversionedvalidation "k8s.io/apimachinery/pkg/apis/meta/v1/validation"
 	"k8s.io/apimachinery/pkg/labels"
+	selectors "k8s.io/apimachinery/pkg/selectors"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation"
@@ -126,7 +126,7 @@ func ValidateDaemonSetSpec(spec *extensions.DaemonSetSpec, fldPath *field.Path) 
 
 	allErrs = append(allErrs, unversionedvalidation.ValidateLabelSelector(spec.Selector, fldPath.Child("selector"))...)
 
-	selector, err := metav1.LabelSelectorAsSelector(spec.Selector)
+	selector, err := selectors.LabelSelectorAsSelector(spec.Selector)
 	if err == nil && !selector.Matches(labels.Set(spec.Template.Labels)) {
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("template", "metadata", "labels"), spec.Template.Labels, "`selector` does not match template `labels`"))
 	}
@@ -251,7 +251,7 @@ func ValidateDeploymentSpec(spec *extensions.DeploymentSpec, fldPath *field.Path
 		}
 	}
 
-	selector, err := metav1.LabelSelectorAsSelector(spec.Selector)
+	selector, err := selectors.LabelSelectorAsSelector(spec.Selector)
 	if err != nil {
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("selector"), spec.Selector, "invalid label selector."))
 	} else {
@@ -550,7 +550,7 @@ func ValidateReplicaSetSpec(spec *extensions.ReplicaSetSpec, fldPath *field.Path
 		}
 	}
 
-	selector, err := metav1.LabelSelectorAsSelector(spec.Selector)
+	selector, err := selectors.LabelSelectorAsSelector(spec.Selector)
 	if err != nil {
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("selector"), spec.Selector, "invalid label selector."))
 	} else {

@@ -30,6 +30,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
+	selectors "k8s.io/apimachinery/pkg/selectors"
 	"k8s.io/apimachinery/pkg/util/errors"
 	intstrutil "k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -569,7 +570,7 @@ func ListReplicaSets(deployment *extensions.Deployment, getRSList rsListFunc) ([
 	//       should be a superset of the deployment's selector, see https://github.com/kubernetes/kubernetes/issues/19830;
 	//       or use controllerRef, see https://github.com/kubernetes/kubernetes/issues/2210
 	namespace := deployment.Namespace
-	selector, err := metav1.LabelSelectorAsSelector(deployment.Spec.Selector)
+	selector, err := selectors.LabelSelectorAsSelector(deployment.Spec.Selector)
 	if err != nil {
 		return nil, err
 	}
@@ -580,7 +581,7 @@ func ListReplicaSets(deployment *extensions.Deployment, getRSList rsListFunc) ([
 // ListPods returns a list of pods the given deployment targets.
 func ListPods(deployment *extensions.Deployment, getPodList podListFunc) (*v1.PodList, error) {
 	namespace := deployment.Namespace
-	selector, err := metav1.LabelSelectorAsSelector(deployment.Spec.Selector)
+	selector, err := selectors.LabelSelectorAsSelector(deployment.Spec.Selector)
 	if err != nil {
 		return nil, err
 	}
@@ -642,7 +643,7 @@ func FindOldReplicaSets(deployment *extensions.Deployment, rsList []*extensions.
 	for _, pod := range podList.Items {
 		podLabelsSelector := labels.Set(pod.ObjectMeta.Labels)
 		for _, rs := range rsList {
-			rsLabelsSelector, err := metav1.LabelSelectorAsSelector(rs.Spec.Selector)
+			rsLabelsSelector, err := selectors.LabelSelectorAsSelector(rs.Spec.Selector)
 			if err != nil {
 				return nil, nil, fmt.Errorf("invalid label selector: %v", err)
 			}
@@ -1016,11 +1017,11 @@ func OverlapsWith(current, other *extensions.Deployment) (bool, error) {
 	if current.UID == other.UID {
 		return false, nil
 	}
-	currentSelector, err := metav1.LabelSelectorAsSelector(current.Spec.Selector)
+	currentSelector, err := selectors.LabelSelectorAsSelector(current.Spec.Selector)
 	if err != nil {
 		return false, fmt.Errorf("deployment %s/%s has invalid label selector: %v", current.Namespace, current.Name, err)
 	}
-	otherSelector, err := metav1.LabelSelectorAsSelector(other.Spec.Selector)
+	otherSelector, err := selectors.LabelSelectorAsSelector(other.Spec.Selector)
 	if err != nil {
 		return false, fmt.Errorf("deployment %s/%s has invalid label selector: %v", other.Namespace, other.Name, err)
 	}
