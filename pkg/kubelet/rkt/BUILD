@@ -76,7 +76,7 @@ go_test(
         "//pkg/kubelet/lifecycle:go_default_library",
         "//pkg/kubelet/network:go_default_library",
         "//pkg/kubelet/network/kubenet:go_default_library",
-        "//pkg/kubelet/network/mock_network:go_default_library",
+        "//pkg/kubelet/network/testing:go_default_library",
         "//pkg/kubelet/types:go_default_library",
         "//pkg/util/exec:go_default_library",
         "//vendor:github.com/appc/spec/schema",
