@@ -127,7 +127,14 @@ func startNamespaceController(ctx ControllerContext) (bool, error) {
 			return snapshot, nil
 		}
 	}
-	namespaceController := namespacecontroller.NewNamespaceController(namespaceKubeClient, namespaceClientPool, discoverResourcesFn, ctx.Options.NamespaceSyncPeriod.Duration, v1.FinalizerKubernetes)
+	namespaceController := namespacecontroller.NewNamespaceController(
+		namespaceKubeClient,
+		namespaceClientPool,
+		discoverResourcesFn,
+		ctx.NewInformerFactory.Core().V1().Namespaces(),
+		ctx.Options.NamespaceSyncPeriod.Duration,
+		v1.FinalizerKubernetes,
+	)
 	go namespaceController.Run(int(ctx.Options.ConcurrentNamespaceSyncs), ctx.Stop)
 
 	return true, nil
