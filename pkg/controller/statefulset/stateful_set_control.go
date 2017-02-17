@@ -133,8 +133,17 @@ func (ssc *defaultStatefulSetControl) UpdateStatefulSet(set *apps.StatefulSet, p
 				set.Name, replicas[i].Name)
 			return nil
 		}
-		// Enforce the StatefulSet invariants,
-		if err := ssc.podControl.UpdateStatefulPod(set, replicas[i]); err != nil {
+		// Enforce the StatefulSet invariants
+		if identityMatches(set, replicas[i]) && storageMatches(set, replicas[i]) {
+			continue
+		}
+		// Make a deep copy so we don't mutate the shared cache
+		copy, err := api.Scheme.DeepCopy(replicas[i])
+		if err != nil {
+			return err
+		}
+		replica := copy.(*v1.Pod)
+		if err := ssc.podControl.UpdateStatefulPod(set, replica); err != nil {
 			return err
 		}
 	}

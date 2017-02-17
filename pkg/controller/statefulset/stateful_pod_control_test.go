@@ -241,6 +241,7 @@ func TestStatefulPodControlUpdateIdentityFailure(t *testing.T) {
 	fakeClient := &fake.Clientset{}
 	control := NewRealStatefulPodControl(fakeClient, recorder)
 	fakeClient.AddReactor("update", "pods", func(action core.Action) (bool, runtime.Object, error) {
+		pod.Name = "goo-0"
 		return true, nil, apierrors.NewInternalError(errors.New("API server down"))
 	})
 	pod.Name = "goo-0"
@@ -344,9 +345,6 @@ func TestStatefulPodControlUpdatePodStorageFailure(t *testing.T) {
 		if !strings.Contains(events[i], v1.EventTypeWarning) {
 			t.Errorf("Expected normal event found %s", events[i])
 		}
-	}
-	if storageMatches(set, pod) {
-		t.Error("Storag matches on failed update")
 	}
 }
 

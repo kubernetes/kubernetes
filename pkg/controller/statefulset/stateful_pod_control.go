@@ -24,7 +24,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	errorutils "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/client-go/tools/record"
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
 	apps "k8s.io/kubernetes/pkg/apis/apps/v1beta1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
@@ -41,7 +40,7 @@ type StatefulPodControlInterface interface {
 	CreateStatefulPod(set *apps.StatefulSet, pod *v1.Pod) error
 	// UpdateStatefulPod Updates a Pod in a StatefulSet. If the Pod already has the correct identity and stable
 	// storage this method is a no-op. If the Pod must be mutated to conform to the Set, it is mutated and updated.
-	// pod is an in parameter, and any updates made to the pod are not reflected as mutations to this parameter. If
+	// pod is an in-out parameter, and any updates made to the pod are reflected as mutations to this parameter. If
 	// the create is successful, the returned error is nil.
 	UpdateStatefulPod(set *apps.StatefulSet, pod *v1.Pod) error
 	// DeleteStatefulPod deletes a Pod in a StatefulSet. The pods PVCs are not deleted. If the delete is successful,
@@ -81,33 +80,22 @@ func (spc *realStatefulPodControl) CreateStatefulPod(set *apps.StatefulSet, pod 
 }
 
 func (spc *realStatefulPodControl) UpdateStatefulPod(set *apps.StatefulSet, pod *v1.Pod) error {
-	if identityMatches(set, pod) && storageMatches(set, pod) {
-		return nil
-	}
-
-	// we make a copy of the Pod on the stack and mutate the copy
-	obj, err := api.Scheme.Copy(pod)
-	if err != nil {
-		return fmt.Errorf("unable to copy pod: %v", err)
-	}
-	podCopy := obj.(*v1.Pod)
-
 	attemptedUpdate := false
 
-	err = retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+	err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
 		// assume the Pod is consistent
 		consistent := true
 		// if the Pod does not conform to its identity, update the identity and dirty the Pod
-		if !identityMatches(set, podCopy) {
-			updateIdentity(set, podCopy)
+		if !identityMatches(set, pod) {
+			updateIdentity(set, pod)
 			consistent = false
 		}
 		// if the Pod does not conform to the StatefulSet's storage requirements, update the Pod's PVC's,
 		// dirty the Pod, and create any missing PVCs
-		if !storageMatches(set, podCopy) {
-			updateStorage(set, podCopy)
+		if !storageMatches(set, pod) {
+			updateStorage(set, pod)
 			consistent = false
-			if err := spc.createPersistentVolumeClaims(set, podCopy); err != nil {
+			if err := spc.createPersistentVolumeClaims(set, pod); err != nil {
 				spc.recordPodEvent("update", set, pod, err)
 				return err
 			}
@@ -119,15 +107,15 @@ func (spc *realStatefulPodControl) UpdateStatefulPod(set *apps.StatefulSet, pod 
 
 		attemptedUpdate = true
 		// commit the update, retrying on conflicts
-		_, err = spc.client.Core().Pods(set.Namespace).Update(podCopy)
+		_, err := spc.client.Core().Pods(set.Namespace).Update(pod)
 		if err == nil {
 			return nil
 		}
 		updateErr := err
 
-		conflicting, err := spc.client.Core().Pods(set.Namespace).Get(podCopy.Name, metav1.GetOptions{})
+		conflicting, err := spc.client.Core().Pods(set.Namespace).Get(pod.Name, metav1.GetOptions{})
 		if err == nil {
-			podCopy = conflicting
+			pod = conflicting
 		}
 
 		return updateErr

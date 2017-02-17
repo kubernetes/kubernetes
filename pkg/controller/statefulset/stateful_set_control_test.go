@@ -26,6 +26,7 @@ import (
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/kubernetes/pkg/api/v1"
 	apps "k8s.io/kubernetes/pkg/apis/apps/v1beta1"
@@ -361,7 +362,7 @@ func TestDefaultStatefulSetControlUpdatePodFailure(t *testing.T) {
 	informerFactory := informers.NewSharedInformerFactory(client, controller.NoResyncPeriodFunc())
 	spc := newFakeStatefulPodControl(informerFactory.Core().V1().Pods(), informerFactory.Apps().V1beta1().StatefulSets())
 	ssc := NewDefaultStatefulSetControl(spc)
-	spc.SetUpdateStatefulPodError(apierrors.NewInternalError(errors.New("API server failed")), 2)
+	spc.SetUpdateStatefulPodError(apierrors.NewInternalError(errors.New("API server failed")), 0)
 
 	stop := make(chan struct{})
 	defer close(stop)
@@ -372,23 +373,34 @@ func TestDefaultStatefulSetControlUpdatePodFailure(t *testing.T) {
 		informerFactory.Core().V1().Pods().Informer().HasSynced,
 	)
 
-	if err := scaleUpStatefulSetControl(set, ssc, spc); !apierrors.IsInternalError(err) {
-		t.Errorf("StatefulSetControl did not return InternalError found %s", err)
+	// have to have 1 successful loop first
+	if err := scaleUpStatefulSetControl(set, ssc, spc); err != nil {
+		t.Fatalf("Unexpected error: %v", err)
 	}
 	var err error
 	set, err = spc.setsLister.StatefulSets(set.Namespace).Get(set.Name)
 	if err != nil {
 		t.Fatalf("Error getting updated StatefulSet: %v", err)
 	}
-	if err := scaleUpStatefulSetControl(set, ssc, spc); err != nil {
-		t.Errorf("Failed to turn up StatefulSet : %s", err)
-	}
-	set, err = spc.setsLister.StatefulSets(set.Namespace).Get(set.Name)
-	if err != nil {
-		t.Fatalf("Error getting updated StatefulSet: %v", err)
-	}
 	if set.Status.Replicas != 3 {
 		t.Error("Failed to scale StatefulSet to 3 replicas")
+	}
+
+	// now mutate a pod's identity
+	pods, err := spc.podsLister.List(labels.Everything())
+	if err != nil {
+		t.Fatalf("Error listing pods: %v")
+	}
+	if len(pods) != 3 {
+		t.Fatalf("Expected 3 pods, got %d", len(pods))
+	}
+	sort.Sort(ascendingOrdinal(pods))
+	pods[0].Name = "goo-0"
+	spc.podsIndexer.Update(pods[0])
+
+	// now it should fail
+	if err := ssc.UpdateStatefulSet(set, pods); !apierrors.IsInternalError(err) {
+		t.Errorf("StatefulSetControl did not return InternalError found %s", err)
 	}
 }
 
