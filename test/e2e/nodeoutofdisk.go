@@ -250,7 +250,7 @@ func fillDiskSpace(c clientset.Interface, node *v1.Node) {
 	cmd := fmt.Sprintf("fallocate -l %d test.img", fillSize)
 	framework.ExpectNoError(framework.IssueSSHCommand(cmd, framework.TestContext.Provider, node))
 
-	ood := framework.WaitForNodeToBe(c, node.Name, v1.NodeOutOfDisk, true, nodeOODTimeOut)
+	ood := framework.WaitForNodeToBe(c, node.Name, v1.NodeDiskPressure, true, nodeOODTimeOut)
 	Expect(ood).To(BeTrue(), "Node %s did not run out of disk within %v", node.Name, nodeOODTimeOut)
 
 	avail, err = availSize(c, node)
@@ -264,6 +264,6 @@ func recoverDiskSpace(c clientset.Interface, node *v1.Node) {
 	cmd := "rm -f test.img"
 	framework.ExpectNoError(framework.IssueSSHCommand(cmd, framework.TestContext.Provider, node))
 
-	ood := framework.WaitForNodeToBe(c, node.Name, v1.NodeOutOfDisk, false, nodeOODTimeOut)
+	ood := framework.WaitForNodeToBe(c, node.Name, v1.NodeDiskPressure, false, nodeOODTimeOut)
 	Expect(ood).To(BeTrue(), "Node %s's out of disk condition status did not change to false within %v", node.Name, nodeOODTimeOut)
 }

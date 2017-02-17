@@ -124,7 +124,6 @@ func GetHollowKubeletConfig(
 	c.MinimumGCAge.Duration = 1 * time.Minute
 	c.NodeStatusUpdateFrequency.Duration = 10 * time.Second
 	c.SyncFrequency.Duration = 10 * time.Second
-	c.OutOfDiskTransitionFrequency.Duration = 5 * time.Minute
 	c.EvictionPressureTransitionPeriod.Duration = 5 * time.Minute
 	c.MaxPods = int32(maxPods)
 	c.PodsPerCore = int32(podsPerCore)
@@ -132,7 +131,6 @@ func GetHollowKubeletConfig(
 	c.DockerExecHandlerName = "native"
 	c.ImageGCHighThresholdPercent = 90
 	c.ImageGCLowThresholdPercent = 80
-	c.LowDiskSpaceThresholdMB = 256
 	c.VolumeStatsAggPeriod.Duration = time.Minute
 	c.CgroupRoot = ""
 	c.ContainerRuntime = "docker"

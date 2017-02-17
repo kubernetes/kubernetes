@@ -319,7 +319,6 @@ func autoConvert_v1alpha1_KubeletConfiguration_To_componentconfig_KubeletConfigu
 	if err := v1.Convert_Pointer_int32_To_int32(&in.ImageGCLowThresholdPercent, &out.ImageGCLowThresholdPercent, s); err != nil {
 		return err
 	}
-	out.LowDiskSpaceThresholdMB = in.LowDiskSpaceThresholdMB
 	out.VolumeStatsAggPeriod = in.VolumeStatsAggPeriod
 	out.NetworkPluginName = in.NetworkPluginName
 	out.NetworkPluginDir = in.NetworkPluginDir
@@ -376,7 +375,6 @@ func autoConvert_v1alpha1_KubeletConfiguration_To_componentconfig_KubeletConfigu
 	if err := v1.Convert_Pointer_bool_To_bool(&in.SerializeImagePulls, &out.SerializeImagePulls, s); err != nil {
 		return err
 	}
-	out.OutOfDiskTransitionFrequency = in.OutOfDiskTransitionFrequency
 	out.NodeIP = in.NodeIP
 	out.NodeLabels = *(*map[string]string)(unsafe.Pointer(&in.NodeLabels))
 	out.NonMasqueradeCIDR = in.NonMasqueradeCIDR
@@ -493,7 +491,6 @@ func autoConvert_componentconfig_KubeletConfiguration_To_v1alpha1_KubeletConfigu
 	if err := v1.Convert_int32_To_Pointer_int32(&in.ImageGCLowThresholdPercent, &out.ImageGCLowThresholdPercent, s); err != nil {
 		return err
 	}
-	out.LowDiskSpaceThresholdMB = in.LowDiskSpaceThresholdMB
 	out.VolumeStatsAggPeriod = in.VolumeStatsAggPeriod
 	out.NetworkPluginName = in.NetworkPluginName
 	out.NetworkPluginMTU = in.NetworkPluginMTU
@@ -550,7 +547,6 @@ func autoConvert_componentconfig_KubeletConfiguration_To_v1alpha1_KubeletConfigu
 	if err := v1.Convert_bool_To_Pointer_bool(&in.SerializeImagePulls, &out.SerializeImagePulls, s); err != nil {
 		return err
 	}
-	out.OutOfDiskTransitionFrequency = in.OutOfDiskTransitionFrequency
 	out.NodeIP = in.NodeIP
 	out.NodeLabels = *(*map[string]string)(unsafe.Pointer(&in.NodeLabels))
 	out.NonMasqueradeCIDR = in.NonMasqueradeCIDR
