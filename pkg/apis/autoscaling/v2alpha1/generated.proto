@@ -33,6 +33,64 @@ import "k8s.io/kubernetes/pkg/apis/autoscaling/v1/generated.proto";
 // Package-wide variables from generator "generated".
 option go_package = "v2alpha1";
 
+// Status and (in future) Configuration of ClusterAutoscaler.
+message ClusterAutoscaler {
+  // Standard object metadata.
+  // +optional
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
+
+  // Current information about ClusterAutoscaler.
+  // +optional
+  optional ClusterAutoscalerStatus status = 3;
+}
+
+// ClusterAutoscalerCondition describes some aspect of ClusterAutoscaler work.
+message ClusterAutoscalerCondition {
+  // Defines the aspect that the condition describes. For example, it can be Health or ScaleUp/Down activity.
+  optional string type = 1;
+
+  // Status of the condition. Tells how given aspect
+  optional string status = 2;
+
+  // Free text extra information about the condition. It may contain some
+  // extra debugging data, like why the cluster is unhealthy.
+  // +optional
+  optional string message = 3;
+
+  // Unique, one-word, CamelCase reason for the condition's last transition.
+  // +optional
+  optional string reason = 4;
+
+  // Last time we probed the condition.
+  // +optional
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.Time lastProbeTime = 5;
+
+  // Since when the condition was in the given state.
+  // +optional
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.Time lastTransitionTime = 6;
+}
+
+// ClusterAutoscalerList is a list of ClusterAutoscaler objects.
+message ClusterAutoscalerList {
+  // metadata is the standard list metadata.
+  // +optional
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
+
+  // items is the list of ClusterAutoscaler objects.
+  repeated ClusterAutoscaler items = 2;
+}
+
+// Status of ClusterAutoscaler
+message ClusterAutoscalerStatus {
+  // Status information of individual node groups on which CA works.
+  // +optional
+  repeated NodeGroupStatus nodeGroupStatuses = 1;
+
+  // Conditions that apply to the whole autoscaler.
+  // +optional
+  repeated ClusterAutoscalerCondition clusterwideConditions = 2;
+}
+
 // CrossVersionObjectReference contains enough information to let you identify the referred resource.
 message CrossVersionObjectReference {
   // Kind of the referent; More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds"
@@ -173,6 +231,15 @@ message MetricStatus {
   // to normal per-pod metrics using the "pods" source.
   // +optional
   optional ResourceMetricStatus resource = 4;
+}
+
+// Status of a group of nodes controlled by ClusterAutoscaler.
+message NodeGroupStatus {
+  // Name of the node group. On GCE it will be equal to MIG url, on AWS it will be ASG name, etc.
+  optional string providerID = 1;
+
+  // List of conditions that describe the state of the node group.
+  repeated ClusterAutoscalerCondition conditions = 2;
 }
 
 // ObjectMetricSource indicates how to scale on a metric describing a

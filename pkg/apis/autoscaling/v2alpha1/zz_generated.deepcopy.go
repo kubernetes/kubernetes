@@ -36,6 +36,10 @@ func init() {
 // to allow building arbitrary schemes.
 func RegisterDeepCopies(scheme *runtime.Scheme) error {
 	return scheme.AddGeneratedDeepCopyFuncs(
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v2alpha1_ClusterAutoscaler, InType: reflect.TypeOf(&ClusterAutoscaler{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v2alpha1_ClusterAutoscalerCondition, InType: reflect.TypeOf(&ClusterAutoscalerCondition{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v2alpha1_ClusterAutoscalerList, InType: reflect.TypeOf(&ClusterAutoscalerList{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v2alpha1_ClusterAutoscalerStatus, InType: reflect.TypeOf(&ClusterAutoscalerStatus{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v2alpha1_CrossVersionObjectReference, InType: reflect.TypeOf(&CrossVersionObjectReference{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v2alpha1_HorizontalPodAutoscaler, InType: reflect.TypeOf(&HorizontalPodAutoscaler{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v2alpha1_HorizontalPodAutoscalerList, InType: reflect.TypeOf(&HorizontalPodAutoscalerList{})},
@@ -43,6 +47,7 @@ func RegisterDeepCopies(scheme *runtime.Scheme) error {
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v2alpha1_HorizontalPodAutoscalerStatus, InType: reflect.TypeOf(&HorizontalPodAutoscalerStatus{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v2alpha1_MetricSpec, InType: reflect.TypeOf(&MetricSpec{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v2alpha1_MetricStatus, InType: reflect.TypeOf(&MetricStatus{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v2alpha1_NodeGroupStatus, InType: reflect.TypeOf(&NodeGroupStatus{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v2alpha1_ObjectMetricSource, InType: reflect.TypeOf(&ObjectMetricSource{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v2alpha1_ObjectMetricStatus, InType: reflect.TypeOf(&ObjectMetricStatus{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v2alpha1_PodsMetricSource, InType: reflect.TypeOf(&PodsMetricSource{})},
@@ -50,6 +55,79 @@ func RegisterDeepCopies(scheme *runtime.Scheme) error {
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v2alpha1_ResourceMetricSource, InType: reflect.TypeOf(&ResourceMetricSource{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v2alpha1_ResourceMetricStatus, InType: reflect.TypeOf(&ResourceMetricStatus{})},
 	)
+}
+
+func DeepCopy_v2alpha1_ClusterAutoscaler(in interface{}, out interface{}, c *conversion.Cloner) error {
+	{
+		in := in.(*ClusterAutoscaler)
+		out := out.(*ClusterAutoscaler)
+		*out = *in
+		if newVal, err := c.DeepCopy(&in.ObjectMeta); err != nil {
+			return err
+		} else {
+			out.ObjectMeta = *newVal.(*v1.ObjectMeta)
+		}
+		if err := DeepCopy_v2alpha1_ClusterAutoscalerStatus(&in.Status, &out.Status, c); err != nil {
+			return err
+		}
+		return nil
+	}
+}
+
+func DeepCopy_v2alpha1_ClusterAutoscalerCondition(in interface{}, out interface{}, c *conversion.Cloner) error {
+	{
+		in := in.(*ClusterAutoscalerCondition)
+		out := out.(*ClusterAutoscalerCondition)
+		*out = *in
+		out.LastProbeTime = in.LastProbeTime.DeepCopy()
+		out.LastTransitionTime = in.LastTransitionTime.DeepCopy()
+		return nil
+	}
+}
+
+func DeepCopy_v2alpha1_ClusterAutoscalerList(in interface{}, out interface{}, c *conversion.Cloner) error {
+	{
+		in := in.(*ClusterAutoscalerList)
+		out := out.(*ClusterAutoscalerList)
+		*out = *in
+		if in.Items != nil {
+			in, out := &in.Items, &out.Items
+			*out = make([]ClusterAutoscaler, len(*in))
+			for i := range *in {
+				if err := DeepCopy_v2alpha1_ClusterAutoscaler(&(*in)[i], &(*out)[i], c); err != nil {
+					return err
+				}
+			}
+		}
+		return nil
+	}
+}
+
+func DeepCopy_v2alpha1_ClusterAutoscalerStatus(in interface{}, out interface{}, c *conversion.Cloner) error {
+	{
+		in := in.(*ClusterAutoscalerStatus)
+		out := out.(*ClusterAutoscalerStatus)
+		*out = *in
+		if in.NodeGroupStatuses != nil {
+			in, out := &in.NodeGroupStatuses, &out.NodeGroupStatuses
+			*out = make([]NodeGroupStatus, len(*in))
+			for i := range *in {
+				if err := DeepCopy_v2alpha1_NodeGroupStatus(&(*in)[i], &(*out)[i], c); err != nil {
+					return err
+				}
+			}
+		}
+		if in.ClusterwideConditions != nil {
+			in, out := &in.ClusterwideConditions, &out.ClusterwideConditions
+			*out = make([]ClusterAutoscalerCondition, len(*in))
+			for i := range *in {
+				if err := DeepCopy_v2alpha1_ClusterAutoscalerCondition(&(*in)[i], &(*out)[i], c); err != nil {
+					return err
+				}
+			}
+		}
+		return nil
+	}
 }
 
 func DeepCopy_v2alpha1_CrossVersionObjectReference(in interface{}, out interface{}, c *conversion.Cloner) error {
@@ -204,6 +282,24 @@ func DeepCopy_v2alpha1_MetricStatus(in interface{}, out interface{}, c *conversi
 			*out = new(ResourceMetricStatus)
 			if err := DeepCopy_v2alpha1_ResourceMetricStatus(*in, *out, c); err != nil {
 				return err
+			}
+		}
+		return nil
+	}
+}
+
+func DeepCopy_v2alpha1_NodeGroupStatus(in interface{}, out interface{}, c *conversion.Cloner) error {
+	{
+		in := in.(*NodeGroupStatus)
+		out := out.(*NodeGroupStatus)
+		*out = *in
+		if in.Conditions != nil {
+			in, out := &in.Conditions, &out.Conditions
+			*out = make([]ClusterAutoscalerCondition, len(*in))
+			for i := range *in {
+				if err := DeepCopy_v2alpha1_ClusterAutoscalerCondition(&(*in)[i], &(*out)[i], c); err != nil {
+					return err
+				}
 			}
 		}
 		return nil

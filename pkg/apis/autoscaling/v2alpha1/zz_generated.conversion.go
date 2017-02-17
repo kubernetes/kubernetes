@@ -39,6 +39,14 @@ func init() {
 // Public to allow building arbitrary schemes.
 func RegisterConversions(scheme *runtime.Scheme) error {
 	return scheme.AddGeneratedConversionFuncs(
+		Convert_v2alpha1_ClusterAutoscaler_To_autoscaling_ClusterAutoscaler,
+		Convert_autoscaling_ClusterAutoscaler_To_v2alpha1_ClusterAutoscaler,
+		Convert_v2alpha1_ClusterAutoscalerCondition_To_autoscaling_ClusterAutoscalerCondition,
+		Convert_autoscaling_ClusterAutoscalerCondition_To_v2alpha1_ClusterAutoscalerCondition,
+		Convert_v2alpha1_ClusterAutoscalerList_To_autoscaling_ClusterAutoscalerList,
+		Convert_autoscaling_ClusterAutoscalerList_To_v2alpha1_ClusterAutoscalerList,
+		Convert_v2alpha1_ClusterAutoscalerStatus_To_autoscaling_ClusterAutoscalerStatus,
+		Convert_autoscaling_ClusterAutoscalerStatus_To_v2alpha1_ClusterAutoscalerStatus,
 		Convert_v2alpha1_CrossVersionObjectReference_To_autoscaling_CrossVersionObjectReference,
 		Convert_autoscaling_CrossVersionObjectReference_To_v2alpha1_CrossVersionObjectReference,
 		Convert_v2alpha1_HorizontalPodAutoscaler_To_autoscaling_HorizontalPodAutoscaler,
@@ -53,6 +61,8 @@ func RegisterConversions(scheme *runtime.Scheme) error {
 		Convert_autoscaling_MetricSpec_To_v2alpha1_MetricSpec,
 		Convert_v2alpha1_MetricStatus_To_autoscaling_MetricStatus,
 		Convert_autoscaling_MetricStatus_To_v2alpha1_MetricStatus,
+		Convert_v2alpha1_NodeGroupStatus_To_autoscaling_NodeGroupStatus,
+		Convert_autoscaling_NodeGroupStatus_To_v2alpha1_NodeGroupStatus,
 		Convert_v2alpha1_ObjectMetricSource_To_autoscaling_ObjectMetricSource,
 		Convert_autoscaling_ObjectMetricSource_To_v2alpha1_ObjectMetricSource,
 		Convert_v2alpha1_ObjectMetricStatus_To_autoscaling_ObjectMetricStatus,
@@ -66,6 +76,98 @@ func RegisterConversions(scheme *runtime.Scheme) error {
 		Convert_v2alpha1_ResourceMetricStatus_To_autoscaling_ResourceMetricStatus,
 		Convert_autoscaling_ResourceMetricStatus_To_v2alpha1_ResourceMetricStatus,
 	)
+}
+
+func autoConvert_v2alpha1_ClusterAutoscaler_To_autoscaling_ClusterAutoscaler(in *ClusterAutoscaler, out *autoscaling.ClusterAutoscaler, s conversion.Scope) error {
+	out.ObjectMeta = in.ObjectMeta
+	if err := Convert_v2alpha1_ClusterAutoscalerStatus_To_autoscaling_ClusterAutoscalerStatus(&in.Status, &out.Status, s); err != nil {
+		return err
+	}
+	return nil
+}
+
+func Convert_v2alpha1_ClusterAutoscaler_To_autoscaling_ClusterAutoscaler(in *ClusterAutoscaler, out *autoscaling.ClusterAutoscaler, s conversion.Scope) error {
+	return autoConvert_v2alpha1_ClusterAutoscaler_To_autoscaling_ClusterAutoscaler(in, out, s)
+}
+
+func autoConvert_autoscaling_ClusterAutoscaler_To_v2alpha1_ClusterAutoscaler(in *autoscaling.ClusterAutoscaler, out *ClusterAutoscaler, s conversion.Scope) error {
+	out.ObjectMeta = in.ObjectMeta
+	if err := Convert_autoscaling_ClusterAutoscalerStatus_To_v2alpha1_ClusterAutoscalerStatus(&in.Status, &out.Status, s); err != nil {
+		return err
+	}
+	return nil
+}
+
+func Convert_autoscaling_ClusterAutoscaler_To_v2alpha1_ClusterAutoscaler(in *autoscaling.ClusterAutoscaler, out *ClusterAutoscaler, s conversion.Scope) error {
+	return autoConvert_autoscaling_ClusterAutoscaler_To_v2alpha1_ClusterAutoscaler(in, out, s)
+}
+
+func autoConvert_v2alpha1_ClusterAutoscalerCondition_To_autoscaling_ClusterAutoscalerCondition(in *ClusterAutoscalerCondition, out *autoscaling.ClusterAutoscalerCondition, s conversion.Scope) error {
+	out.Type = autoscaling.ClusterAutoscalerConditionType(in.Type)
+	out.Status = autoscaling.ClusterAutoscalerConditionStatus(in.Status)
+	out.Message = in.Message
+	out.Reason = in.Reason
+	out.LastProbeTime = in.LastProbeTime
+	out.LastTransitionTime = in.LastTransitionTime
+	return nil
+}
+
+func Convert_v2alpha1_ClusterAutoscalerCondition_To_autoscaling_ClusterAutoscalerCondition(in *ClusterAutoscalerCondition, out *autoscaling.ClusterAutoscalerCondition, s conversion.Scope) error {
+	return autoConvert_v2alpha1_ClusterAutoscalerCondition_To_autoscaling_ClusterAutoscalerCondition(in, out, s)
+}
+
+func autoConvert_autoscaling_ClusterAutoscalerCondition_To_v2alpha1_ClusterAutoscalerCondition(in *autoscaling.ClusterAutoscalerCondition, out *ClusterAutoscalerCondition, s conversion.Scope) error {
+	out.Type = ClusterAutoscalerConditionType(in.Type)
+	out.Status = ClusterAutoscalerConditionStatus(in.Status)
+	out.Message = in.Message
+	out.Reason = in.Reason
+	out.LastProbeTime = in.LastProbeTime
+	out.LastTransitionTime = in.LastTransitionTime
+	return nil
+}
+
+func Convert_autoscaling_ClusterAutoscalerCondition_To_v2alpha1_ClusterAutoscalerCondition(in *autoscaling.ClusterAutoscalerCondition, out *ClusterAutoscalerCondition, s conversion.Scope) error {
+	return autoConvert_autoscaling_ClusterAutoscalerCondition_To_v2alpha1_ClusterAutoscalerCondition(in, out, s)
+}
+
+func autoConvert_v2alpha1_ClusterAutoscalerList_To_autoscaling_ClusterAutoscalerList(in *ClusterAutoscalerList, out *autoscaling.ClusterAutoscalerList, s conversion.Scope) error {
+	out.ListMeta = in.ListMeta
+	out.Items = *(*[]autoscaling.ClusterAutoscaler)(unsafe.Pointer(&in.Items))
+	return nil
+}
+
+func Convert_v2alpha1_ClusterAutoscalerList_To_autoscaling_ClusterAutoscalerList(in *ClusterAutoscalerList, out *autoscaling.ClusterAutoscalerList, s conversion.Scope) error {
+	return autoConvert_v2alpha1_ClusterAutoscalerList_To_autoscaling_ClusterAutoscalerList(in, out, s)
+}
+
+func autoConvert_autoscaling_ClusterAutoscalerList_To_v2alpha1_ClusterAutoscalerList(in *autoscaling.ClusterAutoscalerList, out *ClusterAutoscalerList, s conversion.Scope) error {
+	out.ListMeta = in.ListMeta
+	out.Items = *(*[]ClusterAutoscaler)(unsafe.Pointer(&in.Items))
+	return nil
+}
+
+func Convert_autoscaling_ClusterAutoscalerList_To_v2alpha1_ClusterAutoscalerList(in *autoscaling.ClusterAutoscalerList, out *ClusterAutoscalerList, s conversion.Scope) error {
+	return autoConvert_autoscaling_ClusterAutoscalerList_To_v2alpha1_ClusterAutoscalerList(in, out, s)
+}
+
+func autoConvert_v2alpha1_ClusterAutoscalerStatus_To_autoscaling_ClusterAutoscalerStatus(in *ClusterAutoscalerStatus, out *autoscaling.ClusterAutoscalerStatus, s conversion.Scope) error {
+	out.NodeGroupStatuses = *(*[]autoscaling.NodeGroupStatus)(unsafe.Pointer(&in.NodeGroupStatuses))
+	out.ClusterwideConditions = *(*[]autoscaling.ClusterAutoscalerCondition)(unsafe.Pointer(&in.ClusterwideConditions))
+	return nil
+}
+
+func Convert_v2alpha1_ClusterAutoscalerStatus_To_autoscaling_ClusterAutoscalerStatus(in *ClusterAutoscalerStatus, out *autoscaling.ClusterAutoscalerStatus, s conversion.Scope) error {
+	return autoConvert_v2alpha1_ClusterAutoscalerStatus_To_autoscaling_ClusterAutoscalerStatus(in, out, s)
+}
+
+func autoConvert_autoscaling_ClusterAutoscalerStatus_To_v2alpha1_ClusterAutoscalerStatus(in *autoscaling.ClusterAutoscalerStatus, out *ClusterAutoscalerStatus, s conversion.Scope) error {
+	out.NodeGroupStatuses = *(*[]NodeGroupStatus)(unsafe.Pointer(&in.NodeGroupStatuses))
+	out.ClusterwideConditions = *(*[]ClusterAutoscalerCondition)(unsafe.Pointer(&in.ClusterwideConditions))
+	return nil
+}
+
+func Convert_autoscaling_ClusterAutoscalerStatus_To_v2alpha1_ClusterAutoscalerStatus(in *autoscaling.ClusterAutoscalerStatus, out *ClusterAutoscalerStatus, s conversion.Scope) error {
+	return autoConvert_autoscaling_ClusterAutoscalerStatus_To_v2alpha1_ClusterAutoscalerStatus(in, out, s)
 }
 
 func autoConvert_v2alpha1_CrossVersionObjectReference_To_autoscaling_CrossVersionObjectReference(in *CrossVersionObjectReference, out *autoscaling.CrossVersionObjectReference, s conversion.Scope) error {
@@ -240,6 +342,26 @@ func autoConvert_autoscaling_MetricStatus_To_v2alpha1_MetricStatus(in *autoscali
 
 func Convert_autoscaling_MetricStatus_To_v2alpha1_MetricStatus(in *autoscaling.MetricStatus, out *MetricStatus, s conversion.Scope) error {
 	return autoConvert_autoscaling_MetricStatus_To_v2alpha1_MetricStatus(in, out, s)
+}
+
+func autoConvert_v2alpha1_NodeGroupStatus_To_autoscaling_NodeGroupStatus(in *NodeGroupStatus, out *autoscaling.NodeGroupStatus, s conversion.Scope) error {
+	out.ProviderID = in.ProviderID
+	out.Conditions = *(*[]autoscaling.ClusterAutoscalerCondition)(unsafe.Pointer(&in.Conditions))
+	return nil
+}
+
+func Convert_v2alpha1_NodeGroupStatus_To_autoscaling_NodeGroupStatus(in *NodeGroupStatus, out *autoscaling.NodeGroupStatus, s conversion.Scope) error {
+	return autoConvert_v2alpha1_NodeGroupStatus_To_autoscaling_NodeGroupStatus(in, out, s)
+}
+
+func autoConvert_autoscaling_NodeGroupStatus_To_v2alpha1_NodeGroupStatus(in *autoscaling.NodeGroupStatus, out *NodeGroupStatus, s conversion.Scope) error {
+	out.ProviderID = in.ProviderID
+	out.Conditions = *(*[]ClusterAutoscalerCondition)(unsafe.Pointer(&in.Conditions))
+	return nil
+}
+
+func Convert_autoscaling_NodeGroupStatus_To_v2alpha1_NodeGroupStatus(in *autoscaling.NodeGroupStatus, out *NodeGroupStatus, s conversion.Scope) error {
+	return autoConvert_autoscaling_NodeGroupStatus_To_v2alpha1_NodeGroupStatus(in, out, s)
 }
 
 func autoConvert_v2alpha1_ObjectMetricSource_To_autoscaling_ObjectMetricSource(in *ObjectMetricSource, out *autoscaling.ObjectMetricSource, s conversion.Scope) error {
