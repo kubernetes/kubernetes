@@ -47,6 +47,9 @@ type TokenReviewSpec struct {
 	// Token is the opaque bearer token.
 	// +optional
 	Token string `json:"token,omitempty" protobuf:"bytes,1,opt,name=token"`
+	// Any additional information provided to the authenticator.
+	// +optional
+	Extra map[string]ExtraValue `json:"extra,omitempty" protobuf:"bytes,2,rep,name=extra"`
 }
 
 // TokenReviewStatus is the result of the token authentication request.
