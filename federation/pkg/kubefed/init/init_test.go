@@ -958,6 +958,11 @@ func fakeInitHostFactory(apiserverServiceType v1.ServiceType, federationName, na
 		},
 	}
 
+	if cm.ObjectMeta.Annotations == nil {
+		cm.ObjectMeta.Annotations = make(map[string]string)
+	}
+	cm.ObjectMeta.Annotations[FedConfigMapKey] = fmt.Sprintf("%s=%s", federationName, dnsZoneName)
+
 	podList := v1.PodList{}
 	apiServerPod := v1.Pod{
 		TypeMeta: metav1.TypeMeta{

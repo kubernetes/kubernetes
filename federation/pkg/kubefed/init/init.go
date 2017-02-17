@@ -66,6 +66,11 @@ const (
 	ControllerManagerCN         = "federation-controller-manager"
 	AdminCN                     = "admin"
 	HostClusterLocalDNSZoneName = "cluster.local."
+	FedConfigMapKey             = "federations"
+	ApiServer                   = "apiserver"
+	ControllerManager           = "controller-manager"
+	Credentials                 = "credentials"
+	Kubeconfig                  = "kubeconfig"
 
 	// User name used by federation controller manager to make
 	// calls to federation API server.
@@ -231,10 +236,10 @@ func (i *initFederation) Run(cmdOut io.Writer, config util.AdminConfig) error {
 		return err
 	}
 
-	serverName := fmt.Sprintf("%s-apiserver", i.commonOptions.Name)
-	serverCredName := fmt.Sprintf("%s-credentials", serverName)
-	cmName := fmt.Sprintf("%s-controller-manager", i.commonOptions.Name)
-	cmKubeconfigName := fmt.Sprintf("%s-kubeconfig", cmName)
+	serverName := fmt.Sprintf("%s-%s", i.commonOptions.Name, ApiServer)
+	serverCredName := fmt.Sprintf("%s-%s", serverName, Credentials)
+	cmName := fmt.Sprintf("%s-%s", i.commonOptions.Name, ControllerManager)
+	cmKubeconfigName := fmt.Sprintf("%s-%s", cmName, Kubeconfig)
 
 	// 1. Create a namespace for federation system components
 	_, err = createNamespace(hostClientset, i.commonOptions.FederationSystemNamespace, i.options.dryRun)
@@ -793,6 +798,19 @@ func createControllerManager(clientset *client.Clientset, namespace, name, svcNa
 			},
 		},
 	}
+
+	// We additionally update the details (in annotations) about the
+	// kube-dns config map which needs to be created in the clusters
+	// registering to this federation (at kubefed join).
+	// We wont otherwise have this information available at kubefed join.
+	if dep.ObjectMeta.Annotations == nil {
+		dep.ObjectMeta.Annotations = make(map[string]string)
+	}
+
+	// TODO: the name/domain name pair should ideally be checked for naming convention
+	// as done in kube-dns federation flags check
+	// https://github.com/kubernetes/dns/blob/master/pkg/dns/federation/federation.go
+	dep.ObjectMeta.Annotations[FedConfigMapKey] = fmt.Sprintf("%s=%s", name, dnsZoneName)
 
 	if dryRun {
 		return dep, nil

@@ -21,9 +21,11 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	"strings"
 	"testing"
 
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
+	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/client-go/dynamic"
@@ -31,11 +33,13 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	federationapi "k8s.io/kubernetes/federation/apis/federation/v1beta1"
+	kubefedinit "k8s.io/kubernetes/federation/pkg/kubefed/init"
 	kubefedtesting "k8s.io/kubernetes/federation/pkg/kubefed/testing"
 	"k8s.io/kubernetes/federation/pkg/kubefed/util"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/api/v1"
+	"k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 )
@@ -234,6 +238,12 @@ func fakeJoinHostFactory(clusterName, clusterCtx, secretName, server, token stri
 	if err != nil {
 		return nil, err
 	}
+
+	// In the actual code the secret object and the deployment is created
+	// in base cluster, whereas the configmap is created in the target cluster.
+	// But for our testing convenience we use the same test factory returned
+	// when the code under test invokes config.HostFactory(...) and thus get
+	// the same client, which uses the fake objects as listed below.
 	secretObject := v1.Secret{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "Secret",
@@ -245,6 +255,31 @@ func fakeJoinHostFactory(clusterName, clusterCtx, secretName, server, token stri
 		},
 		Data: map[string][]byte{
 			"kubeconfig": configBytes,
+		},
+	}
+
+	cmObject := v1beta1.Deployment{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "Deployment",
+			APIVersion: testapi.Extensions.GroupVersion().String(),
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      kubefedinit.ControllerManager,
+			Namespace: util.DefaultFederationSystemNamespace,
+		},
+	}
+	if cmObject.ObjectMeta.Annotations == nil {
+		cmObject.ObjectMeta.Annotations = make(map[string]string)
+	}
+	cmObject.ObjectMeta.Annotations[kubefedinit.FedConfigMapKey] = fmt.Sprintf("%s=%s", kubefedinit.ControllerManager, "test-dns-zone")
+
+	configmapObject := v1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      util.KubeDnsName,
+			Namespace: metav1.NamespaceSystem,
+		},
+		Data: map[string]string{
+			kubefedinit.FedConfigMapKey: cmObject.Annotations[kubefedinit.FedConfigMapKey],
 		},
 	}
 
@@ -270,6 +305,26 @@ func fakeJoinHostFactory(clusterName, clusterCtx, secretName, server, token stri
 					return nil, fmt.Errorf("Unexpected secret object\n\tDiff: %s", diff.ObjectGoPrintDiff(got, secretObject))
 				}
 				return &http.Response{StatusCode: http.StatusCreated, Header: kubefedtesting.DefaultHeader(), Body: kubefedtesting.ObjBody(codec, &secretObject)}, nil
+			case p == "/api/v1/namespaces/kube-system/configmaps/" && m == http.MethodPost:
+				body, err := ioutil.ReadAll(req.Body)
+				if err != nil {
+					return nil, err
+				}
+				var got v1.ConfigMap
+				_, _, err = codec.Decode(body, nil, &got)
+				if err != nil {
+					return nil, err
+				}
+				if !apiequality.Semantic.DeepEqual(got, configmapObject) {
+					return nil, fmt.Errorf("Unexpected configmap object\n\tDiff: %s", diff.ObjectGoPrintDiff(got, configmapObject))
+				}
+				return &http.Response{StatusCode: http.StatusCreated, Header: kubefedtesting.DefaultHeader(), Body: kubefedtesting.ObjBody(codec, &configmapObject)}, nil
+			case p == "/apis/extensions/v1beta1/namespaces/federation-system/deployments" && m == http.MethodGet:
+				got := strings.TrimPrefix(p, "/apis/extensions/v1beta1/namespaces/federation-system/deployments")
+				if got != kubefedinit.ControllerManager {
+					return nil, errors.NewNotFound(api.Resource("deployments"), got)
+				}
+				return &http.Response{StatusCode: http.StatusOK, Header: kubefedtesting.DefaultHeader(), Body: kubefedtesting.ObjBody(codec, &cmObject)}, nil
 			default:
 				return nil, fmt.Errorf("unexpected request: %#v\n%#v", req.URL, req)
 			}
