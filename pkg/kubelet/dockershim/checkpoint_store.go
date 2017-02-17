@@ -57,6 +57,16 @@ type FileStore struct {
 	path string
 }
 
+func NewFileStore(path string) (CheckpointStore, error) {
+	if _, err := os.Stat(path); err != nil {
+		// if directory already exists, proceed
+		if err = os.MkdirAll(path, 0755); err != nil && !os.IsExist(err) {
+			return nil, err
+		}
+	}
+	return &FileStore{path: path}, nil
+}
+
 func (fstore *FileStore) Write(key string, data []byte) error {
 	if err := validateKey(key); err != nil {
 		return err
