@@ -24,6 +24,7 @@ readonly KUBE_GOPATH="${KUBE_OUTPUT}/go"
 # If you update this list, please also update build/release-tars/BUILD.
 kube::golang::server_targets() {
   local targets=(
+    cmd/gke-certificates-controller
     cmd/kube-proxy
     cmd/kube-apiserver
     cmd/kube-controller-manager

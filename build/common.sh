@@ -94,6 +94,7 @@ kube::build::get_docker_wrapped_binaries() {
           kube-scheduler,busybox
           kube-aggregator,busybox
           kube-proxy,gcr.io/google_containers/debian-iptables-amd64:${debian_iptables_version}
+          gke-certificates-controller,busybox
         );;
     "arm")
         local targets=(
@@ -102,6 +103,7 @@ kube::build::get_docker_wrapped_binaries() {
           kube-scheduler,armel/busybox
           kube-aggregator,armel/busybox
           kube-proxy,gcr.io/google_containers/debian-iptables-arm:${debian_iptables_version}
+          gke-certificates-controller,armel/busybox
         );;
     "arm64")
         local targets=(
@@ -110,6 +112,7 @@ kube::build::get_docker_wrapped_binaries() {
           kube-scheduler,aarch64/busybox
           kube-aggregator,aarch64/busybox
           kube-proxy,gcr.io/google_containers/debian-iptables-arm64:${debian_iptables_version}
+          gke-certificates-controller,aarch64/busybox
         );;
     "ppc64le")
         local targets=(
@@ -118,6 +121,7 @@ kube::build::get_docker_wrapped_binaries() {
           kube-scheduler,ppc64le/busybox
           kube-aggregator,ppc64le/busybox
           kube-proxy,gcr.io/google_containers/debian-iptables-ppc64le:${debian_iptables_version}
+          gke-certificates-controller,ppc64le/busybox
         );;
     "s390x")
         local targets=(
@@ -126,7 +130,8 @@ kube::build::get_docker_wrapped_binaries() {
           kube-scheduler,s390x/busybox
           kube-aggregator,s390x/busybox
           kube-proxy,gcr.io/google_containers/debian-iptables-s390x:${debian_iptables_version}
-        );;		
+          gke-certificates-controller,s390x/busybox
+        );;
   esac
 
   echo "${targets[@]}"
