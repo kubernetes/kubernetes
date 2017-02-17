@@ -30,7 +30,8 @@ func TestFileStore(t *testing.T) {
 	path, err := ioutil.TempDir("", "FileStore")
 	assert.NoError(t, err)
 	defer cleanUpTestPath(t, path)
-	store := &FileStore{path: path}
+	store, err := NewFileStore(path)
+	assert.NoError(t, err)
 
 	Checkpoints := []struct {
 		key       string
