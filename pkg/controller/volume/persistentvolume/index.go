@@ -22,6 +22,7 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	selectors "k8s.io/apimachinery/pkg/selectors"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/kubernetes/pkg/api/v1"
 )
@@ -96,7 +97,7 @@ func (pvIndex *persistentVolumeOrderedIndex) findByClaim(claim *v1.PersistentVol
 
 	var selector labels.Selector
 	if claim.Spec.Selector != nil {
-		internalSelector, err := metav1.LabelSelectorAsSelector(claim.Spec.Selector)
+		internalSelector, err := selectors.LabelSelectorAsSelector(claim.Spec.Selector)
 		if err != nil {
 			// should be unreachable code due to validation
 			return nil, fmt.Errorf("error creating internal label selector for claim: %v: %v", claimToClaimKey(claim), err)

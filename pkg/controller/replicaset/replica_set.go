@@ -29,6 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	selectors "k8s.io/apimachinery/pkg/selectors"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
@@ -544,7 +545,7 @@ func (rsc *ReplicaSetController) syncReplicaSet(key string) error {
 	}
 
 	rsNeedsSync := rsc.expectations.SatisfiedExpectations(key)
-	selector, err := metav1.LabelSelectorAsSelector(rs.Spec.Selector)
+	selector, err := selectors.LabelSelectorAsSelector(rs.Spec.Selector)
 	if err != nil {
 		utilruntime.HandleError(fmt.Errorf("Error converting pod selector to selector: %v", err))
 		return nil

@@ -293,6 +293,7 @@ staging/src/k8s.io/apimachinery/pkg/runtime/serializer/json
 staging/src/k8s.io/apimachinery/pkg/runtime/serializer/recognizer/testing
 staging/src/k8s.io/apimachinery/pkg/runtime/serializer/versioning
 staging/src/k8s.io/apimachinery/pkg/runtime/serializer/yaml
+staging/src/k8s.io/apimachinery/pkg/selectors
 staging/src/k8s.io/apimachinery/pkg/util/json
 staging/src/k8s.io/apimachinery/pkg/util/validation/field
 staging/src/k8s.io/apimachinery/pkg/version

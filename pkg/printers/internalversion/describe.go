@@ -38,6 +38,7 @@ import (
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	selectors "k8s.io/apimachinery/pkg/selectors"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -1315,7 +1316,7 @@ func (d *ReplicaSetDescriber) Describe(namespace, name string, describerSettings
 		return "", err
 	}
 
-	selector, err := metav1.LabelSelectorAsSelector(rs.Spec.Selector)
+	selector, err := selectors.LabelSelectorAsSelector(rs.Spec.Selector)
 	if err != nil {
 		return "", err
 	}
@@ -1335,7 +1336,7 @@ func describeReplicaSet(rs *extensions.ReplicaSet, events *api.EventList, runnin
 		w := &PrefixWriter{out}
 		w.Write(LEVEL_0, "Name:\t%s\n", rs.Name)
 		w.Write(LEVEL_0, "Namespace:\t%s\n", rs.Namespace)
-		w.Write(LEVEL_0, "Selector:\t%s\n", metav1.FormatLabelSelector(rs.Spec.Selector))
+		w.Write(LEVEL_0, "Selector:\t%s\n", selectors.FormatLabelSelector(rs.Spec.Selector))
 		printLabelsMultiline(w, "Labels", rs.Labels)
 		printAnnotationsMultiline(w, "Annotations", rs.Annotations)
 		w.Write(LEVEL_0, "Replicas:\t%d current / %d desired\n", rs.Status.Replicas, rs.Spec.Replicas)
@@ -1377,7 +1378,7 @@ func describeJob(job *batch.Job, events *api.EventList) (string, error) {
 		w := &PrefixWriter{out}
 		w.Write(LEVEL_0, "Name:\t%s\n", job.Name)
 		w.Write(LEVEL_0, "Namespace:\t%s\n", job.Namespace)
-		selector, _ := metav1.LabelSelectorAsSelector(job.Spec.Selector)
+		selector, _ := selectors.LabelSelectorAsSelector(job.Spec.Selector)
 		w.Write(LEVEL_0, "Selector:\t%s\n", selector)
 		printLabelsMultiline(w, "Labels", job.Labels)
 		printAnnotationsMultiline(w, "Annotations", job.Annotations)
@@ -1452,7 +1453,7 @@ func describeCronJob(scheduledJob *batch.CronJob, events *api.EventList) (string
 
 func describeJobTemplate(jobTemplate batch.JobTemplateSpec, w *PrefixWriter) {
 	if jobTemplate.Spec.Selector != nil {
-		selector, _ := metav1.LabelSelectorAsSelector(jobTemplate.Spec.Selector)
+		selector, _ := selectors.LabelSelectorAsSelector(jobTemplate.Spec.Selector)
 		w.Write(LEVEL_0, "Selector:\t%s\n", selector)
 	} else {
 		w.Write(LEVEL_0, "Selector:\t<unset>\n")
@@ -1503,7 +1504,7 @@ func (d *DaemonSetDescriber) Describe(namespace, name string, describerSettings 
 		return "", err
 	}
 
-	selector, err := metav1.LabelSelectorAsSelector(daemon.Spec.Selector)
+	selector, err := selectors.LabelSelectorAsSelector(daemon.Spec.Selector)
 	if err != nil {
 		return "", err
 	}
@@ -1524,7 +1525,7 @@ func describeDaemonSet(daemon *extensions.DaemonSet, events *api.EventList, runn
 	return tabbedString(func(out io.Writer) error {
 		w := &PrefixWriter{out}
 		w.Write(LEVEL_0, "Name:\t%s\n", daemon.Name)
-		selector, err := metav1.LabelSelectorAsSelector(daemon.Spec.Selector)
+		selector, err := selectors.LabelSelectorAsSelector(daemon.Spec.Selector)
 		if err != nil {
 			// this shouldn't happen if LabelSelector passed validation
 			return err
@@ -2097,7 +2098,7 @@ func (p *StatefulSetDescriber) Describe(namespace, name string, describerSetting
 	}
 	pc := p.client.Core().Pods(namespace)
 
-	selector, err := metav1.LabelSelectorAsSelector(ps.Spec.Selector)
+	selector, err := selectors.LabelSelectorAsSelector(ps.Spec.Selector)
 	if err != nil {
 		return "", err
 	}
@@ -2399,7 +2400,7 @@ func (dd *DeploymentDescriber) Describe(namespace, name string, describerSetting
 	if err != nil {
 		return "", err
 	}
-	selector, err := metav1.LabelSelectorAsSelector(d.Spec.Selector)
+	selector, err := selectors.LabelSelectorAsSelector(d.Spec.Selector)
 	if err != nil {
 		return "", err
 	}
@@ -2469,7 +2470,7 @@ func getDaemonSetsForLabels(c extensionsclient.DaemonSetInterface, labelsToMatch
 	// Find the ones that match labelsToMatch.
 	var matchingDaemonSets []extensions.DaemonSet
 	for _, ds := range dss.Items {
-		selector, err := metav1.LabelSelectorAsSelector(ds.Spec.Selector)
+		selector, err := selectors.LabelSelectorAsSelector(ds.Spec.Selector)
 		if err != nil {
 			// this should never happen if the DaemonSet passed validation
 			return nil, err
@@ -2676,7 +2677,7 @@ func (p *PodDisruptionBudgetDescriber) Describe(namespace, name string, describe
 		w.Write(LEVEL_0, "Name:\t%s\n", pdb.Name)
 		w.Write(LEVEL_0, "Min available:\t%s\n", pdb.Spec.MinAvailable.String())
 		if pdb.Spec.Selector != nil {
-			w.Write(LEVEL_0, "Selector:\t%s\n", metav1.FormatLabelSelector(pdb.Spec.Selector))
+			w.Write(LEVEL_0, "Selector:\t%s\n", selectors.FormatLabelSelector(pdb.Spec.Selector))
 		} else {
 			w.Write(LEVEL_0, "Selector:\t<unset>\n")
 		}

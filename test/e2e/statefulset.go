@@ -23,9 +23,11 @@ import (
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	klabels "k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/selectors"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -229,7 +231,7 @@ var _ = framework.KubeDescribe("StatefulSet", func() {
 			expectedPodName := ss.Name + "-1"
 			expectedPod, err := f.ClientSet.Core().Pods(ns).Get(expectedPodName, metav1.GetOptions{})
 			Expect(err).NotTo(HaveOccurred())
-			watcher, err := f.ClientSet.Core().Pods(ns).Watch(metav1.SingleObject(
+			watcher, err := f.ClientSet.Core().Pods(ns).Watch(selectors.SingleObject(
 				metav1.ObjectMeta{
 					Name:            expectedPod.Name,
 					ResourceVersion: expectedPod.ResourceVersion,
@@ -378,7 +380,7 @@ var _ = framework.KubeDescribe("StatefulSet", func() {
 
 			var initialStatefulPodUID types.UID
 			By("Waiting until stateful pod " + statefulPodName + " will be recreated and deleted at least once in namespace " + f.Namespace.Name)
-			w, err := f.ClientSet.Core().Pods(f.Namespace.Name).Watch(metav1.SingleObject(metav1.ObjectMeta{Name: statefulPodName}))
+			w, err := f.ClientSet.Core().Pods(f.Namespace.Name).Watch(selectors.SingleObject(metav1.ObjectMeta{Name: statefulPodName}))
 			framework.ExpectNoError(err)
 			// we need to get UID from pod in any state and wait until stateful set controller will remove pod atleast once
 			_, err = watch.Until(framework.StatefulPodTimeout, w, func(event watch.Event) (bool, error) {
@@ -657,14 +659,15 @@ func (c *cockroachDBTester) write(statefulPodIndex int, kv map[string]string) {
 		framework.Logf(c.cockroachDBExec(cmd, c.ss.Namespace, name))
 	}
 }
-func (c *cockroachDBTester) read(statefulPodIndex int, key string) string {
-	name := fmt.Sprintf("%v-%d", c.ss.Name, statefulPodIndex)
-	return lastLine(c.cockroachDBExec(fmt.Sprintf("SELECT v FROM foo.bar WHERE k='%v';", key), c.ss.Namespace, name))
-}
 
 func lastLine(out string) string {
 	outLines := strings.Split(strings.Trim(out, "\n"), "\n")
 	return outLines[len(outLines)-1]
+}
+
+func (c *cockroachDBTester) read(statefulPodIndex int, key string) string {
+	name := fmt.Sprintf("%v-%d", c.ss.Name, statefulPodIndex)
+	return lastLine(c.cockroachDBExec(fmt.Sprintf("SELECT v FROM foo.bar WHERE k='%v';", key), c.ss.Namespace, name))
 }
 
 func pollReadWithTimeout(statefulPod statefulPodTester, statefulPodNumber int, key, expectedVal string) error {

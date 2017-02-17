@@ -30,6 +30,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/selectors"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	utilyaml "k8s.io/apimachinery/pkg/util/yaml"
@@ -253,7 +254,7 @@ func (s *StatefulSetTester) update(ns, name string, update func(ss *apps.Statefu
 
 // GetPodList gets the current Pods in ss.
 func (s *StatefulSetTester) GetPodList(ss *apps.StatefulSet) *v1.PodList {
-	selector, err := metav1.LabelSelectorAsSelector(ss.Spec.Selector)
+	selector, err := selectors.LabelSelectorAsSelector(ss.Spec.Selector)
 	ExpectNoError(err)
 	podList, err := s.c.Core().Pods(ss.Namespace).List(metav1.ListOptions{LabelSelector: selector.String()})
 	ExpectNoError(err)

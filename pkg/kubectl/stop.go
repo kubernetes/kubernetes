@@ -25,6 +25,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	selectors "k8s.io/apimachinery/pkg/selectors"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -347,7 +348,7 @@ func (reaper *StatefulSetReaper) Stop(namespace, name string, timeout time.Durat
 	// TODO: This shouldn't be needed, see corresponding TODO in StatefulSetHasDesiredReplicas.
 	// StatefulSet should track generation number.
 	pods := reaper.podClient.Pods(namespace)
-	selector, _ := metav1.LabelSelectorAsSelector(ss.Spec.Selector)
+	selector, _ := selectors.LabelSelectorAsSelector(ss.Spec.Selector)
 	options := metav1.ListOptions{LabelSelector: selector.String()}
 	podList, err := pods.List(options)
 	if err != nil {
@@ -394,7 +395,7 @@ func (reaper *JobReaper) Stop(namespace, name string, timeout time.Duration, gra
 		return err
 	}
 	// at this point only dead pods are left, that should be removed
-	selector, _ := metav1.LabelSelectorAsSelector(job.Spec.Selector)
+	selector, _ := selectors.LabelSelectorAsSelector(job.Spec.Selector)
 	options := metav1.ListOptions{LabelSelector: selector.String()}
 	podList, err := pods.List(options)
 	if err != nil {
@@ -447,7 +448,7 @@ func (reaper *DeploymentReaper) Stop(namespace, name string, timeout time.Durati
 	}
 
 	// Stop all replica sets.
-	selector, err := metav1.LabelSelectorAsSelector(deployment.Spec.Selector)
+	selector, err := selectors.LabelSelectorAsSelector(deployment.Spec.Selector)
 	if err != nil {
 		return err
 	}

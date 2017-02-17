@@ -24,8 +24,8 @@ import (
 	"github.com/golang/glog"
 
 	"k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/selectors"
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/settings"
@@ -103,7 +103,7 @@ func (c *podPresetPlugin) Admit(a admission.Attributes) error {
 
 	// get the pod presets and iterate over them
 	for _, pip := range list {
-		selector, err := metav1.LabelSelectorAsSelector(&pip.Spec.Selector)
+		selector, err := selectors.LabelSelectorAsSelector(&pip.Spec.Selector)
 		if err != nil {
 			return fmt.Errorf("listing pod presets for namespace:%s failed: %v", pod.GetNamespace(), err)
 		}

@@ -22,6 +22,7 @@ import (
 	"sort"
 	"strings"
 
+	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/selection"
 )
 
@@ -77,7 +78,7 @@ func (t *hasTerm) RequiresExactMatch(field string) (value string, found bool) {
 func (t *hasTerm) Transform(fn TransformFunc) (Selector, error) {
 	field, value, err := fn(t.field, t.value)
 	if err != nil {
-		return nil, err
+		return nil, errors.ErrorToBadRequest(err)
 	}
 	return &hasTerm{field, value}, nil
 }
@@ -113,7 +114,7 @@ func (t *notHasTerm) RequiresExactMatch(field string) (value string, found bool)
 func (t *notHasTerm) Transform(fn TransformFunc) (Selector, error) {
 	field, value, err := fn(t.field, t.value)
 	if err != nil {
-		return nil, err
+		return nil, errors.ErrorToBadRequest(err)
 	}
 	return &notHasTerm{field, value}, nil
 }
@@ -173,7 +174,7 @@ func (t andTerm) Transform(fn TransformFunc) (Selector, error) {
 	for i, s := range []Selector(t) {
 		n, err := s.Transform(fn)
 		if err != nil {
-			return nil, err
+			return nil, errors.ErrorToBadRequest(err)
 		}
 		next[i] = n
 	}
@@ -263,7 +264,7 @@ func UnescapeValue(s string) (string, error) {
 				v.WriteRune(c)
 			default:
 				// error on unrecognized escape sequences
-				return "", InvalidEscapeSequence{sequence: string([]rune{'\\', c})}
+				return "", errors.ErrorToBadRequest(InvalidEscapeSequence{sequence: string([]rune{'\\', c})})
 			}
 			inSlash = false
 			continue
@@ -274,7 +275,7 @@ func UnescapeValue(s string) (string, error) {
 			inSlash = true
 		case ',', '=':
 			// unescaped , and = characters are not allowed in field selector values
-			return "", UnescapedRune{r: c}
+			return "", errors.ErrorToBadRequest(UnescapedRune{r: c})
 		default:
 			v.WriteRune(c)
 		}
@@ -282,7 +283,7 @@ func UnescapeValue(s string) (string, error) {
 
 	// Ending with a single backslash is an invalid sequence
 	if inSlash {
-		return "", InvalidEscapeSequence{sequence: "\\"}
+		return "", errors.ErrorToBadRequest(InvalidEscapeSequence{sequence: "\\"})
 	}
 
 	return v.String(), nil
@@ -301,15 +302,23 @@ func ParseSelectorOrDie(s string) Selector {
 // ParseSelector takes a string representing a selector and returns an
 // object suitable for matching, or an error.
 func ParseSelector(selector string) (Selector, error) {
-	return parseSelector(selector,
+	sel, err := parseSelector(selector,
 		func(lhs, rhs string) (newLhs, newRhs string, err error) {
 			return lhs, rhs, nil
 		})
+	if err != nil {
+		return nil, errors.ErrorToBadRequest(err)
+	}
+	return sel, nil
 }
 
 // Parses the selector and runs them through the given TransformFunc.
 func ParseAndTransformSelector(selector string, fn TransformFunc) (Selector, error) {
-	return parseSelector(selector, fn)
+	sel, err := parseSelector(selector, fn)
+	if err != nil {
+		return nil, errors.ErrorToBadRequest(err)
+	}
+	return sel, nil
 }
 
 // Function to transform selectors.

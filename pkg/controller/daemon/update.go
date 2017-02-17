@@ -22,6 +22,7 @@ import (
 	"github.com/golang/glog"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/selectors"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	intstrutil "k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/kubernetes/pkg/api/v1"
@@ -71,7 +72,7 @@ func (dsc *DaemonSetsController) getAllDaemonSetPods(ds *extensions.DaemonSet) (
 	var newPods []*v1.Pod
 	var oldPods []*v1.Pod
 
-	selector, err := metav1.LabelSelectorAsSelector(ds.Spec.Selector)
+	selector, err := selectors.LabelSelectorAsSelector(ds.Spec.Selector)
 	if err != nil {
 		return newPods, oldPods, err
 	}

@@ -26,6 +26,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	selectors "k8s.io/apimachinery/pkg/selectors"
 	"k8s.io/client-go/pkg/api"
 	clientv1 "k8s.io/client-go/pkg/api/v1"
 	core "k8s.io/client-go/testing"
@@ -251,7 +252,7 @@ func (tc *replicaCalcTestCase) runTest(t *testing.T) {
 		podsGetter:    testClient.Core(),
 	}
 
-	selector, err := metav1.LabelSelectorAsSelector(&metav1.LabelSelector{
+	selector, err := selectors.LabelSelectorAsSelector(&metav1.LabelSelector{
 		MatchLabels: map[string]string{"name": podNamePrefix},
 	})
 	if err != nil {

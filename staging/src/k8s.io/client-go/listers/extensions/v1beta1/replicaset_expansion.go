@@ -19,8 +19,8 @@ package v1beta1
 import (
 	"fmt"
 
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/selectors"
 	"k8s.io/client-go/pkg/api/v1"
 	extensions "k8s.io/client-go/pkg/apis/extensions/v1beta1"
 )
@@ -53,7 +53,7 @@ func (s *replicaSetLister) GetPodReplicaSets(pod *v1.Pod) ([]*extensions.Replica
 		if rs.Namespace != pod.Namespace {
 			continue
 		}
-		selector, err := metav1.LabelSelectorAsSelector(rs.Spec.Selector)
+		selector, err := selectors.LabelSelectorAsSelector(rs.Spec.Selector)
 		if err != nil {
 			return nil, fmt.Errorf("invalid selector: %v", err)
 		}

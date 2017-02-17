@@ -19,8 +19,8 @@ package v1beta1
 import (
 	"fmt"
 
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	selectors "k8s.io/apimachinery/pkg/selectors"
 	"k8s.io/kubernetes/pkg/api/v1"
 	apps "k8s.io/kubernetes/pkg/apis/apps/v1beta1"
 )
@@ -57,7 +57,7 @@ func (s *statefulSetLister) GetPodStatefulSets(pod *v1.Pod) ([]*apps.StatefulSet
 		if ps.Namespace != pod.Namespace {
 			continue
 		}
-		selector, err = metav1.LabelSelectorAsSelector(ps.Spec.Selector)
+		selector, err = selectors.LabelSelectorAsSelector(ps.Spec.Selector)
 		if err != nil {
 			return nil, fmt.Errorf("invalid selector: %v", err)
 		}

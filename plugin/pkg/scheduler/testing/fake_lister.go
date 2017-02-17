@@ -19,8 +19,8 @@ package testing
 import (
 	"fmt"
 
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/selectors"
 	"k8s.io/kubernetes/pkg/api/v1"
 	apps "k8s.io/kubernetes/pkg/apis/apps/v1beta1"
 	extensions "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
@@ -124,7 +124,7 @@ func (f FakeReplicaSetLister) GetPodReplicaSets(pod *v1.Pod) (rss []*extensions.
 		if rs.Namespace != pod.Namespace {
 			continue
 		}
-		selector, err = metav1.LabelSelectorAsSelector(rs.Spec.Selector)
+		selector, err = selectors.LabelSelectorAsSelector(rs.Spec.Selector)
 		if err != nil {
 			return
 		}
@@ -153,7 +153,7 @@ func (f FakeStatefulSetLister) GetPodStatefulSets(pod *v1.Pod) (sss []*apps.Stat
 		if ss.Namespace != pod.Namespace {
 			continue
 		}
-		selector, err = metav1.LabelSelectorAsSelector(ss.Spec.Selector)
+		selector, err = selectors.LabelSelectorAsSelector(ss.Spec.Selector)
 		if err != nil {
 			return
 		}

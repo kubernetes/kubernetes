@@ -23,7 +23,10 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/conversion"
+	"k8s.io/apimachinery/pkg/fields"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/selectors"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/extensions"
@@ -141,6 +144,10 @@ func addConversionFuncs(scheme *runtime.Scheme) error {
 		Convert_v1_Secret_To_api_Secret,
 		Convert_v1_ServiceSpec_To_api_ServiceSpec,
 		Convert_v1_ResourceList_To_api_ResourceList,
+		Convert_map_to_unversioned_LabelSelector,
+		Convert_unversioned_LabelSelector_to_map,
+		Convert_string_To_labels_Selector,
+		Convert_labels_Selector_To_string,
 		Convert_v1_ReplicationController_to_extensions_ReplicaSet,
 		Convert_v1_ReplicationControllerSpec_to_extensions_ReplicaSetSpec,
 		Convert_v1_ReplicationControllerStatus_to_extensions_ReplicaSetStatus,
@@ -271,7 +278,7 @@ func Convert_v1_ReplicationController_to_extensions_ReplicaSet(in *ReplicationCo
 func Convert_v1_ReplicationControllerSpec_to_extensions_ReplicaSetSpec(in *ReplicationControllerSpec, out *extensions.ReplicaSetSpec, s conversion.Scope) error {
 	out.Replicas = *in.Replicas
 	if in.Selector != nil {
-		metav1.Convert_map_to_unversioned_LabelSelector(&in.Selector, out.Selector, s)
+		Convert_map_to_unversioned_LabelSelector(&in.Selector, out.Selector, s)
 	}
 	if in.Template != nil {
 		if err := Convert_v1_PodTemplateSpec_To_api_PodTemplateSpec(in.Template, &out.Template, s); err != nil {
@@ -314,7 +321,7 @@ func Convert_extensions_ReplicaSetSpec_to_v1_ReplicationControllerSpec(in *exten
 	out.MinReadySeconds = in.MinReadySeconds
 	var invalidErr error
 	if in.Selector != nil {
-		invalidErr = metav1.Convert_unversioned_LabelSelector_to_map(in.Selector, &out.Selector, s)
+		invalidErr = Convert_unversioned_LabelSelector_to_map(in.Selector, &out.Selector, s)
 	}
 	out.Template = new(PodTemplateSpec)
 	if err := Convert_api_PodTemplateSpec_To_v1_PodTemplateSpec(&in.Template, out.Template, s); err != nil {
@@ -731,6 +738,57 @@ func Convert_v1_ResourceList_To_api_ResourceList(in *ResourceList, out *api.Reso
 
 		(*out)[api.ResourceName(key)] = val
 	}
+	return nil
+}
+
+func Convert_map_to_unversioned_LabelSelector(in *map[string]string, out *metav1.LabelSelector, s conversion.Scope) error {
+	if in == nil {
+		return nil
+	}
+	out = new(metav1.LabelSelector)
+	for labelKey, labelValue := range *in {
+		metav1.AddLabelToSelector(out, labelKey, labelValue)
+	}
+	return nil
+}
+
+func Convert_unversioned_LabelSelector_to_map(in *metav1.LabelSelector, out *map[string]string, s conversion.Scope) error {
+	var err error
+	*out, err = selectors.LabelSelectorAsMap(in)
+	return err
+}
+
+func Convert_string_To_labels_Selector(in *string, out *labels.Selector, s conversion.Scope) error {
+	selector, err := labels.Parse(*in)
+	if err != nil {
+		return err
+	}
+	*out = selector
+	return nil
+}
+
+func Convert_labels_Selector_To_string(in *labels.Selector, out *string, s conversion.Scope) error {
+	if *in == nil {
+		return nil
+	}
+	*out = (*in).String()
+	return nil
+}
+
+func Convert_string_To_fields_Selector(in *string, out *fields.Selector, s conversion.Scope) error {
+	selector, err := fields.ParseSelector(*in)
+	if err != nil {
+		return err
+	}
+	*out = selector
+	return nil
+}
+
+func Convert_fields_Selector_To_string(in *fields.Selector, out *string, s conversion.Scope) error {
+	if *in == nil {
+		return nil
+	}
+	*out = (*in).String()
 	return nil
 }
 

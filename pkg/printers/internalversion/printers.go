@@ -26,6 +26,7 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/selectors"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/kubernetes/federation/apis/federation"
 	"k8s.io/kubernetes/pkg/api"
@@ -507,7 +508,7 @@ func printReplicaSet(rs *extensions.ReplicaSet, w io.Writer, options printers.Pr
 		if err := layoutContainers(containers, w); err != nil {
 			return err
 		}
-		if _, err := fmt.Fprintf(w, "\t%s", metav1.FormatLabelSelector(rs.Spec.Selector)); err != nil {
+		if _, err := fmt.Fprintf(w, "\t%s", selectors.FormatLabelSelector(rs.Spec.Selector)); err != nil {
 			return err
 		}
 	}
@@ -575,7 +576,7 @@ func printJob(job *batch.Job, w io.Writer, options printers.PrintOptions) error 
 		}
 	}
 
-	selector, err := metav1.LabelSelectorAsSelector(job.Spec.Selector)
+	selector, err := selectors.LabelSelectorAsSelector(job.Spec.Selector)
 	if err != nil {
 		// this shouldn't happen if LabelSelector passed validation
 		return err
@@ -865,7 +866,7 @@ func printStatefulSet(ps *apps.StatefulSet, w io.Writer, options printers.PrintO
 		if err := layoutContainers(containers, w); err != nil {
 			return err
 		}
-		if _, err := fmt.Fprintf(w, "\t%s", metav1.FormatLabelSelector(ps.Spec.Selector)); err != nil {
+		if _, err := fmt.Fprintf(w, "\t%s", selectors.FormatLabelSelector(ps.Spec.Selector)); err != nil {
 			return err
 		}
 	}
@@ -904,7 +905,7 @@ func printDaemonSet(ds *extensions.DaemonSet, w io.Writer, options printers.Prin
 	desiredScheduled := ds.Status.DesiredNumberScheduled
 	currentScheduled := ds.Status.CurrentNumberScheduled
 	numberReady := ds.Status.NumberReady
-	selector, err := metav1.LabelSelectorAsSelector(ds.Spec.Selector)
+	selector, err := selectors.LabelSelectorAsSelector(ds.Spec.Selector)
 	if err != nil {
 		// this shouldn't happen if LabelSelector passed validation
 		return err
@@ -1645,7 +1646,7 @@ func printDeployment(deployment *extensions.Deployment, w io.Writer, options pri
 	availableReplicas := deployment.Status.AvailableReplicas
 	age := translateTimestamp(deployment.CreationTimestamp)
 	containers := deployment.Spec.Template.Spec.Containers
-	selector, err := metav1.LabelSelectorAsSelector(deployment.Spec.Selector)
+	selector, err := selectors.LabelSelectorAsSelector(deployment.Spec.Selector)
 	if err != nil {
 		// this shouldn't happen if LabelSelector passed validation
 		return err
@@ -1845,7 +1846,7 @@ func printNetworkPolicy(networkPolicy *extensions.NetworkPolicy, w io.Writer, op
 			return err
 		}
 	}
-	if _, err := fmt.Fprintf(w, "%s\t%v\t%s", name, metav1.FormatLabelSelector(&networkPolicy.Spec.PodSelector), translateTimestamp(networkPolicy.CreationTimestamp)); err != nil {
+	if _, err := fmt.Fprintf(w, "%s\t%v\t%s", name, selectors.FormatLabelSelector(&networkPolicy.Spec.PodSelector), translateTimestamp(networkPolicy.CreationTimestamp)); err != nil {
 		return err
 	}
 	if _, err := fmt.Fprint(w, AppendLabels(networkPolicy.Labels, options.ColumnLabels)); err != nil {

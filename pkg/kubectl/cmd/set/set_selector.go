@@ -25,6 +25,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	selectors "k8s.io/apimachinery/pkg/selectors"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/kubernetes/pkg/api"
@@ -223,6 +224,6 @@ func getResourcesAndSelector(args []string) (resources []string, selector *metav
 		return []string{}, nil, nil
 	}
 	resources = args[:len(args)-1]
-	selector, err = metav1.ParseToLabelSelector(args[len(args)-1])
+	selector, err = selectors.ParseToLabelSelector(args[len(args)-1])
 	return resources, selector, err
 }
