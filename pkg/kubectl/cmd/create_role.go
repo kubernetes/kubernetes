@@ -43,9 +43,6 @@ var (
 
 	// Valid resource verb list for validation.
 	validResourceVerbs = []string{"*", "get", "delete", "list", "create", "update", "patch", "watch", "proxy", "redirect", "deletecollection"}
-
-	// Valid non-resource verb list for validation.
-	validNonResourceVerbs = []string{"get", "post", "put", "delete"}
 )
 
 type CreateRoleOptions struct {
@@ -137,7 +134,7 @@ func (c *CreateRoleOptions) Validate(f cmdutil.Factory) error {
 	}
 
 	for _, v := range c.Verbs {
-		if !arrayContains(validResourceVerbs, v) && !arrayContains(validNonResourceVerbs, v) {
+		if !arrayContains(validResourceVerbs, v) {
 			return fmt.Errorf("invalid verb: '%s'", v)
 		}
 	}
