@@ -143,7 +143,7 @@ var _ = framework.KubeDescribe("Dynamic provisioning", func() {
 			allZones := sets.NewString()     // all zones in the project
 			managedZones := sets.NewString() // subset of allZones
 
-			gceCloud, err := getGCECloud()
+			gceCloud, err := framework.GetGCECloud()
 			Expect(err).NotTo(HaveOccurred())
 
 			// Get all k8s managed zones
