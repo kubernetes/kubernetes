@@ -35,6 +35,13 @@ import (
 	"github.com/golang/glog"
 )
 
+// Converter is an interface for converting between runtime.Object
+// and map[string]interface representation.
+type Converter interface {
+	ToUnstructured(obj runtime.Object, u *map[string]interface{}) error
+	FromUnstructured(u map[string]interface{}, obj runtime.Object) error
+}
+
 type structField struct {
 	structType reflect.Type
 	field      int
@@ -69,27 +76,33 @@ var (
 	float64Type            = reflect.TypeOf(float64(0))
 	boolType               = reflect.TypeOf(bool(false))
 	fieldCache             = newFieldsCache()
-	Converter              = newConverter()
-
+	DefaultConverter       = NewConverter(parseBool(os.Getenv("KUBE_PATCH_CONVERSION_DETECTOR")))
 )
+
+func parseBool(key string) bool {
+	value, err := strconv.ParseBool(key)
+	if err != nil {
+		glog.Errorf("Couldn't parse %s as bool", key)
+	}
+	return value
+}
 
 // ConverterImpl knows how to convert betweek runtime.Object and
 // Unstructured in both ways.
-type ConverterImpl struct {
+type converterImpl struct {
 	// If true, we will be additionally running conversion via json
 	// to ensure that the result is true.
 	// This is supposed to be set only in tests.
 	mismatchDetection bool
 }
 
-func newConverter() *ConverterImpl {
-	mismatchDetection, _ := strconv.ParseBool(os.Getenv("KUBE_PATCH_CONVERSION_DETECTOR"))
-	return &ConverterImpl{
+func NewConverter(mismatchDetection bool) Converter {
+	return &converterImpl{
 		mismatchDetection: mismatchDetection,
 	}
 }
 
-func (c *ConverterImpl) FromUnstructured(u map[string]interface{}, obj runtime.Object) error {
+func (c *converterImpl) FromUnstructured(u map[string]interface{}, obj runtime.Object) error {
 	err := fromUnstructured(reflect.ValueOf(u), reflect.ValueOf(obj).Elem())
 	if c.mismatchDetection {
 		newObj := reflect.New(reflect.TypeOf(obj).Elem()).Interface().(runtime.Object)
@@ -362,7 +375,7 @@ func interfaceFromUnstructured(sv, dv reflect.Value) error {
 	return nil
 }
 
-func (c *ConverterImpl) ToUnstructured(obj runtime.Object, u *map[string]interface{}) error {
+func (c *converterImpl) ToUnstructured(obj runtime.Object, u *map[string]interface{}) error {
 	err := toUnstructured(reflect.ValueOf(obj).Elem(), reflect.ValueOf(u).Elem())
 	if c.mismatchDetection {
 		newUnstr := &map[string]interface{}{}

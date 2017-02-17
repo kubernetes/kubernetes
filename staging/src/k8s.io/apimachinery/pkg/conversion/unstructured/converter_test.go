@@ -42,8 +42,8 @@ type B struct {
 }
 
 type C struct {
-	A []A            `json:"ca"`
-	B                `json:",inline"`
+	A []A `json:"ca"`
+	B `json:",inline"`
 	C string         `json:"cc"`
 	D *int64         `json:"cd"`
 	E map[string]int `json:"ce"`
@@ -122,14 +122,14 @@ func doRoundTrip(t *testing.T, item runtime.Object) {
 	}
 
 	newUnstr := make(map[string]interface{})
-	err = Converter.ToUnstructured(item, &newUnstr)
+	err = DefaultConverter.ToUnstructured(item, &newUnstr)
 	if err != nil {
 		t.Errorf("ToUnstructured failed: %v", err)
 		return
 	}
 
 	newObj := reflect.New(reflect.TypeOf(item).Elem()).Interface().(runtime.Object)
-	err = Converter.FromUnstructured(newUnstr, newObj)
+	err = DefaultConverter.FromUnstructured(newUnstr, newObj)
 	if err != nil {
 		t.Errorf("FromUnstructured failed: %v", err)
 		return
@@ -239,7 +239,7 @@ func doUnrecognized(t *testing.T, jsonData string, item runtime.Object, expected
 		return
 	}
 	newObj := reflect.New(reflect.TypeOf(item).Elem()).Interface().(runtime.Object)
-	err = Converter.FromUnstructured(unstr, newObj)
+	err = DefaultConverter.FromUnstructured(unstr, newObj)
 	if (err != nil) != (expectedErr != nil) {
 		t.Errorf("Unexpected error in FromUnstructured: %v, expected: %v", err, expectedErr)
 	}
