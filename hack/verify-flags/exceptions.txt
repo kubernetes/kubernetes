@@ -88,7 +88,10 @@ cluster/vagrant/provision-utils.sh:  api_servers: '$(echo "$MASTER_IP" | sed -e 
 cluster/vagrant/provision-utils.sh:  node_ip: '$(echo "$MASTER_IP" | sed -e "s/'/''/g")'
 cluster/vagrant/provision-utils.sh:  runtime_config: '$(echo "$RUNTIME_CONFIG" | sed -e "s/'/''/g")'
 examples/cluster-dns/images/frontend/client.py:  service_address = socket.gethostbyname(hostname)
+examples/storage/cassandra/image/files/jvm.options:# information in cassandra.yaml (such as listen_address).
+examples/storage/cassandra/image/files/jvm.options:#-Dcassandra.replace_address=listen_address or broadcast_address of dead node
 examples/storage/cassandra/image/files/run.sh:  cluster_name \
+examples/storage/cassandra/image/files/run.sh:  listen_address \
 examples/storage/vitess/env.sh:    node_ip=$(get_node_ip)
 federation/cluster/common.sh:  local cert_dir="${kube_temp}/easy-rsa-master/easyrsa3"
 federation/deploy/config.json.sample:      "cloud_provider": "gce",
@@ -103,9 +106,6 @@ federation/deploy/config.json.sample:      "cluster_name": "cluster3-kubernetes"
 federation/deploy/config.json.sample:      "num_nodes": 3,
 federation/deploy/config.json.sample:      "num_nodes": 3,
 federation/deploy/config.json.sample:      "num_nodes": 3,
-hack/e2e.go:.phase1.cloud_provider="gce"
-hack/e2e.go:.phase1.cluster_name="{{.Cluster}}"
-hack/e2e.go:.phase1.num_nodes=4
 hack/lib/util.sh:    local api_port=$5
 hack/local-up-cluster.sh:        advertise_address="--advertise_address=${API_HOST_IP}"
 hack/local-up-cluster.sh:      runtime_config="--runtime-config=${RUNTIME_CONFIG}"
