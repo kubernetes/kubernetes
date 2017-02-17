@@ -198,7 +198,6 @@ spec:
           failureThreshold: 5
         args:
         - --cache-size=1000
-        - --no-resolv
         - --server=/{{ .DNSDomain }}/127.0.0.1#10053
         - --server=/in-addr.arpa/127.0.0.1#10053
         - --server=/ip6.arpa/127.0.0.1#10053
