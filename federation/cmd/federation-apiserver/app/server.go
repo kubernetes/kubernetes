@@ -68,6 +68,17 @@ cluster's shared state through which all other components interact.`,
 
 // Run runs the specified APIServer.  This should never exit.
 func Run(s *options.ServerRunOptions) error {
+	stopCh := wait.NeverStop
+	err := NonBlockingRun(s, stopCh)
+	if err != nil {
+		return err
+	}
+	<-stopCh
+	return nil
+}
+
+// NonBlockingRun runs the specified APIServer and configures it to stop with the given channel.
+func NonBlockingRun(s *options.ServerRunOptions, stopCh <-chan struct{}) error {
 	// set defaults
 	if err := s.GenericServerRunOptions.DefaultAdvertiseAddress(s.SecureServing, s.InsecureServing); err != nil {
 		return err
@@ -212,8 +223,8 @@ func Run(s *options.ServerRunOptions) error {
 	installBatchAPIs(m, genericConfig.RESTOptionsGetter)
 	installAutoscalingAPIs(m, genericConfig.RESTOptionsGetter)
 
-	sharedInformers.Start(wait.NeverStop)
-	return m.PrepareRun().Run(wait.NeverStop)
+	sharedInformers.Start(stopCh)
+	return m.PrepareRun().NonBlockingRun(stopCh)
 }
 
 // PostProcessSpec adds removed definitions for backward compatibility
