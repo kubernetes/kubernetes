@@ -42,10 +42,12 @@ function kubelet_monitoring {
   # TODO(andyzheng0831): replace it with a more reliable method if possible.
   sleep 120
   local -r max_seconds=10
+  local output=""
   while [ 1 ]; do
-    if ! curl -m "${max_seconds}" -f -s http://127.0.0.1:10255/healthz > /dev/null; then
+    if ! output=$(curl -m "${max_seconds}" -f -s -S http://127.0.0.1:10255/healthz 2>&1); then
+      # Print the response and/or errors.
+      echo $output
       echo "Kubelet is unhealthy!"
-      curl http://127.0.0.1:10255/healthz
       pkill kubelet
       # Wait for a while, as we don't want to kill it again before it is really up.
       sleep 60
