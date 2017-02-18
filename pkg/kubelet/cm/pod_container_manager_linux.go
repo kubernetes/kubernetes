@@ -187,13 +187,19 @@ func (m *podContainerManagerImpl) GetAllPodsFromCgroups() (map[types.UID]CgroupN
 	// and through each QoS cgroup directory for each subsystem mount
 	// If a pod cgroup exists in even a single subsystem mount
 	// we will attempt to delete it
-	for _, val := range m.subsystems.MountPoints {
+	for key, val := range m.subsystems.MountPoints {
+		glog.Infof("GetAllPodsFromCgroups: examining mountpoint key: %v, value: %v", key, val)
 		for _, qosContainerName := range qosContainersList {
 			// get the subsystems QoS cgroup absolute name
 			qcConversion := m.cgroupManager.Name(CgroupName(qosContainerName))
 			qc := path.Join(val, qcConversion)
+			glog.Infof("GetAllPodsFromCgroups: attempting to read: %v", qc)
 			dirInfo, err := ioutil.ReadDir(qc)
 			if err != nil {
+				if os.IsNotExist(err) {
+					glog.Infof("GetAllPodsFromCgroups: cgroup directory %v does not exist, skipping!", qc)
+					continue
+				}
 				return nil, fmt.Errorf("failed to read the cgroup directory %v : %v", qc, err)
 			}
 			for i := range dirInfo {

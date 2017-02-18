@@ -333,6 +333,8 @@ func (m *cgroupManagerImpl) Update(cgroupConfig *CgroupConfig) error {
 		driverName = m.adapter.adaptName(cgroupConfig.Name, false)
 	}
 
+	glog.Infof("CgroupManager - attempting to update %v, %v using %v", driverName, driverParent, m.adapter.cgroupManagerType)
+
 	// Initialize libcontainer's cgroup config
 	libcontainerCgroupConfig := &libcontainerconfigs.Cgroup{
 		Name:      driverName,
@@ -344,6 +346,7 @@ func (m *cgroupManagerImpl) Update(cgroupConfig *CgroupConfig) error {
 	if err := setSupportedSubsytems(libcontainerCgroupConfig); err != nil {
 		return fmt.Errorf("failed to set supported cgroup subsystems for cgroup %v: %v", cgroupConfig.Name, err)
 	}
+	glog.Infof("CgroupManager - updated %v, %v using %v", driverName, driverParent, m.adapter.cgroupManagerType)
 	return nil
 }
 
@@ -362,6 +365,7 @@ func (m *cgroupManagerImpl) Create(cgroupConfig *CgroupConfig) error {
 		driverName = m.adapter.adaptName(cgroupConfig.Name, false)
 	}
 
+	glog.Infof("CgroupManager - attempting to create %v, %v using %v", driverName, driverParent, m.adapter.cgroupManagerType)
 	resources := m.toResources(cgroupConfig.ResourceParameters)
 	// Initialize libcontainer's cgroup config with driver specific naming.
 	libcontainerCgroupConfig := &libcontainerconfigs.Cgroup{
@@ -385,6 +389,8 @@ func (m *cgroupManagerImpl) Create(cgroupConfig *CgroupConfig) error {
 	if err := manager.Apply(-1); err != nil {
 		return err
 	}
+
+	glog.Infof("CgroupManager - created %v, %v using %v", driverName, driverParent, m.adapter.cgroupManagerType)
 
 	// it may confuse why we call set after we do apply, but the issue is that runc
 	// follows a similar pattern.  it's needed to ensure cpu quota is set properly.
