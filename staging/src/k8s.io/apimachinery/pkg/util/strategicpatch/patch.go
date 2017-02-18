@@ -160,6 +160,12 @@ func diffMaps(original, modified map[string]interface{}, t reflect.Type, ignoreC
 			modifiedValueTyped := modifiedValue.(map[string]interface{})
 			fieldType, fieldPatchStrategy, _, err := forkedjson.LookupPatchMetadata(t, key)
 			if err != nil {
+				// We couldn't look up metadata for the field
+				// If the values are identical, this doesn't matter, no patch is needed
+				if reflect.DeepEqual(originalValue, modifiedValue) {
+					continue
+				}
+				// Otherwise, return the error
 				return nil, err
 			}
 
@@ -184,6 +190,12 @@ func diffMaps(original, modified map[string]interface{}, t reflect.Type, ignoreC
 			modifiedValueTyped := modifiedValue.([]interface{})
 			fieldType, fieldPatchStrategy, fieldPatchMergeKey, err := forkedjson.LookupPatchMetadata(t, key)
 			if err != nil {
+				// We couldn't look up metadata for the field
+				// If the values are identical, this doesn't matter, no patch is needed
+				if reflect.DeepEqual(originalValue, modifiedValue) {
+					continue
+				}
+				// Otherwise, return the error
 				return nil, err
 			}
 
