@@ -189,6 +189,10 @@ func (h *HTTPExtender) send(action string, args interface{}, result interface{})
 		return err
 	}
 
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("Failed %v with extender at URL %v, code %v", action, h.extenderURL, resp.StatusCode)
+	}
+
 	if result != nil {
 		defer resp.Body.Close()
 		body, err := ioutil.ReadAll(resp.Body)

@@ -48,9 +48,10 @@ import (
 )
 
 const (
-	filter     = "filter"
-	prioritize = "prioritize"
-	bind       = "bind"
+	filter      = "filter"
+	prioritize  = "prioritize"
+	bind        = "bind"
+	failPodName = "extender-fail-pod"
 )
 
 type fitPredicate func(pod *v1.Pod, node *v1.Node) (bool, error)
@@ -115,8 +116,14 @@ func (e *Extender) serveHTTP(t *testing.T, w http.ResponseWriter, req *http.Requ
 			return
 		}
 
+		if args.Pod.Name == failPodName {
+			http.Error(w, fmt.Sprintf("Induced bind failure for %v", failPodName), http.StatusInternalServerError)
+			return
+		}
+
 		if err := e.Bind(&args.Pod, args.Node); err != nil {
 			http.Error(w, fmt.Sprintf("Bind failed with error: %v", err), http.StatusInternalServerError)
+			return
 		}
 		w.WriteHeader(http.StatusOK)
 	} else {
@@ -339,4 +346,19 @@ func DoTestPodScheduling(ns *v1.Namespace, t *testing.T, cs clientset.Interface)
 		t.Fatalf("Failed to schedule using extender, expected machine3, got %v", myPod.Spec.NodeName)
 	}
 	t.Logf("Scheduled pod using extenders")
+
+	pod.Name = failPodName
+	failPod, err := cs.Core().Pods(ns.Name).Create(pod)
+	if err != nil {
+		t.Fatalf("Failed to create pod: %v", err)
+	}
+
+	time.Sleep(time.Second * 2)
+
+	if failPod, err := cs.Core().Pods(ns.Name).Get(failPod.Name, metav1.GetOptions{}); err != nil {
+		t.Fatalf("Failed to get pod: %v", err)
+	} else if failPod.Spec.NodeName != "" {
+		t.Fatalf("Pod scheduled to %v when not expected to", failPod.Spec.NodeName)
+	}
+	t.Logf("Tested pod scheduling failure using extenders")
 }
