@@ -86,6 +86,9 @@ type Attributes struct {
 	ReadOnly        bool
 	Managed         bool
 	SupportsSELinux bool
+	// NeedsPropagation is true if the mounter needs to enable mount propagation.
+	// Default to false to keep consistent with old behavior.
+	NeedsPropagation bool
 }
 
 // Mounter interface provides methods to set up/mount the volume.

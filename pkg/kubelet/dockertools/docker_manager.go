@@ -88,7 +88,7 @@ const (
 
 	// Remote API version for docker daemon versions
 	// https://docs.docker.com/engine/reference/api/docker_remote_api/
-	dockerV110APIVersion = "1.22"
+	DockerV110APIVersion = "1.22.0"
 
 	// ndots specifies the minimum number of dots that a domain name must contain for the resolver to consider it as FQDN (fully-qualified)
 	// we want to able to consider SRV lookup names like _dns._udp.kube-dns.default.svc to be considered relative.
@@ -548,23 +548,30 @@ func makeEnvList(envs []kubecontainer.EnvVar) (result []string) {
 // makeMountBindings converts the mount list to a list of strings that
 // can be understood by docker.
 // Each element in the string is in the form of:
-// '<HostPath>:<ContainerPath>', or
-// '<HostPath>:<ContainerPath>:ro', if the path is read only, or
-// '<HostPath>:<ContainerPath>:Z', if the volume requires SELinux
-// relabeling
-func makeMountBindings(mounts []kubecontainer.Mount) (result []string) {
+// '<HostPath>:<ContainerPath>[:options]', where 'options'
+// is a comma-separated list of the following strings:
+// 'ro', if the path is read only
+// 'Z', if the volume requires SELinux relabeling
+// propagation mode such as 'rslave'
+func makeMountBindings(mounts []kubecontainer.Mount, selinuxEnabled bool, propagation string) (result []string) {
 	for _, m := range mounts {
 		bind := fmt.Sprintf("%s:%s", m.HostPath, m.ContainerPath)
+		var attrs []string
 		if m.ReadOnly {
-			bind += ":ro"
+			attrs = append(attrs, "ro")
 		}
-		if m.SELinuxRelabel && selinux.SELinuxEnabled() {
-			if m.ReadOnly {
-				bind += ",Z"
+		if m.SELinuxRelabel && selinuxEnabled {
+			attrs = append(attrs, "Z")
+		}
+		if m.NeedsPropagation {
+			if propagation != "" {
+				attrs = append(attrs, propagation)
 			} else {
-				bind += ":Z"
+				glog.Warningf("This Docker version doesn't support propagation modes for volume mounts, will not use mount propagation for hostPath %q", m.HostPath)
 			}
-
+		}
+		if len(attrs) > 0 {
+			bind = fmt.Sprintf("%s:%s", bind, strings.Join(attrs, ","))
 		}
 		result = append(result, bind)
 	}
@@ -645,6 +652,13 @@ func (dm *DockerManager) runContainer(
 	}
 	fmtSecurityOpts := FmtDockerOpts(securityOpts, optSeparator)
 
+	// Check if current api version is equal to or newer than one used in docker 1.10
+	dockerNewerThanV110, err := dm.checkDockerAPIVersion(DockerV110APIVersion)
+	if err != nil {
+		glog.Errorf("Failed to check docker api version: %v", err)
+		return kubecontainer.ContainerID{}, err
+	}
+
 	// Pod information is recorded on the container as labels to preserve it in the event the pod is deleted
 	// while the Kubelet is down and there is no information available to recover the pod.
 	// TODO: keep these labels up to date if the pod changes
@@ -685,7 +699,14 @@ func (dm *DockerManager) runContainer(
 			CgroupPermissions: device.Permissions,
 		}
 	}
-	binds := makeMountBindings(opts.Mounts)
+
+	// Set propagation mode to "rslave" for HostPath volume mount if current
+	// Docker version supports it
+	propagation := ""
+	if dockerNewerThanV110 >= 0 {
+		propagation = "rslave"
+	}
+	binds := makeMountBindings(opts.Mounts, selinux.SELinuxEnabled(), propagation)
 
 	// The reason we create and mount the log file in here (not in kubelet) is because
 	// the file's location depends on the ID of the container, and we need to create and
@@ -766,10 +787,7 @@ func (dm *DockerManager) runContainer(
 	}
 
 	// If current api version is equal to or newer than docker 1.10 requested, set OomScoreAdj to HostConfig
-	result, err := dm.checkDockerAPIVersion(dockerV110APIVersion)
-	if err != nil {
-		glog.Errorf("Failed to check docker api version: %v", err)
-	} else if result >= 0 {
+	if dockerNewerThanV110 >= 0 {
 		hc.OomScoreAdj = oomScoreAdj
 	}
 
@@ -1205,7 +1223,7 @@ func (dm *DockerManager) getSeccompOpts(pod *v1.Pod, ctrName string) ([]dockerOp
 	}
 
 	// seccomp is only on docker versions >= v1.10
-	if result, err := version.Compare(dockerV110APIVersion); err != nil {
+	if result, err := version.Compare(DockerV110APIVersion); err != nil {
 		return nil, err
 	} else if result < 0 {
 		return nil, nil // return early for Docker < 1.10
@@ -1845,7 +1863,7 @@ func (dm *DockerManager) runContainerInPod(pod *v1.Pod, container *v1.Container,
 
 func (dm *DockerManager) applyOOMScoreAdjIfNeeded(pod *v1.Pod, container *v1.Container, containerInfo *dockertypes.ContainerJSON) error {
 	// Compare current API version with expected api version.
-	result, err := dm.checkDockerAPIVersion(dockerV110APIVersion)
+	result, err := dm.checkDockerAPIVersion(DockerV110APIVersion)
 	if err != nil {
 		return fmt.Errorf("Failed to check docker api version: %v", err)
 	}

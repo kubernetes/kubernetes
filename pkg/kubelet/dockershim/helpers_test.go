@@ -18,6 +18,7 @@ package dockershim
 
 import (
 	"fmt"
+	"reflect"
 	"testing"
 
 	"github.com/blang/semver"
@@ -384,5 +385,71 @@ func TestMakePortsAndBindings(t *testing.T) {
 		actualExposedPorts, actualPortMappings := makePortsAndBindings(test.pm)
 		assert.Equal(t, test.exposedPorts, actualExposedPorts)
 		assert.Equal(t, test.portmappings, actualPortMappings)
+	}
+}
+
+func TestGenerateMountBindings(t *testing.T) {
+	for c, test := range map[string]struct {
+		mounts      []*runtimeapi.Mount
+		propagation string
+		bindings    []string
+	}{
+		"rslave": {
+			mounts: []*runtimeapi.Mount{
+				{
+					HostPath:         "/tmp",
+					ContainerPath:    "/tmp1",
+					Readonly:         true,
+					NeedsPropagation: true,
+				},
+				{
+					HostPath:         "/tmp",
+					ContainerPath:    "/tmp2",
+					Readonly:         false,
+					SelinuxRelabel:   false,
+					NeedsPropagation: true,
+				},
+			},
+			propagation: "rslave",
+			bindings: []string{
+				"/tmp:/tmp1:ro,rslave",
+				"/tmp:/tmp2:rslave",
+			},
+		},
+		"relabel and ro": {
+			mounts: []*runtimeapi.Mount{
+				{
+					HostPath:         "/tmp",
+					ContainerPath:    "/tmp1",
+					Readonly:         true,
+					SelinuxRelabel:   true,
+					NeedsPropagation: true,
+				},
+				{
+					HostPath:       "/tmp",
+					ContainerPath:  "/tmp2",
+					Readonly:       false,
+					SelinuxRelabel: true,
+				},
+				{
+					HostPath:       "/tmp",
+					ContainerPath:  "/tmp3",
+					Readonly:       false,
+					SelinuxRelabel: false,
+				},
+			},
+			propagation: "",
+			bindings: []string{
+				"/tmp:/tmp1:ro,Z",
+				"/tmp:/tmp2:Z",
+				"/tmp:/tmp3",
+			},
+		},
+	} {
+		t.Logf("TestCase - %q", c)
+		bindings := generateMountBindings(test.mounts, test.propagation)
+		if !reflect.DeepEqual(bindings, test.bindings) {
+			t.Errorf("Expected %v, got %v", test.bindings, bindings)
+		}
 	}
 }
