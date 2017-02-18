@@ -17,117 +17,36 @@ limitations under the License.
 package install
 
 import (
-	"fmt"
-
-	"github.com/golang/glog"
-
-	"k8s.io/apimachinery/pkg/api/meta"
-	"k8s.io/apimachinery/pkg/apimachinery"
+	"k8s.io/apimachinery/pkg/apimachinery/announced"
+	"k8s.io/apimachinery/pkg/apimachinery/registered"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/kubernetes/pkg/api"
+
 	"k8s.io/kubernetes/federation/apis/federation"
 	"k8s.io/kubernetes/federation/apis/federation/v1beta1"
-	"k8s.io/kubernetes/pkg/api"
 )
 
-const importPrefix = "k8s.io/kubernetes/federation/apis/federation"
-
-var accessor = meta.NewAccessor()
-
-// availableVersions lists all known external versions for this group from most preferred to least preferred
-var availableVersions = []schema.GroupVersion{v1beta1.SchemeGroupVersion}
-
 func init() {
-	api.Registry.RegisterVersions(availableVersions)
-	externalVersions := []schema.GroupVersion{}
-	for _, v := range availableVersions {
-		if api.Registry.IsAllowedVersion(v) {
-			externalVersions = append(externalVersions, v)
-		}
-	}
-	if len(externalVersions) == 0 {
-		glog.V(4).Infof("No version is registered for group %v", federation.GroupName)
-		return
-	}
-
-	if err := api.Registry.EnableVersions(externalVersions...); err != nil {
-		glog.V(4).Infof("%v", err)
-		return
-	}
-	if err := enableVersions(externalVersions); err != nil {
-		glog.V(4).Infof("%v", err)
-		return
-	}
+	Install(api.GroupFactoryRegistry, api.Registry, api.Scheme)
 }
 
-// TODO: enableVersions should be centralized rather than spread in each API
-// group.
-// We can combine api.Registry.RegisterVersions, api.Registry.EnableVersions and
-// api.Registry.RegisterGroup once we have moved enableVersions there.
-func enableVersions(externalVersions []schema.GroupVersion) error {
-	addVersionsToScheme(externalVersions...)
-	preferredExternalVersion := externalVersions[0]
-
-	groupMeta := apimachinery.GroupMeta{
-		GroupVersion:  preferredExternalVersion,
-		GroupVersions: externalVersions,
-		RESTMapper:    newRESTMapper(externalVersions),
-		SelfLinker:    runtime.SelfLinker(accessor),
-		InterfacesFor: interfacesFor,
-	}
-
-	if err := api.Registry.RegisterGroup(groupMeta); err != nil {
-		return err
-	}
-	return nil
-}
-
-func newRESTMapper(externalVersions []schema.GroupVersion) meta.RESTMapper {
-	// the list of kinds that are scoped at the root of the api hierarchy
-	// if a kind is not enumerated here, it is assumed to have a namespace scope
-	rootScoped := sets.NewString(
-		"Cluster",
-	)
-
-	ignoredKinds := sets.NewString()
-
-	return meta.NewDefaultRESTMapperFromScheme(externalVersions, interfacesFor, importPrefix, ignoredKinds, rootScoped, api.Scheme)
-}
-
-// interfacesFor returns the default Codec and ResourceVersioner for a given version
-// string, or an error if the version is not known.
-func interfacesFor(version schema.GroupVersion) (*meta.VersionInterfaces, error) {
-	switch version {
-	case v1beta1.SchemeGroupVersion:
-		return &meta.VersionInterfaces{
-			ObjectConvertor:  api.Scheme,
-			MetadataAccessor: accessor,
-		}, nil
-	default:
-		g, _ := api.Registry.Group(federation.GroupName)
-		return nil, fmt.Errorf("unsupported storage version: %s (valid: %v)", version, g.GroupVersions)
-	}
-}
-
-func addVersionsToScheme(externalVersions ...schema.GroupVersion) {
-	// add the internal version to Scheme
-	if err := federation.AddToScheme(api.Scheme); err != nil {
-		// Programmer error, detect immediately
+// Install registers the API group and adds types to a scheme
+func Install(groupFactoryRegistry announced.APIGroupFactoryRegistry, registry *registered.APIRegistrationManager, scheme *runtime.Scheme) {
+	if err := announced.NewGroupMetaFactory(
+		&announced.GroupMetaFactoryArgs{
+			GroupName:                  federation.GroupName,
+			VersionPreferenceOrder:     []string{v1beta1.SchemeGroupVersion.Version},
+			ImportPrefix:               "k8s.io/kubernetes/federation/apis/federation",
+			AddInternalObjectsToScheme: federation.AddToScheme,
+			RootScopedKinds: sets.NewString(
+				"Cluster",
+			),
+		},
+		announced.VersionToSchemeFunc{
+			v1beta1.SchemeGroupVersion.Version: v1beta1.AddToScheme,
+		},
+	).Announce(groupFactoryRegistry).RegisterAndEnable(registry, scheme); err != nil {
 		panic(err)
-	}
-	// add the enabled external versions to Scheme
-	for _, v := range externalVersions {
-		if !api.Registry.IsEnabledVersion(v) {
-			glog.Errorf("Version %s is not enabled, so it will not be added to the Scheme.", v)
-			continue
-		}
-		switch v {
-		case v1beta1.SchemeGroupVersion:
-			if err := v1beta1.AddToScheme(api.Scheme); err != nil {
-				// Programmer error, detect immediately
-				panic(err)
-			}
-		}
 	}
 }
