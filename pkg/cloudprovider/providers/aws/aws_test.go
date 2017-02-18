@@ -1072,11 +1072,15 @@ func TestGetVolumeLabels(t *testing.T) {
 	c, err := newAWSCloud(strings.NewReader("[global]"), awsServices)
 	assert.Nil(t, err, "Error building aws cloud: %v", err)
 	volumeId := awsVolumeID("vol-VolumeId")
-	expectedVolumeRequest := &ec2.DescribeVolumesInput{VolumeIds: []*string{volumeId.awsString()}}
+	expectedVolumeRequest := &ec2.DescribeVolumesInput{}
 	awsServices.ec2.On("DescribeVolumes", expectedVolumeRequest).Return([]*ec2.Volume{
 		{
 			VolumeId:         volumeId.awsString(),
 			AvailabilityZone: aws.String("us-east-1a"),
+		},
+		{
+			VolumeId:         awsVolumeID("vol-other").awsString(),
+			AvailabilityZone: aws.String("us-east-1b"),
 		},
 	})
 
