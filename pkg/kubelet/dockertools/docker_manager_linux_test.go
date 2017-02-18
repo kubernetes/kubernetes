@@ -118,7 +118,13 @@ func TestSeccompIsUnconfinedByDefaultWithDockerV110(t *testing.T) {
 		"create", "start", "inspect_container",
 	})
 
-	assert.NoError(t, fakeDocker.AssertCreatedByNameWithOrder([]string{"POD", "bar"}))
+	fakeDocker.Lock()
+	if len(fakeDocker.Created) != 2 ||
+		!matchString(t, "/k8s_POD\\.[a-f0-9]+_foo_new_", fakeDocker.Created[0]) ||
+		!matchString(t, "/k8s_bar\\.[a-f0-9]+_foo_new_", fakeDocker.Created[1]) {
+		t.Errorf("unexpected containers created %v", fakeDocker.Created)
+	}
+	fakeDocker.Unlock()
 
 	newContainer, err := fakeDocker.InspectContainer(fakeDocker.Created[1])
 	if err != nil {
@@ -151,7 +157,13 @@ func TestUnconfinedSeccompProfileWithDockerV110(t *testing.T) {
 		"create", "start", "inspect_container",
 	})
 
-	assert.NoError(t, fakeDocker.AssertCreatedByNameWithOrder([]string{"POD", "bar4"}))
+	fakeDocker.Lock()
+	if len(fakeDocker.Created) != 2 ||
+		!matchString(t, "/k8s_POD\\.[a-f0-9]+_foo4_new_", fakeDocker.Created[0]) ||
+		!matchString(t, "/k8s_bar4\\.[a-f0-9]+_foo4_new_", fakeDocker.Created[1]) {
+		t.Errorf("unexpected containers created %v", fakeDocker.Created)
+	}
+	fakeDocker.Unlock()
 
 	newContainer, err := fakeDocker.InspectContainer(fakeDocker.Created[1])
 	if err != nil {
@@ -180,7 +192,13 @@ func TestDefaultSeccompProfileWithDockerV110(t *testing.T) {
 		"create", "start", "inspect_container",
 	})
 
-	assert.NoError(t, fakeDocker.AssertCreatedByNameWithOrder([]string{"POD", "bar1"}))
+	fakeDocker.Lock()
+	if len(fakeDocker.Created) != 2 ||
+		!matchString(t, "/k8s_POD\\.[a-f0-9]+_foo1_new_", fakeDocker.Created[0]) ||
+		!matchString(t, "/k8s_bar1\\.[a-f0-9]+_foo1_new_", fakeDocker.Created[1]) {
+		t.Errorf("unexpected containers created %v", fakeDocker.Created)
+	}
+	fakeDocker.Unlock()
 
 	newContainer, err := fakeDocker.InspectContainer(fakeDocker.Created[1])
 	if err != nil {
@@ -210,7 +228,13 @@ func TestSeccompContainerAnnotationTrumpsPod(t *testing.T) {
 		"create", "start", "inspect_container",
 	})
 
-	assert.NoError(t, fakeDocker.AssertCreatedByNameWithOrder([]string{"POD", "bar2"}))
+	fakeDocker.Lock()
+	if len(fakeDocker.Created) != 2 ||
+		!matchString(t, "/k8s_POD\\.[a-f0-9]+_foo2_new_", fakeDocker.Created[0]) ||
+		!matchString(t, "/k8s_bar2\\.[a-f0-9]+_foo2_new_", fakeDocker.Created[1]) {
+		t.Errorf("unexpected containers created %v", fakeDocker.Created)
+	}
+	fakeDocker.Unlock()
 
 	newContainer, err := fakeDocker.InspectContainer(fakeDocker.Created[1])
 	if err != nil {
@@ -236,7 +260,13 @@ func TestSecurityOptsAreNilWithDockerV19(t *testing.T) {
 		"create", "start", "inspect_container",
 	})
 
-	assert.NoError(t, fakeDocker.AssertCreatedByNameWithOrder([]string{"POD", "bar"}))
+	fakeDocker.Lock()
+	if len(fakeDocker.Created) != 2 ||
+		!matchString(t, "/k8s_POD\\.[a-f0-9]+_foo_new_", fakeDocker.Created[0]) ||
+		!matchString(t, "/k8s_bar\\.[a-f0-9]+_foo_new_", fakeDocker.Created[1]) {
+		t.Errorf("unexpected containers created %v", fakeDocker.Created)
+	}
+	fakeDocker.Unlock()
 
 	newContainer, err := fakeDocker.InspectContainer(fakeDocker.Created[1])
 	if err != nil {
@@ -276,7 +306,13 @@ func TestCreateAppArmorContanier(t *testing.T) {
 		"create", "start", "inspect_container",
 	})
 
-	assert.NoError(t, fakeDocker.AssertCreatedByNameWithOrder([]string{"POD", "test"}))
+	fakeDocker.Lock()
+	if len(fakeDocker.Created) != 2 ||
+		!matchString(t, "/k8s_POD\\.[a-f0-9]+_foo_new_", fakeDocker.Created[0]) ||
+		!matchString(t, "/k8s_test\\.[a-f0-9]+_foo_new_", fakeDocker.Created[1]) {
+		t.Errorf("unexpected containers created %v", fakeDocker.Created)
+	}
+	fakeDocker.Unlock()
 
 	// Verify security opts.
 	newContainer, err := fakeDocker.InspectContainer(fakeDocker.Created[1])
@@ -348,7 +384,13 @@ func TestSeccompLocalhostProfileIsLoaded(t *testing.T) {
 			"create", "start", "inspect_container",
 		})
 
-		assert.NoError(t, fakeDocker.AssertCreatedByNameWithOrder([]string{"POD", "bar2"}))
+		fakeDocker.Lock()
+		if len(fakeDocker.Created) != 2 ||
+			!matchString(t, "/k8s_POD\\.[a-f0-9]+_foo2_new_", fakeDocker.Created[0]) ||
+			!matchString(t, "/k8s_bar2\\.[a-f0-9]+_foo2_new_", fakeDocker.Created[1]) {
+			t.Errorf("unexpected containers created %v", fakeDocker.Created)
+		}
+		fakeDocker.Unlock()
 
 		newContainer, err := fakeDocker.InspectContainer(fakeDocker.Created[1])
 		if err != nil {
