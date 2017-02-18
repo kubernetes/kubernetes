@@ -74,10 +74,7 @@ func TestSecretController(t *testing.T) {
 	}
 	setClientFactory(secretController.secretFederatedInformer, informerClientFactory)
 
-	secretController.clusterAvailableDelay = time.Second
-	secretController.secretReviewDelay = 50 * time.Millisecond
-	secretController.smallDelay = 20 * time.Millisecond
-	secretController.updateTimeout = 5 * time.Second
+	secretController.MinimizeLatency()
 
 	stop := make(chan struct{})
 	secretController.Run(stop)

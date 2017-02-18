@@ -184,6 +184,14 @@ func NewSecretController(client federationclientset.Interface) *SecretController
 	return secretcontroller
 }
 
+// MinimizeLatency reduces delays and timeouts to make the controller more responsive (useful for testing).
+func (secretcontroller *SecretController) MinimizeLatency() {
+	secretcontroller.clusterAvailableDelay = time.Second
+	secretcontroller.secretReviewDelay = 50 * time.Millisecond
+	secretcontroller.smallDelay = 20 * time.Millisecond
+	secretcontroller.updateTimeout = 5 * time.Second
+}
+
 // Returns true if the given object has the given finalizer in its ObjectMeta.
 func (secretcontroller *SecretController) hasFinalizerFunc(obj pkgruntime.Object, finalizer string) bool {
 	secret := obj.(*apiv1.Secret)
