@@ -41,6 +41,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
@@ -140,6 +141,8 @@ type initFederationOptions struct {
 	apiServerServiceTypeString       string
 	apiServerServiceType             v1.ServiceType
 	apiServerAdvertiseAddress        string
+	apiServerEnableHTTPBasicAuth     bool
+	apiServerEnableTokenAuth         bool
 }
 
 func (o *initFederationOptions) Bind(flags *pflag.FlagSet) {
@@ -156,6 +159,8 @@ func (o *initFederationOptions) Bind(flags *pflag.FlagSet) {
 	flags.StringVar(&o.controllerManagerOverridesString, "controllermanager-arg-overrides", "", "comma separated list of federation-controller-manager arguments to override: Example \"--arg1=value1,--arg2=value2...\"")
 	flags.StringVar(&o.apiServerServiceTypeString, apiserverServiceTypeFlag, string(v1.ServiceTypeLoadBalancer), "The type of service to create for federation API server. Options: 'LoadBalancer' (default), 'NodePort'.")
 	flags.StringVar(&o.apiServerAdvertiseAddress, apiserverAdvertiseAddressFlag, "", "Preferred address to advertise api server nodeport service. Valid only if '"+apiserverServiceTypeFlag+"=NodePort'.")
+	flags.BoolVar(&o.apiServerEnableHTTPBasicAuth, "apiserver-enable-basic-auth", false, "Enables HTTP Basic authentication for the federation-apiserver. Defaults to false.")
+	flags.BoolVar(&o.apiServerEnableTokenAuth, "apiserver-enable-token-auth", false, "Enables token authentication for the federation-apiserver. Defaults to false.")
 }
 
 // NewCmdInit defines the `init` command that bootstraps a federation
@@ -188,6 +193,13 @@ type entityKeyPairs struct {
 	admin             *triple.KeyPair
 }
 
+type credentials struct {
+	username        string
+	password        string
+	token           string
+	certEntKeyPairs *entityKeyPairs
+}
+
 // Complete ensures that options are valid and marshals them if necessary.
 func (i *initFederation) Complete(cmd *cobra.Command, args []string) error {
 	err := i.commonOptions.SetName(cmd, args)
@@ -211,11 +223,11 @@ func (i *initFederation) Complete(cmd *cobra.Command, args []string) error {
 
 	i.options.apiServerOverrides, err = marshallOverrides(i.options.apiServerOverridesString)
 	if err != nil {
-		return fmt.Errorf("Error marshalling --apiserver-arg-overrides: %v", err)
+		return fmt.Errorf("error marshalling --apiserver-arg-overrides: %v", err)
 	}
 	i.options.controllerManagerOverrides, err = marshallOverrides(i.options.controllerManagerOverridesString)
 	if err != nil {
-		return fmt.Errorf("Error marshalling --controllermanager-arg-overrides: %v", err)
+		return fmt.Errorf("error marshalling --controllermanager-arg-overrides: %v", err)
 	}
 
 	return nil
@@ -248,19 +260,20 @@ func (i *initFederation) Run(cmdOut io.Writer, config util.AdminConfig) error {
 		return err
 	}
 
-	// 3. Generate TLS certificates and credentials
-	entKeyPairs, err := genCerts(i.commonOptions.FederationSystemNamespace, i.commonOptions.Name, svc.Name, HostClusterLocalDNSZoneName, ips, hostnames)
+	// 3a. Generate TLS certificates and credentials, and other credentials if needed
+	credentials, err := generateCredentials(hostClientset, i.commonOptions.FederationSystemNamespace, i.commonOptions.Name, svc.Name, HostClusterLocalDNSZoneName, serverCredName, ips, hostnames, i.options.apiServerEnableHTTPBasicAuth, i.options.apiServerEnableTokenAuth, i.options.dryRun)
 	if err != nil {
 		return err
 	}
 
-	_, err = createAPIServerCredentialsSecret(hostClientset, i.commonOptions.FederationSystemNamespace, serverCredName, entKeyPairs, i.options.dryRun)
+	// 3b. Create the secret containing the credentials.
+	_, err = createAPIServerCredentialsSecret(hostClientset, i.commonOptions.FederationSystemNamespace, serverCredName, credentials, i.options.dryRun)
 	if err != nil {
 		return err
 	}
 
 	// 4. Create a kubeconfig secret
-	_, err = createControllerManagerKubeconfigSecret(hostClientset, i.commonOptions.FederationSystemNamespace, i.commonOptions.Name, svc.Name, cmKubeconfigName, entKeyPairs, i.options.dryRun)
+	_, err = createControllerManagerKubeconfigSecret(hostClientset, i.commonOptions.FederationSystemNamespace, i.commonOptions.Name, svc.Name, cmKubeconfigName, credentials.certEntKeyPairs, i.options.dryRun)
 	if err != nil {
 		return err
 	}
@@ -285,7 +298,7 @@ func (i *initFederation) Run(cmdOut io.Writer, config util.AdminConfig) error {
 	}
 
 	// 6. Create federation API server
-	_, err = createAPIServer(hostClientset, i.commonOptions.FederationSystemNamespace, serverName, i.options.image, serverCredName, advertiseAddress, i.options.storageBackend, i.options.apiServerOverrides, pvc, i.options.dryRun)
+	_, err = createAPIServer(hostClientset, i.commonOptions.FederationSystemNamespace, serverName, i.options.image, advertiseAddress, i.options.storageBackend, serverCredName, i.options.apiServerEnableHTTPBasicAuth, i.options.apiServerEnableTokenAuth, i.options.apiServerOverrides, pvc, i.options.dryRun)
 	if err != nil {
 		return err
 	}
@@ -326,7 +339,7 @@ func (i *initFederation) Run(cmdOut io.Writer, config util.AdminConfig) error {
 
 	// 8. Write the federation API server endpoint info, credentials
 	// and context to kubeconfig
-	err = updateKubeconfig(config, i.commonOptions.Name, endpoint, i.commonOptions.Kubeconfig, entKeyPairs, i.options.dryRun)
+	err = updateKubeconfig(config, i.commonOptions.Name, endpoint, i.commonOptions.Kubeconfig, credentials, i.options.dryRun)
 	if err != nil {
 		return err
 	}
@@ -466,6 +479,25 @@ func waitForLoadBalancerAddress(clientset *client.Clientset, svc *api.Service, d
 	return ips, hostnames, nil
 }
 
+func generateCredentials(clientset *client.Clientset, svcNamespace, name, svcName, localDNSZoneName, serverCredName string, ips, hostnames []string, enableHTTPBasicAuth, enableTokenAuth, dryRun bool) (*credentials, error) {
+	credentials := credentials{
+		username: AdminCN,
+	}
+	if enableHTTPBasicAuth {
+		credentials.password = string(uuid.NewUUID())
+	}
+	if enableTokenAuth {
+		credentials.token = string(uuid.NewUUID())
+	}
+
+	entKeyPairs, err := genCerts(svcNamespace, name, svcName, localDNSZoneName, ips, hostnames)
+	if err != nil {
+		return nil, err
+	}
+	credentials.certEntKeyPairs = entKeyPairs
+	return &credentials, nil
+}
+
 func genCerts(svcNamespace, name, svcName, localDNSZoneName string, ips, hostnames []string) (*entityKeyPairs, error) {
 	ca, err := triple.NewCA(name)
 	if err != nil {
@@ -491,18 +523,26 @@ func genCerts(svcNamespace, name, svcName, localDNSZoneName string, ips, hostnam
 	}, nil
 }
 
-func createAPIServerCredentialsSecret(clientset *client.Clientset, namespace, credentialsName string, entKeyPairs *entityKeyPairs, dryRun bool) (*api.Secret, error) {
+func createAPIServerCredentialsSecret(clientset *client.Clientset, namespace, credentialsName string, credentials *credentials, dryRun bool) (*api.Secret, error) {
 	// Build the secret object with API server credentials.
+	data := map[string][]byte{
+		"ca.crt":     certutil.EncodeCertPEM(credentials.certEntKeyPairs.ca.Cert),
+		"server.crt": certutil.EncodeCertPEM(credentials.certEntKeyPairs.server.Cert),
+		"server.key": certutil.EncodePrivateKeyPEM(credentials.certEntKeyPairs.server.Key),
+	}
+	if credentials.password != "" {
+		data["basicauth.csv"] = authFileContents(credentials.username, credentials.password)
+	}
+	if credentials.token != "" {
+		data["token.csv"] = authFileContents(credentials.username, credentials.token)
+	}
+
 	secret := &api.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      credentialsName,
 			Namespace: namespace,
 		},
-		Data: map[string][]byte{
-			"ca.crt":     certutil.EncodeCertPEM(entKeyPairs.ca.Cert),
-			"server.crt": certutil.EncodeCertPEM(entKeyPairs.server.Cert),
-			"server.key": certutil.EncodePrivateKeyPEM(entKeyPairs.server.Key),
-		},
+		Data: data,
 	}
 
 	if dryRun {
@@ -559,7 +599,7 @@ func createPVC(clientset *client.Clientset, namespace, svcName, etcdPVCapacity s
 	return clientset.Core().PersistentVolumeClaims(namespace).Create(pvc)
 }
 
-func createAPIServer(clientset *client.Clientset, namespace, name, image, credentialsName, advertiseAddress, storageBackend string, argOverrides map[string]string, pvc *api.PersistentVolumeClaim, dryRun bool) (*extensions.Deployment, error) {
+func createAPIServer(clientset *client.Clientset, namespace, name, image, advertiseAddress, storageBackend, credentialsName string, hasHTTPBasicAuthFile, hasTokenAuthFile bool, argOverrides map[string]string, pvc *api.PersistentVolumeClaim, dryRun bool) (*extensions.Deployment, error) {
 	command := []string{
 		"/hyperkube",
 		"federation-apiserver",
@@ -577,6 +617,12 @@ func createAPIServer(clientset *client.Clientset, namespace, name, image, creden
 	argsMap["--storage-backend"] = storageBackend
 	if advertiseAddress != "" {
 		argsMap["--advertise-address"] = advertiseAddress
+	}
+	if hasHTTPBasicAuthFile {
+		argsMap["--basic-auth-file"] = "/etc/federation/apiserver/basicauth.csv"
+	}
+	if hasTokenAuthFile {
+		argsMap["--token-auth-file"] = "/etc/federation/apiserver/token.csv"
 	}
 
 	args := argMapsToArgStrings(argsMap, argOverrides)
@@ -891,7 +937,7 @@ func printSuccess(cmdOut io.Writer, ips, hostnames []string, svc *api.Service) e
 	return err
 }
 
-func updateKubeconfig(config util.AdminConfig, name, endpoint, kubeConfigPath string, entKeyPairs *entityKeyPairs, dryRun bool) error {
+func updateKubeconfig(config util.AdminConfig, name, endpoint, kubeConfigPath string, credentials *credentials, dryRun bool) error {
 	po := config.PathOptions()
 	po.LoadingRules.ExplicitPath = kubeConfigPath
 	kubeconfig, err := po.GetStartingConfig()
@@ -906,13 +952,20 @@ func updateKubeconfig(config util.AdminConfig, name, endpoint, kubeConfigPath st
 		endpoint = fmt.Sprintf("https://%s", endpoint)
 	}
 	cluster.Server = endpoint
-	cluster.CertificateAuthorityData = certutil.EncodeCertPEM(entKeyPairs.ca.Cert)
+	cluster.CertificateAuthorityData = certutil.EncodeCertPEM(credentials.certEntKeyPairs.ca.Cert)
 
 	// Populate credentials.
 	authInfo := clientcmdapi.NewAuthInfo()
-	authInfo.ClientCertificateData = certutil.EncodeCertPEM(entKeyPairs.admin.Cert)
-	authInfo.ClientKeyData = certutil.EncodePrivateKeyPEM(entKeyPairs.admin.Key)
-	authInfo.Username = AdminCN
+	authInfo.ClientCertificateData = certutil.EncodeCertPEM(credentials.certEntKeyPairs.admin.Cert)
+	authInfo.ClientKeyData = certutil.EncodePrivateKeyPEM(credentials.certEntKeyPairs.admin.Key)
+	authInfo.Token = credentials.token
+
+	var httpBasicAuthInfo *clientcmdapi.AuthInfo
+	if credentials.password != "" {
+		httpBasicAuthInfo = clientcmdapi.NewAuthInfo()
+		httpBasicAuthInfo.Password = credentials.password
+		httpBasicAuthInfo.Username = credentials.username
+	}
 
 	// Populate context.
 	context := clientcmdapi.NewContext()
@@ -923,6 +976,9 @@ func updateKubeconfig(config util.AdminConfig, name, endpoint, kubeConfigPath st
 	// credentials and context.
 	kubeconfig.Clusters[name] = cluster
 	kubeconfig.AuthInfos[name] = authInfo
+	if httpBasicAuthInfo != nil {
+		kubeconfig.AuthInfos[fmt.Sprintf("%s-basic-auth", name)] = httpBasicAuthInfo
+	}
 	kubeconfig.Contexts[name] = context
 
 	if !dryRun {
@@ -933,4 +989,10 @@ func updateKubeconfig(config util.AdminConfig, name, endpoint, kubeConfigPath st
 	}
 
 	return nil
+}
+
+// authFileContents returns a CSV string containing the contents of an
+// authentication file in the format required by the federation-apiserver.
+func authFileContents(username, authSecret string) []byte {
+	return []byte(fmt.Sprintf("%s,%s,%s\n", authSecret, username, uuid.NewUUID()))
 }
