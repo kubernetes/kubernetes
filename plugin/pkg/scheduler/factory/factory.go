@@ -20,7 +20,6 @@ package factory
 
 import (
 	"fmt"
-	"strings"
 	"time"
 
 	"github.com/golang/glog"
@@ -30,7 +29,6 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
-	utilvalidation "k8s.io/apimachinery/pkg/util/validation"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/kubernetes/pkg/api/v1"
@@ -98,16 +96,13 @@ type ConfigFactory struct {
 	// HardPodAffinitySymmetricWeight represents the weight of implicit PreferredDuringScheduling affinity rule, in the range 0-100.
 	hardPodAffinitySymmetricWeight int
 
-	// Indicate the "all topologies" set for empty topologyKey when it's used for PreferredDuringScheduling pod anti-affinity.
-	failureDomains []string
-
 	// Equivalence class cache
 	equivalencePodCache *core.EquivalenceCache
 }
 
 // NewConfigFactory initializes the default implementation of a Configurator To encourage eventual privatization of the struct type, we only
 // return the interface.
-func NewConfigFactory(client clientset.Interface, schedulerName string, hardPodAffinitySymmetricWeight int, failureDomains string) scheduler.Configurator {
+func NewConfigFactory(client clientset.Interface, schedulerName string, hardPodAffinitySymmetricWeight int) scheduler.Configurator {
 	stopEverything := make(chan struct{})
 	schedulerCache := schedulercache.New(30*time.Second, stopEverything)
 
@@ -132,7 +127,6 @@ func NewConfigFactory(client clientset.Interface, schedulerName string, hardPodA
 		StopEverything:                 stopEverything,
 		schedulerName:                  schedulerName,
 		hardPodAffinitySymmetricWeight: hardPodAffinitySymmetricWeight,
-		failureDomains:                 strings.Split(failureDomains, ","),
 	}
 
 	c.podLister = schedulerCache
@@ -198,10 +192,6 @@ func (c *ConfigFactory) GetNodeStore() cache.Store {
 
 func (c *ConfigFactory) GetHardPodAffinitySymmetricWeight() int {
 	return c.hardPodAffinitySymmetricWeight
-}
-
-func (c *ConfigFactory) GetFailureDomains() []string {
-	return c.failureDomains
 }
 
 func (f *ConfigFactory) GetSchedulerName() string {
@@ -452,12 +442,6 @@ func (f *ConfigFactory) GetPredicates(predicateKeys sets.String) (map[string]alg
 }
 
 func (f *ConfigFactory) getPluginArgs() (*PluginFactoryArgs, error) {
-	for _, failureDomain := range f.failureDomains {
-		if errs := utilvalidation.IsQualifiedName(failureDomain); len(errs) != 0 {
-			return nil, fmt.Errorf("invalid failure domain: %q: %s", failureDomain, strings.Join(errs, ";"))
-		}
-	}
-
 	return &PluginFactoryArgs{
 		PodLister:        f.podLister,
 		ServiceLister:    f.serviceLister,
@@ -469,7 +453,6 @@ func (f *ConfigFactory) getPluginArgs() (*PluginFactoryArgs, error) {
 		PVInfo:     f.pVLister,
 		PVCInfo:    &predicates.CachedPersistentVolumeClaimInfo{StoreToPersistentVolumeClaimLister: f.pVCLister},
 		HardPodAffinitySymmetricWeight: f.hardPodAffinitySymmetricWeight,
-		FailureDomains:                 sets.NewString(f.failureDomains...).List(),
 	}, nil
 }
 

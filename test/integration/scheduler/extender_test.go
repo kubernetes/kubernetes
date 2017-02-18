@@ -239,7 +239,7 @@ func TestSchedulerExtender(t *testing.T) {
 	}
 	policy.APIVersion = api.Registry.GroupOrDie(v1.GroupName).GroupVersion.String()
 
-	schedulerConfigFactory := factory.NewConfigFactory(clientSet, v1.DefaultSchedulerName, v1.DefaultHardPodAffinitySymmetricWeight, v1.DefaultFailureDomains)
+	schedulerConfigFactory := factory.NewConfigFactory(clientSet, v1.DefaultSchedulerName, v1.DefaultHardPodAffinitySymmetricWeight)
 	schedulerConfig, err := schedulerConfigFactory.CreateFromConfig(policy)
 	if err != nil {
 		t.Fatalf("Couldn't create scheduler config: %v", err)

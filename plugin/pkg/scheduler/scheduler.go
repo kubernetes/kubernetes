@@ -62,7 +62,6 @@ type Configurator interface {
 	GetPredicateMetadataProducer() (algorithm.MetadataProducer, error)
 	GetPredicates(predicateKeys sets.String) (map[string]algorithm.FitPredicate, error)
 	GetHardPodAffinitySymmetricWeight() int
-	GetFailureDomains() []string
 	GetSchedulerName() string
 	MakeDefaultErrorFunc(backoff *util.PodBackoff, podQueue *cache.FIFO) func(pod *v1.Pod, err error)
 
