@@ -15,7 +15,7 @@ option (gogoproto.goproto_unrecognized_all) = false;
 
 // Runtime service defines the public APIs for remote container runtimes
 service RuntimeService {
-    // Version returns the runtime name, runtime version, and runtime API version.
+    // Version returns the runtime names, runtime versions, and runtime API versions.
     rpc Version(VersionRequest) returns (VersionResponse) {}
 
     // RunPodSandbox creates and starts a pod-level sandbox. Runtimes must ensure
@@ -100,14 +100,19 @@ message VersionRequest {
 message VersionResponse {
     // Version of the kubelet runtime API.
     string version = 1;
+    // List of container runtimes.
+    repeated Runtime runtimes = 2;
+}
+
+message Runtime {
     // Name of the container runtime.
-    string runtime_name = 2;
+    string runtime_name = 1;
     // Version of the container runtime. The string must be
     // semver-compatible.
-    string runtime_version = 3;
+    string runtime_version = 2;
     // API version of the container runtime. The string must be
     // semver-compatible.
-    string runtime_api_version = 4;
+    string runtime_api_version = 3;
 }
 
 // DNSConfig specifies the DNS servers and search domains of a sandbox.
@@ -309,6 +314,8 @@ message PodSandboxConfig {
     map<string, string> annotations = 7;
     // Optional configurations specific to Linux hosts.
     LinuxPodSandboxConfig linux = 8;
+    // The runtime to use to create the sandbox.
+    Runtime runtime = 9
 }
 
 message RunPodSandboxRequest {
