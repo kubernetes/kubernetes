@@ -972,6 +972,9 @@ start_kube_addons() {
   if [ "${ENABLE_CLUSTER_UI:-}" = "true" ]; then
     setup_addon_manifests "addons" "dashboard"
   fi
+  if [[ "${ENABLE_NODE_PROBLEM_DETECTOR:-}" == "daemonset" ]]; then
+    setup-addon-manifests "addons" "node-problem-detector"
+  fi
   if echo "${ADMISSION_CONTROL:-}" | grep -q "LimitRanger"; then
     setup_addon_manifests "admission-controls" "limit-range"
   fi
