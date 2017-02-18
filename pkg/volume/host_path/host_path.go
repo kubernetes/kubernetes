@@ -182,9 +182,10 @@ var _ volume.Mounter = &hostPathMounter{}
 
 func (b *hostPathMounter) GetAttributes() volume.Attributes {
 	return volume.Attributes{
-		ReadOnly:        b.readOnly,
-		Managed:         false,
-		SupportsSELinux: false,
+		ReadOnly:         b.readOnly,
+		Managed:          false,
+		SupportsSELinux:  false,
+		NeedsPropagation: true,
 	}
 }
 
