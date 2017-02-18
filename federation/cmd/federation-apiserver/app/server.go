@@ -34,7 +34,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/admission"
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	"k8s.io/apiserver/pkg/server/filters"
@@ -67,8 +66,20 @@ cluster's shared state through which all other components interact.`,
 	return cmd
 }
 
-// Run runs the specified APIServer.  This should never exit.
-func Run(s *options.ServerRunOptions) error {
+// Run runs the specified APIServer.  It only returns if stopCh is closed
+// or one of the ports cannot be listened on initially.
+func Run(s *options.ServerRunOptions, stopCh <-chan struct{}) error {
+	err := NonBlockingRun(s, stopCh)
+	if err != nil {
+		return err
+	}
+	<-stopCh
+	return nil
+}
+
+// NonBlockingRun runs the specified APIServer and configures it to
+// stop with the given channel.
+func NonBlockingRun(s *options.ServerRunOptions, stopCh <-chan struct{}) error {
 	// set defaults
 	if err := s.GenericServerRunOptions.DefaultAdvertiseAddress(s.SecureServing, s.InsecureServing); err != nil {
 		return err
@@ -223,8 +234,11 @@ func Run(s *options.ServerRunOptions) error {
 	//	installBatchAPIs(m, genericConfig.RESTOptionsGetter)
 	//	installAutoscalingAPIs(m, genericConfig.RESTOptionsGetter)
 
-	sharedInformers.Start(wait.NeverStop)
-	return m.PrepareRun().Run(wait.NeverStop)
+	err = m.PrepareRun().NonBlockingRun(stopCh)
+	if err == nil {
+		sharedInformers.Start(stopCh)
+	}
+	return err
 }
 
 // PostProcessSpec adds removed definitions for backward compatibility

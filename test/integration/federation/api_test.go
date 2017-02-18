@@ -14,33 +14,27 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package app
+package federation
 
 import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"net/http"
-	"os"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/assert"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	fed_v1b1 "k8s.io/kubernetes/federation/apis/federation/v1beta1"
-	"k8s.io/kubernetes/federation/cmd/federation-apiserver/app"
-	"k8s.io/kubernetes/federation/cmd/federation-apiserver/app/options"
 	"k8s.io/kubernetes/pkg/api/v1"
 	autoscaling_v1 "k8s.io/kubernetes/pkg/apis/autoscaling/v1"
 	batch_v1 "k8s.io/kubernetes/pkg/apis/batch/v1"
 	ext_v1b1 "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
+	"k8s.io/kubernetes/test/integration/federation/framework"
 )
 
-var securePort = 6443 + 2
-var insecurePort = 8080 + 2
-var serverIP = fmt.Sprintf("http://localhost:%v", insecurePort)
 var groupVersions = []schema.GroupVersion{
 	fed_v1b1.SchemeGroupVersion,
 	ext_v1b1.SchemeGroupVersion,
@@ -48,42 +42,25 @@ var groupVersions = []schema.GroupVersion{
 	//	autoscaling_v1.SchemeGroupVersion,
 }
 
-func TestRun(t *testing.T) {
-	certDir, err := ioutil.TempDir("", "")
-	if err != nil {
-		t.Fatalf("Failed to create temporary certificate directory: %v", err)
-	}
-	defer os.RemoveAll(certDir)
+type apiTestFunc func(t *testing.T, host string)
 
-	s := options.NewServerRunOptions()
-	s.SecureServing.ServingOptions.BindPort = securePort
-	s.InsecureServing.BindPort = insecurePort
-	s.Etcd.StorageConfig.ServerList = []string{"http://localhost:2379"}
-	s.SecureServing.ServerCert.CertDirectory = certDir
+func TestFederationAPI(t *testing.T) {
+	f := &framework.FederationAPIFixture{}
+	f.Setup(t)
+	defer f.Teardown(t)
 
-	go func() {
-		if err := app.Run(s); err != nil {
-			t.Fatalf("Error in bringing up the server: %v", err)
-		}
-	}()
-	if err := waitForApiserverUp(); err != nil {
-		t.Fatalf("%v", err)
+	testCases := map[string]apiTestFunc{
+		"swaggerSpec":     testSwaggerSpec,
+		"support":         testSupport,
+		"apiGroupList":    testAPIGroupList,
+		"apiGroup":        testAPIGroup,
+		"apiResourceList": testAPIResourceList,
 	}
-	testSwaggerSpec(t)
-	testSupport(t)
-	testAPIGroupList(t)
-	testAPIGroup(t)
-	testAPIResourceList(t)
-}
-
-func waitForApiserverUp() error {
-	for start := time.Now(); time.Since(start) < time.Minute; time.Sleep(5 * time.Second) {
-		_, err := http.Get(serverIP)
-		if err == nil {
-			return nil
-		}
+	for testName, testFunc := range testCases {
+		t.Run(testName, func(t *testing.T) {
+			testFunc(t, f.Host)
+		})
 	}
-	return fmt.Errorf("waiting for apiserver timed out")
 }
 
 func readResponse(serverURL string) ([]byte, error) {
@@ -102,16 +79,16 @@ func readResponse(serverURL string) ([]byte, error) {
 	return contents, nil
 }
 
-func testSwaggerSpec(t *testing.T) {
-	serverURL := serverIP + "/swaggerapi"
+func testSwaggerSpec(t *testing.T, host string) {
+	serverURL := host + "/swaggerapi"
 	_, err := readResponse(serverURL)
 	if err != nil {
 		t.Fatalf("%v", err)
 	}
 }
 
-func testSupport(t *testing.T) {
-	serverURL := serverIP + "/version"
+func testSupport(t *testing.T, host string) {
+	serverURL := host + "/version"
 	_, err := readResponse(serverURL)
 	if err != nil {
 		t.Fatalf("%v", err)
@@ -127,7 +104,7 @@ func findGroup(groups []metav1.APIGroup, groupName string) *metav1.APIGroup {
 	return nil
 }
 
-func testAPIGroupList(t *testing.T) {
+func testAPIGroupList(t *testing.T, host string) {
 	groupVersionForDiscoveryMap := make(map[string]metav1.GroupVersionForDiscovery)
 	for _, groupVersion := range groupVersions {
 		groupVersionForDiscoveryMap[groupVersion.Group] = metav1.GroupVersionForDiscovery{
@@ -136,7 +113,7 @@ func testAPIGroupList(t *testing.T) {
 		}
 	}
 
-	serverURL := serverIP + "/apis"
+	serverURL := host + "/apis"
 	contents, err := readResponse(serverURL)
 	if err != nil {
 		t.Fatalf("%v", err)
@@ -158,9 +135,9 @@ func testAPIGroupList(t *testing.T) {
 	}
 }
 
-func testAPIGroup(t *testing.T) {
+func testAPIGroup(t *testing.T, host string) {
 	for _, groupVersion := range groupVersions {
-		serverURL := serverIP + "/apis/" + groupVersion.Group
+		serverURL := host + "/apis/" + groupVersion.Group
 		contents, err := readResponse(serverURL)
 		if err != nil {
 			t.Fatalf("%v", err)
@@ -183,11 +160,11 @@ func testAPIGroup(t *testing.T) {
 		assert.Equal(t, apiGroup.PreferredVersion, apiGroup.Versions[0])
 	}
 
-	testCoreAPIGroup(t)
+	testCoreAPIGroup(t, host)
 }
 
-func testCoreAPIGroup(t *testing.T) {
-	serverURL := serverIP + "/api"
+func testCoreAPIGroup(t *testing.T, host string) {
+	serverURL := host + "/api"
 	contents, err := readResponse(serverURL)
 	if err != nil {
 		t.Fatalf("%v", err)
@@ -211,16 +188,16 @@ func findResource(resources []metav1.APIResource, resourceName string) *metav1.A
 	return nil
 }
 
-func testAPIResourceList(t *testing.T) {
-	testFederationResourceList(t)
-	testCoreResourceList(t)
-	testExtensionsResourceList(t)
-	//	testBatchResourceList(t)
-	//	testAutoscalingResourceList(t)
+func testAPIResourceList(t *testing.T, host string) {
+	testFederationResourceList(t, host)
+	testCoreResourceList(t, host)
+	testExtensionsResourceList(t, host)
+	// testBatchResourceList(t, host)
+	// testAutoscalingResourceList(t, host)
 }
 
-func testFederationResourceList(t *testing.T) {
-	serverURL := serverIP + "/apis/" + fed_v1b1.SchemeGroupVersion.String()
+func testFederationResourceList(t *testing.T, host string) {
+	serverURL := host + "/apis/" + fed_v1b1.SchemeGroupVersion.String()
 	contents, err := readResponse(serverURL)
 	if err != nil {
 		t.Fatalf("%v", err)
@@ -243,8 +220,8 @@ func testFederationResourceList(t *testing.T) {
 	assert.False(t, found.Namespaced)
 }
 
-func testCoreResourceList(t *testing.T) {
-	serverURL := serverIP + "/api/" + v1.SchemeGroupVersion.String()
+func testCoreResourceList(t *testing.T, host string) {
+	serverURL := host + "/api/" + v1.SchemeGroupVersion.String()
 	contents, err := readResponse(serverURL)
 	if err != nil {
 		t.Fatalf("%v", err)
@@ -294,8 +271,8 @@ func testCoreResourceList(t *testing.T) {
 	assert.True(t, found.Namespaced)
 }
 
-func testExtensionsResourceList(t *testing.T) {
-	serverURL := serverIP + "/apis/" + ext_v1b1.SchemeGroupVersion.String()
+func testExtensionsResourceList(t *testing.T, host string) {
+	serverURL := host + "/apis/" + ext_v1b1.SchemeGroupVersion.String()
 	contents, err := readResponse(serverURL)
 	if err != nil {
 		t.Fatalf("%v", err)
@@ -351,8 +328,8 @@ func testExtensionsResourceList(t *testing.T) {
 	found = findResource(apiResourceList.APIResources, "deployments/rollback")
 }
 
-func testBatchResourceList(t *testing.T) {
-	serverURL := serverIP + "/apis/" + batch_v1.SchemeGroupVersion.String()
+func testBatchResourceList(t *testing.T, host string) {
+	serverURL := host + "/apis/" + batch_v1.SchemeGroupVersion.String()
 	contents, err := readResponse(serverURL)
 	if err != nil {
 		t.Fatalf("%v", err)
@@ -377,8 +354,8 @@ func testBatchResourceList(t *testing.T) {
 	assert.True(t, found.Namespaced)
 }
 
-func testAutoscalingResourceList(t *testing.T) {
-	serverURL := serverIP + "/apis/" + autoscaling_v1.SchemeGroupVersion.String()
+func testAutoscalingResourceList(t *testing.T, host string) {
+	serverURL := host + "/apis/" + autoscaling_v1.SchemeGroupVersion.String()
 	contents, err := readResponse(serverURL)
 	if err != nil {
 		t.Fatalf("%v", err)
