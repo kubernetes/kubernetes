@@ -81,14 +81,17 @@ type HorizontalController struct {
 	replicaCalc   *ReplicaCalculator
 	eventRecorder record.EventRecorder
 
+	upscaleForbiddenWindow time.Duration
+	downscaleForbiddenWindow time.Duration
+
+
 	// hpaLister is able to list/get HPAs from the shared cache from the informer passed in to
 	// NewHorizontalController.
 	hpaLister       autoscalinglisters.HorizontalPodAutoscalerLister
 	hpaListerSynced cache.InformerSynced
 }
 
-var downscaleForbiddenWindow = 5 * time.Minute
-var upscaleForbiddenWindow = 3 * time.Minute
+
 
 func NewHorizontalController(
 	evtNamespacer v1core.EventsGetter,
@@ -97,6 +100,9 @@ func NewHorizontalController(
 	replicaCalc *ReplicaCalculator,
 	hpaInformer autoscalinginformers.HorizontalPodAutoscalerInformer,
 	resyncPeriod time.Duration,
+	upscaleForbiddenWindow time.Duration,
+	downscaleForbiddenWindow time.Duration,
+
 ) *HorizontalController {
 	broadcaster := record.NewBroadcaster()
 	// TODO: remove the wrapper when every clients have moved to use the clientset.
@@ -108,6 +114,8 @@ func NewHorizontalController(
 		eventRecorder:   recorder,
 		scaleNamespacer: scaleNamespacer,
 		hpaNamespacer:   hpaNamespacer,
+		upscaleForbiddenWindow: upscaleForbiddenWindow,
+		downscaleForbiddenWindow: downscaleForbiddenWindow,
 	}
 
 	hpaInformer.Informer().AddEventHandlerWithResyncPeriod(
@@ -367,7 +375,7 @@ func (a *HorizontalController) reconcileAutoscaler(hpav1Shared *autoscalingv1.Ho
 			desiredReplicas = calculateScaleUpLimit(currentReplicas)
 		}
 
-		rescale = shouldScale(hpa, currentReplicas, desiredReplicas, timestamp)
+		rescale = shouldScale(a, hpa, currentReplicas, desiredReplicas, timestamp)
 	}
 
 	if rescale {
@@ -399,13 +407,13 @@ func shouldScale(hpa *autoscalingv2.HorizontalPodAutoscaler, currentReplicas, de
 
 	// Going down only if the usageRatio dropped significantly below the target
 	// and there was no rescaling in the last downscaleForbiddenWindow.
-	if desiredReplicas < currentReplicas && hpa.Status.LastScaleTime.Add(downscaleForbiddenWindow).Before(timestamp) {
+	if desiredReplicas < currentReplicas && hpa.Status.LastScaleTime.Add(a.downscaleForbiddenWindow).Before(timestamp) {
 		return true
 	}
 
 	// Going up only if the usage ratio increased significantly above the target
 	// and there was no rescaling in the last upscaleForbiddenWindow.
-	if desiredReplicas > currentReplicas && hpa.Status.LastScaleTime.Add(upscaleForbiddenWindow).Before(timestamp) {
+	if desiredReplicas > currentReplicas && hpa.Status.LastScaleTime.Add(a.upscaleForbiddenWindow).Before(timestamp) {
 		return true
 	}
 
