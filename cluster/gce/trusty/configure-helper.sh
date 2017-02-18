@@ -790,7 +790,7 @@ start_kube_scheduler() {
   if [ -n "${SCHEDULER_TEST_LOG_LEVEL:-}" ]; then
     log_level="${SCHEDULER_TEST_LOG_LEVEL}"
   fi
-  params="--master=127.0.0.1:8080 ${log_level} ${SCHEDULER_TEST_ARGS:-}"
+  params="${log_level} ${SCHEDULER_TEST_ARGS:-}"
   if [ -n "${SCHEDULING_ALGORITHM_PROVIDER:-}" ]; then
     params="${params} --algorithm-provider=${SCHEDULING_ALGORITHM_PROVIDER}"
   fi
@@ -800,8 +800,6 @@ start_kube_scheduler() {
   # Remove salt comments and replace variables with values
   src_file="${kube_home}/kube-manifests/kubernetes/gci-trusty/kube-scheduler.manifest"
   remove_salt_config_comments "${src_file}"
-
-  sed -i -e "s@{{srv_kube_path}}@/etc/srv/kubernetes@g" "${src_file}"
   sed -i -e "s@{{params}}@${params}@g" "${src_file}"
   sed -i -e "s@{{pillar\['kube_docker_registry'\]}}@${DOCKER_REGISTRY}@g" "${src_file}"
   sed -i -e "s@{{pillar\['kube-scheduler_docker_tag'\]}}@${kube_scheduler_docker_tag}@g" "${src_file}"
