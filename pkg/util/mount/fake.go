@@ -17,6 +17,7 @@ limitations under the License.
 package mount
 
 import (
+	"path/filepath"
 	"sync"
 
 	"github.com/golang/glog"
@@ -80,9 +81,15 @@ func (f *FakeMounter) Mount(source string, target string, fstype string, options
 		}
 	}
 
-	f.MountPoints = append(f.MountPoints, MountPoint{Device: source, Path: target, Type: fstype})
-	glog.V(5).Infof("Fake mounter: mounted %s to %s", source, target)
-	f.Log = append(f.Log, FakeAction{Action: FakeActionMount, Target: target, Source: source, FSType: fstype})
+	// If target is a symlink, get its absolute path
+	absTarget, err := filepath.EvalSymlinks(target)
+	if err != nil {
+		absTarget = target
+	}
+
+	f.MountPoints = append(f.MountPoints, MountPoint{Device: source, Path: absTarget, Type: fstype})
+	glog.V(5).Infof("Fake mounter: mounted %s to %s", source, absTarget)
+	f.Log = append(f.Log, FakeAction{Action: FakeActionMount, Target: absTarget, Source: source, FSType: fstype})
 	return nil
 }
 
@@ -90,17 +97,23 @@ func (f *FakeMounter) Unmount(target string) error {
 	f.mutex.Lock()
 	defer f.mutex.Unlock()
 
+	// If target is a symlink, get its absolute path
+	absTarget, err := filepath.EvalSymlinks(target)
+	if err != nil {
+		absTarget = target
+	}
+
 	newMountpoints := []MountPoint{}
 	for _, mp := range f.MountPoints {
-		if mp.Path == target {
-			glog.V(5).Infof("Fake mounter: unmounted %s from %s", mp.Device, target)
+		if mp.Path == absTarget {
+			glog.V(5).Infof("Fake mounter: unmounted %s from %s", mp.Device, absTarget)
 			// Don't copy it to newMountpoints
 			continue
 		}
 		newMountpoints = append(newMountpoints, MountPoint{Device: mp.Device, Path: mp.Path, Type: mp.Type})
 	}
 	f.MountPoints = newMountpoints
-	f.Log = append(f.Log, FakeAction{Action: FakeActionUnmount, Target: target})
+	f.Log = append(f.Log, FakeAction{Action: FakeActionUnmount, Target: absTarget})
 	return nil
 }
 
@@ -115,13 +128,19 @@ func (f *FakeMounter) IsLikelyNotMountPoint(file string) (bool, error) {
 	f.mutex.Lock()
 	defer f.mutex.Unlock()
 
+	// If file is a symlink, get its absolute path
+	absFile, err := filepath.EvalSymlinks(file)
+	if err != nil {
+		absFile = file
+	}
+
 	for _, mp := range f.MountPoints {
-		if mp.Path == file {
-			glog.V(5).Infof("isLikelyMountPoint for %s: mounted %s, false", file, mp.Path)
+		if mp.Path == absFile {
+			glog.V(5).Infof("isLikelyNotMountPoint for %s: mounted %s, false", file, mp.Path)
 			return false, nil
 		}
 	}
-	glog.V(5).Infof("isLikelyMountPoint for %s: true", file)
+	glog.V(5).Infof("isLikelyNotMountPoint for %s: true", file)
 	return true, nil
 }
 
