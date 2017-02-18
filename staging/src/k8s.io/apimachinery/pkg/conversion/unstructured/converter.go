@@ -20,14 +20,27 @@ import (
 	"bytes"
 	encodingjson "encoding/json"
 	"fmt"
+	"os"
 	"reflect"
+	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
 
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apimachinery/pkg/util/json"
+
+	"github.com/golang/glog"
 )
+
+// Converter is an interface for converting between runtime.Object
+// and map[string]interface representation.
+type Converter interface {
+	ToUnstructured(obj runtime.Object, u *map[string]interface{}) error
+	FromUnstructured(u map[string]interface{}, obj runtime.Object) error
+}
 
 type structField struct {
 	structType reflect.Type
@@ -37,6 +50,7 @@ type structField struct {
 type fieldInfo struct {
 	name      string
 	nameValue reflect.Value
+	omitempty bool
 }
 
 type fieldsCacheMap map[structField]*fieldInfo
@@ -56,20 +70,59 @@ var (
 	marshalerType          = reflect.TypeOf(new(encodingjson.Marshaler)).Elem()
 	unmarshalerType        = reflect.TypeOf(new(encodingjson.Unmarshaler)).Elem()
 	mapStringInterfaceType = reflect.TypeOf(map[string]interface{}{})
+	stringType             = reflect.TypeOf(string(""))
+	int64Type              = reflect.TypeOf(int64(0))
+	uint64Type             = reflect.TypeOf(uint64(0))
+	float64Type            = reflect.TypeOf(float64(0))
+	boolType               = reflect.TypeOf(bool(false))
 	fieldCache             = newFieldsCache()
+	DefaultConverter       = NewConverter(parseBool(os.Getenv("KUBE_PATCH_CONVERSION_DETECTOR")))
 )
 
-// Converter knows how to convert betweek runtime.Object and
+func parseBool(key string) bool {
+	value, err := strconv.ParseBool(key)
+	if err != nil {
+		glog.Errorf("Couldn't parse %s as bool", key)
+	}
+	return value
+}
+
+// ConverterImpl knows how to convert betweek runtime.Object and
 // Unstructured in both ways.
-type Converter struct {
+type converterImpl struct {
+	// If true, we will be additionally running conversion via json
+	// to ensure that the result is true.
+	// This is supposed to be set only in tests.
+	mismatchDetection bool
 }
 
-func NewConverter() *Converter {
-	return &Converter{}
+func NewConverter(mismatchDetection bool) Converter {
+	return &converterImpl{
+		mismatchDetection: mismatchDetection,
+	}
 }
 
-func (c *Converter) FromUnstructured(u map[string]interface{}, obj runtime.Object) error {
-	return fromUnstructured(reflect.ValueOf(u), reflect.ValueOf(obj).Elem())
+func (c *converterImpl) FromUnstructured(u map[string]interface{}, obj runtime.Object) error {
+	err := fromUnstructured(reflect.ValueOf(u), reflect.ValueOf(obj).Elem())
+	if c.mismatchDetection {
+		newObj := reflect.New(reflect.TypeOf(obj).Elem()).Interface().(runtime.Object)
+		newErr := fromUnstructuredViaJSON(u, newObj)
+		if (err != nil) != (newErr != nil) {
+			glog.Fatalf("FromUnstructured unexpected error for %v: error: %v", u, err)
+		}
+		if err == nil && !apiequality.Semantic.DeepEqual(obj, newObj) {
+			glog.Fatalf("FromUnstructured mismatch for %#v, diff: %v", obj, diff.ObjectReflectDiff(obj, newObj))
+		}
+	}
+	return err
+}
+
+func fromUnstructuredViaJSON(u map[string]interface{}, obj runtime.Object) error {
+	data, err := json.Marshal(u)
+	if err != nil {
+		return err
+	}
+	return json.Unmarshal(data, obj)
 }
 
 func fromUnstructured(sv, dv reflect.Value) error {
@@ -94,6 +147,18 @@ func fromUnstructured(sv, dv reflect.Value) error {
 		// do the same.
 		if st.ConvertibleTo(dt) {
 			switch st.Kind() {
+			case reflect.String:
+				switch dt.Kind() {
+				case reflect.String:
+					dv.Set(sv.Convert(dt))
+					return nil
+				}
+			case reflect.Bool:
+				switch dt.Kind() {
+				case reflect.Bool:
+					dv.Set(sv.Convert(dt))
+					return nil
+				}
 			case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64,
 				reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
 				switch dt.Kind() {
@@ -157,7 +222,13 @@ func fieldInfoFromField(structType reflect.Type, field int) *fieldInfo {
 			info.name = strings.ToLower(typeField.Name[:1]) + typeField.Name[1:]
 		}
 	} else {
-		info.name = strings.Split(jsonTag, ",")[0]
+		items := strings.Split(jsonTag, ",")
+		info.name = items[0]
+		for i := range items {
+			if items[i] == "omitempty" {
+				info.omitempty = true
+			}
+		}
 	}
 	info.nameValue = reflect.ValueOf(info.name)
 
@@ -304,8 +375,27 @@ func interfaceFromUnstructured(sv, dv reflect.Value) error {
 	return nil
 }
 
-func (c *Converter) ToUnstructured(obj runtime.Object, u *map[string]interface{}) error {
-	return toUnstructured(reflect.ValueOf(obj).Elem(), reflect.ValueOf(u).Elem())
+func (c *converterImpl) ToUnstructured(obj runtime.Object, u *map[string]interface{}) error {
+	err := toUnstructured(reflect.ValueOf(obj).Elem(), reflect.ValueOf(u).Elem())
+	if c.mismatchDetection {
+		newUnstr := &map[string]interface{}{}
+		newErr := toUnstructuredViaJSON(obj, newUnstr)
+		if (err != nil) != (newErr != nil) {
+			glog.Fatalf("ToUnstructured unexpected error for %v: error: %v", obj, err)
+		}
+		if err == nil && !apiequality.Semantic.DeepEqual(u, newUnstr) {
+			glog.Fatalf("ToUnstructured mismatch for %#v, diff: %v", u, diff.ObjectReflectDiff(u, newUnstr))
+		}
+	}
+	return err
+}
+
+func toUnstructuredViaJSON(obj runtime.Object, u *map[string]interface{}) error {
+	data, err := json.Marshal(obj)
+	if err != nil {
+		return err
+	}
+	return json.Unmarshal(data, u)
 }
 
 func toUnstructured(sv, dv reflect.Value) error {
@@ -354,14 +444,35 @@ func toUnstructured(sv, dv reflect.Value) error {
 	}
 
 	switch st.Kind() {
-	case reflect.String, reflect.Bool,
-		reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64,
-		reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64,
-		reflect.Float32, reflect.Float64:
+	case reflect.String:
 		if dt.Kind() == reflect.Interface && dv.NumMethod() == 0 {
-			dv.Set(reflect.New(st))
+			dv.Set(reflect.New(stringType))
 		}
-		dv.Set(sv)
+		dv.Set(reflect.ValueOf(sv.String()))
+		return nil
+	case reflect.Bool:
+		if dt.Kind() == reflect.Interface && dv.NumMethod() == 0 {
+			dv.Set(reflect.New(boolType))
+		}
+		dv.Set(reflect.ValueOf(sv.Bool()))
+		return nil
+	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+		if dt.Kind() == reflect.Interface && dv.NumMethod() == 0 {
+			dv.Set(reflect.New(int64Type))
+		}
+		dv.Set(reflect.ValueOf(sv.Int()))
+		return nil
+	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
+		if dt.Kind() == reflect.Interface && dv.NumMethod() == 0 {
+			dv.Set(reflect.New(uint64Type))
+		}
+		dv.Set(reflect.ValueOf(sv.Uint()))
+		return nil
+	case reflect.Float32, reflect.Float64:
+		if dt.Kind() == reflect.Interface && dv.NumMethod() == 0 {
+			dv.Set(reflect.New(float64Type))
+		}
+		dv.Set(reflect.ValueOf(sv.Float()))
 		return nil
 	case reflect.Map:
 		return mapToUnstructured(sv, dv)
@@ -430,6 +541,19 @@ func sliceToUnstructured(sv, dv reflect.Value) error {
 		dv.Set(reflect.Zero(dt))
 		return nil
 	}
+	if st.Elem().Kind() == reflect.Uint8 {
+		dv.Set(reflect.New(stringType))
+		data, err := json.Marshal(sv.Bytes())
+		if err != nil {
+			return err
+		}
+		var result string
+		if err = json.Unmarshal(data, &result); err != nil {
+			return err
+		}
+		dv.Set(reflect.ValueOf(result))
+		return nil
+	}
 	if dt.Kind() == reflect.Interface && dv.NumMethod() == 0 {
 		switch st.Elem().Kind() {
 		// TODO It should be possible to reuse the slice for primitive types.
@@ -465,6 +589,27 @@ func pointerToUnstructured(sv, dv reflect.Value) error {
 	return toUnstructured(sv.Elem(), dv)
 }
 
+func isZero(v reflect.Value) bool {
+	switch v.Kind() {
+	case reflect.Array, reflect.String:
+		return v.Len() == 0
+	case reflect.Bool:
+		return !v.Bool()
+	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+		return v.Int() == 0
+	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
+		return v.Uint() == 0
+	case reflect.Float32, reflect.Float64:
+		return v.Float() == 0
+	case reflect.Map, reflect.Slice:
+		// TODO: It seems that 0-len maps are ignored in it.
+		return v.IsNil() || v.Len() == 0
+	case reflect.Ptr, reflect.Interface:
+		return v.IsNil()
+	}
+	return false
+}
+
 func structToUnstructured(sv, dv reflect.Value) error {
 	st, dt := sv.Type(), dv.Type()
 	if dt.Kind() == reflect.Interface && dv.NumMethod() == 0 {
@@ -481,6 +626,14 @@ func structToUnstructured(sv, dv reflect.Value) error {
 		fieldInfo := fieldInfoFromField(st, i)
 		fv := sv.Field(i)
 
+		if fieldInfo.name == "-" {
+			// This field should be skipped.
+			continue
+		}
+		if fieldInfo.omitempty && isZero(fv) {
+			// omitempty fields should be ignored.
+			continue
+		}
 		if len(fieldInfo.name) == 0 {
 			// This field is inlined.
 			if err := toUnstructured(fv, dv); err != nil {
@@ -488,15 +641,17 @@ func structToUnstructured(sv, dv reflect.Value) error {
 			}
 			continue
 		}
-		if !fv.IsValid() {
-			// No fource field, skip.
-			continue
-		}
 		switch fv.Type().Kind() {
-		case reflect.String, reflect.Bool,
-			reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64,
-			reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
-			realMap[fieldInfo.name] = fv.Interface()
+		case reflect.String:
+			realMap[fieldInfo.name] = fv.String()
+		case reflect.Bool:
+			realMap[fieldInfo.name] = fv.Bool()
+		case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+			realMap[fieldInfo.name] = fv.Int()
+		case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
+			realMap[fieldInfo.name] = fv.Uint()
+		case reflect.Float32, reflect.Float64:
+			realMap[fieldInfo.name] = fv.Float()
 		default:
 			subv := reflect.New(dt.Elem()).Elem()
 			if err := toUnstructured(fv, subv); err != nil {
