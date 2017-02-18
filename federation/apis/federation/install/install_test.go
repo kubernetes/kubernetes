@@ -25,9 +25,11 @@ import (
 	"k8s.io/kubernetes/federation/apis/federation"
 	"k8s.io/kubernetes/federation/apis/federation/v1beta1"
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/apimachinery/pkg/api/meta"
 )
 
 func TestResourceVersioner(t *testing.T) {
+	accessor := meta.NewAccessor()
 	cluster := federation.Cluster{ObjectMeta: metav1.ObjectMeta{ResourceVersion: "10"}}
 	version, err := accessor.ResourceVersion(&cluster)
 	if err != nil {
