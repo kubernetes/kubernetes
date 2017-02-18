@@ -242,6 +242,9 @@ function create-master-auth {
   if [[ -n "${KUBE_PROXY_TOKEN:-}" ]]; then
     replace_prefixed_line "${known_tokens_csv}" "${KUBE_PROXY_TOKEN},"              "system:kube-proxy,uid:kube_proxy"
   fi
+  if [[ -n "${NODE_PROBLEM_DETECTOR_TOKEN:-}" ]]; then
+    replace_prefixed_line "${known_tokens_csv}" "${NODE_PROBLEM_DETECTOR_TOKEN},"   "system:node-problem-detector,uid:node-problem-detector"
+  fi
   local use_cloud_config="false"
   cat <<EOF >/etc/gce.conf
 [global]
@@ -458,6 +461,29 @@ current-context: kube-scheduler
 EOF
 }
 
+function create-node-problem-detector-kubeconfig {
+  echo "Creating node-problem-detector kubeconfig file"
+  mkdir -p /var/lib/node-problem-detector
+  cat <<EOF >/var/lib/node-problem-detector/kubeconfig
+apiVersion: v1
+kind: Config
+users:
+- name: node-problem-detector
+  user:
+    token: ${NODE_PROBLEM_DETECTOR_TOKEN}
+clusters:
+- name: local
+  cluster:
+    certificate-authority-data: ${CA_CERT}
+contexts:
+- context:
+    cluster: local
+    user: node-problem-detector
+  name: service-account-context
+current-context: service-account-context
+EOF
+}
+
 function create-master-etcd-auth {
   if [[ -n "${ETCD_CA_CERT:-}" && -n "${ETCD_PEER_KEY:-}" && -n "${ETCD_PEER_CERT:-}" ]]; then
     local -r auth_dir="/etc/srv/kubernetes"
@@ -658,6 +684,37 @@ EOF
   iptables -t nat -F || true
 
   systemctl start kubelet.service
+}
+
+# This function assembles the node problem detector systemd service file and
+# starts it using systemctl.
+function start-node-problem-detector {
+  echo "Start node problem detector"
+  local -r npd_bin="${KUBE_HOME}/bin/node-problem-detector"
+  local -r km_config="${KUBE_HOME}/node-problem-detector/config/kernel-monitor.json"
+  echo "Using node problem detector binary at ${npd_bin}"
+  local flags="${NPD_TEST_LOG_LEVEL:-"--v=2"} ${NPD_TEST_ARGS:-}"
+  flags+=" --logtostderr"
+  flags+=" --system-log-monitors=${km_config}"
+  flags+=" --apiserver-override=https://${KUBERNETES_MASTER_NAME}?inClusterConfig=false&auth=/var/lib/node-problem-detector/kubeconfig"
+
+  # Write the systemd service file for node problem detector.
+  cat <<EOF >/etc/systemd/system/node-problem-detector.service
+[Unit]
+Description=Kubernetes node problem detector
+Requires=network-online.target
+After=network-online.target
+
+[Service]
+Restart=always
+RestartSec=10
+ExecStart=${npd_bin} ${flags}
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+  systemctl start node-problem-detector.service
 }
 
 # Create the log file and set its properties.
@@ -1249,8 +1306,12 @@ function start-kube-addons {
   if [[ "${ENABLE_CLUSTER_UI:-}" == "true" ]]; then
     setup-addon-manifests "addons" "dashboard"
   fi
-  if [[ "${ENABLE_NODE_PROBLEM_DETECTOR:-}" == "true" ]]; then
+  if [[ "${ENABLE_NODE_PROBLEM_DETECTOR:-}" == "daemonset" ]]; then
     setup-addon-manifests "addons" "node-problem-detector"
+  fi
+  if [[ "${ENABLE_NODE_PROBLEM_DETECTOR:-}" == "standalone" ]]; then
+    # Setup role binding for standalone node problem detector.
+    setup-addon-manifests "addons" "node-problem-detector/standalone"
   fi
   if echo "${ADMISSION_CONTROL:-}" | grep -q "LimitRanger"; then
     setup-addon-manifests "admission-controls" "limit-range"
@@ -1404,6 +1465,9 @@ if [[ "${KUBERNETES_MASTER:-}" == "true" ]]; then
 else
   create-kubelet-kubeconfig
   create-kubeproxy-kubeconfig
+  if [[ "${ENABLE_NODE_PROBLEM_DETECTOR:-}" == "standalone" ]]; then
+    create-node-problem-detector-kubeconfig
+  fi
 fi
 
 override-kubectl
@@ -1433,6 +1497,9 @@ else
   fi
   if [[ "${PREPULL_E2E_IMAGES:-}" == "true" ]]; then
     start-image-puller
+  fi
+  if [[ "${ENABLE_NODE_PROBLEM_DETECTOR:-}" == "standalone" ]]; then
+    start-node-problem-detector
   fi
 fi
 reset-motd
