@@ -289,7 +289,7 @@ func testRSAdoptMatchingOrphans(f *framework.Framework) {
 		},
 	})
 
-	By(fmt.Sprintf("When a replicaset with a matching selector is created"))
+	By("When a replicaset with a matching selector is created")
 	replicas := int32(2)
 	rsSt := newRSWithSelector(name, replicas, map[string]string{"name": name}, name, nginxImageName, name)
 	rs, err := f.ClientSet.Extensions().ReplicaSets(f.Namespace.Name).Create(rsSt)

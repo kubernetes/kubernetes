@@ -273,7 +273,7 @@ func testRCAdoptMatchingOrphans(f *framework.Framework) {
 		},
 	})
 
-	By(fmt.Sprintf("When a replication controller with a matching selector is created"))
+	By("When a replication controller with a matching selector is created")
 	replicas := int32(2)
 	rcSt := newRCWithSelector(name, replicas, map[string]string{"name": name}, name, nginxImageName, name)
 	rc, err := f.ClientSet.Core().ReplicationControllers(f.Namespace.Name).Create(rcSt)
@@ -331,7 +331,7 @@ func testRCReleaseControlledNotMatching(f *framework.Framework) {
 		Expect(err).NotTo(HaveOccurred())
 		for _, owner := range p2.OwnerReferences {
 			if *owner.Controller && owner.UID == rc.UID {
-				// pod still belonging to the replicaset
+				// pod still belonging to the replication controller
 				return false, nil
 			}
 		}
