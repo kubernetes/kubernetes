@@ -68,6 +68,11 @@ cluster's shared state through which all other components interact.`,
 
 // Run runs the specified APIServer.  This should never exit.
 func Run(s *options.ServerRunOptions) error {
+	return RunWithChannel(s, wait.NeverStop)
+}
+
+// Configures the APIServer and its informers
+func RunWithChannel(s *options.ServerRunOptions, stopCh <-chan struct{}) error {
 	// set defaults
 	if err := s.GenericServerRunOptions.DefaultAdvertiseAddress(s.SecureServing, s.InsecureServing); err != nil {
 		return err
@@ -212,8 +217,8 @@ func Run(s *options.ServerRunOptions) error {
 	installBatchAPIs(m, genericConfig.RESTOptionsGetter)
 	installAutoscalingAPIs(m, genericConfig.RESTOptionsGetter)
 
-	sharedInformers.Start(wait.NeverStop)
-	m.PrepareRun().Run(wait.NeverStop)
+	sharedInformers.Start(stopCh)
+	m.PrepareRun().Run(stopCh)
 	return nil
 }
 
