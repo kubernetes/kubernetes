@@ -30,6 +30,7 @@ go_test(
     srcs = [
         "pod_update_test.go",
         "types_test.go",
+        "labels_test.go",
     ],
     library = ":go_default_library",
     tags = ["automanaged"],
