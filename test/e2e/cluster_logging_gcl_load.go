@@ -31,6 +31,7 @@ const (
 	loadTestMaxAllowedLostFraction = 0.1
 )
 
+// TODO(crassirostris): Remove Flaky once test is stable
 var _ = framework.KubeDescribe("Cluster level logging using GCL [Slow] [Flaky]", func() {
 	f := framework.NewDefaultFramework("gcl-logging-load")
 
