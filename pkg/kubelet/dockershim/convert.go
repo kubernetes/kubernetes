@@ -51,7 +51,7 @@ func imageToRuntimeAPIImage(image *dockertypes.Image) (*runtimeapi.Image, error)
 }
 
 func imageInspectToRuntimeAPIImage(image *dockertypes.ImageInspect) (*runtimeapi.Image, error) {
-	if image == nil || image.Config == nil {
+	if image == nil {
 		return nil, fmt.Errorf("unable to convert a nil pointer to a runtime API image")
 	}
 
