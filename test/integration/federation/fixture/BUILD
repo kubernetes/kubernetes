@@ -4,32 +4,38 @@ licenses(["notice"])
 
 load(
     "@io_bazel_rules_go//go:def.bzl",
-    "go_test",
+    "go_library",
 )
 
-go_test(
-    name = "go_default_test",
+go_library(
+    name = "go_default_library",
     srcs = [
-        "crud_test.go",
-        "server_test.go",
+        "api.go",
+        "configmap.go",
+        "federation.go",
+        "resource.go",
+        "secret.go",
     ],
     tags = ["automanaged"],
     deps = [
         "//federation/apis/federation/v1beta1:go_default_library",
         "//federation/client/clientset_generated/federation_clientset:go_default_library",
+        "//federation/cmd/federation-apiserver/app:go_default_library",
+        "//federation/cmd/federation-apiserver/app/options:go_default_library",
+        "//federation/pkg/federation-controller/cluster:go_default_library",
+        "//federation/pkg/federation-controller/configmap:go_default_library",
+        "//federation/pkg/federation-controller/secret:go_default_library",
+        "//federation/pkg/federation-controller/util:go_default_library",
         "//pkg/api/v1:go_default_library",
-        "//pkg/apis/autoscaling/v1:go_default_library",
-        "//pkg/apis/batch/v1:go_default_library",
-        "//pkg/apis/extensions/v1beta1:go_default_library",
         "//pkg/client/clientset_generated/clientset:go_default_library",
-        "//test/integration/federation/fixture:go_default_library",
-        "//vendor:github.com/stretchr/testify/assert",
-        "//vendor:k8s.io/apimachinery/pkg/api/errors",
+        "//pkg/master:go_default_library",
+        "//test/integration/framework:go_default_library",
+        "//vendor:github.com/pborman/uuid",
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
         "//vendor:k8s.io/apimachinery/pkg/runtime",
-        "//vendor:k8s.io/apimachinery/pkg/runtime/schema",
         "//vendor:k8s.io/apimachinery/pkg/types",
         "//vendor:k8s.io/apimachinery/pkg/util/wait",
+        "//vendor:k8s.io/client-go/rest",
     ],
 )
 
@@ -42,9 +48,6 @@ filegroup(
 
 filegroup(
     name = "all-srcs",
-    srcs = [
-        ":package-srcs",
-        "//test/integration/federation/fixture:all-srcs",
-    ],
+    srcs = [":package-srcs"],
     tags = ["automanaged"],
 )
