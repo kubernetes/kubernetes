@@ -323,10 +323,6 @@ type Volumes interface {
 	// Get labels to apply to volume on creation
 	GetVolumeLabels(volumeName KubernetesVolumeID) (map[string]string, error)
 
-	// Get volume's disk path from volume name
-	// return the device path where the volume is attached
-	GetDiskPath(volumeName KubernetesVolumeID) (string, error)
-
 	// Check if the volume is already attached to the node with the specified NodeName
 	DiskIsAttached(diskName KubernetesVolumeID, nodeName types.NodeName) (bool, error)
 
@@ -377,6 +373,12 @@ type Cloud struct {
 
 	// state of our device allocator for each node
 	deviceAllocators map[types.NodeName]DeviceAllocator
+
+	// instanceCache is our local cache of EC2 instance info
+	instanceCache *instanceCache
+
+	// volumeCache is our local cache of EBS volume info
+	volumeCache *volumeCache
 }
 
 var _ Volumes = &Cloud{}
@@ -809,6 +811,9 @@ func newAWSCloud(config io.Reader, awsServices Services) (*Cloud, error) {
 		deviceAllocators: make(map[types.NodeName]DeviceAllocator),
 	}
 
+	awsCloud.instanceCache = newInstanceCache(awsCloud)
+	awsCloud.volumeCache = newVolumeCache(ec2)
+
 	selfAWSInstance, err := awsCloud.buildSelfAWSInstance()
 	if err != nil {
 		return nil, err
@@ -1172,14 +1177,10 @@ func (i *awsInstance) describeInstance() (*ec2.Instance, error) {
 // If the volume is already assigned, this will return the existing mountDevice with alreadyAttached=true.
 // Otherwise the mountDevice is assigned by finding the first available mountDevice, and it is returned with alreadyAttached=false.
 func (c *Cloud) getMountDevice(
-	i *awsInstance,
+	i *cachedInstance,
 	info *ec2.Instance,
 	volumeID awsVolumeID,
 	assign bool) (assigned mountDevice, alreadyAttached bool, err error) {
-	instanceType := i.getInstanceType()
-	if instanceType == nil {
-		return "", false, fmt.Errorf("could not get instance type for instance: %s", i.awsID)
-	}
 
 	deviceMappings := map[mountDevice]awsVolumeID{}
 	for _, blockDevice := range info.BlockDeviceMappings {
@@ -1202,7 +1203,7 @@ func (c *Cloud) getMountDevice(
 	c.attachingMutex.Lock()
 	defer c.attachingMutex.Unlock()
 
-	for mountDevice, volume := range c.attaching[i.nodeName] {
+	for mountDevice, volume := range c.attaching[i.NodeName] {
 		deviceMappings[mountDevice] = volume
 	}
 
@@ -1221,24 +1222,24 @@ func (c *Cloud) getMountDevice(
 	}
 
 	// Find the next unused device name
-	deviceAllocator := c.deviceAllocators[i.nodeName]
+	deviceAllocator := c.deviceAllocators[i.NodeName]
 	if deviceAllocator == nil {
 		// we want device names with two significant characters, starting with /dev/xvdbb
 		// the allowed range is /dev/xvd[b-c][a-z]
 		// http://docs.aws.amazon.com/AWSEC2/latest/UserGuide/device_naming.html
 		deviceAllocator = NewDeviceAllocator(0)
-		c.deviceAllocators[i.nodeName] = deviceAllocator
+		c.deviceAllocators[i.NodeName] = deviceAllocator
 	}
 	chosen, err := deviceAllocator.GetNext(deviceMappings)
 	if err != nil {
 		glog.Warningf("Could not assign a mount device.  mappings=%v, error: %v", deviceMappings, err)
-		return "", false, fmt.Errorf("Too many EBS volumes attached to node %s.", i.nodeName)
+		return "", false, fmt.Errorf("Too many EBS volumes attached to node %s.", i.NodeName)
 	}
 
-	attaching := c.attaching[i.nodeName]
+	attaching := c.attaching[i.NodeName]
 	if attaching == nil {
 		attaching = make(map[mountDevice]awsVolumeID)
-		c.attaching[i.nodeName] = attaching
+		c.attaching[i.NodeName] = attaching
 	}
 	attaching[chosen] = volumeID
 	glog.V(2).Infof("Assigned mount device %s -> volume %s", chosen, volumeID)
@@ -1248,11 +1249,11 @@ func (c *Cloud) getMountDevice(
 
 // endAttaching removes the entry from the "attachments in progress" map
 // It returns true if it was found (and removed), false otherwise
-func (c *Cloud) endAttaching(i *awsInstance, volumeID awsVolumeID, mountDevice mountDevice) bool {
+func (c *Cloud) endAttaching(i *cachedInstance, volumeID awsVolumeID, mountDevice mountDevice) bool {
 	c.attachingMutex.Lock()
 	defer c.attachingMutex.Unlock()
 
-	existingVolumeID, found := c.attaching[i.nodeName][mountDevice]
+	existingVolumeID, found := c.attaching[i.NodeName][mountDevice]
 	if !found {
 		return false
 	}
@@ -1265,52 +1266,27 @@ func (c *Cloud) endAttaching(i *awsInstance, volumeID awsVolumeID, mountDevice m
 		return false
 	}
 	glog.V(2).Infof("Releasing in-process attachment entry: %s -> volume %s", mountDevice, volumeID)
-	delete(c.attaching[i.nodeName], mountDevice)
+	delete(c.attaching[i.NodeName], mountDevice)
 	return true
 }
 
-type awsDisk struct {
-	ec2 EC2
-
-	// Name in k8s
-	name KubernetesVolumeID
-	// id in AWS
-	awsID awsVolumeID
-}
-
-func newAWSDisk(aws *Cloud, name KubernetesVolumeID) (*awsDisk, error) {
+func (c *Cloud) findVolume(cachePolicy *CachePolicy, name KubernetesVolumeID) (*cachedVolume, error) {
 	awsID, err := name.mapToAWSVolumeID()
 	if err != nil {
 		return nil, err
 	}
-	disk := &awsDisk{ec2: aws.ec2, name: name, awsID: awsID}
-	return disk, nil
-}
 
-// Gets the full information about this volume from the EC2 API
-func (d *awsDisk) describeVolume() (*ec2.Volume, error) {
-	volumeID := d.awsID
-
-	request := &ec2.DescribeVolumesInput{
-		VolumeIds: []*string{volumeID.awsString()},
-	}
-
-	volumes, err := d.ec2.DescribeVolumes(request)
-	if err != nil {
-		return nil, fmt.Errorf("error querying ec2 for volume %q: %v", volumeID, err)
-	}
-	if len(volumes) == 0 {
-		return nil, fmt.Errorf("no volumes found for volume %q", volumeID)
-	}
-	if len(volumes) > 1 {
-		return nil, fmt.Errorf("multiple volumes found for volume %q", volumeID)
-	}
-	return volumes[0], nil
+	return c.volumeCache.FindVolumeById(cachePolicy, awsID)
 }
 
 // waitForAttachmentStatus polls until the attachment status is the expected value
 // On success, it returns the last attachment state.
-func (d *awsDisk) waitForAttachmentStatus(status string) (*ec2.VolumeAttachment, error) {
+func (c *Cloud) waitForAttachmentStatus(id awsVolumeID, status string) (*ec2.VolumeAttachment, error) {
+	volume, err := c.volumeCache.FindVolumeById(NeverRefresh, id)
+	if err != nil {
+		return nil, fmt.Errorf("error querying ec2 for volume %q: %v", id, err)
+	}
+
 	backoff := wait.Backoff{
 		Duration: volumeAttachmentStatusInitialDelay,
 		Factor:   volumeAttachmentStatusFactor,
@@ -1323,8 +1299,8 @@ func (d *awsDisk) waitForAttachmentStatus(status string) (*ec2.VolumeAttachment,
 	describeErrorCount := 0
 	var attachment *ec2.VolumeAttachment
 
-	err := wait.ExponentialBackoff(backoff, func() (bool, error) {
-		info, err := d.describeVolume()
+	err = wait.ExponentialBackoff(backoff, func() (bool, error) {
+		info, err := volume.DescribeVolume(&CachePolicy{Name: "VolumePollAttachmentStatus", Validity: volumeAttachmentStatusInitialDelay})
 		if err != nil {
 			describeErrorCount++
 			if describeErrorCount > volumeAttachmentStatusConsecutiveErrorLimit {
@@ -1339,20 +1315,20 @@ func (d *awsDisk) waitForAttachmentStatus(status string) (*ec2.VolumeAttachment,
 		}
 		if len(info.Attachments) > 1 {
 			// Shouldn't happen; log so we know if it is
-			glog.Warningf("Found multiple attachments for volume %q: %v", d.awsID, info)
+			glog.Warningf("Found multiple attachments for volume %q: %v", id, info)
 		}
 		attachmentStatus := ""
 		for _, a := range info.Attachments {
 			if attachmentStatus != "" {
 				// Shouldn't happen; log so we know if it is
-				glog.Warningf("Found multiple attachments for volume %q: %v", d.awsID, info)
+				glog.Warningf("Found multiple attachments for volume %q: %v", id, info)
 			}
 			if a.State != nil {
 				attachment = a
 				attachmentStatus = *a.State
 			} else {
 				// Shouldn't happen; log so we know if it is
-				glog.Warningf("Ignoring nil attachment state for volume %q: %v", d.awsID, a)
+				glog.Warningf("Ignoring nil attachment state for volume %q: %v", id, a)
 			}
 		}
 		if attachmentStatus == "" {
@@ -1363,7 +1339,7 @@ func (d *awsDisk) waitForAttachmentStatus(status string) (*ec2.VolumeAttachment,
 			return true, nil
 		}
 		// continue waiting
-		glog.V(2).Infof("Waiting for volume %q state: actual=%s, desired=%s", d.awsID, attachmentStatus, status)
+		glog.V(2).Infof("Waiting for volume %q state: actual=%s, desired=%s", id, attachmentStatus, status)
 		return false, nil
 	})
 
@@ -1371,9 +1347,9 @@ func (d *awsDisk) waitForAttachmentStatus(status string) (*ec2.VolumeAttachment,
 }
 
 // Deletes the EBS disk
-func (d *awsDisk) deleteVolume() (bool, error) {
-	request := &ec2.DeleteVolumeInput{VolumeId: d.awsID.awsString()}
-	_, err := d.ec2.DeleteVolume(request)
+func (c *Cloud) deleteVolume(id awsVolumeID) (bool, error) {
+	request := &ec2.DeleteVolumeInput{VolumeId: id.awsString()}
+	_, err := c.ec2.DeleteVolume(request)
 	if err != nil {
 		if awsError, ok := err.(awserr.Error); ok {
 			if awsError.Code() == "InvalidVolume.NotFound" {
@@ -1383,8 +1359,10 @@ func (d *awsDisk) deleteVolume() (bool, error) {
 				return false, volume.NewDeletedVolumeInUseError(err.Error())
 			}
 		}
-		return false, fmt.Errorf("error deleting EBS volume %q: %v", d.awsID, err)
+		return false, fmt.Errorf("error deleting EBS volume %q: %v", id, err)
 	}
+	// We could notify the cache here, but there doesn't seem to be any reason to
+	// (and we want to support external deletion of volumes)
 	return true, nil
 }
 
@@ -1433,12 +1411,13 @@ func (c *Cloud) getAwsInstance(nodeName types.NodeName) (*awsInstance, error) {
 
 // AttachDisk implements Volumes.AttachDisk
 func (c *Cloud) AttachDisk(diskName KubernetesVolumeID, nodeName types.NodeName, readOnly bool) (string, error) {
-	disk, err := newAWSDisk(c, diskName)
+	volumeID, err := diskName.mapToAWSVolumeID()
 	if err != nil {
 		return "", err
 	}
 
-	awsInstance, info, err := c.getFullInstance(nodeName)
+	// Attaching volumes requires an up-to-date view, so NeverCache
+	awsInstance, info, err := c.getFullInstance(NeverCache, nodeName)
 	if err != nil {
 		return "", fmt.Errorf("error finding instance %s: %v", nodeName, err)
 	}
@@ -1459,13 +1438,13 @@ func (c *Cloud) AttachDisk(diskName KubernetesVolumeID, nodeName types.NodeName,
 	attachEnded := false
 	defer func() {
 		if attachEnded {
-			if !c.endAttaching(awsInstance, disk.awsID, mountDevice) {
-				glog.Errorf("endAttaching called for disk %q when attach not in progress", disk.awsID)
+			if !c.endAttaching(awsInstance, volumeID, mountDevice) {
+				glog.Errorf("endAttaching called for disk %q when attach not in progress", volumeID)
 			}
 		}
 	}()
 
-	mountDevice, alreadyAttached, err = c.getMountDevice(awsInstance, info, disk.awsID, true)
+	mountDevice, alreadyAttached, err = c.getMountDevice(awsInstance, info, volumeID, true)
 	if err != nil {
 		return "", err
 	}
@@ -1479,21 +1458,21 @@ func (c *Cloud) AttachDisk(diskName KubernetesVolumeID, nodeName types.NodeName,
 	if !alreadyAttached {
 		request := &ec2.AttachVolumeInput{
 			Device:     aws.String(ec2Device),
-			InstanceId: aws.String(awsInstance.awsID),
-			VolumeId:   disk.awsID.awsString(),
+			InstanceId: awsInstance.ID.awsString(),
+			VolumeId:   volumeID.awsString(),
 		}
 
 		attachResponse, err := c.ec2.AttachVolume(request)
 		if err != nil {
 			attachEnded = true
 			// TODO: Check if the volume was concurrently attached?
-			return "", fmt.Errorf("Error attaching EBS volume %q to instance %q: %v", disk.awsID, awsInstance.awsID, err)
+			return "", fmt.Errorf("Error attaching EBS volume %q to instance %q: %v", volumeID, awsInstance.ID, err)
 		}
 
-		glog.V(2).Infof("AttachVolume volume=%q instance=%q request returned %v", disk.awsID, awsInstance.awsID, attachResponse)
+		glog.V(2).Infof("AttachVolume volume=%q instance=%q request returned %v", volumeID, awsInstance.ID, attachResponse)
 	}
 
-	attachment, err := disk.waitForAttachmentStatus("attached")
+	attachment, err := c.waitForAttachmentStatus(volumeID, "attached")
 	if err != nil {
 		return "", err
 	}
@@ -1511,8 +1490,8 @@ func (c *Cloud) AttachDisk(diskName KubernetesVolumeID, nodeName types.NodeName,
 	if ec2Device != aws.StringValue(attachment.Device) {
 		return "", fmt.Errorf("disk attachment of %q to %q failed: requested device %q but found %q", diskName, nodeName, ec2Device, aws.StringValue(attachment.Device))
 	}
-	if awsInstance.awsID != aws.StringValue(attachment.InstanceId) {
-		return "", fmt.Errorf("disk attachment of %q to %q failed: requested instance %q but found %q", diskName, nodeName, awsInstance.awsID, aws.StringValue(attachment.InstanceId))
+	if string(awsInstance.ID) != aws.StringValue(attachment.InstanceId) {
+		return "", fmt.Errorf("disk attachment of %q to %q failed: requested instance %q but found %q", diskName, nodeName, awsInstance.ID, aws.StringValue(attachment.InstanceId))
 	}
 
 	return hostDevice, nil
@@ -1520,12 +1499,13 @@ func (c *Cloud) AttachDisk(diskName KubernetesVolumeID, nodeName types.NodeName,
 
 // DetachDisk implements Volumes.DetachDisk
 func (c *Cloud) DetachDisk(diskName KubernetesVolumeID, nodeName types.NodeName) (string, error) {
-	disk, err := newAWSDisk(c, diskName)
+	volumeID, err := diskName.mapToAWSVolumeID()
 	if err != nil {
 		return "", err
 	}
 
-	awsInstance, info, err := c.getFullInstance(nodeName)
+	// Attaching volumes requires an up-to-date view, so NeverCache
+	awsInstance, info, err := c.getFullInstance(NeverCache, nodeName)
 	if err != nil {
 		if err == cloudprovider.InstanceNotFound {
 			// If instance no longer exists, safe to assume volume is not attached.
@@ -1539,7 +1519,7 @@ func (c *Cloud) DetachDisk(diskName KubernetesVolumeID, nodeName types.NodeName)
 		return "", err
 	}
 
-	mountDevice, alreadyAttached, err := c.getMountDevice(awsInstance, info, disk.awsID, false)
+	mountDevice, alreadyAttached, err := c.getMountDevice(awsInstance, info, volumeID, false)
 	if err != nil {
 		return "", err
 	}
@@ -1550,19 +1530,19 @@ func (c *Cloud) DetachDisk(diskName KubernetesVolumeID, nodeName types.NodeName)
 	}
 
 	request := ec2.DetachVolumeInput{
-		InstanceId: &awsInstance.awsID,
-		VolumeId:   disk.awsID.awsString(),
+		InstanceId: awsInstance.ID.awsString(),
+		VolumeId:   volumeID.awsString(),
 	}
 
 	response, err := c.ec2.DetachVolume(&request)
 	if err != nil {
-		return "", fmt.Errorf("error detaching EBS volume %q from %q: %v", disk.awsID, awsInstance.awsID, err)
+		return "", fmt.Errorf("error detaching EBS volume %q from %q: %v", volumeID, awsInstance.ID, err)
 	}
 	if response == nil {
 		return "", errors.New("no response from DetachVolume")
 	}
 
-	attachment, err := disk.waitForAttachmentStatus("detached")
+	attachment, err := c.waitForAttachmentStatus(volumeID, "detached")
 	if err != nil {
 		return "", err
 	}
@@ -1572,7 +1552,7 @@ func (c *Cloud) DetachDisk(diskName KubernetesVolumeID, nodeName types.NodeName)
 	}
 
 	if mountDevice != "" {
-		c.endAttaching(awsInstance, disk.awsID, mountDevice)
+		c.endAttaching(awsInstance, volumeID, mountDevice)
 		// We don't check the return value - we don't really expect the attachment to have been
 		// in progress, though it might have been
 	}
@@ -1672,27 +1652,29 @@ func (c *Cloud) CreateDisk(volumeOptions *VolumeOptions) (KubernetesVolumeID, er
 
 // DeleteDisk implements Volumes.DeleteDisk
 func (c *Cloud) DeleteDisk(volumeName KubernetesVolumeID) (bool, error) {
-	awsDisk, err := newAWSDisk(c, volumeName)
+	volumeID, err := volumeName.mapToAWSVolumeID()
 	if err != nil {
 		return false, err
 	}
-	return awsDisk.deleteVolume()
+	return c.deleteVolume(volumeID)
 }
 
 // GetVolumeLabels implements Volumes.GetVolumeLabels
 func (c *Cloud) GetVolumeLabels(volumeName KubernetesVolumeID) (map[string]string, error) {
-	awsDisk, err := newAWSDisk(c, volumeName)
+	volumeID, err := volumeName.mapToAWSVolumeID()
 	if err != nil {
 		return nil, err
 	}
-	info, err := awsDisk.describeVolume()
+
+	volume, err := c.volumeCache.FindVolumeById(NeverRefresh, volumeID)
 	if err != nil {
 		return nil, err
 	}
+
 	labels := make(map[string]string)
-	az := aws.StringValue(info.AvailabilityZone)
+	az := volume.AvailabilityZone
 	if az == "" {
-		return nil, fmt.Errorf("volume did not have AZ information: %q", info.VolumeId)
+		return nil, fmt.Errorf("volume did not have AZ information: %q", volumeID)
 	}
 
 	labels[metav1.LabelZoneFailureDomain] = az
@@ -1705,25 +1687,11 @@ func (c *Cloud) GetVolumeLabels(volumeName KubernetesVolumeID) (map[string]strin
 	return labels, nil
 }
 
-// GetDiskPath implements Volumes.GetDiskPath
-func (c *Cloud) GetDiskPath(volumeName KubernetesVolumeID) (string, error) {
-	awsDisk, err := newAWSDisk(c, volumeName)
-	if err != nil {
-		return "", err
-	}
-	info, err := awsDisk.describeVolume()
-	if err != nil {
-		return "", err
-	}
-	if len(info.Attachments) == 0 {
-		return "", fmt.Errorf("No attachment to volume %s", volumeName)
-	}
-	return aws.StringValue(info.Attachments[0].Device), nil
-}
-
 // DiskIsAttached implements Volumes.DiskIsAttached
+// TODO: Remove this - we can inline it into DetachDisk (because it is only used there)
 func (c *Cloud) DiskIsAttached(diskName KubernetesVolumeID, nodeName types.NodeName) (bool, error) {
-	_, instance, err := c.getFullInstance(nodeName)
+	// NeverCache - but TODO remove this function
+	_, instance, err := c.getFullInstance(NeverCache, nodeName)
 	if err != nil {
 		if err == cloudprovider.InstanceNotFound {
 			// If instance no longer exists, safe to assume volume is not attached.
@@ -1762,7 +1730,15 @@ func (c *Cloud) DisksAreAttached(diskNames []KubernetesVolumeID, nodeName types.
 		idToDiskName[volumeID] = diskName
 		attached[diskName] = false
 	}
-	_, instance, err := c.getFullInstance(nodeName)
+
+	// TODO: Move validity duration to method argument
+	cachePolicy := &CachePolicy{Name: "DisksAreAttached", Validity: time.Second * 15}
+
+	var info *ec2.Instance
+	instance, err := c.instanceCache.GetInstanceByNodeName(cachePolicy, nodeName)
+	if err == nil && instance != nil {
+		info, err = instance.DescribeInstance(NeverRefresh)
+	}
 	if err != nil {
 		if err == cloudprovider.InstanceNotFound {
 			// If instance no longer exists, safe to assume volume is not attached.
@@ -1775,7 +1751,13 @@ func (c *Cloud) DisksAreAttached(diskNames []KubernetesVolumeID, nodeName types.
 
 		return attached, err
 	}
-	for _, blockDevice := range instance.BlockDeviceMappings {
+
+	if info == nil {
+		// should be unreachable
+		return nil, fmt.Errorf("unable to retrieve instance info")
+	}
+
+	for _, blockDevice := range info.BlockDeviceMappings {
 		volumeID := awsVolumeID(aws.StringValue(blockDevice.Ebs.VolumeId))
 		diskName, found := idToDiskName[volumeID]
 		if found {
@@ -3256,17 +3238,28 @@ func (c *Cloud) getInstanceByNodeName(nodeName types.NodeName) (*ec2.Instance, e
 	return instance, err
 }
 
-func (c *Cloud) getFullInstance(nodeName types.NodeName) (*awsInstance, *ec2.Instance, error) {
+func (c *Cloud) getFullInstance(cachePolicy *CachePolicy, nodeName types.NodeName) (*cachedInstance, *ec2.Instance, error) {
 	if nodeName == "" {
-		instance, err := c.getInstanceByID(c.selfAWSInstance.awsID)
-		return c.selfAWSInstance, instance, err
+		nodeName = c.selfAWSInstance.nodeName
 	}
-	instance, err := c.getInstanceByNodeName(nodeName)
+
+	// We get the instance with cachePolicy (forcing a refresh if needed), and then we describe it without refreshing
+	instance, err := c.instanceCache.GetInstanceByNodeName(cachePolicy, nodeName)
 	if err != nil {
-		return nil, nil, err
+		if err == cloudprovider.InstanceNotFound {
+			return nil, nil, err
+		}
+		return nil, nil, fmt.Errorf("error finding instance %s: %v", nodeName, err)
 	}
-	awsInstance := newAWSInstance(c.ec2, instance)
-	return awsInstance, instance, err
+	info, err := instance.DescribeInstance(NeverRefresh)
+	if err != nil {
+		if err == cloudprovider.InstanceNotFound {
+			return nil, nil, err
+		}
+		return nil, nil, fmt.Errorf("error describing instance %s: %v", nodeName, err)
+	}
+
+	return instance, info, nil
 }
 
 // Add additional filters, to match on our tags
