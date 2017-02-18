@@ -69,18 +69,18 @@ func (w *predicateAdmitHandler) Admit(attrs *PodAdmitAttributes) PodAdmitResult 
 		glog.Warningf("Failed to admit pod %v - %s", format.Pod(pod), message)
 		return PodAdmitResult{
 			Admit:   fit,
-			Reason:  "UnexpectedError",
+			Reason:  "UnexpectedAdmissionError",
 			Message: message,
 		}
 	}
 	if !fit {
 		fit, reasons, err = w.admissionFailureHandler.HandleAdmissionFailure(pod, reasons)
 		if err != nil {
-			message := fmt.Sprintf("Unexpected error while attempting recover from admission failure: %v", err)
+			message := fmt.Sprintf("Unexpected error while attempting to recover from admission failure: %v", err)
 			glog.Warningf("Failed to admit pod %v - %s", format.Pod(pod), message)
 			return PodAdmitResult{
 				Admit:   fit,
-				Reason:  "UnexpectedError",
+				Reason:  "UnexpectedAdmissionError",
 				Message: message,
 			}
 		}

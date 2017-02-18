@@ -40,7 +40,7 @@ const (
 )
 
 // CriticalPodAdmissionFailureHandler is an AdmissionFailureHandler that handles admission failure for Critical Pods.
-// If the ONLY admission failures are due to insufficient resources, then the CriticalPodAdmissionHandler evicts pods
+// If the ONLY admission failures are due to insufficient resources, then CriticalPodAdmissionHandler evicts pods
 // so that the critical pod can be admitted.  For evictions, the CriticalPodAdmissionHandler evicts a set of pods that
 // frees up the required resource requests.  The set of pods is designed to minimize impact, and is prioritized according to the ordering:
 // minimal impact for guaranteed pods > minimal impact for burstable pods > minimal impact for besteffort pods.
@@ -95,8 +95,7 @@ func (c *CriticalPodAdmissionHandler) HandleAdmissionFailure(pod *v1.Pod, failur
 // based on requests.  For example, if the only insufficient resource is 200Mb of memory, this function could
 // evict a pod with request=250Mb.
 func (c *CriticalPodAdmissionHandler) evictPodsToFreeRequests(insufficientResources admissionRequirementList) error {
-	nonCriticalPods := filterPods(c.getPodsFunc(), func(p *v1.Pod) bool { return !kubetypes.IsCriticalPod(p) })
-	podsToPreempt, err := getPodsToPreempt(nonCriticalPods, insufficientResources)
+	podsToPreempt, err := getPodsToPreempt(c.getPodsFunc(), insufficientResources)
 	if err != nil {
 		return fmt.Errorf("preemption: error finding a set of pods to preempt: %v", err)
 	}
@@ -121,22 +120,19 @@ func (c *CriticalPodAdmissionHandler) evictPodsToFreeRequests(insufficientResour
 
 // getPodsToPreempt returns a list of pods that could be preempted to free requests >= requirements
 func getPodsToPreempt(pods []*v1.Pod, requirements admissionRequirementList) ([]*v1.Pod, error) {
-	bestEffortPods := filterPods(pods, func(p *v1.Pod) bool { return qos.GetPodQOS(p) == v1.PodQOSBestEffort })
-	burstablePods := filterPods(pods, func(p *v1.Pod) bool { return qos.GetPodQOS(p) == v1.PodQOSBurstable })
-	guaranteedPods := filterPods(pods, func(p *v1.Pod) bool { return qos.GetPodQOS(p) == v1.PodQOSGuaranteed })
+	bestEffortPods, burstablePods, guaranteedPods := sortPodsByQOS(pods)
 
-	// We only evict guaranteed pods if we "have to".  This implies that guaranteed pods only need to fulfil requirements
-	// which are not fulfilled by all other burstable or best effort pods.
+	// find the guaranteed pods we would need to evict if we already evicted ALL burstable and besteffort pods.
 	guarateedToEvict, err := getPodsToPreemptByDistance(guaranteedPods, requirements.subtract(append(bestEffortPods, burstablePods...)...))
 	if err != nil {
 		return nil, err
 	}
-	// Once we know the guaranteed pods being evicted, we can subtract their requirements from what we need to meet with burstable pods
-	// In similar fashion to guaranteed pods, we only need to consider requirements not met by all best effort pods.
+	// Find the burstable pods we would need to evict if we already evicted ALL besteffort pods, and the required guaranteed pods.
 	burstableToEvict, err := getPodsToPreemptByDistance(burstablePods, requirements.subtract(append(bestEffortPods, guarateedToEvict...)...))
 	if err != nil {
 		return nil, err
 	}
+	// Find the besteffort pods we would need to evict if we already evicted the required guaranteed and burstable pods.
 	bestEffortToEvict, err := getPodsToPreemptByDistance(bestEffortPods, requirements.subtract(append(burstableToEvict, guarateedToEvict...)...))
 	if err != nil {
 		return nil, err
@@ -156,19 +152,21 @@ func getPodsToPreemptByDistance(pods []*v1.Pod, requirements admissionRequiremen
 			return nil, fmt.Errorf("no set of running pods found to reclaim resources: %v", requirements.toString())
 		}
 		// all distances must be less than len(requirements), because the max distance for a single requirement is 1
-		minDistance := float64(len(requirements) + 1)
-		minPod := 0
+		bestDistance := float64(len(requirements) + 1)
+		bestPodIndex := 0
+		// Find the pod with the smallest distance from requirements
+		// Or, in the case of two equidistant pods, find the pod with "smaller" resource requests.
 		for i, pod := range pods {
 			dist := requirements.distance(pod)
-			if dist < minDistance || minDistance == 0 && dist == 0 && smallerResourceRequest(pod, pods[minPod]) {
-				minDistance = dist
-				minPod = i
+			if dist < bestDistance || (bestDistance == dist && smallerResourceRequest(pod, pods[bestPodIndex])) {
+				bestDistance = dist
+				bestPodIndex = i
 			}
 		}
 		// subtract the pod from requirements, and transfer the pod from input-pods to pods-to-evicted
-		requirements = requirements.subtract(pods[minPod])
-		podsToEvict = append(podsToEvict, pods[minPod])
-		pods[minPod] = pods[len(pods)-1]
+		requirements = requirements.subtract(pods[bestPodIndex])
+		podsToEvict = append(podsToEvict, pods[bestPodIndex])
+		pods[bestPodIndex] = pods[len(pods)-1]
 		pods = pods[:len(pods)-1]
 	}
 	return podsToEvict, nil
@@ -223,15 +221,22 @@ func (a admissionRequirementList) toString() string {
 	return s + "]"
 }
 
-// returns pods in the list of pods where filterFunc returns true.
-func filterPods(pods []*v1.Pod, filterFunc func(p *v1.Pod) bool) []*v1.Pod {
-	filteredPods := []*v1.Pod{}
+// returns lists containing non-critical besteffort, burstable, and guaranteed pods
+func sortPodsByQOS(pods []*v1.Pod) (bestEffort, burstable, guaranteed []*v1.Pod) {
 	for _, pod := range pods {
-		if filterFunc(pod) {
-			filteredPods = append(filteredPods, pod)
+		if !kubetypes.IsCriticalPod(pod) {
+			switch qos.GetPodQOS(pod) {
+				case v1.PodQOSBestEffort:
+					bestEffort = append(bestEffort, pod)
+				case v1.PodQOSBurstable:
+					burstable = append(burstable, pod)
+				case v1.PodQOSGuaranteed:
+					guaranteed = append(guaranteed, pod)
+				default:
+			}
 		}
 	}
-	return filteredPods
+	return
 }
 
 // returns true if pod1 has a smaller request than pod2
