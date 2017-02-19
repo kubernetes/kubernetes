@@ -113,12 +113,15 @@ func (t *DeploymentUpgradeTest) Test(f *framework.Framework, done <-chan struct{
 	_, allOldRSs, newRS, err := deploymentutil.GetAllReplicaSets(t.d, f.ClientSet)
 	framework.ExpectNoError(err)
 	if newRS == nil {
+		By(t.spewReplicaSets(newRS, allOldRSs))
 		framework.ExpectNoError(fmt.Errorf("expected a new replica set for deployment %q", t.d.Name))
 	}
 	if newRS.UID != t.newRS.UID {
+		By(t.spewReplicaSets(newRS, allOldRSs))
 		framework.ExpectNoError(fmt.Errorf("expected new replica set:\n%#v\ngot new replica set:\n%#v\n", t.newRS, newRS))
 	}
 	if len(allOldRSs) != 1 {
+		By(t.spewReplicaSets(newRS, allOldRSs))
 		errString := fmt.Sprintf("expected one old replica set, got %d\n", len(allOldRSs))
 		for i := range allOldRSs {
 			rs := allOldRSs[i]
@@ -127,6 +130,7 @@ func (t *DeploymentUpgradeTest) Test(f *framework.Framework, done <-chan struct{
 		framework.ExpectNoError(fmt.Errorf(errString))
 	}
 	if allOldRSs[0].UID != t.oldRS.UID {
+		By(t.spewReplicaSets(newRS, allOldRSs))
 		framework.ExpectNoError(fmt.Errorf("expected old replica set:\n%#v\ngot old replica set:\n%#v\n", t.oldRS, allOldRSs[0]))
 	}
 }
@@ -134,4 +138,15 @@ func (t *DeploymentUpgradeTest) Test(f *framework.Framework, done <-chan struct{
 // Teardown cleans up any remaining resources.
 func (t *DeploymentUpgradeTest) Teardown(f *framework.Framework) {
 	// rely on the namespace deletion to clean up everything
+}
+
+func (t *DeploymentUpgradeTest) spewReplicaSets(newRS *extensions.ReplicaSet, allOldRSs []*extensions.ReplicaSet) string {
+	msg := fmt.Sprintf("old replica sets prior to the upgrade:\n%#v\n", t.oldRS)
+	msg += fmt.Sprintf("new replica sets prior to the upgrade:\n%#v\n", t.newRS)
+	msg += fmt.Sprintf("new replica set after the upgrade:\n%#v\n", newRS)
+	msg += fmt.Sprintf("old replica sets after the upgrade:\n")
+	for i := range allOldRSs {
+		msg += fmt.Sprintf("%#v\n", allOldRSs[i])
+	}
+	return msg
 }
