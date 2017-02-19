@@ -27,4 +27,4 @@ path-prefix	vendor/
 path-prefix	api/swagger-spec/
 path-prefix	pkg/generated/
 
-paths-from-repo	.generated_docs
+paths-from-repo	docs/.generated_docs
