@@ -149,8 +149,8 @@ func (c *services) List(opts meta_v1.ListOptions) (result *v1.ServiceList, err e
 
 // Watch returns a watch.Interface that watches the requested services.
 func (c *services) Watch(opts meta_v1.ListOptions) (watch.Interface, error) {
+	opts.Watch = true
 	return c.client.Get().
-		Prefix("watch").
 		Namespace(c.ns).
 		Resource("services").
 		VersionedParams(&opts, api.ParameterCodec).
