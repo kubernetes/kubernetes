@@ -40,6 +40,7 @@ import (
 	versionedfake "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/fake"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/fake"
+	"k8s.io/kubernetes/pkg/printers"
 	"k8s.io/kubernetes/pkg/util"
 )
 
@@ -59,7 +60,7 @@ func TestDescribePod(t *testing.T) {
 	})
 	c := &describeClient{T: t, Namespace: "foo", Interface: fake}
 	d := PodDescriber{c}
-	out, err := d.Describe("foo", "bar", DescriberSettings{ShowEvents: true})
+	out, err := d.Describe("foo", "bar", printers.DescriberSettings{ShowEvents: true})
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -83,7 +84,7 @@ func TestDescribePodTolerations(t *testing.T) {
 	})
 	c := &describeClient{T: t, Namespace: "foo", Interface: fake}
 	d := PodDescriber{c}
-	out, err := d.Describe("foo", "bar", DescriberSettings{})
+	out, err := d.Describe("foo", "bar", printers.DescriberSettings{})
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -100,7 +101,7 @@ func TestDescribeNamespace(t *testing.T) {
 	})
 	c := &describeClient{T: t, Namespace: "", Interface: fake}
 	d := NamespaceDescriber{c}
-	out, err := d.Describe("", "myns", DescriberSettings{ShowEvents: true})
+	out, err := d.Describe("", "myns", printers.DescriberSettings{ShowEvents: true})
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -118,7 +119,7 @@ func TestDescribeService(t *testing.T) {
 	})
 	c := &describeClient{T: t, Namespace: "foo", Interface: fake}
 	d := ServiceDescriber{c}
-	out, err := d.Describe("foo", "bar", DescriberSettings{ShowEvents: true})
+	out, err := d.Describe("foo", "bar", printers.DescriberSettings{ShowEvents: true})
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -167,7 +168,7 @@ func TestPodDescribeResultsSorted(t *testing.T) {
 	d := PodDescriber{c}
 
 	// Act
-	out, err := d.Describe("foo", "bar", DescriberSettings{ShowEvents: true})
+	out, err := d.Describe("foo", "bar", printers.DescriberSettings{ShowEvents: true})
 
 	// Assert
 	if err != nil {
@@ -436,7 +437,7 @@ func TestDescribers(t *testing.T) {
 	if out, err := d.DescribeObject(first, second, third); out != "" || err == nil {
 		t.Errorf("unexpected result: %s %v", out, err)
 	} else {
-		if noDescriber, ok := err.(ErrNoDescriber); ok {
+		if noDescriber, ok := err.(printers.ErrNoDescriber); ok {
 			if !reflect.DeepEqual(noDescriber.Types, []string{"*api.Event", "*api.Pod", "*api.Pod"}) {
 				t.Errorf("unexpected describer: %v", err)
 			}
@@ -649,7 +650,7 @@ func TestPersistentVolumeDescriber(t *testing.T) {
 	for name, pv := range tests {
 		fake := fake.NewSimpleClientset(pv)
 		c := PersistentVolumeDescriber{fake}
-		str, err := c.Describe("foo", "bar", DescriberSettings{ShowEvents: true})
+		str, err := c.Describe("foo", "bar", printers.DescriberSettings{ShowEvents: true})
 		if err != nil {
 			t.Errorf("Unexpected error for test %s: %v", name, err)
 		}
@@ -673,7 +674,7 @@ func TestDescribeDeployment(t *testing.T) {
 		},
 	})
 	d := DeploymentDescriber{fake, versionedFake}
-	out, err := d.Describe("foo", "bar", DescriberSettings{ShowEvents: true})
+	out, err := d.Describe("foo", "bar", printers.DescriberSettings{ShowEvents: true})
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -707,7 +708,7 @@ func TestDescribeCluster(t *testing.T) {
 	}
 	fake := fedfake.NewSimpleClientset(&cluster)
 	d := ClusterDescriber{Interface: fake}
-	out, err := d.Describe("any", "foo", DescriberSettings{ShowEvents: true})
+	out, err := d.Describe("any", "foo", printers.DescriberSettings{ShowEvents: true})
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -732,7 +733,7 @@ func TestDescribeStorageClass(t *testing.T) {
 		},
 	})
 	s := StorageClassDescriber{f}
-	out, err := s.Describe("", "foo", DescriberSettings{ShowEvents: true})
+	out, err := s.Describe("", "foo", printers.DescriberSettings{ShowEvents: true})
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -756,7 +757,7 @@ func TestDescribePodDisruptionBudget(t *testing.T) {
 		},
 	})
 	s := PodDisruptionBudgetDescriber{f}
-	out, err := s.Describe("ns1", "pdb1", DescriberSettings{ShowEvents: true})
+	out, err := s.Describe("ns1", "pdb1", printers.DescriberSettings{ShowEvents: true})
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -1112,7 +1113,7 @@ func TestDescribeHorizontalPodAutoscaler(t *testing.T) {
 		}
 		fake := fake.NewSimpleClientset(&test.hpa)
 		desc := HorizontalPodAutoscalerDescriber{fake}
-		str, err := desc.Describe("foo", "bar", DescriberSettings{ShowEvents: true})
+		str, err := desc.Describe("foo", "bar", printers.DescriberSettings{ShowEvents: true})
 		if err != nil {
 			t.Errorf("Unexpected error for test %s: %v", test.name, err)
 		}
@@ -1141,7 +1142,7 @@ func TestDescribeEvents(t *testing.T) {
 		},
 	}
 
-	m := map[string]Describer{
+	m := map[string]printers.Describer{
 		"DaemonSetDescriber": &DaemonSetDescriber{
 			fake.NewSimpleClientset(&extensions.DaemonSet{
 				ObjectMeta: metav1.ObjectMeta{
@@ -1241,7 +1242,7 @@ func TestDescribeEvents(t *testing.T) {
 	}
 
 	for name, d := range m {
-		out, err := d.Describe("foo", "bar", DescriberSettings{ShowEvents: true})
+		out, err := d.Describe("foo", "bar", printers.DescriberSettings{ShowEvents: true})
 		if err != nil {
 			t.Errorf("unexpected error for %q: %v", name, err)
 		}
@@ -1252,7 +1253,7 @@ func TestDescribeEvents(t *testing.T) {
 			t.Errorf("events not found for %q when ShowEvents=true: %s", name, out)
 		}
 
-		out, err = d.Describe("foo", "bar", DescriberSettings{ShowEvents: false})
+		out, err = d.Describe("foo", "bar", printers.DescriberSettings{ShowEvents: false})
 		if err != nil {
 			t.Errorf("unexpected error for %q: %s", name, err)
 		}
