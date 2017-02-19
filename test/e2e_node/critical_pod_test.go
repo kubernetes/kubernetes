@@ -42,6 +42,11 @@ var _ = framework.KubeDescribe("CriticalPod", func() {
 			initialConfig.FeatureGates += ", ExperimentalCriticalPodAnnotation=true"
 		})
 		It("should be able to create and delete a critical pod", func() {
+			configEnabled, err := isKubeletConfigEnabled(f)
+			framework.ExpectNoError(err)
+			if !configEnabled {
+				framework.Skipf("unable to run test without dynamic kubelet config enabled.")
+			}
 			criticalPod := &v1.Pod{
 				TypeMeta: metav1.TypeMeta{
 					Kind:       "Pod",
