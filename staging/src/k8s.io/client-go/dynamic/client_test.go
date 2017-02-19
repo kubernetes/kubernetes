@@ -136,7 +136,7 @@ func TestList(t *testing.T) {
 		}
 		defer srv.Close()
 
-		got, err := cl.Resource(resource, tc.namespace).List(&metav1.ListOptions{})
+		got, err := cl.Resource(resource, tc.namespace).List(metav1.ListOptions{})
 		if err != nil {
 			t.Errorf("unexpected error when listing %q: %v", tc.name, err)
 			continue
@@ -293,7 +293,7 @@ func TestDeleteCollection(t *testing.T) {
 		}
 		defer srv.Close()
 
-		err = cl.Resource(resource, tc.namespace).DeleteCollection(nil, &metav1.ListOptions{})
+		err = cl.Resource(resource, tc.namespace).DeleteCollection(nil, metav1.ListOptions{})
 		if err != nil {
 			t.Errorf("unexpected error when deleting collection %q: %v", tc.name, err)
 			continue
@@ -469,7 +469,7 @@ func TestWatch(t *testing.T) {
 		}
 		defer srv.Close()
 
-		watcher, err := cl.Resource(resource, tc.namespace).Watch(&metav1.ListOptions{})
+		watcher, err := cl.Resource(resource, tc.namespace).Watch(metav1.ListOptions{})
 		if err != nil {
 			t.Errorf("unexpected error when watching %q: %v", tc.name, err)
 			continue
