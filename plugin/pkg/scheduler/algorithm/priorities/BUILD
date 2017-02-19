@@ -60,6 +60,7 @@ go_test(
     tags = ["automanaged"],
     deps = [
         "//pkg/api/v1:go_default_library",
+        "//pkg/apis/apps/v1beta1:go_default_library",
         "//pkg/apis/extensions/v1beta1:go_default_library",
         "//plugin/pkg/scheduler/algorithm/priorities/util:go_default_library",
         "//plugin/pkg/scheduler/api:go_default_library",
