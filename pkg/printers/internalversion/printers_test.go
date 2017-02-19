@@ -131,7 +131,7 @@ func TestPrinter(t *testing.T) {
 		{"test jsonpath", "jsonpath", "{.metadata.name}", podTest, []schema.GroupVersion{v1.SchemeGroupVersion}, "foo"},
 		{"test jsonpath list", "jsonpath", "{.items[*].metadata.name}", podListTest, []schema.GroupVersion{v1.SchemeGroupVersion}, "foo bar"},
 		{"test jsonpath empty list", "jsonpath", "{.items[*].metadata.name}", emptyListTest, []schema.GroupVersion{v1.SchemeGroupVersion}, ""},
-		{"test name", "name", "", podTest, []schema.GroupVersion{v1.SchemeGroupVersion}, "pod/foo\n"},
+		{"test name", "name", "", podTest, []schema.GroupVersion{v1.SchemeGroupVersion}, "pods/foo\n"},
 		{"emits versioned objects", "template", "{{.kind}}", testapi, []schema.GroupVersion{v1.SchemeGroupVersion}, "Pod"},
 	}
 	for _, test := range printerTests {
@@ -342,7 +342,7 @@ func TestNamePrinter(t *testing.T) {
 					Name: "foo",
 				},
 			},
-			"pod/foo\n"},
+			"pods/foo\n"},
 		"List": {
 			&v1.List{
 				TypeMeta: metav1.TypeMeta{
@@ -357,7 +357,7 @@ func TestNamePrinter(t *testing.T) {
 					},
 				},
 			},
-			"pod/foo\npod/bar\n"},
+			"pods/foo\npods/bar\n"},
 	}
 	printer, _, _ := printers.GetStandardPrinter("name", "", false, false, api.Registry.RESTMapper(api.Registry.EnabledVersions()...), api.Scheme, []runtime.Decoder{api.Codecs.UniversalDecoder(), unstructured.UnstructuredJSONScheme})
 	for name, item := range tests {
