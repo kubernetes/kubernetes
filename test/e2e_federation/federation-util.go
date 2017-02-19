@@ -207,7 +207,6 @@ func getRegisteredClusters(userAgentName string, f *fedframework.Framework) (map
 		Expect(framework.TestContext.KubeConfig).ToNot(Equal(""), "KubeConfig must be specified to load clusters' client config")
 		clusters[c.Name] = &cluster{c.Name, createClientsetForCluster(c, i, userAgentName), false, nil}
 	}
-	createNamespaceInClusters(clusters, f)
 	return clusters, primaryClusterName
 }
 
