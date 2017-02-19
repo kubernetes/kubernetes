@@ -124,6 +124,11 @@ func (c *ResourceRecordChangeset) Apply() error {
 	return nil
 }
 
+// ResourceRecordSets returns the parent ResourceRecordSets
+func (c *ResourceRecordChangeset) ResourceRecordSets() dnsprovider.ResourceRecordSets {
+	return c.rrsets
+}
+
 func getHash(text string) string {
 	h := fnv.New32a()
 	h.Write([]byte(text))

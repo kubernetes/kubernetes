@@ -114,3 +114,8 @@ func (c *ResourceRecordChangeset) Apply() error {
 func (c *ResourceRecordChangeset) IsEmpty() bool {
 	return len(c.removals) == 0 && len(c.additions) == 0
 }
+
+// ResourceRecordSets returns the parent ResourceRecordSets
+func (c *ResourceRecordChangeset) ResourceRecordSets() dnsprovider.ResourceRecordSets {
+	return c.rrsets
+}
