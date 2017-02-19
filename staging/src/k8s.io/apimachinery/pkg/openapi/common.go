@@ -124,26 +124,27 @@ type Config struct {
 //
 func GetOpenAPITypeFormat(typeName string) (string, string) {
 	schemaTypeFormatMap := map[string][]string{
-		"uint":      {"integer", "int32"},
-		"uint8":     {"integer", "byte"},
-		"uint16":    {"integer", "int32"},
-		"uint32":    {"integer", "int64"},
-		"uint64":    {"integer", "int64"},
-		"int":       {"integer", "int32"},
-		"int8":      {"integer", "byte"},
-		"int16":     {"integer", "int32"},
-		"int32":     {"integer", "int32"},
-		"int64":     {"integer", "int64"},
-		"byte":      {"integer", "byte"},
-		"float64":   {"number", "double"},
-		"float32":   {"number", "float"},
-		"bool":      {"boolean", ""},
-		"time.Time": {"string", "date-time"},
-		"string":    {"string", ""},
-		"integer":   {"integer", ""},
-		"number":    {"number", ""},
-		"boolean":   {"boolean", ""},
-		"[]byte":    {"string", "byte"}, // base64 encoded characters
+		"uint":        {"integer", "int32"},
+		"uint8":       {"integer", "byte"},
+		"uint16":      {"integer", "int32"},
+		"uint32":      {"integer", "int64"},
+		"uint64":      {"integer", "int64"},
+		"int":         {"integer", "int32"},
+		"int8":        {"integer", "byte"},
+		"int16":       {"integer", "int32"},
+		"int32":       {"integer", "int32"},
+		"int64":       {"integer", "int64"},
+		"byte":        {"integer", "byte"},
+		"float64":     {"number", "double"},
+		"float32":     {"number", "float"},
+		"bool":        {"boolean", ""},
+		"time.Time":   {"string", "date-time"},
+		"string":      {"string", ""},
+		"integer":     {"integer", ""},
+		"number":      {"number", ""},
+		"boolean":     {"boolean", ""},
+		"[]byte":      {"string", "byte"}, // base64 encoded characters
+		"interface{}": {"object", ""},
 	}
 	mapped, ok := schemaTypeFormatMap[typeName]
 	if !ok {
