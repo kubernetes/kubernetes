@@ -74,6 +74,7 @@ func setConfigDefaults(config *rest.Config) error {
 	if err != nil {
 		return err
 	}
+
 	config.APIPath = "/apis"
 	if config.UserAgent == "" {
 		config.UserAgent = rest.DefaultKubernetesUserAgent()
@@ -90,6 +91,7 @@ func setConfigDefaults(config *rest.Config) error {
 	if config.Burst == 0 {
 		config.Burst = 10
 	}
+
 	return nil
 }
 
