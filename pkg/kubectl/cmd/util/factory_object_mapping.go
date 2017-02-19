@@ -31,6 +31,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -48,6 +49,8 @@ import (
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
+	"k8s.io/kubernetes/pkg/printers"
+	printersinternal "k8s.io/kubernetes/pkg/printers/internalversion"
 )
 
 type ring1Factory struct {
@@ -58,10 +61,12 @@ func NewObjectMappingFactory(clientAccessFactory ClientAccessFactory) ObjectMapp
 	f := &ring1Factory{
 		clientAccessFactory: clientAccessFactory,
 	}
-
 	return f
 }
 
+// TODO: This method should return an error now that it can fail.  Alternatively, it needs to
+//   return lazy implementations of mapper and typer that don't hit the wire until they are
+//   invoked.
 func (f *ring1Factory) Object() (meta.RESTMapper, runtime.ObjectTyper) {
 	mapper := api.Registry.RESTMapper()
 	discoveryClient, err := f.clientAccessFactory.DiscoveryClient()
@@ -143,7 +148,18 @@ func (f *ring1Factory) UnstructuredClientForMapping(mapping *meta.RESTMapping) (
 	return restclient.RESTClientFor(cfg)
 }
 
-func (f *ring1Factory) Describer(mapping *meta.RESTMapping) (kubectl.Describer, error) {
+func printerForRing1Factory(f *ring1Factory, cmd *cobra.Command) (printers.ResourcePrinter, bool, error) {
+	mapper, typer := f.Object()
+	// TODO: used by the custom column implementation and the name implementation, break this dependency
+	decoders := []runtime.Decoder{f.clientAccessFactory.Decoder(true), unstructured.UnstructuredJSONScheme}
+	return PrinterForCommand(cmd, mapper, typer, decoders)
+}
+
+func (f *ring1Factory) PrinterForCommand(cmd *cobra.Command) (printers.ResourcePrinter, bool, error) {
+	return printerForRing1Factory(f, cmd)
+}
+
+func (f *ring1Factory) Describer(mapping *meta.RESTMapping) (printers.Describer, error) {
 	mappingVersion := mapping.GroupVersionKind.GroupVersion()
 	if mapping.GroupVersionKind.Group == federation.GroupName {
 		fedClientSet, err := f.clientAccessFactory.FederationClientSetForVersion(&mappingVersion)
@@ -151,7 +167,7 @@ func (f *ring1Factory) Describer(mapping *meta.RESTMapping) (kubectl.Describer, 
 			return nil, err
 		}
 		if mapping.GroupVersionKind.Kind == "Cluster" {
-			return &kubectl.ClusterDescriber{Interface: fedClientSet}, nil
+			return &printersinternal.ClusterDescriber{Interface: fedClientSet}, nil
 		}
 	}
 
@@ -166,7 +182,7 @@ func (f *ring1Factory) Describer(mapping *meta.RESTMapping) (kubectl.Describer, 
 	}
 
 	// try to get a describer
-	if describer, ok := kubectl.DescriberFor(mapping.GroupVersionKind.GroupKind(), clientset); ok {
+	if describer, ok := printersinternal.DescriberFor(mapping.GroupVersionKind.GroupKind(), clientset); ok {
 		return describer, nil
 	}
 	// if this is a kind we don't have a describer for yet, go generic if possible
@@ -178,7 +194,7 @@ func (f *ring1Factory) Describer(mapping *meta.RESTMapping) (kubectl.Describer, 
 }
 
 // helper function to make a generic describer, or return an error
-func genericDescriber(clientAccessFactory ClientAccessFactory, mapping *meta.RESTMapping) (kubectl.Describer, error) {
+func genericDescriber(clientAccessFactory ClientAccessFactory, mapping *meta.RESTMapping) (printers.Describer, error) {
 	clientConfig, err := clientAccessFactory.ClientConfig()
 	if err != nil {
 		return nil, err
@@ -202,7 +218,7 @@ func genericDescriber(clientAccessFactory ClientAccessFactory, mapping *meta.RES
 	}
 	eventsClient := clientSet.Core()
 
-	return kubectl.GenericDescriberFor(mapping, dynamicClient, eventsClient), nil
+	return printersinternal.GenericDescriberFor(mapping, dynamicClient, eventsClient), nil
 }
 
 func (f *ring1Factory) LogsForObject(object, options runtime.Object) (*restclient.Request, error) {
@@ -361,8 +377,8 @@ func (f *ring1Factory) AttachablePodForObject(object runtime.Object) (*api.Pod, 
 	return pod, err
 }
 
-func (f *ring1Factory) PrinterForMapping(cmd *cobra.Command, mapping *meta.RESTMapping, withNamespace bool) (kubectl.ResourcePrinter, error) {
-	printer, generic, err := PrinterForCommand(cmd)
+func (f *ring1Factory) PrinterForMapping(cmd *cobra.Command, mapping *meta.RESTMapping, withNamespace bool) (printers.ResourcePrinter, error) {
+	printer, generic, err := printerForRing1Factory(f, cmd)
 	if err != nil {
 		return nil, err
 	}
@@ -377,15 +393,14 @@ func (f *ring1Factory) PrinterForMapping(cmd *cobra.Command, mapping *meta.RESTM
 			return nil, fmt.Errorf("no serialization format found")
 		}
 
-		printer = kubectl.NewVersionedPrinter(printer, mapping.ObjectConvertor, version, mapping.GroupVersionKind.GroupVersion())
-
+		printer = printers.NewVersionedPrinter(printer, mapping.ObjectConvertor, version, mapping.GroupVersionKind.GroupVersion())
 	} else {
 		// Some callers do not have "label-columns" so we can't use the GetFlagStringSlice() helper
 		columnLabel, err := cmd.Flags().GetStringSlice("label-columns")
 		if err != nil {
 			columnLabel = []string{}
 		}
-		printer, err = f.clientAccessFactory.Printer(mapping, kubectl.PrintOptions{
+		printer, err = f.clientAccessFactory.Printer(mapping, printers.PrintOptions{
 			NoHeaders:          GetFlagBool(cmd, "no-headers"),
 			WithNamespace:      withNamespace,
 			Wide:               GetWideFlag(cmd),
