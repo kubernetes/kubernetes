@@ -23,6 +23,7 @@ import (
 	"time"
 
 	"github.com/golang/glog"
+
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/util/wait"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -33,6 +34,7 @@ import (
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
+	kubepod "k8s.io/kubernetes/pkg/kubelet/pod"
 	"k8s.io/kubernetes/pkg/kubelet/qos"
 	"k8s.io/kubernetes/pkg/kubelet/server/stats"
 	kubelettypes "k8s.io/kubernetes/pkg/kubelet/types"
@@ -108,7 +110,11 @@ func (m *managerImpl) Admit(attrs *lifecycle.PodAdmitAttributes) lifecycle.PodAd
 	if len(m.nodeConditions) == 0 {
 		return lifecycle.PodAdmitResult{Admit: true}
 	}
-
+	// Admit Critical pods even under resource pressure since they are required for system stability.
+	// https://github.com/kubernetes/kubernetes/issues/40573 has more details.
+	if utilfeature.DefaultFeatureGate.Enabled(features.ExperimentalCriticalPodAnnotation) && kubelettypes.IsCriticalPod(attrs.Pod) {
+		return lifecycle.PodAdmitResult{Admit: true}
+	}
 	// the node has memory pressure, admit if not best-effort
 	if hasNodeCondition(m.nodeConditions, v1.NodeMemoryPressure) {
 		notBestEffort := v1.PodQOSBestEffort != qos.GetPodQOS(attrs.Pod)
@@ -327,10 +333,11 @@ func (m *managerImpl) synchronize(diskInfoProvider DiskInfoProvider, podFunc Act
 	// we kill at most a single pod during each eviction interval
 	for i := range activePods {
 		pod := activePods[i]
-		// If the pod is marked as critical and support for critical pod annotations is enabled,
-		// do not evict such pods. Once Kubelet supports preemptions, these pods can be safely evicted.
+		// If the pod is marked as critical and static, and support for critical pod annotations is enabled,
+		// do not evict such pods. Static pods are not re-admitted after evictions.
+		// https://github.com/kubernetes/kubernetes/issues/40573 has more details.
 		if utilfeature.DefaultFeatureGate.Enabled(features.ExperimentalCriticalPodAnnotation) &&
-			kubelettypes.IsCriticalPod(pod) {
+			kubelettypes.IsCriticalPod(pod) && kubepod.IsStaticPod(pod) {
 			continue
 		}
 		status := v1.PodStatus{
