@@ -33,6 +33,9 @@
 Session.vim
 .netrwhist
 
+# cscope-related files
+cscope.*
+
 # Go test binaries
 *.test
 /hack/.test-cmd-auth
