@@ -226,13 +226,13 @@ func sortPodsByQOS(pods []*v1.Pod) (bestEffort, burstable, guaranteed []*v1.Pod)
 	for _, pod := range pods {
 		if !kubetypes.IsCriticalPod(pod) {
 			switch qos.GetPodQOS(pod) {
-				case v1.PodQOSBestEffort:
-					bestEffort = append(bestEffort, pod)
-				case v1.PodQOSBurstable:
-					burstable = append(burstable, pod)
-				case v1.PodQOSGuaranteed:
-					guaranteed = append(guaranteed, pod)
-				default:
+			case v1.PodQOSBestEffort:
+				bestEffort = append(bestEffort, pod)
+			case v1.PodQOSBurstable:
+				burstable = append(burstable, pod)
+			case v1.PodQOSGuaranteed:
+				guaranteed = append(guaranteed, pod)
+			default:
 			}
 		}
 	}
