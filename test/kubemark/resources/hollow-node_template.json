@@ -39,6 +39,12 @@
 						}
 					},
 					{
+						"name": "kernellog-volume",
+						"hostPath": {
+							"path": "/var/log"
+						}
+					},
+					{
 						"name": "no-serviceaccount-access-to-real-master",
 						"emptyDir": {}
 					}
@@ -145,7 +151,7 @@
 				},
 				{
 					"name": "hollow-node-problem-detector",
-					"image": "gcr.io/google_containers/node-problem-detector:v0.3.0-alpha.1",
+					"image": "gcr.io/google_containers/node-problem-detector:v0.3.0-alpha.0",
 					"env": [
 						{
 							"name": "NODE_NAME",
@@ -158,7 +164,7 @@
 					],
 					"command": [
 						"/node-problem-detector",
-						"--system-log-monitors=/config/kernel.monitor",
+						"--kernel-monitor=/config/kernel.monitor",
 						"--apiserver-override=https://{{master_ip}}:443?inClusterConfig=false&auth=/kubeconfig/npd.kubeconfig",
 						"--alsologtostderr",
 						"1>>/var/logs/npd_$(NODE_NAME).log 2>&1"
@@ -172,6 +178,11 @@
 						{
 							"name": "kernelmonitorconfig-volume",
 							"mountPath": "/config",
+							"readOnly": true
+						},
+						{
+							"name": "kernellog-volume",
+							"mountPath": "/log",
 							"readOnly": true
 						},
 						{
