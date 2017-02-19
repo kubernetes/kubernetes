@@ -17,11 +17,10 @@ limitations under the License.
 package v1
 
 import (
-	fmt "fmt"
-	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	serializer "k8s.io/apimachinery/pkg/runtime/serializer"
 	rest "k8s.io/client-go/rest"
-	api "k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/federation/client/clientset_generated/federation_clientset/scheme"
+	v1 "k8s.io/kubernetes/pkg/api/v1"
 )
 
 type CoreV1Interface interface {
@@ -87,22 +86,14 @@ func New(c rest.Interface) *CoreV1Client {
 }
 
 func setConfigDefaults(config *rest.Config) error {
-	gv, err := schema.ParseGroupVersion("/v1")
-	if err != nil {
-		return err
-	}
-	// if /v1 is not enabled, return an error
-	if !api.Registry.IsEnabledVersion(gv) {
-		return fmt.Errorf("/v1 is not enabled")
-	}
+	gv := v1.SchemeGroupVersion
+	config.GroupVersion = &gv
 	config.APIPath = "/api"
+	config.NegotiatedSerializer = serializer.DirectCodecFactory{CodecFactory: scheme.Codecs}
+
 	if config.UserAgent == "" {
 		config.UserAgent = rest.DefaultKubernetesUserAgent()
 	}
-	copyGroupVersion := gv
-	config.GroupVersion = &copyGroupVersion
-
-	config.NegotiatedSerializer = serializer.DirectCodecFactory{CodecFactory: api.Codecs}
 
 	return nil
 }

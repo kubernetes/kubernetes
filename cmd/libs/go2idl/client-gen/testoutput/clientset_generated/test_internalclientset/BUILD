@@ -47,6 +47,7 @@ filegroup(
     srcs = [
         ":package-srcs",
         "//cmd/libs/go2idl/client-gen/testoutput/clientset_generated/test_internalclientset/fake:all-srcs",
+        "//cmd/libs/go2idl/client-gen/testoutput/clientset_generated/test_internalclientset/scheme:all-srcs",
         "//cmd/libs/go2idl/client-gen/testoutput/clientset_generated/test_internalclientset/typed/testgroup/internalversion:all-srcs",
     ],
     tags = ["automanaged"],

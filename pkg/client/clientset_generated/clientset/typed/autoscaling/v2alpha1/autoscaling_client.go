@@ -17,11 +17,10 @@ limitations under the License.
 package v2alpha1
 
 import (
-	fmt "fmt"
-	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	serializer "k8s.io/apimachinery/pkg/runtime/serializer"
 	rest "k8s.io/client-go/rest"
-	api "k8s.io/kubernetes/pkg/api"
+	v2alpha1 "k8s.io/kubernetes/pkg/apis/autoscaling/v2alpha1"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset/scheme"
 )
 
 type AutoscalingV2alpha1Interface interface {
@@ -67,22 +66,14 @@ func New(c rest.Interface) *AutoscalingV2alpha1Client {
 }
 
 func setConfigDefaults(config *rest.Config) error {
-	gv, err := schema.ParseGroupVersion("autoscaling/v2alpha1")
-	if err != nil {
-		return err
-	}
-	// if autoscaling/v2alpha1 is not enabled, return an error
-	if !api.Registry.IsEnabledVersion(gv) {
-		return fmt.Errorf("autoscaling/v2alpha1 is not enabled")
-	}
+	gv := v2alpha1.SchemeGroupVersion
+	config.GroupVersion = &gv
 	config.APIPath = "/apis"
+	config.NegotiatedSerializer = serializer.DirectCodecFactory{CodecFactory: scheme.Codecs}
+
 	if config.UserAgent == "" {
 		config.UserAgent = rest.DefaultKubernetesUserAgent()
 	}
-	copyGroupVersion := gv
-	config.GroupVersion = &copyGroupVersion
-
-	config.NegotiatedSerializer = serializer.DirectCodecFactory{CodecFactory: api.Codecs}
 
 	return nil
 }
