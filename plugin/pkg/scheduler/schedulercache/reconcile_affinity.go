@@ -49,6 +49,9 @@ func ReconcileAffinity(pod *v1.Pod) *v1.Affinity {
 				affinity.PodAntiAffinity = annotationsAffinity.PodAntiAffinity
 			}
 		}
+
+		// Set default value of MinMatchingPods
+		v1.SetDefaults_Affinity(affinity)
 	}
 	return affinity
 }

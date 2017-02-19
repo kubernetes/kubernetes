@@ -1913,6 +1913,24 @@ type PodAffinityTerm struct {
 	// for affinity and for RequiredDuringScheduling pod anti-affinity, empty topologyKey is not allowed.
 	// +optional
 	TopologyKey string
+	// NumOfMatchingPods specifies the minimal number of pod that matching the selector; the term is considered to
+	// be matched if and only if the matching number is larger than NumOfMatchingPods. The behavior is different
+	// when it is used with affinity vs. anti-affinity:
+	//   * When used with anti-affinity, a node N is eligible only if the number of pods
+	//     matching the LabelSelector that are running on nodes with the same value
+	//     for key TopologyKey as N has is less than NumOfMatchingPods. For example,
+	//     if NumOfMatchingPods is 1 (the default), then after this pod is scheduled to node M,
+	//     there will not be more than one pod from the set selected by the LabelSelector
+	//     running on nodes with M's value for key TopologyKey.
+	//   * When used with affinity (not implemented yet), a node N is eligible only if the number
+	//     of pods matching the LabelSelector that are running on nodes with the same value
+	//     for key TopologyKey as N has is greater or equal to NumOfMatchingPods.
+	//     For example, if NumOfMatchingPods is 1 (the default), then after this pod is
+	//     scheduled to node M, there will be at least one pods from the set selected by
+	//     the LabelSelector running on nodes with M's value for key TopologyKey.
+	// The default value is 1.
+	// +optional
+	NumOfMatchingPods uint32
 }
 
 // Node affinity is a group of node affinity scheduling rules.

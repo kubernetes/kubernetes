@@ -563,6 +563,78 @@ func TestSetDefaultPodSpecHostNetwork(t *testing.T) {
 	}
 }
 
+func TestSetDefaults_Affinity(t *testing.T) {
+	tests := []struct {
+		pod             *v1.Pod
+		minMatchingPods []uint32
+		name            string
+	}{
+		{
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Affinity: &v1.Affinity{
+						PodAffinity: &v1.PodAffinity{
+							RequiredDuringSchedulingIgnoredDuringExecution: []v1.PodAffinityTerm{
+								{NumOfMatchingPods: 2},
+								{NumOfMatchingPods: 1},
+								{NumOfMatchingPods: 0},
+							},
+						},
+					},
+				},
+			},
+			minMatchingPods: []uint32{},
+			name:            "The default value of affinity's NumOfMatchingPods is 1",
+		},
+		{
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Affinity: &v1.Affinity{
+						PodAntiAffinity: &v1.PodAntiAffinity{
+							RequiredDuringSchedulingIgnoredDuringExecution: []v1.PodAffinityTerm{
+								{NumOfMatchingPods: 2},
+								{NumOfMatchingPods: 1},
+								{NumOfMatchingPods: 0},
+							},
+						},
+					},
+				},
+			},
+			minMatchingPods: []uint32{2, 1, 1},
+			name:            "The valid value of anti-affinity's NumOfMatchingPods is not changed, others is set to 1",
+		},
+	}
+
+	for _, test := range tests {
+		obj2 := roundTrip(t, runtime.Object(test.pod))
+		pod2 := obj2.(*v1.Pod)
+
+		if pod2.Spec.Affinity.PodAffinity != nil {
+			affinityTerms := pod2.Spec.Affinity.PodAffinity.RequiredDuringSchedulingIgnoredDuringExecution
+			for _, term := range affinityTerms {
+				if term.NumOfMatchingPods != 1 {
+					t.Errorf("%s: expected 1 for affinity terms, got %d", test.name, term.NumOfMatchingPods)
+				}
+			}
+		}
+
+		if pod2.Spec.Affinity.PodAntiAffinity != nil {
+			antiAffinitiyTerms := pod2.Spec.Affinity.PodAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution
+			if len(antiAffinitiyTerms) != len(test.minMatchingPods) {
+				t.Errorf("%s is invalid case: different length of terms", test.name)
+				continue
+			}
+
+			for i := range antiAffinitiyTerms {
+				if antiAffinitiyTerms[i].NumOfMatchingPods != test.minMatchingPods[i] {
+					t.Errorf("%s (%d): expected %d for affinity terms, got %d", test.name,
+						i, test.minMatchingPods[i], antiAffinitiyTerms[i].NumOfMatchingPods)
+				}
+			}
+		}
+	}
+}
+
 func TestSetDefaultNodeExternalID(t *testing.T) {
 	name := "node0"
 	n := &v1.Node{}
