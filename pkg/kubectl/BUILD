@@ -113,6 +113,7 @@ go_library(
         "//vendor:k8s.io/client-go/rest",
         "//vendor:k8s.io/client-go/util/integer",
         "//vendor:k8s.io/client-go/util/jsonpath",
+        "//vendor:vbom.ml/util/sortorder",
     ],
 )
 
