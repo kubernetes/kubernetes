@@ -25,6 +25,8 @@ import (
 	"k8s.io/kubernetes/pkg/api/testing/compat"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/api/validation"
+
+	_ "k8s.io/kubernetes/pkg/api/install"
 )
 
 func TestCompatibility_v1_PodSecurityContext(t *testing.T) {
