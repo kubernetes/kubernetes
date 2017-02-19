@@ -32,7 +32,7 @@ import (
 type genClientset struct {
 	generator.DefaultGen
 	groups             []clientgentypes.GroupVersions
-	typedClientPath    string
+	clientsetPackage   string
 	outputPackage      string
 	imports            namer.ImportTracker
 	clientsetGenerated bool
@@ -57,12 +57,10 @@ func (g *genClientset) Imports(c *generator.Context) (imports []string) {
 	imports = append(imports, g.imports.ImportLines()...)
 	for _, group := range g.groups {
 		for _, version := range group.Versions {
-			typedClientPath := filepath.Join(g.typedClientPath, group.Group.NonEmpty(), version.NonEmpty())
-			imports = append(imports, strings.ToLower(fmt.Sprintf("%s%s \"%s\"", version.NonEmpty(), group.Group.NonEmpty(), typedClientPath)))
+			typedClientPath := filepath.Join(g.clientsetPackage, "typed", group.Group.NonEmpty(), version.NonEmpty())
+			imports = append(imports, strings.ToLower(fmt.Sprintf("%s%s \"%s\"", group.Group.NonEmpty(), version.NonEmpty(), typedClientPath)))
 		}
 	}
-	imports = append(imports, "github.com/golang/glog")
-	imports = append(imports, "k8s.io/client-go/util/flowcontrol")
 	// import solely to initialize client auth plugins.
 	imports = append(imports, "_ \"k8s.io/client-go/plugin/pkg/client/auth\"")
 	return
@@ -72,21 +70,21 @@ func (g *genClientset) GenerateType(c *generator.Context, t *types.Type, w io.Wr
 	// TODO: We actually don't need any type information to generate the clientset,
 	// perhaps we can adapt the go2ild framework to this kind of usage.
 	sw := generator.NewSnippetWriter(w, c, "$", "$")
-	const pkgDiscovery = "k8s.io/client-go/discovery"
-	const pkgRESTClient = "k8s.io/client-go/rest"
 
 	allGroups := clientgentypes.ToGroupVersionPackages(g.groups)
 
 	m := map[string]interface{}{
-		"allGroups":                        allGroups,
-		"Config":                           c.Universe.Type(types.Name{Package: pkgRESTClient, Name: "Config"}),
-		"DefaultKubernetesUserAgent":       c.Universe.Function(types.Name{Package: pkgRESTClient, Name: "DefaultKubernetesUserAgent"}),
-		"RESTClientInterface":              c.Universe.Type(types.Name{Package: pkgRESTClient, Name: "Interface"}),
-		"DiscoveryInterface":               c.Universe.Type(types.Name{Package: pkgDiscovery, Name: "DiscoveryInterface"}),
-		"DiscoveryClient":                  c.Universe.Type(types.Name{Package: pkgDiscovery, Name: "DiscoveryClient"}),
-		"NewDiscoveryClientForConfig":      c.Universe.Function(types.Name{Package: pkgDiscovery, Name: "NewDiscoveryClientForConfig"}),
-		"NewDiscoveryClientForConfigOrDie": c.Universe.Function(types.Name{Package: pkgDiscovery, Name: "NewDiscoveryClientForConfigOrDie"}),
-		"NewDiscoveryClient":               c.Universe.Function(types.Name{Package: pkgDiscovery, Name: "NewDiscoveryClient"}),
+		"allGroups":                            allGroups,
+		"Config":                               c.Universe.Type(types.Name{Package: "k8s.io/client-go/rest", Name: "Config"}),
+		"DefaultKubernetesUserAgent":           c.Universe.Function(types.Name{Package: "k8s.io/client-go/rest", Name: "DefaultKubernetesUserAgent"}),
+		"RESTClientInterface":                  c.Universe.Type(types.Name{Package: "k8s.io/client-go/rest", Name: "Interface"}),
+		"DiscoveryInterface":                   c.Universe.Type(types.Name{Package: "k8s.io/client-go/discovery", Name: "DiscoveryInterface"}),
+		"DiscoveryClient":                      c.Universe.Type(types.Name{Package: "k8s.io/client-go/discovery", Name: "DiscoveryClient"}),
+		"NewDiscoveryClientForConfig":          c.Universe.Function(types.Name{Package: "k8s.io/client-go/discovery", Name: "NewDiscoveryClientForConfig"}),
+		"NewDiscoveryClientForConfigOrDie":     c.Universe.Function(types.Name{Package: "k8s.io/client-go/discovery", Name: "NewDiscoveryClientForConfigOrDie"}),
+		"NewDiscoveryClient":                   c.Universe.Function(types.Name{Package: "k8s.io/client-go/discovery", Name: "NewDiscoveryClient"}),
+		"flowcontrolNewTokenBucketRateLimiter": c.Universe.Function(types.Name{Package: "k8s.io/client-go/util/flowcontrol", Name: "NewTokenBucketRateLimiter"}),
+		"glogErrorf":                           c.Universe.Function(types.Name{Package: "github.com/golang/glog", Name: "Errorf"}),
 	}
 	sw.Do(clientsetInterface, m)
 	sw.Do(clientsetTemplate, m)
@@ -110,8 +108,8 @@ type Interface interface {
 	Discovery() $.DiscoveryInterface|raw$
     $range .allGroups$$.GroupVersion$() $.PackageName$.$.GroupVersion$Interface
 	$if .IsDefaultVersion$// Deprecated: please explicitly pick a version if possible.
-	$.Group$() $.PackageName$.$.GroupVersion$Interface$end$
-    $end$
+	$.Group$() $.PackageName$.$.GroupVersion$Interface
+	$end$$end$
 }
 `
 
@@ -161,7 +159,7 @@ var newClientsetForConfigTemplate = `
 func NewForConfig(c *$.Config|raw$) (*Clientset, error) {
 	configShallowCopy := *c
 	if configShallowCopy.RateLimiter == nil && configShallowCopy.QPS > 0 {
-		configShallowCopy.RateLimiter = flowcontrol.NewTokenBucketRateLimiter(configShallowCopy.QPS, configShallowCopy.Burst)
+		configShallowCopy.RateLimiter = $.flowcontrolNewTokenBucketRateLimiter|raw$(configShallowCopy.QPS, configShallowCopy.Burst)
 	}
 	var cs Clientset
 	var err error
@@ -172,7 +170,7 @@ $range .allGroups$    cs.$.GroupVersion$Client, err =$.PackageName$.NewForConfig
 $end$
 	cs.DiscoveryClient, err = $.NewDiscoveryClientForConfig|raw$(&configShallowCopy)
 	if err!=nil {
-		glog.Errorf("failed to create the DiscoveryClient: %v", err)
+		$.glogErrorf|raw$("failed to create the DiscoveryClient: %v", err)
 		return nil, err
 	}
 	return &cs, nil
