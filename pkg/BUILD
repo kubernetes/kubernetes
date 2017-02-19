@@ -92,6 +92,7 @@ filegroup(
         "//pkg/labels:all-srcs",
         "//pkg/master:all-srcs",
         "//pkg/metrics:all-srcs",
+        "//pkg/printers:all-srcs",
         "//pkg/probe:all-srcs",
         "//pkg/proxy:all-srcs",
         "//pkg/quota:all-srcs",
