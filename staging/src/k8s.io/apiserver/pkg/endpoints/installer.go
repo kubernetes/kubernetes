@@ -28,6 +28,8 @@ import (
 	"time"
 	"unicode"
 
+	"github.com/emicklei/go-restful"
+
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -40,8 +42,6 @@ import (
 	"k8s.io/apiserver/pkg/endpoints/metrics"
 	"k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/rest"
-
-	"github.com/emicklei/go-restful"
 )
 
 type APIInstaller struct {
@@ -524,6 +524,9 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 		Copier:          a.group.Copier,
 		Typer:           a.group.Typer,
 		UnsafeConvertor: a.group.UnsafeConvertor,
+
+		// TODO: Check for the interface on storage
+		TableConvertor: rest.DefaultTableConvertor,
 
 		// TODO: This seems wrong for cross-group subresources. It makes an assumption that a subresource and its parent are in the same group version. Revisit this.
 		Resource:    a.group.GroupVersion.WithResource(resource),

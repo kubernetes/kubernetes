@@ -34,6 +34,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	metainternalversion "k8s.io/apimachinery/pkg/apis/meta/internalversion"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	metav1alpha1 "k8s.io/apimachinery/pkg/apis/meta/v1alpha1"
 	"k8s.io/apimachinery/pkg/conversion/unstructured"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -88,6 +89,8 @@ type RequestScope struct {
 	Typer           runtime.ObjectTyper
 	UnsafeConvertor runtime.ObjectConvertor
 
+	TableConvertor rest.TableConvertor
+
 	Resource    schema.GroupVersionResource
 	Kind        schema.GroupVersionKind
 	Subresource string
@@ -97,6 +100,22 @@ type RequestScope struct {
 
 func (scope *RequestScope) err(err error, w http.ResponseWriter, req *http.Request) {
 	responsewriters.ErrorNegotiated(err, scope.Serializer, scope.Kind.GroupVersion(), w, req)
+}
+
+func (scope *RequestScope) AllowsConversion(gvk schema.GroupVersionKind) bool {
+	// TODO: this is temporary, replace with an abstraction calculated at endpoint installation time
+	if gvk == metav1alpha1.SchemeGroupVersion.WithKind("TableList") {
+		return scope.TableConvertor != nil
+	}
+	return false
+}
+
+func (scope *RequestScope) AllowsServerVersion(version string) bool {
+	return version == scope.MetaGroupVersion.Version
+}
+
+func (scope *RequestScope) AllowsStreamSchema(s string) bool {
+	return s == "watch"
 }
 
 // getterFunc performs a get request with the given context and object name. The request
@@ -110,7 +129,6 @@ const maxRetryWhenPatchConflicts = 5
 // passed-in getterFunc to perform the actual get.
 func getResourceHandler(scope RequestScope, getter getterFunc) restful.RouteFunction {
 	return func(req *restful.Request, res *restful.Response) {
-		w := res.ResponseWriter
 		namespace, name, err := scope.Namer.Name(req)
 		if err != nil {
 			scope.err(err, res.ResponseWriter, req.Request)
@@ -128,7 +146,7 @@ func getResourceHandler(scope RequestScope, getter getterFunc) restful.RouteFunc
 			scope.err(err, res.ResponseWriter, req.Request)
 			return
 		}
-		responsewriters.WriteObject(http.StatusOK, scope.Kind.GroupVersion(), scope.Serializer, result, w, req.Request)
+		transformResponseObject(ctx, scope, req, res, http.StatusOK, result)
 	}
 }
 
@@ -251,8 +269,6 @@ func ListResource(r rest.Lister, rw rest.Watcher, scope RequestScope, forceWatch
 		// For performance tracking purposes.
 		trace := utiltrace.New("List " + req.Request.URL.Path)
 
-		w := res.ResponseWriter
-
 		namespace, err := scope.Namer.Namespace(req)
 		if err != nil {
 			scope.err(err, res.ResponseWriter, req.Request)
@@ -348,7 +364,8 @@ func ListResource(r rest.Lister, rw rest.Watcher, scope RequestScope, forceWatch
 				return
 			}
 		}
-		responsewriters.WriteObject(http.StatusOK, scope.Kind.GroupVersion(), scope.Serializer, result, w, req.Request)
+
+		transformResponseObject(ctx, scope, req, res, http.StatusOK, result)
 		trace.Step(fmt.Sprintf("Writing http response done (%d items)", numberOfItems))
 	}
 }
@@ -358,8 +375,6 @@ func createHandler(r rest.NamedCreater, scope RequestScope, typer runtime.Object
 		// For performance tracking purposes.
 		trace := utiltrace.New("Create " + req.Request.URL.Path)
 		defer trace.LogIfLong(500 * time.Millisecond)
-
-		w := res.ResponseWriter
 
 		// TODO: we either want to remove timeout or document it (if we document, move timeout out of this function and declare it in api_installer)
 		timeout := parseTimeout(req.Request.URL.Query().Get("timeout"))
@@ -441,7 +456,7 @@ func createHandler(r rest.NamedCreater, scope RequestScope, typer runtime.Object
 		}
 		trace.Step("Self-link added")
 
-		responsewriters.WriteObject(http.StatusCreated, scope.Kind.GroupVersion(), scope.Serializer, result, w, req.Request)
+		transformResponseObject(ctx, scope, req, res, http.StatusCreated, result)
 	}
 }
 
@@ -467,8 +482,6 @@ func (c *namedCreaterAdapter) Create(ctx request.Context, name string, obj runti
 // TODO: Eventually PatchResource should just use GuaranteedUpdate and this routine should be a bit cleaner
 func PatchResource(r rest.Patcher, scope RequestScope, admit admission.Interface, converter runtime.ObjectConvertor) restful.RouteFunction {
 	return func(req *restful.Request, res *restful.Response) {
-		w := res.ResponseWriter
-
 		// TODO: we either want to remove timeout or document it (if we
 		// document, move timeout out of this function and declare it in
 		// api_installer)
@@ -535,9 +548,8 @@ func PatchResource(r rest.Patcher, scope RequestScope, admit admission.Interface
 			return
 		}
 
-		responsewriters.WriteObject(http.StatusOK, scope.Kind.GroupVersion(), scope.Serializer, result, w, req.Request)
+		transformResponseObject(ctx, scope, req, res, http.StatusOK, result)
 	}
-
 }
 
 type updateAdmissionFunc func(updatedObject runtime.Object, currentObject runtime.Object) error
@@ -746,8 +758,6 @@ func UpdateResource(r rest.Updater, scope RequestScope, typer runtime.ObjectType
 		trace := utiltrace.New("Update " + req.Request.URL.Path)
 		defer trace.LogIfLong(500 * time.Millisecond)
 
-		w := res.ResponseWriter
-
 		// TODO: we either want to remove timeout or document it (if we document, move timeout out of this function and declare it in api_installer)
 		timeout := parseTimeout(req.Request.URL.Query().Get("timeout"))
 
@@ -822,7 +832,8 @@ func UpdateResource(r rest.Updater, scope RequestScope, typer runtime.ObjectType
 		if wasCreated {
 			status = http.StatusCreated
 		}
-		responsewriters.WriteObject(status, scope.Kind.GroupVersion(), scope.Serializer, result, w, req.Request)
+
+		transformResponseObject(ctx, scope, req, res, status, result)
 	}
 }
 
@@ -832,8 +843,6 @@ func DeleteResource(r rest.GracefulDeleter, allowsOptions bool, scope RequestSco
 		// For performance tracking purposes.
 		trace := utiltrace.New("Delete " + req.Request.URL.Path)
 		defer trace.LogIfLong(500 * time.Millisecond)
-
-		w := res.ResponseWriter
 
 		// TODO: we either want to remove timeout or document it (if we document, move timeout out of this function and declare it in api_installer)
 		timeout := parseTimeout(req.Request.URL.Query().Get("timeout"))
@@ -934,15 +943,13 @@ func DeleteResource(r rest.GracefulDeleter, allowsOptions bool, scope RequestSco
 				}
 			}
 		}
-		responsewriters.WriteObject(status, scope.Kind.GroupVersion(), scope.Serializer, result, w, req.Request)
+		transformResponseObject(ctx, scope, req, res, status, result)
 	}
 }
 
 // DeleteCollection returns a function that will handle a collection deletion
 func DeleteCollection(r rest.CollectionDeleter, checkBody bool, scope RequestScope, admit admission.Interface) restful.RouteFunction {
 	return func(req *restful.Request, res *restful.Response) {
-		w := res.ResponseWriter
-
 		// TODO: we either want to remove timeout or document it (if we document, move timeout out of this function and declare it in api_installer)
 		timeout := parseTimeout(req.Request.URL.Query().Get("timeout"))
 
@@ -1038,7 +1045,7 @@ func DeleteCollection(r rest.CollectionDeleter, checkBody bool, scope RequestSco
 				}
 			}
 		}
-		responsewriters.WriteObjectNegotiated(scope.Serializer, scope.Kind.GroupVersion(), w, req.Request, http.StatusOK, result)
+		transformResponseObject(ctx, scope, req, res, http.StatusOK, result)
 	}
 }
 

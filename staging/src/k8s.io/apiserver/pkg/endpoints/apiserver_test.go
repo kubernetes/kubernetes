@@ -42,11 +42,13 @@ import (
 	apitesting "k8s.io/apimachinery/pkg/api/testing"
 	metainternalversion "k8s.io/apimachinery/pkg/apis/meta/internalversion"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	metav1alpha1 "k8s.io/apimachinery/pkg/apis/meta/v1alpha1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/watch"
@@ -1427,6 +1429,86 @@ func TestGetPretty(t *testing.T) {
 		}
 		if expect != body {
 			t.Errorf("%d: body did not match expected:\n%s\n%s", i, body, expect)
+		}
+	}
+}
+
+func TestGetTable(t *testing.T) {
+	now := metav1.Now()
+	storage := map[string]rest.Storage{}
+	simpleStorage := SimpleRESTStorage{
+		item: genericapitesting.Simple{
+			ObjectMeta: metav1.ObjectMeta{Name: "foo1", Namespace: "ns1", CreationTimestamp: now, UID: types.UID("abcdef0123")},
+			Other:      "foo",
+		},
+	}
+	selfLinker := &setTestSelfLinker{
+		t:           t,
+		expectedSet: "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/default/simple/id",
+		name:        "id",
+		namespace:   "default",
+	}
+	storage["simple"] = &simpleStorage
+	handler := handleLinker(storage, selfLinker)
+	server := httptest.NewServer(handler)
+	defer server.Close()
+
+	metaDoc := metav1.ObjectMeta{}.SwaggerDoc()
+
+	tests := []struct {
+		accept     string
+		params     url.Values
+		pretty     bool
+		expected   *metav1alpha1.TableList
+		statusCode int
+	}{
+		{
+			accept:     runtime.ContentTypeJSON + ";as=TableList;v=v1;g=meta.k8s.io",
+			statusCode: http.StatusNotAcceptable,
+		},
+		{
+			accept: runtime.ContentTypeJSON + ";as=TableList;v=v1alpha1;g=meta.k8s.io",
+			expected: &metav1alpha1.TableList{
+				TypeMeta: metav1.TypeMeta{Kind: "TableList", APIVersion: "meta.k8s.io/v1alpha1"},
+				Headers: []metav1alpha1.TableListHeader{
+					{Name: "Namespace", Type: "string", Description: metaDoc["namespace"]},
+					{Name: "Name", Type: "string", Description: metaDoc["name"]},
+					{Name: "Created At", Type: "date", Description: metaDoc["creationTimestamp"]},
+				},
+				Items: []metav1alpha1.TableListItem{
+					{Cells: []interface{}{"ns1", "foo1", now.Time.UTC().Format(time.RFC3339)}},
+				},
+			},
+		},
+	}
+	for i, test := range tests {
+		u, err := url.Parse(server.URL + "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/default/simple/id")
+		if err != nil {
+			t.Fatal(err)
+		}
+		u.RawQuery = test.params.Encode()
+		req := &http.Request{Method: "GET", URL: u}
+		req.Header = http.Header{}
+		req.Header.Set("Accept", test.accept)
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if test.statusCode != 0 {
+			if resp.StatusCode != test.statusCode {
+				t.Errorf("%d: unexpected response: %#v", resp)
+			}
+			continue
+		}
+		if resp.StatusCode != http.StatusOK {
+			t.Fatal(err)
+		}
+		var itemOut metav1alpha1.TableList
+		if _, err = extractBody(resp, &itemOut); err != nil {
+			t.Fatal(err)
+		}
+		if !reflect.DeepEqual(test.expected, &itemOut) {
+			t.Errorf("%d: did not match: %s", i, diff.ObjectReflectDiff(test.expected, &itemOut))
 		}
 	}
 }

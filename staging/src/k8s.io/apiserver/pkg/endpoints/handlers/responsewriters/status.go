@@ -30,8 +30,8 @@ type statusError interface {
 	Status() metav1.Status
 }
 
-// apiStatus converts an error to an metav1.Status object.
-func apiStatus(err error) *metav1.Status {
+// ErrorToAPIStatus converts an error to an metav1.Status object.
+func ErrorToAPIStatus(err error) *metav1.Status {
 	switch t := err.(type) {
 	case statusError:
 		status := t.Status()
