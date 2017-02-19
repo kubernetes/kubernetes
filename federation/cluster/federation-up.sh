@@ -97,7 +97,6 @@ function join_clusters() {
         --context="${FEDERATION_NAME}" \
         --secret-name="${context//_/-}"    # Replace "_" by "-"
 
-
     # Create kube-dns configmap in each cluster for kube-dns to accept
     # federation queries.
     # TODO: This shouldn't be required after
