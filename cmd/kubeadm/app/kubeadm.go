@@ -30,6 +30,7 @@ func Run() error {
 	// We do not want these flags to show up in --help
 	pflag.CommandLine.MarkHidden("google-json-key")
 	pflag.CommandLine.MarkHidden("log-flush-frequency")
+	pflag.CommandLine.MarkHidden("fuzz-iters")
 
 	cmd := cmd.NewKubeadmCommand(cmdutil.NewFactory(nil), os.Stdin, os.Stdout, os.Stderr)
 	return cmd.Execute()
