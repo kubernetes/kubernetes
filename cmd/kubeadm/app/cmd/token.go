@@ -37,7 +37,7 @@ import (
 	kubeconfigutil "k8s.io/kubernetes/cmd/kubeadm/app/util/kubeconfig"
 	tokenutil "k8s.io/kubernetes/cmd/kubeadm/app/util/token"
 	bootstrapapi "k8s.io/kubernetes/pkg/bootstrap/api"
-	"k8s.io/kubernetes/pkg/kubectl"
+	"k8s.io/kubernetes/pkg/printers"
 )
 
 func NewCmdToken(out io.Writer, errW io.Writer) *cobra.Command {
@@ -207,7 +207,7 @@ func RunListTokens(out io.Writer, errW io.Writer, cmd *cobra.Command) error {
 			if err != nil {
 				return fmt.Errorf("error parsing expiration time [%v]", err)
 			}
-			expires = kubectl.ShortHumanDuration(expireTime.Sub(time.Now()))
+			expires = printers.ShortHumanDuration(expireTime.Sub(time.Now()))
 		}
 		fmt.Fprintf(w, "%s\t%s\t%s\n", tokenId, tokenutil.BearerToken(td), expires)
 	}

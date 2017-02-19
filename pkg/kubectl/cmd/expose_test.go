@@ -28,8 +28,8 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/client-go/rest/fake"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/kubectl"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
+	"k8s.io/kubernetes/pkg/printers"
 )
 
 func TestRunExposeService(t *testing.T) {
@@ -460,7 +460,7 @@ func TestRunExposeService(t *testing.T) {
 
 	for _, test := range tests {
 		f, tf, codec, ns := cmdtesting.NewAPIFactory()
-		tf.Printer = &kubectl.JSONPrinter{}
+		tf.Printer = &printers.JSONPrinter{}
 		tf.Client = &fake.RESTClient{
 			APIRegistry:          api.Registry,
 			NegotiatedSerializer: ns,

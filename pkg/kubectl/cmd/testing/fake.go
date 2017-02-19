@@ -466,8 +466,8 @@ func (f *FakeFactory) NewBuilder() *resource.Builder {
 	return nil
 }
 
-func (f *FakeFactory) DefaultResourceFilterOptions(cmd *cobra.Command, withNamespace bool) *kubectl.PrintOptions {
-	return &kubectl.PrintOptions{}
+func (f *FakeFactory) DefaultResourceFilterOptions(cmd *cobra.Command, withNamespace bool) *printers.PrintOptions {
+	return &printers.PrintOptions{}
 }
 
 func (f *FakeFactory) DefaultResourceFilterFunc() kubectl.Filters {
