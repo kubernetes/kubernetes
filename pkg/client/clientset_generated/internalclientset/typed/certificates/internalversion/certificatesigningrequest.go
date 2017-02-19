@@ -140,8 +140,8 @@ func (c *certificateSigningRequests) List(opts v1.ListOptions) (result *certific
 
 // Watch returns a watch.Interface that watches the requested certificateSigningRequests.
 func (c *certificateSigningRequests) Watch(opts v1.ListOptions) (watch.Interface, error) {
+	opts.Watch = true
 	return c.client.Get().
-		Prefix("watch").
 		Resource("certificatesigningrequests").
 		VersionedParams(&opts, api.ParameterCodec).
 		Watch()
