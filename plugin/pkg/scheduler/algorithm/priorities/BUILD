@@ -68,6 +68,7 @@ go_test(
         "//vendor:k8s.io/apimachinery/pkg/api/resource",
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
         "//vendor:k8s.io/apiserver/pkg/util/feature",
+        "//vendor:k8s.io/client-go/pkg/apis/apps",
     ],
 )
 
