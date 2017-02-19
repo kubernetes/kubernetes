@@ -41,6 +41,7 @@ filegroup(
     srcs = [
         ":package-srcs",
         "//federation/client/clientset_generated/federation_clientset/fake:all-srcs",
+        "//federation/client/clientset_generated/federation_clientset/scheme:all-srcs",
         "//federation/client/clientset_generated/federation_clientset/typed/autoscaling/v1:all-srcs",
         "//federation/client/clientset_generated/federation_clientset/typed/batch/v1:all-srcs",
         "//federation/client/clientset_generated/federation_clientset/typed/core/v1:all-srcs",
