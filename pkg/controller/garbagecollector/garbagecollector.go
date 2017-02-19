@@ -460,7 +460,7 @@ func gcListWatcher(client *dynamic.Client, resource schema.GroupVersionResource)
 			apiResource := metav1.APIResource{Name: resource.Resource}
 			return client.ParameterCodec(dynamic.VersionedParameterEncoderWithV1Fallback).
 				Resource(&apiResource, metav1.NamespaceAll).
-				List(&options)
+				List(options)
 		},
 		WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
 			// APIResource.Kind is not used by the dynamic client, so
@@ -470,7 +470,7 @@ func gcListWatcher(client *dynamic.Client, resource schema.GroupVersionResource)
 			apiResource := metav1.APIResource{Name: resource.Resource}
 			return client.ParameterCodec(dynamic.VersionedParameterEncoderWithV1Fallback).
 				Resource(&apiResource, metav1.NamespaceAll).
-				Watch(&options)
+				Watch(options)
 		},
 	}
 }

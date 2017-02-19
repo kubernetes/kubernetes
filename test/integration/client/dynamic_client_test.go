@@ -93,7 +93,7 @@ func TestDynamicClient(t *testing.T) {
 	}
 
 	// check dynamic list
-	obj, err := dynamicClient.Resource(&resource, ns.Name).List(&metav1.ListOptions{})
+	obj, err := dynamicClient.Resource(&resource, ns.Name).List(metav1.ListOptions{})
 	unstructuredList, ok := obj.(*unstructured.UnstructuredList)
 	if !ok {
 		t.Fatalf("expected *unstructured.UnstructuredList, got %#v", obj)
