@@ -23,4 +23,15 @@ source "${KUBE_ROOT}/hack/lib/init.sh"
 git config http.https://gopkg.in.followRedirects true
 
 go get -u gopkg.in/mikedanese/gazel.v14/gazel
-"${GOPATH}/bin/gazel" -root="$(kube::realpath ${KUBE_ROOT})"
+
+for path in ${GOPATH//:/ }; do
+    if [[ -e "${path}/bin/gazel" ]]; then
+      gazel="${path}/bin/gazel"
+      break
+    fi
+done
+if [[ -z "${gazel:-}" ]]; then
+  echo "Couldn't find gazel on the GOPATH."
+  exit 1
+fi
+"${gazel}" -root="$(kube::realpath ${KUBE_ROOT})"

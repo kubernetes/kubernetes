@@ -161,10 +161,10 @@ addon-dir-create:
     - file_mode: 644
 {% endif %}
 
-{% if pillar.get('enable_node_problem_detector', '').lower() == 'true' %}
-/etc/kubernetes/addons/node-problem-detector/node-problem-detector.yaml:
+{% if pillar.get('enable_node_problem_detector', '').lower() == 'daemonset' %}
+/etc/kubernetes/addons/node-problem-detector/npd.yaml:
   file.managed:
-    - source: salt://kube-addons/node-problem-detector/node-problem-detector.yaml
+    - source: salt://kube-addons/node-problem-detector/npd.yaml
     - user: root
     - group: root
     - file_mode: 644

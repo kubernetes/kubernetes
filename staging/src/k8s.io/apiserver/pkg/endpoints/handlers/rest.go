@@ -38,15 +38,15 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
-	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/mergepatch"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/endpoints/handlers/negotiation"
-	"k8s.io/apiserver/pkg/endpoints/request"
-	utiltrace "k8s.io/apiserver/pkg/util/trace"
 	"k8s.io/apiserver/pkg/endpoints/handlers/responsewriters"
+	"k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/rest"
+	utiltrace "k8s.io/apiserver/pkg/util/trace"
 )
 
 // ContextFunc returns a Context given a request - a context must be returned

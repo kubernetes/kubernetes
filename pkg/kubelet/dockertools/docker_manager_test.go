@@ -54,7 +54,6 @@ import (
 	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
 	"k8s.io/kubernetes/pkg/kubelet/images"
 	"k8s.io/kubernetes/pkg/kubelet/network"
-	"k8s.io/kubernetes/pkg/kubelet/network/mock_network"
 	nettest "k8s.io/kubernetes/pkg/kubelet/network/testing"
 	proberesults "k8s.io/kubernetes/pkg/kubelet/prober/results"
 	"k8s.io/kubernetes/pkg/kubelet/types"
@@ -1829,6 +1828,55 @@ func TestGetPodStatusNoSuchContainer(t *testing.T) {
 	// Verify that we will try to start new contrainers even if the inspections
 	// failed.
 	verifyCalls(t, fakeDocker, []string{
+		// Inspect dead infra container for possible network teardown
+		"inspect_container",
+		// Start a new infra container.
+		"create", "start", "inspect_container", "inspect_container",
+		// Start a new container.
+		"create", "start", "inspect_container",
+	})
+}
+
+func TestSyncPodDeadInfraContainerTeardown(t *testing.T) {
+	const (
+		noSuchContainerID = "nosuchcontainer"
+		infraContainerID  = "9876"
+	)
+	dm, fakeDocker := newTestDockerManager()
+	dm.podInfraContainerImage = "pod_infra_image"
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+	fnp := nettest.NewMockNetworkPlugin(ctrl)
+	dm.network = network.NewPluginManager(fnp)
+
+	pod := makePod("foo", &v1.PodSpec{
+		Containers: []v1.Container{{Name: noSuchContainerID}},
+	})
+
+	fakeDocker.SetFakeContainers([]*FakeContainer{
+		{
+			ID:         infraContainerID,
+			Name:       "/k8s_POD." + strconv.FormatUint(generatePodInfraContainerHash(pod), 16) + "_foo_new_12345678_42",
+			ExitCode:   0,
+			StartedAt:  time.Now(),
+			FinishedAt: time.Now(),
+			Running:    false,
+		},
+	})
+
+	// Can be called multiple times due to GetPodStatus
+	fnp.EXPECT().Name().Return("someNetworkPlugin").AnyTimes()
+	fnp.EXPECT().TearDownPod("new", "foo", gomock.Any()).Return(nil)
+	fnp.EXPECT().GetPodNetworkStatus("new", "foo", gomock.Any()).Return(&network.PodNetworkStatus{IP: net.ParseIP("1.1.1.1")}, nil).AnyTimes()
+	fnp.EXPECT().SetUpPod("new", "foo", gomock.Any()).Return(nil)
+
+	runSyncPod(t, dm, fakeDocker, pod, nil, false)
+
+	// Verify that we will try to start new contrainers even if the inspections
+	// failed.
+	verifyCalls(t, fakeDocker, []string{
+		// Inspect dead infra container for possible network teardown
+		"inspect_container",
 		// Start a new infra container.
 		"create", "start", "inspect_container", "inspect_container",
 		// Start a new container.
@@ -1878,8 +1926,8 @@ func TestSyncPodGetsPodIPFromNetworkPlugin(t *testing.T) {
 	dm.podInfraContainerImage = "pod_infra_image"
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
-	fnp := mock_network.NewMockNetworkPlugin(ctrl)
-	dm.networkPlugin = fnp
+	fnp := nettest.NewMockNetworkPlugin(ctrl)
+	dm.network = network.NewPluginManager(fnp)
 
 	pod := makePod("foo", &v1.PodSpec{
 		Containers: []v1.Container{

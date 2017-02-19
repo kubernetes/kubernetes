@@ -32,7 +32,8 @@ import (
 )
 
 const (
-	threshold3K  = 100
+	warning3K    = 100
+	threshold3K  = 30
 	threshold30K = 30
 	threshold60K = 30
 )
@@ -44,8 +45,11 @@ func TestSchedule100Node3KPods(t *testing.T) {
 	}
 
 	config := defaultSchedulerBenchmarkConfig(100, 3000)
-	if min := schedulePods(config); min < threshold3K {
-		t.Errorf("Too small pod scheduling throughput for 3k pods. Expected %v got %v", threshold3K, min)
+	min := schedulePods(config)
+	if min < threshold3K {
+		t.Errorf("Failing: Scheduling rate was too low for an interval, we saw rate of %v, which is the allowed minimum of %v ! ", min, threshold3K)
+	} else if min < warning3K {
+		fmt.Printf("Warning: pod scheduling throughput for 3k pods was slow for an interval... Saw a interval with very low (%v) scheduling rate!", min)
 	} else {
 		fmt.Printf("Minimal observed throughput for 3k pod test: %v\n", min)
 	}

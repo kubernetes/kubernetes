@@ -10,6 +10,7 @@ load(
 go_library(
     name = "go_default_library",
     srcs = [
+        "autoscaling_utils.go",
         "configmap.go",
         "container_probe.go",
         "docker_containers.go",
@@ -33,7 +34,9 @@ go_library(
         "//pkg/api:go_default_library",
         "//pkg/api/v1:go_default_library",
         "//pkg/api/v1/pod:go_default_library",
+        "//pkg/apis/autoscaling/v1:go_default_library",
         "//pkg/client/clientset_generated/clientset:go_default_library",
+        "//pkg/client/clientset_generated/internalclientset:go_default_library",
         "//pkg/client/conditions:go_default_library",
         "//pkg/kubelet:go_default_library",
         "//pkg/kubelet/events:go_default_library",

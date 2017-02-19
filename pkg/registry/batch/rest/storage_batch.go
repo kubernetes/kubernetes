@@ -21,6 +21,7 @@ import (
 	"k8s.io/apiserver/pkg/registry/generic"
 	"k8s.io/apiserver/pkg/registry/rest"
 	genericapiserver "k8s.io/apiserver/pkg/server"
+	serverstorage "k8s.io/apiserver/pkg/server/storage"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/batch"
 	batchapiv1 "k8s.io/kubernetes/pkg/apis/batch/v1"
@@ -31,7 +32,7 @@ import (
 
 type RESTStorageProvider struct{}
 
-func (p RESTStorageProvider) NewRESTStorage(apiResourceConfigSource genericapiserver.APIResourceConfigSource, restOptionsGetter generic.RESTOptionsGetter) (genericapiserver.APIGroupInfo, bool) {
+func (p RESTStorageProvider) NewRESTStorage(apiResourceConfigSource serverstorage.APIResourceConfigSource, restOptionsGetter generic.RESTOptionsGetter) (genericapiserver.APIGroupInfo, bool) {
 	apiGroupInfo := genericapiserver.NewDefaultAPIGroupInfo(batch.GroupName, api.Registry, api.Scheme, api.ParameterCodec, api.Codecs)
 
 	if apiResourceConfigSource.AnyResourcesForVersionEnabled(batchapiv2alpha1.SchemeGroupVersion) {
@@ -50,7 +51,7 @@ func (p RESTStorageProvider) NewRESTStorage(apiResourceConfigSource genericapise
 	return apiGroupInfo, true
 }
 
-func (p RESTStorageProvider) v1Storage(apiResourceConfigSource genericapiserver.APIResourceConfigSource, restOptionsGetter generic.RESTOptionsGetter) map[string]rest.Storage {
+func (p RESTStorageProvider) v1Storage(apiResourceConfigSource serverstorage.APIResourceConfigSource, restOptionsGetter generic.RESTOptionsGetter) map[string]rest.Storage {
 	version := batchapiv1.SchemeGroupVersion
 
 	storage := map[string]rest.Storage{}
@@ -62,7 +63,7 @@ func (p RESTStorageProvider) v1Storage(apiResourceConfigSource genericapiserver.
 	return storage
 }
 
-func (p RESTStorageProvider) v2alpha1Storage(apiResourceConfigSource genericapiserver.APIResourceConfigSource, restOptionsGetter generic.RESTOptionsGetter) map[string]rest.Storage {
+func (p RESTStorageProvider) v2alpha1Storage(apiResourceConfigSource serverstorage.APIResourceConfigSource, restOptionsGetter generic.RESTOptionsGetter) map[string]rest.Storage {
 	version := batchapiv2alpha1.SchemeGroupVersion
 
 	storage := map[string]rest.Storage{}

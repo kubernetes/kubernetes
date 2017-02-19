@@ -37,7 +37,8 @@ find_files() {
         -o -wholename './target' \
         -o -wholename '*/third_party/*' \
         -o -wholename '*/vendor/*' \
-        -o -wholename './staging' \
+        -o -wholename './staging/src/k8s.io/client-go/*vendor/*' \
+        -o -wholename './staging/src/k8s.io/client-go/pkg/*' \
       \) -prune \
     \) -name '.readonly'
 }

@@ -25,6 +25,7 @@ go_library(
         "//vendor:github.com/spf13/pflag",
         "//vendor:k8s.io/apimachinery/pkg/util/net",
         "//vendor:k8s.io/apiserver/pkg/server/options",
+        "//vendor:k8s.io/apiserver/pkg/storage/storagebackend",
     ],
 )
 

@@ -28,10 +28,10 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	api "k8s.io/client-go/pkg/api/v1"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/images"
-	api "k8s.io/kubernetes/pkg/api/v1"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 )
 
@@ -40,17 +40,15 @@ const (
 	DefaultClusterName     = "kubernetes"
 	DefaultCloudConfigPath = "/etc/kubernetes/cloud-config"
 
-	etcd                           = "etcd"
-	apiServer                      = "apiserver"
-	controllerManager              = "controller-manager"
-	scheduler                      = "scheduler"
-	proxy                          = "proxy"
-	kubeAPIServer                  = "kube-apiserver"
-	kubeControllerManager          = "kube-controller-manager"
-	kubeScheduler                  = "kube-scheduler"
-	kubeProxy                      = "kube-proxy"
-	authorizationPolicyFile        = "abac_policy.json"
-	authorizationWebhookConfigFile = "webhook_authz.conf"
+	etcd                  = "etcd"
+	apiServer             = "apiserver"
+	controllerManager     = "controller-manager"
+	scheduler             = "scheduler"
+	proxy                 = "proxy"
+	kubeAPIServer         = "kube-apiserver"
+	kubeControllerManager = "kube-controller-manager"
+	kubeScheduler         = "kube-scheduler"
+	kubeProxy             = "kube-proxy"
 )
 
 // WriteStaticPodManifests builds manifest objects based on user provided configuration and then dumps it to disk
@@ -320,15 +318,22 @@ func getAPIServerCommand(cfg *kubeadmapi.MasterConfiguration, selfHosted bool) [
 		"--allow-privileged",
 		"--storage-backend=etcd3",
 		"--kubelet-preferred-address-types=InternalIP,ExternalIP,Hostname",
+		// add options to configure the front proxy.  Without the generated client cert, this will never be useable
+		// so add it unconditionally with recommended values
+		"--requestheader-username-headers=X-Remote-User",
+		"--requestheader-group-headers=X-Remote-Group",
+		"--requestheader-extra-headers-prefix=X-Remote-Extra-",
+		"--requestheader-client-ca-file="+getCertFilePath(kubeadmconstants.FrontProxyCACertName),
+		"--requestheader-allowed-names=front-proxy-client",
 	)
 
 	if cfg.AuthorizationMode != "" {
 		command = append(command, "--authorization-mode="+cfg.AuthorizationMode)
 		switch cfg.AuthorizationMode {
 		case kubeadmconstants.AuthzModeABAC:
-			command = append(command, "--authorization-policy-file="+path.Join(kubeadmapi.GlobalEnvParams.KubernetesDir, authorizationPolicyFile))
+			command = append(command, "--authorization-policy-file="+path.Join(kubeadmapi.GlobalEnvParams.KubernetesDir, kubeadmconstants.AuthorizationPolicyFile))
 		case kubeadmconstants.AuthzModeWebhook:
-			command = append(command, "--authorization-webhook-config-file="+path.Join(kubeadmapi.GlobalEnvParams.KubernetesDir, authorizationWebhookConfigFile))
+			command = append(command, "--authorization-webhook-config-file="+path.Join(kubeadmapi.GlobalEnvParams.KubernetesDir, kubeadmconstants.AuthorizationWebhookConfigFile))
 		}
 	}
 
@@ -387,7 +392,7 @@ func getControllerManagerCommand(cfg *kubeadmapi.MasterConfiguration, selfHosted
 		"--service-account-private-key-file="+getCertFilePath(kubeadmconstants.ServiceAccountPrivateKeyName),
 		"--cluster-signing-cert-file="+getCertFilePath(kubeadmconstants.CACertName),
 		"--cluster-signing-key-file="+getCertFilePath(kubeadmconstants.CAKeyName),
-		"--insecure-experimental-approve-all-kubelet-csrs-for-group="+KubeletBootstrapGroup,
+		"--insecure-experimental-approve-all-kubelet-csrs-for-group="+kubeadmconstants.CSVTokenBootstrapGroup,
 	)
 
 	if cfg.CloudProvider != "" {

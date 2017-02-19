@@ -27,6 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/api/v1"
+	storage "k8s.io/kubernetes/pkg/apis/storage/v1beta1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	vsphere "k8s.io/kubernetes/pkg/cloudprovider/providers/vsphere"
 	"k8s.io/kubernetes/pkg/volume/util/volumehelper"
@@ -176,5 +177,91 @@ func writeContentToVSpherePV(client clientset.Interface, pvc *v1.PersistentVolum
 // function to verify content is matching on the volume backed for given PVC
 func verifyContentOfVSpherePV(client clientset.Interface, pvc *v1.PersistentVolumeClaim, expectedContent string) {
 	runInPodWithVolume(client, pvc.Namespace, pvc.Name, "grep '"+expectedContent+"' /mnt/test/data")
-	framework.Logf("Sucessfully verified content of the volume")
+	framework.Logf("Successfully verified content of the volume")
+}
+
+func getVSphereStorageClassSpec(name string, scParameters map[string]string) *storage.StorageClass {
+	var sc *storage.StorageClass
+
+	sc = &storage.StorageClass{
+		TypeMeta: metav1.TypeMeta{
+			Kind: "StorageClass",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name: name,
+		},
+		Provisioner: "kubernetes.io/vsphere-volume",
+	}
+	if scParameters != nil {
+		sc.Parameters = scParameters
+	}
+	return sc
+}
+
+func getVSphereClaimSpecWithStorageClassAnnotation(ns string, storageclass *storage.StorageClass) *v1.PersistentVolumeClaim {
+	scAnnotation := make(map[string]string)
+	scAnnotation["volume.beta.kubernetes.io/storage-class"] = storageclass.Name
+
+	claim := &v1.PersistentVolumeClaim{
+		ObjectMeta: metav1.ObjectMeta{
+			GenerateName: "pvc-",
+			Namespace:    ns,
+			Annotations:  scAnnotation,
+		},
+		Spec: v1.PersistentVolumeClaimSpec{
+			AccessModes: []v1.PersistentVolumeAccessMode{
+				v1.ReadWriteOnce,
+			},
+			Resources: v1.ResourceRequirements{
+				Requests: v1.ResourceList{
+					v1.ResourceName(v1.ResourceStorage): resource.MustParse("2Gi"),
+				},
+			},
+		},
+	}
+	return claim
+}
+
+func getVSpherePodSpecWithClaim(claimName string, nodeSelectorKV map[string]string, command string) *v1.Pod {
+	pod := &v1.Pod{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "Pod",
+			APIVersion: "v1",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			GenerateName: "pod-pvc-",
+		},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
+				{
+					Name:    "volume-tester",
+					Image:   "gcr.io/google_containers/busybox:1.24",
+					Command: []string{"/bin/sh"},
+					Args:    []string{"-c", command},
+					VolumeMounts: []v1.VolumeMount{
+						{
+							Name:      "my-volume",
+							MountPath: "/mnt/test",
+						},
+					},
+				},
+			},
+			RestartPolicy: v1.RestartPolicyNever,
+			Volumes: []v1.Volume{
+				{
+					Name: "my-volume",
+					VolumeSource: v1.VolumeSource{
+						PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{
+							ClaimName: claimName,
+							ReadOnly:  false,
+						},
+					},
+				},
+			},
+		},
+	}
+	if nodeSelectorKV != nil {
+		pod.Spec.NodeSelector = nodeSelectorKV
+	}
+	return pod
 }

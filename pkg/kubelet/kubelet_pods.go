@@ -645,18 +645,20 @@ func (kl *Kubelet) killPod(pod *v1.Pod, runningPod *kubecontainer.Pod, status *k
 		p = *runningPod
 	} else if status != nil {
 		p = kubecontainer.ConvertPodStatusToRunningPod(kl.GetRuntime().Type(), status)
+	} else {
+		return fmt.Errorf("one of the two arguments must be non-nil: runningPod, status")
 	}
 
 	// cache the pod cgroup Name for reducing the cpu resource limits of the pod cgroup once the pod is killed
 	pcm := kl.containerManager.NewPodContainerManager()
 	var podCgroup cm.CgroupName
-	reduceCpuLimts := true
+	reduceCpuLimits := true
 	if pod != nil {
 		podCgroup, _ = pcm.GetPodContainerName(pod)
 	} else {
 		// If the pod is nil then cgroup limit must have already
 		// been decreased earlier
-		reduceCpuLimts = false
+		reduceCpuLimits = false
 	}
 
 	// Call the container runtime KillPod method which stops all running containers of the pod
@@ -671,8 +673,10 @@ func (kl *Kubelet) killPod(pod *v1.Pod, runningPod *kubecontainer.Pod, status *k
 	// Hence we only reduce the cpu resource limits of the pod's cgroup
 	// and defer the responsibilty of destroying the pod's cgroup to the
 	// cleanup method and the housekeeping loop.
-	if reduceCpuLimts {
-		pcm.ReduceCPULimits(podCgroup)
+	if reduceCpuLimits {
+		if err := pcm.ReduceCPULimits(podCgroup); err != nil {
+			glog.Warningf("Failed to reduce the CPU values to the minimum amount of shares: %v", err)
+		}
 	}
 	return nil
 }
@@ -726,6 +730,37 @@ func (kl *Kubelet) podIsTerminated(pod *v1.Pod) bool {
 	}
 
 	return false
+}
+
+// Returns true if all required node-level resources that a pod was consuming have been reclaimed by the kubelet.
+// Reclaiming resources is a prerequisite to deleting a pod from the API server.
+func (kl *Kubelet) OkToDeletePod(pod *v1.Pod) bool {
+	if pod.DeletionTimestamp == nil {
+		// We shouldnt delete pods whose DeletionTimestamp is not set
+		return false
+	}
+	if !notRunning(pod.Status.ContainerStatuses) {
+		// We shouldnt delete pods that still have running containers
+		glog.V(3).Infof("Pod %q is terminated, but some containers are still running", format.Pod(pod))
+		return false
+	}
+	if kl.podVolumesExist(pod.UID) && !kl.kubeletConfiguration.KeepTerminatedPodVolumes {
+		// We shouldnt delete pods whose volumes have not been cleaned up if we are not keeping terminated pod volumes
+		glog.V(3).Infof("Pod %q is terminated, but some volumes have not been cleaned up", format.Pod(pod))
+		return false
+	}
+	return true
+}
+
+// notRunning returns true if every status is terminated or waiting, or the status list
+// is empty.
+func notRunning(statuses []v1.ContainerStatus) bool {
+	for _, status := range statuses {
+		if status.State.Terminated == nil && status.State.Waiting == nil {
+			return false
+		}
+	}
+	return true
 }
 
 // filterOutTerminatedPods returns the given pods which the status manager
@@ -1502,7 +1537,7 @@ func (kl *Kubelet) GetPortForward(podName, podNamespace string, podUID types.UID
 // running and whose volumes have been cleaned up.
 func (kl *Kubelet) cleanupOrphanedPodCgroups(
 	cgroupPods map[types.UID]cm.CgroupName,
-	pods []*v1.Pod, runningPods []*kubecontainer.Pod) error {
+	pods []*v1.Pod, runningPods []*kubecontainer.Pod) {
 	// Add all running and existing terminated pods to a set allPods
 	allPods := sets.NewString()
 	for _, pod := range pods {
@@ -1532,7 +1567,6 @@ func (kl *Kubelet) cleanupOrphanedPodCgroups(
 		// again try to delete these unwanted pod cgroups
 		go pcm.Destroy(val)
 	}
-	return nil
 }
 
 // enableHostUserNamespace determines if the host user namespace should be used by the container runtime.

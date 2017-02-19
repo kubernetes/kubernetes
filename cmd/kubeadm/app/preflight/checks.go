@@ -30,7 +30,6 @@ import (
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
-	"k8s.io/kubernetes/cmd/kubeadm/app/phases/kubeconfig"
 	"k8s.io/kubernetes/pkg/api/validation"
 	"k8s.io/kubernetes/pkg/util/initsystem"
 	"k8s.io/kubernetes/pkg/util/node"
@@ -182,6 +181,19 @@ func (fac FileAvailableCheck) Check() (warnings, errors []error) {
 	errors = []error{}
 	if _, err := os.Stat(fac.Path); err == nil {
 		errors = append(errors, fmt.Errorf("%s already exists", fac.Path))
+	}
+	return nil, errors
+}
+
+// FileExistingCheck checks that the given file does not already exist.
+type FileExistingCheck struct {
+	Path string
+}
+
+func (fac FileExistingCheck) Check() (warnings, errors []error) {
+	errors = []error{}
+	if _, err := os.Stat(fac.Path); err != nil {
+		errors = append(errors, fmt.Errorf("%s doesn't exist", fac.Path))
 	}
 	return nil, errors
 }
@@ -349,6 +361,16 @@ func RunInitMasterChecks(cfg *kubeadmapi.MasterConfiguration) error {
 		)
 	}
 
+	// Check the config for authorization mode
+	switch cfg.AuthorizationMode {
+	case kubeadmconstants.AuthzModeABAC:
+		authorizationPolicyPath := filepath.Join(kubeadmapi.GlobalEnvParams.KubernetesDir, kubeadmconstants.AuthorizationPolicyFile)
+		checks = append(checks, FileExistingCheck{Path: authorizationPolicyPath})
+	case kubeadmconstants.AuthzModeWebhook:
+		authorizationWebhookConfigPath := filepath.Join(kubeadmapi.GlobalEnvParams.KubernetesDir, kubeadmconstants.AuthorizationWebhookConfigFile)
+		checks = append(checks, FileExistingCheck{Path: authorizationWebhookConfigPath})
+	}
+
 	return RunChecks(checks, os.Stderr)
 }
 
@@ -363,7 +385,7 @@ func RunJoinNodeChecks(cfg *kubeadmapi.NodeConfiguration) error {
 		DirAvailableCheck{Path: filepath.Join(kubeadmapi.GlobalEnvParams.KubernetesDir, "manifests")},
 		DirAvailableCheck{Path: "/var/lib/kubelet"},
 		FileAvailableCheck{Path: filepath.Join(kubeadmapi.GlobalEnvParams.HostPKIPath, kubeadmconstants.CACertName)},
-		FileAvailableCheck{Path: filepath.Join(kubeadmapi.GlobalEnvParams.KubernetesDir, kubeconfig.KubeletKubeConfigFileName)},
+		FileAvailableCheck{Path: filepath.Join(kubeadmapi.GlobalEnvParams.KubernetesDir, kubeadmconstants.KubeletKubeConfigFileName)},
 		FileContentCheck{Path: bridgenf, Content: []byte{'1'}},
 		InPathCheck{executable: "ip", mandatory: true},
 		InPathCheck{executable: "iptables", mandatory: true},

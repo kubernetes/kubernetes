@@ -3086,6 +3086,7 @@ func autoConvert_v1_PodSpec_To_api_PodSpec(in *PodSpec, out *api.PodSpec, s conv
 	out.NodeSelector = *(*map[string]string)(unsafe.Pointer(&in.NodeSelector))
 	out.ServiceAccountName = in.ServiceAccountName
 	// INFO: in.DeprecatedServiceAccount opted out of conversion generation
+	out.AutomountServiceAccountToken = (*bool)(unsafe.Pointer(in.AutomountServiceAccountToken))
 	out.NodeName = in.NodeName
 	// INFO: in.HostNetwork opted out of conversion generation
 	// INFO: in.HostPID opted out of conversion generation
@@ -3127,6 +3128,7 @@ func autoConvert_api_PodSpec_To_v1_PodSpec(in *api.PodSpec, out *PodSpec, s conv
 	out.DNSPolicy = DNSPolicy(in.DNSPolicy)
 	out.NodeSelector = *(*map[string]string)(unsafe.Pointer(&in.NodeSelector))
 	out.ServiceAccountName = in.ServiceAccountName
+	out.AutomountServiceAccountToken = (*bool)(unsafe.Pointer(in.AutomountServiceAccountToken))
 	out.NodeName = in.NodeName
 	if in.SecurityContext != nil {
 		in, out := &in.SecurityContext, &out.SecurityContext
@@ -3992,6 +3994,7 @@ func autoConvert_v1_ServiceAccount_To_api_ServiceAccount(in *ServiceAccount, out
 	out.ObjectMeta = in.ObjectMeta
 	out.Secrets = *(*[]api.ObjectReference)(unsafe.Pointer(&in.Secrets))
 	out.ImagePullSecrets = *(*[]api.LocalObjectReference)(unsafe.Pointer(&in.ImagePullSecrets))
+	out.AutomountServiceAccountToken = (*bool)(unsafe.Pointer(in.AutomountServiceAccountToken))
 	return nil
 }
 
@@ -4003,6 +4006,7 @@ func autoConvert_api_ServiceAccount_To_v1_ServiceAccount(in *api.ServiceAccount,
 	out.ObjectMeta = in.ObjectMeta
 	out.Secrets = *(*[]ObjectReference)(unsafe.Pointer(&in.Secrets))
 	out.ImagePullSecrets = *(*[]LocalObjectReference)(unsafe.Pointer(&in.ImagePullSecrets))
+	out.AutomountServiceAccountToken = (*bool)(unsafe.Pointer(in.AutomountServiceAccountToken))
 	return nil
 }
 

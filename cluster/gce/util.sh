@@ -371,6 +371,9 @@ function get-master-env() {
   gcloud compute --project ${PROJECT} ssh --zone ${ZONE} ${KUBE_MASTER} --command \
     "curl --fail --silent -H 'Metadata-Flavor: Google' \
       'http://metadata/computeMetadata/v1/instance/attributes/kube-env'" 2>/dev/null
+  gcloud compute --project ${PROJECT} ssh --zone ${ZONE} ${KUBE_MASTER} --command \
+    "curl --fail --silent -H 'Metadata-Flavor: Google' \
+      'http://metadata/computeMetadata/v1/instance/attributes/kube-master-certs'" 2>/dev/null
 }
 
 # Robustly try to create a static ip.
@@ -822,6 +825,9 @@ function create-master() {
   # http://issue.k8s.io/3168
   KUBELET_TOKEN=$(dd if=/dev/urandom bs=128 count=1 2>/dev/null | base64 | tr -d "=+/" | dd bs=32 count=1 2>/dev/null)
   KUBE_PROXY_TOKEN=$(dd if=/dev/urandom bs=128 count=1 2>/dev/null | base64 | tr -d "=+/" | dd bs=32 count=1 2>/dev/null)
+  if [[ "${ENABLE_NODE_PROBLEM_DETECTOR:-}" == "standalone" ]]; then
+    NODE_PROBLEM_DETECTOR_TOKEN=$(dd if=/dev/urandom bs=128 count=1 2>/dev/null | base64 | tr -d "=+/" | dd bs=32 count=1 2>/dev/null)
+  fi
 
   # Reserve the master's IP so that it can later be transferred to another VM
   # without disrupting the kubelets.

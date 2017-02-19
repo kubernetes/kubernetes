@@ -33,7 +33,7 @@ import (
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/events"
 	"k8s.io/kubernetes/pkg/kubelet/network"
-	"k8s.io/kubernetes/pkg/kubelet/network/mock_network"
+	nettest "k8s.io/kubernetes/pkg/kubelet/network/testing"
 	"k8s.io/kubernetes/pkg/security/apparmor"
 	utilstrings "k8s.io/kubernetes/pkg/util/strings"
 )
@@ -455,8 +455,9 @@ func TestGetPodStatusFromNetworkPlugin(t *testing.T) {
 	for _, test := range cases {
 		dm, fakeDocker := newTestDockerManager()
 		ctrl := gomock.NewController(t)
-		fnp := mock_network.NewMockNetworkPlugin(ctrl)
-		dm.networkPlugin = fnp
+		defer ctrl.Finish()
+		fnp := nettest.NewMockNetworkPlugin(ctrl)
+		dm.network = network.NewPluginManager(fnp)
 
 		fakeDocker.SetFakeRunningContainers([]*FakeContainer{
 			{

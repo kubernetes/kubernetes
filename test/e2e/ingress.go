@@ -125,7 +125,7 @@ var _ = framework.KubeDescribe("Loadbalancing: L7", func() {
 			}
 		})
 
-		It("shoud create ingress with given static-ip", func() {
+		It("should create ingress with given static-ip", func() {
 			// ip released when the rest of lb resources are deleted in cleanupGCE
 			ip := gceController.createStaticIP(ns)
 			By(fmt.Sprintf("allocated static ip %v: %v through the GCE cloud provider", ns, ip))
@@ -158,7 +158,7 @@ var _ = framework.KubeDescribe("Loadbalancing: L7", func() {
 			//	 framework.GetMasterHost(), "glbc", glbcHealthzPort, restartPollInterval, restartTimeout)
 			// restarter.restart()
 			// By("should continue serving on provided static-ip for 30 seconds")
-			// ExpectNoError(jig.verifyURL(fmt.Sprintf("https://%v/", ip), "", 30, 1*time.Second, httpClient))
+			// framework.ExpectNoError(jig.verifyURL(fmt.Sprintf("https://%v/", ip), "", 30, 1*time.Second, httpClient))
 		})
 
 		// TODO: Implement a multizone e2e that verifies traffic reaches each

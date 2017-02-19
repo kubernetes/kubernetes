@@ -83,6 +83,7 @@ go_library(
         "//vendor:k8s.io/apiserver/pkg/registry/generic",
         "//vendor:k8s.io/apiserver/pkg/server",
         "//vendor:k8s.io/apiserver/pkg/server/healthz",
+        "//vendor:k8s.io/apiserver/pkg/server/storage",
     ],
 )
 
@@ -114,7 +115,6 @@ go_test(
         "//pkg/client/clientset_generated/clientset/fake:go_default_library",
         "//pkg/client/clientset_generated/internalclientset/fake:go_default_library",
         "//pkg/generated/openapi:go_default_library",
-        "//pkg/kubeapiserver:go_default_library",
         "//pkg/kubelet/client:go_default_library",
         "//pkg/version:go_default_library",
         "//vendor:github.com/go-openapi/loads",
@@ -131,6 +131,8 @@ go_test(
         "//vendor:k8s.io/apimachinery/pkg/version",
         "//vendor:k8s.io/apiserver/pkg/endpoints/request",
         "//vendor:k8s.io/apiserver/pkg/server",
+        "//vendor:k8s.io/apiserver/pkg/server/options",
+        "//vendor:k8s.io/apiserver/pkg/server/storage",
         "//vendor:k8s.io/apiserver/pkg/storage/etcd/testing",
         "//vendor:k8s.io/client-go/rest",
         "//vendor:k8s.io/client-go/testing",

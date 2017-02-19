@@ -60,6 +60,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/secret"
 	"k8s.io/kubernetes/pkg/kubelet/server/stats"
 	"k8s.io/kubernetes/pkg/kubelet/status"
+	statustest "k8s.io/kubernetes/pkg/kubelet/status/testing"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/kubelet/util/queue"
 	kubeletvolume "k8s.io/kubernetes/pkg/kubelet/volumemanager"
@@ -174,13 +175,10 @@ func newTestKubeletWithImageList(
 	kubelet.cadvisor = mockCadvisor
 
 	fakeMirrorClient := podtest.NewFakeMirrorClient()
-	secretManager, err := secret.NewSimpleSecretManager(kubelet.kubeClient)
-	if err != nil {
-		t.Fatalf("can't create a secret manager: %v", err)
-	}
+	secretManager := secret.NewSimpleSecretManager(kubelet.kubeClient)
 	kubelet.secretManager = secretManager
 	kubelet.podManager = kubepod.NewBasicPodManager(fakeMirrorClient, kubelet.secretManager)
-	kubelet.statusManager = status.NewManager(fakeKubeClient, kubelet.podManager)
+	kubelet.statusManager = status.NewManager(fakeKubeClient, kubelet.podManager, &statustest.FakePodDeletionSafetyProvider{})
 	kubelet.containerRefManager = kubecontainer.NewRefManager()
 	diskSpaceManager, err := newDiskSpaceManager(mockCadvisor, DiskSpacePolicy{})
 	if err != nil {
@@ -262,6 +260,7 @@ func newTestKubeletWithImageList(
 		controllerAttachDetachEnabled,
 		kubelet.nodeName,
 		kubelet.podManager,
+		kubelet.statusManager,
 		fakeKubeClient,
 		kubelet.volumePluginMgr,
 		fakeRuntime,

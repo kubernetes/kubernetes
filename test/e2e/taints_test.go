@@ -128,7 +128,7 @@ func createPodForTaintsTest(hasToleration bool, tolerationSeconds int, podName, 
 	}
 }
 
-// Creates and startes a controller (informer) that watches updates on a pod in given namespace with given name. It puts a new
+// Creates and starts a controller (informer) that watches updates on a pod in given namespace with given name. It puts a new
 // struct into observedDeletion channel for every deletion it sees.
 func createTestController(cs clientset.Interface, observedDeletions chan struct{}, stopCh chan struct{}, podName, ns string) {
 	_, controller := cache.NewInformer(
@@ -193,7 +193,7 @@ var _ = framework.KubeDescribe("NoExecuteTaintManager [Serial]", func() {
 		By("Trying to apply a taint on the Node")
 		testTaint := getTestTaint()
 		framework.AddOrUpdateTaintOnNode(cs, nodeName, testTaint)
-		framework.ExpectNodeHasTaint(cs, nodeName, testTaint)
+		framework.ExpectNodeHasTaint(cs, nodeName, &testTaint)
 		defer framework.RemoveTaintOffNode(cs, nodeName, testTaint)
 
 		// Wait a bit
@@ -225,7 +225,7 @@ var _ = framework.KubeDescribe("NoExecuteTaintManager [Serial]", func() {
 		By("Trying to apply a taint on the Node")
 		testTaint := getTestTaint()
 		framework.AddOrUpdateTaintOnNode(cs, nodeName, testTaint)
-		framework.ExpectNodeHasTaint(cs, nodeName, testTaint)
+		framework.ExpectNodeHasTaint(cs, nodeName, &testTaint)
 		defer framework.RemoveTaintOffNode(cs, nodeName, testTaint)
 
 		// Wait a bit
@@ -258,7 +258,7 @@ var _ = framework.KubeDescribe("NoExecuteTaintManager [Serial]", func() {
 		By("Trying to apply a taint on the Node")
 		testTaint := getTestTaint()
 		framework.AddOrUpdateTaintOnNode(cs, nodeName, testTaint)
-		framework.ExpectNodeHasTaint(cs, nodeName, testTaint)
+		framework.ExpectNodeHasTaint(cs, nodeName, &testTaint)
 		defer framework.RemoveTaintOffNode(cs, nodeName, testTaint)
 
 		// Wait a bit
@@ -302,7 +302,7 @@ var _ = framework.KubeDescribe("NoExecuteTaintManager [Serial]", func() {
 		By("Trying to apply a taint on the Node")
 		testTaint := getTestTaint()
 		framework.AddOrUpdateTaintOnNode(cs, nodeName, testTaint)
-		framework.ExpectNodeHasTaint(cs, nodeName, testTaint)
+		framework.ExpectNodeHasTaint(cs, nodeName, &testTaint)
 		taintRemoved := false
 		defer func() {
 			if !taintRemoved {

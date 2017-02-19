@@ -43,7 +43,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 	"k8s.io/kubernetes/pkg/kubelet/network"
 	"k8s.io/kubernetes/pkg/kubelet/network/kubenet"
-	"k8s.io/kubernetes/pkg/kubelet/network/mock_network"
+	nettest "k8s.io/kubernetes/pkg/kubelet/network/testing"
 	"k8s.io/kubernetes/pkg/kubelet/types"
 	utilexec "k8s.io/kubernetes/pkg/util/exec"
 )
@@ -583,7 +583,7 @@ func TestGetPodStatus(t *testing.T) {
 	defer ctrl.Finish()
 	fr := newFakeRktInterface()
 	fs := newFakeSystemd()
-	fnp := mock_network.NewMockNetworkPlugin(ctrl)
+	fnp := nettest.NewMockNetworkPlugin(ctrl)
 	fos := &containertesting.FakeOS{}
 	frh := &fakeRuntimeHelper{}
 	r := &Runtime{
@@ -591,7 +591,7 @@ func TestGetPodStatus(t *testing.T) {
 		systemd:       fs,
 		runtimeHelper: frh,
 		os:            fos,
-		networkPlugin: fnp,
+		network:       network.NewPluginManager(fnp),
 	}
 
 	ns := func(seconds int64) int64 {
@@ -826,6 +826,8 @@ func TestGetPodStatus(t *testing.T) {
 			} else {
 				fnp.EXPECT().GetPodNetworkStatus("default", "guestbook", kubecontainer.ContainerID{ID: "42"}).
 					Return(nil, fmt.Errorf("no such network"))
+				// Plugin name only requested again in error case
+				fnp.EXPECT().Name().Return(tt.networkPluginName)
 			}
 		}
 
@@ -1388,7 +1390,7 @@ func TestGenerateRunCommand(t *testing.T) {
 
 	for i, tt := range tests {
 		testCaseHint := fmt.Sprintf("test case #%d", i)
-		rkt.networkPlugin = tt.networkPlugin
+		rkt.network = network.NewPluginManager(tt.networkPlugin)
 		rkt.runtimeHelper = &fakeRuntimeHelper{tt.dnsServers, tt.dnsSearches, tt.hostName, "", tt.err}
 		rkt.execer = &utilexec.FakeExec{CommandScript: []utilexec.FakeCommandAction{func(cmd string, args ...string) utilexec.Cmd {
 			return utilexec.InitFakeCmd(&utilexec.FakeCmd{}, cmd, args...)

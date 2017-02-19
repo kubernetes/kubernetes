@@ -1327,6 +1327,10 @@
       "type": "string",
       "description": "DeprecatedServiceAccount is a depreciated alias for ServiceAccountName. Deprecated: Use serviceAccountName instead."
      },
+     "automountServiceAccountToken": {
+      "type": "boolean",
+      "description": "AutomountServiceAccountToken indicates whether a service account token should be automatically mounted."
+     },
      "nodeName": {
       "type": "string",
       "description": "NodeName is a request to schedule this pod onto a specific node. If it is non-empty, the scheduler simply schedules this pod onto that node, assuming that it fits resource requirements."

@@ -17,12 +17,12 @@ limitations under the License.
 package controller
 
 import (
+	"encoding/json"
 	"fmt"
 	"sync"
 	"sync/atomic"
 	"time"
 
-	"github.com/golang/glog"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -30,15 +30,22 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/util/strategicpatch"
+	"k8s.io/apimachinery/pkg/util/wait"
+
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/clock"
 	"k8s.io/client-go/util/integer"
+
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/api/validation"
 	extensions "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
+	clientretry "k8s.io/kubernetes/pkg/client/retry"
+
+	"github.com/golang/glog"
 )
 
 const (
@@ -54,6 +61,12 @@ const (
 	// latency/pod at the scale of 3000 pods over 100 nodes.
 	ExpectationsTimeout = 5 * time.Minute
 )
+
+var UpdateTaintBackoff = wait.Backoff{
+	Steps:    5,
+	Duration: 100 * time.Millisecond,
+	Jitter:   1.0,
+}
 
 var (
 	KeyFunc = cache.DeletionHandlingMetaNamespaceKeyFunc
@@ -754,15 +767,23 @@ func IsPodActive(p *v1.Pod) bool {
 
 // FilterActiveReplicaSets returns replica sets that have (or at least ought to have) pods.
 func FilterActiveReplicaSets(replicaSets []*extensions.ReplicaSet) []*extensions.ReplicaSet {
-	active := []*extensions.ReplicaSet{}
-	for i := range replicaSets {
-		rs := replicaSets[i]
+	activeFilter := func(rs *extensions.ReplicaSet) bool {
+		return rs != nil && *(rs.Spec.Replicas) > 0
+	}
+	return FilterReplicaSets(replicaSets, activeFilter)
+}
 
-		if rs != nil && *(rs.Spec.Replicas) > 0 {
-			active = append(active, replicaSets[i])
+type filterRS func(rs *extensions.ReplicaSet) bool
+
+// FilterReplicaSets returns replica sets that are filtered by filterFn (all returned ones should match filterFn).
+func FilterReplicaSets(RSes []*extensions.ReplicaSet, filterFn filterRS) []*extensions.ReplicaSet {
+	var filtered []*extensions.ReplicaSet
+	for i := range RSes {
+		if filterFn(RSes[i]) {
+			filtered = append(filtered, RSes[i])
 		}
 	}
-	return active
+	return filtered
 }
 
 // PodKey returns a key unique to the given pod within a cluster.
@@ -821,4 +842,91 @@ func (o ReplicaSetsBySizeNewer) Less(i, j int) bool {
 		return ReplicaSetsByCreationTimestamp(o).Less(j, i)
 	}
 	return *(o[i].Spec.Replicas) > *(o[j].Spec.Replicas)
+}
+
+func AddOrUpdateTaintOnNode(c clientset.Interface, nodeName string, taint *v1.Taint) error {
+	firstTry := true
+	return clientretry.RetryOnConflict(UpdateTaintBackoff, func() error {
+		var err error
+		var oldNode *v1.Node
+		// First we try getting node from the API server cache, as it's cheaper. If it fails
+		// we get it from etcd to be sure to have fresh data.
+		if firstTry {
+			oldNode, err = c.Core().Nodes().Get(nodeName, metav1.GetOptions{ResourceVersion: "0"})
+			firstTry = false
+		} else {
+			oldNode, err = c.Core().Nodes().Get(nodeName, metav1.GetOptions{})
+		}
+		if err != nil {
+			return err
+		}
+		newNode, ok, err := v1.AddOrUpdateTaint(oldNode, taint)
+		if err != nil {
+			return fmt.Errorf("Failed to update taint annotation!")
+		}
+		if !ok {
+			return nil
+		}
+		return PatchNodeTaints(c, nodeName, oldNode, newNode)
+	})
+}
+
+// RemoveTaintOffNode is for cleaning up taints temporarily added to node,
+// won't fail if target taint doesn't exist or has been removed.
+func RemoveTaintOffNode(c clientset.Interface, nodeName string, taint *v1.Taint) error {
+	firstTry := true
+	return clientretry.RetryOnConflict(UpdateTaintBackoff, func() error {
+		var err error
+		var oldNode *v1.Node
+		// First we try getting node from the API server cache, as it's cheaper. If it fails
+		// we get it from etcd to be sure to have fresh data.
+		if firstTry {
+			oldNode, err = c.Core().Nodes().Get(nodeName, metav1.GetOptions{ResourceVersion: "0"})
+			firstTry = false
+		} else {
+			oldNode, err = c.Core().Nodes().Get(nodeName, metav1.GetOptions{})
+		}
+		if err != nil {
+			return err
+		}
+		newNode, ok, err := v1.RemoveTaint(oldNode, taint)
+		if err != nil {
+			return fmt.Errorf("Failed to update taint annotation!")
+		}
+		if !ok {
+			return nil
+		}
+		return PatchNodeTaints(c, nodeName, oldNode, newNode)
+	})
+}
+
+// PatchNodeTaints patches node's taints.
+func PatchNodeTaints(c clientset.Interface, nodeName string, oldNode *v1.Node, newNode *v1.Node) error {
+	oldData, err := json.Marshal(oldNode)
+	if err != nil {
+		return fmt.Errorf("failed to marshal old node %#v for node %q: %v", oldNode, nodeName, err)
+	}
+
+	newAnnotations := newNode.Annotations
+	objCopy, err := api.Scheme.DeepCopy(oldNode)
+	if err != nil {
+		return fmt.Errorf("failed to copy node object %#v: %v", oldNode, err)
+	}
+	newNode, ok := (objCopy).(*v1.Node)
+	if !ok {
+		return fmt.Errorf("failed to cast copy onto node object %#v: %v", newNode, err)
+	}
+	newNode.Annotations = newAnnotations
+	newData, err := json.Marshal(newNode)
+	if err != nil {
+		return fmt.Errorf("failed to marshal new node %#v for node %q: %v", newNode, nodeName, err)
+	}
+
+	patchBytes, err := strategicpatch.CreateTwoWayMergePatch(oldData, newData, v1.Node{})
+	if err != nil {
+		return fmt.Errorf("failed to create patch for node %q: %v", nodeName, err)
+	}
+
+	_, err = c.Core().Nodes().Patch(string(nodeName), types.StrategicMergePatchType, patchBytes)
+	return err
 }

@@ -46,7 +46,7 @@ import (
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	certutil "k8s.io/client-go/util/cert"
 	triple "k8s.io/client-go/util/cert/triple"
-	kubeadmkubeconfigphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/kubeconfig"
+	kubeconfigutil "k8s.io/kubernetes/cmd/kubeadm/app/util/kubeconfig"
 	"k8s.io/kubernetes/federation/pkg/kubefed/util"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
@@ -326,7 +326,7 @@ func (i *initFederation) Run(cmdOut io.Writer, config util.AdminConfig) error {
 
 	// 8. Write the federation API server endpoint info, credentials
 	// and context to kubeconfig
-	err = updateKubeconfig(config, i.commonOptions.Name, endpoint, entKeyPairs, i.options.dryRun)
+	err = updateKubeconfig(config, i.commonOptions.Name, endpoint, i.commonOptions.Kubeconfig, entKeyPairs, i.options.dryRun)
 	if err != nil {
 		return err
 	}
@@ -409,6 +409,7 @@ func createService(clientset *client.Clientset, namespace, svcName, apiserverAdv
 func getClusterNodeIPs(clientset *client.Clientset) ([]string, error) {
 	preferredAddressTypes := []api.NodeAddressType{
 		api.NodeExternalIP,
+		api.NodeLegacyHostIP,
 	}
 	nodeList, err := clientset.Nodes().List(metav1.ListOptions{})
 	if err != nil {
@@ -512,7 +513,7 @@ func createAPIServerCredentialsSecret(clientset *client.Clientset, namespace, cr
 }
 
 func createControllerManagerKubeconfigSecret(clientset *client.Clientset, namespace, name, svcName, kubeconfigName string, entKeyPairs *entityKeyPairs, dryRun bool) (*api.Secret, error) {
-	config := kubeadmkubeconfigphase.MakeClientConfigWithCerts(
+	config := kubeconfigutil.CreateWithCerts(
 		fmt.Sprintf("https://%s", svcName),
 		name,
 		ControllerManagerUser,
@@ -548,6 +549,7 @@ func createPVC(clientset *client.Clientset, namespace, svcName, etcdPVCapacity s
 					api.ResourceStorage: capacity,
 				},
 			},
+			Selector: &metav1.LabelSelector{MatchLabels: apiserverSvcSelector},
 		},
 	}
 
@@ -890,8 +892,9 @@ func printSuccess(cmdOut io.Writer, ips, hostnames []string, svc *api.Service) e
 	return err
 }
 
-func updateKubeconfig(config util.AdminConfig, name, endpoint string, entKeyPairs *entityKeyPairs, dryRun bool) error {
+func updateKubeconfig(config util.AdminConfig, name, endpoint, kubeConfigPath string, entKeyPairs *entityKeyPairs, dryRun bool) error {
 	po := config.PathOptions()
+	po.LoadingRules.ExplicitPath = kubeConfigPath
 	kubeconfig, err := po.GetStartingConfig()
 	if err != nil {
 		return err

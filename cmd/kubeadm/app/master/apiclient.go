@@ -25,35 +25,18 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kuberuntime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/client-go/tools/clientcmd"
+	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/pkg/api"
+	"k8s.io/client-go/pkg/api/v1"
+	extensions "k8s.io/client-go/pkg/apis/extensions/v1beta1"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
-	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/v1"
-	extensions "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
-	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
+	kubeconfigutil "k8s.io/kubernetes/cmd/kubeadm/app/util/kubeconfig"
 )
 
-func CreateClientFromFile(path string) (*clientset.Clientset, error) {
-	adminKubeconfig, err := clientcmd.LoadFromFile(path)
-	if err != nil {
-		return nil, fmt.Errorf("failed to load admin kubeconfig [%v]", err)
-	}
-	adminClientConfig, err := clientcmd.NewDefaultClientConfig(*adminKubeconfig, &clientcmd.ConfigOverrides{}).ClientConfig()
-	if err != nil {
-		return nil, fmt.Errorf("failed to create API client configuration [%v]", err)
-	}
-
-	client, err := clientset.NewForConfig(adminClientConfig)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create API client [%v]", err)
-	}
-	return client, nil
-}
-
 func CreateClientAndWaitForAPI(file string) (*clientset.Clientset, error) {
-	client, err := CreateClientFromFile(file)
+	client, err := kubeconfigutil.ClientSetFromFile(file)
 	if err != nil {
 		return nil, err
 	}
