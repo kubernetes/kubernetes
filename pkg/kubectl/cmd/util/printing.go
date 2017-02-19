@@ -22,8 +22,10 @@ import (
 	"strings"
 
 	"k8s.io/apimachinery/pkg/api/meta"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
+	"k8s.io/kubernetes/pkg/printers"
 
 	"github.com/spf13/cobra"
 )
@@ -105,7 +107,7 @@ func ValidateOutputArgs(cmd *cobra.Command) error {
 
 // PrinterForCommand returns the default printer for this command.
 // Requires that printer flags have been added to cmd (see AddPrinterFlags).
-func PrinterForCommand(cmd *cobra.Command) (kubectl.ResourcePrinter, bool, error) {
+func PrinterForCommand(cmd *cobra.Command, mapper meta.RESTMapper, typer runtime.ObjectTyper, decoders []runtime.Decoder) (printers.ResourcePrinter, bool, error) {
 	outputFormat := GetFlagString(cmd, "output")
 
 	// templates are logically optional for specifying a format.
@@ -131,7 +133,10 @@ func PrinterForCommand(cmd *cobra.Command) (kubectl.ResourcePrinter, bool, error
 	if cmd.Flags().Lookup("allow-missing-template-keys") != nil {
 		allowMissingTemplateKeys = GetFlagBool(cmd, "allow-missing-template-keys")
 	}
-	printer, generic, err := kubectl.GetPrinter(outputFormat, templateFile, GetFlagBool(cmd, "no-headers"), allowMissingTemplateKeys)
+	printer, generic, err := printers.GetStandardPrinter(
+		outputFormat, templateFile, GetFlagBool(cmd, "no-headers"), allowMissingTemplateKeys,
+		mapper, typer, decoders,
+	)
 	if err != nil {
 		return nil, generic, err
 	}
@@ -144,7 +149,7 @@ func PrinterForCommand(cmd *cobra.Command) (kubectl.ResourcePrinter, bool, error
 // object passed is non-generic, it attempts to print the object using a HumanReadablePrinter.
 // Requires that printer flags have been added to cmd (see AddPrinterFlags).
 func PrintResourceInfoForCommand(cmd *cobra.Command, info *resource.Info, f Factory, out io.Writer) error {
-	printer, generic, err := PrinterForCommand(cmd)
+	printer, generic, err := f.PrinterForCommand(cmd)
 	if err != nil {
 		return err
 	}
@@ -157,7 +162,7 @@ func PrintResourceInfoForCommand(cmd *cobra.Command, info *resource.Info, f Fact
 	return printer.PrintObj(info.Object, out)
 }
 
-func maybeWrapSortingPrinter(cmd *cobra.Command, printer kubectl.ResourcePrinter) kubectl.ResourcePrinter {
+func maybeWrapSortingPrinter(cmd *cobra.Command, printer printers.ResourcePrinter) printers.ResourcePrinter {
 	sorting, err := cmd.Flags().GetString("sort-by")
 	if err != nil {
 		// error can happen on missing flag or bad flag type.  In either case, this command didn't intent to sort
