@@ -18,7 +18,7 @@ go_library(
     tags = ["automanaged"],
     deps = [
         "//cmd/kubeadm/app/apis/kubeadm:go_default_library",
-        "//cmd/kubeadm/app/phases/kubeconfig:go_default_library",
+        "//cmd/kubeadm/app/util/kubeconfig:go_default_library",
         "//cmd/kubeadm/app/util/token:go_default_library",
         "//pkg/kubelet/util/csr:go_default_library",
         "//vendor:github.com/square/go-jose",
