@@ -227,6 +227,8 @@ setup() {
 run_pod_tests() {
   kube::log::status "Testing kubectl(v1:pods)"
 
+  bad-command-that-should-fail-tests
+
   ### Create POD valid-pod from JSON
   # Pre-condition: no POD exists
   create_and_use_new_namespace
@@ -793,6 +795,9 @@ __EOF__
 
 # Runs tests related to kubectl apply.
 run_kubectl_apply_tests() {
+
+  bad-command-that-should-fail-tests
+
   ## kubectl apply should create the resource that doesn't exist yet
   # Pre-Condition: no POD exists
   kube::test::get_object_assert pods "{{range.items}}{{$id_field}}:{{end}}" ''
@@ -954,6 +959,9 @@ run_kubectl_apply_deployments_tests() {
 
 # Runs tests for --save-config tests.
 run_save_config_tests() {
+
+  bad-command-that-should-fail-tests
+
   ## Configuration annotations should be set when --save-config is enabled
   ## 1. kubectl create --save-config should generate configuration annotation
   # Pre-Condition: no POD exists
@@ -1032,6 +1040,9 @@ run_save_config_tests() {
 }
 
 run_kubectl_run_tests() {
+
+  bad-command-that-should-fail-tests
+
   ## kubectl run should create deployments or jobs
   # Pre-Condition: no Job exists
   kube::test::get_object_assert jobs "{{range.items}}{{$id_field}}:{{end}}" ''
@@ -1054,6 +1065,9 @@ run_kubectl_run_tests() {
 }
 
 run_kubectl_get_tests() {
+
+  bad-command-that-should-fail-tests
+
   ### Test retrieval of non-existing pods
   # Pre-condition: no POD exists
   kube::test::get_object_assert pods "{{range.items}}{{$id_field}}:{{end}}" ''
@@ -1179,6 +1193,9 @@ run_kubectl_get_tests() {
 }
 
 run_kubectl_request_timeout_tests() {
+
+  bad-command-that-should-fail-tests
+
   ### Test global request timeout option
   # Pre-condition: no POD exists
   create_and_use_new_namespace
@@ -1210,6 +1227,9 @@ run_kubectl_request_timeout_tests() {
 }
 
 run_tpr_tests() {
+
+  bad-command-that-should-fail-tests
+
   create_and_use_new_namespace
   kubectl "${kube_flags[@]}" create -f - "${kube_flags[@]}" << __EOF__
 {
@@ -1486,6 +1506,9 @@ __EOF__
 }
 
 run_recursive_resources_tests() {
+
+  bad-command-that-should-fail-tests
+
   ### Create multiple busybox PODs recursively from directory of YAML files
   # Pre-condition: no POD exists
   create_and_use_new_namespace
@@ -1723,6 +1746,9 @@ run_recursive_resources_tests() {
 }
 
 run_namespace_tests() {
+
+  bad-command-that-should-fail-tests
+
   kube::log::status "Testing kubectl(v1:namespaces)"
   ### Create a new namespace
   # Pre-condition: only the "default" namespace exists
@@ -1774,6 +1800,9 @@ run_namespace_tests() {
 }
 
 run_secrets_test() {
+
+  bad-command-that-should-fail-tests
+
   ### Create a new namespace
   # Pre-condition: the test-secrets namespace does not exist
   kube::test::get_object_assert 'namespaces' '{{range.items}}{{ if eq $id_field \"test-secrets\" }}found{{end}}{{end}}:' ':'
@@ -1852,6 +1881,9 @@ __EOF__
 }
 
 run_configmap_tests() {
+
+  bad-command-that-should-fail-tests
+
   kubectl create -f test/fixtures/doc-yaml/user-guide/configmap/configmap.yaml
   kube::test::get_object_assert configmap "{{range.items}}{{$id_field}}{{end}}" 'test-configmap'
   kubectl delete configmap test-configmap "${kube_flags[@]}"
@@ -1878,6 +1910,9 @@ run_configmap_tests() {
 }
 
 run_service_tests() {
+  
+  bad-command-that-should-fail-tests
+
   # switch back to the default namespace
   kubectl config set-context "${CONTEXT}" --namespace=""
   kube::log::status "Testing kubectl(v1:services)"
@@ -2266,6 +2301,9 @@ run_rc_tests() {
 }
 
 run_deployment_tests() {
+  
+  bad-command-that-should-fail-tests
+
   # Test kubectl create deployment
   kubectl create deployment test-nginx --image=gcr.io/google-containers/nginx:test-cmd
   # Post-Condition: Deployment has 2 replicas defined in its spec.
@@ -2373,6 +2411,9 @@ run_deployment_tests() {
 }
 
 run_rs_tests() {
+
+  bad-command-that-should-fail-tests
+
   kube::log::status "Testing kubectl(v1:replicasets)"
 
   ### Create and stop a replica set, make sure it doesn't leak pods
@@ -2482,6 +2523,9 @@ run_rs_tests() {
 }
 
 run_multi_resources_tests() {
+
+  bad-command-that-should-fail-tests
+
   kube::log::status "Testing kubectl(v1:multiple resources)"
 
   FILES="hack/testdata/multi-resource-yaml
@@ -2721,6 +2765,10 @@ runTests() {
     kubectl get "${kube_flags[@]}" -f hack/testdata/kubernetes-service.yaml
   fi
 
+
+  bad-command-that-should-fail-tests
+
+
   # Passing no arguments to create is an error
   ! kubectl create
 
@@ -2850,10 +2898,12 @@ runTests() {
   ###########################
 
   if kube::test::if_supports_resource "${pods}" ; then
+    bad-command-that-should-fail-tests
     run_pod_tests
   fi
 
   if kube::test::if_supports_resource "${pods}" ; then
+    bad-command-that-should-fail-tests
     run_save_config_tests
   fi
 
@@ -2874,6 +2924,7 @@ runTests() {
   if kube::test::if_supports_resource "${pods}" ; then
     # TODO: Move apply tests to run on rs instead of pods so that they can be
     # run for federation apiserver as well.
+    bad-command-that-should-fail-tests
     run_kubectl_apply_tests
     run_kubectl_run_tests
     run_kubectl_create_filter_tests
@@ -2891,6 +2942,7 @@ runTests() {
     # TODO: Move get tests to run on rs instead of pods so that they can be
     # TODO: Move get tests to run on rs instead of pods so that they can be
     # run for federation apiserver as well.
+    bad-command-that-should-fail-tests
     run_kubectl_get_tests
   fi
 
@@ -2901,6 +2953,7 @@ runTests() {
   if kube::test::if_supports_resource "${pods}" ; then
     # TODO: Move request timeout tests to run on rs instead of pods so that they
     # can be run for federation apiserver as well.
+    bad-command-that-should-fail-tests
     run_kubectl_request_timeout_tests
   fi
 
@@ -2909,6 +2962,7 @@ runTests() {
   #####################################
 
   if kube::test::if_supports_resource "${thirdpartyresources}" ; then
+    bad-command-that-should-fail-tests
     run_tpr_tests
   fi
 
@@ -2917,6 +2971,7 @@ runTests() {
   #################
 
   if kube::test::if_supports_resource "${deployments}" ; then
+    bad-command-that-should-fail-tests
     # Test that a valid image reference value is provided as the value of --image in `kubectl run <name> --image`
     output_message=$(kubectl run test1 --image=validname)
     kube::test::if_has_string "${output_message}" 'deployment "test1" created'
@@ -2932,6 +2987,7 @@ runTests() {
   #####################################
 
   if kube::test::if_supports_resource "${pods}" ; then
+    bad-command-that-should-fail-tests
     run_recursive_resources_tests
   fi
 
@@ -2940,6 +2996,7 @@ runTests() {
   # Namespaces #
   ##############
   if kube::test::if_supports_resource "${namespaces}" ; then
+    bad-command-that-should-fail-tests
     run_namespace_tests
   fi
 
@@ -2949,6 +3006,7 @@ runTests() {
   ###########
   if kube::test::if_supports_resource "${namespaces}" ; then
     if kube::test::if_supports_resource "${secrets}" ; then
+      bad-command-that-should-fail-tests
       run_secrets_test
     fi
   fi
@@ -2960,6 +3018,7 @@ runTests() {
 
   if kube::test::if_supports_resource "${namespaces}"; then
     if kube::test::if_supports_resource "${configmaps}" ; then
+      bad-command-that-should-fail-tests
       run_configmap_tests
     fi
   fi
@@ -3014,6 +3073,8 @@ runTests() {
   ####################
 
   if kube::test::if_supports_resource "${namespaces}" && kube::test::if_supports_resource "${serviceaccounts}" ; then
+    bad-command-that-should-fail-tests
+
     ### Create a new namespace
     # Pre-condition: the test-service-accounts namespace does not exist
     kube::test::get_object_assert 'namespaces' '{{range.items}}{{ if eq $id_field \"test-service-accounts\" }}found{{end}}{{end}}:' ':'
@@ -3038,6 +3099,8 @@ runTests() {
   #################
 
   if kube::test::if_supports_resource "${podtemplates}" ; then
+    bad-command-that-should-fail-tests
+
     ### Create PODTEMPLATE
     # Pre-condition: no PODTEMPLATE
     kube::test::get_object_assert podtemplates "{{range.items}}{{.metadata.name}}:{{end}}" ''
@@ -3064,6 +3127,7 @@ runTests() {
   ############
 
   if kube::test::if_supports_resource "${services}" ; then
+    bad-command-that-should-fail-tests
     run_service_tests
   fi
 
@@ -3074,6 +3138,7 @@ runTests() {
 
   if kube::test::if_supports_resource "${namespaces}" ; then
     if kube::test::if_supports_resource "${replicationcontrollers}" ; then
+      bad-command-that-should-fail-tests
       run_rc_tests
     fi
   fi
@@ -3083,6 +3148,7 @@ runTests() {
   ######################
 
   if kube::test::if_supports_resource "${deployments}" ; then
+    bad-command-that-should-fail-tests
     run_deployment_tests
   fi
 
@@ -3091,6 +3157,7 @@ runTests() {
   ######################
 
   if kube::test::if_supports_resource "${replicasets}" ; then
+    bad-command-that-should-fail-tests
     run_rs_tests
   fi
 
@@ -3101,6 +3168,7 @@ runTests() {
 
   if kube::test::if_supports_resource "${statefulsets}" ; then
     kube::log::status "Testing kubectl(v1:statefulsets)"
+    bad-command-that-should-fail-tests
 
     ### Create and stop statefulset, make sure it doesn't leak pods
     # Pre-condition: no statefulset exists
@@ -3134,6 +3202,7 @@ runTests() {
   if kube::test::if_supports_resource "${services}" ; then
     if kube::test::if_supports_resource "${deployments}" ; then
       kube::log::status "Testing kubectl(v1:lists)"
+      bad-command-that-should-fail-tests
 
       ### Create a List with objects from multiple versions
       # Command
@@ -3151,6 +3220,7 @@ runTests() {
   ######################
   if kube::test::if_supports_resource "${services}" ; then
     if kube::test::if_supports_resource "${replicationcontrollers}" ; then
+      bad-command-that-should-fail-tests
       run_multi_resources_tests
     fi
   fi
@@ -3160,6 +3230,7 @@ runTests() {
   ######################
 
   if kube::test::if_supports_resource "${persistentvolumes}" ; then
+    bad-command-that-should-fail-tests
     ### Create and delete persistent volume examples
     # Pre-condition: no persistent volumes currently exist
     kube::test::get_object_assert pv "{{range.items}}{{$id_field}}:{{end}}" ''
@@ -3182,6 +3253,7 @@ runTests() {
   ############################
 
   if kube::test::if_supports_resource "${persistentvolumeclaims}" ; then
+    bad-command-that-should-fail-tests
     ### Create and delete persistent volume claim examples
     # Pre-condition: no persistent volume claims currently exist
     kube::test::get_object_assert pvc "{{range.items}}{{$id_field}}:{{end}}" ''
@@ -3206,6 +3278,7 @@ runTests() {
   ############################
 
   if kube::test::if_supports_resource "${storageclass}" ; then
+    bad-command-that-should-fail-tests
     ### Create and delete storage class
     # Pre-condition: no storage classes currently exist
     kube::test::get_object_assert storageclass "{{range.items}}{{$id_field}}:{{end}}" ''
@@ -3237,6 +3310,7 @@ __EOF__
 
   if kube::test::if_supports_resource "${nodes}" ; then
     kube::log::status "Testing kubectl(v1:nodes)"
+    bad-command-that-should-fail-tests
 
     kube::test::get_object_assert nodes "{{range.items}}{{$id_field}}:{{end}}" '127.0.0.1:'
 
@@ -3293,6 +3367,7 @@ __EOF__
     fi
     rm "${SAR_RESULT_FILE}"
 
+    bad-command-that-should-fail-tests
     SAR_RESULT_FILE="${KUBE_TEMP}/sar-result.json"
     curl -k -H "Content-Type:" http://localhost:8080/apis/authorization.k8s.io/v1/subjectaccessreviews -XPOST -d @test/fixtures/pkg/kubectl/cmd/create/sar-v1.json > "${SAR_RESULT_FILE}"
     if grep -q '"allowed": true' "${SAR_RESULT_FILE}"; then
@@ -3312,6 +3387,7 @@ __EOF__
   if kube::test::if_supports_resource "${nodes}" ; then
     if kube::test::if_supports_resource "${services}" ; then
       kube::log::status "Testing kubectl(v1:multiget)"
+      bad-command-that-should-fail-tests
       kube::test::get_object_assert 'nodes/127.0.0.1 service/kubernetes' "{{range.items}}{{$id_field}}:{{end}}" '127.0.0.1:kubernetes:'
     fi
   fi
@@ -3324,6 +3400,7 @@ __EOF__
   if kube::test::if_supports_resource "${services}" ; then
     if kube::test::if_supports_resource "${replicationcontrollers}" ; then
       kube::log::status "Testing resource aliasing"
+      bad-command-that-should-fail-tests
       kubectl create -f examples/storage/cassandra/cassandra-controller.yaml "${kube_flags[@]}"
       kubectl create -f examples/storage/cassandra/cassandra-service.yaml "${kube_flags[@]}"
 
@@ -3345,6 +3422,7 @@ __EOF__
 
   if kube::test::if_supports_resource "${pods}" ; then
     kube::log::status "Testing kubectl(v1:explain)"
+    bad-command-that-should-fail-tests
     kubectl explain pods
     # shortcuts work
     kubectl explain po
@@ -3368,6 +3446,7 @@ __EOF__
   #####################
 
   if kube::test::if_supports_resource "${pods}" ; then
+    bad-command-that-should-fail-tests
     ### sort-by should not panic if no pod exists
     # Pre-condition: no POD exists
     kube::test::get_object_assert pods "{{range.items}}{{$id_field}}:{{end}}" ''
@@ -3381,6 +3460,7 @@ __EOF__
   ############################
 
   if kube::test::if_supports_resource "${pods}" ; then
+    bad-command-that-should-fail-tests
     # Pre-condition: the "default" namespace exists
     kube::test::get_object_assert namespaces "{{range.items}}{{if eq $id_field \\\"default\\\"}}{{$id_field}}:{{end}}{{end}}" 'default:'
 
@@ -3410,6 +3490,7 @@ __EOF__
   ################
 
   if kube::test::if_supports_resource "${csr}" ; then
+    bad-command-that-should-fail-tests
     # approve
     kubectl create -f hack/testdata/csr.yml "${kube_flags[@]}"
     kube::test::get_object_assert 'csr/foo' '{{range.status.conditions}}{{.type}}{{end}}' ''
