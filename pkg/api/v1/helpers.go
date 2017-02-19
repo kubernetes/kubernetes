@@ -277,6 +277,11 @@ const (
 	// an object (e.g. secret, config map) before fetching it again from apiserver.
 	// This annotation can be attached to node.
 	ObjectTTLAnnotationKey string = "node.alpha.kubernetes.io/ttl"
+
+	// AffinityAnnotationKey represents the key of affinity data (json serialized)
+	// in the Annotations of a Pod.
+	// TODO: remove when alpha support for affinity is removed
+	AffinityAnnotationKey string = "scheduler.alpha.kubernetes.io/affinity"
 )
 
 // GetTolerationsFromPodAnnotations gets the json serialized tolerations data from Pod.Annotations
@@ -645,4 +650,19 @@ func RemoveTaint(node *Node, taint *Taint) (*Node, bool, error) {
 		newNode.Annotations[TaintsAnnotationKey] = string(taintsData)
 	}
 	return newNode, true, nil
+}
+
+// GetAffinityFromPodAnnotations gets the json serialized affinity data from Pod.Annotations
+// and converts it to the Affinity type in api.
+// TODO: remove when alpha support for affinity is removed
+func GetAffinityFromPodAnnotations(annotations map[string]string) (*Affinity, error) {
+	if len(annotations) > 0 && annotations[AffinityAnnotationKey] != "" {
+		var affinity Affinity
+		err := json.Unmarshal([]byte(annotations[AffinityAnnotationKey]), &affinity)
+		if err != nil {
+			return nil, err
+		}
+		return &affinity, nil
+	}
+	return nil, nil
 }

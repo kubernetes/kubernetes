@@ -585,7 +585,7 @@ func podMatchesNodeLabels(pod *v1.Pod, node *v1.Node) bool {
 	// 5. zero-length non-nil []NodeSelectorRequirement matches no nodes also, just for simplicity
 	// 6. non-nil empty NodeSelectorRequirement is not allowed
 	nodeAffinityMatches := true
-	affinity := pod.Spec.Affinity
+	affinity := schedulercache.ReconcileAffinity(pod)
 	if affinity != nil && affinity.NodeAffinity != nil {
 		nodeAffinity := affinity.NodeAffinity
 		// if no required NodeAffinity requirements, will do no-op, means select all nodes.
@@ -897,7 +897,7 @@ func (c *PodAffinityChecker) InterPodAffinityMatches(pod *v1.Pod, meta interface
 	}
 
 	// Now check if <pod> requirements will be satisfied on this node.
-	affinity := pod.Spec.Affinity
+	affinity := schedulercache.ReconcileAffinity(pod)
 	if affinity == nil || (affinity.PodAffinity == nil && affinity.PodAntiAffinity == nil) {
 		return true, nil, nil
 	}
@@ -1001,7 +1001,7 @@ func getMatchingAntiAffinityTerms(pod *v1.Pod, nodeInfoMap map[string]*scheduler
 		}
 		var nodeResult []matchingPodAntiAffinityTerm
 		for _, existingPod := range nodeInfo.PodsWithAffinity() {
-			affinity := existingPod.Spec.Affinity
+			affinity := schedulercache.ReconcileAffinity(existingPod)
 			if affinity == nil {
 				continue
 			}
@@ -1029,7 +1029,7 @@ func getMatchingAntiAffinityTerms(pod *v1.Pod, nodeInfoMap map[string]*scheduler
 func (c *PodAffinityChecker) getMatchingAntiAffinityTerms(pod *v1.Pod, allPods []*v1.Pod) ([]matchingPodAntiAffinityTerm, error) {
 	var result []matchingPodAntiAffinityTerm
 	for _, existingPod := range allPods {
-		affinity := existingPod.Spec.Affinity
+		affinity := schedulercache.ReconcileAffinity(existingPod)
 		if affinity != nil && affinity.PodAntiAffinity != nil {
 			existingPodNode, err := c.info.GetNodeInfo(existingPod.Spec.NodeName)
 			if err != nil {
