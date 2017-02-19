@@ -18,7 +18,7 @@ package internalversion
 
 import (
 	rest "k8s.io/client-go/rest"
-	api "k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/scheme"
 )
 
 type RbacInterface interface {
@@ -79,8 +79,7 @@ func New(c rest.Interface) *RbacClient {
 }
 
 func setConfigDefaults(config *rest.Config) error {
-	// if rbac group is not registered, return an error
-	g, err := api.Registry.Group("rbac.authorization.k8s.io")
+	g, err := scheme.Registry.Group("rbac.authorization.k8s.io")
 	if err != nil {
 		return err
 	}
@@ -90,10 +89,10 @@ func setConfigDefaults(config *rest.Config) error {
 		config.UserAgent = rest.DefaultKubernetesUserAgent()
 	}
 	if config.GroupVersion == nil || config.GroupVersion.Group != g.GroupVersion.Group {
-		copyGroupVersion := g.GroupVersion
-		config.GroupVersion = &copyGroupVersion
+		gv := g.GroupVersion
+		config.GroupVersion = &gv
 	}
-	config.NegotiatedSerializer = api.Codecs
+	config.NegotiatedSerializer = scheme.Codecs
 
 	if config.QPS == 0 {
 		config.QPS = 5
