@@ -29,6 +29,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/client-go/pkg/apis/apps"
 	"k8s.io/kubernetes/pkg/api/v1"
 	extensions "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm"
@@ -517,7 +518,8 @@ func TestZeroRequest(t *testing.T) {
 				Function: algorithmpriorities.NewSelectorSpreadPriority(
 					algorithm.FakeServiceLister([]*v1.Service{}),
 					algorithm.FakeControllerLister([]*v1.ReplicationController{}),
-					algorithm.FakeReplicaSetLister([]*extensions.ReplicaSet{})),
+					algorithm.FakeReplicaSetLister([]*extensions.ReplicaSet{}),
+					algorithm.FakeStatefulSetLister([]*apps.StatefulSet{})),
 				Weight: 1,
 			},
 		}
