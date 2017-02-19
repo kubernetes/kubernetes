@@ -39,11 +39,17 @@ import (
 // be "application/octet-stream". All other objects are sent to standard JSON serialization.
 func WriteObject(statusCode int, gv schema.GroupVersion, s runtime.NegotiatedSerializer, object runtime.Object, w http.ResponseWriter, req *http.Request) {
 	stream, ok := object.(rest.ResourceStreamer)
-	if !ok {
-		WriteObjectNegotiated(s, gv, w, req, statusCode, object)
+	if ok {
+		StreamObject(statusCode, gv, s, stream, w, req)
 		return
 	}
+	WriteObjectNegotiated(s, gv, w, req, statusCode, object)
+}
 
+// StreamObject performs input stream negotiation from a ResourceStreamer and writes that to the response.
+// If the client requests a websocket upgrade, negotiate for a websocket reader protocol (because many
+// browser clients cannot easily handle binary streaming protocols).
+func StreamObject(statusCode int, gv schema.GroupVersion, s runtime.NegotiatedSerializer, stream rest.ResourceStreamer, w http.ResponseWriter, req *http.Request) {
 	out, flush, contentType, err := stream.InputStream(gv.String(), req.Header.Get("Accept"))
 	if err != nil {
 		ErrorNegotiated(err, s, gv, w, req)
@@ -76,27 +82,31 @@ func WriteObject(statusCode int, gv schema.GroupVersion, s runtime.NegotiatedSer
 	io.Copy(writer, out)
 }
 
-// WriteObjectNegotiated renders an object in the content type negotiated by the client
-func WriteObjectNegotiated(s runtime.NegotiatedSerializer, gv schema.GroupVersion, w http.ResponseWriter, req *http.Request, statusCode int, object runtime.Object) {
-	serializer, err := negotiation.NegotiateOutputSerializer(req, s)
-	if err != nil {
-		status := apiStatus(err)
-		WriteRawJSON(int(status.Code), status, w)
-		return
-	}
-
-	w.Header().Set("Content-Type", serializer.MediaType)
+// SerializeObject renders an object in the content type negotiated by the client using the provided encoder.
+func SerializeObject(mediaType string, encoder runtime.Encoder, w http.ResponseWriter, req *http.Request, statusCode int, object runtime.Object) {
+	w.Header().Set("Content-Type", mediaType)
 	w.WriteHeader(statusCode)
 
-	encoder := s.EncoderForVersion(serializer.Serializer, gv)
 	if err := encoder.Encode(object, w); err != nil {
 		errorJSONFatal(err, encoder, w)
 	}
 }
 
+// WriteObjectNegotiated renders an object in the content type negotiated by the client.
+func WriteObjectNegotiated(s runtime.NegotiatedSerializer, gv schema.GroupVersion, w http.ResponseWriter, req *http.Request, statusCode int, object runtime.Object) {
+	serializer, err := negotiation.NegotiateOutputSerializer(req, s)
+	if err != nil {
+		status := ErrorToAPIStatus(err)
+		WriteRawJSON(int(status.Code), status, w)
+		return
+	}
+	encoder := s.EncoderForVersion(serializer.Serializer, gv)
+	SerializeObject(serializer.MediaType, encoder, w, req, statusCode, object)
+}
+
 // ErrorNegotiated renders an error to the response. Returns the HTTP status code of the error.
 func ErrorNegotiated(err error, s runtime.NegotiatedSerializer, gv schema.GroupVersion, w http.ResponseWriter, req *http.Request) int {
-	status := apiStatus(err)
+	status := ErrorToAPIStatus(err)
 	code := int(status.Code)
 	// when writing an error, check to see if the status indicates a retry after period
 	if status.Details != nil && status.Details.RetryAfterSeconds > 0 {
@@ -111,7 +121,7 @@ func ErrorNegotiated(err error, s runtime.NegotiatedSerializer, gv schema.GroupV
 // Returns the HTTP status code of the error.
 func errorJSONFatal(err error, codec runtime.Encoder, w http.ResponseWriter) int {
 	utilruntime.HandleError(fmt.Errorf("apiserver was unable to write a JSON response: %v", err))
-	status := apiStatus(err)
+	status := ErrorToAPIStatus(err)
 	code := int(status.Code)
 	output, err := runtime.Encode(codec, status)
 	if err != nil {

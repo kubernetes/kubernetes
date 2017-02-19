@@ -64,7 +64,7 @@ func TestAPIStatus(t *testing.T) {
 		},
 	}
 	for k, v := range cases {
-		actual := apiStatus(k)
+		actual := ErrorToAPIStatus(k)
 		if !reflect.DeepEqual(actual, &v) {
 			t.Errorf("%s: Expected %#v, Got %#v", k, v, actual)
 		}

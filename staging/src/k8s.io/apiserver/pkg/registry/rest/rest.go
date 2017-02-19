@@ -23,6 +23,7 @@ import (
 
 	metainternalversion "k8s.io/apimachinery/pkg/apis/meta/internalversion"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	metav1alpha1 "k8s.io/apimachinery/pkg/apis/meta/v1alpha1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/watch"
@@ -114,6 +115,10 @@ type GetterWithOptions interface {
 	// will convert the trailing request scheme value to "path" in the map[string][]string
 	// passed to the converter.
 	NewGetOptions() (runtime.Object, bool, string)
+}
+
+type TableConvertor interface {
+	ConvertToTableList(ctx genericapirequest.Context, object runtime.Object, tableOptions runtime.Object) (*metav1alpha1.TableList, error)
 }
 
 // Deleter is an object that can delete a named RESTful resource.
