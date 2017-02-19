@@ -21,6 +21,7 @@ import (
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	rest "k8s.io/client-go/rest"
+	scheme "k8s.io/kubernetes/federation/client/clientset_generated/federation_internalclientset/scheme"
 	api "k8s.io/kubernetes/pkg/api"
 )
 
@@ -98,7 +99,7 @@ func (c *events) DeleteCollection(options *v1.DeleteOptions, listOptions v1.List
 	return c.client.Delete().
 		Namespace(c.ns).
 		Resource("events").
-		VersionedParams(&listOptions, api.ParameterCodec).
+		VersionedParams(&listOptions, scheme.ParameterCodec).
 		Body(options).
 		Do().
 		Error()
@@ -111,7 +112,7 @@ func (c *events) Get(name string, options v1.GetOptions) (result *api.Event, err
 		Namespace(c.ns).
 		Resource("events").
 		Name(name).
-		VersionedParams(&options, api.ParameterCodec).
+		VersionedParams(&options, scheme.ParameterCodec).
 		Do().
 		Into(result)
 	return
@@ -123,7 +124,7 @@ func (c *events) List(opts v1.ListOptions) (result *api.EventList, err error) {
 	err = c.client.Get().
 		Namespace(c.ns).
 		Resource("events").
-		VersionedParams(&opts, api.ParameterCodec).
+		VersionedParams(&opts, scheme.ParameterCodec).
 		Do().
 		Into(result)
 	return
@@ -135,7 +136,7 @@ func (c *events) Watch(opts v1.ListOptions) (watch.Interface, error) {
 	return c.client.Get().
 		Namespace(c.ns).
 		Resource("events").
-		VersionedParams(&opts, api.ParameterCodec).
+		VersionedParams(&opts, scheme.ParameterCodec).
 		Watch()
 }
 
