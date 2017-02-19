@@ -5,7 +5,7 @@
 		"message": "dummy",
 		"timestampFormat": "dummy"
 	},
-	"logPath": "/log/faillog",
+	"logPath": "/dev/null",
 	"lookback": "10m",
 	"bufferSize": 10,
 	"source": "kernel-monitor",
