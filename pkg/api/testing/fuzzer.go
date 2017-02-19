@@ -149,6 +149,27 @@ func coreFuncs(t apitesting.TestingCommon) []interface{} {
 				s.SchedulerName = api.DefaultSchedulerName
 			}
 		},
+		func(a *api.Affinity, c fuzz.Continue) {
+			// The value of affinity MaxPodsPerTopologyKey is always 1.
+			podAffinity := new(api.PodAffinity)
+			podAffinity.RequiredDuringSchedulingIgnoredDuringExecution = []api.PodAffinityTerm{
+				{MinMatchingPods: 1},
+			}
+			a.PodAffinity = podAffinity
+
+			// Random MinMatchingPods for required anti-affinity
+			val := int32(c.Uint32() / 2)
+			if val < 1 {
+				val = 1
+			}
+
+			// The value of anti-affinity MaxPodsPerTopologyKey is random.
+			podAntiAffinity := new(api.PodAntiAffinity)
+			podAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution = []api.PodAffinityTerm{
+				{MinMatchingPods: val},
+			}
+			a.PodAntiAffinity = podAntiAffinity
+		},
 		func(j *api.PodPhase, c fuzz.Continue) {
 			statuses := []api.PodPhase{api.PodPending, api.PodRunning, api.PodFailed, api.PodUnknown}
 			*j = statuses[c.Rand.Intn(len(statuses))]
