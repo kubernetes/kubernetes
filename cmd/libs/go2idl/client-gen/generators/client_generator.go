@@ -85,11 +85,12 @@ func packageForGroup(gv clientgentypes.GroupVersion, typeList []*types.Type, cli
 					DefaultGen: generator.DefaultGen{
 						OptionalName: strings.ToLower(c.Namers["private"].Name(t)),
 					},
-					outputPackage: groupVersionClientPackage,
-					group:         gv.Group.NonEmpty(),
-					version:       gv.Version.String(),
-					typeToMatch:   t,
-					imports:       generator.NewImportTracker(),
+					outputPackage:    groupVersionClientPackage,
+					clientsetPackage: clientsetPackage,
+					group:            gv.Group.NonEmpty(),
+					version:          gv.Version.String(),
+					typeToMatch:      t,
+					imports:          generator.NewImportTracker(),
 				})
 			}
 
@@ -97,13 +98,14 @@ func packageForGroup(gv clientgentypes.GroupVersion, typeList []*types.Type, cli
 				DefaultGen: generator.DefaultGen{
 					OptionalName: gv.Group.NonEmpty() + "_client",
 				},
-				outputPackage: groupVersionClientPackage,
-				inputPackage:  inputPackage,
-				group:         gv.Group.NonEmpty(),
-				version:       gv.Version.String(),
-				apiPath:       apiPath,
-				types:         typeList,
-				imports:       generator.NewImportTracker(),
+				outputPackage:    groupVersionClientPackage,
+				inputPackage:     inputPackage,
+				clientsetPackage: clientsetPackage,
+				group:            gv.Group.NonEmpty(),
+				version:          gv.Version.String(),
+				apiPath:          apiPath,
+				types:            typeList,
+				imports:          generator.NewImportTracker(),
 			})
 
 			expansionFileName := "generated_expansion"
@@ -147,6 +149,39 @@ func packageForClientset(customArgs clientgenargs.Args, clientsetPackage string,
 					clientsetPackage: clientsetPackage,
 					outputPackage:    customArgs.ClientsetName,
 					imports:          generator.NewImportTracker(),
+				},
+			}
+			return generators
+		},
+	}
+}
+
+func packageForScheme(customArgs clientgenargs.Args, clientsetPackage string, srcTreePath string, boilerplate []byte, generatedBy string) generator.Package {
+	schemePackage := filepath.Join(clientsetPackage, "scheme")
+	return &generator.DefaultPackage{
+		PackageName: "scheme",
+		PackagePath: schemePackage,
+		HeaderText:  boilerplate,
+		PackageDocumentation: []byte(
+			generatedBy +
+				`// This package contains the scheme of the automatically generated clientset.
+`),
+		// GeneratorFunc returns a list of generators. Each generator generates a
+		// single file.
+		GeneratorFunc: func(c *generator.Context) (generators []generator.Generator) {
+			generators = []generator.Generator{
+				// Always generate a "doc.go" file.
+				generator.DefaultGen{OptionalName: "doc"},
+
+				&genScheme{
+					DefaultGen: generator.DefaultGen{
+						OptionalName: "register",
+					},
+					inputPackages: customArgs.GroupVersionToInputPath,
+					outputPackage: schemePackage,
+					outputPath:    filepath.Join(srcTreePath, schemePackage),
+					groups:        customArgs.Groups,
+					imports:       generator.NewImportTracker(),
 				},
 			}
 			return generators
@@ -204,6 +239,7 @@ func Packages(context *generator.Context, arguments *args.GeneratorArgs) generat
 	clientsetPackage := filepath.Join(customArgs.ClientsetOutputPath, customArgs.ClientsetName)
 
 	packageList = append(packageList, packageForClientset(customArgs, clientsetPackage, boilerplate, generatedBy))
+	packageList = append(packageList, packageForScheme(customArgs, clientsetPackage, arguments.OutputBase, boilerplate, generatedBy))
 	if customArgs.FakeClient {
 		packageList = append(packageList, fake.PackageForClientset(customArgs, clientsetPackage, boilerplate, generatedBy))
 	}
