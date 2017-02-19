@@ -97,6 +97,7 @@ func (c *CachedNodeInfo) GetNodeInfo(id string) (*v1.Node, error) {
 type matchingPodAntiAffinityTerm struct {
 	term *v1.PodAffinityTerm
 	node *v1.Node
+	pod  *v1.Pod
 }
 
 type predicateMetadata struct {
@@ -922,26 +923,34 @@ func (c *PodAffinityChecker) anyPodMatchesPodAffinityTerm(pod *v1.Pod, allPods [
 	if len(term.TopologyKey) == 0 {
 		return false, false, errors.New("Empty topologyKey is not allowed except for PreferredDuringScheduling pod anti-affinity")
 	}
-	matchingPodExists := false
+
 	namespaces := priorityutil.GetNamespacesFromPodAffinityTerm(pod, term)
 	selector, err := metav1.LabelSelectorAsSelector(term.LabelSelector)
 	if err != nil {
 		return false, false, err
 	}
+
+	replicas := 0
 	for _, existingPod := range allPods {
 		match := priorityutil.PodMatchesTermsNamespaceAndSelector(existingPod, namespaces, selector)
 		if match {
-			matchingPodExists = true
 			existingPodNode, err := c.info.GetNodeInfo(existingPod.Spec.NodeName)
 			if err != nil {
-				return false, matchingPodExists, err
+				// TODO: chech when NodeInfo is empty but Pod is here; and what should we do for
+				// this's case?
+				replicas++
+				return false, replicas > term.MaxAntiAffinityTolerant, err
 			}
 			if priorityutil.NodesHaveSameTopologyKey(node, existingPodNode, term.TopologyKey) {
-				return true, matchingPodExists, nil
+				replicas++
+				// term.MaxAntiAffinityTolerant is 0 if not hard anti-affinity.
+				if replicas > term.MaxAntiAffinityTolerant {
+					return true, true, nil
+				}
 			}
 		}
 	}
-	return false, matchingPodExists, nil
+	return false, replicas > term.MaxAntiAffinityTolerant, nil
 }
 
 func getPodAffinityTerms(podAffinity *v1.PodAffinity) (terms []v1.PodAffinityTerm) {
@@ -961,6 +970,23 @@ func getPodAntiAffinityTerms(podAntiAffinity *v1.PodAntiAffinity) (terms []v1.Po
 	if podAntiAffinity != nil {
 		if len(podAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution) != 0 {
 			terms = podAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution
+		}
+		// TODO: Uncomment this block when implement RequiredDuringSchedulingRequiredDuringExecution.
+		//if len(podAntiAffinity.RequiredDuringSchedulingRequiredDuringExecution) != 0 {
+		//	terms = append(terms, podAntiAffinity.RequiredDuringSchedulingRequiredDuringExecution...)
+		//}
+	}
+	return terms
+}
+
+func getPodAntiAffinityTolerantTerms(podAntiAffinity *v1.PodAntiAffinity) (terms []v1.PodAffinityTerm) {
+	if podAntiAffinity != nil {
+		if len(podAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution) != 0 {
+			for _, term := range podAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution {
+				if term.MaxAntiAffinityTolerant > 0 {
+					terms = append(terms, term)
+				}
+			}
 		}
 		// TODO: Uncomment this block when implement RequiredDuringSchedulingRequiredDuringExecution.
 		//if len(podAntiAffinity.RequiredDuringSchedulingRequiredDuringExecution) != 0 {
@@ -1000,6 +1026,7 @@ func getMatchingAntiAffinityTerms(pod *v1.Pod, nodeInfoMap map[string]*scheduler
 			return
 		}
 		var nodeResult []matchingPodAntiAffinityTerm
+		// TODO: also check MaxAntiAffinity, it's better to merge to common part into one function.
 		for _, existingPod := range nodeInfo.PodsWithAffinity() {
 			affinity := existingPod.Spec.Affinity
 			if affinity == nil {
@@ -1026,20 +1053,27 @@ func getMatchingAntiAffinityTerms(pod *v1.Pod, nodeInfoMap map[string]*scheduler
 	return result, firstError
 }
 
-func (c *PodAffinityChecker) getMatchingAntiAffinityTerms(pod *v1.Pod, allPods []*v1.Pod) ([]matchingPodAntiAffinityTerm, error) {
+func (c *PodAffinityChecker) getMatchingAntiAffinityTerms(pod *v1.Pod, allPods []*v1.Pod) ([]matchingPodAntiAffinityTerm, bool, error) {
 	var result []matchingPodAntiAffinityTerm
+	var hasTolerantTerm bool
+
 	for _, existingPod := range allPods {
 		affinity := existingPod.Spec.Affinity
 		if affinity != nil && affinity.PodAntiAffinity != nil {
 			existingPodNode, err := c.info.GetNodeInfo(existingPod.Spec.NodeName)
 			if err != nil {
-				return nil, err
+				return nil, false, err
 			}
 			for _, term := range getPodAntiAffinityTerms(affinity.PodAntiAffinity) {
+				// The AntiAffinityTolerant Terms is handled by others.
+				if term.MaxAntiAffinityTolerant > 0 {
+					hasTolerantTerm = true
+					continue
+				}
 				namespaces := priorityutil.GetNamespacesFromPodAffinityTerm(existingPod, &term)
 				selector, err := metav1.LabelSelectorAsSelector(term.LabelSelector)
 				if err != nil {
-					return nil, err
+					return nil, false, err
 				}
 				match := priorityutil.PodMatchesTermsNamespaceAndSelector(pod, namespaces, selector)
 				if match {
@@ -1048,13 +1082,16 @@ func (c *PodAffinityChecker) getMatchingAntiAffinityTerms(pod *v1.Pod, allPods [
 			}
 		}
 	}
-	return result, nil
+
+	return result, hasTolerantTerm, nil
 }
 
 // Checks if scheduling the pod onto this node would break any anti-affinity
 // rules indicated by the existing pods.
 func (c *PodAffinityChecker) satisfiesExistingPodsAntiAffinity(pod *v1.Pod, meta interface{}, node *v1.Node) bool {
 	var matchingTerms []matchingPodAntiAffinityTerm
+	var hasTolerantTerms bool
+
 	if predicateMeta, ok := meta.(*predicateMetadata); ok {
 		matchingTerms = predicateMeta.matchingAntiAffinityTerms
 	} else {
@@ -1063,7 +1100,7 @@ func (c *PodAffinityChecker) satisfiesExistingPodsAntiAffinity(pod *v1.Pod, meta
 			glog.V(10).Infof("Failed to get all pods, %+v", err)
 			return false
 		}
-		if matchingTerms, err = c.getMatchingAntiAffinityTerms(pod, allPods); err != nil {
+		if matchingTerms, hasTolerantTerms, err = c.getMatchingAntiAffinityTerms(pod, allPods); err != nil {
 			glog.V(10).Infof("Failed to get all terms that pod %+v matches, err: %+v", podName(pod), err)
 			return false
 		}
@@ -1079,6 +1116,50 @@ func (c *PodAffinityChecker) satisfiesExistingPodsAntiAffinity(pod *v1.Pod, meta
 			return false
 		}
 	}
+
+	// If not matching anti-affinity, check tolerant anti-affinity.
+	if hasTolerantTerms {
+		allPods, err := c.podLister.List(labels.Everything())
+		if err != nil {
+			glog.V(10).Infof("Failed to get all pods, %+v", err)
+			return false
+		}
+
+		// Add current pod into existing pod list for checking.
+		allPods = append(allPods, pod)
+
+		for i := range allPods {
+			pod := allPods[i]
+			if pod.Spec.Affinity == nil {
+				continue
+			}
+
+			terms := getPodAntiAffinityTolerantTerms(pod.Spec.Affinity.PodAntiAffinity)
+
+			if len(terms) == 0 {
+				continue
+			}
+
+			otherPods := allPods[:i]
+			otherPods = append(otherPods, allPods[i+1:]...)
+
+			node, err := c.info.GetNodeInfo(pod.Spec.NodeName)
+			if err != nil {
+				continue
+			}
+
+			for _, term := range terms {
+				// Check all anti-affinity terms.
+				termMatches, _, err := c.anyPodMatchesPodAffinityTerm(pod, otherPods, node, &term)
+				if err != nil || termMatches {
+					glog.V(10).Infof("Cannot schedule pod %+v onto node %v,because of PodAntiAffinityTerm %v, err: %v",
+						podName(pod), node, term, err)
+					return false
+				}
+			}
+		}
+	}
+
 	if glog.V(10) {
 		// We explicitly don't do glog.V(10).Infof() to avoid computing all the parameters if this is
 		// not logged. There is visible performance gain from it.
