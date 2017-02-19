@@ -21,15 +21,15 @@ import (
 	"io"
 
 	"k8s.io/apimachinery/pkg/api/meta"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 )
 
 // NamePrinter is an implementation of ResourcePrinter which outputs "resource/name" pair of an object.
 type NamePrinter struct {
-	Decoder runtime.Decoder
-	Typer   runtime.ObjectTyper
+	Decoders []runtime.Decoder
+	Typer    runtime.ObjectTyper
+	Mapper   meta.RESTMapper
 }
 
 func (p *NamePrinter) AfterPrint(w io.Writer, res string) error {
@@ -44,7 +44,7 @@ func (p *NamePrinter) PrintObj(obj runtime.Object, w io.Writer) error {
 		if err != nil {
 			return err
 		}
-		if errs := runtime.DecodeList(items, p.Decoder, unstructured.UnstructuredJSONScheme); len(errs) > 0 {
+		if errs := runtime.DecodeList(items, p.Decoders...); len(errs) > 0 {
 			return utilerrors.NewAggregate(errs)
 		}
 		for _, obj := range items {
@@ -62,22 +62,24 @@ func (p *NamePrinter) PrintObj(obj runtime.Object, w io.Writer) error {
 		}
 	}
 
-	if kind := obj.GetObjectKind().GroupVersionKind(); len(kind.Kind) == 0 {
-		// this is the old code.  It's unnecessary on decoded external objects, but on internal objects
-		// you may have to do it.  Tests are definitely calling it with internals and I'm not sure who else
-		// is
+	kind := obj.GetObjectKind().GroupVersionKind()
+	if len(kind.Kind) == 0 {
 		if gvks, _, err := p.Typer.ObjectKinds(obj); err == nil {
-			// TODO: this is wrong, it assumes that meta knows about all Kinds - should take a RESTMapper
-			_, resource := meta.KindToResource(gvks[0])
-			fmt.Fprintf(w, "%s/%s\n", resource.Resource, name)
+			for _, gvk := range gvks {
+				if mappings, err := p.Mapper.RESTMappings(gvk.GroupKind(), gvk.Version); err == nil && len(mappings) > 0 {
+					fmt.Fprintf(w, "%s/%s\n", mappings[0].Resource, name)
+				}
+			}
 		} else {
 			fmt.Fprintf(w, "<unknown>/%s\n", name)
 		}
 
 	} else {
-		// TODO: this is wrong, it assumes that meta knows about all Kinds - should take a RESTMapper
-		_, resource := meta.KindToResource(kind)
-		fmt.Fprintf(w, "%s/%s\n", resource.Resource, name)
+		if mappings, err := p.Mapper.RESTMappings(kind.GroupKind(), kind.Version); err == nil && len(mappings) > 0 {
+			fmt.Fprintf(w, "%s/%s\n", mappings[0].Resource, name)
+		} else {
+			fmt.Fprintf(w, "<unknown>/%s\n", name)
+		}
 	}
 
 	return nil
