@@ -62,3 +62,8 @@ type GroupVersionPackage struct {
 	GroupVersion     string
 	PackageName      string
 }
+
+type GroupInstallPackage struct {
+	Group              Group
+	InstallPackageName string
+}

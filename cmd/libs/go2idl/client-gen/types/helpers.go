@@ -102,6 +102,17 @@ func ToGroupVersionPackages(groups []GroupVersions) []GroupVersionPackage {
 	return groupVersionPackages
 }
 
+func ToGroupInstallPackages(groups []GroupVersions) []GroupInstallPackage {
+	var groupInstallPackages []GroupInstallPackage
+	for _, group := range groups {
+		groupInstallPackages = append(groupInstallPackages, GroupInstallPackage{
+			Group:              Group(namer.IC(group.Group.NonEmpty())),
+			InstallPackageName: strings.ToLower(group.Group.NonEmpty()),
+		})
+	}
+	return groupInstallPackages
+}
+
 // NormalizeGroupVersion calls normalizes the GroupVersion.
 //func NormalizeGroupVersion(gv GroupVersion) GroupVersion {
 //	return GroupVersion{Group: gv.Group.NonEmpty(), Version: gv.Version, NonEmptyVersion: normalization.Version(gv.Version)}
