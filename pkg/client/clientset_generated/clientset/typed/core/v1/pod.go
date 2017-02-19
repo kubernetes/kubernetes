@@ -149,8 +149,8 @@ func (c *pods) List(opts meta_v1.ListOptions) (result *v1.PodList, err error) {
 
 // Watch returns a watch.Interface that watches the requested pods.
 func (c *pods) Watch(opts meta_v1.ListOptions) (watch.Interface, error) {
+	opts.Watch = true
 	return c.client.Get().
-		Prefix("watch").
 		Namespace(c.ns).
 		Resource("pods").
 		VersionedParams(&opts, api.ParameterCodec).

@@ -132,8 +132,8 @@ func (c *networkPolicies) List(opts v1.ListOptions) (result *extensions.NetworkP
 
 // Watch returns a watch.Interface that watches the requested networkPolicies.
 func (c *networkPolicies) Watch(opts v1.ListOptions) (watch.Interface, error) {
+	opts.Watch = true
 	return c.client.Get().
-		Prefix("watch").
 		Namespace(c.ns).
 		Resource("networkpolicies").
 		VersionedParams(&opts, api.ParameterCodec).
