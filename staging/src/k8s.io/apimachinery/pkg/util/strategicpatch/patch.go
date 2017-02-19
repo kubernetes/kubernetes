@@ -158,9 +158,16 @@ func diffMaps(original, modified map[string]interface{}, t reflect.Type, ignoreC
 		switch originalValueTyped := originalValue.(type) {
 		case map[string]interface{}:
 			modifiedValueTyped := modifiedValue.(map[string]interface{})
-			fieldType, _, _, err := forkedjson.LookupPatchMetadata(t, key)
+			fieldType, fieldPatchStrategy, _, err := forkedjson.LookupPatchMetadata(t, key)
 			if err != nil {
 				return nil, err
+			}
+
+			if fieldPatchStrategy == replaceDirective {
+				if !ignoreChangesAndAdditions {
+					patch[key] = modifiedValue
+				}
+				continue
 			}
 
 			patchValue, err := diffMaps(originalValueTyped, modifiedValueTyped, fieldType, ignoreChangesAndAdditions, ignoreDeletions)
@@ -1024,6 +1031,10 @@ func mergingMapFieldsHaveConflicts(
 				if leftMarker != rightMarker {
 					return true, nil
 				}
+			}
+
+			if fieldPatchStrategy == replaceDirective {
+				return false, nil
 			}
 
 			// Check the individual keys.
