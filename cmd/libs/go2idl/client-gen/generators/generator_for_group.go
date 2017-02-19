@@ -34,7 +34,7 @@ type genGroup struct {
 	// types in this group
 	types        []*types.Type
 	imports      namer.ImportTracker
-	inputPacakge string
+	inputPackage string
 }
 
 var _ generator.Generator = &genGroup{}
@@ -57,11 +57,6 @@ func (g *genGroup) Imports(c *generator.Context) (imports []string) {
 
 func (g *genGroup) GenerateType(c *generator.Context, t *types.Type, w io.Writer) error {
 	sw := generator.NewSnippetWriter(w, c, "$", "$")
-	const pkgRESTClient = "k8s.io/client-go/rest"
-	const pkgAPI = "k8s.io/kubernetes/pkg/api"
-	const pkgSerializer = "k8s.io/apimachinery/pkg/runtime/serializer"
-	const pkgUnversioned = "k8s.io/kubernetes/pkg/api/unversioned"
-	const pkgSchema = "k8s.io/apimachinery/pkg/runtime/schema"
 
 	apiPath := func(group string) string {
 		if len(g.apiPath) > 0 {
@@ -78,27 +73,29 @@ func (g *genGroup) GenerateType(c *generator.Context, t *types.Type, w io.Writer
 		groupName = ""
 	}
 	// allow user to define a group name that's different from the one parsed from the directory.
-	p := c.Universe.Package(g.inputPacakge)
+	p := c.Universe.Package(g.inputPackage)
 	if override := types.ExtractCommentTags("+", p.DocComments)["groupName"]; override != nil {
 		groupName = override[0]
 	}
 
 	m := map[string]interface{}{
-		"group":                      g.group,
-		"version":                    g.version,
-		"GroupVersion":               namer.IC(g.group) + namer.IC(g.version),
-		"groupName":                  groupName,
-		"types":                      g.types,
-		"Config":                     c.Universe.Type(types.Name{Package: pkgRESTClient, Name: "Config"}),
-		"DefaultKubernetesUserAgent": c.Universe.Function(types.Name{Package: pkgRESTClient, Name: "DefaultKubernetesUserAgent"}),
-		"RESTClientInterface":        c.Universe.Type(types.Name{Package: pkgRESTClient, Name: "Interface"}),
-		"RESTClientFor":              c.Universe.Function(types.Name{Package: pkgRESTClient, Name: "RESTClientFor"}),
-		"ParseGroupVersion":          c.Universe.Function(types.Name{Package: pkgSchema, Name: "ParseGroupVersion"}),
-		"apiPath":                    apiPath(g.group),
-		"apiRegistry":                c.Universe.Variable(types.Name{Package: pkgAPI, Name: "Registry"}),
-		"codecs":                     c.Universe.Variable(types.Name{Package: pkgAPI, Name: "Codecs"}),
-		"directCodecFactory":         c.Universe.Variable(types.Name{Package: pkgSerializer, Name: "DirectCodecFactory"}),
-		"Errorf":                     c.Universe.Variable(types.Name{Package: "fmt", Name: "Errorf"}),
+		"group":                          g.group,
+		"version":                        g.version,
+		"GroupVersion":                   namer.IC(g.group) + namer.IC(g.version),
+		"groupName":                      groupName,
+		"types":                          g.types,
+		"apiPath":                        apiPath(g.group),
+		"fmtErrorf":		          c.Universe.Function(types.Name{Package: "fmt", Name: "Errorf"}),
+		"runtimeAPIVersionInternal":      c.Universe.Variable(types.Name{Package: "k8s.io/apimachinery/pkg/runtime", Name: "APIVersionInternal"}),
+		"schemaGroupVersion":             c.Universe.Type(types.Name{Package: "k8s.io/apimachinery/pkg/runtime/schema", Name: "GroupVersion"}),
+		"schemaParseGroupVersion":        c.Universe.Function(types.Name{Package: "k8s.io/apimachinery/pkg/runtime/schema", Name: "ParseGroupVersion"}),
+		"serializerDirectCodecFactory":   c.Universe.Type(types.Name{Package: "k8s.io/apimachinery/pkg/runtime/serializer", Name: "DirectCodecFactory"}),
+		"restConfig":                     c.Universe.Type(types.Name{Package: "k8s.io/client-go/rest", Name: "Config"}),
+		"restDefaultKubernetesUserAgent": c.Universe.Function(types.Name{Package: "k8s.io/client-go/rest", Name: "DefaultKubernetesUserAgent"}),
+		"restRESTClientInterface":        c.Universe.Type(types.Name{Package: "k8s.io/client-go/rest", Name: "Interface"}),
+		"restRESTClientFor":              c.Universe.Function(types.Name{Package: "k8s.io/client-go/rest", Name: "RESTClientFor"}),
+		"apiCodecs":                      c.Universe.Variable(types.Name{Package: "k8s.io/kubernetes/pkg/api", Name: "Codecs"}),
+		"apiRegistry":                    c.Universe.Variable(types.Name{Package: "k8s.io/kubernetes/pkg/api", Name: "Registry"}),
 	}
 	sw.Do(groupInterfaceTemplate, m)
 	sw.Do(groupClientTemplate, m)
@@ -112,7 +109,6 @@ func (g *genGroup) GenerateType(c *generator.Context, t *types.Type, w io.Writer
 			sw.Do(getterImplNamespaced, wrapper)
 		} else {
 			sw.Do(getterImplNonNamespaced, wrapper)
-
 		}
 	}
 	sw.Do(newClientForConfigTemplate, m)
@@ -130,7 +126,7 @@ func (g *genGroup) GenerateType(c *generator.Context, t *types.Type, w io.Writer
 
 var groupInterfaceTemplate = `
 type $.GroupVersion$Interface interface {
-    RESTClient() $.RESTClientInterface|raw$
+    RESTClient() $.restRESTClientInterface|raw$
     $range .types$ $.|publicPlural$Getter
     $end$
 }
@@ -139,7 +135,7 @@ type $.GroupVersion$Interface interface {
 var groupClientTemplate = `
 // $.GroupVersion$Client is used to interact with features provided by the $.groupName$ group.
 type $.GroupVersion$Client struct {
-	restClient $.RESTClientInterface|raw$
+	restClient $.restRESTClientInterface|raw$
 }
 `
 
@@ -157,12 +153,12 @@ func (c *$.GroupVersion$Client) $.type|publicPlural$() $.type|public$Interface {
 
 var newClientForConfigTemplate = `
 // NewForConfig creates a new $.GroupVersion$Client for the given config.
-func NewForConfig(c *$.Config|raw$) (*$.GroupVersion$Client, error) {
+func NewForConfig(c *$.restConfig|raw$) (*$.GroupVersion$Client, error) {
 	config := *c
 	if err := setConfigDefaults(&config); err != nil {
 		return nil, err
 	}
-	client, err := $.RESTClientFor|raw$(&config)
+	client, err := $.restRESTClientFor|raw$(&config)
 	if err != nil {
 		return nil, err
 	}
@@ -173,7 +169,7 @@ func NewForConfig(c *$.Config|raw$) (*$.GroupVersion$Client, error) {
 var newClientForConfigOrDieTemplate = `
 // NewForConfigOrDie creates a new $.GroupVersion$Client for the given config and
 // panics if there is an error in the config.
-func NewForConfigOrDie(c *$.Config|raw$) *$.GroupVersion$Client {
+func NewForConfigOrDie(c *$.restConfig|raw$) *$.GroupVersion$Client {
 	client, err := NewForConfig(c)
 	if err != nil {
 		panic(err)
@@ -185,7 +181,7 @@ func NewForConfigOrDie(c *$.Config|raw$) *$.GroupVersion$Client {
 var getRESTClient = `
 // RESTClient returns a RESTClient that is used to communicate
 // with API server by this client implementation.
-func (c *$.GroupVersion$Client) RESTClient() $.RESTClientInterface|raw$ {
+func (c *$.GroupVersion$Client) RESTClient() $.restRESTClientInterface|raw$ {
 	if c == nil {
 		return nil
 	}
@@ -195,26 +191,28 @@ func (c *$.GroupVersion$Client) RESTClient() $.RESTClientInterface|raw$ {
 
 var newClientForRESTClientTemplate = `
 // New creates a new $.GroupVersion$Client for the given RESTClient.
-func New(c $.RESTClientInterface|raw$) *$.GroupVersion$Client {
+func New(c $.restRESTClientInterface|raw$) *$.GroupVersion$Client {
 	return &$.GroupVersion$Client{c}
 }
 `
+
 var setInternalVersionClientDefaultsTemplate = `
-func setConfigDefaults(config *$.Config|raw$) error {
+func setConfigDefaults(config *$.restConfig|raw$) error {
 	// if $.group$ group is not registered, return an error
 	g, err := $.apiRegistry|raw$.Group("$.groupName$")
 	if err != nil {
 		return err
 	}
+
 	config.APIPath = $.apiPath$
 	if config.UserAgent == "" {
-		config.UserAgent = $.DefaultKubernetesUserAgent|raw$()
+		config.UserAgent = $.restDefaultKubernetesUserAgent|raw$()
 	}
 	if config.GroupVersion == nil || config.GroupVersion.Group != g.GroupVersion.Group {
 		copyGroupVersion := g.GroupVersion
 		config.GroupVersion = &copyGroupVersion
 	}
-	config.NegotiatedSerializer = $.codecs|raw$
+	config.NegotiatedSerializer = $.apiCodecs|raw$
 
 	if config.QPS == 0 {
 		config.QPS = 5
@@ -222,28 +220,29 @@ func setConfigDefaults(config *$.Config|raw$) error {
 	if config.Burst == 0 {
 		config.Burst = 10
 	}
+
 	return nil
 }
 `
 
 var setClientDefaultsTemplate = `
-func setConfigDefaults(config *$.Config|raw$) error {
-	gv, err := $.ParseGroupVersion|raw$("$.groupName$/$.version$")
+func setConfigDefaults(config *$.restConfig|raw$) error {
+	gv, err := $.schemaParseGroupVersion|raw$("$.groupName$/$.version$")
 	if err != nil {
 		return err
 	}
 	// if $.groupName$/$.version$ is not enabled, return an error
 	if ! $.apiRegistry|raw$.IsEnabledVersion(gv) {
-		return $.Errorf|raw$("$.groupName$/$.version$ is not enabled")
+		return $.fmtErrorf|raw$("$.groupName$/$.version$ is not enabled")
 	}
 	config.APIPath = $.apiPath$
 	if config.UserAgent == "" {
-		config.UserAgent = $.DefaultKubernetesUserAgent|raw$()
+		config.UserAgent = $.restDefaultKubernetesUserAgent|raw$()
 	}
 	copyGroupVersion := gv
 	config.GroupVersion = &copyGroupVersion
 
-	config.NegotiatedSerializer = $.directCodecFactory|raw${CodecFactory: $.codecs|raw$}
+	config.NegotiatedSerializer = $.serializerDirectCodecFactory|raw${CodecFactory: $.apiCodecs|raw$}
 
 	return nil
 }
