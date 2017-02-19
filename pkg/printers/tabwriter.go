@@ -27,7 +27,6 @@ const (
 	tabwriterPadding  = 3
 	tabwriterPadChar  = ' '
 	tabwriterFlags    = 0
-	loadBalancerWidth = 16
 )
 
 // GetNewTabWriter returns a tabwriter that translates tabbed columns in input into properly aligned text.

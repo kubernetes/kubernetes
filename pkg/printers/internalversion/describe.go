@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package kubectl
+package internalversion
 
 import (
 	"bytes"
@@ -26,7 +26,10 @@ import (
 	"reflect"
 	"sort"
 	"strings"
+	"text/tabwriter"
 	"time"
+
+	"github.com/golang/glog"
 
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -42,7 +45,6 @@ import (
 	"k8s.io/kubernetes/federation/apis/federation"
 	fedclientset "k8s.io/kubernetes/federation/client/clientset_generated/federation_internalclientset"
 	"k8s.io/kubernetes/pkg/api"
-
 	"k8s.io/kubernetes/pkg/api/annotations"
 	"k8s.io/kubernetes/pkg/api/events"
 	"k8s.io/kubernetes/pkg/apis/apps"
@@ -55,47 +57,16 @@ import (
 	"k8s.io/kubernetes/pkg/apis/storage"
 	storageutil "k8s.io/kubernetes/pkg/apis/storage/util"
 	versionedclientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
+	coreclientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/core/v1"
+	extensionsclientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/extensions/v1beta1"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	coreclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/core/internalversion"
 	extensionsclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/extensions/internalversion"
 	deploymentutil "k8s.io/kubernetes/pkg/controller/deployment/util"
 	"k8s.io/kubernetes/pkg/fieldpath"
-
-	"github.com/golang/glog"
+	"k8s.io/kubernetes/pkg/kubelet/qos"
+	"k8s.io/kubernetes/pkg/printers"
 )
-
-// Describer generates output for the named resource or an error
-// if the output could not be generated. Implementers typically
-// abstract the retrieval of the named object from a remote server.
-type Describer interface {
-	Describe(namespace, name string, describerSettings DescriberSettings) (output string, err error)
-}
-
-// DescriberSettings holds display configuration for each object
-// describer to control what is printed.
-type DescriberSettings struct {
-	ShowEvents bool
-}
-
-// ObjectDescriber is an interface for displaying arbitrary objects with extra
-// information. Use when an object is in hand (on disk, or already retrieved).
-// Implementers may ignore the additional information passed on extra, or use it
-// by default. ObjectDescribers may return ErrNoDescriber if no suitable describer
-// is found.
-type ObjectDescriber interface {
-	DescribeObject(object interface{}, extra ...interface{}) (output string, err error)
-}
-
-// ErrNoDescriber is a structured error indicating the provided object or objects
-// cannot be described.
-type ErrNoDescriber struct {
-	Types []string
-}
-
-// Error implements the error interface.
-func (e ErrNoDescriber) Error() string {
-	return fmt.Sprintf("no describer has been defined for %v", e.Types)
-}
 
 // Each level has 2 spaces for PrefixWriter
 const (
@@ -122,8 +93,8 @@ func (pw *PrefixWriter) WriteLine(a ...interface{}) {
 	fmt.Fprintln(pw.out, a...)
 }
 
-func describerMap(c clientset.Interface) map[schema.GroupKind]Describer {
-	m := map[schema.GroupKind]Describer{
+func describerMap(c clientset.Interface) map[schema.GroupKind]printers.Describer {
+	m := map[schema.GroupKind]printers.Describer{
 		api.Kind("Pod"):                   &PodDescriber{c},
 		api.Kind("ReplicationController"): &ReplicationControllerDescriber{c},
 		api.Kind("Secret"):                &SecretDescriber{c},
@@ -155,7 +126,7 @@ func describerMap(c clientset.Interface) map[schema.GroupKind]Describer {
 	return m
 }
 
-// List of all resource types we can describe
+// DescribableResources lists all resource types we can describe.
 func DescribableResources() []string {
 	keys := make([]string, 0)
 
@@ -166,16 +137,16 @@ func DescribableResources() []string {
 	return keys
 }
 
-// Describer returns the default describe functions for each of the standard
+// DescriberFor returns the default describe functions for each of the standard
 // Kubernetes types.
-func DescriberFor(kind schema.GroupKind, c clientset.Interface) (Describer, bool) {
+func DescriberFor(kind schema.GroupKind, c clientset.Interface) (printers.Describer, bool) {
 	f, ok := describerMap(c)[kind]
 	return f, ok
 }
 
 // GenericDescriberFor returns a generic describer for the specified mapping
 // that uses only information available from runtime.Unstructured
-func GenericDescriberFor(mapping *meta.RESTMapping, dynamic *dynamic.Client, events coreclient.EventsGetter) Describer {
+func GenericDescriberFor(mapping *meta.RESTMapping, dynamic *dynamic.Client, events coreclient.EventsGetter) printers.Describer {
 	return &genericDescriber{mapping, dynamic, events}
 }
 
@@ -185,7 +156,7 @@ type genericDescriber struct {
 	events  coreclient.EventsGetter
 }
 
-func (g *genericDescriber) Describe(namespace, name string, describerSettings DescriberSettings) (output string, err error) {
+func (g *genericDescriber) Describe(namespace, name string, describerSettings printers.DescriberSettings) (output string, err error) {
 	apiResource := &metav1.APIResource{
 		Name:       g.mapping.Resource,
 		Namespaced: g.mapping.Scope.Name() == meta.RESTScopeNameNamespace,
@@ -214,7 +185,7 @@ func (g *genericDescriber) Describe(namespace, name string, describerSettings De
 }
 
 // DefaultObjectDescriber can describe the default Kubernetes objects.
-var DefaultObjectDescriber ObjectDescriber
+var DefaultObjectDescriber printers.ObjectDescriber
 
 func init() {
 	d := &Describers{}
@@ -239,7 +210,7 @@ type NamespaceDescriber struct {
 	clientset.Interface
 }
 
-func (d *NamespaceDescriber) Describe(namespace, name string, describerSettings DescriberSettings) (string, error) {
+func (d *NamespaceDescriber) Describe(namespace, name string, describerSettings printers.DescriberSettings) (string, error) {
 	ns, err := d.Core().Namespaces().Get(name, metav1.GetOptions{})
 	if err != nil {
 		return "", err
@@ -411,7 +382,7 @@ type LimitRangeDescriber struct {
 	clientset.Interface
 }
 
-func (d *LimitRangeDescriber) Describe(namespace, name string, describerSettings DescriberSettings) (string, error) {
+func (d *LimitRangeDescriber) Describe(namespace, name string, describerSettings printers.DescriberSettings) (string, error) {
 	lr := d.Core().LimitRanges(namespace)
 
 	limitRange, err := lr.Get(name, metav1.GetOptions{})
@@ -438,7 +409,7 @@ type ResourceQuotaDescriber struct {
 	clientset.Interface
 }
 
-func (d *ResourceQuotaDescriber) Describe(namespace, name string, describerSettings DescriberSettings) (string, error) {
+func (d *ResourceQuotaDescriber) Describe(namespace, name string, describerSettings printers.DescriberSettings) (string, error) {
 	rq := d.Core().ResourceQuotas(namespace)
 
 	resourceQuota, err := rq.Get(name, metav1.GetOptions{})
@@ -508,7 +479,7 @@ type PodDescriber struct {
 	clientset.Interface
 }
 
-func (d *PodDescriber) Describe(namespace, name string, describerSettings DescriberSettings) (string, error) {
+func (d *PodDescriber) Describe(namespace, name string, describerSettings printers.DescriberSettings) (string, error) {
 	pod, err := d.Core().Pods(namespace).Get(name, metav1.GetOptions{})
 	if err != nil {
 		if describerSettings.ShowEvents {
@@ -810,7 +781,7 @@ type PersistentVolumeDescriber struct {
 	clientset.Interface
 }
 
-func (d *PersistentVolumeDescriber) Describe(namespace, name string, describerSettings DescriberSettings) (string, error) {
+func (d *PersistentVolumeDescriber) Describe(namespace, name string, describerSettings printers.DescriberSettings) (string, error) {
 	c := d.Core().PersistentVolumes()
 
 	pv, err := c.Get(name, metav1.GetOptions{})
@@ -881,7 +852,7 @@ type PersistentVolumeClaimDescriber struct {
 	clientset.Interface
 }
 
-func (d *PersistentVolumeClaimDescriber) Describe(namespace, name string, describerSettings DescriberSettings) (string, error) {
+func (d *PersistentVolumeClaimDescriber) Describe(namespace, name string, describerSettings printers.DescriberSettings) (string, error) {
 	c := d.Core().PersistentVolumeClaims(namespace)
 
 	pvc, err := c.Get(name, metav1.GetOptions{})
@@ -1214,7 +1185,7 @@ type ReplicationControllerDescriber struct {
 	clientset.Interface
 }
 
-func (d *ReplicationControllerDescriber) Describe(namespace, name string, describerSettings DescriberSettings) (string, error) {
+func (d *ReplicationControllerDescriber) Describe(namespace, name string, describerSettings printers.DescriberSettings) (string, error) {
 	rc := d.Core().ReplicationControllers(namespace)
 	pc := d.Core().Pods(namespace)
 
@@ -1286,7 +1257,7 @@ type ReplicaSetDescriber struct {
 	clientset.Interface
 }
 
-func (d *ReplicaSetDescriber) Describe(namespace, name string, describerSettings DescriberSettings) (string, error) {
+func (d *ReplicaSetDescriber) Describe(namespace, name string, describerSettings printers.DescriberSettings) (string, error) {
 	rsc := d.Extensions().ReplicaSets(namespace)
 	pc := d.Core().Pods(namespace)
 
@@ -1338,7 +1309,7 @@ type JobDescriber struct {
 	clientset.Interface
 }
 
-func (d *JobDescriber) Describe(namespace, name string, describerSettings DescriberSettings) (string, error) {
+func (d *JobDescriber) Describe(namespace, name string, describerSettings printers.DescriberSettings) (string, error) {
 	job, err := d.Batch().Jobs(namespace).Get(name, metav1.GetOptions{})
 	if err != nil {
 		return "", err
@@ -1387,7 +1358,7 @@ type CronJobDescriber struct {
 	clientset.Interface
 }
 
-func (d *CronJobDescriber) Describe(namespace, name string, describerSettings DescriberSettings) (string, error) {
+func (d *CronJobDescriber) Describe(namespace, name string, describerSettings printers.DescriberSettings) (string, error) {
 	scheduledJob, err := d.Batch().CronJobs(namespace).Get(name, metav1.GetOptions{})
 	if err != nil {
 		return "", err
@@ -1474,7 +1445,7 @@ type DaemonSetDescriber struct {
 	clientset.Interface
 }
 
-func (d *DaemonSetDescriber) Describe(namespace, name string, describerSettings DescriberSettings) (string, error) {
+func (d *DaemonSetDescriber) Describe(namespace, name string, describerSettings printers.DescriberSettings) (string, error) {
 	dc := d.Extensions().DaemonSets(namespace)
 	pc := d.Core().Pods(namespace)
 
@@ -1529,7 +1500,7 @@ type SecretDescriber struct {
 	clientset.Interface
 }
 
-func (d *SecretDescriber) Describe(namespace, name string, describerSettings DescriberSettings) (string, error) {
+func (d *SecretDescriber) Describe(namespace, name string, describerSettings printers.DescriberSettings) (string, error) {
 	c := d.Core().Secrets(namespace)
 
 	secret, err := c.Get(name, metav1.GetOptions{})
@@ -1569,7 +1540,7 @@ type IngressDescriber struct {
 	clientset.Interface
 }
 
-func (i *IngressDescriber) Describe(namespace, name string, describerSettings DescriberSettings) (string, error) {
+func (i *IngressDescriber) Describe(namespace, name string, describerSettings printers.DescriberSettings) (string, error) {
 	c := i.Extensions().Ingresses(namespace)
 	ing, err := c.Get(name, metav1.GetOptions{})
 	if err != nil {
@@ -1598,7 +1569,7 @@ func (i *IngressDescriber) describeBackend(ns string, backend *extensions.Ingres
 	return formatEndpoints(endpoints, sets.NewString(spName))
 }
 
-func (i *IngressDescriber) describeIngress(ing *extensions.Ingress, describerSettings DescriberSettings) (string, error) {
+func (i *IngressDescriber) describeIngress(ing *extensions.Ingress, describerSettings printers.DescriberSettings) (string, error) {
 	return tabbedString(func(out io.Writer) error {
 		w := &PrefixWriter{out}
 		w.Write(LEVEL_0, "Name:\t%v\n", ing.Name)
@@ -1682,7 +1653,7 @@ type ServiceDescriber struct {
 	clientset.Interface
 }
 
-func (d *ServiceDescriber) Describe(namespace, name string, describerSettings DescriberSettings) (string, error) {
+func (d *ServiceDescriber) Describe(namespace, name string, describerSettings printers.DescriberSettings) (string, error) {
 	c := d.Core().Services(namespace)
 
 	service, err := c.Get(name, metav1.GetOptions{})
@@ -1762,7 +1733,7 @@ type EndpointsDescriber struct {
 	clientset.Interface
 }
 
-func (d *EndpointsDescriber) Describe(namespace, name string, describerSettings DescriberSettings) (string, error) {
+func (d *EndpointsDescriber) Describe(namespace, name string, describerSettings printers.DescriberSettings) (string, error) {
 	c := d.Core().Endpoints(namespace)
 
 	ep, err := c.Get(name, metav1.GetOptions{})
@@ -1836,7 +1807,7 @@ type ServiceAccountDescriber struct {
 	clientset.Interface
 }
 
-func (d *ServiceAccountDescriber) Describe(namespace, name string, describerSettings DescriberSettings) (string, error) {
+func (d *ServiceAccountDescriber) Describe(namespace, name string, describerSettings printers.DescriberSettings) (string, error) {
 	c := d.Core().ServiceAccounts(namespace)
 
 	serviceAccount, err := c.Get(name, metav1.GetOptions{})
@@ -1944,7 +1915,7 @@ type NodeDescriber struct {
 	clientset.Interface
 }
 
-func (d *NodeDescriber) Describe(namespace, name string, describerSettings DescriberSettings) (string, error) {
+func (d *NodeDescriber) Describe(namespace, name string, describerSettings printers.DescriberSettings) (string, error) {
 	mc := d.Core().Nodes()
 	node, err := mc.Get(name, metav1.GetOptions{})
 	if err != nil {
@@ -2065,7 +2036,7 @@ type StatefulSetDescriber struct {
 	client clientset.Interface
 }
 
-func (p *StatefulSetDescriber) Describe(namespace, name string, describerSettings DescriberSettings) (string, error) {
+func (p *StatefulSetDescriber) Describe(namespace, name string, describerSettings printers.DescriberSettings) (string, error) {
 	ps, err := p.client.Apps().StatefulSets(namespace).Get(name, metav1.GetOptions{})
 	if err != nil {
 		return "", err
@@ -2108,7 +2079,7 @@ type CertificateSigningRequestDescriber struct {
 	client clientset.Interface
 }
 
-func (p *CertificateSigningRequestDescriber) Describe(namespace, name string, describerSettings DescriberSettings) (string, error) {
+func (p *CertificateSigningRequestDescriber) Describe(namespace, name string, describerSettings printers.DescriberSettings) (string, error) {
 	csr, err := p.client.Certificates().CertificateSigningRequests().Get(name, metav1.GetOptions{})
 	if err != nil {
 		return "", err
@@ -2178,7 +2149,7 @@ type HorizontalPodAutoscalerDescriber struct {
 	client clientset.Interface
 }
 
-func (d *HorizontalPodAutoscalerDescriber) Describe(namespace, name string, describerSettings DescriberSettings) (string, error) {
+func (d *HorizontalPodAutoscalerDescriber) Describe(namespace, name string, describerSettings printers.DescriberSettings) (string, error) {
 	hpa, err := d.client.Autoscaling().HorizontalPodAutoscalers(namespace).Get(name, metav1.GetOptions{})
 	if err != nil {
 		return "", err
@@ -2369,7 +2340,7 @@ type DeploymentDescriber struct {
 	versionedClient versionedclientset.Interface
 }
 
-func (dd *DeploymentDescriber) Describe(namespace, name string, describerSettings DescriberSettings) (string, error) {
+func (dd *DeploymentDescriber) Describe(namespace, name string, describerSettings printers.DescriberSettings) (string, error) {
 	d, err := dd.versionedClient.Extensions().Deployments(namespace).Get(name, metav1.GetOptions{})
 	if err != nil {
 		return "", err
@@ -2504,7 +2475,7 @@ type ConfigMapDescriber struct {
 	clientset.Interface
 }
 
-func (d *ConfigMapDescriber) Describe(namespace, name string, describerSettings DescriberSettings) (string, error) {
+func (d *ConfigMapDescriber) Describe(namespace, name string, describerSettings printers.DescriberSettings) (string, error) {
 	c := d.Core().ConfigMaps(namespace)
 
 	configMap, err := c.Get(name, metav1.GetOptions{})
@@ -2537,7 +2508,7 @@ type ClusterDescriber struct {
 	fedclientset.Interface
 }
 
-func (d *ClusterDescriber) Describe(namespace, name string, describerSettings DescriberSettings) (string, error) {
+func (d *ClusterDescriber) Describe(namespace, name string, describerSettings printers.DescriberSettings) (string, error) {
 	cluster, err := d.Federation().Clusters().Get(name, metav1.GetOptions{})
 	if err != nil {
 		return "", err
@@ -2579,7 +2550,7 @@ type NetworkPolicyDescriber struct {
 	clientset.Interface
 }
 
-func (d *NetworkPolicyDescriber) Describe(namespace, name string, describerSettings DescriberSettings) (string, error) {
+func (d *NetworkPolicyDescriber) Describe(namespace, name string, describerSettings printers.DescriberSettings) (string, error) {
 	c := d.Extensions().NetworkPolicies(namespace)
 
 	networkPolicy, err := c.Get(name, metav1.GetOptions{})
@@ -2606,7 +2577,7 @@ type StorageClassDescriber struct {
 	clientset.Interface
 }
 
-func (s *StorageClassDescriber) Describe(namespace, name string, describerSettings DescriberSettings) (string, error) {
+func (s *StorageClassDescriber) Describe(namespace, name string, describerSettings printers.DescriberSettings) (string, error) {
 	sc, err := s.Storage().StorageClasses().Get(name, metav1.GetOptions{})
 	if err != nil {
 		return "", err
@@ -2635,7 +2606,7 @@ type PodDisruptionBudgetDescriber struct {
 	clientset.Interface
 }
 
-func (p *PodDisruptionBudgetDescriber) Describe(namespace, name string, describerSettings DescriberSettings) (string, error) {
+func (p *PodDisruptionBudgetDescriber) Describe(namespace, name string, describerSettings printers.DescriberSettings) (string, error) {
 	pdb, err := p.Policy().PodDisruptionBudgets(namespace).Get(name, metav1.GetOptions{})
 	if err != nil {
 		return "", err
@@ -2673,7 +2644,7 @@ func newErrNoDescriber(types ...reflect.Type) error {
 	for _, t := range types {
 		names = append(names, t.String())
 	}
-	return ErrNoDescriber{Types: names}
+	return printers.ErrNoDescriber{Types: names}
 }
 
 // Describers implements ObjectDescriber against functions registered via Add. Those functions can
@@ -2720,7 +2691,7 @@ func (d *Describers) DescribeObject(exact interface{}, extra ...interface{}) (st
 	return "", newErrNoDescriber(append([]reflect.Type{exactType}, types...)...)
 }
 
-// Add adds one or more describer functions to the Describer. The passed function must
+// Add adds one or more describer functions to the printers.Describer. The passed function must
 // match the signature:
 //
 //     func(...) (string, error)
@@ -2926,5 +2897,104 @@ func printTolerationsMultilineWithIndent(w *PrefixWriter, initialIndent, title, 
 				i++
 			}
 		}
+	}
+}
+
+func tabbedString(f func(io.Writer) error) (string, error) {
+	out := new(tabwriter.Writer)
+	buf := &bytes.Buffer{}
+	out.Init(buf, 0, 8, 1, '\t', 0)
+
+	err := f(out)
+	if err != nil {
+		return "", err
+	}
+
+	out.Flush()
+	str := string(buf.String())
+	return str, nil
+}
+
+type SortableResourceNames []api.ResourceName
+
+func (list SortableResourceNames) Len() int {
+	return len(list)
+}
+
+func (list SortableResourceNames) Swap(i, j int) {
+	list[i], list[j] = list[j], list[i]
+}
+
+func (list SortableResourceNames) Less(i, j int) bool {
+	return list[i] < list[j]
+}
+
+// SortedResourceNames returns the sorted resource names of a resource list.
+func SortedResourceNames(list api.ResourceList) []api.ResourceName {
+	resources := make([]api.ResourceName, 0, len(list))
+	for res := range list {
+		resources = append(resources, res)
+	}
+	sort.Sort(SortableResourceNames(resources))
+	return resources
+}
+
+type SortableResourceQuotas []api.ResourceQuota
+
+func (list SortableResourceQuotas) Len() int {
+	return len(list)
+}
+
+func (list SortableResourceQuotas) Swap(i, j int) {
+	list[i], list[j] = list[j], list[i]
+}
+
+func (list SortableResourceQuotas) Less(i, j int) bool {
+	return list[i].Name < list[j].Name
+}
+
+type SortableVolumeMounts []api.VolumeMount
+
+func (list SortableVolumeMounts) Len() int {
+	return len(list)
+}
+
+func (list SortableVolumeMounts) Swap(i, j int) {
+	list[i], list[j] = list[j], list[i]
+}
+
+func (list SortableVolumeMounts) Less(i, j int) bool {
+	return list[i].MountPath < list[j].MountPath
+}
+
+// SortedQoSResourceNames returns the sorted resource names of a QoS list.
+func SortedQoSResourceNames(list qos.QOSList) []api.ResourceName {
+	resources := make([]api.ResourceName, 0, len(list))
+	for res := range list {
+		resources = append(resources, api.ResourceName(res))
+	}
+	sort.Sort(SortableResourceNames(resources))
+	return resources
+}
+
+func listOfImages(spec *api.PodSpec) []string {
+	images := make([]string, 0, len(spec.Containers))
+	for _, container := range spec.Containers {
+		images = append(images, container.Image)
+	}
+	return images
+}
+
+func makeImageList(spec *api.PodSpec) string {
+	return strings.Join(listOfImages(spec), ",")
+}
+
+func versionedClientsetForDeployment(internalClient clientset.Interface) versionedclientset.Interface {
+	if internalClient == nil {
+		return &versionedclientset.Clientset{}
+	}
+	return &versionedclientset.Clientset{
+		CoreV1Client:            coreclientset.New(internalClient.Core().RESTClient()),
+		ExtensionsV1beta1Client: extensionsclientset.New(internalClient.Extensions().RESTClient()),
 	}
 }
