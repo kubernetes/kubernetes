@@ -23,13 +23,14 @@ import (
 	"text/tabwriter"
 
 	"github.com/spf13/cobra"
+
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
-	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
+	"k8s.io/kubernetes/pkg/printers"
 	"k8s.io/kubernetes/pkg/util/i18n"
 )
 
@@ -108,7 +109,7 @@ func (o GetContextsOptions) RunGetContexts() error {
 
 	out, found := o.out.(*tabwriter.Writer)
 	if !found {
-		out = kubectl.GetNewTabWriter(o.out)
+		out = printers.GetNewTabWriter(o.out)
 		defer out.Flush()
 	}
 

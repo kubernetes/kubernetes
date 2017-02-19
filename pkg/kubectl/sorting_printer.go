@@ -31,13 +31,14 @@ import (
 	"k8s.io/client-go/util/integer"
 	"k8s.io/client-go/util/jsonpath"
 	"k8s.io/kubernetes/pkg/api/v1"
+	"k8s.io/kubernetes/pkg/printers"
 )
 
 // Sorting printer sorts list types before delegating to another printer.
 // Non-list types are simply passed through
 type SortingPrinter struct {
 	SortField string
-	Delegate  ResourcePrinter
+	Delegate  printers.ResourcePrinter
 	Decoder   runtime.Decoder
 }
 
@@ -101,7 +102,7 @@ func SortObjects(decoder runtime.Decoder, objs []runtime.Object, fieldInput stri
 		}
 	}
 
-	field, err := massageJSONPath(fieldInput)
+	field, err := printers.RelaxedJSONPathExpression(fieldInput)
 	if err != nil {
 		return nil, err
 	}
