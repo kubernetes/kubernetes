@@ -149,8 +149,8 @@ func (c *jobs) List(opts v1.ListOptions) (result *v2alpha1.JobList, err error) {
 
 // Watch returns a watch.Interface that watches the requested jobs.
 func (c *jobs) Watch(opts v1.ListOptions) (watch.Interface, error) {
+	opts.Watch = true
 	return c.client.Get().
-		Prefix("watch").
 		Namespace(c.ns).
 		Resource("jobs").
 		VersionedParams(&opts, api.ParameterCodec).

@@ -132,8 +132,8 @@ func (c *roleBindings) List(opts v1.ListOptions) (result *rbac.RoleBindingList, 
 
 // Watch returns a watch.Interface that watches the requested roleBindings.
 func (c *roleBindings) Watch(opts v1.ListOptions) (watch.Interface, error) {
+	opts.Watch = true
 	return c.client.Get().
-		Prefix("watch").
 		Namespace(c.ns).
 		Resource("rolebindings").
 		VersionedParams(&opts, api.ParameterCodec).
