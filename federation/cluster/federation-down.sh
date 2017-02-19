@@ -20,35 +20,46 @@ set -o pipefail
 
 KUBE_ROOT=$(readlink -m $(dirname "${BASH_SOURCE}")/../../)
 
-# For $FEDERATION_KUBE_CONTEXT, $HOST_CLUSTER_CONTEXT,
+# For $FEDERATION_NAME, $FEDERATION_KUBE_CONTEXT, $HOST_CLUSTER_CONTEXT,
 # $KUBEDNS_CONFIGMAP_NAME and $KUBEDNS_CONFIGMAP_NAMESPACE.
 source "${KUBE_ROOT}/federation/cluster/common.sh"
 
-# join_cluster_to_federation joins the clusters in the local kubeconfig to federation. The clusters
-# and their kubeconfig entries in the local kubeconfig are created while deploying clusters, i.e. when kube-up is run.
+# unjoin_clusters unjoins all the clusters from federation.
 function unjoin_clusters() {
-  "${host_kubectl}" config use-context "${FEDERATION_KUBE_CONTEXT}"
-
-  local -r clusters=$("${host_kubectl}" -o jsonpath --template '{.items[*].metadata.name}')
-  for cluster in ${clusters}; do
-    kube::log::status "Unjoining cluster \"${cluster}\" from federation \"${FEDERATION_NAME}\""
+  for context in $(federation_cluster_contexts); do
+    kube::log::status "Unjoining cluster \"${context}\" from federation \"${FEDERATION_NAME}\""
 
     "${KUBE_ROOT}/federation/develop/kubefed.sh" unjoin \
-        "${cluster}" \
+        "${context}" \
+        --context="${FEDERATION_KUBE_CONTEXT}" \
         --host-cluster-context="${HOST_CLUSTER_CONTEXT}"
 
-    # Create kube-dns configmap in each cluster for kube-dns to accept
-    # federation queries.
+    # Delete kube-dns configmap that contains federation
+    # configuration from each cluster.
     # TODO: This shouldn't be required after
     # https://github.com/kubernetes/kubernetes/pull/39338.
     # Remove this after the PR is merged.
-    "${host_kubectl}" delete configmap \
+    kube::log::status "Deleting \"kube-dns\" ConfigMap from \"kube-system\" namespace in cluster \"${context}\""
+    "${KUBE_ROOT}/cluster/kubectl.sh" delete configmap \
+        --context="${context}" \
         --namespace="${KUBEDNS_CONFIGMAP_NAMESPACE}" \
         "${KUBEDNS_CONFIGMAP_NAME}"
   done
 }
 
-cleanup-federation-api-objects
+unjoin_clusters
 
-"${host_kubectl}" delete namespace "${FEDERATION_NAMESPACE}"
+cleanup-federation-api-objects || echo "Couldn't cleanup federation api objects"
 
+"${KUBE_ROOT}/cluster/kubectl.sh" delete namespace \
+    --context="${HOST_CLUSTER_CONTEXT}" \
+    "${FEDERATION_NAMESPACE}"
+
+# TODO(madhusudancs): This is an arbitrary amount of sleep to give Kubernetes
+# clusters enough time to delete the underlying cloud provider resources
+# corresponding to the Kubernetes resources we deleted as part of the test
+# teardowns. It is shameful that we are doing this, but this is just a bandage
+# to stop the bleeding. Please don't use this pattern anywhere. Remove this
+# when proper cloud provider cleanups are implemented in the individual test
+# `AfterEach` blocks.
+sleep 2m
