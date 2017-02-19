@@ -1,4 +1,4 @@
-.generated_docs
+docs/.generated_docs
 docs/admin/federation-apiserver.md
 docs/admin/federation-controller-manager.md
 docs/admin/kube-apiserver.md

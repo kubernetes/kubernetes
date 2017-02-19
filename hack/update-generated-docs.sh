@@ -44,7 +44,7 @@ kube::util::gen-docs "${KUBE_TEMP}"
 kube::util::remove-gen-docs
 
 # Copy fresh docs into the repo.
-# the shopt is so that we get .generated_docs from the glob.
+# the shopt is so that we get docs/.generated_docs from the glob.
 shopt -s dotglob
 cp -af "${KUBE_TEMP}"/* "${KUBE_ROOT}"
 shopt -u dotglob
