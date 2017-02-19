@@ -39,6 +39,12 @@
 						}
 					},
 					{
+						"name": "kernellog-volume",
+						"hostPath": {
+							"path": "/var/log"
+						}
+					},
+					{
 						"name": "no-serviceaccount-access-to-real-master",
 						"emptyDir": {}
 					}
@@ -172,6 +178,11 @@
 						{
 							"name": "kernelmonitorconfig-volume",
 							"mountPath": "/config",
+							"readOnly": true
+						},
+						{
+							"name": "kernellog-volume",
+							"mountPath": "/log",
 							"readOnly": true
 						},
 						{
