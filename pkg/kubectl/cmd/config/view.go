@@ -23,13 +23,15 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"k8s.io/apimachinery/pkg/api/meta"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apiserver/pkg/util/flag"
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	"k8s.io/client-go/tools/clientcmd/api/latest"
-	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
+	"k8s.io/kubernetes/pkg/printers"
 	"k8s.io/kubernetes/pkg/util/i18n"
 )
 
@@ -55,7 +57,7 @@ var (
 		kubectl config view -o jsonpath='{.users[?(@.name == "e2e")].user.password}'`)
 )
 
-func NewCmdConfigView(out io.Writer, ConfigAccess clientcmd.ConfigAccess) *cobra.Command {
+func NewCmdConfigView(out, errOut io.Writer, ConfigAccess clientcmd.ConfigAccess) *cobra.Command {
 	options := &ViewOptions{ConfigAccess: ConfigAccess}
 	// Default to yaml
 	defaultOutputFormat := "yaml"
@@ -69,17 +71,19 @@ func NewCmdConfigView(out io.Writer, ConfigAccess clientcmd.ConfigAccess) *cobra
 			options.Complete()
 			outputFormat := cmdutil.GetFlagString(cmd, "output")
 			if outputFormat == "wide" {
-				fmt.Printf("--output wide is not available in kubectl config view; reset to default output format (%s)\n\n", defaultOutputFormat)
+				fmt.Fprintf(errOut, "--output wide is not available in kubectl config view; reset to default output format (%s)\n\n", defaultOutputFormat)
+				// TODO: once printing is abstracted, this should be handled at flag declaration time
 				cmd.Flags().Set("output", defaultOutputFormat)
 			}
 			if outputFormat == "" {
-				fmt.Printf("Reset to default output format (%s) as --output is empty\n", defaultOutputFormat)
+				fmt.Fprintf(errOut, "Reset to default output format (%s) as --output is empty\n", defaultOutputFormat)
+				// TODO: once printing is abstracted, this should be handled at flag declaration time
 				cmd.Flags().Set("output", defaultOutputFormat)
 			}
 
-			printer, _, err := cmdutil.PrinterForCommand(cmd)
+			printer, _, err := cmdutil.PrinterForCommand(cmd, meta.NewDefaultRESTMapper(nil, nil), latest.Scheme, []runtime.Decoder{latest.Codec})
 			cmdutil.CheckErr(err)
-			printer = kubectl.NewVersionedPrinter(printer, latest.Scheme, latest.ExternalVersion)
+			printer = printers.NewVersionedPrinter(printer, latest.Scheme, latest.ExternalVersion)
 
 			cmdutil.CheckErr(options.Run(out, printer))
 		},
@@ -97,7 +101,7 @@ func NewCmdConfigView(out io.Writer, ConfigAccess clientcmd.ConfigAccess) *cobra
 	return cmd
 }
 
-func (o ViewOptions) Run(out io.Writer, printer kubectl.ResourcePrinter) error {
+func (o ViewOptions) Run(out io.Writer, printer printers.ResourcePrinter) error {
 	config, err := o.loadConfig()
 	if err != nil {
 		return err

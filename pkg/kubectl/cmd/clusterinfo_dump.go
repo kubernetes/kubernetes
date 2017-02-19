@@ -26,9 +26,9 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
+	"k8s.io/kubernetes/pkg/printers"
 	"k8s.io/kubernetes/pkg/util/i18n"
 )
 
@@ -93,10 +93,7 @@ func dumpClusterInfo(f cmdutil.Factory, cmd *cobra.Command, args []string, out i
 		return err
 	}
 
-	printer, _, err := kubectl.GetPrinter("json", "", false, true)
-	if err != nil {
-		return err
-	}
+	printer := &printers.JSONPrinter{}
 
 	nodes, err := clientset.Core().Nodes().List(metav1.ListOptions{})
 	if err != nil {
