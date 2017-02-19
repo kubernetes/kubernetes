@@ -1897,6 +1897,11 @@ type PodAffinityTerm struct {
 	// for affinity and for RequiredDuringScheduling pod anti-affinity, empty topologyKey is not allowed.
 	// +optional
 	TopologyKey string
+	// MinMatchingPods specifies the minimal number of pod that matching the selector; the term is considered to
+	// be matched if and only if the matching number is larger than minMatchingPods. The default value is 1.
+	// Only available for hard pod anti-affinity (RequiredDuringSchedulingIgnoredDuringExecution).
+	// +optional
+	MinMatchingPods int32
 }
 
 // Node affinity is a group of node affinity scheduling rules.
