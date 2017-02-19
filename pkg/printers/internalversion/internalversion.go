@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors.
+Copyright 2017 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,11 +14,10 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package kubectl
+package internalversion
 
 import (
 	"bytes"
-	"encoding/json"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -27,18 +26,14 @@ import (
 	"sort"
 	"strings"
 	"text/tabwriter"
-	"text/template"
 	"time"
 
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/client-go/util/jsonpath"
 	"k8s.io/kubernetes/federation/apis/federation"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/events"
@@ -52,18 +47,6 @@ import (
 	"k8s.io/kubernetes/pkg/apis/storage"
 	storageutil "k8s.io/kubernetes/pkg/apis/storage/util"
 	"k8s.io/kubernetes/pkg/util/node"
-
-	"github.com/ghodss/yaml"
-	"github.com/golang/glog"
-)
-
-const (
-	tabwriterMinWidth = 10
-	tabwriterWidth    = 4
-	tabwriterPadding  = 3
-	tabwriterPadChar  = ' '
-	tabwriterFlags    = 0
-	loadBalancerWidth = 16
 )
 
 // GetPrinter takes a format type, an optional format argument. It will return true
@@ -156,339 +139,6 @@ func GetPrinter(format, formatArgument string, noHeaders, allowMissingTemplateKe
 	return printer, true, nil
 }
 
-// ResourcePrinter is an interface that knows how to print runtime objects.
-type ResourcePrinter interface {
-	// Print receives a runtime object, formats it and prints it to a writer.
-	PrintObj(runtime.Object, io.Writer) error
-	HandledResources() []string
-	//Can be used to print out warning/clarifications if needed
-	//after all objects were printed
-	AfterPrint(io.Writer, string) error
-}
-
-// ResourcePrinterFunc is a function that can print objects
-type ResourcePrinterFunc func(runtime.Object, io.Writer) error
-
-// PrintObj implements ResourcePrinter
-func (fn ResourcePrinterFunc) PrintObj(obj runtime.Object, w io.Writer) error {
-	return fn(obj, w)
-}
-
-// TODO: implement HandledResources()
-func (fn ResourcePrinterFunc) HandledResources() []string {
-	return []string{}
-}
-
-func (fn ResourcePrinterFunc) AfterPrint(io.Writer, string) error {
-	return nil
-}
-
-// VersionedPrinter takes runtime objects and ensures they are converted to a given API version
-// prior to being passed to a nested printer.
-type VersionedPrinter struct {
-	printer   ResourcePrinter
-	converter runtime.ObjectConvertor
-	versions  []schema.GroupVersion
-}
-
-// NewVersionedPrinter wraps a printer to convert objects to a known API version prior to printing.
-func NewVersionedPrinter(printer ResourcePrinter, converter runtime.ObjectConvertor, versions ...schema.GroupVersion) ResourcePrinter {
-	return &VersionedPrinter{
-		printer:   printer,
-		converter: converter,
-		versions:  versions,
-	}
-}
-
-func (p *VersionedPrinter) AfterPrint(w io.Writer, res string) error {
-	return nil
-}
-
-// PrintObj implements ResourcePrinter
-func (p *VersionedPrinter) PrintObj(obj runtime.Object, w io.Writer) error {
-	if len(p.versions) == 0 {
-		return fmt.Errorf("no version specified, object cannot be converted")
-	}
-	converted, err := p.converter.ConvertToVersion(obj, schema.GroupVersions(p.versions))
-	if err != nil {
-		return err
-	}
-	return p.printer.PrintObj(converted, w)
-}
-
-// TODO: implement HandledResources()
-func (p *VersionedPrinter) HandledResources() []string {
-	return []string{}
-}
-
-// NamePrinter is an implementation of ResourcePrinter which outputs "resource/name" pair of an object.
-type NamePrinter struct {
-	Decoder runtime.Decoder
-	Typer   runtime.ObjectTyper
-}
-
-func (p *NamePrinter) AfterPrint(w io.Writer, res string) error {
-	return nil
-}
-
-// PrintObj is an implementation of ResourcePrinter.PrintObj which decodes the object
-// and print "resource/name" pair. If the object is a List, print all items in it.
-func (p *NamePrinter) PrintObj(obj runtime.Object, w io.Writer) error {
-	if meta.IsListType(obj) {
-		items, err := meta.ExtractList(obj)
-		if err != nil {
-			return err
-		}
-		if errs := runtime.DecodeList(items, p.Decoder, unstructured.UnstructuredJSONScheme); len(errs) > 0 {
-			return utilerrors.NewAggregate(errs)
-		}
-		for _, obj := range items {
-			if err := p.PrintObj(obj, w); err != nil {
-				return err
-			}
-		}
-		return nil
-	}
-
-	name := "<unknown>"
-	if acc, err := meta.Accessor(obj); err == nil {
-		if n := acc.GetName(); len(n) > 0 {
-			name = n
-		}
-	}
-
-	if kind := obj.GetObjectKind().GroupVersionKind(); len(kind.Kind) == 0 {
-		// this is the old code.  It's unnecessary on decoded external objects, but on internal objects
-		// you may have to do it.  Tests are definitely calling it with internals and I'm not sure who else
-		// is
-		if gvks, _, err := p.Typer.ObjectKinds(obj); err == nil {
-			// TODO: this is wrong, it assumes that meta knows about all Kinds - should take a RESTMapper
-			_, resource := meta.KindToResource(gvks[0])
-			fmt.Fprintf(w, "%s/%s\n", resource.Resource, name)
-		} else {
-			fmt.Fprintf(w, "<unknown>/%s\n", name)
-		}
-
-	} else {
-		// TODO: this is wrong, it assumes that meta knows about all Kinds - should take a RESTMapper
-		_, resource := meta.KindToResource(kind)
-		fmt.Fprintf(w, "%s/%s\n", resource.Resource, name)
-	}
-
-	return nil
-}
-
-// TODO: implement HandledResources()
-func (p *NamePrinter) HandledResources() []string {
-	return []string{}
-}
-
-// JSONPrinter is an implementation of ResourcePrinter which outputs an object as JSON.
-type JSONPrinter struct {
-}
-
-func (p *JSONPrinter) AfterPrint(w io.Writer, res string) error {
-	return nil
-}
-
-// PrintObj is an implementation of ResourcePrinter.PrintObj which simply writes the object to the Writer.
-func (p *JSONPrinter) PrintObj(obj runtime.Object, w io.Writer) error {
-	switch obj := obj.(type) {
-	case *runtime.Unknown:
-		var buf bytes.Buffer
-		err := json.Indent(&buf, obj.Raw, "", "    ")
-		if err != nil {
-			return err
-		}
-		buf.WriteRune('\n')
-		_, err = buf.WriteTo(w)
-		return err
-	}
-
-	data, err := json.MarshalIndent(obj, "", "    ")
-	if err != nil {
-		return err
-	}
-	data = append(data, '\n')
-	_, err = w.Write(data)
-	return err
-}
-
-// TODO: implement HandledResources()
-func (p *JSONPrinter) HandledResources() []string {
-	return []string{}
-}
-
-// YAMLPrinter is an implementation of ResourcePrinter which outputs an object as YAML.
-// The input object is assumed to be in the internal version of an API and is converted
-// to the given version first.
-type YAMLPrinter struct {
-	version   string
-	converter runtime.ObjectConvertor
-}
-
-func (p *YAMLPrinter) AfterPrint(w io.Writer, res string) error {
-	return nil
-}
-
-// PrintObj prints the data as YAML.
-func (p *YAMLPrinter) PrintObj(obj runtime.Object, w io.Writer) error {
-	switch obj := obj.(type) {
-	case *runtime.Unknown:
-		data, err := yaml.JSONToYAML(obj.Raw)
-		if err != nil {
-			return err
-		}
-		_, err = w.Write(data)
-		return err
-	}
-
-	output, err := yaml.Marshal(obj)
-	if err != nil {
-		return err
-	}
-	_, err = fmt.Fprint(w, string(output))
-	return err
-}
-
-// TODO: implement HandledResources()
-func (p *YAMLPrinter) HandledResources() []string {
-	return []string{}
-}
-
-type handlerEntry struct {
-	columns         []string
-	columnsWithWide []string
-	printFunc       reflect.Value
-	args            []reflect.Value
-}
-
-type PrintOptions struct {
-	NoHeaders          bool
-	WithNamespace      bool
-	WithKind           bool
-	Wide               bool
-	ShowAll            bool
-	ShowLabels         bool
-	AbsoluteTimestamps bool
-	Kind               string
-	ColumnLabels       []string
-}
-
-// HumanReadablePrinter is an implementation of ResourcePrinter which attempts to provide
-// more elegant output. It is not threadsafe, but you may call PrintObj repeatedly; headers
-// will only be printed if the object type changes. This makes it useful for printing items
-// received from watches.
-type HumanReadablePrinter struct {
-	handlerMap   map[reflect.Type]*handlerEntry
-	options      PrintOptions
-	lastType     reflect.Type
-	hiddenObjNum int
-}
-
-// NewHumanReadablePrinter creates a HumanReadablePrinter.
-func NewHumanReadablePrinter(options PrintOptions) *HumanReadablePrinter {
-	printer := &HumanReadablePrinter{
-		handlerMap: make(map[reflect.Type]*handlerEntry),
-		options:    options,
-	}
-	printer.addDefaultHandlers()
-	return printer
-}
-
-// formatResourceName receives a resource kind, name, and boolean specifying
-// whether or not to update the current name to "kind/name"
-func formatResourceName(kind, name string, withKind bool) string {
-	if !withKind || kind == "" {
-		return name
-	}
-
-	return kind + "/" + name
-}
-
-// GetResourceKind returns the type currently set for a resource
-func (h *HumanReadablePrinter) GetResourceKind() string {
-	return h.options.Kind
-}
-
-// EnsurePrintWithKind sets HumanReadablePrinter options "WithKind" to true
-// and "Kind" to the string arg it receives, pre-pending this string
-// to the "NAME" column in an output of resources.
-func (h *HumanReadablePrinter) EnsurePrintWithKind(kind string) {
-	h.options.WithKind = true
-	h.options.Kind = kind
-}
-
-// EnsurePrintHeaders sets the HumanReadablePrinter option "NoHeaders" to false
-// and removes the .lastType that was printed, which forces headers to be
-// printed in cases where multiple lists of the same resource are printed
-// consecutively, but are separated by non-printer related information.
-func (h *HumanReadablePrinter) EnsurePrintHeaders() {
-	h.options.NoHeaders = false
-	h.lastType = nil
-}
-
-// Handler adds a print handler with a given set of columns to HumanReadablePrinter instance.
-// See validatePrintHandlerFunc for required method signature.
-func (h *HumanReadablePrinter) Handler(columns, columnsWithWide []string, printFunc interface{}) error {
-	printFuncValue := reflect.ValueOf(printFunc)
-	if err := h.validatePrintHandlerFunc(printFuncValue); err != nil {
-		glog.Errorf("Unable to add print handler: %v", err)
-		return err
-	}
-
-	objType := printFuncValue.Type().In(0)
-	h.handlerMap[objType] = &handlerEntry{
-		columns:         columns,
-		columnsWithWide: columnsWithWide,
-		printFunc:       printFuncValue,
-	}
-	return nil
-}
-
-// validatePrintHandlerFunc validates print handler signature.
-// printFunc is the function that will be called to print an object.
-// It must be of the following type:
-//  func printFunc(object ObjectType, w io.Writer, options PrintOptions) error
-// where ObjectType is the type of the object that will be printed.
-func (h *HumanReadablePrinter) validatePrintHandlerFunc(printFunc reflect.Value) error {
-	if printFunc.Kind() != reflect.Func {
-		return fmt.Errorf("invalid print handler. %#v is not a function", printFunc)
-	}
-	funcType := printFunc.Type()
-	if funcType.NumIn() != 3 || funcType.NumOut() != 1 {
-		return fmt.Errorf("invalid print handler." +
-			"Must accept 3 parameters and return 1 value.")
-	}
-	if funcType.In(1) != reflect.TypeOf((*io.Writer)(nil)).Elem() ||
-		funcType.In(2) != reflect.TypeOf((*PrintOptions)(nil)).Elem() ||
-		funcType.Out(0) != reflect.TypeOf((*error)(nil)).Elem() {
-		return fmt.Errorf("invalid print handler. The expected signature is: "+
-			"func handler(obj %v, w io.Writer, options PrintOptions) error", funcType.In(0))
-	}
-	return nil
-}
-
-func (h *HumanReadablePrinter) HandledResources() []string {
-	keys := make([]string, 0)
-
-	for k := range h.handlerMap {
-		// k.String looks like "*api.PodList" and we want just "pod"
-		api := strings.Split(k.String(), ".")
-		resource := api[len(api)-1]
-		if strings.HasSuffix(resource, "List") {
-			continue
-		}
-		resource = strings.ToLower(resource)
-		keys = append(keys, resource)
-	}
-	return keys
-}
-
-func (h *HumanReadablePrinter) AfterPrint(output io.Writer, res string) error {
-	return nil
-}
-
 // NOTE: When adding a new resource type here, please update the list
 // pkg/kubectl/cmd/get.go to reflect the new resource type.
 var (
@@ -544,7 +194,7 @@ var (
 	certificateSigningRequestColumns = []string{"NAME", "AGE", "REQUESTOR", "CONDITION"}
 )
 
-func (h *HumanReadablePrinter) printPod(pod *api.Pod, w io.Writer, options PrintOptions) error {
+func printPod(pod *api.Pod, w io.Writer, options PrintOptions) error {
 	if err := printPodBase(pod, w, options); err != nil {
 		return err
 	}
@@ -552,7 +202,7 @@ func (h *HumanReadablePrinter) printPod(pod *api.Pod, w io.Writer, options Print
 	return nil
 }
 
-func (h *HumanReadablePrinter) printPodList(podList *api.PodList, w io.Writer, options PrintOptions) error {
+func printPodList(podList *api.PodList, w io.Writer, options PrintOptions) error {
 	for _, pod := range podList.Items {
 		if err := printPodBase(&pod, w, options); err != nil {
 			return err
@@ -636,18 +286,6 @@ func (h *HumanReadablePrinter) addDefaultHandlers() {
 	h.Handler(storageClassColumns, nil, printStorageClass)
 	h.Handler(storageClassColumns, nil, printStorageClassList)
 	h.Handler(statusColumns, nil, printStatus)
-}
-
-func (h *HumanReadablePrinter) unknown(data []byte, w io.Writer) error {
-	_, err := fmt.Fprintf(w, "Unknown object: %s", string(data))
-	return err
-}
-
-func (h *HumanReadablePrinter) printHeader(columnNames []string, w io.Writer) error {
-	if _, err := fmt.Fprintf(w, "%s\n", strings.Join(columnNames, "\t")); err != nil {
-		return err
-	}
-	return nil
 }
 
 // Pass ports=nil for all ports.
@@ -2449,11 +2087,6 @@ func formatShowLabelsHeader(showLabels bool, t reflect.Type) []string {
 	return nil
 }
 
-// GetNewTabWriter returns a tabwriter that translates tabbed columns in input into properly aligned text.
-func GetNewTabWriter(output io.Writer) *tabwriter.Writer {
-	return tabwriter.NewWriter(output, tabwriterMinWidth, tabwriterWidth, tabwriterPadding, tabwriterPadChar, tabwriterFlags)
-}
-
 // PrintObj prints the obj in a human-friendly format according to the type of the obj.
 func (h *HumanReadablePrinter) PrintObj(obj runtime.Object, output io.Writer) error {
 	// if output is a tabwriter (when it's called by kubectl get), we use it; create a new tabwriter otherwise
@@ -2563,90 +2196,6 @@ func printUnstructured(unstructured runtime.Unstructured, w io.Writer, options P
 	return nil
 }
 
-// TemplatePrinter is an implementation of ResourcePrinter which formats data with a Go Template.
-type TemplatePrinter struct {
-	rawTemplate string
-	template    *template.Template
-}
-
-func NewTemplatePrinter(tmpl []byte) (*TemplatePrinter, error) {
-	t, err := template.New("output").
-		Funcs(template.FuncMap{"exists": exists}).
-		Parse(string(tmpl))
-	if err != nil {
-		return nil, err
-	}
-	return &TemplatePrinter{
-		rawTemplate: string(tmpl),
-		template:    t,
-	}, nil
-}
-
-// AllowMissingKeys tells the template engine if missing keys are allowed.
-func (p *TemplatePrinter) AllowMissingKeys(allow bool) {
-	if allow {
-		p.template.Option("missingkey=default")
-	} else {
-		p.template.Option("missingkey=error")
-	}
-}
-
-func (p *TemplatePrinter) AfterPrint(w io.Writer, res string) error {
-	return nil
-}
-
-// PrintObj formats the obj with the Go Template.
-func (p *TemplatePrinter) PrintObj(obj runtime.Object, w io.Writer) error {
-	var data []byte
-	var err error
-	data, err = json.Marshal(obj)
-	if err != nil {
-		return err
-	}
-
-	out := map[string]interface{}{}
-	if err := json.Unmarshal(data, &out); err != nil {
-		return err
-	}
-	if err = p.safeExecute(w, out); err != nil {
-		// It is way easier to debug this stuff when it shows up in
-		// stdout instead of just stdin. So in addition to returning
-		// a nice error, also print useful stuff with the writer.
-		fmt.Fprintf(w, "Error executing template: %v. Printing more information for debugging the template:\n", err)
-		fmt.Fprintf(w, "\ttemplate was:\n\t\t%v\n", p.rawTemplate)
-		fmt.Fprintf(w, "\traw data was:\n\t\t%v\n", string(data))
-		fmt.Fprintf(w, "\tobject given to template engine was:\n\t\t%+v\n\n", out)
-		return fmt.Errorf("error executing template %q: %v", p.rawTemplate, err)
-	}
-	return nil
-}
-
-// TODO: implement HandledResources()
-func (p *TemplatePrinter) HandledResources() []string {
-	return []string{}
-}
-
-// safeExecute tries to execute the template, but catches panics and returns an error
-// should the template engine panic.
-func (p *TemplatePrinter) safeExecute(w io.Writer, obj interface{}) error {
-	var panicErr error
-	// Sorry for the double anonymous function. There's probably a clever way
-	// to do this that has the defer'd func setting the value to be returned, but
-	// that would be even less obvious.
-	retErr := func() error {
-		defer func() {
-			if x := recover(); x != nil {
-				panicErr = fmt.Errorf("caught panic: %+v", x)
-			}
-		}()
-		return p.template.Execute(w, obj)
-	}()
-	if panicErr != nil {
-		return panicErr
-	}
-	return retErr
-}
-
 func tabbedString(f func(io.Writer) error) (string, error) {
 	out := new(tabwriter.Writer)
 	buf := &bytes.Buffer{}
@@ -2660,135 +2209,6 @@ func tabbedString(f func(io.Writer) error) (string, error) {
 	out.Flush()
 	str := string(buf.String())
 	return str, nil
-}
-
-// exists returns true if it would be possible to call the index function
-// with these arguments.
-//
-// TODO: how to document this for users?
-//
-// index returns the result of indexing its first argument by the following
-// arguments.  Thus "index x 1 2 3" is, in Go syntax, x[1][2][3]. Each
-// indexed item must be a map, slice, or array.
-func exists(item interface{}, indices ...interface{}) bool {
-	v := reflect.ValueOf(item)
-	for _, i := range indices {
-		index := reflect.ValueOf(i)
-		var isNil bool
-		if v, isNil = indirect(v); isNil {
-			return false
-		}
-		switch v.Kind() {
-		case reflect.Array, reflect.Slice, reflect.String:
-			var x int64
-			switch index.Kind() {
-			case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
-				x = index.Int()
-			case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64, reflect.Uintptr:
-				x = int64(index.Uint())
-			default:
-				return false
-			}
-			if x < 0 || x >= int64(v.Len()) {
-				return false
-			}
-			v = v.Index(int(x))
-		case reflect.Map:
-			if !index.IsValid() {
-				index = reflect.Zero(v.Type().Key())
-			}
-			if !index.Type().AssignableTo(v.Type().Key()) {
-				return false
-			}
-			if x := v.MapIndex(index); x.IsValid() {
-				v = x
-			} else {
-				v = reflect.Zero(v.Type().Elem())
-			}
-		default:
-			return false
-		}
-	}
-	if _, isNil := indirect(v); isNil {
-		return false
-	}
-	return true
-}
-
-// stolen from text/template
-// indirect returns the item at the end of indirection, and a bool to indicate if it's nil.
-// We indirect through pointers and empty interfaces (only) because
-// non-empty interfaces have methods we might need.
-func indirect(v reflect.Value) (rv reflect.Value, isNil bool) {
-	for ; v.Kind() == reflect.Ptr || v.Kind() == reflect.Interface; v = v.Elem() {
-		if v.IsNil() {
-			return v, true
-		}
-		if v.Kind() == reflect.Interface && v.NumMethod() > 0 {
-			break
-		}
-	}
-	return v, false
-}
-
-// JSONPathPrinter is an implementation of ResourcePrinter which formats data with jsonpath expression.
-type JSONPathPrinter struct {
-	rawTemplate string
-	*jsonpath.JSONPath
-}
-
-func NewJSONPathPrinter(tmpl string) (*JSONPathPrinter, error) {
-	j := jsonpath.New("out")
-	if err := j.Parse(tmpl); err != nil {
-		return nil, err
-	}
-	return &JSONPathPrinter{tmpl, j}, nil
-}
-
-func (j *JSONPathPrinter) AfterPrint(w io.Writer, res string) error {
-	return nil
-}
-
-// PrintObj formats the obj with the JSONPath Template.
-func (j *JSONPathPrinter) PrintObj(obj runtime.Object, w io.Writer) error {
-	var queryObj interface{} = obj
-	if meta.IsListType(obj) {
-		data, err := json.Marshal(obj)
-		if err != nil {
-			return err
-		}
-		queryObj = map[string]interface{}{}
-		if err := json.Unmarshal(data, &queryObj); err != nil {
-			return err
-		}
-	}
-
-	if unknown, ok := obj.(*runtime.Unknown); ok {
-		data, err := json.Marshal(unknown)
-		if err != nil {
-			return err
-		}
-		queryObj = map[string]interface{}{}
-		if err := json.Unmarshal(data, &queryObj); err != nil {
-			return err
-		}
-	}
-	if unstructured, ok := obj.(*unstructured.Unstructured); ok {
-		queryObj = unstructured.Object
-	}
-
-	if err := j.JSONPath.Execute(w, queryObj); err != nil {
-		fmt.Fprintf(w, "Error executing template: %v. Printing more information for debugging the template:\n", err)
-		fmt.Fprintf(w, "\ttemplate was:\n\t\t%v\n", j.rawTemplate)
-		fmt.Fprintf(w, "\tobject given to jsonpath engine was:\n\t\t%#v\n\n", queryObj)
-		return fmt.Errorf("error executing jsonpath %q: %v\n", j.rawTemplate, err)
-	}
-	return nil
-}
-
-// TODO: implement HandledResources()
-func (p *JSONPathPrinter) HandledResources() []string {
-	return []string{}
 }
 
 // formatEventSource formats EventSource as a comma separated string excluding Host when empty
