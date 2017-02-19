@@ -491,11 +491,11 @@ func TestSingleWatch(t *testing.T) {
 	}
 
 	w, err := client.Core().RESTClient().Get().
-		Prefix("watch").
 		Namespace(ns.Name).
 		Resource("events").
 		Name("event-9").
 		Param("resourceVersion", rv1).
+		Param("watch", "true").
 		Watch()
 
 	if err != nil {

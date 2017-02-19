@@ -197,8 +197,8 @@ func (rc *ResourceClient) Watch(opts metav1.ListOptions) (watch.Interface, error
 	if parameterEncoder == nil {
 		parameterEncoder = defaultParameterEncoder
 	}
+	opts.Watch = true
 	return rc.cl.Get().
-		Prefix("watch").
 		NamespaceIfScoped(rc.ns, rc.resource.Namespaced).
 		Resource(rc.resource.Name).
 		VersionedParams(&opts, parameterEncoder).
