@@ -47,6 +47,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
+	"k8s.io/kubernetes/pkg/printers"
 	utilexec "k8s.io/kubernetes/pkg/util/exec"
 )
 
@@ -672,7 +673,7 @@ func MustPrintWithKinds(objs []runtime.Object, infos []*resource.Info, sorter *k
 
 // FilterResourceList receives a list of runtime objects.
 // If any objects are filtered, that number is returned along with a modified list.
-func FilterResourceList(obj runtime.Object, filterFuncs kubectl.Filters, filterOpts *kubectl.PrintOptions) (int, []runtime.Object, error) {
+func FilterResourceList(obj runtime.Object, filterFuncs kubectl.Filters, filterOpts *printers.PrintOptions) (int, []runtime.Object, error) {
 	items, err := meta.ExtractList(obj)
 	if err != nil {
 		return 0, []runtime.Object{obj}, utilerrors.NewAggregate([]error{err})
@@ -697,7 +698,7 @@ func FilterResourceList(obj runtime.Object, filterFuncs kubectl.Filters, filterO
 	return filterCount, list, nil
 }
 
-func PrintFilterCount(hiddenObjNum int, resource string, options *kubectl.PrintOptions) {
+func PrintFilterCount(hiddenObjNum int, resource string, options *printers.PrintOptions) {
 	if !options.NoHeaders && !options.ShowAll && hiddenObjNum > 0 {
 		glog.V(2).Infof("  info: %d completed object(s) was(were) not shown in %s list. Pass --show-all to see all objects.\n\n", hiddenObjNum, resource)
 	}

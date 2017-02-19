@@ -51,6 +51,7 @@ import (
 	coreclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/core/internalversion"
 	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
+	"k8s.io/kubernetes/pkg/printers"
 )
 
 const (
@@ -136,7 +137,8 @@ type ClientAccessFactory interface {
 	// BindExternalFlags adds any flags defined by external projects (not part of pflags)
 	BindExternalFlags(flags *pflag.FlagSet)
 
-	DefaultResourceFilterOptions(cmd *cobra.Command, withNamespace bool) *kubectl.PrintOptions
+	// TODO: Break the dependency on cmd here.
+	DefaultResourceFilterOptions(cmd *cobra.Command, withNamespace bool) *printers.PrintOptions
 	// DefaultResourceFilterFunc returns a collection of FilterFuncs suitable for filtering specific resource types.
 	DefaultResourceFilterFunc() kubectl.Filters
 
@@ -144,7 +146,7 @@ type ClientAccessFactory interface {
 	SuggestedPodTemplateResources() []schema.GroupResource
 
 	// Returns a Printer for formatting objects of the given type or an error.
-	Printer(mapping *meta.RESTMapping, options kubectl.PrintOptions) (kubectl.ResourcePrinter, error)
+	Printer(mapping *meta.RESTMapping, options printers.PrintOptions) (printers.ResourcePrinter, error)
 	// Pauser marks the object in the info as paused. Currently supported only for Deployments.
 	// Returns the patched object in bytes and any error that occured during the encoding or
 	// in case the object is already paused.
@@ -192,8 +194,13 @@ type ObjectMappingFactory interface {
 	ClientForMapping(mapping *meta.RESTMapping) (resource.RESTClient, error)
 	// Returns a RESTClient for working with Unstructured objects.
 	UnstructuredClientForMapping(mapping *meta.RESTMapping) (resource.RESTClient, error)
+	// PrinterForCommand returns the default printer for the command. It requires that certain options
+	// are declared on the command (see AddPrinterFlags). Returns a printer, true if the printer is
+	// generic (is not internal), or an error if a printer could not be found.
+	// TODO: Break the dependency on cmd here.
+	PrinterForCommand(cmd *cobra.Command) (printers.ResourcePrinter, bool, error)
 	// Returns a Describer for displaying the specified RESTMapping type or an error.
-	Describer(mapping *meta.RESTMapping) (kubectl.Describer, error)
+	Describer(mapping *meta.RESTMapping) (printers.Describer, error)
 
 	// LogsForObject returns a request for the logs associated with the provided object
 	LogsForObject(object, options runtime.Object) (*restclient.Request, error)
@@ -213,7 +220,7 @@ type ObjectMappingFactory interface {
 
 	// PrinterForMapping returns a printer suitable for displaying the provided resource type.
 	// Requires that printer flags have been added to cmd (see AddPrinterFlags).
-	PrinterForMapping(cmd *cobra.Command, mapping *meta.RESTMapping, withNamespace bool) (kubectl.ResourcePrinter, error)
+	PrinterForMapping(cmd *cobra.Command, mapping *meta.RESTMapping, withNamespace bool) (printers.ResourcePrinter, error)
 
 	// Returns a schema that can validate objects stored on disk.
 	Validator(validate bool, cacheDir string) (validation.Schema, error)

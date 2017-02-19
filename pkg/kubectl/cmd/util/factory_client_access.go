@@ -49,6 +49,8 @@ import (
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
+	"k8s.io/kubernetes/pkg/printers"
+	printersinternal "k8s.io/kubernetes/pkg/printers/internalversion"
 )
 
 type ring0Factory struct {
@@ -360,12 +362,12 @@ func (f *ring0Factory) BindExternalFlags(flags *pflag.FlagSet) {
 	flags.AddGoFlagSet(flag.CommandLine)
 }
 
-func (f *ring0Factory) DefaultResourceFilterOptions(cmd *cobra.Command, withNamespace bool) *kubectl.PrintOptions {
+func (f *ring0Factory) DefaultResourceFilterOptions(cmd *cobra.Command, withNamespace bool) *printers.PrintOptions {
 	columnLabel, err := cmd.Flags().GetStringSlice("label-columns")
 	if err != nil {
 		columnLabel = []string{}
 	}
-	opts := &kubectl.PrintOptions{
+	opts := &printers.PrintOptions{
 		NoHeaders:          GetFlagBool(cmd, "no-headers"),
 		WithNamespace:      withNamespace,
 		Wide:               GetWideFlag(cmd),
@@ -392,8 +394,10 @@ func (f *ring0Factory) SuggestedPodTemplateResources() []schema.GroupResource {
 	}
 }
 
-func (f *ring0Factory) Printer(mapping *meta.RESTMapping, options kubectl.PrintOptions) (kubectl.ResourcePrinter, error) {
-	return kubectl.NewHumanReadablePrinter(options), nil
+func (f *ring0Factory) Printer(mapping *meta.RESTMapping, options printers.PrintOptions) (printers.ResourcePrinter, error) {
+	p := printers.NewHumanReadablePrinter(options)
+	printersinternal.AddHandlers(p)
+	return p, nil
 }
 
 func (f *ring0Factory) Pauser(info *resource.Info) ([]byte, error) {
