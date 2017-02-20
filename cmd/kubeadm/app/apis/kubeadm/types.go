@@ -84,7 +84,8 @@ type Etcd struct {
 type NodeConfiguration struct {
 	metav1.TypeMeta
 
-	Discovery Discovery
+	Discovery  Discovery
+	CACertPath string
 }
 
 // ClusterInfo TODO add description

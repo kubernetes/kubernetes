@@ -27,12 +27,14 @@ const (
 	DefaultAPIBindPort               = 6443
 	DefaultDiscoveryBindPort         = 9898
 	DefaultAuthorizationMode         = "RBAC"
+	DefaultCACertPath                = "/etc/kubernetes/pki/ca.crt"
 )
 
 func addDefaultingFuncs(scheme *runtime.Scheme) error {
 	RegisterDefaults(scheme)
 	return scheme.AddDefaultingFuncs(
 		SetDefaults_MasterConfiguration,
+		SetDefaults_NodeConfiguration,
 	)
 }
 
@@ -59,5 +61,11 @@ func SetDefaults_MasterConfiguration(obj *MasterConfiguration) {
 
 	if obj.AuthorizationMode == "" {
 		obj.AuthorizationMode = DefaultAuthorizationMode
+	}
+}
+
+func SetDefaults_NodeConfiguration(obj *NodeConfiguration) {
+	if obj.CACertPath == "" {
+		obj.CACertPath = DefaultCACertPath
 	}
 }
