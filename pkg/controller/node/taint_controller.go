@@ -280,22 +280,13 @@ func (tc *NoExecuteTaintManager) Run(stopCh <-chan struct{}) {
 
 // PodUpdated is used to notify NoExecuteTaintManager about Pod changes.
 func (tc *NoExecuteTaintManager) PodUpdated(oldPod *v1.Pod, newPod *v1.Pod) {
-	var err error
 	oldTolerations := []v1.Toleration{}
 	if oldPod != nil {
-		oldTolerations, err = v1.GetPodTolerations(oldPod)
-		if err != nil {
-			glog.Errorf("Failed to get Tolerations from the old Pod: %v", err)
-			return
-		}
+		oldTolerations = oldPod.Spec.Tolerations
 	}
 	newTolerations := []v1.Toleration{}
 	if newPod != nil {
-		newTolerations, err = v1.GetPodTolerations(newPod)
-		if err != nil {
-			glog.Errorf("Failed to get Tolerations from the new Pod: %v", err)
-			return
-		}
+		newTolerations = newPod.Spec.Tolerations
 	}
 
 	if oldPod != nil && newPod != nil && api.Semantic.DeepEqual(oldTolerations, newTolerations) && oldPod.Spec.NodeName == newPod.Spec.NodeName {
@@ -312,24 +303,15 @@ func (tc *NoExecuteTaintManager) PodUpdated(oldPod *v1.Pod, newPod *v1.Pod) {
 
 // NodeUpdated is used to notify NoExecuteTaintManager about Node changes.
 func (tc *NoExecuteTaintManager) NodeUpdated(oldNode *v1.Node, newNode *v1.Node) {
-	var err error
 	oldTaints := []v1.Taint{}
 	if oldNode != nil {
-		oldTaints, err = v1.GetNodeTaints(oldNode)
-		if err != nil {
-			glog.Errorf("Failed to get Taints from the old Node: %v", err)
-			return
-		}
+		oldTaints = oldNode.Spec.Taints
 	}
 	oldTaints = getNoExecuteTaints(oldTaints)
 
 	newTaints := []v1.Taint{}
 	if newNode != nil {
-		newTaints, err = v1.GetNodeTaints(newNode)
-		if err != nil {
-			glog.Errorf("Failed to get Taints from the new Node: %v", err)
-			return
-		}
+		newTaints = newNode.Spec.Taints
 	}
 	newTaints = getNoExecuteTaints(newTaints)
 
@@ -466,12 +448,7 @@ func (tc *NoExecuteTaintManager) handleNodeUpdate(nodeUpdate *nodeUpdateItem) {
 	for i := range pods {
 		pod := &pods[i]
 		podNamespacedName := types.NamespacedName{Namespace: pod.Namespace, Name: pod.Name}
-		tolerations, err := v1.GetPodTolerations(pod)
-		if err != nil {
-			glog.Errorf("Failed to get Tolerations from Pod %v: %v", podNamespacedName.String(), err)
-			continue
-		}
-		tc.processPodOnNode(podNamespacedName, node.Name, tolerations, taints, now)
+		tc.processPodOnNode(podNamespacedName, node.Name, pod.Spec.Tolerations, taints, now)
 	}
 }
 

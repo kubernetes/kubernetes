@@ -234,14 +234,6 @@ func NodeSelectorRequirementsAsSelector(nsm []NodeSelectorRequirement) (labels.S
 }
 
 const (
-	// TolerationsAnnotationKey represents the key of tolerations data (json serialized)
-	// in the Annotations of a Pod.
-	TolerationsAnnotationKey string = "scheduler.alpha.kubernetes.io/tolerations"
-
-	// TaintsAnnotationKey represents the key of taints data (json serialized)
-	// in the Annotations of a Node.
-	TaintsAnnotationKey string = "scheduler.alpha.kubernetes.io/taints"
-
 	// SeccompPodAnnotationKey represents the key of a seccomp profile applied
 	// to all containers of a pod.
 	SeccompPodAnnotationKey string = "seccomp.security.alpha.kubernetes.io/pod"
@@ -277,40 +269,6 @@ const (
 	// This annotation can be attached to node.
 	ObjectTTLAnnotationKey string = "node.alpha.kubernetes.io/ttl"
 )
-
-// GetTolerationsFromPodAnnotations gets the json serialized tolerations data from Pod.Annotations
-// and converts it to the []Toleration type in api.
-func GetTolerationsFromPodAnnotations(annotations map[string]string) ([]Toleration, error) {
-	var tolerations []Toleration
-	if len(annotations) > 0 && annotations[TolerationsAnnotationKey] != "" {
-		err := json.Unmarshal([]byte(annotations[TolerationsAnnotationKey]), &tolerations)
-		if err != nil {
-			return tolerations, err
-		}
-	}
-	return tolerations, nil
-}
-
-func GetPodTolerations(pod *Pod) ([]Toleration, error) {
-	return GetTolerationsFromPodAnnotations(pod.Annotations)
-}
-
-// GetTaintsFromNodeAnnotations gets the json serialized taints data from Pod.Annotations
-// and converts it to the []Taint type in api.
-func GetTaintsFromNodeAnnotations(annotations map[string]string) ([]Taint, error) {
-	var taints []Taint
-	if len(annotations) > 0 && annotations[TaintsAnnotationKey] != "" {
-		err := json.Unmarshal([]byte(annotations[TaintsAnnotationKey]), &taints)
-		if err != nil {
-			return []Taint{}, err
-		}
-	}
-	return taints, nil
-}
-
-func GetNodeTaints(node *Node) ([]Taint, error) {
-	return GetTaintsFromNodeAnnotations(node.Annotations)
-}
 
 // ToleratesTaint checks if the toleration tolerates the taint.
 // The matching follows the rules below:
