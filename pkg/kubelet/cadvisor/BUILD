@@ -59,6 +59,7 @@ filegroup(
     name = "all-srcs",
     srcs = [
         ":package-srcs",
+        "//pkg/kubelet/cadvisor/fake:all-srcs",
         "//pkg/kubelet/cadvisor/testing:all-srcs",
     ],
     tags = ["automanaged"],

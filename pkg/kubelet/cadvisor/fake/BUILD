@@ -9,14 +9,13 @@ load(
 
 go_library(
     name = "go_default_library",
-    srcs = ["cadvisor_mock.go"],
+    srcs = ["cadvisor_fake.go"],
     tags = ["automanaged"],
     deps = [
         "//pkg/kubelet/cadvisor:go_default_library",
         "//vendor:github.com/google/cadvisor/events",
         "//vendor:github.com/google/cadvisor/info/v1",
         "//vendor:github.com/google/cadvisor/info/v2",
-        "//vendor:github.com/stretchr/testify/mock",
     ],
 )
 
