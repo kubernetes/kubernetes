@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors.
+Copyright 2017 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -31,6 +31,7 @@ import (
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	authorizationapi "k8s.io/kubernetes/pkg/apis/authorization"
 	internalauthorizationclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/authorization/internalversion"
+	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 )
 
@@ -50,6 +51,25 @@ type CanIOptions struct {
 	Err io.Writer
 }
 
+var (
+	canILong = templates.LongDesc(`
+		Check whether an action is allowed.
+
+		VERB is a logical Kubernetes API verb like 'get', 'list', 'watch', 'delete', etc.
+		TYPE is a Kubernetes resource.  Shortcuts and groups will be resolved.
+		NAME is the name of a particular Kubernetes resource.`)
+
+	canIExample = templates.Examples(`
+		# Check to see if I can create pods in any namespace
+		kubectl auth can-i create pods --all-namespaces
+
+		# Check to see if I can list deployments in my current namespace
+		kubectl auth can-i list deployments.extensions
+
+		# Check to see if I can get the job named "bar" in namespace "foo"
+		kubectl auth can-i list jobs.batch/bar -n foo`)
+)
+
 func NewCmdCanI(f cmdutil.Factory, out, err io.Writer) *cobra.Command {
 	o := &CanIOptions{
 		Out: out,
@@ -57,36 +77,42 @@ func NewCmdCanI(f cmdutil.Factory, out, err io.Writer) *cobra.Command {
 	}
 
 	cmd := &cobra.Command{
-		Use:   "can-i VERB RESOURCE [NAME]",
-		Short: "check whether an action is allowed",
-		Long:  "check whether an action is allowed",
+		Use:     "can-i VERB [TYPE | TYPE/NAME]",
+		Short:   "Check whether an action is allowed",
+		Long:    canILong,
+		Example: canIExample,
 		Run: func(cmd *cobra.Command, args []string) {
-			cmdutil.CheckErr(o.Complete(f, cmd, args))
+			cmdutil.CheckErr(o.Complete(f, args))
 			cmdutil.CheckErr(o.Validate())
 
 			allowed, err := o.RunAccessCheck()
-			cmdutil.CheckErr(err)
-			if o.Quiet && !allowed {
-				os.Exit(2)
+			if err == nil {
+				return
 			}
+
+			if o.Quiet && !allowed {
+				os.Exit(1)
+			}
+
+			cmdutil.CheckErr(err)
 		},
 	}
 
-	cmdutil.AddPrinterFlags(cmd)
 	cmd.Flags().BoolVar(&o.AllNamespaces, "all-namespaces", o.AllNamespaces, "If true, check the specified action in all namespaces.")
 	cmd.Flags().BoolVarP(&o.Quiet, "quiet", "q", o.Quiet, "If true, suppress output and just return the exit code.")
 	return cmd
 }
 
-func (o *CanIOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []string) error {
+func (o *CanIOptions) Complete(f cmdutil.Factory, args []string) error {
 	switch len(args) {
-	case 3:
-		o.ResourceName = args[2]
-		fallthrough
 	case 2:
+		resourceTokens := strings.SplitN(args[1], "/", 2)
 		restMapper, _ := f.Object()
 		o.Verb = args[0]
-		o.Resource = resourceFor(restMapper, args[1])
+		o.Resource = resourceFor(restMapper, resourceTokens[0])
+		if len(resourceTokens) > 1 {
+			o.ResourceName = resourceTokens[1]
+		}
 	default:
 		return errors.New("you must specify two or three arguments: verb, resource, and optional resourceName")
 	}
