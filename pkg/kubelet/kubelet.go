@@ -475,6 +475,7 @@ func NewMainKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *Kub
 		experimentalHostUserNamespaceDefaulting: utilfeature.DefaultFeatureGate.Enabled(features.ExperimentalHostUserNamespaceDefaultingGate),
 	}
 
+	glog.Infof("cgroup root: %v, cgroupsPerQOS: %v", klet.cgroupRoot, klet.cgroupsPerQOS)
 	secretManager := secret.NewCachingSecretManager(
 		kubeDeps.KubeClient, secret.GetObjectTTLFromNodeFunc(klet.GetNode))
 

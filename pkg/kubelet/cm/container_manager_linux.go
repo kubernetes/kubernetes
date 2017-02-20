@@ -205,6 +205,7 @@ func NewContainerManager(mountUtil mount.Interface, cadvisorInterface cadvisor.I
 			"In the meantime, you can opt-in to making this a fatal error by enabling --experimental-fail-swap-on.")
 	}
 
+	glog.Infof("cgroup root: %v", nodeConfig.CgroupRoot)
 	// Check if Cgroup-root actually exists on the node
 	if nodeConfig.CgroupsPerQOS {
 		// this does default to / when enabled, but this tests against regressions.
