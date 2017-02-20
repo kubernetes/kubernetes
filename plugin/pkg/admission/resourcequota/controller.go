@@ -26,6 +26,7 @@ import (
 	"github.com/golang/glog"
 
 	"k8s.io/apimachinery/pkg/api/meta"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -34,6 +35,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/quota"
 	_ "k8s.io/kubernetes/pkg/util/workqueue/prometheus" // for workqueue metric registration
+	resourcequotaapi "k8s.io/kubernetes/plugin/pkg/admission/resourcequota/apis/resourcequota"
 )
 
 // Evaluator is used to see if quota constraints are satisfied.
@@ -65,6 +67,9 @@ type quotaEvaluator struct {
 	workers int
 	stopCh  <-chan struct{}
 	init    sync.Once
+
+	// lets us know what resources are limited by default
+	config *resourcequotaapi.Configuration
 }
 
 type admissionWaiter struct {
@@ -79,6 +84,7 @@ func (defaultDeny) Error() string {
 	return "DEFAULT DENY"
 }
 
+// IsDefaultDeny returns true if the error is defaultDeny
 func IsDefaultDeny(err error) bool {
 	if err == nil {
 		return false
@@ -99,7 +105,11 @@ func newAdmissionWaiter(a admission.Attributes) *admissionWaiter {
 // NewQuotaEvaluator configures an admission controller that can enforce quota constraints
 // using the provided registry.  The registry must have the capability to handle group/kinds that
 // are persisted by the server this admission controller is intercepting
-func NewQuotaEvaluator(quotaAccessor QuotaAccessor, registry quota.Registry, lockAcquisitionFunc func([]api.ResourceQuota) func(), workers int, stopCh <-chan struct{}) Evaluator {
+func NewQuotaEvaluator(quotaAccessor QuotaAccessor, registry quota.Registry, lockAcquisitionFunc func([]api.ResourceQuota) func(), config *resourcequotaapi.Configuration, workers int, stopCh <-chan struct{}) Evaluator {
+	// if we get a nil config, just create an empty default.
+	if config == nil {
+		config = &resourcequotaapi.Configuration{}
+	}
 	return &quotaEvaluator{
 		quotaAccessor:       quotaAccessor,
 		lockAcquisitionFunc: lockAcquisitionFunc,
@@ -113,6 +123,7 @@ func NewQuotaEvaluator(quotaAccessor QuotaAccessor, registry quota.Registry, loc
 
 		workers: workers,
 		stopCh:  stopCh,
+		config:  config,
 	}
 }
 
@@ -166,7 +177,9 @@ func (e *quotaEvaluator) checkAttributes(ns string, admissionAttributes []*admis
 		}
 		return
 	}
-	if len(quotas) == 0 {
+	// if limited resources are disabled, we can just return safely when there are no quotas.
+	limitedResourcesDisabled := len(e.config.LimitedResources) == 0
+	if len(quotas) == 0 && limitedResourcesDisabled {
 		for _, admissionAttribute := range admissionAttributes {
 			admissionAttribute.result = nil
 		}
@@ -316,6 +329,41 @@ func copyQuotas(in []api.ResourceQuota) ([]api.ResourceQuota, error) {
 	return out, nil
 }
 
+// filterLimitedResourcesByGroupResource filters the input that match the specified groupResource
+func filterLimitedResourcesByGroupResource(input []resourcequotaapi.LimitedResource, groupResource schema.GroupResource) []resourcequotaapi.LimitedResource {
+	result := []resourcequotaapi.LimitedResource{}
+	for i := range input {
+		limitedResource := input[i]
+		limitedGroupResource := schema.GroupResource{Group: limitedResource.APIGroup, Resource: limitedResource.Resource}
+		if limitedGroupResource == groupResource {
+			result = append(result, limitedResource)
+		}
+	}
+	return result
+}
+
+// limitedByDefault determines from the specfified usage and limitedResources the set of resources names
+// that must be present in a covering quota.  It returns an error if it was unable to determine if
+// a resource was not limited by default.
+func limitedByDefault(usage api.ResourceList, limitedResources []resourcequotaapi.LimitedResource) []api.ResourceName {
+	result := []api.ResourceName{}
+	for _, limitedResource := range limitedResources {
+		for k, v := range usage {
+			// if a resource is consumed, we need to check if it matches on the limited resource list.
+			if v.Sign() == 1 {
+				// if we get a match, we add it to limited set
+				for _, matchContain := range limitedResource.MatchContains {
+					if strings.Contains(string(k), matchContain) {
+						result = append(result, k)
+						break
+					}
+				}
+			}
+		}
+	}
+	return result
+}
+
 // checkRequest verifies that the request does not exceed any quota constraint. it returns a copy of quotas not yet persisted
 // that capture what the usage would be if the request succeeded.  It return an error if the is insufficient quota to satisfy the request
 func (e *quotaEvaluator) checkRequest(quotas []api.ResourceQuota, a admission.Attributes) ([]api.ResourceQuota, error) {
@@ -331,12 +379,30 @@ func (e *quotaEvaluator) checkRequest(quotas []api.ResourceQuota, a admission.At
 		return quotas, nil
 	}
 
+	// if we have limited resources enabled for this resource, always calculate usage
+	inputObject := a.GetObject()
+
+	// determine the set of resource names that must exist in a covering quota
+	limitedResourceNames := []api.ResourceName{}
+	limitedResources := filterLimitedResourcesByGroupResource(e.config.LimitedResources, a.GetResource().GroupResource())
+	if len(limitedResources) > 0 {
+		deltaUsage, err := evaluator.Usage(inputObject)
+		if err != nil {
+			return quotas, err
+		}
+		limitedResourceNames = limitedByDefault(deltaUsage, limitedResources)
+	}
+	limitedResourceNamesSet := quota.ToSet(limitedResourceNames)
+
 	// find the set of quotas that are pertinent to this request
 	// reject if we match the quota, but usage is not calculated yet
 	// reject if the input object does not satisfy quota constraints
 	// if there are no pertinent quotas, we can just return
-	inputObject := a.GetObject()
 	interestingQuotaIndexes := []int{}
+	// track the cumulative set of resources that were required across all quotas
+	// this is needed to know if we have satisfied any constraints where consumption
+	// was limited by default.
+	restrictedResourcesSet := sets.String{}
 	for i := range quotas {
 		resourceQuota := quotas[i]
 		match, err := evaluator.Matches(&resourceQuota, inputObject)
@@ -348,16 +414,26 @@ func (e *quotaEvaluator) checkRequest(quotas []api.ResourceQuota, a admission.At
 		}
 
 		hardResources := quota.ResourceNames(resourceQuota.Status.Hard)
-		requiredResources := evaluator.MatchingResources(hardResources)
-		if err := evaluator.Constraints(requiredResources, inputObject); err != nil {
+		restrictedResources := evaluator.MatchingResources(hardResources)
+		if err := evaluator.Constraints(restrictedResources, inputObject); err != nil {
 			return nil, admission.NewForbidden(a, fmt.Errorf("failed quota: %s: %v", resourceQuota.Name, err))
 		}
 		if !hasUsageStats(&resourceQuota) {
 			return nil, admission.NewForbidden(a, fmt.Errorf("status unknown for quota: %s", resourceQuota.Name))
 		}
-
 		interestingQuotaIndexes = append(interestingQuotaIndexes, i)
+		localRestrictedResourcesSet := quota.ToSet(restrictedResources)
+		restrictedResourcesSet.Insert(localRestrictedResourcesSet.List()...)
 	}
+
+	// verify that for every resource that had limited by default consumption
+	// enabled that there was a corresponding quota that covered its use.
+	// if not, we reject the request.
+	hasNoCoveringQuota := limitedResourceNamesSet.Difference(restrictedResourcesSet)
+	if len(hasNoCoveringQuota) > 0 {
+		return quotas, fmt.Errorf("insufficient quota to consume: %v", strings.Join(hasNoCoveringQuota.List(), ","))
+	}
+
 	if len(interestingQuotaIndexes) == 0 {
 		return quotas, nil
 	}
