@@ -66,7 +66,7 @@ func TestRunOnce(t *testing.T) {
 	podManager := kubepod.NewBasicPodManager(
 		podtest.NewFakeMirrorClient(), fakeSecretManager)
 	diskSpaceManager, _ := newDiskSpaceManager(cadvisor, DiskSpacePolicy{})
-	fakeRuntime := &containertest.FakeRuntime{}
+	fakeRuntime := &containertest.FakeRuntime{Cadvisor: cadvisor}
 	basePath, err := utiltesting.MkTmpdir("kubelet")
 	if err != nil {
 		t.Fatalf("can't make a temp rootdir %v", err)

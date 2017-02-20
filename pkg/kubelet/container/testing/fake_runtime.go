@@ -29,6 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/util/flowcontrol"
 	"k8s.io/kubernetes/pkg/api/v1"
+	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
 	. "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/util/term"
 	"k8s.io/kubernetes/pkg/volume"
@@ -53,6 +54,7 @@ type FakeRuntime struct {
 	StartedContainers []string
 	KilledContainers  []string
 	RuntimeStatus     *RuntimeStatus
+	Cadvisor          cadvisor.Interface
 	VersionInfo       string
 	APIVersionInfo    string
 	RuntimeType       string
@@ -462,7 +464,7 @@ func (f *FakeRuntime) ImageFsInfo() (cadvisorapiv2.FsInfo, error) {
 	defer f.Unlock()
 
 	f.CalledFunctions = append(f.CalledFunctions, "ImageFsInfo")
-	return cadvisorapiv2.FsInfo{}, f.Err
+	return f.Cadvisor.ImagesFsInfo()
 }
 
 func (f *FakeIndirectStreamingRuntime) GetExec(id ContainerID, cmd []string, stdin, stdout, stderr, tty bool) (*url.URL, error) {

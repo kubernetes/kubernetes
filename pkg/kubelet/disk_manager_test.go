@@ -71,7 +71,7 @@ func TestSpaceAvailable(t *testing.T) {
 		Capacity: 10 * mb,
 	}, nil)
 
-	ok, err := dm.IsRuntimeDiskSpaceAvailable()
+	ok, err := dm.IsRuntimeDiskSpaceAvailable(mockCadvisor.ImagesFsInfo)
 	assert.NoError(err)
 	assert.True(ok)
 
@@ -94,7 +94,7 @@ func TestIsRuntimeDiskSpaceAvailableWithSpace(t *testing.T) {
 		Available: 500 * mb,
 	}, nil)
 
-	ok, err := dm.IsRuntimeDiskSpaceAvailable()
+	ok, err := dm.IsRuntimeDiskSpaceAvailable(mockCadvisor.ImagesFsInfo)
 	assert.NoError(err)
 	assert.True(ok)
 }
@@ -113,7 +113,7 @@ func TestIsRuntimeDiskSpaceAvailableWithoutSpace(t *testing.T) {
 	dm, err := newDiskSpaceManager(mockCadvisor, policy)
 	require.NoError(t, err)
 
-	ok, err := dm.IsRuntimeDiskSpaceAvailable()
+	ok, err := dm.IsRuntimeDiskSpaceAvailable(mockCadvisor.ImagesFsInfo)
 	assert.NoError(err)
 	assert.False(ok)
 }
@@ -176,7 +176,7 @@ func TestCache(t *testing.T) {
 	}, nil).Once()
 
 	// Initial calls which should be recorded in mockCadvisor
-	ok, err := dm.IsRuntimeDiskSpaceAvailable()
+	ok, err := dm.IsRuntimeDiskSpaceAvailable(mockCadvisor.ImagesFsInfo)
 	assert.NoError(err)
 	assert.True(ok)
 
@@ -188,7 +188,7 @@ func TestCache(t *testing.T) {
 	cadvisorCallCount := len(mockCadvisor.Calls)
 
 	// Checking for space again shouldn't need to mock as cache would serve it.
-	ok, err = dm.IsRuntimeDiskSpaceAvailable()
+	ok, err = dm.IsRuntimeDiskSpaceAvailable(mockCadvisor.ImagesFsInfo)
 	assert.NoError(err)
 	assert.True(ok)
 
@@ -210,7 +210,7 @@ func TestFsInfoError(t *testing.T) {
 
 	mockCadvisor.On("ImagesFsInfo").Return(cadvisorapi.FsInfo{}, fmt.Errorf("can't find fs"))
 	mockCadvisor.On("RootFsInfo").Return(cadvisorapi.FsInfo{}, fmt.Errorf("EBUSY"))
-	ok, err := dm.IsRuntimeDiskSpaceAvailable()
+	ok, err := dm.IsRuntimeDiskSpaceAvailable(mockCadvisor.ImagesFsInfo)
 	assert.Error(err)
 	assert.True(ok)
 	ok, err = dm.IsRootDiskSpaceAvailable()
