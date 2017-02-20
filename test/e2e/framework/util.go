@@ -2882,7 +2882,7 @@ func DeleteRCAndWaitForGC(c clientset.Interface, ns, name string) error {
 // It waits until the reflector does a List() before returning.
 func podStoreForSelector(c clientset.Interface, ns string, selector labels.Selector) (*testutils.PodStore, error) {
 	ps := testutils.NewPodStore(c, ns, selector, fields.Everything())
-	err := wait.Poll(1*time.Second, 2*time.Minute, func() (bool, error) {
+	err := wait.Poll(100*time.Millisecond, 2*time.Minute, func() (bool, error) {
 		if len(ps.Reflector.LastSyncResourceVersion()) != 0 {
 			return true, nil
 		}
