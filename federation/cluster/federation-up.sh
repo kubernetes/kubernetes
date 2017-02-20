@@ -29,13 +29,15 @@ KUBE_ROOT=$(dirname "${BASH_SOURCE}")/../..
 # For `kube::log::status` function since it already sources
 # "${KUBE_ROOT}/cluster/lib/logging.sh" and DEFAULT_KUBECONFIG
 source "${KUBE_ROOT}/cluster/common.sh"
-# For $FEDERATION_PUSH_REPO_BASE and $FEDERATION_NAMESPACE.
+# For $FEDERATION_KUBE_CONTEXT, $HOST_CLUSTER_CONTEXT,
+# $KUBEDNS_CONFIGMAP_NAME, $KUBEDNS_CONFIGMAP_NAMESPACE and
+# $KUBEDNS_FEDERATION_FLAG.
 source "${KUBE_ROOT}/federation/cluster/common.sh"
 
 FEDERATION_NAME="${FEDERATION_NAME:-e2e-federation}"
-FEDERATION_KUBE_CONTEXT="${FEDERATION_KUBE_CONTEXT:-e2e-federation}"
+
 DNS_ZONE_NAME="${FEDERATION_DNS_ZONE_NAME:-}"
-HOST_CLUSTER_CONTEXT="${FEDERATION_HOST_CLUSTER_CONTEXT:-${1}}"
+FEDERATIONS_DOMAIN_MAP="${FEDERATIONS_DOMAIN_MAP:-}"
 
 # get_version returns the version in KUBERNETES_RELEASE or defaults to the
 # value in the federation `versions` file.
@@ -85,9 +87,9 @@ function init() {
       --image="${kube_registry}/hyperkube-amd64:${kube_version}"
 }
 
-# join_cluster_to_federation joins the clusters in the local kubeconfig to federation. The clusters
+# join_clusters joins the clusters in the local kubeconfig to federation. The clusters
 # and their kubeconfig entries in the local kubeconfig are created while deploying clusters, i.e. when kube-up is run.
-function join_cluster_to_federation() {
+function join_clusters() {
   for cluster in $("${KUBE_ROOT}/cluster/kubectl.sh" config get-clusters |sed -n '1!p'); do
     # Skip federation context
     if [[ "${cluster}" == "${FEDERATION_NAME}" ]]; then
@@ -112,8 +114,7 @@ USE_KUBEFED="${USE_KUBEFED:-}"
 
 if [[ "${USE_KUBEFED}" == "true" ]]; then
   init
-
-  join_cluster_to_federation
+  join_clusters
 else
   export FEDERATION_IMAGE_TAG="$(get_version)"
   create-federation-api-objects
