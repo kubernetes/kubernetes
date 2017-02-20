@@ -17,8 +17,12 @@ limitations under the License.
 package route53
 
 import (
+	"bytes"
+	"fmt"
+
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/route53"
+	"github.com/golang/glog"
 	"k8s.io/kubernetes/federation/pkg/dnsprovider"
 )
 
@@ -91,6 +95,15 @@ func (c *ResourceRecordChangeset) Apply() error {
 
 	if len(changes) == 0 {
 		return nil
+	}
+
+	if glog.V(8) {
+		var sb bytes.Buffer
+		for _, change := range changes {
+			sb.WriteString(fmt.Sprintf("\t%s %s %s\n", aws.StringValue(change.Action), aws.StringValue(change.ResourceRecordSet.Type), aws.StringValue(change.ResourceRecordSet.Name)))
+		}
+
+		glog.V(8).Infof("Route53 Changeset:\n%s", sb.String())
 	}
 
 	service := c.zone.zones.interface_.service
