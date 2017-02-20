@@ -17,54 +17,32 @@ limitations under the License.
 package podautoscaler
 
 import (
+	"encoding/json"
 	"fmt"
 	"math"
+	"strconv"
+	"strings"
 	"testing"
 	"time"
 
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/client-go/pkg/api"
-	clientv1 "k8s.io/client-go/pkg/api/v1"
+	restclient "k8s.io/client-go/rest"
 	core "k8s.io/client-go/testing"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/v1"
-	autoscalingv2 "k8s.io/kubernetes/pkg/apis/autoscaling/v2alpha1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset/fake"
 	"k8s.io/kubernetes/pkg/controller/podautoscaler/metrics"
-	metricsfake "k8s.io/metrics/pkg/client/clientset_generated/clientset/fake"
-	cmfake "k8s.io/metrics/pkg/client/custom_metrics/fake"
 
-	cmapi "k8s.io/metrics/pkg/apis/custom_metrics/v1alpha1"
-	metricsapi "k8s.io/metrics/pkg/apis/metrics/v1alpha1"
+	heapster "k8s.io/heapster/metrics/api/v1/types"
+	metricsapi "k8s.io/heapster/metrics/apis/metrics/v1alpha1"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-type resourceInfo struct {
-	name     v1.ResourceName
-	requests []resource.Quantity
-	levels   []int64
-	// only applies to pod names returned from "heapster"
-	podNames []string
-
-	targetUtilization   int32
-	expectedUtilization int32
-	expectedValue       int64
-}
-
-type metricInfo struct {
-	name         string
-	levels       []int64
-	singleObject *autoscalingv2.CrossVersionObjectReference
-
-	targetUtilization   int64
-	expectedUtilization int64
-}
-
-type replicaCalcTestCase struct {
+type legacyReplicaCalcTestCase struct {
 	currentReplicas  int32
 	expectedReplicas int32
 	expectedError    error
@@ -77,13 +55,7 @@ type replicaCalcTestCase struct {
 	podReadiness []v1.ConditionStatus
 }
 
-const (
-	testNamespace       = "test-namespace"
-	podNamePrefix       = "test-pod"
-	numContainersPerPod = 2
-)
-
-func (tc *replicaCalcTestCase) prepareTestClient(t *testing.T) (*fake.Clientset, *metricsfake.Clientset, *cmfake.FakeCustomMetricsClient) {
+func (tc *legacyReplicaCalcTestCase) prepareTestClient(t *testing.T) *fake.Clientset {
 
 	fakeClient := &fake.Clientset{}
 	fakeClient.AddReactor("list", "pods", func(action core.Action) (handled bool, ret runtime.Object, err error) {
@@ -133,33 +105,30 @@ func (tc *replicaCalcTestCase) prepareTestClient(t *testing.T) (*fake.Clientset,
 		return true, obj, nil
 	})
 
-	fakeMetricsClient := &metricsfake.Clientset{}
-	// NB: we have to sound like Gollum due to gengo's inability to handle already-plural resource names
-	fakeMetricsClient.AddReactor("list", "podmetricses", func(action core.Action) (handled bool, ret runtime.Object, err error) {
+	fakeClient.AddProxyReactor("services", func(action core.Action) (handled bool, ret restclient.ResponseWrapper, err error) {
+		var heapsterRawMemResponse []byte
+
 		if tc.resource != nil {
-			metrics := &metricsapi.PodMetricsList{}
+			metrics := metricsapi.PodMetricsList{}
 			for i, resValue := range tc.resource.levels {
 				podName := fmt.Sprintf("%s-%d", podNamePrefix, i)
 				if len(tc.resource.podNames) > i {
 					podName = tc.resource.podNames[i]
 				}
-				// NB: the list reactor actually does label selector filtering for us,
-				// so we have to make sure our results match the label selector
 				podMetric := metricsapi.PodMetrics{
-					ObjectMeta: metav1.ObjectMeta{
+					ObjectMeta: v1.ObjectMeta{
 						Name:      podName,
 						Namespace: testNamespace,
-						Labels:    map[string]string{"name": podNamePrefix},
 					},
-					Timestamp:  metav1.Time{Time: tc.timestamp},
+					Timestamp:  unversioned.Time{Time: tc.timestamp},
 					Containers: make([]metricsapi.ContainerMetrics, numContainersPerPod),
 				}
 
 				for i := 0; i < numContainersPerPod; i++ {
 					podMetric.Containers[i] = metricsapi.ContainerMetrics{
 						Name: fmt.Sprintf("container%v", i),
-						Usage: clientv1.ResourceList{
-							clientv1.ResourceName(tc.resource.name): *resource.NewMilliQuantity(
+						Usage: v1.ResourceList{
+							v1.ResourceName(tc.resource.name): *resource.NewMilliQuantity(
 								int64(resValue),
 								resource.DecimalSI),
 						},
@@ -167,84 +136,55 @@ func (tc *replicaCalcTestCase) prepareTestClient(t *testing.T) (*fake.Clientset,
 				}
 				metrics.Items = append(metrics.Items, podMetric)
 			}
-			return true, metrics, nil
-		}
-
-		return true, nil, fmt.Errorf("no pod resource metrics specified in test client")
-	})
-
-	fakeCMClient := &cmfake.FakeCustomMetricsClient{}
-	fakeCMClient.AddReactor("get", "*", func(action core.Action) (handled bool, ret runtime.Object, err error) {
-		getForAction, wasGetFor := action.(cmfake.GetForAction)
-		if !wasGetFor {
-			return true, nil, fmt.Errorf("expected a get-for action, got %v instead", action)
-		}
-
-		if tc.metric == nil {
-			return true, nil, fmt.Errorf("no custom metrics specified in test client")
-		}
-
-		assert.Equal(t, tc.metric.name, getForAction.GetMetricName(), "the metric requested should have matched the one specified")
-
-		if getForAction.GetName() == "*" {
-			metrics := cmapi.MetricValueList{}
-
-			// multiple objects
-			assert.Equal(t, "pods", getForAction.GetResource().Resource, "the type of object that we requested multiple metrics for should have been pods")
-
-			for i, level := range tc.metric.levels {
-				podMetric := cmapi.MetricValue{
-					DescribedObject: clientv1.ObjectReference{
-						Kind:      "Pod",
-						Name:      fmt.Sprintf("%s-%d", podNamePrefix, i),
-						Namespace: testNamespace,
-					},
-					Timestamp:  metav1.Time{Time: tc.timestamp},
-					MetricName: tc.metric.name,
-					Value:      *resource.NewMilliQuantity(level, resource.DecimalSI),
-				}
-				metrics.Items = append(metrics.Items, podMetric)
-			}
-
-			return true, &metrics, nil
+			heapsterRawMemResponse, _ = json.Marshal(&metrics)
 		} else {
-			name := getForAction.GetName()
-			mapper := api.Registry.RESTMapper()
-			metrics := &cmapi.MetricValueList{}
-			assert.NotNil(t, tc.metric.singleObject, "should have only requested a single-object metric when calling GetObjectMetricReplicas")
-			gk := schema.FromAPIVersionAndKind(tc.metric.singleObject.APIVersion, tc.metric.singleObject.Kind).GroupKind()
-			mapping, err := mapper.RESTMapping(gk)
-			if err != nil {
-				return true, nil, fmt.Errorf("unable to get mapping for %s: %v", gk.String(), err)
-			}
-			groupResource := schema.GroupResource{Group: mapping.GroupVersionKind.Group, Resource: mapping.Resource}
-
-			assert.Equal(t, groupResource.String(), getForAction.GetResource().Resource, "should have requested metrics for the resource matching the GroupKind passed in")
-			assert.Equal(t, tc.metric.singleObject.Name, name, "should have requested metrics for the object matching the name passed in")
-
-			metrics.Items = []cmapi.MetricValue{
-				{
-					DescribedObject: clientv1.ObjectReference{
-						Kind:       tc.metric.singleObject.Kind,
-						APIVersion: tc.metric.singleObject.APIVersion,
-						Name:       name,
-					},
-					Timestamp:  metav1.Time{Time: tc.timestamp},
-					MetricName: tc.metric.name,
-					Value:      *resource.NewMilliQuantity(int64(tc.metric.levels[0]), resource.DecimalSI),
-				},
+			// only return the pods that we actually asked for
+			proxyAction := action.(core.ProxyGetAction)
+			pathParts := strings.Split(proxyAction.GetPath(), "/")
+			// pathParts should look like [ api, v1, model, namespaces, $NS, pod-list, $PODS, metrics, $METRIC... ]
+			if len(pathParts) < 9 {
+				return true, nil, fmt.Errorf("invalid heapster path %q", proxyAction.GetPath())
 			}
 
-			return true, metrics, nil
+			podNames := strings.Split(pathParts[7], ",")
+			podPresent := make([]bool, len(tc.metric.levels))
+			for _, name := range podNames {
+				if len(name) <= len(podNamePrefix)+1 {
+					return true, nil, fmt.Errorf("unknown pod %q", name)
+				}
+				num, err := strconv.Atoi(name[len(podNamePrefix)+1:])
+				if err != nil {
+					return true, nil, fmt.Errorf("unknown pod %q", name)
+				}
+				podPresent[num] = true
+			}
+
+			timestamp := tc.timestamp
+			metrics := heapster.MetricResultList{}
+			for i, level := range tc.metric.levels {
+				if !podPresent[i] {
+					continue
+				}
+
+				floatVal := float64(tc.metric.levels[i]) / 1000.0
+				metric := heapster.MetricResult{
+					Metrics:         []heapster.MetricPoint{{Timestamp: timestamp, Value: uint64(level), FloatValue: &floatVal}},
+					LatestTimestamp: timestamp,
+				}
+				metrics.Items = append(metrics.Items, metric)
+			}
+			heapsterRawMemResponse, _ = json.Marshal(&metrics)
 		}
+
+		return true, newFakeResponseWrapper(heapsterRawMemResponse), nil
 	})
 
-	return fakeClient, fakeMetricsClient, fakeCMClient
+	return fakeClient
 }
 
-func (tc *replicaCalcTestCase) runTest(t *testing.T) {
-	testClient, testMetricsClient, testCMClient := tc.prepareTestClient(t)
-	metricsClient := metrics.NewRESTMetricsClient(testMetricsClient.MetricsV1alpha1(), testCMClient)
+func (tc *legacyReplicaCalcTestCase) runTest(t *testing.T) {
+	testClient := tc.prepareTestClient(t)
+	metricsClient := metrics.NewHeapsterMetricsClient(testClient, metrics.DefaultHeapsterNamespace, metrics.DefaultHeapsterScheme, metrics.DefaultHeapsterService, metrics.DefaultHeapsterPort)
 
 	replicaCalc := &ReplicaCalculator{
 		metricsClient: metricsClient,
@@ -273,15 +213,7 @@ func (tc *replicaCalcTestCase) runTest(t *testing.T) {
 		assert.True(t, tc.timestamp.Equal(outTimestamp), "timestamp should be as expected")
 
 	} else {
-		var outReplicas int32
-		var outUtilization int64
-		var outTimestamp time.Time
-		var err error
-		if tc.metric.singleObject != nil {
-			outReplicas, outUtilization, outTimestamp, err = replicaCalc.GetObjectMetricReplicas(tc.currentReplicas, tc.metric.targetUtilization, tc.metric.name, testNamespace, tc.metric.singleObject)
-		} else {
-			outReplicas, outUtilization, outTimestamp, err = replicaCalc.GetMetricReplicas(tc.currentReplicas, tc.metric.targetUtilization, tc.metric.name, testNamespace, selector)
-		}
+		outReplicas, outUtilization, outTimestamp, err := replicaCalc.GetMetricReplicas(tc.currentReplicas, tc.metric.targetUtilization, tc.metric.name, testNamespace, selector)
 
 		if tc.expectedError != nil {
 			require.Error(t, err, "there should be an error calculating the replica count")
@@ -295,8 +227,8 @@ func (tc *replicaCalcTestCase) runTest(t *testing.T) {
 	}
 }
 
-func TestReplicaCalcDisjointResourcesMetrics(t *testing.T) {
-	tc := replicaCalcTestCase{
+func LegacyTestReplicaCalcDisjointResourcesMetrics(t *testing.T) {
+	tc := legacyReplicaCalcTestCase{
 		currentReplicas: 1,
 		expectedError:   fmt.Errorf("no metrics returned matched known pods"),
 		resource: &resourceInfo{
@@ -311,8 +243,8 @@ func TestReplicaCalcDisjointResourcesMetrics(t *testing.T) {
 	tc.runTest(t)
 }
 
-func TestReplicaCalcScaleUp(t *testing.T) {
-	tc := replicaCalcTestCase{
+func LegacyTestReplicaCalcScaleUp(t *testing.T) {
+	tc := legacyReplicaCalcTestCase{
 		currentReplicas:  3,
 		expectedReplicas: 5,
 		resource: &resourceInfo{
@@ -328,8 +260,8 @@ func TestReplicaCalcScaleUp(t *testing.T) {
 	tc.runTest(t)
 }
 
-func TestReplicaCalcScaleUpUnreadyLessScale(t *testing.T) {
-	tc := replicaCalcTestCase{
+func LegacyTestReplicaCalcScaleUpUnreadyLessScale(t *testing.T) {
+	tc := legacyReplicaCalcTestCase{
 		currentReplicas:  3,
 		expectedReplicas: 4,
 		podReadiness:     []v1.ConditionStatus{v1.ConditionFalse, v1.ConditionTrue, v1.ConditionTrue},
@@ -346,8 +278,8 @@ func TestReplicaCalcScaleUpUnreadyLessScale(t *testing.T) {
 	tc.runTest(t)
 }
 
-func TestReplicaCalcScaleUpUnreadyNoScale(t *testing.T) {
-	tc := replicaCalcTestCase{
+func LegacyTestReplicaCalcScaleUpUnreadyNoScale(t *testing.T) {
+	tc := legacyReplicaCalcTestCase{
 		currentReplicas:  3,
 		expectedReplicas: 3,
 		podReadiness:     []v1.ConditionStatus{v1.ConditionTrue, v1.ConditionFalse, v1.ConditionFalse},
@@ -364,8 +296,8 @@ func TestReplicaCalcScaleUpUnreadyNoScale(t *testing.T) {
 	tc.runTest(t)
 }
 
-func TestReplicaCalcScaleUpCM(t *testing.T) {
-	tc := replicaCalcTestCase{
+func LegacyTestReplicaCalcScaleUpCM(t *testing.T) {
+	tc := legacyReplicaCalcTestCase{
 		currentReplicas:  3,
 		expectedReplicas: 4,
 		metric: &metricInfo{
@@ -378,8 +310,8 @@ func TestReplicaCalcScaleUpCM(t *testing.T) {
 	tc.runTest(t)
 }
 
-func TestReplicaCalcScaleUpCMUnreadyLessScale(t *testing.T) {
-	tc := replicaCalcTestCase{
+func LegacyTestReplicaCalcScaleUpCMUnreadyLessScale(t *testing.T) {
+	tc := legacyReplicaCalcTestCase{
 		currentReplicas:  3,
 		expectedReplicas: 4,
 		podReadiness:     []v1.ConditionStatus{v1.ConditionTrue, v1.ConditionTrue, v1.ConditionFalse},
@@ -393,8 +325,8 @@ func TestReplicaCalcScaleUpCMUnreadyLessScale(t *testing.T) {
 	tc.runTest(t)
 }
 
-func TestReplicaCalcScaleUpCMUnreadyNoScaleWouldScaleDown(t *testing.T) {
-	tc := replicaCalcTestCase{
+func LegacyTestReplicaCalcScaleUpCMUnreadyNoScaleWouldScaleDown(t *testing.T) {
+	tc := legacyReplicaCalcTestCase{
 		currentReplicas:  3,
 		expectedReplicas: 3,
 		podReadiness:     []v1.ConditionStatus{v1.ConditionFalse, v1.ConditionTrue, v1.ConditionFalse},
@@ -408,27 +340,8 @@ func TestReplicaCalcScaleUpCMUnreadyNoScaleWouldScaleDown(t *testing.T) {
 	tc.runTest(t)
 }
 
-func TestReplicaCalcScaleUpCMObject(t *testing.T) {
-	tc := replicaCalcTestCase{
-		currentReplicas:  3,
-		expectedReplicas: 4,
-		metric: &metricInfo{
-			name:                "qps",
-			levels:              []int64{20000},
-			targetUtilization:   15000,
-			expectedUtilization: 20000,
-			singleObject: &autoscalingv2.CrossVersionObjectReference{
-				Kind:       "Deployment",
-				APIVersion: "extensions/v1beta1",
-				Name:       "some-deployment",
-			},
-		},
-	}
-	tc.runTest(t)
-}
-
-func TestReplicaCalcScaleDown(t *testing.T) {
-	tc := replicaCalcTestCase{
+func LegacyTestReplicaCalcScaleDown(t *testing.T) {
+	tc := legacyReplicaCalcTestCase{
 		currentReplicas:  5,
 		expectedReplicas: 3,
 		resource: &resourceInfo{
@@ -444,8 +357,8 @@ func TestReplicaCalcScaleDown(t *testing.T) {
 	tc.runTest(t)
 }
 
-func TestReplicaCalcScaleDownCM(t *testing.T) {
-	tc := replicaCalcTestCase{
+func LegacyTestReplicaCalcScaleDownCM(t *testing.T) {
+	tc := legacyReplicaCalcTestCase{
 		currentReplicas:  5,
 		expectedReplicas: 3,
 		metric: &metricInfo{
@@ -458,27 +371,8 @@ func TestReplicaCalcScaleDownCM(t *testing.T) {
 	tc.runTest(t)
 }
 
-func TestReplicaCalcScaleDownCMObject(t *testing.T) {
-	tc := replicaCalcTestCase{
-		currentReplicas:  5,
-		expectedReplicas: 3,
-		metric: &metricInfo{
-			name:                "qps",
-			levels:              []int64{12000},
-			targetUtilization:   20000,
-			expectedUtilization: 12000,
-			singleObject: &autoscalingv2.CrossVersionObjectReference{
-				Kind:       "Deployment",
-				APIVersion: "extensions/v1beta1",
-				Name:       "some-deployment",
-			},
-		},
-	}
-	tc.runTest(t)
-}
-
-func TestReplicaCalcScaleDownIgnoresUnreadyPods(t *testing.T) {
-	tc := replicaCalcTestCase{
+func LegacyTestReplicaCalcScaleDownIgnoresUnreadyPods(t *testing.T) {
+	tc := legacyReplicaCalcTestCase{
 		currentReplicas:  5,
 		expectedReplicas: 2,
 		podReadiness:     []v1.ConditionStatus{v1.ConditionTrue, v1.ConditionTrue, v1.ConditionTrue, v1.ConditionFalse, v1.ConditionFalse},
@@ -495,8 +389,8 @@ func TestReplicaCalcScaleDownIgnoresUnreadyPods(t *testing.T) {
 	tc.runTest(t)
 }
 
-func TestReplicaCalcTolerance(t *testing.T) {
-	tc := replicaCalcTestCase{
+func LegacyTestReplicaCalcTolerance(t *testing.T) {
+	tc := legacyReplicaCalcTestCase{
 		currentReplicas:  3,
 		expectedReplicas: 3,
 		resource: &resourceInfo{
@@ -512,8 +406,8 @@ func TestReplicaCalcTolerance(t *testing.T) {
 	tc.runTest(t)
 }
 
-func TestReplicaCalcToleranceCM(t *testing.T) {
-	tc := replicaCalcTestCase{
+func LegacyTestReplicaCalcToleranceCM(t *testing.T) {
+	tc := legacyReplicaCalcTestCase{
 		currentReplicas:  3,
 		expectedReplicas: 3,
 		metric: &metricInfo{
@@ -526,27 +420,8 @@ func TestReplicaCalcToleranceCM(t *testing.T) {
 	tc.runTest(t)
 }
 
-func TestReplicaCalcToleranceCMObject(t *testing.T) {
-	tc := replicaCalcTestCase{
-		currentReplicas:  3,
-		expectedReplicas: 3,
-		metric: &metricInfo{
-			name:                "qps",
-			levels:              []int64{20666},
-			targetUtilization:   20000,
-			expectedUtilization: 20666,
-			singleObject: &autoscalingv2.CrossVersionObjectReference{
-				Kind:       "Deployment",
-				APIVersion: "extensions/v1beta1",
-				Name:       "some-deployment",
-			},
-		},
-	}
-	tc.runTest(t)
-}
-
-func TestReplicaCalcSuperfluousMetrics(t *testing.T) {
-	tc := replicaCalcTestCase{
+func LegacyTestReplicaCalcSuperfluousMetrics(t *testing.T) {
+	tc := legacyReplicaCalcTestCase{
 		currentReplicas:  4,
 		expectedReplicas: 24,
 		resource: &resourceInfo{
@@ -561,8 +436,8 @@ func TestReplicaCalcSuperfluousMetrics(t *testing.T) {
 	tc.runTest(t)
 }
 
-func TestReplicaCalcMissingMetrics(t *testing.T) {
-	tc := replicaCalcTestCase{
+func LegacyTestReplicaCalcMissingMetrics(t *testing.T) {
+	tc := legacyReplicaCalcTestCase{
 		currentReplicas:  4,
 		expectedReplicas: 3,
 		resource: &resourceInfo{
@@ -578,8 +453,8 @@ func TestReplicaCalcMissingMetrics(t *testing.T) {
 	tc.runTest(t)
 }
 
-func TestReplicaCalcEmptyMetrics(t *testing.T) {
-	tc := replicaCalcTestCase{
+func LegacyTestReplicaCalcEmptyMetrics(t *testing.T) {
+	tc := legacyReplicaCalcTestCase{
 		currentReplicas: 4,
 		expectedError:   fmt.Errorf("unable to get metrics for resource cpu: no metrics returned from heapster"),
 		resource: &resourceInfo{
@@ -593,8 +468,8 @@ func TestReplicaCalcEmptyMetrics(t *testing.T) {
 	tc.runTest(t)
 }
 
-func TestReplicaCalcEmptyCPURequest(t *testing.T) {
-	tc := replicaCalcTestCase{
+func LegacyTestReplicaCalcEmptyCPURequest(t *testing.T) {
+	tc := legacyReplicaCalcTestCase{
 		currentReplicas: 1,
 		expectedError:   fmt.Errorf("missing request for"),
 		resource: &resourceInfo{
@@ -608,8 +483,8 @@ func TestReplicaCalcEmptyCPURequest(t *testing.T) {
 	tc.runTest(t)
 }
 
-func TestReplicaCalcMissingMetricsNoChangeEq(t *testing.T) {
-	tc := replicaCalcTestCase{
+func LegacyTestReplicaCalcMissingMetricsNoChangeEq(t *testing.T) {
+	tc := legacyReplicaCalcTestCase{
 		currentReplicas:  2,
 		expectedReplicas: 2,
 		resource: &resourceInfo{
@@ -625,8 +500,8 @@ func TestReplicaCalcMissingMetricsNoChangeEq(t *testing.T) {
 	tc.runTest(t)
 }
 
-func TestReplicaCalcMissingMetricsNoChangeGt(t *testing.T) {
-	tc := replicaCalcTestCase{
+func LegacyTestReplicaCalcMissingMetricsNoChangeGt(t *testing.T) {
+	tc := legacyReplicaCalcTestCase{
 		currentReplicas:  2,
 		expectedReplicas: 2,
 		resource: &resourceInfo{
@@ -642,8 +517,8 @@ func TestReplicaCalcMissingMetricsNoChangeGt(t *testing.T) {
 	tc.runTest(t)
 }
 
-func TestReplicaCalcMissingMetricsNoChangeLt(t *testing.T) {
-	tc := replicaCalcTestCase{
+func LegacyTestReplicaCalcMissingMetricsNoChangeLt(t *testing.T) {
+	tc := legacyReplicaCalcTestCase{
 		currentReplicas:  2,
 		expectedReplicas: 2,
 		resource: &resourceInfo{
@@ -659,8 +534,8 @@ func TestReplicaCalcMissingMetricsNoChangeLt(t *testing.T) {
 	tc.runTest(t)
 }
 
-func TestReplicaCalcMissingMetricsUnreadyNoChange(t *testing.T) {
-	tc := replicaCalcTestCase{
+func LegacyTestReplicaCalcMissingMetricsUnreadyNoChange(t *testing.T) {
+	tc := legacyReplicaCalcTestCase{
 		currentReplicas:  3,
 		expectedReplicas: 3,
 		podReadiness:     []v1.ConditionStatus{v1.ConditionFalse, v1.ConditionTrue, v1.ConditionTrue},
@@ -677,8 +552,8 @@ func TestReplicaCalcMissingMetricsUnreadyNoChange(t *testing.T) {
 	tc.runTest(t)
 }
 
-func TestReplicaCalcMissingMetricsUnreadyScaleUp(t *testing.T) {
-	tc := replicaCalcTestCase{
+func LegacyTestReplicaCalcMissingMetricsUnreadyScaleUp(t *testing.T) {
+	tc := legacyReplicaCalcTestCase{
 		currentReplicas:  3,
 		expectedReplicas: 4,
 		podReadiness:     []v1.ConditionStatus{v1.ConditionFalse, v1.ConditionTrue, v1.ConditionTrue},
@@ -695,8 +570,8 @@ func TestReplicaCalcMissingMetricsUnreadyScaleUp(t *testing.T) {
 	tc.runTest(t)
 }
 
-func TestReplicaCalcMissingMetricsUnreadyScaleDown(t *testing.T) {
-	tc := replicaCalcTestCase{
+func LegacyTestReplicaCalcMissingMetricsUnreadyScaleDown(t *testing.T) {
+	tc := legacyReplicaCalcTestCase{
 		currentReplicas:  4,
 		expectedReplicas: 3,
 		podReadiness:     []v1.ConditionStatus{v1.ConditionFalse, v1.ConditionTrue, v1.ConditionTrue, v1.ConditionTrue},
@@ -716,7 +591,7 @@ func TestReplicaCalcMissingMetricsUnreadyScaleDown(t *testing.T) {
 // TestComputedToleranceAlgImplementation is a regression test which
 // back-calculates a minimal percentage for downscaling based on a small percentage
 // increase in pod utilization which is calibrated against the tolerance value.
-func TestReplicaCalcComputedToleranceAlgImplementation(t *testing.T) {
+func LegacyTestReplicaCalcComputedToleranceAlgImplementation(t *testing.T) {
 
 	startPods := int32(10)
 	// 150 mCPU per pod.
@@ -737,7 +612,7 @@ func TestReplicaCalcComputedToleranceAlgImplementation(t *testing.T) {
 	finalPods := int32(math.Ceil(resourcesUsedRatio * float64(startPods)))
 
 	// To breach tolerance we will create a utilization ratio difference of tolerance to usageRatioToleranceValue)
-	tc := replicaCalcTestCase{
+	tc := legacyReplicaCalcTestCase{
 		currentReplicas:  startPods,
 		expectedReplicas: finalPods,
 		resource: &resourceInfo{

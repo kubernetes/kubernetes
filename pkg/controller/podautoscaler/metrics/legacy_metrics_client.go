@@ -34,26 +34,6 @@ import (
 	v1core "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/core/v1"
 )
 
-// PodMetricsInfo contains pod metric values as a map from pod names to
-// metric values (the metric values are expected to be the metric as a milli-value)
-type PodMetricsInfo map[string]int64
-
-// MetricsClient knows how to query a remote interface to retrieve container-level
-// resource metrics as well as pod-level arbitrary metrics
-type MetricsClient interface {
-	// GetResourceMetric gets the given resource metric (and an associated oldest timestamp)
-	// for all pods matching the specified selector in the given namespace
-	GetResourceMetric(resource v1.ResourceName, namespace string, selector labels.Selector) (PodMetricsInfo, time.Time, error)
-
-	// GetRawMetric gets the given metric (and an associated oldest timestamp)
-	// for all pods matching the specified selector in the given namespace
-	GetRawMetric(metricName string, namespace string, selector labels.Selector) (PodMetricsInfo, time.Time, error)
-
-	// GetObjectMetric gets the given metric (and an associated timestamp) for the given
-	// object in the given namespace
-	GetObjectMetric(metricName string, namespace string, objectRef *autoscaling.CrossVersionObjectReference) (int64, time.Time, error)
-}
-
 const (
 	DefaultHeapsterNamespace = "kube-system"
 	DefaultHeapsterScheme    = "http"
