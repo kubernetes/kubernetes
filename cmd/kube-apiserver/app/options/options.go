@@ -86,9 +86,17 @@ func NewServerRunOptions() *ServerRunOptions {
 			Port:         ports.KubeletPort,
 			ReadOnlyPort: ports.KubeletReadOnlyPort,
 			PreferredAddressTypes: []string{
+				// --override-hostname
 				string(api.NodeHostName),
+
+				// internal, preferring DNS if reported
+				string(api.NodeInternalDNS),
 				string(api.NodeInternalIP),
+
+				// external, preferring DNS if reported
+				string(api.NodeExternalDNS),
 				string(api.NodeExternalIP),
+
 				string(api.NodeLegacyHostIP),
 			},
 			EnableHttps: true,
