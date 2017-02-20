@@ -113,10 +113,7 @@ func (c *claimDefaulterPlugin) Admit(a admission.Attributes) error {
 	}
 
 	glog.V(4).Infof("defaulting storage class for claim %s (generate: %s) to %s", pvc.Name, pvc.GenerateName, def.Name)
-	if pvc.ObjectMeta.Annotations == nil {
-		pvc.ObjectMeta.Annotations = map[string]string{}
-	}
-	pvc.Annotations[api.BetaStorageClassAnnotation] = def.Name
+	pvc.Spec.StorageClassName = &def.Name
 	return nil
 }
 
