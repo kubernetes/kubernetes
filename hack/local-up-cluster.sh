@@ -798,7 +798,7 @@ if [[ "${START_MODE}" != "nokubelet" ]]; then
         ;;
       Linux)
         start_kubelet
-	if [[ "${ENABLE_KUBELET_DEBUG_HANDLER}" = true ]]; then
+	if [[ "${ENABLE_KUBELET_DEBUG_HANDLERS}" = true ]]; then
 	  warning "kubelet is debug mode."
 	fi
         ;;
