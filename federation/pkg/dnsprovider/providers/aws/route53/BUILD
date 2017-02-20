@@ -25,6 +25,7 @@ go_library(
         "//federation/pkg/dnsprovider/providers/aws/route53/stubs:go_default_library",
         "//federation/pkg/dnsprovider/rrstype:go_default_library",
         "//vendor:github.com/aws/aws-sdk-go/aws",
+        "//vendor:github.com/aws/aws-sdk-go/aws/request",
         "//vendor:github.com/aws/aws-sdk-go/aws/session",
         "//vendor:github.com/aws/aws-sdk-go/service/route53",
         "//vendor:github.com/golang/glog",
