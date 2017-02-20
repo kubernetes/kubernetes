@@ -68,12 +68,13 @@ type NodeConfig struct {
 }
 
 type NodeAllocatableConfig struct {
-	KubeReservedCgroupName   string
-	SystemReservedCgroupName string
-	EnforceNodeAllocatable   sets.String
-	KubeReserved             v1.ResourceList
-	SystemReserved           v1.ResourceList
-	HardEvictionThresholds   []evictionapi.Threshold
+	KubeReservedCgroupName      string
+	SystemReservedCgroupName    string
+	EnforceNodeAllocatable      sets.String
+	KubeReserved                v1.ResourceList
+	SystemReserved              v1.ResourceList
+	HardEvictionThresholds      []evictionapi.Threshold
+	IgnoreHardEvictionThreshold bool
 }
 
 type Status struct {

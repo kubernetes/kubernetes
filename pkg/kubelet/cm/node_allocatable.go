@@ -140,7 +140,7 @@ func (cm *containerManagerImpl) getNodeAllocatableInternal(includeHardEviction b
 
 // GetNodeAllocatable returns amount of compute resource available for pods.
 func (cm *containerManagerImpl) GetNodeAllocatable() v1.ResourceList {
-	return cm.getNodeAllocatableInternal(true)
+	return cm.getNodeAllocatableInternal(!cm.NodeConfig.IgnoreHardEvictionThreshold)
 }
 
 // hardEvictionReservation returns a resourcelist that includes reservation of resources based on hard eviction thresholds.
