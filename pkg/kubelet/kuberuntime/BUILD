@@ -54,6 +54,7 @@ go_library(
         "//vendor:github.com/fsnotify/fsnotify",
         "//vendor:github.com/golang/glog",
         "//vendor:github.com/google/cadvisor/info/v1",
+        "//vendor:github.com/google/cadvisor/info/v2",
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
         "//vendor:k8s.io/apimachinery/pkg/types",
         "//vendor:k8s.io/apimachinery/pkg/util/errors",

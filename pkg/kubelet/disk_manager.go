@@ -31,11 +31,14 @@ import (
 // mb is used to easily convert an int to an mb
 const mb = 1024 * 1024
 
+// ImageFsInfoFunc is the interface for getting ImageFsInfo.
+type ImageFsInfoFunc func() (cadvisorapi.FsInfo, error)
+
 // Implementation is thread-safe.
 type diskSpaceManager interface {
 	// Checks the available disk space
 	IsRootDiskSpaceAvailable() (bool, error)
-	IsRuntimeDiskSpaceAvailable() (bool, error)
+	IsRuntimeDiskSpaceAvailable(ImageFsInfoFunc) (bool, error)
 }
 
 type DiskSpacePolicy struct {
@@ -59,7 +62,7 @@ type realDiskSpaceManager struct {
 	policy     DiskSpacePolicy   // thresholds. Set at creation time.
 }
 
-func (dm *realDiskSpaceManager) getFsInfo(fsType string, f func() (cadvisorapi.FsInfo, error)) (fsInfo, error) {
+func (dm *realDiskSpaceManager) getFsInfo(fsType string, f ImageFsInfoFunc) (fsInfo, error) {
 	dm.lock.Lock()
 	defer dm.lock.Unlock()
 	fsi := fsInfo{}
@@ -83,8 +86,8 @@ func (dm *realDiskSpaceManager) getFsInfo(fsType string, f func() (cadvisorapi.F
 	return fsi, nil
 }
 
-func (dm *realDiskSpaceManager) IsRuntimeDiskSpaceAvailable() (bool, error) {
-	return dm.isSpaceAvailable("runtime", dm.policy.DockerFreeDiskMB, dm.cadvisor.ImagesFsInfo)
+func (dm *realDiskSpaceManager) IsRuntimeDiskSpaceAvailable(fsInfoFunc ImageFsInfoFunc) (bool, error) {
+	return dm.isSpaceAvailable("runtime", dm.policy.DockerFreeDiskMB, fsInfoFunc)
 }
 
 func (dm *realDiskSpaceManager) IsRootDiskSpaceAvailable() (bool, error) {

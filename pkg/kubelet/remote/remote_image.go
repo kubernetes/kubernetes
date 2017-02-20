@@ -127,3 +127,17 @@ func (r *RemoteImageService) RemoveImage(image *runtimeapi.ImageSpec) error {
 
 	return nil
 }
+
+// ImageFsInfo returns filesytem information of images.
+func (r *RemoteImageService) ImageFsInfo() (*runtimeapi.FsInfo, error) {
+	ctx, cancel := getContextWithTimeout(r.timeout)
+	defer cancel()
+
+	imageFSInfo, err := r.imageClient.ImageFsInfo(ctx, &runtimeapi.ImageFsInfoRequest{})
+	if err != nil {
+		glog.Errorf("ImageFsInfo failed: %v", err)
+		return nil, err
+	}
+
+	return imageFSInfo.FsInfo, nil
+}

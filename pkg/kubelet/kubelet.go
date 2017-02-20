@@ -552,8 +552,16 @@ func NewMainKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *Kub
 		case "docker":
 			// Create and start the CRI shim running as a grpc server.
 			streamingConfig := getStreamingConfig(kubeCfg, kubeDeps)
-			ds, err := dockershim.NewDockerService(klet.dockerClient, kubeCfg.SeccompProfileRoot, kubeCfg.PodInfraContainerImage,
-				streamingConfig, &pluginSettings, kubeCfg.RuntimeCgroups, kubeCfg.CgroupDriver, dockerExecHandler)
+			ds, err := dockershim.NewDockerService(
+				klet.dockerClient,
+				kubeCfg.SeccompProfileRoot,
+				kubeCfg.PodInfraContainerImage,
+				streamingConfig,
+				&pluginSettings,
+				kubeCfg.RuntimeCgroups,
+				kubeCfg.CgroupDriver,
+				dockerExecHandler,
+				klet.cadvisor)
 			if err != nil {
 				return nil, err
 			}
@@ -622,6 +630,7 @@ func NewMainKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *Kub
 				kubeDeps.OSInterface,
 				klet.networkPlugin,
 				klet,
+				klet.cadvisor,
 				klet.httpClient,
 				dockerExecHandler,
 				kubeDeps.OOMAdjuster,
@@ -667,6 +676,7 @@ func NewMainKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *Kub
 				float32(kubeCfg.RegistryPullQPS),
 				int(kubeCfg.RegistryBurst),
 				kubeCfg.RuntimeRequestTimeout.Duration,
+				klet.cadvisor,
 			)
 			if err != nil {
 				return nil, err
@@ -1625,7 +1635,7 @@ func (kl *Kubelet) deletePod(pod *v1.Pod) error {
 // isOutOfDisk detects if pods can't fit due to lack of disk space.
 func (kl *Kubelet) isOutOfDisk() bool {
 	// Check disk space once globally and reject or accept all new pods.
-	withinBounds, err := kl.diskSpaceManager.IsRuntimeDiskSpaceAvailable()
+	withinBounds, err := kl.diskSpaceManager.IsRuntimeDiskSpaceAvailable(kl.containerRuntime.ImageFsInfo)
 	// Assume enough space in case of errors.
 	if err != nil {
 		glog.Errorf("Failed to check if disk space is available for the runtime: %v", err)
