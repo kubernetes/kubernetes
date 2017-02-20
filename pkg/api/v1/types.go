@@ -2286,6 +2286,9 @@ type PodSpec struct {
 	// If not specified, the pod will be dispatched by default scheduler.
 	// +optional
 	SchedulerName string `json:"schedulername,omitempty" protobuf:"bytes,19,opt,name=schedulername"`
+	// If specified, the pod's tolerations.
+	// +optional
+	Tolerations []Toleration `json:"tolerations,omitempty" protobuf:"bytes,22,opt,name=tolerations"`
 }
 
 // PodSecurityContext holds pod-level security attributes and common container settings.
@@ -3022,6 +3025,9 @@ type NodeSpec struct {
 	// More info: http://releases.k8s.io/HEAD/docs/admin/node.md#manual-node-administration
 	// +optional
 	Unschedulable bool `json:"unschedulable,omitempty" protobuf:"varint,4,opt,name=unschedulable"`
+	// If specified, the node's taints.
+	// +optional
+	Taints []Taint `json:"taints,omitempty"  protobuf:"bytes,5,opt,name=taints"`
 }
 
 // DaemonEndpoint contains information about a single Daemon endpoint.
