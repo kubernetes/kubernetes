@@ -14,6 +14,7 @@ go_library(
         "generator_for_clientset.go",
         "generator_for_expansion.go",
         "generator_for_group.go",
+        "generator_for_scheme.go",
         "generator_for_type.go",
         "tags.go",
     ],

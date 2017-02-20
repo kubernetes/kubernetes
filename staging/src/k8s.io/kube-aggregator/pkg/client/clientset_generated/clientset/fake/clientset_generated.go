@@ -24,8 +24,8 @@ import (
 	"k8s.io/client-go/pkg/api"
 	"k8s.io/client-go/testing"
 	clientset "k8s.io/kube-aggregator/pkg/client/clientset_generated/clientset"
-	v1alpha1apiregistration "k8s.io/kube-aggregator/pkg/client/clientset_generated/clientset/typed/apiregistration/v1alpha1"
-	fakev1alpha1apiregistration "k8s.io/kube-aggregator/pkg/client/clientset_generated/clientset/typed/apiregistration/v1alpha1/fake"
+	apiregistrationv1alpha1 "k8s.io/kube-aggregator/pkg/client/clientset_generated/clientset/typed/apiregistration/v1alpha1"
+	fakeapiregistrationv1alpha1 "k8s.io/kube-aggregator/pkg/client/clientset_generated/clientset/typed/apiregistration/v1alpha1/fake"
 )
 
 // NewSimpleClientset returns a clientset that will respond with the provided objects.
@@ -62,11 +62,11 @@ func (c *Clientset) Discovery() discovery.DiscoveryInterface {
 var _ clientset.Interface = &Clientset{}
 
 // ApiregistrationV1alpha1 retrieves the ApiregistrationV1alpha1Client
-func (c *Clientset) ApiregistrationV1alpha1() v1alpha1apiregistration.ApiregistrationV1alpha1Interface {
-	return &fakev1alpha1apiregistration.FakeApiregistrationV1alpha1{Fake: &c.Fake}
+func (c *Clientset) ApiregistrationV1alpha1() apiregistrationv1alpha1.ApiregistrationV1alpha1Interface {
+	return &fakeapiregistrationv1alpha1.FakeApiregistrationV1alpha1{Fake: &c.Fake}
 }
 
 // Apiregistration retrieves the ApiregistrationV1alpha1Client
-func (c *Clientset) Apiregistration() v1alpha1apiregistration.ApiregistrationV1alpha1Interface {
-	return &fakev1alpha1apiregistration.FakeApiregistrationV1alpha1{Fake: &c.Fake}
+func (c *Clientset) Apiregistration() apiregistrationv1alpha1.ApiregistrationV1alpha1Interface {
+	return &fakeapiregistrationv1alpha1.FakeApiregistrationV1alpha1{Fake: &c.Fake}
 }

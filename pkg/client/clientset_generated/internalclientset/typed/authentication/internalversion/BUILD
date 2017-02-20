@@ -18,8 +18,8 @@ go_library(
     ],
     tags = ["automanaged"],
     deps = [
-        "//pkg/api:go_default_library",
         "//pkg/apis/authentication:go_default_library",
+        "//pkg/client/clientset_generated/internalclientset/scheme:go_default_library",
         "//vendor:k8s.io/client-go/rest",
     ],
 )
