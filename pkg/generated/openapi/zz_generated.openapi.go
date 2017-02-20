@@ -12058,7 +12058,7 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 		"k8s.io/kubernetes/pkg/apis/certificates/v1beta1.CertificateSigningRequestSpec": {
 			Schema: spec.Schema{
 				SchemaProps: spec.SchemaProps{
-					Description: "This information is immutable after the request is created. Only the Request and ExtraInfo fields can be set on creation, other fields are derived by Kubernetes and cannot be modified by users.",
+					Description: "This information is immutable after the request is created. Only the Request and Usages fields can be set on creation, other fields are derived by Kubernetes and cannot be modified by users.",
 					Properties: map[string]spec.Schema{
 						"request": {
 							SchemaProps: spec.SchemaProps{
@@ -12083,25 +12083,48 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 						},
 						"username": {
 							SchemaProps: spec.SchemaProps{
-								Description: "Information about the requesting user (if relevant) See user.Info interface for details",
+								Description: "Information about the requesting user. See user.Info interface for details.",
 								Type:        []string{"string"},
 								Format:      "",
 							},
 						},
 						"uid": {
 							SchemaProps: spec.SchemaProps{
-								Type:   []string{"string"},
-								Format: "",
+								Description: "UID information about the requesting user. See user.Info interface for details.",
+								Type:        []string{"string"},
+								Format:      "",
 							},
 						},
 						"groups": {
 							SchemaProps: spec.SchemaProps{
-								Type: []string{"array"},
+								Description: "Group information about the requesting user. See user.Info interface for details.",
+								Type:        []string{"array"},
 								Items: &spec.SchemaOrArray{
 									Schema: &spec.Schema{
 										SchemaProps: spec.SchemaProps{
 											Type:   []string{"string"},
 											Format: "",
+										},
+									},
+								},
+							},
+						},
+						"extra": {
+							SchemaProps: spec.SchemaProps{
+								Description: "Extra information about the requesting user. See user.Info interface for details.",
+								Type:        []string{"object"},
+								AdditionalProperties: &spec.SchemaOrBool{
+									Schema: &spec.Schema{
+										SchemaProps: spec.SchemaProps{
+											Type: []string{"array"},
+											Items: &spec.SchemaOrArray{
+												Schema: &spec.Schema{
+													SchemaProps: spec.SchemaProps{
+														Type:   []string{"string"},
+														Format: "",
+													},
+												},
+											},
 										},
 									},
 								},

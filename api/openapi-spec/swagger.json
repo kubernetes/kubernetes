@@ -41215,12 +41215,23 @@
     ]
    },
    "io.k8s.kubernetes.pkg.apis.certificates.v1beta1.CertificateSigningRequestSpec": {
-    "description": "This information is immutable after the request is created. Only the Request and ExtraInfo fields can be set on creation, other fields are derived by Kubernetes and cannot be modified by users.",
+    "description": "This information is immutable after the request is created. Only the Request and Usages fields can be set on creation, other fields are derived by Kubernetes and cannot be modified by users.",
     "required": [
      "request"
     ],
     "properties": {
+     "extra": {
+      "description": "Extra information about the requesting user. See user.Info interface for details.",
+      "type": "object",
+      "additionalProperties": {
+       "type": "array",
+       "items": {
+        "type": "string"
+       }
+      }
+     },
      "groups": {
+      "description": "Group information about the requesting user. See user.Info interface for details.",
       "type": "array",
       "items": {
        "type": "string"
@@ -41232,6 +41243,7 @@
       "format": "byte"
      },
      "uid": {
+      "description": "UID information about the requesting user. See user.Info interface for details.",
       "type": "string"
      },
      "usages": {
@@ -41242,7 +41254,7 @@
       }
      },
      "username": {
-      "description": "Information about the requesting user (if relevant) See user.Info interface for details",
+      "description": "Information about the requesting user. See user.Info interface for details.",
       "type": "string"
      }
     }
