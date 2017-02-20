@@ -341,7 +341,7 @@ func (d *namespacedResourcesDeleter) deleteCollection(
 	// resource deletions generically.  it will ensure all resources in the namespace are purged prior to releasing
 	// namespace itself.
 	orphanDependents := false
-	err := dynamicClient.Resource(&apiResource, namespace).DeleteCollection(&metav1.DeleteOptions{OrphanDependents: &orphanDependents}, &metav1.ListOptions{})
+	err := dynamicClient.Resource(&apiResource, namespace).DeleteCollection(&metav1.DeleteOptions{OrphanDependents: &orphanDependents}, metav1.ListOptions{})
 
 	if err == nil {
 		return true, nil
@@ -379,7 +379,7 @@ func (d *namespacedResourcesDeleter) listCollection(
 	}
 
 	apiResource := metav1.APIResource{Name: gvr.Resource, Namespaced: true}
-	obj, err := dynamicClient.Resource(&apiResource, namespace).List(&metav1.ListOptions{})
+	obj, err := dynamicClient.Resource(&apiResource, namespace).List(metav1.ListOptions{})
 	if err == nil {
 		unstructuredList, ok := obj.(*unstructured.UnstructuredList)
 		if !ok {
