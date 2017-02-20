@@ -82,6 +82,7 @@ import (
 	gcecloud "k8s.io/kubernetes/pkg/cloudprovider/providers/gce"
 	"k8s.io/kubernetes/pkg/controller"
 	deploymentutil "k8s.io/kubernetes/pkg/controller/deployment/util"
+	nodectlr "k8s.io/kubernetes/pkg/controller/node"
 	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
 	"k8s.io/kubernetes/pkg/master/ports"
@@ -3956,6 +3957,20 @@ func isNodeConditionSetAsExpected(node *v1.Node, conditionType v1.NodeConditionT
 		// Ensure that the condition type and the status matches as desired.
 		if cond.Type == conditionType {
 			if (cond.Status == v1.ConditionTrue) == wantTrue {
+				if cond.Type != v1.NodeReady {
+					return true
+				}
+				// For NodeReady we need to check if Taints are gone as well
+				taints, err := v1.GetNodeTaints(node)
+				ExpectNoError(err)
+				if err != nil {
+					return false
+				}
+				for _, taint := range taints {
+					if taint.MatchTaint(nodectlr.UnreachableTaintTemplate) || taint.MatchTaint(nodectlr.NotReadyTaintTemplate) {
+						return false
+					}
+				}
 				return true
 			} else {
 				if !silent {
