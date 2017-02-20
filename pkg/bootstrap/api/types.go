@@ -21,6 +21,12 @@ import (
 )
 
 const (
+	// BootstrapTokenSecretPrefix is the prefix for bootstrap token names.
+	// Bootstrap tokens secrets must be named in the form
+	// `bootstrap-token-<token-id>`.  This is the prefix to be used before the
+	// token ID.
+	BootstrapTokenSecretPrefix = "bootstrap-token-"
+
 	// SecretTypeBootstrapToken is used during the automated bootstrap process (first
 	// implemented by kubeadm). It stores tokens that are used to sign well known
 	// ConfigMaps. They may also eventually be used for authentication.
