@@ -1039,6 +1039,44 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 			Dependencies: []string{
 				"k8s.io/apimachinery/pkg/apis/meta/v1.ListMeta", "k8s.io/kubernetes/pkg/api/v1.ConfigMap"},
 		},
+		"k8s.io/kubernetes/pkg/api/v1.ConfigMapProjection": {
+			Schema: spec.Schema{
+				SchemaProps: spec.SchemaProps{
+					Description: "Adapts a ConfigMap into a projected volume.\n\nThe contents of the target ConfigMap's Data field will be presented in a projected volume as files using the keys in the Data field as the file names, unless the items element is populated with specific mappings of keys to paths. Note that this is identical to a configmap volume source without the default mode.",
+					Properties: map[string]spec.Schema{
+						"name": {
+							SchemaProps: spec.SchemaProps{
+								Description: "Name of the referent. More info: http://kubernetes.io/docs/user-guide/identifiers#names",
+								Type:        []string{"string"},
+								Format:      "",
+							},
+						},
+						"items": {
+							SchemaProps: spec.SchemaProps{
+								Description: "If unspecified, each key-value pair in the Data field of the referenced ConfigMap will be projected into the volume as a file whose name is the key and content is the value. If specified, the listed keys will be projected into the specified paths, and unlisted keys will not be present. If a key is specified which is not present in the ConfigMap, the volume setup will error unless it is marked optional. Paths must be relative and may not contain the '..' path or start with '..'.",
+								Type:        []string{"array"},
+								Items: &spec.SchemaOrArray{
+									Schema: &spec.Schema{
+										SchemaProps: spec.SchemaProps{
+											Ref: ref("k8s.io/kubernetes/pkg/api/v1.KeyToPath"),
+										},
+									},
+								},
+							},
+						},
+						"optional": {
+							SchemaProps: spec.SchemaProps{
+								Description: "Specify whether the ConfigMap or it's keys must be defined",
+								Type:        []string{"boolean"},
+								Format:      "",
+							},
+						},
+					},
+				},
+			},
+			Dependencies: []string{
+				"k8s.io/kubernetes/pkg/api/v1.KeyToPath"},
+		},
 		"k8s.io/kubernetes/pkg/api/v1.ConfigMapVolumeSource": {
 			Schema: spec.Schema{
 				SchemaProps: spec.SchemaProps{
@@ -1636,6 +1674,30 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 			},
 			Dependencies: []string{
 				"k8s.io/apimachinery/pkg/apis/meta/v1.Preconditions"},
+		},
+		"k8s.io/kubernetes/pkg/api/v1.DownwardAPIProjection": {
+			Schema: spec.Schema{
+				SchemaProps: spec.SchemaProps{
+					Description: "Represents downward API info for projecting into a projected volume. Note that this is identical to a downwardAPI volume source without the default mode.",
+					Properties: map[string]spec.Schema{
+						"items": {
+							SchemaProps: spec.SchemaProps{
+								Description: "Items is a list of DownwardAPIVolume file",
+								Type:        []string{"array"},
+								Items: &spec.SchemaOrArray{
+									Schema: &spec.Schema{
+										SchemaProps: spec.SchemaProps{
+											Ref: ref("k8s.io/kubernetes/pkg/api/v1.DownwardAPIVolumeFile"),
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			Dependencies: []string{
+				"k8s.io/kubernetes/pkg/api/v1.DownwardAPIVolumeFile"},
 		},
 		"k8s.io/kubernetes/pkg/api/v1.DownwardAPIVolumeFile": {
 			Schema: spec.Schema{
@@ -6905,6 +6967,38 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 			Dependencies: []string{
 				"k8s.io/kubernetes/pkg/api/v1.ExecAction", "k8s.io/kubernetes/pkg/api/v1.HTTPGetAction", "k8s.io/kubernetes/pkg/api/v1.TCPSocketAction"},
 		},
+		"k8s.io/kubernetes/pkg/api/v1.ProjectedVolumeSource": {
+			Schema: spec.Schema{
+				SchemaProps: spec.SchemaProps{
+					Description: "Represents a projected volume source",
+					Properties: map[string]spec.Schema{
+						"sources": {
+							SchemaProps: spec.SchemaProps{
+								Description: "list of volume projections",
+								Type:        []string{"array"},
+								Items: &spec.SchemaOrArray{
+									Schema: &spec.Schema{
+										SchemaProps: spec.SchemaProps{
+											Ref: ref("k8s.io/kubernetes/pkg/api/v1.VolumeProjection"),
+										},
+									},
+								},
+							},
+						},
+						"defaultMode": {
+							SchemaProps: spec.SchemaProps{
+								Description: "Mode bits to use on created files by default. Must be a value between 0 and 0777. Directories within the path are not affected by this setting. This might be in conflict with other options that affect the file mode, like fsGroup, and the result can be other mode bits set.",
+								Type:        []string{"integer"},
+								Format:      "int32",
+							},
+						},
+					},
+					Required: []string{"sources"},
+				},
+			},
+			Dependencies: []string{
+				"k8s.io/kubernetes/pkg/api/v1.VolumeProjection"},
+		},
 		"k8s.io/kubernetes/pkg/api/v1.QuobyteVolumeSource": {
 			Schema: spec.Schema{
 				SchemaProps: spec.SchemaProps{
@@ -7979,6 +8073,44 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 			},
 			Dependencies: []string{
 				"k8s.io/apimachinery/pkg/apis/meta/v1.ListMeta", "k8s.io/kubernetes/pkg/api/v1.Secret"},
+		},
+		"k8s.io/kubernetes/pkg/api/v1.SecretProjection": {
+			Schema: spec.Schema{
+				SchemaProps: spec.SchemaProps{
+					Description: "Adapts a secret into a projected volume.\n\nThe contents of the target Secret's Data field will be presented in a projected volume as files using the keys in the Data field as the file names. Note that this is identical to a secret volume source without the default mode.",
+					Properties: map[string]spec.Schema{
+						"name": {
+							SchemaProps: spec.SchemaProps{
+								Description: "Name of the referent. More info: http://kubernetes.io/docs/user-guide/identifiers#names",
+								Type:        []string{"string"},
+								Format:      "",
+							},
+						},
+						"items": {
+							SchemaProps: spec.SchemaProps{
+								Description: "If unspecified, each key-value pair in the Data field of the referenced Secret will be projected into the volume as a file whose name is the key and content is the value. If specified, the listed keys will be projected into the specified paths, and unlisted keys will not be present. If a key is specified which is not present in the Secret, the volume setup will error unless it is marked optional. Paths must be relative and may not contain the '..' path or start with '..'.",
+								Type:        []string{"array"},
+								Items: &spec.SchemaOrArray{
+									Schema: &spec.Schema{
+										SchemaProps: spec.SchemaProps{
+											Ref: ref("k8s.io/kubernetes/pkg/api/v1.KeyToPath"),
+										},
+									},
+								},
+							},
+						},
+						"optional": {
+							SchemaProps: spec.SchemaProps{
+								Description: "Specify whether the Secret or its key must be defined",
+								Type:        []string{"boolean"},
+								Format:      "",
+							},
+						},
+					},
+				},
+			},
+			Dependencies: []string{
+				"k8s.io/kubernetes/pkg/api/v1.KeyToPath"},
 		},
 		"k8s.io/kubernetes/pkg/api/v1.SecretVolumeSource": {
 			Schema: spec.Schema{
@@ -9453,12 +9585,18 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 								Ref:         ref("k8s.io/kubernetes/pkg/api/v1.PhotonPersistentDiskVolumeSource"),
 							},
 						},
+						"projected": {
+							SchemaProps: spec.SchemaProps{
+								Description: "Items for all in one resources secrets, configmaps, and downward API",
+								Ref:         ref("k8s.io/kubernetes/pkg/api/v1.ProjectedVolumeSource"),
+							},
+						},
 					},
 					Required: []string{"name"},
 				},
 			},
 			Dependencies: []string{
-				"k8s.io/kubernetes/pkg/api/v1.AWSElasticBlockStoreVolumeSource", "k8s.io/kubernetes/pkg/api/v1.AzureDiskVolumeSource", "k8s.io/kubernetes/pkg/api/v1.AzureFileVolumeSource", "k8s.io/kubernetes/pkg/api/v1.CephFSVolumeSource", "k8s.io/kubernetes/pkg/api/v1.CinderVolumeSource", "k8s.io/kubernetes/pkg/api/v1.ConfigMapVolumeSource", "k8s.io/kubernetes/pkg/api/v1.DownwardAPIVolumeSource", "k8s.io/kubernetes/pkg/api/v1.EmptyDirVolumeSource", "k8s.io/kubernetes/pkg/api/v1.FCVolumeSource", "k8s.io/kubernetes/pkg/api/v1.FlexVolumeSource", "k8s.io/kubernetes/pkg/api/v1.FlockerVolumeSource", "k8s.io/kubernetes/pkg/api/v1.GCEPersistentDiskVolumeSource", "k8s.io/kubernetes/pkg/api/v1.GitRepoVolumeSource", "k8s.io/kubernetes/pkg/api/v1.GlusterfsVolumeSource", "k8s.io/kubernetes/pkg/api/v1.HostPathVolumeSource", "k8s.io/kubernetes/pkg/api/v1.ISCSIVolumeSource", "k8s.io/kubernetes/pkg/api/v1.NFSVolumeSource", "k8s.io/kubernetes/pkg/api/v1.PersistentVolumeClaimVolumeSource", "k8s.io/kubernetes/pkg/api/v1.PhotonPersistentDiskVolumeSource", "k8s.io/kubernetes/pkg/api/v1.QuobyteVolumeSource", "k8s.io/kubernetes/pkg/api/v1.RBDVolumeSource", "k8s.io/kubernetes/pkg/api/v1.SecretVolumeSource", "k8s.io/kubernetes/pkg/api/v1.VsphereVirtualDiskVolumeSource"},
+				"k8s.io/kubernetes/pkg/api/v1.AWSElasticBlockStoreVolumeSource", "k8s.io/kubernetes/pkg/api/v1.AzureDiskVolumeSource", "k8s.io/kubernetes/pkg/api/v1.AzureFileVolumeSource", "k8s.io/kubernetes/pkg/api/v1.CephFSVolumeSource", "k8s.io/kubernetes/pkg/api/v1.CinderVolumeSource", "k8s.io/kubernetes/pkg/api/v1.ConfigMapVolumeSource", "k8s.io/kubernetes/pkg/api/v1.DownwardAPIVolumeSource", "k8s.io/kubernetes/pkg/api/v1.EmptyDirVolumeSource", "k8s.io/kubernetes/pkg/api/v1.FCVolumeSource", "k8s.io/kubernetes/pkg/api/v1.FlexVolumeSource", "k8s.io/kubernetes/pkg/api/v1.FlockerVolumeSource", "k8s.io/kubernetes/pkg/api/v1.GCEPersistentDiskVolumeSource", "k8s.io/kubernetes/pkg/api/v1.GitRepoVolumeSource", "k8s.io/kubernetes/pkg/api/v1.GlusterfsVolumeSource", "k8s.io/kubernetes/pkg/api/v1.HostPathVolumeSource", "k8s.io/kubernetes/pkg/api/v1.ISCSIVolumeSource", "k8s.io/kubernetes/pkg/api/v1.NFSVolumeSource", "k8s.io/kubernetes/pkg/api/v1.PersistentVolumeClaimVolumeSource", "k8s.io/kubernetes/pkg/api/v1.PhotonPersistentDiskVolumeSource", "k8s.io/kubernetes/pkg/api/v1.ProjectedVolumeSource", "k8s.io/kubernetes/pkg/api/v1.QuobyteVolumeSource", "k8s.io/kubernetes/pkg/api/v1.RBDVolumeSource", "k8s.io/kubernetes/pkg/api/v1.SecretVolumeSource", "k8s.io/kubernetes/pkg/api/v1.VsphereVirtualDiskVolumeSource"},
 		},
 		"k8s.io/kubernetes/pkg/api/v1.VolumeMount": {
 			Schema: spec.Schema{
@@ -9498,6 +9636,35 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 				},
 			},
 			Dependencies: []string{},
+		},
+		"k8s.io/kubernetes/pkg/api/v1.VolumeProjection": {
+			Schema: spec.Schema{
+				SchemaProps: spec.SchemaProps{
+					Description: "Projection that may be projected along with other supported volume types",
+					Properties: map[string]spec.Schema{
+						"secret": {
+							SchemaProps: spec.SchemaProps{
+								Description: "information about the secret data to project",
+								Ref:         ref("k8s.io/kubernetes/pkg/api/v1.SecretProjection"),
+							},
+						},
+						"downwardAPI": {
+							SchemaProps: spec.SchemaProps{
+								Description: "information about the downwardAPI data to project",
+								Ref:         ref("k8s.io/kubernetes/pkg/api/v1.DownwardAPIProjection"),
+							},
+						},
+						"configMap": {
+							SchemaProps: spec.SchemaProps{
+								Description: "information about the configMap data to project",
+								Ref:         ref("k8s.io/kubernetes/pkg/api/v1.ConfigMapProjection"),
+							},
+						},
+					},
+				},
+			},
+			Dependencies: []string{
+				"k8s.io/kubernetes/pkg/api/v1.ConfigMapProjection", "k8s.io/kubernetes/pkg/api/v1.DownwardAPIProjection", "k8s.io/kubernetes/pkg/api/v1.SecretProjection"},
 		},
 		"k8s.io/kubernetes/pkg/api/v1.VolumeSource": {
 			Schema: spec.Schema{
@@ -9642,11 +9809,17 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 								Ref:         ref("k8s.io/kubernetes/pkg/api/v1.PhotonPersistentDiskVolumeSource"),
 							},
 						},
+						"projected": {
+							SchemaProps: spec.SchemaProps{
+								Description: "Items for all in one resources secrets, configmaps, and downward API",
+								Ref:         ref("k8s.io/kubernetes/pkg/api/v1.ProjectedVolumeSource"),
+							},
+						},
 					},
 				},
 			},
 			Dependencies: []string{
-				"k8s.io/kubernetes/pkg/api/v1.AWSElasticBlockStoreVolumeSource", "k8s.io/kubernetes/pkg/api/v1.AzureDiskVolumeSource", "k8s.io/kubernetes/pkg/api/v1.AzureFileVolumeSource", "k8s.io/kubernetes/pkg/api/v1.CephFSVolumeSource", "k8s.io/kubernetes/pkg/api/v1.CinderVolumeSource", "k8s.io/kubernetes/pkg/api/v1.ConfigMapVolumeSource", "k8s.io/kubernetes/pkg/api/v1.DownwardAPIVolumeSource", "k8s.io/kubernetes/pkg/api/v1.EmptyDirVolumeSource", "k8s.io/kubernetes/pkg/api/v1.FCVolumeSource", "k8s.io/kubernetes/pkg/api/v1.FlexVolumeSource", "k8s.io/kubernetes/pkg/api/v1.FlockerVolumeSource", "k8s.io/kubernetes/pkg/api/v1.GCEPersistentDiskVolumeSource", "k8s.io/kubernetes/pkg/api/v1.GitRepoVolumeSource", "k8s.io/kubernetes/pkg/api/v1.GlusterfsVolumeSource", "k8s.io/kubernetes/pkg/api/v1.HostPathVolumeSource", "k8s.io/kubernetes/pkg/api/v1.ISCSIVolumeSource", "k8s.io/kubernetes/pkg/api/v1.NFSVolumeSource", "k8s.io/kubernetes/pkg/api/v1.PersistentVolumeClaimVolumeSource", "k8s.io/kubernetes/pkg/api/v1.PhotonPersistentDiskVolumeSource", "k8s.io/kubernetes/pkg/api/v1.QuobyteVolumeSource", "k8s.io/kubernetes/pkg/api/v1.RBDVolumeSource", "k8s.io/kubernetes/pkg/api/v1.SecretVolumeSource", "k8s.io/kubernetes/pkg/api/v1.VsphereVirtualDiskVolumeSource"},
+				"k8s.io/kubernetes/pkg/api/v1.AWSElasticBlockStoreVolumeSource", "k8s.io/kubernetes/pkg/api/v1.AzureDiskVolumeSource", "k8s.io/kubernetes/pkg/api/v1.AzureFileVolumeSource", "k8s.io/kubernetes/pkg/api/v1.CephFSVolumeSource", "k8s.io/kubernetes/pkg/api/v1.CinderVolumeSource", "k8s.io/kubernetes/pkg/api/v1.ConfigMapVolumeSource", "k8s.io/kubernetes/pkg/api/v1.DownwardAPIVolumeSource", "k8s.io/kubernetes/pkg/api/v1.EmptyDirVolumeSource", "k8s.io/kubernetes/pkg/api/v1.FCVolumeSource", "k8s.io/kubernetes/pkg/api/v1.FlexVolumeSource", "k8s.io/kubernetes/pkg/api/v1.FlockerVolumeSource", "k8s.io/kubernetes/pkg/api/v1.GCEPersistentDiskVolumeSource", "k8s.io/kubernetes/pkg/api/v1.GitRepoVolumeSource", "k8s.io/kubernetes/pkg/api/v1.GlusterfsVolumeSource", "k8s.io/kubernetes/pkg/api/v1.HostPathVolumeSource", "k8s.io/kubernetes/pkg/api/v1.ISCSIVolumeSource", "k8s.io/kubernetes/pkg/api/v1.NFSVolumeSource", "k8s.io/kubernetes/pkg/api/v1.PersistentVolumeClaimVolumeSource", "k8s.io/kubernetes/pkg/api/v1.PhotonPersistentDiskVolumeSource", "k8s.io/kubernetes/pkg/api/v1.ProjectedVolumeSource", "k8s.io/kubernetes/pkg/api/v1.QuobyteVolumeSource", "k8s.io/kubernetes/pkg/api/v1.RBDVolumeSource", "k8s.io/kubernetes/pkg/api/v1.SecretVolumeSource", "k8s.io/kubernetes/pkg/api/v1.VsphereVirtualDiskVolumeSource"},
 		},
 		"k8s.io/kubernetes/pkg/api/v1.VsphereVirtualDiskVolumeSource": {
 			Schema: spec.Schema{
