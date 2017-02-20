@@ -27,6 +27,7 @@ go_library(
         "//vendor:github.com/aws/aws-sdk-go/aws",
         "//vendor:github.com/aws/aws-sdk-go/aws/session",
         "//vendor:github.com/aws/aws-sdk-go/service/route53",
+        "//vendor:github.com/golang/glog",
         "//vendor:k8s.io/apimachinery/pkg/util/uuid",
     ],
 )
