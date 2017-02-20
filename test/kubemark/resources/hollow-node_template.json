@@ -144,8 +144,8 @@
 					],
 					"resources": {
 						"requests": {
-							"cpu": "20m",
-							"memory": "100M"
+							"cpu": "{{HOLLOW_PROXY_CPU}}m",
+							"memory": "{{HOLLOW_PROXY_MEM}}Ki"
 						}
 					}
 				},

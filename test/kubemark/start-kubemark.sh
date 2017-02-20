@@ -309,6 +309,14 @@ current-context: kubemark-context")
 
   # Create the replication controller for hollow-nodes.
   sed "s/{{numreplicas}}/${NUM_NODES:-10}/g" "${RESOURCE_DIRECTORY}/hollow-node_template.json" > "${RESOURCE_DIRECTORY}/hollow-node.json"
+  proxy_cpu=20
+  if [ "${NUM_NODES:-10}" -gt 1000 ]; then
+    proxy_cpu=40
+  fi
+  proxy_mem_per_node=100
+  proxy_mem=$((100 * 1024 + ${proxy_mem_per_node}*${NUM_NODES:-10}))
+  sed -i'' -e "s/{{HOLLOW_PROXY_CPU}}/${proxy_cpu}/g" "${RESOURCE_DIRECTORY}/hollow-node.json"
+  sed -i'' -e "s/{{HOLLOW_PROXY_MEM}}/${proxy_mem}/g" "${RESOURCE_DIRECTORY}/hollow-node.json"
   sed -i'' -e "s/{{registry}}/${CONTAINER_REGISTRY}/g" "${RESOURCE_DIRECTORY}/hollow-node.json"
   sed -i'' -e "s/{{project}}/${PROJECT}/g" "${RESOURCE_DIRECTORY}/hollow-node.json"
   sed -i'' -e "s/{{master_ip}}/${MASTER_IP}/g" "${RESOURCE_DIRECTORY}/hollow-node.json"
