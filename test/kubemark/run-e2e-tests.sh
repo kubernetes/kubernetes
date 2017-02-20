@@ -33,7 +33,7 @@ export KUBECONFIG="${ABSOLUTE_ROOT}/test/kubemark/resources/kubeconfig.kubemark"
 export E2E_MIN_STARTUP_PODS=0
 
 if [[ -z "$@" ]]; then
-	ARGS='--ginkgo.focus=\[Feature:performance\]'
+	ARGS='--ginkgo.focus=\[Feature:Performance\]'
 else
 	ARGS=$@
 fi
