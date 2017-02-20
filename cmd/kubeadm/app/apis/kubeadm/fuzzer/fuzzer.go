@@ -14,24 +14,25 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package kubeadm
+package fuzzer
 
 import (
 	"github.com/google/gofuzz"
 
 	apitesting "k8s.io/apimachinery/pkg/api/testing"
+	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 )
 
 func KubeadmFuzzerFuncs(t apitesting.TestingCommon) []interface{} {
 	return []interface{}{
-		func(obj *MasterConfiguration, c fuzz.Continue) {
+		func(obj *kubeadm.MasterConfiguration, c fuzz.Continue) {
 			c.FuzzNoCustom(obj)
 			obj.KubernetesVersion = "v10"
 			obj.API.Port = 20
 			obj.Networking.ServiceSubnet = "foo"
 			obj.Networking.DNSDomain = "foo"
 			obj.AuthorizationMode = "foo"
-			obj.Discovery.Token = &TokenDiscovery{}
+			obj.Discovery.Token = &kubeadm.TokenDiscovery{}
 		},
 	}
 }
