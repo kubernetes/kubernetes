@@ -25,6 +25,7 @@ go_library(
     deps = [
         "//pkg/api/v1:go_default_library",
         "//pkg/credentialprovider:go_default_library",
+        "//pkg/kubelet/cadvisor:go_default_library",
         "//pkg/kubelet/container:go_default_library",
         "//pkg/kubelet/events:go_default_library",
         "//pkg/kubelet/images:go_default_library",
@@ -49,6 +50,7 @@ go_library(
         "//vendor:github.com/coreos/rkt/api/v1alpha",
         "//vendor:github.com/docker/engine-api/types",
         "//vendor:github.com/golang/glog",
+        "//vendor:github.com/google/cadvisor/info/v2",
         "//vendor:golang.org/x/net/context",
         "//vendor:google.golang.org/grpc",
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
