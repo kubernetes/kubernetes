@@ -547,11 +547,23 @@ func autoscalingFuncs(t apitesting.TestingCommon) []interface{} {
 			minReplicas := int32(c.Rand.Int31())
 			s.MinReplicas = &minReplicas
 
-			// NB: since this is used for round-tripping, we can only fuzz
-			// fields that round-trip successfully, so only the resource source
-			// type is usable here
+			randomQuantity := func() resource.Quantity {
+				var q resource.Quantity
+				c.Fuzz(&q)
+				// precalc the string for benchmarking purposes
+				_ = q.String()
+				return q
+			}
+
 			targetUtilization := int32(c.RandUint64())
 			s.Metrics = []autoscaling.MetricSpec{
+				{
+					Type: autoscaling.PodsMetricSourceType,
+					Pods: &autoscaling.PodsMetricSource{
+						MetricName:         c.RandString(),
+						TargetAverageValue: randomQuantity(),
+					},
+				},
 				{
 					Type: autoscaling.ResourceMetricSourceType,
 					Resource: &autoscaling.ResourceMetricSource{
@@ -563,11 +575,22 @@ func autoscalingFuncs(t apitesting.TestingCommon) []interface{} {
 		},
 		func(s *autoscaling.HorizontalPodAutoscalerStatus, c fuzz.Continue) {
 			c.FuzzNoCustom(s) // fuzz self without calling this function again
-			// NB: since this is used for round-tripping, we can only fuzz
-			// fields that round-trip successfully, so only the resource status
-			// type is usable here
+			randomQuantity := func() resource.Quantity {
+				var q resource.Quantity
+				c.Fuzz(&q)
+				// precalc the string for benchmarking purposes
+				_ = q.String()
+				return q
+			}
 			currentUtilization := int32(c.RandUint64())
 			s.CurrentMetrics = []autoscaling.MetricStatus{
+				{
+					Type: autoscaling.PodsMetricSourceType,
+					Pods: &autoscaling.PodsMetricStatus{
+						MetricName:          c.RandString(),
+						CurrentAverageValue: randomQuantity(),
+					},
+				},
 				{
 					Type: autoscaling.ResourceMetricSourceType,
 					Resource: &autoscaling.ResourceMetricStatus{
