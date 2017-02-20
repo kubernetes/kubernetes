@@ -17,8 +17,10 @@ limitations under the License.
 package service
 
 import (
+	"fmt"
 	"reflect"
 	"testing"
+	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -298,6 +300,7 @@ func TestGetNodeConditionPredicate(t *testing.T) {
 
 // TODO(a-robinson): Add tests for update/sync/delete.
 
+
 func TestSyncService(t *testing.T) {
 	controller, _, _ := newController()
 
@@ -412,5 +415,314 @@ func TestProcessServiceUpdate(t *testing.T) {
 	}
 	if cachedServiceGot.state.Spec.LoadBalancerIP != newLBIP {
 		t.Fatalf("update LoadBalancerIP error, expected: %s, got: %s", newLBIP, cachedServiceGot.state.Spec.LoadBalancerIP)
+	}
+}
+
+func defaultExternalService() *v1.Service {
+
+	return &v1.Service{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "external-balancer",
+			Namespace: "default",
+		},
+		Spec: v1.ServiceSpec{
+			Type: v1.ServiceTypeLoadBalancer,
+		},
+	}
+
+}
+
+func TestUpdateService(t *testing.T) {
+
+	var controller *ServiceController
+	var cloud *fakecloud.FakeCloud
+
+	testCases := []struct {
+		testName   string                           //Name of the testcase
+		key        string                           //Name of the key in question
+		updateFn   func()                           //Manupulate the structure
+		srv        *v1.Service                      //Service component
+		expectedFn func(error, time.Duration) error //Error comparision function
+	}{
+		{
+			testName: "If updating a valid service",
+			key:      "validKey",
+			srv:      defaultExternalService(),
+			updateFn: func() {
+
+				controller, cloud, _ = newController()
+				controller.cache.getOrCreate("validKey")
+
+			},
+			expectedFn: func(err error, retryDuration time.Duration) error {
+
+				if err != nil {
+					return err
+				}
+				if retryDuration != doNotRetry {
+					return fmt.Errorf("retryDuration Expected=%v Obtained=%v", doNotRetry, retryDuration)
+				}
+				return nil
+			},
+		},
+	}
+
+	for _, tst := range testCases {
+		tst.updateFn()
+		srvCache := controller.cache.getOrCreate(tst.key)
+
+		obtErr, retryDuration := controller.processServiceUpdate(srvCache, tst.srv, tst.key)
+		if err := tst.expectedFn(obtErr, retryDuration); err != nil {
+			t.Errorf("%v processServiceUpdate() %v", tst.testName, err)
+		}
+	}
+
+}
+
+func TestSyncService_new(t *testing.T) {
+
+	var controller *ServiceController
+	var cloud *fakecloud.FakeCloud
+
+	testCases := []struct {
+		testName    string //Name of this test case
+		key         string //Name of the key we should be looking for
+		updateFn    func() //Function to manipulate the controller element to simulate error
+		expectedErr error  //syncService() only returns error
+	}{
+		{
+			testName: "if an invalid service name is synced",
+			key:      "invalid/key/string",
+			updateFn: func() {
+				controller, cloud, _ = newController()
+
+			},
+			expectedErr: fmt.Errorf("unexpected key format: %q", "invalid/key/string"),
+		},
+		/* We cannot open this test case as syncService(key) currently runtime.HandleError(err) and suppresses frequently occurring errors
+		{
+			testName: "if an invalid service is synced",
+			key: "somethingelse",
+			updateFn: func() {
+				controller, cloud, _ = newController()
+				srv := controller.cache.getOrCreate("external-balancer")
+				srv.state = defaultExternalService()
+			},
+			expectedErr: fmt.Errorf("Service somethingelse not in cache even though the watcher thought it was. Ignoring the deletion."),
+		},
+		*/
+		{
+			testName: "if valid service",
+			key:      "external-balancer",
+			updateFn: func() {
+				controller, cloud, _ = newController()
+				srv := controller.cache.getOrCreate("external-balancer")
+				srv.state = defaultExternalService()
+			},
+			expectedErr: nil,
+		},
+	}
+
+	for _, tst := range testCases {
+		var printError bool
+		tst.updateFn()
+		obtainedErr := controller.syncService(tst.key)
+		if obtainedErr != tst.expectedErr {
+			printError = true
+			if obtainedErr != nil && tst.expectedErr != nil {
+				if obtainedErr.Error() == tst.expectedErr.Error() {
+					//Both are valid error objects but still their content is same, then not an error
+					printError = false
+				}
+			}
+		}
+		if printError {
+			t.Errorf("%v Expected=%v Obtained=%v", tst.testName, tst.expectedErr, obtainedErr)
+		}
+	}
+}
+
+func TestDeleteService(t *testing.T) {
+
+	var controller *ServiceController
+	var cloud *fakecloud.FakeCloud
+
+	testCases := []struct {
+		testName        string                                                //Name of the testcase
+		updateFn        func()                                                //Update function used to manupulate srv and controller values
+		checkExpectedFn func(srvErr error, retryDuration time.Duration) error //Function to check if the returned value is expected
+	}{
+		{
+			testName: "If an invalid service is deleted",
+			updateFn: func() {
+				//srv = defaultExternalService()
+				controller, cloud, _ = newController()
+
+			},
+			checkExpectedFn: func(srvErr error, retryDuration time.Duration) error {
+
+				expectedError := "Service external-balancer not in cache even though the watcher thought it was. Ignoring the deletion."
+				if srvErr == nil || srvErr.Error() != expectedError {
+					//cannot be nil or Wrong error message
+					return fmt.Errorf("Expected=%v Obtained=%v", expectedError, srvErr)
+				}
+
+				if retryDuration != doNotRetry {
+					//Retry duration should match
+					return fmt.Errorf("RetryDuration Expected=%v Obtained=%v", doNotRetry, retryDuration)
+				}
+
+				return nil
+			},
+		},
+		{
+			testName: "If cloudprovided failed to delete the service",
+			updateFn: func() {
+				controller, cloud, _ = newController()
+				srv := controller.cache.getOrCreate("external-balancer")
+				srv.state = defaultExternalService()
+				cloud.Err = fmt.Errorf("Error Deleting the Loadbalancer")
+
+			},
+			checkExpectedFn: func(srvErr error, retryDuration time.Duration) error {
+
+				expectedError := "Error Deleting the Loadbalancer"
+
+				if srvErr == nil || srvErr.Error() != expectedError {
+					return fmt.Errorf("Expected=%v Obtained=%v", expectedError, srvErr)
+				}
+
+				if retryDuration != minRetryDelay {
+					return fmt.Errorf("RetryDuration Expected=%v Obtained=%v", minRetryDelay, retryDuration)
+				}
+				return nil
+			},
+		},
+		{
+			testName: "If delete was successful",
+			updateFn: func() {
+
+				controller, cloud, _ = newController()
+				srv := controller.cache.getOrCreate("external-balancer")
+				srv.state = defaultExternalService()
+
+			},
+			checkExpectedFn: func(srvErr error, retryDuration time.Duration) error {
+
+				if srvErr != nil {
+					return fmt.Errorf("Expected=nil Obtained=%v", srvErr)
+				}
+
+				if retryDuration != doNotRetry {
+					//Retry duration should match
+					return fmt.Errorf("RetryDuration Expected=%v Obtained=%v", doNotRetry, retryDuration)
+				}
+
+				return nil
+			},
+		},
+	}
+
+	for _, tst := range testCases {
+		tst.updateFn()
+		obtainedErr, retryDuration := controller.processServiceDeletion("external-balancer")
+		if err := tst.checkExpectedFn(obtainedErr, retryDuration); err != nil {
+			t.Errorf("%v processServiceDeletion() %v", tst.testName, err)
+		}
+	}
+
+}
+
+// Add unit testing for needsUpdate functions
+
+func TestDoesExternalLoadBalancerNeedsUpdate(t *testing.T) {
+
+	var oldSrv, newSrv *v1.Service
+
+	testCases := []struct {
+		testName       string //Name of the test case
+		updateFn       func() //Function to update the old and new service varuables
+		expectedResult bool   //needsupdate always returns bool
+
+	}{
+		{
+			testName: "If the service type is different",
+			updateFn: func() {
+				oldSrv = defaultExternalService()
+				newSrv = defaultExternalService()
+				newSrv.Spec.Type = v1.ServiceTypeClusterIP
+			},
+			expectedResult: true,
+		},
+		{
+			testName: "If the Ports are different",
+			updateFn: func() {
+				oldSrv = defaultExternalService()
+				newSrv = defaultExternalService()
+				oldSrv.Spec.Ports = []v1.ServicePort{
+					{
+						Port: 8000,
+					},
+					{
+						Port: 9000,
+					},
+					{
+						Port: 10000,
+					},
+				}
+				newSrv.Spec.Ports = []v1.ServicePort{
+					{
+						Port: 8001,
+					},
+					{
+						Port: 9001,
+					},
+					{
+						Port: 10001,
+					},
+				}
+
+			},
+			expectedResult: true,
+		},
+		{
+			testName: "If externel ip counts are different",
+			updateFn: func() {
+				oldSrv = defaultExternalService()
+				newSrv = defaultExternalService()
+				oldSrv.Spec.ExternalIPs = []string{"old.IP.1"}
+				newSrv.Spec.ExternalIPs = []string{"new.IP.1", "new.IP.2"}
+			},
+			expectedResult: true,
+		},
+		{
+			testName: "If externel ips are different",
+			updateFn: func() {
+				oldSrv = defaultExternalService()
+				newSrv = defaultExternalService()
+				oldSrv.Spec.ExternalIPs = []string{"old.IP.1", "old.IP.2"}
+				newSrv.Spec.ExternalIPs = []string{"new.IP.1", "new.IP.2"}
+			},
+			expectedResult: true,
+		},
+		{
+			testName: "If UID is different",
+			updateFn: func() {
+				oldSrv = defaultExternalService()
+				newSrv = defaultExternalService()
+				oldSrv.UID = types.UID("UID old")
+				newSrv.UID = types.UID("UID new")
+			},
+			expectedResult: true,
+		},
+	}
+
+	controller, _, _ := newController()
+	for _, tst := range testCases {
+		tst.updateFn()
+		obtainedResult := controller.needsUpdate(oldSrv, newSrv)
+		if obtainedResult != tst.expectedResult {
+			t.Errorf("%v needsUpdate() should have returned %v but returned %v", tst.testName, tst.expectedResult, obtainedResult)
+		}
 	}
 }
