@@ -56,6 +56,7 @@ func TestStrategyCreate(t *testing.T) {
 					Username: "bob",
 					UID:      "123",
 					Groups:   []string{"group1"},
+					Extra:    map[string]certapi.ExtraValue{"foo": {"bar"}},
 				},
 				Status: certapi.CertificateSigningRequestStatus{Conditions: []certapi.CertificateSigningRequestCondition{}},
 			},
