@@ -46,6 +46,7 @@ type API struct {
 	AdvertiseAddresses []string
 	ExternalDNSNames   []string
 	Port               int32
+	PortRange          string
 }
 
 type Discovery struct {

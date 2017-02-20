@@ -36,6 +36,7 @@ type API struct {
 	AdvertiseAddresses []string `json:"advertiseAddresses"`
 	ExternalDNSNames   []string `json:"externalDNSNames"`
 	Port               int32    `json:"port"`
+	PortRange          string   `json:"portRange"`
 }
 
 type Discovery struct {
