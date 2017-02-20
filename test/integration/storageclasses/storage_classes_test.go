@@ -67,17 +67,16 @@ func DoTestStorageClasses(t *testing.T, client clientset.Interface, ns *v1.Names
 	defer deleteStorageClassOrErrorf(t, client, s.Namespace, s.Name)
 
 	// Template for pvcs that specify a storage class
+	classGold := "gold"
 	pvc := &v1.PersistentVolumeClaim{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "XXX",
 			Namespace: ns.Name,
-			Annotations: map[string]string{
-				v1.BetaStorageClassAnnotation: "gold",
-			},
 		},
 		Spec: v1.PersistentVolumeClaimSpec{
-			Resources:   v1.ResourceRequirements{Requests: v1.ResourceList{v1.ResourceName(v1.ResourceStorage): resource.MustParse("1G")}},
-			AccessModes: []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce},
+			Resources:        v1.ResourceRequirements{Requests: v1.ResourceList{v1.ResourceName(v1.ResourceStorage): resource.MustParse("1G")}},
+			AccessModes:      []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce},
+			StorageClassName: &classGold,
 		},
 	}
 
