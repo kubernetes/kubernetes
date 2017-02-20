@@ -2732,6 +2732,8 @@ const (
 	NodeHostName     NodeAddressType = "Hostname"
 	NodeExternalIP   NodeAddressType = "ExternalIP"
 	NodeInternalIP   NodeAddressType = "InternalIP"
+	NodeExternalDNS  NodeAddressType = "ExternalDNS"
+	NodeInternalDNS  NodeAddressType = "InternalDNS"
 )
 
 type NodeAddress struct {
