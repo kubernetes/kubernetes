@@ -18,14 +18,13 @@ package nvidia
 
 import (
 	"fmt"
-	"sync"
 	"os"
 	"path/filepath"
 	"regexp"
+	"sync"
 
 	"k8s.io/kubernetes/pkg/kubelet/dockertools"
 )
-
 
 // TODO: If use NVML in the future, the implementation could be more complex,
 // but also more powerful!
@@ -116,7 +115,6 @@ func (ngm *NvidiaGPUManager) Capacity() int {
 }
 
 // Check whether the GPU device could be assigned to a container.
-// Only check alive containers.
 func (ngm *NvidiaGPUManager) isAvailable(path string) bool {
 	containers, err := dockertools.GetKubeletDockerContainers(ngm.dockerClient, false)
 
@@ -181,4 +179,3 @@ func (ngm *NvidiaGPUManager) AvailableGPUs() (num int) {
 
 	return
 }
-
