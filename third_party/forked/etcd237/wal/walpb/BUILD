@@ -14,6 +14,7 @@ go_library(
         "record.pb.go",
     ],
     tags = ["automanaged"],
+    deps = ["//vendor:github.com/golang/protobuf/proto"],
 )
 
 filegroup(

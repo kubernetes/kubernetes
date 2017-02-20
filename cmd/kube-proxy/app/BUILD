@@ -33,7 +33,20 @@ go_library(
         "//pkg/util/oom:go_default_library",
         "//pkg/util/resourcecontainer:go_default_library",
         "//pkg/util/sysctl:go_default_library",
+        "//vendor:github.com/golang/glog",
+        "//vendor:github.com/spf13/cobra",
+        "//vendor:github.com/spf13/pflag",
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
+        "//vendor:k8s.io/apimachinery/pkg/types",
+        "//vendor:k8s.io/apimachinery/pkg/util/net",
+        "//vendor:k8s.io/apimachinery/pkg/util/wait",
+        "//vendor:k8s.io/apis/pkg/api",
+        "//vendor:k8s.io/client-go/kubernetes",
+        "//vendor:k8s.io/client-go/kubernetes/typed/core/v1",
+        "//vendor:k8s.io/client-go/pkg/api/v1",
+        "//vendor:k8s.io/client-go/tools/clientcmd",
+        "//vendor:k8s.io/client-go/tools/clientcmd/api",
+        "//vendor:k8s.io/client-go/tools/record",
     ],
 )
 
@@ -46,7 +59,9 @@ go_test(
         "//cmd/kube-proxy/app/options:go_default_library",
         "//pkg/apis/componentconfig:go_default_library",
         "//pkg/util/iptables:go_default_library",
+        "//vendor:github.com/stretchr/testify/assert",
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
+        "//vendor:k8s.io/apis/pkg/api",
     ],
 )
 

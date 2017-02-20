@@ -13,7 +13,15 @@ go_test(
     srcs = ["listers_test.go"],
     library = ":go_default_library",
     tags = ["automanaged"],
-    deps = ["//vendor:k8s.io/apimachinery/pkg/apis/meta/v1"],
+    deps = [
+        "//vendor:k8s.io/apimachinery/pkg/api/errors",
+        "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
+        "//vendor:k8s.io/apimachinery/pkg/labels",
+        "//vendor:k8s.io/apimachinery/pkg/util/sets",
+        "//vendor:k8s.io/apis/pkg/api/v1",
+        "//vendor:k8s.io/apis/pkg/apis/extensions/v1beta1",
+        "//vendor:k8s.io/client-go/tools/cache",
+    ],
 )
 
 go_library(
@@ -25,7 +33,23 @@ go_library(
         "listers_rbac.go",
     ],
     tags = ["automanaged"],
-    deps = ["//vendor:k8s.io/apimachinery/pkg/apis/meta/v1"],
+    deps = [
+        "//vendor:github.com/golang/glog",
+        "//vendor:k8s.io/apimachinery/pkg/api/errors",
+        "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
+        "//vendor:k8s.io/apimachinery/pkg/labels",
+        "//vendor:k8s.io/apis/pkg/api",
+        "//vendor:k8s.io/apis/pkg/api/v1",
+        "//vendor:k8s.io/apis/pkg/apis/apps/v1beta1",
+        "//vendor:k8s.io/apis/pkg/apis/certificates/v1beta1",
+        "//vendor:k8s.io/apis/pkg/apis/extensions",
+        "//vendor:k8s.io/apis/pkg/apis/extensions/v1beta1",
+        "//vendor:k8s.io/apis/pkg/apis/policy/v1beta1",
+        "//vendor:k8s.io/apis/pkg/apis/rbac",
+        "//vendor:k8s.io/apis/pkg/apis/storage",
+        "//vendor:k8s.io/apis/pkg/apis/storage/v1beta1",
+        "//vendor:k8s.io/client-go/tools/cache",
+    ],
 )
 
 filegroup(

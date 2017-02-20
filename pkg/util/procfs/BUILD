@@ -17,6 +17,10 @@ go_library(
         "procfs_linux.go",
     ],
     tags = ["automanaged"],
+    deps = [
+        "//vendor:github.com/golang/glog",
+        "//vendor:k8s.io/apimachinery/pkg/util/errors",
+    ],
 )
 
 go_test(
@@ -29,6 +33,7 @@ go_test(
     tags = [
         "automanaged",
     ],
+    deps = ["//vendor:github.com/stretchr/testify/assert"],
 )
 
 filegroup(

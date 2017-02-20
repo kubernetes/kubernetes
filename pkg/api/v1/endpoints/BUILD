@@ -12,7 +12,11 @@ go_library(
     name = "go_default_library",
     srcs = ["util.go"],
     tags = ["automanaged"],
-    deps = ["//pkg/util/hash:go_default_library"],
+    deps = [
+        "//pkg/util/hash:go_default_library",
+        "//vendor:k8s.io/apimachinery/pkg/types",
+        "//vendor:k8s.io/apis/pkg/api/v1",
+    ],
 )
 
 go_test(
@@ -20,6 +24,11 @@ go_test(
     srcs = ["util_test.go"],
     library = ":go_default_library",
     tags = ["automanaged"],
+    deps = [
+        "//vendor:github.com/davecgh/go-spew/spew",
+        "//vendor:k8s.io/apimachinery/pkg/types",
+        "//vendor:k8s.io/apis/pkg/api/v1",
+    ],
 )
 
 filegroup(

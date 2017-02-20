@@ -22,6 +22,9 @@ go_library(
         "//pkg/kubelet/container/testing:go_default_library",
         "//pkg/kubelet/network:go_default_library",
         "//pkg/kubelet/network/hostport:go_default_library",
+        "//vendor:github.com/golang/mock/gomock",
+        "//vendor:k8s.io/apimachinery/pkg/util/sets",
+        "//vendor:k8s.io/apis/pkg/api/v1",
     ],
 )
 
@@ -34,6 +37,8 @@ go_test(
         "//pkg/apis/componentconfig:go_default_library",
         "//pkg/kubelet/container:go_default_library",
         "//pkg/kubelet/network:go_default_library",
+        "//vendor:github.com/golang/mock/gomock",
+        "//vendor:k8s.io/apimachinery/pkg/util/sets",
     ],
 )
 

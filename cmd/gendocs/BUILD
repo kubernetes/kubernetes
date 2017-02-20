@@ -22,6 +22,7 @@ go_library(
         "//cmd/genutils:go_default_library",
         "//pkg/kubectl/cmd:go_default_library",
         "//pkg/kubectl/cmd/util:go_default_library",
+        "//vendor:github.com/spf13/cobra/doc",
     ],
 )
 

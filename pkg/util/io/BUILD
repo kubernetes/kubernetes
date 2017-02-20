@@ -15,6 +15,12 @@ go_library(
         "writer.go",
     ],
     tags = ["automanaged"],
+    deps = [
+        "//vendor:github.com/golang/glog",
+        "//vendor:k8s.io/apimachinery/pkg/runtime",
+        "//vendor:k8s.io/apis/pkg/api",
+        "//vendor:k8s.io/apis/pkg/api/v1",
+    ],
 )
 
 go_test(
@@ -24,6 +30,11 @@ go_test(
     deps = [
         "//pkg/util/io:go_default_library",
         "//pkg/volume:go_default_library",
+        "//vendor:github.com/pborman/uuid",
+        "//vendor:k8s.io/apimachinery/pkg/api/equality",
+        "//vendor:k8s.io/apimachinery/pkg/runtime",
+        "//vendor:k8s.io/apis/pkg/api",
+        "//vendor:k8s.io/client-go/util/testing",
     ],
 )
 

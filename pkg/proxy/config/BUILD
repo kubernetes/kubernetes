@@ -18,7 +18,13 @@ go_library(
     tags = ["automanaged"],
     deps = [
         "//pkg/util/config:go_default_library",
+        "//vendor:github.com/davecgh/go-spew/spew",
+        "//vendor:github.com/golang/glog",
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
+        "//vendor:k8s.io/apimachinery/pkg/fields",
+        "//vendor:k8s.io/apimachinery/pkg/types",
+        "//vendor:k8s.io/apis/pkg/api",
+        "//vendor:k8s.io/client-go/tools/cache",
     ],
 )
 
@@ -27,7 +33,14 @@ go_test(
     srcs = ["api_test.go"],
     library = ":go_default_library",
     tags = ["automanaged"],
-    deps = ["//vendor:k8s.io/apimachinery/pkg/apis/meta/v1"],
+    deps = [
+        "//vendor:k8s.io/apimachinery/pkg/api/equality",
+        "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
+        "//vendor:k8s.io/apimachinery/pkg/runtime",
+        "//vendor:k8s.io/apimachinery/pkg/watch",
+        "//vendor:k8s.io/apis/pkg/api",
+        "//vendor:k8s.io/client-go/tools/cache",
+    ],
 )
 
 go_test(
@@ -37,6 +50,8 @@ go_test(
     deps = [
         "//pkg/proxy/config:go_default_library",
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
+        "//vendor:k8s.io/apimachinery/pkg/util/wait",
+        "//vendor:k8s.io/apis/pkg/api",
     ],
 )
 

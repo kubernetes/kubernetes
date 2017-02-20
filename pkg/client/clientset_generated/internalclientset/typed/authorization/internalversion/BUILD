@@ -21,6 +21,11 @@ go_library(
         "subjectaccessreview_expansion.go",
     ],
     tags = ["automanaged"],
+    deps = [
+        "//vendor:k8s.io/apis/pkg/api",
+        "//vendor:k8s.io/apis/pkg/apis/authorization",
+        "//vendor:k8s.io/client-go/rest",
+    ],
 )
 
 filegroup(

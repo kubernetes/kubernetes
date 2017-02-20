@@ -26,6 +26,12 @@ go_library(
         "//federation/client/clientset_generated/federation_internalclientset/typed/extensions/internalversion/fake:go_default_library",
         "//federation/client/clientset_generated/federation_internalclientset/typed/federation/internalversion:go_default_library",
         "//federation/client/clientset_generated/federation_internalclientset/typed/federation/internalversion/fake:go_default_library",
+        "//vendor:k8s.io/apimachinery/pkg/runtime",
+        "//vendor:k8s.io/apimachinery/pkg/watch",
+        "//vendor:k8s.io/apis/pkg/api",
+        "//vendor:k8s.io/client-go/discovery",
+        "//vendor:k8s.io/client-go/discovery/fake",
+        "//vendor:k8s.io/client-go/testing",
     ],
 )
 

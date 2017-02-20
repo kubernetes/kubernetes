@@ -11,6 +11,13 @@ go_library(
     name = "go_default_library",
     srcs = ["escalation_check.go"],
     tags = ["automanaged"],
+    deps = [
+        "//vendor:k8s.io/apimachinery/pkg/util/runtime",
+        "//vendor:k8s.io/apis/pkg/apis/rbac",
+        "//vendor:k8s.io/apiserver/pkg/authentication/user",
+        "//vendor:k8s.io/apiserver/pkg/authorization/authorizer",
+        "//vendor:k8s.io/apiserver/pkg/endpoints/request",
+    ],
 )
 
 filegroup(

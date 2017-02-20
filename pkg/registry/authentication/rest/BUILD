@@ -11,7 +11,18 @@ go_library(
     name = "go_default_library",
     srcs = ["storage_authentication.go"],
     tags = ["automanaged"],
-    deps = ["//pkg/registry/authentication/tokenreview:go_default_library"],
+    deps = [
+        "//pkg/registry/authentication/tokenreview:go_default_library",
+        "//vendor:k8s.io/apis/pkg/api",
+        "//vendor:k8s.io/apis/pkg/apis/authentication",
+        "//vendor:k8s.io/apis/pkg/apis/authentication/v1",
+        "//vendor:k8s.io/apis/pkg/apis/authentication/v1beta1",
+        "//vendor:k8s.io/apiserver/pkg/authentication/authenticator",
+        "//vendor:k8s.io/apiserver/pkg/registry/generic",
+        "//vendor:k8s.io/apiserver/pkg/registry/rest",
+        "//vendor:k8s.io/apiserver/pkg/server",
+        "//vendor:k8s.io/apiserver/pkg/server/storage",
+    ],
 )
 
 filegroup(

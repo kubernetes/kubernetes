@@ -36,7 +36,14 @@ go_library(
         "//pkg/volume/empty_dir:go_default_library",
         "//pkg/volume/secret:go_default_library",
         "//test/utils:go_default_library",
+        "//vendor:github.com/golang/glog",
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
+        "//vendor:k8s.io/apimachinery/pkg/types",
+        "//vendor:k8s.io/apis/pkg/api",
+        "//vendor:k8s.io/apis/pkg/util",
+        "//vendor:k8s.io/client-go/kubernetes/typed/core/v1",
+        "//vendor:k8s.io/client-go/pkg/api/v1",
+        "//vendor:k8s.io/client-go/tools/record",
     ],
 )
 

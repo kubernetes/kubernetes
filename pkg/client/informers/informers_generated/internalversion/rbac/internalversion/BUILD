@@ -22,6 +22,10 @@ go_library(
         "//pkg/client/informers/informers_generated/internalversion/internalinterfaces:go_default_library",
         "//pkg/client/listers/rbac/internalversion:go_default_library",
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
+        "//vendor:k8s.io/apimachinery/pkg/runtime",
+        "//vendor:k8s.io/apimachinery/pkg/watch",
+        "//vendor:k8s.io/apis/pkg/apis/rbac",
+        "//vendor:k8s.io/client-go/tools/cache",
     ],
 )
 

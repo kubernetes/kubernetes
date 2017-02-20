@@ -13,7 +13,11 @@ go_library(
     tags = ["automanaged"],
     deps = [
         "//federation/pkg/federation-controller/util:go_default_library",
+        "//vendor:github.com/golang/glog",
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
+        "//vendor:k8s.io/apimachinery/pkg/runtime",
+        "//vendor:k8s.io/apis/pkg/api",
+        "//vendor:k8s.io/client-go/tools/record",
     ],
 )
 

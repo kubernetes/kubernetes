@@ -18,7 +18,13 @@ go_library(
     deps = [
         "//pkg/client/clientset_generated/clientset:go_default_library",
         "//pkg/client/clientset_generated/clientset/typed/core/v1:go_default_library",
+        "//vendor:github.com/golang/glog",
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
+        "//vendor:k8s.io/apimachinery/pkg/labels",
+        "//vendor:k8s.io/apis/pkg/api/v1",
+        "//vendor:k8s.io/apis/pkg/apis/autoscaling/v2alpha1",
+        "//vendor:k8s.io/heapster/metrics/api/v1/types",
+        "//vendor:k8s.io/heapster/metrics/apis/metrics/v1alpha1",
     ],
 )
 
@@ -30,7 +36,16 @@ go_test(
     deps = [
         "//pkg/api/unversioned:go_default_library",
         "//pkg/client/clientset_generated/clientset/fake:go_default_library",
+        "//vendor:github.com/stretchr/testify/assert",
+        "//vendor:k8s.io/apimachinery/pkg/api/resource",
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
+        "//vendor:k8s.io/apimachinery/pkg/labels",
+        "//vendor:k8s.io/apimachinery/pkg/runtime",
+        "//vendor:k8s.io/apis/pkg/api/v1",
+        "//vendor:k8s.io/client-go/rest",
+        "//vendor:k8s.io/client-go/testing",
+        "//vendor:k8s.io/heapster/metrics/api/v1/types",
+        "//vendor:k8s.io/heapster/metrics/apis/metrics/v1alpha1",
     ],
 )
 

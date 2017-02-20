@@ -48,6 +48,17 @@ go_library(
         "//pkg/kubelet/util/ioutils:go_default_library",
         "//pkg/util/hash:go_default_library",
         "//pkg/util/term:go_default_library",
+        "//vendor:github.com/blang/semver",
+        "//vendor:github.com/docker/engine-api/types",
+        "//vendor:github.com/docker/engine-api/types/container",
+        "//vendor:github.com/docker/engine-api/types/filters",
+        "//vendor:github.com/docker/engine-api/types/strslice",
+        "//vendor:github.com/docker/go-connections/nat",
+        "//vendor:github.com/golang/glog",
+        "//vendor:k8s.io/apimachinery/pkg/util/errors",
+        "//vendor:k8s.io/apimachinery/pkg/util/sets",
+        "//vendor:k8s.io/apimachinery/pkg/util/wait",
+        "//vendor:k8s.io/apis/pkg/api/v1",
     ],
 )
 
@@ -81,6 +92,14 @@ go_test(
         "//pkg/kubelet/types:go_default_library",
         "//pkg/kubelet/util/cache:go_default_library",
         "//pkg/security/apparmor:go_default_library",
+        "//vendor:github.com/blang/semver",
+        "//vendor:github.com/docker/engine-api/types",
+        "//vendor:github.com/docker/engine-api/types/container",
+        "//vendor:github.com/golang/mock/gomock",
+        "//vendor:github.com/stretchr/testify/assert",
+        "//vendor:github.com/stretchr/testify/require",
+        "//vendor:k8s.io/apis/pkg/api/v1",
+        "//vendor:k8s.io/client-go/util/clock",
     ],
 )
 

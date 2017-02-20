@@ -11,6 +11,12 @@ go_library(
     name = "go_default_library",
     srcs = ["jsonmerge.go"],
     tags = ["automanaged"],
+    deps = [
+        "//vendor:github.com/evanphx/json-patch",
+        "//vendor:github.com/golang/glog",
+        "//vendor:k8s.io/apimachinery/pkg/util/mergepatch",
+        "//vendor:k8s.io/apimachinery/pkg/util/yaml",
+    ],
 )
 
 filegroup(

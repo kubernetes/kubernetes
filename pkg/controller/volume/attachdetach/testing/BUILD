@@ -15,6 +15,11 @@ go_library(
         "//pkg/client/clientset_generated/clientset/fake:go_default_library",
         "//pkg/volume:go_default_library",
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
+        "//vendor:k8s.io/apimachinery/pkg/runtime",
+        "//vendor:k8s.io/apimachinery/pkg/types",
+        "//vendor:k8s.io/apimachinery/pkg/watch",
+        "//vendor:k8s.io/apis/pkg/api/v1",
+        "//vendor:k8s.io/client-go/testing",
     ],
 )
 

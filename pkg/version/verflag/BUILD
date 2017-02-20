@@ -11,7 +11,10 @@ go_library(
     name = "go_default_library",
     srcs = ["verflag.go"],
     tags = ["automanaged"],
-    deps = ["//pkg/version:go_default_library"],
+    deps = [
+        "//pkg/version:go_default_library",
+        "//vendor:github.com/spf13/pflag",
+    ],
 )
 
 filegroup(

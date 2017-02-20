@@ -17,7 +17,14 @@ go_library(
     tags = ["automanaged"],
     deps = [
         "//pkg/client/clientset_generated/clientset/typed/certificates/v1beta1:go_default_library",
+        "//vendor:github.com/golang/glog",
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
+        "//vendor:k8s.io/apimachinery/pkg/fields",
+        "//vendor:k8s.io/apimachinery/pkg/util/wait",
+        "//vendor:k8s.io/apimachinery/pkg/watch",
+        "//vendor:k8s.io/apis/pkg/apis/certificates/v1beta1",
+        "//vendor:k8s.io/apis/pkg/util",
+        "//vendor:k8s.io/client-go/util/cert",
     ],
 )
 
@@ -32,6 +39,9 @@ go_test(
     deps = [
         "//pkg/client/clientset_generated/clientset/typed/certificates/v1beta1:go_default_library",
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
+        "//vendor:k8s.io/apimachinery/pkg/watch",
+        "//vendor:k8s.io/apis/pkg/apis/certificates/v1beta1",
+        "//vendor:k8s.io/client-go/util/cert",
     ],
 )
 

@@ -24,6 +24,11 @@ go_library(
         "//federation/pkg/dnsprovider:go_default_library",
         "//federation/pkg/dnsprovider/providers/coredns/stubs:go_default_library",
         "//federation/pkg/dnsprovider/rrstype:go_default_library",
+        "//vendor:github.com/coreos/etcd/client",
+        "//vendor:github.com/golang/glog",
+        "//vendor:github.com/miekg/coredns/middleware/etcd/msg",
+        "//vendor:golang.org/x/net/context",
+        "//vendor:gopkg.in/gcfg.v1",
     ],
 )
 

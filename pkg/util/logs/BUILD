@@ -11,6 +11,11 @@ go_library(
     name = "go_default_library",
     srcs = ["logs.go"],
     tags = ["automanaged"],
+    deps = [
+        "//vendor:github.com/golang/glog",
+        "//vendor:github.com/spf13/pflag",
+        "//vendor:k8s.io/apimachinery/pkg/util/wait",
+    ],
 )
 
 filegroup(

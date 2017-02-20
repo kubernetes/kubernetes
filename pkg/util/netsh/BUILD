@@ -14,7 +14,10 @@ go_library(
         "netsh.go",
     ],
     tags = ["automanaged"],
-    deps = ["//pkg/util/exec:go_default_library"],
+    deps = [
+        "//pkg/util/exec:go_default_library",
+        "//vendor:github.com/golang/glog",
+    ],
 )
 
 filegroup(

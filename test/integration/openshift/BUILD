@@ -11,7 +11,10 @@ go_test(
     name = "go_default_test",
     srcs = ["openshift_test.go"],
     tags = ["automanaged"],
-    deps = ["//pkg/master:go_default_library"],
+    deps = [
+        "//pkg/master:go_default_library",
+        "//vendor:k8s.io/apiserver/pkg/server",
+    ],
 )
 
 filegroup(

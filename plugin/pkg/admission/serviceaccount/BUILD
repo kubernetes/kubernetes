@@ -20,7 +20,17 @@ go_library(
         "//pkg/kubeapiserver/admission:go_default_library",
         "//pkg/kubelet/types:go_default_library",
         "//pkg/serviceaccount:go_default_library",
+        "//vendor:k8s.io/apimachinery/pkg/api/errors",
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
+        "//vendor:k8s.io/apimachinery/pkg/fields",
+        "//vendor:k8s.io/apimachinery/pkg/runtime",
+        "//vendor:k8s.io/apimachinery/pkg/runtime/schema",
+        "//vendor:k8s.io/apimachinery/pkg/util/sets",
+        "//vendor:k8s.io/apimachinery/pkg/watch",
+        "//vendor:k8s.io/apis/pkg/api",
+        "//vendor:k8s.io/apiserver/pkg/admission",
+        "//vendor:k8s.io/apiserver/pkg/storage/names",
+        "//vendor:k8s.io/client-go/tools/cache",
     ],
 )
 
@@ -32,7 +42,11 @@ go_test(
     deps = [
         "//pkg/client/clientset_generated/internalclientset/fake:go_default_library",
         "//pkg/kubelet/types:go_default_library",
+        "//vendor:k8s.io/apimachinery/pkg/api/errors",
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
+        "//vendor:k8s.io/apimachinery/pkg/types",
+        "//vendor:k8s.io/apis/pkg/api",
+        "//vendor:k8s.io/apiserver/pkg/admission",
     ],
 )
 

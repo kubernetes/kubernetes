@@ -12,7 +12,12 @@ go_library(
     name = "go_default_library",
     srcs = ["ovirt.go"],
     tags = ["automanaged"],
-    deps = ["//pkg/cloudprovider:go_default_library"],
+    deps = [
+        "//pkg/cloudprovider:go_default_library",
+        "//vendor:gopkg.in/gcfg.v1",
+        "//vendor:k8s.io/apimachinery/pkg/types",
+        "//vendor:k8s.io/apis/pkg/api/v1",
+    ],
 )
 
 go_test(

@@ -23,6 +23,7 @@ filegroup(
         "//pkg/api/service:all-srcs",
         "//pkg/api/testapi:all-srcs",
         "//pkg/api/testing:all-srcs",
+        "//pkg/api/tests:all-srcs",
         "//pkg/api/unversioned:all-srcs",
         "//pkg/api/util:all-srcs",
         "//pkg/api/v1/endpoints:all-srcs",

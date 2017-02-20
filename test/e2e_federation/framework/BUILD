@@ -20,7 +20,17 @@ go_library(
         "//pkg/api/validation:go_default_library",
         "//pkg/client/clientset_generated/clientset:go_default_library",
         "//test/e2e/framework:go_default_library",
+        "//vendor:github.com/onsi/ginkgo",
+        "//vendor:github.com/onsi/gomega",
+        "//vendor:gopkg.in/yaml.v2",
+        "//vendor:k8s.io/apimachinery/pkg/api/errors",
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
+        "//vendor:k8s.io/apimachinery/pkg/util/validation",
+        "//vendor:k8s.io/apimachinery/pkg/util/wait",
+        "//vendor:k8s.io/apis/pkg/api",
+        "//vendor:k8s.io/apis/pkg/api/v1",
+        "//vendor:k8s.io/client-go/rest",
+        "//vendor:k8s.io/client-go/tools/clientcmd",
     ],
 )
 

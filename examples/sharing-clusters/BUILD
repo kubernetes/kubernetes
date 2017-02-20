@@ -18,7 +18,11 @@ go_library(
     name = "go_default_library",
     srcs = ["make_secret.go"],
     tags = ["automanaged"],
-    deps = ["//vendor:k8s.io/apimachinery/pkg/apis/meta/v1"],
+    deps = [
+        "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
+        "//vendor:k8s.io/apimachinery/pkg/runtime",
+        "//vendor:k8s.io/apis/pkg/api",
+    ],
 )
 
 filegroup(

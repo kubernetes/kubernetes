@@ -22,6 +22,7 @@ go_library(
         "//pkg/kubelet/container:go_default_library",
         "//pkg/kubelet/dockertools:go_default_library",
         "//pkg/kubelet/lifecycle:go_default_library",
+        "//vendor:k8s.io/apis/pkg/api/v1",
     ],
 )
 
@@ -33,6 +34,7 @@ go_test(
     ],
     library = ":go_default_library",
     tags = ["automanaged"],
+    deps = ["//vendor:k8s.io/apis/pkg/api/v1"],
 )
 
 filegroup(

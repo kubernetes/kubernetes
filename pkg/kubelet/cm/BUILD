@@ -30,6 +30,19 @@ go_library(
         "//pkg/util/procfs:go_default_library",
         "//pkg/util/sysctl:go_default_library",
         "//pkg/util/version:go_default_library",
+        "//vendor:github.com/golang/glog",
+        "//vendor:github.com/opencontainers/runc/libcontainer/cgroups",
+        "//vendor:github.com/opencontainers/runc/libcontainer/cgroups/fs",
+        "//vendor:github.com/opencontainers/runc/libcontainer/cgroups/systemd",
+        "//vendor:github.com/opencontainers/runc/libcontainer/configs",
+        "//vendor:k8s.io/apimachinery/pkg/api/resource",
+        "//vendor:k8s.io/apimachinery/pkg/types",
+        "//vendor:k8s.io/apimachinery/pkg/util/errors",
+        "//vendor:k8s.io/apimachinery/pkg/util/runtime",
+        "//vendor:k8s.io/apimachinery/pkg/util/sets",
+        "//vendor:k8s.io/apimachinery/pkg/util/wait",
+        "//vendor:k8s.io/apis/pkg/api/v1",
+        "//vendor:k8s.io/apis/pkg/util",
     ],
 )
 
@@ -42,7 +55,13 @@ go_test(
     ],
     library = ":go_default_library",
     tags = ["automanaged"],
-    deps = ["//pkg/util/mount:go_default_library"],
+    deps = [
+        "//pkg/util/mount:go_default_library",
+        "//vendor:github.com/stretchr/testify/assert",
+        "//vendor:github.com/stretchr/testify/require",
+        "//vendor:k8s.io/apimachinery/pkg/api/resource",
+        "//vendor:k8s.io/apis/pkg/api/v1",
+    ],
 )
 
 filegroup(

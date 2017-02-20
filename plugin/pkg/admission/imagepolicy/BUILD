@@ -16,6 +16,19 @@ go_library(
         "doc.go",
     ],
     tags = ["automanaged"],
+    deps = [
+        "//vendor:github.com/golang/glog",
+        "//vendor:k8s.io/apimachinery/pkg/api/errors",
+        "//vendor:k8s.io/apimachinery/pkg/runtime/schema",
+        "//vendor:k8s.io/apimachinery/pkg/util/yaml",
+        "//vendor:k8s.io/apis/pkg/api",
+        "//vendor:k8s.io/apis/pkg/apis/imagepolicy/install",
+        "//vendor:k8s.io/apis/pkg/apis/imagepolicy/v1alpha1",
+        "//vendor:k8s.io/apiserver/pkg/admission",
+        "//vendor:k8s.io/apiserver/pkg/util/cache",
+        "//vendor:k8s.io/apiserver/pkg/util/webhook",
+        "//vendor:k8s.io/client-go/rest",
+    ],
 )
 
 go_test(
@@ -27,6 +40,14 @@ go_test(
     ],
     library = ":go_default_library",
     tags = ["automanaged"],
+    deps = [
+        "//vendor:k8s.io/apis/pkg/api",
+        "//vendor:k8s.io/apis/pkg/apis/imagepolicy/install",
+        "//vendor:k8s.io/apis/pkg/apis/imagepolicy/v1alpha1",
+        "//vendor:k8s.io/apiserver/pkg/admission",
+        "//vendor:k8s.io/apiserver/pkg/authentication/user",
+        "//vendor:k8s.io/client-go/tools/clientcmd/api/v1",
+    ],
 )
 
 filegroup(

@@ -11,7 +11,16 @@ go_library(
     name = "go_default_library",
     srcs = ["storage_policy.go"],
     tags = ["automanaged"],
-    deps = ["//pkg/registry/policy/poddisruptionbudget/storage:go_default_library"],
+    deps = [
+        "//pkg/registry/policy/poddisruptionbudget/storage:go_default_library",
+        "//vendor:k8s.io/apis/pkg/api",
+        "//vendor:k8s.io/apis/pkg/apis/policy",
+        "//vendor:k8s.io/apis/pkg/apis/policy/v1beta1",
+        "//vendor:k8s.io/apiserver/pkg/registry/generic",
+        "//vendor:k8s.io/apiserver/pkg/registry/rest",
+        "//vendor:k8s.io/apiserver/pkg/server",
+        "//vendor:k8s.io/apiserver/pkg/server/storage",
+    ],
 )
 
 filegroup(

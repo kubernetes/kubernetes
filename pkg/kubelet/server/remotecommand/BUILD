@@ -21,7 +21,16 @@ go_library(
     deps = [
         "//pkg/util/exec:go_default_library",
         "//pkg/util/term:go_default_library",
+        "//vendor:github.com/golang/glog",
+        "//vendor:k8s.io/apimachinery/pkg/api/errors",
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
+        "//vendor:k8s.io/apimachinery/pkg/types",
+        "//vendor:k8s.io/apimachinery/pkg/util/httpstream",
+        "//vendor:k8s.io/apimachinery/pkg/util/httpstream/spdy",
+        "//vendor:k8s.io/apimachinery/pkg/util/runtime",
+        "//vendor:k8s.io/apis/pkg/api",
+        "//vendor:k8s.io/apiserver/pkg/server/httplog",
+        "//vendor:k8s.io/apiserver/pkg/util/wsstream",
     ],
 )
 

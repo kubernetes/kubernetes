@@ -16,7 +16,15 @@ go_library(
         "metadata.go",
     ],
     tags = ["automanaged"],
-    deps = ["//pkg/credentialprovider:go_default_library"],
+    deps = [
+        "//pkg/credentialprovider:go_default_library",
+        "//vendor:github.com/golang/glog",
+        "//vendor:github.com/spf13/pflag",
+        "//vendor:golang.org/x/oauth2",
+        "//vendor:golang.org/x/oauth2/google",
+        "//vendor:golang.org/x/oauth2/jwt",
+        "//vendor:k8s.io/apimachinery/pkg/util/net",
+    ],
 )
 
 go_test(
@@ -27,7 +35,10 @@ go_test(
     ],
     library = ":go_default_library",
     tags = ["automanaged"],
-    deps = ["//pkg/credentialprovider:go_default_library"],
+    deps = [
+        "//pkg/credentialprovider:go_default_library",
+        "//vendor:k8s.io/apimachinery/pkg/util/net",
+    ],
 )
 
 filegroup(

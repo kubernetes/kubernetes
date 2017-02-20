@@ -18,6 +18,10 @@ go_library(
     name = "go_default_library",
     srcs = ["links.go"],
     tags = ["automanaged"],
+    deps = [
+        "//vendor:github.com/mvdan/xurls",
+        "//vendor:github.com/spf13/pflag",
+    ],
 )
 
 filegroup(

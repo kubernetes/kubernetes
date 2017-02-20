@@ -35,6 +35,7 @@ go_test(
     ],
     library = ":go_default_library",
     tags = ["automanaged"],
+    deps = ["//vendor:github.com/stretchr/testify/assert"],
 )
 
 go_library(
@@ -52,6 +53,7 @@ go_library(
         "whitespace.go",
     ],
     tags = ["automanaged"],
+    deps = ["//vendor:github.com/spf13/pflag"],
 )
 
 filegroup(

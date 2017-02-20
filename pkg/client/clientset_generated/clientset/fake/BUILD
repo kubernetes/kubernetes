@@ -48,6 +48,12 @@ go_library(
         "//pkg/client/clientset_generated/clientset/typed/rbac/v1beta1/fake:go_default_library",
         "//pkg/client/clientset_generated/clientset/typed/storage/v1beta1:go_default_library",
         "//pkg/client/clientset_generated/clientset/typed/storage/v1beta1/fake:go_default_library",
+        "//vendor:k8s.io/apimachinery/pkg/runtime",
+        "//vendor:k8s.io/apimachinery/pkg/watch",
+        "//vendor:k8s.io/apis/pkg/api",
+        "//vendor:k8s.io/client-go/discovery",
+        "//vendor:k8s.io/client-go/discovery/fake",
+        "//vendor:k8s.io/client-go/testing",
     ],
 )
 

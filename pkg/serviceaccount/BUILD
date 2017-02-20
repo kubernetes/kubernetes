@@ -15,6 +15,16 @@ go_library(
         "util.go",
     ],
     tags = ["automanaged"],
+    deps = [
+        "//vendor:github.com/dgrijalva/jwt-go",
+        "//vendor:github.com/golang/glog",
+        "//vendor:k8s.io/apis/pkg/api",
+        "//vendor:k8s.io/apis/pkg/api/v1",
+        "//vendor:k8s.io/apiserver/pkg/authentication/authenticator",
+        "//vendor:k8s.io/apiserver/pkg/authentication/serviceaccount",
+        "//vendor:k8s.io/apiserver/pkg/authentication/user",
+        "//vendor:k8s.io/client-go/util/cert",
+    ],
 )
 
 go_test(
@@ -27,6 +37,9 @@ go_test(
         "//pkg/controller/serviceaccount:go_default_library",
         "//pkg/serviceaccount:go_default_library",
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
+        "//vendor:k8s.io/apis/pkg/api/v1",
+        "//vendor:k8s.io/apiserver/pkg/authentication/serviceaccount",
+        "//vendor:k8s.io/client-go/util/cert",
     ],
 )
 

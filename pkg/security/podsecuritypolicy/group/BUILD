@@ -17,7 +17,12 @@ go_library(
         "types.go",
     ],
     tags = ["automanaged"],
-    deps = ["//pkg/security/podsecuritypolicy/util:go_default_library"],
+    deps = [
+        "//pkg/security/podsecuritypolicy/util:go_default_library",
+        "//vendor:k8s.io/apimachinery/pkg/util/validation/field",
+        "//vendor:k8s.io/apis/pkg/api",
+        "//vendor:k8s.io/apis/pkg/apis/extensions",
+    ],
 )
 
 go_test(
@@ -28,6 +33,10 @@ go_test(
     ],
     library = ":go_default_library",
     tags = ["automanaged"],
+    deps = [
+        "//vendor:k8s.io/apis/pkg/api",
+        "//vendor:k8s.io/apis/pkg/apis/extensions",
+    ],
 )
 
 filegroup(

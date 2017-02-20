@@ -13,13 +13,24 @@ go_test(
     srcs = ["ssh_test.go"],
     library = ":go_default_library",
     tags = ["automanaged"],
+    deps = [
+        "//vendor:github.com/stretchr/testify/assert",
+        "//vendor:k8s.io/client-go/util/clock",
+    ],
 )
 
 go_library(
     name = "go_default_library",
     srcs = ["ssh.go"],
     tags = ["automanaged"],
-    deps = ["//pkg/ssh:go_default_library"],
+    deps = [
+        "//pkg/ssh:go_default_library",
+        "//vendor:github.com/golang/glog",
+        "//vendor:github.com/prometheus/client_golang/prometheus",
+        "//vendor:k8s.io/apimachinery/pkg/util/wait",
+        "//vendor:k8s.io/apis/pkg/util",
+        "//vendor:k8s.io/client-go/util/clock",
+    ],
 )
 
 filegroup(

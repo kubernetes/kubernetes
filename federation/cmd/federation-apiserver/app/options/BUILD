@@ -17,6 +17,10 @@ go_library(
     deps = [
         "//pkg/features:go_default_library",
         "//pkg/kubeapiserver/options:go_default_library",
+        "//vendor:github.com/spf13/pflag",
+        "//vendor:k8s.io/apis/pkg/api",
+        "//vendor:k8s.io/apiserver/pkg/server/options",
+        "//vendor:k8s.io/apiserver/pkg/storage/storagebackend",
     ],
 )
 

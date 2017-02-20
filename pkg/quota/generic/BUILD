@@ -17,7 +17,13 @@ go_library(
     deps = [
         "//pkg/client/informers/informers_generated/externalversions:go_default_library",
         "//pkg/quota:go_default_library",
+        "//vendor:k8s.io/apimachinery/pkg/api/resource",
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
+        "//vendor:k8s.io/apimachinery/pkg/labels",
+        "//vendor:k8s.io/apimachinery/pkg/runtime",
+        "//vendor:k8s.io/apimachinery/pkg/runtime/schema",
+        "//vendor:k8s.io/apis/pkg/api",
+        "//vendor:k8s.io/apiserver/pkg/admission",
     ],
 )
 

@@ -15,6 +15,10 @@ go_library(
         "types.go",
     ],
     tags = ["automanaged"],
+    deps = [
+        "//vendor:k8s.io/apimachinery/pkg/util/validation/field",
+        "//vendor:k8s.io/apis/pkg/api",
+    ],
 )
 
 go_test(
@@ -22,6 +26,7 @@ go_test(
     srcs = ["mustmatchpatterns_test.go"],
     library = ":go_default_library",
     tags = ["automanaged"],
+    deps = ["//vendor:k8s.io/apis/pkg/api"],
 )
 
 filegroup(

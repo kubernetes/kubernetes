@@ -16,6 +16,7 @@ go_library(
         "//cmd/kubeadm/app/apis/kubeadm:go_default_library",
         "//cmd/kubeadm/app/constants:go_default_library",
         "//pkg/registry/core/service/ipallocator:go_default_library",
+        "//vendor:k8s.io/apimachinery/pkg/util/validation/field",
     ],
 )
 
@@ -37,5 +38,8 @@ go_test(
     srcs = ["validation_test.go"],
     library = ":go_default_library",
     tags = ["automanaged"],
-    deps = ["//cmd/kubeadm/app/apis/kubeadm:go_default_library"],
+    deps = [
+        "//cmd/kubeadm/app/apis/kubeadm:go_default_library",
+        "//vendor:k8s.io/apimachinery/pkg/util/validation/field",
+    ],
 )

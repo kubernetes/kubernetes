@@ -21,6 +21,9 @@ go_library(
         "//plugin/pkg/scheduler/api:go_default_library",
         "//plugin/pkg/scheduler/schedulercache:go_default_library",
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
+        "//vendor:k8s.io/apimachinery/pkg/labels",
+        "//vendor:k8s.io/apis/pkg/api/v1",
+        "//vendor:k8s.io/apis/pkg/apis/extensions/v1beta1",
     ],
 )
 
@@ -29,6 +32,7 @@ go_test(
     srcs = ["scheduler_interface_test.go"],
     library = ":go_default_library",
     tags = ["automanaged"],
+    deps = ["//vendor:k8s.io/apis/pkg/api/v1"],
 )
 
 filegroup(

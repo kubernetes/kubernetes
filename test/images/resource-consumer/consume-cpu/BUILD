@@ -18,6 +18,7 @@ go_library(
     name = "go_default_library",
     srcs = ["consume_cpu.go"],
     tags = ["automanaged"],
+    deps = ["//vendor:bitbucket.org/bertimus9/systemstat"],
 )
 
 filegroup(

@@ -17,6 +17,16 @@ go_library(
         "websocket.go",
     ],
     tags = ["automanaged"],
+    deps = [
+        "//vendor:github.com/golang/glog",
+        "//vendor:k8s.io/apimachinery/pkg/types",
+        "//vendor:k8s.io/apimachinery/pkg/util/httpstream",
+        "//vendor:k8s.io/apimachinery/pkg/util/httpstream/spdy",
+        "//vendor:k8s.io/apimachinery/pkg/util/runtime",
+        "//vendor:k8s.io/apis/pkg/api",
+        "//vendor:k8s.io/apiserver/pkg/server/httplog",
+        "//vendor:k8s.io/apiserver/pkg/util/wsstream",
+    ],
 )
 
 go_test(
@@ -27,6 +37,10 @@ go_test(
     ],
     library = ":go_default_library",
     tags = ["automanaged"],
+    deps = [
+        "//vendor:k8s.io/apimachinery/pkg/util/httpstream",
+        "//vendor:k8s.io/apis/pkg/api",
+    ],
 )
 
 filegroup(

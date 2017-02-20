@@ -11,6 +11,10 @@ go_library(
     name = "go_default_library",
     srcs = ["kube_features.go"],
     tags = ["automanaged"],
+    deps = [
+        "//vendor:k8s.io/apiserver/pkg/features",
+        "//vendor:k8s.io/apiserver/pkg/util/feature",
+    ],
 )
 
 filegroup(

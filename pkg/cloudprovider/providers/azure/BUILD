@@ -28,6 +28,19 @@ go_library(
         "//pkg/api/v1/service:go_default_library",
         "//pkg/cloudprovider:go_default_library",
         "//pkg/volume:go_default_library",
+        "//vendor:github.com/Azure/azure-sdk-for-go/arm/compute",
+        "//vendor:github.com/Azure/azure-sdk-for-go/arm/network",
+        "//vendor:github.com/Azure/azure-sdk-for-go/arm/storage",
+        "//vendor:github.com/Azure/azure-sdk-for-go/storage",
+        "//vendor:github.com/Azure/go-autorest/autorest",
+        "//vendor:github.com/Azure/go-autorest/autorest/azure",
+        "//vendor:github.com/Azure/go-autorest/autorest/to",
+        "//vendor:github.com/ghodss/yaml",
+        "//vendor:github.com/golang/glog",
+        "//vendor:github.com/rubiojr/go-vhd/vhd",
+        "//vendor:k8s.io/apimachinery/pkg/types",
+        "//vendor:k8s.io/apimachinery/pkg/util/errors",
+        "//vendor:k8s.io/apis/pkg/api/v1",
     ],
 )
 
@@ -36,7 +49,14 @@ go_test(
     srcs = ["azure_test.go"],
     library = ":go_default_library",
     tags = ["automanaged"],
-    deps = ["//pkg/api/v1/service:go_default_library"],
+    deps = [
+        "//pkg/api/v1/service:go_default_library",
+        "//vendor:github.com/Azure/azure-sdk-for-go/arm/compute",
+        "//vendor:github.com/Azure/azure-sdk-for-go/arm/network",
+        "//vendor:github.com/Azure/go-autorest/autorest/to",
+        "//vendor:k8s.io/apimachinery/pkg/types",
+        "//vendor:k8s.io/apis/pkg/api/v1",
+    ],
 )
 
 filegroup(

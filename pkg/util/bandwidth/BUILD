@@ -18,7 +18,12 @@ go_library(
         "utils.go",
     ],
     tags = ["automanaged"],
-    deps = ["//pkg/util/exec:go_default_library"],
+    deps = [
+        "//pkg/util/exec:go_default_library",
+        "//vendor:github.com/golang/glog",
+        "//vendor:k8s.io/apimachinery/pkg/api/resource",
+        "//vendor:k8s.io/apimachinery/pkg/util/sets",
+    ],
 )
 
 go_test(
@@ -31,7 +36,9 @@ go_test(
     tags = ["automanaged"],
     deps = [
         "//pkg/util/exec:go_default_library",
+        "//vendor:k8s.io/apimachinery/pkg/api/resource",
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
+        "//vendor:k8s.io/apis/pkg/api",
     ],
 )
 

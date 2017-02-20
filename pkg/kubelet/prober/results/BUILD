@@ -12,7 +12,11 @@ go_library(
     name = "go_default_library",
     srcs = ["results_manager.go"],
     tags = ["automanaged"],
-    deps = ["//pkg/kubelet/container:go_default_library"],
+    deps = [
+        "//pkg/kubelet/container:go_default_library",
+        "//vendor:k8s.io/apimachinery/pkg/types",
+        "//vendor:k8s.io/apis/pkg/api/v1",
+    ],
 )
 
 go_test(
@@ -22,7 +26,10 @@ go_test(
     tags = ["automanaged"],
     deps = [
         "//pkg/kubelet/container:go_default_library",
+        "//vendor:github.com/stretchr/testify/assert",
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
+        "//vendor:k8s.io/apimachinery/pkg/util/wait",
+        "//vendor:k8s.io/apis/pkg/api/v1",
     ],
 )
 

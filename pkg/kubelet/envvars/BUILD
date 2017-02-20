@@ -15,6 +15,7 @@ go_library(
         "envvars.go",
     ],
     tags = ["automanaged"],
+    deps = ["//vendor:k8s.io/apis/pkg/api/v1"],
 )
 
 go_test(
@@ -24,6 +25,7 @@ go_test(
     deps = [
         "//pkg/kubelet/envvars:go_default_library",
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
+        "//vendor:k8s.io/apis/pkg/api/v1",
     ],
 )
 

@@ -14,6 +14,11 @@ go_library(
     deps = [
         "//pkg/apis/authorization/validation:go_default_library",
         "//pkg/registry/authorization/util:go_default_library",
+        "//vendor:k8s.io/apimachinery/pkg/api/errors",
+        "//vendor:k8s.io/apimachinery/pkg/runtime",
+        "//vendor:k8s.io/apis/pkg/apis/authorization",
+        "//vendor:k8s.io/apiserver/pkg/authorization/authorizer",
+        "//vendor:k8s.io/apiserver/pkg/endpoints/request",
     ],
 )
 

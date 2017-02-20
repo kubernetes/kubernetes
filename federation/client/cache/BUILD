@@ -11,7 +11,11 @@ go_library(
     name = "go_default_library",
     srcs = ["cluster_cache.go"],
     tags = ["automanaged"],
-    deps = ["//federation/apis/federation/v1beta1:go_default_library"],
+    deps = [
+        "//federation/apis/federation/v1beta1:go_default_library",
+        "//vendor:github.com/golang/glog",
+        "//vendor:k8s.io/client-go/tools/cache",
+    ],
 )
 
 filegroup(

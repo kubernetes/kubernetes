@@ -15,6 +15,10 @@ go_library(
         "ui.go",
     ],
     tags = ["automanaged"],
+    deps = [
+        "//vendor:github.com/emicklei/go-restful",
+        "//vendor:k8s.io/apiserver/pkg/server/mux",
+    ],
 )
 
 filegroup(

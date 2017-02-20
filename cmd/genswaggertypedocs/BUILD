@@ -18,6 +18,11 @@ go_library(
     name = "go_default_library",
     srcs = ["swagger_type_docs.go"],
     tags = ["automanaged"],
+    deps = [
+        "//vendor:github.com/golang/glog",
+        "//vendor:github.com/spf13/pflag",
+        "//vendor:k8s.io/apimachinery/pkg/runtime",
+    ],
 )
 
 filegroup(

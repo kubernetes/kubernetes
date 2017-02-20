@@ -16,7 +16,10 @@ go_library(
         "plugins.go",
     ],
     tags = ["automanaged"],
-    deps = ["//federation/pkg/dnsprovider/rrstype:go_default_library"],
+    deps = [
+        "//federation/pkg/dnsprovider/rrstype:go_default_library",
+        "//vendor:github.com/golang/glog",
+    ],
 )
 
 go_test(

@@ -11,7 +11,17 @@ go_library(
     name = "go_default_library",
     srcs = ["storage_autoscaling.go"],
     tags = ["automanaged"],
-    deps = ["//pkg/registry/autoscaling/horizontalpodautoscaler/storage:go_default_library"],
+    deps = [
+        "//pkg/registry/autoscaling/horizontalpodautoscaler/storage:go_default_library",
+        "//vendor:k8s.io/apis/pkg/api",
+        "//vendor:k8s.io/apis/pkg/apis/autoscaling",
+        "//vendor:k8s.io/apis/pkg/apis/autoscaling/v1",
+        "//vendor:k8s.io/apis/pkg/apis/autoscaling/v2alpha1",
+        "//vendor:k8s.io/apiserver/pkg/registry/generic",
+        "//vendor:k8s.io/apiserver/pkg/registry/rest",
+        "//vendor:k8s.io/apiserver/pkg/server",
+        "//vendor:k8s.io/apiserver/pkg/server/storage",
+    ],
 )
 
 filegroup(

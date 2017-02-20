@@ -26,7 +26,15 @@ go_library(
         "//pkg/volume:go_default_library",
         "//pkg/volume/util:go_default_library",
         "//pkg/volume/util/volumehelper:go_default_library",
+        "//vendor:github.com/golang/glog",
+        "//vendor:github.com/heketi/heketi/client/api/go-client",
+        "//vendor:github.com/heketi/heketi/pkg/glusterfs/api",
+        "//vendor:k8s.io/apimachinery/pkg/api/errors",
+        "//vendor:k8s.io/apimachinery/pkg/api/resource",
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
+        "//vendor:k8s.io/apimachinery/pkg/labels",
+        "//vendor:k8s.io/apimachinery/pkg/types",
+        "//vendor:k8s.io/apis/pkg/api/v1",
     ],
 )
 
@@ -44,7 +52,13 @@ go_test(
         "//pkg/util/mount:go_default_library",
         "//pkg/volume:go_default_library",
         "//pkg/volume/testing:go_default_library",
+        "//vendor:github.com/heketi/heketi/pkg/glusterfs/api",
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
+        "//vendor:k8s.io/apimachinery/pkg/runtime",
+        "//vendor:k8s.io/apimachinery/pkg/types",
+        "//vendor:k8s.io/apis/pkg/api/v1",
+        "//vendor:k8s.io/client-go/testing",
+        "//vendor:k8s.io/client-go/util/testing",
     ],
 )
 

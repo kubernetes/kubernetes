@@ -17,6 +17,10 @@ go_library(
         "//pkg/kubelet/container:go_default_library",
         "//pkg/kubelet/network:go_default_library",
         "//pkg/util/exec:go_default_library",
+        "//vendor:github.com/containernetworking/cni/libcni",
+        "//vendor:github.com/containernetworking/cni/pkg/types",
+        "//vendor:github.com/golang/glog",
+        "//vendor:k8s.io/apimachinery/pkg/util/wait",
     ],
 )
 
@@ -34,6 +38,10 @@ go_test(
         "//pkg/kubelet/network/cni/testing:go_default_library",
         "//pkg/kubelet/network/testing:go_default_library",
         "//pkg/util/exec:go_default_library",
+        "//vendor:github.com/containernetworking/cni/pkg/types",
+        "//vendor:github.com/stretchr/testify/mock",
+        "//vendor:k8s.io/apis/pkg/api/v1",
+        "//vendor:k8s.io/client-go/util/testing",
     ],
 )
 

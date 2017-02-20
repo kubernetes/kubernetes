@@ -12,7 +12,10 @@ go_library(
     name = "go_default_library",
     srcs = ["validation.go"],
     tags = ["automanaged"],
-    deps = ["//plugin/pkg/scheduler/api:go_default_library"],
+    deps = [
+        "//plugin/pkg/scheduler/api:go_default_library",
+        "//vendor:k8s.io/apimachinery/pkg/util/errors",
+    ],
 )
 
 go_test(

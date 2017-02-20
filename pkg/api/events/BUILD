@@ -12,6 +12,7 @@ go_library(
     name = "go_default_library",
     srcs = ["sorted_event_list.go"],
     tags = ["automanaged"],
+    deps = ["//vendor:k8s.io/apis/pkg/api"],
 )
 
 go_test(
@@ -19,7 +20,10 @@ go_test(
     srcs = ["sorted_event_list_test.go"],
     library = ":go_default_library",
     tags = ["automanaged"],
-    deps = ["//vendor:k8s.io/apimachinery/pkg/apis/meta/v1"],
+    deps = [
+        "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
+        "//vendor:k8s.io/apis/pkg/api",
+    ],
 )
 
 filegroup(

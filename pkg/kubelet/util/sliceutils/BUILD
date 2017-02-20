@@ -11,7 +11,10 @@ go_library(
     name = "go_default_library",
     srcs = ["sliceutils.go"],
     tags = ["automanaged"],
-    deps = ["//pkg/kubelet/container:go_default_library"],
+    deps = [
+        "//pkg/kubelet/container:go_default_library",
+        "//vendor:k8s.io/apis/pkg/api/v1",
+    ],
 )
 
 filegroup(

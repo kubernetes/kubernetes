@@ -14,7 +14,11 @@ go_library(
         "pods_to_cache.go",
     ],
     tags = ["automanaged"],
-    deps = ["//plugin/pkg/scheduler/schedulercache:go_default_library"],
+    deps = [
+        "//plugin/pkg/scheduler/schedulercache:go_default_library",
+        "//vendor:k8s.io/apimachinery/pkg/labels",
+        "//vendor:k8s.io/apis/pkg/api/v1",
+    ],
 )
 
 filegroup(

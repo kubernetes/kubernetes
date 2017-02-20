@@ -18,6 +18,11 @@ go_library(
     name = "go_default_library",
     srcs = ["main.go"],
     tags = ["automanaged"],
+    deps = [
+        "//vendor:github.com/codegangsta/negroni",
+        "//vendor:github.com/gorilla/mux",
+        "//vendor:github.com/xyproto/simpleredis",
+    ],
 )
 
 filegroup(

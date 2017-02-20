@@ -11,7 +11,11 @@ go_library(
     name = "go_default_library",
     srcs = ["validation.go"],
     tags = ["automanaged"],
-    deps = ["//pkg/api/validation:go_default_library"],
+    deps = [
+        "//pkg/api/validation:go_default_library",
+        "//vendor:k8s.io/apimachinery/pkg/util/validation/field",
+        "//vendor:k8s.io/apis/pkg/apis/certificates",
+    ],
 )
 
 filegroup(

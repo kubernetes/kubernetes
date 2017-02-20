@@ -11,7 +11,10 @@ go_library(
     name = "go_default_library",
     srcs = ["fake_pod_deletion_safety.go"],
     tags = ["automanaged"],
-    deps = ["//pkg/kubelet/pod:go_default_library"],
+    deps = [
+        "//pkg/kubelet/pod:go_default_library",
+        "//vendor:k8s.io/apis/pkg/api/v1",
+    ],
 )
 
 filegroup(

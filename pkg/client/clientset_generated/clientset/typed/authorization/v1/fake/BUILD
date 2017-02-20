@@ -20,7 +20,12 @@ go_library(
         "fake_subjectaccessreview_expansion.go",
     ],
     tags = ["automanaged"],
-    deps = ["//pkg/client/clientset_generated/clientset/typed/authorization/v1:go_default_library"],
+    deps = [
+        "//pkg/client/clientset_generated/clientset/typed/authorization/v1:go_default_library",
+        "//vendor:k8s.io/apis/pkg/apis/authorization/v1",
+        "//vendor:k8s.io/client-go/rest",
+        "//vendor:k8s.io/client-go/testing",
+    ],
 )
 
 filegroup(

@@ -18,7 +18,10 @@ go_library(
     name = "go_default_library",
     srcs = ["main.go"],
     tags = ["automanaged"],
-    deps = ["//cmd/libs/go2idl/go-to-protobuf/protobuf:go_default_library"],
+    deps = [
+        "//cmd/libs/go2idl/go-to-protobuf/protobuf:go_default_library",
+        "//vendor:github.com/spf13/pflag",
+    ],
 )
 
 filegroup(

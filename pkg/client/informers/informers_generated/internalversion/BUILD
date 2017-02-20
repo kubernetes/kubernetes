@@ -26,6 +26,18 @@ go_library(
         "//pkg/client/informers/informers_generated/internalversion/policy:go_default_library",
         "//pkg/client/informers/informers_generated/internalversion/rbac:go_default_library",
         "//pkg/client/informers/informers_generated/internalversion/storage:go_default_library",
+        "//vendor:k8s.io/apimachinery/pkg/runtime",
+        "//vendor:k8s.io/apimachinery/pkg/runtime/schema",
+        "//vendor:k8s.io/apis/pkg/api",
+        "//vendor:k8s.io/apis/pkg/apis/apps",
+        "//vendor:k8s.io/apis/pkg/apis/autoscaling",
+        "//vendor:k8s.io/apis/pkg/apis/batch",
+        "//vendor:k8s.io/apis/pkg/apis/certificates",
+        "//vendor:k8s.io/apis/pkg/apis/extensions",
+        "//vendor:k8s.io/apis/pkg/apis/policy",
+        "//vendor:k8s.io/apis/pkg/apis/rbac",
+        "//vendor:k8s.io/apis/pkg/apis/storage",
+        "//vendor:k8s.io/client-go/tools/cache",
     ],
 )
 

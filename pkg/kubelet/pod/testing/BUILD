@@ -11,7 +11,11 @@ go_library(
     name = "go_default_library",
     srcs = ["fake_mirror_client.go"],
     tags = ["automanaged"],
-    deps = ["//pkg/kubelet/container:go_default_library"],
+    deps = [
+        "//pkg/kubelet/container:go_default_library",
+        "//vendor:k8s.io/apimachinery/pkg/util/sets",
+        "//vendor:k8s.io/apis/pkg/api/v1",
+    ],
 )
 
 filegroup(

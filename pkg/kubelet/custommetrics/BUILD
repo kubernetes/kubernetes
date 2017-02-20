@@ -12,6 +12,7 @@ go_library(
     name = "go_default_library",
     srcs = ["custom_metrics.go"],
     tags = ["automanaged"],
+    deps = ["//vendor:k8s.io/apis/pkg/api/v1"],
 )
 
 go_test(
@@ -19,6 +20,10 @@ go_test(
     srcs = ["custom_metrics_test.go"],
     library = ":go_default_library",
     tags = ["automanaged"],
+    deps = [
+        "//vendor:github.com/stretchr/testify/assert",
+        "//vendor:k8s.io/apis/pkg/api/v1",
+    ],
 )
 
 filegroup(

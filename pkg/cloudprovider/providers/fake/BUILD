@@ -14,7 +14,11 @@ go_library(
         "fake.go",
     ],
     tags = ["automanaged"],
-    deps = ["//pkg/cloudprovider:go_default_library"],
+    deps = [
+        "//pkg/cloudprovider:go_default_library",
+        "//vendor:k8s.io/apimachinery/pkg/types",
+        "//vendor:k8s.io/apis/pkg/api/v1",
+    ],
 )
 
 filegroup(

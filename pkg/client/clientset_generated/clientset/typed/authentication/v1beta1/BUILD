@@ -17,6 +17,13 @@ go_library(
         "tokenreview_expansion.go",
     ],
     tags = ["automanaged"],
+    deps = [
+        "//vendor:k8s.io/apimachinery/pkg/runtime/schema",
+        "//vendor:k8s.io/apimachinery/pkg/runtime/serializer",
+        "//vendor:k8s.io/apis/pkg/api",
+        "//vendor:k8s.io/apis/pkg/apis/authentication/v1beta1",
+        "//vendor:k8s.io/client-go/rest",
+    ],
 )
 
 filegroup(

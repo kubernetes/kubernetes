@@ -14,6 +14,7 @@ go_library(
     deps = [
         "//pkg/volume:go_default_library",
         "//pkg/volume/util/types:go_default_library",
+        "//vendor:k8s.io/apis/pkg/api/v1",
     ],
 )
 

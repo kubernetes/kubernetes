@@ -16,6 +16,8 @@ go_test(
     deps = [
         "//pkg/registry/extensions/thirdpartyresourcedata:go_default_library",
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
+        "//vendor:k8s.io/apimachinery/pkg/util/sets",
+        "//vendor:k8s.io/apis/pkg/apis/extensions",
     ],
 )
 
@@ -37,7 +39,19 @@ go_library(
         "//pkg/registry/extensions/replicaset/storage:go_default_library",
         "//pkg/registry/extensions/thirdpartyresource/storage:go_default_library",
         "//pkg/registry/extensions/thirdpartyresourcedata:go_default_library",
+        "//vendor:github.com/golang/glog",
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
+        "//vendor:k8s.io/apimachinery/pkg/runtime",
+        "//vendor:k8s.io/apimachinery/pkg/util/runtime",
+        "//vendor:k8s.io/apimachinery/pkg/util/sets",
+        "//vendor:k8s.io/apimachinery/pkg/util/wait",
+        "//vendor:k8s.io/apis/pkg/api",
+        "//vendor:k8s.io/apis/pkg/apis/extensions",
+        "//vendor:k8s.io/apis/pkg/apis/extensions/v1beta1",
+        "//vendor:k8s.io/apiserver/pkg/registry/generic",
+        "//vendor:k8s.io/apiserver/pkg/registry/rest",
+        "//vendor:k8s.io/apiserver/pkg/server",
+        "//vendor:k8s.io/apiserver/pkg/server/storage",
     ],
 )
 

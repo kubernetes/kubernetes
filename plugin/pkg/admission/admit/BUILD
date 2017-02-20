@@ -12,6 +12,7 @@ go_library(
     name = "go_default_library",
     srcs = ["admission.go"],
     tags = ["automanaged"],
+    deps = ["//vendor:k8s.io/apiserver/pkg/admission"],
 )
 
 go_test(

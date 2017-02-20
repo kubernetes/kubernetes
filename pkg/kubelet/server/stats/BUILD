@@ -28,7 +28,14 @@ go_library(
         "//pkg/kubelet/types:go_default_library",
         "//pkg/kubelet/util/format:go_default_library",
         "//pkg/volume:go_default_library",
+        "//vendor:github.com/emicklei/go-restful",
+        "//vendor:github.com/golang/glog",
+        "//vendor:github.com/google/cadvisor/info/v1",
+        "//vendor:github.com/google/cadvisor/info/v2",
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
+        "//vendor:k8s.io/apimachinery/pkg/types",
+        "//vendor:k8s.io/apimachinery/pkg/util/wait",
+        "//vendor:k8s.io/apis/pkg/api/v1",
     ],
 )
 
@@ -46,7 +53,14 @@ go_test(
         "//pkg/kubelet/container:go_default_library",
         "//pkg/kubelet/leaky:go_default_library",
         "//pkg/volume:go_default_library",
+        "//vendor:github.com/google/cadvisor/info/v1",
+        "//vendor:github.com/google/cadvisor/info/v2",
+        "//vendor:github.com/google/gofuzz",
+        "//vendor:github.com/stretchr/testify/assert",
+        "//vendor:github.com/stretchr/testify/mock",
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
+        "//vendor:k8s.io/apimachinery/pkg/types",
+        "//vendor:k8s.io/apis/pkg/api/v1",
     ],
 )
 

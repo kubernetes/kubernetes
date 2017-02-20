@@ -18,7 +18,11 @@ go_library(
         "types.go",
     ],
     tags = ["automanaged"],
-    deps = ["//vendor:k8s.io/apimachinery/pkg/apis/meta/v1"],
+    deps = [
+        "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
+        "//vendor:k8s.io/apis/pkg/api",
+        "//vendor:k8s.io/apis/pkg/api/v1",
+    ],
 )
 
 go_test(
@@ -29,6 +33,10 @@ go_test(
     ],
     library = ":go_default_library",
     tags = ["automanaged"],
+    deps = [
+        "//vendor:github.com/stretchr/testify/require",
+        "//vendor:k8s.io/apis/pkg/api/v1",
+    ],
 )
 
 filegroup(

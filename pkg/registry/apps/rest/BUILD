@@ -11,7 +11,16 @@ go_library(
     name = "go_default_library",
     srcs = ["storage_apps.go"],
     tags = ["automanaged"],
-    deps = ["//pkg/registry/apps/petset/storage:go_default_library"],
+    deps = [
+        "//pkg/registry/apps/petset/storage:go_default_library",
+        "//vendor:k8s.io/apis/pkg/api",
+        "//vendor:k8s.io/apis/pkg/apis/apps",
+        "//vendor:k8s.io/apis/pkg/apis/apps/v1beta1",
+        "//vendor:k8s.io/apiserver/pkg/registry/generic",
+        "//vendor:k8s.io/apiserver/pkg/registry/rest",
+        "//vendor:k8s.io/apiserver/pkg/server",
+        "//vendor:k8s.io/apiserver/pkg/server/storage",
+    ],
 )
 
 filegroup(

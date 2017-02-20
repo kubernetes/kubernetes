@@ -11,7 +11,10 @@ go_library(
     name = "go_default_library",
     srcs = ["cmd_sanity.go"],
     tags = ["automanaged"],
-    deps = ["//pkg/kubectl/cmd/templates:go_default_library"],
+    deps = [
+        "//pkg/kubectl/cmd/templates:go_default_library",
+        "//vendor:github.com/spf13/cobra",
+    ],
 )
 
 filegroup(

@@ -15,6 +15,7 @@ go_library(
     deps = [
         "//pkg/probe:go_default_library",
         "//pkg/util/exec:go_default_library",
+        "//vendor:github.com/golang/glog",
     ],
 )
 

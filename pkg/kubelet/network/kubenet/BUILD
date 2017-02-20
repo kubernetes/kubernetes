@@ -26,6 +26,14 @@ go_library(
         "//pkg/util/exec:go_default_library",
         "//pkg/util/iptables:go_default_library",
         "//pkg/util/sysctl:go_default_library",
+        "//vendor:github.com/containernetworking/cni/libcni",
+        "//vendor:github.com/containernetworking/cni/pkg/types",
+        "//vendor:github.com/golang/glog",
+        "//vendor:github.com/vishvananda/netlink",
+        "//vendor:k8s.io/apimachinery/pkg/util/errors",
+        "//vendor:k8s.io/apimachinery/pkg/util/net",
+        "//vendor:k8s.io/apimachinery/pkg/util/sets",
+        "//vendor:k8s.io/apis/pkg/api/v1",
     ],
 )
 
@@ -45,6 +53,8 @@ go_test(
         "//pkg/util/exec:go_default_library",
         "//pkg/util/iptables/testing:go_default_library",
         "//pkg/util/sysctl/testing:go_default_library",
+        "//vendor:github.com/stretchr/testify/assert",
+        "//vendor:github.com/stretchr/testify/mock",
     ],
 )
 

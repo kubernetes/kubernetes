@@ -18,7 +18,12 @@ go_library(
         "term_writer.go",
     ],
     tags = ["automanaged"],
-    deps = ["//pkg/util/interrupt:go_default_library"],
+    deps = [
+        "//pkg/util/interrupt:go_default_library",
+        "//vendor:github.com/docker/docker/pkg/term",
+        "//vendor:github.com/mitchellh/go-wordwrap",
+        "//vendor:k8s.io/apimachinery/pkg/util/runtime",
+    ],
 )
 
 go_test(

@@ -18,6 +18,10 @@ go_library(
     name = "go_default_library",
     srcs = ["logs_generator.go"],
     tags = ["automanaged"],
+    deps = [
+        "//vendor:github.com/golang/glog",
+        "//vendor:k8s.io/apimachinery/pkg/util/rand",
+    ],
 )
 
 filegroup(

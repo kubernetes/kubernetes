@@ -14,6 +14,13 @@ go_library(
         "horizontalpodautoscaler.go",
     ],
     tags = ["automanaged"],
+    deps = [
+        "//vendor:k8s.io/apimachinery/pkg/api/errors",
+        "//vendor:k8s.io/apimachinery/pkg/labels",
+        "//vendor:k8s.io/apis/pkg/apis/autoscaling",
+        "//vendor:k8s.io/apis/pkg/apis/autoscaling/v1",
+        "//vendor:k8s.io/client-go/tools/cache",
+    ],
 )
 
 filegroup(

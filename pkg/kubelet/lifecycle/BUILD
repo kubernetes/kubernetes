@@ -25,6 +25,10 @@ go_library(
         "//pkg/security/apparmor:go_default_library",
         "//plugin/pkg/scheduler/algorithm/predicates:go_default_library",
         "//plugin/pkg/scheduler/schedulercache:go_default_library",
+        "//vendor:github.com/golang/glog",
+        "//vendor:k8s.io/apimachinery/pkg/types",
+        "//vendor:k8s.io/apimachinery/pkg/util/intstr",
+        "//vendor:k8s.io/apis/pkg/api/v1",
     ],
 )
 
@@ -33,7 +37,11 @@ go_test(
     srcs = ["handlers_test.go"],
     library = ":go_default_library",
     tags = ["automanaged"],
-    deps = ["//pkg/kubelet/container:go_default_library"],
+    deps = [
+        "//pkg/kubelet/container:go_default_library",
+        "//vendor:k8s.io/apimachinery/pkg/util/intstr",
+        "//vendor:k8s.io/apis/pkg/api/v1",
+    ],
 )
 
 filegroup(

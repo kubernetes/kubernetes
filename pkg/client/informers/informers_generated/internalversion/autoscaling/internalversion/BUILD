@@ -19,6 +19,10 @@ go_library(
         "//pkg/client/informers/informers_generated/internalversion/internalinterfaces:go_default_library",
         "//pkg/client/listers/autoscaling/internalversion:go_default_library",
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
+        "//vendor:k8s.io/apimachinery/pkg/runtime",
+        "//vendor:k8s.io/apimachinery/pkg/watch",
+        "//vendor:k8s.io/apis/pkg/apis/autoscaling",
+        "//vendor:k8s.io/client-go/tools/cache",
     ],
 )
 

@@ -12,6 +12,7 @@ go_library(
     name = "go_default_library",
     srcs = ["chaosmonkey.go"],
     tags = ["automanaged"],
+    deps = ["//vendor:github.com/onsi/ginkgo"],
 )
 
 go_test(

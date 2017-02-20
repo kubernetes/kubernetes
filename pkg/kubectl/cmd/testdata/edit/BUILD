@@ -18,6 +18,7 @@ go_library(
     name = "go_default_library",
     srcs = ["record.go"],
     tags = ["automanaged"],
+    deps = ["//vendor:gopkg.in/yaml.v2"],
 )
 
 filegroup(

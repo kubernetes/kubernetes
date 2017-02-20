@@ -15,6 +15,15 @@ go_library(
         "//pkg/registry/authorization/localsubjectaccessreview:go_default_library",
         "//pkg/registry/authorization/selfsubjectaccessreview:go_default_library",
         "//pkg/registry/authorization/subjectaccessreview:go_default_library",
+        "//vendor:k8s.io/apis/pkg/api",
+        "//vendor:k8s.io/apis/pkg/apis/authorization",
+        "//vendor:k8s.io/apis/pkg/apis/authorization/v1",
+        "//vendor:k8s.io/apis/pkg/apis/authorization/v1beta1",
+        "//vendor:k8s.io/apiserver/pkg/authorization/authorizer",
+        "//vendor:k8s.io/apiserver/pkg/registry/generic",
+        "//vendor:k8s.io/apiserver/pkg/registry/rest",
+        "//vendor:k8s.io/apiserver/pkg/server",
+        "//vendor:k8s.io/apiserver/pkg/server/storage",
     ],
 )
 
