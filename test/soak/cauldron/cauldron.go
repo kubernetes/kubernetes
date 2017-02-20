@@ -33,8 +33,8 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/apis/pkg/api"
 	restclient "k8s.io/client-go/rest"
-	"k8s.io/kubernetes/pkg/api"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 )
 

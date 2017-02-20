@@ -19,12 +19,12 @@ package storage
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apis/pkg/api"
+	"k8s.io/apis/pkg/apis/autoscaling"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/generic"
 	genericregistry "k8s.io/apiserver/pkg/registry/generic/registry"
 	"k8s.io/apiserver/pkg/registry/rest"
-	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/apis/autoscaling"
 	"k8s.io/kubernetes/pkg/registry/autoscaling/horizontalpodautoscaler"
 	"k8s.io/kubernetes/pkg/registry/cachesize"
 )

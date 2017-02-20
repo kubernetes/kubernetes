@@ -19,12 +19,12 @@ go_library(
     srcs = ["cauldron.go"],
     tags = ["automanaged"],
     deps = [
-        "//pkg/api:go_default_library",
         "//pkg/client/clientset_generated/internalclientset:go_default_library",
         "//vendor:github.com/golang/glog",
         "//vendor:k8s.io/apimachinery/pkg/api/errors",
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
         "//vendor:k8s.io/apimachinery/pkg/util/intstr",
+        "//vendor:k8s.io/apis/pkg/api",
         "//vendor:k8s.io/client-go/rest",
     ],
 )

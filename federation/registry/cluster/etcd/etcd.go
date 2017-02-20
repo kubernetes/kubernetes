@@ -18,13 +18,13 @@ package etcd
 
 import (
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apis/pkg/api"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/generic"
 	genericregistry "k8s.io/apiserver/pkg/registry/generic/registry"
 	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/kubernetes/federation/apis/federation"
 	"k8s.io/kubernetes/federation/registry/cluster"
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/registry/cachesize"
 )
 

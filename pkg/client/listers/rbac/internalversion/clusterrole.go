@@ -22,8 +22,8 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	rbac "k8s.io/apis/pkg/apis/rbac"
 	"k8s.io/client-go/tools/cache"
-	rbac "k8s.io/kubernetes/pkg/apis/rbac"
 )
 
 // ClusterRoleLister helps list ClusterRoles.

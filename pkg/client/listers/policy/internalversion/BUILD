@@ -17,12 +17,12 @@ go_library(
     ],
     tags = ["automanaged"],
     deps = [
-        "//pkg/api:go_default_library",
-        "//pkg/apis/policy:go_default_library",
         "//vendor:github.com/golang/glog",
         "//vendor:k8s.io/apimachinery/pkg/api/errors",
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
         "//vendor:k8s.io/apimachinery/pkg/labels",
+        "//vendor:k8s.io/apis/pkg/api",
+        "//vendor:k8s.io/apis/pkg/apis/policy",
         "//vendor:k8s.io/client-go/tools/cache",
     ],
 )

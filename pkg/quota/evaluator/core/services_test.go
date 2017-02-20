@@ -20,7 +20,7 @@ import (
 	"testing"
 
 	"k8s.io/apimachinery/pkg/api/resource"
-	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/apis/pkg/api"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset/fake"
 	"k8s.io/kubernetes/pkg/quota"
 )

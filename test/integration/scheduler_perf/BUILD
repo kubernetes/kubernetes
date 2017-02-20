@@ -13,14 +13,14 @@ go_library(
     srcs = ["util.go"],
     tags = ["automanaged"],
     deps = [
-        "//pkg/api:go_default_library",
-        "//pkg/api/v1:go_default_library",
         "//pkg/client/clientset_generated/clientset:go_default_library",
         "//plugin/pkg/scheduler:go_default_library",
         "//plugin/pkg/scheduler/algorithmprovider:go_default_library",
         "//plugin/pkg/scheduler/factory:go_default_library",
         "//test/integration/framework:go_default_library",
         "//vendor:github.com/golang/glog",
+        "//vendor:k8s.io/apis/pkg/api",
+        "//vendor:k8s.io/apis/pkg/api/v1",
         "//vendor:k8s.io/client-go/kubernetes/typed/core/v1",
         "//vendor:k8s.io/client-go/pkg/api/v1",
         "//vendor:k8s.io/client-go/rest",
@@ -37,12 +37,12 @@ go_test(
     library = ":go_default_library",
     tags = ["automanaged"],
     deps = [
-        "//pkg/api/v1:go_default_library",
         "//plugin/pkg/scheduler:go_default_library",
         "//test/integration/framework:go_default_library",
         "//test/utils:go_default_library",
         "//vendor:github.com/golang/glog",
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
+        "//vendor:k8s.io/apis/pkg/api/v1",
     ],
 )
 

@@ -24,8 +24,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/watch"
+	"k8s.io/apis/pkg/api"
 	"k8s.io/client-go/tools/cache"
-	"k8s.io/kubernetes/pkg/api"
 )
 
 type fakeLW struct {

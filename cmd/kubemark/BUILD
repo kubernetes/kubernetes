@@ -19,7 +19,6 @@ go_library(
     srcs = ["hollow-node.go"],
     tags = ["automanaged"],
     deps = [
-        "//pkg/api:go_default_library",
         "//pkg/client/clientset_generated/clientset:go_default_library",
         "//pkg/client/clientset_generated/internalclientset:go_default_library",
         "//pkg/client/metrics/prometheus:go_default_library",
@@ -33,6 +32,7 @@ go_library(
         "//vendor:github.com/golang/glog",
         "//vendor:github.com/spf13/pflag",
         "//vendor:k8s.io/apimachinery/pkg/util/sets",
+        "//vendor:k8s.io/apis/pkg/api",
         "//vendor:k8s.io/apiserver/pkg/util/flag",
         "//vendor:k8s.io/client-go/kubernetes",
         "//vendor:k8s.io/client-go/pkg/api/v1",

@@ -12,8 +12,6 @@ go_library(
     srcs = ["test_utils.go"],
     tags = ["automanaged"],
     deps = [
-        "//pkg/api:go_default_library",
-        "//pkg/api/v1:go_default_library",
         "//pkg/client/clientset_generated/clientset/fake:go_default_library",
         "//pkg/client/clientset_generated/clientset/typed/core/v1:go_default_library",
         "//pkg/util/node:go_default_library",
@@ -25,6 +23,8 @@ go_library(
         "//vendor:k8s.io/apimachinery/pkg/types",
         "//vendor:k8s.io/apimachinery/pkg/util/sets",
         "//vendor:k8s.io/apimachinery/pkg/watch",
+        "//vendor:k8s.io/apis/pkg/api",
+        "//vendor:k8s.io/apis/pkg/api/v1",
         "//vendor:k8s.io/client-go/pkg/api/v1",
         "//vendor:k8s.io/client-go/util/clock",
     ],

@@ -24,6 +24,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
+	apiv1 "k8s.io/apis/pkg/api/v1"
 	"k8s.io/client-go/dynamic"
 	restclient "k8s.io/client-go/rest"
 	core "k8s.io/client-go/testing"
@@ -32,7 +33,6 @@ import (
 	"k8s.io/kubernetes/federation/pkg/federation-controller/util"
 	"k8s.io/kubernetes/federation/pkg/federation-controller/util/deletionhelper"
 	. "k8s.io/kubernetes/federation/pkg/federation-controller/util/test"
-	apiv1 "k8s.io/kubernetes/pkg/api/v1"
 	kubeclientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	fakekubeclientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/fake"
 

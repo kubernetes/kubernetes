@@ -19,7 +19,7 @@ package container
 import (
 	"sync"
 
-	"k8s.io/kubernetes/pkg/api/v1"
+	"k8s.io/apis/pkg/api/v1"
 )
 
 // RefManager manages the references for the containers.

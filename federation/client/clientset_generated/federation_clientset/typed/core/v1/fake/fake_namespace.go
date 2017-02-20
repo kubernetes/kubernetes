@@ -22,8 +22,8 @@ import (
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
+	v1 "k8s.io/apis/pkg/api/v1"
 	testing "k8s.io/client-go/testing"
-	v1 "k8s.io/kubernetes/pkg/api/v1"
 )
 
 // FakeNamespaces implements NamespaceInterface

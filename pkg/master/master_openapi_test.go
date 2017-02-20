@@ -27,8 +27,8 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"k8s.io/apis/pkg/api"
 	genericapiserver "k8s.io/apiserver/pkg/server"
-	"k8s.io/kubernetes/pkg/api"
 	openapigen "k8s.io/kubernetes/pkg/generated/openapi"
 
 	"github.com/go-openapi/loads"

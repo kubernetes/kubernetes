@@ -26,8 +26,8 @@ import (
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
 
-	"k8s.io/kubernetes/pkg/api/v1"
-	apps "k8s.io/kubernetes/pkg/apis/apps/v1beta1"
+	"k8s.io/apis/pkg/api/v1"
+	apps "k8s.io/apis/pkg/apis/apps/v1beta1"
 	"k8s.io/kubernetes/pkg/controller"
 )
 

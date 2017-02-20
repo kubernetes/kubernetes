@@ -19,8 +19,8 @@ package quota
 import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apis/pkg/api"
 	"k8s.io/apiserver/pkg/admission"
-	"k8s.io/kubernetes/pkg/api"
 )
 
 // UsageStatsOptions is an options structs that describes how stats should be calculated

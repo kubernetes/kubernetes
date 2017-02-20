@@ -18,8 +18,8 @@ limitations under the License.
 package options
 
 import (
+	"k8s.io/apis/pkg/api"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/componentconfig"
 	"k8s.io/kubernetes/pkg/apis/componentconfig/v1alpha1"
 	"k8s.io/kubernetes/pkg/client/leaderelection"

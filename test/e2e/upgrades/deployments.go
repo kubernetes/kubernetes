@@ -19,7 +19,7 @@ package upgrades
 import (
 	"fmt"
 
-	extensions "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
+	extensions "k8s.io/apis/pkg/apis/extensions/v1beta1"
 	deploymentutil "k8s.io/kubernetes/pkg/controller/deployment/util"
 	"k8s.io/kubernetes/test/e2e/framework"
 

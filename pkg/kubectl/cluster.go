@@ -21,8 +21,8 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apis/pkg/api/v1"
 	federationapi "k8s.io/kubernetes/federation/apis/federation/v1beta1"
-	"k8s.io/kubernetes/pkg/api/v1"
 )
 
 // ClusterGeneratorV1Beta1 supports stable generation of a

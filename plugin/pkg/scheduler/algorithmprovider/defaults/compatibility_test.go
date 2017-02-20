@@ -25,10 +25,10 @@ import (
 
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apis/pkg/api"
+	"k8s.io/apis/pkg/api/v1"
 	restclient "k8s.io/client-go/rest"
 	utiltesting "k8s.io/client-go/util/testing"
-	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	schedulerapi "k8s.io/kubernetes/plugin/pkg/scheduler/api"
 	latestschedulerapi "k8s.io/kubernetes/plugin/pkg/scheduler/api/latest"

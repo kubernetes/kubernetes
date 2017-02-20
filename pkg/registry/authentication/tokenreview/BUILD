@@ -12,9 +12,9 @@ go_library(
     srcs = ["storage.go"],
     tags = ["automanaged"],
     deps = [
-        "//pkg/apis/authentication:go_default_library",
         "//vendor:k8s.io/apimachinery/pkg/api/errors",
         "//vendor:k8s.io/apimachinery/pkg/runtime",
+        "//vendor:k8s.io/apis/pkg/apis/authentication",
         "//vendor:k8s.io/apiserver/pkg/authentication/authenticator",
         "//vendor:k8s.io/apiserver/pkg/endpoints/request",
     ],

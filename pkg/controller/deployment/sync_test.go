@@ -22,9 +22,9 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	extensions "k8s.io/apis/pkg/apis/extensions/v1beta1"
 	testclient "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/record"
-	extensions "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset/fake"
 	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated/externalversions"
 	"k8s.io/kubernetes/pkg/controller"

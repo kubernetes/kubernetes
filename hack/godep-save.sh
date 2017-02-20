@@ -38,14 +38,17 @@ pushd "${KUBE_ROOT}" > /dev/null
   GO15VENDOREXPERIMENT=1 ${GODEP} save "${REQUIRED_BINS[@]}"
   # create a symlink in vendor directory pointing to the staging client. This
   # let other packages use the staging client as if it were vendored.
-  if [ ! -e "vendor/k8s.io/client-go" ]; then
-    ln -s ../../staging/src/k8s.io/client-go vendor/k8s.io/client-go
+  if [ ! -e "vendor/k8s.io/apis" ]; then
+    ln -s ../../staging/src/k8s.io/apis vendor/k8s.io/apis
+  fi
+  if [ ! -e "vendor/k8s.io/apimachinery" ]; then
+    ln -s ../../staging/src/k8s.io/apimachinery vendor/k8s.io/apimachinery
   fi
   if [ ! -e "vendor/k8s.io/apiserver" ]; then
     ln -s ../../staging/src/k8s.io/apiserver vendor/k8s.io/apiserver
   fi
-  if [ ! -e "vendor/k8s.io/apimachinery" ]; then
-    ln -s ../../staging/src/k8s.io/apimachinery vendor/k8s.io/apimachinery
+  if [ ! -e "vendor/k8s.io/client-go" ]; then
+    ln -s ../../staging/src/k8s.io/client-go vendor/k8s.io/client-go
   fi
   if [ ! -e "vendor/k8s.io/kube-aggregator" ]; then
     ln -s ../../staging/src/k8s.io/kube-aggregator vendor/k8s.io/kube-aggregator

@@ -28,9 +28,9 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/v1"
-	batch "k8s.io/kubernetes/pkg/apis/batch/v2alpha1"
+	"k8s.io/apis/pkg/api"
+	"k8s.io/apis/pkg/api/v1"
+	batch "k8s.io/apis/pkg/apis/batch/v2alpha1"
 )
 
 // Utilities for dealing with Jobs and CronJobs and time.

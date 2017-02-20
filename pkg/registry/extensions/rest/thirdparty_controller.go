@@ -23,7 +23,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/kubernetes/pkg/apis/extensions"
+	"k8s.io/apis/pkg/apis/extensions"
 	extensionsclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/extensions/internalversion"
 	"k8s.io/kubernetes/pkg/registry/extensions/thirdpartyresourcedata"
 )

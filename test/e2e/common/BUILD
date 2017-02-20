@@ -31,10 +31,7 @@ go_library(
     ],
     tags = ["automanaged"],
     deps = [
-        "//pkg/api:go_default_library",
-        "//pkg/api/v1:go_default_library",
         "//pkg/api/v1/pod:go_default_library",
-        "//pkg/apis/autoscaling/v1:go_default_library",
         "//pkg/client/clientset_generated/clientset:go_default_library",
         "//pkg/client/clientset_generated/internalclientset:go_default_library",
         "//pkg/client/conditions:go_default_library",
@@ -56,6 +53,9 @@ go_library(
         "//vendor:k8s.io/apimachinery/pkg/util/uuid",
         "//vendor:k8s.io/apimachinery/pkg/util/wait",
         "//vendor:k8s.io/apimachinery/pkg/watch",
+        "//vendor:k8s.io/apis/pkg/api",
+        "//vendor:k8s.io/apis/pkg/api/v1",
+        "//vendor:k8s.io/apis/pkg/apis/autoscaling/v1",
     ],
 )
 

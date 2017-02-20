@@ -21,11 +21,11 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/apis/pkg/api"
+	"k8s.io/apis/pkg/apis/extensions"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
-	"k8s.io/kubernetes/pkg/apis/extensions"
 )
 
 func newIngress() extensions.Ingress {

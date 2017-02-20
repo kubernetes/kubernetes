@@ -21,9 +21,9 @@ import (
 
 	unversionedvalidation "k8s.io/apimachinery/pkg/apis/meta/v1/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	"k8s.io/apis/pkg/apis/policy"
 	apivalidation "k8s.io/kubernetes/pkg/api/validation"
 	extensionsvalidation "k8s.io/kubernetes/pkg/apis/extensions/validation"
-	"k8s.io/kubernetes/pkg/apis/policy"
 )
 
 func ValidatePodDisruptionBudget(pdb *policy.PodDisruptionBudget) field.ErrorList {

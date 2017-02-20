@@ -17,7 +17,6 @@ go_library(
     tags = ["automanaged"],
     deps = [
         "//cmd/kube-proxy/app/options:go_default_library",
-        "//pkg/api:go_default_library",
         "//pkg/client/clientset_generated/internalclientset:go_default_library",
         "//pkg/proxy:go_default_library",
         "//pkg/proxy/config:go_default_library",
@@ -41,6 +40,7 @@ go_library(
         "//vendor:k8s.io/apimachinery/pkg/types",
         "//vendor:k8s.io/apimachinery/pkg/util/net",
         "//vendor:k8s.io/apimachinery/pkg/util/wait",
+        "//vendor:k8s.io/apis/pkg/api",
         "//vendor:k8s.io/client-go/kubernetes",
         "//vendor:k8s.io/client-go/kubernetes/typed/core/v1",
         "//vendor:k8s.io/client-go/pkg/api/v1",
@@ -57,11 +57,11 @@ go_test(
     tags = ["automanaged"],
     deps = [
         "//cmd/kube-proxy/app/options:go_default_library",
-        "//pkg/api:go_default_library",
         "//pkg/apis/componentconfig:go_default_library",
         "//pkg/util/iptables:go_default_library",
         "//vendor:github.com/stretchr/testify/assert",
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
+        "//vendor:k8s.io/apis/pkg/api",
     ],
 )
 

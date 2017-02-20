@@ -16,7 +16,6 @@ go_library(
     ],
     tags = ["automanaged"],
     deps = [
-        "//pkg/api:go_default_library",
         "//pkg/client/clientset_generated/clientset:go_default_library",
         "//pkg/client/leaderelection:go_default_library",
         "//pkg/client/leaderelection/resourcelock:go_default_library",
@@ -33,6 +32,7 @@ go_library(
         "//vendor:github.com/spf13/pflag",
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
         "//vendor:k8s.io/apimachinery/pkg/runtime",
+        "//vendor:k8s.io/apis/pkg/api",
         "//vendor:k8s.io/apiserver/pkg/server/healthz",
         "//vendor:k8s.io/client-go/kubernetes/typed/core/v1",
         "//vendor:k8s.io/client-go/pkg/api/v1",

@@ -17,9 +17,9 @@ limitations under the License.
 package util
 
 import (
+	authorizationapi "k8s.io/apis/pkg/apis/authorization"
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
-	authorizationapi "k8s.io/kubernetes/pkg/apis/authorization"
 )
 
 // ResourceAttributesFrom combines the API object information and the user.Info from the context to build a full authorizer.AttributesRecord for resource access

@@ -14,7 +14,7 @@ go_library(
         "registry.go",
     ],
     tags = ["automanaged"],
-    deps = ["//pkg/api:go_default_library"],
+    deps = ["//vendor:k8s.io/apis/pkg/api"],
 )
 
 filegroup(

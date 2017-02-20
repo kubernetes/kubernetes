@@ -21,7 +21,7 @@ import (
 	"strconv"
 	"strings"
 
-	"k8s.io/kubernetes/pkg/api/v1"
+	"k8s.io/apis/pkg/api/v1"
 )
 
 // FromServices builds environment variables that a container is started with,

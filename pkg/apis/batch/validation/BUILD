@@ -13,14 +13,14 @@ go_library(
     srcs = ["validation.go"],
     tags = ["automanaged"],
     deps = [
-        "//pkg/api:go_default_library",
         "//pkg/api/validation:go_default_library",
-        "//pkg/apis/batch:go_default_library",
         "//vendor:github.com/robfig/cron",
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1/validation",
         "//vendor:k8s.io/apimachinery/pkg/labels",
         "//vendor:k8s.io/apimachinery/pkg/util/validation/field",
+        "//vendor:k8s.io/apis/pkg/api",
+        "//vendor:k8s.io/apis/pkg/apis/batch",
     ],
 )
 
@@ -30,10 +30,10 @@ go_test(
     library = ":go_default_library",
     tags = ["automanaged"],
     deps = [
-        "//pkg/api:go_default_library",
-        "//pkg/apis/batch:go_default_library",
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
         "//vendor:k8s.io/apimachinery/pkg/types",
+        "//vendor:k8s.io/apis/pkg/api",
+        "//vendor:k8s.io/apis/pkg/apis/batch",
     ],
 )
 

@@ -18,7 +18,7 @@ package internalversion
 
 import (
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/apis/pkg/api"
 )
 
 // NodeConditionPredicate is a function that indicates whether the given node's conditions meet

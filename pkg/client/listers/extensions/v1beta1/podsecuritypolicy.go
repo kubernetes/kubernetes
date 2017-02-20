@@ -22,9 +22,9 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	extensions "k8s.io/apis/pkg/apis/extensions"
+	v1beta1 "k8s.io/apis/pkg/apis/extensions/v1beta1"
 	"k8s.io/client-go/tools/cache"
-	extensions "k8s.io/kubernetes/pkg/apis/extensions"
-	v1beta1 "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 )
 
 // PodSecurityPolicyLister helps list PodSecurityPolicies.

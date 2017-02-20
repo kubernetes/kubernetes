@@ -37,11 +37,11 @@ import (
 
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apis/pkg/api"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	clientv1 "k8s.io/client-go/pkg/api/v1"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/flowcontrol"
-	"k8s.io/kubernetes/pkg/api"
 	apiservice "k8s.io/kubernetes/pkg/api/service"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/proxy"

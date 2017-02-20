@@ -36,8 +36,6 @@ go_library(
     tags = ["automanaged"],
     deps = [
         "//cmd/kubelet/app/options:go_default_library",
-        "//pkg/api:go_default_library",
-        "//pkg/api/v1:go_default_library",
         "//pkg/apis/componentconfig:go_default_library",
         "//pkg/apis/componentconfig/v1alpha1:go_default_library",
         "//pkg/capabilities:go_default_library",
@@ -102,6 +100,8 @@ go_library(
         "//vendor:k8s.io/apimachinery/pkg/types",
         "//vendor:k8s.io/apimachinery/pkg/util/runtime",
         "//vendor:k8s.io/apimachinery/pkg/util/wait",
+        "//vendor:k8s.io/apis/pkg/api",
+        "//vendor:k8s.io/apis/pkg/api/v1",
         "//vendor:k8s.io/apiserver/pkg/authentication/authenticator",
         "//vendor:k8s.io/apiserver/pkg/authentication/authenticatorfactory",
         "//vendor:k8s.io/apiserver/pkg/authorization/authorizer",

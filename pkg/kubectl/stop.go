@@ -28,17 +28,17 @@ import (
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/apis/apps"
-	"k8s.io/kubernetes/pkg/apis/batch"
-	"k8s.io/kubernetes/pkg/apis/extensions"
+	"k8s.io/apis/pkg/api"
+	"k8s.io/apis/pkg/apis/apps"
+	"k8s.io/apis/pkg/apis/batch"
+	"k8s.io/apis/pkg/apis/extensions"
+	"k8s.io/apis/pkg/util"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	appsclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/apps/internalversion"
 	batchclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/batch/internalversion"
 	coreclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/core/internalversion"
 	extensionsclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/extensions/internalversion"
 	deploymentutil "k8s.io/kubernetes/pkg/controller/deployment/util"
-	"k8s.io/kubernetes/pkg/util"
 )
 
 const (

@@ -16,8 +16,6 @@ go_library(
     tags = ["automanaged"],
     deps = [
         "//cmd/kube-apiserver/app/options:go_default_library",
-        "//pkg/api:go_default_library",
-        "//pkg/apis/batch:go_default_library",
         "//pkg/capabilities:go_default_library",
         "//pkg/client/clientset_generated/internalclientset:go_default_library",
         "//pkg/cloudprovider:go_default_library",
@@ -61,6 +59,8 @@ go_library(
         "//vendor:k8s.io/apimachinery/pkg/util/net",
         "//vendor:k8s.io/apimachinery/pkg/util/sets",
         "//vendor:k8s.io/apimachinery/pkg/util/wait",
+        "//vendor:k8s.io/apis/pkg/api",
+        "//vendor:k8s.io/apis/pkg/apis/batch",
         "//vendor:k8s.io/apiserver/pkg/admission",
         "//vendor:k8s.io/apiserver/pkg/server",
         "//vendor:k8s.io/apiserver/pkg/server/filters",

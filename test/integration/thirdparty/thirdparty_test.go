@@ -33,9 +33,9 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/apis/pkg/api"
+	extensions "k8s.io/apis/pkg/apis/extensions/v1beta1"
 	restclient "k8s.io/client-go/rest"
-	"k8s.io/kubernetes/pkg/api"
-	extensions "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/test/integration/framework"
 )

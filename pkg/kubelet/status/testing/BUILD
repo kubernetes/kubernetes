@@ -12,8 +12,8 @@ go_library(
     srcs = ["fake_pod_deletion_safety.go"],
     tags = ["automanaged"],
     deps = [
-        "//pkg/api/v1:go_default_library",
         "//pkg/kubelet/pod:go_default_library",
+        "//vendor:k8s.io/apis/pkg/api/v1",
     ],
 )
 

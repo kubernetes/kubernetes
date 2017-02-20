@@ -20,8 +20,8 @@ import (
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
+	api "k8s.io/apis/pkg/api"
 	rest "k8s.io/client-go/rest"
-	api "k8s.io/kubernetes/pkg/api"
 )
 
 // ReplicationControllersGetter has a method to return a ReplicationControllerInterface.

@@ -21,8 +21,6 @@ go_library(
     ],
     tags = ["automanaged"],
     deps = [
-        "//pkg/api:go_default_library",
-        "//pkg/api/v1:go_default_library",
         "//pkg/apis/componentconfig:go_default_library",
         "//pkg/apis/componentconfig/v1alpha1:go_default_library",
         "//pkg/kubelet/api/v1alpha1/stats:go_default_library",
@@ -43,6 +41,8 @@ go_library(
         "//vendor:k8s.io/apimachinery/pkg/util/sets",
         "//vendor:k8s.io/apimachinery/pkg/util/uuid",
         "//vendor:k8s.io/apimachinery/pkg/util/wait",
+        "//vendor:k8s.io/apis/pkg/api",
+        "//vendor:k8s.io/apis/pkg/api/v1",
     ],
 )
 
@@ -76,7 +76,6 @@ go_test(
         "integration",
     ],
     deps = [
-        "//pkg/api/v1:go_default_library",
         "//pkg/client/clientset_generated/clientset:go_default_library",
         "//pkg/kubelet:go_default_library",
         "//pkg/kubelet/api/v1alpha1/stats:go_default_library",
@@ -113,6 +112,7 @@ go_test(
         "//vendor:k8s.io/apimachinery/pkg/util/intstr",
         "//vendor:k8s.io/apimachinery/pkg/util/uuid",
         "//vendor:k8s.io/apimachinery/pkg/watch",
+        "//vendor:k8s.io/apis/pkg/api/v1",
         "//vendor:k8s.io/client-go/tools/cache",
     ],
 )

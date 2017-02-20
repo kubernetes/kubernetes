@@ -30,9 +30,9 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer/protobuf"
 	"k8s.io/apimachinery/pkg/util/diff"
-	"k8s.io/kubernetes/pkg/api"
-	_ "k8s.io/kubernetes/pkg/api/install"
-	"k8s.io/kubernetes/pkg/api/v1"
+	"k8s.io/apis/pkg/api"
+	_ "k8s.io/apis/pkg/api/install"
+	"k8s.io/apis/pkg/api/v1"
 )
 
 type testObject struct {

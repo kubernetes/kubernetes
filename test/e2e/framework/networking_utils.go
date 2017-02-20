@@ -37,8 +37,8 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/v1"
+	"k8s.io/apis/pkg/api"
+	"k8s.io/apis/pkg/api/v1"
 	coreclientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/core/v1"
 )
 

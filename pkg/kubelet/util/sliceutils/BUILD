@@ -12,8 +12,8 @@ go_library(
     srcs = ["sliceutils.go"],
     tags = ["automanaged"],
     deps = [
-        "//pkg/api/v1:go_default_library",
         "//pkg/kubelet/container:go_default_library",
+        "//vendor:k8s.io/apis/pkg/api/v1",
     ],
 )
 

@@ -20,8 +20,8 @@ import (
 	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	apiv1 "k8s.io/apis/pkg/api/v1"
 	restclient "k8s.io/client-go/rest"
-	apiv1 "k8s.io/kubernetes/pkg/api/v1"
 )
 
 type Policy struct {

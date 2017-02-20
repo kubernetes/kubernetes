@@ -21,14 +21,14 @@ import (
 	"testing"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/kubernetes/pkg/apis/extensions"
+	"k8s.io/apis/pkg/apis/extensions"
 	// Ensure that extensions/v1beta1 package is initialized.
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
+	_ "k8s.io/apis/pkg/apis/extensions/v1beta1"
 	"k8s.io/apiserver/pkg/registry/generic"
 	etcdtesting "k8s.io/apiserver/pkg/storage/etcd/testing"
-	_ "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	"k8s.io/kubernetes/pkg/registry/registrytest"
 )
 

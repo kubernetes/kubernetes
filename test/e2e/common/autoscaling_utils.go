@@ -24,8 +24,8 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
-	"k8s.io/kubernetes/pkg/api/v1"
-	autoscalingv1 "k8s.io/kubernetes/pkg/apis/autoscaling/v1"
+	"k8s.io/apis/pkg/api/v1"
+	autoscalingv1 "k8s.io/apis/pkg/apis/autoscaling/v1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/test/e2e/framework"

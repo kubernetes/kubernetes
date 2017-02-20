@@ -21,8 +21,8 @@ import (
 	"io"
 
 	"k8s.io/apimachinery/pkg/api/resource"
+	"k8s.io/apis/pkg/api"
 	metricsapi "k8s.io/heapster/metrics/apis/metrics/v1alpha1"
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/kubectl"
 )
 

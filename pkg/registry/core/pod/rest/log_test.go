@@ -20,10 +20,10 @@ import (
 	"testing"
 
 	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apis/pkg/api"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/generic"
 	genericregistry "k8s.io/apiserver/pkg/registry/generic/registry"
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/registry/registrytest"
 )
 

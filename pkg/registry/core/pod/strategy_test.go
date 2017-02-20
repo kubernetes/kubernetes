@@ -28,8 +28,8 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apis/pkg/api"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
-	"k8s.io/kubernetes/pkg/api"
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
 	"k8s.io/kubernetes/pkg/kubelet/client"
 )

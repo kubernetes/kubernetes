@@ -17,9 +17,9 @@ go_test(
     library = ":go_default_library",
     tags = ["automanaged"],
     deps = [
-        "//pkg/api:go_default_library",
-        "//pkg/apis/rbac:go_default_library",
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
+        "//vendor:k8s.io/apis/pkg/api",
+        "//vendor:k8s.io/apis/pkg/apis/rbac",
     ],
 )
 
@@ -31,12 +31,12 @@ go_library(
     ],
     tags = ["automanaged"],
     deps = [
-        "//pkg/api:go_default_library",
-        "//pkg/apis/rbac:go_default_library",
         "//pkg/client/clientset_generated/internalclientset/typed/rbac/internalversion:go_default_library",
         "//pkg/registry/rbac/validation:go_default_library",
         "//vendor:k8s.io/apimachinery/pkg/api/errors",
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
+        "//vendor:k8s.io/apis/pkg/api",
+        "//vendor:k8s.io/apis/pkg/apis/rbac",
     ],
 )
 

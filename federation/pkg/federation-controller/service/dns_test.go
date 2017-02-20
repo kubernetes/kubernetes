@@ -26,9 +26,9 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apis/pkg/api/v1"
 	"k8s.io/kubernetes/federation/apis/federation/v1beta1"
 	"k8s.io/kubernetes/federation/pkg/dnsprovider/providers/google/clouddns" // Only for unit testing purposes.
-	"k8s.io/kubernetes/pkg/api/v1"
 )
 
 func TestServiceController_ensureDnsRecords(t *testing.T) {

@@ -18,7 +18,6 @@ go_library(
     ],
     tags = ["automanaged"],
     deps = [
-        "//pkg/api/v1:go_default_library",
         "//pkg/util/env:go_default_library",
         "//pkg/util/mount:go_default_library",
         "//pkg/util/strings:go_default_library",
@@ -30,6 +29,7 @@ go_library(
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
         "//vendor:k8s.io/apimachinery/pkg/types",
         "//vendor:k8s.io/apimachinery/pkg/util/rand",
+        "//vendor:k8s.io/apis/pkg/api/v1",
     ],
 )
 
@@ -43,7 +43,6 @@ go_test(
     library = ":go_default_library",
     tags = ["automanaged"],
     deps = [
-        "//pkg/api/v1:go_default_library",
         "//pkg/util/mount:go_default_library",
         "//pkg/volume:go_default_library",
         "//pkg/volume/testing:go_default_library",
@@ -51,6 +50,7 @@ go_test(
         "//vendor:github.com/stretchr/testify/assert",
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
         "//vendor:k8s.io/apimachinery/pkg/types",
+        "//vendor:k8s.io/apis/pkg/api/v1",
         "//vendor:k8s.io/client-go/util/testing",
     ],
 )

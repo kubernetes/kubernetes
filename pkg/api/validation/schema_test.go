@@ -27,11 +27,11 @@ import (
 	apitesting "k8s.io/apimachinery/pkg/api/testing"
 	"k8s.io/apimachinery/pkg/runtime"
 	k8syaml "k8s.io/apimachinery/pkg/util/yaml"
-	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/apis/pkg/api"
+	"k8s.io/apis/pkg/api/v1"
+	"k8s.io/apis/pkg/apis/extensions/v1beta1"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	kapitesting "k8s.io/kubernetes/pkg/api/testing"
-	"k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 
 	"github.com/ghodss/yaml"
 )

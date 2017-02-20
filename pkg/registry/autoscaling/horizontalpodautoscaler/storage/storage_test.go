@@ -20,15 +20,15 @@ import (
 	"testing"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/apis/autoscaling"
+	"k8s.io/apis/pkg/api"
+	"k8s.io/apis/pkg/apis/autoscaling"
 	// Ensure that autoscaling/v1 package is initialized.
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
+	_ "k8s.io/apis/pkg/apis/autoscaling/v1"
 	"k8s.io/apiserver/pkg/registry/generic"
 	etcdtesting "k8s.io/apiserver/pkg/storage/etcd/testing"
-	_ "k8s.io/kubernetes/pkg/apis/autoscaling/v1"
 	"k8s.io/kubernetes/pkg/registry/registrytest"
 )
 

@@ -21,7 +21,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
-	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/apis/pkg/api"
 )
 
 // Scheme is the default instance of runtime.Scheme to which types in the Kubernetes API are already registered.

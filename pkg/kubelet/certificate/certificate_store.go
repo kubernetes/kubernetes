@@ -29,7 +29,7 @@ import (
 
 	"github.com/golang/glog"
 
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/apis/pkg/util"
 )
 
 const (

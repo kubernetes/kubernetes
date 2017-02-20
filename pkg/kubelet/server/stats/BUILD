@@ -20,7 +20,6 @@ go_library(
     ],
     tags = ["automanaged"],
     deps = [
-        "//pkg/api/v1:go_default_library",
         "//pkg/kubelet/api/v1alpha1/stats:go_default_library",
         "//pkg/kubelet/cm:go_default_library",
         "//pkg/kubelet/container:go_default_library",
@@ -36,6 +35,7 @@ go_library(
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
         "//vendor:k8s.io/apimachinery/pkg/types",
         "//vendor:k8s.io/apimachinery/pkg/util/wait",
+        "//vendor:k8s.io/apis/pkg/api/v1",
     ],
 )
 
@@ -48,7 +48,6 @@ go_test(
     library = ":go_default_library",
     tags = ["automanaged"],
     deps = [
-        "//pkg/api/v1:go_default_library",
         "//pkg/kubelet/api/v1alpha1/stats:go_default_library",
         "//pkg/kubelet/cm:go_default_library",
         "//pkg/kubelet/container:go_default_library",
@@ -61,6 +60,7 @@ go_test(
         "//vendor:github.com/stretchr/testify/mock",
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
         "//vendor:k8s.io/apimachinery/pkg/types",
+        "//vendor:k8s.io/apis/pkg/api/v1",
     ],
 )
 

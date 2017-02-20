@@ -22,9 +22,9 @@ import (
 	"time"
 
 	utilnet "k8s.io/apimachinery/pkg/util/net"
+	"k8s.io/apis/pkg/api"
 	genericoptions "k8s.io/apiserver/pkg/server/options"
 	"k8s.io/apiserver/pkg/storage/storagebackend"
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/validation"
 	kubeoptions "k8s.io/kubernetes/pkg/kubeapiserver/options"
 	kubeletclient "k8s.io/kubernetes/pkg/kubelet/client"

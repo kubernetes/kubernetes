@@ -24,8 +24,8 @@ import (
 	"testing"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apis/pkg/api"
 	utiltesting "k8s.io/client-go/util/testing"
-	"k8s.io/kubernetes/pkg/api"
 )
 
 var rsaCertPEM = `-----BEGIN CERTIFICATE-----

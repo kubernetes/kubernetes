@@ -19,12 +19,12 @@ package storage
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apis/pkg/api"
+	appsapi "k8s.io/apis/pkg/apis/apps"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/generic"
 	genericregistry "k8s.io/apiserver/pkg/registry/generic/registry"
 	"k8s.io/apiserver/pkg/registry/rest"
-	"k8s.io/kubernetes/pkg/api"
-	appsapi "k8s.io/kubernetes/pkg/apis/apps"
 	"k8s.io/kubernetes/pkg/registry/apps/petset"
 	"k8s.io/kubernetes/pkg/registry/cachesize"
 )

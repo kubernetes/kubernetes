@@ -23,8 +23,6 @@ go_library(
     ],
     tags = ["automanaged"],
     deps = [
-        "//pkg/api:go_default_library",
-        "//pkg/api/v1:go_default_library",
         "//pkg/api/validation:go_default_library",
         "//pkg/apis/storage/util:go_default_library",
         "//pkg/client/clientset_generated/clientset:go_default_library",
@@ -38,6 +36,8 @@ go_library(
         "//vendor:k8s.io/apimachinery/pkg/runtime/schema",
         "//vendor:k8s.io/apimachinery/pkg/util/sets",
         "//vendor:k8s.io/apimachinery/pkg/util/validation/field",
+        "//vendor:k8s.io/apis/pkg/api",
+        "//vendor:k8s.io/apis/pkg/api/v1",
         "//vendor:k8s.io/apiserver/pkg/admission",
     ],
 )
@@ -52,12 +52,12 @@ go_test(
     library = ":go_default_library",
     tags = ["automanaged"],
     deps = [
-        "//pkg/api:go_default_library",
         "//pkg/apis/storage/util:go_default_library",
         "//pkg/client/clientset_generated/clientset/fake:go_default_library",
         "//pkg/quota:go_default_library",
         "//vendor:k8s.io/apimachinery/pkg/api/resource",
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
+        "//vendor:k8s.io/apis/pkg/api",
     ],
 )
 

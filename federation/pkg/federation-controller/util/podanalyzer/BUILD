@@ -14,9 +14,9 @@ go_library(
     tags = ["automanaged"],
     deps = [
         "//federation/pkg/federation-controller/util:go_default_library",
-        "//pkg/api/v1:go_default_library",
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
         "//vendor:k8s.io/apimachinery/pkg/labels",
+        "//vendor:k8s.io/apis/pkg/api/v1",
     ],
 )
 
@@ -27,10 +27,10 @@ go_test(
     tags = ["automanaged"],
     deps = [
         "//federation/pkg/federation-controller/util:go_default_library",
-        "//pkg/api/v1:go_default_library",
-        "//pkg/apis/extensions/v1beta1:go_default_library",
         "//vendor:github.com/stretchr/testify/assert",
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
+        "//vendor:k8s.io/apis/pkg/api/v1",
+        "//vendor:k8s.io/apis/pkg/apis/extensions/v1beta1",
     ],
 )
 

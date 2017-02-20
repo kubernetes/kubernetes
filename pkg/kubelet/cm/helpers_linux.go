@@ -25,7 +25,7 @@ import (
 
 	libcontainercgroups "github.com/opencontainers/runc/libcontainer/cgroups"
 
-	"k8s.io/kubernetes/pkg/api/v1"
+	"k8s.io/apis/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/kubelet/qos"
 )
 

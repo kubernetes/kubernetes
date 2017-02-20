@@ -19,7 +19,6 @@ go_library(
     ],
     tags = ["automanaged"],
     deps = [
-        "//pkg/api/v1:go_default_library",
         "//pkg/kubelet/container:go_default_library",
         "//pkg/kubelet/types:go_default_library",
         "//pkg/kubelet/util/format:go_default_library",
@@ -29,6 +28,7 @@ go_library(
         "//vendor:github.com/golang/glog",
         "//vendor:k8s.io/apimachinery/pkg/types",
         "//vendor:k8s.io/apimachinery/pkg/util/intstr",
+        "//vendor:k8s.io/apis/pkg/api/v1",
     ],
 )
 
@@ -38,9 +38,9 @@ go_test(
     library = ":go_default_library",
     tags = ["automanaged"],
     deps = [
-        "//pkg/api/v1:go_default_library",
         "//pkg/kubelet/container:go_default_library",
         "//vendor:k8s.io/apimachinery/pkg/util/intstr",
+        "//vendor:k8s.io/apis/pkg/api/v1",
     ],
 )
 

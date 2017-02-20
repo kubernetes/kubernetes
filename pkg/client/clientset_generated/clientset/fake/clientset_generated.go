@@ -19,10 +19,10 @@ package fake
 import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/watch"
+	"k8s.io/apis/pkg/api"
 	"k8s.io/client-go/discovery"
 	fakediscovery "k8s.io/client-go/discovery/fake"
 	"k8s.io/client-go/testing"
-	"k8s.io/kubernetes/pkg/api"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	v1beta1apps "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/apps/v1beta1"
 	fakev1beta1apps "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/apps/v1beta1/fake"

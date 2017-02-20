@@ -24,8 +24,8 @@ import (
 	"github.com/pborman/uuid"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apis/pkg/api"
 	utiltesting "k8s.io/client-go/util/testing"
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/util/io"
 	"k8s.io/kubernetes/pkg/volume"
 )

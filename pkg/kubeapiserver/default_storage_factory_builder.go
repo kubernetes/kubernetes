@@ -23,10 +23,10 @@ import (
 
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apis/pkg/api"
 	serverstorage "k8s.io/apiserver/pkg/server/storage"
 	"k8s.io/apiserver/pkg/storage/storagebackend"
 	utilflag "k8s.io/apiserver/pkg/util/flag"
-	"k8s.io/kubernetes/pkg/api"
 )
 
 // NewStorageFactory builds the DefaultStorageFactory.

@@ -23,12 +23,8 @@ go_test(
     library = ":go_default_library",
     tags = ["automanaged"],
     deps = [
-        "//pkg/api:go_default_library",
-        "//pkg/api/install:go_default_library",
         "//pkg/api/testapi:go_default_library",
-        "//pkg/api/v1:go_default_library",
         "//pkg/api/validation:go_default_library",
-        "//pkg/apis/extensions:go_default_library",
         "//vendor:github.com/google/gofuzz",
         "//vendor:k8s.io/apimachinery/pkg/api/equality",
         "//vendor:k8s.io/apimachinery/pkg/api/meta",
@@ -42,6 +38,10 @@ go_test(
         "//vendor:k8s.io/apimachinery/pkg/util/sets",
         "//vendor:k8s.io/apimachinery/pkg/util/wait",
         "//vendor:k8s.io/apimachinery/pkg/watch",
+        "//vendor:k8s.io/apis/pkg/api",
+        "//vendor:k8s.io/apis/pkg/api/install",
+        "//vendor:k8s.io/apis/pkg/api/v1",
+        "//vendor:k8s.io/apis/pkg/apis/extensions",
     ],
 )
 

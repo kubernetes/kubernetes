@@ -22,8 +22,8 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/apis/autoscaling"
+	"k8s.io/apis/pkg/api"
+	"k8s.io/apis/pkg/apis/autoscaling"
 )
 
 type HorizontalPodAutoscalerV1 struct{}

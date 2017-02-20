@@ -23,8 +23,8 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/intstr"
-	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/v1"
+	"k8s.io/apis/pkg/api"
+	"k8s.io/apis/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/controller"
 )
 

@@ -19,10 +19,10 @@ package thirdpartyresourcedata
 import (
 	"testing"
 
-	_ "k8s.io/kubernetes/pkg/api"
+	_ "k8s.io/apis/pkg/api"
+	"k8s.io/apis/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
-	"k8s.io/kubernetes/pkg/apis/extensions"
 )
 
 func TestSelectableFieldLabelConversions(t *testing.T) {

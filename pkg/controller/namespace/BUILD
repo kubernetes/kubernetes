@@ -15,7 +15,6 @@ go_library(
     ],
     tags = ["automanaged"],
     deps = [
-        "//pkg/api/v1:go_default_library",
         "//pkg/client/clientset_generated/clientset:go_default_library",
         "//pkg/controller:go_default_library",
         "//pkg/controller/namespace/deletion:go_default_library",
@@ -26,6 +25,7 @@ go_library(
         "//vendor:k8s.io/apimachinery/pkg/util/runtime",
         "//vendor:k8s.io/apimachinery/pkg/util/wait",
         "//vendor:k8s.io/apimachinery/pkg/watch",
+        "//vendor:k8s.io/apis/pkg/api/v1",
         "//vendor:k8s.io/client-go/dynamic",
         "//vendor:k8s.io/client-go/tools/cache",
         "//vendor:k8s.io/client-go/util/workqueue",

@@ -20,8 +20,8 @@ import (
 	"errors"
 	"testing"
 
-	"k8s.io/kubernetes/pkg/api/v1"
-	storage "k8s.io/kubernetes/pkg/apis/storage/v1beta1"
+	"k8s.io/apis/pkg/api/v1"
+	storage "k8s.io/apis/pkg/apis/storage/v1beta1"
 )
 
 // Test single call to syncVolume, expecting recycling to happen.

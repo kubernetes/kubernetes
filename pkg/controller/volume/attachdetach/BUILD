@@ -13,8 +13,6 @@ go_library(
     srcs = ["attach_detach_controller.go"],
     tags = ["automanaged"],
     deps = [
-        "//pkg/api:go_default_library",
-        "//pkg/api/v1:go_default_library",
         "//pkg/client/clientset_generated/clientset:go_default_library",
         "//pkg/client/informers/informers_generated/externalversions/core/v1:go_default_library",
         "//pkg/client/listers/core/v1:go_default_library",
@@ -31,6 +29,8 @@ go_library(
         "//vendor:github.com/golang/glog",
         "//vendor:k8s.io/apimachinery/pkg/types",
         "//vendor:k8s.io/apimachinery/pkg/util/runtime",
+        "//vendor:k8s.io/apis/pkg/api",
+        "//vendor:k8s.io/apis/pkg/api/v1",
         "//vendor:k8s.io/client-go/kubernetes/typed/core/v1",
         "//vendor:k8s.io/client-go/pkg/api/v1",
         "//vendor:k8s.io/client-go/tools/cache",

@@ -25,6 +25,8 @@ import (
 	pkgruntime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/watch"
+	"k8s.io/apis/pkg/api"
+	apiv1 "k8s.io/apis/pkg/api/v1"
 	clientv1 "k8s.io/client-go/pkg/api/v1"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
@@ -34,8 +36,6 @@ import (
 	"k8s.io/kubernetes/federation/pkg/federation-controller/util"
 	"k8s.io/kubernetes/federation/pkg/federation-controller/util/deletionhelper"
 	"k8s.io/kubernetes/federation/pkg/federation-controller/util/eventsink"
-	"k8s.io/kubernetes/pkg/api"
-	apiv1 "k8s.io/kubernetes/pkg/api/v1"
 	kubeclientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/pkg/controller"
 

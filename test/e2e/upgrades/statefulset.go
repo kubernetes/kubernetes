@@ -20,8 +20,8 @@ import (
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 
-	"k8s.io/kubernetes/pkg/api/v1"
-	apps "k8s.io/kubernetes/pkg/apis/apps/v1beta1"
+	"k8s.io/apis/pkg/api/v1"
+	apps "k8s.io/apis/pkg/apis/apps/v1beta1"
 
 	"k8s.io/kubernetes/test/e2e/framework"
 )

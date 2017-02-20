@@ -15,10 +15,10 @@ go_library(
     ],
     tags = ["automanaged"],
     deps = [
-        "//pkg/apis/policy:go_default_library",
         "//pkg/apis/policy/v1alpha1:go_default_library",
         "//vendor:k8s.io/apimachinery/pkg/api/errors",
         "//vendor:k8s.io/apimachinery/pkg/labels",
+        "//vendor:k8s.io/apis/pkg/apis/policy",
         "//vendor:k8s.io/client-go/tools/cache",
     ],
 )

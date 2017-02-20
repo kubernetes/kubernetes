@@ -24,8 +24,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/kubernetes/pkg/api/v1"
-	autoscaling "k8s.io/kubernetes/pkg/apis/autoscaling/v2alpha1"
+	"k8s.io/apis/pkg/api/v1"
+	autoscaling "k8s.io/apis/pkg/apis/autoscaling/v2alpha1"
 	v1coreclient "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/core/v1"
 	metricsclient "k8s.io/kubernetes/pkg/controller/podautoscaler/metrics"
 )

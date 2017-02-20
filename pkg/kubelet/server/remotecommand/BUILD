@@ -19,7 +19,6 @@ go_library(
     ],
     tags = ["automanaged"],
     deps = [
-        "//pkg/api:go_default_library",
         "//pkg/util/exec:go_default_library",
         "//pkg/util/term:go_default_library",
         "//vendor:github.com/golang/glog",
@@ -29,6 +28,7 @@ go_library(
         "//vendor:k8s.io/apimachinery/pkg/util/httpstream",
         "//vendor:k8s.io/apimachinery/pkg/util/httpstream/spdy",
         "//vendor:k8s.io/apimachinery/pkg/util/runtime",
+        "//vendor:k8s.io/apis/pkg/api",
         "//vendor:k8s.io/apiserver/pkg/server/httplog",
         "//vendor:k8s.io/apiserver/pkg/util/wsstream",
     ],

@@ -21,8 +21,8 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/kubernetes/pkg/api/v1"
-	batch "k8s.io/kubernetes/pkg/apis/batch/v1"
+	"k8s.io/apis/pkg/api/v1"
+	batch "k8s.io/apis/pkg/apis/batch/v1"
 )
 
 // JobListerExpansion allows custom methods to be added to

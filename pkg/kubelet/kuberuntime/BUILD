@@ -27,8 +27,6 @@ go_library(
     ],
     tags = ["automanaged"],
     deps = [
-        "//pkg/api:go_default_library",
-        "//pkg/api/v1:go_default_library",
         "//pkg/credentialprovider:go_default_library",
         "//pkg/kubelet/api:go_default_library",
         "//pkg/kubelet/api/v1alpha1/runtime:go_default_library",
@@ -45,7 +43,6 @@ go_library(
         "//pkg/kubelet/util/cache:go_default_library",
         "//pkg/kubelet/util/format:go_default_library",
         "//pkg/securitycontext:go_default_library",
-        "//pkg/util/parsers:go_default_library",
         "//pkg/util/selinux:go_default_library",
         "//pkg/util/tail:go_default_library",
         "//pkg/util/version:go_default_library",
@@ -59,6 +56,9 @@ go_library(
         "//vendor:k8s.io/apimachinery/pkg/util/errors",
         "//vendor:k8s.io/apimachinery/pkg/util/runtime",
         "//vendor:k8s.io/apimachinery/pkg/util/sets",
+        "//vendor:k8s.io/apis/pkg/api",
+        "//vendor:k8s.io/apis/pkg/api/v1",
+        "//vendor:k8s.io/apis/pkg/util/parsers",
         "//vendor:k8s.io/client-go/tools/record",
         "//vendor:k8s.io/client-go/util/flowcontrol",
     ],
@@ -79,7 +79,6 @@ go_test(
     library = ":go_default_library",
     tags = ["automanaged"],
     deps = [
-        "//pkg/api/v1:go_default_library",
         "//pkg/apis/componentconfig:go_default_library",
         "//pkg/kubelet/api/testing:go_default_library",
         "//pkg/kubelet/api/v1alpha1/runtime:go_default_library",
@@ -94,6 +93,7 @@ go_test(
         "//vendor:k8s.io/apimachinery/pkg/types",
         "//vendor:k8s.io/apimachinery/pkg/util/intstr",
         "//vendor:k8s.io/apimachinery/pkg/util/sets",
+        "//vendor:k8s.io/apis/pkg/api/v1",
         "//vendor:k8s.io/client-go/util/flowcontrol",
     ],
 )

@@ -24,7 +24,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/kubernetes/pkg/api/v1"
+	"k8s.io/apis/pkg/api/v1"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/volume"
 	volumetypes "k8s.io/kubernetes/pkg/volume/util/types"

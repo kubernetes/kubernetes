@@ -12,7 +12,7 @@ go_library(
     srcs = ["event.go"],
     tags = ["automanaged"],
     deps = [
-        "//pkg/api/v1:go_default_library",
+        "//vendor:k8s.io/apis/pkg/api/v1",
         "//vendor:k8s.io/client-go/pkg/api/v1",
     ],
 )

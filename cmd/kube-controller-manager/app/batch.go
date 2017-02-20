@@ -22,7 +22,7 @@ package app
 
 import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/kubernetes/pkg/apis/batch"
+	"k8s.io/apis/pkg/apis/batch"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/pkg/controller/cronjob"
 	"k8s.io/kubernetes/pkg/controller/job"

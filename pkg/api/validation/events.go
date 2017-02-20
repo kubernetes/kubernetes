@@ -24,7 +24,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
-	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/apis/pkg/api"
 	apiutil "k8s.io/kubernetes/pkg/api/util"
 )
 

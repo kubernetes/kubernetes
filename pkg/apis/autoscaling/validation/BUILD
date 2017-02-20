@@ -14,10 +14,10 @@ go_library(
     tags = ["automanaged"],
     deps = [
         "//pkg/api/validation:go_default_library",
-        "//pkg/apis/autoscaling:go_default_library",
         "//vendor:k8s.io/apimachinery/pkg/api/validation/path",
         "//vendor:k8s.io/apimachinery/pkg/util/sets",
         "//vendor:k8s.io/apimachinery/pkg/util/validation/field",
+        "//vendor:k8s.io/apis/pkg/apis/autoscaling",
     ],
 )
 
@@ -27,10 +27,10 @@ go_test(
     library = ":go_default_library",
     tags = ["automanaged"],
     deps = [
-        "//pkg/api:go_default_library",
-        "//pkg/apis/autoscaling:go_default_library",
         "//vendor:k8s.io/apimachinery/pkg/api/resource",
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
+        "//vendor:k8s.io/apis/pkg/api",
+        "//vendor:k8s.io/apis/pkg/apis/autoscaling",
     ],
 )
 

@@ -13,10 +13,10 @@ go_library(
     srcs = ["strategy.go"],
     tags = ["automanaged"],
     deps = [
-        "//pkg/api:go_default_library",
         "//pkg/security/apparmor:go_default_library",
         "//pkg/util/maps:go_default_library",
         "//vendor:k8s.io/apimachinery/pkg/util/validation/field",
+        "//vendor:k8s.io/apis/pkg/api",
     ],
 )
 
@@ -26,12 +26,12 @@ go_test(
     library = ":go_default_library",
     tags = ["automanaged"],
     deps = [
-        "//pkg/api:go_default_library",
         "//pkg/security/apparmor:go_default_library",
         "//pkg/util/maps:go_default_library",
         "//vendor:github.com/davecgh/go-spew/spew",
         "//vendor:github.com/stretchr/testify/assert",
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
+        "//vendor:k8s.io/apis/pkg/api",
     ],
 )
 

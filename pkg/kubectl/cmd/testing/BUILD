@@ -13,7 +13,6 @@ go_library(
     tags = ["automanaged"],
     deps = [
         "//federation/client/clientset_generated/federation_internalclientset:go_default_library",
-        "//pkg/api:go_default_library",
         "//pkg/api/testapi:go_default_library",
         "//pkg/api/validation:go_default_library",
         "//pkg/client/clientset_generated/internalclientset:go_default_library",
@@ -28,6 +27,7 @@ go_library(
         "//vendor:k8s.io/apimachinery/pkg/runtime",
         "//vendor:k8s.io/apimachinery/pkg/runtime/schema",
         "//vendor:k8s.io/apimachinery/pkg/runtime/serializer",
+        "//vendor:k8s.io/apis/pkg/api",
         "//vendor:k8s.io/client-go/discovery",
         "//vendor:k8s.io/client-go/rest",
         "//vendor:k8s.io/client-go/rest/fake",

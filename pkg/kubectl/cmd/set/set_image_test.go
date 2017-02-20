@@ -22,9 +22,9 @@ import (
 	"strings"
 	"testing"
 
+	"k8s.io/apis/pkg/api"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/rest/fake"
-	"k8s.io/kubernetes/pkg/api"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/resource"

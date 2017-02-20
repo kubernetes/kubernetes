@@ -12,10 +12,10 @@ go_library(
     srcs = ["storage_storage.go"],
     tags = ["automanaged"],
     deps = [
-        "//pkg/api:go_default_library",
-        "//pkg/apis/storage:go_default_library",
-        "//pkg/apis/storage/v1beta1:go_default_library",
         "//pkg/registry/storage/storageclass/storage:go_default_library",
+        "//vendor:k8s.io/apis/pkg/api",
+        "//vendor:k8s.io/apis/pkg/apis/storage",
+        "//vendor:k8s.io/apis/pkg/apis/storage/v1beta1",
         "//vendor:k8s.io/apiserver/pkg/registry/generic",
         "//vendor:k8s.io/apiserver/pkg/registry/rest",
         "//vendor:k8s.io/apiserver/pkg/server",

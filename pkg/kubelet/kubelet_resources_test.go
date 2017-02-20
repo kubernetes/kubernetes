@@ -25,7 +25,7 @@ import (
 	cadvisorapiv2 "github.com/google/cadvisor/info/v2"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/resource"
-	"k8s.io/kubernetes/pkg/api/v1"
+	"k8s.io/apis/pkg/api/v1"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 )
 

@@ -27,6 +27,7 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/apis/pkg/api"
 	"k8s.io/apiserver/pkg/server/healthz"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	clientv1 "k8s.io/client-go/pkg/api/v1"
@@ -34,7 +35,6 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/kubernetes/cmd/cloud-controller-manager/app/options"
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	newinformers "k8s.io/kubernetes/pkg/client/informers/informers_generated/externalversions"
 	"k8s.io/kubernetes/pkg/client/leaderelection"

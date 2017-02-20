@@ -18,11 +18,11 @@ go_library(
     ],
     tags = ["automanaged"],
     deps = [
-        "//pkg/apis/rbac:go_default_library",
-        "//pkg/apis/rbac/v1alpha1:go_default_library",
         "//vendor:k8s.io/apimachinery/pkg/api/errors",
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
         "//vendor:k8s.io/apimachinery/pkg/labels",
+        "//vendor:k8s.io/apis/pkg/apis/rbac",
+        "//vendor:k8s.io/apis/pkg/apis/rbac/v1alpha1",
         "//vendor:k8s.io/client-go/tools/cache",
     ],
 )

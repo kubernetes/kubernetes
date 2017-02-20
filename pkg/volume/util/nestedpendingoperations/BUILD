@@ -13,11 +13,11 @@ go_library(
     srcs = ["nestedpendingoperations.go"],
     tags = ["automanaged"],
     deps = [
-        "//pkg/api/v1:go_default_library",
         "//pkg/util/goroutinemap/exponentialbackoff:go_default_library",
         "//pkg/volume/util/types:go_default_library",
         "//vendor:github.com/golang/glog",
         "//vendor:k8s.io/apimachinery/pkg/util/runtime",
+        "//vendor:k8s.io/apis/pkg/api/v1",
     ],
 )
 
@@ -27,9 +27,9 @@ go_test(
     library = ":go_default_library",
     tags = ["automanaged"],
     deps = [
-        "//pkg/api/v1:go_default_library",
         "//pkg/volume/util/types:go_default_library",
         "//vendor:k8s.io/apimachinery/pkg/util/wait",
+        "//vendor:k8s.io/apis/pkg/api/v1",
     ],
 )
 

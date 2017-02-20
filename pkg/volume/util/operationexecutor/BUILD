@@ -16,7 +16,6 @@ go_library(
     ],
     tags = ["automanaged"],
     deps = [
-        "//pkg/api/v1:go_default_library",
         "//pkg/client/clientset_generated/clientset:go_default_library",
         "//pkg/kubelet/events:go_default_library",
         "//pkg/util/mount:go_default_library",
@@ -28,6 +27,7 @@ go_library(
         "//vendor:k8s.io/apimachinery/pkg/api/errors",
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
         "//vendor:k8s.io/apimachinery/pkg/types",
+        "//vendor:k8s.io/apis/pkg/api/v1",
         "//vendor:k8s.io/client-go/tools/record",
     ],
 )
@@ -38,12 +38,12 @@ go_test(
     library = ":go_default_library",
     tags = ["automanaged"],
     deps = [
-        "//pkg/api/v1:go_default_library",
         "//pkg/util/mount:go_default_library",
         "//pkg/volume/util/types:go_default_library",
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
         "//vendor:k8s.io/apimachinery/pkg/types",
         "//vendor:k8s.io/apimachinery/pkg/util/uuid",
+        "//vendor:k8s.io/apis/pkg/api/v1",
     ],
 )
 

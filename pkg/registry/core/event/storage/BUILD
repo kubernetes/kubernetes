@@ -14,10 +14,10 @@ go_test(
     library = ":go_default_library",
     tags = ["automanaged"],
     deps = [
-        "//pkg/api:go_default_library",
         "//pkg/registry/registrytest:go_default_library",
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
         "//vendor:k8s.io/apimachinery/pkg/runtime",
+        "//vendor:k8s.io/apis/pkg/api",
         "//vendor:k8s.io/apiserver/pkg/registry/generic",
         "//vendor:k8s.io/apiserver/pkg/storage/etcd/testing",
     ],
@@ -28,10 +28,10 @@ go_library(
     srcs = ["storage.go"],
     tags = ["automanaged"],
     deps = [
-        "//pkg/api:go_default_library",
         "//pkg/registry/cachesize:go_default_library",
         "//pkg/registry/core/event:go_default_library",
         "//vendor:k8s.io/apimachinery/pkg/runtime",
+        "//vendor:k8s.io/apis/pkg/api",
         "//vendor:k8s.io/apiserver/pkg/registry/generic",
         "//vendor:k8s.io/apiserver/pkg/registry/generic/registry",
         "//vendor:k8s.io/apiserver/pkg/registry/rest",

@@ -13,9 +13,9 @@ go_library(
     srcs = ["util.go"],
     tags = ["automanaged"],
     deps = [
-        "//pkg/api:go_default_library",
         "//pkg/util/hash:go_default_library",
         "//vendor:k8s.io/apimachinery/pkg/types",
+        "//vendor:k8s.io/apis/pkg/api",
     ],
 )
 
@@ -25,9 +25,9 @@ go_test(
     library = ":go_default_library",
     tags = ["automanaged"],
     deps = [
-        "//pkg/api:go_default_library",
         "//vendor:github.com/davecgh/go-spew/spew",
         "//vendor:k8s.io/apimachinery/pkg/types",
+        "//vendor:k8s.io/apis/pkg/api",
     ],
 )
 

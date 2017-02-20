@@ -13,7 +13,6 @@ go_library(
     srcs = ["rackspace.go"],
     tags = ["automanaged"],
     deps = [
-        "//pkg/api/v1:go_default_library",
         "//pkg/cloudprovider:go_default_library",
         "//vendor:github.com/golang/glog",
         "//vendor:github.com/rackspace/gophercloud",
@@ -26,6 +25,7 @@ go_library(
         "//vendor:github.com/rackspace/gophercloud/rackspace/compute/v2/volumeattach",
         "//vendor:gopkg.in/gcfg.v1",
         "//vendor:k8s.io/apimachinery/pkg/types",
+        "//vendor:k8s.io/apis/pkg/api/v1",
     ],
 )
 

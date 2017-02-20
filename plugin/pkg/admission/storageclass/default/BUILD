@@ -13,8 +13,6 @@ go_library(
     srcs = ["admission.go"],
     tags = ["automanaged"],
     deps = [
-        "//pkg/api:go_default_library",
-        "//pkg/apis/storage:go_default_library",
         "//pkg/apis/storage/util:go_default_library",
         "//pkg/client/clientset_generated/internalclientset:go_default_library",
         "//pkg/kubeapiserver/admission:go_default_library",
@@ -23,6 +21,8 @@ go_library(
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
         "//vendor:k8s.io/apimachinery/pkg/runtime",
         "//vendor:k8s.io/apimachinery/pkg/watch",
+        "//vendor:k8s.io/apis/pkg/api",
+        "//vendor:k8s.io/apis/pkg/apis/storage",
         "//vendor:k8s.io/apiserver/pkg/admission",
         "//vendor:k8s.io/client-go/tools/cache",
     ],
@@ -34,11 +34,11 @@ go_test(
     library = ":go_default_library",
     tags = ["automanaged"],
     deps = [
-        "//pkg/api:go_default_library",
-        "//pkg/apis/storage:go_default_library",
         "//pkg/apis/storage/util:go_default_library",
         "//vendor:github.com/golang/glog",
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
+        "//vendor:k8s.io/apis/pkg/api",
+        "//vendor:k8s.io/apis/pkg/apis/storage",
         "//vendor:k8s.io/apiserver/pkg/admission",
     ],
 )

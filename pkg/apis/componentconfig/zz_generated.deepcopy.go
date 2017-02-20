@@ -23,7 +23,7 @@ package componentconfig
 import (
 	conversion "k8s.io/apimachinery/pkg/conversion"
 	runtime "k8s.io/apimachinery/pkg/runtime"
-	api "k8s.io/kubernetes/pkg/api"
+	api "k8s.io/apis/pkg/api"
 	reflect "reflect"
 )
 
@@ -165,8 +165,10 @@ func DeepCopy_componentconfig_KubeletConfiguration(in interface{}, out interface
 			in, out := &in.RegisterWithTaints, &out.RegisterWithTaints
 			*out = make([]api.Taint, len(*in))
 			for i := range *in {
-				if err := api.DeepCopy_api_Taint(&(*in)[i], &(*out)[i], c); err != nil {
+				if newVal, err := c.DeepCopy(&(*in)[i]); err != nil {
 					return err
+				} else {
+					(*out)[i] = *newVal.(*api.Taint)
 				}
 			}
 		}

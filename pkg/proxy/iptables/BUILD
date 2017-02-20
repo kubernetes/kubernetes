@@ -13,7 +13,6 @@ go_library(
     srcs = ["proxier.go"],
     tags = ["automanaged"],
     deps = [
-        "//pkg/api:go_default_library",
         "//pkg/api/service:go_default_library",
         "//pkg/features:go_default_library",
         "//pkg/proxy:go_default_library",
@@ -26,6 +25,7 @@ go_library(
         "//vendor:github.com/golang/glog",
         "//vendor:k8s.io/apimachinery/pkg/types",
         "//vendor:k8s.io/apimachinery/pkg/util/sets",
+        "//vendor:k8s.io/apis/pkg/api",
         "//vendor:k8s.io/apiserver/pkg/util/feature",
         "//vendor:k8s.io/client-go/pkg/api/v1",
         "//vendor:k8s.io/client-go/tools/record",
@@ -39,7 +39,6 @@ go_test(
     library = ":go_default_library",
     tags = ["automanaged"],
     deps = [
-        "//pkg/api:go_default_library",
         "//pkg/api/service:go_default_library",
         "//pkg/proxy:go_default_library",
         "//pkg/util/exec:go_default_library",
@@ -50,6 +49,7 @@ go_test(
         "//vendor:k8s.io/apimachinery/pkg/types",
         "//vendor:k8s.io/apimachinery/pkg/util/intstr",
         "//vendor:k8s.io/apimachinery/pkg/util/sets",
+        "//vendor:k8s.io/apis/pkg/api",
     ],
 )
 

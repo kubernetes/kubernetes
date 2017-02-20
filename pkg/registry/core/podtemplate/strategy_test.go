@@ -19,7 +19,7 @@ package podtemplate
 import (
 	"testing"
 
-	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/apis/pkg/api"
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
 )
 

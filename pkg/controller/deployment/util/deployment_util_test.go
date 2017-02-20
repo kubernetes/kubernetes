@@ -28,10 +28,10 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/apis/pkg/api"
+	"k8s.io/apis/pkg/api/v1"
+	extensions "k8s.io/apis/pkg/apis/extensions/v1beta1"
 	core "k8s.io/client-go/testing"
-	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/v1"
-	extensions "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset/fake"
 )
 

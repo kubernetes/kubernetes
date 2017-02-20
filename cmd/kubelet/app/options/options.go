@@ -21,10 +21,10 @@ import (
 	_ "net/http/pprof"
 	"strings"
 
+	"k8s.io/apis/pkg/api"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/apiserver/pkg/util/flag"
 	utilflag "k8s.io/apiserver/pkg/util/flag"
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/componentconfig"
 	// Need to make sure the componentconfig api is installed so defaulting funcs work
 	_ "k8s.io/kubernetes/pkg/apis/componentconfig/install"

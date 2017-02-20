@@ -20,9 +20,9 @@ import (
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
+	api "k8s.io/apis/pkg/api"
+	v2alpha1 "k8s.io/apis/pkg/apis/batch/v2alpha1"
 	rest "k8s.io/client-go/rest"
-	api "k8s.io/kubernetes/pkg/api"
-	v2alpha1 "k8s.io/kubernetes/pkg/apis/batch/v2alpha1"
 )
 
 // CronJobsGetter has a method to return a CronJobInterface.

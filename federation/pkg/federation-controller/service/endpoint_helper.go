@@ -20,9 +20,9 @@ import (
 	"fmt"
 	"time"
 
+	v1 "k8s.io/apis/pkg/api/v1"
 	cache "k8s.io/client-go/tools/cache"
 	fedclientset "k8s.io/kubernetes/federation/client/clientset_generated/federation_clientset"
-	v1 "k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/controller"
 
 	"github.com/golang/glog"

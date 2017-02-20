@@ -17,7 +17,7 @@ limitations under the License.
 package deployment
 
 import (
-	extensions "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
+	extensions "k8s.io/apis/pkg/apis/extensions/v1beta1"
 	"k8s.io/kubernetes/pkg/controller"
 )
 

@@ -25,10 +25,10 @@ go_library(
     tags = ["automanaged"],
     deps = [
         "//pkg/ssh:go_default_library",
-        "//pkg/util:go_default_library",
         "//vendor:github.com/golang/glog",
         "//vendor:github.com/prometheus/client_golang/prometheus",
         "//vendor:k8s.io/apimachinery/pkg/util/wait",
+        "//vendor:k8s.io/apis/pkg/util",
         "//vendor:k8s.io/client-go/util/clock",
     ],
 )

@@ -21,8 +21,8 @@ package v1alpha1
 import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/labels"
+	policy "k8s.io/apis/pkg/apis/policy"
 	"k8s.io/client-go/tools/cache"
-	policy "k8s.io/kubernetes/pkg/apis/policy"
 	v1alpha1 "k8s.io/kubernetes/pkg/apis/policy/v1alpha1"
 )
 

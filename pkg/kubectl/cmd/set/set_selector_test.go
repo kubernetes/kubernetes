@@ -24,9 +24,9 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/apis/batch"
-	"k8s.io/kubernetes/pkg/apis/extensions"
+	"k8s.io/apis/pkg/api"
+	"k8s.io/apis/pkg/apis/batch"
+	"k8s.io/apis/pkg/apis/extensions"
 )
 
 func TestUpdateSelectorForObjectTypes(t *testing.T) {

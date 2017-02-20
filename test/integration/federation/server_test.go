@@ -29,13 +29,13 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apis/pkg/api/v1"
+	autoscaling_v1 "k8s.io/apis/pkg/apis/autoscaling/v1"
+	batch_v1 "k8s.io/apis/pkg/apis/batch/v1"
+	ext_v1b1 "k8s.io/apis/pkg/apis/extensions/v1beta1"
 	fed_v1b1 "k8s.io/kubernetes/federation/apis/federation/v1beta1"
 	"k8s.io/kubernetes/federation/cmd/federation-apiserver/app"
 	"k8s.io/kubernetes/federation/cmd/federation-apiserver/app/options"
-	"k8s.io/kubernetes/pkg/api/v1"
-	autoscaling_v1 "k8s.io/kubernetes/pkg/apis/autoscaling/v1"
-	batch_v1 "k8s.io/kubernetes/pkg/apis/batch/v1"
-	ext_v1b1 "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 )
 
 var securePort = 6443 + 2

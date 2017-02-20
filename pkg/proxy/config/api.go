@@ -21,8 +21,8 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
+	"k8s.io/apis/pkg/api"
 	"k8s.io/client-go/tools/cache"
-	"k8s.io/kubernetes/pkg/api"
 )
 
 // NewSourceAPI creates config source that watches for changes to the services and endpoints.

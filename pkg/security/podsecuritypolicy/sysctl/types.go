@@ -18,7 +18,7 @@ package sysctl
 
 import (
 	"k8s.io/apimachinery/pkg/util/validation/field"
-	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/apis/pkg/api"
 )
 
 // SysctlsStrategy defines the interface for all sysctl strategies.

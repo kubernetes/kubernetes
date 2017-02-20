@@ -29,8 +29,8 @@ import (
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/watch"
-	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/apis/extensions"
+	"k8s.io/apis/pkg/api"
+	"k8s.io/apis/pkg/apis/extensions"
 )
 
 // ErrMatchFunc can be used to filter errors that may not be true failures.

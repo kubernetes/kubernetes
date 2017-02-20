@@ -28,9 +28,9 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apis/pkg/api"
 	"k8s.io/kubernetes/cmd/libs/go2idl/client-gen/test_apis/testgroup"
 	"k8s.io/kubernetes/cmd/libs/go2idl/client-gen/test_apis/testgroup/v1"
-	"k8s.io/kubernetes/pkg/api"
 )
 
 const importPrefix = "k8s.io/kubernetes/cmd/libs/go2idl/client-gen/test_apis/testgroup"

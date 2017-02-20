@@ -13,8 +13,8 @@ go_library(
     srcs = ["allocator.go"],
     tags = ["automanaged"],
     deps = [
-        "//pkg/api:go_default_library",
         "//pkg/registry/core/service/allocator:go_default_library",
+        "//vendor:k8s.io/apis/pkg/api",
     ],
 )
 
@@ -24,8 +24,8 @@ go_test(
     library = ":go_default_library",
     tags = ["automanaged"],
     deps = [
-        "//pkg/api:go_default_library",
         "//vendor:k8s.io/apimachinery/pkg/util/sets",
+        "//vendor:k8s.io/apis/pkg/api",
     ],
 )
 

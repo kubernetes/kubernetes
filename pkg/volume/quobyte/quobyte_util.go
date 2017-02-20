@@ -21,7 +21,7 @@ import (
 	"path"
 	"strings"
 
-	"k8s.io/kubernetes/pkg/api/v1"
+	"k8s.io/apis/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/volume"
 
 	"github.com/golang/glog"

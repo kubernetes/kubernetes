@@ -25,11 +25,11 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/apis/pkg/api"
+	"k8s.io/apis/pkg/apis/policy"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	genericregistry "k8s.io/apiserver/pkg/registry/generic/registry"
 	"k8s.io/apiserver/pkg/registry/rest"
-	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/apis/policy"
 	policyclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/policy/internalversion"
 	"k8s.io/kubernetes/pkg/client/retry"
 )

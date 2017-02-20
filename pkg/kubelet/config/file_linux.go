@@ -26,7 +26,7 @@ import (
 	"github.com/golang/glog"
 	"golang.org/x/exp/inotify"
 
-	"k8s.io/kubernetes/pkg/api/v1"
+	"k8s.io/apis/pkg/api/v1"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 )
 

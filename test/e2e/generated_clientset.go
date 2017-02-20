@@ -27,9 +27,9 @@ import (
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
+	"k8s.io/apis/pkg/api/v1"
+	"k8s.io/apis/pkg/apis/batch/v2alpha1"
 	clientv1 "k8s.io/client-go/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/apis/batch/v2alpha1"
 	"k8s.io/kubernetes/test/e2e/framework"
 
 	. "github.com/onsi/ginkgo"

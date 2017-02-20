@@ -27,8 +27,6 @@ go_library(
         "//federation/pkg/dnsprovider/rrstype:go_default_library",
         "//federation/pkg/federation-controller/util:go_default_library",
         "//federation/pkg/federation-controller/util/deletionhelper:go_default_library",
-        "//pkg/api:go_default_library",
-        "//pkg/api/v1:go_default_library",
         "//pkg/client/clientset_generated/clientset:go_default_library",
         "//pkg/client/legacylisters:go_default_library",
         "//pkg/controller:go_default_library",
@@ -41,6 +39,8 @@ go_library(
         "//vendor:k8s.io/apimachinery/pkg/util/sets",
         "//vendor:k8s.io/apimachinery/pkg/util/wait",
         "//vendor:k8s.io/apimachinery/pkg/watch",
+        "//vendor:k8s.io/apis/pkg/api",
+        "//vendor:k8s.io/apis/pkg/api/v1",
         "//vendor:k8s.io/client-go/pkg/api/v1",
         "//vendor:k8s.io/client-go/rest",
         "//vendor:k8s.io/client-go/tools/cache",
@@ -62,9 +62,9 @@ go_test(
     deps = [
         "//federation/apis/federation/v1beta1:go_default_library",
         "//federation/pkg/dnsprovider/providers/google/clouddns:go_default_library",
-        "//pkg/api/v1:go_default_library",
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
         "//vendor:k8s.io/apimachinery/pkg/util/sets",
+        "//vendor:k8s.io/apis/pkg/api/v1",
     ],
 )
 

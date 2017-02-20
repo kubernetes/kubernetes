@@ -21,7 +21,7 @@ import (
 	"testing"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/kubernetes/pkg/apis/storage"
+	"k8s.io/apis/pkg/apis/storage"
 )
 
 func TestValidateStorageClass(t *testing.T) {

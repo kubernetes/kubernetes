@@ -20,8 +20,8 @@ import (
 	"fmt"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	api "k8s.io/kubernetes/pkg/api/v1"
-	extensions "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
+	api "k8s.io/apis/pkg/api/v1"
+	extensions "k8s.io/apis/pkg/apis/extensions/v1beta1"
 	"k8s.io/kubernetes/pkg/security/apparmor"
 	"k8s.io/kubernetes/test/e2e/framework"
 

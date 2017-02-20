@@ -13,11 +13,11 @@ go_library(
     srcs = ["rest.go"],
     tags = ["automanaged"],
     deps = [
-        "//pkg/apis/authorization:go_default_library",
         "//pkg/apis/authorization/validation:go_default_library",
         "//pkg/registry/authorization/util:go_default_library",
         "//vendor:k8s.io/apimachinery/pkg/api/errors",
         "//vendor:k8s.io/apimachinery/pkg/runtime",
+        "//vendor:k8s.io/apis/pkg/apis/authorization",
         "//vendor:k8s.io/apiserver/pkg/authorization/authorizer",
         "//vendor:k8s.io/apiserver/pkg/endpoints/request",
     ],
@@ -42,7 +42,7 @@ go_test(
     library = ":go_default_library",
     tags = ["automanaged"],
     deps = [
-        "//pkg/apis/authorization:go_default_library",
+        "//vendor:k8s.io/apis/pkg/apis/authorization",
         "//vendor:k8s.io/apiserver/pkg/authentication/user",
         "//vendor:k8s.io/apiserver/pkg/authorization/authorizer",
         "//vendor:k8s.io/apiserver/pkg/endpoints/request",

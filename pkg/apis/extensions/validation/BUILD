@@ -13,9 +13,7 @@ go_library(
     srcs = ["validation.go"],
     tags = ["automanaged"],
     deps = [
-        "//pkg/api:go_default_library",
         "//pkg/api/validation:go_default_library",
-        "//pkg/apis/extensions:go_default_library",
         "//pkg/security/apparmor:go_default_library",
         "//pkg/security/podsecuritypolicy/seccomp:go_default_library",
         "//pkg/security/podsecuritypolicy/util:go_default_library",
@@ -26,6 +24,8 @@ go_library(
         "//vendor:k8s.io/apimachinery/pkg/util/sets",
         "//vendor:k8s.io/apimachinery/pkg/util/validation",
         "//vendor:k8s.io/apimachinery/pkg/util/validation/field",
+        "//vendor:k8s.io/apis/pkg/api",
+        "//vendor:k8s.io/apis/pkg/apis/extensions",
     ],
 )
 
@@ -35,14 +35,14 @@ go_test(
     library = ":go_default_library",
     tags = ["automanaged"],
     deps = [
-        "//pkg/api:go_default_library",
-        "//pkg/apis/extensions:go_default_library",
         "//pkg/security/apparmor:go_default_library",
         "//pkg/security/podsecuritypolicy/seccomp:go_default_library",
         "//pkg/security/podsecuritypolicy/util:go_default_library",
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
         "//vendor:k8s.io/apimachinery/pkg/util/intstr",
         "//vendor:k8s.io/apimachinery/pkg/util/validation/field",
+        "//vendor:k8s.io/apis/pkg/api",
+        "//vendor:k8s.io/apis/pkg/apis/extensions",
     ],
 )
 

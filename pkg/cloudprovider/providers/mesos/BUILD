@@ -18,7 +18,6 @@ go_library(
     ],
     tags = ["automanaged"],
     deps = [
-        "//pkg/api/v1:go_default_library",
         "//pkg/cloudprovider:go_default_library",
         "//vendor:github.com/golang/glog",
         "//vendor:github.com/mesos/mesos-go/detector",
@@ -29,6 +28,7 @@ go_library(
         "//vendor:k8s.io/apimachinery/pkg/api/resource",
         "//vendor:k8s.io/apimachinery/pkg/types",
         "//vendor:k8s.io/apimachinery/pkg/util/net",
+        "//vendor:k8s.io/apis/pkg/api/v1",
     ],
 )
 
