@@ -14,6 +14,7 @@ go_library(
         "defaults.go",
         "doc.go",
         "field_constants.go",
+        "fuzzer.go",
         "helpers.go",
         "json.go",
         "ref.go",
@@ -25,8 +26,10 @@ go_library(
     tags = ["automanaged"],
     deps = [
         "//vendor:github.com/davecgh/go-spew/spew",
+        "//vendor:github.com/google/gofuzz",
         "//vendor:k8s.io/apimachinery/pkg/api/meta",
         "//vendor:k8s.io/apimachinery/pkg/api/resource",
+        "//vendor:k8s.io/apimachinery/pkg/api/testing",
         "//vendor:k8s.io/apimachinery/pkg/apimachinery/announced",
         "//vendor:k8s.io/apimachinery/pkg/apimachinery/registered",
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",

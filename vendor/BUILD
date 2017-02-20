@@ -13859,7 +13859,6 @@ go_library(
         "//vendor:github.com/davecgh/go-spew/spew",
         "//vendor:github.com/golang/protobuf/proto",
         "//vendor:github.com/google/gofuzz",
-        "//vendor:github.com/spf13/pflag",
         "//vendor:k8s.io/apimachinery/pkg/api/equality",
         "//vendor:k8s.io/apimachinery/pkg/api/meta",
         "//vendor:k8s.io/apimachinery/pkg/api/resource",

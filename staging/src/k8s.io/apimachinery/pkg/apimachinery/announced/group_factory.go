@@ -29,6 +29,22 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 )
 
+type SchemeFuncs []SchemeFunc
+
+func (list SchemeFuncs) AddToScheme(scheme *runtime.Scheme) error {
+	for _, item := range list {
+		if err := item(scheme); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func CombineSchemeBuilders(fns ...SchemeFunc) SchemeFuncs {
+	return fns
+}
+
 type SchemeFunc func(*runtime.Scheme) error
 type VersionToSchemeFunc map[string]SchemeFunc
 

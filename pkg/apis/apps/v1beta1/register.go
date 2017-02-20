@@ -17,9 +17,11 @@ limitations under the License.
 package v1beta1
 
 import (
+	"k8s.io/apimachinery/pkg/apimachinery/announced"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/kubernetes/pkg/api/v1"
 )
 
 // GroupName is the group name use in this package
@@ -35,7 +37,7 @@ func Resource(resource string) schema.GroupResource {
 
 var (
 	SchemeBuilder = runtime.NewSchemeBuilder(addKnownTypes, addDefaultingFuncs, addConversionFuncs)
-	AddToScheme   = SchemeBuilder.AddToScheme
+	AddToScheme   = announced.CombineSchemeBuilders(SchemeBuilder.AddToScheme, v1.AddToScheme).AddToScheme
 )
 
 // Adds the list of known types to api.Scheme.
