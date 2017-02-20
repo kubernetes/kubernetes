@@ -740,7 +740,7 @@ func TestISCSIDiskConflicts(t *testing.T) {
 				VolumeSource: v1.VolumeSource{
 					ISCSI: &v1.ISCSIVolumeSource{
 						TargetPortal: "127.0.0.1:3260",
-						IQN:          "iqn.2014-12.server:storage.target01",
+						IQN:          "iqn.2016-12.server:storage.target01",
 						FSType:       "ext4",
 						Lun:          0,
 					},
@@ -753,10 +753,10 @@ func TestISCSIDiskConflicts(t *testing.T) {
 			{
 				VolumeSource: v1.VolumeSource{
 					ISCSI: &v1.ISCSIVolumeSource{
-						TargetPortal: "127.0.0.2:3260",
-						IQN:          "iqn.2014-12.server:storage.target01",
+						TargetPortal: "127.0.0.1:3260",
+						IQN:          "iqn.2017-12.server:storage.target01",
 						FSType:       "ext4",
-						Lun:          1,
+						Lun:          0,
 					},
 				},
 			},
