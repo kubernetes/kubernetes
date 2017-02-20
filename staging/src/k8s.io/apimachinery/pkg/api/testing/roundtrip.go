@@ -19,14 +19,15 @@ package testing
 import (
 	"encoding/hex"
 	"fmt"
+	"os"
 	"reflect"
+	"strconv"
 	"strings"
 	"testing"
 
 	"github.com/davecgh/go-spew/spew"
 	"github.com/golang/protobuf/proto"
 	"github.com/google/gofuzz"
-	flag "github.com/spf13/pflag"
 	"k8s.io/apimachinery/pkg/runtime/serializer/protobuf"
 
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
@@ -78,7 +79,17 @@ func RoundTripProtobufTestForScheme(t *testing.T, scheme *runtime.Scheme, fuzzin
 	RoundTripTypes(t, scheme, codecFactory, fuzzer, nil)
 }
 
-var FuzzIters = flag.Int("fuzz-iters", 20, "How many fuzzing iterations to do.")
+var FuzzIters = 20
+
+func init() {
+	if env := os.Getenv("KUBE_FUZZ_ITERATIONS"); len(env) > 0 {
+		var err error
+		FuzzIters, err = strconv.Atoi(env)
+		if err != nil {
+			panic(err)
+		}
+	}
+}
 
 // globalNonRoundTrippableTypes are kinds that are effectively reserved across all GroupVersions
 // They don't roundtrip
@@ -141,7 +152,7 @@ func roundTripSpecificKind(t *testing.T, internalGVK schema.GroupVersionKind, sc
 	t.Logf("round tripping %v", internalGVK)
 
 	// Try a few times, since runTest uses random values.
-	for i := 0; i < *FuzzIters; i++ {
+	for i := 0; i < FuzzIters; i++ {
 		roundTripToAllExternalVersions(t, scheme, codecFactory, fuzzer, internalGVK, nonRoundTrippableTypes, skipProtobuf)
 		if t.Failed() {
 			break

@@ -17,13 +17,15 @@ limitations under the License.
 package apps
 
 import (
+	"k8s.io/apimachinery/pkg/apimachinery/announced"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/kubernetes/pkg/api"
 )
 
 var (
 	SchemeBuilder = runtime.NewSchemeBuilder(addKnownTypes)
-	AddToScheme   = SchemeBuilder.AddToScheme
+	AddToScheme   = announced.CombineSchemeBuilders(SchemeBuilder.AddToScheme, api.AddToScheme).AddToScheme
 )
 
 // GroupName is the group name use in this package
