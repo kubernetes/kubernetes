@@ -520,12 +520,14 @@ var _ = framework.KubeDescribe("Network Partition [Disruptive] [Slow]", func() {
 				pods, err := c.Core().Pods(metav1.NamespaceAll).List(podOpts)
 				framework.ExpectNoError(err)
 				podTolerationTimes := map[string]time.Duration{}
+				// This test doesn't add tolerations by itself, but because they may be present in the cluster
+				// it needs to account for that.
 				for _, pod := range pods.Items {
 					namespacedName := fmt.Sprintf("%v/%v", pod.Namespace, pod.Name)
 					tolerations, err := v1.GetPodTolerations(&pod)
 					framework.ExpectNoError(err)
 					for _, toleration := range tolerations {
-						if toleration.ToleratesTaint(nodepkg.UnresponsiveTaintTemplate) {
+						if toleration.ToleratesTaint(nodepkg.UnreachableTaintTemplate) {
 							if toleration.TolerationSeconds != nil {
 								podTolerationTimes[namespacedName] = time.Duration(*toleration.TolerationSeconds) * time.Second
 								break
