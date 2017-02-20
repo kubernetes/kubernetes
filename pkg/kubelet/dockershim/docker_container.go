@@ -140,8 +140,11 @@ func (ds *dockerService) CreateContainer(podSandboxID string, config *runtimeapi
 	}
 
 	// Apply Linux-specific options if applicable.
+	apparmorProfile := ""
 	if lc := config.GetLinux(); lc != nil {
 		// Apply resource options.
+		apparmorProfile = lc.ApparmorProfile
+
 		// TODO: Check if the units are correct.
 		// TODO: Can we assume the defaults are sane?
 		rOpts := lc.GetResources()
@@ -183,7 +186,7 @@ func (ds *dockerService) CreateContainer(podSandboxID string, config *runtimeapi
 	hc.Resources.Devices = devices
 
 	// Apply appArmor and seccomp options.
-	securityOpts, err := getContainerSecurityOpts(config.Metadata.Name, sandboxConfig, ds.seccompProfileRoot, securityOptSep)
+	securityOpts, err := getContainerSecurityOpts(config.Metadata.Name, sandboxConfig, ds.seccompProfileRoot, apparmorProfile, securityOptSep)
 	if err != nil {
 		return "", fmt.Errorf("failed to generate container security options for container %q: %v", config.Metadata.Name, err)
 	}
