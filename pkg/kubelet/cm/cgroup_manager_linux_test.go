@@ -30,6 +30,26 @@ func TestLibcontainerAdapterAdaptToSystemd(t *testing.T) {
 			expected: "-.slice",
 		},
 		{
+			input:    "/system.slice",
+			expected: "system.slice",
+		},
+		{
+			input:    "/system.slice/Burstable",
+			expected: "system-Burstable.slice",
+		},
+		{
+			input:    "/Burstable.slice/Burstable-pod_123.slice",
+			expected: "Burstable-pod_123.slice",
+		},
+		{
+			input:    "/test.slice/test-a.slice/test-a-b.slice",
+			expected: "test-a-b.slice",
+		},
+		{
+			input:    "/test.slice/test-a.slice/test-a-b.slice/Burstable",
+			expected: "test-a-b-Burstable.slice",
+		},
+		{
 			input:    "/Burstable",
 			expected: "Burstable.slice",
 		},
