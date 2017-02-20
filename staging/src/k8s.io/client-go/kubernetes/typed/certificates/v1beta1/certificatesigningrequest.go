@@ -20,7 +20,7 @@ import (
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
-	api "k8s.io/client-go/pkg/api"
+	scheme "k8s.io/client-go/kubernetes/scheme"
 	v1beta1 "k8s.io/client-go/pkg/apis/certificates/v1beta1"
 	rest "k8s.io/client-go/rest"
 )
@@ -109,7 +109,7 @@ func (c *certificateSigningRequests) Delete(name string, options *v1.DeleteOptio
 func (c *certificateSigningRequests) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
 	return c.client.Delete().
 		Resource("certificatesigningrequests").
-		VersionedParams(&listOptions, api.ParameterCodec).
+		VersionedParams(&listOptions, scheme.ParameterCodec).
 		Body(options).
 		Do().
 		Error()
@@ -121,7 +121,7 @@ func (c *certificateSigningRequests) Get(name string, options v1.GetOptions) (re
 	err = c.client.Get().
 		Resource("certificatesigningrequests").
 		Name(name).
-		VersionedParams(&options, api.ParameterCodec).
+		VersionedParams(&options, scheme.ParameterCodec).
 		Do().
 		Into(result)
 	return
@@ -132,7 +132,7 @@ func (c *certificateSigningRequests) List(opts v1.ListOptions) (result *v1beta1.
 	result = &v1beta1.CertificateSigningRequestList{}
 	err = c.client.Get().
 		Resource("certificatesigningrequests").
-		VersionedParams(&opts, api.ParameterCodec).
+		VersionedParams(&opts, scheme.ParameterCodec).
 		Do().
 		Into(result)
 	return
@@ -143,7 +143,7 @@ func (c *certificateSigningRequests) Watch(opts v1.ListOptions) (watch.Interface
 	return c.client.Get().
 		Prefix("watch").
 		Resource("certificatesigningrequests").
-		VersionedParams(&opts, api.ParameterCodec).
+		VersionedParams(&opts, scheme.ParameterCodec).
 		Watch()
 }
 

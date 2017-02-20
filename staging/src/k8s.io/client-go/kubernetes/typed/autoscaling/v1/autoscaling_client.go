@@ -17,10 +17,9 @@ limitations under the License.
 package v1
 
 import (
-	fmt "fmt"
-	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	serializer "k8s.io/apimachinery/pkg/runtime/serializer"
-	api "k8s.io/client-go/pkg/api"
+	"k8s.io/client-go/kubernetes/scheme"
+	v1 "k8s.io/client-go/pkg/apis/autoscaling/v1"
 	rest "k8s.io/client-go/rest"
 )
 
@@ -67,22 +66,14 @@ func New(c rest.Interface) *AutoscalingV1Client {
 }
 
 func setConfigDefaults(config *rest.Config) error {
-	gv, err := schema.ParseGroupVersion("autoscaling/v1")
-	if err != nil {
-		return err
-	}
-	// if autoscaling/v1 is not enabled, return an error
-	if !api.Registry.IsEnabledVersion(gv) {
-		return fmt.Errorf("autoscaling/v1 is not enabled")
-	}
+	gv := v1.SchemeGroupVersion
+	config.GroupVersion = &gv
 	config.APIPath = "/apis"
+	config.NegotiatedSerializer = serializer.DirectCodecFactory{CodecFactory: scheme.Codecs}
+
 	if config.UserAgent == "" {
 		config.UserAgent = rest.DefaultKubernetesUserAgent()
 	}
-	copyGroupVersion := gv
-	config.GroupVersion = &copyGroupVersion
-
-	config.NegotiatedSerializer = serializer.DirectCodecFactory{CodecFactory: api.Codecs}
 
 	return nil
 }
