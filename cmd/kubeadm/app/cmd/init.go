@@ -48,6 +48,9 @@ var (
 	initDoneMsgf = dedent.Dedent(`
 		Your Kubernetes master has initialized successfully!
 
+		To start using your cluster, you need to run:
+		export KUBECONFIG=%s
+
 		You should now deploy a pod network to the cluster.
 		Run "kubectl apply -f [podnetwork].yaml" with one of the options listed at:
 		    http://kubernetes.io/docs/admin/addons/
@@ -267,7 +270,7 @@ func (i *Init) Run(out io.Writer) error {
 		return err
 	}
 
-	fmt.Fprintf(out, initDoneMsgf, generateJoinArgs(i.cfg))
+	fmt.Fprintf(out, initDoneMsgf, path.Join(kubeadmapi.GlobalEnvParams.KubernetesDir, kubeadmconstants.AdminKubeConfigFileName), generateJoinArgs(i.cfg))
 	return nil
 }
 
