@@ -732,7 +732,7 @@ var _ = framework.KubeDescribe("Density", func() {
 					name := additionalPodsPrefix + "-" + strconv.Itoa(i+1)
 					framework.ExpectNoError(framework.DeleteRCAndWaitForGC(c, rcNameToNsMap[name], name))
 				}
-				workqueue.Parallelize(16, nodeCount, deleteRC)
+				workqueue.Parallelize(25, nodeCount, deleteRC)
 			}
 
 			cleanupDensityTest(dConfig)
