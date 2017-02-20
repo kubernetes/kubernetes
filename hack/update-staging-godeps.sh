@@ -46,7 +46,7 @@ if [ "${SKIP_RESTORE}" != "true" ]; then
 	GOPATH="${godepRestoreDir}:${KUBE_ROOT}/staging:${ORIGINAL_GOPATH}"
 	# restore from kubernetes godeps to ensure we get the correct levels
 	# you get errors about the staging repos not using a known version control system
-	godep restore > ${godepRestoreDir}/godep-restore.log	2>&1 || true
+	godep restore > ${godepRestoreDir}/godep-restore.log 2>&1 || true
 	echo "finished godep restore"
 fi
 
@@ -54,26 +54,27 @@ echo "forcing fake godep folders to match the current state of master in tmp"
 for stagingRepo in $(ls ${KUBE_ROOT}/staging/src/k8s.io); do
 	echo "    creating ${stagingRepo}"
 	rm -rf ${godepRestoreDir}/src/k8s.io/${stagingRepo}
-	cp -R ${KUBE_ROOT}/staging/src/k8s.io/${stagingRepo} ${godepRestoreDir}/src/k8s.io
+	cp -Ra ${KUBE_ROOT}/staging/src/k8s.io/${stagingRepo} ${godepRestoreDir}/src/k8s.io
 
 	# we need a git commit in the godep folder, otherwise godep won't save
 	pushd ${godepRestoreDir}/src/k8s.io/${stagingRepo}
 	git init > /dev/null
 	# we need this so later commands work, but nothing should ever actually include these commits
+	# these are local only, not global
 	git config user.email "you@example.com"
 	git config user.name "Your Name"
 	git add . > /dev/null
-	git commit -m "fake commit" > /dev/null
+	git commit -qm "fake commit"
 	popd
 done
 
 function updateGodepManifest() {
-	repo=${1}
+	local repo=${1}
 
 	echo "starting ${repo} save"
 	mkdir -p ${TARGET_DIR}/src/k8s.io
 	# if target_dir isn't the same as source dir, you need copy
-	cp -R ${KUBE_ROOT}/staging/src/${repo} ${TARGET_DIR}/src/k8s.io || true
+	test "${KUBE_ROOT}/staging" = "${TARGET_DIR}" || cp -Ra ${KUBE_ROOT}/staging/src/${repo} ${TARGET_DIR}/src/k8s.io
 	# remove the current Godeps.json so we always rebuild it
 	rm -rf ${TARGET_DIR}/src/${repo}/Godeps
 	GOPATH="${godepRestoreDir}:${TARGET_DIR}"

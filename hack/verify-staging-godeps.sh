@@ -30,7 +30,7 @@ TARGET_DIR=$(mktemp -d "${TMPDIR:-/tmp/}$(basename 0).XXXXXXXXXXXX")
 # Register function to be called on EXIT to remove folder.
 function cleanup {
 	SKIP_CLEANUP=${SKIP_CLEANUP:-}
-	if [ "${SKIP_RESTORE}" != "true" ]; then
+	if [ "${SKIP_CLEANUP}" != "true" ]; then
 		rm -rf "${TARGET_DIR}"
 	fi
 }
@@ -38,15 +38,12 @@ trap cleanup EXIT
 
 TARGET_DIR=${TARGET_DIR} ${KUBE_ROOT}/hack/update-staging-godeps.sh
 
-# check each staging repo to make sure its godeps.json is correct
+# check each staging repo to make sure its Godeps.json is correct
 for stagingRepo in $(ls ${KUBE_ROOT}/staging/src/k8s.io); do
 	# we have to skip client-go because it does unusual manipulation of its godeps
 	if [ "${stagingRepo}" == "client-go" ]; then
 		continue
 	fi
 
-	if ! diff -q ${KUBE_ROOT}/staging/src/k8s.io/${stagingRepo}/Godeps/Godeps.json ${TARGET_DIR}/src/k8s.io/${stagingRepo}/Godeps/Godeps.json; then
-		diff ${KUBE_ROOT}/staging/src/k8s.io/${stagingRepo}/Godeps/Godeps.json ${TARGET_DIR}/src/k8s.io/${stagingRepo}/Godeps/Godeps.json
-		exit 1
-	fi
+	diff ${KUBE_ROOT}/staging/src/k8s.io/${stagingRepo}/Godeps/Godeps.json ${TARGET_DIR}/src/k8s.io/${stagingRepo}/Godeps/Godeps.json
 done
