@@ -1121,11 +1121,11 @@ func (r *Runtime) getSelinuxContext(opt *v1.SELinuxOptions) (string, error) {
 func constructSyslogIdentifier(generateName string, podName string) string {
 	if (len(generateName) > 1 && generateName[len(generateName) - 1] == '-') {
 		return generateName[0:len(generateName) - 1]
-	} else if (len(generateName) > 0) {
-		return generateName
-	} else {
-		return podName
 	}
+	if (len(generateName) > 0) {
+		return generateName
+	}
+	return podName
 }
 
 // preparePod will:
