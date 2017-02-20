@@ -28,7 +28,6 @@ import (
 	"k8s.io/kubernetes/pkg/api/v1"
 	rbacv1beta1 "k8s.io/kubernetes/pkg/apis/rbac/v1beta1"
 	storage "k8s.io/kubernetes/pkg/apis/storage/v1"
-	storageutil "k8s.io/kubernetes/pkg/apis/storage/v1/util"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/test/e2e/framework"
 
@@ -264,13 +263,12 @@ func newClaim(ns, suffix string, alpha bool) *v1.PersistentVolumeClaim {
 
 	if alpha {
 		claim.Annotations = map[string]string{
-			storageutil.AlphaStorageClassAnnotation: "",
+			v1.AlphaStorageClassAnnotation: "",
 		}
 	} else {
 		claim.Annotations = map[string]string{
-			storageutil.StorageClassAnnotation: "myclass-" + suffix,
+			v1.BetaStorageClassAnnotation: "myclass-" + suffix,
 		}
-
 	}
 
 	return &claim

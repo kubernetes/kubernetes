@@ -43,7 +43,6 @@ import (
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/api/v1"
 	storage "k8s.io/kubernetes/pkg/apis/storage/v1"
-	storageutil "k8s.io/kubernetes/pkg/apis/storage/v1/util"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset/fake"
 	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated/externalversions"
@@ -658,7 +657,7 @@ func newVolume(name, capacity, boundToClaimUID, boundToClaimName string, phase v
 			switch a {
 			case annDynamicallyProvisioned:
 				volume.Annotations[a] = mockPluginName
-			case storageutil.StorageClassAnnotation:
+			case v1.BetaStorageClassAnnotation:
 				volume.Annotations[a] = "gold"
 			default:
 				volume.Annotations[a] = "yes"
@@ -711,9 +710,9 @@ func withMessage(message string, volumes []*v1.PersistentVolume) []*v1.Persisten
 // Meant to be used to compose claims specified inline in a test.
 func volumeWithClass(className string, volumes []*v1.PersistentVolume) []*v1.PersistentVolume {
 	if volumes[0].Annotations == nil {
-		volumes[0].Annotations = map[string]string{storageutil.StorageClassAnnotation: className}
+		volumes[0].Annotations = map[string]string{v1.BetaStorageClassAnnotation: className}
 	} else {
-		volumes[0].Annotations[storageutil.StorageClassAnnotation] = className
+		volumes[0].Annotations[v1.BetaStorageClassAnnotation] = className
 	}
 	return volumes
 }
@@ -755,7 +754,7 @@ func newClaim(name, claimUID, capacity, boundToVolume string, phase v1.Persisten
 		claim.Annotations = make(map[string]string)
 		for _, a := range annotations {
 			switch a {
-			case storageutil.StorageClassAnnotation:
+			case v1.BetaStorageClassAnnotation:
 				claim.Annotations[a] = "gold"
 			case annStorageProvisioner:
 				claim.Annotations[a] = mockPluginName
@@ -788,9 +787,9 @@ func newClaimArray(name, claimUID, capacity, boundToVolume string, phase v1.Pers
 // Meant to be used to compose claims specified inline in a test.
 func claimWithClass(className string, claims []*v1.PersistentVolumeClaim) []*v1.PersistentVolumeClaim {
 	if claims[0].Annotations == nil {
-		claims[0].Annotations = map[string]string{storageutil.StorageClassAnnotation: className}
+		claims[0].Annotations = map[string]string{v1.BetaStorageClassAnnotation: className}
 	} else {
-		claims[0].Annotations[storageutil.StorageClassAnnotation] = className
+		claims[0].Annotations[v1.BetaStorageClassAnnotation] = className
 	}
 	return claims
 }

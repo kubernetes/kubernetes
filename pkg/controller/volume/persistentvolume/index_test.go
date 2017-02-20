@@ -25,7 +25,6 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/api/v1"
-	storageutil "k8s.io/kubernetes/pkg/apis/storage/v1/util"
 )
 
 func makePVC(size string, modfn func(*v1.PersistentVolumeClaim)) *v1.PersistentVolumeClaim {
@@ -113,7 +112,7 @@ func TestMatchVolume(t *testing.T) {
 			expectedMatch: "gce-pd-silver1",
 			claim: makePVC("1G", func(pvc *v1.PersistentVolumeClaim) {
 				pvc.ObjectMeta.Annotations = map[string]string{
-					storageutil.StorageClassAnnotation: "silver",
+					v1.BetaStorageClassAnnotation: "silver",
 				}
 				pvc.Spec.Selector = &metav1.LabelSelector{
 					MatchLabels: map[string]string{
@@ -127,7 +126,7 @@ func TestMatchVolume(t *testing.T) {
 			expectedMatch: "gce-pd-silver2",
 			claim: makePVC("1G", func(pvc *v1.PersistentVolumeClaim) {
 				pvc.ObjectMeta.Annotations = map[string]string{
-					storageutil.StorageClassAnnotation: "silver",
+					v1.BetaStorageClassAnnotation: "silver",
 				}
 				pvc.Spec.AccessModes = []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce}
 			}),
@@ -543,7 +542,7 @@ func createTestVolumes() []*v1.PersistentVolume {
 					"should-exist": "true",
 				},
 				Annotations: map[string]string{
-					storageutil.StorageClassAnnotation: "silver",
+					v1.BetaStorageClassAnnotation: "silver",
 				},
 			},
 			Spec: v1.PersistentVolumeSpec{
@@ -563,7 +562,7 @@ func createTestVolumes() []*v1.PersistentVolume {
 				UID:  "gce-pd-silver2",
 				Name: "gce0024",
 				Annotations: map[string]string{
-					storageutil.StorageClassAnnotation: "silver",
+					v1.BetaStorageClassAnnotation: "silver",
 				},
 			},
 			Spec: v1.PersistentVolumeSpec{
@@ -583,7 +582,7 @@ func createTestVolumes() []*v1.PersistentVolume {
 				UID:  "gce-pd-gold",
 				Name: "gce0025",
 				Annotations: map[string]string{
-					storageutil.StorageClassAnnotation: "gold",
+					v1.BetaStorageClassAnnotation: "gold",
 				},
 			},
 			Spec: v1.PersistentVolumeSpec{

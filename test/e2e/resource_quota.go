@@ -25,7 +25,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/apis/storage/util"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/pkg/quota/evaluator/core"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -340,7 +339,7 @@ var _ = framework.KubeDescribe("ResourceQuota", func() {
 		By("Creating a PersistentVolumeClaim with storage class")
 		pvc := newTestPersistentVolumeClaimForQuota("test-claim")
 		pvc.Annotations = map[string]string{
-			util.StorageClassAnnotation: "gold",
+			v1.BetaStorageClassAnnotation: "gold",
 		}
 		pvc, err = f.ClientSet.Core().PersistentVolumeClaims(f.Namespace.Name).Create(pvc)
 		Expect(err).NotTo(HaveOccurred())

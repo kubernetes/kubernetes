@@ -21,7 +21,6 @@ import (
 
 	"k8s.io/kubernetes/pkg/api/v1"
 	storage "k8s.io/kubernetes/pkg/apis/storage/v1"
-	storageutil "k8s.io/kubernetes/pkg/apis/storage/v1/util"
 )
 
 // Test single call to syncClaim and syncVolume methods.
@@ -435,14 +434,14 @@ func TestSync(t *testing.T) {
 			"13-1 - binding to class",
 			[]*v1.PersistentVolume{
 				newVolume("volume13-1-1", "1Gi", "", "", v1.VolumePending, v1.PersistentVolumeReclaimRetain),
-				newVolume("volume13-1-2", "10Gi", "", "", v1.VolumePending, v1.PersistentVolumeReclaimRetain, storageutil.StorageClassAnnotation),
+				newVolume("volume13-1-2", "10Gi", "", "", v1.VolumePending, v1.PersistentVolumeReclaimRetain, v1.BetaStorageClassAnnotation),
 			},
 			[]*v1.PersistentVolume{
 				newVolume("volume13-1-1", "1Gi", "", "", v1.VolumePending, v1.PersistentVolumeReclaimRetain),
-				newVolume("volume13-1-2", "10Gi", "uid13-1", "claim13-1", v1.VolumeBound, v1.PersistentVolumeReclaimRetain, annBoundByController, storageutil.StorageClassAnnotation),
+				newVolume("volume13-1-2", "10Gi", "uid13-1", "claim13-1", v1.VolumeBound, v1.PersistentVolumeReclaimRetain, annBoundByController, v1.BetaStorageClassAnnotation),
 			},
-			newClaimArray("claim13-1", "uid13-1", "1Gi", "", v1.ClaimPending, storageutil.StorageClassAnnotation),
-			withExpectedCapacity("10Gi", newClaimArray("claim13-1", "uid13-1", "1Gi", "volume13-1-2", v1.ClaimBound, annBoundByController, storageutil.StorageClassAnnotation, annBindCompleted)),
+			newClaimArray("claim13-1", "uid13-1", "1Gi", "", v1.ClaimPending, v1.BetaStorageClassAnnotation),
+			withExpectedCapacity("10Gi", newClaimArray("claim13-1", "uid13-1", "1Gi", "volume13-1-2", v1.ClaimBound, annBoundByController, v1.BetaStorageClassAnnotation, annBindCompleted)),
 			noevents, noerrors, testSyncClaim,
 		},
 		{
@@ -450,11 +449,11 @@ func TestSync(t *testing.T) {
 			// smaller PV with a class available
 			"13-2 - binding without a class",
 			[]*v1.PersistentVolume{
-				newVolume("volume13-2-1", "1Gi", "", "", v1.VolumePending, v1.PersistentVolumeReclaimRetain, storageutil.StorageClassAnnotation),
+				newVolume("volume13-2-1", "1Gi", "", "", v1.VolumePending, v1.PersistentVolumeReclaimRetain, v1.BetaStorageClassAnnotation),
 				newVolume("volume13-2-2", "10Gi", "", "", v1.VolumePending, v1.PersistentVolumeReclaimRetain),
 			},
 			[]*v1.PersistentVolume{
-				newVolume("volume13-2-1", "1Gi", "", "", v1.VolumePending, v1.PersistentVolumeReclaimRetain, storageutil.StorageClassAnnotation),
+				newVolume("volume13-2-1", "1Gi", "", "", v1.VolumePending, v1.PersistentVolumeReclaimRetain, v1.BetaStorageClassAnnotation),
 				newVolume("volume13-2-2", "10Gi", "uid13-2", "claim13-2", v1.VolumeBound, v1.PersistentVolumeReclaimRetain, annBoundByController),
 			},
 			newClaimArray("claim13-2", "uid13-2", "1Gi", "", v1.ClaimPending),
@@ -467,14 +466,14 @@ func TestSync(t *testing.T) {
 			"13-3 - binding to specific a class",
 			volumeWithClass("silver", []*v1.PersistentVolume{
 				newVolume("volume13-3-1", "1Gi", "", "", v1.VolumePending, v1.PersistentVolumeReclaimRetain),
-				newVolume("volume13-3-2", "10Gi", "", "", v1.VolumePending, v1.PersistentVolumeReclaimRetain, storageutil.StorageClassAnnotation),
+				newVolume("volume13-3-2", "10Gi", "", "", v1.VolumePending, v1.PersistentVolumeReclaimRetain, v1.BetaStorageClassAnnotation),
 			}),
 			volumeWithClass("silver", []*v1.PersistentVolume{
 				newVolume("volume13-3-1", "1Gi", "", "", v1.VolumePending, v1.PersistentVolumeReclaimRetain),
-				newVolume("volume13-3-2", "10Gi", "uid13-3", "claim13-3", v1.VolumeBound, v1.PersistentVolumeReclaimRetain, annBoundByController, storageutil.StorageClassAnnotation),
+				newVolume("volume13-3-2", "10Gi", "uid13-3", "claim13-3", v1.VolumeBound, v1.PersistentVolumeReclaimRetain, annBoundByController, v1.BetaStorageClassAnnotation),
 			}),
-			newClaimArray("claim13-3", "uid13-3", "1Gi", "", v1.ClaimPending, storageutil.StorageClassAnnotation),
-			withExpectedCapacity("10Gi", newClaimArray("claim13-3", "uid13-3", "1Gi", "volume13-3-2", v1.ClaimBound, annBoundByController, annBindCompleted, storageutil.StorageClassAnnotation)),
+			newClaimArray("claim13-3", "uid13-3", "1Gi", "", v1.ClaimPending, v1.BetaStorageClassAnnotation),
+			withExpectedCapacity("10Gi", newClaimArray("claim13-3", "uid13-3", "1Gi", "volume13-3-2", v1.ClaimBound, annBoundByController, annBindCompleted, v1.BetaStorageClassAnnotation)),
 			noevents, noerrors, testSyncClaim,
 		},
 		{

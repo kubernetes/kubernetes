@@ -44,7 +44,6 @@ import (
 	utilpod "k8s.io/kubernetes/pkg/api/pod"
 	apiservice "k8s.io/kubernetes/pkg/api/service"
 	"k8s.io/kubernetes/pkg/api/v1"
-	storageutil "k8s.io/kubernetes/pkg/apis/storage/util"
 	"k8s.io/kubernetes/pkg/capabilities"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/security/apparmor"
@@ -1211,7 +1210,8 @@ func ValidatePersistentVolumeClaimUpdate(newPvc, oldPvc *api.PersistentVolumeCla
 	}
 
 	// storageclass annotation should be immutable after creation
-	allErrs = append(allErrs, ValidateImmutableAnnotation(newPvc.ObjectMeta.Annotations[storageutil.StorageClassAnnotation], oldPvc.ObjectMeta.Annotations[storageutil.StorageClassAnnotation], storageutil.StorageClassAnnotation, field.NewPath("metadata"))...)
+	// TODO: remove Beta when no longer needed
+	allErrs = append(allErrs, ValidateImmutableAnnotation(newPvc.ObjectMeta.Annotations[v1.BetaStorageClassAnnotation], oldPvc.ObjectMeta.Annotations[v1.BetaStorageClassAnnotation], v1.BetaStorageClassAnnotation, field.NewPath("metadata"))...)
 
 	newPvc.Status = oldPvc.Status
 	return allErrs

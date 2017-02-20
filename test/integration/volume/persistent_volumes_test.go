@@ -34,7 +34,6 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
 	storage "k8s.io/kubernetes/pkg/apis/storage/v1"
-	storageutil "k8s.io/kubernetes/pkg/apis/storage/v1/util"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated/externalversions"
 	fakecloud "k8s.io/kubernetes/pkg/cloudprovider/providers/fake"
@@ -889,7 +888,7 @@ func TestPersistentVolumeProvisionMultiPVCs(t *testing.T) {
 	for i := 0; i < objCount; i++ {
 		pvc := createPVC("pvc-provision-"+strconv.Itoa(i), ns.Name, "1G", []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce})
 		pvc.Annotations = map[string]string{
-			storageutil.StorageClassAnnotation: "gold",
+			v1.BetaStorageClassAnnotation: "gold",
 		}
 		pvcs[i] = pvc
 	}
