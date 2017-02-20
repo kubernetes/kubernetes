@@ -29,13 +29,33 @@ source "${KUBE_ROOT}/hack/lib/init.sh"
 
 kube::golang::setup_env
 
+ORIGINAL_GOPATH="${GOPATH}"
+
+godepBinDir=${TMPDIR:-/tmp/}/kube-godep-bin
+mkdir -p "${godepBinDir}"
+godep=${godepBinDir}/bin/godep
+pushd "${godepBinDir}" 2>&1 > /dev/null
+	# Build the godep tool
+	GOPATH="${godepBinDir}"
+	rm -rf *
+	go get -u github.com/tools/godep 2>/dev/null
+	export GODEP="${GOPATH}/bin/godep"
+	pin-godep() {
+		pushd "${GOPATH}/src/github.com/tools/godep" > /dev/null
+			git checkout "$1"
+			"${GODEP}" go install
+		popd > /dev/null
+	}
+	# Use to following if we ever need to pin godep to a specific version again
+	pin-godep 'v74'
+	"${godep}" version
+popd 2>&1 > /dev/null
+
 # keep the godep restore path reasonably stable to avoid unnecessary restores
 godepRestoreDir=${TMPDIR:-/tmp/}/kube-godep-restore
 
 TARGET_DIR=${TARGET_DIR:-${KUBE_ROOT}/staging}
 echo "working in ${TARGET_DIR}"
-
-ORIGINAL_GOPATH="${GOPATH}"
 
 SKIP_RESTORE=${SKIP_RESTORE:-}
 if [ "${SKIP_RESTORE}" != "true" ]; then
@@ -46,7 +66,7 @@ if [ "${SKIP_RESTORE}" != "true" ]; then
 	GOPATH="${godepRestoreDir}:${KUBE_ROOT}/staging:${ORIGINAL_GOPATH}"
 	# restore from kubernetes godeps to ensure we get the correct levels
 	# you get errors about the staging repos not using a known version control system
-	godep restore > ${godepRestoreDir}/godep-restore.log
+	${godep} restore > ${godepRestoreDir}/godep-restore.log
 	echo "finished godep restore"
 fi
 
@@ -79,7 +99,7 @@ function updateGodepManifest() {
 	rm -rf ${TARGET_DIR}/src/${repo}/Godeps
 	GOPATH="${godepRestoreDir}:${TARGET_DIR}"
 	pushd ${TARGET_DIR}/src/${repo}
-	godep save ./...
+	${godep} save ./...
 
 	# now remove all the go files.	We'll re-run a restore, go get, godep save cycle in the sync scripts
 	# to get the commits for other staging k8s.io repos anyway, so we don't need the added files
