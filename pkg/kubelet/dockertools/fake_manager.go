@@ -22,6 +22,7 @@ import (
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/flowcontrol"
 	"k8s.io/kubernetes/pkg/api/v1"
+	cadvisorfake "k8s.io/kubernetes/pkg/kubelet/cadvisor/fake"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/network"
 	proberesults "k8s.io/kubernetes/pkg/kubelet/prober/results"
@@ -50,7 +51,8 @@ func NewFakeDockerManager(
 	fakeProcFs := procfs.NewFakeProcFS()
 	fakePodGetter := &fakePodGetter{}
 	dm := NewDockerManager(client, recorder, livenessManager, containerRefManager, fakePodGetter, machineInfo, podInfraContainerImage, qps,
-		burst, containerLogsDir, osInterface, networkPlugin, runtimeHelper, httpClient, &NativeExecHandler{},
+		burst, containerLogsDir, osInterface, networkPlugin, runtimeHelper,
+		&cadvisorfake.Fake{}, httpClient, &NativeExecHandler{},
 		fakeOOMAdjuster, fakeProcFs, false, imageBackOff, false, false, true, "/var/lib/kubelet/seccomp")
 	dm.dockerPuller = &FakeDockerPuller{}
 

@@ -29,6 +29,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/componentconfig"
 	internalapi "k8s.io/kubernetes/pkg/kubelet/api"
 	runtimeapi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
+	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
 	kubecm "k8s.io/kubernetes/pkg/kubelet/cm"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/dockershim/cm"
@@ -145,11 +146,12 @@ var internalLabelKeys []string = []string{containerTypeLabelKey, containerLogPat
 
 // NOTE: Anything passed to DockerService should be eventually handled in another way when we switch to running the shim as a different process.
 func NewDockerService(client dockertools.DockerInterface, seccompProfileRoot string, podSandboxImage string, streamingConfig *streaming.Config,
-	pluginSettings *NetworkPluginSettings, cgroupsName string, kubeCgroupDriver string, execHandler dockertools.ExecHandler) (DockerService, error) {
+	pluginSettings *NetworkPluginSettings, cgroupsName string, kubeCgroupDriver string, execHandler dockertools.ExecHandler, cadvisor cadvisor.Interface) (DockerService, error) {
 	c := dockertools.NewInstrumentedDockerInterface(client)
 	ds := &dockerService{
 		seccompProfileRoot: seccompProfileRoot,
 		client:             c,
+		cadvisor:           cadvisor,
 		os:                 kubecontainer.RealOS{},
 		podSandboxImage:    podSandboxImage,
 		streamingRuntime: &streamingRuntime{
@@ -236,6 +238,8 @@ type dockerService struct {
 	// version checking for some operations. Use this cache to avoid querying
 	// the docker daemon every time we need to do such checks.
 	versionCache *cache.ObjectCache
+	// cadvisor client.
+	cadvisor cadvisor.Interface
 }
 
 // Version returns the runtime name, runtime version and runtime API version

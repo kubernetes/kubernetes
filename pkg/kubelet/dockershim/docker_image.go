@@ -91,7 +91,9 @@ func (ds *dockerService) RemoveImage(image *runtimeapi.ImageSpec) error {
 	imageInspect, err := ds.client.InspectImageByID(image.Image)
 	if err == nil && imageInspect != nil && len(imageInspect.RepoTags) > 1 {
 		for _, tag := range imageInspect.RepoTags {
-			if _, err := ds.client.RemoveImage(tag, dockertypes.ImageRemoveOptions{PruneChildren: true}); err != nil {
+			if _, err = ds.client.RemoveImage(tag,
+				dockertypes.ImageRemoveOptions{
+					PruneChildren: true}); err != nil {
 				return err
 			}
 		}
@@ -100,4 +102,32 @@ func (ds *dockerService) RemoveImage(image *runtimeapi.ImageSpec) error {
 
 	_, err = ds.client.RemoveImage(image.Image, dockertypes.ImageRemoveOptions{PruneChildren: true})
 	return err
+}
+
+// ImageFsInfo returns filesytem information of images.
+func (ds *dockerService) ImageFsInfo() (*runtimeapi.FsInfo, error) {
+	imageFSInfo, err := ds.cadvisor.ImagesFsInfo()
+	if err != nil {
+		return nil, err
+	}
+
+	fsInfo := &runtimeapi.FsInfo{
+		Device:     imageFSInfo.Device,
+		Mountpoint: imageFSInfo.Mountpoint,
+		Available:  imageFSInfo.Available,
+		Usage:      imageFSInfo.Usage,
+		Labels:     imageFSInfo.Labels,
+	}
+	if imageFSInfo.Inodes != nil {
+		fsInfo.Inodes = &runtimeapi.UInt64Value{
+			Value: *imageFSInfo.Inodes,
+		}
+	}
+	if imageFSInfo.InodesFree != nil {
+		fsInfo.InodesFree = &runtimeapi.UInt64Value{
+			Value: *imageFSInfo.InodesFree,
+		}
+	}
+
+	return fsInfo, nil
 }

@@ -21,6 +21,7 @@ import (
 	"sync"
 
 	"github.com/golang/glog"
+	cadvisorapiv2 "github.com/google/cadvisor/info/v2"
 
 	dockertypes "github.com/docker/engine-api/types"
 	runtime "k8s.io/kubernetes/pkg/kubelet/container"
@@ -99,4 +100,9 @@ func (isp *imageStatsProvider) ImageStats() (*runtime.ImageStats, error) {
 	isp.layers = newLayers
 	isp.imageToLayerIDs = newImageToLayerIDs
 	return ret, nil
+}
+
+// ImageFsInfo gets filesytem information of images.
+func (dm *DockerManager) ImageFsInfo() (cadvisorapiv2.FsInfo, error) {
+	return dm.cadvisor.ImagesFsInfo()
 }

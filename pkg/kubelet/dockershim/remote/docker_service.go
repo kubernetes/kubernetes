@@ -214,3 +214,12 @@ func (d *dockerService) RemoveImage(ctx context.Context, r *runtimeapi.RemoveIma
 	}
 	return &runtimeapi.RemoveImageResponse{}, nil
 }
+
+func (d *dockerService) ImageFsInfo(ctx context.Context, r *runtimeapi.ImageFsInfoRequest) (*runtimeapi.ImageFsInfoResponse, error) {
+	imageFSInfo, err := d.imageService.ImageFsInfo()
+	if err != nil {
+		return nil, err
+	}
+
+	return &runtimeapi.ImageFsInfoResponse{FsInfo: imageFSInfo}, nil
+}

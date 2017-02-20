@@ -52,6 +52,7 @@ import (
 	"k8s.io/client-go/util/flowcontrol"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
+	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	dockersecurity "k8s.io/kubernetes/pkg/kubelet/dockertools/securitycontext"
@@ -133,6 +134,7 @@ type DockerManager struct {
 	containerRefManager *kubecontainer.RefManager
 	os                  kubecontainer.OSInterface
 	machineInfo         *cadvisorapi.MachineInfo
+	cadvisor            cadvisor.Interface
 
 	// The image name of the pod infra container.
 	podInfraContainerImage string
@@ -228,6 +230,7 @@ func NewDockerManager(
 	osInterface kubecontainer.OSInterface,
 	networkPlugin knetwork.NetworkPlugin,
 	runtimeHelper kubecontainer.RuntimeHelper,
+	cadvisor cadvisor.Interface,
 	httpClient types.HttpGetter,
 	execHandler ExecHandler,
 	oomAdjuster *oom.OOMAdjuster,
@@ -263,6 +266,7 @@ func NewDockerManager(
 		containerRefManager:    containerRefManager,
 		os:                     osInterface,
 		machineInfo:            machineInfo,
+		cadvisor:               cadvisor,
 		podInfraContainerImage: podInfraContainerImage,
 		dockerPuller:           newDockerPuller(client),
 		cgroupDriver:           cgroupDriver,
