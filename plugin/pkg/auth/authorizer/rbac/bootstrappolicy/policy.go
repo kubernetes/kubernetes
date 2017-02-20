@@ -294,6 +294,8 @@ func ClusterRoles() []rbac.ClusterRole {
 				rbac.NewRule("delete").Groups(legacyGroup).Resources("secrets").RuleOrDie(),
 				rbac.NewRule("get").Groups(legacyGroup).Resources("endpoints", "namespaces", "serviceaccounts").RuleOrDie(),
 				rbac.NewRule("update").Groups(legacyGroup).Resources("endpoints", "serviceaccounts").RuleOrDie(),
+				// Needed to check API access.  These creates are non-mutating
+				rbac.NewRule("create").Groups(authenticationGroup).Resources("tokenreviews").RuleOrDie(),
 
 				rbac.NewRule("list", "watch").Groups(legacyGroup).Resources(
 					"configmaps",
