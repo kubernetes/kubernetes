@@ -29,6 +29,7 @@ RUNTIME_CONFIG=${RUNTIME_CONFIG:-""}
 KUBELET_AUTHORIZATION_WEBHOOK=${KUBELET_AUTHORIZATION_WEBHOOK:-""}
 KUBELET_AUTHENTICATION_WEBHOOK=${KUBELET_AUTHENTICATION_WEBHOOK:-""}
 POD_MANIFEST_PATH=${POD_MANIFEST_PATH:-"/var/run/kubernetes/static-pods"}
+ENABLE_KUBELET_DEBUG_HANDLERS=${ENABLE_KUBELET_DEBUG_HANDLERS:-false}
 # Name of the network plugin, eg: "kubenet"
 NET_PLUGIN=${NET_PLUGIN:-""}
 # Place the binaries required by NET_PLUGIN in this directory, eg: "/home/kubernetes/bin".
@@ -590,6 +591,7 @@ function start_kubelet {
         --eviction-soft=${EVICTION_SOFT} \
         --eviction-pressure-transition-period=${EVICTION_PRESSURE_TRANSITION_PERIOD} \
         --pod-manifest-path="${POD_MANIFEST_PATH}" \
+        --enable-debugging-handlers=${ENABLE_KUBELET_DEBUG_HANDLERS} \
         ${auth_args} \
         ${dns_args} \
         ${net_plugin_dir_args} \
@@ -794,6 +796,9 @@ if [[ "${START_MODE}" != "nokubelet" ]]; then
         ;;
       Linux)
         start_kubelet
+	if [[ "${ENABLE_KUBELET_DEBUG_HANDLER}" = true ]]; then
+	  warning "kubelet is debug mode."
+	fi
         ;;
       *)
         warning "Unsupported host OS.  Must be Linux or Mac OS X, kubelet aborted."
