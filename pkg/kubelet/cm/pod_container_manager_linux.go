@@ -194,6 +194,9 @@ func (m *podContainerManagerImpl) GetAllPodsFromCgroups() (map[types.UID]CgroupN
 			qc := path.Join(val, qcConversion)
 			dirInfo, err := ioutil.ReadDir(qc)
 			if err != nil {
+				if os.IsNotExist(err) {
+					continue
+				}
 				return nil, fmt.Errorf("failed to read the cgroup directory %v : %v", qc, err)
 			}
 			for i := range dirInfo {
