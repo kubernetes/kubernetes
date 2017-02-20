@@ -90,6 +90,8 @@ service ImageService {
     // This call is idempotent, and must not return an error if the image has
     // already been removed.
     rpc RemoveImage(RemoveImageRequest) returns (RemoveImageResponse) {}
+    // ImageFsInfo returns filesytem information of images.
+    rpc ImageFsInfo(ImageFsInfoRequest) returns (ImageFsInfoResponse) {}
 }
 
 message VersionRequest {
@@ -969,4 +971,37 @@ message StatusRequest {}
 message StatusResponse {
     // Status of the Runtime.
     RuntimeStatus status = 1;
+}
+
+message ImageFsInfoRequest {}
+
+// UInt64Value is the wrapper of uint64.
+message UInt64Value {
+    // The value.
+    uint64 value = 1;
+}
+
+// FsInfo is the filesystem information of the images.
+message FsInfo {
+    // The block device name associated with the filesystem.
+    string device = 1;
+    // Path where the filesystem is mounted.
+    string mountpoint = 2;
+    // Filesystem usage in bytes.
+    uint64 capacity = 3;
+    // Bytes available for non-root use.
+    uint64 available = 4;
+    // Number of bytes used on this filesystem.
+    uint64 usage = 5;
+    // Labels associated with this filesystem.
+    repeated string labels = 6;
+    // Number of Inodes.
+    UInt64Value inodes = 7;
+    // Number of available Inodes (if known)
+    UInt64Value inodes_free = 8;
+}
+
+message ImageFsInfoResponse {
+    // filesystem information of images.
+    FsInfo fs_info = 1;
 }
