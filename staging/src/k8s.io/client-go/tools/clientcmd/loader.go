@@ -25,6 +25,7 @@ import (
 	"path/filepath"
 	"reflect"
 	goruntime "runtime"
+	"sort"
 	"strings"
 
 	"github.com/golang/glog"
@@ -48,6 +49,7 @@ const (
 )
 
 var RecommendedHomeFile = path.Join(homedir.HomeDir(), RecommendedHomeDir, RecommendedFileName)
+var RecommendedHomeFileDir = path.Join(homedir.HomeDir(), RecommendedHomeDir, RecommendedFileName+".d")
 var RecommendedSchemaFile = path.Join(homedir.HomeDir(), RecommendedHomeDir, RecommendedSchemaName)
 
 // currentMigrationRules returns a map that holds the history of recommended home directories used in previous versions.
@@ -129,6 +131,22 @@ type ClientConfigLoadingRules struct {
 // ClientConfigLoadingRules implements the ClientConfigLoader interface.
 var _ ClientConfigLoader = &ClientConfigLoadingRules{}
 
+// getRecommendedHomeFileOrDir returns RecommendedHomeFileDir if RecommendedHomeFile is empty or non-existent.
+// otherwise returns RecommendedHomeFile.
+func getRecommendedHomeFileOrDir() []string {
+	if len(RecommendedHomeFile) == 0 {
+		return []string{RecommendedHomeFileDir}
+	}
+	_, err := os.Stat(RecommendedHomeFile)
+	if os.IsNotExist(err) {
+		return []string{RecommendedHomeFileDir}
+	}
+	if err != nil {
+		glog.V(3).Infof("Failed to get config (%v)", err)
+	}
+	return []string{RecommendedHomeFile}
+}
+
 // NewDefaultClientConfigLoadingRules returns a ClientConfigLoadingRules object with default fields filled in.  You are not required to
 // use this constructor
 func NewDefaultClientConfigLoadingRules() *ClientConfigLoadingRules {
@@ -136,16 +154,47 @@ func NewDefaultClientConfigLoadingRules() *ClientConfigLoadingRules {
 
 	envVarFiles := os.Getenv(RecommendedConfigPathEnvVar)
 	if len(envVarFiles) != 0 {
-		chain = append(chain, filepath.SplitList(envVarFiles)...)
-
+		files := filepath.SplitList(envVarFiles)
+		chain = append(chain, files...)
 	} else {
-		chain = append(chain, RecommendedHomeFile)
+		chain = getRecommendedHomeFileOrDir()
 	}
 
 	return &ClientConfigLoadingRules{
 		Precedence:     chain,
 		MigrationRules: currentMigrationRules(),
 	}
+}
+
+func loadFileOrDir(fileOrDir string) ([]string, error) {
+	stat, err := os.Stat(fileOrDir)
+	if err != nil {
+		return []string{}, err
+	}
+	if stat.IsDir() {
+		return loadConfigDir(fileOrDir)
+	}
+	return []string{fileOrDir}, nil
+}
+
+func loadConfigDir(dir string) ([]string, error) {
+	if len(dir) == 0 {
+		return []string{}, nil
+	}
+	files, err := ioutil.ReadDir(dir)
+	if err != nil {
+		return []string{}, err
+	}
+	result := []string{}
+	for _, file := range files {
+		// Skip hidden files
+		if strings.HasPrefix(file.Name(), ".") {
+			continue
+		}
+		result = append(result, path.Join(dir, file.Name()))
+	}
+	sort.Strings(result)
+	return result, nil
 }
 
 // Load starts by running the MigrationRules and then
@@ -168,17 +217,26 @@ func (rules *ClientConfigLoadingRules) Load() (*clientcmdapi.Config, error) {
 
 	errlist := []error{}
 
-	kubeConfigFiles := []string{}
+	kubeConfigFilesOrDirs := []string{}
 
 	// Make sure a file we were explicitly told to use exists
 	if len(rules.ExplicitPath) > 0 {
 		if _, err := os.Stat(rules.ExplicitPath); os.IsNotExist(err) {
 			return nil, err
 		}
-		kubeConfigFiles = append(kubeConfigFiles, rules.ExplicitPath)
+		kubeConfigFilesOrDirs = append(kubeConfigFilesOrDirs, rules.ExplicitPath)
 
 	} else {
-		kubeConfigFiles = append(kubeConfigFiles, rules.Precedence...)
+		kubeConfigFilesOrDirs = append(kubeConfigFilesOrDirs, rules.Precedence...)
+	}
+
+	kubeConfigFiles := []string{}
+	for _, file := range kubeConfigFilesOrDirs {
+		files, err := loadFileOrDir(file)
+		if err != nil {
+			return nil, err
+		}
+		kubeConfigFiles = append(kubeConfigFiles, files...)
 	}
 
 	kubeconfigs := []*clientcmdapi.Config{}
