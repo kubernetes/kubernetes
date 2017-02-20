@@ -35,31 +35,33 @@ func init() {
 // to allow building arbitrary schemes.
 func RegisterDeepCopies(scheme *runtime.Scheme) error {
 	return scheme.AddGeneratedDeepCopyFuncs(
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_imagepolicy_ImageReview, InType: reflect.TypeOf(&ImageReview{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_imagepolicy_ImageReviewContainerSpec, InType: reflect.TypeOf(&ImageReviewContainerSpec{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_imagepolicy_ImageReviewSpec, InType: reflect.TypeOf(&ImageReviewSpec{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_imagepolicy_ImageReviewStatus, InType: reflect.TypeOf(&ImageReviewStatus{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopyimagepolicyImageReview, InType: reflect.TypeOf(&ImageReview{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopyimagepolicyImageReviewContainerSpec, InType: reflect.TypeOf(&ImageReviewContainerSpec{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopyimagepolicyImageReviewSpec, InType: reflect.TypeOf(&ImageReviewSpec{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopyimagepolicyImageReviewStatus, InType: reflect.TypeOf(&ImageReviewStatus{})},
 	)
 }
 
-func DeepCopy_imagepolicy_ImageReview(in interface{}, out interface{}, c *conversion.Cloner) error {
+// DeepCopyimagepolicyImageReview ...
+func DeepCopyimagepolicyImageReview(in interface{}, out interface{}, c *conversion.Cloner) error {
 	{
 		in := in.(*ImageReview)
 		out := out.(*ImageReview)
 		*out = *in
-		if newVal, err := c.DeepCopy(&in.ObjectMeta); err != nil {
-			return err
-		} else {
+		if newVal, err := c.DeepCopy(&in.ObjectMeta); err == nil {
 			out.ObjectMeta = *newVal.(*v1.ObjectMeta)
+		} else {
+			return err
 		}
-		if err := DeepCopy_imagepolicy_ImageReviewSpec(&in.Spec, &out.Spec, c); err != nil {
+		if err := DeepCopyimagepolicyImageReviewSpec(&in.Spec, &out.Spec, c); err != nil {
 			return err
 		}
 		return nil
 	}
 }
 
-func DeepCopy_imagepolicy_ImageReviewContainerSpec(in interface{}, out interface{}, c *conversion.Cloner) error {
+// DeepCopyimagepolicyImageReviewContainerSpec ...
+func DeepCopyimagepolicyImageReviewContainerSpec(in interface{}, out interface{}, c *conversion.Cloner) error {
 	{
 		in := in.(*ImageReviewContainerSpec)
 		out := out.(*ImageReviewContainerSpec)
@@ -68,7 +70,8 @@ func DeepCopy_imagepolicy_ImageReviewContainerSpec(in interface{}, out interface
 	}
 }
 
-func DeepCopy_imagepolicy_ImageReviewSpec(in interface{}, out interface{}, c *conversion.Cloner) error {
+// DeepCopyimagepolicyImageReviewSpec ...
+func DeepCopyimagepolicyImageReviewSpec(in interface{}, out interface{}, c *conversion.Cloner) error {
 	{
 		in := in.(*ImageReviewSpec)
 		out := out.(*ImageReviewSpec)
@@ -89,7 +92,8 @@ func DeepCopy_imagepolicy_ImageReviewSpec(in interface{}, out interface{}, c *co
 	}
 }
 
-func DeepCopy_imagepolicy_ImageReviewStatus(in interface{}, out interface{}, c *conversion.Cloner) error {
+// DeepCopyimagepolicyImageReviewStatus ...
+func DeepCopyimagepolicyImageReviewStatus(in interface{}, out interface{}, c *conversion.Cloner) error {
 	{
 		in := in.(*ImageReviewStatus)
 		out := out.(*ImageReviewStatus)

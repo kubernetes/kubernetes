@@ -35,35 +35,36 @@ func init() {
 // to allow building arbitrary schemes.
 func RegisterDeepCopies(scheme *runtime.Scheme) error {
 	return scheme.AddGeneratedDeepCopyFuncs(
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1beta1_ClusterRole, InType: reflect.TypeOf(&ClusterRole{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1beta1_ClusterRoleBinding, InType: reflect.TypeOf(&ClusterRoleBinding{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1beta1_ClusterRoleBindingList, InType: reflect.TypeOf(&ClusterRoleBindingList{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1beta1_ClusterRoleList, InType: reflect.TypeOf(&ClusterRoleList{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1beta1_PolicyRule, InType: reflect.TypeOf(&PolicyRule{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1beta1_Role, InType: reflect.TypeOf(&Role{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1beta1_RoleBinding, InType: reflect.TypeOf(&RoleBinding{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1beta1_RoleBindingList, InType: reflect.TypeOf(&RoleBindingList{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1beta1_RoleList, InType: reflect.TypeOf(&RoleList{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1beta1_RoleRef, InType: reflect.TypeOf(&RoleRef{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1beta1_Subject, InType: reflect.TypeOf(&Subject{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopyv1beta1ClusterRole, InType: reflect.TypeOf(&ClusterRole{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopyv1beta1ClusterRoleBinding, InType: reflect.TypeOf(&ClusterRoleBinding{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopyv1beta1ClusterRoleBindingList, InType: reflect.TypeOf(&ClusterRoleBindingList{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopyv1beta1ClusterRoleList, InType: reflect.TypeOf(&ClusterRoleList{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopyv1beta1PolicyRule, InType: reflect.TypeOf(&PolicyRule{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopyv1beta1Role, InType: reflect.TypeOf(&Role{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopyv1beta1RoleBinding, InType: reflect.TypeOf(&RoleBinding{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopyv1beta1RoleBindingList, InType: reflect.TypeOf(&RoleBindingList{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopyv1beta1RoleList, InType: reflect.TypeOf(&RoleList{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopyv1beta1RoleRef, InType: reflect.TypeOf(&RoleRef{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopyv1beta1Subject, InType: reflect.TypeOf(&Subject{})},
 	)
 }
 
-func DeepCopy_v1beta1_ClusterRole(in interface{}, out interface{}, c *conversion.Cloner) error {
+// DeepCopyv1beta1ClusterRole ...
+func DeepCopyv1beta1ClusterRole(in interface{}, out interface{}, c *conversion.Cloner) error {
 	{
 		in := in.(*ClusterRole)
 		out := out.(*ClusterRole)
 		*out = *in
-		if newVal, err := c.DeepCopy(&in.ObjectMeta); err != nil {
-			return err
-		} else {
+		if newVal, err := c.DeepCopy(&in.ObjectMeta); err == nil {
 			out.ObjectMeta = *newVal.(*v1.ObjectMeta)
+		} else {
+			return err
 		}
 		if in.Rules != nil {
 			in, out := &in.Rules, &out.Rules
 			*out = make([]PolicyRule, len(*in))
 			for i := range *in {
-				if err := DeepCopy_v1beta1_PolicyRule(&(*in)[i], &(*out)[i], c); err != nil {
+				if err := DeepCopyv1beta1PolicyRule(&(*in)[i], &(*out)[i], c); err != nil {
 					return err
 				}
 			}
@@ -72,15 +73,16 @@ func DeepCopy_v1beta1_ClusterRole(in interface{}, out interface{}, c *conversion
 	}
 }
 
-func DeepCopy_v1beta1_ClusterRoleBinding(in interface{}, out interface{}, c *conversion.Cloner) error {
+// DeepCopyv1beta1ClusterRoleBinding ...
+func DeepCopyv1beta1ClusterRoleBinding(in interface{}, out interface{}, c *conversion.Cloner) error {
 	{
 		in := in.(*ClusterRoleBinding)
 		out := out.(*ClusterRoleBinding)
 		*out = *in
-		if newVal, err := c.DeepCopy(&in.ObjectMeta); err != nil {
-			return err
-		} else {
+		if newVal, err := c.DeepCopy(&in.ObjectMeta); err == nil {
 			out.ObjectMeta = *newVal.(*v1.ObjectMeta)
+		} else {
+			return err
 		}
 		if in.Subjects != nil {
 			in, out := &in.Subjects, &out.Subjects
@@ -91,7 +93,8 @@ func DeepCopy_v1beta1_ClusterRoleBinding(in interface{}, out interface{}, c *con
 	}
 }
 
-func DeepCopy_v1beta1_ClusterRoleBindingList(in interface{}, out interface{}, c *conversion.Cloner) error {
+// DeepCopyv1beta1ClusterRoleBindingList ...
+func DeepCopyv1beta1ClusterRoleBindingList(in interface{}, out interface{}, c *conversion.Cloner) error {
 	{
 		in := in.(*ClusterRoleBindingList)
 		out := out.(*ClusterRoleBindingList)
@@ -100,7 +103,7 @@ func DeepCopy_v1beta1_ClusterRoleBindingList(in interface{}, out interface{}, c 
 			in, out := &in.Items, &out.Items
 			*out = make([]ClusterRoleBinding, len(*in))
 			for i := range *in {
-				if err := DeepCopy_v1beta1_ClusterRoleBinding(&(*in)[i], &(*out)[i], c); err != nil {
+				if err := DeepCopyv1beta1ClusterRoleBinding(&(*in)[i], &(*out)[i], c); err != nil {
 					return err
 				}
 			}
@@ -109,7 +112,8 @@ func DeepCopy_v1beta1_ClusterRoleBindingList(in interface{}, out interface{}, c 
 	}
 }
 
-func DeepCopy_v1beta1_ClusterRoleList(in interface{}, out interface{}, c *conversion.Cloner) error {
+// DeepCopyv1beta1ClusterRoleList ...
+func DeepCopyv1beta1ClusterRoleList(in interface{}, out interface{}, c *conversion.Cloner) error {
 	{
 		in := in.(*ClusterRoleList)
 		out := out.(*ClusterRoleList)
@@ -118,7 +122,7 @@ func DeepCopy_v1beta1_ClusterRoleList(in interface{}, out interface{}, c *conver
 			in, out := &in.Items, &out.Items
 			*out = make([]ClusterRole, len(*in))
 			for i := range *in {
-				if err := DeepCopy_v1beta1_ClusterRole(&(*in)[i], &(*out)[i], c); err != nil {
+				if err := DeepCopyv1beta1ClusterRole(&(*in)[i], &(*out)[i], c); err != nil {
 					return err
 				}
 			}
@@ -127,7 +131,8 @@ func DeepCopy_v1beta1_ClusterRoleList(in interface{}, out interface{}, c *conver
 	}
 }
 
-func DeepCopy_v1beta1_PolicyRule(in interface{}, out interface{}, c *conversion.Cloner) error {
+// DeepCopyv1beta1PolicyRule ...
+func DeepCopyv1beta1PolicyRule(in interface{}, out interface{}, c *conversion.Cloner) error {
 	{
 		in := in.(*PolicyRule)
 		out := out.(*PolicyRule)
@@ -161,21 +166,22 @@ func DeepCopy_v1beta1_PolicyRule(in interface{}, out interface{}, c *conversion.
 	}
 }
 
-func DeepCopy_v1beta1_Role(in interface{}, out interface{}, c *conversion.Cloner) error {
+// DeepCopyv1beta1Role ...
+func DeepCopyv1beta1Role(in interface{}, out interface{}, c *conversion.Cloner) error {
 	{
 		in := in.(*Role)
 		out := out.(*Role)
 		*out = *in
-		if newVal, err := c.DeepCopy(&in.ObjectMeta); err != nil {
-			return err
-		} else {
+		if newVal, err := c.DeepCopy(&in.ObjectMeta); err == nil {
 			out.ObjectMeta = *newVal.(*v1.ObjectMeta)
+		} else {
+			return err
 		}
 		if in.Rules != nil {
 			in, out := &in.Rules, &out.Rules
 			*out = make([]PolicyRule, len(*in))
 			for i := range *in {
-				if err := DeepCopy_v1beta1_PolicyRule(&(*in)[i], &(*out)[i], c); err != nil {
+				if err := DeepCopyv1beta1PolicyRule(&(*in)[i], &(*out)[i], c); err != nil {
 					return err
 				}
 			}
@@ -184,15 +190,16 @@ func DeepCopy_v1beta1_Role(in interface{}, out interface{}, c *conversion.Cloner
 	}
 }
 
-func DeepCopy_v1beta1_RoleBinding(in interface{}, out interface{}, c *conversion.Cloner) error {
+// DeepCopyv1beta1RoleBinding ...
+func DeepCopyv1beta1RoleBinding(in interface{}, out interface{}, c *conversion.Cloner) error {
 	{
 		in := in.(*RoleBinding)
 		out := out.(*RoleBinding)
 		*out = *in
-		if newVal, err := c.DeepCopy(&in.ObjectMeta); err != nil {
-			return err
-		} else {
+		if newVal, err := c.DeepCopy(&in.ObjectMeta); err == nil {
 			out.ObjectMeta = *newVal.(*v1.ObjectMeta)
+		} else {
+			return err
 		}
 		if in.Subjects != nil {
 			in, out := &in.Subjects, &out.Subjects
@@ -203,7 +210,8 @@ func DeepCopy_v1beta1_RoleBinding(in interface{}, out interface{}, c *conversion
 	}
 }
 
-func DeepCopy_v1beta1_RoleBindingList(in interface{}, out interface{}, c *conversion.Cloner) error {
+// DeepCopyv1beta1RoleBindingList ...
+func DeepCopyv1beta1RoleBindingList(in interface{}, out interface{}, c *conversion.Cloner) error {
 	{
 		in := in.(*RoleBindingList)
 		out := out.(*RoleBindingList)
@@ -212,7 +220,7 @@ func DeepCopy_v1beta1_RoleBindingList(in interface{}, out interface{}, c *conver
 			in, out := &in.Items, &out.Items
 			*out = make([]RoleBinding, len(*in))
 			for i := range *in {
-				if err := DeepCopy_v1beta1_RoleBinding(&(*in)[i], &(*out)[i], c); err != nil {
+				if err := DeepCopyv1beta1RoleBinding(&(*in)[i], &(*out)[i], c); err != nil {
 					return err
 				}
 			}
@@ -221,7 +229,8 @@ func DeepCopy_v1beta1_RoleBindingList(in interface{}, out interface{}, c *conver
 	}
 }
 
-func DeepCopy_v1beta1_RoleList(in interface{}, out interface{}, c *conversion.Cloner) error {
+// DeepCopyv1beta1RoleList ...
+func DeepCopyv1beta1RoleList(in interface{}, out interface{}, c *conversion.Cloner) error {
 	{
 		in := in.(*RoleList)
 		out := out.(*RoleList)
@@ -230,7 +239,7 @@ func DeepCopy_v1beta1_RoleList(in interface{}, out interface{}, c *conversion.Cl
 			in, out := &in.Items, &out.Items
 			*out = make([]Role, len(*in))
 			for i := range *in {
-				if err := DeepCopy_v1beta1_Role(&(*in)[i], &(*out)[i], c); err != nil {
+				if err := DeepCopyv1beta1Role(&(*in)[i], &(*out)[i], c); err != nil {
 					return err
 				}
 			}
@@ -239,7 +248,8 @@ func DeepCopy_v1beta1_RoleList(in interface{}, out interface{}, c *conversion.Cl
 	}
 }
 
-func DeepCopy_v1beta1_RoleRef(in interface{}, out interface{}, c *conversion.Cloner) error {
+// DeepCopyv1beta1RoleRef ...
+func DeepCopyv1beta1RoleRef(in interface{}, out interface{}, c *conversion.Cloner) error {
 	{
 		in := in.(*RoleRef)
 		out := out.(*RoleRef)
@@ -248,7 +258,8 @@ func DeepCopy_v1beta1_RoleRef(in interface{}, out interface{}, c *conversion.Clo
 	}
 }
 
-func DeepCopy_v1beta1_Subject(in interface{}, out interface{}, c *conversion.Cloner) error {
+// DeepCopyv1beta1Subject ...
+func DeepCopyv1beta1Subject(in interface{}, out interface{}, c *conversion.Cloner) error {
 	{
 		in := in.(*Subject)
 		out := out.(*Subject)

@@ -35,32 +35,34 @@ func init() {
 // to allow building arbitrary schemes.
 func RegisterDeepCopies(scheme *runtime.Scheme) error {
 	return scheme.AddGeneratedDeepCopyFuncs(
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1alpha1_APIService, InType: reflect.TypeOf(&APIService{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1alpha1_APIServiceList, InType: reflect.TypeOf(&APIServiceList{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1alpha1_APIServiceSpec, InType: reflect.TypeOf(&APIServiceSpec{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1alpha1_APIServiceStatus, InType: reflect.TypeOf(&APIServiceStatus{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1alpha1_ServiceReference, InType: reflect.TypeOf(&ServiceReference{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopyv1alpha1APIService, InType: reflect.TypeOf(&APIService{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopyv1alpha1APIServiceList, InType: reflect.TypeOf(&APIServiceList{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopyv1alpha1APIServiceSpec, InType: reflect.TypeOf(&APIServiceSpec{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopyv1alpha1APIServiceStatus, InType: reflect.TypeOf(&APIServiceStatus{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopyv1alpha1ServiceReference, InType: reflect.TypeOf(&ServiceReference{})},
 	)
 }
 
-func DeepCopy_v1alpha1_APIService(in interface{}, out interface{}, c *conversion.Cloner) error {
+// DeepCopyv1alpha1APIService ...
+func DeepCopyv1alpha1APIService(in interface{}, out interface{}, c *conversion.Cloner) error {
 	{
 		in := in.(*APIService)
 		out := out.(*APIService)
 		*out = *in
-		if newVal, err := c.DeepCopy(&in.ObjectMeta); err != nil {
-			return err
-		} else {
+		if newVal, err := c.DeepCopy(&in.ObjectMeta); err == nil {
 			out.ObjectMeta = *newVal.(*v1.ObjectMeta)
+		} else {
+			return err
 		}
-		if err := DeepCopy_v1alpha1_APIServiceSpec(&in.Spec, &out.Spec, c); err != nil {
+		if err := DeepCopyv1alpha1APIServiceSpec(&in.Spec, &out.Spec, c); err != nil {
 			return err
 		}
 		return nil
 	}
 }
 
-func DeepCopy_v1alpha1_APIServiceList(in interface{}, out interface{}, c *conversion.Cloner) error {
+// DeepCopyv1alpha1APIServiceList ...
+func DeepCopyv1alpha1APIServiceList(in interface{}, out interface{}, c *conversion.Cloner) error {
 	{
 		in := in.(*APIServiceList)
 		out := out.(*APIServiceList)
@@ -69,7 +71,7 @@ func DeepCopy_v1alpha1_APIServiceList(in interface{}, out interface{}, c *conver
 			in, out := &in.Items, &out.Items
 			*out = make([]APIService, len(*in))
 			for i := range *in {
-				if err := DeepCopy_v1alpha1_APIService(&(*in)[i], &(*out)[i], c); err != nil {
+				if err := DeepCopyv1alpha1APIService(&(*in)[i], &(*out)[i], c); err != nil {
 					return err
 				}
 			}
@@ -78,7 +80,8 @@ func DeepCopy_v1alpha1_APIServiceList(in interface{}, out interface{}, c *conver
 	}
 }
 
-func DeepCopy_v1alpha1_APIServiceSpec(in interface{}, out interface{}, c *conversion.Cloner) error {
+// DeepCopyv1alpha1APIServiceSpec ...
+func DeepCopyv1alpha1APIServiceSpec(in interface{}, out interface{}, c *conversion.Cloner) error {
 	{
 		in := in.(*APIServiceSpec)
 		out := out.(*APIServiceSpec)
@@ -92,7 +95,8 @@ func DeepCopy_v1alpha1_APIServiceSpec(in interface{}, out interface{}, c *conver
 	}
 }
 
-func DeepCopy_v1alpha1_APIServiceStatus(in interface{}, out interface{}, c *conversion.Cloner) error {
+// DeepCopyv1alpha1APIServiceStatus ...
+func DeepCopyv1alpha1APIServiceStatus(in interface{}, out interface{}, c *conversion.Cloner) error {
 	{
 		in := in.(*APIServiceStatus)
 		out := out.(*APIServiceStatus)
@@ -101,7 +105,8 @@ func DeepCopy_v1alpha1_APIServiceStatus(in interface{}, out interface{}, c *conv
 	}
 }
 
-func DeepCopy_v1alpha1_ServiceReference(in interface{}, out interface{}, c *conversion.Cloner) error {
+// DeepCopyv1alpha1ServiceReference ...
+func DeepCopyv1alpha1ServiceReference(in interface{}, out interface{}, c *conversion.Cloner) error {
 	{
 		in := in.(*ServiceReference)
 		out := out.(*ServiceReference)

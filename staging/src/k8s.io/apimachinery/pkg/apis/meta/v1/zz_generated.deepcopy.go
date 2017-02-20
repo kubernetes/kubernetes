@@ -30,43 +30,44 @@ import (
 // GetGeneratedDeepCopyFuncs returns the generated funcs, since we aren't registering them.
 func GetGeneratedDeepCopyFuncs() []conversion.GeneratedDeepCopyFunc {
 	return []conversion.GeneratedDeepCopyFunc{
-		{Fn: DeepCopy_v1_APIGroup, InType: reflect.TypeOf(&APIGroup{})},
-		{Fn: DeepCopy_v1_APIGroupList, InType: reflect.TypeOf(&APIGroupList{})},
-		{Fn: DeepCopy_v1_APIResource, InType: reflect.TypeOf(&APIResource{})},
-		{Fn: DeepCopy_v1_APIResourceList, InType: reflect.TypeOf(&APIResourceList{})},
-		{Fn: DeepCopy_v1_APIVersions, InType: reflect.TypeOf(&APIVersions{})},
-		{Fn: DeepCopy_v1_DeleteOptions, InType: reflect.TypeOf(&DeleteOptions{})},
-		{Fn: DeepCopy_v1_Duration, InType: reflect.TypeOf(&Duration{})},
-		{Fn: DeepCopy_v1_ExportOptions, InType: reflect.TypeOf(&ExportOptions{})},
-		{Fn: DeepCopy_v1_GetOptions, InType: reflect.TypeOf(&GetOptions{})},
-		{Fn: DeepCopy_v1_GroupKind, InType: reflect.TypeOf(&GroupKind{})},
-		{Fn: DeepCopy_v1_GroupResource, InType: reflect.TypeOf(&GroupResource{})},
-		{Fn: DeepCopy_v1_GroupVersion, InType: reflect.TypeOf(&GroupVersion{})},
-		{Fn: DeepCopy_v1_GroupVersionForDiscovery, InType: reflect.TypeOf(&GroupVersionForDiscovery{})},
-		{Fn: DeepCopy_v1_GroupVersionKind, InType: reflect.TypeOf(&GroupVersionKind{})},
-		{Fn: DeepCopy_v1_GroupVersionResource, InType: reflect.TypeOf(&GroupVersionResource{})},
-		{Fn: DeepCopy_v1_InternalEvent, InType: reflect.TypeOf(&InternalEvent{})},
-		{Fn: DeepCopy_v1_LabelSelector, InType: reflect.TypeOf(&LabelSelector{})},
-		{Fn: DeepCopy_v1_LabelSelectorRequirement, InType: reflect.TypeOf(&LabelSelectorRequirement{})},
-		{Fn: DeepCopy_v1_ListMeta, InType: reflect.TypeOf(&ListMeta{})},
-		{Fn: DeepCopy_v1_ListOptions, InType: reflect.TypeOf(&ListOptions{})},
-		{Fn: DeepCopy_v1_ObjectMeta, InType: reflect.TypeOf(&ObjectMeta{})},
-		{Fn: DeepCopy_v1_OwnerReference, InType: reflect.TypeOf(&OwnerReference{})},
-		{Fn: DeepCopy_v1_Patch, InType: reflect.TypeOf(&Patch{})},
-		{Fn: DeepCopy_v1_Preconditions, InType: reflect.TypeOf(&Preconditions{})},
-		{Fn: DeepCopy_v1_RootPaths, InType: reflect.TypeOf(&RootPaths{})},
-		{Fn: DeepCopy_v1_ServerAddressByClientCIDR, InType: reflect.TypeOf(&ServerAddressByClientCIDR{})},
-		{Fn: DeepCopy_v1_Status, InType: reflect.TypeOf(&Status{})},
-		{Fn: DeepCopy_v1_StatusCause, InType: reflect.TypeOf(&StatusCause{})},
-		{Fn: DeepCopy_v1_StatusDetails, InType: reflect.TypeOf(&StatusDetails{})},
-		{Fn: DeepCopy_v1_Time, InType: reflect.TypeOf(&Time{})},
-		{Fn: DeepCopy_v1_Timestamp, InType: reflect.TypeOf(&Timestamp{})},
-		{Fn: DeepCopy_v1_TypeMeta, InType: reflect.TypeOf(&TypeMeta{})},
-		{Fn: DeepCopy_v1_WatchEvent, InType: reflect.TypeOf(&WatchEvent{})},
+		{Fn: DeepCopyv1APIGroup, InType: reflect.TypeOf(&APIGroup{})},
+		{Fn: DeepCopyv1APIGroupList, InType: reflect.TypeOf(&APIGroupList{})},
+		{Fn: DeepCopyv1APIResource, InType: reflect.TypeOf(&APIResource{})},
+		{Fn: DeepCopyv1APIResourceList, InType: reflect.TypeOf(&APIResourceList{})},
+		{Fn: DeepCopyv1APIVersions, InType: reflect.TypeOf(&APIVersions{})},
+		{Fn: DeepCopyv1DeleteOptions, InType: reflect.TypeOf(&DeleteOptions{})},
+		{Fn: DeepCopyv1Duration, InType: reflect.TypeOf(&Duration{})},
+		{Fn: DeepCopyv1ExportOptions, InType: reflect.TypeOf(&ExportOptions{})},
+		{Fn: DeepCopyv1GetOptions, InType: reflect.TypeOf(&GetOptions{})},
+		{Fn: DeepCopyv1GroupKind, InType: reflect.TypeOf(&GroupKind{})},
+		{Fn: DeepCopyv1GroupResource, InType: reflect.TypeOf(&GroupResource{})},
+		{Fn: DeepCopyv1GroupVersion, InType: reflect.TypeOf(&GroupVersion{})},
+		{Fn: DeepCopyv1GroupVersionForDiscovery, InType: reflect.TypeOf(&GroupVersionForDiscovery{})},
+		{Fn: DeepCopyv1GroupVersionKind, InType: reflect.TypeOf(&GroupVersionKind{})},
+		{Fn: DeepCopyv1GroupVersionResource, InType: reflect.TypeOf(&GroupVersionResource{})},
+		{Fn: DeepCopyv1InternalEvent, InType: reflect.TypeOf(&InternalEvent{})},
+		{Fn: DeepCopyv1LabelSelector, InType: reflect.TypeOf(&LabelSelector{})},
+		{Fn: DeepCopyv1LabelSelectorRequirement, InType: reflect.TypeOf(&LabelSelectorRequirement{})},
+		{Fn: DeepCopyv1ListMeta, InType: reflect.TypeOf(&ListMeta{})},
+		{Fn: DeepCopyv1ListOptions, InType: reflect.TypeOf(&ListOptions{})},
+		{Fn: DeepCopyv1ObjectMeta, InType: reflect.TypeOf(&ObjectMeta{})},
+		{Fn: DeepCopyv1OwnerReference, InType: reflect.TypeOf(&OwnerReference{})},
+		{Fn: DeepCopyv1Patch, InType: reflect.TypeOf(&Patch{})},
+		{Fn: DeepCopyv1Preconditions, InType: reflect.TypeOf(&Preconditions{})},
+		{Fn: DeepCopyv1RootPaths, InType: reflect.TypeOf(&RootPaths{})},
+		{Fn: DeepCopyv1ServerAddressByClientCIDR, InType: reflect.TypeOf(&ServerAddressByClientCIDR{})},
+		{Fn: DeepCopyv1Status, InType: reflect.TypeOf(&Status{})},
+		{Fn: DeepCopyv1StatusCause, InType: reflect.TypeOf(&StatusCause{})},
+		{Fn: DeepCopyv1StatusDetails, InType: reflect.TypeOf(&StatusDetails{})},
+		{Fn: DeepCopyv1Time, InType: reflect.TypeOf(&Time{})},
+		{Fn: DeepCopyv1Timestamp, InType: reflect.TypeOf(&Timestamp{})},
+		{Fn: DeepCopyv1TypeMeta, InType: reflect.TypeOf(&TypeMeta{})},
+		{Fn: DeepCopyv1WatchEvent, InType: reflect.TypeOf(&WatchEvent{})},
 	}
 }
 
-func DeepCopy_v1_APIGroup(in interface{}, out interface{}, c *conversion.Cloner) error {
+// DeepCopyv1APIGroup ...
+func DeepCopyv1APIGroup(in interface{}, out interface{}, c *conversion.Cloner) error {
 	{
 		in := in.(*APIGroup)
 		out := out.(*APIGroup)
@@ -85,7 +86,8 @@ func DeepCopy_v1_APIGroup(in interface{}, out interface{}, c *conversion.Cloner)
 	}
 }
 
-func DeepCopy_v1_APIGroupList(in interface{}, out interface{}, c *conversion.Cloner) error {
+// DeepCopyv1APIGroupList ...
+func DeepCopyv1APIGroupList(in interface{}, out interface{}, c *conversion.Cloner) error {
 	{
 		in := in.(*APIGroupList)
 		out := out.(*APIGroupList)
@@ -94,10 +96,10 @@ func DeepCopy_v1_APIGroupList(in interface{}, out interface{}, c *conversion.Clo
 			in, out := &in.Groups, &out.Groups
 			*out = make([]APIGroup, len(*in))
 			for i := range *in {
-				if newVal, err := c.DeepCopy(&(*in)[i]); err != nil {
-					return err
-				} else {
+				if newVal, err := c.DeepCopy(&(*in)[i]); err == nil {
 					(*out)[i] = *newVal.(*APIGroup)
+				} else {
+					return err
 				}
 			}
 		}
@@ -105,7 +107,8 @@ func DeepCopy_v1_APIGroupList(in interface{}, out interface{}, c *conversion.Clo
 	}
 }
 
-func DeepCopy_v1_APIResource(in interface{}, out interface{}, c *conversion.Cloner) error {
+// DeepCopyv1APIResource ...
+func DeepCopyv1APIResource(in interface{}, out interface{}, c *conversion.Cloner) error {
 	{
 		in := in.(*APIResource)
 		out := out.(*APIResource)
@@ -124,7 +127,8 @@ func DeepCopy_v1_APIResource(in interface{}, out interface{}, c *conversion.Clon
 	}
 }
 
-func DeepCopy_v1_APIResourceList(in interface{}, out interface{}, c *conversion.Cloner) error {
+// DeepCopyv1APIResourceList ...
+func DeepCopyv1APIResourceList(in interface{}, out interface{}, c *conversion.Cloner) error {
 	{
 		in := in.(*APIResourceList)
 		out := out.(*APIResourceList)
@@ -133,10 +137,10 @@ func DeepCopy_v1_APIResourceList(in interface{}, out interface{}, c *conversion.
 			in, out := &in.APIResources, &out.APIResources
 			*out = make([]APIResource, len(*in))
 			for i := range *in {
-				if newVal, err := c.DeepCopy(&(*in)[i]); err != nil {
-					return err
-				} else {
+				if newVal, err := c.DeepCopy(&(*in)[i]); err == nil {
 					(*out)[i] = *newVal.(*APIResource)
+				} else {
+					return err
 				}
 			}
 		}
@@ -144,7 +148,8 @@ func DeepCopy_v1_APIResourceList(in interface{}, out interface{}, c *conversion.
 	}
 }
 
-func DeepCopy_v1_APIVersions(in interface{}, out interface{}, c *conversion.Cloner) error {
+// DeepCopyv1APIVersions ...
+func DeepCopyv1APIVersions(in interface{}, out interface{}, c *conversion.Cloner) error {
 	{
 		in := in.(*APIVersions)
 		out := out.(*APIVersions)
@@ -163,7 +168,8 @@ func DeepCopy_v1_APIVersions(in interface{}, out interface{}, c *conversion.Clon
 	}
 }
 
-func DeepCopy_v1_DeleteOptions(in interface{}, out interface{}, c *conversion.Cloner) error {
+// DeepCopyv1DeleteOptions ...
+func DeepCopyv1DeleteOptions(in interface{}, out interface{}, c *conversion.Cloner) error {
 	{
 		in := in.(*DeleteOptions)
 		out := out.(*DeleteOptions)
@@ -175,10 +181,10 @@ func DeepCopy_v1_DeleteOptions(in interface{}, out interface{}, c *conversion.Cl
 		}
 		if in.Preconditions != nil {
 			in, out := &in.Preconditions, &out.Preconditions
-			if newVal, err := c.DeepCopy(*in); err != nil {
-				return err
-			} else {
+			if newVal, err := c.DeepCopy(*in); err == nil {
 				*out = newVal.(*Preconditions)
+			} else {
+				return err
 			}
 		}
 		if in.OrphanDependents != nil {
@@ -190,7 +196,8 @@ func DeepCopy_v1_DeleteOptions(in interface{}, out interface{}, c *conversion.Cl
 	}
 }
 
-func DeepCopy_v1_Duration(in interface{}, out interface{}, c *conversion.Cloner) error {
+// DeepCopyv1Duration ...
+func DeepCopyv1Duration(in interface{}, out interface{}, c *conversion.Cloner) error {
 	{
 		in := in.(*Duration)
 		out := out.(*Duration)
@@ -199,7 +206,8 @@ func DeepCopy_v1_Duration(in interface{}, out interface{}, c *conversion.Cloner)
 	}
 }
 
-func DeepCopy_v1_ExportOptions(in interface{}, out interface{}, c *conversion.Cloner) error {
+// DeepCopyv1ExportOptions ...
+func DeepCopyv1ExportOptions(in interface{}, out interface{}, c *conversion.Cloner) error {
 	{
 		in := in.(*ExportOptions)
 		out := out.(*ExportOptions)
@@ -208,7 +216,8 @@ func DeepCopy_v1_ExportOptions(in interface{}, out interface{}, c *conversion.Cl
 	}
 }
 
-func DeepCopy_v1_GetOptions(in interface{}, out interface{}, c *conversion.Cloner) error {
+// DeepCopyv1GetOptions ...
+func DeepCopyv1GetOptions(in interface{}, out interface{}, c *conversion.Cloner) error {
 	{
 		in := in.(*GetOptions)
 		out := out.(*GetOptions)
@@ -217,7 +226,8 @@ func DeepCopy_v1_GetOptions(in interface{}, out interface{}, c *conversion.Clone
 	}
 }
 
-func DeepCopy_v1_GroupKind(in interface{}, out interface{}, c *conversion.Cloner) error {
+// DeepCopyv1GroupKind ...
+func DeepCopyv1GroupKind(in interface{}, out interface{}, c *conversion.Cloner) error {
 	{
 		in := in.(*GroupKind)
 		out := out.(*GroupKind)
@@ -226,7 +236,8 @@ func DeepCopy_v1_GroupKind(in interface{}, out interface{}, c *conversion.Cloner
 	}
 }
 
-func DeepCopy_v1_GroupResource(in interface{}, out interface{}, c *conversion.Cloner) error {
+// DeepCopyv1GroupResource ...
+func DeepCopyv1GroupResource(in interface{}, out interface{}, c *conversion.Cloner) error {
 	{
 		in := in.(*GroupResource)
 		out := out.(*GroupResource)
@@ -235,7 +246,8 @@ func DeepCopy_v1_GroupResource(in interface{}, out interface{}, c *conversion.Cl
 	}
 }
 
-func DeepCopy_v1_GroupVersion(in interface{}, out interface{}, c *conversion.Cloner) error {
+// DeepCopyv1GroupVersion ...
+func DeepCopyv1GroupVersion(in interface{}, out interface{}, c *conversion.Cloner) error {
 	{
 		in := in.(*GroupVersion)
 		out := out.(*GroupVersion)
@@ -244,7 +256,8 @@ func DeepCopy_v1_GroupVersion(in interface{}, out interface{}, c *conversion.Clo
 	}
 }
 
-func DeepCopy_v1_GroupVersionForDiscovery(in interface{}, out interface{}, c *conversion.Cloner) error {
+// DeepCopyv1GroupVersionForDiscovery ...
+func DeepCopyv1GroupVersionForDiscovery(in interface{}, out interface{}, c *conversion.Cloner) error {
 	{
 		in := in.(*GroupVersionForDiscovery)
 		out := out.(*GroupVersionForDiscovery)
@@ -253,7 +266,8 @@ func DeepCopy_v1_GroupVersionForDiscovery(in interface{}, out interface{}, c *co
 	}
 }
 
-func DeepCopy_v1_GroupVersionKind(in interface{}, out interface{}, c *conversion.Cloner) error {
+// DeepCopyv1GroupVersionKind ...
+func DeepCopyv1GroupVersionKind(in interface{}, out interface{}, c *conversion.Cloner) error {
 	{
 		in := in.(*GroupVersionKind)
 		out := out.(*GroupVersionKind)
@@ -262,7 +276,8 @@ func DeepCopy_v1_GroupVersionKind(in interface{}, out interface{}, c *conversion
 	}
 }
 
-func DeepCopy_v1_GroupVersionResource(in interface{}, out interface{}, c *conversion.Cloner) error {
+// DeepCopyv1GroupVersionResource ...
+func DeepCopyv1GroupVersionResource(in interface{}, out interface{}, c *conversion.Cloner) error {
 	{
 		in := in.(*GroupVersionResource)
 		out := out.(*GroupVersionResource)
@@ -271,24 +286,26 @@ func DeepCopy_v1_GroupVersionResource(in interface{}, out interface{}, c *conver
 	}
 }
 
-func DeepCopy_v1_InternalEvent(in interface{}, out interface{}, c *conversion.Cloner) error {
+// DeepCopyv1InternalEvent ...
+func DeepCopyv1InternalEvent(in interface{}, out interface{}, c *conversion.Cloner) error {
 	{
 		in := in.(*InternalEvent)
 		out := out.(*InternalEvent)
 		*out = *in
 		// in.Object is kind 'Interface'
 		if in.Object != nil {
-			if newVal, err := c.DeepCopy(&in.Object); err != nil {
-				return err
-			} else {
+			if newVal, err := c.DeepCopy(&in.Object); err == nil {
 				out.Object = *newVal.(*runtime.Object)
+			} else {
+				return err
 			}
 		}
 		return nil
 	}
 }
 
-func DeepCopy_v1_LabelSelector(in interface{}, out interface{}, c *conversion.Cloner) error {
+// DeepCopyv1LabelSelector ...
+func DeepCopyv1LabelSelector(in interface{}, out interface{}, c *conversion.Cloner) error {
 	{
 		in := in.(*LabelSelector)
 		out := out.(*LabelSelector)
@@ -304,10 +321,10 @@ func DeepCopy_v1_LabelSelector(in interface{}, out interface{}, c *conversion.Cl
 			in, out := &in.MatchExpressions, &out.MatchExpressions
 			*out = make([]LabelSelectorRequirement, len(*in))
 			for i := range *in {
-				if newVal, err := c.DeepCopy(&(*in)[i]); err != nil {
-					return err
-				} else {
+				if newVal, err := c.DeepCopy(&(*in)[i]); err == nil {
 					(*out)[i] = *newVal.(*LabelSelectorRequirement)
+				} else {
+					return err
 				}
 			}
 		}
@@ -315,7 +332,8 @@ func DeepCopy_v1_LabelSelector(in interface{}, out interface{}, c *conversion.Cl
 	}
 }
 
-func DeepCopy_v1_LabelSelectorRequirement(in interface{}, out interface{}, c *conversion.Cloner) error {
+// DeepCopyv1LabelSelectorRequirement ...
+func DeepCopyv1LabelSelectorRequirement(in interface{}, out interface{}, c *conversion.Cloner) error {
 	{
 		in := in.(*LabelSelectorRequirement)
 		out := out.(*LabelSelectorRequirement)
@@ -329,7 +347,8 @@ func DeepCopy_v1_LabelSelectorRequirement(in interface{}, out interface{}, c *co
 	}
 }
 
-func DeepCopy_v1_ListMeta(in interface{}, out interface{}, c *conversion.Cloner) error {
+// DeepCopyv1ListMeta ...
+func DeepCopyv1ListMeta(in interface{}, out interface{}, c *conversion.Cloner) error {
 	{
 		in := in.(*ListMeta)
 		out := out.(*ListMeta)
@@ -338,7 +357,8 @@ func DeepCopy_v1_ListMeta(in interface{}, out interface{}, c *conversion.Cloner)
 	}
 }
 
-func DeepCopy_v1_ListOptions(in interface{}, out interface{}, c *conversion.Cloner) error {
+// DeepCopyv1ListOptions ...
+func DeepCopyv1ListOptions(in interface{}, out interface{}, c *conversion.Cloner) error {
 	{
 		in := in.(*ListOptions)
 		out := out.(*ListOptions)
@@ -352,7 +372,8 @@ func DeepCopy_v1_ListOptions(in interface{}, out interface{}, c *conversion.Clon
 	}
 }
 
-func DeepCopy_v1_ObjectMeta(in interface{}, out interface{}, c *conversion.Cloner) error {
+// DeepCopyv1ObjectMeta ...
+func DeepCopyv1ObjectMeta(in interface{}, out interface{}, c *conversion.Cloner) error {
 	{
 		in := in.(*ObjectMeta)
 		out := out.(*ObjectMeta)
@@ -386,10 +407,10 @@ func DeepCopy_v1_ObjectMeta(in interface{}, out interface{}, c *conversion.Clone
 			in, out := &in.OwnerReferences, &out.OwnerReferences
 			*out = make([]OwnerReference, len(*in))
 			for i := range *in {
-				if newVal, err := c.DeepCopy(&(*in)[i]); err != nil {
-					return err
-				} else {
+				if newVal, err := c.DeepCopy(&(*in)[i]); err == nil {
 					(*out)[i] = *newVal.(*OwnerReference)
+				} else {
+					return err
 				}
 			}
 		}
@@ -402,7 +423,8 @@ func DeepCopy_v1_ObjectMeta(in interface{}, out interface{}, c *conversion.Clone
 	}
 }
 
-func DeepCopy_v1_OwnerReference(in interface{}, out interface{}, c *conversion.Cloner) error {
+// DeepCopyv1OwnerReference ...
+func DeepCopyv1OwnerReference(in interface{}, out interface{}, c *conversion.Cloner) error {
 	{
 		in := in.(*OwnerReference)
 		out := out.(*OwnerReference)
@@ -416,7 +438,8 @@ func DeepCopy_v1_OwnerReference(in interface{}, out interface{}, c *conversion.C
 	}
 }
 
-func DeepCopy_v1_Patch(in interface{}, out interface{}, c *conversion.Cloner) error {
+// DeepCopyv1Patch ...
+func DeepCopyv1Patch(in interface{}, out interface{}, c *conversion.Cloner) error {
 	{
 		in := in.(*Patch)
 		out := out.(*Patch)
@@ -425,7 +448,8 @@ func DeepCopy_v1_Patch(in interface{}, out interface{}, c *conversion.Cloner) er
 	}
 }
 
-func DeepCopy_v1_Preconditions(in interface{}, out interface{}, c *conversion.Cloner) error {
+// DeepCopyv1Preconditions ...
+func DeepCopyv1Preconditions(in interface{}, out interface{}, c *conversion.Cloner) error {
 	{
 		in := in.(*Preconditions)
 		out := out.(*Preconditions)
@@ -439,7 +463,8 @@ func DeepCopy_v1_Preconditions(in interface{}, out interface{}, c *conversion.Cl
 	}
 }
 
-func DeepCopy_v1_RootPaths(in interface{}, out interface{}, c *conversion.Cloner) error {
+// DeepCopyv1RootPaths ...
+func DeepCopyv1RootPaths(in interface{}, out interface{}, c *conversion.Cloner) error {
 	{
 		in := in.(*RootPaths)
 		out := out.(*RootPaths)
@@ -453,7 +478,8 @@ func DeepCopy_v1_RootPaths(in interface{}, out interface{}, c *conversion.Cloner
 	}
 }
 
-func DeepCopy_v1_ServerAddressByClientCIDR(in interface{}, out interface{}, c *conversion.Cloner) error {
+// DeepCopyv1ServerAddressByClientCIDR ...
+func DeepCopyv1ServerAddressByClientCIDR(in interface{}, out interface{}, c *conversion.Cloner) error {
 	{
 		in := in.(*ServerAddressByClientCIDR)
 		out := out.(*ServerAddressByClientCIDR)
@@ -462,24 +488,26 @@ func DeepCopy_v1_ServerAddressByClientCIDR(in interface{}, out interface{}, c *c
 	}
 }
 
-func DeepCopy_v1_Status(in interface{}, out interface{}, c *conversion.Cloner) error {
+// DeepCopyv1Status ...
+func DeepCopyv1Status(in interface{}, out interface{}, c *conversion.Cloner) error {
 	{
 		in := in.(*Status)
 		out := out.(*Status)
 		*out = *in
 		if in.Details != nil {
 			in, out := &in.Details, &out.Details
-			if newVal, err := c.DeepCopy(*in); err != nil {
-				return err
-			} else {
+			if newVal, err := c.DeepCopy(*in); err == nil {
 				*out = newVal.(*StatusDetails)
+			} else {
+				return err
 			}
 		}
 		return nil
 	}
 }
 
-func DeepCopy_v1_StatusCause(in interface{}, out interface{}, c *conversion.Cloner) error {
+// DeepCopyv1StatusCause ...
+func DeepCopyv1StatusCause(in interface{}, out interface{}, c *conversion.Cloner) error {
 	{
 		in := in.(*StatusCause)
 		out := out.(*StatusCause)
@@ -488,7 +516,8 @@ func DeepCopy_v1_StatusCause(in interface{}, out interface{}, c *conversion.Clon
 	}
 }
 
-func DeepCopy_v1_StatusDetails(in interface{}, out interface{}, c *conversion.Cloner) error {
+// DeepCopyv1StatusDetails ...
+func DeepCopyv1StatusDetails(in interface{}, out interface{}, c *conversion.Cloner) error {
 	{
 		in := in.(*StatusDetails)
 		out := out.(*StatusDetails)
@@ -502,7 +531,8 @@ func DeepCopy_v1_StatusDetails(in interface{}, out interface{}, c *conversion.Cl
 	}
 }
 
-func DeepCopy_v1_Time(in interface{}, out interface{}, c *conversion.Cloner) error {
+// DeepCopyv1Time ...
+func DeepCopyv1Time(in interface{}, out interface{}, c *conversion.Cloner) error {
 	{
 		in := in.(*Time)
 		out := out.(*Time)
@@ -511,7 +541,8 @@ func DeepCopy_v1_Time(in interface{}, out interface{}, c *conversion.Cloner) err
 	}
 }
 
-func DeepCopy_v1_Timestamp(in interface{}, out interface{}, c *conversion.Cloner) error {
+// DeepCopyv1Timestamp ...
+func DeepCopyv1Timestamp(in interface{}, out interface{}, c *conversion.Cloner) error {
 	{
 		in := in.(*Timestamp)
 		out := out.(*Timestamp)
@@ -520,7 +551,8 @@ func DeepCopy_v1_Timestamp(in interface{}, out interface{}, c *conversion.Cloner
 	}
 }
 
-func DeepCopy_v1_TypeMeta(in interface{}, out interface{}, c *conversion.Cloner) error {
+// DeepCopyv1TypeMeta ...
+func DeepCopyv1TypeMeta(in interface{}, out interface{}, c *conversion.Cloner) error {
 	{
 		in := in.(*TypeMeta)
 		out := out.(*TypeMeta)
@@ -529,15 +561,16 @@ func DeepCopy_v1_TypeMeta(in interface{}, out interface{}, c *conversion.Cloner)
 	}
 }
 
-func DeepCopy_v1_WatchEvent(in interface{}, out interface{}, c *conversion.Cloner) error {
+// DeepCopyv1WatchEvent ...
+func DeepCopyv1WatchEvent(in interface{}, out interface{}, c *conversion.Cloner) error {
 	{
 		in := in.(*WatchEvent)
 		out := out.(*WatchEvent)
 		*out = *in
-		if newVal, err := c.DeepCopy(&in.Object); err != nil {
-			return err
-		} else {
+		if newVal, err := c.DeepCopy(&in.Object); err == nil {
 			out.Object = *newVal.(*runtime.RawExtension)
+		} else {
+			return err
 		}
 		return nil
 	}

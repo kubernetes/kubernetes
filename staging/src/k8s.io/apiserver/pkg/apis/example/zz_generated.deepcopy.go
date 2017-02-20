@@ -35,39 +35,41 @@ func init() {
 // to allow building arbitrary schemes.
 func RegisterDeepCopies(scheme *runtime.Scheme) error {
 	return scheme.AddGeneratedDeepCopyFuncs(
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_example_Pod, InType: reflect.TypeOf(&Pod{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_example_PodCondition, InType: reflect.TypeOf(&PodCondition{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_example_PodList, InType: reflect.TypeOf(&PodList{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_example_PodSpec, InType: reflect.TypeOf(&PodSpec{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_example_PodStatus, InType: reflect.TypeOf(&PodStatus{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopyexamplePod, InType: reflect.TypeOf(&Pod{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopyexamplePodCondition, InType: reflect.TypeOf(&PodCondition{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopyexamplePodList, InType: reflect.TypeOf(&PodList{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopyexamplePodSpec, InType: reflect.TypeOf(&PodSpec{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopyexamplePodStatus, InType: reflect.TypeOf(&PodStatus{})},
 	)
 }
 
-func DeepCopy_example_Pod(in interface{}, out interface{}, c *conversion.Cloner) error {
+// DeepCopyexamplePod ...
+func DeepCopyexamplePod(in interface{}, out interface{}, c *conversion.Cloner) error {
 	{
 		in := in.(*Pod)
 		out := out.(*Pod)
 		*out = *in
-		if newVal, err := c.DeepCopy(&in.ObjectMeta); err != nil {
-			return err
-		} else {
+		if newVal, err := c.DeepCopy(&in.ObjectMeta); err == nil {
 			out.ObjectMeta = *newVal.(*v1.ObjectMeta)
-		}
-		if newVal, err := c.DeepCopy(&in.Spec); err != nil {
-			return err
 		} else {
+			return err
+		}
+		if newVal, err := c.DeepCopy(&in.Spec); err == nil {
 			out.Spec = *newVal.(*PodSpec)
-		}
-		if newVal, err := c.DeepCopy(&in.Status); err != nil {
-			return err
 		} else {
+			return err
+		}
+		if newVal, err := c.DeepCopy(&in.Status); err == nil {
 			out.Status = *newVal.(*PodStatus)
+		} else {
+			return err
 		}
 		return nil
 	}
 }
 
-func DeepCopy_example_PodCondition(in interface{}, out interface{}, c *conversion.Cloner) error {
+// DeepCopyexamplePodCondition ...
+func DeepCopyexamplePodCondition(in interface{}, out interface{}, c *conversion.Cloner) error {
 	{
 		in := in.(*PodCondition)
 		out := out.(*PodCondition)
@@ -78,7 +80,8 @@ func DeepCopy_example_PodCondition(in interface{}, out interface{}, c *conversio
 	}
 }
 
-func DeepCopy_example_PodList(in interface{}, out interface{}, c *conversion.Cloner) error {
+// DeepCopyexamplePodList ...
+func DeepCopyexamplePodList(in interface{}, out interface{}, c *conversion.Cloner) error {
 	{
 		in := in.(*PodList)
 		out := out.(*PodList)
@@ -87,10 +90,10 @@ func DeepCopy_example_PodList(in interface{}, out interface{}, c *conversion.Clo
 			in, out := &in.Items, &out.Items
 			*out = make([]Pod, len(*in))
 			for i := range *in {
-				if newVal, err := c.DeepCopy(&(*in)[i]); err != nil {
-					return err
-				} else {
+				if newVal, err := c.DeepCopy(&(*in)[i]); err == nil {
 					(*out)[i] = *newVal.(*Pod)
+				} else {
+					return err
 				}
 			}
 		}
@@ -98,7 +101,8 @@ func DeepCopy_example_PodList(in interface{}, out interface{}, c *conversion.Clo
 	}
 }
 
-func DeepCopy_example_PodSpec(in interface{}, out interface{}, c *conversion.Cloner) error {
+// DeepCopyexamplePodSpec ...
+func DeepCopyexamplePodSpec(in interface{}, out interface{}, c *conversion.Cloner) error {
 	{
 		in := in.(*PodSpec)
 		out := out.(*PodSpec)
@@ -124,7 +128,8 @@ func DeepCopy_example_PodSpec(in interface{}, out interface{}, c *conversion.Clo
 	}
 }
 
-func DeepCopy_example_PodStatus(in interface{}, out interface{}, c *conversion.Cloner) error {
+// DeepCopyexamplePodStatus ...
+func DeepCopyexamplePodStatus(in interface{}, out interface{}, c *conversion.Cloner) error {
 	{
 		in := in.(*PodStatus)
 		out := out.(*PodStatus)
@@ -133,10 +138,10 @@ func DeepCopy_example_PodStatus(in interface{}, out interface{}, c *conversion.C
 			in, out := &in.Conditions, &out.Conditions
 			*out = make([]PodCondition, len(*in))
 			for i := range *in {
-				if newVal, err := c.DeepCopy(&(*in)[i]); err != nil {
-					return err
-				} else {
+				if newVal, err := c.DeepCopy(&(*in)[i]); err == nil {
 					(*out)[i] = *newVal.(*PodCondition)
+				} else {
+					return err
 				}
 			}
 		}

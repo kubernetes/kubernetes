@@ -35,35 +35,37 @@ func init() {
 // to allow building arbitrary schemes.
 func RegisterDeepCopies(scheme *runtime.Scheme) error {
 	return scheme.AddGeneratedDeepCopyFuncs(
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_authorization_LocalSubjectAccessReview, InType: reflect.TypeOf(&LocalSubjectAccessReview{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_authorization_NonResourceAttributes, InType: reflect.TypeOf(&NonResourceAttributes{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_authorization_ResourceAttributes, InType: reflect.TypeOf(&ResourceAttributes{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_authorization_SelfSubjectAccessReview, InType: reflect.TypeOf(&SelfSubjectAccessReview{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_authorization_SelfSubjectAccessReviewSpec, InType: reflect.TypeOf(&SelfSubjectAccessReviewSpec{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_authorization_SubjectAccessReview, InType: reflect.TypeOf(&SubjectAccessReview{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_authorization_SubjectAccessReviewSpec, InType: reflect.TypeOf(&SubjectAccessReviewSpec{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_authorization_SubjectAccessReviewStatus, InType: reflect.TypeOf(&SubjectAccessReviewStatus{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopyauthorizationLocalSubjectAccessReview, InType: reflect.TypeOf(&LocalSubjectAccessReview{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopyauthorizationNonResourceAttributes, InType: reflect.TypeOf(&NonResourceAttributes{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopyauthorizationResourceAttributes, InType: reflect.TypeOf(&ResourceAttributes{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopyauthorizationSelfSubjectAccessReview, InType: reflect.TypeOf(&SelfSubjectAccessReview{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopyauthorizationSelfSubjectAccessReviewSpec, InType: reflect.TypeOf(&SelfSubjectAccessReviewSpec{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopyauthorizationSubjectAccessReview, InType: reflect.TypeOf(&SubjectAccessReview{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopyauthorizationSubjectAccessReviewSpec, InType: reflect.TypeOf(&SubjectAccessReviewSpec{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopyauthorizationSubjectAccessReviewStatus, InType: reflect.TypeOf(&SubjectAccessReviewStatus{})},
 	)
 }
 
-func DeepCopy_authorization_LocalSubjectAccessReview(in interface{}, out interface{}, c *conversion.Cloner) error {
+// DeepCopyauthorizationLocalSubjectAccessReview ...
+func DeepCopyauthorizationLocalSubjectAccessReview(in interface{}, out interface{}, c *conversion.Cloner) error {
 	{
 		in := in.(*LocalSubjectAccessReview)
 		out := out.(*LocalSubjectAccessReview)
 		*out = *in
-		if newVal, err := c.DeepCopy(&in.ObjectMeta); err != nil {
-			return err
-		} else {
+		if newVal, err := c.DeepCopy(&in.ObjectMeta); err == nil {
 			out.ObjectMeta = *newVal.(*v1.ObjectMeta)
+		} else {
+			return err
 		}
-		if err := DeepCopy_authorization_SubjectAccessReviewSpec(&in.Spec, &out.Spec, c); err != nil {
+		if err := DeepCopyauthorizationSubjectAccessReviewSpec(&in.Spec, &out.Spec, c); err != nil {
 			return err
 		}
 		return nil
 	}
 }
 
-func DeepCopy_authorization_NonResourceAttributes(in interface{}, out interface{}, c *conversion.Cloner) error {
+// DeepCopyauthorizationNonResourceAttributes ...
+func DeepCopyauthorizationNonResourceAttributes(in interface{}, out interface{}, c *conversion.Cloner) error {
 	{
 		in := in.(*NonResourceAttributes)
 		out := out.(*NonResourceAttributes)
@@ -72,7 +74,8 @@ func DeepCopy_authorization_NonResourceAttributes(in interface{}, out interface{
 	}
 }
 
-func DeepCopy_authorization_ResourceAttributes(in interface{}, out interface{}, c *conversion.Cloner) error {
+// DeepCopyauthorizationResourceAttributes ...
+func DeepCopyauthorizationResourceAttributes(in interface{}, out interface{}, c *conversion.Cloner) error {
 	{
 		in := in.(*ResourceAttributes)
 		out := out.(*ResourceAttributes)
@@ -81,24 +84,26 @@ func DeepCopy_authorization_ResourceAttributes(in interface{}, out interface{}, 
 	}
 }
 
-func DeepCopy_authorization_SelfSubjectAccessReview(in interface{}, out interface{}, c *conversion.Cloner) error {
+// DeepCopyauthorizationSelfSubjectAccessReview ...
+func DeepCopyauthorizationSelfSubjectAccessReview(in interface{}, out interface{}, c *conversion.Cloner) error {
 	{
 		in := in.(*SelfSubjectAccessReview)
 		out := out.(*SelfSubjectAccessReview)
 		*out = *in
-		if newVal, err := c.DeepCopy(&in.ObjectMeta); err != nil {
-			return err
-		} else {
+		if newVal, err := c.DeepCopy(&in.ObjectMeta); err == nil {
 			out.ObjectMeta = *newVal.(*v1.ObjectMeta)
+		} else {
+			return err
 		}
-		if err := DeepCopy_authorization_SelfSubjectAccessReviewSpec(&in.Spec, &out.Spec, c); err != nil {
+		if err := DeepCopyauthorizationSelfSubjectAccessReviewSpec(&in.Spec, &out.Spec, c); err != nil {
 			return err
 		}
 		return nil
 	}
 }
 
-func DeepCopy_authorization_SelfSubjectAccessReviewSpec(in interface{}, out interface{}, c *conversion.Cloner) error {
+// DeepCopyauthorizationSelfSubjectAccessReviewSpec ...
+func DeepCopyauthorizationSelfSubjectAccessReviewSpec(in interface{}, out interface{}, c *conversion.Cloner) error {
 	{
 		in := in.(*SelfSubjectAccessReviewSpec)
 		out := out.(*SelfSubjectAccessReviewSpec)
@@ -117,24 +122,26 @@ func DeepCopy_authorization_SelfSubjectAccessReviewSpec(in interface{}, out inte
 	}
 }
 
-func DeepCopy_authorization_SubjectAccessReview(in interface{}, out interface{}, c *conversion.Cloner) error {
+// DeepCopyauthorizationSubjectAccessReview ...
+func DeepCopyauthorizationSubjectAccessReview(in interface{}, out interface{}, c *conversion.Cloner) error {
 	{
 		in := in.(*SubjectAccessReview)
 		out := out.(*SubjectAccessReview)
 		*out = *in
-		if newVal, err := c.DeepCopy(&in.ObjectMeta); err != nil {
-			return err
-		} else {
+		if newVal, err := c.DeepCopy(&in.ObjectMeta); err == nil {
 			out.ObjectMeta = *newVal.(*v1.ObjectMeta)
+		} else {
+			return err
 		}
-		if err := DeepCopy_authorization_SubjectAccessReviewSpec(&in.Spec, &out.Spec, c); err != nil {
+		if err := DeepCopyauthorizationSubjectAccessReviewSpec(&in.Spec, &out.Spec, c); err != nil {
 			return err
 		}
 		return nil
 	}
 }
 
-func DeepCopy_authorization_SubjectAccessReviewSpec(in interface{}, out interface{}, c *conversion.Cloner) error {
+// DeepCopyauthorizationSubjectAccessReviewSpec ...
+func DeepCopyauthorizationSubjectAccessReviewSpec(in interface{}, out interface{}, c *conversion.Cloner) error {
 	{
 		in := in.(*SubjectAccessReviewSpec)
 		out := out.(*SubjectAccessReviewSpec)
@@ -158,10 +165,10 @@ func DeepCopy_authorization_SubjectAccessReviewSpec(in interface{}, out interfac
 			in, out := &in.Extra, &out.Extra
 			*out = make(map[string]ExtraValue)
 			for key, val := range *in {
-				if newVal, err := c.DeepCopy(&val); err != nil {
-					return err
-				} else {
+				if newVal, err := c.DeepCopy(&val); err == nil {
 					(*out)[key] = *newVal.(*ExtraValue)
+				} else {
+					return err
 				}
 			}
 		}
@@ -169,7 +176,8 @@ func DeepCopy_authorization_SubjectAccessReviewSpec(in interface{}, out interfac
 	}
 }
 
-func DeepCopy_authorization_SubjectAccessReviewStatus(in interface{}, out interface{}, c *conversion.Cloner) error {
+// DeepCopyauthorizationSubjectAccessReviewStatus ...
+func DeepCopyauthorizationSubjectAccessReviewStatus(in interface{}, out interface{}, c *conversion.Cloner) error {
 	{
 		in := in.(*SubjectAccessReviewStatus)
 		out := out.(*SubjectAccessReviewStatus)

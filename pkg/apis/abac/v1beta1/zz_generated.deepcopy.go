@@ -34,12 +34,13 @@ func init() {
 // to allow building arbitrary schemes.
 func RegisterDeepCopies(scheme *runtime.Scheme) error {
 	return scheme.AddGeneratedDeepCopyFuncs(
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1beta1_Policy, InType: reflect.TypeOf(&Policy{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1beta1_PolicySpec, InType: reflect.TypeOf(&PolicySpec{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopyv1beta1Policy, InType: reflect.TypeOf(&Policy{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopyv1beta1PolicySpec, InType: reflect.TypeOf(&PolicySpec{})},
 	)
 }
 
-func DeepCopy_v1beta1_Policy(in interface{}, out interface{}, c *conversion.Cloner) error {
+// DeepCopyv1beta1Policy ...
+func DeepCopyv1beta1Policy(in interface{}, out interface{}, c *conversion.Cloner) error {
 	{
 		in := in.(*Policy)
 		out := out.(*Policy)
@@ -48,7 +49,8 @@ func DeepCopy_v1beta1_Policy(in interface{}, out interface{}, c *conversion.Clon
 	}
 }
 
-func DeepCopy_v1beta1_PolicySpec(in interface{}, out interface{}, c *conversion.Cloner) error {
+// DeepCopyv1beta1PolicySpec ...
+func DeepCopyv1beta1PolicySpec(in interface{}, out interface{}, c *conversion.Cloner) error {
 	{
 		in := in.(*PolicySpec)
 		out := out.(*PolicySpec)

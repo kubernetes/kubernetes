@@ -37,66 +37,67 @@ func init() {
 // to allow building arbitrary schemes.
 func RegisterDeepCopies(scheme *runtime.Scheme) error {
 	return scheme.AddGeneratedDeepCopyFuncs(
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_extensions_APIVersion, InType: reflect.TypeOf(&APIVersion{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_extensions_CustomMetricCurrentStatus, InType: reflect.TypeOf(&CustomMetricCurrentStatus{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_extensions_CustomMetricCurrentStatusList, InType: reflect.TypeOf(&CustomMetricCurrentStatusList{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_extensions_CustomMetricTarget, InType: reflect.TypeOf(&CustomMetricTarget{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_extensions_CustomMetricTargetList, InType: reflect.TypeOf(&CustomMetricTargetList{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_extensions_DaemonSet, InType: reflect.TypeOf(&DaemonSet{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_extensions_DaemonSetList, InType: reflect.TypeOf(&DaemonSetList{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_extensions_DaemonSetSpec, InType: reflect.TypeOf(&DaemonSetSpec{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_extensions_DaemonSetStatus, InType: reflect.TypeOf(&DaemonSetStatus{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_extensions_Deployment, InType: reflect.TypeOf(&Deployment{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_extensions_DeploymentCondition, InType: reflect.TypeOf(&DeploymentCondition{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_extensions_DeploymentList, InType: reflect.TypeOf(&DeploymentList{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_extensions_DeploymentRollback, InType: reflect.TypeOf(&DeploymentRollback{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_extensions_DeploymentSpec, InType: reflect.TypeOf(&DeploymentSpec{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_extensions_DeploymentStatus, InType: reflect.TypeOf(&DeploymentStatus{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_extensions_DeploymentStrategy, InType: reflect.TypeOf(&DeploymentStrategy{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_extensions_FSGroupStrategyOptions, InType: reflect.TypeOf(&FSGroupStrategyOptions{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_extensions_HTTPIngressPath, InType: reflect.TypeOf(&HTTPIngressPath{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_extensions_HTTPIngressRuleValue, InType: reflect.TypeOf(&HTTPIngressRuleValue{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_extensions_HostPortRange, InType: reflect.TypeOf(&HostPortRange{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_extensions_IDRange, InType: reflect.TypeOf(&IDRange{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_extensions_Ingress, InType: reflect.TypeOf(&Ingress{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_extensions_IngressBackend, InType: reflect.TypeOf(&IngressBackend{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_extensions_IngressList, InType: reflect.TypeOf(&IngressList{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_extensions_IngressRule, InType: reflect.TypeOf(&IngressRule{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_extensions_IngressRuleValue, InType: reflect.TypeOf(&IngressRuleValue{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_extensions_IngressSpec, InType: reflect.TypeOf(&IngressSpec{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_extensions_IngressStatus, InType: reflect.TypeOf(&IngressStatus{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_extensions_IngressTLS, InType: reflect.TypeOf(&IngressTLS{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_extensions_NetworkPolicy, InType: reflect.TypeOf(&NetworkPolicy{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_extensions_NetworkPolicyIngressRule, InType: reflect.TypeOf(&NetworkPolicyIngressRule{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_extensions_NetworkPolicyList, InType: reflect.TypeOf(&NetworkPolicyList{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_extensions_NetworkPolicyPeer, InType: reflect.TypeOf(&NetworkPolicyPeer{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_extensions_NetworkPolicyPort, InType: reflect.TypeOf(&NetworkPolicyPort{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_extensions_NetworkPolicySpec, InType: reflect.TypeOf(&NetworkPolicySpec{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_extensions_PodSecurityPolicy, InType: reflect.TypeOf(&PodSecurityPolicy{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_extensions_PodSecurityPolicyList, InType: reflect.TypeOf(&PodSecurityPolicyList{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_extensions_PodSecurityPolicySpec, InType: reflect.TypeOf(&PodSecurityPolicySpec{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_extensions_ReplicaSet, InType: reflect.TypeOf(&ReplicaSet{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_extensions_ReplicaSetCondition, InType: reflect.TypeOf(&ReplicaSetCondition{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_extensions_ReplicaSetList, InType: reflect.TypeOf(&ReplicaSetList{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_extensions_ReplicaSetSpec, InType: reflect.TypeOf(&ReplicaSetSpec{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_extensions_ReplicaSetStatus, InType: reflect.TypeOf(&ReplicaSetStatus{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_extensions_ReplicationControllerDummy, InType: reflect.TypeOf(&ReplicationControllerDummy{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_extensions_RollbackConfig, InType: reflect.TypeOf(&RollbackConfig{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_extensions_RollingUpdateDeployment, InType: reflect.TypeOf(&RollingUpdateDeployment{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_extensions_RunAsUserStrategyOptions, InType: reflect.TypeOf(&RunAsUserStrategyOptions{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_extensions_SELinuxStrategyOptions, InType: reflect.TypeOf(&SELinuxStrategyOptions{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_extensions_Scale, InType: reflect.TypeOf(&Scale{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_extensions_ScaleSpec, InType: reflect.TypeOf(&ScaleSpec{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_extensions_ScaleStatus, InType: reflect.TypeOf(&ScaleStatus{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_extensions_SupplementalGroupsStrategyOptions, InType: reflect.TypeOf(&SupplementalGroupsStrategyOptions{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_extensions_ThirdPartyResource, InType: reflect.TypeOf(&ThirdPartyResource{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_extensions_ThirdPartyResourceData, InType: reflect.TypeOf(&ThirdPartyResourceData{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_extensions_ThirdPartyResourceDataList, InType: reflect.TypeOf(&ThirdPartyResourceDataList{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_extensions_ThirdPartyResourceList, InType: reflect.TypeOf(&ThirdPartyResourceList{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopyextensionsAPIVersion, InType: reflect.TypeOf(&APIVersion{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopyextensionsCustomMetricCurrentStatus, InType: reflect.TypeOf(&CustomMetricCurrentStatus{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopyextensionsCustomMetricCurrentStatusList, InType: reflect.TypeOf(&CustomMetricCurrentStatusList{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopyextensionsCustomMetricTarget, InType: reflect.TypeOf(&CustomMetricTarget{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopyextensionsCustomMetricTargetList, InType: reflect.TypeOf(&CustomMetricTargetList{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopyextensionsDaemonSet, InType: reflect.TypeOf(&DaemonSet{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopyextensionsDaemonSetList, InType: reflect.TypeOf(&DaemonSetList{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopyextensionsDaemonSetSpec, InType: reflect.TypeOf(&DaemonSetSpec{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopyextensionsDaemonSetStatus, InType: reflect.TypeOf(&DaemonSetStatus{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopyextensionsDeployment, InType: reflect.TypeOf(&Deployment{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopyextensionsDeploymentCondition, InType: reflect.TypeOf(&DeploymentCondition{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopyextensionsDeploymentList, InType: reflect.TypeOf(&DeploymentList{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopyextensionsDeploymentRollback, InType: reflect.TypeOf(&DeploymentRollback{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopyextensionsDeploymentSpec, InType: reflect.TypeOf(&DeploymentSpec{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopyextensionsDeploymentStatus, InType: reflect.TypeOf(&DeploymentStatus{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopyextensionsDeploymentStrategy, InType: reflect.TypeOf(&DeploymentStrategy{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopyextensionsFSGroupStrategyOptions, InType: reflect.TypeOf(&FSGroupStrategyOptions{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopyextensionsHTTPIngressPath, InType: reflect.TypeOf(&HTTPIngressPath{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopyextensionsHTTPIngressRuleValue, InType: reflect.TypeOf(&HTTPIngressRuleValue{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopyextensionsHostPortRange, InType: reflect.TypeOf(&HostPortRange{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopyextensionsIDRange, InType: reflect.TypeOf(&IDRange{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopyextensionsIngress, InType: reflect.TypeOf(&Ingress{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopyextensionsIngressBackend, InType: reflect.TypeOf(&IngressBackend{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopyextensionsIngressList, InType: reflect.TypeOf(&IngressList{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopyextensionsIngressRule, InType: reflect.TypeOf(&IngressRule{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopyextensionsIngressRuleValue, InType: reflect.TypeOf(&IngressRuleValue{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopyextensionsIngressSpec, InType: reflect.TypeOf(&IngressSpec{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopyextensionsIngressStatus, InType: reflect.TypeOf(&IngressStatus{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopyextensionsIngressTLS, InType: reflect.TypeOf(&IngressTLS{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopyextensionsNetworkPolicy, InType: reflect.TypeOf(&NetworkPolicy{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopyextensionsNetworkPolicyIngressRule, InType: reflect.TypeOf(&NetworkPolicyIngressRule{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopyextensionsNetworkPolicyList, InType: reflect.TypeOf(&NetworkPolicyList{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopyextensionsNetworkPolicyPeer, InType: reflect.TypeOf(&NetworkPolicyPeer{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopyextensionsNetworkPolicyPort, InType: reflect.TypeOf(&NetworkPolicyPort{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopyextensionsNetworkPolicySpec, InType: reflect.TypeOf(&NetworkPolicySpec{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopyextensionsPodSecurityPolicy, InType: reflect.TypeOf(&PodSecurityPolicy{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopyextensionsPodSecurityPolicyList, InType: reflect.TypeOf(&PodSecurityPolicyList{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopyextensionsPodSecurityPolicySpec, InType: reflect.TypeOf(&PodSecurityPolicySpec{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopyextensionsReplicaSet, InType: reflect.TypeOf(&ReplicaSet{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopyextensionsReplicaSetCondition, InType: reflect.TypeOf(&ReplicaSetCondition{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopyextensionsReplicaSetList, InType: reflect.TypeOf(&ReplicaSetList{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopyextensionsReplicaSetSpec, InType: reflect.TypeOf(&ReplicaSetSpec{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopyextensionsReplicaSetStatus, InType: reflect.TypeOf(&ReplicaSetStatus{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopyextensionsReplicationControllerDummy, InType: reflect.TypeOf(&ReplicationControllerDummy{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopyextensionsRollbackConfig, InType: reflect.TypeOf(&RollbackConfig{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopyextensionsRollingUpdateDeployment, InType: reflect.TypeOf(&RollingUpdateDeployment{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopyextensionsRunAsUserStrategyOptions, InType: reflect.TypeOf(&RunAsUserStrategyOptions{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopyextensionsSELinuxStrategyOptions, InType: reflect.TypeOf(&SELinuxStrategyOptions{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopyextensionsScale, InType: reflect.TypeOf(&Scale{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopyextensionsScaleSpec, InType: reflect.TypeOf(&ScaleSpec{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopyextensionsScaleStatus, InType: reflect.TypeOf(&ScaleStatus{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopyextensionsSupplementalGroupsStrategyOptions, InType: reflect.TypeOf(&SupplementalGroupsStrategyOptions{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopyextensionsThirdPartyResource, InType: reflect.TypeOf(&ThirdPartyResource{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopyextensionsThirdPartyResourceData, InType: reflect.TypeOf(&ThirdPartyResourceData{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopyextensionsThirdPartyResourceDataList, InType: reflect.TypeOf(&ThirdPartyResourceDataList{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopyextensionsThirdPartyResourceList, InType: reflect.TypeOf(&ThirdPartyResourceList{})},
 	)
 }
 
-func DeepCopy_extensions_APIVersion(in interface{}, out interface{}, c *conversion.Cloner) error {
+// DeepCopyextensionsAPIVersion ...
+func DeepCopyextensionsAPIVersion(in interface{}, out interface{}, c *conversion.Cloner) error {
 	{
 		in := in.(*APIVersion)
 		out := out.(*APIVersion)
@@ -105,7 +106,8 @@ func DeepCopy_extensions_APIVersion(in interface{}, out interface{}, c *conversi
 	}
 }
 
-func DeepCopy_extensions_CustomMetricCurrentStatus(in interface{}, out interface{}, c *conversion.Cloner) error {
+// DeepCopyextensionsCustomMetricCurrentStatus ...
+func DeepCopyextensionsCustomMetricCurrentStatus(in interface{}, out interface{}, c *conversion.Cloner) error {
 	{
 		in := in.(*CustomMetricCurrentStatus)
 		out := out.(*CustomMetricCurrentStatus)
@@ -115,7 +117,8 @@ func DeepCopy_extensions_CustomMetricCurrentStatus(in interface{}, out interface
 	}
 }
 
-func DeepCopy_extensions_CustomMetricCurrentStatusList(in interface{}, out interface{}, c *conversion.Cloner) error {
+// DeepCopyextensionsCustomMetricCurrentStatusList ...
+func DeepCopyextensionsCustomMetricCurrentStatusList(in interface{}, out interface{}, c *conversion.Cloner) error {
 	{
 		in := in.(*CustomMetricCurrentStatusList)
 		out := out.(*CustomMetricCurrentStatusList)
@@ -124,7 +127,7 @@ func DeepCopy_extensions_CustomMetricCurrentStatusList(in interface{}, out inter
 			in, out := &in.Items, &out.Items
 			*out = make([]CustomMetricCurrentStatus, len(*in))
 			for i := range *in {
-				if err := DeepCopy_extensions_CustomMetricCurrentStatus(&(*in)[i], &(*out)[i], c); err != nil {
+				if err := DeepCopyextensionsCustomMetricCurrentStatus(&(*in)[i], &(*out)[i], c); err != nil {
 					return err
 				}
 			}
@@ -133,7 +136,8 @@ func DeepCopy_extensions_CustomMetricCurrentStatusList(in interface{}, out inter
 	}
 }
 
-func DeepCopy_extensions_CustomMetricTarget(in interface{}, out interface{}, c *conversion.Cloner) error {
+// DeepCopyextensionsCustomMetricTarget ...
+func DeepCopyextensionsCustomMetricTarget(in interface{}, out interface{}, c *conversion.Cloner) error {
 	{
 		in := in.(*CustomMetricTarget)
 		out := out.(*CustomMetricTarget)
@@ -143,7 +147,8 @@ func DeepCopy_extensions_CustomMetricTarget(in interface{}, out interface{}, c *
 	}
 }
 
-func DeepCopy_extensions_CustomMetricTargetList(in interface{}, out interface{}, c *conversion.Cloner) error {
+// DeepCopyextensionsCustomMetricTargetList ...
+func DeepCopyextensionsCustomMetricTargetList(in interface{}, out interface{}, c *conversion.Cloner) error {
 	{
 		in := in.(*CustomMetricTargetList)
 		out := out.(*CustomMetricTargetList)
@@ -152,7 +157,7 @@ func DeepCopy_extensions_CustomMetricTargetList(in interface{}, out interface{},
 			in, out := &in.Items, &out.Items
 			*out = make([]CustomMetricTarget, len(*in))
 			for i := range *in {
-				if err := DeepCopy_extensions_CustomMetricTarget(&(*in)[i], &(*out)[i], c); err != nil {
+				if err := DeepCopyextensionsCustomMetricTarget(&(*in)[i], &(*out)[i], c); err != nil {
 					return err
 				}
 			}
@@ -161,24 +166,26 @@ func DeepCopy_extensions_CustomMetricTargetList(in interface{}, out interface{},
 	}
 }
 
-func DeepCopy_extensions_DaemonSet(in interface{}, out interface{}, c *conversion.Cloner) error {
+// DeepCopyextensionsDaemonSet ...
+func DeepCopyextensionsDaemonSet(in interface{}, out interface{}, c *conversion.Cloner) error {
 	{
 		in := in.(*DaemonSet)
 		out := out.(*DaemonSet)
 		*out = *in
-		if newVal, err := c.DeepCopy(&in.ObjectMeta); err != nil {
-			return err
-		} else {
+		if newVal, err := c.DeepCopy(&in.ObjectMeta); err == nil {
 			out.ObjectMeta = *newVal.(*v1.ObjectMeta)
+		} else {
+			return err
 		}
-		if err := DeepCopy_extensions_DaemonSetSpec(&in.Spec, &out.Spec, c); err != nil {
+		if err := DeepCopyextensionsDaemonSetSpec(&in.Spec, &out.Spec, c); err != nil {
 			return err
 		}
 		return nil
 	}
 }
 
-func DeepCopy_extensions_DaemonSetList(in interface{}, out interface{}, c *conversion.Cloner) error {
+// DeepCopyextensionsDaemonSetList ...
+func DeepCopyextensionsDaemonSetList(in interface{}, out interface{}, c *conversion.Cloner) error {
 	{
 		in := in.(*DaemonSetList)
 		out := out.(*DaemonSetList)
@@ -187,7 +194,7 @@ func DeepCopy_extensions_DaemonSetList(in interface{}, out interface{}, c *conve
 			in, out := &in.Items, &out.Items
 			*out = make([]DaemonSet, len(*in))
 			for i := range *in {
-				if err := DeepCopy_extensions_DaemonSet(&(*in)[i], &(*out)[i], c); err != nil {
+				if err := DeepCopyextensionsDaemonSet(&(*in)[i], &(*out)[i], c); err != nil {
 					return err
 				}
 			}
@@ -196,27 +203,29 @@ func DeepCopy_extensions_DaemonSetList(in interface{}, out interface{}, c *conve
 	}
 }
 
-func DeepCopy_extensions_DaemonSetSpec(in interface{}, out interface{}, c *conversion.Cloner) error {
+// DeepCopyextensionsDaemonSetSpec ...
+func DeepCopyextensionsDaemonSetSpec(in interface{}, out interface{}, c *conversion.Cloner) error {
 	{
 		in := in.(*DaemonSetSpec)
 		out := out.(*DaemonSetSpec)
 		*out = *in
 		if in.Selector != nil {
 			in, out := &in.Selector, &out.Selector
-			if newVal, err := c.DeepCopy(*in); err != nil {
-				return err
-			} else {
+			if newVal, err := c.DeepCopy(*in); err == nil {
 				*out = newVal.(*v1.LabelSelector)
+			} else {
+				return err
 			}
 		}
-		if err := api.DeepCopy_api_PodTemplateSpec(&in.Template, &out.Template, c); err != nil {
+		if err := api.DeepCopyapiPodTemplateSpec(&in.Template, &out.Template, c); err != nil {
 			return err
 		}
 		return nil
 	}
 }
 
-func DeepCopy_extensions_DaemonSetStatus(in interface{}, out interface{}, c *conversion.Cloner) error {
+// DeepCopyextensionsDaemonSetStatus ...
+func DeepCopyextensionsDaemonSetStatus(in interface{}, out interface{}, c *conversion.Cloner) error {
 	{
 		in := in.(*DaemonSetStatus)
 		out := out.(*DaemonSetStatus)
@@ -225,27 +234,29 @@ func DeepCopy_extensions_DaemonSetStatus(in interface{}, out interface{}, c *con
 	}
 }
 
-func DeepCopy_extensions_Deployment(in interface{}, out interface{}, c *conversion.Cloner) error {
+// DeepCopyextensionsDeployment ...
+func DeepCopyextensionsDeployment(in interface{}, out interface{}, c *conversion.Cloner) error {
 	{
 		in := in.(*Deployment)
 		out := out.(*Deployment)
 		*out = *in
-		if newVal, err := c.DeepCopy(&in.ObjectMeta); err != nil {
-			return err
-		} else {
+		if newVal, err := c.DeepCopy(&in.ObjectMeta); err == nil {
 			out.ObjectMeta = *newVal.(*v1.ObjectMeta)
-		}
-		if err := DeepCopy_extensions_DeploymentSpec(&in.Spec, &out.Spec, c); err != nil {
+		} else {
 			return err
 		}
-		if err := DeepCopy_extensions_DeploymentStatus(&in.Status, &out.Status, c); err != nil {
+		if err := DeepCopyextensionsDeploymentSpec(&in.Spec, &out.Spec, c); err != nil {
+			return err
+		}
+		if err := DeepCopyextensionsDeploymentStatus(&in.Status, &out.Status, c); err != nil {
 			return err
 		}
 		return nil
 	}
 }
 
-func DeepCopy_extensions_DeploymentCondition(in interface{}, out interface{}, c *conversion.Cloner) error {
+// DeepCopyextensionsDeploymentCondition ...
+func DeepCopyextensionsDeploymentCondition(in interface{}, out interface{}, c *conversion.Cloner) error {
 	{
 		in := in.(*DeploymentCondition)
 		out := out.(*DeploymentCondition)
@@ -256,7 +267,8 @@ func DeepCopy_extensions_DeploymentCondition(in interface{}, out interface{}, c 
 	}
 }
 
-func DeepCopy_extensions_DeploymentList(in interface{}, out interface{}, c *conversion.Cloner) error {
+// DeepCopyextensionsDeploymentList ...
+func DeepCopyextensionsDeploymentList(in interface{}, out interface{}, c *conversion.Cloner) error {
 	{
 		in := in.(*DeploymentList)
 		out := out.(*DeploymentList)
@@ -265,7 +277,7 @@ func DeepCopy_extensions_DeploymentList(in interface{}, out interface{}, c *conv
 			in, out := &in.Items, &out.Items
 			*out = make([]Deployment, len(*in))
 			for i := range *in {
-				if err := DeepCopy_extensions_Deployment(&(*in)[i], &(*out)[i], c); err != nil {
+				if err := DeepCopyextensionsDeployment(&(*in)[i], &(*out)[i], c); err != nil {
 					return err
 				}
 			}
@@ -274,7 +286,8 @@ func DeepCopy_extensions_DeploymentList(in interface{}, out interface{}, c *conv
 	}
 }
 
-func DeepCopy_extensions_DeploymentRollback(in interface{}, out interface{}, c *conversion.Cloner) error {
+// DeepCopyextensionsDeploymentRollback ...
+func DeepCopyextensionsDeploymentRollback(in interface{}, out interface{}, c *conversion.Cloner) error {
 	{
 		in := in.(*DeploymentRollback)
 		out := out.(*DeploymentRollback)
@@ -290,23 +303,24 @@ func DeepCopy_extensions_DeploymentRollback(in interface{}, out interface{}, c *
 	}
 }
 
-func DeepCopy_extensions_DeploymentSpec(in interface{}, out interface{}, c *conversion.Cloner) error {
+// DeepCopyextensionsDeploymentSpec ...
+func DeepCopyextensionsDeploymentSpec(in interface{}, out interface{}, c *conversion.Cloner) error {
 	{
 		in := in.(*DeploymentSpec)
 		out := out.(*DeploymentSpec)
 		*out = *in
 		if in.Selector != nil {
 			in, out := &in.Selector, &out.Selector
-			if newVal, err := c.DeepCopy(*in); err != nil {
-				return err
-			} else {
+			if newVal, err := c.DeepCopy(*in); err == nil {
 				*out = newVal.(*v1.LabelSelector)
+			} else {
+				return err
 			}
 		}
-		if err := api.DeepCopy_api_PodTemplateSpec(&in.Template, &out.Template, c); err != nil {
+		if err := api.DeepCopyapiPodTemplateSpec(&in.Template, &out.Template, c); err != nil {
 			return err
 		}
-		if err := DeepCopy_extensions_DeploymentStrategy(&in.Strategy, &out.Strategy, c); err != nil {
+		if err := DeepCopyextensionsDeploymentStrategy(&in.Strategy, &out.Strategy, c); err != nil {
 			return err
 		}
 		if in.RevisionHistoryLimit != nil {
@@ -328,7 +342,8 @@ func DeepCopy_extensions_DeploymentSpec(in interface{}, out interface{}, c *conv
 	}
 }
 
-func DeepCopy_extensions_DeploymentStatus(in interface{}, out interface{}, c *conversion.Cloner) error {
+// DeepCopyextensionsDeploymentStatus ...
+func DeepCopyextensionsDeploymentStatus(in interface{}, out interface{}, c *conversion.Cloner) error {
 	{
 		in := in.(*DeploymentStatus)
 		out := out.(*DeploymentStatus)
@@ -337,7 +352,7 @@ func DeepCopy_extensions_DeploymentStatus(in interface{}, out interface{}, c *co
 			in, out := &in.Conditions, &out.Conditions
 			*out = make([]DeploymentCondition, len(*in))
 			for i := range *in {
-				if err := DeepCopy_extensions_DeploymentCondition(&(*in)[i], &(*out)[i], c); err != nil {
+				if err := DeepCopyextensionsDeploymentCondition(&(*in)[i], &(*out)[i], c); err != nil {
 					return err
 				}
 			}
@@ -346,7 +361,8 @@ func DeepCopy_extensions_DeploymentStatus(in interface{}, out interface{}, c *co
 	}
 }
 
-func DeepCopy_extensions_DeploymentStrategy(in interface{}, out interface{}, c *conversion.Cloner) error {
+// DeepCopyextensionsDeploymentStrategy ...
+func DeepCopyextensionsDeploymentStrategy(in interface{}, out interface{}, c *conversion.Cloner) error {
 	{
 		in := in.(*DeploymentStrategy)
 		out := out.(*DeploymentStrategy)
@@ -360,7 +376,8 @@ func DeepCopy_extensions_DeploymentStrategy(in interface{}, out interface{}, c *
 	}
 }
 
-func DeepCopy_extensions_FSGroupStrategyOptions(in interface{}, out interface{}, c *conversion.Cloner) error {
+// DeepCopyextensionsFSGroupStrategyOptions ...
+func DeepCopyextensionsFSGroupStrategyOptions(in interface{}, out interface{}, c *conversion.Cloner) error {
 	{
 		in := in.(*FSGroupStrategyOptions)
 		out := out.(*FSGroupStrategyOptions)
@@ -374,7 +391,8 @@ func DeepCopy_extensions_FSGroupStrategyOptions(in interface{}, out interface{},
 	}
 }
 
-func DeepCopy_extensions_HTTPIngressPath(in interface{}, out interface{}, c *conversion.Cloner) error {
+// DeepCopyextensionsHTTPIngressPath ...
+func DeepCopyextensionsHTTPIngressPath(in interface{}, out interface{}, c *conversion.Cloner) error {
 	{
 		in := in.(*HTTPIngressPath)
 		out := out.(*HTTPIngressPath)
@@ -383,7 +401,8 @@ func DeepCopy_extensions_HTTPIngressPath(in interface{}, out interface{}, c *con
 	}
 }
 
-func DeepCopy_extensions_HTTPIngressRuleValue(in interface{}, out interface{}, c *conversion.Cloner) error {
+// DeepCopyextensionsHTTPIngressRuleValue ...
+func DeepCopyextensionsHTTPIngressRuleValue(in interface{}, out interface{}, c *conversion.Cloner) error {
 	{
 		in := in.(*HTTPIngressRuleValue)
 		out := out.(*HTTPIngressRuleValue)
@@ -397,7 +416,8 @@ func DeepCopy_extensions_HTTPIngressRuleValue(in interface{}, out interface{}, c
 	}
 }
 
-func DeepCopy_extensions_HostPortRange(in interface{}, out interface{}, c *conversion.Cloner) error {
+// DeepCopyextensionsHostPortRange ...
+func DeepCopyextensionsHostPortRange(in interface{}, out interface{}, c *conversion.Cloner) error {
 	{
 		in := in.(*HostPortRange)
 		out := out.(*HostPortRange)
@@ -406,7 +426,8 @@ func DeepCopy_extensions_HostPortRange(in interface{}, out interface{}, c *conve
 	}
 }
 
-func DeepCopy_extensions_IDRange(in interface{}, out interface{}, c *conversion.Cloner) error {
+// DeepCopyextensionsIDRange ...
+func DeepCopyextensionsIDRange(in interface{}, out interface{}, c *conversion.Cloner) error {
 	{
 		in := in.(*IDRange)
 		out := out.(*IDRange)
@@ -415,27 +436,29 @@ func DeepCopy_extensions_IDRange(in interface{}, out interface{}, c *conversion.
 	}
 }
 
-func DeepCopy_extensions_Ingress(in interface{}, out interface{}, c *conversion.Cloner) error {
+// DeepCopyextensionsIngress ...
+func DeepCopyextensionsIngress(in interface{}, out interface{}, c *conversion.Cloner) error {
 	{
 		in := in.(*Ingress)
 		out := out.(*Ingress)
 		*out = *in
-		if newVal, err := c.DeepCopy(&in.ObjectMeta); err != nil {
-			return err
-		} else {
+		if newVal, err := c.DeepCopy(&in.ObjectMeta); err == nil {
 			out.ObjectMeta = *newVal.(*v1.ObjectMeta)
-		}
-		if err := DeepCopy_extensions_IngressSpec(&in.Spec, &out.Spec, c); err != nil {
+		} else {
 			return err
 		}
-		if err := DeepCopy_extensions_IngressStatus(&in.Status, &out.Status, c); err != nil {
+		if err := DeepCopyextensionsIngressSpec(&in.Spec, &out.Spec, c); err != nil {
+			return err
+		}
+		if err := DeepCopyextensionsIngressStatus(&in.Status, &out.Status, c); err != nil {
 			return err
 		}
 		return nil
 	}
 }
 
-func DeepCopy_extensions_IngressBackend(in interface{}, out interface{}, c *conversion.Cloner) error {
+// DeepCopyextensionsIngressBackend ...
+func DeepCopyextensionsIngressBackend(in interface{}, out interface{}, c *conversion.Cloner) error {
 	{
 		in := in.(*IngressBackend)
 		out := out.(*IngressBackend)
@@ -444,7 +467,8 @@ func DeepCopy_extensions_IngressBackend(in interface{}, out interface{}, c *conv
 	}
 }
 
-func DeepCopy_extensions_IngressList(in interface{}, out interface{}, c *conversion.Cloner) error {
+// DeepCopyextensionsIngressList ...
+func DeepCopyextensionsIngressList(in interface{}, out interface{}, c *conversion.Cloner) error {
 	{
 		in := in.(*IngressList)
 		out := out.(*IngressList)
@@ -453,7 +477,7 @@ func DeepCopy_extensions_IngressList(in interface{}, out interface{}, c *convers
 			in, out := &in.Items, &out.Items
 			*out = make([]Ingress, len(*in))
 			for i := range *in {
-				if err := DeepCopy_extensions_Ingress(&(*in)[i], &(*out)[i], c); err != nil {
+				if err := DeepCopyextensionsIngress(&(*in)[i], &(*out)[i], c); err != nil {
 					return err
 				}
 			}
@@ -462,19 +486,21 @@ func DeepCopy_extensions_IngressList(in interface{}, out interface{}, c *convers
 	}
 }
 
-func DeepCopy_extensions_IngressRule(in interface{}, out interface{}, c *conversion.Cloner) error {
+// DeepCopyextensionsIngressRule ...
+func DeepCopyextensionsIngressRule(in interface{}, out interface{}, c *conversion.Cloner) error {
 	{
 		in := in.(*IngressRule)
 		out := out.(*IngressRule)
 		*out = *in
-		if err := DeepCopy_extensions_IngressRuleValue(&in.IngressRuleValue, &out.IngressRuleValue, c); err != nil {
+		if err := DeepCopyextensionsIngressRuleValue(&in.IngressRuleValue, &out.IngressRuleValue, c); err != nil {
 			return err
 		}
 		return nil
 	}
 }
 
-func DeepCopy_extensions_IngressRuleValue(in interface{}, out interface{}, c *conversion.Cloner) error {
+// DeepCopyextensionsIngressRuleValue ...
+func DeepCopyextensionsIngressRuleValue(in interface{}, out interface{}, c *conversion.Cloner) error {
 	{
 		in := in.(*IngressRuleValue)
 		out := out.(*IngressRuleValue)
@@ -482,7 +508,7 @@ func DeepCopy_extensions_IngressRuleValue(in interface{}, out interface{}, c *co
 		if in.HTTP != nil {
 			in, out := &in.HTTP, &out.HTTP
 			*out = new(HTTPIngressRuleValue)
-			if err := DeepCopy_extensions_HTTPIngressRuleValue(*in, *out, c); err != nil {
+			if err := DeepCopyextensionsHTTPIngressRuleValue(*in, *out, c); err != nil {
 				return err
 			}
 		}
@@ -490,7 +516,8 @@ func DeepCopy_extensions_IngressRuleValue(in interface{}, out interface{}, c *co
 	}
 }
 
-func DeepCopy_extensions_IngressSpec(in interface{}, out interface{}, c *conversion.Cloner) error {
+// DeepCopyextensionsIngressSpec ...
+func DeepCopyextensionsIngressSpec(in interface{}, out interface{}, c *conversion.Cloner) error {
 	{
 		in := in.(*IngressSpec)
 		out := out.(*IngressSpec)
@@ -504,7 +531,7 @@ func DeepCopy_extensions_IngressSpec(in interface{}, out interface{}, c *convers
 			in, out := &in.TLS, &out.TLS
 			*out = make([]IngressTLS, len(*in))
 			for i := range *in {
-				if err := DeepCopy_extensions_IngressTLS(&(*in)[i], &(*out)[i], c); err != nil {
+				if err := DeepCopyextensionsIngressTLS(&(*in)[i], &(*out)[i], c); err != nil {
 					return err
 				}
 			}
@@ -513,7 +540,7 @@ func DeepCopy_extensions_IngressSpec(in interface{}, out interface{}, c *convers
 			in, out := &in.Rules, &out.Rules
 			*out = make([]IngressRule, len(*in))
 			for i := range *in {
-				if err := DeepCopy_extensions_IngressRule(&(*in)[i], &(*out)[i], c); err != nil {
+				if err := DeepCopyextensionsIngressRule(&(*in)[i], &(*out)[i], c); err != nil {
 					return err
 				}
 			}
@@ -522,19 +549,21 @@ func DeepCopy_extensions_IngressSpec(in interface{}, out interface{}, c *convers
 	}
 }
 
-func DeepCopy_extensions_IngressStatus(in interface{}, out interface{}, c *conversion.Cloner) error {
+// DeepCopyextensionsIngressStatus ...
+func DeepCopyextensionsIngressStatus(in interface{}, out interface{}, c *conversion.Cloner) error {
 	{
 		in := in.(*IngressStatus)
 		out := out.(*IngressStatus)
 		*out = *in
-		if err := api.DeepCopy_api_LoadBalancerStatus(&in.LoadBalancer, &out.LoadBalancer, c); err != nil {
+		if err := api.DeepCopyapiLoadBalancerStatus(&in.LoadBalancer, &out.LoadBalancer, c); err != nil {
 			return err
 		}
 		return nil
 	}
 }
 
-func DeepCopy_extensions_IngressTLS(in interface{}, out interface{}, c *conversion.Cloner) error {
+// DeepCopyextensionsIngressTLS ...
+func DeepCopyextensionsIngressTLS(in interface{}, out interface{}, c *conversion.Cloner) error {
 	{
 		in := in.(*IngressTLS)
 		out := out.(*IngressTLS)
@@ -548,24 +577,26 @@ func DeepCopy_extensions_IngressTLS(in interface{}, out interface{}, c *conversi
 	}
 }
 
-func DeepCopy_extensions_NetworkPolicy(in interface{}, out interface{}, c *conversion.Cloner) error {
+// DeepCopyextensionsNetworkPolicy ...
+func DeepCopyextensionsNetworkPolicy(in interface{}, out interface{}, c *conversion.Cloner) error {
 	{
 		in := in.(*NetworkPolicy)
 		out := out.(*NetworkPolicy)
 		*out = *in
-		if newVal, err := c.DeepCopy(&in.ObjectMeta); err != nil {
-			return err
-		} else {
+		if newVal, err := c.DeepCopy(&in.ObjectMeta); err == nil {
 			out.ObjectMeta = *newVal.(*v1.ObjectMeta)
+		} else {
+			return err
 		}
-		if err := DeepCopy_extensions_NetworkPolicySpec(&in.Spec, &out.Spec, c); err != nil {
+		if err := DeepCopyextensionsNetworkPolicySpec(&in.Spec, &out.Spec, c); err != nil {
 			return err
 		}
 		return nil
 	}
 }
 
-func DeepCopy_extensions_NetworkPolicyIngressRule(in interface{}, out interface{}, c *conversion.Cloner) error {
+// DeepCopyextensionsNetworkPolicyIngressRule ...
+func DeepCopyextensionsNetworkPolicyIngressRule(in interface{}, out interface{}, c *conversion.Cloner) error {
 	{
 		in := in.(*NetworkPolicyIngressRule)
 		out := out.(*NetworkPolicyIngressRule)
@@ -574,7 +605,7 @@ func DeepCopy_extensions_NetworkPolicyIngressRule(in interface{}, out interface{
 			in, out := &in.Ports, &out.Ports
 			*out = make([]NetworkPolicyPort, len(*in))
 			for i := range *in {
-				if err := DeepCopy_extensions_NetworkPolicyPort(&(*in)[i], &(*out)[i], c); err != nil {
+				if err := DeepCopyextensionsNetworkPolicyPort(&(*in)[i], &(*out)[i], c); err != nil {
 					return err
 				}
 			}
@@ -583,7 +614,7 @@ func DeepCopy_extensions_NetworkPolicyIngressRule(in interface{}, out interface{
 			in, out := &in.From, &out.From
 			*out = make([]NetworkPolicyPeer, len(*in))
 			for i := range *in {
-				if err := DeepCopy_extensions_NetworkPolicyPeer(&(*in)[i], &(*out)[i], c); err != nil {
+				if err := DeepCopyextensionsNetworkPolicyPeer(&(*in)[i], &(*out)[i], c); err != nil {
 					return err
 				}
 			}
@@ -592,7 +623,8 @@ func DeepCopy_extensions_NetworkPolicyIngressRule(in interface{}, out interface{
 	}
 }
 
-func DeepCopy_extensions_NetworkPolicyList(in interface{}, out interface{}, c *conversion.Cloner) error {
+// DeepCopyextensionsNetworkPolicyList ...
+func DeepCopyextensionsNetworkPolicyList(in interface{}, out interface{}, c *conversion.Cloner) error {
 	{
 		in := in.(*NetworkPolicyList)
 		out := out.(*NetworkPolicyList)
@@ -601,7 +633,7 @@ func DeepCopy_extensions_NetworkPolicyList(in interface{}, out interface{}, c *c
 			in, out := &in.Items, &out.Items
 			*out = make([]NetworkPolicy, len(*in))
 			for i := range *in {
-				if err := DeepCopy_extensions_NetworkPolicy(&(*in)[i], &(*out)[i], c); err != nil {
+				if err := DeepCopyextensionsNetworkPolicy(&(*in)[i], &(*out)[i], c); err != nil {
 					return err
 				}
 			}
@@ -610,32 +642,34 @@ func DeepCopy_extensions_NetworkPolicyList(in interface{}, out interface{}, c *c
 	}
 }
 
-func DeepCopy_extensions_NetworkPolicyPeer(in interface{}, out interface{}, c *conversion.Cloner) error {
+// DeepCopyextensionsNetworkPolicyPeer ...
+func DeepCopyextensionsNetworkPolicyPeer(in interface{}, out interface{}, c *conversion.Cloner) error {
 	{
 		in := in.(*NetworkPolicyPeer)
 		out := out.(*NetworkPolicyPeer)
 		*out = *in
 		if in.PodSelector != nil {
 			in, out := &in.PodSelector, &out.PodSelector
-			if newVal, err := c.DeepCopy(*in); err != nil {
-				return err
-			} else {
+			if newVal, err := c.DeepCopy(*in); err == nil {
 				*out = newVal.(*v1.LabelSelector)
+			} else {
+				return err
 			}
 		}
 		if in.NamespaceSelector != nil {
 			in, out := &in.NamespaceSelector, &out.NamespaceSelector
-			if newVal, err := c.DeepCopy(*in); err != nil {
-				return err
-			} else {
+			if newVal, err := c.DeepCopy(*in); err == nil {
 				*out = newVal.(*v1.LabelSelector)
+			} else {
+				return err
 			}
 		}
 		return nil
 	}
 }
 
-func DeepCopy_extensions_NetworkPolicyPort(in interface{}, out interface{}, c *conversion.Cloner) error {
+// DeepCopyextensionsNetworkPolicyPort ...
+func DeepCopyextensionsNetworkPolicyPort(in interface{}, out interface{}, c *conversion.Cloner) error {
 	{
 		in := in.(*NetworkPolicyPort)
 		out := out.(*NetworkPolicyPort)
@@ -654,21 +688,22 @@ func DeepCopy_extensions_NetworkPolicyPort(in interface{}, out interface{}, c *c
 	}
 }
 
-func DeepCopy_extensions_NetworkPolicySpec(in interface{}, out interface{}, c *conversion.Cloner) error {
+// DeepCopyextensionsNetworkPolicySpec ...
+func DeepCopyextensionsNetworkPolicySpec(in interface{}, out interface{}, c *conversion.Cloner) error {
 	{
 		in := in.(*NetworkPolicySpec)
 		out := out.(*NetworkPolicySpec)
 		*out = *in
-		if newVal, err := c.DeepCopy(&in.PodSelector); err != nil {
-			return err
-		} else {
+		if newVal, err := c.DeepCopy(&in.PodSelector); err == nil {
 			out.PodSelector = *newVal.(*v1.LabelSelector)
+		} else {
+			return err
 		}
 		if in.Ingress != nil {
 			in, out := &in.Ingress, &out.Ingress
 			*out = make([]NetworkPolicyIngressRule, len(*in))
 			for i := range *in {
-				if err := DeepCopy_extensions_NetworkPolicyIngressRule(&(*in)[i], &(*out)[i], c); err != nil {
+				if err := DeepCopyextensionsNetworkPolicyIngressRule(&(*in)[i], &(*out)[i], c); err != nil {
 					return err
 				}
 			}
@@ -677,24 +712,26 @@ func DeepCopy_extensions_NetworkPolicySpec(in interface{}, out interface{}, c *c
 	}
 }
 
-func DeepCopy_extensions_PodSecurityPolicy(in interface{}, out interface{}, c *conversion.Cloner) error {
+// DeepCopyextensionsPodSecurityPolicy ...
+func DeepCopyextensionsPodSecurityPolicy(in interface{}, out interface{}, c *conversion.Cloner) error {
 	{
 		in := in.(*PodSecurityPolicy)
 		out := out.(*PodSecurityPolicy)
 		*out = *in
-		if newVal, err := c.DeepCopy(&in.ObjectMeta); err != nil {
-			return err
-		} else {
+		if newVal, err := c.DeepCopy(&in.ObjectMeta); err == nil {
 			out.ObjectMeta = *newVal.(*v1.ObjectMeta)
+		} else {
+			return err
 		}
-		if err := DeepCopy_extensions_PodSecurityPolicySpec(&in.Spec, &out.Spec, c); err != nil {
+		if err := DeepCopyextensionsPodSecurityPolicySpec(&in.Spec, &out.Spec, c); err != nil {
 			return err
 		}
 		return nil
 	}
 }
 
-func DeepCopy_extensions_PodSecurityPolicyList(in interface{}, out interface{}, c *conversion.Cloner) error {
+// DeepCopyextensionsPodSecurityPolicyList ...
+func DeepCopyextensionsPodSecurityPolicyList(in interface{}, out interface{}, c *conversion.Cloner) error {
 	{
 		in := in.(*PodSecurityPolicyList)
 		out := out.(*PodSecurityPolicyList)
@@ -703,7 +740,7 @@ func DeepCopy_extensions_PodSecurityPolicyList(in interface{}, out interface{}, 
 			in, out := &in.Items, &out.Items
 			*out = make([]PodSecurityPolicy, len(*in))
 			for i := range *in {
-				if err := DeepCopy_extensions_PodSecurityPolicy(&(*in)[i], &(*out)[i], c); err != nil {
+				if err := DeepCopyextensionsPodSecurityPolicy(&(*in)[i], &(*out)[i], c); err != nil {
 					return err
 				}
 			}
@@ -712,7 +749,8 @@ func DeepCopy_extensions_PodSecurityPolicyList(in interface{}, out interface{}, 
 	}
 }
 
-func DeepCopy_extensions_PodSecurityPolicySpec(in interface{}, out interface{}, c *conversion.Cloner) error {
+// DeepCopyextensionsPodSecurityPolicySpec ...
+func DeepCopyextensionsPodSecurityPolicySpec(in interface{}, out interface{}, c *conversion.Cloner) error {
 	{
 		in := in.(*PodSecurityPolicySpec)
 		out := out.(*PodSecurityPolicySpec)
@@ -742,43 +780,45 @@ func DeepCopy_extensions_PodSecurityPolicySpec(in interface{}, out interface{}, 
 			*out = make([]HostPortRange, len(*in))
 			copy(*out, *in)
 		}
-		if err := DeepCopy_extensions_SELinuxStrategyOptions(&in.SELinux, &out.SELinux, c); err != nil {
+		if err := DeepCopyextensionsSELinuxStrategyOptions(&in.SELinux, &out.SELinux, c); err != nil {
 			return err
 		}
-		if err := DeepCopy_extensions_RunAsUserStrategyOptions(&in.RunAsUser, &out.RunAsUser, c); err != nil {
+		if err := DeepCopyextensionsRunAsUserStrategyOptions(&in.RunAsUser, &out.RunAsUser, c); err != nil {
 			return err
 		}
-		if err := DeepCopy_extensions_SupplementalGroupsStrategyOptions(&in.SupplementalGroups, &out.SupplementalGroups, c); err != nil {
+		if err := DeepCopyextensionsSupplementalGroupsStrategyOptions(&in.SupplementalGroups, &out.SupplementalGroups, c); err != nil {
 			return err
 		}
-		if err := DeepCopy_extensions_FSGroupStrategyOptions(&in.FSGroup, &out.FSGroup, c); err != nil {
+		if err := DeepCopyextensionsFSGroupStrategyOptions(&in.FSGroup, &out.FSGroup, c); err != nil {
 			return err
 		}
 		return nil
 	}
 }
 
-func DeepCopy_extensions_ReplicaSet(in interface{}, out interface{}, c *conversion.Cloner) error {
+// DeepCopyextensionsReplicaSet ...
+func DeepCopyextensionsReplicaSet(in interface{}, out interface{}, c *conversion.Cloner) error {
 	{
 		in := in.(*ReplicaSet)
 		out := out.(*ReplicaSet)
 		*out = *in
-		if newVal, err := c.DeepCopy(&in.ObjectMeta); err != nil {
-			return err
-		} else {
+		if newVal, err := c.DeepCopy(&in.ObjectMeta); err == nil {
 			out.ObjectMeta = *newVal.(*v1.ObjectMeta)
-		}
-		if err := DeepCopy_extensions_ReplicaSetSpec(&in.Spec, &out.Spec, c); err != nil {
+		} else {
 			return err
 		}
-		if err := DeepCopy_extensions_ReplicaSetStatus(&in.Status, &out.Status, c); err != nil {
+		if err := DeepCopyextensionsReplicaSetSpec(&in.Spec, &out.Spec, c); err != nil {
+			return err
+		}
+		if err := DeepCopyextensionsReplicaSetStatus(&in.Status, &out.Status, c); err != nil {
 			return err
 		}
 		return nil
 	}
 }
 
-func DeepCopy_extensions_ReplicaSetCondition(in interface{}, out interface{}, c *conversion.Cloner) error {
+// DeepCopyextensionsReplicaSetCondition ...
+func DeepCopyextensionsReplicaSetCondition(in interface{}, out interface{}, c *conversion.Cloner) error {
 	{
 		in := in.(*ReplicaSetCondition)
 		out := out.(*ReplicaSetCondition)
@@ -788,7 +828,8 @@ func DeepCopy_extensions_ReplicaSetCondition(in interface{}, out interface{}, c 
 	}
 }
 
-func DeepCopy_extensions_ReplicaSetList(in interface{}, out interface{}, c *conversion.Cloner) error {
+// DeepCopyextensionsReplicaSetList ...
+func DeepCopyextensionsReplicaSetList(in interface{}, out interface{}, c *conversion.Cloner) error {
 	{
 		in := in.(*ReplicaSetList)
 		out := out.(*ReplicaSetList)
@@ -797,7 +838,7 @@ func DeepCopy_extensions_ReplicaSetList(in interface{}, out interface{}, c *conv
 			in, out := &in.Items, &out.Items
 			*out = make([]ReplicaSet, len(*in))
 			for i := range *in {
-				if err := DeepCopy_extensions_ReplicaSet(&(*in)[i], &(*out)[i], c); err != nil {
+				if err := DeepCopyextensionsReplicaSet(&(*in)[i], &(*out)[i], c); err != nil {
 					return err
 				}
 			}
@@ -806,27 +847,29 @@ func DeepCopy_extensions_ReplicaSetList(in interface{}, out interface{}, c *conv
 	}
 }
 
-func DeepCopy_extensions_ReplicaSetSpec(in interface{}, out interface{}, c *conversion.Cloner) error {
+// DeepCopyextensionsReplicaSetSpec ...
+func DeepCopyextensionsReplicaSetSpec(in interface{}, out interface{}, c *conversion.Cloner) error {
 	{
 		in := in.(*ReplicaSetSpec)
 		out := out.(*ReplicaSetSpec)
 		*out = *in
 		if in.Selector != nil {
 			in, out := &in.Selector, &out.Selector
-			if newVal, err := c.DeepCopy(*in); err != nil {
-				return err
-			} else {
+			if newVal, err := c.DeepCopy(*in); err == nil {
 				*out = newVal.(*v1.LabelSelector)
+			} else {
+				return err
 			}
 		}
-		if err := api.DeepCopy_api_PodTemplateSpec(&in.Template, &out.Template, c); err != nil {
+		if err := api.DeepCopyapiPodTemplateSpec(&in.Template, &out.Template, c); err != nil {
 			return err
 		}
 		return nil
 	}
 }
 
-func DeepCopy_extensions_ReplicaSetStatus(in interface{}, out interface{}, c *conversion.Cloner) error {
+// DeepCopyextensionsReplicaSetStatus ...
+func DeepCopyextensionsReplicaSetStatus(in interface{}, out interface{}, c *conversion.Cloner) error {
 	{
 		in := in.(*ReplicaSetStatus)
 		out := out.(*ReplicaSetStatus)
@@ -835,7 +878,7 @@ func DeepCopy_extensions_ReplicaSetStatus(in interface{}, out interface{}, c *co
 			in, out := &in.Conditions, &out.Conditions
 			*out = make([]ReplicaSetCondition, len(*in))
 			for i := range *in {
-				if err := DeepCopy_extensions_ReplicaSetCondition(&(*in)[i], &(*out)[i], c); err != nil {
+				if err := DeepCopyextensionsReplicaSetCondition(&(*in)[i], &(*out)[i], c); err != nil {
 					return err
 				}
 			}
@@ -844,7 +887,8 @@ func DeepCopy_extensions_ReplicaSetStatus(in interface{}, out interface{}, c *co
 	}
 }
 
-func DeepCopy_extensions_ReplicationControllerDummy(in interface{}, out interface{}, c *conversion.Cloner) error {
+// DeepCopyextensionsReplicationControllerDummy ...
+func DeepCopyextensionsReplicationControllerDummy(in interface{}, out interface{}, c *conversion.Cloner) error {
 	{
 		in := in.(*ReplicationControllerDummy)
 		out := out.(*ReplicationControllerDummy)
@@ -853,7 +897,8 @@ func DeepCopy_extensions_ReplicationControllerDummy(in interface{}, out interfac
 	}
 }
 
-func DeepCopy_extensions_RollbackConfig(in interface{}, out interface{}, c *conversion.Cloner) error {
+// DeepCopyextensionsRollbackConfig ...
+func DeepCopyextensionsRollbackConfig(in interface{}, out interface{}, c *conversion.Cloner) error {
 	{
 		in := in.(*RollbackConfig)
 		out := out.(*RollbackConfig)
@@ -862,7 +907,8 @@ func DeepCopy_extensions_RollbackConfig(in interface{}, out interface{}, c *conv
 	}
 }
 
-func DeepCopy_extensions_RollingUpdateDeployment(in interface{}, out interface{}, c *conversion.Cloner) error {
+// DeepCopyextensionsRollingUpdateDeployment ...
+func DeepCopyextensionsRollingUpdateDeployment(in interface{}, out interface{}, c *conversion.Cloner) error {
 	{
 		in := in.(*RollingUpdateDeployment)
 		out := out.(*RollingUpdateDeployment)
@@ -871,7 +917,8 @@ func DeepCopy_extensions_RollingUpdateDeployment(in interface{}, out interface{}
 	}
 }
 
-func DeepCopy_extensions_RunAsUserStrategyOptions(in interface{}, out interface{}, c *conversion.Cloner) error {
+// DeepCopyextensionsRunAsUserStrategyOptions ...
+func DeepCopyextensionsRunAsUserStrategyOptions(in interface{}, out interface{}, c *conversion.Cloner) error {
 	{
 		in := in.(*RunAsUserStrategyOptions)
 		out := out.(*RunAsUserStrategyOptions)
@@ -885,7 +932,8 @@ func DeepCopy_extensions_RunAsUserStrategyOptions(in interface{}, out interface{
 	}
 }
 
-func DeepCopy_extensions_SELinuxStrategyOptions(in interface{}, out interface{}, c *conversion.Cloner) error {
+// DeepCopyextensionsSELinuxStrategyOptions ...
+func DeepCopyextensionsSELinuxStrategyOptions(in interface{}, out interface{}, c *conversion.Cloner) error {
 	{
 		in := in.(*SELinuxStrategyOptions)
 		out := out.(*SELinuxStrategyOptions)
@@ -899,24 +947,26 @@ func DeepCopy_extensions_SELinuxStrategyOptions(in interface{}, out interface{},
 	}
 }
 
-func DeepCopy_extensions_Scale(in interface{}, out interface{}, c *conversion.Cloner) error {
+// DeepCopyextensionsScale ...
+func DeepCopyextensionsScale(in interface{}, out interface{}, c *conversion.Cloner) error {
 	{
 		in := in.(*Scale)
 		out := out.(*Scale)
 		*out = *in
-		if newVal, err := c.DeepCopy(&in.ObjectMeta); err != nil {
-			return err
-		} else {
+		if newVal, err := c.DeepCopy(&in.ObjectMeta); err == nil {
 			out.ObjectMeta = *newVal.(*v1.ObjectMeta)
+		} else {
+			return err
 		}
-		if err := DeepCopy_extensions_ScaleStatus(&in.Status, &out.Status, c); err != nil {
+		if err := DeepCopyextensionsScaleStatus(&in.Status, &out.Status, c); err != nil {
 			return err
 		}
 		return nil
 	}
 }
 
-func DeepCopy_extensions_ScaleSpec(in interface{}, out interface{}, c *conversion.Cloner) error {
+// DeepCopyextensionsScaleSpec ...
+func DeepCopyextensionsScaleSpec(in interface{}, out interface{}, c *conversion.Cloner) error {
 	{
 		in := in.(*ScaleSpec)
 		out := out.(*ScaleSpec)
@@ -925,24 +975,26 @@ func DeepCopy_extensions_ScaleSpec(in interface{}, out interface{}, c *conversio
 	}
 }
 
-func DeepCopy_extensions_ScaleStatus(in interface{}, out interface{}, c *conversion.Cloner) error {
+// DeepCopyextensionsScaleStatus ...
+func DeepCopyextensionsScaleStatus(in interface{}, out interface{}, c *conversion.Cloner) error {
 	{
 		in := in.(*ScaleStatus)
 		out := out.(*ScaleStatus)
 		*out = *in
 		if in.Selector != nil {
 			in, out := &in.Selector, &out.Selector
-			if newVal, err := c.DeepCopy(*in); err != nil {
-				return err
-			} else {
+			if newVal, err := c.DeepCopy(*in); err == nil {
 				*out = newVal.(*v1.LabelSelector)
+			} else {
+				return err
 			}
 		}
 		return nil
 	}
 }
 
-func DeepCopy_extensions_SupplementalGroupsStrategyOptions(in interface{}, out interface{}, c *conversion.Cloner) error {
+// DeepCopyextensionsSupplementalGroupsStrategyOptions ...
+func DeepCopyextensionsSupplementalGroupsStrategyOptions(in interface{}, out interface{}, c *conversion.Cloner) error {
 	{
 		in := in.(*SupplementalGroupsStrategyOptions)
 		out := out.(*SupplementalGroupsStrategyOptions)
@@ -956,15 +1008,16 @@ func DeepCopy_extensions_SupplementalGroupsStrategyOptions(in interface{}, out i
 	}
 }
 
-func DeepCopy_extensions_ThirdPartyResource(in interface{}, out interface{}, c *conversion.Cloner) error {
+// DeepCopyextensionsThirdPartyResource ...
+func DeepCopyextensionsThirdPartyResource(in interface{}, out interface{}, c *conversion.Cloner) error {
 	{
 		in := in.(*ThirdPartyResource)
 		out := out.(*ThirdPartyResource)
 		*out = *in
-		if newVal, err := c.DeepCopy(&in.ObjectMeta); err != nil {
-			return err
-		} else {
+		if newVal, err := c.DeepCopy(&in.ObjectMeta); err == nil {
 			out.ObjectMeta = *newVal.(*v1.ObjectMeta)
+		} else {
+			return err
 		}
 		if in.Versions != nil {
 			in, out := &in.Versions, &out.Versions
@@ -975,15 +1028,16 @@ func DeepCopy_extensions_ThirdPartyResource(in interface{}, out interface{}, c *
 	}
 }
 
-func DeepCopy_extensions_ThirdPartyResourceData(in interface{}, out interface{}, c *conversion.Cloner) error {
+// DeepCopyextensionsThirdPartyResourceData ...
+func DeepCopyextensionsThirdPartyResourceData(in interface{}, out interface{}, c *conversion.Cloner) error {
 	{
 		in := in.(*ThirdPartyResourceData)
 		out := out.(*ThirdPartyResourceData)
 		*out = *in
-		if newVal, err := c.DeepCopy(&in.ObjectMeta); err != nil {
-			return err
-		} else {
+		if newVal, err := c.DeepCopy(&in.ObjectMeta); err == nil {
 			out.ObjectMeta = *newVal.(*v1.ObjectMeta)
+		} else {
+			return err
 		}
 		if in.Data != nil {
 			in, out := &in.Data, &out.Data
@@ -994,7 +1048,8 @@ func DeepCopy_extensions_ThirdPartyResourceData(in interface{}, out interface{},
 	}
 }
 
-func DeepCopy_extensions_ThirdPartyResourceDataList(in interface{}, out interface{}, c *conversion.Cloner) error {
+// DeepCopyextensionsThirdPartyResourceDataList ...
+func DeepCopyextensionsThirdPartyResourceDataList(in interface{}, out interface{}, c *conversion.Cloner) error {
 	{
 		in := in.(*ThirdPartyResourceDataList)
 		out := out.(*ThirdPartyResourceDataList)
@@ -1003,7 +1058,7 @@ func DeepCopy_extensions_ThirdPartyResourceDataList(in interface{}, out interfac
 			in, out := &in.Items, &out.Items
 			*out = make([]ThirdPartyResourceData, len(*in))
 			for i := range *in {
-				if err := DeepCopy_extensions_ThirdPartyResourceData(&(*in)[i], &(*out)[i], c); err != nil {
+				if err := DeepCopyextensionsThirdPartyResourceData(&(*in)[i], &(*out)[i], c); err != nil {
 					return err
 				}
 			}
@@ -1012,7 +1067,8 @@ func DeepCopy_extensions_ThirdPartyResourceDataList(in interface{}, out interfac
 	}
 }
 
-func DeepCopy_extensions_ThirdPartyResourceList(in interface{}, out interface{}, c *conversion.Cloner) error {
+// DeepCopyextensionsThirdPartyResourceList ...
+func DeepCopyextensionsThirdPartyResourceList(in interface{}, out interface{}, c *conversion.Cloner) error {
 	{
 		in := in.(*ThirdPartyResourceList)
 		out := out.(*ThirdPartyResourceList)
@@ -1021,7 +1077,7 @@ func DeepCopy_extensions_ThirdPartyResourceList(in interface{}, out interface{},
 			in, out := &in.Items, &out.Items
 			*out = make([]ThirdPartyResource, len(*in))
 			for i := range *in {
-				if err := DeepCopy_extensions_ThirdPartyResource(&(*in)[i], &(*out)[i], c); err != nil {
+				if err := DeepCopyextensionsThirdPartyResource(&(*in)[i], &(*out)[i], c); err != nil {
 					return err
 				}
 			}

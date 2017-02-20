@@ -36,36 +36,38 @@ func init() {
 // to allow building arbitrary schemes.
 func RegisterDeepCopies(scheme *runtime.Scheme) error {
 	return scheme.AddGeneratedDeepCopyFuncs(
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1beta1_Cluster, InType: reflect.TypeOf(&Cluster{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1beta1_ClusterCondition, InType: reflect.TypeOf(&ClusterCondition{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1beta1_ClusterList, InType: reflect.TypeOf(&ClusterList{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1beta1_ClusterSpec, InType: reflect.TypeOf(&ClusterSpec{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1beta1_ClusterStatus, InType: reflect.TypeOf(&ClusterStatus{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1beta1_ServerAddressByClientCIDR, InType: reflect.TypeOf(&ServerAddressByClientCIDR{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopyv1beta1Cluster, InType: reflect.TypeOf(&Cluster{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopyv1beta1ClusterCondition, InType: reflect.TypeOf(&ClusterCondition{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopyv1beta1ClusterList, InType: reflect.TypeOf(&ClusterList{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopyv1beta1ClusterSpec, InType: reflect.TypeOf(&ClusterSpec{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopyv1beta1ClusterStatus, InType: reflect.TypeOf(&ClusterStatus{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopyv1beta1ServerAddressByClientCIDR, InType: reflect.TypeOf(&ServerAddressByClientCIDR{})},
 	)
 }
 
-func DeepCopy_v1beta1_Cluster(in interface{}, out interface{}, c *conversion.Cloner) error {
+// DeepCopyv1beta1Cluster ...
+func DeepCopyv1beta1Cluster(in interface{}, out interface{}, c *conversion.Cloner) error {
 	{
 		in := in.(*Cluster)
 		out := out.(*Cluster)
 		*out = *in
-		if newVal, err := c.DeepCopy(&in.ObjectMeta); err != nil {
-			return err
-		} else {
+		if newVal, err := c.DeepCopy(&in.ObjectMeta); err == nil {
 			out.ObjectMeta = *newVal.(*v1.ObjectMeta)
-		}
-		if err := DeepCopy_v1beta1_ClusterSpec(&in.Spec, &out.Spec, c); err != nil {
+		} else {
 			return err
 		}
-		if err := DeepCopy_v1beta1_ClusterStatus(&in.Status, &out.Status, c); err != nil {
+		if err := DeepCopyv1beta1ClusterSpec(&in.Spec, &out.Spec, c); err != nil {
+			return err
+		}
+		if err := DeepCopyv1beta1ClusterStatus(&in.Status, &out.Status, c); err != nil {
 			return err
 		}
 		return nil
 	}
 }
 
-func DeepCopy_v1beta1_ClusterCondition(in interface{}, out interface{}, c *conversion.Cloner) error {
+// DeepCopyv1beta1ClusterCondition ...
+func DeepCopyv1beta1ClusterCondition(in interface{}, out interface{}, c *conversion.Cloner) error {
 	{
 		in := in.(*ClusterCondition)
 		out := out.(*ClusterCondition)
@@ -76,7 +78,8 @@ func DeepCopy_v1beta1_ClusterCondition(in interface{}, out interface{}, c *conve
 	}
 }
 
-func DeepCopy_v1beta1_ClusterList(in interface{}, out interface{}, c *conversion.Cloner) error {
+// DeepCopyv1beta1ClusterList ...
+func DeepCopyv1beta1ClusterList(in interface{}, out interface{}, c *conversion.Cloner) error {
 	{
 		in := in.(*ClusterList)
 		out := out.(*ClusterList)
@@ -85,7 +88,7 @@ func DeepCopy_v1beta1_ClusterList(in interface{}, out interface{}, c *conversion
 			in, out := &in.Items, &out.Items
 			*out = make([]Cluster, len(*in))
 			for i := range *in {
-				if err := DeepCopy_v1beta1_Cluster(&(*in)[i], &(*out)[i], c); err != nil {
+				if err := DeepCopyv1beta1Cluster(&(*in)[i], &(*out)[i], c); err != nil {
 					return err
 				}
 			}
@@ -94,7 +97,8 @@ func DeepCopy_v1beta1_ClusterList(in interface{}, out interface{}, c *conversion
 	}
 }
 
-func DeepCopy_v1beta1_ClusterSpec(in interface{}, out interface{}, c *conversion.Cloner) error {
+// DeepCopyv1beta1ClusterSpec ...
+func DeepCopyv1beta1ClusterSpec(in interface{}, out interface{}, c *conversion.Cloner) error {
 	{
 		in := in.(*ClusterSpec)
 		out := out.(*ClusterSpec)
@@ -113,7 +117,8 @@ func DeepCopy_v1beta1_ClusterSpec(in interface{}, out interface{}, c *conversion
 	}
 }
 
-func DeepCopy_v1beta1_ClusterStatus(in interface{}, out interface{}, c *conversion.Cloner) error {
+// DeepCopyv1beta1ClusterStatus ...
+func DeepCopyv1beta1ClusterStatus(in interface{}, out interface{}, c *conversion.Cloner) error {
 	{
 		in := in.(*ClusterStatus)
 		out := out.(*ClusterStatus)
@@ -122,7 +127,7 @@ func DeepCopy_v1beta1_ClusterStatus(in interface{}, out interface{}, c *conversi
 			in, out := &in.Conditions, &out.Conditions
 			*out = make([]ClusterCondition, len(*in))
 			for i := range *in {
-				if err := DeepCopy_v1beta1_ClusterCondition(&(*in)[i], &(*out)[i], c); err != nil {
+				if err := DeepCopyv1beta1ClusterCondition(&(*in)[i], &(*out)[i], c); err != nil {
 					return err
 				}
 			}
@@ -136,7 +141,8 @@ func DeepCopy_v1beta1_ClusterStatus(in interface{}, out interface{}, c *conversi
 	}
 }
 
-func DeepCopy_v1beta1_ServerAddressByClientCIDR(in interface{}, out interface{}, c *conversion.Cloner) error {
+// DeepCopyv1beta1ServerAddressByClientCIDR ...
+func DeepCopyv1beta1ServerAddressByClientCIDR(in interface{}, out interface{}, c *conversion.Cloner) error {
 	{
 		in := in.(*ServerAddressByClientCIDR)
 		out := out.(*ServerAddressByClientCIDR)

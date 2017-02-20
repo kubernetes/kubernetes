@@ -35,20 +35,21 @@ func init() {
 // to allow building arbitrary schemes.
 func RegisterDeepCopies(scheme *runtime.Scheme) error {
 	return scheme.AddGeneratedDeepCopyFuncs(
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_storage_StorageClass, InType: reflect.TypeOf(&StorageClass{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_storage_StorageClassList, InType: reflect.TypeOf(&StorageClassList{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopystorageStorageClass, InType: reflect.TypeOf(&StorageClass{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopystorageStorageClassList, InType: reflect.TypeOf(&StorageClassList{})},
 	)
 }
 
-func DeepCopy_storage_StorageClass(in interface{}, out interface{}, c *conversion.Cloner) error {
+// DeepCopystorageStorageClass ...
+func DeepCopystorageStorageClass(in interface{}, out interface{}, c *conversion.Cloner) error {
 	{
 		in := in.(*StorageClass)
 		out := out.(*StorageClass)
 		*out = *in
-		if newVal, err := c.DeepCopy(&in.ObjectMeta); err != nil {
-			return err
-		} else {
+		if newVal, err := c.DeepCopy(&in.ObjectMeta); err == nil {
 			out.ObjectMeta = *newVal.(*v1.ObjectMeta)
+		} else {
+			return err
 		}
 		if in.Parameters != nil {
 			in, out := &in.Parameters, &out.Parameters
@@ -61,7 +62,8 @@ func DeepCopy_storage_StorageClass(in interface{}, out interface{}, c *conversio
 	}
 }
 
-func DeepCopy_storage_StorageClassList(in interface{}, out interface{}, c *conversion.Cloner) error {
+// DeepCopystorageStorageClassList ...
+func DeepCopystorageStorageClassList(in interface{}, out interface{}, c *conversion.Cloner) error {
 	{
 		in := in.(*StorageClassList)
 		out := out.(*StorageClassList)
@@ -70,7 +72,7 @@ func DeepCopy_storage_StorageClassList(in interface{}, out interface{}, c *conve
 			in, out := &in.Items, &out.Items
 			*out = make([]StorageClass, len(*in))
 			for i := range *in {
-				if err := DeepCopy_storage_StorageClass(&(*in)[i], &(*out)[i], c); err != nil {
+				if err := DeepCopystorageStorageClass(&(*in)[i], &(*out)[i], c); err != nil {
 					return err
 				}
 			}

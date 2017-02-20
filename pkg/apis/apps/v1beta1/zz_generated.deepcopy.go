@@ -36,34 +36,36 @@ func init() {
 // to allow building arbitrary schemes.
 func RegisterDeepCopies(scheme *runtime.Scheme) error {
 	return scheme.AddGeneratedDeepCopyFuncs(
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1beta1_StatefulSet, InType: reflect.TypeOf(&StatefulSet{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1beta1_StatefulSetList, InType: reflect.TypeOf(&StatefulSetList{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1beta1_StatefulSetSpec, InType: reflect.TypeOf(&StatefulSetSpec{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1beta1_StatefulSetStatus, InType: reflect.TypeOf(&StatefulSetStatus{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopyv1beta1StatefulSet, InType: reflect.TypeOf(&StatefulSet{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopyv1beta1StatefulSetList, InType: reflect.TypeOf(&StatefulSetList{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopyv1beta1StatefulSetSpec, InType: reflect.TypeOf(&StatefulSetSpec{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopyv1beta1StatefulSetStatus, InType: reflect.TypeOf(&StatefulSetStatus{})},
 	)
 }
 
-func DeepCopy_v1beta1_StatefulSet(in interface{}, out interface{}, c *conversion.Cloner) error {
+// DeepCopyv1beta1StatefulSet ...
+func DeepCopyv1beta1StatefulSet(in interface{}, out interface{}, c *conversion.Cloner) error {
 	{
 		in := in.(*StatefulSet)
 		out := out.(*StatefulSet)
 		*out = *in
-		if newVal, err := c.DeepCopy(&in.ObjectMeta); err != nil {
-			return err
-		} else {
+		if newVal, err := c.DeepCopy(&in.ObjectMeta); err == nil {
 			out.ObjectMeta = *newVal.(*v1.ObjectMeta)
-		}
-		if err := DeepCopy_v1beta1_StatefulSetSpec(&in.Spec, &out.Spec, c); err != nil {
+		} else {
 			return err
 		}
-		if err := DeepCopy_v1beta1_StatefulSetStatus(&in.Status, &out.Status, c); err != nil {
+		if err := DeepCopyv1beta1StatefulSetSpec(&in.Spec, &out.Spec, c); err != nil {
+			return err
+		}
+		if err := DeepCopyv1beta1StatefulSetStatus(&in.Status, &out.Status, c); err != nil {
 			return err
 		}
 		return nil
 	}
 }
 
-func DeepCopy_v1beta1_StatefulSetList(in interface{}, out interface{}, c *conversion.Cloner) error {
+// DeepCopyv1beta1StatefulSetList ...
+func DeepCopyv1beta1StatefulSetList(in interface{}, out interface{}, c *conversion.Cloner) error {
 	{
 		in := in.(*StatefulSetList)
 		out := out.(*StatefulSetList)
@@ -72,7 +74,7 @@ func DeepCopy_v1beta1_StatefulSetList(in interface{}, out interface{}, c *conver
 			in, out := &in.Items, &out.Items
 			*out = make([]StatefulSet, len(*in))
 			for i := range *in {
-				if err := DeepCopy_v1beta1_StatefulSet(&(*in)[i], &(*out)[i], c); err != nil {
+				if err := DeepCopyv1beta1StatefulSet(&(*in)[i], &(*out)[i], c); err != nil {
 					return err
 				}
 			}
@@ -81,7 +83,8 @@ func DeepCopy_v1beta1_StatefulSetList(in interface{}, out interface{}, c *conver
 	}
 }
 
-func DeepCopy_v1beta1_StatefulSetSpec(in interface{}, out interface{}, c *conversion.Cloner) error {
+// DeepCopyv1beta1StatefulSetSpec ...
+func DeepCopyv1beta1StatefulSetSpec(in interface{}, out interface{}, c *conversion.Cloner) error {
 	{
 		in := in.(*StatefulSetSpec)
 		out := out.(*StatefulSetSpec)
@@ -93,20 +96,20 @@ func DeepCopy_v1beta1_StatefulSetSpec(in interface{}, out interface{}, c *conver
 		}
 		if in.Selector != nil {
 			in, out := &in.Selector, &out.Selector
-			if newVal, err := c.DeepCopy(*in); err != nil {
-				return err
-			} else {
+			if newVal, err := c.DeepCopy(*in); err == nil {
 				*out = newVal.(*v1.LabelSelector)
+			} else {
+				return err
 			}
 		}
-		if err := api_v1.DeepCopy_v1_PodTemplateSpec(&in.Template, &out.Template, c); err != nil {
+		if err := api_v1.DeepCopyv1PodTemplateSpec(&in.Template, &out.Template, c); err != nil {
 			return err
 		}
 		if in.VolumeClaimTemplates != nil {
 			in, out := &in.VolumeClaimTemplates, &out.VolumeClaimTemplates
 			*out = make([]api_v1.PersistentVolumeClaim, len(*in))
 			for i := range *in {
-				if err := api_v1.DeepCopy_v1_PersistentVolumeClaim(&(*in)[i], &(*out)[i], c); err != nil {
+				if err := api_v1.DeepCopyv1PersistentVolumeClaim(&(*in)[i], &(*out)[i], c); err != nil {
 					return err
 				}
 			}
@@ -115,7 +118,8 @@ func DeepCopy_v1beta1_StatefulSetSpec(in interface{}, out interface{}, c *conver
 	}
 }
 
-func DeepCopy_v1beta1_StatefulSetStatus(in interface{}, out interface{}, c *conversion.Cloner) error {
+// DeepCopyv1beta1StatefulSetStatus ...
+func DeepCopyv1beta1StatefulSetStatus(in interface{}, out interface{}, c *conversion.Cloner) error {
 	{
 		in := in.(*StatefulSetStatus)
 		out := out.(*StatefulSetStatus)
