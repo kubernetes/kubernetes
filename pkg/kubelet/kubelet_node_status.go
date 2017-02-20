@@ -17,7 +17,6 @@ limitations under the License.
 package kubelet
 
 import (
-	"encoding/json"
 	"fmt"
 	"math"
 	"net"
@@ -204,19 +203,13 @@ func (kl *Kubelet) initialNode() (*v1.Node, error) {
 		},
 	}
 	if len(kl.kubeletConfiguration.RegisterWithTaints) > 0 {
-		annotations := make(map[string]string)
 		taints := make([]v1.Taint, len(kl.kubeletConfiguration.RegisterWithTaints))
 		for i := range kl.kubeletConfiguration.RegisterWithTaints {
 			if err := v1.Convert_api_Taint_To_v1_Taint(&kl.kubeletConfiguration.RegisterWithTaints[i], &taints[i], nil); err != nil {
 				return nil, err
 			}
 		}
-		b, err := json.Marshal(taints)
-		if err != nil {
-			return nil, err
-		}
-		annotations[v1.TaintsAnnotationKey] = string(b)
-		node.ObjectMeta.Annotations = annotations
+		node.Spec.Taints = taints
 
 	}
 	// Initially, set NodeNetworkUnavailable to true.

@@ -1913,6 +1913,9 @@ type PodSpec struct {
 	// If not specified, the pod will be dispatched by default scheduler.
 	// +optional
 	SchedulerName string
+	// If specified, the pod's tolerations.
+	// +optional
+	Tolerations []Toleration
 }
 
 // Sysctl defines a kernel parameter to be set
@@ -2530,6 +2533,10 @@ type NodeSpec struct {
 	// Unschedulable controls node schedulability of new pods. By default node is schedulable.
 	// +optional
 	Unschedulable bool
+
+	// If specified, the node's taints.
+	// +optional
+	Taints []Taint
 }
 
 // DaemonEndpoint contains information about a single Daemon endpoint.

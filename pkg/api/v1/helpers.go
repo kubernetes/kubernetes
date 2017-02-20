@@ -235,14 +235,6 @@ func NodeSelectorRequirementsAsSelector(nsm []NodeSelectorRequirement) (labels.S
 }
 
 const (
-	// TolerationsAnnotationKey represents the key of tolerations data (json serialized)
-	// in the Annotations of a Pod.
-	TolerationsAnnotationKey string = "scheduler.alpha.kubernetes.io/tolerations"
-
-	// TaintsAnnotationKey represents the key of taints data (json serialized)
-	// in the Annotations of a Node.
-	TaintsAnnotationKey string = "scheduler.alpha.kubernetes.io/taints"
-
 	// SeccompPodAnnotationKey represents the key of a seccomp profile applied
 	// to all containers of a pod.
 	SeccompPodAnnotationKey string = "seccomp.security.alpha.kubernetes.io/pod"
@@ -284,77 +276,32 @@ const (
 	AffinityAnnotationKey string = "scheduler.alpha.kubernetes.io/affinity"
 )
 
-// GetTolerationsFromPodAnnotations gets the json serialized tolerations data from Pod.Annotations
-// and converts it to the []Toleration type in api.
-func GetTolerationsFromPodAnnotations(annotations map[string]string) ([]Toleration, error) {
-	var tolerations []Toleration
-	if len(annotations) > 0 && annotations[TolerationsAnnotationKey] != "" {
-		err := json.Unmarshal([]byte(annotations[TolerationsAnnotationKey]), &tolerations)
-		if err != nil {
-			return tolerations, err
-		}
-	}
-	return tolerations, nil
-}
-
-func GetPodTolerations(pod *Pod) ([]Toleration, error) {
-	return GetTolerationsFromPodAnnotations(pod.Annotations)
-}
-
 // Tries to add a toleration to annotations list. Returns true if something was updated
 // false otherwise.
 func AddOrUpdateTolerationInPod(pod *Pod, toleration *Toleration) (bool, error) {
-	podTolerations, err := GetPodTolerations(pod)
-	if err != nil {
-		return false, err
-	}
+	podTolerations := pod.Spec.Tolerations
 
-	var newTolerations []*Toleration
+	var newTolerations []Toleration
 	updated := false
 	for i := range podTolerations {
 		if toleration.MatchToleration(&podTolerations[i]) {
 			if api.Semantic.DeepEqual(toleration, podTolerations[i]) {
 				return false, nil
 			}
-			newTolerations = append(newTolerations, toleration)
+			newTolerations = append(newTolerations, *toleration)
 			updated = true
 			continue
 		}
 
-		newTolerations = append(newTolerations, &podTolerations[i])
+		newTolerations = append(newTolerations, podTolerations[i])
 	}
 
 	if !updated {
-		newTolerations = append(newTolerations, toleration)
+		newTolerations = append(newTolerations, *toleration)
 	}
 
-	tolerationsData, err := json.Marshal(newTolerations)
-	if err != nil {
-		return false, err
-	}
-
-	if pod.Annotations == nil {
-		pod.Annotations = make(map[string]string)
-	}
-	pod.Annotations[TolerationsAnnotationKey] = string(tolerationsData)
+	pod.Spec.Tolerations = newTolerations
 	return true, nil
-}
-
-// GetTaintsFromNodeAnnotations gets the json serialized taints data from Pod.Annotations
-// and converts it to the []Taint type in api.
-func GetTaintsFromNodeAnnotations(annotations map[string]string) ([]Taint, error) {
-	var taints []Taint
-	if len(annotations) > 0 && annotations[TaintsAnnotationKey] != "" {
-		err := json.Unmarshal([]byte(annotations[TaintsAnnotationKey]), &taints)
-		if err != nil {
-			return []Taint{}, err
-		}
-	}
-	return taints, nil
-}
-
-func GetNodeTaints(node *Node) ([]Taint, error) {
-	return GetTaintsFromNodeAnnotations(node.Annotations)
 }
 
 // MatchToleration checks if the toleration matches tolerationToMatch. Tolerations are unique by <key,effect,operator,value>,
@@ -574,39 +521,28 @@ func AddOrUpdateTaint(node *Node, taint *Taint) (*Node, bool, error) {
 		return nil, false, err
 	}
 	newNode := objCopy.(*Node)
-	nodeTaints, err := GetTaintsFromNodeAnnotations(newNode.Annotations)
-	if err != nil {
-		return newNode, false, err
-	}
+	nodeTaints := newNode.Spec.Taints
 
-	var newTaints []*Taint
+	var newTaints []Taint
 	updated := false
 	for i := range nodeTaints {
 		if taint.MatchTaint(&nodeTaints[i]) {
 			if api.Semantic.DeepEqual(taint, nodeTaints[i]) {
 				return newNode, false, nil
 			}
-			newTaints = append(newTaints, taint)
+			newTaints = append(newTaints, *taint)
 			updated = true
 			continue
 		}
 
-		newTaints = append(newTaints, &nodeTaints[i])
+		newTaints = append(newTaints, nodeTaints[i])
 	}
 
 	if !updated {
-		newTaints = append(newTaints, taint)
+		newTaints = append(newTaints, *taint)
 	}
 
-	taintsData, err := json.Marshal(newTaints)
-	if err != nil {
-		return nil, false, err
-	}
-
-	if newNode.Annotations == nil {
-		newNode.Annotations = make(map[string]string)
-	}
-	newNode.Annotations[TaintsAnnotationKey] = string(taintsData)
+	newNode.Spec.Taints = newTaints
 	return newNode, true, nil
 }
 
@@ -627,10 +563,7 @@ func RemoveTaint(node *Node, taint *Taint) (*Node, bool, error) {
 		return nil, false, err
 	}
 	newNode := objCopy.(*Node)
-	nodeTaints, err := GetTaintsFromNodeAnnotations(newNode.Annotations)
-	if err != nil {
-		return newNode, false, err
-	}
+	nodeTaints := newNode.Spec.Taints
 	if len(nodeTaints) == 0 {
 		return newNode, false, nil
 	}
@@ -640,15 +573,7 @@ func RemoveTaint(node *Node, taint *Taint) (*Node, bool, error) {
 	}
 
 	newTaints, _ := DeleteTaint(nodeTaints, taint)
-	if len(newTaints) == 0 {
-		delete(newNode.Annotations, TaintsAnnotationKey)
-	} else {
-		taintsData, err := json.Marshal(newTaints)
-		if err != nil {
-			return newNode, false, err
-		}
-		newNode.Annotations[TaintsAnnotationKey] = string(taintsData)
-	}
+	newNode.Spec.Taints = newTaints
 	return newNode, true, nil
 }
 
