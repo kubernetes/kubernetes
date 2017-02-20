@@ -29,8 +29,8 @@ import (
 	"k8s.io/apimachinery/pkg/util/httpstream"
 	"k8s.io/apimachinery/pkg/util/httpstream/spdy"
 	"k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/apis/pkg/api"
 	"k8s.io/apiserver/pkg/util/wsstream"
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/util/term"
 
 	"github.com/golang/glog"

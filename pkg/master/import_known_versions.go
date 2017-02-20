@@ -20,20 +20,20 @@ package master
 import (
 	"fmt"
 
-	"k8s.io/kubernetes/pkg/api"
-	_ "k8s.io/kubernetes/pkg/api/install"
-	_ "k8s.io/kubernetes/pkg/apis/apps/install"
-	_ "k8s.io/kubernetes/pkg/apis/authentication/install"
-	_ "k8s.io/kubernetes/pkg/apis/authorization/install"
-	_ "k8s.io/kubernetes/pkg/apis/autoscaling/install"
-	_ "k8s.io/kubernetes/pkg/apis/batch/install"
-	_ "k8s.io/kubernetes/pkg/apis/certificates/install"
+	"k8s.io/apis/pkg/api"
+	_ "k8s.io/apis/pkg/api/install"
+	_ "k8s.io/apis/pkg/apis/apps/install"
+	_ "k8s.io/apis/pkg/apis/authentication/install"
+	_ "k8s.io/apis/pkg/apis/authorization/install"
+	_ "k8s.io/apis/pkg/apis/autoscaling/install"
+	_ "k8s.io/apis/pkg/apis/batch/install"
+	_ "k8s.io/apis/pkg/apis/certificates/install"
+	_ "k8s.io/apis/pkg/apis/extensions/install"
+	_ "k8s.io/apis/pkg/apis/imagepolicy/install"
+	_ "k8s.io/apis/pkg/apis/policy/install"
+	_ "k8s.io/apis/pkg/apis/rbac/install"
+	_ "k8s.io/apis/pkg/apis/storage/install"
 	_ "k8s.io/kubernetes/pkg/apis/componentconfig/install"
-	_ "k8s.io/kubernetes/pkg/apis/extensions/install"
-	_ "k8s.io/kubernetes/pkg/apis/imagepolicy/install"
-	_ "k8s.io/kubernetes/pkg/apis/policy/install"
-	_ "k8s.io/kubernetes/pkg/apis/rbac/install"
-	_ "k8s.io/kubernetes/pkg/apis/storage/install"
 )
 
 func init() {

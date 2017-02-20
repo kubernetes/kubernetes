@@ -21,9 +21,9 @@ import (
 	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	api_v1 "k8s.io/apis/pkg/api/v1"
+	"k8s.io/apis/pkg/apis/extensions/v1beta1"
 	"k8s.io/kubernetes/federation/pkg/federation-controller/util"
-	api_v1 "k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 
 	"github.com/stretchr/testify/assert"
 )

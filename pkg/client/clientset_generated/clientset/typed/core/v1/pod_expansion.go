@@ -17,10 +17,10 @@ limitations under the License.
 package v1
 
 import (
+	"k8s.io/apis/pkg/api"
+	"k8s.io/apis/pkg/api/v1"
+	policy "k8s.io/apis/pkg/apis/policy/v1beta1"
 	restclient "k8s.io/client-go/rest"
-	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/v1"
-	policy "k8s.io/kubernetes/pkg/apis/policy/v1beta1"
 )
 
 // The PodExpansion interface allows manually adding extra methods to the PodInterface.

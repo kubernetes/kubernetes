@@ -13,13 +13,8 @@ go_library(
     srcs = ["node.go"],
     tags = ["automanaged"],
     deps = [
-        "//pkg/api:go_default_library",
-        "//pkg/api/v1:go_default_library",
         "//pkg/client/clientset_generated/clientset:go_default_library",
-        "//vendor:github.com/golang/glog",
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
-        "//vendor:k8s.io/apimachinery/pkg/types",
-        "//vendor:k8s.io/apimachinery/pkg/util/strategicpatch",
     ],
 )
 
@@ -28,10 +23,7 @@ go_test(
     srcs = ["node_test.go"],
     library = ":go_default_library",
     tags = ["automanaged"],
-    deps = [
-        "//pkg/api/v1:go_default_library",
-        "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
-    ],
+    deps = ["//vendor:k8s.io/apimachinery/pkg/apis/meta/v1"],
 )
 
 filegroup(

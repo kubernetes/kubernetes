@@ -22,9 +22,9 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	storage "k8s.io/apis/pkg/apis/storage"
+	v1beta1 "k8s.io/apis/pkg/apis/storage/v1beta1"
 	"k8s.io/client-go/tools/cache"
-	storage "k8s.io/kubernetes/pkg/apis/storage"
-	v1beta1 "k8s.io/kubernetes/pkg/apis/storage/v1beta1"
 )
 
 // StorageClassLister helps list StorageClasses.

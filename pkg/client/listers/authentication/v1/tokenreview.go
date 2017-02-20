@@ -22,9 +22,9 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	authentication "k8s.io/apis/pkg/apis/authentication"
+	v1 "k8s.io/apis/pkg/apis/authentication/v1"
 	"k8s.io/client-go/tools/cache"
-	authentication "k8s.io/kubernetes/pkg/apis/authentication"
-	v1 "k8s.io/kubernetes/pkg/apis/authentication/v1"
 )
 
 // TokenReviewLister helps list TokenReviews.

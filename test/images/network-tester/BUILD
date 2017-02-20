@@ -21,8 +21,6 @@ go_library(
     deps = [
         "//pkg/client/clientset_generated/internalclientset:go_default_library",
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
-        "//vendor:k8s.io/apimachinery/pkg/util/sets",
-        "//vendor:k8s.io/client-go/rest",
     ],
 )
 

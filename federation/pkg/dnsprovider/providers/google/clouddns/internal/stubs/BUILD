@@ -31,8 +31,6 @@ go_library(
     deps = [
         "//federation/pkg/dnsprovider/providers/google/clouddns/internal/interfaces:go_default_library",
         "//federation/pkg/dnsprovider/rrstype:go_default_library",
-        "//vendor:google.golang.org/api/dns/v1",
-        "//vendor:google.golang.org/api/googleapi",
     ],
 )
 

@@ -21,14 +21,14 @@ import (
 	_ "net/http/pprof"
 	"time"
 
+	"k8s.io/apis/pkg/api"
+	"k8s.io/apis/pkg/util"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	clientv1 "k8s.io/client-go/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/componentconfig"
 	"k8s.io/kubernetes/pkg/apis/componentconfig/v1alpha1"
 	_ "k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/qos"
-	"k8s.io/kubernetes/pkg/util"
 
 	// add the kubernetes feature gates
 	_ "k8s.io/kubernetes/pkg/features"

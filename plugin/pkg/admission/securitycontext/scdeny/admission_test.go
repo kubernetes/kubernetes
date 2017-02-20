@@ -19,8 +19,8 @@ package scdeny
 import (
 	"testing"
 
+	"k8s.io/apis/pkg/api"
 	"k8s.io/apiserver/pkg/admission"
-	"k8s.io/kubernetes/pkg/api"
 )
 
 // ensures the SecurityContext is denied if it defines anything more than Caps or Privileged

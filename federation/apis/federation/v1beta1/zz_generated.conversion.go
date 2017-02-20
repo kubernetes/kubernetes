@@ -23,9 +23,9 @@ package v1beta1
 import (
 	conversion "k8s.io/apimachinery/pkg/conversion"
 	runtime "k8s.io/apimachinery/pkg/runtime"
+	api "k8s.io/apis/pkg/api"
+	v1 "k8s.io/apis/pkg/api/v1"
 	federation "k8s.io/kubernetes/federation/apis/federation"
-	api "k8s.io/kubernetes/pkg/api"
-	v1 "k8s.io/kubernetes/pkg/api/v1"
 	unsafe "unsafe"
 )
 

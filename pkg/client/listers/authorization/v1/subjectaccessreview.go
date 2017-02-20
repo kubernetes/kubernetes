@@ -22,9 +22,9 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	authorization "k8s.io/apis/pkg/apis/authorization"
+	v1 "k8s.io/apis/pkg/apis/authorization/v1"
 	"k8s.io/client-go/tools/cache"
-	authorization "k8s.io/kubernetes/pkg/apis/authorization"
-	v1 "k8s.io/kubernetes/pkg/apis/authorization/v1"
 )
 
 // SubjectAccessReviewLister helps list SubjectAccessReviews.

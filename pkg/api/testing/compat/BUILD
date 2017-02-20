@@ -11,13 +11,7 @@ go_library(
     name = "go_default_library",
     srcs = ["compatibility_tester.go"],
     tags = ["automanaged"],
-    deps = [
-        "//pkg/api:go_default_library",
-        "//pkg/kubectl:go_default_library",
-        "//vendor:k8s.io/apimachinery/pkg/runtime",
-        "//vendor:k8s.io/apimachinery/pkg/runtime/schema",
-        "//vendor:k8s.io/apimachinery/pkg/util/validation/field",
-    ],
+    deps = ["//pkg/kubectl:go_default_library"],
 )
 
 filegroup(

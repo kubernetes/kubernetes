@@ -38,10 +38,10 @@ import (
 	"k8s.io/client-go/util/clock"
 	"k8s.io/client-go/util/integer"
 
-	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/v1"
+	"k8s.io/apis/pkg/api"
+	"k8s.io/apis/pkg/api/v1"
+	extensions "k8s.io/apis/pkg/apis/extensions/v1beta1"
 	"k8s.io/kubernetes/pkg/api/validation"
-	extensions "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	clientretry "k8s.io/kubernetes/pkg/client/retry"
 

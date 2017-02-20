@@ -22,8 +22,8 @@ import (
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
+	storage "k8s.io/apis/pkg/apis/storage"
 	testing "k8s.io/client-go/testing"
-	storage "k8s.io/kubernetes/pkg/apis/storage"
 )
 
 // FakeStorageClasses implements StorageClassInterface

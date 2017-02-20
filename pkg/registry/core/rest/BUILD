@@ -13,10 +13,6 @@ go_test(
     srcs = ["storage_core_test.go"],
     library = ":go_default_library",
     tags = ["automanaged"],
-    deps = [
-        "//vendor:k8s.io/apimachinery/pkg/runtime/schema",
-        "//vendor:k8s.io/apiserver/pkg/storage/storagebackend",
-    ],
 )
 
 go_library(
@@ -24,7 +20,6 @@ go_library(
     srcs = ["storage_core.go"],
     tags = ["automanaged"],
     deps = [
-        "//pkg/api:go_default_library",
         "//pkg/client/clientset_generated/internalclientset/typed/policy/internalversion:go_default_library",
         "//pkg/kubelet/client:go_default_library",
         "//pkg/master/ports:go_default_library",
@@ -51,15 +46,6 @@ go_library(
         "//pkg/registry/core/service/portallocator:go_default_library",
         "//pkg/registry/core/service/storage:go_default_library",
         "//pkg/registry/core/serviceaccount/storage:go_default_library",
-        "//vendor:github.com/golang/glog",
-        "//vendor:k8s.io/apimachinery/pkg/runtime/schema",
-        "//vendor:k8s.io/apimachinery/pkg/util/net",
-        "//vendor:k8s.io/apiserver/pkg/registry/generic",
-        "//vendor:k8s.io/apiserver/pkg/registry/rest",
-        "//vendor:k8s.io/apiserver/pkg/server",
-        "//vendor:k8s.io/apiserver/pkg/server/storage",
-        "//vendor:k8s.io/apiserver/pkg/storage/etcd/util",
-        "//vendor:k8s.io/client-go/rest",
     ],
 )
 

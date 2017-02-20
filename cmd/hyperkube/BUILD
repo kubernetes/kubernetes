@@ -20,10 +20,6 @@ go_test(
     srcs = ["hyperkube_test.go"],
     library = ":go_default_library",
     tags = ["automanaged"],
-    deps = [
-        "//vendor:github.com/spf13/cobra",
-        "//vendor:github.com/stretchr/testify/assert",
-    ],
 )
 
 go_library(
@@ -58,15 +54,10 @@ go_library(
         "//pkg/client/metrics/prometheus:go_default_library",
         "//pkg/kubectl/cmd:go_default_library",
         "//pkg/kubectl/cmd/util:go_default_library",
-        "//pkg/util:go_default_library",
         "//pkg/version/prometheus:go_default_library",
         "//pkg/version/verflag:go_default_library",
         "//plugin/cmd/kube-scheduler/app:go_default_library",
         "//plugin/cmd/kube-scheduler/app/options:go_default_library",
-        "//vendor:github.com/spf13/pflag",
-        "//vendor:k8s.io/apiserver/pkg/server/healthz",
-        "//vendor:k8s.io/apiserver/pkg/util/flag",
-        "//vendor:k8s.io/apiserver/pkg/util/logs",
     ],
 )
 

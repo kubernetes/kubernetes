@@ -12,11 +12,7 @@ go_library(
     name = "go_default_library",
     srcs = ["goroutinemap.go"],
     tags = ["automanaged"],
-    deps = [
-        "//pkg/util/goroutinemap/exponentialbackoff:go_default_library",
-        "//vendor:github.com/golang/glog",
-        "//vendor:k8s.io/apimachinery/pkg/util/runtime",
-    ],
+    deps = ["//pkg/util/goroutinemap/exponentialbackoff:go_default_library"],
 )
 
 go_test(
@@ -24,7 +20,6 @@ go_test(
     srcs = ["goroutinemap_test.go"],
     library = ":go_default_library",
     tags = ["automanaged"],
-    deps = ["//vendor:k8s.io/apimachinery/pkg/util/wait"],
 )
 
 filegroup(

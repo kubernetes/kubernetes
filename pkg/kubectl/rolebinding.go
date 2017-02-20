@@ -22,7 +22,7 @@ import (
 	"strings"
 
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/kubernetes/pkg/apis/rbac"
+	"k8s.io/apis/pkg/apis/rbac"
 )
 
 // RoleBindingGeneratorV1 supports stable generation of a roleBinding.

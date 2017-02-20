@@ -23,9 +23,6 @@ go_library(
     deps = [
         "//pkg/apis/abac:go_default_library",
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
-        "//vendor:k8s.io/apimachinery/pkg/conversion",
-        "//vendor:k8s.io/apimachinery/pkg/runtime",
-        "//vendor:k8s.io/apimachinery/pkg/runtime/schema",
     ],
 )
 
@@ -36,7 +33,6 @@ go_test(
     deps = [
         "//pkg/apis/abac:go_default_library",
         "//pkg/apis/abac/v1beta1:go_default_library",
-        "//vendor:k8s.io/apiserver/pkg/authentication/user",
     ],
 )
 

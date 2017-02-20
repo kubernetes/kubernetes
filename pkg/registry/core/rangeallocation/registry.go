@@ -17,7 +17,7 @@ limitations under the License.
 package rangeallocation
 
 import (
-	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/apis/pkg/api"
 )
 
 // RangeRegistry is a registry that can retrieve or persist a RangeAllocation object.

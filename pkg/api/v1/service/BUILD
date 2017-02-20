@@ -15,11 +15,7 @@ go_library(
         "util.go",
     ],
     tags = ["automanaged"],
-    deps = [
-        "//pkg/api/v1:go_default_library",
-        "//pkg/util/net/sets:go_default_library",
-        "//vendor:github.com/golang/glog",
-    ],
+    deps = ["//pkg/util/net/sets:go_default_library"],
 )
 
 go_test(
@@ -27,10 +23,7 @@ go_test(
     srcs = ["util_test.go"],
     library = ":go_default_library",
     tags = ["automanaged"],
-    deps = [
-        "//pkg/api/v1:go_default_library",
-        "//pkg/util/net/sets:go_default_library",
-    ],
+    deps = ["//pkg/util/net/sets:go_default_library"],
 )
 
 filegroup(

@@ -20,11 +20,6 @@ go_library(
     name = "go_default_library",
     srcs = ["kubeconfig.go"],
     tags = ["automanaged"],
-    deps = [
-        "//vendor:k8s.io/client-go/kubernetes",
-        "//vendor:k8s.io/client-go/tools/clientcmd",
-        "//vendor:k8s.io/client-go/tools/clientcmd/api",
-    ],
 )
 
 filegroup(

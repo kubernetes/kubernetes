@@ -21,8 +21,8 @@ package internalversion
 import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/labels"
+	apps "k8s.io/apis/pkg/apis/apps"
 	"k8s.io/client-go/tools/cache"
-	apps "k8s.io/kubernetes/pkg/apis/apps"
 )
 
 // StatefulSetLister helps list StatefulSets.

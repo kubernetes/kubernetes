@@ -17,12 +17,7 @@ go_library(
         "zz_generated.conversion.go",
     ],
     tags = ["automanaged"],
-    deps = [
-        "//pkg/api/v1:go_default_library",
-        "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
-        "//vendor:k8s.io/apimachinery/pkg/runtime",
-        "//vendor:k8s.io/apimachinery/pkg/runtime/schema",
-    ],
+    deps = ["//vendor:k8s.io/apimachinery/pkg/apis/meta/v1"],
 )
 
 filegroup(

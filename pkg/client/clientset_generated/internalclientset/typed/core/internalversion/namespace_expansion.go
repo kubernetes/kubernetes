@@ -16,7 +16,7 @@ limitations under the License.
 
 package internalversion
 
-import "k8s.io/kubernetes/pkg/api"
+import "k8s.io/apis/pkg/api"
 
 // The NamespaceExpansion interface allows manually adding extra methods to the NamespaceInterface.
 type NamespaceExpansion interface {

@@ -25,11 +25,11 @@ import (
 
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apis/pkg/api"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/rest/fake"
 	federationapi "k8s.io/kubernetes/federation/apis/federation"
 	kubefedtesting "k8s.io/kubernetes/federation/pkg/kubefed/testing"
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"

@@ -21,16 +21,16 @@ package internalversion
 import (
 	"fmt"
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
+	api "k8s.io/apis/pkg/api"
+	apps "k8s.io/apis/pkg/apis/apps"
+	autoscaling "k8s.io/apis/pkg/apis/autoscaling"
+	batch "k8s.io/apis/pkg/apis/batch"
+	certificates "k8s.io/apis/pkg/apis/certificates"
+	extensions "k8s.io/apis/pkg/apis/extensions"
+	policy "k8s.io/apis/pkg/apis/policy"
+	rbac "k8s.io/apis/pkg/apis/rbac"
+	storage "k8s.io/apis/pkg/apis/storage"
 	cache "k8s.io/client-go/tools/cache"
-	api "k8s.io/kubernetes/pkg/api"
-	apps "k8s.io/kubernetes/pkg/apis/apps"
-	autoscaling "k8s.io/kubernetes/pkg/apis/autoscaling"
-	batch "k8s.io/kubernetes/pkg/apis/batch"
-	certificates "k8s.io/kubernetes/pkg/apis/certificates"
-	extensions "k8s.io/kubernetes/pkg/apis/extensions"
-	policy "k8s.io/kubernetes/pkg/apis/policy"
-	rbac "k8s.io/kubernetes/pkg/apis/rbac"
-	storage "k8s.io/kubernetes/pkg/apis/storage"
 )
 
 // GenericInformer is type of SharedIndexInformer which will locate and delegate to other

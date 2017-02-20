@@ -12,14 +12,7 @@ go_library(
     name = "go_default_library",
     srcs = ["photon.go"],
     tags = ["automanaged"],
-    deps = [
-        "//pkg/api/v1:go_default_library",
-        "//pkg/cloudprovider:go_default_library",
-        "//vendor:github.com/golang/glog",
-        "//vendor:github.com/vmware/photon-controller-go-sdk/photon",
-        "//vendor:gopkg.in/gcfg.v1",
-        "//vendor:k8s.io/apimachinery/pkg/types",
-    ],
+    deps = ["//pkg/cloudprovider:go_default_library"],
 )
 
 go_test(
@@ -27,11 +20,7 @@ go_test(
     srcs = ["photon_test.go"],
     library = ":go_default_library",
     tags = ["automanaged"],
-    deps = [
-        "//pkg/cloudprovider:go_default_library",
-        "//vendor:k8s.io/apimachinery/pkg/types",
-        "//vendor:k8s.io/apimachinery/pkg/util/rand",
-    ],
+    deps = ["//pkg/cloudprovider:go_default_library"],
 )
 
 filegroup(

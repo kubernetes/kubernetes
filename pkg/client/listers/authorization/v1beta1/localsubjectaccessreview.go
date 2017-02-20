@@ -21,9 +21,9 @@ package v1beta1
 import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/labels"
+	authorization "k8s.io/apis/pkg/apis/authorization"
+	v1beta1 "k8s.io/apis/pkg/apis/authorization/v1beta1"
 	"k8s.io/client-go/tools/cache"
-	authorization "k8s.io/kubernetes/pkg/apis/authorization"
-	v1beta1 "k8s.io/kubernetes/pkg/apis/authorization/v1beta1"
 )
 
 // LocalSubjectAccessReviewLister helps list LocalSubjectAccessReviews.

@@ -15,13 +15,7 @@ go_library(
         "cloudstack_loadbalancer.go",
     ],
     tags = ["automanaged"],
-    deps = [
-        "//pkg/api/v1:go_default_library",
-        "//pkg/cloudprovider:go_default_library",
-        "//vendor:github.com/golang/glog",
-        "//vendor:github.com/xanzy/go-cloudstack/cloudstack",
-        "//vendor:gopkg.in/gcfg.v1",
-    ],
+    deps = ["//pkg/cloudprovider:go_default_library"],
 )
 
 go_test(
@@ -29,10 +23,7 @@ go_test(
     srcs = ["cloudstack_test.go"],
     library = ":go_default_library",
     tags = ["automanaged"],
-    deps = [
-        "//pkg/api/v1:go_default_library",
-        "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
-    ],
+    deps = ["//vendor:k8s.io/apimachinery/pkg/apis/meta/v1"],
 )
 
 filegroup(

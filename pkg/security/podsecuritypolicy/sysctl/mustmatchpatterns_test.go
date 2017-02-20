@@ -19,7 +19,7 @@ package sysctl
 import (
 	"testing"
 
-	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/apis/pkg/api"
 )
 
 func TestValidate(t *testing.T) {

@@ -15,24 +15,7 @@ go_library(
         "vsphere_util.go",
     ],
     tags = ["automanaged"],
-    deps = [
-        "//pkg/api/v1:go_default_library",
-        "//pkg/cloudprovider:go_default_library",
-        "//vendor:github.com/golang/glog",
-        "//vendor:github.com/vmware/govmomi",
-        "//vendor:github.com/vmware/govmomi/find",
-        "//vendor:github.com/vmware/govmomi/object",
-        "//vendor:github.com/vmware/govmomi/property",
-        "//vendor:github.com/vmware/govmomi/session",
-        "//vendor:github.com/vmware/govmomi/vim25",
-        "//vendor:github.com/vmware/govmomi/vim25/mo",
-        "//vendor:github.com/vmware/govmomi/vim25/soap",
-        "//vendor:github.com/vmware/govmomi/vim25/types",
-        "//vendor:golang.org/x/net/context",
-        "//vendor:gopkg.in/gcfg.v1",
-        "//vendor:k8s.io/apimachinery/pkg/types",
-        "//vendor:k8s.io/apimachinery/pkg/util/runtime",
-    ],
+    deps = ["//pkg/cloudprovider:go_default_library"],
 )
 
 go_test(
@@ -40,12 +23,7 @@ go_test(
     srcs = ["vsphere_test.go"],
     library = ":go_default_library",
     tags = ["automanaged"],
-    deps = [
-        "//pkg/cloudprovider:go_default_library",
-        "//vendor:golang.org/x/net/context",
-        "//vendor:k8s.io/apimachinery/pkg/types",
-        "//vendor:k8s.io/apimachinery/pkg/util/rand",
-    ],
+    deps = ["//pkg/cloudprovider:go_default_library"],
 )
 
 filegroup(

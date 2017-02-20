@@ -20,10 +20,7 @@ go_test(
     srcs = ["planner_test.go"],
     library = ":go_default_library",
     tags = ["automanaged"],
-    deps = [
-        "//federation/apis/federation:go_default_library",
-        "//vendor:github.com/stretchr/testify/assert",
-    ],
+    deps = ["//federation/apis/federation:go_default_library"],
 )
 
 filegroup(

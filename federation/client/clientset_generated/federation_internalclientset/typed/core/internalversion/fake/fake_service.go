@@ -22,8 +22,8 @@ import (
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
+	api "k8s.io/apis/pkg/api"
 	testing "k8s.io/client-go/testing"
-	api "k8s.io/kubernetes/pkg/api"
 )
 
 // FakeServices implements ServiceInterface

@@ -21,7 +21,7 @@ import (
 	"sort"
 	"time"
 
-	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/apis/pkg/api"
 
 	gce "cloud.google.com/go/compute/metadata"
 	"golang.org/x/oauth2"

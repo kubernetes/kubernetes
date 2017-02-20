@@ -18,11 +18,7 @@ go_library(
         "nsenter_mount.go",
     ],
     tags = ["automanaged"],
-    deps = [
-        "//pkg/util/exec:go_default_library",
-        "//vendor:github.com/golang/glog",
-        "//vendor:k8s.io/apimachinery/pkg/util/sets",
-    ],
+    deps = ["//pkg/util/exec:go_default_library"],
 )
 
 go_test(

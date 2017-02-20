@@ -27,9 +27,9 @@ import (
 	"time"
 
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/apis/pkg/util"
 	"k8s.io/client-go/util/clock"
 	"k8s.io/kubernetes/pkg/ssh"
-	"k8s.io/kubernetes/pkg/util"
 
 	"github.com/golang/glog"
 	"github.com/prometheus/client_golang/prometheus"

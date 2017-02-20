@@ -16,14 +16,7 @@ go_library(
         "subjectaccessreview.go",
     ],
     tags = ["automanaged"],
-    deps = [
-        "//pkg/apis/authorization:go_default_library",
-        "//pkg/apis/authorization/v1:go_default_library",
-        "//vendor:k8s.io/apimachinery/pkg/api/errors",
-        "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
-        "//vendor:k8s.io/apimachinery/pkg/labels",
-        "//vendor:k8s.io/client-go/tools/cache",
-    ],
+    deps = ["//vendor:k8s.io/apimachinery/pkg/apis/meta/v1"],
 )
 
 filegroup(

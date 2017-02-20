@@ -22,9 +22,6 @@ go_library(
         "//federation/cmd/federation-apiserver/app:go_default_library",
         "//federation/cmd/federation-apiserver/app/options:go_default_library",
         "//pkg/version/verflag:go_default_library",
-        "//vendor:github.com/spf13/pflag",
-        "//vendor:k8s.io/apiserver/pkg/util/flag",
-        "//vendor:k8s.io/apiserver/pkg/util/logs",
     ],
 )
 

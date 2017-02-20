@@ -22,8 +22,8 @@ import (
 	"sync"
 	"time"
 
+	"k8s.io/apis/pkg/api/v1"
 	storageetcd "k8s.io/apiserver/pkg/storage/etcd"
-	"k8s.io/kubernetes/pkg/api/v1"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/pkg/kubelet/util"
 

@@ -19,11 +19,9 @@ go_library(
     ],
     tags = ["automanaged"],
     deps = [
-        "//pkg/api/v1:go_default_library",
         "//pkg/kubelet/container:go_default_library",
         "//pkg/kubelet/leaky:go_default_library",
         "//pkg/securitycontext:go_default_library",
-        "//vendor:github.com/docker/engine-api/types/container",
     ],
 )
 
@@ -32,11 +30,7 @@ go_test(
     srcs = ["provider_test.go"],
     library = ":go_default_library",
     tags = ["automanaged"],
-    deps = [
-        "//pkg/api/testing:go_default_library",
-        "//pkg/api/v1:go_default_library",
-        "//vendor:github.com/docker/engine-api/types/container",
-    ],
+    deps = ["//pkg/api/testing:go_default_library"],
 )
 
 filegroup(

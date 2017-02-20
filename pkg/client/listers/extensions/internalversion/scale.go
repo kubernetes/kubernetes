@@ -21,8 +21,8 @@ package internalversion
 import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/labels"
+	extensions "k8s.io/apis/pkg/apis/extensions"
 	"k8s.io/client-go/tools/cache"
-	extensions "k8s.io/kubernetes/pkg/apis/extensions"
 )
 
 // ScaleLister helps list Scales.

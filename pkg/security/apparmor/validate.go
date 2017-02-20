@@ -25,10 +25,10 @@ import (
 	"path"
 	"strings"
 
+	"k8s.io/apis/pkg/api/v1"
+	"k8s.io/apis/pkg/util"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/features"
-	"k8s.io/kubernetes/pkg/util"
 )
 
 // Whether AppArmor should be disabled by default.

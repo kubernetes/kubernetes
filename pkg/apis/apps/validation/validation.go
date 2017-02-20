@@ -23,9 +23,9 @@ import (
 	unversionedvalidation "k8s.io/apimachinery/pkg/apis/meta/v1/validation"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/validation/field"
-	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/apis/pkg/api"
+	"k8s.io/apis/pkg/apis/apps"
 	apivalidation "k8s.io/kubernetes/pkg/api/validation"
-	"k8s.io/kubernetes/pkg/apis/apps"
 )
 
 // ValidateStatefulSetName can be used to check whether the given StatefulSet name is valid.

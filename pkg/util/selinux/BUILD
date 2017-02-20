@@ -15,7 +15,6 @@ go_library(
         "selinux_linux.go",
     ],
     tags = ["automanaged"],
-    deps = ["//vendor:github.com/opencontainers/runc/libcontainer/selinux"],
 )
 
 filegroup(

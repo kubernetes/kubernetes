@@ -15,12 +15,7 @@ go_library(
         "operation.go",
     ],
     tags = ["automanaged"],
-    deps = [
-        "//pkg/api:go_default_library",
-        "//pkg/registry/core/service/allocator:go_default_library",
-        "//vendor:github.com/golang/glog",
-        "//vendor:k8s.io/apimachinery/pkg/util/net",
-    ],
+    deps = ["//pkg/registry/core/service/allocator:go_default_library"],
 )
 
 go_test(
@@ -28,11 +23,6 @@ go_test(
     srcs = ["allocator_test.go"],
     library = ":go_default_library",
     tags = ["automanaged"],
-    deps = [
-        "//pkg/api:go_default_library",
-        "//vendor:k8s.io/apimachinery/pkg/util/net",
-        "//vendor:k8s.io/apimachinery/pkg/util/sets",
-    ],
 )
 
 filegroup(

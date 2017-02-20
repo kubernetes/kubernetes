@@ -20,7 +20,7 @@ import (
 	"reflect"
 	"testing"
 
-	"k8s.io/kubernetes/pkg/apis/rbac"
+	"k8s.io/apis/pkg/apis/rbac"
 )
 
 type escalationTest struct {

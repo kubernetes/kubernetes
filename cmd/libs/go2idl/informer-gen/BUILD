@@ -18,12 +18,7 @@ go_library(
     name = "go_default_library",
     srcs = ["main.go"],
     tags = ["automanaged"],
-    deps = [
-        "//cmd/libs/go2idl/informer-gen/generators:go_default_library",
-        "//vendor:github.com/golang/glog",
-        "//vendor:github.com/spf13/pflag",
-        "//vendor:k8s.io/gengo/args",
-    ],
+    deps = ["//cmd/libs/go2idl/informer-gen/generators:go_default_library"],
 )
 
 filegroup(

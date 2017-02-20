@@ -15,11 +15,6 @@ go_library(
         "types.go",
     ],
     tags = ["automanaged"],
-    deps = [
-        "//vendor:github.com/go-openapi/spec",
-        "//vendor:github.com/google/gofuzz",
-        "//vendor:k8s.io/apimachinery/pkg/openapi",
-    ],
 )
 
 filegroup(

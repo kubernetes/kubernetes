@@ -19,8 +19,8 @@ package kubelet
 import (
 	"fmt"
 
-	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/v1"
+	"k8s.io/apis/pkg/api"
+	"k8s.io/apis/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/fieldpath"
 )
 

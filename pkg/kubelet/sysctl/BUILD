@@ -17,7 +17,6 @@ go_library(
     ],
     tags = ["automanaged"],
     deps = [
-        "//pkg/api/v1:go_default_library",
         "//pkg/api/validation:go_default_library",
         "//pkg/apis/extensions/validation:go_default_library",
         "//pkg/kubelet/container:go_default_library",
@@ -34,7 +33,6 @@ go_test(
     ],
     library = ":go_default_library",
     tags = ["automanaged"],
-    deps = ["//pkg/api/v1:go_default_library"],
 )
 
 filegroup(

@@ -11,11 +11,7 @@ go_library(
     name = "go_default_library",
     srcs = ["factory_interfaces.go"],
     tags = ["automanaged"],
-    deps = [
-        "//pkg/client/clientset_generated/clientset:go_default_library",
-        "//vendor:k8s.io/apimachinery/pkg/runtime",
-        "//vendor:k8s.io/client-go/tools/cache",
-    ],
+    deps = ["//pkg/client/clientset_generated/clientset:go_default_library"],
 )
 
 filegroup(

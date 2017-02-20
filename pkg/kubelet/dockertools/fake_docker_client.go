@@ -31,7 +31,7 @@ import (
 	dockercontainer "github.com/docker/engine-api/types/container"
 	"k8s.io/client-go/util/clock"
 
-	"k8s.io/kubernetes/pkg/api/v1"
+	"k8s.io/apis/pkg/api/v1"
 )
 
 type calledDetail struct {

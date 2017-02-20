@@ -21,7 +21,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/apis/pkg/api"
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
 )
 

@@ -26,8 +26,6 @@ go_library(
     ],
     tags = ["automanaged"],
     deps = [
-        "//pkg/api:go_default_library",
-        "//pkg/api/v1:go_default_library",
         "//pkg/kubelet/api/v1alpha1/runtime:go_default_library",
         "//pkg/kubelet/events:go_default_library",
         "//pkg/kubelet/util/format:go_default_library",
@@ -36,16 +34,7 @@ go_library(
         "//pkg/util/term:go_default_library",
         "//pkg/volume:go_default_library",
         "//third_party/forked/golang/expansion:go_default_library",
-        "//vendor:github.com/golang/glog",
-        "//vendor:github.com/kr/pty",
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
-        "//vendor:k8s.io/apimachinery/pkg/runtime",
-        "//vendor:k8s.io/apimachinery/pkg/types",
-        "//vendor:k8s.io/apimachinery/pkg/util/errors",
-        "//vendor:k8s.io/apimachinery/pkg/util/runtime",
-        "//vendor:k8s.io/client-go/pkg/api/v1",
-        "//vendor:k8s.io/client-go/tools/record",
-        "//vendor:k8s.io/client-go/util/flowcontrol",
     ],
 )
 
@@ -59,13 +48,7 @@ go_test(
     ],
     library = ":go_default_library",
     tags = ["automanaged"],
-    deps = [
-        "//pkg/api:go_default_library",
-        "//pkg/api/v1:go_default_library",
-        "//vendor:github.com/stretchr/testify/assert",
-        "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
-        "//vendor:k8s.io/apimachinery/pkg/types",
-    ],
+    deps = ["//vendor:k8s.io/apimachinery/pkg/apis/meta/v1"],
 )
 
 go_test(

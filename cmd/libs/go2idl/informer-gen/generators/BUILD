@@ -22,15 +22,7 @@ go_library(
         "versioninterface.go",
     ],
     tags = ["automanaged"],
-    deps = [
-        "//cmd/libs/go2idl/client-gen/types:go_default_library",
-        "//vendor:github.com/golang/glog",
-        "//vendor:github.com/spf13/pflag",
-        "//vendor:k8s.io/gengo/args",
-        "//vendor:k8s.io/gengo/generator",
-        "//vendor:k8s.io/gengo/namer",
-        "//vendor:k8s.io/gengo/types",
-    ],
+    deps = ["//cmd/libs/go2idl/client-gen/types:go_default_library"],
 )
 
 filegroup(

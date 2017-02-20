@@ -20,16 +20,7 @@ go_library(
         "wal.go",
     ],
     tags = ["automanaged"],
-    deps = [
-        "//third_party/forked/etcd221/pkg/fileutil:go_default_library",
-        "//vendor:github.com/coreos/etcd/pkg/crc",
-        "//vendor:github.com/coreos/etcd/pkg/pbutil",
-        "//vendor:github.com/coreos/etcd/raft",
-        "//vendor:github.com/coreos/etcd/raft/raftpb",
-        "//vendor:github.com/coreos/etcd/wal/walpb",
-        "//vendor:github.com/coreos/pkg/capnslog",
-        "//vendor:github.com/prometheus/client_golang/prometheus",
-    ],
+    deps = ["//third_party/forked/etcd221/pkg/fileutil:go_default_library"],
 )
 
 filegroup(

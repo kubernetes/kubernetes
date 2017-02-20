@@ -17,12 +17,7 @@ go_library(
         "fake_tokenreview_expansion.go",
     ],
     tags = ["automanaged"],
-    deps = [
-        "//pkg/apis/authentication:go_default_library",
-        "//pkg/client/clientset_generated/internalclientset/typed/authentication/internalversion:go_default_library",
-        "//vendor:k8s.io/client-go/rest",
-        "//vendor:k8s.io/client-go/testing",
-    ],
+    deps = ["//pkg/client/clientset_generated/internalclientset/typed/authentication/internalversion:go_default_library"],
 )
 
 filegroup(

@@ -15,15 +15,6 @@ go_library(
     ],
     tags = ["automanaged"],
     deps = [
-        "//pkg/api:go_default_library",
-        "//pkg/apis/apps:go_default_library",
-        "//pkg/apis/autoscaling:go_default_library",
-        "//pkg/apis/batch:go_default_library",
-        "//pkg/apis/certificates:go_default_library",
-        "//pkg/apis/extensions:go_default_library",
-        "//pkg/apis/policy:go_default_library",
-        "//pkg/apis/rbac:go_default_library",
-        "//pkg/apis/storage:go_default_library",
         "//pkg/client/clientset_generated/internalclientset:go_default_library",
         "//pkg/client/informers/informers_generated/internalversion/apps:go_default_library",
         "//pkg/client/informers/informers_generated/internalversion/autoscaling:go_default_library",
@@ -35,9 +26,6 @@ go_library(
         "//pkg/client/informers/informers_generated/internalversion/policy:go_default_library",
         "//pkg/client/informers/informers_generated/internalversion/rbac:go_default_library",
         "//pkg/client/informers/informers_generated/internalversion/storage:go_default_library",
-        "//vendor:k8s.io/apimachinery/pkg/runtime",
-        "//vendor:k8s.io/apimachinery/pkg/runtime/schema",
-        "//vendor:k8s.io/client-go/tools/cache",
     ],
 )
 

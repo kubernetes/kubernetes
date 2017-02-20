@@ -18,8 +18,8 @@ package kubectl
 
 import (
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/v1"
+	"k8s.io/apis/pkg/api"
+	"k8s.io/apis/pkg/api/v1"
 )
 
 // FilterFunc is a function that knows how to filter a specific resource kind.

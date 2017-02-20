@@ -15,7 +15,6 @@ go_library(
         "doc.go",
     ],
     tags = ["automanaged"],
-    deps = ["//vendor:k8s.io/apimachinery/pkg/util/wait"],
 )
 
 go_test(

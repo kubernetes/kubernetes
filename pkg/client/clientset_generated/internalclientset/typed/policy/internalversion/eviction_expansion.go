@@ -17,7 +17,7 @@ limitations under the License.
 package internalversion
 
 import (
-	policy "k8s.io/kubernetes/pkg/apis/policy"
+	policy "k8s.io/apis/pkg/apis/policy"
 )
 
 // The EvictionExpansion interface allows manually adding extra methods to the ScaleInterface.

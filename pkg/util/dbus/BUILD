@@ -16,7 +16,6 @@ go_library(
         "fake_dbus.go",
     ],
     tags = ["automanaged"],
-    deps = ["//vendor:github.com/godbus/dbus"],
 )
 
 go_test(
@@ -24,7 +23,6 @@ go_test(
     srcs = ["dbus_test.go"],
     library = ":go_default_library",
     tags = ["automanaged"],
-    deps = ["//vendor:github.com/godbus/dbus"],
 )
 
 filegroup(

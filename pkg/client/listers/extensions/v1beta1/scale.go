@@ -21,9 +21,9 @@ package v1beta1
 import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/labels"
+	extensions "k8s.io/apis/pkg/apis/extensions"
+	v1beta1 "k8s.io/apis/pkg/apis/extensions/v1beta1"
 	"k8s.io/client-go/tools/cache"
-	extensions "k8s.io/kubernetes/pkg/apis/extensions"
-	v1beta1 "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 )
 
 // ScaleLister helps list Scales.

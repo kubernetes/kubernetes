@@ -14,10 +14,6 @@ go_library(
         "types.go",
     ],
     tags = ["automanaged"],
-    deps = [
-        "//vendor:k8s.io/apimachinery/pkg/runtime",
-        "//vendor:k8s.io/apimachinery/pkg/watch",
-    ],
 )
 
 filegroup(

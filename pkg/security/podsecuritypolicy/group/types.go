@@ -18,7 +18,7 @@ package group
 
 import (
 	"k8s.io/apimachinery/pkg/util/validation/field"
-	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/apis/pkg/api"
 )
 
 // GroupStrategy defines the interface for all group constraint strategies.

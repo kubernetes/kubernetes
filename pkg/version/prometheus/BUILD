@@ -11,10 +11,7 @@ go_library(
     name = "go_default_library",
     srcs = ["prometheus.go"],
     tags = ["automanaged"],
-    deps = [
-        "//pkg/version:go_default_library",
-        "//vendor:github.com/prometheus/client_golang/prometheus",
-    ],
+    deps = ["//pkg/version:go_default_library"],
 )
 
 filegroup(

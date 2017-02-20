@@ -12,10 +12,7 @@ go_library(
     name = "go_default_library",
     srcs = ["hairpin.go"],
     tags = ["automanaged"],
-    deps = [
-        "//pkg/util/exec:go_default_library",
-        "//vendor:github.com/golang/glog",
-    ],
+    deps = ["//pkg/util/exec:go_default_library"],
 )
 
 go_test(

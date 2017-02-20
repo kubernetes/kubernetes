@@ -18,22 +18,7 @@ go_library(
         "influxdb.go",
     ],
     tags = ["automanaged"],
-    deps = [
-        "//pkg/api:go_default_library",
-        "//vendor:cloud.google.com/go/compute/metadata",
-        "//vendor:github.com/golang/glog",
-        "//vendor:github.com/hawkular/hawkular-client-go/metrics",
-        "//vendor:github.com/influxdata/influxdb/client",
-        "//vendor:golang.org/x/oauth2",
-        "//vendor:golang.org/x/oauth2/google",
-        "//vendor:google.golang.org/api/cloudmonitoring/v2beta2",
-        "//vendor:k8s.io/apimachinery/pkg/api/errors",
-        "//vendor:k8s.io/apimachinery/pkg/api/resource",
-        "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
-        "//vendor:k8s.io/apiserver/pkg/admission",
-        "//vendor:k8s.io/client-go/rest",
-        "//vendor:k8s.io/client-go/tools/clientcmd",
-    ],
+    deps = ["//vendor:k8s.io/apimachinery/pkg/apis/meta/v1"],
 )
 
 go_test(
@@ -44,13 +29,7 @@ go_test(
     ],
     library = ":go_default_library",
     tags = ["automanaged"],
-    deps = [
-        "//pkg/api:go_default_library",
-        "//vendor:github.com/stretchr/testify/require",
-        "//vendor:k8s.io/apimachinery/pkg/api/resource",
-        "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
-        "//vendor:k8s.io/apiserver/pkg/admission",
-    ],
+    deps = ["//vendor:k8s.io/apimachinery/pkg/apis/meta/v1"],
 )
 
 filegroup(

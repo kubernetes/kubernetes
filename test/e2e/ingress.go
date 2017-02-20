@@ -22,8 +22,8 @@ import (
 	"time"
 
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	rbacv1beta1 "k8s.io/apis/pkg/apis/rbac/v1beta1"
 	"k8s.io/apiserver/pkg/authentication/serviceaccount"
-	rbacv1beta1 "k8s.io/kubernetes/pkg/apis/rbac/v1beta1"
 	"k8s.io/kubernetes/test/e2e/framework"
 
 	. "github.com/onsi/ginkgo"

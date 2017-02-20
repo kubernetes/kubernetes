@@ -17,7 +17,7 @@ limitations under the License.
 package v1beta1
 
 import (
-	authenticationapi "k8s.io/kubernetes/pkg/apis/authentication/v1beta1"
+	authenticationapi "k8s.io/apis/pkg/apis/authentication/v1beta1"
 )
 
 type TokenReviewExpansion interface {

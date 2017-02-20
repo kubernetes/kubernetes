@@ -90,7 +90,7 @@ func (g *genClientForType) GenerateType(c *generator.Context, t *types.Type, w i
 		"PatchType":           c.Universe.Type(types.Name{Package: "k8s.io/apimachinery/pkg/types", Name: "PatchType"}),
 		"watchInterface":      c.Universe.Type(types.Name{Package: "k8s.io/apimachinery/pkg/watch", Name: "Interface"}),
 		"RESTClientInterface": c.Universe.Type(types.Name{Package: "k8s.io/client-go/rest", Name: "Interface"}),
-		"apiParameterCodec":   c.Universe.Type(types.Name{Package: "k8s.io/kubernetes/pkg/api", Name: "ParameterCodec"}),
+		"apiParameterCodec":   c.Universe.Type(types.Name{Package: "k8s.io/apis/pkg/api", Name: "ParameterCodec"}),
 	}
 
 	sw.Do(getterComment, m)

@@ -26,8 +26,8 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/kubernetes/pkg/api"
-	api_v1 "k8s.io/kubernetes/pkg/api/v1"
+	"k8s.io/apis/pkg/api"
+	api_v1 "k8s.io/apis/pkg/api/v1"
 	"k8s.io/kubernetes/test/e2e/framework"
 )
 

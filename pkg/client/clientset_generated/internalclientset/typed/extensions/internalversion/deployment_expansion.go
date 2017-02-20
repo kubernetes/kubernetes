@@ -16,7 +16,7 @@ limitations under the License.
 
 package internalversion
 
-import "k8s.io/kubernetes/pkg/apis/extensions"
+import "k8s.io/apis/pkg/apis/extensions"
 
 // The DeploymentExpansion interface allows manually adding extra methods to the DeploymentInterface.
 type DeploymentExpansion interface {

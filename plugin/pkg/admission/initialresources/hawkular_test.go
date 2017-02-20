@@ -25,7 +25,7 @@ import (
 	"testing"
 	"time"
 
-	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/apis/pkg/api"
 
 	assert "github.com/stretchr/testify/require"
 )

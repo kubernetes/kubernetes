@@ -15,11 +15,6 @@ go_library(
         "util.go",
     ],
     tags = ["automanaged"],
-    deps = [
-        "//pkg/api:go_default_library",
-        "//pkg/apis/extensions:go_default_library",
-        "//vendor:k8s.io/apimachinery/pkg/util/sets",
-    ],
 )
 
 go_test(
@@ -27,10 +22,6 @@ go_test(
     srcs = ["util_test.go"],
     library = ":go_default_library",
     tags = ["automanaged"],
-    deps = [
-        "//pkg/api:go_default_library",
-        "//pkg/apis/extensions:go_default_library",
-    ],
 )
 
 filegroup(

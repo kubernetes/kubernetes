@@ -11,10 +11,6 @@ go_library(
     name = "go_default_library",
     srcs = ["prometheus.go"],
     tags = ["automanaged"],
-    deps = [
-        "//vendor:github.com/prometheus/client_golang/prometheus",
-        "//vendor:k8s.io/client-go/util/workqueue",
-    ],
 )
 
 filegroup(

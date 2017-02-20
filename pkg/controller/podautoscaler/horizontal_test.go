@@ -31,15 +31,15 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/watch"
+	"k8s.io/apis/pkg/api/v1"
+	autoscalingv1 "k8s.io/apis/pkg/apis/autoscaling/v1"
+	autoscalingv2 "k8s.io/apis/pkg/apis/autoscaling/v2alpha1"
+	extensions "k8s.io/apis/pkg/apis/extensions/v1beta1"
 	clientfake "k8s.io/client-go/kubernetes/fake"
 	clientv1 "k8s.io/client-go/pkg/api/v1"
 	restclient "k8s.io/client-go/rest"
 	core "k8s.io/client-go/testing"
 	"k8s.io/kubernetes/pkg/api/unversioned"
-	"k8s.io/kubernetes/pkg/api/v1"
-	autoscalingv1 "k8s.io/kubernetes/pkg/apis/autoscaling/v1"
-	autoscalingv2 "k8s.io/kubernetes/pkg/apis/autoscaling/v2alpha1"
-	extensions "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset/fake"
 	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated/externalversions"
 	"k8s.io/kubernetes/pkg/controller"
@@ -50,8 +50,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	_ "k8s.io/kubernetes/pkg/apis/autoscaling/install"
-	_ "k8s.io/kubernetes/pkg/apis/extensions/install"
+	_ "k8s.io/apis/pkg/apis/autoscaling/install"
+	_ "k8s.io/apis/pkg/apis/extensions/install"
 )
 
 func alwaysReady() bool { return true }

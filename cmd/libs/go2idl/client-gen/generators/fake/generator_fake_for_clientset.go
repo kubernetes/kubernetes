@@ -69,7 +69,7 @@ func (g *genClientset) Imports(c *generator.Context) (imports []string) {
 	imports = append(imports, fmt.Sprintf("clientset \"%s\"", g.clientsetPath))
 	// imports for the code in commonTemplate
 	imports = append(imports,
-		"k8s.io/kubernetes/pkg/api",
+		"k8s.io/apis/pkg/api",
 		"k8s.io/client-go/testing",
 		"k8s.io/client-go/discovery",
 		"fakediscovery \"k8s.io/client-go/discovery/fake\"",

@@ -16,7 +16,7 @@ limitations under the License.
 
 package internalversion
 
-import "k8s.io/kubernetes/pkg/apis/certificates"
+import "k8s.io/apis/pkg/apis/certificates"
 
 type CertificateSigningRequestExpansion interface {
 	UpdateApproval(certificateSigningRequest *certificates.CertificateSigningRequest) (result *certificates.CertificateSigningRequest, err error)

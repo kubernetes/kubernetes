@@ -21,8 +21,8 @@ package internalversion
 import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/labels"
+	autoscaling "k8s.io/apis/pkg/apis/autoscaling"
 	"k8s.io/client-go/tools/cache"
-	autoscaling "k8s.io/kubernetes/pkg/apis/autoscaling"
 )
 
 // HorizontalPodAutoscalerLister helps list HorizontalPodAutoscalers.

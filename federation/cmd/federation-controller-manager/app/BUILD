@@ -34,19 +34,7 @@ go_library(
         "//federation/pkg/federation-controller/util:go_default_library",
         "//pkg/util/configz:go_default_library",
         "//pkg/version:go_default_library",
-        "//vendor:github.com/golang/glog",
-        "//vendor:github.com/prometheus/client_golang/prometheus",
-        "//vendor:github.com/spf13/cobra",
-        "//vendor:github.com/spf13/pflag",
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
-        "//vendor:k8s.io/apimachinery/pkg/runtime/schema",
-        "//vendor:k8s.io/apimachinery/pkg/util/wait",
-        "//vendor:k8s.io/apiserver/pkg/server/healthz",
-        "//vendor:k8s.io/apiserver/pkg/util/flag",
-        "//vendor:k8s.io/client-go/discovery",
-        "//vendor:k8s.io/client-go/dynamic",
-        "//vendor:k8s.io/client-go/rest",
-        "//vendor:k8s.io/client-go/tools/clientcmd",
     ],
 )
 
@@ -58,8 +46,6 @@ go_test(
     deps = [
         "//federation/pkg/federation-controller/ingress:go_default_library",
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
-        "//vendor:k8s.io/apimachinery/pkg/runtime/schema",
-        "//vendor:k8s.io/apiserver/pkg/util/flag",
     ],
 )
 

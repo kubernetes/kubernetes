@@ -23,22 +23,10 @@ go_library(
     deps = [
         "//cmd/kube-apiserver/app:go_default_library",
         "//cmd/kube-apiserver/app/options:go_default_library",
-        "//pkg/api:go_default_library",
-        "//pkg/api/v1:go_default_library",
         "//pkg/client/clientset_generated/clientset:go_default_library",
         "//pkg/controller/namespace:go_default_library",
         "//test/e2e/framework:go_default_library",
         "//test/e2e_node/builder:go_default_library",
-        "//vendor:github.com/coreos/etcd/etcdserver",
-        "//vendor:github.com/coreos/etcd/etcdserver/api/v2http",
-        "//vendor:github.com/coreos/etcd/pkg/transport",
-        "//vendor:github.com/coreos/etcd/pkg/types",
-        "//vendor:github.com/coreos/pkg/capnslog",
-        "//vendor:github.com/golang/glog",
-        "//vendor:github.com/kardianos/osext",
-        "//vendor:k8s.io/apiserver/pkg/util/feature",
-        "//vendor:k8s.io/client-go/dynamic",
-        "//vendor:k8s.io/client-go/rest",
     ],
 )
 

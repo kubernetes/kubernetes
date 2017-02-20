@@ -14,14 +14,7 @@ go_library(
         "storageclass.go",
     ],
     tags = ["automanaged"],
-    deps = [
-        "//pkg/apis/storage:go_default_library",
-        "//pkg/apis/storage/v1beta1:go_default_library",
-        "//vendor:k8s.io/apimachinery/pkg/api/errors",
-        "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
-        "//vendor:k8s.io/apimachinery/pkg/labels",
-        "//vendor:k8s.io/client-go/tools/cache",
-    ],
+    deps = ["//vendor:k8s.io/apimachinery/pkg/apis/meta/v1"],
 )
 
 filegroup(

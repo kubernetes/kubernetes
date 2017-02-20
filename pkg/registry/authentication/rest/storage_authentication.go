@@ -17,15 +17,15 @@ limitations under the License.
 package rest
 
 import (
+	"k8s.io/apis/pkg/api"
+	"k8s.io/apis/pkg/apis/authentication"
+	authenticationv1 "k8s.io/apis/pkg/apis/authentication/v1"
+	authenticationv1beta1 "k8s.io/apis/pkg/apis/authentication/v1beta1"
 	"k8s.io/apiserver/pkg/authentication/authenticator"
 	"k8s.io/apiserver/pkg/registry/generic"
 	"k8s.io/apiserver/pkg/registry/rest"
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	serverstorage "k8s.io/apiserver/pkg/server/storage"
-	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/apis/authentication"
-	authenticationv1 "k8s.io/kubernetes/pkg/apis/authentication/v1"
-	authenticationv1beta1 "k8s.io/kubernetes/pkg/apis/authentication/v1beta1"
 	"k8s.io/kubernetes/pkg/registry/authentication/tokenreview"
 )
 

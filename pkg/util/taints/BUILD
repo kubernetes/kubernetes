@@ -12,11 +12,6 @@ go_library(
     name = "go_default_library",
     srcs = ["taints.go"],
     tags = ["automanaged"],
-    deps = [
-        "//pkg/api:go_default_library",
-        "//pkg/api/v1:go_default_library",
-        "//vendor:k8s.io/apimachinery/pkg/util/validation",
-    ],
 )
 
 go_test(
@@ -24,10 +19,6 @@ go_test(
     srcs = ["taints_test.go"],
     library = ":go_default_library",
     tags = ["automanaged"],
-    deps = [
-        "//pkg/api:go_default_library",
-        "//vendor:github.com/spf13/pflag",
-    ],
 )
 
 filegroup(

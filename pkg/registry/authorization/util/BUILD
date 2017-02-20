@@ -12,11 +12,6 @@ go_library(
     name = "go_default_library",
     srcs = ["helpers.go"],
     tags = ["automanaged"],
-    deps = [
-        "//pkg/apis/authorization:go_default_library",
-        "//vendor:k8s.io/apiserver/pkg/authentication/user",
-        "//vendor:k8s.io/apiserver/pkg/authorization/authorizer",
-    ],
 )
 
 filegroup(
@@ -37,9 +32,4 @@ go_test(
     srcs = ["helpers_test.go"],
     library = ":go_default_library",
     tags = ["automanaged"],
-    deps = [
-        "//pkg/apis/authorization:go_default_library",
-        "//vendor:k8s.io/apimachinery/pkg/util/sets",
-        "//vendor:k8s.io/apiserver/pkg/authorization/authorizer",
-    ],
 )

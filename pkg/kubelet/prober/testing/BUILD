@@ -11,10 +11,6 @@ go_library(
     name = "go_default_library",
     srcs = ["fake_manager.go"],
     tags = ["automanaged"],
-    deps = [
-        "//pkg/api/v1:go_default_library",
-        "//vendor:k8s.io/apimachinery/pkg/types",
-    ],
 )
 
 filegroup(

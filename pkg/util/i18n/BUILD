@@ -12,11 +12,7 @@ go_library(
     name = "go_default_library",
     srcs = ["i18n.go"],
     tags = ["automanaged"],
-    deps = [
-        "//pkg/generated:go_default_library",
-        "//vendor:github.com/chai2010/gettext-go/gettext",
-        "//vendor:github.com/golang/glog",
-    ],
+    deps = ["//pkg/generated:go_default_library"],
 )
 
 go_test(

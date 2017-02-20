@@ -12,10 +12,7 @@ go_library(
     name = "go_default_library",
     srcs = ["tcp.go"],
     tags = ["automanaged"],
-    deps = [
-        "//pkg/probe:go_default_library",
-        "//vendor:github.com/golang/glog",
-    ],
+    deps = ["//pkg/probe:go_default_library"],
 )
 
 go_test(

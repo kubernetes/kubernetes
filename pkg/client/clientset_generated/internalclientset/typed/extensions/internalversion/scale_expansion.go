@@ -19,7 +19,7 @@ package internalversion
 import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/kubernetes/pkg/apis/extensions"
+	"k8s.io/apis/pkg/apis/extensions"
 )
 
 // The ScaleExpansion interface allows manually adding extra methods to the ScaleInterface.

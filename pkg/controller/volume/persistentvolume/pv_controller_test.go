@@ -22,9 +22,9 @@ import (
 
 	"github.com/golang/glog"
 	"k8s.io/apimachinery/pkg/watch"
+	"k8s.io/apis/pkg/api/v1"
 	core "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/cache"
-	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset/fake"
 	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated/externalversions"
 	"k8s.io/kubernetes/pkg/controller"

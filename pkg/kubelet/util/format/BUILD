@@ -15,10 +15,6 @@ go_library(
         "resources.go",
     ],
     tags = ["automanaged"],
-    deps = [
-        "//pkg/api/v1:go_default_library",
-        "//vendor:k8s.io/apimachinery/pkg/types",
-    ],
 )
 
 go_test(
@@ -26,10 +22,6 @@ go_test(
     srcs = ["resources_test.go"],
     library = ":go_default_library",
     tags = ["automanaged"],
-    deps = [
-        "//pkg/api/v1:go_default_library",
-        "//vendor:k8s.io/apimachinery/pkg/api/resource",
-    ],
 )
 
 filegroup(

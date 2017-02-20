@@ -21,7 +21,7 @@ import (
 
 	"strings"
 
-	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/apis/pkg/api"
 	netsets "k8s.io/kubernetes/pkg/util/net/sets"
 )
 

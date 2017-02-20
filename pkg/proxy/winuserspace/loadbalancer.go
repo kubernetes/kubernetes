@@ -19,7 +19,7 @@ package winuserspace
 import (
 	"net"
 
-	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/apis/pkg/api"
 	"k8s.io/kubernetes/pkg/proxy"
 )
 
