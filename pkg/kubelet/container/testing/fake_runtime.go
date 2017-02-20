@@ -24,6 +24,8 @@ import (
 	"sync"
 	"time"
 
+	cadvisorapiv2 "github.com/google/cadvisor/info/v2"
+
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/util/flowcontrol"
 	"k8s.io/kubernetes/pkg/api/v1"
@@ -453,6 +455,14 @@ func (f *FakeRuntime) ImageStats() (*ImageStats, error) {
 
 	f.CalledFunctions = append(f.CalledFunctions, "ImageStats")
 	return nil, f.Err
+}
+
+func (f *FakeRuntime) ImageFsInfo() (cadvisorapiv2.FsInfo, error) {
+	f.Lock()
+	defer f.Unlock()
+
+	f.CalledFunctions = append(f.CalledFunctions, "ImageFsInfo")
+	return cadvisorapiv2.FsInfo{}, f.Err
 }
 
 func (f *FakeIndirectStreamingRuntime) GetExec(id ContainerID, cmd []string, stdin, stdout, stderr, tty bool) (*url.URL, error) {

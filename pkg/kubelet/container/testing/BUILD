@@ -23,6 +23,7 @@ go_library(
         "//pkg/util/term:go_default_library",
         "//pkg/volume:go_default_library",
         "//vendor:github.com/golang/mock/gomock",
+        "//vendor:github.com/google/cadvisor/info/v2",
         "//vendor:github.com/stretchr/testify/mock",
         "//vendor:k8s.io/apimachinery/pkg/types",
         "//vendor:k8s.io/client-go/util/flowcontrol",

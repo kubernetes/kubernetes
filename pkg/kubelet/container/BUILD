@@ -37,6 +37,7 @@ go_library(
         "//pkg/volume:go_default_library",
         "//third_party/forked/golang/expansion:go_default_library",
         "//vendor:github.com/golang/glog",
+        "//vendor:github.com/google/cadvisor/info/v2",
         "//vendor:github.com/kr/pty",
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
         "//vendor:k8s.io/apimachinery/pkg/runtime",

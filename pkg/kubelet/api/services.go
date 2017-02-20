@@ -97,4 +97,6 @@ type ImageManagerService interface {
 	PullImage(image *runtimeapi.ImageSpec, auth *runtimeapi.AuthConfig) (string, error)
 	// RemoveImage removes the image.
 	RemoveImage(image *runtimeapi.ImageSpec) error
+	// ImageFsInfo returns filesytem information of images.
+	ImageFsInfo() (*runtimeapi.FsInfo, error)
 }

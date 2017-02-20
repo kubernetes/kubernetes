@@ -118,3 +118,17 @@ func (r *FakeImageService) RemoveImage(image *runtimeapi.ImageSpec) error {
 
 	return nil
 }
+
+func (r *FakeImageService) ImageFsInfo() (*runtimeapi.FsInfo, error) {
+	r.Lock()
+	defer r.Unlock()
+
+	r.Called = append(r.Called, "ImageFsInfo")
+
+	var totalBytes uint64
+	for _, img := range r.Images {
+		totalBytes += img.Size_
+	}
+
+	return &runtimeapi.FsInfo{Usage: totalBytes}, nil
+}
