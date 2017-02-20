@@ -204,9 +204,6 @@ func SetDefaults_KubeletConfiguration(obj *KubeletConfiguration) {
 	if obj.CertDirectory == "" {
 		obj.CertDirectory = "/var/run/kubernetes"
 	}
-	if obj.CgroupsPerQOS == nil {
-		obj.CgroupsPerQOS = boolVar(false)
-	}
 	if obj.ContainerRuntime == "" {
 		obj.ContainerRuntime = "docker"
 	}
@@ -395,21 +392,11 @@ func SetDefaults_KubeletConfiguration(obj *KubeletConfiguration) {
 		obj.IPTablesDropBit = &temp
 	}
 	if obj.CgroupsPerQOS == nil {
-		temp := false
+		temp := true
 		obj.CgroupsPerQOS = &temp
 	}
 	if obj.CgroupDriver == "" {
 		obj.CgroupDriver = "cgroupfs"
-	}
-	// NOTE: this is for backwards compatibility with earlier releases where cgroup-root was optional.
-	// if cgroups per qos is not enabled, and cgroup-root is not specified, we need to default to the
-	// container runtime default and not default to the root cgroup.
-	if obj.CgroupsPerQOS != nil {
-		if *obj.CgroupsPerQOS {
-			if obj.CgroupRoot == "" {
-				obj.CgroupRoot = "/"
-			}
-		}
 	}
 	if obj.EnableCRI == nil {
 		obj.EnableCRI = boolVar(true)
