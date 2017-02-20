@@ -72,11 +72,7 @@ func (p *plugin) Admit(attributes admission.Attributes) (err error) {
 		return nil
 	}
 
-	tolerations, err := v1.GetPodTolerations(pod)
-	if err != nil {
-		glog.V(5).Infof("Invalid pod tolerations detected, but we will leave handling of this to validation phase")
-		return nil
-	}
+	tolerations := pod.Spec.Tolerations
 
 	toleratesNodeNotReady := false
 	toleratesNodeUnreachable := false
