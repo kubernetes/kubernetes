@@ -41,11 +41,11 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/apis/pkg/api"
-	"k8s.io/apis/pkg/api/testapi"
-	kapitesting "k8s.io/apis/pkg/api/testing"
 	"k8s.io/apis/pkg/api/v1"
 	"k8s.io/apis/pkg/apis/extensions"
 	"k8s.io/apis/pkg/apis/extensions/v1beta1"
+	"k8s.io/kubernetes/pkg/api/testapi"
+	kapitesting "k8s.io/kubernetes/pkg/api/testing"
 )
 
 // fuzzInternalObject fuzzes an arbitrary runtime object using the appropriate

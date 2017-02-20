@@ -31,10 +31,10 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/serializer/protobuf"
 	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apis/pkg/api"
-	kapitesting "k8s.io/apis/pkg/api/testing"
 	"k8s.io/apis/pkg/api/v1"
 	_ "k8s.io/apis/pkg/apis/extensions"
 	_ "k8s.io/apis/pkg/apis/extensions/v1beta1"
+	kapitesting "k8s.io/kubernetes/pkg/api/testing"
 )
 
 func TestUniversalDeserializer(t *testing.T) {

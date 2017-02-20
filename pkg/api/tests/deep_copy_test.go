@@ -26,7 +26,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apis/pkg/api"
-	"k8s.io/apis/pkg/api/testapi"
+	"k8s.io/kubernetes/pkg/api/testapi"
 )
 
 func parseTimeOrDie(ts string) metav1.Time {

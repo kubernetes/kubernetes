@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package v1_test
+package api_test
 
 import (
 	"testing"
@@ -22,9 +22,9 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apis/pkg/api"
-	"k8s.io/apis/pkg/api/testing/compat"
 	"k8s.io/apis/pkg/api/v1"
-	"k8s.io/apis/pkg/api/validation"
+	"k8s.io/kubernetes/pkg/api/testing/compat"
+	"k8s.io/kubernetes/pkg/api/validation"
 )
 
 func TestCompatibility_v1_PodSecurityContext(t *testing.T) {
