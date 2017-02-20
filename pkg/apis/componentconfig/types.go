@@ -794,6 +794,10 @@ type KubeControllerManagerConfiguration struct {
 	// If set to true enables NoExecute Taints and will evict all not-tolerating
 	// Pod running on Nodes tainted with this kind of Taints.
 	EnableTaintManager bool
+	// horizontalPodAutoscalerUseRESTClients causes the HPA controller to use REST clients
+	// through the kube-aggregator when enabled, instead of using the legacy metrics client
+	// through the API server proxy.
+	HorizontalPodAutoscalerUseRESTClients bool
 }
 
 // VolumeConfiguration contains *all* enumerated flags meant to configure all volume

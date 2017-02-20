@@ -656,3 +656,10 @@ windows-line-endings
 www-prefix
 zone-id
 zone-name
+garbage-collector-enabled
+viper-config
+log-lines-total
+run-duration
+attach-detach-reconcile-sync-period
+disable-attach-detach-reconcile-sync
+horizontal-pod-autoscaler-use-rest-clients
