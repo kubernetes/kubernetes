@@ -87,11 +87,7 @@ func getTestWebhookTokenAuth(serverURL string) (authenticator.Request, error) {
 	if err := json.NewEncoder(kubecfgFile).Encode(config); err != nil {
 		return nil, err
 	}
-	webhookTokenAuth, err := webhook.New(kubecfgFile.Name(), 2*time.Minute)
-	if err != nil {
-		return nil, err
-	}
-	return bearertoken.New(webhookTokenAuth), nil
+	return webhook.New(kubecfgFile.Name(), 2*time.Minute, []string{})
 }
 
 func path(resource, namespace, name string) string {

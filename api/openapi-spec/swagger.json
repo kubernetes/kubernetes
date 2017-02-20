@@ -39461,6 +39461,16 @@
    "io.k8s.kubernetes.pkg.apis.authentication.v1.TokenReviewSpec": {
     "description": "TokenReviewSpec is a description of the token authentication request.",
     "properties": {
+     "extra": {
+      "description": "Any additional information provided to the authenticator.",
+      "type": "object",
+      "additionalProperties": {
+       "type": "array",
+       "items": {
+        "type": "string"
+       }
+      }
+     },
      "token": {
       "description": "Token is the opaque bearer token.",
       "type": "string"
@@ -39551,6 +39561,16 @@
    "io.k8s.kubernetes.pkg.apis.authentication.v1beta1.TokenReviewSpec": {
     "description": "TokenReviewSpec is a description of the token authentication request.",
     "properties": {
+     "extra": {
+      "description": "Any additional information provided to the authenticator.",
+      "type": "object",
+      "additionalProperties": {
+       "type": "array",
+       "items": {
+        "type": "string"
+       }
+      }
+     },
      "token": {
       "description": "Token is the opaque bearer token.",
       "type": "string"

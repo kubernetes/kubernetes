@@ -40,6 +40,7 @@ func (TokenReview) SwaggerDoc() map[string]string {
 var map_TokenReviewSpec = map[string]string{
 	"":      "TokenReviewSpec is a description of the token authentication request.",
 	"token": "Token is the opaque bearer token.",
+	"extra": "Any additional information provided to the authenticator.",
 }
 
 func (TokenReviewSpec) SwaggerDoc() map[string]string {

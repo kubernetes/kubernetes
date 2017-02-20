@@ -18,6 +18,7 @@ package v1alpha1
 
 import (
 	"k8s.io/apimachinery/pkg/conversion"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	api "k8s.io/client-go/pkg/apis/rbac"
 )
 
@@ -30,12 +31,50 @@ func Convert_v1alpha1_Subject_To_rbac_Subject(in *Subject, out *api.Subject, s c
 		return err
 	}
 
+	// specifically set the APIGroup for the three subjects recognized in v1alpha1
+	switch {
+	case in.Kind == ServiceAccountKind:
+		out.APIGroup = ""
+	case in.Kind == UserKind:
+		out.APIGroup = GroupName
+	case in.Kind == GroupKind:
+		out.APIGroup = GroupName
+	default:
+		// For unrecognized kinds, use the group portion of the APIVersion if we can get it
+		if gv, err := schema.ParseGroupVersion(in.APIVersion); err == nil {
+			out.APIGroup = gv.Group
+		}
+	}
+
 	// User * in v1alpha1 will only match all authenticated users
 	// This is only for compatibility with old RBAC bindings
 	// Special treatment for * should not be included in v1beta1
-	if out.Kind == UserKind && out.Name == "*" {
+	if out.Kind == UserKind && out.APIGroup == GroupName && out.Name == "*" {
 		out.Kind = GroupKind
 		out.Name = allAuthenticated
+	}
+
+	return nil
+}
+
+func Convert_rbac_Subject_To_v1alpha1_Subject(in *api.Subject, out *Subject, s conversion.Scope) error {
+	if err := autoConvert_rbac_Subject_To_v1alpha1_Subject(in, out, s); err != nil {
+		return err
+	}
+
+	switch {
+	case in.Kind == ServiceAccountKind && in.APIGroup == "":
+		// Make service accounts v1
+		out.APIVersion = "v1"
+	case in.Kind == UserKind && in.APIGroup == GroupName:
+		// users in the rbac API group get v1alpha
+		out.APIVersion = SchemeGroupVersion.String()
+	case in.Kind == GroupKind && in.APIGroup == GroupName:
+		// groups in the rbac API group get v1alpha
+		out.APIVersion = SchemeGroupVersion.String()
+	default:
+		// otherwise, they get an unspecified version of a group
+		out.APIVersion = schema.GroupVersion{Group: in.APIGroup}.String()
 	}
 
 	return nil

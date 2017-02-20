@@ -219,6 +219,10 @@
      "token": {
       "type": "string",
       "description": "Token is the opaque bearer token."
+     },
+     "extra": {
+      "type": "object",
+      "description": "Any additional information provided to the authenticator."
      }
     }
    },

@@ -18,6 +18,10 @@ limitations under the License.
 package webhook
 
 import (
+	"encoding/json"
+	"errors"
+	"net/http"
+	"strings"
 	"time"
 
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -38,41 +42,88 @@ var (
 
 const retryBackoff = 500 * time.Millisecond
 
-// Ensure WebhookTokenAuthenticator implements the authenticator.Token interface.
-var _ authenticator.Token = (*WebhookTokenAuthenticator)(nil)
+// Ensure WebhookTokenAuthenticator implements the authenticator.Request interface.
+var _ authenticator.Request = (*WebhookTokenAuthenticator)(nil)
 
 type WebhookTokenAuthenticator struct {
 	tokenReview    authenticationclient.TokenReviewInterface
 	responseCache  *cache.LRUExpireCache
 	ttl            time.Duration
 	initialBackoff time.Duration
+	extraHeaders   []string
 }
 
 // NewFromInterface creates a webhook authenticator using the given tokenReview client
-func NewFromInterface(tokenReview authenticationclient.TokenReviewInterface, ttl time.Duration) (*WebhookTokenAuthenticator, error) {
-	return newWithBackoff(tokenReview, ttl, retryBackoff)
+func NewFromInterface(tokenReview authenticationclient.TokenReviewInterface, ttl time.Duration, extraHeaders []string) (*WebhookTokenAuthenticator, error) {
+	return newWithBackoff(tokenReview, ttl, retryBackoff, extraHeaders)
 }
 
 // New creates a new WebhookTokenAuthenticator from the provided kubeconfig file.
-func New(kubeConfigFile string, ttl time.Duration) (*WebhookTokenAuthenticator, error) {
+func New(kubeConfigFile string, ttl time.Duration, extraHeaders []string) (*WebhookTokenAuthenticator, error) {
 	tokenReview, err := tokenReviewInterfaceFromKubeconfig(kubeConfigFile)
 	if err != nil {
 		return nil, err
 	}
-	return newWithBackoff(tokenReview, ttl, retryBackoff)
+	return newWithBackoff(tokenReview, ttl, retryBackoff, extraHeaders)
 }
 
 // newWithBackoff allows tests to skip the sleep.
-func newWithBackoff(tokenReview authenticationclient.TokenReviewInterface, ttl, initialBackoff time.Duration) (*WebhookTokenAuthenticator, error) {
-	return &WebhookTokenAuthenticator{tokenReview, cache.NewLRUExpireCache(1024), ttl, initialBackoff}, nil
+func newWithBackoff(tokenReview authenticationclient.TokenReviewInterface, ttl, initialBackoff time.Duration, extraHeaders []string) (*WebhookTokenAuthenticator, error) {
+	return &WebhookTokenAuthenticator{tokenReview, cache.NewLRUExpireCache(1024), ttl, initialBackoff, extraHeaders}, nil
 }
 
-// AuthenticateToken implements the authenticator.Token interface.
-func (w *WebhookTokenAuthenticator) AuthenticateToken(token string) (user.Info, bool, error) {
-	r := &authentication.TokenReview{
-		Spec: authentication.TokenReviewSpec{Token: token},
+var invalidToken = errors.New("invalid bearer token")
+
+func extractToken(req *http.Request) (string, error) {
+	auth := strings.TrimSpace(req.Header.Get("Authorization"))
+	if auth == "" {
+		return "", nil
 	}
-	if entry, ok := w.responseCache.Get(r.Spec); ok {
+	parts := strings.Split(auth, " ")
+	if len(parts) < 2 || strings.ToLower(parts[0]) != "bearer" {
+		return "", nil
+	}
+
+	token := parts[1]
+
+	// Empty bearer tokens aren't valid
+	if len(token) == 0 {
+		return "", nil
+	}
+
+	return token, nil
+}
+
+func (w *WebhookTokenAuthenticator) extractExtra(req *http.Request) map[string]authentication.ExtraValue {
+	var extra = map[string]authentication.ExtraValue{}
+
+	for _, k := range w.extraHeaders {
+		extra[k] = req.Header[k]
+	}
+
+	return extra
+}
+
+// AuthenticateToken implements the authenticator.AuthenticateRequest interface.
+func (w *WebhookTokenAuthenticator) AuthenticateRequest(req *http.Request) (user.Info, bool, error) {
+	token, err := extractToken(req)
+
+	if err != nil {
+		return nil, false, err
+	}
+
+	r := &authentication.TokenReview{
+		Spec: authentication.TokenReviewSpec{Token: token, Extra: w.extractExtra(req)},
+	}
+
+	rKeyBytes, err := json.Marshal(r.Spec)
+	if err != nil {
+		return nil, false, err
+	}
+
+	rKey := string(rKeyBytes)
+
+	if entry, ok := w.responseCache.Get(rKey); ok {
 		r.Status = entry.(authentication.TokenReviewStatus)
 	} else {
 		var (
@@ -87,7 +138,7 @@ func (w *WebhookTokenAuthenticator) AuthenticateToken(token string) (user.Info, 
 			return nil, false, err
 		}
 		r.Status = result.Status
-		w.responseCache.Add(r.Spec, result.Status, w.ttl)
+		w.responseCache.Add(rKey, result.Status, w.ttl)
 	}
 	if !r.Status.Authenticated {
 		return nil, false, nil

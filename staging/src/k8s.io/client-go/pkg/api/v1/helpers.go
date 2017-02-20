@@ -26,6 +26,7 @@ import (
 	"k8s.io/apimachinery/pkg/selection"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
+
 	"k8s.io/client-go/pkg/api"
 )
 
@@ -392,7 +393,7 @@ func DeleteTaint(taints []Taint, taintToDelete *Taint) ([]Taint, bool) {
 	newTaints := []Taint{}
 	deleted := false
 	for i := range taints {
-		if taintToDelete.MatchTaint(taints[i]) {
+		if taintToDelete.MatchTaint(&taints[i]) {
 			deleted = true
 			continue
 		}
@@ -403,6 +404,9 @@ func DeleteTaint(taints []Taint, taintToDelete *Taint) ([]Taint, bool) {
 
 // Returns true and list of Tolerations matching all Taints if all are tolerated, or false otherwise.
 func GetMatchingTolerations(taints []Taint, tolerations []Toleration) (bool, []Toleration) {
+	if len(taints) == 0 {
+		return true, []Toleration{}
+	}
 	if len(tolerations) == 0 && len(taints) > 0 {
 		return false, []Toleration{}
 	}
@@ -425,7 +429,7 @@ func GetMatchingTolerations(taints []Taint, tolerations []Toleration) (bool, []T
 
 // MatchTaint checks if the taint matches taintToMatch. Taints are unique by key:effect,
 // if the two taints have same key:effect, regard as they match.
-func (t *Taint) MatchTaint(taintToMatch Taint) bool {
+func (t *Taint) MatchTaint(taintToMatch *Taint) bool {
 	return t.Key == taintToMatch.Key && t.Effect == taintToMatch.Effect
 }
 
@@ -506,4 +510,90 @@ type Sysctl struct {
 type NodeResources struct {
 	// Capacity represents the available resources of a node
 	Capacity ResourceList `protobuf:"bytes,1,rep,name=capacity,casttype=ResourceList,castkey=ResourceName"`
+}
+
+// Tries to add a taint to annotations list. Returns a new copy of updated Node and true if something was updated
+// false otherwise.
+func AddOrUpdateTaint(node *Node, taint *Taint) (*Node, bool, error) {
+	objCopy, err := api.Scheme.DeepCopy(node)
+	if err != nil {
+		return nil, false, err
+	}
+	newNode := objCopy.(*Node)
+	nodeTaints, err := GetTaintsFromNodeAnnotations(newNode.Annotations)
+	if err != nil {
+		return newNode, false, err
+	}
+
+	var newTaints []*Taint
+	updated := false
+	for i := range nodeTaints {
+		if taint.MatchTaint(&nodeTaints[i]) {
+			if api.Semantic.DeepEqual(taint, nodeTaints[i]) {
+				return newNode, false, nil
+			}
+			newTaints = append(newTaints, taint)
+			updated = true
+			continue
+		}
+
+		newTaints = append(newTaints, &nodeTaints[i])
+	}
+
+	if !updated {
+		newTaints = append(newTaints, taint)
+	}
+
+	taintsData, err := json.Marshal(newTaints)
+	if err != nil {
+		return nil, false, err
+	}
+
+	if newNode.Annotations == nil {
+		newNode.Annotations = make(map[string]string)
+	}
+	newNode.Annotations[TaintsAnnotationKey] = string(taintsData)
+	return newNode, true, nil
+}
+
+func TaintExists(taints []Taint, taintToFind *Taint) bool {
+	for _, taint := range taints {
+		if taint.MatchTaint(taintToFind) {
+			return true
+		}
+	}
+	return false
+}
+
+// Tries to remove a taint from annotations list. Returns a new copy of updated Node and true if something was updated
+// false otherwise.
+func RemoveTaint(node *Node, taint *Taint) (*Node, bool, error) {
+	objCopy, err := api.Scheme.DeepCopy(node)
+	if err != nil {
+		return nil, false, err
+	}
+	newNode := objCopy.(*Node)
+	nodeTaints, err := GetTaintsFromNodeAnnotations(newNode.Annotations)
+	if err != nil {
+		return newNode, false, err
+	}
+	if len(nodeTaints) == 0 {
+		return newNode, false, nil
+	}
+
+	if !TaintExists(nodeTaints, taint) {
+		return newNode, false, nil
+	}
+
+	newTaints, _ := DeleteTaint(nodeTaints, taint)
+	if len(newTaints) == 0 {
+		delete(newNode.Annotations, TaintsAnnotationKey)
+	} else {
+		taintsData, err := json.Marshal(newTaints)
+		if err != nil {
+			return newNode, false, err
+		}
+		newNode.Annotations[TaintsAnnotationKey] = string(taintsData)
+	}
+	return newNode, true, nil
 }
