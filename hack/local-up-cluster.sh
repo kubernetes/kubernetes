@@ -42,6 +42,8 @@ CGROUPS_PER_QOS=${CGROUPS_PER_QOS:-false}
 CGROUP_ROOT=${CGROUP_ROOT:-""}
 # name of the cgroup driver, i.e. cgroupfs or systemd
 CGROUP_DRIVER=${CGROUP_DRIVER:-""}
+# owner of client certs, default to current user if not specified
+USER=${USER:-$(whoami)}
 
 # enables testing eviction scenarios locally.
 EVICTION_HARD=${EVICTION_HARD:-"memory.available<100Mi"}
