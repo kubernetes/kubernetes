@@ -79,6 +79,7 @@ func TestValidatePersistentVolumes(t *testing.T) {
 				PersistentVolumeSource: api.PersistentVolumeSource{
 					HostPath: &api.HostPathVolumeSource{Path: "/foo"},
 				},
+				StorageClassName: "valid",
 			}),
 		},
 		"good-volume-with-retain-policy": {
@@ -205,6 +206,19 @@ func TestValidatePersistentVolumes(t *testing.T) {
 				PersistentVolumeReclaimPolicy: api.PersistentVolumeReclaimRecycle,
 			}),
 		},
+		"invalid-storage-class-name": {
+			isExpectedFailure: true,
+			volume: testVolume("invalid-storage-class-name", "", api.PersistentVolumeSpec{
+				Capacity: api.ResourceList{
+					api.ResourceName(api.ResourceStorage): resource.MustParse("10G"),
+				},
+				AccessModes: []api.PersistentVolumeAccessMode{api.ReadWriteOnce},
+				PersistentVolumeSource: api.PersistentVolumeSource{
+					HostPath: &api.HostPathVolumeSource{Path: "/foo"},
+				},
+				StorageClassName: "-invalid-",
+			}),
+		},
 	}
 
 	for name, scenario := range scenarios {
@@ -257,6 +271,8 @@ func testVolumeClaimAnnotation(name string, namespace string, ann string, annval
 }
 
 func TestValidatePersistentVolumeClaim(t *testing.T) {
+	invalidClassName := "-invalid-"
+	validClassName := "valid"
 	scenarios := map[string]struct {
 		isExpectedFailure bool
 		claim             *api.PersistentVolumeClaim
@@ -281,6 +297,7 @@ func TestValidatePersistentVolumeClaim(t *testing.T) {
 						api.ResourceName(api.ResourceStorage): resource.MustParse("10G"),
 					},
 				},
+				StorageClassName: &validClassName,
 			}),
 		},
 		"invalid-label-selector": {
@@ -382,6 +399,29 @@ func TestValidatePersistentVolumeClaim(t *testing.T) {
 						api.ResourceName(api.ResourceStorage): resource.MustParse("-10G"),
 					},
 				},
+			}),
+		},
+		"invalid-storage-class-name": {
+			isExpectedFailure: true,
+			claim: testVolumeClaim("foo", "ns", api.PersistentVolumeClaimSpec{
+				Selector: &metav1.LabelSelector{
+					MatchExpressions: []metav1.LabelSelectorRequirement{
+						{
+							Key:      "key2",
+							Operator: "Exists",
+						},
+					},
+				},
+				AccessModes: []api.PersistentVolumeAccessMode{
+					api.ReadWriteOnce,
+					api.ReadOnlyMany,
+				},
+				Resources: api.ResourceRequirements{
+					Requests: api.ResourceList{
+						api.ResourceName(api.ResourceStorage): resource.MustParse("10G"),
+					},
+				},
+				StorageClassName: &invalidClassName,
 			}),
 		},
 	}
