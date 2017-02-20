@@ -39,7 +39,73 @@ func ConfFromFile(filename string) (*NetworkConfig, error) {
 	return ConfFromBytes(bytes)
 }
 
-func ConfFiles(dir string) ([]string, error) {
+func ConfListFromBytes(bytes []byte) (*NetworkConfigList, error) {
+	rawList := make(map[string]interface{})
+	if err := json.Unmarshal(bytes, &rawList); err != nil {
+		return nil, fmt.Errorf("error parsing configuration list: %s", err)
+	}
+
+	rawName, ok := rawList["name"]
+	if !ok {
+		return nil, fmt.Errorf("error parsing configuration list: no name")
+	}
+	name, ok := rawName.(string)
+	if !ok {
+		return nil, fmt.Errorf("error parsing configuration list: invalid name type %T", rawName)
+	}
+
+	var cniVersion string
+	rawVersion, ok := rawList["cniVersion"]
+	if ok {
+		cniVersion, ok = rawVersion.(string)
+		if !ok {
+			return nil, fmt.Errorf("error parsing configuration list: invalid cniVersion type %T", rawVersion)
+		}
+	}
+
+	list := &NetworkConfigList{
+		Name:       name,
+		CNIVersion: cniVersion,
+		Bytes:      bytes,
+	}
+
+	var plugins []interface{}
+	plug, ok := rawList["plugins"]
+	if !ok {
+		return nil, fmt.Errorf("error parsing configuration list: no 'plugins' key")
+	}
+	plugins, ok = plug.([]interface{})
+	if !ok {
+		return nil, fmt.Errorf("error parsing configuration list: invalid 'plugins' type %T", plug)
+	}
+	if len(plugins) == 0 {
+		return nil, fmt.Errorf("error parsing configuration list: no plugins in list")
+	}
+
+	for i, conf := range plugins {
+		newBytes, err := json.Marshal(conf)
+		if err != nil {
+			return nil, fmt.Errorf("Failed to marshal plugin config %d: %v", i, err)
+		}
+		netConf, err := ConfFromBytes(newBytes)
+		if err != nil {
+			return nil, fmt.Errorf("Failed to parse plugin config %d: %v", i, err)
+		}
+		list.Plugins = append(list.Plugins, netConf)
+	}
+
+	return list, nil
+}
+
+func ConfListFromFile(filename string) (*NetworkConfigList, error) {
+	bytes, err := ioutil.ReadFile(filename)
+	if err != nil {
+		return nil, fmt.Errorf("error reading %s: %s", filename, err)
+	}
+	return ConfListFromBytes(bytes)
+}
+
+func ConfFiles(dir string, extensions []string) ([]string, error) {
 	// In part, adapted from rkt/networking/podenv.go#listFiles
 	files, err := ioutil.ReadDir(dir)
 	switch {
@@ -55,15 +121,18 @@ func ConfFiles(dir string) ([]string, error) {
 		if f.IsDir() {
 			continue
 		}
-		if filepath.Ext(f.Name()) == ".conf" {
-			confFiles = append(confFiles, filepath.Join(dir, f.Name()))
+		fileExt := filepath.Ext(f.Name())
+		for _, ext := range extensions {
+			if fileExt == ext {
+				confFiles = append(confFiles, filepath.Join(dir, f.Name()))
+			}
 		}
 	}
 	return confFiles, nil
 }
 
 func LoadConf(dir, name string) (*NetworkConfig, error) {
-	files, err := ConfFiles(dir)
+	files, err := ConfFiles(dir, []string{".conf", ".json"})
 	switch {
 	case err != nil:
 		return nil, err
@@ -82,6 +151,28 @@ func LoadConf(dir, name string) (*NetworkConfig, error) {
 		}
 	}
 	return nil, fmt.Errorf(`no net configuration with name "%s" in %s`, name, dir)
+}
+
+func LoadConfList(dir, name string) (*NetworkConfigList, error) {
+	files, err := ConfFiles(dir, []string{".conflist"})
+	switch {
+	case err != nil:
+		return nil, err
+	case len(files) == 0:
+		return nil, fmt.Errorf("no net configuration lists found")
+	}
+	sort.Strings(files)
+
+	for _, confFile := range files {
+		conf, err := ConfListFromFile(confFile)
+		if err != nil {
+			return nil, err
+		}
+		if conf.Name == name {
+			return conf, nil
+		}
+	}
+	return nil, fmt.Errorf(`no net configuration list with name "%s" in %s`, name, dir)
 }
 
 func InjectConf(original *NetworkConfig, key string, newValue interface{}) (*NetworkConfig, error) {
