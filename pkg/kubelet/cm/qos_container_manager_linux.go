@@ -113,6 +113,7 @@ func (m *qosContainerManagerImpl) Start(nodeInfo *v1.Node, getPods func() []*v1.
 	// resoruce limit and we are wanting to put continuous downward
 	// pressure on the cgroup such that we can eventually get to the
 	// desired limit.
+	// It is also needed to handle restore/recovery.
 	go wait.Until(func() {
 		err := m.UpdateReserve()
 		if err != nil {
@@ -123,7 +124,37 @@ func (m *qosContainerManagerImpl) Start(nodeInfo *v1.Node, getPods func() []*v1.
 	return nil
 }
 
-// setMemoryReserve sums the memory limits of all pods in a QOS class,
+// setCPUReserve sets the cpu shares for each qos tier
+func (m *qosContainerManagerImpl) setCPUReserve(configs map[v1.PodQOSClass]*CgroupConfig) error {
+	pods := m.getPods()
+	burstablePodCPURequest := int64(0)
+	for i := range pods {
+		pod := pods[i]
+		qosClass := qos.GetPodQOS(pod)
+		if qosClass != v1.PodQOSBurstable {
+			// we only care about the burstable qos tier
+			continue
+		}
+		for _, container := range pod.Spec.Containers {
+			if request, found := container.Resources.Requests[v1.ResourceCPU]; found {
+				burstablePodCPURequest += request.MilliValue()
+			}
+		}
+	}
+	// make sure best effort is always 2 shares
+	bestEffortCPUShares := int64(MinShares)
+	configs[v1.PodQOSBestEffort].ResourceParameters.CpuShares = &bestEffortCPUShares
+
+	// set burstable shares based on current observe state
+	burstableCPUShares := MilliCPUToShares(burstablePodCPURequest)
+	if burstableCPUShares < int64(MinShares) {
+		burstableCPUShares = int64(MinShares)
+	}
+	configs[v1.PodQOSBurstable].ResourceParameters.CpuShares = &burstableCPUShares
+	return nil
+}
+
+// setMemoryReserve sums the memory requests of all pods in a QOS class,
 // calculates QOS class memory limits, and set those limits in the
 // CgroupConfig for each QOS class.
 func (m *qosContainerManagerImpl) setMemoryReserve(configs map[v1.PodQOSClass]*CgroupConfig, percentReserve int64) error {
@@ -194,10 +225,6 @@ func (m *qosContainerManagerImpl) retrySetMemoryReserve(configs map[v1.PodQOSCla
 }
 
 func (m *qosContainerManagerImpl) UpdateReserve() error {
-	if len(m.QOSReserveRequests) == 0 {
-		return nil
-	}
-
 	qosConfigs := map[v1.PodQOSClass]*CgroupConfig{
 		v1.PodQOSBurstable: &CgroupConfig{
 			Name:               CgroupName(m.qosContainersInfo.Burstable),
@@ -209,12 +236,17 @@ func (m *qosContainerManagerImpl) UpdateReserve() error {
 		},
 	}
 
+	if err := m.setCPUReserve(qosConfigs); err != nil {
+		return err
+	}
+
 	for resource, percentReserve := range m.QOSReserveRequests {
 		switch resource {
 		case v1.ResourceMemory:
 			m.setMemoryReserve(qosConfigs, percentReserve)
 		}
 	}
+
 	updateSuccess := true
 	for _, config := range qosConfigs {
 		err := m.cgroupManager.Update(config)
