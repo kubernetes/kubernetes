@@ -17,6 +17,8 @@ limitations under the License.
 package v1beta1
 
 import (
+	"fmt"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -39,7 +41,7 @@ type CertificateSigningRequest struct {
 }
 
 // This information is immutable after the request is created. Only the Request
-// and ExtraInfo fields can be set on creation, other fields are derived by
+// and Usages fields can be set on creation, other fields are derived by
 // Kubernetes and cannot be modified by users.
 type CertificateSigningRequestSpec struct {
 	// Base64-encoded PKCS#10 CSR data
@@ -51,14 +53,31 @@ type CertificateSigningRequestSpec struct {
 	//      https://tools.ietf.org/html/rfc5280#section-4.2.1.12
 	Usages []KeyUsage `json:"usages,omitempty" protobuf:"bytes,5,opt,name=keyUsage"`
 
-	// Information about the requesting user (if relevant)
-	// See user.Info interface for details
+	// Information about the requesting user.
+	// See user.Info interface for details.
 	// +optional
 	Username string `json:"username,omitempty" protobuf:"bytes,2,opt,name=username"`
+	// UID information about the requesting user.
+	// See user.Info interface for details.
 	// +optional
 	UID string `json:"uid,omitempty" protobuf:"bytes,3,opt,name=uid"`
+	// Group information about the requesting user.
+	// See user.Info interface for details.
 	// +optional
 	Groups []string `json:"groups,omitempty" protobuf:"bytes,4,rep,name=groups"`
+	// Extra information about the requesting user.
+	// See user.Info interface for details.
+	// +optional
+	Extra map[string]ExtraValue `json:"extra,omitempty" protobuf:"bytes,6,rep,name=extra"`
+}
+
+// ExtraValue masks the value so protobuf can generate
+// +protobuf.nullable=true
+// +protobuf.options.(gogoproto.goproto_stringer)=false
+type ExtraValue []string
+
+func (t ExtraValue) String() string {
+	return fmt.Sprintf("%v", []string(t))
 }
 
 type CertificateSigningRequestStatus struct {
