@@ -35,12 +35,6 @@
 					{
 						"name": "logs-volume",
 						"hostPath": {
-							"path": "/var/logs"
-						}
-					},
-					{
-						"name": "kernellog-volume",
-						"hostPath": {
 							"path": "/var/log"
 						}
 					},
@@ -80,7 +74,7 @@
 					"command": [
 						"/bin/sh",
 						"-c",
-						"./kubemark.sh --morph=kubelet --name=$(NODE_NAME) --kubeconfig=/kubeconfig/kubelet.kubeconfig $(CONTENT_TYPE) --v=2 1>>/var/logs/kubelet_$(NODE_NAME).log 2>&1"
+						"./kubemark.sh --morph=kubelet --name=$(NODE_NAME) --kubeconfig=/kubeconfig/kubelet.kubeconfig $(CONTENT_TYPE) --v=2 1>>/var/log/kubelet-$(NODE_NAME).log 2>&1"
 					],
 					"volumeMounts": [
 						{
@@ -90,7 +84,7 @@
 						},
 						{
 							"name": "logs-volume",
-							"mountPath": "/var/logs"
+							"mountPath": "/var/log"
 						}
 					],
 					"resources": {
@@ -129,7 +123,7 @@
 					"command": [
 						"/bin/sh",
 						"-c",
-						"./kubemark.sh --morph=proxy --name=$(NODE_NAME) --kubeconfig=/kubeconfig/kubeproxy.kubeconfig $(CONTENT_TYPE) --v=2 1>>/var/logs/kubeproxy_$(NODE_NAME).log 2>&1"
+						"./kubemark.sh --morph=proxy --name=$(NODE_NAME) --kubeconfig=/kubeconfig/kubeproxy.kubeconfig $(CONTENT_TYPE) --v=2 1>>/var/log/kubeproxy-$(NODE_NAME).log 2>&1"
 					],
 					"volumeMounts": [
 						{
@@ -139,7 +133,7 @@
 						},
 						{
 							"name": "logs-volume",
-							"mountPath": "/var/logs"
+							"mountPath": "/var/log"
 						}
 					],
 					"resources": {
@@ -167,7 +161,7 @@
 						"--kernel-monitor=/config/kernel.monitor",
 						"--apiserver-override=https://{{master_ip}}:443?inClusterConfig=false&auth=/kubeconfig/npd.kubeconfig",
 						"--alsologtostderr",
-						"1>>/var/logs/npd_$(NODE_NAME).log 2>&1"
+						"1>>/var/log/npd-$(NODE_NAME).log 2>&1"
 					],
 					"volumeMounts": [
 						{
@@ -181,18 +175,13 @@
 							"readOnly": true
 						},
 						{
-							"name": "kernellog-volume",
-							"mountPath": "/log",
-							"readOnly": true
-						},
-						{
 							"name": "no-serviceaccount-access-to-real-master",
 							"mountPath": "/var/run/secrets/kubernetes.io/serviceaccount",
 							"readOnly": true
 						},
 						{
 							"name": "logs-volume",
-							"mountPath": "/var/logs"
+							"mountPath": "/var/log"
 						}
 					],
 					"resources": {
