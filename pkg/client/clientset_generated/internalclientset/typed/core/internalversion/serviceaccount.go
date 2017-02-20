@@ -131,8 +131,8 @@ func (c *serviceAccounts) List(opts v1.ListOptions) (result *api.ServiceAccountL
 
 // Watch returns a watch.Interface that watches the requested serviceAccounts.
 func (c *serviceAccounts) Watch(opts v1.ListOptions) (watch.Interface, error) {
+	opts.Watch = true
 	return c.client.Get().
-		Prefix("watch").
 		Namespace(c.ns).
 		Resource("serviceaccounts").
 		VersionedParams(&opts, api.ParameterCodec).
