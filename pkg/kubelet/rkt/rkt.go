@@ -1116,7 +1116,7 @@ func (r *Runtime) getSelinuxContext(opt *v1.SELinuxOptions) (string, error) {
 	return strings.Join(ctx, ":"), nil
 }
 
-// From the generateName or the podName return a basename for improve the logging with the Journal
+// From the generateName or the podName return a basename for improving the logging with the Journal
 // journalctl -t podBaseName
 func constructSyslogIdentifier(generateName string, podName string) string {
 	if (len(generateName) > 1 && generateName[len(generateName) - 1] == '-') {
