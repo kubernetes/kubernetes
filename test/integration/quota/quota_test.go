@@ -85,7 +85,7 @@ func TestQuota(t *testing.T) {
 	defer close(controllerCh)
 
 	informers := informers.NewSharedInformerFactory(clientset, controller.NoResyncPeriodFunc())
-	rm := replicationcontroller.NewReplicationManager(
+	rm := replicationcontroller.NewReplicationController(
 		informers.Core().V1().Pods(),
 		informers.Core().V1().ReplicationControllers(),
 		clientset,

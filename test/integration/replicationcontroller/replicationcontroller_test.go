@@ -123,7 +123,7 @@ func verifyRemainingObjects(t *testing.T, clientSet clientset.Interface, namespa
 	return ret, nil
 }
 
-func rmSetup(t *testing.T, stopCh chan struct{}, enableGarbageCollector bool) (*httptest.Server, *replication.ReplicationManager, informers.SharedInformerFactory, clientset.Interface) {
+func rmSetup(t *testing.T, stopCh chan struct{}, enableGarbageCollector bool) (*httptest.Server, *replication.ReplicationController, informers.SharedInformerFactory, clientset.Interface) {
 	masterConfig := framework.NewIntegrationTestMasterConfig()
 	_, s := framework.RunAMaster(masterConfig)
 
@@ -135,7 +135,7 @@ func rmSetup(t *testing.T, stopCh chan struct{}, enableGarbageCollector bool) (*
 	resyncPeriod := 12 * time.Hour
 
 	informers := informers.NewSharedInformerFactory(clientSet, resyncPeriod)
-	rm := replication.NewReplicationManager(informers.Core().V1().Pods(), informers.Core().V1().ReplicationControllers(), clientSet, replication.BurstReplicas, 4096, enableGarbageCollector)
+	rm := replication.NewReplicationController(informers.Core().V1().Pods(), informers.Core().V1().ReplicationControllers(), clientSet, replication.BurstReplicas, 4096, enableGarbageCollector)
 	informers.Start(stopCh)
 
 	return s, rm, informers, clientSet

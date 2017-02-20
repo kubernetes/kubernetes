@@ -54,7 +54,7 @@ func startEndpointController(ctx ControllerContext) (bool, error) {
 }
 
 func startReplicationController(ctx ControllerContext) (bool, error) {
-	go replicationcontroller.NewReplicationManager(
+	go replicationcontroller.NewReplicationController(
 		ctx.NewInformerFactory.Core().V1().Pods(),
 		ctx.NewInformerFactory.Core().V1().ReplicationControllers(),
 		ctx.ClientBuilder.ClientOrDie("replication-controller"),

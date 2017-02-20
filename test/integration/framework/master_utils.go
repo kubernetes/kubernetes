@@ -96,7 +96,7 @@ type MasterComponents struct {
 	// Restclient used to talk to the kubernetes master
 	ClientSet clientset.Interface
 	// Replication controller manager
-	ControllerManager *replicationcontroller.ReplicationManager
+	ControllerManager *replicationcontroller.ReplicationController
 	// Channel for stop signals to rc manager
 	rcStopCh chan struct{}
 	// Used to stop master components individually, and via MasterComponents.Stop
@@ -106,8 +106,8 @@ type MasterComponents struct {
 // Config is a struct of configuration directives for NewMasterComponents.
 type Config struct {
 	// If nil, a default is used, partially filled configs will not get populated.
-	MasterConfig            *master.Config
-	StartReplicationManager bool
+	MasterConfig               *master.Config
+	StartReplicationController bool
 	// Client throttling qps
 	QPS float32
 	// Client burst qps, also burst replicas allowed in rc manager
@@ -124,11 +124,11 @@ func NewMasterComponents(c *Config) *MasterComponents {
 	clientset := clientset.NewForConfigOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &api.Registry.GroupOrDie(v1.GroupName).GroupVersion}, QPS: c.QPS, Burst: c.Burst})
 	rcStopCh := make(chan struct{})
 	informerFactory := informers.NewSharedInformerFactory(clientset, controller.NoResyncPeriodFunc())
-	controllerManager := replicationcontroller.NewReplicationManager(informerFactory.Core().V1().Pods(), informerFactory.Core().V1().ReplicationControllers(), clientset, c.Burst, 4096, false)
+	controllerManager := replicationcontroller.NewReplicationController(informerFactory.Core().V1().Pods(), informerFactory.Core().V1().ReplicationControllers(), clientset, c.Burst, 4096, false)
 
 	// TODO: Support events once we can cleanly shutdown an event recorder.
 	controllerManager.SetEventRecorder(&record.FakeRecorder{})
-	if c.StartReplicationManager {
+	if c.StartReplicationController {
 		informerFactory.Start(rcStopCh)
 		go controllerManager.Run(goruntime.NumCPU(), rcStopCh)
 	}
