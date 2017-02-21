@@ -630,7 +630,7 @@ upgrade-image
 upgrade-target
 use-service-account-credentials
 use-kubernetes-cluster-service
-use-kubernetes-version
+kubernetes-version
 user-whitelist
 verb
 verify-only
