@@ -548,6 +548,75 @@ func TestKnownTypes(t *testing.T) {
 	}
 }
 
+func TestAddKnownTypesIdemPotent(t *testing.T) {
+	s := runtime.NewScheme()
+
+	gv := schema.GroupVersion{Group: "foo", Version: "v1"}
+	s.AddKnownTypes(gv, &InternalSimple{})
+	s.AddKnownTypes(gv, &InternalSimple{})
+	if len(s.KnownTypes(gv)) != 1 {
+		t.Errorf("expected only one %v type after double registration", gv)
+	}
+	if len(s.AllKnownTypes()) != 1 {
+		t.Errorf("expected only one type after double registration")
+	}
+
+	s.AddKnownTypeWithName(gv.WithKind("InternalSimple"), &InternalSimple{})
+	s.AddKnownTypeWithName(gv.WithKind("InternalSimple"), &InternalSimple{})
+	if len(s.KnownTypes(gv)) != 1 {
+		t.Errorf("expected only one %v type after double registration with custom name", gv)
+	}
+	if len(s.AllKnownTypes()) != 1 {
+		t.Errorf("expected only one type after double registration with custom name")
+	}
+
+	s.AddUnversionedTypes(gv, &InternalSimple{})
+	if len(s.KnownTypes(gv)) != 1 {
+		t.Errorf("expected only one %v type after double registration with custom name", gv)
+	}
+	if len(s.AllKnownTypes()) != 1 {
+		t.Errorf("expected only one type after double registration with custom name")
+	}
+
+	kinds, _, err := s.ObjectKinds(&InternalSimple{})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(kinds) != 1 {
+		t.Errorf("expected only one kind for InternalSimple after double registration", gv)
+	}
+}
+
+func TestConflictingAddKnownTypes(t *testing.T) {
+	s := runtime.NewScheme()
+	gv := schema.GroupVersion{Group: "foo", Version: "v1"}
+
+	panicked := func() (ret bool) {
+		defer func() {
+			recover()
+			ret = true
+		}()
+		s.AddKnownTypeWithName(gv.WithKind("InternalSimple"), &InternalSimple{})
+		s.AddKnownTypeWithName(gv.WithKind("InternalSimple"), &ExternalSimple{})
+		return false
+	}()
+	if !panicked {
+		t.Errorf("Expected AddKnownTypesWithName to panic with conflicting type registrations")
+	}
+
+	panicked = func() (ret bool) {
+		defer func() {
+			recover()
+			ret = true
+		}()
+		s.AddUnversionedTypes(gv, &InternalSimple{})
+		return false
+	}()
+	if !panicked {
+		t.Errorf("Expected AddUnversionedTypes to panic with conflicting type registrations")
+	}
+}
+
 func TestConvertToVersionBasic(t *testing.T) {
 	s := GetTestScheme()
 	tt := &TestType1{A: "I'm not a pointer object"}
