@@ -207,9 +207,7 @@ func deleteAllIngressesOrFail(clientset *fedclientset.Clientset, nsName string) 
 	Expect(err).NotTo(HaveOccurred(), fmt.Sprintf("Error in deleting ingresses in namespace: %s", nsName))
 }
 
-/*
-   equivalent returns true if the two ingress spec are equivalent.
-*/
+// equivalent returns true if the two ingress spec are equivalent.
 func equivalentIngress(federatedIngress, clusterIngress v1beta1.Ingress) bool {
 	return reflect.DeepEqual(clusterIngress.Spec, federatedIngress.Spec)
 }
@@ -244,10 +242,8 @@ func verifyCascadingDeletionForIngress(clientset *fedclientset.Clientset, cluste
 	}
 }
 
-/*
-   waitForIngressOrFail waits until a ingress is either present or absent in the cluster specified by clientset.
-   If the condition is not met within timout, it fails the calling test.
-*/
+// waitForIngressOrFail waits until a ingress is either present or absent in the cluster specified by clientset.
+// If the condition is not met within timout, it fails the calling test.
 func waitForIngressOrFail(clientset *kubeclientset.Clientset, namespace string, ingress *v1beta1.Ingress, present bool, timeout time.Duration) {
 	By(fmt.Sprintf("Fetching a federated ingress shard of ingress %q in namespace %q from cluster", ingress.Name, namespace))
 	var clusterIngress *v1beta1.Ingress
@@ -271,9 +267,7 @@ func waitForIngressOrFail(clientset *kubeclientset.Clientset, namespace string, 
 	}
 }
 
-/*
-   waitForIngressShardsOrFail waits for the ingress to appear in all clusters
-*/
+// waitForIngressShardsOrFail waits for the ingress to appear in all clusters
 func waitForIngressShardsOrFail(namespace string, ingress *v1beta1.Ingress, clusters map[string]*cluster) {
 	framework.Logf("Waiting for ingress %q in %d clusters", ingress.Name, len(clusters))
 	for _, c := range clusters {
@@ -281,9 +275,7 @@ func waitForIngressShardsOrFail(namespace string, ingress *v1beta1.Ingress, clus
 	}
 }
 
-/*
-   waitForIngressShardsUpdatedOrFail waits for the ingress to be updated in all clusters
-*/
+// waitForIngressShardsUpdatedOrFail waits for the ingress to be updated in all clusters
 func waitForIngressShardsUpdatedOrFail(namespace string, ingress *v1beta1.Ingress, clusters map[string]*cluster) {
 	framework.Logf("Waiting for ingress %q in %d clusters", ingress.Name, len(clusters))
 	for _, c := range clusters {
@@ -291,10 +283,8 @@ func waitForIngressShardsUpdatedOrFail(namespace string, ingress *v1beta1.Ingres
 	}
 }
 
-/*
-   waitForIngressUpdateOrFail waits until a ingress is updated in the specified cluster with same spec of federated ingress.
-   If the condition is not met within timeout, it fails the calling test.
-*/
+// waitForIngressUpdateOrFail waits until a ingress is updated in the specified cluster with same spec of federated ingress.
+// If the condition is not met within timeout, it fails the calling test.
 func waitForIngressUpdateOrFail(clientset *kubeclientset.Clientset, namespace string, ingress *v1beta1.Ingress, timeout time.Duration) {
 	By(fmt.Sprintf("Fetching a federated ingress shard of ingress %q in namespace %q from cluster", ingress.Name, namespace))
 	err := wait.PollImmediate(framework.Poll, timeout, func() (bool, error) {
@@ -313,9 +303,7 @@ func waitForIngressUpdateOrFail(clientset *kubeclientset.Clientset, namespace st
 	framework.ExpectNoError(err, "Failed to verify ingress %q in namespace %q in cluster", ingress.Name, namespace)
 }
 
-/*
-   waitForIngressShardsGoneOrFail waits for the ingress to disappear in all clusters
-*/
+// waitForIngressShardsGoneOrFail waits for the ingress to disappear in all clusters
 func waitForIngressShardsGoneOrFail(namespace string, ingress *v1beta1.Ingress, clusters map[string]*cluster) {
 	framework.Logf("Waiting for ingress %q in %d clusters", ingress.Name, len(clusters))
 	for _, c := range clusters {
