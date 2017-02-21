@@ -1069,7 +1069,7 @@ func TestListObjectWithDifferentVersions(t *testing.T) {
 func TestWatch(t *testing.T) {
 	_, svc := testData()
 	w, err := NewBuilder(testapi.Default.RESTMapper(), api.Scheme, fakeClientWith("", t, map[string]string{
-		"/namespaces/test/services?fieldSelector=metadata.name%3Dredis-master&resourceVersion=12&watch=true": watchBody(watch.Event{
+		"/watch/namespaces/test/services/redis-master?resourceVersion=12": watchBody(watch.Event{
 			Type:   watch.Added,
 			Object: &svc.Items[0],
 		}),
