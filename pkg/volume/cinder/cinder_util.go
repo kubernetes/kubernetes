@@ -165,13 +165,13 @@ func (util *CinderDiskUtil) CreateVolume(c *cinderVolumeProvisioner) (volumeID s
 		return "", 0, fmt.Errorf("claim.Spec.Selector is not supported for dynamic provisioning on Cinder")
 	}
 
-	name, err = cloud.CreateVolume(name, volSizeGB, vtype, availability, c.options.CloudTags)
+	volumeID, err = cloud.CreateVolume(name, volSizeGB, vtype, availability, c.options.CloudTags)
 	if err != nil {
 		glog.V(2).Infof("Error creating cinder volume: %v", err)
 		return "", 0, err
 	}
-	glog.V(2).Infof("Successfully created cinder volume %s", name)
-	return name, volSizeGB, nil
+	glog.V(2).Infof("Successfully created cinder volume %s", volumeID)
+	return volumeID, volSizeGB, nil
 }
 
 func probeAttachedVolume() error {

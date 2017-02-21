@@ -44,15 +44,15 @@ func ProbeVolumePlugins() []volume.VolumePlugin {
 }
 
 type CinderProvider interface {
-	AttachDisk(instanceID string, diskName string) (string, error)
-	DetachDisk(instanceID string, partialDiskId string) error
-	DeleteVolume(volumeName string) error
-	CreateVolume(name string, size int, vtype, availability string, tags *map[string]string) (volumeName string, err error)
-	GetDevicePath(diskId string) string
+	AttachDisk(instanceID, volumeID string) (string, error)
+	DetachDisk(instanceID, volumeID string) error
+	DeleteVolume(volumeID string) error
+	CreateVolume(name string, size int, vtype, availability string, tags *map[string]string) (volumeID string, err error)
+	GetDevicePath(volumeID string) string
 	InstanceID() (string, error)
-	GetAttachmentDiskPath(instanceID string, diskName string) (string, error)
-	DiskIsAttached(diskName, instanceID string) (bool, error)
-	DisksAreAttached(diskNames []string, instanceID string) (map[string]bool, error)
+	GetAttachmentDiskPath(instanceID, volumeID string) (string, error)
+	DiskIsAttached(instanceID, volumeID string) (bool, error)
+	DisksAreAttached(instanceID string, volumeIDs []string) (map[string]bool, error)
 	ShouldTrustDevicePath() bool
 	Instances() (cloudprovider.Instances, bool)
 }
@@ -262,8 +262,6 @@ type cinderVolume struct {
 	pdName string
 	// Filesystem type, optional.
 	fsType string
-	// Specifies the partition to mount
-	//partition string
 	// Specifies whether the disk will be attached as read-only.
 	readOnly bool
 	// Utility interface that provides API calls to the provider to attach/detach disks.
