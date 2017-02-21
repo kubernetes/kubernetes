@@ -22,6 +22,7 @@ package app
 import (
 	"crypto/tls"
 	"fmt"
+	"io/ioutil"
 	"net"
 	"net/http"
 	"net/url"
@@ -314,8 +315,25 @@ func Run(s *options.ServerRunOptions) error {
 		return err
 	}
 
+	clientCA, err := readCAIfPresent(s.Authentication.ClientCert.ClientCA)
+	if err != nil {
+		return err
+	}
+	requestHeaderProxyCA, err := readCAIfPresent(s.Authentication.RequestHeader.ClientCAFile)
+	if err != nil {
+		return err
+	}
 	config := &master.Config{
 		GenericConfig: genericConfig,
+
+		ClientCARegistrationHook: master.ClientCARegistrationHook{
+			ClientCA:                         clientCA,
+			RequestHeaderUsernameHeaders:     s.Authentication.RequestHeader.UsernameHeaders,
+			RequestHeaderGroupHeaders:        s.Authentication.RequestHeader.GroupHeaders,
+			RequestHeaderExtraHeaderPrefixes: s.Authentication.RequestHeader.ExtraHeaderPrefixes,
+			RequestHeaderCA:                  requestHeaderProxyCA,
+			RequestHeaderAllowedNames:        s.Authentication.RequestHeader.AllowedNames,
+		},
 
 		APIResourceConfigSource: storageFactory.APIResourceConfigSource,
 		StorageFactory:          storageFactory,
@@ -352,6 +370,13 @@ func Run(s *options.ServerRunOptions) error {
 	sharedInformers.Start(wait.NeverStop)
 	m.GenericAPIServer.PrepareRun().Run(wait.NeverStop)
 	return nil
+}
+
+func readCAIfPresent(file string) ([]byte, error) {
+	if len(file) == 0 {
+		return nil, nil
+	}
+	return ioutil.ReadFile(file)
 }
 
 // PostProcessSpec adds removed definitions for backward compatibility
