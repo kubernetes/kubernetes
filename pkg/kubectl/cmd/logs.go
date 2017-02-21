@@ -80,7 +80,8 @@ type LogsOptions struct {
 	Decoder      runtime.Decoder
 
 	Object        runtime.Object
-	LogsForObject func(object, options runtime.Object) (*restclient.Request, error)
+	GetPodTimeout time.Duration
+	LogsForObject func(object, options runtime.Object, timeout time.Duration) (*restclient.Request, error)
 
 	Out io.Writer
 }
@@ -100,7 +101,7 @@ func NewCmdLogs(f cmdutil.Factory, out io.Writer) *cobra.Command {
 		},
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(o.Complete(f, out, cmd, args))
-			cmdutil.CheckErr(o.Validate())
+			cmdutil.CheckErr(o.Validate(cmd))
 			cmdutil.CheckErr(o.RunLogs())
 		},
 		Aliases: []string{"log"},
@@ -113,10 +114,10 @@ func NewCmdLogs(f cmdutil.Factory, out io.Writer) *cobra.Command {
 	cmd.Flags().String("since-time", "", i18n.T("Only return logs after a specific date (RFC3339). Defaults to all logs. Only one of since-time / since may be used."))
 	cmd.Flags().Duration("since", 0, "Only return logs newer than a relative duration like 5s, 2m, or 3h. Defaults to all logs. Only one of since-time / since may be used.")
 	cmd.Flags().StringP("container", "c", "", "Print the logs of this container")
-
 	cmd.Flags().Bool("interactive", false, "If true, prompt the user for input when required.")
 	cmd.Flags().MarkDeprecated("interactive", "This flag is no longer respected and there is no replacement.")
 	cmdutil.AddInclude3rdPartyFlags(cmd)
+	cmdutil.AddPodRunningTimeoutFlag(cmd, defaultPodLogsTimeout)
 	cmd.Flags().StringP("selector", "l", "", "Selector (label query) to filter on.")
 	return cmd
 }
@@ -215,7 +216,7 @@ func (o *LogsOptions) Complete(f cmdutil.Factory, out io.Writer, cmd *cobra.Comm
 	return nil
 }
 
-func (o LogsOptions) Validate() error {
+func (o LogsOptions) Validate(cmd *cobra.Command) error {
 	logsOptions, ok := o.Options.(*api.PodLogOptions)
 	if !ok {
 		return errors.New("unexpected logs options object")
@@ -224,6 +225,11 @@ func (o LogsOptions) Validate() error {
 		return errs.ToAggregate()
 	}
 
+	var err error
+	o.GetPodTimeout, err = cmdutil.GetPodRunningTimoutFlag(cmd)
+	if err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -243,7 +249,7 @@ func (o LogsOptions) RunLogs() error {
 }
 
 func (o LogsOptions) getLogs(obj runtime.Object) error {
-	req, err := o.LogsForObject(obj, o.Options)
+	req, err := o.LogsForObject(obj, o.Options, o.GetPodTimeout)
 	if err != nil {
 		return err
 	}

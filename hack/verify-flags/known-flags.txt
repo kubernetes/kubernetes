@@ -516,6 +516,7 @@ pod-infra-container-image
 pod-manifest-path
 pod-network-cidr
 pod-running
+pod-running-timeout
 pods-per-core
 policy-config-file
 poll-interval

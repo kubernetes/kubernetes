@@ -31,6 +31,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/fake"
+	"time"
 )
 
 type fakeClientAccessFactory struct {
@@ -146,7 +147,7 @@ func TestLogsForObject(t *testing.T) {
 	for _, test := range tests {
 		caf := newFakeClientAccessFactory(test.pods)
 		omf := NewObjectMappingFactory(caf)
-		_, err := omf.LogsForObject(test.obj, test.opts)
+		_, err := omf.LogsForObject(test.obj, test.opts, 20*time.Second)
 		if err != nil {
 			t.Errorf("%s: unexpected error: %v", test.name, err)
 			continue
