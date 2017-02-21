@@ -21,6 +21,7 @@ import (
 	"io"
 	"os"
 	"path"
+	"time"
 
 	"github.com/spf13/cobra"
 
@@ -46,6 +47,7 @@ func NewCmdClusterInfoDump(f cmdutil.Factory, cmdOut io.Writer) *cobra.Command {
 	cmd.Flags().String("output-directory", "", "Where to output the files.  If empty or '-' uses stdout, otherwise creates a directory hierarchy in that directory")
 	cmd.Flags().StringSlice("namespaces", []string{}, "A comma separated list of namespaces to dump.")
 	cmd.Flags().Bool("all-namespaces", false, "If true, dump all namespaces.  If true, --namespaces is ignored.")
+	cmd.Flags().Int64("get-pod-timeout", 20, "Specify the timeout (in seconds) of get first pod")
 	return cmd
 }
 
@@ -88,6 +90,11 @@ func setupOutputWriter(cmd *cobra.Command, defaultWriter io.Writer, filename str
 }
 
 func dumpClusterInfo(f cmdutil.Factory, cmd *cobra.Command, args []string, out io.Writer) error {
+	timeout := cmdutil.GetFlagInt64(cmd, "get-pod-timeout")
+	if timeout == 0 {
+		return fmt.Errorf("get-pod-timeout can not be 0")
+	}
+
 	clientset, err := f.ClientSet()
 	if err != nil {
 		return err
@@ -193,7 +200,7 @@ func dumpClusterInfo(f cmdutil.Factory, cmd *cobra.Command, args []string, out i
 			pod := &pods.Items[ix]
 			writer := setupOutputWriter(cmd, out, path.Join(namespace, pod.Name, "logs.txt"))
 			writer.Write([]byte(fmt.Sprintf("==== START logs for %s/%s ====\n", pod.Namespace, pod.Name)))
-			request, err := f.LogsForObject(pod, &api.PodLogOptions{})
+			request, err := f.LogsForObject(pod, &api.PodLogOptions{}, time.Second*time.Duration(timeout))
 			if err != nil {
 				return err
 			}

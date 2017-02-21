@@ -74,7 +74,8 @@ type LogsOptions struct {
 	Decoder      runtime.Decoder
 
 	Object        runtime.Object
-	LogsForObject func(object, options runtime.Object) (*restclient.Request, error)
+	GetPodTimeOut int64
+	LogsForObject func(object, options runtime.Object, timeout time.Duration) (*restclient.Request, error)
 
 	Out io.Writer
 }
@@ -109,7 +110,7 @@ func NewCmdLogs(f cmdutil.Factory, out io.Writer) *cobra.Command {
 	cmd.Flags().String("since-time", "", "Only return logs after a specific date (RFC3339). Defaults to all logs. Only one of since-time / since may be used.")
 	cmd.Flags().Duration("since", 0, "Only return logs newer than a relative duration like 5s, 2m, or 3h. Defaults to all logs. Only one of since-time / since may be used.")
 	cmd.Flags().StringP("container", "c", "", "Print the logs of this container")
-
+	cmd.Flags().Int64Var(&o.GetPodTimeOut, "get-pod-timeout", 20, "Specify the timeout (in seconds) of get first pod")
 	cmd.Flags().Bool("interactive", false, "If true, prompt the user for input when required.")
 	cmd.Flags().MarkDeprecated("interactive", "This flag is no longer respected and there is no replacement.")
 	cmdutil.AddInclude3rdPartyFlags(cmd)
@@ -220,6 +221,9 @@ func (o LogsOptions) Validate() error {
 		return errs.ToAggregate()
 	}
 
+	if o.GetPodTimeOut == 0 {
+		return errors.New("get-pod-timeout can not be 0")
+	}
 	return nil
 }
 
@@ -239,7 +243,7 @@ func (o LogsOptions) RunLogs() error {
 }
 
 func (o LogsOptions) getLogs(obj runtime.Object) error {
-	req, err := o.LogsForObject(obj, o.Options)
+	req, err := o.LogsForObject(obj, o.Options, time.Second*time.Duration(o.GetPodTimeOut))
 	if err != nil {
 		return err
 	}
