@@ -545,10 +545,19 @@ function write-master-env {
   fi
 
   build-kube-env true "${KUBE_TEMP}/master-kube-env.yaml"
+  build-kube-master-certs "${KUBE_TEMP}/kube-master-certs.yaml"
 }
 
 function write-node-env {
   build-kube-env false "${KUBE_TEMP}/node-kube-env.yaml"
+}
+
+function build-kube-master-certs {
+  local file=$1
+  rm -f ${file}
+  cat >$file <<EOF
+CA_KEY: $(yaml-quote ${CA_KEY_BASE64:-})
+EOF
 }
 
 # $1: if 'true', we're building a master yaml, else a node
@@ -879,6 +888,7 @@ function create-certs {
   CERT_DIR="${KUBE_TEMP}/easy-rsa-master/easyrsa3"
   # By default, linux wraps base64 output every 76 cols, so we use 'tr -d' to remove whitespaces.
   # Note 'base64 -w0' doesn't work on Mac OS X, which has different flags.
+  CA_KEY_BASE64=$(cat "${CERT_DIR}/pki/private/ca.key" | base64 | tr -d '\r\n')
   CA_CERT_BASE64=$(cat "${CERT_DIR}/pki/ca.crt" | base64 | tr -d '\r\n')
   MASTER_CERT_BASE64=$(cat "${CERT_DIR}/pki/issued/${MASTER_NAME}.crt" | base64 | tr -d '\r\n')
   MASTER_KEY_BASE64=$(cat "${CERT_DIR}/pki/private/${MASTER_NAME}.key" | base64 | tr -d '\r\n')
