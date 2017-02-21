@@ -46,6 +46,30 @@ func TestValidateTokenDiscovery(t *testing.T) {
 	}
 }
 
+func TestValidateAuthorizationMode(t *testing.T) {
+	var tests = []struct {
+		s        string
+		f        *field.Path
+		expected bool
+	}{
+		{"", nil, false},
+		{"rBAC", nil, false},      // not supported
+		{"not valid", nil, false}, // not supported
+		{"RBAC", nil, true},       // supported
+		{"Webhook", nil, true},    // supported
+	}
+	for _, rt := range tests {
+		actual := ValidateAuthorizationMode(rt.s, rt.f)
+		if (len(actual) == 0) != rt.expected {
+			t.Errorf(
+				"failed ValidateAuthorizationMode:\n\texpected: %t\n\t  actual: %t",
+				rt.expected,
+				(len(actual) == 0),
+			)
+		}
+	}
+}
+
 func TestValidateServiceSubnet(t *testing.T) {
 	var tests = []struct {
 		s        string
@@ -87,16 +111,19 @@ func TestValidateMasterConfiguration(t *testing.T) {
 					Addresses: []string{"foobar"},
 				},
 			},
+			AuthorizationMode: "RBAC",
 		}, false},
 		{&kubeadm.MasterConfiguration{
 			Discovery: kubeadm.Discovery{
 				HTTPS: &kubeadm.HTTPSDiscovery{URL: "foo"},
 			},
+			AuthorizationMode: "RBAC",
 		}, true},
 		{&kubeadm.MasterConfiguration{
 			Discovery: kubeadm.Discovery{
 				File: &kubeadm.FileDiscovery{Path: "foo"},
 			},
+			AuthorizationMode: "RBAC",
 		}, true},
 		{&kubeadm.MasterConfiguration{
 			Discovery: kubeadm.Discovery{
@@ -106,6 +133,7 @@ func TestValidateMasterConfiguration(t *testing.T) {
 					Addresses: []string{"foobar"},
 				},
 			},
+			AuthorizationMode: "RBAC",
 		}, true},
 	}
 	for _, rt := range tests {

@@ -32,6 +32,7 @@ import (
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/images"
+	authzmodes "k8s.io/kubernetes/pkg/kubeapiserver/authorizer/modes"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 )
 
@@ -326,15 +327,7 @@ func getAPIServerCommand(cfg *kubeadmapi.MasterConfiguration, selfHosted bool) [
 		"--requestheader-allowed-names=front-proxy-client",
 	)
 
-	if cfg.AuthorizationMode != "" {
-		command = append(command, "--authorization-mode="+cfg.AuthorizationMode)
-		switch cfg.AuthorizationMode {
-		case kubeadmconstants.AuthzModeABAC:
-			command = append(command, "--authorization-policy-file="+path.Join(kubeadmapi.GlobalEnvParams.KubernetesDir, kubeadmconstants.AuthorizationPolicyFile))
-		case kubeadmconstants.AuthzModeWebhook:
-			command = append(command, "--authorization-webhook-config-file="+path.Join(kubeadmapi.GlobalEnvParams.KubernetesDir, kubeadmconstants.AuthorizationWebhookConfigFile))
-		}
-	}
+	command = append(command, getAuthzParameters(cfg.AuthorizationMode)...)
 
 	// Use first address we are given
 	if len(cfg.API.AdvertiseAddresses) > 0 {
@@ -458,4 +451,23 @@ func getSelfHostedAPIServerEnv() []api.EnvVar {
 	}
 
 	return append(getProxyEnvVars(), podIPEnvVar)
+}
+
+func getAuthzParameters(authzMode string) []string {
+	command := []string{}
+	// RBAC is always on. If the user specified
+	authzModes := []string{authzmodes.ModeRBAC}
+	if len(authzMode) != 0 && authzMode != authzmodes.ModeRBAC {
+		authzModes = append(authzModes, authzMode)
+	}
+
+	command = append(command, "--authorization-mode="+strings.Join(authzModes, ","))
+
+	switch authzMode {
+	case authzmodes.ModeABAC:
+		command = append(command, "--authorization-policy-file="+kubeadmconstants.AuthorizationPolicyPath)
+	case authzmodes.ModeWebhook:
+		command = append(command, "--authorization-webhook-config-file="+kubeadmconstants.AuthorizationWebhookConfigPath)
+	}
+	return command
 }

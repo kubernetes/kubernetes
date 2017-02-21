@@ -31,6 +31,7 @@ import (
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/pkg/api/validation"
+	authzmodes "k8s.io/kubernetes/pkg/kubeapiserver/authorizer/modes"
 	"k8s.io/kubernetes/pkg/util/initsystem"
 	"k8s.io/kubernetes/pkg/util/node"
 	"k8s.io/kubernetes/test/e2e_node/system"
@@ -363,12 +364,10 @@ func RunInitMasterChecks(cfg *kubeadmapi.MasterConfiguration) error {
 
 	// Check the config for authorization mode
 	switch cfg.AuthorizationMode {
-	case kubeadmconstants.AuthzModeABAC:
-		authorizationPolicyPath := filepath.Join(kubeadmapi.GlobalEnvParams.KubernetesDir, kubeadmconstants.AuthorizationPolicyFile)
-		checks = append(checks, FileExistingCheck{Path: authorizationPolicyPath})
-	case kubeadmconstants.AuthzModeWebhook:
-		authorizationWebhookConfigPath := filepath.Join(kubeadmapi.GlobalEnvParams.KubernetesDir, kubeadmconstants.AuthorizationWebhookConfigFile)
-		checks = append(checks, FileExistingCheck{Path: authorizationWebhookConfigPath})
+	case authzmodes.ModeABAC:
+		checks = append(checks, FileExistingCheck{Path: kubeadmconstants.AuthorizationPolicyPath})
+	case authzmodes.ModeWebhook:
+		checks = append(checks, FileExistingCheck{Path: kubeadmconstants.AuthorizationWebhookConfigPath})
 	}
 
 	return RunChecks(checks, os.Stderr)
