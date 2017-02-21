@@ -124,7 +124,9 @@ func (s *Scheduler) scheduleOne() {
 	}
 
 	go func() {
-		defer metrics.E2eSchedulingLatency.Observe(metrics.SinceInMicroseconds(start))
+		defer func() {		
+			metrics.E2eSchedulingLatency.Observe(metrics.SinceInMicroseconds(start))
+		}()
 
 		b := &api.Binding{
 			ObjectMeta: api.ObjectMeta{Namespace: pod.Namespace, Name: pod.Name},
