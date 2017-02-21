@@ -329,19 +329,33 @@ func (i *initFederation) Run(cmdOut io.Writer, config util.AdminConfig) error {
 		return err
 	}
 
-	// 7. Create federation controller manager
-	// 7a. Create a service account in the host cluster for federation
-	// controller manager.
-	sa, err := createControllerManagerSA(hostClientset, i.commonOptions.FederationSystemNamespace, i.options.dryRun)
+	sa := &api.ServiceAccount{}
+	sa.Name = ""
+	// 7. Create deployment for federation controller manager
+	rbacVersionedClientset, err := util.GetVersionedClientForRBACOrFail(hostFactory)
+	// The below code either creates teh SA and the related roles or skips
+	// creating the same if the RBAC support is not found in the base cluster
+	// TODO: We must evaluate creating a separate service account even when RBAC support is missing
 	if err != nil {
-		return err
-	}
+		if _, ok := err.(*util.NoRBACAPIError); !ok {
+			return err
+		}
+		// If the error is type NoRBACAPIError, We continue to create the rest of
+		// the resources, without the SA and roles (in the abscense of RBAC support).
+	} else {
+		// 7a. Create a service account in the host cluster for federation
+		// controller manager.
+		sa, err = createControllerManagerSA(rbacVersionedClientset, i.commonOptions.FederationSystemNamespace, i.options.dryRun)
+		if err != nil {
+			return err
+		}
 
-	// 7b. Create RBAC role and role binding for federation controller
-	// manager service account.
-	_, _, err = createRoleBindings(hostClientset, i.commonOptions.FederationSystemNamespace, sa.Name, i.options.dryRun)
-	if err != nil {
-		return err
+		// 7b. Create RBAC role and role binding for federation controller
+		// manager service account.
+		_, _, err = createRoleBindings(rbacVersionedClientset, i.commonOptions.FederationSystemNamespace, sa.Name, i.options.dryRun)
+		if err != nil {
+			return err
+		}
 	}
 
 	// 7c. Create a dns-provider config secret
@@ -874,10 +888,13 @@ func createControllerManager(clientset client.Interface, namespace, name, svcNam
 							},
 						},
 					},
-					ServiceAccountName: saName,
 				},
 			},
 		},
+	}
+
+	if saName != "" {
+		dep.Spec.Template.Spec.ServiceAccountName = saName
 	}
 
 	if dryRun {
