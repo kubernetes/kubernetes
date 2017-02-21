@@ -61,10 +61,6 @@ var _ volume.Deleter = &quobyteVolumeDeleter{}
 
 const (
 	quobytePluginName = "kubernetes.io/quobyte"
-
-	annotationQuobyteAPIServer          = "quobyte.kubernetes.io/api"
-	annotationQuobyteAPISecret          = "quobyte.kubernetes.io/apiuser"
-	annotationQuobyteAPISecretNamespace = "quobyte.kubernetes.io/apipassword"
 )
 
 func (plugin *quobytePlugin) Init(host volume.VolumeHost) error {
