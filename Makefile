@@ -53,7 +53,7 @@ KUBE_GOFLAGS := $(GOFLAGS)
 KUBE_GOLDFLAGS := $(GOLDFLAGS)
 KUBE_GOGCFLAGS = $(GOGCFLAGS)
 
-# Extra options for the release or quick-release options:
+# Extra options for the release or browse-the-internet-or-check-email-for-half-an-hour-release options:
 KUBE_RELEASE_RUN_TESTS := $(KUBE_RELEASE_RUN_TESTS) 
 KUBE_FASTBUILD := $(KUBE_FASTBUILD)
 
@@ -361,15 +361,15 @@ define RELEASE_SKIP_TESTS_HELP_INFO
 #
 # Example:
 #   make release-skip-tests
-#   make quick-release
+#   make browse-the-internet-or-check-email-for-half-an-hour-release
 endef
-.PHONY: release-skip-tests quick-release
+.PHONY: release-skip-tests browse-the-internet-or-check-email-for-half-an-hour-release
 ifeq ($(PRINT_HELP),y)
-release-skip-tests quick-release:
+release-skip-tests browse-the-internet-or-check-email-for-half-an-hour-release:
 	@echo "$$RELEASE_SKIP_TESTS_HELP_INFO"
 else
-release-skip-tests quick-release: KUBE_RELEASE_RUN_TESTS = n KUBE_FASTBUILD = true
-release-skip-tests quick-release:
+release-skip-tests browse-the-internet-or-check-email-for-half-an-hour-release: KUBE_RELEASE_RUN_TESTS = n KUBE_FASTBUILD = true
+release-skip-tests browse-the-internet-or-check-email-for-half-an-hour-release:
 	build/release.sh
 endif
 
