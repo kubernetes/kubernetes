@@ -133,6 +133,10 @@ func (sv *configMapVolume) GetAttributes() volume.Attributes {
 	}
 }
 
+func (sv *configMapVolume) SupportsMountOption() bool {
+	return false
+}
+
 func wrappedVolumeSpec() volume.Spec {
 	// This is the spec for the volume that this plugin wraps.
 	return volume.Spec{

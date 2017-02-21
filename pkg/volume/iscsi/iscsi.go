@@ -121,10 +121,11 @@ func (plugin *iscsiPlugin) newMounterInternal(spec *volume.Spec, podUID types.UI
 			iface:   iface,
 			manager: manager,
 			plugin:  plugin},
-		fsType:     iscsi.FSType,
-		readOnly:   readOnly,
-		mounter:    &mount.SafeFormatAndMount{Interface: mounter, Runner: exec.New()},
-		deviceUtil: ioutil.NewDeviceHandler(ioutil.NewIOHandler()),
+		fsType:       iscsi.FSType,
+		readOnly:     readOnly,
+		mounter:      &mount.SafeFormatAndMount{Interface: mounter, Runner: exec.New()},
+		deviceUtil:   ioutil.NewDeviceHandler(ioutil.NewIOHandler()),
+		mountOptions: volume.MountOptionFromSpec(spec),
 	}, nil
 }
 
@@ -184,10 +185,11 @@ func (iscsi *iscsiDisk) GetPath() string {
 
 type iscsiDiskMounter struct {
 	*iscsiDisk
-	readOnly   bool
-	fsType     string
-	mounter    *mount.SafeFormatAndMount
-	deviceUtil ioutil.DeviceUtil
+	readOnly     bool
+	fsType       string
+	mounter      *mount.SafeFormatAndMount
+	deviceUtil   ioutil.DeviceUtil
+	mountOptions []string
 }
 
 var _ volume.Mounter = &iscsiDiskMounter{}
@@ -198,6 +200,10 @@ func (b *iscsiDiskMounter) GetAttributes() volume.Attributes {
 		Managed:         !b.readOnly,
 		SupportsSELinux: true,
 	}
+}
+
+func (b *iscsiDiskMounter) SupportsMountOption() bool {
+	return true
 }
 
 // Checks prior to mount operations to verify that the required components (binaries, etc.)

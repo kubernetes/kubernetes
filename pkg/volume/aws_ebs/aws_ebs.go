@@ -277,6 +277,10 @@ func (b *awsElasticBlockStoreMounter) GetAttributes() volume.Attributes {
 	}
 }
 
+func (b *awsElasticBlockStore) SupportsMountOption() bool {
+	return true
+}
+
 // Checks prior to mount operations to verify that the required components (binaries, etc.)
 // to mount the volume are available on the underlying node.
 // If not, it returns an error

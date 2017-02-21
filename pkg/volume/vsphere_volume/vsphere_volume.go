@@ -183,6 +183,10 @@ func (b *vsphereVolumeMounter) GetAttributes() volume.Attributes {
 	}
 }
 
+func (b *vsphereVolumeMounter) SupportsMountOption() bool {
+	return true
+}
+
 // SetUp attaches the disk and bind mounts to the volume path.
 func (b *vsphereVolumeMounter) SetUp(fsGroup *int64) error {
 	return b.SetUpAt(b.GetPath(), fsGroup)

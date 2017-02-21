@@ -129,16 +129,18 @@ func (plugin *cephfsPlugin) newMounterInternal(spec *volume.Spec, podUID types.U
 
 	return &cephfsMounter{
 		cephfs: &cephfs{
-			podUID:      podUID,
-			volName:     spec.Name(),
-			mon:         cephvs.Monitors,
-			path:        path,
-			secret:      secret,
-			id:          id,
-			secret_file: secret_file,
-			readonly:    cephvs.ReadOnly,
-			mounter:     mounter,
-			plugin:      plugin},
+			podUID:       podUID,
+			volName:      spec.Name(),
+			mon:          cephvs.Monitors,
+			path:         path,
+			secret:       secret,
+			id:           id,
+			secret_file:  secret_file,
+			readonly:     cephvs.ReadOnly,
+			mounter:      mounter,
+			plugin:       plugin,
+			mountOptions: volume.MountOptionFromSpec(spec),
+		},
 	}, nil
 }
 
@@ -182,6 +184,7 @@ type cephfs struct {
 	mounter     mount.Interface
 	plugin      *cephfsPlugin
 	volume.MetricsNil
+	mountOptions []string
 }
 
 type cephfsMounter struct {
@@ -196,6 +199,10 @@ func (cephfsVolume *cephfsMounter) GetAttributes() volume.Attributes {
 		Managed:         false,
 		SupportsSELinux: false,
 	}
+}
+
+func (cephfsVolume *cephfsMounter) SupportsMountOption() bool {
+	return true
 }
 
 // Checks prior to mount operations to verify that the required components (binaries, etc.)
@@ -282,7 +289,8 @@ func (cephfsVolume *cephfs) execMount(mountpoint string) error {
 	}
 	src += hosts[i] + ":" + cephfsVolume.path
 
-	if err := cephfsVolume.mounter.Mount(src, mountpoint, "ceph", opt); err != nil {
+	mountOptions := volume.JoinMountOptions(cephfsVolume.mountOptions, opt)
+	if err := cephfsVolume.mounter.Mount(src, mountpoint, "ceph", mountOptions); err != nil {
 		return fmt.Errorf("CephFS: mount failed: %v", err)
 	}
 

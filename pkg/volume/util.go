@@ -372,3 +372,35 @@ func UnmountViaEmptyDir(dir string, host VolumeHost, volName string, volSpec Spe
 	}
 	return wrapped.TearDownAt(dir)
 }
+
+// MountOptionFromSpec extracts and joins mount options from volume spec with supplied options
+func MountOptionFromSpec(spec *Spec, options ...string) []string {
+	pv := spec.PersistentVolume
+
+	if pv != nil {
+		if mo, ok := pv.Annotations[MountOptionAnnotation]; ok {
+			moList := strings.Split(mo, ",")
+			return JoinMountOptions(moList, options)
+		}
+
+	}
+	return options
+}
+
+// JoinMountOptions joins mount options eliminating duplicates
+func JoinMountOptions(userOptions []string, systemOptions []string) []string {
+	allMountOptions := map[string]string{}
+
+	for _, mountOption := range userOptions {
+		allMountOptions[mountOption] = mountOption
+	}
+
+	for _, mountOption := range systemOptions {
+		allMountOptions[mountOption] = mountOption
+	}
+	mountOptionSlice := make([]string, 0, len(allMountOptions))
+	for key := range allMountOptions {
+		mountOptionSlice = append(mountOptionSlice, key)
+	}
+	return mountOptionSlice
+}

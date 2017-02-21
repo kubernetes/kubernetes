@@ -383,6 +383,8 @@ func (og *operationGenerator) GenerateMountVolumeFunc(
 			newMounterErr)
 	}
 
+	checkMountOptionSupport(og, volumeToMount, volumeMounter)
+
 	// Get attacher, if possible
 	attachableVolumePlugin, _ :=
 		og.volumePluginMgr.FindAttachablePluginBySpec(volumeToMount.VolumeSpec)
@@ -866,4 +868,19 @@ func (og *operationGenerator) verifyVolumeIsSafeToDetach(
 		volumeToDetach.VolumeSpec.Name(),
 		volumeToDetach.NodeName)
 	return nil
+}
+
+func checkMountOptionSupport(og *operationGenerator, volumeToMount VolumeToMount, mounter volume.Mounter) {
+	mountOptions := volume.MountOptionFromSpec(volumeToMount.VolumeSpec)
+
+	if len(mountOptions) > 0 && !mounter.SupportsMountOption() {
+		err := fmt.Errorf(
+			"MountVolume.checkMountOptionSupport failed for volume %q (spec.Name: %q) pod %q (UID: %q) with: %q",
+			volumeToMount.VolumeName,
+			volumeToMount.VolumeSpec.Name(),
+			volumeToMount.PodName,
+			volumeToMount.Pod.UID,
+			"Mount options are not supported for this volume type")
+		og.recorder.Eventf(volumeToMount.Pod, v1.EventTypeWarning, kevents.UnsupportedMountOption, err.Error())
+	}
 }
