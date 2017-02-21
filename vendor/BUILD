@@ -9143,6 +9143,7 @@ go_test(
         "//vendor:github.com/ghodss/yaml",
         "//vendor:k8s.io/apimachinery/pkg/runtime",
         "//vendor:k8s.io/apimachinery/pkg/util/mergepatch",
+        "//vendor:k8s.io/apimachinery/pkg/util/sets",
     ],
 )
 
