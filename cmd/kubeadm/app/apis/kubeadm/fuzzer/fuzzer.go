@@ -34,5 +34,10 @@ func KubeadmFuzzerFuncs(t apitesting.TestingCommon) []interface{} {
 			obj.AuthorizationMode = "foo"
 			obj.Discovery.Token = &kubeadm.TokenDiscovery{}
 		},
+		func(obj *kubeadm.NodeConfiguration, c fuzz.Continue) {
+			c.FuzzNoCustom(obj)
+			obj.CACertPath = "foo"
+			obj.Discovery.Token = &kubeadm.TokenDiscovery{}
+		},
 	}
 }
