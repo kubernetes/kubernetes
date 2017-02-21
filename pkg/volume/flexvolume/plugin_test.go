@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors.
+Copyright 2017 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -30,27 +30,27 @@ func TestInit(t *testing.T) {
 	plugin.Init(plugin.host)
 }
 
-func fakeDeviceNameOutput(name string) exec.FakeCombinedOutputAction {
+func fakeVolumeNameOutput(name string) exec.FakeCombinedOutputAction {
 	return fakeResultOutput(&DriverStatus{
 		Status: StatusSuccess,
-		Device: name,
+		VolumeName: name,
 	})
 }
 
-func TestGetDeviceName(t *testing.T) {
+func TestGetVolumeName(t *testing.T) {
 	spec := fakeVolumeSpec()
 	plugin, _ := testPlugin()
 	plugin.runner = fakeRunner(
-		assertDriverCall(t, fakeDeviceNameOutput("/dev/sdx"), getVolumeNameCmd,
+		assertDriverCall(t, fakeVolumeNameOutput("/dev/sdx"), getVolumeNameCmd,
 			specJson(plugin, spec, nil)),
 	)
 
 	name, err := plugin.GetVolumeName(spec)
 	if err != nil {
-		t.Errorf("GetDeviceName() failed: %v", err)
+		t.Errorf("GetVolumeName() failed: %v", err)
 	}
 	expectedName := "~dev~sdx"
 	if name != expectedName {
-		t.Errorf("GetDeviceName() returned %v instead of %v", name, expectedName)
+		t.Errorf("GetVolumeName() returned %v instead of %v", name, expectedName)
 	}
 }

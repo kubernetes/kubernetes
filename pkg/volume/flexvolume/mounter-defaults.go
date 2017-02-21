@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors.
+Copyright 2017 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -42,9 +42,7 @@ func (f *mounterDefaults) SetUpAt(dir string, fsGroup *int64) error {
 	if err := doMount(f.mounter, src, dir, "auto", []string{"bind"}); err != nil {
 		return err
 	}
-	if !f.readOnly {
-		volume.SetVolumeOwnership((*flexVolumeMounter)(f), fsGroup)
-	}
+
 	return nil
 }
 
