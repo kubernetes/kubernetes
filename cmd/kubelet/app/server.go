@@ -72,6 +72,7 @@ import (
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/dockertools"
 	"k8s.io/kubernetes/pkg/kubelet/eviction"
+	evictionapi "k8s.io/kubernetes/pkg/kubelet/eviction/api"
 	"k8s.io/kubernetes/pkg/kubelet/server"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/util/configz"
@@ -500,10 +501,10 @@ func run(s *options.KubeletServer, kubeDeps *kubelet.KubeletDeps) (err error) {
 		if err != nil {
 			return err
 		}
-		hardEvictionThresholds := v1.ResourceList{}
+		var hardEvictionThresholds []evictionapi.Threshold
 		// If the user requested to ignore eviction thresholds, then do not set valid values for hardEvictionThresholds here.
 		if !s.ExperimentalNodeAllocatableIgnoreEvictionThreshold {
-			hardEvictionThresholds, err := eviction.ParseThresholdConfig(s.EvictionHard, "", "", "")
+			hardEvictionThresholds, err = eviction.ParseThresholdConfig(s.EvictionHard, "", "", "")
 			if err != nil {
 				return err
 			}
@@ -522,13 +523,12 @@ func run(s *options.KubeletServer, kubeDeps *kubelet.KubeletDeps) (err error) {
 				ProtectKernelDefaults: s.ProtectKernelDefaults,
 				EnableCRI:             s.EnableCRI,
 				NodeAllocatableConfig: cm.NodeAllocatableConfig{
-					KubeReservedCgroupName:      s.KubeReservedCgroup,
-					SystemReservedCgroupName:    s.SystemReservedCgroup,
-					EnforceNodeAllocatable:      sets.NewString(s.EnforceNodeAllocatable...),
-					KubeReserved:                kubeReserved,
-					SystemReserved:              systemReserved,
-					HardEvictionThresholds:      hardEvictionThresholds,
-					IgnoreHardEvictionThreshold: s.ExperimentalNodeAllocatableIgnoreEvictionThreshold,
+					KubeReservedCgroupName:   s.KubeReservedCgroup,
+					SystemReservedCgroupName: s.SystemReservedCgroup,
+					EnforceNodeAllocatable:   sets.NewString(s.EnforceNodeAllocatable...),
+					KubeReserved:             kubeReserved,
+					SystemReserved:           systemReserved,
+					HardEvictionThresholds:   hardEvictionThresholds,
 				},
 			},
 			s.ExperimentalFailSwapOn,
