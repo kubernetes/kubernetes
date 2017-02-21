@@ -55,7 +55,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/componentconfig"
 	componentconfigv1alpha1 "k8s.io/kubernetes/pkg/apis/componentconfig/v1alpha1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
-	"k8s.io/kubernetes/pkg/client/legacylisters"
+	corelisters "k8s.io/kubernetes/pkg/client/listers/core/v1"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/features"
 	internalapi "k8s.io/kubernetes/pkg/kubelet/api"
@@ -374,21 +374,21 @@ func NewMainKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *Kub
 		dockerExecHandler = &dockertools.NativeExecHandler{}
 	}
 
-	serviceStore := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
+	serviceIndexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
 	if kubeDeps.KubeClient != nil {
 		serviceLW := cache.NewListWatchFromClient(kubeDeps.KubeClient.Core().RESTClient(), "services", metav1.NamespaceAll, fields.Everything())
-		cache.NewReflector(serviceLW, &v1.Service{}, serviceStore, 0).Run()
+		cache.NewReflector(serviceLW, &v1.Service{}, serviceIndexer, 0).Run()
 	}
-	serviceLister := &listers.StoreToServiceLister{Indexer: serviceStore}
+	serviceLister := corelisters.NewServiceLister(serviceIndexer)
 
-	nodeStore := cache.NewStore(cache.MetaNamespaceKeyFunc)
+	nodeIndexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{})
 	if kubeDeps.KubeClient != nil {
 		fieldSelector := fields.Set{api.ObjectNameField: string(nodeName)}.AsSelector()
 		nodeLW := cache.NewListWatchFromClient(kubeDeps.KubeClient.Core().RESTClient(), "nodes", metav1.NamespaceAll, fieldSelector)
-		cache.NewReflector(nodeLW, &v1.Node{}, nodeStore, 0).Run()
+		cache.NewReflector(nodeLW, &v1.Node{}, nodeIndexer, 0).Run()
 	}
-	nodeLister := &listers.StoreToNodeLister{Store: nodeStore}
-	nodeInfo := &predicates.CachedNodeInfo{StoreToNodeLister: nodeLister}
+	nodeLister := corelisters.NewNodeLister(nodeIndexer)
+	nodeInfo := &predicates.CachedNodeInfo{nodeLister}
 
 	// TODO: get the real node object of ourself,
 	// and use the real node name and UID.
@@ -803,7 +803,7 @@ type serviceLister interface {
 }
 
 type nodeLister interface {
-	List() (machines v1.NodeList, err error)
+	List(labels.Selector) ([]*v1.Node, error)
 }
 
 // Kubelet is the main kubelet implementation.
