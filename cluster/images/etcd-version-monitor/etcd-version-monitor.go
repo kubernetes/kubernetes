@@ -21,6 +21,7 @@ import (
 	goflag "flag"
 	"fmt"
 	"net/http"
+	"os"
 	"time"
 
 	"github.com/golang/glog"
@@ -218,7 +219,8 @@ func main() {
 	// Register the metrics we defined above with prometheus.
 	prometheus.MustRegister(etcdVersion)
 	prometheus.MustRegister(etcdGRPCRequestsTotal)
-	prometheus.Unregister(prometheus.NewGoCollector()) // Unregister go metrics.
+	prometheus.Unregister(prometheus.NewGoCollector())                     // Unregister go metrics.
+	prometheus.Unregister(prometheus.NewProcessCollector(os.Getpid(), "")) // Unregister process metrics.
 
 	// Spawn threads for periodically scraping etcd version metrics.
 	stopCh := make(chan struct{})
@@ -228,6 +230,6 @@ func main() {
 
 	// Serve our metrics on listenAddress/metricsPath.
 	glog.Infof("Listening on: %v", listenAddress)
-	http.Handle(metricsPath, prometheus.Handler())
+	http.Handle(metricsPath, prometheus.UninstrumentedHandler())
 	glog.Errorf("Stopped listening/serving metrics: %v", http.ListenAndServe(listenAddress, nil))
 }
