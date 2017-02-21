@@ -1966,9 +1966,9 @@ func TestPreparePodArgs(t *testing.T) {
 
 func TestConstructSyslogIdentifier(t *testing.T) {
 	testCases := []struct {
-		podName     		string
-		podGenerateName 	string
-		identifier          	string
+		podName         string
+		podGenerateName string
+		identifier      string
 	}{
 		{
 			"prometheus-node-exporter-rv90m",
