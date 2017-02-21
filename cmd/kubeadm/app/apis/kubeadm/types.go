@@ -40,6 +40,7 @@ type MasterConfiguration struct {
 	KubernetesVersion string
 	CloudProvider     string
 	AuthorizationMode string
+	AdmissionControl  string
 }
 
 type API struct {

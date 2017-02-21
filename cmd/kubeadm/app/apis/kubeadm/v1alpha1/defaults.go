@@ -27,6 +27,7 @@ const (
 	DefaultAPIBindPort               = 6443
 	DefaultDiscoveryBindPort         = 9898
 	DefaultAuthorizationMode         = "RBAC"
+	DefaultAdmissionControl          = "NamespaceLifecycle,LimitRanger,ServiceAccount,PersistentVolumeLabel,DefaultStorageClass,ResourceQuota"
 )
 
 func addDefaultingFuncs(scheme *runtime.Scheme) error {
@@ -59,5 +60,9 @@ func SetDefaults_MasterConfiguration(obj *MasterConfiguration) {
 
 	if obj.AuthorizationMode == "" {
 		obj.AuthorizationMode = DefaultAuthorizationMode
+	}
+
+	if obj.AdmissionControl == "" {
+		obj.AdmissionControl = DefaultAdmissionControl
 	}
 }
