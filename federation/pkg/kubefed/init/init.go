@@ -57,6 +57,7 @@ import (
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/version"
 
+	"github.com/golang/glog"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 )
@@ -236,19 +237,24 @@ func (i *initFederation) Run(cmdOut io.Writer, config util.AdminConfig) error {
 	cmName := fmt.Sprintf("%s-controller-manager", i.commonOptions.Name)
 	cmKubeconfigName := fmt.Sprintf("%s-kubeconfig", cmName)
 
-	// 1. Create a namespace for federation system components
+	// 1.
+	fmt.Fprint(cmdOut, "Creating a namespace for federation system components... ")
 	_, err = createNamespace(hostClientset, i.commonOptions.FederationSystemNamespace, i.options.dryRun)
 	if err != nil {
 		return err
 	}
+	fmt.Fprint(cmdOut, "done\n")
 
-	// 2. Expose a network endpoint for the federation API server
+	// 2.
+	fmt.Fprint(cmdOut, "Creating federation control plane objects (service, credentials, persistent volume claim)... ")
 	svc, ips, hostnames, err := createService(hostClientset, i.commonOptions.FederationSystemNamespace, serverName, i.options.apiServerAdvertiseAddress, i.options.apiServerServiceType, i.options.dryRun)
 	if err != nil {
 		return err
 	}
+	glog.V(4).Infof("Created service named %s with IP addresses %v, hostnames %v", svc.Name, ips, hostnames)
 
-	// 3. Generate TLS certificates and credentials
+	// 3.
+	glog.V(4).Info("Generating TLS certificates and credentials for communicating with the federation API server")
 	entKeyPairs, err := genCerts(i.commonOptions.FederationSystemNamespace, i.commonOptions.Name, svc.Name, HostClusterLocalDNSZoneName, ips, hostnames)
 	if err != nil {
 		return err
@@ -258,16 +264,18 @@ func (i *initFederation) Run(cmdOut io.Writer, config util.AdminConfig) error {
 	if err != nil {
 		return err
 	}
+	glog.V(4).Info("Certificates and credentials generated")
 
-	// 4. Create a kubeconfig secret
+	// 4.
+	glog.V(4).Info("Creating an entry in the kubeconfig file with the certificate and credential data")
 	_, err = createControllerManagerKubeconfigSecret(hostClientset, i.commonOptions.FederationSystemNamespace, i.commonOptions.Name, svc.Name, cmKubeconfigName, entKeyPairs, i.options.dryRun)
 	if err != nil {
 		return err
 	}
+	glog.V(4).Info("kubeconfig successfully updated")
 
-	// 5. Create a persistent volume and a claim to store the federation
-	// API server's state. This is where federation API server's etcd
-	// stores its data.
+	// 5.
+	glog.V(4).Info("Creating a persistent volume and a claim to store the federation API server's state, including etcd data")
 	var pvc *api.PersistentVolumeClaim
 	if i.options.etcdPersistentStorage {
 		pvc, err = createPVC(hostClientset, i.commonOptions.FederationSystemNamespace, svc.Name, i.options.etcdPVCapacity, i.options.dryRun)
@@ -275,6 +283,8 @@ func (i *initFederation) Run(cmdOut io.Writer, config util.AdminConfig) error {
 			return err
 		}
 	}
+	glog.V(4).Info("Persistent volume and claim created")
+	fmt.Fprint(cmdOut, "done\n")
 
 	// Since only one IP address can be specified as advertise address,
 	// we arbitrarily pick the first available IP address
@@ -284,33 +294,42 @@ func (i *initFederation) Run(cmdOut io.Writer, config util.AdminConfig) error {
 		advertiseAddress = ips[0]
 	}
 
-	// 6. Create federation API server
+	// 6.
+	fmt.Fprint(cmdOut, "Creating federation component deployments...")
 	_, err = createAPIServer(hostClientset, i.commonOptions.FederationSystemNamespace, serverName, i.options.image, serverCredName, advertiseAddress, i.options.storageBackend, i.options.apiServerOverrides, pvc, i.options.dryRun)
 	if err != nil {
 		return err
 	}
+	glog.V(4).Info("Successfully created federation API server")
 
 	// 7. Create federation controller manager
-	// 7a. Create a service account in the host cluster for federation
-	// controller manager.
+	// 7a.
+	glog.V(4).Info("Creating service account for federation controller manager in the host cluster")
 	sa, err := createControllerManagerSA(hostClientset, i.commonOptions.FederationSystemNamespace, i.options.dryRun)
 	if err != nil {
 		return err
 	}
+	glog.V(4).Info("Successfully created federation controller manager service account")
 
-	// 7b. Create RBAC role and role binding for federation controller
-	// manager service account.
+	// 7b.
+	glog.V(4).Info("Creating RBAC role and role bindings for the federation controller manager's service account")
 	_, _, err = createRoleBindings(hostClientset, i.commonOptions.FederationSystemNamespace, sa.Name, i.options.dryRun)
 	if err != nil {
 		return err
 	}
+	glog.V(4).Info("Successfully created RBAC role and role bindings")
 
-	// 7c. Create federation controller manager deployment.
+	// 7c.
+	glog.V(4).Info("Creating federation controller manager deployment")
 	_, err = createControllerManager(hostClientset, i.commonOptions.FederationSystemNamespace, i.commonOptions.Name, svc.Name, cmName, i.options.image, cmKubeconfigName, i.options.dnsZoneName, i.options.dnsProvider, sa.Name, i.options.controllerManagerOverrides, i.options.dryRun)
 	if err != nil {
 		return err
 	}
+	glog.V(4).Info("Successfully created federation controller manager deployment")
+	fmt.Fprint(cmdOut, "done\n")
 
+	// 8.
+	fmt.Fprint(cmdOut, "Updating kubeconfig... ")
 	// Pick the first ip/hostname to update the api server endpoint in kubeconfig and also to give information to user
 	// In case of NodePort Service for api server, ips are node external ips.
 	endpoint := ""
@@ -324,20 +343,21 @@ func (i *initFederation) Run(cmdOut io.Writer, config util.AdminConfig) error {
 		endpoint = endpoint + ":" + strconv.Itoa(int(svc.Spec.Ports[0].NodePort))
 	}
 
-	// 8. Write the federation API server endpoint info, credentials
-	// and context to kubeconfig
 	err = updateKubeconfig(config, i.commonOptions.Name, endpoint, i.commonOptions.Kubeconfig, entKeyPairs, i.options.dryRun)
 	if err != nil {
 		return err
 	}
+	fmt.Fprint(cmdOut, "done\n")
 
 	if !i.options.dryRun {
+		fmt.Fprint(cmdOut, "Waiting for federation control plane to come up... ")
 		fedPods := []string{serverName, cmName}
 		err = waitForPods(hostClientset, fedPods, i.commonOptions.FederationSystemNamespace)
 		if err != nil {
 			return err
 		}
 		err = waitSrvHealthy(config, i.commonOptions.Name, i.commonOptions.Kubeconfig)
+		fmt.Fprint(cmdOut, "done\n")
 		if err != nil {
 			return err
 		}
