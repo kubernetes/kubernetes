@@ -30,7 +30,7 @@ import (
 
 var (
 	defaultNotReadyTolerationSeconds = flag.Int64("default-not-ready-toleration-seconds", 300,
-		"Indicates the tolerationSeconds of the toleration for `notReady:NoExecute`"+
+		"Indicates the tolerationSeconds of the toleration for notReady:NoExecute"+
 			" that is added by default to every pod that does not already have such a toleration.")
 
 	defaultUnreachableTolerationSeconds = flag.Int64("default-unreachable-toleration-seconds", 300,

@@ -136,7 +136,7 @@ coreos:
         --v=2 \
         --service-account-key-file=/var/run/kubernetes/kube-serviceaccount.key \
         --service-account-lookup=false \
-        --admission-control=NamespaceLifecycle,NamespaceAutoProvision,LimitRanger,SecurityContextDeny,ServiceAccount,ResourceQuota
+        --admission-control=NamespaceLifecycle,NamespaceAutoProvision,LimitRanger,SecurityContextDeny,ServiceAccount,ResourceQuota,DefaultTolerationSeconds
         Restart=always
         RestartSec=5
     - name: apiserver-advertiser.service
