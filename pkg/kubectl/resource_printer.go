@@ -2043,13 +2043,7 @@ func printComponentStatusList(list *api.ComponentStatusList, w io.Writer, option
 func printThirdPartyResource(rsrc *extensions.ThirdPartyResource, w io.Writer, options PrintOptions) error {
 	name := formatResourceName(options.Kind, rsrc.Name, options.WithKind)
 
-	versions := make([]string, len(rsrc.Versions))
-	for ix := range rsrc.Versions {
-		version := &rsrc.Versions[ix]
-		versions[ix] = fmt.Sprintf("%s", version.Name)
-	}
-	versionsString := strings.Join(versions, ",")
-	if _, err := fmt.Fprintf(w, "%s\t%s\t%s\n", name, rsrc.Description, versionsString); err != nil {
+	if _, err := fmt.Fprintf(w, "%s\t%s\t%s\n", name, rsrc.Spec.Description, rsrc.Spec.Version); err != nil {
 		return err
 	}
 	return nil

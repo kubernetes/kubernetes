@@ -17,9 +17,6 @@ limitations under the License.
 package thirdpartyresourcedata
 
 import (
-	"fmt"
-	"strings"
-
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 )
@@ -29,40 +26,9 @@ func ExtractGroupVersionKind(list *extensions.ThirdPartyResourceList) ([]schema.
 	gvks := []schema.GroupVersionKind{}
 	for ix := range list.Items {
 		rsrc := &list.Items[ix]
-		kind, group, err := ExtractApiGroupAndKind(rsrc)
-		if err != nil {
-			return nil, nil, err
-		}
-		for _, version := range rsrc.Versions {
-			gv := schema.GroupVersion{Group: group, Version: version.Name}
-			gvs = append(gvs, gv)
-			gvks = append(gvks, schema.GroupVersionKind{Group: group, Version: version.Name, Kind: kind})
-		}
+		gvk := schema.GroupVersionKind{Group: rsrc.Spec.Group, Version: rsrc.Spec.Version, Kind: rsrc.Spec.Kind}
+		gvs = append(gvs, gvk.GroupVersion())
+		gvks = append(gvks, gvk)
 	}
 	return gvs, gvks, nil
-}
-
-func convertToCamelCase(input string) string {
-	result := ""
-	toUpper := true
-	for ix := range input {
-		char := input[ix]
-		if toUpper {
-			result = result + string([]byte{(char - 32)})
-			toUpper = false
-		} else if char == '-' {
-			toUpper = true
-		} else {
-			result = result + string([]byte{char})
-		}
-	}
-	return result
-}
-
-func ExtractApiGroupAndKind(rsrc *extensions.ThirdPartyResource) (kind string, group string, err error) {
-	parts := strings.Split(rsrc.Name, ".")
-	if len(parts) < 3 {
-		return "", "", fmt.Errorf("unexpectedly short resource name: %s, expected at least <kind>.<domain>.<tld>", rsrc.Name)
-	}
-	return convertToCamelCase(parts[0]), strings.Join(parts[1:], "."), nil
 }

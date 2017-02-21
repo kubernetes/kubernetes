@@ -17,12 +17,12 @@ limitations under the License.
 package rest
 
 import (
+	"strings"
 	"testing"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	expapi "k8s.io/kubernetes/pkg/apis/extensions"
-	"k8s.io/kubernetes/pkg/registry/extensions/thirdpartyresourcedata"
 )
 
 type FakeAPIInterface struct {
@@ -39,8 +39,7 @@ func (f *FakeAPIInterface) RemoveThirdPartyResource(path string) error {
 
 func (f *FakeAPIInterface) InstallThirdPartyResource(rsrc *expapi.ThirdPartyResource) error {
 	f.installed = append(f.installed, rsrc)
-	_, group, _ := thirdpartyresourcedata.ExtractApiGroupAndKind(rsrc)
-	f.apis = append(f.apis, MakeThirdPartyPath(group))
+	f.apis = append(f.apis, MakeThirdPartyPath(rsrc.Spec.Group))
 	return nil
 }
 
@@ -48,8 +47,7 @@ func (f *FakeAPIInterface) HasThirdPartyResource(rsrc *expapi.ThirdPartyResource
 	if f.apis == nil {
 		return false, nil
 	}
-	_, group, _ := thirdpartyresourcedata.ExtractApiGroupAndKind(rsrc)
-	path := MakeThirdPartyPath(group)
+	path := MakeThirdPartyPath(rsrc.Spec.Group)
 	for _, api := range f.apis {
 		if api == path {
 			return true, nil
@@ -66,7 +64,15 @@ func TestSyncAPIs(t *testing.T) {
 	resourcesNamed := func(names ...string) []expapi.ThirdPartyResource {
 		result := []expapi.ThirdPartyResource{}
 		for _, name := range names {
-			result = append(result, expapi.ThirdPartyResource{ObjectMeta: metav1.ObjectMeta{Name: name}})
+			parts := strings.SplitN(name, ".", 2)
+			result = append(result, expapi.ThirdPartyResource{
+				ObjectMeta: metav1.ObjectMeta{Name: name},
+				Spec: expapi.ThirdPartyResourceSpec{
+					Group:    parts[1],
+					Version:  "v1",
+					Resource: parts[0],
+				},
+			})
 		}
 		return result
 	}

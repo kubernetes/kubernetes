@@ -40,6 +40,7 @@ func addConversionFuncs(scheme *runtime.Scheme) error {
 		Convert_v1beta1_RollingUpdateDeployment_To_extensions_RollingUpdateDeployment,
 		Convert_extensions_ReplicaSetSpec_To_v1beta1_ReplicaSetSpec,
 		Convert_v1beta1_ReplicaSetSpec_To_extensions_ReplicaSetSpec,
+		Convert_extensions_ThirdPartyResource_To_v1beta1_ThirdPartyResource,
 	)
 	if err != nil {
 		return err
@@ -63,6 +64,15 @@ func addConversionFuncs(scheme *runtime.Scheme) error {
 		}
 	}
 
+	return nil
+}
+
+func Convert_extensions_ThirdPartyResource_To_v1beta1_ThirdPartyResource(in *extensions.ThirdPartyResource, out *ThirdPartyResource, s conversion.Scope) error {
+	if err := autoConvert_extensions_ThirdPartyResource_To_v1beta1_ThirdPartyResource(in, out, s); err != nil {
+		return err
+	}
+	out.Description = in.Spec.Description
+	out.Versions = []APIVersion{{Name: in.Spec.Version}}
 	return nil
 }
 

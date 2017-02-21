@@ -23,7 +23,6 @@ import (
 
 	"github.com/golang/glog"
 
-	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -96,23 +95,14 @@ type thirdPartyEntry struct {
 
 // HasThirdPartyResource returns true if a particular third party resource currently installed.
 func (m *ThirdPartyResourceServer) HasThirdPartyResource(rsrc *extensions.ThirdPartyResource) (bool, error) {
-	kind, group, err := thirdpartyresourcedata.ExtractApiGroupAndKind(rsrc)
-	if err != nil {
-		return false, err
-	}
-	path := extensionsrest.MakeThirdPartyPath(group)
+	path := extensionsrest.MakeThirdPartyPath(rsrc.Spec.Group)
 	m.thirdPartyResourcesLock.Lock()
 	defer m.thirdPartyResourcesLock.Unlock()
 	entry := m.thirdPartyResources[path]
 	if entry == nil {
 		return false, nil
 	}
-	plural, _ := meta.KindToResource(schema.GroupVersionKind{
-		Group:   group,
-		Version: rsrc.Versions[0].Name,
-		Kind:    kind,
-	})
-	_, found := entry.storage[plural.Resource]
+	_, found := entry.storage[rsrc.Spec.Resource]
 	return found, nil
 }
 
@@ -248,36 +238,31 @@ func (m *ThirdPartyResourceServer) addThirdPartyResourceStorage(path, resource s
 // then the following RESTful resource is created on the server:
 //   http://<host>/apis/company.com/v1/foos/...
 func (m *ThirdPartyResourceServer) InstallThirdPartyResource(rsrc *extensions.ThirdPartyResource) error {
-	kind, group, err := thirdpartyresourcedata.ExtractApiGroupAndKind(rsrc)
-	if err != nil {
-		return err
+	gvk := schema.GroupVersionKind{Group: rsrc.Spec.Group, Version: rsrc.Spec.Version, Kind: rsrc.Spec.Kind}
+	if len(gvk.Group) == 0 {
+		return fmt.Errorf("ThirdPartyResource %s has no defined group", rsrc.Name)
 	}
-	if len(rsrc.Versions) == 0 {
+	if len(gvk.Version) == 0 {
 		return fmt.Errorf("ThirdPartyResource %s has no defined versions", rsrc.Name)
 	}
-	plural, _ := meta.KindToResource(schema.GroupVersionKind{
-		Group:   group,
-		Version: rsrc.Versions[0].Name,
-		Kind:    kind,
-	})
-	path := extensionsrest.MakeThirdPartyPath(group)
+	path := extensionsrest.MakeThirdPartyPath(gvk.Group)
 
 	groupVersion := metav1.GroupVersionForDiscovery{
-		GroupVersion: group + "/" + rsrc.Versions[0].Name,
-		Version:      rsrc.Versions[0].Name,
+		GroupVersion: gvk.GroupVersion().String(),
+		Version:      gvk.Version,
 	}
 	apiGroup := metav1.APIGroup{
-		Name:             group,
+		Name:             gvk.Group,
 		Versions:         []metav1.GroupVersionForDiscovery{groupVersion},
 		PreferredVersion: groupVersion,
 	}
 
-	thirdparty := m.thirdpartyapi(group, kind, rsrc.Versions[0].Name, plural.Resource)
+	thirdparty := m.thirdpartyapi(gvk.Group, gvk.Kind, gvk.Version, rsrc.Spec.Resource)
 
 	// If storage exists, this group has already been added, just update
 	// the group with the new API
 	if m.hasThirdPartyGroupStorage(path) {
-		m.addThirdPartyResourceStorage(path, plural.Resource, thirdparty.Storage[plural.Resource].(*thirdpartyresourcedatastore.REST), apiGroup)
+		m.addThirdPartyResourceStorage(path, rsrc.Spec.Resource, thirdparty.Storage[rsrc.Spec.Resource].(*thirdpartyresourcedatastore.REST), apiGroup)
 		return thirdparty.UpdateREST(m.genericAPIServer.HandlerContainer.Container)
 	}
 
@@ -286,8 +271,8 @@ func (m *ThirdPartyResourceServer) InstallThirdPartyResource(rsrc *extensions.Th
 	}
 	m.genericAPIServer.HandlerContainer.Add(genericapi.NewGroupWebService(api.Codecs, path, apiGroup))
 
-	m.addThirdPartyResourceStorage(path, plural.Resource, thirdparty.Storage[plural.Resource].(*thirdpartyresourcedatastore.REST), apiGroup)
-	api.Registry.AddThirdPartyAPIGroupVersions(schema.GroupVersion{Group: group, Version: rsrc.Versions[0].Name})
+	m.addThirdPartyResourceStorage(path, rsrc.Spec.Resource, thirdparty.Storage[rsrc.Spec.Resource].(*thirdpartyresourcedatastore.REST), apiGroup)
+	api.Registry.AddThirdPartyAPIGroupVersions(gvk.GroupVersion())
 	return nil
 }
 

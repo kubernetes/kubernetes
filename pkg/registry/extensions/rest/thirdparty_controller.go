@@ -25,7 +25,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	extensionsclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/extensions/internalversion"
-	"k8s.io/kubernetes/pkg/registry/extensions/thirdpartyresourcedata"
 )
 
 // ResourceInterface is the interface for the parts of the master that know how to add/remove
@@ -82,13 +81,8 @@ func (t *ThirdPartyController) syncResourceList(list runtime.Object) error {
 		// Loop across all schema objects for third party resources
 		for ix := range list.Items {
 			item := &list.Items[ix]
-			// extract the api group and resource kind from the schema
-			_, group, err := thirdpartyresourcedata.ExtractApiGroupAndKind(item)
-			if err != nil {
-				return err
-			}
 			// place it in the set of resources that we expect, so that we don't delete it in the delete pass
-			existing.Insert(MakeThirdPartyPath(group))
+			existing.Insert(MakeThirdPartyPath(item.Spec.Group))
 			// ensure a RESTful resource for this schema exists on the master
 			if err := t.SyncOneResource(item); err != nil {
 				return err

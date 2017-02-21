@@ -47,7 +47,6 @@ go_test(
     srcs = [
         "codec_test.go",
         "strategy_test.go",
-        "util_test.go",
     ],
     library = ":go_default_library",
     tags = ["automanaged"],

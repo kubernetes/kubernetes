@@ -42337,7 +42337,7 @@
       "type": "string"
      },
      "description": {
-      "description": "Description is the description of this object.",
+      "description": "Description is the description of this object. Deprecated: Use spec.description instead.",
       "type": "string"
      },
      "kind": {
@@ -42348,8 +42348,16 @@
       "description": "Standard object metadata",
       "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta"
      },
+     "spec": {
+      "description": "Spec describes the resource",
+      "$ref": "#/definitions/io.k8s.kubernetes.pkg.apis.extensions.v1beta1.ThirdPartyResourceSpec"
+     },
+     "status": {
+      "description": "Status describes the current state of the resource",
+      "$ref": "#/definitions/io.k8s.kubernetes.pkg.apis.extensions.v1beta1.ThirdPartyResourceStatus"
+     },
      "versions": {
-      "description": "Versions are versions for this third party object",
+      "description": "Versions are versions for this third party object. Deprecated: Use spec.version instead.",
       "type": "array",
       "items": {
        "$ref": "#/definitions/io.k8s.kubernetes.pkg.apis.extensions.v1beta1.APIVersion"
@@ -42363,6 +42371,34 @@
       "Kind": "ThirdPartyResource"
      }
     ]
+   },
+   "io.k8s.kubernetes.pkg.apis.extensions.v1beta1.ThirdPartyResourceCondition": {
+    "required": [
+     "type",
+     "status"
+    ],
+    "properties": {
+     "lastUpdateTime": {
+      "description": "timestamp for the last update to this condition",
+      "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Time"
+     },
+     "message": {
+      "description": "human readable message with details about the state",
+      "type": "string"
+     },
+     "reason": {
+      "description": "brief reason for the state",
+      "type": "string"
+     },
+     "status": {
+      "description": "Status of the condition",
+      "type": "string"
+     },
+     "type": {
+      "description": "request approval state, currently Approved or Denied.",
+      "type": "string"
+     }
+    }
    },
    "io.k8s.kubernetes.pkg.apis.extensions.v1beta1.ThirdPartyResourceList": {
     "description": "ThirdPartyResourceList is a list of ThirdPartyResources.",
@@ -42397,6 +42433,48 @@
       "Kind": "ThirdPartyResourceList"
      }
     ]
+   },
+   "io.k8s.kubernetes.pkg.apis.extensions.v1beta1.ThirdPartyResourceSpec": {
+    "properties": {
+     "description": {
+      "type": "string"
+     },
+     "group": {
+      "type": "string"
+     },
+     "kind": {
+      "type": "string"
+     },
+     "namespaced": {
+      "type": "boolean"
+     },
+     "resource": {
+      "type": "string"
+     },
+     "resourceSingular": {
+      "type": "string"
+     },
+     "shortNames": {
+      "type": "array",
+      "items": {
+       "type": "string"
+      }
+     },
+     "version": {
+      "type": "string"
+     }
+    }
+   },
+   "io.k8s.kubernetes.pkg.apis.extensions.v1beta1.ThirdPartyResourceStatus": {
+    "properties": {
+     "conditions": {
+      "description": "Conditions applied to the resource",
+      "type": "array",
+      "items": {
+       "$ref": "#/definitions/io.k8s.kubernetes.pkg.apis.extensions.v1beta1.ThirdPartyResourceCondition"
+      }
+     }
+    }
    },
    "io.k8s.kubernetes.pkg.apis.policy.v1beta1.Eviction": {
     "description": "Eviction evicts a pod from its node subject to certain policies and safety constraints. This is a subresource of Pod.  A request to cause such an eviction is created by POSTing to .../pods/\u003cpod name\u003e/evictions.",

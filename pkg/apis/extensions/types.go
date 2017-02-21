@@ -119,12 +119,68 @@ type ThirdPartyResource struct {
 	// +optional
 	metav1.ObjectMeta
 
-	// Description is the description of this object.
+	// Spec describes the resource
 	// +optional
-	Description string
+	Spec ThirdPartyResourceSpec
 
-	// Versions are versions for this third party object
-	Versions []APIVersion
+	// Status describes the current state of the resource
+	// +optional
+	Status ThirdPartyResourceStatus
+}
+
+type ThirdPartyResourceSpec struct {
+	Group string
+
+	Version string
+
+	Kind string
+
+	Resource string
+
+	ResourceSingular string
+
+	Namespaced *bool
+
+	ShortNames []string
+
+	Description string
+}
+
+type ThirdPartyResourceStatus struct {
+	// Conditions applied to the resource
+	// +optional
+	Conditions []ThirdPartyResourceCondition
+}
+
+type ThirdPartyResourceConditionType string
+
+// These are the possible conditions for a ThirdPartyResource
+const (
+	ThirdPartyResourceActive ThirdPartyResourceConditionType = "Active"
+)
+
+type ThirdPartyResourceConditionStatus string
+
+const (
+	ThirdPartyResourceConditionStatusTrue    ThirdPartyResourceConditionStatus = "True"
+	ThirdPartyResourceConditionStatusFalse   ThirdPartyResourceConditionStatus = "False"
+	ThirdPartyResourceConditionStatusUnknown ThirdPartyResourceConditionStatus = "Unknown"
+)
+
+type ThirdPartyResourceCondition struct {
+	// Condition
+	Type ThirdPartyResourceConditionType
+	// Status of the condition
+	Status ThirdPartyResourceConditionStatus
+	// brief reason for the state
+	// +optional
+	Reason string
+	// human readable message with details about the state
+	// +optional
+	Message string
+	// timestamp for the last update to this condition
+	// +optional
+	LastUpdateTime metav1.Time
 }
 
 type ThirdPartyResourceList struct {

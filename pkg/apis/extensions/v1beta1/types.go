@@ -109,12 +109,79 @@ type ThirdPartyResource struct {
 	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
 	// Description is the description of this object.
+	// Deprecated: Use spec.description instead.
+	// +k8s:conversion-gen=false
 	// +optional
 	Description string `json:"description,omitempty" protobuf:"bytes,2,opt,name=description"`
 
-	// Versions are versions for this third party object
+	// Versions are versions for this third party object.
+	// Deprecated: Use spec.version instead.
+	// +k8s:conversion-gen=false
 	// +optional
 	Versions []APIVersion `json:"versions,omitempty" protobuf:"bytes,3,rep,name=versions"`
+
+	// Spec describes the resource
+	// +optional
+	Spec ThirdPartyResourceSpec `json:"spec,omitempty" protobuf:"bytes,4,opt,name=spec"`
+
+	// Status describes the current state of the resource
+	// +optional
+	Status ThirdPartyResourceStatus `json:"status,omitempty" protobuf:"bytes,5,opt,name=status"`
+}
+
+type ThirdPartyResourceSpec struct {
+	Group string `json:"group,omitempty" protobuf:"bytes,1,opt,name=group"`
+
+	Version string `json:"version,omitempty" protobuf:"bytes,2,opt,name=version"`
+
+	Kind string `json:"kind,omitempty" protobuf:"bytes,3,opt,name=kind"`
+
+	Resource string `json:"resource,omitempty" protobuf:"bytes,4,opt,name=resource"`
+
+	ResourceSingular string `json:"resourceSingular,omitempty" protobuf:"bytes,5,opt,name=resourceSingular"`
+
+	Namespaced *bool `json:"namespaced,omitempty" protobuf:"bytes,6,opt,name=namespaced"`
+
+	ShortNames []string `json:"shortNames,omitempty" protobuf:"bytes,7,opt,name=shortNames"`
+
+	Description string `json:"description,omitempty" protobuf:"bytes,8,opt,name=description"`
+}
+
+type ThirdPartyResourceStatus struct {
+	// Conditions applied to the resource
+	// +optional
+	Conditions []ThirdPartyResourceCondition `json:"conditions,omitempty" protobuf:"bytes,1,rep,name=conditions"`
+}
+
+type ThirdPartyResourceConditionType string
+
+// These are the possible conditions for a ThirdPartyResource
+const (
+	ThirdPartyResourceActive ThirdPartyResourceConditionType = "Active"
+)
+
+type ThirdPartyResourceConditionStatus string
+
+const (
+	ThirdPartyResourceConditionStatusTrue    ThirdPartyResourceConditionStatus = "True"
+	ThirdPartyResourceConditionStatusFalse   ThirdPartyResourceConditionStatus = "False"
+	ThirdPartyResourceConditionStatusUnknown ThirdPartyResourceConditionStatus = "Unknown"
+)
+
+type ThirdPartyResourceCondition struct {
+	// request approval state, currently Approved or Denied.
+	Type ThirdPartyResourceConditionType `json:"type" protobuf:"bytes,1,opt,name=type,casttype=ThirdPartyResourceConditionType"`
+	// Status of the condition
+	Status ThirdPartyResourceConditionStatus `json:"status" protobuf:"bytes,2,opt,name=status,casttype=ThirdPartyResourceStatus"`
+	// brief reason for the state
+	// +optional
+	Reason string `json:"reason,omitempty" protobuf:"bytes,3,opt,name=reason"`
+	// human readable message with details about the state
+	// +optional
+	Message string `json:"message,omitempty" protobuf:"bytes,4,opt,name=message"`
+	// timestamp for the last update to this condition
+	// +optional
+	LastUpdateTime metav1.Time `json:"lastUpdateTime,omitempty" protobuf:"bytes,5,opt,name=lastUpdateTime"`
 }
 
 // ThirdPartyResourceList is a list of ThirdPartyResources.
