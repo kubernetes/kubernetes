@@ -22,6 +22,7 @@ import (
 	"sync"
 
 	"k8s.io/kubernetes/pkg/api/v1"
+	"k8s.io/kubernetes/pkg/kubelet/qos"
 )
 
 type QOSContainerManager interface {
@@ -106,6 +107,34 @@ func (m *qosContainerManagerImpl) Start(nodeInfo *v1.Node, activePods ActivePods
 	return nil
 }
 
+func (m *qosContainerManagerImpl) setCPUCgroupConfig(configs map[v1.PodQOSClass]*CgroupConfig) {
+	pods := m.activePods()
+	burstablePodCPURequest := int64(0)
+	for i := range pods {
+		pod := pods[i]
+		qosClass := qos.GetPodQOS(pod)
+		if qosClass != v1.PodQOSBurstable {
+			// we only care about the burstable qos tier
+			continue
+		}
+		for _, container := range pod.Spec.Containers {
+			if request, found := container.Resources.Requests[v1.ResourceCPU]; found {
+				burstablePodCPURequest += request.MilliValue()
+			}
+		}
+	}
+	// make sure best effort is always 2 shares
+	bestEffortCPUShares := int64(MinShares)
+	configs[v1.PodQOSBestEffort].ResourceParameters.CpuShares = &bestEffortCPUShares
+
+	// set burstable shares based on current observe state
+	burstableCPUShares := MilliCPUToShares(burstablePodCPURequest)
+	if burstableCPUShares < int64(MinShares) {
+		burstableCPUShares = int64(MinShares)
+	}
+	configs[v1.PodQOSBurstable].ResourceParameters.CpuShares = &burstableCPUShares
+}
+
 func (m *qosContainerManagerImpl) UpdateCgroups() error {
 	m.Lock()
 	defer m.Unlock()
@@ -121,7 +150,8 @@ func (m *qosContainerManagerImpl) UpdateCgroups() error {
 		},
 	}
 
-	// TODO: manipulate the configs for the QoS Cgroups here
+	// update the qos level cgroup settings for cpu shares
+	m.setCPUCgroupConfig(qosConfigs)
 
 	for _, config := range qosConfigs {
 		err := m.cgroupManager.Update(config)
