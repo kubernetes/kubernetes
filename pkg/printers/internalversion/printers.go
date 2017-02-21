@@ -223,7 +223,11 @@ func formatEndpoints(endpoints *api.Endpoints, ports sets.String) string {
 					}
 					addr := &ss.Addresses[i]
 					if !more {
-						list = append(list, fmt.Sprintf("%s:%d", addr.IP, port.Port))
+						ip := addr.IP
+						if strings.Contains(ip, ":") {
+							ip = "[" + ip + "]"
+						}
+						list = append(list, fmt.Sprintf("%s:%d", ip, port.Port))
 					}
 					count++
 				}
