@@ -30,7 +30,6 @@ import (
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmapiext "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha1"
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/validation"
-	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/flags"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/discovery"
 	kubemaster "k8s.io/kubernetes/cmd/kubeadm/app/master"
@@ -106,11 +105,6 @@ func NewCmdInit(out io.Writer) *cobra.Command {
 		&cfg.Networking.DNSDomain, "service-dns-domain", cfg.Networking.DNSDomain,
 		`Use alternative domain for services, e.g. "myorg.internal"`,
 	)
-	cmd.PersistentFlags().Var(
-		flags.NewCloudProviderFlag(&cfg.CloudProvider), "cloud-provider",
-		`Enable cloud provider features (external load-balancers, storage, etc). Note that you have to configure all kubelets manually`,
-	)
-
 	cmd.PersistentFlags().StringVar(
 		&cfg.KubernetesVersion, "use-kubernetes-version", cfg.KubernetesVersion,
 		`Choose a specific Kubernetes version for the control plane`,
