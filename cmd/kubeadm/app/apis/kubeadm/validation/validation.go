@@ -25,10 +25,26 @@ import (
 	"k8s.io/kubernetes/pkg/registry/core/service/ipallocator"
 )
 
+// TODO: Break out the cloudprovider functionality out of core and only support the new flow
+// described in https://github.com/kubernetes/community/pull/128
+var cloudproviders = []string{
+	"aws",
+	"azure",
+	"cloudstack",
+	"gce",
+	"mesos",
+	"openstack",
+	"ovirt",
+	"photon",
+	"rackspace",
+	"vsphere",
+}
+
 func ValidateMasterConfiguration(c *kubeadm.MasterConfiguration) field.ErrorList {
 	allErrs := field.ErrorList{}
 	allErrs = append(allErrs, ValidateDiscovery(&c.Discovery, field.NewPath("discovery"))...)
 	allErrs = append(allErrs, ValidateDiscovery(&c.Discovery, field.NewPath("service subnet"))...)
+	allErrs = append(allErrs, ValidateCloudProvider(c.CloudProvider, field.NewPath("cloudprovider"))...)
 	return allErrs
 }
 
@@ -90,4 +106,16 @@ func ValidateServiceSubnet(subnet string, fldPath *field.Path) field.ErrorList {
 		return field.ErrorList{field.Invalid(fldPath, nil, "service subnet is too small")}
 	}
 	return field.ErrorList{}
+}
+
+func ValidateCloudProvider(provider string, fldPath *field.Path) field.ErrorList {
+	if len(provider) == 0 {
+		return field.ErrorList{}
+	}
+	for _, supported := range cloudproviders {
+		if provider == supported {
+			return field.ErrorList{}
+		}
+	}
+	return field.ErrorList{field.Invalid(fldPath, nil, "cloudprovider not supported")}
 }
