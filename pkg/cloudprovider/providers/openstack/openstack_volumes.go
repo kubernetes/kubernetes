@@ -115,7 +115,8 @@ func (os *OpenStack) getVolume(diskName string) (volumes.Volume, error) {
 		return volume, err
 	}
 
-	err = volumes.List(sClient, nil).EachPage(func(page pagination.Page) (bool, error) {
+	opts := &volumes.ListOpts{Name: diskName}
+	err = volumes.List(sClient, opts).EachPage(func(page pagination.Page) (bool, error) {
 		vols, err := volumes.ExtractVolumes(page)
 		if err != nil {
 			glog.Errorf("Failed to extract volumes: %v", err)
