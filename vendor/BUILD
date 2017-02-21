@@ -6483,6 +6483,7 @@ go_library(
     name = "github.com/spf13/pflag",
     srcs = [
         "github.com/spf13/pflag/bool.go",
+        "github.com/spf13/pflag/bool_slice.go",
         "github.com/spf13/pflag/count.go",
         "github.com/spf13/pflag/duration.go",
         "github.com/spf13/pflag/flag.go",
@@ -6495,6 +6496,7 @@ go_library(
         "github.com/spf13/pflag/int8.go",
         "github.com/spf13/pflag/int_slice.go",
         "github.com/spf13/pflag/ip.go",
+        "github.com/spf13/pflag/ip_slice.go",
         "github.com/spf13/pflag/ipmask.go",
         "github.com/spf13/pflag/ipnet.go",
         "github.com/spf13/pflag/string.go",
@@ -6505,6 +6507,7 @@ go_library(
         "github.com/spf13/pflag/uint32.go",
         "github.com/spf13/pflag/uint64.go",
         "github.com/spf13/pflag/uint8.go",
+        "github.com/spf13/pflag/uint_slice.go",
     ],
     tags = ["automanaged"],
 )
