@@ -19,6 +19,7 @@ package volume
 import (
 	"fmt"
 	"hash/fnv"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -29,6 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
+	"k8s.io/kubernetes/pkg/util/slice"
 )
 
 type testcase struct {
@@ -304,7 +306,74 @@ func TestGenerateVolumeName(t *testing.T) {
 	if v3 != expect {
 		t.Errorf("Expected %s, got %s", expect, v3)
 	}
+}
 
+func TestMountOptionFromSpec(t *testing.T) {
+	scenarios := map[string]struct {
+		volume            *Spec
+		expectedMountList []string
+		systemOptions     []string
+	}{
+		"volume-with-mount-options": {
+			volume: createVolumeSpecWithMountOption("good-mount-opts", "ro,nfsvers=3", v1.PersistentVolumeSpec{
+				PersistentVolumeSource: v1.PersistentVolumeSource{
+					NFS: &v1.NFSVolumeSource{Server: "localhost", Path: "/srv", ReadOnly: false},
+				},
+			}),
+			expectedMountList: []string{"ro", "nfsvers=3"},
+			systemOptions:     nil,
+		},
+		"volume-with-bad-mount-options": {
+			volume: createVolumeSpecWithMountOption("good-mount-opts", "", v1.PersistentVolumeSpec{
+				PersistentVolumeSource: v1.PersistentVolumeSource{
+					NFS: &v1.NFSVolumeSource{Server: "localhost", Path: "/srv", ReadOnly: false},
+				},
+			}),
+			expectedMountList: []string{},
+			systemOptions:     nil,
+		},
+		"vol-with-sys-opts": {
+			volume: createVolumeSpecWithMountOption("good-mount-opts", "ro,nfsvers=3", v1.PersistentVolumeSpec{
+				PersistentVolumeSource: v1.PersistentVolumeSource{
+					NFS: &v1.NFSVolumeSource{Server: "localhost", Path: "/srv", ReadOnly: false},
+				},
+			}),
+			expectedMountList: []string{"ro", "nfsvers=3", "fsid=100", "hard"},
+			systemOptions:     []string{"fsid=100", "hard"},
+		},
+		"vol-with-sys-opts-with-dup": {
+			volume: createVolumeSpecWithMountOption("good-mount-opts", "ro,nfsvers=3", v1.PersistentVolumeSpec{
+				PersistentVolumeSource: v1.PersistentVolumeSource{
+					NFS: &v1.NFSVolumeSource{Server: "localhost", Path: "/srv", ReadOnly: false},
+				},
+			}),
+			expectedMountList: []string{"ro", "nfsvers=3", "fsid=100"},
+			systemOptions:     []string{"fsid=100", "ro"},
+		},
+	}
+
+	for name, scenario := range scenarios {
+		mountOptions := MountOptionFromSpec(scenario.volume, scenario.systemOptions...)
+		if !reflect.DeepEqual(slice.SortStrings(mountOptions), slice.SortStrings(scenario.expectedMountList)) {
+			t.Errorf("for %s expected mount options : %v got %v", name, scenario.expectedMountList, mountOptions)
+		}
+	}
+}
+
+func createVolumeSpecWithMountOption(name string, mountOptions string, spec v1.PersistentVolumeSpec) *Spec {
+	annotations := map[string]string{
+		MountOptionAnnotation: mountOptions,
+	}
+	objMeta := metav1.ObjectMeta{
+		Name:        name,
+		Annotations: annotations,
+	}
+
+	pv := &v1.PersistentVolume{
+		ObjectMeta: objMeta,
+		Spec:       spec,
+	}
+	return &Spec{PersistentVolume: pv}
 }
 
 func checkFnv32(t *testing.T, s string, expected int) {
