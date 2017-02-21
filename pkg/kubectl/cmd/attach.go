@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"io"
 	"net/url"
+	"time"
 
 	"github.com/golang/glog"
 	"github.com/spf13/cobra"
@@ -55,6 +56,11 @@ var (
 		`)
 )
 
+const (
+	defaultPodAttachTimeout = 60 * time.Second
+	defaultPodLogsTimeout   = 20 * time.Second
+)
+
 func NewCmdAttach(f cmdutil.Factory, cmdIn io.Reader, cmdOut, cmdErr io.Writer) *cobra.Command {
 	options := &AttachOptions{
 		StreamOptions: StreamOptions{
@@ -76,7 +82,7 @@ func NewCmdAttach(f cmdutil.Factory, cmdIn io.Reader, cmdOut, cmdErr io.Writer) 
 			cmdutil.CheckErr(options.Run())
 		},
 	}
-	// TODO support UID
+	cmdutil.AddPodRunningTimeoutFlag(cmd, defaultPodAttachTimeout)
 	cmd.Flags().StringVarP(&options.ContainerName, "container", "c", "", "Container name. If omitted, the first container in the pod will be chosen")
 	cmd.Flags().BoolVarP(&options.Stdin, "stdin", "i", false, "Pass stdin to the container")
 	cmd.Flags().BoolVarP(&options.TTY, "tty", "t", false, "Stdin is a TTY")
@@ -114,9 +120,10 @@ type AttachOptions struct {
 
 	Pod *api.Pod
 
-	Attach    RemoteAttach
-	PodClient coreclient.PodsGetter
-	Config    *restclient.Config
+	Attach        RemoteAttach
+	PodClient     coreclient.PodsGetter
+	GetPodTimeout time.Duration
+	Config        *restclient.Config
 }
 
 // Complete verifies command line arguments and loads data from the command environment
@@ -131,6 +138,11 @@ func (p *AttachOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, argsIn [
 	namespace, _, err := f.DefaultNamespace()
 	if err != nil {
 		return err
+	}
+
+	p.GetPodTimeout, err = cmdutil.GetPodRunningTimeoutFlag(cmd)
+	if err != nil {
+		return cmdutil.UsageError(cmd, err.Error())
 	}
 
 	mapper, typer := f.Object()
@@ -149,7 +161,7 @@ func (p *AttachOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, argsIn [
 		return err
 	}
 
-	attachablePod, err := f.AttachablePodForObject(obj)
+	attachablePod, err := f.AttachablePodForObject(obj, p.GetPodTimeout)
 	if err != nil {
 		return err
 	}

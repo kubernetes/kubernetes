@@ -387,6 +387,14 @@ func GetFlagDuration(cmd *cobra.Command, flag string) time.Duration {
 	return d
 }
 
+func GetPodRunningTimeoutFlag(cmd *cobra.Command) (time.Duration, error) {
+	timeout := GetFlagDuration(cmd, "pod-running-timeout")
+	if timeout <= 0 {
+		return timeout, fmt.Errorf("--pod-running-timeout must be higher than zero")
+	}
+	return timeout, nil
+}
+
 func AddValidateFlags(cmd *cobra.Command) {
 	cmd.Flags().Bool("validate", true, "If true, use a schema to validate the input before sending it")
 	cmd.Flags().String("schema-cache-dir", fmt.Sprintf("~/%s/%s", clientcmd.RecommendedHomeDir, clientcmd.RecommendedSchemaName), fmt.Sprintf("If non-empty, load/store cached API schemas in this directory, default is '$HOME/%s/%s'", clientcmd.RecommendedHomeDir, clientcmd.RecommendedSchemaName))
@@ -401,6 +409,10 @@ func AddFilenameOptionFlags(cmd *cobra.Command, options *resource.FilenameOption
 // AddDryRunFlag adds dry-run flag to a command. Usually used by mutations.
 func AddDryRunFlag(cmd *cobra.Command) {
 	cmd.Flags().Bool("dry-run", false, "If true, only print the object that would be sent, without sending it.")
+}
+
+func AddPodRunningTimeoutFlag(cmd *cobra.Command, defaultTimeout time.Duration) {
+	cmd.Flags().Duration("pod-running-timeout", defaultTimeout, "The length of time (like 5s, 2m, or 3h, higher than zero) to wait until at least one pod is running")
 }
 
 func AddApplyAnnotationFlags(cmd *cobra.Command) {
