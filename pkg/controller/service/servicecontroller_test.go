@@ -64,6 +64,20 @@ func newController() (*ServiceController, *fakecloud.FakeCloud, *fake.Clientset)
 	return controller, cloud, client
 }
 
+func defaultExternalService() *v1.Service {
+
+	return &v1.Service{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "external-balancer",
+			Namespace: "default",
+		},
+		Spec: v1.ServiceSpec{
+			Type: v1.ServiceTypeLoadBalancer,
+		},
+	}
+
+}
+
 func TestCreateExternalLoadBalancer(t *testing.T) {
 	table := []struct {
 		service             *v1.Service
@@ -432,61 +446,14 @@ func defaultExternalService() *v1.Service {
 
 }
 
-func TestUpdateService(t *testing.T) {
-
-	var controller *ServiceController
-	var cloud *fakecloud.FakeCloud
-
-	testCases := []struct {
-		testName   string                           //Name of the testcase
-		key        string                           //Name of the key in question
-		updateFn   func()                           //Manupulate the structure
-		srv        *v1.Service                      //Service component
-		expectedFn func(error, time.Duration) error //Error comparision function
-	}{
-		{
-			testName: "If updating a valid service",
-			key:      "validKey",
-			srv:      defaultExternalService(),
-			updateFn: func() {
-
-				controller, cloud, _ = newController()
-				controller.cache.getOrCreate("validKey")
-
-			},
-			expectedFn: func(err error, retryDuration time.Duration) error {
-
-				if err != nil {
-					return err
-				}
-				if retryDuration != doNotRetry {
-					return fmt.Errorf("retryDuration Expected=%v Obtained=%v", doNotRetry, retryDuration)
-				}
-				return nil
-			},
-		},
-	}
-
-	for _, tst := range testCases {
-		tst.updateFn()
-		srvCache := controller.cache.getOrCreate(tst.key)
-
-		obtErr, retryDuration := controller.processServiceUpdate(srvCache, tst.srv, tst.key)
-		if err := tst.expectedFn(obtErr, retryDuration); err != nil {
-			t.Errorf("%v processServiceUpdate() %v", tst.testName, err)
-		}
-	}
-
-}
-
 func TestSyncService_new(t *testing.T) {
 
 	var controller *ServiceController
 	var cloud *fakecloud.FakeCloud
 
 	testCases := []struct {
-		testName    string //Name of this test case
-		key         string //Name of the key we should be looking for
+		testName    string
+		key         string
 		updateFn    func() //Function to manipulate the controller element to simulate error
 		expectedErr error  //syncService() only returns error
 	}{
@@ -511,6 +478,8 @@ func TestSyncService_new(t *testing.T) {
 			expectedErr: fmt.Errorf("Service somethingelse not in cache even though the watcher thought it was. Ignoring the deletion."),
 		},
 		*/
+
+		//TODO: see if we can add a test for valid but error throwing service, its difficult right now because synCService() currently runtime.HandleError
 		{
 			testName: "if valid service",
 			key:      "external-balancer",
@@ -531,7 +500,7 @@ func TestSyncService_new(t *testing.T) {
 			printError = true
 			if obtainedErr != nil && tst.expectedErr != nil {
 				if obtainedErr.Error() == tst.expectedErr.Error() {
-					//Both are valid error objects but still their content is same, then not an error
+					//Check if the actual error matches, if yes then test PASSed
 					printError = false
 				}
 			}
@@ -548,16 +517,14 @@ func TestDeleteService(t *testing.T) {
 	var cloud *fakecloud.FakeCloud
 
 	testCases := []struct {
-		testName        string                                                //Name of the testcase
+		testName        string
 		updateFn        func()                                                //Update function used to manupulate srv and controller values
 		checkExpectedFn func(srvErr error, retryDuration time.Duration) error //Function to check if the returned value is expected
 	}{
 		{
 			testName: "If an invalid service is deleted",
 			updateFn: func() {
-				//srv = defaultExternalService()
 				controller, cloud, _ = newController()
-
 			},
 			checkExpectedFn: func(srvErr error, retryDuration time.Duration) error {
 
@@ -724,5 +691,129 @@ func TestDoesExternalLoadBalancerNeedsUpdate(t *testing.T) {
 		if obtainedResult != tst.expectedResult {
 			t.Errorf("%v needsUpdate() should have returned %v but returned %v", tst.testName, tst.expectedResult, obtainedResult)
 		}
+	}
+}
+
+func TestServiceCache(t *testing.T) {
+
+	sC := &serviceCache{serviceMap: make(map[string]*cachedService)} //ServiceCache
+
+	testCases := []struct {
+		testName   string
+		runTest    func()
+		expectedFn func() error
+	}{
+		{
+			testName: "Add",
+			runTest: func() {
+				cS := sC.getOrCreate("addTest")
+				cS.state = defaultExternalService()
+			},
+			expectedFn: func() error {
+				//There must be exactly one element
+				if len(sC.serviceMap) != 1 {
+					return fmt.Errorf("Expected=1 Obtained=%d", len(sC.serviceMap))
+				}
+				return nil
+			},
+		},
+		{
+			testName: "Del",
+			runTest: func() {
+				sC.delete("addTest")
+
+			},
+			expectedFn: func() error {
+				//Now it should have no element
+				if len(sC.serviceMap) != 0 {
+					return fmt.Errorf("Expected=0 Obtained=%d", len(sC.serviceMap))
+				}
+				return nil
+			},
+		},
+		{
+			testName: "SetandGet",
+			runTest: func() {
+				sC.set("addTest", &cachedService{state: defaultExternalService()})
+			},
+			expectedFn: func() error {
+				//Now it should have one element
+				Cs, bool := sC.get("addTest")
+				if !bool {
+					return fmt.Errorf("is Available Expected=true Obtained=%v", bool)
+				}
+				if Cs == nil {
+					return fmt.Errorf("CachedService expected:non-nil Obtained=nil")
+				}
+				return nil
+			},
+		},
+		{
+			testName: "ListKeys",
+			runTest: func() {
+				//Add one more entry here
+				sC.set("addTest1", &cachedService{state: defaultExternalService()})
+			},
+			expectedFn: func() error {
+				//It should have two elements
+				keys := sC.ListKeys()
+				if len(keys) != 2 {
+					return fmt.Errorf("Elementes Expected=2 Obtained=%v", len(keys))
+				}
+				if keys[0] != "addTest" || keys[1] != "addTest1" {
+					return fmt.Errorf("Keys do not match")
+				}
+				return nil
+			},
+		},
+		{
+			testName: "GetbyKeys",
+			runTest: func() {
+				//Do nothing
+			},
+			expectedFn: func() error {
+				//It should have two elements
+				srv, isKey, err := sC.GetByKey("addTest")
+				if srv == nil || isKey == false || err != nil {
+					return fmt.Errorf("Expected(non-nil, true, nil) Obtained(%v,%v,%v)", srv, isKey, err)
+				}
+				return nil
+			},
+		},
+		{
+			testName: "allServices",
+			runTest: func() {
+				//Do nothing
+			},
+			expectedFn: func() error {
+				//It should return two elements
+				srvArray := sC.allServices()
+				if len(srvArray) != 2 {
+					return fmt.Errorf("Expected(2) Obtained(%v)", len(srvArray))
+				}
+				return nil
+			},
+		},
+	}
+
+	for _, tst := range testCases {
+		tst.runTest()
+		if err := tst.expectedFn(); err != nil {
+			t.Errorf("%v returned %v", tst.testName, err)
+		}
+	}
+}
+
+//Test a utility functions as its not easy to unit test nodeSyncLoop directly
+func TestUtilityFunctions_nodeSlicesEqualForLB(t *testing.T) {
+	numNodes := 10
+	nArray := make([]*v1.Node, 10)
+
+	for i := 0; i < numNodes; i++ {
+		nArray[i] = &v1.Node{}
+		nArray[i].Name = fmt.Sprintf("node1")
+	}
+	if !nodeSlicesEqualForLB(nArray, nArray) {
+		t.Errorf("Expected=true Obtained=false")
 	}
 }
