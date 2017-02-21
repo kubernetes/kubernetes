@@ -1622,6 +1622,10 @@ message NodeSpec {
   // More info: http://releases.k8s.io/HEAD/docs/admin/node.md#manual-node-administration
   // +optional
   optional bool unschedulable = 4;
+
+  // If specified, the node's taints.
+  // +optional
+  repeated Taint taints = 5;
 }
 
 // NodeStatus is information about the current status of a node.
@@ -2662,6 +2666,10 @@ message PodSpec {
   // If not specified, the pod will be dispatched by default scheduler.
   // +optional
   optional string schedulername = 19;
+
+  // If specified, the pod's tolerations.
+  // +optional
+  repeated Toleration tolerations = 22;
 }
 
 // PodStatus represents information about the status of a pod. Status may trail the actual
