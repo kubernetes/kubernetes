@@ -56,23 +56,34 @@ func TestGetPodNetworkStatus(t *testing.T) {
 
 	testCases := []struct {
 		id          string
+		netns       string
 		expectError bool
 		expectIP    string
 	}{
 		//in podCIDR map
 		{
 			"1",
+			"",
 			false,
 			"10.245.0.2",
 		},
 		{
 			"2",
+			"",
 			false,
 			"10.245.0.3",
 		},
-		//not in podCIDR map
+		//not in podCIDR map, retrieve non-exist network namespace
 		{
 			"3",
+			"/proc/0/net/ns",
+			true,
+			"",
+		},
+		//not in podCIDR map, retrieve empty network namespace
+		{
+			"4",
+			"",
 			true,
 			"",
 		},
@@ -108,6 +119,7 @@ func TestGetPodNetworkStatus(t *testing.T) {
 	fakeKubenet := newFakeKubenetPlugin(podIPMap, &fexec, fhost)
 
 	for i, tc := range testCases {
+		fhost.NetNs = tc.netns
 		out, err := fakeKubenet.GetPodNetworkStatus("", "", kubecontainer.ContainerID{ID: tc.id})
 		if tc.expectError {
 			if err == nil {
