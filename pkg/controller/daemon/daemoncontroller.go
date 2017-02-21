@@ -753,6 +753,32 @@ func (dsc *DaemonSetsController) nodeShouldRunDaemonPod(node *v1.Node, ds *exten
 	newPod.Namespace = ds.Namespace
 	newPod.Spec.NodeName = node.Name
 
+	// DaemonPods shouldn't be deleted by NodeController in case of Node problems.
+	// Add infinite toleration for taint notReady:NoExecute here
+	// to survive taint-based eviction enforced by NodeController
+	// when node turns not ready.
+	_, err = v1.AddOrUpdateTolerationInPod(newPod, &v1.Toleration{
+		Key:      metav1.TaintNodeNotReady,
+		Operator: v1.TolerationOpExists,
+		Effect:   v1.TaintEffectNoExecute,
+	})
+	if err != nil {
+		return false, false, false, err
+	}
+
+	// DaemonPods shouldn't be deleted by NodeController in case of Node problems.
+	// Add infinite toleration for taint unreachable:NoExecute here
+	// to survive taint-based eviction enforced by NodeController
+	// when node turns unreachable.
+	_, err = v1.AddOrUpdateTolerationInPod(newPod, &v1.Toleration{
+		Key:      metav1.TaintNodeUnreachable,
+		Operator: v1.TolerationOpExists,
+		Effect:   v1.TaintEffectNoExecute,
+	})
+	if err != nil {
+		return false, false, false, err
+	}
+
 	pods := []*v1.Pod{}
 
 	podList, err := dsc.podLister.List(labels.Everything())

@@ -17,6 +17,7 @@ limitations under the License.
 package daemon
 
 import (
+	"encoding/json"
 	"fmt"
 	"testing"
 
@@ -52,6 +53,22 @@ const (
 		"value": "user1",
 		"effect": "NoSchedule"
 	}]`
+)
+
+var (
+	nodeNotReadyTaint, _ = json.Marshal([]v1.Taint{{
+		Key:       metav1.TaintNodeNotReady,
+		Effect:    v1.TaintEffectNoExecute,
+		TimeAdded: metav1.Now(),
+	}})
+	nodeNotReady = string(nodeNotReadyTaint)
+
+	nodeUnreachableTaint, _ = json.Marshal([]v1.Taint{{
+		Key:       metav1.TaintNodeUnreachable,
+		Effect:    v1.TaintEffectNoExecute,
+		TimeAdded: metav1.Now(),
+	}})
+	nodeUnreachable = string(nodeUnreachableTaint)
 )
 
 func getKey(ds *extensions.DaemonSet, t *testing.T) string {
@@ -741,6 +758,40 @@ func TestTaintedNodeDaemonLaunchesToleratePod(t *testing.T) {
 
 	ds := newDaemonSet("tolerate")
 	setDaemonSetToleration(ds, noSchedule)
+	manager.dsStore.Add(ds)
+
+	syncAndValidateDaemonSets(t, manager, ds, podControl, 1, 0)
+}
+
+// DaemonSet should launch a pod on a not ready node with taint notReady:NoExecute.
+func TestNotReadyNodeDaemonLaunchesPod(t *testing.T) {
+	manager, podControl, _ := newTestController()
+
+	node := newNode("tainted", nil)
+	setNodeTaint(node, nodeNotReady)
+	node.Status.Conditions = []v1.NodeCondition{
+		{Type: v1.NodeReady, Status: v1.ConditionFalse},
+	}
+	manager.nodeStore.Add(node)
+
+	ds := newDaemonSet("simple")
+	manager.dsStore.Add(ds)
+
+	syncAndValidateDaemonSets(t, manager, ds, podControl, 1, 0)
+}
+
+// DaemonSet should launch a pod on an unreachable node with taint unreachable:NoExecute.
+func TestUnreachableNodeDaemonLaunchesPod(t *testing.T) {
+	manager, podControl, _ := newTestController()
+
+	node := newNode("tainted", nil)
+	setNodeTaint(node, nodeUnreachable)
+	node.Status.Conditions = []v1.NodeCondition{
+		{Type: v1.NodeReady, Status: v1.ConditionUnknown},
+	}
+	manager.nodeStore.Add(node)
+
+	ds := newDaemonSet("simple")
 	manager.dsStore.Add(ds)
 
 	syncAndValidateDaemonSets(t, manager, ds, podControl, 1, 0)
