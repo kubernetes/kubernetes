@@ -2521,15 +2521,30 @@ func VerifyThatTaintIsGone(c clientset.Interface, nodeName string, taint *v1.Tai
 
 func ExpectNodeHasTaint(c clientset.Interface, nodeName string, taint *v1.Taint) {
 	By("verifying the node has the taint " + taint.ToString())
-	node, err := c.Core().Nodes().Get(nodeName, metav1.GetOptions{})
-	ExpectNoError(err)
-
-	nodeTaints, err := v1.GetTaintsFromNodeAnnotations(node.Annotations)
-	ExpectNoError(err)
-
-	if len(nodeTaints) == 0 || !v1.TaintExists(nodeTaints, taint) {
+	if has, err := NodeHasTaint(c, nodeName, taint); !has {
+		ExpectNoError(err)
 		Failf("Failed to find taint %s on node %s", taint.ToString(), nodeName)
 	}
+}
+
+func NodeHasTaint(c clientset.Interface, nodeName string, taint *v1.Taint) (bool, error) {
+	node, err := c.Core().Nodes().Get(nodeName, metav1.GetOptions{})
+	if err != nil {
+		return false, err
+	}
+	if err != nil {
+		return false, err
+	}
+
+	nodeTaints, err := v1.GetTaintsFromNodeAnnotations(node.Annotations)
+	if err != nil {
+		return false, err
+	}
+
+	if len(nodeTaints) == 0 || !v1.TaintExists(nodeTaints, taint) {
+		return false, nil
+	}
+	return true, nil
 }
 
 func getScalerForKind(internalClientset internalclientset.Interface, kind schema.GroupKind) (kubectl.Scaler, error) {
