@@ -111,7 +111,9 @@ func (volumes *VolumesV2) createVolume(opts VolumeCreateOpts) (string, error) {
 func (volumes *VolumesV1) getVolume(diskName string) (Volume, error) {
 	var volume_v1 volumes_v1.Volume
 	var volume Volume
-	err := volumes_v1.List(volumes.blockstorage, nil).EachPage(func(page pagination.Page) (bool, error) {
+
+	opts := &volumes_v1.ListOpts{Name: diskName}
+	err := volumes_v1.List(volumes.blockstorage, opts).EachPage(func(page pagination.Page) (bool, error) {
 		vols, err := volumes_v1.ExtractVolumes(page)
 		if err != nil {
 			glog.Errorf("Failed to extract volumes: %v", err)
@@ -149,7 +151,9 @@ func (volumes *VolumesV1) getVolume(diskName string) (Volume, error) {
 func (volumes *VolumesV2) getVolume(diskName string) (Volume, error) {
 	var volume_v2 volumes_v2.Volume
 	var volume Volume
-	err := volumes_v2.List(volumes.blockstorage, nil).EachPage(func(page pagination.Page) (bool, error) {
+
+	opts := &volumes_v2.ListOpts{Name: diskName}
+	err := volumes_v2.List(volumes.blockstorage, opts).EachPage(func(page pagination.Page) (bool, error) {
 		vols, err := volumes_v2.ExtractVolumes(page)
 		if err != nil {
 			glog.Errorf("Failed to extract volumes: %v", err)
