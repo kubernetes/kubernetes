@@ -107,6 +107,7 @@ filegroup(
         "//pkg/volume/iscsi:all-srcs",
         "//pkg/volume/nfs:all-srcs",
         "//pkg/volume/photon_pd:all-srcs",
+        "//pkg/volume/projected:all-srcs",
         "//pkg/volume/quobyte:all-srcs",
         "//pkg/volume/rbd:all-srcs",
         "//pkg/volume/secret:all-srcs",
