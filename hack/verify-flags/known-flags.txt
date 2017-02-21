@@ -214,6 +214,7 @@ experimental-kernel-memcg-notification
 experimental-keystone-ca-file
 experimental-keystone-url
 experimental-mounter-path
+experimental-node-allocatable-ignore-eviction-threshold
 experimental-nvidia-gpus
 experimental-prefix
 external-etcd-cafile
