@@ -44,6 +44,8 @@ func (f *FakeCmd) SetStdin(in io.Reader) {}
 
 func (f *FakeCmd) SetStdout(out io.Writer) {}
 
+func (f *FakeCmd) Stop() {}
+
 type fakeExitError struct {
 	exited     bool
 	statusCode int
