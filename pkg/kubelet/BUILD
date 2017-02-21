@@ -43,7 +43,7 @@ go_library(
         "//pkg/apis/componentconfig/v1alpha1:go_default_library",
         "//pkg/capabilities:go_default_library",
         "//pkg/client/clientset_generated/clientset:go_default_library",
-        "//pkg/client/legacylisters:go_default_library",
+        "//pkg/client/listers/core/v1:go_default_library",
         "//pkg/cloudprovider:go_default_library",
         "//pkg/features:go_default_library",
         "//pkg/fieldpath:go_default_library",
