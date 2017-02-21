@@ -19,6 +19,7 @@ package upgrades
 import (
 	"fmt"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	extensions "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	deploymentutil "k8s.io/kubernetes/pkg/controller/deployment/util"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -32,9 +33,10 @@ import (
 // DeploymentUpgradeTest tests that a deployment is using the same replica
 // sets before and after a cluster upgrade.
 type DeploymentUpgradeTest struct {
-	d     *extensions.Deployment
-	oldRS *extensions.ReplicaSet
-	newRS *extensions.ReplicaSet
+	oldD     *extensions.Deployment
+	updatedD *extensions.Deployment
+	oldRS    *extensions.ReplicaSet
+	newRS    *extensions.ReplicaSet
 }
 
 // Setup creates a deployment and makes sure it has a new and an old replica set running.
@@ -100,28 +102,36 @@ func (t *DeploymentUpgradeTest) Setup(f *framework.Framework) {
 
 	// Store new replica set - should be the same after the upgrade.
 	t.newRS = rs
-	t.d = deployment
+	deployment, err = c.Extensions().Deployments(ns).Get(deployment.Name, metav1.GetOptions{})
+	framework.ExpectNoError(err)
+	t.oldD = deployment
 }
 
 // Test checks whether the replica sets for a deployment are the same after an upgrade.
 func (t *DeploymentUpgradeTest) Test(f *framework.Framework, done <-chan struct{}, upgrade UpgradeType) {
 	// Block until upgrade is done
-	By(fmt.Sprintf("Waiting for upgrade to finish before checking replica sets for deployment %q", t.d.Name))
+	By(fmt.Sprintf("Waiting for upgrade to finish before checking replica sets for deployment %q", t.oldD.Name))
 	<-done
 
-	By(fmt.Sprintf("Checking that replica sets for deployment %q are the same as prior to the upgrade", t.d.Name))
-	_, allOldRSs, newRS, err := deploymentutil.GetAllReplicaSets(t.d, f.ClientSet)
+	c := f.ClientSet
+
+	deployment, err := c.Extensions().Deployments(t.oldD.Namespace).Get(t.oldD.Name, metav1.GetOptions{})
+	framework.ExpectNoError(err)
+	t.updatedD = deployment
+
+	By(fmt.Sprintf("Checking that replica sets for deployment %q are the same as prior to the upgrade", t.updatedD.Name))
+	_, allOldRSs, newRS, err := deploymentutil.GetAllReplicaSets(t.updatedD, c)
 	framework.ExpectNoError(err)
 	if newRS == nil {
-		By(t.spewReplicaSets(newRS, allOldRSs))
-		framework.ExpectNoError(fmt.Errorf("expected a new replica set for deployment %q", t.d.Name))
+		By(t.spewDeploymentAndReplicaSets(newRS, allOldRSs))
+		framework.ExpectNoError(fmt.Errorf("expected a new replica set for deployment %q", t.updatedD.Name))
 	}
 	if newRS.UID != t.newRS.UID {
-		By(t.spewReplicaSets(newRS, allOldRSs))
+		By(t.spewDeploymentAndReplicaSets(newRS, allOldRSs))
 		framework.ExpectNoError(fmt.Errorf("expected new replica set:\n%#v\ngot new replica set:\n%#v\n", t.newRS, newRS))
 	}
 	if len(allOldRSs) != 1 {
-		By(t.spewReplicaSets(newRS, allOldRSs))
+		By(t.spewDeploymentAndReplicaSets(newRS, allOldRSs))
 		errString := fmt.Sprintf("expected one old replica set, got %d\n", len(allOldRSs))
 		for i := range allOldRSs {
 			rs := allOldRSs[i]
@@ -130,7 +140,7 @@ func (t *DeploymentUpgradeTest) Test(f *framework.Framework, done <-chan struct{
 		framework.ExpectNoError(fmt.Errorf(errString))
 	}
 	if allOldRSs[0].UID != t.oldRS.UID {
-		By(t.spewReplicaSets(newRS, allOldRSs))
+		By(t.spewDeploymentAndReplicaSets(newRS, allOldRSs))
 		framework.ExpectNoError(fmt.Errorf("expected old replica set:\n%#v\ngot old replica set:\n%#v\n", t.oldRS, allOldRSs[0]))
 	}
 }
@@ -140,9 +150,11 @@ func (t *DeploymentUpgradeTest) Teardown(f *framework.Framework) {
 	// rely on the namespace deletion to clean up everything
 }
 
-func (t *DeploymentUpgradeTest) spewReplicaSets(newRS *extensions.ReplicaSet, allOldRSs []*extensions.ReplicaSet) string {
-	msg := fmt.Sprintf("old replica sets prior to the upgrade:\n%#v\n", t.oldRS)
+func (t *DeploymentUpgradeTest) spewDeploymentAndReplicaSets(newRS *extensions.ReplicaSet, allOldRSs []*extensions.ReplicaSet) string {
+	msg := fmt.Sprintf("deployment prior to the upgrade:\n%#v\n", t.oldD)
+	msg += fmt.Sprintf("old replica sets prior to the upgrade:\n%#v\n", t.oldRS)
 	msg += fmt.Sprintf("new replica sets prior to the upgrade:\n%#v\n", t.newRS)
+	msg += fmt.Sprintf("deployment after the upgrade:\n%#v\n", t.updatedD)
 	msg += fmt.Sprintf("new replica set after the upgrade:\n%#v\n", newRS)
 	msg += fmt.Sprintf("old replica sets after the upgrade:\n")
 	for i := range allOldRSs {
