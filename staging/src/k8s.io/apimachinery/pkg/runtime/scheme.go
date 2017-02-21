@@ -190,7 +190,17 @@ func (s *Scheme) AddKnownTypeWithName(gvk schema.GroupVersionKind, obj Object) {
 		panic("All types must be pointers to structs.")
 	}
 
+	if oldT, found := s.gvkToType[gvk]; found && oldT != t {
+		panic(fmt.Sprintf("Double registration of different types for %v: old=%v.%v, new=%v.%v", gvk, oldT.PkgPath(), oldT.Name(), t.PkgPath(), t.Name()))
+	}
+
 	s.gvkToType[gvk] = t
+
+	for _, existingGvk := range s.typeToGVK[t] {
+		if existingGvk == gvk {
+			return
+		}
+	}
 	s.typeToGVK[t] = append(s.typeToGVK[t], gvk)
 }
 
