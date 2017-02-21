@@ -223,9 +223,11 @@ func RunCleanupActions() {
 // and then the function that only runs on the first Ginkgo node.
 var _ = ginkgo.SynchronizedAfterSuite(func() {
 	// Run on all Ginkgo nodes
+	framework.Logf("Running AfterSuite actions on all node")
 	RunCleanupActions()
 }, func() {
 	// Run only Ginkgo on node 1
+	framework.Logf("Running AfterSuite actions on node 1")
 	if framework.TestContext.ReportDir != "" {
 		framework.CoreDump(framework.TestContext.ReportDir)
 	}
