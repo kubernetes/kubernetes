@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors.
+Copyright 2017 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -22,13 +22,13 @@ import (
 	"os"
 
 	"github.com/golang/glog"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	api "k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/volume"
+	"k8s.io/kubernetes/pkg/volume/util"
 )
 
-func addSecretsToOptions(options map[string]string, spec *volume.Spec, namespace string, host volume.VolumeHost) error {
+func addSecretsToOptions(options map[string]string, spec *volume.Spec, namespace string, driverName string, host volume.VolumeHost) error {
 	fv, _ := getVolumeSource(spec)
 	if fv.SecretRef == nil {
 		return nil
@@ -39,13 +39,13 @@ func addSecretsToOptions(options map[string]string, spec *volume.Spec, namespace
 		return fmt.Errorf("Cannot get kube client")
 	}
 
-	secret, err := kubeClient.Core().Secrets(namespace).Get(fv.SecretRef.Name, metav1.GetOptions{})
+	secrets, err := util.GetSecretForPV(namespace, fv.SecretRef.Name, driverName, host.GetKubeClient())
 	if err != nil {
 		err = fmt.Errorf("Couldn't get secret %v/%v err: %v", namespace, fv.SecretRef.Name, err)
 		return err
 	}
-	for name, data := range secret.Data {
-		options[optionKeySecret+"/"+name] = base64.StdEncoding.EncodeToString(data)
+	for name, data := range secrets {
+		options[optionKeySecret+"/"+name] = base64.StdEncoding.EncodeToString([]byte(data))
 		glog.V(1).Infof("found flex volume secret info: %s", name)
 	}
 
@@ -63,7 +63,7 @@ func getVolumeSource(spec *volume.Spec) (volumeSource *api.FlexVolumeSource, rea
 	return
 }
 
-func prepareForMount(mounter mount.Interface, deviceMountPath string) (alreadyMounted bool, err error) {
+func prepareForMount(mounter mount.Interface, deviceMountPath string) (bool,error) {
 	if _, err := os.Stat(deviceMountPath); os.IsNotExist(err) {
 		if err := os.MkdirAll(deviceMountPath, 0750); err != nil {
 			return false, err

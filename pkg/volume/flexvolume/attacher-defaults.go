@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors.
+Copyright 2017 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -26,6 +26,7 @@ import (
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/volume"
+	"k8s.io/kubernetes/pkg/util/exec"
 )
 
 type attacherDefaults flexVolumeAttacher
@@ -66,5 +67,7 @@ func (a *attacherDefaults) MountDevice(spec *volume.Spec, devicePath string, dev
 		options = append(options, "rw")
 	}
 
-	return doMount(mounter, devicePath, deviceMountPath, volSource.FSType, options)
+	diskMounter := &mount.SafeFormatAndMount{Interface: mounter, Runner: exec.New()}
+
+	return diskMounter.FormatAndMount(devicePath, deviceMountPath, volSource.FSType, options)
 }

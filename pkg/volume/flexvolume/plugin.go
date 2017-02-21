@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors.
+Copyright 2017 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -173,7 +173,7 @@ func (plugin *flexVolumePlugin) unsupported(commands ...string) {
 	plugin.unsupportedCommands = append(plugin.unsupportedCommands, commands...)
 }
 
-// Returns true iff the given command is know to be unsupported.
+// Returns true iff the given command is known to be unsupported.
 func (plugin *flexVolumePlugin) isUnsupported(command string) bool {
 	plugin.Lock()
 	defer plugin.Unlock()
