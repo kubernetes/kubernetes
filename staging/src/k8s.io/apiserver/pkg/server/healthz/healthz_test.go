@@ -51,10 +51,10 @@ func TestMulitipleChecks(t *testing.T) {
 		{"/healthz?verbose", "[+]ping ok\nhealthz check passed\n", http.StatusOK, false},
 		{"/healthz/ping", "ok", http.StatusOK, false},
 		{"/healthz", "ok", http.StatusOK, false},
-		{"/healthz?verbose", "[+]ping ok\n[-]bad failed: this will fail\nhealthz check failed\n", http.StatusInternalServerError, true},
+		{"/healthz?verbose", "[+]ping ok\n[-]bad failed: reason withheld\nhealthz check failed\n", http.StatusInternalServerError, true},
 		{"/healthz/ping", "ok", http.StatusOK, true},
 		{"/healthz/bad", "internal server error: this will fail\n", http.StatusInternalServerError, true},
-		{"/healthz", "[+]ping ok\n[-]bad failed: this will fail\nhealthz check failed\n", http.StatusInternalServerError, true},
+		{"/healthz", "[+]ping ok\n[-]bad failed: reason withheld\nhealthz check failed\n", http.StatusInternalServerError, true},
 	}
 
 	for i, test := range tests {
