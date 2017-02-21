@@ -53,9 +53,9 @@ func MasterUpgrade(v string) error {
 func etcdUpgradeGCE(target_storage, target_version string) error {
 	env := append(
 		os.Environ(),
-		"TARGET_STORAGE="+target_storage,
-		"TARGET_VERSION="+target_version,
-		"STORAGE_BACKEND="+target_storage)
+		"TEST_ETCD_VERSION="+target_version,
+		"STORAGE_BACKEND="+target_storage,
+		"TEST_ETCD_IMAGE=3.0.14")
 
 	_, _, err := RunCmdEnv(env, path.Join(TestContext.RepoRoot, "cluster/gce/upgrade.sh"), "-l", "-M")
 
