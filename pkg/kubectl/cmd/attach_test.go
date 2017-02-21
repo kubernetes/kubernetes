@@ -60,25 +60,25 @@ func TestPodAndContainerAttach(t *testing.T) {
 		obj               runtime.Object
 	}{
 		{
-			p:           &AttachOptions{},
+			p:           &AttachOptions{GetPodTimeOut: 10},
 			expectError: true,
 			name:        "empty",
 		},
 		{
-			p:           &AttachOptions{},
+			p:           &AttachOptions{GetPodTimeOut: 10},
 			args:        []string{"one", "two", "three"},
 			expectError: true,
 			name:        "too many args",
 		},
 		{
-			p:           &AttachOptions{},
+			p:           &AttachOptions{GetPodTimeOut: 20},
 			args:        []string{"foo"},
 			expectedPod: "foo",
 			name:        "no container, no flags",
 			obj:         attachPod(),
 		},
 		{
-			p:                 &AttachOptions{StreamOptions: StreamOptions{ContainerName: "bar"}},
+			p:                 &AttachOptions{StreamOptions: StreamOptions{ContainerName: "bar"}, GetPodTimeOut: 1000},
 			args:              []string{"foo"},
 			expectedPod:       "foo",
 			expectedContainer: "bar",
@@ -86,7 +86,7 @@ func TestPodAndContainerAttach(t *testing.T) {
 			obj:               attachPod(),
 		},
 		{
-			p:                 &AttachOptions{StreamOptions: StreamOptions{ContainerName: "initfoo"}},
+			p:                 &AttachOptions{StreamOptions: StreamOptions{ContainerName: "initfoo"}, GetPodTimeOut: 1000},
 			args:              []string{"foo"},
 			expectedPod:       "foo",
 			expectedContainer: "initfoo",
@@ -94,25 +94,33 @@ func TestPodAndContainerAttach(t *testing.T) {
 			obj:               attachPod(),
 		},
 		{
-			p:           &AttachOptions{StreamOptions: StreamOptions{ContainerName: "bar"}},
+			p:           &AttachOptions{StreamOptions: StreamOptions{ContainerName: "bar"}, GetPodTimeOut: 1000},
 			args:        []string{"foo", "-c", "wrong"},
 			expectError: true,
 			name:        "non-existing container in flag",
 			obj:         attachPod(),
 		},
 		{
-			p:           &AttachOptions{},
+			p:           &AttachOptions{GetPodTimeOut: 10},
 			args:        []string{"pods", "foo"},
 			expectedPod: "foo",
 			name:        "no container, no flags, pods and name",
 			obj:         attachPod(),
 		},
 		{
-			p:           &AttachOptions{},
+			p:           &AttachOptions{GetPodTimeOut: 10},
 			args:        []string{"pod/foo"},
 			expectedPod: "foo",
 			name:        "no container, no flags, pod/name",
 			obj:         attachPod(),
+		},
+		{
+			p:           &AttachOptions{GetPodTimeOut: 0},
+			args:        []string{"pod/foo"},
+			expectedPod: "foo",
+			name:        "invaild get pod timeout value",
+			obj:         attachPod(),
+			expectError: true,
 		},
 	}
 
@@ -227,7 +235,8 @@ func TestAttach(t *testing.T) {
 				Out:           bufOut,
 				Err:           bufErr,
 			},
-			Attach: remoteAttach,
+			Attach:        remoteAttach,
+			GetPodTimeOut: 1000,
 		}
 		cmd := &cobra.Command{}
 		if err := params.Complete(f, cmd, []string{"foo"}); err != nil {
@@ -310,7 +319,8 @@ func TestAttachWarnings(t *testing.T) {
 				Stdin:         test.stdin,
 				TTY:           test.tty,
 			},
-			Attach: ex,
+			Attach:        ex,
+			GetPodTimeOut: 1000,
 		}
 		cmd := &cobra.Command{}
 		if err := params.Complete(f, cmd, []string{"foo"}); err != nil {

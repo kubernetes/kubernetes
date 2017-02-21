@@ -21,9 +21,8 @@ import (
 	"io"
 	"os"
 
-	"github.com/spf13/cobra"
-
 	"github.com/docker/distribution/reference"
+	"github.com/spf13/cobra"
 
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -135,6 +134,7 @@ func addRunFlags(cmd *cobra.Command) {
 	cmd.Flags().String("service-overrides", "", i18n.T("An inline JSON override for the generated service object. If this is non-empty, it is used to override the generated object. Requires that the object supply a valid apiVersion field.  Only used if --expose is true."))
 	cmd.Flags().Bool("quiet", false, "If true, suppress prompt messages.")
 	cmd.Flags().String("schedule", "", i18n.T("A schedule in the Cron format the job should be run with."))
+	cmd.Flags().Duration("pod-running-timeout", defaultPodAttachTimeout, "The length of time (like 5s, 2m, or 3h, higher than zero) to wait until at least one pod is running")
 }
 
 func Run(f cmdutil.Factory, cmdIn io.Reader, cmdOut, cmdErr io.Writer, cmd *cobra.Command, args []string, argsLenAtDash int) error {
@@ -145,6 +145,12 @@ func Run(f cmdutil.Factory, cmdIn io.Reader, cmdOut, cmdErr io.Writer, cmd *cobr
 	// Let kubectl run follow rules for `--`, see #13004 issue
 	if len(args) == 0 || argsLenAtDash == 0 {
 		return cmdutil.UsageError(cmd, "NAME is required for run")
+	}
+
+	timeout = cmdutil.GetFlagDuration(cmd, "pod-running-timeout")
+	timeout, err := cmdutil.GetValidatedPodRunningTimeOut(cmd, timeout)
+	if err != nil {
+		return cmdutil.UsageError(cmd, err.Error())
 	}
 
 	// validate image name
@@ -268,8 +274,8 @@ func Run(f cmdutil.Factory, cmdIn io.Reader, cmdOut, cmdErr io.Writer, cmd *cobr
 				TTY:   tty,
 				Quiet: quiet,
 			},
-
-			CommandName: cmd.Parent().CommandPath() + " attach",
+			GetPodTimeOut: timeout,
+			CommandName:   cmd.Parent().CommandPath() + " attach",
 
 			Attach: &DefaultRemoteAttach{},
 		}
@@ -285,7 +291,7 @@ func Run(f cmdutil.Factory, cmdIn io.Reader, cmdOut, cmdErr io.Writer, cmd *cobr
 		}
 		opts.PodClient = clientset.Core()
 
-		attachablePod, err := f.AttachablePodForObject(obj)
+		attachablePod, err := f.AttachablePodForObject(obj, opts.GetPodTimeOut)
 		if err != nil {
 			return err
 		}
@@ -427,7 +433,7 @@ func handleAttachPod(f cmdutil.Factory, podClient coreclient.PodsGetter, ns, nam
 		return err
 	}
 	if pod.Status.Phase == api.PodSucceeded || pod.Status.Phase == api.PodFailed {
-		req, err := f.LogsForObject(pod, &api.PodLogOptions{Container: ctrName})
+		req, err := f.LogsForObject(pod, &api.PodLogOptions{Container: ctrName}, opts.GetPodTimeOut)
 		if err != nil {
 			return err
 		}
@@ -448,7 +454,7 @@ func handleAttachPod(f cmdutil.Factory, podClient coreclient.PodsGetter, ns, nam
 	stderr := opts.Err
 	if err := opts.Run(); err != nil {
 		fmt.Fprintf(stderr, "Error attaching, falling back to logs: %v\n", err)
-		req, err := f.LogsForObject(pod, &api.PodLogOptions{Container: ctrName})
+		req, err := f.LogsForObject(pod, &api.PodLogOptions{Container: ctrName}, opts.GetPodTimeOut)
 		if err != nil {
 			return err
 		}

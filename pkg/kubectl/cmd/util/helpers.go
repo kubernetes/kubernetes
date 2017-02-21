@@ -386,6 +386,13 @@ func GetFlagDuration(cmd *cobra.Command, flag string) time.Duration {
 	return d
 }
 
+func GetValidatedPodRunningTimeOut(cmd *cobra.Command, timeout time.Duration) (time.Duration, error) {
+	if timeout <= 0 {
+		return timeout, fmt.Errorf("--pod-running-timeout must be higher than zero")
+	}
+	return timeout, nil
+}
+
 func AddValidateFlags(cmd *cobra.Command) {
 	cmd.Flags().Bool("validate", true, "If true, use a schema to validate the input before sending it")
 	cmd.Flags().String("schema-cache-dir", fmt.Sprintf("~/%s/%s", clientcmd.RecommendedHomeDir, clientcmd.RecommendedSchemaName), fmt.Sprintf("If non-empty, load/store cached API schemas in this directory, default is '$HOME/%s/%s'", clientcmd.RecommendedHomeDir, clientcmd.RecommendedSchemaName))
