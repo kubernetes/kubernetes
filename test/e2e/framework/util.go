@@ -495,8 +495,7 @@ func WaitForPodsSuccess(c clientset.Interface, ns string, successPodLabels map[s
 // and some in Success. This is to allow the client to decide if "Success"
 // means "Ready" or not.
 // If skipSucceeded is true, any pods that are Succeeded are not counted.
-func WaitForPodsRunningReady(c clientset.Interface, ns string, minPods int32, timeout time.Duration, ignoreLabels map[string]string, skipSucceeded bool) error {
-
+func WaitForPodsRunningReady(c clientset.Interface, ns string, minPods, allowedNotReadyPods int32, timeout time.Duration, ignoreLabels map[string]string, skipSucceeded bool) error {
 	ignoreSelector := labels.SelectorFromSet(ignoreLabels)
 	start := time.Now()
 	Logf("Waiting up to %v for all pods (need at least %d) in namespace '%s' to be running and ready",
@@ -504,6 +503,7 @@ func WaitForPodsRunningReady(c clientset.Interface, ns string, minPods int32, ti
 	wg := sync.WaitGroup{}
 	wg.Add(1)
 	var waitForSuccessError error
+	var ignoreNotReady bool
 	badPods := []v1.Pod{}
 	desiredPods := 0
 	go func() {
@@ -544,6 +544,7 @@ func WaitForPodsRunningReady(c clientset.Interface, ns string, minPods int32, ti
 			return false, nil
 		}
 		nOk := int32(0)
+		notReady := int32(0)
 		badPods = []v1.Pod{}
 		desiredPods = len(podList.Items)
 		for _, pod := range podList.Items {
@@ -564,6 +565,7 @@ func WaitForPodsRunningReady(c clientset.Interface, ns string, minPods int32, ti
 				return false, errors.New("unexpected Succeeded pod state")
 			case pod.Status.Phase != v1.PodFailed:
 				Logf("The status of Pod %s is %s (Ready = false), waiting for it to be either Running (with Ready = true) or Failed", pod.ObjectMeta.Name, pod.Status.Phase)
+				notReady++
 				badPods = append(badPods, pod)
 			default:
 				if _, ok := pod.Annotations[v1.CreatedByAnnotation]; !ok {
@@ -581,10 +583,14 @@ func WaitForPodsRunningReady(c clientset.Interface, ns string, minPods int32, ti
 		if replicaOk == replicas && nOk >= minPods && len(badPods) == 0 {
 			return true, nil
 		}
+		ignoreNotReady = (notReady <= allowedNotReadyPods)
 		logPodStates(badPods)
 		return false, nil
 	}) != nil {
-		return errors.New(errorBadPodsStates(badPods, desiredPods, ns, "RUNNING and READY", timeout))
+		if !ignoreNotReady {
+			return errors.New(errorBadPodsStates(badPods, desiredPods, ns, "RUNNING and READY", timeout))
+		}
+		Logf("Number of not-ready pods is allowed.")
 	}
 	wg.Wait()
 	if waitForSuccessError != nil {
