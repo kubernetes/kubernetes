@@ -19,10 +19,13 @@
 usage() {
 	err "Invalid usage. Usage: "
 	err "\t$0 init"
-	err "\t$0 attach <json params>"
-	err "\t$0 detach <mount device>"
-	err "\t$0 mount <mount dir> <mount device> <json params>"
-	err "\t$0 unmount <mount dir>"
+	err "\t$0 attach <json params> <nodename>"
+	err "\t$0 detach <mount device> <nodename>"
+	err "\t$0 waitforattach <mount device> <json params>"
+	err "\t$0 mountdevice <mount dir> <mount device> <json params>"
+	err "\t$0 unmountdevice <mount dir>"
+	err "\t$0 getvolumename <json params>"
+	err "\t$0 isattached <json params> <nodename>"
 	exit 1
 }
 
@@ -43,16 +46,23 @@ ismounted() {
 	fi
 }
 
-attach() {
-	VOLUMEID=$(echo $1 | jq -r '.volumeID')
-	SIZE=$(echo $1 | jq -r '.size')
-	VG=$(echo $1|jq -r '.volumegroup')
+getdevice() {
+	VOLUMEID=$(echo ${JSON_PARAMS} | jq -r '.volumeID')
+	VG=$(echo ${JSON_PARAMS}|jq -r '.volumegroup')
 
 	# LVM substitutes - with --
 	VOLUMEID=`echo $VOLUMEID|sed s/-/--/g`
 	VG=`echo $VG|sed s/-/--/g`
 
 	DMDEV="/dev/mapper/${VG}-${VOLUMEID}"
+	echo ${DMDEV}
+}
+
+attach() {
+	JSON_PARAMS=$1
+	SIZE=$(echo $1 | jq -r '.size')
+
+	DMDEV=$(getdevice)
 	if [ ! -b "${DMDEV}" ]; then
 		err "{\"status\": \"Failure\", \"message\": \"Volume ${VOLUMEID} does not exist\"}"
 		exit 1
@@ -66,7 +76,12 @@ detach() {
 	exit 0
 }
 
-domount() {
+waitforattach() {
+	shift
+	attach $*
+}
+
+domountdevice() {
 	MNTPATH=$1
 	DMDEV=$2
 	FSTYPE=$(echo $3|jq -r '.["kubernetes.io/fsType"]')
@@ -101,8 +116,13 @@ domount() {
 	exit 0
 }
 
-unmount() {
+unmountdevice() {
 	MNTPATH=$1
+	if [ ! -d ${MNTPATH} ]; then
+		log "{\"status\": \"Success\"}"
+		exit 0
+	fi
+
 	if [ $(ismounted) -eq 0 ] ; then
 		log "{\"status\": \"Success\"}"
 		exit 0
@@ -113,9 +133,24 @@ unmount() {
 		err "{ \"status\": \"Failed\", \"message\": \"Failed to unmount volume at ${MNTPATH}\"}"
 		exit 1
 	fi
-	rmdir ${MNTPATH} &> /dev/null
 
 	log "{\"status\": \"Success\"}"
+	exit 0
+}
+
+getvolumename() {
+	JSON_PARAMS=$1
+	DMDEV=$(getdevice)
+
+	# get lvm device UUID
+	UUID=`lvs -o lv_uuid --noheadings ${DMDEV} 2>/dev/null|tr -d " "`
+
+	log "{\"status\": \"Success\", \"volumeName\":\"${UUID}\"}"
+	exit 0
+}
+
+isattached() {
+	log "{\"status\": \"Success\", \"attached\":true}"
 	exit 0
 }
 
@@ -139,14 +174,24 @@ case "$op" in
 	detach)
 		detach $*
 		;;
-	mount)
-		domount $*
+	waitforattach)
+		waitforattach $*
 		;;
-	unmount)
-		unmount $*
+	mountdevice)
+		domountdevice $*
 		;;
+	unmountdevice)
+		unmountdevice $*
+		;;
+	getvolumename)
+		getvolumename $*
+		;;
+	isattached)
+                isattached $*
+                ;;
 	*)
-		usage
+		err "{ \"status\": \"Not supported\" }"
+		exit 1
 esac
 
 exit 1
