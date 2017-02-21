@@ -17,8 +17,6 @@ limitations under the License.
 package upgrades
 
 import (
-	"fmt"
-
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/controller"
@@ -79,9 +77,10 @@ func (t *DaemonSetUpgradeTest) Setup(f *framework.Framework) {
 
 	By("Waiting for DaemonSet pods to become ready")
 	wait.Poll(framework.Poll, framework.PodStartTimeout, func() (bool, error) {
-		return checkRunningOnAllNodes(f, t.daemonSet.Namespace, t.daemonSet.Labels)
+		res, err := checkRunningOnAllNodes(f, t.daemonSet.Namespace, t.daemonSet.Labels)
+		framework.ExpectNoError(err)
+		return res, err
 	})
-	framework.ExpectNoError(err)
 
 	By("Validating the DaemonSet after creation")
 	t.validateRunningDaemonSet(f)
@@ -112,21 +111,29 @@ func (t *DaemonSetUpgradeTest) Teardown(f *framework.Framework) {
 }
 
 func (t *DaemonSetUpgradeTest) validateRunningDaemonSet(f *framework.Framework) {
-	// Pods should come up in a reasonable amount of time
 	By("confirming the DaemonSet pods are running on all expected nodes")
-	_, err := checkRunningOnAllNodes(f, t.daemonSet.Namespace, t.daemonSet.Labels)
+	res, err := checkRunningOnAllNodes(f, t.daemonSet.Namespace, t.daemonSet.Labels)
 	framework.ExpectNoError(err)
+	if !res {
+		framework.Failf("expected DaemonSet pod to be running on all nodes, it was not")
+	}
 
 	// DaemonSet resource itself should be good
 	By("confirming the DaemonSet resource is in a good state")
-	err = checkDaemonStatus(f, t.daemonSet.Namespace, t.daemonSet.Name)
+	res, err = checkDaemonStatus(f, t.daemonSet.Namespace, t.daemonSet.Name)
 	framework.ExpectNoError(err)
+	if !res {
+		framework.Failf("expected DaemonSet to be in a good state, it was not")
+	}
 }
 
+// should return true if they're running, false if not, and an error if something unexpected happens
 func checkRunningOnAllNodes(f *framework.Framework, namespace string, selector map[string]string) (bool, error) {
-
 	nodeList, err := f.ClientSet.Core().Nodes().List(metav1.ListOptions{})
-	framework.ExpectNoError(err)
+	if err != nil {
+		return false, err
+	}
+
 	nodeNames := make([]string, 0)
 	for _, node := range nodeList.Items {
 		taints, err := v1.GetNodeTaints(&node)
@@ -145,7 +152,7 @@ func checkDaemonPodOnNodes(f *framework.Framework, namespace string, labelSet ma
 	options := metav1.ListOptions{LabelSelector: selector.String()}
 	podList, err := f.ClientSet.Core().Pods(namespace).List(options)
 	if err != nil {
-		return false, nil
+		return false, err
 	}
 	pods := podList.Items
 
@@ -168,17 +175,23 @@ func checkDaemonPodOnNodes(f *framework.Framework, namespace string, labelSet ma
 	// Ensure that sizes of the lists are the same. We've verified that every element of nodeNames is in
 	// nodesToPodCount, so verifying the lengths are equal ensures that there aren't pods running on any
 	// other nodes.
-	return len(nodesToPodCount) == len(nodeNames), nil
+	if len(nodesToPodCount) == len(nodeNames) {
+		return true, nil
+	}
+
+	return false, nil
 }
 
-func checkDaemonStatus(f *framework.Framework, namespace string, dsName string) error {
+func checkDaemonStatus(f *framework.Framework, namespace string, dsName string) (bool, error) {
 	ds, err := f.ClientSet.ExtensionsV1beta1().DaemonSets(namespace).Get(dsName, metav1.GetOptions{})
-	framework.ExpectNoError(err)
+	if err != nil {
+		return false, err
+	}
 
 	desired, scheduled, ready := ds.Status.DesiredNumberScheduled, ds.Status.CurrentNumberScheduled, ds.Status.NumberReady
 	if desired != scheduled && desired != ready {
-		return fmt.Errorf("Error in daemon status. DesiredScheduled: %d, CurrentScheduled: %d, Ready: %d", desired, scheduled, ready)
+		return false, nil
 	}
 
-	return nil
+	return true, nil
 }

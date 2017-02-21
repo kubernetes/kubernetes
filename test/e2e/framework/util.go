@@ -928,7 +928,7 @@ func deleteNS(c clientset.Interface, clientPool dynamic.ClientPool, namespace st
 	}
 
 	// wait for namespace to delete or timeout.
-	err := wait.PollImmediate(Poll, timeout, func() (bool, error) {
+	err := wait.PollImmediate(5*time.Second, timeout, func() (bool, error) {
 		if _, err := c.Core().Namespaces().Get(namespace, metav1.GetOptions{}); err != nil {
 			if apierrs.IsNotFound(err) {
 				return true, nil
