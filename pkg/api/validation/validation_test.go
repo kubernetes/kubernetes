@@ -4506,7 +4506,6 @@ func TestValidatePodUpdate(t *testing.T) {
 			false,
 			"activeDeadlineSeconds change to nil from positive",
 		},
-
 		{
 			api.Pod{
 				ObjectMeta: metav1.ObjectMeta{Name: "foo"},
@@ -4586,6 +4585,157 @@ func TestValidatePodUpdate(t *testing.T) {
 			},
 			true,
 			"bad label change",
+		},
+		{
+			api.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo",
+				},
+				Spec: api.PodSpec{
+					NodeName:    "node1",
+					Tolerations: []api.Toleration{{Key: "key1", Value: "value2"}},
+				},
+			},
+			api.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo",
+				},
+				Spec: api.PodSpec{
+					NodeName:    "node1",
+					Tolerations: []api.Toleration{{Key: "key1", Value: "value1"}},
+				},
+			},
+			false,
+			"existing toleration value modified in pod spec updates",
+		},
+		{
+			api.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo",
+				},
+				Spec: api.PodSpec{
+					NodeName:    "node1",
+					Tolerations: []api.Toleration{{Key: "key1", Value: "value2", Operator: "Equal", Effect: "NoExecute", TolerationSeconds: nil}},
+				},
+			},
+			api.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo",
+				},
+				Spec: api.PodSpec{
+					NodeName:    "node1",
+					Tolerations: []api.Toleration{{Key: "key1", Value: "value1", Operator: "Equal", Effect: "NoExecute", TolerationSeconds: &[]int64{10}[0]}},
+				},
+			},
+			false,
+			"existing toleration value modified in pod spec updates with modified tolerationSeconds",
+		},
+		{
+			api.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo",
+				},
+				Spec: api.PodSpec{
+					NodeName:    "node1",
+					Tolerations: []api.Toleration{{Key: "key1", Value: "value1", Operator: "Equal", Effect: "NoExecute", TolerationSeconds: &[]int64{10}[0]}},
+				},
+			},
+			api.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo",
+				},
+				Spec: api.PodSpec{
+					NodeName:    "node1",
+					Tolerations: []api.Toleration{{Key: "key1", Value: "value1", Operator: "Equal", Effect: "NoExecute", TolerationSeconds: &[]int64{20}[0]}},
+				}},
+			true,
+			"modified tolerationSeconds in existing toleration value in pod spec updates",
+		},
+		{
+			api.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo",
+				},
+				Spec: api.PodSpec{
+					Tolerations: []api.Toleration{{Key: "key1", Value: "value2"}},
+				},
+			},
+			api.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo",
+				},
+				Spec: api.PodSpec{
+					NodeName:    "",
+					Tolerations: []api.Toleration{{Key: "key1", Value: "value1"}},
+				},
+			},
+			false,
+			"toleration modified in updates to an unscheduled pod",
+		},
+		{
+			api.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo",
+				},
+				Spec: api.PodSpec{
+					NodeName:    "node1",
+					Tolerations: []api.Toleration{{Key: "key1", Value: "value1"}},
+				},
+			},
+			api.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo",
+				},
+				Spec: api.PodSpec{
+					NodeName:    "node1",
+					Tolerations: []api.Toleration{{Key: "key1", Value: "value1"}},
+				},
+			},
+			true,
+			"tolerations unmodified in updates to a scheduled pod",
+		},
+		{
+			api.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo",
+				},
+				Spec: api.PodSpec{
+					NodeName: "node1",
+					Tolerations: []api.Toleration{
+						{Key: "key1", Value: "value1", Operator: "Equal", Effect: "NoExecute", TolerationSeconds: &[]int64{20}[0]},
+						{Key: "key2", Value: "value2", Operator: "Equal", Effect: "NoExecute", TolerationSeconds: &[]int64{30}[0]},
+					},
+				}},
+			api.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo",
+				},
+				Spec: api.PodSpec{
+					NodeName:    "node1",
+					Tolerations: []api.Toleration{{Key: "key1", Value: "value1", Operator: "Equal", Effect: "NoExecute", TolerationSeconds: &[]int64{10}[0]}},
+				},
+			},
+			true,
+			"added valid new toleration to existing tolerations in pod spec updates",
+		},
+		{
+			api.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "foo"}, Spec: api.PodSpec{
+					NodeName: "node1",
+					Tolerations: []api.Toleration{
+						{Key: "key1", Value: "value1", Operator: "Equal", Effect: "NoExecute", TolerationSeconds: &[]int64{20}[0]},
+						{Key: "key2", Value: "value2", Operator: "Equal", Effect: "NoSchedule", TolerationSeconds: &[]int64{30}[0]},
+					},
+				}},
+			api.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo",
+				},
+				Spec: api.PodSpec{
+					NodeName: "node1", Tolerations: []api.Toleration{{Key: "key1", Value: "value1", Operator: "Equal", Effect: "NoExecute", TolerationSeconds: &[]int64{10}[0]}},
+				}},
+			false,
+			"added invalid new toleration to existing tolerations in pod spec updates",
 		},
 	}
 
