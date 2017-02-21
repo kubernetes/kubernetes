@@ -41,7 +41,7 @@ import (
 const (
 	configmaps       string = "configmaps"
 	clusters         string = "clusters"
-	informerStoreErr        = "configmap should have appeared in the informer store"
+	informerStoreErr string = "configmap should have appeared in the informer store"
 )
 
 func TestConfigMapController(t *testing.T) {

@@ -38,27 +38,33 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+const (
+	daemonsets string = "daemonsets"
+	clusters   string = "clusters"
+	errorMsgF  string = "expected: %v, actual: %v"
+)
+
 func TestDaemonSetController(t *testing.T) {
 	cluster1 := NewCluster("cluster1", apiv1.ConditionTrue)
 	cluster2 := NewCluster("cluster2", apiv1.ConditionTrue)
 
 	fakeClient := &fakefedclientset.Clientset{}
-	RegisterFakeList("clusters", &fakeClient.Fake, &federationapi.ClusterList{Items: []federationapi.Cluster{*cluster1}})
-	RegisterFakeList("daemonsets", &fakeClient.Fake, &extensionsv1.DaemonSetList{Items: []extensionsv1.DaemonSet{}})
-	daemonsetWatch := RegisterFakeWatch("daemonsets", &fakeClient.Fake)
-	daemonsetUpdateChan := RegisterFakeCopyOnUpdate("daemonsets", &fakeClient.Fake, daemonsetWatch)
+	RegisterFakeList(clusters, &fakeClient.Fake, &federationapi.ClusterList{Items: []federationapi.Cluster{*cluster1}})
+	RegisterFakeList(daemonsets, &fakeClient.Fake, &extensionsv1.DaemonSetList{Items: []extensionsv1.DaemonSet{}})
+	daemonsetWatch := RegisterFakeWatch(daemonsets, &fakeClient.Fake)
+	daemonsetUpdateChan := RegisterFakeCopyOnUpdate(daemonsets, &fakeClient.Fake, daemonsetWatch)
 	clusterWatch := RegisterFakeWatch("clusters", &fakeClient.Fake)
 
 	cluster1Client := &fakekubeclientset.Clientset{}
-	cluster1Watch := RegisterFakeWatch("daemonsets", &cluster1Client.Fake)
-	RegisterFakeList("daemonsets", &cluster1Client.Fake, &extensionsv1.DaemonSetList{Items: []extensionsv1.DaemonSet{}})
-	cluster1CreateChan := RegisterFakeCopyOnCreate("daemonsets", &cluster1Client.Fake, cluster1Watch)
-	cluster1UpdateChan := RegisterFakeCopyOnUpdate("daemonsets", &cluster1Client.Fake, cluster1Watch)
+	cluster1Watch := RegisterFakeWatch(daemonsets, &cluster1Client.Fake)
+	RegisterFakeList(daemonsets, &cluster1Client.Fake, &extensionsv1.DaemonSetList{Items: []extensionsv1.DaemonSet{}})
+	cluster1CreateChan := RegisterFakeCopyOnCreate(daemonsets, &cluster1Client.Fake, cluster1Watch)
+	cluster1UpdateChan := RegisterFakeCopyOnUpdate(daemonsets, &cluster1Client.Fake, cluster1Watch)
 
 	cluster2Client := &fakekubeclientset.Clientset{}
-	cluster2Watch := RegisterFakeWatch("daemonsets", &cluster2Client.Fake)
-	RegisterFakeList("daemonsets", &cluster2Client.Fake, &extensionsv1.DaemonSetList{Items: []extensionsv1.DaemonSet{}})
-	cluster2CreateChan := RegisterFakeCopyOnCreate("daemonsets", &cluster2Client.Fake, cluster2Watch)
+	cluster2Watch := RegisterFakeWatch(daemonsets, &cluster2Client.Fake)
+	RegisterFakeList(daemonsets, &cluster2Client.Fake, &extensionsv1.DaemonSetList{Items: []extensionsv1.DaemonSet{}})
+	cluster2CreateChan := RegisterFakeCopyOnCreate(daemonsets, &cluster2Client.Fake, cluster2Watch)
 
 	daemonsetController := NewDaemonSetController(fakeClient)
 	informer := ToFederatedInformerForTestOnly(daemonsetController.daemonsetFederatedInformer)
@@ -108,7 +114,7 @@ func TestDaemonSetController(t *testing.T) {
 	assert.Equal(t, daemonset1.Namespace, createdDaemonSet.Namespace)
 	assert.Equal(t, daemonset1.Name, createdDaemonSet.Name)
 	assert.True(t, daemonsetsEqual(daemonset1, *createdDaemonSet),
-		fmt.Sprintf("expected: %v, actual: %v", daemonset1, *createdDaemonSet))
+		fmt.Sprintf(errorMsgF, daemonset1, *createdDaemonSet))
 
 	// Wait for the daemonset to appear in the informer store
 	err := WaitForStoreUpdate(
@@ -127,7 +133,7 @@ func TestDaemonSetController(t *testing.T) {
 	assert.Equal(t, daemonset1.Name, updatedDaemonSet.Name)
 	assert.Equal(t, daemonset1.Namespace, updatedDaemonSet.Namespace)
 	assert.True(t, daemonsetsEqual(daemonset1, *updatedDaemonSet),
-		fmt.Sprintf("expected: %v, actual: %v", daemonset1, *updatedDaemonSet))
+		fmt.Sprintf(errorMsgF, daemonset1, *updatedDaemonSet))
 
 	// Test update federated daemonset.
 	daemonset1.Spec.Template.Name = "TEST"
@@ -142,7 +148,7 @@ func TestDaemonSetController(t *testing.T) {
 	assert.Equal(t, daemonset1.Name, createdDaemonSet2.Name)
 	assert.Equal(t, daemonset1.Namespace, createdDaemonSet2.Namespace)
 	assert.True(t, daemonsetsEqual(daemonset1, *createdDaemonSet2),
-		fmt.Sprintf("expected: %v, actual: %v", daemonset1, *createdDaemonSet2))
+		fmt.Sprintf(errorMsgF, daemonset1, *createdDaemonSet2))
 
 	close(stop)
 }
@@ -152,6 +158,10 @@ func daemonsetsEqual(a, b extensionsv1.DaemonSet) bool {
 }
 
 func GetDaemonSetFromChan(c chan runtime.Object) *extensionsv1.DaemonSet {
-	daemonset := GetObjectFromChan(c).(*extensionsv1.DaemonSet)
-	return daemonset
+	if daemonset := GetObjectFromChan(c); daemonset == nil {
+		return nil
+	} else {
+		return daemonset.(*extensionsv1.DaemonSet)
+	}
+
 }
