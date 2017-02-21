@@ -60,7 +60,8 @@ func diskSetUp(manager diskManager, b iscsiDiskMounter, volPath string, mounter 
 	if b.readOnly {
 		options = append(options, "ro")
 	}
-	err = mounter.Mount(globalPDPath, volPath, "", options)
+	mountOptions := volume.JoinMountOptions(b.mountOptions, options)
+	err = mounter.Mount(globalPDPath, volPath, "", mountOptions)
 	if err != nil {
 		glog.Errorf("failed to bind mount:%s", globalPDPath)
 		return err

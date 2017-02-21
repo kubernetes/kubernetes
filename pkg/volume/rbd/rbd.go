@@ -136,11 +136,12 @@ func (plugin *rbdPlugin) newMounterInternal(spec *volume.Spec, podUID types.UID,
 			mounter:  &mount.SafeFormatAndMount{Interface: mounter, Runner: exec.New()},
 			plugin:   plugin,
 		},
-		Mon:     source.CephMonitors,
-		Id:      id,
-		Keyring: keyring,
-		Secret:  secret,
-		fsType:  source.FSType,
+		Mon:          source.CephMonitors,
+		Id:           id,
+		Keyring:      keyring,
+		Secret:       secret,
+		fsType:       source.FSType,
+		mountOptions: volume.MountOptionFromSpec(spec),
 	}, nil
 }
 
@@ -360,13 +361,14 @@ func (rbd *rbd) GetPath() string {
 type rbdMounter struct {
 	*rbd
 	// capitalized so they can be exported in persistRBD()
-	Mon         []string
-	Id          string
-	Keyring     string
-	Secret      string
-	fsType      string
-	adminSecret string
-	adminId     string
+	Mon          []string
+	Id           string
+	Keyring      string
+	Secret       string
+	fsType       string
+	adminSecret  string
+	adminId      string
+	mountOptions []string
 }
 
 var _ volume.Mounter = &rbdMounter{}
@@ -377,6 +379,10 @@ func (b *rbd) GetAttributes() volume.Attributes {
 		Managed:         !b.ReadOnly,
 		SupportsSELinux: true,
 	}
+}
+
+func (b *rbd) SupportsMountOption() bool {
+	return true
 }
 
 // Checks prior to mount operations to verify that the required components (binaries, etc.)

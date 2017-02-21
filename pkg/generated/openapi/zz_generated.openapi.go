@@ -5693,6 +5693,20 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 								Format:      "",
 							},
 						},
+						"mountOptions": {
+							SchemaProps: spec.SchemaProps{
+								Description: "The mount options to be used for mounting the volumes",
+								Type:        []string{"array"},
+								Items: &spec.SchemaOrArray{
+									Schema: &spec.Schema{
+										SchemaProps: spec.SchemaProps{
+											Type:   []string{"string"},
+											Format: "",
+										},
+									},
+								},
+							},
+						},
 					},
 				},
 			},

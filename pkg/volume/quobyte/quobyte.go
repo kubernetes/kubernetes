@@ -169,8 +169,9 @@ func (plugin *quobytePlugin) newMounterInternal(spec *volume.Spec, pod *v1.Pod, 
 			volume:  source.Volume,
 			plugin:  plugin,
 		},
-		registry: source.Registry,
-		readOnly: readOnly,
+		registry:     source.Registry,
+		readOnly:     readOnly,
+		mountOptions: volume.MountOptionFromSpec(spec),
 	}, nil
 }
 
@@ -205,8 +206,9 @@ type quobyte struct {
 
 type quobyteMounter struct {
 	*quobyte
-	registry string
-	readOnly bool
+	registry     string
+	readOnly     bool
+	mountOptions []string
 }
 
 var _ volume.Mounter = &quobyteMounter{}
@@ -217,6 +219,10 @@ func (mounter *quobyteMounter) GetAttributes() volume.Attributes {
 		Managed:         false,
 		SupportsSELinux: false,
 	}
+}
+
+func (mounter *quobyteMounter) SupportsMountOption() bool {
+	return true
 }
 
 // Checks prior to mount operations to verify that the required components (binaries, etc.)
@@ -249,7 +255,8 @@ func (mounter *quobyteMounter) SetUpAt(dir string, fsGroup *int64) error {
 	}
 
 	//if a trailing slash is missing we add it here
-	if err := mounter.mounter.Mount(mounter.correctTraillingSlash(mounter.registry), dir, "quobyte", options); err != nil {
+	mountOptions := volume.JoinMountOptions(mounter.mountOptions, options)
+	if err := mounter.mounter.Mount(mounter.correctTraillingSlash(mounter.registry), dir, "quobyte", mountOptions); err != nil {
 		return fmt.Errorf("quobyte: mount failed: %v", err)
 	}
 

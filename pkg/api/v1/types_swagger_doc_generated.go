@@ -1133,6 +1133,7 @@ var map_PersistentVolumeSpec = map[string]string{
 	"accessModes":                   "AccessModes contains all ways the volume can be mounted. More info: http://kubernetes.io/docs/user-guide/persistent-volumes#access-modes",
 	"claimRef":                      "ClaimRef is part of a bi-directional binding between PersistentVolume and PersistentVolumeClaim. Expected to be non-nil when bound. claim.VolumeName is the authoritative bind between PV and PVC. More info: http://kubernetes.io/docs/user-guide/persistent-volumes#binding",
 	"persistentVolumeReclaimPolicy": "What happens to a persistent volume when released from its claim. Valid options are Retain (default) and Recycle. Recycling must be supported by the volume plugin underlying this persistent volume. More info: http://kubernetes.io/docs/user-guide/persistent-volumes#recycling-policy",
+	"mountOptions":                  "The mount options to be used for mounting the volumes",
 }
 
 func (PersistentVolumeSpec) SwaggerDoc() map[string]string {

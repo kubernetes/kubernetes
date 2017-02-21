@@ -37822,6 +37822,13 @@
       "description": "ISCSI represents an ISCSI Disk resource that is attached to a kubelet's host machine and then exposed to the pod. Provisioned by an admin.",
       "$ref": "#/definitions/io.k8s.kubernetes.pkg.api.v1.ISCSIVolumeSource"
      },
+     "mountOptions": {
+      "description": "The mount options to be used for mounting the volumes",
+      "type": "array",
+      "items": {
+       "type": "string"
+      }
+     },
      "nfs": {
       "description": "NFS represents an NFS mount on the host. Provisioned by an admin. More info: http://kubernetes.io/docs/user-guide/volumes#nfs",
       "$ref": "#/definitions/io.k8s.kubernetes.pkg.api.v1.NFSVolumeSource"

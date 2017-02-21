@@ -2039,6 +2039,11 @@ func DeepCopy_v1_PersistentVolumeSpec(in interface{}, out interface{}, c *conver
 			*out = new(ObjectReference)
 			**out = **in
 		}
+		if in.MountOptions != nil {
+			in, out := &in.MountOptions, &out.MountOptions
+			*out = make([]string, len(*in))
+			copy(*out, *in)
+		}
 		return nil
 	}
 }

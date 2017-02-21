@@ -2153,6 +2153,10 @@ message PersistentVolumeSpec {
   // More info: http://kubernetes.io/docs/user-guide/persistent-volumes#recycling-policy
   // +optional
   optional string persistentVolumeReclaimPolicy = 5;
+
+  // The mount options to be used for mounting the volumes
+  // +optional
+  repeated string mountOptions = 6;
 }
 
 // PersistentVolumeStatus is the current status of a persistent volume.

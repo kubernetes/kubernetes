@@ -155,6 +155,10 @@ func (b *gitRepoVolumeMounter) GetAttributes() volume.Attributes {
 	}
 }
 
+func (b *gitRepoVolumeMounter) SupportsMountOption() bool {
+	return false
+}
+
 // Checks prior to mount operations to verify that the required components (binaries, etc.)
 // to mount the volume are available on the underlying node.
 // If not, it returns an error

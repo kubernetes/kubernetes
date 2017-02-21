@@ -327,6 +327,10 @@ func (_ *FakeVolume) GetAttributes() Attributes {
 	}
 }
 
+func (_ *FakeVolume) SupportsMountOption() bool {
+	return true
+}
+
 func (fv *FakeVolume) CanMount() error {
 	return nil
 }

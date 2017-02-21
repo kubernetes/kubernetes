@@ -401,6 +401,9 @@ type PersistentVolumeSpec struct {
 	// ignored, i.e. labels of this PV do not need to match PVC selector.
 	// +optional
 	ClaimRef *ObjectReference
+	// Optional: Mount Options to use for persistent volume
+	// +optional
+	MountOptions []string
 	// Optional: what happens to a persistent volume when released from its claim.
 	// +optional
 	PersistentVolumeReclaimPolicy PersistentVolumeReclaimPolicy

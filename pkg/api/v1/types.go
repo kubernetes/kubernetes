@@ -466,6 +466,9 @@ type PersistentVolumeSpec struct {
 	// More info: http://kubernetes.io/docs/user-guide/persistent-volumes#recycling-policy
 	// +optional
 	PersistentVolumeReclaimPolicy PersistentVolumeReclaimPolicy `json:"persistentVolumeReclaimPolicy,omitempty" protobuf:"bytes,5,opt,name=persistentVolumeReclaimPolicy,casttype=PersistentVolumeReclaimPolicy"`
+	// The mount options to be used for mounting the volumes
+	// +optional
+	MountOptions []string `json:"mountOptions,omitempty" protobuf:"bytes,6,opt,name=mountOptions"`
 }
 
 // PersistentVolumeReclaimPolicy describes a policy for end-of-life maintenance of persistent volumes.

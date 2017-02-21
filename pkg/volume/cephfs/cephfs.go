@@ -138,7 +138,8 @@ func (plugin *cephfsPlugin) newMounterInternal(spec *volume.Spec, podUID types.U
 			secret_file: secret_file,
 			readonly:    cephvs.ReadOnly,
 			mounter:     mounter,
-			plugin:      plugin},
+			plugin:      plugin,
+		},
 	}, nil
 }
 
@@ -186,6 +187,7 @@ type cephfs struct {
 
 type cephfsMounter struct {
 	*cephfs
+	mountOptions []string
 }
 
 var _ volume.Mounter = &cephfsMounter{}
@@ -196,6 +198,10 @@ func (cephfsVolume *cephfsMounter) GetAttributes() volume.Attributes {
 		Managed:         false,
 		SupportsSELinux: false,
 	}
+}
+
+func (cephfsVolume *cephfsMounter) SupportsMountOption() bool {
+	return true
 }
 
 // Checks prior to mount operations to verify that the required components (binaries, etc.)

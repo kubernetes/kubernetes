@@ -17895,6 +17895,12 @@
      "persistentVolumeReclaimPolicy": {
       "type": "string",
       "description": "What happens to a persistent volume when released from its claim. Valid options are Retain (default) and Recycle. Recycling must be supported by the volume plugin underlying this persistent volume. More info: http://kubernetes.io/docs/user-guide/persistent-volumes#recycling-policy"
+     },
+     "mountOptions": {
+      "type": "array",
+      "items": {
+       "type": "string"
+      }
      }
     }
    },
