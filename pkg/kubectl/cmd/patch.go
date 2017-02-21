@@ -190,12 +190,18 @@ func RunPatch(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []strin
 				infoCopy.Object = patchedObj
 				infoCopy.VersionedObject = patchedObj
 				if patch, patchType, err := cmdutil.ChangeResourcePatch(&infoCopy, f.Command()); err == nil {
-					if _, err = helper.Patch(info.Namespace, info.Name, patchType, patch); err != nil {
+					if recordedObj, err := helper.Patch(info.Namespace, info.Name, patchType, patch); err != nil {
 						glog.V(4).Infof("error recording reason: %v", err)
+					} else {
+						patchedObj = recordedObj
 					}
 				}
 			}
 			count++
+
+			if err := info.Refresh(patchedObj, true); err != nil {
+				return err
+			}
 
 			oldData, err := json.Marshal(info.Object)
 			if err != nil {
@@ -209,9 +215,10 @@ func RunPatch(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []strin
 				dataChangedMsg = "patched"
 			}
 
-			if options.OutputFormat == "name" || len(options.OutputFormat) == 0 {
-				cmdutil.PrintSuccess(mapper, options.OutputFormat == "name", out, info.Mapping.Resource, info.Name, false, dataChangedMsg)
+			if len(options.OutputFormat) > 0 && options.OutputFormat != "name" {
+				return cmdutil.PrintResourceInfoForCommand(cmd, info, f, out)
 			}
+			cmdutil.PrintSuccess(mapper, options.OutputFormat == "name", out, info.Mapping.Resource, info.Name, false, dataChangedMsg)
 			return nil
 		}
 
@@ -233,16 +240,10 @@ func RunPatch(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []strin
 		// rawExtension := &runtime.Unknown{
 		//	Raw: originalPatchedObjJS,
 		// }
-
-		printer, err := f.PrinterForMapping(cmd, mapping, false)
-		if err != nil {
+		if err := info.Refresh(targetObj, true); err != nil {
 			return err
 		}
-		if err := printer.PrintObj(targetObj, out); err != nil {
-			return err
-		}
-
-		return nil
+		return cmdutil.PrintResourceInfoForCommand(cmd, info, f, out)
 	})
 	if err != nil {
 		return err
