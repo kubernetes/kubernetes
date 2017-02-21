@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"net/url"
 	"reflect"
+	"runtime/debug"
 
 	"k8s.io/apimachinery/pkg/conversion"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -43,7 +44,8 @@ import (
 type Scheme struct {
 	// versionMap allows one to figure out the go type of an object with
 	// the given version and name.
-	gvkToType map[schema.GroupVersionKind]reflect.Type
+	gvkToType            map[schema.GroupVersionKind]reflect.Type
+	gvkToTypeStacktraces map[schema.GroupVersionKind]string
 
 	// typeToGroupVersion allows one to find metadata for a given go object.
 	// The reflect.Type we index by should *not* be a pointer.
@@ -80,11 +82,12 @@ type FieldLabelConversionFunc func(label, value string) (internalLabel, internal
 // NewScheme creates a new Scheme. This scheme is pluggable by default.
 func NewScheme() *Scheme {
 	s := &Scheme{
-		gvkToType:        map[schema.GroupVersionKind]reflect.Type{},
-		typeToGVK:        map[reflect.Type][]schema.GroupVersionKind{},
-		unversionedTypes: map[reflect.Type]schema.GroupVersionKind{},
-		unversionedKinds: map[string]reflect.Type{},
-		cloner:           conversion.NewCloner(),
+		gvkToType:            map[schema.GroupVersionKind]reflect.Type{},
+		gvkToTypeStacktraces: map[schema.GroupVersionKind]string{},
+		typeToGVK:            map[reflect.Type][]schema.GroupVersionKind{},
+		unversionedTypes:     map[reflect.Type]schema.GroupVersionKind{},
+		unversionedKinds:     map[string]reflect.Type{},
+		cloner:               conversion.NewCloner(),
 		fieldLabelConversionFuncs: map[string]map[string]FieldLabelConversionFunc{},
 		defaulterFuncs:            map[reflect.Type]func(interface{}){},
 	}
@@ -191,10 +194,11 @@ func (s *Scheme) AddKnownTypeWithName(gvk schema.GroupVersionKind, obj Object) {
 	}
 
 	if oldT, found := s.gvkToType[gvk]; found && oldT != t {
-		panic(fmt.Sprintf("Double registration of different types for %v: old=%v.%v, new=%v.%v", gvk, oldT.PkgPath(), oldT.Name(), t.PkgPath(), t.Name()))
+		panic(fmt.Sprintf("Double registration of different types for %v: old=%v.%v, new=%v.%v\n\nOld stack: %v\n\n", gvk, oldT.PkgPath(), oldT.Name(), t.PkgPath(), t.Name(), s.gvkToTypeStacktraces[gvk]))
 	}
 
 	s.gvkToType[gvk] = t
+	s.gvkToTypeStacktraces[gvk] = string(debug.Stack())
 
 	for _, existingGvk := range s.typeToGVK[t] {
 		if existingGvk == gvk {
