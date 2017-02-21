@@ -339,9 +339,13 @@ var _ = framework.KubeDescribe("Density", func() {
 		}
 	})
 
+	options := framework.FrameworkOptions{
+		ClientQPS:   50.0,
+		ClientBurst: 100,
+	}
 	// Explicitly put here, to delete namespace at the end of the test
 	// (after measuring latency metrics, etc.).
-	f := framework.NewDefaultFramework("density")
+	f := framework.NewFramework("density", options, nil)
 	f.NamespaceDeletionTimeout = time.Hour
 
 	BeforeEach(func() {
