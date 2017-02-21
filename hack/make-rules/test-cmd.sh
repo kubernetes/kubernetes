@@ -68,51 +68,10 @@ function run_kube_controller_manager() {
   kube::util::wait_for_url "http://127.0.0.1:${CTLRMGR_PORT}/healthz" "controller-manager"
 }
 
-function run_kubelet() {
-  # Only run kubelet on platforms it supports
-  if [[ "$(go env GOHOSTOS)" == "linux" ]]; then
-    kube::log::status "Building kubelet"
-    make -C "${KUBE_ROOT}" WHAT="cmd/kubelet"
-
-    kube::log::status "Starting kubelet in masterless mode"
-    "${KUBE_OUTPUT_HOSTBIN}/kubelet" \
-      --really-crash-for-testing=true \
-      --root-dir=/tmp/kubelet.$$ \
-      --cert-dir="${TMPDIR:-/tmp/}" \
-      --docker-endpoint="fake://" \
-      --hostname-override="127.0.0.1" \
-      --address="127.0.0.1" \
-      --port="$KUBELET_PORT" \
-      --healthz-port="${KUBELET_HEALTHZ_PORT}" 1>&2 &
-    KUBELET_PID=$!
-    kube::util::wait_for_url "http://127.0.0.1:${KUBELET_HEALTHZ_PORT}/healthz" "kubelet(masterless)"
-    kill ${KUBELET_PID} 1>&2 2>/dev/null
-
-    kube::log::status "Starting kubelet in masterful mode"
-    "${KUBE_OUTPUT_HOSTBIN}/kubelet" \
-      --really-crash-for-testing=true \
-      --root-dir=/tmp/kubelet.$$ \
-      --cert-dir="${TMPDIR:-/tmp/}" \
-      --docker-endpoint="fake://" \
-      --hostname-override="127.0.0.1" \
-      --address="127.0.0.1" \
-      --api-servers="${API_HOST}:${API_PORT}" \
-      --port="$KUBELET_PORT" \
-      --healthz-port="${KUBELET_HEALTHZ_PORT}" 1>&2 &
-    KUBELET_PID=$!
-
-    kube::util::wait_for_url "http://127.0.0.1:${KUBELET_HEALTHZ_PORT}/healthz" "kubelet"
-  fi
-}
-
-# Creates a node object with name 127.0.0.1 if it doesnt exist already.
-# This is required for non-linux platforms where we do not run kubelet.
+# Creates a node object with name 127.0.0.1. This is required because we do not
+# run kubelet.
 function create_node() {
-  if [[ "$(go env GOHOSTOS)" == "linux" ]]; then
-    kube::util::wait_for_url "http://127.0.0.1:${API_PORT}/api/v1/nodes/127.0.0.1" "apiserver(nodes)"
-  else
-    # create a fake node
-    kubectl create -f - -s "http://127.0.0.1:${API_PORT}" << __EOF__
+  kubectl create -f - -s "http://127.0.0.1:${API_PORT}" << __EOF__
 {
   "kind": "Node",
   "apiVersion": "v1",
@@ -126,7 +85,6 @@ function create_node() {
   }
 }
 __EOF__
-  fi
 }
 
 kube::log::status "Running kubectl tests for kube-apiserver"
@@ -134,7 +92,6 @@ kube::log::status "Running kubectl tests for kube-apiserver"
 setup
 run_kube_apiserver
 run_kube_controller_manager
-run_kubelet
 create_node
 SUPPORTED_RESOURCES=("*")
 # WARNING: Do not wrap this call in a subshell to capture output, e.g. output=$(runTests)
