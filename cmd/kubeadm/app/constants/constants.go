@@ -74,6 +74,10 @@ const (
 	// DefaultTokenDuration specifies the default amount of time that a bootstrap token will be valid
 	DefaultTokenDuration = time.Duration(8) * time.Hour
 
+	// LabelNodeRoleMaster specifies that a node is a master
+	// It's copied over to kubeadm until it's merged in core: https://github.com/kubernetes/kubernetes/pull/39112
+	LabelNodeRoleMaster = "node-role.kubernetes.io/master"
+
 	// CSVTokenBootstrapUser is currently the user the bootstrap token in the .csv file
 	// TODO: This should change to something more official and supported
 	// TODO: Prefix with kubeadm prefix
