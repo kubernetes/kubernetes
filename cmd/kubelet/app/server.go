@@ -399,11 +399,12 @@ func run(s *options.KubeletServer, kubeDeps *kubelet.KubeletDeps) (err error) {
 			}
 		}
 
+		nodeName, err := getNodeName(cloud, nodeutil.GetHostname(s.HostnameOverride))
+		if err != nil {
+			return err
+		}
+
 		if s.BootstrapKubeconfig != "" {
-			nodeName, err := getNodeName(cloud, nodeutil.GetHostname(s.HostnameOverride))
-			if err != nil {
-				return err
-			}
 			if err := bootstrapClientCert(s.KubeConfig.Value(), s.BootstrapKubeconfig, s.CertDirectory, nodeName); err != nil {
 				return err
 			}
@@ -447,12 +448,12 @@ func run(s *options.KubeletServer, kubeDeps *kubelet.KubeletDeps) (err error) {
 		kubeDeps.EventClient = eventClient
 	}
 
-	if kubeDeps.Auth == nil {
-		nodeName, err := getNodeName(kubeDeps.Cloud, nodeutil.GetHostname(s.HostnameOverride))
-		if err != nil {
-			return err
-		}
+	nodeName, err := getNodeName(kubeDeps.Cloud, nodeutil.GetHostname(s.HostnameOverride))
+	if err != nil {
+		return err
+	}
 
+	if kubeDeps.Auth == nil {
 		auth, err := buildAuth(nodeName, kubeDeps.ExternalKubeClient, s.KubeletConfiguration)
 		if err != nil {
 			return err
@@ -464,6 +465,19 @@ func run(s *options.KubeletServer, kubeDeps *kubelet.KubeletDeps) (err error) {
 		kubeDeps.CAdvisorInterface, err = cadvisor.New(uint(s.CAdvisorPort), s.ContainerRuntime, s.RootDirectory)
 		if err != nil {
 			return err
+		}
+	}
+
+	// Needed by Container Manager.
+	if kubeDeps.Recorder == nil {
+		eventBroadcaster := record.NewBroadcaster()
+		kubeDeps.Recorder = eventBroadcaster.NewRecorder(api.Scheme, clientv1.EventSource{Component: "kubelet", Host: string(nodeName)})
+		eventBroadcaster.StartLogging(glog.V(3).Infof)
+		if kubeDeps.EventClient != nil {
+			glog.V(4).Infof("Sending events to api server.")
+			eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: kubeDeps.EventClient.Events("")})
+		} else {
+			glog.Warning("No api server defined - no events will be sent to API server.")
 		}
 	}
 
@@ -503,7 +517,8 @@ func run(s *options.KubeletServer, kubeDeps *kubelet.KubeletDeps) (err error) {
 					IgnoreHardEvictionThreshold: s.ExperimentalNodeAllocatableIgnoreEvictionThreshold,
 				},
 			},
-			s.ExperimentalFailSwapOn)
+			s.ExperimentalFailSwapOn,
+			kubeDeps.Recorder)
 
 		if err != nil {
 			return err
@@ -718,15 +733,16 @@ func RunKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *kubelet
 	if err != nil {
 		return err
 	}
-
-	eventBroadcaster := record.NewBroadcaster()
-	kubeDeps.Recorder = eventBroadcaster.NewRecorder(api.Scheme, clientv1.EventSource{Component: "kubelet", Host: string(nodeName)})
-	eventBroadcaster.StartLogging(glog.V(3).Infof)
-	if kubeDeps.EventClient != nil {
-		glog.V(4).Infof("Sending events to api server.")
-		eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: kubeDeps.EventClient.Events("")})
-	} else {
-		glog.Warning("No api server defined - no events will be sent to API server.")
+	if kubeDeps.Recorder == nil {
+		eventBroadcaster := record.NewBroadcaster()
+		kubeDeps.Recorder = eventBroadcaster.NewRecorder(api.Scheme, clientv1.EventSource{Component: "kubelet", Host: string(nodeName)})
+		eventBroadcaster.StartLogging(glog.V(3).Infof)
+		if kubeDeps.EventClient != nil {
+			glog.V(4).Infof("Sending events to api server.")
+			eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: kubeDeps.EventClient.Events("")})
+		} else {
+			glog.Warning("No api server defined - no events will be sent to API server.")
+		}
 	}
 
 	// TODO(mtaufen): I moved the validation of these fields here, from UnsecuredKubeletConfig,

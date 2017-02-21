@@ -21,6 +21,7 @@ package cm
 import (
 	"github.com/golang/glog"
 
+	"k8s.io/client-go/tools/record"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
 	"k8s.io/kubernetes/pkg/util/mount"
@@ -37,6 +38,6 @@ func (cm *containerManagerImpl) Start(_ *v1.Node) error {
 	return nil
 }
 
-func NewContainerManager(mountUtil mount.Interface, cadvisorInterface cadvisor.Interface, nodeConfig NodeConfig, failSwapOn bool) (ContainerManager, error) {
+func NewContainerManager(mountUtil mount.Interface, cadvisorInterface cadvisor.Interface, nodeConfig NodeConfig, failSwapOn bool, recorder record.EventRecorder) (ContainerManager, error) {
 	return &containerManagerImpl{}, nil
 }

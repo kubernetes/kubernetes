@@ -20,10 +20,13 @@ package cm
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/golang/glog"
 
+	"k8s.io/client-go/tools/record"
 	"k8s.io/kubernetes/pkg/api/v1"
+	"k8s.io/kubernetes/pkg/kubelet/events"
 	evictionapi "k8s.io/kubernetes/pkg/kubelet/eviction/api"
 )
 
@@ -46,7 +49,10 @@ func createNodeAllocatableCgroups(nc NodeAllocatableConfig, nodeAllocatable v1.R
 }
 
 // Enforce Node Allocatable Cgroup settings.
-func enforceNodeAllocatableCgroups(nc NodeAllocatableConfig, nodeAllocatable v1.ResourceList, cgroupManager CgroupManager) error {
+func (cm *containerManagerImpl) enforceNodeAllocatableCgroups() error {
+	nc := cm.NodeConfig.NodeAllocatableConfig
+	nodeAllocatable := cm.getNodeAllocatableInternal(false /* ignore hard eviction threshold */)
+
 	glog.V(4).Infof("Attempting to enforce Node Allocatable with config: %+v", nc)
 	glog.V(4).Infof("Node Allocatable resources: %+v", nodeAllocatable)
 	// Create top level cgroups for all pods if necessary.
@@ -55,22 +61,36 @@ func enforceNodeAllocatableCgroups(nc NodeAllocatableConfig, nodeAllocatable v1.
 			Name:               CgroupName(defaultNodeAllocatableCgroupName),
 			ResourceParameters: getCgroupConfig(nodeAllocatable),
 		}
-		glog.V(4).Infof("Updating Node Allocatable cgroup with %d cpu shares and %d bytes of memory", cgroupConfig.ResourceParameters.CpuShares, cgroupConfig.ResourceParameters.Memory)
-		if err := cgroupManager.Update(cgroupConfig); err != nil {
-			glog.Errorf("Failed to create %q cgroup and apply limits")
-			return err
-		}
+		// If Node Allocatable is enforced on a node that has not been drained or is updated on an existing node to a lower value,
+		// existing memory usage across pods might be higher that current Node Allocatable Memory Limits.
+		// Pod Evictions are expected to bring down memory usage to below Node Allocatable limits.
+		// Until evictions happen retry cgroup updates.
+		go func(node *v1.Node, r record.EventRecorder) {
+			for {
+				glog.V(4).Infof("Attempting to update Node Allocatable cgroup with %d cpu shares and %d bytes of memory", cgroupConfig.ResourceParameters.CpuShares, cgroupConfig.ResourceParameters.Memory)
+				err := cm.cgroupManager.Update(cgroupConfig)
+				if err == nil {
+					r.Event(node, v1.EventTypeNormal, events.SuccessfulNodeAllocatableEnforcement, "Updated Node Allocatable limit across pods")
+				}
+				message := fmt.Sprintf("Failed to update limits on cgroup %q: %v", err)
+				r.Event(node, v1.EventTypeWarning, events.FailedNodeAllocatableEnforcement, message)
+				glog.Error(message)
+				// TODO: Set Limits to be a few bytes greater than current memory usage to try to force kernel to reclaim memory.
+				// Retry after a minute.
+				time.Sleep(time.Minute)
+			}
+		}(cm.nodeInfo, cm.recorder)
 	}
 	// Now apply kube reserved and system reserved limits if required.
 	if nc.EnforceNodeAllocatable.Has(systemReservedEnforcementKey) {
 		glog.V(2).Infof("Enforcing system reserved on cgroup %q with limits: %+v", nc.SystemReservedCgroupName, nc.SystemReserved)
-		if err := enforceExistingCgroup(cgroupManager, nc.SystemReservedCgroupName, nc.SystemReserved); err != nil {
+		if err := enforceExistingCgroup(cm.cgroupManager, nc.SystemReservedCgroupName, nc.SystemReserved); err != nil {
 			return fmt.Errorf("failed to enforce System Reserved Cgroup Limits: %v", err)
 		}
 	}
 	if nc.EnforceNodeAllocatable.Has(kubeReservedEnforcementKey) {
 		glog.V(2).Infof("Enforcing kube reserved on cgroup %q with limits: %+v", nc.KubeReservedCgroupName, nc.KubeReserved)
-		if err := enforceExistingCgroup(cgroupManager, nc.KubeReservedCgroupName, nc.KubeReserved); err != nil {
+		if err := enforceExistingCgroup(cm.cgroupManager, nc.KubeReservedCgroupName, nc.KubeReserved); err != nil {
 			return fmt.Errorf("failed to enforce Kube Reserved Cgroup Limits: %v", err)
 		}
 	}

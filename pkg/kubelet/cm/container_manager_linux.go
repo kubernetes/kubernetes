@@ -38,6 +38,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/client-go/tools/record"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
 	cmutil "k8s.io/kubernetes/pkg/kubelet/cm/util"
@@ -108,6 +109,7 @@ type containerManagerImpl struct {
 	cgroupManager CgroupManager
 	capacity      v1.ResourceList
 	cgroupRoot    string
+	recorder      record.EventRecorder
 }
 
 type features struct {
@@ -170,7 +172,7 @@ func validateSystemRequirements(mountUtil mount.Interface) (features, error) {
 // TODO(vmarmol): Add limits to the system containers.
 // Takes the absolute name of the specified containers.
 // Empty container name disables use of the specified container.
-func NewContainerManager(mountUtil mount.Interface, cadvisorInterface cadvisor.Interface, nodeConfig NodeConfig, failSwapOn bool) (ContainerManager, error) {
+func NewContainerManager(mountUtil mount.Interface, cadvisorInterface cadvisor.Interface, nodeConfig NodeConfig, failSwapOn bool, recorder record.EventRecorder) (ContainerManager, error) {
 	subsystems, err := GetCgroupSubsystems()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get mounted cgroup subsystems: %v", err)
@@ -241,6 +243,7 @@ func NewContainerManager(mountUtil mount.Interface, cadvisorInterface cadvisor.I
 		cgroupManager:     cgroupManager,
 		capacity:          capacity,
 		cgroupRoot:        cgroupRoot,
+		recorder:          recorder,
 	}, nil
 }
 
@@ -383,9 +386,7 @@ func (cm *containerManagerImpl) setupNode() error {
 	}
 
 	// Enforce Node Allocatable (if required)
-	if err := enforceNodeAllocatableCgroups(cm.NodeConfig.NodeAllocatableConfig,
-		cm.getNodeAllocatableInternal(false), // ignore eviction thresholds.
-		cm.cgroupManager); err != nil {
+	if err := cm.enforceNodeAllocatableCgroups(); err != nil {
 		return err
 	}
 
