@@ -31,7 +31,7 @@ type unsupportedContainerManager struct {
 
 var _ ContainerManager = &unsupportedContainerManager{}
 
-func (unsupportedContainerManager) Start(_ *v1.Node) error {
+func (unsupportedContainerManager) Start(_ *v1.Node, _ ActivePodsFunc) error {
 	return fmt.Errorf("Container Manager is unsupported in this build")
 }
 
@@ -49,6 +49,10 @@ func (unsupportedContainerManager) GetMountedSubsystems() *CgroupSubsystems {
 
 func (unsupportedContainerManager) GetQOSContainersInfo() QOSContainersInfo {
 	return QOSContainersInfo{}
+}
+
+func (unsupportedContainerManager) UpdateQOSCgroups() error {
+	return nil
 }
 
 func (cm *unsupportedContainerManager) Status() Status {

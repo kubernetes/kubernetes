@@ -1182,7 +1182,7 @@ func (kl *Kubelet) initializeModules() error {
 		return fmt.Errorf("Kubelet failed to get node info: %v", err)
 	}
 
-	if err := kl.containerManager.Start(node); err != nil {
+	if err := kl.containerManager.Start(node, kl.getActivePods); err != nil {
 		return fmt.Errorf("Failed to start ContainerManager %v", err)
 	}
 
@@ -1479,6 +1479,9 @@ func (kl *Kubelet) syncPod(o syncPodOptions) error {
 		if !(podKilled && pod.Spec.RestartPolicy == v1.RestartPolicyNever) {
 			if err := pcm.EnsureExists(pod); err != nil {
 				return fmt.Errorf("failed to ensure that the pod: %v cgroups exist and are correctly applied: %v", pod.UID, err)
+			}
+			if err := kl.containerManager.UpdateQOSCgroups(); err != nil {
+				glog.V(2).Infof("Failed to update QoS cgroups while syncing pod: %v", err)
 			}
 		}
 	}
