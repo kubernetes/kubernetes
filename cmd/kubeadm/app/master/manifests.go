@@ -37,7 +37,6 @@ import (
 
 // Static pod definitions in golang form are included below so that `kubeadm init` can get going.
 const (
-	DefaultClusterName     = "kubernetes"
 	DefaultCloudConfigPath = "/etc/kubernetes/cloud-config"
 
 	etcd                  = "etcd"
@@ -387,12 +386,12 @@ func getControllerManagerCommand(cfg *kubeadmapi.MasterConfiguration, selfHosted
 		"--address=127.0.0.1",
 		"--leader-elect",
 		"--master=127.0.0.1:8080",
-		"--cluster-name="+DefaultClusterName,
 		"--root-ca-file="+getCertFilePath(kubeadmconstants.CACertName),
 		"--service-account-private-key-file="+getCertFilePath(kubeadmconstants.ServiceAccountPrivateKeyName),
 		"--cluster-signing-cert-file="+getCertFilePath(kubeadmconstants.CACertName),
 		"--cluster-signing-key-file="+getCertFilePath(kubeadmconstants.CAKeyName),
 		"--insecure-experimental-approve-all-kubelet-csrs-for-group="+kubeadmconstants.CSVTokenBootstrapGroup,
+		"--use-service-account-credentials",
 	)
 
 	if cfg.CloudProvider != "" {
