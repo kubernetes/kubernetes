@@ -25,7 +25,6 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/pkg/api/v1"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
-	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	tokenutil "k8s.io/kubernetes/cmd/kubeadm/app/util/token"
 	bootstrapapi "k8s.io/kubernetes/pkg/bootstrap/api"
 )
@@ -41,7 +40,7 @@ func UpdateOrCreateToken(client *clientset.Clientset, d *kubeadmapi.TokenDiscove
 	if valid, err := tokenutil.ValidateToken(d); !valid {
 		return err
 	}
-	secretName := fmt.Sprintf("%s%s", kubeadmconstants.BootstrapTokenSecretPrefix, d.ID)
+	secretName := fmt.Sprintf("%s%s", bootstrapapi.BootstrapTokenSecretPrefix, d.ID)
 	var lastErr error
 	for i := 0; i < tokenCreateRetries; i++ {
 		secret, err := client.Secrets(metav1.NamespaceSystem).Get(secretName, metav1.GetOptions{})

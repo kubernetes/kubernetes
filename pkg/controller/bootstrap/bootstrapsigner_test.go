@@ -34,6 +34,8 @@ func init() {
 	spew.Config.DisableMethods = true
 }
 
+const testTokenID = "abc123"
+
 func newBootstrapSigner() (*BootstrapSigner, *fake.Clientset) {
 	options := DefaultBootstrapSignerOptions()
 	cl := fake.NewSimpleClientset()
@@ -69,7 +71,7 @@ func TestSimpleSign(t *testing.T) {
 	cm := newConfigMap("", "")
 	signer.configMaps.Add(cm)
 
-	secret := newTokenSecret("tokenID", "tokenSecret")
+	secret := newTokenSecret(testTokenID, "tokenSecret")
 	addSecretSigningUsage(secret, "true")
 	signer.secrets.Add(secret)
 
@@ -78,7 +80,7 @@ func TestSimpleSign(t *testing.T) {
 	expected := []core.Action{
 		core.NewUpdateAction(schema.GroupVersionResource{Version: "v1", Resource: "configmaps"},
 			api.NamespacePublic,
-			newConfigMap("tokenID", "eyJhbGciOiJIUzI1NiIsImtpZCI6InRva2VuSUQifQ..QAvK9DAjF0hSyASEkH1MOTB5rJMmbWEY9j-z1NSYILE")),
+			newConfigMap(testTokenID, "eyJhbGciOiJIUzI1NiIsImtpZCI6ImFiYzEyMyJ9..QSxpUG7Q542CirTI2ECPSZjvBOJURUW5a7XqFpNI958")),
 	}
 
 	verifyActions(t, expected, cl.Actions())
@@ -87,10 +89,10 @@ func TestSimpleSign(t *testing.T) {
 func TestNoSignNeeded(t *testing.T) {
 	signer, cl := newBootstrapSigner()
 
-	cm := newConfigMap("tokenID", "eyJhbGciOiJIUzI1NiIsImtpZCI6InRva2VuSUQifQ..QAvK9DAjF0hSyASEkH1MOTB5rJMmbWEY9j-z1NSYILE")
+	cm := newConfigMap(testTokenID, "eyJhbGciOiJIUzI1NiIsImtpZCI6ImFiYzEyMyJ9..QSxpUG7Q542CirTI2ECPSZjvBOJURUW5a7XqFpNI958")
 	signer.configMaps.Add(cm)
 
-	secret := newTokenSecret("tokenID", "tokenSecret")
+	secret := newTokenSecret(testTokenID, "tokenSecret")
 	addSecretSigningUsage(secret, "true")
 	signer.secrets.Add(secret)
 
@@ -102,10 +104,10 @@ func TestNoSignNeeded(t *testing.T) {
 func TestUpdateSignature(t *testing.T) {
 	signer, cl := newBootstrapSigner()
 
-	cm := newConfigMap("tokenID", "old signature")
+	cm := newConfigMap(testTokenID, "old signature")
 	signer.configMaps.Add(cm)
 
-	secret := newTokenSecret("tokenID", "tokenSecret")
+	secret := newTokenSecret(testTokenID, "tokenSecret")
 	addSecretSigningUsage(secret, "true")
 	signer.secrets.Add(secret)
 
@@ -114,7 +116,7 @@ func TestUpdateSignature(t *testing.T) {
 	expected := []core.Action{
 		core.NewUpdateAction(schema.GroupVersionResource{Version: "v1", Resource: "configmaps"},
 			api.NamespacePublic,
-			newConfigMap("tokenID", "eyJhbGciOiJIUzI1NiIsImtpZCI6InRva2VuSUQifQ..QAvK9DAjF0hSyASEkH1MOTB5rJMmbWEY9j-z1NSYILE")),
+			newConfigMap(testTokenID, "eyJhbGciOiJIUzI1NiIsImtpZCI6ImFiYzEyMyJ9..QSxpUG7Q542CirTI2ECPSZjvBOJURUW5a7XqFpNI958")),
 	}
 
 	verifyActions(t, expected, cl.Actions())
@@ -123,7 +125,7 @@ func TestUpdateSignature(t *testing.T) {
 func TestRemoveSignature(t *testing.T) {
 	signer, cl := newBootstrapSigner()
 
-	cm := newConfigMap("tokenID", "old signature")
+	cm := newConfigMap(testTokenID, "old signature")
 	signer.configMaps.Add(cm)
 
 	signer.signConfigMap()
