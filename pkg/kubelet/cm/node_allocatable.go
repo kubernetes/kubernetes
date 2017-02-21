@@ -20,10 +20,12 @@ package cm
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/golang/glog"
 
+	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/kubelet/events"
@@ -31,18 +33,24 @@ import (
 )
 
 const (
-	defaultNodeAllocatableCgroupName = "/kubepods"
-	nodeAllocatableEnforcementKey    = "pods"
-	systemReservedEnforcementKey     = "system-reserved"
-	kubeReservedEnforcementKey       = "kube-reserved"
+	defaultNodeAllocatableCgroupName = "kubepods"
+	NodeAllocatableEnforcementKey    = "pods"
+	SystemReservedEnforcementKey     = "system-reserved"
+	KubeReservedEnforcementKey       = "kube-reserved"
+	// Constants for identifying various types of Node Allocatable reservations.
+	forScheduling = iota // 0
+	forEnforcement
 )
 
-func createNodeAllocatableCgroups(nc NodeAllocatableConfig, nodeAllocatable v1.ResourceList, cgroupManager CgroupManager) error {
+func (cm *containerManagerImpl) createNodeAllocatableCgroups() error {
 	cgroupConfig := &CgroupConfig{
-		Name: CgroupName(defaultNodeAllocatableCgroupName),
+		Name: CgroupName(cm.cgroupRoot),
 	}
-	if err := cgroupManager.Create(cgroupConfig); err != nil {
-		glog.Errorf("Failed to create %q cgroup and apply limits")
+	if cm.cgroupManager.Exists(cgroupConfig.Name) {
+		return nil
+	}
+	if err := cm.cgroupManager.Create(cgroupConfig); err != nil {
+		glog.Errorf("Failed to create %q cgroup", cm.cgroupRoot)
 		return err
 	}
 	return nil
@@ -51,12 +59,12 @@ func createNodeAllocatableCgroups(nc NodeAllocatableConfig, nodeAllocatable v1.R
 // Enforce Node Allocatable Cgroup settings.
 func (cm *containerManagerImpl) enforceNodeAllocatableCgroups() error {
 	nc := cm.NodeConfig.NodeAllocatableConfig
-	nodeAllocatable := cm.getNodeAllocatableInternal(false /* ignore hard eviction threshold */)
+	nodeAllocatable := cm.getNodeAllocatableInternal(forEnforcement)
 
 	glog.V(4).Infof("Attempting to enforce Node Allocatable with config: %+v", nc)
 	glog.V(4).Infof("Node Allocatable resources: %+v", nodeAllocatable)
 	// Create top level cgroups for all pods if necessary.
-	if nc.EnforceNodeAllocatable.Has(nodeAllocatableEnforcementKey) {
+	if nc.EnforceNodeAllocatable.Has(NodeAllocatableEnforcementKey) {
 		cgroupConfig := &CgroupConfig{
 			Name:               CgroupName(defaultNodeAllocatableCgroupName),
 			ResourceParameters: getCgroupConfig(nodeAllocatable),
@@ -82,13 +90,13 @@ func (cm *containerManagerImpl) enforceNodeAllocatableCgroups() error {
 		}(cm.nodeInfo, cm.recorder)
 	}
 	// Now apply kube reserved and system reserved limits if required.
-	if nc.EnforceNodeAllocatable.Has(systemReservedEnforcementKey) {
+	if nc.EnforceNodeAllocatable.Has(SystemReservedEnforcementKey) {
 		glog.V(2).Infof("Enforcing system reserved on cgroup %q with limits: %+v", nc.SystemReservedCgroupName, nc.SystemReserved)
 		if err := enforceExistingCgroup(cm.cgroupManager, nc.SystemReservedCgroupName, nc.SystemReserved); err != nil {
 			return fmt.Errorf("failed to enforce System Reserved Cgroup Limits: %v", err)
 		}
 	}
-	if nc.EnforceNodeAllocatable.Has(kubeReservedEnforcementKey) {
+	if nc.EnforceNodeAllocatable.Has(KubeReservedEnforcementKey) {
 		glog.V(2).Infof("Enforcing kube reserved on cgroup %q with limits: %+v", nc.KubeReservedCgroupName, nc.KubeReserved)
 		if err := enforceExistingCgroup(cm.cgroupManager, nc.KubeReservedCgroupName, nc.KubeReserved); err != nil {
 			return fmt.Errorf("failed to enforce Kube Reserved Cgroup Limits: %v", err)
@@ -97,6 +105,7 @@ func (cm *containerManagerImpl) enforceNodeAllocatableCgroups() error {
 	return nil
 }
 
+// enforceExistingCgroup updates the limits `rl` on existing cgroup `cName` using `cgroupManager` interface.
 func enforceExistingCgroup(cgroupManager CgroupManager, cName string, rl v1.ResourceList) error {
 	cgroupConfig := &CgroupConfig{
 		Name:               CgroupName(cName),
@@ -112,6 +121,7 @@ func enforceExistingCgroup(cgroupManager CgroupManager, cName string, rl v1.Reso
 	return nil
 }
 
+// Returns a ResourceConfig object that can be used to create or update cgroups via CgroupManager interface.
 func getCgroupConfig(rl v1.ResourceList) *ResourceConfig {
 	// TODO(vishh): Set CPU Quota if necessary.
 	if rl == nil {
@@ -131,9 +141,14 @@ func getCgroupConfig(rl v1.ResourceList) *ResourceConfig {
 	return &rc
 }
 
-func (cm *containerManagerImpl) getNodeAllocatableInternal(includeHardEviction bool) v1.ResourceList {
+// getNodeAllocatableInternal returns the Node Allocatable based on the purpose.
+// Acceptible values for purpose are `forScheduling` and `forEnforcement`.
+// If `forScheduling` is the purpose, then hard eviction thresholds are subtracted from capacity while computing Node Allocatable.
+// If `forEnforcement` if the purpose, then hard eviction thresholds are ignored.
+// Returns a ResourceList.
+func (cm *containerManagerImpl) getNodeAllocatableInternal(purpose int) v1.ResourceList {
 	var evictionReservation v1.ResourceList
-	if includeHardEviction {
+	if purpose == forScheduling {
 		evictionReservation = hardEvictionReservation(cm.HardEvictionThresholds, cm.capacity)
 	}
 	result := make(v1.ResourceList)
@@ -158,9 +173,9 @@ func (cm *containerManagerImpl) getNodeAllocatableInternal(includeHardEviction b
 
 }
 
-// GetNodeAllocatable returns amount of compute resource available for pods.
+// GetNodeAllocatable returns amount of compute resource available for the scheduler.
 func (cm *containerManagerImpl) GetNodeAllocatable() v1.ResourceList {
-	return cm.getNodeAllocatableInternal(!cm.NodeConfig.IgnoreHardEvictionThreshold)
+	return cm.getNodeAllocatableInternal(forScheduling)
 }
 
 // hardEvictionReservation returns a resourcelist that includes reservation of resources based on hard eviction thresholds.
@@ -181,4 +196,21 @@ func hardEvictionReservation(thresholds []evictionapi.Threshold, capacity v1.Res
 		}
 	}
 	return ret
+}
+
+// validateNodeAllocatable ensures that the user specified Node Allocatable Configuration doesn't reserve more than the node capacity.
+// Returns error if the configuration is invalid, nil otherwise.
+func (cm *containerManagerImpl) validateNodeAllocatable() error {
+	na := cm.GetNodeAllocatable()
+	zeroValue := resource.MustParse("0")
+	var errors []string
+	for key, val := range na {
+		if val.Cmp(zeroValue) <= 0 {
+			errors = append(errors, fmt.Sprintf("Resource %q has an allocatable of %v", key, val))
+		}
+	}
+	if len(errors) > 0 {
+		return fmt.Errorf("Invalid Node Allocatable configuration. %s", strings.Join(errors, " "))
+	}
+	return nil
 }

@@ -102,14 +102,20 @@ type containerManagerImpl struct {
 	// External containers being managed.
 	systemContainers []*systemContainer
 	qosContainers    QOSContainersInfo
-	periodicTasks    []func()
+	// Tasks that are run periodically
+	periodicTasks []func()
 	// holds all the mounted cgroup subsystems
-	subsystems    *CgroupSubsystems
-	nodeInfo      *v1.Node
+	subsystems *CgroupSubsystems
+	nodeInfo   *v1.Node
+	// Interface for cgroup management
 	cgroupManager CgroupManager
-	capacity      v1.ResourceList
-	cgroupRoot    string
-	recorder      record.EventRecorder
+	// Capacity of this node.
+	capacity v1.ResourceList
+	// Absolute cgroupfs path to a cgroup that Kubelet needs to place all pods under.
+	// This path include a top level container for enforcing Node Allocatable.
+	cgroupRoot string
+	// Event recorder interface.
+	recorder record.EventRecorder
 }
 
 type features struct {
@@ -378,6 +384,9 @@ func (cm *containerManagerImpl) setupNode() error {
 
 	// Setup top level qos containers only if CgroupsPerQOS flag is specified as true
 	if cm.NodeConfig.CgroupsPerQOS {
+		if err := cm.createNodeAllocatableCgroups(); err != nil {
+			return err
+		}
 		qosContainersInfo, err := InitQOS(cm.NodeConfig.CgroupDriver, cm.cgroupRoot, cm.subsystems)
 		if err != nil {
 			return fmt.Errorf("failed to initialise top level QOS containers: %v", err)
@@ -548,6 +557,10 @@ func (cm *containerManagerImpl) Start(node *v1.Node) error {
 	cm.nodeInfo = node
 	// Setup the node
 	if err := cm.setupNode(); err != nil {
+		return err
+	}
+	// Ensure that node allocatable configuration is valid.
+	if err := cm.validateNodeAllocatable(); err != nil {
 		return err
 	}
 	// Don't run a background thread if there are no ensureStateFuncs.

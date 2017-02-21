@@ -27,14 +27,16 @@ import (
 	evictionapi "k8s.io/kubernetes/pkg/kubelet/eviction/api"
 )
 
-func TestGetNodeAllocatable(t *testing.T) {
+func TestNodeAllocatable(t *testing.T) {
 	memoryEvictionThreshold := resource.MustParse("100Mi")
+	highMemoryEvictionThreshold := resource.MustParse("2Gi")
 	testCases := []struct {
-		kubeReserved   v1.ResourceList
-		systemReserved v1.ResourceList
-		capacity       v1.ResourceList
-		expected       v1.ResourceList
-		hardThreshold  evictionapi.ThresholdValue
+		kubeReserved         v1.ResourceList
+		systemReserved       v1.ResourceList
+		capacity             v1.ResourceList
+		expected             v1.ResourceList
+		hardThreshold        evictionapi.ThresholdValue
+		invalidConfiguration bool
 	}{
 		{
 			kubeReserved:   getResourceList("100m", "100Mi"),
@@ -86,6 +88,16 @@ func TestGetNodeAllocatable(t *testing.T) {
 			capacity:       getResourceList("10", ""),
 			expected:       getResourceList("10", ""),
 		},
+		{
+			kubeReserved:   getResourceList("5", "10Gi"),
+			systemReserved: getResourceList("5", "10Gi"),
+			hardThreshold: evictionapi.ThresholdValue{
+				Quantity: &highMemoryEvictionThreshold,
+			},
+
+			capacity:             getResourceList("10", "11Gi"),
+			invalidConfiguration: true,
+		},
 	}
 	for idx, tc := range testCases {
 		nc := NodeConfig{
@@ -105,10 +117,17 @@ func TestGetNodeAllocatable(t *testing.T) {
 			NodeConfig: nc,
 			capacity:   tc.capacity,
 		}
-		for k, v := range cm.GetNodeAllocatable() {
-			expected, exists := tc.expected[k]
-			assert.True(t, exists)
-			assert.Equal(t, expected.MilliValue(), v.MilliValue(), "test case %d failed for resource %q", idx+1, k)
+		err := cm.validateNodeAllocatable()
+		if !tc.invalidConfiguration && err != nil {
+			t.Logf("Expected valid node allocatable configuration: %v", err)
+			t.FailNow()
+		}
+		if !tc.invalidConfiguration {
+			for k, v := range cm.GetNodeAllocatable() {
+				expected, exists := tc.expected[k]
+				assert.True(t, exists)
+				assert.Equal(t, expected.MilliValue(), v.MilliValue(), "test case %d failed for resource %q", idx+1, k)
+			}
 		}
 	}
 }

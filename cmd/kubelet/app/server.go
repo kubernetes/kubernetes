@@ -316,6 +316,16 @@ func validateConfig(s *options.KubeletServer) error {
 	if s.SystemCgroups != "" && s.CgroupRoot == "" {
 		return fmt.Errorf("invalid configuration: system container was specified and cgroup root was not specified")
 	}
+	for _, val := range s.EnforceNodeAllocatable {
+		switch val {
+		case cm.NodeAllocatableEnforcementKey:
+		case cm.SystemReservedEnforcementKey:
+		case cm.KubeReservedEnforcementKey:
+			continue
+		default:
+			return fmt.Errorf("invalid option %q specified for EnforceNodeAllocatable setting. Valid options are %q, %q or %q", val, cm.NodeAllocatableEnforcementKey, cm.SystemReservedEnforcementKey, cm.KubeReservedEnforcementKey)
+		}
+	}
 	return nil
 }
 
@@ -490,9 +500,13 @@ func run(s *options.KubeletServer, kubeDeps *kubelet.KubeletDeps) (err error) {
 		if err != nil {
 			return err
 		}
-		hardEvictionThresholds, err := eviction.ParseThresholdConfig(s.EvictionHard, "", "", "")
-		if err != nil {
-			return err
+		hardEvictionThresholds := v1.ResourceList{}
+		// If the user requested to ignore eviction thresholds, then do not set valid values for hardEvictionThresholds here.
+		if !s.ExperimentalNodeAllocatableIgnoreEvictionThreshold {
+			hardEvictionThresholds, err := eviction.ParseThresholdConfig(s.EvictionHard, "", "", "")
+			if err != nil {
+				return err
+			}
 		}
 		kubeDeps.ContainerManager, err = cm.NewContainerManager(
 			kubeDeps.Mounter,
