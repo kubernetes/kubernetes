@@ -415,11 +415,22 @@ func SetReplicasAnnotations(rs *extensions.ReplicaSet, desiredReplicas, maxRepli
 
 // MaxUnavailable returns the maximum unavailable pods a rolling deployment can take.
 func MaxUnavailable(deployment extensions.Deployment) int32 {
-	if !IsRollingUpdate(&deployment) {
+	if !IsRollingUpdate(&deployment) || *(deployment.Spec.Replicas) == 0 {
 		return int32(0)
 	}
 	// Error caught by validation
 	_, maxUnavailable, _ := ResolveFenceposts(deployment.Spec.Strategy.RollingUpdate.MaxSurge, deployment.Spec.Strategy.RollingUpdate.MaxUnavailable, *(deployment.Spec.Replicas))
+	return maxUnavailable
+}
+
+// MaxUnavailableInternal returns the maximum unavailable pods a rolling deployment can take.
+// TODO: remove the duplicate
+func MaxUnavailableInternal(deployment internalextensions.Deployment) int32 {
+	if !(deployment.Spec.Strategy.Type == internalextensions.RollingUpdateDeploymentStrategyType) || deployment.Spec.Replicas == 0 {
+		return int32(0)
+	}
+	// Error caught by validation
+	_, maxUnavailable, _ := ResolveFenceposts(&deployment.Spec.Strategy.RollingUpdate.MaxSurge, &deployment.Spec.Strategy.RollingUpdate.MaxUnavailable, deployment.Spec.Replicas)
 	return maxUnavailable
 }
 
