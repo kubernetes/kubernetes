@@ -279,6 +279,12 @@ func getSecretNames(pod *v1.Pod) sets.String {
 	for i := range pod.Spec.Volumes {
 		if source := pod.Spec.Volumes[i].Secret; source != nil {
 			result.Insert(source.SecretName)
+		} else if source := pod.Spec.Volumes[i].Projected; source != nil {
+			for j := range source.Sources {
+				if secretVolumeSource := source.Sources[j].Secret; secretVolumeSource != nil {
+					result.Insert(secretVolumeSource.Name)
+				}
+			}
 		}
 	}
 	return result

@@ -190,6 +190,20 @@ func SetObjectDefaults_Pod(in *Pod) {
 		if a.VolumeSource.AzureDisk != nil {
 			SetDefaults_AzureDiskVolumeSource(a.VolumeSource.AzureDisk)
 		}
+		if a.VolumeSource.Projected != nil {
+			SetDefaults_ProjectedVolumeSource(a.VolumeSource.Projected)
+			for j := range a.VolumeSource.Projected.Sources {
+				b := &a.VolumeSource.Projected.Sources[j]
+				if b.DownwardAPI != nil {
+					for k := range b.DownwardAPI.Items {
+						c := &b.DownwardAPI.Items[k]
+						if c.FieldRef != nil {
+							SetDefaults_ObjectFieldSelector(c.FieldRef)
+						}
+					}
+				}
+			}
+		}
 	}
 	for i := range in.Spec.InitContainers {
 		a := &in.Spec.InitContainers[i]
@@ -321,6 +335,20 @@ func SetObjectDefaults_PodTemplate(in *PodTemplate) {
 		if a.VolumeSource.AzureDisk != nil {
 			SetDefaults_AzureDiskVolumeSource(a.VolumeSource.AzureDisk)
 		}
+		if a.VolumeSource.Projected != nil {
+			SetDefaults_ProjectedVolumeSource(a.VolumeSource.Projected)
+			for j := range a.VolumeSource.Projected.Sources {
+				b := &a.VolumeSource.Projected.Sources[j]
+				if b.DownwardAPI != nil {
+					for k := range b.DownwardAPI.Items {
+						c := &b.DownwardAPI.Items[k]
+						if c.FieldRef != nil {
+							SetDefaults_ObjectFieldSelector(c.FieldRef)
+						}
+					}
+				}
+			}
+		}
 	}
 	for i := range in.Template.Spec.InitContainers {
 		a := &in.Template.Spec.InitContainers[i]
@@ -445,6 +473,20 @@ func SetObjectDefaults_ReplicationController(in *ReplicationController) {
 			}
 			if a.VolumeSource.AzureDisk != nil {
 				SetDefaults_AzureDiskVolumeSource(a.VolumeSource.AzureDisk)
+			}
+			if a.VolumeSource.Projected != nil {
+				SetDefaults_ProjectedVolumeSource(a.VolumeSource.Projected)
+				for j := range a.VolumeSource.Projected.Sources {
+					b := &a.VolumeSource.Projected.Sources[j]
+					if b.DownwardAPI != nil {
+						for k := range b.DownwardAPI.Items {
+							c := &b.DownwardAPI.Items[k]
+							if c.FieldRef != nil {
+								SetDefaults_ObjectFieldSelector(c.FieldRef)
+							}
+						}
+					}
+				}
 			}
 		}
 		for i := range in.Spec.Template.Spec.InitContainers {
