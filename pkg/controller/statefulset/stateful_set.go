@@ -69,7 +69,7 @@ type StatefulSetController struct {
 }
 
 // NewStatefulSetController creates a new statefulset controller.
-func NewStatefulSetController(podInformer cache.SharedIndexInformer, kubeClient clientset.Interface, resyncPeriod time.Duration) *StatefulSetController {
+func NewStatefulSetController(podInformer cache.SharedIndexInformer, kubeClient clientset.Interface) *StatefulSetController {
 	eventBroadcaster := record.NewBroadcaster()
 	eventBroadcaster.StartLogging(glog.Infof)
 	eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: v1core.New(kubeClient.Core().RESTClient()).Events("")})
