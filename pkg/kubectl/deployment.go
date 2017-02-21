@@ -26,7 +26,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/extensions"
 )
 
-// DeploymentGeneratorV1 supports stable generation of a deployment
+// DeploymentBasicGeneratorV1 supports stable generation of a deployment
 type DeploymentBasicGeneratorV1 struct {
 	Name   string
 	Images []string
