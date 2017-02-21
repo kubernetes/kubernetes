@@ -205,7 +205,7 @@ func genericDescriber(clientAccessFactory ClientAccessFactory, mapping *meta.RES
 	return kubectl.GenericDescriberFor(mapping, dynamicClient, eventsClient), nil
 }
 
-func (f *ring1Factory) LogsForObject(object, options runtime.Object) (*restclient.Request, error) {
+func (f *ring1Factory) LogsForObject(object, options runtime.Object, timeout time.Duration) (*restclient.Request, error) {
 	clientset, err := f.clientAccessFactory.ClientSetForVersion(nil)
 	if err != nil {
 		return nil, err
@@ -226,7 +226,7 @@ func (f *ring1Factory) LogsForObject(object, options runtime.Object) (*restclien
 		}
 		selector := labels.SelectorFromSet(t.Spec.Selector)
 		sortBy := func(pods []*v1.Pod) sort.Interface { return controller.ByLogging(pods) }
-		pod, numPods, err := GetFirstPod(clientset.Core(), t.Namespace, selector, 20*time.Second, sortBy)
+		pod, numPods, err := GetFirstPod(clientset.Core(), t.Namespace, selector, timeout, sortBy)
 		if err != nil {
 			return nil, err
 		}
@@ -246,7 +246,7 @@ func (f *ring1Factory) LogsForObject(object, options runtime.Object) (*restclien
 			return nil, fmt.Errorf("invalid label selector: %v", err)
 		}
 		sortBy := func(pods []*v1.Pod) sort.Interface { return controller.ByLogging(pods) }
-		pod, numPods, err := GetFirstPod(clientset.Core(), t.Namespace, selector, 20*time.Second, sortBy)
+		pod, numPods, err := GetFirstPod(clientset.Core(), t.Namespace, selector, timeout, sortBy)
 		if err != nil {
 			return nil, err
 		}
@@ -315,7 +315,7 @@ func (f *ring1Factory) StatusViewer(mapping *meta.RESTMapping) (kubectl.StatusVi
 	return kubectl.StatusViewerFor(mapping.GroupVersionKind.GroupKind(), clientset)
 }
 
-func (f *ring1Factory) AttachablePodForObject(object runtime.Object) (*api.Pod, error) {
+func (f *ring1Factory) AttachablePodForObject(object runtime.Object, timeout time.Duration) (*api.Pod, error) {
 	clientset, err := f.clientAccessFactory.ClientSetForVersion(nil)
 	if err != nil {
 		return nil, err
@@ -357,7 +357,7 @@ func (f *ring1Factory) AttachablePodForObject(object runtime.Object) (*api.Pod, 
 		return nil, fmt.Errorf("cannot attach to %v: not implemented", gvks[0])
 	}
 	sortBy := func(pods []*v1.Pod) sort.Interface { return sort.Reverse(controller.ActivePods(pods)) }
-	pod, _, err := GetFirstPod(clientset.Core(), namespace, selector, 1*time.Minute, sortBy)
+	pod, _, err := GetFirstPod(clientset.Core(), namespace, selector, timeout, sortBy)
 	return pod, err
 }
 

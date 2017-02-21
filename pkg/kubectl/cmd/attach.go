@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"io"
 	"net/url"
+	"time"
 
 	"github.com/golang/glog"
 	"github.com/spf13/cobra"
@@ -76,7 +77,7 @@ func NewCmdAttach(f cmdutil.Factory, cmdIn io.Reader, cmdOut, cmdErr io.Writer) 
 			cmdutil.CheckErr(options.Run())
 		},
 	}
-	// TODO support UID
+	cmd.Flags().Int64Var(&options.GetPodTimeOut, "pod-running-timeout", 60, "The length of time (in seconds) to wait until at least one pod is running")
 	cmd.Flags().StringVarP(&options.ContainerName, "container", "c", "", "Container name. If omitted, the first container in the pod will be chosen")
 	cmd.Flags().BoolVarP(&options.Stdin, "stdin", "i", false, "Pass stdin to the container")
 	cmd.Flags().BoolVarP(&options.TTY, "tty", "t", false, "Stdin is a TTY")
@@ -114,9 +115,10 @@ type AttachOptions struct {
 
 	Pod *api.Pod
 
-	Attach    RemoteAttach
-	PodClient coreclient.PodsGetter
-	Config    *restclient.Config
+	Attach        RemoteAttach
+	PodClient     coreclient.PodsGetter
+	GetPodTimeOut int64
+	Config        *restclient.Config
 }
 
 // Complete verifies command line arguments and loads data from the command environment
@@ -128,6 +130,9 @@ func (p *AttachOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, argsIn [
 		return cmdutil.UsageError(cmd, fmt.Sprintf("expected fewer than three arguments: POD or TYPE/NAME or TYPE NAME, saw %d: %s", len(argsIn), argsIn))
 	}
 
+	if p.GetPodTimeOut <= 0 {
+		return fmt.Errorf("--pod-running-timeout must be higher than zero")
+	}
 	namespace, _, err := f.DefaultNamespace()
 	if err != nil {
 		return err
@@ -149,7 +154,7 @@ func (p *AttachOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, argsIn [
 		return err
 	}
 
-	attachablePod, err := f.AttachablePodForObject(obj)
+	attachablePod, err := f.AttachablePodForObject(obj, time.Second*time.Duration(p.GetPodTimeOut))
 	if err != nil {
 		return err
 	}

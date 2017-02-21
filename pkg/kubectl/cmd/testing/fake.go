@@ -41,6 +41,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
+	"time"
 )
 
 type InternalType struct {
@@ -375,7 +376,7 @@ func (f *FakeFactory) LabelsForObject(runtime.Object) (map[string]string, error)
 	return nil, nil
 }
 
-func (f *FakeFactory) LogsForObject(object, options runtime.Object) (*restclient.Request, error) {
+func (f *FakeFactory) LogsForObject(object, options runtime.Object, timeout time.Duration) (*restclient.Request, error) {
 	return nil, nil
 }
 
@@ -422,7 +423,7 @@ func (f *FakeFactory) CanBeAutoscaled(schema.GroupKind) error {
 	return nil
 }
 
-func (f *FakeFactory) AttachablePodForObject(ob runtime.Object) (*api.Pod, error) {
+func (f *FakeFactory) AttachablePodForObject(ob runtime.Object, timeout time.Duration) (*api.Pod, error) {
 	return nil, nil
 }
 
@@ -595,7 +596,7 @@ func (f *fakeAPIFactory) Printer(mapping *meta.RESTMapping, options kubectl.Prin
 	return f.tf.Printer, f.tf.Err
 }
 
-func (f *fakeAPIFactory) LogsForObject(object, options runtime.Object) (*restclient.Request, error) {
+func (f *fakeAPIFactory) LogsForObject(object, options runtime.Object, timeout time.Duration) (*restclient.Request, error) {
 	c, err := f.ClientSet()
 	if err != nil {
 		panic(err)
@@ -617,7 +618,7 @@ func (f *fakeAPIFactory) LogsForObject(object, options runtime.Object) (*restcli
 	}
 }
 
-func (f *fakeAPIFactory) AttachablePodForObject(object runtime.Object) (*api.Pod, error) {
+func (f *fakeAPIFactory) AttachablePodForObject(object runtime.Object, timeout time.Duration) (*api.Pod, error) {
 	switch t := object.(type) {
 	case *api.Pod:
 		return t, nil
