@@ -358,10 +358,8 @@ func verifyCascadingDeletionForService(clientset *fedclientset.Clientset, cluste
 	}
 }
 
-/*
-   equivalent returns true if the two services are equivalent.  Fields which are expected to differ between
-   federated services and the underlying cluster services (e.g. ClusterIP, LoadBalancerIP etc) are ignored.
-*/
+// equivalent returns true if the two services are equivalent.  Fields which are expected to differ between
+// federated services and the underlying cluster services (e.g. ClusterIP, LoadBalancerIP etc) are ignored.
 func equivalent(federationService, clusterService v1.Service) bool {
 	// TODO: I think that we need a DeepCopy here to avoid clobbering our parameters.
 	clusterService.Spec.ClusterIP = federationService.Spec.ClusterIP
