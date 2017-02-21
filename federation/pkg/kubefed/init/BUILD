@@ -23,6 +23,7 @@ go_library(
         "//pkg/kubectl/cmd/templates:go_default_library",
         "//pkg/kubectl/cmd/util:go_default_library",
         "//pkg/version:go_default_library",
+        "//vendor:github.com/golang/glog",
         "//vendor:github.com/spf13/cobra",
         "//vendor:github.com/spf13/pflag",
         "//vendor:k8s.io/apimachinery/pkg/api/resource",
