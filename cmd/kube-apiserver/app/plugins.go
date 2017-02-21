@@ -27,6 +27,7 @@ import (
 	_ "k8s.io/kubernetes/plugin/pkg/admission/admit"
 	_ "k8s.io/kubernetes/plugin/pkg/admission/alwayspullimages"
 	_ "k8s.io/kubernetes/plugin/pkg/admission/antiaffinity"
+	_ "k8s.io/kubernetes/plugin/pkg/admission/defaulttolerationseconds"
 	_ "k8s.io/kubernetes/plugin/pkg/admission/deny"
 	_ "k8s.io/kubernetes/plugin/pkg/admission/exec"
 	_ "k8s.io/kubernetes/plugin/pkg/admission/gc"

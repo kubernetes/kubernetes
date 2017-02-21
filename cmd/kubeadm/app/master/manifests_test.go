@@ -370,7 +370,7 @@ func TestGetAPIServerCommand(t *testing.T) {
 			expected: []string{
 				"kube-apiserver",
 				"--insecure-bind-address=127.0.0.1",
-				"--admission-control=NamespaceLifecycle,LimitRanger,ServiceAccount,PersistentVolumeLabel,DefaultStorageClass,ResourceQuota",
+				"--admission-control=NamespaceLifecycle,LimitRanger,ServiceAccount,PersistentVolumeLabel,DefaultStorageClass,ResourceQuota,DefaultTolerationSeconds",
 				"--service-cluster-ip-range=bar",
 				"--service-account-key-file=" + kubeadmapi.GlobalEnvParams.HostPKIPath + "/sa.pub",
 				"--client-ca-file=" + kubeadmapi.GlobalEnvParams.HostPKIPath + "/ca.crt",
@@ -399,7 +399,7 @@ func TestGetAPIServerCommand(t *testing.T) {
 			expected: []string{
 				"kube-apiserver",
 				"--insecure-bind-address=127.0.0.1",
-				"--admission-control=NamespaceLifecycle,LimitRanger,ServiceAccount,PersistentVolumeLabel,DefaultStorageClass,ResourceQuota",
+				"--admission-control=NamespaceLifecycle,LimitRanger,ServiceAccount,PersistentVolumeLabel,DefaultStorageClass,ResourceQuota,DefaultTolerationSeconds",
 				"--service-cluster-ip-range=bar",
 				"--service-account-key-file=" + kubeadmapi.GlobalEnvParams.HostPKIPath + "/sa.pub",
 				"--client-ca-file=" + kubeadmapi.GlobalEnvParams.HostPKIPath + "/ca.crt",
@@ -430,7 +430,7 @@ func TestGetAPIServerCommand(t *testing.T) {
 			expected: []string{
 				"kube-apiserver",
 				"--insecure-bind-address=127.0.0.1",
-				"--admission-control=NamespaceLifecycle,LimitRanger,ServiceAccount,PersistentVolumeLabel,DefaultStorageClass,ResourceQuota",
+				"--admission-control=NamespaceLifecycle,LimitRanger,ServiceAccount,PersistentVolumeLabel,DefaultStorageClass,ResourceQuota,DefaultTolerationSeconds",
 				"--service-cluster-ip-range=bar",
 				"--service-account-key-file=" + kubeadmapi.GlobalEnvParams.HostPKIPath + "/sa.pub",
 				"--client-ca-file=" + kubeadmapi.GlobalEnvParams.HostPKIPath + "/ca.crt",
