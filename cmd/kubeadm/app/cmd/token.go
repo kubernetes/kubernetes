@@ -227,7 +227,7 @@ func RunDeleteToken(out io.Writer, cmd *cobra.Command, tokenId string) error {
 		return err
 	}
 
-	tokenSecretName := fmt.Sprintf("%s%s", kubeadmconstants.BootstrapTokenSecretPrefix, tokenId)
+	tokenSecretName := fmt.Sprintf("%s%s", bootstrapapi.BootstrapTokenSecretPrefix, tokenId)
 	if err := client.Secrets(metav1.NamespaceSystem).Delete(tokenSecretName, nil); err != nil {
 		return fmt.Errorf("failed to delete bootstrap token [%v]", err)
 	}

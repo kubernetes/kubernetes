@@ -73,8 +73,6 @@ const (
 
 	// DefaultTokenDuration specifies the default amount of time that a bootstrap token will be valid
 	DefaultTokenDuration = time.Duration(8) * time.Hour
-	// BootstrapTokenSecretPrefix the the prefix that will be used for the Secrets that are created as type bootstrap.kubernetes.io/token
-	BootstrapTokenSecretPrefix = "bootstrap-token-"
 
 	// CSVTokenBootstrapUser is currently the user the bootstrap token in the .csv file
 	// TODO: This should change to something more official and supported
