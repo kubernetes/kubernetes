@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors.
+Copyright 2017 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -66,7 +66,7 @@ func (f *flexVolumeMounter) SetUpAt(dir string, fsGroup *int64) error {
 	extraOptions := make(map[string]string)
 
 	// Extract secret and pass it as options.
-	if err := addSecretsToOptions(extraOptions, f.spec, f.podNamespace, f.plugin.host); err != nil {
+	if err := addSecretsToOptions(extraOptions, f.spec, f.podNamespace, f.driverName, f.plugin.host); err != nil {
 		return err
 	}
 
@@ -79,9 +79,18 @@ func (f *flexVolumeMounter) SetUpAt(dir string, fsGroup *int64) error {
 
 	_, err = call.Run()
 	if isCmdNotSupportedErr(err) {
-		return (*mounterDefaults)(f).SetUpAt(dir, fsGroup)
+		err = (*mounterDefaults)(f).SetUpAt(dir, fsGroup)
 	}
-	return err
+
+	if err != nil {
+		return err
+	}
+
+	if !f.readOnly {
+		volume.SetVolumeOwnership(f, fsGroup)
+	}
+
+	return nil
 }
 
 // GetAttributes get the flex volume attributes. The attributes will be queried
