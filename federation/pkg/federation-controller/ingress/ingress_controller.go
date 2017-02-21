@@ -501,12 +501,6 @@ func (ic *IngressController) reconcileConfigMapForCluster(clusterName string) {
 		return
 	}
 
-	ingressList := ic.ingressInformerStore.List()
-	if len(ingressList) <= 0 {
-		glog.V(4).Infof("No federated ingresses, ignore reconcile config map.")
-		return
-	}
-
 	if clusterName == allClustersKey {
 		clusters, err := ic.configMapFederatedInformer.GetReadyClusters()
 		if err != nil {
@@ -529,7 +523,7 @@ func (ic *IngressController) reconcileConfigMapForCluster(clusterName string) {
 		uidConfigMapNamespacedName := types.NamespacedName{Name: uidConfigMapName, Namespace: uidConfigMapNamespace}
 		configMapObj, found, err := ic.configMapFederatedInformer.GetTargetStore().GetByKey(cluster.Name, uidConfigMapNamespacedName.String())
 		if !found || err != nil {
-			glog.Errorf("Failed to get ConfigMap %q for cluster %q.  Will try again later: %v", uidConfigMapNamespacedName, cluster.Name, err)
+			glog.V(4).Infof("Failed to get ConfigMap %q for cluster %q.  Will try again later: %v", uidConfigMapNamespacedName, cluster.Name, err)
 			ic.configMapDeliverer.DeliverAfter(clusterName, nil, ic.configMapReviewDelay)
 			return
 		}
