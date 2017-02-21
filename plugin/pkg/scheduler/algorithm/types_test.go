@@ -19,23 +19,43 @@ package algorithm
 import (
 	"testing"
 
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/schedulercache"
 )
 
 // EmptyMetadataProducer should returns a no-op MetadataProducer type.
 func TestEmptyMetadataProducer(t *testing.T) {
-	pod := &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "1"}}
-
-	nodeNameToInfo := map[string]*schedulercache.NodeInfo{
-		"3": schedulercache.NewNodeInfo(),
-		"2": schedulercache.NewNodeInfo(),
-		"1": schedulercache.NewNodeInfo(pod),
+	noResources := v1.PodSpec{
+		Containers: []v1.Container{
+			{},
+		},
 	}
-	err := EmptyMetadataProducer(pod, nodeNameToInfo)
-	if err != nil {
-		t.Errorf("failed to produce empty metadata")
-		return
+	tests := []struct {
+		pod    *v1.Pod
+		labels map[string]string
+	}{
+		{
+			pod: &v1.Pod{Spec: noResources},
+			labels: map[string]string{
+				"foo": "bar",
+			},
+		},
+	}
+
+	//node := v1.Node{ObjectMeta: metav1.ObjectMeta{Labels: test.labels}}
+	//nodeInfo := schedulercache.NewNodeInfo()
+	//nodeInfo.SetNode(&node)
+
+	for _, test := range tests {
+		nodeNameToInfo := map[string]*schedulercache.NodeInfo{
+			"3": schedulercache.NewNodeInfo(),
+			"2": schedulercache.NewNodeInfo(test.pod),
+			"1": schedulercache.NewNodeInfo(),
+		}
+		shouldBeNil := EmptyMetadataProducer(test.pod, nodeNameToInfo)
+		if shouldBeNil != nil {
+			t.Errorf("failed to produce empty metadata")
+			return
+		}
 	}
 }
