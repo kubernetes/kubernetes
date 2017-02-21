@@ -159,9 +159,10 @@ func Run(s *options.CMServer) error {
 		var clientBuilder controller.ControllerClientBuilder
 		if len(s.ServiceAccountKeyFile) > 0 && s.UseServiceAccountCredentials {
 			clientBuilder = controller.SAControllerClientBuilder{
-				ClientConfig: restclient.AnonymousClientConfig(kubeconfig),
-				CoreClient:   kubeClient.Core(),
-				Namespace:    "kube-system",
+				ClientConfig:         restclient.AnonymousClientConfig(kubeconfig),
+				CoreClient:           kubeClient.Core(),
+				AuthenticationClient: kubeClient.Authentication(),
+				Namespace:            "kube-system",
 			}
 		} else {
 			clientBuilder = rootClientBuilder
@@ -450,11 +451,17 @@ func StartControllers(controllers map[string]InitFunc, s *options.CMServer, root
 	nodeController.Run()
 	time.Sleep(wait.Jitter(s.ControllerStartInterval.Duration, ControllerStartJitter))
 
-	serviceController, err := servicecontroller.New(cloud, clientBuilder.ClientOrDie("service-controller"), s.ClusterName)
+	serviceController, err := servicecontroller.New(
+		cloud,
+		clientBuilder.ClientOrDie("service-controller"),
+		newSharedInformers.Core().V1().Services(),
+		newSharedInformers.Core().V1().Nodes(),
+		s.ClusterName,
+	)
 	if err != nil {
 		glog.Errorf("Failed to start service controller: %v", err)
 	} else {
-		serviceController.Run(int(s.ConcurrentServiceSyncs))
+		go serviceController.Run(stop, int(s.ConcurrentServiceSyncs))
 	}
 	time.Sleep(wait.Jitter(s.ControllerStartInterval.Duration, ControllerStartJitter))
 
@@ -483,6 +490,9 @@ func StartControllers(controllers map[string]InitFunc, s *options.CMServer, root
 		VolumePlugins:             ProbeControllerVolumePlugins(cloud, s.VolumeConfiguration),
 		Cloud:                     cloud,
 		ClusterName:               s.ClusterName,
+		VolumeInformer:            newSharedInformers.Core().V1().PersistentVolumes(),
+		ClaimInformer:             newSharedInformers.Core().V1().PersistentVolumeClaims(),
+		ClassInformer:             newSharedInformers.Storage().V1beta1().StorageClasses(),
 		EnableDynamicProvisioning: s.VolumeConfiguration.EnableDynamicProvisioning,
 	}
 	volumeController := persistentvolumecontroller.NewController(params)

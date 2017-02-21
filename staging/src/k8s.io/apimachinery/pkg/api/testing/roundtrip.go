@@ -31,12 +31,52 @@ import (
 
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/meta"
+	"k8s.io/apimachinery/pkg/apimachinery/announced"
+	"k8s.io/apimachinery/pkg/apimachinery/registered"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	runtimeserializer "k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apimachinery/pkg/util/sets"
 )
+
+type InstallFunc func(groupFactoryRegistry announced.APIGroupFactoryRegistry, registry *registered.APIRegistrationManager, scheme *runtime.Scheme)
+
+// RoundTripTestForAPIGroup is convenient to call from your install package to make sure that a "bare" install of your group provides
+// enough information to round trip
+func RoundTripTestForAPIGroup(t *testing.T, installFn InstallFunc, fuzzingFuncs []interface{}) {
+	groupFactoryRegistry := make(announced.APIGroupFactoryRegistry)
+	registry := registered.NewOrDie("")
+	scheme := runtime.NewScheme()
+	installFn(groupFactoryRegistry, registry, scheme)
+
+	RoundTripTestForScheme(t, scheme, fuzzingFuncs)
+}
+
+// RoundTripTestForScheme is convenient to call if you already have a scheme and want to make sure that its well-formed
+func RoundTripTestForScheme(t *testing.T, scheme *runtime.Scheme, fuzzingFuncs []interface{}) {
+	codecFactory := runtimeserializer.NewCodecFactory(scheme)
+	fuzzer := DefaultFuzzers(t, codecFactory, fuzzingFuncs)
+	RoundTripTypesWithoutProtobuf(t, scheme, codecFactory, fuzzer, nil)
+}
+
+// RoundTripProtobufTestForAPIGroup is convenient to call from your install package to make sure that a "bare" install of your group provides
+// enough information to round trip
+func RoundTripProtobufTestForAPIGroup(t *testing.T, installFn InstallFunc, fuzzingFuncs []interface{}) {
+	groupFactoryRegistry := make(announced.APIGroupFactoryRegistry)
+	registry := registered.NewOrDie("")
+	scheme := runtime.NewScheme()
+	installFn(groupFactoryRegistry, registry, scheme)
+
+	RoundTripProtobufTestForScheme(t, scheme, fuzzingFuncs)
+}
+
+// RoundTripProtobufTestForScheme is convenient to call if you already have a scheme and want to make sure that its well-formed
+func RoundTripProtobufTestForScheme(t *testing.T, scheme *runtime.Scheme, fuzzingFuncs []interface{}) {
+	codecFactory := runtimeserializer.NewCodecFactory(scheme)
+	fuzzer := DefaultFuzzers(t, codecFactory, fuzzingFuncs)
+	RoundTripTypes(t, scheme, codecFactory, fuzzer, nil)
+}
 
 var FuzzIters = flag.Int("fuzz-iters", 20, "How many fuzzing iterations to do.")
 
@@ -230,6 +270,15 @@ func roundTrip(t *testing.T, scheme *runtime.Scheme, codec runtime.Codec, object
 	// decoded into
 	if !apiequality.Semantic.DeepEqual(object, obj3) {
 		t.Errorf("3: %v: diff: %v\nCodec: %#v", name, diff.ObjectReflectDiff(object, obj3), codec)
+		return
+	}
+
+	// do structure-preserving fuzzing of the deep-copied object. If it shares anything with the original,
+	// the deep-copy was actually only a shallow copy. Then original and obj3 will be different after fuzzing.
+	// NOTE: we use the encoding+decoding here as an alternative, guaranteed deep-copy to compare against.
+	ValueFuzz(object)
+	if !apiequality.Semantic.DeepEqual(original, obj3) {
+		t.Errorf("0: %v: fuzzing a copy altered the original, diff: %v", name, diff.ObjectReflectDiff(original, object))
 		return
 	}
 }

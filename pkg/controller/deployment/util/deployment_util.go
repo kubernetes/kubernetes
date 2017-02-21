@@ -786,31 +786,6 @@ func GetAvailableReplicaCountForReplicaSets(replicaSets []*extensions.ReplicaSet
 	return totalAvailableReplicas
 }
 
-// IsPodAvailable return true if the pod is available.
-// TODO: Remove this once we start using replica set status for calculating available pods
-// for a deployment.
-func IsPodAvailable(pod *v1.Pod, minReadySeconds int32, now time.Time) bool {
-	if !controller.IsPodActive(pod) {
-		return false
-	}
-	// Check if we've passed minReadySeconds since LastTransitionTime
-	// If so, this pod is ready
-	for _, c := range pod.Status.Conditions {
-		// we only care about pod ready conditions
-		if c.Type == v1.PodReady && c.Status == v1.ConditionTrue {
-			glog.V(4).Infof("Comparing pod %s/%s ready condition last transition time %s + minReadySeconds %d with now %s.", pod.Namespace, pod.Name, c.LastTransitionTime.String(), minReadySeconds, now.String())
-			// 2 cases that this ready condition is valid (passed minReadySeconds, i.e. the pod is available):
-			// 1. minReadySeconds == 0, or
-			// 2. LastTransitionTime (is set) + minReadySeconds (>0) < current time
-			minReadySecondsDuration := time.Duration(minReadySeconds) * time.Second
-			if minReadySeconds == 0 || !c.LastTransitionTime.IsZero() && c.LastTransitionTime.Add(minReadySecondsDuration).Before(now) {
-				return true
-			}
-		}
-	}
-	return false
-}
-
 // IsRollingUpdate returns true if the strategy type is a rolling update.
 func IsRollingUpdate(deployment *extensions.Deployment) bool {
 	return deployment.Spec.Strategy.Type == extensions.RollingUpdateDeploymentStrategyType

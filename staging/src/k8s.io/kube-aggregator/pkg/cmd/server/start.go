@@ -30,7 +30,8 @@ import (
 	genericoptions "k8s.io/apiserver/pkg/server/options"
 	kubeclientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/pkg/api"
-	restclient "k8s.io/client-go/rest"
+	"k8s.io/client-go/rest"
+	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/kube-aggregator/pkg/apiserver"
 
 	"k8s.io/kube-aggregator/pkg/apis/apiregistration/v1alpha1"
@@ -45,6 +46,10 @@ type AggregatorOptions struct {
 	// this to confirm the proxy's identity
 	ProxyClientCertFile string
 	ProxyClientKeyFile  string
+
+	// CoreAPIKubeconfig is a filename for a kubeconfig file to contact the core API server wtih
+	// If it is not set, the in cluster config is used
+	CoreAPIKubeconfig string
 
 	StdOut io.Writer
 	StdErr io.Writer
@@ -81,7 +86,9 @@ func NewCommandStartAggregator(out, err io.Writer) *cobra.Command {
 	o.RecommendedOptions.AddFlags(flags)
 	flags.StringVar(&o.ProxyClientCertFile, "proxy-client-cert-file", o.ProxyClientCertFile, "client certificate used identify the proxy to the API server")
 	flags.StringVar(&o.ProxyClientKeyFile, "proxy-client-key-file", o.ProxyClientKeyFile, "client certificate key used identify the proxy to the API server")
-
+	flags.StringVar(&o.CoreAPIKubeconfig, "core-kubeconfig", o.CoreAPIKubeconfig, ""+
+		"kubeconfig file pointing at the 'core' kubernetes server with enough rights to get,list,watch "+
+		" services,endpoints.  If not set, the in-cluster config is used")
 	return cmd
 }
 
@@ -110,10 +117,21 @@ func (o AggregatorOptions) RunAggregator() error {
 		sets.NewString("attach", "exec", "proxy", "log", "portforward"),
 	)
 
-	kubeconfig, err := restclient.InClusterConfig()
+	var kubeconfig *rest.Config
+	var err error
+	if len(o.CoreAPIKubeconfig) > 0 {
+		loadingRules := &clientcmd.ClientConfigLoadingRules{ExplicitPath: o.CoreAPIKubeconfig}
+		loader := clientcmd.NewNonInteractiveDeferredLoadingClientConfig(loadingRules, &clientcmd.ConfigOverrides{})
+
+		kubeconfig, err = loader.ClientConfig()
+
+	} else {
+		kubeconfig, err = rest.InClusterConfig()
+	}
 	if err != nil {
 		return err
 	}
+
 	coreAPIServerClient, err := kubeclientset.NewForConfig(kubeconfig)
 	if err != nil {
 		return err

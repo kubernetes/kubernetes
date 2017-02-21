@@ -547,11 +547,23 @@ func autoscalingFuncs(t apitesting.TestingCommon) []interface{} {
 			minReplicas := int32(c.Rand.Int31())
 			s.MinReplicas = &minReplicas
 
-			// NB: since this is used for round-tripping, we can only fuzz
-			// fields that round-trip successfully, so only the resource source
-			// type is usable here
+			randomQuantity := func() resource.Quantity {
+				var q resource.Quantity
+				c.Fuzz(&q)
+				// precalc the string for benchmarking purposes
+				_ = q.String()
+				return q
+			}
+
 			targetUtilization := int32(c.RandUint64())
 			s.Metrics = []autoscaling.MetricSpec{
+				{
+					Type: autoscaling.PodsMetricSourceType,
+					Pods: &autoscaling.PodsMetricSource{
+						MetricName:         c.RandString(),
+						TargetAverageValue: randomQuantity(),
+					},
+				},
 				{
 					Type: autoscaling.ResourceMetricSourceType,
 					Resource: &autoscaling.ResourceMetricSource{
@@ -563,11 +575,22 @@ func autoscalingFuncs(t apitesting.TestingCommon) []interface{} {
 		},
 		func(s *autoscaling.HorizontalPodAutoscalerStatus, c fuzz.Continue) {
 			c.FuzzNoCustom(s) // fuzz self without calling this function again
-			// NB: since this is used for round-tripping, we can only fuzz
-			// fields that round-trip successfully, so only the resource status
-			// type is usable here
+			randomQuantity := func() resource.Quantity {
+				var q resource.Quantity
+				c.Fuzz(&q)
+				// precalc the string for benchmarking purposes
+				_ = q.String()
+				return q
+			}
 			currentUtilization := int32(c.RandUint64())
 			s.CurrentMetrics = []autoscaling.MetricStatus{
+				{
+					Type: autoscaling.PodsMetricSourceType,
+					Pods: &autoscaling.PodsMetricStatus{
+						MetricName:          c.RandString(),
+						CurrentAverageValue: randomQuantity(),
+					},
+				},
 				{
 					Type: autoscaling.ResourceMetricSourceType,
 					Resource: &autoscaling.ResourceMetricStatus{
@@ -610,20 +633,6 @@ func rbacFuncs(t apitesting.TestingCommon) []interface{} {
 	}
 }
 
-func kubeAdmFuncs(t apitesting.TestingCommon) []interface{} {
-	return []interface{}{
-		func(obj *kubeadm.MasterConfiguration, c fuzz.Continue) {
-			c.FuzzNoCustom(obj)
-			obj.KubernetesVersion = "v10"
-			obj.API.Port = 20
-			obj.Networking.ServiceSubnet = "foo"
-			obj.Networking.DNSDomain = "foo"
-			obj.AuthorizationMode = "foo"
-			obj.Discovery.Token = &kubeadm.TokenDiscovery{}
-		},
-	}
-}
-
 func policyFuncs(t apitesting.TestingCommon) []interface{} {
 	return []interface{}{
 		func(s *policy.PodDisruptionBudgetStatus, c fuzz.Continue) {
@@ -651,7 +660,7 @@ func FuzzerFuncs(t apitesting.TestingCommon, codecs runtimeserializer.CodecFacto
 		batchFuncs(t),
 		autoscalingFuncs(t),
 		rbacFuncs(t),
-		kubeAdmFuncs(t),
+		kubeadm.KubeadmFuzzerFuncs(t),
 		policyFuncs(t),
 		certificateFuncs(t),
 	)

@@ -274,7 +274,7 @@ func TestMatchTaint(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		if tc.expectMatch != tc.taint.MatchTaint(tc.taintToMatch) {
+		if tc.expectMatch != tc.taint.MatchTaint(&tc.taintToMatch) {
 			t.Errorf("[%s] expect taint %s match taint %s", tc.description, tc.taint.ToString(), tc.taintToMatch.ToString())
 		}
 	}
@@ -641,6 +641,63 @@ func TestSysctlsFromPodAnnotation(t *testing.T) {
 			t.Errorf("[%v]did not expect error but got: %v", i, err)
 		} else if !reflect.DeepEqual(sysctls, test.expectValue) {
 			t.Errorf("[%v]expect value %v but got %v", i, test.expectValue, sysctls)
+		}
+	}
+}
+
+// TODO: remove when alpha support for affinity is removed
+func TestGetAffinityFromPodAnnotations(t *testing.T) {
+	testCases := []struct {
+		pod       *Pod
+		expectErr bool
+	}{
+		{
+			pod:       &Pod{},
+			expectErr: false,
+		},
+		{
+			pod: &Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						AffinityAnnotationKey: `
+						{"nodeAffinity": { "requiredDuringSchedulingIgnoredDuringExecution": {
+							"nodeSelectorTerms": [{
+								"matchExpressions": [{
+									"key": "foo",
+									"operator": "In",
+									"values": ["value1", "value2"]
+								}]
+							}]
+						}}}`,
+					},
+				},
+			},
+			expectErr: false,
+		},
+		{
+			pod: &Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						AffinityAnnotationKey: `
+						{"nodeAffinity": { "requiredDuringSchedulingIgnoredDuringExecution": {
+							"nodeSelectorTerms": [{
+								"matchExpressions": [{
+									"key": "foo",
+						`,
+					},
+				},
+			},
+			expectErr: true,
+		},
+	}
+
+	for i, tc := range testCases {
+		_, err := GetAffinityFromPodAnnotations(tc.pod.Annotations)
+		if err == nil && tc.expectErr {
+			t.Errorf("[%v]expected error but got none.", i)
+		}
+		if err != nil && !tc.expectErr {
+			t.Errorf("[%v]did not expect error but got: %v", i, err)
 		}
 	}
 }

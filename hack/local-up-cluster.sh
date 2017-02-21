@@ -28,12 +28,13 @@ PSP_ADMISSION=${PSP_ADMISSION:-""}
 RUNTIME_CONFIG=${RUNTIME_CONFIG:-""}
 KUBELET_AUTHORIZATION_WEBHOOK=${KUBELET_AUTHORIZATION_WEBHOOK:-""}
 KUBELET_AUTHENTICATION_WEBHOOK=${KUBELET_AUTHENTICATION_WEBHOOK:-""}
-POD_MANIFEST_PATH=${POD_MANIFEST_PATH:-""}
+POD_MANIFEST_PATH=${POD_MANIFEST_PATH:-"/var/run/kubernetes/static-pods"}
 # Name of the network plugin, eg: "kubenet"
 NET_PLUGIN=${NET_PLUGIN:-""}
 # Place the binaries required by NET_PLUGIN in this directory, eg: "/home/kubernetes/bin".
 NET_PLUGIN_DIR=${NET_PLUGIN_DIR:-""}
 SERVICE_CLUSTER_IP_RANGE=${SERVICE_CLUSTER_IP_RANGE:-10.0.0.0/24}
+FIRST_SERVICE_CLUSTER_IP=${FIRST_SERVICE_CLUSTER_IP:-10.0.0.1}
 # if enabled, must set CGROUP_ROOT
 CGROUPS_PER_QOS=${CGROUPS_PER_QOS:-false}
 # this is not defaulted to preserve backward compatibility.
@@ -41,6 +42,8 @@ CGROUPS_PER_QOS=${CGROUPS_PER_QOS:-false}
 CGROUP_ROOT=${CGROUP_ROOT:-""}
 # name of the cgroup driver, i.e. cgroupfs or systemd
 CGROUP_DRIVER=${CGROUP_DRIVER:-""}
+# owner of client certs, default to current user if not specified
+USER=${USER:-$(whoami)}
 
 # enables testing eviction scenarios locally.
 EVICTION_HARD=${EVICTION_HARD:-"memory.available<100Mi"}
@@ -62,6 +65,9 @@ CLOUD_PROVIDER=${CLOUD_PROVIDER:-""}
 CLOUD_CONFIG=${CLOUD_CONFIG:-""}
 FEATURE_GATES=${FEATURE_GATES:-"AllAlpha=true"}
 
+# enable swagger ui
+ENABLE_SWAGGER_UI=${ENABLE_SWAGGER_UI:-false}
+
 # RBAC Mode options
 ALLOW_ANY_TOKEN=${ALLOW_ANY_TOKEN:-false}
 ENABLE_RBAC=${ENABLE_RBAC:-false}
@@ -72,6 +78,7 @@ AUTH_ARGS=${AUTH_ARGS:-""}
 KUBE_CACHE_MUTATION_DETECTOR="${KUBE_CACHE_MUTATION_DETECTOR:-true}"
 export KUBE_CACHE_MUTATION_DETECTOR
 
+ADMISSION_CONTROL_CONFIG_FILE=${ADMISSION_CONTROL_CONFIG_FILE:-""}
 
 # START_MODE can be 'all', 'kubeletonly', or 'nokubelet'
 START_MODE=${START_MODE:-"all"}
@@ -192,8 +199,7 @@ ENABLE_CONTROLLER_ATTACH_DETACH=${ENABLE_CONTROLLER_ATTACH_DETACH:-"true"} # cur
 # This is the default dir and filename where the apiserver will generate a self-signed cert
 # which should be able to be used as the CA to verify itself
 CERT_DIR=${CERT_DIR:-"/var/run/kubernetes"}
-ROOT_CA_FILE=$CERT_DIR/apiserver.crt
-EXPERIMENTAL_CRI=${EXPERIMENTAL_CRI:-"false"}
+ROOT_CA_FILE=${CERT_DIR}/server-ca.crt
 
 # name of the cgroup driver, i.e. cgroupfs or systemd
 if [[ ${CONTAINER_RUNTIME} == "docker" ]]; then
@@ -373,6 +379,11 @@ function start_apiserver {
     # This is the default dir and filename where the apiserver will generate a self-signed cert
     # which should be able to be used as the CA to verify itself
 
+    swagger_arg=""
+    if [[ "${ENABLE_SWAGGER_UI}" = true ]]; then
+      swagger_arg="--enable-swagger-ui=true "
+    fi
+
     anytoken_arg=""
     if [[ "${ALLOW_ANY_TOKEN}" = true ]]; then
       anytoken_arg="--insecure-allow-any-token "
@@ -398,23 +409,32 @@ function start_apiserver {
         advertise_address="--advertise_address=${API_HOST_IP}"
     fi
 
-    # Create client ca
+    # Create CA signers
+    kube::util::create_signing_certkey "${CONTROLPLANE_SUDO}" "${CERT_DIR}" server '"server auth"'
     kube::util::create_signing_certkey "${CONTROLPLANE_SUDO}" "${CERT_DIR}" client '"client auth"'
+    # Create auth proxy client ca
+    kube::util::create_signing_certkey "${CONTROLPLANE_SUDO}" "${CERT_DIR}" request-header '"client auth"'
+
+    # serving cert for kube-apiserver
+    kube::util::create_serving_certkey "${CONTROLPLANE_SUDO}" "${CERT_DIR}" "server-ca" kube-apiserver kubernetes.default kubernetes.default.svc "localhost" ${API_HOST_IP} ${API_HOST} ${FIRST_SERVICE_CLUSTER_IP}
 
     # Create client certs signed with client-ca, given id, given CN and a number of groups
-    # NOTE: system:masters will be removed in the future
     kube::util::create_client_certkey "${CONTROLPLANE_SUDO}" "${CERT_DIR}" 'client-ca' kubelet system:node:${HOSTNAME_OVERRIDE} system:nodes
     kube::util::create_client_certkey "${CONTROLPLANE_SUDO}" "${CERT_DIR}" 'client-ca' kube-proxy system:kube-proxy system:nodes
     kube::util::create_client_certkey "${CONTROLPLANE_SUDO}" "${CERT_DIR}" 'client-ca' controller system:kube-controller-manager
-    kube::util::create_client_certkey "${CONTROLPLANE_SUDO}" "${CERT_DIR}" 'client-ca' scheduler system:scheduler system:masters
+    kube::util::create_client_certkey "${CONTROLPLANE_SUDO}" "${CERT_DIR}" 'client-ca' scheduler  system:kube-scheduler
     kube::util::create_client_certkey "${CONTROLPLANE_SUDO}" "${CERT_DIR}" 'client-ca' admin system:admin system:masters
 
-    # Create auth proxy client ca
-    kube::util::create_signing_certkey "${CONTROLPLANE_SUDO}" "${CERT_DIR}" request-header '"client auth"'
+    # Create matching certificates for kube-aggregator
+    kube::util::create_serving_certkey "${CONTROLPLANE_SUDO}" "${CERT_DIR}" "server-ca" kube-aggregator api.kube-public.svc "localhost" ${API_HOST_IP}
     kube::util::create_client_certkey "${CONTROLPLANE_SUDO}" "${CERT_DIR}" request-header-ca auth-proxy system:auth-proxy
+    # TODO remove masters and add rolebinding
+    kube::util::create_client_certkey "${CONTROLPLANE_SUDO}" "${CERT_DIR}" 'client-ca' kube-aggregator system:kube-aggregator system:masters
+    kube::util::write_client_kubeconfig "${CONTROLPLANE_SUDO}" "${CERT_DIR}" "${ROOT_CA_FILE}" "${API_HOST}" "${API_SECURE_PORT}" kube-aggregator
+
 
     APISERVER_LOG=/tmp/kube-apiserver.log
-    ${CONTROLPLANE_SUDO} "${GO_OUT}/hyperkube" apiserver ${anytoken_arg} ${authorizer_arg} ${priv_arg} ${runtime_config}\
+    ${CONTROLPLANE_SUDO} "${GO_OUT}/hyperkube" apiserver ${swagger_arg} ${anytoken_arg} ${authorizer_arg} ${priv_arg} ${runtime_config}\
       ${advertise_address} \
       --v=${LOG_LEVEL} \
       --cert-dir="${CERT_DIR}" \
@@ -422,9 +442,12 @@ function start_apiserver {
       --service-account-key-file="${SERVICE_ACCOUNT_KEY}" \
       --service-account-lookup="${SERVICE_ACCOUNT_LOOKUP}" \
       --admission-control="${ADMISSION_CONTROL}" \
+      --admission-control-config-file="${ADMISSION_CONTROL_CONFIG_FILE}" \
       --bind-address="${API_BIND_ADDR}" \
       --secure-port="${API_SECURE_PORT}" \
-      --tls-ca-file="${ROOT_CA_FILE}" \
+      --tls-cert-file="${CERT_DIR}/serving-kube-apiserver.crt" \
+      --tls-private-key-file="${CERT_DIR}/serving-kube-apiserver.key" \
+      --tls-ca-file="${CERT_DIR}/server-ca.crt" \
       --insecure-bind-address="${API_HOST_IP}" \
       --insecure-port="${API_PORT}" \
       --etcd-servers="http://${ETCD_HOST}:${ETCD_PORT}" \
@@ -469,6 +492,14 @@ function start_apiserver {
             AUTH_ARGS="--client-key=${CERT_DIR}/client-admin.key --client-certificate=${CERT_DIR}/client-admin.crt"
         fi
     fi
+
+    # create the kube-public namespace for the aggregator
+    ${KUBECTL} --kubeconfig="${CERT_DIR}/admin.kubeconfig" create namespace kube-public
+    ${CONTROLPLANE_SUDO} cp "${CERT_DIR}/admin.kubeconfig" "${CERT_DIR}/admin-kube-aggregator.kubeconfig"
+    ${CONTROLPLANE_SUDO} chown $(whoami) "${CERT_DIR}/admin-kube-aggregator.kubeconfig"
+    ${KUBECTL} config set-cluster local-up-cluster --kubeconfig="${CERT_DIR}/admin-kube-aggregator.kubeconfig" --server="https://${API_HOST_IP}:31090"
+    echo "use 'kubectl --kubeconfig=${CERT_DIR}/admin-kube-aggregator.kubeconfig' to use the aggregated API server"
+
 }
 
 function start_controller_manager {
@@ -496,6 +527,7 @@ function start_controller_manager {
 
 function start_kubelet {
     KUBELET_LOG=/tmp/kubelet.log
+    mkdir -p ${POD_MANIFEST_PATH} || true
 
     priv_arg=""
     if [[ -n "${ALLOW_PRIVILEGED}" ]]; then
@@ -549,7 +581,6 @@ function start_kubelet {
         --v=${LOG_LEVEL} \
         --chaos-chance="${CHAOS_CHANCE}" \
         --container-runtime="${CONTAINER_RUNTIME}" \
-        --experimental-cri=${EXPERIMENTAL_CRI} \
         --rkt-path="${RKT_PATH}" \
         --rkt-stage1-image="${RKT_STAGE1_IMAGE}" \
         --hostname-override="${HOSTNAME_OVERRIDE}" \

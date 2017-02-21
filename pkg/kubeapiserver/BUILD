@@ -13,16 +13,13 @@ go_library(
     srcs = [
         "default_storage_factory_builder.go",
         "doc.go",
-        "rest.go",
     ],
     tags = ["automanaged"],
     deps = [
         "//pkg/api:go_default_library",
         "//vendor:k8s.io/apimachinery/pkg/runtime",
         "//vendor:k8s.io/apimachinery/pkg/runtime/schema",
-        "//vendor:k8s.io/apiserver/pkg/registry/generic",
-        "//vendor:k8s.io/apiserver/pkg/registry/generic/registry",
-        "//vendor:k8s.io/apiserver/pkg/server",
+        "//vendor:k8s.io/apiserver/pkg/server/storage",
         "//vendor:k8s.io/apiserver/pkg/storage/storagebackend",
         "//vendor:k8s.io/apiserver/pkg/util/flag",
     ],
@@ -59,6 +56,6 @@ go_test(
         "//pkg/apis/extensions/install:go_default_library",
         "//pkg/apis/extensions/v1beta1:go_default_library",
         "//vendor:k8s.io/apimachinery/pkg/runtime/schema",
-        "//vendor:k8s.io/apiserver/pkg/server",
+        "//vendor:k8s.io/apiserver/pkg/server/storage",
     ],
 )

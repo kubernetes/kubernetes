@@ -2303,6 +2303,11 @@ func DeepCopy_v1_PodSpec(in interface{}, out interface{}, c *conversion.Cloner) 
 				(*out)[key] = val
 			}
 		}
+		if in.AutomountServiceAccountToken != nil {
+			in, out := &in.AutomountServiceAccountToken, &out.AutomountServiceAccountToken
+			*out = new(bool)
+			**out = **in
+		}
 		if in.SecurityContext != nil {
 			in, out := &in.SecurityContext, &out.SecurityContext
 			*out = new(PodSecurityContext)
@@ -2947,6 +2952,11 @@ func DeepCopy_v1_ServiceAccount(in interface{}, out interface{}, c *conversion.C
 			in, out := &in.ImagePullSecrets, &out.ImagePullSecrets
 			*out = make([]LocalObjectReference, len(*in))
 			copy(*out, *in)
+		}
+		if in.AutomountServiceAccountToken != nil {
+			in, out := &in.AutomountServiceAccountToken, &out.AutomountServiceAccountToken
+			*out = new(bool)
+			**out = **in
 		}
 		return nil
 	}

@@ -19,6 +19,7 @@ cmd/kubeadm
 cmd/kubeadm/app/apis/kubeadm/install
 cmd/kubeadm/app/phases/apiconfig
 cmd/kubeadm/app/phases/certs
+cmd/kubeadm/app/phases/kubeconfig
 cmd/kubectl
 cmd/kubelet
 cmd/libs/go2idl/client-gen
@@ -254,12 +255,15 @@ plugin/cmd/kube-scheduler
 plugin/cmd/kube-scheduler/app/options
 plugin/pkg/admission/admit
 plugin/pkg/admission/alwayspullimages
+plugin/pkg/admission/defaulttolerationseconds
 plugin/pkg/admission/deny
 plugin/pkg/admission/exec
 plugin/pkg/admission/gc
 plugin/pkg/admission/imagepolicy
 plugin/pkg/admission/namespace/autoprovision
 plugin/pkg/admission/namespace/exists
+plugin/pkg/admission/resourcequota/apis/resourcequota/install
+plugin/pkg/admission/resourcequota/apis/resourcequota/validation
 plugin/pkg/admission/securitycontext/scdeny
 plugin/pkg/auth
 plugin/pkg/auth/authorizer

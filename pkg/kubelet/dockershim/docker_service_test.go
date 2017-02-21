@@ -32,20 +32,21 @@ import (
 	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
 	"k8s.io/kubernetes/pkg/kubelet/dockertools"
 	"k8s.io/kubernetes/pkg/kubelet/network"
-	"k8s.io/kubernetes/pkg/kubelet/network/mock_network"
+	nettest "k8s.io/kubernetes/pkg/kubelet/network/testing"
 	"k8s.io/kubernetes/pkg/kubelet/util/cache"
 )
 
 // newTestNetworkPlugin returns a mock plugin that implements network.NetworkPlugin
-func newTestNetworkPlugin(t *testing.T) *mock_network.MockNetworkPlugin {
+func newTestNetworkPlugin(t *testing.T) *nettest.MockNetworkPlugin {
 	ctrl := gomock.NewController(t)
-	return mock_network.NewMockNetworkPlugin(ctrl)
+	return nettest.NewMockNetworkPlugin(ctrl)
 }
 
 func newTestDockerService() (*dockerService, *dockertools.FakeDockerClient, *clock.FakeClock) {
 	fakeClock := clock.NewFakeClock(time.Time{})
 	c := dockertools.NewFakeDockerClient().WithClock(fakeClock).WithVersion("1.11.2", "1.23")
-	return &dockerService{client: c, os: &containertest.FakeOS{}, networkPlugin: &network.NoopNetworkPlugin{},
+	pm := network.NewPluginManager(&network.NoopNetworkPlugin{})
+	return &dockerService{client: c, os: &containertest.FakeOS{}, network: pm,
 		legacyCleanup: legacyCleanupFlag{done: 1}, checkpointHandler: NewTestPersistentCheckpointHandler()}, c, fakeClock
 }
 
@@ -95,7 +96,7 @@ func TestStatus(t *testing.T) {
 
 	// Should not report ready status is network plugin returns error.
 	mockPlugin := newTestNetworkPlugin(t)
-	ds.networkPlugin = mockPlugin
+	ds.network = network.NewPluginManager(mockPlugin)
 	defer mockPlugin.Finish()
 	mockPlugin.EXPECT().Status().Return(errors.New("network error"))
 	status, err = ds.Status()

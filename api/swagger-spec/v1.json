@@ -4845,6 +4845,36 @@
      },
      {
       "type": "string",
+      "method": "PATCH",
+      "summary": "proxy PATCH requests to Node",
+      "nickname": "proxyPATCHNodeWithPath",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the Node",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "path",
+        "description": "path to the resource",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "produces": [
+       "*/*"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     },
+     {
+      "type": "string",
       "method": "DELETE",
       "summary": "proxy DELETE requests to Node",
       "nickname": "proxyDELETENodeWithPath",
@@ -4988,6 +5018,28 @@
       "method": "POST",
       "summary": "proxy POST requests to Node",
       "nickname": "proxyPOSTNode",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the Node",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "produces": [
+       "*/*"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     },
+     {
+      "type": "string",
+      "method": "PATCH",
+      "summary": "proxy PATCH requests to Node",
+      "nickname": "proxyPATCHNode",
       "parameters": [
        {
         "type": "string",
@@ -8087,6 +8139,44 @@
      },
      {
       "type": "string",
+      "method": "PATCH",
+      "summary": "proxy PATCH requests to Pod",
+      "nickname": "proxyPATCHNamespacedPodWithPath",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "namespace",
+        "description": "object name and auth scope, such as for teams and projects",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the Pod",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "path",
+        "description": "path to the resource",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "produces": [
+       "*/*"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     },
+     {
+      "type": "string",
       "method": "DELETE",
       "summary": "proxy DELETE requests to Pod",
       "nickname": "proxyDELETENamespacedPodWithPath",
@@ -8270,6 +8360,36 @@
       "method": "POST",
       "summary": "proxy POST requests to Pod",
       "nickname": "proxyPOSTNamespacedPod",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "namespace",
+        "description": "object name and auth scope, such as for teams and projects",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the Pod",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "produces": [
+       "*/*"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     },
+     {
+      "type": "string",
+      "method": "PATCH",
+      "summary": "proxy PATCH requests to Pod",
+      "nickname": "proxyPATCHNamespacedPod",
       "parameters": [
        {
         "type": "string",
@@ -15032,6 +15152,44 @@
      },
      {
       "type": "string",
+      "method": "PATCH",
+      "summary": "proxy PATCH requests to Service",
+      "nickname": "proxyPATCHNamespacedServiceWithPath",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "namespace",
+        "description": "object name and auth scope, such as for teams and projects",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the Service",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "path",
+        "description": "path to the resource",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "produces": [
+       "*/*"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     },
+     {
+      "type": "string",
       "method": "DELETE",
       "summary": "proxy DELETE requests to Service",
       "nickname": "proxyDELETENamespacedServiceWithPath",
@@ -15215,6 +15373,36 @@
       "method": "POST",
       "summary": "proxy POST requests to Service",
       "nickname": "proxyPOSTNamespacedService",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "namespace",
+        "description": "object name and auth scope, such as for teams and projects",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the Service",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "produces": [
+       "*/*"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     },
+     {
+      "type": "string",
+      "method": "PATCH",
+      "summary": "proxy PATCH requests to Service",
+      "nickname": "proxyPATCHNamespacedService",
       "parameters": [
        {
         "type": "string",
@@ -18265,6 +18453,10 @@
       "type": "string",
       "description": "DeprecatedServiceAccount is a depreciated alias for ServiceAccountName. Deprecated: Use serviceAccountName instead."
      },
+     "automountServiceAccountToken": {
+      "type": "boolean",
+      "description": "AutomountServiceAccountToken indicates whether a service account token should be automatically mounted."
+     },
      "nodeName": {
       "type": "string",
       "description": "NodeName is a request to schedule this pod onto a specific node. If it is non-empty, the scheduler simply schedules this pod onto that node, assuming that it fits resource requirements."
@@ -20078,6 +20270,10 @@
        "$ref": "v1.LocalObjectReference"
       },
       "description": "ImagePullSecrets is a list of references to secrets in the same namespace to use for pulling any images in pods that reference this ServiceAccount. ImagePullSecrets are distinct from Secrets because Secrets can be mounted in the pod, but ImagePullSecrets are only accessed by the kubelet. More info: http://kubernetes.io/docs/user-guide/secrets#manually-specifying-an-imagepullsecret"
+     },
+     "automountServiceAccountToken": {
+      "type": "boolean",
+      "description": "AutomountServiceAccountToken indicates whether pods running as this service account should have an API token automatically mounted. Can be overridden at the pod level."
      }
     }
    },

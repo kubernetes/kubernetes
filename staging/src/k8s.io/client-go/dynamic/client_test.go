@@ -136,7 +136,7 @@ func TestList(t *testing.T) {
 		}
 		defer srv.Close()
 
-		got, err := cl.Resource(resource, tc.namespace).List(&metav1.ListOptions{})
+		got, err := cl.Resource(resource, tc.namespace).List(metav1.ListOptions{})
 		if err != nil {
 			t.Errorf("unexpected error when listing %q: %v", tc.name, err)
 			continue
@@ -293,7 +293,7 @@ func TestDeleteCollection(t *testing.T) {
 		}
 		defer srv.Close()
 
-		err = cl.Resource(resource, tc.namespace).DeleteCollection(nil, &metav1.ListOptions{})
+		err = cl.Resource(resource, tc.namespace).DeleteCollection(nil, metav1.ListOptions{})
 		if err != nil {
 			t.Errorf("unexpected error when deleting collection %q: %v", tc.name, err)
 			continue
@@ -425,10 +425,12 @@ func TestWatch(t *testing.T) {
 		namespace string
 		events    []watch.Event
 		path      string
+		query     string
 	}{
 		{
-			name: "normal_watch",
-			path: "/api/gtest/vtest/watch/rtest",
+			name:  "normal_watch",
+			path:  "/api/gtest/vtest/rtest",
+			query: "watch=true",
 			events: []watch.Event{
 				{Type: watch.Added, Object: getObject("vTest", "rTest", "normal_watch")},
 				{Type: watch.Modified, Object: getObject("vTest", "rTest", "normal_watch")},
@@ -438,7 +440,8 @@ func TestWatch(t *testing.T) {
 		{
 			name:      "namespaced_watch",
 			namespace: "nstest",
-			path:      "/api/gtest/vtest/watch/namespaces/nstest/rtest",
+			path:      "/api/gtest/vtest/namespaces/nstest/rtest",
+			query:     "watch=true",
 			events: []watch.Event{
 				{Type: watch.Added, Object: getObject("vTest", "rTest", "namespaced_watch")},
 				{Type: watch.Modified, Object: getObject("vTest", "rTest", "namespaced_watch")},
@@ -457,6 +460,9 @@ func TestWatch(t *testing.T) {
 			if r.URL.Path != tc.path {
 				t.Errorf("Watch(%q) got path %s. wanted %s", tc.name, r.URL.Path, tc.path)
 			}
+			if r.URL.RawQuery != tc.query {
+				t.Errorf("Watch(%q) got query %s. wanted %s", tc.name, r.URL.RawQuery, tc.query)
+			}
 
 			enc := restclientwatch.NewEncoder(streaming.NewEncoder(w, dynamicCodec{}), dynamicCodec{})
 			for _, e := range tc.events {
@@ -469,7 +475,7 @@ func TestWatch(t *testing.T) {
 		}
 		defer srv.Close()
 
-		watcher, err := cl.Resource(resource, tc.namespace).Watch(&metav1.ListOptions{})
+		watcher, err := cl.Resource(resource, tc.namespace).Watch(metav1.ListOptions{})
 		if err != nil {
 			t.Errorf("unexpected error when watching %q: %v", tc.name, err)
 			continue

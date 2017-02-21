@@ -452,6 +452,9 @@ prepare_etcd_manifest() {
   local etcd_protocol="http"
   local etcd_creds=""
 
+  if [[ -n "${INITIAL_ETCD_CLUSTER_STATE:-}" ]]; then
+    cluster_state="${INITIAL_ETCD_CLUSTER_STATE}"
+  fi
   if [[ -n "${ETCD_CA_KEY:-}" && -n "${ETCD_CA_CERT:-}" && -n "${ETCD_PEER_KEY:-}" && -n "${ETCD_PEER_CERT:-}" ]]; then
     etcd_creds=" --peer-trusted-ca-file /etc/srv/kubernetes/etcd-ca.crt --peer-cert-file /etc/srv/kubernetes/etcd-peer.crt --peer-key-file /etc/srv/kubernetes/etcd-peer.key -peer-client-cert-auth "
     etcd_protocol="https"
@@ -461,7 +464,6 @@ prepare_etcd_manifest() {
     etcd_host="etcd-${host}=${etcd_protocol}://${host}:$3"
     if [[ -n "${etcd_cluster}" ]]; then
       etcd_cluster+=","
-      cluster_state="existing"
     fi
     etcd_cluster+="${etcd_host}"
   done
@@ -573,6 +575,7 @@ remove_salt_config_comments() {
 #   DOCKER_REGISTRY
 start_kube_apiserver() {
   prepare_log_file /var/log/kube-apiserver.log
+  prepare_log_file /var/log/kube-apiserver-audit.log
   # Load the docker image from file.
   echo "Try to load docker image file kube-apiserver.tar"
   timeout 30 docker load -i /home/kubernetes/kube-docker-files/kube-apiserver.tar
@@ -595,6 +598,9 @@ start_kube_apiserver() {
   if [[ -n "${STORAGE_BACKEND:-}" ]]; then
     params="${params} --storage-backend=${STORAGE_BACKEND}"
   fi
+  if [[ -n "${STORAGE_MEDIA_TYPE:-}" ]]; then
+    params="${params} --storage-media-type=${STORAGE_MEDIA_TYPE}"
+  fi
   if [ -n "${NUM_NODES:-}" ]; then
     # If the cluster is large, increase max-requests-inflight limit in apiserver.
     if [[ "${NUM_NODES}" -ge 1000 ]]; then
@@ -610,6 +616,21 @@ start_kube_apiserver() {
   fi
   if [ -n "${ETCD_QUORUM_READ:-}" ]; then
     params="${params} --etcd-quorum-read=${ETCD_QUORUM_READ}"
+  fi
+
+  if [[ "${ENABLE_APISERVER_BASIC_AUDIT:-}" == "true" ]]; then
+    # We currently only support enabling with a fixed path and with built-in log
+    # rotation "disabled" (large value) so it behaves like kube-apiserver.log.
+    # External log rotation should be set up the same as for kube-apiserver.log.
+    params="${params} --audit-log-path=/var/log/kube-apiserver-audit.log"
+    params="${params} --audit-log-maxage=0"
+    params="${params} --audit-log-maxbackup=0"
+    # Lumberjack doesn't offer any way to disable size-based rotation. It also
+    # has an in-memory counter that doesn't notice if you truncate the file.
+    # 2000000000 (in MiB) is a large number that fits in 31 bits. If the log
+    # grows at 10MiB/s (~30K QPS), it will rotate after ~6 years if apiserver
+    # never restarts. Please manually restart apiserver before this time.
+    params="${params} --audit-log-maxsize=2000000000"
   fi
 
   local admission_controller_config_mount=""
@@ -769,7 +790,7 @@ start_kube_scheduler() {
   if [ -n "${SCHEDULER_TEST_LOG_LEVEL:-}" ]; then
     log_level="${SCHEDULER_TEST_LOG_LEVEL}"
   fi
-  params="${log_level} ${SCHEDULER_TEST_ARGS:-}"
+  params="--master=127.0.0.1:8080 ${log_level} ${SCHEDULER_TEST_ARGS:-}"
   if [ -n "${SCHEDULING_ALGORITHM_PROVIDER:-}" ]; then
     params="${params} --algorithm-provider=${SCHEDULING_ALGORITHM_PROVIDER}"
   fi
@@ -779,6 +800,8 @@ start_kube_scheduler() {
   # Remove salt comments and replace variables with values
   src_file="${kube_home}/kube-manifests/kubernetes/gci-trusty/kube-scheduler.manifest"
   remove_salt_config_comments "${src_file}"
+
+  sed -i -e "s@{{srv_kube_path}}@/etc/srv/kubernetes@g" "${src_file}"
   sed -i -e "s@{{params}}@${params}@g" "${src_file}"
   sed -i -e "s@{{pillar\['kube_docker_registry'\]}}@${DOCKER_REGISTRY}@g" "${src_file}"
   sed -i -e "s@{{pillar\['kube-scheduler_docker_tag'\]}}@${kube_scheduler_docker_tag}@g" "${src_file}"
@@ -948,6 +971,9 @@ start_kube_addons() {
   fi
   if [ "${ENABLE_CLUSTER_UI:-}" = "true" ]; then
     setup_addon_manifests "addons" "dashboard"
+  fi
+  if [[ "${ENABLE_NODE_PROBLEM_DETECTOR:-}" == "daemonset" ]]; then
+    setup-addon-manifests "addons" "node-problem-detector"
   fi
   if echo "${ADMISSION_CONTROL:-}" | grep -q "LimitRanger"; then
     setup_addon_manifests "admission-controls" "limit-range"

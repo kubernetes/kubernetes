@@ -102,7 +102,7 @@ var _ = framework.KubeDescribe("Federation namespace [Feature:Federation]", func
 		It("deletes replicasets in the namespace when the namespace is deleted", func() {
 			fedframework.SkipUnlessFederated(f.ClientSet)
 
-			nsName := createNamespace(f.FederationClientset.Core().Namespaces())
+			nsName = createNamespace(f.FederationClientset.Core().Namespaces())
 			rsName := v1.SimpleNameGenerator.GenerateName(replicaSetNamePrefix)
 			replicaCount := int32(2)
 			rs := &v1beta1.ReplicaSet{

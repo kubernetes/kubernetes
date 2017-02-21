@@ -21,10 +21,13 @@ import (
 	"time"
 
 	"github.com/golang/glog"
+	"k8s.io/apimachinery/pkg/watch"
+	core "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset/fake"
-	fcache "k8s.io/kubernetes/pkg/controller/volume/persistentvolume/testing"
+	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated/externalversions"
+	"k8s.io/kubernetes/pkg/controller"
 )
 
 // Test the real controller methods (add/update/delete claim/volume) with
@@ -161,26 +164,38 @@ func TestControllerSync(t *testing.T) {
 
 		// Initialize the controller
 		client := &fake.Clientset{}
-		volumeSource := fcache.NewFakePVControllerSource()
-		claimSource := fcache.NewFakePVCControllerSource()
-		ctrl := newTestController(client, volumeSource, claimSource, nil, true)
-		reactor := newVolumeReactor(client, ctrl, volumeSource, claimSource, test.errors)
+
+		fakeVolumeWatch := watch.NewFake()
+		client.PrependWatchReactor("persistentvolumes", core.DefaultWatchReactor(fakeVolumeWatch, nil))
+		fakeClaimWatch := watch.NewFake()
+		client.PrependWatchReactor("persistentvolumeclaims", core.DefaultWatchReactor(fakeClaimWatch, nil))
+		client.PrependWatchReactor("storageclasses", core.DefaultWatchReactor(watch.NewFake(), nil))
+
+		informers := informers.NewSharedInformerFactory(client, controller.NoResyncPeriodFunc())
+		ctrl := newTestController(client, informers, true)
+
+		reactor := newVolumeReactor(client, ctrl, fakeVolumeWatch, fakeClaimWatch, test.errors)
 		for _, claim := range test.initialClaims {
-			claimSource.Add(claim)
 			reactor.claims[claim.Name] = claim
+			go func(claim *v1.PersistentVolumeClaim) {
+				fakeClaimWatch.Add(claim)
+			}(claim)
 		}
 		for _, volume := range test.initialVolumes {
-			volumeSource.Add(volume)
 			reactor.volumes[volume.Name] = volume
+			go func(volume *v1.PersistentVolume) {
+				fakeVolumeWatch.Add(volume)
+			}(volume)
 		}
 
 		// Start the controller
 		stopCh := make(chan struct{})
+		informers.Start(stopCh)
 		go ctrl.Run(stopCh)
 
 		// Wait for the controller to pass initial sync and fill its caches.
-		for !ctrl.volumeController.HasSynced() ||
-			!ctrl.claimController.HasSynced() ||
+		for !ctrl.volumeListerSynced() ||
+			!ctrl.claimListerSynced() ||
 			len(ctrl.claims.ListKeys()) < len(test.initialClaims) ||
 			len(ctrl.volumes.store.ListKeys()) < len(test.initialVolumes) {
 

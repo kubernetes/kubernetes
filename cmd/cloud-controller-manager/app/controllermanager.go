@@ -135,9 +135,10 @@ func Run(s *options.CloudControllerManagerServer, cloud cloudprovider.Interface)
 		var clientBuilder controller.ControllerClientBuilder
 		if len(s.ServiceAccountKeyFile) > 0 && s.UseServiceAccountCredentials {
 			clientBuilder = controller.SAControllerClientBuilder{
-				ClientConfig: restclient.AnonymousClientConfig(kubeconfig),
-				CoreClient:   kubeClient.Core(),
-				Namespace:    "kube-system",
+				ClientConfig:         restclient.AnonymousClientConfig(kubeconfig),
+				CoreClient:           kubeClient.Core(),
+				AuthenticationClient: kubeClient.Authentication(),
+				Namespace:            "kube-system",
 			}
 		} else {
 			clientBuilder = rootClientBuilder
@@ -216,11 +217,17 @@ func StartControllers(s *options.CloudControllerManagerServer, kubeconfig *restc
 	time.Sleep(wait.Jitter(s.ControllerStartInterval.Duration, ControllerStartJitter))
 
 	// Start the service controller
-	serviceController, err := servicecontroller.New(cloud, client("service-controller"), s.ClusterName)
+	serviceController, err := servicecontroller.New(
+		cloud,
+		client("service-controller"),
+		newSharedInformers.Core().V1().Services(),
+		newSharedInformers.Core().V1().Nodes(),
+		s.ClusterName,
+	)
 	if err != nil {
 		glog.Errorf("Failed to start service controller: %v", err)
 	} else {
-		serviceController.Run(int(s.ConcurrentServiceSyncs))
+		go serviceController.Run(stop, int(s.ConcurrentServiceSyncs))
 	}
 	time.Sleep(wait.Jitter(s.ControllerStartInterval.Duration, ControllerStartJitter))
 

@@ -25,6 +25,7 @@ import (
 
 	"github.com/davecgh/go-spew/spew"
 	"github.com/ghodss/yaml"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/mergepatch"
 )
 
@@ -92,6 +93,7 @@ type MergeItem struct {
 	NonMergingIntList []int
 	MergeItemPtr      *MergeItem `patchStrategy:"merge" patchMergeKey:"name"`
 	SimpleMap         map[string]string
+	ReplacingItem     runtime.RawExtension `patchStrategy:"replace"`
 }
 
 var mergeItem MergeItem
@@ -2364,5 +2366,262 @@ func TestNumberConversion(t *testing.T) {
 			t.Errorf("%s: expected %s, got %s", k, tc.ExpectedResult, string(result))
 			continue
 		}
+	}
+}
+
+var replaceRawExtensionPatchTestCases = []StrategicMergePatchRawTestCase{
+	{
+		Description: "replace RawExtension field, rest unchanched",
+		StrategicMergePatchRawTestCaseData: StrategicMergePatchRawTestCaseData{
+			Original: []byte(`
+name: my-object
+value: some-value
+other: current-other
+replacingItem:
+  Some: Generic
+  Yaml: Inside
+  The: RawExtension
+  Field: Period
+`),
+			Current: []byte(`
+name: my-object
+value: some-value
+other: current-other
+merginglist:
+  - name: 1
+  - name: 2
+  - name: 3
+replacingItem:
+  Some: Generic
+  Yaml: Inside
+  The: RawExtension
+  Field: Period
+`),
+			Modified: []byte(`
+name: my-object
+value: some-value
+other: current-other
+merginglist:
+  - name: 1
+  - name: 2
+  - name: 3
+replacingItem:
+  Newly: Modified
+  Yaml: Inside
+  The: RawExtension
+`),
+			TwoWay: []byte(`
+merginglist:
+  - name: 1
+  - name: 2
+  - name: 3
+replacingItem:
+  Newly: Modified
+  Yaml: Inside
+  The: RawExtension
+`),
+			TwoWayResult: []byte(`
+name: my-object
+value: some-value
+other: current-other
+merginglist:
+  - name: 1
+  - name: 2
+  - name: 3
+replacingItem:
+  Newly: Modified
+  Yaml: Inside
+  The: RawExtension
+`),
+			ThreeWay: []byte(`
+replacingItem:
+  Newly: Modified
+  Yaml: Inside
+  The: RawExtension
+`),
+			Result: []byte(`
+name: my-object
+value: some-value
+other: current-other
+merginglist:
+  - name: 1
+  - name: 2
+  - name: 3
+replacingItem:
+  Newly: Modified
+  Yaml: Inside
+  The: RawExtension
+`),
+		},
+	},
+	{
+		Description: "replace RawExtension field and merge list",
+		StrategicMergePatchRawTestCaseData: StrategicMergePatchRawTestCaseData{
+			Original: []byte(`
+name: my-object
+value: some-value
+other: current-other
+merginglist:
+  - name: 1
+replacingItem:
+  Some: Generic
+  Yaml: Inside
+  The: RawExtension
+  Field: Period
+`),
+			Current: []byte(`
+name: my-object
+value: some-value
+other: current-other
+merginglist:
+  - name: 1
+  - name: 3
+replacingItem:
+  Some: Generic
+  Yaml: Inside
+  The: RawExtension
+  Field: Period
+`),
+			Modified: []byte(`
+name: my-object
+value: some-value
+other: current-other
+merginglist:
+  - name: 1
+  - name: 2
+replacingItem:
+  Newly: Modified
+  Yaml: Inside
+  The: RawExtension
+`),
+			TwoWay: []byte(`
+merginglist:
+  - name: 2
+replacingItem:
+  Newly: Modified
+  Yaml: Inside
+  The: RawExtension
+`),
+			TwoWayResult: []byte(`
+name: my-object
+value: some-value
+other: current-other
+merginglist:
+  - name: 1
+  - name: 2
+replacingItem:
+  Newly: Modified
+  Yaml: Inside
+  The: RawExtension
+`),
+			ThreeWay: []byte(`
+merginglist:
+  - name: 2
+replacingItem:
+  Newly: Modified
+  Yaml: Inside
+  The: RawExtension
+`),
+			Result: []byte(`
+name: my-object
+value: some-value
+other: current-other
+merginglist:
+  - name: 1
+  - name: 3
+  - name: 2
+replacingItem:
+  Newly: Modified
+  Yaml: Inside
+  The: RawExtension
+`),
+		},
+	},
+}
+
+func TestReplaceWithRawExtension(t *testing.T) {
+	for _, c := range replaceRawExtensionPatchTestCases {
+		testTwoWayPatchWithoutSorting(t, c)
+		testThreeWayPatchWithoutSorting(t, c)
+	}
+}
+
+func testTwoWayPatchWithoutSorting(t *testing.T, c StrategicMergePatchRawTestCase) {
+	original, expectedPatch, modified, expectedResult := twoWayRawTestCaseToJSONOrFail(t, c)
+
+	actualPatch, err := CreateTwoWayMergePatch(original, modified, mergeItem)
+	if err != nil {
+		t.Errorf("error: %s\nin test case: %s\ncannot create two way patch:\noriginal:%s\ntwoWay:%s\nmodified:%s\ncurrent:%s\nthreeWay:%s\nresult:%s\n",
+			err, c.Description, c.Original, c.TwoWay, c.Modified, c.Current, c.ThreeWay, c.Result)
+		return
+	}
+
+	testPatchCreationWithoutSorting(t, expectedPatch, actualPatch, c.Description)
+	testPatchApplicationWithoutSorting(t, original, actualPatch, expectedResult, c.Description)
+}
+
+func testThreeWayPatchWithoutSorting(t *testing.T, c StrategicMergePatchRawTestCase) {
+	original, modified, current, expected, result := threeWayRawTestCaseToJSONOrFail(t, c)
+	actual, err := CreateThreeWayMergePatch(original, modified, current, mergeItem, false)
+	if err != nil {
+		if !mergepatch.IsConflict(err) {
+			t.Errorf("error: %s\nin test case: %s\ncannot create three way patch:\noriginal:%s\ntwoWay:%s\nmodified:%s\ncurrent:%s\nthreeWay:%s\nresult:%s\n",
+				err, c.Description, c.Original, c.TwoWay, c.Modified, c.Current, c.ThreeWay, c.Result)
+			return
+		}
+
+		if !strings.Contains(c.Description, "conflict") {
+			t.Errorf("unexpected conflict: %s\nin test case: %s\ncannot create three way patch:\noriginal:%s\ntwoWay:%s\nmodified:%s\ncurrent:%s\nthreeWay:%s\nresult:%s\n",
+				err, c.Description, c.Original, c.TwoWay, c.Modified, c.Current, c.ThreeWay, c.Result)
+			return
+		}
+
+		if len(c.Result) > 0 {
+			actual, err := CreateThreeWayMergePatch(original, modified, current, mergeItem, true)
+			if err != nil {
+				t.Errorf("error: %s\nin test case: %s\ncannot force three way patch application:\noriginal:%s\ntwoWay:%s\nmodified:%s\ncurrent:%s\nthreeWay:%s\nresult:%s\n",
+					err, c.Description, c.Original, c.TwoWay, c.Modified, c.Current, c.ThreeWay, c.Result)
+				return
+			}
+
+			testPatchCreationWithoutSorting(t, expected, actual, c.Description)
+			testPatchApplicationWithoutSorting(t, current, actual, result, c.Description)
+		}
+
+		return
+	}
+
+	if strings.Contains(c.Description, "conflict") || len(c.Result) < 1 {
+		t.Errorf("error: %s\nin test case: %s\nexpected conflict did not occur:\noriginal:%s\ntwoWay:%s\nmodified:%s\ncurrent:%s\nthreeWay:%s\nresult:%s\n",
+			err, c.Description, c.Original, c.TwoWay, c.Modified, c.Current, c.ThreeWay, c.Result)
+		return
+	}
+
+	testPatchCreationWithoutSorting(t, expected, actual, c.Description)
+	testPatchApplicationWithoutSorting(t, current, actual, result, c.Description)
+}
+
+func testPatchCreationWithoutSorting(t *testing.T, expected, actual []byte, description string) {
+	if !reflect.DeepEqual(actual, expected) {
+		t.Errorf("error in test case: %s\nexpected patch:\n%s\ngot:\n%s\n",
+			description, jsonToYAMLOrError(expected), jsonToYAMLOrError(actual))
+		return
+	}
+}
+
+func testPatchApplicationWithoutSorting(t *testing.T, original, patch, expected []byte, description string) {
+	result, err := StrategicMergePatch(original, patch, mergeItem)
+	if err != nil {
+		t.Errorf("error: %s\nin test case: %s\ncannot apply patch:\n%s\nto original:\n%s\n",
+			err, description, jsonToYAMLOrError(patch), jsonToYAMLOrError(original))
+		return
+	}
+
+	if !reflect.DeepEqual(result, expected) {
+		format := "error in test case: %s\npatch application failed:\noriginal:\n%s\npatch:\n%s\nexpected:\n%s\ngot:\n%s\n"
+		t.Errorf(format, description,
+			jsonToYAMLOrError(original), jsonToYAMLOrError(patch),
+			jsonToYAMLOrError(expected), jsonToYAMLOrError(result))
+		return
 	}
 }

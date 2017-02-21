@@ -131,7 +131,8 @@ type Config struct {
 	OpenAPIConfig *openapicommon.Config
 	// SwaggerConfig will be used in generating Swagger spec. This is nil by default. Use DefaultSwaggerConfig for "working" defaults.
 	SwaggerConfig *swagger.Config
-	// RESTOptionsGetter is used to construct "normal" RESTStorage types
+
+	// RESTOptionsGetter is used to construct RESTStorage types via the generic registry.
 	RESTOptionsGetter genericregistry.RESTOptionsGetter
 
 	// If specified, requests will be allocated a random timeout between this value, and twice this value.

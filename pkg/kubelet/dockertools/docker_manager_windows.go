@@ -65,8 +65,13 @@ func getNetworkingMode() string {
 
 // Infrastructure containers are not supported on Windows. For this reason, we
 // make sure to not grab the infra container's IP for the pod.
-func containerProvidesPodIP(name *KubeletContainerName) bool {
-	return name.ContainerName != PodInfraContainerName
+func containerProvidesPodIP(containerName string) bool {
+	return containerName != PodInfraContainerName
+}
+
+// All containers in Windows need networking setup/teardown
+func containerIsNetworked(containerName string) bool {
+	return true
 }
 
 // Returns nil as both Seccomp and AppArmor security options are not valid on Windows
