@@ -333,6 +333,16 @@ type containerToKillInfo struct {
 	message string
 }
 
+// containerExitedInfo contains necessary information of an exited container
+type containerExitedInfo struct {
+	// The name of the container.
+	name string
+	// The exit code of the container.
+	exitCode int
+	// A string explains why container is in such a status.
+	reason string
+}
+
 // podContainerSpecChanges keeps information on changes that need to happen for a pod.
 type podContainerSpecChanges struct {
 	// Whether need to create a new sandbox.
@@ -354,6 +364,11 @@ type podContainerSpecChanges struct {
 	// the key is the container ID of the container, while
 	// the value contains necessary information to kill a container.
 	ContainersToKill map[kubecontainer.ContainerID]containerToKillInfo
+
+	// ContainersExited keeps a map of containers that exited, note that
+	// the key is the container ID of the container, while
+	// the value contains necessary information of this exited container.
+	ContainersExited map[kubecontainer.ContainerID]containerExitedInfo
 
 	// InitFailed indicates whether init containers are failed.
 	InitFailed bool
@@ -437,6 +452,7 @@ func (m *kubeGenericRuntimeManager) computePodContainerChanges(pod *v1.Pod, podS
 		ContainersToKeep:     make(map[kubecontainer.ContainerID]int),
 		InitContainersToKeep: make(map[kubecontainer.ContainerID]int),
 		ContainersToKill:     make(map[kubecontainer.ContainerID]containerToKillInfo),
+		ContainersExited:     make(map[kubecontainer.ContainerID]containerExitedInfo),
 	}
 
 	// check the status of init containers.
@@ -453,6 +469,14 @@ func (m *kubeGenericRuntimeManager) computePodContainerChanges(pod *v1.Pod, podS
 	for index, container := range pod.Spec.Containers {
 		containerStatus := podStatus.FindContainerStatusByName(container.Name)
 		if containerStatus == nil || containerStatus.State != kubecontainer.ContainerStateRunning {
+			// get exited container status
+			if containerStatus != nil && containerStatus.State == kubecontainer.ContainerStateExited {
+				changes.ContainersExited[containerStatus.ID] = containerExitedInfo{
+					name:     container.Name,
+					exitCode: containerStatus.ExitCode,
+					reason:   containerStatus.Reason,
+				}
+			}
 			if kubecontainer.ShouldContainerBeRestarted(&container, pod, podStatus) {
 				message := fmt.Sprintf("Container %+v is dead, but RestartPolicy says that we should restart it.", container)
 				glog.Info(message)
@@ -547,11 +571,11 @@ func (m *kubeGenericRuntimeManager) SyncPod(pod *v1.Pod, _ v1.PodStatus, podStat
 	// Step 1: Compute sandbox and container changes.
 	podContainerChanges := m.computePodContainerChanges(pod, podStatus)
 	glog.V(3).Infof("computePodContainerChanges got %+v for pod %q", podContainerChanges, format.Pod(pod))
+	ref, err := v1.GetReference(api.Scheme, pod)
+	if err != nil {
+		glog.Errorf("Couldn't make a ref to pod %q: '%v'", format.Pod(pod), err)
+	}
 	if podContainerChanges.CreateSandbox {
-		ref, err := v1.GetReference(api.Scheme, pod)
-		if err != nil {
-			glog.Errorf("Couldn't make a ref to pod %q: '%v'", format.Pod(pod), err)
-		}
 		if podContainerChanges.SandboxID != "" {
 			m.recorder.Eventf(ref, v1.EventTypeNormal, "SandboxChanged", "Pod sandbox changed, it will be killed and re-created.")
 		} else {
@@ -560,7 +584,13 @@ func (m *kubeGenericRuntimeManager) SyncPod(pod *v1.Pod, _ v1.PodStatus, podStat
 
 	}
 
-	// Step 2: Kill the pod if the sandbox has changed.
+	// Step 2: Record exited containers in events
+	for containerID, containerInfo := range podContainerChanges.ContainersExited {
+		m.recorder.Eventf(ref, v1.EventTypeWarning, "ContainerExited", "Container %q(id=%q) for pod %q exited with code %v, reason: %v",
+			containerInfo.name, containerID, format.Pod(pod), containerInfo.exitCode, containerInfo.reason)
+	}
+
+	// Step 3: Kill the pod if the sandbox has changed.
 	if podContainerChanges.CreateSandbox || (len(podContainerChanges.ContainersToKeep) == 0 && len(podContainerChanges.ContainersToStart) == 0) {
 		if len(podContainerChanges.ContainersToKeep) == 0 && len(podContainerChanges.ContainersToStart) == 0 {
 			glog.V(4).Infof("Stopping PodSandbox for %q because all other containers are dead.", format.Pod(pod))
@@ -575,7 +605,7 @@ func (m *kubeGenericRuntimeManager) SyncPod(pod *v1.Pod, _ v1.PodStatus, podStat
 			return
 		}
 	} else {
-		// Step 3: kill any running containers in this pod which are not to keep.
+		// Step 4: kill any running containers in this pod which are not to keep.
 		for containerID, containerInfo := range podContainerChanges.ContainersToKill {
 			glog.V(3).Infof("Killing unwanted container %q(id=%q) for pod %q", containerInfo.name, containerID, format.Pod(pod))
 			killContainerResult := kubecontainer.NewSyncResult(kubecontainer.KillContainer, containerInfo.name)
@@ -605,7 +635,7 @@ func (m *kubeGenericRuntimeManager) SyncPod(pod *v1.Pod, _ v1.PodStatus, podStat
 		podIP = podStatus.IP
 	}
 
-	// Step 4: Create a sandbox for the pod if necessary.
+	// Step 5: Create a sandbox for the pod if necessary.
 	podSandboxID := podContainerChanges.SandboxID
 	if podContainerChanges.CreateSandbox && len(podContainerChanges.ContainersToStart) > 0 {
 		var msg string
@@ -644,7 +674,7 @@ func (m *kubeGenericRuntimeManager) SyncPod(pod *v1.Pod, _ v1.PodStatus, podStat
 		return
 	}
 
-	// Step 5: start init containers.
+	// Step 6: start init containers.
 	status, next, done := findNextInitContainerToRun(pod, podStatus)
 	if status != nil && status.ExitCode != 0 {
 		// container initialization has failed, flag the pod as failed
@@ -696,7 +726,7 @@ func (m *kubeGenericRuntimeManager) SyncPod(pod *v1.Pod, _ v1.PodStatus, podStat
 		return
 	}
 
-	// Step 6: start containers in podContainerChanges.ContainersToStart.
+	// Step 7: start containers in podContainerChanges.ContainersToStart.
 	for idx := range podContainerChanges.ContainersToStart {
 		container := &pod.Spec.Containers[idx]
 		startContainerResult := kubecontainer.NewSyncResult(kubecontainer.StartContainer, container.Name)
