@@ -18,6 +18,7 @@ go_library(
         "helpers_linux.go",
         "pod_container_manager_linux.go",
         "pod_container_manager_stub.go",
+        "qos_container_manager_linux.go",
         "types.go",
     ],
     tags = ["automanaged"],
