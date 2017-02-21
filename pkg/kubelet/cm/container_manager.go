@@ -16,14 +16,16 @@ limitations under the License.
 
 package cm
 
-import "k8s.io/kubernetes/pkg/api/v1"
+import (
+	"k8s.io/kubernetes/pkg/api/v1"
+)
 
 // Manages the containers running on a machine.
 type ContainerManager interface {
 	// Runs the container manager's housekeeping.
 	// - Ensures that the Docker daemon is in a container.
 	// - Creates the system container where all non-containerized processes run.
-	Start(*v1.Node) error
+	Start(*v1.Node, func() []*v1.Pod) error
 
 	// Returns resources allocated to system cgroups in the machine.
 	// These cgroups include the system and Kubernetes services.
@@ -44,6 +46,9 @@ type ContainerManager interface {
 
 	// GetQOSContainersInfo returns the names of top level QoS containers
 	GetQOSContainersInfo() QOSContainersInfo
+
+	// UpdateQOSCgroups returns the names of top level QoS containers
+	UpdateQOSCgroups() error
 }
 
 type NodeConfig struct {
