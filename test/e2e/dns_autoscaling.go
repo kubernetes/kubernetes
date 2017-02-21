@@ -47,23 +47,16 @@ var _ = framework.KubeDescribe("DNS horizontal autoscaling", func() {
 	var c clientset.Interface
 	var previousParams map[string]string
 	var originDNSReplicasCount int
-
-	DNSParams_1 := DNSParamsLinear{
-		nodesPerReplica: 1,
-	}
-	DNSParams_2 := DNSParamsLinear{
-		nodesPerReplica: 2,
-	}
-	DNSParams_3 := DNSParamsLinear{
-		nodesPerReplica: 3,
-		coresPerReplica: 3,
-	}
+	var DNSParams_1 DNSParamsLinear
+	var DNSParams_2 DNSParamsLinear
+	var DNSParams_3 DNSParamsLinear
 
 	BeforeEach(func() {
 		framework.SkipUnlessProviderIs("gce", "gke")
 		c = f.ClientSet
 
-		Expect(len(framework.GetReadySchedulableNodesOrDie(c).Items)).NotTo(BeZero())
+		nodeCount := len(framework.GetReadySchedulableNodesOrDie(c).Items)
+		Expect(nodeCount).NotTo(BeZero())
 
 		By("Collecting original replicas count and DNS scaling params")
 		var err error
@@ -73,6 +66,35 @@ var _ = framework.KubeDescribe("DNS horizontal autoscaling", func() {
 		pcm, err := fetchDNSScalingConfigMap(c)
 		Expect(err).NotTo(HaveOccurred())
 		previousParams = pcm.Data
+
+		if nodeCount <= 500 {
+			DNSParams_1 = DNSParamsLinear{
+				nodesPerReplica: 1,
+			}
+			DNSParams_2 = DNSParamsLinear{
+				nodesPerReplica: 2,
+			}
+			DNSParams_3 = DNSParamsLinear{
+				nodesPerReplica: 3,
+				coresPerReplica: 3,
+			}
+		} else {
+			// In large clusters, avoid creating/deleting too many DNS pods,
+			// it is supposed to be correctness test, not performance one.
+			// The default setup is: 256 cores/replica, 16 nodes/replica.
+			// With nodeCount > 500, nodes/13, nodes/14, nodes/15 and nodes/16
+			// are different numbers.
+			DNSParams_1 = DNSParamsLinear{
+				nodesPerReplica: 13,
+			}
+			DNSParams_2 = DNSParamsLinear{
+				nodesPerReplica: 14,
+			}
+			DNSParams_3 = DNSParamsLinear{
+				nodesPerReplica: 15,
+				coresPerReplica: 15,
+			}
+		}
 	})
 
 	// This test is separated because it is slow and need to run serially.
