@@ -77,8 +77,9 @@ func (s *DeploymentStatusViewer) Status(namespace, name string, revision int64) 
 		if deployment.Status.Replicas > deployment.Status.UpdatedReplicas {
 			return fmt.Sprintf("Waiting for rollout to finish: %d old replicas are pending termination...\n", deployment.Status.Replicas-deployment.Status.UpdatedReplicas), false, nil
 		}
-		if deployment.Status.AvailableReplicas < deployment.Status.UpdatedReplicas {
-			return fmt.Sprintf("Waiting for rollout to finish: %d of %d updated replicas are available...\n", deployment.Status.AvailableReplicas, deployment.Status.UpdatedReplicas), false, nil
+		minRequired := deployment.Spec.Replicas - util.MaxUnavailableInternal(*deployment)
+		if deployment.Status.AvailableReplicas < minRequired {
+			return fmt.Sprintf("Waiting for rollout to finish: %d of %d updated replicas are available (minimum required: %d)...\n", deployment.Status.AvailableReplicas, deployment.Status.UpdatedReplicas, minRequired), false, nil
 		}
 		return fmt.Sprintf("deployment %q successfully rolled out\n", name), true, nil
 	}
