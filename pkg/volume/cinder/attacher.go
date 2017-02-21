@@ -68,35 +68,35 @@ func (attacher *cinderDiskAttacher) Attach(spec *volume.Spec, nodeName types.Nod
 
 	volumeID := volumeSource.VolumeID
 
-	instanceid, err := attacher.nodeInstanceID(nodeName)
+	instanceID, err := attacher.nodeInstanceID(nodeName)
 	if err != nil {
 		return "", err
 	}
 
-	attached, err := attacher.cinderProvider.DiskIsAttached(volumeID, instanceid)
+	attached, err := attacher.cinderProvider.DiskIsAttached(instanceID, volumeID)
 	if err != nil {
 		// Log error and continue with attach
 		glog.Warningf(
 			"Error checking if volume (%q) is already attached to current instance (%q). Will continue and try attach anyway. err=%v",
-			volumeID, instanceid, err)
+			volumeID, instanceID, err)
 	}
 
 	if err == nil && attached {
 		// Volume is already attached to instance.
-		glog.Infof("Attach operation is successful. volume %q is already attached to instance %q.", volumeID, instanceid)
+		glog.Infof("Attach operation is successful. volume %q is already attached to instance %q.", volumeID, instanceID)
 	} else {
-		_, err = attacher.cinderProvider.AttachDisk(instanceid, volumeID)
+		_, err = attacher.cinderProvider.AttachDisk(instanceID, volumeID)
 		if err == nil {
-			glog.Infof("Attach operation successful: volume %q attached to instance %q.", volumeID, instanceid)
+			glog.Infof("Attach operation successful: volume %q attached to instance %q.", volumeID, instanceID)
 		} else {
-			glog.Infof("Attach volume %q to instance %q failed with %v", volumeID, instanceid, err)
+			glog.Infof("Attach volume %q to instance %q failed with %v", volumeID, instanceID, err)
 			return "", err
 		}
 	}
 
-	devicePath, err := attacher.cinderProvider.GetAttachmentDiskPath(instanceid, volumeID)
+	devicePath, err := attacher.cinderProvider.GetAttachmentDiskPath(instanceID, volumeID)
 	if err != nil {
-		glog.Infof("Attach volume %q to instance %q failed with %v", volumeID, instanceid, err)
+		glog.Infof("Attach volume %q to instance %q failed with %v", volumeID, instanceID, err)
 		return "", err
 	}
 
@@ -119,12 +119,12 @@ func (attacher *cinderDiskAttacher) VolumesAreAttached(specs []*volume.Spec, nod
 		volumeSpecMap[volumeSource.VolumeID] = spec
 	}
 
-	instanceid, err := attacher.nodeInstanceID(nodeName)
+	instanceID, err := attacher.nodeInstanceID(nodeName)
 	if err != nil {
 		return volumesAttachedCheck, err
 	}
 
-	attachedResult, err := attacher.cinderProvider.DisksAreAttached(volumeIDList, instanceid)
+	attachedResult, err := attacher.cinderProvider.DisksAreAttached(instanceID, volumeIDList)
 	if err != nil {
 		// Log error and continue with attach
 		glog.Errorf(
@@ -255,12 +255,12 @@ func (detacher *cinderDiskDetacher) Detach(deviceMountPath string, nodeName type
 	if !res {
 		return fmt.Errorf("failed to list openstack instances")
 	}
-	instanceid, err := instances.InstanceID(nodeName)
-	if ind := strings.LastIndex(instanceid, "/"); ind >= 0 {
-		instanceid = instanceid[(ind + 1):]
+	instanceID, err := instances.InstanceID(nodeName)
+	if ind := strings.LastIndex(instanceID, "/"); ind >= 0 {
+		instanceID = instanceID[(ind + 1):]
 	}
 
-	attached, err := detacher.cinderProvider.DiskIsAttached(volumeID, instanceid)
+	attached, err := detacher.cinderProvider.DiskIsAttached(instanceID, volumeID)
 	if err != nil {
 		// Log error and continue with detach
 		glog.Errorf(
@@ -274,11 +274,11 @@ func (detacher *cinderDiskDetacher) Detach(deviceMountPath string, nodeName type
 		return nil
 	}
 
-	if err = detacher.cinderProvider.DetachDisk(instanceid, volumeID); err != nil {
+	if err = detacher.cinderProvider.DetachDisk(instanceID, volumeID); err != nil {
 		glog.Errorf("Error detaching volume %q: %v", volumeID, err)
 		return err
 	}
-	glog.Infof("detached volume %q from instance %q", volumeID, instanceid)
+	glog.Infof("detached volume %q from instance %q", volumeID, instanceID)
 	return nil
 }
 
@@ -291,12 +291,12 @@ func (attacher *cinderDiskAttacher) nodeInstanceID(nodeName types.NodeName) (str
 	if !res {
 		return "", fmt.Errorf("failed to list openstack instances")
 	}
-	instanceid, err := instances.InstanceID(nodeName)
+	instanceID, err := instances.InstanceID(nodeName)
 	if err != nil {
 		return "", err
 	}
-	if ind := strings.LastIndex(instanceid, "/"); ind >= 0 {
-		instanceid = instanceid[(ind + 1):]
+	if ind := strings.LastIndex(instanceID, "/"); ind >= 0 {
+		instanceID = instanceID[(ind + 1):]
 	}
-	return instanceid, nil
+	return instanceID, nil
 }
