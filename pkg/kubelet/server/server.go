@@ -285,6 +285,7 @@ const pprofBasePath = "/debug/pprof/"
 
 // InstallDeguggingHandlers registers the HTTP request patterns that serve logs or run commands/containers
 func (s *Server) InstallDebuggingHandlers(criHandler http.Handler) {
+	glog.Infof("Adding debug handlers to kubelet server.")
 	var ws *restful.WebService
 
 	ws = new(restful.WebService)
