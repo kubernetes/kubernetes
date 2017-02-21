@@ -112,7 +112,7 @@ type ResourceClient struct {
 }
 
 // List returns a list of objects for this resource.
-func (rc *ResourceClient) List(opts metav1.ListOptions) (runtime.Object, error) {
+func (rc *ResourceClient) List(opts runtime.Object) (runtime.Object, error) {
 	parameterEncoder := rc.parameterCodec
 	if parameterEncoder == nil {
 		parameterEncoder = defaultParameterEncoder
@@ -120,7 +120,7 @@ func (rc *ResourceClient) List(opts metav1.ListOptions) (runtime.Object, error) 
 	return rc.cl.Get().
 		NamespaceIfScoped(rc.ns, rc.resource.Namespaced).
 		Resource(rc.resource.Name).
-		VersionedParams(&opts, parameterEncoder).
+		VersionedParams(opts, parameterEncoder).
 		Do().
 		Get()
 }
@@ -149,7 +149,7 @@ func (rc *ResourceClient) Delete(name string, opts *metav1.DeleteOptions) error 
 }
 
 // DeleteCollection deletes a collection of objects.
-func (rc *ResourceClient) DeleteCollection(deleteOptions *metav1.DeleteOptions, listOptions metav1.ListOptions) error {
+func (rc *ResourceClient) DeleteCollection(deleteOptions *metav1.DeleteOptions, listOptions runtime.Object) error {
 	parameterEncoder := rc.parameterCodec
 	if parameterEncoder == nil {
 		parameterEncoder = defaultParameterEncoder
@@ -157,7 +157,7 @@ func (rc *ResourceClient) DeleteCollection(deleteOptions *metav1.DeleteOptions, 
 	return rc.cl.Delete().
 		NamespaceIfScoped(rc.ns, rc.resource.Namespaced).
 		Resource(rc.resource.Name).
-		VersionedParams(&listOptions, parameterEncoder).
+		VersionedParams(listOptions, parameterEncoder).
 		Body(deleteOptions).
 		Do().
 		Error()
@@ -192,16 +192,16 @@ func (rc *ResourceClient) Update(obj *unstructured.Unstructured) (*unstructured.
 }
 
 // Watch returns a watch.Interface that watches the resource.
-func (rc *ResourceClient) Watch(opts metav1.ListOptions) (watch.Interface, error) {
+func (rc *ResourceClient) Watch(opts runtime.Object) (watch.Interface, error) {
 	parameterEncoder := rc.parameterCodec
 	if parameterEncoder == nil {
 		parameterEncoder = defaultParameterEncoder
 	}
-	opts.Watch = true
 	return rc.cl.Get().
+		Prefix("watch").
 		NamespaceIfScoped(rc.ns, rc.resource.Namespaced).
 		Resource(rc.resource.Name).
-		VersionedParams(&opts, parameterEncoder).
+		VersionedParams(opts, parameterEncoder).
 		Watch()
 }
 
