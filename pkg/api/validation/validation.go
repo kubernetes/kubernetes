@@ -2348,9 +2348,16 @@ func ValidatePodUpdate(newPod, oldPod *api.Pod) field.ErrorList {
 		activeDeadlineSeconds := *oldPod.Spec.ActiveDeadlineSeconds
 		mungedPod.Spec.ActiveDeadlineSeconds = &activeDeadlineSeconds
 	}
+
+	// Allow tolerations updates.
+	if len(newPod.Spec.Tolerations) > 0 {
+		allErrs = append(allErrs, validateTolerations(newPod.Spec.Tolerations, fldPath.Child("tolerations"))...)
+	}
+	mungedPod.Spec.Tolerations = oldPod.Spec.Tolerations
+
 	if !apiequality.Semantic.DeepEqual(mungedPod.Spec, oldPod.Spec) {
 		//TODO: Pinpoint the specific field that causes the invalid error after we have strategic merge diff
-		allErrs = append(allErrs, field.Forbidden(specPath, "pod updates may not change fields other than `containers[*].image` or `spec.activeDeadlineSeconds`"))
+		allErrs = append(allErrs, field.Forbidden(specPath, "pod updates may not change fields other than `containers[*].image` or `spec.activeDeadlineSeconds` or `spec.tolerations`"))
 	}
 
 	return allErrs

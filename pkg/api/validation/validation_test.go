@@ -4587,6 +4587,71 @@ func TestValidatePodUpdate(t *testing.T) {
 			true,
 			"bad label change",
 		},
+		{
+			api.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo",
+				},
+				Spec: api.PodSpec{
+					NodeName:    "node1",
+					Tolerations: []api.Toleration{{Key: "key1", Value: "value1"}},
+				},
+			},
+			api.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo",
+				},
+				Spec: api.PodSpec{
+					NodeName:    "node1",
+					Tolerations: []api.Toleration{{Key: "key1", Value: "value2"}},
+				},
+			},
+			true,
+			"toleration modified in pod updates",
+		},
+		{
+			api.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo",
+				},
+				Spec: api.PodSpec{
+					Tolerations: []api.Toleration{{Key: "key1", Value: "value1"}},
+				},
+			},
+			api.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo",
+				},
+				Spec: api.PodSpec{
+					NodeName:    "",
+					Tolerations: []api.Toleration{{Key: "key1", Value: "value2"}},
+				},
+			},
+			true,
+			"toleration modified in updates to an unscheduled pod",
+		},
+		{
+			api.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo",
+				},
+				Spec: api.PodSpec{
+					NodeName:    "node1",
+					Tolerations: []api.Toleration{{Key: "key1", Value: "value1"}},
+				},
+			},
+			api.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo",
+				},
+				Spec: api.PodSpec{
+					NodeName:    "node1",
+					Tolerations: []api.Toleration{{Key: "key1", Value: "value1"}},
+				},
+			},
+			true,
+			"tolerations unmodified in updates to a scheduled pod",
+		},
 	}
 
 	for _, test := range tests {
