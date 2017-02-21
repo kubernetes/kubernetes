@@ -251,3 +251,8 @@ func (eic execInContainer) SetStdin(in io.Reader) {
 func (eic execInContainer) SetStdout(out io.Writer) {
 	//unimplemented
 }
+
+func (eic execInContainer) Stop() {
+	//unimplemented
+}
+
