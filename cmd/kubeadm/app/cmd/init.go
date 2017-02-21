@@ -106,7 +106,7 @@ func NewCmdInit(out io.Writer) *cobra.Command {
 		`Use alternative domain for services, e.g. "myorg.internal"`,
 	)
 	cmd.PersistentFlags().StringVar(
-		&cfg.KubernetesVersion, "use-kubernetes-version", cfg.KubernetesVersion,
+		&cfg.KubernetesVersion, "kubernetes-version", cfg.KubernetesVersion,
 		`Choose a specific Kubernetes version for the control plane`,
 	)
 
