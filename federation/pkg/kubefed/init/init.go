@@ -43,6 +43,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/tools/clientcmd"
@@ -92,6 +93,8 @@ const (
 	apiserverAdvertiseAddressFlag = "api-server-advertise-address"
 
 	dnsProviderSecretName = "federation-dns-provider.conf"
+
+	rbacAPINotAvailable = "RBAC API not available"
 )
 
 var (
@@ -329,19 +332,28 @@ func (i *initFederation) Run(cmdOut io.Writer, config util.AdminConfig) error {
 		return err
 	}
 
-	// 7. Create federation controller manager
-	// 7a. Create a service account in the host cluster for federation
-	// controller manager.
-	sa, err := createControllerManagerSA(hostClientset, i.commonOptions.FederationSystemNamespace, i.options.dryRun)
+	sa := &api.ServiceAccount{}
+	sa.Name = ""
+	// 7. Create deployment for federation controller manager
+	versionedClientset, err := getVersionedClientForRBACOrFail(hostFactory)
 	if err != nil {
-		return err
-	}
+		if err.Error() != rbacAPINotAvailable {
+			return err
+		}
+	} else {
+		// 7a. Create a service account in the host cluster for federation
+		// controller manager.
+		sa, err = createControllerManagerSA(versionedClientset, i.commonOptions.FederationSystemNamespace, i.options.dryRun)
+		if err != nil {
+			return err
+		}
 
-	// 7b. Create RBAC role and role binding for federation controller
-	// manager service account.
-	_, _, err = createRoleBindings(hostClientset, i.commonOptions.FederationSystemNamespace, sa.Name, i.options.dryRun)
-	if err != nil {
-		return err
+		// 7b. Create RBAC role and role binding for federation controller
+		// manager service account.
+		_, _, err = createRoleBindings(versionedClientset, i.commonOptions.FederationSystemNamespace, sa.Name, i.options.dryRun)
+		if err != nil {
+			return err
+		}
 	}
 
 	// 7c. Create a dns-provider config secret
@@ -874,10 +886,13 @@ func createControllerManager(clientset client.Interface, namespace, name, svcNam
 							},
 						},
 					},
-					ServiceAccountName: saName,
 				},
 			},
 		},
+	}
+
+	if saName != "" {
+		dep.Spec.Template.Spec.ServiceAccountName = saName
 	}
 
 	if dryRun {
@@ -1095,4 +1110,44 @@ func addDNSProviderConfig(dep *extensions.Deployment, secretName string) *extens
 // authentication file in the format required by the federation-apiserver.
 func authFileContents(username, authSecret string) []byte {
 	return []byte(fmt.Sprintf("%s,%s,%s\n", authSecret, username, uuid.NewUUID()))
+}
+
+func getVersionedClientForRBACOrFail(hostFactory cmdutil.Factory) (client.Interface, error) {
+	discoveryclient, err := hostFactory.DiscoveryClient()
+	if err != nil {
+		return nil, err
+	}
+	groupList, err := discoveryclient.ServerGroups()
+	if err != nil {
+		return nil, fmt.Errorf("Couldn't get available api versions from host cluster: %v", err)
+	}
+
+	for _, g := range groupList.Groups {
+		if g.Name == rbac.GroupName {
+			if g.PreferredVersion.GroupVersion != "" {
+				gv := strings.Split(g.PreferredVersion.GroupVersion, "/")
+				if len(gv) != 2 {
+					return nil, fmt.Errorf("Incorrect api groupversion received from host cluster")
+				}
+				return hostFactory.ClientSetForVersion(&schema.GroupVersion{
+					Group:   gv[0],
+					Version: gv[1],
+				})
+			}
+			for i := 0; i < len(g.Versions); i++ {
+				if g.Versions[i].GroupVersion != "" {
+					gv := strings.Split(g.Versions[i].GroupVersion, "/")
+					if len(gv) != 2 {
+						return nil, fmt.Errorf("Incorrect api groupversion received from host cluster")
+					}
+					return hostFactory.ClientSetForVersion(&schema.GroupVersion{
+						Group:   gv[0],
+						Version: gv[1],
+					})
+				}
+			}
+		}
+	}
+
+	return nil, fmt.Errorf(rbacAPINotAvailable)
 }
