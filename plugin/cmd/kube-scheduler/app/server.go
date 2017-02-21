@@ -29,6 +29,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apiserver/pkg/server/healthz"
 
+	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated/externalversions"
 	"k8s.io/kubernetes/pkg/client/leaderelection"
 	"k8s.io/kubernetes/pkg/client/leaderelection/resourcelock"
 	"k8s.io/kubernetes/pkg/util/configz"
@@ -67,24 +68,47 @@ func Run(s *options.SchedulerServer) error {
 	if err != nil {
 		return fmt.Errorf("unable to create kube client: %v", err)
 	}
+
 	recorder := createRecorder(kubecli, s)
-	sched, err := createScheduler(s, kubecli, recorder)
+
+	informerFactory := informers.NewSharedInformerFactory(kubecli, 0)
+
+	sched, err := createScheduler(
+		s,
+		kubecli,
+		informerFactory.Core().V1().Nodes(),
+		informerFactory.Core().V1().PersistentVolumes(),
+		informerFactory.Core().V1().PersistentVolumeClaims(),
+		informerFactory.Core().V1().ReplicationControllers(),
+		informerFactory.Extensions().V1beta1().ReplicaSets(),
+		informerFactory.Core().V1().Services(),
+		recorder,
+	)
 	if err != nil {
 		return fmt.Errorf("error creating scheduler: %v", err)
 	}
+
 	go startHTTP(s)
+
+	stop := make(chan struct{})
+	defer close(stop)
+	informerFactory.Start(stop)
+
 	run := func(_ <-chan struct{}) {
 		sched.Run()
 		select {}
 	}
+
 	if !s.LeaderElection.LeaderElect {
 		run(nil)
 		panic("unreachable")
 	}
+
 	id, err := os.Hostname()
 	if err != nil {
 		return fmt.Errorf("unable to get hostname: %v", err)
 	}
+
 	// TODO: enable other lock types
 	rl := &resourcelock.EndpointsLock{
 		EndpointsMeta: metav1.ObjectMeta{
@@ -97,6 +121,7 @@ func Run(s *options.SchedulerServer) error {
 			EventRecorder: recorder,
 		},
 	}
+
 	leaderelection.RunOrDie(leaderelection.LeaderElectionConfig{
 		Lock:          rl,
 		LeaseDuration: s.LeaderElection.LeaseDuration.Duration,
@@ -109,6 +134,7 @@ func Run(s *options.SchedulerServer) error {
 			},
 		},
 	})
+
 	panic("unreachable")
 }
 

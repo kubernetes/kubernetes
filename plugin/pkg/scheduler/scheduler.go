@@ -24,6 +24,7 @@ import (
 	"k8s.io/client-go/tools/record"
 	"k8s.io/kubernetes/pkg/api/v1"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
+	corelisters "k8s.io/kubernetes/pkg/client/listers/core/v1"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm"
 	schedulerapi "k8s.io/kubernetes/plugin/pkg/scheduler/api"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/metrics"
@@ -69,9 +70,9 @@ type Configurator interface {
 	ResponsibleForPod(pod *v1.Pod) bool
 
 	// Needs to be exposed for things like integration tests where we want to make fake nodes.
-	GetNodeStore() cache.Store
+	GetNodeLister() corelisters.NodeLister
 	GetClient() clientset.Interface
-	GetScheduledPodListerIndexer() cache.Indexer
+	GetScheduledPodLister() corelisters.PodLister
 	Run()
 
 	Create() (*Config, error)

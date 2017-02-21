@@ -195,7 +195,7 @@ func TestUpdateNodesInExternalLoadBalancer(t *testing.T) {
 				newService("s0", "333", v1.ServiceTypeLoadBalancer),
 			},
 			expectedUpdateCalls: []fakecloud.FakeUpdateBalancerCall{
-				{newService("s0", "333", v1.ServiceTypeLoadBalancer), nodes},
+				{Service: newService("s0", "333", v1.ServiceTypeLoadBalancer), Hosts: nodes},
 			},
 		},
 		{
@@ -206,9 +206,9 @@ func TestUpdateNodesInExternalLoadBalancer(t *testing.T) {
 				newService("s2", "666", v1.ServiceTypeLoadBalancer),
 			},
 			expectedUpdateCalls: []fakecloud.FakeUpdateBalancerCall{
-				{newService("s0", "444", v1.ServiceTypeLoadBalancer), nodes},
-				{newService("s1", "555", v1.ServiceTypeLoadBalancer), nodes},
-				{newService("s2", "666", v1.ServiceTypeLoadBalancer), nodes},
+				{Service: newService("s0", "444", v1.ServiceTypeLoadBalancer), Hosts: nodes},
+				{Service: newService("s1", "555", v1.ServiceTypeLoadBalancer), Hosts: nodes},
+				{Service: newService("s2", "666", v1.ServiceTypeLoadBalancer), Hosts: nodes},
 			},
 		},
 		{
@@ -220,8 +220,8 @@ func TestUpdateNodesInExternalLoadBalancer(t *testing.T) {
 				newService("s4", "123", v1.ServiceTypeClusterIP),
 			},
 			expectedUpdateCalls: []fakecloud.FakeUpdateBalancerCall{
-				{newService("s1", "888", v1.ServiceTypeLoadBalancer), nodes},
-				{newService("s3", "999", v1.ServiceTypeLoadBalancer), nodes},
+				{Service: newService("s1", "888", v1.ServiceTypeLoadBalancer), Hosts: nodes},
+				{Service: newService("s3", "999", v1.ServiceTypeLoadBalancer), Hosts: nodes},
 			},
 		},
 		{
@@ -231,7 +231,7 @@ func TestUpdateNodesInExternalLoadBalancer(t *testing.T) {
 				nil,
 			},
 			expectedUpdateCalls: []fakecloud.FakeUpdateBalancerCall{
-				{newService("s0", "234", v1.ServiceTypeLoadBalancer), nodes},
+				{Service: newService("s0", "234", v1.ServiceTypeLoadBalancer), Hosts: nodes},
 			},
 		},
 	}
