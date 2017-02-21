@@ -29,7 +29,7 @@ type Interface interface {
 	ShuttingDown() bool
 }
 
-// New constructs a new workqueue (see the package comment).
+// New constructs a new work queue (see the package comment).
 func New() *Type {
 	return NewNamed("")
 }
