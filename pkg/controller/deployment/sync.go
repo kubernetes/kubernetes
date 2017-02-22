@@ -578,6 +578,12 @@ func (dc *DeploymentController) syncDeploymentStatus(allRSs []*extensions.Replic
 func (dc *DeploymentController) calculateStatus(allRSs []*extensions.ReplicaSet, newRS *extensions.ReplicaSet, deployment *extensions.Deployment) extensions.DeploymentStatus {
 	availableReplicas := deploymentutil.GetAvailableReplicaCountForReplicaSets(allRSs)
 	totalReplicas := deploymentutil.GetReplicaCountForReplicaSets(allRSs)
+	unavailableReplicas := totalReplicas - availableReplicas
+	// If unavailableReplicas is negative, then that means the Deployment has more available replicas running than
+	// desired, eg. whenever it scales down. In such a case we should simply default unavailableReplicas to zero.
+	if unavailableReplicas < 0 {
+		unavailableReplicas = 0
+	}
 
 	if availableReplicas >= deployment.Spec.Replicas-deploymentutil.MaxUnavailable(*deployment) {
 		minAvailability := deploymentutil.NewDeploymentCondition(extensions.DeploymentAvailable, api.ConditionTrue, deploymentutil.MinimumReplicasAvailable, "Deployment has minimum availability.")
@@ -593,7 +599,7 @@ func (dc *DeploymentController) calculateStatus(allRSs []*extensions.ReplicaSet,
 		Replicas:            deploymentutil.GetActualReplicaCountForReplicaSets(allRSs),
 		UpdatedReplicas:     deploymentutil.GetActualReplicaCountForReplicaSets([]*extensions.ReplicaSet{newRS}),
 		AvailableReplicas:   availableReplicas,
-		UnavailableReplicas: totalReplicas - availableReplicas,
+		UnavailableReplicas: unavailableReplicas,
 		Conditions:          deployment.Status.Conditions,
 	}
 }
