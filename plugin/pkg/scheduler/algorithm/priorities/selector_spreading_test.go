@@ -24,9 +24,9 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/api/v1"
 	extensions "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
-	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm"
 	schedulerapi "k8s.io/kubernetes/plugin/pkg/scheduler/api"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/schedulercache"
+	schedulertesting "k8s.io/kubernetes/plugin/pkg/scheduler/testing"
 )
 
 func controllerRef(kind, name, uid string) []metav1.OwnerReference {
@@ -286,9 +286,9 @@ func TestSelectorSpreadPriority(t *testing.T) {
 	for _, test := range tests {
 		nodeNameToInfo := schedulercache.CreateNodeNameToInfoMap(test.pods, nil)
 		selectorSpread := SelectorSpread{
-			serviceLister:    algorithm.FakeServiceLister(test.services),
-			controllerLister: algorithm.FakeControllerLister(test.rcs),
-			replicaSetLister: algorithm.FakeReplicaSetLister(test.rss),
+			serviceLister:    schedulertesting.FakeServiceLister(test.services),
+			controllerLister: schedulertesting.FakeControllerLister(test.rcs),
+			replicaSetLister: schedulertesting.FakeReplicaSetLister(test.rss),
 		}
 		list, err := selectorSpread.CalculateSpreadPriority(test.pod, nodeNameToInfo, makeNodeList(test.nodes))
 		if err != nil {
@@ -493,9 +493,9 @@ func TestZoneSelectorSpreadPriority(t *testing.T) {
 	for _, test := range tests {
 		nodeNameToInfo := schedulercache.CreateNodeNameToInfoMap(test.pods, nil)
 		selectorSpread := SelectorSpread{
-			serviceLister:    algorithm.FakeServiceLister(test.services),
-			controllerLister: algorithm.FakeControllerLister(test.rcs),
-			replicaSetLister: algorithm.FakeReplicaSetLister(test.rss),
+			serviceLister:    schedulertesting.FakeServiceLister(test.services),
+			controllerLister: schedulertesting.FakeControllerLister(test.rcs),
+			replicaSetLister: schedulertesting.FakeReplicaSetLister(test.rss),
 		}
 		list, err := selectorSpread.CalculateSpreadPriority(test.pod, nodeNameToInfo, makeLabeledNodeList(labeledNodes))
 		if err != nil {
@@ -668,7 +668,7 @@ func TestZoneSpreadPriority(t *testing.T) {
 
 	for _, test := range tests {
 		nodeNameToInfo := schedulercache.CreateNodeNameToInfoMap(test.pods, nil)
-		zoneSpread := ServiceAntiAffinity{podLister: algorithm.FakePodLister(test.pods), serviceLister: algorithm.FakeServiceLister(test.services), label: "zone"}
+		zoneSpread := ServiceAntiAffinity{podLister: schedulertesting.FakePodLister(test.pods), serviceLister: schedulertesting.FakeServiceLister(test.services), label: "zone"}
 		list, err := zoneSpread.CalculateAntiAffinityPriority(test.pod, nodeNameToInfo, makeLabeledNodeList(test.nodes))
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
