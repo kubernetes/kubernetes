@@ -20,13 +20,67 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	"net/url"
+	"strings"
 
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
+	"k8s.io/kubernetes/cmd/kubeadm/app/discovery/file"
+	"k8s.io/kubernetes/cmd/kubeadm/app/discovery/https"
+	"k8s.io/kubernetes/cmd/kubeadm/app/discovery/token"
 	kubenode "k8s.io/kubernetes/cmd/kubeadm/app/node"
 	tokenutil "k8s.io/kubernetes/cmd/kubeadm/app/util/token"
 )
+
+func Check(discURL, discFile, discToken string) (string, error) {
+	count := 0
+	disc := ""
+	if discURL != "" {
+		disc = discURL
+		count++
+	}
+	if discFile != "" {
+		disc = discFile
+		count++
+	}
+	if discToken != "" {
+		disc = discToken
+		count++
+	}
+	if count > 1 {
+		return "", fmt.Errorf("too many discovery options chosen: count %d", count)
+	}
+
+	return disc, nil
+}
+
+func Assign(d *kubeadmapi.Discovery, disc string) error {
+	u, err := url.Parse(disc)
+	if err != nil {
+		return err
+	}
+	switch u.Scheme {
+	case "https":
+		https.Parse(u, d)
+	case "file":
+		file.Parse(u, d)
+	case "token":
+		// Make sure a valid RFC 3986 URL has been passed and parsed.
+		// See https://github.com/kubernetes/kubeadm/issues/95#issuecomment-270431296 for more details.
+		if !strings.Contains(disc, "@") {
+			disc := disc + "@"
+			u, err = url.Parse(disc)
+			if err != nil {
+				return err
+			}
+		}
+		token.Parse(u, d)
+	default:
+		return fmt.Errorf("unknown discovery scheme")
+	}
+	return nil
+}
 
 // For identifies and executes the desired discovery mechanism.
 func For(d kubeadmapi.Discovery) (*clientcmdapi.Config, error) {
