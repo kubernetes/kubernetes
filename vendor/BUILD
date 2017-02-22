@@ -16689,3 +16689,250 @@ go_library(
     tags = ["automanaged"],
     deps = ["//vendor:github.com/golang/protobuf/proto"],
 )
+
+go_library(
+    name = "k8s.io/metrics/pkg/apis/custom_metrics",
+    srcs = [
+        "k8s.io/metrics/pkg/apis/custom_metrics/doc.go",
+        "k8s.io/metrics/pkg/apis/custom_metrics/register.go",
+        "k8s.io/metrics/pkg/apis/custom_metrics/types.generated.go",
+        "k8s.io/metrics/pkg/apis/custom_metrics/types.go",
+        "k8s.io/metrics/pkg/apis/custom_metrics/zz_generated.deepcopy.go",
+    ],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:github.com/ugorji/go/codec",
+        "//vendor:k8s.io/apimachinery/pkg/api/resource",
+        "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
+        "//vendor:k8s.io/apimachinery/pkg/conversion",
+        "//vendor:k8s.io/apimachinery/pkg/runtime",
+        "//vendor:k8s.io/apimachinery/pkg/runtime/schema",
+        "//vendor:k8s.io/apimachinery/pkg/types",
+        "//vendor:k8s.io/client-go/pkg/api",
+    ],
+)
+
+go_library(
+    name = "k8s.io/metrics/pkg/apis/custom_metrics/install",
+    srcs = ["k8s.io/metrics/pkg/apis/custom_metrics/install/install.go"],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:k8s.io/apimachinery/pkg/apimachinery/announced",
+        "//vendor:k8s.io/apimachinery/pkg/apimachinery/registered",
+        "//vendor:k8s.io/apimachinery/pkg/runtime",
+        "//vendor:k8s.io/client-go/pkg/api",
+        "//vendor:k8s.io/metrics/pkg/apis/custom_metrics",
+        "//vendor:k8s.io/metrics/pkg/apis/custom_metrics/v1alpha1",
+    ],
+)
+
+go_library(
+    name = "k8s.io/metrics/pkg/apis/custom_metrics/v1alpha1",
+    srcs = [
+        "k8s.io/metrics/pkg/apis/custom_metrics/v1alpha1/doc.go",
+        "k8s.io/metrics/pkg/apis/custom_metrics/v1alpha1/generated.pb.go",
+        "k8s.io/metrics/pkg/apis/custom_metrics/v1alpha1/register.go",
+        "k8s.io/metrics/pkg/apis/custom_metrics/v1alpha1/types.generated.go",
+        "k8s.io/metrics/pkg/apis/custom_metrics/v1alpha1/types.go",
+        "k8s.io/metrics/pkg/apis/custom_metrics/v1alpha1/zz_generated.conversion.go",
+        "k8s.io/metrics/pkg/apis/custom_metrics/v1alpha1/zz_generated.deepcopy.go",
+    ],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:github.com/gogo/protobuf/proto",
+        "//vendor:github.com/ugorji/go/codec",
+        "//vendor:k8s.io/apimachinery/pkg/api/resource",
+        "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
+        "//vendor:k8s.io/apimachinery/pkg/conversion",
+        "//vendor:k8s.io/apimachinery/pkg/runtime",
+        "//vendor:k8s.io/apimachinery/pkg/runtime/schema",
+        "//vendor:k8s.io/apimachinery/pkg/types",
+        "//vendor:k8s.io/client-go/pkg/api/v1",
+        "//vendor:k8s.io/metrics/pkg/apis/custom_metrics",
+    ],
+)
+
+go_library(
+    name = "k8s.io/metrics/pkg/apis/metrics",
+    srcs = [
+        "k8s.io/metrics/pkg/apis/metrics/doc.go",
+        "k8s.io/metrics/pkg/apis/metrics/register.go",
+        "k8s.io/metrics/pkg/apis/metrics/types.go",
+        "k8s.io/metrics/pkg/apis/metrics/zz_generated.deepcopy.go",
+    ],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
+        "//vendor:k8s.io/apimachinery/pkg/conversion",
+        "//vendor:k8s.io/apimachinery/pkg/runtime",
+        "//vendor:k8s.io/apimachinery/pkg/runtime/schema",
+        "//vendor:k8s.io/client-go/pkg/api",
+    ],
+)
+
+go_library(
+    name = "k8s.io/metrics/pkg/apis/metrics/install",
+    srcs = ["k8s.io/metrics/pkg/apis/metrics/install/install.go"],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:k8s.io/apimachinery/pkg/apimachinery/announced",
+        "//vendor:k8s.io/apimachinery/pkg/apimachinery/registered",
+        "//vendor:k8s.io/apimachinery/pkg/runtime",
+        "//vendor:k8s.io/apimachinery/pkg/util/sets",
+        "//vendor:k8s.io/client-go/pkg/api",
+        "//vendor:k8s.io/metrics/pkg/apis/metrics",
+        "//vendor:k8s.io/metrics/pkg/apis/metrics/v1alpha1",
+    ],
+)
+
+go_library(
+    name = "k8s.io/metrics/pkg/apis/metrics/v1alpha1",
+    srcs = [
+        "k8s.io/metrics/pkg/apis/metrics/v1alpha1/doc.go",
+        "k8s.io/metrics/pkg/apis/metrics/v1alpha1/generated.pb.go",
+        "k8s.io/metrics/pkg/apis/metrics/v1alpha1/register.go",
+        "k8s.io/metrics/pkg/apis/metrics/v1alpha1/types.go",
+        "k8s.io/metrics/pkg/apis/metrics/v1alpha1/zz_generated.conversion.go",
+        "k8s.io/metrics/pkg/apis/metrics/v1alpha1/zz_generated.deepcopy.go",
+    ],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:github.com/gogo/protobuf/proto",
+        "//vendor:github.com/gogo/protobuf/sortkeys",
+        "//vendor:k8s.io/apimachinery/pkg/api/resource",
+        "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
+        "//vendor:k8s.io/apimachinery/pkg/conversion",
+        "//vendor:k8s.io/apimachinery/pkg/runtime",
+        "//vendor:k8s.io/apimachinery/pkg/runtime/schema",
+        "//vendor:k8s.io/client-go/pkg/api",
+        "//vendor:k8s.io/client-go/pkg/api/v1",
+        "//vendor:k8s.io/metrics/pkg/apis/metrics",
+    ],
+)
+
+go_library(
+    name = "k8s.io/metrics/pkg/client/clientset_generated/clientset",
+    srcs = [
+        "k8s.io/metrics/pkg/client/clientset_generated/clientset/clientset.go",
+        "k8s.io/metrics/pkg/client/clientset_generated/clientset/doc.go",
+    ],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:github.com/golang/glog",
+        "//vendor:k8s.io/client-go/discovery",
+        "//vendor:k8s.io/client-go/plugin/pkg/client/auth",
+        "//vendor:k8s.io/client-go/rest",
+        "//vendor:k8s.io/client-go/util/flowcontrol",
+        "//vendor:k8s.io/metrics/pkg/client/clientset_generated/clientset/typed/metrics/v1alpha1",
+    ],
+)
+
+go_library(
+    name = "k8s.io/metrics/pkg/client/clientset_generated/clientset/fake",
+    srcs = [
+        "k8s.io/metrics/pkg/client/clientset_generated/clientset/fake/clientset_generated.go",
+        "k8s.io/metrics/pkg/client/clientset_generated/clientset/fake/doc.go",
+    ],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:k8s.io/apimachinery/pkg/runtime",
+        "//vendor:k8s.io/apimachinery/pkg/watch",
+        "//vendor:k8s.io/client-go/discovery",
+        "//vendor:k8s.io/client-go/discovery/fake",
+        "//vendor:k8s.io/client-go/pkg/api",
+        "//vendor:k8s.io/client-go/testing",
+        "//vendor:k8s.io/metrics/pkg/client/clientset_generated/clientset",
+        "//vendor:k8s.io/metrics/pkg/client/clientset_generated/clientset/typed/metrics/v1alpha1",
+        "//vendor:k8s.io/metrics/pkg/client/clientset_generated/clientset/typed/metrics/v1alpha1/fake",
+    ],
+)
+
+go_library(
+    name = "k8s.io/metrics/pkg/client/clientset_generated/clientset/scheme",
+    srcs = [
+        "k8s.io/metrics/pkg/client/clientset_generated/clientset/scheme/doc.go",
+        "k8s.io/metrics/pkg/client/clientset_generated/clientset/scheme/register.go",
+    ],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
+        "//vendor:k8s.io/apimachinery/pkg/runtime",
+        "//vendor:k8s.io/apimachinery/pkg/runtime/schema",
+        "//vendor:k8s.io/apimachinery/pkg/runtime/serializer",
+        "//vendor:k8s.io/metrics/pkg/apis/metrics/v1alpha1",
+    ],
+)
+
+go_library(
+    name = "k8s.io/metrics/pkg/client/clientset_generated/clientset/typed/metrics/v1alpha1",
+    srcs = [
+        "k8s.io/metrics/pkg/client/clientset_generated/clientset/typed/metrics/v1alpha1/doc.go",
+        "k8s.io/metrics/pkg/client/clientset_generated/clientset/typed/metrics/v1alpha1/generated_expansion.go",
+        "k8s.io/metrics/pkg/client/clientset_generated/clientset/typed/metrics/v1alpha1/metrics_client.go",
+        "k8s.io/metrics/pkg/client/clientset_generated/clientset/typed/metrics/v1alpha1/nodemetrics.go",
+        "k8s.io/metrics/pkg/client/clientset_generated/clientset/typed/metrics/v1alpha1/podmetrics.go",
+    ],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
+        "//vendor:k8s.io/apimachinery/pkg/runtime/serializer",
+        "//vendor:k8s.io/apimachinery/pkg/watch",
+        "//vendor:k8s.io/client-go/rest",
+        "//vendor:k8s.io/metrics/pkg/apis/metrics/v1alpha1",
+        "//vendor:k8s.io/metrics/pkg/client/clientset_generated/clientset/scheme",
+    ],
+)
+
+go_library(
+    name = "k8s.io/metrics/pkg/client/clientset_generated/clientset/typed/metrics/v1alpha1/fake",
+    srcs = [
+        "k8s.io/metrics/pkg/client/clientset_generated/clientset/typed/metrics/v1alpha1/fake/doc.go",
+        "k8s.io/metrics/pkg/client/clientset_generated/clientset/typed/metrics/v1alpha1/fake/fake_metrics_client.go",
+        "k8s.io/metrics/pkg/client/clientset_generated/clientset/typed/metrics/v1alpha1/fake/fake_nodemetrics.go",
+        "k8s.io/metrics/pkg/client/clientset_generated/clientset/typed/metrics/v1alpha1/fake/fake_podmetrics.go",
+    ],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
+        "//vendor:k8s.io/apimachinery/pkg/labels",
+        "//vendor:k8s.io/apimachinery/pkg/runtime/schema",
+        "//vendor:k8s.io/apimachinery/pkg/watch",
+        "//vendor:k8s.io/client-go/rest",
+        "//vendor:k8s.io/client-go/testing",
+        "//vendor:k8s.io/metrics/pkg/apis/metrics/v1alpha1",
+        "//vendor:k8s.io/metrics/pkg/client/clientset_generated/clientset/typed/metrics/v1alpha1",
+    ],
+)
+
+go_library(
+    name = "k8s.io/metrics/pkg/client/custom_metrics",
+    srcs = [
+        "k8s.io/metrics/pkg/client/custom_metrics/client.go",
+        "k8s.io/metrics/pkg/client/custom_metrics/interfaces.go",
+    ],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:k8s.io/apimachinery/pkg/api/meta",
+        "//vendor:k8s.io/apimachinery/pkg/labels",
+        "//vendor:k8s.io/apimachinery/pkg/runtime/schema",
+        "//vendor:k8s.io/apimachinery/pkg/runtime/serializer",
+        "//vendor:k8s.io/client-go/pkg/api",
+        "//vendor:k8s.io/client-go/rest",
+        "//vendor:k8s.io/client-go/util/flowcontrol",
+        "//vendor:k8s.io/metrics/pkg/apis/custom_metrics/v1alpha1",
+    ],
+)
+
+go_library(
+    name = "k8s.io/metrics/pkg/client/custom_metrics/fake",
+    srcs = ["k8s.io/metrics/pkg/client/custom_metrics/fake/fake_client.go"],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:k8s.io/apimachinery/pkg/labels",
+        "//vendor:k8s.io/apimachinery/pkg/runtime/schema",
+        "//vendor:k8s.io/client-go/pkg/api",
+        "//vendor:k8s.io/client-go/testing",
+        "//vendor:k8s.io/metrics/pkg/apis/custom_metrics/v1alpha1",
+        "//vendor:k8s.io/metrics/pkg/client/custom_metrics",
+    ],
+)
