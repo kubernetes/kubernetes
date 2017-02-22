@@ -379,6 +379,7 @@ type provisionerConfig struct {
 	gidMin          int
 	gidMax          int
 	volumeType      gapi.VolumeDurabilityInfo
+	volume 			string
 }
 
 type glusterfsVolumeProvisioner struct {
@@ -885,6 +886,12 @@ func parseClassParameters(params map[string]string, kubeClient clientset.Interfa
 			cfg.secretName = v
 		case "secretnamespace":
 			cfg.secretNamespace = v
+		case "volume":
+			if v == "rwo" || v == "rwx" {
+				cfg.volume = v
+			} else {
+				return nil, fmt.Errorf("glusterfs: invalid value %q for volume plugin %s", k, glusterfsPluginName)
+			}
 		case "clusterid":
 			if len(v) != 0 {
 				cfg.clusterId = v
