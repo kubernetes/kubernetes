@@ -56,10 +56,10 @@ func calculateScaleUpLimit(currentReplicas int32) int32 {
 	return int32(math.Max(scaleUpLimitFactor*float64(currentReplicas), scaleUpLimitMinimum))
 }
 
-// ConvertToVersionVia is like api.Scheme.ConvertToVersion, but it does so via an internal version first.
-// We use it since working with v2alpha1 is convinient here, but we want to use the v1 client (and
-// can't just use the internal version).  Note that it does *not* guarantee a copy is made -- this should
-// be done separately if we need to mutate the object.
+// UnsafeConvertToVersionVia is like api.Scheme.UnsafeConvertToVersion, but it does so via an internal version first.
+// We use it since working with v2alpha1 is convenient here, but we want to use the v1 client (and
+// can't just use the internal version).  Note that conversion mutates the object, so you need to deepcopy
+// *before* you call this if the input object came out of a shared cache.
 func UnsafeConvertToVersionVia(obj runtime.Object, externalVersion schema.GroupVersion) (runtime.Object, error) {
 	objInt, err := api.Scheme.UnsafeConvertToVersion(obj, schema.GroupVersion{Group: externalVersion.Group, Version: runtime.APIVersionInternal})
 	if err != nil {
@@ -275,8 +275,16 @@ func (a *HorizontalController) computeReplicasForMetrics(hpa *autoscalingv2.Hori
 	return replicas, metric, statuses, timestamp, nil
 }
 
-func (a *HorizontalController) reconcileAutoscaler(hpav1 *autoscalingv1.HorizontalPodAutoscaler) error {
-	// first, convert to autoscaling/v2, which makes our lives easier when calculating metrics
+func (a *HorizontalController) reconcileAutoscaler(hpav1Shared *autoscalingv1.HorizontalPodAutoscaler) error {
+	// make a copy so that we never mutate the shared informer cache (conversion can mutate the object)
+	hpav1Raw, err := api.Scheme.DeepCopy(hpav1Shared)
+	if err != nil {
+		a.eventRecorder.Event(hpav1Shared, v1.EventTypeWarning, "FailedConvertHPA", err.Error())
+		return fmt.Errorf("failed to deep-copy the HPA: %v", err)
+	}
+
+	// then, convert to autoscaling/v2, which makes our lives easier when calculating metrics
+	hpav1 := hpav1Raw.(*autoscalingv1.HorizontalPodAutoscaler)
 	hpaRaw, err := UnsafeConvertToVersionVia(hpav1, autoscalingv2.SchemeGroupVersion)
 	if err != nil {
 		a.eventRecorder.Event(hpav1, v1.EventTypeWarning, "FailedConvertHPA", err.Error())
@@ -412,12 +420,6 @@ func (a *HorizontalController) updateCurrentReplicasInStatus(hpa *autoscalingv2.
 }
 
 func (a *HorizontalController) updateStatus(hpa *autoscalingv2.HorizontalPodAutoscaler, currentReplicas, desiredReplicas int32, metricStatuses []autoscalingv2.MetricStatus, rescale bool) error {
-	// make a copy so that we don't mutate the shared informer cache
-	hpaCopy, err := api.Scheme.DeepCopy(hpa)
-	if err != nil {
-		return nil
-	}
-	hpa = hpaCopy.(*autoscalingv2.HorizontalPodAutoscaler)
 	hpa.Status = autoscalingv2.HorizontalPodAutoscalerStatus{
 		CurrentReplicas: currentReplicas,
 		DesiredReplicas: desiredReplicas,
