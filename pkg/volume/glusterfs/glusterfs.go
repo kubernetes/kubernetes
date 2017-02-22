@@ -690,6 +690,33 @@ func (r *glusterfsVolumeProvisioner) Provision() (*v1.PersistentVolume, error) {
 	return pv, nil
 }
 
+func (p *glusterfsVolumeProvisioner) GetClusterNodes(cli *gcli.Client, cluster string) (dynamicHostIps []string, err error) {
+	clusterinfo, err := cli.ClusterInfo(cluster)
+	if err != nil {
+		glog.Errorf("glusterfs: failed to get cluster details: %v", err)
+		return nil, fmt.Errorf("failed to get cluster details: %v", err)
+	}
+
+	// For the dynamically provisioned volume, we gather the list of node IPs
+	// of the cluster on which provisioned volume belongs to, as there can be multiple
+	// clusters.
+	for _, node := range clusterinfo.Nodes {
+		nodei, err := cli.NodeInfo(string(node))
+		if err != nil {
+			glog.Errorf("glusterfs: failed to get hostip: %v", err)
+			return nil, fmt.Errorf("failed to get hostip: %v", err)
+		}
+		ipaddr := dstrings.Join(nodei.NodeAddRequest.Hostnames.Storage, "")
+		dynamicHostIps = append(dynamicHostIps, ipaddr)
+	}
+	glog.V(3).Infof("glusterfs: hostlist :%v", dynamicHostIps)
+	if len(dynamicHostIps) == 0 {
+		glog.Errorf("glusterfs: no hosts found: %v", err)
+		return nil, fmt.Errorf("no hosts found: %v", err)
+	}
+	return dynamicHostIps, nil
+}
+
 func (p *glusterfsVolumeProvisioner) CreateVolume(gid int) (r *v1.GlusterfsVolumeSource, size int, err error) {
 	var clusterIds []string
 	capacity := p.options.PVC.Spec.Resources.Requests[v1.ResourceName(v1.ResourceStorage)]
@@ -717,28 +744,10 @@ func (p *glusterfsVolumeProvisioner) CreateVolume(gid int) (r *v1.GlusterfsVolum
 		return nil, 0, fmt.Errorf("error creating volume %v", err)
 	}
 	glog.V(1).Infof("glusterfs: volume with size: %d and name: %s created", volume.Size, volume.Name)
-	clusterinfo, err := cli.ClusterInfo(volume.Cluster)
+	dynamicHostIps, err := p.GetClusterNodes(cli, volume.Cluster)
 	if err != nil {
-		glog.Errorf("glusterfs: failed to get cluster details: %v", err)
-		return nil, 0, fmt.Errorf("failed to get cluster details: %v", err)
-	}
-	// For the above dynamically provisioned volume, we gather the list of node IPs
-	// of the cluster on which provisioned volume belongs to, as there can be multiple
-	// clusters.
-	var dynamicHostIps []string
-	for _, node := range clusterinfo.Nodes {
-		nodei, err := cli.NodeInfo(string(node))
-		if err != nil {
-			glog.Errorf("glusterfs: failed to get hostip: %v", err)
-			return nil, 0, fmt.Errorf("failed to get hostip: %v", err)
-		}
-		ipaddr := dstrings.Join(nodei.NodeAddRequest.Hostnames.Storage, "")
-		dynamicHostIps = append(dynamicHostIps, ipaddr)
-	}
-	glog.V(3).Infof("glusterfs: hostlist :%v", dynamicHostIps)
-	if len(dynamicHostIps) == 0 {
-		glog.Errorf("glusterfs: no hosts found: %v", err)
-		return nil, 0, fmt.Errorf("no hosts found: %v", err)
+		glog.Errorf("glusterfs: error [%v] when getting cluster nodes for volume %s", err, volume)
+		return nil, 0, fmt.Errorf("error [%v] when getting cluster nodes for volume %s", err, volume)
 	}
 
 	// The 'endpointname' is created in form of 'gluster-dynamic-<claimname>'.
