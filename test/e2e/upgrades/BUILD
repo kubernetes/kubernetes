@@ -13,6 +13,7 @@ go_library(
         "configmaps.go",
         "deployments.go",
         "horizontal_pod_autoscalers.go",
+        "job.go",
         "persistent_volumes.go",
         "secrets.go",
         "services.go",
@@ -24,6 +25,7 @@ go_library(
     deps = [
         "//pkg/api/v1:go_default_library",
         "//pkg/apis/apps/v1beta1:go_default_library",
+        "//pkg/apis/batch/v1:go_default_library",
         "//pkg/apis/extensions/v1beta1:go_default_library",
         "//pkg/controller/deployment/util:go_default_library",
         "//pkg/kubelet/sysctl:go_default_library",
