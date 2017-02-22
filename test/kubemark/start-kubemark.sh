@@ -311,7 +311,7 @@ current-context: kubemark-context")
   sed "s/{{numreplicas}}/${NUM_NODES:-10}/g" "${RESOURCE_DIRECTORY}/hollow-node_template.json" > "${RESOURCE_DIRECTORY}/hollow-node.json"
   proxy_cpu=20
   if [ "${NUM_NODES:-10}" -gt 1000 ]; then
-    proxy_cpu=40
+    proxy_cpu=50
   fi
   proxy_mem_per_node=100
   proxy_mem=$((100 * 1024 + ${proxy_mem_per_node}*${NUM_NODES:-10}))
