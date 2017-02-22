@@ -17,13 +17,17 @@ limitations under the License.
 package validation
 
 import (
+	"fmt"
 	"net"
+	"net/url"
+	"os"
 	"path"
 	"strings"
 
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
-	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
+	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
+	tokenutil "k8s.io/kubernetes/cmd/kubeadm/app/util/token"
 	authzmodes "k8s.io/kubernetes/pkg/kubeapiserver/authorizer/modes"
 	"k8s.io/kubernetes/pkg/registry/core/service/ipallocator"
 )
@@ -45,7 +49,6 @@ var cloudproviders = []string{
 
 func ValidateMasterConfiguration(c *kubeadm.MasterConfiguration) field.ErrorList {
 	allErrs := field.ErrorList{}
-	allErrs = append(allErrs, ValidateDiscovery(&c.Discovery, field.NewPath("discovery"))...)
 	allErrs = append(allErrs, ValidateServiceSubnet(c.Networking.ServiceSubnet, field.NewPath("service subnet"))...)
 	allErrs = append(allErrs, ValidateCloudProvider(c.CloudProvider, field.NewPath("cloudprovider"))...)
 	allErrs = append(allErrs, ValidateAuthorizationMode(c.AuthorizationMode, field.NewPath("authorization-mode"))...)
@@ -54,52 +57,10 @@ func ValidateMasterConfiguration(c *kubeadm.MasterConfiguration) field.ErrorList
 
 func ValidateNodeConfiguration(c *kubeadm.NodeConfiguration) field.ErrorList {
 	allErrs := field.ErrorList{}
-	allErrs = append(allErrs, ValidateDiscovery(&c.Discovery, field.NewPath("discovery"))...)
+	allErrs = append(allErrs, ValidateDiscovery(c, field.NewPath("discovery"))...)
 
 	if !path.IsAbs(c.CACertPath) || !strings.HasSuffix(c.CACertPath, ".crt") {
 		allErrs = append(allErrs, field.Invalid(field.NewPath("ca-cert-path"), nil, "the ca certificate path must be an absolute path"))
-	}
-	return allErrs
-}
-
-func ValidateDiscovery(c *kubeadm.Discovery, fldPath *field.Path) field.ErrorList {
-	allErrs := field.ErrorList{}
-	var count int
-	if c.Token != nil {
-		allErrs = append(allErrs, ValidateTokenDiscovery(c.Token, fldPath)...)
-		count++
-	}
-	if c.File != nil {
-		allErrs = append(allErrs, ValidateFileDiscovery(c.File, fldPath)...)
-		count++
-	}
-	if c.HTTPS != nil {
-		allErrs = append(allErrs, ValidateHTTPSDiscovery(c.HTTPS, fldPath)...)
-		count++
-	}
-	if count != 1 {
-		allErrs = append(allErrs, field.Invalid(fldPath, nil, "exactly one discovery strategy can be provided"))
-	}
-	return allErrs
-}
-
-func ValidateFileDiscovery(c *kubeadm.FileDiscovery, fldPath *field.Path) field.ErrorList {
-	allErrs := field.ErrorList{}
-	return allErrs
-}
-
-func ValidateHTTPSDiscovery(c *kubeadm.HTTPSDiscovery, fldPath *field.Path) field.ErrorList {
-	allErrs := field.ErrorList{}
-	return allErrs
-}
-
-func ValidateTokenDiscovery(c *kubeadm.TokenDiscovery, fldPath *field.Path) field.ErrorList {
-	allErrs := field.ErrorList{}
-	if len(c.ID) == 0 || len(c.Secret) == 0 {
-		allErrs = append(allErrs, field.Invalid(fldPath, nil, "token must be specific as <ID>:<Secret>"))
-	}
-	if len(c.Addresses) == 0 {
-		allErrs = append(allErrs, field.Invalid(fldPath, nil, "at least one address is required"))
 	}
 	return allErrs
 }
@@ -111,13 +72,96 @@ func ValidateAuthorizationMode(authzMode string, fldPath *field.Path) field.Erro
 	return field.ErrorList{}
 }
 
+func ValidateDiscovery(c *kubeadm.NodeConfiguration, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	allErrs = append(allErrs, ValidateArgSelection(c, fldPath)...)
+	allErrs = append(allErrs, ValidateTLSBootstrapTokenArg(c, fldPath)...)
+	allErrs = append(allErrs, ValidateToken(c.Token, fldPath)...)
+	allErrs = append(allErrs, ValidateToken(c.DiscoveryToken, fldPath)...)
+	allErrs = append(allErrs, ValidateDiscoveryFile(c, fldPath)...)
+	allErrs = append(allErrs, ValidateToken(c.TLSBootstrapToken, fldPath)...)
+	allErrs = append(allErrs, ValidateJoinDiscoveryTokenAPIServer(c, fldPath)...)
+	return allErrs
+}
+
+func ValidateArgSelection(cfg *kubeadm.NodeConfiguration, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	if len(cfg.DiscoveryToken) != 0 && len(cfg.DiscoveryFile) != 0 {
+		allErrs = append(allErrs, field.Invalid(fldPath, nil, "DiscoveryToken and DiscoveryFile cannot both be set"))
+	}
+	if len(cfg.DiscoveryToken) == 0 {
+		allErrs = append(allErrs, field.Invalid(fldPath, nil, "Token value not found in DiscoveryToken or Token"))
+	}
+	if len(cfg.DiscoveryTokenAPIServers) < 1 {
+		allErrs = append(allErrs, field.Invalid(fldPath, nil, "DiscoveryTokenAPIServers not set"))
+	}
+	// TODO remove once we support multiple api servers
+	if len(cfg.DiscoveryTokenAPIServers) > 1 {
+		fmt.Println("[validation] WARNING: kubeadm doesn't fully support multiple API Servers yet")
+	}
+	return allErrs
+}
+
+func ValidateTLSBootstrapTokenArg(cfg *kubeadm.NodeConfiguration, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	if len(cfg.TLSBootstrapToken) != 0 {
+		if len(cfg.Token) != 0 {
+			allErrs = append(allErrs, field.Invalid(fldPath, nil, "TLSBootstrapToken or Token must be set"))
+		}
+	}
+	return allErrs
+}
+
+func ValidateJoinDiscoveryTokenAPIServer(c *kubeadm.NodeConfiguration, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	for _, m := range c.DiscoveryTokenAPIServers {
+		_, _, err := net.SplitHostPort(m)
+		if err != nil {
+			allErrs = append(allErrs, field.Invalid(fldPath, nil, err.Error()))
+		}
+	}
+	return allErrs
+}
+
+func ValidateDiscoveryFile(c *kubeadm.NodeConfiguration, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	u, err := url.Parse(c.DiscoveryFile)
+	if err != nil {
+		// Ok, something without a URI scheme is passed, assume a file
+		if _, err := os.Stat(c.DiscoveryFile); os.IsNotExist(err) {
+			allErrs = append(allErrs, field.Invalid(fldPath, nil, "not a valid HTTPS URL or a file on disk"))
+		}
+	} else {
+		// Parsable URL, but require HTTPS
+		if u.Scheme != "https" {
+			allErrs = append(allErrs, field.Invalid(fldPath, nil, "must be https"))
+		}
+	}
+
+	return allErrs
+}
+
+func ValidateToken(t string, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+
+	id, secret, err := tokenutil.ParseToken(t)
+	if err != nil {
+		allErrs = append(allErrs, field.Invalid(fldPath, nil, err.Error()))
+	}
+
+	if len(id) == 0 || len(secret) == 0 {
+		allErrs = append(allErrs, field.Invalid(fldPath, nil, "token must be specific as <ID>.<Secret>"))
+	}
+	return allErrs
+}
+
 func ValidateServiceSubnet(subnet string, fldPath *field.Path) field.ErrorList {
 	_, svcSubnet, err := net.ParseCIDR(subnet)
 	if err != nil {
 		return field.ErrorList{field.Invalid(fldPath, nil, "couldn't parse the service subnet")}
 	}
 	numAddresses := ipallocator.RangeSize(svcSubnet)
-	if numAddresses < kubeadmconstants.MinimumAddressesInServiceSubnet {
+	if numAddresses < constants.MinimumAddressesInServiceSubnet {
 		return field.ErrorList{field.Invalid(fldPath, nil, "service subnet is too small")}
 	}
 	return field.ErrorList{}
