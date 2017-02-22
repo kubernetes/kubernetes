@@ -17,14 +17,18 @@ limitations under the License.
 package cni
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
+	"io/ioutil"
+	"os"
 	"sort"
 	"sync"
 	"time"
 
 	"github.com/containernetworking/cni/libcni"
 	cnitypes "github.com/containernetworking/cni/pkg/types"
+	"github.com/containernetworking/cni/pkg/types/current"
 	"github.com/golang/glog"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/apis/componentconfig"
@@ -40,8 +44,53 @@ const (
 	VendorCNIDirTemplate = "%s/opt/%s/bin"
 )
 
+type ResultsStore struct {
+	Position string
+}
+
+func (store *ResultsStore) Save(name string, result cnitypes.Result) error {
+	res, err := current.GetResult(result)
+	if err != nil {
+		return err
+	}
+	b, err := json.Marshal(res)
+	if err != nil {
+		return err
+	}
+	filename := store.Position + "/" + name
+	err = ioutil.WriteFile(filename, b, 0600)
+	if err != nil {
+		return err
+	}
+	return err
+}
+
+func (store *ResultsStore) Read(name string) (*current.Result, error) {
+	filename := store.Position + "/" + name
+	b, err := ioutil.ReadFile(filename)
+	if err != nil {
+		return nil, err
+	}
+	var res *current.Result
+	err = json.Unmarshal(b, res)
+	if err != nil {
+		return nil, err
+	}
+	return res, err
+}
+
+func (store *ResultsStore) Delete(name string) error {
+	filename := store.Position + "/" + name
+	err := os.Remove(filename)
+	if err != nil {
+		return err
+	}
+	return err
+}
+
 type cniNetworkPlugin struct {
 	network.NoopNetworkPlugin
+	store *ResultsStore
 
 	loNetwork *cniNetwork
 
@@ -88,7 +137,8 @@ func getDefaultCNINetwork(pluginDir, binDir, vendorCNIDirPrefix string) (*cniNet
 	if pluginDir == "" {
 		pluginDir = DefaultNetDir
 	}
-	files, err := libcni.ConfFiles(pluginDir)
+	ext := []string{".conf"}
+	files, err := libcni.ConfFiles(pluginDir, ext)
 	switch {
 	case err != nil:
 		return nil, err
@@ -204,10 +254,16 @@ func (plugin *cniNetworkPlugin) SetUpPod(namespace string, name string, id kubec
 		return err
 	}
 
-	_, err = plugin.getDefaultNetwork().addToNetwork(name, namespace, id, netnsPath)
+	res, err := plugin.getDefaultNetwork().addToNetwork(name, namespace, id, netnsPath)
 	if err != nil {
 		glog.Errorf("Error while adding to cni network: %s", err)
 		return err
+	}
+	if plugin.store != nil {
+		err := plugin.store.Save(name, res)
+		if err != nil {
+			return err
+		}
 	}
 
 	return err
@@ -220,6 +276,12 @@ func (plugin *cniNetworkPlugin) TearDownPod(namespace string, name string, id ku
 	netnsPath, err := plugin.host.GetNetNS(id.ID)
 	if err != nil {
 		return fmt.Errorf("CNI failed to retrieve network namespace path: %v", err)
+	}
+	if plugin.store != nil {
+		err := plugin.store.Delete(name)
+		if err != nil {
+			return err
+		}
 	}
 
 	return plugin.getDefaultNetwork().deleteFromNetwork(name, namespace, id, netnsPath)
@@ -241,7 +303,7 @@ func (plugin *cniNetworkPlugin) GetPodNetworkStatus(namespace string, name strin
 	return &network.PodNetworkStatus{IP: ip}, nil
 }
 
-func (network *cniNetwork) addToNetwork(podName string, podNamespace string, podInfraContainerID kubecontainer.ContainerID, podNetnsPath string) (*cnitypes.Result, error) {
+func (network *cniNetwork) addToNetwork(podName string, podNamespace string, podInfraContainerID kubecontainer.ContainerID, podNetnsPath string) (cnitypes.Result, error) {
 	rt, err := buildCNIRuntimeConf(podName, podNamespace, podInfraContainerID, podNetnsPath)
 	if err != nil {
 		glog.Errorf("Error adding network: %v", err)

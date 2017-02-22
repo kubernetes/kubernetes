@@ -31,6 +31,7 @@ import (
 
 	"github.com/containernetworking/cni/libcni"
 	cnitypes "github.com/containernetworking/cni/pkg/types"
+	"github.com/containernetworking/cni/pkg/types/current"
 	"github.com/golang/glog"
 	"github.com/vishvananda/netlink"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
@@ -318,12 +319,25 @@ func (plugin *kubenetNetworkPlugin) setup(namespace string, name string, id kube
 	if err != nil {
 		return err
 	}
-	if res.IP4 == nil {
+
+	result, err := current.GetResult(res)
+	if err != nil {
+		return err
+	}
+
+	var ipconfig *current.IPConfig
+	for _, ip := range result.IPs {
+		if ip.Interface == 2 {
+			ipconfig = ip
+		}
+	}
+
+	if ipconfig == nil {
 		return fmt.Errorf("CNI plugin reported no IPv4 address for container %v.", id)
 	}
-	ip4 := res.IP4.IP.IP.To4()
+	ip4 := ipconfig.Address.IP
 	if ip4 == nil {
-		return fmt.Errorf("CNI plugin reported an invalid IPv4 address for container %v: %+v.", id, res.IP4)
+		return fmt.Errorf("CNI plugin reported an invalid IPv4 address for container %v: %+v.", id, ipconfig)
 	}
 
 	// Explicitly assign mac address to cbr0. If bridge mac address is not explicitly set will adopt the lowest MAC address of the attached veths.
@@ -766,7 +780,7 @@ func (plugin *kubenetNetworkPlugin) buildCNIRuntimeConf(ifName string, id kubeco
 	}, nil
 }
 
-func (plugin *kubenetNetworkPlugin) addContainerToNetwork(config *libcni.NetworkConfig, ifName, namespace, name string, id kubecontainer.ContainerID) (*cnitypes.Result, error) {
+func (plugin *kubenetNetworkPlugin) addContainerToNetwork(config *libcni.NetworkConfig, ifName, namespace, name string, id kubecontainer.ContainerID) (cnitypes.Result, error) {
 	rt, err := plugin.buildCNIRuntimeConf(ifName, id)
 	if err != nil {
 		return nil, fmt.Errorf("Error building CNI config: %v", err)

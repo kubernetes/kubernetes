@@ -47,6 +47,9 @@ type Args struct {
 	Path          string
 }
 
+// Args implements the CNIArgs interface
+var _ CNIArgs = &Args{}
+
 func (args *Args) AsEnv() []string {
 	env := os.Environ()
 	pluginArgsStr := args.PluginArgsStr
