@@ -22,6 +22,7 @@ import (
 	"sort"
 	"time"
 
+	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	clientv1 "k8s.io/client-go/pkg/api/v1"
@@ -32,12 +33,13 @@ import (
 	"k8s.io/kubernetes/pkg/api/v1"
 	apps "k8s.io/kubernetes/pkg/apis/apps/v1beta1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
-	"k8s.io/kubernetes/pkg/client/legacylisters"
+	appsinformers "k8s.io/kubernetes/pkg/client/informers/informers_generated/externalversions/apps/v1beta1"
+	coreinformers "k8s.io/kubernetes/pkg/client/informers/informers_generated/externalversions/core/v1"
+	appslisters "k8s.io/kubernetes/pkg/client/listers/apps/v1beta1"
+	corelisters "k8s.io/kubernetes/pkg/client/listers/core/v1"
 
-	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/kubernetes/pkg/controller"
 
@@ -57,11 +59,11 @@ type StatefulSetController struct {
 	// Abstracted out for testing.
 	control StatefulSetControlInterface
 	// podStore is a cache of watched pods.
-	podStore listers.StoreToPodLister
+	podStore corelisters.PodLister
 	// podStoreSynced returns true if the pod store has synced at least once.
 	podStoreSynced cache.InformerSynced
 	// A store of StatefulSets, populated by setController.
-	setStore listers.StoreToStatefulSetLister
+	setStore appslisters.StatefulSetLister
 	// Watches changes to all StatefulSets.
 	setController cache.Controller
 	// StatefulSets that need to be synced.
@@ -69,7 +71,7 @@ type StatefulSetController struct {
 }
 
 // NewStatefulSetController creates a new statefulset controller.
-func NewStatefulSetController(podInformer cache.SharedIndexInformer, kubeClient clientset.Interface, resyncPeriod time.Duration) *StatefulSetController {
+func NewStatefulSetController(podInformer coreinformers.PodInformer, statefulSetInformer appsinformers.StatefulSetInformer, kubeClient clientset.Interface, resyncPeriod time.Duration) *StatefulSetController {
 	eventBroadcaster := record.NewBroadcaster()
 	eventBroadcaster.StartLogging(glog.Infof)
 	eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: v1core.New(kubeClient.Core().RESTClient()).Events("")})
@@ -80,8 +82,7 @@ func NewStatefulSetController(podInformer cache.SharedIndexInformer, kubeClient 
 		control:    NewDefaultStatefulSetControl(NewRealStatefulPodControl(kubeClient, recorder)),
 		queue:      workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "statefulset"),
 	}
-
-	podInformer.AddEventHandler(cache.ResourceEventHandlerFuncs{
+	podInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
 		// lookup the statefulset and enqueue
 		AddFunc: ssc.addPod,
 		// lookup current and old statefulset if labels changed
@@ -89,19 +90,8 @@ func NewStatefulSetController(podInformer cache.SharedIndexInformer, kubeClient 
 		// lookup statefulset accounting for deletion tombstones
 		DeleteFunc: ssc.deletePod,
 	})
-	ssc.podStore.Indexer = podInformer.GetIndexer()
-
-	ssc.setStore.Store, ssc.setController = cache.NewInformer(
-		&cache.ListWatch{
-			ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
-				return ssc.kubeClient.Apps().StatefulSets(v1.NamespaceAll).List(options)
-			},
-			WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
-				return ssc.kubeClient.Apps().StatefulSets(v1.NamespaceAll).Watch(options)
-			},
-		},
-		&apps.StatefulSet{},
-		statefulSetResyncPeriod,
+	ssc.podStore = podInformer.Lister()
+	statefulSetInformer.Informer().AddEventHandlerWithResyncPeriod(
 		cache.ResourceEventHandlerFuncs{
 			AddFunc: ssc.enqueueStatefulSet,
 			UpdateFunc: func(old, cur interface{}) {
@@ -114,9 +104,11 @@ func NewStatefulSetController(podInformer cache.SharedIndexInformer, kubeClient 
 			},
 			DeleteFunc: ssc.enqueueStatefulSet,
 		},
+		statefulSetResyncPeriod,
 	)
+	ssc.setStore = statefulSetInformer.Lister()
 	// TODO: Watch volumes
-	ssc.podStoreSynced = podInformer.GetController().HasSynced
+	ssc.podStoreSynced = podInformer.Informer().HasSynced
 	return ssc
 }
 
@@ -225,14 +217,14 @@ func (ssc *StatefulSetController) getStatefulSetForPod(pod *v1.Pod) *apps.Statef
 		sort.Sort(overlappingStatefulSets(sets))
 		// return the first created set for which pod is a member
 		for i := range sets {
-			if isMemberOf(&sets[i], pod) {
-				return &sets[i]
+			if isMemberOf(sets[i], pod) {
+				return sets[i]
 			}
 		}
 		glog.V(4).Infof("No StatefulSets found for pod %v, StatefulSet controller will avoid syncing", pod.Name)
 		return nil
 	}
-	return &sets[0]
+	return sets[0]
 
 }
 
@@ -275,9 +267,12 @@ func (ssc *StatefulSetController) sync(key string) error {
 	defer func() {
 		glog.V(4).Infof("Finished syncing statefulset %q (%v)", key, time.Now().Sub(startTime))
 	}()
-
-	obj, exists, err := ssc.setStore.Store.GetByKey(key)
-	if !exists {
+	namespace, name, err := cache.SplitMetaNamespaceKey(key)
+	if err != nil {
+		return err
+	}
+	set, err := ssc.setStore.StatefulSets(namespace).Get(name)
+	if errors.IsNotFound(err) {
 		glog.Infof("StatefulSet has been deleted %v", key)
 		return nil
 	}
@@ -285,14 +280,12 @@ func (ssc *StatefulSetController) sync(key string) error {
 		utilruntime.HandleError(fmt.Errorf("Unable to retrieve StatefulSet %v from store: %v", key, err))
 		return err
 	}
-
-	set := *obj.(*apps.StatefulSet)
-	pods, err := ssc.getPodsForStatefulSet(&set)
+	pods, err := ssc.getPodsForStatefulSet(set)
 	if err != nil {
 		return err
 	}
 
-	return ssc.syncStatefulSet(&set, pods)
+	return ssc.syncStatefulSet(set, pods)
 }
 
 // syncStatefulSet syncs a tuple of (statefulset, []*v1.Pod).

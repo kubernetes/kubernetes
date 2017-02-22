@@ -31,7 +31,9 @@ import (
 
 	"k8s.io/kubernetes/pkg/api/v1"
 	apps "k8s.io/kubernetes/pkg/apis/apps/v1beta1"
-	listers "k8s.io/kubernetes/pkg/client/legacylisters"
+	appslisters "k8s.io/kubernetes/pkg/client/listers/apps/v1beta1"
+	corelisters "k8s.io/kubernetes/pkg/client/listers/core/v1"
+
 	"k8s.io/kubernetes/pkg/controller"
 )
 
@@ -352,9 +354,9 @@ func (rt *requestTracker) reset() {
 }
 
 type fakeStatefulPodControl struct {
-	podsLister          listers.StoreToPodLister
-	claimsLister        listers.StoreToPersistentVolumeClaimLister
-	setsLister          listers.StoreToStatefulSetLister
+	podsLister          corelisters.PodLister
+	claimsLister        corelisters.PersistentVolumeClaimLister
+	setsLister          appslisters.StatefulSetLister
 	podsIndexer         cache.Indexer
 	claimsIndexer       cache.Indexer
 	setsIndexer         cache.Indexer
@@ -372,9 +374,9 @@ func newFakeStatefulPodControl() *fakeStatefulPodControl {
 	setsIndexer := cache.NewIndexer(controller.KeyFunc,
 		cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
 	return &fakeStatefulPodControl{
-		listers.StoreToPodLister{Indexer: podsIndexer},
-		listers.StoreToPersistentVolumeClaimLister{Indexer: claimsIndexer},
-		listers.StoreToStatefulSetLister{Store: setsIndexer},
+		corelisters.NewPodLister(podsIndexer),
+		corelisters.NewPersistentVolumeClaimLister(claimsIndexer),
+		appslisters.NewStatefulSetLister(setsIndexer),
 		podsIndexer,
 		claimsIndexer,
 		setsIndexer,
