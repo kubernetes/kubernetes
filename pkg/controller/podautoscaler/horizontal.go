@@ -276,6 +276,13 @@ func (a *HorizontalController) computeReplicasForMetrics(hpa *autoscalingv2.Hori
 }
 
 func (a *HorizontalController) reconcileAutoscaler(hpav1 *autoscalingv1.HorizontalPodAutoscaler) error {
+	// make a copy so that we don't mutate the shared informer cache. NOTE: UnsafeConvertToVersionVia below mutates!
+	hpaCopy, err := api.Scheme.DeepCopy(hpav1)
+	if err != nil {
+		return nil
+	}
+	hpav1 = hpaCopy.(*autoscalingv1.HorizontalPodAutoscaler)
+
 	// first, convert to autoscaling/v2, which makes our lives easier when calculating metrics
 	hpaRaw, err := UnsafeConvertToVersionVia(hpav1, autoscalingv2.SchemeGroupVersion)
 	if err != nil {
