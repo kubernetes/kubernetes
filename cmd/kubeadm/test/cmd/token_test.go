@@ -25,7 +25,7 @@ import (
 )
 
 const (
-	TokenExpectedRegex = "^\\S{6}\\:\\S{16}\n$"
+	TokenExpectedRegex = "^\\S{6}\\.\\S{16}\n$"
 )
 
 var kubeadmPath = flag.String("kubeadm-path", filepath.Join(os.Getenv("KUBE_ROOT"), "cluster/kubeadm.sh"), "Location of kubeadm")
