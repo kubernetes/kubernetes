@@ -37,7 +37,8 @@ func InitNodeE2ERemote() TestSuite {
 	return &NodeE2ERemote{}
 }
 
-const localCOSMounterPath = "cluster/gce/gci/mounter/mounter"
+const localCOSMounterDir = "cluster/gce/gci/mounter/"
+const localCOSMounterFile = "mounter"
 
 // SetupTestPackage sets up the test package with binaries k8s required for node e2e tests
 func (n *NodeE2ERemote) SetupTestPackage(tardir string) error {
@@ -66,29 +67,41 @@ func (n *NodeE2ERemote) SetupTestPackage(tardir string) error {
 	}
 
 	// Include the GCI/COS mounter artifacts in the deployed tarball
+	err = tarAddCOSMounter(tardir)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func tarAddFile(tardir, source, destdir, destfile string) error {
+	tardest := filepath.Join(tardir, destdir)
+	dest := filepath.Join(tardest, destfile)
+	out, err := exec.Command("mkdir", "-p", tardest).CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("failed to directory %q for file %q (from: %q). Err: %v. Output:\n%s", tardest, destfile, source, err, out)
+	}
+	out, err = exec.Command("cp", source, dest).CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("failed to copy file %q (from: %q) to the archive bin %q. Err: %v. Output:\n%s", destfile, source, tardir, err, out)
+	}
+	return nil
+}
+
+// Includes the GCI/COS mounter artifacts in the deployed tarball
+func tarAddCOSMounter(tardir string) error {
 	k8sDir, err := builder.GetK8sRootDir()
 	if err != nil {
 		return fmt.Errorf("Could not find K8s root dir! Err: %v", err)
 	}
-	source := filepath.Join(k8sDir, localCOSMounterPath)
+	source := filepath.Join(k8sDir, localCOSMounterDir, localCOSMounterFile)
 
 	// Require the GCI/COS mounter script, we want to make sure the remote test runner stays up to date if the mounter file moves
 	if _, err := os.Stat(source); err != nil {
 		return fmt.Errorf("Could not find GCI/COS mounter script at %q! If this script has been (re)moved, please update the e2e node remote test runner accordingly! Err: %v", source, err)
 	}
 
-	bindir := "cluster/gce/gci/mounter"
-	bin := "mounter"
-	destdir := filepath.Join(tardir, bindir)
-	dest := filepath.Join(destdir, bin)
-	out, err := exec.Command("mkdir", "-p", filepath.Join(tardir, bindir)).CombinedOutput()
-	if err != nil {
-		return fmt.Errorf("failed to create directory %q for GCI/COS mounter script. Err: %v. Output:\n%s", destdir, err, out)
-	}
-	out, err = exec.Command("cp", source, dest).CombinedOutput()
-	if err != nil {
-		return fmt.Errorf("failed to copy GCI/COS mounter script to the archive bin. Err: %v. Output:\n%s", err, out)
-	}
+	tarAddFile(tardir, source, localCOSMounterDir, localCOSMounterFile)
 	return nil
 }
 
@@ -113,7 +126,7 @@ func updateCOSMounterPath(args, host, workspace string) (string, error) {
 	if err != nil {
 		return args, fmt.Errorf("could not find K8s root dir! Err: %v", err)
 	}
-	source := filepath.Join(k8sDir, localCOSMounterPath)
+	source := filepath.Join(k8sDir, localCOSMounterDir, localCOSMounterFile)
 
 	// Require the GCI/COS mounter script, we want to make sure the remote test runner stays up to date if the mounter file moves
 	if _, err = os.Stat(source); err != nil {
@@ -123,7 +136,7 @@ func updateCOSMounterPath(args, host, workspace string) (string, error) {
 	glog.V(2).Infof("GCI/COS node and GCI/COS mounter both detected, modifying --experimental-mounter-path accordingly")
 	// Note this implicitly requires the script to be where we expect in the tarball, so if that location changes the error
 	// here will tell us to update the remote test runner.
-	mounterPath := filepath.Join(workspace, localCOSMounterPath)
+	mounterPath := filepath.Join(workspace, localCOSMounterDir, localCOSMounterFile)
 	output, err = SSH(host, "sh", "-c", fmt.Sprintf("'chmod 544 %s'", mounterPath))
 	if err != nil {
 		return args, fmt.Errorf("unabled to chmod 544 GCI/COS mounter script. Err: %v, Output:\n%s", err, output)
