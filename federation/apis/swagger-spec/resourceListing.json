@@ -54,6 +54,10 @@
     "description": "API at /apis/autoscaling/v1"
    },
    {
+    "path": "/apis/autoscaling/v2alpha1",
+    "description": "API at /apis/autoscaling/v2alpha1"
+   },
+   {
     "path": "/apis/autoscaling",
     "description": "get information of a group"
    }
