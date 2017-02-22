@@ -59,9 +59,29 @@ import (
 	"k8s.io/apiserver/pkg/endpoints/request"
 	genericapitesting "k8s.io/apiserver/pkg/endpoints/testing"
 	"k8s.io/apiserver/pkg/registry/rest"
-	"k8s.io/kubernetes/plugin/pkg/admission/admit"
-	"k8s.io/kubernetes/plugin/pkg/admission/deny"
 )
+
+// alwaysAdmit is an implementation of admission.Interface which always says yes to an admit request.
+// It is useful in tests and when using kubernetes in an open manner.
+type alwaysAdmit struct{}
+
+func (alwaysAdmit) Admit(a admission.Attributes) (err error) {
+	return nil
+}
+
+func (alwaysAdmit) Handles(operation admission.Operation) bool {
+	return true
+}
+
+type alwaysDeny struct{}
+
+func (alwaysDeny) Admit(a admission.Attributes) (err error) {
+	return admission.NewForbidden(a, errors.New("Admission control is denying all modifications"))
+}
+
+func (alwaysDeny) Handles(operation admission.Operation) bool {
+	return true
+}
 
 // This creates fake API versions, similar to api/latest.go.
 var testAPIGroup = "test.group"
@@ -207,7 +227,7 @@ func init() {
 
 	mapper = nsMapper
 	namespaceMapper = nsMapper
-	admissionControl = admit.NewAlwaysAdmit()
+	admissionControl = alwaysAdmit{}
 	requestContextMapper = request.NewRequestContextMapper()
 
 	scheme.AddFieldLabelConversionFunc(grouplessGroupVersion.String(), "Simple",
@@ -240,7 +260,7 @@ func handle(storage map[string]rest.Storage) http.Handler {
 
 // tests with a deny admission controller
 func handleDeny(storage map[string]rest.Storage) http.Handler {
-	return handleInternal(storage, deny.NewAlwaysDeny(), selfLinker)
+	return handleInternal(storage, alwaysDeny{}, selfLinker)
 }
 
 // tests using the new namespace scope mechanism
@@ -2991,7 +3011,7 @@ func TestCreateInvokesAdmissionControl(t *testing.T) {
 		namespace:   "other",
 		expectedSet: "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/other/foo/bar",
 	}
-	handler := handleInternal(map[string]rest.Storage{"foo": &storage}, deny.NewAlwaysDeny(), selfLinker)
+	handler := handleInternal(map[string]rest.Storage{"foo": &storage}, alwaysDeny{}, selfLinker)
 	server := httptest.NewServer(handler)
 	defer server.Close()
 	client := http.Client{}
