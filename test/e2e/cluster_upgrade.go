@@ -34,6 +34,7 @@ var upgradeTests = []upgrades.Test{
 	&upgrades.SecretUpgradeTest{},
 	&upgrades.StatefulSetUpgradeTest{},
 	&upgrades.DeploymentUpgradeTest{},
+	&upgrades.JobUpgradeTest{},
 	&upgrades.ConfigMapUpgradeTest{},
 	&upgrades.HPAUpgradeTest{},
 }
