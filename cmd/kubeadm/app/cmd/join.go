@@ -59,15 +59,12 @@ func NewCmdJoin(out io.Writer) *cobra.Command {
 
 	var skipPreFlight bool
 	var cfgPath string
-	var discURL string
-	var discFile string
-	var discToken string
 
 	cmd := &cobra.Command{
 		Use:   "join <master address>",
 		Short: "Run this on any machine you wish to join an existing cluster",
 		Run: func(cmd *cobra.Command, args []string) {
-			j, err := NewJoin(cfgPath, discURL, discFile, discToken, args, &cfg, skipPreFlight)
+			j, err := NewJoin(cfgPath, args, &cfg, skipPreFlight)
 			kubeadmutil.CheckErr(err)
 			kubeadmutil.CheckErr(j.Validate())
 			kubeadmutil.CheckErr(j.Run(out))
@@ -75,10 +72,11 @@ func NewCmdJoin(out io.Writer) *cobra.Command {
 	}
 
 	cmd.PersistentFlags().StringVar(&cfgPath, "config", cfgPath, "Path to kubeadm config file")
-	cmd.PersistentFlags().StringVar(&discURL, "discovery-url", discURL, "Discovery URL")
-	cmd.PersistentFlags().StringVar(&discFile, "discovery-file", discFile, "Discovery File path")
-	cmd.PersistentFlags().StringVar(&discToken, "discovery-token", discToken, "Discovery Token")
-	cmd.PersistentFlags().StringVar(&discToken, "token", discToken, "This sets the token for both discovery and bootstrap auth")
+	cmd.PersistentFlags().StringVar(&cfg.DiscoveryURL, "discovery-url", "", "Discovery URL")
+	cmd.PersistentFlags().StringVar(&cfg.DiscoveryFile, "discovery-file", "", "Discovery File path")
+	cmd.PersistentFlags().StringVar(&cfg.DiscoveryToken, "discovery-token", "", "Discovery Token")
+	cmd.PersistentFlags().StringVar(&cfg.TLSBootstrapToken, "tls-bootstrap-token", "", "blabla")
+	cmd.PersistentFlags().StringVar(&cfg.Token, "token", "", "This sets the token for both discovery and bootstrap auth")
 
 	cmd.PersistentFlags().BoolVar(
 		&skipPreFlight, "skip-preflight-checks", false,
@@ -92,7 +90,7 @@ type Join struct {
 	cfg *kubeadmapi.NodeConfiguration
 }
 
-func NewJoin(cfgPath, discURL, discFile, discToken string, args []string, cfg *kubeadmapi.NodeConfiguration, skipPreFlight bool) (*Join, error) {
+func NewJoin(cfgPath string, args []string, cfg *kubeadmapi.NodeConfiguration, skipPreFlight bool) (*Join, error) {
 	fmt.Println("[kubeadm] WARNING: kubeadm is in alpha, please do not use it for production clusters.")
 
 	if cfgPath != "" {
@@ -121,15 +119,6 @@ func NewJoin(cfgPath, discURL, discFile, discToken string, args []string, cfg *k
 		fmt.Println("[preflight] Skipping pre-flight checks")
 	}
 
-	disc, err := discovery.Check(discURL, discFile, discToken)
-	if err != nil {
-		return nil, err
-	}
-	err = discovery.Assign(&cfg.Discovery, disc)
-	if err != nil {
-		return nil, err
-	}
-
 	// Try to start the kubelet service in case it's inactive
 	preflight.TryStartKubelet()
 
@@ -142,7 +131,7 @@ func (j *Join) Validate() error {
 
 // Run executes worker node provisioning and tries to join an existing cluster.
 func (j *Join) Run(out io.Writer) error {
-	cfg, err := discovery.For(j.cfg.Discovery)
+	cfg, err := discovery.For(*j.cfg)
 	if err != nil {
 		return err
 	}
