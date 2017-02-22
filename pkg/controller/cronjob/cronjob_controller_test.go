@@ -27,7 +27,8 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/kubernetes/pkg/api/v1"
-	batch "k8s.io/kubernetes/pkg/apis/batch/v2alpha1"
+	batchv1 "k8s.io/kubernetes/pkg/apis/batch/v1"
+	batchv2alpha1 "k8s.io/kubernetes/pkg/apis/batch/v2alpha1"
 )
 
 // schedule is hourly on the hour
@@ -92,8 +93,8 @@ func startTimeStringToTime(startTime string) time.Time {
 }
 
 // returns a cronJob with some fields filled in.
-func cronJob() batch.CronJob {
-	return batch.CronJob{
+func cronJob() batchv2alpha1.CronJob {
+	return batchv2alpha1.CronJob{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:              "mycronjob",
 			Namespace:         "snazzycats",
@@ -101,10 +102,10 @@ func cronJob() batch.CronJob {
 			SelfLink:          "/apis/batch/v2alpha1/namespaces/snazzycats/cronjobs/mycronjob",
 			CreationTimestamp: metav1.Time{Time: justBeforeTheHour()},
 		},
-		Spec: batch.CronJobSpec{
+		Spec: batchv2alpha1.CronJobSpec{
 			Schedule:          "* * * * ?",
-			ConcurrencyPolicy: batch.AllowConcurrent,
-			JobTemplate: batch.JobTemplateSpec{
+			ConcurrencyPolicy: batchv2alpha1.AllowConcurrent,
+			JobTemplate: batchv2alpha1.JobTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels:      map[string]string{"a": "b"},
 					Annotations: map[string]string{"x": "y"},
@@ -115,9 +116,9 @@ func cronJob() batch.CronJob {
 	}
 }
 
-func jobSpec() batch.JobSpec {
+func jobSpec() batchv1.JobSpec {
 	one := int32(1)
-	return batch.JobSpec{
+	return batchv1.JobSpec{
 		Parallelism: &one,
 		Completions: &one,
 		Template: v1.PodTemplateSpec{
@@ -135,8 +136,8 @@ func jobSpec() batch.JobSpec {
 	}
 }
 
-func newJob(UID string) batch.Job {
-	return batch.Job{
+func newJob(UID string) batchv1.Job {
+	return batchv1.Job{
 		ObjectMeta: metav1.ObjectMeta{
 			UID:       types.UID(UID),
 			Name:      "foobar",
@@ -148,15 +149,15 @@ func newJob(UID string) batch.Job {
 }
 
 var (
-	shortDead  int64                   = 10
-	mediumDead int64                   = 2 * 60 * 60
-	longDead   int64                   = 1000000
-	noDead     int64                   = -12345
-	A          batch.ConcurrencyPolicy = batch.AllowConcurrent
-	f          batch.ConcurrencyPolicy = batch.ForbidConcurrent
-	R          batch.ConcurrencyPolicy = batch.ReplaceConcurrent
-	T          bool                    = true
-	F          bool                    = false
+	shortDead  int64                           = 10
+	mediumDead int64                           = 2 * 60 * 60
+	longDead   int64                           = 1000000
+	noDead     int64                           = -12345
+	A          batchv2alpha1.ConcurrencyPolicy = batchv2alpha1.AllowConcurrent
+	f          batchv2alpha1.ConcurrencyPolicy = batchv2alpha1.ForbidConcurrent
+	R          batchv2alpha1.ConcurrencyPolicy = batchv2alpha1.ReplaceConcurrent
+	T          bool                            = true
+	F          bool                            = false
 )
 
 func TestSyncOne_RunOrNot(t *testing.T) {
@@ -175,7 +176,7 @@ func TestSyncOne_RunOrNot(t *testing.T) {
 
 	testCases := map[string]struct {
 		// sj spec
-		concurrencyPolicy batch.ConcurrencyPolicy
+		concurrencyPolicy batchv2alpha1.ConcurrencyPolicy
 		suspend           bool
 		schedule          string
 		deadline          int64
@@ -251,10 +252,10 @@ func TestSyncOne_RunOrNot(t *testing.T) {
 		}
 
 		var (
-			job *batch.Job
+			job *batchv1.Job
 			err error
 		)
-		js := []batch.Job{}
+		js := []batchv1.Job{}
 		if tc.ranPreviously {
 			sj.ObjectMeta.CreationTimestamp = metav1.Time{Time: justBeforeThePriorHour()}
 			sj.Status.LastScheduleTime = &metav1.Time{Time: justAfterThePriorHour()}
@@ -466,7 +467,7 @@ func TestCleanupFinishedJobs_DeleteOrNot(t *testing.T) {
 		sj.Spec.FailedJobsHistoryLimit = tc.failedJobsHistoryLimit
 
 		var (
-			job *batch.Job
+			job *batchv1.Job
 			err error
 		)
 
@@ -481,7 +482,7 @@ func TestCleanupFinishedJobs_DeleteOrNot(t *testing.T) {
 		}
 
 		// Create jobs
-		js := []batch.Job{}
+		js := []batchv1.Job{}
 		jobsToDelete := []string{}
 		sj.Status.Active = []v1.ObjectReference{}
 
@@ -495,13 +496,13 @@ func TestCleanupFinishedJobs_DeleteOrNot(t *testing.T) {
 			job.Namespace = ""
 
 			if spec.IsFinished {
-				var conditionType batch.JobConditionType
+				var conditionType batchv1.JobConditionType
 				if spec.IsSuccessful {
-					conditionType = batch.JobComplete
+					conditionType = batchv1.JobComplete
 				} else {
-					conditionType = batch.JobFailed
+					conditionType = batchv1.JobFailed
 				}
-				condition := batch.JobCondition{Type: conditionType, Status: v1.ConditionTrue}
+				condition := batchv1.JobCondition{Type: conditionType, Status: v1.ConditionTrue}
 				job.Status.Conditions = append(job.Status.Conditions, condition)
 
 				if spec.IsStillInActiveList {
@@ -563,13 +564,13 @@ func TestCleanupFinishedJobs_DeleteOrNot(t *testing.T) {
 // TestSyncOne_Status tests sj.UpdateStatus in syncOne
 func TestSyncOne_Status(t *testing.T) {
 	finishedJob := newJob("1")
-	finishedJob.Status.Conditions = append(finishedJob.Status.Conditions, batch.JobCondition{Type: batch.JobComplete, Status: v1.ConditionTrue})
+	finishedJob.Status.Conditions = append(finishedJob.Status.Conditions, batchv1.JobCondition{Type: batchv1.JobComplete, Status: v1.ConditionTrue})
 	unexpectedJob := newJob("2")
 	missingJob := newJob("3")
 
 	testCases := map[string]struct {
 		// sj spec
-		concurrencyPolicy batch.ConcurrencyPolicy
+		concurrencyPolicy batchv2alpha1.ConcurrencyPolicy
 		suspend           bool
 		schedule          string
 		deadline          int64
@@ -654,7 +655,7 @@ func TestSyncOne_Status(t *testing.T) {
 			}
 			sj.ObjectMeta.CreationTimestamp = metav1.Time{Time: justBeforeTheHour()}
 		}
-		jobs := []batch.Job{}
+		jobs := []batchv1.Job{}
 		if tc.hasFinishedJob {
 			ref, err := getRef(&finishedJob)
 			if err != nil {
