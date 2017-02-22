@@ -274,7 +274,7 @@ func getVSpherePodSpecWithVolumePaths(volumePaths []string, keyValuelabel map[st
 	var volumes []v1.Volume
 
 	for index, volumePath := range volumePaths {
-		var name = "volume" + strconv.Itoa(index+1)
+		name := fmt.Sprintf("volume%v", index+1)
 		volumeMounts = append(volumeMounts, v1.VolumeMount{Name: name, MountPath: "/mnt/" + name})
 		vsphereVolume := new(v1.VsphereVirtualDiskVolumeSource)
 		vsphereVolume.VolumePath = volumePath
@@ -284,10 +284,11 @@ func getVSpherePodSpecWithVolumePaths(volumePaths []string, keyValuelabel map[st
 	}
 
 	if commands == nil || len(commands) == 0 {
-		commands = make([]string, 3)
-		commands[0] = "/bin/sh"
-		commands[1] = "-c"
-		commands[2] = "while true ; do sleep 2 ; done "
+		commands = []string{
+			"/bin/sh",
+			"-c",
+			"while true; do sleep 2; done",
+		}
 	}
 	pod := &v1.Pod{
 		TypeMeta: metav1.TypeMeta{
@@ -319,22 +320,18 @@ func getVSpherePodSpecWithVolumePaths(volumePaths []string, keyValuelabel map[st
 
 func verifyFilesExistOnVSphereVolume(namespace string, podName string, filePaths []string) {
 	for _, filePath := range filePaths {
-		_, err := framework.LookForStringInPodExec(namespace, podName, []string{"/bin/cat", filePath}, "", time.Minute)
-		errMessage := "failed to verify file:" + filePath + " on the pod:" + podName
-		Expect(err).NotTo(HaveOccurred(), errMessage)
+		_, err := framework.RunKubectl("exec", fmt.Sprintf("--namespace=%s", namespace), podName, "--", "/bin/ls", filePath)
+		Expect(err).NotTo(HaveOccurred(), fmt.Sprintf("failed to verify file: %q on the pod: %q", filePath, podName))
 	}
 }
 
 func createEmptyFileOnVSphereVolume(namespace string, podName string, filePath string) {
 	_, err := framework.LookForStringInPodExec(namespace, podName, []string{"/bin/touch", filePath}, "", time.Minute)
-	errMessage := "failed to create empty file:" + filePath + " on the pod:" + podName
-	Expect(err).NotTo(HaveOccurred(), errMessage)
+	Expect(err).NotTo(HaveOccurred(), fmt.Sprintf("failed to create empty file: %q on the pod: %q", filePath, podName))
 }
 
 func createEmptyFilesOnVSphereVolume(namespace string, podName string, filePaths []string) {
 	for _, filePath := range filePaths {
-		_, err := framework.LookForStringInPodExec(namespace, podName, []string{"/bin/touch", filePath}, "", time.Minute)
-		errMessage := "failed to create empty file:" + filePath + " on the pod:" + podName
-		Expect(err).NotTo(HaveOccurred(), errMessage)
+		createEmptyFileOnVSphereVolume(namespace, podName, filePath)
 	}
 }
