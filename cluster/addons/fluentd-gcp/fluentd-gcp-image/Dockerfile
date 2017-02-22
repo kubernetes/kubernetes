@@ -20,7 +20,7 @@
 # scope and that the Logging API has been enabled for the project
 # in the Google Developer Console.
 
-FROM gcr.io/google_containers/ubuntu-slim:0.4
+FROM gcr.io/google_containers/ubuntu-slim:0.6
 MAINTAINER Alex Robinson "arob@google.com"
 
 # Disable prompts from apt.
