@@ -19,7 +19,6 @@ package federation_clientset
 import (
 	"github.com/golang/glog"
 	discovery "k8s.io/client-go/discovery"
-	_ "k8s.io/client-go/plugin/pkg/client/auth"
 	rest "k8s.io/client-go/rest"
 	"k8s.io/client-go/util/flowcontrol"
 	v1autoscaling "k8s.io/kubernetes/federation/client/clientset_generated/federation_clientset/typed/autoscaling/v1"
