@@ -442,10 +442,11 @@ var _ = framework.KubeDescribe("Network Partition [Disruptive] [Slow]", func() {
 			parallelism := int32(2)
 			completions := int32(4)
 
-			job := newTestJob("notTerminate", "network-partition", v1.RestartPolicyNever, parallelism, completions)
-			job, err := createJob(f.ClientSet, f.Namespace.Name, job)
+			job := framework.NewTestJob("notTerminate", "network-partition", v1.RestartPolicyNever,
+				parallelism, completions)
+			job, err := framework.CreateJob(f.ClientSet, f.Namespace.Name, job)
 			Expect(err).NotTo(HaveOccurred())
-			label := labels.SelectorFromSet(labels.Set(map[string]string{jobSelectorKey: job.Name}))
+			label := labels.SelectorFromSet(labels.Set(map[string]string{framework.JobSelectorKey: job.Name}))
 
 			By(fmt.Sprintf("verifying that there are now %v running pods", parallelism))
 			_, err = framework.PodsCreatedByLabel(c, ns, job.Name, parallelism, label)
