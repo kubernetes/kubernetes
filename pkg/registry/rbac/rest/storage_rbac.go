@@ -138,8 +138,8 @@ func PostStartHook(hookContext genericapiserver.PostStartHookContext) error {
 		// ensure bootstrap roles are created or reconciled
 		for _, clusterRole := range append(bootstrappolicy.ClusterRoles(), bootstrappolicy.ControllerRoles()...) {
 			opts := reconciliation.ReconcileClusterRoleOptions{
-				Role:    &clusterRole,
-				Client:  clientset.ClusterRoles(),
+				Role:    reconciliation.ClusterRoleRuleOwner{ClusterRole: &clusterRole},
+				Client:  reconciliation.ClusterRoleModifier{Client: clientset.ClusterRoles()},
 				Confirm: true,
 			}
 			err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
