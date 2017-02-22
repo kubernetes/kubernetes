@@ -92,8 +92,13 @@ type Etcd struct {
 type NodeConfiguration struct {
 	metav1.TypeMeta
 
-	Discovery  Discovery
-	CACertPath string
+	CACertPath     string
+	DiscoveryFile  string
+	DiscoveryToken string
+	// Currently we only pay attention to one api server but hope to support >1 in the future
+	DiscoveryTokenAPIServers []string
+	TLSBootstrapToken        string
+	Token                    string
 }
 
 // ClusterInfo TODO add description
