@@ -48,6 +48,10 @@ var (
 	UserAgentName                 = "federation-e2e"
 	// We use this to decide how long to wait for our DNS probes to succeed.
 	DNSTTL = 180 * time.Second // TODO: make k8s.io/kubernetes/federation/pkg/federation-controller/service.minDnsTtl exported, and import it here.
+
+	// FederatedSvcNodePort is the node port on which the federated
+	// service shards are exposed in the underlying cluster.
+	FederatedSvcNodePort = int32(32256)
 )
 
 var FederationSuite common.Suite
@@ -259,6 +263,7 @@ func createService(clientset *fedclientset.Clientset, namespace, name string) (*
 					Protocol:   v1.ProtocolTCP,
 					Port:       80,
 					TargetPort: intstr.FromInt(8080),
+					NodePort:   FederatedSvcNodePort,
 				},
 			},
 			SessionAffinity: v1.ServiceAffinityNone,
@@ -279,10 +284,11 @@ func deleteServiceOrFail(clientset *fedclientset.Clientset, namespace string, se
 	if clientset == nil || len(namespace) == 0 || len(serviceName) == 0 {
 		Fail(fmt.Sprintf("Internal error: invalid parameters passed to deleteServiceOrFail: clientset: %v, namespace: %v, service: %v", clientset, namespace, serviceName))
 	}
+	framework.Logf("Deleting service %q in namespace %v", serviceName, namespace)
 	err := clientset.Services(namespace).Delete(serviceName, &metav1.DeleteOptions{OrphanDependents: orphanDependents})
 	framework.ExpectNoError(err, "Error deleting service %q from namespace %q", serviceName, namespace)
 	// Wait for the service to be deleted.
-	err = wait.Poll(5*time.Second, 3*wait.ForeverTestTimeout, func() (bool, error) {
+	err = wait.Poll(5*time.Second, 10*wait.ForeverTestTimeout, func() (bool, error) {
 		_, err := clientset.Core().Services(namespace).Get(serviceName, metav1.GetOptions{})
 		if err != nil && errors.IsNotFound(err) {
 			return true, nil
