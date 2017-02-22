@@ -19,18 +19,21 @@ package azure_file
 import (
 	"fmt"
 
+	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	v1 "k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/volume"
 )
 
 // Abstract interface to azure file operations.
 type azureUtil interface {
-	GetAzureCredentials(host volume.VolumeHost, nameSpace, secretName, shareName string) (string, string, error)
+	GetAzureCredentials(host volume.VolumeHost, nameSpace, secretName string) (string, string, error)
+	SetAzureCredentials(host volume.VolumeHost, nameSpace, accountName, accountKey string) (string, error)
 }
 
 type azureSvc struct{}
 
-func (s *azureSvc) GetAzureCredentials(host volume.VolumeHost, nameSpace, secretName, shareName string) (string, string, error) {
+func (s *azureSvc) GetAzureCredentials(host volume.VolumeHost, nameSpace, secretName string) (string, string, error) {
 	var accountKey, accountName string
 	kubeClient := host.GetKubeClient()
 	if kubeClient == nil {
@@ -53,4 +56,31 @@ func (s *azureSvc) GetAzureCredentials(host volume.VolumeHost, nameSpace, secret
 		return "", "", fmt.Errorf("Invalid %v/%v, couldn't extract azurestorageaccountname or azurestorageaccountkey", nameSpace, secretName)
 	}
 	return accountName, accountKey, nil
+}
+
+func (s *azureSvc) SetAzureCredentials(host volume.VolumeHost, nameSpace, accountName, accountKey string) (string, error) {
+	kubeClient := host.GetKubeClient()
+	if kubeClient == nil {
+		return "", fmt.Errorf("Cannot get kube client")
+	}
+	secretName := "azure-storage-account-" + accountName + "-secret"
+	secret := &v1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: nameSpace,
+			Name:      secretName,
+		},
+		Data: map[string][]byte{
+			"azurestorageaccountname": []byte(accountName),
+			"azurestorageaccountkey":  []byte(accountKey),
+		},
+		Type: "Opaque",
+	}
+	_, err := kubeClient.Core().Secrets(nameSpace).Create(secret)
+	if errors.IsAlreadyExists(err) {
+		err = nil
+	}
+	if err != nil {
+		return "", fmt.Errorf("Couldn't create secret %v", err)
+	}
+	return secretName, err
 }
