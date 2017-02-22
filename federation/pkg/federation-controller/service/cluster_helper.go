@@ -29,23 +29,23 @@ import (
 	v1beta1 "k8s.io/kubernetes/federation/apis/federation/v1beta1"
 	v1 "k8s.io/kubernetes/pkg/api/v1"
 	kubeclientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
-	"k8s.io/kubernetes/pkg/client/legacylisters"
 
 	"reflect"
 
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/federation/pkg/federation-controller/util"
+	corelisters "k8s.io/kubernetes/pkg/client/listers/core/v1"
 )
 
 type clusterCache struct {
 	clientset *kubeclientset.Clientset
 	cluster   *v1beta1.Cluster
 	// A store of services, populated by the serviceController
-	serviceStore listers.StoreToServiceLister
+	serviceStore corelisters.ServiceLister
 	// Watches changes to all services
 	serviceController cache.Controller
 	// A store of endpoint, populated by the serviceController
-	endpointStore listers.StoreToEndpointsLister
+	endpointStore corelisters.EndpointsLister
 	// Watches changes to all endpoints
 	endpointController cache.Controller
 	// services that need to be synced
@@ -91,7 +91,8 @@ func (cc *clusterClientCache) startClusterLW(cluster *v1beta1.Cluster, clusterNa
 			serviceQueue:  workqueue.New(),
 			endpointQueue: workqueue.New(),
 		}
-		cachedClusterClient.endpointStore.Store, cachedClusterClient.endpointController = cache.NewInformer(
+		var endpointIndexer cache.Indexer
+		endpointIndexer, cachedClusterClient.endpointController = cache.NewIndexerInformer(
 			&cache.ListWatch{
 				ListFunc: func(options metav1.ListOptions) (pkgruntime.Object, error) {
 					return clientset.Core().Endpoints(metav1.NamespaceAll).List(options)
@@ -113,9 +114,12 @@ func (cc *clusterClientCache) startClusterLW(cluster *v1beta1.Cluster, clusterNa
 					cc.enqueueEndpoint(obj, clusterName)
 				},
 			},
+			cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc},
 		)
+		cachedClusterClient.endpointStore = corelisters.NewEndpointsLister(endpointIndexer)
 
-		cachedClusterClient.serviceStore.Indexer, cachedClusterClient.serviceController = cache.NewIndexerInformer(
+		var serviceIndexer cache.Indexer
+		serviceIndexer, cachedClusterClient.serviceController = cache.NewIndexerInformer(
 			&cache.ListWatch{
 				ListFunc: func(options metav1.ListOptions) (pkgruntime.Object, error) {
 					return clientset.Core().Services(metav1.NamespaceAll).List(options)
@@ -152,6 +156,7 @@ func (cc *clusterClientCache) startClusterLW(cluster *v1beta1.Cluster, clusterNa
 			},
 			cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc},
 		)
+		cachedClusterClient.serviceStore = corelisters.NewServiceLister(serviceIndexer)
 		cc.clientMap[clusterName] = cachedClusterClient
 		go cachedClusterClient.serviceController.Run(wait.NeverStop)
 		go cachedClusterClient.endpointController.Run(wait.NeverStop)
