@@ -19,13 +19,21 @@ package preflight
 import (
 	"bufio"
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"net"
 	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
+
+	"github.com/blang/semver"
+
+	"crypto/tls"
+	"crypto/x509"
+	"strings"
 
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
@@ -37,6 +45,10 @@ import (
 )
 
 const bridgenf string = "/proc/sys/net/bridge/bridge-nf-call-iptables"
+
+var (
+	minExternalEtcdVersion = semver.MustParse(kubeadmconstants.MinExternalEtcdVersion)
+)
 
 type Error struct {
 	Msg string
@@ -325,6 +337,112 @@ func (sysver SystemVerificationCheck) Check() (warnings, errors []error) {
 	return nil, nil
 }
 
+type etcdVersionResponse struct {
+	Etcdserver  string
+	Etcdcluster string
+}
+
+// ExternalEtcdVersionCheck checks if version of external etcd meets the demand of kubeadm
+type ExternalEtcdVersionCheck struct {
+	Etcd kubeadmapi.Etcd
+}
+
+func (evc ExternalEtcdVersionCheck) Check() (warnings, errors []error) {
+	var config *tls.Config
+	var err error
+	if config, err = evc.configRootCAs(config); err != nil {
+		errors = append(errors, err)
+		return nil, errors
+	}
+	if config, err = evc.configCertAndKey(config); err != nil {
+		errors = append(errors, err)
+		return nil, errors
+	}
+
+	client := evc.getHTTPClient(config)
+	for _, endpoint := range evc.Etcd.Endpoints {
+		resp := etcdVersionResponse{}
+		if strings.HasSuffix(endpoint, "/") {
+			endpoint = endpoint + "version"
+		} else {
+			endpoint = endpoint + "/version"
+		}
+		err := getJSON(client, endpoint, &resp)
+		if err != nil {
+			errors = append(errors, err)
+			continue
+		}
+
+		etcdVersion, err := semver.Parse(resp.Etcdserver)
+		if err != nil {
+			errors = append(errors, fmt.Errorf("couldn't parse external etcd version %q: %v", resp.Etcdserver, err))
+			continue
+		}
+		if etcdVersion.LT(minExternalEtcdVersion) {
+			errors = append(errors, fmt.Errorf("this version of kubeadm only support external etcd version >= %s. Current version: %s", kubeadmconstants.MinExternalEtcdVersion, resp.Etcdserver))
+			continue
+		}
+	}
+
+	return nil, errors
+}
+
+// configRootCAs configures and returns a reference to tls.Config instance if CAFile is provided
+func (evc ExternalEtcdVersionCheck) configRootCAs(config *tls.Config) (*tls.Config, error) {
+	var CACertPool *x509.CertPool
+	if evc.Etcd.CAFile != "" {
+		CACert, err := ioutil.ReadFile(evc.Etcd.CAFile)
+		if err != nil {
+			return nil, fmt.Errorf("couldn't load server certificate %s: %v", evc.Etcd.CAFile, err)
+		}
+		CACertPool = x509.NewCertPool()
+		CACertPool.AppendCertsFromPEM(CACert)
+
+	}
+	if CACertPool != nil {
+		if config == nil {
+			config = &tls.Config{}
+		}
+		config.RootCAs = CACertPool
+	}
+	return config, nil
+
+}
+
+// configCertAndKey configures and returns a reference to tls.Config instance if CertFile and KeyFile pair is provided
+func (evc ExternalEtcdVersionCheck) configCertAndKey(config *tls.Config) (*tls.Config, error) {
+	var cert tls.Certificate
+	if evc.Etcd.CertFile != "" && evc.Etcd.KeyFile != "" {
+		var err error
+		cert, err = tls.LoadX509KeyPair(evc.Etcd.CertFile, evc.Etcd.KeyFile)
+		if err != nil {
+			return nil, fmt.Errorf("couldn't load certificate and key pair %s, %s: %v", evc.Etcd.CertFile, evc.Etcd.KeyFile, err)
+		}
+		if config == nil {
+			config = &tls.Config{}
+		}
+		config.Certificates = []tls.Certificate{cert}
+	}
+
+	return config, nil
+}
+func (evc ExternalEtcdVersionCheck) getHTTPClient(config *tls.Config) *http.Client {
+	if config != nil {
+		transport := &http.Transport{
+			TLSClientConfig: config,
+		}
+		return &http.Client{Transport: transport}
+	}
+	return &http.Client{}
+}
+func getJSON(client *http.Client, url string, target interface{}) error {
+	r, err := client.Get(url)
+	if err != nil {
+		return err
+	}
+	defer r.Body.Close()
+	return json.NewDecoder(r.Body).Decode(target)
+}
 func RunInitMasterChecks(cfg *kubeadmapi.MasterConfiguration) error {
 	checks := []Checker{
 		SystemVerificationCheck{},
@@ -358,6 +476,11 @@ func RunInitMasterChecks(cfg *kubeadmapi.MasterConfiguration) error {
 		checks = append(checks,
 			PortOpenCheck{port: 2379},
 			DirAvailableCheck{Path: "/var/lib/etcd"},
+		)
+	} else {
+		// Only check etcd version when external endpoints are specified
+		checks = append(checks,
+			ExternalEtcdVersionCheck{Etcd: cfg.Etcd},
 		)
 	}
 
