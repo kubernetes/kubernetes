@@ -146,8 +146,11 @@ func RunReplace(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []str
 			return err
 		}
 
-		if err := kubectl.CreateOrUpdateAnnotation(cmdutil.GetFlagBool(cmd, cmdutil.ApplyAnnotationsFlag), info, f.JSONEncoder()); err != nil {
-			return cmdutil.AddSourceToErr("replacing", info.Source, err)
+		// If the flag is true, create or update the annotation. Otherwise, NOP
+		if cmdutil.GetFlagBool(cmd, cmdutil.ApplyAnnotationsFlag) {
+			if err := kubectl.CreateOrUpdateAnnotation(true, info, f.JSONEncoder()); err != nil {
+				return cmdutil.AddSourceToErr("replacing", info.Source, err)
+			}
 		}
 
 		if cmdutil.ShouldRecord(cmd, info) {
@@ -267,8 +270,11 @@ func forceReplace(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []s
 			return err
 		}
 
-		if err := kubectl.CreateOrUpdateAnnotation(cmdutil.GetFlagBool(cmd, cmdutil.ApplyAnnotationsFlag), info, f.JSONEncoder()); err != nil {
-			return err
+		// If the flag is true, create or update the annotation. Otherwise, NOP
+		if cmdutil.GetFlagBool(cmd, cmdutil.ApplyAnnotationsFlag) {
+			if err := kubectl.CreateOrUpdateAnnotation(true, info, f.JSONEncoder()); err != nil {
+				return cmdutil.AddSourceToErr("replacing", info.Source, err)
+			}
 		}
 
 		if cmdutil.ShouldRecord(cmd, info) {
