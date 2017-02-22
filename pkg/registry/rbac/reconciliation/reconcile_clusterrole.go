@@ -37,21 +37,38 @@ var (
 	ReconcileNone     ReconcileOperation = "none"
 )
 
+type RuleOwnerModifier interface {
+	Get(namespace, name string) (RuleOwner, error)
+	Create(RuleOwner) (RuleOwner, error)
+	Update(RuleOwner) (RuleOwner, error)
+}
+
+type RuleOwner interface {
+	GetNamespace() string
+	GetName() string
+	GetLabels() map[string]string
+	SetLabels(map[string]string)
+	GetAnnotations() map[string]string
+	SetAnnotations(map[string]string)
+	GetRules() []rbac.PolicyRule
+	SetRules([]rbac.PolicyRule)
+}
+
 type ReconcileClusterRoleOptions struct {
 	// Role is the expected role that will be reconciled
-	Role *rbac.ClusterRole
+	Role RuleOwner
 	// Confirm indicates writes should be performed. When false, results are returned as a dry-run.
 	Confirm bool
 	// RemoveExtraPermissions indicates reconciliation should remove extra permissions from an existing role
 	RemoveExtraPermissions bool
 	// Client is used to look up existing roles, and create/update the role when Confirm=true
-	Client internalversion.ClusterRoleInterface
+	Client RuleOwnerModifier
 }
 
 type ReconcileClusterRoleResult struct {
 	// Role is the reconciled role from the reconciliation operation.
 	// If the reconcile was performed as a dry-run, or the existing role was protected, the reconciled role is not persisted.
-	Role *rbac.ClusterRole
+	Role RuleOwner
 
 	// MissingRules contains expected rules that were missing from the currently persisted role
 	MissingRules []rbac.PolicyRule
@@ -81,12 +98,12 @@ func (o *ReconcileClusterRoleOptions) run(attempts int) (*ReconcileClusterRoleRe
 
 	var result *ReconcileClusterRoleResult
 
-	existing, err := o.Client.Get(o.Role.Name, metav1.GetOptions{})
+	existing, err := o.Client.Get(o.Role.GetNamespace(), o.Role.GetName())
 	switch {
 	case errors.IsNotFound(err):
 		result = &ReconcileClusterRoleResult{
 			Role:         o.Role,
-			MissingRules: o.Role.Rules,
+			MissingRules: o.Role.GetRules(),
 			Operation:    ReconcileCreate,
 		}
 
@@ -144,41 +161,41 @@ func (o *ReconcileClusterRoleOptions) run(attempts int) (*ReconcileClusterRoleRe
 
 // computeReconciledRole returns the role that must be created and/or updated to make the
 // existing role's permissions match the expected role's permissions
-func computeReconciledRole(existing, expected *rbac.ClusterRole, removeExtraPermissions bool) (*ReconcileClusterRoleResult, error) {
+func computeReconciledRole(existing, expected RuleOwner, removeExtraPermissions bool) (*ReconcileClusterRoleResult, error) {
 	result := &ReconcileClusterRoleResult{Operation: ReconcileNone}
 
-	result.Protected = (existing.Annotations[rbac.AutoUpdateAnnotationKey] == "false")
+	result.Protected = (existing.GetAnnotations()[rbac.AutoUpdateAnnotationKey] == "false")
 
 	// Start with a copy of the existing object
 	changedObj, err := api.Scheme.DeepCopy(existing)
 	if err != nil {
 		return nil, err
 	}
-	result.Role = changedObj.(*rbac.ClusterRole)
+	result.Role = changedObj.(RuleOwner)
 
 	// Merge expected annotations and labels
-	result.Role.Annotations = merge(expected.Annotations, result.Role.Annotations)
-	if !reflect.DeepEqual(result.Role.Annotations, existing.Annotations) {
+	result.Role.SetAnnotations(merge(expected.GetAnnotations(), result.Role.GetAnnotations()))
+	if !reflect.DeepEqual(result.Role.GetAnnotations(), existing.GetAnnotations()) {
 		result.Operation = ReconcileUpdate
 	}
-	result.Role.Labels = merge(expected.Labels, result.Role.Labels)
-	if !reflect.DeepEqual(result.Role.Labels, existing.Labels) {
+	result.Role.SetLabels(merge(expected.GetLabels(), result.Role.GetLabels()))
+	if !reflect.DeepEqual(result.Role.GetLabels(), existing.GetLabels()) {
 		result.Operation = ReconcileUpdate
 	}
 
 	// Compute extra and missing rules
-	_, result.ExtraRules = validation.Covers(expected.Rules, existing.Rules)
-	_, result.MissingRules = validation.Covers(existing.Rules, expected.Rules)
+	_, result.ExtraRules = validation.Covers(expected.GetRules(), existing.GetRules())
+	_, result.MissingRules = validation.Covers(existing.GetRules(), expected.GetRules())
 
 	switch {
 	case !removeExtraPermissions && len(result.MissingRules) > 0:
 		// add missing rules in the union case
-		result.Role.Rules = append(result.Role.Rules, result.MissingRules...)
+		result.Role.SetRules(append(result.Role.GetRules(), result.MissingRules...))
 		result.Operation = ReconcileUpdate
 
 	case removeExtraPermissions && (len(result.MissingRules) > 0 || len(result.ExtraRules) > 0):
 		// stomp to expected rules in the non-union case
-		result.Role.Rules = expected.Rules
+		result.Role.SetRules(expected.GetRules())
 		result.Operation = ReconcileUpdate
 	}
 
@@ -197,4 +214,69 @@ func merge(maps ...map[string]string) map[string]string {
 		}
 	}
 	return output
+}
+
+type ClusterRoleRuleOwner struct {
+	*rbac.ClusterRole
+}
+
+func (o ClusterRoleRuleOwner) GetNamespace() string {
+	return o.Namespace
+}
+
+func (o ClusterRoleRuleOwner) GetName() string {
+	return o.Name
+}
+
+func (o ClusterRoleRuleOwner) GetLabels() map[string]string {
+	return o.Labels
+}
+
+func (o ClusterRoleRuleOwner) SetLabels(in map[string]string) {
+	o.Labels = in
+}
+
+func (o ClusterRoleRuleOwner) GetAnnotations() map[string]string {
+	return o.Annotations
+}
+
+func (o ClusterRoleRuleOwner) SetAnnotations(in map[string]string) {
+	o.Annotations = in
+}
+
+func (o ClusterRoleRuleOwner) GetRules() []rbac.PolicyRule {
+	return o.Rules
+}
+
+func (o ClusterRoleRuleOwner) SetRules(in []rbac.PolicyRule) {
+	o.Rules = in
+}
+
+type ClusterRoleModifier struct {
+	Client internalversion.ClusterRoleInterface
+}
+
+func (c ClusterRoleModifier) Get(namespace, name string) (RuleOwner, error) {
+	ret, err := c.Client.Get(name, metav1.GetOptions{})
+	if err != nil {
+		return nil, err
+	}
+	return ClusterRoleRuleOwner{ClusterRole: ret}, err
+}
+
+func (c ClusterRoleModifier) Create(in RuleOwner) (RuleOwner, error) {
+	ret, err := c.Client.Create(in.(ClusterRoleRuleOwner).ClusterRole)
+	if err != nil {
+		return nil, err
+	}
+	return ClusterRoleRuleOwner{ClusterRole: ret}, err
+}
+
+func (c ClusterRoleModifier) Update(in RuleOwner) (RuleOwner, error) {
+	ret, err := c.Client.Create(in.(ClusterRoleRuleOwner).ClusterRole)
+	if err != nil {
+		return nil, err
+	}
+	return ClusterRoleRuleOwner{ClusterRole: ret}, err
+
 }

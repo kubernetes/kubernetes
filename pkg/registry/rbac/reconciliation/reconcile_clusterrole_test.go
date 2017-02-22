@@ -256,7 +256,9 @@ func TestComputeReconciledRole(t *testing.T) {
 	}
 
 	for k, tc := range tests {
-		result, err := computeReconciledRole(tc.actualRole, tc.expectedRole, tc.removeExtraPermissions)
+		actualRole := ClusterRoleRuleOwner{ClusterRole: tc.actualRole}
+		expectedRole := ClusterRoleRuleOwner{ClusterRole: tc.expectedRole}
+		result, err := computeReconciledRole(actualRole, expectedRole, tc.removeExtraPermissions)
 		if err != nil {
 			t.Errorf("%s: %v", k, err)
 			continue
@@ -266,7 +268,7 @@ func TestComputeReconciledRole(t *testing.T) {
 			t.Errorf("%s: Expected\n\t%v\ngot\n\t%v", k, tc.expectedReconciliationNeeded, reconciliationNeeded)
 			continue
 		}
-		if reconciliationNeeded && !api.Semantic.DeepEqual(result.Role, tc.expectedReconciledRole) {
+		if reconciliationNeeded && !api.Semantic.DeepEqual(result.Role.(ClusterRoleRuleOwner).ClusterRole, tc.expectedReconciledRole) {
 			t.Errorf("%s: Expected\n\t%#v\ngot\n\t%#v", k, tc.expectedReconciledRole, result.Role)
 		}
 	}
