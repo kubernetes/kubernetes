@@ -153,7 +153,7 @@ func TestScheduler(t *testing.T) {
 					gotAssumedPod = pod
 				},
 			},
-			NodeLister: algorithm.FakeNodeLister(
+			NodeLister: schedulertesting.FakeNodeLister(
 				[]*v1.Node{&testNode},
 			),
 			Algorithm: item.algo,
@@ -205,7 +205,7 @@ func TestSchedulerNoPhantomPodAfterExpire(t *testing.T) {
 	pod := podWithPort("pod.Name", "", 8080)
 	node := v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "machine1"}}
 	scache.AddNode(&node)
-	nodeLister := algorithm.FakeNodeLister([]*v1.Node{&node})
+	nodeLister := schedulertesting.FakeNodeLister([]*v1.Node{&node})
 	predicateMap := map[string]algorithm.FitPredicate{"PodFitsHostPorts": predicates.PodFitsHostPorts}
 	scheduler, bindingChan, _ := setupTestSchedulerWithOnePodOnNode(t, queuedPodStore, scache, nodeLister, predicateMap, pod, &node)
 
@@ -263,7 +263,7 @@ func TestSchedulerNoPhantomPodAfterDelete(t *testing.T) {
 	firstPod := podWithPort("pod.Name", "", 8080)
 	node := v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "machine1"}}
 	scache.AddNode(&node)
-	nodeLister := algorithm.FakeNodeLister([]*v1.Node{&node})
+	nodeLister := schedulertesting.FakeNodeLister([]*v1.Node{&node})
 	predicateMap := map[string]algorithm.FitPredicate{"PodFitsHostPorts": predicates.PodFitsHostPorts}
 	scheduler, bindingChan, errChan := setupTestSchedulerWithOnePodOnNode(t, queuedPodStore, scache, nodeLister, predicateMap, firstPod, &node)
 
@@ -346,7 +346,7 @@ func TestSchedulerErrorWithLongBinding(t *testing.T) {
 		node := v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "machine1"}}
 		scache.AddNode(&node)
 
-		nodeLister := algorithm.FakeNodeLister([]*v1.Node{&node})
+		nodeLister := schedulertesting.FakeNodeLister([]*v1.Node{&node})
 		predicateMap := map[string]algorithm.FitPredicate{"PodFitsHostPorts": predicates.PodFitsHostPorts}
 
 		scheduler, bindingChan := setupTestSchedulerLongBindingWithRetry(
@@ -377,7 +377,7 @@ func TestSchedulerErrorWithLongBinding(t *testing.T) {
 // queuedPodStore: pods queued before processing.
 // cache: scheduler cache that might contain assumed pods.
 func setupTestSchedulerWithOnePodOnNode(t *testing.T, queuedPodStore *clientcache.FIFO, scache schedulercache.Cache,
-	nodeLister algorithm.FakeNodeLister, predicateMap map[string]algorithm.FitPredicate, pod *v1.Pod, node *v1.Node) (*Scheduler, chan *v1.Binding, chan error) {
+	nodeLister schedulertesting.FakeNodeLister, predicateMap map[string]algorithm.FitPredicate, pod *v1.Pod, node *v1.Node) (*Scheduler, chan *v1.Binding, chan error) {
 
 	scheduler, bindingChan, errChan := setupTestScheduler(queuedPodStore, scache, nodeLister, predicateMap)
 
@@ -441,7 +441,7 @@ func TestSchedulerFailedSchedulingReasons(t *testing.T) {
 		scache.AddNode(&node)
 		nodes = append(nodes, &node)
 	}
-	nodeLister := algorithm.FakeNodeLister(nodes)
+	nodeLister := schedulertesting.FakeNodeLister(nodes)
 	predicateMap := map[string]algorithm.FitPredicate{
 		"PodFitsResources": predicates.PodFitsResources,
 	}
@@ -477,7 +477,7 @@ func TestSchedulerFailedSchedulingReasons(t *testing.T) {
 
 // queuedPodStore: pods queued before processing.
 // scache: scheduler cache that might contain assumed pods.
-func setupTestScheduler(queuedPodStore *clientcache.FIFO, scache schedulercache.Cache, nodeLister algorithm.FakeNodeLister, predicateMap map[string]algorithm.FitPredicate) (*Scheduler, chan *v1.Binding, chan error) {
+func setupTestScheduler(queuedPodStore *clientcache.FIFO, scache schedulercache.Cache, nodeLister schedulertesting.FakeNodeLister, predicateMap map[string]algorithm.FitPredicate) (*Scheduler, chan *v1.Binding, chan error) {
 	algo := core.NewGenericScheduler(
 		scache,
 		predicateMap,
@@ -507,7 +507,7 @@ func setupTestScheduler(queuedPodStore *clientcache.FIFO, scache schedulercache.
 	return New(cfg), bindingChan, errChan
 }
 
-func setupTestSchedulerLongBindingWithRetry(queuedPodStore *clientcache.FIFO, scache schedulercache.Cache, nodeLister algorithm.FakeNodeLister, predicateMap map[string]algorithm.FitPredicate, stop chan struct{}, bindingTime time.Duration) (*Scheduler, chan *v1.Binding) {
+func setupTestSchedulerLongBindingWithRetry(queuedPodStore *clientcache.FIFO, scache schedulercache.Cache, nodeLister schedulertesting.FakeNodeLister, predicateMap map[string]algorithm.FitPredicate, stop chan struct{}, bindingTime time.Duration) (*Scheduler, chan *v1.Binding) {
 	algo := core.NewGenericScheduler(
 		scache,
 		predicateMap,
