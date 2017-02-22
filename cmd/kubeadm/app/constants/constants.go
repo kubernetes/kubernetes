@@ -46,8 +46,12 @@ const (
 	FrontProxyClientCertName           = "front-proxy-client.crt"
 	FrontProxyClientKeyName            = "front-proxy-client.key"
 
-	AdminKubeConfigFileName   = "admin.conf"
-	KubeletKubeConfigFileName = "kubelet.conf"
+	AdminKubeConfigFileName             = "admin.conf"
+	KubeletKubeConfigFileName           = "kubelet.conf"
+	ControllerManagerKubeConfigFileName = "controller-manager.conf"
+	SchedulerKubeConfigFileName         = "scheduler.conf"
+
+	DefaultCertDir = "/etc/kubernetes/pki"
 
 	// TODO: These constants should actually come from pkg/kubeapiserver/authorizer, but we can't vendor that package in now
 	// because of all the other sub-packages that would get vendored. To fix this, a pkg/kubeapiserver/authorizer/modes package
@@ -59,6 +63,13 @@ const (
 
 	// Important: a "v"-prefix shouldn't exist here; semver doesn't allow that
 	MinimumControlPlaneVersion = "1.6.0-alpha.2"
+
+	// Some well-known users and groups in the core Kubernetes authorization system
+
+	ControllerManagerUser = "system:kube-controller-manager"
+	SchedulerUser         = "system:kube-scheduler"
+	MastersGroup          = "system:masters"
+	NodesGroup            = "system:nodes"
 
 	// Constants for what we name our ServiceAccounts with limited access to the cluster in case of RBAC
 	KubeDNSServiceAccountName   = "kube-dns"

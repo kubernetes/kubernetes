@@ -151,7 +151,7 @@ func CreatePKIAssets(cfg *kubeadmapi.MasterConfiguration, pkiDir string) error {
 		// TODO: Add a test case to verify that this cert has the x509.ExtKeyUsageClientAuth flag
 		config := certutil.Config{
 			CommonName:   "kube-apiserver-kubelet-client",
-			Organization: []string{"system:masters"},
+			Organization: []string{kubeadmconstants.MastersGroup},
 			Usages:       []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth},
 		}
 		apiClientCert, apiClientKey, err := pkiutil.NewCertAndKey(caCert, caKey, config)
