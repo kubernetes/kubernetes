@@ -83,6 +83,11 @@ ADMISSION_CONTROL_CONFIG_FILE=${ADMISSION_CONTROL_CONFIG_FILE:-""}
 # START_MODE can be 'all', 'kubeletonly', or 'nokubelet'
 START_MODE=${START_MODE:-"all"}
 
+# By default, we ensure all resources associated with a pod are cleaned up prior to deletion.
+# If you need to debug a pod's volume information, and wish for it not to be deleted during
+# development, set this flag to true, otherwise leave untouched.'
+KEEP_TERMINATED_POD_VOLUMES=${KEEP_TERMINATED_POD_VOLUMES:-false}
+
 # sanity check for OpenStack provider
 if [ "${CLOUD_PROVIDER}" == "openstack" ]; then
     if [ "${CLOUD_CONFIG}" == "" ]; then
@@ -527,14 +532,17 @@ function start_controller_manager {
 
 function start_kubelet {
     KUBELET_LOG=/tmp/kubelet.log
-    mkdir -p ${POD_MANIFEST_PATH} || true
+    # Ensure kubelet dir exists
+    mkdir -p /var/lib/kubelet &>/dev/null || sudo mkdir -p /var/lib/kubelet
+
+    # Ensure POD_MANIFEST_PATH is created
+    mkdir -p "${POD_MANIFEST_PATH}" &>/dev/null || sudo mkdir -p "${POD_MANIFEST_PATH}"
 
     priv_arg=""
     if [[ -n "${ALLOW_PRIVILEGED}" ]]; then
       priv_arg="--allow-privileged "
     fi
 
-    mkdir -p /var/lib/kubelet
     if [[ -z "${DOCKERIZE_KUBELET}" ]]; then
       # Enable dns
       if [[ "${ENABLE_CLUSTER_DNS}" = true ]]; then
@@ -595,7 +603,7 @@ function start_kubelet {
         --cgroups-per-qos=${CGROUPS_PER_QOS} \
         --cgroup-driver=${CGROUP_DRIVER} \
         --cgroup-root=${CGROUP_ROOT} \
-        --keep-terminated-pod-volumes=true \
+        --keep-terminated-pod-volumes=${KEEP_TERMINATED_POD_VOLUMES} \
         --eviction-hard=${EVICTION_HARD} \
         --eviction-soft=${EVICTION_SOFT} \
         --eviction-pressure-transition-period=${EVICTION_PRESSURE_TRANSITION_PERIOD} \
