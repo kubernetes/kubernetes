@@ -164,7 +164,7 @@ func NewReplicationManagerFromClient(kubeClient clientset.Interface, burstReplic
 	informerFactory := informers.NewSharedInformerFactory(kubeClient, controller.NoResyncPeriodFunc())
 	podInformer := informerFactory.Core().V1().Pods()
 	rcInformer := informerFactory.Core().V1().ReplicationControllers()
-	rm := NewReplicationManager(podInformer, rcInformer, kubeClient, burstReplicas, lookupCacheSize, false)
+	rm := NewReplicationManager(podInformer, rcInformer, kubeClient, burstReplicas, lookupCacheSize)
 	rm.podListerSynced = alwaysReady
 	rm.rcListerSynced = alwaysReady
 	return rm, podInformer, rcInformer
@@ -459,7 +459,7 @@ func TestWatchControllers(t *testing.T) {
 	informers := informers.NewSharedInformerFactory(c, controller.NoResyncPeriodFunc())
 	podInformer := informers.Core().V1().Pods()
 	rcInformer := informers.Core().V1().ReplicationControllers()
-	manager := NewReplicationManager(podInformer, rcInformer, c, BurstReplicas, 0, false)
+	manager := NewReplicationManager(podInformer, rcInformer, c, BurstReplicas, 0)
 	informers.Start(stopCh)
 
 	var testControllerSpec v1.ReplicationController
@@ -1114,18 +1114,17 @@ func BenchmarkGetPodControllerSingleNS(b *testing.B) {
 	}
 }
 
-// setupManagerWithGCEnabled creates a RC manager with a fakePodControl and with garbageCollectorEnabled set to true
-func setupManagerWithGCEnabled(objs ...runtime.Object) (manager *ReplicationManager, fakePodControl *controller.FakePodControl, podInformer coreinformers.PodInformer, rcInformer coreinformers.ReplicationControllerInformer) {
+// setupManager creates a RC manager with a fakePodControl.
+func setupManager(objs ...runtime.Object) (manager *ReplicationManager, fakePodControl *controller.FakePodControl, podInformer coreinformers.PodInformer, rcInformer coreinformers.ReplicationControllerInformer) {
 	c := fakeclientset.NewSimpleClientset(objs...)
 	fakePodControl = &controller.FakePodControl{}
 	manager, podInformer, rcInformer = NewReplicationManagerFromClient(c, BurstReplicas, 0)
-	manager.garbageCollectorEnabled = true
 	manager.podControl = fakePodControl
 	return manager, fakePodControl, podInformer, rcInformer
 }
 
 func TestDoNotPatchPodWithOtherControlRef(t *testing.T) {
-	manager, fakePodControl, podInformer, rcInformer := setupManagerWithGCEnabled()
+	manager, fakePodControl, podInformer, rcInformer := setupManager()
 	rc := newReplicationController(2)
 	rcInformer.Informer().GetIndexer().Add(rc)
 	var trueVar = true
@@ -1144,7 +1143,7 @@ func TestDoNotPatchPodWithOtherControlRef(t *testing.T) {
 
 func TestPatchPodWithOtherOwnerRef(t *testing.T) {
 	rc := newReplicationController(2)
-	manager, fakePodControl, podInformer, rcInformer := setupManagerWithGCEnabled(rc)
+	manager, fakePodControl, podInformer, rcInformer := setupManager(rc)
 	rcInformer.Informer().GetIndexer().Add(rc)
 	// add to podLister one more matching pod that doesn't have a controller
 	// ref, but has an owner ref pointing to other object. Expect a patch to
@@ -1164,7 +1163,7 @@ func TestPatchPodWithOtherOwnerRef(t *testing.T) {
 
 func TestPatchPodWithCorrectOwnerRef(t *testing.T) {
 	rc := newReplicationController(2)
-	manager, fakePodControl, podInformer, rcInformer := setupManagerWithGCEnabled(rc)
+	manager, fakePodControl, podInformer, rcInformer := setupManager(rc)
 	rcInformer.Informer().GetIndexer().Add(rc)
 	// add to podLister a matching pod that has an ownerRef pointing to the rc,
 	// but ownerRef.Controller is false. Expect a patch to take control it.
@@ -1183,7 +1182,7 @@ func TestPatchPodWithCorrectOwnerRef(t *testing.T) {
 
 func TestPatchPodFails(t *testing.T) {
 	rc := newReplicationController(2)
-	manager, fakePodControl, podInformer, rcInformer := setupManagerWithGCEnabled(rc)
+	manager, fakePodControl, podInformer, rcInformer := setupManager(rc)
 	rcInformer.Informer().GetIndexer().Add(rc)
 	// add to podLister two matching pods. Expect two patches to take control
 	// them.
@@ -1208,7 +1207,7 @@ func TestPatchPodFails(t *testing.T) {
 
 func TestPatchExtraPodsThenDelete(t *testing.T) {
 	rc := newReplicationController(2)
-	manager, fakePodControl, podInformer, rcInformer := setupManagerWithGCEnabled(rc)
+	manager, fakePodControl, podInformer, rcInformer := setupManager(rc)
 	rcInformer.Informer().GetIndexer().Add(rc)
 	// add to podLister three matching pods. Expect three patches to take control
 	// them, and later delete one of them.
@@ -1224,7 +1223,7 @@ func TestPatchExtraPodsThenDelete(t *testing.T) {
 }
 
 func TestUpdateLabelsRemoveControllerRef(t *testing.T) {
-	manager, fakePodControl, podInformer, rcInformer := setupManagerWithGCEnabled()
+	manager, fakePodControl, podInformer, rcInformer := setupManager()
 	rc := newReplicationController(2)
 	rcInformer.Informer().GetIndexer().Add(rc)
 	// put one pod in the podLister
@@ -1262,7 +1261,7 @@ func TestUpdateLabelsRemoveControllerRef(t *testing.T) {
 }
 
 func TestUpdateSelectorControllerRef(t *testing.T) {
-	manager, fakePodControl, podInformer, rcInformer := setupManagerWithGCEnabled()
+	manager, fakePodControl, podInformer, rcInformer := setupManager()
 	rc := newReplicationController(2)
 	// put 2 pods in the podLister
 	newPodList(podInformer.Informer().GetIndexer(), 2, v1.PodRunning, rc, "pod")
@@ -1295,7 +1294,7 @@ func TestUpdateSelectorControllerRef(t *testing.T) {
 // RC manager shouldn't adopt or create more pods if the rc is about to be
 // deleted.
 func TestDoNotAdoptOrCreateIfBeingDeleted(t *testing.T) {
-	manager, fakePodControl, podInformer, rcInformer := setupManagerWithGCEnabled()
+	manager, fakePodControl, podInformer, rcInformer := setupManager()
 	rc := newReplicationController(2)
 	now := metav1.Now()
 	rc.DeletionTimestamp = &now
@@ -1393,7 +1392,8 @@ func TestAvailableReplicas(t *testing.T) {
 
 	decRc := runtime.EncodeOrDie(testapi.Default.Codec(), rc)
 	fakeHandler.ValidateRequest(t, testapi.Default.ResourcePath(replicationControllerResourceName(), rc.Namespace, rc.Name)+"/status", "PUT", &decRc)
-	validateSyncReplication(t, &fakePodControl, 0, 0, 0)
+	// Expect 2 patches for pods being adopted.
+	validateSyncReplication(t, &fakePodControl, 0, 0, 2)
 }
 
 var (
