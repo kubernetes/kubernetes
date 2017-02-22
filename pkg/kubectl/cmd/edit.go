@@ -531,10 +531,19 @@ func visitToCreate(createVisitor resource.Visitor, mapper meta.RESTMapper, out, 
 func visitAnnotation(cmd *cobra.Command, f cmdutil.Factory, annotationVisitor resource.Visitor, encoder runtime.Encoder) error {
 	// iterate through all items to apply annotations
 	err := annotationVisitor.Visit(func(info *resource.Info, incomingErr error) error {
-		// put configuration annotation in "updates"
-		if err := kubectl.CreateOrUpdateAnnotation(cmdutil.GetFlagBool(cmd, cmdutil.ApplyAnnotationsFlag), info, encoder); err != nil {
-			return err
+		// If the flag is true, create or update the annotation.
+		// If the flag is unspecified, update the annotation only if it already exists.
+		// If the flag is false, drop the annotation.
+		if !cmd.Flags().Changed(cmdutil.ApplyAnnotationsFlag) || cmdutil.GetFlagBool(cmd, cmdutil.ApplyAnnotationsFlag) {
+			if err := kubectl.CreateOrUpdateAnnotation(cmdutil.GetFlagBool(cmd, cmdutil.ApplyAnnotationsFlag), info, encoder); err != nil {
+				return err
+			}
+		} else {
+			if err := kubectl.DeleteConfiguration(info); err != nil {
+				return err
+			}
 		}
+
 		if cmdutil.ShouldRecord(cmd, info) {
 			if err := cmdutil.RecordChangeCause(info.Object, f.Command()); err != nil {
 				return err

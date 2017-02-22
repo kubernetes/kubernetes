@@ -68,6 +68,40 @@ func SetOriginalConfiguration(info *resource.Info, original []byte) error {
 	return nil
 }
 
+// DeleteConfiguration delete the LastAppliedConfigAnnotation in the internal object and/or the
+// versioned object.
+func DeleteConfiguration(info *resource.Info) error {
+	deleteFn := func(obj runtime.Object) error {
+		accessor, err := meta.Accessor(obj)
+		if err != nil {
+			return err
+		}
+		// Get the current annotations from the object.
+		annots := accessor.GetAnnotations()
+		if annots == nil {
+			annots = map[string]string{}
+		}
+		delete(annots, annotations.LastAppliedConfigAnnotation)
+		accessor.SetAnnotations(annots)
+		return nil
+	}
+
+	if info.VersionedObject != nil {
+		err := deleteFn(info.VersionedObject)
+		if err != nil {
+			return err
+		}
+	}
+
+	if info.Object != nil {
+		err := deleteFn(info.Object)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 // GetModifiedConfiguration retrieves the modified configuration of the object.
 // If annotate is true, it embeds the result as an annotation in the modified
 // configuration. If an object was read from the command input, it will use that
