@@ -23,6 +23,6 @@ import (
 type unmounterDefaults flexVolumeUnmounter
 
 func (f *unmounterDefaults) TearDownAt(dir string) error {
-	glog.Warning(logPrefix(f.plugin), "using default TearDownAt for ", dir)
+	glog.V(5).Infof(logPrefix(f.plugin), "using default TearDownAt for ", dir)
 	return doUnmount(f.mounter, dir)
 }
