@@ -146,7 +146,9 @@ disable-attach-detach-reconcile-sync
 disable-filter
 disable-kubenet
 disable-log-dump
+discovery-file
 discovery-port
+discovery-token
 dns-bind-address
 dns-port
 dns-provider
@@ -166,10 +168,6 @@ dump-logs-on-failure
 duration-sec
 e2e-output-dir
 e2e-verify-service-account
-etcd-metrics-scrape-uri
-etcd-upgrade-storage
-etcd-upgrade-version
-etcd-version-scrape-uri
 enable-controller-attach-detach
 enable-cri
 enable-custom-metrics
@@ -188,6 +186,7 @@ etcd-certfile
 etcd-config
 etcd-keyfile
 etcd-metrics-scrape-uri
+etcd-metrics-scrape-uri
 etcd-mutation-timeout
 etcd-persistent-storage
 etcd-prefix
@@ -196,6 +195,9 @@ etcd-quorum-read
 etcd-server
 etcd-servers
 etcd-servers-overrides
+etcd-upgrade-storage
+etcd-upgrade-version
+etcd-version-scrape-uri
 etcd-version-scrape-uri
 event-burst
 event-qps
@@ -214,12 +216,12 @@ exit-on-lock-contention
 experimental-allowed-unsafe-sysctls
 experimental-bootstrap-kubeconfig
 experimental-bootstrap-token-auth
-experimental-keystone-url
 experimental-check-node-capabilities-before-mount
 experimental-cri
 experimental-fail-swap-on
 experimental-kernel-memcg-notification
 experimental-keystone-ca-file
+experimental-keystone-url
 experimental-keystone-url
 experimental-mounter-path
 experimental-nvidia-gpus
@@ -628,6 +630,7 @@ tcp-services
 terminated-pod-gc-threshold
 test-flags
 test-timeout
+tls-bootstrap-token
 tls-ca-file
 tls-cert-file
 tls-private-key-file
@@ -645,8 +648,8 @@ update-period
 upgrade-image
 upgrade-target
 use-kubernetes-cluster-service
-use-service-account-credentials
 use-kubernetes-version
+use-service-account-credentials
 use-taint-based-evictions
 user-whitelist
 verb
