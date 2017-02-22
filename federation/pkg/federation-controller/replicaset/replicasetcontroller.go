@@ -27,7 +27,9 @@ import (
 
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	clientv1 "k8s.io/client-go/pkg/api/v1"
@@ -47,7 +49,7 @@ import (
 	apiv1 "k8s.io/kubernetes/pkg/api/v1"
 	extensionsv1 "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	kubeclientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
-	"k8s.io/kubernetes/pkg/client/legacylisters"
+	extensionslisters "k8s.io/kubernetes/pkg/client/listers/extensions/v1beta1"
 	"k8s.io/kubernetes/pkg/controller"
 )
 
@@ -84,7 +86,7 @@ type ReplicaSetController struct {
 	fedClient fedclientset.Interface
 
 	replicaSetController cache.Controller
-	replicaSetStore      listers.StoreToReplicaSetLister
+	replicaSetLister     extensionslisters.ReplicaSetLister
 
 	fedReplicaSetInformer fedutil.FederatedInformer
 	fedPodInformer        fedutil.FederatedInformer
@@ -172,7 +174,8 @@ func NewReplicaSetController(federationClient fedclientset.Interface) *ReplicaSe
 	}
 	frsc.fedPodInformer = fedutil.NewFederatedInformer(federationClient, podFedInformerFactory, &fedutil.ClusterLifecycleHandlerFuncs{})
 
-	frsc.replicaSetStore.Indexer, frsc.replicaSetController = cache.NewIndexerInformer(
+	var replicaSetIndexer cache.Indexer
+	replicaSetIndexer, frsc.replicaSetController = cache.NewIndexerInformer(
 		&cache.ListWatch{
 			ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
 				return frsc.fedClient.Extensions().ReplicaSets(metav1.NamespaceAll).List(options)
@@ -188,6 +191,7 @@ func NewReplicaSetController(federationClient fedclientset.Interface) *ReplicaSe
 		),
 		cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc},
 	)
+	frsc.replicaSetLister = extensionslisters.NewReplicaSetLister(replicaSetIndexer)
 
 	frsc.fedUpdater = fedutil.NewFederatedUpdater(frsc.fedReplicaSetInformer,
 		func(client kubeclientset.Interface, obj runtime.Object) error {
@@ -349,12 +353,18 @@ func (frsc *ReplicaSetController) deliverLocalReplicaSet(obj interface{}, durati
 		glog.Errorf("Couldn't get key for object %v: %v", obj, err)
 		return
 	}
-	_, exists, err := frsc.replicaSetStore.Indexer.GetByKey(key)
+	namespace, name, err := cache.SplitMetaNamespaceKey(key)
 	if err != nil {
-		glog.Errorf("Couldn't get federation replicaset %v: %v", key, err)
-		return
+		glog.Errorf("Error splitting key for object %v: %v", obj, err)
 	}
-	if exists { // ignore replicasets exists only in local k8s
+	_, err = frsc.replicaSetLister.ReplicaSets(namespace).Get(name)
+	switch {
+	case errors.IsNotFound(err):
+		// do nothing
+	case err != nil:
+		glog.Errorf("Couldn't get federation replicaset %v: %v", key, err)
+	default:
+		// ReplicaSet exists. Ignore ReplicaSets that exist only in local k8s
 		frsc.deliverReplicaSetByKey(key, duration, false)
 	}
 }
@@ -477,13 +487,17 @@ func (frsc *ReplicaSetController) reconcileReplicaSet(key string) (reconciliatio
 	startTime := time.Now()
 	defer glog.V(4).Infof("Finished reconcile replicaset %q (%v)", key, time.Now().Sub(startTime))
 
-	objFromStore, exists, err := frsc.replicaSetStore.Indexer.GetByKey(key)
+	namespace, name, err := cache.SplitMetaNamespaceKey(key)
 	if err != nil {
 		return statusError, err
 	}
-	if !exists {
+	objFromStore, err := frsc.replicaSetLister.ReplicaSets(namespace).Get(name)
+	if errors.IsNotFound(err) {
 		// don't delete local replicasets for now. Do not reconcile it anymore.
 		return statusAllOk, nil
+	}
+	if err != nil {
+		return statusError, err
 	}
 	obj, err := api.Scheme.DeepCopy(objFromStore)
 	frs, ok := obj.(*extensionsv1.ReplicaSet)
@@ -626,7 +640,11 @@ func (frsc *ReplicaSetController) reconcileReplicaSetsOnClusterChange() {
 	if !frsc.isSynced() {
 		frsc.clusterDeliverer.DeliverAfter(allClustersKey, nil, clusterAvailableDelay)
 	}
-	rss := frsc.replicaSetStore.Indexer.List()
+	rss, err := frsc.replicaSetLister.List(labels.Everything())
+	if err != nil {
+		utilruntime.HandleError(fmt.Errorf("error listing replica sets: %v", err))
+		return
+	}
 	for _, rs := range rss {
 		key, _ := controller.KeyFunc(rs)
 		frsc.deliverReplicaSetByKey(key, 0, false)
