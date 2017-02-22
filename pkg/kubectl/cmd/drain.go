@@ -308,7 +308,10 @@ func (o *DrainOptions) unreplicatedFilter(pod api.Pod) (bool, *warning, *fatal) 
 	}
 
 	sr, err := o.getPodCreator(pod)
-	if err != nil {
+	removeOrphandedPod := apierrors.IsNotFound(err) && o.Force
+	if removeOrphandedPod {
+		return true, &warning{err.Error()}, nil
+	} else if err != nil {
 		return false, nil, &fatal{err.Error()}
 	}
 	if sr != nil {
@@ -321,11 +324,18 @@ func (o *DrainOptions) unreplicatedFilter(pod api.Pod) (bool, *warning, *fatal) 
 }
 
 func (o *DrainOptions) daemonsetFilter(pod api.Pod) (bool, *warning, *fatal) {
-	// Note that we return false in all cases where the pod is DaemonSet managed,
+	// Note that we return false in cases where the pod is DaemonSet managed,
 	// regardless of flags.  We never delete them, the only question is whether
 	// their presence constitutes an error.
+	//
+	// The exception is for pods that are orphaned (the referencing
+	// management resource - including DaemonSet - is not found).
+	// Such pods will be deleted if --force is used.
 	sr, err := o.getPodCreator(pod)
-	if err != nil {
+	removeOrphandedPod := apierrors.IsNotFound(err) && o.Force
+	if removeOrphandedPod {
+		return true, &warning{err.Error()}, nil
+	} else if err != nil {
 		return false, nil, &fatal{err.Error()}
 	}
 	if sr == nil || sr.Reference.Kind != "DaemonSet" {
