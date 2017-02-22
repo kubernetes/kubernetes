@@ -612,9 +612,9 @@ var _ = framework.KubeDescribe("Network Partition [Disruptive] [Slow]", func() {
 
 				By("Expect to observe node and pod status change from Ready to NotReady after network partition")
 				expectNodeReadiness(false, newNode)
-				wait.Poll(1*time.Second, timeout, func() (bool, error) {
+				framework.ExpectNoError(wait.Poll(1*time.Second, timeout, func() (bool, error) {
 					return framework.NodeHasTaint(c, node.Name, nodepkg.UnreachableTaintTemplate)
-				})
+				}))
 				if err = framework.WaitForMatchPodsCondition(c, podOpts, "NotReady", podNotReadyTimeout, testutils.PodNotReady); err != nil {
 					framework.Failf("Pods on node %s did not become NotReady within %v: %v", node.Name, podNotReadyTimeout, err)
 				}
