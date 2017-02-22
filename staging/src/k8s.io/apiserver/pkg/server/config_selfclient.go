@@ -145,7 +145,7 @@ func (s *ServingInfo) NewSelfClientConfig(token string) (*restclient.Config, err
 		return nil, nil
 	}
 	return &restclient.Config{
-		Host: s.BindAddress,
+		Host: "http://" + s.BindAddress,
 		// Increase QPS limits. The client is currently passed to all admission plugins,
 		// and those can be throttled in case of higher load on apiserver - see #22340 and #22422
 		// for more details. Once #22422 is fixed, we may want to remove it.
