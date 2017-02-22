@@ -30,12 +30,13 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
-	batch "k8s.io/kubernetes/pkg/apis/batch/v2alpha1"
+	batchv1 "k8s.io/kubernetes/pkg/apis/batch/v1"
+	batchv2alpha1 "k8s.io/kubernetes/pkg/apis/batch/v2alpha1"
 )
 
 // Utilities for dealing with Jobs and CronJobs and time.
 
-func inActiveList(sj batch.CronJob, uid types.UID) bool {
+func inActiveList(sj batchv2alpha1.CronJob, uid types.UID) bool {
 	for _, j := range sj.Status.Active {
 		if j.UID == uid {
 			return true
@@ -44,7 +45,7 @@ func inActiveList(sj batch.CronJob, uid types.UID) bool {
 	return false
 }
 
-func deleteFromActiveList(sj *batch.CronJob, uid types.UID) {
+func deleteFromActiveList(sj *batchv2alpha1.CronJob, uid types.UID) {
 	if sj == nil {
 		return
 	}
@@ -58,7 +59,7 @@ func deleteFromActiveList(sj *batch.CronJob, uid types.UID) {
 }
 
 // getParentUIDFromJob extracts UID of job's parent and whether it was found
-func getParentUIDFromJob(j batch.Job) (types.UID, bool) {
+func getParentUIDFromJob(j batchv1.Job) (types.UID, bool) {
 	creatorRefJson, found := j.ObjectMeta.Annotations[v1.CreatedByAnnotation]
 	if !found {
 		glog.V(4).Infof("Job with no created-by annotation, name %s namespace %s", j.Name, j.Namespace)
@@ -85,8 +86,8 @@ func getParentUIDFromJob(j batch.Job) (types.UID, bool) {
 
 // groupJobsByParent groups jobs into a map keyed by the job parent UID (e.g. scheduledJob).
 // It has no receiver, to facilitate testing.
-func groupJobsByParent(sjs []batch.CronJob, js []batch.Job) map[types.UID][]batch.Job {
-	jobsBySj := make(map[types.UID][]batch.Job)
+func groupJobsByParent(sjs []batchv2alpha1.CronJob, js []batchv1.Job) map[types.UID][]batchv1.Job {
+	jobsBySj := make(map[types.UID][]batchv1.Job)
 	for _, job := range js {
 		parentUID, found := getParentUIDFromJob(job)
 		if !found {
@@ -120,7 +121,7 @@ func getNextStartTimeAfter(schedule string, now time.Time) (time.Time, error) {
 //
 // If there are too many (>100) unstarted times, just give up and return an empty slice.
 // If there were missed times prior to the last known start time, then those are not returned.
-func getRecentUnmetScheduleTimes(sj batch.CronJob, now time.Time) ([]time.Time, error) {
+func getRecentUnmetScheduleTimes(sj batchv2alpha1.CronJob, now time.Time) ([]time.Time, error) {
 	starts := []time.Time{}
 	sched, err := cron.ParseStandard(sj.Spec.Schedule)
 	if err != nil {
@@ -181,7 +182,7 @@ func getRecentUnmetScheduleTimes(sj batch.CronJob, now time.Time) ([]time.Time, 
 // XXX unit test this
 
 // getJobFromTemplate makes a Job from a CronJob
-func getJobFromTemplate(sj *batch.CronJob, scheduledTime time.Time) (*batch.Job, error) {
+func getJobFromTemplate(sj *batchv2alpha1.CronJob, scheduledTime time.Time) (*batchv1.Job, error) {
 	// TODO: consider adding the following labels:
 	// nominal-start-time=$RFC_3339_DATE_OF_INTENDED_START -- for user convenience
 	// scheduled-job-name=$SJ_NAME -- for user convenience
@@ -195,7 +196,7 @@ func getJobFromTemplate(sj *batch.CronJob, scheduledTime time.Time) (*batch.Job,
 	// We want job names for a given nominal start time to have a deterministic name to avoid the same job being created twice
 	name := fmt.Sprintf("%s-%d", sj.Name, getTimeHash(scheduledTime))
 
-	job := &batch.Job{
+	job := &batchv1.Job{
 		ObjectMeta: metav1.ObjectMeta{
 			Labels:      labels,
 			Annotations: annotations,
@@ -234,22 +235,22 @@ func makeCreatedByRefJson(object runtime.Object) (string, error) {
 	return string(createdByRefJson), nil
 }
 
-func getFinishedStatus(j *batch.Job) (bool, batch.JobConditionType) {
+func getFinishedStatus(j *batchv1.Job) (bool, batchv1.JobConditionType) {
 	for _, c := range j.Status.Conditions {
-		if (c.Type == batch.JobComplete || c.Type == batch.JobFailed) && c.Status == v1.ConditionTrue {
+		if (c.Type == batchv1.JobComplete || c.Type == batchv1.JobFailed) && c.Status == v1.ConditionTrue {
 			return true, c.Type
 		}
 	}
 	return false, ""
 }
 
-func IsJobFinished(j *batch.Job) bool {
+func IsJobFinished(j *batchv1.Job) bool {
 	isFinished, _ := getFinishedStatus(j)
 	return isFinished
 }
 
 // byJobStartTime sorts a list of jobs by start timestamp, using their names as a tie breaker.
-type byJobStartTime []batch.Job
+type byJobStartTime []batchv1.Job
 
 func (o byJobStartTime) Len() int      { return len(o) }
 func (o byJobStartTime) Swap(i, j int) { o[i], o[j] = o[j], o[i] }
