@@ -122,6 +122,7 @@ deserialization-cache-size
 dest-file
 disable-filter
 disable-kubenet
+disable-log-dump
 dns-port
 dns-provider
 dns-provider-config
