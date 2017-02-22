@@ -17,7 +17,9 @@ limitations under the License.
 package bootstrappolicy
 
 import (
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apiserver/pkg/authentication/user"
 	rbac "k8s.io/kubernetes/pkg/apis/rbac"
 )
@@ -44,40 +46,42 @@ const (
 	storageGroup        = "storage.k8s.io"
 )
 
+func addDefaultMetadata(obj runtime.Object) {
+	metadata, err := meta.Accessor(obj)
+	if err != nil {
+		// if this happens, then some static code is broken
+		panic(err)
+	}
+
+	labels := metadata.GetLabels()
+	if labels == nil {
+		labels = map[string]string{}
+	}
+	for k, v := range Label {
+		labels[k] = v
+	}
+	metadata.SetLabels(labels)
+
+	annotations := metadata.GetAnnotations()
+	if annotations == nil {
+		annotations = map[string]string{}
+	}
+	for k, v := range Annotation {
+		annotations[k] = v
+	}
+	metadata.SetAnnotations(annotations)
+}
+
 func addClusterRoleLabel(roles []rbac.ClusterRole) {
 	for i := range roles {
-		if roles[i].ObjectMeta.Labels == nil {
-			roles[i].ObjectMeta.Labels = make(map[string]string)
-		}
-		for k, v := range Label {
-			roles[i].ObjectMeta.Labels[k] = v
-		}
-
-		if roles[i].ObjectMeta.Annotations == nil {
-			roles[i].ObjectMeta.Annotations = make(map[string]string)
-		}
-		for k, v := range Annotation {
-			roles[i].ObjectMeta.Annotations[k] = v
-		}
+		addDefaultMetadata(&roles[i])
 	}
 	return
 }
 
 func addClusterRoleBindingLabel(rolebindings []rbac.ClusterRoleBinding) {
 	for i := range rolebindings {
-		if rolebindings[i].ObjectMeta.Labels == nil {
-			rolebindings[i].ObjectMeta.Labels = make(map[string]string)
-		}
-		for k, v := range Label {
-			rolebindings[i].ObjectMeta.Labels[k] = v
-		}
-
-		if rolebindings[i].ObjectMeta.Annotations == nil {
-			rolebindings[i].ObjectMeta.Annotations = make(map[string]string)
-		}
-		for k, v := range Annotation {
-			rolebindings[i].ObjectMeta.Annotations[k] = v
-		}
+		addDefaultMetadata(&rolebindings[i])
 	}
 	return
 }
