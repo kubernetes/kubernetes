@@ -82,10 +82,11 @@ type RequestScope struct {
 	Serializer runtime.NegotiatedSerializer
 	runtime.ParameterCodec
 
-	Creater   runtime.ObjectCreater
-	Convertor runtime.ObjectConvertor
-	Copier    runtime.ObjectCopier
-	Typer     runtime.ObjectTyper
+	Creater         runtime.ObjectCreater
+	Convertor       runtime.ObjectConvertor
+	Copier          runtime.ObjectCopier
+	Typer           runtime.ObjectTyper
+	UnsafeConvertor runtime.ObjectConvertor
 
 	Resource    schema.GroupVersionResource
 	Kind        schema.GroupVersionKind
@@ -523,7 +524,7 @@ func PatchResource(r rest.Patcher, scope RequestScope, admit admission.Interface
 		}
 
 		result, err := patchResource(ctx, updateAdmit, timeout, versionedObj, r, name, patchType, patchJS,
-			scope.Namer, scope.Copier, scope.Typer, scope.Creater, scope.Convertor, scope.Resource, codec)
+			scope.Namer, scope.Copier, scope.Typer, scope.Creater, scope.UnsafeConvertor, scope.Resource, codec)
 		if err != nil {
 			scope.err(err, res.ResponseWriter, req.Request)
 			return
@@ -555,7 +556,7 @@ func patchResource(
 	copier runtime.ObjectCopier,
 	typer runtime.ObjectTyper,
 	creater runtime.ObjectCreater,
-	convertor runtime.ObjectConvertor,
+	unsafeConvertor runtime.ObjectConvertor,
 	resource schema.GroupVersionResource,
 	codec runtime.Codec,
 ) (runtime.Object, error) {
@@ -607,9 +608,7 @@ func patchResource(
 					return nil, err
 				}
 				gvk := gvks[0]
-				// TODO: Since <currentObject> is throwaway, we can use unsafe conversion.
-				// However, to do that, we need to pass runtime.Scheme here.
-				currentVersionedObject, err := convertor.ConvertToVersion(currentObject, gvk.GroupVersion())
+				currentVersionedObject, err := unsafeConvertor.ConvertToVersion(currentObject, gvk.GroupVersion())
 				if err != nil {
 					return nil, err
 				}
@@ -621,9 +620,18 @@ func patchResource(
 				if err != nil {
 					return nil, err
 				}
-				if err := convertor.Convert(versionedObjToUpdate, objToUpdate, nil); err != nil {
+				// Convert the object back to unversioned.
+				gvks, _, err = typer.ObjectKinds(objToUpdate)
+				if err != nil {
 					return nil, err
 				}
+				gvk = gvks[0]
+				unversionedObjToUpdate, err := unsafeConvertor.ConvertToVersion(versionedObjToUpdate, gvk.GroupVersion())
+				if err != nil {
+					return nil, err
+				}
+				objToUpdate = unversionedObjToUpdate
+				// Store unstructured representations for possible retries.
 				originalObjMap, originalPatchMap = originalMap, patchMap
 			}
 			if err := checkName(objToUpdate, name, namespace, namer); err != nil {
@@ -649,9 +657,7 @@ func patchResource(
 				return nil, err
 			}
 			gvk := gvks[0]
-			// TODO: Since <currentObject> is throwaway, we can use unsafe conversion.
-			// However, to do that, we need to pass runtime.Scheme here.
-			currentVersionedObject, err := convertor.ConvertToVersion(currentObject, gvk.GroupVersion())
+			currentVersionedObject, err := unsafeConvertor.ConvertToVersion(currentObject, gvk.GroupVersion())
 			if err != nil {
 				return nil, err
 			}
@@ -718,10 +724,18 @@ func patchResource(
 			if err := applyPatchToObject(codec, currentObjMap, originalPatchMap, versionedObjToUpdate, versionedObj); err != nil {
 				return nil, err
 			}
+			// Convert the object back to unversioned.
 			objToUpdate := patcher.New()
-			if err := convertor.Convert(versionedObjToUpdate, objToUpdate, nil); err != nil {
+			gvks, _, err = typer.ObjectKinds(objToUpdate)
+			if err != nil {
 				return nil, err
 			}
+			gvk = gvks[0]
+			unversionedObjToUpdate, err := unsafeConvertor.ConvertToVersion(versionedObjToUpdate, gvk.GroupVersion())
+			if err != nil {
+				return nil, err
+			}
+			objToUpdate = unversionedObjToUpdate
 
 			return objToUpdate, nil
 		}

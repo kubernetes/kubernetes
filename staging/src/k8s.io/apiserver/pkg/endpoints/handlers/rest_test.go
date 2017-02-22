@@ -202,7 +202,7 @@ func (tc *patchTestCase) Run(t *testing.T) {
 	copier := runtime.ObjectCopier(api.Scheme)
 	typer := runtime.ObjectTyper(api.Scheme)
 	creater := runtime.ObjectCreater(api.Scheme)
-	convertor := runtime.ObjectConvertor(api.Scheme)
+	convertor := runtime.UnsafeObjectConvertor(api.Scheme)
 	resource := schema.GroupVersionResource{Group: "", Version: "v1", Resource: "pods"}
 	versionedObj := &v1.Pod{}
 
