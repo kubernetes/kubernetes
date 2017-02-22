@@ -141,6 +141,7 @@ deserialization-cache-size
 dest-file
 disable-filter
 disable-kubenet
+disable-log-dump
 discovery-port
 dns-bind-address
 dns-port
