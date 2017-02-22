@@ -86,6 +86,8 @@ type Config struct {
 	// Server should be accessed without verifying the TLS
 	// certificate. For testing only.
 	Insecure bool
+	// ServerName is an optional override passed to the server for SNI and used to check server ceritificates against.
+	ServerName string
 
 	// UserAgent is an optional field that specifies the caller of this request.
 	UserAgent string
