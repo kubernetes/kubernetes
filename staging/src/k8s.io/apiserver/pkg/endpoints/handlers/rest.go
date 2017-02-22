@@ -607,6 +607,8 @@ func patchResource(
 					return nil, err
 				}
 				gvk := gvks[0]
+				// TODO: Since <currentObject> is throwaway, we can use unsafe conversion.
+				// However, to do that, we need to pass runtime.Scheme here.
 				currentVersionedObject, err := convertor.ConvertToVersion(currentObject, gvk.GroupVersion())
 				if err != nil {
 					return nil, err
@@ -647,6 +649,8 @@ func patchResource(
 				return nil, err
 			}
 			gvk := gvks[0]
+			// TODO: Since <currentObject> is throwaway, we can use unsafe conversion.
+			// However, to do that, we need to pass runtime.Scheme here.
 			currentVersionedObject, err := convertor.ConvertToVersion(currentObject, gvk.GroupVersion())
 			if err != nil {
 				return nil, err

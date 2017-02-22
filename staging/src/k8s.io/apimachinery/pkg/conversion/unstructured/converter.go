@@ -32,6 +32,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apimachinery/pkg/util/json"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 
 	"github.com/golang/glog"
 )
@@ -83,7 +84,7 @@ var (
 func parseBool(key string) bool {
 	value, err := strconv.ParseBool(key)
 	if err != nil {
-		glog.Errorf("Couldn't parse '%s' as bool for unstructured mismatch detection", key)
+		utilruntime.HandleError(fmt.Errorf("Couldn't parse '%s' as bool for unstructured mismatch detection", key))
 	}
 	return value
 }
