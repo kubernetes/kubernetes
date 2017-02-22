@@ -431,6 +431,8 @@ type RunContainerOptions struct {
 	DNSSearch []string
 	// The parent cgroup to pass to Docker
 	CgroupParent string
+	// The particular device path for blkio throttle.
+	BlkioDevicePath string
 	// The type of container rootfs
 	ReadOnly bool
 	// hostname for pod containers

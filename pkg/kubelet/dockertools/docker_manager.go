@@ -42,6 +42,7 @@ import (
 	"github.com/golang/glog"
 	cadvisorapi "github.com/google/cadvisor/info/v1"
 
+	"github.com/docker/engine-api/types/blkiodev"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kruntime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -661,6 +662,8 @@ func (dm *DockerManager) runContainer(
 	memoryLimit := container.Resources.Limits.Memory().Value()
 	cpuRequest := container.Resources.Requests.Cpu()
 	cpuLimit := container.Resources.Limits.Cpu()
+	storageReadIOpsLimit := container.Resources.Limits.StorageReadIOps().Value()
+	storageWriteIOpsLimit := container.Resources.Limits.StorageWriteIOps().Value()
 	var cpuShares int64
 	// If request is not specified, but limit is, we want request to default to limit.
 	// API server does this for new containers, but we repeat this logic in Kubelet
@@ -671,6 +674,13 @@ func (dm *DockerManager) runContainer(
 		// if cpuRequest.Amount is nil, then milliCPUToShares will return the minimal number
 		// of CPU shares.
 		cpuShares = cm.MilliCPUToShares(cpuRequest.MilliValue())
+	}
+
+	blkioDeviceReadIOps := []*blkiodev.ThrottleDevice{
+		{Path: opts.BlkioDevicePath, Rate: uint64(storageReadIOpsLimit)},
+	}
+	blkioDeviceWriteIOps := []*blkiodev.ThrottleDevice{
+		{Path: opts.BlkioDevicePath, Rate: uint64(storageWriteIOpsLimit)},
 	}
 
 	// Set devices for container.
@@ -734,10 +744,12 @@ func (dm *DockerManager) runContainer(
 		UsernsMode:     dockercontainer.UsernsMode(userNsMode),
 		ReadonlyRootfs: readOnlyRootFilesystem(container),
 		Resources: dockercontainer.Resources{
-			Memory:     memoryLimit,
-			MemorySwap: -1,
-			CPUShares:  cpuShares,
-			Devices:    devices,
+			Memory:               memoryLimit,
+			MemorySwap:           -1,
+			CPUShares:            cpuShares,
+			Devices:              devices,
+			BlkioDeviceReadIOps:  blkioDeviceReadIOps,
+			BlkioDeviceWriteIOps: blkioDeviceWriteIOps,
 		},
 		SecurityOpt: fmtSecurityOpts,
 	}

@@ -2597,6 +2597,76 @@ func TestValidateContainers(t *testing.T) {
 			TerminationMessagePolicy: "File",
 		},
 		{
+			Name:  "resources-test-with-storage-read-iops-with-request",
+			Image: "image",
+			Resources: api.ResourceRequirements{
+				Requests: api.ResourceList{
+					api.ResourceName(api.ResourceCPU):             resource.MustParse("10"),
+					api.ResourceName(api.ResourceMemory):          resource.MustParse("10G"),
+					api.ResourceName(api.ResourceStorageReadIOps): resource.MustParse("10"),
+				},
+				Limits: api.ResourceList{
+					api.ResourceName(api.ResourceCPU):             resource.MustParse("10"),
+					api.ResourceName(api.ResourceMemory):          resource.MustParse("10G"),
+					api.ResourceName(api.ResourceStorageReadIOps): resource.MustParse("10"),
+				},
+			},
+			ImagePullPolicy:          "IfNotPresent",
+			TerminationMessagePolicy: "File",
+		},
+		{
+			Name:  "resources-test-with-storage-read-iops-without-request",
+			Image: "image",
+			Resources: api.ResourceRequirements{
+				Requests: api.ResourceList{
+					api.ResourceName(api.ResourceCPU):    resource.MustParse("10"),
+					api.ResourceName(api.ResourceMemory): resource.MustParse("10G"),
+				},
+				Limits: api.ResourceList{
+					api.ResourceName(api.ResourceCPU):             resource.MustParse("10"),
+					api.ResourceName(api.ResourceMemory):          resource.MustParse("10G"),
+					api.ResourceName(api.ResourceStorageReadIOps): resource.MustParse("10"),
+				},
+			},
+			ImagePullPolicy:          "IfNotPresent",
+			TerminationMessagePolicy: "File",
+		},
+		{
+			Name:  "resources-test-with-storage-write-iops-with-request",
+			Image: "image",
+			Resources: api.ResourceRequirements{
+				Requests: api.ResourceList{
+					api.ResourceName(api.ResourceCPU):              resource.MustParse("10"),
+					api.ResourceName(api.ResourceMemory):           resource.MustParse("10G"),
+					api.ResourceName(api.ResourceStorageWriteIOps): resource.MustParse("10"),
+				},
+				Limits: api.ResourceList{
+					api.ResourceName(api.ResourceCPU):              resource.MustParse("10"),
+					api.ResourceName(api.ResourceMemory):           resource.MustParse("10G"),
+					api.ResourceName(api.ResourceStorageWriteIOps): resource.MustParse("10"),
+				},
+			},
+			ImagePullPolicy:          "IfNotPresent",
+			TerminationMessagePolicy: "File",
+		},
+		{
+			Name:  "resources-test-with-storage-write-iops-without-request",
+			Image: "image",
+			Resources: api.ResourceRequirements{
+				Requests: api.ResourceList{
+					api.ResourceName(api.ResourceCPU):    resource.MustParse("10"),
+					api.ResourceName(api.ResourceMemory): resource.MustParse("10G"),
+				},
+				Limits: api.ResourceList{
+					api.ResourceName(api.ResourceCPU):              resource.MustParse("10"),
+					api.ResourceName(api.ResourceMemory):           resource.MustParse("10G"),
+					api.ResourceName(api.ResourceStorageWriteIOps): resource.MustParse("10"),
+				},
+			},
+			ImagePullPolicy:          "IfNotPresent",
+			TerminationMessagePolicy: "File",
+		},
+		{
 			Name:  "resources-request-limit-simple",
 			Image: "image",
 			Resources: api.ResourceRequirements{
@@ -2881,6 +2951,46 @@ func TestValidateContainers(t *testing.T) {
 				},
 				TerminationMessagePolicy: "File",
 				ImagePullPolicy:          "IfNotPresent",
+			},
+		},
+		"Resource StorageReadIOps limit must match request": {
+			{
+				Name:  "storage-read-iops-resource-request-limit",
+				Image: "image",
+				Resources: api.ResourceRequirements{
+					Requests: api.ResourceList{
+						api.ResourceName(api.ResourceCPU):             resource.MustParse("10"),
+						api.ResourceName(api.ResourceMemory):          resource.MustParse("10G"),
+						api.ResourceName(api.ResourceStorageReadIOps): resource.MustParse("10"),
+					},
+					Limits: api.ResourceList{
+						api.ResourceName(api.ResourceCPU):             resource.MustParse("10"),
+						api.ResourceName(api.ResourceMemory):          resource.MustParse("10G"),
+						api.ResourceName(api.ResourceStorageReadIOps): resource.MustParse("20"),
+					},
+				},
+				ImagePullPolicy:          "IfNotPresent",
+				TerminationMessagePolicy: "File",
+			},
+		},
+		"Resource StorageWriteIOps limit must match request": {
+			{
+				Name:  "storage-write-iops-resource-request-limit",
+				Image: "image",
+				Resources: api.ResourceRequirements{
+					Requests: api.ResourceList{
+						api.ResourceName(api.ResourceCPU):              resource.MustParse("10"),
+						api.ResourceName(api.ResourceMemory):           resource.MustParse("10G"),
+						api.ResourceName(api.ResourceStorageWriteIOps): resource.MustParse("10"),
+					},
+					Limits: api.ResourceList{
+						api.ResourceName(api.ResourceCPU):              resource.MustParse("10"),
+						api.ResourceName(api.ResourceMemory):           resource.MustParse("10G"),
+						api.ResourceName(api.ResourceStorageWriteIOps): resource.MustParse("20"),
+					},
+				},
+				ImagePullPolicy:          "IfNotPresent",
+				TerminationMessagePolicy: "File",
 			},
 		},
 		"Request limit simple invalid": {

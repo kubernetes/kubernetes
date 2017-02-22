@@ -64,6 +64,7 @@ cert-dir
 certificate-authority
 cgroup-driver
 cgroup-root
+blkio-device-path
 cgroups-per-qos
 chaos-chance
 clean-start

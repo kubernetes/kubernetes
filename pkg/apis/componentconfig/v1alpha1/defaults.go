@@ -207,6 +207,9 @@ func SetDefaults_KubeletConfiguration(obj *KubeletConfiguration) {
 	if obj.CgroupsPerQOS == nil {
 		obj.CgroupsPerQOS = boolVar(false)
 	}
+	if obj.BlkioDevicePath == "" {
+		obj.BlkioDevicePath = "/dev/sda"
+	}
 	if obj.ContainerRuntime == "" {
 		obj.ContainerRuntime = "docker"
 	}

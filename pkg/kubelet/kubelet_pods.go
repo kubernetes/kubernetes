@@ -299,7 +299,7 @@ func (kl *Kubelet) GenerateRunContainerOptions(pod *v1.Pod, container *v1.Contai
 	var err error
 	pcm := kl.containerManager.NewPodContainerManager()
 	_, podContainerName := pcm.GetPodContainerName(pod)
-	opts := &kubecontainer.RunContainerOptions{CgroupParent: podContainerName}
+	opts := &kubecontainer.RunContainerOptions{CgroupParent: podContainerName, BlkioDevicePath: kl.blkioDevicePath}
 	hostname, hostDomainName, err := kl.GeneratePodHostNameAndDomain(pod)
 	if err != nil {
 		return nil, err
