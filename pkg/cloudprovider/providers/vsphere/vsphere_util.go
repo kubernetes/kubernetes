@@ -48,6 +48,7 @@ func getVSphereConfig() *VSphereConfig {
 	cfg.Global.Datacenter = os.Getenv("VSPHERE_DATACENTER")
 	cfg.Global.Datastore = os.Getenv("VSPHERE_DATASTORE")
 	cfg.Global.WorkingDir = os.Getenv("VSPHERE_WORKING_DIR")
+	cfg.Global.VMName = os.Getenv("VSPHERE_VM_NAME")
 	cfg.Global.InsecureFlag = false
 	if strings.ToLower(os.Getenv("VSPHERE_INSECURE")) == "true" {
 		cfg.Global.InsecureFlag = true
