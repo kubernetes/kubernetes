@@ -71,7 +71,9 @@ func TestIsConfigTransportTLS(t *testing.T) {
 		{
 			Config: &Config{
 				Host:     "1.2.3.4:567",
-				Insecure: true,
+				TLSClientConfig: TLSClientConfig{
+					Insecure: true,
+				},
 			},
 			TransportTLS: true,
 		},
