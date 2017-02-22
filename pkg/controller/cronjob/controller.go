@@ -152,6 +152,7 @@ func SyncOne(sj batch.CronJob, js []batch.Job, now time.Time, jc jobControlInter
 	updatedSJ, err := sjc.UpdateStatus(&sj)
 	if err != nil {
 		glog.Errorf("Unable to update status for %s (rv = %s): %v", nameForLog, sj.ResourceVersion, err)
+		return
 	}
 	sj = *updatedSJ
 
