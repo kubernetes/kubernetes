@@ -68,13 +68,7 @@ func main() {
 	// removes the Deps whose ImportPath contains "k8s.io/kubernetes"
 	i := 0
 	for _, dep := range g.Deps {
-		if strings.Contains(dep.ImportPath, "k8s.io/apimachinery") {
-			continue
-		}
-		if strings.Contains(dep.ImportPath, "k8s.io/kubernetes") {
-			continue
-		}
-		if strings.Contains(dep.ImportPath, "k8s.io/client-go") {
+		if strings.Contains(dep.ImportPath, "k8s.io/") {
 			continue
 		}
 		g.Deps[i] = dep
