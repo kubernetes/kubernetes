@@ -30,7 +30,7 @@ import (
 	. "github.com/onsi/ginkgo"
 )
 
-// DaemonSetUpgradeTest tests that a DaemonSet is running before, during and after
+// DaemonSetUpgradeTest tests that a DaemonSet is running before and after
 // a cluster upgrade.
 type DaemonSetUpgradeTest struct {
 	daemonSet *extensions.DaemonSet
@@ -76,29 +76,19 @@ func (t *DaemonSetUpgradeTest) Setup(f *framework.Framework) {
 	}
 
 	By("Waiting for DaemonSet pods to become ready")
-	wait.Poll(framework.Poll, framework.PodStartTimeout, func() (bool, error) {
-		res, err := checkRunningOnAllNodes(f, t.daemonSet.Namespace, t.daemonSet.Labels)
-		framework.ExpectNoError(err)
-		return res, err
+	err = wait.Poll(framework.Poll, framework.PodStartTimeout, func() (bool, error) {
+		return checkRunningOnAllNodes(f, t.daemonSet.Namespace, t.daemonSet.Labels)
 	})
+	framework.ExpectNoError(err)
 
 	By("Validating the DaemonSet after creation")
 	t.validateRunningDaemonSet(f)
 }
 
-// Test validates that the DaemonSet is running during the upgrade (if applicable) and
-// verifies again post-upgrade that it's running
+// Test waits until the upgrade has completed and then verifies that the DaemonSet
+// is still running
 func (t *DaemonSetUpgradeTest) Test(f *framework.Framework, done <-chan struct{}, upgrade UpgradeType) {
-	testDuringDisruption := upgrade == MasterUpgrade
-
-	if testDuringDisruption {
-		By("validating the DaemonSet is still running during upgrade")
-
-		wait.Until(func() {
-			t.validateRunningDaemonSet(f)
-		}, framework.Poll, done)
-	}
-
+	By("Waiting for upgradet to complete before re-validating DaemonSet")
 	<-done
 
 	By("validating the DaemonSet is still running after upgrade")
@@ -127,7 +117,6 @@ func (t *DaemonSetUpgradeTest) validateRunningDaemonSet(f *framework.Framework) 
 	}
 }
 
-// should return true if they're running, false if not, and an error if something unexpected happens
 func checkRunningOnAllNodes(f *framework.Framework, namespace string, selector map[string]string) (bool, error) {
 	nodeList, err := f.ClientSet.Core().Nodes().List(metav1.ListOptions{})
 	if err != nil {
@@ -175,11 +164,7 @@ func checkDaemonPodOnNodes(f *framework.Framework, namespace string, labelSet ma
 	// Ensure that sizes of the lists are the same. We've verified that every element of nodeNames is in
 	// nodesToPodCount, so verifying the lengths are equal ensures that there aren't pods running on any
 	// other nodes.
-	if len(nodesToPodCount) == len(nodeNames) {
-		return true, nil
-	}
-
-	return false, nil
+	return len(nodesToPodCount) == len(nodeNames), nil
 }
 
 func checkDaemonStatus(f *framework.Framework, namespace string, dsName string) (bool, error) {
