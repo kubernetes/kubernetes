@@ -26,28 +26,38 @@ import (
 	restclient "k8s.io/client-go/rest"
 )
 
+// loopbackBindAddress determines the address to query when constructing a
+// loopback REST client.
+func loopbackBindAddress(bindAddress string) string {
+	host, port, err := net.SplitHostPort(bindAddress)
+	if err != nil {
+		// should never happen
+		return nil, fmt.Errorf("invalid bind address: %q", bindAddress)
+	}
+	// Value is assumed to be an actual IP or DNS name, not "0.0.0.0". Default
+	// to "localhost".
+	if host == "0.0.0.0" {
+		host = "localhost"
+	}
+	return net.JoinHostPort(host, port), nil
+}
+
 func (s *SecureServingInfo) NewSelfClientConfig(token string) (*restclient.Config, error) {
 	if s == nil || (s.Cert == nil && len(s.SNICerts) == 0) {
 		return nil, nil
 	}
 
-	host, port, err := net.SplitHostPort(s.ServingInfo.BindAddress)
+	bindAddr, err := loopbackBindAddress(s.ServingInfo.BindAddress)
 	if err != nil {
-		// should never happen
-		return nil, fmt.Errorf("invalid secure bind address: %q", s.ServingInfo.BindAddress)
+		return nil, err
 	}
-	if host == "0.0.0.0" {
-		// compare MaybeDefaultWithSelfSignedCerts which adds "localhost" to the cert as alternateDNS
-		host = "localhost"
-	}
-
 	clientConfig := &restclient.Config{
 		// Increase QPS limits. The client is currently passed to all admission plugins,
 		// and those can be throttled in case of higher load on apiserver - see #22340 and #22422
 		// for more details. Once #22422 is fixed, we may want to remove it.
 		QPS:         50,
 		Burst:       100,
-		Host:        "https://" + net.JoinHostPort(host, port),
+		Host:        "https://" + bindAddr,
 		BearerToken: token,
 	}
 
@@ -144,8 +154,13 @@ func (s *ServingInfo) NewSelfClientConfig(token string) (*restclient.Config, err
 	if s == nil {
 		return nil, nil
 	}
+	bindAddr, err := s.loopbackBindAddress(s.BindAddress)
+	if err != nil {
+		return nil, err
+	}
+
 	return &restclient.Config{
-		Host: s.BindAddress,
+		Host: "http://" + bindAddr,
 		// Increase QPS limits. The client is currently passed to all admission plugins,
 		// and those can be throttled in case of higher load on apiserver - see #22340 and #22422
 		// for more details. Once #22422 is fixed, we may want to remove it.
