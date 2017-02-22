@@ -25,6 +25,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/batch"
 	batchapiv1 "k8s.io/kubernetes/pkg/apis/batch/v1"
+	batchapiv1beta1 "k8s.io/kubernetes/pkg/apis/batch/v1beta1"
 	batchapiv2alpha1 "k8s.io/kubernetes/pkg/apis/batch/v2alpha1"
 	cronjobstore "k8s.io/kubernetes/pkg/registry/batch/cronjob/storage"
 	jobstore "k8s.io/kubernetes/pkg/registry/batch/job/storage"
@@ -42,6 +43,11 @@ func (p RESTStorageProvider) NewRESTStorage(apiResourceConfigSource serverstorag
 			"scheduledjobs":        batchapiv2alpha1.SchemeGroupVersion.WithKind("ScheduledJob"),
 			"scheduledjobs/status": batchapiv2alpha1.SchemeGroupVersion.WithKind("ScheduledJob"),
 		}
+	}
+
+	if apiResourceConfigSource.AnyResourcesForVersionEnabled(batchapiv1beta1.SchemeGroupVersion) {
+		apiGroupInfo.VersionedResourcesStorageMap[batchapiv1beta1.SchemeGroupVersion.Version] = p.v1beta1Storage(apiResourceConfigSource, restOptionsGetter)
+		apiGroupInfo.GroupMeta.GroupVersion = batchapiv1beta1.SchemeGroupVersion
 	}
 	if apiResourceConfigSource.AnyResourcesForVersionEnabled(batchapiv1.SchemeGroupVersion) {
 		apiGroupInfo.VersionedResourcesStorageMap[batchapiv1.SchemeGroupVersion.Version] = p.v1Storage(apiResourceConfigSource, restOptionsGetter)
@@ -73,6 +79,18 @@ func (p RESTStorageProvider) v2alpha1Storage(apiResourceConfigSource serverstora
 		storage["cronjobs/status"] = cronJobsStatusStorage
 		storage["scheduledjobs"] = cronJobsStorage
 		storage["scheduledjobs/status"] = cronJobsStatusStorage
+	}
+	return storage
+}
+
+func (p RESTStorageProvider) v1beta1Storage(apiResourceConfigSource serverstorage.APIResourceConfigSource, restOptionsGetter generic.RESTOptionsGetter) map[string]rest.Storage {
+	version := batchapiv1beta1.SchemeGroupVersion
+
+	storage := map[string]rest.Storage{}
+	if apiResourceConfigSource.ResourceEnabled(version.WithResource("cronjobs")) {
+		cronJobsStorage, cronJobsStatusStorage := cronjobstore.NewREST(restOptionsGetter)
+		storage["cronjobs"] = cronJobsStorage
+		storage["cronjobs/status"] = cronJobsStatusStorage
 	}
 	return storage
 }

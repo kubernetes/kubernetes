@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors.
+Copyright 2017 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package v2alpha1_test
+package v1beta1_test
 
 import (
 	"reflect"
@@ -70,7 +70,7 @@ func TestSetDefaultCronJob(t *testing.T) {
 			t.Errorf("%s: got different concurrencyPolicy than expected: %v %v", name, actual.Spec.ConcurrencyPolicy, expected.Spec.ConcurrencyPolicy)
 		}
 		if *actual.Spec.Suspend != *expected.Spec.Suspend {
-			t.Errorf("%s: got different suspend than expected: %v %v", name, *actual.Spec.Suspend, *expected.Spec.Suspend)
+			t.Errorf("%s: got different suspend than expected: %d %d", name, *actual.Spec.Suspend, *expected.Spec.Suspend)
 		}
 	}
 }
