@@ -362,7 +362,7 @@ func StartControllers(controllers map[string]InitFunc, s *options.CMServer, root
 
 	// always start the SA token controller first using a full-power client, since it needs to mint tokens for the rest
 	if len(s.ServiceAccountKeyFile) > 0 && IsControllerEnabled(saTokenControllerName, ControllersDisabledByDefault, s.Controllers...) {
-		privateKey, err := serviceaccount.ReadPrivateKey(s.ServiceAccountKeyFile)
+		privateKey, err := certutil.ReadPrivateKeyFromFile(s.ServiceAccountKeyFile)
 		if err != nil {
 			return fmt.Errorf("error reading key for service account token controller: %v", err)
 		} else {

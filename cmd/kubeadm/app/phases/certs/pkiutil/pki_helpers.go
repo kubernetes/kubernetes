@@ -176,7 +176,7 @@ func TryLoadKeyFromDisk(pkiPath, name string) (*rsa.PrivateKey, error) {
 	privateKeyPath := pathForKey(pkiPath, name)
 
 	// Parse the private key from a file
-	privKey, err := certutil.PrivateKeyFromFile(privateKeyPath)
+	privKey, err := certutil.ReadPrivateKeyFromFile(privateKeyPath)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't load the private key file %s: %v", privateKeyPath, err)
 	}
