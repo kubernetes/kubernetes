@@ -30,6 +30,7 @@ func TestEmptyMetadataProducer(t *testing.T) {
 			{},
 		},
 	}
+
 	tests := []struct {
 		pod    *v1.Pod
 		labels map[string]string
@@ -42,10 +43,6 @@ func TestEmptyMetadataProducer(t *testing.T) {
 		},
 	}
 
-	//node := v1.Node{ObjectMeta: metav1.ObjectMeta{Labels: test.labels}}
-	//nodeInfo := schedulercache.NewNodeInfo()
-	//nodeInfo.SetNode(&node)
-
 	for _, test := range tests {
 		nodeNameToInfo := map[string]*schedulercache.NodeInfo{
 			"3": schedulercache.NewNodeInfo(),
@@ -55,7 +52,6 @@ func TestEmptyMetadataProducer(t *testing.T) {
 		shouldBeNil := EmptyMetadataProducer(test.pod, nodeNameToInfo)
 		if shouldBeNil != nil {
 			t.Errorf("failed to produce empty metadata")
-			return
 		}
 	}
 }

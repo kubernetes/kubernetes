@@ -37,9 +37,7 @@ go_test(
     tags = ["automanaged"],
     deps = [
         "//pkg/api/v1:go_default_library",
-        "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1"
-	    "//vendor:k8s.io/kubernetes/pkg/api/v1"
-	    "//vendor:k8s.io/kubernetes/plugin/pkg/scheduler/schedulercache"
+	    "//vendor:k8s.io/kubernetes/plugin/pkg/scheduler/schedulercache",
     ],
 )
 
