@@ -185,7 +185,10 @@ def idle_status():
     if not all_kube_system_pods_running():
         hookenv.status_set('waiting', 'Waiting for kube-system pods to start')
     elif hookenv.config('service-cidr') != service_cidr():
-        hookenv.status_set('active', 'WARN: cannot change service-cidr, still using ' + service_cidr())
+        msg = "Cannot change {0} to {1}".format(service_cidr(),
+                                                hookenv.config('service-cidr'))
+        hookenv.log(msg, level=hookenv.WARN)
+        hookenv.status_set('active', msg)
     else:
         hookenv.status_set('active', 'Kubernetes master running.')
 
@@ -302,7 +305,7 @@ def start_kube_dns():
 
     context = {
         'arch': arch(),
-        # The dictionary named 'pillar' is a construct of the k8s template files.
+        # The dictionary named pillar is a construct of the k8s template files.
         'pillar': {
             'dns_server': get_dns_ip(),
             'dns_replicas': 1,

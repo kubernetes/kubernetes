@@ -40,6 +40,10 @@ cluster/gce/trusty/configure-helper.sh:    sed -i -e "s@{{ *pillar\.get('storage
 cluster/gce/trusty/configure-helper.sh:  sed -i -e "s@{{pillar\['allow_privileged'\]}}@true@g" "${src_file}"
 cluster/gce/util.sh:    local node_ip=$(gcloud compute instances describe --project "${PROJECT}" --zone "${ZONE}" \
 cluster/juju/layers/kubernetes-master/reactive/kubernetes_master.py:            context['pillar'] = {'num_nodes': get_node_count()}
+cluster/juju/layers/kubernetes-master/reactive/kubernetes_master.py:    db.set('kubernetes-master.service-cidr', service_cidr())
+cluster/juju/layers/kubernetes-master/reactive/kubernetes_master.py:    api_opts.add('--service-cluster-ip-range', service_cidr())
+cluster/juju/layers/kubernetes-master/reactive/kubernetes_master.py:    elif hookenv.config('service-cidr') != service_cidr():
+cluster/juju/layers/kubernetes-master/reactive/kubernetes_master.py:        msg = "Cannot change {0} to {1}".format(service_cidr(),
 cluster/juju/layers/kubernetes-master/reactive/kubernetes_master.py:    cluster_dns.set_dns_info(53, hookenv.config('dns_domain'), dns_ip)
 cluster/juju/layers/kubernetes-master/reactive/kubernetes_master.py:    ip = service_cidr().split('/')[0]
 cluster/juju/layers/kubernetes-master/reactive/kubernetes_master.py:    ip = service_cidr().split('/')[0]
