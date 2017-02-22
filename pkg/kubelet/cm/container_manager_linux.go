@@ -220,6 +220,7 @@ func NewContainerManager(mountUtil mount.Interface, cadvisorInterface cadvisor.I
 		if !cgroupManager.Exists(CgroupName(nodeConfig.CgroupRoot)) {
 			return nil, fmt.Errorf("invalid configuration: cgroup-root doesn't exist: %v", err)
 		}
+		glog.Infof("container manager verified cgroup-root exists: %v", nodeConfig.CgroupRoot)
 	}
 	return &containerManagerImpl{
 		cadvisorInterface: cadvisorInterface,
