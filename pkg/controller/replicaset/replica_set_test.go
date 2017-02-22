@@ -60,7 +60,6 @@ func testNewReplicaSetControllerFromClient(client clientset.Interface, stopCh ch
 		client,
 		burstReplicas,
 		lookupCacheSize,
-		false,
 	)
 
 	ret.podListerSynced = alwaysReady
@@ -532,7 +531,6 @@ func TestWatchControllers(t *testing.T) {
 		client,
 		BurstReplicas,
 		0,
-		false,
 	)
 	informers.Start(stopCh)
 
@@ -1134,13 +1132,11 @@ func TestDeletionTimestamp(t *testing.T) {
 	}
 }
 
-// setupManagerWithGCEnabled creates a RS manager with a fakePodControl
-// and with garbageCollectorEnabled set to true
-func setupManagerWithGCEnabled(stopCh chan struct{}, objs ...runtime.Object) (manager *ReplicaSetController, fakePodControl *controller.FakePodControl, informers informers.SharedInformerFactory) {
+// setupManager creates a RS manager with a fakePodControl.
+func setupManager(stopCh chan struct{}, objs ...runtime.Object) (manager *ReplicaSetController, fakePodControl *controller.FakePodControl, informers informers.SharedInformerFactory) {
 	c := fakeclientset.NewSimpleClientset(objs...)
 	fakePodControl = &controller.FakePodControl{}
 	manager, informers = testNewReplicaSetControllerFromClient(c, stopCh, BurstReplicas, 0)
-	manager.garbageCollectorEnabled = true
 
 	manager.podControl = fakePodControl
 	return manager, fakePodControl, informers
@@ -1151,7 +1147,7 @@ func TestDoNotPatchPodWithOtherControlRef(t *testing.T) {
 	rs := newReplicaSet(2, labelMap)
 	stopCh := make(chan struct{})
 	defer close(stopCh)
-	manager, fakePodControl, informers := setupManagerWithGCEnabled(stopCh, rs)
+	manager, fakePodControl, informers := setupManager(stopCh, rs)
 	informers.Extensions().V1beta1().ReplicaSets().Informer().GetIndexer().Add(rs)
 	var trueVar = true
 	otherControllerReference := metav1.OwnerReference{UID: uuid.NewUUID(), APIVersion: "v1beta1", Kind: "ReplicaSet", Name: "AnotherRS", Controller: &trueVar}
@@ -1172,7 +1168,7 @@ func TestPatchPodWithOtherOwnerRef(t *testing.T) {
 	rs := newReplicaSet(2, labelMap)
 	stopCh := make(chan struct{})
 	defer close(stopCh)
-	manager, fakePodControl, informers := setupManagerWithGCEnabled(stopCh, rs)
+	manager, fakePodControl, informers := setupManager(stopCh, rs)
 	informers.Extensions().V1beta1().ReplicaSets().Informer().GetIndexer().Add(rs)
 	// add to podLister one more matching pod that doesn't have a controller
 	// ref, but has an owner ref pointing to other object. Expect a patch to
@@ -1195,7 +1191,7 @@ func TestPatchPodWithCorrectOwnerRef(t *testing.T) {
 	rs := newReplicaSet(2, labelMap)
 	stopCh := make(chan struct{})
 	defer close(stopCh)
-	manager, fakePodControl, informers := setupManagerWithGCEnabled(stopCh, rs)
+	manager, fakePodControl, informers := setupManager(stopCh, rs)
 	informers.Extensions().V1beta1().ReplicaSets().Informer().GetIndexer().Add(rs)
 	// add to podLister a matching pod that has an ownerRef pointing to the rs,
 	// but ownerRef.Controller is false. Expect a patch to take control it.
@@ -1217,7 +1213,7 @@ func TestPatchPodFails(t *testing.T) {
 	rs := newReplicaSet(2, labelMap)
 	stopCh := make(chan struct{})
 	defer close(stopCh)
-	manager, fakePodControl, informers := setupManagerWithGCEnabled(stopCh, rs)
+	manager, fakePodControl, informers := setupManager(stopCh, rs)
 	informers.Extensions().V1beta1().ReplicaSets().Informer().GetIndexer().Add(rs)
 	// add to podLister two matching pods. Expect two patches to take control
 	// them.
@@ -1245,7 +1241,7 @@ func TestPatchExtraPodsThenDelete(t *testing.T) {
 	rs := newReplicaSet(2, labelMap)
 	stopCh := make(chan struct{})
 	defer close(stopCh)
-	manager, fakePodControl, informers := setupManagerWithGCEnabled(stopCh, rs)
+	manager, fakePodControl, informers := setupManager(stopCh, rs)
 	informers.Extensions().V1beta1().ReplicaSets().Informer().GetIndexer().Add(rs)
 	// add to podLister three matching pods. Expect three patches to take control
 	// them, and later delete one of them.
@@ -1265,7 +1261,7 @@ func TestUpdateLabelsRemoveControllerRef(t *testing.T) {
 	rs := newReplicaSet(2, labelMap)
 	stopCh := make(chan struct{})
 	defer close(stopCh)
-	manager, fakePodControl, informers := setupManagerWithGCEnabled(stopCh, rs)
+	manager, fakePodControl, informers := setupManager(stopCh, rs)
 	informers.Extensions().V1beta1().ReplicaSets().Informer().GetIndexer().Add(rs)
 	// put one pod in the podLister
 	pod := newPod("pod", rs, v1.PodRunning, nil)
@@ -1306,7 +1302,7 @@ func TestUpdateSelectorControllerRef(t *testing.T) {
 	rs := newReplicaSet(2, labelMap)
 	stopCh := make(chan struct{})
 	defer close(stopCh)
-	manager, fakePodControl, informers := setupManagerWithGCEnabled(stopCh, rs)
+	manager, fakePodControl, informers := setupManager(stopCh, rs)
 	// put 2 pods in the podLister
 	newPodList(informers.Core().V1().Pods().Informer().GetIndexer(), 2, v1.PodRunning, labelMap, rs, "pod")
 	// update the RS so that its selector no longer matches the pods
@@ -1342,7 +1338,7 @@ func TestDoNotAdoptOrCreateIfBeingDeleted(t *testing.T) {
 	rs := newReplicaSet(2, labelMap)
 	stopCh := make(chan struct{})
 	defer close(stopCh)
-	manager, fakePodControl, informers := setupManagerWithGCEnabled(stopCh, rs)
+	manager, fakePodControl, informers := setupManager(stopCh, rs)
 	now := metav1.Now()
 	rs.DeletionTimestamp = &now
 	informers.Extensions().V1beta1().ReplicaSets().Informer().GetIndexer().Add(rs)
@@ -1447,7 +1443,8 @@ func TestAvailableReplicas(t *testing.T) {
 
 	decRs := runtime.EncodeOrDie(testapi.Extensions.Codec(), rs)
 	fakeHandler.ValidateRequest(t, testapi.Extensions.ResourcePath(replicaSetResourceName(), rs.Namespace, rs.Name)+"/status", "PUT", &decRs)
-	validateSyncReplicaSet(t, &fakePodControl, 0, 0, 0)
+	// Expect 2 patches for pods being adopted.
+	validateSyncReplicaSet(t, &fakePodControl, 0, 0, 2)
 }
 
 var (

@@ -93,7 +93,6 @@ func TestQuota(t *testing.T) {
 		clientset,
 		replicationcontroller.BurstReplicas,
 		4096,
-		false,
 	)
 	rm.SetEventRecorder(&record.FakeRecorder{})
 	go rm.Run(3, controllerCh)
