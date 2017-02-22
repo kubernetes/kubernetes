@@ -18,7 +18,9 @@ package util
 
 import (
 	"fmt"
+	"math/rand"
 	"reflect"
+	"strconv"
 	"testing"
 	"time"
 
@@ -27,6 +29,7 @@ import (
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	core "k8s.io/client-go/testing"
 	"k8s.io/kubernetes/pkg/api"
@@ -161,6 +164,7 @@ func generateRS(deployment extensions.Deployment) extensions.ReplicaSet {
 	template := GetNewReplicaSetTemplate(&deployment)
 	return extensions.ReplicaSet{
 		ObjectMeta: metav1.ObjectMeta{
+			UID:    randomUID(),
 			Name:   v1.SimpleNameGenerator.GenerateName("replicaset"),
 			Labels: template.Labels,
 		},
@@ -170,6 +174,10 @@ func generateRS(deployment extensions.Deployment) extensions.ReplicaSet {
 			Selector: &metav1.LabelSelector{MatchLabels: template.Labels},
 		},
 	}
+}
+
+func randomUID() types.UID {
+	return types.UID(strconv.FormatInt(rand.Int63(), 10))
 }
 
 // generateDeployment creates a deployment, with the input image as its template
@@ -466,9 +474,18 @@ func TestEqualIgnoreHash(t *testing.T) {
 }
 
 func TestFindNewReplicaSet(t *testing.T) {
+	now := metav1.Now()
+	later := metav1.Time{Time: now.Add(time.Minute)}
+
 	deployment := generateDeployment("nginx")
 	newRS := generateRS(deployment)
-	newRS.Labels[extensions.DefaultDeploymentUniqueLabelKey] = "different-hash"
+	newRS.Labels[extensions.DefaultDeploymentUniqueLabelKey] = "hash"
+	newRS.CreationTimestamp = later
+
+	newRSDup := generateRS(deployment)
+	newRSDup.Labels[extensions.DefaultDeploymentUniqueLabelKey] = "different-hash"
+	newRSDup.CreationTimestamp = now
+
 	oldDeployment := generateDeployment("nginx")
 	oldDeployment.Spec.Template.Spec.Containers[0].Name = "nginx-old-1"
 	oldRS := generateRS(oldDeployment)
@@ -481,10 +498,16 @@ func TestFindNewReplicaSet(t *testing.T) {
 		expected   *extensions.ReplicaSet
 	}{
 		{
-			test:       "Get new ReplicaSet with the same spec but different pod-template-hash value",
+			test:       "Get new ReplicaSet with the same template as Deployment spec but different pod-template-hash value",
 			deployment: deployment,
 			rsList:     []*extensions.ReplicaSet{&newRS, &oldRS},
 			expected:   &newRS,
+		},
+		{
+			test:       "Get the oldest new ReplicaSet when there are more than one ReplicaSet with the same template",
+			deployment: deployment,
+			rsList:     []*extensions.ReplicaSet{&newRS, &oldRS, &newRSDup},
+			expected:   &newRSDup,
 		},
 		{
 			test:       "Get nil new ReplicaSet",
@@ -502,13 +525,23 @@ func TestFindNewReplicaSet(t *testing.T) {
 }
 
 func TestFindOldReplicaSets(t *testing.T) {
+	now := metav1.Now()
+	later := metav1.Time{Time: now.Add(time.Minute)}
+
 	deployment := generateDeployment("nginx")
 	newRS := generateRS(deployment)
-	newRS.Labels[extensions.DefaultDeploymentUniqueLabelKey] = "different-hash"
+	newRS.Labels[extensions.DefaultDeploymentUniqueLabelKey] = "hash"
+	newRS.CreationTimestamp = later
+
+	newRSDup := generateRS(deployment)
+	newRSDup.Labels[extensions.DefaultDeploymentUniqueLabelKey] = "different-hash"
+	newRSDup.CreationTimestamp = now
+
 	oldDeployment := generateDeployment("nginx")
 	oldDeployment.Spec.Template.Spec.Containers[0].Name = "nginx-old-1"
 	oldRS := generateRS(oldDeployment)
 	oldRS.Status.FullyLabeledReplicas = *(oldRS.Spec.Replicas)
+
 	newPod := generatePodFromRS(newRS)
 	oldPod := generatePodFromRS(oldRS)
 
@@ -541,6 +574,18 @@ func TestFindOldReplicaSets(t *testing.T) {
 				},
 			},
 			expected: []*extensions.ReplicaSet{&oldRS},
+		},
+		{
+			test:       "Get old ReplicaSets with two new ReplicaSets, only the oldest new ReplicaSet is seen as new ReplicaSet",
+			deployment: deployment,
+			rsList:     []*extensions.ReplicaSet{&oldRS, &newRS, &newRSDup},
+			podList: &v1.PodList{
+				Items: []v1.Pod{
+					newPod,
+					oldPod,
+				},
+			},
+			expected: []*extensions.ReplicaSet{&oldRS, &newRS},
 		},
 		{
 			test:       "Get empty old ReplicaSets",
