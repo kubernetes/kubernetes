@@ -27,18 +27,18 @@ type detacherDefaults flexVolumeDetacher
 
 // Detach is part of the volume.Detacher interface.
 func (d *detacherDefaults) Detach(deviceName string, hostName types.NodeName) error {
-	glog.Warning(logPrefix(d.plugin), "using default Detach for device ", deviceName, ", host ", hostName)
+	glog.V(5).Infof(logPrefix(d.plugin), "using default Detach for device ", deviceName, ", host ", hostName)
 	return nil
 }
 
 // WaitForDetach is part of the volume.Detacher interface.
 func (d *detacherDefaults) WaitForDetach(devicePath string, timeout time.Duration) error {
-	glog.Warning(logPrefix(d.plugin), "using default WaitForDetach for device ", devicePath)
+	glog.V(5).Infof(logPrefix(d.plugin), "using default WaitForDetach for device ", devicePath)
 	return nil
 }
 
 // UnmountDevice is part of the volume.Detacher interface.
 func (d *detacherDefaults) UnmountDevice(deviceMountPath string) error {
-	glog.Warning(logPrefix(d.plugin), "using default UnmountDevice for device mount path ", deviceMountPath)
+	glog.V(5).Infof(logPrefix(d.plugin), "using default UnmountDevice for device mount path ", deviceMountPath)
 	return doUnmount(d.plugin.host.GetMounter(), deviceMountPath)
 }
