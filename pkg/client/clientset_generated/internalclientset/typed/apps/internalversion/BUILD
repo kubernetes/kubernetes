@@ -13,6 +13,7 @@ go_library(
         "apps_client.go",
         "doc.go",
         "generated_expansion.go",
+        "podinjectionpolicy.go",
         "statefulset.go",
     ],
     tags = ["automanaged"],

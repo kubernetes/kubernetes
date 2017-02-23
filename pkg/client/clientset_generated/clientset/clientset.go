@@ -21,6 +21,7 @@ import (
 	discovery "k8s.io/client-go/discovery"
 	rest "k8s.io/client-go/rest"
 	"k8s.io/client-go/util/flowcontrol"
+	v1alpha1apps "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/apps/v1alpha1"
 	v1beta1apps "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/apps/v1beta1"
 	v1authentication "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/authentication/v1"
 	v1beta1authentication "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/authentication/v1beta1"
@@ -44,6 +45,8 @@ type Interface interface {
 	CoreV1() v1core.CoreV1Interface
 	// Deprecated: please explicitly pick a version if possible.
 	Core() v1core.CoreV1Interface
+	AppsV1alpha1() v1alpha1apps.AppsV1alpha1Interface
+
 	AppsV1beta1() v1beta1apps.AppsV1beta1Interface
 	// Deprecated: please explicitly pick a version if possible.
 	Apps() v1beta1apps.AppsV1beta1Interface
@@ -91,6 +94,7 @@ type Interface interface {
 type Clientset struct {
 	*discovery.DiscoveryClient
 	*v1core.CoreV1Client
+	*v1alpha1apps.AppsV1alpha1Client
 	*v1beta1apps.AppsV1beta1Client
 	*v1authentication.AuthenticationV1Client
 	*v1beta1authentication.AuthenticationV1beta1Client
@@ -123,6 +127,14 @@ func (c *Clientset) Core() v1core.CoreV1Interface {
 		return nil
 	}
 	return c.CoreV1Client
+}
+
+// AppsV1alpha1 retrieves the AppsV1alpha1Client
+func (c *Clientset) AppsV1alpha1() v1alpha1apps.AppsV1alpha1Interface {
+	if c == nil {
+		return nil
+	}
+	return c.AppsV1alpha1Client
 }
 
 // AppsV1beta1 retrieves the AppsV1beta1Client
@@ -355,6 +367,10 @@ func NewForConfig(c *rest.Config) (*Clientset, error) {
 	if err != nil {
 		return nil, err
 	}
+	cs.AppsV1alpha1Client, err = v1alpha1apps.NewForConfig(&configShallowCopy)
+	if err != nil {
+		return nil, err
+	}
 	cs.AppsV1beta1Client, err = v1beta1apps.NewForConfig(&configShallowCopy)
 	if err != nil {
 		return nil, err
@@ -429,6 +445,7 @@ func NewForConfig(c *rest.Config) (*Clientset, error) {
 func NewForConfigOrDie(c *rest.Config) *Clientset {
 	var cs Clientset
 	cs.CoreV1Client = v1core.NewForConfigOrDie(c)
+	cs.AppsV1alpha1Client = v1alpha1apps.NewForConfigOrDie(c)
 	cs.AppsV1beta1Client = v1beta1apps.NewForConfigOrDie(c)
 	cs.AuthenticationV1Client = v1authentication.NewForConfigOrDie(c)
 	cs.AuthenticationV1beta1Client = v1beta1authentication.NewForConfigOrDie(c)
@@ -453,6 +470,7 @@ func NewForConfigOrDie(c *rest.Config) *Clientset {
 func New(c rest.Interface) *Clientset {
 	var cs Clientset
 	cs.CoreV1Client = v1core.New(c)
+	cs.AppsV1alpha1Client = v1alpha1apps.New(c)
 	cs.AppsV1beta1Client = v1beta1apps.New(c)
 	cs.AuthenticationV1Client = v1authentication.New(c)
 	cs.AuthenticationV1beta1Client = v1beta1authentication.New(c)

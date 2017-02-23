@@ -28,6 +28,7 @@ go_library(
         "//pkg/apis/policy/install:go_default_library",
         "//pkg/apis/rbac/install:go_default_library",
         "//pkg/apis/storage/install:go_default_library",
+        "//pkg/client/clientset_generated/clientset/typed/apps/v1alpha1:go_default_library",
         "//pkg/client/clientset_generated/clientset/typed/apps/v1beta1:go_default_library",
         "//pkg/client/clientset_generated/clientset/typed/authentication/v1:go_default_library",
         "//pkg/client/clientset_generated/clientset/typed/authentication/v1beta1:go_default_library",
@@ -63,6 +64,7 @@ filegroup(
     srcs = [
         ":package-srcs",
         "//pkg/client/clientset_generated/clientset/fake:all-srcs",
+        "//pkg/client/clientset_generated/clientset/typed/apps/v1alpha1:all-srcs",
         "//pkg/client/clientset_generated/clientset/typed/apps/v1beta1:all-srcs",
         "//pkg/client/clientset_generated/clientset/typed/authentication/v1:all-srcs",
         "//pkg/client/clientset_generated/clientset/typed/authentication/v1beta1:all-srcs",

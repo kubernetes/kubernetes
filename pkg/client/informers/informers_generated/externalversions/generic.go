@@ -23,6 +23,7 @@ import (
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	cache "k8s.io/client-go/tools/cache"
 	api_v1 "k8s.io/kubernetes/pkg/api/v1"
+	v1alpha1 "k8s.io/kubernetes/pkg/apis/apps/v1alpha1"
 	v1beta1 "k8s.io/kubernetes/pkg/apis/apps/v1beta1"
 	v1 "k8s.io/kubernetes/pkg/apis/autoscaling/v1"
 	v2alpha1 "k8s.io/kubernetes/pkg/apis/autoscaling/v2alpha1"
@@ -31,7 +32,7 @@ import (
 	certificates_v1beta1 "k8s.io/kubernetes/pkg/apis/certificates/v1beta1"
 	extensions_v1beta1 "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	policy_v1beta1 "k8s.io/kubernetes/pkg/apis/policy/v1beta1"
-	v1alpha1 "k8s.io/kubernetes/pkg/apis/rbac/v1alpha1"
+	rbac_v1alpha1 "k8s.io/kubernetes/pkg/apis/rbac/v1alpha1"
 	rbac_v1beta1 "k8s.io/kubernetes/pkg/apis/rbac/v1beta1"
 	storage_v1beta1 "k8s.io/kubernetes/pkg/apis/storage/v1beta1"
 )
@@ -62,7 +63,11 @@ func (f *genericInformer) Lister() cache.GenericLister {
 // TODO extend this to unknown resources with a client pool
 func (f *sharedInformerFactory) ForResource(resource schema.GroupVersionResource) (GenericInformer, error) {
 	switch resource {
-	// Group=Apps, Version=V1beta1
+	// Group=Apps, Version=V1alpha1
+	case v1alpha1.SchemeGroupVersion.WithResource("podinjectionpolicies"):
+		return &genericInformer{resource: resource.GroupResource(), informer: f.Apps().V1alpha1().PodInjectionPolicies().Informer()}, nil
+
+		// Group=Apps, Version=V1beta1
 	case v1beta1.SchemeGroupVersion.WithResource("statefulsets"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Apps().V1beta1().StatefulSets().Informer()}, nil
 
@@ -141,13 +146,13 @@ func (f *sharedInformerFactory) ForResource(resource schema.GroupVersionResource
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Policy().V1beta1().PodDisruptionBudgets().Informer()}, nil
 
 		// Group=Rbac, Version=V1alpha1
-	case v1alpha1.SchemeGroupVersion.WithResource("clusterroles"):
+	case rbac_v1alpha1.SchemeGroupVersion.WithResource("clusterroles"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Rbac().V1alpha1().ClusterRoles().Informer()}, nil
-	case v1alpha1.SchemeGroupVersion.WithResource("clusterrolebindings"):
+	case rbac_v1alpha1.SchemeGroupVersion.WithResource("clusterrolebindings"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Rbac().V1alpha1().ClusterRoleBindings().Informer()}, nil
-	case v1alpha1.SchemeGroupVersion.WithResource("roles"):
+	case rbac_v1alpha1.SchemeGroupVersion.WithResource("roles"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Rbac().V1alpha1().Roles().Informer()}, nil
-	case v1alpha1.SchemeGroupVersion.WithResource("rolebindings"):
+	case rbac_v1alpha1.SchemeGroupVersion.WithResource("rolebindings"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Rbac().V1alpha1().RoleBindings().Informer()}, nil
 
 		// Group=Rbac, Version=V1beta1

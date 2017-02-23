@@ -12,6 +12,7 @@ go_library(
     srcs = [
         "doc.go",
         "fake_apps_client.go",
+        "fake_podinjectionpolicy.go",
         "fake_statefulset.go",
     ],
     tags = ["automanaged"],

@@ -19,24 +19,20 @@ package fake
 import (
 	rest "k8s.io/client-go/rest"
 	testing "k8s.io/client-go/testing"
-	internalversion "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/apps/internalversion"
+	v1alpha1 "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/apps/v1alpha1"
 )
 
-type FakeApps struct {
+type FakeAppsV1alpha1 struct {
 	*testing.Fake
 }
 
-func (c *FakeApps) PodInjectionPolicies(namespace string) internalversion.PodInjectionPolicyInterface {
+func (c *FakeAppsV1alpha1) PodInjectionPolicies(namespace string) v1alpha1.PodInjectionPolicyInterface {
 	return &FakePodInjectionPolicies{c, namespace}
-}
-
-func (c *FakeApps) StatefulSets(namespace string) internalversion.StatefulSetInterface {
-	return &FakeStatefulSets{c, namespace}
 }
 
 // RESTClient returns a RESTClient that is used to communicate
 // with API server by this client implementation.
-func (c *FakeApps) RESTClient() rest.Interface {
+func (c *FakeAppsV1alpha1) RESTClient() rest.Interface {
 	var ret *rest.RESTClient
 	return ret
 }

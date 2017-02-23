@@ -24,6 +24,8 @@ import (
 	"k8s.io/client-go/testing"
 	"k8s.io/kubernetes/pkg/api"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
+	v1alpha1apps "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/apps/v1alpha1"
+	fakev1alpha1apps "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/apps/v1alpha1/fake"
 	v1beta1apps "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/apps/v1beta1"
 	fakev1beta1apps "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/apps/v1beta1/fake"
 	v1authentication "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/authentication/v1"
@@ -99,6 +101,11 @@ func (c *Clientset) CoreV1() v1core.CoreV1Interface {
 // Core retrieves the CoreV1Client
 func (c *Clientset) Core() v1core.CoreV1Interface {
 	return &fakev1core.FakeCoreV1{Fake: &c.Fake}
+}
+
+// AppsV1alpha1 retrieves the AppsV1alpha1Client
+func (c *Clientset) AppsV1alpha1() v1alpha1apps.AppsV1alpha1Interface {
+	return &fakev1alpha1apps.FakeAppsV1alpha1{Fake: &c.Fake}
 }
 
 // AppsV1beta1 retrieves the AppsV1beta1Client

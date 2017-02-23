@@ -17,6 +17,8 @@ go_library(
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/client/clientset_generated/clientset:go_default_library",
+        "//pkg/client/clientset_generated/clientset/typed/apps/v1alpha1:go_default_library",
+        "//pkg/client/clientset_generated/clientset/typed/apps/v1alpha1/fake:go_default_library",
         "//pkg/client/clientset_generated/clientset/typed/apps/v1beta1:go_default_library",
         "//pkg/client/clientset_generated/clientset/typed/apps/v1beta1/fake:go_default_library",
         "//pkg/client/clientset_generated/clientset/typed/authentication/v1:go_default_library",

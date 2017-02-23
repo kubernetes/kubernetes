@@ -11,6 +11,7 @@ go_library(
     name = "go_default_library",
     srcs = [
         "expansion_generated.go",
+        "podinjectionpolicy.go",
         "statefulset.go",
         "statefulset_expansion.go",
     ],

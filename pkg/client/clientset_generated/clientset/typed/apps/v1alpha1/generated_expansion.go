@@ -14,8 +14,6 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package internalversion
+package v1alpha1
 
 type PodInjectionPolicyExpansion interface{}
-
-type StatefulSetExpansion interface{}
