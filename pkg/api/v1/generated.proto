@@ -680,10 +680,18 @@ message DeleteOptions {
   // +optional
   optional Preconditions preconditions = 2;
 
+  // Deprecated: please use the PropagationPolicy, this field will be deprecated in 1.7.
   // Should the dependent objects be orphaned. If true/false, the "orphan"
   // finalizer will be added to/removed from the object's finalizers list.
+  // Either this field or PropagationPolicy may be set, but not both.
   // +optional
   optional bool orphanDependents = 3;
+
+  // Whether and how garbage collection will be performed.
+  // Defaults to Default.
+  // Either this field or OrphanDependents may be set, but not both.
+  // +optional
+  optional string propagationPolicy = 4;
 }
 
 // Represents downward API info for projecting into a projected volume.

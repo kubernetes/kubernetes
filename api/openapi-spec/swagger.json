@@ -1059,8 +1059,15 @@
       {
        "uniqueItems": true,
        "type": "boolean",
-       "description": "Should the dependent objects be orphaned. If true/false, the \"orphan\" finalizer will be added to/removed from the object's finalizers list.",
+       "description": "Deprecated: please use the PropagationPolicy, this field will be deprecated in 1.7. Should the dependent objects be orphaned. If true/false, the \"orphan\" finalizer will be added to/removed from the object's finalizers list. Either this field or PropagationPolicy may be set, but not both.",
        "name": "orphanDependents",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "string",
+       "description": "Whether and how garbage collection will be performed. Defaults to Default. Either this field or OrphanDependents may be set, but not both.",
+       "name": "propagationPolicy",
        "in": "query"
       }
      ],
@@ -1456,8 +1463,15 @@
       {
        "uniqueItems": true,
        "type": "boolean",
-       "description": "Should the dependent objects be orphaned. If true/false, the \"orphan\" finalizer will be added to/removed from the object's finalizers list.",
+       "description": "Deprecated: please use the PropagationPolicy, this field will be deprecated in 1.7. Should the dependent objects be orphaned. If true/false, the \"orphan\" finalizer will be added to/removed from the object's finalizers list. Either this field or PropagationPolicy may be set, but not both.",
        "name": "orphanDependents",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "string",
+       "description": "Whether and how garbage collection will be performed. Defaults to Default. Either this field or OrphanDependents may be set, but not both.",
+       "name": "propagationPolicy",
        "in": "query"
       }
      ],
@@ -1853,8 +1867,15 @@
       {
        "uniqueItems": true,
        "type": "boolean",
-       "description": "Should the dependent objects be orphaned. If true/false, the \"orphan\" finalizer will be added to/removed from the object's finalizers list.",
+       "description": "Deprecated: please use the PropagationPolicy, this field will be deprecated in 1.7. Should the dependent objects be orphaned. If true/false, the \"orphan\" finalizer will be added to/removed from the object's finalizers list. Either this field or PropagationPolicy may be set, but not both.",
        "name": "orphanDependents",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "string",
+       "description": "Whether and how garbage collection will be performed. Defaults to Default. Either this field or OrphanDependents may be set, but not both.",
+       "name": "propagationPolicy",
        "in": "query"
       }
      ],
@@ -2250,8 +2271,15 @@
       {
        "uniqueItems": true,
        "type": "boolean",
-       "description": "Should the dependent objects be orphaned. If true/false, the \"orphan\" finalizer will be added to/removed from the object's finalizers list.",
+       "description": "Deprecated: please use the PropagationPolicy, this field will be deprecated in 1.7. Should the dependent objects be orphaned. If true/false, the \"orphan\" finalizer will be added to/removed from the object's finalizers list. Either this field or PropagationPolicy may be set, but not both.",
        "name": "orphanDependents",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "string",
+       "description": "Whether and how garbage collection will be performed. Defaults to Default. Either this field or OrphanDependents may be set, but not both.",
+       "name": "propagationPolicy",
        "in": "query"
       }
      ],
@@ -2647,8 +2675,15 @@
       {
        "uniqueItems": true,
        "type": "boolean",
-       "description": "Should the dependent objects be orphaned. If true/false, the \"orphan\" finalizer will be added to/removed from the object's finalizers list.",
+       "description": "Deprecated: please use the PropagationPolicy, this field will be deprecated in 1.7. Should the dependent objects be orphaned. If true/false, the \"orphan\" finalizer will be added to/removed from the object's finalizers list. Either this field or PropagationPolicy may be set, but not both.",
        "name": "orphanDependents",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "string",
+       "description": "Whether and how garbage collection will be performed. Defaults to Default. Either this field or OrphanDependents may be set, but not both.",
+       "name": "propagationPolicy",
        "in": "query"
       }
      ],
@@ -3180,8 +3215,15 @@
       {
        "uniqueItems": true,
        "type": "boolean",
-       "description": "Should the dependent objects be orphaned. If true/false, the \"orphan\" finalizer will be added to/removed from the object's finalizers list.",
+       "description": "Deprecated: please use the PropagationPolicy, this field will be deprecated in 1.7. Should the dependent objects be orphaned. If true/false, the \"orphan\" finalizer will be added to/removed from the object's finalizers list. Either this field or PropagationPolicy may be set, but not both.",
        "name": "orphanDependents",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "string",
+       "description": "Whether and how garbage collection will be performed. Defaults to Default. Either this field or OrphanDependents may be set, but not both.",
+       "name": "propagationPolicy",
        "in": "query"
       }
      ],
@@ -4643,8 +4685,15 @@
       {
        "uniqueItems": true,
        "type": "boolean",
-       "description": "Should the dependent objects be orphaned. If true/false, the \"orphan\" finalizer will be added to/removed from the object's finalizers list.",
+       "description": "Deprecated: please use the PropagationPolicy, this field will be deprecated in 1.7. Should the dependent objects be orphaned. If true/false, the \"orphan\" finalizer will be added to/removed from the object's finalizers list. Either this field or PropagationPolicy may be set, but not both.",
        "name": "orphanDependents",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "string",
+       "description": "Whether and how garbage collection will be performed. Defaults to Default. Either this field or OrphanDependents may be set, but not both.",
+       "name": "propagationPolicy",
        "in": "query"
       }
      ],
@@ -5040,8 +5089,15 @@
       {
        "uniqueItems": true,
        "type": "boolean",
-       "description": "Should the dependent objects be orphaned. If true/false, the \"orphan\" finalizer will be added to/removed from the object's finalizers list.",
+       "description": "Deprecated: please use the PropagationPolicy, this field will be deprecated in 1.7. Should the dependent objects be orphaned. If true/false, the \"orphan\" finalizer will be added to/removed from the object's finalizers list. Either this field or PropagationPolicy may be set, but not both.",
        "name": "orphanDependents",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "string",
+       "description": "Whether and how garbage collection will be performed. Defaults to Default. Either this field or OrphanDependents may be set, but not both.",
+       "name": "propagationPolicy",
        "in": "query"
       }
      ],
@@ -5709,8 +5765,15 @@
       {
        "uniqueItems": true,
        "type": "boolean",
-       "description": "Should the dependent objects be orphaned. If true/false, the \"orphan\" finalizer will be added to/removed from the object's finalizers list.",
+       "description": "Deprecated: please use the PropagationPolicy, this field will be deprecated in 1.7. Should the dependent objects be orphaned. If true/false, the \"orphan\" finalizer will be added to/removed from the object's finalizers list. Either this field or PropagationPolicy may be set, but not both.",
        "name": "orphanDependents",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "string",
+       "description": "Whether and how garbage collection will be performed. Defaults to Default. Either this field or OrphanDependents may be set, but not both.",
+       "name": "propagationPolicy",
        "in": "query"
       }
      ],
@@ -6242,8 +6305,15 @@
       {
        "uniqueItems": true,
        "type": "boolean",
-       "description": "Should the dependent objects be orphaned. If true/false, the \"orphan\" finalizer will be added to/removed from the object's finalizers list.",
+       "description": "Deprecated: please use the PropagationPolicy, this field will be deprecated in 1.7. Should the dependent objects be orphaned. If true/false, the \"orphan\" finalizer will be added to/removed from the object's finalizers list. Either this field or PropagationPolicy may be set, but not both.",
        "name": "orphanDependents",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "string",
+       "description": "Whether and how garbage collection will be performed. Defaults to Default. Either this field or OrphanDependents may be set, but not both.",
+       "name": "propagationPolicy",
        "in": "query"
       }
      ],
@@ -6639,8 +6709,15 @@
       {
        "uniqueItems": true,
        "type": "boolean",
-       "description": "Should the dependent objects be orphaned. If true/false, the \"orphan\" finalizer will be added to/removed from the object's finalizers list.",
+       "description": "Deprecated: please use the PropagationPolicy, this field will be deprecated in 1.7. Should the dependent objects be orphaned. If true/false, the \"orphan\" finalizer will be added to/removed from the object's finalizers list. Either this field or PropagationPolicy may be set, but not both.",
        "name": "orphanDependents",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "string",
+       "description": "Whether and how garbage collection will be performed. Defaults to Default. Either this field or OrphanDependents may be set, but not both.",
+       "name": "propagationPolicy",
        "in": "query"
       }
      ],
@@ -7673,8 +7750,15 @@
       {
        "uniqueItems": true,
        "type": "boolean",
-       "description": "Should the dependent objects be orphaned. If true/false, the \"orphan\" finalizer will be added to/removed from the object's finalizers list.",
+       "description": "Deprecated: please use the PropagationPolicy, this field will be deprecated in 1.7. Should the dependent objects be orphaned. If true/false, the \"orphan\" finalizer will be added to/removed from the object's finalizers list. Either this field or PropagationPolicy may be set, but not both.",
        "name": "orphanDependents",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "string",
+       "description": "Whether and how garbage collection will be performed. Defaults to Default. Either this field or OrphanDependents may be set, but not both.",
+       "name": "propagationPolicy",
        "in": "query"
       }
      ],
@@ -8240,8 +8324,15 @@
       {
        "uniqueItems": true,
        "type": "boolean",
-       "description": "Should the dependent objects be orphaned. If true/false, the \"orphan\" finalizer will be added to/removed from the object's finalizers list.",
+       "description": "Deprecated: please use the PropagationPolicy, this field will be deprecated in 1.7. Should the dependent objects be orphaned. If true/false, the \"orphan\" finalizer will be added to/removed from the object's finalizers list. Either this field or PropagationPolicy may be set, but not both.",
        "name": "orphanDependents",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "string",
+       "description": "Whether and how garbage collection will be performed. Defaults to Default. Either this field or OrphanDependents may be set, but not both.",
+       "name": "propagationPolicy",
        "in": "query"
       }
      ],
@@ -9196,8 +9287,15 @@
       {
        "uniqueItems": true,
        "type": "boolean",
-       "description": "Should the dependent objects be orphaned. If true/false, the \"orphan\" finalizer will be added to/removed from the object's finalizers list.",
+       "description": "Deprecated: please use the PropagationPolicy, this field will be deprecated in 1.7. Should the dependent objects be orphaned. If true/false, the \"orphan\" finalizer will be added to/removed from the object's finalizers list. Either this field or PropagationPolicy may be set, but not both.",
        "name": "orphanDependents",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "string",
+       "description": "Whether and how garbage collection will be performed. Defaults to Default. Either this field or OrphanDependents may be set, but not both.",
+       "name": "propagationPolicy",
        "in": "query"
       }
      ],
@@ -15159,8 +15257,15 @@
       {
        "uniqueItems": true,
        "type": "boolean",
-       "description": "Should the dependent objects be orphaned. If true/false, the \"orphan\" finalizer will be added to/removed from the object's finalizers list.",
+       "description": "Deprecated: please use the PropagationPolicy, this field will be deprecated in 1.7. Should the dependent objects be orphaned. If true/false, the \"orphan\" finalizer will be added to/removed from the object's finalizers list. Either this field or PropagationPolicy may be set, but not both.",
        "name": "orphanDependents",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "string",
+       "description": "Whether and how garbage collection will be performed. Defaults to Default. Either this field or OrphanDependents may be set, but not both.",
+       "name": "propagationPolicy",
        "in": "query"
       }
      ],
@@ -16781,8 +16886,15 @@
       {
        "uniqueItems": true,
        "type": "boolean",
-       "description": "Should the dependent objects be orphaned. If true/false, the \"orphan\" finalizer will be added to/removed from the object's finalizers list.",
+       "description": "Deprecated: please use the PropagationPolicy, this field will be deprecated in 1.7. Should the dependent objects be orphaned. If true/false, the \"orphan\" finalizer will be added to/removed from the object's finalizers list. Either this field or PropagationPolicy may be set, but not both.",
        "name": "orphanDependents",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "string",
+       "description": "Whether and how garbage collection will be performed. Defaults to Default. Either this field or OrphanDependents may be set, but not both.",
+       "name": "propagationPolicy",
        "in": "query"
       }
      ],
@@ -17679,8 +17791,15 @@
       {
        "uniqueItems": true,
        "type": "boolean",
-       "description": "Should the dependent objects be orphaned. If true/false, the \"orphan\" finalizer will be added to/removed from the object's finalizers list.",
+       "description": "Deprecated: please use the PropagationPolicy, this field will be deprecated in 1.7. Should the dependent objects be orphaned. If true/false, the \"orphan\" finalizer will be added to/removed from the object's finalizers list. Either this field or PropagationPolicy may be set, but not both.",
        "name": "orphanDependents",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "string",
+       "description": "Whether and how garbage collection will be performed. Defaults to Default. Either this field or OrphanDependents may be set, but not both.",
+       "name": "propagationPolicy",
        "in": "query"
       }
      ],
@@ -18610,8 +18729,15 @@
       {
        "uniqueItems": true,
        "type": "boolean",
-       "description": "Should the dependent objects be orphaned. If true/false, the \"orphan\" finalizer will be added to/removed from the object's finalizers list.",
+       "description": "Deprecated: please use the PropagationPolicy, this field will be deprecated in 1.7. Should the dependent objects be orphaned. If true/false, the \"orphan\" finalizer will be added to/removed from the object's finalizers list. Either this field or PropagationPolicy may be set, but not both.",
        "name": "orphanDependents",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "string",
+       "description": "Whether and how garbage collection will be performed. Defaults to Default. Either this field or OrphanDependents may be set, but not both.",
+       "name": "propagationPolicy",
        "in": "query"
       }
      ],
@@ -19585,8 +19711,15 @@
       {
        "uniqueItems": true,
        "type": "boolean",
-       "description": "Should the dependent objects be orphaned. If true/false, the \"orphan\" finalizer will be added to/removed from the object's finalizers list.",
+       "description": "Deprecated: please use the PropagationPolicy, this field will be deprecated in 1.7. Should the dependent objects be orphaned. If true/false, the \"orphan\" finalizer will be added to/removed from the object's finalizers list. Either this field or PropagationPolicy may be set, but not both.",
        "name": "orphanDependents",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "string",
+       "description": "Whether and how garbage collection will be performed. Defaults to Default. Either this field or OrphanDependents may be set, but not both.",
+       "name": "propagationPolicy",
        "in": "query"
       }
      ],
@@ -20118,8 +20251,15 @@
       {
        "uniqueItems": true,
        "type": "boolean",
-       "description": "Should the dependent objects be orphaned. If true/false, the \"orphan\" finalizer will be added to/removed from the object's finalizers list.",
+       "description": "Deprecated: please use the PropagationPolicy, this field will be deprecated in 1.7. Should the dependent objects be orphaned. If true/false, the \"orphan\" finalizer will be added to/removed from the object's finalizers list. Either this field or PropagationPolicy may be set, but not both.",
        "name": "orphanDependents",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "string",
+       "description": "Whether and how garbage collection will be performed. Defaults to Default. Either this field or OrphanDependents may be set, but not both.",
+       "name": "propagationPolicy",
        "in": "query"
       }
      ],
@@ -20651,8 +20791,15 @@
       {
        "uniqueItems": true,
        "type": "boolean",
-       "description": "Should the dependent objects be orphaned. If true/false, the \"orphan\" finalizer will be added to/removed from the object's finalizers list.",
+       "description": "Deprecated: please use the PropagationPolicy, this field will be deprecated in 1.7. Should the dependent objects be orphaned. If true/false, the \"orphan\" finalizer will be added to/removed from the object's finalizers list. Either this field or PropagationPolicy may be set, but not both.",
        "name": "orphanDependents",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "string",
+       "description": "Whether and how garbage collection will be performed. Defaults to Default. Either this field or OrphanDependents may be set, but not both.",
+       "name": "propagationPolicy",
        "in": "query"
       }
      ],
@@ -22084,8 +22231,15 @@
       {
        "uniqueItems": true,
        "type": "boolean",
-       "description": "Should the dependent objects be orphaned. If true/false, the \"orphan\" finalizer will be added to/removed from the object's finalizers list.",
+       "description": "Deprecated: please use the PropagationPolicy, this field will be deprecated in 1.7. Should the dependent objects be orphaned. If true/false, the \"orphan\" finalizer will be added to/removed from the object's finalizers list. Either this field or PropagationPolicy may be set, but not both.",
        "name": "orphanDependents",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "string",
+       "description": "Whether and how garbage collection will be performed. Defaults to Default. Either this field or OrphanDependents may be set, but not both.",
+       "name": "propagationPolicy",
        "in": "query"
       }
      ],
@@ -23048,8 +23202,15 @@
       {
        "uniqueItems": true,
        "type": "boolean",
-       "description": "Should the dependent objects be orphaned. If true/false, the \"orphan\" finalizer will be added to/removed from the object's finalizers list.",
+       "description": "Deprecated: please use the PropagationPolicy, this field will be deprecated in 1.7. Should the dependent objects be orphaned. If true/false, the \"orphan\" finalizer will be added to/removed from the object's finalizers list. Either this field or PropagationPolicy may be set, but not both.",
        "name": "orphanDependents",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "string",
+       "description": "Whether and how garbage collection will be performed. Defaults to Default. Either this field or OrphanDependents may be set, but not both.",
+       "name": "propagationPolicy",
        "in": "query"
       }
      ],
@@ -23581,8 +23742,15 @@
       {
        "uniqueItems": true,
        "type": "boolean",
-       "description": "Should the dependent objects be orphaned. If true/false, the \"orphan\" finalizer will be added to/removed from the object's finalizers list.",
+       "description": "Deprecated: please use the PropagationPolicy, this field will be deprecated in 1.7. Should the dependent objects be orphaned. If true/false, the \"orphan\" finalizer will be added to/removed from the object's finalizers list. Either this field or PropagationPolicy may be set, but not both.",
        "name": "orphanDependents",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "string",
+       "description": "Whether and how garbage collection will be performed. Defaults to Default. Either this field or OrphanDependents may be set, but not both.",
+       "name": "propagationPolicy",
        "in": "query"
       }
      ],
@@ -24316,8 +24484,15 @@
       {
        "uniqueItems": true,
        "type": "boolean",
-       "description": "Should the dependent objects be orphaned. If true/false, the \"orphan\" finalizer will be added to/removed from the object's finalizers list.",
+       "description": "Deprecated: please use the PropagationPolicy, this field will be deprecated in 1.7. Should the dependent objects be orphaned. If true/false, the \"orphan\" finalizer will be added to/removed from the object's finalizers list. Either this field or PropagationPolicy may be set, but not both.",
        "name": "orphanDependents",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "string",
+       "description": "Whether and how garbage collection will be performed. Defaults to Default. Either this field or OrphanDependents may be set, but not both.",
+       "name": "propagationPolicy",
        "in": "query"
       }
      ],
@@ -24849,8 +25024,15 @@
       {
        "uniqueItems": true,
        "type": "boolean",
-       "description": "Should the dependent objects be orphaned. If true/false, the \"orphan\" finalizer will be added to/removed from the object's finalizers list.",
+       "description": "Deprecated: please use the PropagationPolicy, this field will be deprecated in 1.7. Should the dependent objects be orphaned. If true/false, the \"orphan\" finalizer will be added to/removed from the object's finalizers list. Either this field or PropagationPolicy may be set, but not both.",
        "name": "orphanDependents",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "string",
+       "description": "Whether and how garbage collection will be performed. Defaults to Default. Either this field or OrphanDependents may be set, but not both.",
+       "name": "propagationPolicy",
        "in": "query"
       }
      ],
@@ -25246,8 +25428,15 @@
       {
        "uniqueItems": true,
        "type": "boolean",
-       "description": "Should the dependent objects be orphaned. If true/false, the \"orphan\" finalizer will be added to/removed from the object's finalizers list.",
+       "description": "Deprecated: please use the PropagationPolicy, this field will be deprecated in 1.7. Should the dependent objects be orphaned. If true/false, the \"orphan\" finalizer will be added to/removed from the object's finalizers list. Either this field or PropagationPolicy may be set, but not both.",
        "name": "orphanDependents",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "string",
+       "description": "Whether and how garbage collection will be performed. Defaults to Default. Either this field or OrphanDependents may be set, but not both.",
+       "name": "propagationPolicy",
        "in": "query"
       }
      ],
@@ -26120,8 +26309,15 @@
       {
        "uniqueItems": true,
        "type": "boolean",
-       "description": "Should the dependent objects be orphaned. If true/false, the \"orphan\" finalizer will be added to/removed from the object's finalizers list.",
+       "description": "Deprecated: please use the PropagationPolicy, this field will be deprecated in 1.7. Should the dependent objects be orphaned. If true/false, the \"orphan\" finalizer will be added to/removed from the object's finalizers list. Either this field or PropagationPolicy may be set, but not both.",
        "name": "orphanDependents",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "string",
+       "description": "Whether and how garbage collection will be performed. Defaults to Default. Either this field or OrphanDependents may be set, but not both.",
+       "name": "propagationPolicy",
        "in": "query"
       }
      ],
@@ -26578,8 +26774,15 @@
       {
        "uniqueItems": true,
        "type": "boolean",
-       "description": "Should the dependent objects be orphaned. If true/false, the \"orphan\" finalizer will be added to/removed from the object's finalizers list.",
+       "description": "Deprecated: please use the PropagationPolicy, this field will be deprecated in 1.7. Should the dependent objects be orphaned. If true/false, the \"orphan\" finalizer will be added to/removed from the object's finalizers list. Either this field or PropagationPolicy may be set, but not both.",
        "name": "orphanDependents",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "string",
+       "description": "Whether and how garbage collection will be performed. Defaults to Default. Either this field or OrphanDependents may be set, but not both.",
+       "name": "propagationPolicy",
        "in": "query"
       }
      ],
@@ -28632,8 +28835,15 @@
       {
        "uniqueItems": true,
        "type": "boolean",
-       "description": "Should the dependent objects be orphaned. If true/false, the \"orphan\" finalizer will be added to/removed from the object's finalizers list.",
+       "description": "Deprecated: please use the PropagationPolicy, this field will be deprecated in 1.7. Should the dependent objects be orphaned. If true/false, the \"orphan\" finalizer will be added to/removed from the object's finalizers list. Either this field or PropagationPolicy may be set, but not both.",
        "name": "orphanDependents",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "string",
+       "description": "Whether and how garbage collection will be performed. Defaults to Default. Either this field or OrphanDependents may be set, but not both.",
+       "name": "propagationPolicy",
        "in": "query"
       }
      ],
@@ -29539,8 +29749,15 @@
       {
        "uniqueItems": true,
        "type": "boolean",
-       "description": "Should the dependent objects be orphaned. If true/false, the \"orphan\" finalizer will be added to/removed from the object's finalizers list.",
+       "description": "Deprecated: please use the PropagationPolicy, this field will be deprecated in 1.7. Should the dependent objects be orphaned. If true/false, the \"orphan\" finalizer will be added to/removed from the object's finalizers list. Either this field or PropagationPolicy may be set, but not both.",
        "name": "orphanDependents",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "string",
+       "description": "Whether and how garbage collection will be performed. Defaults to Default. Either this field or OrphanDependents may be set, but not both.",
+       "name": "propagationPolicy",
        "in": "query"
       }
      ],
@@ -29904,8 +30121,15 @@
       {
        "uniqueItems": true,
        "type": "boolean",
-       "description": "Should the dependent objects be orphaned. If true/false, the \"orphan\" finalizer will be added to/removed from the object's finalizers list.",
+       "description": "Deprecated: please use the PropagationPolicy, this field will be deprecated in 1.7. Should the dependent objects be orphaned. If true/false, the \"orphan\" finalizer will be added to/removed from the object's finalizers list. Either this field or PropagationPolicy may be set, but not both.",
        "name": "orphanDependents",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "string",
+       "description": "Whether and how garbage collection will be performed. Defaults to Default. Either this field or OrphanDependents may be set, but not both.",
+       "name": "propagationPolicy",
        "in": "query"
       }
      ],
@@ -30277,8 +30501,15 @@
       {
        "uniqueItems": true,
        "type": "boolean",
-       "description": "Should the dependent objects be orphaned. If true/false, the \"orphan\" finalizer will be added to/removed from the object's finalizers list.",
+       "description": "Deprecated: please use the PropagationPolicy, this field will be deprecated in 1.7. Should the dependent objects be orphaned. If true/false, the \"orphan\" finalizer will be added to/removed from the object's finalizers list. Either this field or PropagationPolicy may be set, but not both.",
        "name": "orphanDependents",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "string",
+       "description": "Whether and how garbage collection will be performed. Defaults to Default. Either this field or OrphanDependents may be set, but not both.",
+       "name": "propagationPolicy",
        "in": "query"
       }
      ],
@@ -30658,8 +30889,15 @@
       {
        "uniqueItems": true,
        "type": "boolean",
-       "description": "Should the dependent objects be orphaned. If true/false, the \"orphan\" finalizer will be added to/removed from the object's finalizers list.",
+       "description": "Deprecated: please use the PropagationPolicy, this field will be deprecated in 1.7. Should the dependent objects be orphaned. If true/false, the \"orphan\" finalizer will be added to/removed from the object's finalizers list. Either this field or PropagationPolicy may be set, but not both.",
        "name": "orphanDependents",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "string",
+       "description": "Whether and how garbage collection will be performed. Defaults to Default. Either this field or OrphanDependents may be set, but not both.",
+       "name": "propagationPolicy",
        "in": "query"
       }
      ],
@@ -32052,8 +32290,15 @@
       {
        "uniqueItems": true,
        "type": "boolean",
-       "description": "Should the dependent objects be orphaned. If true/false, the \"orphan\" finalizer will be added to/removed from the object's finalizers list.",
+       "description": "Deprecated: please use the PropagationPolicy, this field will be deprecated in 1.7. Should the dependent objects be orphaned. If true/false, the \"orphan\" finalizer will be added to/removed from the object's finalizers list. Either this field or PropagationPolicy may be set, but not both.",
        "name": "orphanDependents",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "string",
+       "description": "Whether and how garbage collection will be performed. Defaults to Default. Either this field or OrphanDependents may be set, but not both.",
+       "name": "propagationPolicy",
        "in": "query"
       }
      ],
@@ -32417,8 +32662,15 @@
       {
        "uniqueItems": true,
        "type": "boolean",
-       "description": "Should the dependent objects be orphaned. If true/false, the \"orphan\" finalizer will be added to/removed from the object's finalizers list.",
+       "description": "Deprecated: please use the PropagationPolicy, this field will be deprecated in 1.7. Should the dependent objects be orphaned. If true/false, the \"orphan\" finalizer will be added to/removed from the object's finalizers list. Either this field or PropagationPolicy may be set, but not both.",
        "name": "orphanDependents",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "string",
+       "description": "Whether and how garbage collection will be performed. Defaults to Default. Either this field or OrphanDependents may be set, but not both.",
+       "name": "propagationPolicy",
        "in": "query"
       }
      ],
@@ -32790,8 +33042,15 @@
       {
        "uniqueItems": true,
        "type": "boolean",
-       "description": "Should the dependent objects be orphaned. If true/false, the \"orphan\" finalizer will be added to/removed from the object's finalizers list.",
+       "description": "Deprecated: please use the PropagationPolicy, this field will be deprecated in 1.7. Should the dependent objects be orphaned. If true/false, the \"orphan\" finalizer will be added to/removed from the object's finalizers list. Either this field or PropagationPolicy may be set, but not both.",
        "name": "orphanDependents",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "string",
+       "description": "Whether and how garbage collection will be performed. Defaults to Default. Either this field or OrphanDependents may be set, but not both.",
+       "name": "propagationPolicy",
        "in": "query"
       }
      ],
@@ -33171,8 +33430,15 @@
       {
        "uniqueItems": true,
        "type": "boolean",
-       "description": "Should the dependent objects be orphaned. If true/false, the \"orphan\" finalizer will be added to/removed from the object's finalizers list.",
+       "description": "Deprecated: please use the PropagationPolicy, this field will be deprecated in 1.7. Should the dependent objects be orphaned. If true/false, the \"orphan\" finalizer will be added to/removed from the object's finalizers list. Either this field or PropagationPolicy may be set, but not both.",
        "name": "orphanDependents",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "string",
+       "description": "Whether and how garbage collection will be performed. Defaults to Default. Either this field or OrphanDependents may be set, but not both.",
+       "name": "propagationPolicy",
        "in": "query"
       }
      ],
@@ -34614,8 +34880,15 @@
       {
        "uniqueItems": true,
        "type": "boolean",
-       "description": "Should the dependent objects be orphaned. If true/false, the \"orphan\" finalizer will be added to/removed from the object's finalizers list.",
+       "description": "Deprecated: please use the PropagationPolicy, this field will be deprecated in 1.7. Should the dependent objects be orphaned. If true/false, the \"orphan\" finalizer will be added to/removed from the object's finalizers list. Either this field or PropagationPolicy may be set, but not both.",
        "name": "orphanDependents",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "string",
+       "description": "Whether and how garbage collection will be performed. Defaults to Default. Either this field or OrphanDependents may be set, but not both.",
+       "name": "propagationPolicy",
        "in": "query"
       }
      ],
@@ -35104,12 +35377,16 @@
       "type": "string"
      },
      "orphanDependents": {
-      "description": "Should the dependent objects be orphaned. If true/false, the \"orphan\" finalizer will be added to/removed from the object's finalizers list.",
+      "description": "Deprecated: please use the PropagationPolicy, this field will be deprecated in 1.7. Should the dependent objects be orphaned. If true/false, the \"orphan\" finalizer will be added to/removed from the object's finalizers list. Either this field or PropagationPolicy may be set, but not both.",
       "type": "boolean"
      },
      "preconditions": {
       "description": "Must be fulfilled before a deletion is carried out. If not possible, a 409 Conflict status will be returned.",
       "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Preconditions"
+     },
+     "propagationPolicy": {
+      "description": "Whether and how garbage collection will be performed. Defaults to Default. Either this field or OrphanDependents may be set, but not both.",
+      "type": "string"
      }
     }
    },
@@ -35277,6 +35554,10 @@
      "apiVersion": {
       "description": "API version of the referent.",
       "type": "string"
+     },
+     "blockOwnerDeletion": {
+      "description": "If true, AND if the owner has the \"foregroundDeletion\" finalizer, then the owner cannot be deleted from the key-value store until this reference is removed. Defaults to false. To set this field, a user needs \"delete\" permission of the owner, otherwise 422 (Unprocessable Entity) will be returned.",
+      "type": "boolean"
      },
      "controller": {
       "description": "If true, this reference points to the managing controller.",
