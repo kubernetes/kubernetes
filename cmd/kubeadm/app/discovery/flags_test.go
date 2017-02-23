@@ -60,7 +60,7 @@ func TestNewDiscoveryValue(t *testing.T) {
 						Addresses: []string{"foobar"},
 					},
 				},
-			}, expect: "token://foo:bar@foobar",
+			}, expect: "token://foo.bar@foobar",
 		},
 	}
 	for _, rt := range tests {
