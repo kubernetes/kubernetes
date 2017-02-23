@@ -459,6 +459,8 @@ func (dc *DeploymentController) classifyReplicaSets(deployment *extensions.Deplo
 	}
 	cm := controller.NewReplicaSetControllerRefManager(dc.rsControl, deployment.ObjectMeta, deploymentSelector, getDeploymentKind())
 	matchesAndControlled, matchesNeedsController, controlledDoesNotMatch := cm.Classify(rsList)
+
+	var errlist []error
 	// Adopt replica sets only if this deployment is not going to be deleted.
 	if deployment.DeletionTimestamp == nil {
 		for _, replicaSet := range matchesNeedsController {
@@ -467,7 +469,7 @@ func (dc *DeploymentController) classifyReplicaSets(deployment *extensions.Deplo
 			if err != nil {
 				// If the RS no longer exists, don't even log the error.
 				if !errors.IsNotFound(err) {
-					utilruntime.HandleError(err)
+					errlist = append(errlist, err)
 				}
 			} else {
 				matchesAndControlled = append(matchesAndControlled, replicaSet)
@@ -475,7 +477,6 @@ func (dc *DeploymentController) classifyReplicaSets(deployment *extensions.Deplo
 		}
 	}
 	// remove the controllerRef for the RS that no longer have matching labels
-	var errlist []error
 	for _, replicaSet := range controlledDoesNotMatch {
 		err := cm.ReleaseReplicaSet(replicaSet)
 		if err != nil {
