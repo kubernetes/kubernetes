@@ -25,17 +25,20 @@ import (
 	"github.com/golang/glog"
 
 	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/labels"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	kcache "k8s.io/client-go/tools/cache"
 	corelisters "k8s.io/kubernetes/pkg/client/listers/core/v1"
 	"k8s.io/kubernetes/pkg/controller/volume/attachdetach/cache"
+	"k8s.io/kubernetes/pkg/controller/volume/attachdetach/util"
+	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util/volumehelper"
 )
 
 // DesiredStateOfWorldPopulator periodically verifies that the pods in the
-// desired state of th world still exist, if not, it removes them.
-// TODO: it also loops through the list of active pods and ensures that
+// desired state of the world still exist, if not, it removes them.
+// It also loops through the list of active pods and ensures that
 // each one exists in the desired state of the world cache
 // if it has volumes.
 type DesiredStateOfWorldPopulator interface {
@@ -51,11 +54,17 @@ type DesiredStateOfWorldPopulator interface {
 func NewDesiredStateOfWorldPopulator(
 	loopSleepDuration time.Duration,
 	podLister corelisters.PodLister,
-	desiredStateOfWorld cache.DesiredStateOfWorld) DesiredStateOfWorldPopulator {
+	desiredStateOfWorld cache.DesiredStateOfWorld,
+	volumePluginMgr *volume.VolumePluginMgr,
+	pvcLister corelisters.PersistentVolumeClaimLister,
+	pvLister corelisters.PersistentVolumeLister) DesiredStateOfWorldPopulator {
 	return &desiredStateOfWorldPopulator{
 		loopSleepDuration:   loopSleepDuration,
 		podLister:           podLister,
 		desiredStateOfWorld: desiredStateOfWorld,
+		volumePluginMgr:     volumePluginMgr,
+		pvcLister:           pvcLister,
+		pvLister:            pvLister,
 	}
 }
 
@@ -63,6 +72,9 @@ type desiredStateOfWorldPopulator struct {
 	loopSleepDuration   time.Duration
 	podLister           corelisters.PodLister
 	desiredStateOfWorld cache.DesiredStateOfWorld
+	volumePluginMgr     *volume.VolumePluginMgr
+	pvcLister           corelisters.PersistentVolumeClaimLister
+	pvLister            corelisters.PersistentVolumeLister
 }
 
 func (dswp *desiredStateOfWorldPopulator) Run(stopCh <-chan struct{}) {
@@ -72,6 +84,7 @@ func (dswp *desiredStateOfWorldPopulator) Run(stopCh <-chan struct{}) {
 func (dswp *desiredStateOfWorldPopulator) populatorLoopFunc() func() {
 	return func() {
 		dswp.findAndRemoveDeletedPods()
+		dswp.findAndAddActivePods()
 	}
 }
 
@@ -112,4 +125,22 @@ func (dswp *desiredStateOfWorldPopulator) findAndRemoveDeletedPods() {
 		glog.V(1).Infof("Removing pod %q (UID %q) from dsw because it does not exist in pod informer.", dswPodKey, dswPodUID)
 		dswp.desiredStateOfWorld.DeletePod(dswPodUID, dswPodToAdd.VolumeName, dswPodToAdd.NodeName)
 	}
+}
+
+func (dswp *desiredStateOfWorldPopulator) findAndAddActivePods() {
+	pods, err := dswp.podLister.List(labels.Everything())
+	if err != nil {
+		glog.Errorf("podLister List failed: %v", err)
+		return
+	}
+	for _, pod := range pods {
+		if volumehelper.IsPodTerminated(pod, pod.Status) {
+			// Do not add volumes for terminated pods
+			continue
+		}
+		util.ProcessPodVolumes(pod, true,
+			dswp.desiredStateOfWorld, dswp.volumePluginMgr, dswp.pvcLister, dswp.pvLister)
+
+	}
+
 }
