@@ -75,6 +75,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/network"
 	"k8s.io/kubernetes/pkg/kubelet/pleg"
 	kubepod "k8s.io/kubernetes/pkg/kubelet/pod"
+	"k8s.io/kubernetes/pkg/kubelet/preemption"
 	"k8s.io/kubernetes/pkg/kubelet/prober"
 	proberesults "k8s.io/kubernetes/pkg/kubelet/prober/results"
 	"k8s.io/kubernetes/pkg/kubelet/remote"
@@ -783,7 +784,8 @@ func NewMainKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *Kub
 	klet.AddPodSyncLoopHandler(activeDeadlineHandler)
 	klet.AddPodSyncHandler(activeDeadlineHandler)
 
-	klet.admitHandlers.AddPodAdmitHandler(lifecycle.NewPredicateAdmitHandler(klet.getNodeAnyWay))
+	criticalPodAdmissionHandler := preemption.NewCriticalPodAdmissionHandler(klet.getActivePods, killPodNow(klet.podWorkers, kubeDeps.Recorder), kubeDeps.Recorder)
+	klet.admitHandlers.AddPodAdmitHandler(lifecycle.NewPredicateAdmitHandler(klet.getNodeAnyWay, criticalPodAdmissionHandler))
 	// apply functional Option's
 	for _, opt := range kubeDeps.Options {
 		opt(klet)
