@@ -11,8 +11,8 @@ load(
 go_test(
     name = "go_default_test",
     srcs = [
-        "reconcile_clusterrole_test.go",
         "reconcile_clusterrolebindings_test.go",
+        "reconcile_role_test.go",
     ],
     library = ":go_default_library",
     tags = ["automanaged"],
@@ -26,8 +26,9 @@ go_test(
 go_library(
     name = "go_default_library",
     srcs = [
-        "reconcile_clusterrole.go",
         "reconcile_clusterrolebindings.go",
+        "reconcile_role.go",
+        "role_interfaces.go",
     ],
     tags = ["automanaged"],
     deps = [
