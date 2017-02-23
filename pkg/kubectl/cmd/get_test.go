@@ -73,7 +73,7 @@ func testData() (*api.PodList, *api.ServiceList, *api.ReplicationControllerList)
 			},
 		},
 	}
-	rc := &api.ReplicationControllerList{
+	rcs := &api.ReplicationControllerList{
 		ListMeta: metav1.ListMeta{
 			ResourceVersion: "17",
 		},
@@ -84,9 +84,26 @@ func testData() (*api.PodList, *api.ServiceList, *api.ReplicationControllerList)
 					Replicas: 1,
 				},
 			},
+			{
+				ObjectMeta: metav1.ObjectMeta{Name: "redis-master", Namespace: "test", ResourceVersion: "19"},
+				Spec: api.ReplicationControllerSpec{
+					Replicas: 1,
+				},
+			},
+			{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:            "redis-master",
+					Namespace:       "test",
+					ResourceVersion: "20",
+					Annotations:     map[string]string{"kubectl.kubernetes.io/last-applied-configuration": `{"metadata":{"annotations":{},"name":"rc1","namespace":"test"},"spec":{"replicas":2}}`},
+				},
+				Spec: api.ReplicationControllerSpec{
+					Replicas: 2,
+				},
+			},
 		},
 	}
-	return pods, svc, rc
+	return pods, svc, rcs
 }
 
 func testComponentStatusData() *api.ComponentStatusList {

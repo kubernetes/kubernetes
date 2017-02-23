@@ -18,12 +18,16 @@ package cmd
 
 import (
 	"bytes"
+	"io/ioutil"
 	"net/http"
+	"strconv"
 	"strings"
 	"testing"
 
+	"k8s.io/apimachinery/pkg/util/json"
 	"k8s.io/client-go/rest/fake"
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/annotations"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
 )
 
@@ -244,5 +248,117 @@ func TestForceReplaceObjectNotFound(t *testing.T) {
 
 	if buf.String() != "replicationcontroller/rc1\n" {
 		t.Errorf("unexpected output: %s", buf.String())
+	}
+}
+
+func TestReplaceObjectWithAnnotation(t *testing.T) {
+	_, _, rc := testData()
+
+	f, tf, codec, _ := cmdtesting.NewAPIFactory()
+	tf.Printer = &testPrinter{}
+	deleted := false
+	saveConfig := false
+	var expectedNum int64
+	tf.UnstructuredClient = &fake.RESTClient{
+		APIRegistry:          api.Registry,
+		NegotiatedSerializer: unstructuredSerializer,
+		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
+			if saveConfig {
+				expectedNum = 1
+			} else {
+				expectedNum = 2
+			}
+			switch p, m := req.URL.Path, req.Method; {
+			case p == "/api/v1/namespaces/test" && m == http.MethodGet:
+				return &http.Response{StatusCode: http.StatusOK, Header: defaultHeader(), Body: objBody(codec, &api.Namespace{})}, nil
+			case p == "/namespaces/test/replicationcontrollers/redis-master" && m == http.MethodDelete:
+				deleted = true
+				return &http.Response{StatusCode: http.StatusOK, Header: defaultHeader(), Body: objBody(codec, &rc.Items[1])}, nil
+			case p == "/namespaces/test/replicationcontrollers/redis-master" && m == http.MethodPut:
+				validateReplaceRequest(t, req, expectedNum)
+				return &http.Response{StatusCode: http.StatusOK, Header: defaultHeader(), Body: objBody(codec, &rc.Items[1])}, nil
+			case p == "/namespaces/test/replicationcontrollers/redis-master" && m == http.MethodGet:
+				statusCode := http.StatusOK
+				if deleted {
+					statusCode = http.StatusNotFound
+				}
+				return &http.Response{StatusCode: statusCode, Header: defaultHeader(), Body: objBody(codec, &rc.Items[2])}, nil
+			case p == "/namespaces/test/replicationcontrollers" && m == http.MethodPost:
+				validateReplaceRequest(t, req, expectedNum)
+				return &http.Response{StatusCode: http.StatusCreated, Header: defaultHeader(), Body: objBody(codec, &rc.Items[1])}, nil
+			default:
+				t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
+				return nil, nil
+			}
+		}),
+	}
+	tf.Namespace = "test"
+	buf := bytes.NewBuffer([]byte{})
+
+	cmd := NewCmdReplace(f, buf)
+	saveConfig = false
+	cmd.Flags().Set("save-config", strconv.FormatBool(saveConfig))
+	cmd.Flags().Set("filename", "../../../examples/guestbook/legacy/redis-master-controller.yaml")
+	cmd.Flags().Set("output", "name")
+	cmd.Run(cmd, []string{})
+
+	if buf.String() != "replicationcontroller/redis-master\n" {
+		t.Errorf("unexpected output: %s", buf.String())
+	}
+
+	buf.Reset()
+	saveConfig = true
+	cmd.Flags().Set("save-config", strconv.FormatBool(saveConfig))
+	cmd.Run(cmd, []string{})
+
+	if buf.String() != "replicationcontroller/redis-master\n" {
+		t.Errorf("unexpected output: %s", buf.String())
+	}
+
+	buf.Reset()
+	saveConfig = false
+	cmd.Flags().Set("save-config", strconv.FormatBool(saveConfig))
+	cmd.Flags().Set("force", "true")
+	cmd.Flags().Set("cascade", "false")
+	cmd.Run(cmd, []string{})
+
+	if buf.String() != "replicationcontroller/redis-master\nreplicationcontroller/redis-master\n" {
+		t.Errorf("unexpected output: %s", buf.String())
+	}
+
+	buf.Reset()
+	saveConfig = true
+	cmd.Flags().Set("save-config", strconv.FormatBool(saveConfig))
+	cmd.Run(cmd, []string{})
+
+	if buf.String() != "replicationcontroller/redis-master\nreplicationcontroller/redis-master\n" {
+		t.Errorf("unexpected output: %s", buf.String())
+	}
+}
+
+func validateReplaceRequest(t *testing.T, req *http.Request, expectedNum int64) {
+	replaceBytes, err := ioutil.ReadAll(req.Body)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	replaceMap := map[string]interface{}{}
+	if err := json.Unmarshal(replaceBytes, &replaceMap); err != nil {
+		t.Fatal(err)
+	}
+
+	annotationsMap := walkMapPath(t, replaceMap, []string{"metadata", "annotations"})
+	applyAnnotation, ok := annotationsMap[annotations.LastAppliedConfigAnnotation]
+	if !ok {
+		t.Fatalf("replace request does not contain annotation:\n%s\n", replaceBytes)
+	}
+	applyAnnotationMap := map[string]interface{}{}
+	if err := json.Unmarshal([]byte(applyAnnotation.(string)), &applyAnnotationMap); err != nil {
+		t.Fatal(err)
+	}
+	specMap := walkMapPath(t, applyAnnotationMap, []string{"spec"})
+	replicas, ok := specMap["replicas"]
+	if !ok || replicas.(int64) != expectedNum {
+		t.Fatalf("replace request does not contain desired annotation:\n%s\n", replaceBytes)
 	}
 }
