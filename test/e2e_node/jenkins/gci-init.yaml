@@ -3,10 +3,15 @@
 runcmd:
   - mount /tmp /tmp -o remount,exec,suid
   - usermod -a -G docker jenkins
-  - mkdir -p /home/kubernetes/bin/
-  - mount -B /home/kubernetes/bin /home/kubernetes/bin
-  - mount -B -o remount,exec /home/kubernetes/bin 
-  - wget https://storage.googleapis.com/kubernetes-release/rkt/v1.18.0/rkt -O /home/kubernetes/bin/rkt
-  - wget https://storage.googleapis.com/kubernetes-release/rkt/v1.18.0/stage1-fly.aci -O /home/kubernetes/bin/stage1-fly.aci
-  - wget https://storage.googleapis.com/kubernetes-release/gci-mounter/gci-mounter-v2.aci -O /home/kubernetes/bin/gci-mounter-v2.aci
-  - chmod a+x /home/kubernetes/bin/rkt
+  - mkdir -p /var/lib/kubelet
+  - mkdir -p /home/kubernetes/containerized_mounter/rootfs
+  - mount --bind /home/kubernetes/containerized_mounter/ /home/kubernetes/containerized_mounter/
+  - mount -o remount, exec /home/kubernetes/containerized_mounter/
+  - wget https://storage.googleapis.com/kubernetes-release/gci-mounter/mounter.tar -O /tmp/mounter.tar
+  - tar xvf /tmp/mounter.tar -C /home/kubernetes/containerized_mounter/rootfs
+  - mkdir -p /home/kubernetes/containerized_mounter/rootfs/var/lib/kubelet
+  - mount --rbind /var/lib/kubelet /home/kubernetes/containerized_mounter/rootfs/var/lib/kubelet
+  - mount --make-rshared /home/kubernetes/containerized_mounter/rootfs/var/lib/kubelet
+  - mount --bind /proc /home/kubernetes/containerized_mounter/rootfs/proc
+  - mount --bind /dev /home/kubernetes/containerized_mounter/rootfs/dev
+  - rm /tmp/mounter.tar
