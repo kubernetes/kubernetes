@@ -27,7 +27,7 @@ import (
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	genericoptions "k8s.io/apiserver/pkg/server/options"
 	"k8s.io/kubernetes/pkg/kubeapiserver/authenticator"
-	"k8s.io/kubernetes/pkg/kubeapiserver/authorizer"
+	authzmodes "k8s.io/kubernetes/pkg/kubeapiserver/authorizer/modes"
 )
 
 type BuiltInAuthenticationOptions struct {
@@ -353,7 +353,7 @@ func (o *BuiltInAuthenticationOptions) ApplyAuthorization(authorization *BuiltIn
 	if o.Anonymous.Allow {
 		found := false
 		for _, mode := range strings.Split(authorization.Mode, ",") {
-			if mode == authorizer.ModeAlwaysAllow {
+			if mode == authzmodes.ModeAlwaysAllow {
 				found = true
 				break
 			}
