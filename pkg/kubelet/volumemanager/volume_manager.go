@@ -364,9 +364,10 @@ func (vm *volumeManager) WaitForAttachAndMount(pod *v1.Pod) error {
 		}
 
 		return fmt.Errorf(
-			"timeout expired waiting for volumes to attach/mount for pod %q/%q. list of unattached/unmounted volumes=%v",
+			"timeout expired waiting for volumes to attach/mount for pod %q/%q. With error %v. list of unattached/unmounted volumes=%v",
 			pod.Namespace,
 			pod.Name,
+			err,
 			unmountedVolumes)
 	}
 
