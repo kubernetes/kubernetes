@@ -115,7 +115,21 @@ func (attacher *azureDiskAttacher) Attach(spec *volume.Spec, nodeName types.Node
 	return strconv.Itoa(int(lun)), err
 }
 
-func (attacher *azureDiskAttacher) VolumesAreAttached(specs []*volume.Spec, nodeName types.NodeName) (map[*volume.Spec]bool, error) {
+func (attacher *azureDiskAttacher) VolumesAreAttached(volumesByNode map[types.NodeName][]*volume.Spec) (map[*volume.Spec]bool, error) {
+	volumesAttachedCheck := make(map[*volume.Spec]bool)
+	for nodeName, specs := range volumesByNode {
+		nodeVolumesAttachedCheck, err := attacher.volumesAreAttachedToNode(specs, nodeName)
+		if err != nil {
+			return nil, err
+		}
+		for k, v := range nodeVolumesAttachedCheck {
+			volumesAttachedCheck[k] = v
+		}
+	}
+	return volumesAttachedCheck, nil
+}
+
+func (attacher *azureDiskAttacher) volumesAreAttachedToNode(specs []*volume.Spec, nodeName types.NodeName) (map[*volume.Spec]bool, error) {
 	volumesAttachedCheck := make(map[*volume.Spec]bool)
 	volumeSpecMap := make(map[string]*volume.Spec)
 	volumeIDList := []string{}

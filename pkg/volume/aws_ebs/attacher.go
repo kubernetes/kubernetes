@@ -77,28 +77,31 @@ func (attacher *awsElasticBlockStoreAttacher) Attach(spec *volume.Spec, nodeName
 	return devicePath, nil
 }
 
-func (attacher *awsElasticBlockStoreAttacher) VolumesAreAttached(specs []*volume.Spec, nodeName types.NodeName) (map[*volume.Spec]bool, error) {
+func (attacher *awsElasticBlockStoreAttacher) VolumesAreAttached(volumesByNode map[types.NodeName][]*volume.Spec) (map[*volume.Spec]bool, error) {
 	volumesAttachedCheck := make(map[*volume.Spec]bool)
 	volumeSpecMap := make(map[aws.KubernetesVolumeID]*volume.Spec)
-	volumeIDList := []aws.KubernetesVolumeID{}
-	for _, spec := range specs {
-		volumeSource, _, err := getVolumeSource(spec)
-		if err != nil {
-			glog.Errorf("Error getting volume (%q) source : %v", spec.Name(), err)
-			continue
-		}
+	diskNamesByNode := make(map[types.NodeName][]aws.KubernetesVolumeID)
+	for node, specs := range volumesByNode {
+		for _, spec := range specs {
+			volumeSource, _, err := getVolumeSource(spec)
+			if err != nil {
+				glog.Errorf("Error getting volume (%q) source : %v", spec.Name(), err)
+				continue
+			}
 
-		name := aws.KubernetesVolumeID(volumeSource.VolumeID)
-		volumeIDList = append(volumeIDList, name)
-		volumesAttachedCheck[spec] = true
-		volumeSpecMap[name] = spec
+			name := aws.KubernetesVolumeID(volumeSource.VolumeID)
+			diskNamesByNode[node] = append(diskNamesByNode[node], name)
+			volumesAttachedCheck[spec] = true
+			volumeSpecMap[name] = spec
+		}
 	}
-	attachedResult, err := attacher.awsVolumes.DisksAreAttached(volumeIDList, nodeName)
+
+	attachedResult, err := attacher.awsVolumes.DisksAreAttached(diskNamesByNode)
 	if err != nil {
 		// Log error and continue with attach
 		glog.Errorf(
-			"Error checking if volumes (%v) is already attached to current node (%q). err=%v",
-			volumeIDList, nodeName, err)
+			"Error checking if volumes attached to nodes. err=%v",
+			err)
 		return volumesAttachedCheck, err
 	}
 

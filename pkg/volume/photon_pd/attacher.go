@@ -81,7 +81,21 @@ func (attacher *photonPersistentDiskAttacher) Attach(spec *volume.Spec, nodeName
 	return path.Join(diskByIDPath, diskPhotonPrefix+PdidWithNoHypens), nil
 }
 
-func (attacher *photonPersistentDiskAttacher) VolumesAreAttached(specs []*volume.Spec, nodeName types.NodeName) (map[*volume.Spec]bool, error) {
+func (attacher *photonPersistentDiskAttacher) VolumesAreAttached(volumesByNode map[types.NodeName][]*volume.Spec) (map[*volume.Spec]bool, error) {
+	volumesAttachedCheck := make(map[*volume.Spec]bool)
+	for nodeName, specs := range volumesByNode {
+		nodeVolumesAttachedCheck, err := attacher.volumesAreAttachedToNode(specs, nodeName)
+		if err != nil {
+			return nil, err
+		}
+		for k, v := range nodeVolumesAttachedCheck {
+			volumesAttachedCheck[k] = v
+		}
+	}
+	return volumesAttachedCheck, nil
+}
+
+func (attacher *photonPersistentDiskAttacher) volumesAreAttachedToNode(specs []*volume.Spec, nodeName types.NodeName) (map[*volume.Spec]bool, error) {
 	volumesAttachedCheck := make(map[*volume.Spec]bool)
 	volumeSpecMap := make(map[string]*volume.Spec)
 	pdIDList := []string{}

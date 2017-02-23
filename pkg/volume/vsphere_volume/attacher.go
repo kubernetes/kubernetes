@@ -84,7 +84,21 @@ func (attacher *vsphereVMDKAttacher) Attach(spec *volume.Spec, nodeName types.No
 	return path.Join(diskByIDPath, diskSCSIPrefix+diskUUID), nil
 }
 
-func (attacher *vsphereVMDKAttacher) VolumesAreAttached(specs []*volume.Spec, nodeName types.NodeName) (map[*volume.Spec]bool, error) {
+func (attacher *vsphereVMDKAttacher) VolumesAreAttached(volumesByNode map[types.NodeName][]*volume.Spec) (map[*volume.Spec]bool, error) {
+	volumesAttachedCheck := make(map[*volume.Spec]bool)
+	for nodeName, specs := range volumesByNode {
+		nodeVolumesAttachedCheck, err := attacher.volumesAreAttachedToNode(specs, nodeName)
+		if err != nil {
+			return nil, err
+		}
+		for k, v := range nodeVolumesAttachedCheck {
+			volumesAttachedCheck[k] = v
+		}
+	}
+	return volumesAttachedCheck, nil
+}
+
+func (attacher *vsphereVMDKAttacher) volumesAreAttachedToNode(specs []*volume.Spec, nodeName types.NodeName) (map[*volume.Spec]bool, error) {
 	volumesAttachedCheck := make(map[*volume.Spec]bool)
 	volumeSpecMap := make(map[string]*volume.Spec)
 	volumePathList := []string{}

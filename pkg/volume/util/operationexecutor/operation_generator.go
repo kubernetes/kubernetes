@@ -81,7 +81,7 @@ type OperationGenerator interface {
 	GenerateDetachVolumeFunc(volumeToDetach AttachedVolume, verifySafeToDetach bool, actualStateOfWorld ActualStateOfWorldAttacherUpdater) (func() error, error)
 
 	// Generates the VolumesAreAttached function needed to verify if volume plugins are attached
-	GenerateVolumesAreAttachedFunc(attachedVolumes []AttachedVolume, nodeName types.NodeName, actualStateOfWorld ActualStateOfWorldAttacherUpdater) (func() error, error)
+	GenerateVolumesAreAttachedFunc(attachedVolumesByNode map[types.NodeName][]AttachedVolume, actualStateOfWorld ActualStateOfWorldAttacherUpdater) (func() error, error)
 
 	// Generates the UnMountDevice function needed to perform the unmount of a device
 	GenerateUnmountDeviceFunc(deviceToDetach AttachedVolume, actualStateOfWorld ActualStateOfWorldMounterUpdater, mounter mount.Interface) (func() error, error)
@@ -91,42 +91,43 @@ type OperationGenerator interface {
 }
 
 func (og *operationGenerator) GenerateVolumesAreAttachedFunc(
-	attachedVolumes []AttachedVolume,
-	nodeName types.NodeName,
+	attachedVolumesByNode map[types.NodeName][]AttachedVolume,
 	actualStateOfWorld ActualStateOfWorldAttacherUpdater) (func() error, error) {
 
 	// volumesPerPlugin maps from a volume plugin to a list of volume specs which belong
 	// to this type of plugin
-	volumesPerPlugin := make(map[string][]*volume.Spec)
+	volumesPerPlugin := make(map[string]map[types.NodeName][]*volume.Spec)
 	// volumeSpecMap maps from a volume spec to its unique volumeName which will be used
 	// when calling MarkVolumeAsDetached
 	volumeSpecMap := make(map[*volume.Spec]v1.UniqueVolumeName)
 	// Iterate each volume spec and put them into a map index by the pluginName
-	for _, volumeAttached := range attachedVolumes {
-		volumePlugin, err :=
-			og.volumePluginMgr.FindPluginBySpec(volumeAttached.VolumeSpec)
-		if err != nil || volumePlugin == nil {
-			glog.Errorf(
-				"VolumesAreAttached.FindPluginBySpec failed for volume %q (spec.Name: %q) on node %q with error: %v",
-				volumeAttached.VolumeName,
-				volumeAttached.VolumeSpec.Name(),
-				volumeAttached.NodeName,
-				err)
+	for node, attachedVolumes := range attachedVolumesByNode {
+		for _, volumeAttached := range attachedVolumes {
+			volumePlugin, err :=
+				og.volumePluginMgr.FindPluginBySpec(volumeAttached.VolumeSpec)
+			if err != nil || volumePlugin == nil {
+				glog.Errorf(
+					"VolumesAreAttached.FindPluginBySpec failed for volume %q (spec.Name: %q) on node %q with error: %v",
+					volumeAttached.VolumeName,
+					volumeAttached.VolumeSpec.Name(),
+					volumeAttached.NodeName,
+					err)
+			}
+			volumeSpecList, pluginExists := volumesPerPlugin[volumePlugin.GetPluginName()]
+			if !pluginExists {
+				volumeSpecList = make(map[types.NodeName][]*volume.Spec)
+			}
+			volumeSpecList[node] = append(volumeSpecList[node], volumeAttached.VolumeSpec)
+			volumesPerPlugin[volumePlugin.GetPluginName()] = volumeSpecList
+			volumeSpecMap[volumeAttached.VolumeSpec] = volumeAttached.VolumeName
 		}
-		volumeSpecList, pluginExists := volumesPerPlugin[volumePlugin.GetPluginName()]
-		if !pluginExists {
-			volumeSpecList = []*volume.Spec{}
-		}
-		volumeSpecList = append(volumeSpecList, volumeAttached.VolumeSpec)
-		volumesPerPlugin[volumePlugin.GetPluginName()] = volumeSpecList
-		volumeSpecMap[volumeAttached.VolumeSpec] = volumeAttached.VolumeName
 	}
 
 	return func() error {
 
 		// For each volume plugin, pass the list of volume specs to VolumesAreAttached to check
 		// whether the volumes are still attached.
-		for pluginName, volumesSpecs := range volumesPerPlugin {
+		for pluginName, volumeSpecsByNode := range volumesPerPlugin {
 			attachableVolumePlugin, err :=
 				og.volumePluginMgr.FindAttachablePluginByName(pluginName)
 			if err != nil || attachableVolumePlugin == nil {
@@ -146,20 +147,22 @@ func (og *operationGenerator) GenerateVolumesAreAttachedFunc(
 				continue
 			}
 
-			attached, areAttachedErr := volumeAttacher.VolumesAreAttached(volumesSpecs, nodeName)
+			attached, areAttachedErr := volumeAttacher.VolumesAreAttached(volumeSpecsByNode)
 			if areAttachedErr != nil {
 				glog.Errorf(
-					"VolumesAreAttached failed for checking on node %q with: %v",
-					nodeName,
+					"VolumesAreAttached failed with: %v",
 					areAttachedErr)
 				continue
 			}
 
-			for spec, check := range attached {
-				if !check {
-					actualStateOfWorld.MarkVolumeAsDetached(volumeSpecMap[spec], nodeName)
-					glog.V(1).Infof("VerifyVolumesAreAttached determined volume %q (spec.Name: %q) is no longer attached to node %q, therefore it was marked as detached.",
-						volumeSpecMap[spec], spec.Name(), nodeName)
+			for nodeName, specs := range volumeSpecsByNode {
+				for _, spec := range specs {
+					check := attached[spec]
+					if !check {
+						actualStateOfWorld.MarkVolumeAsDetached(volumeSpecMap[spec], nodeName)
+						glog.V(1).Infof("VerifyVolumesAreAttached determined volume %q (spec.Name: %q) is no longer attached to node %q, therefore it was marked as detached.",
+							volumeSpecMap[spec], spec.Name(), nodeName)
+					}
 				}
 			}
 		}
