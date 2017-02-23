@@ -145,7 +145,7 @@ var internalLabelKeys []string = []string{containerTypeLabelKey, containerLogPat
 
 // NOTE: Anything passed to DockerService should be eventually handled in another way when we switch to running the shim as a different process.
 func NewDockerService(client dockertools.DockerInterface, seccompProfileRoot string, podSandboxImage string, streamingConfig *streaming.Config,
-	pluginSettings *NetworkPluginSettings, cgroupsName string, kubeCgroupDriver string, execHandler dockertools.ExecHandler) (DockerService, error) {
+	pluginSettings *NetworkPluginSettings, cgroupsName string, kubeCgroupDriver string, kubeEnableCRI bool, execHandler dockertools.ExecHandler) (DockerService, error) {
 	c := dockertools.NewInstrumentedDockerInterface(client)
 	checkpointHandler, err := NewPersistentCheckpointHandler()
 	if err != nil {
@@ -197,6 +197,15 @@ func NewDockerService(client dockertools.DockerInterface, seccompProfileRoot str
 	} else {
 		cgroupDriver = dockerInfo.CgroupDriver
 	}
+
+	if kubeEnableCRI {
+		if err != nil {
+			glog.Warningf("Unable to verify logging driver compatibility. Only json-file is supported by the kubelet CRI.")
+		} else if dockerInfo.LoggingDriver != "json-file" {
+			return nil, fmt.Errorf("Logging driver %s is not supported.  Only json-file is supported by the kubelet CRI.", dockerInfo.LoggingDriver)
+		}
+	}
+
 	if len(kubeCgroupDriver) != 0 && kubeCgroupDriver != cgroupDriver {
 		return nil, fmt.Errorf("misconfiguration: kubelet cgroup driver: %q is different from docker cgroup driver: %q", kubeCgroupDriver, cgroupDriver)
 	}

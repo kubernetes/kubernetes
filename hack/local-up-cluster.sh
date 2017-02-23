@@ -39,6 +39,7 @@ FIRST_SERVICE_CLUSTER_IP=${FIRST_SERVICE_CLUSTER_IP:-10.0.0.1}
 CGROUPS_PER_QOS=${CGROUPS_PER_QOS:-true}
 # name of the cgroup driver, i.e. cgroupfs or systemd
 CGROUP_DRIVER=${CGROUP_DRIVER:-""}
+ENABLE_CRI=${ENABLE_CRI:-"true"}
 # owner of client certs, default to current user if not specified
 USER=${USER:-$(whoami)}
 
@@ -205,6 +206,11 @@ if [[ ${CONTAINER_RUNTIME} == "docker" ]]; then
     # match driver with docker runtime reported value (they must match)
     CGROUP_DRIVER=$(docker info | grep "Cgroup Driver:" | cut -f3- -d' ')
     echo "Kubelet cgroup driver defaulted to use: ${CGROUP_DRIVER}"
+  fi
+  LOGGING_DRIVER=$(docker info | grep "Logging Driver:" | cut -f3- -d' ')
+  if [[ "${LOGGING_DRIVER}" != "json-file" ]] && [[ "${ENABLE_CRI}" == "true" ]]; then
+    echo "ERROR kubelet CRI requires docker use the json-file (default) logging driver"
+    exit 1
   fi
 fi
 
@@ -596,6 +602,7 @@ function start_kubelet {
         --eviction-soft=${EVICTION_SOFT} \
         --eviction-pressure-transition-period=${EVICTION_PRESSURE_TRANSITION_PERIOD} \
         --pod-manifest-path="${POD_MANIFEST_PATH}" \
+        --enable-cri="${ENABLE_CRI}" \
         ${auth_args} \
         ${dns_args} \
         ${net_plugin_dir_args} \
