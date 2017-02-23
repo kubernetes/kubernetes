@@ -34,6 +34,9 @@ const (
 	GroupKind          = "Group"
 	ServiceAccountKind = "ServiceAccount"
 	UserKind           = "User"
+
+	// AutoUpdateAnnotationKey is the name of an annotation which prevents reconciliation if set to "false"
+	AutoUpdateAnnotationKey = "rbac.authorization.kubernetes.io/autoupdate"
 )
 
 // Authorization is calculated against
@@ -72,7 +75,10 @@ type Subject struct {
 	// Kind of object being referenced. Values defined by this API group are "User", "Group", and "ServiceAccount".
 	// If the Authorizer does not recognized the kind value, the Authorizer should report an error.
 	Kind string `json:"kind" protobuf:"bytes,1,opt,name=kind"`
-	// APIVersion holds the API group and version of the referenced object.
+	// APIVersion holds the API group and version of the referenced subject.
+	// Defaults to "v1" for ServiceAccount subjects.
+	// Defaults to "rbac.authorization.k8s.io/v1alpha1" for User and Group subjects.
+	// +k8s:conversion-gen=false
 	// +optional
 	APIVersion string `json:"apiVersion,omitempty" protobuf:"bytes,2,opt.name=apiVersion"`
 	// Name of the object being referenced.
