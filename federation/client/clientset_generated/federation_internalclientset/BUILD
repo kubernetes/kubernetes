@@ -12,11 +12,9 @@ go_library(
     srcs = [
         "clientset.go",
         "doc.go",
-        "import_known_versions.go",
     ],
     tags = ["automanaged"],
     deps = [
-        "//federation/apis/federation/install:go_default_library",
         "//federation/client/clientset_generated/federation_internalclientset/typed/autoscaling/internalversion:go_default_library",
         "//federation/client/clientset_generated/federation_internalclientset/typed/batch/internalversion:go_default_library",
         "//federation/client/clientset_generated/federation_internalclientset/typed/core/internalversion:go_default_library",
@@ -41,6 +39,7 @@ filegroup(
     srcs = [
         ":package-srcs",
         "//federation/client/clientset_generated/federation_internalclientset/fake:all-srcs",
+        "//federation/client/clientset_generated/federation_internalclientset/scheme:all-srcs",
         "//federation/client/clientset_generated/federation_internalclientset/typed/autoscaling/internalversion:all-srcs",
         "//federation/client/clientset_generated/federation_internalclientset/typed/batch/internalversion:all-srcs",
         "//federation/client/clientset_generated/federation_internalclientset/typed/core/internalversion:all-srcs",
