@@ -222,3 +222,89 @@ func createAdClients(ns *v1.Namespace, t *testing.T, server *httptest.Server, sy
 	}
 	return testClient, ctrl, informers
 }
+
+// Via integration test we can verify that if pod add
+// event is somehow missed by AttachDetach controller - it still
+// gets added by Desired State of World populator.
+func TestPodAddedByDswp(t *testing.T) {
+	_, server := framework.RunAMaster(nil)
+	defer server.Close()
+	namespaceName := "test-pod-deletion"
+
+	node := &v1.Node{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "node-sandbox",
+			Annotations: map[string]string{
+				volumehelper.ControllerManagedAttachAnnotation: "true",
+			},
+		},
+	}
+
+	ns := framework.CreateTestingNamespace(namespaceName, server, t)
+	defer framework.DeleteTestingNamespace(ns, server, t)
+
+	testClient, ctrl, informers := createAdClients(ns, t, server, defaultSyncPeriod)
+
+	pod := fakePodWithVol(namespaceName)
+	podStopCh := make(chan struct{})
+
+	if _, err := testClient.Core().Nodes().Create(node); err != nil {
+		t.Fatalf("Failed to created node : %v", err)
+	}
+
+	go informers.Core().V1().Nodes().Informer().Run(podStopCh)
+
+	if _, err := testClient.Core().Pods(ns.Name).Create(pod); err != nil {
+		t.Errorf("Failed to create pod : %v", err)
+	}
+
+	podInformer := informers.Core().V1().Pods().Informer()
+	go podInformer.Run(podStopCh)
+
+	// start controller loop
+	stopCh := make(chan struct{})
+	go informers.Core().V1().PersistentVolumeClaims().Informer().Run(stopCh)
+	go informers.Core().V1().PersistentVolumes().Informer().Run(stopCh)
+	go ctrl.Run(stopCh)
+
+	waitToObservePods(t, podInformer, 1)
+	podKey, err := cache.MetaNamespaceKeyFunc(pod)
+	if err != nil {
+		t.Fatalf("MetaNamespaceKeyFunc failed with : %v", err)
+	}
+
+	_, _, err = podInformer.GetStore().GetByKey(podKey)
+
+	if err != nil {
+		t.Fatalf("Pod not found in Pod Informer cache : %v", err)
+	}
+
+	waitForPodsInDSWP(t, ctrl.GetDesiredStateOfWorld())
+
+	// let's stop pod events from getting triggered
+	close(podStopCh)
+	podObj, err := api.Scheme.DeepCopy(pod)
+	if err != nil {
+		t.Fatalf("Error copying pod : %v", err)
+	}
+	podNew, ok := podObj.(*v1.Pod)
+	if !ok {
+		t.Fatalf("Error converting pod : %v", err)
+	}
+	newPodName := "newFakepod"
+	podNew.SetName(newPodName)
+	err = podInformer.GetStore().Add(podNew)
+	if err != nil {
+		t.Fatalf("Error adding pod : %v", err)
+	}
+
+	waitToObservePods(t, podInformer, 2)
+	// the findAndAddActivePods loop turns every 3 minute
+	time.Sleep(200 * time.Second)
+	podsToAdd := ctrl.GetDesiredStateOfWorld().GetPodToAdd()
+	if len(podsToAdd) != 2 {
+		t.Fatalf("DSW should have two pods")
+	}
+
+	close(stopCh)
+}
