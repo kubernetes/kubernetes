@@ -609,7 +609,7 @@ func (r *Request) URL() *url.URL {
 // finalURLTemplate is similar to URL(), but will make all specific parameter values equal
 // - instead of name or namespace, "{name}" and "{namespace}" will be used, and all query
 // parameters will be reset. This creates a copy of the request so as not to change the
-// underyling object.  This means some useful request info (like the types of field
+// underlying object.  This means some useful request info (like the types of field
 // selectors in use) will be lost.
 // TODO: preserve field selector keys
 func (r Request) finalURLTemplate() url.URL {
