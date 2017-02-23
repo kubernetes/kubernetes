@@ -73,6 +73,7 @@ go_library(
         "//pkg/volume/util/volumehelper:go_default_library",
         "//plugin/pkg/scheduler/algorithm/predicates:go_default_library",
         "//plugin/pkg/scheduler/schedulercache:go_default_library",
+        "//test/e2e/generated:go_default_library",
         "//test/e2e/perftype:go_default_library",
         "//test/utils:go_default_library",
         "//vendor:github.com/golang/glog",

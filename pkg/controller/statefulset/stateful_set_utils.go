@@ -38,7 +38,7 @@ var updateConflictError = fmt.Errorf("aborting update after %d attempts", maxUpd
 
 // overlappingStatefulSets sorts a list of StatefulSets by creation timestamp, using their names as a tie breaker.
 // Generally used to tie break between StatefulSets that have overlapping selectors.
-type overlappingStatefulSets []apps.StatefulSet
+type overlappingStatefulSets []*apps.StatefulSet
 
 func (o overlappingStatefulSets) Len() int { return len(o) }
 
