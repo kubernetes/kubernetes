@@ -45,7 +45,6 @@ import (
 
 	"k8s.io/kubernetes/pkg/api/annotations"
 	"k8s.io/kubernetes/pkg/api/events"
-	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/apis/apps"
 	"k8s.io/kubernetes/pkg/apis/autoscaling"
 	"k8s.io/kubernetes/pkg/apis/batch"
@@ -582,7 +581,7 @@ func describePod(pod *api.Pod, events *api.EventList) (string, error) {
 		describeVolumes(pod.Spec.Volumes, w, "")
 		w.Write(LEVEL_0, "QoS Class:\t%s\n", pod.Status.QOSClass)
 		printLabelsMultiline(w, "Node-Selectors", pod.Spec.NodeSelector)
-		printTolerationsInAnnotationMultiline(w, "Tolerations", pod.Annotations)
+		printPodTolerationsMultiline(w, "Tolerations", pod.Spec.Tolerations)
 		if events != nil {
 			DescribeEvents(events, w)
 		}
@@ -1987,7 +1986,7 @@ func describeNode(node *api.Node, nodeNonTerminatedPodsList *api.PodList, events
 		w.Write(LEVEL_0, "Name:\t%s\n", node.Name)
 		w.Write(LEVEL_0, "Role:\t%s\n", findNodeRole(node))
 		printLabelsMultiline(w, "Labels", node.Labels)
-		printTaintsInAnnotationMultiline(w, "Taints", node.Annotations)
+		printNodeTaintsMultiline(w, "Taints", node.Spec.Taints)
 		w.Write(LEVEL_0, "CreationTimestamp:\t%s\n", node.CreationTimestamp.Time.Format(time.RFC1123Z))
 		w.Write(LEVEL_0, "Phase:\t%v\n", node.Status.Phase)
 		if len(node.Status.Conditions) > 0 {
@@ -2854,17 +2853,7 @@ func printLabelsMultilineWithIndent(w *PrefixWriter, initialIndent, title, inner
 }
 
 // printTaintsMultiline prints multiple taints with a proper alignment.
-func printTaintsInAnnotationMultiline(w *PrefixWriter, title string, annotations map[string]string) {
-	v1Taints, err := v1.GetTaintsFromNodeAnnotations(annotations)
-	if err != nil {
-		v1Taints = []v1.Taint{}
-	}
-	taints := make([]api.Taint, len(v1Taints))
-	for i := range v1Taints {
-		if err := v1.Convert_v1_Taint_To_api_Taint(&v1Taints[i], &taints[i], nil); err != nil {
-			panic(err)
-		}
-	}
+func printNodeTaintsMultiline(w *PrefixWriter, title string, taints []api.Taint) {
 	printTaintsMultilineWithIndent(w, "", title, "\t", taints)
 }
 
@@ -2898,18 +2887,8 @@ func printTaintsMultilineWithIndent(w *PrefixWriter, initialIndent, title, inner
 	}
 }
 
-// printTolerationsMultiline prints multiple tolerations with a proper alignment.
-func printTolerationsInAnnotationMultiline(w *PrefixWriter, title string, annotations map[string]string) {
-	v1Tolerations, err := v1.GetTolerationsFromPodAnnotations(annotations)
-	if err != nil {
-		v1Tolerations = []v1.Toleration{}
-	}
-	tolerations := make([]api.Toleration, len(v1Tolerations))
-	for i := range v1Tolerations {
-		if err := v1.Convert_v1_Toleration_To_api_Toleration(&v1Tolerations[i], &tolerations[i], nil); err != nil {
-			panic(err)
-		}
-	}
+// printPodTolerationsMultiline prints multiple tolerations with a proper alignment.
+func printPodTolerationsMultiline(w *PrefixWriter, title string, tolerations []api.Toleration) {
 	printTolerationsMultilineWithIndent(w, "", title, "\t", tolerations)
 }
 

@@ -2517,9 +2517,8 @@ func RemoveLabelOffNode(c clientset.Interface, nodeName string, labelKey string)
 func VerifyThatTaintIsGone(c clientset.Interface, nodeName string, taint *v1.Taint) {
 	By("verifying the node doesn't have the taint " + taint.ToString())
 	nodeUpdated, err := c.Core().Nodes().Get(nodeName, metav1.GetOptions{})
-	taintsGot, err := v1.GetTaintsFromNodeAnnotations(nodeUpdated.Annotations)
 	ExpectNoError(err)
-	if v1.TaintExists(taintsGot, taint) {
+	if v1.TaintExists(nodeUpdated.Spec.Taints, taint) {
 		Failf("Failed removing taint " + taint.ToString() + " of the node " + nodeName)
 	}
 }
@@ -2529,8 +2528,7 @@ func ExpectNodeHasTaint(c clientset.Interface, nodeName string, taint *v1.Taint)
 	node, err := c.Core().Nodes().Get(nodeName, metav1.GetOptions{})
 	ExpectNoError(err)
 
-	nodeTaints, err := v1.GetTaintsFromNodeAnnotations(node.Annotations)
-	ExpectNoError(err)
+	nodeTaints := node.Spec.Taints
 
 	if len(nodeTaints) == 0 || !v1.TaintExists(nodeTaints, taint) {
 		Failf("Failed to find taint %s on node %s", taint.ToString(), nodeName)

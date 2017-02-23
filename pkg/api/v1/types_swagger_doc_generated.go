@@ -936,6 +936,7 @@ var map_NodeSpec = map[string]string{
 	"externalID":    "External ID of the node assigned by some machine database (e.g. a cloud provider). Deprecated.",
 	"providerID":    "ID of the node assigned by the cloud provider in the format: <ProviderName>://<ProviderSpecificNodeID>",
 	"unschedulable": "Unschedulable controls node schedulability of new pods. By default, node is schedulable. More info: http://releases.k8s.io/HEAD/docs/admin/node.md#manual-node-administration",
+	"taints":        "If specified, the node's taints.",
 }
 
 func (NodeSpec) SwaggerDoc() map[string]string {
@@ -1331,6 +1332,7 @@ var map_PodSpec = map[string]string{
 	"subdomain":                     "If specified, the fully qualified Pod hostname will be \"<hostname>.<subdomain>.<pod namespace>.svc.<cluster domain>\". If not specified, the pod will not have a domainname at all.",
 	"affinity":                      "If specified, the pod's scheduling constraints",
 	"schedulername":                 "If specified, the pod will be dispatched by specified scheduler. If not specified, the pod will be dispatched by default scheduler.",
+	"tolerations":                   "If specified, the pod's tolerations.",
 }
 
 func (PodSpec) SwaggerDoc() map[string]string {

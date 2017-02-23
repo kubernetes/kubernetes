@@ -18,7 +18,6 @@ package kubectl
 
 import (
 	"bytes"
-	"encoding/json"
 	"fmt"
 	"reflect"
 	"strings"
@@ -70,16 +69,15 @@ func TestDescribePod(t *testing.T) {
 }
 
 func TestDescribePodTolerations(t *testing.T) {
-
-	podTolerations := []v1.Toleration{{Key: "key1", Value: "value1"},
-		{Key: "key2", Value: "value2"}}
-	pt, _ := json.Marshal(podTolerations)
 	fake := fake.NewSimpleClientset(&api.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "bar",
 			Namespace: "foo",
-			Annotations: map[string]string{
-				v1.TolerationsAnnotationKey: string(pt),
+		},
+		Spec: api.PodSpec{
+			Tolerations: []api.Toleration{
+				{Key: "key1", Value: "value1"},
+				{Key: "key2", Value: "value2"},
 			},
 		},
 	})
