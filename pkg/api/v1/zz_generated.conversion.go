@@ -2759,8 +2759,8 @@ func autoConvert_api_PersistentVolumeSpec_To_v1_PersistentVolumeSpec(in *api.Per
 	}
 	out.AccessModes = *(*[]PersistentVolumeAccessMode)(unsafe.Pointer(&in.AccessModes))
 	out.ClaimRef = (*ObjectReference)(unsafe.Pointer(in.ClaimRef))
-	out.MountOptions = *(*[]string)(unsafe.Pointer(&in.MountOptions))
 	out.PersistentVolumeReclaimPolicy = PersistentVolumeReclaimPolicy(in.PersistentVolumeReclaimPolicy)
+	out.MountOptions = *(*[]string)(unsafe.Pointer(&in.MountOptions))
 	return nil
 }
 

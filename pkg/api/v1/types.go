@@ -468,7 +468,7 @@ type PersistentVolumeSpec struct {
 	PersistentVolumeReclaimPolicy PersistentVolumeReclaimPolicy `json:"persistentVolumeReclaimPolicy,omitempty" protobuf:"bytes,5,opt,name=persistentVolumeReclaimPolicy,casttype=PersistentVolumeReclaimPolicy"`
 	// The mount options to be used for mounting the volumes
 	// +optional
-	MountOptions []string `json:"mountOptions,omitempty" protobuf:"bytes,6,opt,name=mountOptions"`
+	MountOptions []string `json:"mountOptions,omitempty" protobuf:"bytes,6,rep,name=mountOptions"`
 }
 
 // PersistentVolumeReclaimPolicy describes a policy for end-of-life maintenance of persistent volumes.
