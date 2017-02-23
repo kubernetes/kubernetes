@@ -14,6 +14,7 @@ go_library(
         "daemonsets.go",
         "deployments.go",
         "horizontal_pod_autoscalers.go",
+        "ingress.go",
         "job.go",
         "persistent_volumes.go",
         "secrets.go",
