@@ -34,7 +34,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/apis/componentconfig"
 	v1alpha1 "k8s.io/kubernetes/pkg/apis/componentconfig/v1alpha1"
-	"k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/stats"
+	stats "k8s.io/kubernetes/pkg/kubelet/apis/stats/v1alpha1"
 	// utilconfig "k8s.io/kubernetes/pkg/util/config"
 	"k8s.io/kubernetes/test/e2e/framework"
 
