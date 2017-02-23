@@ -14,16 +14,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# These steps must be executed once the host /var and /lib volumes have
+# been mounted, and therefore cannot be done in the docker build stage.
+
 # For systems without journald
 mkdir -p /var/log/journal
 
-if [ ! -z "`ls /host/lib/libsystemd* 2>/dev/null`" ]
-then
+# Copy host libsystemd into image to avoid compatibility issues.
+if [ ! -z "$(ls /host/lib/libsystemd* 2>/dev/null)" ]; then
   rm /lib/x86_64-linux-gnu/libsystemd*
   cp -a /host/lib/libsystemd* /lib/x86_64-linux-gnu/
 fi
 
-LD_PRELOAD=/opt/td-agent/embedded/lib/libjemalloc.so
-RUBY_GC_HEAP_OLDOBJECT_LIMIT_FACTOR=0.9
-
-/usr/sbin/td-agent $@
+/usr/local/bin/fluentd $@
