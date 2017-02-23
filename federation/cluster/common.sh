@@ -106,15 +106,6 @@ KUBE_BUILD_STAGE=${KUBE_BUILD_STAGE:-release-stage}
 
 source "${KUBE_ROOT}/cluster/common.sh"
 
-# kubefed configuration
-FEDERATION_KUBE_CONTEXT="${FEDERATION_KUBE_CONTEXT:-e2e-federation}"
-HOST_CLUSTER_CONTEXT="${FEDERATION_HOST_CLUSTER_CONTEXT:-${1}}"
-
-# kube-dns configuration.
-KUBEDNS_CONFIGMAP_NAME="kube-dns"
-KUBEDNS_CONFIGMAP_NAMESPACE="kube-system"
-KUBEDNS_FEDERATION_FLAG="federations"
-
 host_kubectl="${KUBE_ROOT}/cluster/kubectl.sh --namespace=${FEDERATION_NAMESPACE}"
 
 # required:
