@@ -40,11 +40,12 @@ type MasterConfiguration struct {
 	KubernetesVersion string
 	CloudProvider     string
 	AuthorizationMode string
+	CertAltNames      []string
+	CertificatesDir   string
 }
 
 type API struct {
 	AdvertiseAddresses []string
-	ExternalDNSNames   []string
 	Port               int32
 }
 

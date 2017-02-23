@@ -17,11 +17,15 @@ limitations under the License.
 package validation
 
 import (
+	"fmt"
 	"net"
+	"path/filepath"
 
+	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
+	apivalidation "k8s.io/kubernetes/pkg/api/validation"
 	authzmodes "k8s.io/kubernetes/pkg/kubeapiserver/authorizer/modes"
 	"k8s.io/kubernetes/pkg/registry/core/service/ipallocator"
 )
@@ -47,6 +51,8 @@ func ValidateMasterConfiguration(c *kubeadm.MasterConfiguration) field.ErrorList
 	allErrs = append(allErrs, ValidateServiceSubnet(c.Networking.ServiceSubnet, field.NewPath("service subnet"))...)
 	allErrs = append(allErrs, ValidateCloudProvider(c.CloudProvider, field.NewPath("cloudprovider"))...)
 	allErrs = append(allErrs, ValidateAuthorizationMode(c.AuthorizationMode, field.NewPath("authorization-mode"))...)
+	allErrs = append(allErrs, ValidateNetworking(&c.Networking, field.NewPath("networking"))...)
+	allErrs = append(allErrs, ValidateCertAltNames(c.CertAltNames, field.NewPath("cert-altnames"))...)
 	return allErrs
 }
 
@@ -72,7 +78,7 @@ func ValidateDiscovery(c *kubeadm.Discovery, fldPath *field.Path) field.ErrorLis
 		count++
 	}
 	if count != 1 {
-		allErrs = append(allErrs, field.Invalid(fldPath, nil, "exactly one discovery strategy can be provided"))
+		allErrs = append(allErrs, field.Invalid(fldPath, "", "exactly one discovery strategy can be provided"))
 	}
 	return allErrs
 }
@@ -90,10 +96,10 @@ func ValidateHTTPSDiscovery(c *kubeadm.HTTPSDiscovery, fldPath *field.Path) fiel
 func ValidateTokenDiscovery(c *kubeadm.TokenDiscovery, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	if len(c.ID) == 0 || len(c.Secret) == 0 {
-		allErrs = append(allErrs, field.Invalid(fldPath, nil, "token must be specific as <ID>:<Secret>"))
+		allErrs = append(allErrs, field.Required(fldPath, "token must be specific as <ID>:<Secret>"))
 	}
 	if len(c.Addresses) == 0 {
-		allErrs = append(allErrs, field.Invalid(fldPath, nil, "at least one address is required"))
+		allErrs = append(allErrs, field.Required(fldPath, "at least one address is required"))
 	}
 	return allErrs
 }
@@ -105,26 +111,66 @@ func ValidateAuthorizationMode(authzMode string, fldPath *field.Path) field.Erro
 	return field.ErrorList{}
 }
 
-func ValidateServiceSubnet(subnet string, fldPath *field.Path) field.ErrorList {
+func ValidateCertAltNames(altnames []string, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	for _, altname := range altnames {
+		if len(validation.IsDNS1123Subdomain(altname)) != 0 && net.ParseIP(altname) == nil {
+			allErrs = append(allErrs, field.Invalid(fldPath, altnames, fmt.Sprintf("altname %s is not a valid dns label or ip address", altname)))
+		}
+	}
+	return allErrs
+}
+
+func ValidateIPFromString(ipaddr string, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	if net.ParseIP(ipaddr) == nil {
+		allErrs = append(allErrs, field.Invalid(fldPath, ipaddr, "ip address is not valid"))
+	}
+	return allErrs
+}
+
+func ValidateIPNetFromString(subnet string, minAddrs int64, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
 	_, svcSubnet, err := net.ParseCIDR(subnet)
 	if err != nil {
-		return field.ErrorList{field.Invalid(fldPath, nil, "couldn't parse the service subnet")}
+		allErrs = append(allErrs, field.Invalid(fldPath, subnet, "couldn't parse subnet"))
+		return allErrs
 	}
 	numAddresses := ipallocator.RangeSize(svcSubnet)
-	if numAddresses < kubeadmconstants.MinimumAddressesInServiceSubnet {
-		return field.ErrorList{field.Invalid(fldPath, nil, "service subnet is too small")}
+	if numAddresses < minAddrs {
+		allErrs = append(allErrs, field.Invalid(fldPath, subnet, "subnet is too small"))
 	}
-	return field.ErrorList{}
+	return allErrs
+}
+
+func ValidateNetworking(c *kubeadm.Networking, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	allErrs = append(allErrs, apivalidation.ValidateDNS1123Subdomain(c.DNSDomain, field.NewPath("dns-domain"))...)
+	allErrs = append(allErrs, ValidateIPNetFromString(c.ServiceSubnet, kubeadmconstants.MinimumAddressesInServiceSubnet, field.NewPath("service-subnet"))...)
+	if len(c.PodSubnet) != 0 {
+		allErrs = append(allErrs, ValidateIPNetFromString(c.PodSubnet, kubeadmconstants.MinimumAddressesInServiceSubnet, field.NewPath("pod-subnet"))...)
+	}
+	return allErrs
+}
+
+func ValidateAbsolutePath(path string, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	if !filepath.IsAbs(path) {
+		allErrs = append(allErrs, field.Invalid(fldPath, path, "path is not absolute"))
+	}
+	return allErrs
 }
 
 func ValidateCloudProvider(provider string, fldPath *field.Path) field.ErrorList {
-	if len(provider) == 0 {
-		return field.ErrorList{}
+	allErrs := field.ErrorList{}
+	if len(provider) != 0 {
+		return allErrs
 	}
 	for _, supported := range cloudproviders {
 		if provider == supported {
-			return field.ErrorList{}
+			return allErrs
 		}
 	}
-	return field.ErrorList{field.Invalid(fldPath, nil, "cloudprovider not supported")}
+	allErrs = append(allErrs, field.Invalid(fldPath, nil, "cloudprovider not supported"))
+	return allErrs
 }

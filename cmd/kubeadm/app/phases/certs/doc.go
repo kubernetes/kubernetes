@@ -23,7 +23,7 @@ package certs
 	INPUTS:
 		From MasterConfiguration
 			.API.AdvertiseAddresses is needed for knowing which IPs the certs should be signed for
-			.API.ExternalDNSNames is needed for knowing which DNS names the certs should be signed for
+			AltNames is needed for knowing which DNS names the certs should be signed for
 			.Networking.DNSDomain is needed for knowing which DNS name the internal kubernetes service has
 			.Networking.ServiceSubnet is needed for knowing which IP the internal kubernetes service is going to point to
 			The PKIPath is required for knowing where all certificates should be stored

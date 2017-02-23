@@ -30,11 +30,15 @@ type MasterConfiguration struct {
 	KubernetesVersion string     `json:"kubernetesVersion"`
 	CloudProvider     string     `json:"cloudProvider"`
 	AuthorizationMode string     `json:"authorizationMode"`
+
+	// All IP addresses and DNS names these certs should be signed for
+	// Defaults to the default networking interface's IP address and the hostname of the master node
+	CertAltNames    []string `json:"certAltNames"`
+	CertificatesDir string   `json:"certificatesDir"`
 }
 
 type API struct {
 	AdvertiseAddresses []string `json:"advertiseAddresses"`
-	ExternalDNSNames   []string `json:"externalDNSNames"`
 	Port               int32    `json:"port"`
 }
 
