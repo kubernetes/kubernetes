@@ -574,6 +574,7 @@ func (proxier *Proxier) OnEndpointsUpdate(allEndpoints []api.Endpoints) {
 	activeEndpoints := make(map[proxy.ServicePortName]bool) // use a map as a set
 	staleConnections := make(map[endpointServicePair]bool)
 	svcPortToInfoMap := make(map[proxy.ServicePortName][]hostPortInfo)
+	newEndpointsMap := make(map[proxy.ServicePortName][]*endpointsInfo)
 
 	// Update endpoints for services.
 	for i := range allEndpoints {
@@ -610,32 +611,48 @@ func (proxier *Proxier) OnEndpointsUpdate(allEndpoints []api.Endpoints) {
 			// Flatten the list of current endpoint infos to just a list of ips as strings
 			curEndpointIPs := flattenEndpointsInfo(curEndpoints)
 			if len(curEndpointIPs) != len(newEndpoints) || !slicesEquiv(slice.CopyStrings(curEndpointIPs), newEndpoints) {
+				glog.V(3).Infof("Setting endpoints for %q to %+v", svcPort, newEndpoints)
+				// Gather stale connections to removed endpoints
 				removedEndpoints := getRemovedEndpoints(curEndpointIPs, newEndpoints)
 				for _, ep := range removedEndpoints {
 					staleConnections[endpointServicePair{endpoint: ep, servicePortName: svcPort}] = true
 				}
-				glog.V(3).Infof("Setting endpoints for %q to %+v", svcPort, newEndpoints)
-				// Once the set operations using the list of ips are complete, build the list of endpoint infos
-				proxier.endpointsMap[svcPort] = proxier.buildEndpointInfoList(portsToEndpoints[portname], newEndpoints)
 			}
+			// Once the set operations using the list of ips are complete, build the list of endpoint infos
+			newEndpointsMap[svcPort] = proxier.buildEndpointInfoList(portsToEndpoints[portname], newEndpoints)
 			activeEndpoints[svcPort] = true
 		}
 	}
-	// Remove endpoints missing from the update.
+	// Check stale connections against endpoints missing from the update.
 	for svcPort := range proxier.endpointsMap {
 		if !activeEndpoints[svcPort] {
+			glog.V(2).Infof("Removing endpoints for %q", svcPort)
 			// record endpoints of unactive service to stale connections
 			for _, ep := range proxier.endpointsMap[svcPort] {
 				staleConnections[endpointServicePair{endpoint: ep.ip, servicePortName: svcPort}] = true
 			}
-
-			glog.V(2).Infof("Removing endpoints for %q", svcPort)
-			delete(proxier.endpointsMap, svcPort)
 		}
+	}
 
+	// Update service health check
+	allSvcPorts := make(map[proxy.ServicePortName]bool)
+	for svcPort := range proxier.endpointsMap {
+		allSvcPorts[svcPort] = true
+	}
+	for svcPort := range newEndpointsMap {
+		allSvcPorts[svcPort] = true
+	}
+	for svcPort := range allSvcPorts {
 		proxier.updateHealthCheckEntries(svcPort.NamespacedName, svcPortToInfoMap[svcPort])
 	}
-	proxier.syncProxyRules()
+
+	if len(newEndpointsMap) != len(proxier.endpointsMap) || !reflect.DeepEqual(newEndpointsMap, proxier.endpointsMap) {
+		proxier.endpointsMap = newEndpointsMap
+		proxier.syncProxyRules()
+	} else {
+		glog.V(4).Infof("Skipping proxy iptables rule sync on endpoint update because nothing changed")
+	}
+
 	proxier.deleteEndpointConnections(staleConnections)
 }
 
