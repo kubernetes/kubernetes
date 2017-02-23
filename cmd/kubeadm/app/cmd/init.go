@@ -69,12 +69,11 @@ func NewCmdInit(out io.Writer) *cobra.Command {
 
 	var cfgPath string
 	var skipPreFlight bool
-	var selfHosted bool
 	cmd := &cobra.Command{
 		Use:   "init",
 		Short: "Run this in order to set up the Kubernetes master",
 		Run: func(cmd *cobra.Command, args []string) {
-			i, err := NewInit(cfgPath, &cfg, skipPreFlight, selfHosted)
+			i, err := NewInit(cfgPath, &cfg, skipPreFlight)
 			kubeadmutil.CheckErr(err)
 			kubeadmutil.CheckErr(i.Validate())
 			kubeadmutil.CheckErr(i.Run(out))
@@ -122,15 +121,10 @@ func NewCmdInit(out io.Writer) *cobra.Command {
 		"The discovery method kubeadm will use for connecting nodes to the master",
 	)
 
-	cmd.PersistentFlags().BoolVar(
-		&selfHosted, "self-hosted", selfHosted,
-		"Enable self-hosted control plane",
-	)
-
 	return cmd
 }
 
-func NewInit(cfgPath string, cfg *kubeadmapi.MasterConfiguration, skipPreFlight bool, selfHosted bool) (*Init, error) {
+func NewInit(cfgPath string, cfg *kubeadmapi.MasterConfiguration, skipPreFlight bool) (*Init, error) {
 
 	fmt.Println("[kubeadm] WARNING: kubeadm is in alpha, please do not use it for production clusters.")
 
@@ -169,12 +163,11 @@ func NewInit(cfgPath string, cfg *kubeadmapi.MasterConfiguration, skipPreFlight 
 	// Try to start the kubelet service in case it's inactive
 	preflight.TryStartKubelet()
 
-	return &Init{cfg: cfg, selfHosted: selfHosted}, nil
+	return &Init{cfg: cfg}, nil
 }
 
 type Init struct {
-	cfg        *kubeadmapi.MasterConfiguration
-	selfHosted bool
+	cfg *kubeadmapi.MasterConfiguration
 }
 
 // Validate validates configuration passed to "kubeadm init"
@@ -225,13 +218,15 @@ func (i *Init) Run(out io.Writer) error {
 	}
 
 	// Is deployment type self-hosted?
-	if i.selfHosted {
+	if i.cfg.SelfHosted {
 		// Temporary control plane is up, now we create our self hosted control
 		// plane components and remove the static manifests:
 		fmt.Println("[init] Creating self-hosted control plane...")
 		if err := kubemaster.CreateSelfHostedControlPlane(i.cfg, client); err != nil {
 			return err
 		}
+	} else {
+		fmt.Println("[init] ############ NOT SELF-HOSTED")
 	}
 
 	// PHASE 4: Set up the bootstrap tokens

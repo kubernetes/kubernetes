@@ -30,6 +30,7 @@ type MasterConfiguration struct {
 	KubernetesVersion string     `json:"kubernetesVersion"`
 	CloudProvider     string     `json:"cloudProvider"`
 	AuthorizationMode string     `json:"authorizationMode"`
+	SelfHosted        bool       `json:"selfHosted"`
 }
 
 type API struct {
