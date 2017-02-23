@@ -182,7 +182,7 @@ func TestAdoption(t *testing.T) {
 				return []metav1.OwnerReference{{UID: rs.UID, Name: rs.Name, APIVersion: "extensions/v1beta1", Kind: "ReplicaSet"}}
 			},
 			func(rs *v1beta1.ReplicaSet) []metav1.OwnerReference {
-				return []metav1.OwnerReference{{UID: rs.UID, Name: rs.Name, APIVersion: "extensions/v1beta1", Kind: "ReplicaSet", Controller: &trueVar}}
+				return []metav1.OwnerReference{{UID: rs.UID, Name: rs.Name, APIVersion: "extensions/v1beta1", Kind: "ReplicaSet", Controller: &trueVar, BlockOwnerDeletion: &trueVar}}
 			},
 		},
 		{
@@ -191,7 +191,7 @@ func TestAdoption(t *testing.T) {
 				return []metav1.OwnerReference{}
 			},
 			func(rs *v1beta1.ReplicaSet) []metav1.OwnerReference {
-				return []metav1.OwnerReference{{UID: rs.UID, Name: rs.Name, APIVersion: "extensions/v1beta1", Kind: "ReplicaSet", Controller: &trueVar}}
+				return []metav1.OwnerReference{{UID: rs.UID, Name: rs.Name, APIVersion: "extensions/v1beta1", Kind: "ReplicaSet", Controller: &trueVar, BlockOwnerDeletion: &trueVar}}
 			},
 		},
 		{
@@ -256,7 +256,7 @@ func TestAdoption(t *testing.T) {
 				return false, nil
 			}
 		}); err != nil {
-			t.Fatal(err)
+			t.Fatalf("test %q failed: %v", tc.name, err)
 		}
 		close(stopCh)
 	}
