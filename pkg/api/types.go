@@ -2979,6 +2979,22 @@ type Preconditions struct {
 	UID *types.UID
 }
 
+// DeletionPropagation decides whether and how garbage collection will be performed.
+type DeletionPropagation string
+
+const (
+	// The default depends on the existing finalizers on the object and the type of the object.
+	Default DeletionPropagation = "Default"
+	// Orphans the dependents.
+	Orphan DeletionPropagation = "Orphan"
+	// Deletes the object from the key-value store, the garbage collector will delete the dependents in the background.
+	Background DeletionPropagation = "Background"
+	// The object exists in the key-value store until the garbage collector deletes all the dependents whose ownerReference.blockOwnerDeletion=true from the key-value store.
+	// API sever will put the "DeletingDependents" finalizer on the object, and sets its deletionTimestamp.
+	// This policy is cascading, i.e., the dependents will be deleted with Foreground.
+	Foreground DeletionPropagation = "Foreground"
+)
+
 // DeleteOptions may be provided when deleting an API object
 // DEPRECATED: This type has been moved to meta/v1 and will be removed soon.
 type DeleteOptions struct {
@@ -2999,6 +3015,12 @@ type DeleteOptions struct {
 	// finalizer will be added to/removed from the object's finalizers list.
 	// +optional
 	OrphanDependents *bool
+
+	// Whether and how garbage collection will be performed.
+	// Defaults to Default.
+	// Either this field or OrphanDependents may be set, but not both.
+	// +optional
+	PropagationPolicy *DeletionPropagation
 }
 
 // ListOptions is the query options to a standard REST list call, and has future support for

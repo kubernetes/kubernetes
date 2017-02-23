@@ -295,7 +295,6 @@ func ValidateObjectMeta(meta *metav1.ObjectMeta, requiresNamespace bool, nameFn 
 	for i := range meta.Finalizers {
 		allErrs = append(allErrs, validateKubeFinalizerName(string(meta.Finalizers[i]), fldPath.Child("finalizers").Index(i))...)
 	}
-
 	return allErrs
 }
 
