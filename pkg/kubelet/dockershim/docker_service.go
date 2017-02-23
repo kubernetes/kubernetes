@@ -197,6 +197,9 @@ func NewDockerService(client dockertools.DockerInterface, seccompProfileRoot str
 	} else {
 		cgroupDriver = dockerInfo.CgroupDriver
 	}
+	if dockerInfo.LoggingDriver != "json-file" {
+		glog.Fatalf("Logging driver %s is not supported.  Only json-file logging driver is supported by the kubelet CRI", dockerInfo.LoggingDriver)
+	}
 	if len(kubeCgroupDriver) != 0 && kubeCgroupDriver != cgroupDriver {
 		return nil, fmt.Errorf("misconfiguration: kubelet cgroup driver: %q is different from docker cgroup driver: %q", kubeCgroupDriver, cgroupDriver)
 	}

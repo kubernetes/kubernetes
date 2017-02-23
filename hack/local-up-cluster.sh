@@ -206,6 +206,11 @@ if [[ ${CONTAINER_RUNTIME} == "docker" ]]; then
     CGROUP_DRIVER=$(docker info | grep "Cgroup Driver:" | cut -f3- -d' ')
     echo "Kubelet cgroup driver defaulted to use: ${CGROUP_DRIVER}"
   fi
+  LOGGING_DRIVER=$(docker info | grep "Logging Driver:" | cut -f3- -d' ')
+  if [[ ${LOGGING_DRIVER} != "json-file" ]]; then
+    echo "ERROR kubelet CRI requires docker use the json-file (default) logging driver"
+    exit 1
+  fi
 fi
 
 
