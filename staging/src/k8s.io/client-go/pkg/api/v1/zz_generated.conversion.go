@@ -1064,6 +1064,7 @@ func autoConvert_v1_DeleteOptions_To_api_DeleteOptions(in *DeleteOptions, out *a
 	out.GracePeriodSeconds = (*int64)(unsafe.Pointer(in.GracePeriodSeconds))
 	out.Preconditions = (*api.Preconditions)(unsafe.Pointer(in.Preconditions))
 	out.OrphanDependents = (*bool)(unsafe.Pointer(in.OrphanDependents))
+	out.PropagationPolicy = (*api.DeletionPropagation)(unsafe.Pointer(in.PropagationPolicy))
 	return nil
 }
 
@@ -1075,6 +1076,7 @@ func autoConvert_api_DeleteOptions_To_v1_DeleteOptions(in *api.DeleteOptions, ou
 	out.GracePeriodSeconds = (*int64)(unsafe.Pointer(in.GracePeriodSeconds))
 	out.Preconditions = (*Preconditions)(unsafe.Pointer(in.Preconditions))
 	out.OrphanDependents = (*bool)(unsafe.Pointer(in.OrphanDependents))
+	out.PropagationPolicy = (*DeletionPropagation)(unsafe.Pointer(in.PropagationPolicy))
 	return nil
 }
 
