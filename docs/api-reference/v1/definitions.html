@@ -1074,6 +1074,13 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 <td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
 <td class="tableblock halign-left valign-top"></td>
 </tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">storageClassName</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Name of the StorageClass required by the claim. More info: <a href="http://kubernetes.io/docs/user-guide/persistent-volumes#class-1">http://kubernetes.io/docs/user-guide/persistent-volumes#class-1</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
 </tbody>
 </table>
 
@@ -7026,6 +7033,13 @@ Examples:<br>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">persistentVolumeReclaimPolicy</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">What happens to a persistent volume when released from its claim. Valid options are Retain (default) and Recycle. Recycling must be supported by the volume plugin underlying this persistent volume. More info: <a href="http://kubernetes.io/docs/user-guide/persistent-volumes#recycling-policy">http://kubernetes.io/docs/user-guide/persistent-volumes#recycling-policy</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">storageClassName</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Name of StorageClass to which this persistent volume belongs. Empty value means that this volume does not belong to any StorageClass.</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
 <td class="tableblock halign-left valign-top"></td>
