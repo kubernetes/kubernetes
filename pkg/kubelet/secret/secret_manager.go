@@ -24,6 +24,7 @@ import (
 
 	storageetcd "k8s.io/apiserver/pkg/storage/etcd"
 	"k8s.io/kubernetes/pkg/api/v1"
+	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/pkg/kubelet/util"
 
@@ -261,32 +262,10 @@ func (c *cachingSecretManager) GetSecret(namespace, name string) (*v1.Secret, er
 
 func getSecretNames(pod *v1.Pod) sets.String {
 	result := sets.NewString()
-	for _, reference := range pod.Spec.ImagePullSecrets {
-		result.Insert(reference.Name)
-	}
-	for i := range pod.Spec.Containers {
-		for _, env := range pod.Spec.Containers[i].EnvFrom {
-			if env.SecretRef != nil {
-				result.Insert(env.SecretRef.Name)
-			}
-		}
-		for _, envVar := range pod.Spec.Containers[i].Env {
-			if envVar.ValueFrom != nil && envVar.ValueFrom.SecretKeyRef != nil {
-				result.Insert(envVar.ValueFrom.SecretKeyRef.Name)
-			}
-		}
-	}
-	for i := range pod.Spec.Volumes {
-		if source := pod.Spec.Volumes[i].Secret; source != nil {
-			result.Insert(source.SecretName)
-		} else if source := pod.Spec.Volumes[i].Projected; source != nil {
-			for j := range source.Sources {
-				if secretVolumeSource := source.Sources[j].Secret; secretVolumeSource != nil {
-					result.Insert(secretVolumeSource.Name)
-				}
-			}
-		}
-	}
+	podutil.VisitPodSecretNames(pod, func(name string) bool {
+		result.Insert(name)
+		return true
+	})
 	return result
 }
 
