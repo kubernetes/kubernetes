@@ -549,7 +549,6 @@ func createPVC(clientset *client.Clientset, namespace, svcName, etcdPVCapacity s
 					api.ResourceStorage: capacity,
 				},
 			},
-			Selector: &metav1.LabelSelector{MatchLabels: apiserverSvcSelector},
 		},
 	}
 
