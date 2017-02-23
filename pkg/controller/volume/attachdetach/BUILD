@@ -23,6 +23,7 @@ go_library(
         "//pkg/controller/volume/attachdetach/populator:go_default_library",
         "//pkg/controller/volume/attachdetach/reconciler:go_default_library",
         "//pkg/controller/volume/attachdetach/statusupdater:go_default_library",
+        "//pkg/controller/volume/attachdetach/util:go_default_library",
         "//pkg/util/io:go_default_library",
         "//pkg/util/mount:go_default_library",
         "//pkg/volume:go_default_library",
@@ -66,6 +67,7 @@ filegroup(
         "//pkg/controller/volume/attachdetach/reconciler:all-srcs",
         "//pkg/controller/volume/attachdetach/statusupdater:all-srcs",
         "//pkg/controller/volume/attachdetach/testing:all-srcs",
+        "//pkg/controller/volume/attachdetach/util:all-srcs",
     ],
     tags = ["automanaged"],
 )
