@@ -72,6 +72,7 @@ pkg_tar(
         "salt/cluster-autoscaler/cluster-autoscaler.manifest",
         "salt/e2e-image-puller/e2e-image-puller.manifest",
         "salt/etcd/etcd.manifest",
+        "salt/gke-certificates-controller/gke-certificates-cotroller.manifest",
         "salt/kube-addons/kube-addon-manager.yaml",
         "salt/kube-apiserver/abac-authz-policy.jsonl",
         "salt/kube-apiserver/kube-apiserver.manifest",
