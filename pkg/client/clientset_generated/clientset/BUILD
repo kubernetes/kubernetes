@@ -63,6 +63,7 @@ filegroup(
     srcs = [
         ":package-srcs",
         "//pkg/client/clientset_generated/clientset/fake:all-srcs",
+        "//pkg/client/clientset_generated/clientset/scheme:all-srcs",
         "//pkg/client/clientset_generated/clientset/typed/apps/v1beta1:all-srcs",
         "//pkg/client/clientset_generated/clientset/typed/authentication/v1:all-srcs",
         "//pkg/client/clientset_generated/clientset/typed/authentication/v1beta1:all-srcs",
