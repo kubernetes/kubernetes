@@ -47,12 +47,15 @@ endif
 
 build: clean
 	cp ./* $(TEMP_DIR)
-	cd $(TEMP_DIR) && sed -i "s|BASEIMAGE|$(BASEIMAGE)|g" Dockerfile.build
-	cd $(TEMP_DIR) && sed -i "s|ARCH|$(QEMUARCH)|g" Dockerfile.build
+	cat Dockerfile.build \
+		| sed "s|BASEIMAGE|$(BASEIMAGE)|g" \
+		| sed "s|ARCH|$(QEMUARCH)|g" \
+		> $(TEMP_DIR)/Dockerfile.build
 
 ifeq ($(ARCH),amd64)
 	# When building "normally" for amd64, remove the whole line, it has no part in the amd64 image
-	cd $(TEMP_DIR) && sed -i "/CROSS_BUILD_/d" Dockerfile.build
+	sed "/CROSS_BUILD_/d" $(TEMP_DIR)/Dockerfile.build > $(TEMP_DIR)/Dockerfile.build.tmp
+	mv $(TEMP_DIR)/Dockerfile.build.tmp $(TEMP_DIR)/Dockerfile.build
 else
 	# When cross-building, only the placeholder "CROSS_BUILD_" should be removed
 	# Register /usr/bin/qemu-ARCH-static as the handler for ARM binaries in the kernel
