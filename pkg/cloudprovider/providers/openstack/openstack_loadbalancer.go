@@ -1005,7 +1005,7 @@ func (lbaas *LbaasV2) EnsureLoadBalancer(clusterName string, apiService *v1.Serv
 			}
 
 			nodeSecurityGroupID := getStringFromServiceAnnotation(apiService, ServiceAnnotationLoadBalancerNodeSecurityGroupID, lbaas.opts.NodeSecurityGroupID, lbaas.opts.EnableAnnotationNodeSecurityGroupID)
-			err := createNodeSecurityGroup(lbaas.network, nodeSecurityGroupID, int(port.NodePort), string(port.Protocol), lbSecGroup.ID)
+			err := createNodeSecurityGroup(lbaas.network, nodeSecurityGroupID, int(port.NodePort), port.Protocol, lbSecGroup.ID)
 
 			if err != nil {
 				glog.Errorf("Error occured creating security group for loadbalancer %s:", loadbalancer.ID)
@@ -1473,7 +1473,7 @@ func (lb *LbaasV1) EnsureLoadBalancer(clusterName string, apiService *v1.Service
 	}
 
 	// if this service has an annotation for LB method, use that instead
-	lbMethod := getStringFromServiceAnnotation(apiService, ServiceAnnotationLoadBalancerLBMethod, lb.opts.LBMethod, lb.opts.EnableAnnotationLBMethod)
+	lbMethod := pools.LBMethod(getStringFromServiceAnnotation(apiService, ServiceAnnotationLoadBalancerLBMethod, lb.opts.LBMethod, lb.opts.EnableAnnotationLBMethod))
 
 	if lbMethod == "" {
 		lbMethod = pools.LBMethodRoundRobin
