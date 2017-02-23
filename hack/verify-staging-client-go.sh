@@ -72,5 +72,5 @@ export GOPATH="${TEMP_STAGING_GOPATH}"
 godep restore ${V} 2>&1 | sed 's/^/  /'
 
 echo "Testing staging/copy.sh"
-staging/copy.sh -d 2>&1 | sed 's/^/  /'
+staging/copy.sh -d -f 2>&1 | sed 's/^/  /'
 popd
