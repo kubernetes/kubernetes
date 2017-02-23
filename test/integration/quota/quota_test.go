@@ -30,6 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/record"
@@ -329,7 +330,15 @@ func TestQuotaLimitedResourceDenial(t *testing.T) {
 	}
 	waitForQuota(t, quota, clientset)
 
-	if _, err := clientset.Core().Pods(ns.Name).Create(pod); err != nil {
+	// attempt to create a new pod once the quota is propagated
+	err = wait.PollImmediate(5*time.Second, time.Minute, func() (bool, error) {
+		// retry until we succeed (to allow time for all changes to propagate)
+		if _, err := clientset.Core().Pods(ns.Name).Create(pod); err == nil {
+			return true, nil
+		}
+		return false, nil
+	})
+	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 }
