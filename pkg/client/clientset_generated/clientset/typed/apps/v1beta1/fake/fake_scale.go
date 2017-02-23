@@ -14,10 +14,10 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package v1beta1
+package fake
 
-type DeploymentExpansion interface{}
-
-type ScaleExpansion interface{}
-
-type StatefulSetExpansion interface{}
+// FakeScales implements ScaleInterface
+type FakeScales struct {
+	Fake *FakeAppsV1beta1
+	ns   string
+}
