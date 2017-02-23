@@ -64,6 +64,20 @@ func SetObjectDefaults_Job(in *Job) {
 		if a.VolumeSource.AzureDisk != nil {
 			api_v1.SetDefaults_AzureDiskVolumeSource(a.VolumeSource.AzureDisk)
 		}
+		if a.VolumeSource.Projected != nil {
+			api_v1.SetDefaults_ProjectedVolumeSource(a.VolumeSource.Projected)
+			for j := range a.VolumeSource.Projected.Sources {
+				b := &a.VolumeSource.Projected.Sources[j]
+				if b.DownwardAPI != nil {
+					for k := range b.DownwardAPI.Items {
+						c := &b.DownwardAPI.Items[k]
+						if c.FieldRef != nil {
+							api_v1.SetDefaults_ObjectFieldSelector(c.FieldRef)
+						}
+					}
+				}
+			}
+		}
 	}
 	for i := range in.Spec.Template.Spec.InitContainers {
 		a := &in.Spec.Template.Spec.InitContainers[i]

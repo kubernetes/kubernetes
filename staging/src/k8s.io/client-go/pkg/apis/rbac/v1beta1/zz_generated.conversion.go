@@ -330,7 +330,7 @@ func Convert_rbac_RoleRef_To_v1beta1_RoleRef(in *rbac.RoleRef, out *RoleRef, s c
 
 func autoConvert_v1beta1_Subject_To_rbac_Subject(in *Subject, out *rbac.Subject, s conversion.Scope) error {
 	out.Kind = in.Kind
-	out.APIVersion = in.APIVersion
+	out.APIGroup = in.APIGroup
 	out.Name = in.Name
 	out.Namespace = in.Namespace
 	return nil
@@ -342,7 +342,7 @@ func Convert_v1beta1_Subject_To_rbac_Subject(in *Subject, out *rbac.Subject, s c
 
 func autoConvert_rbac_Subject_To_v1beta1_Subject(in *rbac.Subject, out *Subject, s conversion.Scope) error {
 	out.Kind = in.Kind
-	out.APIVersion = in.APIVersion
+	out.APIGroup = in.APIGroup
 	out.Name = in.Name
 	out.Namespace = in.Namespace
 	return nil
