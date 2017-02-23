@@ -21,6 +21,8 @@ set -o pipefail
 KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
 cd ${KUBE_ROOT}
 
+git status || true
+
 # Smoke test client-go examples
 echo "Smoke testing client-go examples"
 go install ./staging/src/k8s.io/client-go/examples/... 2>&1 | sed 's/^/  /'
