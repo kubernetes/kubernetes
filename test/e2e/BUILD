@@ -79,7 +79,6 @@ go_library(
         "proxy.go",
         "pv_reclaimpolicy.go",
         "pvc_label_selector.go",
-        "pvutil.go",
         "rc.go",
         "reboot.go",
         "replica_set.go",

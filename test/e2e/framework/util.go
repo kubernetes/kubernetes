@@ -4594,6 +4594,14 @@ func getPodLogsInternal(c clientset.Interface, namespace, podName, containerName
 	return string(logs), err
 }
 
+func GetGCECloud() (*gcecloud.GCECloud, error) {
+	gceCloud, ok := TestContext.CloudConfig.Provider.(*gcecloud.GCECloud)
+	if !ok {
+		return nil, fmt.Errorf("failed to convert CloudConfig.Provider to GCECloud: %#v", TestContext.CloudConfig.Provider)
+	}
+	return gceCloud, nil
+}
+
 // EnsureLoadBalancerResourcesDeleted ensures that cloud load balancer resources that were created
 // are actually cleaned up.  Currently only implemented for GCE/GKE.
 func EnsureLoadBalancerResourcesDeleted(ip, portRange string) error {
@@ -4604,9 +4612,9 @@ func EnsureLoadBalancerResourcesDeleted(ip, portRange string) error {
 }
 
 func ensureGCELoadBalancerResourcesDeleted(ip, portRange string) error {
-	gceCloud, ok := TestContext.CloudConfig.Provider.(*gcecloud.GCECloud)
-	if !ok {
-		return fmt.Errorf("failed to convert CloudConfig.Provider to GCECloud: %#v", TestContext.CloudConfig.Provider)
+	gceCloud, err := GetGCECloud()
+	if err != nil {
+		return err
 	}
 	project := TestContext.CloudConfig.ProjectID
 	region, err := gcecloud.GetGCERegion(TestContext.CloudConfig.Zone)
@@ -5094,9 +5102,9 @@ func (p *E2ETestNodePreparer) CleanupNodes() error {
 // the given name. The name is usually the UUID of the Service prefixed with an
 // alpha-numeric character ('a') to work around cloudprovider rules.
 func CleanupGCEResources(loadBalancerName string) (retErr error) {
-	gceCloud, ok := TestContext.CloudConfig.Provider.(*gcecloud.GCECloud)
-	if !ok {
-		return fmt.Errorf("failed to convert CloudConfig.Provider to GCECloud: %#v", TestContext.CloudConfig.Provider)
+	gceCloud, err := GetGCECloud()
+	if err != nil {
+		return err
 	}
 	if err := gceCloud.DeleteFirewall(loadBalancerName); err != nil &&
 		!IsGoogleAPIHTTPErrorCode(err, http.StatusNotFound) {
