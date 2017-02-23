@@ -672,7 +672,6 @@ func fakeInitHostFactory(apiserverServiceType v1.ServiceType, federationName, na
 					v1.ResourceStorage: capacity,
 				},
 			},
-			Selector: &metav1.LabelSelector{MatchLabels: apiserverSvcSelector},
 		},
 	}
 
