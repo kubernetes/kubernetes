@@ -121,10 +121,18 @@ message DeleteOptions {
   // +optional
   optional Preconditions preconditions = 2;
 
+  // Deprecated: please use the PropagationPolicy, this field will be deprecated in 1.7.
   // Should the dependent objects be orphaned. If true/false, the "orphan"
   // finalizer will be added to/removed from the object's finalizers list.
+  // Either this field or PropagationPolicy may be set, but not both.
   // +optional
   optional bool orphanDependents = 3;
+
+  // Whether and how garbage collection will be performed.
+  // Defaults to Default.
+  // Either this field or OrphanDependents may be set, but not both.
+  // +optional
+  optional string propagationPolicy = 4;
 }
 
 // Duration is a wrapper around time.Duration which supports correct
@@ -469,6 +477,15 @@ message OwnerReference {
   // If true, this reference points to the managing controller.
   // +optional
   optional bool controller = 6;
+
+  // If true, AND if the owner has the "foregroundDeletion" finalizer, then
+  // the owner cannot be deleted from the key-value store until this
+  // reference is removed.
+  // Defaults to false.
+  // To set this field, a user needs "delete" permission of the owner,
+  // otherwise 422 (Unprocessable Entity) will be returned.
+  // +optional
+  optional bool blockOwnerDeletion = 7;
 }
 
 // Preconditions must be fulfilled before an operation (update, delete, etc.) is carried out.

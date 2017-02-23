@@ -351,8 +351,15 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 						},
 						"orphanDependents": {
 							SchemaProps: spec.SchemaProps{
-								Description: "Should the dependent objects be orphaned. If true/false, the \"orphan\" finalizer will be added to/removed from the object's finalizers list.",
+								Description: "Deprecated: please use the PropagationPolicy, this field will be deprecated in 1.7. Should the dependent objects be orphaned. If true/false, the \"orphan\" finalizer will be added to/removed from the object's finalizers list. Either this field or PropagationPolicy may be set, but not both.",
 								Type:        []string{"boolean"},
+								Format:      "",
+							},
+						},
+						"propagationPolicy": {
+							SchemaProps: spec.SchemaProps{
+								Description: "Whether and how garbage collection will be performed. Defaults to Default. Either this field or OrphanDependents may be set, but not both.",
+								Type:        []string{"string"},
 								Format:      "",
 							},
 						},
@@ -962,6 +969,13 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 						"controller": {
 							SchemaProps: spec.SchemaProps{
 								Description: "If true, this reference points to the managing controller.",
+								Type:        []string{"boolean"},
+								Format:      "",
+							},
+						},
+						"blockOwnerDeletion": {
+							SchemaProps: spec.SchemaProps{
+								Description: "If true, AND if the owner has the \"foregroundDeletion\" finalizer, then the owner cannot be deleted from the key-value store until this reference is removed. Defaults to false. To set this field, a user needs \"delete\" permission of the owner, otherwise 422 (Unprocessable Entity) will be returned.",
 								Type:        []string{"boolean"},
 								Format:      "",
 							},
