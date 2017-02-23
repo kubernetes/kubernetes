@@ -67,6 +67,11 @@ func TestIsPodUpdated(t *testing.T) {
 			newPod("pod1", "node1", map[string]string{}),
 			false,
 		},
+		{
+			int64(12355),
+			newPod("pod1", "node1", nil),
+			false,
+		},
 	}
 	for _, test := range tests {
 		updated := IsPodUpdated(test.templateGeneration, test.pod)
@@ -76,12 +81,12 @@ func TestIsPodUpdated(t *testing.T) {
 	}
 }
 
-func TestGetPodTemplateWithRevision(t *testing.T) {
+func TestGetPodTemplateWithGeneration(t *testing.T) {
 	generation := int64(1)
 	podTemplateSpec := v1.PodTemplateSpec{}
 	newPodTemplate := GetPodTemplateWithGeneration(podTemplateSpec, generation)
 	label, exists := newPodTemplate.ObjectMeta.Labels[extensions.DaemonSetTemplateGenerationKey]
 	if !exists || label != fmt.Sprint(generation) {
-		t.Errorf("Error in getting podTemplateSpec with label geneartion. Exists: %t, label: %s", exists, label)
+		t.Errorf("Error in getting podTemplateSpec with label generation. Exists: %t, label: %s", exists, label)
 	}
 }
