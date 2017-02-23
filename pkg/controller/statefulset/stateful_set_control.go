@@ -111,6 +111,12 @@ func (ssc *defaultStatefulSetControl) UpdateStatefulSet(set *apps.StatefulSet, p
 		}
 	}
 
+	// If the StatefulSet is being deleted, don't do anything other than updating
+	// status.
+	if set.DeletionTimestamp != nil {
+		return nil
+	}
+
 	// Examine each replica with respect to its ordinal
 	for i := range replicas {
 		// delete and recreate failed pods
