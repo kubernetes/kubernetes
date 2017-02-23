@@ -143,7 +143,6 @@ func rmSetup(t *testing.T) (*httptest.Server, *replicaset.ReplicaSetController, 
 		informers.Core().V1().Pods(),
 		clientset.NewForConfigOrDie(restclient.AddUserAgent(&config, "replicaset-controller")),
 		replicaset.BurstReplicas,
-		4096,
 	)
 
 	if err != nil {

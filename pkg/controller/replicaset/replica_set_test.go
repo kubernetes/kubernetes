@@ -51,7 +51,7 @@ import (
 	"k8s.io/kubernetes/pkg/securitycontext"
 )
 
-func testNewReplicaSetControllerFromClient(client clientset.Interface, stopCh chan struct{}, burstReplicas int, lookupCacheSize int) (*ReplicaSetController, informers.SharedInformerFactory) {
+func testNewReplicaSetControllerFromClient(client clientset.Interface, stopCh chan struct{}, burstReplicas int) (*ReplicaSetController, informers.SharedInformerFactory) {
 	informers := informers.NewSharedInformerFactory(client, controller.NoResyncPeriodFunc())
 
 	ret := NewReplicaSetController(
@@ -59,7 +59,6 @@ func testNewReplicaSetControllerFromClient(client clientset.Interface, stopCh ch
 		informers.Core().V1().Pods(),
 		client,
 		burstReplicas,
-		lookupCacheSize,
 	)
 
 	ret.podListerSynced = alwaysReady
@@ -210,7 +209,7 @@ func TestSyncReplicaSetDoesNothing(t *testing.T) {
 	fakePodControl := controller.FakePodControl{}
 	stopCh := make(chan struct{})
 	defer close(stopCh)
-	manager, informers := testNewReplicaSetControllerFromClient(client, stopCh, BurstReplicas, 0)
+	manager, informers := testNewReplicaSetControllerFromClient(client, stopCh, BurstReplicas)
 
 	// 2 running pods, a controller with 2 replicas, sync is a no-op
 	labelMap := map[string]string{"foo": "bar"}
@@ -228,7 +227,7 @@ func TestSyncReplicaSetDeletes(t *testing.T) {
 	fakePodControl := controller.FakePodControl{}
 	stopCh := make(chan struct{})
 	defer close(stopCh)
-	manager, informers := testNewReplicaSetControllerFromClient(client, stopCh, BurstReplicas, 0)
+	manager, informers := testNewReplicaSetControllerFromClient(client, stopCh, BurstReplicas)
 	manager.podControl = &fakePodControl
 
 	// 2 running pods and a controller with 1 replica, one pod delete expected
@@ -246,7 +245,7 @@ func TestDeleteFinalStateUnknown(t *testing.T) {
 	fakePodControl := controller.FakePodControl{}
 	stopCh := make(chan struct{})
 	defer close(stopCh)
-	manager, informers := testNewReplicaSetControllerFromClient(client, stopCh, BurstReplicas, 0)
+	manager, informers := testNewReplicaSetControllerFromClient(client, stopCh, BurstReplicas)
 	manager.podControl = &fakePodControl
 
 	received := make(chan string)
@@ -280,7 +279,7 @@ func TestSyncReplicaSetCreates(t *testing.T) {
 	client := clientset.NewForConfigOrDie(&restclient.Config{Host: "", ContentConfig: restclient.ContentConfig{GroupVersion: &api.Registry.GroupOrDie(v1.GroupName).GroupVersion}})
 	stopCh := make(chan struct{})
 	defer close(stopCh)
-	manager, informers := testNewReplicaSetControllerFromClient(client, stopCh, BurstReplicas, 0)
+	manager, informers := testNewReplicaSetControllerFromClient(client, stopCh, BurstReplicas)
 
 	// A controller with 2 replicas and no pods in the store, 2 creates expected
 	labelMap := map[string]string{"foo": "bar"}
@@ -305,7 +304,7 @@ func TestStatusUpdatesWithoutReplicasChange(t *testing.T) {
 	client := clientset.NewForConfigOrDie(&restclient.Config{Host: testServer.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &api.Registry.GroupOrDie(v1.GroupName).GroupVersion}})
 	stopCh := make(chan struct{})
 	defer close(stopCh)
-	manager, informers := testNewReplicaSetControllerFromClient(client, stopCh, BurstReplicas, 0)
+	manager, informers := testNewReplicaSetControllerFromClient(client, stopCh, BurstReplicas)
 
 	// Steady state for the ReplicaSet, no Status.Replicas updates expected
 	activePods := 5
@@ -350,7 +349,7 @@ func TestControllerUpdateReplicas(t *testing.T) {
 	client := clientset.NewForConfigOrDie(&restclient.Config{Host: testServer.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &api.Registry.GroupOrDie(v1.GroupName).GroupVersion}})
 	stopCh := make(chan struct{})
 	defer close(stopCh)
-	manager, informers := testNewReplicaSetControllerFromClient(client, stopCh, BurstReplicas, 0)
+	manager, informers := testNewReplicaSetControllerFromClient(client, stopCh, BurstReplicas)
 
 	// Insufficient number of pods in the system, and Status.Replicas is wrong;
 	// Status.Replica should update to match number of pods in system, 1 new pod should be created.
@@ -399,7 +398,7 @@ func TestSyncReplicaSetDormancy(t *testing.T) {
 	fakePodControl := controller.FakePodControl{}
 	stopCh := make(chan struct{})
 	defer close(stopCh)
-	manager, informers := testNewReplicaSetControllerFromClient(client, stopCh, BurstReplicas, 0)
+	manager, informers := testNewReplicaSetControllerFromClient(client, stopCh, BurstReplicas)
 
 	manager.podControl = &fakePodControl
 
@@ -455,7 +454,7 @@ func TestSyncReplicaSetDormancy(t *testing.T) {
 func TestPodControllerLookup(t *testing.T) {
 	stopCh := make(chan struct{})
 	defer close(stopCh)
-	manager, informers := testNewReplicaSetControllerFromClient(clientset.NewForConfigOrDie(&restclient.Config{Host: "", ContentConfig: restclient.ContentConfig{GroupVersion: &api.Registry.GroupOrDie(v1.GroupName).GroupVersion}}), stopCh, BurstReplicas, 0)
+	manager, informers := testNewReplicaSetControllerFromClient(clientset.NewForConfigOrDie(&restclient.Config{Host: "", ContentConfig: restclient.ContentConfig{GroupVersion: &api.Registry.GroupOrDie(v1.GroupName).GroupVersion}}), stopCh, BurstReplicas)
 	testCases := []struct {
 		inRSs     []*extensions.ReplicaSet
 		pod       *v1.Pod
@@ -503,7 +502,12 @@ func TestPodControllerLookup(t *testing.T) {
 		for _, r := range c.inRSs {
 			informers.Extensions().V1beta1().ReplicaSets().Informer().GetIndexer().Add(r)
 		}
-		if rs := manager.getPodReplicaSet(c.pod); rs != nil {
+		if rss := manager.getPodReplicaSets(c.pod); rss != nil {
+			if len(rss) != 1 {
+				t.Errorf("len(rss) = %v, want %v", len(rss), 1)
+				continue
+			}
+			rs := rss[0]
 			if c.outRSName != rs.Name {
 				t.Errorf("Got replica set %+v expected %+v", rs.Name, c.outRSName)
 			}
@@ -530,7 +534,6 @@ func TestWatchControllers(t *testing.T) {
 		informers.Core().V1().Pods(),
 		client,
 		BurstReplicas,
-		0,
 	)
 	informers.Start(stopCh)
 
@@ -575,7 +578,7 @@ func TestWatchPods(t *testing.T) {
 	stopCh := make(chan struct{})
 	defer close(stopCh)
 
-	manager, informers := testNewReplicaSetControllerFromClient(client, stopCh, BurstReplicas, 0)
+	manager, informers := testNewReplicaSetControllerFromClient(client, stopCh, BurstReplicas)
 
 	// Put one ReplicaSet into the shared informer
 	labelMap := map[string]string{"foo": "bar"}
@@ -621,7 +624,7 @@ func TestWatchPods(t *testing.T) {
 func TestUpdatePods(t *testing.T) {
 	stopCh := make(chan struct{})
 	defer close(stopCh)
-	manager, informers := testNewReplicaSetControllerFromClient(fake.NewSimpleClientset(), stopCh, BurstReplicas, 0)
+	manager, informers := testNewReplicaSetControllerFromClient(fake.NewSimpleClientset(), stopCh, BurstReplicas)
 
 	received := make(chan string)
 
@@ -650,16 +653,19 @@ func TestUpdatePods(t *testing.T) {
 	testRSSpec2.Name = "barfoo"
 	informers.Extensions().V1beta1().ReplicaSets().Informer().GetIndexer().Add(&testRSSpec2)
 
-	// case 1: We put in the podLister a pod with labels matching testRSSpec1,
-	// then update its labels to match testRSSpec2.  We expect to receive a sync
-	// request for both replica sets.
+	isController := true
+	controllerRef1 := metav1.OwnerReference{UID: testRSSpec1.UID, APIVersion: "v1", Kind: "ReplicaSet", Name: testRSSpec1.Name, Controller: &isController}
+	controllerRef2 := metav1.OwnerReference{UID: testRSSpec2.UID, APIVersion: "v1", Kind: "ReplicaSet", Name: testRSSpec2.Name, Controller: &isController}
+
+	// case 1: Pod with a ControllerRef
 	pod1 := newPodList(informers.Core().V1().Pods().Informer().GetIndexer(), 1, v1.PodRunning, labelMap1, testRSSpec1, "pod").Items[0]
+	pod1.OwnerReferences = []metav1.OwnerReference{controllerRef1}
 	pod1.ResourceVersion = "1"
 	pod2 := pod1
 	pod2.Labels = labelMap2
 	pod2.ResourceVersion = "2"
 	manager.updatePod(&pod1, &pod2)
-	expected := sets.NewString(testRSSpec1.Name, testRSSpec2.Name)
+	expected := sets.NewString(testRSSpec1.Name)
 	for _, name := range expected.List() {
 		t.Logf("Expecting update for %+v", name)
 		select {
@@ -668,17 +674,20 @@ func TestUpdatePods(t *testing.T) {
 				t.Errorf("Expected keys %#v got %v", expected, got)
 			}
 		case <-time.After(wait.ForeverTestTimeout):
-			t.Errorf("Expected update notifications for replica sets within 100ms each")
+			t.Errorf("Expected update notifications for replica sets")
 		}
 	}
 
-	// case 2: pod1 in the podLister has labels matching testRSSpec1. We update
-	// its labels to match no replica set. We expect to receive a sync request
-	// for testRSSpec1.
-	pod2.Labels = make(map[string]string)
+	// case 2: Remove ControllerRef (orphan). Expect to sync label-matching RS.
+	pod1 = newPodList(informers.Core().V1().Pods().Informer().GetIndexer(), 1, v1.PodRunning, labelMap1, testRSSpec1, "pod").Items[0]
+	pod1.ResourceVersion = "1"
+	pod1.Labels = labelMap2
+	pod1.OwnerReferences = []metav1.OwnerReference{controllerRef2}
+	pod2 = pod1
+	pod2.OwnerReferences = nil
 	pod2.ResourceVersion = "2"
 	manager.updatePod(&pod1, &pod2)
-	expected = sets.NewString(testRSSpec1.Name)
+	expected = sets.NewString(testRSSpec2.Name)
 	for _, name := range expected.List() {
 		t.Logf("Expecting update for %+v", name)
 		select {
@@ -687,7 +696,52 @@ func TestUpdatePods(t *testing.T) {
 				t.Errorf("Expected keys %#v got %v", expected, got)
 			}
 		case <-time.After(wait.ForeverTestTimeout):
-			t.Errorf("Expected update notifications for replica sets within 100ms each")
+			t.Errorf("Expected update notifications for replica sets")
+		}
+	}
+
+	// case 2: Remove ControllerRef (orphan). Expect to sync both former owner and
+	// any label-matching RS.
+	pod1 = newPodList(informers.Core().V1().Pods().Informer().GetIndexer(), 1, v1.PodRunning, labelMap1, testRSSpec1, "pod").Items[0]
+	pod1.ResourceVersion = "1"
+	pod1.Labels = labelMap2
+	pod1.OwnerReferences = []metav1.OwnerReference{controllerRef1}
+	pod2 = pod1
+	pod2.OwnerReferences = nil
+	pod2.ResourceVersion = "2"
+	manager.updatePod(&pod1, &pod2)
+	expected = sets.NewString(testRSSpec1.Name, testRSSpec2.Name)
+	for _, name := range expected.List() {
+		t.Logf("Expecting update for %+v", name)
+		select {
+		case got := <-received:
+			if !expected.Has(got) {
+				t.Errorf("Expected keys %#v got %v", expected, got)
+			}
+		case <-time.After(wait.ForeverTestTimeout):
+			t.Errorf("Expected update notifications for replica sets")
+		}
+	}
+
+	// case 4: Keep ControllerRef, change labels. Expect to sync owning RS.
+	pod1 = newPodList(informers.Core().V1().Pods().Informer().GetIndexer(), 1, v1.PodRunning, labelMap1, testRSSpec1, "pod").Items[0]
+	pod1.ResourceVersion = "1"
+	pod1.Labels = labelMap1
+	pod1.OwnerReferences = []metav1.OwnerReference{controllerRef2}
+	pod2 = pod1
+	pod2.Labels = labelMap2
+	pod2.ResourceVersion = "2"
+	manager.updatePod(&pod1, &pod2)
+	expected = sets.NewString(testRSSpec2.Name)
+	for _, name := range expected.List() {
+		t.Logf("Expecting update for %+v", name)
+		select {
+		case got := <-received:
+			if !expected.Has(got) {
+				t.Errorf("Expected keys %#v got %v", expected, got)
+			}
+		case <-time.After(wait.ForeverTestTimeout):
+			t.Errorf("Expected update notifications for replica sets")
 		}
 	}
 }
@@ -705,7 +759,7 @@ func TestControllerUpdateRequeue(t *testing.T) {
 	stopCh := make(chan struct{})
 	defer close(stopCh)
 	client := clientset.NewForConfigOrDie(&restclient.Config{Host: testServer.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &api.Registry.GroupOrDie(v1.GroupName).GroupVersion}})
-	manager, informers := testNewReplicaSetControllerFromClient(client, stopCh, BurstReplicas, 0)
+	manager, informers := testNewReplicaSetControllerFromClient(client, stopCh, BurstReplicas)
 
 	labelMap := map[string]string{"foo": "bar"}
 	rs := newReplicaSet(1, labelMap)
@@ -776,7 +830,7 @@ func doTestControllerBurstReplicas(t *testing.T, burstReplicas, numReplicas int)
 	fakePodControl := controller.FakePodControl{}
 	stopCh := make(chan struct{})
 	defer close(stopCh)
-	manager, informers := testNewReplicaSetControllerFromClient(client, stopCh, burstReplicas, 0)
+	manager, informers := testNewReplicaSetControllerFromClient(client, stopCh, burstReplicas)
 	manager.podControl = &fakePodControl
 
 	labelMap := map[string]string{"foo": "bar"}
@@ -839,6 +893,7 @@ func doTestControllerBurstReplicas(t *testing.T, burstReplicas, numReplicas int)
 				// the rs is waiting for.
 				expectedDels := manager.expectations.GetUIDs(getKey(rsSpec, t))
 				podsToDelete := []*v1.Pod{}
+				isController := true
 				for _, key := range expectedDels.List() {
 					nsName := strings.Split(key, "/")
 					podsToDelete = append(podsToDelete, &v1.Pod{
@@ -846,6 +901,9 @@ func doTestControllerBurstReplicas(t *testing.T, burstReplicas, numReplicas int)
 							Name:      nsName[1],
 							Namespace: nsName[0],
 							Labels:    rsSpec.Spec.Selector.MatchLabels,
+							OwnerReferences: []metav1.OwnerReference{
+								{UID: rsSpec.UID, APIVersion: "v1", Kind: "ReplicaSet", Name: rsSpec.Name, Controller: &isController},
+							},
 						},
 					})
 				}
@@ -882,11 +940,15 @@ func doTestControllerBurstReplicas(t *testing.T, burstReplicas, numReplicas int)
 					t.Fatalf("Waiting on unexpected number of deletes.")
 				}
 				nsName := strings.Split(expectedDel.List()[0], "/")
+				isController := true
 				lastPod := &v1.Pod{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      nsName[1],
 						Namespace: nsName[0],
 						Labels:    rsSpec.Spec.Selector.MatchLabels,
+						OwnerReferences: []metav1.OwnerReference{
+							{UID: rsSpec.UID, APIVersion: "v1", Kind: "ReplicaSet", Name: rsSpec.Name, Controller: &isController},
+						},
 					},
 				}
 				informers.Core().V1().Pods().Informer().GetIndexer().Delete(lastPod)
@@ -929,7 +991,7 @@ func TestRSSyncExpectations(t *testing.T) {
 	fakePodControl := controller.FakePodControl{}
 	stopCh := make(chan struct{})
 	defer close(stopCh)
-	manager, informers := testNewReplicaSetControllerFromClient(client, stopCh, 2, 0)
+	manager, informers := testNewReplicaSetControllerFromClient(client, stopCh, 2)
 	manager.podControl = &fakePodControl
 
 	labelMap := map[string]string{"foo": "bar"}
@@ -955,7 +1017,7 @@ func TestDeleteControllerAndExpectations(t *testing.T) {
 	client := clientset.NewForConfigOrDie(&restclient.Config{Host: "", ContentConfig: restclient.ContentConfig{GroupVersion: &api.Registry.GroupOrDie(v1.GroupName).GroupVersion}})
 	stopCh := make(chan struct{})
 	defer close(stopCh)
-	manager, informers := testNewReplicaSetControllerFromClient(client, stopCh, 10, 0)
+	manager, informers := testNewReplicaSetControllerFromClient(client, stopCh, 10)
 
 	rs := newReplicaSet(1, map[string]string{"foo": "bar"})
 	informers.Extensions().V1beta1().ReplicaSets().Informer().GetIndexer().Add(rs)
@@ -1009,34 +1071,42 @@ func TestOverlappingRSs(t *testing.T) {
 	client := clientset.NewForConfigOrDie(&restclient.Config{Host: "", ContentConfig: restclient.ContentConfig{GroupVersion: &api.Registry.GroupOrDie(v1.GroupName).GroupVersion}})
 	labelMap := map[string]string{"foo": "bar"}
 
-	for i := 0; i < 5; i++ {
-		func() {
-			stopCh := make(chan struct{})
-			defer close(stopCh)
-			manager, informers := testNewReplicaSetControllerFromClient(client, stopCh, 10, 0)
+	stopCh := make(chan struct{})
+	defer close(stopCh)
+	manager, informers := testNewReplicaSetControllerFromClient(client, stopCh, 10)
 
-			// Create 10 ReplicaSets, shuffled them randomly and insert them into the ReplicaSet controller's store
-			var controllers []*extensions.ReplicaSet
-			for j := 1; j < 10; j++ {
-				rsSpec := newReplicaSet(1, labelMap)
-				rsSpec.CreationTimestamp = metav1.Date(2014, time.December, j, 0, 0, 0, 0, time.Local)
-				rsSpec.Name = string(uuid.NewUUID())
-				controllers = append(controllers, rsSpec)
-			}
-			shuffledControllers := shuffle(controllers)
-			for j := range shuffledControllers {
-				informers.Extensions().V1beta1().ReplicaSets().Informer().GetIndexer().Add(shuffledControllers[j])
-			}
-			// Add a pod and make sure only the oldest ReplicaSet is synced
-			pods := newPodList(nil, 1, v1.PodPending, labelMap, controllers[0], "pod")
-			rsKey := getKey(controllers[0], t)
+	// Create 10 ReplicaSets, shuffled them randomly and insert them into the
+	// ReplicaSet controller's store.
+	// All use the same CreationTimestamp since ControllerRef should be able
+	// to handle that.
+	timestamp := metav1.Date(2014, time.December, 0, 0, 0, 0, 0, time.Local)
+	var controllers []*extensions.ReplicaSet
+	for j := 1; j < 10; j++ {
+		rsSpec := newReplicaSet(1, labelMap)
+		rsSpec.CreationTimestamp = timestamp
+		rsSpec.Name = fmt.Sprintf("rs%d", j)
+		controllers = append(controllers, rsSpec)
+	}
+	shuffledControllers := shuffle(controllers)
+	for j := range shuffledControllers {
+		informers.Extensions().V1beta1().ReplicaSets().Informer().GetIndexer().Add(shuffledControllers[j])
+	}
+	// Add a pod with a ControllerRef and make sure only the corresponding
+	// ReplicaSet is synced. Pick a RS in the middle since the old code used to
+	// sort by name if all timestamps were equal.
+	rs := controllers[3]
+	pods := newPodList(nil, 1, v1.PodPending, labelMap, rs, "pod")
+	pod := &pods.Items[0]
+	isController := true
+	pod.OwnerReferences = []metav1.OwnerReference{
+		{UID: rs.UID, APIVersion: "v1", Kind: "ReplicaSet", Name: rs.Name, Controller: &isController},
+	}
+	rsKey := getKey(rs, t)
 
-			manager.addPod(&pods.Items[0])
-			queueRS, _ := manager.queue.Get()
-			if queueRS != rsKey {
-				t.Fatalf("Expected to find key %v in queue, found %v", rsKey, queueRS)
-			}
-		}()
+	manager.addPod(pod)
+	queueRS, _ := manager.queue.Get()
+	if queueRS != rsKey {
+		t.Fatalf("Expected to find key %v in queue, found %v", rsKey, queueRS)
 	}
 }
 
@@ -1045,7 +1115,7 @@ func TestDeletionTimestamp(t *testing.T) {
 	labelMap := map[string]string{"foo": "bar"}
 	stopCh := make(chan struct{})
 	defer close(stopCh)
-	manager, informers := testNewReplicaSetControllerFromClient(c, stopCh, 10, 0)
+	manager, informers := testNewReplicaSetControllerFromClient(c, stopCh, 10)
 
 	rs := newReplicaSet(1, labelMap)
 	informers.Extensions().V1beta1().ReplicaSets().Informer().GetIndexer().Add(rs)
@@ -1092,11 +1162,15 @@ func TestDeletionTimestamp(t *testing.T) {
 
 	// An update to the pod (including an update to the deletion timestamp)
 	// should not be counted as a second delete.
+	isController := true
 	secondPod := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: pod.Namespace,
 			Name:      "secondPod",
 			Labels:    pod.Labels,
+			OwnerReferences: []metav1.OwnerReference{
+				{UID: rs.UID, APIVersion: "v1", Kind: "ReplicaSet", Name: rs.Name, Controller: &isController},
+			},
 		},
 	}
 	manager.expectations.ExpectDeletions(rsKey, []string{controller.PodKey(secondPod)})
@@ -1136,7 +1210,7 @@ func TestDeletionTimestamp(t *testing.T) {
 func setupManager(stopCh chan struct{}, objs ...runtime.Object) (manager *ReplicaSetController, fakePodControl *controller.FakePodControl, informers informers.SharedInformerFactory) {
 	c := fakeclientset.NewSimpleClientset(objs...)
 	fakePodControl = &controller.FakePodControl{}
-	manager, informers = testNewReplicaSetControllerFromClient(c, stopCh, BurstReplicas, 0)
+	manager, informers = testNewReplicaSetControllerFromClient(c, stopCh, BurstReplicas)
 
 	manager.podControl = fakePodControl
 	return manager, fakePodControl, informers
@@ -1366,7 +1440,7 @@ func TestReadyReplicas(t *testing.T) {
 	client := clientset.NewForConfigOrDie(&restclient.Config{Host: testServer.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &api.Registry.GroupOrDie(v1.GroupName).GroupVersion}})
 	stopCh := make(chan struct{})
 	defer close(stopCh)
-	manager, informers := testNewReplicaSetControllerFromClient(client, stopCh, BurstReplicas, 0)
+	manager, informers := testNewReplicaSetControllerFromClient(client, stopCh, BurstReplicas)
 
 	// Status.Replica should update to match number of pods in system, 1 new pod should be created.
 	labelMap := map[string]string{"foo": "bar"}
@@ -1408,7 +1482,7 @@ func TestAvailableReplicas(t *testing.T) {
 	client := clientset.NewForConfigOrDie(&restclient.Config{Host: testServer.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &api.Registry.GroupOrDie(v1.GroupName).GroupVersion}})
 	stopCh := make(chan struct{})
 	defer close(stopCh)
-	manager, informers := testNewReplicaSetControllerFromClient(client, stopCh, BurstReplicas, 0)
+	manager, informers := testNewReplicaSetControllerFromClient(client, stopCh, BurstReplicas)
 
 	// Status.Replica should update to match number of pods in system, 1 new pod should be created.
 	labelMap := map[string]string{"foo": "bar"}
