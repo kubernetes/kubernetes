@@ -36,7 +36,7 @@ func For(d *kubeadmapi.NodeConfiguration) (*clientcmdapi.Config, error) {
 	case len(d.DiscoveryURL) != 0:
 		return runHTTPSDiscovery(d.DiscoveryURL)
 	case len(d.DiscoveryToken) != 0:
-		return runTokenDiscovery(d.DiscoveryToken)
+		return runTokenDiscovery(d.DiscoveryToken, d.Masters)
 	default:
 		return nil, fmt.Errorf("couldn't find a valid discovery configuration.")
 	}
@@ -64,12 +64,12 @@ func runHTTPSDiscovery(hd string) (*clientcmdapi.Config, error) {
 }
 
 // runTokenDiscovery executes token-based discovery.
-func runTokenDiscovery(td string) (*clientcmdapi.Config, error) {
+func runTokenDiscovery(td string, m []string) (*clientcmdapi.Config, error) {
 	id, secret, err := tokenutil.ParseToken(td)
 	if err != nil {
 		return nil, err
 	}
-	t := &kubeadmapi.TokenDiscovery{ID: id, Secret: secret}
+	t := &kubeadmapi.TokenDiscovery{ID: id, Secret: secret, Addresses: m}
 
 	if valid, err := tokenutil.ValidateToken(t); valid == false {
 		return nil, err
