@@ -389,18 +389,16 @@ func MountOptionFromSpec(spec *Spec, options ...string) []string {
 
 // JoinMountOptions joins mount options eliminating duplicates
 func JoinMountOptions(userOptions []string, systemOptions []string) []string {
-	allMountOptions := map[string]string{}
+	allMountOptions := sets.NewString()
 
 	for _, mountOption := range userOptions {
-		allMountOptions[mountOption] = mountOption
+		if len(mountOption) > 0 {
+			allMountOptions.Insert(mountOption)
+		}
 	}
 
 	for _, mountOption := range systemOptions {
-		allMountOptions[mountOption] = mountOption
+		allMountOptions.Insert(mountOption)
 	}
-	mountOptionSlice := make([]string, 0, len(allMountOptions))
-	for key := range allMountOptions {
-		mountOptionSlice = append(mountOptionSlice, key)
-	}
-	return mountOptionSlice
+	return allMountOptions.UnsortedList()
 }
