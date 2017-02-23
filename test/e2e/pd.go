@@ -589,7 +589,7 @@ func createPD() (string, error) {
 	if framework.TestContext.Provider == "gce" || framework.TestContext.Provider == "gke" {
 		pdName := fmt.Sprintf("%s-%s", framework.TestContext.Prefix, string(uuid.NewUUID()))
 
-		gceCloud, err := getGCECloud()
+		gceCloud, err := framework.GetGCECloud()
 		if err != nil {
 			return "", err
 		}
@@ -624,7 +624,7 @@ func createPD() (string, error) {
 
 func deletePD(pdName string) error {
 	if framework.TestContext.Provider == "gce" || framework.TestContext.Provider == "gke" {
-		gceCloud, err := getGCECloud()
+		gceCloud, err := framework.GetGCECloud()
 		if err != nil {
 			return err
 		}
@@ -663,7 +663,7 @@ func deletePD(pdName string) error {
 
 func detachPD(nodeName types.NodeName, pdName string) error {
 	if framework.TestContext.Provider == "gce" || framework.TestContext.Provider == "gke" {
-		gceCloud, err := getGCECloud()
+		gceCloud, err := framework.GetGCECloud()
 		if err != nil {
 			return err
 		}
@@ -771,7 +771,7 @@ func testPDPod(diskNames []string, targetNode types.NodeName, readOnly bool, num
 func waitForPDDetach(diskName string, nodeName types.NodeName) error {
 	if framework.TestContext.Provider == "gce" || framework.TestContext.Provider == "gke" {
 		framework.Logf("Waiting for GCE PD %q to detach from node %q.", diskName, nodeName)
-		gceCloud, err := getGCECloud()
+		gceCloud, err := framework.GetGCECloud()
 		if err != nil {
 			return err
 		}
@@ -796,16 +796,6 @@ func waitForPDDetach(diskName string, nodeName types.NodeName) error {
 	}
 
 	return nil
-}
-
-func getGCECloud() (*gcecloud.GCECloud, error) {
-	gceCloud, ok := framework.TestContext.CloudConfig.Provider.(*gcecloud.GCECloud)
-
-	if !ok {
-		return nil, fmt.Errorf("failed to convert CloudConfig.Provider to GCECloud: %#v", framework.TestContext.CloudConfig.Provider)
-	}
-
-	return gceCloud, nil
 }
 
 func detachAndDeletePDs(diskName string, hosts []types.NodeName) {
