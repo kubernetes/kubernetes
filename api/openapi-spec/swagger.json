@@ -14813,6 +14813,39 @@
      }
     }
    },
+   "/apis/apps/v1alpha1/": {
+    "get": {
+     "description": "get available resources",
+     "consumes": [
+      "application/json",
+      "application/yaml",
+      "application/vnd.kubernetes.protobuf"
+     ],
+     "produces": [
+      "application/json",
+      "application/yaml",
+      "application/vnd.kubernetes.protobuf"
+     ],
+     "schemes": [
+      "https"
+     ],
+     "tags": [
+      "apps_v1alpha1"
+     ],
+     "operationId": "getAppsV1alpha1APIResources",
+     "responses": {
+      "200": {
+       "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.APIResourceList"
+       }
+      },
+      "401": {
+       "description": "Unauthorized"
+      }
+     }
+    }
+   },
    "/apis/apps/v1beta1/": {
     "get": {
      "description": "get available resources",

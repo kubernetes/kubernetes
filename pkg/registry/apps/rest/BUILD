@@ -14,6 +14,7 @@ go_library(
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/apis/apps:go_default_library",
+        "//pkg/apis/apps/v1alpha1:go_default_library",
         "//pkg/apis/apps/v1beta1:go_default_library",
         "//pkg/registry/apps/petset/storage:go_default_library",
         "//pkg/registry/apps/podinjectionpolicy/storage:go_default_library",
