@@ -28,6 +28,7 @@ import (
 	"github.com/golang/glog"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
@@ -56,6 +57,9 @@ var (
 
 		# Update a single-container pod's image version (tag) to v4
 		kubectl get pod mypod -o yaml | sed 's/\(image: myimage\):.*$/\1:v4/' | kubectl replace -f -
+
+		# Replace a deployment using the data in deployment.json and save the config in its annotation.
+		kubectl replace -f ./deployment.json --save-config
 
 		# Force replace, delete and then re-create the resource
 		kubectl replace --force -f ./pod.json`)
@@ -86,7 +90,8 @@ func NewCmdReplace(f cmdutil.Factory, out io.Writer) *cobra.Command {
 	cmd.Flags().Duration("timeout", 0, "Only relevant during a force replace. The length of time to wait before giving up on a delete of the old resource, zero means determine a timeout from the size of the object. Any other values should contain a corresponding time unit (e.g. 1s, 2m, 3h).")
 	cmdutil.AddValidateFlags(cmd)
 	cmdutil.AddOutputFlagsForMutation(cmd)
-	cmdutil.AddApplyAnnotationFlags(cmd)
+	overrideMsg := "If true, the configuration of current object will be saved in its annotation. If false and the user-proviced config doesn't have the annotation, we will save the annotation from the live object if there are any. If false and the user-proviced config has the annotation, we will use the user-provided annotation. This flag is useful when you want to perform kubectl apply on this object in the future."
+	cmdutil.AddApplyAnnotationFlagsWithMsg(cmd, overrideMsg)
 	cmdutil.AddRecordFlag(cmd)
 	cmdutil.AddInclude3rdPartyFlags(cmd)
 
@@ -146,7 +151,8 @@ func RunReplace(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []str
 			return err
 		}
 
-		if err := kubectl.CreateOrUpdateAnnotation(cmdutil.GetFlagBool(cmd, cmdutil.ApplyAnnotationsFlag), info, f.JSONEncoder()); err != nil {
+		saveConifg := cmdutil.GetFlagBool(cmd, cmdutil.ApplyAnnotationsFlag)
+		if err := handleApplyAnnotation(info, saveConifg, f.JSONEncoder()); err != nil {
 			return cmdutil.AddSourceToErr("replacing", info.Source, err)
 		}
 
@@ -267,8 +273,9 @@ func forceReplace(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []s
 			return err
 		}
 
-		if err := kubectl.CreateOrUpdateAnnotation(cmdutil.GetFlagBool(cmd, cmdutil.ApplyAnnotationsFlag), info, f.JSONEncoder()); err != nil {
-			return err
+		saveConifg := cmdutil.GetFlagBool(cmd, cmdutil.ApplyAnnotationsFlag)
+		if err := handleApplyAnnotation(info, saveConifg, f.JSONEncoder()); err != nil {
+			return cmdutil.AddSourceToErr("replacing", info.Source, err)
 		}
 
 		if cmdutil.ShouldRecord(cmd, info) {
@@ -293,6 +300,38 @@ func forceReplace(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []s
 	}
 	if count == 0 {
 		return fmt.Errorf("no objects passed to replace")
+	}
+	return nil
+}
+
+// If saveConfig is true, create or update the annotation.
+// If saveConfig is false and the local config file doesn't have the annotation, we save the annotation from the live object if there is one.
+// If saveConfig is false and the local config file has the annotation, we use the annotation in the config file.
+func handleApplyAnnotation(info *resource.Info, saveConfig bool, encoder runtime.Encoder) error {
+	if saveConfig {
+		if err := kubectl.CreateOrUpdateAnnotation(true, info, encoder); err != nil {
+			return err
+		}
+	} else {
+		anno, err := kubectl.GetOriginalConfiguration(info.Mapping, info.Object)
+		if err != nil {
+			return err
+		}
+		// The user-provided config doesn't have the annotation, try to get it from live object
+		if anno == nil {
+			modifiedObj := info.Object
+			if err := info.Get(); err != nil {
+				return err
+			}
+			annotationFromLiveObj, err := kubectl.GetOriginalConfiguration(info.Mapping, info.Object)
+			if err != nil {
+				return err
+			}
+			info.Object = modifiedObj
+			if err = kubectl.SetOriginalConfiguration(info, annotationFromLiveObj); err != nil {
+				return err
+			}
+		}
 	}
 	return nil
 }

@@ -403,7 +403,19 @@ func AddDryRunFlag(cmd *cobra.Command) {
 }
 
 func AddApplyAnnotationFlags(cmd *cobra.Command) {
-	cmd.Flags().Bool(ApplyAnnotationsFlag, false, "If true, the configuration of current object will be saved in its annotation. This is useful when you want to perform kubectl apply on this object in the future.")
+	addApplyAnnotationFlagsWithMsg(cmd, "")
+}
+
+func AddApplyAnnotationFlagsWithMsg(cmd *cobra.Command, overrideMessage string) {
+	addApplyAnnotationFlagsWithMsg(cmd, overrideMessage)
+}
+
+func addApplyAnnotationFlagsWithMsg(cmd *cobra.Command, overrideMessage string) {
+	defaultMessage := "If true, the configuration of current object will be saved in its annotation. Otherwise, the annotation will be unchanged. This flag is useful when you want to perform kubectl apply on this object in the future."
+	if len(overrideMessage) <= 0 {
+		overrideMessage = defaultMessage
+	}
+	cmd.Flags().Bool(ApplyAnnotationsFlag, false, overrideMessage)
 }
 
 // AddGeneratorFlags adds flags common to resource generation commands
