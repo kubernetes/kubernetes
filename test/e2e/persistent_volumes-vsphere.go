@@ -25,12 +25,13 @@ import (
 	vsphere "k8s.io/kubernetes/pkg/cloudprovider/providers/vsphere"
 	"k8s.io/kubernetes/test/e2e/framework"
 
+	"fmt"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 )
 
 // Testing configurations of single a PV/PVC pair attached to a vSphere Disk
-var _ = framework.KubeDescribe("PersistentVolumes:vsphere", func() {
+var _ = framework.KubeDescribe("PersistentVolumes:vsphere [Volume]", func() {
 	var (
 		c          clientset.Interface
 		ns         string
@@ -99,11 +100,12 @@ var _ = framework.KubeDescribe("PersistentVolumes:vsphere", func() {
 		if c != nil {
 			if clientPod != nil {
 				clientPod, err = c.CoreV1().Pods(ns).Get(clientPod.Name, metav1.GetOptions{})
-				if !apierrs.IsNotFound(err) {
+				if err == nil {
 					framework.DeletePodWithWait(f, c, clientPod)
+				} else {
+					Expect(apierrs.IsNotFound(err)).To(BeTrue(), fmt.Sprintf("unexpected api error re-getting pod %q: %v", clientPod.Name, err))
 				}
 			}
-
 			if pv != nil {
 				framework.DeletePersistentVolume(c, pv.Name)
 			}
@@ -165,5 +167,15 @@ var _ = framework.KubeDescribe("PersistentVolumes:vsphere", func() {
 		pv = nil
 		By("Deleting the pod")
 		framework.DeletePodWithWait(f, c, clientPod)
+	})
+	/*
+		This test verifies that a volume mounted to a pod remains mounted after a kubelet restarts.
+		Steps:
+		1. Write to the volume
+		2. Restart kubelet
+		3. Verify that written file is accessible after kubelet restart
+	*/
+	It("should test that a file written to the mount before kubelet restart is stat-able after restart [Disruptive]", func() {
+		testKubeletRestartsAndRestoresMount(c, f, clientPod, pvc, pv)
 	})
 })
