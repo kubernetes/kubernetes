@@ -26,6 +26,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/apiserver/pkg/storage"
+	"k8s.io/apiserver/pkg/storage/value"
 
 	"github.com/coreos/etcd/clientv3"
 	etcdrpc "github.com/coreos/etcd/etcdserver/api/v3rpc/rpctypes"
@@ -43,7 +44,7 @@ type watcher struct {
 	client      *clientv3.Client
 	codec       runtime.Codec
 	versioner   storage.Versioner
-	transformer ValueTransformer
+	transformer value.Transformer
 }
 
 // watchChan implements watch.Interface.
@@ -60,7 +61,7 @@ type watchChan struct {
 	errChan           chan error
 }
 
-func newWatcher(client *clientv3.Client, codec runtime.Codec, versioner storage.Versioner, transformer ValueTransformer) *watcher {
+func newWatcher(client *clientv3.Client, codec runtime.Codec, versioner storage.Versioner, transformer value.Transformer) *watcher {
 	return &watcher{
 		client:      client,
 		codec:       codec,
@@ -343,7 +344,7 @@ func (wc *watchChan) sendEvent(e *event) {
 
 func (wc *watchChan) prepareObjs(e *event) (curObj runtime.Object, oldObj runtime.Object, err error) {
 	if !e.isDeleted {
-		data, _, err := wc.watcher.transformer.TransformFromStorage(e.value)
+		data, _, err := wc.watcher.transformer.TransformFromStorage(e.value, authenticatedDataString(e.key))
 		if err != nil {
 			return nil, nil, err
 		}
@@ -358,7 +359,7 @@ func (wc *watchChan) prepareObjs(e *event) (curObj runtime.Object, oldObj runtim
 	// we need the object only to compute whether it was filtered out
 	// before).
 	if len(e.prevValue) > 0 && (e.isDeleted || !wc.acceptAll()) {
-		data, _, err := wc.watcher.transformer.TransformFromStorage(e.prevValue)
+		data, _, err := wc.watcher.transformer.TransformFromStorage(e.prevValue, authenticatedDataString(e.key))
 		if err != nil {
 			return nil, nil, err
 		}
