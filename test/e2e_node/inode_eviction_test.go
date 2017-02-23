@@ -233,7 +233,7 @@ func runEvictionTest(f *framework.Framework, testCondition string, podTestSpecs 
 				return nil
 			}, evictionTestTimeout, evictionPollInterval).Should(BeNil())
 
-			By("making sure conditions do not return")
+			By("making sure conditions do not return, and that pods that shouldnt fail dont fail")
 			Consistently(func() error {
 				hasPressure, err := hasPressureCondition(f, testCondition)
 				if err != nil {
@@ -244,6 +244,18 @@ func runEvictionTest(f *framework.Framework, testCondition string, podTestSpecs 
 				}
 				if hasPressure {
 					return fmt.Errorf("%s dissappeared and then reappeared", testCondition)
+				}
+				// Gather current information
+				updatedPodList, _ := f.ClientSet.Core().Pods(f.Namespace.Name).List(metav1.ListOptions{})
+				for _, priorityPodSpec := range podTestSpecs {
+					// EvictionPriority 0 pods should not fail
+					if priorityPodSpec.evictionPriority == 0 {
+						for _, p := range updatedPodList.Items {
+							if p.Name == priorityPodSpec.pod.Name && p.Status.Phase == v1.PodFailed {
+								return fmt.Errorf("%s pod failed (delayed) and shouldn't have failed", p.Name)
+							}
+						}
+					}
 				}
 				return nil
 			}, postTestConditionMonitoringPeriod, evictionPollInterval).Should(BeNil())
