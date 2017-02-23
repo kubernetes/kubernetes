@@ -20,7 +20,8 @@ set -o pipefail
 
 FAIL_ON_CHANGES=false
 DRY_RUN=false
-while getopts ":fd" opt; do
+RUN_FROM_UPDATE_SCRIPT=false
+while getopts ":fdu" opt; do
   case $opt in
     f)
       FAIL_ON_CHANGES=true
@@ -28,14 +29,21 @@ while getopts ":fd" opt; do
     d)
       DRY_RUN=true
       ;;
+    u)
+      RUN_FROM_UPDATE_SCRIPT=true
+      ;;
     \?)
       echo "Invalid option: -$OPTARG" >&2
+      exit 1
       ;;
   esac
 done
 readonly FAIL_ON_CHANGES DRY_RUN
 
-echo "**PLEASE** run \"godep restore\" before running this script"
+if [ "${RUN_FROM_UPDATE_SCRIPT}" != true ]; then
+  echo "WARNING WARNING WARNING - do not run this script directly, but via hack/update-staging-client-go.sh"
+fi
+
 # PREREQUISITES: run `godep restore` in the main repo before calling this script.
 CLIENTSET="clientset"
 MAIN_REPO_FROM_SRC="k8s.io/kubernetes"
