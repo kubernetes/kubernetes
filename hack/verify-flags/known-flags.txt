@@ -59,6 +59,7 @@ bounding-dirs
 build-dependencies
 build-only
 build-tag
+ca-cert-path
 cadvisor-port
 cert-dir
 certificate-authority

@@ -160,16 +160,25 @@ func TestValidateNodeConfiguration(t *testing.T) {
 					Addresses: []string{"foobar"},
 				},
 			},
+			CACertPath: "/some/cert.crt",
 		}, false},
 		{&kubeadm.NodeConfiguration{
 			Discovery: kubeadm.Discovery{
 				HTTPS: &kubeadm.HTTPSDiscovery{URL: "foo"},
 			},
+			CACertPath: "/some/path", // no .crt suffix
+		}, false},
+		{&kubeadm.NodeConfiguration{
+			Discovery: kubeadm.Discovery{
+				HTTPS: &kubeadm.HTTPSDiscovery{URL: "foo"},
+			},
+			CACertPath: "/some/cert.crt",
 		}, true},
 		{&kubeadm.NodeConfiguration{
 			Discovery: kubeadm.Discovery{
 				File: &kubeadm.FileDiscovery{Path: "foo"},
 			},
+			CACertPath: "/some/other/cert.crt",
 		}, true},
 		{&kubeadm.NodeConfiguration{
 			Discovery: kubeadm.Discovery{
@@ -179,6 +188,7 @@ func TestValidateNodeConfiguration(t *testing.T) {
 					Addresses: []string{"foobar"},
 				},
 			},
+			CACertPath: "/a/third/cert.crt",
 		}, true},
 	}
 	for _, rt := range tests {
