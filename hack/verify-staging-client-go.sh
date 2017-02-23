@@ -50,7 +50,9 @@ if [ "${USE_TEMP_DIR:-1}" = 1 ]; then
     }
     trap cleanup EXIT SIGINT
     mkdir -p "${TEMP_STAGING_GOPATH}/src/k8s.io"
-    ln -s "${PWD}" "${TEMP_STAGING_GOPATH}/src/k8s.io"
+    git clone --shared -n . "${TEMP_STAGING_GOPATH}/src/k8s.io/kubernetes"
+    REF=$(git rev-parse HEAD)
+    (cd ${TEMP_STAGING_GOPATH}/src/k8s.io/kubernetes; git checkout $REF)
 else
     TEMP_STAGING_GOPATH="${GOPATH}"
 fi
