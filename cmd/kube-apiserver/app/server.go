@@ -127,6 +127,9 @@ func Run(s *options.ServerRunOptions) error {
 		return err
 	}
 
+	// Use protobufs for self-communication.
+	genericConfig.LoopbackClientConfig.ContentConfig.ContentType = "application/vnd.kubernetes.protobuf"
+
 	capabilities.Initialize(capabilities.Capabilities{
 		AllowPrivileged: s.AllowPrivileged,
 		// TODO(vmarmol): Implement support for HostNetworkSources.
