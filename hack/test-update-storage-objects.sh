@@ -159,7 +159,7 @@ killApiServer
 
 kube::etcd::stop
 TARGET_STORAGE="etcd3" \
-  TARGET_VERSION="3.0.14" \
+  TARGET_VERSION="3.0.17" \
   DATA_DIRECTORY="${ETCD_DIR}" \
   ETCD=$(which etcd) \
   ETCDCTL=$(which etcdctl) \

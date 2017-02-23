@@ -830,7 +830,7 @@ func fakeInitHostFactory(apiserverServiceType v1.ServiceType, federationName, na
 						},
 						{
 							Name:  "etcd",
-							Image: "gcr.io/google_containers/etcd:3.0.14-alpha.1",
+							Image: "gcr.io/google_containers/etcd:3.0.17-alpha.1",
 							Command: []string{
 								"/usr/local/bin/etcd",
 								"--data-dir",

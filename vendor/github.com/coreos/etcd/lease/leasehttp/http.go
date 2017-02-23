@@ -19,10 +19,10 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
-	"time"
 
 	pb "github.com/coreos/etcd/etcdserver/etcdserverpb"
 	"github.com/coreos/etcd/lease"
+	"golang.org/x/net/context"
 )
 
 // NewHandler returns an http Handler for lease renewals
@@ -75,15 +75,22 @@ func (h *leaseHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 // RenewHTTP renews a lease at a given primary server.
 // TODO: Batch request in future?
-func RenewHTTP(id lease.LeaseID, url string, rt http.RoundTripper, timeout time.Duration) (int64, error) {
+func RenewHTTP(ctx context.Context, id lease.LeaseID, url string, rt http.RoundTripper) (int64, error) {
 	// will post lreq protobuf to leader
 	lreq, err := (&pb.LeaseKeepAliveRequest{ID: int64(id)}).Marshal()
 	if err != nil {
 		return -1, err
 	}
 
-	cc := &http.Client{Transport: rt, Timeout: timeout}
-	resp, err := cc.Post(url, "application/protobuf", bytes.NewReader(lreq))
+	cc := &http.Client{Transport: rt}
+	req, err := http.NewRequest("POST", url, bytes.NewReader(lreq))
+	if err != nil {
+		return -1, err
+	}
+	req.Header.Set("Content-Type", "application/protobuf")
+	req.Cancel = ctx.Done()
+
+	resp, err := cc.Do(req)
 	if err != nil {
 		// TODO detect if leader failed and retry?
 		return -1, err
