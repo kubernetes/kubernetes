@@ -86,7 +86,7 @@ func (s *DeploymentStatusViewer) Status(namespace, name string, revision int64) 
 
 // Status returns a message describing daemon set status, and a bool value indicating if the status is considered done
 func (s *DaemonSetStatusViewer) Status(namespace, name string, revision int64) (string, bool, error) {
-	//ignoring revision as DaemonSets do not have history yet
+	//ignoring revision as DaemonSets does not have history yet
 
 	daemon, err := s.c.DaemonSets(namespace).Get(name, metav1.GetOptions{})
 	if err != nil {

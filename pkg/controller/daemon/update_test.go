@@ -19,17 +19,117 @@ package daemon
 import (
 	"testing"
 
+	"k8s.io/apimachinery/pkg/util/intstr"
 	extensions "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 )
 
-// DaemonSets without node selectors should launch pods on every node.
-func TestSimpleDaemonSetUpdatesWithRollingUpdate(t *testing.T) {
+func TestDaemonSetUpdatesPods(t *testing.T) {
 	manager, podControl, _ := newTestController()
+	maxUnavailable := 2
 	addNodes(manager.nodeStore, 0, 5, nil)
 	ds := newDaemonSet("foo")
 	manager.dsStore.Add(ds)
 	syncAndValidateDaemonSets(t, manager, ds, podControl, 5, 0)
-	syncAndValidateDaemonSets(t, manager, ds, podControl, 5, 0)
-	// change strategy type to RollingUpdate
+	markPodsReady(podControl.podStore)
+
+	ds.Spec.Template.Spec.Containers[0].Image = "foo2/bar2"
 	ds.Spec.UpdateStrategy.Type = extensions.RollingUpdateDaemonSetStrategyType
+	intStr := intstr.FromInt(maxUnavailable)
+	ds.Spec.UpdateStrategy.RollingUpdate = &extensions.RollingUpdateDaemonSet{MaxUnavailable: &intStr}
+	ds.Spec.TemplateGeneration++
+	manager.dsStore.Update(ds)
+
+	clearExpectations(t, manager, ds, podControl)
+	syncAndValidateDaemonSets(t, manager, ds, podControl, 0, maxUnavailable)
+	clearExpectations(t, manager, ds, podControl)
+	syncAndValidateDaemonSets(t, manager, ds, podControl, maxUnavailable, 0)
+	markPodsReady(podControl.podStore)
+
+	clearExpectations(t, manager, ds, podControl)
+	syncAndValidateDaemonSets(t, manager, ds, podControl, 0, maxUnavailable)
+	clearExpectations(t, manager, ds, podControl)
+	syncAndValidateDaemonSets(t, manager, ds, podControl, maxUnavailable, 0)
+	markPodsReady(podControl.podStore)
+
+	clearExpectations(t, manager, ds, podControl)
+	syncAndValidateDaemonSets(t, manager, ds, podControl, 0, 1)
+	clearExpectations(t, manager, ds, podControl)
+	syncAndValidateDaemonSets(t, manager, ds, podControl, 1, 0)
+	markPodsReady(podControl.podStore)
+
+	clearExpectations(t, manager, ds, podControl)
+	syncAndValidateDaemonSets(t, manager, ds, podControl, 0, 0)
+	clearExpectations(t, manager, ds, podControl)
+}
+
+func TestDaemonSetUpdatesWhenNewPosIsNotReady(t *testing.T) {
+	manager, podControl, _ := newTestController()
+	maxUnavailable := 3
+	addNodes(manager.nodeStore, 0, 5, nil)
+	ds := newDaemonSet("foo")
+	manager.dsStore.Add(ds)
+	syncAndValidateDaemonSets(t, manager, ds, podControl, 5, 0)
+	markPodsReady(podControl.podStore)
+
+	ds.Spec.Template.Spec.Containers[0].Image = "foo2/bar2"
+	ds.Spec.UpdateStrategy.Type = extensions.RollingUpdateDaemonSetStrategyType
+	intStr := intstr.FromInt(maxUnavailable)
+	ds.Spec.UpdateStrategy.RollingUpdate = &extensions.RollingUpdateDaemonSet{MaxUnavailable: &intStr}
+	ds.Spec.TemplateGeneration++
+	manager.dsStore.Update(ds)
+
+	// new pods are not ready numUnavailable == maxUnavailable
+	clearExpectations(t, manager, ds, podControl)
+	syncAndValidateDaemonSets(t, manager, ds, podControl, 0, maxUnavailable)
+	clearExpectations(t, manager, ds, podControl)
+	syncAndValidateDaemonSets(t, manager, ds, podControl, maxUnavailable, 0)
+
+	clearExpectations(t, manager, ds, podControl)
+	syncAndValidateDaemonSets(t, manager, ds, podControl, 0, 0)
+	clearExpectations(t, manager, ds, podControl)
+}
+
+func TestDaemonSetUpdatesAllOldPodsNotReady(t *testing.T) {
+	manager, podControl, _ := newTestController()
+	maxUnavailable := 3
+	addNodes(manager.nodeStore, 0, 5, nil)
+	ds := newDaemonSet("foo")
+	manager.dsStore.Add(ds)
+	syncAndValidateDaemonSets(t, manager, ds, podControl, 5, 0)
+
+	ds.Spec.Template.Spec.Containers[0].Image = "foo2/bar2"
+	ds.Spec.UpdateStrategy.Type = extensions.RollingUpdateDaemonSetStrategyType
+	intStr := intstr.FromInt(maxUnavailable)
+	ds.Spec.UpdateStrategy.RollingUpdate = &extensions.RollingUpdateDaemonSet{MaxUnavailable: &intStr}
+	ds.Spec.TemplateGeneration++
+	manager.dsStore.Update(ds)
+
+	// all old pods are unavailable so should be removed
+	clearExpectations(t, manager, ds, podControl)
+	syncAndValidateDaemonSets(t, manager, ds, podControl, 0, 5)
+	clearExpectations(t, manager, ds, podControl)
+	syncAndValidateDaemonSets(t, manager, ds, podControl, 5, 0)
+
+	clearExpectations(t, manager, ds, podControl)
+	syncAndValidateDaemonSets(t, manager, ds, podControl, 0, 0)
+	clearExpectations(t, manager, ds, podControl)
+}
+
+func TestDaemonSetUpdatesNoTemplateChanged(t *testing.T) {
+	manager, podControl, _ := newTestController()
+	maxUnavailable := 3
+	addNodes(manager.nodeStore, 0, 5, nil)
+	ds := newDaemonSet("foo")
+	manager.dsStore.Add(ds)
+	syncAndValidateDaemonSets(t, manager, ds, podControl, 5, 0)
+
+	ds.Spec.UpdateStrategy.Type = extensions.RollingUpdateDaemonSetStrategyType
+	intStr := intstr.FromInt(maxUnavailable)
+	ds.Spec.UpdateStrategy.RollingUpdate = &extensions.RollingUpdateDaemonSet{MaxUnavailable: &intStr}
+	manager.dsStore.Update(ds)
+
+	// template is not changed no pod should be removed
+	clearExpectations(t, manager, ds, podControl)
+	syncAndValidateDaemonSets(t, manager, ds, podControl, 0, 0)
+	clearExpectations(t, manager, ds, podControl)
 }
