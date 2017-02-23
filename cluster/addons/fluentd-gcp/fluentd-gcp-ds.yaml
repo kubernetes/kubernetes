@@ -2,19 +2,19 @@
 apiVersion: extensions/v1beta1
 kind: DaemonSet
 metadata:
-  name: fluentd-gcp-v1.38
+  name: fluentd-gcp-v1.39
   namespace: kube-system
   labels:
     k8s-app: fluentd-gcp
     kubernetes.io/cluster-service: "true"
-    version: v1.38
+    version: v1.39
 spec:
   template:
     metadata:
       labels:
         k8s-app: fluentd-gcp
         kubernetes.io/cluster-service: "true"
-        version: v1.38
+        version: v1.39
       # This annotation ensures that fluentd does not get evicted if the node
       # supports critical pod annotation based priority scheme.
       # Note that this does not guarantee admission on the nodes (#40573).
@@ -25,7 +25,7 @@ spec:
       dnsPolicy: Default
       containers:
       - name: fluentd-gcp
-        image: gcr.io/google_containers/fluentd-gcp:1.38
+        image: gcr.io/google_containers/fluentd-gcp:1.39
         # If fluentd consumes its own logs, the following situation may happen:
         # fluentd fails to send a chunk to the server => writes it to the log =>
         # tries to send this message to the server => fails to send a chunk and so on.
