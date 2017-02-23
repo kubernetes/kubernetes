@@ -191,7 +191,7 @@ func (m *PodControllerRefManager) AdoptPod(pod *v1.Pod) error {
 	// Note that ValidateOwnerReferences() will reject this patch if another
 	// OwnerReference exists with controller=true.
 	addControllerPatch := fmt.Sprintf(
-		`{"metadata":{"ownerReferences":[{"apiVersion":"%s","kind":"%s","name":"%s","uid":"%s","controller":true}],"uid":"%s"}}`,
+		`{"metadata":{"ownerReferences":[{"apiVersion":"%s","kind":"%s","name":"%s","uid":"%s","controller":true,"blockOwnerDeletion":true}],"uid":"%s"}}`,
 		m.controllerKind.GroupVersion(), m.controllerKind.Kind,
 		m.controller.GetName(), m.controller.GetUID(), pod.UID)
 	return m.podControl.PatchPod(pod.Namespace, pod.Name, []byte(addControllerPatch))
