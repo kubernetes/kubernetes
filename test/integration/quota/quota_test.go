@@ -92,7 +92,6 @@ func TestQuota(t *testing.T) {
 		informers.Core().V1().ReplicationControllers(),
 		clientset,
 		replicationcontroller.BurstReplicas,
-		4096,
 	)
 	rm.SetEventRecorder(&record.FakeRecorder{})
 	go rm.Run(3, controllerCh)
@@ -273,8 +272,6 @@ func TestQuotaLimitedResourceDenial(t *testing.T) {
 		informers.Core().V1().ReplicationControllers(),
 		clientset,
 		replicationcontroller.BurstReplicas,
-		4096,
-		false,
 	)
 	rm.SetEventRecorder(&record.FakeRecorder{})
 	go rm.Run(3, controllerCh)
