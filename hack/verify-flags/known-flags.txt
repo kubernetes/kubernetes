@@ -78,6 +78,7 @@ cert-altnames
 cert-dir
 certificate-authority
 cgroup-driver
+blkio-device-path
 cgroup-root
 cgroups-per-qos
 chaos-chance

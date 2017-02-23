@@ -452,6 +452,7 @@ func NewMainKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *Kub
 		oomWatcher:        oomWatcher,
 		cgroupsPerQOS:     kubeCfg.CgroupsPerQOS,
 		cgroupRoot:        kubeCfg.CgroupRoot,
+		blkioDevicePath:   kubeCfg.BlkioDevicePath,
 		mounter:           kubeDeps.Mounter,
 		writer:            kubeDeps.Writer,
 		nonMasqueradeCIDR: kubeCfg.NonMasqueradeCIDR,
@@ -991,6 +992,9 @@ type Kubelet struct {
 
 	// If non-empty, pass this to the container runtime as the root cgroup.
 	cgroupRoot string
+
+	// The particular device path for blkio throttle.
+	blkioDevicePath string
 
 	// Mounter to use for volumes.
 	mounter mount.Interface

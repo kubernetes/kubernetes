@@ -356,6 +356,8 @@ type KubeletConfiguration struct {
 	// cgroupRoot is the root cgroup to use for pods. This is handled by the
 	// container runtime on a best effort basis.
 	CgroupRoot string `json:"cgroupRoot"`
+        // The particular device path for blkio throttle.
+        BlkioDevicePath string `json:"blkioDevicePath,omitempty`
 	// Enable QoS based Cgroup hierarchy: top level cgroups for QoS Classes
 	// And all Burstable and BestEffort pods are brought up under their
 	// specific top level QoS cgroup.

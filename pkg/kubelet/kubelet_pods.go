@@ -279,7 +279,7 @@ func (kl *Kubelet) GenerateRunContainerOptions(pod *v1.Pod, container *v1.Contai
 	var err error
 	useClusterFirstPolicy := false
 	cgroupParent := kl.GetPodCgroupParent(pod)
-	opts := &kubecontainer.RunContainerOptions{CgroupParent: cgroupParent}
+	opts := &kubecontainer.RunContainerOptions{CgroupParent: cgroupParent, BlkioDevicePath: kl.blkioDevicePath}
 	hostname, hostDomainName, err := kl.GeneratePodHostNameAndDomain(pod)
 	if err != nil {
 		return nil, false, err

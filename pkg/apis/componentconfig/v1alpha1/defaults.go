@@ -398,6 +398,9 @@ func SetDefaults_KubeletConfiguration(obj *KubeletConfiguration) {
 		temp := int32(defaultIPTablesDropBit)
 		obj.IPTablesDropBit = &temp
 	}
+        if obj.BlkioDevicePath == "" {
+                obj.BlkioDevicePath = "/dev/sda"
+        }
 	if obj.CgroupsPerQOS == nil {
 		temp := true
 		obj.CgroupsPerQOS = &temp

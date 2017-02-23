@@ -3413,9 +3413,13 @@ func ValidateResourceRequirements(requirements *api.ResourceRequirements, fldPat
 		// Check that request <= limit.
 		requestQuantity, exists := requirements.Requests[resourceName]
 		if exists {
-			// For GPUs, not only requests can't exceed limits, they also can't be lower, i.e. must be equal.
+			// For GPUs, StorageIOps, not only requests can't exceed limits, they also can't be lower, i.e. must be equal.
 			if resourceName == api.ResourceNvidiaGPU && quantity.Cmp(requestQuantity) != 0 {
 				allErrs = append(allErrs, field.Invalid(reqPath, requestQuantity.String(), fmt.Sprintf("must be equal to %s limit", api.ResourceNvidiaGPU)))
+			} else if resourceName == api.ResourceStorageReadIOps && quantity.Cmp(requestQuantity) != 0 {
+				allErrs = append(allErrs, field.Invalid(reqPath, requestQuantity.String(), fmt.Sprintf("must be equal to %s limit", api.ResourceStorageReadIOps)))
+			} else if resourceName == api.ResourceStorageWriteIOps && quantity.Cmp(requestQuantity) != 0 {
+				allErrs = append(allErrs, field.Invalid(reqPath, requestQuantity.String(), fmt.Sprintf("must be equal to %s limit", api.ResourceStorageWriteIOps)))
 			} else if quantity.Cmp(requestQuantity) < 0 {
 				allErrs = append(allErrs, field.Invalid(limPath, quantity.String(), fmt.Sprintf("must be greater than or equal to %s request", resourceName)))
 			}
