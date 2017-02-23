@@ -31,6 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/rest/fake"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/annotations"
@@ -59,9 +60,11 @@ func validateApplyArgs(cmd *cobra.Command, args []string) error {
 }
 
 const (
-	filenameRC    = "../../../test/fixtures/pkg/kubectl/cmd/apply/rc.yaml"
-	filenameSVC   = "../../../test/fixtures/pkg/kubectl/cmd/apply/service.yaml"
-	filenameRCSVC = "../../../test/fixtures/pkg/kubectl/cmd/apply/rc-service.yaml"
+	filenameRC       = "../../../test/fixtures/pkg/kubectl/cmd/apply/rc.yaml"
+	filenameSVC      = "../../../test/fixtures/pkg/kubectl/cmd/apply/service.yaml"
+	filenameTPR      = "../../../test/fixtures/pkg/kubectl/cmd/apply/third-party-resource.yaml"
+	filenameTPREntry = "../../../test/fixtures/pkg/kubectl/cmd/apply/third-party-resource-entry.yaml"
+	filenameRCSVC    = "../../../test/fixtures/pkg/kubectl/cmd/apply/rc-service.yaml"
 )
 
 func readBytesFromFile(t *testing.T, filename string) []byte {
@@ -156,6 +159,20 @@ func readAndAnnotateService(t *testing.T, filename string) (string, []byte) {
 	svc1 := readServiceFromFile(t, filename)
 	svc2 := readServiceFromFile(t, filename)
 	return annotateRuntimeObject(t, svc1, svc2, "Service")
+}
+
+func readTPRFromFile(t *testing.T, filename string) []byte {
+	raw := readBytesFromFile(t, filename)
+	obj := &extensions.ThirdPartyResource{}
+	if err := runtime.DecodeInto(testapi.Extensions.Codec(), raw, obj); err != nil {
+		t.Fatal(err)
+	}
+
+	objJSON, err := runtime.Encode(testapi.Extensions.Codec(), obj)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return objJSON
 }
 
 func validatePatchApplication(t *testing.T, req *http.Request) {
@@ -276,6 +293,85 @@ func TestApplyObject(t *testing.T) {
 	expectRC := "replicationcontroller/" + nameRC + "\n"
 	if buf.String() != expectRC {
 		t.Fatalf("unexpected output: %s\nexpected: %s", buf.String(), expectRC)
+	}
+}
+
+// TestApplyTPR uses apply commad with ThirdPartyResources.
+func TestApplyTPR(t *testing.T) {
+	initTestErrorHandler(t)
+	nameTPR := "test-tpr.unit-test.test.com"
+	pathTPR := "/thirdpartyresources/" + nameTPR
+	currentTPR := readTPRFromFile(t, filenameTPR)
+
+	verifiedPatch := false
+
+	f, tf, _, ns := cmdtesting.NewAPIFactory()
+	tf.Printer = &testPrinter{}
+	tf.JSONEncoder = testapi.Extensions.Codec()
+	tf.UnstructuredClient = &fake.RESTClient{
+		ContentConfig: restclient.ContentConfig{
+			ContentType: runtime.ContentTypeJSON,
+			GroupVersion: &schema.GroupVersion{
+				Group:   extensions.GroupName,
+				Version: "v1beta1",
+			},
+			NegotiatedSerializer: ns,
+		},
+		NegotiatedSerializer: ns,
+		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
+			switch p, m := req.URL.Path, req.Method; {
+			case p == pathTPR && m == "GET":
+				bodyTPR := ioutil.NopCloser(bytes.NewReader(currentTPR))
+				return &http.Response{
+					StatusCode: 200,
+					Header:     defaultHeader(),
+					Body:       bodyTPR,
+				}, nil
+			case p == pathTPR && m == "PATCH":
+				patch, err := ioutil.ReadAll(req.Body)
+				if err != nil {
+					t.Fatal(err)
+				}
+				patchMap := map[string]interface{}{}
+				if err := json.Unmarshal(patch, &patchMap); err != nil {
+					t.Fatal(err)
+				}
+				annotationMap := walkMapPath(t, patchMap, []string{"metadata", "annotations"})
+				if _, ok := annotationMap[annotations.LastAppliedConfigAnnotation]; !ok {
+					t.Fatalf("patch does not contain annotation:\n%s\n", patch)
+				}
+
+				verifiedPatch = true
+
+				bodyTPR := ioutil.NopCloser(bytes.NewReader(currentTPR))
+				return &http.Response{
+					StatusCode: 200,
+					Header:     defaultHeader(),
+					Body:       bodyTPR,
+				}, nil
+			default:
+				t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
+				return nil, nil
+			}
+		}),
+	}
+
+	buf := bytes.NewBuffer([]byte{})
+	errBuf := bytes.NewBuffer([]byte{})
+
+	cmd := NewCmdApply(f, buf, errBuf)
+	cmd.Flags().Set("filename", filenameTPR)
+	cmd.Flags().Set("output", "name")
+	cmd.Run(cmd, []string{})
+
+	// Check the output of the kubectl apply command.
+	expectTPR := "thirdpartyresource/" + nameTPR + "\n"
+	if buf.String() != expectTPR {
+		t.Fatalf("unexpected output: %s\nexpected: %s", buf.String(), expectTPR)
+	}
+
+	if !verifiedPatch {
+		t.Fatal("No server-side patch call detected")
 	}
 }
 

@@ -219,6 +219,7 @@ type TestFactory struct {
 	Validator          validation.Schema
 	Namespace          string
 	ClientConfig       *restclient.Config
+	JSONEncoder        runtime.Encoder
 	Err                error
 	Command            string
 
@@ -535,7 +536,11 @@ func (f *fakeAPIFactory) Decoder(bool) runtime.Decoder {
 }
 
 func (f *fakeAPIFactory) JSONEncoder() runtime.Encoder {
-	return testapi.Default.Codec()
+	if f.tf.JSONEncoder != nil {
+		return f.tf.JSONEncoder
+	} else {
+		return testapi.Default.Codec()
+	}
 }
 
 func (f *fakeAPIFactory) ClientSet() (*internalclientset.Clientset, error) {
@@ -723,6 +728,7 @@ func testDynamicResources() []*discovery.APIGroupResources {
 			VersionedResources: map[string][]metav1.APIResource{
 				"v1beta1": {
 					{Name: "deployments", Namespaced: true, Kind: "Deployment"},
+					{Name: "thirdpartyresources", Namespaced: false, Kind: "ThirdPartyResource"},
 				},
 			},
 		},

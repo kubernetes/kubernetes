@@ -1,0 +1,7 @@
+apiVersion: extensions/v1beta1
+kind: ThirdPartyResource
+metadata:
+  name: test-tpr.unit-test.test.com
+description: "A TPR definition used for unit tests"
+versions:
+- name: v1

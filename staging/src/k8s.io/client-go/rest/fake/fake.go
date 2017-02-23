@@ -50,6 +50,8 @@ type RESTClient struct {
 	APIRegistry          *registered.APIRegistrationManager
 	VersionedAPIPath     string
 
+	ContentConfig restclient.ContentConfig
+
 	Req  *http.Request
 	Resp *http.Response
 	Err  error
@@ -88,23 +90,27 @@ func (c *RESTClient) GetRateLimiter() flowcontrol.RateLimiter {
 }
 
 func (c *RESTClient) request(verb string) *restclient.Request {
-	config := restclient.ContentConfig{
-		ContentType: runtime.ContentTypeJSON,
-		// TODO this was hardcoded before, but it doesn't look right
-		GroupVersion:         &c.APIRegistry.GroupOrDie("").GroupVersion,
-		NegotiatedSerializer: c.NegotiatedSerializer,
+	config := c.ContentConfig
+	defaultContentConfig := restclient.ContentConfig{}
+	if config == defaultContentConfig {
+		config = restclient.ContentConfig{
+			ContentType: runtime.ContentTypeJSON,
+			// TODO this was hardcoded before, but it doesn't look right
+			GroupVersion:         &c.APIRegistry.GroupOrDie(c.GroupName).GroupVersion,
+			NegotiatedSerializer: c.NegotiatedSerializer,
+		}
 	}
 
 	ns := c.NegotiatedSerializer
 	info, _ := runtime.SerializerInfoForMediaType(ns.SupportedMediaTypes(), runtime.ContentTypeJSON)
 	internalVersion := schema.GroupVersion{
-		Group:   c.APIRegistry.GroupOrDie(c.GroupName).GroupVersion.Group,
+		Group:   config.GroupVersion.Group,
 		Version: runtime.APIVersionInternal,
 	}
 	internalVersion.Version = runtime.APIVersionInternal
 	serializers := restclient.Serializers{
 		// TODO this was hardcoded before, but it doesn't look right
-		Encoder: ns.EncoderForVersion(info.Serializer, c.APIRegistry.GroupOrDie("").GroupVersion),
+		Encoder: ns.EncoderForVersion(info.Serializer, *config.GroupVersion),
 		Decoder: ns.DecoderToVersion(info.Serializer, internalVersion),
 	}
 	if info.StreamSerializer != nil {
