@@ -53,7 +53,9 @@ func (daemonSetStrategy) PrepareForCreate(ctx genericapirequest.Context, obj run
 	daemonSet.Status = extensions.DaemonSetStatus{}
 
 	daemonSet.Generation = 1
-	daemonSet.TemplateGeneration = 1
+	if daemonSet.Spec.TemplateGeneration < 1 {
+		daemonSet.Spec.TemplateGeneration = 1
+	}
 }
 
 // PrepareForUpdate clears fields that are not allowed to be set by end users on update.
@@ -65,7 +67,7 @@ func (daemonSetStrategy) PrepareForUpdate(ctx genericapirequest.Context, obj, ol
 	newDaemonSet.Status = oldDaemonSet.Status
 
 	// update is not allowed to set TemplateGeneration
-	newDaemonSet.TemplateGeneration = oldDaemonSet.TemplateGeneration
+	newDaemonSet.Spec.TemplateGeneration = oldDaemonSet.Spec.TemplateGeneration
 
 	// Any changes to the spec increment the generation number, any changes to the
 	// status should reflect the generation number of the corresponding object. We push
@@ -79,7 +81,7 @@ func (daemonSetStrategy) PrepareForUpdate(ctx genericapirequest.Context, obj, ol
 	// TODO: Any changes to a part of the object that represents desired state (labels,
 	// annotations etc) should also increment the generation.
 	if !reflect.DeepEqual(oldDaemonSet.Spec.Template, newDaemonSet.Spec.Template) {
-		newDaemonSet.TemplateGeneration = oldDaemonSet.TemplateGeneration + 1
+		newDaemonSet.Spec.TemplateGeneration = oldDaemonSet.Spec.TemplateGeneration + 1
 		newDaemonSet.Generation = oldDaemonSet.Generation + 1
 		return
 	}

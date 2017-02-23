@@ -80,7 +80,7 @@ func (dsc *DaemonSetsController) getAllDaemonSetPods(ds *extensions.DaemonSet) (
 		return newPods, oldPods, fmt.Errorf("Couldn't get list of pods for daemon set %#v: %v", ds, err)
 	}
 	for _, pod := range daemonPods {
-		if util.IsPodUpdated(ds.TemplateGeneration, pod) {
+		if util.IsPodUpdated(ds.Spec.TemplateGeneration, pod) {
 			newPods = append(newPods, pod)
 		} else {
 			oldPods = append(oldPods, pod)

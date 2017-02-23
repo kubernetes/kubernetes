@@ -440,6 +440,11 @@ type DaemonSetSpec struct {
 	// is ready).
 	// +optional
 	MinReadySeconds int32 `json:"minReadySeconds,omitempty" protobuf:"varint,4,opt,name=minReadySeconds"`
+
+	// A sequence number representing a specific generation of the template.
+	// Populated by the system. It can be set only during the creation.
+	// +optional
+	TemplateGeneration int64 `json:"templateGeneration,omitempty" protobuf:"varint,5,opt,name=templateGeneration"`
 }
 
 // DaemonSetStatus represents the current status of a daemon set.
@@ -507,11 +512,6 @@ type DaemonSet struct {
 	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status
 	// +optional
 	Status DaemonSetStatus `json:"status,omitempty" protobuf:"bytes,3,opt,name=status"`
-
-	// A sequence number representing a specific generation of the template.
-	// Populated by the system. Read-only.
-	// +optional
-	TemplateGeneration int64 `json:"templateGeneration,omitempty" protobuf:"varint,4,opt,name=templateGeneration"`
 }
 
 const (
