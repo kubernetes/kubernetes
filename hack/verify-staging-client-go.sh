@@ -57,8 +57,9 @@ fi
 for PACKAGE in apimachinery client-go; do
     PACKAGE_PATH="${TEMP_STAGING_GOPATH}/src/k8s.io/${PACKAGE}"
     echo "Creating a temporary ${PACKAGE} repo with a snapshot of HEAD"
+    rm -rf "${PACKAGE_PATH}"
     mkdir -p "${PACKAGE_PATH}"
-    rsync -ax --delete staging/src/k8s.io/${PACKAGE}/ "${PACKAGE_PATH}/"
+    git archive --format=tar "HEAD:staging/src/k8s.io/${PACKAGE}" | tar -xf - -C "${PACKAGE_PATH}"
     pushd "${PACKAGE_PATH}" >/dev/null
     git init >/dev/null
     git add *
