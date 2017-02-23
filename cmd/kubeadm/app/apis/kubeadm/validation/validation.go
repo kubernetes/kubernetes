@@ -25,9 +25,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
-	"k8s.io/kubernetes/cmd/kubeadm/app/discovery/file"
-	"k8s.io/kubernetes/cmd/kubeadm/app/discovery/https"
-	"k8s.io/kubernetes/cmd/kubeadm/app/discovery/token"
 	tokenutil "k8s.io/kubernetes/cmd/kubeadm/app/util/token"
 	authzmodes "k8s.io/kubernetes/pkg/kubeapiserver/authorizer/modes"
 	"k8s.io/kubernetes/pkg/registry/core/service/ipallocator"
@@ -175,15 +172,11 @@ func ValidateDiscoveryFile(c *kubeadm.NodeConfiguration, fldPath *field.Path) fi
 	}
 
 	// will remove url parsing of file once Discovery struct is removed
-	u, err := url.Parse(c.DiscoveryURL)
+	_, err := url.Parse(c.DiscoveryURL)
 	if err != nil {
 		allErrs = append(allErrs, field.Invalid(fldPath, nil, err.Error()))
 	}
 
-	// TODO to remove field.ErrorList
-	if len(allErrs) == 0 {
-		file.Parse(u, &c.Discovery)
-	}
 	return allErrs
 }
 
@@ -196,29 +189,21 @@ func ValidateDiscoveryURL(c *kubeadm.NodeConfiguration, fldPath *field.Path) fie
 	if u.Scheme != "https" {
 		allErrs = append(allErrs, field.Invalid(fldPath, nil, "must be https"))
 	}
-	// TODO to remove field.ErrorList
-	if len(allErrs) == 0 {
-		https.Parse(u, &c.Discovery)
-	}
 	return allErrs
 }
 
 func ValidateDiscoveryToken(c *kubeadm.NodeConfiguration, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
-	u, err := url.Parse(c.DiscoveryToken)
+	_, err := url.Parse(c.DiscoveryToken)
 	if err != nil {
 		allErrs = append(allErrs, field.Invalid(fldPath, nil, err.Error()))
 	}
 	if !strings.Contains(c.DiscoveryToken, "@") {
 		c.DiscoveryToken = c.DiscoveryToken + "@"
-		u, err = url.Parse(c.DiscoveryToken)
+		_, err = url.Parse(c.DiscoveryToken)
 		if err != nil {
 			allErrs = append(allErrs, field.Invalid(fldPath, nil, err.Error()))
 		}
-	}
-	// TODO to remove field.ErrorList
-	if len(allErrs) == 0 {
-		token.Parse(u, &c.Discovery)
 	}
 
 	id, secret, err := tokenutil.ParseToken(c.DiscoveryToken)
