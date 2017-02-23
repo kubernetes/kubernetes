@@ -40,6 +40,7 @@ import (
 	"k8s.io/kubernetes/pkg/controller/volume/attachdetach/populator"
 	"k8s.io/kubernetes/pkg/controller/volume/attachdetach/reconciler"
 	"k8s.io/kubernetes/pkg/controller/volume/attachdetach/statusupdater"
+	"k8s.io/kubernetes/pkg/controller/volume/attachdetach/util"
 	"k8s.io/kubernetes/pkg/util/io"
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/volume"
@@ -151,7 +152,9 @@ func NewAttachDetachController(
 	adc.desiredStateOfWorldPopulator = populator.NewDesiredStateOfWorldPopulator(
 		desiredStateOfWorldPopulatorLoopSleepPeriod,
 		podInformer.Lister(),
-		adc.desiredStateOfWorld)
+		adc.desiredStateOfWorld,
+		pvcInformer.Lister(),
+		pvInformer.Lister())
 
 	return adc, nil
 }
@@ -345,7 +348,7 @@ func (adc *attachDetachController) processPodVolumes(
 
 	// Process volume spec for each volume defined in pod
 	for _, podVolume := range pod.Spec.Volumes {
-		volumeSpec, err := adc.createVolumeSpec(podVolume, pod.Namespace)
+		volumeSpec, err := util.CreateVolumeSpec(podVolume, pod.Namespace, adc.pvcLister, adc.pvLister)
 		if err != nil {
 			glog.V(10).Infof(
 				"Error processing volume %q for pod %q/%q: %v",
@@ -401,137 +404,6 @@ func (adc *attachDetachController) processPodVolumes(
 	}
 
 	return
-}
-
-// createVolumeSpec creates and returns a mutatable volume.Spec object for the
-// specified volume. It dereference any PVC to get PV objects, if needed.
-func (adc *attachDetachController) createVolumeSpec(
-	podVolume v1.Volume, podNamespace string) (*volume.Spec, error) {
-	if pvcSource := podVolume.VolumeSource.PersistentVolumeClaim; pvcSource != nil {
-		glog.V(10).Infof(
-			"Found PVC, ClaimName: %q/%q",
-			podNamespace,
-			pvcSource.ClaimName)
-
-		// If podVolume is a PVC, fetch the real PV behind the claim
-		pvName, pvcUID, err := adc.getPVCFromCacheExtractPV(
-			podNamespace, pvcSource.ClaimName)
-		if err != nil {
-			return nil, fmt.Errorf(
-				"error processing PVC %q/%q: %v",
-				podNamespace,
-				pvcSource.ClaimName,
-				err)
-		}
-
-		glog.V(10).Infof(
-			"Found bound PV for PVC (ClaimName %q/%q pvcUID %v): pvName=%q",
-			podNamespace,
-			pvcSource.ClaimName,
-			pvcUID,
-			pvName)
-
-		// Fetch actual PV object
-		volumeSpec, err := adc.getPVSpecFromCache(
-			pvName, pvcSource.ReadOnly, pvcUID)
-		if err != nil {
-			return nil, fmt.Errorf(
-				"error processing PVC %q/%q: %v",
-				podNamespace,
-				pvcSource.ClaimName,
-				err)
-		}
-
-		glog.V(10).Infof(
-			"Extracted volumeSpec (%v) from bound PV (pvName %q) and PVC (ClaimName %q/%q pvcUID %v)",
-			volumeSpec.Name,
-			pvName,
-			podNamespace,
-			pvcSource.ClaimName,
-			pvcUID)
-
-		return volumeSpec, nil
-	}
-
-	// Do not return the original volume object, since it's from the shared
-	// informer it may be mutated by another consumer.
-	clonedPodVolumeObj, err := api.Scheme.DeepCopy(&podVolume)
-	if err != nil || clonedPodVolumeObj == nil {
-		return nil, fmt.Errorf(
-			"failed to deep copy %q volume object. err=%v", podVolume.Name, err)
-	}
-
-	clonedPodVolume, ok := clonedPodVolumeObj.(*v1.Volume)
-	if !ok {
-		return nil, fmt.Errorf("failed to cast clonedPodVolume %#v to v1.Volume", clonedPodVolumeObj)
-	}
-
-	return volume.NewSpecFromVolume(clonedPodVolume), nil
-}
-
-// getPVCFromCacheExtractPV fetches the PVC object with the given namespace and
-// name from the shared internal PVC store extracts the name of the PV it is
-// pointing to and returns it.
-// This method returns an error if a PVC object does not exist in the cache
-// with the given namespace/name.
-// This method returns an error if the PVC object's phase is not "Bound".
-func (adc *attachDetachController) getPVCFromCacheExtractPV(namespace string, name string) (string, types.UID, error) {
-	pvc, err := adc.pvcLister.PersistentVolumeClaims(namespace).Get(name)
-	if err != nil {
-		return "", "", fmt.Errorf("failed to find PVC %s/%s in PVCInformer cache: %v", namespace, name, err)
-	}
-
-	if pvc.Status.Phase != v1.ClaimBound || pvc.Spec.VolumeName == "" {
-		return "", "", fmt.Errorf(
-			"PVC %s/%s has non-bound phase (%q) or empty pvc.Spec.VolumeName (%q)",
-			namespace,
-			name,
-			pvc.Status.Phase,
-			pvc.Spec.VolumeName)
-	}
-
-	return pvc.Spec.VolumeName, pvc.UID, nil
-}
-
-// getPVSpecFromCache fetches the PV object with the given name from the shared
-// internal PV store and returns a volume.Spec representing it.
-// This method returns an error if a PV object does not exist in the cache with
-// the given name.
-// This method deep copies the PV object so the caller may use the returned
-// volume.Spec object without worrying about it mutating unexpectedly.
-func (adc *attachDetachController) getPVSpecFromCache(name string, pvcReadOnly bool, expectedClaimUID types.UID) (*volume.Spec, error) {
-	pv, err := adc.pvLister.Get(name)
-	if err != nil {
-		return nil, fmt.Errorf("failed to find PV %q in PVInformer cache: %v", name, err)
-	}
-
-	if pv.Spec.ClaimRef == nil {
-		return nil, fmt.Errorf(
-			"found PV object %q but it has a nil pv.Spec.ClaimRef indicating it is not yet bound to the claim",
-			name)
-	}
-
-	if pv.Spec.ClaimRef.UID != expectedClaimUID {
-		return nil, fmt.Errorf(
-			"found PV object %q but its pv.Spec.ClaimRef.UID (%q) does not point to claim.UID (%q)",
-			name,
-			pv.Spec.ClaimRef.UID,
-			expectedClaimUID)
-	}
-
-	// Do not return the object from the informer, since the store is shared it
-	// may be mutated by another consumer.
-	clonedPVObj, err := api.Scheme.DeepCopy(pv)
-	if err != nil || clonedPVObj == nil {
-		return nil, fmt.Errorf("failed to deep copy %q PV object. err=%v", name, err)
-	}
-
-	clonedPV, ok := clonedPVObj.(*v1.PersistentVolume)
-	if !ok {
-		return nil, fmt.Errorf("failed to cast %q clonedPV %#v to PersistentVolume", name, pv)
-	}
-
-	return volume.NewSpecFromPersistentVolume(clonedPV, pvcReadOnly), nil
 }
 
 // processVolumesInUse processes the list of volumes marked as "in-use"

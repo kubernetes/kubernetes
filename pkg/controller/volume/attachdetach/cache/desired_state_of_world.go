@@ -30,6 +30,7 @@ import (
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util/operationexecutor"
 	"k8s.io/kubernetes/pkg/volume/util/types"
+	volumetypes "k8s.io/kubernetes/pkg/volume/util/types"
 	"k8s.io/kubernetes/pkg/volume/util/volumehelper"
 )
 
@@ -95,6 +96,9 @@ type DesiredStateOfWorld interface {
 	// GetPodToAdd generates and returns a map of pods based on the current desired
 	// state of world
 	GetPodToAdd() map[types.UniquePodName]PodToAdd
+
+	//IsPodVolumePreviouslyAdded checks whether pod references the specified volume is added to dsw
+	IsPodVolumePreviouslyAdded(podName volumetypes.UniquePodName, volumeSpec *volume.Spec, nodeName k8stypes.NodeName) (bool, error)
 }
 
 // VolumeToAttach represents a volume that should be attached to a node.
@@ -360,4 +364,35 @@ func (dsw *desiredStateOfWorld) GetPodToAdd() map[types.UniquePodName]PodToAdd {
 		}
 	}
 	return pods
+}
+
+func (dsw *desiredStateOfWorld) IsPodVolumePreviouslyAdded(podName volumetypes.UniquePodName, volumeSpec *volume.Spec, nodeName k8stypes.NodeName) (bool, error) {
+	nodeObj, nodeExists := dsw.nodesManaged[nodeName]
+	if !nodeExists {
+		return false, fmt.Errorf(
+			"no node with the name %q exists in the list of managed nodes",
+			nodeName)
+	}
+	attachableVolumePlugin, err := dsw.volumePluginMgr.FindAttachablePluginBySpec(volumeSpec)
+	if err != nil || attachableVolumePlugin == nil {
+		return false, fmt.Errorf(
+			"failed to get AttachablePlugin from volumeSpec for volume %q err=%v",
+			volumeSpec.Name(),
+			err)
+	}
+	volumeName, err := volumehelper.GetUniqueVolumeNameFromSpec(
+		attachableVolumePlugin, volumeSpec)
+	if err != nil {
+		return false, fmt.Errorf(
+			"failed to GetUniqueVolumeNameFromSpec for volumeSpec %q err=%v",
+			volumeSpec.Name(),
+			err)
+	}
+	volumeObj, volumeExists := nodeObj.volumesToAttach[volumeName]
+	if !volumeExists {
+		return false, nil
+	}
+	_, podExists := volumeObj.scheduledPods[podName]
+
+	return podExists, nil
 }
