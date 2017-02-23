@@ -12826,12 +12826,32 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 								Ref:         ref("k8s.io/kubernetes/pkg/api/v1.PodTemplateSpec"),
 							},
 						},
+						"updateStrategy": {
+							SchemaProps: spec.SchemaProps{
+								Description: "UpdateStrategy to replace existing DaemonSet pods with new pods.",
+								Ref:         ref("k8s.io/kubernetes/pkg/apis/extensions/v1beta1.DaemonSetUpdateStrategy"),
+							},
+						},
+						"minReadySeconds": {
+							SchemaProps: spec.SchemaProps{
+								Description: "MinReadySeconds minimum number of seconds for which a newly created DaemonSet pod should be ready without any of its container crashing, for it to be considered available. Defaults to 0 (pod will be considered available as soon as it is ready).",
+								Type:        []string{"integer"},
+								Format:      "int32",
+							},
+						},
+						"templateGeneration": {
+							SchemaProps: spec.SchemaProps{
+								Description: "A sequence number representing a specific generation of the template. Populated by the system. It can be set only during the creation.",
+								Type:        []string{"integer"},
+								Format:      "int64",
+							},
+						},
 					},
 					Required: []string{"template"},
 				},
 			},
 			Dependencies: []string{
-				"k8s.io/apimachinery/pkg/apis/meta/v1.LabelSelector", "k8s.io/kubernetes/pkg/api/v1.PodTemplateSpec"},
+				"k8s.io/apimachinery/pkg/apis/meta/v1.LabelSelector", "k8s.io/kubernetes/pkg/api/v1.PodTemplateSpec", "k8s.io/kubernetes/pkg/apis/extensions/v1beta1.DaemonSetUpdateStrategy"},
 		},
 		"k8s.io/kubernetes/pkg/apis/extensions/v1beta1.DaemonSetStatus": {
 			Schema: spec.Schema{
@@ -12873,11 +12893,55 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 								Format:      "int64",
 							},
 						},
+						"updatedNumberScheduled": {
+							SchemaProps: spec.SchemaProps{
+								Description: "UpdatedNumberScheduled is the total number of nodes that are running updated daemon pod",
+								Type:        []string{"integer"},
+								Format:      "int32",
+							},
+						},
+						"numberAvailable": {
+							SchemaProps: spec.SchemaProps{
+								Description: "NumberAvailable is the number of nodes that should be running the daemon pod and have one or more of the daemon pod running and available (ready for at least minReadySeconds)",
+								Type:        []string{"integer"},
+								Format:      "int32",
+							},
+						},
+						"numberUnavailable": {
+							SchemaProps: spec.SchemaProps{
+								Description: "NumberUnavailable is the number of nodes that should be running the daemon pod and have none of the daemon pod running and available (ready for at least minReadySeconds)",
+								Type:        []string{"integer"},
+								Format:      "int32",
+							},
+						},
 					},
 					Required: []string{"currentNumberScheduled", "numberMisscheduled", "desiredNumberScheduled", "numberReady"},
 				},
 			},
 			Dependencies: []string{},
+		},
+		"k8s.io/kubernetes/pkg/apis/extensions/v1beta1.DaemonSetUpdateStrategy": {
+			Schema: spec.Schema{
+				SchemaProps: spec.SchemaProps{
+					Properties: map[string]spec.Schema{
+						"type": {
+							SchemaProps: spec.SchemaProps{
+								Description: "Type of daemon set update. Can be \"RollingUpdate\" or \"OnDelete\". Default is OnDelete.",
+								Type:        []string{"string"},
+								Format:      "",
+							},
+						},
+						"rollingUpdate": {
+							SchemaProps: spec.SchemaProps{
+								Description: "Rolling update config params. Present only if DaemonSetUpdateStrategy = RollingUpdate.",
+								Ref:         ref("k8s.io/kubernetes/pkg/apis/extensions/v1beta1.RollingUpdateDaemonSet"),
+							},
+						},
+					},
+				},
+			},
+			Dependencies: []string{
+				"k8s.io/kubernetes/pkg/apis/extensions/v1beta1.RollingUpdateDaemonSet"},
 		},
 		"k8s.io/kubernetes/pkg/apis/extensions/v1beta1.Deployment": {
 			Schema: spec.Schema{
@@ -15030,6 +15094,23 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 				},
 			},
 			Dependencies: []string{},
+		},
+		"k8s.io/kubernetes/pkg/apis/extensions/v1beta1.RollingUpdateDaemonSet": {
+			Schema: spec.Schema{
+				SchemaProps: spec.SchemaProps{
+					Description: "Spec to control the desired behavior of daemon set rolling update.",
+					Properties: map[string]spec.Schema{
+						"maxUnavailable": {
+							SchemaProps: spec.SchemaProps{
+								Description: "The maximum number of DaemonSet pods that can be unavailable during the update. Value can be an absolute number (ex: 5) or a percentage of total number of DaemonSet pods at the start of the update (ex: 10%). Absolute number is calculated from percentage by rounding up. This cannot be 0. Default value is 1. Example: when this is set to 30%, 30% of the currently running DaemonSet pods can be stopped for an update at any given time. The update starts by stopping at most 30% of the currently running DaemonSet pods and then brings up new DaemonSet pods in their place. Once the new pods are ready, it then proceeds onto other DaemonSet pods, thus ensuring that at least 70% of original number of DaemonSet pods are available at all times during the update.",
+								Ref:         ref("k8s.io/apimachinery/pkg/util/intstr.IntOrString"),
+							},
+						},
+					},
+				},
+			},
+			Dependencies: []string{
+				"k8s.io/apimachinery/pkg/util/intstr.IntOrString"},
 		},
 		"k8s.io/kubernetes/pkg/apis/extensions/v1beta1.RollingUpdateDeployment": {
 			Schema: spec.Schema{
