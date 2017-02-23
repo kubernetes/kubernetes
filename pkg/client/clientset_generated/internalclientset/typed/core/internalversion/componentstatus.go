@@ -124,8 +124,8 @@ func (c *componentStatuses) List(opts v1.ListOptions) (result *api.ComponentStat
 
 // Watch returns a watch.Interface that watches the requested componentStatuses.
 func (c *componentStatuses) Watch(opts v1.ListOptions) (watch.Interface, error) {
+	opts.Watch = true
 	return c.client.Get().
-		Prefix("watch").
 		Resource("componentstatuses").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Watch()

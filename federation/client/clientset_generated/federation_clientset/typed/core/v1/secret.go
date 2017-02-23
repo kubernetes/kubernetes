@@ -132,8 +132,8 @@ func (c *secrets) List(opts meta_v1.ListOptions) (result *v1.SecretList, err err
 
 // Watch returns a watch.Interface that watches the requested secrets.
 func (c *secrets) Watch(opts meta_v1.ListOptions) (watch.Interface, error) {
+	opts.Watch = true
 	return c.client.Get().
-		Prefix("watch").
 		Namespace(c.ns).
 		Resource("secrets").
 		VersionedParams(&opts, scheme.ParameterCodec).

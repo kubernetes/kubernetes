@@ -132,8 +132,8 @@ func (c *configMaps) List(opts v1.ListOptions) (result *api.ConfigMapList, err e
 
 // Watch returns a watch.Interface that watches the requested configMaps.
 func (c *configMaps) Watch(opts v1.ListOptions) (watch.Interface, error) {
+	opts.Watch = true
 	return c.client.Get().
-		Prefix("watch").
 		Namespace(c.ns).
 		Resource("configmaps").
 		VersionedParams(&opts, scheme.ParameterCodec).

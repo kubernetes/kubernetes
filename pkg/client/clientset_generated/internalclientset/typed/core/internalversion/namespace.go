@@ -140,8 +140,8 @@ func (c *namespaces) List(opts v1.ListOptions) (result *api.NamespaceList, err e
 
 // Watch returns a watch.Interface that watches the requested namespaces.
 func (c *namespaces) Watch(opts v1.ListOptions) (watch.Interface, error) {
+	opts.Watch = true
 	return c.client.Get().
-		Prefix("watch").
 		Resource("namespaces").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Watch()

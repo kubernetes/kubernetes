@@ -149,8 +149,8 @@ func (c *resourceQuotas) List(opts v1.ListOptions) (result *api.ResourceQuotaLis
 
 // Watch returns a watch.Interface that watches the requested resourceQuotas.
 func (c *resourceQuotas) Watch(opts v1.ListOptions) (watch.Interface, error) {
+	opts.Watch = true
 	return c.client.Get().
-		Prefix("watch").
 		Namespace(c.ns).
 		Resource("resourcequotas").
 		VersionedParams(&opts, scheme.ParameterCodec).

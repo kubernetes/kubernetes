@@ -140,8 +140,8 @@ func (c *persistentVolumes) List(opts v1.ListOptions) (result *api.PersistentVol
 
 // Watch returns a watch.Interface that watches the requested persistentVolumes.
 func (c *persistentVolumes) Watch(opts v1.ListOptions) (watch.Interface, error) {
+	opts.Watch = true
 	return c.client.Get().
-		Prefix("watch").
 		Resource("persistentvolumes").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Watch()
