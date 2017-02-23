@@ -107,9 +107,10 @@ func CreateDiscoveryDeploymentAndSecret(cfg *kubeadmapi.MasterConfiguration, cli
 }
 
 func createDiscoveryDeployment(client *clientset.Clientset) error {
-	discoveryBytes, err := kubeadmutil.ParseTemplate(KubeDiscoveryDeployment, struct{ ImageRepository, Arch string }{
+	discoveryBytes, err := kubeadmutil.ParseTemplate(KubeDiscoveryDeployment, struct{ ImageRepository, Arch, MasterTaintKey string }{
 		ImageRepository: kubeadmapi.GlobalEnvParams.RepositoryPrefix,
 		Arch:            runtime.GOARCH,
+		MasterTaintKey:  kubeadmconstants.LabelNodeRoleMaster,
 	})
 	if err != nil {
 		return fmt.Errorf("error when parsing kube-discovery template: %v", err)
@@ -119,6 +120,10 @@ func createDiscoveryDeployment(client *clientset.Clientset) error {
 	if err := kuberuntime.DecodeInto(api.Codecs.UniversalDecoder(), discoveryBytes, discoveryDeployment); err != nil {
 		return fmt.Errorf("unable to decode kube-discovery deployment %v", err)
 	}
+
+	// TODO: Set this in the yaml spec instead
+	discoveryDeployment.Spec.Template.Spec.Tolerations = []v1.Toleration{kubeadmconstants.MasterToleration}
+
 	if _, err := client.ExtensionsV1beta1().Deployments(metav1.NamespaceSystem).Create(discoveryDeployment); err != nil {
 		return fmt.Errorf("unable to create a new discovery deployment: %v", err)
 	}
