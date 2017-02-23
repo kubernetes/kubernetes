@@ -170,7 +170,7 @@ func TestAdoption(t *testing.T) {
 				return []metav1.OwnerReference{{UID: rc.UID, Name: rc.Name, APIVersion: "v1", Kind: "ReplicationController"}}
 			},
 			func(rc *v1.ReplicationController) []metav1.OwnerReference {
-				return []metav1.OwnerReference{{UID: rc.UID, Name: rc.Name, APIVersion: "v1", Kind: "ReplicationController", Controller: &trueVar}}
+				return []metav1.OwnerReference{{UID: rc.UID, Name: rc.Name, APIVersion: "v1", Kind: "ReplicationController", Controller: &trueVar, BlockOwnerDeletion: &trueVar}}
 			},
 		},
 		{
@@ -179,7 +179,7 @@ func TestAdoption(t *testing.T) {
 				return []metav1.OwnerReference{}
 			},
 			func(rc *v1.ReplicationController) []metav1.OwnerReference {
-				return []metav1.OwnerReference{{UID: rc.UID, Name: rc.Name, APIVersion: "v1", Kind: "ReplicationController", Controller: &trueVar}}
+				return []metav1.OwnerReference{{UID: rc.UID, Name: rc.Name, APIVersion: "v1", Kind: "ReplicationController", Controller: &trueVar, BlockOwnerDeletion: &trueVar}}
 			},
 		},
 		{
@@ -243,7 +243,7 @@ func TestAdoption(t *testing.T) {
 				return false, nil
 			}
 		}); err != nil {
-			t.Fatal(err)
+			t.Fatalf("test %q failed: %v", tc.name, err)
 		}
 		close(stopCh)
 	}
