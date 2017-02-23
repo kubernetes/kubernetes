@@ -201,25 +201,6 @@ func TestValidateNodeConfiguration(t *testing.T) {
 				},
 			},
 		}, false},
-		{&kubeadm.NodeConfiguration{
-			Discovery: kubeadm.Discovery{
-				HTTPS: &kubeadm.HTTPSDiscovery{URL: "foo"},
-			},
-		}, true},
-		{&kubeadm.NodeConfiguration{
-			Discovery: kubeadm.Discovery{
-				File: &kubeadm.FileDiscovery{Path: "foo"},
-			},
-		}, true},
-		{&kubeadm.NodeConfiguration{
-			Discovery: kubeadm.Discovery{
-				Token: &kubeadm.TokenDiscovery{
-					ID:        "abcdef",
-					Secret:    "1234567890123456",
-					Addresses: []string{"foobar"},
-				},
-			},
-		}, true},
 	}
 	for _, rt := range tests {
 		actual := ValidateNodeConfiguration(rt.s)

@@ -19,7 +19,7 @@ package validation
 import (
 	"net"
 	"net/url"
-	"path"
+	"os"
 	"strings"
 
 	"k8s.io/apimachinery/pkg/util/validation/field"
@@ -132,7 +132,7 @@ func ValidateDiscovery(c *kubeadm.NodeConfiguration, fldPath *field.Path) field.
 		allErrs = append(allErrs, ValidateDiscoveryURL(c, fldPath)...)
 		count++
 	}
-	if count != 1 {
+	if count > 1 {
 		allErrs = append(allErrs, field.Invalid(fldPath, nil, "exactly one discovery strategy can be provided"))
 	}
 	return allErrs
@@ -141,7 +141,7 @@ func ValidateDiscovery(c *kubeadm.NodeConfiguration, fldPath *field.Path) field.
 func ValidateTLSBootstrapToken(cfg *kubeadm.NodeConfiguration, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	if len(cfg.Token) != 0 && (len(cfg.TLSBootstrapToken) != 0 || len(cfg.DiscoveryToken) != 0) {
-		allErrs = append(allErrs, field.Invalid(fldPath, nil, "--token are mutually exclusive with --bootstrap-token and --discovery-token"))
+		allErrs = append(allErrs, field.Invalid(fldPath, nil, "--token is mutually exclusive with --bootstrap-token and --discovery-token"))
 	}
 	if len(cfg.Token) == 0 && (len(cfg.TLSBootstrapToken) == 0 || len(cfg.DiscoveryToken) == 0) {
 		allErrs = append(
@@ -150,16 +150,24 @@ func ValidateTLSBootstrapToken(cfg *kubeadm.NodeConfiguration, fldPath *field.Pa
 		)
 	}
 	if len(cfg.Token) != 0 {
-		cfg.TLSBootstrapToken = cfg.Token
-		cfg.DiscoveryToken = cfg.Token
+		if len(cfg.DiscoveryURL) != 0 {
+			cfg.TLSBootstrapToken = cfg.Token
+		} else {
+			cfg.DiscoveryURL = cfg.Token
+		}
+		if len(cfg.DiscoveryToken) != 0 {
+			cfg.TLSBootstrapToken = cfg.Token
+		} else {
+			cfg.DiscoveryToken = cfg.Token
+		}
 	}
 	return allErrs
 }
 
 func ValidateDiscoveryFile(c *kubeadm.NodeConfiguration, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
-	if !path.IsAbs(c.DiscoveryFile) {
-		allErrs = append(allErrs, field.Invalid(fldPath, nil, "not an absolute file path"))
+	if _, err := os.Stat(c.DiscoveryFile); os.IsNotExist(err) {
+		allErrs = append(allErrs, field.Invalid(fldPath, nil, "file does not exist"))
 	}
 
 	// will remove url parsing of file once Discovery struct is removed
