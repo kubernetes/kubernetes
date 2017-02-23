@@ -1160,13 +1160,8 @@ func PodToleratesNodeTaints(pod *v1.Pod, meta interface{}, nodeInfo *schedulerca
 		return false, nil, err
 	}
 
-	tolerations, err := v1.GetTolerationsFromPodAnnotations(pod.Annotations)
-	if err != nil {
-		return false, nil, err
-	}
-
-	if v1.TolerationsTolerateTaintsWithFilter(tolerations, taints, func(t *v1.Taint) bool {
-		// PodToleratesNodeTaints is only interested in NoSchedule and NoExecute taints.
+	if v1.TolerationsTolerateTaintsWithFilter(pod.Spec.Tolerations, taints, func(t *v1.Taint) bool {
+		// PodToleratesNodeTaints is only interested in NoSchedule taints.
 		return t.Effect == v1.TaintEffectNoSchedule || t.Effect == v1.TaintEffectNoExecute
 	}) {
 		return true, nil, nil

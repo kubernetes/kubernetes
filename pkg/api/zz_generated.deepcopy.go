@@ -1516,6 +1516,9 @@ func DeepCopy_api_Node(in interface{}, out interface{}, c *conversion.Cloner) er
 		} else {
 			out.ObjectMeta = *newVal.(*v1.ObjectMeta)
 		}
+		if err := DeepCopy_api_NodeSpec(&in.Spec, &out.Spec, c); err != nil {
+			return err
+		}
 		if err := DeepCopy_api_NodeStatus(&in.Status, &out.Status, c); err != nil {
 			return err
 		}
@@ -1675,6 +1678,15 @@ func DeepCopy_api_NodeSpec(in interface{}, out interface{}, c *conversion.Cloner
 		in := in.(*NodeSpec)
 		out := out.(*NodeSpec)
 		*out = *in
+		if in.Taints != nil {
+			in, out := &in.Taints, &out.Taints
+			*out = make([]Taint, len(*in))
+			for i := range *in {
+				if err := DeepCopy_api_Taint(&(*in)[i], &(*out)[i], c); err != nil {
+					return err
+				}
+			}
+		}
 		return nil
 	}
 }
@@ -2415,6 +2427,15 @@ func DeepCopy_api_PodSpec(in interface{}, out interface{}, c *conversion.Cloner)
 			*out = new(Affinity)
 			if err := DeepCopy_api_Affinity(*in, *out, c); err != nil {
 				return err
+			}
+		}
+		if in.Tolerations != nil {
+			in, out := &in.Tolerations, &out.Tolerations
+			*out = make([]Toleration, len(*in))
+			for i := range *in {
+				if err := DeepCopy_api_Toleration(&(*in)[i], &(*out)[i], c); err != nil {
+					return err
+				}
 			}
 		}
 		return nil
