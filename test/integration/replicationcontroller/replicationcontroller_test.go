@@ -135,7 +135,7 @@ func rmSetup(t *testing.T, stopCh chan struct{}) (*httptest.Server, *replication
 	resyncPeriod := 12 * time.Hour
 
 	informers := informers.NewSharedInformerFactory(clientSet, resyncPeriod)
-	rm := replication.NewReplicationManager(informers.Core().V1().Pods(), informers.Core().V1().ReplicationControllers(), clientSet, replication.BurstReplicas, 4096)
+	rm := replication.NewReplicationManager(informers.Core().V1().Pods(), informers.Core().V1().ReplicationControllers(), clientSet, replication.BurstReplicas)
 	informers.Start(stopCh)
 
 	return s, rm, informers, clientSet
