@@ -18,5 +18,50 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
+V=""
+IN_PLACE="0"
+COPY_FLAGS="-u"
+while getopts ":vidf" opt; do
+  case $opt in
+    v) # increase verbosity
+      V="-v"
+      ;;
+    i) # do not godep-restore into a temporary directory, but use the existing GOPATH
+      IN_PLACE=1
+      ;;
+    d) # dry-run: do not actually update the client
+	  COPY_FLAGS+=" -d"
+	  ;;
+    f) # fail-on-diff: fail if the client changed
+	  COPY_FLAGS+=" -f"
+	  ;;
+    \?)
+      echo "Invalid option: -$OPTARG" >&2
+      exit 1
+      ;;
+  esac
+done
+readonly V IN_PLACE
+
 KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
-"${KUBE_ROOT}"/staging/copy.sh
+cd ${KUBE_ROOT}
+
+# Create temporary GOPATH to run godep-restore into
+if [ "${IN_PLACE}" != 1 ]; then
+    GODEP_RESTORE_TMPDIR=$(mktemp -d -t verify-staging-client-go.XXXXX)
+    echo "Creating a temporary GOPATH directory for godep-restore: ${GODEP_RESTORE_TMPDIR}"
+    cleanup() {
+        if [ "${KEEP_TEMP_DIR:-0}" != 1 ]; then
+            rm -rf "${GODEP_RESTORE_TMPDIR}"
+        fi
+    }
+    trap cleanup EXIT SIGINT
+    mkdir -p "${GODEP_RESTORE_TMPDIR}/src"
+    export GOPATH="${GODEP_RESTORE_TMPDIR}:${GOPATH}"
+fi
+
+echo "Running godep restore"
+godep restore ${V} 2>&1 | sed 's/^/  /'
+
+echo "Running staging/copy.sh"
+eval staging/copy.sh ${COPY_FLAGS} 2>&1 | sed 's/^/  /'
