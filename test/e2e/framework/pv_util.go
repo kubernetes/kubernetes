@@ -18,18 +18,32 @@ package framework
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
+	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/aws/awserr"
+	"github.com/aws/aws-sdk-go/aws/session"
+	"github.com/aws/aws-sdk-go/service/ec2"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+	"google.golang.org/api/googleapi"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
+	awscloud "k8s.io/kubernetes/pkg/cloudprovider/providers/aws"
+	gcecloud "k8s.io/kubernetes/pkg/cloudprovider/providers/gce"
 	"k8s.io/kubernetes/pkg/volume/util/volumehelper"
+)
+
+const (
+	PDRetryTimeout  = 5 * time.Minute
+	PDRetryPollTime = 5 * time.Second
 )
 
 // Map of all PVs used in the multi pv-pvc tests. The key is the PV's name, which is
@@ -506,17 +520,16 @@ func MakePersistentVolumeClaim(ns string) *v1.PersistentVolumeClaim {
 // Returns a pod definition based on the namespace. The pod references the PVC's
 // name.
 func MakeWritePod(ns string, pvcName string) *v1.Pod {
-	return MakePod(ns, pvcName, "touch /mnt/SUCCESS && (id -G | grep -E '\\b777\\b')")
+	return MakePod(ns, pvcName, true, "touch /mnt/SUCCESS && (id -G | grep -E '\\b777\\b')")
 }
 
 // Returns a pod definition based on the namespace. The pod references the PVC's
 // name.  A slice of BASH commands can be supplied as args to be run by the pod
-func MakePod(ns string, pvcName string, command ...string) *v1.Pod {
+func MakePod(ns string, pvcName string, isPrivileged bool, command string) *v1.Pod {
 
 	if len(command) == 0 {
-		command = []string{"while true; do sleep 1; done"}
+		command = "while true; do sleep 1; done"
 	}
-	var isPrivileged bool = true
 	return &v1.Pod{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "Pod",
@@ -531,8 +544,8 @@ func MakePod(ns string, pvcName string, command ...string) *v1.Pod {
 				{
 					Name:    "write-pod",
 					Image:   "gcr.io/google_containers/busybox:1.24",
-					Command: []string{"/bin/sh", "-c"},
-					Args:    command,
+					Command: []string{"/bin/sh"},
+					Args:    []string{"-c", command},
 					VolumeMounts: []v1.VolumeMount{
 						{
 							Name:      pvcName,
@@ -561,7 +574,7 @@ func MakePod(ns string, pvcName string, command ...string) *v1.Pod {
 
 // Define and create a pod with a mounted PV.  Pod runs infinite loop until killed.
 func CreateClientPod(c clientset.Interface, ns string, pvc *v1.PersistentVolumeClaim) *v1.Pod {
-	clientPod := MakePod(ns, pvc.Name)
+	clientPod := MakePod(ns, pvc.Name, true, "")
 	clientPod, err := c.Core().Pods(ns).Create(clientPod)
 	Expect(err).NotTo(HaveOccurred())
 
@@ -571,4 +584,107 @@ func CreateClientPod(c clientset.Interface, ns string, pvc *v1.PersistentVolumeC
 	clientPod, err = c.Core().Pods(ns).Get(clientPod.Name, metav1.GetOptions{})
 	Expect(apierrs.IsNotFound(err)).To(BeFalse())
 	return clientPod
+}
+
+func CreatePDWithRetry() (string, error) {
+	newDiskName := ""
+	var err error
+	for start := time.Now(); time.Since(start) < PDRetryTimeout; time.Sleep(PDRetryPollTime) {
+		if newDiskName, err = createPD(); err != nil {
+			Logf("Couldn't create a new PD. Sleeping 5 seconds (%v)", err)
+			continue
+		}
+		Logf("Successfully created a new PD: %q.", newDiskName)
+		break
+	}
+	return newDiskName, err
+}
+
+func DeletePDWithRetry(diskName string) {
+	var err error
+	for start := time.Now(); time.Since(start) < PDRetryTimeout; time.Sleep(PDRetryPollTime) {
+		if err = deletePD(diskName); err != nil {
+			Logf("Couldn't delete PD %q. Sleeping 5 seconds (%v)", diskName, err)
+			continue
+		}
+		Logf("Successfully deleted PD %q.", diskName)
+		break
+	}
+	ExpectNoError(err, "Error deleting PD")
+}
+
+func createPD() (string, error) {
+	if TestContext.Provider == "gce" || TestContext.Provider == "gke" {
+		pdName := fmt.Sprintf("%s-%s", TestContext.Prefix, string(uuid.NewUUID()))
+
+		gceCloud, err := GetGCECloud()
+		if err != nil {
+			return "", err
+		}
+
+		tags := map[string]string{}
+		err = gceCloud.CreateDisk(pdName, gcecloud.DiskTypeSSD, TestContext.CloudConfig.Zone, 10 /* sizeGb */, tags)
+		if err != nil {
+			return "", err
+		}
+		return pdName, nil
+	} else if TestContext.Provider == "aws" {
+		client := ec2.New(session.New())
+
+		request := &ec2.CreateVolumeInput{}
+		request.AvailabilityZone = aws.String(TestContext.CloudConfig.Zone)
+		request.Size = aws.Int64(10)
+		request.VolumeType = aws.String(awscloud.DefaultVolumeType)
+		response, err := client.CreateVolume(request)
+		if err != nil {
+			return "", err
+		}
+
+		az := aws.StringValue(response.AvailabilityZone)
+		awsID := aws.StringValue(response.VolumeId)
+
+		volumeName := "aws://" + az + "/" + awsID
+		return volumeName, nil
+	} else {
+		return "", fmt.Errorf("Provider does not support volume creation")
+	}
+}
+
+func deletePD(pdName string) error {
+	if TestContext.Provider == "gce" || TestContext.Provider == "gke" {
+		gceCloud, err := GetGCECloud()
+		if err != nil {
+			return err
+		}
+
+		err = gceCloud.DeleteDisk(pdName)
+
+		if err != nil {
+			if gerr, ok := err.(*googleapi.Error); ok && len(gerr.Errors) > 0 && gerr.Errors[0].Reason == "notFound" {
+				// PD already exists, ignore error.
+				return nil
+			}
+
+			Logf("Error deleting PD %q: %v", pdName, err)
+		}
+		return err
+	} else if TestContext.Provider == "aws" {
+		client := ec2.New(session.New())
+
+		tokens := strings.Split(pdName, "/")
+		awsVolumeID := tokens[len(tokens)-1]
+
+		request := &ec2.DeleteVolumeInput{VolumeId: aws.String(awsVolumeID)}
+		_, err := client.DeleteVolume(request)
+		if err != nil {
+			if awsError, ok := err.(awserr.Error); ok && awsError.Code() == "InvalidVolume.NotFound" {
+				Logf("Volume deletion implicitly succeeded because volume %q does not exist.", pdName)
+			} else {
+				return fmt.Errorf("error deleting EBS volumes: %v", err)
+			}
+		}
+		return nil
+	} else {
+		return fmt.Errorf("Provider does not support volume deletion")
+	}
 }
