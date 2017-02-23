@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"math/rand"
 	"reflect"
+	"sort"
 	"strconv"
 	"testing"
 	"time"
@@ -36,6 +37,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/v1"
 	extensions "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset/fake"
+	"k8s.io/kubernetes/pkg/controller"
 )
 
 func addListRSReactor(fakeClient *fake.Clientset, obj runtime.Object) *fake.Clientset {
@@ -527,6 +529,7 @@ func TestFindNewReplicaSet(t *testing.T) {
 func TestFindOldReplicaSets(t *testing.T) {
 	now := metav1.Now()
 	later := metav1.Time{Time: now.Add(time.Minute)}
+	before := metav1.Time{Time: now.Add(-time.Minute)}
 
 	deployment := generateDeployment("nginx")
 	newRS := generateRS(deployment)
@@ -541,6 +544,7 @@ func TestFindOldReplicaSets(t *testing.T) {
 	oldDeployment.Spec.Template.Spec.Containers[0].Name = "nginx-old-1"
 	oldRS := generateRS(oldDeployment)
 	oldRS.Status.FullyLabeledReplicas = *(oldRS.Spec.Replicas)
+	oldRS.CreationTimestamp = before
 
 	newPod := generatePodFromRS(newRS)
 	oldPod := generatePodFromRS(oldRS)
@@ -601,7 +605,10 @@ func TestFindOldReplicaSets(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		if old, _, err := FindOldReplicaSets(&test.deployment, test.rsList, test.podList); !reflect.DeepEqual(old, test.expected) || err != nil {
+		old, _, err := FindOldReplicaSets(&test.deployment, test.rsList, test.podList)
+		sort.Sort(controller.ReplicaSetsByCreationTimestamp(old))
+		sort.Sort(controller.ReplicaSetsByCreationTimestamp(test.expected))
+		if !reflect.DeepEqual(old, test.expected) || err != nil {
 			t.Errorf("In test case %q, expected %#v, got %#v: %v", test.test, test.expected, old, err)
 		}
 	}
