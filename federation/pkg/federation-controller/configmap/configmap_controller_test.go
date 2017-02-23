@@ -73,10 +73,7 @@ func TestConfigMapController(t *testing.T) {
 		}
 	})
 
-	configmapController.clusterAvailableDelay = time.Second
-	configmapController.configmapReviewDelay = 50 * time.Millisecond
-	configmapController.smallDelay = 20 * time.Millisecond
-	configmapController.updateTimeout = 5 * time.Second
+	configmapController.MinimizeLatency()
 
 	stop := make(chan struct{})
 	configmapController.Run(stop)

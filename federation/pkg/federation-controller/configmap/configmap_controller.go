@@ -185,6 +185,14 @@ func NewConfigMapController(client federationclientset.Interface) *ConfigMapCont
 	return configmapcontroller
 }
 
+// MinimizeLatency reduces delays and timeouts to make the controller more responsive (useful for testing).
+func (configmapcontroller *ConfigMapController) MinimizeLatency() {
+	configmapcontroller.clusterAvailableDelay = time.Second
+	configmapcontroller.configmapReviewDelay = 50 * time.Millisecond
+	configmapcontroller.smallDelay = 20 * time.Millisecond
+	configmapcontroller.updateTimeout = 5 * time.Second
+}
+
 // hasFinalizerFunc returns true if the given object has the given finalizer in its ObjectMeta.
 func (configmapcontroller *ConfigMapController) hasFinalizerFunc(obj pkgruntime.Object, finalizer string) bool {
 	configmap := obj.(*apiv1.ConfigMap)
