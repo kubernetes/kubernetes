@@ -166,4 +166,14 @@ var _ = framework.KubeDescribe("PersistentVolumes:vsphere", func() {
 		By("Deleting the pod")
 		framework.DeletePodWithWait(f, c, clientPod)
 	})
+	/*
+		This test verifies that a volume mounted to a pod remains mounted after a kubelet restarts.
+		Steps:
+		1. Write to the volume
+		2. Restart kubelet
+		3. Verify that written file is accessible after kubelet restart
+	*/
+	It("should test that a file written to the mount before kubelet restart is stat-able after restart", func() {
+		testKubeletRestartsAndRestoresMount(c, f, clientPod, pvc, pv)
+	})
 })
