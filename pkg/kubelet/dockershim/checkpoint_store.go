@@ -57,15 +57,19 @@ type FileStore struct {
 	path string
 }
 
+func NewFileStore(path string) (CheckpointStore, error) {
+	if err := ensurePath(path); err != nil {
+		return nil, err
+	}
+	return &FileStore{path: path}, nil
+}
+
 func (fstore *FileStore) Write(key string, data []byte) error {
 	if err := validateKey(key); err != nil {
 		return err
 	}
-	if _, err := os.Stat(fstore.path); err != nil {
-		// if directory already exists, proceed
-		if err = os.MkdirAll(fstore.path, 0755); err != nil && !os.IsExist(err) {
-			return err
-		}
+	if err := ensurePath(fstore.path); err != nil {
+		return err
 	}
 	tmpfile := filepath.Join(fstore.path, fmt.Sprintf("%s%s%s", tmpPrefix, key, tmpSuffix))
 	if err := ioutil.WriteFile(tmpfile, data, 0644); err != nil {
@@ -111,6 +115,15 @@ func (fstore *FileStore) List() ([]string, error) {
 
 func (fstore *FileStore) getCheckpointPath(key string) string {
 	return filepath.Join(fstore.path, key)
+}
+
+// ensurePath creates input directory if it does not exist
+func ensurePath(path string) error {
+	if _, err := os.Stat(path); err != nil {
+		// MkdirAll returns nil if directory already exists
+		return os.MkdirAll(path, 0755)
+	}
+	return nil
 }
 
 func validateKey(key string) error {
