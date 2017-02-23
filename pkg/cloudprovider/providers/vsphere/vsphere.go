@@ -273,6 +273,9 @@ func newVSphere(cfg VSphereConfig) (*VSphere, error) {
 	if cfg.Global.RoundTripperCount == 0 {
 		cfg.Global.RoundTripperCount = RoundTripperDefaultCount
 	}
+	if cfg.Global.VCenterPort != "" {
+		glog.Warningf("port is a deprecated field in vsphere.conf and will be removed in future release.")
+	}
 
 	c, err := newClient(&cfg, context.TODO())
 	if err != nil {
@@ -310,7 +313,7 @@ func logout(vs *VSphere) {
 
 func newClient(cfg *VSphereConfig, ctx context.Context) (*govmomi.Client, error) {
 	// Parse URL from string
-	u, err := url.Parse(fmt.Sprintf("https://%s:%s/sdk", cfg.Global.VCenterIP, cfg.Global.VCenterPort))
+	u, err := url.Parse(fmt.Sprintf("https://%s/sdk", cfg.Global.VCenterIP))
 	if err != nil {
 		return nil, err
 	}
