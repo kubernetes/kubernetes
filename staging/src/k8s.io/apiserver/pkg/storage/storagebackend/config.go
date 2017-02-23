@@ -16,7 +16,10 @@ limitations under the License.
 
 package storagebackend
 
-import "k8s.io/apimachinery/pkg/runtime"
+import (
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apiserver/pkg/storage/value"
+)
 
 const (
 	StorageTypeUnset = ""
@@ -45,6 +48,8 @@ type Config struct {
 
 	Codec  runtime.Codec
 	Copier runtime.ObjectCopier
+	// Transformer allows the value to be transformed prior to persisting into etcd.
+	Transformer value.Transformer
 }
 
 func NewDefaultConfig(prefix string, copier runtime.ObjectCopier, codec runtime.Codec) *Config {
