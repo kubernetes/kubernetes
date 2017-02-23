@@ -31,7 +31,7 @@ ALL_ARCH = amd64 arm arm64 ppc64le s390x
 
 GOARM=7
 TEMP_DIR := $(shell mktemp -d)
-GOLANG_VERSION=1.7.4
+GOLANG_VERSION=1.7.5
 
 BIN = serve_hostname
 SRCS = serve_hostname.go
