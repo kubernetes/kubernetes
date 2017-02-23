@@ -18,9 +18,15 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
+
+KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
+source "${KUBE_ROOT}/hack/lib/init.sh"
+
+
 FAIL_ON_CHANGES=false
 DRY_RUN=false
-while getopts ":fd" opt; do
+RUN_FROM_UPDATE_SCRIPT=false
+while getopts ":fdu" opt; do
   case $opt in
     f)
       FAIL_ON_CHANGES=true
@@ -28,24 +34,30 @@ while getopts ":fd" opt; do
     d)
       DRY_RUN=true
       ;;
+    u)
+      RUN_FROM_UPDATE_SCRIPT=true
+      ;;
     \?)
       echo "Invalid option: -$OPTARG" >&2
+      exit 1
       ;;
   esac
 done
 readonly FAIL_ON_CHANGES DRY_RUN
 
-echo "**PLEASE** run \"godep restore\" before running this script"
+if [ "${RUN_FROM_UPDATE_SCRIPT}" != true ]; then
+  echo "Do not run this script directly, but via hack/update-staging-client-go.sh."
+  exit 1
+fi
+
 # PREREQUISITES: run `godep restore` in the main repo before calling this script.
 CLIENTSET="clientset"
 MAIN_REPO_FROM_SRC="k8s.io/kubernetes"
-MAIN_REPO="${GOPATH%:*}/src/${MAIN_REPO_FROM_SRC}"
+MAIN_REPO="$(cd "${KUBE_ROOT}"; pwd)" # absolute path
 CLIENT_REPO_FROM_SRC="k8s.io/client-go"
 CLIENT_REPO_TEMP_FROM_SRC="k8s.io/_tmp"
 CLIENT_REPO="${MAIN_REPO}/staging/src/${CLIENT_REPO_FROM_SRC}"
 CLIENT_REPO_TEMP="${MAIN_REPO}/staging/src/${CLIENT_REPO_TEMP_FROM_SRC}"
-
-DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 if LANG=C sed --help 2>&1 | grep -q GNU; then
   SED="sed"
@@ -127,7 +139,7 @@ rm -rf "${CLIENT_REPO_TEMP}"/vendor/k8s.io/kubernetes
 mv "${CLIENT_REPO_TEMP}"/vendor "${CLIENT_REPO_TEMP}"/_vendor
 
 echo "rewriting Godeps.json"
-go run "${DIR}/godeps-json-updater.go" --godeps-file="${CLIENT_REPO_TEMP}/Godeps/Godeps.json" --client-go-import-path="${CLIENT_REPO_FROM_SRC}"
+go run "${KUBE_ROOT}/staging/godeps-json-updater.go" --godeps-file="${CLIENT_REPO_TEMP}/Godeps/Godeps.json" --client-go-import-path="${CLIENT_REPO_FROM_SRC}"
 
 echo "rewriting imports"
 grep -Rl "\"${MAIN_REPO_FROM_SRC}" "${CLIENT_REPO_TEMP}" | \
@@ -204,17 +216,17 @@ rm -rf "${CLIENT_REPO_TEMP}/_vendor/k8s.io/client-go"
 rm -rf "${CLIENT_REPO_TEMP}/staging"
 
 if [ "${FAIL_ON_CHANGES}" = true ]; then
-    echo "running FAIL_ON_CHANGES"
-    ret=0
-    if diff -NauprB -I "GoVersion.*\|GodepVersion.*" "${CLIENT_REPO}" "${CLIENT_REPO_TEMP}"; then
-      echo "${CLIENT_REPO} up to date."
-      cleanup
-      exit 0
-    else
-      echo "${CLIENT_REPO} is out of date. Please run hack/update-client-go.sh"
-      cleanup
-      exit 1
-    fi
+  echo "running FAIL_ON_CHANGES"
+  ret=0
+  if diff --ignore-matching-lines='^\s*\"Comment\"' -NauprB -I "GoVersion.*\|GodepVersion.*" "${CLIENT_REPO}" "${CLIENT_REPO_TEMP}"; then
+    echo "${CLIENT_REPO} up to date."
+    cleanup
+    exit 0
+  else
+    echo "${CLIENT_REPO} is out of date. Please run hack/update-staging-client-go.sh"
+    cleanup
+    exit 1
+  fi
 fi
 
 # clean the ${CLIENT_REPO}
