@@ -30,6 +30,7 @@ import (
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util/operationexecutor"
 	"k8s.io/kubernetes/pkg/volume/util/types"
+	volumetypes "k8s.io/kubernetes/pkg/volume/util/types"
 	"k8s.io/kubernetes/pkg/volume/util/volumehelper"
 )
 
@@ -86,6 +87,9 @@ type DesiredStateOfWorld interface {
 	// in the list of volumes that should be attached to the specified node by
 	// the attach detach controller.
 	VolumeExists(volumeName v1.UniqueVolumeName, nodeName k8stypes.NodeName) bool
+
+	//PodExists checks whether pod references the specified volume is added to dsw
+	PodExists(podName volumetypes.UniquePodName, volumeName v1.UniqueVolumeName, nodeName k8stypes.NodeName) bool
 
 	// GetVolumesToAttach generates and returns a list of volumes to attach
 	// and the nodes they should be attached to based on the current desired
@@ -360,4 +364,22 @@ func (dsw *desiredStateOfWorld) GetPodToAdd() map[types.UniquePodName]PodToAdd {
 		}
 	}
 	return pods
+}
+
+func (dsw *desiredStateOfWorld) PodExists(podName volumetypes.UniquePodName, volumeName v1.UniqueVolumeName, nodeName k8stypes.NodeName) bool {
+	dsw.RLock()
+	defer dsw.RUnlock()
+
+	nodeObj, nodeExists := dsw.nodesManaged[nodeName]
+	if !nodeExists {
+		return false
+	}
+
+	volumeObj, volumeExists := nodeObj.volumesToAttach[volumeName]
+	if !volumeExists {
+		return false
+	}
+	_, podExists := volumeObj.scheduledPods[podName]
+
+	return podExists
 }
