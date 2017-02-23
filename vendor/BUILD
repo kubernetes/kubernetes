@@ -10885,6 +10885,7 @@ go_test(
         "//vendor:k8s.io/apiserver/pkg/apis/example/v1",
         "//vendor:k8s.io/apiserver/pkg/storage",
         "//vendor:k8s.io/apiserver/pkg/storage/tests",
+        "//vendor:k8s.io/apiserver/pkg/storage/value",
     ],
 )
 
@@ -10911,6 +10912,7 @@ go_library(
         "//vendor:k8s.io/apimachinery/pkg/watch",
         "//vendor:k8s.io/apiserver/pkg/storage",
         "//vendor:k8s.io/apiserver/pkg/storage/etcd",
+        "//vendor:k8s.io/apiserver/pkg/storage/value",
         "//vendor:k8s.io/apiserver/pkg/util/trace",
     ],
 )
@@ -10933,7 +10935,10 @@ go_library(
     name = "k8s.io/apiserver/pkg/storage/storagebackend",
     srcs = ["k8s.io/apiserver/pkg/storage/storagebackend/config.go"],
     tags = ["automanaged"],
-    deps = ["//vendor:k8s.io/apimachinery/pkg/runtime"],
+    deps = [
+        "//vendor:k8s.io/apimachinery/pkg/runtime",
+        "//vendor:k8s.io/apiserver/pkg/storage/value",
+    ],
 )
 
 go_test(
@@ -11023,6 +11028,7 @@ go_test(
         "//vendor:k8s.io/apiserver/pkg/storage/etcd/etcdtest",
         "//vendor:k8s.io/apiserver/pkg/storage/etcd/testing",
         "//vendor:k8s.io/apiserver/pkg/storage/etcd3",
+        "//vendor:k8s.io/apiserver/pkg/storage/value",
         "//vendor:k8s.io/client-go/pkg/api/install",
     ],
 )
@@ -17085,4 +17091,32 @@ go_test(
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
         "//vendor:k8s.io/apimachinery/pkg/runtime",
     ],
+)
+
+go_test(
+    name = "k8s.io/apiserver/pkg/storage/value_test",
+    srcs = ["k8s.io/apiserver/pkg/storage/value/prefix_test.go"],
+    library = ":k8s.io/apiserver/pkg/storage/value",
+    tags = ["automanaged"],
+)
+
+go_library(
+    name = "k8s.io/apiserver/pkg/storage/value",
+    srcs = ["k8s.io/apiserver/pkg/storage/value/prefix.go"],
+    tags = ["automanaged"],
+)
+
+go_test(
+    name = "k8s.io/apiserver/pkg/storage/value/encrypt/aes_test",
+    srcs = ["k8s.io/apiserver/pkg/storage/value/encrypt/aes/aes_test.go"],
+    library = ":k8s.io/apiserver/pkg/storage/value/encrypt/aes",
+    tags = ["automanaged"],
+    deps = ["//vendor:k8s.io/apiserver/pkg/storage/value"],
+)
+
+go_library(
+    name = "k8s.io/apiserver/pkg/storage/value/encrypt/aes",
+    srcs = ["k8s.io/apiserver/pkg/storage/value/encrypt/aes/aes.go"],
+    tags = ["automanaged"],
+    deps = ["//vendor:k8s.io/apiserver/pkg/storage/value"],
 )
