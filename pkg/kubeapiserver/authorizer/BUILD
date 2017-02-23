@@ -16,6 +16,7 @@ go_test(
     ],
     library = ":go_default_library",
     tags = ["automanaged"],
+    deps = ["//pkg/kubeapiserver/authorizer/modes:go_default_library"],
 )
 
 go_library(
@@ -25,6 +26,7 @@ go_library(
     deps = [
         "//pkg/auth/authorizer/abac:go_default_library",
         "//pkg/controller/informers:go_default_library",
+        "//pkg/kubeapiserver/authorizer/modes:go_default_library",
         "//plugin/pkg/auth/authorizer/rbac:go_default_library",
         "//vendor:k8s.io/apiserver/pkg/authorization/authorizer",
         "//vendor:k8s.io/apiserver/pkg/authorization/authorizerfactory",
@@ -42,6 +44,9 @@ filegroup(
 
 filegroup(
     name = "all-srcs",
-    srcs = [":package-srcs"],
+    srcs = [
+        ":package-srcs",
+        "//pkg/kubeapiserver/authorizer/modes:all-srcs",
+    ],
     tags = ["automanaged"],
 )
