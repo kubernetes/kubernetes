@@ -5166,6 +5166,7 @@ go_library(
         "//vendor:github.com/onsi/ginkgo/ginkgo/testrunner",
         "//vendor:github.com/onsi/ginkgo/ginkgo/testsuite",
         "//vendor:github.com/onsi/ginkgo/ginkgo/watch",
+        "//vendor:github.com/onsi/ginkgo/reporters/stenographer/support/go-colorable",
         "//vendor:github.com/onsi/ginkgo/types",
     ],
 )
@@ -5391,7 +5392,10 @@ go_library(
         "github.com/onsi/ginkgo/reporters/stenographer/stenographer.go",
     ],
     tags = ["automanaged"],
-    deps = ["//vendor:github.com/onsi/ginkgo/types"],
+    deps = [
+        "//vendor:github.com/onsi/ginkgo/reporters/stenographer/support/go-colorable",
+        "//vendor:github.com/onsi/ginkgo/types",
+    ],
 )
 
 go_library(
@@ -17123,5 +17127,23 @@ go_test(
     name = "k8s.io/apimachinery/pkg/apis/meta/v1/unstructured_test",
     srcs = ["k8s.io/apimachinery/pkg/apis/meta/v1/unstructured/unstructured_test.go"],
     library = ":k8s.io/apimachinery/pkg/apis/meta/v1/unstructured",
+    tags = ["automanaged"],
+)
+
+go_library(
+    name = "github.com/onsi/ginkgo/reporters/stenographer/support/go-colorable",
+    srcs = [
+        "github.com/onsi/ginkgo/reporters/stenographer/support/go-colorable/colorable_others.go",
+        "github.com/onsi/ginkgo/reporters/stenographer/support/go-colorable/noncolorable.go",
+    ],
+    tags = ["automanaged"],
+)
+
+go_library(
+    name = "github.com/onsi/ginkgo/reporters/stenographer/support/go-isatty",
+    srcs = [
+        "github.com/onsi/ginkgo/reporters/stenographer/support/go-isatty/doc.go",
+        "github.com/onsi/ginkgo/reporters/stenographer/support/go-isatty/isatty_linux.go",
+    ],
     tags = ["automanaged"],
 )
