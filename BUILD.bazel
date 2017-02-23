@@ -46,7 +46,6 @@ filegroup(
         "//hack:all-srcs",
         "//pkg:all-srcs",
         "//plugin:all-srcs",
-        "//src/gopkg.in/mikedanese/gazel.v14:all-srcs",
         "//test:all-srcs",
         "//third_party:all-srcs",
         "//vendor:all-srcs",

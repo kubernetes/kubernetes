@@ -24,7 +24,6 @@ filegroup(
         "//cmd/genyaml:all-srcs",
         "//cmd/gke-certificates-controller:all-srcs",
         "//cmd/hyperkube:all-srcs",
-        "//cmd/kube-aggregator:all-srcs",
         "//cmd/kube-apiserver:all-srcs",
         "//cmd/kube-controller-manager:all-srcs",
         "//cmd/kube-proxy:all-srcs",
