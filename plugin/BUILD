@@ -28,6 +28,7 @@ filegroup(
         "//plugin/pkg/admission/namespace/exists:all-srcs",
         "//plugin/pkg/admission/namespace/lifecycle:all-srcs",
         "//plugin/pkg/admission/persistentvolume/label:all-srcs",
+        "//plugin/pkg/admission/podinjectionpolicy:all-srcs",
         "//plugin/pkg/admission/podnodeselector:all-srcs",
         "//plugin/pkg/admission/resourcequota:all-srcs",
         "//plugin/pkg/admission/security:all-srcs",
