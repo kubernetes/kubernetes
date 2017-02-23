@@ -50,7 +50,7 @@ var cloudproviders = []string{
 
 func ValidateMasterConfiguration(c *kubeadm.MasterConfiguration) field.ErrorList {
 	allErrs := field.ErrorList{}
-	allErrs = append(allErrs, ValidateDiscovery(&c.Discovery, field.NewPath("discovery"))...)
+	allErrs = append(allErrs, ValidateDiscoveryStruct(&c.Discovery, field.NewPath("discovery"))...)
 	allErrs = append(allErrs, ValidateServiceSubnet(c.Networking.ServiceSubnet, field.NewPath("service subnet"))...)
 	allErrs = append(allErrs, ValidateCloudProvider(c.CloudProvider, field.NewPath("cloudprovider"))...)
 	allErrs = append(allErrs, ValidateAuthorizationMode(c.AuthorizationMode, field.NewPath("authorization-mode"))...)
@@ -67,7 +67,7 @@ func ValidateNodeConfiguration(c *kubeadm.NodeConfiguration) field.ErrorList {
 	return allErrs
 }
 
-//This will be removed once Discovery Type gets removed
+// ValidateDiscoveryStruct TODO This will be removed once Discovery Type gets removed
 func ValidateDiscoveryStruct(c *kubeadm.Discovery, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	var count int
@@ -89,19 +89,19 @@ func ValidateDiscoveryStruct(c *kubeadm.Discovery, fldPath *field.Path) field.Er
 	return allErrs
 }
 
-//This will be removed once Discovery Type gets removed
+// ValidateFileDiscovery TODO This will be removed once Discovery Type gets removed
 func ValidateFileDiscovery(c *kubeadm.FileDiscovery, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	return allErrs
 }
 
-//This will be removed once Discovery Type gets removed
+// ValidateHTTPSDiscovery TODO This will be removed once Discovery Type gets removed
 func ValidateHTTPSDiscovery(c *kubeadm.HTTPSDiscovery, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	return allErrs
 }
 
-//This will be removed once Discovery Type gets removed
+// ValidateTokenDiscovery TODO This will be removed once Discovery Type gets removed
 func ValidateTokenDiscovery(c *kubeadm.TokenDiscovery, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	if len(c.ID) == 0 || len(c.Secret) == 0 {
@@ -180,6 +180,7 @@ func ValidateDiscoveryFile(c *kubeadm.NodeConfiguration, fldPath *field.Path) fi
 		allErrs = append(allErrs, field.Invalid(fldPath, nil, err.Error()))
 	}
 
+	// TODO to remove field.ErrorList
 	if len(allErrs) == 0 {
 		file.Parse(u, &c.Discovery)
 	}
@@ -195,6 +196,7 @@ func ValidateDiscoveryURL(c *kubeadm.NodeConfiguration, fldPath *field.Path) fie
 	if u.Scheme != "https" {
 		allErrs = append(allErrs, field.Invalid(fldPath, nil, "must be https"))
 	}
+	// TODO to remove field.ErrorList
 	if len(allErrs) == 0 {
 		https.Parse(u, &c.Discovery)
 	}
@@ -214,6 +216,7 @@ func ValidateDiscoveryToken(c *kubeadm.NodeConfiguration, fldPath *field.Path) f
 			allErrs = append(allErrs, field.Invalid(fldPath, nil, err.Error()))
 		}
 	}
+	// TODO to remove field.ErrorList
 	if len(allErrs) == 0 {
 		token.Parse(u, &c.Discovery)
 	}
