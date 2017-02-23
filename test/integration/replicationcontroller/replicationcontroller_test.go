@@ -158,7 +158,7 @@ func waitToObservePods(t *testing.T, podInformer cache.SharedIndexInformer, podN
 }
 
 func TestAdoption(t *testing.T) {
-	var trueVar = true
+	boolPtr := func(b bool) *bool { return &b }
 	testCases := []struct {
 		name                    string
 		existingOwnerReferences func(rc *v1.ReplicationController) []metav1.OwnerReference
@@ -170,7 +170,7 @@ func TestAdoption(t *testing.T) {
 				return []metav1.OwnerReference{{UID: rc.UID, Name: rc.Name, APIVersion: "v1", Kind: "ReplicationController"}}
 			},
 			func(rc *v1.ReplicationController) []metav1.OwnerReference {
-				return []metav1.OwnerReference{{UID: rc.UID, Name: rc.Name, APIVersion: "v1", Kind: "ReplicationController", Controller: &trueVar}}
+				return []metav1.OwnerReference{{UID: rc.UID, Name: rc.Name, APIVersion: "v1", Kind: "ReplicationController", Controller: boolPtr(true), BlockOwnerDeletion: boolPtr(true)}}
 			},
 		},
 		{
@@ -179,29 +179,29 @@ func TestAdoption(t *testing.T) {
 				return []metav1.OwnerReference{}
 			},
 			func(rc *v1.ReplicationController) []metav1.OwnerReference {
-				return []metav1.OwnerReference{{UID: rc.UID, Name: rc.Name, APIVersion: "v1", Kind: "ReplicationController", Controller: &trueVar}}
+				return []metav1.OwnerReference{{UID: rc.UID, Name: rc.Name, APIVersion: "v1", Kind: "ReplicationController", Controller: boolPtr(true), BlockOwnerDeletion: boolPtr(true)}}
 			},
 		},
 		{
 			"pod refers rc as a controller",
 			func(rc *v1.ReplicationController) []metav1.OwnerReference {
-				return []metav1.OwnerReference{{UID: rc.UID, Name: rc.Name, APIVersion: "v1", Kind: "ReplicationController", Controller: &trueVar}}
+				return []metav1.OwnerReference{{UID: rc.UID, Name: rc.Name, APIVersion: "v1", Kind: "ReplicationController", Controller: boolPtr(true)}}
 			},
 			func(rc *v1.ReplicationController) []metav1.OwnerReference {
-				return []metav1.OwnerReference{{UID: rc.UID, Name: rc.Name, APIVersion: "v1", Kind: "ReplicationController", Controller: &trueVar}}
+				return []metav1.OwnerReference{{UID: rc.UID, Name: rc.Name, APIVersion: "v1", Kind: "ReplicationController", Controller: boolPtr(true)}}
 			},
 		},
 		{
 			"pod refers other rc as the controller, refers the rc as an owner",
 			func(rc *v1.ReplicationController) []metav1.OwnerReference {
 				return []metav1.OwnerReference{
-					{UID: "1", Name: "anotherRC", APIVersion: "v1", Kind: "ReplicationController", Controller: &trueVar},
+					{UID: "1", Name: "anotherRC", APIVersion: "v1", Kind: "ReplicationController", Controller: boolPtr(true)},
 					{UID: rc.UID, Name: rc.Name, APIVersion: "v1", Kind: "ReplicationController"},
 				}
 			},
 			func(rc *v1.ReplicationController) []metav1.OwnerReference {
 				return []metav1.OwnerReference{
-					{UID: "1", Name: "anotherRC", APIVersion: "v1", Kind: "ReplicationController", Controller: &trueVar},
+					{UID: "1", Name: "anotherRC", APIVersion: "v1", Kind: "ReplicationController", Controller: boolPtr(true)},
 					{UID: rc.UID, Name: rc.Name, APIVersion: "v1", Kind: "ReplicationController"},
 				}
 			},
@@ -243,7 +243,7 @@ func TestAdoption(t *testing.T) {
 				return false, nil
 			}
 		}); err != nil {
-			t.Fatal(err)
+			t.Fatalf("test %q failed: %v", tc.name, err)
 		}
 		close(stopCh)
 	}
