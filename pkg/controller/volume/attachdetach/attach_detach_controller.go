@@ -149,6 +149,7 @@ func NewAttachDetachController(
 		adc.nodeStatusUpdater)
 
 	adc.desiredStateOfWorldPopulator = populator.NewDesiredStateOfWorldPopulator(
+		kubeClient,
 		desiredStateOfWorldPopulatorLoopSleepPeriod,
 		podInformer.Lister(),
 		adc.desiredStateOfWorld)
