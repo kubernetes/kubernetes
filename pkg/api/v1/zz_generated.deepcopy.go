@@ -733,6 +733,11 @@ func DeepCopy_v1_DeleteOptions(in interface{}, out interface{}, c *conversion.Cl
 			*out = new(bool)
 			**out = **in
 		}
+		if in.PropagationPolicy != nil {
+			in, out := &in.PropagationPolicy, &out.PropagationPolicy
+			*out = new(DeletionPropagation)
+			**out = **in
+		}
 		return nil
 	}
 }

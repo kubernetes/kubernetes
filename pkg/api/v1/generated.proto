@@ -684,6 +684,12 @@ message DeleteOptions {
   // finalizer will be added to/removed from the object's finalizers list.
   // +optional
   optional bool orphanDependents = 3;
+
+  // Whether and how garbage collection will be performed.
+  // Defaults to Default.
+  // Either this field or OrphanDependents may be set, but not both.
+  // +optional
+  optional string propagationPolicy = 4;
 }
 
 // Represents downward API info for projecting into a projected volume.
