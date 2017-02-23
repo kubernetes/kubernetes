@@ -31,7 +31,8 @@ import (
 	kubeconfigutil "k8s.io/kubernetes/cmd/kubeadm/app/util/kubeconfig"
 )
 
-type KubeConfigProperties struct {
+// BuildConfigProperties holds some simple information about how this phase should build the KubeConfig object
+type BuildConfigProperties struct {
 	CertDir         string
 	ClientName      string
 	Organization    []string
@@ -59,7 +60,7 @@ func CreateInitKubeConfigFiles(masterEndpoint, pkiDir, outDir string) error {
 	}
 
 	// Create a lightweight specification for what the files should look like
-	filesToCreateFromSpec := map[string]KubeConfigProperties{
+	filesToCreateFromSpec := map[string]BuildConfigProperties{
 		kubeadmconstants.AdminKubeConfigFileName: {
 			ClientName:      "kubernetes-admin",
 			APIServer:       masterEndpoint,
@@ -105,7 +106,8 @@ func CreateInitKubeConfigFiles(masterEndpoint, pkiDir, outDir string) error {
 	return nil
 }
 
-func GetKubeConfigBytesFromSpec(config KubeConfigProperties) ([]byte, error) {
+// GetKubeConfigBytesFromSpec takes properties how to build a KubeConfig file and then returns the bytes of that file
+func GetKubeConfigBytesFromSpec(config BuildConfigProperties) ([]byte, error) {
 	kubeconfig, err := buildKubeConfig(config)
 	if err != nil {
 		return []byte{}, err
@@ -119,7 +121,7 @@ func GetKubeConfigBytesFromSpec(config KubeConfigProperties) ([]byte, error) {
 }
 
 // buildKubeConfig creates a kubeconfig object from some commonly specified properties in the struct above
-func buildKubeConfig(config KubeConfigProperties) (*clientcmdapi.Config, error) {
+func buildKubeConfig(config BuildConfigProperties) (*clientcmdapi.Config, error) {
 
 	// Try to load ca.crt and ca.key from the PKI directory
 	caCert, caKey, err := pkiutil.TryLoadCertAndKeyFromDisk(config.CertDir, kubeadmconstants.CACertAndKeyBaseName)
