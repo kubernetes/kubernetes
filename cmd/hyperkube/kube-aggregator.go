@@ -19,6 +19,7 @@ package main
 import (
 	"os"
 
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kube-aggregator/pkg/cmd/server"
 )
 
@@ -39,7 +40,7 @@ func NewKubeAggregator() *Server {
 			if err := o.Validate(args); err != nil {
 				return err
 			}
-			if err := o.RunAggregator(); err != nil {
+			if err := o.RunAggregator(wait.NeverStop); err != nil {
 				return err
 			}
 			return nil
