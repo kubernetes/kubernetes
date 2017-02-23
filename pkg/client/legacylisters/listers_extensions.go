@@ -179,7 +179,9 @@ func (s storeReplicaSetsNamespacer) Get(name string) (*extensions.ReplicaSet, er
 	return obj.(*extensions.ReplicaSet), nil
 }
 
-// GetPodReplicaSets returns a list of ReplicaSets managing a pod. Returns an error only if no matching ReplicaSets are found.
+// GetPodReplicaSets returns a list of ReplicaSets that potentially match a pod.
+// Only the one specified in the Pod's ControllerRef will actually manage it.
+// Returns an error only if no matching ReplicaSets are found.
 func (s *StoreToReplicaSetLister) GetPodReplicaSets(pod *v1.Pod) (rss []*extensions.ReplicaSet, err error) {
 	if len(pod.Labels) == 0 {
 		err = fmt.Errorf("no ReplicaSets found for pod %v because it has no labels", pod.Name)

@@ -178,7 +178,9 @@ func (s storeReplicationControllersNamespacer) Get(name string) (*v1.Replication
 	return obj.(*v1.ReplicationController), nil
 }
 
-// GetPodControllers returns a list of replication controllers managing a pod. Returns an error only if no matching controllers are found.
+// GetPodControllers returns a list of ReplicationControllers that potentially match a pod.
+// Only the one specified in the Pod's ControllerRef will actually manage it.
+// Returns an error only if no matching ReplicationControllers are found.
 func (s *StoreToReplicationControllerLister) GetPodControllers(pod *v1.Pod) (controllers []*v1.ReplicationController, err error) {
 	if len(pod.Labels) == 0 {
 		err = fmt.Errorf("no controllers found for pod %v because it has no labels", pod.Name)
