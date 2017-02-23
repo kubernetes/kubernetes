@@ -71,12 +71,25 @@ func NewCmdJoin(out io.Writer) *cobra.Command {
 		},
 	}
 
-	cmd.PersistentFlags().StringVar(&cfgPath, "config", cfgPath, "Path to kubeadm config file")
-	cmd.PersistentFlags().StringVar(&cfg.DiscoveryURL, "discovery-url", "", "Discovery URL")
-	cmd.PersistentFlags().StringVar(&cfg.DiscoveryFile, "discovery-file", "", "Discovery File path")
-	cmd.PersistentFlags().StringVar(&cfg.DiscoveryToken, "discovery-token", "", "Discovery Token")
-	cmd.PersistentFlags().StringVar(&cfg.TLSBootstrapToken, "tls-bootstrap-token", "", "blabla")
-	cmd.PersistentFlags().StringVar(&cfg.Token, "token", "", "This sets the token for both discovery and bootstrap auth")
+	cmd.PersistentFlags().StringVar(
+		&cfgPath, "config", cfgPath,
+		"Path to kubeadm config file")
+
+	cmd.PersistentFlags().StringVar(
+		&cfg.DiscoveryURL, "discovery-url", "",
+		"An HTTPS url from which to download cluster information")
+	cmd.PersistentFlags().StringVar(
+		&cfg.DiscoveryFile, "discovery-file", "",
+		"A file from which to load cluster information")
+	cmd.PersistentFlags().StringVar(
+		&cfg.DiscoveryToken, "discovery-token", "",
+		"A token used to validate cluster information fetched from the master")
+	cmd.PersistentFlags().StringVar(
+		&cfg.TLSBootstrapToken, "tls-bootstrap-token", "",
+		"A token used for TLS boostrapping")
+	cmd.PersistentFlags().StringVar(
+		&cfg.Token, "token", "",
+		"Use this token for both discovery-token and tls-bootstrap-token")
 
 	cmd.PersistentFlags().BoolVar(
 		&skipPreFlight, "skip-preflight-checks", false,
