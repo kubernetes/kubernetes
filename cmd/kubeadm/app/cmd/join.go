@@ -144,7 +144,7 @@ func (j *Join) Validate() error {
 
 // Run executes worker node provisioning and tries to join an existing cluster.
 func (j *Join) Run(out io.Writer) error {
-	cfg, err := discovery.For(*j.cfg)
+	cfg, err := discovery.For(j.cfg)
 	if err != nil {
 		return err
 	}

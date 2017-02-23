@@ -29,27 +29,27 @@ import (
 )
 
 // For identifies and executes the desired discovery mechanism.
-func For(d kubeadmapi.NodeConfiguration) (*clientcmdapi.Config, error) {
+func For(d *kubeadmapi.NodeConfiguration) (*clientcmdapi.Config, error) {
 	switch {
 	case len(d.DiscoveryFile) != 0:
-		return runFileDiscovery(d.Discovery.File)
+		return runFileDiscovery(d.DiscoveryFile)
 	case len(d.DiscoveryURL) != 0:
-		return runHTTPSDiscovery(d.Discovery.HTTPS)
+		return runHTTPSDiscovery(d.DiscoveryURL)
 	case len(d.DiscoveryToken) != 0:
-		return runTokenDiscovery(d.Discovery.Token)
+		return runTokenDiscovery(d.DiscoveryToken)
 	default:
 		return nil, fmt.Errorf("couldn't find a valid discovery configuration.")
 	}
 }
 
 // runFileDiscovery executes file-based discovery.
-func runFileDiscovery(fd *kubeadmapi.FileDiscovery) (*clientcmdapi.Config, error) {
-	return clientcmd.LoadFromFile(fd.Path)
+func runFileDiscovery(fd string) (*clientcmdapi.Config, error) {
+	return clientcmd.LoadFromFile(fd)
 }
 
 // runHTTPSDiscovery executes HTTPS-based discovery.
-func runHTTPSDiscovery(hd *kubeadmapi.HTTPSDiscovery) (*clientcmdapi.Config, error) {
-	response, err := http.Get(hd.URL)
+func runHTTPSDiscovery(hd string) (*clientcmdapi.Config, error) {
+	response, err := http.Get(hd)
 	if err != nil {
 		return nil, err
 	}
@@ -64,17 +64,23 @@ func runHTTPSDiscovery(hd *kubeadmapi.HTTPSDiscovery) (*clientcmdapi.Config, err
 }
 
 // runTokenDiscovery executes token-based discovery.
-func runTokenDiscovery(td *kubeadmapi.TokenDiscovery) (*clientcmdapi.Config, error) {
-	if valid, err := tokenutil.ValidateToken(td); valid == false {
+func runTokenDiscovery(td string) (*clientcmdapi.Config, error) {
+	id, secret, err := tokenutil.ParseToken(td)
+	if err != nil {
+		return nil, err
+	}
+	t := &kubeadmapi.TokenDiscovery{ID: id, Secret: secret}
+
+	if valid, err := tokenutil.ValidateToken(t); valid == false {
 		return nil, err
 	}
 
-	clusterInfo, err := kubenode.RetrieveTrustedClusterInfo(td)
+	clusterInfo, err := kubenode.RetrieveTrustedClusterInfo(t)
 	if err != nil {
 		return nil, err
 	}
 
-	cfg, err := kubenode.EstablishMasterConnection(td, clusterInfo)
+	cfg, err := kubenode.EstablishMasterConnection(t, clusterInfo)
 	if err != nil {
 		return nil, err
 	}
