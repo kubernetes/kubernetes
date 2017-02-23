@@ -974,7 +974,7 @@ func TestDaemonSetUpdatesPods(t *testing.T) {
 	ds.Spec.UpdateStrategy.Type = extensions.RollingUpdateDaemonSetStrategyType
 	intStr := intstr.FromInt(maxUnavailable)
 	ds.Spec.UpdateStrategy.RollingUpdate = &extensions.RollingUpdateDaemonSet{MaxUnavailable: &intStr}
-	ds.TemplateGeneration++
+	ds.Spec.TemplateGeneration++
 	manager.dsStore.Update(ds)
 
 	clearExpectations(t, manager, ds, podControl)
@@ -1013,7 +1013,7 @@ func TestDaemonSetUpdatesWhenNewPosIsNotReady(t *testing.T) {
 	ds.Spec.UpdateStrategy.Type = extensions.RollingUpdateDaemonSetStrategyType
 	intStr := intstr.FromInt(maxUnavailable)
 	ds.Spec.UpdateStrategy.RollingUpdate = &extensions.RollingUpdateDaemonSet{MaxUnavailable: &intStr}
-	ds.TemplateGeneration++
+	ds.Spec.TemplateGeneration++
 	manager.dsStore.Update(ds)
 
 	// new pods are not ready numUnavailable == maxUnavailable
@@ -1039,7 +1039,7 @@ func TestDaemonSetUpdatesAllOldPodsNotReady(t *testing.T) {
 	ds.Spec.UpdateStrategy.Type = extensions.RollingUpdateDaemonSetStrategyType
 	intStr := intstr.FromInt(maxUnavailable)
 	ds.Spec.UpdateStrategy.RollingUpdate = &extensions.RollingUpdateDaemonSet{MaxUnavailable: &intStr}
-	ds.TemplateGeneration++
+	ds.Spec.TemplateGeneration++
 	manager.dsStore.Update(ds)
 
 	// all old pods are unavailable so should be removed

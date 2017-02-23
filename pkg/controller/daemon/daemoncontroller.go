@@ -576,7 +576,7 @@ func (dsc *DaemonSetsController) syncNodes(ds *extensions.DaemonSet, podsToDelet
 	glog.V(4).Infof("Nodes needing daemon pods for daemon set %s: %+v, creating %d", ds.Name, nodesNeedingDaemonPods, createDiff)
 	createWait := sync.WaitGroup{}
 	createWait.Add(createDiff)
-	template := util.GetPodTemplateWithGeneration(ds.Spec.Template, ds.TemplateGeneration)
+	template := util.GetPodTemplateWithGeneration(ds.Spec.Template, ds.Spec.TemplateGeneration)
 	for i := 0; i < createDiff; i++ {
 		go func(ix int) {
 			defer createWait.Done()
@@ -695,7 +695,7 @@ func (dsc *DaemonSetsController) updateDaemonSetStatus(ds *extensions.DaemonSet)
 						numberAvailable++
 					}
 				}
-				if util.IsPodUpdated(ds.TemplateGeneration, pod) {
+				if util.IsPodUpdated(ds.Spec.TemplateGeneration, pod) {
 					updatedNumberScheduled++
 				}
 			}
