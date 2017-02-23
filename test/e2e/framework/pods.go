@@ -27,8 +27,11 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
 	v1core "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/core/v1"
+	"k8s.io/kubernetes/pkg/kubelet/events"
+	"k8s.io/kubernetes/pkg/kubelet/sysctl"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -169,7 +172,7 @@ func (c *PodClient) mungeSpec(pod *v1.Pod) {
 }
 
 // TODO(random-liu): Move pod wait function into this file
-// WaitForSuccess waits for pod to success.
+// WaitForSuccess waits for pod to succeed.
 func (c *PodClient) WaitForSuccess(name string, timeout time.Duration) {
 	f := c.f
 	Expect(WaitForPodCondition(f.ClientSet, f.Namespace.Name, name, "success or failure", timeout,
@@ -184,6 +187,30 @@ func (c *PodClient) WaitForSuccess(name string, timeout time.Duration) {
 			}
 		},
 	)).To(Succeed(), "wait for pod %q to success", name)
+}
+
+// WaitForSuccess waits for pod to succeed or an error event for that pod.
+func (c *PodClient) WaitForErrorEventOrSuccess(pod *v1.Pod) (*v1.Event, error) {
+	var ev *v1.Event
+	err := wait.Poll(Poll, PodStartTimeout, func() (bool, error) {
+		evnts, err := c.f.ClientSet.Core().Events(pod.Namespace).Search(api.Scheme, pod)
+		if err != nil {
+			return false, fmt.Errorf("error in listing events: %s", err)
+		}
+		for _, e := range evnts.Items {
+			switch e.Reason {
+			case events.KillingContainer, events.FailedToCreateContainer, sysctl.UnsupportedReason, sysctl.ForbiddenReason:
+				ev = &e
+				return true, nil
+			case events.StartedContainer:
+				return true, nil
+			default:
+				// ignore all other errors
+			}
+		}
+		return false, nil
+	})
+	return ev, err
 }
 
 // MatchContainerOutput gest output of a container and match expected regexp in the output.
