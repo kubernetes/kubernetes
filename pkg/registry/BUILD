@@ -25,6 +25,7 @@ filegroup(
     srcs = [
         ":package-srcs",
         "//pkg/registry/apps/petset:all-srcs",
+        "//pkg/registry/apps/podinjectionpolicy:all-srcs",
         "//pkg/registry/apps/rest:all-srcs",
         "//pkg/registry/authentication/rest:all-srcs",
         "//pkg/registry/authentication/tokenreview:all-srcs",

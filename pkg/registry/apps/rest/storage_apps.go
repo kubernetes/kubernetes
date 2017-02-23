@@ -23,8 +23,10 @@ import (
 	serverstorage "k8s.io/apiserver/pkg/server/storage"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/apps"
+	appsapiv1alpha1 "k8s.io/kubernetes/pkg/apis/apps/v1alpha1"
 	appsapiv1beta1 "k8s.io/kubernetes/pkg/apis/apps/v1beta1"
 	statefulsetstore "k8s.io/kubernetes/pkg/registry/apps/petset/storage"
+	pipstore "k8s.io/kubernetes/pkg/registry/apps/podinjectionpolicy/storage"
 )
 
 type RESTStorageProvider struct{}
@@ -35,6 +37,11 @@ func (p RESTStorageProvider) NewRESTStorage(apiResourceConfigSource serverstorag
 	if apiResourceConfigSource.AnyResourcesForVersionEnabled(appsapiv1beta1.SchemeGroupVersion) {
 		apiGroupInfo.VersionedResourcesStorageMap[appsapiv1beta1.SchemeGroupVersion.Version] = p.v1beta1Storage(apiResourceConfigSource, restOptionsGetter)
 		apiGroupInfo.GroupMeta.GroupVersion = appsapiv1beta1.SchemeGroupVersion
+	}
+
+	if apiResourceConfigSource.AnyResourcesForVersionEnabled(appsapiv1alpha1.SchemeGroupVersion) {
+		apiGroupInfo.VersionedResourcesStorageMap[appsapiv1alpha1.SchemeGroupVersion.Version] = p.v1alpha1Storage(apiResourceConfigSource, restOptionsGetter)
+		apiGroupInfo.GroupMeta.GroupVersion = appsapiv1alpha1.SchemeGroupVersion
 	}
 
 	return apiGroupInfo, true
@@ -48,6 +55,17 @@ func (p RESTStorageProvider) v1beta1Storage(apiResourceConfigSource serverstorag
 		statefulsetStorage, statefulsetStatusStorage := statefulsetstore.NewREST(restOptionsGetter)
 		storage["statefulsets"] = statefulsetStorage
 		storage["statefulsets/status"] = statefulsetStatusStorage
+	}
+	return storage
+}
+
+func (p RESTStorageProvider) v1alpha1Storage(apiResourceConfigSource serverstorage.APIResourceConfigSource, restOptionsGetter generic.RESTOptionsGetter) map[string]rest.Storage {
+	version := appsapiv1beta1.SchemeGroupVersion
+
+	storage := map[string]rest.Storage{}
+	if apiResourceConfigSource.ResourceEnabled(version.WithResource("podinjectionpolicies")) {
+		podInjectionPolicyStorage := pipstore.NewREST(restOptionsGetter)
+		storage["podinjectionpolicies"] = podInjectionPolicyStorage
 	}
 	return storage
 }
