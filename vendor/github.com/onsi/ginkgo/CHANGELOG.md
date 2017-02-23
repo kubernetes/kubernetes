@@ -4,6 +4,7 @@ Improvements:
 
 - `Skip(message)` can be used to skip the current test.
 - Added `extensions/table` - a Ginkgo DSL for [Table Driven Tests](http://onsi.github.io/ginkgo/#table-driven-tests)
+- Add `GinkgoRandomSeed()` - shorthand for `config.GinkgoConfig.RandomSeed`
 
 Bug Fixes:
 
@@ -68,7 +69,7 @@ No changes, just dropping the beta.
 New Features:
 
 - `ginkgo watch` now monitors packages *and their dependencies* for changes.  The depth of the dependency tree can be modified with the `-depth` flag.
-- Test suites with a programmatic focus (`FIt`, `FDescribe`, etc...) exit with non-zero status code, evne when they pass.  This allows CI systems to detect accidental commits of focused test suites.
+- Test suites with a programmatic focus (`FIt`, `FDescribe`, etc...) exit with non-zero status code, even when they pass.  This allows CI systems to detect accidental commits of focused test suites.
 - `ginkgo -p` runs the testsuite in parallel with an auto-detected number of nodes.
 - `ginkgo -tags=TAG_LIST` passes a list of tags down to the `go build` command.
 - `ginkgo --failFast` aborts the test suite after the first failure.
