@@ -149,8 +149,8 @@ func (c *cronJobs) List(opts v1.ListOptions) (result *v2alpha1.CronJobList, err 
 
 // Watch returns a watch.Interface that watches the requested cronJobs.
 func (c *cronJobs) Watch(opts v1.ListOptions) (watch.Interface, error) {
+	opts.Watch = true
 	return c.client.Get().
-		Prefix("watch").
 		Namespace(c.ns).
 		Resource("cronjobs").
 		VersionedParams(&opts, scheme.ParameterCodec).

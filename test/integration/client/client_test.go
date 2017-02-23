@@ -29,6 +29,7 @@ import (
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -491,11 +492,11 @@ func TestSingleWatch(t *testing.T) {
 	}
 
 	w, err := client.Core().RESTClient().Get().
-		Prefix("watch").
 		Namespace(ns.Name).
 		Resource("events").
-		Name("event-9").
 		Param("resourceVersion", rv1).
+		Param("watch", "true").
+		FieldsSelectorParam(fields.OneTermEqualSelector("metadata.name", "event-9")).
 		Watch()
 
 	if err != nil {

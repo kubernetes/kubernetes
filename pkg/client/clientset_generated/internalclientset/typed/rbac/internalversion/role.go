@@ -132,8 +132,8 @@ func (c *roles) List(opts v1.ListOptions) (result *rbac.RoleList, err error) {
 
 // Watch returns a watch.Interface that watches the requested roles.
 func (c *roles) Watch(opts v1.ListOptions) (watch.Interface, error) {
+	opts.Watch = true
 	return c.client.Get().
-		Prefix("watch").
 		Namespace(c.ns).
 		Resource("roles").
 		VersionedParams(&opts, scheme.ParameterCodec).

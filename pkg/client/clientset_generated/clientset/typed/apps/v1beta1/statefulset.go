@@ -149,8 +149,8 @@ func (c *statefulSets) List(opts v1.ListOptions) (result *v1beta1.StatefulSetLis
 
 // Watch returns a watch.Interface that watches the requested statefulSets.
 func (c *statefulSets) Watch(opts v1.ListOptions) (watch.Interface, error) {
+	opts.Watch = true
 	return c.client.Get().
-		Prefix("watch").
 		Namespace(c.ns).
 		Resource("statefulsets").
 		VersionedParams(&opts, scheme.ParameterCodec).
