@@ -80,6 +80,8 @@ base:
 {% endif %}
 {% if pillar.get('network_provider', '').lower() == 'opencontrail' %}
     - opencontrail-networking-master
+{% else %}
+    - kube-proxy
 {% endif %}
 {% if pillar.get('enable_cluster_autoscaler', '').lower() == 'true' %}
     - cluster-autoscaler

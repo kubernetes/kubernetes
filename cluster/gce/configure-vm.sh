@@ -1152,8 +1152,8 @@ if [[ -z "${is_push}" ]]; then
     create-salt-master-kubelet-auth
   else
     create-salt-kubelet-auth
-    create-salt-kubeproxy-auth
   fi
+  create-salt-kubeproxy-auth
   download-release
   configure-salt
   remove-docker-artifacts

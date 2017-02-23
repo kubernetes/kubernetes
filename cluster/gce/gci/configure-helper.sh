@@ -54,9 +54,7 @@ function create-dirs {
   echo "Creating required directories"
   mkdir -p /var/lib/kubelet
   mkdir -p /etc/kubernetes/manifests
-  if [[ "${KUBERNETES_MASTER:-}" == "false" ]]; then
-    mkdir -p /var/lib/kube-proxy
-  fi
+  mkdir -p /var/lib/kube-proxy
 }
 
 # Formats the given device ($1) if needed and mounts it at given mount point
@@ -622,9 +620,8 @@ function load-docker-images {
     try-load-docker-image "${img_dir}/kube-apiserver.tar"
     try-load-docker-image "${img_dir}/kube-controller-manager.tar"
     try-load-docker-image "${img_dir}/kube-scheduler.tar"
-  else
-    try-load-docker-image "${img_dir}/kube-proxy.tar"
   fi
+  try-load-docker-image "${img_dir}/kube-proxy.tar"
 }
 
 # This function assembles the kubelet systemd service file and starts it
@@ -1529,11 +1526,12 @@ if [[ "${KUBERNETES_MASTER:-}" == "true" ]]; then
 else
   create-node-pki
   create-kubelet-kubeconfig
-  create-kubeproxy-kubeconfig
   if [[ "${ENABLE_NODE_PROBLEM_DETECTOR:-}" == "standalone" ]]; then
     create-node-problem-detector-kubeconfig
   fi
 fi
+
+create-kubeproxy-kubeconfig
 
 override-kubectl
 # Run the containerized mounter once to pre-cache the container image.
@@ -1554,8 +1552,11 @@ if [[ "${KUBERNETES_MASTER:-}" == "true" ]]; then
   start-lb-controller
   start-rescheduler
   start-fluentd-static-pod
-else
-  start-kube-proxy
+fi
+
+start-kube-proxy
+
+if [[ "${KUBERNETES_MASTER:-}" == "false" ]]; then
   # Kube-registry-proxy.
   if [[ "${ENABLE_CLUSTER_REGISTRY:-}" == "true" ]]; then
     start-kube-registry-proxy
