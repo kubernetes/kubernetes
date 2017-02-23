@@ -47,7 +47,6 @@ var cloudproviders = []string{
 
 func ValidateMasterConfiguration(c *kubeadm.MasterConfiguration) field.ErrorList {
 	allErrs := field.ErrorList{}
-	allErrs = append(allErrs, ValidateDiscoveryStruct(&c.Discovery, field.NewPath("discovery"))...)
 	allErrs = append(allErrs, ValidateServiceSubnet(c.Networking.ServiceSubnet, field.NewPath("service subnet"))...)
 	allErrs = append(allErrs, ValidateCloudProvider(c.CloudProvider, field.NewPath("cloudprovider"))...)
 	allErrs = append(allErrs, ValidateAuthorizationMode(c.AuthorizationMode, field.NewPath("authorization-mode"))...)
@@ -60,52 +59,6 @@ func ValidateNodeConfiguration(c *kubeadm.NodeConfiguration) field.ErrorList {
 
 	if !path.IsAbs(c.CACertPath) || !strings.HasSuffix(c.CACertPath, ".crt") {
 		allErrs = append(allErrs, field.Invalid(field.NewPath("ca-cert-path"), nil, "the ca certificate path must be an absolute path"))
-	}
-	return allErrs
-}
-
-// ValidateDiscoveryStruct TODO This will be removed once Discovery Type gets removed
-func ValidateDiscoveryStruct(c *kubeadm.Discovery, fldPath *field.Path) field.ErrorList {
-	allErrs := field.ErrorList{}
-	var count int
-	if c.Token != nil {
-		allErrs = append(allErrs, ValidateTokenDiscovery(c.Token, fldPath)...)
-		count++
-	}
-	if c.File != nil {
-		allErrs = append(allErrs, ValidateFileDiscovery(c.File, fldPath)...)
-		count++
-	}
-	if c.HTTPS != nil {
-		allErrs = append(allErrs, ValidateHTTPSDiscovery(c.HTTPS, fldPath)...)
-		count++
-	}
-	if count != 1 {
-		allErrs = append(allErrs, field.Invalid(fldPath, nil, "exactly one discovery strategy can be provided"))
-	}
-	return allErrs
-}
-
-// ValidateFileDiscovery TODO This will be removed once Discovery Type gets removed
-func ValidateFileDiscovery(c *kubeadm.FileDiscovery, fldPath *field.Path) field.ErrorList {
-	allErrs := field.ErrorList{}
-	return allErrs
-}
-
-// ValidateHTTPSDiscovery TODO This will be removed once Discovery Type gets removed
-func ValidateHTTPSDiscovery(c *kubeadm.HTTPSDiscovery, fldPath *field.Path) field.ErrorList {
-	allErrs := field.ErrorList{}
-	return allErrs
-}
-
-// ValidateTokenDiscovery TODO This will be removed once Discovery Type gets removed
-func ValidateTokenDiscovery(c *kubeadm.TokenDiscovery, fldPath *field.Path) field.ErrorList {
-	allErrs := field.ErrorList{}
-	if len(c.ID) == 0 || len(c.Secret) == 0 {
-		allErrs = append(allErrs, field.Invalid(fldPath, nil, "token must be specific as <ID>:<Secret>"))
-	}
-	if len(c.Addresses) == 0 {
-		allErrs = append(allErrs, field.Invalid(fldPath, nil, "at least one address is required"))
 	}
 	return allErrs
 }
@@ -162,6 +115,9 @@ func ValidateTLSBootstrapToken(cfg *kubeadm.NodeConfiguration, fldPath *field.Pa
 			cfg.DiscoveryToken = cfg.Token
 		}
 	}
+	if len(cfg.Masters) == 0 {
+		allErrs = append(allErrs, field.Invalid(fldPath, nil, "master address(es) not specified"))
+	}
 	return allErrs
 }
 
@@ -171,12 +127,6 @@ func ValidateDiscoveryFile(c *kubeadm.NodeConfiguration, fldPath *field.Path) fi
 		allErrs = append(allErrs, field.Invalid(fldPath, nil, "file does not exist"))
 	}
 
-	// will remove url parsing of file once Discovery struct is removed
-	_, err := url.Parse(c.DiscoveryURL)
-	if err != nil {
-		allErrs = append(allErrs, field.Invalid(fldPath, nil, err.Error()))
-	}
-
 	return allErrs
 }
 
@@ -184,7 +134,7 @@ func ValidateDiscoveryURL(c *kubeadm.NodeConfiguration, fldPath *field.Path) fie
 	allErrs := field.ErrorList{}
 	u, err := url.Parse(c.DiscoveryURL)
 	if err != nil {
-		allErrs = append(allErrs, field.Invalid(fldPath, nil, err.Error()))
+		allErrs = append(allErrs, field.Invalid(fldPath, nil, "invalide URL"))
 	}
 	if u.Scheme != "https" {
 		allErrs = append(allErrs, field.Invalid(fldPath, nil, "must be https"))
@@ -194,16 +144,8 @@ func ValidateDiscoveryURL(c *kubeadm.NodeConfiguration, fldPath *field.Path) fie
 
 func ValidateDiscoveryToken(c *kubeadm.NodeConfiguration, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
-	_, err := url.Parse(c.DiscoveryToken)
-	if err != nil {
-		allErrs = append(allErrs, field.Invalid(fldPath, nil, err.Error()))
-	}
 	if !strings.Contains(c.DiscoveryToken, "@") {
 		c.DiscoveryToken = c.DiscoveryToken + "@"
-		_, err = url.Parse(c.DiscoveryToken)
-		if err != nil {
-			allErrs = append(allErrs, field.Invalid(fldPath, nil, err.Error()))
-		}
 	}
 
 	id, secret, err := tokenutil.ParseToken(c.DiscoveryToken)
