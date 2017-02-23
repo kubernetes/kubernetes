@@ -2786,7 +2786,7 @@ func DeleteResourceAndPods(clientset clientset.Interface, internalClientset inte
 	}
 	deleteTime := time.Now().Sub(startTime)
 	Logf("Deleting %v %s took: %v", kind, name, deleteTime)
-	err = waitForPodsInactive(ps, 10*time.Millisecond, 10*time.Minute)
+	err = waitForPodsInactive(ps, 100*time.Millisecond, 10*time.Minute)
 	if err != nil {
 		return fmt.Errorf("error while waiting for pods to become inactive %s: %v", name, err)
 	}
@@ -2794,10 +2794,12 @@ func DeleteResourceAndPods(clientset clientset.Interface, internalClientset inte
 	Logf("Terminating %v %s pods took: %v", kind, name, terminatePodTime)
 	// this is to relieve namespace controller's pressure when deleting the
 	// namespace after a test.
-	err = waitForPodsGone(ps, 10*time.Second, 10*time.Minute)
+	err = waitForPodsGone(ps, 100*time.Millisecond, 10*time.Minute)
 	if err != nil {
 		return fmt.Errorf("error while waiting for pods gone %s: %v", name, err)
 	}
+	gcPodTime := time.Now().Sub(startTime) - terminatePodTime
+	Logf("Garbage collecting %v %s pods took: %v", kind, name, gcPodTime)
 	return nil
 }
 
