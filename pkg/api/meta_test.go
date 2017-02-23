@@ -20,8 +20,6 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/google/gofuzz"
-
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -30,50 +28,6 @@ import (
 )
 
 var _ metav1.Object = &metav1.ObjectMeta{}
-
-func getObjectMetaAndOwnerReferences() (objectMeta metav1.ObjectMeta, metaOwnerReferences []metav1.OwnerReference) {
-	fuzz.New().NilChance(.5).NumElements(1, 5).Fuzz(&objectMeta)
-	references := objectMeta.OwnerReferences
-	metaOwnerReferences = make([]metav1.OwnerReference, 0)
-	for i := 0; i < len(references); i++ {
-		metaOwnerReferences = append(metaOwnerReferences, metav1.OwnerReference{
-			Kind:       references[i].Kind,
-			Name:       references[i].Name,
-			UID:        references[i].UID,
-			APIVersion: references[i].APIVersion,
-			Controller: references[i].Controller,
-		})
-	}
-	if len(references) == 0 {
-		objectMeta.OwnerReferences = make([]metav1.OwnerReference, 0)
-	}
-	return objectMeta, metaOwnerReferences
-}
-
-func testGetOwnerReferences(t *testing.T) {
-	meta, expected := getObjectMetaAndOwnerReferences()
-	refs := meta.GetOwnerReferences()
-	if !reflect.DeepEqual(refs, expected) {
-		t.Errorf("expect %v\n got %v", expected, refs)
-	}
-}
-
-func testSetOwnerReferences(t *testing.T) {
-	expected, newRefs := getObjectMetaAndOwnerReferences()
-	objectMeta := &metav1.ObjectMeta{}
-	objectMeta.SetOwnerReferences(newRefs)
-	if !reflect.DeepEqual(expected.OwnerReferences, objectMeta.OwnerReferences) {
-		t.Errorf("expect: %#v\n got: %#v", expected.OwnerReferences, objectMeta.OwnerReferences)
-	}
-}
-
-func TestAccessOwnerReferences(t *testing.T) {
-	fuzzIter := 5
-	for i := 0; i < fuzzIter; i++ {
-		testGetOwnerReferences(t)
-		testSetOwnerReferences(t)
-	}
-}
 
 func TestAccessorImplementations(t *testing.T) {
 	for _, gv := range api.Registry.EnabledVersions() {

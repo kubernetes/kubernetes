@@ -123,6 +123,7 @@ func TestDecode(t *testing.T) {
 }
 
 func TestUnstructuredGetters(t *testing.T) {
+	trueVar := true
 	unstruct := unstructured.Unstructured{
 		Object: map[string]interface{}{
 			"kind":       "test_kind",
@@ -154,6 +155,10 @@ func TestUnstructuredGetters(t *testing.T) {
 						"name":       "podb",
 						"apiVersion": "v1",
 						"uid":        "2",
+						// though these fields are of type *bool, but when
+						// decoded from JSON, they are unmarshalled as bool.
+						"controller":         true,
+						"blockOwnerDeletion": true,
 					},
 				},
 				"finalizers": []interface{}{
@@ -221,10 +226,12 @@ func TestUnstructuredGetters(t *testing.T) {
 			UID:        "1",
 		},
 		{
-			Kind:       "Pod",
-			Name:       "podb",
-			APIVersion: "v1",
-			UID:        "2",
+			Kind:               "Pod",
+			Name:               "podb",
+			APIVersion:         "v1",
+			UID:                "2",
+			Controller:         &trueVar,
+			BlockOwnerDeletion: &trueVar,
 		},
 	}
 	if got, want := refs, expectedOwnerReferences; !reflect.DeepEqual(got, want) {
@@ -263,18 +270,20 @@ func TestUnstructuredSetters(t *testing.T) {
 				},
 				"ownerReferences": []map[string]interface{}{
 					{
-						"kind":       "Pod",
-						"name":       "poda",
-						"apiVersion": "v1",
-						"uid":        "1",
-						"controller": (*bool)(nil),
+						"kind":               "Pod",
+						"name":               "poda",
+						"apiVersion":         "v1",
+						"uid":                "1",
+						"controller":         (*bool)(nil),
+						"blockOwnerDeletion": (*bool)(nil),
 					},
 					{
-						"kind":       "Pod",
-						"name":       "podb",
-						"apiVersion": "v1",
-						"uid":        "2",
-						"controller": &trueVar,
+						"kind":               "Pod",
+						"name":               "podb",
+						"apiVersion":         "v1",
+						"uid":                "2",
+						"controller":         &trueVar,
+						"blockOwnerDeletion": &trueVar,
 					},
 				},
 				"finalizers": []interface{}{
@@ -307,11 +316,12 @@ func TestUnstructuredSetters(t *testing.T) {
 			UID:        "1",
 		},
 		{
-			Kind:       "Pod",
-			Name:       "podb",
-			APIVersion: "v1",
-			UID:        "2",
-			Controller: &trueVar,
+			Kind:               "Pod",
+			Name:               "podb",
+			APIVersion:         "v1",
+			UID:                "2",
+			Controller:         &trueVar,
+			BlockOwnerDeletion: &trueVar,
 		},
 	}
 	unstruct.SetOwnerReferences(newOwnerReferences)
