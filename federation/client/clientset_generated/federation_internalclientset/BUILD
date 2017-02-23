@@ -24,7 +24,6 @@ go_library(
         "//federation/client/clientset_generated/federation_internalclientset/typed/federation/internalversion:go_default_library",
         "//vendor:github.com/golang/glog",
         "//vendor:k8s.io/client-go/discovery",
-        "//vendor:k8s.io/client-go/plugin/pkg/client/auth",
         "//vendor:k8s.io/client-go/rest",
         "//vendor:k8s.io/client-go/util/flowcontrol",
     ],

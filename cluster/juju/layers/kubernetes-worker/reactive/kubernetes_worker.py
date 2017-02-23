@@ -165,7 +165,7 @@ def start_worker(kube_api, kube_dns, cni):
         opts = FlagManager('kubelet')
         # Append the DNS flags + data to the FlagManager object.
 
-        opts.add('--cluster-dns', dns['sdn-ip']) # FIXME: sdn-ip needs a rename
+        opts.add('--cluster-dns', dns['sdn-ip'])  # FIXME sdn-ip needs a rename
         opts.add('--cluster-domain', dns['domain'])
 
         create_config(servers[0])
