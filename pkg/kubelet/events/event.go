@@ -62,6 +62,7 @@ const (
 	NodeRebooted            = "Rebooted"
 	ContainerGCFailed       = "ContainerGCFailed"
 	ImageGCFailed           = "ImageGCFailed"
+	UnsupportedMountOption  = "UnsupportedMountOption"
 
 	// Image manager event reason list
 	InvalidDiskCapacity = "InvalidDiskCapacity"
