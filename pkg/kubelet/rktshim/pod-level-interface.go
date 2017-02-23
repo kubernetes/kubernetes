@@ -17,8 +17,8 @@ limitations under the License.
 package rktshim
 
 import (
-	kubeletapi "k8s.io/kubernetes/pkg/kubelet/api"
-	runtimeapi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
+	kubeletapi "k8s.io/kubernetes/pkg/kubelet/apis/runtime"
+	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/runtime/v1alpha1"
 )
 
 // PodSandboxManager provides basic operations to create/delete and examine

@@ -26,8 +26,8 @@ import (
 	"github.com/golang/glog"
 
 	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/kubernetes/pkg/kubelet/api"
-	"k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
+	internalapi "k8s.io/kubernetes/pkg/kubelet/apis/runtime"
+	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/runtime/v1alpha1"
 	"k8s.io/kubernetes/pkg/kubelet/remote"
 	commontest "k8s.io/kubernetes/test/e2e/common"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -82,7 +82,7 @@ func (dp *dockerPuller) Pull(image string) ([]byte, error) {
 }
 
 type remotePuller struct {
-	imageService api.ImageManagerService
+	imageService internalapi.ImageManagerService
 }
 
 func (rp *remotePuller) Name() string {
@@ -91,7 +91,7 @@ func (rp *remotePuller) Name() string {
 
 func (rp *remotePuller) Pull(image string) ([]byte, error) {
 	// TODO(runcom): should we check if the image is already pulled with ImageStatus?
-	_, err := rp.imageService.PullImage(&runtime.ImageSpec{Image: image}, nil)
+	_, err := rp.imageService.PullImage(&runtimeapi.ImageSpec{Image: image}, nil)
 	return nil, err
 }
 

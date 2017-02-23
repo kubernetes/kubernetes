@@ -9,16 +9,9 @@ load(
 
 go_library(
     name = "go_default_library",
-    srcs = [
-        "fake_image_service.go",
-        "fake_runtime_service.go",
-        "utils.go",
-    ],
+    srcs = ["services.go"],
     tags = ["automanaged"],
-    deps = [
-        "//pkg/kubelet/api/v1alpha1/runtime:go_default_library",
-        "//pkg/kubelet/util/sliceutils:go_default_library",
-    ],
+    deps = ["//pkg/kubelet/apis/runtime/v1alpha1:go_default_library"],
 )
 
 filegroup(
@@ -30,6 +23,10 @@ filegroup(
 
 filegroup(
     name = "all-srcs",
-    srcs = [":package-srcs"],
+    srcs = [
+        ":package-srcs",
+        "//pkg/kubelet/apis/runtime/testing:all-srcs",
+        "//pkg/kubelet/apis/runtime/v1alpha1:all-srcs",
+    ],
     tags = ["automanaged"],
 )

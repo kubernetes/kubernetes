@@ -50,7 +50,7 @@ go_library(
         "//pkg/cloudprovider:go_default_library",
         "//pkg/features:go_default_library",
         "//pkg/fieldpath:go_default_library",
-        "//pkg/kubelet/api:go_default_library",
+        "//pkg/kubelet/apis/runtime:go_default_library",
         "//pkg/kubelet/cadvisor:go_default_library",
         "//pkg/kubelet/cm:go_default_library",
         "//pkg/kubelet/config:go_default_library",
@@ -238,7 +238,8 @@ filegroup(
     name = "all-srcs",
     srcs = [
         ":package-srcs",
-        "//pkg/kubelet/api:all-srcs",
+        "//pkg/kubelet/apis/runtime:all-srcs",
+        "//pkg/kubelet/apis/stats/v1alpha1:all-srcs",
         "//pkg/kubelet/cadvisor:all-srcs",
         "//pkg/kubelet/certificate:all-srcs",
         "//pkg/kubelet/client:all-srcs",
