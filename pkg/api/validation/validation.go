@@ -1848,8 +1848,8 @@ func validateTaintEffect(effect *api.TaintEffect, allowEmpty bool, fldPath *fiel
 	return allErrors
 }
 
-// validateTolerations tests if given tolerations have valid data.
-func validateTolerations(tolerations []api.Toleration, fldPath *field.Path) field.ErrorList {
+// ValidateTolerations tests if given tolerations have valid data.
+func ValidateTolerations(tolerations []api.Toleration, fldPath *field.Path) field.ErrorList {
 	allErrors := field.ErrorList{}
 	for i, toleration := range tolerations {
 		idxPath := fldPath.Index(i)
@@ -1946,7 +1946,7 @@ func ValidatePodSpec(spec *api.PodSpec, fldPath *field.Path) field.ErrorList {
 	}
 
 	if len(spec.Tolerations) > 0 {
-		allErrs = append(allErrs, validateTolerations(spec.Tolerations, fldPath.Child("tolerations"))...)
+		allErrs = append(allErrs, ValidateTolerations(spec.Tolerations, fldPath.Child("tolerations"))...)
 	}
 
 	return allErrs
