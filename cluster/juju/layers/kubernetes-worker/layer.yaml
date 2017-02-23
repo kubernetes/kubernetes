@@ -3,6 +3,7 @@ includes:
   - 'layer:basic'
   - 'layer:debug'
   - 'layer:docker'
+  - 'layer:metrics'
   - 'layer:nagios'
   - 'layer:tls-client'
   - 'interface:http'
