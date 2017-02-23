@@ -15,7 +15,8 @@
 # limitations under the License.
 
 # A script encapsulating a common Dockerimage pattern for installing packages
-# and then cleaning up.
+# and then cleaning up the unnecessary install artifacts.
+# e.g. clean-install iptables ebtables conntrack
 
 set -o errexit
 

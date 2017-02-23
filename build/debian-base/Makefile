@@ -14,7 +14,7 @@
 
 all: build
 
-REGISTRY ?= gcr.io/google_containers
+REGISTRY ?= gcr.io/google-containers
 IMAGE ?= debian-base
 BUILD_IMAGE ?= debian-build
 
@@ -66,9 +66,6 @@ endif
 	docker export $(BUILD_IMAGE) > $(TEMP_DIR)/$(TAR_FILE)
 	docker build -t $(REGISTRY)/$(IMAGE)-$(ARCH):$(TAG) $(TEMP_DIR)
 	rm -rf $(TEMP_DIR)
-
-push: container
-	docker push $(REGISTRY)/$(IMAGE)-$(ARCH):$(TAG)
 
 clean:
 	docker rmi -f $(REGISTRY)/$(IMAGE)-$(ARCH):$(TAG) || true
