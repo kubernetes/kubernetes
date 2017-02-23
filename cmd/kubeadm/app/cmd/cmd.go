@@ -81,13 +81,14 @@ func NewKubeadmCommand(f cmdutil.Factory, in io.Reader, out, err io.Writer) *cob
 	cmds.AddCommand(NewCmdJoin(out))
 	cmds.AddCommand(NewCmdReset(out))
 	cmds.AddCommand(NewCmdVersion(out))
+	cmds.AddCommand(NewCmdToken(out, err))
 
 	// Wrap not yet usable/supported commands in experimental sub-command:
+	// We should add "kubeadm phase" here
 	experimentalCmd := &cobra.Command{
-		Use:   "ex",
+		Use:   "alpha",
 		Short: "Experimental sub-commands not yet fully functional.",
 	}
-	experimentalCmd.AddCommand(NewCmdToken(out, err))
 	cmds.AddCommand(experimentalCmd)
 
 	return cmds

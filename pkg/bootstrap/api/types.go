@@ -47,6 +47,14 @@ const (
 	// should be considered invalid. Optional.
 	BootstrapTokenExpirationKey = "expiration"
 
+	// BootstrapTokenDescriptionKey is a description in human-readable format that
+	// describes what the bootstrap token is used for. Optional.
+	BootstrapTokenDescriptionKey = "description"
+
+	// BootstrapTokenUsagePrefix is the prefix for the other usage constants that specifies different
+	// functions of a bootstrap token
+	BootstrapTokenUsagePrefix = "usage-bootstrap-"
+
 	// BootstrapTokenUsageSigningKey signals that this token should be used to
 	// sign configs as part of the bootstrap process. Value must be "true". Any
 	// other value is assumed to be false. Optional.

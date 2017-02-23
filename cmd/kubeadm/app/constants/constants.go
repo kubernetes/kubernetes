@@ -67,7 +67,8 @@ const (
 	MinimumAddressesInServiceSubnet = 10
 
 	// DefaultTokenDuration specifies the default amount of time that a bootstrap token will be valid
-	DefaultTokenDuration = time.Duration(8) * time.Hour
+	// Default behaviour is "never expire" == 0
+	DefaultTokenDuration = 0
 
 	// CSVTokenBootstrapUser is currently the user the bootstrap token in the .csv file
 	// TODO: This should change to something more official and supported
@@ -82,4 +83,7 @@ const (
 var (
 	AuthorizationPolicyPath        = path.Join(KubernetesDir, "abac_policy.json")
 	AuthorizationWebhookConfigPath = path.Join(KubernetesDir, "webhook_authz.conf")
+
+	// DefaultTokenUsages specifies the default functions a token will get
+	DefaultTokenUsages = []string{"signing", "authentication"}
 )
