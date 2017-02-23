@@ -20,9 +20,10 @@ import (
 	"encoding/json"
 	"testing"
 
-	"k8s.io/kubernetes/pkg/api"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	utiltesting "k8s.io/client-go/util/testing"
+	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/util/exec"
-	utiltesting "k8s.io/kubernetes/pkg/util/testing"
 	"k8s.io/kubernetes/pkg/volume"
 	volumetesting "k8s.io/kubernetes/pkg/volume/testing"
 )
@@ -35,7 +36,7 @@ func testPlugin() (*flexVolumePlugin, string) {
 	return &flexVolumePlugin{
 		driverName:          "test",
 		execPath:            "/plugin",
-		host:                volumetesting.NewFakeVolumeHost(rootDir, nil, nil, ""),
+		host:                volumetesting.NewFakeVolumeHost(rootDir, nil, nil),
 		unsupportedCommands: []string{},
 	}, rootDir
 }
@@ -76,11 +77,11 @@ func fakeResultOutput(result interface{}) exec.FakeCombinedOutputAction {
 }
 
 func successOutput() exec.FakeCombinedOutputAction {
-	return fakeResultOutput(&DriverStatus{StatusSuccess, "", "", ""})
+	return fakeResultOutput(&DriverStatus{StatusSuccess, "", "", "", true})
 }
 
 func notSupportedOutput() exec.FakeCombinedOutputAction {
-	return fakeResultOutput(&DriverStatus{StatusNotSupported, "", "", ""})
+	return fakeResultOutput(&DriverStatus{StatusNotSupported, "", "", "", false})
 }
 
 func sameArgs(args, expectedArgs []string) bool {
@@ -96,10 +97,10 @@ func sameArgs(args, expectedArgs []string) bool {
 }
 
 func fakeVolumeSpec() *volume.Spec {
-	vol := &api.Volume{
+	vol := &v1.Volume{
 		Name: "vol1",
-		VolumeSource: api.VolumeSource{
-			FlexVolume: &api.FlexVolumeSource{
+		VolumeSource: v1.VolumeSource{
+			FlexVolume: &v1.FlexVolumeSource{
 				Driver:   "kubernetes.io/fakeAttacher",
 				ReadOnly: false,
 			},
@@ -109,13 +110,13 @@ func fakeVolumeSpec() *volume.Spec {
 }
 
 func fakePersistentVolumeSpec() *volume.Spec {
-	vol := &api.PersistentVolume{
-		ObjectMeta: api.ObjectMeta{
+	vol := &v1.PersistentVolume{
+		ObjectMeta: metav1.ObjectMeta{
 			Name: "vol1",
 		},
-		Spec: api.PersistentVolumeSpec{
-			PersistentVolumeSource: api.PersistentVolumeSource{
-				FlexVolume: &api.FlexVolumeSource{
+		Spec: v1.PersistentVolumeSpec{
+			PersistentVolumeSource: v1.PersistentVolumeSource{
+				FlexVolume: &v1.FlexVolumeSource{
 					Driver:   "kubernetes.io/fakeAttacher",
 					ReadOnly: false,
 				},

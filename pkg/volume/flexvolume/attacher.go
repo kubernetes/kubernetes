@@ -103,8 +103,8 @@ func (a *flexVolumeAttacher) VolumesAreAttached(specs []*volume.Spec, nodeName t
 		volumesAttachedCheck[spec] = true
 
 		call := a.plugin.NewDriverCall(isAttached)
-		call.Append(string(nodeName))
 		call.AppendSpec(spec, a.plugin.host, nil)
+		call.Append(string(nodeName))
 
 		status, err := call.Run()
 		if isCmdNotSupportedErr(err) {

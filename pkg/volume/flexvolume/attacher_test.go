@@ -17,6 +17,7 @@ limitations under the License.
 package flexvolume
 
 import (
+	"k8s.io/kubernetes/pkg/volume"
 	"testing"
 	"time"
 )
@@ -39,51 +40,12 @@ func TestWaitForAttach(t *testing.T) {
 
 	plugin, _ := testPlugin()
 	plugin.runner = fakeRunner(
-		assertDriverCall(t, notSupportedOutput(), waitForAttachCmd,
-			specJson(plugin, spec, nil), "/dev/sdx"),
+		assertDriverCall(t, notSupportedOutput(), waitForAttachCmd, "/dev/sdx",
+			specJson(plugin, spec, nil)),
 	)
 
 	a, _ := plugin.NewAttacher()
 	a.WaitForAttach(spec, "/dev/sdx", 1*time.Second)
-}
-
-func TestGetDeviceMountPath(t *testing.T) {
-	spec := fakeVolumeSpec()
-
-	plugin, rootDir := testPlugin()
-	mountsDir := rootDir + "/plugins/kubernetes.io/flexvolume/test/mounts"
-	extraOptions := map[string]string{
-		optionMountsDir: mountsDir,
-	}
-	plugin.runner = fakeRunner(
-		assertDriverCall(t, notSupportedOutput(), getDeviceMountPathCmd,
-			specJson(plugin, spec, extraOptions)),
-		// the default is based on plugin.GetDeviceName
-		assertDriverCall(t, fakeDeviceNameOutput("sdx"), getVolumeNameCmd,
-			specJson(plugin, spec, nil)),
-		// second call for the driverSupport cache test
-		// (attacher shouldn't call getDeviceMountPathCmd anymore)
-		assertDriverCall(t, fakeDeviceNameOutput("sdx"), getVolumeNameCmd,
-			specJson(plugin, spec, nil)),
-	)
-
-	expectedPath := mountsDir + "/sdx"
-	a, _ := plugin.NewAttacher()
-	path, err := a.GetDeviceMountPath(spec)
-	if err != nil {
-		t.Errorf("GetDeviceMountPath() failed: %v", err)
-	}
-	if path != expectedPath {
-		t.Errorf("GetDeviceMountPath() returns %v instead of %v", path, expectedPath)
-	}
-
-	path2, err := a.GetDeviceMountPath(spec)
-	if err != nil {
-		t.Errorf("GetDeviceMountPath() failed: %v", err)
-	}
-	if path2 != expectedPath {
-		t.Errorf("GetDeviceMountPath() returns %v instead of %v", path2, expectedPath)
-	}
 }
 
 func TestMountDevice(t *testing.T) {
@@ -91,10 +53,22 @@ func TestMountDevice(t *testing.T) {
 
 	plugin, rootDir := testPlugin()
 	plugin.runner = fakeRunner(
-		assertDriverCall(t, notSupportedOutput(), mountDeviceCmd,
-			specJson(plugin, spec, nil), "/dev/sdx", rootDir+"/mount-dir"),
+		assertDriverCall(t, notSupportedOutput(), mountDeviceCmd, rootDir+"/mount-dir", "/dev/sdx",
+			specJson(plugin, spec, nil)),
 	)
 
 	a, _ := plugin.NewAttacher()
 	a.MountDevice(spec, "/dev/sdx", rootDir+"/mount-dir")
+}
+
+func TestIsVolumeAttached(t *testing.T) {
+	spec := fakeVolumeSpec()
+
+	plugin, _ := testPlugin()
+	plugin.runner = fakeRunner(
+		assertDriverCall(t, notSupportedOutput(), isAttached, specJson(plugin, spec, nil), "localhost"),
+	)
+	a, _ := plugin.NewAttacher()
+	specs := []*volume.Spec{spec}
+	a.VolumesAreAttached(specs, "localhost")
 }

@@ -18,7 +18,6 @@ package flexvolume
 
 import (
 	"testing"
-	"time"
 )
 
 func TestDetach(t *testing.T) {
@@ -30,17 +29,6 @@ func TestDetach(t *testing.T) {
 
 	d, _ := plugin.NewDetacher()
 	d.Detach("sdx", "localhost")
-}
-
-func TestWaitForDetach(t *testing.T) {
-	plugin, _ := testPlugin()
-	plugin.runner = fakeRunner(
-		assertDriverCall(t, notSupportedOutput(), waitForDetachCmd,
-			"/dev/sdx"),
-	)
-
-	d, _ := plugin.NewDetacher()
-	d.WaitForDetach("/dev/sdx", 1*time.Second)
 }
 
 func TestUnmountDevice(t *testing.T) {

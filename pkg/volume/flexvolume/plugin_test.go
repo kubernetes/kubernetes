@@ -32,7 +32,7 @@ func TestInit(t *testing.T) {
 
 func fakeVolumeNameOutput(name string) exec.FakeCombinedOutputAction {
 	return fakeResultOutput(&DriverStatus{
-		Status: StatusSuccess,
+		Status:     StatusSuccess,
 		VolumeName: name,
 	})
 }

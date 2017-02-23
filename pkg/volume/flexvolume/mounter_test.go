@@ -19,28 +19,28 @@ package flexvolume
 import (
 	"testing"
 
-	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/util/mount"
 )
 
 func TestSetUpAt(t *testing.T) {
 	spec := fakeVolumeSpec()
-	pod := &api.Pod{}
+	pod := &v1.Pod{}
 	mounter := &mount.FakeMounter{}
 
 	plugin, rootDir := testPlugin()
-	plugin.unsupportedCommands = []string{getDeviceMountPathCmd}
+	plugin.unsupportedCommands = []string{"unsupportedCmd"}
 	plugin.runner = fakeRunner(
 		// first call without fsGroup
-		assertDriverCall(t, successOutput(), mountCmd,
-			specJson(plugin, spec, nil), rootDir+"/mount-dir"),
+		assertDriverCall(t, successOutput(), mountCmd, rootDir+"/mount-dir",
+			specJson(plugin, spec, nil)),
 
 		// second test has fsGroup
-		assertDriverCall(t, notSupportedOutput(), mountCmd,
+		assertDriverCall(t, notSupportedOutput(), mountCmd, rootDir+"/mount-dir",
 			specJson(plugin, spec, map[string]string{
 				optionFSGroup: "42",
-			}), rootDir+"/mount-dir"),
-		assertDriverCall(t, fakeDeviceNameOutput("sdx"), getVolumeNameCmd,
+			})),
+		assertDriverCall(t, fakeVolumeNameOutput("sdx"), getVolumeNameCmd,
 			specJson(plugin, spec, nil)),
 	)
 

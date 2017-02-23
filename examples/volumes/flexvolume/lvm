@@ -150,7 +150,7 @@ getvolumename() {
 }
 
 isattached() {
-	log "{\"status\": \"Success\", \"attached\":false}"
+	log "{\"status\": \"Success\", \"attached\":true}"
 	exit 0
 }
 

@@ -255,4 +255,3 @@ func (eic execInContainer) SetStdout(out io.Writer) {
 func (eic execInContainer) Stop() {
 	//unimplemented
 }
-

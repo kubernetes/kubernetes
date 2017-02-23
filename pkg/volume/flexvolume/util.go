@@ -63,7 +63,7 @@ func getVolumeSource(spec *volume.Spec) (volumeSource *api.FlexVolumeSource, rea
 	return
 }
 
-func prepareForMount(mounter mount.Interface, deviceMountPath string) (bool,error) {
+func prepareForMount(mounter mount.Interface, deviceMountPath string) (bool, error) {
 	if _, err := os.Stat(deviceMountPath); os.IsNotExist(err) {
 		if err := os.MkdirAll(deviceMountPath, 0750); err != nil {
 			return false, err
