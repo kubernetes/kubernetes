@@ -137,7 +137,6 @@ install_kube_binary_config() {
     # This should be the case of GCI.
     readonly kube_bin="${kube_home}/bin"
     mkdir -p "${kube_bin}"
-    mount --bind "${kube_bin}" "${kube_bin}"
     mount -o remount,rw,exec "${kube_bin}"
     cp "${src_dir}/kubelet" "${kube_bin}"
     cp "${src_dir}/kubectl" "${kube_bin}"
