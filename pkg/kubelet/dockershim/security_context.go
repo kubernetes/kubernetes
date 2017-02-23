@@ -183,7 +183,7 @@ func modifyPIDNamespaceOverrides(disableSharedPID bool, version *semver.Version,
 	if !strings.HasPrefix(string(hc.PidMode), "container:") {
 		return
 	}
-	if disableSharedPID || (version.Major <= 1 && version.Minor <= 23) {
+	if disableSharedPID || version.LT(semver.Version{Major: 1, Minor: 24}) {
 		hc.PidMode = ""
 	}
 }

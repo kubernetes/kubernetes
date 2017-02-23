@@ -523,7 +523,7 @@ type KubeletConfiguration struct {
 	// This can be useful for debugging volume related issues.
 	KeepTerminatedPodVolumes bool `json:"keepTerminatedPodVolumes,omitempty"`
 	// This flag, if set, disables use of a shared PID namespace for pods run by the docker CRI runtime.
-	DockerDisableSharedPID bool `json:"dockerDisableSharedPID,omitempty"`
+	DockerDisableSharedPID *bool `json:"dockerDisableSharedPID,omitempty"`
 }
 
 type KubeletAuthorizationMode string
