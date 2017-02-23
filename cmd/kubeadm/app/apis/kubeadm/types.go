@@ -84,7 +84,6 @@ type Etcd struct {
 type NodeConfiguration struct {
 	metav1.TypeMeta
 
-	Discovery         Discovery
 	DiscoveryURL      string
 	DiscoveryFile     string
 	DiscoveryToken    string
