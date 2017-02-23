@@ -244,7 +244,7 @@ type dockerService struct {
 	// This option provides an escape hatch to override the new default behavior for Docker under
 	// the CRI to use a shared PID namespace for all pods. It is temporary and will be removed.
 	// See proposals/pod-pid-namespace.md for details.
-	// TODO: Remove once the escape hatch is no longer used (1.7?)
+	// TODO: Remove once the escape hatch is no longer used (https://issues.k8s.io/41938)
 	disableSharedPID bool
 }
 
