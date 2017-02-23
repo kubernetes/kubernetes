@@ -487,11 +487,12 @@ func (rm *ReplicationManager) manageReplicas(filteredPods []*v1.Pod, rc *v1.Repl
 				if rm.garbageCollectorEnabled {
 					var trueVar = true
 					controllerRef := &metav1.OwnerReference{
-						APIVersion: getRCKind().GroupVersion().String(),
-						Kind:       getRCKind().Kind,
-						Name:       rc.Name,
-						UID:        rc.UID,
-						Controller: &trueVar,
+						APIVersion:         getRCKind().GroupVersion().String(),
+						Kind:               getRCKind().Kind,
+						Name:               rc.Name,
+						UID:                rc.UID,
+						BlockOwnerDeletion: &trueVar,
+						Controller:         &trueVar,
 					}
 					err = rm.podControl.CreatePodsWithControllerRef(rc.Namespace, rc.Spec.Template, rc, controllerRef)
 				} else {
