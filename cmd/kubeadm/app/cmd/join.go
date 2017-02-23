@@ -86,10 +86,14 @@ func NewCmdJoin(out io.Writer) *cobra.Command {
 		"A token used to validate cluster information fetched from the master")
 	cmd.PersistentFlags().StringVar(
 		&cfg.TLSBootstrapToken, "tls-bootstrap-token", "",
-		"A token used for TLS boostrapping")
+		"A token used for TLS bootstrapping")
 	cmd.PersistentFlags().StringVar(
 		&cfg.Token, "token", "",
 		"Use this token for both discovery-token and tls-bootstrap-token")
+	cmd.PersistentFlags().StringSliceVar(
+		&cfg.Masters, "masters", cfg.Masters,
+		"The IP addresses of masters [addr:port]",
+	)
 
 	cmd.PersistentFlags().BoolVar(
 		&skipPreFlight, "skip-preflight-checks", false,

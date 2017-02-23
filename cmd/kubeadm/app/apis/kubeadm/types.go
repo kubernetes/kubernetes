@@ -90,6 +90,7 @@ type NodeConfiguration struct {
 	DiscoveryToken    string
 	TLSBootstrapToken string
 	Token             string
+	Masters           []string
 }
 
 // ClusterInfo TODO add description
