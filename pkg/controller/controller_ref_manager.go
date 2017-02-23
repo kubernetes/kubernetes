@@ -113,7 +113,7 @@ func (m *PodControllerRefManager) AdoptPod(pod *v1.Pod) error {
 			strings.Join([]string{pod.Namespace, pod.Name, string(pod.UID)}, "_"))
 	}
 	addControllerPatch := fmt.Sprintf(
-		`{"metadata":{"ownerReferences":[{"apiVersion":"%s","kind":"%s","name":"%s","uid":"%s","controller":true}],"uid":"%s"}}`,
+		`{"metadata":{"ownerReferences":[{"apiVersion":"%s","kind":"%s","name":"%s","uid":"%s","controller":true,"blockOwnerDeletion":true}],"uid":"%s"}}`,
 		m.controllerKind.GroupVersion(), m.controllerKind.Kind,
 		m.controllerObject.Name, m.controllerObject.UID, pod.UID)
 	return m.podControl.PatchPod(pod.Namespace, pod.Name, []byte(addControllerPatch))
