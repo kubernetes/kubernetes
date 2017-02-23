@@ -16,6 +16,7 @@ limitations under the License.
 
 package azure
 
+/*
 import (
 	"fmt"
 	"regexp"
@@ -37,7 +38,7 @@ func (az *Cloud) createVhdBlob(accountName, accountKey, name string, sizeGB int6
 		return "", "", err
 	}
 	size := 1024 * 1024 * 1024 * sizeGB
-	vhdSize := size + vhdHeaderSize /* header size */
+	vhdSize := size + vhdHeaderSize
 	// Blob name in URL must end with '.vhd' extension.
 	name = name + ".vhd"
 	err = blobClient.PutPageBlob(vhdContainerName, name, vhdSize, tags)
@@ -109,3 +110,4 @@ func (az *Cloud) getBlobNameAndAccountFromURI(uri string) (string, string, error
 	}
 	return string(res[1]), string(res[2]), nil
 }
+*/

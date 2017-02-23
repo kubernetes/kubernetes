@@ -994,11 +994,16 @@ type PhotonPersistentDiskVolumeSource struct {
 }
 
 type AzureDataDiskCachingMode string
+type AzureDataDiskKind string
 
 const (
 	AzureDataDiskCachingNone      AzureDataDiskCachingMode = "None"
 	AzureDataDiskCachingReadOnly  AzureDataDiskCachingMode = "ReadOnly"
 	AzureDataDiskCachingReadWrite AzureDataDiskCachingMode = "ReadWrite"
+
+	AzureSharedBlobDisk    AzureDataDiskKind = "shared"
+	AzureDedicatedBlobDisk AzureDataDiskKind = "dedicated"
+	AzureManagedDisk       AzureDataDiskKind = "managed"
 )
 
 // AzureDisk represents an Azure Data Disk mount on the host and bind mount to the pod.
@@ -1019,6 +1024,11 @@ type AzureDiskVolumeSource struct {
 	// the ReadOnly setting in VolumeMounts.
 	// +optional
 	ReadOnly *bool
+	// Defaults to shared
+	// shared: mulitple blob disks per storage account
+	// dedicated: single blob disk per storage account
+	// managed: azure managed data disk (only in managed availability set)
+	Kind *AzureDataDiskKind
 }
 
 // Adapts a ConfigMap into a volume.
