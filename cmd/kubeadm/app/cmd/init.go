@@ -253,11 +253,9 @@ func (i *Init) Run(out io.Writer) error {
 		return err
 	}
 
-	if i.cfg.AuthorizationMode == kubeadmconstants.AuthzModeRBAC {
-		err = apiconfigphase.CreateRBACRules(client)
-		if err != nil {
-			return err
-		}
+	err = apiconfigphase.CreateRBACRules(client)
+	if err != nil {
+		return err
 	}
 
 	if err := addonsphase.CreateEssentialAddons(i.cfg, client); err != nil {
