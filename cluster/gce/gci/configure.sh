@@ -176,6 +176,7 @@ function install-kube-binary-config {
     cp "${src_dir}/kube-apiserver.tar" "${dst_dir}"
     cp "${src_dir}/kube-controller-manager.tar" "${dst_dir}"
     cp "${src_dir}/kube-scheduler.tar" "${dst_dir}"
+    cp "${src_dir}/gke-certificates-controller.tar" "${dst_dir}"
     cp -r "${KUBE_HOME}/kubernetes/addons" "${dst_dir}"
   fi
   local -r kube_bin="${KUBE_HOME}/bin"

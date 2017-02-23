@@ -571,6 +571,7 @@ function load-docker-images {
     try-load-docker-image "${img_dir}/kube-apiserver.tar"
     try-load-docker-image "${img_dir}/kube-controller-manager.tar"
     try-load-docker-image "${img_dir}/kube-scheduler.tar"
+    try-load-docker-image "${img_dir}/gke-certificates-controller.tar"
   else
     try-load-docker-image "${img_dir}/kube-proxy.tar"
   fi
