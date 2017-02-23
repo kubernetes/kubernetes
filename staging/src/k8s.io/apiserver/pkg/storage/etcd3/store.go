@@ -37,27 +37,9 @@ import (
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/etcd"
+	"k8s.io/apiserver/pkg/storage/value"
 	utiltrace "k8s.io/apiserver/pkg/util/trace"
 )
-
-// ValueTransformer allows a string value to be transformed before being read from or written to the underlying store. The methods
-// must be able to undo the transformation caused by the other.
-type ValueTransformer interface {
-	// TransformFromStorage may transform the provided data from its underlying storage representation or return an error.
-	// Stale is true if the object on disk is stale and a write to etcd should be issued, even if the contents of the object
-	// have not changed.
-	TransformFromStorage([]byte) (data []byte, stale bool, err error)
-	// TransformToStorage may transform the provided data into the appropriate form in storage or return an error.
-	TransformToStorage([]byte) (data []byte, err error)
-}
-
-type identityTransformer struct{}
-
-func (identityTransformer) TransformFromStorage(b []byte) ([]byte, bool, error) { return b, false, nil }
-func (identityTransformer) TransformToStorage(b []byte) ([]byte, error)         { return b, nil }
-
-// IdentityTransformer performs no transformation on the provided values.
-var IdentityTransformer ValueTransformer = identityTransformer{}
 
 type store struct {
 	client *clientv3.Client
@@ -66,7 +48,7 @@ type store struct {
 	getOps      []clientv3.OpOption
 	codec       runtime.Codec
 	versioner   storage.Versioner
-	transformer ValueTransformer
+	transformer value.Transformer
 	pathPrefix  string
 	watcher     *watcher
 }
@@ -85,17 +67,17 @@ type objState struct {
 }
 
 // New returns an etcd3 implementation of storage.Interface.
-func New(c *clientv3.Client, codec runtime.Codec, prefix string, transformer ValueTransformer) storage.Interface {
+func New(c *clientv3.Client, codec runtime.Codec, prefix string, transformer value.Transformer) storage.Interface {
 	return newStore(c, true, codec, prefix, transformer)
 }
 
 // NewWithNoQuorumRead returns etcd3 implementation of storage.Interface
 // where Get operations don't require quorum read.
-func NewWithNoQuorumRead(c *clientv3.Client, codec runtime.Codec, prefix string, transformer ValueTransformer) storage.Interface {
+func NewWithNoQuorumRead(c *clientv3.Client, codec runtime.Codec, prefix string, transformer value.Transformer) storage.Interface {
 	return newStore(c, false, codec, prefix, transformer)
 }
 
-func newStore(c *clientv3.Client, quorumRead bool, codec runtime.Codec, prefix string, transformer ValueTransformer) *store {
+func newStore(c *clientv3.Client, quorumRead bool, codec runtime.Codec, prefix string, transformer value.Transformer) *store {
 	versioner := etcd.APIObjectVersioner{}
 	result := &store{
 		client:      c,
@@ -134,7 +116,7 @@ func (s *store) Get(ctx context.Context, key string, resourceVersion string, out
 	}
 	kv := getResp.Kvs[0]
 
-	data, _, err := s.transformer.TransformFromStorage(kv.Value)
+	data, _, err := s.transformer.TransformFromStorage(kv.Value, value.DefaultContext(kv.Key))
 	if err != nil {
 		return storage.NewInternalError(err.Error())
 	}
@@ -158,7 +140,7 @@ func (s *store) Create(ctx context.Context, key string, obj, out runtime.Object,
 		return err
 	}
 
-	newData, err := s.transformer.TransformToStorage(data)
+	newData, err := s.transformer.TransformToStorage(data, value.DefaultContext([]byte(key)))
 	if err != nil {
 		return storage.NewInternalError(err.Error())
 	}
@@ -211,7 +193,7 @@ func (s *store) unconditionalDelete(ctx context.Context, key string, out runtime
 	}
 
 	kv := getResp.Kvs[0]
-	data, _, err := s.transformer.TransformFromStorage(kv.Value)
+	data, _, err := s.transformer.TransformFromStorage(kv.Value, value.DefaultContext(kv.Key))
 	if err != nil {
 		return storage.NewInternalError(err.Error())
 	}
@@ -281,6 +263,7 @@ func (s *store) GuaranteedUpdate(
 	}
 	trace.Step("initial value restored")
 
+	transformContext := value.DefaultContext([]byte(key))
 	for {
 		if err := checkPreconditions(key, precondtions, origState.obj); err != nil {
 			return err
@@ -299,7 +282,7 @@ func (s *store) GuaranteedUpdate(
 			return decode(s.codec, s.versioner, origState.data, out, origState.rev)
 		}
 
-		newData, err := s.transformer.TransformToStorage(data)
+		newData, err := s.transformer.TransformToStorage(data, transformContext)
 		if err != nil {
 			return storage.NewInternalError(err.Error())
 		}
@@ -352,7 +335,7 @@ func (s *store) GetToList(ctx context.Context, key string, resourceVersion strin
 	if len(getResp.Kvs) == 0 {
 		return nil
 	}
-	data, _, err := s.transformer.TransformFromStorage(getResp.Kvs[0].Value)
+	data, _, err := s.transformer.TransformFromStorage(getResp.Kvs[0].Value, value.DefaultContext(getResp.Kvs[0].Key))
 	if err != nil {
 		return storage.NewInternalError(err.Error())
 	}
@@ -387,7 +370,7 @@ func (s *store) List(ctx context.Context, key, resourceVersion string, pred stor
 
 	elems := make([]*elemForDecode, 0, len(getResp.Kvs))
 	for _, kv := range getResp.Kvs {
-		data, _, err := s.transformer.TransformFromStorage(kv.Value)
+		data, _, err := s.transformer.TransformFromStorage(kv.Value, value.DefaultContext(kv.Key))
 		if err != nil {
 			utilruntime.HandleError(fmt.Errorf("unable to transform key %q: %v", key, err))
 			continue
@@ -437,7 +420,7 @@ func (s *store) getState(getResp *clientv3.GetResponse, key string, v reflect.Va
 			return nil, err
 		}
 	} else {
-		data, stale, err := s.transformer.TransformFromStorage(getResp.Kvs[0].Value)
+		data, stale, err := s.transformer.TransformFromStorage(getResp.Kvs[0].Value, value.DefaultContext(getResp.Kvs[0].Key))
 		if err != nil {
 			return nil, storage.NewInternalError(err.Error())
 		}
