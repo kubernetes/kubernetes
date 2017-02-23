@@ -38,7 +38,7 @@ const (
 	diskSCSIPrefix     = "wwn-0x"
 	diskformat         = "diskformat"
 	datastore          = "datastore"
-	Fstype		   = "fstype"
+	Fstype             = "fstype"
 
 	HostFailuresToTolerateCapability    = "hostfailurestotolerate"
 	ForceProvisioningCapability         = "forceprovisioning"
