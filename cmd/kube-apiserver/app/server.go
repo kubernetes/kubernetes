@@ -127,6 +127,12 @@ func Run(s *options.ServerRunOptions) error {
 		return err
 	}
 
+	// Use protobufs for self-communication.
+	// Since not every generic apiserver has to support protobufs, we
+	// cannot default to it in generic apiserver and need to explicitly
+	// set it in kube-apiserver.
+	genericConfig.LoopbackClientConfig.ContentConfig.ContentType = "application/vnd.kubernetes.protobuf"
+
 	capabilities.Initialize(capabilities.Capabilities{
 		AllowPrivileged: s.AllowPrivileged,
 		// TODO(vmarmol): Implement support for HostNetworkSources.
