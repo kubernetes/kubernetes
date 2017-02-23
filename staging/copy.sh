@@ -120,10 +120,12 @@ find "${MAIN_REPO}/pkg/version" -maxdepth 1 -type f | xargs -I{} cp {} "${CLIENT
 mkcp "pkg/client/clientset_generated/${CLIENTSET}" "pkg/client/clientset_generated"
 mkcp "pkg/client/informers/informers_generated/externalversions" "pkg/client/informers/informers_generated"
 
-echo "copy repos in staging/ to temp dir"
+pushd "${CLIENT_REPO_TEMP}" > /dev/null
+echo "generating vendor/"
 kube::util::ensure-temp-dir
 TMP_GOPATH="${KUBE_TEMP}/go"
-
+mkdir -p "${TMP_GOPATH}/src/k8s.io"
+# make snapshots for repos in staging/"
 for repo in $(ls ${KUBE_ROOT}/staging/src/k8s.io); do
   cp -a "${KUBE_ROOT}/staging/src/k8s.io/${repo}" "${TMP_GOPATH}/src/k8s.io/"
   pushd "${TMP_GOPATH}/src/k8s.io/${repo}" >/dev/null
@@ -134,16 +136,13 @@ for repo in $(ls ${KUBE_ROOT}/staging/src/k8s.io); do
     git commit -q -m "Snapshot" >/dev/null
   popd >/dev/null
 done
-
-pushd "${CLIENT_REPO_TEMP}" > /dev/null
-echo "generating vendor/"
-# client-go depends on some apimachinery packages. Adding staging/ to the GOPATH
-# so that if client-go has new dependencies on apimachinery, `godep save` can
-# find the dependent packages in staging/, instead of failing. Note that all
-# k8s.io/apimachinery dependencies will be updated later by the robot to point
-# to the real k8s.io/apimachinery commit and vendor the real code.
-GOPATH="${GOPATH}:${MAIN_REPO}/staging"
-GO15VENDOREXPERIMENT=1 godep save ./...
+# client-go depends on some apimachinery packages. Adding ${TMP_GOPATH} to the
+# GOPATH so that if client-go has new dependencies on apimachinery, `godep save`
+# can find the dependent packages from ${TMP_GOPATH}, instead of failing. Note
+# that in Godeps.json, the "Rev"s of the entries for k8s.io/apimachinery will be
+# invalid, they will be updated later by the publish robot to point to the real
+# k8s.io/apimachinery commit.
+GOPATH="${TMP_GOPATH}":"${GOPATH}" godep save ./...
 popd > /dev/null
 
 echo "moving vendor/k8s.io/kubernetes"
@@ -154,11 +153,6 @@ rm -rf "${CLIENT_REPO_TEMP}"/vendor/k8s.io/kubernetes
 mv "${CLIENT_REPO_TEMP}"/vendor "${CLIENT_REPO_TEMP}"/_vendor
 
 echo "rewriting Godeps.json"
-# Because we set two paths in $GOPATH, godep mistakenly constructs import paths
-# of dependencies found in the secondary GOPATH with the primary GOPATH. We
-# remove the extra relative path.
-#${SED} -i 's|k8s.io/kubernetes/staging/src/||g' "${CLIENT_REPO_TEMP}/Godeps/Godeps.json"
-
 # The entries for k8s.io/apimahcinery are not removed from Godeps.json, though
 # they contain the invalid commit revision. The publish robot will set the
 # correct commit revision.
@@ -228,15 +222,17 @@ find "${CLIENT_REPO_TEMP}" -type f \( \
   -name "*.sh" \
   \) -delete
 
-echo "remove cyclical godep"
+echo "remove unwanted packages from /vendor"
+# remove cyclical godep
 rm -rf "${CLIENT_REPO_TEMP}/_vendor/k8s.io/client-go"
-# If godep cannot find dependent packages in the primary GOPATH, it will search
-# in the secondary GOPATH staging/. If successful, godep will wrongly copy the
-# dependents relative to the primary GOPATH (looks like a godep bug), creating
-# the ${CLIENT_REPO_TEMP}/staging dir. These copies will not be recognized by
-# the Go compiler, so we just remove them. Note that the publishing robot will
-# correctly resolve these dependencies later.
-rm -rf "${CLIENT_REPO_TEMP}/staging"
+# Remove apimachinery. The robot will NOT add back the code. This is to make
+# sure client-go users who downloads with `go get` to end up with a single copy
+# of apimachinery, instead of having another copy in client-go/vendor/. The
+# robot will make sure the latest commit of client-go works with the latest
+# commit of apimahinery.
+rm -rf "${CLIENT_REPO_TEMP}/_vendor/k8s.io/apimachinery"
+# Remove glog. glog has flags which causes panics if there are multiple copies of glog.
+rm -rf "${CLIENT_REPO_TEMP}/_vendor/github.com/golang/glog"
 
 if [ "${FAIL_ON_CHANGES}" = true ]; then
   echo "running FAIL_ON_CHANGES"
