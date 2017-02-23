@@ -142,7 +142,7 @@ func (plugin *photonPersistentDiskPlugin) ConstructVolumeSpec(volumeSpecName, mo
 // Abstract interface to disk operations.
 type pdManager interface {
 	// Creates a volume
-	CreateVolume(provisioner *photonPersistentDiskProvisioner) (pdID string, volumeSizeGB int, err error)
+	CreateVolume(provisioner *photonPersistentDiskProvisioner) (pdID string, volumeSizeGB int, fstype string, err error)
 	// Deletes a volume
 	DeleteVolume(deleter *photonPersistentDiskDeleter) error
 }
@@ -333,9 +333,13 @@ func (plugin *photonPersistentDiskPlugin) newProvisionerInternal(options volume.
 }
 
 func (p *photonPersistentDiskProvisioner) Provision() (*api.PersistentVolume, error) {
-	pdID, sizeGB, err := p.manager.CreateVolume(p)
+	pdID, sizeGB, fstype, err := p.manager.CreateVolume(p)
 	if err != nil {
 		return nil, err
+	}
+
+	if fstype == "" {
+		fstype = "ext4"
 	}
 
 	pv := &api.PersistentVolume{
@@ -355,7 +359,7 @@ func (p *photonPersistentDiskProvisioner) Provision() (*api.PersistentVolume, er
 			PersistentVolumeSource: api.PersistentVolumeSource{
 				PhotonPersistentDisk: &api.PhotonPersistentDiskVolumeSource{
 					PdID:   pdID,
-					FSType: "ext4",
+					FSType: fstype,
 				},
 			},
 		},

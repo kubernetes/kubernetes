@@ -88,8 +88,8 @@ func contains(modes []api.PersistentVolumeAccessMode, mode api.PersistentVolumeA
 type fakePDManager struct {
 }
 
-func (fake *fakePDManager) CreateVolume(c *photonPersistentDiskProvisioner) (pdID string, volumeSizeGB int, err error) {
-	return "test-photon-pd-id", 10, nil
+func (fake *fakePDManager) CreateVolume(c *photonPersistentDiskProvisioner) (pdID string, volumeSizeGB int, fstype string, err error) {
+	return "test-photon-pd-id", 10, "ext4", nil
 }
 
 func (fake *fakePDManager) DeleteVolume(cd *photonPersistentDiskDeleter) error {
