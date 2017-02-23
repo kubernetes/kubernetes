@@ -22,6 +22,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
+	authzmodes "k8s.io/kubernetes/pkg/kubeapiserver/authorizer/modes"
 	"k8s.io/kubernetes/pkg/registry/core/service/ipallocator"
 )
 
@@ -43,8 +44,9 @@ var cloudproviders = []string{
 func ValidateMasterConfiguration(c *kubeadm.MasterConfiguration) field.ErrorList {
 	allErrs := field.ErrorList{}
 	allErrs = append(allErrs, ValidateDiscovery(&c.Discovery, field.NewPath("discovery"))...)
-	allErrs = append(allErrs, ValidateDiscovery(&c.Discovery, field.NewPath("service subnet"))...)
+	allErrs = append(allErrs, ValidateServiceSubnet(c.Networking.ServiceSubnet, field.NewPath("service subnet"))...)
 	allErrs = append(allErrs, ValidateCloudProvider(c.CloudProvider, field.NewPath("cloudprovider"))...)
+	allErrs = append(allErrs, ValidateAuthorizationMode(c.AuthorizationMode, field.NewPath("authorization-mode"))...)
 	return allErrs
 }
 
@@ -94,6 +96,13 @@ func ValidateTokenDiscovery(c *kubeadm.TokenDiscovery, fldPath *field.Path) fiel
 		allErrs = append(allErrs, field.Invalid(fldPath, nil, "at least one address is required"))
 	}
 	return allErrs
+}
+
+func ValidateAuthorizationMode(authzMode string, fldPath *field.Path) field.ErrorList {
+	if !authzmodes.IsValidAuthorizationMode(authzMode) {
+		return field.ErrorList{field.Invalid(fldPath, nil, "invalid authorization mode")}
+	}
+	return field.ErrorList{}
 }
 
 func ValidateServiceSubnet(subnet string, fldPath *field.Path) field.ErrorList {
