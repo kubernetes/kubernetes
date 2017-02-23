@@ -19,10 +19,13 @@ set -o nounset
 set -o pipefail
 
 V=""
-while getopts ":v" opt; do
+while getopts ":vi" opt; do
   case $opt in
     v) # increase verbosity
       V="-v"
+      ;;
+    i) # in-place
+      USE_TEMP_DIR=0
       ;;
     \?)
       echo "Invalid option: -$OPTARG" >&2
