@@ -40,7 +40,7 @@ func NewCmdKubeConfig(out io.Writer) *cobra.Command {
 }
 
 func NewCmdToken(out io.Writer) *cobra.Command {
-	config := &kubeconfigphase.KubeConfigProperties{
+	config := &kubeconfigphase.BuildConfigProperties{
 		MakeClientCerts: false,
 	}
 	cmd := &cobra.Command{
@@ -57,7 +57,7 @@ func NewCmdToken(out io.Writer) *cobra.Command {
 }
 
 func NewCmdClientCerts(out io.Writer) *cobra.Command {
-	config := &kubeconfigphase.KubeConfigProperties{
+	config := &kubeconfigphase.BuildConfigProperties{
 		MakeClientCerts: true,
 	}
 	cmd := &cobra.Command{
@@ -73,13 +73,13 @@ func NewCmdClientCerts(out io.Writer) *cobra.Command {
 	return cmd
 }
 
-func addCommonFlags(cmd *cobra.Command, config *kubeconfigphase.KubeConfigProperties) {
+func addCommonFlags(cmd *cobra.Command, config *kubeconfigphase.BuildConfigProperties) {
 	cmd.Flags().StringVar(&config.CertDir, "cert-dir", kubeadmconstants.DefaultCertDir, "The path to the directory where the certificates are.")
 	cmd.Flags().StringVar(&config.ClientName, "client-name", "", "The name of the client for which the KubeConfig file will be generated.")
 	cmd.Flags().StringVar(&config.APIServer, "server", "", "The location of the api server.")
 }
 
-func validateCommonFlags(config *kubeconfigphase.KubeConfigProperties) error {
+func validateCommonFlags(config *kubeconfigphase.BuildConfigProperties) error {
 	if len(config.ClientName) == 0 {
 		return fmt.Errorf("The --client-name flag is required")
 	}
@@ -90,7 +90,7 @@ func validateCommonFlags(config *kubeconfigphase.KubeConfigProperties) error {
 }
 
 // RunCreateWithToken generates a kubeconfig file from with a token as the authentication mechanism
-func RunCreateWithToken(out io.Writer, config *kubeconfigphase.KubeConfigProperties) error {
+func RunCreateWithToken(out io.Writer, config *kubeconfigphase.BuildConfigProperties) error {
 	if len(config.Token) == 0 {
 		return fmt.Errorf("The --token flag is required")
 	}
@@ -106,7 +106,7 @@ func RunCreateWithToken(out io.Writer, config *kubeconfigphase.KubeConfigPropert
 }
 
 // RunCreateWithClientCerts generates a kubeconfig file from with client certs as the authentication mechanism
-func RunCreateWithClientCerts(out io.Writer, config *kubeconfigphase.KubeConfigProperties) error {
+func RunCreateWithClientCerts(out io.Writer, config *kubeconfigphase.BuildConfigProperties) error {
 	if err := validateCommonFlags(config); err != nil {
 		return err
 	}
