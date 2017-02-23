@@ -4609,6 +4609,10 @@
       "type": "string",
       "description": "DeprecatedServiceAccount is a depreciated alias for ServiceAccountName. Deprecated: Use serviceAccountName instead."
      },
+     "automountServiceAccountToken": {
+      "type": "boolean",
+      "description": "AutomountServiceAccountToken indicates whether a service account token should be automatically mounted."
+     },
      "nodeName": {
       "type": "string",
       "description": "NodeName is a request to schedule this pod onto a specific node. If it is non-empty, the scheduler simply schedules this pod onto that node, assuming that it fits resource requirements."
@@ -4756,6 +4760,10 @@
      "photonPersistentDisk": {
       "$ref": "v1.PhotonPersistentDiskVolumeSource",
       "description": "PhotonPersistentDisk represents a PhotonController persistent disk attached and mounted on kubelets host machine"
+     },
+     "projected": {
+      "$ref": "v1.ProjectedVolumeSource",
+      "description": "Items for all in one resources secrets, configmaps, and downward API"
      }
     }
    },
@@ -4965,7 +4973,8 @@
       "type": "array",
       "items": {
        "type": "string"
-      }
+      },
+      "description": "iSCSI target portal List. The portal is either an IP or ip_addr:port if the port is other than default (typically TCP ports 860 and 3260)."
      }
     }
    },
@@ -5418,6 +5427,100 @@
      "fsType": {
       "type": "string",
       "description": "Filesystem type to mount. Must be a filesystem type supported by the host operating system. Ex. \"ext4\", \"xfs\", \"ntfs\". Implicitly inferred to be \"ext4\" if unspecified."
+     }
+    }
+   },
+   "v1.ProjectedVolumeSource": {
+    "id": "v1.ProjectedVolumeSource",
+    "description": "Represents a projected volume source",
+    "required": [
+     "sources"
+    ],
+    "properties": {
+     "sources": {
+      "type": "array",
+      "items": {
+       "$ref": "v1.VolumeProjection"
+      },
+      "description": "list of volume projections"
+     },
+     "defaultMode": {
+      "type": "integer",
+      "format": "int32",
+      "description": "Mode bits to use on created files by default. Must be a value between 0 and 0777. Directories within the path are not affected by this setting. This might be in conflict with other options that affect the file mode, like fsGroup, and the result can be other mode bits set."
+     }
+    }
+   },
+   "v1.VolumeProjection": {
+    "id": "v1.VolumeProjection",
+    "description": "Projection that may be projected along with other supported volume types",
+    "properties": {
+     "secret": {
+      "$ref": "v1.SecretProjection",
+      "description": "information about the secret data to project"
+     },
+     "downwardAPI": {
+      "$ref": "v1.DownwardAPIProjection",
+      "description": "information about the downwardAPI data to project"
+     },
+     "configMap": {
+      "$ref": "v1.ConfigMapProjection",
+      "description": "information about the configMap data to project"
+     }
+    }
+   },
+   "v1.SecretProjection": {
+    "id": "v1.SecretProjection",
+    "description": "Adapts a secret into a projected volume.\n\nThe contents of the target Secret's Data field will be presented in a projected volume as files using the keys in the Data field as the file names. Note that this is identical to a secret volume source without the default mode.",
+    "properties": {
+     "name": {
+      "type": "string",
+      "description": "Name of the referent. More info: http://kubernetes.io/docs/user-guide/identifiers#names"
+     },
+     "items": {
+      "type": "array",
+      "items": {
+       "$ref": "v1.KeyToPath"
+      },
+      "description": "If unspecified, each key-value pair in the Data field of the referenced Secret will be projected into the volume as a file whose name is the key and content is the value. If specified, the listed keys will be projected into the specified paths, and unlisted keys will not be present. If a key is specified which is not present in the Secret, the volume setup will error unless it is marked optional. Paths must be relative and may not contain the '..' path or start with '..'."
+     },
+     "optional": {
+      "type": "boolean",
+      "description": "Specify whether the Secret or its key must be defined"
+     }
+    }
+   },
+   "v1.DownwardAPIProjection": {
+    "id": "v1.DownwardAPIProjection",
+    "description": "Represents downward API info for projecting into a projected volume. Note that this is identical to a downwardAPI volume source without the default mode.",
+    "properties": {
+     "items": {
+      "type": "array",
+      "items": {
+       "$ref": "v1.DownwardAPIVolumeFile"
+      },
+      "description": "Items is a list of DownwardAPIVolume file"
+     }
+    }
+   },
+   "v1.ConfigMapProjection": {
+    "id": "v1.ConfigMapProjection",
+    "description": "Adapts a ConfigMap into a projected volume.\n\nThe contents of the target ConfigMap's Data field will be presented in a projected volume as files using the keys in the Data field as the file names, unless the items element is populated with specific mappings of keys to paths. Note that this is identical to a configmap volume source without the default mode.",
+    "properties": {
+     "name": {
+      "type": "string",
+      "description": "Name of the referent. More info: http://kubernetes.io/docs/user-guide/identifiers#names"
+     },
+     "items": {
+      "type": "array",
+      "items": {
+       "$ref": "v1.KeyToPath"
+      },
+      "description": "If unspecified, each key-value pair in the Data field of the referenced ConfigMap will be projected into the volume as a file whose name is the key and content is the value. If specified, the listed keys will be projected into the specified paths, and unlisted keys will not be present. If a key is specified which is not present in the ConfigMap, the volume setup will error unless it is marked optional. Paths must be relative and may not contain the '..' path or start with '..'."
+     },
+     "optional": {
+      "type": "boolean",
+      "description": "Specify whether the ConfigMap or it's keys must be defined"
      }
     }
    },
