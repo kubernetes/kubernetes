@@ -205,6 +205,7 @@ executor-suicide-timeout
 exit-on-lock-contention
 experimental-allowed-unsafe-sysctls
 experimental-bootstrap-kubeconfig
+experimental-bootstrap-token-auth
 experimental-keystone-url
 experimental-keystone-ca-file
 experimental-mounter-path
