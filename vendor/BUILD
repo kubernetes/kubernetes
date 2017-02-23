@@ -16415,6 +16415,7 @@ go_library(
     srcs = ["k8s.io/kube-aggregator/main.go"],
     tags = ["automanaged"],
     deps = [
+        "//vendor:k8s.io/apimachinery/pkg/util/wait",
         "//vendor:k8s.io/apiserver/pkg/util/logs",
         "//vendor:k8s.io/kube-aggregator/pkg/apis/apiregistration/install",
         "//vendor:k8s.io/kube-aggregator/pkg/apis/apiregistration/validation",
@@ -16874,7 +16875,6 @@ go_library(
     deps = [
         "//vendor:github.com/spf13/cobra",
         "//vendor:k8s.io/apimachinery/pkg/util/sets",
-        "//vendor:k8s.io/apimachinery/pkg/util/wait",
         "//vendor:k8s.io/apiserver/pkg/server",
         "//vendor:k8s.io/apiserver/pkg/server/filters",
         "//vendor:k8s.io/apiserver/pkg/server/options",
