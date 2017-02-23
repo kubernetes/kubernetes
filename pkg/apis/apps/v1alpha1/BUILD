@@ -13,11 +13,16 @@ go_library(
         "doc.go",
         "register.go",
         "types.go",
+        "types_swagger_doc_generated.go",
+        "zz_generated.conversion.go",
         "zz_generated.deepcopy.go",
+        "zz_generated.defaults.go",
     ],
     tags = ["automanaged"],
     deps = [
         "//pkg/api:go_default_library",
+        "//pkg/api/v1:go_default_library",
+        "//pkg/apis/apps:go_default_library",
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
         "//vendor:k8s.io/apimachinery/pkg/conversion",
         "//vendor:k8s.io/apimachinery/pkg/runtime",
@@ -34,12 +39,6 @@ filegroup(
 
 filegroup(
     name = "all-srcs",
-    srcs = [
-        ":package-srcs",
-        "//pkg/apis/apps/install:all-srcs",
-        "//pkg/apis/apps/v1alpha1:all-srcs",
-        "//pkg/apis/apps/v1beta1:all-srcs",
-        "//pkg/apis/apps/validation:all-srcs",
-    ],
+    srcs = [":package-srcs"],
     tags = ["automanaged"],
 )

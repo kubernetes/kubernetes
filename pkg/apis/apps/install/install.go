@@ -24,6 +24,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/apps"
+	"k8s.io/kubernetes/pkg/apis/apps/v1alpha1"
 	"k8s.io/kubernetes/pkg/apis/apps/v1beta1"
 )
 
@@ -41,7 +42,8 @@ func Install(groupFactoryRegistry announced.APIGroupFactoryRegistry, registry *r
 			AddInternalObjectsToScheme: apps.AddToScheme,
 		},
 		announced.VersionToSchemeFunc{
-			v1beta1.SchemeGroupVersion.Version: v1beta1.AddToScheme,
+			v1alpha1.SchemeGroupVersion.Version: v1alpha1.AddToScheme,
+			v1beta1.SchemeGroupVersion.Version:  v1beta1.AddToScheme,
 		},
 	).Announce(groupFactoryRegistry).RegisterAndEnable(registry, scheme); err != nil {
 		panic(err)

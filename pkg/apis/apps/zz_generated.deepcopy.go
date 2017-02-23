@@ -36,11 +36,95 @@ func init() {
 // to allow building arbitrary schemes.
 func RegisterDeepCopies(scheme *runtime.Scheme) error {
 	return scheme.AddGeneratedDeepCopyFuncs(
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_apps_PodInjectionPolicy, InType: reflect.TypeOf(&PodInjectionPolicy{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_apps_PodInjectionPolicyList, InType: reflect.TypeOf(&PodInjectionPolicyList{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_apps_PodInjectionPolicySpec, InType: reflect.TypeOf(&PodInjectionPolicySpec{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_apps_StatefulSet, InType: reflect.TypeOf(&StatefulSet{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_apps_StatefulSetList, InType: reflect.TypeOf(&StatefulSetList{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_apps_StatefulSetSpec, InType: reflect.TypeOf(&StatefulSetSpec{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_apps_StatefulSetStatus, InType: reflect.TypeOf(&StatefulSetStatus{})},
 	)
+}
+
+func DeepCopy_apps_PodInjectionPolicy(in interface{}, out interface{}, c *conversion.Cloner) error {
+	{
+		in := in.(*PodInjectionPolicy)
+		out := out.(*PodInjectionPolicy)
+		*out = *in
+		if newVal, err := c.DeepCopy(&in.ObjectMeta); err != nil {
+			return err
+		} else {
+			out.ObjectMeta = *newVal.(*v1.ObjectMeta)
+		}
+		if err := DeepCopy_apps_PodInjectionPolicySpec(&in.Spec, &out.Spec, c); err != nil {
+			return err
+		}
+		return nil
+	}
+}
+
+func DeepCopy_apps_PodInjectionPolicyList(in interface{}, out interface{}, c *conversion.Cloner) error {
+	{
+		in := in.(*PodInjectionPolicyList)
+		out := out.(*PodInjectionPolicyList)
+		*out = *in
+		if in.Items != nil {
+			in, out := &in.Items, &out.Items
+			*out = make([]PodInjectionPolicy, len(*in))
+			for i := range *in {
+				if err := DeepCopy_apps_PodInjectionPolicy(&(*in)[i], &(*out)[i], c); err != nil {
+					return err
+				}
+			}
+		}
+		return nil
+	}
+}
+
+func DeepCopy_apps_PodInjectionPolicySpec(in interface{}, out interface{}, c *conversion.Cloner) error {
+	{
+		in := in.(*PodInjectionPolicySpec)
+		out := out.(*PodInjectionPolicySpec)
+		*out = *in
+		if newVal, err := c.DeepCopy(&in.Selector); err != nil {
+			return err
+		} else {
+			out.Selector = *newVal.(*v1.LabelSelector)
+		}
+		if in.Env != nil {
+			in, out := &in.Env, &out.Env
+			*out = make([]api.EnvVar, len(*in))
+			for i := range *in {
+				if err := api.DeepCopy_api_EnvVar(&(*in)[i], &(*out)[i], c); err != nil {
+					return err
+				}
+			}
+		}
+		if in.EnvFrom != nil {
+			in, out := &in.EnvFrom, &out.EnvFrom
+			*out = make([]api.EnvFromSource, len(*in))
+			for i := range *in {
+				if err := api.DeepCopy_api_EnvFromSource(&(*in)[i], &(*out)[i], c); err != nil {
+					return err
+				}
+			}
+		}
+		if in.Volumes != nil {
+			in, out := &in.Volumes, &out.Volumes
+			*out = make([]api.Volume, len(*in))
+			for i := range *in {
+				if err := api.DeepCopy_api_Volume(&(*in)[i], &(*out)[i], c); err != nil {
+					return err
+				}
+			}
+		}
+		if in.VolumeMounts != nil {
+			in, out := &in.VolumeMounts, &out.VolumeMounts
+			*out = make([]api.VolumeMount, len(*in))
+			copy(*out, *in)
+		}
+		return nil
+	}
 }
 
 func DeepCopy_apps_StatefulSet(in interface{}, out interface{}, c *conversion.Cloner) error {

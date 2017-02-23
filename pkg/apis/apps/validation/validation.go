@@ -129,3 +129,34 @@ func ValidateStatefulSetStatusUpdate(statefulSet, oldStatefulSet *apps.StatefulS
 	// TODO: Validate status.
 	return allErrs
 }
+
+// ValidatePodInjectionPolicyName can be used to check whether the given PodInjectionPolicy name is valid.
+// Prefix indicates this name will be used as part of generation, in which case
+// trailing dashes are allowed.
+func ValidatePodInjectionPolicyName(name string, prefix bool) []string {
+	// TODO: Validate that there's name for the suffix inserted by the pods.
+	// Currently this is just "-index". In the future we may allow a user
+	// specified list of suffixes and we need  to validate the longest one.
+	return apivalidation.NameIsDNSSubdomain(name, prefix)
+}
+
+// ValidatePodInjectionPolicySpec tests if required fields in the PodInjectionPolicy spec are set.
+func ValidatePodInjectionPolicySpec(spec *apps.PodInjectionPolicySpec, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+
+	return allErrs
+}
+
+// ValidatePodInjectionPolicy validates a PodInjectionPolicy.
+func ValidatePodInjectionPolicy(pip *apps.PodInjectionPolicy) field.ErrorList {
+	allErrs := apivalidation.ValidateObjectMeta(&pip.ObjectMeta, true, ValidateStatefulSetName, field.NewPath("metadata"))
+	allErrs = append(allErrs, ValidatePodInjectionPolicySpec(&pip.Spec, field.NewPath("spec"))...)
+	return allErrs
+}
+
+// ValidatePodInjectionPolicyUpdate tests if required fields in the PodInjectionPolicy are set.
+func ValidatePodInjectionPolicyUpdate(pip, oldPip *apps.PodInjectionPolicy) field.ErrorList {
+	allErrs := apivalidation.ValidateObjectMetaUpdate(&pip.ObjectMeta, &oldPip.ObjectMeta, field.NewPath("metadata"))
+
+	return allErrs
+}

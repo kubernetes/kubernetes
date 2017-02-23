@@ -101,3 +101,44 @@ type StatefulSetList struct {
 	metav1.ListMeta
 	Items []StatefulSet
 }
+
+// +genclient=true
+
+// PodInjectionPolicy is a policy resource that defines additional runtime
+// requirements for a Pod.
+type PodInjectionPolicy struct {
+	metav1.TypeMeta
+	// +optional
+	metav1.ObjectMeta
+
+	// +optional
+	Spec PodInjectionPolicySpec
+}
+
+// PodInjectionPolicySpec is a description of a pod injection policy.
+type PodInjectionPolicySpec struct {
+	// Selector is a label query over a set of resources, in this case pods.
+	// Required.
+	Selector metav1.LabelSelector
+	// Env defines the collection of EnvVar to inject into containers.
+	// +optional
+	Env []api.EnvVar
+	// EnvFrom defines the collection of EnvFromSource to inject into containers.
+	// +optional
+	EnvFrom []api.EnvFromSource
+	// Volumes defines the collection of Volume to inject into the pod.
+	// +optional
+	Volumes []api.Volume
+	// VolumeMounts defines the collection of VolumeMount to inject into containers.
+	// +optional
+	VolumeMounts []api.VolumeMount
+}
+
+// PodInjectionPolicyList is a list of PodInjectionPolicy objects.
+type PodInjectionPolicyList struct {
+	metav1.TypeMeta
+	// +optional
+	metav1.ListMeta
+
+	Items []PodInjectionPolicy
+}
