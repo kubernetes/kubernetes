@@ -132,8 +132,8 @@ func (c *podTemplates) List(opts v1.ListOptions) (result *api.PodTemplateList, e
 
 // Watch returns a watch.Interface that watches the requested podTemplates.
 func (c *podTemplates) Watch(opts v1.ListOptions) (watch.Interface, error) {
-	opts.Watch = true
 	return c.client.Get().
+		Prefix("watch").
 		Namespace(c.ns).
 		Resource("podtemplates").
 		VersionedParams(&opts, scheme.ParameterCodec).

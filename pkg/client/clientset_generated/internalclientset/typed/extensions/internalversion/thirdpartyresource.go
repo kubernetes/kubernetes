@@ -124,8 +124,8 @@ func (c *thirdPartyResources) List(opts v1.ListOptions) (result *extensions.Thir
 
 // Watch returns a watch.Interface that watches the requested thirdPartyResources.
 func (c *thirdPartyResources) Watch(opts v1.ListOptions) (watch.Interface, error) {
-	opts.Watch = true
 	return c.client.Get().
+		Prefix("watch").
 		Resource("thirdpartyresources").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Watch()

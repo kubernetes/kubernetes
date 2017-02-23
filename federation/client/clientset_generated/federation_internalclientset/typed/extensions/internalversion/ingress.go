@@ -149,8 +149,8 @@ func (c *ingresses) List(opts v1.ListOptions) (result *extensions.IngressList, e
 
 // Watch returns a watch.Interface that watches the requested ingresses.
 func (c *ingresses) Watch(opts v1.ListOptions) (watch.Interface, error) {
-	opts.Watch = true
 	return c.client.Get().
+		Prefix("watch").
 		Namespace(c.ns).
 		Resource("ingresses").
 		VersionedParams(&opts, scheme.ParameterCodec).

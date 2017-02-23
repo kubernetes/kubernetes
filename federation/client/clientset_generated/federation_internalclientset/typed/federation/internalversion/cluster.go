@@ -140,8 +140,8 @@ func (c *clusters) List(opts v1.ListOptions) (result *federation.ClusterList, er
 
 // Watch returns a watch.Interface that watches the requested clusters.
 func (c *clusters) Watch(opts v1.ListOptions) (watch.Interface, error) {
-	opts.Watch = true
 	return c.client.Get().
+		Prefix("watch").
 		Resource("clusters").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Watch()
