@@ -35,7 +35,7 @@ const (
 	checkSleepDuration = time.Second
 	diskByIDPath       = "/dev/disk/by-id/"
 	diskSCSIPrefix     = "wwn-0x"
-	Fstype		   = "fstype"
+	Fstype             = "fstype"
 )
 
 var ErrProbeVolume = errors.New("Error scanning attached volumes")
