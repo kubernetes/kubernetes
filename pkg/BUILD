@@ -40,7 +40,6 @@ filegroup(
         "//pkg/client/informers/informers_generated/externalversions:all-srcs",
         "//pkg/client/informers/informers_generated/internalversion:all-srcs",
         "//pkg/client/leaderelection:all-srcs",
-        "//pkg/client/legacylisters:all-srcs",
         "//pkg/client/listers/apps/internalversion:all-srcs",
         "//pkg/client/listers/apps/v1beta1:all-srcs",
         "//pkg/client/listers/authentication/internalversion:all-srcs",
