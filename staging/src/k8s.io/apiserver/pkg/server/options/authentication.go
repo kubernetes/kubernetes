@@ -60,7 +60,7 @@ func (s *RequestHeaderAuthenticationOptions) AddFlags(fs *pflag.FlagSet) {
 // ToAuthenticationRequestHeaderConfig returns a RequestHeaderConfig config object for these options
 // if necessary, nil otherwise.
 func (s *RequestHeaderAuthenticationOptions) ToAuthenticationRequestHeaderConfig() *authenticatorfactory.RequestHeaderConfig {
-	if len(s.UsernameHeaders) == 0 || (len(s.UsernameHeaders) == 1 && len(s.UsernameHeaders[0]) == 0) {
+	if len(s.ClientCAFile) == 0 {
 		return nil
 	}
 
