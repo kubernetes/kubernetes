@@ -304,7 +304,7 @@ func getAPIServerCommand(cfg *kubeadmapi.MasterConfiguration, selfHosted bool) [
 	}
 
 	command = append(getComponentBaseCommand(apiServer),
-		"--insecure-bind-address=127.0.0.1",
+		"--insecure-port=0",
 		"--admission-control=NamespaceLifecycle,LimitRanger,ServiceAccount,PersistentVolumeLabel,DefaultStorageClass,ResourceQuota",
 		"--service-cluster-ip-range="+cfg.Networking.ServiceSubnet,
 		"--service-account-key-file="+getCertFilePath(kubeadmconstants.ServiceAccountPublicKeyName),
