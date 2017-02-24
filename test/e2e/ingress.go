@@ -90,7 +90,7 @@ var _ = framework.KubeDescribe("Loadbalancing: L7", func() {
 			jig.DeleteIngress()
 
 			By("Cleaning up cloud resources")
-			framework.CleanupGCE(gceController)
+			framework.CleanupGCEIngressController(gceController)
 		})
 
 		It("should conform to Ingress spec", func() {
@@ -104,7 +104,7 @@ var _ = framework.KubeDescribe("Loadbalancing: L7", func() {
 		})
 
 		It("should create ingress with given static-ip", func() {
-			// ip released when the rest of lb resources are deleted in cleanupGCE
+			// ip released when the rest of lb resources are deleted in CleanupGCEIngressController
 			ip := gceController.CreateStaticIP(ns)
 			By(fmt.Sprintf("allocated static ip %v: %v through the GCE cloud provider", ns, ip))
 
@@ -157,7 +157,7 @@ var _ = framework.KubeDescribe("Loadbalancing: L7", func() {
 			// but we want to allow easy testing where a user might've hand
 			// configured firewalls.
 			if framework.ProviderIs("gce", "gke") {
-				framework.ExpectNoError(framework.GcloudCreate("firewall-rules", fmt.Sprintf("ingress-80-443-%v", ns), framework.TestContext.CloudConfig.ProjectID, "--allow", "tcp:80,tcp:443", "--network", framework.TestContext.CloudConfig.Network))
+				framework.ExpectNoError(framework.GcloudComputeResourceCreate("firewall-rules", fmt.Sprintf("ingress-80-443-%v", ns), framework.TestContext.CloudConfig.ProjectID, "--allow", "tcp:80,tcp:443", "--network", framework.TestContext.CloudConfig.Network))
 			} else {
 				framework.Logf("WARNING: Not running on GCE/GKE, cannot create firewall rules for :80, :443. Assuming traffic can reach the external ips of all nodes in cluster on those ports.")
 			}
@@ -167,7 +167,7 @@ var _ = framework.KubeDescribe("Loadbalancing: L7", func() {
 
 		AfterEach(func() {
 			if framework.ProviderIs("gce", "gke") {
-				framework.ExpectNoError(framework.GcloudDelete("firewall-rules", fmt.Sprintf("ingress-80-443-%v", ns), framework.TestContext.CloudConfig.ProjectID))
+				framework.ExpectNoError(framework.GcloudComputeResourceDelete("firewall-rules", fmt.Sprintf("ingress-80-443-%v", ns), framework.TestContext.CloudConfig.ProjectID))
 			}
 			if CurrentGinkgoTestDescription().Failed {
 				framework.DescribeIng(ns)

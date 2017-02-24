@@ -20,6 +20,7 @@ import (
 
 	. "github.com/onsi/ginkgo"
 
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/test/e2e/framework"
 )
 
@@ -34,6 +35,8 @@ type IngressUpgradeTest struct {
 // Setup creates a GLBC, allocates an ip, and an ingress resource,
 // then waits for a successful connectivity check to the ip.
 func (t *IngressUpgradeTest) Setup(f *framework.Framework) {
+	framework.SkipUnlessProviderIs("gce", "gke")
+
 	// jig handles all Kubernetes testing logic
 	jig := framework.NewIngressTestJig(f.ClientSet)
 
@@ -46,12 +49,13 @@ func (t *IngressUpgradeTest) Setup(f *framework.Framework) {
 		Client: jig.Client,
 		Cloud:  framework.TestContext.CloudConfig,
 	}
+	gceController.Init()
 
 	t.gceController = gceController
 	t.jig = jig
 	t.httpClient = framework.BuildInsecureClient(framework.IngressReqTimeout)
 
-	// Allocate a static-ip for the Ingress, this IP is cleaned up via CleanupGCE
+	// Allocate a static-ip for the Ingress, this IP is cleaned up via CleanupGCEIngressController
 	t.ip = t.gceController.CreateStaticIP(ns.Name)
 
 	// Create a working basic Ingress
@@ -97,17 +101,20 @@ func (t *IngressUpgradeTest) Teardown(f *framework.Framework) {
 	t.jig.DeleteIngress()
 
 	By("Cleaning up cloud resources")
-	framework.CleanupGCE(t.gceController)
+	framework.CleanupGCEIngressController(t.gceController)
 }
 
 func (t *IngressUpgradeTest) verify(f *framework.Framework, done <-chan struct{}, testDuringDisruption bool) {
 	if testDuringDisruption {
 		By("continuously hitting the Ingress IP")
-		framework.ExpectNoError(framework.PollURL(fmt.Sprintf("https://%v/", t.ip), "", framework.LoadBalancerPollTimeout, t.jig.PollInterval, t.httpClient, false))
+		wait.Until(func() {
+			framework.ExpectNoError(framework.PollURL(fmt.Sprintf("https://%v/", t.ip), "", framework.LoadBalancerPollTimeout, t.jig.PollInterval, t.httpClient, false))
+		}, t.jig.PollInterval, done)
 	} else {
 		By("waiting for upgrade to finish without checking if Ingress remains up")
 		<-done
 	}
 	By("hitting the Ingress IP " + t.ip)
+
 	framework.ExpectNoError(framework.PollURL(fmt.Sprintf("https://%v/", t.ip), "", framework.LoadBalancerPollTimeout, t.jig.PollInterval, t.httpClient, false))
 }

@@ -13,6 +13,7 @@ go_library(
         "configmaps.go",
         "deployments.go",
         "horizontal_pod_autoscalers.go",
+        "ingress.go",
         "secrets.go",
         "services.go",
         "statefulset.go",
