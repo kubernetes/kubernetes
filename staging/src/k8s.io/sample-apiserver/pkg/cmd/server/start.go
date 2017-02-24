@@ -44,7 +44,6 @@ func NewWardleServerOptions(out, errOut io.Writer) *WardleServerOptions {
 		StdOut: out,
 		StdErr: errOut,
 	}
-	o.RecommendedOptions.SecureServing.ServingOptions.BindPort = 443
 
 	return o
 }

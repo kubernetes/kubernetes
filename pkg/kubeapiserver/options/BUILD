@@ -15,6 +15,7 @@ go_library(
         "authentication.go",
         "authorization.go",
         "cloudprovider.go",
+        "serving.go",
         "storage_versions.go",
     ],
     tags = ["automanaged"],
