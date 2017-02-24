@@ -1477,11 +1477,13 @@ func (kl *Kubelet) syncPod(o syncPodOptions) error {
 		// they are not expected to run again.
 		// We don't create and apply updates to cgroup if its a run once pod and was killed above
 		if !(podKilled && pod.Spec.RestartPolicy == v1.RestartPolicyNever) {
-			if err := pcm.EnsureExists(pod); err != nil {
-				return fmt.Errorf("failed to ensure that the pod: %v cgroups exist and are correctly applied: %v", pod.UID, err)
-			}
-			if err := kl.containerManager.UpdateQOSCgroups(); err != nil {
-				glog.V(2).Infof("Failed to update QoS cgroups while syncing pod: %v", err)
+			if !pcm.Exists(pod) {
+				if err := kl.containerManager.UpdateQOSCgroups(); err != nil {
+					glog.V(2).Infof("Failed to update QoS cgroups while syncing pod: %v", err)
+				}
+				if err := pcm.EnsureExists(pod); err != nil {
+					return fmt.Errorf("failed to ensure that the pod: %v cgroups exist and are correctly applied: %v", pod.UID, err)
+				}
 			}
 		}
 	}

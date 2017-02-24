@@ -21,6 +21,8 @@ import (
 	"path"
 	"sync"
 
+	"github.com/golang/glog"
+
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/kubelet/qos"
 )
@@ -107,7 +109,7 @@ func (m *qosContainerManagerImpl) Start(nodeInfo *v1.Node, activePods ActivePods
 	return nil
 }
 
-func (m *qosContainerManagerImpl) setCPUCgroupConfig(configs map[v1.PodQOSClass]*CgroupConfig) {
+func (m *qosContainerManagerImpl) setCPUCgroupConfig(configs map[v1.PodQOSClass]*CgroupConfig) error {
 	pods := m.activePods()
 	burstablePodCPURequest := int64(0)
 	for i := range pods {
@@ -117,12 +119,15 @@ func (m *qosContainerManagerImpl) setCPUCgroupConfig(configs map[v1.PodQOSClass]
 			// we only care about the burstable qos tier
 			continue
 		}
-		for _, container := range pod.Spec.Containers {
-			if request, found := container.Resources.Requests[v1.ResourceCPU]; found {
-				burstablePodCPURequest += request.MilliValue()
-			}
+		req, _, err := v1.PodRequestsAndLimits(pod)
+		if err != nil {
+			return err
+		}
+		if request, found := req[v1.ResourceCPU]; found {
+			burstablePodCPURequest += request.MilliValue()
 		}
 	}
+
 	// make sure best effort is always 2 shares
 	bestEffortCPUShares := int64(MinShares)
 	configs[v1.PodQOSBestEffort].ResourceParameters.CpuShares = &bestEffortCPUShares
@@ -133,6 +138,7 @@ func (m *qosContainerManagerImpl) setCPUCgroupConfig(configs map[v1.PodQOSClass]
 		burstableCPUShares = int64(MinShares)
 	}
 	configs[v1.PodQOSBurstable].ResourceParameters.CpuShares = &burstableCPUShares
+	return nil
 }
 
 func (m *qosContainerManagerImpl) UpdateCgroups() error {
@@ -151,15 +157,18 @@ func (m *qosContainerManagerImpl) UpdateCgroups() error {
 	}
 
 	// update the qos level cgroup settings for cpu shares
-	m.setCPUCgroupConfig(qosConfigs)
+	if err := m.setCPUCgroupConfig(qosConfigs); err != nil {
+		return err
+	}
 
 	for _, config := range qosConfigs {
 		err := m.cgroupManager.Update(config)
 		if err != nil {
+			glog.V(2).Infof("[ContainerManager]: Failed updated QoS cgroup configuration")
 			return err
 		}
 	}
-
+	glog.V(2).Infof("[ContainerManager]: Updated QoS cgroup configuration")
 	return nil
 }
 
