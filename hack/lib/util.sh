@@ -440,9 +440,9 @@ kube::util::godep_restored() {
     fi
     local head
     if [ -d "${gopath}/src/${root}/.git" ]; then
-        head="$(cd "${gopath}/src/${root}" && git rev-parse HEAD)"
+      head="$(cd "${gopath}/src/${root}" && git rev-parse HEAD)"
     else
-        head="$(cd "${gopath}/src/${root}" && hg parent -T '{node}')"
+      head="$(cd "${gopath}/src/${root}" && hg parent -T '{node}')"
     fi
     if [ "${head}" != "${rev}" ]; then
       echo "Unexpected HEAD '${head}' at ${gopath}/src/${root}, expected '${rev}'." 1>&2
@@ -455,10 +455,10 @@ kube::util::godep_restored() {
 
 # Exits script if working directory is dirty.
 kube::util::ensure_clean_working_dir() {
-    if ! git diff --exit-code; then
-        echo -e "\nUnexpected dirty working directory."
-        exit 1
-    fi
+  if ! git diff --exit-code; then
+    echo -e "\nUnexpected dirty working directory."
+    exit 1
+  fi
 }
 
 # Ensure that the given godep version is installed and in the path

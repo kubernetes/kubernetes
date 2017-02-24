@@ -62,41 +62,41 @@ kube::util::ensure_godep_version v74
 TMP_GOPATH="${KUBE_TEMP}/go"
 
 function updateGodepManifest() {
-	local repo="${1}"
+  local repo="${1}"
 
-	echo "Updating godeps for ${repo}"
-    rm -rf Godeps # remove the current Godeps.json so we always rebuild it
-    GOPATH="${TMP_GOPATH}:${GOPATH}:${KUBE_ROOT}/staging" godep save ${V} ./... 2>&1 | sed 's/^/  /'
+  echo "Updating godeps for ${repo}"
+  rm -rf Godeps # remove the current Godeps.json so we always rebuild it
+  GOPATH="${TMP_GOPATH}:${GOPATH}:${KUBE_ROOT}/staging" godep save ${V} ./... 2>&1 | sed 's/^/  /'
 
-    echo "Rewriting Godeps.json to remove commits that don't really exist because we haven't pushed the prereqs yet"
-    go run "${KUBE_ROOT}/staging/godeps-json-updater.go" --godeps-file="${TMP_GOPATH}/src/${repo}/Godeps/Godeps.json" --client-go-import-path="${repo}"
+  echo "Rewriting Godeps.json to remove commits that don't really exist because we haven't pushed the prereqs yet"
+  go run "${KUBE_ROOT}/staging/godeps-json-updater.go" --godeps-file="${TMP_GOPATH}/src/${repo}/Godeps/Godeps.json" --client-go-import-path="${repo}"
 
-    # commit so that following repos do not see this repo as dirty
-    git add vendor >/dev/null
-    git commit -a -m "Updated Godeps.json" >/dev/null
+  # commit so that following repos do not see this repo as dirty
+  git add vendor >/dev/null
+  git commit -a -m "Updated Godeps.json" >/dev/null
 }
 
 # move into staging and save the dependencies for everything in order
 mkdir -p "${TMP_GOPATH}/src/k8s.io"
 for repo in $(ls ${KUBE_ROOT}/staging/src/k8s.io); do
-	# we have to skip client-go because it does unusual manipulation of its godeps
-	if [ "${repo}" == "client-go" ]; then
-		continue
-	fi
+  # we have to skip client-go because it does unusual manipulation of its godeps
+  if [ "${repo}" == "client-go" ]; then
+    continue
+  fi
 
-	cp -a "${KUBE_ROOT}/staging/src/k8s.io/${repo}" "${TMP_GOPATH}/src/k8s.io/"
+  cp -a "${KUBE_ROOT}/staging/src/k8s.io/${repo}" "${TMP_GOPATH}/src/k8s.io/"
 
-	pushd "${TMP_GOPATH}/src/k8s.io/${repo}" >/dev/null
-	  git init>/dev/null
-	  git add . >/dev/null
-	  git -c user.email="nobody@k8s.io" -c user.name="$0" commit -q -m "Snapshot" >/dev/null
-	  updateGodepManifest "k8s.io/${repo}"
-    popd >/dev/null
+  pushd "${TMP_GOPATH}/src/k8s.io/${repo}" >/dev/null
+    git init>/dev/null
+    git add . >/dev/null
+    git -c user.email="nobody@k8s.io" -c user.name="$0" commit -q -m "Snapshot" >/dev/null
+    updateGodepManifest "k8s.io/${repo}"
+  popd >/dev/null
 
-    if [ "${FAIL_ON_DIFF}" == true ]; then
-        diff --ignore-matching-lines='^\s*\"Comment\"' -u "${KUBE_ROOT}/staging/src/k8s.io/${repo}/Godeps" "${TMP_GOPATH}/src/k8s.io/${repo}/Godeps/Godeps.json"
-    fi
-    if [ "${DRY_RUN}" != true ]; then
-        cp "${TMP_GOPATH}/src/k8s.io/${repo}/Godeps/Godeps.json" "${KUBE_ROOT}/staging/src/k8s.io/${repo}/Godeps"
-    fi
+  if [ "${FAIL_ON_DIFF}" == true ]; then
+    diff --ignore-matching-lines='^\s*\"Comment\"' -u "${KUBE_ROOT}/staging/src/k8s.io/${repo}/Godeps" "${TMP_GOPATH}/src/k8s.io/${repo}/Godeps/Godeps.json"
+  fi
+  if [ "${DRY_RUN}" != true ]; then
+    cp "${TMP_GOPATH}/src/k8s.io/${repo}/Godeps/Godeps.json" "${KUBE_ROOT}/staging/src/k8s.io/${repo}/Godeps"
+  fi
 done
