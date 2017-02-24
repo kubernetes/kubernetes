@@ -90,7 +90,6 @@ func TestInitFederation(t *testing.T) {
 		etcdPersistence       string
 		expectedErr           string
 		dnsProvider           string
-		storageBackend        string
 		dryRun                string
 		apiserverArgOverrides string
 		cmArgOverrides        string
@@ -107,7 +106,6 @@ func TestInitFederation(t *testing.T) {
 			etcdPersistence:       "true",
 			expectedErr:           "",
 			dnsProvider:           "test-dns-provider",
-			storageBackend:        "etcd2",
 			dryRun:                "",
 			apiserverArgOverrides: "--client-ca-file=override,--log-dir=override",
 			cmArgOverrides:        "--dns-provider=override,--log-dir=override",
@@ -124,7 +122,6 @@ func TestInitFederation(t *testing.T) {
 			etcdPersistence:      "true",
 			expectedErr:          "",
 			dnsProvider:          "", //test for default value of dns provider
-			storageBackend:       "etcd2",
 			dryRun:               "",
 		},
 		{
@@ -139,7 +136,6 @@ func TestInitFederation(t *testing.T) {
 			etcdPersistence:      "true",
 			expectedErr:          "",
 			dnsProvider:          "test-dns-provider",
-			storageBackend:       "etcd2",
 			dryRun:               "valid-run",
 		},
 		{
@@ -154,7 +150,6 @@ func TestInitFederation(t *testing.T) {
 			etcdPersistence:      "false",
 			expectedErr:          "",
 			dnsProvider:          "test-dns-provider",
-			storageBackend:       "etcd3",
 			dryRun:               "",
 		},
 		{
@@ -168,7 +163,6 @@ func TestInitFederation(t *testing.T) {
 			etcdPersistence:      "true",
 			expectedErr:          "",
 			dnsProvider:          "test-dns-provider",
-			storageBackend:       "etcd3",
 			dryRun:               "",
 		},
 		{
@@ -183,7 +177,6 @@ func TestInitFederation(t *testing.T) {
 			etcdPersistence:      "true",
 			expectedErr:          "",
 			dnsProvider:          "test-dns-provider",
-			storageBackend:       "etcd3",
 			dryRun:               "",
 		},
 	}
@@ -200,7 +193,7 @@ func TestInitFederation(t *testing.T) {
 		} else {
 			dnsProvider = "google-clouddns" //default value of dns-provider
 		}
-		hostFactory, err := fakeInitHostFactory(tc.apiserverServiceType, tc.federation, util.DefaultFederationSystemNamespace, tc.advertiseAddress, tc.lbIP, tc.dnsZoneName, tc.image, dnsProvider, tc.etcdPersistence, tc.etcdPVCapacity, tc.storageBackend, tc.apiserverArgOverrides, tc.cmArgOverrides)
+		hostFactory, err := fakeInitHostFactory(tc.apiserverServiceType, tc.federation, util.DefaultFederationSystemNamespace, tc.advertiseAddress, tc.lbIP, tc.dnsZoneName, tc.image, dnsProvider, tc.etcdPersistence, tc.etcdPVCapacity, tc.apiserverArgOverrides, tc.cmArgOverrides)
 		if err != nil {
 			t.Fatalf("[%d] unexpected error: %v", i, err)
 		}
@@ -219,9 +212,6 @@ func TestInitFederation(t *testing.T) {
 		cmd.Flags().Set("apiserver-arg-overrides", tc.apiserverArgOverrides)
 		cmd.Flags().Set("controllermanager-arg-overrides", tc.cmArgOverrides)
 
-		if tc.storageBackend != "" {
-			cmd.Flags().Set("storage-backend", tc.storageBackend)
-		}
 		if tc.dnsProvider != "" {
 			cmd.Flags().Set("dns-provider", tc.dnsProvider)
 		}
@@ -565,7 +555,7 @@ func TestCertsHTTPS(t *testing.T) {
 	}
 }
 
-func fakeInitHostFactory(apiserverServiceType v1.ServiceType, federationName, namespaceName, advertiseAddress, lbIp, dnsZoneName, image, dnsProvider, etcdPersistence, etcdPVCapacity, storageProvider, apiserverOverrideArg, cmOverrideArg string) (cmdutil.Factory, error) {
+func fakeInitHostFactory(apiserverServiceType v1.ServiceType, federationName, namespaceName, advertiseAddress, lbIp, dnsZoneName, image, dnsProvider, etcdPersistence, etcdPVCapacity, apiserverOverrideArg, cmOverrideArg string) (cmdutil.Factory, error) {
 	svcName := federationName + "-apiserver"
 	svcUrlPrefix := "/api/v1/namespaces/federation-system/services"
 	credSecretName := svcName + "-credentials"
@@ -771,7 +761,6 @@ func fakeInitHostFactory(apiserverServiceType v1.ServiceType, federationName, na
 		"--tls-cert-file=/etc/federation/apiserver/server.crt",
 		"--tls-private-key-file=/etc/federation/apiserver/server.key",
 		"--admission-control=NamespaceLifecycle",
-		fmt.Sprintf("--storage-backend=%s", storageProvider),
 		fmt.Sprintf("--advertise-address=%s", address),
 	}
 
