@@ -64,19 +64,19 @@ func getVolumeSource(spec *volume.Spec) (volumeSource *api.FlexVolumeSource, rea
 }
 
 func prepareForMount(mounter mount.Interface, deviceMountPath string) (bool, error) {
-	if _, err := os.Stat(deviceMountPath); os.IsNotExist(err) {
-		if err := os.MkdirAll(deviceMountPath, 0750); err != nil {
+
+	notMnt, err := mounter.IsLikelyNotMountPoint(deviceMountPath)
+	if err != nil {
+		if os.IsNotExist(err) {
+			if err := os.MkdirAll(deviceMountPath, 0750); err != nil {
+				return false, err
+			}
+			notMnt = true
+		} else {
 			return false, err
 		}
-		return false, nil
-	} else if err != nil {
-		glog.Errorf("Failed to stat %s: %v", deviceMountPath, err)
-		return false, err
 	}
-	notMnt, err := isNotMounted(mounter, deviceMountPath)
-	if err != nil {
-		return false, err
-	}
+
 	return !notMnt, nil
 }
 
@@ -98,14 +98,4 @@ func isNotMounted(mounter mount.Interface, deviceMountPath string) (bool, error)
 		return false, err
 	}
 	return notmnt, nil
-}
-
-// Unmount from the given path.
-// The caller is expected to have checked it is mounted before.
-func doUnmount(mounter mount.Interface, deviceMountPath string) error {
-	if err := mounter.Unmount(deviceMountPath); err != nil {
-		glog.Errorf("Failed to unmount volume: %s, error: %s", deviceMountPath, err.Error())
-		return err
-	}
-	return nil
 }

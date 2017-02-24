@@ -73,7 +73,6 @@ func (f *flexVolumeUnmounter) TearDownAt(dir string) error {
 	if pathExists, pathErr := util.PathExists(dir); pathErr != nil {
 		return fmt.Errorf("Error checking if path exists: %v", pathErr)
 	} else if !pathExists {
-		glog.Warningf("Warning: Unmount skipped because path does not exist: %v", dir)
 		return nil
 	}
 	return os.Remove(dir)

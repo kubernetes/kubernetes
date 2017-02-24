@@ -18,11 +18,12 @@ package flexvolume
 
 import (
 	"github.com/golang/glog"
+	"k8s.io/kubernetes/pkg/volume/util"
 )
 
 type unmounterDefaults flexVolumeUnmounter
 
 func (f *unmounterDefaults) TearDownAt(dir string) error {
-	glog.V(5).Infof(logPrefix(f.plugin), "using default TearDownAt for ", dir)
-	return doUnmount(f.mounter, dir)
+	glog.Warning(logPrefix(f.plugin), "using default TearDownAt for ", dir)
+	return util.UnmountPath(dir, f.mounter)
 }

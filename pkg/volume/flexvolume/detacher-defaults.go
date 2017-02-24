@@ -21,24 +21,25 @@ import (
 
 	"github.com/golang/glog"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/kubernetes/pkg/volume/util"
 )
 
 type detacherDefaults flexVolumeDetacher
 
 // Detach is part of the volume.Detacher interface.
 func (d *detacherDefaults) Detach(deviceName string, hostName types.NodeName) error {
-	glog.V(5).Infof(logPrefix(d.plugin), "using default Detach for device ", deviceName, ", host ", hostName)
+	glog.Warning(logPrefix(d.plugin), "using default Detach for device ", deviceName, ", host ", hostName)
 	return nil
 }
 
 // WaitForDetach is part of the volume.Detacher interface.
 func (d *detacherDefaults) WaitForDetach(devicePath string, timeout time.Duration) error {
-	glog.V(5).Infof(logPrefix(d.plugin), "using default WaitForDetach for device ", devicePath)
+	glog.Warning(logPrefix(d.plugin), "using default WaitForDetach for device ", devicePath)
 	return nil
 }
 
 // UnmountDevice is part of the volume.Detacher interface.
 func (d *detacherDefaults) UnmountDevice(deviceMountPath string) error {
-	glog.V(5).Infof(logPrefix(d.plugin), "using default UnmountDevice for device mount path ", deviceMountPath)
-	return doUnmount(d.plugin.host.GetMounter(), deviceMountPath)
+	glog.Warning(logPrefix(d.plugin), "using default UnmountDevice for device mount path ", deviceMountPath)
+	return util.UnmountPath(deviceMountPath, d.plugin.host.GetMounter())
 }

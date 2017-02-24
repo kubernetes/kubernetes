@@ -33,19 +33,19 @@ type attacherDefaults flexVolumeAttacher
 
 // Attach is part of the volume.Attacher interface
 func (a *attacherDefaults) Attach(spec *volume.Spec, hostName types.NodeName) (string, error) {
-	glog.V(5).Infof(logPrefix(a.plugin), "using default Attach for volume ", spec.Name, ", host ", hostName)
+	glog.Warning(logPrefix(a.plugin), "using default Attach for volume ", spec.Name, ", host ", hostName)
 	return "", nil
 }
 
 // WaitForAttach is part of the volume.Attacher interface
 func (a *attacherDefaults) WaitForAttach(spec *volume.Spec, devicePath string, timeout time.Duration) (string, error) {
-	glog.V(5).Infof(logPrefix(a.plugin), "using default WaitForAttach for volume ", spec.Name, ", device ", devicePath)
+	glog.Warning(logPrefix(a.plugin), "using default WaitForAttach for volume ", spec.Name, ", device ", devicePath)
 	return devicePath, nil
 }
 
 // GetDeviceMountPath is part of the volume.Attacher interface
 func (a *attacherDefaults) GetDeviceMountPath(spec *volume.Spec, mountsDir string) (string, error) {
-	glog.V(5).Infof(logPrefix(a.plugin), "using default GetDeviceMountPath for volume ", spec.Name)
+	glog.Warning(logPrefix(a.plugin), "using default GetDeviceMountPath for volume ", spec.Name, ", mountsDir ", mountsDir)
 	volumeName, err := a.plugin.GetVolumeName(spec)
 	if err != nil {
 		return "", fmt.Errorf("GetVolumeName failed from GetDeviceMountPath: %s", err)
@@ -56,7 +56,7 @@ func (a *attacherDefaults) GetDeviceMountPath(spec *volume.Spec, mountsDir strin
 
 // MountDevice is part of the volume.Attacher interface
 func (a *attacherDefaults) MountDevice(spec *volume.Spec, devicePath string, deviceMountPath string, mounter mount.Interface) error {
-	glog.V(5).Infof(logPrefix(a.plugin), "using default MountDevice for volume ", spec.Name, ", device ", devicePath)
+	glog.Warning(logPrefix(a.plugin), "using default MountDevice for volume ", spec.Name, ", device ", devicePath, ", deviceMountPath ", deviceMountPath)
 	volSource, readOnly := getVolumeSource(spec)
 
 	options := make([]string, 0)
