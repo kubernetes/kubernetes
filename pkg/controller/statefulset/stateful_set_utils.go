@@ -22,7 +22,6 @@ import (
 	"strconv"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/kubernetes/pkg/api/v1"
 	podapi "k8s.io/kubernetes/pkg/api/v1/pod"
 	apps "k8s.io/kubernetes/pkg/apis/apps/v1beta1"
@@ -232,16 +231,12 @@ func isHealthy(pod *v1.Pod) bool {
 	return isRunningAndReady(pod) && !isTerminated(pod)
 }
 
-func getSSKind() schema.GroupVersionKind {
-	return apps.SchemeGroupVersion.WithKind("StatefulSet")
-}
-
 // newControllerRef returns an ControllerRef pointing to a given StatefulSet.
 func newControllerRef(set *apps.StatefulSet) *metav1.OwnerReference {
 	isController := true
 	return &metav1.OwnerReference{
-		APIVersion: apps.SchemeGroupVersion.String(),
-		Kind:       "StatefulSet",
+		APIVersion: controllerKind.GroupVersion().String(),
+		Kind:       controllerKind.Kind,
 		Name:       set.Name,
 		UID:        set.UID,
 		Controller: &isController,
