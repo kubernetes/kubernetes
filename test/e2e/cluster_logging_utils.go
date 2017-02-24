@@ -17,7 +17,6 @@ limitations under the License.
 package e2e
 
 import (
-	"errors"
 	"fmt"
 	"strconv"
 	"strings"
@@ -64,6 +63,7 @@ type logEntry struct {
 }
 
 type logsProvider interface {
+	FluentdApplicationName() string
 	EnsureWorking() error
 	ReadEntries(*loggingPod) []*logEntry
 }
@@ -174,7 +174,7 @@ func waitForLogsIngestion(f *framework.Framework, config *loggingTestConfig) err
 			lostFraction*100, config.MaxAllowedLostFraction*100)
 	}
 
-	fluentdPods, err := getFluentdPods(f)
+	fluentdPods, err := getFluentdPods(f, config.LogsProvider.FluentdApplicationName())
 	if err != nil {
 		return fmt.Errorf("failed to get fluentd pods due to %v", err)
 	}
@@ -239,39 +239,8 @@ func getMissingLinesCount(logsProvider logsProvider, pod *loggingPod) (int, erro
 	return pod.ExpectedLinesNumber - len(pod.Occurrences), nil
 }
 
-func reportLogsFromFluentdPod(f *framework.Framework, pod *loggingPod) error {
-	synthLoggerPod, err := f.PodClient().Get(pod.Name, meta_v1.GetOptions{})
-	if err != nil {
-		return fmt.Errorf("failed to get synth logger pod due to %v", err)
-	}
-
-	synthLoggerNodeName := synthLoggerPod.Spec.NodeName
-	if synthLoggerNodeName == "" {
-		return errors.New("synthlogger pod is not assigned to the node")
-	}
-
-	fluentdPods, err := getFluentdPods(f)
-	if err != nil {
-		return fmt.Errorf("failed to get fluentd pods due to %v", err)
-	}
-
-	for _, fluentdPod := range fluentdPods.Items {
-		if fluentdPod.Spec.NodeName == synthLoggerNodeName {
-			containerName := fluentdPod.Spec.Containers[0].Name
-			logs, err := framework.GetPodLogs(f.ClientSet, meta_v1.NamespaceSystem, fluentdPod.Name, containerName)
-			if err != nil {
-				return fmt.Errorf("failed to get logs from fluentd pod %s due to %v", fluentdPod.Name, err)
-			}
-			framework.Logf("Logs from fluentd pod %s:\n%s", fluentdPod.Name, logs)
-			return nil
-		}
-	}
-
-	return fmt.Errorf("failed to find fluentd pod running on node %s", synthLoggerNodeName)
-}
-
-func getFluentdPods(f *framework.Framework) (*api_v1.PodList, error) {
-	label := labels.SelectorFromSet(labels.Set(map[string]string{"k8s-app": "fluentd-gcp"}))
+func getFluentdPods(f *framework.Framework, fluentdApplicationName string) (*api_v1.PodList, error) {
+	label := labels.SelectorFromSet(labels.Set(map[string]string{"k8s-app": fluentdApplicationName}))
 	options := meta_v1.ListOptions{LabelSelector: label.String()}
 	return f.ClientSet.Core().Pods(api.NamespaceSystem).List(options)
 }

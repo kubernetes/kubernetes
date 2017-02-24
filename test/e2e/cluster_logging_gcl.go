@@ -59,9 +59,5 @@ var _ = framework.KubeDescribe("Cluster level logging using GCL [Flaky]", func()
 		}
 		err = waitForLogsIngestion(f, config)
 		framework.ExpectNoError(err, "Failed to ingest logs")
-
-		if err != nil {
-			reportLogsFromFluentdPod(f, pod)
-		}
 	})
 })
