@@ -115,6 +115,5 @@ func (t *IngressUpgradeTest) verify(f *framework.Framework, done <-chan struct{}
 		<-done
 	}
 	By("hitting the Ingress IP " + t.ip)
-
 	framework.ExpectNoError(framework.PollURL(fmt.Sprintf("https://%v/", t.ip), "", framework.LoadBalancerPollTimeout, t.jig.PollInterval, t.httpClient, false))
 }

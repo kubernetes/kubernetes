@@ -48,7 +48,6 @@ go_library(
         "ha_master.go",
         "horizontal_pod_autoscaling.go",
         "ingress.go",
-        "ingress_utils.go",
         "initial_resources.go",
         "job.go",
         "kibana_logging.go",
