@@ -25,7 +25,6 @@ filegroup(
         "//cmd/hyperkube:all-srcs",
         "//cmd/kube-apiserver:all-srcs",
         "//cmd/kube-controller-manager:all-srcs",
-        "//cmd/kube-discovery:all-srcs",
         "//cmd/kube-proxy:all-srcs",
         "//cmd/kubeadm:all-srcs",
         "//cmd/kubectl:all-srcs",
