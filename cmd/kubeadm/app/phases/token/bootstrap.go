@@ -24,13 +24,17 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/pkg/api/v1"
+	"k8s.io/client-go/tools/clientcmd"
+	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
+	kubeconfigutil "k8s.io/kubernetes/cmd/kubeadm/app/util/kubeconfig"
 	tokenutil "k8s.io/kubernetes/cmd/kubeadm/app/util/token"
 	bootstrapapi "k8s.io/kubernetes/pkg/bootstrap/api"
 )
 
 const (
-	tokenCreateRetries = 5
+	tokenCreateRetries         = 5
+	bootstrapKubeConfigContext = "bootstrap-context"
 )
 
 // UpdateOrCreateToken attempts to update a token with the given ID, or create if it does
@@ -81,12 +85,55 @@ func UpdateOrCreateToken(client *clientset.Clientset, d *kubeadmapi.TokenDiscove
 	)
 }
 
+// CreateBootstrapConfigMap creates the public cluster-info ConfigMap
+func CreateBootstrapConfigMap(file string) error {
+	adminConfig, err := clientcmd.LoadFromFile(file)
+	if err != nil {
+		return fmt.Errorf("failed to load admin kubeconfig [%v]", err)
+	}
+	client, err := kubeconfigutil.KubeConfigToClientSet(adminConfig)
+	if err != nil {
+		return err
+	}
+
+	adminCluster := adminConfig.Contexts[adminConfig.CurrentContext].Cluster
+	// Copy the cluster from admin.conf to the bootstrap kubeconfig, contains the CA cert and the server URL
+	bootstrapConfig := &clientcmdapi.Config{
+		Clusters: map[string]*clientcmdapi.Cluster{
+			adminCluster: adminConfig.Clusters[adminCluster],
+		},
+		Contexts: map[string]*clientcmdapi.Context{
+			bootstrapKubeConfigContext: {
+				Cluster: adminCluster,
+			},
+		},
+		CurrentContext: bootstrapKubeConfigContext,
+	}
+	bootstrapBytes, err := clientcmd.Write(*bootstrapConfig)
+	if err != nil {
+		return err
+	}
+
+	bootstrapConfigMap := v1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{Name: bootstrapapi.ConfigMapClusterInfo},
+		Data: map[string]string{
+			bootstrapapi.KubeConfigKey: string(bootstrapBytes),
+		},
+	}
+
+	if _, err := client.CoreV1().ConfigMaps(metav1.NamespacePublic).Create(&bootstrapConfigMap); err != nil {
+		return err
+	}
+	return nil
+}
+
 // encodeTokenSecretData takes the token discovery object and an optional duration and returns the .Data for the Secret
 func encodeTokenSecretData(d *kubeadmapi.TokenDiscovery, duration time.Duration) map[string][]byte {
 	data := map[string][]byte{
-		bootstrapapi.BootstrapTokenIDKey:           []byte(d.ID),
-		bootstrapapi.BootstrapTokenSecretKey:       []byte(d.Secret),
-		bootstrapapi.BootstrapTokenUsageSigningKey: []byte("true"),
+		bootstrapapi.BootstrapTokenIDKey:               []byte(d.ID),
+		bootstrapapi.BootstrapTokenSecretKey:           []byte(d.Secret),
+		bootstrapapi.BootstrapTokenUsageSigningKey:     []byte("true"),
+		bootstrapapi.BootstrapTokenUsageAuthentication: []byte("true"),
 	}
 
 	if duration > 0 {

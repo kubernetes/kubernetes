@@ -69,14 +69,5 @@ func runTokenDiscovery(td *kubeadmapi.TokenDiscovery) (*clientcmdapi.Config, err
 		return nil, err
 	}
 
-	clusterInfo, err := kubenode.RetrieveTrustedClusterInfo(td)
-	if err != nil {
-		return nil, err
-	}
-
-	cfg, err := kubenode.EstablishMasterConnection(td, clusterInfo)
-	if err != nil {
-		return nil, err
-	}
-	return cfg, nil
+	return kubenode.RetrieveValidatedTokenKubeConfig(td), nil
 }

@@ -26,7 +26,6 @@ type EnvParams struct {
 	HostEtcdPath     string
 	HyperkubeImage   string
 	RepositoryPrefix string
-	DiscoveryImage   string
 	EtcdImage        string
 }
 

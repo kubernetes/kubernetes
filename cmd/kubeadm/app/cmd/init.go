@@ -202,20 +202,13 @@ func (i *Init) Run(out io.Writer) error {
 		return err
 	}
 
-	// TODO: It's not great to have an exception for token here, but necessary because the apiserver doesn't handle this properly in the API yet
-	// but relies on files on disk for now, which is daunting.
-	if i.cfg.Discovery.Token != nil {
-		if err := tokenphase.CreateTokenAuthFile(tokenutil.BearerToken(i.cfg.Discovery.Token)); err != nil {
-			return err
-		}
-	}
-
 	// PHASE 3: Bootstrap the control plane
 	if err := kubemaster.WriteStaticPodManifests(i.cfg); err != nil {
 		return err
 	}
 
-	client, err := kubemaster.CreateClientAndWaitForAPI(path.Join(kubeadmapi.GlobalEnvParams.KubernetesDir, kubeadmconstants.AdminKubeConfigFileName))
+	adminKubeConfigPath := path.Join(kubeadmapi.GlobalEnvParams.KubernetesDir, kubeadmconstants.AdminKubeConfigFileName)
+	client, err := kubemaster.CreateClientAndWaitForAPI(adminKubeConfigPath)
 	if err != nil {
 		return err
 	}
@@ -237,10 +230,10 @@ func (i *Init) Run(out io.Writer) error {
 	// PHASE 4: Set up the bootstrap tokens
 	if i.cfg.Discovery.Token != nil {
 		fmt.Printf("[token-discovery] Using token: %s\n", tokenutil.BearerToken(i.cfg.Discovery.Token))
-		if err := kubemaster.CreateDiscoveryDeploymentAndSecret(i.cfg, client); err != nil {
+		if err := tokenphase.UpdateOrCreateToken(client, i.cfg.Discovery.Token, kubeadmconstants.DefaultTokenDuration); err != nil {
 			return err
 		}
-		if err := tokenphase.UpdateOrCreateToken(client, i.cfg.Discovery.Token, kubeadmconstants.DefaultTokenDuration); err != nil {
+		if err := tokenphase.CreateBootstrapConfigMap(adminKubeConfigPath); err != nil {
 			return err
 		}
 	}

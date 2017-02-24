@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"os"
 	"path/filepath"
 
 	"github.com/renstrom/dedent"
@@ -135,7 +136,19 @@ func (j *Join) Run(out io.Writer) error {
 	if err != nil {
 		return err
 	}
-	if err := kubenode.PerformTLSBootstrap(cfg); err != nil {
+
+	hostname, err := os.Hostname()
+	if err != nil {
+		return err
+	}
+	client, err := kubeconfigutil.KubeConfigToClientSet(cfg)
+	if err != nil {
+		return err
+	}
+	if err := kubenode.ValidateAPIServer(client); err != nil {
+		return err
+	}
+	if err := kubenode.PerformTLSBootstrap(cfg, hostname); err != nil {
 		return err
 	}
 
