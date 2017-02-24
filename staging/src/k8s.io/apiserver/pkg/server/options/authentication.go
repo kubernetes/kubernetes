@@ -17,14 +17,19 @@ limitations under the License.
 package options
 
 import (
+	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"time"
 
+	"github.com/golang/glog"
 	"github.com/spf13/pflag"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apiserver/pkg/authentication/authenticatorfactory"
 	"k8s.io/apiserver/pkg/server"
 	authenticationclient "k8s.io/client-go/kubernetes/typed/authentication/v1beta1"
+	coreclient "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 )
@@ -98,6 +103,8 @@ type DelegatingAuthenticationOptions struct {
 
 	ClientCert    ClientCertAuthenticationOptions
 	RequestHeader RequestHeaderAuthenticationOptions
+
+	SkipInClusterLookup bool
 }
 
 func NewDelegatingAuthenticationOptions() *DelegatingAuthenticationOptions {
@@ -128,15 +135,28 @@ func (s *DelegatingAuthenticationOptions) AddFlags(fs *pflag.FlagSet) {
 
 	s.ClientCert.AddFlags(fs)
 	s.RequestHeader.AddFlags(fs)
+
+	fs.BoolVar(&s.SkipInClusterLookup, "authentication-skip-lookup", s.SkipInClusterLookup, ""+
+		"If false, the authentication-kubeconfig will be used to lookup missing authentication "+
+		"configuration from the cluster.")
+
 }
 
 func (s *DelegatingAuthenticationOptions) ApplyTo(c *server.Config) error {
-	var err error
-	c, err = c.ApplyClientCert(s.ClientCert.ClientCA)
+	clientCA, err := s.getClientCA()
+	if err != nil {
+		return err
+	}
+	c, err = c.ApplyClientCert(clientCA.ClientCA)
 	if err != nil {
 		return fmt.Errorf("unable to load client CA file: %v", err)
 	}
-	c, err = c.ApplyClientCert(s.RequestHeader.ClientCAFile)
+
+	requestHeader, err := s.getRequestHeader()
+	if err != nil {
+		return err
+	}
+	c, err = c.ApplyClientCert(requestHeader.ClientCAFile)
 	if err != nil {
 		return fmt.Errorf("unable to load client CA file: %v", err)
 	}
@@ -165,17 +185,139 @@ func (s *DelegatingAuthenticationOptions) ToAuthenticationConfig() (authenticato
 		return authenticatorfactory.DelegatingAuthenticatorConfig{}, err
 	}
 
+	clientCA, err := s.getClientCA()
+	if err != nil {
+		return authenticatorfactory.DelegatingAuthenticatorConfig{}, err
+	}
+	requestHeader, err := s.getRequestHeader()
+	if err != nil {
+		return authenticatorfactory.DelegatingAuthenticatorConfig{}, err
+	}
+
 	ret := authenticatorfactory.DelegatingAuthenticatorConfig{
 		Anonymous:               true,
 		TokenAccessReviewClient: tokenClient,
 		CacheTTL:                s.CacheTTL,
-		ClientCAFile:            s.ClientCert.ClientCA,
-		RequestHeaderConfig:     s.RequestHeader.ToAuthenticationRequestHeaderConfig(),
+		ClientCAFile:            clientCA.ClientCA,
+		RequestHeaderConfig:     requestHeader.ToAuthenticationRequestHeaderConfig(),
 	}
 	return ret, nil
 }
 
-func (s *DelegatingAuthenticationOptions) newTokenAccessReview() (authenticationclient.TokenReviewInterface, error) {
+func (s *DelegatingAuthenticationOptions) getClientCA() (*ClientCertAuthenticationOptions, error) {
+	if len(s.ClientCert.ClientCA) > 0 || s.SkipInClusterLookup {
+		return &s.ClientCert, nil
+	}
+
+	incluster, err := s.lookupInClusterClientCA()
+	if err != nil {
+		// don't fail, maybe they're doing something really weird
+		glog.Warningf("Unable to look kube-system/extension-apiserver-authentication.  Usually fixed by " +
+			"'kubectl create rolebinding -n kube-system ROLE_NAME --role=extension-apiserver-authentication-reader --serviceaccount=YOUR_NS:YOUR_SA'")
+		return nil, err
+	}
+	if incluster == nil {
+		return nil, fmt.Errorf("cluster doesn't provide client-ca-file")
+	}
+	return incluster, nil
+}
+
+func (s *DelegatingAuthenticationOptions) getRequestHeader() (*RequestHeaderAuthenticationOptions, error) {
+	if len(s.RequestHeader.ClientCAFile) > 0 || s.SkipInClusterLookup {
+		return &s.RequestHeader, nil
+	}
+
+	incluster, err := s.lookupInClusterRequestHeader()
+	if err != nil {
+		// don't fail, maybe they're doing something really weird
+		glog.Warningf("Unable to look kube-system/extension-apiserver-authentication.  Usually fixed by " +
+			"'kubectl create rolebinding -n kube-system ROLE_NAME --role=extension-apiserver-authentication-reader --serviceaccount=YOUR_NS:YOUR_SA'")
+		return nil, err
+	}
+	if incluster == nil {
+		return nil, fmt.Errorf("cluster doesn't provide requestheader-client-ca-file")
+	}
+	return incluster, nil
+}
+
+func (s *DelegatingAuthenticationOptions) lookupInClusterClientCA() (*ClientCertAuthenticationOptions, error) {
+	clientConfig, err := s.getClientConfig()
+	if err != nil {
+		return nil, err
+	}
+	client, err := coreclient.NewForConfig(clientConfig)
+	if err != nil {
+		return nil, err
+	}
+
+	authConfigMap, err := client.ConfigMaps(metav1.NamespaceSystem).Get("extension-apiserver-authentication", metav1.GetOptions{})
+	if err != nil {
+		return nil, err
+	}
+
+	clientCA, ok := authConfigMap.Data["client-ca-file"]
+	if !ok {
+		return nil, nil
+	}
+
+	f, err := ioutil.TempFile("", "client-ca-file")
+	if err != nil {
+		return nil, err
+	}
+	if err := ioutil.WriteFile(f.Name(), []byte(clientCA), 0600); err != nil {
+		return nil, err
+	}
+	return &ClientCertAuthenticationOptions{ClientCA: f.Name()}, nil
+}
+
+func (s *DelegatingAuthenticationOptions) lookupInClusterRequestHeader() (*RequestHeaderAuthenticationOptions, error) {
+	clientConfig, err := s.getClientConfig()
+	if err != nil {
+		return nil, err
+	}
+	client, err := coreclient.NewForConfig(clientConfig)
+	if err != nil {
+		return nil, err
+	}
+
+	authConfigMap, err := client.ConfigMaps(metav1.NamespaceSystem).Get("extension-apiserver-authentication", metav1.GetOptions{})
+	if err != nil {
+		return nil, err
+	}
+
+	requestHeaderCA, ok := authConfigMap.Data["requestheader-client-ca-file"]
+	if !ok {
+		return nil, nil
+	}
+
+	f, err := ioutil.TempFile("", "requestheader-client-ca-file")
+	if err != nil {
+		return nil, err
+	}
+	if err := ioutil.WriteFile(f.Name(), []byte(requestHeaderCA), 0600); err != nil {
+		return nil, err
+	}
+	return &RequestHeaderAuthenticationOptions{
+		UsernameHeaders:     deserializeStrings(authConfigMap.Data["requestheader-username-headers"]),
+		GroupHeaders:        deserializeStrings(authConfigMap.Data["requestheader-group-headers"]),
+		ExtraHeaderPrefixes: deserializeStrings(authConfigMap.Data["requestheader-extra-headers-prefix"]),
+		ClientCAFile:        f.Name(),
+		AllowedNames:        deserializeStrings(authConfigMap.Data["requestheader-allowed-names"]),
+	}, nil
+}
+
+func deserializeStrings(in string) []string {
+	if len(in) == 0 {
+		return nil
+	}
+	var ret []string
+	if err := json.Unmarshal([]byte(in), &ret); err != nil {
+		return nil
+	}
+	return ret
+}
+
+func (s *DelegatingAuthenticationOptions) getClientConfig() (*rest.Config, error) {
 	var clientConfig *rest.Config
 	var err error
 	if len(s.RemoteKubeConfigFile) > 0 {
@@ -197,6 +339,14 @@ func (s *DelegatingAuthenticationOptions) newTokenAccessReview() (authentication
 	clientConfig.QPS = 200
 	clientConfig.Burst = 400
 
+	return clientConfig, nil
+}
+
+func (s *DelegatingAuthenticationOptions) newTokenAccessReview() (authenticationclient.TokenReviewInterface, error) {
+	clientConfig, err := s.getClientConfig()
+	if err != nil {
+		return nil, err
+	}
 	client, err := authenticationclient.NewForConfig(clientConfig)
 	if err != nil {
 		return nil, err

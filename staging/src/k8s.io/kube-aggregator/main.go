@@ -18,6 +18,7 @@ package main
 
 import (
 	"flag"
+	"fmt"
 	"os"
 	"runtime"
 
@@ -33,6 +34,7 @@ import (
 )
 
 func main() {
+	fmt.Printf("#### 0a\n")
 	logs.InitLogs()
 	defer logs.FlushLogs()
 
@@ -40,9 +42,12 @@ func main() {
 		runtime.GOMAXPROCS(runtime.NumCPU())
 	}
 
+	fmt.Printf("#### 0b\n")
 	cmd := server.NewCommandStartAggregator(os.Stdout, os.Stderr)
 	cmd.Flags().AddGoFlagSet(flag.CommandLine)
 	if err := cmd.Execute(); err != nil {
+		fmt.Printf("#### 0c\n")
 		panic(err)
 	}
+	fmt.Printf("#### 0d\n")
 }
