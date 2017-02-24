@@ -22,6 +22,7 @@ import (
 	"os"
 	"path"
 	"regexp"
+	"strconv"
 	"sync"
 
 	"github.com/golang/glog"
@@ -31,6 +32,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/kubelet/dockertools"
 	"k8s.io/kubernetes/pkg/kubelet/gpu"
+	"k8s.io/kubernetes/pkg/kubelet/gpu/nvidia/nvml"
 )
 
 // TODO: rework to use Nvidia's NVML, which is more complex, but also provides more fine-grained information and stats.
@@ -42,6 +44,7 @@ const (
 	// Optional device.
 	nvidiaUVMToolsDevice string = "/dev/nvidia-uvm-tools"
 	devDirectory                = "/dev"
+	devDirectoryPrefix          = "/dev/nvidia"
 	nvidiaDeviceRE              = `^nvidia[0-9]*$`
 	nvidiaFullpathRE            = `^/dev/nvidia[0-9]*$`
 )
@@ -62,6 +65,7 @@ type nvidiaGPUManager struct {
 	// TODO: Should make this independent of Docker in the future.
 	dockerClient     dockertools.DockerInterface
 	activePodsLister activePodsLister
+	nvmlWrapper      nvml.Nvml
 }
 
 // NewNvidiaGPUManager returns a GPUManager that manages local Nvidia GPUs.
@@ -70,10 +74,17 @@ func NewNvidiaGPUManager(activePodsLister activePodsLister, dockerClient dockert
 	if dockerClient == nil {
 		return nil, fmt.Errorf("invalid docker client specified")
 	}
+
+	nvmlWrapper := nvml.NewNvmlWrapper()
+	if err := nvmlWrapper.NvmlInit(); err != nil {
+		return nil, fmt.Errorf("NVML initialization failed.")
+	}
+
 	return &nvidiaGPUManager{
 		allGPUs:          sets.NewString(),
 		dockerClient:     dockerClient,
 		activePodsLister: activePodsLister,
+		nvmlWrapper:      nvmlWrapper,
 	}, nil
 }
 
@@ -98,7 +109,7 @@ func (ngm *nvidiaGPUManager) Start() error {
 		ngm.defaultDevices = append(ngm.defaultDevices, nvidiaUVMToolsDevice)
 	}
 
-	if err := ngm.discoverGPUs(); err != nil {
+	if err := ngm.discoverGPUsByNVML(); err != nil {
 		return err
 	}
 	// It's possible that the runtime isn't available now.
@@ -210,6 +221,26 @@ func (ngm *nvidiaGPUManager) discoverGPUs() error {
 		if reg.MatchString(f.Name()) {
 			glog.V(2).Infof("Found Nvidia GPU %q", f.Name())
 			ngm.allGPUs.Insert(path.Join(devDirectory, f.Name()))
+		}
+	}
+
+	return nil
+}
+
+// As the above shows, added the NVML support.
+func (ngm *nvidiaGPUManager) discoverGPUsByNVML() error {
+	if ngm.nvmlWrapper == nil {
+		return fmt.Errorf("NVML warpper is nil!")
+	}
+	count, err := ngm.nvmlWrapper.NvmlGetDeviceCount()
+	if err != nil {
+		return fmt.Errorf("Get GPU counts error:%q", err)
+	}
+	for id := uint(0); id < count; id++ {
+		if minor, err := ngm.nvmlWrapper.NvmlGetDeviceMinorByIdx(id); err != nil {
+			return fmt.Errorf("Get GPU minor<%d> error:%q", id, err)
+		} else {
+			ngm.allGPUs.Insert(devDirectoryPrefix + strconv.Itoa(minor))
 		}
 	}
 
