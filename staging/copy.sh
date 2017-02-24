@@ -120,6 +120,12 @@ find "${MAIN_REPO}/pkg/version" -maxdepth 1 -type f | xargs -I{} cp {} "${CLIENT
 mkcp "pkg/client/clientset_generated/${CLIENTSET}" "pkg/client/clientset_generated"
 mkcp "pkg/client/informers/informers_generated/externalversions" "pkg/client/informers/informers_generated"
 
+# safety check that we don't have another apimachinery in the GOPATH
+if go list -f '{{.Dir}}' k8s.io/apimachinery/pkg/runtime &>/dev/null; then
+    echo "ERROR: unexpected k8s.io/apimachinery in GOPATH '$GOPATH'" 1>&2
+    exit 1
+fi
+
 pushd "${CLIENT_REPO_TEMP}" > /dev/null
 echo "generating vendor/"
 # client-go depends on some apimachinery packages. Adding staging/ to the GOPATH
