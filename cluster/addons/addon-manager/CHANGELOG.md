@@ -1,3 +1,7 @@
+### Version 6.4-alpha.3 (Thu February 23 2017 Zihong Zheng <zihongz@google.com>)
+ - Update kubectl to HEAD (GitCommit:"17375fc59fff39135af63bd1750bb07c36ef873b")
+   for supporting taints/tolerations api fields.
+
 ### Version 6.4-alpha.2 (Wed February 16 2017 Zihong Zheng <zihongz@google.com>)
  - Update kubectl to v1.6.0-alpha.2 to use HPA in autoscaling/v1 instead of extensions/v1beta1.
 
