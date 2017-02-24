@@ -243,28 +243,28 @@ func ExtractContainerResourceValue(fs *ResourceFieldSelector, container *Contain
 
 	switch fs.Resource {
 	case "limits.cpu":
-		return ConvertResourceCPUToString(container.Resources.Limits.Cpu(), divisor)
+		return convertResourceCPUToString(container.Resources.Limits.Cpu(), divisor)
 	case "limits.memory":
-		return ConvertResourceMemoryToString(container.Resources.Limits.Memory(), divisor)
+		return convertResourceMemoryToString(container.Resources.Limits.Memory(), divisor)
 	case "requests.cpu":
-		return ConvertResourceCPUToString(container.Resources.Requests.Cpu(), divisor)
+		return convertResourceCPUToString(container.Resources.Requests.Cpu(), divisor)
 	case "requests.memory":
-		return ConvertResourceMemoryToString(container.Resources.Requests.Memory(), divisor)
+		return convertResourceMemoryToString(container.Resources.Requests.Memory(), divisor)
 	}
 
 	return "", fmt.Errorf("unsupported container resource : %v", fs.Resource)
 }
 
-// ConvertResourceCPUToString converts cpu value to the format of divisor and returns
+// convertResourceCPUToString converts cpu value to the format of divisor and returns
 // ceiling of the value.
-func ConvertResourceCPUToString(cpu *resource.Quantity, divisor resource.Quantity) (string, error) {
+func convertResourceCPUToString(cpu *resource.Quantity, divisor resource.Quantity) (string, error) {
 	c := int64(math.Ceil(float64(cpu.MilliValue()) / float64(divisor.MilliValue())))
 	return strconv.FormatInt(c, 10), nil
 }
 
-// ConvertResourceMemoryToString converts memory value to the format of divisor and returns
+// convertResourceMemoryToString converts memory value to the format of divisor and returns
 // ceiling of the value.
-func ConvertResourceMemoryToString(memory *resource.Quantity, divisor resource.Quantity) (string, error) {
+func convertResourceMemoryToString(memory *resource.Quantity, divisor resource.Quantity) (string, error) {
 	m := int64(math.Ceil(float64(memory.Value()) / float64(divisor.Value())))
 	return strconv.FormatInt(m, 10), nil
 }
