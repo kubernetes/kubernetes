@@ -107,6 +107,9 @@ federation/deploy/config.json.sample:      "cluster_cidr": "10.188.0.0/14",
 federation/deploy/config.json.sample:      "cluster_name": "cluster1-kubernetes",
 federation/deploy/config.json.sample:      "cluster_name": "cluster2-kubernetes",
 federation/deploy/config.json.sample:      "cluster_name": "cluster3-kubernetes",
+federation/deploy/config.json.sample:      "kubernetes_version": "v1.4.0"
+federation/deploy/config.json.sample:      "kubernetes_version": "v1.4.0"
+federation/deploy/config.json.sample:      "kubernetes_version": "v1.4.0"
 federation/deploy/config.json.sample:      "num_nodes": 3,
 federation/deploy/config.json.sample:      "num_nodes": 3,
 federation/deploy/config.json.sample:      "num_nodes": 3,
