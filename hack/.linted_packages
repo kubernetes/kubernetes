@@ -263,6 +263,8 @@ plugin/pkg/admission/gc
 plugin/pkg/admission/imagepolicy
 plugin/pkg/admission/namespace/autoprovision
 plugin/pkg/admission/namespace/exists
+plugin/pkg/admission/podplacementrestriction/apis/podplacementrestriction/install
+plugin/pkg/admission/podplacementrestriction/apis/podplacementrestriction/validation
 plugin/pkg/admission/resourcequota/apis/resourcequota/install
 plugin/pkg/admission/resourcequota/apis/resourcequota/validation
 plugin/pkg/admission/securitycontext/scdeny
