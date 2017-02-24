@@ -99,6 +99,7 @@ pushd "${_kubetmp}" 2>&1 > /dev/null
   pin-godep 'v74'
   "${GODEP}" version
 
+  export GOPATH="${GOPATH}:${_kubetmp}/staging"
   # Fill out that nice clean place with the kube godeps
   echo "Starting to download all kubernetes godeps. This takes a while"
   "${GODEP}" restore
