@@ -121,6 +121,12 @@ func (u *unjoinFederation) Run(f cmdutil.Factory, cmdOut, cmdErr io.Writer, conf
 		}
 	}
 
+	// Delete the federation namespace in the unjoining cluster.
+	err = deleteFederationNamespaceFromCluster(cluster, secret, u.commonOptions.FederationSystemNamespace)
+	if err != nil {
+		return err
+	}
+
 	_, err = fmt.Fprintf(cmdOut, "Successfully removed cluster %q from federation\n", u.commonOptions.Name)
 	return err
 }
@@ -253,4 +259,16 @@ func removeConfigMapString(str string, toRemove string) string {
 		}
 	}
 	return strings.Join(values, ",")
+}
+
+// deleteFederationNamespaceFromCluster removes the federation system namespace from the
+// cluster that is leaving the federation.
+func deleteFederationNamespaceFromCluster(cluster *federationapi.Cluster, secret *api.Secret, fedSystemNamespace string) error {
+	clientset, err := getClientsetFromCluster(secret, cluster)
+	if err != nil {
+		return err
+	}
+
+	orphanDependents := false
+	return clientset.Core().Namespaces().Delete(fedSystemNamespace, &metav1.DeleteOptions{OrphanDependents: &orphanDependents})
 }

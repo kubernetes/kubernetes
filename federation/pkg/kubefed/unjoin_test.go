@@ -121,7 +121,7 @@ func TestUnjoinFederation(t *testing.T) {
 			expectedServer:     "https://10.20.30.40",
 			expectedErr:        fmt.Sprintf("WARNING: secret %q not found in the host cluster, so it couldn't be deleted", "noexist"),
 		},
-		// TODO: Figure out a way to test the scenarios of configmap deletion
+		// TODO: Figure out a way to test the scenarios of configmap and namespace deletion
 		// As of now we delete the config map after deriving the clientset using
 		// the cluster object we retrieved from the federation server and the
 		// secret object retrieved from the base cluster.
