@@ -810,8 +810,8 @@ func TestInsufficientCapacityNodeDaemonLaunchesCriticalPod(t *testing.T) {
 	syncAndValidateDaemonSets(t, manager, ds, podControl, 1, 0)
 }
 
-// DaemonSets should launch a critical pod even when there are port conflicts.
-func TestPortConflictNodeDaemonLaunchesCriticalPod(t *testing.T) {
+// DaemonSets should NOT launch a critical pod when there are port conflicts.
+func TestPortConflictNodeDaemonDoesNotLaunchCriticalPod(t *testing.T) {
 	podSpec := v1.PodSpec{
 		NodeName: "port-conflict",
 		Containers: []v1.Container{{
@@ -827,17 +827,12 @@ func TestPortConflictNodeDaemonLaunchesCriticalPod(t *testing.T) {
 		Spec: podSpec,
 	})
 
-	// Without enabling critical pod annotation feature gate, we shouldn't create critical pod
-	utilfeature.DefaultFeatureGate.Set("ExperimentalCriticalPodAnnotation=False")
+	utilfeature.DefaultFeatureGate.Set("ExperimentalCriticalPodAnnotation=True")
 	ds := newDaemonSet("critical")
 	ds.Spec.Template.Spec = podSpec
 	setDaemonSetCritical(ds)
 	manager.dsStore.Add(ds)
 	syncAndValidateDaemonSets(t, manager, ds, podControl, 0, 0)
-
-	// Enabling critical pod annotation feature gate should create critical pod
-	utilfeature.DefaultFeatureGate.Set("ExperimentalCriticalPodAnnotation=True")
-	syncAndValidateDaemonSets(t, manager, ds, podControl, 1, 0)
 }
 
 func setDaemonSetCritical(ds *extensions.DaemonSet) {

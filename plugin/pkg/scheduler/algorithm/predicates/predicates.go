@@ -876,7 +876,13 @@ func noncriticalPredicates(pod *v1.Pod, meta interface{}, nodeInfo *schedulercac
 		predicateFails = append(predicateFails, reasons...)
 	}
 
-	fit, reasons, err = PodFitsHost(pod, meta, nodeInfo)
+	return len(predicateFails) == 0, predicateFails, nil
+}
+
+// EssentialPredicates are the predicates that all pods, including critical pods, need
+func EssentialPredicates(pod *v1.Pod, meta interface{}, nodeInfo *schedulercache.NodeInfo) (bool, []algorithm.PredicateFailureReason, error) {
+	var predicateFails []algorithm.PredicateFailureReason
+	fit, reasons, err := PodFitsHost(pod, meta, nodeInfo)
 	if err != nil {
 		return false, predicateFails, err
 	}
@@ -884,6 +890,8 @@ func noncriticalPredicates(pod *v1.Pod, meta interface{}, nodeInfo *schedulercac
 		predicateFails = append(predicateFails, reasons...)
 	}
 
+	// TODO: PodFitsHostPorts is essential for now, but kubelet should ideally
+	//       preempt pods to free up host ports too
 	fit, reasons, err = PodFitsHostPorts(pod, meta, nodeInfo)
 	if err != nil {
 		return false, predicateFails, err
@@ -892,13 +900,7 @@ func noncriticalPredicates(pod *v1.Pod, meta interface{}, nodeInfo *schedulercac
 		predicateFails = append(predicateFails, reasons...)
 	}
 
-	return len(predicateFails) == 0, predicateFails, nil
-}
-
-// EssentialPredicates are the predicates that all pods, including critical pods, need
-func EssentialPredicates(pod *v1.Pod, meta interface{}, nodeInfo *schedulercache.NodeInfo) (bool, []algorithm.PredicateFailureReason, error) {
-	var predicateFails []algorithm.PredicateFailureReason
-	fit, reasons, err := PodSelectorMatches(pod, meta, nodeInfo)
+	fit, reasons, err = PodSelectorMatches(pod, meta, nodeInfo)
 	if err != nil {
 		return false, predicateFails, err
 	}

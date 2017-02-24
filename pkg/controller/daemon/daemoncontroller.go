@@ -752,6 +752,8 @@ func (dsc *DaemonSetsController) nodeShouldRunDaemonPod(node *v1.Node, ds *exten
 		if critical {
 			break
 		}
+		// TODO: There are other node status that the DaemonSet should ideally respect too,
+		//       e.g. MemoryPressure, and DiskPressure
 		if c.Type == v1.NodeOutOfDisk && c.Status == v1.ConditionTrue {
 			// the kubelet will evict this pod if it needs to. Let kubelet
 			// decide whether to continue running this pod so leave shouldContinueRunning
