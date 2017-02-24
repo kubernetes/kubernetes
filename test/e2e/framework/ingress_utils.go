@@ -31,15 +31,11 @@ import (
 	"math/big"
 	"net"
 	"net/http"
-	"os"
 	"os/exec"
 	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
-
-	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/v1"
 
 	compute "google.golang.org/api/compute/v1"
 	"google.golang.org/api/googleapi"
@@ -51,9 +47,12 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	utilyaml "k8s.io/apimachinery/pkg/util/yaml"
+	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/v1"
 	extensions "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	gcecloud "k8s.io/kubernetes/pkg/cloudprovider/providers/gce"
+	"k8s.io/kubernetes/pkg/util"
 	utilexec "k8s.io/kubernetes/pkg/util/exec"
 	testutils "k8s.io/kubernetes/test/utils"
 
@@ -79,7 +78,7 @@ const (
 	// Name of the default http backend service
 	defaultBackendName = "default-http-backend"
 
-	// IP src range from which the GCE L7 performs health checks.
+	// GCEL7SrcRange is the IP src range from which the GCE L7 performs health checks.
 	GCEL7SrcRange = "130.211.0.0/22"
 
 	// Cloud resources created by the ingress controller older than this
@@ -87,10 +86,10 @@ const (
 	// TODO(37335): write soak tests and bump this up to a week.
 	maxAge = -48 * time.Hour
 
-	// parent path to yaml test manifests.
+	// IngressManifestPath is the parent path to yaml test manifests.
 	IngressManifestPath = "test/e2e/testing-manifests/ingress"
 
-	// timeout on a single http request.
+	// IngressReqTimeout is the timeout on a single http request.
 	IngressReqTimeout = 10 * time.Second
 
 	// healthz port used to verify glbc restarted correctly on the master.
@@ -108,6 +107,7 @@ const (
 	nameLenLimit = 62
 )
 
+// IngressTestJig holds the relevant state and parameters of the ingress test.
 type IngressTestJig struct {
 	Client  clientset.Interface
 	RootCAs map[string][]byte
@@ -122,12 +122,16 @@ type IngressTestJig struct {
 	PollInterval time.Duration
 }
 
+// IngressConformanceTests contains a closure with an entry and exit log line.
 type IngressConformanceTests struct {
 	EntryLog string
 	Execute  func()
 	ExitLog  string
 }
 
+// CreateIngressComformanceTests generates an slice of sequential test cases:
+// a simple http ingress, ingress with HTTPS, ingress HTTPS with a modified hostname,
+// ingress https with a modified URLMap
 func CreateIngressComformanceTests(jig *IngressTestJig, ns string) []IngressConformanceTests {
 	manifestPath := filepath.Join(IngressManifestPath, "http")
 	// These constants match the manifests used in IngressManifestPath
@@ -267,13 +271,13 @@ func generateRSACerts(host string, isCA bool, keyOut, certOut io.Writer) error {
 	return nil
 }
 
-// buildTransport creates a transport for use in executing HTTPS requests with
+// buildTransportWithCA creates a transport for use in executing HTTPS requests with
 // the given certs. Note that the given rootCA must be configured with isCA=true.
-func buildTransport(serverName string, rootCA []byte) (*http.Transport, error) {
+func buildTransportWithCA(serverName string, rootCA []byte) (*http.Transport, error) {
 	pool := x509.NewCertPool()
 	ok := pool.AppendCertsFromPEM(rootCA)
 	if !ok {
-		return nil, fmt.Errorf("Unable to load serverCA.")
+		return nil, fmt.Errorf("Unable to load serverCA")
 	}
 	return utilnet.SetTransportDefaults(&http.Transport{
 		TLSClientConfig: &tls.Config{
@@ -290,10 +294,10 @@ func BuildInsecureClient(timeout time.Duration) *http.Client {
 	return &http.Client{Timeout: timeout, Transport: utilnet.SetTransportDefaults(t)}
 }
 
-// createSecret creates a secret containing TLS certificates for the given Ingress.
-// If a secret with the same name already exists in the namespace of the
+// createIngressTLSSecret creates a secret containing TLS certificates for the given Ingress.
+// If a secret with the same name already pathExists in the namespace of the
 // Ingress, it's updated.
-func createSecret(kubeClient clientset.Interface, ing *extensions.Ingress) (host string, rootCA, privKey []byte, err error) {
+func createIngressTLSSecret(kubeClient clientset.Interface, ing *extensions.Ingress) (host string, rootCA, privKey []byte, err error) {
 	var k, c bytes.Buffer
 	tls := ing.Spec.TLS[0]
 	host = strings.Join(tls.Hosts, ",")
@@ -326,7 +330,9 @@ func createSecret(kubeClient clientset.Interface, ing *extensions.Ingress) (host
 	return host, cert, key, err
 }
 
-func CleanupGCE(gceController *GCEIngressController) {
+// CleanupGCEIngressController calls the GCEIngressController.Cleanup(false)
+// followed with deleting the static ip, and then a final GCEIngressController.Cleanup(true)
+func CleanupGCEIngressController(gceController *GCEIngressController) {
 	pollErr := wait.Poll(5*time.Second, LoadBalancerCleanupTimeout, func() (bool, error) {
 		if err := gceController.Cleanup(false); err != nil {
 			Logf("Still waiting for glbc to cleanup:\n%v", err)
@@ -369,7 +375,7 @@ func (cont *GCEIngressController) deleteForwardingRule(del bool) string {
 	msg := ""
 	fwList := []compute.ForwardingRule{}
 	for _, regex := range []string{fmt.Sprintf("%vfw-.*%v.*", k8sPrefix, clusterDelimiter), fmt.Sprintf("%vfws-.*%v.*", k8sPrefix, clusterDelimiter)} {
-		gcloudList("forwarding-rules", regex, cont.Cloud.ProjectID, &fwList)
+		gcloudComputeResourceList("forwarding-rules", regex, cont.Cloud.ProjectID, &fwList)
 		if len(fwList) == 0 {
 			continue
 		}
@@ -379,7 +385,7 @@ func (cont *GCEIngressController) deleteForwardingRule(del bool) string {
 			}
 			msg += fmt.Sprintf("%v (forwarding rule)\n", f.Name)
 			if del {
-				GcloudDelete("forwarding-rules", f.Name, cont.Cloud.ProjectID, "--global")
+				GcloudComputeResourceDelete("forwarding-rules", f.Name, cont.Cloud.ProjectID, "--global")
 			}
 		}
 	}
@@ -390,7 +396,7 @@ func (cont *GCEIngressController) deleteAddresses(del bool) string {
 	msg := ""
 	ipList := []compute.Address{}
 	regex := fmt.Sprintf("%vfw-.*%v.*", k8sPrefix, clusterDelimiter)
-	gcloudList("addresses", regex, cont.Cloud.ProjectID, &ipList)
+	gcloudComputeResourceList("addresses", regex, cont.Cloud.ProjectID, &ipList)
 	if len(ipList) != 0 {
 		for _, ip := range ipList {
 			if !cont.canDelete(ip.Name, ip.CreationTimestamp, del) {
@@ -398,7 +404,7 @@ func (cont *GCEIngressController) deleteAddresses(del bool) string {
 			}
 			msg += fmt.Sprintf("%v (static-ip)\n", ip.Name)
 			if del {
-				GcloudDelete("addresses", ip.Name, cont.Cloud.ProjectID, "--global")
+				GcloudComputeResourceDelete("addresses", ip.Name, cont.Cloud.ProjectID, "--global")
 			}
 		}
 	}
@@ -409,7 +415,7 @@ func (cont *GCEIngressController) deleteTargetProxy(del bool) string {
 	msg := ""
 	tpList := []compute.TargetHttpProxy{}
 	regex := fmt.Sprintf("%vtp-.*%v.*", k8sPrefix, clusterDelimiter)
-	gcloudList("target-http-proxies", regex, cont.Cloud.ProjectID, &tpList)
+	gcloudComputeResourceList("target-http-proxies", regex, cont.Cloud.ProjectID, &tpList)
 	if len(tpList) != 0 {
 		for _, t := range tpList {
 			if !cont.canDelete(t.Name, t.CreationTimestamp, del) {
@@ -417,13 +423,13 @@ func (cont *GCEIngressController) deleteTargetProxy(del bool) string {
 			}
 			msg += fmt.Sprintf("%v (target-http-proxy)\n", t.Name)
 			if del {
-				GcloudDelete("target-http-proxies", t.Name, cont.Cloud.ProjectID)
+				GcloudComputeResourceDelete("target-http-proxies", t.Name, cont.Cloud.ProjectID)
 			}
 		}
 	}
 	tpsList := []compute.TargetHttpsProxy{}
 	regex = fmt.Sprintf("%vtps-.*%v.*", k8sPrefix, clusterDelimiter)
-	gcloudList("target-https-proxies", regex, cont.Cloud.ProjectID, &tpsList)
+	gcloudComputeResourceList("target-https-proxies", regex, cont.Cloud.ProjectID, &tpsList)
 	if len(tpsList) != 0 {
 		for _, t := range tpsList {
 			if !cont.canDelete(t.Name, t.CreationTimestamp, del) {
@@ -431,14 +437,14 @@ func (cont *GCEIngressController) deleteTargetProxy(del bool) string {
 			}
 			msg += fmt.Sprintf("%v (target-https-proxy)\n", t.Name)
 			if del {
-				GcloudDelete("target-https-proxies", t.Name, cont.Cloud.ProjectID)
+				GcloudComputeResourceDelete("target-https-proxies", t.Name, cont.Cloud.ProjectID)
 			}
 		}
 	}
 	return msg
 }
 
-func (cont *GCEIngressController) deleteUrlMap(del bool) (msg string) {
+func (cont *GCEIngressController) deleteURLMap(del bool) (msg string) {
 	gceCloud := cont.Cloud.Provider.(*gcecloud.GCECloud)
 	umList, err := gceCloud.ListUrlMaps()
 	if err != nil {
@@ -493,7 +499,7 @@ func (cont *GCEIngressController) deleteBackendService(del bool) (msg string) {
 	return msg
 }
 
-func (cont *GCEIngressController) deleteHttpHealthCheck(del bool) (msg string) {
+func (cont *GCEIngressController) deleteHTTPHealthCheck(del bool) (msg string) {
 	gceCloud := cont.Cloud.Provider.(*gcecloud.GCECloud)
 	hcList, err := gceCloud.ListHttpHealthChecks()
 	if err != nil {
@@ -603,10 +609,12 @@ func (cont *GCEIngressController) canDelete(resourceName, creationTimestamp stri
 	return false
 }
 
+// GetFirewallRuleName returns the name of the firewall used for the GCEIngressController.
 func (cont *GCEIngressController) GetFirewallRuleName() string {
 	return fmt.Sprintf("%vfw-l7%v%v", k8sPrefix, clusterDelimiter, cont.UID)
 }
 
+// GetFirewallRule returns the firewall used by the GCEIngressController.
 func (cont *GCEIngressController) GetFirewallRule() *compute.Firewall {
 	gceCloud := cont.Cloud.Provider.(*gcecloud.GCECloud)
 	fwName := cont.GetFirewallRuleName()
@@ -618,7 +626,7 @@ func (cont *GCEIngressController) GetFirewallRule() *compute.Firewall {
 func (cont *GCEIngressController) deleteFirewallRule(del bool) (msg string) {
 	fwList := []compute.Firewall{}
 	regex := fmt.Sprintf("%vfw-l7%v.*", k8sPrefix, clusterDelimiter)
-	gcloudList("firewall-rules", regex, cont.Cloud.ProjectID, &fwList)
+	gcloudComputeResourceList("firewall-rules", regex, cont.Cloud.ProjectID, &fwList)
 	if len(fwList) != 0 {
 		for _, f := range fwList {
 			if !cont.canDelete(f.Name, f.CreationTimestamp, del) {
@@ -626,7 +634,7 @@ func (cont *GCEIngressController) deleteFirewallRule(del bool) (msg string) {
 			}
 			msg += fmt.Sprintf("%v (firewall rule)\n", f.Name)
 			if del {
-				GcloudDelete("firewall-rules", f.Name, cont.Cloud.ProjectID)
+				GcloudComputeResourceDelete("firewall-rules", f.Name, cont.Cloud.ProjectID)
 			}
 		}
 	}
@@ -650,9 +658,9 @@ func (cont *GCEIngressController) Cleanup(del bool) error {
 	errMsg += cont.deleteAddresses(del)
 
 	errMsg += cont.deleteTargetProxy(del)
-	errMsg += cont.deleteUrlMap(del)
+	errMsg += cont.deleteURLMap(del)
 	errMsg += cont.deleteBackendService(del)
-	errMsg += cont.deleteHttpHealthCheck(del)
+	errMsg += cont.deleteHTTPHealthCheck(del)
 
 	errMsg += cont.deleteInstanceGroup(del)
 	errMsg += cont.deleteFirewallRule(del)
@@ -667,6 +675,7 @@ func (cont *GCEIngressController) Cleanup(del bool) error {
 	return fmt.Errorf(errMsg)
 }
 
+// Init initializes the GCEIngressController with an UID
 func (cont *GCEIngressController) Init() {
 	uid, err := cont.getL7AddonUID()
 	Expect(err).NotTo(HaveOccurred())
@@ -705,14 +714,14 @@ func (cont *GCEIngressController) CreateStaticIP(name string) string {
 // CreateStaticIP.
 func (cont *GCEIngressController) deleteStaticIPs() error {
 	if cont.staticIPName != "" {
-		if err := GcloudDelete("addresses", cont.staticIPName, cont.Cloud.ProjectID, "--global"); err == nil {
+		if err := GcloudComputeResourceDelete("addresses", cont.staticIPName, cont.Cloud.ProjectID, "--global"); err == nil {
 			cont.staticIPName = ""
 		} else {
 			return err
 		}
 	} else {
 		e2eIPs := []compute.Address{}
-		gcloudList("addresses", "e2e-.*", cont.Cloud.ProjectID, &e2eIPs)
+		gcloudComputeResourceList("addresses", "e2e-.*", cont.Cloud.ProjectID, &e2eIPs)
 		ips := []string{}
 		for _, ip := range e2eIPs {
 			ips = append(ips, ip.Name)
@@ -722,8 +731,8 @@ func (cont *GCEIngressController) deleteStaticIPs() error {
 	return nil
 }
 
-// gcloudList unmarshals json output of gcloud into given out interface.
-func gcloudList(resource, regex, project string, out interface{}) {
+// gcloudComputeResourceList unmarshals json output of gcloud into given out interface.
+func gcloudComputeResourceList(resource, regex, project string, out interface{}) {
 	// gcloud prints a message to stderr if it has an available update
 	// so we only look at stdout.
 	command := []string{
@@ -750,7 +759,8 @@ func gcloudList(resource, regex, project string, out interface{}) {
 	}
 }
 
-func GcloudDelete(resource, name, project string, args ...string) error {
+// GcloudComputeResourceDelete deletes the specified compute resource by name and project.
+func GcloudComputeResourceDelete(resource, name, project string, args ...string) error {
 	Logf("Deleting %v: %v", resource, name)
 	argList := append([]string{"compute", resource, "delete", name, fmt.Sprintf("--project=%v", project), "-q"}, args...)
 	output, err := exec.Command("gcloud", argList...).CombinedOutput()
@@ -760,7 +770,8 @@ func GcloudDelete(resource, name, project string, args ...string) error {
 	return err
 }
 
-func GcloudCreate(resource, name, project string, args ...string) error {
+// GcloudComputeResourceCreate creates a compute resource with a name and arguments.
+func GcloudComputeResourceCreate(resource, name, project string, args ...string) error {
 	Logf("Creating %v in project %v: %v", resource, project, name)
 	argsList := append([]string{"compute", resource, "create", name, fmt.Sprintf("--project=%v", project)}, args...)
 	Logf("Running command: gcloud %+v", strings.Join(argsList, " "))
@@ -786,11 +797,11 @@ func (j *IngressTestJig) CreateIngress(manifestPath, ns string, ingAnnotations m
 	Logf("creating service")
 	RunKubectlOrDie("create", "-f", mkpath("svc.yaml"), fmt.Sprintf("--namespace=%v", ns))
 
-	if exists(mkpath("secret.yaml")) {
+	if exists, _ := util.FileExists(mkpath("secret.yaml")); exists {
 		Logf("creating secret")
 		RunKubectlOrDie("create", "-f", mkpath("secret.yaml"), fmt.Sprintf("--namespace=%v", ns))
 	}
-	j.Ingress = ingFromManifest(mkpath("ing.yaml"))
+	j.Ingress = createIngressFromManifest(mkpath("ing.yaml"))
 	j.Ingress.Namespace = ns
 	j.Ingress.Annotations = map[string]string{ingressClass: j.Class}
 	for k, v := range ingAnnotations {
@@ -802,6 +813,7 @@ func (j *IngressTestJig) CreateIngress(manifestPath, ns string, ingAnnotations m
 	ExpectNoError(err)
 }
 
+// Update retrieves the ingress, performs the passed function, and then updates it.
 func (j *IngressTestJig) Update(update func(ing *extensions.Ingress)) {
 	var err error
 	ns, name := j.Ingress.Namespace, j.Ingress.Name
@@ -823,11 +835,12 @@ func (j *IngressTestJig) Update(update func(ing *extensions.Ingress)) {
 	Failf("too many retries updating ingress %q", name)
 }
 
+// AddHTTPS updates the ingress to use this secret for these hosts.
 func (j *IngressTestJig) AddHTTPS(secretName string, hosts ...string) {
 	j.Ingress.Spec.TLS = []extensions.IngressTLS{{Hosts: hosts, SecretName: secretName}}
 	// TODO: Just create the secret in GetRootCAs once we're watching secrets in
 	// the ingress controller.
-	_, cert, _, err := createSecret(j.Client, j.Ingress)
+	_, cert, _, err := createIngressTLSSecret(j.Client, j.Ingress)
 	ExpectNoError(err)
 	Logf("Updating ingress %v to use secret %v for TLS termination", j.Ingress.Name, secretName)
 	j.Update(func(ing *extensions.Ingress) {
@@ -836,6 +849,7 @@ func (j *IngressTestJig) AddHTTPS(secretName string, hosts ...string) {
 	j.RootCAs[secretName] = cert
 }
 
+// GetRootCA returns a rootCA from the ingress test jig.
 func (j *IngressTestJig) GetRootCA(secretName string) (rootCA []byte) {
 	var ok bool
 	rootCA, ok = j.RootCAs[secretName]
@@ -845,11 +859,12 @@ func (j *IngressTestJig) GetRootCA(secretName string) (rootCA []byte) {
 	return
 }
 
+// DeleteIngress deletes the ingress resource
 func (j *IngressTestJig) DeleteIngress() {
 	ExpectNoError(j.Client.Extensions().Ingresses(j.Ingress.Namespace).Delete(j.Ingress.Name, nil))
 }
 
-// waitForIngress waits till the ingress acquires an IP, then waits for its
+// WaitForIngress waits till the ingress acquires an IP, then waits for its
 // hosts/urls to respond to a protocol check (either http or https). If
 // waitForNodePort is true, the NodePort of the Service is verified before
 // verifying the Ingress. NodePort is currently a requirement for cloudprovider
@@ -870,14 +885,14 @@ func (j *IngressTestJig) WaitForIngress(waitForNodePort bool) {
 		if len(j.Ingress.Spec.TLS) > 0 {
 			knownHosts := sets.NewString(j.Ingress.Spec.TLS[0].Hosts...)
 			if knownHosts.Has(rules.Host) {
-				timeoutClient.Transport, err = buildTransport(rules.Host, j.GetRootCA(j.Ingress.Spec.TLS[0].SecretName))
+				timeoutClient.Transport, err = buildTransportWithCA(rules.Host, j.GetRootCA(j.Ingress.Spec.TLS[0].SecretName))
 				ExpectNoError(err)
 				proto = "https"
 			}
 		}
 		for _, p := range rules.IngressRuleValue.HTTP.Paths {
 			if waitForNodePort {
-				j.CurlServiceNodePort(j.Ingress.Namespace, p.Backend.ServiceName, int(p.Backend.ServicePort.IntVal))
+				j.pollServiceNodePort(j.Ingress.Namespace, p.Backend.ServiceName, int(p.Backend.ServicePort.IntVal))
 			}
 			route := fmt.Sprintf("%v://%v%v", proto, address, p.Path)
 			Logf("Testing route %v host %v with simple GET", route, rules.Host)
@@ -901,7 +916,7 @@ func (j *IngressTestJig) VerifyURL(route, host string, iterations int, interval 
 	return nil
 }
 
-func (j *IngressTestJig) CurlServiceNodePort(ns, name string, port int) {
+func (j *IngressTestJig) pollServiceNodePort(ns, name string, port int) {
 	// TODO: Curl all nodes?
 	u, err := GetNodePortURL(j.Client, ns, name, port)
 	ExpectNoError(err)
@@ -934,7 +949,7 @@ func (j *IngressTestJig) GetIngressNodePorts() []string {
 	return nodePorts
 }
 
-// constructFirewallForIngress returns the expected GCE firewall rule for the ingress resource
+// ConstructFirewallForIngress returns the expected GCE firewall rule for the ingress resource
 func (j *IngressTestJig) ConstructFirewallForIngress(gceController *GCEIngressController) *compute.Firewall {
 	nodeTags := GetNodeTags(j.Client, gceController.Cloud)
 	nodePorts := j.GetIngressNodePorts()
@@ -952,8 +967,8 @@ func (j *IngressTestJig) ConstructFirewallForIngress(gceController *GCEIngressCo
 	return &fw
 }
 
-// ingFromManifest reads a .json/yaml file and returns the rc in it.
-func ingFromManifest(fileName string) *extensions.Ingress {
+// createIngressFromManifest reads a .json/yaml file and returns the rc in it.
+func createIngressFromManifest(fileName string) *extensions.Ingress {
 	var ing extensions.Ingress
 	Logf("Parsing ingress from %v", fileName)
 	data, err := ioutil.ReadFile(fileName)
@@ -978,18 +993,6 @@ func (cont *GCEIngressController) getL7AddonUID() (string, error) {
 	return "", fmt.Errorf("Could not find cluster UID for L7 addon pod")
 }
 
-func exists(path string) bool {
-	_, err := os.Stat(path)
-	if err == nil {
-		return true
-	}
-	if os.IsNotExist(err) {
-		return false
-	}
-	Failf("Failed to os.Stat path %v", path)
-	return false
-}
-
 // GCEIngressController manages implementation details of Ingress on GCE/GKE.
 type GCEIngressController struct {
 	Ns           string
@@ -1002,6 +1005,7 @@ type GCEIngressController struct {
 	Cloud        CloudConfig
 }
 
+// NewIngressTestJig instantiates struct with client
 func NewIngressTestJig(c clientset.Interface) *IngressTestJig {
 	return &IngressTestJig{Client: c, RootCAs: map[string][]byte{}, PollInterval: LoadBalancerPollInterval}
 }
@@ -1015,6 +1019,7 @@ type NginxIngressController struct {
 	externalIP string
 }
 
+// Init initializes the NginxIngressController
 func (cont *NginxIngressController) Init() {
 	mkpath := func(file string) string {
 		return filepath.Join(TestContext.RepoRoot, IngressManifestPath, "nginx", file)
