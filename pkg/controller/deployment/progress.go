@@ -64,15 +64,11 @@ func (dc *DeploymentController) hasFailed(d *extensions.Deployment) (bool, error
 
 	// If the deployment is complete or it is progressing, there is no need to check if it
 	// has timed out.
-	// TODO: Switch to a much higher verbosity level
-	glog.V(2).Infof("Checking if deployment %q is complete or progressing", d.Name)
 	if util.DeploymentComplete(d, &newStatus) || util.DeploymentProgressing(d, &newStatus) {
 		return false, nil
 	}
 
 	// Check if the deployment has timed out.
-	// TODO: Switch to a much higher verbosity level
-	glog.V(2).Infof("Checking if deployment %q has timed out", d.Name)
 	return util.DeploymentTimedOut(d, &newStatus), nil
 }
 
@@ -231,11 +227,11 @@ func (dc *DeploymentController) requeueStuckDeployment(d *extensions.Deployment,
 	// Make it ratelimited so we stay on the safe side, eventually the Deployment should
 	// transition either to a Complete or to a TimedOut condition.
 	if after < time.Second {
-		glog.V(2).Infof("Queueing up deployment %q for a progress check now", d.Name)
+		glog.V(4).Infof("Queueing up deployment %q for a progress check now", d.Name)
 		dc.enqueueRateLimited(d)
 		return time.Duration(0)
 	}
-	glog.V(2).Infof("Queueing up deployment %q for a progress check after %ds", d.Name, int(after.Seconds()))
+	glog.V(4).Infof("Queueing up deployment %q for a progress check after %ds", d.Name, int(after.Seconds()))
 	dc.enqueueAfter(d, after)
 	return after
 }

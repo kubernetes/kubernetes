@@ -558,7 +558,7 @@ func (dc *DeploymentController) cleanupDeployment(oldRSs []*extensions.ReplicaSe
 	}
 
 	sort.Sort(controller.ReplicaSetsByCreationTimestamp(cleanableRSes))
-	glog.V(2).Infof("Looking to cleanup old replica sets for deployment %q", deployment.Name)
+	glog.V(4).Infof("Looking to cleanup old replica sets for deployment %q", deployment.Name)
 
 	var errList []error
 	// TODO: This should be parallelized.
@@ -568,7 +568,7 @@ func (dc *DeploymentController) cleanupDeployment(oldRSs []*extensions.ReplicaSe
 		if rs.Status.Replicas != 0 || *(rs.Spec.Replicas) != 0 || rs.Generation > rs.Status.ObservedGeneration || rs.DeletionTimestamp != nil {
 			continue
 		}
-		glog.V(2).Infof("Trying to cleanup replica set %q for deployment %q", rs.Name, deployment.Name)
+		glog.V(4).Infof("Trying to cleanup replica set %q for deployment %q", rs.Name, deployment.Name)
 		if err := dc.client.Extensions().ReplicaSets(rs.Namespace).Delete(rs.Name, nil); err != nil && !errors.IsNotFound(err) {
 			glog.V(2).Infof("Failed deleting old replica set %v for deployment %v: %v", rs.Name, deployment.Name, err)
 			errList = append(errList, err)
