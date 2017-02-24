@@ -95,21 +95,189 @@ func ValidateDiscovery(c *kubeadm.NodeConfiguration, fldPath *field.Path) field.
 
 func ValidateArgSelection(cfg *kubeadm.NodeConfiguration, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
-	if len(cfg.Token) != 0 && (len(cfg.TLSBootstrapToken) != 0 || len(cfg.DiscoveryToken) != 0) {
-		allErrs = append(allErrs, field.Invalid(fldPath, nil, "--token is mutually exclusive with --bootstrap-token and --discovery-token"))
-	}
-	if len(cfg.Token) == 0 && (len(cfg.TLSBootstrapToken) == 0 || len(cfg.DiscoveryToken) == 0) {
-		allErrs = append(
-			allErrs,
-			field.Invalid(fldPath, nil, "If --token is not specified, both --bootstrap-token and --discovery-token have to be provided"),
-		)
-	}
+	allErrs = append(allErrs, ValidateTokenArg(cfg, field.NewPath("discovery"))...)
+	allErrs = append(allErrs, ValidateDiscoveryTokenArg(cfg, field.NewPath("discovery"))...)
+	allErrs = append(allErrs, ValidateTLSBootstrapTokenArg(cfg, field.NewPath("discovery"))...)
+	allErrs = append(allErrs, ValidateDiscoveryFileArg(cfg, field.NewPath("discovery"))...)
+	allErrs = append(allErrs, ValidateDiscoveryURLArg(cfg, field.NewPath("discovery"))...)
 	if len(cfg.Token) != 0 {
 		cfg.TLSBootstrapToken = cfg.Token
 		cfg.DiscoveryToken = cfg.Token
 	}
-	if len(cfg.Masters) == 0 {
-		allErrs = append(allErrs, field.Invalid(fldPath, nil, "master address(es) not specified"))
+	return allErrs
+}
+
+func ValidateTokenArg(cfg *kubeadm.NodeConfiguration, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	if len(cfg.Token) != 0 {
+		if len(cfg.TLSBootstrapToken) != 0 || len(cfg.DiscoveryToken) != 0 || len(cfg.DiscoveryURL) != 0 || len(cfg.DiscoveryFile) != 0 {
+			allErrs = append(
+				allErrs,
+				field.Invalid(
+					fldPath,
+					nil,
+					"--token is mutually exclusive with --tls-bootstrap-token, --discovery-token, --discovery-file, and --discovery-url",
+				),
+			)
+		}
+		if len(cfg.Masters) < 1 {
+			allErrs = append(
+				allErrs,
+				field.Invalid(
+					fldPath,
+					nil,
+					"--token must also specificy --masters",
+				),
+			)
+		}
+	}
+	return allErrs
+}
+
+func ValidateDiscoveryTokenArg(cfg *kubeadm.NodeConfiguration, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	if len(cfg.DiscoveryToken) != 0 {
+		if len(cfg.Token) != 0 || len(cfg.DiscoveryURL) != 0 || len(cfg.DiscoveryFile) != 0 {
+			allErrs = append(
+				allErrs,
+				field.Invalid(
+					fldPath,
+					nil,
+					"--discovery-token is mutually exclusive with --token, --discovery-file, and --discovery-url",
+				),
+			)
+		}
+		if len(cfg.Masters) < 1 {
+			allErrs = append(
+				allErrs,
+				field.Invalid(
+					fldPath,
+					nil,
+					"--discovery-token must also specificy --masters",
+				),
+			)
+		}
+		if len(cfg.TLSBootstrapToken) != 0 {
+			allErrs = append(
+				allErrs,
+				field.Invalid(
+					fldPath,
+					nil,
+					"--discovery-token must also specificy --tls-bootstrap-token",
+				),
+			)
+		}
+	}
+	return allErrs
+}
+
+func ValidateTLSBootstrapTokenArg(cfg *kubeadm.NodeConfiguration, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	if len(cfg.TLSBootstrapToken) != 0 {
+		if len(cfg.Token) != 0 || len(cfg.DiscoveryURL) != 0 || len(cfg.DiscoveryFile) != 0 {
+			allErrs = append(
+				allErrs,
+				field.Invalid(
+					fldPath,
+					nil,
+					"--tls-bootstrap-token is mutually exclusive with --token, --discovery-file, and --discovery-url",
+				),
+			)
+		}
+		if len(cfg.Masters) < 1 {
+			allErrs = append(
+				allErrs,
+				field.Invalid(
+					fldPath,
+					nil,
+					"--tls-bootstrap-token must also specificy --masters",
+				),
+			)
+		}
+		if len(cfg.DiscoveryToken) != 0 {
+			allErrs = append(
+				allErrs,
+				field.Invalid(
+					fldPath,
+					nil,
+					"--tls-bootstrap-token must also specificy --discovery-token",
+				),
+			)
+		}
+	}
+	return allErrs
+}
+
+func ValidateDiscoveryFileArg(cfg *kubeadm.NodeConfiguration, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	if len(cfg.DiscoveryFile) != 0 {
+		if len(cfg.Token) != 0 || len(cfg.DiscoveryToken) != 0 || len(cfg.DiscoveryURL) != 0 {
+			allErrs = append(
+				allErrs,
+				field.Invalid(
+					fldPath,
+					nil,
+					"--discovery-file is mutually exclusive with --token, --discovery-token, and --discovery-url",
+				),
+			)
+		}
+		if len(cfg.Masters) != 0 {
+			allErrs = append(
+				allErrs,
+				field.Invalid(
+					fldPath,
+					nil,
+					"--discovery-file must not specificy --masters",
+				),
+			)
+		}
+		if len(cfg.TLSBootstrapToken) != 0 {
+			allErrs = append(
+				allErrs,
+				field.Invalid(
+					fldPath,
+					nil,
+					"--discovery-file must also specificy --tls-bootstrap-token",
+				),
+			)
+		}
+	}
+	return allErrs
+}
+
+func ValidateDiscoveryURLArg(cfg *kubeadm.NodeConfiguration, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	if len(cfg.DiscoveryURL) != 0 {
+		if len(cfg.Token) != 0 || len(cfg.DiscoveryToken) != 0 || len(cfg.DiscoveryFile) != 0 {
+			allErrs = append(
+				allErrs,
+				field.Invalid(
+					fldPath,
+					nil,
+					"--discovery-url is mutually exclusive with --token, --discovery-token, and --discovery-file",
+				),
+			)
+		}
+		if len(cfg.Masters) != 0 {
+			allErrs = append(
+				allErrs,
+				field.Invalid(
+					fldPath,
+					nil,
+					"--discovery-url must not specificy --masters",
+				),
+			)
+		}
+		if len(cfg.TLSBootstrapToken) != 0 {
+			allErrs = append(
+				allErrs,
+				field.Invalid(
+					fldPath,
+					nil,
+					"--discovery-url must also specificy --tls-bootstrap-token",
+				),
+			)
+		}
 	}
 	return allErrs
 }
