@@ -104,7 +104,7 @@ func updateNodeLabels(c clientset.Interface, nodeNames sets.String, toAdd, toRem
 		var node *v1.Node
 		var err error
 		for i := 0; i < maxRetries; i++ {
-			node, err = c.Core().Nodes().Get(nodeName, metav1.GetOptions{})
+			node, err = c.CoreV1().Nodes().Get(nodeName, metav1.GetOptions{})
 			if err != nil {
 				framework.Logf("Error getting node %s: %v", nodeName, err)
 				continue
@@ -119,7 +119,7 @@ func updateNodeLabels(c clientset.Interface, nodeNames sets.String, toAdd, toRem
 					delete(node.ObjectMeta.Labels, k)
 				}
 			}
-			_, err = c.Core().Nodes().Update(node)
+			_, err = c.CoreV1().Nodes().Update(node)
 			if err != nil {
 				framework.Logf("Error updating node %s: %v", nodeName, err)
 			} else {
@@ -213,13 +213,13 @@ func createPodUsingNfs(f *framework.Framework, c clientset.Interface, ns, nfsIP,
 			},
 		},
 	}
-	rtnPod, err := c.Core().Pods(ns).Create(pod)
+	rtnPod, err := c.CoreV1().Pods(ns).Create(pod)
 	Expect(err).NotTo(HaveOccurred())
 
 	err = f.WaitForPodReady(rtnPod.Name) // running & ready
 	Expect(err).NotTo(HaveOccurred())
 
-	rtnPod, err = c.Core().Pods(ns).Get(rtnPod.Name, metav1.GetOptions{}) // return fresh pod
+	rtnPod, err = c.CoreV1().Pods(ns).Get(rtnPod.Name, metav1.GetOptions{}) // return fresh pod
 	Expect(err).NotTo(HaveOccurred())
 
 	return rtnPod
@@ -440,11 +440,11 @@ var _ = framework.KubeDescribe("kubelet", func() {
 			// fill in test slice for this context
 			testTbl := []hostCleanupTest{
 				{
-					itDescr: "after deleting the nfs-server, the host should be cleaned-up when deleting sleeping pod which mounts an NFS vol",
+					itDescr: "after stopping the nfs-server and deleting the (sleeping) client pod, the NFS mount and the pod's UID directory should be removed.",
 					podCmd:  "sleep 6000", // keep pod running
 				},
 				{
-					itDescr: "after deleting the nfs-server, the host should be cleaned-up when deleting a pod accessing the NFS vol",
+					itDescr: "after stopping the nfs-server and deleting the (active) client pod, the NFS mount and the pod's UID directory should be removed.",
 					podCmd:  "while true; do echo FeFieFoFum >>/mnt/SUCCESS; sleep 1; cat /mnt/SUCCESS; done",
 				},
 			}
@@ -496,14 +496,14 @@ var _ = framework.KubeDescribe("kubelet", func() {
 			// Addresses issue #37657.
 			// Note: the pod's vol mount (as a side effect) ends up being moved to /tmp
 			//    and can be unmounted via `umount -f`.
-			It("move pod's uid dir and delete pod", func() {
+			It("move NFS client pod's UID directory then delete pod", func() {
 				pod = createPodUsingNfs(f, c, ns, nfsIP, "sleep 6000")
 
 				By("Move pod's uid dir to /tmp")
 				movePodUidDir(c, pod)
 
 				By("Delete the pod mounted to the NFS volume")
-				deletePodWithWait(f, c, pod)
+				framework.DeletePodWithWait(f, c, pod)
 				// pod object is now stale, but is intentionally not nil
 				// Note: the pod's nfs mount, now in /tmp, will not be unmounted
 
