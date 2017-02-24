@@ -118,6 +118,10 @@ func (plugin *quobytePlugin) RequiresRemount() bool {
 	return false
 }
 
+func (plugin *quobytePlugin) SupportsMountOption() bool {
+	return true
+}
+
 func (plugin *quobytePlugin) GetAccessModes() []v1.PersistentVolumeAccessMode {
 	return []v1.PersistentVolumeAccessMode{
 		v1.ReadWriteOnce,
@@ -219,10 +223,6 @@ func (mounter *quobyteMounter) GetAttributes() volume.Attributes {
 		Managed:         false,
 		SupportsSELinux: false,
 	}
-}
-
-func (mounter *quobyteMounter) SupportsMountOption() bool {
-	return true
 }
 
 // Checks prior to mount operations to verify that the required components (binaries, etc.)

@@ -103,6 +103,10 @@ func (plugin *azureDataDiskPlugin) RequiresRemount() bool {
 	return false
 }
 
+func (plugin *azureDataDiskPlugin) SupportsMountOption() bool {
+	return true
+}
+
 func (plugin *azureDataDiskPlugin) GetAccessModes() []v1.PersistentVolumeAccessMode {
 	return []v1.PersistentVolumeAccessMode{
 		v1.ReadWriteOnce,
@@ -216,10 +220,6 @@ func (b *azureDiskMounter) GetAttributes() volume.Attributes {
 		Managed:         !b.readOnly,
 		SupportsSELinux: true,
 	}
-}
-
-func (b *azureDiskMounter) SupportsMountOption() bool {
-	return true
 }
 
 // Checks prior to mount operations to verify that the required components (binaries, etc.)

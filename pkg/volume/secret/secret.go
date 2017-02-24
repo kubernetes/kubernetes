@@ -85,6 +85,10 @@ func (plugin *secretPlugin) RequiresRemount() bool {
 	return true
 }
 
+func (plugin *secretPlugin) SupportsMountOption() bool {
+	return false
+}
+
 func (plugin *secretPlugin) NewMounter(spec *volume.Spec, pod *v1.Pod, opts volume.VolumeOptions) (volume.Mounter, error) {
 	return &secretVolumeMounter{
 		secretVolume: &secretVolume{
@@ -161,10 +165,6 @@ func (sv *secretVolume) GetAttributes() volume.Attributes {
 		Managed:         true,
 		SupportsSELinux: true,
 	}
-}
-
-func (sv *secretVolume) SupportsMountOption() bool {
-	return false
 }
 
 // Checks prior to mount operations to verify that the required components (binaries, etc.)

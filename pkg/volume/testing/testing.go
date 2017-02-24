@@ -203,6 +203,10 @@ func (plugin *FakeVolumePlugin) RequiresRemount() bool {
 	return false
 }
 
+func (plugin *FakeVolumePlugin) SupportsMountOption() bool {
+	return true
+}
+
 func (plugin *FakeVolumePlugin) NewMounter(spec *Spec, pod *v1.Pod, opts VolumeOptions) (Mounter, error) {
 	plugin.Lock()
 	defer plugin.Unlock()
@@ -325,10 +329,6 @@ func (_ *FakeVolume) GetAttributes() Attributes {
 		Managed:         true,
 		SupportsSELinux: true,
 	}
-}
-
-func (_ *FakeVolume) SupportsMountOption() bool {
-	return true
 }
 
 func (fv *FakeVolume) CanMount() error {

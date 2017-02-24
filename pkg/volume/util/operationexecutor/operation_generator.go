@@ -383,7 +383,7 @@ func (og *operationGenerator) GenerateMountVolumeFunc(
 			newMounterErr)
 	}
 
-	checkMountOptionSupport(og, volumeToMount, volumeMounter)
+	checkMountOptionSupport(og, volumeToMount, volumePlugin)
 
 	// Get attacher, if possible
 	attachableVolumePlugin, _ :=
@@ -870,10 +870,10 @@ func (og *operationGenerator) verifyVolumeIsSafeToDetach(
 	return nil
 }
 
-func checkMountOptionSupport(og *operationGenerator, volumeToMount VolumeToMount, mounter volume.Mounter) {
+func checkMountOptionSupport(og *operationGenerator, volumeToMount VolumeToMount, plugin volume.VolumePlugin) {
 	mountOptions := volume.MountOptionFromSpec(volumeToMount.VolumeSpec)
 
-	if len(mountOptions) > 0 && !mounter.SupportsMountOption() {
+	if len(mountOptions) > 0 && !plugin.SupportsMountOption() {
 		err := fmt.Errorf(
 			"MountVolume.checkMountOptionSupport failed for volume %q (spec.Name: %q) pod %q (UID: %q) with: %q",
 			volumeToMount.VolumeName,

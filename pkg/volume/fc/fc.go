@@ -78,6 +78,10 @@ func (plugin *fcPlugin) RequiresRemount() bool {
 	return false
 }
 
+func (plugin *fcPlugin) SupportsMountOption() bool {
+	return false
+}
+
 func (plugin *fcPlugin) GetAccessModes() []v1.PersistentVolumeAccessMode {
 	return []v1.PersistentVolumeAccessMode{
 		v1.ReadWriteOnce,
@@ -187,10 +191,6 @@ func (b *fcDiskMounter) GetAttributes() volume.Attributes {
 		Managed:         !b.readOnly,
 		SupportsSELinux: true,
 	}
-}
-
-func (b *fcDiskMounter) SupportsMountOption() bool {
-	return false
 }
 
 // Checks prior to mount operations to verify that the required components (binaries, etc.)

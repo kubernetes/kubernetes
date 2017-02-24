@@ -88,6 +88,10 @@ func (plugin *nfsPlugin) RequiresRemount() bool {
 	return false
 }
 
+func (plugin *nfsPlugin) SupportsMountOption() bool {
+	return true
+}
+
 func (plugin *nfsPlugin) GetAccessModes() []v1.PersistentVolumeAccessMode {
 	return []v1.PersistentVolumeAccessMode{
 		v1.ReadWriteOnce,
@@ -222,10 +226,6 @@ func (b *nfsMounter) GetAttributes() volume.Attributes {
 		Managed:         false,
 		SupportsSELinux: false,
 	}
-}
-
-func (b *nfsMounter) SupportsMountOption() bool {
-	return true
 }
 
 // SetUp attaches the disk and bind mounts to the volume path.

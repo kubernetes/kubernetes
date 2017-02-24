@@ -86,6 +86,10 @@ func (plugin *rbdPlugin) RequiresRemount() bool {
 	return false
 }
 
+func (plugin *rbdPlugin) SupportsMountOption() bool {
+	return true
+}
+
 func (plugin *rbdPlugin) GetAccessModes() []v1.PersistentVolumeAccessMode {
 	return []v1.PersistentVolumeAccessMode{
 		v1.ReadWriteOnce,
@@ -379,10 +383,6 @@ func (b *rbd) GetAttributes() volume.Attributes {
 		Managed:         !b.ReadOnly,
 		SupportsSELinux: true,
 	}
-}
-
-func (b *rbd) SupportsMountOption() bool {
-	return true
 }
 
 // Checks prior to mount operations to verify that the required components (binaries, etc.)

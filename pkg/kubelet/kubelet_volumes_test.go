@@ -460,10 +460,6 @@ func (f *stubVolume) GetAttributes() volume.Attributes {
 	return volume.Attributes{}
 }
 
-func (f *stubVolume) SupportsMountOption() bool {
-	return false
-}
-
 func (f *stubVolume) CanMount() error {
 	return nil
 }

@@ -92,6 +92,10 @@ func (plugin *projectedPlugin) RequiresRemount() bool {
 	return true
 }
 
+func (plugin *projectedPlugin) SupportsMountOption() bool {
+	return false
+}
+
 func (plugin *projectedPlugin) NewMounter(spec *volume.Spec, pod *v1.Pod, opts volume.VolumeOptions) (volume.Mounter, error) {
 	return &projectedVolumeMounter{
 		projectedVolume: &projectedVolume{
@@ -158,10 +162,6 @@ func (sv *projectedVolume) GetAttributes() volume.Attributes {
 		SupportsSELinux: true,
 	}
 
-}
-
-func (sv *projectedVolume) SupportsMountOption() bool {
-	return false
 }
 
 // Checks prior to mount operations to verify that the required components (binaries, etc.)

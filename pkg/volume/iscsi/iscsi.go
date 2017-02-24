@@ -82,6 +82,10 @@ func (plugin *iscsiPlugin) RequiresRemount() bool {
 	return false
 }
 
+func (plugin *iscsiPlugin) SupportsMountOption() bool {
+	return true
+}
+
 func (plugin *iscsiPlugin) GetAccessModes() []v1.PersistentVolumeAccessMode {
 	return []v1.PersistentVolumeAccessMode{
 		v1.ReadWriteOnce,
@@ -200,10 +204,6 @@ func (b *iscsiDiskMounter) GetAttributes() volume.Attributes {
 		Managed:         !b.readOnly,
 		SupportsSELinux: true,
 	}
-}
-
-func (b *iscsiDiskMounter) SupportsMountOption() bool {
-	return true
 }
 
 // Checks prior to mount operations to verify that the required components (binaries, etc.)

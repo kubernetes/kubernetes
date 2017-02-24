@@ -83,6 +83,10 @@ func (plugin *hostPathPlugin) RequiresRemount() bool {
 	return false
 }
 
+func (plugin *hostPathPlugin) SupportsMountOption() bool {
+	return false
+}
+
 func (plugin *hostPathPlugin) GetAccessModes() []v1.PersistentVolumeAccessMode {
 	return []v1.PersistentVolumeAccessMode{
 		v1.ReadWriteOnce,
@@ -185,10 +189,6 @@ func (b *hostPathMounter) GetAttributes() volume.Attributes {
 		Managed:         false,
 		SupportsSELinux: false,
 	}
-}
-
-func (b *hostPathMounter) SupportsMountOption() bool {
-	return false
 }
 
 // Checks prior to mount operations to verify that the required components (binaries, etc.)

@@ -121,9 +121,6 @@ type Mounter interface {
 	SetUpAt(dir string, fsGroup *int64) error
 	// GetAttributes returns the attributes of the mounter.
 	GetAttributes() Attributes
-
-	// SupportsMountOption returns if volume plugins support Mount options
-	SupportsMountOption() bool
 }
 
 // Unmounter interface provides methods to cleanup/unmount the volumes.

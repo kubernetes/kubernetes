@@ -72,6 +72,10 @@ func (plugin *cephfsPlugin) RequiresRemount() bool {
 	return false
 }
 
+func (plugin *cephfsPlugin) SupportsMountOption() bool {
+	return true
+}
+
 func (plugin *cephfsPlugin) GetAccessModes() []v1.PersistentVolumeAccessMode {
 	return []v1.PersistentVolumeAccessMode{
 		v1.ReadWriteOnce,
@@ -199,10 +203,6 @@ func (cephfsVolume *cephfsMounter) GetAttributes() volume.Attributes {
 		Managed:         false,
 		SupportsSELinux: false,
 	}
-}
-
-func (cephfsVolume *cephfsMounter) SupportsMountOption() bool {
-	return true
 }
 
 // Checks prior to mount operations to verify that the required components (binaries, etc.)

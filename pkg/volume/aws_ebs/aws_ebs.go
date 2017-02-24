@@ -87,6 +87,10 @@ func (plugin *awsElasticBlockStorePlugin) RequiresRemount() bool {
 	return false
 }
 
+func (plugin *awsElasticBlockStorePlugin) SupportsMountOption() bool {
+	return true
+}
+
 func (plugin *awsElasticBlockStorePlugin) GetAccessModes() []v1.PersistentVolumeAccessMode {
 	return []v1.PersistentVolumeAccessMode{
 		v1.ReadWriteOnce,
@@ -275,10 +279,6 @@ func (b *awsElasticBlockStoreMounter) GetAttributes() volume.Attributes {
 		Managed:         !b.readOnly,
 		SupportsSELinux: true,
 	}
-}
-
-func (b *awsElasticBlockStore) SupportsMountOption() bool {
-	return true
 }
 
 // Checks prior to mount operations to verify that the required components (binaries, etc.)

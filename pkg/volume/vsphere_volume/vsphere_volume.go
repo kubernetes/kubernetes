@@ -80,6 +80,10 @@ func (plugin *vsphereVolumePlugin) RequiresRemount() bool {
 	return false
 }
 
+func (plugin *vsphereVolumePlugin) SupportsMountOption() bool {
+	return true
+}
+
 func (plugin *vsphereVolumePlugin) NewMounter(spec *volume.Spec, pod *v1.Pod, _ volume.VolumeOptions) (volume.Mounter, error) {
 	return plugin.newMounterInternal(spec, pod.UID, &VsphereDiskUtil{}, plugin.host.GetMounter())
 }
@@ -181,10 +185,6 @@ func (b *vsphereVolumeMounter) GetAttributes() volume.Attributes {
 	return volume.Attributes{
 		SupportsSELinux: true,
 	}
-}
-
-func (b *vsphereVolumeMounter) SupportsMountOption() bool {
-	return true
 }
 
 // SetUp attaches the disk and bind mounts to the volume path.

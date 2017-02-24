@@ -98,6 +98,10 @@ func (plugin *flexVolumePlugin) RequiresRemount() bool {
 	return false
 }
 
+func (plugin *flexVolumePlugin) SupportsMountOption() bool {
+	return false
+}
+
 // GetAccessModes gets the allowed access modes for this plugin.
 func (plugin *flexVolumePlugin) GetAccessModes() []v1.PersistentVolumeAccessMode {
 	return []v1.PersistentVolumeAccessMode{
@@ -260,10 +264,6 @@ func (f flexVolumeMounter) GetAttributes() volume.Attributes {
 		Managed:         false,
 		SupportsSELinux: false,
 	}
-}
-
-func (f *flexVolumeMounter) SupportsMountOption() bool {
-	return false
 }
 
 // Checks prior to mount operations to verify that the required components (binaries, etc.)

@@ -116,6 +116,10 @@ func (plugin *glusterfsPlugin) RequiresRemount() bool {
 	return false
 }
 
+func (plugin *glusterfsPlugin) SupportsMountOption() bool {
+	return true
+}
+
 func (plugin *glusterfsPlugin) GetAccessModes() []v1.PersistentVolumeAccessMode {
 	return []v1.PersistentVolumeAccessMode{
 		v1.ReadWriteOnce,
@@ -226,10 +230,6 @@ func (b *glusterfsMounter) GetAttributes() volume.Attributes {
 		Managed:         false,
 		SupportsSELinux: false,
 	}
-}
-
-func (b *glusterfsMounter) SupportsMountOption() bool {
-	return true
 }
 
 // Checks prior to mount operations to verify that the required components (binaries, etc.)

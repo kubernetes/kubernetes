@@ -82,6 +82,10 @@ func (plugin *downwardAPIPlugin) RequiresRemount() bool {
 	return true
 }
 
+func (plugin *downwardAPIPlugin) SupportsMountOption() bool {
+	return false
+}
+
 func (plugin *downwardAPIPlugin) NewMounter(spec *volume.Spec, pod *v1.Pod, opts volume.VolumeOptions) (volume.Mounter, error) {
 	v := &downwardAPIVolume{
 		volName: spec.Name(),
@@ -145,10 +149,6 @@ func (d *downwardAPIVolume) GetAttributes() volume.Attributes {
 		Managed:         true,
 		SupportsSELinux: true,
 	}
-}
-
-func (d *downwardAPIVolume) SupportsMountOption() bool {
-	return false
 }
 
 // Checks prior to mount operations to verify that the required components (binaries, etc.)

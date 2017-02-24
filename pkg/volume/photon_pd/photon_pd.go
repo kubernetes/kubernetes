@@ -79,6 +79,10 @@ func (plugin *photonPersistentDiskPlugin) RequiresRemount() bool {
 	return false
 }
 
+func (plugin *photonPersistentDiskPlugin) SupportsMountOption() bool {
+	return true
+}
+
 func (plugin *photonPersistentDiskPlugin) NewMounter(spec *volume.Spec, pod *v1.Pod, _ volume.VolumeOptions) (volume.Mounter, error) {
 	return plugin.newMounterInternal(spec, pod.UID, &PhotonDiskUtil{}, plugin.host.GetMounter())
 }
@@ -176,10 +180,6 @@ func (b *photonPersistentDiskMounter) GetAttributes() volume.Attributes {
 	return volume.Attributes{
 		SupportsSELinux: true,
 	}
-}
-
-func (b *photonPersistentDiskMounter) SupportsMountOption() bool {
-	return true
 }
 
 // Checks prior to mount operations to verify that the required components (binaries, etc.)

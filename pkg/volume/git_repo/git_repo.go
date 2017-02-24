@@ -81,6 +81,10 @@ func (plugin *gitRepoPlugin) RequiresRemount() bool {
 	return false
 }
 
+func (plugin *gitRepoPlugin) SupportsMountOption() bool {
+	return false
+}
+
 func (plugin *gitRepoPlugin) NewMounter(spec *volume.Spec, pod *v1.Pod, opts volume.VolumeOptions) (volume.Mounter, error) {
 	return &gitRepoVolumeMounter{
 		gitRepoVolume: &gitRepoVolume{
@@ -153,10 +157,6 @@ func (b *gitRepoVolumeMounter) GetAttributes() volume.Attributes {
 		Managed:         true,
 		SupportsSELinux: true, // xattr change should be okay, TODO: double check
 	}
-}
-
-func (b *gitRepoVolumeMounter) SupportsMountOption() bool {
-	return false
 }
 
 // Checks prior to mount operations to verify that the required components (binaries, etc.)

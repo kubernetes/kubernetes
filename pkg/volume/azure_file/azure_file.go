@@ -79,6 +79,10 @@ func (plugin *azureFilePlugin) RequiresRemount() bool {
 	return false
 }
 
+func (plugin *azureFilePlugin) SupportsMountOption() bool {
+	return true
+}
+
 func (plugin *azureFilePlugin) GetAccessModes() []v1.PersistentVolumeAccessMode {
 	return []v1.PersistentVolumeAccessMode{
 		v1.ReadWriteOnce,
@@ -170,10 +174,6 @@ func (b *azureFileMounter) GetAttributes() volume.Attributes {
 		Managed:         !b.readOnly,
 		SupportsSELinux: false,
 	}
-}
-
-func (b *azureFileMounter) SupportsMountOption() bool {
-	return true
 }
 
 // Checks prior to mount operations to verify that the required components (binaries, etc.)
