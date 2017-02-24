@@ -2128,6 +2128,10 @@ message PersistentVolumeSource {
 
   // PhotonPersistentDisk represents a PhotonController persistent disk attached and mounted on kubelets host machine
   optional PhotonPersistentDiskVolumeSource photonPersistentDisk = 17;
+
+  // StorageOS represents a StorageOS volume that is attached to the kubelet's host machine and mounted into the pod
+  // +optional
+  optional StorageOSVolumeSource storageos = 18;
 }
 
 // PersistentVolumeSpec is the specification of a persistent volume.
@@ -3580,6 +3584,37 @@ message ServiceStatus {
   optional LoadBalancerStatus loadBalancer = 1;
 }
 
+// Represents a StorageOS persistent volume resource.
+message StorageOSVolumeSource {
+  // VolumeName is the human-readable name of the StorageOS volume.  Volume
+  // names are only unique within a namespace.
+  optional string volumeName = 1;
+
+  // Namespace specifies the scope of the volume name within StorageOS.  If no
+  // namespace is specified, the namespace of the pod will be used.  Set to
+  // "default" if you are not using namespaces within StorageOS.
+  // +optional
+  optional string namespace = 2;
+
+  // The name of the storage pool to provision from.  Pools can have different
+  // capacity and performance characteristics depending on the underlying
+  // storage resources used in them.  If not specified, the default pool will be
+  // used.
+  // +optional
+  optional string pool = 3;
+
+  // Filesystem type to mount.
+  // Must be a filesystem type supported by the host operating system.
+  // Ex. "ext4", "xfs", "ntfs". Implicitly inferred to be "ext4" if unspecified.
+  // +optional
+  optional string fsType = 4;
+
+  // Defaults to false (read/write). ReadOnly here will force
+  // the ReadOnly setting in VolumeMounts.
+  // +optional
+  optional bool readOnly = 5;
+}
+
 message Sysctl {
   optional string name = 1;
 
@@ -3810,8 +3845,12 @@ message VolumeSource {
   // PhotonPersistentDisk represents a PhotonController persistent disk attached and mounted on kubelets host machine
   optional PhotonPersistentDiskVolumeSource photonPersistentDisk = 23;
 
+  // StorageOS represents a StorageOS volume that is attached to the kubelet's host machine and mounted into the pod
+  // +optional
+  optional StorageOSVolumeSource storageos = 24;
+
   // Items for all in one resources secrets, configmaps, and downward API
-  optional ProjectedVolumeSource projected = 24;
+  optional ProjectedVolumeSource projected = 25;
 }
 
 // Represents a vSphere volume resource.

@@ -17150,3 +17150,43 @@ go_library(
     ],
     tags = ["automanaged"],
 )
+
+go_library(
+    name = "github.com/storageos/go-api",
+    srcs = [
+        "github.com/storageos/go-api/client.go",
+        "github.com/storageos/go-api/client_unix.go",
+        "github.com/storageos/go-api/pool.go",
+        "github.com/storageos/go-api/rule.go",
+        "github.com/storageos/go-api/template.go",
+        "github.com/storageos/go-api/validation.go",
+        "github.com/storageos/go-api/volume.go",
+    ],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:github.com/storageos/go-api/types",
+        "//vendor:golang.org/x/net/context/ctxhttp",
+    ],
+)
+
+go_library(
+    name = "github.com/storageos/go-api/types",
+    srcs = [
+        "github.com/storageos/go-api/types/capacity_stats.go",
+        "github.com/storageos/go-api/types/deployment.go",
+        "github.com/storageos/go-api/types/driver_instance.go",
+        "github.com/storageos/go-api/types/error_response.go",
+        "github.com/storageos/go-api/types/list_options.go",
+        "github.com/storageos/go-api/types/operator.go",
+        "github.com/storageos/go-api/types/pool.go",
+        "github.com/storageos/go-api/types/pool_create_options.go",
+        "github.com/storageos/go-api/types/rule.go",
+        "github.com/storageos/go-api/types/rule_create_options.go",
+        "github.com/storageos/go-api/types/template.go",
+        "github.com/storageos/go-api/types/template_create_options.go",
+        "github.com/storageos/go-api/types/volume.go",
+        "github.com/storageos/go-api/types/volume_create_options.go",
+        "github.com/storageos/go-api/types/volume_update_options.go",
+    ],
+    tags = ["automanaged"],
+)

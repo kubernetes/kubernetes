@@ -194,6 +194,7 @@ func RegisterDeepCopies(scheme *runtime.Scheme) error {
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_ServiceProxyOptions, InType: reflect.TypeOf(&ServiceProxyOptions{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_ServiceSpec, InType: reflect.TypeOf(&ServiceSpec{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_ServiceStatus, InType: reflect.TypeOf(&ServiceStatus{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_StorageOSVolumeSource, InType: reflect.TypeOf(&StorageOSVolumeSource{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_Sysctl, InType: reflect.TypeOf(&Sysctl{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_TCPSocketAction, InType: reflect.TypeOf(&TCPSocketAction{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_Taint, InType: reflect.TypeOf(&Taint{})},
@@ -2059,6 +2060,11 @@ func DeepCopy_api_PersistentVolumeSource(in interface{}, out interface{}, c *con
 			*out = new(PhotonPersistentDiskVolumeSource)
 			**out = **in
 		}
+		if in.StorageOS != nil {
+			in, out := &in.StorageOS, &out.StorageOS
+			*out = new(StorageOSVolumeSource)
+			**out = **in
+		}
 		return nil
 	}
 }
@@ -3209,6 +3215,15 @@ func DeepCopy_api_ServiceStatus(in interface{}, out interface{}, c *conversion.C
 	}
 }
 
+func DeepCopy_api_StorageOSVolumeSource(in interface{}, out interface{}, c *conversion.Cloner) error {
+	{
+		in := in.(*StorageOSVolumeSource)
+		out := out.(*StorageOSVolumeSource)
+		*out = *in
+		return nil
+	}
+}
+
 func DeepCopy_api_Sysctl(in interface{}, out interface{}, c *conversion.Cloner) error {
 	{
 		in := in.(*Sysctl)
@@ -3438,6 +3453,11 @@ func DeepCopy_api_VolumeSource(in interface{}, out interface{}, c *conversion.Cl
 		if in.PhotonPersistentDisk != nil {
 			in, out := &in.PhotonPersistentDisk, &out.PhotonPersistentDisk
 			*out = new(PhotonPersistentDiskVolumeSource)
+			**out = **in
+		}
+		if in.StorageOS != nil {
+			in, out := &in.StorageOS, &out.StorageOS
+			*out = new(StorageOSVolumeSource)
 			**out = **in
 		}
 		if in.Projected != nil {

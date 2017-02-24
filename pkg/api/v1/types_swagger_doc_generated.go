@@ -1122,6 +1122,7 @@ var map_PersistentVolumeSource = map[string]string{
 	"quobyte":              "Quobyte represents a Quobyte mount on the host that shares a pod's lifetime",
 	"azureDisk":            "AzureDisk represents an Azure Data Disk mount on the host and bind mount to the pod.",
 	"photonPersistentDisk": "PhotonPersistentDisk represents a PhotonController persistent disk attached and mounted on kubelets host machine",
+	"storageos":            "StorageOS represents a StorageOS volume that is attached to the kubelet's host machine and mounted into the pod",
 }
 
 func (PersistentVolumeSource) SwaggerDoc() map[string]string {
@@ -1805,6 +1806,19 @@ func (ServiceStatus) SwaggerDoc() map[string]string {
 	return map_ServiceStatus
 }
 
+var map_StorageOSVolumeSource = map[string]string{
+	"":           "Represents a StorageOS persistent volume resource.",
+	"volumeName": "VolumeName is the human-readable name of the StorageOS volume.  Volume names are only unique within a namespace.",
+	"namespace":  "Namespace specifies the scope of the volume name within StorageOS.  If no namespace is specified, the namespace of the pod will be used.  Set to \"default\" if you are not using namespaces within StorageOS.",
+	"pool":       "The name of the storage pool to provision from.  Pools can have different capacity and performance characteristics depending on the underlying storage resources used in them.  If not specified, the default pool will be used.",
+	"fsType":     "Filesystem type to mount. Must be a filesystem type supported by the host operating system. Ex. \"ext4\", \"xfs\", \"ntfs\". Implicitly inferred to be \"ext4\" if unspecified.",
+	"readOnly":   "Defaults to false (read/write). ReadOnly here will force the ReadOnly setting in VolumeMounts.",
+}
+
+func (StorageOSVolumeSource) SwaggerDoc() map[string]string {
+	return map_StorageOSVolumeSource
+}
+
 var map_TCPSocketAction = map[string]string{
 	"":     "TCPSocketAction describes an action based on opening a socket",
 	"port": "Number or name of the port to access on the container. Number must be in the range 1 to 65535. Name must be an IANA_SVC_NAME.",
@@ -1896,6 +1910,7 @@ var map_VolumeSource = map[string]string{
 	"quobyte":              "Quobyte represents a Quobyte mount on the host that shares a pod's lifetime",
 	"azureDisk":            "AzureDisk represents an Azure Data Disk mount on the host and bind mount to the pod.",
 	"photonPersistentDisk": "PhotonPersistentDisk represents a PhotonController persistent disk attached and mounted on kubelets host machine",
+	"storageos":            "StorageOS represents a StorageOS volume that is attached to the kubelet's host machine and mounted into the pod",
 	"projected":            "Items for all in one resources secrets, configmaps, and downward API",
 }
 

@@ -112,6 +112,7 @@ filegroup(
         "//pkg/volume/quobyte:all-srcs",
         "//pkg/volume/rbd:all-srcs",
         "//pkg/volume/secret:all-srcs",
+        "//pkg/volume/storageos:all-srcs",
         "//pkg/volume/testing:all-srcs",
         "//pkg/volume/util:all-srcs",
         "//pkg/volume/vsphere_volume:all-srcs",

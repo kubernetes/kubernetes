@@ -191,6 +191,7 @@ func RegisterDeepCopies(scheme *runtime.Scheme) error {
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_ServiceProxyOptions, InType: reflect.TypeOf(&ServiceProxyOptions{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_ServiceSpec, InType: reflect.TypeOf(&ServiceSpec{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_ServiceStatus, InType: reflect.TypeOf(&ServiceStatus{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_StorageOSVolumeSource, InType: reflect.TypeOf(&StorageOSVolumeSource{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_Sysctl, InType: reflect.TypeOf(&Sysctl{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_TCPSocketAction, InType: reflect.TypeOf(&TCPSocketAction{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_Taint, InType: reflect.TypeOf(&Taint{})},
@@ -2015,6 +2016,11 @@ func DeepCopy_v1_PersistentVolumeSource(in interface{}, out interface{}, c *conv
 			*out = new(PhotonPersistentDiskVolumeSource)
 			**out = **in
 		}
+		if in.StorageOS != nil {
+			in, out := &in.StorageOS, &out.StorageOS
+			*out = new(StorageOSVolumeSource)
+			**out = **in
+		}
 		return nil
 	}
 }
@@ -3182,6 +3188,15 @@ func DeepCopy_v1_ServiceStatus(in interface{}, out interface{}, c *conversion.Cl
 	}
 }
 
+func DeepCopy_v1_StorageOSVolumeSource(in interface{}, out interface{}, c *conversion.Cloner) error {
+	{
+		in := in.(*StorageOSVolumeSource)
+		out := out.(*StorageOSVolumeSource)
+		*out = *in
+		return nil
+	}
+}
+
 func DeepCopy_v1_Sysctl(in interface{}, out interface{}, c *conversion.Cloner) error {
 	{
 		in := in.(*Sysctl)
@@ -3411,6 +3426,11 @@ func DeepCopy_v1_VolumeSource(in interface{}, out interface{}, c *conversion.Clo
 		if in.PhotonPersistentDisk != nil {
 			in, out := &in.PhotonPersistentDisk, &out.PhotonPersistentDisk
 			*out = new(PhotonPersistentDiskVolumeSource)
+			**out = **in
+		}
+		if in.StorageOS != nil {
+			in, out := &in.StorageOS, &out.StorageOS
+			*out = new(StorageOSVolumeSource)
 			**out = **in
 		}
 		if in.Projected != nil {

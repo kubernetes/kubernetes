@@ -326,8 +326,11 @@ type VolumeSource struct {
 	AzureDisk *AzureDiskVolumeSource `json:"azureDisk,omitempty" protobuf:"bytes,22,opt,name=azureDisk"`
 	// PhotonPersistentDisk represents a PhotonController persistent disk attached and mounted on kubelets host machine
 	PhotonPersistentDisk *PhotonPersistentDiskVolumeSource `json:"photonPersistentDisk,omitempty" protobuf:"bytes,23,opt,name=photonPersistentDisk"`
-	// Items for all in one resources secrets, configmaps, and downward API
-	Projected *ProjectedVolumeSource `json:"projected,omitempty"`
+	// StorageOS represents a StorageOS volume that is attached to the kubelet's host machine and mounted into the pod
+	// +optional
+	StorageOS *StorageOSVolumeSource `json:"storageos,omitempty" protobuf:"bytes,24,opt,name=storageos"`
+        // Items for all in one resources secrets, configmaps, and downward API
+	Projected *ProjectedVolumeSource `json:"projected,omitempty" protobuf:"bytes,25,opt,name=projected"`
 }
 
 // PersistentVolumeClaimVolumeSource references the user's PVC in the same namespace.
@@ -413,6 +416,9 @@ type PersistentVolumeSource struct {
 	AzureDisk *AzureDiskVolumeSource `json:"azureDisk,omitempty" protobuf:"bytes,16,opt,name=azureDisk"`
 	// PhotonPersistentDisk represents a PhotonController persistent disk attached and mounted on kubelets host machine
 	PhotonPersistentDisk *PhotonPersistentDiskVolumeSource `json:"photonPersistentDisk,omitempty" protobuf:"bytes,17,opt,name=photonPersistentDisk"`
+	// StorageOS represents a StorageOS volume that is attached to the kubelet's host machine and mounted into the pod
+	// +optional
+	StorageOS *StorageOSVolumeSource `json:"storageos,omitempty" protobuf:"bytes,18,opt,name=storageos"`
 }
 
 // +genclient=true
@@ -1105,6 +1111,33 @@ type AzureDiskVolumeSource struct {
 	// the ReadOnly setting in VolumeMounts.
 	// +optional
 	ReadOnly *bool `json:"readOnly,omitempty" protobuf:"varint,5,opt,name=readOnly"`
+}
+
+// Represents a StorageOS persistent volume resource.
+type StorageOSVolumeSource struct {
+	// VolumeName is the human-readable name of the StorageOS volume.  Volume
+	// names are only unique within a namespace.
+	VolumeName string `json:"volumeName,omitempty" protobuf:"bytes,1,opt,name=volumeName"`
+	// Namespace specifies the scope of the volume name within StorageOS.  If no
+	// namespace is specified, the namespace of the pod will be used.  Set to
+	// "default" if you are not using namespaces within StorageOS.
+	// +optional
+	Namespace string `json:"namespace,omitempty" protobuf:"bytes,2,opt,name=namespace"`
+	// The name of the storage pool to provision from.  Pools can have different
+	// capacity and performance characteristics depending on the underlying
+	// storage resources used in them.  If not specified, the default pool will be
+	// used.
+	// +optional
+	Pool string `json:"pool,omitempty" protobuf:"bytes,3,opt,name=pool"`
+	// Filesystem type to mount.
+	// Must be a filesystem type supported by the host operating system.
+	// Ex. "ext4", "xfs", "ntfs". Implicitly inferred to be "ext4" if unspecified.
+	// +optional
+	FSType string `json:"fsType,omitempty" protobuf:"bytes,4,opt,name=fsType"`
+	// Defaults to false (read/write). ReadOnly here will force
+	// the ReadOnly setting in VolumeMounts.
+	// +optional
+	ReadOnly bool `json:"readOnly,omitempty" protobuf:"varint,5,opt,name=readOnly"`
 }
 
 // Adapts a ConfigMap into a volume.

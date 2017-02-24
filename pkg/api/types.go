@@ -294,6 +294,9 @@ type VolumeSource struct {
 	AzureDisk *AzureDiskVolumeSource
 	// PhotonPersistentDisk represents a Photon Controller persistent disk attached and mounted on kubelets host machine
 	PhotonPersistentDisk *PhotonPersistentDiskVolumeSource
+	// StorageOS represents a StorageOS volume that is attached to the kubelet's host machine and mounted into the pod
+	// +optional
+	StorageOS *StorageOSVolumeSource
 	// Items for all in one resources secrets, configmaps, and downward API
 	Projected *ProjectedVolumeSource
 }
@@ -358,6 +361,9 @@ type PersistentVolumeSource struct {
 	AzureDisk *AzureDiskVolumeSource
 	// PhotonPersistentDisk represents a Photon Controller persistent disk attached and mounted on kubelets host machine
 	PhotonPersistentDisk *PhotonPersistentDiskVolumeSource
+	// StorageOS represents a StorageOS volume that is attached to the kubelet's host machine and mounted into the pod
+	// +optional
+	StorageOS *StorageOSVolumeSource
 }
 
 type PersistentVolumeClaimVolumeSource struct {
@@ -1027,6 +1033,33 @@ type AzureDiskVolumeSource struct {
 	// the ReadOnly setting in VolumeMounts.
 	// +optional
 	ReadOnly *bool
+}
+
+// Represents a StorageOS persistent volume resource.
+type StorageOSVolumeSource struct {
+	// VolumeName is the human-readable name of the StorageOS volume.  Volume
+	// names are only unique within a namespace.
+	VolumeName string
+	// Namespace specifies the scope of the volume name within StorageOS.  If no
+	// namespace is specified, the namespace of the pod will be used.  Set to
+	// "default" if you are not using namespaces within StorageOS.
+	// +optional
+	Namespace string
+	// The name of the storage pool to provision from.  Pools can have different
+	// capacity and performance characteristics depending on the underlying
+	// storage resources used in them.  If not specified, the default pool will be
+	// used.
+	// +optional
+	Pool string
+	// Filesystem type to mount.
+	// Must be a filesystem type supported by the host operating system.
+	// Ex. "ext4", "xfs", "ntfs". Implicitly inferred to be "ext4" if unspecified.
+	// +optional
+	FSType string
+	// Optional: Defaults to false (read/write). ReadOnly here will force
+	// the ReadOnly setting in VolumeMounts.
+	// +optional
+	ReadOnly bool
 }
 
 // Adapts a ConfigMap into a volume.

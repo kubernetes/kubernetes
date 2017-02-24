@@ -347,6 +347,8 @@ func RegisterConversions(scheme *runtime.Scheme) error {
 		Convert_api_ServiceSpec_To_v1_ServiceSpec,
 		Convert_v1_ServiceStatus_To_api_ServiceStatus,
 		Convert_api_ServiceStatus_To_v1_ServiceStatus,
+		Convert_v1_StorageOSVolumeSource_To_api_StorageOSVolumeSource,
+		Convert_api_StorageOSVolumeSource_To_v1_StorageOSVolumeSource,
 		Convert_v1_Sysctl_To_api_Sysctl,
 		Convert_api_Sysctl_To_v1_Sysctl,
 		Convert_v1_TCPSocketAction_To_api_TCPSocketAction,
@@ -2706,6 +2708,7 @@ func autoConvert_v1_PersistentVolumeSource_To_api_PersistentVolumeSource(in *Per
 	out.Quobyte = (*api.QuobyteVolumeSource)(unsafe.Pointer(in.Quobyte))
 	out.AzureDisk = (*api.AzureDiskVolumeSource)(unsafe.Pointer(in.AzureDisk))
 	out.PhotonPersistentDisk = (*api.PhotonPersistentDiskVolumeSource)(unsafe.Pointer(in.PhotonPersistentDisk))
+	out.StorageOS = (*api.StorageOSVolumeSource)(unsafe.Pointer(in.StorageOS))
 	return nil
 }
 
@@ -2731,6 +2734,7 @@ func autoConvert_api_PersistentVolumeSource_To_v1_PersistentVolumeSource(in *api
 	out.VsphereVolume = (*VsphereVirtualDiskVolumeSource)(unsafe.Pointer(in.VsphereVolume))
 	out.AzureDisk = (*AzureDiskVolumeSource)(unsafe.Pointer(in.AzureDisk))
 	out.PhotonPersistentDisk = (*PhotonPersistentDiskVolumeSource)(unsafe.Pointer(in.PhotonPersistentDisk))
+	out.StorageOS = (*StorageOSVolumeSource)(unsafe.Pointer(in.StorageOS))
 	return nil
 }
 
@@ -4275,6 +4279,32 @@ func Convert_api_ServiceStatus_To_v1_ServiceStatus(in *api.ServiceStatus, out *S
 	return autoConvert_api_ServiceStatus_To_v1_ServiceStatus(in, out, s)
 }
 
+func autoConvert_v1_StorageOSVolumeSource_To_api_StorageOSVolumeSource(in *StorageOSVolumeSource, out *api.StorageOSVolumeSource, s conversion.Scope) error {
+	out.VolumeName = in.VolumeName
+	out.Namespace = in.Namespace
+	out.Pool = in.Pool
+	out.FSType = in.FSType
+	out.ReadOnly = in.ReadOnly
+	return nil
+}
+
+func Convert_v1_StorageOSVolumeSource_To_api_StorageOSVolumeSource(in *StorageOSVolumeSource, out *api.StorageOSVolumeSource, s conversion.Scope) error {
+	return autoConvert_v1_StorageOSVolumeSource_To_api_StorageOSVolumeSource(in, out, s)
+}
+
+func autoConvert_api_StorageOSVolumeSource_To_v1_StorageOSVolumeSource(in *api.StorageOSVolumeSource, out *StorageOSVolumeSource, s conversion.Scope) error {
+	out.VolumeName = in.VolumeName
+	out.Namespace = in.Namespace
+	out.Pool = in.Pool
+	out.FSType = in.FSType
+	out.ReadOnly = in.ReadOnly
+	return nil
+}
+
+func Convert_api_StorageOSVolumeSource_To_v1_StorageOSVolumeSource(in *api.StorageOSVolumeSource, out *StorageOSVolumeSource, s conversion.Scope) error {
+	return autoConvert_api_StorageOSVolumeSource_To_v1_StorageOSVolumeSource(in, out, s)
+}
+
 func autoConvert_v1_Sysctl_To_api_Sysctl(in *Sysctl, out *api.Sysctl, s conversion.Scope) error {
 	out.Name = in.Name
 	out.Value = in.Value
@@ -4457,6 +4487,7 @@ func autoConvert_v1_VolumeSource_To_api_VolumeSource(in *VolumeSource, out *api.
 	out.Quobyte = (*api.QuobyteVolumeSource)(unsafe.Pointer(in.Quobyte))
 	out.AzureDisk = (*api.AzureDiskVolumeSource)(unsafe.Pointer(in.AzureDisk))
 	out.PhotonPersistentDisk = (*api.PhotonPersistentDiskVolumeSource)(unsafe.Pointer(in.PhotonPersistentDisk))
+	out.StorageOS = (*api.StorageOSVolumeSource)(unsafe.Pointer(in.StorageOS))
 	out.Projected = (*api.ProjectedVolumeSource)(unsafe.Pointer(in.Projected))
 	return nil
 }
@@ -4489,6 +4520,7 @@ func autoConvert_api_VolumeSource_To_v1_VolumeSource(in *api.VolumeSource, out *
 	out.VsphereVolume = (*VsphereVirtualDiskVolumeSource)(unsafe.Pointer(in.VsphereVolume))
 	out.AzureDisk = (*AzureDiskVolumeSource)(unsafe.Pointer(in.AzureDisk))
 	out.PhotonPersistentDisk = (*PhotonPersistentDiskVolumeSource)(unsafe.Pointer(in.PhotonPersistentDisk))
+	out.StorageOS = (*StorageOSVolumeSource)(unsafe.Pointer(in.StorageOS))
 	out.Projected = (*ProjectedVolumeSource)(unsafe.Pointer(in.Projected))
 	return nil
 }
