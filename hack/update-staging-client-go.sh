@@ -44,24 +44,15 @@ done
 readonly V IN_PLACE
 
 KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
+source "${KUBE_ROOT}/hack/lib/util.sh"
+
 cd ${KUBE_ROOT}
 
-# Create temporary GOPATH to run godep-restore into
-if [ "${IN_PLACE}" != 1 ]; then
-    GODEP_RESTORE_TMPDIR=$(mktemp -d -t verify-staging-client-go.XXXXX)
-    echo "Creating a temporary GOPATH directory for godep-restore: ${GODEP_RESTORE_TMPDIR}"
-    cleanup() {
-        if [ "${KEEP_TEMP_DIR:-0}" != 1 ]; then
-            rm -rf "${GODEP_RESTORE_TMPDIR}"
-        fi
-    }
-    trap cleanup EXIT SIGINT
-    mkdir -p "${GODEP_RESTORE_TMPDIR}/src"
-    export GOPATH="${GODEP_RESTORE_TMPDIR}:${GOPATH}"
+echo "Checking whether godeps are restored"
+if ! kube::util::godep_restored 2>&1 | sed 's/^/  /'; then
+  echo -e '\nRun 'godep restore' to download dependencies.' 1>&2
+  exit 1
 fi
-
-echo "Running godep restore"
-godep restore ${V} 2>&1 | sed 's/^/  /'
 
 echo "Running staging/copy.sh"
 eval staging/copy.sh ${COPY_FLAGS} 2>&1 | sed 's/^/  /'

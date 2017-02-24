@@ -411,6 +411,63 @@ kube::util::git_upstream_remote_name() {
     head -n 1 | awk '{print $1}'
 }
 
+# Checks whether godep restore was run in the current GOPATH, i.e. that all referenced repos exist
+# and are checked out to the referenced rev.
+kube::util::godep_restored() {
+  local -r godeps_json=${1:-Godeps/Godeps.json}
+  local -r gopath=${2:-${GOPATH%:*}}
+  if ! which jq &>/dev/null; then
+    echo "jq not found. Please install." 1>&2
+    return 1
+  fi
+  local root
+  local old_rev=""
+  while read path rev; do
+    rev=$(echo "${rev}" | sed "s/['\"]//g") # remove quotes which are around revs sometimes
+
+    if [[ "${rev}" == "${old_rev}" ]] && [[ "${path}" == "${root}"* ]]; then
+      # avoid checking the same git/hg root again
+      continue
+    fi
+
+    root="${path}"
+    while [ "${root}" != "." -a ! -d "${gopath}/src/${root}/.git" -a ! -d "${gopath}/src/${root}/.hg" ]; do
+      root=$(dirname "${root}")
+    done
+    if [ "${root}" == "." ]; then
+      echo "No checkout of ${path} found in GOPATH \"${gopath}\"." 1>&2
+      return 1
+    fi
+    local head
+    if [ -d "${gopath}/src/${root}/.git" ]; then
+        head="$(cd "${gopath}/src/${root}" && git rev-parse HEAD)"
+    else
+        head="$(cd "${gopath}/src/${root}" && hg parent -T '{node}')"
+    fi
+    if [ "${head}" != "${rev}" ]; then
+      echo "Unexpected HEAD '${head}' at ${gopath}/src/${root}, expected '${rev}'." 1>&2
+      return 1
+    fi
+    old_rev="${rev}"
+  done < <(jq '.Deps|.[]|.ImportPath + " " + .Rev' -r < "${godeps_json}")
+  return 0
+}
+
+# Ensure that the given godep version is installed and in the path
+kube::util::ensure_godep_version() {
+  if [[ "$(godep version)" == *"godep ${1}"* ]]; then
+    return
+  fi
+
+  kube::util::ensure-temp-dir
+  mkdir -p "${KUBE_TEMP}/go/src"
+  GOPATH="${KUBE_TEMP}/go" go get -u github.com/tools/godep 2>/dev/null
+  (cd "${KUBE_TEMP}/go/src/github.com/tools/godep" && git checkout "${1:-v74}" && GOPATH="${KUBE_TEMP}/go" go install .)
+  PATH="${KUBE_TEMP}/go/bin:${PATH}"
+  hash -r # force bash to clear PATH cache
+  godep version
+}
+
 # Checks whether there are any files matching pattern $2 changed between the
 # current branch and upstream branch named by $1.
 # Returns 1 (false) if there are no changes, 0 (true) if there are changes
