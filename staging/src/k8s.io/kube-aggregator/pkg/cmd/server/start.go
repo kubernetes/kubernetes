@@ -63,7 +63,6 @@ func NewCommandStartAggregator(out, err io.Writer) *cobra.Command {
 		StdOut: out,
 		StdErr: err,
 	}
-	o.RecommendedOptions.SecureServing.ServingOptions.BindPort = 443
 
 	cmd := &cobra.Command{
 		Short: "Launch a API aggregator and proxy server",
