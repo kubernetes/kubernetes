@@ -44,7 +44,7 @@ func startHPAController(ctx ControllerContext) (bool, error) {
 		hpaClient.Extensions(),
 		hpaClient.Autoscaling(),
 		replicaCalc,
-		ctx.NewInformerFactory.Autoscaling().V1().HorizontalPodAutoscalers(),
+		ctx.InformerFactory.Autoscaling().V1().HorizontalPodAutoscalers(),
 		ctx.Options.HorizontalPodAutoscalerSyncPeriod.Duration,
 	).Run(ctx.Stop)
 	return true, nil

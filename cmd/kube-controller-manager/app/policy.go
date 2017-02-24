@@ -30,12 +30,12 @@ func startDisruptionController(ctx ControllerContext) (bool, error) {
 		return false, nil
 	}
 	go disruption.NewDisruptionController(
-		ctx.NewInformerFactory.Core().V1().Pods(),
-		ctx.NewInformerFactory.Policy().V1beta1().PodDisruptionBudgets(),
-		ctx.NewInformerFactory.Core().V1().ReplicationControllers(),
-		ctx.NewInformerFactory.Extensions().V1beta1().ReplicaSets(),
-		ctx.NewInformerFactory.Extensions().V1beta1().Deployments(),
-		ctx.NewInformerFactory.Apps().V1beta1().StatefulSets(),
+		ctx.InformerFactory.Core().V1().Pods(),
+		ctx.InformerFactory.Policy().V1beta1().PodDisruptionBudgets(),
+		ctx.InformerFactory.Core().V1().ReplicationControllers(),
+		ctx.InformerFactory.Extensions().V1beta1().ReplicaSets(),
+		ctx.InformerFactory.Extensions().V1beta1().Deployments(),
+		ctx.InformerFactory.Apps().V1beta1().StatefulSets(),
 		ctx.ClientBuilder.ClientOrDie("disruption-controller"),
 	).Run(ctx.Stop)
 	return true, nil
