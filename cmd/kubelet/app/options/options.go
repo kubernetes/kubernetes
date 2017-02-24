@@ -91,7 +91,7 @@ func (s *KubeletServer) AddFlags(fs *pflag.FlagSet) {
 	fs.StringSliceVar(&s.APIServerList, "api-servers", []string{}, "List of Kubernetes API servers for publishing events, and reading pods and services. (ip:port), comma separated.")
 	fs.MarkDeprecated("api-servers", "Use --kubeconfig instead. Will be removed in a future version.")
 
-	fs.StringVar(&s.PodManifestPath, "pod-manifest-path", s.PodManifestPath, "Path to to the directory containing pod manifest files to run, or the path to a single pod manifest file.")
+	fs.StringVar(&s.PodManifestPath, "pod-manifest-path", s.PodManifestPath, "Path to to the directory containing pod manifest files to run, or the path to a single pod manifest file. Files starting with dots will be ignored.")
 	fs.DurationVar(&s.SyncFrequency.Duration, "sync-frequency", s.SyncFrequency.Duration, "Max period between synchronizing running containers and config")
 	fs.DurationVar(&s.FileCheckFrequency.Duration, "file-check-frequency", s.FileCheckFrequency.Duration, "Duration between checking config files for new data")
 	fs.DurationVar(&s.HTTPCheckFrequency.Duration, "http-check-frequency", s.HTTPCheckFrequency.Duration, "Duration between checking http for new data")
