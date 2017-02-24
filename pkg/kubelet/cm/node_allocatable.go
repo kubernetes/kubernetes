@@ -223,7 +223,7 @@ func (cm *containerManagerImpl) validateNodeAllocatable() error {
 	zeroValue := resource.MustParse("0")
 	var errors []string
 	for key, val := range na {
-		if val.Cmp(zeroValue) <= 0 {
+		if val.Cmp(zeroValue) < 0 {
 			errors = append(errors, fmt.Sprintf("Resource %q has an allocatable of %v", key, val))
 		}
 	}

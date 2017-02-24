@@ -20,6 +20,7 @@ package app
 import (
 	"crypto/tls"
 	"errors"
+	"math"
 	"fmt"
 	"io/ioutil"
 	"math/rand"
@@ -525,6 +526,21 @@ func run(s *options.KubeletServer, kubeDeps *kubelet.KubeletDeps) (err error) {
 				return err
 			}
 		}
+		// It is safe to invoke `MachineInfo` on cAdvisor before logically initializing cAdvisor here because
+		// machine info is computed and cached once as part of cAdvisor object creation.
+		info, err := kubeDeps.CAdvisorInterface.MachineInfo()
+		if err != nil {
+			return err
+		}
+		capacity := cadvisor.CapacityFromMachineInfo(info)
+		if s.KubeletConfiguration.PodsPerCore > 0 {
+			capacity[v1.ResourcePods] = *resource.NewQuantity(
+				int64(math.Min(float64(info.NumCores*int(s.KubeletConfiguration.PodsPerCore)), float64(s.KubeletConfiguration.MaxPods))), resource.DecimalSI)
+		} else {
+			capacity[v1.ResourcePods] = *resource.NewQuantity(int64(s.KubeletConfiguration.MaxPods), resource.DecimalSI)
+		}
+		capacity[v1.ResourceNvidiaGPU] = *resource.NewQuantity(int64(s.KubeletConfiguration.NvidiaGPUs), resource.DecimalSI)
+
 		kubeDeps.ContainerManager, err = cm.NewContainerManager(
 			kubeDeps.Mounter,
 			kubeDeps.CAdvisorInterface,
@@ -548,7 +564,8 @@ func run(s *options.KubeletServer, kubeDeps *kubelet.KubeletDeps) (err error) {
 				},
 			},
 			s.ExperimentalFailSwapOn,
-			kubeDeps.Recorder)
+			kubeDeps.Recorder,
+			capacity)
 
 		if err != nil {
 			return err

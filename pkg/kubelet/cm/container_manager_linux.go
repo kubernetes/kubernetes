@@ -178,7 +178,7 @@ func validateSystemRequirements(mountUtil mount.Interface) (features, error) {
 // TODO(vmarmol): Add limits to the system containers.
 // Takes the absolute name of the specified containers.
 // Empty container name disables use of the specified container.
-func NewContainerManager(mountUtil mount.Interface, cadvisorInterface cadvisor.Interface, nodeConfig NodeConfig, failSwapOn bool, recorder record.EventRecorder) (ContainerManager, error) {
+func NewContainerManager(mountUtil mount.Interface, cadvisorInterface cadvisor.Interface, nodeConfig NodeConfig, failSwapOn bool, recorder record.EventRecorder, capacity v1.ResourceList) (ContainerManager, error) {
 	subsystems, err := GetCgroupSubsystems()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get mounted cgroup subsystems: %v", err)
@@ -214,14 +214,6 @@ func NewContainerManager(mountUtil mount.Interface, cadvisorInterface cadvisor.I
 		glog.Warningf("Running with swap on is not supported, please disable swap! " +
 			"This will be a fatal error by default starting in K8s v1.6! " +
 			"In the meantime, you can opt-in to making this a fatal error by enabling --experimental-fail-swap-on.")
-	}
-	var capacity = v1.ResourceList{}
-	// It is safe to invoke `MachineInfo` on cAdvisor before logically initializing cAdvisor here because
-	// machine info is computed and cached once as part of cAdvisor object creation.
-	if info, err := cadvisorInterface.MachineInfo(); err == nil {
-		capacity = cadvisor.CapacityFromMachineInfo(info)
-	} else {
-		return nil, err
 	}
 
 	cgroupRoot := nodeConfig.CgroupRoot
