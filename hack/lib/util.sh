@@ -442,7 +442,7 @@ kube::util::godep_restored() {
     if [ -d "${gopath}/src/${root}/.git" ]; then
       head="$(cd "${gopath}/src/${root}" && git rev-parse HEAD)"
     else
-      head="$(cd "${gopath}/src/${root}" && hg parent -T '{node}')"
+      head="$(cd "${gopath}/src/${root}" && hg parent --template '{node}')"
     fi
     if [ "${head}" != "${rev}" ]; then
       echo "Unexpected HEAD '${head}' at ${gopath}/src/${root}, expected '${rev}'." 1>&2
