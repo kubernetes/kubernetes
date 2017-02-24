@@ -1,4 +1,6 @@
 [![Build Status](https://travis-ci.org/spf13/pflag.svg?branch=master)](https://travis-ci.org/spf13/pflag)
+[![Go Report Card](https://goreportcard.com/badge/github.com/spf13/pflag)](https://goreportcard.com/report/github.com/spf13/pflag)
+[![GoDoc](https://godoc.org/github.com/spf13/pflag?status.svg)](https://godoc.org/github.com/spf13/pflag)
 
 ## Description
 
@@ -106,9 +108,9 @@ that give one-letter shorthands for flags. You can use these by appending
 var ip = flag.IntP("flagname", "f", 1234, "help message")
 var flagvar bool
 func init() {
-    flag.BoolVarP("boolname", "b", true, "help message")
+	flag.BoolVarP(&flagvar, "boolname", "b", true, "help message")
 }
-flag.VarP(&flagVar, "varname", "v", 1234, "help message")
+flag.VarP(&flagVal, "varname", "v", "help message")
 ```
 
 Shorthand letters can be used with single dashes on the command line.
