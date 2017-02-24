@@ -20,6 +20,7 @@ import (
 	"encoding/json"
 	"testing"
 
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/kubernetes/federation/apis/federation"
@@ -28,6 +29,7 @@ import (
 )
 
 func TestResourceVersioner(t *testing.T) {
+	accessor := meta.NewAccessor()
 	cluster := federation.Cluster{ObjectMeta: metav1.ObjectMeta{ResourceVersion: "10"}}
 	version, err := accessor.ResourceVersion(&cluster)
 	if err != nil {

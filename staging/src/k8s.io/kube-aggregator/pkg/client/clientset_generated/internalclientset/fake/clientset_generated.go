@@ -24,8 +24,8 @@ import (
 	"k8s.io/client-go/pkg/api"
 	"k8s.io/client-go/testing"
 	clientset "k8s.io/kube-aggregator/pkg/client/clientset_generated/internalclientset"
-	internalversionapiregistration "k8s.io/kube-aggregator/pkg/client/clientset_generated/internalclientset/typed/apiregistration/internalversion"
-	fakeinternalversionapiregistration "k8s.io/kube-aggregator/pkg/client/clientset_generated/internalclientset/typed/apiregistration/internalversion/fake"
+	apiregistrationinternalversion "k8s.io/kube-aggregator/pkg/client/clientset_generated/internalclientset/typed/apiregistration/internalversion"
+	fakeapiregistrationinternalversion "k8s.io/kube-aggregator/pkg/client/clientset_generated/internalclientset/typed/apiregistration/internalversion/fake"
 )
 
 // NewSimpleClientset returns a clientset that will respond with the provided objects.
@@ -62,6 +62,6 @@ func (c *Clientset) Discovery() discovery.DiscoveryInterface {
 var _ clientset.Interface = &Clientset{}
 
 // Apiregistration retrieves the ApiregistrationClient
-func (c *Clientset) Apiregistration() internalversionapiregistration.ApiregistrationInterface {
-	return &fakeinternalversionapiregistration.FakeApiregistration{Fake: &c.Fake}
+func (c *Clientset) Apiregistration() apiregistrationinternalversion.ApiregistrationInterface {
+	return &fakeapiregistrationinternalversion.FakeApiregistration{Fake: &c.Fake}
 }

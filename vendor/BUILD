@@ -1609,6 +1609,7 @@ go_library(
     deps = [
         "//vendor:github.com/coreos/etcd/etcdserver/etcdserverpb",
         "//vendor:github.com/coreos/etcd/lease",
+        "//vendor:golang.org/x/net/context",
     ],
 )
 
@@ -6742,7 +6743,6 @@ go_library(
         "//vendor:github.com/vmware/govmomi/vim25",
         "//vendor:github.com/vmware/govmomi/vim25/soap",
         "//vendor:github.com/vmware/govmomi/vim25/types",
-        "//vendor:golang.org/x/net/context",
     ],
 )
 
@@ -6760,7 +6760,6 @@ go_library(
         "//vendor:github.com/vmware/govmomi/vim25",
         "//vendor:github.com/vmware/govmomi/vim25/mo",
         "//vendor:github.com/vmware/govmomi/vim25/types",
-        "//vendor:golang.org/x/net/context",
     ],
 )
 
@@ -6777,7 +6776,6 @@ go_library(
         "//vendor:github.com/vmware/govmomi/vim25/mo",
         "//vendor:github.com/vmware/govmomi/vim25/soap",
         "//vendor:github.com/vmware/govmomi/vim25/types",
-        "//vendor:golang.org/x/net/context",
     ],
 )
 
@@ -6792,6 +6790,9 @@ go_library(
         "github.com/vmware/govmomi/object/customization_spec_manager.go",
         "github.com/vmware/govmomi/object/datacenter.go",
         "github.com/vmware/govmomi/object/datastore.go",
+        "github.com/vmware/govmomi/object/datastore_file.go",
+        "github.com/vmware/govmomi/object/datastore_path.go",
+        "github.com/vmware/govmomi/object/diagnostic_log.go",
         "github.com/vmware/govmomi/object/diagnostic_manager.go",
         "github.com/vmware/govmomi/object/distributed_virtual_portgroup.go",
         "github.com/vmware/govmomi/object/distributed_virtual_switch.go",
@@ -6800,9 +6801,12 @@ go_library(
         "github.com/vmware/govmomi/object/folder.go",
         "github.com/vmware/govmomi/object/history_collector.go",
         "github.com/vmware/govmomi/object/host_account_manager.go",
+        "github.com/vmware/govmomi/object/host_certificate_info.go",
+        "github.com/vmware/govmomi/object/host_certificate_manager.go",
         "github.com/vmware/govmomi/object/host_config_manager.go",
         "github.com/vmware/govmomi/object/host_datastore_browser.go",
         "github.com/vmware/govmomi/object/host_datastore_system.go",
+        "github.com/vmware/govmomi/object/host_date_time_system.go",
         "github.com/vmware/govmomi/object/host_firewall_system.go",
         "github.com/vmware/govmomi/object/host_network_system.go",
         "github.com/vmware/govmomi/object/host_service_system.go",
@@ -6840,7 +6844,6 @@ go_library(
         "//vendor:github.com/vmware/govmomi/vim25/progress",
         "//vendor:github.com/vmware/govmomi/vim25/soap",
         "//vendor:github.com/vmware/govmomi/vim25/types",
-        "//vendor:golang.org/x/net/context",
     ],
 )
 
@@ -6857,7 +6860,6 @@ go_library(
         "//vendor:github.com/vmware/govmomi/vim25/mo",
         "//vendor:github.com/vmware/govmomi/vim25/soap",
         "//vendor:github.com/vmware/govmomi/vim25/types",
-        "//vendor:golang.org/x/net/context",
     ],
 )
 
@@ -6875,7 +6877,6 @@ go_library(
         "//vendor:github.com/vmware/govmomi/vim25/mo",
         "//vendor:github.com/vmware/govmomi/vim25/soap",
         "//vendor:github.com/vmware/govmomi/vim25/types",
-        "//vendor:golang.org/x/net/context",
     ],
 )
 
@@ -6890,7 +6891,6 @@ go_library(
         "//vendor:github.com/vmware/govmomi/property",
         "//vendor:github.com/vmware/govmomi/vim25/progress",
         "//vendor:github.com/vmware/govmomi/vim25/types",
-        "//vendor:golang.org/x/net/context",
     ],
 )
 
@@ -6906,7 +6906,6 @@ go_library(
         "//vendor:github.com/vmware/govmomi/vim25/methods",
         "//vendor:github.com/vmware/govmomi/vim25/soap",
         "//vendor:github.com/vmware/govmomi/vim25/types",
-        "//vendor:golang.org/x/net/context",
     ],
 )
 
@@ -6927,7 +6926,6 @@ go_library(
     deps = [
         "//vendor:github.com/vmware/govmomi/vim25/soap",
         "//vendor:github.com/vmware/govmomi/vim25/types",
-        "//vendor:golang.org/x/net/context",
     ],
 )
 
@@ -6948,7 +6946,6 @@ go_library(
         "//vendor:github.com/vmware/govmomi/vim25/methods",
         "//vendor:github.com/vmware/govmomi/vim25/soap",
         "//vendor:github.com/vmware/govmomi/vim25/types",
-        "//vendor:golang.org/x/net/context",
     ],
 )
 
@@ -6981,7 +6978,6 @@ go_library(
         "//vendor:github.com/vmware/govmomi/vim25/progress",
         "//vendor:github.com/vmware/govmomi/vim25/types",
         "//vendor:github.com/vmware/govmomi/vim25/xml",
-        "//vendor:golang.org/x/net/context",
     ],
 )
 
@@ -16616,13 +16612,12 @@ go_library(
     tags = ["automanaged"],
     deps = [
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
-        "//vendor:k8s.io/apimachinery/pkg/runtime/schema",
         "//vendor:k8s.io/apimachinery/pkg/runtime/serializer",
         "//vendor:k8s.io/apimachinery/pkg/types",
         "//vendor:k8s.io/apimachinery/pkg/watch",
-        "//vendor:k8s.io/client-go/pkg/api",
         "//vendor:k8s.io/client-go/rest",
         "//vendor:k8s.io/kube-aggregator/pkg/apis/apiregistration/v1alpha1",
+        "//vendor:k8s.io/kube-aggregator/pkg/client/clientset_generated/clientset/scheme",
     ],
 )
 
@@ -16696,9 +16691,9 @@ go_library(
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
         "//vendor:k8s.io/apimachinery/pkg/types",
         "//vendor:k8s.io/apimachinery/pkg/watch",
-        "//vendor:k8s.io/client-go/pkg/api",
         "//vendor:k8s.io/client-go/rest",
         "//vendor:k8s.io/kube-aggregator/pkg/apis/apiregistration",
+        "//vendor:k8s.io/kube-aggregator/pkg/client/clientset_generated/internalclientset/scheme",
     ],
 )
 
@@ -17084,5 +17079,39 @@ go_test(
     deps = [
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
         "//vendor:k8s.io/apimachinery/pkg/runtime",
+    ],
+)
+
+go_library(
+    name = "k8s.io/kube-aggregator/pkg/client/clientset_generated/clientset/scheme",
+    srcs = [
+        "k8s.io/kube-aggregator/pkg/client/clientset_generated/clientset/scheme/doc.go",
+        "k8s.io/kube-aggregator/pkg/client/clientset_generated/clientset/scheme/register.go",
+    ],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
+        "//vendor:k8s.io/apimachinery/pkg/runtime",
+        "//vendor:k8s.io/apimachinery/pkg/runtime/schema",
+        "//vendor:k8s.io/apimachinery/pkg/runtime/serializer",
+        "//vendor:k8s.io/kube-aggregator/pkg/apis/apiregistration/v1alpha1",
+    ],
+)
+
+go_library(
+    name = "k8s.io/kube-aggregator/pkg/client/clientset_generated/internalclientset/scheme",
+    srcs = [
+        "k8s.io/kube-aggregator/pkg/client/clientset_generated/internalclientset/scheme/doc.go",
+        "k8s.io/kube-aggregator/pkg/client/clientset_generated/internalclientset/scheme/register.go",
+    ],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:k8s.io/apimachinery/pkg/apimachinery/announced",
+        "//vendor:k8s.io/apimachinery/pkg/apimachinery/registered",
+        "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
+        "//vendor:k8s.io/apimachinery/pkg/runtime",
+        "//vendor:k8s.io/apimachinery/pkg/runtime/schema",
+        "//vendor:k8s.io/apimachinery/pkg/runtime/serializer",
+        "//vendor:k8s.io/kube-aggregator/pkg/apis/apiregistration/install",
     ],
 )

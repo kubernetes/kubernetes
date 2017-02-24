@@ -369,6 +369,7 @@ items:
     - /api/*
     - /apis
     - /apis/*
+    - /healthz
     - /swaggerapi
     - /swaggerapi/*
     - /version
@@ -489,6 +490,7 @@ items:
     resources:
     - daemonsets
     - deployments
+    - podsecuritypolicies
     - replicasets
     verbs:
     - list
@@ -533,6 +535,24 @@ items:
     - storage.k8s.io
     resources:
     - storageclasses
+    verbs:
+    - list
+    - watch
+- apiVersion: rbac.authorization.k8s.io/v1beta1
+  kind: ClusterRole
+  metadata:
+    annotations:
+      rbac.authorization.kubernetes.io/autoupdate: "true"
+    creationTimestamp: null
+    labels:
+      kubernetes.io/bootstrapping: rbac-defaults
+    name: system:kube-dns
+  rules:
+  - apiGroups:
+    - ""
+    resources:
+    - endpoints
+    - services
     verbs:
     - list
     - watch

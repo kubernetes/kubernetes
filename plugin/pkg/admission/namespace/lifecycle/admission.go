@@ -28,11 +28,11 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/admission"
 	utilcache "k8s.io/apiserver/pkg/util/cache"
-	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/clock"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
-	"k8s.io/kubernetes/pkg/controller/informers"
+	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated/internalversion"
+	corelisters "k8s.io/kubernetes/pkg/client/listers/core/internalversion"
 	kubeapiserveradmission "k8s.io/kubernetes/pkg/kubeapiserver/admission"
 )
 
@@ -61,7 +61,7 @@ type lifecycle struct {
 	*admission.Handler
 	client             internalclientset.Interface
 	immortalNamespaces sets.String
-	namespaceInformer  cache.SharedIndexInformer
+	namespaceLister    corelisters.NamespaceLister
 	// forceLiveLookupCache holds a list of entries for namespaces that we have a strong reason to believe are stale in our local cache.
 	// if a namespace is in this cache, then we will ignore our local state and always fetch latest from api server.
 	forceLiveLookupCache *utilcache.LRUExpireCache
@@ -109,24 +109,31 @@ func (l *lifecycle) Admit(a admission.Attributes) error {
 	}
 
 	var (
-		namespaceObj interface{}
-		exists       bool
-		err          error
+		exists bool
+		err    error
 	)
 
-	key := makeNamespaceKey(a.GetNamespace())
-	namespaceObj, exists, err = l.namespaceInformer.GetStore().Get(key)
+	namespace, err := l.namespaceLister.Get(a.GetNamespace())
 	if err != nil {
-		return errors.NewInternalError(err)
+		if !errors.IsNotFound(err) {
+			return errors.NewInternalError(err)
+		}
+	} else {
+		exists = true
 	}
 
 	if !exists && a.GetOperation() == admission.Create {
 		// give the cache time to observe the namespace before rejecting a create.
 		// this helps when creating a namespace and immediately creating objects within it.
 		time.Sleep(missingNamespaceWait)
-		namespaceObj, exists, err = l.namespaceInformer.GetStore().Get(key)
-		if err != nil {
+		namespace, err = l.namespaceLister.Get(a.GetNamespace())
+		switch {
+		case errors.IsNotFound(err):
+			// no-op
+		case err != nil:
 			return errors.NewInternalError(err)
+		default:
+			exists = true
 		}
 		if exists {
 			glog.V(4).Infof("found %s in cache after waiting", a.GetNamespace())
@@ -137,17 +144,17 @@ func (l *lifecycle) Admit(a admission.Attributes) error {
 	forceLiveLookup := false
 	if _, ok := l.forceLiveLookupCache.Get(a.GetNamespace()); ok {
 		// we think the namespace was marked for deletion, but our current local cache says otherwise, we will force a live lookup.
-		forceLiveLookup = exists && namespaceObj.(*api.Namespace).Status.Phase == api.NamespaceActive
+		forceLiveLookup = exists && namespace.Status.Phase == api.NamespaceActive
 	}
 
 	// refuse to operate on non-existent namespaces
 	if !exists || forceLiveLookup {
 		// as a last resort, make a call directly to storage
-		namespaceObj, err = l.client.Core().Namespaces().Get(a.GetNamespace(), metav1.GetOptions{})
-		if err != nil {
-			if errors.IsNotFound(err) {
-				return err
-			}
+		namespace, err = l.client.Core().Namespaces().Get(a.GetNamespace(), metav1.GetOptions{})
+		switch {
+		case errors.IsNotFound(err):
+			return err
+		case err != nil:
 			return errors.NewInternalError(err)
 		}
 		glog.V(4).Infof("found %s via storage lookup", a.GetNamespace())
@@ -155,7 +162,6 @@ func (l *lifecycle) Admit(a admission.Attributes) error {
 
 	// ensure that we're not trying to create objects in terminating namespaces
 	if a.GetOperation() == admission.Create {
-		namespace := namespaceObj.(*api.Namespace)
 		if namespace.Status.Phase != api.NamespaceTerminating {
 			return nil
 		}
@@ -182,8 +188,9 @@ func newLifecycleWithClock(immortalNamespaces sets.String, clock utilcache.Clock
 }
 
 func (l *lifecycle) SetInformerFactory(f informers.SharedInformerFactory) {
-	l.namespaceInformer = f.InternalNamespaces().Informer()
-	l.SetReadyFunc(l.namespaceInformer.HasSynced)
+	namespaceInformer := f.Core().InternalVersion().Namespaces()
+	l.namespaceLister = namespaceInformer.Lister()
+	l.SetReadyFunc(namespaceInformer.Informer().HasSynced)
 }
 
 func (l *lifecycle) SetInternalClientSet(client internalclientset.Interface) {
@@ -191,8 +198,8 @@ func (l *lifecycle) SetInternalClientSet(client internalclientset.Interface) {
 }
 
 func (l *lifecycle) Validate() error {
-	if l.namespaceInformer == nil {
-		return fmt.Errorf("missing namespaceInformer")
+	if l.namespaceLister == nil {
+		return fmt.Errorf("missing namespaceLister")
 	}
 	if l.client == nil {
 		return fmt.Errorf("missing client")

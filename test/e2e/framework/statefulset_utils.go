@@ -18,7 +18,6 @@ package framework
 
 import (
 	"fmt"
-	"io/ioutil"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -38,6 +37,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/v1"
 	apps "k8s.io/kubernetes/pkg/apis/apps/v1beta1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
+	"k8s.io/kubernetes/test/e2e/generated"
 )
 
 const (
@@ -70,8 +70,7 @@ func CreateStatefulSetService(name string, labels map[string]string) *v1.Service
 func StatefulSetFromManifest(fileName, ns string) *apps.StatefulSet {
 	var ss apps.StatefulSet
 	Logf("Parsing statefulset from %v", fileName)
-	data, err := ioutil.ReadFile(fileName)
-	Expect(err).NotTo(HaveOccurred())
+	data := generated.ReadOrDie(fileName)
 	json, err := utilyaml.ToJSON(data)
 	Expect(err).NotTo(HaveOccurred())
 
@@ -99,7 +98,7 @@ func NewStatefulSetTester(c clientset.Interface) *StatefulSetTester {
 // CreateStatefulSet creates a StatefulSet from the manifest at manifestPath in the Namespace ns using kubectl create.
 func (s *StatefulSetTester) CreateStatefulSet(manifestPath, ns string) *apps.StatefulSet {
 	mkpath := func(file string) string {
-		return filepath.Join(TestContext.RepoRoot, manifestPath, file)
+		return filepath.Join(manifestPath, file)
 	}
 	ss := StatefulSetFromManifest(mkpath("statefulset.yaml"), ns)
 

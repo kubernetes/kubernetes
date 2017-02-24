@@ -25,6 +25,7 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/client-go/rest/fake"
 	"k8s.io/kubernetes/pkg/apis/rbac"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
 )
@@ -53,6 +54,8 @@ func TestCreateRole(t *testing.T) {
 	printer := &testRolePrinter{}
 	tf.Printer = printer
 	tf.Namespace = "test"
+	tf.Client = &fake.RESTClient{}
+	tf.ClientConfig = defaultClientConfig()
 
 	tests := map[string]struct {
 		verbs         string
@@ -214,7 +217,8 @@ func TestValidate(t *testing.T) {
 	}
 
 	for name, test := range tests {
-		err := test.roleOptions.Validate(f)
+		test.roleOptions.Mapper, _ = f.Object()
+		err := test.roleOptions.Validate()
 		if test.expectErr && err != nil {
 			continue
 		}
@@ -230,6 +234,8 @@ func TestComplete(t *testing.T) {
 	f, tf, _, _ := cmdtesting.NewAPIFactory()
 	tf.Printer = &testPrinter{}
 	tf.Namespace = "test"
+	tf.Client = &fake.RESTClient{}
+	tf.ClientConfig = defaultClientConfig()
 
 	buf := bytes.NewBuffer([]byte{})
 	cmd := NewCmdCreateRole(f, buf)
@@ -357,15 +363,28 @@ func TestComplete(t *testing.T) {
 	}
 
 	for name, test := range tests {
-		err := test.roleOptions.Complete(cmd, test.params)
+		err := test.roleOptions.Complete(f, cmd, test.params)
 		if !test.expectErr && err != nil {
 			t.Errorf("%s: unexpected error: %v", name, err)
 		}
 		if test.expectErr && err != nil {
 			continue
 		}
-		if !reflect.DeepEqual(test.roleOptions, test.expected) {
-			t.Errorf("%s:\nexpected:\n%#v\nsaw:\n%#v", name, test.expected, test.roleOptions)
+
+		if test.roleOptions.Name != test.expected.Name {
+			t.Errorf("%s:\nexpected name:\n%#v\nsaw name:\n%#v", name, test.expected.Name, test.roleOptions.Name)
+		}
+
+		if !reflect.DeepEqual(test.roleOptions.Verbs, test.expected.Verbs) {
+			t.Errorf("%s:\nexpected verbs:\n%#v\nsaw verbs:\n%#v", name, test.expected.Verbs, test.roleOptions.Verbs)
+		}
+
+		if !reflect.DeepEqual(test.roleOptions.Resources, test.expected.Resources) {
+			t.Errorf("%s:\nexpected resources:\n%#v\nsaw resources:\n%#v", name, test.expected.Resources, test.roleOptions.Resources)
+		}
+
+		if !reflect.DeepEqual(test.roleOptions.ResourceNames, test.expected.ResourceNames) {
+			t.Errorf("%s:\nexpected resource names:\n%#v\nsaw resource names:\n%#v", name, test.expected.ResourceNames, test.roleOptions.ResourceNames)
 		}
 	}
 }

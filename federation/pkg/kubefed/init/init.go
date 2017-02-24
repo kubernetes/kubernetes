@@ -549,7 +549,6 @@ func createPVC(clientset *client.Clientset, namespace, svcName, etcdPVCapacity s
 					api.ResourceStorage: capacity,
 				},
 			},
-			Selector: &metav1.LabelSelector{MatchLabels: apiserverSvcSelector},
 		},
 	}
 
@@ -622,7 +621,7 @@ func createAPIServer(clientset *client.Clientset, namespace, name, image, creden
 						},
 						{
 							Name:  "etcd",
-							Image: "gcr.io/google_containers/etcd:3.0.14-alpha.1",
+							Image: "gcr.io/google_containers/etcd:3.0.17-alpha.1",
 							Command: []string{
 								"/usr/local/bin/etcd",
 								"--data-dir",

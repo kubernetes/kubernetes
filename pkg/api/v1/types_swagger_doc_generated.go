@@ -936,6 +936,7 @@ var map_NodeSpec = map[string]string{
 	"externalID":    "External ID of the node assigned by some machine database (e.g. a cloud provider). Deprecated.",
 	"providerID":    "ID of the node assigned by the cloud provider in the format: <ProviderName>://<ProviderSpecificNodeID>",
 	"unschedulable": "Unschedulable controls node schedulability of new pods. By default, node is schedulable. More info: http://releases.k8s.io/HEAD/docs/admin/node.md#manual-node-administration",
+	"taints":        "If specified, the node's taints.",
 }
 
 func (NodeSpec) SwaggerDoc() map[string]string {
@@ -1059,11 +1060,12 @@ func (PersistentVolumeClaimList) SwaggerDoc() map[string]string {
 }
 
 var map_PersistentVolumeClaimSpec = map[string]string{
-	"":            "PersistentVolumeClaimSpec describes the common attributes of storage devices and allows a Source for provider-specific attributes",
-	"accessModes": "AccessModes contains the desired access modes the volume should have. More info: http://kubernetes.io/docs/user-guide/persistent-volumes#access-modes-1",
-	"selector":    "A label query over volumes to consider for binding.",
-	"resources":   "Resources represents the minimum resources the volume should have. More info: http://kubernetes.io/docs/user-guide/persistent-volumes#resources",
-	"volumeName":  "VolumeName is the binding reference to the PersistentVolume backing this claim.",
+	"":                 "PersistentVolumeClaimSpec describes the common attributes of storage devices and allows a Source for provider-specific attributes",
+	"accessModes":      "AccessModes contains the desired access modes the volume should have. More info: http://kubernetes.io/docs/user-guide/persistent-volumes#access-modes-1",
+	"selector":         "A label query over volumes to consider for binding.",
+	"resources":        "Resources represents the minimum resources the volume should have. More info: http://kubernetes.io/docs/user-guide/persistent-volumes#resources",
+	"volumeName":       "VolumeName is the binding reference to the PersistentVolume backing this claim.",
+	"storageClassName": "Name of the StorageClass required by the claim. More info: http://kubernetes.io/docs/user-guide/persistent-volumes#class-1",
 }
 
 func (PersistentVolumeClaimSpec) SwaggerDoc() map[string]string {
@@ -1132,6 +1134,7 @@ var map_PersistentVolumeSpec = map[string]string{
 	"accessModes":                   "AccessModes contains all ways the volume can be mounted. More info: http://kubernetes.io/docs/user-guide/persistent-volumes#access-modes",
 	"claimRef":                      "ClaimRef is part of a bi-directional binding between PersistentVolume and PersistentVolumeClaim. Expected to be non-nil when bound. claim.VolumeName is the authoritative bind between PV and PVC. More info: http://kubernetes.io/docs/user-guide/persistent-volumes#binding",
 	"persistentVolumeReclaimPolicy": "What happens to a persistent volume when released from its claim. Valid options are Retain (default) and Recycle. Recycling must be supported by the volume plugin underlying this persistent volume. More info: http://kubernetes.io/docs/user-guide/persistent-volumes#recycling-policy",
+	"storageClassName":              "Name of StorageClass to which this persistent volume belongs. Empty value means that this volume does not belong to any StorageClass.",
 }
 
 func (PersistentVolumeSpec) SwaggerDoc() map[string]string {
@@ -1331,6 +1334,7 @@ var map_PodSpec = map[string]string{
 	"subdomain":                     "If specified, the fully qualified Pod hostname will be \"<hostname>.<subdomain>.<pod namespace>.svc.<cluster domain>\". If not specified, the pod will not have a domainname at all.",
 	"affinity":                      "If specified, the pod's scheduling constraints",
 	"schedulername":                 "If specified, the pod will be dispatched by specified scheduler. If not specified, the pod will be dispatched by default scheduler.",
+	"tolerations":                   "If specified, the pod's tolerations.",
 }
 
 func (PodSpec) SwaggerDoc() map[string]string {

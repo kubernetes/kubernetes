@@ -46,7 +46,7 @@ func (d *discoveryValue) String() string {
 	case d.v.File != nil:
 		return "file://" + d.v.File.Path
 	case d.v.Token != nil:
-		return fmt.Sprintf("token://%s:%s@%s", d.v.Token.ID, d.v.Token.Secret, strings.Join(d.v.Token.Addresses, ","))
+		return fmt.Sprintf("token://%s.%s@%s", d.v.Token.ID, d.v.Token.Secret, strings.Join(d.v.Token.Addresses, ","))
 	default:
 		return "unknown"
 	}

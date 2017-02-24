@@ -21,7 +21,7 @@ import (
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	rest "k8s.io/client-go/rest"
-	api "k8s.io/kubernetes/pkg/api"
+	scheme "k8s.io/kubernetes/federation/client/clientset_generated/federation_clientset/scheme"
 	v1 "k8s.io/kubernetes/pkg/apis/batch/v1"
 )
 
@@ -116,7 +116,7 @@ func (c *jobs) DeleteCollection(options *meta_v1.DeleteOptions, listOptions meta
 	return c.client.Delete().
 		Namespace(c.ns).
 		Resource("jobs").
-		VersionedParams(&listOptions, api.ParameterCodec).
+		VersionedParams(&listOptions, scheme.ParameterCodec).
 		Body(options).
 		Do().
 		Error()
@@ -129,7 +129,7 @@ func (c *jobs) Get(name string, options meta_v1.GetOptions) (result *v1.Job, err
 		Namespace(c.ns).
 		Resource("jobs").
 		Name(name).
-		VersionedParams(&options, api.ParameterCodec).
+		VersionedParams(&options, scheme.ParameterCodec).
 		Do().
 		Into(result)
 	return
@@ -141,7 +141,7 @@ func (c *jobs) List(opts meta_v1.ListOptions) (result *v1.JobList, err error) {
 	err = c.client.Get().
 		Namespace(c.ns).
 		Resource("jobs").
-		VersionedParams(&opts, api.ParameterCodec).
+		VersionedParams(&opts, scheme.ParameterCodec).
 		Do().
 		Into(result)
 	return
@@ -149,11 +149,11 @@ func (c *jobs) List(opts meta_v1.ListOptions) (result *v1.JobList, err error) {
 
 // Watch returns a watch.Interface that watches the requested jobs.
 func (c *jobs) Watch(opts meta_v1.ListOptions) (watch.Interface, error) {
+	opts.Watch = true
 	return c.client.Get().
-		Prefix("watch").
 		Namespace(c.ns).
 		Resource("jobs").
-		VersionedParams(&opts, api.ParameterCodec).
+		VersionedParams(&opts, scheme.ParameterCodec).
 		Watch()
 }
 

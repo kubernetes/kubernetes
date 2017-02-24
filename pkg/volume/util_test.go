@@ -18,12 +18,14 @@ package volume
 
 import (
 	"fmt"
+	"hash/fnv"
 	"strings"
 	"testing"
 
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
@@ -303,4 +305,152 @@ func TestGenerateVolumeName(t *testing.T) {
 		t.Errorf("Expected %s, got %s", expect, v3)
 	}
 
+}
+
+func checkFnv32(t *testing.T, s string, expected int) {
+	h := fnv.New32()
+	h.Write([]byte(s))
+	h.Sum32()
+
+	if int(h.Sum32()) != expected {
+		t.Fatalf("hash of %q was %v, expected %v", s, h.Sum32(), expected)
+	}
+}
+
+func TestChooseZoneForVolume(t *testing.T) {
+	checkFnv32(t, "henley", 1180403676)
+	// 1180403676 mod 3 == 0, so the offset from "henley" is 0, which makes it easier to verify this by inspection
+
+	// A few others
+	checkFnv32(t, "henley-", 2652299129)
+	checkFnv32(t, "henley-a", 1459735322)
+	checkFnv32(t, "", 2166136261)
+
+	tests := []struct {
+		Zones      []string
+		VolumeName string
+		Expected   string
+	}{
+		// Test for PVC names that don't have a dash
+		{
+			Zones:      []string{"a", "b", "c"},
+			VolumeName: "henley",
+			Expected:   "a", // hash("henley") == 0
+		},
+		// Tests for PVC names that end in - number, but don't look like statefulset PVCs
+		{
+			Zones:      []string{"a", "b", "c"},
+			VolumeName: "henley-0",
+			Expected:   "a", // hash("henley") == 0
+		},
+		{
+			Zones:      []string{"a", "b", "c"},
+			VolumeName: "henley-1",
+			Expected:   "b", // hash("henley") + 1 == 1
+		},
+		{
+			Zones:      []string{"a", "b", "c"},
+			VolumeName: "henley-2",
+			Expected:   "c", // hash("henley") + 2 == 2
+		},
+		{
+			Zones:      []string{"a", "b", "c"},
+			VolumeName: "henley-3",
+			Expected:   "a", // hash("henley") + 3 == 3 === 0 mod 3
+		},
+		{
+			Zones:      []string{"a", "b", "c"},
+			VolumeName: "henley-4",
+			Expected:   "b", // hash("henley") + 4 == 4 === 1 mod 3
+		},
+		// Tests for PVC names that are edge cases
+		{
+			Zones:      []string{"a", "b", "c"},
+			VolumeName: "henley-",
+			Expected:   "c", // hash("henley-") = 2652299129 === 2 mod 3
+		},
+		{
+			Zones:      []string{"a", "b", "c"},
+			VolumeName: "henley-a",
+			Expected:   "c", // hash("henley-a") = 1459735322 === 2 mod 3
+		},
+		{
+			Zones:      []string{"a", "b", "c"},
+			VolumeName: "medium--1",
+			Expected:   "c", // hash("") + 1 == 2166136261 + 1 === 2 mod 3
+		},
+		// Tests for PVC names for simple StatefulSet cases
+		{
+			Zones:      []string{"a", "b", "c"},
+			VolumeName: "medium-henley-1",
+			Expected:   "b", // hash("henley") + 1 == 1
+		},
+		{
+			Zones:      []string{"a", "b", "c"},
+			VolumeName: "loud-henley-1",
+			Expected:   "b", // hash("henley") + 1 == 1
+		},
+		{
+			Zones:      []string{"a", "b", "c"},
+			VolumeName: "quiet-henley-2",
+			Expected:   "c", // hash("henley") + 2 == 2
+		},
+		{
+			Zones:      []string{"a", "b", "c"},
+			VolumeName: "medium-henley-2",
+			Expected:   "c", // hash("henley") + 2 == 2
+		},
+		{
+			Zones:      []string{"a", "b", "c"},
+			VolumeName: "medium-henley-3",
+			Expected:   "a", // hash("henley") + 3 == 3 === 0 mod 3
+		},
+		{
+			Zones:      []string{"a", "b", "c"},
+			VolumeName: "medium-henley-4",
+			Expected:   "b", // hash("henley") + 4 == 4 === 1 mod 3
+		},
+		// Tests for statefulsets (or claims) with dashes in the names
+		{
+			Zones:      []string{"a", "b", "c"},
+			VolumeName: "medium-alpha-henley-2",
+			Expected:   "c", // hash("henley") + 2 == 2
+		},
+		{
+			Zones:      []string{"a", "b", "c"},
+			VolumeName: "medium-beta-henley-3",
+			Expected:   "a", // hash("henley") + 3 == 3 === 0 mod 3
+		},
+		{
+			Zones:      []string{"a", "b", "c"},
+			VolumeName: "medium-gamma-henley-4",
+			Expected:   "b", // hash("henley") + 4 == 4 === 1 mod 3
+		},
+		// Tests for statefulsets name ending in -
+		{
+			Zones:      []string{"a", "b", "c"},
+			VolumeName: "medium-henley--2",
+			Expected:   "a", // hash("") + 2 == 0 mod 3
+		},
+		{
+			Zones:      []string{"a", "b", "c"},
+			VolumeName: "medium-henley--3",
+			Expected:   "b", // hash("") + 3 == 1 mod 3
+		},
+		{
+			Zones:      []string{"a", "b", "c"},
+			VolumeName: "medium-henley--4",
+			Expected:   "c", // hash("") + 4 == 2 mod 3
+		},
+	}
+
+	for _, test := range tests {
+		zonesSet := sets.NewString(test.Zones...)
+
+		actual := ChooseZoneForVolume(zonesSet, test.VolumeName)
+
+		for actual != test.Expected {
+			t.Errorf("Test %v failed, expected zone %q, actual %q", test, test.Expected, actual)
+		}
+	}
 }

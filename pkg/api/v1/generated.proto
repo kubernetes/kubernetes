@@ -1622,6 +1622,10 @@ message NodeSpec {
   // More info: http://releases.k8s.io/HEAD/docs/admin/node.md#manual-node-administration
   // +optional
   optional bool unschedulable = 4;
+
+  // If specified, the node's taints.
+  // +optional
+  repeated Taint taints = 5;
 }
 
 // NodeStatus is information about the current status of a node.
@@ -1989,6 +1993,11 @@ message PersistentVolumeClaimSpec {
   // VolumeName is the binding reference to the PersistentVolume backing this claim.
   // +optional
   optional string volumeName = 3;
+
+  // Name of the StorageClass required by the claim.
+  // More info: http://kubernetes.io/docs/user-guide/persistent-volumes#class-1
+  // +optional
+  optional string storageClassName = 5;
 }
 
 // PersistentVolumeClaimStatus is the current status of a persistent volume claim.
@@ -2149,6 +2158,11 @@ message PersistentVolumeSpec {
   // More info: http://kubernetes.io/docs/user-guide/persistent-volumes#recycling-policy
   // +optional
   optional string persistentVolumeReclaimPolicy = 5;
+
+  // Name of StorageClass to which this persistent volume belongs. Empty value
+  // means that this volume does not belong to any StorageClass.
+  // +optional
+  optional string storageClassName = 6;
 }
 
 // PersistentVolumeStatus is the current status of a persistent volume.
@@ -2662,6 +2676,10 @@ message PodSpec {
   // If not specified, the pod will be dispatched by default scheduler.
   // +optional
   optional string schedulername = 19;
+
+  // If specified, the pod's tolerations.
+  // +optional
+  repeated Toleration tolerations = 22;
 }
 
 // PodStatus represents information about the status of a pod. Status may trail the actual

@@ -26,58 +26,58 @@
 		},
 		{
 			"ImportPath": "github.com/coreos/etcd/auth/authpb",
-			"Comment": "v3.0.14",
-			"Rev": "8a37349097a592db79ba3087f3cae9cd4b0af21c"
+			"Comment": "v3.0.17",
+			"Rev": "cc198e22d3b8fd7ec98304c95e68ee375be54589"
 		},
 		{
 			"ImportPath": "github.com/coreos/etcd/client",
-			"Comment": "v3.0.14",
-			"Rev": "8a37349097a592db79ba3087f3cae9cd4b0af21c"
+			"Comment": "v3.0.17",
+			"Rev": "cc198e22d3b8fd7ec98304c95e68ee375be54589"
 		},
 		{
 			"ImportPath": "github.com/coreos/etcd/clientv3",
-			"Comment": "v3.0.14",
-			"Rev": "8a37349097a592db79ba3087f3cae9cd4b0af21c"
+			"Comment": "v3.0.17",
+			"Rev": "cc198e22d3b8fd7ec98304c95e68ee375be54589"
 		},
 		{
 			"ImportPath": "github.com/coreos/etcd/etcdserver/api/v3rpc/rpctypes",
-			"Comment": "v3.0.14",
-			"Rev": "8a37349097a592db79ba3087f3cae9cd4b0af21c"
+			"Comment": "v3.0.17",
+			"Rev": "cc198e22d3b8fd7ec98304c95e68ee375be54589"
 		},
 		{
 			"ImportPath": "github.com/coreos/etcd/etcdserver/etcdserverpb",
-			"Comment": "v3.0.14",
-			"Rev": "8a37349097a592db79ba3087f3cae9cd4b0af21c"
+			"Comment": "v3.0.17",
+			"Rev": "cc198e22d3b8fd7ec98304c95e68ee375be54589"
 		},
 		{
 			"ImportPath": "github.com/coreos/etcd/mvcc/mvccpb",
-			"Comment": "v3.0.14",
-			"Rev": "8a37349097a592db79ba3087f3cae9cd4b0af21c"
+			"Comment": "v3.0.17",
+			"Rev": "cc198e22d3b8fd7ec98304c95e68ee375be54589"
 		},
 		{
 			"ImportPath": "github.com/coreos/etcd/pkg/fileutil",
-			"Comment": "v3.0.14",
-			"Rev": "8a37349097a592db79ba3087f3cae9cd4b0af21c"
+			"Comment": "v3.0.17",
+			"Rev": "cc198e22d3b8fd7ec98304c95e68ee375be54589"
 		},
 		{
 			"ImportPath": "github.com/coreos/etcd/pkg/pathutil",
-			"Comment": "v3.0.14",
-			"Rev": "8a37349097a592db79ba3087f3cae9cd4b0af21c"
+			"Comment": "v3.0.17",
+			"Rev": "cc198e22d3b8fd7ec98304c95e68ee375be54589"
 		},
 		{
 			"ImportPath": "github.com/coreos/etcd/pkg/tlsutil",
-			"Comment": "v3.0.14",
-			"Rev": "8a37349097a592db79ba3087f3cae9cd4b0af21c"
+			"Comment": "v3.0.17",
+			"Rev": "cc198e22d3b8fd7ec98304c95e68ee375be54589"
 		},
 		{
 			"ImportPath": "github.com/coreos/etcd/pkg/transport",
-			"Comment": "v3.0.14",
-			"Rev": "8a37349097a592db79ba3087f3cae9cd4b0af21c"
+			"Comment": "v3.0.17",
+			"Rev": "cc198e22d3b8fd7ec98304c95e68ee375be54589"
 		},
 		{
 			"ImportPath": "github.com/coreos/etcd/pkg/types",
-			"Comment": "v3.0.14",
-			"Rev": "8a37349097a592db79ba3087f3cae9cd4b0af21c"
+			"Comment": "v3.0.17",
+			"Rev": "cc198e22d3b8fd7ec98304c95e68ee375be54589"
 		},
 		{
 			"ImportPath": "github.com/coreos/go-systemd/daemon",
@@ -100,12 +100,12 @@
 		},
 		{
 			"ImportPath": "github.com/docker/distribution/digest",
-			"Comment": "v2.4.0-rc.1-38-gcd27f17",
+			"Comment": "v2.4.0-rc.1-38-gcd27f179",
 			"Rev": "cd27f179f2c10c5d300e6d09025b538c475b0d51"
 		},
 		{
 			"ImportPath": "github.com/docker/distribution/reference",
-			"Comment": "v2.4.0-rc.1-38-gcd27f17",
+			"Comment": "v2.4.0-rc.1-38-gcd27f179",
 			"Rev": "cd27f179f2c10c5d300e6d09025b538c475b0d51"
 		},
 		{
@@ -153,12 +153,12 @@
 		},
 		{
 			"ImportPath": "github.com/gogo/protobuf/proto",
-			"Comment": "v0.2-33-ge18d7aa",
+			"Comment": "v0.2-33-ge18d7aa8",
 			"Rev": "e18d7aa8f8c624c915db340349aad4c49b10d173"
 		},
 		{
 			"ImportPath": "github.com/gogo/protobuf/sortkeys",
-			"Comment": "v0.2-33-ge18d7aa",
+			"Comment": "v0.2-33-ge18d7aa8",
 			"Rev": "e18d7aa8f8c624c915db340349aad4c49b10d173"
 		},
 		{

@@ -75,6 +75,8 @@ type TestContextType struct {
 	CreateTestingNS CreateTestingNSFn
 	// If set to true test will dump data about the namespace in which test was running.
 	DumpLogsOnFailure bool
+	// Disables dumping cluster log from master and nodes after all tests.
+	DisableLogDump bool
 	// If the garbage collector is enabled in the kube-apiserver and kube-controller-manager.
 	GarbageCollectorEnabled bool
 	// FeatureGates is a set of key=value pairs that describe feature gates for alpha/experimental features.
@@ -148,6 +150,7 @@ func RegisterCommonFlags() {
 	flag.BoolVar(&TestContext.GatherMetricsAfterTest, "gather-metrics-at-teardown", false, "If set to true framwork will gather metrics from all components after each test.")
 	flag.StringVar(&TestContext.OutputPrintType, "output-print-type", "hr", "Comma separated list: 'hr' for human readable summaries 'json' for JSON ones.")
 	flag.BoolVar(&TestContext.DumpLogsOnFailure, "dump-logs-on-failure", true, "If set to true test will dump data about the namespace in which test was running.")
+	flag.BoolVar(&TestContext.DisableLogDump, "disable-log-dump", false, "If set to true, logs from master and nodes won't be gathered after test run.")
 	flag.BoolVar(&TestContext.DeleteNamespace, "delete-namespace", true, "If true tests will delete namespace after completion. It is only designed to make debugging easier, DO NOT turn it off by default.")
 	flag.BoolVar(&TestContext.DeleteNamespaceOnFailure, "delete-namespace-on-failure", true, "If true, framework will delete test namespace on failure. Used only during test debugging.")
 	flag.IntVar(&TestContext.AllowedNotReadyNodes, "allowed-not-ready-nodes", 0, "If non-zero, framework will allow for that many non-ready nodes when checking for all ready nodes.")

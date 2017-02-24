@@ -22,6 +22,7 @@ import (
 	watch "k8s.io/apimachinery/pkg/watch"
 	rest "k8s.io/client-go/rest"
 	api "k8s.io/kubernetes/pkg/api"
+	scheme "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/scheme"
 )
 
 // PodTemplatesGetter has a method to return a PodTemplateInterface.
@@ -98,7 +99,7 @@ func (c *podTemplates) DeleteCollection(options *v1.DeleteOptions, listOptions v
 	return c.client.Delete().
 		Namespace(c.ns).
 		Resource("podtemplates").
-		VersionedParams(&listOptions, api.ParameterCodec).
+		VersionedParams(&listOptions, scheme.ParameterCodec).
 		Body(options).
 		Do().
 		Error()
@@ -111,7 +112,7 @@ func (c *podTemplates) Get(name string, options v1.GetOptions) (result *api.PodT
 		Namespace(c.ns).
 		Resource("podtemplates").
 		Name(name).
-		VersionedParams(&options, api.ParameterCodec).
+		VersionedParams(&options, scheme.ParameterCodec).
 		Do().
 		Into(result)
 	return
@@ -123,7 +124,7 @@ func (c *podTemplates) List(opts v1.ListOptions) (result *api.PodTemplateList, e
 	err = c.client.Get().
 		Namespace(c.ns).
 		Resource("podtemplates").
-		VersionedParams(&opts, api.ParameterCodec).
+		VersionedParams(&opts, scheme.ParameterCodec).
 		Do().
 		Into(result)
 	return
@@ -131,11 +132,11 @@ func (c *podTemplates) List(opts v1.ListOptions) (result *api.PodTemplateList, e
 
 // Watch returns a watch.Interface that watches the requested podTemplates.
 func (c *podTemplates) Watch(opts v1.ListOptions) (watch.Interface, error) {
+	opts.Watch = true
 	return c.client.Get().
-		Prefix("watch").
 		Namespace(c.ns).
 		Resource("podtemplates").
-		VersionedParams(&opts, api.ParameterCodec).
+		VersionedParams(&opts, scheme.ParameterCodec).
 		Watch()
 }
 
