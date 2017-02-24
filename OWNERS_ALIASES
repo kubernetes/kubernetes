@@ -48,3 +48,11 @@ aliases:
     - vishh
     - yifan-gu
     - yujuhong
+  sig-network-reviewers:
+    - thockin
+    - freehan
+    - bowei
+    - mrhohn
+    - dcbw
+    - danwinship
+    - caseydavenport
