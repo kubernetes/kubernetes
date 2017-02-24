@@ -110,7 +110,6 @@ func WriteStaticPodManifests(cfg *kubeadmapi.MasterConfiguration) error {
 			VolumeMounts:  []api.VolumeMount{certsVolumeMount(), etcdVolumeMount(), k8sVolumeMount()},
 			Image:         images.GetCoreImage(images.KubeEtcdImage, cfg, kubeadmapi.GlobalEnvParams.EtcdImage),
 			LivenessProbe: componentProbe(2379, "/health"),
-			Resources:     componentResources("200m"),
 		}, certsVolume(cfg), etcdVolume(cfg), k8sVolume(cfg))
 
 		etcdPod.Spec.SecurityContext = &api.PodSecurityContext{
