@@ -50,6 +50,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/apis/componentconfig"
+	"k8s.io/kubernetes/pkg/kubelet/cm"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
 	"k8s.io/kubernetes/pkg/kubelet/images"
@@ -87,6 +88,7 @@ func (f *fakeHTTP) Get(url string) (*http.Response, error) {
 
 // fakeRuntimeHelper implementes kubecontainer.RuntimeHelper inter
 // faces for testing purposes.
+// TODO(random-liu): Move this into pkg/kubelet/container/testing
 type fakeRuntimeHelper struct{}
 
 var _ kubecontainer.RuntimeHelper = &fakeRuntimeHelper{}
@@ -104,6 +106,10 @@ func (f *fakeRuntimeHelper) GenerateRunContainerOptions(pod *v1.Pod, container *
 		opts.PodContainerDir = testPodContainerDir
 	}
 	return &opts, nil
+}
+
+func (f *fakeRuntimeHelper) GetPodCgroupParent(pod *v1.Pod) (cm.CgroupName, string) {
+	return "", ""
 }
 
 func (f *fakeRuntimeHelper) GetClusterDNS(pod *v1.Pod) ([]string, []string, error) {

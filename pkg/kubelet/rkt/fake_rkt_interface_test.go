@@ -28,6 +28,7 @@ import (
 	"google.golang.org/grpc"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/api/v1"
+	"k8s.io/kubernetes/pkg/kubelet/cm"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 )
 
@@ -151,6 +152,7 @@ func (f *fakeSystemd) ResetFailedUnit(name string) error {
 }
 
 // fakeRuntimeHelper implementes kubecontainer.RuntimeHelper interfaces for testing purpose.
+// TODO(random-liu): Move this into pkg/kubelet/container/testing
 type fakeRuntimeHelper struct {
 	dnsServers  []string
 	dnsSearches []string
@@ -161,6 +163,10 @@ type fakeRuntimeHelper struct {
 
 func (f *fakeRuntimeHelper) GenerateRunContainerOptions(pod *v1.Pod, container *v1.Container, podIP string) (*kubecontainer.RunContainerOptions, error) {
 	return nil, fmt.Errorf("Not implemented")
+}
+
+func (f *fakeRuntimeHelper) GetPodCgroupParent(pod *v1.Pod) (cm.CgroupName, string) {
+	return "", ""
 }
 
 func (f *fakeRuntimeHelper) GetClusterDNS(pod *v1.Pod) ([]string, []string, error) {
