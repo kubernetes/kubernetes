@@ -24,6 +24,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
@@ -56,6 +57,8 @@ type StatefulSetController struct {
 	// control returns an interface capable of syncing a stateful set.
 	// Abstracted out for testing.
 	control StatefulSetControlInterface
+	// podControl is used for patching pods.
+	podControl controller.PodControlInterface
 	// podLister is able to list/get pods from a shared informer's store
 	podLister corelisters.PodLister
 	// podListerSynced returns true if the pod shared informer has synced at least once
@@ -83,6 +86,7 @@ func NewStatefulSetController(
 		kubeClient: kubeClient,
 		control:    NewDefaultStatefulSetControl(NewRealStatefulPodControl(kubeClient, setInformer.Lister(), podInformer.Lister(), recorder)),
 		queue:      workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "statefulset"),
+		podControl: controller.RealPodControl{KubeClient: kubeClient, Recorder: recorder},
 	}
 
 	podInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
@@ -198,13 +202,26 @@ func (ssc *StatefulSetController) deletePod(obj interface{}) {
 	}
 }
 
-// getPodsForStatefulSets returns the pods that match the selectors of the given statefulset.
-func (ssc *StatefulSetController) getPodsForStatefulSet(set *apps.StatefulSet) ([]*v1.Pod, error) {
-	sel, err := metav1.LabelSelectorAsSelector(set.Spec.Selector)
+// getPodsForStatefulSet returns the Pods that a given StatefulSet should manage.
+// It also reconciles ControllerRef by adopting/orphaning.
+//
+// NOTE: Returned Pods are pointers to objects from the cache.
+//       If you need to modify one, you need to copy it first.
+func (ssc *StatefulSetController) getPodsForStatefulSet(set *apps.StatefulSet, selector labels.Selector) ([]*v1.Pod, error) {
+	// List all pods to include the pods that don't match the selector anymore but
+	// has a ControllerRef pointing to this StatefulSet.
+	pods, err := ssc.podLister.Pods(set.Namespace).List(labels.Everything())
 	if err != nil {
-		return []*v1.Pod{}, err
+		return nil, err
 	}
-	return ssc.podLister.Pods(set.Namespace).List(sel)
+
+	filter := func(pod *v1.Pod) bool {
+		// Only claim if it matches our StatefulSet name. Otherwise release/ignore.
+		return isMemberOf(set, pod)
+	}
+
+	cm := controller.NewPodControllerRefManager(ssc.podControl, set, selector, getSSKind())
+	return cm.ClaimPods(pods, filter)
 }
 
 // getStatefulSetForPod returns the StatefulSet managing the given pod.
@@ -286,11 +303,17 @@ func (ssc *StatefulSetController) sync(key string) error {
 		return nil
 	}
 	if err != nil {
-		utilruntime.HandleError(fmt.Errorf("Unable to retrieve StatefulSet %v from store: %v", key, err))
+		utilruntime.HandleError(fmt.Errorf("unable to retrieve StatefulSet %v from store: %v", key, err))
 		return err
 	}
+	selector, err := metav1.LabelSelectorAsSelector(set.Spec.Selector)
+	if err != nil {
+		utilruntime.HandleError(fmt.Errorf("error converting StatefulSet %v selector: %v", key, err))
+		// This is a non-transient error, so don't retry.
+		return nil
+	}
 
-	pods, err := ssc.getPodsForStatefulSet(set)
+	pods, err := ssc.getPodsForStatefulSet(set, selector)
 	if err != nil {
 		return err
 	}
