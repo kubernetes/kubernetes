@@ -56,7 +56,7 @@ func (cm *unsupportedContainerManager) Status() Status {
 	return Status{}
 }
 
-func (cm *unsupportedContainerManager) GetNodeAllocatable() v1.ResourceList {
+func (cm *unsupportedContainerManager) GetNodeAllocatableReservation() v1.ResourceList {
 	return nil
 }
 

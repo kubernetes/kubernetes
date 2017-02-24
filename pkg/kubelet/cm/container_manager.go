@@ -50,8 +50,8 @@ type ContainerManager interface {
 	// GetQOSContainersInfo returns the names of top level QoS containers
 	GetQOSContainersInfo() QOSContainersInfo
 
-	// GetNodeAllocatable returns the amount of compute resources that can be consumed by pods.
-	GetNodeAllocatable() v1.ResourceList
+	// GetNodeAllocatable returns the amount of compute resources that have to be reserved from scheduling.
+	GetNodeAllocatableReservation() v1.ResourceList
 }
 
 type NodeConfig struct {
@@ -80,3 +80,10 @@ type Status struct {
 	// Any soft requirements that were unsatisfied.
 	SoftRequirements error
 }
+
+const (
+	// Uer visible keys for managing node allocatable enforcement on the node.
+	NodeAllocatableEnforcementKey = "pods"
+	SystemReservedEnforcementKey  = "system-reserved"
+	KubeReservedEnforcementKey    = "kube-reserved"
+)

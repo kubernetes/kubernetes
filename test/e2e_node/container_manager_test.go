@@ -83,8 +83,8 @@ func expectFileValToEqual(filePath string, expectedValue, delta int64) {
 	Expect((actual < (expectedValue-delta)) || (actual > (expectedValue+delta))).To(BeFalse(), "Expected value at %q to be between %d and %d. Got %d", filePath, (expectedValue - delta), (expectedValue + delta), actual)
 }
 
-var _ = framework.KubeDescribe("Kubelet Container Manager Node Allocatable Enforcement [Serial]", func() {
-	f := framework.NewDefaultFramework("kubelet-container-manager-na")
+var _ = framework.KubeDescribe("Kubelet Container Manager [Serial]", func() {
+	f := framework.NewDefaultFramework("kubelet-container-manager")
 
 	Describe("Validate Node Allocatable", func() {
 		Context("once the node is setup", func() {
@@ -136,6 +136,8 @@ var _ = framework.KubeDescribe("Kubelet Container Manager Node Allocatable Enfor
 				expectFileValToEqual(filepath.Join(subsystems.MountPoints["memory"], "kubepods", "memory.limit_in_bytes"), allocatableMemory.Value(), 0)
 				// Check that Allocatable reported to scheduler includes eviction thresholds.
 				schedulerAllocatable := getLocalNode(f).Status.Allocatable
+				// Expect allocatable to include all resources in capacity.
+				Expect(len(schedulerAllocatable)).To(Equal(len(capacity)))
 				// CPU based evictions are not supported.
 				Expect(allocatableCPU.Cmp(schedulerAllocatable["cpu"])).To(Equal(0), "Unexpected cpu allocatable value exposed by the node. Expected: %v, got: %v, capacity: %v", allocatableCPU, schedulerAllocatable["cpu"], capacity["cpu"])
 				// Memory allocatable should take into account eviction thresholds.
@@ -146,10 +148,6 @@ var _ = framework.KubeDescribe("Kubelet Container Manager Node Allocatable Enfor
 			// TODO: Add test for enforcing System Reserved and Kube Reserved. Requires creation of dummy cgroups.
 		})
 	})
-})
-
-var _ = framework.KubeDescribe("Kubelet Container Manager OOM score Enforcement [Serial]", func() {
-	f := framework.NewDefaultFramework("kubelet-container-manager-oom")
 
 	Describe("Validate OOM score adjustments", func() {
 		Context("once the node is setup", func() {

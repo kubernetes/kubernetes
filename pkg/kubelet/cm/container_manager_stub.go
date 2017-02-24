@@ -50,7 +50,7 @@ func (cm *containerManagerStub) Status() Status {
 	return Status{}
 }
 
-func (cm *containerManagerStub) GetNodeAllocatable() v1.ResourceList {
+func (cm *containerManagerStub) GetNodeAllocatableReservation() v1.ResourceList {
 	return nil
 }
 

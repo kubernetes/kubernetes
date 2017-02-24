@@ -522,7 +522,17 @@ func (kl *Kubelet) setNodeStatusMachineInfo(node *v1.Node) {
 	}
 
 	// Set Allocatable.
-	node.Status.Allocatable = kl.containerManager.GetNodeAllocatable()
+	if node.Status.Allocatable == nil {
+		node.Status.Allocatable = make(v1.ResourceList)
+	}
+	allocatableReservation := kl.containerManager.GetNodeAllocatableReservation()
+	for k, v := range node.Status.Capacity {
+		value := *(v.Copy())
+		if res, exists := allocatableReservation[k]; exists {
+			value.Sub(res)
+		}
+		node.Status.Allocatable[k] = value
+	}
 }
 
 // Set versioninfo for the node.

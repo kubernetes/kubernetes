@@ -115,7 +115,7 @@ type localCM struct {
 	allocatable v1.ResourceList
 }
 
-func (lcm *localCM) GetNodeAllocatable() v1.ResourceList {
+func (lcm *localCM) GetNodeAllocatableReservation() v1.ResourceList {
 	return lcm.allocatable
 }
 
@@ -129,8 +129,8 @@ func TestUpdateNewNodeStatus(t *testing.T) {
 	kubelet.containerManager = &localCM{
 		ContainerManager: cm.NewStubContainerManager(),
 		allocatable: v1.ResourceList{
-			v1.ResourceCPU:    *resource.NewMilliQuantity(1800, resource.DecimalSI),
-			v1.ResourceMemory: *resource.NewQuantity(9900E6, resource.BinarySI),
+			v1.ResourceCPU:    *resource.NewMilliQuantity(200, resource.DecimalSI),
+			v1.ResourceMemory: *resource.NewQuantity(100E6, resource.BinarySI),
 		},
 	}
 	kubeClient := testKubelet.fakeKubeClient
@@ -214,8 +214,10 @@ func TestUpdateNewNodeStatus(t *testing.T) {
 				v1.ResourceNvidiaGPU: *resource.NewQuantity(0, resource.DecimalSI),
 			},
 			Allocatable: v1.ResourceList{
-				v1.ResourceCPU:    *resource.NewMilliQuantity(1800, resource.DecimalSI),
-				v1.ResourceMemory: *resource.NewQuantity(9900E6, resource.BinarySI),
+				v1.ResourceCPU:       *resource.NewMilliQuantity(1800, resource.DecimalSI),
+				v1.ResourceMemory:    *resource.NewQuantity(9900E6, resource.BinarySI),
+				v1.ResourcePods:      *resource.NewQuantity(0, resource.DecimalSI),
+				v1.ResourceNvidiaGPU: *resource.NewQuantity(0, resource.DecimalSI),
 			},
 			Addresses: []v1.NodeAddress{
 				{Type: v1.NodeLegacyHostIP, Address: "127.0.0.1"},
@@ -350,10 +352,8 @@ func TestUpdateExistingNodeStatus(t *testing.T) {
 	kubelet.containerManager = &localCM{
 		ContainerManager: cm.NewStubContainerManager(),
 		allocatable: v1.ResourceList{
-			v1.ResourceCPU:       *resource.NewMilliQuantity(2800, resource.DecimalSI),
-			v1.ResourceMemory:    *resource.NewQuantity(19900E6, resource.BinarySI),
-			v1.ResourcePods:      *resource.NewQuantity(0, resource.DecimalSI),
-			v1.ResourceNvidiaGPU: *resource.NewQuantity(0, resource.DecimalSI),
+			v1.ResourceCPU:    *resource.NewMilliQuantity(200, resource.DecimalSI),
+			v1.ResourceMemory: *resource.NewQuantity(100E6, resource.BinarySI),
 		},
 	}
 
@@ -488,7 +488,7 @@ func TestUpdateExistingNodeStatus(t *testing.T) {
 				v1.ResourceNvidiaGPU: *resource.NewQuantity(0, resource.DecimalSI),
 			},
 			Allocatable: v1.ResourceList{
-				v1.ResourceCPU:       *resource.NewMilliQuantity(2800, resource.DecimalSI),
+				v1.ResourceCPU:       *resource.NewMilliQuantity(1800, resource.DecimalSI),
 				v1.ResourceMemory:    *resource.NewQuantity(19900E6, resource.BinarySI),
 				v1.ResourcePods:      *resource.NewQuantity(0, resource.DecimalSI),
 				v1.ResourceNvidiaGPU: *resource.NewQuantity(0, resource.DecimalSI),
@@ -716,10 +716,8 @@ func TestUpdateNodeStatusWithRuntimeStateError(t *testing.T) {
 	kubelet.containerManager = &localCM{
 		ContainerManager: cm.NewStubContainerManager(),
 		allocatable: v1.ResourceList{
-			v1.ResourceCPU:       *resource.NewMilliQuantity(1800, resource.DecimalSI),
-			v1.ResourceMemory:    *resource.NewQuantity(9900E6, resource.BinarySI),
-			v1.ResourcePods:      *resource.NewQuantity(0, resource.DecimalSI),
-			v1.ResourceNvidiaGPU: *resource.NewQuantity(0, resource.DecimalSI),
+			v1.ResourceCPU:    *resource.NewMilliQuantity(200, resource.DecimalSI),
+			v1.ResourceMemory: *resource.NewQuantity(100E6, resource.BinarySI),
 		},
 	}
 

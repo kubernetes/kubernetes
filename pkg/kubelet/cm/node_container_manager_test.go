@@ -27,20 +27,20 @@ import (
 	evictionapi "k8s.io/kubernetes/pkg/kubelet/eviction/api"
 )
 
-func TestNodeAllocatableForScheduling(t *testing.T) {
+func TestNodeAllocatableReservationForScheduling(t *testing.T) {
 	memoryEvictionThreshold := resource.MustParse("100Mi")
 	testCases := []struct {
 		kubeReserved   v1.ResourceList
 		systemReserved v1.ResourceList
-		capacity       v1.ResourceList
 		expected       v1.ResourceList
+		capacity       v1.ResourceList
 		hardThreshold  evictionapi.ThresholdValue
 	}{
 		{
 			kubeReserved:   getResourceList("100m", "100Mi"),
 			systemReserved: getResourceList("50m", "50Mi"),
 			capacity:       getResourceList("10", "10Gi"),
-			expected:       getResourceList("9850m", "10090Mi"),
+			expected:       getResourceList("150m", "150Mi"),
 		},
 		{
 			kubeReserved:   getResourceList("100m", "100Mi"),
@@ -49,42 +49,42 @@ func TestNodeAllocatableForScheduling(t *testing.T) {
 				Quantity: &memoryEvictionThreshold,
 			},
 			capacity: getResourceList("10", "10Gi"),
-			expected: getResourceList("9850m", "10475274240"),
+			expected: getResourceList("150m", "250Mi"),
 		},
 		{
 			kubeReserved:   getResourceList("100m", "100Mi"),
 			systemReserved: getResourceList("50m", "50Mi"),
+			capacity:       getResourceList("10", "10Gi"),
 			hardThreshold: evictionapi.ThresholdValue{
 				Percentage: 0.05,
 			},
-			capacity: getResourceList("10", "10Gi"),
-			expected: getResourceList("9850m", "10043260920"),
+			expected: getResourceList("150m", "694157320"),
 		},
 
 		{
 			kubeReserved:   v1.ResourceList{},
 			systemReserved: v1.ResourceList{},
 			capacity:       getResourceList("10", "10Gi"),
-			expected:       getResourceList("10", "10Gi"),
+			expected:       getResourceList("", ""),
 		},
 		{
 			kubeReserved:   getResourceList("", "100Mi"),
 			systemReserved: getResourceList("50m", "50Mi"),
 			capacity:       getResourceList("10", "10Gi"),
-			expected:       getResourceList("9950m", "10090Mi"),
+			expected:       getResourceList("50m", "150Mi"),
 		},
 
 		{
 			kubeReserved:   getResourceList("50m", "100Mi"),
 			systemReserved: getResourceList("", "50Mi"),
 			capacity:       getResourceList("10", "10Gi"),
-			expected:       getResourceList("9950m", "10090Mi"),
+			expected:       getResourceList("50m", "150Mi"),
 		},
 		{
 			kubeReserved:   getResourceList("", "100Mi"),
 			systemReserved: getResourceList("", "50Mi"),
 			capacity:       getResourceList("10", ""),
-			expected:       getResourceList("10", ""),
+			expected:       getResourceList("", "150Mi"),
 		},
 	}
 	for idx, tc := range testCases {
@@ -105,9 +105,9 @@ func TestNodeAllocatableForScheduling(t *testing.T) {
 			NodeConfig: nc,
 			capacity:   tc.capacity,
 		}
-		for k, v := range cm.getNodeAllocatableInternal(forScheduling) {
+		for k, v := range cm.GetNodeAllocatableReservation() {
 			expected, exists := tc.expected[k]
-			assert.True(t, exists)
+			assert.True(t, exists, "test case %d expected resource %q", idx+1, k)
 			assert.Equal(t, expected.MilliValue(), v.MilliValue(), "test case %d failed for resource %q", idx+1, k)
 		}
 	}
@@ -124,8 +124,8 @@ func TestNodeAllocatableWithNilHardThreshold(t *testing.T) {
 		NodeConfig: nc,
 		capacity:   getResourceList("10", "10Gi"),
 	}
-	expected := getResourceList("9850m", "10090Mi")
-	for k, v := range cm.getNodeAllocatableInternal(forScheduling) {
+	expected := getResourceList("150m", "150Mi")
+	for k, v := range cm.GetNodeAllocatableReservation() {
 		expected, exists := expected[k]
 		assert.True(t, exists)
 		assert.Equal(t, expected.MilliValue(), v.MilliValue(), "failed for resource %q", k)
@@ -210,7 +210,7 @@ func TestNodeAllocatableForEnforcement(t *testing.T) {
 			NodeConfig: nc,
 			capacity:   tc.capacity,
 		}
-		for k, v := range cm.getNodeAllocatableInternal(forEnforcement) {
+		for k, v := range cm.getNodeAllocatableAbsolute() {
 			expected, exists := tc.expected[k]
 			assert.True(t, exists)
 			assert.Equal(t, expected.MilliValue(), v.MilliValue(), "test case %d failed for resource %q", idx+1, k)

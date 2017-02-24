@@ -31,16 +31,8 @@ import (
 	evictionapi "k8s.io/kubernetes/pkg/kubelet/eviction/api"
 )
 
-type nodeAllocatableCalculationPurpose int
-
 const (
 	defaultNodeAllocatableCgroupName = "kubepods"
-	NodeAllocatableEnforcementKey    = "pods"
-	SystemReservedEnforcementKey     = "system-reserved"
-	KubeReservedEnforcementKey       = "kube-reserved"
-	// Constants for identifying various types of Node Allocatable reservations.
-	forScheduling  nodeAllocatableCalculationPurpose = iota // 0
-	forEnforcement nodeAllocatableCalculationPurpose = iota
 )
 
 func (cm *containerManagerImpl) createNodeAllocatableCgroups() error {
@@ -75,7 +67,7 @@ func runUntilSuccess(f func() error, success func(), failure func(error), retryP
 // Enforce Node Allocatable Cgroup settings.
 func (cm *containerManagerImpl) enforceNodeAllocatableCgroups() error {
 	nc := cm.NodeConfig.NodeAllocatableConfig
-	nodeAllocatable := cm.getNodeAllocatableInternal(forEnforcement)
+	nodeAllocatable := cm.getNodeAllocatableAbsolute()
 
 	glog.V(4).Infof("Attempting to enforce Node Allocatable with config: %+v", nc)
 	glog.V(4).Infof("Node Allocatable resources: %+v", nodeAllocatable)
@@ -159,16 +151,10 @@ func getCgroupConfig(rl v1.ResourceList) *ResourceConfig {
 	return &rc
 }
 
-// getNodeAllocatableInternal returns the Node Allocatable based on the purpose.
-// Acceptible values for purpose are `forScheduling` and `forEnforcement`.
-// If `forScheduling` is the purpose, then hard eviction thresholds are subtracted from capacity while computing Node Allocatable.
-// If `forEnforcement` if the purpose, then hard eviction thresholds are ignored.
+// getNodeAllocatableAbsolute returns the absolute value of Node Allocatable which is primarily useful for enforcement.
+// Note that not all resources that are available on the node are included in the returned list of resources.
 // Returns a ResourceList.
-func (cm *containerManagerImpl) getNodeAllocatableInternal(purpose nodeAllocatableCalculationPurpose) v1.ResourceList {
-	var evictionReservation v1.ResourceList
-	if purpose == forScheduling {
-		evictionReservation = hardEvictionReservation(cm.HardEvictionThresholds, cm.capacity)
-	}
+func (cm *containerManagerImpl) getNodeAllocatableAbsolute() v1.ResourceList {
 	result := make(v1.ResourceList)
 	for k, v := range cm.capacity {
 		value := *(v.Copy())
@@ -177,9 +163,6 @@ func (cm *containerManagerImpl) getNodeAllocatableInternal(purpose nodeAllocatab
 		}
 		if cm.NodeConfig.KubeReserved != nil {
 			value.Sub(cm.NodeConfig.KubeReserved[k])
-		}
-		if evictionReservation != nil {
-			value.Sub(evictionReservation[k])
 		}
 		if value.Sign() < 0 {
 			// Negative Allocatable resources don't make sense.
@@ -191,9 +174,26 @@ func (cm *containerManagerImpl) getNodeAllocatableInternal(purpose nodeAllocatab
 
 }
 
-// GetNodeAllocatable returns amount of compute resource available for the scheduler.
-func (cm *containerManagerImpl) GetNodeAllocatable() v1.ResourceList {
-	return cm.getNodeAllocatableInternal(forScheduling)
+// GetNodeAllocatable returns amount of compute resource that have to be reserved on this node from scheduling.
+func (cm *containerManagerImpl) GetNodeAllocatableReservation() v1.ResourceList {
+	evictionReservation := hardEvictionReservation(cm.HardEvictionThresholds, cm.capacity)
+	result := make(v1.ResourceList)
+	for k := range cm.capacity {
+		value := resource.NewQuantity(0, resource.DecimalSI)
+		if cm.NodeConfig.SystemReserved != nil {
+			value.Add(cm.NodeConfig.SystemReserved[k])
+		}
+		if cm.NodeConfig.KubeReserved != nil {
+			value.Add(cm.NodeConfig.KubeReserved[k])
+		}
+		if evictionReservation != nil {
+			value.Add(evictionReservation[k])
+		}
+		if !value.IsZero() {
+			result[k] = *value
+		}
+	}
+	return result
 }
 
 // hardEvictionReservation returns a resourcelist that includes reservation of resources based on hard eviction thresholds.
@@ -219,7 +219,7 @@ func hardEvictionReservation(thresholds []evictionapi.Threshold, capacity v1.Res
 // validateNodeAllocatable ensures that the user specified Node Allocatable Configuration doesn't reserve more than the node capacity.
 // Returns error if the configuration is invalid, nil otherwise.
 func (cm *containerManagerImpl) validateNodeAllocatable() error {
-	na := cm.GetNodeAllocatable()
+	na := cm.GetNodeAllocatableReservation()
 	zeroValue := resource.MustParse("0")
 	var errors []string
 	for key, val := range na {
