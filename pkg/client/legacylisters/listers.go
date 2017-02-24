@@ -212,7 +212,9 @@ func (s *StoreToStatefulSetLister) StatefulSets(namespace string) storeStatefulS
 	return storeStatefulSetsNamespacer{s.Store, namespace}
 }
 
-// GetPodStatefulSets returns a list of StatefulSets managing a pod. Returns an error only if no matching StatefulSets are found.
+// GetPodStatefulSets returns a list of StatefulSets that potentially match a pod.
+// Only the one specified in the Pod's ControllerRef will actually manage it.
+// Returns an error only if no matching StatefulSets are found.
 func (s *StoreToStatefulSetLister) GetPodStatefulSets(pod *v1.Pod) (psList []apps.StatefulSet, err error) {
 	var selector labels.Selector
 	var ps apps.StatefulSet
